@@ -6732,3 +6732,48 @@ City, the danger map, the flee test and the stored unit strength
   the unit terms +0x18a8 / +0x18ac / +0x18b0, +0x1170 and 0x4f2b50 held 0;
   a capture's start reading a record the game adds later (1117 t33 the
   Scout 851971 on 33:12, 33 against 23); 1124 t111 a capture's start at 167 against 97, untraced.
+
+## C-129: the bankruptcy's victim and every seat's upgrade to the furthest rung — READ (0x4e05e0, 0x5374c0), both twins
+
+`bankruptcy` (cpu/core/phase.ts) through `seatPoolSlots` (cpu/core/tactical.ts)
+and `promotionsHeld` (cpu/core/units.ts); `upgradeType` (cpu/core/stockpile.ts)
+read by `canUpgradeUnit` / `upgradeUnit`, `minorUpgradeVisible` /
+`minorUpgradeUnit`, the replay's upgrade. GPU `_bankruptcy`
+(gpu/core/sim_orders.py, `_seat_pool_slots` first), `_upgrade_type_of`
+(gpu/core/sim_seats.py) read by `_upgrade_ok` / `_upgrade_units`.
+
+- THE VICTIM (0x4e05e0, once per disband 0x4dd270 counts): over the player's
+  unit list (Player +0x12e8 +0xd8, slot order — the id's low 16 bits), a unit
+  whose Units.Maintenance less the treasury's per-unit discount (+0x338) is
+  above 0 is a candidate. The first candidate sets both minima; a later one
+  becomes the victim where it carries strictly fewer air units (0x929790,
+  none in these engines) or holds strictly fewer promotions (0x55e710 on its
+  experience record +0x1bc0). So the victim is the first candidate, in pool
+  order, holding the fewest promotions.
+- THE POOL ORDER: a unit holds its slot from its making (the free slots a
+  stack: 1128 city-state 3's slots 1, 6, 9 freed t164 / t166 / t176, the
+  Field Cannon made first takes 9, the Line Infantry 6); the engines give a
+  city-state's and the Free Cities' units theirs at the tactical pass
+  (`poolSlots`), so the bankruptcy brings the pool up to date first. The
+  replay's per-turn world stands the record's units of a city-state and the
+  Free Cities in the game's slots (the id's low half), as the barbarians'.
+  A major's units keep `state.units` order (its pool is not modelled).
+  Not a bankruptcy: 1117 t179's Bombard 1638405 (shortfall 7, removed after
+  the research job).
+- Confirmed: runs/h1_duely1128 t132 city-state 3's Man-at-Arms 2031619
+  (slot 3, no promotion) after three Men-at-Arms with one each (slots 0-2);
+  t178 its Line Infantry 2490374 (slot 6) before the Field Cannon 2424841
+  made before it (slot 9); runs/h1_duely1121 t165 city-state 4's Skirmisher
+  2293760 (slot 0) before 1638401 (slot 1); its t178 / t185 losses. 1128's
+  city-state 3 knowledge base t90-t108 and t132-t153, 1121's city-state 4
+  t165-t189 (but t177) as logged.
+- THE UPGRADE TYPE (0x5909a0 -> 0x5374c0, 0x5375f0 the rung with the
+  player's unique standing in for it, 0x537fd0 its PrereqTech / PrereqCivic)
+  is every seat's: the furthest rung of the line whose every step is held.
+  The upgrade's Gold (0x590520 -> 0x5376d0) and its resource (0x591000) read
+  the same type. runs/h1_duely1124 t178 China's Quadrireme 1572876, Square
+  Rigging and Refining held, UnitUpgraded to the Battleship 6160397 past the
+  Frigate; 1124's knowledge bases to t180 as logged.
+- Open: 0x4dd270's disband count reads floor(S / 10) for the shortfall S
+  where the lab's runs/bankrupt_m35 lost one unit a turn at S 35
+  (`GOLD_DISBANDS_PER_TURN`); its balance operand (+0xf8 >> 8) unidentified.

@@ -20,7 +20,7 @@ import { citiesOf, civOf, isCityStateSeat, leaderOf, seatOf, tileOwnedByCiv, til
 import { minorCity, regionalReach, suzerainEffectCount, suzerainMinorSeats, suzerainOf } from './cityStates';
 import { HATTUSA_FREE_STRATEGIC } from '../data/cityStates';
 import { hexDistance } from '../../world/hex';
-import { getModifiers } from './effects';
+import { getModifiers, isCivicComplete, isTechComplete } from './effects';
 import { goldenDedication } from './eras';
 import { goldAffordable } from './game';
 import { GOLD_EQUIVALENT_OTHER_YIELDS } from './trade';
@@ -389,11 +389,10 @@ export function upgradeGoldCost(
   state: GameState,
   seat: number,
   unitType: string,
+  next: string,
   levied = false,
   formation = 0,
 ): number {
-  const next = civUpgradeTarget(civOf(state, seat), unitType, leaderOf(state, seat));
-  if (!next) return 0;
   const net = Math.max(0, Math.trunc(((UNITS[next]?.cost ?? 0) - (UNITS[unitType]?.cost ?? 0)) * UPGRADE_NET_PRODUCTION_PERCENT_COST / 100));
   let c = (scaleByGameSpeed(UPGRADE_BASE_COST) + net * GOLD_EQUIVALENT_OTHER_YIELDS) * 256;
   if (formation === 1) c *= 2;
@@ -415,23 +414,43 @@ export function upgradeGoldCost(
   return g - (g % PURCHASE_DIVISOR);
 }
 
-/** can this seat's treasury cover the upgrade? */
+/** THE UPGRADE TYPE of chassis `type` for the seat (0x5909a0 -> 0x5374c0),
+ *  every seat alike: its UnitUpgrades rung, the seat's unique standing in for
+ *  it (0x5375f0, `civUpgradeTarget`), where the seat holds that rung's
+ *  PrereqTech and PrereqCivic (0x537fd0), and from there on up while the
+ *  next rung's are held — the furthest. A Warrior trained with
+ *  Apprenticeship held becomes a Man-at-Arms in one upgrade
+ *  (runs/h1_duely1127 t105: city-state 2's Warrior 1441793, UnitUpgraded to
+ *  UNIT_MAN_AT_ARMS 1507336); a Quadrireme with Square Rigging and Refining
+ *  held a Battleship
+ *  (runs/h1_duely1124 t178: China's 1572876 to the Battleship 6160397). None
+ *  where the first rung's are not held. */
+export function upgradeType(state: GameState, seat: number, type: string): string | undefined {
+  const next = civUpgradeTarget(civOf(state, seat), type, leaderOf(state, seat));
+  const def = next ? UNITS[next] : undefined;
+  if (!next || !def) return undefined;
+  if (def.requiresTech && !isTechComplete(state, def.requiresTech, seat)) return undefined;
+  if (def.requiresCivic && !isCivicComplete(state, def.requiresCivic, seat)) return undefined;
+  return upgradeType(state, seat, next) ?? next;
+}
+
+/** can this seat's treasury cover the upgrade of `unitType` into `next`? */
 export function canPayUpgradeGold(
   state: GameState,
   seat: number,
   unitType: string,
+  next: string,
   levied = false,
   formation = 0,
 ): boolean {
   const s = seatOf(state, seat);
-  return !!s && goldAffordable(s.treasury, upgradeGoldCost(state, seat, unitType, levied, formation));
+  return !!s && goldAffordable(s.treasury, upgradeGoldCost(state, seat, unitType, next, levied, formation));
 }
 
-/** what the UPGRADE draws out of the bank: the new chassis' own charge, or
- *  nothing at all when both rungs ask for the same resource. */
-export function upgradeResourceCost(state: GameState, seat: number, unitType: string): { id: string; n: number } | undefined {
-  const next = civUpgradeTarget(civOf(state, seat), unitType, leaderOf(state, seat));
-  if (!next) return undefined;
+/** what the UPGRADE of `unitType` into `next` draws out of the bank: the new
+ *  chassis' own charge, or nothing at all when both rungs ask for the same
+ *  resource. */
+export function upgradeResourceCost(state: GameState, seat: number, unitType: string, next: string): { id: string; n: number } | undefined {
   const c = unitResourceCost(next);
   if (!c || c.id === UNITS[unitType]?.requiresResource) return undefined;
   // CIV6 (Force Modernization, EFFECT_ADJUST_PLAYER_UNIT_UPGRADE_RESOURCE_COST_DISCOUNT)

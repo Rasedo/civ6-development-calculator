@@ -38,7 +38,7 @@ describe('the upgrade ladder', () => {
     expect(canUpgradeUnit(state, u, 0)).toBe(false); // no movement left
     u.movesLeft = 3 * MP_SCALE;
 
-    const price = upgradeGoldCost(state, 0, 'SCOUT');
+    const price = upgradeGoldCost(state, 0, 'SCOUT', 'SKIRMISHER');
     expect(price).toBeGreaterThan(0);
     seat.treasury = price - 1;
     expect(canUpgradeUnit(state, u, 0)).toBe(false); // cannot pay
@@ -63,7 +63,7 @@ describe('the upgrade ladder', () => {
     u.promos = 1 << 2;
     u.xp = 17;
     const gold0 = seat.treasury;
-    const price = upgradeGoldCost(state, 0, 'SCOUT');
+    const price = upgradeGoldCost(state, 0, 'SCOUT', 'SKIRMISHER');
     expect(upgradeUnit(state, u, 0).ok).toBe(true);
     expect(u.type).toBe('SKIRMISHER');
     expect(u.hp).toBe(40);
@@ -81,18 +81,18 @@ describe('the upgrade ladder', () => {
     // any)".
     expect(UNITS.SWORDSMAN.requiresResource).toBe('IRON');
     expect(UNITS.MAN_AT_ARMS.requiresResource).toBe('IRON');
-    expect(upgradeResourceCost(state, 0, 'SWORDSMAN')).toBeUndefined(); // Iron -> Iron
+    expect(upgradeResourceCost(state, 0, 'SWORDSMAN', 'MAN_AT_ARMS')).toBeUndefined(); // Iron -> Iron
 
     expect(UNITS.MUSKETMAN.requiresResource).toBe('NITER');
     expect(UNITS.LINE_INFANTRY.requiresResource).toBe('NITER');
-    expect(upgradeResourceCost(state, 0, 'MUSKETMAN')).toBeUndefined();
+    expect(upgradeResourceCost(state, 0, 'MUSKETMAN', 'LINE_INFANTRY')).toBeUndefined();
 
     // Knight (Iron) -> Cuirassier (Iron) is also free; Crossbowman (none) ->
     // Field Cannon (none) has nothing to charge either. The Horseman's rung
     // is the one that pays: Horses -> Horses is free, but Warrior -> Swordsman
     // moves from nothing to Iron.
     expect(UNITS.WARRIOR.requiresResource).toBeUndefined();
-    expect(upgradeResourceCost(state, 0, 'WARRIOR')).toEqual({ id: 'IRON', n: 10 });
+    expect(upgradeResourceCost(state, 0, 'WARRIOR', 'SWORDSMAN')).toEqual({ id: 'IRON', n: 10 });
   });
 
   it('the bank has to cover the new chassis, and the upgrade draws it down', () => {

@@ -36,7 +36,7 @@ import { createRelic, gwHasRoom, placeGreatWork } from './greatWorks';
 import { GWO_ARTIFACT } from '../data/greatWorks';
 import { clearCampFor, conquerEncampment } from './combat';
 import { emergencyHeal, emergencyMoveBonus } from './emergency';
-import { civUnitAllowed, civUpgradeTarget, GDR_UPGRADES, GDR_ENHANCED_MOVES, UNITS, UNIT_HP, UNIT_TYPE_IDX, ENCAMPMENT_HP, ROCK_BAND_VENUES, ROCK_BAND_WONDER_VENUE, ROCK_BAND_TIERS, ROCK_BAND_TIER_ODDS, ROCK_BAND_MAX_LEVEL, type UnitDef } from '../data/units';
+import { civUnitAllowed, GDR_UPGRADES, GDR_ENHANCED_MOVES, UNITS, UNIT_HP, UNIT_TYPE_IDX, ENCAMPMENT_HP, ROCK_BAND_VENUES, ROCK_BAND_WONDER_VENUE, ROCK_BAND_TIERS, ROCK_BAND_TIER_ODDS, ROCK_BAND_MAX_LEVEL, type UnitDef } from '../data/units';
 import {
   ALPINE_CLASSES, ALPINE_FEATURE, FIONN_CLASSES, FIONN_FEATURE, BAND_VENUE_BIT, BAND_VENUE_DISTRICTS, CONCERT_SHARE_RANGE,
   ROCK_BAND_MAX_PROMOTIONS, UNIT_PROMO_CLASS,
@@ -70,7 +70,7 @@ import { FEATURES } from '../../world/features';
 import { RESOURCES } from '../../world/resources';
 import { BARB_SEAT, NO_SEAT, isBarbSeat, borderTurnsFrom, capsOf, campTiles, cityAtTile, cityHolders, civHasStrategic, civOf, drawCitizenName, civsAtWar, isCiv, isCityStateSeat, leaderOf, seatOf, seatsAllied, tileSeat } from './seats';
 import { suzerainOf } from './cityStates';
-import { canPayStockpile, canPayUpgradeGold, spendStockpile, upgradeGoldCost, upgradeResourceCost } from './stockpile';
+import { canPayStockpile, canPayUpgradeGold, spendStockpile, upgradeGoldCost, upgradeResourceCost, upgradeType } from './stockpile';
 import { canTrainAir, carryAirWith, isAirUnit } from './air';
 import { canTrainSpy, isSpy } from './espionage';
 import { canTrainWithStockpile } from './stockpile';
@@ -1332,32 +1332,36 @@ export function goldBuyableUnits(state: GameState, seat: number): UnitDef[] {
  * than 0 Movement left", its owner can pay the Gold, and — in GS — holds the
  * strategic resource the NEXT chassis asks for, "unless the unit you're
  * upgrading also requires the same resource, in which case you don't need
- * any". The new chassis must itself be unlocked. "Upgraded units retain all
+ * any". The new chassis is the furthest rung unlocked (`upgradeType`). "Upgraded units retain all
  * their Promotions and experience" and "units do not Heal upon upgrading".
  *
  * MODEL: the source does not say what movement an upgrade leaves behind, so
  * this spends the rest of the turn, like every other verb here.
  */
 export function canUpgradeUnit(state: GameState, unit: Unit, seat: number): boolean {
-  const next = civUpgradeTarget(civOf(state, seat), unit.type, leaderOf(state, seat));
+  const next = upgradeType(state, seat, unit.type);
   if (!next || unit.seat !== seat || unit.movesLeft <= 0) return false;
-  const def = UNITS[next];
-  if (!def) return false;
-  if (def.requiresTech && !isTechComplete(state, def.requiresTech, seat)) return false;
-  if (def.requiresCivic && !isCivicComplete(state, def.requiresCivic, seat)) return false;
   const tile = state.map.tiles[unit.tileIndex];
   if (tileSeat(tile) !== seat) return false;
-  if (!canPayUpgradeGold(state, seat, unit.type, unit.leviedFrom !== undefined, unit.formation ?? 0)) return false;
-  const c = upgradeResourceCost(state, seat, unit.type);
+  if (!canPayUpgradeGold(state, seat, unit.type, next, unit.leviedFrom !== undefined, unit.formation ?? 0)) return false;
+  const c = upgradeResourceCost(state, seat, unit.type, next);
   return !c || canPayStockpile(state, seat, c.id, c.n);
+}
+
+/** the promotions a unit holds: the set bits of its `promos` (the set flags
+ *  of its experience record, +0x1bc0) */
+export function promotionsHeld(u: Unit): number {
+  let n = 0;
+  for (let v = u.promos ?? 0; v; v &= v - 1) n++;
+  return n;
 }
 
 export function upgradeUnit(state: GameState, unit: Unit, seat: number): RuleResult {
   if (!canUpgradeUnit(state, unit, seat)) return { ok: false, reason: 'Cannot upgrade here.' };
-  const next = civUpgradeTarget(civOf(state, seat), unit.type, leaderOf(state, seat))!;
+  const next = upgradeType(state, seat, unit.type)!;
   const s = seatOf(state, seat)!;
-  s.treasury -= upgradeGoldCost(state, seat, unit.type, unit.leviedFrom !== undefined, unit.formation ?? 0);
-  const c = upgradeResourceCost(state, seat, unit.type);
+  s.treasury -= upgradeGoldCost(state, seat, unit.type, next, unit.leviedFrom !== undefined, unit.formation ?? 0);
+  const c = upgradeResourceCost(state, seat, unit.type, next);
   if (c) spendStockpile(state, seat, c.id, c.n, 'ug');
   unit.type = next;
   unit.movesLeft = 0;

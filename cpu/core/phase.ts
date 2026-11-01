@@ -36,7 +36,7 @@ import { storeUnitStrength } from './aiView';
 import { militaryFavTech } from './operations/unitRows';
 import { freeTradeValue, majorTradeLists } from './aiTrade';
 import { FREE_CITY_PAIR_CLASS, LOYALTY_RELIGION_MATCHING, LOYALTY_RELIGION_MISMATCHING, LOYALTY_STARVATION } from '../data/seats';
-import { plotDistance, tacticalTargets } from './tactical';
+import { plotDistance, seatPoolSlots, tacticalTargets } from './tactical';
 import { freeCitiesMilitary, freeRaidCheck, freeRaidSignal } from './freeOps';
 import { plotsSeenNow, ringPlots } from './barbarians';
 import { PROJECTS, PROJECT_LIST, projectConversionRate } from '../data/projects';
@@ -67,7 +67,7 @@ import { logDistrictCost } from './difflog';
 import { canBuildRoad, canBuildRailroad, canPlaceDistrictIn, canPlaceWonder, suzerainNames, adjacentPlotRowOk, adjacentPlotTarget, portalExit, PORTAL_MP, validImprovementsIn, wonderExists } from './rules';
 import { BUILT_WONDERS, type BuiltWonderDef } from '../data/builtWonders';
 import { seatWonders } from './wonders';
-import { cleanFallout, escortUnit, breakEscort, disbandUnit, builderCost, traderCost, builderRemoveFeature, trainableUnits, goldBuyableUnits, purchaseSpotBlocked, unitMadeAnew, archaeologistExcavate, naturalistPark, performConcert, upgradeUnit, unitDomain, formationBanned, cityGarrisons } from './units';
+import { cleanFallout, escortUnit, breakEscort, disbandUnit, builderCost, traderCost, builderRemoveFeature, trainableUnits, goldBuyableUnits, purchaseSpotBlocked, unitMadeAnew, archaeologistExcavate, naturalistPark, performConcert, upgradeUnit, unitDomain, formationBanned, cityGarrisons, promotionsHeld } from './units';
 import { killUnit } from './combat';
 import { adoptBeliefs, itemCost, unitProdCost, availableProjects, buyTile, buyWorshipBuilding, purchaseBuildingWithFaith, purchaseUnitWithFaith, wallsGoldBlocked, boostProject, wonderChargeBoost, condemnHeretic, formUp, convertHeathens, districtScaledBase, districtDiscounted, refreshDistrictDiscount, engineerFinish, foundCity, goldAffordable, isEncampHarborItem, launchInquisition, evangelizeBelief, purchaseCivilianWithFaith, purchaseNaturalist, purchaseReligiousUnit, purchaseRockBand, purchaseSettler, queueProject, removeHeresy, guruHeal, settlerCost, unitGoldPrice, unitStepCost, unitsAcquired, districtVariantCost, buildingPurchaseCost, spreadReligiousPressure } from './game';
 import { DISTRICTS, PLACEABLE_DISTRICTS, SCAFFOLD_DISTRICTS } from '../data/districts';
@@ -1000,12 +1000,22 @@ function threatened(state: GameState, city: City): boolean {
  *  treasury stands below 0 is the turn's shortfall (`goldShortfall`, which
  *  its cities' amenities read until its next upkeep), the treasury clamps at
  *  0, and `bankruptDisbands` units go: each the FIRST unit of the seat's
- *  roster with upkeep (`upkeepOf` > 0) — a Crossbowman went before four
- *  Musketmen, a Warrior with none was skipped, 8 of 8
- *  (runs/bankrupt_m15_20260926T083048Z.jsonl,
- *  runs/bankrupt_m35_20260926T083304Z.jsonl). The roster order is
- *  `state.units`, spawn order, the one order both engines own (the GPU's pool
- *  appends, so its lowest slot is the same unit); nothing is refunded. The
+ *  list with upkeep (`upkeepOf` > 0) holding the FEWEST promotions
+ *  (0x4e05e0: the walk keeps the first unit with Maintenance less the
+ *  treasury's discount above 0, replaced by a later one holding strictly
+ *  fewer promotions, the set flags of its experience record +0x1bc0, or
+ *  carrying strictly fewer air units — none in these engines). The list is
+ *  the player's pool order (`slot`: a city-state's and the Free Cities',
+ *  brought up to date first, `seatPoolSlots`, a unit holding its slot from
+ *  its making), else `state.units`, spawn order (the GPU's pool appends,
+ *  so its lowest slot is the same unit) — a Crossbowman went before four Musketmen, a
+ *  Warrior with none was skipped, 8 of 8 (runs/bankrupt_m15_20260926T083048Z.jsonl,
+ *  runs/bankrupt_m35_20260926T083304Z.jsonl); runs/h1_duely1128 t132
+ *  city-state 3's Man-at-Arms 2031619 after three promoted Men-at-Arms,
+ *  runs/h1_duely1121 t165 city-state 4's Skirmisher 2293760 in slot 0
+ *  before 1638401 in slot 1, 1128 t178 city-state 3's Line Infantry 2490374
+ *  in slot 6 before the Field Cannon 2424841 made before it in slot 9.
+ *  Nothing is refunded. The
  *  disband comes before the turn's tactical look: a city-state's knowledge
  *  base keeps the unit's record as last seen, aging on (every unit the five
  *  duely duels' city-states lose to their treasury below 0 at their start,
@@ -1018,8 +1028,19 @@ export function bankruptcy(state: GameState, s: Seat, upkeepOf: (unit: Unit) => 
   s.goldShortfall = goldShortfall(s.treasury);
   if (s.treasury < 0) s.treasury = 0;
   const n = bankruptDisbands(s.goldShortfall);
+  if (n > 0) seatPoolSlots(state, s);
   for (let k = 0; k < n; k++) {
-    const victim = state.units.find((u) => u.seat === s.seat && upkeepOf(u) > 0);
+    const list = state.units.filter((u) => u.seat === s.seat && upkeepOf(u) > 0)
+      .sort((a, b) => (a.slot ?? 0) - (b.slot ?? 0));
+    let victim: Unit | undefined;
+    let fewest = Infinity;
+    for (const u of list) {
+      const held = promotionsHeld(u);
+      if (held < fewest) {
+        fewest = held;
+        victim = u;
+      }
+    }
     if (!victim) return;
     disbandUnit(state, victim.id);
   }

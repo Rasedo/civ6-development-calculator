@@ -2215,7 +2215,7 @@ class SimMinors:
         return fin
 
     def _minor_upgrade_type(self, s: int) -> torch.Tensor:
-        """[B, P] long `minorUpgradeType` over the major pool (0x5909a0 ->
+        """[B, P] long `upgradeType` for minor `s` over the major pool (0x5909a0 ->
         0x5374c0): the unit's UnitUpgrades rung where minor `s` holds its
         PrereqTech and PrereqCivic (0x537fd0), and on up while the next
         rung's are held — the furthest; -1 where the first rung's are not"""

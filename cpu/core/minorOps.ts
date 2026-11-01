@@ -32,10 +32,11 @@ import { ARMY_READ_AGE, lookCamps, type KnownUnit } from './operations/knowledge
 import { NO_PLOT, opDef, opJobUnits } from './operations/operation';
 import { seatUnitRows } from './operations/unitRows';
 import { newCityAi } from './aiCityTrees';
-import { installType, minorCanUpgrade, minorSetItem, minorUpgradeType, minorUpgradeUnit, minorUpgradeVisible } from './minorBuild';
+import { installType, minorCanUpgrade, minorSetItem, minorUpgradeUnit, minorUpgradeVisible } from './minorBuild';
 import { minorContractCity, minorSecondHook } from './minorCityAi';
 import { BARB_SEAT, campTiles, tileSeat } from './seats';
-import { disbandUnit } from './units';
+import { disbandUnit, promotionsHeld } from './units';
+import { upgradeType } from './stockpile';
 import { goldAffordable } from './game';
 import { FX } from './aiValue';
 import { newEconomicMemory, upgradePurchase } from './aiEconomic';
@@ -269,7 +270,7 @@ export function upgradeTreesTick(state: GameState, cs: CityState, pass: Pass): v
   const busy = new Set(minorOpUnits(cs));
   for (const u of order(state.units.filter((x) => x.seat === cs.seat).map((x) => x.id))) {
     if (held.has(u.id) || busy.has(u.id) || pass.done.has(u.id)) continue;
-    if (minorUpgradeVisible(cs, u)) held.add(u.id);
+    if (minorUpgradeVisible(state, cs, u)) held.add(u.id);
   }
   const ops = cs.ops ? opsOf(cs.ops) : [];
   for (const op of ops) {
@@ -277,7 +278,7 @@ export function upgradeTreesTick(state: GameState, cs: CityState, pass: Pass): v
     for (const t of op.teams) {
       for (const id of t.members) {
         const u = own(id);
-        if (u && !pass.done.has(id) && minorUpgradeVisible(cs, u)) held.add(id);
+        if (u && !pass.done.has(id) && minorUpgradeVisible(state, cs, u)) held.add(id);
       }
       t.members = t.members.filter((id) => !held.has(id));
     }
@@ -311,7 +312,7 @@ export function upgradeTreesTick(state: GameState, cs: CityState, pass: Pass): v
         }
         continue;
       }
-      if (upgradeUnasked(cs, u) || (promotionCount(u) <= 1 && state.units.filter((x) => x.seat === cs.seat && x.type === u.type).length > 10)) drop(u);
+      if (upgradeUnasked(state, cs, u) || (promotionsHeld(u) <= 1 && state.units.filter((x) => x.seat === cs.seat && x.type === u.type).length > 10)) drop(u);
       continue;
     }
     if (unupgradedDeleted(state, cs, u)) drop(u);
@@ -378,22 +379,15 @@ export function upgradeMayGo(state: GameState, cs: CityState, u: Unit): boolean 
 }
 
 /** the unit's upgrade asks no strategic resource (0x591000 -1, on the
- *  chassis 0x5909a0 names: `minorUpgradeType`) */
-const upgradeUnasked = (cs: CityState, u: Unit): boolean => !UNITS[minorUpgradeType(cs, u.type) ?? '']?.requiresResource;
+ *  chassis 0x5909a0 names: `upgradeType`) */
+const upgradeUnasked = (state: GameState, cs: CityState, u: Unit): boolean => !UNITS[upgradeType(state, cs.seat, u.type) ?? '']?.requiresResource;
 
 /** Upgrade Units with Can Delete on a held unit whose full test fails: one
  *  no longer visible (0x58fff0 with r8 1) deleted, a visible one deleted on
  *  the minor's own ground where its upgrade asks no strategic resource */
 export function unupgradedDeleted(state: GameState, cs: CityState, u: Unit): boolean {
-  if (!minorUpgradeVisible(cs, u)) return true;
-  return tileSeat(state.map.tiles[u.tileIndex]) === cs.seat && upgradeUnasked(cs, u);
-}
-
-/** the promotions a unit holds (its `promos` bits) */
-function promotionCount(u: Unit): number {
-  let n = 0;
-  for (let b = u.promos ?? 0; b; b &= b - 1) n += 1;
-  return n;
+  if (!minorUpgradeVisible(state, cs, u)) return true;
+  return tileSeat(state.map.tiles[u.tileIndex]) === cs.seat && upgradeUnasked(state, cs, u);
 }
 
 /** Find Unit Targets' plot for a unit (the job 0x7eba40, a city-state's one

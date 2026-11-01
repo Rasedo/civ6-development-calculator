@@ -5333,25 +5333,19 @@ class SimMasks:
 
     def _upgrade_ok(self, row: int, sc: torch.Tensor, tc: torch.Tensor,
                     utype: torch.Tensor) -> torch.Tensor:
-        """[B, N] — `canUpgradeUnit`. CIV6 (Unit): the chassis has a successor,
-        the successor is unlocked, the unit stands "in friendly territory" with
+        """[B, N] — `canUpgradeUnit`. CIV6 (Unit): the chassis has an upgrade
+        (`_upgrade_type_of`, the furthest rung unlocked), the unit stands "in friendly territory" with
         "more than 0 Movement left", and the seat can pay the Gold and whatever
         strategic resource the NEW chassis asks for — "unless the unit you're
         upgrading also requires the same resource, in which case you don't
         need any"."""
         B, N = utype.shape
         dev = self.device
-        nxt = self._up_to_of(row, utype)
+        nxt = self._upgrade_type_of(row, utype)
         ok = (nxt >= 0) & (utype >= 0)
         if not bool(ok.count_nonzero()):
             return torch.zeros(B, N, dtype=torch.bool, device=dev)
         nc = nxt.clamp(min=0)
-        rt, rc = self._type_tech.take(nc), self._type_civic.take(nc)
-        have_t = torch.where(rt >= 0, self.civ_techs[:, row].gather(1, rt.clamp(min=0)),
-                             torch.ones_like(ok))
-        have_c = torch.where(rc >= 0, self.civ_civics[:, row].gather(1, rc.clamp(min=0)),
-                             torch.ones_like(ok))
-        ok = ok & have_t & have_c
         ok = ok & (self.tile_seat.gather(1, tc) == row)
         ok = ok & (self.unit_mp.gather(1, sc) > 0)
         # the GOLD (`upgradeGoldCost`, the applier's own price)

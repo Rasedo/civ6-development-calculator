@@ -1,4 +1,5 @@
-"""BANKRUPTCY'S VICTIM IS THE FIRST UNIT WITH UPKEEP IN ROSTER ORDER — the GPU
+"""BANKRUPTCY'S VICTIM IS THE FIRST UNIT WITH UPKEEP IN ROSTER ORDER (of those
+holding the fewest promotions; these units hold none) — the GPU
 half.
 
     python tests/gpu/bankruptcy_tie_test.py

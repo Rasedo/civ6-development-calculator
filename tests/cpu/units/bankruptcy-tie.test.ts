@@ -7,7 +7,8 @@ import { getModifiers, unitUpkeep } from '../../../cpu/core/effects';
 import type { GameState } from '../../../cpu/core/types';
 
 /**
- * BANKRUPTCY'S VICTIM IS THE FIRST UNIT WITH UPKEEP IN ROSTER ORDER.
+ * BANKRUPTCY'S VICTIM IS THE FIRST UNIT WITH UPKEEP IN ROSTER ORDER (of those
+ * holding the fewest promotions; these units hold none).
  *
  * The live game disbanded the first unit of the seat's list that pays upkeep,
  * not the priciest: a Crossbowman went before four Musketmen, a Warrior with

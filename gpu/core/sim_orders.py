@@ -1907,7 +1907,10 @@ class SimOrders:
         the whole Gold it stands below 0 (milli-rounded, `goldShortfall`) is
         the turn's shortfall, kept in `seat_shortfall` for its cities'
         amenities; `_bk_disbands` units go while S >= 10, each the FIRST alive unit of
-        the row's SEAT with upkeep (`maint` [B, W] > 0) — the lowest slot,
+        the row's SEAT with upkeep (`maint` [B, W] > 0) holding the FEWEST
+        promotions (the set bits of `unit_promos`), first in its player's pool
+        order (`unit_pslot`: a city-state's and the Free Cities' pool brought
+        up to date first, `_seat_pool_slots`), a major's by its lowest slot,
         which is TS's first in `state.units`: the pool only appends, so one
         seat's slots ascend in its own spawn order. Returns the balance
         clamped at 0 (unchanged outside `active`); nothing is refunded."""
@@ -1917,6 +1920,13 @@ class SimOrders:
         left = torch.where(active & (-short <= self._bk_disband_line),
                            torch.full_like(short, self._bk_disbands), torch.zeros_like(short))
         seat = int(self._ROW_SEAT[row])
+        # the player's unit pool brought up to date (`seatPoolSlots`)
+        due = left > 0
+        if bool(due.count_nonzero()):
+            if 100 <= seat < 100 + self.S:
+                self._seat_pool_slots(seat - 100, "major", seat, due)
+            elif seat == FREE_SEAT:
+                self._seat_pool_slots(self.S, "barb", seat, due)
         W = maint.shape[1]
         slots = torch.arange(W, device=self.device).unsqueeze(0)  # [1, W]
         while bool((left > 0).count_nonzero()):
@@ -1924,7 +1934,12 @@ class SimOrders:
             do_kill = (left > 0) & cand.any(dim=1)
             if not bool(do_kill.count_nonzero()):
                 break
-            victim = torch.where(cand, slots, torch.full_like(slots, W)).min(dim=1).values
+            held = self._popcount(self.unit_promos[:, :W])
+            fewest = torch.where(cand, held, torch.full_like(held, 1 << 30)).min(dim=1, keepdim=True).values
+            ps = self.unit_pslot[:, :W]
+            order = torch.where(ps >= 0, ps, torch.full_like(ps, 1 << 20)) * (W + 1) + slots
+            order = torch.where(cand & (held == fewest), order, torch.full_like(order, 1 << 40))
+            victim = order.argmin(dim=1)
             rows = do_kill.nonzero(as_tuple=True)[0]
             vslot = victim[rows]
             vtile = self.unit_tile[rows, vslot]

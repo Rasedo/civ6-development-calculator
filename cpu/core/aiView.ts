@@ -378,7 +378,7 @@ export function aiView(state: GameState, opts: { forecastNow?: boolean } = {}): 
     // city-state's upgrade price; another party's not read
     unitUpgradeGolds: (i) => {
       const cs = isCityStateSeat(i) ? (seatOf(state, i) as CityState | undefined) : undefined;
-      return cs ? state.units.filter((u) => u.seat === i && minorUpgradeVisible(cs, u)).map(() => MINOR_UPGRADE_GOLD) : [];
+      return cs ? state.units.filter((u) => u.seat === i && minorUpgradeVisible(state, cs, u)).map(() => MINOR_UPGRADE_GOLD) : [];
     },
     // its government's (a city-state's Chiefdom); the Free Cities accrue none
     influencePointsPerTurn: (i) => (i === FREE_SEAT ? 0 : govInfluence(seatGovernment(state, i)).points),

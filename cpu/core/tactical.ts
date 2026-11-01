@@ -7,7 +7,7 @@
  * (`barbarianPhase`), a city-state's turn for its own (`cityStateTactics`),
  * the Free Cities' turn for theirs (`freeCityTactics`).
  */
-import type { ArmyRecord, City, CityState, GameState, Tile, Unit } from './types';
+import type { ArmyRecord, City, CityState, GameState, Seat, Tile, Unit, UnitPool } from './types';
 import { DIRECTION_TYPES, axialToOffset, hexDistance, neighborTile, neighbors, offsetToAxial, tileAt, tilesWithin } from '../../world/hex';
 import { hullPassage, isCoastalLand, isImpassable, isWater } from '../../world/query';
 import { COMBAT_BOMBARD_VS_UNIT, EMBARK_MOVES, MP_SCALE } from '../data/constants';
@@ -2750,6 +2750,18 @@ export function aiDefenderOf(state: GameState, u: Unit): boolean {
   return (isBarbSeat(u.seat) ? aiTypeOf(state, u) : militaryAiTypeOf(u)) === AI_DEFENDER;
 }
 
+/** THE PLAYER'S UNIT POOL brought up to date (`poolSlots`): a city-state's
+ *  (slot 0 its founding Settler's) or the Free Cities'; every unit of the
+ *  seat holds its slot from here on, as the game's does from its making.
+ *  Undefined for a seat with no pool (a major). */
+export function seatPoolSlots(state: GameState, s: Seat): UnitPool | undefined {
+  const minor = isCityStateSeat(s.seat);
+  if (!minor && s.seat !== FREE_SEAT) return undefined;
+  const pool = (s.unitPool ??= { size: minor ? 1 : 0, free: [], dying: [] });
+  poolSlots(pool, state.units.filter((u) => u.seat === s.seat));
+  return pool;
+}
+
 /**
  * A CITY-STATE'S TACTICAL TURN (TacticalAI 0x771530 over Tactics.xml's
  * "Minor Civ Tactical" and "Minor Civ Homeland" lists): its unit pool
@@ -2766,8 +2778,7 @@ export function aiDefenderOf(state: GameState, u: Unit): boolean {
  * due).
  */
 export function cityStateTactics(state: GameState, cityState: CityState, operations: (pass: Pass) => void): void {
-  const pool = (cityState.unitPool ??= { size: 1, free: [], dying: [] });
-  poolSlots(pool, state.units.filter((u) => u.seat === cityState.seat));
+  const pool = seatPoolSlots(state, cityState)!;
   costsHeld = new Map();
   try {
     const pass = openPass(state, cityState.seat, militaryAiTypeOf);
@@ -2813,8 +2824,7 @@ export function cityStateTactics(state: GameState, cityState: CityState, operati
 export function freeCityTactics(state: GameState, operations: (pass: Pass) => void): void {
   const free = state.freeSeat;
   if (!free) return;
-  const pool = (free.unitPool ??= { size: 0, free: [], dying: [] });
-  poolSlots(pool, state.units.filter((u) => u.seat === FREE_SEAT));
+  const pool = seatPoolSlots(state, free)!;
   costsHeld = new Map();
   try {
     const pass = openPass(state, FREE_SEAT, militaryAiTypeOf);

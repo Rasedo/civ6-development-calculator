@@ -71,7 +71,7 @@ import { unitProductionTable } from './aiUnitProduction';
 import { AI_BUILDING_INDEX, AI_UNIT_INDEX, amenityCityOf, amenityPerTurn, buildingTable, buildingValue, constructibleNow, defaultSpecialization, growthForecast, specializationBests, unitTable, type AiUnitRow, type CityBuildFacts, type CityGrowth, type CityBuildTables, type PickFacts } from './aiCityBuild';
 import { defensiveCancel } from './aiCityTrees';
 import { projectTable, type ProjectTableFacts } from './aiProjectValue';
-import { accrueStockpiles, canPayStockpile, capStockpiles, chargeUnitUpkeep, spendStockpile, stockFree, stockOf, stockpileCap, stockpileIncome, strategicSlot, unitResourceCost, unitUpkeepBill, upgradeGoldCost } from './stockpile';
+import { accrueStockpiles, canPayStockpile, capStockpiles, chargeUnitUpkeep, spendStockpile, stockFree, stockOf, stockpileCap, stockpileIncome, strategicSlot, unitResourceCost, unitUpkeepBill, upgradeGoldCost, upgradeType } from './stockpile';
 import { FX, FX_MIN, fmul, fxConst, fxOf, pseudoYieldValue, turnsAt, valueBetween, yieldValue } from './aiValue';
 import { cityGrowth, aiView, storeUnitStrength } from './aiView';
 import { congressUdtProdDistrict } from './congress';
@@ -653,7 +653,7 @@ export function minorUpgradeUnit(state: GameState, cityState: CityState, u: Unit
   // the new chassis' strategic cost where its stock covers it, none where
   // both rungs ask the same resource (`upgradeResourceCost`'s rule; a
   // city-state upgrades without it)
-  const next = minorUpgradeType(cityState, u.type)!;
+  const next = upgradeType(state, cityState.seat, u.type)!;
   const res = unitResourceCost(next);
   if (res && res.id !== UNITS[u.type].requiresResource && canPayStockpile(state, cityState.seat, res.id, res.n)) {
     spendStockpile(state, cityState.seat, res.id, res.n, 'ug');
@@ -669,31 +669,14 @@ export function minorUpgradeUnit(state: GameState, cityState: CityState, u: Unit
  *  ground with Movement left (CIV6, Unit: "in friendly territory", "more
  *  than 0 Movement") */
 export function minorCanUpgrade(state: GameState, cityState: CityState, u: Unit): boolean {
-  if (!minorUpgradeVisible(cityState, u) || u.movesLeft <= 0) return false;
+  if (!minorUpgradeVisible(state, cityState, u) || u.movesLeft <= 0) return false;
   return tileSeat(state.map.tiles[u.tileIndex]) === cityState.seat;
 }
 
 /** the unit has an upgrade the minor's research unlocks (0x58fff0, the
- *  visible test) */
-export function minorUpgradeVisible(cityState: CityState, u: Unit): boolean {
-  return minorUpgradeType(cityState, u.type) !== undefined;
-}
-
-/** the chassis a `type` upgrades into for the minor (0x5909a0 -> 0x5374c0):
- *  its UnitUpgrades rung where the minor holds that rung's PrereqTech and
- *  PrereqCivic (0x537fd0), and from there on up while the next rung's are
- *  held — the furthest, so a Warrior trained with Apprenticeship held
- *  becomes a Man-at-Arms in one upgrade (runs/h1_duely1127 t105: city-state
- *  2's Warrior 1441793, completed and upgraded at once, UnitUpgraded to
- *  UNIT_MAN_AT_ARMS 1507336). None where the first rung's are not held. */
-export function minorUpgradeType(cityState: CityState, type: string): string | undefined {
-  const next = UNITS[type]?.upgradesTo;
-  const def = next ? UNITS[next] : undefined;
-  if (!next || !def) return undefined;
-  const r = cityState.research;
-  if (def.requiresTech && !r.techs.includes(def.requiresTech)) return undefined;
-  if (def.requiresCivic && !r.civics.includes(def.requiresCivic)) return undefined;
-  return minorUpgradeType(cityState, next) ?? next;
+ *  visible test: `upgradeType`) */
+export function minorUpgradeVisible(state: GameState, cityState: CityState, u: Unit): boolean {
+  return upgradeType(state, cityState.seat, u.type) !== undefined;
 }
 
 /** A unit's purchase price for the minor: its Production cost (a Builder's
@@ -1585,7 +1568,7 @@ function minorUnitTerm(state: GameState, cityState: CityState, table: readonly (
         if (!id || src.upgradesTo !== id) continue;
         const n = state.units.filter((x) => x.seat === cityState.seat && x.type === src.id).length;
         if (n === 0) continue;
-        const gold = yieldValue(facts.view, cityState.seat, upgradeGoldCost(state, cityState.seat, src.id) * FX, 'YIELD_GOLD');
+        const gold = yieldValue(facts.view, cityState.seat, upgradeGoldCost(state, cityState.seat, src.id, id) * FX, 'YIELD_GOLD');
         v += n * Math.max(avg - gold, UPGRADE_SOURCE_FLOOR);
       }
     }

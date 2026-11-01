@@ -2075,10 +2075,33 @@ class SimSeats:
         rep = self._row_repl(row).gather(1, up.clamp(min=0).unsqueeze(0).expand(self.B, -1))
         return torch.where((up >= 0).unsqueeze(0) & (rep >= 0), rep, up.unsqueeze(0).expand(self.B, -1))
 
-    def _up_to_of(self, row: int, utype: torch.Tensor) -> torch.Tensor:
-        """`_up_to_row` read at each unit's chassis — `utype` [B] or [B, N]."""
+    def _upgrade_type_of(self, row: int, utype: torch.Tensor) -> torch.Tensor:
+        """`upgradeType` (0x5909a0 -> 0x5374c0) at each unit's chassis for
+        major row `row`, `utype` [B] or [B, N]: its rung (`_up_to_row`) where
+        the row holds that rung's PrereqTech and PrereqCivic (0x537fd0), and
+        on up while the next rung's are held — the furthest; -1 where the
+        first rung's are not (or `utype` < 0)."""
+        B = self.B
         up = self._up_to_row(row)
-        return up.gather(1, utype.clamp(min=0).reshape(self.B, -1)).reshape(utype.shape)
+        techs, civics = self.civ_techs[:, row], self.civ_civics[:, row]
+
+        def held(t: torch.Tensor) -> torch.Tensor:
+            tc = t.clamp(min=0)
+            rt, rc = self._type_tech.take(tc), self._type_civic.take(tc)
+            ok_t = (rt < 0) | techs.gather(1, rt.clamp(min=0))
+            ok_c = (rc < 0) | civics.gather(1, rc.clamp(min=0))
+            return (t >= 0) & ok_t & ok_c
+
+        ut = utype.reshape(B, -1)
+        cur = up.gather(1, ut.clamp(min=0))
+        cur = torch.where((ut >= 0) & held(cur), cur, torch.full_like(cur, -1))
+        for _ in range(self.NU):
+            nxt = torch.where(cur >= 0, up.gather(1, cur.clamp(min=0)), torch.full_like(cur, -1))
+            step = held(nxt)
+            if not bool(step.count_nonzero()):
+                break
+            cur = torch.where(step, nxt, cur)
+        return cur.reshape(utype.shape)
 
     def _best_trainable_naval(self, row: int) -> torch.Tensor:
         """`bestTrainableNaval`'s twin, [B] long (-1 none) — the strongest HULL
@@ -4184,7 +4207,7 @@ class SimSeats:
         chassis, pay the gold and the new chassis' resource, and spend the rest
         of the turn. CIV6: promotions and experience ride along, and "units do
         not Heal upon upgrading"."""
-        nxt = self._up_to_of(row, utp)
+        nxt = self._upgrade_type_of(row, utp)
         ok = hit & (nxt >= 0) & (utp >= 0)
         if not bool(ok.count_nonzero()):
             return
@@ -4192,11 +4215,6 @@ class SimSeats:
         here = self.unit_tile.gather(1, sc.unsqueeze(1)).squeeze(1)
         ok = ok & (self.tile_seat.gather(1, here.clamp(min=0).unsqueeze(1)).squeeze(1) == row) & (here >= 0)
         ok = ok & (self.unit_mp.gather(1, sc.unsqueeze(1)).squeeze(1) > 0)
-        rt, rc = self._type_tech[nc], self._type_civic[nc]
-        ok = ok & torch.where(rt >= 0, self.civ_techs[:, row].gather(1, rt.clamp(min=0).unsqueeze(1)).squeeze(1),
-                              torch.ones_like(ok))
-        ok = ok & torch.where(rc >= 0, self.civ_civics[:, row].gather(1, rc.clamp(min=0).unsqueeze(1)).squeeze(1),
-                              torch.ones_like(ok))
         price = self._upgrade_gold_cost(row, utp, nc, self.unit_levied.gather(1, sc.unsqueeze(1)).squeeze(1),
                                         self.unit_formation.gather(1, sc.unsqueeze(1)).squeeze(1))
         ok = ok & self._afford(self.civ_treasury[:, row], price)

@@ -40,8 +40,8 @@ describe('a levied unit upgrades cheaply', () => {
   it('charges a plain unit the full price and a levied one a quarter', () => {
     const s = scene('MATTHIAS_CORVINUS');
     expect(getModifiers(s, 0).levy.length).toBe(1);
-    const full = upgradeGoldCost(s, 0, 'WARRIOR', false);
-    const cut = upgradeGoldCost(s, 0, 'WARRIOR', true);
+    const full = upgradeGoldCost(s, 0, 'WARRIOR', 'SWORDSMAN', false);
+    const cut = upgradeGoldCost(s, 0, 'WARRIOR', 'SWORDSMAN', true);
     expect(full).toBeGreaterThan(0);              // or this lane proves nothing
     // a quarter of the full price, down to a multiple of PURCHASE_DIVISOR
     expect(cut).toBe(Math.floor((full * 0.25) / 5) * 5);
@@ -51,8 +51,8 @@ describe('a levied unit upgrades cheaply', () => {
   it('gives a seat without the row no discount at all', () => {
     const s = scene('VICTORIA');
     expect(getModifiers(s, 0).levy.length).toBe(0);
-    const full = upgradeGoldCost(s, 0, 'WARRIOR', false);
-    expect(upgradeGoldCost(s, 0, 'WARRIOR', true)).toBe(full);
+    const full = upgradeGoldCost(s, 0, 'WARRIOR', 'SWORDSMAN', false);
+    expect(upgradeGoldCost(s, 0, 'WARRIOR', 'SWORDSMAN', true)).toBe(full);
   });
 
   it('reads the install for the ABILITY too: +2 Movement, +5 Combat', () => {

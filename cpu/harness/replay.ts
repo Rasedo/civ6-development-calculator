@@ -61,7 +61,7 @@ import { recordMoments } from '../core/moments';
 import { applyGovernorActions, governorsOf } from '../core/governors';
 import { GOVERNOR_PROMOTIONS, GOV_APPOINT, GOV_ASSIGN_CITY, GOV_ASSIGN_MINOR, GOV_PROMOTE, promotionBit } from '../data/governors';
 import { BOOSTS } from '../data/boosts';
-import { chargeUnitResource, upgradeGoldCost } from '../core/stockpile';
+import { chargeUnitResource, upgradeGoldCost, upgradeType } from '../core/stockpile';
 import { applyTrainingGrants, cityStrikeStrength, clearCampFor, flankSupportLive, hostilePillage, meleeAttack, rangedAttack, seizeCivilian, terrainDefense } from '../core/combat';
 import { freeCitiesMilitary, traceFreeOps } from '../core/freeOps';
 import { barbarianTactics, barbMovesNow, dangerPlane, refreshBarbarians, tacticsDrawing, knowledgeLook, traceKnowledge, traceTactics } from '../core/tactical';
@@ -92,7 +92,7 @@ import { PROMOTE_HEAL, aiPromotionPick, attacksPerTurn, promoCount, takePromotio
 import { fireFeature } from '../data/disasters';
 import { nameRivers } from '../core/disasters';
 import { civicAgendas, setupAgendas } from '../core/agendas';
-import { holdMinorCatchUp, holdMinorOrders, holdMinorStart, minorCombatDesire, minorResearch, minorSetItem, minorBuildFacts, minorKnowledge, minorKnownUnits, minorItemCost, minorItemInHand, minorItemKey, minorBuildingPrice, minorUnitPrice, minorUpgradeType, minorUpgradeUnit, minorUpgradeVisible, traceMinorLays, traceMinorPolicyScores, traceMinorPurchases } from '../core/minorBuild';
+import { holdMinorCatchUp, holdMinorOrders, holdMinorStart, minorCombatDesire, minorResearch, minorSetItem, minorBuildFacts, minorKnowledge, minorKnownUnits, minorItemCost, minorItemInHand, minorItemKey, minorBuildingPrice, minorUnitPrice, minorUpgradeUnit, minorUpgradeVisible, traceMinorLays, traceMinorPolicyScores, traceMinorPurchases } from '../core/minorBuild';
 import { DEDICATED_IMPROVEMENTS, IMPROVEMENT_IDS, unitActionIndex } from '../core/unitActions';
 import { loadCatalog, type Catalog, type DumpCity, type TurnRecord } from './record';
 import { num, bool } from './record';
@@ -3335,10 +3335,9 @@ const res = buyTile(state, city.id, d.plot, seat);        if (!res.ok) setTileOw
         // 851968, trained and upgraded to the Swordsman 917509 in its turn)
         const into = r ? engineRowOf(ctx.cat, 'unit', r.type) : null;
         const mapped = new Set(ctx.units.values());
-        // a city-state's upgrade climbs its line as far as its research
-        // reaches (`minorUpgradeType`: a Warrior to a Man-at-Arms)
-        const minorOf = (x: Unit) => (isCityStateSeat(x.seat) ? state.cityStates.find((c) => c.seat === x.seat) : undefined);
-        const upTo = (x: Unit) => { const m = minorOf(x); return m ? minorUpgradeType(m, x.type) : UNITS[x.type]?.upgradesTo; };
+        // an upgrade climbs its line as far as its player's research reaches
+        // (`upgradeType`: a Warrior to a Man-at-Arms)
+        const upTo = (x: Unit) => upgradeType(state, x.seat, x.type);
         const made = unitOf(ctx, d.unit) ? undefined
           : state.units.find((x) => x.seat === seatOfP(ctx, d.player) && !mapped.has(x) && !!into && upTo(x) === into);
         if (made) {
@@ -3367,7 +3366,7 @@ const res = buyTile(state, city.id, d.plot, seat);        if (!res.ok) setTileOw
         const minor = isCityStateSeat(u.seat) ? state.cityStates.find((c) => c.seat === u.seat) : undefined;
         // bought through its economic AI (0x68c940), as its trees buy it
         if (minor?.economy) upgradePurchase(minor.economy, MINOR_UPGRADE_GOLD * FX);
-        const res = minor ? (minorUpgradeUnit(state, minor, u) ? { ok: true } : { ok: false, reason: `the minor may not upgrade ${u.type}->${minorUpgradeType(minor, u.type)} (gold ${r3(minor.treasury)}, plot seat ${tileSeat(state.map.tiles[u.tileIndex])}, techs ${minor.research.techs.join('|')})` })
+        const res = minor ? (minorUpgradeUnit(state, minor, u) ? { ok: true } : { ok: false, reason: `the minor may not upgrade ${u.type}->${upgradeType(state, u.seat, u.type)} (gold ${r3(minor.treasury)}, plot seat ${tileSeat(state.map.tiles[u.tileIndex])}, techs ${minor.research.techs.join('|')})` })
           : upgradeUnit(state, u, u.seat);
         ctx.units.delete(d.unit);
         ctx.units.set(d.into, u);
@@ -3377,7 +3376,8 @@ const res = buyTile(state, city.id, d.plot, seat);        if (!res.ok) setTileOw
         if (!res.ok) {
           const t = r ? engineRowOf(ctx.cat, 'unit', r.type) : null;
           const s = seatOf(state, u.seat);
-          if (s) s.treasury -= minor ? MINOR_UPGRADE_GOLD : upgradeGoldCost(state, u.seat, u.type, u.leviedFrom !== undefined, u.formation ?? 0);
+          const to = t ?? upgradeType(state, u.seat, u.type);
+          if (s) s.treasury -= minor ? MINOR_UPGRADE_GOLD : to ? upgradeGoldCost(state, u.seat, u.type, to, u.leviedFrom !== undefined, u.formation ?? 0) : 0;
           if (t) u.type = t;
           u.movesLeft = 0;
           // the upgrade the record made raises its seat's bests and answers
@@ -4777,8 +4777,9 @@ function perTurnWorld(ctx: Ctx, a: TurnRecord, imp: Imported, history: History, 
   // the game's roster runs in the order its units were made, the serial in
   // an id's high half, where the record lists them by pool slot: every walk
   // of a player's units reads it (runs/h1_duely1117 t179: city-state 4's
-  // bankruptcy disbands its older Bombard 1638405, serial 25, before
-  // 1835012, serial 28 on the lower slot)
+  // AI deletes its older Bombard 1638405 after its research job, serial 25, before
+  // 1835012, serial 28 on the lower slot); a pool walk reads the slots the
+  // world takes at its end
   const serial = new Map<Unit, number>();
   let k = 0;
   for (const r of a.units) {
@@ -4866,6 +4867,22 @@ function perTurnWorld(ctx: Ctx, a: TurnRecord, imp: Imported, history: History, 
   for (const key of Object.keys(state)) if (!(key in world)) delete (state as unknown as Record<string, unknown>)[key];
   Object.assign(state, world);
   importedWorld(state, imp, a, history);
+  // a city-state's and the Free Cities' units stand in the game's pool slots,
+  // an id's low half, as the barbarians' do (`barbarianTurn`): a slot held is
+  // none of the pool's free ones
+  for (const s of [...state.cityStates, ...(state.freeSeat ? [state.freeSeat] : [])]) {
+    const held = new Set<number>();
+    for (const [key, u] of ctx.units) {
+      if (u.seat !== s.seat) continue;
+      u.slot = Number(key.split(':')[1]) & 0xffff;
+      held.add(u.slot);
+    }
+    if (!held.size) continue;
+    const pool = (s.unitPool ??= { size: s === state.freeSeat ? 0 : 1, free: [], dying: [] });
+    pool.size = Math.max(pool.size, ...[...held].map((x) => x + 1));
+    pool.free = pool.free.filter((x) => !held.has(x));
+    pool.dying = pool.dying.filter((x) => !held.has(x));
+  }
   ctx.retained = new Map();
 }
 
@@ -5649,7 +5666,7 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
       // no strategic resource), as the game's did: no unit record t+1 holds
       // (runs/h1_duelu1128 Bologna at 0 Gold t241-t246, a tree each turn a
       // technology lands, its Default Specialization's Scouts gone)
-      if (!paid && cs && !op && (cs.upgradeTrigger || (cs.upgrading?.length ?? 0) > 0) && minorUpgradeVisible(cs, u)
+      if (!paid && cs && !op && (cs.upgradeTrigger || (cs.upgrading?.length ?? 0) > 0) && minorUpgradeVisible(state, cs, u)
         && !upgradeMayGo(state, cs, u) && unupgradedDeleted(state, cs, u)) continue;
       count(ctx, isBarbSeat(u.seat) ? 'barb:unit' : 'minorAi:unit', 'fallback', ctx.playerOfSeat.get(u.seat),
         `${u.type}${paid ? ' bought' : ''}${op ? ` for ${op}` : ''}`);
