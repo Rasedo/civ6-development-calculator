@@ -1478,12 +1478,16 @@
     - recording: h1_duely1121
       turn: 13
       value: "Hunza's Autocracy flat bonus 12 / 12 / 16 / 15 / 15 / 15 / 16 at t11-17 and 18 / 20 / 20 / 20 / 21 / 21 / 21 / 22 at t19-26 as runs/lb1_gov1121 logged: the wonder's term with its units' COMBAT_EXPERIENCE term, one whole (Political Philosophy t14-30 as logged but t19)"
+    - recording: lab3_gov1121
+      turn: 11
+      value: "Antioch (player 4), the parts live (govlog.py sites 5-10, FinalRelease 0x47634e..0x476580): Autocracy's Amount 0.0977, best Production 3.5 (city 65536), PSEUDOYIELD_WONDER 0.1953, wonder term 13.734 over 0..50 at t8-14; COMBAT_EXPERIENCE PSEUDOYIELD_UNIT_COMBAT 0.0977 / 0.0977 / 0.0977 / 0.2266 / 0.1055 / 0.1055 / 0.0977 at t8-14 (x (1 + the Combat Desire AI_Military.csv logs that turn: 0.0 / 0.0 / 0.0 / 1.3 / 0.1 / 0.1 / 0.0), units 1 / 1 / 1 / 1 / 1 / 2 / 2, term 0.152 / 0.152 / 0.152 / 0.383 / 0.152 / 0.383 / 0.383; the flat bonus whole(13.734 + that) 13 / 13 / 13 / 14 / 13 / 14 / 14; no great people term"
   impl: [cpu/core/aiModifiers.ts:ANALYZERS, gpu/core/sim_policy.py:_pol_analyze]
   readings:
     - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
     - "C-97: the government and policy choice — the choice READ, the values PARTLY READ"
     - "C-130: the government values' parts at Hunza (live) — READ"
     - "C-130: the flat bonus's wonder term runs on into the combat experience term — READ, both twins"
+    - "C-130: Antioch's government values read the Combat Desire of their own turn (live) — READ"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "- EFFECT_ADJUST_FLAT_BONUS 0x6c5700 (@f03ea0, vtable 0xd626c8; its parser 0x6c4e40: fx(Amount x 0.01f) +8, the BonusType's..."

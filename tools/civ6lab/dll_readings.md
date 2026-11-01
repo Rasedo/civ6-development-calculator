@@ -6089,3 +6089,34 @@ in `choiceOrder`; `std_sort` (gpu/core/std_sort.py) in `_mops_choice_order`.
   the Evangelize and evict terms, the inquisition's points); the +0x2a78
   row (keyed by Units +0x24, +0x1c x 100 tourism) unnamed, no row for a
   city-state's unit in these games.
+
+## C-130: Antioch's government values read the Combat Desire of their own turn (live) — READ
+
+- `govlog.py` on seed 1121 replayed to t15 (AI_GovtPolicies.csv, AI_Research.csv,
+  RandCalls.csv and AI_CityBuild.csv byte-identical to runs/h1_duely1121's
+  first rows), with the flat bonus's parts (sites 5-10: FinalRelease
+  0x47634e / 0x476386 / 0x4763e7 / 0x476420 / 0x4764a6 / 0x476580 in 0x476060's
+  WONDER_CONSTRUCTION case 0x476325) and the slot bests the government value
+  reads (culture AI +0x2f0, 0x52fe44): runs/lab3_gov1121.govlog.jsonl.
+- Antioch (player 4), t8-t14: Autocracy's flat bonus is the wonder term
+  13.734 (best Production 3.5 in its one city, PSEUDOYIELD_WONDER of the
+  Amount 0.0977 = 0.1953, 0..50) plus COMBAT_EXPERIENCE: the units (1 to t12,
+  2 from t13) x PSEUDOYIELD_UNIT_COMBAT of the Amount / 10, discounted. That
+  pseudo-yield reads 0.0977 / 0.0977 / 0.0977 / 0.2266 / 0.1055 / 0.1055 /
+  0.0977 at t8-t14: the Amount x (1 + W), W the Combat Desire AI_Military.csv
+  logs for player 4 the same turn (0.0 / 0.0 / 0.0 / 1.3 / 0.1 / 0.1 / 0.0).
+  The term 0.152 / 0.383 (t11) / 0.152 (t12) / 0.383 (t13, two units); the
+  flat bonus, one whole of the sum, 13 / 13 / 13 / 14 / 13 / 14 / 14.
+  Oligarchy's COMBAT_EXPERIENCE alike (0.383 / 0.859 at t11 / 0.383) stays
+  below 1 and adds 0; Classical Republic's GREAT_PEOPLE 0.
+- The pre-modifier values: Chiefdom 2.098 / 3.797 (t12-13) / 2.098 (t14),
+  Autocracy 18.156 / 21.352 / 19.652, Oligarchy 18.254 / 20.801 / 18.254,
+  Classical Republic 19.203 / 20.699, from the slot bests 21 / 0 / -1 / -1 /
+  21 / 0 (t8-11), 21 / 17 / 14 / -1 / 21 / 0 (t12-13), 21 / 0 / 14 / -1 / 21
+  / 0 (t14) by GovernmentSlots index.
+- So the civics AI's government values of turn T read the Combat Desire the
+  military AI wrote at T (its row of turn T): Autocracy 14 at t11 and 13 at
+  t12 where a desire a turn late (0.0 at t11, 1.3 at t12) gives 13 / 14 —
+  Political Philosophy's +1 / -1 at the t11 / t12 computes. The CPU twin
+  (`minorBuild.ts`) sets `CityState.combatDesire` after `minorResearchAi`
+  in a city-state's turn, so its government values read the previous turn's.

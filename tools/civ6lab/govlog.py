@@ -22,18 +22,36 @@ The sites (FinalRelease; the Release twins):
                           (Release 0x620413 -> 0x7b0330): the government
                           (r12d), the player (r13 +0xd8), the value
   3 0x5300af -> 0x529ed0  inside the government value: the value before
-                          the modifiers (edi) and their sum (the function
-                          reuses its registers, so the government and the
-                          player come from the site-2 or -4 record that
-                          follows)
+                          the modifiers (edi), their sum, and the slot
+                          bests it read (the culture AI +0x2f0, by
+                          GovernmentSlots index, its first six) (the
+                          function reuses its registers, so the government
+                          and the player come from the site-2 or -4 record
+                          that follows)
   4 0x418529 -> 0x52fd20  the government choice on a completed civic
                           (Release 0x625d70): the government (esi), the
                           player ([rdi+0x90] +0xd8), the value
+  EFFECT_ADJUST_FLAT_BONUS's WONDER_CONSTRUCTION -> COMBAT_EXPERIENCE ->
+  GREAT_PEOPLE fall-through (0x476060 from 0x476325; Release 0x6c5700
+  from 0x6c5b9d), every call (the context's player r13 +0x80):
+  5 0x47634e -> 0x1332f0  a city's Production (City::GetYield): [rax], the
+                          best before (ebx), the city ([rdi] +0xa8)
+  6 0x476386 -> 0x52af40  PSEUDOYIELD_WONDER of the Amount ([r14+8])
+  7 0x4763e7 -> 0x528660  the wonder term: the best x that per turn
+                          ([rbp-0x29]) from the context's start (+0xb4) to
+                          its horizon (+0xb8)
+  8 0x476420 -> 0x52af40  PSEUDOYIELD_UNIT_COMBAT of the Amount; the unit
+                          count (edi, Player_Units +0xb8)
+  9 0x4764a6 -> 0x528660  the combat experience term (its per turn
+                          [rbp-0x29]); ebx the wonder term
+ 10 0x476580 -> 0x528660  a great person class's term (r14d its
+                          pseudo-yield, [rbp-0x21] its per turn)
 `read` writes one line per government value: the turn, the government,
-the player, the value, the value before the modifiers, their sum and each
-modifier's term (the entry, its analyzer object's and vtable's RVAs: the
-analyzer names the EffectType, `dll_readings.md` "C-96 / C-97: the AI's yield weights and the modifier
-evaluator").
+the player, the value, the value before the modifiers, their sum, the
+slot bests and each modifier's term (the entry, its analyzer object's and
+vtable's RVAs: the analyzer names the EffectType, `dll_readings.md` "C-96
+/ C-97: the AI's yield weights and the modifier evaluator"; a flat bonus
+term carries its parts, `flat`).
 """
 from __future__ import annotations
 
@@ -54,7 +72,23 @@ SITES = (
     (2, 0x413CC5, 0x52FD20),
     (3, 0x5300AF, 0x529ED0),
     (4, 0x418529, 0x52FD20),
+    (5, 0x47634E, 0x1332F0),
+    (6, 0x476386, 0x52AF40),
+    (7, 0x4763E7, 0x528660),
+    (8, 0x476420, 0x52AF40),
+    (9, 0x4764A6, 0x528660),
+    (10, 0x476580, 0x528660),
 )
+# the flat bonus's sites: the context's player, the result [rax], then each its own
+FLAT_HEAD = "4d8b9580000000 410fb792d8000000 41895108 8b10 4189510c"
+FLAT = {
+    5: "41895910 4c8b17 418b92a8000000 41895114",
+    6: "41895910 418b5608 41895118",
+    7: "41895910 418b5608 41895118 8b55d7 4189511c 418b95b4000000 41895120 418b95b8000000 41895124",
+    8: "41895910 41897914 418b5608 41895118",
+    9: "41895910 41897914 8b55d7 4189511c 418b95b4000000 41895120 418b95b8000000 41895124",
+    10: "41895910 8b55df 4189512c 45897130 418b95b4000000 41895120 418b95b8000000 41895124",
+}
 
 
 def _slot(a: Asm, n: int, hdr: int) -> None:
@@ -97,6 +131,12 @@ def build(mem: int, base: int) -> bytes:
         elif n == 3:
             _slot(a, n, hdr)
             a.b("4189790c 8b10 41895110")                              # edi, the modifiers' sum
+            a.b("4d8b9558060000 4d8b92f0020000")                       # r10 = the slot bests
+            for k in range(6):
+                a.b(f"418b52{4 * k:02x} 418951{0x14 + 4 * k:02x}")
+        elif n in FLAT:
+            _slot(a, n, hdr)
+            a.b(FLAT_HEAD).b(FLAT[n])
         else:
             _slot(a, n, hdr)
             a.b("41897104 4c8b9790000000 410fb792d8000000 41895108 8b10 4189510c")
@@ -166,20 +206,53 @@ def cmd_read(a, pm, base) -> int:
     n = min(count & 0xFFFFFFFF, CAP)
     raw = pm.read(mem + CODE_SIZE + HDR, n * REC) if n else b""
     out, pend, inner, kept = open(a.out, "w", encoding="utf-8", newline="\n"), [], {}, 0
+    flat: list = []
     for j in range(0, len(raw), REC):
         site, ga, pb, v1, v2, _pad, q1, q2, q3, q4, turn, done = struct.unpack("<IiiiiIQQQQII", raw[j:j + REC])
+        w = struct.unpack("<16i", raw[j:j + REC])
         if done != DONE:
             continue
+        if site in FLAT:
+            # a call's parts start at its first city's Production
+            if site == 5 and flat and flat[-1]["site"] != 5:
+                flat = []
+            f = {"site": site, "player": w[2], "result": w[3] / 256}
+            if site == 5:
+                f.update(best=w[4] / 256, city=w[5])
+            elif site in (6, 7, 8):
+                f.update(amount=w[6] / 256)
+            if site in (7, 9):
+                f.update(perTurn=w[7] / 256, start=w[8], horizon=w[9])
+            if site == 8:
+                f.update(units=w[5])
+            if site == 9:
+                f.update(wonder=w[4] / 256)
+            if site == 10:
+                f.update(perTurn=w[11] / 256, pseudo=w[12], start=w[8], horizon=w[9])
+            flat.append(f)
+            continue
         if site == 1:
-            pend.append({"sum": v1 / 256, "entry": hex(q1), "analyzer": hex(q2 - base) if q2 else None,
-                         "vtable": hex(q3 - base) if q3 else None, "key": hex(q4), "ctx40": pb})
+            m = {"sum": v1 / 256, "entry": hex(q1), "analyzer": hex(q2 - base) if q2 else None,
+                 "vtable": hex(q3 - base) if q3 else None, "key": hex(q4), "ctx40": pb}
+            if flat and flat[-1]["site"] in (9, 10):
+                m["flat"] = {
+                    "production": [{"city": f["city"], "yield": f["result"]} for f in flat if f["site"] == 5],
+                    **{k: f["result"] for f in flat for k, s in (("wonderPY", 6), ("wonder", 7), ("combatPY", 8),
+                                                                  ("combat", 9)) if f["site"] == s},
+                    "units": next((f["units"] for f in flat if f["site"] == 8), None),
+                    "amount": next((f["amount"] for f in flat if f["site"] == 6), None),
+                    "span": next(([f["start"], f["horizon"]] for f in flat if f["site"] == 7), None),
+                    "greatPeople": [[f["pseudo"], f["perTurn"], f["result"]] for f in flat if f["site"] == 10],
+                }
+            flat = []
+            pend.append(m)
             continue
         if site == 3:
             prev = 0.0
             for m in pend:
                 m["term"] = round(m["sum"] - prev, 6)
                 prev = m["sum"]
-            inner = {"before": v1 / 256, "modifiers": v2 / 256, "each": pend}
+            inner = {"before": v1 / 256, "modifiers": v2 / 256, "slotBest": [x / 256 for x in w[5:11]], "each": pend}
             pend = []
             continue
         rec = {"at": "turn" if site == 2 else "choice", "turn": turn, "gov": ga, "player": pb, "value": v1 / 256, **inner}

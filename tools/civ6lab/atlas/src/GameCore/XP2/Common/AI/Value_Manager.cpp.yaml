@@ -744,6 +744,9 @@
     - recording: lb1_gov1121
       turn: 19
       value: "Hunza (player 2): Autocracy 21.35 + 18 (EFFECT_ADJUST_FLAT_BONUS), Oligarchy 20.80 + 1 (the flat bonus; 0 at t15-18), Classical Republic 20.70, Chiefdom 3.80 (govlog.py); the civic value at T reads the values of T - 1"
+    - recording: lab3_gov1121
+      turn: 12
+      value: "Antioch (player 4), the slot bests read (culture AI +0x2f0, FinalRelease 0x52fe44 / 0x52fe6f; by GovernmentSlots index) 21 / 0 / -1 / -1 / 21 / 0 at t8-11, 21 / 17 / 14 / -1 / 21 / 0 at t12-13, 21 / 0 / 14 / -1 / 21 / 0 at t14: Chiefdom 2.098 / 3.797 / 2.098, Autocracy 18.156 + 13 / 14 (t11) / 21.352 + 13 (t12) / + 14 (t13) / 19.652 + 14, Oligarchy 18.254 / 20.801 / 18.254 + 0, Classical Republic 19.203 / 20.699 + 0 at t8-11 / t12-13 / t14"
   impl:
     - cpu/core/aiPolicyValue.ts:governmentValue
     - cpu/core/aiPolicyValue.ts:governmentValue
@@ -755,6 +758,7 @@
     - "C-97: the government and policy choice — the choice READ, the values PARTLY READ"
     - "H-1: the civics AI — READ (the choice, the walk, the propagation), PARTLY READ (the value)"
     - "C-130: the government values' parts at Hunza (live) — READ"
+    - "C-130: Antioch's government values read the Combat Desire of their own turn (live) — READ"
   context:
     - "...its (0x392cb0: unlocked 0x39df60, not the current) and the current, in order, valued by 0x7b0330 to valueHorizons[0]; the first strictly highest; a different one is commanded (civics..."
     - "- The government's value (0x7b0330): FX_MIN when start >= horizon, or for one held before (PlayerCulture +0x350 [governmen..."
