@@ -6188,3 +6188,32 @@ in `choiceOrder`; `std_sort` (gpu/core/std_sort.py) in `_mops_choice_order`.
   need and full lists (0x73fba0) and the entry's buildable flag (0x4cb590,
   0x39d490, 0x4aa790) read as the engines take them; the AI-type bitfield
   the walk tests (global @0xf28c78 +0x408, +0x400 per unit) is unread.
+
+## C-98 / C-130: a city-state's building turns under the Urban Development Treaty — READ (0x17b1e0's rate), both twins
+
+`minorItemMult`, `minorItemTurns`, the minor's production step and its
+`buildTurns` (`cpu/core/minorBuild.ts`), `majorItemTurns`
+(`cpu/core/freeCityBuild.ts`); `_minor_item_mult` (`gpu/core/sim_minors.py`),
+`_item_rate_mult` (`gpu/core/sim_cityvalue.py`).
+
+- THE RATE (0x17b1e0, 0x17b2ae..0x17b516): the city's Production x (the
+  queue's modifier on the building + the extra the caller passes), then the
+  queue's multipliers past it. The treaty's outcome A
+  (MODIFIER_ALL_CITIES_ADJUST_DISTRICT_BUILDING_PRODUCTION, Amount 100, every
+  city, the city-states' too) doubles the Production toward a building of
+  its district past the minor's percents: 1121 Hunza's Star Fort at
+  Production x (1 + 2.0 walls + extra) x 2.
+- A civilization's own building at a minor (the Tsikhe, which the engine
+  files under the Star Fort's key) takes none of the Star Fort's kept
+  progress: the queue keeps progress per building row.
+- Confirmed (runs/h1_duely1121, the City Centre treaty t142-161, AI_GovtPolicies
+  .csv's POLICY_LIMES at Hunza fitted through 0x6c1a80): the Star Fort 4 / 3
+  turns and the Tsikhe 10 / 5 (Limes 185 at R 1, 138 at R 0, 93 with the
+  Star Fort built), its Star Fort done at t150. On a one-seed aimem trace to
+  t170: every Limes row t142-148 and t150-161 as logged, the governments'
+  military slot best with them (Merchant Republic +2.0, Theocracy +3.0 x
+  the era's 2): Exploration and Reformed Church t144-152 as logged;
+  civicScore.minor misses to t170 97 -> 33, policyScore.minor 87 -> 12.
+- Open: the other multipliers of the minor's queue (the Global Energy
+  Treaty's plant, Public Works' projects, the roster's prodMults) not on a
+  minor's step or turns; 0x178610 and +0x308 / +0x30c unread.

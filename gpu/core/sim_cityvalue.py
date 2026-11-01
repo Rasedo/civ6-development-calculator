@@ -1829,6 +1829,17 @@ class _MinorFacts:
         r = self.T["bld"].get(b)
         return -1 if r is None else self.E["building"][self.T["bld_rows"].index(r)]
 
+    def _item_rate_mult(self, item, rate):
+        """`minorItemMult` on a raw rate: the Urban Development Treaty's
+        outcome A doubles it toward a building of its district"""
+        sim = self.sim
+        bi = self._building_index(item) if item.startswith("BUILDING_") else -1
+        if bi < 0:
+            return rate
+        cp = sim._congress_udt()[0]
+        hit = (cp != sim.UDT_NONE) & (sim._b_req_district[bi] == cp)
+        return torch.where(hit, (rate.double() * sim._c_prod_mult).long(), rate)
+
     def _didx(self, d):
         r = [x["type"] for x in self.sim.rules.ai_city_build["districts"]]
         return self.E["district"][r.index(d)] if d in r else -1
@@ -2202,6 +2213,7 @@ class _MinorFacts:
         if self.founding is not None:
             prod = torch.where(self.founding, self._founding_production(), prod)
         rate = torch.floor(prod * (1 + pct / 100) * _FX + 0.5).long()
+        rate = self._item_rate_mult(item, rate)
         return _turns_at(torch.floor(cost * _FX).long() - torch.floor(progress * _FX + 0.5).long(), rate)
 
     def _founding_production(self):
@@ -2245,14 +2257,17 @@ class _MinorFacts:
         row = self.T["bld"].get(u)
         if row is not None and row["trait"]:
             # a civilization's own building (`traitBuildingCost`): its row's
-            # Cost at the engine building's scale, none of the minor's percents
+            # Cost at the engine building's scale, none of the minor's
+            # percents, none of the engine building's kept progress
             base = self.sim.rules.ai_city_build["buildings"][int(self.T["building_row"][self._building_index(u)])]
             if int(base["cost"]) > 0:
                 cost = torch.floor(cost * int(row["cost"]) / int(base["cost"]))
                 pct = torch.zeros_like(pct)
+                progress = sim.citystate_ovf[:, s].double()
         rate = torch.floor(self._total(1) * (1 + pct / 100 + (0 if scale else extra / _FX)) * _FX + 0.5).long()
         if scale and extra:
             rate = _fmul(rate, torch.full_like(rate, int(extra)))
+        rate = self._item_rate_mult(u, rate)
         return _turns_at(torch.floor(cost * _FX).long() - torch.floor(progress * _FX + 0.5).long(), rate)
 
     def unit_expected(self, u):
@@ -2813,6 +2828,7 @@ class _FreeFacts(_MinorFacts):
         rate = torch.floor(self._total(1) * (1 + (0 if scale else extra / _FX)) * _FX + 0.5).long()
         if scale and extra:
             rate = _fmul(rate, torch.full_like(rate, int(extra)))
+        rate = self._item_rate_mult(u, rate)
         return _turns_at(torch.floor(self._item_cost(u) * _FX).long() - torch.floor(progress * _FX + 0.5).long(), rate)
 
     def unit_expected(self, u):

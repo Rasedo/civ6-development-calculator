@@ -14,7 +14,8 @@ import { PROJECTS } from '../data/projects';
 import { TECHS } from '../data/techs';
 import { CIVICS } from '../data/civics';
 import { GOVERNMENTS } from '../data/policies';
-import { CIV_LEADERS } from '../data/seats';
+import { CIV_LEADERS, CONGRESS_PROD_MULT } from '../data/seats';
+import { congressUdtProdDistrict } from './congress';
 import { AI_CIVILIZATION_TRAITS, AI_LEADER_TRAITS } from '../data/aiTables';
 import { AI_BUILDINGS, AI_UNITS } from '../data/aiBuildTables';
 import { engineId } from '../data/aliases';
@@ -281,7 +282,11 @@ export function majorItemTurns(state: GameState, city: City, type: string, extra
   const inQueue = city.queue.find((x) => keyOf(x) === k);
   const progress = (inQueue?.progress ?? 0) + (city.productionBank ?? 0);
   const base = fxOf(computeCityStats(state, city).total.production * (1 + prodBoostPct(getModifiers(state, city.seat), q, s.gpPerm) + (scale ? 0 : extra / FX)));
-  const rate = scale && extra ? fmul(base, extra) : base;
+  // the Urban Development Treaty's outcome A past the percents (0x17b1e0's
+  // queue multiplier, `minorItemMult`)
+  const udt = congressUdtProdDistrict(state);
+  const mult = q.kind === 'building' && udt !== null && BUILDINGS[q.building]?.district === udt ? CONGRESS_PROD_MULT : 1;
+  const rate = fmul(scale && extra ? fmul(base, extra) : base, mult * FX);
   return turnsAt(itemPrice(state, city, q) * FX - fxOf(progress), rate);
 }
 

@@ -378,6 +378,14 @@
   context:
     - "...growth 0x1b46e0, borders 0x1a9bc0, loyalty 0x19f8d0, then the citizens' (city +0x1b50, 0x1783b0) 0x194f80, a thunk to the full reassign 0x196320: every citizen re-placed every turn..."
   review: imported
+- addr: 0x178610
+  final: 0xfc770
+  kind: function
+  semantics: a non-wonder building's multiplier for 0x17b1e0 (taken where above 1.0), its terms unread (+0x324, the plot 0x59270).
+  status: UNREAD
+  readings:
+    - "C-98 / C-130: a city-state's building turns under the Urban Development Treaty — READ (0x17b1e0's rate), both twins"
+  review: reviewed
 - addr: 0x178c50
   kind: function
   semantics: a district's project production modifier.
@@ -537,9 +545,12 @@
   final: 0xfe420
   kind: function
   name: turnsToBuildBuilding
-  semantics: "the building's build turns, the queue's own estimate: 0x8c4540's ceil((cost - progress) / Production toward the item), the progress the item's kept part plus the store an idle step or a completion left."
+  semantics: "the building's build turns, the queue's own estimate: 0x8c4540's ceil((cost - progress) / Production toward the item), the progress the item's kept part plus the store an idle step or a completion left. The rate (0x17b2ae..0x17b38a): the city's Production (0x1cb9f0) x (the queue's per-building modifier +0x2a8[building] + the extra passed), then the queue's multipliers (0x17b443..0x17b516: a wonder +0x308 / +0x30c, else 0x178610's where above 1.0 and +0x318) — the Urban Development Treaty's x2 a multiplier past the percents."
   status: PARTLY
   cases:
+    - recording: h1_duely1121
+      turn: 142
+      value: "Hunza t142-161 under the City Centre Urban Development Treaty: Limes' Star Fort 4 / 3 and Tsikhe 10 / 5 turns (0x6c1a80's T0 / T1 fitted to AI_GovtPolicies.csv's Limes 185 / 138 / 93), every POLICY_LIMES row t142-148 and t150-161 as logged"
     - recording: AI_Research.csv
       value: "- The building turns T as the job reads them (`cpu/core/aiCityBuild.ts`,   measured by `cpu/harness/cityBuildLab.ts` on the record of the turn after,   the research turns from AI_Research.csv): the an"
     - recording: 1124
@@ -550,10 +561,16 @@
     - cpu/core/aiValue.ts:AiValueView
     - cpu/core/minorBuild.ts:minorItemTurns
     - gpu/core/sim_cityvalue.py:item_turns
+    - cpu/core/freeCityBuild.ts:majorItemTurns
+    - gpu/core/sim_minors.py:_minor_item_mult
+    - gpu/core/sim_cityvalue.py:_item_rate_mult
+    - cpu/core/minorBuild.ts:minorItemMult
+    - cpu/core/freeCityBuild.ts:base
   readings:
     - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
     - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
     - "C-96: the unit value's unit count and the founding Production — READ, both twins"
+    - "C-98 / C-130: a city-state's building turns under the Urban Development Treaty — READ (0x17b1e0's rate), both twins"
   notes:
     - ".claude/scratchpad/cb/notes.txt: ...(techTurns 0x7610e0, civicTurns 0x621920) + prereq district turns(+10 if not current) + build turns 0x17b1e0 (+10 if [rbp-0x60] && current != bld) + prereq buildings...  value = 0x7a4d40(bld, turns, plot=-999..."
   context:

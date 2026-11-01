@@ -73,6 +73,8 @@ import { projectTable, type ProjectTableFacts } from './aiProjectValue';
 import { accrueStockpiles, canPayStockpile, capStockpiles, chargeUnitUpkeep, spendStockpile, stockFree, stockOf, stockpileCap, stockpileIncome, strategicSlot, unitResourceCost, unitUpkeepBill, upgradeGoldCost } from './stockpile';
 import { FX, FX_MIN, fmul, fxConst, fxOf, pseudoYieldValue, turnsAt, valueBetween, yieldValue } from './aiValue';
 import { cityGrowth, aiView, storeUnitStrength } from './aiView';
+import { congressUdtProdDistrict } from './congress';
+import { CONGRESS_PROD_MULT } from '../data/seats';
 import { civicPolicyBest, governmentValues, policyScores, slotTypeBest } from './aiPolicyValue';
 import { cityStateSight } from './fog';
 import { combatDesire, type CombatDesire } from './aiMilitary';
@@ -952,7 +954,7 @@ export function minorBuild(state: GameState, cityState: CityState, production: n
   const cost = minorItemCost(state, cityState, item);
   const before = cityState.prodProgress ?? 0;
   const paid = made + (cityState.prodOverflow ?? 0);
-  cityState.prodProgress = before + paid * ((100 + pct) / 100);
+  cityState.prodProgress = before + paid * ((100 + pct) / 100) * minorItemMult(state, item);
   cityState.prodOverflow = 0;
   const def = 'project' in item ? PROJECTS[item.project] : undefined;
   if (def?.yield) cityState.projectYield = { key: def.yield, amount: Math.min(paid, cost) * projectConversionRate(def) };
@@ -1119,15 +1121,19 @@ export function minorItemTurns(state: GameState, cityState: CityState, type: str
   const item = minorItemOfType(type);
   if (!item) return 500;
   const k = minorItemKey(item);
-  const progress = (cityState.prodItem === k ? cityState.prodProgress ?? 0 : cityState.prodRetained?.[k] ?? 0) + (cityState.prodOverflow ?? 0);
-  const stats = computeCityStats(state, minorCity(cityState));
   // a civilization's own building (BUILDING_TSIKHE, the engine's
   // RENAISSANCE_WALLS) at its own Cost, none of the minor's percents (its
-  // walls' names the three walls alone)
+  // walls' names the three walls alone), and none of the progress the
+  // engine building it shares a key with holds — the game's queue keeps
+  // progress per building row (runs/h1_duely1121 Hunza t149-151: Limes'
+  // Tsikhe at 10 / 5 turns while the Star Fort it builds runs to 1 turn)
   const own = 'building' in item ? traitBuildingCost(state, cityState, type, item.building) : null;
+  const kept = own !== null ? 0 : cityState.prodItem === k ? cityState.prodProgress ?? 0 : cityState.prodRetained?.[k] ?? 0;
+  const progress = kept + (cityState.prodOverflow ?? 0);
+  const stats = computeCityStats(state, minorCity(cityState));
   const pct = own === null ? minorItemPct(state, cityState, item) : 0;
   const base = fxOf(stats.total.production * (1 + pct / 100 + (scale ? 0 : extra / FX)));
-  const rate = scale && extra ? fmul(base, extra) : base;
+  const rate = fmul(scale && extra ? fmul(base, extra) : base, minorItemMult(state, item) * FX);
   return turnsAt((own ?? minorItemCost(state, cityState, item)) * FX - fxOf(progress), rate);
 }
 
@@ -1691,7 +1697,7 @@ export function minorBuildFacts(state: GameState, cityState: CityState, known: (
       const progress = (cityState.prodItem === k ? cityState.prodProgress ?? 0 : cityState.prodRetained?.[k] ?? 0) + (cityState.prodOverflow ?? 0);
       const cost = minorItemCost(state, cityState, item as Exclude<MinorItem, { none: true }>);
       const pct = fresh && 'unit' in item && item.unit !== 'BUILDER' ? 0 : minorItemPct(state, cityState, item);
-      const rate = fxOf((founding ? foundingProduction(stats) : stats.total.production) * (1 + pct / 100));
+      const rate = fxOf((founding ? foundingProduction(stats) : stats.total.production) * (1 + pct / 100)) * minorItemMult(state, item);
       return turnsAt(cost * FX - fxOf(progress), rate);
     },
   };
@@ -1834,6 +1840,20 @@ export function minorPickFacts(state: GameState, cityState: CityState, facts: Ci
  */
 export function minorUnderThreat(cityState: CityState, threat: number): boolean {
   return threat > -1 && ((cityState.hp ?? CITY_MAX_HP) < CITY_MAX_HP || !!cityState.threatNear);
+}
+
+/** The multiplier a minor's Production toward the item takes past its
+ *  percents: the Urban Development Treaty's outcome A
+ *  (MODIFIER_ALL_CITIES_ADJUST_DISTRICT_BUILDING_PRODUCTION, every city's,
+ *  the city-states' too) doubles it toward a building of the treaty's
+ *  district — the build turns' queue multiplier after Production x
+ *  (percent + extra) (0x17b1e0 at 0x17b50c; runs/h1_duely1121 Hunza
+ *  t142-161 under the City Centre treaty: Limes' Star Fort at 4 / 3 turns
+ *  and Tsikhe at 10 / 5, its Star Fort done at t150) */
+export function minorItemMult(state: GameState, item: MinorItem): number {
+  if (!('building' in item)) return 1;
+  const d = congressUdtProdDistrict(state);
+  return d !== null && BUILDINGS[item.building]?.district === d ? CONGRESS_PROD_MULT : 1;
 }
 
 /** The percent a minor's step pays toward the item on top of its Production:

@@ -1548,6 +1548,17 @@ class SimMinors:
             out = torch.where(is_p, pc, out)
         return out
 
+    def _minor_item_mult(self, key: torch.Tensor) -> torch.Tensor:
+        """[B] f64 — `minorItemMult`: the Urban Development Treaty's outcome A
+        doubles the Production toward a building of its district, past the
+        item's percents"""
+        is_b = (key >= self._mk_b0) & (key < self._mk_d0)
+        bi = (key - self._mk_b0).clamp(min=0, max=self.NB - 1)
+        cp = self._congress_udt()[0]
+        hit = is_b & (cp != self.UDT_NONE) & (self._b_req_district.take(bi) == cp)
+        one = torch.ones(self.B, dtype=torch.float64, device=self.device)
+        return torch.where(hit, one * float(self._c_prod_mult), one)
+
     def _minor_item_pct(self, s: int, key: torch.Tensor) -> torch.Tensor:
         """[B] f64 — `minorItemPct`: a Builder +200%, a unit not of the civilian formation +200%
         while the minor holds fewer than ten, walls +200%, the Harbor and the
@@ -2016,7 +2027,7 @@ class SimMinors:
         cost = self._minor_item_cost(s, item)
         before = self.citystate_prod[:, s].clone()
         paid = made + self.citystate_ovf[:, s]
-        self.citystate_prod[:, s] = torch.where(act, before + paid * ((100 + pct) / 100), before)
+        self.citystate_prod[:, s] = torch.where(act, before + paid * ((100 + pct) / 100) * self._minor_item_mult(item), before)
         self.citystate_ovf[:, s] = torch.where(act, zero_b, self.citystate_ovf[:, s])
         _is_u, _is_b, is_d, is_p, _is_r = self._mk_kinds(item)
         if bool((act & is_p).any()):
