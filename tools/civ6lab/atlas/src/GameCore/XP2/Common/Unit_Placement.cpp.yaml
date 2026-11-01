@@ -178,6 +178,7 @@
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
     - "C-96: the knowledge base's army records and the Combat Desire — READ (the records, the update, the desire), PARTLY READ (the signals' looks; the standing-army count in its own section below)"
     - "C-99: the pathfinder's later-turn pool, Heal's hull, the tactical list's explorers, Move Unit's planning — READ, both twins"
+    - "C-95: the barbarians' Builder Capture — READ (the event, the start, the tree's walk), ported"
   notes:
     - ".claude/scratchpad/mu1/readings_c96.md: ...k; the distance max(|dx|, |dy|) where the   signs differ, |dx| + |dy| else); the unit may enter it (0x586360 flag   0x40), the player revealed it, no other player's unit on it and none of   its own that it ma..."
     - ".claude/scratchpad/mu1/readings_c96.md: ...a hull outside   its own territory heads for its player's nearest city (first of equals) —   where 0x586360 (flag 0x10) allows it, PARTLY READ. The engines carry no   influence map: every plot reads no dange..."
@@ -222,8 +223,18 @@
     - "H-1: the raids — READ"
     - "C-95: Explore Land and the barbarians' revealed plots — READ, ported (two tests below unread)"
     - "C-96: the knowledge base's army records and the Combat Desire — READ (the records, the update, the desire), PARTLY READ (the signals' looks; the standing-army count in its own section below)"
+    - "C-95: the barbarians' Builder Capture — READ (the event, the start, the tree's walk), ported"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...om 0 to more — newly visible to the barbarian player, not to the scout alone. A move (0x586d40 → 0x58f3f0 with add) adds the new sight before it drops the old, so a plot both sights..."
     - "...The triggers: a unit placed on a plot another player sees (0x5246f0, from the placement 0x586d40: each player whose visibility count of the plot is above 0); a plot coming into view me..."
   review: imported
+- addr: 0x587ca0
+  final: 0x3b20a0
+  kind: function
+  name: formation placement
+  semantics: places each member of a formation (+0x728, count +0x738) through 0x586d40 with the step's flags; 1 only where every member's placement succeeds
+  status: PARTLY
+  readings:
+    - "C-95: the barbarians' Builder Capture — READ (the event, the start, the tree's walk), ported"
+  review: reviewed

@@ -128,6 +128,15 @@
   context:
     - ...rch 0x26dcd0 with its third argument 1 (flags 0x115), which installs the start callback 0x26eea0 at +0xa8; GeneratePath calls it first, and it sets the start node's Movement (+0x1bc, r...
   review: imported
+- addr: 0x26ef40
+  final: 0x1a7510
+  kind: function
+  name: formation path request
+  semantics: a formation's path (more than one member, not embarked, a member of domain 2 or 4 by 0x2669d0) carries flag 0x2000, which the move 0x26fe20 turns into 0x80 for each member's placement
+  status: PARTLY
+  readings:
+    - "C-95: the barbarians' Builder Capture — READ (the event, the start, the tree's walk), ported"
+  review: reviewed
 - addr: 0x26f1d0
   final: 0x1a76a0
   kind: function
@@ -228,6 +237,7 @@
     - "H-1: a civilian stepped on — READ"
     - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
     - DLL rules the engines contradict
+    - "C-95: the barbarians' Builder Capture — READ (the event, the start, the tree's walk), ported"
   context:
     - "- A unit's move onto a plot holding a religious unit it kills (0x26fe20 → 0x493f80 with the capture flag 1) swings religion: RELIGION_SPREAD_ UNIT_CAPTURE (g..."
     - "- The move 0x26fe20 walks the destination plot's units from the last to the first; for each one not dead (+..."

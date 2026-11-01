@@ -7930,6 +7930,18 @@ the event in `seizeCivilian` (cpu/core/combat.ts, `GameState.barbCaptures`);
   Warriors, 56 and 60 damage on no one's ground beside the camp, go to
   their safe plots 13:10 and 14:10 and fortify ("Operation Protect Units,
   Move" / "Fortify").
+- THE FORMATION'S PATH (0x26ef40, PARTLY READ): a formation of more than
+  one member (+0x738), not embarked (+0x278 0), whose members include one of
+  domain 2 (land) or 4 (0x2669d0 on each member's +0x650) sets path flag
+  0x2000; the move 0x26fe20 turns it into 0x80 for each member's placement
+  (0x587ca0 -> 0x586d40 -> 0x586360), which reads it only in the sea-domain
+  branch (a hull's district test): so 0x2000 does not by itself bar a land
+  escort's step. The formation moves only if every member's placement
+  succeeds (0x587ca0 returns 1 alone then). Not explained: runs/h1_duely1121
+  t157-160, the capture team 983046 (Builder 4522014, Line Infantry 4128797
+  escorting, on 9:12, China's centre striking the escort each turn) logs
+  "Operation Move ... 9:12, 4:19, 9:12" — the step tried and refused — while
+  AI_Planning lists 8:13 at (1/0) for both; it steps at t161.
 - ASK (the operation manager's files): `targetValid` (nodes.ts) holds a
   camp target valid; the tree's INVALID swap needs the camp branch of
   0x73abf0 there ("no camp the seat knows on the target": `targetGone`),
