@@ -68,7 +68,12 @@
   final: 0x528310
   kind: function
   name: presentValue
-  status: PARTLY
+  semantics: "pv(out, value, rate, n): n 0 -> value; n < 0 -> 0; rate 0 -> value x n; rate >= 50.0 or rate x n x 0.01 >= 10.0 -> value / (rate x 0.01); else (1 + r)^n - 1 by its binomial to the cube (a = n r, c = n(n-1) r^2, e = n(n-1)(n-2) r^3, s = a + c/2 + e x fx(1/6), each product truncated), PV = s x value / max(r (1 + s), fx(0.01)); 24.8 fixed point. FinalRelease 0x528310 the same code."
+  status: READ
+  cases:
+    - recording: h1_duelv1124
+      turn: 2
+      value: Cardiff's Monument 24.25 = X + trunc(X), X = PV(1.0, 50) - PV(1.0, 11)
   impl:
     - cpu/core/aiModifiers.ts:adjacencyValue
     - cpu/core/aiValue.ts:presentValue
@@ -86,7 +91,7 @@
     - "...), less Maintenance (+0x38) as Gold; the sum v becomes PV(v, rate, H) - PV(v, rate, T) (0x7a16e0 twice). After it, already discounted: Entertainment (+0x2c) > 0 adds 0x79f7c0 for this..."
     - "- The present value 0x7a16e0 (FinalRelease 0x528310, the same code): n 0 -> v; n < 0 -> 0; rate 0 -> v n; rate >= 50..."
     - "...of 0x2c4170(player). Each term is paid from landing to the horizon: PV(H) - PV(turns) (0x7a16e0: a(D-1)/(kD), D = 1 + nk + n(n-1)k²/2 + n(n-1)(n-2)k³ x 0.16667, k = rate/100, a perpet..."
-  review: imported
+  review: reviewed
 - addr: 0x7a2140
   final: 0x528660
   kind: function
@@ -319,6 +324,7 @@
 - addr: 0x7a4b20
   final: 0x529ed0
   kind: function
+  semantics: "the modifiers' sum: per modifier 0x6cede0 in a copied context; a context naming a yield adds value x DefaultValue, any other min(value, 0x7fffff) << 8."
   status: READ
   cases:
     - recording: 1124
@@ -355,7 +361,7 @@
     - "...st (0x39dcd0) through 0x7a10c0 (a Gold value per plot of a walk); the modifiers through 0x7a4b20 (\"the AI's yield weights and the modifier evaluator\" below). Column offsets from the..."
     - ...ceMaintenanceType (+0x50) whose stockpile is out zeroes the value before the modifiers (0x7a4b20, the per-unit list GlobalAI +0x3a50).
     - "....5 where the row is [+0x12a0]+0xd88 and 0x3dcf50 holds; + the row's modifiers analysed (0x7a4b20). The discount is the GlobalAI's +0x290 (a variable at +0x238): its initializer (0x6d..."
-  review: imported
+  review: reviewed
 - addr: 0x7a4d40
   final: 0x52a050
   kind: function
@@ -415,6 +421,7 @@
   final: 0x52af40
   kind: function
   name: pseudoYieldValue
+  semantics: "pseudoYieldValue(amount, pseudo, player): f = 1 + 0x700810's weight, q = 0x655840; f q >= 0 -> f + q, else +-0.1 where |q| > |f|; amount x that x DefaultValue."
   status: READ
   cases:
     - recording: 1124
@@ -442,12 +449,17 @@
     - ...ds' +0x638, +0x7a8, the +0x6b0 list or +0x6c8); per row also pseudo-yield terms through 0x7a60d0 (PSEUDOYIELD_GOLDENAGE_POINT from 0x2c40b0, 0x2c4350 for Science, 0x2c3ed0, 0x2c4290 fo...
     - ...counts near it (CityBuildAI +0x978, 0x5d45c0) -> 0 outright; through the pseudo-yield (0x7a60d0); below handicap 3 (player +0x908) less Maintenance (+0x5c) less player +0x13a0 +0x338...
     - "...record +0x530): past H, -9999 (0xf04cb0). The own term: PSEUDOYIELD_TECHNOLOGY of 1.0 (0x7a60d0: amount x DefaultValue x max(0, 1 + bias), the bias 0x700810 the sum of four per-player..."
-  review: imported
+  review: reviewed
 - addr: 0x7a6690
   final: 0x52b110
   kind: function
   name: yieldValue
-  status: PARTLY
+  semantics: "yieldValue(amount, yield, player): amount x Yields.DefaultValue (Gold 0.5, else 1.0) x (1 + min(w[y], 9.0)), w = 0x702ad0's weight of the player; no player: the bare DefaultValue."
+  status: READ
+  cases:
+    - recording: h1_duelv1124
+      turn: 2
+      value: "the city-states' Monument at weight 0: X + trunc(X)"
   impl:
     - cpu/core/aiValue.ts:yieldValue
     - gpu/core/sim_cityvalue.py:_cv_yield
@@ -479,7 +491,7 @@
     - ...hifts each row's integer back to fixed point and applies the adjacency percent per row (0x7a6690) before adding it.
     - ...fx(1 + bldPct 0.01) (city +0xbc0 through 0x7a2fa0; 0x18e890) through the yield value 0x7a6690 = amount x Yields.DefaultValue (Gold 0.5) x (1 + min(w[y], 9.0)), w[y] = 0x702ad0, the...
     - ...City Analysis value (0x5d4cd0, capped 50.0), and its upgrade sources' gold (0x5376d0 -> 0x7a6690); PSEUDOYIELD_UNIT_COMBAT of 100 where 0x4f2af0 names the row; PSEUDOYIELD_TOURISM of t...
-  review: imported
+  review: reviewed
 - addr: 0x7a67f0
   final: 0x52b200
   kind: function
@@ -563,6 +575,7 @@
   final: 0x52b900
   kind: function
   name: valueConstructible
+  semantics: "a building's or project's value: per Building_YieldChanges row through 0x7a6690, the pseudo-yields, the defence and great work terms, less Maintenance; PV(H) - PV(T); then the entertainment, regional, power, flood barrier, free unit, housing and modifier terms."
   status: READ
   cases:
     - recording: h1_duelw1124
@@ -590,7 +603,7 @@
     - "- A building's or project's value 0x7a7590: per Building_YieldChanges row (Buildings +0x2e0) the amount x fx(1 + cityPct[y] 0.01)..."
     - "...opulation 1..4; the entertainment term passes ONE Amenity whatever the Entertainment (0x7a8dcd: r9d 1): PSEUDOYIELD_HAPPINESS of 1 where the happiness level holds, else of the levels..."
     - ...yzer's slot 1, none to slot 2; nesting stops at depth 4. The context (0x6ccd50, filled in 0x7a7590) carries T (+0xb4), H (+0xb8), the rate as a float (+0xbc), the city and the player; 0x7a...
-  review: imported
+  review: reviewed
 - addr: 0x7a9a10
   final: 0x52caf0
   kind: function
@@ -648,7 +661,12 @@
 - addr: 0x7b0330
   final: 0x52fd20
   kind: function
-  status: PARTLY
+  semantics: "a government's value: FX_MIN at start >= horizon, or for one held before (+0x350[g]) not current; per Government_SlotCounts row the slot type's best card / 10 over the slot's place; + Governments_XP2 Favor as PSEUDOYIELD_DIPLOMATIC_FAVOR, PV(horizon) - PV(start); + its modifiers (+0xb68[g]) by 0x7a4b20."
+  status: READ
+  cases:
+    - recording: h1_duely1121
+      turn: 56
+      value: Hunza's Divine Right with Monarchy's walls housing, exact
   impl:
     - cpu/core/aiPolicyValue.ts:governmentValue
     - cpu/core/aiPolicyValue.ts:governmentValue
@@ -662,7 +680,7 @@
   context:
     - "...its (0x392cb0: unlocked 0x39df60, not the current) and the current, in order, valued by 0x7b0330 to valueHorizons[0]; the first strictly highest; a different one is commanded (civics..."
     - "- The government's value (0x7b0330): FX_MIN when start >= horizon, or for one held before (PlayerCulture +0x350 [governmen..."
-  review: imported
+  review: reviewed
 - addr: 0x7b0bb0
   final: 0x5300f0
   kind: function
@@ -825,6 +843,7 @@
   final: 0x533190
   kind: function
   name: valueUnit
+  semantics: "a unit's value (out, unit, &rate, T, H, player, city): the exits (T >= H, not the player's version, an untrainable domain, a minor at peace past five units, a Spy) FX(-9999); the branch by pseudo-yield (combat via the unit production table, trade via 0x7a7110, religious, explorer); the tail (copies, promotion class weight, a missing strategic -> 0, maintenance, PV(H) - PV(T))."
   status: PARTLY
   cases:
     - recording: h1_duelv1124
@@ -862,4 +881,4 @@
     - "...ite building's turns; value = 0x7a4d40(building, T, no plot, valueHorizons[1]). A unit: 0x7b62c0(unit, T from its prerequisites and train turns 0x17bb40, +10 likewise, valueHorizons[1]..."
     - "...ad50d0: +0x28 > 0 -> 0x7a67f0, +0x48 bit 1 -> 0x39110); each free unit (+0x298) through 0x7b62c0; Housing (+0x34) > 0 through 0x7a3d70 (CityBuildAI, city +0x1788, population +0x588,..."
     - "- A unit's value 0x7b62c0: the section \"C-96 / C-97: the unit value\"."
-  review: imported
+  review: reviewed

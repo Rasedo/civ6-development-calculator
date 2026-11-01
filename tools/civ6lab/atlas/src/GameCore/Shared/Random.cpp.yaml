@@ -6,7 +6,12 @@
 - addr: 0x8b6c10
   final: 0x5fa040
   kind: function
-  status: PARTLY
+  semantics: "the synchronous generator: state' = 0x41c64e6d x state + 0x3039 (mod 2^32), value = ((state' >> 16) x (max & 0xffff)) >> 16, the state stored every call (0x8b6dd9), the old state logged (0x8b6da9); max 0 steps and returns 0; no lock."
+  status: READ
+  cases:
+    - recording: h1_duelw1117
+      turn: 1
+      value: RandCalls.csv 46,082 / 46,082 values of 1117 and 1118
   impl:
     - cpu/core/rand.ts:LCG_MUL
     - cpu/core/rand.ts:DrawLabel
@@ -22,4 +27,4 @@
     - One generator (0x8b6c10, 16-bit max); 224 labelled draw sites.
     - "The generator (0x8b6c10): state' = 0x41c64e6d · state + 0x3039 (mod 2^32), value = ((state' >> 16) · (max & 0xfff..."
     - "The synchronous generator is never raced. 0x8b6c10 (Random.cpp) takes no lock: it reads the state at 0x8b6c98, logs the old state (the RandC..."
-  review: imported
+  review: reviewed

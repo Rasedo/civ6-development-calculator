@@ -24,6 +24,7 @@
 - addr: 0x365ae0
   final: 0x25f890
   kind: function
+  semantics: "one adjacency row: admitted by 0x367010; YieldChange for Self and the plot's river, then per neighbour per clause it answers; floor(n x YieldChange / TilesRequired)."
   status: READ
   cases:
     - recording: h1_duelw1118
@@ -50,7 +51,7 @@
     - ...ia 0x366df0, the plot's owner and city); the city's yield walk 0x7aaf80 calls the per-row 0x365ae0 itself.
     - "...plot): the district row's vector of Adjacency_YieldChanges rows (+0x100), each through 0x365ae0, SUMMED AS INTEGERS; then the player's modifier-added adjacencies (0x1cb470: MODIFIER..."
     - "- 0x365ae0, one row (column map from the loader 0xa57930's SELECT: flag byte +0xc0 = AdjacentNatur..."
-  review: imported
+  review: reviewed
 - addr: 0x3664d0
   final: 0x25fe30
   kind: function

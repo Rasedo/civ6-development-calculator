@@ -237,7 +237,12 @@
 - addr: 0x5ebb30
   final: 0x3f2e80
   kind: function
-  status: PARTLY
+  semantics: "the knowledge base's ageing (first in 0x785f30 on player signal +0x1f8): every army record's age + 1, one above 0x14 before the step erased (0x5f09b0); the known cities aged, a seen cityless one dropped; the camps seen empty dropped; the trade route value 0x5e9b20 at its tail."
+  status: READ
+  cases:
+    - recording: h1_duelv1124
+      turn: 39
+      value: minor 3's dead Warrior 131073 on its ARMY line t17-t38, gone at t39
   impl:
     - cpu/core/tactical.ts:ARMY_RECORD_AGE
     - cpu/core/minorBuild.ts:minorKnowledge
@@ -254,7 +259,7 @@
     - "C-95: the barbarians' Builder Capture — READ (the event, the start, the tree's walk), ported"
   context:
     - "- The update (0x5ebb30): every entry ages; one whose plot the player sees with no city of its owner there is d..."
-  review: imported
+  review: reviewed
 - addr: 0x5ec7b0
   final: 0x3f3680
   kind: function

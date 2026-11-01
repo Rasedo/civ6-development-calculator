@@ -171,6 +171,7 @@
   review: imported
 - addr: 0x197230
   kind: function
+  semantics: "places the unassigned citizens: one entry per free slot of the 37-plot hexspace, scored food / favored / other; a DP table over entries x count, better = need met, then favored, then other, strict; the backtrack's N assigned (0x194d90)."
   status: READ
   cases:
     - recording: 1124
@@ -189,4 +190,4 @@
     - ...s the full reassign 0x196320 (save the forced counts +0x08, unassign all 0x196440, assign 0x197230, lay the forced counts back 0x196e30), else 0x197230 places the unassigned ones beside th...
     - "0x197230: need = max(0, -floor((food256 - consumption(pop) << 8) / 256)), food the city's cached f..."
     - "...P) — the attacker on a tie (0x206d01: `jle`). The experience reads the result after it (0x1975e0 at 0x206e98 / 0x206ee2). Records: 1124 t13 a barbarian Warrior at 8 HP (32 taken, 24 ov..."
-  review: imported
+  review: reviewed

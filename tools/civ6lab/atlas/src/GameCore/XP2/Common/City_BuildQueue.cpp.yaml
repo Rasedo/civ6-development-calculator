@@ -547,7 +547,12 @@
 - addr: 0x17c2e0
   final: 0xfec80
   kind: function
-  status: PARTLY
+  semantics: "a unit's strategic charge in a city: the speed-scaled Units_XP2 ResourceCost (Player_Units +0x430) times the formation's multiple, a Corps / Army less trunc of m_xCorpsArmyDiscount +0x390, less round of m_xStrategicResourceRequirementModifier +0x3b0, at least 1 last."
+  status: READ
+  cases:
+    - recording: h1_duely1128
+      turn: 33
+      value: Nazca's Horseman trained on 10 Horses (ResourceCost 20 online 10)
   impl: [cpu/core/stockpile.ts:unitBaseResourceCost, cpu/core/stockpile.ts:formationResourceCost]
   readings:
     - "C-96: the resource value and the research value's resources — READ (bonus, luxury, the call), PARTLY READ (the strategic stockpile terms)"
@@ -555,7 +560,7 @@
     - "C-96: the queue's strategic charge, a placed district's resource, the minors' resource turn — READ (0x17c2e0, 0x186460's names), a fit for the district, both twins"
   context:
     - ...8 / +0x1a0), no progress (0x17d1a0) and a StrategicResource (+0x2c8) reserves its cost (0x17c2e0, its formation's) where the stock less the reservations (0x4aa790) covers it (0x4a7400)...
-  review: imported
+  review: reviewed
 - addr: 0x17c790
   final: 0xff1b0
   kind: function

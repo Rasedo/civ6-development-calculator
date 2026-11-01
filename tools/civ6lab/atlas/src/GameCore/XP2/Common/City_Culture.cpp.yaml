@@ -124,6 +124,7 @@
 - addr: 0x1aa7f0
   final: 0x11bf20
   kind: function
+  semantics: "GetNextBuyablePlot's scorer: every unowned plot within 5 touching the city scored d x DISTANCE_MULTIPLIER x 2 + the resource / water / ring / improvement / wonder / yield costs, less the unowned neighbours' seen resources and wonders; the lowest cost's ties walked dq outer, dr inner, for 0x1ab1c0's draw."
   status: READ
   cases:
     - recording: h1_duelw1116
@@ -143,7 +144,7 @@
     - 0x1aa7f0 scores every plot within PLOT_INFLUENCE_MAX_ACQUIRE_DISTANCE (5) of the centre that is un...
     - "...in the scorer's walk over the plots within 5 of the centre, axial dq outer and dr inner (0x1aa7f0) — not tile-index order: replaying each start's picks from the `pre` seed over the record..."
     - "- the picker 0x1ab1c0 draws only over a non-empty list (0x1aa7f0: unowned plots, byte +0x1c 0xff). Its three callers are the border turn's two and 0x1..."
-  review: imported
+  review: reviewed
 - addr: 0x1ab060
   final: 0x11c5d0
   kind: function

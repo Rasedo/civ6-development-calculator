@@ -5,6 +5,7 @@
 # set `review: reviewed`.
 - addr: 0x42bdd0
   kind: function
+  semantics: "the goody hut's kind: each kind's Weight x the row count in 24.8, halved per time the player had it, floored at 1.0, rounded half up, only with an eligible subtype; one draw over the sum, then one over the kind's eligible subtypes."
   status: READ
   cases:
     - recording: h1_duelw1117
@@ -24,7 +25,7 @@
   readings: ["H-1: the goody hut's kind — READ"]
   context:
     - "0x42bdd0 (Player_Goody_Hut.cpp): over the GoodyHuts rows whose ImprovementType is the popped one (..."
-  review: imported
+  review: reviewed
 - addr: 0x42c980
   final: 0x2dad40
   kind: function

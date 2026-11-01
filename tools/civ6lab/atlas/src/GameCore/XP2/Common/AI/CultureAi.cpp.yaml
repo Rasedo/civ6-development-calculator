@@ -221,6 +221,7 @@
 - addr: 0x625d70
   final: 0x4182b0
   kind: function
+  semantics: "the government and policy choice: the government 0x7b0330 values strictly highest commanded; then per slot the best CanSlot-admitted card above the slot's own commanded."
   status: READ
   cases:
     - recording: 1103
@@ -235,11 +236,12 @@
     - "- The AI (0x625d70, on a completed civic and each turn): the government command, then each slot in order:..."
     - "...in hand (0x399a90 = -1). A COMPLETION fires the delegate 0x6293e0 — the government pass 0x625d70, then 0x626600 with the completed civic as the key — over the entries the AI's last tur..."
     - "- The choice (0x625d70; on the completed-civic event 0x6293e0 with the civic, and from the AI turn 0x620110 wi..."
-  review: imported
+  review: reviewed
 - addr: 0x626600
   final: 0x418860
   kind: function
   name: civicChoice
+  semantics: "the civic choice (key): comparator 0x6182e0 (unowned first; next step on the key loses; larger turns; higher score); its next step queued; else one 'Random Civic Choice' draw."
   status: PARTLY
   cases:
     - recording: AI_GovtPolicies.csv
@@ -259,7 +261,7 @@
     - "...h, no draw, else ONE uniform draw over every researchable tech; \"Random Civic Choice\" 0x626600 alike) — which way the plan went the records do not show; a great person's replacement..."
     - "...%d\" — the score and the turns of every row with turns at least 0; \"RANDOMLY CHOSEN CIVIC\" 0x626600)."
     - "- THE CHOICE, 0x626600 (key): the comparator 0x6182e0 over the entries — unowned before owned; a row whose nex..."
-  review: imported
+  review: reviewed
 - addr: 0x628450
   kind: function
   name: congressVotes

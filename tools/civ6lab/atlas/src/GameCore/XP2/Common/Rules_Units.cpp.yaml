@@ -38,6 +38,7 @@
   final: 0x37dd10
   kind: function
   name: Unit_Upgrade_Manager
+  semantics: "the upgrade's Gold: speed(UPGRADE_BASE_COST 10) + max(0, new - old cost) x 2; x2 Corps, x3 Army; less the player's discount; at least speed(15); a levy's percent and floor; down to a multiple of 5."
   status: READ
   cases:
     - recording: h1_duelw1117
@@ -57,7 +58,7 @@
     - "Unit_Upgrade_Manager's cost 0x5376d0 (via 0x590520; \"Upgraded unit is cheaper than current unit\", \"iNetProduction >= 0\"), in 2..."
     - ...' average City Analysis value (0x5d4cd0, capped 50.0), and its upgrade sources' gold (0x5376d0 -> 0x7a6690); PSEUDOYIELD_UNIT_COMBAT of 100 where 0x4f2af0 names the row; PSEUDOYIELD_...
     - ...r's version, the cities' average City Analysis value (0x5d4cd0) and the upgrades' gold (0x5376d0, 20.0 at least); PSEUDOYIELD [0xf2e254] of 100 where 0x4f2ac0 names the row; per buildi...
-  review: imported
+  review: reviewed
 - addr: 0x537fd0
   final: 0x37e230
   kind: function

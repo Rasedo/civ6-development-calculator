@@ -6,7 +6,12 @@
 - addr: 0x939980
   kind: function
   name: Game_Quests
-  status: PARTLY
+  semantics: "gives a quest to a pair (client minor, actor major): none while the pair holds one; the last completed type skipped; each logic IsValidToStartQuest (0x849110) admits; one 'Selecting a random new quest' draw over their count; the record started (0x849400) and its picker run."
+  status: READ
+  cases:
+    - recording: h1_duelw1117
+      turn: 13
+      value: the era / meeting quests t13, t17, t31 as logged (dll_quests.py 335 / 341)
   impl:
     - cpu/core/quests.ts:giveQuest
     - cpu/data/quests.ts:QUEST_MAX_STANDING
@@ -17,7 +22,7 @@
   context:
     - "- Game_Quests 0x939980 gives a city-state's quests: \"H-1: the city-states' quests\" below."
     - "- Who is given one (0x939980, client edx, actor r8d): 1 − the pair's standing quests; the type of the pair's last CO..."
-  review: imported
+  review: reviewed
 - addr: 0x939f70
   kind: function
   status: PARTLY

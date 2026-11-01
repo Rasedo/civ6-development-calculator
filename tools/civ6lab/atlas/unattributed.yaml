@@ -1249,7 +1249,6 @@
   kind: function
   status: PARTLY
   readings:
-    - DLL readings (GameCore_XP2_Release.dll)
     - "C-95: a river crossing's Movement — READ"
     - "C-94: the aid request's gate — READ (0x2597d0 over the event tally 0x33b350), both twins"
     - "H-1: the barbarians' turn (0x1514a0) — READ (the max camps and the sight LAB)"
@@ -2225,6 +2224,7 @@
     - "C-95: the tactical pass — READ (the barbarians' moves; the minors share it)"
     - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
     - "C-96: the city-states' tactical pass — READ (Wander Near City, Heal, the non-barbarian priorities, FindAlternateLocation), the families it needs PARTLY READ"
+    - "C-96 / C-97: the unit value — READ (the combat, trade, explorer branches, the tail, the military AI's unit production), PARTLY READ (its inputs)"
   notes:
     - ".claude/scratchpad/bt/tacnames.txt: ...=== ann 0x5bbf80 2000 function 005bbf80..005bcdb2 (3634 bytes) 005bbf80 sub      rsp, 0x28 005bbf84 lea      rcx, [r..."
     - ".claude/scratchpad/cb/notes.txt: ...97c GOLD f2f980 SCI f2f984 CULT f2f988 FAITH (loader 0x8a0720 by hash). PSEUDOYIELD globals: loader 0x5bbf80, mapping in gnames.json (value = string BEFORE the previous lea; fixed).  DS CHOOSER 0x5d4d70: best..."
@@ -4673,7 +4673,6 @@
     - cpu/core/barbarianOps.ts:newBarbTreeId
     - gpu/core/sim_barbops.py:_bop_next_id
   readings:
-    - "...irst). THE TREE POOL (the manager +0x3a0, READ): 0x7ff7b0 makes a tree in the pool by 0x7fef20 — the slot its free list's head (+0x2c, each entry's +8 the next) names, else a new blo..."
     - "C-99: the upgrade trees — READ (the trigger, Find Available Unit's upgradeable offer, Find Unit Targets' job, Upgrade Units, the economic AI's upgrade, Move Unit with no Location), ported; the deletion of an excess obsolete unit unported"
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
   notes: ["imported: READ in its section, no confirming case found beside it"]

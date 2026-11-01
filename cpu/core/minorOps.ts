@@ -1,8 +1,8 @@
 /**
  * THE CITY-STATES' OPERATIONS IN THE ENGINE'S MINOR TURN, on the one
  * operation manager (cpu/core/operations; the reading is
- * tools/civ6lab/dll_readings.md "C-97: the operations" and "C-96: the
- * city-states' operations"). A minor's manager state is `CityState.ops`;
+ * tools/civ6lab/dll_readings.md "C-97: the operations" and "C-97: City
+ * Defense"). A minor's manager state is `CityState.ops`;
  * its knowledge base is its own (`armyKnown`, `campsKnown`); its contracts
  * are its city AI's (`cityAi`, the one contract book of the player), the
  * operations' trees taking their ids from the city AI's tree serial. Its

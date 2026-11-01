@@ -163,13 +163,18 @@
   final: 0x27de70
   kind: function
   name: PlayerCulture::GetCostToUnlockPolicies
-  status: PARTLY
+  semantics: "GetCostToUnlockPolicies: 0 with an empty slot or the culture's +0xc00 flag; p = max(100 C // 61, 100 T // 77); E(x) = x + 9x p // 100; max(E(50) - s E(5), E(10)), s = turn - the last civic's turn - 1; halved under GOVERNMENT_UNLOCK_WITH_FAITH; less its remainder by 5."
+  status: READ
+  cases:
+    - recording: dll_policy
+      turn: 0
+      value: 853 / 853 recorded prices exact
   impl: [cpu/core/effects.ts:policyUnlockCost, cpu/data/constants.ts:CIVIC_UNLOCK_MAX_COST]
   readings: ["B-D: the policy-unlock price — CLOSED"]
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "`PlayerCulture::GetCostToUnlockPolicies` 0x398e70 (Lua `GetCostToUnlockPolicies` 0x9a2280), the escalation 0x5267a0 (type 1), the progress..."
-  review: imported
+  review: reviewed
 - addr: 0x3990d0
   final: 0x27e0c0
   kind: function

@@ -1532,6 +1532,7 @@
     - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
     - "H-1: the civics AI — READ (the choice, the walk, the propagation), PARTLY READ (the value)"
     - "C-97: the religion AI — the belief scores READ (the job, the value, the analysis's attach), the picks READ, the analyzers PARTLY READ"
+    - "C-96 / C-97: the unit value — READ (the combat, trade, explorer branches, the tail, the military AI's unit production), PARTLY READ (its inputs)"
   context:
     - ...the unit's pseudo-yield (Units +0x290, PSEUDOYIELD_UNIT_COMBAT by default; the globals @0xf2e254 COMBAT, 258 NAVAL, 25c AIR, 26c TRADE, 268 RELIGIOUS, 250 ARCHAEOLOGIST, 260 EXPLORER,...
     - ...nalysis value (0x5d4cd0) and the upgrades' gold (0x5376d0, 20.0 at least); PSEUDOYIELD [0xf2e254] of 100 where 0x4f2ac0 names the row; per building the player's version 0.5, a wonder...

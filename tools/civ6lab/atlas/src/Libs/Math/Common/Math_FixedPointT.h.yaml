@@ -174,7 +174,12 @@
 - addr: 0x519090
   final: 0x366940
   kind: function
-  status: PARTLY
+  semantics: "the damage law: v = trunc((24 + r) x expf(x) + 0.5), x = (10 x D) >> 8, D the strength difference in 1/256 (k = trunc(COMBAT_POWER_SCALING 0.04 x 256)); clamped [1, 100] for units; on a district's hit points with its walls standing less trunc(v x t / 256), t = trunc(256 x left / max); the outer defence's hit taken at the combat type's percent (melee 15, ranged 50, bombard 100)."
+  status: READ
+  cases:
+    - recording: h1_duelw1124
+      turn: 13
+      value: "a barbarian Warrior's blow on a city-state Warrior: CombatLog 18 / 32"
   impl:
     - cpu/core/combat.ts:lawDraw
     - cpu/core/combat.ts:districtHit
@@ -193,7 +198,7 @@
     - "...mbat: one \"Unit Combat Damage\" draw rand(COMBAT_MAX_EXTRA_DAMAGE 12) per damage figure (0x519090; the preview takes the midpoint 6, no draw); \"Unit Capture Chance\" on a capture; an int..."
     - "- The damage law (0x519090; struct 0x519370): damage = trunc((24 + r) x expf(x) + 0.5), clamped [1, 100], x = (k x..."
     - ...0x1c COMBAT_MINIMUM_DAMAGE, +0x20 COMBAT_BASE_DAMAGE, +0x2d the bypass flag). The law 0x519090 takes v = trunc((24 + r) x expf(x) + 0.5) unclamped; on the hit points' hash (0x5e97d62...
-  review: imported
+  review: reviewed
 - addr: 0x521ed0
   final: 0x36cb00
   kind: function
@@ -216,6 +221,7 @@
 - addr: 0x522630
   final: 0x36d0d0
   kind: function
+  semantics: "the Combat a wounded unit loses, 24.8: (10 << 8) less x its +0x1868 reduction, x (damage x 100 / max HP) >> 8, each percent a float32 x 0.01f cut to 1/256."
   status: READ
   cases:
     - recording: 1121
@@ -241,7 +247,7 @@
     - "- 0x522630, the Combat a wounded unit loses, 24.8: m = COMBAT_WOUNDED_DAMAGE_ MULTIPLIER (gp +0x23..."
     - "...56dc90 with the formation's) is strictly greater, and only then takes its wounds off (0x522630). Recorded: 1121 Guangzhou t191, a Line Infantry Corps (75, 16 HP) over an Ironclad (70..."
     - "...tack bonus (+0x1890); 0x51c2d0 takes off the damaged district's loss — the wounded law (0x522630) at COMBAT_WOUNDED_DISTRICT_DAMAGE_MULTIPLIER 10 on the percent of the outer defense'..."
-  review: imported
+  review: reviewed
 - addr: 0x5228c0
   final: 0x36d1d0
   kind: function
@@ -353,6 +359,7 @@
 - addr: 0x700810
   final: 0x4b52a0
   kind: function
+  semantics: "the pseudo-yield weight: [+0x12a0] +0x7e8[p] + +0x620[p] + the PseudoYields list (+0x748, default +0x760) + the +0x768 / +0x780 list, at least -1.0 (@0xd136f4); a Great Person class adds 0x2c4230's golden-age points; PSEUDOYIELD_DISTRICT 0.5 x the era's ChronologyIndex. The +0x620 array's writer is unread."
   status: PARTLY
   impl:
     - cpu/core/aiValue.ts:AiValueView
@@ -373,7 +380,7 @@
     - ...Scientist's, Admiral's, Engineer's and Writer's at 0 lose their buildings' matches). 0x700810's sum is max(-1.0, military AI +0x7e8 + player AI +0x620 + the lists +0x768 / +0x748) p...
     - "...YIELD_TECHNOLOGY of 1.0 (0x7a60d0: amount x DefaultValue x max(0, 1 + bias), the bias 0x700810 the sum of four per-player arrays, unread), +1.0 where row +0xc0 is set, +5.0 for Embar..."
     - ...s, the policies' values, the modifiers, the per-player bias of 0x7a60d0's pseudo-yields 0x700810) are AUDIT C-96.
-  review: imported
+  review: reviewed
 - addr: 0x723bb0
   final: 0x4cf3b0
   kind: function

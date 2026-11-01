@@ -7,7 +7,12 @@
   final: 0x366f30
   kind: function
   name: Rules_Combat
-  status: PARTLY
+  semantics: "a combat's experience: base 1 (ranged / bombard) else 2; attacker ceil(1 + base + k D/A), defender ceil(base + k A/D), k = KILL_BONUS 2 on a kill, the strengths the raw Combat / Ranged / Bombard columns with corps / army; x the side's XP percent rounded up; at most 8 (EXPERIENCE_MAXIMUM_ONE_COMBAT, Expansion2); a barbarian's 1."
+  status: READ
+  cases:
+    - recording: dll_xp
+      turn: 0
+      value: the Bomber's +3 on Infantry 4 / 4 strikes
   impl:
     - cpu/core/combat.ts:xpStrength
     - cpu/core/combat.ts:interceptFight
@@ -21,7 +26,7 @@
   context:
     - "Rules_Combat 0x5197e0 (called by every resolver; the air strike 0x203cb0 picks the combat type 0x204451: BOMBAR..."
     - "- XP: the interceptor's = 0x5197e0 with the MELEE / UNIT_VS_UNIT types, the kill flag 0 and the interceptor as the DEFENDE..."
-  review: imported
+  review: reviewed
 - addr: 0x51a080
   final: 0x367320
   kind: function

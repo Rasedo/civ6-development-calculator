@@ -293,10 +293,15 @@
 - addr: 0x4cd900
   final: 0x336940
   kind: function
-  status: PARTLY
+  semantics: "a tech boost lands: B = floor(Boost x cost / 100), q = (B << 16) / (cost << 8) x 100 + m_iModifiedBoost (+0xf8); amount = cost x q / 100, fraction dropped; min(cost - progress, amount) added to that tech's progress, completing it at the cost. The cost is never cut."
+  status: READ
+  cases:
+    - recording: dll_boost
+      turn: 0
+      value: 29 / 32 current-item boosts exact (Rome Astrology 25 -> 9)
   impl: [cpu/core/boosts.ts:boostAmount, gpu/core/sim_economy.py:_boost_amount]
   readings: ["H-1: a boost lands as progress — READ"]
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "The trigger 0x4cd900 (techs, \"LOC_NOTIFICATION_TECH_BOOST_MESSAGE\"; civics 0x3a3c00, \"Cannot trigger a boost f..."
-  review: imported
+  review: reviewed

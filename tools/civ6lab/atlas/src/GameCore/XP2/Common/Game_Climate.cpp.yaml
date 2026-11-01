@@ -123,6 +123,7 @@
   review: imported
 - addr: 0x287c00
   kind: function
+  semantics: "the weighted picker: one draw over the 16-bit total of the weights, the first entry whose running sum passes it."
   status: READ
   cases:
     - recording: 1115
@@ -141,7 +142,7 @@
     - "...fits all 120 observations: `tests/cpu/harness/ civ6Random.test.ts`). The weighted picker 0x287c00: one draw over the 16-bit total, the first entry whose running sum passes it."
     - "...the volcano roll 0x335040, the weights 0x335260 (no draw), 0x33a280, \"Random Event Roll\" (0x287c00, over the vector at +0x128, never empty: the empty slot rides it), the event 0x334d30, th..."
     - "\"Rolling Espionage Result\" draws ONE weighted pick (0x287c00) over six weights in index order. A mission (0x52b2a0, table 0x52b8f0) with the needed ro..."
-  review: imported
+  review: reviewed
 - addr: 0x287e80
   final: 0x1ba750
   kind: function

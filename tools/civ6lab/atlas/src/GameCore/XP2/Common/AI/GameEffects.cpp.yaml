@@ -6,6 +6,7 @@
 - addr: 0x6cede0
   final: 0x48e9e0
   kind: function
+  semantics: "a modifier's analysis: refuses a fourth nesting; over at most 51 subjects of the collection, each whose requirement set 0x6cf3c0 admits to the analyzer's slot 1, none to slot 2; clears the context's +0xc0 first."
   status: READ
   cases:
     - recording: h1_duelw1124
@@ -20,4 +21,4 @@
     - "...0xf03d80, vtable 0xd63400; COLLECTION_OWNER ...), the requirement set and the arguments. 0x6cede0 runs one over at most 51 subjects: a subject whose requirements hold (0x6cf3c0) goes to t..."
     - "...e collection, the requirement set's key +0x10, the parsed arguments +0x38) the analysis 0x6cede0 into a context (0x142650 copies the evaluation's: +0xb4 start, +0xb8 horizon, +0xbc rat..."
     - "- The analysis (0x6cede0): a fourth nested analysis refused (\"Nested attach modifiers. AI will not analyze\"); th..."
-  review: imported
+  review: reviewed

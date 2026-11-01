@@ -6,6 +6,7 @@
 - addr: 0x4a6110
   kind: function
   name: Player_Resources
+  semantics: "rebuilds m_aLuxuryAllocations (+0x460): a city entry per city, a resource entry per held resource (reach 0x527a50, a no-cap one x copies with a wrap flag); resources stable-sorted by reach descending, cities by their non-luxury amenities less need ascending before each resource; each resource one amenity to the first `reach` cities."
   status: READ
   cases:
     - recording: 1122
@@ -37,7 +38,7 @@
     - "Player_Resources.cpp 0x4a6110 (callers 0x4a7560, the import/export setter, and 0x4a8ed0) rebuilds `m_aLuxuryAllocations..."
     - "...at the list's end — a wrapping (no-cap, copies > 1) one runs on from the list's start (0x4a6b74)."
     - "...the resources (+0x1320, 0x4a8ed0 at 0x4e46c0: the holdings recomputed by 0x4ab6e0, then 0x4a6110 rebuilds the allocation), the governors' clocks (0x432980 at 0x4e46df), and only then e..."
-  review: imported
+  review: reviewed
 - addr: 0x4a6d90
   final: 0x31e5f0
   kind: function

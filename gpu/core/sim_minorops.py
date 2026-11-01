@@ -1,7 +1,7 @@
 """THE CITY-STATES' AND THE FREE CITIES' OPERATIONS on the GPU
 (cpu/core/minorOps.ts and cpu/core/freeOps.ts over the one operation manager
 cpu/core/operations; `tools/civ6lab/dll_readings.md` "C-97: the operations",
-"C-96: the city-states' operations", "C-60: the Free Cities Raid"): each
+"C-97: City Defense", "C-60: the Free Cities Raid"): each
 holder's manager state as `mops_*` planes ([B, S + 1, ...]: a row per minor,
 then the Free Cities' `FR`), a minor's turn in three parts as the game's
 Control Manager runs a player's lists —

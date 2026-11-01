@@ -234,7 +234,12 @@
   final: 0x38f720
   kind: function
   name: Trade_Manager
-  status: PARTLY
+  semantics: "a trade route's end turn: start + speed(TRADE_ROUTE_TURN_DURATION_BASE, gp +0x714) + speed(the GAME era's Eras_XP2 TradeRouteMinimumEndTurnChange +0x30) read when asked; at least start + 1. Online 10 + 0 / 0 / 5 / 5 / 10 / 10 / 10 / 15 / 15 by era."
+  status: READ
+  cases:
+    - recording: h1_duely1127
+      turn: 114
+      value: Hattusa's route to China begun t95 ends t114 (Renaissance 15)
   impl:
     - cpu/core/trade.ts:TRADE_ROUTE_DURATION
     - cpu/core/trade.ts:TRADE_ROUTE_ERA_TERM
@@ -246,7 +251,7 @@
     - "...e.cpp 0x960f40 (FinalRelease 0x66bf70), the operation's per-turn check, and Trade_Manager 0x552bc0 (FinalRelease 0x38f720), the term. Check: runs/h1_duely1127 Hattusa (the records' route r..."
     - ...+0x220 / +0x224 against the origin), the game turn (the game object +0x110) at or past 0x552bc0(the operation's start turn +0x20) removes the route (0x5521f0). Nothing else ends a r...
     - "- 0x552bc0(start): start + 0x5254d0(TRADE_ROUTE_TURN_DURATION_BASE, the global parameters +0x714)..."
-  review: imported
+  review: reviewed
 - addr: 0x552d40
   final: 0x392150
   kind: function
@@ -313,7 +318,12 @@
   review: imported
 - addr: 0x5545e0
   kind: function
-  status: PARTLY
+  semantics: "the plunder payout: V = sum over yields of (origin + destination) x (1 Gold, else 2); base = max(50, V x speed(TRADE_ROUTE_TURN_DURATION_BASE) // 2); + base x the plundering unit's +0x1858 percent // 100; Gold, no draw."
+  status: READ
+  cases:
+    - recording: plunder
+      turn: 0
+      value: 16 / 16 recorded plunders (runs/plunder_*)
   impl:
     - cpu/core/trade.ts:PLUNDER_ROUTE_GOLD
     - cpu/core/trade.ts:PLUNDER_ROUTE_TURNS
@@ -324,4 +334,4 @@
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - Trade_Manager plunder 0x5545e0 (yield loop 0x554860..0x554a4e, route yields 0x559b30 origin / 0x559bc0 destination, spee...
-  review: imported
+  review: reviewed
