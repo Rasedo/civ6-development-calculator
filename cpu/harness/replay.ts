@@ -1267,9 +1267,14 @@ function minorAi(ctx: Ctx, b: TurnRecord, turn: number, made: ReadonlySet<Unit>,
     const home = key && !was.has(key) ? ctx.levyFrom.get(key) : undefined;
     const first = home ?? (old !== undefined && !was.has(key!) ? old : key);
     const at = first ? was.get(first) : undefined;
-    if (first !== key && !home) {
+    // ...and one home from a levy that the pair's upgrade order renamed as
+    // well stands in record t+1's chassis with no Movement left (runs/
+    // h1_duely1121 t154: city-state 2's Musketman 2424833, home from China's
+    // levy, upgraded at once to the Line Infantry 2490368, no tactical row)
+    const renamed = home ? [...ctx.units].find(([k, x]) => x === u && ctx.upgradedFrom.has(k))?.[0] : undefined;
+    if ((first !== key && !home) || renamed) {
       upgraded.add(c);
-      const r = b.units.find((x) => `${x.owner}:${x.id}` === key);
+      const r = b.units.find((x) => `${x.owner}:${x.id}` === (renamed ?? key));
       const into = r ? engineRowOf(ctx.cat, 'unit', r.type) : null;
       if (into) c.type = into;
     }

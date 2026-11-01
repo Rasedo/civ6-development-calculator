@@ -4111,6 +4111,19 @@
   context:
     - "...update (0x7877e0: the tactical knowledge turn 0x785f30, the scripted starts 0x725b80 / 0x726a20) — a barbarian player's: the knowledge base's camps (KB +0x638, 16 bytes each, count..."
   review: reviewed
+- addr: 0x727db0
+  final: 0x4d2e20
+  kind: function
+  name: the military AI's upgrade
+  semantics: "called by the military AI's job 0x722690 right after its strengths' line (0x727510): over the player's units (Player +0x12e8 +0xd8), alive (+0x770 clear) and on the map, each with an upgrade type (0x5904c0 -> 0x5909a0), the gain 0x79ca90(player +0x1290 +0x268, the new type) - 0x79ca90(..., its own type); the largest above 0 (strict, the first of equals) whose full test passes (0x58fff0, r8 0 r9 0) and whose upgrade Gold (0x590520 << 8) the economic AI affords at the UNITS slot with the reserve 0.5 (@0xd20458 as 24.8; 0x6874d0) is kept; after the walk that one unit, for a player no human drives, is bought through 0x68c940 (UNITCOMMAND_UPGRADE)."
+  status: PARTLY
+  cases:
+    - recording: h1_duely1121
+      turn: 154
+      value: "city-state 2's Musketman 2424833, home from China's levy, UnitCommandStarted -750032448 (UNITCOMMAND_UPGRADE) after ResearchChanged(-1) and before PlayerTurnActivated, no Upgrade Units tree in the aimem: UnitUpgraded to the Line Infantry 2490368"
+  notes:
+    - "not ported: ported as read (the minor's unit production table, the savings at its turn) it upgrades every turn from t60 on 1121 (knowledge.army 941 -> 714 of 942 to t190); the gain's table or the full test's flags read otherwise"
+  review: reviewed
 - addr: 0x731d10
   final: 0x64a6d0
   kind: function
