@@ -12405,3 +12405,20 @@ update in `_mops_upgrade_trees` (gpu/core/sim_minorops.py).
   the run lowered ops.members on 1127 (1202 -> 1137 carried), so what tells
   the two turns apart (its Movement, the ground, the endangered move of
   t112 before it) is unread.
+
+## C-112: a city-state's citizens re-placed between records — the records' counts, the trigger unread
+
+- runs/h1_duely1128 Hong Kong t5: the drought's PlotYieldChanged rows on
+  (7..9, 5..7) close turn 4 (actions 540-546, 316's Food 1 -> 0); the city's
+  Production of turn 5 is 316's (City_BuildQueue 7.5 = 2.5 x 3), its record
+  t6 works 362, and the engine's full re-place (`minorReplaceCitizens`) on
+  record t5 picks 362. In Hong Kong's own turn (actions 596-606) only its
+  units' moves and, just before, its CivicCompleted (Code of Laws, 594).
+- Over the five duely duels' city-state city-turns with population and
+  plots unchanged (3,179): the engine's full re-place on record t moves a
+  citizen in 196; record t+1 holds the re-placed set in 88, the old in 80,
+  another in 28 (1117 / 1128 17 / 4 / 2, the other three 71 / 76 / 26). A
+  re-place every turn is no rule; a worked plot's yields falling between
+  records is no trigger either (with it 8 / 5 / 13; 1128 Hong Kong t5, t16
+  re-placed, 1117 Caguana t37, t50 kept). What re-places a city-state's
+  citizens between its records stays unread.

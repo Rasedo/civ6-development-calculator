@@ -224,6 +224,9 @@ interface Ctx {
    *  minors' units' turn has run their city's second hook and trees
    *  (`minorClearsAfter`) */
   minorClears: Extract<Decision, { kind: 'clear' }>[];
+  /** the plots a city-state's Builder cleared in the copy's units' turn,
+   *  unpaid, its charge spent there (`holdMinorClears`) */
+  minorCleared: Set<number>;
   /** the record's new units of those city-states the engine has not made,
    *  matched once the clearings' lumps have landed (`minorClearsAfter`) */
   minorClearUnits: { d: Extract<Decision, { kind: 'unitNew' }>; ds: readonly Decision[] }[];
@@ -1621,9 +1624,11 @@ function minorLaysAfter(ctx: Ctx, lays: readonly { u: Unit; plot: number; imp: s
 function minorClearsAfter(ctx: Ctx, b: TurnRecord): void {
   const open = ctx.minorClears;
   const units = ctx.minorClearUnits;
+  const cleared = ctx.minorCleared;
   ctx.minorClears = [];
   ctx.minorClearUnits = [];
-  for (const d of open) applyClear(ctx, d);
+  ctx.minorCleared = new Set();
+  for (const d of open) applyClear(ctx, d, cleared.has(d.plot));
   // the record's new units of those city-states: a lump's completion
   // among them
   for (const { d, ds } of units) applyUnitNew(ctx, b, d, ds, false);
@@ -2496,13 +2501,16 @@ function applyFound(ctx: Ctx, d: Extract<Decision, { kind: 'found' }>): void {
 /** A FEATURE OR RESOURCE TAKEN OFF (the record's clearing): the order is the
  *  player's, through the engine's verb with the builder the log names, from
  *  the plot: the lump, the charge */
-function applyClear(ctx: Ctx, d: Extract<Decision, { kind: 'clear' }>): void {
+function applyClear(ctx: Ctx, d: Extract<Decision, { kind: 'clear' }>, copyCleared = false): void {
   const { state } = ctx;
   const seat = seatOfP(ctx, d.player);
   const t = state.map.tiles[d.plot];
   if (d.what === 'feature' ? !t.feature : !t.resource) return void count(ctx, `clear:${d.what}`, 'refused', d.player);
   const builder = d.unit ? unitOf(ctx, d.unit) : undefined;
-  let why = d.unit ? 'a builder the replay does not hold' : undefined;
+  // a city-state's clearing its copy's own Builder made on the plot, its
+  // charge spent there (runs/h1_duely1127 Hattusa t38: Builder 262144's last
+  // charge on 531): the record's lump lands for it
+  let why = d.unit && !(copyCleared && !builder) ? 'a builder the replay does not hold' : undefined;
   if (builder) {
     builder.tileIndex = d.plot;
     const res = d.what === 'feature' ? builderRemoveFeature(state, builder.id, seat) : builderHarvest(state, builder.id);
@@ -4799,7 +4807,7 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
   const ctx: Ctx = {
     state, cat, W: recs[0].head.W, seatOfPlayer: first.seatOfPlayer, playerOfSeat: first.playerOfSeat,
     units: new Map(), retained: new Map(), pendingMinors: new Map(), next: first, tally: new Map(), fellBack: new Map(), imposed: new Map(), reasons: new Map(),
-    engineKilled: new Set(), routeSpent: new Map(), paths: new Map(), walked: new Set(), steps: new Map(), barbBlows: new Map(), gone: new Map(), barbSeized: [], minorBlows: new Map(), minorBuys: [], minorImproves: [], minorClears: [], minorClearUnits: [], barbBattles: [], barbFought: new Set(), minorUnits: [], minorGround: [], buyTrace, lateBlows: [], upgradeInto: new Set(), upgradedFrom: new Map(), barbSteps: [], barbPillaged: [], envoys: [], battled: new Set(), fortified: new Map(), undug: new Map(), streams: new Map(), applied: new Set(), barbNew: [], lateEnvoys: [], log: history.randLog, stream, prev: recs[0],
+    engineKilled: new Set(), routeSpent: new Map(), paths: new Map(), walked: new Set(), steps: new Map(), barbBlows: new Map(), gone: new Map(), barbSeized: [], minorBlows: new Map(), minorBuys: [], minorImproves: [], minorClears: [], minorCleared: new Set(), minorClearUnits: [], barbBattles: [], barbFought: new Set(), minorUnits: [], minorGround: [], buyTrace, lateBlows: [], upgradeInto: new Set(), upgradedFrom: new Map(), barbSteps: [], barbPillaged: [], envoys: [], battled: new Set(), fortified: new Map(), undug: new Map(), streams: new Map(), applied: new Set(), barbNew: [], lateEnvoys: [], log: history.randLog, stream, prev: recs[0],
     researchAi: report.researchAi, researchScores: report.researchScores, agendaCivics: null, researchBefore: new Map(), aiResearchLog: loadAiResearchLog(dumpPath),
     tactical: loadTactical(dumpPath), barbTally: report.barbTactics, minorTally: report.minorTactics, minorDraws: report.minorDraws,
     civicAi: report.civicAi, civicScores: report.civicScores, civicBefore: new Map(), aiCivicLog: govtLog.civics, aiPolicyLog: govtLog.policies,
@@ -4845,7 +4853,10 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
   // lump landing after it (`minorClearsAfter`)
   holdMinorClears((plot, clears) => {
     const r = ctx.next.state.map.tiles[plot];
-    if (!(clears === 'feature' ? r.feature : r.resource)) return 'unpaid';
+    if (!(clears === 'feature' ? r.feature : r.resource)) {
+      ctx.minorCleared.add(plot);
+      return 'unpaid';
+    }
     count(ctx, 'minorAi:clear', 'fallback', ctx.playerOfSeat.get(ctx.state.map.tiles[plot].ownerSeat),
       `plot ${plot}: the engine cleared its ${clears}, the game kept it`);
     return 'kept';
