@@ -57,7 +57,7 @@ import { irradiated } from './nuclear';
 import { atRngPoint } from './rand';
 import { knowledgeLook } from './tactical';
 import { plotsSeenNow } from './barbarians';
-import { cityStateMilitary, minorCampsLook } from './minorOps';
+import { cityStateMilitary, minorCampsLook, minorMilitaryUpgrade } from './minorOps';
 import { tilesWithin } from '../../world/hex';
 import { hasRiver } from '../../world/query';
 import { aliases, engineId, gameTypeOf } from '../data/aliases';
@@ -103,8 +103,9 @@ import { opsOf } from './operations/manager';
  *  (`minorKnowledge`), its contract purchases (`minorContractPurchases`),
  *  then its actions: a research
  *  completion's upgrades, its city AI's turn (`minorAiTurn`: its builds,
- *  purchases and trees, the trees' Builders' work) and its civics AI's
- *  government values on the city it left, its routes' walk and a
+ *  purchases and trees, the trees' Builders' work), its civics AI's
+ *  government values on the city it left, its military AI's upgrade
+ *  (`minorMilitaryUpgrade`), its routes' walk and a
  *  free Trader's route, its city's ranged strikes (the majors' own body
  *  fired from the minor's centre strength), its army's walk, and last the
  *  boosts the turn earned (`detectBoosts`). */
@@ -183,6 +184,12 @@ export function minorPhase(state: GameState): void {
     // between the plots 399 and 445; Autocracy's wonder term and Political
     // Philosophy 392.1 / 396.1 a turn apart as logged)
     government();
+    // its military AI's upgrade (0x722690 -> 0x727db0, the military's pass 2
+    // after the cities' in the Control Manager's first list): after the
+    // look, which records the unit as it stood (runs/h1_duely1124 t43: city-
+    // state 2's Warrior 262144 a Warrior at age 0 in its own records, the
+    // Swordsman from t44), on the table its city AI read
+    minorMilitaryUpgrade(state, cityState);
     delete cityState.armyCounted;
     minorTrade(state, cityState, !ordersHeld);
     const city = minorCity(cityState);

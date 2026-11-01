@@ -7153,3 +7153,46 @@ is ported.
 - OPEN: a city's or Encampment's zone in a move's cost (`inEnemyZoc`
   counts units alone); the MoveTo order's own refusal of the city (the
   operation's start) is read on the recording, not in the order's code.
+
+## C-129: the military AI's upgrade after the look; the Free Cities buy none — READ (0x6096c0's lists, 0x687bf0), both twins
+
+`minorMilitaryUpgrade` (cpu/core/minorOps.ts) runs in `minorPhase`
+(cpu/core/minorBuild.ts) after the city AI's turn and the civics AI's
+government values, on the unit production table the city AI read
+(`armyCounted`), before the units' turn; GPU `_mops_military_upgrade` in
+`_city_state_phase` (gpu/core/sim_minors.py) at the same place. The replay
+lands the record's upgrade ordered before the minor's PlayerTurnActivated at
+that call (`traceMinorUpgrade`), not at the minor's turn end.
+
+- THE ORDER: the Control Manager's first list (0x60e8c0) holds the cities'
+  update (CityBuildAI pass 2), research, the economic AI 0x687bf0 (pass 3,
+  written 0x68534e) and the military AI 0x722690 (pass 2, written 0x71ac27);
+  it runs pass by pass from 4 down, each job acting in its own pass, so the
+  savings and contract purchases come before the upgrade and the cities'
+  update before it within pass 2. The knowledge base's look is before it:
+  runs/h1_duely1124 t43 city-state 2's Warrior 262144, upgraded before its
+  PlayerTurnActivated, stands a Warrior at age 0 in its own records of the
+  turn and a Swordsman from t44 (landing the upgrade before the look moves
+  knowledge.army 0 -> 73 misses on 1124 to t130, 1 -> 269 on 1121 to t190).
+- The upgrade reads the savings the turn's savings turn left:
+  runs/h1_duely1127 t126 / t127 / t129 city-state 4's Skirmishers are bought
+  only on them (with the slots of the turn before none is).
+- THE FREE CITIES: TRAIT_LEADER_FREE_CITIES carries no DefaultSavings list
+  (Expansion1_Leaders.xml; Leaders.xml lists it for TRAIT_LEADER_MAJOR_CIV
+  and MINOR_CIV_DEFAULT_TRAIT alone), so the economic AI's total weight
+  (+0x458) is 0: 0x687bf0 asserts at 0x687c89 and goes on, the weight over
+  the total a NaN whose 24.8 conversion (cvttss2si, << 8) is 0, every share
+  0 and the treasury's change all the SLUSH slot's. The UNITS slot stays 0,
+  the can-afford (0x6874d0, slot 1 at half the cost) fails, and 0x727db0
+  buys nothing: no Free City upgrade in any recording; neither twin walks it
+  for them.
+- Cases (carried, one seed each, unit.upgrade): runs/h1_duely1121 t1-189
+  40 of 40, runs/h1_duely1127 t1-129 20 of 20, runs/h1_duely1128 t1-129 16
+  of 16 (t110 Hong Kong's Warrior 1966081 to the Man-at-Arms, the unit its
+  city trained that turn), runs/h1_duely1124 t1-129 9 of 10; every other
+  kind as before on those spans.
+- OPEN: runs/h1_duely1124 t47 city-state 2's Warrior 196610 on its ground,
+  its UNITS slot at 2.9 Gold after the turn's savings (2.5 the test): the
+  engine buys it, the game none before its PlayerTurnActivated (its tree
+  upgrades it after); on the slots before the turn's savings (2.4) the game's,
+  which loses 1127 t126-t129.

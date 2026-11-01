@@ -5,8 +5,7 @@ city events, trees and contracts"). Each city-state's turn after its step
 (`_minor_build`), as the game's Control Manager runs a player's lists:
 
  - B: the Economic AI's savings turn (0x687bf0, `_cv_savings_turn`), the
-   military AI's turn (`_mops_evaluate`, then its upgrade
-   `_mops_military_upgrade`, sim_minorops.py) — both
+   military AI's turn (`_mops_evaluate`, sim_minorops.py) — both
    `_minor_military_turn`, before the knowledge base's look — and after the
    look its contract purchases (`_minor_contract_purchases`);
  - A: the city's update (0x5ce680): its threat (0x5cbd10, `_minor_threat`),
@@ -116,8 +115,6 @@ class SimMinorAi:
         boost = _gold_boost_of(self.citystate_net_income[:, s])
         self.citystate_gold_boost[:, s] = torch.where(alive, boost, self.citystate_gold_boost[:, s])
         self._mops_evaluate(s)
-        # its one upgrade of the turn (0x722690 -> 0x727db0)
-        self._mops_military_upgrade(s, alive)
 
     def _minor_gp_class(self) -> torch.Tensor:
         """[B] `minorGreatPersonClass` (0x2f7eb0): a class of the AI's list

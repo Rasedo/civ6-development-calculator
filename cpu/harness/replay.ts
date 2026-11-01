@@ -5489,7 +5489,7 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
         // ...its upgrades made in its turn, which no later look sees undone
         // (runs/h1_dueld1128 t41: Hong Kong's Warrior upgraded to a
         // Swordsman before Granada's turn, none of its records a Warrior)
-        const ups = ds.filter((d) => d.kind === 'upgrade' && d.player === player);
+        const ups = ds.filter((d) => d.kind === 'upgrade' && d.player === player && !landed.has(d));
         if (ups.length) {
           const rng = state.rngState;
           applyPhase(ctx, ups, 'after', b, b, new Set([player]));
@@ -5575,6 +5575,7 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
       // agree; a levied unit home in its turn goes by the id the game gives
       // it there
       const homeIds = new Map(ds.flatMap((d) => (d.kind === 'levyEnd' ? d.units.map(([f, t]) => [f, t] as const) : [])));
+      const landed = new Set<Decision>();
       traceMinorUpgrade((cs, u) => {
         const p = ctx.playerOfSeat.get(cs.seat)!;
         const open = opens.get(p);
@@ -5591,6 +5592,21 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
           score(ctx, 'unit.upgrade', ctx.turn, p, `p${p} upgrade`, equal, u ? `${ours} -> ${upgradeType(state, u.seat, u.type)}` : ours,
             `${game} -> ${into ?? '?'}`);
         }
+        // ...and the game's upgrade lands there, at its military AI's turn,
+        // so the minor's turn after reads the unit upgraded and its savings
+        // spent; a levied unit home in its turn goes by its new id from here
+        const d = ds.find((x) => x.kind === 'upgrade' && x.player === p && x.unit === game && !landed.has(x));
+        if (!d) return;
+        for (const [f, t] of homeIds) {
+          const v = ctx.units.get(f);
+          if (t !== game || !v || ctx.units.has(game)) continue;
+          ctx.units.delete(f);
+          ctx.units.set(game, v);
+        }
+        landed.add(d);
+        const rng = state.rngState;
+        applyPhase(ctx, [d], 'after', b, b, new Set([p]));
+        state.rngState = rng;
       });
       try {
         minorTurns(state);

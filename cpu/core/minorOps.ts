@@ -8,9 +8,9 @@
  * operations' trees taking their ids from the city AI's tree serial. Its
  * turn, as the game's Control Manager runs a player's lists:
  *
- *  - B: the military AI's turn (`minorOpsEvaluate`, then its upgrade
- *    `minorMilitaryUpgrade`, from `minorMilitaryTurn`,
- *    before the turn's knowledge base look);
+ *  - B: the military AI's turn (`minorOpsEvaluate`, from `minorMilitaryTurn`,
+ *    before the turn's knowledge base look), and its upgrade
+ *    (`minorMilitaryUpgrade`) after the city AI's turn;
  *  - A: the city's defence event starts City Defense (`minorOpsStart`);
  *  - C: the operations' run in its tactical pass, after each unit's
  *    planning (`cityStateMilitary`): the operations' units are theirs, the
@@ -387,8 +387,9 @@ export function traceMinorUpgrade(fn: typeof upgradeTracer): void {
 }
 
 /**
- * THE MILITARY AI'S UPGRADE (0x727db0, from its job 0x722690 after the
- * operations' evaluation): over the minor's units in its order, each with
+ * THE MILITARY AI'S UPGRADE (0x727db0, from its job 0x722690 in the
+ * military's pass 2, after the knowledge base's look and the city AI's
+ * turn): over the minor's units in its order, each with
  * an upgrade its research unlocks (0x5909a0), the gain — its unit
  * production table's value of the upgrade less its own (0x79ca90, 0 for a
  * type the table lacks); of the gains above 0 the largest (the first of
@@ -398,6 +399,7 @@ export function traceMinorUpgrade(fn: typeof upgradeTracer): void {
  * turn spent. Under the replay's hold the pick is the tracer's alone.
  */
 export function minorMilitaryUpgrade(state: GameState, cs: CityState): void {
+  if (cs.centerIndex < 0) return;
   const eco = (cs.economy ??= newEconomicMemory());
   const table = minorUnitProduction(state, cs, minorKnownUnits(cs));
   const value = (t: string) => table.get(installType('unit', t, 'UNIT_'))?.value ?? 0;

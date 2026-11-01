@@ -2930,6 +2930,7 @@
   readings:
     - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
     - "C-129: a city-state's contract purchases come after its knowledge base's look — the job order READ (0x6096c0), the birth record's timing off the aimem sites, both twins"
+    - "C-129: the military AI's upgrade after the look; the Free Cities buy none — READ (0x6096c0's lists, 0x687bf0), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...SSES (READ): 0x6096c0 pushes three job lists (std::function, 0x40 bytes each) — +0x370 (0x60e8c0: the cities 0x5c2650, ..., the Economic AI 0x687bf0, the military 0x722690), +0x388 (0x..."
@@ -3969,6 +3970,7 @@
     - cpu/core/minorCityAi.ts:minorMilitaryTurn
     - cpu/core/minorOps.ts:minorMilitaryUpgrade
     - gpu/core/sim_minorai.py:_minor_military_turn
+    - cpu/core/minorBuild.ts:minorPhase
   readings:
     - "H-1: draws the AI takes, draws the engines lack"
     - "C-97: the operations — the manager READ (no-enemy candidates), the war candidates unread"
@@ -3980,6 +3982,7 @@
     - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
     - "C-129: a city-state's contract purchases come after its knowledge base's look — the job order READ (0x6096c0), the birth record's timing off the aimem sites, both twins"
     - "C-129: the military AI's upgrade — READ (0x727db0, 0x6874d0), both twins"
+    - "C-129: the military AI's upgrade after the look; the Free Cities buy none — READ (0x6096c0's lists, 0x687bf0), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...om the behaviour tree — \"HL: Rock Band Move\" (0x710f40) and the CITY_ASSAULT operation (0x722690), each building a unit's name for its log (the band template over 118 and 155): the AI'..."
@@ -4158,12 +4161,17 @@
     - recording: h1_duely1121
       turn: 61
       value: "every upgrade the log orders before a city-state's PlayerTurnActivated (at most one a player-turn, 129 over the five duely duels) is the engine's pick: 1121 t61-t98 26 of 26 (the Warriors t61-t72 first, the Swordsmen t73-t75 next, Galley t91, Men-at-Arms t96-t98)"
+    - recording: h1_duely1124
+      turn: 43
+      value: city-state 2's Warrior 262144 upgraded before its PlayerTurnActivated stays a Warrior at age 0 in its own records of the turn (the look before the upgrade), the Swordsman from t44
   impl:
     - cpu/core/minorOps.ts:minorMilitaryUpgrade
     - gpu/core/sim_minorops.py:_mops_military_upgrade
-    - cpu/core/minorCityAi.ts:minorMilitaryTurn
-    - gpu/core/sim_minorai.py:_minor_military_turn
-  readings: ["C-129: the military AI's upgrade — READ (0x727db0, 0x6874d0), both twins"]
+    - cpu/core/minorBuild.ts:minorPhase
+    - gpu/core/sim_minors.py:_city_state_phase
+  readings:
+    - "C-129: the military AI's upgrade — READ (0x727db0, 0x6874d0), both twins"
+    - "C-129: the military AI's upgrade after the look; the Free Cities buy none — READ (0x6096c0's lists, 0x687bf0), both twins"
   review: reviewed
 - addr: 0x731d10
   final: 0x64a6d0

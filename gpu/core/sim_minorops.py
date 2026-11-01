@@ -1401,7 +1401,7 @@ class SimMinorOps:
         afford = self._cv_can_afford(self.citystate_savings[:, s], cost, 1, _FX // 2)
         full = (self._minor_can_upgrade(s)[:, :P]
                 & self._afford(self.citystate_treasury[:, s], self._mb_upgrade_gold).unsqueeze(1))
-        ok = u["own"] & (u["tile"] >= 0) & (nxt >= 0) & (gain > 0) & full & (alive & afford).unsqueeze(1)
+        ok = u["own"] & (u["tile"] >= 0) & (nxt >= 0) & (gain > 0) & full & (alive & (self.citystate_center[:, s] >= 0) & afford).unsqueeze(1)
         if not bool(ok.any()):
             return
         # the largest gain, of equals the first in pool order

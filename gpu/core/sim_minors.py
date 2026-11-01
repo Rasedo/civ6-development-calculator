@@ -89,6 +89,9 @@ class SimMinors:
             # the civics AI's government values on the city its update left
             # (the Food focus it set re-placed its citizens: `minorPhase`)
             government()
+            # its military AI's upgrade (`minorMilitaryUpgrade`): after the
+            # look, on the table its city AI read
+            self._mops_military_upgrade(s, alive)
             del self._cv_counted[s]
             self._minor_trade(s)
             self._city_strikes(self._CITY_MINOR0 + s, col0, alive)

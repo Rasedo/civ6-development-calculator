@@ -24,6 +24,7 @@
     - "C-97: the majors' diplomatic actions — the pick, the state machine and the receiver READ, the evaluator's terms PARTLY READ"
     - "C-97: the sender's pick, the savings, the threat and the focus — the savings, the spacing, the trust term and the focus READ, the threat PARTLY READ"
     - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
+    - "C-129: the military AI's upgrade after the look; the Free Cities buy none — READ (0x6096c0's lists, 0x687bf0), both twins"
   notes:
     - ".claude/scratchpad/dp2/NOTES.md: ...]vt+0x30(other)  (cond unknown)   +0x48 0x672f90 CAN-DO: not human-check(0x3da870 on +0x1300), econ 0x6874d0(cost, slot 2, frac 0.5),         game CanDoAction 0x3dd9a0, a count +0x20 + 0x3d9450(to) < [f28c78]..."
     - ".claude/scratchpad/dp2/NOTES.md: ...efaultSavings): SLUSH_FUND 3, UNITS 4, PLOTS 1, GREAT_PEOPLE 1 (slot order = ? rowid).   Can-afford 0x6874d0(econ,&amt,slot,&frac): savings+0x5b8[slot] >= amt*(1-frac) ... then +0x598 term.   Spend 0x68acd0(e..."
@@ -73,6 +74,7 @@
     - "C-130: the Economic AI's Gold boost on the treasury's banked net income — READ (0x4e08f0, PlayerTreasury +0x1b8), both twins"
     - "C-129: a city-state's contract purchases come after its knowledge base's look — the job order READ (0x6096c0), the birth record's timing off the aimem sites, both twins"
     - "C-96: the savings' accrual"
+    - "C-129: the military AI's upgrade after the look; the Free Cities buy none — READ (0x6096c0's lists, 0x687bf0), both twins"
   notes:
     - "imported: READ in its section, no confirming case found beside it"
     - ".claude/scratchpad/dp2/NOTES.md: ...2, -cost) (refund); r==0xc -> +0x6338[to][a]=1; always 0x64a300(+0xc28[to], a). - Economic AI turn 0x687bf0: delta = treasury(+0x13a0 +0xf8) - last(+0x1b8); each saving slot i:   savings(+0x540)[i] += delta..."
