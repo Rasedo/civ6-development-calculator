@@ -2047,6 +2047,7 @@
     - "C-99: an embarked unit passes no other player's passenger — the step's flag-1 test READ (0x2720a0 at 0x272372, 0x271be0, 0x586360 at 0x586542, 0x208b80 under 0x108, 0x20a2a0), both twins"
     - "C-99: the stacking count holds other players' units, the wanders' kept-out plots, a Harbor's water no shore — READ (0x585d90, 0x585eb0, 0x2720a0, 0x77bf50, 0x77b9a0, 0x530240), both twins"
     - "C-124: an attack order to a plot out of sight loses its attack flag — READ (0x962310), both twins"
+    - "C-125: the safe plot's stacking test holds other players' units — READ (0x716b90 at 0x716d77 -> 0x585eb0 / 0x585d90), both twins"
   context:
     - "...that keep it out (0x585d90: its own of its class, vtable +0xb8; another player's where 0x518f40 refuses the pair), none with MakeTradeRoute (+0x1b9 bit 64) or Spy (+0x1ba bit 2). Th..."
   review: reviewed

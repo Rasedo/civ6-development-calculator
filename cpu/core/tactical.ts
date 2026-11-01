@@ -2526,8 +2526,11 @@ function garrisonDistrict(state: GameState, t: Tile): boolean {
 
 /**
  * THE SAFE PLOT (InfluenceMap 0x716b90) for the unit: of its planning reach,
- * the plots of this turn not `taken` already, none of its own units stacking
- * with it there (0x585eb0, itself counted) and no unit at war with it
+ * the plots of this turn not `taken` already, none holding a unit that keeps
+ * it out (0x585eb0, `keptOut`: one of its own stacking with it, itself
+ * counted, or another player's at peace but a Trader or a Spy — runs/
+ * h1_duely1127 t88: player 0's Warrior on 29:15 keeps city-state 3's Galley
+ * 393216 to 28:17) and no unit at war with it
  * (0x5861f0), none in fallout (0x2d2100). A FORT is a plot of the player's
  * own territory whose district has HitPoints (DistrictInfo +0x58: the city
  * centre and the Encampment, `garrisonDistrict`). Against the best so far,
@@ -2564,7 +2567,7 @@ function safePlot(state: GameState, pass: Pass, u: Unit, taken: ReadonlySet<numb
     if (r.turns > 1 || taken.has(r.tile) || r.moves < minMoves * FIX) continue;
     const t = state.map.tiles[r.tile];
     if (irradiated(t)) continue;
-    if (stackedAt(state, u, r.tile) || enemyAt(state, u, r.tile)) continue;
+    if (keptOut(state, u, r.tile) || enemyAt(state, u, r.tile)) continue;
     const d = pass.danger[r.tile];
     const safe = d <= 0;
     const own = tileSeat(t) === u.seat;

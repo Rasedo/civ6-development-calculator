@@ -7719,3 +7719,28 @@ update (gpu/core/sim_tactics.py).
 - The improvement event's value is no gate here: the game's trees start at
   t44 and t45 on 210 as the engines' do (the Mine 71.45, the reservation's
   whole 71).
+
+## C-125: the safe plot's stacking test holds other players' units — READ (0x716b90 at 0x716d77 -> 0x585eb0 / 0x585d90), both twins
+
+`safePlot`'s `keptOut` (cpu/core/tactical.ts); `_tac_safe_plot`'s
+`_tac_peaceful` (gpu/core/sim_tactics.py).
+
+- THE TEST (0x716d77): with its fifth argument clear the safe plot skips a
+  plot where 0x585eb0(formation, plot, 0) counts a unit: over the
+  formation's members, 0x585d90 counts the plot's units not at war with the
+  member — one of its player that stacks with it, or another player's but a
+  Trader (Units +0x1b9 & 0x40), a Spy (+0x1ba & 2) or a pair 0x518f40 lets
+  share the plot. It is `keptOut`, not the own-units test alone.
+- THE MAJORS' UNITS: the majors play before the minors, so a minor's pass
+  sees a major's unit where the major's actions left it.
+- CONFIRMED (one-seed aimem traces): runs/h1_duely1127 t88 city-state 3's
+  hurt Galley 393216 on 30:19 (Naval Superiority, target 31:20) takes 28:17
+  as logged — player 0's embarked Warrior 1245188 on 29:15 keeps it from
+  29:15; t129 / t131 its Move to Safety / Protect Units to 512 as logged.
+- OPEN: runs/h1_duely1127 t92-96 the Galley's safe plot is 28:17 as logged,
+  but the walk ends on 29:16, short of it, past player 0's Warriors on 29:17
+  / 29:15; t133-137 its safe plot 511 / 512 where the game's is 555;
+  runs/h1_duely1128 t41 city-state 4's Horseman 589827 on 30:7 (danger
+  move 0x80e8ab, no goal) takes 33:10 where ours takes the empty centre
+  32:11 (a fort by 0x716b90 at 0x716de5..0x716e19, its Walls done at t40),
+  the exclusion unread.

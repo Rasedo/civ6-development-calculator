@@ -4131,8 +4131,9 @@ class SimTactics:
         """[B] — `safePlot` for the unit at local slot `u_b` in the games of
         `mask`: of its planning reach's plots of this turn in closing order
         with `min_mv` [B] whole Movement left at least (none: 0), none in
-        `taken`, none with a unit of its own stacking with it (itself
-        counted), one at war with it or fallout, the first best — a fort (its
+        `taken`, none with a unit that keeps it out (`keptOut`: its own
+        stacking with it, itself counted, or another player's at peace but a
+        Trader), one at war with it or fallout, the first best — a fort (its
         own territory under a city centre or an Encampment) over any plot
         but a fort, of two forts the lower danger; a plot of no danger over
         one of danger, a fort aside; of two of no danger its own territory,
@@ -4149,8 +4150,8 @@ class SimTactics:
         mask = mask & (row >= 0)
         rr = row.clamp(min=0)
         rt, rk, mv = res["turns"][rr], res["rank"][rr], res["moves"][rr]
-        cand = (mask.unsqueeze(1) & (rt == 1) & ~taken & ~self._tac_own_mil(seat) & ~self._tac_hostile(seat)
-                & (self.tile_fallout <= 0))
+        cand = (mask.unsqueeze(1) & (rt == 1) & ~taken & ~self._tac_own_mil(seat) & ~self._tac_peaceful(seat)
+                & ~self._tac_hostile(seat) & (self.tile_fallout <= 0))
         if min_mv is not None:
             cand = cand & (mv >= (min_mv * _FIX).unsqueeze(1))
         garrison = self._centre_plane()
