@@ -347,6 +347,8 @@
   name: formation placement
   semantics: places each member of a formation (+0x728, count +0x738) through 0x586d40 with the step's flags; 1 only where every member's placement succeeds
   status: PARTLY
+  impl: [cpu/core/tactical.ts:walk, gpu/core/sim_tactics.py:_tac_move_to]
   readings:
     - "C-95: the barbarians' Builder Capture — READ (the event, the start, the tree's walk), ported"
+    - "C-99: a move order carried on as the turn ends, the zone-of-control wait, the embark rule's TO plot — READ (0x962380, 0x52f50, 0x26fe20, 0x2675e0, 0x2673f0, 0x530420, 0x267650), both twins"
   review: reviewed

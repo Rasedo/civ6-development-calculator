@@ -1833,21 +1833,32 @@
 - kind: field
   owner: Formation
   offset: 0x278
-  name: embarked
+  name: domain
   type: int
-  semantics: 0 not embarked.
-  status: PARTLY
+  semantics: "the formation's domain: the least of its members' +0x650 (sea 0, air 1, land 2), 0 for an embarked member (0x267650 at 0x26791f..0x26794c; the sync value of +0x220); the embark / disembark rules test the plot's domain mask on it (0x81240)"
+  status: READ
+  cases:
+    - recording: h1_duely1124
+      turn: 76
+      value: "city-state 3's Heavy Chariot on 40:12 plans the Harbor 40:13 (1/1) by its centre, the shore's 39:12 (1/0): embarking pays (AI_Planning.csv)"
   readings:
+    - "C-99: a move order carried on as the turn ends, the zone-of-control wait, the embark rule's TO plot — READ (0x962380, 0x52f50, 0x26fe20, 0x2675e0, 0x2673f0, 0x530420, 0x267650), both twins"
     - "C-95: the barbarians' Builder Capture — READ (the event, the start, the tree's walk), ported"
   review: reviewed
 - kind: field
   owner: Formation
   offset: 0x518
   name: zocAnswer
-  semantics: the zone of control answer the walk stores.
-  status: PARTLY
-  writers: [0x26fe20]
+  semantics: "m_bHasMovedIntoZOC: the zone test 0x26f980 of the plot the formation's last step this turn ended on (the sync value of +0x4c0, set by 0x2675e0 from the step 0x26fe20, cleared by the turn start 0x2673f0); the MoveTo execution 0x962380 waits unmoved while it holds"
+  status: READ
+  cases:
+    - recording: h1_duely1121
+      turn: 11
+      value: the barbarian Scout 262147 halted on 37:9 by a zone of control, Movement left, stays there (record t12)
+  impl: [cpu/core/tactical.ts:zocMoved, gpu/core/sim_tactics.py:_tac_zoc_moved_of]
+  writers: [0x26fe20, 0x2675e0, 0x2673f0]
   readings:
+    - "C-99: a move order carried on as the turn ends, the zone-of-control wait, the embark rule's TO plot — READ (0x962380, 0x52f50, 0x26fe20, 0x2675e0, 0x2673f0, 0x530420, 0x267650), both twins"
     - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
   review: reviewed
 - kind: field

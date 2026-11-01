@@ -6,7 +6,7 @@
 - addr: 0x962030
   final: 0x66cd90
   kind: function
-  semantics: "MoveTo (UNITOPERATION_MOVE_TO, hash 0x580f2f68, two UnitOperationSegmentComplete a unit-turn): the unit's move order to a plot, queued on the unit (+0x60) — a walk standing short of a plot it may not end on, Movement left, walks again once the player's other units have moved (runs/h1_duely1121 t71 city-state 4's Warrior 262146; `withShortOrders`) — with its flags (Operation Move: 0x1001, 0x80 where the game's +0x590 is above 0, 8 for a unit with no combat or 0x266950(2) on its formation, 0x8000 a formation of domain 2 without 0x266950(3), 0x10 the goal barred)."
+  semantics: "MoveTo (UNITOPERATION_MOVE_TO, hash 0x580f2f68, two UnitOperationSegmentComplete a unit-turn): the unit's move order to a plot, queued on the unit (+0x60) — a walk left short of its destination, Movement left, walks again once the player's other units have moved (runs/h1_duely1121 t71 city-state 4's Warrior 262146; `withShortOrders`) — with its flags (Operation Move: 0x1001, 0x80 where the game's +0x590 is above 0, 8 for a unit with no combat or 0x266950(2) on its formation, 0x8000 a formation of domain 2 without 0x266950(3), 0x10 the goal barred)."
   status: PARTLY
   cases:
     - recording: AI_Tactical.csv
@@ -64,18 +64,29 @@
   final: 0x66d0e0
   kind: function
   name: the MoveTo operation's execution
-  semantics: "a request of this turn (+0x20) cancels the formation's other members' operations; the path 0x2726b0 none: done unmoved; the first step (0x266690) reached this turn: the attack flag's battle (0x211f80, 0x1fbae0), else a visible defender at war or a defended district there (0x209e30) ends it unmoved; a unit not of the air whose formation moved into a zone of control this turn (+0x518, m_bHasMovedIntoZOC) waits (+0x11); else the move 0x26fe20"
+  semantics: "a request of this turn (+0x20) cancels the formation's other members' operations; the path 0x2726b0 none: done unmoved; the first step (0x266690) reached this turn: the attack flag's battle (0x211f80, 0x1fbae0), else a visible defender at war or a defended district there (0x209e30) ends it unmoved; a unit not of the air whose formation's last step this turn ended in a zone of control (+0x518, m_bHasMovedIntoZOC) waits (+0x11) unmoved; else the step 0x26fe20: 0 done (+0x10), -1 waits (+0x11: the node after the start a later turn's), above 0 moved (+0x12). The queue 0x52f50 keeps an operation not done and runs it again later in the turn."
   status: PARTLY
   cases:
     - recording: h1_duely1121
       turn: 158
       value: "runs/h1_duely1121 t158-t160: Builder Capture 983046 (Builder 4522014, Line Infantry 4128797 on 9:12), strength 62-65 below 66, holds; t161 steps to 8:13"
+    - recording: h1_duely1121
+      turn: 11
+      value: "the barbarian Scout 262147 halted on 37:9 by a zone of control, Movement left, stays (record t12): its HL Explore order waits"
+    - recording: h1_duely1121
+      turn: 95
+      value: the barbarian Warrior 1769487 stopped for its Movement goes on to 7:14 once its Man-At-Arms 3014664 left it (record t96)
   impl:
     - cpu/core/tactical.ts:moveTo
     - gpu/core/sim_tactics.py:_tac_move_to
     - cpu/core/tactical.ts:walk
     - cpu/core/tactical.ts:carry
+    - cpu/core/tactical.ts:orderOnce
+    - cpu/core/tactical.ts:zocMoved
+    - gpu/core/sim_tactics.py:_tac_zoc_moved_of
+    - cpu/core/tactical.ts:withShortOrders
   readings:
+    - "C-99: a move order carried on as the turn ends, the zone-of-control wait, the embark rule's TO plot — READ (0x962380, 0x52f50, 0x26fe20, 0x2675e0, 0x2673f0, 0x530420, 0x267650), both twins"
     - "C-123: Operation Move's danger flags, the MoveTo execution and m_blockedTurns — READ (0x816cb0 at 0x816e70 / 0x817839, 0x962380, 0x73e610), both twins"
     - "C-95: Operation Move's ring test takes no path (0x815d50) — READ, both twins"
     - "C-124: the kept path is never taken; a move order's path passes other players' units out of sight — READ (0x272aa0, 0x2714b0, 0x586360 at 0x586542..0x5865a1, 0x26fe20), both twins"

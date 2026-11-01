@@ -7580,3 +7580,56 @@ replay's `minorShots` landed in `minorAi`; GPU `_minor_pass`.
   seven at t180, [[1,4]] still five at t181); runs/h1_duelw1119 t97
   Babylon, Amani established there, China's 1 -> 3 beside Rome's 2: most 3,
   one plot as recorded (the sum's 5 gave the engines' two).
+
+## C-99: a move order carried on as the turn ends, the zone-of-control wait, the embark rule's TO plot — READ (0x962380, 0x52f50, 0x26fe20, 0x2675e0, 0x2673f0, 0x530420, 0x267650), both twins
+
+`moveTo`, `withShortOrders`, `zocMoved`, `orderOnce`, `walk`
+(cpu/core/tactical.ts). GPU `_tac_move_to`'s `waitz` / `refused` / `short`,
+`_tac_zoc_moved_of`, `_tac_with_short` (gpu/core/sim_tactics.py).
+
+- THE QUEUE (Unit_Operations_Manager vtable 0xcff8c0 +0x38 = 0x52f50): the
+  unit's front operation runs (its vt +0x20; the MoveTo operation's
+  0x962380) into a result whose +0x10 is done, +0x11 waits, +0x12 moved;
+  while it moved and neither done nor waiting, with Movement left (the
+  formation test 0x265d70), it runs again (one step a run, 100 at most);
+  done, the operation leaves the queue (vt +0x48); otherwise the segment ends
+  (UnitOperationSegmentComplete) with the operation kept, run again later
+  in the turn where the unit has Movement (0x56c690).
+- THE STEP 0x26fe20: one step of the formation's path (0x2726b0) a call: no
+  path, 0 (done); the node after the start of a later turn than the first
+  (+4 above 1, 0x26ff81), -1 (wait); the placement 0x587ca0 refused, 0
+  (done, 0x270933); stepped, the path's turns, above 0 (moved). After each
+  step the formation's +0x518 (m_bHasMovedIntoZOC, the sync value of +0x4c0
+  set by 0x2675e0) takes the zone test 0x26f980 of the plot it stands on;
+  the formation's turn start 0x2673f0 clears it.
+- THE MOVETO EXECUTION 0x962380 maps them: 0 done, -1 waits, above 0
+  moved; ahead of the step, a unit not of the air whose formation's +0x518
+  is set waits unmoved (0x962793), the path's first node an attack (flag
+  0x10) struck before that test. So every move order its walk leaves short
+  of its destination stays queued and walks again, its path found anew in
+  the engines, once the player's other units have moved: stopped for its
+  Movement as much as short of a plot held; done where no path, a step
+  refused, the destination reached or the attack struck. Confirmed:
+  runs/h1_duely1121 t95 the barbarian Warrior 1769487 stopped on 8:14 for
+  its Movement goes on to 7:14 once its Man-At-Arms 3014664 left it (record
+  t96 7:14); t148 Builder Capture's Builder 4259860 / Bombard 3997700 walk
+  back to 15:19; t23 the Scout 1441809 ends on 709 as logged. The zone
+  wait: t11 the Scout 262147 halted on 37:9 by a zone of control, Movement
+  left, stays there (record t12), t12 the Scout 131073 on 11:19, t67 the
+  Warrior 589832 on 8:16, t85 the Galley 1572882 on 30:19.
+- THE FORMATION'S DOMAIN (+0x278, the sync value of +0x220): the least of
+  its members' domains (+0x650: sea 0, air 1, land 2), 0 for an embarked
+  member (0x267650 at 0x26791f..0x26794c).
+- THE EMBARK RULE'S TO PLOT (0x530467..0x530499): the TO water plot's plot
+  vt +0x40 and its domain mask (0x81240) on the formation's domain; a land
+  formation asks bit 4, which a claim sets on land plots alone (0x66a90 /
+  0x66680), so no water plot passes and every embarking step pays
+  MOVEMENT_EMBARK_COST where no FreeEmbark district waives it: the
+  engines' `shoreCrossing` holds no TO-plot test. AI_Planning.csv agrees:
+  runs/h1_duely1124 t73-t91 city-state 3's two Heavy Chariots embark onto
+  its owned 40:14 / 41:14 / 42:13 at the embarking cost; t76 the Chariot on 40:12 plans the Harbor 40:13 (1/1) by its centre
+  41:12 (1 + 1, the centre's FreeEmbark), 39:12 (1/0) by the shore.
+- OPEN (C-99 / C-124): the second walk takes a fresh path where the game's
+  formation keeps its path (0x272aa0): runs/h1_duely1121 t109 the Musketman
+  3473423 stopped on 6:17 for its Movement walks on to 6:16 once its own unit
+  on 6:16 left it, the game's stays on 6:17; plot vt +0x40 unread.

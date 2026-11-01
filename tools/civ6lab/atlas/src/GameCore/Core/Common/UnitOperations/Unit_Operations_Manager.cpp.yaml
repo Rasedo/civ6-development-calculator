@@ -3,6 +3,19 @@
 # `review: imported` = bootstrapped from dll_readings.md / code comments / saved
 # labels and not yet reviewed: verify against the disassembly, then edit and
 # set `review: reviewed`.
+- addr: 0x52f50
+  kind: function
+  name: the unit's operation run
+  semantics: "Unit_Operations_Manager vtable 0xcff8c0 +0x38: the unit's front operation runs (its vt +0x20, the result +0x10 done, +0x11 waits, +0x12 moved, +0 the steps) while it moved, neither done nor waiting, the formation test 0x265d70 holding and the steps under 100; done, the operation leaves the queue (vt +0x48, 0x585440); else UnitOperationSegmentComplete (event 0xcb0345f1) with the operation kept, run again where the unit has Movement (0x56c690)."
+  status: READ
+  cases:
+    - recording: h1_duely1121
+      turn: 148
+      value: Builder Capture's Builder 4259860 and Bombard 3997700 step to 14:19, the segment ends (UnitOperationSegmentComplete), then walk back to 15:19 after the player's other units moved
+  impl: [cpu/core/tactical.ts:withShortOrders, gpu/core/sim_tactics.py:_tac_with_short]
+  readings:
+    - "C-99: a move order carried on as the turn ends, the zone-of-control wait, the embark rule's TO plot — READ (0x962380, 0x52f50, 0x26fe20, 0x2675e0, 0x2673f0, 0x530420, 0x267650), both twins"
+  review: reviewed
 - addr: 0x53e20
   final: 0x408f0
   kind: function

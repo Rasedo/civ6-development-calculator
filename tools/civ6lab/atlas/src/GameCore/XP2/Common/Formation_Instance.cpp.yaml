@@ -65,6 +65,16 @@
   context:
     - "...est 0x815d50 takes a plot holding a unit of the mover's player only where 0x265ac0 -> 0x265af0 passes it on the mover's path finder (+0x738 0: any; else formation classes, damage, th..."
   review: imported
+- addr: 0x265d70
+  final: 0x1a3710
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-99: a move order carried on as the turn ends, the zone-of-control wait, the embark rule's TO plot — READ (0x962380, 0x52f50, 0x26fe20, 0x2675e0, 0x2673f0, 0x530420, 0x267650), both twins"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - ...; while it moved and neither done nor waiting, with Movement left (the formation test 0x265d70), it runs again (one step a run, 100 at most); done, the operation leaves the queue (vt...
+  review: imported
 - addr: 0x265d80
   final: 0x1a3720
   kind: function
@@ -247,18 +257,35 @@
     - recording: h1_duely1121
       turn: 168
       value: the 6:10 team's Settler 4587543 holds on the formation's Movement once its escort's plunder ended the Line Infantry's
-  impl: [cpu/core/tactical.ts:passMoveExec, gpu/core/sim_tactics.py:_op_move_exec]
+  impl:
+    - cpu/core/tactical.ts:passMoveExec
+    - gpu/core/sim_tactics.py:_op_move_exec
+    - cpu/core/tactical.ts:zocMoved
   readings:
     - "C-123: a formation's Movement and its path's stacking — READ (0x2673f0, 0x267650, 0x262cd0, 0x585eb0 in the path validity), both twins"
     - "C-123: Operation Move's danger flags, the MoveTo execution and m_blockedTurns — READ (0x816cb0 at 0x816e70 / 0x817839, 0x962380, 0x73e610), both twins"
+    - "C-99: a move order carried on as the turn ends, the zone-of-control wait, the embark rule's TO plot — READ (0x962380, 0x52f50, 0x26fe20, 0x2675e0, 0x2673f0, 0x530420, 0x267650), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ...20 from 0x26f980 on its new plot, cleared each turn by Player_Units' DoTurn 0x4e4560 -> 0x2673f0) waits (+0x11), else it moves (0x26fe20). Ended (+0x10), a unit whose plot is not val...
   review: imported
+- addr: 0x2675e0
+  kind: function
+  name: the formation's zone answer
+  semantics: sets m_bHasMovedIntoZOC (the sync value +0x518 of +0x4c0, 0x42eb20) and sends event 0xc52231ab; the step 0x26fe20 calls it after each step whose zone test 0x26f980 changes it
+  status: READ
+  cases:
+    - recording: h1_duely1121
+      turn: 12
+      value: the barbarian Scout 131073 halted on 11:19 by a zone of control stays there, Movement left (record t13)
+  impl: [cpu/core/tactical.ts:zocMoved, gpu/core/sim_tactics.py:_tac_zoc_moved_of]
+  readings:
+    - "C-99: a move order carried on as the turn ends, the zone-of-control wait, the embark rule's TO plot — READ (0x962380, 0x52f50, 0x26fe20, 0x2675e0, 0x2673f0, 0x530420, 0x267650), both twins"
+  review: reviewed
 - addr: 0x267650
   kind: function
   name: the formation's refresh
-  semantics: the formation's class flags re-read over its members; its Movement +0x218 to the least of the members' GetMovementMovesRemaining (0x56e2b0; +0x1938 members the most), each member told (event 0xc50d66d6); reached from a member's 0x56d6f0 through 0x267b00
+  semantics: the formation's class flags re-read over its members; its Movement +0x218 to the least of the members' GetMovementMovesRemaining (0x56e2b0; +0x1938 members the most), each member told (event 0xc50d66d6); reached from a member's 0x56d6f0 through 0x267b00; the formation's domain +0x278 (the sync value of +0x220) the least of its members' +0x650, 0 for an embarked member (0x26791f..0x26794c)
   status: READ
   cases:
     - recording: h1_duely1121
@@ -269,5 +296,6 @@
     - gpu/core/sim_tactics.py:_op_move_exec
     - cpu/core/tactical.ts:live
   readings:
+    - "C-99: a move order carried on as the turn ends, the zone-of-control wait, the embark rule's TO plot — READ (0x962380, 0x52f50, 0x26fe20, 0x2675e0, 0x2673f0, 0x530420, 0x267650), both twins"
     - "C-123: a formation's Movement and its path's stacking — READ (0x2673f0, 0x267650, 0x262cd0, 0x585eb0 in the path validity), both twins"
   review: reviewed

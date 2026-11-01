@@ -766,15 +766,15 @@ export function pathTo(state: GameState, unit: Unit, dest: number, laterTurns = 
  *  own stacking unit holds, its first not; with no `explore` (its flag 1) the
  *  path leaves no plot the player never revealed; with `danger` (its flags
  *  8 / 0x8000) its first turn steps onto no plot of danger, (its flag 2)
- *  no step onto the ground of a player at war with it. */
+ *  no step onto the ground of a player at war with it. In an AI player's
+ *  pass a unit whose last step of the turn ended in a zone of control does
+ *  not move (`orderOnce`). */
 export function moveTo(state: GameState, unit: Unit, dest: number, strike = true,
   laterTurns = false, explore = true, danger?: PathDanger, mates: readonly Unit[] = []): void {
-  const from = unit.tileIndex;
-  const cut = orderOnce(state, unit, dest, strike, laterTurns, explore, danger, mates);
-  // an order that walked and stopped short of a plot its path goes through
-  // but may not end on, Movement left, stays on the unit, carried on as the
-  // player's turn ends
-  if (shortOrders && cut && state.units.includes(unit) && unit.tileIndex !== from && unit.movesLeft > 0 && unit.tileIndex !== dest) {
+  const open = orderOnce(state, unit, dest, strike, laterTurns, explore, danger, mates);
+  // an order its walk left short of its destination, Movement left, stays
+  // on the unit, carried on as the player's turn ends
+  if (shortOrders && open && state.units.includes(unit) && unit.movesLeft > 0 && unit.tileIndex !== dest) {
     shortOrders.push(() => orderOnce(state, unit, dest, strike, laterTurns, explore, danger, mates));
   }
 }
@@ -784,49 +784,83 @@ export function moveTo(state: GameState, unit: Unit, dest: number, strike = true
  *  the order given; null outside an AI player's pass */
 let shortOrders: (() => void)[] | null = null;
 
+/** the units whose last step of the player's turn ended in a zone of
+ *  control (their formation's m_bHasMovedIntoZOC +0x518, set by each step
+ *  of the walk 0x26fe20 at 0x270800 from 0x26f980, cleared at the
+ *  formation's turn start 0x2673f0); null outside an AI player's pass */
+let zocMoved: Set<Unit> | null = null;
+
 /**
  * A player's AI turn with its move orders carried on (`moveTo`): an order
- * that stops short of its destination with Movement left — the plot its
- * Movement reached held, the walk standing short of it — stays queued on
- * the unit, and the unit walks it
- * again from where it stands once the player's other units have moved, its
- * path found anew (runs/h1_duely1121 t71: city-state 4's Warrior 262146
- * stops on 33:19 short of the Swordsman 720896 on 33:20, the tactical pass
- * wanders the Swordsman to 34:20, the Warrior's order goes on to 33:20; 33
- * such second walks over the five duely duels, the barbarians' among them,
- * the record's UnitMoved after the order's UnitOperationSegmentComplete;
- * 1121 t103 its Man-At-Arms 1048577 goes on from 38:13 to 38:12, 1127 t109
- * city-state 3's Galley 393216 to 29:16)
+ * whose walk stops short of its destination with Movement left — the next
+ * plot of its path a later turn's, for its Movement or a plot held — stays
+ * queued on the unit (the MoveTo operation's execution 0x962380 waits,
+ * +0x11, where the step 0x26fe20 finds its next node beyond the first
+ * turn; the queue 0x52f50 ends the segment with the operation kept), and
+ * the unit walks it again from where it stands once the player's other
+ * units have moved, its path found anew (runs/h1_duely1121 t71: city-state
+ * 4's Warrior 262146 stops on 33:19 short of the Swordsman 720896 on 33:20,
+ * the tactical pass wanders the Swordsman to 34:20, the Warrior's order goes
+ * on to 33:20; 33 such second walks over the five duely duels, the
+ * barbarians' among them, the record's UnitMoved after the order's
+ * UnitOperationSegmentComplete; 1121 t103 its Man-At-Arms 1048577 goes on
+ * from 38:13 to 38:12, 1127 t109 city-state 3's Galley 393216 to 29:16;
+ * 1121 t95 the barbarian Warrior 1769487 stopped on 8:14 for its Movement
+ * goes on to 7:14 once its Man-At-Arms left it, t148 the Builder Capture's
+ * pair goes back to 15:19)
  */
 function withShortOrders(fn: () => void): void {
   const outer = shortOrders;
+  const outerZoc = zocMoved;
   const mine: (() => void)[] = [];
   shortOrders = mine;
+  zocMoved = new Set();
   try {
-    fn();
+    try {
+      fn();
+    } finally {
+      shortOrders = outer;
+    }
+    for (const run of mine) run();
   } finally {
-    shortOrders = outer;
+    zocMoved = outerZoc;
   }
-  for (const run of mine) run();
 }
 
-/** one walk of a move order (the unit's mission 0x962030): true where the
- *  walk stood short of a plot it may not end on */
+/** one walk of a move order (the MoveTo operation's execution 0x962380):
+ *  true where the order stays open — its walk stood short of its
+ *  destination, the step's next node a later turn's or a plot held. A unit
+ *  whose last step of the turn ended in a zone of control waits (0x962793:
+ *  the formation's +0x518), striking all the same where its path's next
+ *  plot is the one it attacks into */
 function orderOnce(state: GameState, unit: Unit, dest: number, strike: boolean,
   laterTurns: boolean, explore: boolean, danger: PathDanger | undefined, mates: readonly Unit[]): boolean {
   if (!state.units.includes(unit) || unit.movesLeft <= 0 || unit.tileIndex === dest) return false;
   let path = pathTo(state, unit, dest, laterTurns, explore, danger, mates);
+  if (!path.length) return false;
   // a path ending on a plot it attacks into: it walks to its side, and
   // strikes it where its Movement and attacks last (the order's attack flag)
-  const last = path.length ? path[path.length - 1] : -1;
-  const into = last >= 0 && attackPlot(state, unit, last);
+  const last = path[path.length - 1];
+  const into = attackPlot(state, unit, last);
   if (into) path = path.slice(0, -1);
-  const cut = walk(state, unit, path, dest, mates);
-  if (into && strike && unit.movesLeft > 0 && attacksLeftOf(unit) > 0 && state.units.includes(unit)
-    && plotDistance(state, unit.tileIndex, last) === 1) {
-    meleeAttack(state, unit.id, last, unit.seat);
+  if (zocMoved?.has(unit) && path.length) return false;
+  const from = unit.tileIndex;
+  const refused = walk(state, unit, path, dest, mates);
+  if (zocMoved && unit.tileIndex !== from) {
+    const at = unit.tileIndex;
+    const zoned = inEnemyZoc(state, at, unit, dest, stackedWith(state, unit, mates, at) || foreignAt(state, unit, at));
+    for (const m of [unit, ...mates]) {
+      if (zoned) zocMoved.add(m);
+      else zocMoved.delete(m);
+    }
   }
-  return cut;
+  if (refused || !state.units.includes(unit)) return false;
+  if (into) {
+    if (plotDistance(state, unit.tileIndex, last) !== 1) return true;
+    if (strike && unit.movesLeft > 0 && attacksLeftOf(unit) > 0) meleeAttack(state, unit.id, last, unit.seat);
+    return false;
+  }
+  return unit.tileIndex !== dest;
 }
 
 /** a plot the unit would attack into rather than enter: one a unit of a
@@ -839,10 +873,12 @@ function attackPlot(state: GameState, unit: Unit, p: number): boolean {
   return encampmentBlocks(state, t, unit);
 }
 
-/** the walk of a path as far as the unit's Movement carries it this turn, a
- *  zone of control ending it (`inEnemyZoc` on the order's destination `dest`,
- *  a plot its own stacking unit or another player's holds at the limit);
- *  true where it stood short of a plot it may not end on */
+/** the walk of a path as far as the unit's Movement carries it this turn,
+ *  short of a plot it may not end on, a zone of control ending it
+ *  (`inEnemyZoc` on the order's destination `dest`, a plot its own stacking
+ *  unit or another player's holds at the limit); true where a step was
+ *  refused (the placement 0x587ca0 refusing: the order done, 0x26fe20 at
+ *  0x270933) */
 function walk(state: GameState, unit: Unit, path: number[], dest: number, mates: readonly Unit[] = []): boolean {
   const { tiles } = state.map;
   // how far its Movement carries it along the path this turn
@@ -869,12 +905,13 @@ function walk(state: GameState, unit: Unit, path: number[], dest: number, mates:
     from = p;
     if (mp <= 0 || inEnemyZoc(state, p, unit, dest, stackedWith(state, unit, mates, p) || foreignAt(state, unit, p))) break;
   }
-  const reached = stop;
   while (stop > 0 && (stackedWith(state, unit, mates, path[stop - 1]) || foreignAt(state, unit, path[stop - 1]))) stop -= 1;
   for (let i = 0; i < stop; i++) {
-    if (stepUnit(state, unit, tiles[path[i]]) !== 'moved') return false;
+    const r = stepUnit(state, unit, tiles[path[i]]);
+    if (r === 'halted') return false;
+    if (r !== 'moved') return true;
   }
-  return stop < reached;
+  return false;
 }
 
 /** a unit that holds its plot: no aircraft, no spy */

@@ -1012,7 +1012,10 @@ export function embarkTechMoves(state: GameState, seat: number): number {
  *  embark cost and carries no Movement (runs/h1_duely1117 t185: city-state
  *  3's embarked Bombard on its own water 42:14 plans 41:14's Farm (1/2);
  *  t176 city-state 2's Line Infantry on its Harbor 14:7 plans its centre
- *  14:8 (1/4), AI_Planning.csv) */
+ *  14:8 (1/4), AI_Planning.csv). The embark rule's own test of the TO
+ *  plot's mask (0x530467..0x530499) asks the land formation's domain, a
+ *  bit no water plot holds: every embarking step crosses (runs/h1_duely1124
+ *  t73-t91 city-state 3's Heavy Chariots onto its owned 40:14 / 41:14) */
 export function shoreCrossing(type: string, from: Tile, to: Tile): boolean {
   if (UNITS[type]?.naval || waterWalks(type) || isWater(from) === isWater(to)) return false;
   return !(isWater(from) && from.ownerSeat !== NO_SEAT);

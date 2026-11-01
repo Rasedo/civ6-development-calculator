@@ -32,6 +32,15 @@
   context:
     - "...(1 + 0.01 x the city's +0x1e00 at the plot's terrain +0x2c, 0x4a9ff0; @0xd136f0 0.01, @0xcfc9f8 1.0) from T to H; the count passed is its whole part (`sar 8`). The plot's own improv..."
   review: reviewed
+- addr: 0xcff8c0
+  kind: global
+  status: PARTLY
+  readings:
+    - "C-99: a move order carried on as the turn ends, the zone-of-control wait, the embark rule's TO plot — READ (0x962380, 0x52f50, 0x26fe20, 0x2675e0, 0x2673f0, 0x530420, 0x267650), both twins"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "- THE QUEUE (Unit_Operations_Manager vtable 0xcff8c0 +0x38 = 0x52f50): the unit's front operation runs (its vt +0x20; the MoveTo operation's..."
+  review: imported
 - addr: 0xd02108
   kind: global
   semantics: the generic CvAStar's base vtable (Pathfinder_Instance.cpp).

@@ -15,6 +15,7 @@
       value: the claimed water's mask as the claim leaves it (0x530240's test)
   readings:
     - "C-99: an owned water plot no shore, a move order carried on as the turn ends — READ (0x530240, 0x66790, 0x66a90, 0x66680, 0x814e0, 0x81240, 0x7eeba0), both twins"
+    - "C-99: a move order carried on as the turn ends, the zone-of-control wait, the embark rule's TO plot — READ (0x962380, 0x52f50, 0x26fe20, 0x2675e0, 0x2673f0, 0x530420, 0x267650), both twins"
   review: reviewed
 - addr: 0x66790
   final: 0x4c5f0

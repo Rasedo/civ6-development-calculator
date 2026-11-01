@@ -58,7 +58,7 @@
 - addr: 0x530420
   final: 0x378010
   kind: function
-  semantics: "the embark rule (land to water): none where the TO water plot passes vt +0x40 and its domain mask takes the formation's +0x278 (0x530467..0x530499; the land formation's domain, unported: onto owned water the planning keeps one Movement more than onto unowned, runs/h1_duely1124 t76); else it waives MOVEMENT_EMBARK_COST at a FreeEmbark district (completion read off the FROM plot). Then, FreeEmbark or not, where the Movement the step starts with exceeds the TO domain's full Movement, the excess (0x774c0: +0x20 - +0x18) is carried."
+  semantics: "the embark rule (land to water): none where the TO water plot passes vt +0x40 and its domain mask takes the formation's domain +0x278 (0x530467..0x530499): a land formation asks bit 4, set on land plots alone (0x66a90, 0x66680), so no water plot passes and every embarking step pays (runs/h1_duely1124 t73-t91 city-state 3's Heavy Chariots onto its owned 40:14 / 41:14 / 42:13, AI_Planning.csv); else it waives MOVEMENT_EMBARK_COST at a FreeEmbark district (completion read off the FROM plot). Then, FreeEmbark or not, where the Movement the step starts with exceeds the TO domain's full Movement, the excess (0x774c0: +0x20 - +0x18) is carried."
   status: READ
   cases:
     - recording: h1_duely1128
@@ -82,6 +82,7 @@
     - "C-99: a shore crossing's carried Movement — READ (0x26e920, 0x530420, 0x530240), both twins"
     - "C-99: a shore crossing's carried Movement"
     - "C-99: an owned water plot no shore, a move order carried on as the turn ends — READ (0x530240, 0x66790, 0x66a90, 0x66680, 0x814e0, 0x81240, 0x7eeba0), both twins"
+    - "C-99: a move order carried on as the turn ends, the zone-of-control wait, the embark rule's TO plot — READ (0x962380, 0x52f50, 0x26fe20, 0x2675e0, 0x2673f0, 0x530420, 0x267650), both twins"
   notes:
     - ".claude/scratchpad/mu1/readings_c96.md: ...0x272ca0), no river   crossing where either plot is a city's or water (0x531510); the embark   rule 0x530420 (land to water) and the disembark 0x530240 waive   MOVEMENT_EMBARK_COST where a district with FreeE..."
   context:

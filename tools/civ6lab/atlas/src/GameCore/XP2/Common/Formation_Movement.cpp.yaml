@@ -320,6 +320,7 @@
     - cpu/core/tactical.ts:moves
     - cpu/core/units.ts:inEnemyZoc
     - gpu/core/sim_tactics.py:_tac_zoc_path
+    - cpu/core/tactical.ts:zocMoved
   readings:
     - "C-125: a district's zone of control in a move's path, waived on the path's destination; a city-state's strikes after its units' planning — READ (0x530f50 at 0x531127..0x531302, 0x26f980, 0x26f870), FIT (the strikes' place), both twins"
     - "C-95: the unit pathfinder and the planning's reach — READ, confirmed on the Wander draws"
@@ -329,6 +330,7 @@
     - "C-123: Operation Move's danger flags, the MoveTo execution and m_blockedTurns — READ (0x816cb0 at 0x816e70 / 0x817839, 0x962380, 0x73e610), both twins"
     - "C-99: the carry under a zone of control"
     - "C-95: the danger map's search pays no zone of control, a ranged unit strikes from its range; the rampage strike's ring — READ (0x26df90, 0x26e920, 0x771670, 0x691f0, 0x76ecf0), FIT (the ranged unit's strike), both twins"
+    - "C-99: a move order carried on as the turn ends, the zone-of-control wait, the embark rule's TO plot — READ (0x962380, 0x52f50, 0x26fe20, 0x2675e0, 0x2673f0, 0x530420, 0x267650), both twins"
   context:
     - "...or the parent began a turn (it spends everything); a zone of control spends everything (0x26f980) — save under flag 0x800. Between two plots the player never revealed (node +0x51 bit 0..."
     - "- THE ZONE OF CONTROL'S TEST (Rules_Movement 0x530f50, READ; through 0x26f980(finder, from, to, the path's destination) from the path cost 0x26e920, the move's step..."
@@ -336,7 +338,7 @@
   review: reviewed
 - addr: 0x26fe20
   kind: function
-  semantics: "Walks the destination plot's units from the last to the first; for each not dead (+0x770), not a combat unit (0x209dd0), whose unit info lacks the +0x1ba bit 2, and whose player the mover's is at war with (0x469cd0), calls 0x212500(victim, mover, plot, ...); a 0 back destroys the victim (the religion swing 0x493f80 with the capture flag 1), a 1 or a 2 leaves it be; then the mover completes its step. A formation's move: the path flag 0x2000 becomes 0x80 for each member's placement (0x587ca0); the formation moves only if every member's placement succeeds. The engines' melee order onto a religious unit only shares its plot, and their seizure takes no plot the mover cannot stand on without embarking (AUDIT C-94)."
+  semantics: "Walks the destination plot's units from the last to the first; for each not dead (+0x770), not a combat unit (0x209dd0), whose unit info lacks the +0x1ba bit 2, and whose player the mover's is at war with (0x469cd0), calls 0x212500(victim, mover, plot, ...); a 0 back destroys the victim (the religion swing 0x493f80 with the capture flag 1), a 1 or a 2 leaves it be; then the mover completes its step. One step a call, its answer: no path (0x2726b0) 0; the node after the start of a later turn than the first (+4 above 1, 0x26ff81) -1; the placement 0x587ca0 refused 0 (0x270933); stepped, the path's turns; after each step the formation's +0x518 takes the zone test 0x26f980 of its plot (0x270800, 0x2675e0). A formation's move: the path flag 0x2000 becomes 0x80 for each member's placement (0x587ca0); the formation moves only if every member's placement succeeds. The engines' melee order onto a religious unit only shares its plot, and their seizure takes no plot the mover cannot stand on without embarking (AUDIT C-94)."
   status: READ
   cases:
     - recording: 1121
@@ -354,7 +356,11 @@
     - cpu/core/game.ts:religiousUnitLost
     - cpu/core/tactical.ts:walk
     - cpu/core/tactical.ts:carry
+    - cpu/core/tactical.ts:orderOnce
+    - cpu/core/tactical.ts:zocMoved
+    - cpu/core/tactical.ts:withShortOrders
   readings:
+    - "C-99: a move order carried on as the turn ends, the zone-of-control wait, the embark rule's TO plot — READ (0x962380, 0x52f50, 0x26fe20, 0x2675e0, 0x2673f0, 0x530420, 0x267650), both twins"
     - "H-1: an annex re-places the citizens, the garrison's unit, a religious unit killed on a move — READ"
     - "H-1: a civilian stepped on — READ"
     - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
@@ -623,6 +629,7 @@
     - "C-123: Operation Move's danger flags, the MoveTo execution and m_blockedTurns — READ (0x816cb0 at 0x816e70 / 0x817839, 0x962380, 0x73e610), both twins"
     - "C-123: Protect Units' plunder at the barbarians' turn open and Operation Move's formation bar — READ (0x80d790 at 0x80de60..0x80e7dc, 0x816cb0 at 0x81794d..0x817985 -> 0x585eb0), both twins and the replay's copy"
     - "C-124: the formation's kept path, and a path's other players' units — READ (0x272aa0, 0x26e3a0, 0x782d0, 0x586360 at 0x586542..0x5865a1), unported"
+    - "C-99: a move order carried on as the turn ends, the zone-of-control wait, the embark rule's TO plot — READ (0x962380, 0x52f50, 0x26fe20, 0x2675e0, 0x2673f0, 0x530420, 0x267650), both twins"
   context:
     - "...cost (plot vt +0x18) << 8 needs 0x56e760 clear), and the destinations valid both ways (0x2726b0 flag 4). Start (0x972a50): the unit's formation to the target (flags | 4), then the p..."
   review: imported

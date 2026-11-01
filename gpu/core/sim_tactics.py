@@ -1321,7 +1321,8 @@ class SimTactics:
         never revealed; with `danger` (the danger map [B, T], the order's
         flag 8 [B], flag 0x8000 [B] and flag 2 [B]) its first turn steps onto
         no plot of danger, and under flag 2 no step onto the ground of a
-        player at war with it."""
+        player at war with it. In an AI player's pass a unit whose last step
+        of the turn ended in a zone of control does not move (`orderOnce`)."""
         if not bool(mask.count_nonzero()):
             return
         # a destination another player's unit holds out of the player's sight
@@ -1363,9 +1364,16 @@ class SimTactics:
         idx = (lead.unsqueeze(1) + torch.arange(L, device=dev).unsqueeze(0))
         path = torch.where(idx < L, path.gather(1, idx.clamp(max=L - 1)), torch.full_like(path, -1))
         plen = L - lead
+        has_path = res["found"] & (plen > 0)
         # a path ending on a plot it attacks into: it walks to its side
         into = res["found"] & res["attack"][ar, dr] & (plen > 0)
         plen = plen - into.long()
+        # a unit whose last step of the turn ended in a zone of control waits
+        # (`zocMoved`), striking all the same from beside its target
+        zm = self._tac_zoc_moved_of(pre)
+        waitz = torch.zeros_like(into) if zm is None else zm[rows, sr] & (plen > 0)
+        plen = torch.where(waitz, torch.zeros_like(plen), plen)
+        into = into & ~waitz
         path = torch.where(torch.arange(L, device=dev).unsqueeze(0) < plen.unsqueeze(1), path, torch.full_like(path, -1))
         tile_p = getattr(self, f"{pre}_unit_tile")
         mp_p = getattr(self, f"{pre}_unit_mp")
@@ -1436,7 +1444,6 @@ class SimTactics:
             stop = torch.where(on, torch.full_like(stop, i + 1), stop)
             frm = torch.where(on, pc, frm)
             on = on & (mp > 0) & ~halts[ar, pc]
-        reached = stop.clone()
         for _ in range(L):
             back_off = (stop > 0) & no_end[ar, path.gather(1, (stop - 1).clamp(min=0).unsqueeze(1)).squeeze(1).clamp(min=0)]
             if not bool(back_off.count_nonzero()):
@@ -1455,6 +1462,8 @@ class SimTactics:
         # steps on
         under = torch.full((R,), -1, dtype=torch.long, device=dev)
         under_emb = torch.zeros(R, dtype=torch.bool, device=dev)
+        # a step refused (the placement 0x587ca0): the order done
+        refused = torch.zeros(R, dtype=torch.bool, device=dev)
         for i in range(L):
             go = going & (i < stop)
             if not bool(go.count_nonzero()):
@@ -1475,6 +1484,7 @@ class SimTactics:
             mvB = self._step_verb(okB, gslot, hereB, nxtB, dirB, seat, torch.zeros_like(okB),
                                   clear_camp=seat != BARB_SEAT)
             moved = mvB[rows]
+            refused = refused | (go & ~moved)
             back_on = moved & (under >= 0)
             if bool(back_on.count_nonzero()):
                 bm = back_on & ~under_emb
@@ -1486,6 +1496,18 @@ class SimTactics:
             under = torch.where(moved, torch.where(occ >= 0, occ, torch.full_like(occ, -1)), under)
             under_emb = torch.where(moved, emb_to, under_emb)
             going = moved & (mp_p[rows, sr] > 0)
+        # the formation's last step in a zone of control or not (`zocMoved`)
+        now = tile_p[rows, sr]
+        if zm is not None:
+            stepped = now != start
+            if bool(stepped.count_nonzero()):
+                zoned = halts[ar, now.clamp(min=0)]
+                rs, ss = rows[stepped], sr[stepped]
+                zm[rs, ss] = zoned[stepped]
+                if mr is not None:
+                    pm = stepped & (mr >= 0)
+                    if bool(pm.count_nonzero()):
+                        zm[rows[pm], mr[pm]] = zoned[pm]
         # the strike, where its Movement and attacks last beside the plot
         if strike and bool(into.count_nonzero()):
             here = tile_p[rows, sr].clamp(min=0)
@@ -1500,13 +1522,16 @@ class SimTactics:
                     self._barb_melee_at(m, u, tt)
                 else:
                     self._hostile_vs_unit(m, tt, pre, u)
-        # an order that walked and stopped short of a plot its path goes
-        # through but may not end on, Movement left, stays on the unit,
-        # carried on as the player's turn ends (`moveTo`, `withShortOrders`)
+        # an order its walk left short of its destination, Movement left,
+        # stays on the unit, carried on as the player's turn ends (`moveTo`,
+        # `withShortOrders`): one with a path, no step refused, not waiting
+        # in a zone of control, off its destination (beside it, for one it
+        # attacks into)
         pend = getattr(self, "_tac_short", None)
         if pend is not None:
             now = tile_p[rows, sr]
-            short = (getattr(self, f"{pre}_unit_alive")[rows, sr] & (stop < reached) & (now != start)
+            off = torch.where(into, self.pair_dist[now.clamp(min=0), dr].to(torch.long) != 1, now != dr)
+            short = (getattr(self, f"{pre}_unit_alive")[rows, sr] & has_path & ~first & ~refused & ~waitz & off
                      & (mp_p[rows, sr] > 0) & (now != dr))
             if bool(short.count_nonzero()):
                 sm = torch.zeros(B, dtype=torch.bool, device=dev)
@@ -1514,32 +1539,48 @@ class SimTactics:
                 pend.append((sm, us.clone(), dest.clone(), dict(pre=pre, seat=seat, strike=strike, later_turns=later_turns,
                                                                 explore=explore, danger=danger, mate=mate)))
 
+    def _tac_zoc_moved_of(self, pre: str) -> torch.Tensor | None:
+        """[B, U] bool of pool `pre` — `zocMoved`: the units whose last step
+        of the player's turn ended in a zone of control (their formation's
+        +0x518); None outside an AI player's pass"""
+        scope = getattr(self, "_tac_zocm", None)
+        if scope is None:
+            return None
+        if pre not in scope:
+            scope[pre] = torch.zeros_like(getattr(self, f"{pre}_unit_alive"))
+        return scope[pre]
+
     def _tac_with_short(self, fn) -> None:
         """`withShortOrders`: a player's AI turn `fn` with its move orders
         carried on — each order `_tac_move_to` left short of its destination
         with Movement left walks again, in the order given, from where its
         unit stands once the player's other units have moved, its path found
-        anew"""
+        anew — and its units' zone-of-control waits (`_tac_zoc_moved_of`)"""
         outer = getattr(self, "_tac_short", None)
+        outer_zoc = getattr(self, "_tac_zocm", None)
         mine: list = []
         self._tac_short = mine
+        self._tac_zocm = {}
         try:
-            fn()
+            try:
+                fn()
+            finally:
+                self._tac_short = outer
+            if not mine:
+                return
+            self._tac_short = None
+            try:
+                for sm, us, dest, kw in mine:
+                    pre = kw["pre"]
+                    bidx = torch.arange(self.B, device=self.device)
+                    now = getattr(self, f"{pre}_unit_tile")[bidx, us]
+                    go = (sm & getattr(self, f"{pre}_unit_alive")[bidx, us] & (getattr(self, f"{pre}_unit_mp")[bidx, us] > 0)
+                          & (now != dest.clamp(min=0)))
+                    self._tac_move_to(go, us, dest, **kw)
+            finally:
+                self._tac_short = outer
         finally:
-            self._tac_short = outer
-        if not mine:
-            return
-        self._tac_short = None
-        try:
-            for sm, us, dest, kw in mine:
-                pre = kw["pre"]
-                bidx = torch.arange(self.B, device=self.device)
-                now = getattr(self, f"{pre}_unit_tile")[bidx, us]
-                go = (sm & getattr(self, f"{pre}_unit_alive")[bidx, us] & (getattr(self, f"{pre}_unit_mp")[bidx, us] > 0)
-                      & (now != dest.clamp(min=0)))
-                self._tac_move_to(go, us, dest, **kw)
-        finally:
-            self._tac_short = outer
+            self._tac_zocm = outer_zoc
 
     # --------------------------------------------------- the target list
 
