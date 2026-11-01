@@ -81,6 +81,7 @@ import { cityStateSight } from './fog';
 import { combatDesire, type CombatDesire } from './aiMilitary';
 import { minorTradeList, minorTradeValue } from './aiTrade';
 import { militaryFavTech } from './operations/unitRows';
+import { opsOf } from './operations/manager';
 
 /** One minor at a time — a district one minor lands may lend a neighbour's
  *  district adjacency across the border, so the next minor's yields read it.
@@ -666,6 +667,17 @@ export function minorUpgradeUnit(state: GameState, cityState: CityState, u: Unit
   // Swordsman, the Combat Desire -0.1 -> 0.0)
   delete u.aiDefender;
   delete u.aiHomed;
+  // and in no operation: the old unit dead (+0x770), the new one not
+  // assigned to it (+0x7d0), the team update keeps neither (0x73fc75 -> 0x732cd0)
+  // (runs/h1_duely1117 city-state 4 t91: City Defense's garrison Catapult
+  // upgraded, its Trebuchet 1179651 wandering at t92 and joining the
+  // standing army, City Defense three units)
+  if (cityState.ops) {
+    for (const op of opsOf(cityState.ops)) {
+      for (const t of op.teams) t.members = t.members.filter((id) => id !== u.id);
+      if (op.released) op.released = op.released.filter((id) => id !== u.id);
+    }
+  }
   raiseBestTrained(state, cityState.seat, u.type, u.formation ?? 0);
   return true;
 }

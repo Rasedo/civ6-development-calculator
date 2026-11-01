@@ -344,7 +344,10 @@ class SimMinors:
     def _kb_unit_anew(self, rows: torch.Tensor, g: torch.Tensor) -> None:
         """`unitMadeAnew` — global units `g` [N] of the games `rows` [N]
         made anew under another owner (a levy, its return home): every
-        knowledge base's record of each is a gone unit's (slot -1), aging on"""
+        knowledge base's record of each is a gone unit's (slot -1), aging on;
+        the new unit of its type's own AI type, homed nowhere"""
+        self.unit_defender[rows, g] = False
+        self.unit_homed[rows, g] = False
         slot = self.citystate_kb_slot
         for bi, gi in zip(rows.tolist(), g.tolist()):
             sb = slot[bi]
@@ -2291,6 +2294,16 @@ class SimMinors:
         # the upgrade a new unit: of its type's own AI type, homed nowhere
         self.major_unit_defender[rr, u] = False
         self.major_unit_homed[rr, u] = False
+        # and in no operation: the new unit not assigned to it (+0x7d0,
+        # `minorUpgradeUnit`)
+        uu = torch.where(go, first, torch.full_like(first, -2)).unsqueeze(1)
+        for k in range(self.mops_mem.shape[2]):
+            for ti in range(self.mops_mem.shape[3]):
+                hit = self.mops_mem[:, s, k, ti] == uu
+                on = hit.any(dim=1)
+                if bool(on.any()):
+                    self._mops_compact(s, k, ti, ~hit, on)
+        self.mops_rel[rr, s, :, u] = False
         self._gen_ver += 1
         # the upgraded chassis raises the minor's base (`raiseBestTrained`)
         self._raise_best_trained(self._CITY_MINOR0 + s, go, self.major_unit_type.gather(1, fc.unsqueeze(1)).squeeze(1),

@@ -1808,8 +1808,12 @@ export function recordAttacker(state: GameState, attacker: Unit, seat: number): 
  *  record of it is a gone unit's, aging on (runs/h1_duely1117: city-state
  *  3's Warriors levied by China at t28, home at t42, levied again at t45 —
  *  the barbarians keep the records of 655365, 720902 and 786439 as China's
- *  beside the new 1376263, 1441798 and 1507333) */
+ *  beside the new 1376263, 1441798 and 1507333); the new unit of its type's
+ *  own AI type and homed nowhere (the unit's init 0x563cd0: runs/h1_duely1121
+ *  Hunza t56, its levied Warriors home outside its standing army) */
 export function unitMadeAnew(state: GameState, u: Unit): void {
+  delete u.aiDefender;
+  delete u.aiHomed;
   for (const h of [...state.cityStates, ...(state.freeSeat ? [state.freeSeat] : []), state.barbSeat]) {
     for (const r of h.armyKnown ?? []) if (r.id === u.id) r.id = -1;
   }

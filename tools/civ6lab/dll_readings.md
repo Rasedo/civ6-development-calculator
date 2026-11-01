@@ -6974,3 +6974,28 @@ tactical.ts). GPU `crowd_n` in `_tac_search`, the Wander candidates over
   h1_duely1121 t41-77 the Scout 131073's "tertiary regions" 10:9 inside
   China's cities, no path in the engines (the zone of control of units the
   barbarians do not see, unread).
+
+## C-128: a unit made anew leaves its operation and its standing army — READ, both twins
+
+`minorUpgradeUnit` (cpu/core/minorBuild.ts), `unitMadeAnew`
+(cpu/core/units.ts), `garrisonExecute`; GPU `_minor_upgrade_unit` and
+`_kb_unit_anew` (gpu/core/sim_minors.py), `_x_garrison`
+(gpu/core/sim_minorops.py) on the holder's pool (`_mops_u`).
+
+- AN UPGRADE and A LEVY (granted or home) remove the unit and add one of a
+  new id. The new unit's constructor (0x563cd0) writes its assignment
+  (+0x7d0, written afresh at 0x563e50) and its home (-1 at
+  0x5657b2): it is in no operation — the team update keeps a member alive
+  (+0x770 clear) and assigned to the operation (0x73fba0 at 0x73fc75 ->
+  0x732cd0), which neither the dead old unit nor the new one is — and in no
+  standing army, of its type's own AI type, until the army takes it.
+- GARRISON CITY runs on the holder's own pool: the Free Cities' garrison
+  moves and takes DEFENDER as a city-state's does.
+- CONFIRMED (one-seed aimem traces, AI_Military.csv's Combat Desire):
+  runs/h1_duely1117 city-state 4 t91-94 (City Defense's garrison Catapult
+  upgraded at t91; its Trebuchet 1179651 wanders at t92 and joins the army:
+  0.0 at t93-94 as logged, City Defense three units); runs/h1_duely1121
+  Hunza t56-63 (its levied Warriors home at t56, out of the army: 0.0 as
+  logged); runs/h1_duely1124 city-state 4 t83-91 (its units added anew at
+  t83: 0.0 as logged).
+- OPEN: no recording holds a Free City, so their garrison has no case.

@@ -13,12 +13,19 @@
     - recording: h1_duely1127
       turn: 67
       value: "city-state 3's Galley 393216, released at t66 and still listed at t67's log site: Naval Superiority's team line \"Not Ready\" with no unit, then Recruiting minimums UNIT_GALLEY, \"1 units, Recruited 1\""
+    - recording: h1_duely1117
+      turn: 92
+      value: "city-state 4's City Defense garrison Catapult upgraded at t91: its Trebuchet 1179651 in no operation (Wander at t92), City Defense three units"
   impl:
+    - cpu/core/minorBuild.ts:minorUpgradeUnit
+    - gpu/core/sim_minors.py:_minor_upgrade_unit
     - cpu/core/operations/nodes.ts:refreshStrengths
     - gpu/core/sim_minorops.py:_mops_refresh
     - cpu/core/operations/nodes.ts:targets
+    - cpu/core/minorBuild.ts:minorUpgradeUnit
   readings:
     - "C-99: Defend Units' ship release and the team update's members — READ (0x73d1f0, 0x73fba0 at 0x73fc75 -> 0x732cd0), both twins"
+    - "C-128: a unit made anew leaves its operation and its standing army — READ, both twins"
   review: reviewed
 - addr: 0x737610
   final: 0x4db690
@@ -536,6 +543,7 @@
     - gpu/core/sim_barbops.py:_bcap_refresh
     - cpu/core/operations/nodes.ts:targets
     - gpu/core/sim_minorops.py:_mops_refresh
+    - cpu/core/minorBuild.ts:minorUpgradeUnit
   readings:
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
     - "C-97: City Defense and the assault target's validity — the city's threat, the defence event, Is City Threatened, Garrison City and the district target's validity READ; the threat's level terms, the garrison's swap and the team's unit to build unread"
@@ -546,5 +554,6 @@
     - "C-126: the unit choice walks the stored table, stable-sorted at its build, and the table is rebuilt every turn — 0x797980 / 0x79d3a0 and the build's signals READ, both twins; the sea entries' absence open"
     - "C-99: Defend Units' ship release and the team update's members — READ (0x73d1f0, 0x73fba0 at 0x73fc75 -> 0x732cd0), both twins"
     - "C-99: an operation's start takes its strengths; a unit's AI strengths with its formation — READ (0x73a120, 0x56dc90, 0x56e3e0, 0x56daa0, 0x1497d0), both twins"
+    - "C-128: a unit made anew leaves its operation and its standing army — READ, both twins"
   notes: ["imported: cited by the code, in no dll_readings section"]
   review: reviewed

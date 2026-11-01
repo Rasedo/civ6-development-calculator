@@ -2652,12 +2652,18 @@ def _x_garrison(sim, c: _OpCtx, i: int, on: torch.Tensor) -> None:
     planning reaches
     the city this turn the candidate (the ranged, the bombard, the combat
     strength above the best and the garrison's); with no garrison a military
-    unit of the minor on the city its garrison at no strength; with neither
+    unit of the holder on the city its garrison at no strength; with neither
     the candidate moves in, its moves ended (0x56d6f0) on the city with no
     ranged strength; with a stronger candidate it moves beside the city,
     else a garrison of no Range fortifies, its moves ended (`garrisonExecute`).
     Each unit it takes has its turn done (0x570b40), its Movement kept"""
     s, k = c.s, c.k
+    # the holder's pool: a minor's, or the Free Cities' (`_mops_u`)
+    pre, seat = sim._mops_pre(s), sim._mops_seat(s)
+
+    def U(name: str) -> torch.Tensor:
+        return sim._mops_u(s, name)
+
     view = c.view
     dev = sim.device
     B = sim.B
@@ -2670,7 +2676,7 @@ def _x_garrison(sim, c: _OpCtx, i: int, on: torch.Tensor) -> None:
     # the operation's units in the player's unit order (0x6092c0: pool order,
     # `garrisonExecute`), not the teams'
     mc = mem.clamp(min=0)
-    key = torch.where(mem >= 0, sim.major_unit_pslot.gather(1, mc).clamp(min=0), torch.full_like(mem, 1 << 30))
+    key = torch.where(mem >= 0, U("pslot").gather(1, mc).clamp(min=0), torch.full_like(mem, 1 << 30))
     mem = mem.gather(1, key.argsort(dim=1, stable=True))
     gar = torch.full((B,), -1, dtype=torch.long, device=dev)
     g_r = torch.zeros(B, dtype=torch.long, device=dev)
@@ -2678,15 +2684,15 @@ def _x_garrison(sim, c: _OpCtx, i: int, on: torch.Tensor) -> None:
     b_r = torch.zeros(B, dtype=torch.long, device=dev)
     b_c = torch.zeros(B, dtype=torch.long, device=dev)
     pick = torch.full((B,), -1, dtype=torch.long, device=dev)
-    cb_all, rg_all, bm_all = sim._ai_combat("major"), sim._ai_ranged("major"), sim._ai_bombard("major")
+    cb_all, rg_all, bm_all = sim._ai_combat(pre), sim._ai_ranged(pre), sim._ai_bombard(pre)
     for j in range(mem.shape[1]):
         us = mem[:, j]
         uc = us.clamp(min=0)
-        ok = g & (us >= 0) & sim.major_unit_alive[b, uc] & (sim.major_unit_seat[b, uc] == 100 + s)
+        ok = g & (us >= 0) & U("alive")[b, uc] & (U("seat")[b, uc] == seat)
         if not bool(ok.any()):
             continue
         cb, rg, bm = cb_all[b, uc], rg_all[b, uc], bm_all[b, uc]
-        on_city = ok & (sim.major_unit_tile[b, uc] == city)
+        on_city = ok & (U("tile")[b, uc] == city)
         gar = torch.where(on_city, us, gar)
         g_c = torch.where(on_city, cb, g_c)
         g_r = torch.where(on_city, torch.maximum(rg, bm - 5), g_r)
@@ -2700,7 +2706,7 @@ def _x_garrison(sim, c: _OpCtx, i: int, on: torch.Tensor) -> None:
         cc = cand & (cb > b_c) & (cb > g_c)
         b_c = torch.where(cc, cb, b_c)
         pick = torch.where(cc & (pick < 0) & (g_r == 0) & (b_r == 0), us, pick)
-    seat = 100 + s
+
     done, ended, ended_mp = c.view["done"], c.view["ended"], c.view["ended_mp"]
 
     def end_turn(u: torch.Tensor, mask: torch.Tensor) -> None:
@@ -2716,48 +2722,48 @@ def _x_garrison(sim, c: _OpCtx, i: int, on: torch.Tensor) -> None:
             return
         uc = u[r]
         fresh = ~ended[r, uc]
-        ended_mp[r, uc] = torch.where(fresh, sim.major_unit_mp[r, uc], ended_mp[r, uc])
+        ended_mp[r, uc] = torch.where(fresh, U("mp")[r, uc], ended_mp[r, uc])
         ended[r, uc] = True
-        sim.major_unit_mp[r, uc] = 0
+        U("mp")[r, uc] = 0
     no_g = g & (gar < 0)
     if bool(no_g.any()):
         # a military unit of the minor on the city takes the garrison's
         # branch at no strength
         cc = city.clamp(min=0)
-        own = sim.major_unit_alive & (sim.major_unit_seat == seat) & (sim.major_unit_tile == cc.unsqueeze(1))
-        ut = sim.major_unit_type.clamp(min=0, max=sim.NU - 1)
+        own = U("alive") & (U("seat") == seat) & (U("tile") == cc.unsqueeze(1))
+        ut = U("type").clamp(min=0, max=sim.NU - 1)
         fights = (sim._type_combat.take(ut) + sim._type_ranged_strength.take(ut) + sim._type_bombard.take(ut)) > 0
         held = (own & fights).any(dim=1)
         # the first such unit in the player's unit order (pool order)
-        okey = torch.where(own & fights, sim.major_unit_pslot, torch.full_like(sim.major_unit_pslot, 1 << 30))
+        okey = torch.where(own & fights, U("pslot"), torch.full_like(U("pslot"), 1 << 30))
         standing = okey.argmin(dim=1)
         gar = torch.where(no_g & held, standing, gar)
         go = no_g & ~held & (pick >= 0)
         sim._mops_move(s, pick, city, go)
         end_turn(pick, go)
         pc = pick.clamp(min=0)
-        pt = sim.major_unit_type[b, pc].clamp(min=0, max=sim.NU - 1)
-        end_moves(pick, go & (sim.major_unit_tile[b, pc] == city) & (sim._type_ranged_strength.take(pt) == 0))
+        pt = U("type")[b, pc].clamp(min=0, max=sim.NU - 1)
+        end_moves(pick, go & (U("tile")[b, pc] == city) & (sim._type_ranged_strength.take(pt) == 0))
     with_g = g & (gar >= 0)
     end_turn(gar, with_g)
     stronger = (g_r < b_r) | ((g_r <= 0) & (g_c < b_c))
     m = with_g & stronger & (pick >= 0)
     if bool(m.any()):
         spot = sim._mops_plan_spot(s, view, pick, city, 1, True, torch.ones_like(city))
-        here = sim.major_unit_tile[b, pick.clamp(min=0)]
+        here = U("tile")[b, pick.clamp(min=0)]
         sim._mops_move(s, pick, spot, m & (spot >= 0) & (spot != here))
         # its swap into the city with the garrison (0x972880), its moves
         # ended there (0x56d6f0; `garrisonExecute`)
         sim._mops_swap(s, pick, city, m)
-        end_moves(pick, m & (sim.major_unit_tile[b, pick.clamp(min=0)] == city))
+        end_moves(pick, m & (U("tile")[b, pick.clamp(min=0)] == city))
     end_turn(pick, m)
     # else a garrison of no Range fortifies, its moves ended
-    gt = sim.major_unit_type[b, gar.clamp(min=0)].clamp(min=0, max=sim.NU - 1)
+    gt = U("type")[b, gar.clamp(min=0)].clamp(min=0, max=sim.NU - 1)
     end_moves(gar, with_g & ~m & (sim._type_ranged_range.take(gt) == 0))
     # the candidate swapped in takes AI type DEFENDER, the garrison its
     # type's own; with no stronger candidate the garrison takes DEFENDER
     # (0x1e60f0 on unit +0x168; `garrisonExecute`), its home kept
-    dfd = sim.major_unit_defender
+    dfd = U("defender")
     r = m.nonzero(as_tuple=True)[0]
     if r.numel():
         dfd[r, pick[r]] = True

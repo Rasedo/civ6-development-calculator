@@ -112,8 +112,10 @@
 - addr: 0x563cd0
   kind: function
   status: PARTLY
-  impl: [cpu/core/minorBuild.ts:minorUpgradeUnit]
-  readings: ["C-128: the standing army's home and Garrison City's DEFENDER — READ, both twins"]
+  impl: [cpu/core/minorBuild.ts:minorUpgradeUnit, cpu/core/units.ts:unitMadeAnew]
+  readings:
+    - "C-128: the standing army's home and Garrison City's DEFENDER — READ, both twins"
+    - "C-128: a unit made anew leaves its operation and its standing army — READ, both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...s +0xf8) and where it drops one (-1). The other writers of the home: the unit's init (0x5657b2, -1) and a city's capture (0x5c9d40 from 0x1fdea0: the capturing unit's assignment -1,..."
