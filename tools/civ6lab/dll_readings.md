@@ -4051,8 +4051,21 @@ building tables).
   is not refused — its repair stands — so it is valued as unbuilt
   (`refused`; h1_duelv1124 Granada t73-t78, its pillaged Lighthouse logged
   76.11-162.61 where ours read -9999: 474 -> 491 of 491 Lighthouse rows
-  valid, its value still about a fifth of the log's — the repair's per-turn
-  value unread).
+  valid). 0x7a4d40 with no plot (0x7a5182..0x7a51d9), READ: a building the
+  city holds (City_Buildings 0x18e9f0) pillaged (0x18fe60) — or held under
+  damaged walls (0x197ff0 above 0) with OuterDefenseHitPoints (+0x54 /
+  +0x58) — has its value (0x7a7590) doubled (0x7a5136, x 0x200); the
+  table refuses a held building but a pillaged one, so only the repair's
+  doubling reaches it. Its T is the repair's: the rest past the resumed
+  75% at no percent (`minorItemFor`), the repair in hand the city's
+  current item (the queue's building entry: no +10 for it, +10 for the
+  rest). runs/h1_duelv1124 Granada t86-t89, the Lighthouse's repair in
+  hand at 47 / 50 / 53 / 56 of 60: 157.77 / 169.69 / 213.44 / 227.34 as
+  logged, 2 x 113.67 at its last turn; the duely duels' repairs queued as
+  the game's (1124 Granada t86-90, 1117 Valletta t145-148, 1121 Ayutthaya
+  t217-222, 1127 Muscat t241-250). A record's repair progress counts the
+  building's whole cost, the resumed part with it (1117 Valletta t144 45
+  of 60), the engine's the rest.
 - The building value's defence terms past the city's own (0x7a84c0..
   0x7a8758, OuterDefenseHitPoints rows): over the player's cities, one whose
   CityBuildAI +0x1b8 is above -1 adds 4.0 (once); the city holding the

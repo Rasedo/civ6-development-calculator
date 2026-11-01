@@ -1116,7 +1116,8 @@ export function minorItemType(cityState: CityState): string | null {
   const k = cityState.prodItem;
   if (!k) return null;
   const [kind, id] = k.split(':');
-  return kind === 'building' ? installType('building', id, 'BUILDING_')
+  // a repair is its building's queue entry
+  return kind === 'building' || kind === 'repair' ? installType('building', id, 'BUILDING_')
     : kind === 'district' ? installType('district', id, 'DISTRICT_')
       : kind === 'unit' ? installType('unit', id, 'UNIT_')
         : kind === 'project' ? installType('project', id, 'PROJECT_') : null;
@@ -1574,7 +1575,8 @@ export function minorBuildFacts(state: GameState, cityState: CityState, known: (
     techTurns: turns,
     civicTurns: turns,
     buildTurns: (type) => {
-      const item = minorItemOfType(type);
+      // a building the city holds pillaged: its repair's turns
+      const item = minorItemFor(cityState, type);
       if (!item) return 500;
       const k = minorItemKey(item);
       // the progress kept on the item, and the store an idle step or a

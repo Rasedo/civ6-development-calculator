@@ -770,12 +770,19 @@ export function specializationBests(t: CityBuildTables, f: PickFacts): Record<'b
 }
 
 /** THE BUILDINGS TABLE of the city centre (0x5ce970's building loop): a raw
- *  value per Buildings row in database order */
+ *  value per Buildings row in database order, each 0x7a4d40's with no plot:
+ *  the building value (0x7a7590) doubled where the city holds the building
+ *  pillaged (0x18e9f0 and 0x18fe60, 0x7a5182..0x7a51d9 -> 0x7a5136;
+ *  runs/h1_duelv1124 Granada t89 its pillaged Lighthouse 227.34 = 2 x
+ *  113.67) — the same doubling for a held walls building under damaged
+ *  walls never reaches the table, which refuses a held building */
 export function buildingTable(f: CityBuildFacts): number[] {
   return AI_BUILDINGS.map((b) => {
     if (b.wonder || b.placement) return FX_MIN;
     if (f.version(b.type) !== b.type || refused(f, b)) return FX_MIN;
     const t = buildingTurns(f, b);
-    return t < 0 ? FX_MIN : buildingValue(f, b, t);
+    if (t < 0 || t >= AI_VALUE_HORIZON) return FX_MIN;
+    const v = buildingValue(f, b, t);
+    return f.hasBuilding(b.type) && f.buildingPillaged(b.type) ? fmul(v, 2 * FX) : v;
   });
 }

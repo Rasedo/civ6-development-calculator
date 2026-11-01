@@ -1082,6 +1082,9 @@ class SimCityValue:
                 out.append(torch.full_like(t, _FX_MIN))
                 continue
             v = self._cv_building(f, b["type"], t, torch.full_like(t, hz))
+            # 0x7a4d40: a held pillaged building's value doubled
+            pil = _t(f.has_building(b["type"]), like).bool() & _t(f.building_pillaged(b["type"]), like).bool()
+            v = torch.where(pil & (t < hz), _fmul(v, torch.full_like(v, 2 * _FX)), v)
             out.append(torch.where(no | (t < 0), torch.full_like(v, _FX_MIN), v))
         return out
 
@@ -1917,12 +1920,16 @@ class _MinorFacts:
         return -1 if pi < 0 else sim._mk_p0 + pi
 
     def producing(self):
-        it = self.sim.citystate_item[:, self.s]
-        return (it >= 0) & (it < self.sim._mk_r0)
+        return self.sim.citystate_item[:, self.s] >= 0
 
     def current_is(self, item):
+        # a repair in hand is its building's queue entry (`minorItemType`)
         k = self._item_key(item)
-        return (self.sim.citystate_item[:, self.s] == k) & (k >= 0)
+        it = self.sim.citystate_item[:, self.s]
+        hit = (it == k) & (k >= 0)
+        if item.startswith("BUILDING_") and k >= 0:
+            hit = hit | (it == k - self.sim._mk_b0 + self.sim._mk_r0)
+        return hit
 
     def _analysed(self, key, ids, held, cur, left, entries):
         """`analysedTurns`: 0 for none or one held; else the analysis' turns
@@ -2085,6 +2092,16 @@ class _MinorFacts:
         progress = torch.where(cur == k, sim.citystate_prod[:, s], sim.citystate_kept[:, s, k]) + sim.citystate_ovf[:, s]
         pct = self._item_pct(u)
         cost = self._item_cost(u)
+        if u.startswith("BUILDING_"):
+            # a building the city holds pillaged: its repair's turns
+            # (`minorItemFor`), its rest at no percent
+            pil = self.has_building(u) & self.building_pillaged(u)
+            if bool(pil.any()):
+                kr = k - sim._mk_b0 + sim._mk_r0
+                rprog = torch.where(cur == kr, sim.citystate_prod[:, s], sim.citystate_kept[:, s, kr]) + sim.citystate_ovf[:, s]
+                progress = torch.where(pil, rprog, progress)
+                cost = torch.where(pil, sim._minor_item_cost(s, torch.full_like(cur, kr)).double(), cost)
+                pct = torch.where(pil, torch.zeros_like(pct), pct)
         row = self.T["bld"].get(u)
         if row is not None and row["trait"]:
             # a civilization's own building (`traitBuildingCost`): its row's
@@ -2260,9 +2277,7 @@ class _MinorFacts:
     def building_held(self, b):
         # 0x17e690: the queue's building entries of the type — the item in
         # hand, a repair's its building's (`minorPickFacts`)
-        bi = self._building_index(b)
-        rk = self.sim.citystate_item[:, self.s] == (self.sim._mk_r0 + bi)
-        return self.current_is(b) | (rk & (bi >= 0))
+        return self.current_is(b)
 
     def can_construct(self, b):
         return self.sim._cv_constructible(self, self.T["bld"][b])

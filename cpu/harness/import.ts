@@ -62,7 +62,7 @@ import { IMPROVEMENTS } from '../data/improvements';
 import { GOVERNMENTS, POLICIES, type SlotKind } from '../data/policies';
 import { ENHANCER_BELIEFS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, PANTHEONS, WORSHIP_BELIEFS } from '../data/religion';
 import { AGE_GOLDEN } from '../data/seats';
-import { CITY_STATE_SUZERAIN_BONUS, CITY_STATE_TYPES, LEVY_TURNS, MINOR_CATCHUP_PCT } from '../data/cityStates';
+import { CITY_STATE_SUZERAIN_BONUS, CITY_STATE_TYPES, LEVY_TURNS, MINOR_CATCHUP_PCT, MINOR_REPAIR_RESUME_PCT } from '../data/cityStates';
 import { researchCost } from '../core/economy';
 import { ALPINE_FEATURE, PROMO_CLASSES } from '../data/promotions';
 import { unitPromoRows } from '../core/promotions';
@@ -2435,6 +2435,13 @@ export function importTurn(rec: TurnRecord, cat: Catalog, history?: History): Im
       if (key) {
         minor.prodItem = key;
         minor.prodProgress = num(c.queueProgress?.[0]) || 0;
+        // a repair's queue progress counts its building's whole cost, the
+        // resumed part with it (runs/h1_duely1117 Valletta t144: its
+        // Lighthouse's repair at 45 of 60), the engine's the rest past it
+        if (item && 'repair' in item) {
+          const cost = BUILDINGS[item.repair].cost;
+          minor.prodProgress = Math.max(0, minor.prodProgress - Math.floor((cost * MINOR_REPAIR_RESUME_PCT) / 100));
+        }
       }
       // a district in hand stands at the record's queued Location
       if (item && 'district' in item) minor.prodSite = item.site;

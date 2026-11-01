@@ -73,9 +73,11 @@
     - cpu/core/aiValue.ts:AiValueView
     - cpu/core/minorCityAi.ts:city
     - cpu/core/minorCityAi.ts:districtWhole
+    - cpu/core/aiCityBuild.ts:buildingTable
   readings:
     - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
     - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
+    - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...Amount +0x10): a city subject; Amount weighted, x0.5 where the city lacks the building (0x18e9f0), span."
@@ -91,9 +93,11 @@
     - cpu/core/city.ts:citySpecialistSlots
     - cpu/core/minorCityAi.ts:city
     - cpu/core/minorCityAi.ts:districtWhole
+    - cpu/core/aiCityBuild.ts:buildingTable
   readings:
     - "H-1: a pillaged building's specialist, the centre's defence, three moments — READ"
     - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
+    - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
   context:
     - "...its row's base (+0x54 behind +0x50) plus each building of the district not pillaged (0x18fe60 on the city's buildings +0x1c78: the byte array the Lua IsPillaged binding 0x9847b0 ->..."
   review: imported
