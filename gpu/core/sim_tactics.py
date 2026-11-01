@@ -540,7 +540,8 @@ class SimTactics:
         turn of every plot the search closed, those it only passes or attacks
         included. With `stand` (the danger map's search) an attack is struck
         only from the unit's own plot or one none of its own stacking units
-        holds. With `later_turns` (the path's flag 0x1000) a path's turn may
+        holds, by no unit with a range, and no zone of control is paid (flag
+        0x800). With `later_turns` (the path's flag 0x1000) a path's turn may
         end on a plot its own stacking unit holds after its first. With
         `from_full` (the planning's, `search`'s fromFull) each unit sets out on
         its full Movement, unmoved by its Movement left. With no `explore`
@@ -609,6 +610,10 @@ class SimTactics:
         fights = self._type_combat.take(utype) > 0
         atk_n = torch.where(naval.unsqueeze(1), a_nav[rows], a_land[rows] | (a_fw[rows] & embarks.unsqueeze(1))) \
             & fights.unsqueeze(1) & ~ent_n
+        if stand:
+            # the danger map's search: a unit with a range strikes by stepping
+            # onto no plot, its range covers the plots beside its reach
+            atk_n = atk_n & ~(self._type_ranged_strength.take(utype) > 0).unsqueeze(1)
         cost_b = self._tac_cost()  # [B, T, 6]
         # each unit's terrain waivers (`terrainMp`: hills, Woods)
         waive = self._tac_waive_code(utype, getattr(self, f"{pre}_unit_promos")[rows, slots],
@@ -629,12 +634,6 @@ class SimTactics:
             waive_cliff = self._promo_flag(utype, getattr(self, f"{pre}_unit_promos")[rows, slots], "CLIFFS")
         zp = (torch.where(naval.unsqueeze(1), self._tac_zoc(seat, naval=True)[rows], self._tac_zoc(seat, naval=False)[rows])
               & ~self._tac_zoc_ignored(utype).unsqueeze(1)) if zoc else None
-        if stand and not zoc:
-            # the danger map's search (flags 0x311): a step into a zone of
-            # control the player sees spends everything (`search`)
-            sn_d = self._barb_seen("barbarians" if seat == BARB_SEAT else seat)
-            zp = (torch.where(naval.unsqueeze(1), self._tac_zoc(seat, sn_d, True)[rows], self._tac_zoc(seat, sn_d, False)[rows])
-                  & ~self._tac_zoc_ignored(utype).unsqueeze(1))
         # the planning's search (no flag 0x200: 0x26e570 at 0x26e83e) moves on
         # from no plot of a zone of control the player sees but the unit's
         # own; an attack it strikes from there all the same (`groundOf`'s
@@ -1892,6 +1891,30 @@ class SimTactics:
                         ok = ((turns[rr] == 1) & (moves[rr] > 0) & ~res["attack"][rr] & (dtp <= urng.unsqueeze(1))
                               & ~self._tac_stacked_other(u_b) & far.unsqueeze(1))
                         spot = first_in_reach(row, ok)
+                        # with none, the first plot of the target's ring at
+                        # its range (1 at least; 0x6b1b0 -> 0x691f0) with a
+                        # path under flags 0 (0x272a60 from 0x76ecf0: none its
+                        # own stacking unit holds) (`strike`)
+                        fb = far & (spot < 0)
+                        if bool(fb.count_nonzero()):
+                            R = urng.clamp(min=1, max=3)
+                            ring = self._barb_ring[tc]  # [B, 37]
+                            jr = torch.arange(ring.shape[1], device=dev).unsqueeze(0)
+                            inr = ((jr >= (1 + 3 * R * (R - 1)).unsqueeze(1)) & (jr < (1 + 3 * R * (R + 1)).unsqueeze(1))
+                                   & (ring >= 0))
+                            inr = inr & ~self._tac_stacked_other(u_b).gather(1, ring.clamp(min=0))
+                            ring_p = torch.full_like(spot, -1)
+                            for jj in range(ring.shape[1]):
+                                need = fb & (ring_p < 0) & inr[:, jj]
+                                if not bool(need.count_nonzero()):
+                                    continue
+                                r_i = bidx[need]
+                                p_i = ring[need, jj]
+                                res2 = self._tac_search(r_i, u_b[need], BARB_SEAT, 1 << 30, True, dest=p_i, pre="barb",
+                                                        later_turns=False)
+                                ok2 = res2["turns"][torch.arange(r_i.shape[0], device=dev), p_i] > 0
+                                ring_p[r_i[ok2]] = p_i[ok2]
+                            spot = torch.where(fb, ring_p, spot)
                         self._tac_move_to(far & (spot >= 0), u_b, spot)
                     at = self.barb_unit_tile[bidx, u_b].clamp(min=0)
                     fire = (shoot & self.barb_unit_alive[bidx, u_b] & (self.pair_dist[at, tc].to(torch.long) <= urng)

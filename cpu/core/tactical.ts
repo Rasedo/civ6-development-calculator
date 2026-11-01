@@ -340,7 +340,7 @@ function domainPool(state: GameState, unit: Unit, sea: boolean): number {
  * at full; a step dearer than the Movement left waits for the next turn,
  * unless it leaves the unit's own plot unmoved, where it spends everything; a
  * zone of control spends everything (`zoc`; the planning's breadth-first
- * search, flag 0x800, reads none, and strikes a unit at war on any ground,
+ * search and the danger map's, flag 0x800, read none, and strike a unit at war on any ground,
  * a move order's path one on its own domain's); a strike's step is priced
  * so and then spends the Movement it leaves. Its cost (0x270dd0): 1000 x the step's
  * Movement +2, and where the step ends the turn's Movement +4, +3 more off
@@ -350,7 +350,7 @@ function domainPool(state: GameState, unit: Unit, sea: boolean): number {
  * the turn and Movement the step reaches it with, and whether it attacks —
  * the start first, linked from itself. Standing to attack (the danger map's
  * search): an attack is struck only from the unit's own plot or one none of
- * its own stacking units holds. With laterTurns (the path's flag 0x1000) a
+ * its own stacking units holds, and by no unit with a range. With laterTurns (the path's flag 0x1000) a
  * path's turn may end on a plot its own stacking unit holds after its first.
  */
 /** a move order's danger flags over the player's danger map (`dangerPlane`):
@@ -451,8 +451,12 @@ function search(state: GameState, unit: Unit, maxTurns: number, zoc: boolean, on
       if (isWater(from) === isWater(to) && ground.revealed(to.index) && ground.boarded(to.index)) continue;
       // the danger map's search (0x26df90, flags 0x311): an attack is struck
       // from a plot the unit may stand on, its own or one none of its own
-      // stacking units holds
-      if (attack && standToAttack && best !== start && ground.full(best.tile)) continue;
+      // stacking units holds; a unit with a range strikes by stepping onto
+      // no plot, its range covers the plots beside its reach (runs/h1_duely1124
+      // t53: the barbarian Archer on 40:8 reaches 39:8 / 39:9 beside city-state
+      // 4's Warrior on 38:8, so 36:7, three plots from them, holds no danger
+      // and its Warrior 327683 Heals there)
+      if (attack && standToAttack && (rangeOf(unit) > 0 || (best !== start && ground.full(best.tile)))) continue;
       // a move order's danger flags (the path validity 0x2720a0 at
       // 0x272590..0x272612): from a node of the path's first turn, under
       // flag 8 no child of danger (the player's danger map 0x716a90 above
@@ -539,14 +543,14 @@ function search(state: GameState, unit: Unit, maxTurns: number, zoc: boolean, on
       // Movement it leaves (0x26e570: the cost adds it)
       cost += moves;
       moves = 0;
-    } else if (moves > 0 && (zoc ? ground.zoc(to) : standToAttack && ground.seenZoc(to.index))) {
+    } else if (moves > 0 && zoc && ground.zoc(to)) {
       // a zone of control's step costs at least the Movement it starts with
       // (0x26f980's minimum), the parent's carry on top: with one, the step
-      // is left short (0x26ed00). The danger map's search (flags 0x311: no
-      // 0x800) pays it on a zone its player sees (runs/h1_duely1124 t53:
-      // the barbarian Archer on 40:8 stops on 39:8 beside city-state 4's
-      // Warrior on 38:8, so 36:7 holds no danger and its Warrior 327683
-      // Heals there)
+      // is left short (0x26ed00). The danger map's search pays none: 0x26df90
+      // adds 0x800 to its flags 0x311 (at 0x26e12f), and the cost 0x26e920
+      // skips the zone under it (at 0x26eb27) (runs/h1_duely1127 t4: the
+      // barbarian Scout on 5:12 flees to 4:13, 5:13 beyond it in the danger
+      // of city-state 3's Warrior on 4:12)
       cost = pm;
       moves = 0;
       carry = 0;
@@ -603,14 +607,17 @@ export function reachPlots(state: GameState, unit: Unit, maxTurns: number): Reac
  *  under flag 0x1000: the path's search, its zone of control spending the
  *  Movement — the planning's breadth-first refusal 0x26e570 is not its
  *  validity —, a turn after the first free to end where its own stacking
- *  unit stands; stopped once `dest` closes); 0 where it cannot */
-export function turnsToPlot(state: GameState, unit: Unit, dest: number): number {
+ *  unit stands; stopped once `dest` closes); 0 where it cannot. With no
+ *  `laterTurns` (the path's flags 0) no turn of it ends where its own
+ *  stacking unit stands, `dest` the last turn's end. */
+export function turnsToPlot(state: GameState, unit: Unit, dest: number, laterTurns = true): number {
+  if (!laterTurns && dest !== unit.tileIndex && stackedOther(state, unit, dest)) return 0;
   let turns = 0;
   search(state, unit, Infinity, true, (n, ground) => {
     if (n.tile !== dest) return false;
     if (n.attack || n.tile === unit.tileIndex || ground.stand(n.tile)) turns = n.turns;
     return true;
-  }, undefined, false, true);
+  }, undefined, false, laterTurns);
   return turns;
 }
 
@@ -1225,7 +1232,7 @@ export function aiStrengths(state: GameState, u: Unit): { melee: number; ranged:
  * read by 0x716a90): per player at war with `seat`, each unit of it the seat
  * sees now with a combat, ranged or bombard strength adds its danger
  * (`unitDanger`) to every plot its one-turn planning search closes from where
- * it stands on its full Movement (0x7921e0 -> 0x26df90, its attacks
+ * it stands on its full Movement (0x7921e0 -> 0x26df90, no zone of control, its melee attacks
  * included but a ship's onto land: runs/h1_duelv1128 t45 / t80 / t109, a
  * city-state's land unit beside a barbarian Galley and Quadriremes logs the
  * Quadriremes' ranged danger alone), and to a second list, each plot once: every other plot within
@@ -1533,18 +1540,29 @@ function defenderAt(state: GameState, unit: Unit, p: number): boolean {
  * religious unit it moves onto; a target a fighter holds, or a City Center or
  * Encampment, a ranged unit strikes from where it stands, else from the first
  * plot of its planning reach of this turn with Movement left within its range
- * and none of its own stacking there (0x585eb0) it moves to first; else it
- * goes for the target's plot with the attack flag (`moveTo`).
+ * and none of its own stacking there (0x585eb0) it moves to first, with none
+ * toward the first plot of the target's ring at its range it has a path to
+ * (one with no planning stays); else it goes for the target's plot with the
+ * attack flag (`moveTo`).
  */
 function strike(state: GameState, pass: Pass, u: Unit, e: Target): void {
   const T = e.tile;
   const range = rangeOf(u);
   const fight = e.type === 'COMBAT_DISTRICT' || defenderAt(state, u, T);
   if (fight && range > 0) {
-    if (plotDistance(state, u.tileIndex, T) > range) {
+    if (plotDistance(state, u.tileIndex, T) > range && pass.plan.has(u.id)) {
       const spot = (pass.reach.get(u.id) ?? []).find((r) => r.turns === 1 && r.moves > 0 && !r.attack
         && plotDistance(state, r.tile, T) <= range && !stackedOther(state, u, r.tile));
-      if (spot) moveTo(state, u, spot.tile);
+      // with none, the first plot of the target's ring at its range (1 at
+      // least; 0x6b1b0 -> 0x691f0) it has a path to (0x272a60 under flags 0
+      // from the functor 0x76ecf0), its move order walking toward it
+      // (runs/h1_duely1121 t30: the rampaging Quadrireme on 9:1 for the
+      // Warrior on 8:6 sails to 8:4; h1_duely1127 t52: the Quadrireme on
+      // 32:21 for 35:22 stays, the ring's one plot it reaches, 35:23, its
+      // Galley's)
+      const to = spot ? spot.tile : ringPlots(state, T, Math.max(1, range))
+        .find((p) => plotDistance(state, T, p) === Math.max(1, range) && turnsToPlot(state, u, p, false) > 0);
+      if (to !== undefined) moveTo(state, u, to);
     }
     if (state.units.includes(u) && plotDistance(state, u.tileIndex, T) <= range && u.movesLeft > 0 && attacksLeftOf(u) > 0) {
       hostileRangedStrike(state, u, T);

@@ -143,7 +143,7 @@
 - addr: 0x771670
   final: 0x503660
   kind: function
-  semantics: "the rampage strike: a civilian, Trader or religious unit it moves onto; a ranged unit at a fighter or COMBAT_DISTRICT strikes, first moving to the first plot of its reach this turn with Movement left within range and none of its own stacking; else MOVE_TO the target's plot with the attack flag 0x10. Its arguments the tactical object (its unit list +0x270, 0x30 a unit: +0x24 dealt, +0x28 taken), the target, its plot, two flags ([rbp+0x108] the exchange filter: taken above dealt skipped; [rbp+0x110] the survival filter: damage + taken — twice taken in the ranged loop — at the unit's health skipped). A fighter or COMBAT_DISTRICT target (0x208b80, the type test at 0x7716f4) takes the ranged loop (Ranged or Bombard above 0) then the melee loop, which skips a ranged unit and gives each other one MOVE_TO (0x962030) on the target with flag 0x10 (0x771e44). A melee unit's MOVE_TO with the attack flag on a target its player does not see now goes nowhere — a FIT (the pathfinder's own test unread); ported as the attack plots taken only on a plot the player sees now (groundOf's attack, _tac_attack_planes)."
+  semantics: "the rampage strike: a civilian, Trader or religious unit it moves onto; a ranged unit at a fighter or COMBAT_DISTRICT strikes, first moving to the first plot of its reach this turn with Movement left within range and none of its own stacking, with none toward the first plot of the target's ring at max(range, 1) (0x6b1b0 -> 0x691f0) the functor 0x76ecf0 finds a path to (0x272a60 under flags 0), a unit with no planning (+0x1fc0) moving none; else MOVE_TO the target's plot with the attack flag 0x10. Its arguments the tactical object (its unit list +0x270, 0x30 a unit: +0x24 dealt, +0x28 taken), the target, its plot, two flags ([rbp+0x108] the exchange filter: taken above dealt skipped; [rbp+0x110] the survival filter: damage + taken — twice taken in the ranged loop — at the unit's health skipped). A fighter or COMBAT_DISTRICT target (0x208b80, the type test at 0x7716f4) takes the ranged loop (Ranged or Bombard above 0) then the melee loop, which skips a ranged unit and gives each other one MOVE_TO (0x962030) on the target with flag 0x10 (0x771e44). A melee unit's MOVE_TO with the attack flag on a target its player does not see now goes nowhere — a FIT (the pathfinder's own test unread); ported as the attack plots taken only on a plot the player sees now (groundOf's attack, _tac_attack_planes)."
   status: READ
   cases:
     - recording: h1_duely1117
@@ -153,8 +153,15 @@
       value: "Shadow check over   1124: of 446 rows the logged target is in the list for 423 (the rest the   knowledge base's), the pick matches 415 of them;"
     - recording: h1_duely1117
       value: t127-t134 the rampaging Man-At-Arms at 37:16 holds for Longxi's 37:13 out of the barbarians' sight (MOVE_TO flag 0x10 at 0x771e44); args 4/5 the exchange and survival filters, Rampage passes 0
-  impl: [cpu/core/tactical.ts:strike, cpu/core/tactical.ts:groundOf]
+    - recording: h1_duely1121
+      turn: 30
+      value: the rampaging Quadrireme 786443 on 9:1 for the Warrior on 8:6, no spot this turn, sails to 8:4 (the ring's first plot with a path)
+  impl:
+    - cpu/core/tactical.ts:strike
+    - cpu/core/tactical.ts:groundOf
+    - gpu/core/sim_tactics.py:_tac_rampage
   readings:
+    - "C-95: the danger map's search pays no zone of control, a ranged unit strikes from its range; the rampage strike's ring — READ (0x26df90, 0x26e920, 0x771670, 0x691f0, 0x76ecf0), FIT (the ranged unit's strike), both twins"
     - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
     - "C-95: a strike's move order onto a plot out of sight — READ (the strike), FIT (the path's sight test)"
     - "C-95: a strike's move order onto a plot out of sight"

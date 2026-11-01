@@ -10,6 +10,7 @@
   status: PARTLY
   readings:
     - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
+    - "C-95: the danger map's search pays no zone of control, a ranged unit strikes from its range; the rampage strike's ring — READ (0x26df90, 0x26e920, 0x771670, 0x691f0, 0x76ecf0), FIT (the ranged unit's strike), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ...180); the civilian taken ends the target; then each ranged one within range strikes it (0x964a40).

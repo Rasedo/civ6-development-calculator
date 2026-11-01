@@ -6511,3 +6511,50 @@ turn left is AI_Research.csv's RESEARCHING row (`Ctx.researchAtTurn`).
   barbarian capture stays listed in its old operation through the end look
   (runs/h1_duely1121 t68: Barbarian Attack's three, Builder Capture's
   Settler and Warrior), the engines drop it at the capture.
+
+## C-95: the danger map's search pays no zone of control, a ranged unit strikes from its range; the rampage strike's ring — READ (0x26df90, 0x26e920, 0x771670, 0x691f0, 0x76ecf0), FIT (the ranged unit's strike), both twins
+
+`search` (its standToAttack link and price's zone branch), `turnsToPlot`
+(its `laterTurns`), `strike` (cpu/core/tactical.ts); `_tac_search` (`stand`'s
+`atk_n`, no `zp`), `_tac_rampage`'s ring (gpu/core/sim_tactics.py).
+
+- THE REACH SEARCH 0x26df90 adds 0x800 to the flags it is given (bts eax,
+  0xb at 0x26e12f) before the search 0x7a630 with no destination; the cost
+  0x26e920 runs the zone of control 0x26f980 only with +0x398 & 0x800 clear
+  (at 0x26eb27). The danger map's call (0x716739, flags 0x311) so pays no
+  zone: runs/h1_duely1127 t4, the barbarian Scout on 5:12 (hp 10) flees to
+  4:13, 5:13 beyond it in the danger of city-state 3's Warrior on 4:12;
+  runs/h1_duely1121 t26, the Scout on 4:18 (hp 53) flees to 5:19, its plot
+  in the danger of player 1's Warrior on 5:16 through 4:17; h1_duely1124
+  t11, the Scout on 37:6 goes to 36:6. The danger map's range list walks
+  the same reach list (0x7167b0 over [rbp-0x51]) as the reach's own add
+  (0x716930).
+- FIT: in the danger map's search a unit with a range strikes by stepping
+  onto no plot (no attack node), its range covering the plots beside its
+  reach: runs/h1_duely1124 t53, the barbarian Archer on 40:8 reaches 39:8 /
+  39:9 beside city-state 4's Warrior on 38:8, 36:7 three plots from them
+  holds no danger and its Warrior 327683 Heals there as logged. Unread: the
+  attack node's own test for a ranged mover in 0x2720a0 / 0x271be0.
+- THE RAMPAGE STRIKE 0x771670, a ranged unit beyond its range of a fighter
+  or COMBAT_DISTRICT: with a planning (+0x1fc0; none, no move), the first
+  plot of the planning's reach of turn 1 with Movement within its range and
+  no own stacking unit (0x771a84..0x771b17); with none, the ring of the
+  target at max(range, 1) (0x6b1b0 -> GetRingPlots 0x6b130 -> 0x691f0: the
+  ring at that radius, its six corners (0,1), (-1,0), (1,-1), (0,-1),
+  (1,0), (-1,1) times the radius, each walked along its next side 1, 2, 0,
+  4, 5, 3 — `ringPlots`' ring at that radius) through the functor
+  0x76ecf0, which keeps the first plot whose path 0x272a60 under flags 0
+  answers turns (no 0x1000: no turn of it ends on its own stacking unit,
+  the plot the path's last); then MOVE_TO (0x962190) on the plot found,
+  the strike (0x964a40) where the move brings it in range.
+  runs/h1_duely1121 t30 / t51 / t57 / t60: the rampaging Quadrireme 786443
+  sails 9:1 -> 8:4, 8:5 -> 7:7, 6:9 -> 7:7, 7:7 -> 8:5 toward its targets as
+  logged; h1_duely1127 t52 / t69: the Quadrireme 1769491 on 32:21 / 32:20
+  for 35:22 stays (Barbarian Rampage, then HL: End Turn as logged), the
+  ring's one plot it has a path to, 35:23, its own Galley 917516's.
+- Open: 1124 t119 the Caravel 4587523 on 31:19 and t125 the Galley 1376265
+  on 28:6, 1127 t121 the Musketman 4325382 on 11:3, 1128 t159 the
+  Man-At-Arms 5505044 on 40:15 flee (Move to safety) where the game's
+  strike (Attack Units / Wander): the enemy ships and units beside them
+  now reach their plots; 1121 t28 the Scout 1441809 on 7:17 takes 8:17, the
+  game's 7:15 (our danger 15 from player 1's Slinger 327682 on 6:14).

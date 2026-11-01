@@ -22,13 +22,24 @@
   review: reviewed
 - addr: 0x26df90
   kind: function
-  semantics: "the reach search with flags (0x311 the danger map's: 0x200 skips the planning's zone refusal, no 0x800 keeps the zone's spend-everything step)."
-  status: PARTLY
+  semantics: "the reach search with flags: it adds 0x800 to the caller's (bts eax, 0xb at 0x26e12f; 0x100 more where the unit's +0x4b8 is clear) before the search 0x7a630 with no destination (-9999, -9999), so no reach search pays a zone of control (the cost 0x26e920 skips it under 0x800). The danger map's call (0x716739) passes 0x311: 0x200 skips the planning's zone refusal and the unit attack test of 0x26e570."
+  status: READ
+  cases:
+    - recording: h1_duely1127
+      turn: 4
+      value: the barbarian Scout on 5:12 (hp 10) flees to 4:13, 5:13 beyond it in the danger of city-state 3's Warrior on 4:12 (its zone not paid)
+    - recording: h1_duely1121
+      turn: 26
+      value: the barbarian Scout on 4:18 (hp 53) flees to 5:19, its plot in the danger of player 1's Warrior on 5:16 through 4:17
   impl:
+    - cpu/core/tactical.ts:search
     - cpu/core/tactical.ts:dangerPlane
     - cpu/core/tactical.ts:exploreTarget
     - cpu/core/tactical.ts:from
+    - gpu/core/sim_tactics.py:_tac_search
+    - cpu/core/tactical.ts:moves
   readings:
+    - "C-95: the danger map's search pays no zone of control, a ranged unit strikes from its range; the rampage strike's ring — READ (0x26df90, 0x26e920, 0x771670, 0x691f0, 0x76ecf0), FIT (the ranged unit's strike), both twins"
     - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
     - "C-97: the settle site evaluation — READ (the score, the choices), PARTLY READ (the danger, the plot yield)"
     - "C-95: the danger map and Move to Safety — READ, ported"
@@ -81,7 +92,7 @@
 - addr: 0x26e920
   final: 0x1a7150
   kind: function
-  semantics: "the step's cost rules (0x531660..0x530240): into a city at most CITY_MOVEMENT_COST 1 (0x531660 caps the step, 0x272ca0), no river crossing where either plot is a city's or water (0x531510); the embark rule 0x530420 (land to water) and the disembark 0x530240 waive MOVEMENT_EMBARK_COST where a district with FreeEmbark (Districts +0xe1 bit 2) stands at the FROM or the TO plot, the completion (0x811b0) read off the FROM plot's district in both cases; a land unit whose player may embark it takes water (a turn on the domain's pool: [r9 + 0x180 + domain*4]). A step's turns and Movement (24.8): a parent with no Movement starts the next turn at the domain's full Movement; a step costing more than the Movement left waits for the next turn (turns + 1, Movement 0), unless the parent is the unit's own plot and the unit has not moved (flag 0x100) or the parent began a turn (it spends everything); a zone of control spends everything (0x26f980) save under flag 0x800. Between two plots the player never revealed (node +0x51 & 1, 0x154c0) the step costs the parent's or 1 and no rule runs. Its context: +0x18 the TO domain's full Movement ([pathfinder + 0x180 + domain*4] by the TO plot's water), +0x20 the Movement the step starts with (the parent's, or the new turn's full), +0x34 the cost the rules add (0x26ee80), +0x38 a carry the rules add (0x26ee90), stored as the node's +0x20 (0x26d7f0). The next step from a node pays the node's carry on top of its rules' cost (0x26ed00: [parent + 0x20] + cost); a step left short clears it. Ported: search's price and walk (cpu/core/tactical.ts), price6 and _tac_move_to's walk."
+  semantics: "the step's cost rules (0x531660..0x530240): into a city at most CITY_MOVEMENT_COST 1 (0x531660 caps the step, 0x272ca0), no river crossing where either plot is a city's or water (0x531510); the embark rule 0x530420 (land to water) and the disembark 0x530240 waive MOVEMENT_EMBARK_COST where a district with FreeEmbark (Districts +0xe1 bit 2) stands at the FROM or the TO plot, the completion (0x811b0) read off the FROM plot's district in both cases; a land unit whose player may embark it takes water (a turn on the domain's pool: [r9 + 0x180 + domain*4]). A step's turns and Movement (24.8): a parent with no Movement starts the next turn at the domain's full Movement; a step costing more than the Movement left waits for the next turn (turns + 1, Movement 0), unless the parent is the unit's own plot and the unit has not moved (flag 0x100) or the parent began a turn (it spends everything); a zone of control spends everything (0x26f980) save under flag 0x800 (the test at 0x26eb27; every reach search 0x26df90 sets it). Between two plots the player never revealed (node +0x51 & 1, 0x154c0) the step costs the parent's or 1 and no rule runs. Its context: +0x18 the TO domain's full Movement ([pathfinder + 0x180 + domain*4] by the TO plot's water), +0x20 the Movement the step starts with (the parent's, or the new turn's full), +0x34 the cost the rules add (0x26ee80), +0x38 a carry the rules add (0x26ee90), stored as the node's +0x20 (0x26d7f0). The next step from a node pays the node's carry on top of its rules' cost (0x26ed00: [parent + 0x20] + cost); a step left short clears it. Ported: search's price and walk (cpu/core/tactical.ts), price6 and _tac_move_to's walk."
   status: READ
   cases:
     - recording: h1_duely1128
@@ -112,6 +123,7 @@
     - "C-95: the planning sets out on the full Movement, the walk on the turn's restored — READ (the planning), FIT (the restore's place)"
     - "C-99: the carry under a zone of control — READ (0x26e920), both twins"
     - "C-99: a shore crossing's carried Movement"
+    - "C-95: the danger map's search pays no zone of control, a ranged unit strikes from its range; the rampage strike's ring — READ (0x26df90, 0x26e920, 0x771670, 0x691f0, 0x76ecf0), FIT (the ranged unit's strike), both twins"
   review: reviewed
 - addr: 0x26ee80
   final: 0x1a74c0
@@ -248,6 +260,7 @@
     - "C-99: the carry under a zone of control — READ (0x26e920), both twins"
     - "C-123: Operation Move's danger flags, the MoveTo execution and m_blockedTurns — READ (0x816cb0 at 0x816e70 / 0x817839, 0x962380, 0x73e610), both twins"
     - "C-99: the carry under a zone of control"
+    - "C-95: the danger map's search pays no zone of control, a ranged unit strikes from its range; the rampage strike's ring — READ (0x26df90, 0x26e920, 0x771670, 0x691f0, 0x76ecf0), FIT (the ranged unit's strike), both twins"
   context:
     - "...or the parent began a turn (it spends everything); a zone of control spends everything (0x26f980) — save under flag 0x800. Between two plots the player never revealed (node +0x51 bit 0..."
     - "- THE ZONE OF CONTROL'S TEST (Rules_Movement 0x530f50, READ; through 0x26f980(finder, from, to, the path's destination) from the path cost 0x26e920, the move's step..."
@@ -411,6 +424,7 @@
     - "C-99: an embarked unit passes no other player's passenger — the step's flag-1 test READ (0x2720a0 at 0x272372, 0x271be0, 0x586360 at 0x586542, 0x208b80 under 0x108, 0x20a2a0), both twins"
     - "C-99: the planning list's map layer and closed ground, a siege unit in Attack Units — READ (0x2665b0 -> 0x585eb0, 0x26d890's 0x586900 under 9 -> 0x586360 at 0x586624, 0x80ceb0 at 0x80d015 / 0x80d1cf), both twins"
     - "C-99: Naval Patrol's explore target — the list and the tests READ, two cases unexplained"
+    - "C-95: the danger map's search pays no zone of control, a ranged unit strikes from its range; the rampage strike's ring — READ (0x26df90, 0x26e920, 0x771670, 0x691f0, 0x76ecf0), FIT (the ranged unit's strike), both twins"
   context:
     - "...N ENDS (0x2720a0, the move order's validity at the end of 0x26e570): each node records (0x271be0) whether its player sees its plot (+0x50 bit 2) and the count of the unit's own stackin..."
     - "- THE PLANNING'S LIST TEST (0x26d890, a node closing, code 3), READ: the node's flags (0x271be0 on its first visit): +0x50 bit 1 the plot seen now (the player's visibility count +0x29..."
@@ -475,6 +489,7 @@
     - "C-123: a formation's Movement and its path's stacking — READ (0x2673f0, 0x267650, 0x262cd0, 0x585eb0 in the path validity), both twins"
     - "C-99: Move Unit's no-Location execution, the swap's partner and the move order's first turn"
     - "C-95: Operation Move's ring test takes no path (0x815d50) — READ, both twins"
+    - "C-95: the danger map's search pays no zone of control, a ranged unit strikes from its range; the rampage strike's ring — READ (0x26df90, 0x26e920, 0x771670, 0x691f0, 0x76ecf0), FIT (the ranged unit's strike), both twins"
   context:
     - "- THE PATH'S TURN ENDS (0x2720a0, the move order's validity at the end of 0x26e570): each node records (0x271be0) whethe..."
     - "- A plot the player never revealed is the reach's leaf (READ): the validity 0x2720a0 under the search's flag 1 (0x115) refuses a step whose parent is not revealed (node +0x..."

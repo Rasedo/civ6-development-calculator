@@ -281,9 +281,12 @@
 - addr: 0x691f0
   final: 0x4dfa0
   kind: function
-  semantics: the ring at distance 1.
+  semantics: "the ring at a radius (edx; 0 the plot alone, 0x696c0): the six corners of the table @0xf0bf40 ((0,1), (-1,0), (1,-1), (0,-1), (1,0), (-1,1)) times the radius, each walked along its next side (1, 2, 0, 4, 5, 3), each plot on the map to the functor: ringPlots' ring at that radius."
   status: READ
   cases:
+    - recording: h1_duely1127
+      turn: 52
+      value: "the Quadrireme 1769491's rampage ring round 35:22 at radius 1: 35:23 the one plot with a path, its own Galley's: no move"
     - recording: h1_duelw1116
       value: "Records (land plots, game `GetAppeal` against the engine, per record): runs/h1_duelw1116 4,700 mismatching plot-turns -> 156, the rest one-turn readings and the cases below;"
     - recording: 1116
@@ -293,13 +296,17 @@
     - recording: 1109
       turn: 225
       value: "and a National Park's Tourism (1109 Handan t225-241) read the park's appeal before the Conservation term until t242 — the same cache."
-  impl: [gpu/core/sim_economy.py:SimEconomy]
+  impl:
+    - gpu/core/sim_economy.py:SimEconomy
+    - cpu/core/tactical.ts:to
+    - gpu/core/sim_tactics.py:first_in_reach
   readings:
     - "C-74: the fire — READ"
     - "H-1: the plot's Appeal — READ"
     - "C-74: the fire's spread — READ (the order)"
     - "C-97: the settle site evaluation — READ (the score, the choices), PARTLY READ (the danger, the plot yield)"
     - "C-95: the danger map and Move to Safety — READ, ported"
+    - "C-95: the danger map's search pays no zone of control, a ranged unit strikes from its range; the rampage strike's ring — READ (0x26df90, 0x26e920, 0x771670, 0x691f0, 0x76ecf0), FIT (the ranged unit's strike), both twins"
   notes:
     - ".claude/scratchpad/st1/reading.md: ...a unit with the flag +0x18bd also onto the land plots   beside each reach plot (the ring 0x6b0a0 -> 0x691f0, deduped within its   own list). An air unit (+0x650 == 1, taken as the air domain) onto the   plot..."
   context:
@@ -375,6 +382,17 @@
   context:
     - ...a unit with the flag +0x18bd also onto the land plots beside each reach plot (the ring 0x6b0a0 -> 0x691f0, deduped within its own list). An air unit (+0x650 == 1, taken as the air do...
   review: reviewed
+- addr: 0x6b130
+  final: 0x4f9c0
+  kind: function
+  name: GetRingPlots
+  status: PARTLY
+  readings:
+    - "C-95: the danger map's search pays no zone of control, a ranged unit strikes from its range; the rampage strike's ring — READ (0x26df90, 0x26e920, 0x771670, 0x691f0, 0x76ecf0), FIT (the ranged unit's strike), both twins"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "....0x771b17); with none, the ring of the target at max(range, 1) (0x6b1b0 -> GetRingPlots 0x6b130 -> 0x691f0: the ring at that radius, its six corners (0,1), (-1,0), (1,-1), (0,-1), (..."
+  review: imported
 - addr: 0x6b1b0
   final: 0x4fa40
   kind: function
@@ -395,6 +413,8 @@
     - cpu/core/opsOrders.ts:endangered
     - cpu/core/minorCityAi.ts:builderPlotOf
     - cpu/core/aiValue.ts:AiValueView
+    - cpu/core/tactical.ts:to
+    - gpu/core/sim_tactics.py:first_in_reach
   readings:
     - "C-74: the fire — READ"
     - "H-1: the plot's Appeal — READ"
@@ -405,6 +425,7 @@
     - "C-96: the district value's remaining terms — READ (the envoys' term, the golden-age term's reader, the modifiers' list, the neighbours' functor), a LAB (the district's buildings), and the Farm's adjacency in the plot values"
     - "C-96: the improvement value — READ (0x7a58f0, 0x7b1320's yields, tourism and modifiers, the feature removal 0x7a3010, the harvest 0x7a37d0, the build unit 0x7a2e20, EFFECT_ADJUST_CITY_FREE_POWER), PARTLY READ (the hazards' turns, 0x7b1320's defence, claimed plots and neighbours terms)"
     - "C-100: a district on a feature it may not stand on, and the Mountain Portal's analyzer — READ"
+    - "C-95: the danger map's search pays no zone of control, a ranged unit strikes from its range; the rampage strike's ring — READ (0x26df90, 0x26e920, 0x771670, 0x691f0, 0x76ecf0), FIT (the ranged unit's strike), both twins"
   context:
     - "SPREAD (0x336a50's last arm → 0x33b580): the plot's neighbours within 1 (0x6b1b0), each that passes 0x339960 — for a one-off, the event's own start test 0x28ec10 (its Ran..."
     - ...e pillaged, -1 for its own pillaged improvement (+0x4d bit 0), then the ring of radius 1 (0x6b1b0 -> 0x691f0, the centre not in it) through 0x513780, and last +1 when the plot's owner hol...
@@ -1109,11 +1130,14 @@
     - gpu/core/sim_barbops.py:_bop_scout_tick
     - cpu/core/tactical.ts:exploreTarget
     - gpu/core/sim_tactics.py:nearest
+    - cpu/core/tactical.ts:to
+    - gpu/core/sim_tactics.py:first_in_reach
   readings:
     - "C-95: Explore Land and the barbarians' revealed plots — READ, ported (two tests below unread)"
     - "C-95: the scout's tree \"Barbarian Found City\" — READ, ported"
     - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
     - "C-99: Move Unit's no-Location execution, the swap's partner and the move order's first turn — READ, ported; the swap's path tests and 0x56e760 unread"
+    - "C-95: the danger map's search pays no zone of control, a ranged unit strikes from its range; the rampage strike's ring — READ (0x26df90, 0x26e920, 0x771670, 0x691f0, 0x76ecf0), FIT (the ranged unit's strike), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...order, strictly nearer replaces, +0x4c clear, enterable 0x586360), with a path to it (0x272a60), not chosen (\"HL: Explore cur region\"); a unit off any region the nearest of its area..."
@@ -4236,6 +4260,28 @@
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ...actly its range with Movement left, 0x78fa10), the targets of that type within 5 of it (0x76eb50), each unit's spots per target from its planning (turns, the planning's combat simulati...
+  review: reviewed
+- addr: 0x76ecf0
+  final: 0x5013c0
+  kind: function
+  semantics: "the rampage strike's ring functor (vtable @0xd6fcf8 slot 2, via 0x77dfa0): while its kept plot is none (-9999), a ring plot whose path 0x272a60 (the formation's, flags 0) answers non-zero turns is kept: the ring's first plot with a path."
+  status: READ
+  cases:
+    - recording: h1_duely1127
+      turn: 52
+      value: "the rampaging Quadrireme 1769491 on 32:21 for 35:22: the ring's one plot it reaches, 35:23, holds its own Galley 917516, no path under flags 0, no move (Barbarian Rampage, then HL: End Turn as logged)"
+  impl:
+    - cpu/core/tactical.ts:strike
+    - cpu/core/tactical.ts:turnsToPlot
+    - gpu/core/sim_tactics.py:_tac_rampage
+    - cpu/core/tactical.ts:to
+    - gpu/core/sim_tactics.py:first_in_reach
+  readings:
+    - "C-95: the danger map's search pays no zone of control, a ranged unit strikes from its range; the rampage strike's ring — READ (0x26df90, 0x26e920, 0x771670, 0x691f0, 0x76ecf0), FIT (the ranged unit's strike), both twins"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...from its range; the rampage strike's ring — READ (0x26df90, 0x26e920, 0x771670, 0x691f0, 0x76ecf0), FIT (the ranged unit's strike), both twins"
+    - "...ts next side 1, 2, 0, 4, 5, 3 — `ringPlots`' ring at that radius) through the functor 0x76ecf0, which keeps the first plot whose path 0x272a60 under flags 0 answers turns (no 0x1000:..."
   review: reviewed
 - addr: 0x76f320
   final: 0x501910
