@@ -149,6 +149,7 @@
     - "H-1: the citizen manager's placement and the yield flags — READ"
     - "C-97: the government and policy choice — the choice READ, the values PARTLY READ"
     - "C-130: the Economic AI's Gold boost on the treasury's banked net income — READ (0x4e08f0, PlayerTreasury +0x1b8), both twins"
+    - "C-126 / C-130: who may plunder a route (0x9555a0) and the treasury turn's city term (0x4dd3b0) — READ, the plunder ported in both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...x(0, -floor((food256 - consumption(pop) << 8) / 256)), food the city's cached food yield (0x1cb8b0, `m_bIsCached`), consumption 0x5276c0 of the new population. One entry per free slot of e..."

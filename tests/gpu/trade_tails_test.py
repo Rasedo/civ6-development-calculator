@@ -12,7 +12,8 @@ tests/cpu/units/unique-{land,sea-air}-units.test.ts.
     Traders alone.
   * CIV6 (Francis Drake, Ching Shih): the admirals' plunder percentage is an
     ability of the naval classes, so a hull on the Trader's tile is paid it
-    and a passenger or a land raider the plain amount.
+    and a land raider the plain amount; an embarked unit plunders nothing
+    (the command's can-do 0x9555a0).
   * CIV6 (Mountain Tunnel, Qhapaq Ñan): a Trader walks onto a portal's
     mountain and takes the portal as a unit does, a seventh candidate taken
     only when strictly closer.
@@ -110,14 +111,15 @@ def test_admiral_hull(rules, path) -> None:
             sim._fx_at_seat = lambda key, seat, rows=None, real=real, pol=pol: (
                 torch.full_like(seat, pol, dtype=sim.dtype) if key == "rplun" else real(key, seat, rows))
         k = sim._gp_perm_names.index("routePlunderPct")
-        sea = free_tile(sim, water=True)
-        park_route(sim, 1, sea)
         if hull:
+            sea = free_tile(sim, water=True)
+            park_route(sim, 1, sea)
             put(sim, 0, gal, sea)
             assert int(sim.military_at[0, sea]) >= 0, "the hull files on the military plane"
         else:
-            put(sim, 0, sim._warrior_idx, sea, embarked=True)
-            assert int(sim.embarked_at[0, sea]) >= 0, "the passenger files as a PASSENGER"
+            dry = free_tile(sim, water=False)
+            park_route(sim, 1, dry)
+            put(sim, 0, sim._warrior_idx, dry)
         at_war(sim, 0, 1)
         sim.civ_gp_perm[0, 0, k] = pct
         g0 = float(sim.civ_treasury[0, 0])
@@ -126,7 +128,7 @@ def test_admiral_hull(rules, path) -> None:
         got = float(sim.civ_treasury[0, 0]) - g0
         assert abs(got - sim._trade_plunder_gold * want) < 1e-9, \
             f"pct {pct}, policy {pol}, hull {hull}: banked {got}, want {sim._trade_plunder_gold * want}"
-    print("  2 the admirals OK — a hull takes the percentage on top of the policies', a passenger the plain gold")
+    print("  2 the admirals OK — a hull takes the percentage on top of the policies', a land raider the plain gold")
 
 
 def test_plunder_value(rules, path) -> None:

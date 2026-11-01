@@ -332,11 +332,20 @@ export const TRADE_WALK_EXPIRY_RAIL = 2 * TRADE_COURSE_MAX;
 export const TRADER_GUARD_RADIUS = srcConst('trade.guardRadius', 4,
   xml('RequirementArguments', 'RequirementId=TRADER_IS_WITHIN_FOUR_REQUIREMENT&Name=MaxDistance', 'Value'));
 
+/** a unit that may plunder a route (the command's can-do 0x9555a0): a
+ *  Combat, Ranged or Bombard strength above 0, not embarked — a civilian
+ *  or a support unit never (runs/h1_duely1124 t205-t206: the barbarians'
+ *  captured Builder on Bologna's Trader's plot 431, the route standing) */
+function canPlunder(u: Unit): boolean {
+  const d = UNITS[u.type];
+  return !!d && !u.embarked && (d.combat > 0 || (d.ranged?.strength ?? 0) > 0 || (d.bombard ?? 0) > 0);
+}
+
 /**
  * The seat that would PLUNDER a Trader standing on `tileIndex` — the LOWEST
- * hostile seat id with a unit there (barbarians always hostile, others by
- * the war matrix), or null. CIV6 (Reform the Coinage, Golden face): "your
- * Traders cannot be plundered."
+ * hostile seat id with a unit there that may plunder (`canPlunder`;
+ * barbarians always hostile, others by the war matrix), or null. CIV6
+ * (Reform the Coinage, Golden face): "your Traders cannot be plundered."
  */
 export function routePlunderer(state: GameState, tileIndex: number, seat: number): number | null {
   if (!state.unitsMode) return null;
@@ -356,7 +365,7 @@ export function routePlunderer(state: GameState, tileIndex: number, seat: number
   }
   let raider: number | null = null;
   for (const u of state.units) {
-    if (u.tileIndex !== tileIndex) continue;
+    if (u.tileIndex !== tileIndex || !canPlunder(u)) continue;
     const hostile = isBarbSeat(u.seat) || (u.seat !== seat && civsAtWar(state, u.seat, seat));
     if (!hostile) continue;
     if (raider === null || u.seat < raider) raider = u.seat;

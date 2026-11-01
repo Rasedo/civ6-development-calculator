@@ -20,8 +20,9 @@ income + expiry):
     seat no longer holds is dropped while a live pair survives;
   * a CAPTURED destination drops the route even though its centre tile is
     still a live city centre — the case a tile key could not see;
-  * plunder asks the walker's TILE and never a class, so an EMBARKED hostile
-    ends the route exactly as a hull or a civilian does;
+  * plunder takes a unit that may plunder (a Combat, Ranged or Bombard
+    strength, not embarked: the command's can-do 0x9555a0), so an EMBARKED hostile
+    on the walker's tile leaves the route standing;
   * the route tensors ride snapshot/restore.
 """
 
@@ -317,8 +318,8 @@ def main() -> None:
     assert tr6 == 0, "plunder DESTROYS the Trader — no return"
     print("plunder ok")
 
-    # --- 8b) the raider is a PASSENGER. `routePlunderer` asks the TILE and
-    #         never a class, so an embarked hostile ends the route too -------
+    # --- 8b) the hostile is a PASSENGER: an embarked unit may not plunder
+    #         (`canPlunder`), so the route stands -----------------------------
     s6b = settle_all(BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64))
     sea = next((t_ for t_ in range(s6b.T)
                 if bool(s6b.wpass[0, t_]) and int(s6b.military_at[0, t_]) < 0
@@ -347,8 +348,8 @@ def main() -> None:
     s6b.sync_war()
     g6b = float(s6b.civ_treasury[0, 0])
     s6b._trade_walk_tick(1, torch.ones(s6b.B, dtype=torch.bool))
-    assert int(s6b.seat_routes[0, 1, 0, 0]) == -1, "an EMBARKED hostile on the walker tile plunders too"
-    assert abs(float(s6b.civ_treasury[0, 0]) - g6b - s6b._trade_plunder_gold) < 1e-9, "the passenger banks plunderGold"
+    assert int(s6b.seat_routes[0, 1, 0, 0]) >= 0, "an EMBARKED hostile on the walker tile plunders nothing"
+    assert float(s6b.civ_treasury[0, 0]) == g6b, "the passenger banks nothing"
     print("plunder (passenger) ok")
 
     # --- 9) the candidate + apply pair -------------------------------------

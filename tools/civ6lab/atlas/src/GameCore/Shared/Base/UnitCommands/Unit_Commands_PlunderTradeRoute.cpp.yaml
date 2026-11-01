@@ -3,6 +3,24 @@
 # `review: imported` = bootstrapped from dll_readings.md / code comments / saved
 # labels and not yet reviewed: verify against the disassembly, then edit and
 # set `review: reviewed`.
+- addr: 0x9555a0
+  final: 0x661870
+  kind: function
+  name: canPlunder
+  semantics: "The Plunder Trade Route command's can-do: a unit with movement left (0x56c690), a Combat (0x56dc90), Ranged (0x56e3e0) or Bombard (0x56daa0) strength above 0, unit +0x650 not 1, not embarked (0x8be30); then the plot's route tests."
+  status: PARTLY
+  cases:
+    - recording: h1_duely1124
+      turn: 205
+      value: the barbarians' captured Builder on Bologna's Trader's plot 431 t205-t206, the route standing to its expiry at t209 as logged
+  impl:
+    - cpu/core/trade.ts:canPlunder
+    - gpu/core/sim_seats.py:_trade_walk_tick
+    - gpu/core/sim_seats.py:raider_seat
+  readings:
+    - "C-126 / C-130: who may plunder a route (0x9555a0) and the treasury turn's city term (0x4dd3b0) — READ, the plunder ported in both twins"
+  notes: [the plot's route tests past 0x955625 and unit +0x650 unread]
+  review: reviewed
 - addr: 0x955950
   final: 0x661b90
   kind: function

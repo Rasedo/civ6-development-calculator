@@ -16351,9 +16351,9 @@ class SimSeats:
         destination and starts a fresh round trip at home; a route whose
         origin or destination city is gone does not walk.
 
-        PLUNDER: a unit hostile to the route's owner standing on the walker's
-        tile destroys the route AND its Trader — a hull, a civilian or a
-        PASSENGER, since `routePlunderer` asks the tile and not a class; a
+        PLUNDER: a unit hostile to the route's owner that may plunder (a
+        Combat, Ranged or Bombard strength, not embarked) standing on the
+        walker's tile destroys the route AND its Trader (`routePlunderer`); a
         MAJOR raider (the lowest hostile seat id on a shared tile — the
         cross-engine tie-break) banks the gold (`routePlunderGold`), the
         admirals' percentage only where its hull stands on the tile. An
@@ -16414,11 +16414,16 @@ class SimSeats:
         ms = self.military_at[bb, tiles]
         cv = self.civilian_at[bb, tiles]
         su = self.support_at[bb, tiles]
-        eb = self.embarked_at[bb, tiles]
-        s_m = torch.where(ms >= 0, self.unit_seat[bb, ms.clamp(min=0)], torch.full_like(ms, -1))
-        s_c = torch.where(cv >= 0, self.unit_seat[bb, cv.clamp(min=0)], torch.full_like(cv, -1))
-        s_s = torch.where(su >= 0, self.unit_seat[bb, su.clamp(min=0)], torch.full_like(su, -1))
-        s_e = torch.where(eb >= 0, self.unit_seat[bb, eb.clamp(min=0)], torch.full_like(eb, -1))
+
+        # a unit that may plunder (`canPlunder`, the command's can-do
+        # 0x9555a0): a Combat, Ranged or Bombard strength above 0; an
+        # embarked unit never, so the embarked plane holds no raider
+        def raider_seat(ix: torch.Tensor) -> torch.Tensor:
+            ty = self.unit_type[bb, ix.clamp(min=0)].clamp(min=0)
+            can = ((self._type_combat.take(ty) > 0) | (self._type_ranged_strength.take(ty) > 0)
+                   | (self._type_bombard.take(ty) > 0))
+            return torch.where((ix >= 0) & can, self.unit_seat[bb, ix.clamp(min=0)], torch.full_like(ix, -1))
+        s_m, s_c, s_s = raider_seat(ms), raider_seat(cv), raider_seat(su)
 
         def hostile(sp: torch.Tensor) -> torch.Tensor:
             valid = sp >= 0
@@ -16427,11 +16432,10 @@ class SimSeats:
             at_war = self.war[bb, row, rb]
             return valid & (sp != row) & (barb | at_war)
 
-        h_m, h_c, h_s, h_e = hostile(s_m), hostile(s_c), hostile(s_s), hostile(s_e)
+        h_m, h_c, h_s = hostile(s_m), hostile(s_c), hostile(s_s)
         big = torch.full_like(s_m, 1 << 30)
         raider = torch.minimum(torch.where(h_m, s_m, big), torch.where(h_c, s_c, big))
         raider = torch.minimum(raider, torch.where(h_s, s_s, big))
-        raider = torch.minimum(raider, torch.where(h_e, s_e, big))
         # CIV6 (ABILITY_MANDEKALU / ABILITY_BIREME_PROTECT_TRADER): the escort
         # grants its OWN seat's Traders within `_trader_guard_radius` of it
         # immunity, on the escort's ground alone — a guard in reach takes the

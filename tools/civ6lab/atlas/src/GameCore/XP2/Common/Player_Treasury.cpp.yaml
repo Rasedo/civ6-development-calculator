@@ -25,17 +25,17 @@
   review: imported
 - addr: 0x4dd3b0
   kind: function
+  name: treasuryCityTerm
+  semantics: "The treasury turn's second term: over the player's cities (Player_Cities +0x12f0 +0xd8), a city whose int +0x1724 is above 0 gives min(+0x1724, its Gold yield's whole part) (City::GetYield 0x1cb8b0), summed as 24.8 into *out (taken off m_xCachedNetIncome); the amount is subtracted from the city's +0x1630 block +0x9c. +0x1724's writer unread (no displacement write)."
   status: READ
   cases:
-    - recording: 1121
-      turn: 85
-      value: "a district project that starts on a record's 0 progress takes   an overflow no record holds (1121 Hunza t85: the stat -1.73, the   importer's -4.40)."
+    - recording: h1_duely1124
+      turn: 93
+      value: "0 for a city-state: the stat equals the record before's Gold yield less Maintenance on 3,635 of 3,698 minor turns of the five duely duels, the one whole-Gold miss (1124 t93 player 2) its Gold yield's own 15 -> 14"
   readings:
+    - "C-126 / C-130: who may plunder a route (0x9555a0) and the treasury turn's city term (0x4dd3b0) — READ, the plunder ported in both twins"
     - "C-130: the Economic AI's Gold boost on the treasury's banked net income — READ (0x4e08f0, PlayerTreasury +0x1b8), both twins"
-  context:
-    - "...es and the cities' turns: +0x1b8 = GetGoldYield (0x4ddc70 -> GameAttribute::Value) less 0x4dd3b0's sum less the total Maintenance (0x4df2d0); then 0x4deb70 stores the income excludin..."
-    - "- Open: 0x4dd3b0's sum (city GetYield 0x1cb8b0 terms, read as 0 for a city-state); a district project th..."
-  review: imported
+  review: reviewed
 - addr: 0x4ddc70
   final: 0x341600
   kind: function

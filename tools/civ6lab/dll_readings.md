@@ -5569,3 +5569,35 @@ in the minors' phase, `_cv_known(s, before, after)`.
 - OPEN: where the military AI's turn (0x722690, registered after the
   economic AI) reads its camps and own units from; the purchases' records
   in the city AI's table read off no case.
+
+## C-126 / C-130: who may plunder a route (0x9555a0) and the treasury turn's city term (0x4dd3b0) — READ, the plunder ported in both twins
+
+`canPlunder` / `routePlunderer` (cpu/core/trade.ts); `_trade_walk_tick`'s
+`raider_seat` (gpu/core/sim_seats.py).
+
+- The Plunder Trade Route command's can-do (0x9555a0,
+  Unit_Commands_PlunderTradeRoute.cpp): a unit with movement left (0x56c690),
+  a Combat (0x56dc90), Ranged (0x56e3e0) or Bombard (0x56daa0) strength
+  above 0, unit +0x650 not 1, not embarked (0x8be30), then the plot's route
+  tests. Ported: a raider on the walker's plot is a unit with a Combat,
+  Ranged or Bombard strength that is not embarked; a civilian, a support
+  unit or a passenger never plunders.
+- CONFIRMED: runs/h1_duely1124 Bologna's Trader 655362 on 431 at t205-t206
+  beside the barbarians' captured Builder 5111833, its route to Shenyang
+  ending t209 as logged; the engine had plundered it at t205, its gold step
+  then short the route's Gold through t210. Now the engine's banked net
+  equals the record's m_xCachedNetIncome t204-t214 (-3.44 / -1.44 / -3.44 /
+  -3.44 / 7.56 / 5.56 / 5.56 / 0 / 10.77) and Bologna's t225 and t240
+  Builders are bought as recorded (aimem and carried).
+- 0x4dd3b0 (the treasury turn's second term): over the player's cities
+  (Player_Cities +0x12f0 +0xd8), a city whose int +0x1724 is above 0 gives
+  min(+0x1724, its Gold yield's whole part) (City::GetYield 0x1cb8b0, the
+  whole Gold where it is the smaller), summed as 24.8 and taken off the net
+  income; the taken amount is subtracted from the city's +0x1630 block's
+  +0x9c. No instruction writes +0x1724 by displacement (its writer unread).
+  For a city-state it reads 0: over the five duely duels the stat equals
+  the record before's Gold yield less Maintenance on 3,635 of 3,698 minor
+  turns; of the 63 others one is a whole Gold short (1124 t93 player 2, its
+  Gold yield itself 15 -> 14 in m_xCachedNetIncomeExcludingTrade), the rest
+  fractions or gains (a change between the record and the treasury turn).
+  The engines take no term.
