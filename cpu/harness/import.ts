@@ -1341,9 +1341,14 @@ export function advanceHistory(h: History, rec: TurnRecord, cat: Catalog): void 
     // a unit trained, bought or upgraded raises them (`raiseBestTrained`):
     // runs/h1_duely1127 player 3, unread from t135 at 55, its Infantry
     // 1507329 standing by t220 with no City Defense against China's
-    // Infantry and Field Cannon t223-t249
-    const was = h.trained.get(p.id);
-    if (!was || !h.last) continue;
+    // Infantry and Field Cannon t223-t249; a recording with no read at all
+    // raises them from none (runs/h1_duelv1124's city-states: the units
+    // tables' ranged and siege rows past a Pikeman trained — Crossbowman 8
+    // -> 131 of 447, Trebuchet 0 -> 120 of 414, Field Cannon 3 -> 101 of
+    // 332, Heavy Chariot 19 -> 243 of 589 within 0.005, cityBuildLab)
+    if (!h.last) continue;
+    const was = h.trained.get(p.id) ?? [0, 0];
+    h.trained.set(p.id, was);
     const seen = new Set(h.last.units.map((u) => `${u.owner}:${u.id}`));
     const levies = leviesAcross(h.last, rec);
     for (const u of rec.units) {
