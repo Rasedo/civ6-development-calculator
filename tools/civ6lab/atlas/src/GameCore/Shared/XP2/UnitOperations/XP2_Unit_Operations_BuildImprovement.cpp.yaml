@@ -14,6 +14,7 @@
   impl: [cpu/core/minorBuild.ts:owner, gpu/core/sim_minorai.py:order]
   readings:
     - "H-1: an annex re-places the citizens, the garrison's unit, a religious unit killed on a move — READ"
+    - "C-100 / C-112: a city-state's power and its regional buildings, the citizen reassign's callers — a fit and a reading"
   context:
     - "...6320: the favored / disfavored yield setters (0x196f90, 0x1970e0), an improvement laid (0xa4cee0, 0xa4e7a0). Recorded: a city-state's envoy annex re-places before its growth (1121 Hu..."
   review: imported

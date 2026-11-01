@@ -5418,6 +5418,15 @@
   context:
     - "...0x196320 whatever the value was and fires the event (hash 0xe808a01e) — the city command 0x975920 (SET_FOCUS) and the Lua setters 0x9c0c80 / 0x9c0ce0 are their only callers, so every City..."
   review: imported
+- addr: 0x9766c0
+  final: 0x67fdd0
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-100 / C-112: a city-state's power and its regional buildings, the citizen reassign's callers — a fit and a reading"
+  context:
+    - "...4e7a0), and 0x1956b0 (a plot's citizen toggled, reached only from the command handler 0x9766c0, a plot command of kind 5): no plot-yield change among them, so what moves runs/h1_duel..."
+  review: imported
 - addr: 0x977aa0
   final: 0x680f70
   kind: function

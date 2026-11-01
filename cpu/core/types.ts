@@ -1232,9 +1232,6 @@ export interface CityState extends Seat {
   lastHitTurn?: number;
   /** its city's power this turn (`City.powered`), set by `minorPower` */
   powered?: boolean;
-  /** its last turn's Production went toward a `fullyPowered` project that is
-   *  still running (`minorBuild`) — the queue head `minorPower` reads */
-  fullyPowered?: boolean;
   /** the district project its last turn's Production went toward and did
    *  not finish (`minorBuild`) — the queue head the religious step reads
    *  (`pressureFromCity`). Absent = none. */

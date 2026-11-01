@@ -699,6 +699,24 @@
     - ...WONDER its production completes annexes WONDER_FREE_TILES_UPON_COMPLETION (2) plots (0x17f870, building info +0x158 bit 0x40, -> 0x1a8a30), one picker draw each, before the wonder's...
     - "- A wonder's annex (0x17f870 → AnnexPlots 0x1a8a30) fires its CityTileOwnershipChanged rows BEFORE the WonderComplet..."
   review: imported
+- addr: 0x180cb0
+  final: 0x1020b0
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-100 / C-112: a city-state's power and its regional buildings, the citizen reassign's callers — a fit and a reading"
+  context:
+    - "...L CITIZEN REASSIGN 0x196320's callers (the DLL's call sites): the building completions (0x180cb0, 0x181700), the favored / disfavored yield setters (0x196f90, 0x1970e0), AnnexPlot (0x1..."
+  review: imported
+- addr: 0x181700
+  final: 0x1029c0
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-100 / C-112: a city-state's power and its regional buildings, the citizen reassign's callers — a fit and a reading"
+  context:
+    - "...REASSIGN 0x196320's callers (the DLL's call sites): the building completions (0x180cb0, 0x181700), the favored / disfavored yield setters (0x196f90, 0x1970e0), AnnexPlot (0x1a8b70), th..."
+  review: imported
 - addr: 0x183b30
   final: 0x1047b0
   kind: function

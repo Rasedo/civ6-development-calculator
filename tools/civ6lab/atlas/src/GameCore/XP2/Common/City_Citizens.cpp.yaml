@@ -28,6 +28,15 @@
   context:
     - "City_Citizens.cpp. `ChangeNumUnassigned` (0x194fb0, called with the population change by City::ChangePopulation 0x1c79b0) adds to m_iNumUnas..."
   review: imported
+- addr: 0x1956b0
+  final: 0x10fe70
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-100 / C-112: a city-state's power and its regional buildings, the citizen reassign's callers — a fit and a reading"
+  context:
+    - ...(0x1a8b70), the culture bomb (0x524e30), an improvement laid (0xa4cee0, 0xa4e7a0), and 0x1956b0 (a plot's citizen toggled, reached only from the command handler 0x9766c0, a plot com...
+  review: imported
 - addr: 0x195940
   final: 0x10fff0
   kind: function
@@ -94,6 +103,7 @@
   readings:
     - "H-1: the citizen manager's placement and the yield flags — READ"
     - "H-1: an annex re-places the citizens, the garrison's unit, a religious unit killed on a move — READ"
+    - "C-100 / C-112: a city-state's power and its regional buildings, the citizen reassign's callers — a fit and a reading"
   context:
     - "...1c79b0) adds to m_iNumUnassignedCitizens (+0x68): a negative count runs the full reassign 0x196320 (save the forced counts +0x08, unassign all 0x196440, assign 0x197230, lay the forced cou..."
     - "...nd writes the disfavored byte (+0x50); 0x1970e0 the converse; each runs the full reassign 0x196320 whatever the value was and fires the event (hash 0xe808a01e) — the city command 0x975920..."
@@ -131,6 +141,7 @@
   readings:
     - "H-1: the citizen manager's placement and the yield flags — READ"
     - "H-1: an annex re-places the citizens, the garrison's unit, a religious unit killed on a move — READ"
+    - "C-100 / C-112: a city-state's power and its regional buildings, the citizen reassign's callers — a fit and a reading"
   context:
     - "...d (`favored`, `disfavored`) and on each CityFocusChanged row (one letter per Yields row). 0x196f90 asserts the yield is not favored (+0x38) and writes the disfavored byte (+0x50); 0x1970e0..."
     - "...ng one (0x1a903c). Other callers of 0x196320: the favored / disfavored yield setters (0x196f90, 0x1970e0), an improvement laid (0xa4cee0, 0xa4e7a0). Recorded: a city-state's envoy an..."
@@ -150,6 +161,7 @@
   readings:
     - "H-1: the citizen manager's placement and the yield flags — READ"
     - "H-1: an annex re-places the citizens, the garrison's unit, a religious unit killed on a move — READ"
+    - "C-100 / C-112: a city-state's power and its regional buildings, the citizen reassign's callers — a fit and a reading"
   context:
     - ...0x196f90 asserts the yield is not favored (+0x38) and writes the disfavored byte (+0x50); 0x1970e0 the converse; each runs the full reassign 0x196320 whatever the value was and fires the e...
     - "...0x1a903c). Other callers of 0x196320: the favored / disfavored yield setters (0x196f90, 0x1970e0), an improvement laid (0xa4cee0, 0xa4e7a0). Recorded: a city-state's envoy annex re-pla..."

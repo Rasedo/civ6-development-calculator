@@ -16,9 +16,8 @@ takes no decision), so these scenes are the whole evidence:
      Science, the civic pot by the Culture and the build pot by the
      Production; Gold banks in `citystate_treasury` less its units' upkeep,
      stopping at 0, and Faith in `citystate_faith`
-  3. its grid (`_minor_power`): a Factory with nothing to feed it stays dark,
-     a Solar Farm on the minor's own ground lights it, and the lit Factory pays
-     its powered Production
+  3. its grid (`_minor_power`): a minor's city is never short of power, its
+     Factory lit with no plant
 """
 
 from __future__ import annotations
@@ -167,28 +166,14 @@ def test_power(rules, path) -> None:
     ws, fac = BLD.index("WORKSHOP"), BLD.index("FACTORY")
     sim._minor_power(s)
     assert not bool(sim.city_powered[B0, row, 0]), "a minor with no load is lit"
-    iz = give_minor_district(sim, s, sim._iz_idx)
+    give_minor_district(sim, s, sim._iz_idx)
     sim.city_bldg[B0, row, 0, ws] = True
     sim.city_bldg[B0, row, 0, fac] = True
     sim._bldg_version += 1
     sim._eff_version += 1
     sim._minor_power(s)
-    assert not bool(sim.city_powered[B0, row, 0]), "a Factory with no supply is lit"
-    dark = walk(sim, row)[1]
-    solar = next(i for i, x in enumerate(RULES["improvements"]["ids"] if isinstance(RULES["improvements"], dict)
-                                         else [r["id"] for r in RULES["improvements"]]) if x == "SOLAR_FARM")
-    ctr = int(sim.citystate_center[B0, s])
-    plot = next(t for t in range(sim.T)
-                if int(sim.tile_seat[B0, t]) == 100 + s and t not in (ctr, iz) and int(sim.district[B0, t]) < 0
-                and bool(sim.passable[B0, t]))
-    sim.improvement[B0, plot] = solar
-    sim._eff_version += 1
-    sim._minor_power(s)
-    assert bool(sim.city_powered[B0, row, 0]), "a Solar Farm on the minor's ground does not light its Factory"
-    sim._eff_version += 1
-    lit = walk(sim, row)[1]
-    assert lit > dark, f"the lit Factory pays no more Production ({dark} -> {lit})"
-    print(f"  3 grid OK — the Factory dark, then lit by a Solar Farm ({dark:.2f} -> {lit:.2f} Production)")
+    assert bool(sim.city_powered[B0, row, 0]), "a minor's Factory with no plant is dark"
+    print("  3 grid OK — the Factory lit with no plant")
 
 
 def main() -> None:

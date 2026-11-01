@@ -469,30 +469,18 @@ class SimMinors:
         self.citystate_levy_ends[:, s] = torch.where(back, torch.full_like(ls, -1), self.citystate_levy_ends[:, s])
 
     def _minor_power(self, s: int) -> None:
-        """`minorPower` — CIV6 (Power): the minor city's load is met all at
-        once or not at all. No plant runs for a city-state (its stockpile
-        feeds none): its renewables — a Dam's supply, the generators on its own
-        plots — carry the whole load (`cityPower`'s fuel-free half, the
-        governor, wonder and suzerain terms a city-state never holds aside),
-        or a running `fullyPowered` project meets it."""
+        """`minorPower` — a city-state's city is never short of power: a load
+        it has is met (runs/h1_duely1124 Cardiff t214 its Factory's powered
+        +3 and its regional powered +3, no generator; Bologna's Research Lab
+        t207-t220)."""
         row = self._CITY_MINOR0 + s
-        B, dev = self.B, self.device
         alive = self.city_alive[:, row, 0]
         dreg = self.city_dist_tile[:, row, :1]
         stand = (self.city_bldg[:, row, :1]
                  & ~self._bldg_dark(dreg, self.city_bldg_pillaged[:, row, :1]))[:, 0]  # [B, NB]
         demand = (stand.double() * self._b_cols(row)["power"]).sum(dim=1)
         demand = demand + self._laser_power_load * self.city_lasers[:, row, 0].double()
-        demand = torch.where(alive, demand, torch.zeros_like(demand))
-        supply = torch.zeros(B, dtype=torch.float64, device=dev)
-        if bool((demand > 0).count_nonzero()):
-            if bool((self._b_power_supply > 0).count_nonzero()):
-                supply = supply + stand.double() @ self._b_power_supply
-            if self._imp_power_any:
-                live = ((self.improvement >= 0) & ~self.pillaged & (self.tile_seat == 100 + s)
-                        & (self.tile_city == -1))
-                supply = supply + (self._imp_power[self.improvement.clamp(min=0)] * live.double()).sum(dim=1)
-        self.city_powered[:, row, 0] = (demand > 0) & ((supply >= demand) | self.citystate_full_power[:, s])
+        self.city_powered[:, row, 0] = alive & (demand > 0)
 
     def _minor_traders(self, s: int) -> torch.Tensor:
         """[B] long — minor `s`'s Traders out on a route or standing
@@ -1940,7 +1928,6 @@ class SimMinors:
         if not bool(alive.count_nonzero()):
             return
         B, dev = self.B, self.device
-        self.citystate_full_power[:, s] = False
         self.citystate_build_proj[:, s] = -1
         row = self._CITY_MINOR0 + s
         self.city_proj_conv[:, row, 0] = 0
@@ -2004,7 +1991,6 @@ class SimMinors:
             pi = (item - self._mk_p0).clamp(min=0, max=int(P["fp"].shape[0]) - 1)
             sp = short & is_p
             self.citystate_build_proj[:, s] = torch.where(sp, pi, self.citystate_build_proj[:, s])
-            self.citystate_full_power[:, s] |= sp & P["fp"].take(pi)
         done = act & ~short
         if not bool(done.count_nonzero()):
             return

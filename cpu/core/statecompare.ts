@@ -1031,7 +1031,6 @@ const CITY_STATE_G: Record<string, Extractor> = {
   levyEnds: overCityStates((cityState) => cityState.levyEnds ?? -1),
   minorLastHit: overCityStates((cityState) => cityState.lastHitTurn ?? 0),
   minorPowered: overCityStates((cityState) => (cityState.powered ? 1 : 0)),
-  minorFullyPowered: overCityStates((cityState) => (cityState.fullyPowered ? 1 : 0)),
   minorBuildProject: overCityStates((cityState) => (cityState.buildProject ? Object.keys(PROJECTS).indexOf(cityState.buildProject) : -1)),
   minorRepairWait: overCityStates((cityState) => (cityState.repairWait ? 1 : 0)),
   minorRoutes: overCityStates((cityState, state) => routeRowsOf(state, cityState)),

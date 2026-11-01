@@ -213,15 +213,14 @@ function levyUnitHome(state: GameState, cityState: CityState, u: Unit): void {
 }
 
 /**
- * THE MINOR'S GRID (`cityPower` over its one city). CIV6 (Power): the load is
- * met all at once or not at all. No power plant runs for a city-state (its
- * stockpile feeds none); its renewables (a Dam, the Solar and Wind Farms on
- * its plots) must carry the whole load — or a running `fullyPowered` project
- * (Industrial Zone Logistics) meets it, as a major's does.
+ * THE MINOR'S GRID (`cityPower`'s load over its one city): a city-state's
+ * city is never short of power, a load it has met (runs/h1_duely1124 Cardiff
+ * t214: Production 9.30078125 as recorded only with its Factory's powered +3
+ * and its regional powered +3, no generator on its plots; Bologna's Research
+ * Lab t207-t220; the Solar Farm rows' 40.00 with no Production term).
  */
 export function minorPower(state: GameState, cityState: CityState): void {
-  const p = cityPower(state, minorCity(cityState));
-  cityState.powered = p.demand > 0 && (p.supply >= p.demand || !!cityState.fullyPowered);
+  cityState.powered = cityPower(state, minorCity(cityState)).demand > 0;
 }
 
 /** the minor's Tech Contracts (its city AI's Add Goal Tech contracts): each
@@ -860,7 +859,6 @@ export function minorItemKey(item: MinorItem): string {
  * (`minorRepairTarget`).
  */
 export function minorBuild(state: GameState, cityState: CityState, production: number): void {
-  cityState.fullyPowered = false;
   delete cityState.buildProject;
   delete cityState.projectYield;
   // A, which is the city's plain Production too: a minor holds no flat
@@ -917,7 +915,6 @@ export function minorBuild(state: GameState, cityState: CityState, production: n
   }
   if (cityState.prodProgress < cost) {
     if (def && 'project' in item) {
-      cityState.fullyPowered = !!def.fullyPowered;
       cityState.buildProject = item.project;
     }
     return;

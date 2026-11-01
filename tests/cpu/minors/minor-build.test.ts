@@ -283,19 +283,15 @@ describe('the items the step completes', () => {
     expect(withConv).toBeGreaterThan(computeCityStats(state, minorCity(cs)).total.science);
   });
 
-  it('a running Logistics project lights the grid; a finished one does not', () => {
+  it('a finished Logistics project leaves no progress behind', () => {
     const state = makeState(makeMap(24, 24));
     const cs = addCs(state, 12, 12, { type: 'industrial', buildings: ['ANCIENT_WALLS', 'WORKSHOP', 'FACTORY'] });
     hold(cs, 'INDUSTRIAL_ZONE', tileAtCoords(state.map, 13, 12));
     state.turn = 1;
-    inHand(cs, 'project:LOGISTICS', 0);
-    step(state, cs);
-    expect(cs.fullyPowered).toBe(true);
     const pot = projectCost(state, cs.seat, 'LOGISTICS') + 100;
     inHand(cs, 'project:LOGISTICS', pot);
     step(state, cs);
     expect(cs.prodProgress).toBe(0);
-    expect(cs.fullyPowered).toBe(false);
   });
 
   it('the worship building its majority religion names', () => {

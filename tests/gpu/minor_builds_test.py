@@ -411,16 +411,11 @@ def test_the_logistics_power(rules, path) -> None:
         sim.city_bldg[B0, row, 0, BLD.index(name)] = True
     sim._eff_version += 1
     sim._minor_power(s)
-    assert not bool(sim.city_powered[B0, row, 0]), "the Factory's load, nothing to meet it"
-    in_hand(sim, s, sim._mk_p0 + logi, 0.0)
-    sim._minor_build(s, sim._minor_production(s))
-    assert bool(sim.citystate_full_power[B0, s]), "the step went toward Logistics"
-    sim._minor_power(s)
-    assert bool(sim.city_powered[B0, row, 0]), "a running Logistics meets the whole load"
+    assert bool(sim.city_powered[B0, row, 0]), "a city-state's load is met"
     in_hand(sim, s, sim._mk_p0 + logi, 1.0e4)
     sim._minor_build(s, sim._minor_production(s))
-    assert float(sim.citystate_prod[B0, s]) == 0.0 and not bool(sim.citystate_full_power[B0, s])
-    print("  11 logistics OK — a running project lights the minor's grid, a finished one does not")
+    assert float(sim.citystate_prod[B0, s]) == 0.0
+    print("  11 logistics OK — a city-state's grid always met, a finished project leaves no progress")
 
 
 def test_the_worship_building(rules, path) -> None:

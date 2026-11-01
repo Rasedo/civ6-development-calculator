@@ -163,7 +163,7 @@ describe("the levy takes the minor's own army", () => {
 });
 
 describe("a minor's grid", () => {
-  it('a Factory with nothing to feed it stays dark; a Solar Farm on its ground lights it', () => {
+  it('a minor\'s city is never short of power: a Factory with no plant is lit', () => {
     const state = makeState(makeMap(24, 24));
     const cs = addCs(state, 12, 12, 'industrial', 4);
     minorPower(state, cs);
@@ -172,14 +172,11 @@ describe("a minor's grid", () => {
     iz.district = 'INDUSTRIAL_ZONE';
     iz.districtComplete = true;
     cs.districts = [{ type: 'INDUSTRIAL_ZONE', tileIndex: iz.index }];
+    cs.buildings = ['WORKSHOP'];
+    const unlit = computeCityStats(state, minorCity(cs)).total.production;
     cs.buildings = ['WORKSHOP', 'FACTORY'];
     minorPower(state, cs);
-    expect(cs.powered).toBe(false);
-    const dark = computeCityStats(state, minorCity(cs)).total.production;
-    const farm = tileAtCoords(state.map, 11, 12);
-    farm.improvement = 'SOLAR_FARM';
-    minorPower(state, cs);
     expect(cs.powered).toBe(true);
-    expect(computeCityStats(state, minorCity(cs)).total.production).toBeGreaterThan(dark);
+    expect(computeCityStats(state, minorCity(cs)).total.production).toBeGreaterThan(unlit);
   });
 });

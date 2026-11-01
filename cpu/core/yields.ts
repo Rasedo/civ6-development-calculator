@@ -1,6 +1,6 @@
 
 import { addYields, emptyYields, type GameState, type City, type Tile, type Yields, type DistrictId, type ImprovementId } from './types';
-import { citiesOf, civOf, seatOf, tileBelongsTo, tileSeat, civVariantOf, hiddenResourcesFor } from './seats';
+import { citiesOf, civOf, isCityStateSeat, seatOf, tileBelongsTo, tileSeat, civVariantOf, hiddenResourcesFor } from './seats';
 import { neighbors, hexDistance } from '../../world/hex';
 import type { FeatureId, GameMap } from '../../world/types';
 import { isWater, isMountain, hasRiver, naturalWonderAt } from '../../world/query';
@@ -804,7 +804,8 @@ export function regionalEffects(
   const out: RegionalEffects = { yields: emptyYields(), amenities: 0 };
   const civ = civOf(state, city.seat);
   const techs = seatOf(state, city.seat)?.research.techs ?? [];
-  for (const other of citiesOf(state, city.seat)) {
+  // a city-state's one city its own source (it holds no seat's city list)
+  for (const other of isCityStateSeat(city.seat) ? [city] : citiesOf(state, city.seat)) {
     for (const inst of other.districts) {
       const tile = state.map.tiles[inst.tileIndex];
       if (!tile.districtComplete || tile.districtPillaged) continue; // pillaged source is dark

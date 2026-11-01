@@ -434,9 +434,6 @@ class SimInit:
         self.citystate_kb_seen = torch.full(_kb, -1, dtype=torch.int16, device=device)
         self.citystate_kb_plot = torch.full(_kb, -1, dtype=torch.int16, device=device)
         self.citystate_kb_damage = torch.zeros(_kb, dtype=torch.int16, device=device)
-        # its last turn's Production went toward a `fullyPowered` project
-        # still running — the queue head `_minor_power` reads (`fullyPowered`)
-        self.citystate_full_power = torch.zeros(B, s_pad, dtype=torch.bool, device=device)
         # the district project (projects-table row, -1 none) its last turn's
         # Production went toward and did not finish — the queue head the
         # religious step reads (`buildProject`)

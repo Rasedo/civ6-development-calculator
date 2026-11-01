@@ -12323,3 +12323,27 @@ Heal in `_minor_pass` / `_free_tactics` (gpu/core/sim_tactics.py);
   row 107 at t165, the fresh price 165), so the importer locks it as it
   does an unfinished district's. The engines completed the repair at t165,
   the game at t166 (1124 p3 contract 674).
+
+## C-100 / C-112: a city-state's power and its regional buildings, the citizen reassign's callers — a fit and a reading
+
+- A CITY-STATE'S CITY IS NEVER SHORT OF POWER (a fit, City_Power's minor
+  path unread): runs/h1_duely1124 Cardiff t214 records Production
+  9.30078125 (its yields row) with eight worked plots, two Industrial Zone
+  specialists, a Workshop and a Factory and no generator: the engine's
+  sum reads it to the 256th only with the Factory's powered +3 and its
+  regional powered +3 (25 -> 31 raw, x 0.3); Bologna's Research Lab
+  t207-t220 and the Solar Farm rows' 40.00 with no Production term
+  ("C-96: EFFECT_ADJUST_CITY_FREE_POWER") alike. `minorPower`, GPU
+  `_minor_power`: a load it has is met; the minor's Logistics flag
+  (`CityState.fullyPowered`, `citystate_full_power`) deleted.
+- A CITY-STATE'S OWN REGIONAL BUILDINGS reach its city (`regionalEffects`:
+  its one city the source; the GPU's `_seat_regional` on the minor's row
+  already did): Cardiff's Factory +3 (25 -> 28 raw before the power).
+- THE FULL CITIZEN REASSIGN 0x196320's callers (the DLL's call sites): the
+  building completions (0x180cb0, 0x181700), the favored / disfavored
+  yield setters (0x196f90, 0x1970e0), AnnexPlot (0x1a8b70), the culture
+  bomb (0x524e30), an improvement laid (0xa4cee0, 0xa4e7a0), and 0x1956b0
+  (a plot's citizen toggled, reached only from the command handler
+  0x9766c0, a plot command of kind 5): no plot-yield change among them, so
+  what moves runs/h1_duely1128 t5 Hong Kong's citizen off its drought plot
+  316 (to 362) before its analysis stays unread.

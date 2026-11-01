@@ -4451,7 +4451,7 @@ const GAME_MEMORY = ['barbTribes', 'barbPool', 'barbCampsBegun', 'barbSpotNext']
 const GAME_STORES = ['warTurns'] as const;
 const SEAT_STORES = ['barbKills'] as const;
 const RESEARCH_STORES = ['techOverflow', 'civicOverflow'] as const;
-const MINOR_STORES = ['prodOverflow', 'prodRetained', 'fullyPowered', 'repairWait', 'lastHitTurn', 'fuelShort', 'tradeRoutes', 'foundedTurn', 'stockpile', 'prodReserved'] as const;
+const MINOR_STORES = ['prodOverflow', 'prodRetained', 'repairWait', 'lastHitTurn', 'fuelShort', 'tradeRoutes', 'foundedTurn', 'stockpile', 'prodReserved'] as const;
 
 /** the named fields of `from` onto `to`, a field `from` lacks dropped */
 function carryFields(from: object, to: object, keys: readonly string[]): void {

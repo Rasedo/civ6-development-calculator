@@ -2678,18 +2678,7 @@
           "planes": [
             "city_powered"
           ],
-          "note": "the minor city's grid this turn, off its renewables or a running Logistics"
-        },
-        {
-          "name": "minorFullyPowered",
-          "compare": "exact",
-          "covers": [
-            "CityState.fullyPowered"
-          ],
-          "planes": [
-            "citystate_full_power"
-          ],
-          "note": "its last turn's Production went toward a still-running fullyPowered project"
+          "note": "the minor city's grid this turn: any load it has met (`minorPower`)"
         },
         {
           "name": "minorBuildProject",
