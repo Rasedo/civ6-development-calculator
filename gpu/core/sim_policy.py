@@ -36,12 +36,12 @@ _POL_ANALYZERS = {
     "EFFECT_ADJUST_PLAYER_UNIT_UPGRADE_DISCOUNT_PERCENT", "EFFECT_ADJUST_FLAT_BONUS",
     "EFFECT_ADJUST_BUILDING_YIELD_MODIFIERS_FOR_DISTRICT", "EFFECT_ADJUST_PLAYER_TOURISM",
     "EFFECT_ADJUST_CITY_YIELD_PER_POPULATION", "EFFECT_ADJUST_CITY_YIELD_PER_DISTRICT",
+    "EFFECT_ADJUST_SPACE_RACE_PROJECTS_PRODUCTION",
 }
-# worth 0 in a minor's policy context: the space race projects (a minor's
-# city builds none), the Influence a minor may not give, its tributaries and
-# placed envoys (none)
+# worth 0 in a minor's policy context: the Influence a minor may not give,
+# its tributaries and placed envoys (none)
 _POL_ZERO = {
-    "EFFECT_ADJUST_SPACE_RACE_PROJECTS_PRODUCTION", "EFFECT_ADJUST_DUPLICATE_FIRST_INFLUENCE_TOKEN",
+    "EFFECT_ADJUST_DUPLICATE_FIRST_INFLUENCE_TOKEN",
     "EFFECT_ADJUST_PLAYER_YIELD_CHANGE_PER_TRIBUTARY", "EFFECT_ADJUST_PLAYER_YIELD_CHANGE_PER_USED_INFLUENCE_TOKEN",
 }
 _POL_COLLECTIONS = {"COLLECTION_OWNER", "COLLECTION_PLAYER_CITIES", "COLLECTION_PLAYER_CAPITAL_CITY", "COLLECTION_PLAYER_DISTRICTS",
@@ -445,6 +445,27 @@ class SimPolicy:
             else:
                 n = f.population()
             return span(self._cv_yield(n.long() * (amount * _FX), y)) >> 8
+        if eff == "EFFECT_ADJUST_SPACE_RACE_PROJECTS_PRODUCTION":
+            # 0x6be2d0 on the subject city (the context's, +0x70): per
+            # SpaceRace project, where the city builds it within the horizon
+            # at the Production lifted by the Amount (raw over 1.0), its
+            # owner's PSEUDOYIELD_SPACE_RACE worth discounted at those turns
+            # less at the turns without it; a completed one's whole worth is
+            # not paid here (the engine keeps a major's completions alone,
+            # `project_done`). A city-state's city has no project turns
+            # (`projectTurns` -1 both ways: nothing)
+            if not city or ctx["s"] != self.FR:
+                return zero
+            f = sub["f"]
+            p = "PSEUDOYIELD_SPACE_RACE"
+            v = self._cv_pseudo(full(_FX), p, f0.pseudo_w(p))
+            acc = zero
+            for pi in self.rules.civic_ai["spaceRaceProjects"]:
+                t_0 = f.project_turns(int(pi), 0)
+                t_1 = f.project_turns(int(pi), amount)
+                d = (_discounted(v, r, t_1) - _discounted(v, r, t_0)) >> 8
+                acc = acc + torch.where(t_1 < h, d, zero)
+            return acc
         if eff in ("EFFECT_ADJUST_TRADE_ROUTE_YIELD", "EFFECT_ADJUST_TRADE_ROUTE_YIELD_FOR_INTERNATIONAL",
                    "EFFECT_ADJUST_TRADE_ROUTE_YIELD_FOR_DOMESTIC"):
             cap = torch.as_tensor(f0.trade_capacity(), device=dev).long().expand(B)

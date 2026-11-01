@@ -7959,3 +7959,7 @@ the `_imp_eng` branch.
   Tunnel pick 46, t214-t218), and 1127 t172's tree holds element 4's
   reservation. The engines' improvement event starts none, which leaves no
   difference in the contracts.
+
+## C-130: the Free Cities' city subjects and space race projects on the GPU — both twins
+
+A city subject carries its own city's facts on the GPU as in TS (COLLECTION_PLAYER_CITIES' next 0x69ea00 writes the city to +0x70): `_cv_subjects` / `city_subjects()`, a Free City's siblings each its own `_FreeFacts`, a city-state's one city; no city in the context gives the player subject or none. EFFECT_ADJUST_SPACE_RACE_PROJECTS_PRODUCTION (0x6be2d0) scores each SpaceRace project on a Free City subject (`_FreeFacts.project_turns`, the twin of TS `projectTurns`); the Free Cities' trade capacity and Traders read the seat's own (`_trade_capacity(FREE_ROW)`). This closes the open line of the section "C-98 / C-130: the player tourism analyzer, the city subject's context, the dark trade buildings". Open: Online Communities' 0x6a1380.

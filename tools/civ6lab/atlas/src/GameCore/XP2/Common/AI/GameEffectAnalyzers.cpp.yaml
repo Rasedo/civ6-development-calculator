@@ -46,6 +46,7 @@
   readings:
     - "H-1: the civics AI — READ (the choice, the walk, the propagation), PARTLY READ (the value)"
     - "C-98 / C-130: the player tourism analyzer, the city subject's context, the dark trade buildings — READ (0x6b0700, 0x6b0430, 0x69ea00's +0x70), a FIT (the capacity), both twins"
+    - "C-130: the Free Cities' city subjects and space race projects on the GPU — both twins"
   notes: ["not ported: 0x394830 for a city-state unread"]
   review: reviewed
 - addr: 0x6a1700
@@ -1170,9 +1171,13 @@
     - recording: h1_duelw1117
       turn: 28
       value: Space Initiative 66 on the replayed state (the log 111 under its science weight)
-  impl: [cpu/core/aiModifiers.ts:ANALYZERS]
+  impl:
+    - cpu/core/aiModifiers.ts:ANALYZERS
+    - gpu/core/sim_policy.py:_pol_analyze
+    - gpu/core/sim_cityvalue.py:project_turns
   readings:
     - "C-97: the governor AI — the analysis, the choice and the seats READ, the analyzers PARTLY READ"
+    - "C-130: the Free Cities' city subjects and space race projects on the GPU — both twins"
   context:
     - ...owner's envoys' worth 0x7a46c0 at Amount), EFFECT_ADJUST_SPACE_RACE_PROJECTS_PRODUCTION 0x6be2d0 (the context city's owner's PSEUDOYIELD_SPACE_RACE @0xf2e2ac of 1.0 at its weight; per...
     - "...r's: its pressure 0x1f33e0 x Amount, raw), EFFECT_ADJUST_SPACE_RACE_PROJECTS_PRODUCTION 0x6be2d0 (per SpaceRace project the owner has not completed: PSEUDOYIELD_SPACE_RACE 1.0 weighted..."

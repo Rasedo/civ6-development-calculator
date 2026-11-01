@@ -37,7 +37,7 @@ import {
   PSEUDOYIELD_TECHNOLOGY, PSEUDOYIELD_WONDER,
 } from '../data/aiValue';
 import { RESEARCH_AI_EMBARK_ALL, RESEARCH_AI_EMBARK_UNIT, RESEARCH_AI_TASK_BIAS } from '../data/aiResearch';
-import { AI_GOVERNMENTS, AI_GREAT_PERSON_CLASSES, AI_POLICIES, AI_SLOT_TYPES } from '../data/aiTables';
+import { AI_GOVERNMENTS, AI_GREAT_PERSON_CLASSES, AI_POLICIES, AI_SLOT_TYPES, AI_SPACE_RACE_PROJECTS } from '../data/aiTables';
 import { CIVIC_AI_FORMATION_UNITS, CIVIC_AI_POLICY_FLOOR } from '../data/aiCivics';
 import { techUnlocks } from '../core/aiResearch';
 import { civicUnlocks } from '../core/aiCivics';
@@ -1188,6 +1188,9 @@ export function buildRules() {
       // the Great Person classes in their AI order (a city-state's store's
       // index, `citystate_gp_points`)
       gpClassTypes: AI_GREAT_PERSON_CLASSES,
+      // the SpaceRace projects in the AI's order (EFFECT_ADJUST_SPACE_RACE_
+      // PROJECTS_PRODUCTION's walk), each its engine project index, -1 none
+      spaceRaceProjects: AI_SPACE_RACE_PROJECTS.map((t) => Object.keys(PROJECTS).indexOf(engineId('project', t, 'PROJECT_', PROJECTS) ?? '')),
     },
     cityState: {
       government: CITY_STATE_GOVERNMENT,

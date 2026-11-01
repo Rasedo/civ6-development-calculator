@@ -3465,6 +3465,7 @@
     - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
     - "C-97: the government and policy choice — the choice READ, the values PARTLY READ"
     - "C-98 / C-130: the player tourism analyzer, the city subject's context, the dark trade buildings — READ (0x6b0700, 0x6b0430, 0x69ea00's +0x70), a FIT (the capacity), both twins"
+    - "C-130: the Free Cities' city subjects and space race projects on the GPU — both twins"
   context:
     - "...gistry's object @f03bb8: begin 0x69e9e0 clears +0x70 and the counters +0xd0 / +0xd4; next 0x69ea00 sets +0x70 to each of the player's cities, +0x12f0 +0xa0, counting +0xd4; past the last c..."
   review: reviewed

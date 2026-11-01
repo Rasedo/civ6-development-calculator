@@ -667,8 +667,8 @@ class Mods:
     def pseudo_w(self, p):
         return 128 if p == "PSEUDOYIELD_DIPLOMATIC_FAVOR" else 0
 
-    def player_cities(self):
-        return 1
+    def city_subjects(self):
+        return [(self, 1)]
 
     def city_districts(self):
         return [("DISTRICT_CITY_CENTER", 1), ("DISTRICT_HARBOR", 1)]

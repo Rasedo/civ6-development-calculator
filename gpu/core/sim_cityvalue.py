@@ -1410,6 +1410,8 @@ class SimCityValue:
         shape = sub["mask"]
         if not rs:
             return torch.ones_like(shape)
+        # a city subject's requirements read its own city
+        cf = sub.get("f", f)
         met = []
         for r in rs["reqs"]:
             ty = r["type"]
@@ -1438,23 +1440,23 @@ class SimCityValue:
                 if k != "city" or wonder in reads["wonders"]:
                     v = no
                 else:
-                    v = _t(f.city_has_building(b), shape).bool()
+                    v = _t(cf.city_has_building(b), shape).bool()
             elif ty == "REQUIREMENT_CITY_IS_OWNER_CAPITAL_CONTINENT":
                 # 0x6cfd60: an owner with no capital (the Free Cities), or the
                 # city on its home continent (a city-state's one city on it)
                 v = torch.ones_like(shape) if k == "city" else no
             elif ty == "REQUIREMENT_CITY_HAS_GARRISON_UNIT":
                 # 0x6d4420: the city's population at least 9
-                v = _t(f.population() >= 9, shape).bool() if k == "city" else no
+                v = _t(cf.population() >= 9, shape).bool() if k == "city" else no
             elif ty == "REQUIREMENT_CITY_HAS_X_POPULATION":
                 # 0x6cfad0: the city's population at least Amount
-                v = _t(f.population() >= int(float(a.get("Amount", 0) or 0)), shape).bool() if k == "city" else no
+                v = _t(cf.population() >= int(float(a.get("Amount", 0) or 0)), shape).bool() if k == "city" else no
             elif ty == "REQUIREMENT_CITY_HAS_X_SPECIALTY_DISTRICTS":
                 # 0x6d4190: the city's finished specialty districts at least Amount
                 if k != "city":
                     v = no
                 else:
-                    tl = self.city_dist_tile[:, f.row, getattr(f, "j", 0)]
+                    tl = self.city_dist_tile[:, cf.row, getattr(cf, "j", 0)]
                     done = (tl >= 0) & self.district_complete.gather(1, tl.clamp(min=0))
                     n = (done & self._is_specialty).sum(dim=1)
                     v = _t(n >= int(float(a.get("Amount", 0) or 0)), shape).bool()
@@ -1470,21 +1472,27 @@ class SimCityValue:
             return ~st.any(0)
         return st.all(0)
 
-    def _cv_subjects(self, f, collection: str):
-        """a collection's subjects for the owner city's analysis; None for a
-        collection not read"""
+    def _cv_subjects(self, f, collection: str, nocity: bool = False):
+        """a collection's subjects in the analysis of the context's city `f`
+        (`nocity`: the context holds no city, the empty subject's of
+        COLLECTION_PLAYER_CITIES' walk); a city subject carries its own
+        city's facts (`f`), the context's city of the analyzer and of an
+        analysis nested on it; None for a collection not read"""
         like = f.like()
         one = torch.ones_like(like, dtype=torch.bool)
-        if collection in ("COLLECTION_OWNER", "COLLECTION_CITY_TRAINED_UNITS"):
-            return [{"kind": "city", "mask": one}]
+        if collection == "COLLECTION_OWNER":
+            return [{"kind": "player", "mask": one}] if nocity else [{"kind": "city", "mask": one, "f": f}]
+        if collection == "COLLECTION_CITY_TRAINED_UNITS":
+            return [] if nocity else [{"kind": "city", "mask": one, "f": f}]
         if collection == "COLLECTION_PLAYER_CITIES":
-            # the player's cities, then the walk's empty ones (0x69ea00)
-            # while fewer than five subjects have been given
-            n = f.player_cities()
-            if torch.is_tensor(n):
-                cities = [{"kind": "city", "mask": n > k} for k in range(int(n.max()) if n.numel() else 0)]
-                return cities + [{"kind": "nocity", "mask": n + k < self._CV_PLAYER_CITIES_WALK} for k in range(self._CV_PLAYER_CITIES_WALK)]
-            return [{"kind": "city", "mask": one}] * int(n) + [{"kind": "nocity", "mask": one}] * max(0, self._CV_PLAYER_CITIES_WALK - int(n))
+            # the player's cities, each setting the context's city (+0x70),
+            # then the walk's empty ones (0x69ea00) while fewer than five
+            # subjects have been given
+            cities = [{"kind": "city", "mask": _t(alive, like).bool(), "f": g} for g, alive in f.city_subjects()]
+            n = sum((c["mask"].long() for c in cities), like)
+            return cities + [{"kind": "nocity", "mask": n + k < self._CV_PLAYER_CITIES_WALK} for k in range(self._CV_PLAYER_CITIES_WALK)]
+        if collection in ("COLLECTION_CITY_DISTRICTS", "COLLECTION_CITY_PLOT_YIELDS") and nocity:
+            return []
         if collection == "COLLECTION_CITY_DISTRICTS":
             return [{"kind": "district", "type": d, "mask": _t(held, like).bool()} for d, held in f.city_districts()]
         if collection == "COLLECTION_CITY_PLOT_YIELDS":
@@ -1494,9 +1502,9 @@ class SimCityValue:
             return []
         return None
 
-    def _cv_analyze(self, f, eff: str, a: dict, sub: dict, t: torch.Tensor, h: torch.Tensor) -> torch.Tensor:
+    def _cv_analyze(self, f, eff: str, a: dict, sub: dict, t: torch.Tensor, h: torch.Tensor, nocity: bool = False) -> torch.Tensor:
         """an analyzer's whole number on one subject (per element, or per
-        plot for the plot subjects)"""
+        plot for the plot subjects); `f` the context's city (`nocity`: none)"""
         T = self._cv_tables()
         r = T["rate"]
         like = sub["mask"].long()
@@ -1509,6 +1517,11 @@ class SimCityValue:
             return torch.where(t == h, _discounted(v, r, t), span(v))
 
         city = sub["kind"] == "city"
+        # the context's city the analyzer reads (+0x70): a city subject's
+        # own, none on the walk's empty subject, else the context's as it
+        # stood
+        sf = sub.get("f", f)
+        none = sub["kind"] == "nocity" or (nocity and not city)
         zero = torch.zeros_like(like)
         if eff == "EFFECT_ADJUST_PLOT_YIELD":
             if sub["kind"] != "plots":
@@ -1527,12 +1540,12 @@ class SimCityValue:
             if not city:
                 return zero
             per = self._cv_yield(torch.full_like(like, _fx_float(_f32(amount * _f32(0.01)))), "YIELD_GOLD")
-            prod = torch.floor(torch.as_tensor(f.city_yield("YIELD_PRODUCTION"), dtype=torch.float64) * _FX + 0.5).long()
+            prod = torch.floor(torch.as_tensor(sf.city_yield("YIELD_PRODUCTION"), dtype=torch.float64) * _FX + 0.5).long()
             return between(_fmul(per, prod.expand_as(per))) >> 8
         if eff == "EFFECT_ADJUST_CITY_INNER_DEFENSE":
-            if sub["kind"] == "nocity":
+            if none:
                 return zero
-            return torch.where(_t(f.city_strikes(), like).bool(), torch.full_like(like, amount), zero)
+            return torch.where(_t(sf.city_strikes(), like).bool(), torch.full_like(like, amount), zero)
         if eff == "EFFECT_ADJUST_TRADE_ROUTE_CAPACITY":
             k = f.trade_knowledge()
             if k is None:
@@ -1546,17 +1559,24 @@ class SimCityValue:
             p = "PSEUDOYIELD_DIPLOMATIC_FAVOR" if eff == "EFFECT_ADJUST_PLAYER_EXTRA_FAVOR_PER_TURN" else "PSEUDOYIELD_INFLUENCE"
             return span(self._cv_pseudo(torch.full_like(like, amount * _FX), p, f.pseudo_w(p))) >> 8
         if eff == "EFFECT_ADJUST_UNIT_PRODUCTION":
-            # the evaluation's city alone (`EFFECT_ADJUST_UNIT_PRODUCTION`)
+            # the context's city alone, with none every city of the player
+            # (`EFFECT_ADJUST_UNIT_PRODUCTION`)
             if not a.get("UnitType"):
                 return zero
             pct = _fx_const(_f32(amount * _f32(0.01)))
-            return _t(self._cv_unit_prod_value(f, a["UnitType"], pct, t, h), like)
+            if not none:
+                return _t(self._cv_unit_prod_value(sf, a["UnitType"], pct, t, h), like)
+            acc = zero
+            for g, alive in f.city_subjects():
+                v = _t(self._cv_unit_prod_value(g, a["UnitType"], pct, t, h), like)
+                acc = acc + torch.where(_t(alive, like).bool(), v, zero)
+            return acc
         if eff == "EFFECT_ADJUST_IMPROVEMENT_HOUSING":
             # 0x6ad2b0: the context's city, the Amount's Housing more at its
             # population from the start to the horizon (0x7a3d70)
-            if sub["kind"] == "nocity":
+            if none:
                 return zero
-            return _t(f.housing_value(amount, t, h) >> 8, like)
+            return _t(sf.housing_value(amount, t, h) >> 8, like)
         if eff == "EFFECT_GRANT_UNIT_IN_CITY":
             if not city:
                 return zero
@@ -1578,10 +1598,10 @@ class SimCityValue:
             # PSEUDOYIELD_GPP_SCIENTIST, from the start to the horizon
             if not city or amount <= 0:
                 return zero
-            prod = torch.floor(torch.as_tensor(f.city_yield("YIELD_PRODUCTION"), dtype=torch.float64) * _FX + 0.5).long()
+            prod = torch.floor(torch.as_tensor(sf.city_yield("YIELD_PRODUCTION"), dtype=torch.float64) * _FX + 0.5).long()
             half = _fmul(prod.expand_as(like), torch.full_like(like, _fx_const(0.5)))
             pt = between(self._cv_yield(half, "YIELD_PRODUCTION", f.yield_w("YIELD_PRODUCTION")))
-            pt = torch.where(_t(f.power_short(), like).bool(), pt, torch.zeros_like(pt))
+            pt = torch.where(_t(sf.power_short(), like).bool(), pt, torch.zeros_like(pt))
             ps = between(self._cv_pseudo(torch.full_like(like, amount * _FX), "PSEUDOYIELD_GPP_SCIENTIST",
                                          f.pseudo_w("PSEUDOYIELD_GPP_SCIENTIST")))
             return torch.maximum(pt, ps) >> 8
@@ -1615,15 +1635,24 @@ class SimCityValue:
         v = torch.div(per * pct, _FX, rounding_mode="floor")
         return self._cv_yield(_present_value(v, r, end) - _present_value(v, r, t), "YIELD_PRODUCTION") >> 8
 
-    def _cv_analysis(self, f, m: dict, t: torch.Tensor, h: torch.Tensor, depth: int):
+    def _cv_analysis(self, f, m: dict, t: torch.Tensor, h: torch.Tensor, depth: int, nocity: bool = False):
         """0x6cede0: the whole number the modifier's subjects leave; None
-        where refused"""
+        where refused. `f` the context's city (`nocity`: none); an analysis
+        nested on a subject stands on the context it leaves (`onSubject`): a
+        city subject's city, none on the walk's empty subject, else the
+        context as it stood"""
         reads = self._cv_tables()["reads"]
         if depth >= 4:
             return None
         like = f.like()
-        subs = self._cv_subjects(f, m.get("collection"))
+        subs = self._cv_subjects(f, m.get("collection"), nocity)
         eff = m.get("effect")
+
+        def nested(sub, x):
+            if sub["kind"] == "city":
+                return self._cv_analysis(sub["f"], x, t, h, depth + 1)
+            return self._cv_analysis(f, x, t, h, depth + 1, nocity or sub["kind"] == "nocity")
+
         if eff in ("EFFECT_ATTACH_MODIFIER", "EFFECT_ATTACH_MODIFIER_TO_PLAYERTYPE"):
             inner = m.get("attach")
             if not inner or subs is None:
@@ -1633,7 +1662,7 @@ class SimCityValue:
                 ok = self._cv_admits(f, m.get("subjectReqs"), sub)
                 if ok is None:
                     return torch.zeros_like(like)
-                v = self._cv_analysis(f, inner, t, h, depth + 1)
+                v = nested(sub, inner)
                 if v is not None:
                     acc = torch.where(ok & sub["mask"], v, acc)
             return acc
@@ -1647,11 +1676,11 @@ class SimCityValue:
             if eff == "EFFECT_GRANT_ABILITY":
                 v = torch.zeros_like(like)
                 for x in m.get("ability") or []:
-                    w = self._cv_analysis(f, x, t, h, depth + 1)
+                    w = nested(sub, x)
                     if w is not None:
                         v = v + w
             else:
-                v = self._cv_analyze(f, eff, m.get("args") or {}, sub, t, h)
+                v = self._cv_analyze(f, eff, m.get("args") or {}, sub, t, h, nocity)
             if sub["kind"] == "plots":
                 total = total + torch.where(ok & sub["mask"], v, torch.zeros_like(v)).sum(-1)
             else:
@@ -2337,10 +2366,11 @@ class _MinorFacts:
     def favoured(self, p):
         return False
 
-    # the modifiers' reads (an owner city's analysis): a minor's city is no
-    # city of its player list
-    def player_cities(self):
-        return 0
+    # the modifiers' reads (an owner city's analysis): the player's cities,
+    # each its facts and the games it stands in — a city-state's one city
+    # while its centre stands (`seatCities`)
+    def city_subjects(self):
+        return [(self, self._centre() >= 0)]
 
     def city_districts(self):
         """the city's districts by install type, each with where it holds one
@@ -2794,17 +2824,22 @@ class _FreeFacts(_MinorFacts):
             if bi == int(sim._barrier_bidx):
                 return sim._flood_barrier_cost(row)[:, self.j].double()
             return sim.rules_dev.b_cost.to(torch.float64)[bi].expand(B)
-        pct = sim._progress_pct_of(sim.citystate_techs[:, self.s].sum(dim=1), sim.citystate_civics[:, self.s].sum(dim=1))
         if item.startswith("DISTRICT_"):
+            pct = sim._progress_pct_of(sim.citystate_techs[:, self.s].sum(dim=1), sim.citystate_civics[:, self.s].sum(dim=1))
             dv = self._didx(item)
             return sim._progress_cost(int(sim._mb_d_base[dv]), int(sim._mb_d_k[dv]), pct).double()
-        pi = self._pidx(item)
+        return self._project_cost(self._pidx(item))
+
+    def _project_cost(self, pi: int):
+        """`projectCost` of engine project `pi` in the Free City [B] f64"""
+        sim = self.sim
         if pi == sim._repair_proj_idx:
             return sim._free_repair(self.j)[1]
+        pct = sim._progress_pct_of(sim.citystate_techs[:, self.s].sum(dim=1), sim.citystate_civics[:, self.s].sum(dim=1))
         prow = sim._proj_rows[pi]
         if int(prow["pgb"]) >= 0:
             return sim._progress_cost(int(prow["pgb"]), int(prow["pk"]), pct).double()
-        return torch.full((B,), float(max(int(prow["pc"]), 0)), dtype=torch.float64, device=sim.device)
+        return torch.full((sim.B,), float(max(int(prow["pc"]), 0)), dtype=torch.float64, device=sim.device)
 
     def _item_pct(self, item: str):
         return torch.zeros(self.sim.B, dtype=torch.float64, device=self.sim.device)
@@ -2840,6 +2875,26 @@ class _FreeFacts(_MinorFacts):
         rate = self._item_rate_mult(u, rate)
         return _turns_at(torch.floor(self._item_cost(u) * _FX).long() - torch.floor(progress * _FX + 0.5).long(), rate)
 
+    def project_turns(self, pi: int, extra: int):
+        """`projectTurns` [B] of engine project `pi`: its cost less the
+        progress the queue's first entry of it holds and the bank, at the
+        city's Production times the seat's project multiplier (the turn
+        step's, no governor, suzerainty or research percent on the Free
+        Cities' row) lifted by 1.0 + `extra` raw; -1 for a project the engine
+        has none of (`pi` -1) or at no Production"""
+        sim = self.sim
+        if pi < 0:
+            return torch.full((sim.B,), -1, dtype=torch.long, device=sim.device)
+        cur = sim.city_current[:, self.row, self.j]
+        hit = cur == sim.PROJECT_BASE + pi
+        first = hit & (hit.long().cumsum(dim=1) == 1)
+        kept = (sim.city_progress[:, self.row, self.j].double() * first.double()).sum(dim=1)
+        mult = sim._gov_mods(self.row)[12]["projprod"].double()
+        base = torch.floor(self._total(1) * mult * _FX + 0.5).long()
+        rate = _fmul(base, torch.full_like(base, _FX + int(extra)))
+        rem = torch.floor((self._project_cost(pi) - kept - sim.city_prod_bank[:, self.row, self.j].double()) * _FX + 0.5).long()
+        return _turns_at(rem, rate)
+
     def unit_expected(self, u):
         """`majorUnitExpected` (0x5d4750), raw: 1.0 with progress the queue
         holds on the unit, 0 where the city cannot train it, else 0.5"""
@@ -2853,9 +2908,21 @@ class _FreeFacts(_MinorFacts):
         can = _t(self.can_train(u), like).bool()
         return torch.where(kept, like + _FX, torch.where(can, like + _FX // 2, like))
 
-    def player_cities(self):
+    def city_subjects(self):
+        """the Free Cities' cities in their columns' order, each its own
+        facts (sharing the seat's city stats) and where it lives"""
         sim = self.sim
-        return sim.city_alive[:, self.row].sum(dim=1)
+
+        def of(j):
+            if j == self.j:
+                return self
+
+            def build():
+                g = _FreeFacts(sim, j)
+                g._memo["stats"] = self._stats()
+                return g
+            return self._get(("city", j), build)
+        return [(of(j), sim.city_alive[:, self.row, j]) for j in range(sim.city_alive.shape[2])]
 
     def city_districts(self):
         sim = self.sim
@@ -2879,10 +2946,12 @@ class _FreeFacts(_MinorFacts):
         return torch.minimum(sim.city_outer_hp[:, self.row, self.j].long(), mx) > 0
 
     def traders(self):
-        return 0
+        # the Free Cities' Traders (`traders`)
+        sim = self.sim
+        return (self._mine() & (sim.barb_unit_type == sim._trader_idx)).sum(dim=1)
 
     def trade_capacity(self):
-        return 0
+        return self.sim._trade_capacity(self.row)
 
     def unit_cost(self, u):
         ui = self._uidx(u)
