@@ -977,15 +977,17 @@ export function embarkTechMoves(state: GameState, seat: number): number {
  * injected at the call site rather than flagged in here.
  */
 /** a land unit's step across the shore under the embark and disembark rules
- *  (0x530420 / 0x530240): a step off a Harbor's water is none — the
- *  disembark rule passes a plot whose district takes the formation
- *  (0x530297..0x5302c8: the plot's district word, 0x81240), so it pays no
- *  embark cost and carries no Movement (runs/h1_duely1117 t176: city-state
- *  2's embarked Line Infantry on its Harbor 14:7 plans its centre 14:8
- *  (1/4) and 14:9 beyond it (1/3), AI_Planning.csv) */
+ *  (0x530420 / 0x530240): a step off an owned water plot is none — the
+ *  disembark rule passes a plot whose domain mask takes the formation
+ *  (0x530297..0x5302c8: the plot's +0x14 word, 0x81240), the mask a city's
+ *  claim sets on every plot it owns (0x66790 -> 0x66a90), so it pays no
+ *  embark cost and carries no Movement (runs/h1_duely1117 t185: city-state
+ *  3's embarked Bombard on its own water 42:14 plans 41:14's Farm (1/2);
+ *  t176 city-state 2's Line Infantry on its Harbor 14:7 plans its centre
+ *  14:8 (1/4), AI_Planning.csv) */
 export function shoreCrossing(type: string, from: Tile, to: Tile): boolean {
   if (UNITS[type]?.naval || waterWalks(type) || isWater(from) === isWater(to)) return false;
-  return !(isWater(from) && from.district === 'HARBOR');
+  return !(isWater(from) && from.ownerSeat !== NO_SEAT);
 }
 
 /** What one step from `from` into its neighbour `to` costs this unit, in
@@ -1090,11 +1092,12 @@ export function stepUnit(state: GameState, unit: Unit, to: Tile): StepOutcome {
   logUnitOrder(state, unit.seat, unit.id, 'move', to.index);
   unit.movesLeft = Math.max(0, unit.movesLeft - cost);
   grantFeatureAbilities(state, unit);
-  // the transfer cap: what carries over can never exceed the NEW mode's
-  // pool — which becomes the granted pool every later afford this turn reads
+  // the NEW mode's pool becomes the granted pool every later afford this
+  // turn reads; a shore crossing's transfer caps what carries over at it
+  // (the pathfinder's `carry`), a step off an owned water plot carries all
   if (transition) {
     const modeFull = unitFullMoves(state, unit);
-    unit.movesLeft = Math.min(unit.movesLeft, modeFull);
+    if (shoreCrossing(unit.type, from, to)) unit.movesLeft = Math.min(unit.movesLeft, modeFull);
     unit.movesFull = modeFull;
   }
   for (const rider of riders) {
@@ -1105,7 +1108,7 @@ export function stepUnit(state: GameState, unit: Unit, to: Tile): StepOutcome {
     if (!riderFree) rider.movesLeft = Math.max(0, rider.movesLeft - cost);
     if (rTrans) {
       const rModeFull = unitFullMoves(state, rider);
-      rider.movesLeft = Math.min(rider.movesLeft, rModeFull);
+      if (shoreCrossing(rider.type, from, to)) rider.movesLeft = Math.min(rider.movesLeft, rModeFull);
       rider.movesFull = rModeFull;
     }
   }

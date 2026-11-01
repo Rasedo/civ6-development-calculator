@@ -17,7 +17,7 @@
 - addr: 0x530240
   final: 0x377e40
   kind: function
-  semantics: "the disembark rule: none where the FROM plot (water) has a district that takes the formation (0x530289..0x5302c8: vt +0x40, 0x81240 on the formation's +0x278; read as the Harbor): no embark cost, no carry. Else it waives MOVEMENT_EMBARK_COST at a FreeEmbark district (completion read off the FROM plot), and, FreeEmbark or not, where the Movement the step starts with exceeds the TO domain's full Movement, the excess (0x774c0: +0x20 - +0x18) is carried."
+  semantics: "the disembark rule: none where the FROM plot (water) passes vt +0x40 and its domain mask (word +0x14, set on every plot a city claims: 0x66790 -> 0x66a90) takes the formation's +0x278 (0x81240) (0x530289..0x5302c8): every owned water plot, no embark cost, no carry. Else it waives MOVEMENT_EMBARK_COST at a FreeEmbark district (completion read off the FROM plot), and, FreeEmbark or not, where the Movement the step starts with exceeds the TO domain's full Movement, the excess (0x774c0: +0x20 - +0x18) is carried."
   status: READ
   cases:
     - recording: h1_duely1124
@@ -31,6 +31,9 @@
     - recording: h1_duely1117
       turn: 176
       value: "city-state 2's embarked Line Infantry on its Harbor 14:7 plans its centre 14:8 (1/4) and 14:9 beyond it (1/3): no Movement carried off the Harbor (AI_Planning.csv)"
+    - recording: h1_duely1117
+      turn: 185
+      value: "city-state 3's embarked Bombard 1769477 on its own water 42:14 (no district) plans 41:14's Farm (1/2): no embark cost off an owned water plot (AI_Planning.csv)"
   impl:
     - cpu/core/units.ts:stepCost
     - gpu/core/sim_seats.py:_step_verb
@@ -39,13 +42,14 @@
     - cpu/core/tactical.ts:cross
     - gpu/core/sim_tactics.py:price6
     - cpu/core/units.ts:shoreCrossing
-    - gpu/core/sim_tactics.py:_harbor_exit
+    - gpu/core/sim_tactics.py:_owned_exit
+    - cpu/core/units.ts:stepUnit
   readings:
     - "C-96: the city-states' tactical pass — READ (Wander Near City, Heal, the non-barbarian priorities, FindAlternateLocation), the families it needs PARTLY READ"
     - "C-99: a shore crossing's carried Movement — READ (0x26e920, 0x530420, 0x530240), both twins"
     - "C-99: a shore crossing's carried Movement"
     - "C-99: the stacking count holds other players' units, the wanders' kept-out plots, a Harbor's water no shore — READ (0x585d90, 0x585eb0, 0x2720a0, 0x77bf50, 0x77b9a0, 0x530240), both twins"
-    - "C-99: the stacking count holds other players' units, the wanders' kept-out plots, a Harbor's water no shore — READ (0x585d90, 0x585eb0, 0x2720a0, 0x77bf50, 0x77b9a0, 0x530240), both twins"
+    - "C-99: an owned water plot no shore, a move order carried on as the turn ends — READ (0x530240, 0x66790, 0x66a90, 0x66680, 0x814e0, 0x81240, 0x7eeba0), both twins"
   notes:
     - ".claude/scratchpad/mu1/readings_c96.md: ...plot is a city's or water (0x531510); the embark   rule 0x530420 (land to water) and the disembark 0x530240 waive   MOVEMENT_EMBARK_COST where a district with FreeEmbark (Districts +0xe1   bit 2, `dll_rowmap..."
   context:
@@ -54,7 +58,7 @@
 - addr: 0x530420
   final: 0x378010
   kind: function
-  semantics: "the embark rule (land to water): waives MOVEMENT_EMBARK_COST at a FreeEmbark district (completion read off the FROM plot). Then, FreeEmbark or not, where the Movement the step starts with exceeds the TO domain's full Movement, the excess (0x774c0: +0x20 - +0x18) is carried."
+  semantics: "the embark rule (land to water): none where the TO water plot passes vt +0x40 and its domain mask takes the formation's +0x278 (0x530467..0x530499; the land formation's domain, unported: onto owned water the planning keeps one Movement more than onto unowned, runs/h1_duely1124 t76); else it waives MOVEMENT_EMBARK_COST at a FreeEmbark district (completion read off the FROM plot). Then, FreeEmbark or not, where the Movement the step starts with exceeds the TO domain's full Movement, the excess (0x774c0: +0x20 - +0x18) is carried."
   status: READ
   cases:
     - recording: h1_duely1128
@@ -77,6 +81,7 @@
     - "C-96: the city-states' tactical pass — READ (Wander Near City, Heal, the non-barbarian priorities, FindAlternateLocation), the families it needs PARTLY READ"
     - "C-99: a shore crossing's carried Movement — READ (0x26e920, 0x530420, 0x530240), both twins"
     - "C-99: a shore crossing's carried Movement"
+    - "C-99: an owned water plot no shore, a move order carried on as the turn ends — READ (0x530240, 0x66790, 0x66a90, 0x66680, 0x814e0, 0x81240, 0x7eeba0), both twins"
   notes:
     - ".claude/scratchpad/mu1/readings_c96.md: ...0x272ca0), no river   crossing where either plot is a city's or water (0x531510); the embark   rule 0x530420 (land to water) and the disembark 0x530240 waive   MOVEMENT_EMBARK_COST where a district with FreeE..."
   context:

@@ -712,17 +712,64 @@ export function pathTo(state: GameState, unit: Unit, dest: number, laterTurns = 
  *  no step onto the ground of a player at war with it. */
 export function moveTo(state: GameState, unit: Unit, dest: number, strike = true,
   laterTurns = false, explore = true, danger?: PathDanger, mates: readonly Unit[] = []): void {
+  const from = unit.tileIndex;
+  const cut = orderOnce(state, unit, dest, strike, laterTurns, explore, danger, mates);
+  // an order that walked and stopped short of a plot its path goes through
+  // but may not end on, Movement left, stays on the unit, carried on as the
+  // player's turn ends
+  if (shortOrders && cut && state.units.includes(unit) && unit.tileIndex !== from && unit.movesLeft > 0 && unit.tileIndex !== dest) {
+    shortOrders.push(() => orderOnce(state, unit, dest, strike, laterTurns, explore, danger, mates));
+  }
+}
+
+/** the move orders a player's turn left short of their destinations with
+ *  Movement left (the unit's operation queue +0x60 holding the order), in
+ *  the order given; null outside an AI player's pass */
+let shortOrders: (() => void)[] | null = null;
+
+/**
+ * A player's AI turn with its move orders carried on (`moveTo`): an order
+ * that stops short of its destination with Movement left — the plot its
+ * Movement reached held, the walk standing short of it — stays queued on
+ * the unit, and the unit walks it
+ * again from where it stands once the player's other units have moved, its
+ * path found anew (runs/h1_duely1121 t71: city-state 4's Warrior 262146
+ * stops on 33:19 short of the Swordsman 720896 on 33:20, the tactical pass
+ * wanders the Swordsman to 34:20, the Warrior's order goes on to 33:20; 33
+ * such second walks over the five duely duels, the barbarians' among them,
+ * the record's UnitMoved after the order's UnitOperationSegmentComplete;
+ * 1121 t103 its Man-At-Arms 1048577 goes on from 38:13 to 38:12, 1127 t109
+ * city-state 3's Galley 393216 to 29:16)
+ */
+function withShortOrders(fn: () => void): void {
+  const outer = shortOrders;
+  const mine: (() => void)[] = [];
+  shortOrders = mine;
+  try {
+    fn();
+  } finally {
+    shortOrders = outer;
+  }
+  for (const run of mine) run();
+}
+
+/** one walk of a move order (the unit's mission 0x962030): true where the
+ *  walk stood short of a plot it may not end on */
+function orderOnce(state: GameState, unit: Unit, dest: number, strike: boolean,
+  laterTurns: boolean, explore: boolean, danger: PathDanger | undefined, mates: readonly Unit[]): boolean {
+  if (!state.units.includes(unit) || unit.movesLeft <= 0 || unit.tileIndex === dest) return false;
   let path = pathTo(state, unit, dest, laterTurns, explore, danger, mates);
   // a path ending on a plot it attacks into: it walks to its side, and
   // strikes it where its Movement and attacks last (the order's attack flag)
   const last = path.length ? path[path.length - 1] : -1;
   const into = last >= 0 && attackPlot(state, unit, last);
   if (into) path = path.slice(0, -1);
-  walk(state, unit, path, mates);
+  const cut = walk(state, unit, path, mates);
   if (into && strike && unit.movesLeft > 0 && attacksLeftOf(unit) > 0 && state.units.includes(unit)
     && plotDistance(state, unit.tileIndex, last) === 1) {
     meleeAttack(state, unit.id, last, unit.seat);
   }
+  return cut;
 }
 
 /** a plot the unit would attack into rather than enter: one a unit of a
@@ -735,8 +782,9 @@ function attackPlot(state: GameState, unit: Unit, p: number): boolean {
   return encampmentBlocks(state, t, unit);
 }
 
-/** the walk of a path as far as the unit's Movement carries it this turn */
-function walk(state: GameState, unit: Unit, path: number[], mates: readonly Unit[] = []): void {
+/** the walk of a path as far as the unit's Movement carries it this turn;
+ *  true where it stood short of a plot it may not end on */
+function walk(state: GameState, unit: Unit, path: number[], mates: readonly Unit[] = []): boolean {
   const { tiles } = state.map;
   // how far its Movement carries it along the path this turn
   const full = unit.movesFull ?? unitFullMoves(state, unit);
@@ -757,10 +805,12 @@ function walk(state: GameState, unit: Unit, path: number[], mates: readonly Unit
     from = p;
     if (mp <= 0 || inEnemyZoc(state, p, unit)) break;
   }
+  const reached = stop;
   while (stop > 0 && (stackedWith(state, unit, mates, path[stop - 1]) || foreignAt(state, unit, path[stop - 1]))) stop -= 1;
   for (let i = 0; i < stop; i++) {
-    if (stepUnit(state, unit, tiles[path[i]]) !== 'moved') return;
+    if (stepUnit(state, unit, tiles[path[i]]) !== 'moved') return false;
   }
+  return stop < reached;
 }
 
 /** a unit that holds its plot: no aircraft, no spy */
@@ -2856,31 +2906,33 @@ export function cityStateTactics(state: GameState, cityState: CityState, operati
   const pool = seatPoolSlots(state, cityState)!;
   costsHeld = new Map();
   try {
-    const pass = openPass(state, cityState.seat, militaryAiTypeOf);
-    // a unit with no Movement left as the pass opens is none of its (the
-    // game logs no tactical row: runs/h1_duely1117 t19 city-state 3's
-    // Warrior 393220 bought at its start, 1121 t61 city-state 2's Swordsman
-    // 1310720 upgraded; 199 such unit-turns over the five duely duels, none
-    // logged)
-    for (const u of pass.units) if (u.movesLeft <= 0) pass.done.add(u.id);
-    operations(pass);
-    // the tactical list (`tacticalUnit`): an explorer of AI type EXPLORE is
-    // the homeland's (every city-state Scout's row of the five duely duels
-    // is HL: End Turn, 165 of 165)
-    const all = pass.units;
-    pass.units = all.filter((u) => tacticalUnit(state, u, pass.ai.get(u.id) ?? -1));
-    supportFormation(state, pass);
-    attackUnits(state, pass, 'HIGH');
-    moveToSafety(state, pass);
-    attackUnits(state, pass, 'MEDIUM');
-    promotion(state, pass);
-    attackUnits(state, pass, 'LOW');
-    heal(state, pass);
-    chaseTarget(state, pass);
-    wanderNearCity(state, pass, cityState.centerIndex);
-    pass.units = all;
-    homelandSafety(state, pass);
-    for (const u of pass.units) if (live(state, pass, u)) finish(pass, u, 'HL: End Turn');
+    withShortOrders(() => {
+      const pass = openPass(state, cityState.seat, militaryAiTypeOf);
+      // a unit with no Movement left as the pass opens is none of its (the
+      // game logs no tactical row: runs/h1_duely1117 t19 city-state 3's
+      // Warrior 393220 bought at its start, 1121 t61 city-state 2's Swordsman
+      // 1310720 upgraded; 199 such unit-turns over the five duely duels, none
+      // logged)
+      for (const u of pass.units) if (u.movesLeft <= 0) pass.done.add(u.id);
+      operations(pass);
+      // the tactical list (`tacticalUnit`): an explorer of AI type EXPLORE is
+      // the homeland's (every city-state Scout's row of the five duely duels
+      // is HL: End Turn, 165 of 165)
+      const all = pass.units;
+      pass.units = all.filter((u) => tacticalUnit(state, u, pass.ai.get(u.id) ?? -1));
+      supportFormation(state, pass);
+      attackUnits(state, pass, 'HIGH');
+      moveToSafety(state, pass);
+      attackUnits(state, pass, 'MEDIUM');
+      promotion(state, pass);
+      attackUnits(state, pass, 'LOW');
+      heal(state, pass);
+      chaseTarget(state, pass);
+      wanderNearCity(state, pass, cityState.centerIndex);
+      pass.units = all;
+      homelandSafety(state, pass);
+      for (const u of pass.units) if (live(state, pass, u)) finish(pass, u, 'HL: End Turn');
+    });
   } finally {
     costsHeld = null;
   }
@@ -2902,17 +2954,19 @@ export function freeCityTactics(state: GameState, operations: (pass: Pass) => vo
   const pool = seatPoolSlots(state, free)!;
   costsHeld = new Map();
   try {
-    const pass = openPass(state, FREE_SEAT, militaryAiTypeOf);
-    operations(pass);
-    // the tactical list (`tacticalUnit`); the homeland's End Turn takes all
-    const all = pass.units;
-    pass.units = all.filter((u) => tacticalUnit(state, u, pass.ai.get(u.id) ?? -1));
-    attackUnits(state, pass, 'HIGH');
-    attackUnits(state, pass, 'MEDIUM');
-    moveToSafety(state, pass);
-    attackUnits(state, pass, 'LOW');
-    wanderNearCamp(state, pass, (u) => freeHome(state, u));
-    for (const u of all) if (live(state, pass, u)) finish(pass, u, 'HL: End Turn');
+    withShortOrders(() => {
+      const pass = openPass(state, FREE_SEAT, militaryAiTypeOf);
+      operations(pass);
+      // the tactical list (`tacticalUnit`); the homeland's End Turn takes all
+      const all = pass.units;
+      pass.units = all.filter((u) => tacticalUnit(state, u, pass.ai.get(u.id) ?? -1));
+      attackUnits(state, pass, 'HIGH');
+      attackUnits(state, pass, 'MEDIUM');
+      moveToSafety(state, pass);
+      attackUnits(state, pass, 'LOW');
+      wanderNearCamp(state, pass, (u) => freeHome(state, u));
+      for (const u of all) if (live(state, pass, u)) finish(pass, u, 'HL: End Turn');
+    });
   } finally {
     costsHeld = null;
   }
@@ -3219,7 +3273,7 @@ export function passMoveExec(state: GameState, pass: Pass, members: readonly num
 export function barbarianTactics(state: GameState, acting: ReadonlySet<number>): void {
   costsHeld = new Map();
   try {
-    tacticalPass(state, acting);
+    withShortOrders(() => tacticalPass(state, acting));
   } finally {
     costsHeld = null;
   }

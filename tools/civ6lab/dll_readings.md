@@ -7196,3 +7196,51 @@ that call (`traceMinorUpgrade`), not at the minor's turn end.
   engine buys it, the game none before its PlayerTurnActivated (its tree
   upgrades it after); on the slots before the turn's savings (2.4) the game's,
   which loses 1127 t126-t129.
+
+## C-99: an owned water plot no shore, a move order carried on as the turn ends — READ (0x530240, 0x66790, 0x66a90, 0x66680, 0x814e0, 0x81240, 0x7eeba0), both twins
+
+`shoreCrossing` and `stepUnit`'s transfer cap (cpu/core/units.ts); `moveTo`,
+`withShortOrders`, `orderOnce`, `walk` (cpu/core/tactical.ts). GPU
+`_owned_exit` in `price6` / `_tac_step` / the walk, `_tac_with_short` and the
+registration at `_tac_move_to`'s end (gpu/core/sim_tactics.py), the step's dock
+and the cap in `_step_verb` (gpu/core/sim_seats.py).
+
+- THE PLOT'S DOMAIN MASK (the plot info's word +0x14): a claim (0x66790,
+  Map_CityPlots: SetOwner 0x84760, then 0x66a90) clears it and sets bit 1
+  where the plot is water or a coastal city, bit 4 where it is land, and 0x10
+  and 2 on every claimed plot (0x814e0 sets or clears a bit); the load's
+  refresh 0x66680 does the same over the map's plots. 0x81240 tests it by
+  domain (0 bit 1, 1 bit 2, 2 bit 4, 4 0x10, else 8). An unclaimed plot holds
+  none.
+- THE DISEMBARK RULE 0x530240 (0x530289..0x5302c8): a step off a water plot
+  whose mask takes the embarked formation (+0x278, 0x81240) is no shore
+  crossing: no MOVEMENT_EMBARK_COST, no Movement carried, the unit keeping
+  the Movement it lands with. Every claimed water plot, a Harbor's or not,
+  whoever owns it.
+- Confirmed (AI_Planning.csv, every embarked city-state land unit's step
+  ashore in turn 1 on 1117 / 1121 / 1124): off an owned water plot the land
+  plot's own cost (1 flat, 2 Woods / Jungle / Marsh), off an unowned one that
+  and the embark cost; runs/h1_duely1117 t185 city-state 3's Bombard 1769477
+  on its water 42:14 plans 41:14's Farm (1/2); one-seed aimem traces to t200:
+  1117 city-state 3's Wander and Operation units t141-187.
+- A MOVE ORDER'S QUEUE: Move Unit's execution 0x7eeba0 queues SWAP_UNITS
+  (0x972880, op 0x7fa205d1) and MOVE_TO (0x962030, op 0x580f2f68) on the
+  unit's operation queue (vt +0x60); each MOVE_TO logs two
+  UnitOperationSegmentComplete. A walk that stands short of a plot its path
+  goes through but may not end on, Movement left, keeps the order; the unit
+  walks it again, its path found anew, once the player's other units have
+  moved (the record's UnitMoved after the first segment's event: 33 over the
+  five duely duels, runs/h1_duely1121 t71 city-state 4's Warrior 262146 on
+  to 33:20 once its Swordsman left it). Ported for the city-states', the Free
+  Cities' and the barbarians' passes. Matched: 1121 t103 its Man-At-Arms
+  1048577 on from 38:13 to 38:12; 1127 t109 city-state 3's Galley 393216 to
+  29:16.
+- OPEN (C-99): the embark side's test at 0x530473..0x530499 (the TO water
+  plot's mask on the land formation's domain): onto owned water the
+  planning keeps one more Movement than onto unowned (runs/h1_duely1124 t76
+  city-state 3's Heavy Chariot on 40:12: 40:13 (1/1), 39:12 (1/0)), not
+  ported; an order whose walk stopped for its Movement, no plot held, went
+  on in the game (1121 t95 the barbarian Warrior 1769487, t148 the Builder
+  4259860), not ported; the second walk's path of 1121 t69 (Warrior 262146
+  back from 35:19 to 35:18, ours staying) unmatched; plot vt +0x40 (read
+  first by 0x530240 and 0x66680) unread.

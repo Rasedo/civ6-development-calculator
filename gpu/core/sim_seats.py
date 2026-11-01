@@ -13541,11 +13541,11 @@ class SimSeats:
                 self._mp_scale + terr)
             # `stepCost`'s waiver (0x530420 / 0x530240): a FreeEmbark district
             # (a city's centre, a city-state's included, or a Harbor) at the
-            # FROM or TO plot, the FROM plot's district complete; a step off a
-            # Harbor's water is no shore crossing (`shoreCrossing`)
+            # FROM or TO plot, the FROM plot's district complete; a step off
+            # an owned water plot is no shore crossing (`shoreCrossing`)
             hc1 = hc.unsqueeze(1)
-            easy_dock = self._embark_waived(hc1, dc1).squeeze(1) | (
-                self.wpass.gather(1, hc1).squeeze(1) & (self.district.gather(1, hc1).squeeze(1) == self._harbor_didx))
+            owned_exit = from_water & (self.tile_seat.gather(1, hc1).squeeze(1) >= 0)
+            easy_dock = self._embark_waived(hc1, dc1).squeeze(1) | owned_exit
             cost = torch.where(
                 transition,
                 # CIV6 (EFFECT_ADJUST_UNIT_IGNORE_SHORES): the Knarr's units, the
@@ -13677,9 +13677,12 @@ class SimSeats:
             self._clear_camp_at(moved, dest, _mv_seat, seat)
         spent = (mp - cost).clamp(min=0)
         if bool((moved & transition).count_nonzero()):
-            # the transfer cap, and the stored full pool refreshed for the
-            # flipped slots — every later afford this turn must read the NEW
-            # mode, exactly as `unitFullMoves` answers live on TS
+            # the stored full pool refreshed for the flipped slots — every
+            # later afford this turn must read the NEW mode, exactly as
+            # `unitFullMoves` answers live on TS — and a shore crossing's
+            # transfer capped at it (a step off an owned water plot carries
+            # all)
+            _cross = transition & ~(from_water & (self.tile_seat.gather(1, hc.unsqueeze(1)).squeeze(1) >= 0))
             for _pre in ("major", "barb"):
                 _lo = self.POOL_LO[_pre]
                 _tr = moved & transition & (gslot >= _lo) & (gslot < self.POOL_HI[_pre])
@@ -13691,7 +13694,7 @@ class SimSeats:
                 _r = _tr.nonzero(as_tuple=True)[0]
                 _s = gslot[_r] - _lo
                 self.unit_mp_full[_r, gslot[_r]] = _f[_r, _s]
-                spent[_r] = torch.minimum(spent[_r], _f[_r, _s])
+                spent[_r] = torch.where(_cross[_r], torch.minimum(spent[_r], _f[_r, _s]), spent[_r])
         self.unit_mp[rows, gs] = spent.take(rows)
         _ty = u_type.clamp(min=0, max=self.NU - 1)
         self.unit_attacks[rows, gs] = self._step_attacks_left(

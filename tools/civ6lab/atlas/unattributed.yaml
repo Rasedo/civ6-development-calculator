@@ -256,6 +256,20 @@
   context:
     - ...rray of Players by id (0x37b760 (FinalRelease 0x26c770) reads it; the game's own lookup 0x5d3e0 (FinalRelease 0x44f00) takes game +0x240 +0x20, 0x8a08a0 (FinalRelease 0x63d080)); a Pl...
   review: reviewed
+- addr: 0x66a90
+  final: 0x4c850
+  kind: function
+  name: plotDomainMask
+  semantics: "a claimed plot's domain mask (the plot info's word +0x14, through vt +0x38): cleared, then bit 1 where the plot is water or a coastal city (IsCity 0x81120, IsCoastalLand 0x82a10), bit 4 where it is land, 0x10 and 2 always (0x814e0). Called after the claim's SetOwner (0x66790) and by the district code."
+  status: READ
+  cases:
+    - recording: h1_duely1117
+      turn: 185
+      value: city-state 3's own water 42:14 lets its Bombard off with no embark cost (0x530240), unowned water not (AI_Planning.csv)
+  impl: [cpu/core/units.ts:shoreCrossing, gpu/core/sim_tactics.py:_owned_exit]
+  readings:
+    - "C-99: an owned water plot no shore, a move order carried on as the turn ends — READ (0x530240, 0x66790, 0x66a90, 0x66680, 0x814e0, 0x81240, 0x7eeba0), both twins"
+  review: reviewed
 - addr: 0x69010
   final: 0x4ddc0
   kind: function
@@ -552,14 +566,19 @@
 - addr: 0x81240
   final: 0x5e890
   kind: function
-  semantics: "a district's info word (+0x14) bit test: argument 0 the water bit (1), argument 2 the land bit (4). Argument 1 tests bit 2. Who writes word +0x14 is unread."
-  status: PARTLY
+  semantics: "the plot's domain mask test (the plot info's word +0x14) by domain: 0 bit 1, 1 bit 2, 2 bit 4, 4 0x10, else 8. A city's claim sets the mask (0x66790 -> 0x66a90: bit 1 water or a coastal city, bit 4 land, 0x10 and 2 always; 0x814e0 the setter); an unclaimed plot holds none."
+  status: READ
+  cases:
+    - recording: h1_duely1117
+      turn: 185
+      value: "the disembark rule's test (0x530240): city-state 3's Bombard 1769477 off its owned water 42:14 plans 41:14 (1/2), off unowned water the embark cost (AI_Planning.csv)"
   impl: [cpu/core/units.ts:shoreCrossing]
   readings:
     - "C-20 tail: the trade path's land and water tests and the switch — READ"
     - "C-96: the knowledge base's army records and the Combat Desire — READ (the records, the update, the desire), PARTLY READ (the signals' looks; the standing-army count in its own section below)"
     - "C-20 tail: the trade path's land and water tests and the switch"
     - "C-99: the stacking count holds other players' units, the wanders' kept-out plots, a Harbor's water no shore — READ (0x585d90, 0x585eb0, 0x2720a0, 0x77bf50, 0x77b9a0, 0x530240), both twins"
+    - "C-99: an owned water plot no shore, a move order carried on as the turn ends — READ (0x530240, 0x66790, 0x66a90, 0x66680, 0x814e0, 0x81240, 0x7eeba0), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...rtual +0x40 holds (a district stands there), they read the plot info's word +0x14 through 0x81240 — argument 0 tests bit 1, 1 bit 2, 2 bit 4: land = bit 4 and not bit 1, water = bit 1 and..."
@@ -582,6 +601,19 @@
   context:
     - "...e, on water for AdjacentSeaResource, by class name for AdjacentResourceClass; a wonder (0x81330); OtherDistrictAdjacent: the neighbour's owner (+0x1c) is the player, its district (0x8..."
     - "...(0xa2b200: the district flagged +0x48 & 0x40) on a plot of the list whose city holds it (0x81330) — the list, not the river's whole network (`riverShielded` over `riverReach`). The engin..."
+  review: reviewed
+- addr: 0x814e0
+  final: 0x5eb30
+  kind: function
+  name: setPlotDomainBit
+  semantics: sets (r8b 1) or clears bit dx of the plot info's domain mask word +0x14
+  status: READ
+  cases:
+    - recording: h1_duely1117
+      turn: 185
+      value: the claim's mask (0x66a90) on 42:14 lets city-state 3's Bombard off with no embark cost
+  readings:
+    - "C-99: an owned water plot no shore, a move order carried on as the turn ends — READ (0x530240, 0x66790, 0x66a90, 0x66680, 0x814e0, 0x81240, 0x7eeba0), both twins"
   review: reviewed
 - addr: 0x8bcd0
   final: 0x668a0

@@ -6,7 +6,7 @@
 - addr: 0x972880
   final: 0x67c690
   kind: function
-  semantics: UNITOPERATION_SWAP_UNITS (hash 0x7fa205d1) pushed through the unit's operation queue (+0x60); its CanStart unread. CanStart is 0x9724c0 through the partner 0x972540.
+  semantics: UNITOPERATION_SWAP_UNITS (hash 0x7fa205d1) pushed through the unit's operation queue (+0x60), before Move Unit's MOVE_TO (0x7eeba0); its CanStart unread. CanStart is 0x9724c0 through the partner 0x972540; it logs no UnitOperationSegmentComplete (the record's two per unit-turn are MOVE_TO's 0x580f2f68).
   status: PARTLY
   impl:
     - cpu/core/operations/assault.ts:garrisonExecute
@@ -26,6 +26,7 @@
     - "C-99: Move Unit's no-Location execution, the swap's partner and the move order's first turn — READ, ported; the swap's path tests and 0x56e760 unread"
     - "C-99: the city-states' Promotion move on the replay's copy, Garrison City's swap — READ, both twins"
     - "C-99: Move Unit's no-Location execution, the swap's partner and the move order's first turn"
+    - "C-99: an owned water plot no shore, a move order carried on as the turn ends — READ (0x530240, 0x66790, 0x66a90, 0x66680, 0x814e0, 0x81240, 0x7eeba0), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ..., the candidate moves to its planning's spot by the city and swaps in (the swap command 0x972880, unported); else the garrison fortifies (0x95eae0) where it has no range and the team...

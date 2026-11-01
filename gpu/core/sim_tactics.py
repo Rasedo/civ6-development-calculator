@@ -786,8 +786,8 @@ class SimTactics:
                 blind6 = unrev6
             cst = (self._tac_cost_rows(rows, best, waive) if any_hf else cost_b[rows, best])[:, cols]
             fw = water_n.gather(1, b1)  # [N, 1]
-            # a step off a Harbor's water is no shore crossing (`shoreCrossing`)
-            hx = self._harbor_exit(rows, best).unsqueeze(1)
+            # a step off an owned water plot is no shore crossing (`shoreCrossing`)
+            hx = self._owned_exit(rows, best).unsqueeze(1)
             cliff6 = None
             if any_embark:
                 # an embarked step costs one Movement; a land/water step
@@ -1221,8 +1221,8 @@ class SimTactics:
         mp1 = torch.full_like(frm, self._mp_scale)
         land = self._tac_cost_rows(rows, frm, waive).gather(1, dcol.unsqueeze(1)).squeeze(1)
         ctr = self._centre_plane()
-        # a step off a Harbor's water is no shore crossing (`shoreCrossing`)
-        dock = self._embark_waived(frm.unsqueeze(1), to.unsqueeze(1), rows).squeeze(1) | self._harbor_exit(rows, frm)
+        # a step off an owned water plot is no shore crossing (`shoreCrossing`)
+        dock = self._embark_waived(frm.unsqueeze(1), to.unsqueeze(1), rows).squeeze(1) | self._owned_exit(rows, frm)
         entry = self._tac_entry()[rows, to]
         for c in sorted(set(waive.tolist()) - {0}):
             entry = entry - (waive == c).long() * self._tac_waived(c)[rows, to]
@@ -1233,11 +1233,12 @@ class SimTactics:
         cost = torch.where(fw & tw, mp1, torch.where(fw != tw, trans, land))
         return torch.where(naval, mp1, cost)
 
-    def _harbor_exit(self, rows: torch.Tensor, frm: torch.Tensor) -> torch.Tensor:
-        """[R] bool — `shoreCrossing`'s exception: the step leaves a Harbor's
-        water (the disembark rule passes a plot whose district takes the
-        formation, 0x530297..0x5302c8)"""
-        return self.water[rows, frm] & (self.district[rows, frm] == self._harbor_didx)
+    def _owned_exit(self, rows: torch.Tensor, frm: torch.Tensor) -> torch.Tensor:
+        """[R] bool — `shoreCrossing`'s exception: the step leaves an owned
+        water plot (the disembark rule passes a plot whose domain mask takes
+        the formation, 0x530297..0x5302c8; a city's claim sets the mask on
+        every plot it owns, 0x66790 -> 0x66a90)"""
+        return self.water[rows, frm] & (self.tile_seat[rows, frm] >= 0)
 
     def _move_unit_danger(self, plane: torch.Tensor) -> tuple:
         """`moveUnitDanger`: Move Unit's order without Allow Danger (0x7eeba0's
@@ -1359,13 +1360,14 @@ class SimTactics:
             c = self._tac_step(rows, frm, pc, dcol, ut, ign_shore, waive) + carry
             on = on & ~((mp < c) & (mp < full))
             tw = self.water[rows, pc]
-            cross = (self.water[rows, frm] != tw) & ~naval & ~ww & ~self._harbor_exit(rows, frm)
+            cross = (self.water[rows, frm] != tw) & ~naval & ~ww & ~self._owned_exit(rows, frm)
             max_to = torch.where(tw, fs_w, fl_w)
             carry = torch.where(on & cross & (mp > max_to), mp - max_to, torch.zeros_like(carry))
             mp = torch.where(on, (mp - c).clamp(min=0), mp)
             stop = torch.where(on, torch.full_like(stop, i + 1), stop)
             frm = torch.where(on, pc, frm)
             on = on & (mp > 0) & ~halts[ar, pc]
+        reached = stop.clone()
         for _ in range(L):
             back_off = (stop > 0) & no_end[ar, path.gather(1, (stop - 1).clamp(min=0).unsqueeze(1)).squeeze(1).clamp(min=0)]
             if not bool(back_off.count_nonzero()):
@@ -1429,6 +1431,46 @@ class SimTactics:
                     self._barb_melee_at(m, u, tt)
                 else:
                     self._hostile_vs_unit(m, tt, pre, u)
+        # an order that walked and stopped short of a plot its path goes
+        # through but may not end on, Movement left, stays on the unit,
+        # carried on as the player's turn ends (`moveTo`, `withShortOrders`)
+        pend = getattr(self, "_tac_short", None)
+        if pend is not None:
+            now = tile_p[rows, sr]
+            short = (getattr(self, f"{pre}_unit_alive")[rows, sr] & (stop < reached) & (now != start)
+                     & (mp_p[rows, sr] > 0) & (now != dr))
+            if bool(short.count_nonzero()):
+                sm = torch.zeros(B, dtype=torch.bool, device=dev)
+                sm[rows[short]] = True
+                pend.append((sm, us.clone(), dest.clone(), dict(pre=pre, seat=seat, strike=strike, later_turns=later_turns,
+                                                                explore=explore, danger=danger, mate=mate)))
+
+    def _tac_with_short(self, fn) -> None:
+        """`withShortOrders`: a player's AI turn `fn` with its move orders
+        carried on — each order `_tac_move_to` left short of its destination
+        with Movement left walks again, in the order given, from where its
+        unit stands once the player's other units have moved, its path found
+        anew"""
+        outer = getattr(self, "_tac_short", None)
+        mine: list = []
+        self._tac_short = mine
+        try:
+            fn()
+        finally:
+            self._tac_short = outer
+        if not mine:
+            return
+        self._tac_short = None
+        try:
+            for sm, us, dest, kw in mine:
+                pre = kw["pre"]
+                bidx = torch.arange(self.B, device=self.device)
+                now = getattr(self, f"{pre}_unit_tile")[bidx, us]
+                go = (sm & getattr(self, f"{pre}_unit_alive")[bidx, us] & (getattr(self, f"{pre}_unit_mp")[bidx, us] > 0)
+                      & (now != dest.clamp(min=0)))
+                self._tac_move_to(go, us, dest, **kw)
+        finally:
+            self._tac_short = outer
 
     # --------------------------------------------------- the target list
 
@@ -1814,7 +1856,7 @@ class SimTactics:
         self._tac_cost_held = None
         self._tac_full_held = None
         try:
-            self._tac_pass(acting)
+            self._tac_with_short(lambda: self._tac_pass(acting))
         finally:
             self._tac_in_pass = False
             self._tac_cost_held = None
@@ -4090,7 +4132,7 @@ class SimTactics:
         self._tac_cost_held = None
         self._tac_full_held = None
         try:
-            self._minor_pass(s, act)
+            self._tac_with_short(lambda: self._minor_pass(s, act))
         finally:
             self._tac_in_pass = False
             self._tac_cost_held = None
@@ -4315,13 +4357,9 @@ class SimTactics:
         Priority, Move to Safety, Attack Low Priority, Wander Near Camp round
         each unit's home (`freeHome`) in pool order; the rest end their
         turn."""
-        dev = self.device
-        B, T = self.B, self.T
-        bidx = torch.arange(B, device=dev)
         k = self.S
         pre = "barb"
         seat = FREE_SEAT
-
         if not bool(act.count_nonzero()):
             return
         self._seat_pool_slots(k, pre, seat, act)
@@ -4329,56 +4367,65 @@ class SimTactics:
         self._tac_cost_held = None
         self._tac_full_held = None
         try:
-            ops_on = bool((act & (self.mops_def[:, self.FR] >= 0).any(dim=1)).any())
-            op = self._seat_pass_open(pre, seat, act, full=ops_on)
-            units, order, npass = op["units"], op["order"], op["npass"]
-            done = torch.zeros_like(units)
-            self._mops_run(self.FR, act, op, done)
-            homes = self._free_homes()
-            # the tactical list (`tacticalUnit`); the pass's own units (its job)
-            ai = self._minor_ai(units, pre)
-            tac = self._minor_tactical(ai, pre)
-            peers = self._tac_peers(units & tac, pre)
-
-            def live() -> torch.Tensor:
-                return units & ~done & self.barb_unit_alive & (self.barb_unit_seat == seat) & tac
-
-            # ATTACK HIGH and MEDIUM PRIORITY, MOVE TO SAFETY, ATTACK LOW
-            # PRIORITY (the attacks where a foe stands near)
-            if op["tg"] is not None:
-                for kind in (3, 2):
-                    self._tac_attack_units(live, done, ai, order, op["rowof"], op["res"], op["tg"], kind, peers, pre, seat)
-            self._tac_move_to_safety(live, done, order, npass, op["rowof"], op["res"], op["danger"], pre, seat, False)
-            if op["tg"] is not None:
-                self._tac_attack_units(live, done, ai, order, op["rowof"], op["res"], op["tg"], 1, peers, pre, seat)
-            for j in range(int(npass.max()) if B else 0):
-                u_b = order[:, j]
-                home = homes[bidx, u_b]
-                # Wander Near Camp: AI type above EXPLORE (`wanderNearCamp`)
-                ok = (j < npass) & live()[bidx, u_b] & (home >= 0) & (ai[bidx, u_b] > _AI_EXPLORE)
-                if not bool(ok.count_nonzero()):
-                    continue
-                camp = home.clamp(min=0)
-                rt, rk = self._seat_reach_turns(op, u_b)
-                cseat = self.tile_seat[bidx, camp]
-                ccity = self.tile_city[bidx, camp]
-                bound = (cseat != NO_SEAT) & (ccity != -1)
-                same = (self.tile_seat == cseat.unsqueeze(1)) & (self.tile_city == ccity.unsqueeze(1))
-                cand = ((rt == 1) & ~self._tac_hostile(seat) & ~self._tac_own_mil(seat) & ~self._tac_peaceful(seat)
-                        & (self.pair_dist[camp].to(torch.long) <= _WANDER_CAMP_RANGE)
-                        & (~bound.unsqueeze(1) | same))
-                count = cand.sum(dim=1)
-                pick = self._rand_range(ok & (count > 0), count)
-                by_rank = torch.where(cand, rk, torch.full_like(rk, 1 << 40)).argsort(dim=1, stable=True)
-                dest = torch.where(count > 0, by_rank.gather(1, pick.clamp(min=0, max=T - 1).unsqueeze(1)).squeeze(1),
-                                   camp)
-                self._tac_move_to(ok, u_b, dest, pre, seat, False)
-                done[bidx[ok], u_b[ok]] = True
+            self._tac_with_short(lambda: self._free_pass(act))
         finally:
             self._tac_in_pass = False
             self._tac_cost_held = None
             self._tac_full_held = None
         self._seat_pool_dying(k, pre, seat, act)
+
+    def _free_pass(self, act: torch.Tensor) -> None:
+        """`_free_tactics`' moves"""
+        dev = self.device
+        B, T = self.B, self.T
+        bidx = torch.arange(B, device=dev)
+        pre = "barb"
+        seat = FREE_SEAT
+        ops_on = bool((act & (self.mops_def[:, self.FR] >= 0).any(dim=1)).any())
+        op = self._seat_pass_open(pre, seat, act, full=ops_on)
+        units, order, npass = op["units"], op["order"], op["npass"]
+        done = torch.zeros_like(units)
+        self._mops_run(self.FR, act, op, done)
+        homes = self._free_homes()
+        # the tactical list (`tacticalUnit`); the pass's own units (its job)
+        ai = self._minor_ai(units, pre)
+        tac = self._minor_tactical(ai, pre)
+        peers = self._tac_peers(units & tac, pre)
+
+        def live() -> torch.Tensor:
+            return units & ~done & self.barb_unit_alive & (self.barb_unit_seat == seat) & tac
+
+        # ATTACK HIGH and MEDIUM PRIORITY, MOVE TO SAFETY, ATTACK LOW
+        # PRIORITY (the attacks where a foe stands near)
+        if op["tg"] is not None:
+            for kind in (3, 2):
+                self._tac_attack_units(live, done, ai, order, op["rowof"], op["res"], op["tg"], kind, peers, pre, seat)
+        self._tac_move_to_safety(live, done, order, npass, op["rowof"], op["res"], op["danger"], pre, seat, False)
+        if op["tg"] is not None:
+            self._tac_attack_units(live, done, ai, order, op["rowof"], op["res"], op["tg"], 1, peers, pre, seat)
+        for j in range(int(npass.max()) if B else 0):
+            u_b = order[:, j]
+            home = homes[bidx, u_b]
+            # Wander Near Camp: AI type above EXPLORE (`wanderNearCamp`)
+            ok = (j < npass) & live()[bidx, u_b] & (home >= 0) & (ai[bidx, u_b] > _AI_EXPLORE)
+            if not bool(ok.count_nonzero()):
+                continue
+            camp = home.clamp(min=0)
+            rt, rk = self._seat_reach_turns(op, u_b)
+            cseat = self.tile_seat[bidx, camp]
+            ccity = self.tile_city[bidx, camp]
+            bound = (cseat != NO_SEAT) & (ccity != -1)
+            same = (self.tile_seat == cseat.unsqueeze(1)) & (self.tile_city == ccity.unsqueeze(1))
+            cand = ((rt == 1) & ~self._tac_hostile(seat) & ~self._tac_own_mil(seat) & ~self._tac_peaceful(seat)
+                    & (self.pair_dist[camp].to(torch.long) <= _WANDER_CAMP_RANGE)
+                    & (~bound.unsqueeze(1) | same))
+            count = cand.sum(dim=1)
+            pick = self._rand_range(ok & (count > 0), count)
+            by_rank = torch.where(cand, rk, torch.full_like(rk, 1 << 40)).argsort(dim=1, stable=True)
+            dest = torch.where(count > 0, by_rank.gather(1, pick.clamp(min=0, max=T - 1).unsqueeze(1)).squeeze(1),
+                               camp)
+            self._tac_move_to(ok, u_b, dest, pre, seat, False)
+            done[bidx[ok], u_b[ok]] = True
 
     def _free_homes(self) -> torch.Tensor:
         """[B, U] long — `freeHome` of each hostile-pool unit: the centre of

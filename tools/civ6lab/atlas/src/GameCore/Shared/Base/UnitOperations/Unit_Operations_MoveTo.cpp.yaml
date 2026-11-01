@@ -6,7 +6,7 @@
 - addr: 0x962030
   final: 0x66cd90
   kind: function
-  semantics: "MoveTo: the unit's move order to a plot with its flags (Operation Move: 0x1001, 0x80 where the game's +0x590 is above 0, 8 for a unit with no combat or 0x266950(2) on its formation, 0x8000 a formation of domain 2 without 0x266950(3), 0x10 the goal barred)."
+  semantics: "MoveTo (UNITOPERATION_MOVE_TO, hash 0x580f2f68, two UnitOperationSegmentComplete a unit-turn): the unit's move order to a plot, queued on the unit (+0x60) — a walk standing short of a plot it may not end on, Movement left, walks again once the player's other units have moved (runs/h1_duely1121 t71 city-state 4's Warrior 262146; `withShortOrders`) — with its flags (Operation Move: 0x1001, 0x80 where the game's +0x590 is above 0, 8 for a unit with no combat or 0x266950(2) on its formation, 0x8000 a formation of domain 2 without 0x266950(3), 0x10 the goal barred)."
   status: PARTLY
   cases:
     - recording: AI_Tactical.csv
@@ -20,6 +20,9 @@
     - cpu/core/minorOps.ts:upgradeMove
     - gpu/core/sim_minorops.py:_mops_upgrade_move
     - cpu/core/tactical.ts:heal
+    - cpu/core/tactical.ts:withShortOrders
+    - cpu/core/tactical.ts:orderOnce
+    - gpu/core/sim_tactics.py:_tac_with_short
   readings:
     - "C-96: the city-states' tactical pass — READ (Wander Near City, Heal, the non-barbarian priorities, FindAlternateLocation), the families it needs PARTLY READ"
     - "C-95: the danger map and Move to Safety — READ, ported"
@@ -35,6 +38,7 @@
     - "C-99: the pathfinder's later-turn pool, Heal's hull, the tactical list's explorers, Move Unit's planning — READ, both twins"
     - "C-99: the city-states' Promotion move on the replay's copy, Garrison City's swap — READ, both twins"
     - "C-125: a civilian at war in the planning's search, a zone of control across a river, the attack's move onto a city — READ (0x26e570, 0x530f50 at 0x5310c8..0x5311c9, 0x771f80 at 0x772121), both twins"
+    - "C-99: an owned water plot no shore, a move order carried on as the turn ends — READ (0x530240, 0x66790, 0x66a90, 0x66680, 0x814e0, 0x81240, 0x7eeba0), both twins"
   notes:
     - ".claude/scratchpad/mu1/readings_c96.md: ...+0x60, revealed   0x2d2220) are never read: ONE \"Random Direction\" draw over the count, the   move 0x962030 to the plot drawn (\"Wander\", \"Move To\" the plot). With none:   FindAlternateLocation (0x585940) rou..."
   context:

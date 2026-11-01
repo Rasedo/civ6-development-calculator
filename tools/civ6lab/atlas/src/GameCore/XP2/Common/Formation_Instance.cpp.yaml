@@ -81,11 +81,16 @@
 - addr: 0x266510
   final: 0x1a3dd0
   kind: function
-  semantics: the ignore-shores ability (the embark rules waive MOVEMENT_EMBARK_COST).
-  status: PARTLY
+  semantics: "the ignore-shores ability (the embark rules waive MOVEMENT_EMBARK_COST): every member with m_bIgnoreShores (unit +0x1937), or one with it and m_bEscortMobility (+0x1938) — the unit's movement abilities from +0x1924 (0x56a760's names: clear-terrain, friendly and enemy territory start Movement, extra moves, jump range, enter foreign lands +0x1934, ignore rivers +0x1935, cliffs +0x1936, shores +0x1937, escort mobility +0x1938, paradrop +0x1939)."
+  status: READ
+  cases:
+    - recording: h1_duely1117
+      turn: 185
+      value: "no city-state Bombard holds IgnoreShores: off unowned water its step ashore pays the embark cost (AI_Planning.csv)"
   readings:
     - "C-99: a shore crossing's carried Movement — READ (0x26e920, 0x530420, 0x530240), both twins"
     - "C-99: a shore crossing's carried Movement"
+    - "C-99: an owned water plot no shore, a move order carried on as the turn ends — READ (0x530240, 0x66790, 0x66a90, 0x66680, 0x814e0, 0x81240, 0x7eeba0), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...land): MOVEMENT_EMBARK_COST unless a FreeEmbark district (or the ignore-shores ability 0x266510); then, FreeEmbark or not, where the Movement the step starts with exceeds the TO domai..."

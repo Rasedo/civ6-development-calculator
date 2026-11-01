@@ -3,6 +3,19 @@
 # `review: imported` = bootstrapped from dll_readings.md / code comments / saved
 # labels and not yet reviewed: verify against the disassembly, then edit and
 # set `review: reviewed`.
+- addr: 0x56a760
+  final: 0x3afbb0
+  kind: function
+  name: movementAbilitiesString
+  semantics: "the unit's movement abilities as a debug string (the struct at +0x1924 onward): m_iClearTerrainStartMovement, m_iFriendlyTerritoryStartMovement, m_iEnemyTerritoryStartMovement, m_iExtraMoves, m_iJumpRange (+0x10 of it), m_bEnterForeignLands +0x14, m_bIgnoreRivers +0x15, m_bIgnoreCliffs +0x16, m_bIgnoreShores +0x17, m_bEscortMobility +0x18, m_bCanParadrop +0x19 — unit +0x1937 / +0x1938 the shores and escort bits 0x266510 reads"
+  status: READ
+  cases:
+    - recording: h1_duely1117
+      turn: 185
+      value: "the Bombard's +0x1937 clear: the embark cost off unowned water (AI_Planning.csv)"
+  readings:
+    - "C-99: an owned water plot no shore, a move order carried on as the turn ends — READ (0x530240, 0x66790, 0x66a90, 0x66680, 0x814e0, 0x81240, 0x7eeba0), both twins"
+  review: reviewed
 - addr: 0x56c480
   final: 0x3a23e0
   kind: function
