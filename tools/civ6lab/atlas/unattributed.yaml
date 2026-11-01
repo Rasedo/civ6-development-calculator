@@ -633,6 +633,7 @@
     - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
     - "C-97: the government and policy choice — the choice READ, the values PARTLY READ"
     - "C-97: the religion AI — the belief scores READ (the job, the value, the analysis's attach), the picks READ, the analyzers PARTLY READ"
+    - "H-1: the barbarians' turn (0x1514a0) — READ (the max camps and the sight LAB)"
   context:
     - "...30 (per subject the ability's UnitAbilityModifiers analysed in a copy of the context, 0x142650, their sums added); COLLECTION_CITY_TRAINED_UNITS (0x69ffa0: once, the evaluation's cit..."
     - "...ment set's key +0x10, the parsed arguments +0x38) the analysis 0x6cede0 into a context (0x142650 copies the evaluation's: +0xb4 start, +0xb8 horizon, +0xbc rate, +0x70 the city subje..."
@@ -697,6 +698,15 @@
   context:
     - "...100); boldness at it, no raid running (+0x3c) and no bribe -> the raid starts at once (0x149980), else the city goes on the raid list (+0x48). For a raid's own tree ending: threshold..."
     - "...(+0x58), no raid running: boldness >= RaidingBoldness starts it; either pops its list. 0x149980 / 0x1497d0 refuse while either operation runs."
+  review: imported
+- addr: 0x14c930
+  final: 0xdfe20
+  kind: function
+  status: PARTLY
+  readings: ["H-1: the barbarians' turn (0x1514a0) — READ (the max camps and the sight LAB)"]
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - .../ inc / mov of +0xa8..+0xb4 in 0x140000..0x160000 or 0x7c0000..0x7d0000 but the copies 0x14c930 / 0x142650 / 0x142e90 / 0x7ca670 and the decrements). runs/h1_duely1128 tribe 2 raise...
   review: imported
 - addr: 0x1a7710
   final: 0x11a290
@@ -4109,6 +4119,15 @@
   context:
     - "...4a0); Has Agenda (+0xe20, the row's StringValue); Founded Religion; Unconverted Cities (0x7bff10: knowledge-base entries with no majority religion >= threshold); Cannot Found Religion..."
   review: imported
+- addr: 0x7bfff0
+  final: 0x539590
+  kind: function
+  status: PARTLY
+  readings: ["H-1: the barbarians' turn (0x1514a0) — READ (the max camps and the sight LAB)"]
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - ...unts; its writer is unread (no add / inc / mov of +0xa8..+0xb4 in 0x140000..0x160000 or 0x7c0000..0x7d0000 but the copies 0x14c930 / 0x142650 / 0x142e90 / 0x7ca670 and the decrements)....
+  review: imported
 - addr: 0x7c05e0
   final: 0x539b80
   kind: function
@@ -4217,6 +4236,15 @@
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ...09e0; Barbarian Raid Check 0x7c7330; Barbarian Recruit 0x7c7580; Barbarian Spawn Change 0x7c7b70 / 0x7c6e50; Notify Owner 0x7c6fa0; In Difficulty Range 0x7f1d70; Make Formation 0x7efd7...
+  review: imported
+- addr: 0x7ca670
+  final: 0x53fad0
+  kind: function
+  status: PARTLY
+  readings: ["H-1: the barbarians' turn (0x1514a0) — READ (the max camps and the sight LAB)"]
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - ...x140000..0x160000 or 0x7c0000..0x7d0000 but the copies 0x14c930 / 0x142650 / 0x142e90 / 0x7ca670 and the decrements). runs/h1_duely1128 tribe 2 raises each clock t89-166 at a battle-lo...
   review: imported
 - addr: 0x7cb230
   final: 0x53feb0

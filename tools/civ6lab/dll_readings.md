@@ -1683,6 +1683,18 @@ clans' 0x8e1bf0 (no clans in these games).
   scaled) and resets; under 5 units "Barbarian Ranged unit roll" rand(100) <
   PercentRangedUnits (BARBARIAN_NAVAL_2 100) picks ranged, else melee; off a
   spawn turn a tribe short of its 1 scout counts 5 turns and raises one.
+  THE SPAWN TURN'S BRANCHES (READ, 0x148ab6..0x148c08), the first that
+  applies: the asked list (+0x90, count +0xa0) — its head raised straight
+  (0x144fb0, uncounted) and popped (0x149f30); else a pending melee count
+  +0xa8 > 0 — a melee raise (0x144b20, counted) and +0xa8 lowered; else
+  pending ranged +0xac (0x144bf0, counted), siege +0xb0 (0x144e00), support
+  +0xb4 (0x144ed0) likewise; else, the count +0x34 under NumMilitary +0x30,
+  the ranged roll. So a pending class count raises past the cap of 5 and
+  still counts; its writer is unread (no add / inc / mov of +0xa8..+0xb4
+  in 0x140000..0x160000 or 0x7c0000..0x7d0000 but the copies 0x14c930 /
+  0x142650 / 0x142e90 / 0x7ca670 and the decrements). runs/h1_duely1128
+  tribe 2 raises each clock t89-166 at a battle-lowered count of 11-18:
+  the pending counts are the read that fits it, unported.
   THE COUNTS (READ): "under 5 units" and "short of its scout" read the
   tribe's own counts, not its living units: +0x34 (zeroed at the tribe's
   init 0x147fc0, the defender 0x144940 uncounted) grows by each unit the
