@@ -12448,3 +12448,34 @@ update in `_mops_upgrade_trees` (gpu/core/sim_minorops.py).
   values 21.23; its Bank contract at t163, the Market repaired t159.
   Ported (`minorPickFacts` / the Free Cities' `reasonsClear`,
   `event_building`).
+
+## C-112: the citizen manager has no turn of its own — READ (the event's raisers), the records' counts
+
+- CityFocusChanged (event hash 0xe808a01e) is raised at the favored /
+  disfavored yield setters (0x1970e0 at 0x1971e5, 0x196f90 at 0x197095:
+  the SET_FOCUS command 0x975920, built only by the city AI's Food focus
+  0x5cdae0 through 0x975550, and the Lua setters) and where an improvement
+  is laid (0xa4cee0 at 0xa4d25b, 0xa4e7a0 at 0xa4ebb3: the unit operations'
+  BuildImprovement / BuildImprovementAdjacent), each beside its full
+  reassign 0x196320; the other sites holding the hash are the cache event
+  streams' listeners (Culture 0x108210, Religion 0x11ea50, Techs 0x1259a0,
+  Treasury 0x1295c0). The assign 0x197230's one caller is the full
+  reassign. So a city-state's citizens move between records only at those
+  triggers (and growth, starvation, an annex, a culture bomb, a district
+  placed, a wonder built: "C-100 / C-112: … the citizen reassign's
+  callers"), no per-turn update, timer or plot-yield gate — as the engines
+  run them (`minorReplaceCitizens` at an annex, a citizen lost, an
+  improvement laid, a district placed, a Food focus change).
+- The records agree (city-state city-turns with population and plots
+  unchanged, the engine's full re-place on record t moving a citizen, 196
+  over the five duely duels): with a CityFocusChanged row of the city's
+  player in the turn, record t+1 holds the re-placed set in 74 of 99 (kept
+  9, another set 16 — the favored flags and the placement's scores); with
+  none and no improvement on the city's plots, the old set in 56 of 58;
+  with an improvement and no focus row 12 / 15 kept / 12. The repeated
+  "......" rows (runs/h1_duely1121 Hunza t5, t7, t9, t17, t19 with no Food
+  ever favored) are its Builders' improvements (each row the action after
+  its ImprovementAddedToMap: 583 / 584, 935 / 936, 1228 / 1230, 2719 /
+  2720, 3150 / 3152). Unexplained: the two
+  re-places with neither row (runs/h1_duely1128 Hong Kong t5's drought
+  plot 316 -> 362 among them).

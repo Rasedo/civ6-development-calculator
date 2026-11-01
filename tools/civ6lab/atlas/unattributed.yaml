@@ -5451,7 +5451,9 @@
       value: "a start-window row lands after the city turns: re-placing at those rows before the border step costs 112 step.border passes on 1129, before the growth 129 step.growth passes — the city turns bank on t"
     - recording: 1129
       value: "`citizens.ts` YieldFlags: a favored flag puts the yield's doubled value in the favored score, a disfavored one drops it) and re-places on a start's wonder annex where the record holds them (1129: step"
-  readings: ["H-1: the citizen manager's placement and the yield flags — READ"]
+  readings:
+    - "H-1: the citizen manager's placement and the yield flags — READ"
+    - "C-112: the citizen manager has no turn of its own — READ (the event's raisers), the records' counts"
   context:
     - "...0x196320 whatever the value was and fires the event (hash 0xe808a01e) — the city command 0x975920 (SET_FOCUS) and the Lua setters 0x9c0c80 / 0x9c0ce0 are their only callers, so every City..."
   review: imported
