@@ -213,6 +213,9 @@ interface Ctx {
    *  fighting those battles in its pass; each with its record key, which a
    *  unit the pair killed has left the replay's map by */
   minorBlows: Map<Unit, { snap: Unit; key: string }>;
+  /** a city-state's unit the pair's promote order raised, its promotions and
+   *  level before it: the copy's pass finds the promotion still due */
+  minorPromoted: Map<Unit, { promos: number; level: number }>;
   /** this pair's city-state purchases the record holds, each answered once
    *  the minors' units' turn has run their city's second hook
    *  (`minorBuysAfter`) */
@@ -1221,6 +1224,15 @@ function minorAi(ctx: Ctx, b: TurnRecord, turn: number, made: ReadonlySet<Unit>,
     // 196610, 8 experience at the turn's start, attacks with no promotion due)
     const x0 = xpWas.get(first!);
     if (x0 !== undefined) c.xp = x0;
+    // ...and its promotions as they stood before the pair's promote order:
+    // the game's pass takes it in its Promotion move (runs/h1_duely1124 t52:
+    // city-state 4's Warrior 131073, 15 experience at level 1, promotes
+    // before Attack Low Priority)
+    const pr = ctx.minorPromoted.get(u);
+    if (pr) {
+      c.promos = pr.promos;
+      c.level = pr.level;
+    }
     // ...and embarked or ashore as the first record stands it, the pool its
     // Movement is composed on
     const e0 = embWas.get(first!);
@@ -3312,6 +3324,7 @@ const res = buyTile(state, city.id, d.plot, seat);        if (!res.ok) setTileOw
         // a city-state's pick is its tactical AI's (`aiPromotionPick`, its
         // Promotion move run on the copy beside the record): scored here
         if (isCityStateSeat(u.seat)) {
+          if (!ctx.minorPromoted.has(u)) ctx.minorPromoted.set(u, { promos: u.promos ?? 0, level: u.level ?? 1 });
           const ours = aiPromotionPick(u);
           count(ctx, 'minorAi:promote', ours === k ? 'applied' : 'fallback', d.player, `the AI's ${unitPromoRows(u)[ours]?.id ?? 'none'}, the game's ${name}`);
         }
@@ -4811,7 +4824,7 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
   const ctx: Ctx = {
     state, cat, W: recs[0].head.W, seatOfPlayer: first.seatOfPlayer, playerOfSeat: first.playerOfSeat,
     units: new Map(), retained: new Map(), pendingMinors: new Map(), next: first, tally: new Map(), fellBack: new Map(), imposed: new Map(), reasons: new Map(),
-    engineKilled: new Set(), routeSpent: new Map(), paths: new Map(), walked: new Set(), steps: new Map(), barbBlows: new Map(), gone: new Map(), barbSeized: [], minorBlows: new Map(), minorBuys: [], minorImproves: [], minorClears: [], minorCleared: new Set(), minorClearUnits: [], barbBattles: [], barbFought: new Set(), minorUnits: [], minorGround: [], buyTrace, lateBlows: [], upgradeInto: new Set(), upgradedFrom: new Map(), barbSteps: [], barbPillaged: [], envoys: [], battled: new Set(), fortified: new Map(), undug: new Map(), streams: new Map(), applied: new Set(), barbNew: [], lateEnvoys: [], log: history.randLog, stream, prev: recs[0],
+    engineKilled: new Set(), routeSpent: new Map(), paths: new Map(), walked: new Set(), steps: new Map(), barbBlows: new Map(), gone: new Map(), barbSeized: [], minorBlows: new Map(), minorPromoted: new Map(), minorBuys: [], minorImproves: [], minorClears: [], minorCleared: new Set(), minorClearUnits: [], barbBattles: [], barbFought: new Set(), minorUnits: [], minorGround: [], buyTrace, lateBlows: [], upgradeInto: new Set(), upgradedFrom: new Map(), barbSteps: [], barbPillaged: [], envoys: [], battled: new Set(), fortified: new Map(), undug: new Map(), streams: new Map(), applied: new Set(), barbNew: [], lateEnvoys: [], log: history.randLog, stream, prev: recs[0],
     researchAi: report.researchAi, researchScores: report.researchScores, agendaCivics: null, researchBefore: new Map(), aiResearchLog: loadAiResearchLog(dumpPath),
     tactical: loadTactical(dumpPath), barbTally: report.barbTactics, minorTally: report.minorTactics, minorDraws: report.minorDraws,
     civicAi: report.civicAi, civicScores: report.civicScores, civicBefore: new Map(), aiCivicLog: govtLog.civics, aiPolicyLog: govtLog.policies,
@@ -4918,6 +4931,7 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
     ctx.gone = new Map();
     ctx.barbSeized = [];
     ctx.minorBlows = new Map();
+    ctx.minorPromoted = new Map();
     ctx.minorBuys = [];
     ctx.minorImproves = [];
     ctx.lateBlows = [];

@@ -792,6 +792,7 @@
     - "C-96: the standing army and the Combat Desire's city terms — READ (0x5ca7e0, the watched setter 0x731d10, 0x79b9c0), the unit table's orientation READ"
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
     - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
+    - "C-99: the city-states' Promotion move on the replay's copy, Garrison City's swap — READ, both twins"
   context:
     - "...+0x7d0 the operation's id and +0x770 clear) and sets each one's AI type (+0x168, setter 0x1e60f0) to its type's own (0x79b9c0: the highest UnitAiInfos flag of the type up to COMBAT 3,..."
   review: imported
@@ -2101,6 +2102,7 @@
     - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
     - "C-99: Move Unit's no-Location execution, the swap's partner and the move order's first turn — READ, ported; the swap's path tests and 0x56e760 unread"
     - "C-126 / C-99: the purchase list's at-war sums, Garrison City's turn done and Operation Move's movers — READ, both twins"
+    - "C-99: the city-states' Promotion move on the replay's copy, Garrison City's swap — READ, both twins"
   notes:
     - ".claude/scratchpad/mu1/readings_c96.md: ...000, else the skip 0x95eae0 (\"Wander Back to City\", \"Move To\" the   city). The turn ends (0x56d6f0, 0x570b40). Confirmed: the turn's \"Random   Direction\" draws pair one to one with the AI_Tactical.csv rows \"W..."
   context:
@@ -5425,6 +5427,7 @@
     - gpu/core/sim_minorops.py:_mops_upgrade_move
   readings:
     - "C-99: Move Unit's no-Location execution, the swap's partner and the move order's first turn — READ, ported; the swap's path tests and 0x56e760 unread"
+    - "C-99: the city-states' Promotion move on the replay's copy, Garrison City's swap — READ, both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "- THE SWAP'S PARTNER (0x972540, the operation's vt +0xc0, CanStart 0x9724c0 and Start 0x972a50 through it): the unit w..."

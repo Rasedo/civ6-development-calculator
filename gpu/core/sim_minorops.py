@@ -1838,9 +1838,24 @@ class SimMinorOps:
             m = m & (~hot | ok)
         if not bool(m.any()):
             return
+        beside = self._mops_swap(s, us, dest, m)
+        self._tac_move_to(m & ~beside, uc, dc, pre, seat, strike=False, later_turns=True)
+
+    def _mops_swap(self, s: int, us: torch.Tensor, dest: torch.Tensor, mask: torch.Tensor) -> torch.Tensor:
+        """`swapUnits` (UNITOPERATION_SWAP_UNITS 0x972880) for the unit at
+        local slot `us` [B] onto `dest` [B] where `mask`: its own military
+        unit there beside it, both with Movement left, changes places with it;
+        [B] the games where such a unit of its own stood beside it"""
+        pre, seat = self._mops_pre(s), self._mops_seat(s)
+        b = torch.arange(self.B, device=self.device)
+        uc = us.clamp(min=0)
+        dc = dest.clamp(min=0)
+        tile = self._mops_u(s, "tile")
+        here = tile[b, uc].clamp(min=0)
+        mp = self._mops_u(s, "mp")
+        m = mask & (us >= 0) & (dest >= 0) & (mp[b, uc] > 0)
         occ = self.military_at[b, dc]
         own = (occ >= 0) & (self.unit_seat[b, occ.clamp(min=0)] == seat)
-        mp = self._mops_u(s, "mp")
         other = (occ.clamp(min=0) - self.POOL_LO[pre]).clamp(min=0, max=mp.shape[1] - 1)
         beside = m & own & (self.pair_dist[here, dc].to(torch.long) == 1)
         sw = beside & (mp[b, other] > 0)
@@ -1852,7 +1867,7 @@ class SimMinorOps:
             tile[b[there], other[there]] = here[there]
             self.military_at[b[there], here[there]] = occ[there]
             self.military_at[b[back], dc[back]] = occ[back]
-        self._tac_move_to(m & ~beside, uc, dc, pre, seat, strike=False, later_turns=True)
+        return beside
 
     def _mops_strike(self, s: int, us: torch.Tensor, plot: torch.Tensor, mask: torch.Tensor) -> None:
         """a member's blow on `plot` (`passOrders.strike`): a ranged unit within
@@ -2636,6 +2651,10 @@ def _x_garrison(sim, c: _OpCtx, i: int, on: torch.Tensor) -> None:
         spot = sim._mops_plan_spot(s, view, pick, city, 1, True, torch.ones_like(city))
         here = sim.major_unit_tile[b, pick.clamp(min=0)]
         sim._mops_move(s, pick, spot, m & (spot >= 0) & (spot != here))
+        # its swap into the city with the garrison (0x972880), its moves
+        # ended there (0x56d6f0; `garrisonExecute`)
+        sim._mops_swap(s, pick, city, m)
+        end_moves(pick, m & (sim.major_unit_tile[b, pick.clamp(min=0)] == city))
     end_turn(pick, m)
     # else a garrison of no Range fortifies, its moves ended
     gt = sim.major_unit_type[b, gar.clamp(min=0)].clamp(min=0, max=sim.NU - 1)

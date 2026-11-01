@@ -224,8 +224,9 @@ const garrisonCity: BtHandler<OpsContext> = {
  *  seat on the city takes the garrison's branch at no strength (0x81100a ->
  *  0x811129); with neither, the candidate moves in, its moves ended
  *  (0x56d6f0) where it stands on the city with no RangedCombat. In the
- *  garrison's branch a stronger candidate moves beside the city (the swap
- *  command 0x972880 into it is unported), else a garrison of no Range
+ *  garrison's branch a stronger candidate moves beside the city and swaps
+ *  into it with the garrison (0x972880), its moves ended there (0x56d6f0),
+ *  else a garrison of no Range
  *  fortifies, its moves ended (0x95eae0, 0x56d6f0; where every team's
  *  +0x98 less +0x94 is at most 10, those sums unported and the test taken
  *  as held). Each unit the execution takes has its turn done (0x570b40)
@@ -289,9 +290,14 @@ function garrisonExecute(_node: Parameters<BtHandler<OpsContext>['update']>[0], 
   ctx.endTurn?.(garrison.id);
   const stronger = gRanged < bestRanged || (gRanged <= 0 && gCombat < bestCombat);
   if (stronger && pick) {
+    // the candidate's turn done, its move beside the city, then its swap
+    // into it with the garrison (UNITOPERATION_SWAP_UNITS 0x972880 at
+    // 0x8112c1); on the city its moves end (0x56d6f0 at 0x811323)
+    ctx.endTurn?.(pick.id);
     const spot = view.planSpot(pick.id, city, 1, true, 1);
     if (spot >= 0 && spot !== pick.plot) moveTo(ctx, pick, spot);
-    ctx.endTurn?.(pick.id);
+    ctx.swap?.(pick.id, city);
+    if (unitsById(ctx.view(), ctx.seat).get(pick.id)?.plot === city) ctx.endMoves?.(pick.id);
     return;
   }
   if (garrison.range === 0) ctx.endMoves?.(garrison.id);

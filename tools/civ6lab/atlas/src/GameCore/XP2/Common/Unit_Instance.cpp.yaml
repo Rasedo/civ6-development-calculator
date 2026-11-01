@@ -73,6 +73,7 @@
     - cpu/core/operations/nodes.ts:OpsContext
     - gpu/core/sim_minorops.py:_x_garrison
     - gpu/core/sim_minorops.py:end_moves
+    - cpu/core/operations/assault.ts:stronger
   readings:
     - "C-95: the tactical pass — READ (the barbarians' moves; the minors share it)"
     - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
@@ -82,6 +83,7 @@
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
     - "C-126 / C-99: the purchase list's at-war sums, Garrison City's turn done and Operation Move's movers — READ, both twins"
+    - "C-99: the city-states' Promotion move on the replay's copy, Garrison City's swap — READ, both twins"
   notes:
     - ".claude/scratchpad/mu1/readings_c96.md: ...flag 0x1000, else the skip 0x95eae0 (\"Wander Back to City\", \"Move To\" the   city). The turn ends (0x56d6f0, 0x570b40). Confirmed: the turn's \"Random   Direction\" draws pair one to one with the AI_Tactical.c..."
   context:

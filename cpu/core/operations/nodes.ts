@@ -93,6 +93,10 @@ export interface OpsContext {
    *  Operation Move still takes it with Movement left; none outside the
    *  seat's units' turn */
   endTurn?: (id: number) => void;
+  /** UNITOPERATION_SWAP_UNITS (0x972880, `swapUnits`): the unit changes
+   *  places with its own unit on `plot` beside it, both with Movement left;
+   *  none outside the seat's units' turn */
+  swap?: (id: number, plot: number) => void;
   /** the unit's moves ended (0x56d6f0): the operations' nodes read it with
    *  no Movement (its rest kept); none outside the seat's units' turn */
   endMoves?: (id: number) => void;

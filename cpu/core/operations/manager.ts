@@ -115,6 +115,7 @@ export interface OpsEnv {
   defend?: OpsContext['defend'];
   endTurn?: OpsContext['endTurn'];
   endMoves?: OpsContext['endMoves'];
+  swap?: OpsContext['swap'];
   /** Naval Patrol's moves (`OpsContext`), where the seat's units' turn gives them */
   patrol?: OpsContext['patrol'];
   /** Naval Pillage's blows (`OpsContext`), where the seat's units' turn gives them */
@@ -416,6 +417,7 @@ function context(ai: OpsAi, env: OpsEnv, op: Operation): OpsContext {
     defend: env.defend,
     endTurn: env.endTurn,
     endMoves: env.endMoves,
+    swap: env.swap,
     patrol: env.patrol,
     pillage: env.pillage,
     ownAiType: env.ownAiType,

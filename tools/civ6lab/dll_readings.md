@@ -12535,3 +12535,32 @@ update in `_mops_upgrade_trees` (gpu/core/sim_minorops.py).
   runs/h1_duely1121 Ayutthaya's pillaged Shipyard, contract 649 submitted
   t209, queued t215 (value 1311.8) over the Builder's 668, cancelled t222;
   the engines took the Builder at t215.
+
+## C-99: the city-states' Promotion move on the replay's copy, Garrison City's swap — READ, both twins
+
+`minorPromoted` (cpu/harness/replay.ts: the `promote` order's arm and
+`minorAi`'s copy); `garrisonExecute` (cpu/core/operations/assault.ts) with
+the pass's `swap` (cpu/core/opsOrders.ts, `swapUnits`); `_x_garrison` and
+`_mops_swap` (gpu/core/sim_minorops.py).
+
+- THE PROMOTION MOVE (the replay): a city-state's promotion is an order of
+  record t+1's actions, which the replay applied to the units before the
+  copy of the city-state's pass was taken, so the copy found no promotion
+  due. The game's pass takes it in its Promotion move, after Attack Medium
+  Priority and before Attack Low Priority (Tactics.xml "Minor Civ
+  Tactical"). The copy now stands each unit the pair's promote order raised
+  with its promotions and level as they were before it. runs/h1_duely1124
+  t52 city-state 4: its Warrior 131073 (15 experience, level 1) Promotes,
+  and the Archer target goes to 196610 alone. Before, ours struck it with
+  131073 too, which took the barbarian Scout the Heavy Chariot chases and
+  left 327683 one Random Direction candidate short. All four rows now
+  equal the log's.
+- THE CANDIDATE'S SWAP (0x810d30 at 0x8111d2..0x811323, READ): with a
+  stronger candidate the candidate has its turn done (0x570b40). Its
+  planning's plot at range 1 of the city with Movement left (0x791300) is
+  ordered to (0x962030) where it is not its own plot. Then
+  UNITOPERATION_SWAP_UNITS (0x972880) onto the city exchanges it with the
+  garrison (the partner rules 0x972540: both with Movement, beside each
+  other). Standing on the city, its moves end (0x56d6f0). Then the
+  candidate takes AI type DEFENDER and the garrison its type's own
+  (0x1e60f0 on +0x168; unported).
