@@ -101,6 +101,8 @@
     - cpu/core/operations/nodes.ts:navalPatrol
     - cpu/core/operations/operation.ts:opJobUnits
     - gpu/core/sim_minorops.py:_x_naval_patrol
+    - cpu/core/operations/nodes.ts:recruitUnits
+    - gpu/core/sim_minorops.py:jobs
   readings:
     - "C-95: the tactical pass — READ (the barbarians' moves; the minors share it)"
     - "C-97: the war operations — the war candidates, the city value's frame, the assault nodes and Attack Units READ; the loyalty lead's sources, the team update's danger and the assault's executions PARTLY READ"
@@ -119,6 +121,7 @@
     - "C-99: Move Unit's update with no Location ends the Upgrade Units trees — READ, both twins"
     - "C-96: the standing army and the Combat Desire's city terms"
     - "C-99: Defend Units' ship release and the team update's members — READ (0x73d1f0, 0x73fba0 at 0x73fc75 -> 0x732cd0), both twins"
+    - "C-99 / C-129: the military AI's job refreshes the operations before its upgrade; Recruit Units updates the teams only on a changed count — READ (0x722690, 0x81c820), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...able slot): the unit list (+0x240, 0x77d100 from the player's unit evaluator 0x60a8c0 / 0x6092c0), then the moves (0x770ce0) in the order of the player's AiFavoredItems tactical list..."
@@ -225,6 +228,7 @@
     - cpu/core/freeOps.ts:ops
     - cpu/core/minorOps.ts:env
     - cpu/core/minorOps.ts:trees
+    - cpu/core/operations/nodes.ts:update
   readings:
     - "C-99: a unit bought in the turn sits out the operations, a Harbor trains ships"
     - "C-126: the second hook's purchase sits out the trees after it; an operation a recruit empties ends at its tick — the turn-done offer (0x60a8c0, 0x60a440) READ, the empty operation's end a log reading, both twins"
@@ -238,6 +242,7 @@
     - "C-96: the standing army and the Combat Desire's city terms — READ (0x5ca7e0, the watched setter 0x731d10, 0x79b9c0), the unit table's orientation READ"
     - "C-99: the upgrade trees — READ (the trigger, Find Available Unit's upgradeable offer, Find Unit Targets' job, Upgrade Units, the economic AI's upgrade, Move Unit with no Location), ported; the deletion of an excess obsolete unit unported"
     - "C-99: a unit bought in the turn sits out the operations, a Harbor trains ships — the recruit's turn-done offer READ (0x60a8c0, 0x60a440), 0x1c77c0's district arm READ, the candidates' own strength a FIT, both twins"
+    - "C-99 / C-129: the military AI's job refreshes the operations before its upgrade; Recruit Units updates the teams only on a changed count — READ (0x722690, 0x81c820), both twins"
   context:
     - "...is not yet recruitable (W at t7 recruited at t8, the t9 W not at t9): LAB — the evaluator 0x60a8c0 is unread. The raid operation's own end (its tree's last Notify Owner, which opens the ci..."
     - "...71530, a vtable slot): the unit list (+0x240, 0x77d100 from the player's unit evaluator 0x60a8c0 / 0x6092c0), then the moves (0x770ce0) in the order of the player's AiFavoredItems tact..."

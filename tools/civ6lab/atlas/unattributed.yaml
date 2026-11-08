@@ -4228,9 +4228,15 @@
   final: 0x4ce580
   kind: function
   name: MilitaryAI
-  semantics: "the military AI's operation manager job: each running operation logged (0x727510) and its team refreshed; follows the tribes' turn (a tribe's start logged before the running operations' lines). -> 0x727510. The candidates (0x722d70, 0x70-byte entries at +0x328) are built and evaluated before the turn's triggers."
+  semantics: "the military AI's operation manager job: each running operation logged (0x727510) and its team refreshed; follows the tribes' turn (a tribe's start logged before the running operations' lines). -> 0x727510 (at 0x7226c8), then the upgrade 0x727db0 (at 0x7226d0). The candidates (0x722d70, 0x70-byte entries at +0x328) are built and evaluated before the turn's triggers."
   status: PARTLY
+  cases:
+    - recording: h1_duely1127
+      turn: 94
+      value: City Defense at 63 with the Heavy Chariot 720899 upgraded after the refresh, no recruit
   impl:
+    - cpu/core/minorOps.ts:minorOpsRefresh
+    - gpu/core/sim_minorops.py:_mops_refresh_run
     - cpu/harness/drawSites.ts:DRAW_SITES
     - cpu/core/minorCityAi.ts:minorMilitaryTurn
     - cpu/core/minorOps.ts:minorMilitaryUpgrade
@@ -4238,6 +4244,7 @@
     - cpu/core/minorBuild.ts:minorPhase
     - cpu/core/minorBuild.ts:prev
   readings:
+    - "C-99 / C-129: the military AI's job refreshes the operations before its upgrade; Recruit Units updates the teams only on a changed count — READ (0x722690, 0x81c820), both twins"
     - "H-1: draws the AI takes, draws the engines lack"
     - "C-97: the operations — the manager READ (no-enemy candidates), the war candidates unread"
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
@@ -4437,9 +4444,11 @@
     - cpu/core/minorBuild.ts:minorPhase
     - gpu/core/sim_minors.py:_city_state_phase
     - cpu/core/minorBuild.ts:prev
+    - cpu/core/minorOps.ts:minorOpsRefresh
   readings:
     - "C-129: the military AI's upgrade — READ (0x727db0, 0x6874d0), both twins"
     - "C-129: the military AI's upgrade after the look; the Free Cities buy none — READ (0x6096c0's lists, 0x687bf0), both twins"
+    - "C-99 / C-129: the military AI's job refreshes the operations before its upgrade; Recruit Units updates the teams only on a changed count — READ (0x722690, 0x81c820), both twins"
   review: reviewed
 - addr: 0x731d10
   final: 0x64a6d0
@@ -6309,17 +6318,23 @@
   final: 0x57c0a0
   kind: function
   name: Recruit Units (update)
-  semantics: "Recruit Units' update (data +0x00 Already in progress, +0x10 Contract ID, +0x20 Recruit Range, +0x30 Allow creation, +0x40 Recruit Value, +0x50 Time Limit, +0x60 Allow Stealing): \"Contract for\" names the first team's unit to build (0x739cd0), NONE for none; done (+0x88) with no units FAILURE; the tag's contract FAILED: FAILURE; COMPLETED: it leaves the tree; with creation and a unit, the unit asked (+0x8c). Not done, not ready (0x73aa60) and not in progress: RUNNING with a contract or a unit asked, else FAILURE; otherwise done, SUCCESS. The recruit 0x60a8c0 -> 0x738050: the free units, then the units of the lower-priority unlocked operations. After the recruit (0x60a8c0, whose offer does not exclude a DEFENDER) it lists the operation's units (0x6092c0: +0x7d0 the operation's id, +0x770 clear) and sets each one's AI type (+0x168, setter 0x1e60f0) to its type's own (0x79b9c0) at 0x81cb90..0x81cbd3, before the strengths (0x73f7d0): the standing army counts it no more. Ported: ownAiType (cpu/core/opsOrders.ts), _u_recruit (gpu/core/sim_minorops.py)."
+  semantics: "Recruit Units' update (data +0x00 Already in progress, +0x10 Contract ID, +0x20 Recruit Range, +0x30 Allow creation, +0x40 Recruit Value, +0x50 Time Limit, +0x60 Allow Stealing): \"Contract for\" names the first team's unit to build (0x739cd0), NONE for none; done (+0x88) with no units FAILURE; the tag's contract FAILED: FAILURE; COMPLETED: it leaves the tree; with creation and a unit, the unit asked (+0x8c). Not done, not ready (0x73aa60) and not in progress: RUNNING with a contract or a unit asked, else FAILURE; otherwise done, SUCCESS. The recruit 0x60a8c0 -> 0x738050: the free units, then the units of the lower-priority unlocked operations. After the recruit (0x60a8c0, whose offer does not exclude a DEFENDER) it lists the operation's units (0x6092c0: +0x7d0 the operation's id, +0x770 clear) and sets each one's AI type (+0x168, setter 0x1e60f0) to its type's own (0x79b9c0) at 0x81cb90..0x81cbd3, the standing army counts it no more. The teams update (0x73f7d0) where the units counted as the update opens (0x6092c0) are not the data's +0x80 (dl 0, 0x81c939, each joining its team 0x737e80), +0x80 then the count and +0x8c -1; after the recruit the count again in +0x84 and the teams update (dl 1, 0x81cc04) only where the first ran or +0x84 > +0x80. Ported: ownAiType (cpu/core/opsOrders.ts), _u_recruit (gpu/core/sim_minorops.py)."
   status: READ
   cases:
+    - recording: h1_duely1117
+      turn: 91
+      value: City Defense four entries at 100 after the Catapult's upgrade, Operation Recruit, 3 units, Recruited 0 (node +0x80 / +0x84 3 / 3)
     - recording: h1_duelv1128
       turn: 15
       value: City Defense, Operation Recruit, 3 units, Recruited 3
   impl:
+    - cpu/core/operations/nodes.ts:teamsUpdate
+    - gpu/core/sim_minorops.py:_mops_teams_update
     - cpu/core/operations/nodes.ts:OP_NODES
     - cpu/core/operations/nodes.ts:recruitUnits
     - gpu/core/sim_minorops.py:_u_recruit
   readings:
+    - "C-99 / C-129: the military AI's job refreshes the operations before its upgrade; Recruit Units updates the teams only on a changed count — READ (0x722690, 0x81c820), both twins"
     - "C-97: the behaviour trees — READ (the interpreter), the nodes PARTLY READ"
     - "C-97: City Defense and the assault target's validity — the city's threat, the defence event, Is City Threatened, Garrison City and the district target's validity READ; the threat's level terms, the garrison's swap and the team's unit to build unread"
     - "C-96 / C-97: the team's unit to build, the recruit's contract and the knowledge base's camps — the team update's requirements and readiness, the unit choice, Recruit Units' result and contract, the camps READ; the maintenance resource test, the recruit's stealing and levy unread"

@@ -11,7 +11,7 @@
  * graph's current child, graph +0x10) and a node's own fields: Move Unit's
  * kept unit (its data +0x50), Clear Plot's (+0x40), Build Improvement's unit
  * (+0x50) and improvement (+0x54), the Contract Manager's turn counter
- * (+0x50), Turn Limiter's first turn (+0x30), Recruit Units' done flag
+ * (+0x50), Turn Limiter's first turn (+0x30), Recruit Units' units counted (+0x80), its done flag
  * (+0x88) and the unit it asked (+0x8c); the other nodes keep no field
  * across turns, Operation Move's per-team stores aside, which stay ours.
  *
@@ -68,7 +68,7 @@ const NODE_FIELDS: Readonly<Record<string, readonly [string, number, FieldKind][
   'Build Improvement': [['unit', 0x50, 'unit'], ['improvement', 0x54, 'improvement']],
   'Contract Manager Decorator': [['counter', 0x50, 'int']],
   'Turn Limiter': [['start', 0x30, 'turn']],
-  'Recruit Units': [['done', 0x88, 'bool'], ['unit', 0x8c, 'unitType']],
+  'Recruit Units': [['listed', 0x80, 'int'], ['done', 0x88, 'bool'], ['unit', 0x8c, 'unitType']],
 };
 
 export interface ImportWorld {

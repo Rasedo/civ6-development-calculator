@@ -9526,3 +9526,72 @@ cpu/core/units.ts; `TechDef.embarkUnit`, cpu/data/techs.ts); GPU
   moment), the engines' 18:7; runs/h1_duely1128 t26-t106 the Settler
   2228251 and Slinger 1441812 hold on 13:14 for 30:6 where the engines find
   a path (t56 to 12:13).
+
+## C-99 / C-129: the military AI's job refreshes the operations before its upgrade; Recruit Units updates the teams only on a changed count — READ (0x722690, 0x81c820), both twins
+
+`minorOpsRefresh` (cpu/core/minorOps.ts) in `minorPhase` before
+`minorMilitaryUpgrade` (cpu/core/minorBuild.ts); `operationsRun` without the
+refresh, the Free Cities' `freeCitiesMilitary` calling `operationsRefresh`
+first (cpu/core/freeOps.ts); `recruitUnits`' `listed` and `teamsUpdate`
+(cpu/core/operations/nodes.ts); `minorUpgradeUnit`'s release
+(cpu/core/minorBuild.ts); the import's Recruit Units +0x80
+(cpu/harness/gameAiImport.ts). GPU `_mops_refresh_run`, `_mops_teams_update`,
+`_u_recruit` on `mops_mc` (gpu/core/sim_minorops.py), the call before
+`_mops_military_upgrade` (gpu/core/sim_minors.py) and in `_free_pass`
+(gpu/core/sim_tactics.py), `_minor_upgrade_unit`'s `mops_rel`
+(gpu/core/sim_minors.py).
+
+- THE JOB (0x722690): 0x727510 (the running lines, the strengths 0x73eb60 /
+  0x73f7d0, the pick's start) at 0x7226c8, then the upgrade 0x727db0 at
+  0x7226d0 — after the city AI's turn, before the units' pass. An upgrade's
+  old unit is dead (+0x770) after the refresh: its team lists it until the
+  next team update.
+- RECRUIT UNITS' UPDATE (0x81c820, the decision update's edx the node's
+  status, FRESH each turn): the operation's units (0x6092c0: +0x7d0 the
+  operation, +0x770 clear) counted; where the count is not the node data's
+  +0x80, each joins its team (0x737e80) and the teams update (0x73f7d0 dl 0,
+  0x81c939); +0x80 the count, +0x8c -1. After the recruit (0x60a8c0) the
+  units counted again (+0x84, 0x81cb5f) and the teams update (0x73f7d0 dl 1,
+  0x81cc04) only where the first update ran or +0x84 > +0x80. The log's
+  "%d units, Recruited %d" are those counts. The aimem node data hold them
+  (1117 city-state 4's City Defense node 4: t89 [3, 4], t91 [3, 3], t92
+  [2, 3]).
+- CONFIRMED (one-seed aimem traces): runs/h1_duely1117 t91 city-state 4's
+  City Defense, its Catapult 1114113 upgraded to the Trebuchet 1179651 before
+  the turn opens: the team four entries at 100 to the end look, "Operation
+  Recruit, 3 units, Recruited 0"; runs/h1_duely1127 t94 city-state 4's City
+  Defense, its Heavy Chariot 720899 upgraded to the Knight 1114117: 63 with
+  it, no recruit of the free Crossbowman; runs/h1_duely1124 city-state 4 t93-96
+  as logged; runs/h1_duely1124 t118-126 (the slot keep) unchanged.
+- Open: the upgraded unit keeps its id in the engines, so the team's entry
+  names the new chassis (1117 t91 / 1127 t94 ops.members: TREBUCHET / KNIGHT
+  where the game's entry is the dead CATAPULT / HEAVY_CHARIOT); the Free
+  Cities' refresh stays in their pass (their job unread).
+
+## C-129: the replay's minors read the turn's blows as their turn opens — the aimem sites, both modes
+
+`holdMinorStart`'s damage before each minor's PlayerTurnActivated and its
+deferred kills (`killedAt`), `minorAi`'s absorbed unit and promotion heal,
+`takeGameMemory`'s late blows, `holdBankruptDisband` (cpu/harness/replay.ts,
+cpu/core/phase.ts). Replay only: the engines' own order is the game's.
+
+- A unit another player struck before a minor's turn opens stands with the
+  log's damage (its UnitDamageChanged) for that minor's turn: runs/h1_duely1127
+  t13 city-state 3's Warrior strikes the barbarian Scout 786442 to 51, city-
+  state 4's log site records it at 51, Attack Barb Camp's Enemy Str 16.
+- A kill a later player's turn makes stays out of the minors' turns before
+  it: runs/h1_duely1127 t17 the barbarians' Warrior 983053 dies attacking
+  city-state 3's Warrior in their turn; city-state 4's look sees it on 6:11
+  at 62, City Defense's Enemy Str 30.
+- The import of the end look takes the late blows after it:
+  runs/h1_duely1124 t17 the barbarians' Warrior 1441805 kills city-state 3's
+  Warrior and advances to 42:8, the t18 record there at 21 (also 1117 t42 /
+  t85, 1128 t14 / t22, 1121 t23, 1124 t110, 1128 t79).
+- A unit a formation of the minor's turn absorbs stands in the copy for its
+  operations: runs/h1_duely1117 t142 city-state 3's Crossbowman 1376257,
+  City Defense at 75.
+- The copy's operation member holds its health before the pair's promotion:
+  runs/h1_duely1124 t50 city-state 3's Warrior 720900 at 77, Attack Barb
+  Camp at 13, Protect Units' Promote after.
+- A major's bankruptcy disband is the record's: runs/h1_duely1124 t242-244
+  player 1's AT Crew 6946843 on 37:18, in city-state 3's t244 look.

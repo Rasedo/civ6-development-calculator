@@ -626,6 +626,8 @@
     - cpu/core/barbarianOps.ts:env
     - cpu/core/barbarianOps.ts:view
     - cpu/core/operations/manager.ts:live
+    - cpu/core/minorBuild.ts:prev
+    - cpu/core/minorOps.ts:minorOpsRefresh
   readings:
     - "C-97: the operations — the manager READ (no-enemy candidates), the war candidates unread"
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
@@ -635,6 +637,7 @@
     - "C-95: the barbarians' Builder Capture — READ (the event, the start, the tree's walk), ported"
     - "H-1: the AI memory reader — READ (the hooks, the pointer paths, the contracts, the knowledge base, the operations, the trees), PARTLY READ (the religious AI's holder)"
     - "C-129: the military AI's upgrade — READ (0x727db0, 0x6874d0), both twins"
+    - "C-99 / C-129: the military AI's job refreshes the operations before its upgrade; Recruit Units updates the teams only on a changed count — READ (0x722690, 0x81c820), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "- The manager (0x722690 -> 0x727510). The candidates (0x722d70, 0x70-byte entries at +0x328), built and evaluated before th..."

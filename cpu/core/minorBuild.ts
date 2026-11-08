@@ -57,7 +57,7 @@ import { irradiated } from './nuclear';
 import { atRngPoint } from './rand';
 import { knowledgeLook } from './tactical';
 import { plotsSeenNow } from './barbarians';
-import { cityStateMilitary, minorCampsLook, minorMilitaryUpgrade, upgradeTreesStart } from './minorOps';
+import { cityStateMilitary, minorCampsLook, minorMilitaryUpgrade, minorOpsRefresh, upgradeTreesStart } from './minorOps';
 import { tilesWithin } from '../../world/hex';
 import { hasRiver } from '../../world/query';
 import { aliases, engineId, gameTypeOf } from '../data/aliases';
@@ -106,7 +106,8 @@ import { opsOf } from './operations/manager';
  *  actions: a research
  *  completion's upgrades, its city AI's turn (`minorAiTurn`: its builds,
  *  purchases and trees, the trees' Builders' work), its civics AI's
- *  government values on the city it left, its military AI's upgrade
+ *  government values on the city it left, its operations' refresh
+ *  (`minorOpsRefresh`) and its military AI's upgrade
  *  (`minorMilitaryUpgrade`), its routes' walk and a
  *  free Trader's route, its army's walk (`cityStateMilitary`, its city's
  *  ranged strikes after its units' planning), and last the
@@ -203,11 +204,13 @@ export function minorPhase(state: GameState): void {
     // between the plots 399 and 445; Autocracy's wonder term and Political
     // Philosophy 392.1 / 396.1 a turn apart as logged)
     government();
-    // its military AI's upgrade (0x722690 -> 0x727db0, the military's pass 2
-    // after the cities' in the Control Manager's first list): after the
-    // look, which records the unit as it stood (runs/h1_duely1124 t43: city-
-    // state 2's Warrior 262144 a Warrior at age 0 in its own records, the
-    // Swordsman from t44), on the table its city AI read
+    // its military AI's job (0x722690, the military's pass 2 after the
+    // cities' in the Control Manager's first list): its operations' refresh
+    // (0x727510), then its upgrade (0x727db0) — after the look, which records
+    // the unit as it stood (runs/h1_duely1124 t43: city-state 2's Warrior
+    // 262144 a Warrior at age 0 in its own records, the Swordsman from t44),
+    // on the table its city AI read
+    minorOpsRefresh(state, cityState);
     minorMilitaryUpgrade(state, cityState);
     delete cityState.armyCounted;
     minorTrade(state, cityState, !ordersHeld);
@@ -753,15 +756,16 @@ export function minorUpgradeUnit(state: GameState, cityState: CityState, u: Unit
   // Swordsman, the Combat Desire -0.1 -> 0.0)
   delete u.aiDefender;
   delete u.aiHomed;
-  // and in no operation: the old unit dead (+0x770), the new one not
-  // assigned to it (+0x7d0), the team update keeps neither (0x73fc75 -> 0x732cd0)
-  // (runs/h1_duely1117 city-state 4 t91: City Defense's garrison Catapult
-  // upgraded, its Trebuchet 1179651 wandering at t92 and joining the
-  // standing army, City Defense three units)
+  // and in no job of an operation: the old unit dead (+0x770), the new one
+  // not assigned to it (+0x7d0) — its team lists it until its next update
+  // drops it (0x73fc75 -> 0x732cd0), released (runs/h1_duely1117 city-state
+  // 4 t91: City Defense's Catapult 1114113 upgraded to the Trebuchet 1179651,
+  // which wanders at t92 and joins the standing army; the team four entries
+  // at 100 to the end look, three at t92)
   if (cityState.ops) {
     for (const op of opsOf(cityState.ops)) {
-      for (const t of op.teams) t.members = t.members.filter((id) => id !== u.id);
-      if (op.released) op.released = op.released.filter((id) => id !== u.id);
+      if (!op.teams.some((t) => t.members.includes(u.id)) || op.released?.includes(u.id)) continue;
+      (op.released ??= []).push(u.id);
     }
   }
   raiseBestTrained(state, cityState.seat, u.type, u.formation ?? 0);

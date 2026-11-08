@@ -346,8 +346,8 @@ export function operationsEvaluate(ai: OpsAi, env: OpsEnv, slotOf: ReadonlyMap<n
  *  hook run in that pass of their lists (0x608870, 0x608580) */
 export const CITY_AI_PASS = 2;
 
-/** THE OPERATIONS' RUN (with the tree manager's tick): each operation's
- *  target and teams logged; the chosen candidate started; the trees by
+/** THE OPERATIONS' RUN (the tree manager's tick), after their refresh
+ *  (`operationsRefresh`): the trees by
  *  priority, the highest first, of equals in the tree pool's slot order (`treeSlot`) — the tree
  *  manager's tick (0x7ffdd0) runs once per priority and ticks the trees of
  *  that priority alone (0x7d3a00 / 0x7cb3d0: tree +0x548, its definition's
@@ -360,7 +360,6 @@ export const CITY_AI_PASS = 2;
  *  city-state 4 t16: City Defense's Warrior steps onto the centre, no
  *  purchase) */
 export function operationsRun(ai: OpsAi, env: OpsEnv): void {
-  operationsRefresh(ai, env);
   const order = [...opsOf(ai).map((op) => ({ priority: opDef(op).priority, slot: treeSlot(op.id), tick: () => tickTree(ai, env, op) })), ...(env.trees ?? [])]
     .sort((a, b) => b.priority - a.priority || a.slot - b.slot);
   let hooked = !env.cityHook;

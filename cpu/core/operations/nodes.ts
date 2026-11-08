@@ -311,7 +311,15 @@ const findAvailableUnit: BtHandler<OpsContext> = {
   },
 };
 
-// RECRUIT UNITS (0x81c820 update; the recruit 0x60a8c0 -> 0x738050)
+// RECRUIT UNITS (0x81c820 update; the recruit 0x60a8c0 -> 0x738050). The
+// operation's units (0x6092c0: assigned to it, +0x7d0, and alive) counted as
+// the update opens: where the count is not the one the node stored at its
+// last update (its data +0x80) the teams are updated (0x73f7d0); the count
+// stored; after the recruit, counted again (+0x84), the teams updated where
+// the first update ran or the count grew — else the teams stand as the
+// operations' refresh left them (runs/h1_duely1117 t91: city-state 4's City
+// Defense Catapult 1114113 upgraded after the refresh, the team four
+// Catapults at 100 to the end look, "Operation Recruit, 3 units, Recruited 0")
 const recruitUnits: BtHandler<OpsContext> = {
   update(node, run, ctx) {
     const m = run.mem[node.index];
@@ -321,7 +329,11 @@ const recruitUnits: BtHandler<OpsContext> = {
     const inProgress = dataBool(node, 'Already in progress') ?? false;
     const creation = dataBool(node, 'Allow creation') ?? true;
     const range = dataInt(node, 'Recruit Range') ?? -1;
-    const before = opUnits(op).length;
+    const jobs = (): number => opJobUnits(op).filter((id) => units.has(id)).length;
+    const before = jobs();
+    const listed = before !== ((m.listed as number | undefined) ?? 0);
+    if (listed) teamsUpdate(ctx);
+    m.listed = before;
     // the evaluator's two offers (0x60a8c0): the seat's units in no
     // operation; then the units the recruit signal frees — those of its
     // unlocked operations of a lower priority, which leave them
@@ -346,8 +358,8 @@ const recruitUnits: BtHandler<OpsContext> = {
     // the operation's units (the player's walk 0x6092c0) each take their
     // type's own AI type (unit +0x168, 0x79b9c0)
     ctx.ownAiType(opUnits(op));
-    refreshStrengths(ctx);
-    const after = opUnits(op).length;
+    const after = jobs();
+    if (listed || after > before) teamsUpdate(ctx);
     const unit = opUnit(op);
     ctx.log(`${op.def}, Operation Recruit, ${after} units, Recruited ${after - before}, Contract for: ${unit ?? 'NONE'}`);
     if (m.done && after === 0) return BT_FAILURE;
@@ -422,8 +434,16 @@ function tagOf(run: BtRun, node: BtNode, name: string): unknown {
  *  its owner's best combat strength (PlayerStats +0xf0) too */
 export function refreshStrengths(ctx: OpsContext): void {
   const { op } = ctx;
+  op.enemyStrength = op.target === NO_PLOT ? 0 : enemyStrengthAbout(ctx, ctx.view());
+  teamsUpdate(ctx);
+}
+
+/** the teams' rebuild and update (0x73f7d0): the members released leave,
+ *  each team updated (`teamUpdate`, `updateTeam`), the teams' strengths
+ *  summed */
+function teamsUpdate(ctx: OpsContext): void {
+  const { op } = ctx;
   const view = ctx.view();
-  op.enemyStrength = op.target === NO_PLOT ? 0 : enemyStrengthAbout(ctx, view);
   let total = 0;
   const targets = view.attackTargets(ctx.seat);
   // the team update's members (0x73fba0 -> 0x732cd0): those whose assignment

@@ -997,6 +997,14 @@ function threatened(state: GameState, city: City): boolean {
   return list.some((e) => e.type === 'HIGH' && plotDistance(state, e.tile, city.centerIndex) <= FREE_CITY_BUILDER_THREAT);
 }
 
+/** THE REPLAY'S HOLD on a seat's bankruptcy disband (`holdBankruptDisband`):
+ *  a seat it holds disbands none, the record's removals landing its losses.
+ *  Null outside a replay. */
+let disbandHeld: ((s: Seat) => boolean) | null = null;
+export function holdBankruptDisband(fn: typeof disbandHeld): void {
+  disbandHeld = fn;
+}
+
 /** BANKRUPTCY for seat `s` once its turn's charges have landed, every seat
  *  alike — a major's, a city-state's and the Free Cities': the whole Gold its
  *  treasury stands below 0 is the turn's shortfall (`goldShortfall`, which
@@ -1029,7 +1037,7 @@ function threatened(state: GameState, city: City): boolean {
 export function bankruptcy(state: GameState, s: Seat, upkeepOf: (unit: Unit) => number): void {
   s.goldShortfall = goldShortfall(s.treasury);
   if (s.treasury < 0) s.treasury = 0;
-  const n = bankruptDisbands(s.goldShortfall);
+  const n = disbandHeld?.(s) ? 0 : bankruptDisbands(s.goldShortfall);
   if (n > 0) seatPoolSlots(state, s);
   for (let k = 0; k < n; k++) {
     const list = state.units.filter((u) => u.seat === s.seat && upkeepOf(u) > 0)

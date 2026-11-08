@@ -1335,7 +1335,7 @@ _MUTABLE = [
     "citystate_kb_form",  # the formation each record's unit had when last seen
     # its operations (`OpsAi`, sim_minorops.py): the pool, the trees, the teams, the stores, the pick, the camps known, the plots revealed
     "mops_def", "mops_id", "mops_target", "mops_rally", "mops_bk_target", "mops_bk_rally", "mops_started", "mops_estr",
-    "mops_str", "mops_st", "mops_ma", "mops_mb", "mops_bb", "mops_tm", "mops_mem", "mops_cnt", "mops_goal", "mops_eng",
+    "mops_str", "mops_st", "mops_ma", "mops_mb", "mops_mc", "mops_bb", "mops_tm", "mops_mem", "mops_cnt", "mops_goal", "mops_eng",
     "mops_mins", "mops_ready", "mops_ong", "mops_unit", "mops_tstr", "mops_join", "mops_rel", "mops_mslot", "mops_twice", "mops_mvs", "mops_mvg", "mops_free", "mops_nfree",
     "mops_size", "mops_pick", "mops_pick_target", "mops_pick_rally", "mops_camps", "barb_camps_known", "mops_revealed",
     "mops_enemy",

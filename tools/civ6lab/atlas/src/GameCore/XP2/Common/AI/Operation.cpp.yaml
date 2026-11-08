@@ -28,6 +28,7 @@
     - gpu/core/sim_minorops.py:_mops_refresh
     - cpu/core/operations/nodes.ts:targets
     - cpu/core/minorBuild.ts:minorUpgradeUnit
+    - gpu/core/sim_minorops.py:_mops_teams_update
   readings:
     - "C-99: Defend Units' ship release and the team update's members — READ (0x73d1f0, 0x73fba0 at 0x73fc75 -> 0x732cd0), both twins"
     - "C-128: a unit made anew leaves its operation and its standing army — READ, both twins"
@@ -82,6 +83,7 @@
     - "C-95: the barbarians' Builder Capture — READ (the event, the start, the tree's walk), ported"
     - "H-1: the raids — READ"
     - "C-99: the upgrade trees — READ (the trigger, Find Available Unit's upgradeable offer, Find Unit Targets' job, Upgrade Units, the economic AI's upgrade, Move Unit with no Location), ported; the deletion of an excess obsolete unit unported"
+    - "C-99 / C-129: the military AI's job refreshes the operations before its upgrade; Recruit Units updates the teams only on a changed count — READ (0x722690, 0x81c820), both twins"
   context:
     - "...job the unit is in — the tactical pass's, the homeland's, an operation's (`addMember` 0x737e80 writes the operation's id +0x720) — listed by job through 0x6092c0. The tactical pass (..."
   review: reviewed
@@ -508,6 +510,7 @@
     - "C-95: an operation's enemy strength"
     - "C-99: an operation's start takes its strengths; a unit's AI strengths with its formation — READ (0x73a120, 0x56dc90, 0x56e3e0, 0x56daa0, 0x1497d0), both twins"
     - "C-128: the army records' formation in the army strength; a capture's start before the end look — READ (0x5eadb0 at 0x5eaf79), both twins"
+    - "C-99 / C-129: the military AI's job refreshes the operations before its upgrade; Recruit Units updates the teams only on a changed count — READ (0x722690, 0x81c820), both twins"
   context:
     - "...; a type of none has no limit. The running lines (\"%s running, TARGET\"), the strengths (0x73eb60, 0x73f7d0) and team lines (0x73b360) come first, then the start (0x726470 -> 0x73a120,..."
   review: reviewed
@@ -521,6 +524,9 @@
     - cpu/core/operations/nodes.ts:refreshStrengths
     - cpu/core/operations/manager.ts:startOperation
     - gpu/core/sim_minorops.py:_mops_start
+    - cpu/core/operations/nodes.ts:recruitUnits
+    - cpu/core/operations/nodes.ts:teamsUpdate
+    - gpu/core/sim_minorops.py:_mops_teams_update
   readings:
     - "C-97: the operations — the manager READ (no-enemy candidates), the war candidates unread"
     - "C-97: the operations — the manager and its candidates READ, the staging list and City Defense's start unread"
@@ -530,6 +536,7 @@
     - "C-96: the standing army and the Combat Desire's city terms — READ (0x5ca7e0, the watched setter 0x731d10, 0x79b9c0), the unit table's orientation READ"
     - "C-99: Defend Units' ship release and the team update's members — READ (0x73d1f0, 0x73fba0 at 0x73fc75 -> 0x732cd0), both twins"
     - "C-99: an operation's start takes its strengths; a unit's AI strengths with its formation — READ (0x73a120, 0x56dc90, 0x56e3e0, 0x56daa0, 0x1497d0), both twins"
+    - "C-99 / C-129: the military AI's job refreshes the operations before its upgrade; Recruit Units updates the teams only on a changed count — READ (0x722690, 0x81c820), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...f none has no limit. The running lines (\"%s running, TARGET\"), the strengths (0x73eb60, 0x73f7d0) and team lines (0x73b360) come first, then the start (0x726470 -> 0x73a120, \"Started\")..."
@@ -557,6 +564,7 @@
     - gpu/core/sim_minorops.py:_mops_refresh
     - cpu/core/minorBuild.ts:minorUpgradeUnit
     - cpu/core/operations/operation.ts:keepMembers
+    - gpu/core/sim_minorops.py:_mops_teams_update
   readings:
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
     - "C-97: City Defense and the assault target's validity — the city's threat, the defence event, Is City Threatened, Garrison City and the district target's validity READ; the threat's level terms, the garrison's swap and the team's unit to build unread"

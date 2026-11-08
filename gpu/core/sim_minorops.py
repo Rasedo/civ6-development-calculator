@@ -173,6 +173,7 @@ class _OpCtx:
         self.st = sim.mops_st[:, s, k]
         self.ma = sim.mops_ma[:, s, k]
         self.mb = sim.mops_mb[:, s, k]
+        self.mc = sim.mops_mc[:, s, k]
         self.bb = sim.mops_bb[:, s, k]
         self.ref = sim.mops_id[:, s, k]
         self.view = view
@@ -259,6 +260,9 @@ class SimMinorOps:
         self.mops_st = torch.zeros(B, S, NO, N, dtype=L, device=device)
         self.mops_ma = torch.full((B, S, NO, N), NONE, dtype=L, device=device)
         self.mops_mb = torch.full((B, S, NO, N), NONE, dtype=L, device=device)
+        # Recruit Units' count of the operation's units at its last update
+        # (its data +0x80, `recruitUnits`' listed)
+        self.mops_mc = torch.zeros(B, S, NO, N, dtype=L, device=device)
         self.mops_bb = torch.full((B, S, NO, NT), NONE, dtype=L, device=device)
         # the teams: the definition's team (-1 none), members (major pool
         # slots in join order, -1 padded), per requirement the members
@@ -973,7 +977,18 @@ class SimMinorOps:
 
     def _mops_refresh(self, s: int, k: int, live: torch.Tensor, u: dict, rows: dict, tg: dict) -> None:
         """`refreshStrengths` of slot `k` where `live`: the enemy strength
-        about the target, each team's update, the teams' strength summed"""
+        about the target, then the teams' update (`_mops_teams_update`)"""
+        on = live & (self.mops_def[:, s, k] >= 0)
+        if not bool(on.any()):
+            return
+        tgt = self.mops_target[:, s, k]
+        estr = self._ops_enemy_str(self._mops_seat(s), self._mops_kb(s), tgt, self.mops_enemy[:, s, k])
+        self.mops_estr[:, s, k] = torch.where(on, estr, self.mops_estr[:, s, k])
+        self._mops_teams_update(s, k, on, u, rows, tg)
+
+    def _mops_teams_update(self, s: int, k: int, live: torch.Tensor, u: dict, rows: dict, tg: dict) -> None:
+        """`teamsUpdate` (0x73f7d0) of slot `k` where `live`: the members
+        released leave, each team's update, the teams' strength summed"""
         on = live & (self.mops_def[:, s, k] >= 0)
         if not bool(on.any()):
             return
@@ -986,9 +1001,6 @@ class SimMinorOps:
                 gone = (mem >= 0) & rel.gather(1, mem.clamp(min=0))
                 self._mops_compact(s, k, ti, ~gone, on)
             self.mops_rel[:, s, k] = rel & ~on.unsqueeze(1)
-        tgt = self.mops_target[:, s, k]
-        estr = self._ops_enemy_str(self._mops_seat(s), self._mops_kb(s), tgt, self.mops_enemy[:, s, k])
-        self.mops_estr[:, s, k] = torch.where(on, estr, self.mops_estr[:, s, k])
         for ti in range(N_TEAMS):
             self._mops_team_update(s, k, ti, on, u, rows)
             self._mops_update_team(s, k, ti, on, u, tg)
@@ -1040,6 +1052,7 @@ class SimMinorOps:
             self.mops_st[rows, s, kk] = BT_FRESH
             self.mops_ma[rows, s, kk] = NONE
             self.mops_mb[rows, s, kk] = NONE
+            self.mops_mc[rows, s, kk] = 0
             self.mops_bb[rows, s, kk] = NONE
             self.mops_tm[rows, s, kk] = -1
             self.mops_mem[rows, s, kk] = -1
@@ -1362,13 +1375,34 @@ class SimMinorOps:
 
     # -- the operations' run (C) ------------------------------------------------
 
+    def _mops_refresh_run(self, s: int, act: torch.Tensor, tg: dict | None = None) -> None:
+        """`operationsRefresh` for holder `s` where `act`: each running
+        operation refreshed, the pick started — a minor's in its military AI's
+        job before its upgrade (`minorOpsRefresh`), the Free Cities' in
+        their pass (`tg` its target list)"""
+        Tm = self._mops_tables()
+        on = act & ((self.mops_def[:, s] >= 0).any(dim=1) | (self.mops_pick[:, s] >= 0))
+        if not bool(on.any()):
+            return
+        if tg is None:
+            tg = self._tac_targets(self._mops_seat(s), self._mops_kb(s))
+        u = self._mops_units(s)
+        rows = self._mops_unit_rows(s, u)
+        for k in range(N_OPS):
+            self._mops_refresh(s, k, on, u, rows, tg)
+        for d in (Tm.d_abc, Tm.d_nav):
+            pick = on & (self.mops_pick[:, s] == d)
+            if bool(pick.any()):
+                self._mops_start(s, d, self.mops_pick_target[:, s], self.mops_pick_rally[:, s], pick)
+        self.mops_pick[:, s] = torch.where(on, -1, self.mops_pick[:, s])
+
     def _mops_run(self, s: int, act: torch.Tensor, op: dict, done: torch.Tensor) -> None:
         """`operationsRun` for holder `s` in its pass (`op` the pass's opening,
-        `done` its units' turns): each running operation refreshed, the pick
-        started, the trees by priority (the highest first, of equals in slot
-        order); the operations' units' turns end; the units whose moves an
-        order ended (0x56d6f0) read no Movement through the run and take it
-        back after it (their rest kept)"""
+        `done` its units' turns), after the refresh (`_mops_refresh_run`):
+        the trees by priority (the highest first, of equals in slot order);
+        the operations' units' turns end; the units whose moves an order
+        ended (0x56d6f0) read no Movement through the run and take it back
+        after it (their rest kept)"""
         Tm = self._mops_tables()
         on = act & ((self.mops_def[:, s] >= 0).any(dim=1) | (self.mops_pick[:, s] >= 0))
         # its "Upgrade Units" trees as the walk opens (`upgradeTreesStart`)
@@ -1413,14 +1447,7 @@ class SimMinorOps:
                 "ended_mp": torch.zeros_like(self.major_unit_mp),
                 "robbed": torch.zeros(self.B, N_OPS, dtype=torch.bool, device=self.device)}
         u = self._mops_units(s)
-        rows = view["rows"] = self._mops_unit_rows(s, u)
-        for k in range(N_OPS):
-            self._mops_refresh(s, k, on, u, rows, tg)
-        for d in (Tm.d_abc, Tm.d_nav):
-            pick = on & (self.mops_pick[:, s] == d)
-            if bool(pick.any()):
-                self._mops_start(s, d, self.mops_pick_target[:, s], self.mops_pick_rally[:, s], pick)
-        self.mops_pick[:, s] = torch.where(on, -1, self.mops_pick[:, s])
+        view["rows"] = self._mops_unit_rows(s, u)
         # the trees by priority, the highest first, of equals in the tree
         # pool's slot order (`operationsRun`: the tree manager's tick per
         # priority), the operations' and the "Upgrade Units" trees alike —
@@ -2385,9 +2412,12 @@ def _x_attack_units(sim, c: _OpCtx, i: int, on: torch.Tensor) -> None:
 
 
 def _u_recruit(sim, c: _OpCtx, i: int, at: torch.Tensor) -> torch.Tensor:
-    """RECRUIT UNITS (0x81c820): the recruit from the free units, then from
-    the units the recruit signal frees (the lower-priority operations'); the
-    strengths refreshed; the contract's state; the node's status"""
+    """RECRUIT UNITS (0x81c820): the operation's units counted, the teams
+    updated where the count is not the one the node stored (`mops_mc`), the
+    count stored; the recruit from the free units, then from the units the
+    recruit signal frees (the lower-priority operations'); the teams updated
+    again where the first update ran or the count grew; the contract's
+    state; the node's status (`recruitUnits`)"""
     s, k = c.s, c.k
     tree = c.tree
     Tm = c.T
@@ -2398,6 +2428,18 @@ def _u_recruit(sim, c: _OpCtx, i: int, at: torch.Tensor) -> torch.Tensor:
     rng = tree.int_(i, "Recruit Range")
     rng = -1 if rng is None else rng
     u = sim._mops_units(s)
+    run = torch.zeros(sim.B, N_OPS, dtype=torch.bool, device=at.device)
+    run[:, k] = True
+
+    def jobs() -> torch.Tensor:
+        # the operation's units (0x6092c0): assigned to it and alive
+        return (sim._mops_jobs(s, run) & u["own"]).sum(dim=1)
+
+    before = jobs()
+    listed = at & (before != c.mc[:, i])
+    if bool(listed.any()):
+        sim._mops_teams_update(s, k, listed, u, view["rows"], view["tg"])
+    c.mc[:, i] = torch.where(at, before, c.mc[:, i])
     # the evaluator's offer (0x60a8c0): in no job, its turn not done
     busy = sim._mops_busy(s) | c.view["done"]
     offer, _n = sim._mops_in_order(u["own"] & ~busy & at.unsqueeze(1), u["key"])
@@ -2441,9 +2483,10 @@ def _u_recruit(sim, c: _OpCtx, i: int, at: torch.Tensor) -> torch.Tensor:
     for ti in range(N_TEAMS):
         mine = sim._mops_member_mask(s, k, ti) & at.unsqueeze(1)
         dfd &= ~mine
-    rows = view["rows"]
-    sim._mops_refresh(s, k, at, sim._mops_units(s), rows, view["tg"])
-    after = _n_units(sim, c)
+    after = jobs()
+    grew = at & (listed | (after > before))
+    if bool(grew.any()):
+        sim._mops_teams_update(s, k, grew, u, view["rows"], view["tg"])
     unit = torch.full_like(c.ref, -1)
     for ti in range(N_TEAMS - 1, -1, -1):
         tu = sim.mops_unit[:, s, k, ti]

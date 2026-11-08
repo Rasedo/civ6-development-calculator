@@ -32,7 +32,7 @@ import type { City, GameState, Unit } from './types';
 import { aiView } from './aiView';
 import { defenderAiType, passOrders, passView, ownAiType } from './opsOrders';
 import { recentOf } from './minorOps';
-import { newOpsAi, operationsRun, opsOf, startOperationAt, type OpsAi, type OpsEnv } from './operations/manager';
+import { newOpsAi, operationsRefresh, operationsRun, opsOf, startOperationAt, type OpsAi, type OpsEnv } from './operations/manager';
 import { NO_PLOT, opUnits } from './operations/operation';
 import { seatUnitRows } from './operations/unitRows';
 import { newCityAi, type CityAi } from './aiCityTrees';
@@ -191,13 +191,15 @@ export function freeRaidCheck(state: GameState, city: City): void {
   if (!ops || !opsOf(ops).some((o) => o.id === r.op)) r.op = -1;
 }
 
-/** the operations' trees in the Free Cities' tactical pass, once each unit's
- *  planning is taken; the operations' units' turns are theirs */
+/** the operations' refresh and trees in the Free Cities' tactical pass, once
+ *  each unit's planning is taken; the operations' units' turns are theirs */
 export function freeCitiesMilitary(state: GameState): void {
   freeCityTactics(state, (pass) => {
     const ops = opsOfFree(state);
     // the units whose turn is done out of the operations' offers (0x60a8c0)
-    operationsRun(ops, { ...freeEnv(state, pass), held: () => [...pass.done] });
+    const env = { ...freeEnv(state, pass), held: () => [...pass.done] };
+    operationsRefresh(ops, env);
+    operationsRun(ops, env);
     // the destroy loop after the walk: the ended trees' slots free
     freeEndedTrees(freeSeatOf(state), opsOf(ops).map((o) => o.id));
     for (const id of opsOf(ops).flatMap(opUnits)) {

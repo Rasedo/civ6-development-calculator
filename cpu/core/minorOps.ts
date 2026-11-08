@@ -28,7 +28,7 @@ import { gameTypeOf } from '../data/aliases';
 import { aiView } from './aiView';
 import { cityStateTactics, moveTo, moveUnitDanger, passEnd, passFinish, passReachAt, plotDistance, seatPoolSlots, stackedAt, swapUnits, type Pass } from './tactical';
 import { defenderAiType, ownAiType, passOrders, passView } from './opsOrders';
-import { newOpsAi, operationsEvaluate, operationsRun, opContracts, opsOf, startOperationNamed, type OpsAi, type OpsEnv } from './operations/manager';
+import { newOpsAi, operationsEvaluate, operationsRefresh, operationsRun, opContracts, opsOf, startOperationNamed, type OpsAi, type OpsEnv } from './operations/manager';
 import { ARMY_READ_AGE, lookCamps, type KnownUnit } from './operations/knowledge';
 import { NO_PLOT, opDef, opJobUnits } from './operations/operation';
 import { seatUnitRows } from './operations/unitRows';
@@ -184,6 +184,17 @@ export function minorOpsEvaluate(state: GameState, cs: CityState): void {
   seatPoolSlots(state, cs);
   const slotOf = new Map(state.units.filter((u) => u.seat === cs.seat && u.slot !== undefined).map((u) => [u.id, u.slot!] as const));
   operationsEvaluate(opsOfMinor(cs), minorEnv(state, cs, null), slotOf);
+}
+
+/** THE MILITARY AI'S JOB's head (0x722690 -> 0x727510, before its upgrade
+ *  0x727db0): each running operation's lines and strengths (the enemy's
+ *  about the target, the teams' update), the pick started — on the
+ *  knowledge base the turn's look left, its units as the turn found them
+ *  (runs/h1_duely1127 t94: city-state 4's City Defense, its Heavy Chariot
+ *  720899 then upgraded to the Knight 1114117, at 63 with it to the end
+ *  look, no recruit) */
+export function minorOpsRefresh(state: GameState, cs: CityState): void {
+  if (cs.ops) operationsRefresh(cs.ops, minorEnv(state, cs, null));
 }
 
 /** A: the defence event's start (0x7265b0): the operation's id */

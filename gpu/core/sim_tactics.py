@@ -5125,6 +5125,7 @@ class SimTactics:
         op = self._seat_pass_open(pre, seat, act, full=ops_on)
         units, order, npass = op["units"], op["order"], op["npass"]
         done = torch.zeros_like(units)
+        self._mops_refresh_run(self.FR, act, op["tg"])
         self._mops_run(self.FR, act, op, done)
         homes = self._free_homes()
         # the tactical list (`tacticalUnit`); the pass's own units (its job)

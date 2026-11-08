@@ -92,8 +92,10 @@ class SimMinors:
             # the civics AI's government values on the city its update left
             # (the Food focus it set re-placed its citizens: `minorPhase`)
             government()
-            # its military AI's upgrade (`minorMilitaryUpgrade`): after the
-            # look, on the table its city AI read
+            # its military AI's job: its operations' refresh
+            # (`minorOpsRefresh`), then its upgrade (`minorMilitaryUpgrade`):
+            # after the look, on the table its city AI read
+            self._mops_refresh_run(s, alive)
             self._mops_military_upgrade(s, alive)
             del self._cv_counted[s]
             self._minor_trade(s)
@@ -2362,16 +2364,12 @@ class SimMinors:
         # the upgrade a new unit: of its type's own AI type, homed nowhere
         self.major_unit_defender[rr, u] = False
         self.major_unit_homed[rr, u] = False
-        # and in no operation: the new unit not assigned to it (+0x7d0,
-        # `minorUpgradeUnit`)
-        uu = torch.where(go, first, torch.full_like(first, -2)).unsqueeze(1)
-        for k in range(self.mops_mem.shape[2]):
-            for ti in range(self.mops_mem.shape[3]):
-                hit = self.mops_mem[:, s, k, ti] == uu
-                on = hit.any(dim=1)
-                if bool(on.any()):
-                    self._mops_compact(s, k, ti, ~hit, on)
-        self.mops_rel[rr, s, :, u] = False
+        # and in no job of an operation: the new unit not assigned to it
+        # (+0x7d0), its team listing it until its next update, released
+        # (`minorUpgradeUnit`)
+        uu = torch.where(go, first, torch.full_like(first, -2))
+        held = (self.mops_mem[:, s] == uu.view(-1, 1, 1, 1)).flatten(2).any(dim=2)
+        self.mops_rel[rr, s, :, u] |= held[rr]
         self._gen_ver += 1
         # the upgraded chassis raises the minor's base (`raiseBestTrained`)
         self._raise_best_trained(self._CITY_MINOR0 + s, go, self.major_unit_type.gather(1, fc.unsqueeze(1)).squeeze(1),

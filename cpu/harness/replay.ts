@@ -43,7 +43,7 @@ import { advanceTurn, minorTurns, turnChange, turnClose, foundCity, foundCityAt,
 import { completeQueueItem } from '../core/production';
 import { applySeatUnitOrders, buySeatBuilding, declareWar, districtSiteCost, districtSiteLegal, foundPantheon, grantPantheonUnit, jumpMadeAnew, levyGoldCost, levyUnits, paveGround,
   placeSeatDistrict, putOffer, answerOffer, sueForPeace, transferCity, cityStrikeAt, holdCityStrikes, envoysAtStart, applySeatEnvoys,
-  seatPhase, worldCongress } from '../core/phase';
+  seatPhase, worldCongress, holdBankruptDisband } from '../core/phase';
 import { addEnvoys, cityStateAt, declareWarOnCityState, minorCity, minorReplaceCitizens, placeCityStateAt, sueForPeaceWithCityState } from '../core/cityStates';
 import { CP_ACCEPTED, CP_CANCELLED, CP_IN_PROGRESS, contractById } from '../core/aiContracts';
 import { availableBuildings, canPlaceWonder, validImprovements, wallsMax } from '../core/rules';
@@ -220,9 +220,10 @@ interface Ctx {
   /** each shot of a city-state's city the pair fired (by its centre), the
    *  unit it struck as the shot left it: the copy of its turn takes it there */
   minorShots: { centre: number; unit: Unit; hp: number; dead: boolean }[];
-  /** a city-state's unit the pair's promote order raised, its promotions and
-   *  level before it: the copy's pass finds the promotion still due */
-  minorPromoted: Map<Unit, { promos: number; level: number }>;
+  /** a city-state's unit the pair's promote order raised, its promotions,
+   *  level and health before it and its health after: the copy's pass finds
+   *  the promotion still due, its heal not taken */
+  minorPromoted: Map<Unit, { promos: number; level: number; hp: number; healed?: number }>;
   /** this pair's city-state purchases the record holds, each answered once
    *  the minors' units' turn has run their city's second hook
    *  (`minorBuysAfter`) */
@@ -1324,6 +1325,27 @@ function minorAi(ctx: Ctx, b: TurnRecord, turn: number, made: ReadonlySet<Unit>,
     c.hp = snap.hp;
     c.fortifyTurns = snap.fortifyTurns;
   }
+  // — and a unit a formation of its minor's turn absorbed (the log's
+  // UnitFormCorps / UnitFormArmy, then its removal), which stood for the
+  // turn's operations before the formation (runs/h1_duely1117 t142: city-state
+  // 3's Crossbowman 1376257, City Defense's member, Operation Move to 42:12,
+  // then absorbed into 1310722's Corps; the team's Recruit counts it, the
+  // strength 75 to the end look)
+  const acts = (b as { actions?: unknown[][] }).actions ?? [];
+  for (let j = 1; j < acts.length; j++) {
+    const x = acts[j];
+    const p = acts[j - 1];
+    if (x[2] !== 'UnitRemovedFromMap' || (p[2] !== 'UnitFormCorps' && p[2] !== 'UnitFormArmy') || p[3] !== x[3]) continue;
+    const key = `${x[3]}:${x[4]}`;
+    const u = ctx.gone.get(key);
+    if (!u || !minorAiSeat(u.seat) || back.has(u) || !was.has(key)) continue;
+    const c = structuredClone(u);
+    const mine = copy.units.flatMap((y, i) => (y.seat === c.seat ? [i] : []));
+    const before = mine.filter((i) => copy.units[i].id < c.id);
+    copy.units.splice(before.length ? before[before.length - 1] + 1 : mine.length ? mine[0] : copy.units.length, 0, c);
+    twin.set(c, u);
+    keyOf.set(u, key);
+  }
   const gone = new Set<Unit>();
   const upgraded = new Set<Unit>();
   const madeAshore = new Set<Unit>();
@@ -1383,11 +1405,16 @@ function minorAi(ctx: Ctx, b: TurnRecord, turn: number, made: ReadonlySet<Unit>,
     // ...and its promotions as they stood before the pair's promote order:
     // the game's pass takes it in its Promotion move (runs/h1_duely1124 t52:
     // city-state 4's Warrior 131073, 15 experience at level 1, promotes
-    // before Attack Low Priority)
+    // before Attack Low Priority) — and its health before the promotion's
+    // heal where it stands healed: an operation's team update reads it before
+    // Protect Units promotes (runs/h1_duely1124 t50: city-state 3's Warrior
+    // 720900 at 77 damage, Attack Barb Camp's strength 13, then "Operation
+    // Protect Units, UNIT_WARRIOR, Promote" heals it to 27)
     const pr = ctx.minorPromoted.get(u);
     if (pr) {
       c.promos = pr.promos;
       c.level = pr.level;
+      if (pr.healed !== undefined && c.hp === pr.healed) c.hp = pr.hp;
     }
     // ...and embarked or ashore as the first record stands it, the pool its
     // Movement is composed on
@@ -3673,17 +3700,22 @@ const res = buyTile(state, city.id, d.plot, seat);        if (!res.ok) setTileOw
         // a city-state's pick is its tactical AI's (`aiPromotionPick`, its
         // Promotion move run on the copy beside the record): scored here
         if (isCityStateSeat(u.seat)) {
-          if (!ctx.minorPromoted.has(u)) ctx.minorPromoted.set(u, { promos: u.promos ?? 0, level: u.level ?? 1 });
+          if (!ctx.minorPromoted.has(u)) ctx.minorPromoted.set(u, { promos: u.promos ?? 0, level: u.level ?? 1, hp: u.hp });
           const ours = aiPromotionPick(u);
           count(ctx, 'minorAi:promote', ours === k ? 'applied' : 'fallback', d.player, `the AI's ${unitPromoRows(u)[ours]?.id ?? 'none'}, the game's ${name}`);
         }
-        if (k >= 0 && takePromotion(u, k)) { ctx.promoteHp.set(u, u.hp); count(ctx, 'promote', 'applied', d.player); break; }
+        const healed = (): void => {
+          const pr = ctx.minorPromoted.get(u);
+          if (pr && pr.healed === undefined) pr.healed = u.hp;
+        };
+        if (k >= 0 && takePromotion(u, k)) { ctx.promoteHp.set(u, u.hp); healed(); count(ctx, 'promote', 'applied', d.player); break; }
         if (k >= 0) {
           // the experience is kept through the promotion, as the engine's
           u.promos = (u.promos ?? 0) | (1 << k);
           u.level = (u.level ?? 1) + 1;
           u.hp = Math.min(UNIT_HP, u.hp + PROMOTE_HEAL);
           ctx.promoteHp.set(u, u.hp);
+          healed();
         }
         count(ctx, 'promote', 'fallback', d.player, k < 0 ? `no ${name} in the unit's class` : 'the engine offered no such pick');
         break;
@@ -5078,6 +5110,12 @@ function takeGameMemory(ctx: Ctx, world: GameState, imp: Imported, turn: number,
     }
   }
   const spawns = fromAimem && ctx.gameMemory ? importGameKnowledge(ctx, world, imp, turn) : [];
+  // ...and a later player's blow of that turn on a minor's unit, which came
+  // after its end look, records its attacker on the imported records as the
+  // pair's late blows did on the engine's (runs/h1_duely1124 t17: the
+  // barbarians' Warrior 1441805 kills city-state 3's Warrior from 41:7 and
+  // advances to 42:8, city-state 3's t18 record of it there at 21 damage)
+  if (fromAimem && ctx.gameMemory) for (const { seat, attacker } of ctx.lateBlows) recordAttacker(world, attacker, seat);
   for (const sp of spawns) {
     const k = (world.barbTribes ?? []).findIndex((tr) => tr.op?.id === sp.op);
     if (k >= 0) barbSpawnChange(world, k, sp.rate, sp.raiding);
@@ -5324,6 +5362,11 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
   // after its turn (`minorBuilds`, `buyUnit`, `improve`, `unitNew`)
   holdMinorOrders(true);
   holdCityStrikes(true);
+  // a major's bankruptcy disband is the record's: its removals land it, the
+  // engine's treasury disbands none (runs/h1_duely1124 t242-244: player 1's
+  // AT Crew 6946843 on 37:18 the engine's shortfall took, in city-state 3's
+  // t244 look in the game)
+  holdBankruptDisband((s) => isCiv(s.seat));
   // the city-states' own purchases of the pair, each with its price
   // each purchase with the economic AI's savings as it bought (its spend
   // follows the purchase, on the city's threat)
@@ -5738,6 +5781,7 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
       // unit (runs/h1_duely1117 t113: the barbarians' Builder on 33:10 taken
       // by China's Knight, out of Antananarivo's look)
       const acts = (b as { actions?: unknown[][] }).actions ?? [];
+      const killedAt = new Map<string, number>(acts.flatMap((x) => (x[2] === 'UnitKilledInCombat' ? [[`${x[3]}:${x[4]}`, x[0] as number] as const] : [])));
       const heldAfter = new Set(b.units.map((x) => `${x.owner}:${x.id}`));
       const lastPlot = new Map<string, number>(ctx.prev.units.map((r) => [`${r.owner}:${r.id}`, r.y * ctx.W + r.x]));
       const opens = new Map<number, number>();
@@ -5814,18 +5858,43 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
           if (i >= 0) state.units.splice(i, 1);
         }
       };
+      // ...and another player's unit with the damage the log gives it before
+      // its turn opens: an earlier minor's blow, which the record's battles
+      // land after the minors' turns, is on the unit its look records
+      // (runs/h1_duely1127 t13: city-state 3's Warrior strikes the barbarian
+      // Scout 786442 to 51, city-state 4's look records it at 51, its Attack
+      // Barb Camp's Enemy Str 16); each back as it stood once the turns end
+      const damageAt = (open: number, owner: number): Map<string, number> => {
+        const d = new Map<string, number>();
+        for (const x of acts) {
+          if ((x[0] as number) >= open) break;
+          if (x[2] === 'UnitDamageChanged' && x[3] !== owner) d.set(`${x[3]}:${x[4]}`, x[5] as number);
+        }
+        return d;
+      };
+      const hpWas = new Map<Unit, number>();
+      const unhurt = () => {
+        for (const [u, hp] of hpWas) u.hp = hp;
+        hpWas.clear();
+      };
       holdMinorStart((_st, cs) => {
         unrestore();
+        unhurt();
         if (before !== undefined) ended(before);
         before = ctx.playerOfSeat.get(cs.seat)!;
+        const open = opens.get(before);
         for (const [key, killer] of killedBy) {
-          const u = killer < before ? ctx.units.get(key) : undefined;
+          // ...a kill in a later player's turn (a unit dying on its own blow
+          // against the city-state's) not yet (runs/h1_duely1127 t17: the
+          // barbarians' Warrior 983053 on 6:11 dies attacking city-state 3's
+          // Warrior in their turn, in city-state 4's look at 62 damage)
+          const at = killedAt.get(key);
+          const u = killer < before && (open === undefined || at === undefined || at < open) ? ctx.units.get(key) : undefined;
           const i = u ? state.units.indexOf(u) : -1;
           if (i < 0) continue;
           fallen.push([u!, i]);
           state.units.splice(i, 1);
         }
-        const open = opens.get(before);
         for (const r of open === undefined ? [] : removed) {
           if (r.ord >= open! || r.owner === before) continue;
           const u = ctx.units.get(r.key);
@@ -5852,6 +5921,12 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
           if (t.ord >= open! || t.owner < before) continue;
           const u = unitOf(ctx, t.key);
           if (u) u.tileIndex = t.plot;
+        }
+        for (const [key, dmg] of open === undefined ? [] : damageAt(open, before)) {
+          const u = unitOf(ctx, key);
+          if (!u || dmg >= UNIT_HP || !state.units.includes(u)) continue;
+          hpWas.set(u, u.hp);
+          u.hp = UNIT_HP - dmg;
         }
         // ...and the majors' units where the log's last step before its turn
         // opens put them, not a later teleport's plot
@@ -5922,10 +5997,12 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
         // t160: Antananarivo, the last city-state, its Scout trained and
         // upgraded to the Skirmisher 2097158 as Industrialization lands)
         unrestore();
+        unhurt();
         if (before !== undefined) ended(before);
         ctx.minorGround = state.map.tiles.map(groundOf);
       } finally {
         unrestore();
+        unhurt();
         holdMinorStart(null);
         traceMinorUpgrade(null);
         for (const [u, i] of fallen.reverse()) state.units.splice(Math.min(i, state.units.length), 0, u);
@@ -6324,6 +6401,7 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
   holdResearchEra(null);
   holdMinorOrders(false);
   holdCityStrikes(false);
+  holdBankruptDisband(null);
   traceMinorPurchases(null);
   traceMinorPolicyScores(null);
   if (operations.active) report.operations = operations.tally;
