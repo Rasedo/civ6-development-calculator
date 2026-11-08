@@ -113,7 +113,7 @@ A question the SOURCE under-determines; neither engine ships a branch until the 
   - LAB (C-16): the level field's base (0 or 1) and why multi-route police almost never guess right (the fit wants P ≈ 0–0.15 on 214 escapes); with a post standing the pursuer is the counterspy itself, and its escapes prefer a term of 2–3 (2.4 logL over none, 71 two-route escapes, `c16g_escape.py`) — suggestive, not settled.
 - **C-20. THE ROUTE'S TRANSPORTATION EFFICIENCY.** Weight 1.
   - LAB (DLL reading): whether a city-centre plot is neither land nor water to the path — IsLand / IsWater (0x5583a0 / 0x558460) read bits 1 and 4 of the plot info's word +0x14 where a district stands, both set meaning neither (`dll_readings.md` "C-20 tail"); a Canal plot is both land and water to the path (`multiDomainPlot` / `_multi_domain_plot`, the route score's TRADE_ROUTE_TRANSPORTATION_EFFICIENCY_SCORE_MULTIPLE_DOMAINS); which bits a centre and a Harbor carry is unread. The engines take no land↔water switch onto or off a centre and refuel 15 onto one.
-  - LAB: a sweep recording CanStartTradeRoute and the constructed posts per pair, and a map dump of `lab4_t225`, to score the path plot by plot (GetTradeRoutePath reads a cache that answers refused pairs too).
+  - LAB: run `tools/civ6lab/c108_sweep.py` on `lab4_t225` (CanStartRoute, GetTradeRoutePath plot by plot, the constructed posts per city, the h1 dump of the turn) and score it with `cpu/harness/tradePathLab.ts` against `tradeCourse` and the route eligibility, pair by pair (GetTradeRoutePath's cache answers refused pairs too).
 - **C-26. CIVILIZATION ABILITIES — THE RESIDUE.** Weight 1.
   - LAB: Cyber Warfare's opponent-era requirement against a district.
 - **C-38. A CITY-STATE'S PLAY.** Weight 1.
