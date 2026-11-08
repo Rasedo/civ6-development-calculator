@@ -3,6 +3,18 @@
 # `review: imported` = bootstrapped from dll_readings.md / code comments / saved
 # labels and not yet reviewed: verify against the disassembly, then edit and
 # set `review: reviewed`.
+- addr: 0x9402a0
+  final: 0x64fbf0
+  kind: function
+  name: the units manager's kill
+  semantics: "the units manager's kill (this, unit, flag r8b, player r9d): ... then over the unit's owner's units (player +0x12e8) the delayed kill (0x4ef040) where the flag is set, else the destroy (0x4ef100); it takes the unit's entry out of the ObjectPairingManager (@0xf07400) (0x929680 / 0x9297f0 / 0x9299b0). The upgrade's kill passes the flag 1 (0xa49cb0 at 0xa49e8a)."
+  status: PARTLY
+  impl: [cpu/core/units.ts:upgradeAnew, gpu/core/sim_seats.py:_upgrade_anew]
+  readings:
+    - "C-129: the upgrade is a new unit, its old self dying in its pool slot to the turn's end — READ (0xa49cb0, 0x9402a0, 0x4ef040, 0x4ef6d0), both twins"
+  notes:
+    - the head's plot walk (vt +0x58 over the plot and its ring) unread; reached from the destroy's thunk 0x941130 (vt +0x68) by its signature, not by a vtable read
+  review: reviewed
 - addr: 0x9406e0
   final: 0x64fff0
   kind: function

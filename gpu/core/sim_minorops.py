@@ -358,6 +358,8 @@ class SimMinorOps:
             "bombard": self._ai_bombard(self._mops_pre(s)), "range": self._type_ranged_range.take(ut),
             "dmg": hp_max - pu("hp"), "mp": mp, "mp_whole": torch.div(mp, self._mp_scale, rounding_mode="floor"),
             "base_moves": base, "defender": pu("defender"),
+            # its units an upgrade took off this turn, as they stood (`unitsDying`)
+            "dying": pu("dying") & (pu("seat") == seat),
         }
 
     def _mops_in_order(self, mask: torch.Tensor, key: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
@@ -1656,12 +1658,12 @@ class SimMinorOps:
             if bool(miss.any()):
                 rr = miss.nonzero(as_tuple=True)[0]
                 unbought[rr, us[rr]] = True
-            up = self._minor_upgrade_unit(s, bought, us)
+            up, made = self._minor_upgrade_unit(s, bought, us)
             if bool(up.any()):
                 rr = up.nonzero(as_tuple=True)[0]
                 held[rr, us[rr]] = False
                 # the upgrade is a new unit, out of the pass (`passEnd`)
-                done[rr, us[rr]] = True
+                done[rr, made[rr]] = True
         # THE DELETION (Can Delete, the node's data absent: true): a unit the
         # economic AI did not buy where its upgrade asks no strategic resource
         # (0x591000 -1) or it holds at most one promotion beside more than 10
@@ -1675,7 +1677,8 @@ class SimMinorOps:
         for bit in range(32):
             npro = npro + ((pr >> bit) & 1)
         cnt = torch.zeros(ut.shape[0], self.NU, dtype=torch.long, device=self.device)
-        cnt.scatter_add_(1, ut, own.long())
+        # the units standing now: an upgrade's new unit, not its old
+        cnt.scatter_add_(1, ut, (self._mops_u(s, "alive") & (self._mops_u(s, "seat") == self._mops_seat(s))).long())
         many = cnt.gather(1, ut) > 10
         tile = self.major_unit_tile[:, :P].clamp(min=0)
         home = self.tile_seat.gather(1, tile) == 100 + s
@@ -1823,7 +1826,9 @@ class SimMinorOps:
         estr = self.mops_estr[:, s, k]
         ours = self._mops_best(s)
         members = (self.mops_mem[:, s, k, ti] >= 0).sum(dim=1) + self.mops_twice[:, s, k, ti].sum(dim=1)
-        cur_mem = (ustr * self._mops_member_times(s, k, ti) * u["own"].long()).sum(dim=1)
+        # the teams' lists read by id (0x4f2310): a member an upgrade took off
+        # this turn as it stood
+        cur_mem = (ustr * self._mops_member_times(s, k, ti) * (u["own"] | u["dying"]).long()).sum(dim=1)
         ready = self.mops_ready[:, s, k, ti]
         for dd, ts in Tm.team_reqs.items():
             for tj, tr in enumerate(ts):

@@ -1459,7 +1459,10 @@ class SimInit:
         self._UNIT_PLANES: list = []
         for _pl, _dt in (
             ("alive", torch.bool),      # a slot holds a living unit
-            ("emb", torch.bool),        # embarked — a land unit standing on water
+            # a unit an upgrade took off this turn, as it stood: dead, still on
+            # its player's list until the turn's end (`GameState.unitsDying`)
+            ("dying", torch.bool),
+            ("emb", torch.bool),       # embarked — a land unit standing on water
             ("type", torch.long),       # roster index (barbs too)
             ("tile", torch.long),
             ("hp", torch.long),

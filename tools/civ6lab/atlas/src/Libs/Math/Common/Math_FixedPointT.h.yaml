@@ -295,6 +295,26 @@
   context:
     - "- Flanking (0x521530) and Support (0x521ed0, 0x5228c0) are gated on the player's m_bMilitaryCombatAdjacency (+0x1268), which only EFFECT_GR..."
   review: reviewed
+- addr: 0x55dc00
+  final: 0x396d70
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-129: the upgrade is a new unit, its old self dying in its pool slot to the turn's end — READ (0xa49cb0, 0x9402a0, 0x4ef040, 0x4ef6d0), both twins"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "- OPEN: +0x890, +0x5f0 and 0x55e4a0 / 0x55dc00's fixed value the new unit takes; the ObjectPairingManager (@0xf07400) pairing whose..."
+  review: imported
+- addr: 0x55e4a0
+  final: 0x396f60
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-129: the upgrade is a new unit, its old self dying in its pool slot to the turn's end — READ (0xa49cb0, 0x9402a0, 0x4ef040, 0x4ef6d0), both twins"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "- OPEN: +0x890, +0x5f0 and 0x55e4a0 / 0x55dc00's fixed value the new unit takes; the ObjectPairingManager (@0xf07400)..."
+  review: imported
 - addr: 0x5d83c0
   final: 0x3eae80
   kind: function

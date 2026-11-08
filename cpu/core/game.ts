@@ -1644,9 +1644,12 @@ export function minorTurns(state: GameState): void {
   freeCitiesPhase(state);
 }
 
-/** THE TURN'S CLOSE after every player: theological combat, the Special
- *  Sessions and the emergencies, then the heal of every unit and every city */
+/** THE TURN'S CLOSE after every player: the units the turn's upgrades took
+ *  off leave their players' lists (EndTurn's erase 0x4ef6d0), theological
+ *  combat, the Special Sessions and the emergencies, then the heal of every
+ *  unit and every city */
 export function turnClose(state: GameState): void {
+  delete state.unitsDying;
   theologicalCombatPhase(state);
   emergencySessions(state);
   if (state.unitsMode) refreshUnits(state);

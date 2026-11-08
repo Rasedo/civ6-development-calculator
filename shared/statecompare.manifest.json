@@ -337,6 +337,17 @@
           "note": "the city-states' and the Free Cities' unit pools (`poolSlots`, the order their tactical AI walks their units in): one row — each live city-state by id (its size, its free slots in push order, the slots waiting to go free, each of its units' slots in unit order), then the Free Cities' the same."
         },
         {
+          "name": "unitsDying",
+          "compare": "exact",
+          "covers": [
+            "GameState.unitsDying"
+          ],
+          "planes": [
+            "unit_dying"
+          ],
+          "note": "the units the turn's upgrades took off as they stood (`upgradeAnew`: dead, on their player's list in their pool slot until the turn's close), as a sorted multiset of (seat, pool slot, unit type, hit points)."
+        },
+        {
           "name": "cityCount",
           "compare": "exact",
           "covers": [],

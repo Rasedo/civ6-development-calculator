@@ -1,0 +1,15 @@
+# The DLL atlas, curated layer (tools/civ6lab/atlas.py documents the record).
+# Records keyed by GameCore_XP2_Release.dll RVA; `final` the FinalRelease RVA.
+# `review: imported` = bootstrapped from dll_readings.md / code comments / saved
+# labels and not yet reviewed: verify against the disassembly, then edit and
+# set `review: reviewed`.
+- addr: 0x9293b0
+  final: 0x640a20
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-129: the upgrade is a new unit, its old self dying in its pool slot to the turn's end — READ (0xa49cb0, 0x9402a0, 0x4ef040, 0x4ef6d0), both twins"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - ...the ObjectPairingManager (@0xf07400) pairing whose entry the command re-keys to the new unit (0x9297f0 -> 0x9293b0); whether the create raises the owner's knowledge signal (the engines record the new un...
+  review: imported

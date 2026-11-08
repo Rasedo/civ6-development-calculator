@@ -614,6 +614,11 @@ export interface GameState {
   gpPassedBy?: number[];
   unitsMode: boolean;
   units: Unit[];
+  /** the units an upgrade took off this turn, as they stood (the delayed
+   *  kill 0x4ef040: dead, on their player's list in their pool slot until
+   *  the turn's end, 0x4ef6d0): an operation's team that lists one reads its
+   *  type and strength (`upgradeAnew`, `turnClose`) */
+  unitsDying?: Unit[];
   nextUnitId: number;
   rngState: number;
   /** the Future tree the game drew at its start (`drawResearchTree`): its

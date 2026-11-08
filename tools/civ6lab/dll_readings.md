@@ -10430,3 +10430,53 @@ ability's free techs, a Great Person's boosted eureka (`activateGreatPerson` /
 - OPEN: a start's free techs (a roster's TECH rows, `_apply_roster_start`)
   are laid before the handler can run and set no catch-up; no recording
   starts a major with one.
+
+## C-129: the upgrade is a new unit, its old self dying in its pool slot to the turn's end — READ (0xa49cb0, 0x9402a0, 0x4ef040, 0x4ef6d0), both twins
+
+`upgradeAnew` (cpu/core/units.ts) from `upgradeUnit` and `minorUpgradeUnit`
+(cpu/core/minorBuild.ts); `GameState.unitsDying`, cleared by `turnClose`
+(cpu/core/game.ts); `AiView.unitsDying` read by Recruit Units' strength
+(cpu/core/operations/nodes.ts); the replay's look types and units' pass copy
+(cpu/harness/replay.ts). GPU `_upgrade_anew` (gpu/core/sim_seats.py) from
+`_upgrade_units` and `_minor_upgrade_unit` (gpu/core/sim_minors.py), the
+`unit_dying` plane cleared at the step's close (gpu/core/sim_step.py), the
+recruit's `dying` (gpu/core/sim_minorops.py).
+
+- THE COMMAND (0xa49cb0, the XP2 UPGRADE command's execution): the units
+  manager's destroy (vt +0x60) with the flag 1 takes the old unit — the
+  delayed kill (0x4ef040: dead, +0x770, off the map, on its player's list
+  in its slot until EndTurn's erase 0x4ef6d0); the manager's create (vt
+  +0x50) makes one of the upgrade's type (0x5909a0) on its plot. The new
+  unit takes the damage, the military formation, the level, the experience,
+  every promotion held, the name, the embarked state and the abilities the
+  old held; its Movement 0 (0x56d6f0), its turn ended (0x570b40). Nothing
+  writes its fortification, its assignment (+0x7d0) or its home, which the
+  unit's init (0x563cd0) leaves: unfortified, in no operation, of its
+  type's own AI type, homed nowhere.
+- THE ID AND THE SLOT: the new unit is a new id in the next free pool slot
+  (`poolSlots`; the old slot is held by the dead unit to the turn's end);
+  the engines give it a new id and a new place last in the unit order (the
+  GPU the pool's next slot), its pool slot at its player's next pass.
+  Every record of the old id names a unit gone.
+- THE OLD UNIT'S TEAM: the team's list keeps the old id until its next team
+  update drops it (released, `minorUpgradeUnit`), and the player's unit
+  list (0x4f2310, by slot) still finds the dead unit there: the end look
+  and the recruit's strength (0x73c7c0) read its type and strength as it
+  stood (`unitsDying`).
+- CONFIRMED (one-seed aimem and carried traces): runs/h1_duelz1127 t94
+  city-state 4's City Defense, its Heavy Chariot 720899 (slot 3) upgraded to
+  the Knight 1114117 (slot 5): "UNIT_HEAVY_CHARIOT; UNIT_TREBUCHET" at 63 to
+  the end look, "1 units, Recruited 0", the Crossbowman left free — as
+  logged; runs/h1_duelz1117 t91 city-state 4's City Defense, its Catapult
+  1114113 (slot 1) upgraded to the Trebuchet 1179651 (slot 3): CATAPULT x4 at
+  100 to the end look, as logged; runs/h1_duelz1128 t86 city-state 3's
+  Warrior 655367 (slot 7) -> Man-at-Arms 1179650 (slot 2), the knowledge base
+  keeping 655367's record aging beside the new one's. A unit an upgrade made
+  in the minor's units' pass, after its end-of-turn list in the replay's
+  order, is listed by its new id (runs/h1_duelz1127 t95 city-state 4's
+  Conscription 36 as logged, its Archer upgraded to a Crossbowman in its
+  t94 units' pass).
+- OPEN: +0x890, +0x5f0 and 0x55e4a0 / 0x55dc00's fixed value the new unit
+  takes; the ObjectPairingManager (@0xf07400) pairing whose entry the command
+  re-keys to the new unit (0x9297f0 -> 0x9293b0); whether the create raises the owner's
+  knowledge signal (the engines record the new unit at the next look).

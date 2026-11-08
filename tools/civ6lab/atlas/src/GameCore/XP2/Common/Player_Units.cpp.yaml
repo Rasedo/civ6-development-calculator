@@ -99,8 +99,12 @@
     - cpu/core/minorBuild.ts:minorListedUnits
     - cpu/core/minorBuild.ts:minorEndTurnList
     - cpu/core/trade.ts:plunderTrader
+    - cpu/core/units.ts:upgradeAnew
+    - gpu/core/sim_seats.py:_upgrade_anew
+    - cpu/core/types.ts:GameState
   readings:
     - "C-98: a unit off the map counts on its owner's list until its end of turn"
+    - "C-129: the upgrade is a new unit, its old self dying in its pool slot to the turn's end — READ (0xa49cb0, 0x9402a0, 0x4ef040, 0x4ef6d0), both twins"
     - "C-123 / C-95: the Plunder Trade Route command and the AI's plunder after the move — READ (0x89dae0, 0x89dfc0, 0x9555a0, 0x9559a0, 0x5545e0 at 0x554667 / 0x554d4c, 0x58fc20, 0x7746a0, 0x70a440, 0x771f80 at 0x7722b6 / 0x77254e / 0x77277f, 0x776140 at 0x776424..0x776470), both twins"
     - "C-98 / C-96: a city-state's unit count and standing army read its list with the delayed kill's dead — READ (0x7b62c0 at 0x7b63aa, 0x5ca7e0 at 0x5ca978 / 0x5caa88, 0x4ef6d0), both twins"
   review: reviewed
@@ -136,9 +140,14 @@
     - cpu/core/minorBuild.ts:minorEndTurnList
     - gpu/core/sim_minors.py:_minor_end_turn_list
     - cpu/core/types.ts:CityState
+    - cpu/core/game.ts:turnClose
+    - gpu/core/sim_step.py:step
+    - cpu/core/types.ts:GameState
+    - cpu/core/units.ts:upgradeAnew
   readings:
     - "C-98: a unit off the map counts on its owner's list until its end of turn"
     - "C-98 / C-96: a city-state's unit count and standing army read its list with the delayed kill's dead — READ (0x7b62c0 at 0x7b63aa, 0x5ca7e0 at 0x5ca978 / 0x5caa88, 0x4ef6d0), both twins"
+    - "C-129: the upgrade is a new unit, its old self dying in its pool slot to the turn's end — READ (0xa49cb0, 0x9402a0, 0x4ef040, 0x4ef6d0), both twins"
   review: reviewed
 - addr: 0x4f2310
   final: 0x2c4360
@@ -149,12 +158,17 @@
     - recording: h1_duely1124
       turn: 120
       value: "city-state 4's Attack Barb Camp: its Pikeman 1048582 (slot 6) killed at t119, the team still listing 1048582 at t120's tactical site with type 96 (the Trebuchet 1441798 on slot 6), three Trebuchets at 105"
-  impl: [cpu/core/operations/operation.ts:keepMembers, gpu/core/sim_minorops.py:_mops_keep_members]
+  impl:
+    - cpu/core/operations/operation.ts:keepMembers
+    - gpu/core/sim_minorops.py:_mops_keep_members
+    - cpu/core/operations/nodes.ts:offer
+    - gpu/core/sim_minorops.py:_mops_recruit_team
   readings:
     - "C-99 / C-129: a team member gone resolves by its pool slot — READ (0x732cd0 -> 0x4f2310), both twins"
     - "C-95: the target list's knowledge-base entries — READ, ported (two records on one plot below)"
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
     - "H-1: the AI memory reader — READ (the hooks, the pointer paths, the contracts, the knowledge base, the operations, the trees), PARTLY READ (the religious AI's holder)"
+    - "C-129: the upgrade is a new unit, its old self dying in its pool slot to the turn's end — READ (0xa49cb0, 0x9402a0, 0x4ef040, 0x4ef6d0), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...1 — seen at the last look, not at this turn's — whose unit (+0, the player's unit list 0x4f2310) still stands (+0x770 clear) within 2 of the plot recorded (+0x10 / +0x14): the unit's..."

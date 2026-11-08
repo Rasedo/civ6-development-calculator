@@ -1471,8 +1471,8 @@ export function goldBuyableUnits(state: GameState, seat: number): UnitDef[] {
  * any". The new chassis is the furthest rung unlocked (`upgradeType`). "Upgraded units retain all
  * their Promotions and experience" and "units do not Heal upon upgrading".
  *
- * MODEL: the source does not say what movement an upgrade leaves behind, so
- * this spends the rest of the turn, like every other verb here.
+ * The upgrade is a new unit (`upgradeAnew`), its Movement spent (0x56d6f0)
+ * and its turn ended (0x570b40).
  */
 export function canUpgradeUnit(state: GameState, unit: Unit, seat: number): boolean {
   const next = upgradeType(state, seat, unit.type);
@@ -1482,6 +1482,33 @@ export function canUpgradeUnit(state: GameState, unit: Unit, seat: number): bool
   if (!canPayUpgradeGold(state, seat, unit.type, next, unit.leviedFrom !== undefined, unit.formation ?? 0)) return false;
   const c = upgradeResourceCost(state, seat, unit.type, next);
   return !c || canPayStockpile(state, seat, c.id, c.n);
+}
+
+/** THE UPGRADE IS A NEW UNIT (the upgrade command 0xa49cb0): the old unit
+ *  dies with its erase delayed (0x4ef040: dead, +0x770, on its player's list
+ *  in its pool slot until the turn's end, 0x4ef6d0 — `unitsDying`), and the
+ *  player makes one of the upgrade's type on its plot, of a new id and a new
+ *  pool slot (`poolSlots`), last in its unit list. The new one takes the
+ *  old's damage, formation, experience, level and promotions; it stands
+ *  unfortified, homed nowhere, of its type's own AI type (the unit's init
+ *  0x563cd0), in no operation's job, its Movement spent (0x56d6f0). An
+ *  operation's team keeps the old id until its next update, reading the old
+ *  unit's type and strength (runs/h1_duelz1127 t94 city-state 4's City
+ *  Defense: Heavy Chariot 720899 upgraded to the Knight 1114117, the team
+ *  "UNIT_HEAVY_CHARIOT; UNIT_TREBUCHET" at 63; runs/h1_duely1128 t86
+ *  city-state 3's Warrior 655367 in slot 7 -> Man-at-Arms 1179650 in slot
+ *  2). Every other record of the old id names a unit gone. */
+export function upgradeAnew(state: GameState, unit: Unit, next: string): void {
+  (state.unitsDying ??= []).push({ ...unit });
+  state.units = state.units.filter((u) => u !== unit);
+  unit.id = state.nextUnitId++;
+  delete unit.slot;
+  delete unit.aiDefender;
+  delete unit.aiHomed;
+  if (unit.fortifyTurns !== undefined) unit.fortifyTurns = 0;
+  unit.type = next;
+  unit.movesLeft = 0;
+  state.units.push(unit);
 }
 
 /** the promotions a unit holds: the set bits of its `promos` (the set flags
@@ -1499,8 +1526,7 @@ export function upgradeUnit(state: GameState, unit: Unit, seat: number): RuleRes
   s.treasury -= upgradeGoldCost(state, seat, unit.type, next, unit.leviedFrom !== undefined, unit.formation ?? 0);
   const c = upgradeResourceCost(state, seat, unit.type, next);
   if (c) spendStockpile(state, seat, c.id, c.n, 'ug');
-  unit.type = next;
-  unit.movesLeft = 0;
+  upgradeAnew(state, unit, next);
   unit.movesFull = unitFullMoves(state, unit);
   raiseBestTrained(state, seat, next, unit.formation ?? 0);
   questUnitAdded(state, seat, next);

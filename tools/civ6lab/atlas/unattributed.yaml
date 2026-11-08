@@ -2757,6 +2757,7 @@
     - cpu/core/minorOps.ts:cities
     - cpu/core/operations/assault.ts:pillageExecute
     - cpu/core/tactical.ts:makeMilitaryFormation
+    - cpu/core/units.ts:canUpgradeUnit
   readings:
     - "C-95: the tactical pass — READ (the barbarians' moves; the minors share it)"
     - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
@@ -2777,6 +2778,7 @@
     - "C-93: Operation Pillage takes a member on its target alone; a capture is its step's; Wander asks Movement; a captor leaves the pass — READ (0x811390 at 0x811786..0x811838, 0x26fe20, 0x77b9a0 at 0x77baa1, 0x212500), both twins"
     - "C-123 / C-95: the Plunder Trade Route command and the AI's plunder after the move — READ (0x89dae0, 0x89dfc0, 0x9555a0, 0x9559a0, 0x5545e0 at 0x554667 / 0x554d4c, 0x58fc20, 0x7746a0, 0x70a440, 0x771f80 at 0x7722b6 / 0x77254e / 0x77277f, 0x776140 at 0x776424..0x776470), both twins"
     - "C-128: a city-state's Make Military Formation — READ (0x77a190, 0x770670, 0x536da0, 0x773e20, 0x94a870, 0x949930), both twins"
+    - "C-129: the upgrade is a new unit, its old self dying in its pool slot to the turn's end — READ (0xa49cb0, 0x9402a0, 0x4ef040, 0x4ef6d0), both twins"
   notes:
     - ".claude/scratchpad/mu1/readings_c96.md: ...000, else the skip 0x95eae0 (\"Wander Back to City\", \"Move To\" the   city). The turn ends (0x56d6f0, 0x570b40). Confirmed: the turn's \"Random   Direction\" draws pair one to one with the AI_Tactical.csv rows \"W..."
   context:
@@ -2854,6 +2856,7 @@
     - "C-126: the purchase list's buildable test and the upgrade's furthest rung"
     - "C-129: the bankruptcy's victim and every seat's upgrade to the furthest rung — READ (0x4e05e0, 0x5374c0), both twins"
     - "C-129: the military AI's upgrade — READ (0x727db0, 0x6874d0), both twins"
+    - "C-129: the upgrade is a new unit, its old self dying in its pool slot to the turn's end — READ (0xa49cb0, 0x9402a0, 0x4ef040, 0x4ef6d0), both twins"
   context:
     - "..., unit, test-visible 1) — not a barbarian's (0x56ee80) and an upgrade type it may take (0x5909a0 -> 0x5374c0) — the Amount x its upgrade's Gold (0x590520 << 8) as Gold at the player'..."
   review: reviewed
@@ -6662,6 +6665,15 @@
   notes:
     - the registry's identity (0x929680, a game-instance table indexed by @0xf07400) not read; every unit of the five duely duels carries none
   review: reviewed
+- addr: 0x9297f0
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-129: the upgrade is a new unit, its old self dying in its pool slot to the turn's end — READ (0xa49cb0, 0x9402a0, 0x4ef040, 0x4ef6d0), both twins"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - ...akes; the ObjectPairingManager (@0xf07400) pairing whose entry the command re-keys to the new unit (0x9297f0 -> 0x9293b0); whether the create raises the owner's knowledge signal (the engines recor...
+  review: imported
 - addr: 0x93d570
   final: 0x64d740
   kind: function

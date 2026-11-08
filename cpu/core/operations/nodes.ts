@@ -339,11 +339,16 @@ const recruitUnits: BtHandler<OpsContext> = {
     // unlocked operations of a lower priority, which leave them
     const busy = ctx.assigned();
     const offer = view.units(ctx.seat).filter((u) => !busy.has(u.id));
-    recruitOperation(view, ctx.seat, op, offer, inProgress, range, units, (l) => ctx.log(l));
+    // the teams' lists read by id (0x4f2310): a member an upgrade took off
+    // this turn as it stood (runs/h1_duely1117 t91: City Defense's Catapult
+    // 1114113 upgraded after the refresh, "Operation Recruit, 3 units,
+    // Recruited 0" over four Catapults)
+    const members = new Map([...view.unitsDying(ctx.seat).map((u) => [u.id, u] as const), ...units]);
+    recruitOperation(view, ctx.seat, op, offer, inProgress, range, members, (l) => ctx.log(l));
     const lower = ctx.others().filter((o) => o !== op && !o.locked && opDef(o).priority < opDef(op).priority);
     const freed = lower.flatMap(opUnits).map((id) => units.get(id)).filter((u): u is AiUnitView => !!u);
     if (freed.length) {
-      const taken = recruitOperation(view, ctx.seat, op, [...freed], inProgress, range, units, (l) => ctx.log(l));
+      const taken = recruitOperation(view, ctx.seat, op, [...freed], inProgress, range, members, (l) => ctx.log(l));
       const held = lower.filter((o) => opUnits(o).length > 0);
       for (const u of taken) {
         for (const o of lower) for (const t of o.teams) t.members = t.members.filter((id) => id !== u.id);

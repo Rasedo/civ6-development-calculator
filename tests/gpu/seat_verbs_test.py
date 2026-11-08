@@ -392,11 +392,15 @@ def main() -> None:
     sim9.major_unit_hp[0, sl9] = 40
     sim9.major_unit_promos[0, sl9] = 5
     order(sim9, row, sl9, sim9._A_UPGRADE)
-    assert int(sim9.major_unit_type[0, sl9]) == up_dst, "the chassis must change"
+    # the upgrade is a new unit in the pool's next slot, the old one dying
+    nw9 = int(sim9.unit_next[0]) - 1
+    assert not bool(sim9.major_unit_alive[0, sl9]) and bool(sim9.major_unit_dying[0, sl9]), "the old unit dies as it stood"
+    assert int(sim9.major_unit_type[0, sl9]) == up_src, "and reads as it stood"
+    assert int(sim9.major_unit_type[0, nw9]) == up_dst, "the chassis must change"
     assert abs(float(sim9.civ_treasury[0, row]) - (gold0 - price9)) < 1e-6, "and pay for it"
-    assert int(sim9.major_unit_hp[0, sl9]) == 40, "CIV6: units do not Heal upon upgrading"
-    assert int(sim9.major_unit_promos[0, sl9]) == 5, "CIV6: promotions ride along"
-    assert float(sim9.major_unit_mp[0, sl9]) == 0.0, "and the turn is spent"
+    assert int(sim9.major_unit_hp[0, nw9]) == 40, "CIV6: units do not Heal upon upgrading"
+    assert int(sim9.major_unit_promos[0, nw9]) == 5, "CIV6: promotions ride along"
+    assert float(sim9.major_unit_mp[0, nw9]) == 0.0, "and the turn is spent"
     print(f"  9 UPGRADE OK ({up_src} -> {up_dst}, {price9:.0f} gold, promotions kept, no heal)")
 
     # --- 10 FOUND on the seat's OWN ground ---------------------------------

@@ -34,6 +34,9 @@ class SimStep:
         self._city_state_phase()
         self._free_cities_phase()
 
+        # the turn's close (`turnClose`): the units the turn's upgrades took
+        # off leave their players' lists (EndTurn's erase 0x4ef6d0)
+        self.unit_dying.zero_()
         self._theological_combat_phase()
         self._emergency_sessions()
         # every unit's heal, fortification and movement (`refreshUnits`), then

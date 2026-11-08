@@ -52,7 +52,7 @@ import { centerBuildingIds } from './prodLayout';
 import { cityLowlands, coastalLowlandCounts, floodBarrierCost, repairBehindBarrier } from './climate';
 import { minorTrade, tradeCapacity, tradeGraphTurn } from './trade';
 import { BARB_SEAT, FREE_SEAT, freeSeatOf, hiddenResourcesFor, isCiv, majorityReligionOf, majorsAlive, seatOf, tileSeat } from './seats';
-import { builderCost, cityNavalCapable, disbandUnit, raiseBestTrained, spawnUnit, traderCost, unitFullMoves, unitIsMilitary, unitMadeAnew } from './units';
+import { builderCost, cityNavalCapable, disbandUnit, raiseBestTrained, spawnUnit, traderCost, unitFullMoves, unitIsMilitary, unitMadeAnew, upgradeAnew } from './units';
 import { irradiated } from './nuclear';
 import { atRngPoint } from './rand';
 import { knowledgeLook } from './tactical';
@@ -768,24 +768,21 @@ export function minorUpgradeUnit(state: GameState, cityState: CityState, u: Unit
   if (res && res.id !== UNITS[u.type].requiresResource && canPayStockpile(state, cityState.seat, res.id, res.n)) {
     spendStockpile(state, cityState.seat, res.id, res.n, 'ug');
   }
-  u.type = next;
-  u.movesLeft = 0;
-  // the upgrade a new unit (a new id in the records): of its type's own AI
-  // type and homed nowhere (the unit's init 0x563cd0), out of the standing
-  // army (runs/h1_duely1127 city-state 2 t43: its garrison Warrior 44's
-  // Swordsman, the Combat Desire -0.1 -> 0.0)
-  delete u.aiDefender;
-  delete u.aiHomed;
-  // and in no job of an operation: the old unit dead (+0x770), the new one
-  // not assigned to it (+0x7d0) — its team lists it until its next update
-  // drops it (0x73fc75 -> 0x732cd0), released (runs/h1_duely1117 city-state
-  // 4 t91: City Defense's Catapult 1114113 upgraded to the Trebuchet 1179651,
-  // which wanders at t92 and joins the standing army; the team four entries
-  // at 100 to the end look, three at t92)
+  // the upgrade a new unit (`upgradeAnew`): of its type's own AI type and
+  // homed nowhere, out of the standing army (runs/h1_duely1127 city-state 2
+  // t43: its garrison Warrior 44's Swordsman, the Combat Desire -0.1 ->
+  // 0.0), in no job of an operation: the old unit dead (+0x770), the new one
+  // not assigned to it (+0x7d0) — its team lists the old until its next
+  // update drops it (0x73fc75 -> 0x732cd0), released (runs/h1_duely1117
+  // city-state 4 t91: City Defense's Catapult 1114113 upgraded to the
+  // Trebuchet 1179651, which wanders at t92 and joins the standing army; the
+  // team four Catapults at 100 to the end look, three at t92)
+  const old = u.id;
+  upgradeAnew(state, u, next);
   if (cityState.ops) {
     for (const op of opsOf(cityState.ops)) {
-      if (!op.teams.some((t) => t.members.includes(u.id)) || op.released?.includes(u.id)) continue;
-      (op.released ??= []).push(u.id);
+      if (!op.teams.some((t) => t.members.includes(old)) || op.released?.includes(old)) continue;
+      (op.released ??= []).push(old);
     }
   }
   raiseBestTrained(state, cityState.seat, u.type, u.formation ?? 0);

@@ -179,6 +179,7 @@ export function aiView(state: GameState, opts: { updated?: boolean } = {}): AiVi
       return l ? gameTypeOf('leader', l, 'LEADER_') : null;
     },
     units: (i) => unitsOf(state, i).map((u) => unitView(state, u)),
+    unitsDying: (i) => (state.unitsDying ?? []).filter((u) => u.seat === i).map((u) => unitView(state, u)),
     unitReach: (id, turns) => {
       const u = state.units.find((x) => x.id === id);
       return u ? reachPlots(state, u, turns).map((r) => ({ plot: r.tile, turns: r.turns, moves: r.moves })) : [];

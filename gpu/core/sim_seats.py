@@ -4199,10 +4199,10 @@ class SimSeats:
 
     def _upgrade_units(self, row: int, hit: torch.Tensor, sc: torch.Tensor,
                        utp: torch.Tensor) -> None:
-        """`upgradeUnit` — the ordered rungs that pass `_upgrade_ok` change
-        chassis, pay the gold and the new chassis' resource, and spend the rest
-        of the turn. CIV6: promotions and experience ride along, and "units do
-        not Heal upon upgrading"."""
+        """`upgradeUnit` — the ordered rungs that pass `_upgrade_ok` pay the
+        gold and the new chassis' resource and are each made a new unit of it
+        (`_upgrade_anew`), its turn spent. CIV6: promotions and experience
+        ride along, and "units do not Heal upon upgrading"."""
         nxt = self._upgrade_type_of(row, utp)
         ok = hit & (nxt >= 0) & (utp >= 0)
         if not bool(ok.count_nonzero()):
@@ -4228,11 +4228,9 @@ class SimSeats:
             pay = (ok & want).long() * cost
             self.civ_stockpile[:, row].scatter_add_(1, slot.clamp(min=0).unsqueeze(1), -pay.unsqueeze(1))
             self._log_stock((ok & want).nonzero(as_tuple=True)[0], row, slot[ok & want], "ug")
-        self.unit_type.scatter_(1, sc.unsqueeze(1),
-                                torch.where(ok, nc, utp).unsqueeze(1))
-        self.unit_mp.scatter_(1, sc.unsqueeze(1),
-                              torch.where(ok, torch.zeros_like(here),
-                                          self.unit_mp.gather(1, sc.unsqueeze(1)).squeeze(1)).unsqueeze(1))
+        # the upgrade a new unit (`upgradeAnew`)
+        rr = ok.nonzero(as_tuple=True)[0]
+        self._upgrade_anew(rr, sc[rr], nc[rr])
         self._raise_best_trained(row, ok, nc, formation=self.unit_formation.gather(1, sc.unsqueeze(1)).squeeze(1))
         self._quest_unit_added(row, ok, nc)
 
@@ -13004,6 +13002,41 @@ class SimSeats:
         self._carry_capture(rows, src, dst)
         self._occ_set(rows, tile, dst)
         cur[rows] += 1
+
+    def _upgrade_anew(self, rows: torch.Tensor, src: torch.Tensor, to_type: torch.Tensor) -> torch.Tensor:
+        """`upgradeAnew` — the upgrade is a new unit: the major-pool unit `src`
+        [N] of the games `rows` [N] dies as it stands, dying until the turn's
+        end (`unit_dying`), and a unit of `to_type` [N] takes its plot in the
+        next slot of the pool, last in its seat's order: the old's damage,
+        formation, experience, level, promotions and the rest it carries,
+        unfortified, homed nowhere, of its type's own AI type, with no pool
+        slot until its player's pass, on no unit list until its owner's end of
+        turn, its Movement spent. [N] the new slots."""
+        lo = self.POOL_LO["major"]
+        cur = getattr(self, self.POOL_NEXT["major"])
+        dst = cur[rows] + lo
+        assert int(dst.max()) < self.POOL_HI["major"], "major slot pool exhausted"
+        tile = self.unit_tile[rows, src]
+        self._occ_clear(rows, tile, src)
+        carry = [pl for pl in self._UNIT_PLANES if pl not in ("alive", "dying")]
+        vals = {k: getattr(self, f"unit_{k}")[rows, src].clone() for k in carry}
+        for k, v in vals.items():
+            getattr(self, f"unit_{k}")[rows, dst] = v
+        self.unit_alive[rows, src] = False
+        self.unit_dying[rows, src] = True
+        self.unit_alive[rows, dst] = True
+        self.unit_dying[rows, dst] = False
+        self.unit_type[rows, dst] = to_type
+        self.unit_mp[rows, dst] = 0
+        self.unit_fortify[rows, dst] = 0
+        self.unit_defender[rows, dst] = False
+        self.unit_homed[rows, dst] = False
+        self.unit_pslot[rows, dst] = -1
+        self.unit_list_seat[rows, dst] = -1
+        self._occ_set_new(rows, tile, dst)
+        cur[rows] += 1
+        self._gen_ver += 1
+        return dst
 
     def _engineer_types(self, type_idx: torch.Tensor) -> torch.Tensor:
         """CIV6 (Mausoleum): "Great Engineers have an additional charge" — the

@@ -143,6 +143,9 @@ export interface AiView extends AiValueView {
   cityPlots(seat: number): readonly number[];
   leaderType(seat: number): string | null;
   units(seat: number): readonly AiUnitView[];
+  /** the seat's units an upgrade took off this turn, as they stood
+   *  (`GameState.unitsDying`): the player's unit list still finds them by id */
+  unitsDying(seat: number): readonly AiUnitView[];
   /** a unit's planning reach within `turns` on the Movement it has left, in
    *  the pathfinder's order */
   unitReach(unitId: number, turns: number): readonly AiReachView[];

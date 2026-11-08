@@ -47,7 +47,7 @@ import { applySeatUnitOrders, buySeatBuilding, declareWar, districtSiteCost, dis
 import { addEnvoys, cityStateAt, declareWarOnCityState, minorCity, minorReplaceCitizens, placeCityStateAt, sueForPeaceWithCityState } from '../core/cityStates';
 import { CP_ACCEPTED, CP_CANCELLED, CP_IN_PROGRESS, contractById } from '../core/aiContracts';
 import { availableBuildings, canPlaceWonder, validImprovements, wallsMax } from '../core/rules';
-import { builderHarvest, builderRemoveFeature, spawnUnit, tallyUnitMade, trainableUnits, builderCost, traderCost, disbandUnit, drawAndPayGoody, grantedMoves, unitFullMoves, restUnit, upgradeUnit, unitsAt, unitDomain, fortifyBonus, crossesRiver, waterWalks, cityAtIndex, raiseBestTrained, recordAttacker, unitMadeAnew, FORTIFY_MAX_TURNS, ANTIQUITY_CIVIC, SHIPWRECK_CIVIC } from '../core/units';
+import { builderHarvest, builderRemoveFeature, spawnUnit, tallyUnitMade, trainableUnits, builderCost, traderCost, disbandUnit, drawAndPayGoody, grantedMoves, unitFullMoves, restUnit, upgradeUnit, upgradeAnew, unitsAt, unitDomain, fortifyBonus, crossesRiver, waterWalks, cityAtIndex, raiseBestTrained, recordAttacker, unitMadeAnew, FORTIFY_MAX_TURNS, ANTIQUITY_CIVIC, SHIPWRECK_CIVIC } from '../core/units';
 import { availableCivicsIn, availableTechsIn, computeUnlocks, goldPrice, governmentSlots, policyWireOf, seatGovernment, darkAgeEra,
   unlockedPolicyIds } from '../core/effects';
 import { selectResearch, chopGrant, harvestGrant, applyLumpYield, holdResearchEra, researchCost } from '../core/economy';
@@ -356,6 +356,9 @@ interface Ctx {
   /** each unit's type as the city-states' and Free Cities' turns left the
    *  units (the moment of their end looks), by id */
   minorLookTypes: Map<number, string>;
+  /** the units the minors' turns' upgrades took off, as they stood
+   *  (`unitsDying`), for their units' passes after the turn's close */
+  minorDying: Unit[];
   memoryClean: Map<number, boolean>;
   civicScores: Record<ResearchParty, ResearchScoreTally>;
   /** the game's city build value tables (`<dump>.logs/AI_CityBuild.csv`'s
@@ -1289,6 +1292,9 @@ function minorAi(ctx: Ctx, b: TurnRecord, turn: number, made: ReadonlySet<Unit>,
   revealedWas: ReadonlyMap<number, number[] | undefined>): void {
   const { state } = ctx;
   const copy = deserialize(serialize(state));
+  // ...its units' passes after the turn's close read the units the turn's
+  // upgrades took off, as the game's turn does (`unitsDying`)
+  if (ctx.minorDying.length) copy.unitsDying = structuredClone(ctx.minorDying);
   landMajorDistricts(ctx, b, turn, copy);
   // the revealed plots as the turn opened and those its ground sees as its
   // turn comes, a plot annexed in a major's start revealing the plots beside
@@ -3764,15 +3770,13 @@ const res = buyTile(state, city.id, d.plot, seat);        if (!res.ok) setTileOw
           : upgradeUnit(state, u, u.seat);
         ctx.units.delete(d.unit);
         ctx.units.set(d.into, u);
-        // the game's upgraded unit is a new one, in none of the minor's
-        // "Upgrade Units" trees
-        if (minor?.upgradeTrees) for (const t of minor.upgradeTrees) t.units = t.units.filter((id) => id !== u.id);
         if (!res.ok) {
           const t = r ? engineRowOf(ctx.cat, 'unit', r.type) : null;
           const s = seatOf(state, u.seat);
           const to = t ?? upgradeType(state, u.seat, u.type);
           if (s) s.treasury -= minor ? MINOR_UPGRADE_GOLD : to ? upgradeGoldCost(state, u.seat, u.type, to, u.leviedFrom !== undefined, u.formation ?? 0) : 0;
-          if (t) u.type = t;
+          // the record's upgrade a new unit as the verb's (`upgradeAnew`)
+          if (t && t !== u.type) upgradeAnew(state, u, t);
           u.movesLeft = 0;
           // the upgrade the record made raises its seat's bests and answers
           // its Train Unit quests as the verb's does
@@ -5604,7 +5608,7 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
     researchAi: report.researchAi, researchScores: report.researchScores, agendaCivics: null, researchBefore: new Map(), researchAtTurn: new Map(), aiResearchLog: loadAiResearchLog(dumpPath),
     tactical: loadTactical(dumpPath), barbTally: report.barbTactics, minorTally: report.minorTactics, minorDraws: report.minorDraws,
     civicAi: report.civicAi, civicScores: report.civicScores, civicBefore: new Map(), aiCivicLog: govtLog.civics, aiPolicyLog: govtLog.policies,
-    scores: report.scores, turn: recs[0].turn, memoryLogs: new MemoryLogs(dumpPath), gameMemory: GameMemory.of(dumpPath), armyLogged: new Map(), minorLookTypes: new Map(),
+    scores: report.scores, turn: recs[0].turn, memoryLogs: new MemoryLogs(dumpPath), gameMemory: GameMemory.of(dumpPath), armyLogged: new Map(), minorLookTypes: new Map(), minorDying: [],
     // a game from its first turn opens on no memory, the game's as well
     memoryClean: new Map([...first.playerOfSeat].filter(([seat]) => minorAiSeat(seat) || isBarbSeat(seat)).map(([, p]) => [p, recs[0].turn <= 1] as const)),
     cityBuildLog: loadCityBuildTables(dumpPath), cityBuild: newCityBuildTally(), cityBuildPer: new Map(),
@@ -6010,8 +6014,20 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
         const ups = ds.filter((d) => d.kind === 'upgrade' && d.player === player && !landed.has(d));
         if (ups.length) {
           const rng = state.rngState;
+          const was = new Map(ups.flatMap((d) => {
+            const u = d.kind === 'upgrade' ? unitOf(ctx, d.unit) : undefined;
+            return u ? [[u, u.id] as const] : [];
+          }));
           applyPhase(ctx, ups, 'after', b, b, new Set([player]));
           state.rngState = rng;
+          // ...made before its end of turn, which erased the old unit off its
+          // unit list and listed the new (`minorEndTurnList`)
+          const cs = state.cityStates.find((c) => c.seat === seat);
+          for (const [u, id] of cs?.unitsListed ? was : []) {
+            if (u.id === id || !(id in cs!.unitsListed!)) continue;
+            delete cs!.unitsListed![id];
+            cs!.unitsListed![u.id] = u.type;
+          }
         }
       };
       // ...and with the units the record took off that the log removes after
@@ -6176,7 +6192,9 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
         traceMinorUpgrade(null);
         for (const [u, i] of fallen.reverse()) state.units.splice(Math.min(i, state.units.length), 0, u);
       }
-      ctx.minorLookTypes = new Map(state.units.map((u) => [u.id, gameTypeOf('unit', u.type, 'UNIT_')]));
+      // ...a team's member an upgrade took off read as it stood (`unitsDying`)
+      ctx.minorLookTypes = new Map([...state.unitsDying ?? [], ...state.units].map((u) => [u.id, gameTypeOf('unit', u.type, 'UNIT_')]));
+      ctx.minorDying = state.unitsDying ?? [];
       takeBarbs();
       worldCongress(state);
       turnClose(state);

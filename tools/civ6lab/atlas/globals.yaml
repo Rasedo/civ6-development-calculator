@@ -906,6 +906,15 @@
   context:
     - "...b3e50 (args: row, &discount, turns, H, player, the row's record +0x530): past H, -9999 (0xf04cb0). The own term: PSEUDOYIELD_TECHNOLOGY of 1.0 (0x7a60d0: amount x DefaultValue x max(0,..."
   review: reviewed
+- addr: 0xf07400
+  kind: global
+  status: PARTLY
+  readings:
+    - "C-129: the upgrade is a new unit, its old self dying in its pool slot to the turn's end — READ (0xa49cb0, 0x9402a0, 0x4ef040, 0x4ef6d0), both twins"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - ...0x5f0 and 0x55e4a0 / 0x55dc00's fixed value the new unit takes; the ObjectPairingManager (@0xf07400) pairing whose entry the command re-keys to the new unit (0x9297f0 -> 0x9293b0); whether the cre...
+  review: imported
 - addr: 0xf0bf40
   kind: global
   semantics: "the ring walk's six steps: (0, 1), (-1, 0), (1, -1), (0, -1), (1, 0), (-1, 1) in (x - y // 2, y) — SOUTHEAST, WEST, NORTHEAST, NORTHWEST, EAST, SOUTHWEST (the fire spread's order)."

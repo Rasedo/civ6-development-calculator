@@ -465,6 +465,12 @@ GAME = {
     "barbExplored": lambda sim, b, rows: [sim.barb_explored[b].nonzero(as_tuple=True)[0].tolist()],
     "barbTribes": lambda sim, b, rows: [_barb_tribes_row(sim, b)],
     "unitPools": lambda sim, b, rows: [_unit_pools_row(sim, b)],
+    # the units the turn's upgrades took off, as they stood (`_upgrade_anew`):
+    # seat, pool slot (-1 none), unit type, hit points, sorted
+    "unitsDying": lambda sim, b, rows: [[x for r in sorted(
+        (int(se), int(sl), int(t), int(h)) for d, se, sl, t, h in zip(
+            sim.unit_dying[b].tolist(), sim.unit_seat[b].tolist(), sim.unit_pslot[b].tolist(),
+            sim.unit_type[b].tolist(), sim.unit_hp[b].tolist()) if d) for x in r]],
     "cityCount": lambda sim, b, rows: [sum(1 for c, _ in _city_rows(sim, b) if c < sim.n_majors)],  # civSeats' cities, as TS counts
     "unitCount": lambda sim, b, rows: [len(_unit_rows(sim, b))],
     "climatePhase": lambda sim, b, rows: [int(sim.climate_idx[b])],

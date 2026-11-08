@@ -2393,18 +2393,19 @@ class SimMinors:
         own = self.tile_seat.gather(1, tile) == 100 + s
         return self._minor_upgrade_visible(s) & own & (self.major_unit_mp > 0)
 
-    def _minor_upgrade_unit(self, s: int, go: torch.Tensor, first: torch.Tensor) -> torch.Tensor:
+    def _minor_upgrade_unit(self, s: int, go: torch.Tensor, first: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
         """`minorUpgradeUnit` for the unit at major pool slot `first` [B] where
         `go`: the treasury covering `upgradeGold` and the full test passing,
         it pays; the minor asks no strategic resource, paying the new chassis'
         cost where its stock covers it; the upgrade spends the unit's turn.
-        [B] whether it upgraded."""
+        [B] whether it upgraded, and [B] the new unit's major pool slot (-1
+        none)."""
         fc = first.clamp(min=0)
         ok = (self._minor_can_upgrade(s).gather(1, fc.unsqueeze(1)).squeeze(1)
               & self._afford(self.citystate_treasury[:, s], self._mb_upgrade_gold))
         go = go & (first >= 0) & ok
         if not bool(go.count_nonzero()):
-            return go
+            return go, torch.full_like(first, -1)
         ut = self.major_unit_type.clamp(min=0, max=self.NU - 1)
         nxt = self._minor_upgrade_type(s)
         rr = go.nonzero(as_tuple=True)[0]
@@ -2423,22 +2424,21 @@ class SimMinors:
             if bool(pay.count_nonzero()):
                 bank.scatter_add_(1, k.clamp(min=0).unsqueeze(1), -(pay.long() * n_res).unsqueeze(1))
                 self.citystate_stockpile[rr, s] = bank
-        self.major_unit_type[rr, u] = nxt[rr, u]
-        self.major_unit_mp[rr, u] = 0
-        # the upgrade a new unit: of its type's own AI type, homed nowhere
-        self.major_unit_defender[rr, u] = False
-        self.major_unit_homed[rr, u] = False
-        # and in no job of an operation: the new unit not assigned to it
-        # (+0x7d0), its team listing it until its next update, released
+        # the upgrade a new unit (`upgradeAnew`), in no job of an operation:
+        # the old unit's team lists it until its next update, released
         # (`minorUpgradeUnit`)
         uu = torch.where(go, first, torch.full_like(first, -2))
         held = (self.mops_mem[:, s] == uu.view(-1, 1, 1, 1)).flatten(2).any(dim=2)
         self.mops_rel[rr, s, :, u] |= held[rr]
-        self._gen_ver += 1
+        to = nxt[rr, u]
+        made = torch.full_like(first, -1)
+        made[rr] = self._upgrade_anew(rr, u, to) - self.POOL_LO["major"]
         # the upgraded chassis raises the minor's base (`raiseBestTrained`)
-        self._raise_best_trained(self._CITY_MINOR0 + s, go, self.major_unit_type.gather(1, fc.unsqueeze(1)).squeeze(1),
+        typ = self.major_unit_type.gather(1, fc.unsqueeze(1)).squeeze(1)
+        typ[rr] = to
+        self._raise_best_trained(self._CITY_MINOR0 + s, go, typ,
                                formation=self.major_unit_formation.gather(1, fc.unsqueeze(1)).squeeze(1))
-        return go
+        return go, made
 
     def _naval_capable_minor(self, s: int) -> torch.Tensor:
         """[B] — `cityNavalCapable` for minor `s`'s city: enterable water

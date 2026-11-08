@@ -358,8 +358,9 @@ export function upgradeTreesTick(state: GameState, cs: CityState, pass: Pass, tr
         // the upgrade is a new unit, out of the pass: no tactical row that
         // turn (runs/h1_duely1121 t61 city-state 2's Swordsman 1310720,
         // UnitAddedToMap, no AI_Tactical.csv row)
+        const id = u.id;
         if (minorUpgradeUnit(state, cs, u)) {
-          held.delete(u.id);
+          held.delete(id);
           passEnd(pass, u);
         }
         continue;

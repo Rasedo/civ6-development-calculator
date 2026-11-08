@@ -649,6 +649,10 @@ const GAME: Record<string, Extractor> = {
     out.push(...row(FREE_SEAT, s.freeSeat?.unitPool ?? { size: 0, free: [], dying: [] }));
     return [out];
   },
+  // the units the turn's upgrades took off, as they stood (`upgradeAnew`):
+  // seat, pool slot (-1 none), unit type, hit points, sorted
+  unitsDying: (s) => [(s.unitsDying ?? []).map((u) => [u.seat, u.slot ?? -1, idx(UNIT_IDX, u.type), u.hp])
+    .sort((a, b) => a[0] - b[0] || a[1] - b[1] || a[2] - b[2] || a[3] - b[3]).flat()],
   cityCount: (s) => [civSeats(s).reduce((n, x) => n + x.cities.length, 0)],
   unitCount: (s) => [s.units.length],
   climatePhase: (s) => [s.climateIdx ?? -1],

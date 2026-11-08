@@ -59,6 +59,7 @@
     - cpu/core/operations/nodes.ts:targets
     - cpu/core/minorBuild.ts:minorUpgradeUnit
     - gpu/core/sim_minorops.py:_mops_teams_update
+    - cpu/core/minorBuild.ts:old
   readings:
     - "C-99: Defend Units' ship release and the team update's members — READ (0x73d1f0, 0x73fba0 at 0x73fc75 -> 0x732cd0), both twins"
     - "C-128: a unit made anew leaves its operation and its standing army — READ, both twins"
@@ -492,6 +493,7 @@
   readings:
     - "C-129: the recruit's minimums leave the offer, the strength counts the list as listed — READ (0x73be10 at 0x73c63e..0x73c77b, 0x73c7c0, 0x7383d0, 0x8fd8f0), both twins; the replay's upgrade a new id"
     - "C-129: the teams recruit from the offer's copy in pool slot order; the id sort orders the original alone, for the set difference — READ (0x738050 at 0x7380c8..0x738108, 0x738152, 0x73819d, 0x7381e7, 0x738250..0x738288), both twins"
+    - "C-129: the upgrade is a new unit, its old self dying in its pool slot to the turn's end — READ (0xa49cb0, 0x9402a0, 0x4ef040, 0x4ef6d0), both twins"
   review: reviewed
 - addr: 0x73d1f0
   final: 0x4e09f0
@@ -689,6 +691,7 @@
     - cpu/core/minorBuild.ts:minorUpgradeUnit
     - cpu/core/operations/operation.ts:keepMembers
     - gpu/core/sim_minorops.py:_mops_teams_update
+    - cpu/core/minorBuild.ts:old
   readings:
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
     - "C-97: City Defense and the assault target's validity — the city's threat, the defence event, Is City Threatened, Garrison City and the district target's validity READ; the threat's level terms, the garrison's swap and the team's unit to build unread"
