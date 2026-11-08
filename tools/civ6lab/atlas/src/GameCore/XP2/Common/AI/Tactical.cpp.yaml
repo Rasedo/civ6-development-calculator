@@ -33,13 +33,20 @@
 - addr: 0x7704e0
   final: 0x502660
   kind: function
-  semantics: the attack results' comparator (EASTL merge sort).
-  status: PARTLY
-  impl: [cpu/core/tactical.ts:assignTo, cpu/core/tactical.ts:assignedBefore]
+  semantics: "the attack results' comparator (EASTL merge sort) over the 0x38-byte entries (+0x4 the unit's id Unit +0x100, +0x8 / +0xc its plot, +0x10 / +0x14 its spot, +0x24 its damage Unit +0xcf0; written at 0x776f1a..0x776ff4): one with a spot first; one whose spot is the other's plot after it, one standing on the other's spot before it; the shorter move (GetPlotDistance plot to spot); the less damaged; the lower unit id (unsigned, the serial in its high half: the unit made first)."
+  status: READ
+  cases:
+    - recording: h1_duelz1124
+      turn: 29
+      value: city-state 3's City Defense Warriors 458755 (41:11 -> 42:10), 327681 (40:11 -> 41:11), 589824 (41:12 -> 40:11) on 41:10, all undamaged and one plot each, run 458755 first over 589824 (serial 7 under 9, slot 3 over 0), as logged
+  impl:
+    - cpu/core/tactical.ts:assignTo
+    - cpu/core/tactical.ts:assignedBefore
+    - gpu/core/sim_tactics.py:_tac_merge_sort
   readings:
     - "C-95: Attack Units — READ, ported"
     - "C-97: the war operations — the war candidates, the city value's frame, the assault nodes and Attack Units READ; the loyalty lead's sources, the team update's danger and the assault's executions PARTLY READ"
-  notes: ["imported: READ in its section, no confirming case found beside it"]
+    - "C-125: the attack results' last tie-break is the unit id — READ (0x7704e0 at 0x770642..0x770648, 0x776f1a..0x776f27), both twins"
   context:
     - "...at capacity 1 (the first largest positive), the move λ 0x770710. The results sorted by 0x7704e0 through EASTL's merge sort (halves n / 2)."
   review: reviewed
@@ -551,6 +558,7 @@
     - "C-95 / C-123 / C-125: the stand-to-attack site, a district closed to a ranged unit, City Attack's members and log, the siege gain's lift, a city's blow back, the units of no zone of control — READ (0x2720a0 at 0x272255..0x272330, 0x271be0 at 0x271e69 / 0x271f2e, 0x586360 at 0x5866c9..0x58671f, 0x8109e0, 0x80ceb0 at 0x80d6f9, 0x771f80, 0x80f6b0 at 0x80f75f / 0x80f824 / 0x80f95a, 0x791470, 0x56d6c0), both twins"
     - "C-123 / C-95: a Trader stands on the trade layer; a city's shot is a COMBAT_DISTRICT spot's blow back — READ (0x901e0, 0x586360 -> 0x208b80, 0x585eb0 -> 0x585d90, 0x791470 at 0x7917f7..0x7918f7 -> 0x249ee0 / 0x205720, 0x776140 at 0x776780..0x7767fa), both twins"
     - "C-123 / C-95: the Plunder Trade Route command and the AI's plunder after the move — READ (0x89dae0, 0x89dfc0, 0x9555a0, 0x9559a0, 0x5545e0 at 0x554667 / 0x554d4c, 0x58fc20, 0x7746a0, 0x70a440, 0x771f80 at 0x7722b6 / 0x77254e / 0x77277f, 0x776140 at 0x776424..0x776470), both twins"
+    - "C-125: the attack results' last tie-break is the unit id — READ (0x7704e0 at 0x770642..0x770648, 0x776f1a..0x776f27), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "- THE ASSIGNMENT (0x776140): a target's health floor(100 x 281 / 256) less its damage (1.1 in 24.8); for MEDIUM /..."

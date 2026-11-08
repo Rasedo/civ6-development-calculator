@@ -1776,7 +1776,10 @@ class SimTactics:
             c = self._tac_step(rows, frm, pc, dcol, ut, ign_shore, waive) + carry
             on = on & ~((mp < c) & (mp < full))
             tw = self.water[rows, pc]
-            cross = (self.water[rows, frm] != tw) & ~naval & ~ww & ~self._owned_exit(rows, frm)
+            # a land unit's step across the shore carries, a step off an owned
+            # water plot too (`walk`: no crossing to the pathfinder, the step
+            # caps the Movement it lands with)
+            cross = (self.water[rows, frm] != tw) & ~naval & ~ww
             max_to = torch.where(tw, fs_w, fl_w)
             carry = torch.where(on & cross & (mp > max_to), mp - max_to, torch.zeros_like(carry))
             mp = torch.where(on, (mp - c).clamp(min=0), mp)
@@ -3196,9 +3199,9 @@ class SimTactics:
         frm = here
         dmg = int(self.rules.combat["unitHp"]) - uhp
         slot = torch.where(got, us, torch.full_like(us, -1))
-        # the tie-break: the pool slot
-        pslot = getattr(self, "barb_unit_slotno" if seat == BARB_SEAT else f"{pre}_unit_pslot").gather(1, us)
-        perm = self._tac_merge_sort(uv.sum(dim=1), got, move, frm, dmg, pslot)
+        # the tie-break: the unit made first (the unit id, its serial high;
+        # the pool's storage only appends, so its index runs in making order)
+        perm = self._tac_merge_sort(uv.sum(dim=1), got, move, frm, dmg, us)
         # a CIVILIAN or TRADER target's (+0x33): no strike, the move onto it
         # captures a civilian, a Trader's plot a plain step
         kd = kinds.gather(1, tk.gather(1, ck.gather(1, c4c)))
@@ -3621,7 +3624,8 @@ class SimTactics:
         1 where the goal is barred to a member off it — one of its own
         stacking with it or, in a formation, with the formation's other
         member —, and with a Leader Tag named), its plot (its planning's at
-        the radius in the goal's region, else the ring walk's), its turn
+        the radius in the goal's region or where it or the goal holds none, else
+        the ring walk's), its turn
         done, its move order — over the pass's danger map `danger` [B, T] its
         flag 8 where the operation is `weak` [B] (its strength below its
         target's) for a unit with no combat or one in a formation, else for a
@@ -3695,7 +3699,10 @@ class SimTactics:
             strike = torch.zeros_like(act[rows])
             p = self._op_reach_at(rows, ur, gr, _PLAN_TURNS, False, r, rowof, res, pre, seat)
             rg = region[rows]
-            pin = (p >= 0) & (rg >= 0) & (self.tile_region[rows, p.clamp(min=0)] == rg)
+            # the planning's plot taken where it or the goal holds no region,
+            # or both hold the same (0x817a1c..0x817a6a)
+            pr = self.tile_region[rows, p.clamp(min=0)]
+            pin = (p >= 0) & ((pr < 0) | (rg < 0) | (pr == rg))
             dest = torch.where(pin, p, dest)
             walk = ~pin & (r > 0)
             if bool(walk.count_nonzero()):

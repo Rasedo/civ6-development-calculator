@@ -52,6 +52,7 @@
     - "C-99: the stacking count holds other players' units, the wanders' kept-out plots, a Harbor's water no shore — READ (0x585d90, 0x585eb0, 0x2720a0, 0x77bf50, 0x77b9a0, 0x530240), both twins"
     - "C-99: an owned water plot no shore, a move order carried on as the turn ends — READ (0x530240, 0x66790, 0x66a90, 0x66680, 0x814e0, 0x81240, 0x7eeba0), both twins"
     - "C-95: the embark rules for a formation that may embark, a district's zone unseen, a city's kill in the planning, a raised unit's AI type, a move order's attack spot — READ (0x530420, 0x530240, 0x52fe90 at 0x52fed4, 0x530f50 at 0x531168, 0x791470 at 0x791677, 0x79b9c0), FIT (the move order's attack spot), both twins"
+    - "C-99: Operation Move takes a planning plot of no region; a step off owned water caps the Movement it lands with — READ (0x816cb0 at 0x817a03..0x817a6a), a fit (the cap), both twins"
   notes:
     - ".claude/scratchpad/mu1/readings_c96.md: ...plot is a city's or water (0x531510); the embark   rule 0x530420 (land to water) and the disembark 0x530240 waive   MOVEMENT_EMBARK_COST where a district with FreeEmbark (Districts +0xe1   bit 2, `dll_rowmap..."
   context:

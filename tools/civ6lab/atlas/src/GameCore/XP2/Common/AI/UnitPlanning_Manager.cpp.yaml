@@ -126,6 +126,7 @@
     - "C-99: the city-states' Promotion move on the replay's copy, Garrison City's swap — READ, both twins"
     - "C-127: a unit bought this turn holds no planning, so the tree that bought it ends — READ (records, aimem), both twins"
     - "C-124 / C-95: every search but the planning's pays the stacking +1e6, the cost reads the child's revealed bit, Explore's flag 0x40 prices the unrevealed — READ (0x270dd0 at 0x270e55 / 0x270e86 / 0x270ff2 / 0x2711c3..0x271268 / 0x2713d3, 0x502aa0, 0x26df90's callers 0x716739 / 0x70aadd, 0x70ce90 at 0x70ced5, 0x803060 at 0x80316f), both twins"
+    - "C-99: Operation Move takes a planning plot of no region; a step off owned water caps the Movement it lands with — READ (0x816cb0 at 0x817a03..0x817a6a), a fit (the cap), both twins"
   context:
     - ...Pillage 0x803250, Naval Escort 0x817f60; Operation Move's unit tactical block (+0x1fc0, 0x791300); the city assault nodes (Can Alpha City, Is At War, Operation Diplomacy, Operation Pil...
   review: reviewed

@@ -1162,7 +1162,10 @@ function walk(state: GameState, unit: Unit, path: number[], dest: number, mates:
     if (enemyOnLayer(state, unit, p)) break;
     const cost = stepCost(state, unit, tiles[from], tiles[p], embarks) + carry;
     if (mp < cost && mp < full) break;
-    const cross = shoreCrossing(unit.type, tiles[from], tiles[p]);
+    // a land unit's step across the shore carries, a step off an owned water
+    // plot too: the pathfinder prices that step as no crossing, the walk caps
+    // the Movement it lands with (`stepUnit`)
+    const cross = !UNITS[unit.type]?.naval && !waterWalks(unit.type) && isWater(tiles[from]) !== isWater(tiles[p]);
     const maxTo = domainPool(state, unit, isWater(tiles[p])) * MP_SCALE;
     carry = cross && mp > maxTo ? mp - maxTo : 0;
     mp = Math.max(0, mp - cost);
@@ -2686,8 +2689,8 @@ export function assignTo(state: GameState, pass: Pass, units: Unit[], targets: T
 /** the order the assignments run in (0x7704e0): one with a spot before one
  *  without; one whose spot is where the other stands after it, one standing
  *  where the other's spot is before it; else the shorter move, at equal
- *  lengths the less damaged unit, then the lower pool slot (the game compares
- *  the unit IDs, whose low half is the slot) */
+ *  lengths the less damaged unit, then the lower unit id (the entry's +0x4,
+ *  Unit +0x100: the serial in its high half, so the unit made first) */
 function assignedBefore(state: GameState, a: Assigned | null, b: Assigned | null): boolean {
   if (!a || !b) return !!a && !b;
   if (a.move === b.from) return false;
@@ -2696,7 +2699,7 @@ function assignedBefore(state: GameState, a: Assigned | null, b: Assigned | null
   const db = plotDistance(state, b.from, b.move);
   if (da !== db) return da < db;
   if (a.damage !== b.damage) return a.damage < b.damage;
-  return (a.unit.slot ?? 0) < (b.unit.slot ?? 0);
+  return a.unit.id < b.unit.id;
 }
 
 /** EASTL's merge sort with a buffer (0x76f0f0 -> 0x76f320): halves of n / 2,
@@ -3837,7 +3840,9 @@ function moveBarred(state: GameState, u: Unit, goal: number, paths: ReadonlySet<
  * stacks with any member: runs/h1_duely1121 t157-t173 Builder Capture's
  * Settlers beside their Musketmen go for 4:19 / 4:18 beside the camp 3:19
  * its Spearman holds); the first plot of its planning of two turns at the radius
- * (0x791300) where it lies in the goal's region, else of the plots within
+ * (0x791300) where it lies in the goal's region or where it or the goal lies
+ * in none (0x817a1c..0x817a6a: a water plot; runs/h1_duelz1117 t158 city-state
+ * 3's Crossbowman 1310722 for 42:13 goes to the coast 43:13), else of the plots within
  * the radius of the goal (the ring walk 0x6aef0, the test 0x815d50) one in
  * the goal's region before one outside, then the nearest it, its own plot or
  * one with none of its own that the unit may stand on, whatever its path
@@ -3882,7 +3887,8 @@ export function passMoveExec(state: GameState, pass: Pass, members: readonly num
     let dest = goal;
     let strike = false;
     const p = reachAt(state, pass, u, goal, PLAN_TURNS, false, r);
-    if (p >= 0 && region >= 0 && (state.map.tiles[p].region ?? -1) === region) dest = p;
+    const pRegion = p >= 0 ? state.map.tiles[p].region ?? -1 : -1;
+    if (p >= 0 && (pRegion < 0 || region < 0 || pRegion === region)) dest = p;
     else if (r > 0) {
       const ground = groundOf(state, u, false, false, true, mine);
       let best = -1;

@@ -10555,3 +10555,57 @@ GPU `_minor_danger_open` written in `_city_state_phase`
 - Open (not ported): CityBuildAI +0x5e8's writer (the constructor writes
   -9999; the Economic AI's plot purchase 0x68a100 reads it); runs/h1_duelz1121
   city-state 4 Expropriation 0.5 t236-249 is this analyzer's term.
+
+## C-125: the attack results' last tie-break is the unit id — READ (0x7704e0 at 0x770642..0x770648, 0x776f1a..0x776f27), both twins
+
+`assignedBefore` (cpu/core/tactical.ts); GPU `_tac_merge_sort`'s key, the
+pool storage index (gpu/core/sim_tactics.py `_tac_assign`).
+
+- THE ENTRY (0x776140 at 0x776f1a..0x776ff4, 0x38 bytes): +0x0 the owner
+  (word), +0x4 the unit's id (Unit +0x100, the serial in its high half),
+  +0x8 / +0xc its plot, +0x10 / +0x14 its spot, +0x24 its damage (Unit
+  +0xcf0).
+- THE COMPARATOR (0x7704e0): a spot before none; a spot on the other's plot
+  after it, a plot on the other's spot before it; the shorter plot-to-spot
+  distance; the lower damage; then the lower id, unsigned (0x770642: +0x4
+  against +0x4, `setb`) — the unit made first, not the lower pool slot. The
+  engines' unit ids run in making order within a player (the replay's
+  import numbers each record's units by serial; the GPU pools only append).
+- Confirmed (one-seed aimem trace): runs/h1_duelz1124 t29 city-state 3's
+  City Defense Warriors 458755 on 41:11, 327681 on 40:11 and 589824 on
+  41:12 against the barbarian Warrior on 41:10, all undamaged and one plot
+  from their spots: the game runs 458755 (serial 7, slot 3) before 589824
+  (serial 9, slot 0), 589824 last, and 589824 kills and advances onto
+  41:10 — "At 41:11 ... At 40:11 ... At 41:12" as logged; the old slot key
+  ran 589824 first and 327681 took the kill (two plot misses).
+- Open: an upgrade the engines make in the pass keeps the unit's id, where
+  the game's new unit takes a new serial.
+
+## C-99: Operation Move takes a planning plot of no region; a step off owned water caps the Movement it lands with — READ (0x816cb0 at 0x817a03..0x817a6a), a fit (the cap), both twins
+
+`passMoveExec`, `walk` (cpu/core/tactical.ts), `stepUnit` (cpu/core/units.ts);
+GPU `_op_move_exec`'s `pin` and the walk's `cross` (gpu/core/sim_tactics.py),
+`_step_verb`'s `_dock` (gpu/core/sim_seats.py).
+
+- OPERATION MOVE'S PLOT (0x816cb0 at 0x817a03..0x817a6a): the planning's
+  first plot at the radius (0x791300) is the destination where its plot
+  holds no region (Plot +0x18 null: a water plot), where the goal's holds
+  none, or where both hold the same region id; else, with a radius, the
+  ring walk. Confirmed: runs/h1_duelz1117 t158 city-state 3's new City
+  Defense, its Crossbowman 1310722 on 1:11 for 42:13 at radius 1, takes its
+  planning's 43:13 (the coast, after 43:11 at 2) and ends there, as logged
+  ("1:11, 43:13, 43:13"); the region test alone sent it to the ring's 43:12.
+- A STEP OFF AN OWNED WATER PLOT (a fit, records): the pathfinder prices it
+  as no shore crossing (0x530240's domain mask: the unit lands with its
+  embarked Movement), but the unit's Movement is capped at its land pool
+  before the step is paid, and the walk carries the excess as at any
+  crossing. Confirmed (one-seed aimem traces): runs/h1_duelz1117 city-state
+  2's Line Infantry 1179654 (land 2, embarked 3 / 5): t160 on its Harbor
+  water 14:7 (embarked, 3) for 15:10 lands on 15:8 and steps to 15:9 alone
+  (2 - 1 - 1), as logged; t201 on 14:6 (5) for 16:6 walks 14:7, lands on
+  15:8 with 1 and holds there short of the Hills 15:7, its carried order
+  not walking on, as logged (UnitMoved 15:8 then two
+  UnitOperationSegmentComplete). The cap's writer (the step's domain change
+  after 0x26fe20) is unread; a formation's riders keep their own rule.
+- Open: 1117 t188 the same unit's step 14:7 -> 15:6 (an unowned water
+  plot by our borders), 1117 t220 its Wander target.
