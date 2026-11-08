@@ -500,7 +500,28 @@ GAME = {
     "freeAiSerials": lambda sim, b, rows: [[int(sim.cai_c_serial[b, sim.FR]), *_tree_pool(sim, b, sim.FR)]],
     "storms": lambda sim, b, rows: [_storm_table(sim, b)],
     "droughts": lambda sim, b, rows: [_drought_table(sim, b)],
+    "tradeEdges": lambda sim, b, rows: [_trade_edge_table(sim, b)],
 }
+
+
+def _trade_edge_table(sim, b: int) -> list[int]:
+    """The trade graph's edges whose two cities still live (their keys the
+    living cities' at the two centres), sorted by (origin centre, destination
+    centre): [origin, destination, length, *path] — TS's `tradeEdges` row."""
+    vx = sim._trade_vertices(b)
+    rows = []
+    for k in range(sim.trade_edge_ok.shape[1]):
+        ka = int(sim.trade_edge_ok[b, k])
+        if ka < 0:
+            continue
+        o, d = int(sim.trade_edge_o[b, k]), int(sim.trade_edge_d[b, k])
+        if vx.get(o) != ka or vx.get(d) != int(sim.trade_edge_dk[b, k]):
+            continue
+        path = [int(x) for x in sim.trade_edge_path[b, k].tolist() if x >= 0]
+        if path:
+            rows.append([o, d, len(path), *path])
+    rows.sort(key=lambda r: (r[0], r[1]))
+    return [x for r in rows for x in r]
 
 
 def _storm_table(sim, b: int) -> list[int]:

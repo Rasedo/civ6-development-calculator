@@ -13,7 +13,7 @@ import { civOf, civsAtWar, seatOf } from './seats';
 import { GOLD_PURCHASE_MULT, FAITH_PURCHASE_MULT, CITY_WORK_RADIUS } from '../data/constants';
 import { PEACE_GOLD_COST, DED_MONUMENTALITY } from '../data/seats';
 import { tradeCapacity, freeTrader, routeYields, routeYieldsInternational, cityStateRouteYields, routePostGold } from './trade';
-import { tradeCourse, tradeReach } from './tradePath';
+import { tradeAdmits, tradeReach } from './tradePath';
 import { isExplored } from './fog';
 import {
   buildingFaithCost, faithBuyableClass, faithBuysLandUnits, goldAffordable, naturalistCost, rockBandCost,
@@ -39,7 +39,7 @@ import { tilesWithin } from '../../world/hex';
 /** The route CANDIDATE this seat would take — over EVERY legal destination at
  * once: own cities in array order, then MET city-states, then every other
  * major's EXPLORED cities (from asc, to asc, cityState asc, seat asc). Best NEW
- * in-range pair by the route's TOTAL yields, strictly-greater beats, so ties
+ * pair CanStartRoute's path admits (`tradeAdmits`) by the route's TOTAL yields, strictly-greater beats, so ties
  * keep the first pair in that scan order. [origin CENTRE, dest code (CENTRE or
  * -(2 + city-state ID))], [-1,-1] = none. Gated on capacity AND a free Trader
  * — the unit the verb spends. */
@@ -55,7 +55,7 @@ export function routeCandidateRow(state: GameState, actor: Seat): number[] {
     for (const to of actor.cities) {
       if (to.id === from.id) continue;
       if (routes.some((x) => x.from === from.id && x.to === to.id)) continue;
-      if (!tradeCourse(reach, to.centerIndex)) continue;
+      if (!tradeAdmits(reach, to.centerIndex)) continue;
       const y = routeYields(state, to);
       const ySum = y.food + y.production;
       if (!best || ySum > best.ySum) best = { from: from.centerIndex, dest: to.centerIndex, ySum };
@@ -67,7 +67,7 @@ export function routeCandidateRow(state: GameState, actor: Seat): number[] {
       const ci = cityState.id;
       const gMet = hasMet(cityState, actor.seat);
       const gHas = routes.some((x) => x.from === from.id && x.toCs === cityState.id);
-      const gRch = tradeCourse(reach, cityState.centerIndex) !== null;
+      const gRch = tradeAdmits(reach, cityState.centerIndex);
       // EVERY city-state, gate by gate — a candidate one engine holds and the
       // other refuses is the whole question, and only the gates answer it.
       const dlG = (globalThis as { __diffLog?: string[] }).__diffLog;
@@ -89,7 +89,7 @@ export function routeCandidateRow(state: GameState, actor: Seat): number[] {
       for (const pc of other.cities) {
         if (!isExplored(state, actor.seat, pc.centerIndex)) continue;
         if (routes.some((x) => x.from === from.id && x.toSeat === other.seat && x.toSeatCity === pc.id)) continue;
-        if (!tradeCourse(reach, pc.centerIndex)) continue;
+        if (!tradeAdmits(reach, pc.centerIndex)) continue;
         const py = routeYieldsInternational(state, from, pc, actor.seat);
         const ySum = py.food + py.production + py.gold + py.science + py.culture + py.faith
           + routePostGold(state, actor.seat, pc.centerIndex);

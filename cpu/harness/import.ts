@@ -30,9 +30,9 @@ import type { City, CityState, CityStateType, DistrictId, FeatureId, GameMap, Ga
 import { NO_SEAT } from '../core/types';
 import { minorItemKey, minorRepairResumed, type MinorItem } from '../core/minorBuild';
 import { createGameFromMap } from '../core/game';
-import { BARB_SEAT, FREE_SEAT, civOf, emptySeat, isBarbSeat, startMeleeCS, freeSeatOf, grantKey, isCiv, markCityCentre, seatOf, tileBelongsTo, seatOfCityState, setTileOwner, setWar, majorsMet, majorsAlive, setMetTurnWith } from '../core/seats';
-import { routeOriginCenter, stampTradingPost } from '../core/trade';
-import { tradeCourse, tradeReach } from '../core/tradePath';
+import { BARB_SEAT, FREE_SEAT, civOf, emptySeat, isBarbSeat, isCityStateSeat, startMeleeCS, freeSeatOf, grantKey, isCiv, markCityCentre, seatOf, tileBelongsTo, seatOfCityState, setTileOwner, setWar, majorsMet, majorsAlive, setMetTurnWith } from '../core/seats';
+import { routeDestCenter, routeOriginCenter, stampTradingPost } from '../core/trade';
+import { setTradeEdge, tradeCourse, tradeReach } from '../core/tradePath';
 import { civEraIndex, cityCentreYields, cityPlotBonus, cityYieldCtx, growthDetachResidue, luxuryAmenities, luxuryHoldings, parkAmenities } from '../core/city';
 import { tileYields } from '../core/yields';
 import type { EventReplay } from './eventReplay';
@@ -2264,9 +2264,12 @@ export function importTurn(rec: TurnRecord, cat: Catalog, history?: History): Im
     }
     const suz = num(p.suzerain);
     cs.suzerain = suz >= 0 ? seatOfGame(suz) : -1;
+    // the players it has met: a major or the Free Cities on its `met`, a
+    // city-state on its `metMinors`
     for (const m of p.met ?? []) {
       const g = seatOfGame(m);
-      if (g >= 0 && g < state.seats.length) cs.met.push(g);
+      if ((g >= 0 && g < state.seats.length) || g === FREE_SEAT) cs.met.push(g);
+      else if (isCityStateSeat(g) && g !== cs.seat && !cs.metMinors?.includes(g)) (cs.metMinors ??= []).push(g);
     }
   }
 
@@ -3282,7 +3285,8 @@ function importFloodCounts(rec: TurnRecord, state: GameState, cities: Iterable<C
  * Trading Posts the history saw planted (`History.posts`) with Rome's in each
  * of its cities (All Roads Lead to Rome). The record names no path, so a
  * route's course is the one the engine's walk lays from its origin
- * (`tradeCourse`), and its start the first record that carried it.
+ * (`tradeCourse`), and its start the first record that carried it; the
+ * course is its edge's path on the trade graph (`setTradeEdge`).
  */
 function importTradeRoutes(rec: TurnRecord, state: GameState, cityByKey: Map<string, City>,
   minorOfPlayer: Map<number, CityState>, seatOfGame: (pid: number) => number,
@@ -3313,6 +3317,7 @@ function importTradeRoutes(rec: TurnRecord, state: GameState, cityByKey: Map<str
     const seen = history?.routeSeen.get(routeKey(r));
     if (seen !== undefined) route.createdTurn = seen;
     (owner.tradeRoutes ??= []).push(route);
+    setTradeEdge(state, routeOriginCenter(state, owner as Seat, route), routeDestCenter(state, owner as Seat, route), route.course ?? []);
     out.push({ owner: owner.seat, route, game: r });
   }
   return out;

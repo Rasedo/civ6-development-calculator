@@ -56,6 +56,7 @@ import { isWater } from '../../world/query';
 import { FEATURES } from '../../world/features';
 import { TERRAINS } from '../../world/terrains';
 import { routeOriginCenter } from './trade';
+import { tradeVertices } from './tradePath';
 import { treeBaseCost, treePrereqs } from './researchTree';
 import { floodRivers } from './disasters';
 import { GP_CITY_PERM, GP_PERM, GP_CLASSES, GREAT_PEOPLE } from '../data/greatPeople';
@@ -693,7 +694,27 @@ const GAME: Record<string, Extractor> = {
   // the live droughts in the order they began: per record its turns left,
   // then its footprint behind its count
   droughts: (s) => [(s.droughts ?? []).flatMap((r) => [r.left, r.plots.length, ...r.plots])],
+  // the trade graph's edges between living cities, by (origin centre,
+  // destination centre): each its path behind its length
+  tradeEdges: (s) => [tradeEdgesRecord(s)],
 };
+
+/** `GameState.tradeEdges` flat: per edge whose two cities still live, sorted
+ *  by (origin centre, destination centre), [origin, destination, length,
+ *  ...path] */
+function tradeEdgesRecord(s: GameState): number[] {
+  const at = new Map([...tradeVertices(s)].map(([c, v]) => [v, c]));
+  const rows: number[][] = [];
+  for (const [k, path] of Object.entries(s.tradeEdges ?? {})) {
+    const [a, b] = k.split('>');
+    const o = at.get(a);
+    const d = at.get(b);
+    if (o === undefined || d === undefined || path.length === 0) continue;
+    rows.push([o, d, path.length, ...path]);
+  }
+  rows.sort((x, y) => x[0] - y[0] || x[1] - y[1]);
+  return rows.flat();
+}
 
 /** a research record flat: the techs held behind their count, the civics
  *  held behind theirs, each tree's progress, the items in hand, the goal,

@@ -18,7 +18,7 @@ import { BUILT_WONDERS } from '../data/builtWonders';
 import { disbandUnit, mapLayer, spawnUnit, unitDomain, unitsHostile } from './units';
 import { revealAround, unitSeesThrough, unitSight } from './fog';
 import { minorRouteCandidate } from './aiTrade';
-import { routeInRange, tradeCourse, tradeReach } from './tradePath';
+import { refreshTradeEdges, setTradeEdge, tradeAdmits, tradeCourse, tradePath, tradeReach } from './tradePath';
 import { TRADE_COURSE_MAX, scaleByGameSpeed } from '../data/constants';
 import { DISTRICTS, DISTRICT_ROUTE_YIELDS } from '../data/districts';
 import { UNITS } from '../data/units';
@@ -503,6 +503,24 @@ export function freeTrader(state: GameState, seat: number): Unit | undefined {
     if (!best || u.tileIndex < best.tileIndex) best = u;
   }
   return best;
+}
+
+/** THE TRADE GRAPH'S TURN of a seat (0x4d8a40, in the player's DoTurn after
+ *  the governors' clocks and before the cities' turns): each living Trader
+ *  of the seat on no route, standing in a city of the seat, updates the
+ *  graph from that city (`refreshTradeEdges`, 0x545020), the edges of its
+ *  running routes kept */
+export function tradeGraphTurn(state: GameState, seat: number): void {
+  const owner = seatOf(state, seat);
+  if (!owner) return;
+  const own = new Set(routeCities(state, seat).map((c) => c.centerIndex));
+  for (const u of state.units) {
+    if (u.seat !== seat || !UNITS[u.type]?.trader || u.routed || !own.has(u.tileIndex)) continue;
+    const origin = u.tileIndex;
+    const running = new Set((owner.tradeRoutes ?? [])
+      .filter((r) => routeOriginCenter(state, owner, r) === origin).map((r) => routeDestCenter(state, owner, r)));
+    refreshTradeEdges(state, seat, origin, (dest) => running.has(dest));
+  }
 }
 
 /** The CURRENT centre tile of a route's destination — -1 when it no longer
@@ -1217,7 +1235,7 @@ export function canAddTradeRoute(state: GameState, from: number, to: number, sea
   if (routes.some((r) => r.from === from && r.to === to)) {
     return { ok: false, reason: 'That route already runs.' };
   }
-  if (!routeInRange(state, seat, a.centerIndex, b.centerIndex)) {
+  if (!tradeAdmits(tradeReach(state, seat, a.centerIndex), b.centerIndex)) {
     return { ok: false, reason: 'Beyond trade range.' };
   }
   return { ok: true };
@@ -1245,10 +1263,11 @@ function commitRoute(state: GameState, seat: number, originCenter: number, destC
     if (t) disbandUnit(state, t.id);
   }
   route.createdTurn = state.turn;
-  // the COURSE, computed once here and walked for the route's life (the
-  // trade manager's path cache); every caller has checked the range, so the
-  // destination is on it
-  route.course = tradeCourse(tradeReach(state, seat, originCenter), destCenter) ?? [];
+  // the COURSE, laid once here and walked for the route's life: the trade
+  // graph's path (`tradePath`, 0x555380), laid on the edge origin ->
+  // destination; every caller has checked CanStartRoute, so one is found
+  route.course = tradePath(tradeReach(state, seat, originCenter), destCenter) ?? [];
+  setTradeEdge(state, originCenter, destCenter, route.course);
   route.walkTile = originCenter;
   route.walkLeg = 0;
   // the walker lays road on every LAND tile it stands on; the origin is turn 0
@@ -1282,7 +1301,7 @@ export function canAddCsTradeRoute(state: GameState, from: number, cityStateId: 
   if (routes.some((r) => r.from === from && r.toCs === cityStateId)) {
     return { ok: false, reason: 'That route already runs.' };
   }
-  if (!routeInRange(state, seat, a.centerIndex, cityState.centerIndex)) {
+  if (!tradeAdmits(tradeReach(state, seat, a.centerIndex), cityState.centerIndex)) {
     return { ok: false, reason: 'Beyond trade range.' };
   }
   return { ok: true };
@@ -1321,7 +1340,7 @@ export function canAddIntlTradeRoute(state: GameState, from: number, toSeat: num
   if (routes.some((r) => r.from === from && r.toSeat === toSeat && r.toSeatCity === seatCity)) {
     return { ok: false, reason: 'That route already runs.' };
   }
-  if (!routeInRange(state, seat, a.centerIndex, civCity.centerIndex)) {
+  if (!tradeAdmits(tradeReach(state, seat, a.centerIndex), civCity.centerIndex)) {
     return { ok: false, reason: 'Beyond trade range.' };
   }
   return { ok: true };
@@ -1480,7 +1499,7 @@ export function minorRouteTo(state: GameState, cityState: CityState, route: Trad
   }
   if (route.toSeat !== undefined && civsAtWar(state, cityState.seat, route.toSeat)) return { ok: false, reason: 'At war with the destination.' };
   const dest = routeDestCenter(state, cityState, route);
-  if (dest < 0 || !tradeCourse(tradeReach(state, cityState.seat, cityState.centerIndex), dest)) return { ok: false, reason: 'Beyond trade range.' };
+  if (dest < 0 || !tradeAdmits(tradeReach(state, cityState.seat, cityState.centerIndex), dest)) return { ok: false, reason: 'Beyond trade range.' };
   commitRoute(state, cityState.seat, cityState.centerIndex, dest, { from: -1, to: -1, ...(route.toCs !== undefined ? { toCs: route.toCs }
     : { toSeat: route.toSeat, toSeatCity: route.toSeatCity }) });
   return { ok: true };

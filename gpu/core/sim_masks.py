@@ -2355,17 +2355,149 @@ class SimMasks:
     def _trade_store_course(self, row: int, rows: torch.Tensor, slot: torch.Tensor,
                             origins: torch.Tensor, dests: torch.Tensor) -> None:
         """Commit the COURSE of the route row `row` opens in each game of
-        `rows` at `slot`, from `origins` to `dests` (all [n]) — `tradeCourse`
-        out of the origin's walk, -1-padded; all -1 where none reaches."""
+        `rows` at `slot`, from `origins` to `dests` (all [n]) — the trade
+        graph's path (`_trade_path`, 0x555380), -1-padded, laid on the edge
+        origin -> destination; all -1 where none is found."""
         games = rows.tolist()
         graphs = self._trade_graphs(row, games)
         self.seat_route_course[rows, row, slot] = -1
         for i, b in enumerate(games):
             o, d = int(origins[i]), int(dests[i])
-            course = self._trade_course(b, row, o, d, graphs[b])
+            vx = self._trade_vertices(b)
+            course = self._trade_path(b, row, o, d, graphs[b], vx)
             if course:
                 self.seat_route_course[b, row, int(slot[i]), :len(course)] = torch.tensor(
                     course, dtype=torch.long, device=self.device)
+                self._trade_edge_put(b, o, d, course, vx)
+
+    def _trade_vertices(self, b: int) -> dict[int, int]:
+        """`tradeVertices` for game `b`: centre -> the key of the living city
+        there (row << 20 plus its city id + 1; a city-state's row << 20)"""
+        out: dict[int, int] = {}
+        for r2 in list(range(self.n_majors)) + [self.FREE_ROW]:
+            al = self.city_alive[b, r2].tolist()
+            ct = self.city_center[b, r2].tolist()
+            ids = self.city_id[b, r2].tolist()
+            for a, c, i in zip(al, ct, ids):
+                if a and c >= 0:
+                    out[c] = (r2 << 20) + i + 1
+        for s in range(self.S):
+            c = int(self.citystate_center[b, s])
+            if bool(self.citystate_alive[b, s]) and c >= 0:
+                out[c] = (self._CITY_MINOR0 + s) << 20
+        return out
+
+    def _trade_edge_slot(self, b: int, ka: int, kb: int) -> int:
+        """the slot of game `b`'s edge from the city keyed `ka` to the one
+        keyed `kb`, -1 none"""
+        hit = ((self.trade_edge_ok[b] == ka) & (self.trade_edge_dk[b] == kb)).nonzero(as_tuple=True)[0]
+        return int(hit[0]) if len(hit) else -1
+
+    def _trade_edge(self, b: int, o: int, d: int, vx: dict[int, int]) -> list[int] | None:
+        """`tradeEdge` (0x541ae0): the path on game `b`'s edge from the city
+        at centre `o` to the one at `d`, None where none is laid"""
+        ka, kb = vx.get(o), vx.get(d)
+        if ka is None or kb is None:
+            return None
+        k = self._trade_edge_slot(b, ka, kb)
+        if k < 0:
+            return None
+        p = [x for x in self.trade_edge_path[b, k].tolist() if x >= 0]
+        return p or None
+
+    def _trade_edge_put(self, b: int, o: int, d: int, path: list[int], vx: dict[int, int]) -> None:
+        """`setTradeEdge` (0x53e900 / 0x53e510): lay `path` on game `b`'s
+        edge from the city at centre `o` to the one at `d`"""
+        ka, kb = vx.get(o), vx.get(d)
+        if ka is None or kb is None or not path:
+            return
+        k = self._trade_edge_slot(b, ka, kb)
+        if k < 0:
+            free = (self.trade_edge_ok[b] < 0).nonzero(as_tuple=True)[0]
+            assert len(free) > 0, "trade_edge table exhausted — raise trade.edgesMax"
+            k = int(free[0])
+        self.trade_edge_o[b, k] = o
+        self.trade_edge_ok[b, k] = ka
+        self.trade_edge_d[b, k] = d
+        self.trade_edge_dk[b, k] = kb
+        self.trade_edge_path[b, k] = -1
+        self.trade_edge_path[b, k, :len(path)] = torch.tensor(path, dtype=torch.int32, device=self.device)
+
+    def _trade_admits(self, b: int, row: int, o: int, d: int, gr: tuple, vx: dict[int, int]) -> bool:
+        """`tradeAdmits` (CanStartRoute's path, 0x552ed0): game `b`'s edge
+        o -> d holds a path, else the pathfinder reaches `d` from `o`"""
+        return self._trade_edge(b, o, d, vx) is not None or self._trade_course(b, row, o, d, gr) is not None
+
+    def _trade_path(self, b: int, row: int, o: int, d: int, gr: tuple, vx: dict[int, int]) -> list[int] | None:
+        """`tradePath` (0x54bdb0 / 0x555380: the edge, else 0x5526a0): game
+        `b`'s edge o -> d's path, else the edge d -> o's walked backwards,
+        else the pathfinder's course (`_trade_course`); None where none"""
+        fwd = self._trade_edge(b, o, d, vx)
+        if fwd is not None:
+            return fwd
+        back = self._trade_edge(b, d, o, vx)
+        if back is not None:
+            return back[::-1]
+        return self._trade_course(b, row, o, d, gr)
+
+    def _trade_admit_rows(self, row: int, games: list[int], origins: torch.Tensor) -> torch.Tensor:
+        """[B, O, T] bool — `_trade_reach_rows` with every centre the trade
+        graph's edge from each origin of `origins` [B, O] holds a path to
+        (`tradeAdmits` over every destination)"""
+        out = self._trade_reach_rows(row, games, origins)
+        for b in games:
+            vx = self._trade_vertices(b)
+            at = {k: c for c, k in vx.items()}
+            ok, dk = self.trade_edge_ok[b].tolist(), self.trade_edge_dk[b].tolist()
+            for j, o in enumerate(origins[b].tolist()):
+                ka = vx.get(o)
+                if o < 0 or ka is None:
+                    continue
+                for e, (a, d) in enumerate(zip(ok, dk)):
+                    if a == ka and d in at:
+                        out[b, j, at[d]] = True
+        return out
+
+    def _trade_graph_turn(self, row: int, mask: torch.Tensor) -> None:
+        """`tradeGraphTurn` (0x4d8a40, the player's DoTurn after the
+        governors' clocks and before the cities): in the games `mask` [B],
+        each living Trader of row `row` standing in a city of the row updates
+        the trade graph from that city (`refreshTradeEdges`, 0x545020): every
+        other living city's edge with no route of the row running on it
+        takes the pathfinder's course; an edge it no longer reaches keeps its
+        path"""
+        if self._trader_idx < 0:
+            return
+        al = (mask.unsqueeze(1) & self.major_unit_alive
+              & (self.major_unit_seat == int(self._ROW_SEAT[row])) & (self.major_unit_type == self._trader_idx))
+        games = al.any(dim=1).nonzero(as_tuple=True)[0].tolist()
+        if not games:
+            return
+        graphs = self._trade_graphs(row, games)
+        for b in games:
+            if row >= self._CITY_MINOR0 and row < self._CITY_MINOR0 + self.S:
+                s = row - self._CITY_MINOR0
+                own = {int(self.citystate_center[b, s])} if bool(self.citystate_alive[b, s]) else set()
+            else:
+                own = {c for a, c in zip(self.city_alive[b, row].tolist(), self.city_center[b, row].tolist()) if a and c >= 0}
+            for slot in al[b].nonzero(as_tuple=True)[0].tolist():
+                origin = int(self.major_unit_tile[b, slot])
+                if origin not in own:
+                    continue
+                running = set()
+                for k in range(self.seat_routes.shape[2]):
+                    if int(self.seat_routes[b, row, k, 0]) < 0:
+                        continue
+                    crs = [x for x in self.seat_route_course[b, row, k].tolist() if x >= 0]
+                    if crs and crs[0] == origin:
+                        running.add(crs[-1])
+                vx = self._trade_vertices(b)
+                for dest in vx:
+                    if dest == origin or dest in running:
+                        continue
+                    course = self._trade_course(b, row, origin, dest, graphs[b])
+                    if course:
+                        self._trade_edge_put(b, origin, dest, course, vx)
 
     def _trade_reach_rows(self, row: int, games: list[int], origins: torch.Tensor) -> torch.Tensor:
         """[B, O, T] bool — for each game of `games` and each origin centre in

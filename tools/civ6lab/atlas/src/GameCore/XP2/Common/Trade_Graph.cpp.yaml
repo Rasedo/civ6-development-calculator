@@ -13,6 +13,72 @@
   context:
     - "- OPEN: who writes the trade graph's cache and when it is dropped (Trade_Graph.cpp 0x53d630..0x5457be): the game's paths and admissions that our fresh walk prices dearer, out of r..."
   review: imported
+- addr: 0x53e510
+  kind: function
+  semantics: an edge's path (+0x338 m_vMostRecentPath) set from a pathfinder's node list, walked from its last (the origin) to its first (the destination) as plot indices
+  status: READ
+  cases:
+    - recording: h1_duelz1124_20261108T114456Z
+      turn: 180
+      value: Shenyang -> Bologna (578 -> 384) starts at t180 on the path the walk laid at t147 (578,577,576,620,...,659,658,613,...,384) with an idle Trader in Shenyang; the walk reaches Bologna no more from t170
+  impl: [cpu/core/tradePath.ts:setTradeEdge, gpu/core/sim_masks.py:_trade_edge_put]
+  readings: ["C-108: the trade graph's paths — READ, both twins"]
+  review: reviewed
+- addr: 0x53e650
+  kind: function
+  semantics: "an edge's route added: m_bHasActiveRoute set (asserting none was active and a path exists)"
+  status: READ
+  cases:
+    - recording: h1_duelz1124_20261108T114456Z
+      turn: 180
+      value: Shenyang -> Bologna (578 -> 384) starts at t180 on the path the walk laid at t147 (578,577,576,620,...,659,658,613,...,384) with an idle Trader in Shenyang; the walk reaches Bologna no more from t170
+  impl: [cpu/core/trade.ts:tradeGraphTurn]
+  readings: ["C-108: the trade graph's paths — READ, both twins"]
+  review: reviewed
+- addr: 0x53e900
+  kind: function
+  semantics: "AddPath(from vertex, to vertex, plots): the edge from -> to (made where missing, 0x53e0f0) takes the plots (0x53e440)"
+  status: READ
+  cases:
+    - recording: h1_duelz1124_20261108T114456Z
+      turn: 180
+      value: Shenyang -> Bologna (578 -> 384) starts at t180 on the path the walk laid at t147 (578,577,576,620,...,659,658,613,...,384) with an idle Trader in Shenyang; the walk reaches Bologna no more from t170
+  impl: [cpu/core/tradePath.ts:setTradeEdge, gpu/core/sim_masks.py:_trade_edge_put]
+  readings: ["C-108: the trade graph's paths — READ, both twins"]
+  review: reviewed
+- addr: 0x53eb50
+  kind: function
+  semantics: "AddPath over two city ids: 0x53e900 with their vertices"
+  status: READ
+  cases:
+    - recording: h1_duelz1124_20261108T114456Z
+      turn: 180
+      value: Shenyang -> Bologna (578 -> 384) starts at t180 on the path the walk laid at t147 with an idle Trader in Shenyang
+  impl: [cpu/core/tradePath.ts:setTradeEdge]
+  readings: ["C-108: the trade graph's paths — READ, both twins"]
+  review: reviewed
+- addr: 0x540ee0
+  kind: function
+  semantics: the edge from vertex rdx to vertex r8 (the node map +0x140 by rdx, its edge set by r8), null none
+  status: READ
+  cases:
+    - recording: h1_duelz1124_20261108T114456Z
+      turn: 180
+      value: Shenyang -> Bologna (578 -> 384) starts at t180 on the path the walk laid at t147 (578,577,576,620,...,659,658,613,...,384) with an idle Trader in Shenyang; the walk reaches Bologna no more from t170
+  impl: [cpu/core/tradePath.ts:tradeEdge]
+  readings: ["C-108: the trade graph's paths — READ, both twins"]
+  review: reviewed
+- addr: 0x541770
+  kind: function
+  semantics: "the Trade Graph Update jobs: per queued (player, origin plot, destination plot, edge) a fresh path (0x5590d0) set on the edge (0x53e510) where found"
+  status: READ
+  cases:
+    - recording: h1_duelz1124_20261108T114456Z
+      turn: 180
+      value: Shenyang -> Bologna (578 -> 384) starts at t180 on the path the walk laid at t147 (578,577,576,620,...,659,658,613,...,384) with an idle Trader in Shenyang; the walk reaches Bologna no more from t170
+  impl: [cpu/core/tradePath.ts:refreshTradeEdges]
+  readings: ["C-108: the trade graph's paths — READ, both twins"]
+  review: reviewed
 - addr: 0x5419a0
   final: 0x385c80
   kind: function
@@ -22,14 +88,16 @@
     - recording: 1124
       turn: 180
       value: "- Unexplained (AUDIT C-94 LAB): 1124's Shenyang -> Bologna (t180) took the   Taiyuan - sea - Granada path although the walk as read labels the shared   plot (40,10) off the cheaper road first with 3 r"
-  readings: ["H-1: the trade path's search, its score and the Canal — READ"]
+  readings:
+    - "H-1: the trade path's search, its score and the Canal — READ"
+    - "C-108: the trade graph's paths — READ, both twins"
   context:
     - ...counts none until t223). The path cache (0x541ae0 over the trade network graph's edges, 0x5419a0) answers a pair before any search (0x5526a0); whether an edge holds the reverse route...
   review: reviewed
 - addr: 0x541ae0
   final: 0x385dc0
   kind: function
-  semantics: the trade path cache over the trade network graph's edges (0x5419a0).
+  semantics: "the path on the trade graph's edge from vertex rdx to vertex r8 (0x5419a0: the node of rdx, its edge to r8, the edge's +0x338 path), null where none or empty"
   status: READ
   cases:
     - recording: h1_duelw1108
@@ -37,10 +105,12 @@
     - recording: 1124
       turn: 180
       value: "- Unexplained (AUDIT C-94 LAB): 1124's Shenyang -> Bologna (t180) took the   Taiyuan - sea - Granada path although the walk as read labels the shared   plot (40,10) off the cheaper road first with 3 r"
+  impl: [cpu/core/tradePath.ts:tradeEdge, gpu/core/sim_masks.py:_trade_edge]
   readings:
     - "H-1: a route's yield per path plot (Hunza) — READ"
     - "H-1: the trade path's search, its score and the Canal — READ"
     - "C-108: the trade path's portals, its open list and CanStartRoute's gates — READ, both twins"
+    - "C-108: the trade graph's paths — READ, both twins"
   context:
     - "...0x54bdb0 (a route's yield of one type): the route's path from the trade manager's cache (0x541ae0; else a fresh path, 0x5526a0), n its plots (4-byte entries, both ends included); the post..."
     - ...no Trading Post there (the route's own yield counts none until t223). The path cache (0x541ae0 over the trade network graph's edges, 0x5419a0) answers a pair before any search (0x552...
@@ -55,3 +125,39 @@
   context:
     - "...et (+0x1ee0, 0x6c8660 -> 0x1fa000: the trade manager's routes out of the city's vertex, 0x542bd0) with a functor (vtable 0xd64048, its call 0x6c8fa0 -> 0x6c89b0, READ): per route its d..."
   review: imported
+- addr: 0x543100
+  kind: function
+  semantics: "an edge's route removed: m_bHasActiveRoute cleared (+0x1c0 / +0x218); the path kept"
+  status: READ
+  cases:
+    - recording: h1_duelz1124_20261108T114456Z
+      turn: 180
+      value: Shenyang -> Bologna (578 -> 384) starts at t180 on the path the walk laid at t147 (578,577,576,620,...,659,658,613,...,384) with an idle Trader in Shenyang; the walk reaches Bologna no more from t170
+  impl: [cpu/core/trade.ts:tradeGraphTurn]
+  readings: ["C-108: the trade graph's paths — READ, both twins"]
+  review: reviewed
+- addr: 0x545020
+  kind: function
+  semantics: "the trade graph's update from one city vertex for its owner: over every player's cities but the origin, the edge origin -> city (found 0x540ee0, else made 0x53e0f0) with no active route (+0x218 m_bHasActiveRoute) takes a fresh path (0x5590d0, inline or as Trade Graph Update jobs 0x541770); a search that fails leaves the edge's path"
+  status: READ
+  cases:
+    - recording: h1_duelz1124_20261108T114456Z
+      turn: 180
+      value: Shenyang -> Bologna (578 -> 384) starts at t180 on the path the walk laid at t147 (578,577,576,620,...,659,658,613,...,384) with an idle Trader in Shenyang; the walk reaches Bologna no more from t170
+  impl:
+    - cpu/core/tradePath.ts:refreshTradeEdges
+    - gpu/core/sim_masks.py:_trade_graph_turn
+    - cpu/core/trade.ts:tradeGraphTurn
+  readings: ["C-108: the trade graph's paths — READ, both twins"]
+  review: reviewed
+- addr: 0x5457c0
+  kind: function
+  semantics: "the trade graph's update from a city id (its owner word +0): 0x545020 over the city's vertex for that player"
+  status: READ
+  cases:
+    - recording: h1_duelz1124_20261108T114456Z
+      turn: 180
+      value: Shenyang -> Bologna (578 -> 384) starts at t180 on the path the walk laid at t147 with an idle Trader in Shenyang
+  impl: [cpu/core/tradePath.ts:refreshTradeEdges]
+  readings: ["C-108: the trade graph's paths — READ, both twins"]
+  review: reviewed

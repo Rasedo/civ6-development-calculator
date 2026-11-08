@@ -303,7 +303,80 @@ export function tradeCourse(reach: TradeReach, dest: number): number[] | null {
   return out.reverse();
 }
 
-/** Is `dest` within `seat`'s trade range of `origin`? */
+/** Is `dest` within `seat`'s trade range of `origin`? (the pathfinder
+ *  alone, 0x559140) */
 export function routeInRange(state: GameState, seat: number, origin: number, dest: number): boolean {
   return tradeCourse(tradeReach(state, seat, origin), dest) !== null;
+}
+
+/**
+ * THE TRADE GRAPH'S PATHS (Trade_Graph.cpp; `tools/civ6lab/dll_readings.md`
+ * "C-108: the trade graph's paths"). One directed edge per pair of cities,
+ * keyed by the two cities (`tradeVertices`: the holder and the city id; a
+ * city-state's one city -1), holds the path last laid from the first to the
+ * second (`GameState.tradeEdges`, m_vMostRecentPath). A city's capture mints
+ * a new id, so its edges stop resolving.
+ */
+
+/** centre -> the trade graph's vertex of the living city there */
+export function tradeVertices(state: GameState): Map<number, string> {
+  const out = new Map<number, string>();
+  for (const s of state.seats) for (const c of s.cities) out.set(c.centerIndex, `${s.seat}:${c.id}`);
+  for (const c of state.freeSeat?.cities ?? []) out.set(c.centerIndex, `${state.freeSeat!.seat}:${c.id}`);
+  for (const cs of state.cityStates ?? []) if (cs.centerIndex >= 0) out.set(cs.centerIndex, `${cs.seat}:-1`);
+  return out;
+}
+
+/** the edge origin -> dest's path (0x541ae0: the edge's path, null where
+ *  none is laid) */
+export function tradeEdge(state: GameState, origin: number, dest: number,
+  vx: Map<number, string> = tradeVertices(state)): number[] | null {
+  const a = vx.get(origin);
+  const b = vx.get(dest);
+  const p = a && b ? state.tradeEdges?.[`${a}>${b}`] : undefined;
+  return p && p.length > 0 ? p : null;
+}
+
+/** lay `path` on the edge origin -> dest (0x53e900 / 0x53e510) */
+export function setTradeEdge(state: GameState, origin: number, dest: number, path: readonly number[],
+  vx: Map<number, string> = tradeVertices(state)): void {
+  const a = vx.get(origin);
+  const b = vx.get(dest);
+  if (!a || !b || path.length === 0) return;
+  (state.tradeEdges ??= {})[`${a}>${b}`] = [...path];
+}
+
+/** CanStartRoute's path (0x552ed0): the edge origin -> dest holds a path,
+ *  else the pathfinder reaches `dest` from the walk's origin */
+export function tradeAdmits(reach: TradeReach, dest: number): boolean {
+  return tradeEdge(reach.state, reach.origin, dest) !== null || tradeCourse(reach, dest) !== null;
+}
+
+/** A route's path from the walk's origin to `dest` (0x54bdb0 / 0x555380 /
+ *  GetTradeRoutePath: the edge origin -> dest's path, else 0x5526a0): the
+ *  edge's, else the edge dest -> origin's walked backwards, else the
+ *  pathfinder's course (`tradeCourse`); null where none */
+export function tradePath(reach: TradeReach, dest: number): number[] | null {
+  const vx = tradeVertices(reach.state);
+  const fwd = tradeEdge(reach.state, reach.origin, dest, vx);
+  if (fwd) return [...fwd];
+  const back = tradeEdge(reach.state, dest, reach.origin, vx);
+  if (back) return [...back].reverse();
+  return tradeCourse(reach, dest);
+}
+
+/** THE TRADE GRAPH'S UPDATE from one city (0x545020): over every other
+ *  living city, each edge from `origin` with no route running on it
+ *  (`running`, m_bHasActiveRoute) takes the pathfinder's course for the
+ *  origin's holder `seat`; an edge it no longer reaches keeps its path */
+export function refreshTradeEdges(state: GameState, seat: number, origin: number,
+  running: (dest: number) => boolean): void {
+  const vx = tradeVertices(state);
+  if (!vx.has(origin)) return;
+  const reach = tradeReach(state, seat, origin);
+  for (const dest of vx.keys()) {
+    if (dest === origin || running(dest)) continue;
+    const course = tradeCourse(reach, dest);
+    if (course) setTradeEdge(state, origin, dest, course, vx);
+  }
 }

@@ -2500,6 +2500,9 @@ class SimPhase:
         # the cities: the clocks, then this seat's choices (`governorPhase`);
         # a posting is an envoy count (`resolveSuzerains`)
         self._governor_phase(row, active)
+        # the trade graph's turn, after the governors' clocks and before the
+        # cities (`tradeGraphTurn`)
+        self._trade_graph_turn(row, active)
         if self.S:
             self._cs_resolve_suzerain()
         # the Wish face's wonder Tourism reaches the ESTABLISHED governors'

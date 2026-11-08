@@ -697,6 +697,21 @@
             "drought_plots"
           ],
           "note": "each live drought in the order it began: turns left, then its footprint's plots in disc order behind their count"
+        },
+        {
+          "name": "tradeEdges",
+          "compare": "exact",
+          "covers": [
+            "GameState.tradeEdges"
+          ],
+          "planes": [
+            "trade_edge_o",
+            "trade_edge_ok",
+            "trade_edge_d",
+            "trade_edge_dk",
+            "trade_edge_path"
+          ],
+          "note": "the trade graph's edges whose two cities still live, sorted by (origin centre, destination centre): each its path behind its length. The cities' identities (holder and city id) are not compared."
         }
       ]
     },

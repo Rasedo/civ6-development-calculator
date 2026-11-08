@@ -28,7 +28,7 @@ import { researchCost, selectResearch, pillagePlunder } from './economy';
 import { IMPROVEMENTS } from '../data/improvements';
 import { isSpaceProject } from '../data/projects';
 import { containmentBonus, sameReligionToken, getModifiers, makeYieldCtx, prodBoostPct, seatYieldMultPerSuzerain, unitUpkeep } from './effects';
-import { allRoadsLeadToRome, addTradeRoute, addCsTradeRoute, addIntlTradeRoute, cancelRoutesBetween, congressCancelBannedIntl, plunderTrader, tradeRouteExpiry, tradeRouteWalk } from './trade';
+import { allRoadsLeadToRome, addTradeRoute, addCsTradeRoute, addIntlTradeRoute, cancelRoutesBetween, congressCancelBannedIntl, plunderTrader, tradeGraphTurn, tradeRouteExpiry, tradeRouteWalk } from './trade';
 import { addEnvoys, allianceSuzInfluence, cityStateById, declareWarOnCityState, envoysOf, hasMet, isSuzerain, minorCity, resolveSuzerains, sueForPeaceWithCityState, suzerainBuildingLoyalty, suzerainProjectMult, suzerainWonderPct, suzerainGpCultureMult, meetCityState } from './cityStates';
 import { LEVY_TURNS, govInfluence } from '../data/cityStates';
 import { freeCityBuild, freeCombatDesire, freeKnowledge, minorBestOfClass, minorCompleteNow, minorOrdersHeld, minorResearch, trainableIn } from './minorBuild';
@@ -3231,6 +3231,9 @@ export function seatPhase(state: GameState, only?: { seats: ReadonlySet<number>;
     // envoys she brings count toward the Favor. A posting is an envoy count,
     // so the minors' stored answer moves with it.
     governorPhase(state, actor.seat, rec?.governors ?? []);
+    // the trade graph's turn, after the governors' clocks and before the
+    // cities (`tradeGraphTurn`)
+    tradeGraphTurn(state, actor.seat);
     resolveSuzerains(state);
     // the tourism term reads the seat's ERA off its completed research: after
     // this turn's techs, before any civic completes

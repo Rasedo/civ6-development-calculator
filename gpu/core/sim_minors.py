@@ -41,6 +41,8 @@ class SimMinors:
             # its units move (`upgradeRoads`)
             self._upgrade_roads(self.n_majors + s)
             self._store_unit_strength(s, alive)
+            # the trade graph's turn before its city's (`tradeGraphTurn`)
+            self._trade_graph_turn(self._CITY_MINOR0 + s, alive)
             self._minor_build(s, self._minor_production(s))
             # the boosts its city's turn earned land at once (`minorPhase`)
             self._detect_minor_boosts(s, alive)
@@ -667,9 +669,9 @@ class SimMinors:
         holds (`citystate_trade_ok`), each whose holder it is not at war with
         and has met (`tradeMet`: `citystate_met_minor`, `seat_citystate_met`):
         not one its routes already run to, not under Trade Policy's ban, one
-        the potential course (`_trade_course`) reaches — the route's value,
-        its origin yields on that course (`_minor_dest_y6`, the path term
-        `_route_path_gold` over the course, the Trading Post at the
+        CanStartRoute's path admits (`_trade_admits`) — the route's value,
+        its origin yields on the route's path (`_trade_path`; `_minor_dest_y6`,
+        the path term `_route_path_gold` over it, the Trading Post at the
         destination `_route_post_gold`) valued at the minor's weights and
         summed, times 2 where the minor holds no Trading Post in any city of
         the destination's holder (0x4d9830). The greatest wins, the first in
@@ -713,10 +715,13 @@ class SimMinors:
             graphs = self._trade_graphs(row, games)
             o_ct = self.citystate_center[:, s].tolist()
             for b in games:
+                vx = self._trade_vertices(b)
                 for d in on[b].nonzero(as_tuple=True)[0].tolist():
-                    course = self._trade_course(b, row, int(o_ct[b]), int(ctr[b, d]), graphs[b])
-                    if course:
-                        crs[b, d, :len(course)] = torch.tensor(course, dtype=torch.long, device=dev)
+                    o, dc = int(o_ct[b]), int(ctr[b, d])
+                    if not self._trade_admits(b, row, o, dc, graphs[b], vx):
+                        continue
+                    course = self._trade_path(b, row, o, dc, graphs[b], vx)
+                    crs[b, d, :len(course)] = torch.tensor(course, dtype=torch.long, device=dev)
         on = on & (crs[:, :, 0] >= 0)
         found = torch.zeros(B, dtype=torch.bool, device=dev)
         code = torch.full((B,), -1, dtype=torch.long, device=dev)

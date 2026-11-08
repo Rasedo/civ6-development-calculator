@@ -45,8 +45,13 @@
       value: "Hunza's 0.2 (51): Aquileia -> Rome (5 plots) +1, -> Hunza (10) +2, Rome -> Shenyang (21) +4"
     - recording: h1_duelw1108
       value: Aquileia -> Rome (5 plots) +1, Aquileia -> Hunza (10) +2, Rome -> Shenyang through Antium (21) +4 (runs/h1_duelw1108;
-  impl: [cpu/core/trade.ts:routeLengthGold]
-  readings: ["H-1: a route's yield per path plot (Hunza) — READ"]
+  impl:
+    - cpu/core/trade.ts:routeLengthGold
+    - cpu/core/tradePath.ts:tradePath
+    - gpu/core/sim_masks.py:_trade_path
+  readings:
+    - "H-1: a route's yield per path plot (Hunza) — READ"
+    - "C-108: the trade graph's paths — READ, both twins"
   context:
     - "Trade_Manager 0x54bdb0 (a route's yield of one type): the route's path from the trade manager's cache (0x541ae0;..."
   review: reviewed
@@ -118,6 +123,7 @@
   readings:
     - "C-96: the trade AI's route value — READ (0x5e9b20, 0x78f210, 0x78e010, 0x559140's use), PARTLY READ (0x526330's terms, the knowledge base's city order)"
     - "H-1: the trade record's player — READ (0x5ecb50, 0x787f50, 0x5e9b20's walk), PARTLY READ (the city-states' meetings with each other, the majors' weights)"
+    - "C-108: the trade graph's paths — READ, both twins"
   context:
     - ...ieldsFromPotentialRoute 0x54eb90, 0x54c630, the path term CalculateOriginYieldsFromPath 0x54e160 skipped on the last argument 1, Trade_Manager 0x54c6c0); a domestic one adds the dest...
   review: reviewed
@@ -244,7 +250,7 @@
 - addr: 0x5526a0
   final: 0x38f2c0
   kind: function
-  semantics: answers a city pair from the path cache before any search.
+  semantics: "a route's path origin -> destination off the trade graph: the edge destination -> origin's path (0x541ae0 with the two swapped) walked backwards, else a fresh search (0x559140), its nodes destination first walked backwards; origin first either way"
   status: READ
   cases:
     - recording: h1_duelw1108
@@ -252,10 +258,12 @@
     - recording: 1124
       turn: 180
       value: "- Unexplained (AUDIT C-94 LAB): 1124's Shenyang -> Bologna (t180) took the   Taiyuan - sea - Granada path although the walk as read labels the shared   plot (40,10) off the cheaper road first with 3 r"
+  impl: [cpu/core/tradePath.ts:tradePath, gpu/core/sim_masks.py:_trade_path]
   readings:
     - "H-1: a route's yield per path plot (Hunza) — READ"
     - "H-1: the trade path's search, its score and the Canal — READ"
     - "C-108: the trade path's portals, its open list and CanStartRoute's gates — READ, both twins"
+    - "C-108: the trade graph's paths — READ, both twins"
   context:
     - "...one type): the route's path from the trade manager's cache (0x541ae0; else a fresh path, 0x5526a0), n its plots (4-byte entries, both ends included); the posts counted on it (0x5500b0) ti..."
     - ...41ae0 over the trade network graph's edges, 0x5419a0) answers a pair before any search (0x5526a0); whether an edge holds the reverse route's path is unread.
@@ -286,6 +294,17 @@
     - "...e.cpp 0x960f40 (FinalRelease 0x66bf70), the operation's per-turn check, and Trade_Manager 0x552bc0 (FinalRelease 0x38f720), the term. Check: runs/h1_duely1127 Hattusa (the records' route r..."
     - ...+0x220 / +0x224 against the origin), the game turn (the game object +0x110) at or past 0x552bc0(the operation's start turn +0x20) removes the route (0x5521f0). Nothing else ends a r...
     - "- 0x552bc0(start): start + 0x5254d0(TRADE_ROUTE_TURN_DURATION_BASE, the global parameters +0x714)..."
+  review: reviewed
+- addr: 0x552cb0
+  kind: function
+  semantics: the edge origin -> destination's path (0x541ae0)
+  status: READ
+  cases:
+    - recording: h1_duelz1124_20261108T114456Z
+      turn: 180
+      value: Shenyang -> Bologna (578 -> 384) starts at t180 on the path the walk laid at t147 (578,577,576,620,...,659,658,613,...,384) with an idle Trader in Shenyang; the walk reaches Bologna no more from t170
+  impl: [cpu/core/tradePath.ts:tradeEdge]
+  readings: ["C-108: the trade graph's paths — READ, both twins"]
   review: reviewed
 - addr: 0x552d40
   final: 0x392150
@@ -318,8 +337,10 @@
   cases:
     - recording: c108_t225_20261108T115945Z
       value: the game admits 1:65536 54:11 -> 4:524294 18:16 (52 plots) beyond the fresh walk's range
+  impl: [cpu/core/tradePath.ts:tradeAdmits, gpu/core/sim_masks.py:_trade_admits]
   readings:
     - "C-108: the trade path's portals, its open list and CanStartRoute's gates — READ, both twins"
+    - "C-108: the trade graph's paths — READ, both twins"
   review: reviewed
 - addr: 0x552fb0
   kind: function
@@ -340,11 +361,23 @@
     - "H-1: the civics AI — READ (the choice, the walk, the propagation), PARTLY READ (the value)"
     - "C-130: Online Communities' route tourism, the tourism toward a player — READ (0x6a1380, 0x6a1240, 0x394830's modifiers, 0x552fb0), both twins"
   review: reviewed
+- addr: 0x553010
+  kind: function
+  semantics: the edge origin -> destination holds a path (0x541ae0)
+  status: READ
+  cases:
+    - recording: h1_duelz1124_20261108T114456Z
+      turn: 180
+      value: Shenyang -> Bologna (578 -> 384) starts at t180 on the path the walk laid at t147 (578,577,576,620,...,659,658,613,...,384) with an idle Trader in Shenyang; the walk reaches Bologna no more from t170
+  impl: [cpu/core/tradePath.ts:tradeEdge]
+  readings: ["C-108: the trade graph's paths — READ, both twins"]
+  review: reviewed
 - addr: 0x553070
   kind: function
   status: PARTLY
   readings:
     - "C-108: the trade path's portals, its open list and CanStartRoute's gates — READ, both twins"
+    - "C-108: the trade graph's paths — READ, both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ...the trade graph's cached path for the pair (0x541ae0) admits it, else a fresh search (0x553070 -> 0x559140). Starting a route (0x555380) takes the cached path the same way, else 0x55...
@@ -442,9 +475,26 @@
 - addr: 0x555380
   kind: function
   status: PARTLY
+  impl:
+    - cpu/core/trade.ts:commitRoute
+    - cpu/core/tradePath.ts:tradePath
+    - gpu/core/sim_masks.py:_trade_store_course
+    - gpu/core/sim_masks.py:_trade_path
   readings:
     - "C-108: the trade path's portals, its open list and CanStartRoute's gates — READ, both twins"
+    - "C-108: the trade graph's paths — READ, both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...air (0x541ae0) admits it, else a fresh search (0x553070 -> 0x559140). Starting a route (0x555380) takes the cached path the same way, else 0x5526a0. (`tradeMet`; `minorRouteCandidate`..."
   review: imported
+- addr: 0x556380
+  kind: function
+  semantics: "a Trader's trade graph update: a live MakeTradeRoute unit on no active route standing in a city of its owner updates the graph from that city (0x5457c0 -> 0x545020)"
+  status: READ
+  cases:
+    - recording: h1_duelz1124_20261108T114456Z
+      turn: 180
+      value: Shenyang -> Bologna (578 -> 384) starts at t180 on the path the walk laid at t147 (578,577,576,620,...,659,658,613,...,384) with an idle Trader in Shenyang; the walk reaches Bologna no more from t170
+  impl: [cpu/core/trade.ts:tradeGraphTurn]
+  readings: ["C-108: the trade graph's paths — READ, both twins"]
+  review: reviewed

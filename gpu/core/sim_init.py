@@ -1417,6 +1417,17 @@ class SimInit:
         self.seat_route_course = torch.full(
             (B, self.NS, k_routes, int(self.rules.trade["courseMax"])), -1,
             dtype=torch.long, device=device)
+        # THE TRADE GRAPH'S PATHS (`GameState.tradeEdges`): per edge slot the
+        # origin and destination centres, their cities' keys (`_trade_vertices`:
+        # the row and the city id; -1 an empty slot) and the path last laid
+        # from the first to the second, origin to destination, -1-padded
+        _ne = int(self.rules.trade["edgesMax"])
+        self.trade_edge_o = torch.full((B, _ne), -1, dtype=torch.long, device=device)
+        self.trade_edge_ok = torch.full((B, _ne), -1, dtype=torch.long, device=device)
+        self.trade_edge_d = torch.full((B, _ne), -1, dtype=torch.long, device=device)
+        self.trade_edge_dk = torch.full((B, _ne), -1, dtype=torch.long, device=device)
+        self.trade_edge_path = torch.full((B, _ne, int(self.rules.trade["courseMax"])), -1,
+                                          dtype=torch.int32, device=device)
         # CIV6 (Trading Post): one bool per (seat row, CENTRE tile) — the row,
         # a major's or a city-state's, holds a Trading Post there. Stamped at
         # both endpoints when a route runs its FULL term; the chain and gold

@@ -50,7 +50,7 @@ import { computeUnlocksIn, purchaseStep, unitMaintenance, type Unlocks } from '.
 import { buildingPillaged, cityPower, repairBuilding } from './yields';
 import { centerBuildingIds } from './prodLayout';
 import { cityLowlands, coastalLowlandCounts, floodBarrierCost, repairBehindBarrier } from './climate';
-import { minorTrade, tradeCapacity } from './trade';
+import { minorTrade, tradeCapacity, tradeGraphTurn } from './trade';
 import { BARB_SEAT, FREE_SEAT, freeSeatOf, hiddenResourcesFor, isCiv, majorityReligionOf, majorsAlive, seatOf, tileSeat } from './seats';
 import { builderCost, cityNavalCapable, disbandUnit, raiseBestTrained, spawnUnit, traderCost, unitFullMoves, unitIsMilitary, unitMadeAnew } from './units';
 import { irradiated } from './nuclear';
@@ -129,7 +129,11 @@ export function minorPhase(state: GameState): void {
     // Kong t156: its Industrial era, its new Builder from the centre to 9:9
     // on Industrial roads at 0.75 with Movement left, the Farm laid there)
     upgradeRoads(state, cityState.seat, cityState.research);
-    storeUnitStrength(state, cityState.seat);    minorBuild(state, cityState, computeCityStats(state, minorCity(cityState)).total.production);
+    storeUnitStrength(state, cityState.seat);
+    // the trade graph's turn before its city's (`tradeGraphTurn`, the
+    // player's DoTurn 0x4e4560 -> 0x4d8a40)
+    tradeGraphTurn(state, cityState.seat);
+    minorBuild(state, cityState, computeCityStats(state, minorCity(cityState)).total.production);
     // the boosts its city's turn earned land at once (runs/h1_duely1128
     // Nazca's Holy Site completed t15: State Workforce boosted that turn,
     // its civics AI's t15 analysis at 6 turns as logged)

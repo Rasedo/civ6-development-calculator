@@ -39,7 +39,7 @@ import { aiView } from './aiView';
 import { civsAtWar, freeSeatOf, isCiv, isCityStateSeat, seatOf } from './seats';
 import { congressIntlBanned } from './congress';
 import { minorRouteOriginYields, routeDestYields, routeOriginYields, routePostGold, tradeMet } from './trade';
-import { routeInRange, tradeCourse, tradeReach } from './tradePath';
+import { routeInRange, tradeAdmits, tradePath, tradeReach } from './tradePath';
 import type { CityState, GameState, Seat, TradeRoute, Yields } from './types';
 
 /** a known city a trade AI reads: its centre, its holder and the route
@@ -167,14 +167,14 @@ export function routeValueOver(state: GameState, seat: number): number {
  * with (0x469cd0) and has met (`tradeMet`, CanStartRoute's 0x553410): the
  * route's value — its origin yields on its potential
  * course, the path term with it (0x526330 with its last argument 0:
- * `minorRouteOriginYields` on the course `tradeCourse` lays, the Trading
+ * `minorRouteOriginYields` on the route's path `tradePath` lays, the Trading
  * Post there and on the way), each valued at the minor's weights
  * (`yieldValue`, 0x7a6690) and summed — times 2 where the minor holds no
  * Trading Post in any city of the destination's holder (0x4d9830: 1, plus 1
  * and the diplomatic +0x480 term a city-state carries none of), else once.
  * The list sorted the highest first (0x78d510), the first in the list's
  * order on a tie; the first a route may start to (CanStartRoute 0x54efc0:
- * none running there, in range, Trade Policy's ban) is taken
+ * none running there, the trade graph's path or the pathfinder's (`tradeAdmits`), Trade Policy's ban) is taken
  * (runs/h1_duely1127 Mexico City t53: Hattusa at 3 Gold and 1 Science,
  * twice, over Xi'an, where its post stands, at 4 Gold, 1 Science and 1
  * Faith, as Game_TradeManager logs). Null = none.
@@ -193,8 +193,8 @@ export function minorRouteCandidate(state: GameState, cs: CityState): TradeRoute
     if (r.toCs !== undefined ? routes.some((x) => x.toCs === r.toCs)
       : routes.some((x) => x.toSeat === r.toSeat && x.toSeatCity === r.toSeatCity)) continue;
     if (r.toSeat !== undefined && congressIntlBanned(state, r.toSeat)) continue;
-    const course = tradeCourse(reach, k.centre);
-    if (!course) continue;
+    if (!tradeAdmits(reach, k.centre)) continue;
+    const course = tradePath(reach, k.centre)!;
     const y = minorRouteOriginYields(state, cs, { ...r, course });
     if (!y) continue;
     const holderCentres = isCityStateSeat(k.holder)

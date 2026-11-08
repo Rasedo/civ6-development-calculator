@@ -10296,3 +10296,49 @@ cpu/harness/replay.ts).
   growth accumulator 0x1b6180 (Migration Treaty: 51 attached, 50 after a
   detach's residue), word 32 (+0x80) the Food box (the record's Food
   exact); `City.growthDrift` still folds the detaches.
+
+## C-108: the trade graph's paths — READ, both twins
+
+- THE GRAPH (Trade_Graph.cpp, the trade manager's +0x110): a vertex per
+  city ({player, type 2, city id}); one DIRECTED edge per pair (the node map
+  +0x140 keyed by the first vertex, its edge set by the second: 0x540ee0,
+  0x5419a0), holding the path last laid from the first to the second
+  (+0x338 m_vMostRecentPath, origin first) and whether a route runs on it
+  (+0x218 m_bHasActiveRoute: set by AddTradeRoute 0x53e650, cleared by
+  0x543100, which keeps the path). `GameState.tradeEdges` /
+  `trade_edge_*`, keyed by `tradeVertices` / `_trade_vertices` (a capture
+  mints a new city id, so a captured city's edges stop resolving).
+- WHO LAYS A PATH: (1) the player's DoTurn (0x4e4560 at 0x4e46ee, after the
+  governors' clocks and before the cities) runs 0x4d8a40: each living unit
+  with MakeTradeRoute on no active route standing in a city of its owner
+  (0x556380) updates the graph from that city (0x5457c0 -> 0x545020): over
+  every player's cities but the origin, the edge origin -> city with no
+  active route takes a fresh search for the origin's owner (0x5590d0, inline
+  or as "Trade Graph Update" jobs 0x541770; set by 0x53e510); a search that
+  fails LEAVES the edge's old path (`tradeGraphTurn` / `_trade_graph_turn`,
+  `refreshTradeEdges`). (2) A route's start (0x555380): the edge origin ->
+  destination's path where it holds one (0x553010), else 0x5526a0's, laid
+  on the edge (AddPath 0x53eb50 -> 0x53e900); then AddTradeRoute
+  (`commitRoute` / `_trade_store_course`, `setTradeEdge`).
+- WHO READS IT: CanStartRoute's path 0x552ed0: the edge origin -> destination
+  holds a path, else a fresh search 0x553070 -> 0x559140 (`tradeAdmits` /
+  `_trade_admits`, `_trade_admit_rows`). A route's path (its start 0x555380,
+  its yields 0x54bdb0 and the path term 0x54e160, GetTradeRoutePath
+  0x12ee30): the edge origin -> destination's path, else 0x5526a0: the edge
+  DESTINATION -> ORIGIN's path walked backwards (0x541ae0 with the vertices
+  swapped), else the fresh search's (`tradePath` / `_trade_path`). The
+  city-state's route choice values each candidate on that path and takes the
+  first CanStartRoute admits (`minorRouteCandidate`, `_minor_route_candidate`);
+  the trade AI's list (0x78f210) asks the pathfinder alone (`routeInRange`).
+- CONFIRMED: runs/h1_duelz1124 Shenyang -> Bologna (578 -> 384), started t180
+  on 578,577,576,620,619,618,617,616,659,658,613,569,524,480,435,...,384:
+  the walk laid that path at t147 with China's Trader 2818050 idle in
+  Shenyang and reaches Bologna no more from t170 (t179's update with the same
+  Trader idle there finds none and keeps it); the engine's replay admits and
+  lays the route on it (the import's "a route the engine's walk cannot lay"
+  case). runs/c108_t225_20261108T115945Z: 853 of the 1,946 pairs the game
+  admits read the exact reverse of the pair the other way (396 of the 531
+  that differ from the fresh walk).
+- OPEN: the import starts the graph from the record's running routes alone
+  (their courses); the pairs a single-turn dump admits off older paths
+  (c108: 18 -> 14, 18 -> 5:589831, 54:11 -> 18:16) need the records before it.

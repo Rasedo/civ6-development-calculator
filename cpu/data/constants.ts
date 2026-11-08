@@ -594,6 +594,13 @@ export const TRADE_COURSE_MAX = srcConst('trade.courseMax', 96, {
   stylized: 'a storage capacity for the route course, not a rule; a 44 x 26 map fits any budget-walked path under it',
 });
 
+/** The trade graph's edges the GPU twin holds (`trade_edge_*`, a fixed
+ *  table; TS keeps `GameState.tradeEdges` unbounded): a storage capacity,
+ *  above the directed city pairs a map here lays paths between. */
+export const TRADE_EDGES_MAX = srcConst('trade.edgesMax', 2048, {
+  stylized: 'a storage capacity for the trade graph, not a rule; the GPU refuses to run past it',
+});
+
 /** A strategic resource's stockpile cap before the Encampment buildings:
  *  the resource's StockpileCap through the game speed (Player_Resources
  *  0x4aabe0: 0x5254d0 of the Resource_Consumption row's +0x2c, plus the

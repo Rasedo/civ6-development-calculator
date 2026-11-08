@@ -15,6 +15,20 @@
   context:
     - "...de vector +0xeb8 that EFFECT_ADJUST_PLAYER_TRADE_ROUTE_YIELD_PER_PATH_TILE writes through 0x4d8220): floor(n x a + a / 2) in 24.8 fixed point (`and ebx, 0xffffff00`), a = Hunza's 0.2 held..."
   review: reviewed
+- addr: 0x4d8a40
+  kind: function
+  semantics: "the player's trade graph turn (Player DoTurn 0x4e4560 at 0x4e46ee, after the governors' clocks and before the cities): each living unit with MakeTradeRoute (+0x1b9 bit 0x40) on no active route runs 0x556380"
+  status: READ
+  cases:
+    - recording: h1_duelz1124_20261108T114456Z
+      turn: 180
+      value: Shenyang -> Bologna (578 -> 384) starts at t180 on the path the walk laid at t147 (578,577,576,620,...,659,658,613,...,384) with an idle Trader in Shenyang; the walk reaches Bologna no more from t170
+  impl:
+    - cpu/core/trade.ts:tradeGraphTurn
+    - gpu/core/sim_masks.py:_trade_graph_turn
+    - cpu/core/minorBuild.ts:prev
+  readings: ["C-108: the trade graph's paths — READ, both twins"]
+  review: reviewed
 - addr: 0x4d9320
   final: 0x743c0
   kind: function

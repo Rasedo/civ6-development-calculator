@@ -1245,6 +1245,11 @@ _MUTABLE = [
     "seat_route_dseat", "seat_route_dcity",  # international dest (seat row, city id), else -1/-1 (domestic/CS)
     "seat_route_born", "seat_route_walk", "seat_route_leg",  # the Trader's walk (birth turn, tile, leg)
     "seat_route_course",  # the stored course (the path's plots, origin to destination, -1-padded)
+    "trade_edge_o",  # the trade graph's edges: origin centre
+    "trade_edge_ok",  # origin city key (-1 an empty slot)
+    "trade_edge_d",  # destination centre
+    "trade_edge_dk",  # destination city key
+    "trade_edge_path",  # the path last laid, origin to destination, -1-padded
     "trading_post",  # Trading Posts by (seat row, centre tile)
     "city_id",
     "unit_next",

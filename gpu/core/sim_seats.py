@@ -16177,11 +16177,12 @@ class SimSeats:
 
     def _route_reach_from(self, row: int, games: list[int]) -> torch.Tensor:
         """[B, RC, T] bool — for each of this row's city slots as ORIGIN, every
-        plot a route may END at (`tradeCourse` not null — the walk's range
-        budget), in the games `games`; False elsewhere."""
+        plot CanStartRoute's path admits a route to (`tradeAdmits`: the trade
+        graph's edge, else the walk's range budget), in the games `games`;
+        False elsewhere."""
         centers = torch.where(self.city_alive[:, row], self.city_center[:, row],
                               torch.full_like(self.city_center[:, row], -1))
-        return self._trade_reach_rows(row, games, centers)
+        return self._trade_admit_rows(row, games, centers)
 
     def _route_post_gold(self, row: int, dest_ct: torch.Tensor) -> torch.Tensor:
         """`routePostGold`, shaped like `dest_ct` ([B, ...] CENTRE tiles) —
@@ -16743,8 +16744,8 @@ class SimSeats:
     def _apply_route(self, row: int, frm: torch.Tensor, dst: torch.Tensor) -> None:
         """Apply the wire's route intent for seat row `row` — [origin CENTRE,
         dest code (a CENTRE tile, or -(2+csIndex))]. Re-validates what canAdd*
-        validates — origin resolves, capacity, no duplicate, range (the walk
-        from the origin, `_trade_reach_rows`), a free Trader — then SPENDS the
+        validates — origin resolves, capacity, no duplicate, CanStartRoute's
+        path (`_trade_admit_rows`), a free Trader — then SPENDS the
         Trader and creates the route: exp = turn + the era minimum, born =
         turn, the stored course, the walker at the origin on leg 0, road on
         the origin."""
@@ -16766,7 +16767,7 @@ class SimSeats:
             return
         o_id = ids.gather(1, o_j.unsqueeze(1)).squeeze(1)
         o_ct = centers.gather(1, o_j.unsqueeze(1)).squeeze(1)
-        reach_o = self._trade_reach_rows(row, ok.nonzero(as_tuple=True)[0].tolist(), o_ct.unsqueeze(1))[:, 0]  # [B, T]
+        reach_o = self._trade_admit_rows(row, ok.nonzero(as_tuple=True)[0].tolist(), o_ct.unsqueeze(1))[:, 0]  # [B, T]
         to_code = torch.full((B,), -1, dtype=torch.long, device=dev)
         dseat = torch.full((B,), -1, dtype=torch.long, device=dev)
         dcity = torch.full((B,), -1, dtype=torch.long, device=dev)
@@ -16831,7 +16832,7 @@ class SimSeats:
         self.seat_route_born[rows, row, slot] = int(self.turn)
         self.seat_route_walk[rows, row, slot] = o_ct[rows]
         self.seat_route_leg[rows, row, slot] = 0
-        # the COURSE, computed once here and walked for the route's life
+        # the COURSE, laid once here and walked for the route's life
         self._trade_store_course(row, rows, slot, o_ct[rows], dest_ct[rows])
         # the walker lays road on every LAND tile it stands on; the origin is turn 0
         lr = rows[~self.water[rows, o_ct[rows]]]

@@ -595,6 +595,11 @@ export interface GameState {
   storms?: StormRecord[];
   /** the live DROUGHTS (Game_Climate m_aDroughts), in the order they began */
   droughts?: DroughtRecord[];
+  /** THE TRADE GRAPH'S PATHS (Trade_Graph.cpp m_vMostRecentPath): per
+   *  directed city pair, keyed `origin>destination` by the two cities'
+   *  `tradeVertices`, the path last laid from the first to the second, origin
+   *  to destination (`tradeEdge`) */
+  tradeEdges?: Record<string, number[]>;
   seatActions?: SeatActionLog;
   sandbox: boolean;
   /** Great-person ids recruited BY ANYONE, in claim order. Real Civ 6 great
