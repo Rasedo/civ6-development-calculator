@@ -1515,8 +1515,8 @@ class SimTactics:
         other players' but never ends on another player's unit or its own
         that stacks with it, and stops short of a unit at war with it its
         path passed out of its sight. A path ending on a plot it attacks into
-        stops at its side, and with `strike` (the barbarians') it strikes
-        there. A destination its own stacking unit or another player's unit
+        stops at its side, and with `strike` it strikes there
+        (`meleeAttack`: `_melee_at`). A destination its own stacking unit or another player's unit
         at peace in its sight holds is no path (within the first turn under
         `later_turns`), nor one another player's unit holds out of its
         sight. With
@@ -1733,10 +1733,7 @@ class SimTactics:
                 m[rows[hit & (sr == u)]] = True
                 tt = torch.zeros(B, dtype=torch.long, device=dev)
                 tt[rows] = dr
-                if seat == BARB_SEAT:
-                    self._barb_melee_at(m, u, tt)
-                else:
-                    self._hostile_vs_unit(m, tt, pre, u)
+                self._melee_at(m, pre, u, tt, seat)
         # an order its walk left short of its destination, Movement left,
         # stays on the unit, carried on as the player's turn ends (`moveTo`,
         # `withShortOrders`): one with a path, no step refused, not waiting

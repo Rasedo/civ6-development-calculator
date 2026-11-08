@@ -13016,21 +13016,6 @@ class SimSeats:
         return (((mil >= 0) & (mseat != BARB_SEAT))
                 | (self._shot_embarked_plane(False) >= 0))
 
-    def _nonbarb_unit_at(self, tiles: torch.Tensor) -> torch.Tensor:
-        """[B, N] — a unit a barbarian's melee may take stands AT `tiles`: a
-        non-barbarian military unit, civilian, support unit or passenger (a
-        civilian the barbarians hold is theirs) — every class the raider's
-        adjacency scan offers. A prober asking about one tile per game has no
-        business building the whole map."""
-        t = tiles.clamp(min=0)
-        mil = self._visible_military_at(BARB_SEAT).gather(1, t)
-        mseat = torch.where(mil >= 0, self.unit_seat.gather(1, mil.clamp(min=0)), torch.full_like(mil, -1))
-        foe = (mil >= 0) & (mseat != BARB_SEAT)
-        for plane in (self.civilian_at, self.support_at, self.embarked_at):
-            o = plane.gather(1, t)
-            foe = foe | ((o >= 0) & (self.unit_seat.gather(1, o.clamp(min=0)) != BARB_SEAT))
-        return foe
-
     def _pool_at(self, plane: torch.Tensor, pool: str) -> torch.Tensor:
         lo, hi = self.POOL_LO[pool], self.POOL_HI[pool]
         mine = (plane >= lo) & (plane < hi)
@@ -14951,9 +14936,9 @@ class SimSeats:
 
     def _melee_city(self, att: torch.Tensor, tgt: torch.Tensor, atk_kind: str, u: int) -> None:
         """The battle in `_assault_city`, then the aftermath the ATTACKER's
-        class decides: a MAJOR takes the city (one `_transfer_city`, which pays
-        the +40 plunder and razes at the winner's cap), a BARBARIAN sacks it
-        (barbs never hold ground).
+        seat decides: a MAJOR takes the city (one `_transfer_city`, which pays
+        the +40 plunder and razes at the winner's cap), any other captor (a
+        barbarian, a city-state, the Free Cities) sacks it.
 
         The city falling is NOT gated on the attacker surviving — TS kills the
         unit before the city-hp check, so an attacker can trade itself for the
@@ -14970,7 +14955,9 @@ class SimSeats:
             return
         a_seat = self._pool_of(atk_kind)[6]
         self._raze_garrison(fell, self.city_center[fell, hrow[fell], slot[fell]], a_seat[fell, u])
-        if POOL_CLASS[atk_kind] == "major":
+        _maj_cap = (a_seat[fell, u] >= 0) & (a_seat[fell, u] < self.n_majors)
+        take = fell[_maj_cap]
+        if take.numel():
             # CIV6 (Isibongo): "Conquering a city with a unit will upgrade it
             # into a Corps or Army, if the proper Civics are unlocked" — read
             # BEFORE the transfer, which pays the plunder and moves the tiles
@@ -14978,19 +14965,19 @@ class SimSeats:
             if self._conquest_formation_rows:
                 _atype = self._pool_of(atk_kind)[2]
                 _aform = getattr(self, f"{atk_kind}_unit_formation")
-                for _b in fell.tolist():
+                for _b in take.tolist():
                     _ar = int(a_seat[_b, u])
-                    if not (0 <= _ar < self.n_majors):
-                        continue
                     if not any(bool(self._row_is(_ar, _c, _l)[_b]) for _c, _l in self._conquest_formation_rows):
                         continue
                     _tier = int(self._formation_tier_for(_ar, int(_atype[_b, u]))[_b])
                     if _tier > int(_aform[_b, u]):
                         _aform[_b, u] = _tier
-            for _b in fell.tolist():
+            for _b in take.tolist():
                 _ctr_c = int(self.city_center[_b, int(hrow[_b]), int(slot[_b])])
                 self._transfer_city(_b, int(hrow[_b]), int(slot[_b]), int(a_seat[_b, u]), conquest=True, loyalty=False)
                 self._conquistador_convert(_b, int(a_seat[_b, u]), _ctr_c)
+        fell = fell[~_maj_cap]
+        if fell.numel() == 0:
             return
         hr, sl = hrow[fell], slot[fell]
         self.city_pop[fell, hr, sl] = ((self.city_pop[fell, hr, sl] * 3) // 4).clamp(min=1)

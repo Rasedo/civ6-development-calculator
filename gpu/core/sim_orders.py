@@ -865,85 +865,13 @@ class SimOrders:
                         & (self._type_ranged_strength[ut] <= 0)
                     ))
                 if bool(valid.count_nonzero()):
-                    # WHO is on the target tile, and is any of them hostile to
-                    # this seat? `unitsHostile` answers for every pair, so no
-                    # seat needs a clause of its own.
-                    _ms = self._visible_military_at(row).gather(1, tc.unsqueeze(1)).squeeze(1)
-                    # civilian OR support, a RELIGIOUS unit never: a melee
-                    # order onto one is a move (`_melee_coloc`)
-                    _cs = self._melee_class_at(tc)
-                    _es = self.embarked_at.gather(1, tc.unsqueeze(1)).squeeze(1)
-                    neg = torch.full_like(_ms, -1)
-                    _es_t = self.unit_type.gather(1, _es.clamp(min=0).unsqueeze(1)).squeeze(1).clamp(min=0, max=self.NU - 1)
-                    _es = torch.where((_es >= 0) & (self._rel_strength.take(_es_t) > 0), neg, _es)
-                    m_seat = torch.where(_ms >= 0, self.unit_seat.gather(1, _ms.clamp(min=0).unsqueeze(1)).squeeze(1), neg)
-                    c_seat = torch.where(_cs >= 0, self.unit_seat.gather(1, _cs.clamp(min=0).unsqueeze(1)).squeeze(1), neg)
-                    e_seat = torch.where(_es >= 0, self.unit_seat.gather(1, _es.clamp(min=0).unsqueeze(1)).squeeze(1), neg)
-                    # the passenger is a target in its own right
-                    host_m = (self._seats_hostile(row, m_seat.unsqueeze(1))
-                              | self._seats_hostile(row, e_seat.unsqueeze(1))).squeeze(1)
-                    host_c = self._seats_hostile(row, c_seat.unsqueeze(1)).squeeze(1)
-                    _rs = self._religious_civ_at(tc)
-                    r_seat = torch.where(_rs >= 0, self.unit_seat.gather(1, _rs.clamp(min=0).unsqueeze(1)).squeeze(1), neg)
-                    host_r = (self._seats_hostile(row, r_seat.unsqueeze(1)).squeeze(1)
-                              & ~self.water.gather(1, tc.unsqueeze(1)).squeeze(1)
-                              & ~self.unit_naval.take(ut))
-                    ctr = self._centre_seat_plane().gather(1, tc.unsqueeze(1)).squeeze(1)
-                    city_t = self._seats_hostile(
-                        row, self._centre_target_seat(ctr).unsqueeze(1)).squeeze(1)
-                    cs_t = torch.zeros_like(valid)
-                    if self.S > 0:
-                        _cst = torch.zeros(B, self.T, dtype=torch.bool, device=dev)
-                        _cst.scatter_(1, self.citystate_center[:, :self.S].clamp(min=0), self._citystate_target(row))
-                        cs_t = _cst.gather(1, tc.unsqueeze(1)).squeeze(1) & (ctr >= 100)
                     melee = self._type_ranged_strength.take(ut) <= 0
-                    # meleeAttackInner's precedence as DISJOINT arms (a legal
-                    # column landing in none of them is a silent no-op):
-                    #   1. a live enemy Encampment, WHOEVER stands on it — a
-                    #      unit sheltering there is invulnerable while the
-                    #      district holds,
-                    #   2. a MAJOR centre under city-first,
-                    #   3. a CITY-STATE centre under city-first,
-                    #   4. the unit resolver.
-                    enc_t = (
-                        self._encamp_block(tc.unsqueeze(1), row).squeeze(1)
-                        & ~city_t & ~cs_t
-                        if self._encamp_didx >= 0 else torch.zeros_like(valid)
-                    )
-                    city_hit = city_t
-                    cs_hit = cs_t & ~city_t
-                    unit_hit = (host_m | host_c) & ~city_hit & ~cs_hit & ~enc_t
-                    # CIV6: one military unit to a tile — the move is refused
-                    # where any military unit already stands, the mover's own
-                    # or a seat at peace with it (seen or not)
-                    any_mil = self.military_at.gather(1, tc.unsqueeze(1)).squeeze(1) >= 0
-                    coloc = host_r & ~host_m & ~host_c & ~any_mil & ~city_hit & ~cs_hit & ~enc_t
-                    _css = self.citystate_at.gather(1, tc.unsqueeze(1)).squeeze(1).clamp(min=0)
                     for b_ in valid.nonzero(as_tuple=True)[0].tolist():
                         v = int(sc[b_])
                         one = torch.zeros(B, dtype=torch.bool, device=dev)
                         one[b_] = True
                         if bool(melee[b_]):
-                            if bool(enc_t[b_]):
-                                self._attack_encampment(one, tc, "major", v)
-                            elif bool(city_hit[b_]):
-                                self._melee_city(one, tgt, "major", v)
-                            elif bool(cs_hit[b_]):
-                                _csr = self._assault_city_state(one, _css, tgt, "major", v)
-                                if _csr is not None and bool(_csr[2].count_nonzero()):
-                                    self._capture_city_state(
-                                        _csr[2].nonzero(as_tuple=True)[0], _css, self.unit_seat[:, v])
-                            elif bool(unit_hit[b_]):
-                                # spends through `spendAttack`, inside the body
-                                self._hostile_vs_unit(one, tgt, "major", v)
-                                continue
-                            elif bool(coloc[b_]):
-                                # a MOVE onto a religious unit's tile: no attack
-                                self._melee_coloc(one, tc, "major", v, row)
-                                continue
-                            else:
-                                continue  # nothing to attack — TS's `no(...)`, no MP spent
-                            self.unit_mp[b_, v] = 0  # the turn is spent (TS movesLeft = 0)
+                            self._melee_at(one, "major", v, tc, row)
                         else:
                             # rangedAttack: one roll, no retaliation, no
                             # advance. It re-derives its own target and spends
@@ -2013,65 +1941,83 @@ class SimOrders:
         self._barbarian_tactics(acting)
         self._barb_slots_dying()
 
-    def _barb_melee_at(self, attack: torch.Tensor, u: int, ttc: torch.Tensor) -> None:
-        """`meleeAttack` by the barbarian at local slot `u` on the plot `ttc`
-        [B] in the games of `attack`: a city centre, a city-state's, a unit
-        that fights, a civilian it moves onto, an Encampment; a blow at a
-        city or an Encampment ends its turn."""
-        _cplane = self._centre_seat_plane()
-        ctr_here = self.centre_slot_at.gather(1, ttc.unsqueeze(1)).squeeze(1) >= 0
-        _csp = _cplane.gather(1, ttc.unsqueeze(1)).squeeze(1)
-        cs_here = (_csp >= 100) & (_csp < BARB_SEAT)
-        # the minor's slot where the tile is a minor's, 0 elsewhere: the
-        # assault gathers on every game, and a Free City plot's 300 is no slot
-        _csi = torch.where(cs_here, _csp - 100, torch.zeros_like(_csp))
-        has_u = self._nonbarb_unit_at(ttc.unsqueeze(1)).squeeze(1)
-        # a RELIGIOUS unit is no melee target: with nothing else there the
-        # blow is a MOVE onto its tile (`_melee_coloc`)
-        _rb = self._religious_civ_at(ttc)
-        _eb = self.embarked_at.gather(1, ttc.unsqueeze(1)).squeeze(1)
-        _eb_t = self.unit_type.gather(1, _eb.clamp(min=0).unsqueeze(1)).squeeze(1).clamp(min=0, max=self.NU - 1)
-        _mb = self._visible_military_at(BARB_SEAT).gather(1, ttc.unsqueeze(1)).squeeze(1)
-        _mb_seat = torch.where(_mb >= 0, self.unit_seat.gather(1, _mb.clamp(min=0).unsqueeze(1)).squeeze(1),
-                               torch.full_like(_mb, -1))
-        fight_u = (((_mb >= 0) & (_mb_seat != BARB_SEAT))
-                   | (self._melee_class_at(ttc) >= 0)
-                   | ((_eb >= 0) & ~(self._rel_strength.take(_eb_t) > 0)))
-        rel_u = ((_rb >= 0) & ~self.water.gather(1, ttc.unsqueeze(1)).squeeze(1)
-                 & ~self.unit_naval.take(self.barb_unit_type[:, u].clamp(min=0, max=self.NU - 1)))
-        _enc_here = (
-            self._encamp_block(ttc.unsqueeze(1), BARB_SEAT).squeeze(1)
-            if self._encamp_didx >= 0
-            else torch.zeros_like(attack)
-        )
-        city_att = attack & ctr_here
-        cs_att = attack & cs_here & ~ctr_here
-        # the district shelters whoever stands on it, so it answers first
-        unit_att = attack & has_u & fight_u & ~ctr_here & ~cs_here & ~_enc_here
-        # CIV6: one military unit to a tile — the move is refused where a
-        # barbarian military unit already stands
-        own_mil = (_mb >= 0) & (_mb_seat == BARB_SEAT)
-        coloc_att = attack & has_u & ~fight_u & rel_u & ~own_mil & ~ctr_here & ~cs_here & ~_enc_here
-        enc_att = attack & ~ctr_here & ~cs_here & _enc_here
+    def _melee_at(self, attack: torch.Tensor, pre: str, u: int, ttc: torch.Tensor, seat: int) -> None:
+        """`meleeAttackInner`'s dispatch for the unit at local slot `u` of
+        pool `pre` (its player `seat`, an int) on the plot `ttc` [B] in the
+        games of `attack`, its arms disjoint in the TS precedence:
+          1. a live Encampment hostile to `seat` (`encampmentBlocks`),
+             whoever stands on it, where no city answers,
+          2. a city centre (a major's, a Free City's) whose holder is
+             hostile to `seat`, city-first over its garrison,
+          3. a city-state's centre `seat` may attack (`cityStateAttackable`),
+          4. a hostile unit (`_hostile_vs_unit`: a fighter, or the civilians
+             a move onto the plot takes),
+          5. a MOVE onto a plot whose only hostile occupant is a RELIGIOUS
+             unit ashore, by a unit not naval, where no military unit stands
+             (`_melee_coloc`);
+        anything else is `no(...)`, nothing spent. A blow at a city, a
+        city-state or an Encampment ends the unit's turn; the unit arms spend
+        inside their own bodies, where the promotion that waives it is read."""
+        neg = torch.full_like(ttc, -1)
+        t1 = ttc.unsqueeze(1)
 
-        if bool(city_att.count_nonzero()):
-            self._melee_city(city_att, ttc, "barb", u)
-        if bool(cs_att.count_nonzero()):
-            # the shared assault floors the minor at 1 HP for a barbarian
-            # attacker, so the capture tail it returns is always empty here
-            self._assault_city_state(cs_att, _csi.clamp(min=0), ttc, "barb", u)
-        if bool(unit_att.count_nonzero()):
-            self._hostile_vs_unit(unit_att, ttc, "barb", u)
-        if bool(coloc_att.count_nonzero()):
-            self._melee_coloc(coloc_att, ttc, "barb", u, BARB_SEAT)
+        def _seat_of(slot: torch.Tensor) -> torch.Tensor:
+            return torch.where(slot >= 0, self.unit_seat.gather(1, slot.clamp(min=0).unsqueeze(1)).squeeze(1), neg)
+
+        def _hostile(s: torch.Tensor) -> torch.Tensor:
+            return self._seats_hostile(seat, s.unsqueeze(1)).squeeze(1)
+
+        ctr = self._centre_seat_plane().gather(1, t1).squeeze(1)
+        city_att = attack & _hostile(self._centre_target_seat(ctr))
+        S = self.S
+        cs_here = (ctr >= 100) & (ctr < 100 + S)
+        # the minor's slot where the tile is a minor's centre, 0 elsewhere
+        _csi = torch.where(cs_here, ctr - 100, torch.zeros_like(ctr))
+        if S > 0:
+            # `cityStateAttackable`: an always-hostile seat needs no war
+            if seat in (BARB_SEAT, FREE_SEAT):
+                cs_ok = torch.ones_like(cs_here)
+            else:
+                cs_ok = self._citystate_target(int(self._seat_row[seat])).gather(1, _csi.unsqueeze(1)).squeeze(1)
+            cs_att = attack & cs_here & cs_ok & ~city_att
+        else:
+            cs_att = torch.zeros_like(attack)
+        enc_att = (attack & self._encamp_block(t1, seat).squeeze(1) & ~city_att & ~cs_att
+                   if self._encamp_didx >= 0 else torch.zeros_like(attack))
+        # the hostile units a melee blow may take: the fighter in `seat`'s
+        # sight, a passenger (a RELIGIOUS one never), a civilian or support
+        _ms = self._visible_military_at(seat).gather(1, t1).squeeze(1)
+        _es = self.embarked_at.gather(1, t1).squeeze(1)
+        _es_t = self.unit_type.gather(1, _es.clamp(min=0).unsqueeze(1)).squeeze(1).clamp(min=0, max=self.NU - 1)
+        _es = torch.where((_es >= 0) & (self._rel_strength.take(_es_t) > 0), neg, _es)
+        _cs = self._melee_class_at(ttc)
+        host_u = _hostile(_seat_of(_ms)) | _hostile(_seat_of(_es)) | _hostile(_seat_of(_cs))
+        unit_att = attack & host_u & ~city_att & ~cs_att & ~enc_att
+        a_type = getattr(self, f"{pre}_unit_type")[:, u].clamp(min=0, max=self.NU - 1)
+        host_r = (_hostile(_seat_of(self._religious_civ_at(ttc)))
+                  & ~self.water.gather(1, t1).squeeze(1) & ~self.unit_naval.take(a_type))
+        # CIV6: one military unit to a tile — the move is refused where any
+        # military unit already stands, seen or not
+        any_mil = self.military_at.gather(1, t1).squeeze(1) >= 0
+        coloc_att = attack & host_r & ~host_u & ~any_mil & ~city_att & ~cs_att & ~enc_att
+
         if bool(enc_att.count_nonzero()):
-            self._attack_encampment(enc_att, ttc, "barb", u)
-        # A blow at a CITY or an Encampment ends the raider's turn
-        # outright; the unit arms spend inside their own bodies, where the
-        # promotion that waives it is read.
-        city_spent = city_att | cs_att | enc_att
-        self.barb_unit_mp[:, u] = torch.where(
-            city_spent, torch.zeros_like(self.barb_unit_mp[:, u]), self.barb_unit_mp[:, u])
+            self._attack_encampment(enc_att, ttc, pre, u)
+        if bool(city_att.count_nonzero()):
+            self._melee_city(city_att, ttc, pre, u)
+        if bool(cs_att.count_nonzero()):
+            # an always-hostile attacker's assault floors the minor at 1 HP,
+            # so its capture tail is empty
+            _csr = self._assault_city_state(cs_att, _csi, ttc, pre, u)
+            if _csr is not None and seat < self.n_majors and bool(_csr[2].count_nonzero()):
+                self._capture_city_state(_csr[2].nonzero(as_tuple=True)[0], _csi, seat)
+        if bool(unit_att.count_nonzero()):
+            self._hostile_vs_unit(unit_att, ttc, pre, u)
+        if bool(coloc_att.count_nonzero()):
+            self._melee_coloc(coloc_att, ttc, pre, u, seat)
+        spent = city_att | cs_att | enc_att
+        mp = getattr(self, f"{pre}_unit_mp")
+        mp[:, u] = torch.where(spent, torch.zeros_like(mp[:, u]), mp[:, u])
 
     def _barb_pillage_here(self, act: torch.Tensor, us: torch.Tensor) -> torch.Tensor:
         """`hostilePillage` for the barbarian at local slot `us` [B] in the
