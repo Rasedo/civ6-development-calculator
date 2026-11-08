@@ -18,11 +18,14 @@
  * A city tree becomes our CityTree: its control id, name and slot (the
  * event that starts it), its run, its trigger (its Decode Trigger's values),
  * the units assigned to it (unit +0x300) and its contracts; matched to ours
- * of the same name and trigger, it keeps our id. The plot reservations are
+ * of the same name and trigger, under the game's control id. An "Upgrade Units"
+ * tree becomes ours under its control id, the units assigned to it its own;
+ * the player's tree pool (`newTreeId`) holds every control the look lists
+ * (a slot none holds free, the generation past the highest). The plot reservations are
  * the succeeded Reserve Plot nodes'.
  *
  * An operation (`importOps`) becomes ours of the same definition and target
- * (else of the same definition), which keeps its id, slot, backup's rally
+ * (else of the same definition), which keeps its slot, backup's rally
  * and enemy, start and build permission: its enemy, target and
  * rally, its strengths (op +0x220, +0x238), its tree's run, its trigger (the
  * Decode Trigger's units and value), its lock (a Lock Units node that
@@ -33,9 +36,9 @@
  * one (+0x10, +0x11, +0x12), engaged (+0x90), the units it took in (+0x58)
  * and its goals (+0xe8 + 8 x the slot). Its team's unit to build and
  * strength stay ours (the FinalRelease team holds neither where the
- * Release's does). A city-state's operations are the game's whole — one of
- * ours the game lacks ends, one the game holds and we lack starts under the
- * game's tree id; the barbarians' and the Free Cities' are tied to their
+ * Release's does). A city-state's operations are the game's whole, each
+ * under the game's tree id — one of ours the game lacks ends, one the game
+ * holds and we lack starts —; the barbarians' and the Free Cities' are tied to their
  * tribes and cities by our ids, so only those both sides hold are taken,
  * their trigger (a raid's tribe) ours. A remembered turn (Turn Limiter's)
  * is ours of the game's (`ImportWorld.turnShift`).
@@ -46,6 +49,7 @@ import { BT_FRESH, BT_SUCCESS, type AiTreeNode, type BtMemory } from '../core/be
 import { opsOf, type OpsAi } from '../core/operations/manager';
 import { NO_PLOT, type Operation, type OpTeam } from '../core/operations/operation';
 import type { CityState } from '../core/types';
+import { treeFirstGen, treeGen, treeHeld, treeSlot } from '../core/treePool';
 import { AI_CITY_TREES } from '../data/aiCityTrees';
 import { AI_OP_DEFS, AI_OP_TEAMS, AI_TEAM_REQS, AI_TREES } from '../data/aiOperations';
 import type { GameContract, GameMemoryRead, GameOperation, GameTree, MemoryNames } from './aiMemory';
@@ -181,10 +185,6 @@ function treeOf(w: ImportWorld, id: number, g: GameTree, assigned: Record<string
   };
 }
 
-/** two triggers of one item at one plot */
-const sameTrigger = (a: CityTreeTrigger, b: CityTreeTrigger): boolean => a.unit === b.unit && a.building === b.building
-  && a.district === b.district && a.improvement === b.improvement && a.plot === b.plot && a.tech === b.tech && a.civic === b.civic;
-
 const plotOf = (w: ImportWorld, x: number, y: number): number => (x < 0 || y < 0 ? NO_PLOT : y * w.W + x);
 
 /** a game team's bytes onto our team of the definition's row `name` */
@@ -216,7 +216,7 @@ function teamRows(def: string, n: number): string[] | null {
 /** one game operation onto ours (`base` the one of ours it matches, else
  *  a new one under the game's tree id); null where its rows are not ours or
  *  its tree ended */
-function opOf(w: ImportWorld, g: GameOperation, tree: GameTree | undefined, base: Operation | undefined, turn: number,
+function opOf(w: ImportWorld, g: GameOperation, tree: GameTree | undefined, base: Operation | undefined, turn: number, whole: boolean,
   assigned: Readonly<Record<string, number>>): Operation | null {
   const def = AI_OP_DEFS[g.name ?? ''];
   const rows = def ? AI_TREES[def.tree ?? ''] : undefined;
@@ -243,7 +243,7 @@ function opOf(w: ImportWorld, g: GameOperation, tree: GameTree | undefined, base
   const released = g.teams.flat().filter((m) => assigned[String(m[0])] !== g.treeControlId)
     .flatMap((m) => { const u = w.unitOf(m[0]); return u === undefined ? [] : [u]; });
   return {
-    id: base?.id ?? g.treeControlId,
+    id: whole ? g.treeControlId : base?.id ?? g.treeControlId,
     def: def.name, enemy: g.enemy, target, rally: plotOf(w, g.rallyX, g.rallyY),
     backup: backup === NO_PLOT ? null : { target: backup, rally: base?.backup?.rally ?? backup, enemy: base?.backup?.enemy ?? g.enemy },
     teams: names.map((t, k) => teamOf(w, t, g.teams[k], g.teamCounts[k], g.teamsRaw[k], base?.teams[k]?.team === t ? base.teams[k] : undefined)),
@@ -283,9 +283,12 @@ export function importOps(ai: OpsAi, read: GameMemoryRead, w: ImportWorld, turn:
     if (!base && !whole) continue;
     // one whose rows are not ours stays ours where we hold it, its
     // contracts the game's
-    const op = opOf(w, g, tree, base, turn, read.assigned ?? {}) ?? base;
+    const op = opOf(w, g, tree, base, turn, whole, read.assigned ?? {}) ?? base;
     if (!op) continue;
-    if (op === base) base.contracts = (tree?.contracts ?? []).filter((c) => c >= 0);
+    if (op === base) {
+      base.contracts = (tree?.contracts ?? []).filter((c) => c >= 0);
+      if (whole) base.id = g.treeControlId;
+    }
     // a linked seat's trigger names its tribe (the barbarians: its index
     // among ours), which stays ours
     else if (!whole && base) {
@@ -362,24 +365,35 @@ function contractOf(w: ImportWorld, c: GameContract, trees: Record<string, GameT
 export function importCityAi(cs: CityState, read: GameMemoryRead, w: ImportWorld, opIds: ReadonlyMap<number, number>): { trees: number; contracts: number } {
   const ai = cs.cityAi as CityAi | undefined;
   if (!ai || !read.trees || !read.contracts) return { trees: 0, contracts: 0 };
-  // each game tree onto ours of the same name and trigger, which keeps its
-  // id; one ours lacks comes under the game's control id; ours the game
-  // lacks end
+  // each game city tree under its control id; ours the game lacks end
   const trees: CityTree[] = [];
   const idOf = new Map<number, number>(opIds);
-  const free = [...ai.trees];
   for (const [id, g] of Object.entries(read.trees)) {
     if ((g.operation ?? -1) !== -1) continue;
     const t = treeOf(w, Number(id), g, read.assigned ?? {});
     if (!t) continue;
-    const k = free.findIndex((o) => o.name === t.name && sameTrigger(o.trigger, t.trigger));
-    if (k >= 0) {
-      t.id = free[k].id;
-      free.splice(k, 1);
-    }
     idOf.set(Number(id), t.id);
     trees.push(t);
   }
+  // each "Upgrade Units" tree under its control id, the units assigned to
+  // it its own
+  const upgrades = Object.entries(read.trees).filter(([, g]) => g.name === 'Upgrade Units' && (g.operation ?? -1) === -1).map(([id]) => ({
+    id: Number(id),
+    units: Object.entries(read.assigned ?? {}).filter(([, job]) => job === Number(id))
+      .flatMap(([u]) => { const e = w.unitOf(Number(u)); return e === undefined ? [] : [e]; }),
+  }));
+  if (upgrades.length) cs.upgradeTrees = upgrades;
+  else delete cs.upgradeTrees;
+  // the tree pool: every control the look lists holds its slot, a slot none
+  // holds free (ours in their order, beneath them the rest), the next
+  // generation past the highest
+  const controls = Object.keys(read.trees).map(Number);
+  const taken = new Set(controls.map(treeSlot));
+  cs.opsNext = Math.max(cs.opsNext ?? treeFirstGen(cs.seat), ...controls.map((c) => treeGen(c) + 1));
+  cs.treeSlots = Math.max(cs.treeSlots ?? treeHeld(cs.seat), ...controls.map((c) => treeSlot(c) + 1));
+  const freeSlots = (cs.treeFree ?? []).filter((s) => !taken.has(s) && s < cs.treeSlots!);
+  for (let s = treeHeld(cs.seat); s < cs.treeSlots; s++) if (!taken.has(s) && !freeSlots.includes(s)) freeSlots.unshift(s);
+  cs.treeFree = freeSlots;
   // every contract of a tree taken — the city trees' and the operations':
   // its owner's, else the taken tree whose list holds it — and every one
   // the research or culture AI holds (a civic goal's contract is owned by
@@ -447,6 +461,5 @@ export function importCityAi(cs: CityState, read: GameMemoryRead, w: ImportWorld
   ai.inHand = { [-1]: city && held.has(city.hand) ? city.hand : -1 };
   ai.purchase = (read.holders?.economic ?? []).filter((id) => held.has(id));
   ai.nextContract = Math.max(ai.nextContract, ...contracts.map((c) => c.id + 1));
-  ai.nextTree = Math.max(ai.nextTree, ...trees.map((t) => t.id + 1), ...ops.map((o) => o.id + 1));
   return { trees: trees.length, contracts: contracts.length };
 }

@@ -884,6 +884,13 @@ export interface UnitPool {
   dying: number[];
 }
 
+/** A CITY-STATE'S "UPGRADE UNITS" TREE (`upgradeTreesTick`): its control's
+ *  id in the player's tree pool and the units it holds, in pool order */
+export interface UpgradeTree {
+  id: number;
+  units: number[];
+}
+
 export interface Seat {
   seat: number;
   /** the player's handicap, a Difficulties index; absent, the AI's Prince */
@@ -925,23 +932,21 @@ export interface Seat {
    *  order. Absent = none. */
   campsKnown?: number[];
   /** the city AI of a city-state (`minorAiTurn`: the events' slots, the
-   *  trees, the contracts and reservations) or the Free Cities (the ids their
-   *  operations' trees take, `freeOps.ts`) (`CityAi`) */
+   *  trees, the contracts and reservations) or the Free Cities (their
+   *  operations' contracts, `freeOps.ts`) (`CityAi`) */
   cityAi?: CityAi;
   /** the operation manager of a city-state (`minorOps.ts`), the Free Cities
-   *  (`freeOps.ts`) or the barbarians (`barbarianOps.ts`); the barbarians'
-   *  tree pool (`newBarbTreeId`): the generation the next tree's id takes,
-   *  the slots it made, its free slots (the head last) */
+   *  (`freeOps.ts`) or the barbarians (`barbarianOps.ts`); the player's tree
+   *  pool (`newTreeId`, treePool.ts), whose ids every tree of a city-state,
+   *  the Free Cities or the barbarians takes: the generation the next tree's
+   *  id takes, the slots it made, its free slots (the head last) */
   ops?: OpsAi;
   opsNext?: number;
   treeSlots?: number;
   treeFree?: number[];
-  /** the units a city-state's "Upgrade Units" trees hold (`upgradeTreesTick`):
-   *  present while a tree runs, empty where it holds none */
-  upgrading?: number[];
-  /** a city-state's technology or civic gained since its "Upgrade Units"
-   *  trees last ticked (TRIGGER_TECH_UPGRADE / TRIGGER_CIVIC_UPGRADE) */
-  upgradeTrigger?: boolean;
+  /** a city-state's running "Upgrade Units" trees (`upgradeTreesTick`):
+   *  each its id in the tree pool and the units it holds */
+  upgradeTrees?: UpgradeTree[];
   /**
    * THIS SEAT'S CITIES — one field on one interface, so a rule that touches
    * a seat's cities cannot be written twice and drift.

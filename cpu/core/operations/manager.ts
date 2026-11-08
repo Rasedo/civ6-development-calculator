@@ -34,6 +34,7 @@
  */
 import { AI_LEADER_OP_LISTS, AI_OP_DEFS, AI_OP_LIMIT_LISTS, AI_OP_LISTS, AI_TREES } from '../../data/aiOperations';
 import { compileTree, tick, BT_FRESH, type BtNode, type BtRun } from '../behaviorTree';
+import { treeSlot } from '../treePool';
 import { NO_PLOT, addMember, newTeams, opDef, opJobUnits, opUnits, robbedOps, xy, type Operation } from './operation';
 import { OP_NODES, refreshStrengths, switchToBackup, type DiplomacyRequest, type OpsContext } from './nodes';
 import type { ContractBook, ContractCity, ContractNodeWorld } from '../aiContracts';
@@ -65,9 +66,9 @@ export interface OpsAi {
 export interface OpsEnv {
   turn: number;
   /** the seat's triggered trees with no operation (a city-state's "Upgrade
-   *  Units", `upgradeTreesTick`): each ticks in the run beside the
-   *  operations' trees by its priority, after the operations of its own */
-  trees?: readonly { priority: number; tick: () => void }[];
+   *  Units", `upgradeTreesTick`): each ticks in the run among the
+   *  operations' trees by its priority, of equals by its tree pool slot */
+  trees?: readonly { priority: number; slot: number; tick: () => void }[];
   /** the city's second hook (0x5c2610 -> 0x5ce5b0), run in the city AI's
    *  pass (`CITY_AI_PASS`): after the trees of a higher priority, before
    *  those of its own or lower */
@@ -348,7 +349,7 @@ export const CITY_AI_PASS = 2;
 
 /** THE OPERATIONS' RUN (with the tree manager's tick): each operation's
  *  target and teams logged; the chosen candidate started; the trees by
- *  priority, the highest first, of equals in slot order — the tree
+ *  priority, the highest first, of equals in the tree pool's slot order (`treeSlot`) — the tree
  *  manager's tick (0x7ffdd0) runs once per priority and ticks the trees of
  *  that priority alone (0x7d3a00 / 0x7cb3d0: tree +0x548, its definition's
  *  Priority) (runs/h1_duelw1121 Hunza t13: City Defense, priority 4, ticks
@@ -361,23 +362,15 @@ export const CITY_AI_PASS = 2;
  *  purchase) */
 export function operationsRun(ai: OpsAi, env: OpsEnv): void {
   operationsRefresh(ai, env);
-  const order = opsOf(ai).map((op, k) => ({ op, k })).sort((a, b) => opDef(b.op).priority - opDef(a.op).priority || a.k - b.k);
-  const trees = [...(env.trees ?? [])].sort((a, b) => b.priority - a.priority);
+  const order = [...opsOf(ai).map((op) => ({ priority: opDef(op).priority, slot: treeSlot(op.id), tick: () => tickTree(ai, env, op) })), ...(env.trees ?? [])]
+    .sort((a, b) => b.priority - a.priority || a.slot - b.slot);
   let hooked = !env.cityHook;
   const hook = (priority: number) => {
     if (hooked || priority > CITY_AI_PASS) return;
     hooked = true;
     env.cityHook!();
   };
-  for (const { op } of order) {
-    while (trees.length && trees[0].priority > opDef(op).priority) {
-      hook(trees[0].priority);
-      trees.shift()!.tick();
-    }
-    hook(opDef(op).priority);
-    tickTree(ai, env, op);
-  }
-  for (const t of trees) {
+  for (const t of order) {
     hook(t.priority);
     t.tick();
   }

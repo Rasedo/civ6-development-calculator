@@ -9012,3 +9012,53 @@ returns (cpu/core/aiEconomic.ts) through `minorMilitaryTurn`, called after
   analogue runs/h1_duelv1121 t169 (same city, project, 4.8 Production, T 45)
   logs 29.77 where the engines value 31.82 (the per-turn value 0.936 of
   ours, t164-177 alike).
+
+## C-99: a non-major player's tree pool — every city-state tree, its operations' and its "Upgrade Units" trees in one pool, ticked in slot order — READ (0x7ff9a0 / 0x7ff7b0 / 0x800c60 -> 0x7fef20, 0x7ffdd0 -> 0x7cb2e0), both twins
+
+`newTreeId`, `freeEndedTrees`, `treeSlot`, `treeHeld` (cpu/core/treePool.ts) on
+the seat's `opsNext` / `treeSlots` / `treeFree`; `upgradeTreesStart`,
+`upgradeTreesTick` (one tree), `minorFreeTrees`, `upgradeHeld`
+(cpu/core/minorOps.ts, `CityState.upgradeTrees`); `operationsRun`'s order
+(cpu/core/operations/manager.ts), `tickCityTrees`' order (aiCityTrees.ts),
+`jobOf`'s tree id (tactical.ts). GPU `new_tree_id`, `free_ended_trees`
+(gpu/core/sim_citytrees.py, `cai_t_gen` / `cai_t_slots` / `cai_t_free` /
+`cai_t_nfree`), `_mops_upgrade_start`, `_mops_upgrade_tree`,
+`_mops_walk_slots`, `_mops_free_trees` (gpu/core/sim_minorops.py,
+`mops_upg_id`, `mops_upg_of`). The aimem import (`importCityAi`) takes the
+game's control ids for the city trees, the operations and the "Upgrade
+Units" trees, and the pool from the controls the look lists.
+
+- ONE POOL: the city events (0x5cd150, 0x5cc910, 0x5ccc10), startOperation
+  (0x73a120) and the scout's start (0x1485c0) make their trees through
+  0x7ff9a0 -> 0x7ff7b0, the trigger row (0x800c60) directly — all by
+  0x7fef20 on the manager's pool +0x3a0: the free list's head (the last
+  freed) else a new slot, the id the next generation over the slot. A
+  city-state's slots 0..2 are standing (its Simple City Tree 3:2, made at
+  its founding), so its first other control is 4:3; the Free Cities' and
+  the barbarians' 0..1 (`treeHeld`). The ids are the aimem's control ids
+  (`m_eventTrees` keys, `controlId`; `treeId` is a second id, the tree
+  object's).
+- THE WALK (0x7ffdd0): once per priority, the trees of that priority in
+  the used list's slot order — the operations' trees, the "Upgrade Units"
+  trees and the city trees alike; the destroy loop after it frees each
+  ended tree's slot to the free list's head in slot order. A tree that
+  ends in the walk keeps its slot through the rest of it: a tree made in
+  the city's hook in the same walk takes another slot (runs/h1_duely1121
+  t70 city-state 4: the Upgrade Units tree 42:6 fails, the hook's Build
+  City District takes 43:7, 44:6 at t71's trigger).
+- THE TRIGGER makes one "Upgrade Units" tree per technology gained, each
+  its own units (the aimem's `assigned` per control): a newer tree in a
+  freed lower slot ticks first and takes the units freed since.
+- CONFIRMED (one-seed traces, `--memory aimem`): runs/h1_duely1121 t69-71
+  city-state 4 — 41:4 holds the Warrior 524293, 40:5 the Warriors 262146 /
+  589828; 524293 reaches the centre first, 262146 ends on 33:20 (913) as
+  the game; 1121 t131 city-state 2's Horseman 786438; runs/h1_duely1124 t91
+  Granada's Heavy Chariot 1114117, t93 city-state 4's Heavy Chariot 983040
+  in 61:4 (Upgrade Units, 368) with the Pikeman / Trebuchet of 65:8, t136
+  city-state 3's Knight 1376260; the ids every look shows, e.g. 1124 t92-95
+  a fresh tree in slot 5 each turn failing at once (63:5, 64:5, 66:5).
+- OPEN: runs/h1_duely1121 t69 the Warrior 524293: the game's City Defense
+  (33:7) moves it (AI_Tactical.csv Operation) and 41:4 holds it at the end
+  look as City Defense is gone; the engines' 41:4 takes and moves it
+  (Upgrade Units). The Free Cities' cities' standing trees are not in
+  their pool (no Free Cities aimem in the duels to read them on).

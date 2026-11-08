@@ -66,6 +66,7 @@ import { aiView } from './aiView';
 import { economicGoldBoost } from './aiWeights';
 import { AI_GREAT_PERSON_CLASSES } from '../data/aiTables';
 import { minorJobUnits, minorOpContracts, minorOpLive, minorOpNear, minorOpsEvaluate, minorOpsStart } from './minorOps';
+import { newTreeId } from './treePool';
 import { freeOpNear } from './freeOps';
 import { ARMY_READ_AGE } from './operations/knowledge';
 import { joinBuilt } from './operations/manager';
@@ -605,7 +606,7 @@ function minorTreeWorld(state: GameState, cs: CityState, ai: CityAi, city: CityT
       return hexDistance(state.map, ta.col, ta.row, tb.col, tb.row);
     },
     newContractId: () => ai.nextContract++,
-    newTreeId: () => ai.nextTree++,
+    newTreeId: () => newTreeId(cs),
     log: () => undefined,
     clearProduction: () => minorSetItem(state, cs, null),
     order: (u, kind, plot, imp, safe) => {

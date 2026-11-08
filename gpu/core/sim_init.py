@@ -400,11 +400,14 @@ class SimInit:
         self.citystate_res_counts = torch.zeros(B, s_pad, len(rules.res_ai), dtype=torch.long, device=device)
         # the events' slots, the trees, the contracts and the reservations of
         # each minor's city (`CityAi`, gpu/core/sim_citytrees.py), then the
-        # Free Cities' (the row `FR`: the ids their operations' trees take):
+        # Free Cities' (the row `FR`: their tree pool, `newTreeId`):
         # its planes are the sim's `cai_*`
-        from .sim_citytrees import CityAi, city_tree_tables
+        from .sim_citytrees import TREE_HELD_FREE, CityAi, city_tree_tables
         _ctt = city_tree_tables(rules)
         self.cityai = CityAi(_ctt, _ctt.trees_of("MINOR_CIV_DEFAULT_TRAIT"), B, r_pad, device)
+        # the Free Cities' tree pool: their two standing controls' slots
+        self.cityai.t_slots[:, self.FR] = TREE_HELD_FREE
+        self.cityai.t_gen[:, self.FR] = TREE_HELD_FREE + 1
         for _n, _v in vars(self.cityai).items():
             if torch.is_tensor(_v):
                 setattr(self, "cai_" + _n, _v)
@@ -4207,7 +4210,7 @@ class SimInit:
         self.tribe_op_ready = torch.zeros(B, self.KT, dtype=torch.bool, device=device)
         self.barb_unit_op = torch.zeros(B, simbase.BARB_POOL_MAX, dtype=torch.bool, device=device)
         self.barb_unit_join = torch.full((B, simbase.BARB_POOL_MAX), -1, dtype=torch.long, device=device)
-        # the barbarians' tree pool (`newBarbTreeId`): the next tree's
+        # the barbarians' tree pool (`newTreeId`): the next tree's
         # generation, the slots made, the free slots (a stack, the head on
         # top) — at most every tribe's operation and scout's tree and every
         # capture's at once, past the standing controls' slots

@@ -87,7 +87,8 @@ import { BUILT_WONDERS } from '../data/builtWonders';
 import { GW_LAYOUT_W } from '../data/greatWorks';
 import { CITY_STATE_TYPES } from '../data/cityStates';
 import { MINOR_OP_DEFS } from './minorOps';
-import { BARB_TREE_FIRST_GEN, BARB_TREE_HELD, barbHomingRecord, barbOpRecord } from './barbarianOps';
+import { barbHomingRecord, barbOpRecord } from './barbarianOps';
+import { treeFirstGen, treeHeld, treeSlot } from './treePool';
 import { opsOf, type OpsAi } from './operations/manager';
 import { FREE_RAID_DEF } from './freeOps';
 import { AI_OP_TEAMS } from '../data/aiOperations';
@@ -375,6 +376,10 @@ const overUnits = (fn: (u: Unit) => Val): Extractor => (_state, rows) => (rows a
 const overTiles = (fn: (t: Tile) => Val): Extractor => (_state, rows) => (rows as Tile[]).map(fn);
 const overCityStates = (fn: (cityState: CityState, state: GameState) => Val): Extractor =>
   (state, rows) => (rows as CityState[]).map((cityState) => fn(cityState, state));
+/** a player's tree pool (`newTreeId`): the generation its next tree takes,
+ *  the slots it made, its free slots (the head last) */
+const treePoolRecord = (s: Seat | undefined, seat: number): number[] => [s?.opsNext ?? treeFirstGen(seat), s?.treeSlots ?? treeHeld(seat),
+  (s?.treeFree ?? []).length, ...(s?.treeFree ?? [])];
 /** a knowledge base's enemy unit counts as [unit index, count] pairs by
  *  unit index, flat */
 const enemyCountsRecord = (n: Record<string, number> | undefined): number[] =>
@@ -603,9 +608,9 @@ const GAME: Record<string, Extractor> = {
       t.score ?? 0, ...barbOpRecord(s, t),
       // the player its units rampage against, its camp taken
       t.rampage ?? -1]),
-    ...s.seats.map((x) => s.barbSpotNext?.[x.seat] ?? 0), s.barbSeat.opsNext ?? BARB_TREE_FIRST_GEN,
-    // the trees' pool (`newBarbTreeId`): its slots made, its free list
-    s.barbSeat.treeSlots ?? BARB_TREE_HELD, (s.barbSeat.treeFree ?? []).length, ...(s.barbSeat.treeFree ?? []),
+    ...s.seats.map((x) => s.barbSpotNext?.[x.seat] ?? 0), s.barbSeat.opsNext ?? treeFirstGen(BARB_SEAT),
+    // the trees' pool (`newTreeId`): its slots made, its free list
+    s.barbSeat.treeSlots ?? treeHeld(BARB_SEAT), (s.barbSeat.treeFree ?? []).length, ...(s.barbSeat.treeFree ?? []),
     techs.length, ...techs, civics.length, ...civics,
     // the unit pool (`barbSlots`): its size, its free slots, those waiting to
     // go free, each unit's slot in unit order; each tribe's camp defender alive
@@ -661,9 +666,9 @@ const GAME: Record<string, Extractor> = {
   freeCombatDesire: (s) => [s.freeSeat?.combatDesire ?? 0],
   freeTradeValue: (s) => [s.freeSeat?.tradeValue ?? 0],
   // the Free Cities' operations (the Free Cities Raid) and the ids their
-  // next contract and tree take
+  // next contract takes and their tree pool (`newTreeId`)
   freeOps: (s) => [opsRecord(s.freeSeat?.ops, FREE_SEAT, [...MINOR_OP_DEFS, FREE_RAID_DEF], s)],
-  freeAiSerials: (s) => [[s.freeSeat?.cityAi?.nextContract ?? 1, s.freeSeat?.cityAi?.nextTree ?? 100]],
+  freeAiSerials: (s) => [[s.freeSeat?.cityAi?.nextContract ?? 1, ...treePoolRecord(s.freeSeat, FREE_SEAT)]],
   // the live storms in the order they began: the last serial, then per
   // record its serial, row, centre, turns left, and its struck plots sorted
   // behind their count
@@ -1028,10 +1033,16 @@ const CITY_STATE_G: Record<string, Extractor> = {
     .map((r) => [r.owner, idx(UNIT_IDX, r.type), r.seen, r.plot, r.damage, r.formation ?? 0])
     .sort((a, b) => a[0] - b[0] || a[1] - b[1] || a[2] - b[2] || a[3] - b[3] || a[4] - b[4] || a[5] - b[5]).flat()),
   minorOps: overCityStates((cityState, state) => minorOpsRecord(cityState, state)),
-  // its "Upgrade Units" trees: running, the trigger, their units' pool slots
-  minorUpgrading: overCityStates((cityState, state) => [cityState.upgrading ? 1 : 0, cityState.upgradeTrigger ? 1 : 0,
-    ...(cityState.upgrading ?? []).map((id) => state.units.find((u) => u.id === id && u.seat === cityState.seat)?.slot ?? -1)
-      .filter((s) => s >= 0).sort((a, b) => a - b)]),
+  // its "Upgrade Units" trees in slot order: each its id and its units'
+  // pool slots
+  minorUpgrading: overCityStates((cityState, state) => {
+    const trees = [...(cityState.upgradeTrees ?? [])].sort((a, b) => treeSlot(a.id) - treeSlot(b.id));
+    return [trees.length, ...trees.flatMap((t) => {
+      const slots = t.units.map((id) => state.units.find((u) => u.id === id && u.seat === cityState.seat)?.slot ?? -1)
+        .filter((s) => s >= 0).sort((a, b) => a - b);
+      return [t.id, slots.length, ...slots];
+    })];
+  }),
   minorCampsKnown: overCityStates((cityState) => [...(cityState.campsKnown ?? [])]),
   minorProjectYield: overCityStates((cityState) => projectYieldCols(cityState.projectYield)),
   minorTreasury: overCityStates((cityState) => cityState.treasury),
@@ -1101,7 +1112,7 @@ const CITY_STATE_G: Record<string, Extractor> = {
   minorPurchaseList: overCityStates((cityState) => [...(cityState.cityAi?.purchase ?? [])].sort((a, b) => a - b)),
   minorReservations: overCityStates((cityState) => [...(cityState.cityAi?.reservations ?? [])].sort((a, b) => a.plot - b.plot)
     .flatMap((r) => [r.plot, r.tree, r.value])),
-  minorAiHand: overCityStates((cityState) => [cityState.cityAi?.inHand[-1] ?? -1, cityState.cityAi?.nextContract ?? 1, cityState.cityAi?.nextTree ?? 100,
+  minorAiHand: overCityStates((cityState) => [cityState.cityAi?.inHand[-1] ?? -1, cityState.cityAi?.nextContract ?? 1, ...treePoolRecord(cityState, cityState.seat),
     cityState.cityAi ? 1 : 0]),
   minorBuildersTrained: overCityStates((cityState) => cityState.buildersTrained),
   minorBestMeleeCS: overCityStates((cityState) => cityState.bestMeleeCS),

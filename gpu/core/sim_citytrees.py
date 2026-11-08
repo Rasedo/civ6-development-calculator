@@ -38,6 +38,15 @@ N_CONTRACTS = 16
 N_RESERVATIONS = 8
 N_TREE_UNITS = 4
 
+# THE PLAYER'S TREE POOL (`newTreeId`, cpu/core/treePool.ts): a control id is
+# its generation over its slot; a city-state's standing controls hold slots
+# 0..2 (its Simple City Tree slot 2), the Free Cities' 0..1 (`treeHeld`);
+# the free list's capacity
+TREE_SLOT = 0x10000
+TREE_HELD_MINOR = 3
+TREE_HELD_FREE = 2
+N_TREE_FREE = 16
+
 # a contract's goal kind (the techContracts / plotContracts maps)
 GOAL_NONE, GOAL_TECH, GOAL_CIVIC, GOAL_PLOT = 0, 1, 2, 3
 # a city tree's priority (BehaviorTree +0x548; `CITY_TREE_PRIORITY`)
@@ -266,7 +275,55 @@ class CityAi:
         self.r_tree = torch.full((B, S, R), -1, dtype=L, device=dev)
         self.r_value = torch.zeros(B, S, R, dtype=L, device=dev)
         self.c_serial = torch.ones(B, S, dtype=L, device=dev)
-        self.t_serial = torch.full((B, S), 100, dtype=L, device=dev)
+        # the seat's tree pool (`newTreeId`): the generation its next tree
+        # takes, the slots made, the free slots (a stack, the head on top) —
+        # a city-state's; the sim sets the Free Cities' row (`TREE_HELD_FREE`)
+        self.t_gen = torch.full((B, S), TREE_HELD_MINOR + 1, dtype=L, device=dev)
+        self.t_slots = torch.full((B, S), TREE_HELD_MINOR, dtype=L, device=dev)
+        self.t_free = torch.zeros(B, S, N_TREE_FREE, dtype=L, device=dev)
+        self.t_nfree = torch.zeros(B, S, dtype=L, device=dev)
+
+
+# -- the seat's tree pool ---------------------------------------------------
+
+def new_tree_id(ai: CityAi, s: int, mask: torch.Tensor) -> torch.Tensor:
+    """`newTreeId` where `mask`: a new tree of seat `s`'s pool (0x7fef20) —
+    the slot the free list's head names, else the pool's next new one — its
+    id [B] the next generation over the slot"""
+    gen = ai.t_gen[:, s].clone()
+    ai.t_gen[:, s] += mask.long()
+    nf = ai.t_nfree[:, s]
+    pop = mask & (nf > 0)
+    top = ai.t_free[:, s].gather(1, (nf - 1).clamp(min=0).unsqueeze(1)).squeeze(1)
+    slot = torch.where(pop, top, ai.t_slots[:, s])
+    ai.t_nfree[:, s] = nf - pop.long()
+    ai.t_slots[:, s] += (mask & ~pop).long()
+    assert int(ai.t_slots[:, s].max()) <= N_TREE_FREE, "tree pool: raise N_TREE_FREE"
+    return gen * TREE_SLOT + slot
+
+
+def free_ended_trees(ai: CityAi, s: int, held: int, live: list, mask: torch.Tensor) -> None:
+    """`freeEndedTrees` for seat `s` where `mask` (`held` its standing slots): after the
+    walk each slot past them whose tree no longer runs — none of `live`'s
+    ids ([B, K] tensors, -1 none) — to the free list's head, in slot order"""
+    B, dev = ai.B, ai.device
+    n = N_TREE_FREE
+    b = torch.arange(B, device=dev)
+    on = torch.zeros(B, n + 1, dtype=torch.bool, device=dev)
+    for ids in live:
+        sl = torch.where(ids >= 0, ids % TREE_SLOT, n).clamp(max=n)
+        on.scatter_(1, sl, True)
+    listed = torch.zeros(B, n + 1, dtype=torch.bool, device=dev)
+    k = torch.arange(n, device=dev).unsqueeze(0)
+    fl = torch.where(k < ai.t_nfree[:, s].unsqueeze(1), ai.t_free[:, s], n)
+    listed.scatter_(1, fl, True)
+    for q in range(held, int(ai.t_slots[:, s].max()) if B else 0):
+        go = mask & (q < ai.t_slots[:, s]) & ~on[:, q] & ~listed[:, q]
+        if not bool(go.any()):
+            continue
+        r = b[go]
+        ai.t_free[r, s, ai.t_nfree[r, s]] = q
+        ai.t_nfree[:, s] += go.long()
 
 
 # -- the seat's book -------------------------------------------------------
@@ -601,8 +658,7 @@ def start_tree(ai: CityAi, s: int, slot: int, trigger: list, mask: torch.Tensor)
     district, improvement, plot, tech, civic, city], each [B] or a number)"""
     if not bool(mask.any()):
         return
-    tid = ai.t_serial[:, s].clone()
-    ai.t_serial[:, s] += mask.long()
+    tid = new_tree_id(ai, s, mask)
     m = mask
     ai.tr_alive[:, s, slot] |= m
     ai.tr_id[:, s, slot] = torch.where(m, tid, ai.tr_id[:, s, slot])
@@ -1588,7 +1644,7 @@ def tick_tree(ai: CityAi, s: int, k: int, w, turn: int, act: torch.Tensor) -> to
 
 def tick_city_trees(ai: CityAi, s: int, w, turn: int, mask: torch.Tensor) -> None:
     """THE TREE MANAGER'S TICK (`tickCityTrees`) where `mask`: each running
-    tree of the seat, in the order they started, ticks once; a tree whose
+    tree of the seat, in the tree pool's slot order, ticks once; a tree whose
     root ends, or one of whose units its orders spent, ends; the
     reservations of trees ended and the contracts no holder keeps go"""
     city_ok = _b(w.city_alive(), mask)
@@ -1598,7 +1654,7 @@ def tick_city_trees(ai: CityAi, s: int, w, turn: int, mask: torch.Tensor) -> Non
     # a tree whose city is gone ends
     ai.tr_alive[:, s] &= ~(alive & ~city_ok.unsqueeze(1))
     alive = alive & city_ok.unsqueeze(1)
-    key = torch.where(alive, ids, torch.full_like(ids, 1 << 40))
+    key = torch.where(alive, ids % TREE_SLOT, torch.full_like(ids, 1 << 40))
     rank = key.argsort(dim=1).argsort(dim=1)
     for r in range(N_SLOTS):
         for k in ks:

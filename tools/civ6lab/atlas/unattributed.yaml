@@ -14,7 +14,7 @@
     - recording: h1_duelw1105
       turn: 12
       value: "So a tree started in the walk ticks in it   only where its slot lies past the one ticking: runs/h1_duelw1105 log t12,   tribe 4's scout's tree (slot 1) starts the raid on 12:14 in slot 0 (tribe   0's "
-  impl: [cpu/core/barbarianOps.ts:TREE_SLOT]
+  impl: [cpu/core/treePool.ts:treeSlot]
   readings:
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
   context:
@@ -2783,8 +2783,9 @@
       value: "the upgrade's StrategicResource (+0x2c8) index, -1 none: Bologna's Scouts (Skirmisher, none) deleted, Hong Kong's Warriors (Swordsman, Iron) held"
   impl:
     - cpu/core/minorOps.ts:upgradeTreesTick
-    - gpu/core/sim_minorops.py:_mops_upgrade_trees
+    - gpu/core/sim_minorops.py:_mops_upgrade_tree
     - cpu/core/minorOps.ts:upgradeUnasked
+    - gpu/core/sim_minorops.py:_mops_upgrade_tree
   readings:
     - "C-99: the upgrade trees — READ (the trigger, Find Available Unit's upgradeable offer, Find Unit Targets' job, Upgrade Units, the economic AI's upgrade, Move Unit with no Location), ported; the deletion of an excess obsolete unit unported"
     - "C-96: the upgrade trees' deletion — READ (0x7ef850's branches, 0x591000), both twins"
@@ -5392,6 +5393,7 @@
   kind: function
   semantics: seeds a behaviour tree at its priority (a city tree at its CityBuildAI's pass 2).
   status: PARTLY
+  impl: [cpu/core/minorOps.ts:upgradeTreesStart]
   readings:
     - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
     - "C-96 / C-97: the team's unit to build, the recruit's contract and the knowledge base's camps — the team update's requirements and readiness, the unit choice, Recruit Units' result and contract, the camps READ; the maintenance resource test, the recruit's stealing and levy unread"
@@ -5775,17 +5777,23 @@
 - addr: 0x7fef20
   final: 0x563070
   kind: function
-  semantics: "the tree pool's slot: its free list's head (+0x2c, each entry's +8 the next), else a new block's (0x7ff430); the id (+0x28 += 0x10000) | slot; the used list (head +0x38, tail +0x40, each entry's +8 / +0x10 its neighbours) kept in slot order (linked before the next used slot, else at the tail). A tree started in the tick's walk ticks in it only where its slot lies past the one ticking. The barbarians' pool opens with slots 0 and 1 held and its generation at 3 (the first tree 196610)."
-  status: PARTLY
+  semantics: "the tree pool's slot: its free list's head (+0x2c, each entry's +8 the next), else a new block's (0x7ff430); the id (+0x28 += 0x10000) | slot; the used list (head +0x38, tail +0x40, each entry's +8 / +0x10 its neighbours) kept in slot order (linked before the next used slot, else at the tail). A tree started in the tick's walk ticks in it only where its slot lies past the one ticking. One pool per player: a city-state's city trees (0x7ff9a0 from the events), its operations' trees (0x73a120) and its Upgrade Units trees (0x800c60) all take it, the ids the aimem's control ids. The barbarians' and the Free Cities' pool opens with slots 0 and 1 held and its generation at 3 (the first tree 196610); a city-state's with slots 0..2 (its Simple City Tree 3:2), its first other tree 4:3."
+  status: READ
   cases:
     - recording: h1_duely1128
       turn: 4
       value: the first barbarian tree 196610 (generation 3, slot 2); ids as the game's through t78
+    - recording: h1_duely1121
+      turn: 71
+      value: "city-state 4's Upgrade Units trees 41:4 (the Warrior 524293) and 40:5 (the Warriors 262146 / 589828): 41:4 ticks first, 262146 ends on 33:20 as the game"
   impl:
-    - cpu/core/barbarianOps.ts:TREE_SLOT
-    - cpu/core/barbarianOps.ts:newBarbTreeId
+    - cpu/core/treePool.ts:newTreeId
+    - cpu/core/treePool.ts:treeSlot
+    - gpu/core/sim_citytrees.py:new_tree_id
     - gpu/core/sim_barbops.py:_bop_next_id
+    - cpu/core/minorOps.ts:upgradeTreesStart
   readings:
+    - "C-99: a non-major player's tree pool — every city-state tree, its operations' and its \"Upgrade Units\" trees in one pool, ticked in slot order — READ (0x7ff9a0 / 0x7ff7b0 / 0x800c60 -> 0x7fef20, 0x7ffdd0 -> 0x7cb2e0), both twins"
     - "C-99: the upgrade trees — READ (the trigger, Find Available Unit's upgradeable offer, Find Unit Targets' job, Upgrade Units, the economic AI's upgrade, Move Unit with no Location), ported; the deletion of an excess obsolete unit unported"
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
     - "C-99 / C-128: the swap's partner test and its step along its own path; Move Unit's update before the executions; a Trader no passenger — READ (0x972540, 0x56e760, 0x972a50 -> 0x26fe20, 0x7d3a00 -> 0x7f0020, 0x586360 -> 0x208b80 / 0x523d60), both twins"
@@ -5811,13 +5819,15 @@
     - cpu/core/aiCityTrees.ts:tickCityTrees
     - cpu/core/barbarianOps.ts:barbarianTrees
     - cpu/core/operations/manager.ts:operationsRun
-    - cpu/core/barbarianOps.ts:freeEndedTrees
+    - cpu/core/treePool.ts:freeEndedTrees
+    - cpu/core/minorOps.ts:minorFreeTrees
     - cpu/core/minorCityAi.ts:minorSecondHook
   readings:
     - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
     - "C-95: the scout's tree \"Barbarian Found City\" — READ, ported"
     - "C-99: the district and improvement events on one plot — the eruption's turns (a LAB, both twins)"
+    - "C-99: a non-major player's tree pool — every city-state tree, its operations' and its \"Upgrade Units\" trees in one pool, ticked in slot order — READ (0x7ff9a0 / 0x7ff7b0 / 0x800c60 -> 0x7fef20, 0x7ffdd0 -> 0x7cb2e0), both twins"
   context:
     - "...is empty, then TryPurchaseUnits 0x68be60 over the city's units; the tree manager's tick 0x7ffdd0; tactical). A city founded during the turn exists for C only: the Default Specializatio..."
     - "- The tree manager's tick 0x7ffdd0: each tree 0x7d3a00, then 0x7cb2e0 in a loop destroys a tree whose +0x368 is set or who..."
@@ -5848,7 +5858,7 @@
   final: 0x564650
   kind: function
   name: AI_EVENT_DESIRE_SETTLE
-  semantics: "starts the capture's operation at the event (no tick of its own). The named definition by 0x7265b0 with its flag, the target the first payload unit's plot (+0x220), the candidate's rally the plot; each payload unit to its team (addMember 0x737e80, the unit leaving the team it held). The start runs at the event, inside the trees' walks where a tree's blow took the civilian: its tree ticks in its priority's walk where that is yet to come; a capture of the tactical pass after the walks first ticks in the next turn's. A trigger row (+0x388) with no operation makes a tree in the manager (0x7fef20, its nodes 0x7faa60; none, dropped) and starts it at the row's priority (0x7cb230): one Upgrade Units tree per technology or civic gained (TRIGGER_TECH_UPGRADE / TRIGGER_CIVIC_UPGRADE, Priority 3), no test of a tree already running. For a city-state a civic gained starts no Upgrade Units tree (a FIT on the records: a technology gained is followed by a new tree on 1042 of 1061 minor-turns, a civic alone on 68 of 446); where the civic event's dispatch stops is unread. Ported: upgradeTrigger (minorTurn), _minor_turn's mops_upg_trig."
+  semantics: "starts the capture's operation at the event (no tick of its own). The named definition by 0x7265b0 with its flag, the target the first payload unit's plot (+0x220), the candidate's rally the plot; each payload unit to its team (addMember 0x737e80, the unit leaving the team it held). The start runs at the event, inside the trees' walks where a tree's blow took the civilian: its tree ticks in its priority's walk where that is yet to come; a capture of the tactical pass after the walks first ticks in the next turn's. A trigger row (+0x388) with no operation makes a tree in the manager (0x7fef20, its nodes 0x7faa60; none, dropped) and starts it at the row's priority (0x7cb230): one Upgrade Units tree per technology or civic gained (TRIGGER_TECH_UPGRADE / TRIGGER_CIVIC_UPGRADE, Priority 3), no test of a tree already running. For a city-state a civic gained starts no Upgrade Units tree (a FIT on the records: a technology gained is followed by a new tree on 1042 of 1061 minor-turns, a civic alone on 68 of 446); where the civic event's dispatch stops is unread. Ported: upgradeTreesStart (minorTurn), _minor_turn's _mops_upgrade_start."
   status: PARTLY
   cases:
     - recording: h1_duely1124
@@ -5857,7 +5867,10 @@
     - recording: h1_duelw1128
       turn: 26
       value: the raid's Slinger to the capture (t25-26), the raid's team two Warriors
-  impl: [cpu/core/barbarianOps.ts:barbarianCaptures, cpu/core/minorOps.ts:upgradeTreesTick]
+  impl:
+    - cpu/core/barbarianOps.ts:barbarianCaptures
+    - cpu/core/minorOps.ts:upgradeTreesStart
+    - cpu/core/minorOps.ts:upgradeTreesTick
   readings:
     - "C-97: the operations — the manager READ (no-enemy candidates), the war candidates unread"
     - "C-97: the operations — the manager and its candidates READ, the staging list and City Defense's start unread"
@@ -5866,6 +5879,7 @@
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
     - "C-99: the Upgrade Units trees start on a technology gained alone — FIT (records), both twins"
     - "C-99: the Upgrade Units trees start on a technology gained alone"
+    - "C-99: a non-major player's tree pool — every city-state tree, its operations' and its \"Upgrade Units\" trees in one pool, ticked in slot order — READ (0x7ff9a0 / 0x7ff7b0 / 0x800c60 -> 0x7fef20, 0x7ffdd0 -> 0x7cb2e0), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "- AI_EVENT_DESIRE_SETTLE (0x800c60 -> 0x7265b0): the candidate of the named definition with no operation (with the call's..."

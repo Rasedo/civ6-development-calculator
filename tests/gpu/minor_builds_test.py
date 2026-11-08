@@ -531,10 +531,10 @@ def test_the_city_ai(rules, path) -> None:
     sim.citystate_ai_on[B0, s] = False
     sim.cai_slots[B0, s] = -1
     sim.cai_tr_alive[B0, s] = False
-    t0 = int(sim.cai_t_serial[B0, s])
+    t0 = int(sim.cai_t_gen[B0, s])
     sim._minor_ai_turn(s)
     assert bool(sim.citystate_ai_on[B0, s]), "the AI did not mark its city seen"
-    assert int(sim.cai_t_serial[B0, s]) == t0, "a fresh city's events started a tree"
+    assert int(sim.cai_t_gen[B0, s]) == t0, "a fresh city's events started a tree"
     # a unit its step trains joins the tree whose contract asked for it
     sim = build(rules, path)
     T = sim._cv_tables()

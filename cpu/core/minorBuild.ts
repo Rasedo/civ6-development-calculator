@@ -57,7 +57,7 @@ import { irradiated } from './nuclear';
 import { atRngPoint } from './rand';
 import { knowledgeLook } from './tactical';
 import { plotsSeenNow } from './barbarians';
-import { cityStateMilitary, minorCampsLook, minorMilitaryUpgrade } from './minorOps';
+import { cityStateMilitary, minorCampsLook, minorMilitaryUpgrade, upgradeTreesStart } from './minorOps';
 import { tilesWithin } from '../../world/hex';
 import { hasRiver } from '../../world/query';
 import { aliases, engineId, gameTypeOf } from '../data/aliases';
@@ -172,13 +172,13 @@ export function minorPhase(state: GameState): void {
     minorContractPurchases(state, cityState, units);
     minorEconomicDisband(state, cityState, fell);
     cityState.armyCounted = minorArmyCounts((cityState.armyKnown ?? []).filter((r) => !sighted.has(r)));
-    // its "Upgrade Units" trees' trigger: a technology gained
+    // its "Upgrade Units" trees' trigger: a tree per technology gained
     // (TRIGGER_TECH_UPGRADE, AI_EVENT_GAIN_TECH). A civic gained alone starts
     // none, its TRIGGER_CIVIC_UPGRADE row (AI_EVENT_GAIN_CIVIC) notwithstanding:
     // over the five duely duels a tech gain is followed by a new tree on
     // 1042 of 1061 minor-turns, a civic gain with no tech on 68 of 446
     // (runs/h1_duely1124 t84 city-state 4, runs/h1_duely1128 t139 Bologna)
-    if (techs > 0) cityState.upgradeTrigger = true;
+    upgradeTreesStart(cityState, techs);
     minorAiTurn(state, cityState, fresh, units);
     // the civics AI's government values on the city its update left: the
     // Food focus it set re-placed its citizens (runs/h1_duely1128 city-state

@@ -224,6 +224,7 @@
     - cpu/core/minorOps.ts:upgradeTreesTick
     - cpu/core/freeOps.ts:ops
     - cpu/core/minorOps.ts:env
+    - cpu/core/minorOps.ts:trees
   readings:
     - "C-99: a unit bought in the turn sits out the operations, a Harbor trains ships"
     - "C-126: the second hook's purchase sits out the trees after it; an operation a recruit empties ends at its tick — the turn-done offer (0x60a8c0, 0x60a440) READ, the empty operation's end a log reading, both twins"

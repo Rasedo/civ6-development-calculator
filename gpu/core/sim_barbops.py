@@ -135,7 +135,7 @@ class SimBarbOps:
         return self.barb_unit_alive & self.barb_unit_op & (self.barb_unit_tribe == k)
 
     def _bop_next_id(self, mask: torch.Tensor) -> torch.Tensor:
-        """`newBarbTreeId` where `mask`: a new tree of the barbarians' pool
+        """`newTreeId` where `mask`: a new tree of the barbarians' pool
         (0x7fef20) — the slot the free list's head names, else the pool's
         next new one — its id the next generation over the slot"""
         b = self._bidx

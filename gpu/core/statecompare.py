@@ -385,7 +385,7 @@ def _barb_tribes_row(sim, b: int) -> list[int]:
                 int(sim.tribe_ramp[b, k])]
     row += [int(x) for x in sim.barb_spot_next[b, : sim.n_majors].tolist()]
     row += [int(sim.barb_tree_next[b])]
-    # the trees' pool (`newBarbTreeId`): its slots made, its free list
+    # the trees' pool (`newTreeId`): its slots made, its free list
     nf_t = int(sim.barb_tree_nfree[b])
     row += [int(sim.barb_tree_slots[b]), nf_t, *[int(x) for x in sim.barb_tree_free[b, :nf_t].tolist()]]
     techs = sim.barb_techs[b].nonzero().flatten().tolist()
@@ -482,7 +482,7 @@ GAME = {
     "freeCombatDesire": lambda sim, b, rows: [int(sim.citystate_combat_desire[b, sim.FR])],
     "freeTradeValue": lambda sim, b, rows: [int(sim.free_trade_value[b])],
     "freeOps": lambda sim, b, rows: [_minor_ops(sim, b, sim.FR)],
-    "freeAiSerials": lambda sim, b, rows: [[int(sim.cai_c_serial[b, sim.FR]), int(sim.cai_t_serial[b, sim.FR])]],
+    "freeAiSerials": lambda sim, b, rows: [[int(sim.cai_c_serial[b, sim.FR]), *_tree_pool(sim, b, sim.FR)]],
     "storms": lambda sim, b, rows: [_storm_table(sim, b)],
     "droughts": lambda sim, b, rows: [_drought_table(sim, b)],
 }
@@ -1095,7 +1095,7 @@ CITY_STATE = {
         [x for r in sorted((int(p), int(t), int(v)) for p, t, v in zip(sim.cai_r_plot[b, s].tolist(), sim.cai_r_tree[b, s].tolist(),
                                                                         sim.cai_r_value[b, s].tolist()) if p >= 0) for x in r]
         for s in rows],
-    "minorAiHand": lambda sim, b, rows: [[int(sim.cai_in_hand[b, s]), int(sim.cai_c_serial[b, s]), int(sim.cai_t_serial[b, s]),
+    "minorAiHand": lambda sim, b, rows: [[int(sim.cai_in_hand[b, s]), int(sim.cai_c_serial[b, s]), *_tree_pool(sim, b, s),
                                           int(bool(sim.citystate_ai_on[b, s]))] for s in rows],
     "minorBuildersTrained": lambda sim, b, rows: [int(sim.citystate_builders_trained[b, s]) for s in rows],
     "minorBestMeleeCS": lambda sim, b, rows: [int(sim.citystate_best_melee[b, s]) for s in rows],
@@ -1204,18 +1204,32 @@ def _minor_ops(sim, b: int, s: int) -> list[int]:
     return out
 
 
+def _tree_pool(sim, b: int, s: int) -> list[int]:
+    """seat `s`'s tree pool (`newTreeId`) as `treePoolRecord` reads it: the
+    generation its next tree takes, the slots made, its free slots (the head
+    last)"""
+    nf = int(sim.cai_t_nfree[b, s])
+    return [int(sim.cai_t_gen[b, s]), int(sim.cai_t_slots[b, s]), nf, *[int(x) for x in sim.cai_t_free[b, s, :nf].tolist()]]
+
+
 def _minor_upgrading(sim, b: int, s: int) -> list[int]:
-    """minor `s`'s "Upgrade Units" trees as `minorUpgrading` reads them:
-    running, the trigger, their units' pool slots ascending"""
+    """minor `s`'s "Upgrade Units" trees as `minorUpgrading` reads them: their
+    count, then in the tree pool's slot order each its id and its units'
+    pool slots ascending"""
     lo = sim.POOL_LO["major"]
     seat = 100 + s
-    slots = []
     P = sim.major_unit_alive.shape[1]
-    for u in sim.mops_upg[b, s, :P].nonzero(as_tuple=True)[0].tolist():
-        g = u + lo
-        if bool(sim.unit_alive[b, g]) and int(sim.unit_seat[b, g]) == seat and int(sim.unit_pslot[b, g]) >= 0:
-            slots.append(int(sim.unit_pslot[b, g]))
-    return [int(bool(sim.mops_upg_on[b, s])), int(bool(sim.mops_upg_trig[b, s]))] + sorted(slots)
+    of = sim.mops_upg_of[b, s, :P].tolist()
+    trees = sorted(((int(tid), t) for t, tid in enumerate(sim.mops_upg_id[b, s].tolist()) if tid >= 0), key=lambda x: x[0] % 0x10000)
+    out = [len(trees)]
+    for tid, t in trees:
+        slots = []
+        for u, k in enumerate(of):
+            g = u + lo
+            if k == t and bool(sim.unit_alive[b, g]) and int(sim.unit_seat[b, g]) == seat and int(sim.unit_pslot[b, g]) >= 0:
+                slots.append(int(sim.unit_pslot[b, g]))
+        out += [tid, len(slots), *sorted(slots)]
+    return out
 
 
 def _ai_contracts(sim, b: int, s: int) -> list[int]:

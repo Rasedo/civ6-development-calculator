@@ -80,9 +80,9 @@ class SimMinors:
             self._minor_contract_purchases(s, self.citystate_alive[:, s] & (self.citystate_center[:, s] >= 0), units)
             self._minor_economic_disband(s, fell)
             self._cv_counted[s] = self._cv_known(s, before, after)
-            # its "Upgrade Units" trees' trigger: a technology gained
+            # its "Upgrade Units" trees' trigger: a tree per technology gained
             # (`minorTurn`: a civic gained alone starts none)
-            self.mops_upg_trig[:, s] |= alive & (techs > 0)
+            self._mops_upgrade_start(s, torch.where(alive, techs.long(), torch.zeros_like(techs.long())))
             # its city AI ran before this turn (the City Analysis job's list
             # takes none the turn the city is founded)
             ran = self.citystate_ai_on[:, s].clone()

@@ -22,7 +22,7 @@
  * not), City Defense (the defence event), Naval Superiority (its own start,
  * off a coastal city) — the Default_List's order.
  */
-import type { ArmyRecord, CityState, GameState, Unit } from './types';
+import type { ArmyRecord, CityState, GameState, Unit, UpgradeTree } from './types';
 import { UNITS } from '../data/units';
 import { gameTypeOf } from '../data/aliases';
 import { aiView } from './aiView';
@@ -33,6 +33,7 @@ import { ARMY_READ_AGE, lookCamps, type KnownUnit } from './operations/knowledge
 import { NO_PLOT, opDef, opJobUnits } from './operations/operation';
 import { seatUnitRows } from './operations/unitRows';
 import { newCityAi } from './aiCityTrees';
+import { freeEndedTrees, newTreeId, treeSlot } from './treePool';
 import { installType, minorCanUpgrade, minorKnownUnits, minorOrdersHeld, minorSetItem, minorUnitProduction, minorUpgradeUnit, minorUpgradeVisible } from './minorBuild';
 import { minorContractCity, minorSecondHook } from './minorCityAi';
 import { BARB_SEAT, campTiles, tileSeat } from './seats';
@@ -144,7 +145,7 @@ function minorEnv(state: GameState, cs: CityState, pass: Pass | null): OpsEnv {
       minorSetItem(state, cs, null);
       cities = null;
     },
-    newOpId: () => ai.nextTree++,
+    newOpId: () => newTreeId(cs),
     settle: null,
     unitRows: () => (rows ??= (() => {
       const by = new Map<string, number>();
@@ -211,7 +212,25 @@ export const minorOpUnits = (cs: CityState): number[] => (cs.ops ? opsOf(cs.ops)
 
 /** the units in a job of the minor (unit +0x7d0): its running operations'
  *  and its "Upgrade Units" trees' */
-export const minorJobUnits = (cs: CityState): number[] => [...minorOpUnits(cs), ...(cs.upgrading ?? [])];
+export const minorJobUnits = (cs: CityState): number[] => [...minorOpUnits(cs), ...upgradeHeld(cs)];
+
+/** the units the minor's "Upgrade Units" trees hold */
+export const upgradeHeld = (cs: CityState): number[] => (cs.upgradeTrees ?? []).flatMap((t) => t.units);
+
+/** THE "UPGRADE UNITS" TRIGGER (0x800c60 from +0x388): `n` new trees, each
+ *  a control of the player's tree pool (0x7fef20, `newTreeId`) holding no
+ *  unit, started (0x7cb230) to tick in the next walk */
+export function upgradeTreesStart(cs: CityState, n: number): void {
+  for (let k = 0; k < n; k++) (cs.upgradeTrees ??= []).push({ id: newTreeId(cs), units: [] });
+}
+
+/** THE DESTROY LOOP after the minor's walk (`freeEndedTrees`): the slots of
+ *  its trees no longer running — its city trees', its operations', its
+ *  "Upgrade Units" trees' — free */
+export function minorFreeTrees(cs: CityState): void {
+  freeEndedTrees(cs, [...(cs.cityAi?.trees ?? []).filter((t) => !t.done).map((t) => t.id),
+    ...(cs.ops ? opsOf(cs.ops).map((o) => o.id) : []), ...(cs.upgradeTrees ?? []).map((t) => t.id)]);
+}
 
 /** the move a unit the "Upgrade Units" trees hold takes in the pass: the
  *  tree's, which logs no tactical row */
@@ -224,10 +243,15 @@ const UPGRADE_TREE_PRIORITY = AI_TRIGGERED_TREES.find((t) => t.tree === 'Upgrade
  * THE CITY-STATE'S "UPGRADE UNITS" TREES (MinorCivTriggeredTrees:
  * TRIGGER_TECH_UPGRADE / TRIGGER_CIVIC_UPGRADE, Priority 3, no operation;
  * `tools/civ6lab/dll_readings.md` "C-99: the upgrade trees"), their tick in
- * the operations' run. The trigger (0x800c60) starts a tree per technology
- * or civic gained; the trees' units are one list (`CityState.upgrading`, in
- * the player's unit order), a tree running while it holds a unit: Concurrent
- * over Find Available Unit, Find Unit Targets, Upgrade Units and Move Unit.
+ * the operations' run. The trigger (0x800c60, `upgradeTreesStart`) starts a
+ * tree per technology gained; each tree (`CityState.upgradeTrees`) holds its
+ * own units (in the player's unit order) and ticks in the walk by the tree
+ * pool's slot order among the trees of its priority — a newer tree in a
+ * freed lower slot first, taking the units freed since (runs/h1_duely1121
+ * t69-71 city-state 4: the Warrior 524293 in tree 41:4 reaches the centre
+ * before the Warrior 262146 of tree 40:5, whose path then ends its turn on
+ * 33:20) —, running while it holds a unit: Concurrent over Find Available
+ * Unit, Find Unit Targets, Upgrade Units and Move Unit.
  *  - FIND AVAILABLE UNIT (0x7ec7b0, Upgradeable Units): the evaluator's offer
  *    (0x60a8c0) — the minor's units in no operation (a city tree's are its
  *    Builders, which have no upgrade), their turn not done, then
@@ -267,15 +291,17 @@ const UPGRADE_TREE_PRIORITY = AI_TRIGGERED_TREES.find((t) => t.tree === 'Upgrade
  *    Gold: its eight Scouts, Skirmishers asking no resource, gone at t240;
  *    1128 Hong Kong's Warriors and Men-at-Arms, Iron and Niter asked, held).
  */
-export function upgradeTreesTick(state: GameState, cs: CityState, pass: Pass): void {
+export function upgradeTreesTick(state: GameState, cs: CityState, pass: Pass, tree: UpgradeTree): void {
   const own = (id: number) => state.units.find((u) => u.id === id && u.seat === cs.seat);
-  const trig = !!cs.upgradeTrigger;
-  delete cs.upgradeTrigger;
-  if (!cs.upgrading && !trig) return;
-  const held = new Set((cs.upgrading ?? []).filter((id) => own(id)));
+  const held = new Set(tree.units.filter((id) => own(id)));
   const order = (ids: Iterable<number>) => [...ids].map(own).filter((u): u is Unit => !!u).sort((a, b) => (a.slot ?? 0) - (b.slot ?? 0));
-  // Find Available Unit: the free units, then the lower-priority operations'
-  const busy = new Set(minorOpUnits(cs));
+  const end = (): void => {
+    cs.upgradeTrees = (cs.upgradeTrees ?? []).filter((t) => t !== tree);
+    if (!cs.upgradeTrees.length) delete cs.upgradeTrees;
+  };
+  // Find Available Unit: the free units (in no operation and no other
+  // tree), then the lower-priority operations'
+  const busy = new Set([...minorOpUnits(cs), ...(cs.upgradeTrees ?? []).filter((t) => t !== tree).flatMap((t) => t.units)]);
   for (const u of order(state.units.filter((x) => x.seat === cs.seat).map((x) => x.id))) {
     if (held.has(u.id) || busy.has(u.id) || pass.done.has(u.id)) continue;
     if (minorUpgradeVisible(state, cs, u)) held.add(u.id);
@@ -291,18 +317,20 @@ export function upgradeTreesTick(state: GameState, cs: CityState, pass: Pass): v
       t.members = t.members.filter((id) => !held.has(id));
     }
   }
+  // each joining unit is in the tree's job from its join (0x737e80)
+  tree.units = order(held).map((u) => u.id);
   if (!held.size) {
-    delete cs.upgrading;
+    end();
     return;
   }
   // Find Unit Targets: none of the units with a target, the tree FAILS
   const targets = new Map(order(held).map((u) => [u.id, upgradeTarget(state, cs, u)] as const));
   if (![...targets.values()].some((p) => p >= 0)) {
-    delete cs.upgrading;
+    end();
     return;
   }
   // Move Unit's update in the walk, before any execution (btTick 0x7d3a00):
-  // its SUCCESS ends the trees once the executions ran
+  // its SUCCESS ends the tree once the executions ran
   const arrived = upgradeArrived(state, pass, order(held), targets);
   // Upgrade Units' execution (Can Delete: the node holds no data, true),
   // then Move Unit's
@@ -328,10 +356,10 @@ export function upgradeTreesTick(state: GameState, cs: CityState, pass: Pass): v
     }
     if (unupgradedDeleted(state, cs, u)) drop(u);
   }
+  tree.units = order(held).map((u) => u.id);
   for (const u of order(held)) upgradeMove(state, pass, u, targets.get(u.id) ?? -1);
   for (const u of order(held)) passFinish(pass, u, UPGRADE_MOVE, u.tileIndex);
-  if (arrived) delete cs.upgrading;
-  else cs.upgrading = order(held).map((u) => u.id);
+  if (arrived) end();
 }
 
 /** MOVE UNIT'S UPDATE with no Location (0x7f0020 at 0x7f067c): SUCCESS where
@@ -474,7 +502,9 @@ export function cityStateMilitary(state: GameState, cs: CityState): void {
   cityStateTactics(state, cs, (pass) => {
     const ops = opsOfMinor(cs);
     const env = minorEnv(state, cs, pass);
-    operationsRun(ops, { ...env, trees: [{ priority: UPGRADE_TREE_PRIORITY, tick: () => upgradeTreesTick(state, cs, pass) }],
+    // its "Upgrade Units" trees each a tree of the walk, by its pool slot
+    const trees = (cs.upgradeTrees ?? []).map((t) => ({ priority: UPGRADE_TREE_PRIORITY, slot: treeSlot(t.id), tick: () => upgradeTreesTick(state, cs, pass, t) }));
+    operationsRun(ops, { ...env, trees,
       // a unit the hook buys has its turn done at its creation (0x60a440):
       // the trees of priority 2 after the hook offer it not (runs/h1_duely1121
       // t30 city-state 3's Galley bought under City Defense, Naval
@@ -488,7 +518,9 @@ export function cityStateMilitary(state: GameState, cs: CityState): void {
       // +0x530): the units the trees hold and those whose turn is done — a
       // unit bought this turn among them (runs/h1_duely1124 t72 city-state
       // 3's City Defense recruits no Heavy Chariot bought that turn, t73 it)
-      held: () => [...(cs.upgrading ?? []), ...pass.done] });
+      held: () => [...upgradeHeld(cs), ...pass.done] });
+    // the destroy loop after the walk: the ended trees' slots free
+    minorFreeTrees(cs);
     for (const id of opsOf(ops).flatMap(opJobUnits)) {
       const u = state.units.find((x) => x.id === id && x.seat === cs.seat);
       if (u) passFinish(pass, u, 'Operation', u.tileIndex);

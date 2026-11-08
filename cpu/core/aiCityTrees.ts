@@ -24,6 +24,7 @@ import { BT_ERROR, BT_FAILURE, BT_FRESH, BT_RUNNING, BT_SUCCESS, compileTree, da
 import { CP_ACCEPTED, CP_CANCELLED, CP_CLAIMED, CP_COMPLETED, CP_FAILED, CP_IN_PROGRESS, buildUnitNode, contractById, contractManagerNode, prereqsOf, reapContracts,
   treeContractOf, type AiContract, type ContractBook, type ContractCity, type ContractNodeWorld } from './aiContracts';
 import { FX, FX_MIN } from './aiValue';
+import { treeSlot } from './treePool';
 
 /** CityEvents' slots the events use */
 export const SLOT_UNIT_OR_BUILDING = 1;
@@ -81,14 +82,13 @@ export interface CityAi extends ContractBook {
   techContracts: Record<number, string>;
   /** per plot purchase contract id its plot (Purchase Plot) */
   plotContracts: Record<number, number>;
-  /** the ids the seat's next contract and next tree take */
+  /** the id the seat's next contract takes */
   nextContract: number;
-  nextTree: number;
 }
 
 export const newCityAi = (): CityAi => ({
   contracts: [], city: {}, inHand: {}, purchase: [], trees: [], slots: {}, reservations: [], techContracts: {}, plotContracts: {},
-  nextContract: 1, nextTree: 100,
+  nextContract: 1,
 });
 
 /** the tech and civic contracts whose goal the player now holds COMPLETED,
@@ -213,6 +213,7 @@ export interface CityTreeWorld {
   /** plot distance */
   distance(a: number, b: number): number;
   newContractId(): number;
+  /** the id the next tree takes in the player's tree pool (`newTreeId`) */
   newTreeId(): number;
   log(line: string): void;
   /** the city's production cleared (the contract listener 0x175d10) */
@@ -1000,10 +1001,11 @@ export const CITY_NODES: Readonly<Record<string, BtHandler<Ctx>>> = {
 };
 
 /** THE TREE MANAGER'S TICK (0x7ffdd0): each running tree of the seat, in the
- *  order they started, ticks once; a tree whose root ends, or one of whose
- *  units its orders spent, ends, its reservations and its units free */
+ *  tree pool's slot order (`treeSlot`), ticks once; a tree whose root ends,
+ *  or one of whose units its orders spent, ends, its reservations and its
+ *  units free */
 export function tickCityTrees(ai: CityAi, w: CityTreeWorld): void {
-  for (const t of ai.trees) {
+  for (const t of [...ai.trees].sort((a, b) => treeSlot(a.id) - treeSlot(b.id))) {
     if (t.done) continue;
     const city = w.cities.find((c) => c.id === t.city);
     if (!city) {

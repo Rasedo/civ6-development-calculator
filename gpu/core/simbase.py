@@ -1329,7 +1329,7 @@ _MUTABLE = [
     "cai_slots", "cai_tr_alive", "cai_tr_id", "cai_tr_status", "cai_tr_mem_a", "cai_tr_mem_b", "cai_tr_bb", "cai_tr_trigger",
     "cai_tr_units", "cai_c_id", "cai_c_tree", "cai_c_unit", "cai_c_building", "cai_c_district", "cai_c_goal_kind", "cai_c_goal",
     "cai_c_plot", "cai_c_value", "cai_c_priority", "cai_c_city", "cai_c_max_turns", "cai_c_turns", "cai_c_progress", "cai_c_assign", "cai_c_queued",
-    "cai_c_in_tree", "cai_c_listed", "cai_c_purchase", "cai_c_shown", "cai_c_goal_held", "cai_c_released", "cai_in_hand", "cai_r_plot", "cai_r_tree", "cai_r_value", "cai_c_serial", "cai_t_serial",
+    "cai_c_in_tree", "cai_c_listed", "cai_c_purchase", "cai_c_shown", "cai_c_goal_held", "cai_c_released", "cai_in_hand", "cai_r_plot", "cai_r_tree", "cai_r_value", "cai_c_serial", "cai_t_gen", "cai_t_slots", "cai_t_free", "cai_t_nfree",
     "citystate_kb_slot", "citystate_kb_owner", "citystate_kb_type", "citystate_kb_seen", "citystate_kb_plot",  # its knowledge base's army records
     "citystate_kb_damage",  # the damage each record's unit had when last seen
     "citystate_kb_form",  # the formation each record's unit had when last seen
@@ -1339,7 +1339,7 @@ _MUTABLE = [
     "mops_mins", "mops_ready", "mops_ong", "mops_unit", "mops_tstr", "mops_join", "mops_rel", "mops_mvs", "mops_mvg", "mops_free", "mops_nfree",
     "mops_size", "mops_pick", "mops_pick_target", "mops_pick_rally", "mops_camps", "barb_camps_known", "mops_revealed",
     "mops_enemy",
-    "mops_upg", "mops_upg_on", "mops_upg_trig",  # its "Upgrade Units" trees: their units, running, the trigger
+    "mops_upg_id", "mops_upg_of",  # its "Upgrade Units" trees: their ids, the tree holding each unit
     "citystate_kb_seq", "citystate_kb_next", "citystate_kb_aged", "citystate_kb_enemy",  # the records' order, the last ageing, its enemy counts
     "citystate_build_proj",  # the unfinished district project the minor's last step worked on
     "citystate_repair_wait",  # a pillaged building's repair waits for the minor's item in hand

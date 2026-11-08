@@ -648,9 +648,12 @@
           "covers": [],
           "planes": [
             "cai_c_serial",
-            "cai_t_serial"
+            "cai_t_gen",
+            "cai_t_slots",
+            "cai_t_free",
+            "cai_t_nfree"
           ],
-          "note": "the ids the Free Cities' next contract and next operation tree take (`freeSeat.cityAi`; the row `FR`; they make no contract: the Free Cities Assault names no Contract ID)"
+          "note": "the id the Free Cities' next contract takes (`freeSeat.cityAi`; the row `FR`; they make no contract: the Free Cities Assault names no Contract ID) and their tree pool (`newTreeId`: the next generation, the slots made, the free slots)"
         },
         {
           "name": "storms",
@@ -2449,15 +2452,15 @@
         {
           "name": "minorUpgrading",
           "compare": "exact",
-          "note": "a city-state's \"Upgrade Units\" trees: whether one runs, its trigger, the units held",
+          "note": "a city-state's \"Upgrade Units\" trees: their count, then in the tree pool's slot order each its id and its units' pool slots",
           "covers": [
-            "Seat.upgrading",
-            "Seat.upgradeTrigger"
+            "Seat.upgradeTrees",
+            "UpgradeTree.id",
+            "UpgradeTree.units"
           ],
           "planes": [
-            "mops_upg",
-            "mops_upg_on",
-            "mops_upg_trig"
+            "mops_upg_id",
+            "mops_upg_of"
           ]
         },
         {
@@ -3154,10 +3157,13 @@
           "planes": [
             "cai_in_hand",
             "cai_c_serial",
-            "cai_t_serial",
+            "cai_t_gen",
+            "cai_t_slots",
+            "cai_t_free",
+            "cai_t_nfree",
             "citystate_ai_on"
           ],
-          "note": "the contract the city holds in hand (-1 none), the ids its next contract and tree take, and whether its AI has run"
+          "note": "the contract the city holds in hand (-1 none), the id its next contract takes, its tree pool (`newTreeId`: the next generation, the slots made, the free slots), and whether its AI has run"
         },
         {
           "name": "minorBuildersTrained",

@@ -2,8 +2,8 @@
  * THE FREE CITIES' RAID (FreeCities_Manager, GameCore_XP2 0x2765f0 -> 0x277470
  * -> 0x274ea0; `tools/civ6lab/dll_readings.md` "C-60: the Free Cities Raid")
  * on the one operation manager (cpu/core/operations). The Free Cities' manager
- * state is `freeSeat.ops`; `freeSeat.cityAi` holds the ids their operations'
- * trees take (they hold no contract: a Free City runs no city tree, and the
+ * state is `freeSeat.ops`, their trees' ids its tree pool's (`newTreeId`);
+ * `freeSeat.cityAi` holds no contract (a Free City runs no city tree, and the
  * Free Cities Assault names no Contract ID); their knowledge base
  * `freeSeat.armyKnown` (`freeKnowledge`).
  *
@@ -36,6 +36,7 @@ import { newOpsAi, operationsRun, opsOf, startOperationAt, type OpsAi, type OpsE
 import { NO_PLOT, opUnits } from './operations/operation';
 import { seatUnitRows } from './operations/unitRows';
 import { newCityAi, type CityAi } from './aiCityTrees';
+import { freeEndedTrees, newTreeId } from './treePool';
 import { BARB_SEAT, FREE_SEAT, freeSeatOf, isCiv, seatOf } from './seats';
 import { freeCityTactics, passFinish, passPillage, plotDistance, type Pass } from './tactical';
 import { installType } from './minorBuild';
@@ -109,7 +110,7 @@ function freeEnv(state: GameState, pass: Pass | null): OpsEnv {
     newContractId: noContract,
     contractCities: noContract,
     clearProduction: noContract,
-    newOpId: () => book.nextTree++,
+    newOpId: () => newTreeId(freeSeatOf(state)),
     settle: null,
     unitRows: () => {
       const by = new Map<string, number>();
@@ -197,6 +198,8 @@ export function freeCitiesMilitary(state: GameState): void {
     const ops = opsOfFree(state);
     // the units whose turn is done out of the operations' offers (0x60a8c0)
     operationsRun(ops, { ...freeEnv(state, pass), held: () => [...pass.done] });
+    // the destroy loop after the walk: the ended trees' slots free
+    freeEndedTrees(freeSeatOf(state), opsOf(ops).map((o) => o.id));
     for (const id of opsOf(ops).flatMap(opUnits)) {
       const u = unitOf(state, id);
       if (u) passFinish(pass, u, 'Operation', u.tileIndex);

@@ -96,7 +96,7 @@ import { DEDICATED_IMPROVEMENTS, IMPROVEMENT_IDS, unitActionIndex } from '../cor
 import { loadCatalog, type Catalog, type DumpCity, type TurnRecord } from './record';
 import { num, bool } from './record';
 import { holdMinorClears, minorAiTurn, minorContractPurchases, minorGreatPersonClass, minorMilitaryTurn, minorSecondHook, traceMinorAi } from '../core/minorCityAi';
-import { UPGRADE_MOVE, cityStateMilitary, holdSecondHook, traceMinorOps, traceMinorUpgrade, unupgradedDeleted, upgradeMayGo } from '../core/minorOps';
+import { UPGRADE_MOVE, cityStateMilitary, holdSecondHook, traceMinorOps, traceMinorUpgrade, unupgradedDeleted, upgradeMayGo, upgradeTreesStart } from '../core/minorOps';
 import { barbSpawnChange, holdBarbCaptures, traceBarbOps } from '../core/barbarianOps';
 import { newOpsAi, opsOf } from '../core/operations/manager';
 import { opUnits } from '../core/operations/operation';
@@ -1451,7 +1451,7 @@ function minorAi(ctx: Ctx, b: TurnRecord, turn: number, made: ReadonlySet<Unit>,
   // units, no tactical row)
   for (const c of copy.cityStates) {
     const r = seatOf(ctx.next.state, c.seat)?.research;
-    if (r?.techs.some((x) => !c.research.techs.includes(x))) c.upgradeTrigger = true;
+    if (r) upgradeTreesStart(c, r.techs.filter((x) => !c.research.techs.includes(x)).length);
   }
   for (const s of [...copy.cityStates, ...copy.seats]) {
     const r = seatOf(ctx.next.state, s.seat)?.research;
@@ -1907,12 +1907,14 @@ function minorOpsAfter(ctx: Ctx, b: TurnRecord, turn: number, copy: GameState, t
     if (!cs) continue;
     if (c.ops) cs.ops = c.ops;
     if (c.cityAi) cs.cityAi = c.cityAi;
-    // its "Upgrade Units" trees as its units' turn left them, and the savings
-    // their upgrades spent
-    if (c.upgrading) cs.upgrading = c.upgrading;
-    else delete cs.upgrading;
-    if (c.upgradeTrigger) cs.upgradeTrigger = true;
-    else delete cs.upgradeTrigger;
+    // its "Upgrade Units" trees and tree pool as its units' turn left them,
+    // and the savings their upgrades spent
+    if (c.upgradeTrees) cs.upgradeTrees = c.upgradeTrees;
+    else delete cs.upgradeTrees;
+    for (const k of ['opsNext', 'treeSlots', 'treeFree'] as const) {
+      if (c[k] === undefined) delete cs[k];
+      else (cs as Record<typeof k, unknown>)[k] = c[k];
+    }
     if (c.economy) cs.economy = c.economy;
     // its knowledge base's look after its units' turn (`minorPhase`'s last),
     // in the pair's turn and before the barbarians' turn: its units on the
@@ -3581,7 +3583,7 @@ const res = buyTile(state, city.id, d.plot, seat);        if (!res.ok) setTileOw
         ctx.units.set(d.into, u);
         // the game's upgraded unit is a new one, in none of the minor's
         // "Upgrade Units" trees
-        if (minor?.upgrading) minor.upgrading = minor.upgrading.filter((id) => id !== u.id);
+        if (minor?.upgradeTrees) for (const t of minor.upgradeTrees) t.units = t.units.filter((id) => id !== u.id);
         if (!res.ok) {
           const t = r ? engineRowOf(ctx.cat, 'unit', r.type) : null;
           const s = seatOf(state, u.seat);
@@ -4838,7 +4840,7 @@ const SEAT_MEMORY = ['unitPool', 'armyKnown', 'armyAged', 'enemyCounts', 'combat
 const RESEARCH_MEMORY = ['goal', 'aiEntries', 'civicAiEntries', 'civicGovValues', 'civicPolicyBest', 'civicSlotBest', 'aiLeft', 'aiLeftSeen',
   'techCatchUp', 'civicCatchUp', 'favTech'] as const;
 const MINOR_MEMORY = ['prodSetValue', 'favoredFood', 'tradeCities', 'tradeRejected', 'tradeValue', 'metMinors', 'unitValues', 'buildingValues', 'resourceCounts',
-  'economy', 'threat', 'threatNear', 'aiGrowth', 'aiGrowthSeen', 'revealed', 'standingArmyShort', 'explored', 'upgrading', 'upgradeTrigger'] as const;
+  'economy', 'threat', 'threatNear', 'aiGrowth', 'aiGrowthSeen', 'revealed', 'standingArmyShort', 'explored', 'upgradeTrees'] as const;
 const CITY_MEMORY = ['aiThreat', 'aiThreatNear', 'freeRaid', 'tradeCities', 'tradeRejected'] as const;
 const UNIT_MEMORY = ['slot', 'aiDefender', 'aiHomed', 'escorted', 'originalOwner'] as const;
 const GAME_MEMORY = ['barbTribes', 'barbPool', 'barbCampsBegun', 'barbSpotNext'] as const;
@@ -5983,7 +5985,7 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
       // no strategic resource), as the game's did: no unit record t+1 holds
       // (runs/h1_duelu1128 Bologna at 0 Gold t241-t246, a tree each turn a
       // technology lands, its Default Specialization's Scouts gone)
-      if (!paid && cs && !op && (cs.upgradeTrigger || (cs.upgrading?.length ?? 0) > 0) && minorUpgradeVisible(state, cs, u)
+      if (!paid && cs && !op && (cs.upgradeTrees?.length ?? 0) > 0 && minorUpgradeVisible(state, cs, u)
         && !upgradeMayGo(state, cs, u) && unupgradedDeleted(state, cs, u)) continue;
       count(ctx, isBarbSeat(u.seat) ? 'barb:unit' : 'minorAi:unit', 'fallback', ctx.playerOfSeat.get(u.seat),
         `${u.type}${paid ? ' bought' : ''}${op ? ` for ${op}` : ''}`);

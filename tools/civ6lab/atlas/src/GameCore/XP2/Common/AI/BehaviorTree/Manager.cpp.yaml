@@ -17,15 +17,22 @@
       value: "So a tree started in the walk ticks in it   only where its slot lies past the one ticking: runs/h1_duelw1105 log t12,   tribe 4's scout's tree (slot 1) starts the raid on 12:14 in slot 0 (tribe   0's "
   readings:
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
+    - "C-99: a non-major player's tree pool — every city-state tree, its operations' and its \"Upgrade Units\" trees in one pool, ticked in slot order — READ (0x7ff9a0 / 0x7ff7b0 / 0x800c60 -> 0x7fef20, 0x7ffdd0 -> 0x7cb2e0), both twins"
   context:
     - "...31: \"Barbarian City Assault, Started\" first). THE TREE POOL (the manager +0x3a0, READ): 0x7ff7b0 makes a tree in the pool by 0x7fef20 — the slot its free list's head (+0x2c, each entry..."
   review: reviewed
 - addr: 0x7ff9a0
   final: 0x563840
   kind: function
-  semantics: makes a behaviour tree (the events'); never ticked by its event.
-  status: PARTLY
+  semantics: "makes a behaviour tree (the events'); never ticked by its event. Through 0x7ff7b0 -> 0x7fef20 on the player's one tree pool: its callers the city events (0x5cd150, 0x5cc910, 0x5ccc10), startOperation (0x73a120) and the scout's start (0x1485c0)."
+  status: READ
+  cases:
+    - recording: h1_duely1121
+      turn: 3
+      value: city-state 4's city trees 4:3 / 5:4 / 6:5 after its Simple City Tree 3:2, its Upgrade Units tree 7:6 at t6, Simple Operation Attack 9:6 at t10 after Build City Building 8:3 in the freed slot 3
+  impl: [cpu/core/treePool.ts:newTreeId]
   readings:
+    - "C-99: a non-major player's tree pool — every city-state tree, its operations' and its \"Upgrade Units\" trees in one pool, ticked in slot order — READ (0x7ff9a0 / 0x7ff7b0 / 0x800c60 -> 0x7fef20, 0x7ffdd0 -> 0x7cb2e0), both twins"
     - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
     - "C-95: the scout's tree \"Barbarian Found City\" — READ (the tree, its start, Protect Unit's update), PARTLY READ (the nodes' executions), unported"
     - "C-95: the scout's tree \"Barbarian Found City\" — READ, ported"

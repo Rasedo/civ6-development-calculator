@@ -39,7 +39,7 @@ from . import simbase
 from .sim_citytrees import (
     BT_ERROR, BT_FAILURE, BT_FRESH, BT_RUNNING, BT_SKIPPED, BT_SUCCESS, CP_ACCEPTED, CP_CANCELLED, CP_CLAIMED,
     CP_COMPLETED, CP_FAILED, CP_IN_PROGRESS, NONE, SHAPE_SELECTOR, _NEXT_MEM, _Tree, _cget, _cset,
-    _propagate, _u_contract_manager, new_contract, submit_contract,
+    _propagate, _u_contract_manager, new_contract, submit_contract, free_ended_trees, new_tree_id, TREE_HELD_FREE, TREE_HELD_MINOR, TREE_SLOT,
 )
 from .sim_research import _FX
 from .sim_tactics import _AI_COMBAT, _AI_DEFENDER
@@ -52,6 +52,8 @@ N_TEAMS = 2
 N_MEMBERS = 16
 N_CAMPS = 16
 N_MOVES = 2
+# the "Upgrade Units" trees a city-state runs at once
+N_UPG = 4
 # the age at most of a record the army strength reads (`ARMY_READ_AGE`,
 # 0x5eadb0 -> 0x5ef760 with 2)
 _ARMY_READ_AGE = 2
@@ -300,12 +302,11 @@ class SimMinorOps:
         # the plots its knowledge base's looks have seen or a meeting revealed
         # (`CityState.revealed`)
         self.mops_revealed = torch.zeros(B, S, self.T, dtype=torch.bool, device=device)
-        # the "Upgrade Units" trees (`CityState.upgrading`): their units over
-        # the holder's pool, whether a tree runs, a technology or civic gained
-        # since their last tick
-        self.mops_upg = torch.zeros(B, S, P, dtype=torch.bool, device=device)
-        self.mops_upg_on = torch.zeros(B, S, dtype=torch.bool, device=device)
-        self.mops_upg_trig = torch.zeros(B, S, dtype=torch.bool, device=device)
+        # the "Upgrade Units" trees (`CityState.upgradeTrees`): each tree's id
+        # in the tree pool (-1 none), and per unit over the holder's pool the
+        # tree holding it (-1 none)
+        self.mops_upg_id = torch.full((B, S, N_UPG), -1, dtype=torch.long, device=device)
+        self.mops_upg_of = torch.full((B, S, P), -1, dtype=torch.long, device=device)
 
     # -- the minor's units --------------------------------------------------
 
@@ -693,7 +694,7 @@ class SimMinorOps:
         any of its operations' teams lists but those its Defend Units
         released, its "Upgrade Units" trees hold"""
         P = self._mops_u(s, "alive").shape[1]
-        return self._mops_jobs(s, torch.ones_like(self.mops_def[:, s], dtype=torch.bool)) | self.mops_upg[:, s, :P]
+        return self._mops_jobs(s, torch.ones_like(self.mops_def[:, s], dtype=torch.bool)) | (self.mops_upg_of[:, s, :P] >= 0)
 
     def _mops_jobs(self, s: int, run: torch.Tensor) -> torch.Tensor:
         """[B, P] the units in a job of holder `s`'s operations where `run`
@@ -999,8 +1000,7 @@ class SimMinorOps:
             return torch.full((B,), -1, dtype=torch.long, device=dev)
         Tm = self._mops_tables()
         ai = self.cityai
-        tid = ai.t_serial[:, s].clone()
-        ai.t_serial[:, s] += m.long()
+        tid = new_tree_id(ai, s, m)
         nf = self.mops_nfree[:, s]
         use_free = m & (nf > 0)
         top = self.mops_free[:, s].gather(1, (nf - 1).clamp(min=0).unsqueeze(1)).squeeze(1)
@@ -1104,7 +1104,7 @@ class SimMinorOps:
         """[B, P] the units in a job of holder `s` (unit +0x7d0, `minorJobUnits`):
         listed in any of its running operations, held by its "Upgrade Units"
         trees"""
-        return self._mops_op_units(s) | self.mops_upg[:, s, :self._mops_u(s, "alive").shape[1]]
+        return self._mops_op_units(s) | (self.mops_upg_of[:, s, :self._mops_u(s, "alive").shape[1]] >= 0)
 
     def _mops_op_units(self, s: int) -> torch.Tensor:
         """[B, P] the units in a job of any running operation of holder `s`:
@@ -1316,7 +1316,9 @@ class SimMinorOps:
         back after it (their rest kept)"""
         Tm = self._mops_tables()
         on = act & ((self.mops_def[:, s] >= 0).any(dim=1) | (self.mops_pick[:, s] >= 0))
-        upg = s != self.FR and bool((act & (self.mops_upg_on[:, s] | self.mops_upg_trig[:, s])).any())
+        # its "Upgrade Units" trees as the walk opens (`upgradeTreesStart`)
+        upg_ids = self.mops_upg_id[:, s].clone() if s != self.FR else None
+        upg = upg_ids is not None and bool((act.unsqueeze(1) & (upg_ids >= 0)).any())
         # the city's second hook in the city AI's pass (`CITY_AI_PASS`):
         # after the trees of a higher priority, before the rest
         hook = [s != self.FR]
@@ -1330,10 +1332,25 @@ class SimMinorOps:
                 # (0x60a440): the trees after the hook offer it not
                 after = self._mops_u(s, "alive") & (self._mops_u(s, "seat") == self._mops_seat(s))
                 done.logical_or_(after & ~before)
+
+        def upgrade_trees(q: int | None) -> None:
+            # the "Upgrade Units" trees of pool slot `q` (any slot: None),
+            # each where it ran as the walk opened
+            for t in range(N_UPG):
+                tid = upg_ids[:, t]
+                m = act & (tid >= 0) & (self.mops_upg_id[:, s, t] == tid)
+                if q is not None:
+                    m = m & (tid % TREE_SLOT == q)
+                if bool(m.any()):
+                    self._mops_upgrade_tree(s, t, m, op, done)
+
         if not bool(on.any()):
-            city_hook(_CITY_AI_PASS)
             if upg:
-                self._mops_upgrade_trees(s, act, op, done)
+                # their slot order alone: no operation runs
+                for q in self._mops_walk_slots(s, upg_ids):
+                    upgrade_trees(q)
+            city_hook(_CITY_AI_PASS)
+            self._mops_free_trees(s, act)
             return
         tg = op["tg"] if op["tg"] is not None else self._tac_targets(self._mops_seat(s), self._mops_kb(s))
         view = {"op": op, "done": done, "tg": tg, "rows": None, "world": None,
@@ -1349,29 +1366,35 @@ class SimMinorOps:
             if bool(pick.any()):
                 self._mops_start(s, d, self.mops_pick_target[:, s], self.mops_pick_rally[:, s], pick)
         self.mops_pick[:, s] = torch.where(on, -1, self.mops_pick[:, s])
-        # the trees by priority, the highest first, of equals in slot order
-        # (`operationsRun`: the tree manager's tick per priority), the
-        # "Upgrade Units" trees after the operations of their own
+        # the trees by priority, the highest first, of equals in the tree
+        # pool's slot order (`operationsRun`: the tree manager's tick per
+        # priority), the operations' and the "Upgrade Units" trees alike —
+        # each that runs as the walk opens
+        op_ids = torch.where(self.mops_def[:, s] >= 0, self.mops_id[:, s], torch.full_like(self.mops_id[:, s], -1))
+        slots = self._mops_walk_slots(s, op_ids if upg_ids is None else torch.cat([op_ids, upg_ids], dim=1))
         prios = {int(Tm.defs[d]["priority"]) for d in Tm.trees} | ({Tm.upgrade_priority} if upg else set())
         for prio in sorted(prios, reverse=True):
             city_hook(prio)
-            for k in range(N_OPS):
-                for d in Tm.trees:
-                    if int(Tm.defs[d]["priority"]) != prio:
-                        continue
-                    m = on & (self.mops_def[:, s, k] == d)
-                    if bool(m.any()):
-                        # an operation a recruit left with no unit ends, its
-                        # tree not run (`robbedOps`)
-                        rb = m & view["robbed"][:, k] & ~(self.mops_mem[:, s, k] >= 0).flatten(1).any(dim=1)
-                        view["robbed"][:, k] &= ~m
-                        self._mops_end(s, k, rb)
-                        m = m & ~rb
-                    if bool(m.any()):
-                        self._mops_tick(s, k, d, m, view)
-            if upg and prio == Tm.upgrade_priority:
-                self._mops_upgrade_trees(s, act, op, done)
+            for q in slots:
+                for k in range(N_OPS):
+                    atq = (op_ids[:, k] >= 0) & (self.mops_id[:, s, k] == op_ids[:, k]) & (op_ids[:, k] % TREE_SLOT == q)
+                    for d in Tm.trees:
+                        if int(Tm.defs[d]["priority"]) != prio:
+                            continue
+                        m = on & atq & (self.mops_def[:, s, k] == d)
+                        if bool(m.any()):
+                            # an operation a recruit left with no unit ends, its
+                            # tree not run (`robbedOps`)
+                            rb = m & view["robbed"][:, k] & ~(self.mops_mem[:, s, k] >= 0).flatten(1).any(dim=1)
+                            view["robbed"][:, k] &= ~m
+                            self._mops_end(s, k, rb)
+                            m = m & ~rb
+                        if bool(m.any()):
+                            self._mops_tick(s, k, d, m, view)
+                if upg and prio == Tm.upgrade_priority:
+                    upgrade_trees(q)
         city_hook(_CITY_AI_PASS)
+        self._mops_free_trees(s, act)
         busy = self._mops_busy(s) & self._mops_u(s, "alive") & (self._mops_u(s, "seat") == self._mops_seat(s))
         done |= busy & on.unsqueeze(1) & (op["rowof"] >= 0)
         # ...and stay ended through the pass (`Pass.ended`)
@@ -1381,6 +1404,36 @@ class SimMinorOps:
             self._tac_moves_ended[:, lo:lo + w] |= view["ended"][:, :w]
         if bool(view["ended"].any()):
             self.major_unit_mp.copy_(torch.where(view["ended"], view["ended_mp"], self.major_unit_mp))
+
+    def _mops_walk_slots(self, s: int, ids: torch.Tensor) -> list[int]:
+        """the tree pool slots the trees of `ids` [B, K] (-1 none) stand in,
+        ascending: the walk's order of equal priorities"""
+        live = ids[ids >= 0]
+        return sorted(set((live % TREE_SLOT).tolist())) if live.numel() else []
+
+    def _mops_free_trees(self, s: int, act: torch.Tensor) -> None:
+        """the destroy loop after holder `s`'s walk where `act`
+        (`minorFreeTrees`; the Free Cities' their operations'): the slots of
+        its trees no longer running free"""
+        ai = self.cityai
+        live = [torch.where(self.mops_def[:, s] >= 0, self.mops_id[:, s], torch.full_like(self.mops_id[:, s], -1))]
+        if s != self.FR:
+            live += [torch.where(ai.tr_alive[:, s], ai.tr_id[:, s], torch.full_like(ai.tr_id[:, s], -1)), self.mops_upg_id[:, s]]
+        free_ended_trees(ai, s, TREE_HELD_FREE if s == self.FR else TREE_HELD_MINOR, live, act)
+
+    def _mops_upgrade_start(self, s: int, n: torch.Tensor) -> None:
+        """`upgradeTreesStart` for minor `s`: `n` [B] new "Upgrade Units" trees,
+        each a control of its tree pool (`new_tree_id`) holding no unit"""
+        for j in range(int(n.max()) if n.numel() else 0):
+            m = n > j
+            if not bool(m.any()):
+                break
+            tid = new_tree_id(self.cityai, s, m)
+            free = self.mops_upg_id[:, s] < 0
+            assert bool((free.any(dim=1) | ~m).all()), "upgrade trees: raise N_UPG"
+            k = free.long().argmax(dim=1)
+            r = m.nonzero(as_tuple=True)[0]
+            self.mops_upg_id[r, s, k[r]] = tid[r]
 
     def _mops_military_upgrade(self, s: int, alive: torch.Tensor) -> None:
         """`minorMilitaryUpgrade` (0x727db0) for minor `s` where `alive` [B]:
@@ -1423,32 +1476,28 @@ class SimMinorOps:
         self.citystate_balance[:, s] = torch.where(bought, bal, self.citystate_balance[:, s])
         self._minor_upgrade_unit(s, bought, first)
 
-    def _mops_upgrade_trees(self, s: int, act: torch.Tensor, op: dict, done: torch.Tensor) -> None:
-        """`upgradeTreesTick` for minor `s` where `act` (its pass, `done` its
-        units' turns): where a tree runs or the trigger stands — Find
-        Available Unit's offer (the units in no job, their turn not done, then
-        those of its operations of a lower priority, which leave them) each
-        whose upgrade its research unlocks joining, none held ending the
-        trees; Find Unit Targets (the city centre, a ship's a coastal centre
-        or else the Harbor's plot), none ending the trees; Move Unit's
+    def _mops_upgrade_tree(self, s: int, t: int, go: torch.Tensor, op: dict, done: torch.Tensor) -> None:
+        """`upgradeTreesTick` of minor `s`'s "Upgrade Units" tree `t` where `go`
+        (its pass, `done` its units' turns): Find Available Unit's offer (the
+        units in no job — no operation's, no other tree's —, their turn not
+        done, then those of its operations of a lower priority, which leave
+        them) each whose upgrade its research unlocks joining, none held
+        ending the tree; Find Unit Targets (the city centre, a ship's a coastal
+        centre or else the Harbor's plot), none ending the tree; Move Unit's
         update before any execution (`upgradeArrived`: its SUCCESS ends the
-        trees once the executions ran); Upgrade Units' execution (in pool
+        tree once the executions ran); Upgrade Units' execution (in pool
         order, the full test and the treasury, the economic AI's purchase;
         Can Delete's deletion of the units it does not upgrade); Move Unit's
         (each left for its target); the units' turns done"""
         Tm = self._mops_tables()
-        trig = act & self.mops_upg_trig[:, s]
-        self.mops_upg_trig[:, s] &= ~act
-        go = act & (self.mops_upg_on[:, s] | trig)
-        if not bool(go.any()):
-            return
         u = self._mops_units(s)
         P = u["own"].shape[1]
         own = u["own"]
-        held = self.mops_upg[:, s, :P] & own & go.unsqueeze(1)
+        of = self.mops_upg_of[:, s, :P]
+        held = (of == t) & own & go.unsqueeze(1)
         vis = self._minor_upgrade_visible(s)[:, :P]
         # Find Available Unit: the free units, then the lower-priority operations'
-        free = own & ~self._mops_op_units(s) & ~held & ~done & go.unsqueeze(1)
+        free = own & ~self._mops_op_units(s) & (of < 0) & ~done & go.unsqueeze(1)
         held = held | (free & vis)
         for k in range(N_OPS):
             low = torch.zeros_like(go)
@@ -1563,8 +1612,12 @@ class SimMinorOps:
         done |= held
         held &= ~ended.unsqueeze(1)
         live = live & ~ended
-        self.mops_upg[:, s, :P] = torch.where(go.unsqueeze(1), held, self.mops_upg[:, s, :P])
-        self.mops_upg_on[:, s] = torch.where(go, live, self.mops_upg_on[:, s])
+        # the units it holds where it runs on; one that ended lets its units
+        # go and leaves its pool slot to the destroy loop
+        mine = go.unsqueeze(1) & (of == t)
+        self.mops_upg_of[:, s, :P] = torch.where(mine, -1, self.mops_upg_of[:, s, :P])
+        self.mops_upg_of[:, s, :P] = torch.where(held & live.unsqueeze(1), t, self.mops_upg_of[:, s, :P])
+        self.mops_upg_id[:, s, t] = torch.where(go & ~live, -1, self.mops_upg_id[:, s, t])
 
     def _mops_tick(self, s: int, k: int, d: int, act: torch.Tensor, view: dict) -> None:
         """ONE TICK of slot `k`'s tree (definition `d`) where `act` (the

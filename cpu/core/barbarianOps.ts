@@ -17,6 +17,7 @@
  */
 import type { BarbHoming, BarbTarget, BarbTribe, GameState, Unit } from './types';
 import { BARB_SEAT, isBarbSeat } from './seats';
+import { freeEndedTrees, newTreeId, treeSlot } from './treePool';
 import { aiView } from './aiView';
 import { passOrders, passView } from './opsOrders';
 import { recentOf } from './minorOps';
@@ -198,7 +199,7 @@ function barbEnv(state: GameState, pass: Pass | null): OpsEnv {
     newContractId: none,
     contractCities: () => [],
     clearProduction: none,
-    newOpId: () => newBarbTreeId(state),
+    newOpId: () => newTreeId(state.barbSeat),
     settle: null,
     unitRows: () => [],
     // a unit action row of theirs: a pillage where the unit stands
@@ -352,49 +353,6 @@ export function barbarianCaptures(state: GameState, ticked: ReadonlySet<number> 
   }
 }
 
-/** a tree's id: the tree manager's pool generation over its slot (0x7fef20:
- *  +0x28 += 0x10000, or'd with the slot) */
-const TREE_SLOT = 0x10000;
-export const treeSlot = (id: number): number => id % TREE_SLOT;
-
-/** THE POOL AS THE GAME OPENS: slots 0 and 1 held for good by the
- *  barbarians' two standing controls (no tree: the AI memory reader lists
- *  the trees alone), generation 2 a control gone before the first tree, so
- *  the first tree is generation 3 in slot 2 (runs/h1_duely1117, 1121, 1124,
- *  1127, 1128: each one's first barbarian tree 196610) */
-export const BARB_TREE_HELD = 2;
-export const BARB_TREE_FIRST_GEN = 3;
-
-/**
- * A NEW TREE OF THE BARBARIANS (the tree manager's pool +0x3a0, 0x7fef20):
- * the slot its free list's head names — the last one freed — else the
- * pool's next new slot; the pool's list of trees kept in slot order. Its id
- * the next generation over the slot.
- */
-export function newBarbTreeId(state: GameState): number {
-  const seat = state.barbSeat;
-  const gen = seat.opsNext ?? BARB_TREE_FIRST_GEN;
-  seat.opsNext = gen + 1;
-  const free = (seat.treeFree ??= []);
-  let slot = free.pop();
-  if (slot === undefined) {
-    slot = seat.treeSlots ?? BARB_TREE_HELD;
-    seat.treeSlots = slot + 1;
-  }
-  return gen * TREE_SLOT + slot;
-}
-
-/** THE POOL'S DESTROY LOOP after the walk (0x7ffdd0 -> 0x7cb2e0): each slot
- *  past the standing controls' whose tree ended goes to the free list's
- *  head, in slot order (the last freed, the highest, taken first) */
-function freeEndedTrees(state: GameState): void {
-  const seat = state.barbSeat;
-  const live = new Set([...(seat.ops ? opsOf(seat.ops).map((o) => o.id) : []),
-    ...(state.barbTribes ?? []).flatMap((t) => (t.homing ? [t.homing.id] : []))].map(treeSlot));
-  const free = (seat.treeFree ??= []);
-  for (let s = BARB_TREE_HELD; s < (seat.treeSlots ?? BARB_TREE_HELD); s++) if (!live.has(s) && !free.includes(s)) free.push(s);
-}
-
 /**
  * THE BARBARIANS' TREES' TICK in their tactical pass (the tree manager's
  * tick 0x7ffdd0, list C of the player's turn, once each unit's planning is
@@ -437,7 +395,7 @@ export function barbarianTrees(state: GameState, pass: Pass): Set<number> {
       barbarianCaptures(state, held);
     }
   }
-  freeEndedTrees(state);
+  freeEndedTrees(state.barbSeat, [...opsOf(ai).map((o) => o.id), ...(state.barbTribes ?? []).flatMap((t) => (t.homing ? [t.homing.id] : []))]);
   for (const id of held) pass.done.add(id);
   return held;
 }
@@ -620,9 +578,9 @@ function tickScout(state: GameState, pass: Pass, tribe: BarbTribe): void {
 
 /** THE SCOUT'S TREE'S START (0x1485c0, from the scout's look): on the scout
  *  alone, its trigger the camp and the tribe, the city it saw; a new tree
- *  of the player's pool (`newBarbTreeId`) */
+ *  of the player's pool (`newTreeId`) */
 export function barbScoutTreeStart(state: GameState, tribe: BarbTribe, scout: number, target: BarbTarget): void {
   const nodes = scoutTreeNodes();
-  const id = newBarbTreeId(state);
+  const id = newTreeId(state.barbSeat);
   tribe.homing = { id, scout, target, status: nodes.map(() => BT_FRESH), mem: nodes.map(() => ({})), bb: {} };
 }
