@@ -2202,13 +2202,17 @@ function minorFinish(state: GameState, cityState: CityState, item: Exclude<Minor
 /**
  * A LUMP OF FOOD OR PRODUCTION lands in the minor's city (`applyLumpYield`:
  * its Builder's harvest or feature removal) and acts at once: Food fills the
- * box and a full box grows the city, Production goes to the item in hand —
- * completing it at its price, the rest stored as a step's overflow — or to
- * the store with nothing in hand (runs/h1_duelw1124 t21: Granada's Builder
- * clears a Rainforest in its actions, 6 Food and 6 Production; the Warrior
- * at 18 of 20 completes and the box at 11 of 16 grows to 4 with 1 left,
- * before its next start). A district's site is the step's, so its progress
- * waits for the step.
+ * box and a full box grows the city, Production goes to the item in hand
+ * at the item's percent, as the step pays (`minorItemPct`, `minorItemMult`)
+ * — completing it at its price, the rest stored as a step's overflow — or
+ * to the store with nothing in hand (runs/h1_duelw1124 t21: Granada's
+ * Builder clears a Rainforest in its actions, 6 Food and 6 Production; the
+ * Warrior at 18 of 20 completes and the box at 11 of 16 grows to 4 with 1
+ * left, before its next start). A district in hand completes on its site
+ * alike (runs/h1_duely1117 Caguana t36: its Builder's chop of 19 in Build
+ * City Improvement's tick, at the Harbor's +500%, completes the Harbor
+ * placed on 43:14 that turn at 24 of 53; runs/h1_duely1121 Antioch t191:
+ * the chop of 61 completes the Commercial Hub queued that turn, 165).
  */
 export function minorLump(state: GameState, cityState: CityState, key: 'food' | 'production', amount: number): void {
   if (key === 'food') {
@@ -2219,19 +2223,19 @@ export function minorLump(state: GameState, cityState: CityState, key: 'food' | 
     cityState.foodBox = city.foodBox;
     return;
   }
-  const key0 = cityState.prodItem ?? '';
-  const [kind, id] = [key0.slice(0, key0.indexOf(':')), key0.slice(key0.indexOf(':') + 1)];
-  const item: Exclude<MinorItem, { none: true }> | undefined = kind === 'unit' ? { unit: id } : kind === 'building' ? { building: id }
-    : kind === 'project' ? { project: id } : kind === 'repair' ? { repair: id } : undefined;
-  if (!key0) {
+  const item = minorItemInHand(cityState);
+  if (!item) {
     cityState.prodOverflow = (cityState.prodOverflow ?? 0) + amount;
     return;
   }
   const before = cityState.prodProgress ?? 0;
-  cityState.prodProgress = before + amount;
-  if (!item) return;
+  cityState.prodProgress = before + amount * ((100 + minorItemPct(state, cityState, item)) / 100) * minorItemMult(state, item);
   const cost = minorItemCost(state, cityState, item);
   if (cityState.prodProgress < cost) return;
+  // the overflow the lump's own amount leaves past the price, unscaled
+  // (runs/h1_duely1117 Caguana t38: the Harbor's chop leaves none, the
+  // Lighthouse picked as logged; runs/h1_duely1127 Mexico City t49-51: the
+  // Water Mill's chop leaves 9.6, its Walls done at t51)
   if (minorFinish(state, cityState, item)) cityState.prodOverflow = (cityState.prodOverflow ?? 0) + Math.max(0, before + amount - cost);
 }
 

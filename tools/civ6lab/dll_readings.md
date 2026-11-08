@@ -9454,3 +9454,23 @@ route walk through it (gpu/core/sim_seats.py); the driver's `A_PL`
   the district standing only from record 122: Caguana's t121 civics AI on
   Food 33 for the game's 34 (its route's Food 1 from the district), Civil
   Prestige 80 / 65 for 65 / 87 at t121 / t122.
+
+## C-96 / C-127: a Builder's lump lands on a city-state's item in hand at the item's percent, a district too — the recorded event order read, both twins
+
+- A Feature_Removes / harvest lump the minor's Builder makes in its tree's
+  tick goes to the item in hand as the step pays it: × (100 + the item's
+  percent) (`minorItemPct`: the Harbor and the type's district +500%, a
+  Builder, a small army's unit and the walls +200%) × the treaty's
+  multiple (`minorItemMult`); a district in hand completes on its site
+  (`minorLump`; GPU `_minor_lump`). The overflow it leaves is the lump's
+  own amount past the price, unscaled.
+- runs/h1_duely1117 Caguana t36: the Harbor placed on 43:14 that turn
+  (DistrictAddedToMap before the activation), the Builder's chop
+  (UnitOperationStarted -771890458) then CityProductionCompleted 2 / 4 inside
+  the AI turn: 24 + 19 × 6 over 53; its contract gone at the end look, the
+  t38 pick the Lighthouse (no overflow). runs/h1_duely1121 Antioch t191: the
+  Commercial Hub queued from its contract 575, the chop of 61 completes it
+  in the tick (165). runs/h1_duely1127 Mexico City t49: the Water Mill's
+  chop (percent 0) leaves 9.6, its Walls complete at t51 as logged.
+- Open: no case tells whether the idle store (`prodOverflow`) also lands
+  with a lump; the Free Cities' lump is not this path.

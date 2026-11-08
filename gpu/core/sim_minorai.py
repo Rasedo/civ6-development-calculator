@@ -1516,10 +1516,11 @@ class SimMinorAi:
     def _minor_lump(self, s: int, mask: torch.Tensor, ykey: int, amount: torch.Tensor) -> None:
         """`minorLump` and `applyLumpYield` for minor `s` where `mask`: Gold
         and Faith to its purse, Science and Culture to its research, Food to
-        its city's box (a full box grows it), Production to the item in hand —
+        its city's box (a full box grows it), Production to the item in hand
+        at the item's percent (`_minor_item_pct`, `_minor_item_mult`) —
         completing it at its price, the rest stored as a step's overflow — or
-        to the store with nothing in hand; a district's progress waits for
-        the step"""
+        to the store with nothing in hand, a district in hand on its site
+        alike"""
         if not bool(mask.count_nonzero()):
             return
         # the facts' memos of the build turns read the progress
@@ -1549,16 +1550,15 @@ class SimMinorAi:
         if not bool(has.count_nonzero()):
             return
         before = self.citystate_prod[:, s].clone()
-        self.citystate_prod[:, s] = torch.where(has, before + amt, before)
-        _u, _b, is_d, _p, _r = self._mk_kinds(key)
-        chk = has & ~is_d
-        if not bool(chk.count_nonzero()):
-            return
+        pct = self._minor_item_pct(s, key)
+        after = before + amt * ((100 + pct) / 100) * self._minor_item_mult(key)
+        self.citystate_prod[:, s] = torch.where(has, after, before)
         cost = self._minor_item_cost(s, key)
-        done = chk & (self.citystate_prod[:, s] >= cost)
+        done = has & (self.citystate_prod[:, s] >= cost)
         if not bool(done.count_nonzero()):
             return
         fin = self._minor_finish(s, done, key)
+        # the overflow the lump's own amount leaves past the price, unscaled
         self.citystate_ovf[:, s] += torch.where(fin, (before + amt - cost).clamp(min=0), torch.zeros_like(amt))
 
     def _minor_clear(self, s: int, mask: torch.Tensor, g: torch.Tensor, plot: torch.Tensor,
