@@ -2351,10 +2351,16 @@
     - recording: h1_duelv1127
       turn: 61
       value: the meeting turn equals DiplomacySummary.csv's Met line
-  impl: [cpu/core/fog.ts:majorLookMeets]
+  impl:
+    - cpu/core/fog.ts:majorLookMeets
+    - cpu/core/fog.ts:minorLook
+    - cpu/core/fog.ts:freeLook
+    - gpu/core/sim_masks.py:_minor_look
+    - gpu/core/sim_masks.py:_free_look
   readings:
     - "C-97: the majors' meeting — READ (the triggers, the effects), PARTLY READ (the shared sight)"
     - "C-97: the majors' meeting"
+    - "C-108: Rockefeller's route Gold and the Free Cities' meetings — READ (0x54c6c0's count functors, 0x556610, 0x524890 / 0x5249c0), both twins"
   context:
     - ...hose visibility count of the plot is above 0); a plot coming into view meets its owner (0x524890); a unit coming into view meets its owner (0x5249c0).
   review: reviewed
@@ -2367,10 +2373,16 @@
     - recording: h1_duelv1127
       turn: 61
       value: the meeting turn equals DiplomacySummary.csv's Met line
-  impl: [cpu/core/fog.ts:majorLookMeets]
+  impl:
+    - cpu/core/fog.ts:majorLookMeets
+    - cpu/core/fog.ts:minorLook
+    - cpu/core/fog.ts:freeLook
+    - gpu/core/sim_masks.py:_minor_look
+    - gpu/core/sim_masks.py:_free_look
   readings:
     - "C-97: the majors' meeting — READ (the triggers, the effects), PARTLY READ (the shared sight)"
     - "C-97: the majors' meeting"
+    - "C-108: Rockefeller's route Gold and the Free Cities' meetings — READ (0x54c6c0's count functors, 0x556610, 0x524890 / 0x5249c0), both twins"
   context:
     - ...t coming into view meets its owner (0x524890); a unit coming into view meets its owner (0x5249c0).
   review: reviewed
@@ -2577,6 +2589,23 @@
     - true where the player holds the unit's MandatoryObsoleteTech +0x240, MandatoryObsoleteCivic +0x238, ObsoleteTech +0x250 or ObsoleteCivic +0x248
   context:
     - "...es, in the Units' order, for each unit the player's version of itself, an obsolete one (0x538460: MandatoryObsoleteCivic +0x238 / Tech +0x240, ObsoleteCivic +0x248 / Tech +0x250 held)..."
+  review: reviewed
+- addr: 0x556610
+  final: 0x3921e0
+  kind: function
+  name: Trade_Manager strategic count functor
+  semantics: "a per-destination count functor 0x54c6c0 builds on the DESTINATION city: City_Resources (0x1f71b0) on city +0x1e00 for the strategic class 0xc163880a (0x5565f0 the luxury class 0xa9f06a65, 0x556660 the bonus class 0xa3fcd07b), the city's owner's visibility."
+  status: READ
+  cases:
+    - recording: h1_duelz1124
+      turn: 215
+      value: Shenyang -> Bologna +2 Gold from Rockefeller's activation, Bologna's one strategic plot (t215-222 as recorded)
+  impl:
+    - cpu/core/trade.ts:routeRockefellerGold
+    - gpu/core/sim_seats.py:_cs_strat_plots
+    - gpu/core/sim_seats.py:_city_strat_plots
+  readings:
+    - "C-108: Rockefeller's route Gold and the Free Cities' meetings — READ (0x54c6c0's count functors, 0x556610, 0x524890 / 0x5249c0), both twins"
   review: reviewed
 - addr: 0x558ba0
   final: 0x393630

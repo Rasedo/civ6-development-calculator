@@ -13,17 +13,22 @@
     - recording: h1_duely1128
       turn: 229
       value: Bologna's Market Economy 88 (two route yields 58, the luxury and strategic plots at its routes' destinations 30) at t229-249, 84 at t223-228, as logged
+    - recording: h1_duelz1124
+      turn: 215
+      value: Shenyang -> Bologna +2 Gold under Rockefeller, Bologna's one strategic plot (t215-222 as recorded)
   impl:
     - cpu/core/trade.ts:cityResourcePlots
     - cpu/core/trade.ts:routeDestLuxuryGold
-    - cpu/core/trade.ts:routeDestStrategicPlots
     - gpu/core/sim_seats.py:_route_dest_plots
     - gpu/core/sim_seats.py:_city_lux_plots
     - gpu/core/sim_seats.py:_city_strat_plots
     - cpu/core/aiModifiers.ts:ANALYZERS
     - gpu/core/sim_policy.py:full
+    - cpu/core/trade.ts:routeRockefellerGold
+    - gpu/core/sim_seats.py:_cs_strat_plots
   readings:
     - "H-1: the civics AI — READ (the choice, the walk, the propagation), PARTLY READ (the value)"
     - "C-130: Market Economy's per-destination-resource route analyzers — READ (0x6b2aa0, 0x6b44d0, 0x6c89b0, 0x6c87a0, 0x1f71b0's viewer), both twins"
+    - "C-108: Rockefeller's route Gold and the Free Cities' meetings — READ (0x54c6c0's count functors, 0x556610, 0x524890 / 0x5249c0), both twins"
   notes: ["imported: cited by the code, in no dll_readings section"]
   review: reviewed

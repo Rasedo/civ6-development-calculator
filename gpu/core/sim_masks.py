@@ -3127,6 +3127,10 @@ class SimMasks:
         if seat == BARB_SEAT:
             self._barb_reveal(rows, spot[rows], self._unit_sight(_ut_b, self.barb_unit_promos[rows, slot]),
                               see_through=self._sees_through(_ut_b, self.barb_unit_promos[rows, slot]))
+        elif seat == FREE_SEAT:
+            # a Free Cities' unit's look meets the city-states it takes in
+            self._free_look(rows, spot[rows], self._unit_sight(_ut_b, self.barb_unit_promos[rows, slot]),
+                            self._sees_through(_ut_b, self.barb_unit_promos[rows, slot]))
         if self._log_diff:
             for _sb in rows.tolist():
                 _ut = unit_type[_sb] if isinstance(unit_type, torch.Tensor) else unit_type
@@ -3467,6 +3471,29 @@ class SimMasks:
             self.citystate_met_minor[nr, o, ns] = True
             self.citystate_trade_seat[nr, ns] = seat_o
             self.citystate_trade_seat[nr, o] = 100 + ns
+        # and the Free Cities, one of whose plots or units (the barbarian
+        # pool's) the look takes in (`CityState.met`)
+        bt = self.barb_unit_tile[rows].clamp(min=0)
+        fin = disk.gather(1, bt) & self.barb_unit_alive[rows] & (self.barb_unit_seat[rows] == FREE_SEAT)
+        fseen = ((disk & (own == FREE_SEAT)).any(dim=1) | fin.any(dim=1)) & (s >= 0)
+        if bool(fseen.count_nonzero()):
+            self.citystate_met_free[rows[fseen], sc[fseen]] = True
+
+    def _free_look(self, rows: torch.Tensor, tiles: torch.Tensor, radius, see_through: torch.Tensor) -> None:
+        """`freeLook`: a Free Cities' unit stands on `tiles` ([K]) and looks,
+        in the games `rows` ([K], unique); every city-state one of whose
+        plots or units the look takes in meets the Free Cities
+        (`citystate_met_free`). No-op with fog off, as `revealAround` gates."""
+        if not self.fog_of_war or rows.numel() == 0 or self.S == 0:
+            return
+        disk = self._los_disk(rows, tiles.clamp(min=0), radius, see_through)
+        own = self.tile_seat[rows]
+        uin = disk.gather(1, self.major_unit_tile[rows].clamp(min=0)) & self.major_unit_alive[rows]
+        us = self.major_unit_seat[rows]
+        for o in range(self.S):
+            seen = (disk & (own == 100 + o)).any(dim=1) | (uin & (us == 100 + o)).any(dim=1)
+            if bool(seen.count_nonzero()):
+                self.citystate_met_free[rows[seen], o] = True
 
     def _eyes_of(self, rows: torch.Tensor, seats: torch.Tensor, g: int) -> torch.Tensor:
         """`seatSeesPlot`'s eyes: where `seats` ([K, X] absolute seats, the

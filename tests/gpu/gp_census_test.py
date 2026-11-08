@@ -386,8 +386,8 @@ def test_routes(rules, path, R) -> None:
     assert gold(1) == out0 + 2, "...and provides +2 Gold to it"
     print("  1 foreign-route Gold OK — both ends")
 
-    # John Rockefeller: +2 per strategic plot at the destination the sender sees
-    kinds = int(sim._city_strat_plots(1)[B0, ROW, 0])
+    # John Rockefeller: +2 per strategic plot at the destination its owner sees
+    kinds = int(sim._city_strat_plots()[B0, ROW, 0])
     o1 = gold(1)
     sim.civ_gp_perm[:, 1, sim._gp_perm_names.index("strategicRouteGold")] = 2.0
     assert gold(1) == o1 + 2 * kinds, f"Rockefeller: {kinds} strategic plots at the destination"

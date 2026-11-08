@@ -1142,6 +1142,7 @@ const CITY_STATE_G: Record<string, Extractor> = {
   minorTradeValue: overCityStates((cityState) => cityState.tradeValue ?? 0),
   minorTradeSeat: overCityStates((cityState) => cityState.tradeSeat ?? cityState.seat),
   minorMetMinors: overCityStates((cityState) => [...(cityState.metMinors ?? [])].sort((a, b) => a - b)),
+  minorMetFree: overCityStates((cityState) => (cityState.met.includes(FREE_SEAT) ? 1 : 0)),
   minorUnitStrength: overCityStates((cityState) => cityState.unitStrength ?? 0),
   minorArmyAged: overCityStates((cityState) => cityState.armyAged ?? -1),
   minorEnemyCounts: overCityStates((cityState) => enemyCountsRecord(cityState.enemyCounts)),

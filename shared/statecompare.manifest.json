@@ -3057,6 +3057,17 @@
           "note": "the other city-states the minor has met, their seats ascending"
         },
         {
+          "name": "minorMetFree",
+          "compare": "exact",
+          "covers": [
+            "CityState.met"
+          ],
+          "planes": [
+            "citystate_met_free"
+          ],
+          "note": "1 where the minor has met the Free Cities (FREE_SEAT in its met list), else 0"
+        },
+        {
           "name": "minorUnitStrength",
           "compare": "exact",
           "covers": [

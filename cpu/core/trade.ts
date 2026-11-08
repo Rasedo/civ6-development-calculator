@@ -155,21 +155,16 @@ export function cityRouteDestPlots(state: GameState, seat: number, cityId: numbe
 }
 
 /** CIV6 (John Rockefeller, MODIFIER_PLAYER_CITIES_ADJUST_TRADE_ROUTE_YIELD_PER_
- *  DESTINATION_STRATEGIC_FOR_DOMESTIC / _FOR_INTERNATIONAL): the strategic
- *  plots City_Resources 0x1f71b0 counts at the destination — every plot
- *  within 3 rings of its centre that the city owns carrying a strategic
- *  resource the route's owner sees, improved or not, a copy counting again
- *  (runs/h1_duelw1112 Xi'an -> Longxi: +2 Gold at t214 for the unimproved
- *  Oil, +4 from t216 when Combined Arms shows the Uranium). */
-export function routeDestStrategicPlots(state: GameState, seat: number, dest: City): number {
-  const hidden = hiddenResourcesFor(state, seat);
-  const c = state.map.tiles[dest.centerIndex];
-  let n = 0;
-  for (const t of tilesWithin(state.map, c.col, c.row, DEST_LUXURY_RINGS)) {
-    if (!t.resource || hidden.has(t.resource) || !tileBelongsTo(t, dest)) continue;
-    if (RESOURCES[t.resource]?.category === 'strategic') n += 1;
-  }
-  return n;
+ *  DESTINATION_STRATEGIC_FOR_DOMESTIC / _FOR_INTERNATIONAL): Gold per
+ *  strategic plot City_Resources 0x1f71b0 counts at the destination city
+ *  (`cityResourcePlots`, the destination owner's view; Trade_Manager
+ *  0x54c6c0 builds the count's functor 0x556610 on the destination city), a
+ *  city-state's included (runs/h1_duelz1124 Shenyang -> Bologna +2 Gold
+ *  from t215, Rockefeller's activation, for Bologna's one strategic plot). */
+function routeRockefellerGold(state: GameState, seat: number, destSeat: number, destCity: number | null,
+  centre: number): number {
+  const per = gpPermOf(seatOf(state, seat), 'strategicRouteGold');
+  return per && centre >= 0 ? per * cityResourcePlots(state, destSeat, destCity, centre, 'strategic') : 0;
 }
 
 /** The Gold of the Trading Posts a route's course passes through, and for
@@ -1024,7 +1019,6 @@ export function routeOriginYields(state: GameState, city: City, route: TradeRout
   const seat = city.seat;
   const out = emptyYields();
   const gpOwner = seatOf(state, seat);
-  const gpStratGold = gpPermOf(gpOwner, 'strategicRouteGold');
   const seatMods = getModifiers(state, seat);
   const rowsHere = seatMods.routeImprovement;
   const originWonderGold = wonderRouteOriginGold(state, city);
@@ -1060,6 +1054,9 @@ export function routeOriginYields(state: GameState, city: City, route: TradeRout
       out.gold += routeLengthGold(state, seat, route);
       // CIV6 (Amsterdam): a city-state's city is a foreign city too
       out.gold += routeDestLuxuryGold(state, seat, cityState.seat, null, cityState.centerIndex);
+      // CIV6 (John Rockefeller): the international row, a city-state's city
+      // a foreign destination
+      out.gold += routeRockefellerGold(state, seat, cityState.seat, null, cityState.centerIndex);
       // CIV6 (Ibn Fadlan, MODIFIER_PLAYER_ADJUST_TRADE_ROUTES_CITY_STATE_YIELD)
       out.faith += gpPermOf(gpOwner, 'csRouteFaith');
       // CIV6 (Raj): the same modifier on a policy card
@@ -1121,7 +1118,7 @@ export function routeOriginYields(state: GameState, city: City, route: TradeRout
       // city provides +2 Gold to foreign Trade Routes" — the destination's
       out.gold += gpCityPermOf(civCity, 'foreignRouteGold');
       // CIV6 (John Rockefeller): Gold per strategic plot at the destination
-      if (gpStratGold) out.gold += gpStratGold * routeDestStrategicPlots(state, seat, civCity);
+      out.gold += routeRockefellerGold(state, seat, civCity.seat, isCityStateSeat(civCity.seat) ? null : civCity.id, civCity.centerIndex);
       // CIV6 (University of Sankore): "Other Civilizations' Trade Routes
       // to this city provide +1 Science and +1 Gold for them."
       const snd = wonderRouteSenderYields(state, civCity);
@@ -1143,7 +1140,7 @@ export function routeOriginYields(state: GameState, city: City, route: TradeRout
     // CIV6 (Raja Todar Mal): "+0.5 Gold for each specialty district at the
     // destination" of a route to your own city
     out.gold += gpPermOf(gpOwner, 'domesticRouteGoldPerSpecialty') * specialtyDistricts(state, dest);
-    if (gpStratGold) out.gold += gpStratGold * routeDestStrategicPlots(state, seat, dest);
+    out.gold += routeRockefellerGold(state, seat, dest.seat, dest.id, dest.centerIndex);
     // CIV6 (EFFECT_ADJUST_TRADE_ROUTE_YIELD_FOR_DOMESTIC): the roster's rows,
     // the same reader the international leg uses
     addRouteRows(state, out, getModifiers(state, seat).domesticRouteYields, city, dest);
@@ -1469,8 +1466,9 @@ export function minorTrade(state: GameState, cityState: CityState, pick: boolean
 /** CanStartRoute's meeting (0x553410 -> HasMet 0x3daaf0): a route between two
  *  players asks that its origin's player has met the destination's, whoever
  *  they are — a city-state another city-state (`metMinors`), a major a
- *  city-state or a city-state a major (`met`), two majors (`majorsMet`). The
- *  Free Cities meet every major. */
+ *  city-state or a city-state a major, a city-state the Free Cities or the
+ *  Free Cities a city-state (`met`, the looks' meetings), two majors
+ *  (`majorsMet`). The Free Cities meet every major. */
 export function tradeMet(state: GameState, seat: number, other: number): boolean {
   if (seat === other) return true;
   const cs = (s: number) => state.cityStates?.find((c) => c.seat === s);

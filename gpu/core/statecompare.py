@@ -1118,6 +1118,7 @@ CITY_STATE = {
     "minorTradeSeat": lambda sim, b, rows: [int(sim.citystate_trade_seat[b, s]) for s in rows],
     "minorMetMinors": lambda sim, b, rows: [[100 + o for o, on in enumerate(sim.citystate_met_minor[b, s, : sim.S].tolist()) if on]
                                             for s in rows],
+    "minorMetFree": lambda sim, b, rows: [int(bool(sim.citystate_met_free[b, s])) for s in rows],
     "minorUnitStrength": lambda sim, b, rows: [int(sim.citystate_unit_strength[b, s]) for s in rows],
     "minorArmyAged": lambda sim, b, rows: [int(sim.citystate_kb_aged[b, s]) for s in rows],
     "minorEnemyCounts": lambda sim, b, rows: [_enemy_counts(sim, b, s) for s in rows],

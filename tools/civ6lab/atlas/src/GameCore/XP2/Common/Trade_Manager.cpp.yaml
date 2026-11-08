@@ -97,10 +97,12 @@
     - cpu/data/cityStates.ts:CITY_STATE_ROUTE_TO_OTHERS
     - cpu/data/seats.ts:TRADE_ROUTE_GOLD_CULTURAL_DOMINANCE
     - gpu/core/sim_seats.py:_rk_add
+    - cpu/core/trade.ts:routeRockefellerGold
   readings:
     - "C-94: trade posts and cultural dominance — READ"
     - "C-94: Sovereignty's route yield — READ"
     - "C-96: the trade AI's route value — READ (0x5e9b20, 0x78f210, 0x78e010, 0x559140's use), PARTLY READ (0x526330's terms, the knowledge base's city order)"
+    - "C-108: Rockefeller's route Gold and the Free Cities' meetings — READ (0x54c6c0's count functors, 0x556610, 0x524890 / 0x5249c0), both twins"
   context:
     - "...yer: visiting > the other's domestic sets the pair's flag, < clears it, equal keeps it. 0x54c6c0 adds TRADE_ROUTE_GOLD_CULTURAL_DOMINANCE (gp +0x6ec, 4) to a route whose origin's own..."
     - "- Trade_Manager 0x54c6c0, per yield of a route: X = the DESTINATION city's route-to-others row of that yield (ci..."

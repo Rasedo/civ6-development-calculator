@@ -5844,16 +5844,34 @@ class SimSeats:
             out[:, r].scatter_add_(1, slc, (has & (sl >= 0) & near).long())
         return out
 
-    def _city_strat_plots(self, viewer: int) -> torch.Tensor:
-        """[B, n_majors, RC] long — `routeDestStrategicPlots`' count: each
+    def _cs_strat_plots(self) -> torch.Tensor:
+        """[B, S] long — `routeRockefellerGold`'s count on a minor: its
+        plots within 3 rings of its centre carrying a strategic resource the
+        minor sees, a copy counting again (City_Resources 0x1f71b0)."""
+        B, S = self.B, self.S
+        if S == 0:
+            return torch.zeros(B, 1, dtype=torch.long, device=self.device)
+        out = torch.zeros(B, S, dtype=torch.long, device=self.device)
+        live = self._res_live() & (self.res_cat == 2)
+        tix = torch.arange(self.T, device=self.device)
+        for s in range(S):
+            d = self._CITY_MINOR0 + s
+            ctr = self.citystate_center[:, s].clamp(min=0)
+            near = self.pair_dist[ctr.unsqueeze(1), tix.unsqueeze(0)] <= 3
+            out[:, s] = (live & ~self._res_hidden(d) & near & (self.tile_seat == int(self._ROW_SEAT[d]))).sum(dim=1)
+        return out
+
+    def _city_strat_plots(self) -> torch.Tensor:
+        """[B, n_majors, RC] long — `routeRockefellerGold`'s count: each
         city's own plots within 3 rings of its centre carrying a strategic
-        resource row `viewer` sees, improved or not, a copy counting again
+        resource its owner sees, improved or not, a copy counting again
         (City_Resources 0x1f71b0)."""
         B, NM, RC = self.B, self.n_majors, self.RC
         out = torch.zeros(B, NM, RC, dtype=torch.long, device=self.device)
-        has = self._res_live() & (self.res_cat == 2) & ~self._res_hidden(viewer)
+        live = self._res_live() & (self.res_cat == 2)
         tix = torch.arange(self.T, device=self.device)
         for r in range(NM):
+            has = live & ~self._res_hidden(r)
             sl = self.city_slot_at(r)  # [B, T] owning column, -1 none
             slc = sl.clamp(min=0)
             ctr = self.city_center[:, r, :RC].gather(1, slc).clamp(min=0)    # [B, T]
@@ -9510,10 +9528,10 @@ class SimSeats:
             _spec_o = (_comp_o & self._is_specialty.reshape(1, 1, -1)).sum(dim=2).double()  # [B, cols]
             _rk_add(2, _tdm.unsqueeze(1) * _spec_o.gather(1, dest_j) * pd)
         # CIV6 (John Rockefeller): Gold per strategic plot at the destination
-        # (`routeDestStrategicPlots`)
+        # (`routeRockefellerGold`)
         _rkf = self._gp_perm(row, "strategicRouteGold").double()
         if bool(_rkf.count_nonzero()):
-            _kd = self._city_strat_plots(row)[:, row].double()
+            _kd = self._city_strat_plots()[:, row].double()
             _rk_add(2, _rkf.unsqueeze(1) * _kd.gather(1, dest_j) * pd)
         # CIV6 (EFFECT_ADJUST_TRADE_ROUTE_YIELD_FOR_DOMESTIC): the roster's
         # rows, the same shape the international leg pays
@@ -9637,6 +9655,11 @@ class SimSeats:
                     _lux_c = self._cs_lux_plots()[:, :S].gather(1, css)
                     _rk_add(2, _lux_c.double() * self._suz_dest_lux_gold
                             * _vc.double().unsqueeze(1) * pays_c.double())
+            # CIV6 (John Rockefeller): the international row, a city-state's
+            # city a foreign destination (`routeRockefellerGold`)
+            if bool(_rkf.count_nonzero()):
+                _ks_c = self._cs_strat_plots()[:, :S].gather(1, css)
+                _rk_add(2, _rkf.unsqueeze(1) * _ks_c.double() * pays_c.double())
         # INTERNATIONAL legs: a route to ANY OTHER MAJOR's city
         # (seat_route_dcity >= 0) pays District_TradeRouteYields' INTERNATIONAL
         # column over the dest's completed districts plus the centre row.
@@ -9732,7 +9755,7 @@ class SimSeats:
                 gold_i = gold_i + _fgd.gather(1, _rx).gather(2, _col).squeeze(2).double()
             if bool(_rkf.count_nonzero()):
                 _kall = torch.zeros(B, self.city_id.shape[1], RCw, dtype=torch.float64, device=self.device)
-                _ks = self._city_strat_plots(row).double()
+                _ks = self._city_strat_plots().double()
                 _kall[:, : _ks.shape[1], : _ks.shape[2]] = _ks
                 gold_i = gold_i + _rkf.unsqueeze(1) * _kall.gather(1, _rx).gather(2, _col).squeeze(2)
             # CIV6 (University of Sankore): "Other Civilizations' Trade Routes
@@ -13820,6 +13843,12 @@ class SimSeats:
             self._barb_reveal(rows[brb], dest.take(rows)[brb],
                               self._unit_sight(_bu, _bp),
                               see_through=self._sees_through(_bu, _bp))
+        # a Free Cities' mover's look meets the city-states it takes in
+        fre = srow == FREE_SEAT
+        if bool(fre.count_nonzero()):
+            _fu = u_type.take(rows)[fre]
+            _fp = u_promos.take(rows)[fre]
+            self._free_look(rows[fre], dest.take(rows)[fre], self._unit_sight(_fu, _fp), self._sees_through(_fu, _fp))
         major = srow < self.n_majors
         if bool(major.count_nonzero()):
             # the CHASSIS's own sight, not the default: `unitSight` is what TS
@@ -14566,6 +14595,9 @@ class SimSeats:
         brb = seat == BARB_SEAT
         if bool(brb.count_nonzero()):
             self._barb_reveal(rows[brb], tile[brb], self._unit_sight(u_type[brb], u_promos[brb]), see_through=thr[brb])
+        fre = seat == FREE_SEAT
+        if bool(fre.count_nonzero()):
+            self._free_look(rows[fre], tile[fre], self._unit_sight(u_type[fre], u_promos[fre]), thr[fre])
         major = (seat >= 0) & (seat < self.n_majors)
         if bool(major.count_nonzero()):
             self._reveal_around(rows[major], seat[major], tile[major], sight[major], see_through=thr[major],

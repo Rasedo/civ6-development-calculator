@@ -10480,3 +10480,37 @@ recruit's `dying` (gpu/core/sim_minorops.py).
   takes; the ObjectPairingManager (@0xf07400) pairing whose entry the command
   re-keys to the new unit (0x9297f0 -> 0x9293b0); whether the create raises the owner's
   knowledge signal (the engines record the new unit at the next look).
+
+## C-108: Rockefeller's route Gold and the Free Cities' meetings — READ (0x54c6c0's count functors, 0x556610, 0x524890 / 0x5249c0), both twins
+
+`routeRockefellerGold` (cpu/core/trade.ts) on every leg of `routeOriginYields`,
+a city-state's included; `minorLook` / `freeLook` (cpu/core/fog.ts) and
+`CityState.met`. GPU: `_city_strat_plots`, `_cs_strat_plots` and the
+city-state leg of `_seat_route_income` (sim_seats.py); `_minor_look`,
+`_free_look` and `citystate_met_free` (sim_masks.py).
+
+- THE COUNT FUNCTORS: Trade_Manager 0x54c6c0 resolves the origin and the
+  destination cities (0x57960 on each id) and builds its per-destination
+  count functors on the DESTINATION city (r14, at 0x54c840..0x54ca61); the
+  strategic one, 0x556610, is `City_Resources(city + 0x1e00, 0xc163880a)`
+  (0x1f71b0), whose visibility is the city's owner's (city +0x1b8 ->
+  +0x1320). John Rockefeller's _FOR_DOMESTIC / _FOR_INTERNATIONAL rows pay
+  Amount x that count, a city-state's city a foreign destination like a
+  major's: Gold 2 x the strategic plots within 3 rings of the destination's
+  centre that it owns and its owner sees.
+- Confirmed: runs/h1_duelz1124 Shenyang -> Bologna +2 Gold from t215, the
+  turn after China's Rockefeller (Bologna's one strategic plot), route
+  origin Gold 7.56 / 12.56 / 9.56 / 14.56 at t215-222 as recorded; Shanghai
+  -> Xi'an +2 Gold the same turn.
+- THE MEETS 0x524890 / 0x5249c0: a plot coming into view meets its owner, a
+  unit coming into view its owner, for every player's visibility with no
+  class gate beyond a living player other than the viewer: a city-state's
+  unit's look meets the Free Cities (a Free Cities' plot or unit in it), a
+  Free Cities' unit's look the city-states. The pair's meeting is recorded
+  on both sides (the Free Cities' met list, the minor's); `CityState.met`
+  holds FREE_SEAT, which `tradeMet` reads for a route between the two.
+  runs/c108_t225: Preslav (19), Mohenjo-Daro, Chinguetti, Singapore,
+  Ngazargamu and Zanzibar list the Free Cities met, Babylon, Valletta,
+  Lisbon and Armagh do not.
+- OPEN: the turn each of the lab's minors met the Free Cities (one record);
+  the five duelz games seat no Free City.

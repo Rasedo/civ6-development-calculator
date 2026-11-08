@@ -385,6 +385,8 @@ class SimInit:
         # `.metMinors`)
         self.citystate_trade_seat = (100 + torch.arange(s_pad, device=device)).unsqueeze(0).repeat(B, 1)
         self.citystate_met_minor = torch.zeros(B, s_pad, s_pad, dtype=torch.bool, device=device)
+        # has the minor met the Free Cities (`CityState.met` holding FREE_SEAT)
+        self.citystate_met_free = torch.zeros(B, s_pad, dtype=torch.bool, device=device)
         # the Free Cities' route value K (raw, `freeTradeValue`)
         self.free_trade_value = torch.zeros(B, dtype=torch.long, device=device)
         self.citystate_unit_values = torch.full((B, s_pad, len(rules.ai_city_build["units"])), -9999 * 256,
