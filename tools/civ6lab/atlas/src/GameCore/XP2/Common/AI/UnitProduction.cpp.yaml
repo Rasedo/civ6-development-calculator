@@ -172,6 +172,7 @@
     - cpu/core/aiValue.ts:playerUnits
     - gpu/core/sim_policy.py:_pol_unit_moves
     - cpu/core/minorOps.ts:minorMilitaryUpgrade
+    - cpu/core/aiValue.ts:AiValueView
   readings:
     - "C-96 / C-97: the unit value — READ (the combat, trade, explorer branches, the tail, the military AI's unit production), PARTLY READ (its inputs)"
     - "C-96: the AI's promotion choice (0x77ac30, 0x774970, 0x7b5d70) — READ, not ported"

@@ -508,6 +508,17 @@
           ]
         },
         {
+          "name": "barbEnemyCounts",
+          "compare": "exact",
+          "note": "the barbarians' knowledge base's enemy unit counts as their last ageing left them (`knowledgeLook` on `barbSeat.enemyCounts`; the row `BK`), (unit type, count) by unit type.",
+          "covers": [
+            "Seat.enemyCounts"
+          ],
+          "planes": [
+            "citystate_kb_enemy"
+          ]
+        },
+        {
           "name": "barbCampsKnown",
           "compare": "exact",
           "note": "the camps the barbarians' knowledge base holds, in its order (`barbCampsLook` on `barbSeat.campsKnown`).",
@@ -555,6 +566,17 @@
           ],
           "planes": [
             "citystate_kb_aged"
+          ]
+        },
+        {
+          "name": "freeEnemyCounts",
+          "compare": "exact",
+          "note": "the Free Cities' knowledge base's enemy unit counts as their last ageing left them (`knowledgeLook` on `freeSeat.enemyCounts`; the row `FK`), as barbEnemyCounts.",
+          "covers": [
+            "Seat.enemyCounts"
+          ],
+          "planes": [
+            "citystate_kb_enemy"
           ]
         },
         {
@@ -3019,6 +3041,17 @@
             "citystate_kb_aged"
           ],
           "note": "the turn the minor's knowledge base's army records last aged (`knowledgeLook`); -1 never"
+        },
+        {
+          "name": "minorEnemyCounts",
+          "compare": "exact",
+          "covers": [
+            "Seat.enemyCounts"
+          ],
+          "planes": [
+            "citystate_kb_enemy"
+          ],
+          "note": "the minor's knowledge base's enemy unit counts as its last ageing left them (`knowledgeLook`): per unit type the records of the units of the players at war with it, the barbarians left out, as (unit type, count) by unit type"
         },
         {
           "name": "minorRevealed",

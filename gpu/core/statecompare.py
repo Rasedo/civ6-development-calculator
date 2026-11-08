@@ -227,6 +227,12 @@ def _batch_rows(sim, tag: str, c: int, fn) -> list:
     return memo[key]
 
 
+def _enemy_counts(sim, b: int, r: int) -> list[int]:
+    """a knowledge base row's enemy unit counts as (unit index, count) pairs
+    by unit index, flat (`enemyCountsRecord`)"""
+    return [x for t, n in enumerate(sim.citystate_kb_enemy[b, r].tolist()) if n > 0 for x in (t, int(n))]
+
+
 def _wars_of(sim, b: int, seat: int) -> list[int]:
     row = sim.war[b, _seat_row(sim, seat)].tolist()
     return sorted(int(sim._ROW_SEAT[j]) for j, on in enumerate(row) if on)
@@ -463,6 +469,7 @@ GAME = {
             sim.citystate_kb_type[b, sim.BK].tolist(), sim.citystate_kb_seen[b, sim.BK].tolist(),
             sim.citystate_kb_plot[b, sim.BK].tolist(), sim.citystate_kb_damage[b, sim.BK].tolist(), sim.citystate_kb_form[b, sim.BK].tolist()) if k != -2) for x in r]],
     "barbArmyAged": lambda sim, b, rows: [int(sim.citystate_kb_aged[b, sim.BK])],
+    "barbEnemyCounts": lambda sim, b, rows: [_enemy_counts(sim, b, sim.BK)],
     "barbCampsKnown": lambda sim, b, rows: [[int(x) for x in sim.barb_camps_known[b].tolist() if x >= 0]],
     "freeUnitStrength": lambda sim, b, rows: [int(sim.citystate_unit_strength[b, sim.FR])],
     "freeArmyKnown": lambda sim, b, rows: [[x for r in sorted(
@@ -471,6 +478,7 @@ GAME = {
             sim.citystate_kb_type[b, sim.FK].tolist(), sim.citystate_kb_seen[b, sim.FK].tolist(),
             sim.citystate_kb_plot[b, sim.FK].tolist(), sim.citystate_kb_damage[b, sim.FK].tolist(), sim.citystate_kb_form[b, sim.FK].tolist()) if k != -2) for x in r]],
     "freeArmyAged": lambda sim, b, rows: [int(sim.citystate_kb_aged[b, sim.FK])],
+    "freeEnemyCounts": lambda sim, b, rows: [_enemy_counts(sim, b, sim.FK)],
     "freeCombatDesire": lambda sim, b, rows: [int(sim.citystate_combat_desire[b, sim.FR])],
     "freeTradeValue": lambda sim, b, rows: [int(sim.free_trade_value[b])],
     "freeOps": lambda sim, b, rows: [_minor_ops(sim, b, sim.FR)],
@@ -1071,6 +1079,7 @@ CITY_STATE = {
                                             for s in rows],
     "minorUnitStrength": lambda sim, b, rows: [int(sim.citystate_unit_strength[b, s]) for s in rows],
     "minorArmyAged": lambda sim, b, rows: [int(sim.citystate_kb_aged[b, s]) for s in rows],
+    "minorEnemyCounts": lambda sim, b, rows: [_enemy_counts(sim, b, s) for s in rows],
     "minorRevealed": lambda sim, b, rows: [[int(p) for p in sim.mops_revealed[b, s].nonzero(as_tuple=True)[0].tolist()]
                                            for s in rows],
     "minorSavings": lambda sim, b, rows: [[int(x) for x in sim.citystate_savings[b, s].tolist()] + [int(sim.citystate_balance[b, s]),

@@ -141,6 +141,8 @@ class SimPolicy:
         if m.get("attach"):
             self._pol_check_read(m["attach"], reads, owner, depth + 1)
         if eff in ("EFFECT_ATTACH_MODIFIER", "EFFECT_ATTACH_MODIFIER_TO_PLAYERTYPE", "EFFECT_GRANT_ABILITY"):
+            if self._strength_wrapper(m, reads):
+                return
             if m.get("collection") in reads["collections"] and self._pol_live_nested(m, reads):
                 raise NotImplementedError(f"{owner} {m.get('id')}: {eff} analysed in TS, not on the GPU")
             return
@@ -883,6 +885,65 @@ class SimPolicy:
         moves = torch.div(self._tac_full_now(pre), self._mp_scale, rounding_mode="floor")
         return own & (rank < 51), row, moves, rank
 
+    def _strength_wrapper(self, m: dict, reads: dict) -> bool:
+        """a wrapper over COLLECTION_PLAYER_UNITS whose nested modifiers are
+        EFFECT_ADJUST_PLAYER_STRENGTH_MODIFIER on COLLECTION_UNIT_COMBAT, their
+        kept requirements PLAYER_IS_ATTACKING (always met) or refusing
+        (`_strength_mod_value`); any other kept requirement refused here"""
+        if m.get("collection") != "COLLECTION_PLAYER_UNITS":
+            return False
+        eff = m.get("effect")
+        inner = list(m.get("ability") or []) if eff == "EFFECT_GRANT_ABILITY" else (
+            [m["attach"]] if eff in ("EFFECT_ATTACH_MODIFIER", "EFFECT_ATTACH_MODIFIER_TO_PLAYERTYPE") and m.get("attach") else [])
+        if not inner or not all(x.get("effect") == "EFFECT_ADJUST_PLAYER_STRENGTH_MODIFIER"
+                                and x.get("collection") == "COLLECTION_UNIT_COMBAT" for x in inner):
+            return False
+        for rs in [m.get("subjectReqs")] + [x.get("subjectReqs") for x in inner]:
+            for r in (rs or {}).get("reqs", []):
+                if r["type"] in reads["evaluators"] and r["type"] != "REQUIREMENT_PLAYER_IS_ATTACKING":
+                    raise NotImplementedError(f"modifier {m.get('id')}: requirement {r['type']} on a strength modifier's units")
+        return True
+
+    def _strength_mod_value(self, s: int, m: dict) -> torch.Tensor:
+        """[B] the whole value of a strength wrapper (`_strength_wrapper`) of
+        minor `s` (the Free Cities at `FR`): per unit of its first 51 in pool
+        order (`playerUnits`), the most over the enemy unit types its
+        knowledge base's last ageing counted (`citystate_kb_enemy`) of Combat
+        above 0 of min(10, trunc(count x max(0, Amount x
+        COMBAT_POWER_SCALING + the unit's combat strength (`_ai_combat`) -
+        the type's Combat))), float32 (0x6b2060); EFFECT_GRANT_ABILITY sums
+        its units' (0x6b5b30), EFFECT_ATTACH_MODIFIER takes its last
+        unit's (0x6ab630); a refused set 0"""
+        reads = self._cv_tables()["reads"]
+        B, dev = self.B, self.device
+        zero = torch.zeros(B, dtype=torch.long, device=dev)
+        if self._pol_refused(m.get("subjectReqs"), reads):
+            return zero
+        inner = list(m.get("ability") or []) if m.get("effect") == "EFFECT_GRANT_ABILITY" else [m["attach"]]
+        on, _row, _moves, rank = self._pol_units(s)
+        pre = "barb" if s == self.FR else "major"
+        cu = self._ai_combat(pre).to(torch.float32)
+        kb = self.FK if s == self.FR else s
+        cnt = self.citystate_kb_enemy[:, kb].to(torch.float32)
+        ck = self._type_combat.to(torch.float32)
+        live = (self.citystate_kb_enemy[:, kb] > 0) & (self._type_combat > 0).unsqueeze(0)
+        scale = torch.tensor(_f32(float(self.rules.civic_ai["combatPowerScaling"])), dtype=torch.float32, device=dev)
+        per = torch.zeros(on.shape, dtype=torch.long, device=dev)
+        for x in inner:
+            if self._pol_refused(x.get("subjectReqs"), reads):
+                continue
+            amount = torch.tensor(float(int(float((x.get("args") or {}).get("Amount", 0) or 0))), dtype=torch.float32, device=dev)
+            xx = ((amount * scale) + cu).unsqueeze(2) - ck.view(1, 1, -1)
+            xx = torch.clamp(xx, min=0.0)
+            v = torch.trunc(cnt.unsqueeze(1) * xx).long().clamp(max=10)
+            v = torch.where(live.unsqueeze(1), v, torch.zeros_like(v))
+            per = per + v.max(dim=2).values
+        per = torch.where(on, per, torch.zeros_like(per))
+        if m.get("effect") == "EFFECT_GRANT_ABILITY":
+            return per.sum(dim=1)
+        last = torch.where(on, rank, torch.full_like(rank, -1)).argmax(dim=1, keepdim=True)
+        return torch.where(on.any(dim=1), per.gather(1, last).squeeze(1), zero)
+
     def _pol_unit_moves(self, ctx: dict, amount: int, h: int) -> torch.Tensor:
         """EFFECT_ADJUST_UNIT_FRIENDLY_TERRITORY_START_MOVEMENT (0x6ac440) over
         the minor's units: per unit with Movement, fx(Amount) x its type's
@@ -956,6 +1017,8 @@ class SimPolicy:
         reads = self._cv_tables()["reads"]
         zero = torch.zeros(ctx["B"], dtype=torch.long, device=ctx["dev"])
         eff = m.get("effect")
+        if self._strength_wrapper(m, reads):
+            return self._strength_mod_value(ctx["s"], m)
         if eff not in reads["analyzers"] or eff in ("EFFECT_ATTACH_MODIFIER", "EFFECT_ATTACH_MODIFIER_TO_PLAYERTYPE", "EFFECT_GRANT_ABILITY"):
             return zero
         if m.get("collection") not in reads["collections"] or self._pol_refused(m.get("subjectReqs"), reads):

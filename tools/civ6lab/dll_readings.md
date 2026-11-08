@@ -8226,3 +8226,61 @@ GPU `_tac_search`'s `stack_n` in `price6` and its `halt`
   engines too without the +1e6): their 13-turn path to 4:19 turns off 16:18 / 15:19,
   where the rampaging Crossbowmen 94 / 99 stand in the engines' state; the
   game's units there at that moment are unread.
+
+## C-130 / C-98: the Archaeologist's value, the strength modifier's analysis, the knowledge base's enemy unit counts — READ (0x7b62c0 at 0x7b6a8c, 0x27fcf0, 0x6b2060, 0x69ed80, 0x5eab80, 0xbe4aa0), both twins
+
+`unitValue`'s PSEUDOYIELD_UNIT_ARCHAEOLOGIST branch, `worldArtifacts`,
+`CityBuildFacts.artifacts` (cpu/core/aiCityBuild.ts, minorBuild.ts,
+freeCityBuild.ts); `ANALYZERS.EFFECT_ADJUST_PLAYER_STRENGTH_MODIFIER`,
+`SETS`, `subjects`' COLLECTION_UNIT_COMBAT, `EVALUATORS.
+REQUIREMENT_PLAYER_IS_ATTACKING` (cpu/core/aiModifiers.ts);
+`AiValueView.enemyUnitCounts`, `playerUnits`' combat (aiView.ts);
+`knowledgeLook`'s `Seat.enemyCounts` (tactical.ts). GPU `_cv_unit`'s
+ARCHAEOLOGIST branch and `_MinorFacts.artifacts` (sim_cityvalue.py),
+`_strength_wrapper` / `_strength_mod_value` (sim_policy.py, read by
+`_pol_mod_value` and `_cv_analysis`), `_knowledge_look`'s
+`citystate_kb_enemy` (sim_minors.py).
+
+- THE ARCHAEOLOGIST (0x7b62c0 at 0x7b6a8c..0x7b6b70): v = min(n, 10) x (1 +
+  the eras' points 0x2c3f30 (the eras record's +0x68 for the player, none
+  for a player outside it: a city-state, the Free Cities) as
+  PSEUDOYIELD_GOLDENAGE_POINT); n the entries of the artifact list
+  (0x27fcf0's component +0x108, 0x27fe80; 28 bytes each, a plot's x / y at
+  +4 / +8, found by plot in 0x280010), read as the dig sites on the map
+  (antiquity sites and shipwrecks). Then the value's tail (copies,
+  promotion weight, PSEUDOYIELD_UNIT_ARCHAEOLOGIST, Maintenance, PV(H) -
+  PV(T)). A civic's unit term reads it (Natural History).
+- Confirmed (one-seed aimem trace t170-t194): runs/h1_duely1128 Bologna's
+  Natural History (and the five civics past it, which carry its score):
+  the table's Archaeologist 16.2 / 24.2 / 24.5 / 34.0 / 129.1 / 140.8 /
+  247.9 at T 48 / 47 / 46 / 45 / 33 / 31 / 23 over the base 359.6 / 480.3
+  — 396.0 at t180, 504.4 / 504.8 / 514.2 / 609.4 at t181-t184, 621.0 at
+  t186-t187, 728.1 at t192 as logged; 0 on the turns its table holds it at
+  FX(-9999) (t185, t188-t191: 480.3).
+- THE STRENGTH MODIFIER (0x6b2060, Amount +8 whole): on the context's unit
+  (+0x90) and the unit type COLLECTION_UNIT_COMBAT stands on (+0x5c, its
+  count +8) of Combat (Units +0x48) above 0, x = Amount x
+  COMBAT_POWER_SCALING (gp +0x210, 0.04) + GetCombat(unit, 0) - that
+  Combat, float, 0 below 0; trunc(count x x) at most 10; +0xc0 = max(+0xc0,
+  it). EFFECT_GRANT_ABILITY on COLLECTION_PLAYER_UNITS (0x6b5b30) sums it
+  over the player's units (at most 51); EFFECT_ATTACH_MODIFIER (the
+  Foreign Ministry's) takes its last unit's.
+- COLLECTION_UNIT_COMBAT (0x69ed80): in the Units' order each type whose
+  knowledge base count +0x618 is not 0. +0x618 (0x5eab80, run by the
+  ageing 0x5ebb30): per type the counts the knowledge base keeps of the
+  players of the game's list (+0xfa0) at war with the player, the player
+  left out — the barbarians not among them. The policy jobs run before the
+  turn's ageing and read the last one's.
+- REQUIREMENT_PLAYER_IS_ATTACKING (@f04430, vtable 0xd67640; its evaluate,
+  slot 1, 0xbe4aa0 `mov al, 1`): met in every analysis.
+- Confirmed (one-seed aimem trace t196-t240): runs/h1_duely1128 Bologna's
+  Religious Orders: unlogged t203-t208 while its knowledge base knows the
+  barbarians' Ranger and Pike and Shot alone; player 0's Warrior seen at
+  t207, counted at the t208 ageing, the card 10 (its Infantry) from t209 as
+  logged. Totalitarianism (Fascism's FASCISM_ATTACK 10) 763.9 at t210,
+  1197.5 at t212 and t214-t216 as logged.
+- Open (C-130): the artifact list's entries the dig sites stand for (an
+  excavated site's entry, the sites a major's civic lays in its own turn:
+  runs/h1_duely1128 t177 and 1124 t167 the game's minors value the
+  Archaeologist on sites the replay imports a record later); 0x5eab80's
+  list +0xfa0 read as every player but the barbarians.

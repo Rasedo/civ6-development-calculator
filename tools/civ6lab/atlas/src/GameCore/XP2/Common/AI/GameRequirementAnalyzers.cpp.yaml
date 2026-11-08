@@ -346,3 +346,16 @@
   context:
     - "...) of at least Amount citizens (+0x588). REQUIREMENT_CITY_HAS_HIGH_ADJACENCY_ DISTRICT 0x6d4860 (DistrictType +8, YieldType +0xc, Amount +0x10): the context's city's district of the t..."
   review: reviewed
+- addr: 0xd67640
+  kind: global
+  name: REQUIREMENT_PLAYER_IS_ATTACKING's vtable
+  semantics: "the vtable of REQUIREMENT_PLAYER_IS_ATTACKING's registry object @f04430 (0x6cc680); its evaluate (slot 1) 0xbe4aa0, `mov al, 1`"
+  status: READ
+  cases:
+    - recording: h1_duely1128
+      turn: 210
+      value: Fascism's FASCISM_ATTACK_BUFF (its set PLAYER_IS_ATTACKING) counts 10, Totalitarianism 763.9 as logged
+  impl: [cpu/core/aiModifiers.ts:EVALUATORS]
+  readings:
+    - "C-130 / C-98: the Archaeologist's value, the strength modifier's analysis, the knowledge base's enemy unit counts — READ (0x7b62c0 at 0x7b6a8c, 0x27fcf0, 0x6b2060, 0x69ed80, 0x5eab80, 0xbe4aa0), both twins"
+  review: reviewed

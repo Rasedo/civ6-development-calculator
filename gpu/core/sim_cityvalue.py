@@ -23,6 +23,8 @@ _NUCLEAR_OWN = 250
 _NUCLEAR_SPREAD = 1000
 _SLOT_SLUSH, _SLOT_UNITS, _SLOT_PLOTS, _SLOT_GREAT_PEOPLE = 0, 1, 2, 3
 _COMBAT_PSEUDO = ("PSEUDOYIELD_UNIT_COMBAT", "PSEUDOYIELD_UNIT_NAVAL_COMBAT", "PSEUDOYIELD_UNIT_AIR_COMBAT")
+# the artifacts an Archaeologist's value counts at most (0x7b6a98)
+_ARCHAEOLOGIST_ARTIFACTS_CAP = 10
 _PLOTS_CAP = 150 * _FX
 
 
@@ -873,6 +875,12 @@ class SimCityValue:
             if f.full_civ():
                 read = read & False
             v = torch.full_like(like, _FX)
+        elif pseudo == "PSEUDOYIELD_UNIT_ARCHAEOLOGIST":
+            # the world's artifacts, at most 10, times 1 + the eras' points
+            # as PSEUDOYIELD_GOLDENAGE_POINT, none outside the eras record
+            if f.full_civ():
+                read = read & False
+            v = _t(f.artifacts(), like) * _FX
         elif pseudo == "PSEUDOYIELD_UNIT_RELIGIOUS":
             # its religious term counts only in a city of the player's own
             # founded religion (0x4681c0 +0x1c0), which a city-state and the
@@ -1391,7 +1399,7 @@ class SimCityValue:
         on which the analyzers here read nothing — its subjects are not
         walked; refuse one the TS analyses to something on a unit (a nested
         modifier analysed on its own collection, any)"""
-        if depth >= 4:
+        if depth >= 4 or self._strength_wrapper(m, reads):
             return
         eff = m.get("effect")
         if eff in reads["analyzers"] and eff not in self._CV_WRAPPERS and (nested or eff not in self._CV_UNIT_ZERO):
@@ -1645,6 +1653,8 @@ class SimCityValue:
         if depth >= 4:
             return None
         like = f.like()
+        if self._strength_wrapper(m, reads):
+            return self._strength_mod_value(f.s, m)
         subs = self._cv_subjects(f, m.get("collection"), nocity)
         eff = m.get("effect")
 
@@ -2063,6 +2073,12 @@ class _MinorFacts:
 
     def handicap(self):
         return 0
+
+    def artifacts(self):
+        """`worldArtifacts`: the dig sites on the map (antiquity sites and
+        shipwrecks), at most 10, [B]"""
+        sim = self.sim
+        return self._get("artifacts", lambda: torch.clamp((sim.antiquity | sim.shipwreck).sum(dim=1), max=_ARCHAEOLOGIST_ARTIFACTS_CAP))
 
     def value_horizon(self):
         return self.T["horizon"]

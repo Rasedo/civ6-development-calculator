@@ -7728,16 +7728,20 @@
 - addr: 0xbe4aa0
   final: 0x9b1040
   kind: function
-  semantics: "an analyzer's slot 2 (no subject passed): nothing."
-  status: PARTLY
+  semantics: "`mov al, 1; ret`: an analyzer's slot 2 (no subject passed): nothing; REQUIREMENT_PLAYER_IS_ATTACKING's evaluate (@f04430, vtable 0xd67640 slot 1): met in every analysis"
+  status: READ
   cases:
+    - recording: h1_duely1128
+      turn: 210
+      value: Fascism's FASCISM_ATTACK_BUFF (its set PLAYER_IS_ATTACKING) counts 10, Totalitarianism 763.9 as logged
     - recording: h1_duelw1124
       turn: 2
       value: "EFFECT_ATTACH_MODIFIER 0x6ab630   analyses its attached modifier (parser 0x6ab400: ModifierId) in a copy of   the context (0x142650) on the subject and SETS +0xc0 to that analysis's   total — an attac"
-  impl: [cpu/core/aiModifiers.ts:NONE_ANALYZERS]
+  impl: [cpu/core/aiModifiers.ts:NONE_ANALYZERS, cpu/core/aiModifiers.ts:EVALUATORS]
   readings:
     - "C-97: the religion AI — the belief scores READ (the job, the value, the analysis's attach), the picks READ, the analyzers PARTLY READ"
     - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
+    - "C-130 / C-98: the Archaeologist's value, the strength modifier's analysis, the knowledge base's enemy unit counts — READ (0x7b62c0 at 0x7b6a8c, 0x27fcf0, 0x6b2060, 0x69ed80, 0x5eab80, 0xbe4aa0), both twins"
   context:
     - ...adds each ability modifier's analysis. Where no subject passes, the analyzer's slot 2 (0xbe4aa0, nothing, but for EFFECT_ADJUST_DISTRICT_GREAT_PERSON_POINTS 0x6a4750).
   review: reviewed

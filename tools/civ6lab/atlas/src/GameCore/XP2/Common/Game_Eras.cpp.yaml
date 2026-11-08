@@ -133,6 +133,22 @@
   context:
     - ...erms through 0x7a60d0 (PSEUDOYIELD_GOLDENAGE_POINT from 0x2c40b0, 0x2c4350 for Science, 0x2c3ed0, 0x2c4290 for a prerequisite of era 5 or later); then a second yields pass (0x18e570),...
   review: imported
+- addr: 0x2c3f30
+  final: 0x1e5b10
+  kind: function
+  semantics: "the eras record's +0x68 for a player (its per-player vector +0x5b8, 0x78-byte entries, 0x2baf70), 0 for -1 or a player past the vector: the Archaeologist's golden-age points; a city-state and the Free Cities hold none"
+  status: READ
+  cases:
+    - recording: h1_duely1128
+      turn: 184
+      value: Bologna's Archaeologist at 10 artifacts x 1.0 (no points), 129.1 at T 33 as Natural History's 609.4 logs
+  impl:
+    - cpu/core/aiCityBuild.ts:unitValue
+    - gpu/core/sim_cityvalue.py:_cv_unit
+    - cpu/core/aiCityBuild.ts:v
+  readings:
+    - "C-130 / C-98: the Archaeologist's value, the strength modifier's analysis, the knowledge base's enemy unit counts — READ (0x7b62c0 at 0x7b6a8c, 0x27fcf0, 0x6b2060, 0x69ed80, 0x5eab80, 0xbe4aa0), both twins"
+  review: reviewed
 - addr: 0x2c40b0
   final: 0x1e5c50
   kind: function

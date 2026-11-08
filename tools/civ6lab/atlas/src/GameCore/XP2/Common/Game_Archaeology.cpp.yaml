@@ -26,6 +26,31 @@
   context:
     - "...7 t217's three draws over 35, 44 and 9 are n = 7, 8 and 3. The caller: Game_Archaeology 0x27f640 lays a kind's dig sites once a game (RESOURCE_ANTIQUITY_SITE / RESOURCE_SHIPWRECK, a do..."
   review: reviewed
+- addr: 0x27fcf0
+  final: 0x1b47c0
+  kind: function
+  semantics: "the Game_Archaeology component: the game instance's (0x91e4a0) component array (+8, 0x120-byte entries) at the index 0x280880 registered (@f01a20), its first qword; its +0x108 the artifact list (28-byte entries, a plot's x / y at +4 / +8)"
+  status: READ
+  cases:
+    - recording: h1_duely1128
+      turn: 184
+      value: "Bologna's Archaeologist value on 10 artifacts (12 dig sites): 129.1 at T 33, Natural History 609.4 as logged"
+  impl: [cpu/core/aiCityBuild.ts:worldArtifacts, gpu/core/sim_cityvalue.py:artifacts]
+  readings:
+    - "C-130 / C-98: the Archaeologist's value, the strength modifier's analysis, the knowledge base's enemy unit counts — READ (0x7b62c0 at 0x7b6a8c, 0x27fcf0, 0x6b2060, 0x69ed80, 0x5eab80, 0xbe4aa0), both twins"
+  review: reviewed
+- addr: 0x27fe80
+  final: 0x1b4950
+  kind: function
+  semantics: "`lea rax, [rcx + 0x108]; ret`: a component's +0x108 vector — the artifact list of Game_Archaeology (0x27fcf0), the history's list of 0x2ffe80's (96-byte entries)"
+  status: READ
+  cases:
+    - recording: h1_duely1128
+      turn: 184
+      value: the artifact list Bologna's Archaeologist value counts (Natural History 609.4 as logged)
+  readings:
+    - "C-130 / C-98: the Archaeologist's value, the strength modifier's analysis, the knowledge base's enemy unit counts — READ (0x7b62c0 at 0x7b6a8c, 0x27fcf0, 0x6b2060, 0x69ed80, 0x5eab80, 0xbe4aa0), both twins"
+  review: reviewed
 - addr: 0x27fe90
   final: 0x1b4960
   kind: function
@@ -44,6 +69,18 @@
   readings: ["H-1: a city's name, a citizen's name — READ"]
   context:
     - "...only for a site with none (the js at 0x280664 → 0x280752; n from the era of a player 0x27fe90 names). 1117 t217: four Shipwrecks laid, three draws. The history is in no record: the..."
+  review: reviewed
+- addr: 0x280010
+  final: 0x1b4a60
+  kind: function
+  semantics: "the artifact list's entry at a plot: the plot index split by the map width (the global's +0x28) into x / y, the first of the list (+0x108, 28 bytes each) whose +4 / +8 match; -1 none"
+  status: READ
+  cases:
+    - recording: h1_duely1128
+      turn: 184
+      value: the list Bologna's Archaeologist value counts, one entry per dig site (Natural History 609.4 as logged)
+  readings:
+    - "C-130 / C-98: the Archaeologist's value, the strength modifier's analysis, the knowledge base's enemy unit counts — READ (0x7b62c0 at 0x7b6a8c, 0x27fcf0, 0x6b2060, 0x69ed80, 0x5eab80, 0xbe4aa0), both twins"
   review: reviewed
 - addr: 0x280140
   final: 0x1b4b20

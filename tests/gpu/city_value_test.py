@@ -441,6 +441,9 @@ class City:
     def tribe(self):
         return False
 
+    def artifacts(self):
+        return 0
+
     def unit_count(self):
         return self.o["units"]
 

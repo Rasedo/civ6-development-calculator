@@ -1162,10 +1162,24 @@ export const ARMY_RECORD_AGE = 21;
  * barbarian Scout at age 1 at t7 that its Warrior's t6 move brought into
  * view.
  */
-export function knowledgeLook(state: GameState, holder: { armyKnown?: ArmyRecord[]; armyAged?: number }, seat: number,
-  sight: ArrayLike<number>, age: boolean): void {
+export function knowledgeLook(state: GameState, holder: { armyKnown?: ArmyRecord[]; armyAged?: number; enemyCounts?: Record<string, number> },
+  seat: number, sight: ArrayLike<number>, age: boolean): void {
   const kept = (holder.armyKnown ?? []).filter((r) => !age || state.turn - r.seen <= ARMY_RECORD_AGE);
-  if (age) holder.armyAged = state.turn;
+  if (age) {
+    holder.armyAged = state.turn;
+    // the ageing's enemy unit counts (0x5eab80): the players of the game's
+    // list (no barbarian) at war with the seat (runs/h1_duely1128 Bologna
+    // t203-t208: the barbarian Ranger and Pike and Shot it knows count
+    // nothing, its Religious Orders unlogged; player 0's Warrior seen at
+    // t207 counts from the t208 ageing, the card 10 from t209 as logged)
+    const n: Record<string, number> = {};
+    for (const r of kept) {
+      if (r.owner === seat || isBarbSeat(r.owner) || !civsAtWar(state, seat, r.owner)) continue;
+      n[r.type] = (n[r.type] ?? 0) + 1;
+    }
+    if (Object.keys(n).length) holder.enemyCounts = n;
+    else delete holder.enemyCounts;
+  }
   // the look (Targets.cpp 0x7877e0) walks each plot's units of the map's
   // layer 0 (0x75800): a Trader and a religious unit are none of them (no
   // AI_Knowledge.csv ARMY line on runs/h1_duelw1117-1128 names a

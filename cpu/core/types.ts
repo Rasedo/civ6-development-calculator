@@ -899,6 +899,11 @@ export interface Seat {
   /** the turn the records last aged (`knowledgeLook` with its ageing): a
    *  record's age is this less the turn it was last seen */
   armyAged?: number;
+  /** THE KNOWLEDGE BASE'S ENEMY UNIT COUNTS (+0x618, 0x5eab80 at the
+   *  ageing 0x5ebb30): by unit type the records the ageing kept of
+   *  the units of the players at war with the seat, the barbarians and the
+   *  seat itself left out. Absent = none. */
+  enemyCounts?: Record<string, number>;
   /** a city-state's records by install unit type as the turn's look ages
    *  them, before its sightings add any: the unit production table its city
    *  AI's turn reads (`minorKnownUnits`); absent outside that turn */

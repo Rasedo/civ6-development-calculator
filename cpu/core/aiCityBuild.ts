@@ -37,6 +37,7 @@ import { AI_VALUE_HORIZON } from '../data/aiValue';
 import { FX, FX_MIN, fdiv, fmul, fxConst, fxOf, presentValue, pseudoYieldValue, traderValue, valueBetween, yieldValue, AI_RATE, type AiValueView } from './aiValue';
 import type { UnitProductionEntry } from './aiUnitProduction';
 import type { CityStats } from './city';
+import type { GameState } from './types';
 import { AMENITY_TIERS, amenityTier, growthFoodNeeded, housingGrowthFactor } from '../data/constants';
 import { AI_YIELD_DEFAULT } from '../data/aiTables';
 import { modifiersValue, type AiModifier } from './aiModifiers';
@@ -262,7 +263,24 @@ export interface CityBuildFacts {
   resourceAccess(resource: string): boolean;
   /** the player's handicap index (player +0x908) */
   handicap: number;
+  /** the world's artifacts an Archaeologist's value counts (`worldArtifacts`) */
+  artifacts: number;
 }
+
+/** THE WORLD'S ARTIFACTS as the Archaeologist's value counts them: the
+ *  artifact list's entries (0x27fcf0's +0x108, 56 bytes each), at most 10;
+ *  read as the dig sites on the map (antiquity sites and shipwrecks) */
+export function worldArtifacts(state: GameState): number {
+  let n = 0;
+  for (const t of state.map.tiles) {
+    if (t.antiquity || t.shipwreck) n += 1;
+    if (n >= ARCHAEOLOGIST_ARTIFACTS_CAP) break;
+  }
+  return n;
+}
+
+/** the artifacts an Archaeologist's value counts at most (0x7b6a98) */
+const ARCHAEOLOGIST_ARTIFACTS_CAP = 10;
 
 /** 0x7b62c0's exits, A UNIT VALUED AT FX(-9999): at or past the horizon;
  *  not the player's version of it; a player that is neither a full
@@ -674,6 +692,13 @@ export function unitValue(f: CityBuildFacts, u: AiUnitRow, t: number, h = AI_VAL
     // the eras record (a city-state)
     if (f.fullCiv) return null;
     v = FX;
+  } else if (pseudo === 'PSEUDOYIELD_UNIT_ARCHAEOLOGIST') {
+    // the world's artifacts, at most 10, times 1 + the eras' points
+    // (0x2c3f30) as PSEUDOYIELD_GOLDENAGE_POINT, which a player outside the
+    // eras record (a city-state, the Free Cities) holds none of
+    // (0x7b6a8c..0x7b6b70)
+    if (f.fullCiv) return null;
+    v = f.artifacts * FX;
   } else if (pseudo === 'PSEUDOYIELD_UNIT_RELIGIOUS') {
     // its religious term (ReligiousStrength x 0.01 by its charges, x the
     // eras' points) counts only in a city of the player's own founded

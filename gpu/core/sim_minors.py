@@ -264,6 +264,19 @@ class SimMinors:
                 slot[drop] = -2
                 for q in (owner, typ, seen_t, plot, seq):
                     q[drop] = -1
+            # the ageing's enemy unit counts (0x5eab80): the records the
+            # ageing kept of the units of the players at war with the seat,
+            # the barbarians and the seat itself left out
+            o = owner.long()
+            orow = self._seat_row.take(o.clamp(min=0, max=self._seat_row.numel() - 1))
+            srow = int(self._seat_row[seat])
+            war = self.war[:, srow].gather(1, orow)
+            on = (slot != -2) & (o >= 0) & (o != seat) & (o != BARB_SEAT) & war & alive.unsqueeze(1)
+            cnt = torch.zeros(B, self.NU + 1, dtype=torch.long, device=dev)
+            t_ix = torch.where(on, typ.long().clamp(min=0, max=self.NU - 1), torch.full_like(o, self.NU))
+            cnt.scatter_add_(1, t_ix, on.long())
+            self.citystate_kb_enemy[:, r] = torch.where(alive.unsqueeze(1), cnt[:, :self.NU].to(self.citystate_kb_enemy.dtype),
+                                                        self.citystate_kb_enemy[:, r])
         tile = self.unit_tile.clamp(min=0)
         vis = self.unit_alive & (self.unit_tile >= 0) & sight.gather(1, tile) & alive.unsqueeze(1)
         if self._stealth_live:

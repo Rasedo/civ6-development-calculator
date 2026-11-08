@@ -75,10 +75,20 @@
 - addr: 0x5eab80
   kind: function
   name: the knowledge base's enemy unit counts
-  semantics: per unit type, +0x618[type] = the sum of the type's counts the knowledge base keeps for each player of the game's list at war with the player (IsAtWarWith), the player itself left out
-  status: PARTLY
+  semantics: per unit type, +0x618[type] = the sum of the type's counts the knowledge base keeps (its per-player vectors, 24-byte entries, the count at +0x10) for each player of the game's list (+0xfa0) at war with the player (IsAtWarWith), the player itself left out; run by the ageing 0x5ebb30. The barbarians are not counted (read as not on the list).
+  status: READ
+  cases:
+    - recording: h1_duely1128
+      turn: 208
+      value: Bologna's barbarian Ranger and Pike and Shot count nothing (Religious Orders unlogged t203-t208); player 0's Warrior seen t207 counts from the t208 ageing (the card 10 from t209)
+  impl:
+    - cpu/core/tactical.ts:knowledgeLook
+    - gpu/core/sim_minors.py:_knowledge_look
+    - cpu/core/tactical.ts:kept
+    - cpu/core/types.ts:Seat
   readings:
     - "H-1: the civics AI — READ (the choice, the walk, the propagation), PARTLY READ (the value)"
+    - "C-130 / C-98: the Archaeologist's value, the strength modifier's analysis, the knowledge base's enemy unit counts — READ (0x7b62c0 at 0x7b6a8c, 0x27fcf0, 0x6b2060, 0x69ed80, 0x5eab80, 0xbe4aa0), both twins"
   review: reviewed
 - addr: 0x5eadb0
   kind: function
@@ -283,6 +293,7 @@
     - cpu/core/tactical.ts:ARMY_RECORD_AGE
     - cpu/core/tactical.ts:knowledgeLook
     - cpu/core/operations/knowledge.ts:lookCamps
+    - cpu/core/types.ts:Seat
   readings:
     - "C-97: the AI's knowledge of the map's cities — READ (the record, the update, the statistics, the advantage), PARTLY READ (the city AI's stored yields)"
     - "C-96: the knowledge base's army records and the Combat Desire — READ (the records, the update, the desire), PARTLY READ (the signals' looks, the standing-army count)"
@@ -291,6 +302,7 @@
     - "C-96: the trade AI's route value — READ (0x5e9b20, 0x78f210, 0x78e010, 0x559140's use), PARTLY READ (0x526330's terms, the knowledge base's city order)"
     - "C-95: the barbarians' Builder Capture — READ (the event, the start, the tree's walk), ported"
     - "C-97: the AI's knowledge of the map's cities"
+    - "C-130 / C-98: the Archaeologist's value, the strength modifier's analysis, the knowledge base's enemy unit counts — READ (0x7b62c0 at 0x7b6a8c, 0x27fcf0, 0x6b2060, 0x69ed80, 0x5eab80, 0xbe4aa0), both twins"
   context:
     - "- The update (0x5ebb30): every entry ages; one whose plot the player sees with no city of its owner there is d..."
   review: reviewed

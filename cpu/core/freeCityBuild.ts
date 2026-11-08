@@ -22,7 +22,7 @@ import { engineId } from '../data/aliases';
 import { RESOURCES } from '../../world/resources';
 import { hasRiver } from '../../world/query';
 import { hexDistance, tilesWithin } from '../../world/hex';
-import { AI_BUILDING_INDEX, AI_UNIT_INDEX, amenityCityOf, growthForecast, type AmenityCity, type CityBuildFacts } from './aiCityBuild';
+import { AI_BUILDING_INDEX, AI_UNIT_INDEX, amenityCityOf, growthForecast, worldArtifacts, type AmenityCity, type CityBuildFacts } from './aiCityBuild';
 import { FX, fmul, fxOf, turnsAt } from './aiValue';
 import { unitProductionTable } from './aiUnitProduction';
 import { researchAnalysis } from './aiResearch';
@@ -227,6 +227,7 @@ function majorBuildFacts(state: GameState, city: City, known: (unit: string) => 
         .some((t) => t.resource === id));
     },
     handicap: handicapOf(state, seat),
+    artifacts: worldArtifacts(state),
     growth,
     forecast: growthForecast(growth),
     current: majorItemType(city.queue[0]),

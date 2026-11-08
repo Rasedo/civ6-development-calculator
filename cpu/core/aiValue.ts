@@ -256,8 +256,12 @@ export interface AiValueView {
   /** a unit at the head of the city's build queue (0x179860 on city +0x2170) */
   cityTrainingUnit(seat: number, cityId: number): boolean;
   /** the seat's units in its list's order, their plot, UnitType, whole
-   *  Movement (0x56e130) and level (the unit's experience +0x1bc0, its +0x10) */
-  playerUnits(seat: number): readonly { plot: number; type: string; moves: number; level: number }[];
+   *  Movement (0x56e130), level (the unit's experience +0x1bc0, its +0x10)
+   *  and combat strength as the AI reads it (0x56dc90 with 0, `aiStrengths`) */
+  playerUnits(seat: number): readonly { plot: number; type: string; moves: number; level: number; combat: number }[];
+  /** the knowledge base's enemy unit counts as its last ageing left them
+   *  (`Seat.enemyCounts`, +0x618), by UnitType */
+  enemyUnitCounts(seat: number): ReadonlyMap<string, number>;
   /** the military AI's unit production value of a UnitType (0x79ca90: its
    *  table entry's +0x160, 0 none) */
   unitProductionValue(seat: number, unitType: string): number;

@@ -1340,7 +1340,7 @@ _MUTABLE = [
     "mops_size", "mops_pick", "mops_pick_target", "mops_pick_rally", "mops_camps", "barb_camps_known", "mops_revealed",
     "mops_enemy",
     "mops_upg", "mops_upg_on", "mops_upg_trig",  # its "Upgrade Units" trees: their units, running, the trigger
-    "citystate_kb_seq", "citystate_kb_next", "citystate_kb_aged",  # the records' order, the last ageing
+    "citystate_kb_seq", "citystate_kb_next", "citystate_kb_aged", "citystate_kb_enemy",  # the records' order, the last ageing, its enemy counts
     "citystate_build_proj",  # the unfinished district project the minor's last step worked on
     "citystate_repair_wait",  # a pillaged building's repair waits for the minor's item in hand
     "city_free_grant",  # a Free City's count of turns toward its next grant

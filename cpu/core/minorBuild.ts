@@ -68,7 +68,7 @@ import { AI_VALUE_HORIZON } from '../data/aiValue';
 import { TECH_IMPROVEMENT_RESOURCES, resourceValue, type ResourceFacts } from './aiResource';
 import { RESOURCES, extractsResource } from '../../world/resources';
 import { unitProductionTable } from './aiUnitProduction';
-import { AI_BUILDING_INDEX, AI_UNIT_INDEX, amenityCityOf, amenityPerTurn, buildingTable, buildingValue, constructibleNow, defaultSpecialization, growthForecast, specializationBests, unitTable, type AiUnitRow, type CityBuildFacts, type CityGrowth, type CityBuildTables, type PickFacts } from './aiCityBuild';
+import { AI_BUILDING_INDEX, AI_UNIT_INDEX, amenityCityOf, amenityPerTurn, buildingTable, buildingValue, constructibleNow, defaultSpecialization, growthForecast, specializationBests, unitTable, worldArtifacts, type AiUnitRow, type CityBuildFacts, type CityGrowth, type CityBuildTables, type PickFacts } from './aiCityBuild';
 import { defensiveCancel } from './aiCityTrees';
 import { projectTable, type ProjectTableFacts } from './aiProjectValue';
 import { accrueStockpiles, canPayStockpile, capStockpiles, chargeUnitUpkeep, spendStockpile, stockFree, stockOf, stockpileCap, stockpileIncome, strategicSlot, unitResourceCost, unitUpkeepBill, upgradeGoldCost, upgradeType } from './stockpile';
@@ -1740,6 +1740,7 @@ export function minorBuildFacts(state: GameState, cityState: CityState, known: (
       return state.map.tiles.some((t) => t.resource === id && tileSeat(t) === cityState.seat && extractsResource(t));
     },
     handicap: 0,
+    artifacts: worldArtifacts(state),
     growth: minorCityGrowth(state, cityState),
     // the forecast of its city's update between the turn's production and
     // its growth (`CityState.aiGrowth`); a city founded this turn, its own

@@ -92,7 +92,7 @@ export interface ValueTerms {
   /** the unit the evaluation stands on (context +0x90): the subject of a
    *  COLLECTION_PLAYER_UNITS walk, kept through a granted ability's own
    *  modifiers; absent, none */
-  unit?: { plot: number; type: string; moves: number; level: number };
+  unit?: { plot: number; type: string; moves: number; level: number; combat: number };
   /** a resolution's target hint (0x67dd40's handlers), in the install's
    *  types: the luxury (+0x4c), the yield (+0x64), the government (+0x28),
    *  the great person class (+0x6c), the project (+0x68) */
@@ -123,7 +123,8 @@ type Subject =
   | { kind: 'nocity' }
   | { kind: 'district'; cityId: number; type: string }
   | { kind: 'plot'; plot: AiPlotView }
-  | { kind: 'unit'; plot: number; type: string; moves: number; level: number };
+  | { kind: 'unit'; plot: number; type: string; moves: number; level: number; combat: number }
+  | { kind: 'unitType'; type: string; count: number };
 
 /** the subjects COLLECTION_PLAYER_CITIES' walk gives at least (0x69ea00's
  *  +0xd4 against 5) */
@@ -171,7 +172,13 @@ function subjects(t: ValueTerms, collection: string): Subject[] | null {
     // context's other player (+0x40)
     case 'COLLECTION_MAJOR_PLAYERS': return t.view.majors().map((m) => ({ kind: 'player', other: m }));
     // the player's units in its list's order, each the context's unit (+0x90)
-    case 'COLLECTION_PLAYER_UNITS': return t.view.playerUnits(t.seat).map((u) => ({ kind: 'unit', plot: u.plot, type: u.type, moves: u.moves, level: u.level }));
+    case 'COLLECTION_PLAYER_UNITS': return t.view.playerUnits(t.seat).map((u) => ({ kind: 'unit', plot: u.plot, type: u.type, moves: u.moves, level: u.level, combat: u.combat }));
+    // 0x69ed80: in the Units' order each type the knowledge base's enemy
+    // counts (+0x618) hold, its count the context's +8
+    case 'COLLECTION_UNIT_COMBAT': {
+      const n = t.view.enemyUnitCounts(t.seat);
+      return AI_UNITS.filter((u) => (n.get(u.type) ?? 0) > 0).map((u) => ({ kind: 'unitType', type: u.type, count: n.get(u.type)! }));
+    }
     default: return null;
   }
 }
@@ -210,6 +217,8 @@ const EVALUATORS: Readonly<Record<string, Evaluator>> = {
   // resource revealed to the player (0x6d1c00), an improvement (0x6cfcd0:
   // plot +0x44)
   REQUIREMENT_PLOT_TERRAIN_TYPE_MATCHES: (_t, args, s) => s.kind === 'plot' && s.plot.terrain === args.TerrainType,
+  // 0xbe4aa0 (@f04430's evaluate): always met in an analysis
+  REQUIREMENT_PLAYER_IS_ATTACKING: () => true,
   REQUIREMENT_PLOT_FEATURE_TYPE_MATCHES: (_t, args, s) => s.kind === 'plot' && s.plot.feature === args.FeatureType,
   REQUIREMENT_PLOT_RESOURCE_TYPE_MATCHES: (_t, args, s) => s.kind === 'plot' && !!s.plot.resource && s.plot.resource === args.ResourceType,
   REQUIREMENT_PLOT_RESOURCE_VISIBLE: (_t, _args, s) => s.kind === 'plot' && s.plot.resourceVisible,
@@ -326,6 +335,8 @@ const START_ERA = 0;
 /** the records' age the barbarian-combat analyzer reads (0x5eb0f0's fifth
  *  argument) */
 const KNOWN_AGE = 10;
+/** the most a strength modifier's analysis counts a unit (0x6b217d) */
+const STRENGTH_MODIFIER_CAP = 10;
 /** an Amount the analyzer's parser stores as fx(Amount x 0.01f) */
 const pctOf = (args: Readonly<Record<string, string>>): number =>
   fxConst(Math.fround((Number(args.Amount ?? 0) | 0) * Math.fround(0.01)));
@@ -1079,6 +1090,21 @@ const ANALYZERS: Readonly<Record<string, Analyzer>> = {
     const a = Math.fround(Math.exp(Math.fround((Number(args.Amount ?? 0) | 0) * Math.fround(COMBAT_POWER_SCALING))));
     return whole(valueBetween(fxConst(a), t.start, t.horizon, t.rate));
   },
+  // 0x6b2060 (Amount +8, whole): on the context's unit (+0x90) and the
+  // enemy unit type COLLECTION_UNIT_COMBAT stands on (+0x5c, its count +8)
+  // of Combat above 0, x = Amount x COMBAT_POWER_SCALING + the unit's
+  // combat strength (0x56dc90 with 0) - the type's Combat, float, 0 below 0;
+  // trunc(count x x), at most 10, the most of its subjects (`SETS`): a unit
+  // stronger than an enemy type the knowledge base counts 10
+  EFFECT_ADJUST_PLAYER_STRENGTH_MODIFIER: (t, args, s) => {
+    if (!t.unit || s.kind !== 'unitType' || s.count <= 0) return 0;
+    const ck = AI_UNITS[AI_UNIT_INDEX.get(s.type) ?? -1]?.combat ?? 0;
+    if (ck <= 0) return 0;
+    const amount = Math.fround(Number(args.Amount ?? 0) | 0);
+    let x = Math.fround(Math.fround(Math.fround(amount * Math.fround(COMBAT_POWER_SCALING)) + t.unit.combat) - ck);
+    if (x < 0) x = 0;
+    return Math.min(STRENGTH_MODIFIER_CAP, Math.trunc(Math.fround(s.count * x)));
+  },
   // 0x6b2350 (UnitType +8, Amount +0x10 as its parser 0x6b1d00 stores it,
   // fx(Amount x 0.01f)): per city of the player (the context's city alone
   // where it has one), the Amount x its Production (CityBuildAI +0x1008) x
@@ -1202,6 +1228,7 @@ const ANALYZERS: Readonly<Record<string, Analyzer>> = {
  *  it to its value */
 const SETS: Readonly<Record<string, (acc: number, v: number) => number>> = {
   EFFECT_ADJUST_PLAYER_BUFF_UNIT_PRODUCTION_YIELD: (acc, v) => Math.max(acc, v),
+  EFFECT_ADJUST_PLAYER_STRENGTH_MODIFIER: (acc, v) => Math.max(acc, v),
   EFFECT_ADJUST_GOVERNMENT_SLOTS: (acc, v) => (Number.isNaN(v) ? 0 : acc + v),
   EFFECT_ADJUST_PLAYER_BAN_CITY_PRODUCTION: (_acc, v) => v,
 };
@@ -1307,7 +1334,7 @@ export const AI_MODIFIER_READS = {
   none: Object.keys(NONE_ANALYZERS),
   collections: ['COLLECTION_OWNER', 'COLLECTION_PLAYER_CITIES', 'COLLECTION_PLAYER_CAPITAL_CITY', 'COLLECTION_PLAYER_DISTRICTS',
     'COLLECTION_CITY_DISTRICTS', 'COLLECTION_CITY_TRAINED_UNITS', 'COLLECTION_CITY_PLOT_YIELDS', 'COLLECTION_ALL_CITIES',
-    'COLLECTION_ALL_PLAYERS', 'COLLECTION_MAJOR_PLAYERS', 'COLLECTION_PLAYER_UNITS'],
+    'COLLECTION_ALL_PLAYERS', 'COLLECTION_MAJOR_PLAYERS', 'COLLECTION_PLAYER_UNITS', 'COLLECTION_UNIT_COMBAT'],
   /** the wonders CITY_HAS_BUILDING never holds outside its own city */
   wonders: Object.keys(BUILT_WONDERS),
 };

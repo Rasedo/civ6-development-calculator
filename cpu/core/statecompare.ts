@@ -375,6 +375,10 @@ const overUnits = (fn: (u: Unit) => Val): Extractor => (_state, rows) => (rows a
 const overTiles = (fn: (t: Tile) => Val): Extractor => (_state, rows) => (rows as Tile[]).map(fn);
 const overCityStates = (fn: (cityState: CityState, state: GameState) => Val): Extractor =>
   (state, rows) => (rows as CityState[]).map((cityState) => fn(cityState, state));
+/** a knowledge base's enemy unit counts as [unit index, count] pairs by
+ *  unit index, flat */
+const enemyCountsRecord = (n: Record<string, number> | undefined): number[] =>
+  Object.entries(n ?? {}).map(([t, c]) => [idx(UNIT_IDX, t), c]).sort((a, b) => a[0] - b[0]).flat();
 /** a district project's converted yield as [yield index, amount], [-1, 0] for none */
 const projectYieldCols = (p: ProjectYield | undefined): number[] =>
   (p ? [YIELD_KEYS.indexOf(p.key), p.amount] : [-1, 0]);
@@ -644,6 +648,7 @@ const GAME: Record<string, Extractor> = {
     .map((r) => [r.owner, idx(UNIT_IDX, r.type), r.seen, r.plot, r.damage, r.formation ?? 0])
     .sort((a, b) => a[0] - b[0] || a[1] - b[1] || a[2] - b[2] || a[3] - b[3] || a[4] - b[4] || a[5] - b[5]).flat()],
   barbArmyAged: (s) => [s.barbSeat.armyAged ?? -1],
+  barbEnemyCounts: (s) => [enemyCountsRecord(s.barbSeat.enemyCounts)],
   barbCampsKnown: (s) => [[...(s.barbSeat.campsKnown ?? [])]],
   freeUnitStrength: (s) => [s.freeSeat?.unitStrength ?? 0],
   // the Free Cities' knowledge base's army records (`freeKnowledge`), as the
@@ -652,6 +657,7 @@ const GAME: Record<string, Extractor> = {
     .map((r) => [r.owner, idx(UNIT_IDX, r.type), r.seen, r.plot, r.damage, r.formation ?? 0])
     .sort((a, b) => a[0] - b[0] || a[1] - b[1] || a[2] - b[2] || a[3] - b[3] || a[4] - b[4] || a[5] - b[5]).flat()],
   freeArmyAged: (s) => [s.freeSeat?.armyAged ?? -1],
+  freeEnemyCounts: (s) => [enemyCountsRecord(s.freeSeat?.enemyCounts)],
   freeCombatDesire: (s) => [s.freeSeat?.combatDesire ?? 0],
   freeTradeValue: (s) => [s.freeSeat?.tradeValue ?? 0],
   // the Free Cities' operations (the Free Cities Raid) and the ids their
@@ -1085,6 +1091,7 @@ const CITY_STATE_G: Record<string, Extractor> = {
   minorMetMinors: overCityStates((cityState) => [...(cityState.metMinors ?? [])].sort((a, b) => a - b)),
   minorUnitStrength: overCityStates((cityState) => cityState.unitStrength ?? 0),
   minorArmyAged: overCityStates((cityState) => cityState.armyAged ?? -1),
+  minorEnemyCounts: overCityStates((cityState) => enemyCountsRecord(cityState.enemyCounts)),
   minorRevealed: overCityStates((cityState) => (cityState.revealed ?? []).flatMap((v, p) => (v === 1 ? [p] : []))),
   minorSavings: overCityStates((cityState) => [...(cityState.economy?.savings ?? [0, 0, 0, 0]), cityState.economy?.balance ?? 0,
     cityState.economy?.goldBoost ?? 0]),

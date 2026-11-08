@@ -4335,6 +4335,9 @@ class SimInit:
         self._celestial_tech = int(cb["celestialTech"])
         ru = rules.units or [{"id": "WARRIOR", "cost": 40, "combat": 20, "maintenance": 0, "civilian": 0, "requiresTech": -1}]
         self.NU = len(ru)
+        # each knowledge base row's enemy unit counts by unit type as its
+        # last ageing left them (`enemyCounts`, `_knowledge_look`)
+        self.citystate_kb_enemy = torch.zeros(B, self.citystate_kb_aged.shape[1], self.NU, dtype=torch.int16, device=device)
         # [n_tags, NU] bool: the roster types each barbarian class tag holds
         # (a raid's recruit counts a unit to its class by them)
         # per unit type, UNITAI_COMBAT (the raid team's requirement)

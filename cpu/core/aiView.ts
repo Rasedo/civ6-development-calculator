@@ -435,7 +435,9 @@ export function aiView(state: GameState, opts: { forecastNow?: boolean } = {}): 
       }
       return table.get(type)?.value ?? 0;
     },
-    playerUnits: (i) => unitsOf(state, i).map((u) => ({ plot: u.tileIndex, type: gameTypeOf('unit', u.type, 'UNIT_'), moves: Math.floor(unitFullMoves(state, u) / MP_SCALE), level: u.level ?? 1 })),
+    playerUnits: (i) => unitsOf(state, i).map((u) => ({ plot: u.tileIndex, type: gameTypeOf('unit', u.type, 'UNIT_'), moves: Math.floor(unitFullMoves(state, u) / MP_SCALE),
+      level: u.level ?? 1, combat: aiStrengths(state, u).melee })),
+    enemyUnitCounts: (i) => new Map(Object.entries(seatOf(state, i)?.enemyCounts ?? {}).map(([t, n]) => [gameTypeOf('unit', t, 'UNIT_'), n])),
     barbarianSeats: () => [BARB_SEAT],
     bestUnitOfClass: (i, cls) => {
       const traits = isCityStateSeat(i) ? null : majorTraits(state, i);
