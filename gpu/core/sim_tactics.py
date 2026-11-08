@@ -1697,11 +1697,27 @@ class SimTactics:
                     pm = stepped & (mr >= 0)
                     if bool(pm.count_nonzero()):
                         zm[rows[pm], mr[pm]] = zoned[pm]
-        # the strike, where its Movement and attacks last beside the plot
+        # the strike (`orderOnce` -> `meleeAttack`), where no step was refused
+        # and its Movement and attacks last beside the plot, under
+        # `meleeAttack`'s own refusals: a unit that fights, no siege unit, and
+        # the amphibious reach — an embarked unit strikes an open LAND shore,
+        # never a plot afloat nor one a cliff closes (`amphibiousReach`)
         if strike and bool(into.count_nonzero()):
             here = tile_p[rows, sr].clamp(min=0)
-            hit = (into & getattr(self, f"{pre}_unit_alive")[rows, sr] & (mp_p[rows, sr] > 0)
-                   & (getattr(self, f"{pre}_unit_attacks")[rows, sr] > 0) & (self.pair_dist[here, dr].to(torch.long) == 1))
+            hit = (into & ~refused & getattr(self, f"{pre}_unit_alive")[rows, sr] & (mp_p[rows, sr] > 0)
+                   & (getattr(self, f"{pre}_unit_attacks")[rows, sr] > 0) & (self.pair_dist[here, dr].to(torch.long) == 1)
+                   & (self._type_combat.take(ut) > 0) & (self._type_bombard.take(ut) <= 0))
+            emb = getattr(self, f"{pre}_unit_emb")[rows, sr]
+            if bool((hit & emb).count_nonzero()):
+                hereB = torch.zeros(B, dtype=torch.long, device=dev)
+                hereB[rows] = here
+                waiveB = torch.ones(B, dtype=torch.bool, device=dev)
+                waiveB[rows] = self._promo_flag(ut, getattr(self, f"{pre}_unit_promos")[rows, sr], "CLIFFS")
+                cliff6 = self._cliff_block_dirs(hereB.unsqueeze(1), self.neigh[hereB].unsqueeze(1),
+                                                self.tile_seat == seat, waiveB.unsqueeze(1))[:, 0][rows]
+                dcol = (self.neigh[here] == dr.unsqueeze(1)).long().argmax(dim=1)
+                shut = self.water[rows, dr] | cliff6.gather(1, dcol.unsqueeze(1)).squeeze(1)
+                hit = hit & ~(emb & shut)
             for u in torch.unique(sr[hit]).tolist():
                 m = torch.zeros(B, dtype=torch.bool, device=dev)
                 m[rows[hit & (sr == u)]] = True
