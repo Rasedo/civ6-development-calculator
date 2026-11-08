@@ -48,17 +48,17 @@ describe('the tile swap', () => {
     expect(swapTileOk(state, a, t.index)).toBe(false);
   });
 
-  it('keeps the plot\'s pin — a retag inside one seat is not a change of hands', () => {
+  it('drops the plot\'s forced citizen — it is the losing city\'s', () => {
     const { state, a, b } = scene();
     const t = tileAtCoords(state.map, 6, 5);
     setTileOwner(t, 0, b.id);
-    t.locked = true;
+    t.forced = true;
     state.seatActions = { [state.turn - 1]: { 0: {
       production: [], tech: null, civic: null, units: [], swapTiles: [[a.centerIndex, t.index]],
     } } };
     seatPhase(state);
     expect(tileCity(t)).toBe(a.id);
-    expect(t.locked).toBe(true);
+    expect(t.forced).toBeUndefined();
   });
 
   it('refuses every plot the text names, and every plot out of reach', () => {

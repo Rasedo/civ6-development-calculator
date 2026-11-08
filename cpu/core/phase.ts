@@ -55,7 +55,7 @@ import { PANTHEONS, PANTHEON_FAITH_COST, PANTHEON_IDS } from '../data/religion';
 import { CITY_WORK_RADIUS, scaleByGameSpeed, GOLD_PURCHASE_MULT, MP_SCALE, RAILROAD_TECH, borderGrowthCost, FAITH_PURCHASE_MULT, amenityTierIndex } from '../data/constants';
 import { cityDistrictSum, darkBuildings, stampBuildingEra } from './yields';
 import type { CityStats } from './city';
-import { cityFlags, placeCitizens, replaceAllCitizens } from './citizens';
+import { cityFlags, placeCitizens, replaceAllCitizens, toggleCitizen } from './citizens';
 import { beliefSeatYields, computeCityStats, cityBuildingSum, luxuryAmenities, drawBorderPlot, acquireTile, refreshParkAmenities, seatBuildingSum, swapTileOk, wonderRegionalLoyalty } from './city';
 import { accrueStockpiles, canTrainWithStockpile, capStockpiles, chargeUnitResource, chargeUnitUpkeep, layRailroad, resolveSeatPower } from './stockpile';
 import { ageReactors } from './disasters';
@@ -2029,18 +2029,25 @@ export function applySeatActionRecord(state: GameState, actor: Seat, rec: SeatAc
       }
     }
   }
-  // CITIZEN ASSIGNMENT, in the GPU's arm order: the pins, the plot flips,
-  // then the tile swaps. All re-validate — a pin needs a living city of this
-  // seat, a flip needs the plot to be this seat's ground, a swap the whole of
-  // `swapTileOk` against the state the swaps before it left.
+  // CITIZEN ASSIGNMENT, in the GPU's arm order: the forced specialists, the
+  // plot toggles, then the tile swaps. All re-validate — a count needs a
+  // living city of this seat, a toggle the plot's own city of this seat, a
+  // swap the whole of `swapTileOk` against the state the swaps before it
+  // left. Each city whose forced specialists the record sets is re-placed
+  // whole once (the re-place cuts what its slots or citizens cannot hold),
+  // and each toggle re-places its city (0x1956b0 -> 0x196320).
+  const forcedIn: City[] = [];
   for (const [centre, di, n] of rec.specialists ?? []) {
     const pinCity = actor.cities.find((c) => c.centerIndex === centre);
     if (!pinCity || di < 0 || di >= PLACEABLE_DISTRICTS.length) continue;
-    (pinCity.specialistPref ??= PLACEABLE_DISTRICTS.map(() => -1))[di] = Math.max(-1, Math.trunc(n));
+    (pinCity.specialistForced ??= PLACEABLE_DISTRICTS.map(() => 0))[di] = Math.max(0, Math.trunc(n));
+    if (!forcedIn.includes(pinCity)) forcedIn.push(pinCity);
   }
+  for (const c of actor.cities) if (forcedIn.includes(c)) replaceAllCitizens(state, c, cityFlags(c));
   for (const tileIndex of rec.lockTiles ?? []) {
     const plot = state.map.tiles[tileIndex];
-    if (plot && tileSeat(plot) === actor.seat) plot.locked = !plot.locked;
+    const lockCity = plot && tileSeat(plot) === actor.seat ? actor.cities.find((c) => c.id === tileCity(plot)) : undefined;
+    if (lockCity) toggleCitizen(state, lockCity, plot, cityFlags(lockCity));
   }
   for (const [centre, tileIndex] of rec.swapTiles ?? []) {
     const claim = actor.cities.find((c) => c.centerIndex === centre);

@@ -12333,3 +12333,44 @@ read the knowledge base (`_mops_refresh_run`'s `_tac_targets(seat, kb)`).
   (runs/h1_duelp1124 t73-75 city-state 3's Quadrireme 1048577 on Granada's
   centre strikes 40:13 from 41:12, the engines move it to 41:13 first) is the
   assignment's (0x776140), unread here.
+
+## C-112: the full re-place keeps the forced citizens — READ (0x196440, 0x1956b0, 0x197230), both twins
+
+`replaceAllCitizens`, `toggleCitizen` and `forcedPlots` (cpu/core/citizens.ts),
+`Tile.forced`, `City.specialistForced`, the seat record's `specialists` /
+`lockTiles` arm (cpu/core/phase.ts), `setTileOwner` (cpu/core/seats.ts); GPU
+`_place_citizens(full=True)`, `_toggle_citizen` and `_forced_plots`
+(gpu/core/sim_minors.py), `_apply_citizens` (gpu/core/sim_seats.py),
+`tile_forced`, `city_spec_forced`.
+
+- THE CITIZENS OBJECT keeps two counts per hexspace plot (indexed by 0x5ce10
+  in the DLL's 37-plot order): the workers +0x08 (count +0x18) and the FORCED
+  ones +0x20 (count +0x30). A district plot's forced count is its forced
+  specialists; the engines keep a plot's as `Tile.forced`, a district's per
+  type as `City.specialistForced`.
+- THE UNASSIGN (0x196440, the full reassign's first step) keeps the forced
+  citizens: the unassigned count +0x68 is the population (City +0x588) less
+  every forced count; a forced count above the plot's capacity (0x195940: 0
+  on the centre and where the plot is not the city's, a district's specialist
+  slots, 0 where no yield is above 0, else 1) is cut to it; while +0x68 is
+  below 0 the forced counts are cut in hexspace order, index 0 up ("Removing
+  forced workers to match city population went wrong" asserts +0x68 = 0
+  after); then every plot's workers are cleared. The placement 0x197230 gives
+  a plot as many entries as its capacity less its workers plus forced
+  (0x19749f..0x1974a7) and less its forced count again (0x19750e..0x197523,
+  the same 0x5ce10 index), so the unassigned are placed beside the forced and
+  a district with k forced specialists offers its slots less 2k.
+- THE TOGGLE (0x1956b0, the city command's plot arm): the budget is the
+  population less the forced counts of the city's other hexspace plots;
+  nothing while it is 0 or less; less the plot's own, one more is forced on
+  the plot while the budget stays above 0 and the count is below the plot's
+  capacity, else the plot's forced count is set 0; then the full reassign
+  (0x19587d). The engines' `lockTiles` is this click on the plot's own city;
+  `specialists` sets a district type's forced count, the re-place cutting it
+  to the slots and the citizens.
+- A PLOT CHANGING CITY: the losing city's capacity on it is 0 (0x195940's
+  owning-city test at 0x1959a8) and AnnexPlot's reassign of the losing city
+  (0x1a903c) cuts its forced count; the gaining city's vector holds none for
+  it. `setTileOwner` drops `Tile.forced` on any change of city.
+- Open: the lab records no forced count, so no recorded case confirms the
+  population cut's order or the toggle's budget.

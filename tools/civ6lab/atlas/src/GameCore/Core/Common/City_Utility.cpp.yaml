@@ -16,6 +16,19 @@
   context:
     - "...the new population. One entry per free slot of each plot of the city's 37-plot hexspace (0x5cc00 over the tables 0xefedf0 / 0xefeef0: axial dq, dr per index — the centre, then rings 1, 2..."
   review: reviewed
+- addr: 0x5ce10
+  final: 0x449b0
+  kind: function
+  semantics: "a plot's index in its city's 37-plot hexspace (rcx the city, rdx the plot), negative outside it: the index of the citizens object's per-plot vectors (+0x08 workers, +0x20 forced)."
+  status: PARTLY
+  impl: [cpu/core/citizens.ts:hexspacePlots, gpu/core/sim_minors.py:_forced_plots]
+  readings:
+    - "C-112: the full re-place keeps the forced citizens — READ (0x196440, 0x1956b0, 0x197230), both twins"
+  notes: [read from its callers (0x1956b0, 0x197230), not disassembled itself]
+  context:
+    - "- THE CITIZENS OBJECT keeps two counts per hexspace plot (indexed by 0x5ce10 in the DLL's 37-plot order): the workers +0x08 (count +0x18) and the FORCED ones +0x2..."
+    - ...ed (0x19749f..0x1974a7) and less its forced count again (0x19750e..0x197523, the same 0x5ce10 index), so the unassigned are placed beside the forced and a district with k forced spe...
+  review: reviewed
 - addr: 0x5d000
   kind: function
   semantics: the plot at a ring index around a centre.

@@ -145,8 +145,8 @@ export function productionObs(
 }
 
 /** Per PLACEABLE_DISTRICTS index: the specialist slots the city's district
- *  of that type offers (`citySpecialistSlots`), and the citizens pinned
- *  into them, -1 where the automatic rule fills it. */
+ *  of that type offers (`citySpecialistSlots`), and the citizens forced
+ *  into them (`City.specialistForced`), -1 where none is. */
 function specialistObs(state: GameState, city: City): { specSlots: number[]; specPin: number[] } {
   const slots = citySpecialistSlots(state, city);
   return {
@@ -154,17 +154,20 @@ function specialistObs(state: GameState, city: City): { specSlots: number[]; spe
       const inst = city.districts.find((d) => d.type === type);
       return inst ? (slots.get(inst.tileIndex) ?? 0) : 0;
     }),
-    specPin: PLACEABLE_DISTRICTS.map((_t, di) => city.specialistPref?.[di] ?? -1),
+    specPin: PLACEABLE_DISTRICTS.map((_t, di) => {
+      const f = city.specialistForced?.[di] ?? 0;
+      return f > 0 ? f : -1;
+    }),
   };
 }
 
-/** Every plot the city may work as [tile, resource priority, locked], and
+/** Every plot the city may work as [tile, resource priority, forced], and
  *  every plot a sibling holds that it may claim (`swapTileOk`) as [tile,
- *  holder's centre, worked by any of the seat's cities, locked]; both
+ *  holder's centre, worked by any of the seat's cities, forced]; both
  *  ascending by tile. */
 function citizenObs(state: GameState, city: City, worked: ReadonlySet<number>): { workTiles: number[][]; swapFrom: number[][] } {
   const workTiles = workableTiles(state, city)
-    .map((t) => [t.index, resourcePriority(t), t.locked ? 1 : 0])
+    .map((t) => [t.index, resourcePriority(t), t.forced ? 1 : 0])
     .sort((a, b) => a[0] - b[0]);
   const siblings = citiesOf(state, city.seat);
   const ctr = state.map.tiles[city.centerIndex];
@@ -172,7 +175,7 @@ function citizenObs(state: GameState, city: City, worked: ReadonlySet<number>): 
   for (const t of tilesWithin(state.map, ctr.col, ctr.row, CITY_WORK_RADIUS)) {
     if (!swapTileOk(state, city, t.index)) continue;
     const holder = siblings.find((c) => c.id === tileCity(t))!;
-    swapFrom.push([t.index, holder.centerIndex, worked.has(t.index) ? 1 : 0, t.locked ? 1 : 0]);
+    swapFrom.push([t.index, holder.centerIndex, worked.has(t.index) ? 1 : 0, t.forced ? 1 : 0]);
   }
   swapFrom.sort((a, b) => a[0] - b[0]);
   return { workTiles, swapFrom };

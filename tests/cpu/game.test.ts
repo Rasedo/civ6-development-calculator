@@ -8,6 +8,7 @@ import { availableBuildings, canFoundCity } from '../../cpu/core/rules';
 import { placeSeatDistrict } from '../../cpu/core/phase';
 import { computeUnlocksIn } from '../../cpu/core/effects';
 import { computeCityStats, assignWorkedTiles, luxuryAmenities } from '../../cpu/core/city';
+import { replaceAllCitizens } from '../../cpu/core/citizens';
 
 describe('rule formulas', () => {
   it('growth thresholds follow the Civ 6 curve at the online speed', () => {
@@ -123,9 +124,14 @@ describe('citizens and growth', () => {
     const mediocre = tileAtCoords(state.map, 7, 8); // plain grassland, would not win on score
     const better = tileAtCoords(state.map, 9, 8);
     better.elevation = 'HILLS'; // 2F1P beats 2F
+    // a plot's yields changing re-place no citizen: the city's next full
+    // re-place does
+    replaceAllCitizens(state, city);
     expect(assignWorkedTiles(state, city)).toContain(better.index);
 
-    mediocre.locked = true;
+    // a citizen its player forced stays through the full re-place
+    mediocre.forced = true;
+    replaceAllCitizens(state, city);
     const worked = assignWorkedTiles(state, city);
     expect(worked).toContain(mediocre.index);
     expect(worked.length).toBe(1);

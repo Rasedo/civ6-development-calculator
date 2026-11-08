@@ -325,20 +325,26 @@ describe('the action FILE drives the TS civ', () => {
     expect(effectiveSpecialists(state, city).get(dt.index) ?? 0).toBe(0);  // no overflow, nothing pinned
     const plot = tileAtCoords(state.map, 5, 6);
     setTileOwner(plot, civ.seat, city.id);
+    // a plot takes a forced citizen only while one is free of the forced
+    // ones (0x1956b0): two citizens, one for the slot and one for the plot
+    city.population = 2;
     state.seatActions = { [state.turn - 1]: { [civ.seat]: {
       production: [], tech: null, civic: null, units: [],
       specialists: [[city.centerIndex, di, 1]], lockTiles: [plot.index],
     } } };
     seatPhase(state);
+    // both survive the city turn's full re-place
+    expect(city.specialistForced?.[di]).toBe(1);
     expect(city.specialistPref?.[di]).toBe(1);
     expect(effectiveSpecialists(state, city).get(dt.index)).toBe(1);
+    expect(plot.forced).toBe(true);
     expect(plot.locked).toBe(true);
     // the flip is a TOGGLE, exactly as the city screen's click is
     state.seatActions = { [state.turn - 1]: { [civ.seat]: {
       production: [], tech: null, civic: null, units: [], lockTiles: [plot.index],
     } } };
     seatPhase(state);
-    expect(plot.locked).toBe(false);
+    expect(plot.forced).toBeUndefined();
   });
 
   it('a recorded Special Session BALLOT is banked for the turn', () => {

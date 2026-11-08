@@ -1292,7 +1292,7 @@ _MUTABLE = [
     "appeal_base", "appeal_feat", "feat_removable", "tile_ftu", "_feat_adj", "_nfeat_adj",
     "built_wonder", "built_wonder_complete", "city_wonder",  # world wonders + the per-city registry
     "fertility", "fertility_prod", "fertility_sci", "fertility_cul",
-    "tile_locked", "drought", "improvement", "pillaged", "district",
+    "tile_locked", "tile_forced", "drought", "improvement", "pillaged", "district",
     "storm_event", "storm_at", "storm_left",  # the live STORM records: row, centre, turns left
     "storm_id", "storm_struck", "storm_serial",  # each one's serial and struck plots, the counter
     "storm_scar",  # every plot a storm's walk struck, its record live or ended
@@ -1362,7 +1362,7 @@ _MUTABLE = [
     "civ_tourism_to", "civ_tourism_rel_to",  # lifetime tourism SENT, per (from, to) major pair
     "civ_dominant",  # cultural dominance, per (from, to) major pair
     "civ_unit_acq",  # copies of each chassis a seat has ever acquired (the progressive price)
-    "city_alive", "city_center", "city_pop", "city_hp", "city_outer_hp", "city_last_hit", "city_is_cap", "city_orig_cap", "city_founder", "city_former", "city_loyalty", "city_acquired", "city_growth", "city_cbox", "city_next_plot", "city_current", "city_progress", "city_cost", "city_qtile", "city_gw_obj", "city_gw_maker", "city_gw_era", "city_gw_seat", "city_spec_pin", "city_idle", "city_fav_food", "city_boost_turn", "city_bldg", "city_bldg_pillaged", "city_bldg_era", "city_reactor_age",
+    "city_alive", "city_center", "city_pop", "city_hp", "city_outer_hp", "city_last_hit", "city_is_cap", "city_orig_cap", "city_founder", "city_former", "city_loyalty", "city_acquired", "city_growth", "city_cbox", "city_next_plot", "city_current", "city_progress", "city_cost", "city_qtile", "city_gw_obj", "city_gw_maker", "city_gw_era", "city_gw_seat", "city_spec_pin", "city_spec_forced", "city_idle", "city_fav_food", "city_boost_turn", "city_bldg", "city_bldg_pillaged", "city_bldg_era", "city_reactor_age",
     "war_turns", "treaty_turns", "peace_turns", "conquest_turns",
     "civ_gpp_turn",  # Great Person points EARNED this turn, per class (a competition reads it)
     "civ_co2", "civ_co2_turn", "climate_idx", "sea_rise_from", "river_named", "tile_flooded", "tile_flood_ct", "tile_air_bonus", "tile_gp_perm",

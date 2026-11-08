@@ -100,7 +100,7 @@ describe('the cities group', () => {
     const city = state.seats[0].cities[0];
     const wheat = tileAtCoords(state.map, 4, 10);
     wheat.resource = 'WHEAT';
-    wheat.locked = true;
+    wheat.forced = true;
     const row = citiesObs(state, 0)[0];
     expect(row.workTiles.map((w) => w[0])).not.toContain(city.centerIndex);
     expect(row.workTiles.find((w) => w[0] === wheat.index)).toEqual([wheat.index, 1, 1]);
@@ -109,7 +109,7 @@ describe('the cities group', () => {
     expect(idx).toEqual([...idx].sort((a, b) => a - b));
   });
 
-  it('swapFrom: a sibling plot within reach and touching the claimant\'s land, not next to its holder, with worked and locked', () => {
+  it('swapFrom: a sibling plot within reach and touching the claimant\'s land, not next to its holder, with worked and forced', () => {
     const state = scene();
     const [a, b] = state.seats[0].cities;
     const t = tileAtCoords(state.map, 7, 10);   // held by a, two from a, three from b
@@ -117,7 +117,7 @@ describe('the cities group', () => {
     const touch = tileAtCoords(state.map, 8, 10);   // b's plot beside it
     setTileOwner(touch, 0, b.id);
     a.workedTiles = [t.index];
-    t.locked = true;
+    t.forced = true;
     let rows = citiesObs(state, 0);
     expect(rows[1].swapFrom).toContainEqual([t.index, a.centerIndex, 1, 1]);
     // a plot next to its holder's centre never swaps

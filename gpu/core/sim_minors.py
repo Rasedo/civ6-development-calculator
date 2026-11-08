@@ -2974,17 +2974,6 @@ class SimMinors:
         ctr = self.city_center[bidx, row, col].clamp(min=0)
         mine = (self.tile_seat == seat) & (self.tile_city == cid.unsqueeze(1))
         nD = self.city_spec_pin.shape[3]
-        if full:
-            self.tile_locked[mask.unsqueeze(1) & mine] = False
-            self.city_spec_pin[bidx, row, col] = torch.where(mask.unsqueeze(1), 0, self.city_spec_pin[bidx, row, col])
-            n = self.city_pop[bidx, row, col]
-        n = torch.where(mask, n, torch.zeros_like(n)).clamp(min=0)
-        self.city_spec_pin[bidx, row, col] = torch.where(mask.unsqueeze(1), self.city_spec_pin[bidx, row, col].clamp(min=0),
-                                                         self.city_spec_pin[bidx, row, col])
-        self.city_idle[bidx, row, col] = torch.where(mask, n, self.city_idle[bidx, row, col])
-        total = self._seat_city_stats(row, record=False)[0]
-        surplus = total[bidx, col, 0] - self.city_pop[bidx, row, col].double() * self.rules.food_per_citizen
-        need = (-torch.floor(surplus)).clamp(min=0)
         y = self._city_plot_yields(row, col)
         win = tiles_from_offsets(ctr, self._hex37_off, self.W, self.H, self.wrap_x)  # [B, 37]
         P = win.shape[1]
@@ -2993,6 +2982,38 @@ class SimMinors:
         def at(plane):
             return plane.gather(1, wc)
 
+        if full:
+            # the unassign (0x196440) keeps the FORCED citizens, cut to each
+            # plot's capacity, then in hexspace order to the city's citizens
+            f, cap, onw = self._forced_plots(row, col, win, mine, y)
+            slots_all = self._city_spec_slots(row)[bidx, col]
+            spf = torch.minimum(self.city_spec_forced[bidx, row, col], slots_all)
+            has_d = onw.any(dim=2)
+            f = torch.where(has_d, (onw.long() * spf.unsqueeze(1)).sum(dim=2), f)
+            f = torch.minimum(f, cap)
+            excess = f.sum(dim=1) - self.city_pop[bidx, row, col]
+            cut = torch.minimum(f, (excess.unsqueeze(1) - (f.cumsum(dim=1) - f)).clamp(min=0))
+            f = f - cut
+            spf = spf - (onw.long() * cut.unsqueeze(2)).sum(dim=1)
+            m2 = mask.unsqueeze(1)
+            self.city_spec_forced[bidx, row, col] = torch.where(m2, spf, self.city_spec_forced[bidx, row, col])
+            self.tile_forced[m2 & mine] = False
+            self.tile_locked[m2 & mine] = False
+            keep = m2 & ~has_d & (f > 0) & (win >= 0)
+            if bool(keep.count_nonzero()):
+                r, p = keep.nonzero(as_tuple=True)
+                self.tile_forced[r, win[r, p]] = True
+                self.tile_locked[r, win[r, p]] = True
+            self.city_spec_pin[bidx, row, col] = torch.where(m2, spf, self.city_spec_pin[bidx, row, col])
+            n = self.city_pop[bidx, row, col] - torch.where(mask, f.sum(dim=1), torch.zeros_like(excess))
+        n = torch.where(mask, n, torch.zeros_like(n)).clamp(min=0)
+        self.city_spec_pin[bidx, row, col] = torch.where(mask.unsqueeze(1), self.city_spec_pin[bidx, row, col].clamp(min=0),
+                                                         self.city_spec_pin[bidx, row, col])
+        self.city_idle[bidx, row, col] = torch.where(mask, n, self.city_idle[bidx, row, col])
+        total = self._seat_city_stats(row, record=False)[0]
+        surplus = total[bidx, col, 0] - self.city_pop[bidx, row, col].double() * self.rules.food_per_citizen
+        need = (-torch.floor(surplus)).clamp(min=0)
+
         tile_ok = ((win >= 0) & (win != ctr.unsqueeze(1)) & at(mine) & (at(self.district) < 0)
                    & (at(self.built_wonder) < 0) & ~at(self.tile_locked))
         yt = torch.trunc(y.gather(1, wc.unsqueeze(2).expand(-1, -1, 6)))  # [B, P, 6]
@@ -3000,7 +3021,9 @@ class SimMinors:
         # a district of the city at a plot: its specialists' yields and free slots
         dreg = self.city_dist_tile[bidx, row, col]  # [B, nD]
         slots = self._city_spec_slots(row)[bidx, col]  # [B, nD]
-        free = (slots - self.city_spec_pin[bidx, row, col].clamp(min=0)).clamp(min=0)
+        # the capacity less the workers, the forced among them, and the forced
+        # again (0x197230 at 0x19749f..0x197523)
+        free = (slots - self.city_spec_pin[bidx, row, col].clamp(min=0) - self.city_spec_forced[bidx, row, col]).clamp(min=0)
         bldg = self.city_bldg[bidx, row, col]
         spec_y = torch.zeros(B, nD, 6, dtype=torch.float64, device=dev)
         for di in range(min(nD, len(self.districts_cat))):
@@ -3092,6 +3115,64 @@ class SimMinors:
         placed = chosen.sum(dim=1)
         self.city_idle[bidx, row, col] = torch.where(mask, (n - placed).clamp(min=0), self.city_idle[bidx, row, col])
         self._eff_version += 1
+
+    def _forced_plots(self, row: int, col: torch.Tensor, win: torch.Tensor, mine: torch.Tensor,
+                      y: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+        """per hexspace plot `win` [B, P] of the city in column `col` [B]:
+        its forced citizens off a district (`tile_forced`), its capacity
+        (0x195940: 0 on the centre and on a plot not the city's, a district's
+        specialist slots, 0 on a wonder's plot or where no yield is above 0,
+        else 1), and [B, P, nD] the city's district of each type standing on
+        it — `forcedPlots`"""
+        bidx = self._bidx
+        wc = win.clamp(min=0)
+        ctr = self.city_center[bidx, row, col]
+        dreg = self.city_dist_tile[bidx, row, col]  # [B, nD]
+        onw = (dreg.unsqueeze(1) == win.unsqueeze(2)) & (win >= 0).unsqueeze(2) & (dreg >= 0).unsqueeze(1)
+        has_d = onw.any(dim=2)
+        mine_p = (win >= 0) & mine.gather(1, wc)
+        bare = mine_p & (self.district.gather(1, wc) < 0)
+        f = (bare & ~has_d & self.tile_forced.gather(1, wc)).long()
+        yields = (y.gather(1, wc.unsqueeze(2).expand(-1, -1, 6)) > 0).any(dim=2)
+        plain = bare & ~has_d & (win != ctr.unsqueeze(1)) & (self.built_wonder.gather(1, wc) < 0) & yields
+        slots = self._city_spec_slots(row)[bidx, col]  # [B, nD]
+        cap = torch.where(has_d, (onw.long() * slots.unsqueeze(1)).sum(dim=2), plain.long())
+        return f, cap, onw
+
+    def _toggle_citizen(self, row: int, col: torch.Tensor, mask: torch.Tensor, plot: torch.Tensor) -> None:
+        """`toggleCitizen` (0x1956b0) on plot `plot` [B] of the city in column
+        `col` [B] of seat row `row` where `mask`: nothing while no citizen is
+        free of the ones forced on the city's other plots, else one more forced
+        on the plot below its capacity with a citizen free, its forced ones
+        released otherwise; then the full re-place"""
+        bidx = self._bidx
+        mask = mask & self.city_alive[bidx, row, col]
+        if not bool(mask.count_nonzero()):
+            return
+        seat = int(self._ROW_SEAT[row])
+        cid = self.city_id[bidx, row, col]
+        ctr = self.city_center[bidx, row, col].clamp(min=0)
+        mine = (self.tile_seat == seat) & (self.tile_city == cid.unsqueeze(1))
+        win = tiles_from_offsets(ctr, self._hex37_off, self.W, self.H, self.wrap_x)
+        f, cap, onw = self._forced_plots(row, col, win, mine, self._city_plot_yields(row, col))
+        spf = self.city_spec_forced[bidx, row, col]
+        has_d = onw.any(dim=2)
+        f = torch.where(has_d, (onw.long() * spf.unsqueeze(1)).sum(dim=2), f)
+        here = (win == plot.unsqueeze(1)) & (win >= 0) & mine.gather(1, win.clamp(min=0))
+        f_here = (f * here.long()).sum(dim=1)
+        cap_here = (cap * here.long()).sum(dim=1)
+        budget = self.city_pop[bidx, row, col] - (f.sum(dim=1) - f_here)
+        go = mask & here.any(dim=1) & (budget > 0)
+        if not bool(go.count_nonzero()):
+            return
+        nf = torch.where((budget - f_here > 0) & (f_here < cap_here), f_here + 1, torch.zeros_like(f_here))
+        d_here = (onw & here.unsqueeze(2)).any(dim=1)  # [B, nD]
+        hd = d_here.any(dim=1)
+        self.city_spec_forced[bidx, row, col] = torch.where(go.unsqueeze(1) & d_here, nf.unsqueeze(1), spf)
+        pc = plot.clamp(min=0)
+        was = self.tile_forced[bidx, pc]
+        self.tile_forced[bidx, pc] = torch.where(go, ~hd & (nf > 0), was)
+        self._place_citizens(row, col, go, None, full=True, fav_food=self.city_fav_food[bidx, row, col])
 
     def _minor_replace_citizens(self, s: int, mask: torch.Tensor) -> None:
         """`minorReplaceCitizens`: every citizen of minor `s`'s city re-placed

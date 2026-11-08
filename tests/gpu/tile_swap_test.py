@@ -179,16 +179,15 @@ def main() -> None:
     print("  the reach: within 3 and touching the claimant's land, at 2 and at 3; never at 4")
 
     # --- 2) THE RECORD ARM: a refused swap does nothing, an allowed one lands,
-    # the pin stays (a retag inside one seat is not a change of hands) ------
+    # the forced citizen is dropped (it was the losing city's) -------------
     act = torch.ones(sim.B, dtype=torch.bool)
-    sim.tile_locked[0, good] = True
+    sim.tile_forced[0, good] = True
     sim._apply_citizens(row, act, None, None,
                         torch.tensor([[[ca, next_b], [cb, good], [good, good], [ca, good]]], dtype=torch.long))
     assert int(sim.tile_city[0, next_b]) == idb, "a refused swap must not land"
     assert int(sim.tile_city[0, good]) == ida, "the allowed swap must retag the plot to the claimant"
     assert int(sim.tile_seat[0, good]) == row
-    assert bool(sim.tile_locked[0, good]), "a same-seat retag keeps the plot's pin"
-    sim.tile_locked[0, good] = False
+    assert not bool(sim.tile_forced[0, good]), "a retag to another city drops the plot's forced citizen"
     tiles, valid = sim._work_window(row)
     win = {int(t) for t, v in zip(tiles[0, ja].tolist(), valid[0, ja].tolist()) if v}
     assert good in win, "the claimant works the swapped plot"

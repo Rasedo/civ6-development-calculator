@@ -1,8 +1,10 @@
 /**
  * THE GAME'S CITIZEN MANAGER (City_Citizens.cpp, GameCore_XP2): `placeCitizens`
  * puts `n` unassigned citizens beside the ones already working, the way
- * 0x197230 does; `replaceAllCitizens` re-places them all (0x196320). The
- * city-states place by it (`minorPlaceCitizens`), the H-1 steps too.
+ * 0x197230 does; `replaceAllCitizens` re-places them all (0x196320) beside
+ * the ones the player forced (`Tile.forced`, `City.specialistForced`;
+ * `toggleCitizen` is the player's click). The city-states place by it
+ * (`minorPlaceCitizens`), the H-1 steps too.
  *
  * - The Food NEED: the city's Food surplus with only the assigned citizens
  *   working, floored in its 1/256 fixed point, negated, at least 0.
@@ -97,7 +99,9 @@ export function placeCitizens(state: GameState, city: City, n: number, flags: Yi
     if (di) {
       const pi = PLACEABLE_DISTRICTS.indexOf(di.type);
       const y = specialistYields(di.type, city.buildings);
-      const free = (slots.get(t.index) ?? 0) - (pi >= 0 ? pins[pi] : 0);
+      // the entries: the capacity less the workers, the forced ones among
+      // them, and the forced ones again (0x197230 at 0x19749f..0x197523)
+      const free = (slots.get(t.index) ?? 0) - (pi >= 0 ? pins[pi] + (city.specialistForced?.[pi] ?? 0) : 0);
       if (!y || pi < 0) continue;
       for (let k = 0; k < free; k++) entries.push(score(y, t.index, flags));
       continue;
@@ -129,11 +133,109 @@ export function placeCitizens(state: GameState, city: City, n: number, flags: Yi
   city.idleCitizens = n - placed > 0 ? n - placed : undefined;
 }
 
-/** Re-place every citizen of the city (a citizen lost: 0x194fb0 with a
- *  negative count unassigns all, then places them all). */
+/** The city's hexspace plots in the DLL's order (the citizens object's plot
+ *  vectors are indexed so: 0x5ce10). */
+function hexspacePlots(state: GameState, city: City): Tile[] {
+  const centre = state.map.tiles[city.centerIndex];
+  const out: Tile[] = [];
+  for (const [dq, dr] of HEXSPACE) {
+    const t = hexPlot(state, centre, dq, dr);
+    if (t) out.push(t);
+  }
+  return out;
+}
+
+/** The FORCED citizens of the city (the citizens object's forced counts,
+ *  +0x20, a count per hexspace plot): a plot's `Tile.forced`, a district
+ *  plot's the city's `specialistForced` for the district's type. Each plot's
+ *  forced count and its capacity (0x195940: 0 on the centre and on a plot not
+ *  the city's, a district's specialist slots, 0 on a wonder's plot or where
+ *  no yield is above 0, else 1), in hexspace order. */
+function forcedPlots(state: GameState, city: City): { t: Tile; pi: number; f: number; cap: number }[] {
+  const ctx = cityYieldCtx(state, city);
+  const bonus = cityPlotBonus(state, city);
+  const slots = citySpecialistSlots(state, city);
+  const out: { t: Tile; pi: number; f: number; cap: number }[] = [];
+  for (const t of hexspacePlots(state, city)) {
+    // another city's plot holds none of this city's citizens
+    if (!tileBelongsTo(t, city)) continue;
+    const di = t.district ? city.districts.find((d) => d.tileIndex === t.index) : undefined;
+    const pi = di ? PLACEABLE_DISTRICTS.indexOf(di.type) : -1;
+    const f = di ? (pi >= 0 ? city.specialistForced?.[pi] ?? 0 : 0) : !t.district && t.forced ? 1 : 0;
+    let cap = 0;
+    if (di) cap = slots.get(t.index) ?? 0;
+    else if (t.index !== city.centerIndex && !t.district && !t.builtWonder) {
+      const y = tileYields(ctx, t);
+      bonus(t, false, y);
+      cap = YIELD_KEYS.some((k) => y[k] > 0) ? 1 : 0;
+    }
+    out.push({ t, pi, f, cap });
+  }
+  return out;
+}
+
+function setForced(city: City, e: { t: Tile; pi: number }, f: number): void {
+  if (e.pi >= 0) (city.specialistForced ??= PLACEABLE_DISTRICTS.map(() => 0))[e.pi] = f;
+  if (e.pi < 0 && f > 0) e.t.forced = true;
+  else delete e.t.forced;
+}
+
+/** Re-place every citizen of the city (0x196320; a citizen lost: 0x194fb0
+ *  with a negative count). The unassign (0x196440) keeps the FORCED
+ *  citizens: each plot's forced count is cut to its capacity (a district
+ *  type's to its slots, none where the city has no such district), then,
+ *  while more are forced than the city has citizens, cut in hexspace order;
+ *  every other citizen is unassigned and placed again beside them
+ *  (0x197230). */
 export function replaceAllCitizens(state: GameState, city: City, flags: YieldFlags = ''): void {
+  const held = city.specialistForced;
+  if (held) {
+    const slots = citySpecialistSlots(state, city);
+    city.specialistForced = PLACEABLE_DISTRICTS.map((type, pi) => {
+      const inst = city.districts.find((d) => d.type === type);
+      return Math.min(held[pi], inst ? slots.get(inst.tileIndex) ?? 0 : 0);
+    });
+  }
+  const plots = forcedPlots(state, city);
+  let excess = -city.population;
+  for (const e of plots) {
+    e.f = Math.min(e.f, e.cap);
+    excess += e.f;
+  }
+  for (const e of plots) {
+    const cut = Math.min(e.f, Math.max(0, excess));
+    e.f -= cut;
+    excess -= cut;
+  }
   for (const t of state.map.tiles) if (t.locked && tileBelongsTo(t, city)) t.locked = false;
-  city.specialistPref = PLACEABLE_DISTRICTS.map(() => 0);
+  const pins = PLACEABLE_DISTRICTS.map(() => 0);
+  let forced = 0;
+  for (const e of plots) {
+    setForced(city, e, e.f);
+    forced += e.f;
+    if (e.f <= 0) continue;
+    if (e.pi >= 0) pins[e.pi] = e.f;
+    else e.t.locked = true;
+  }
+  city.specialistPref = pins;
   city.idleCitizens = undefined;
-  placeCitizens(state, city, city.population, flags);
+  placeCitizens(state, city, city.population - forced, flags);
+}
+
+/** A plot's citizen TOGGLED by its city's player (0x1956b0, the city
+ *  command's plot arm): with no citizen left beyond the ones forced on the
+ *  city's other plots, nothing; else one more forced on the plot while it
+ *  holds fewer than its capacity and a citizen is free, its forced ones
+ *  released otherwise; then the full re-place. A plot outside the city's
+ *  hexspace takes none. */
+export function toggleCitizen(state: GameState, city: City, plot: Tile, flags: YieldFlags = ''): void {
+  const plots = forcedPlots(state, city);
+  const here = plots.find((e) => e.t === plot);
+  if (!here) return;
+  let budget = city.population;
+  for (const e of plots) if (e !== here) budget -= e.f;
+  if (budget <= 0) return;
+  budget -= here.f;
+  setForced(city, here, budget > 0 && here.f < here.cap ? here.f + 1 : 0);
+  replaceAllCitizens(state, city, flags);
 }

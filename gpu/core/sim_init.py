@@ -1400,10 +1400,13 @@ class SimInit:
         # a city-state's district price locked at its placement, per type, 0
         # none (`CityState.districts`' cost, `minorPlaceDistrict`)
         self.citystate_dist_cost = torch.zeros(B, max(self.S, 1), nd_b4, dtype=torch.long, device=device)
-        # CITIZENS PINNED into each district's specialist slots, -1 where the
-        # automatic rule decides (City.specialistPref). Same geometry as the
-        # registry above, because a pin names a district TYPE.
+        # CITIZENS working each district's specialist slots, the citizen
+        # manager's placement (City.specialistPref). Same geometry as the
+        # registry above, because a count names a district TYPE.
         self.city_spec_pin = torch.full((B, self.CITY_ROWS, civ_city_pad, nd_b4), -1, dtype=torch.long, device=device)
+        # the citizens the player FORCED into each district's slots
+        # (City.specialistForced): the full re-place keeps them
+        self.city_spec_forced = torch.zeros((B, self.CITY_ROWS, civ_city_pad, nd_b4), dtype=torch.long, device=device)
         # CITIZENS LEFT IDLE, on neither a plot nor a slot (City.idleCitizens):
         # the walk works population less specialists less these.
         self.city_idle = torch.zeros(B, self.CITY_ROWS, civ_city_pad, dtype=torch.long, device=device)
@@ -2438,10 +2441,12 @@ class SimInit:
         # the SCIENCE and CULTURE silt an eruption leaves on a plot it paints
         self.fertility_sci = torch.zeros(B, T, dtype=torch.long, device=device)
         self.fertility_cul = torch.zeros(B, T, dtype=torch.long, device=device)
-        # a CITIZEN is PINNED to this plot (Tile.locked): the work ranking takes
-        # every locked plot a city can reach before it ranks anything by score;
-        # the city-states' founding placed theirs (`lockedInit`)
+        # a CITIZEN works this plot (Tile.locked): the work ranking takes every
+        # locked plot a city can reach before it ranks anything by score; the
+        # city-states' founding placed theirs (`lockedInit`)
         self.tile_locked = torch.tensor([f["lockedInit"] for f in fixtures], dtype=torch.bool, device=device)
+        # the plot's citizen FORCED by its city's player (Tile.forced)
+        self.tile_forced = torch.zeros_like(self.tile_locked)
         # CIV6 (Marina Raskova): the permanent "+1 air unit slots" a retired
         # general leaves on a district tile (`Tile.airSlotBonus`)
         self.tile_air_bonus = torch.zeros(B, T, dtype=torch.long, device=device)

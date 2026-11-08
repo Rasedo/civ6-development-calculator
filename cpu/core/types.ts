@@ -115,10 +115,15 @@ export interface City {
   /** The seat a FREE CITY revolted from: its centre stands on that seat's
    *  base (`holderStrength`). -1 on every other city. */
   formerSeat?: number;
-  /** CITIZEN ASSIGNMENT for the district SLOTS: how many citizens the player
-   * has pinned into each district, by PLACEABLE_DISTRICTS index; -1 where the
-   * automatic rule decides. `Tile.locked` is the same choice for plots. */
+  /** the citizens working each district's SLOTS, by PLACEABLE_DISTRICTS
+   * index: the citizen manager's placement (`placeCitizens`), the forced ones
+   * among them. `Tile.locked` is the same for plots. */
   specialistPref?: number[];
+  /** the citizens the player FORCED into each district's slots, by
+   * PLACEABLE_DISTRICTS index (the citizens object's forced count on the
+   * district's plot): the full re-place keeps them (`replaceAllCitizens`).
+   * `Tile.forced` is the same for plots. */
+  specialistForced?: number[];
   /** CITIZEN ASSIGNMENT, the third choice: citizens the player leaves on
    *  neither a plot nor a slot. The walk works population less specialists
    *  less these, and each pays its Gold (`UNASSIGNED_CITIZEN_GOLD`). */
@@ -386,12 +391,12 @@ export interface SeatActionRecord {
    *  standing this turn with its promise. */
   keepPromise?: [number, number][];
   /** CITIZEN ASSIGNMENT for the district SLOTS: [centreTile, districtIndex,
-   * count] — how many citizens this city pins into that district. A negative
-   * count hands the slot back to the automatic rule. */
+   * count] — how many citizens this city forces into that district
+   * (`City.specialistForced`). A count of 0 or less forces none. */
   specialists?: [number, number, number][];
-  /** CITIZEN ASSIGNMENT for the PLOTS: the tiles whose citizen pin this seat
-   * FLIPS this turn, in order. A flip is what the city screen's click does,
-   * and both engines re-validate that the plot is this seat's ground. */
+  /** CITIZEN ASSIGNMENT for the PLOTS: the tiles whose citizen this seat
+   * TOGGLES this turn, in order (`toggleCitizen`, the city screen's click),
+   * each in the plot's own city of this seat. */
   lockTiles?: number[];
   /** The TILE SWAP: [claiming city's centreTile, tile] each, in order — the
    * plot moves from one of this seat's cities to the claiming one. Both

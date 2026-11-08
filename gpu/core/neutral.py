@@ -490,7 +490,8 @@ def _city_rows(sim, row: int) -> list:
             k_col = torch.tensor([sim.DISTRICT_BASE + si for _j, si in keys], dtype=torch.long, device=sim.device)
             site_rows = torch.stack([bb, k_slot[kk], k_col[kk], tt, _as_long(adj[k_adj[kk], bb, tt])], dim=1)
     if len(sim.districts_cat):
-        spec = torch.cat([sim._city_spec_slots(row), sim.city_spec_pin[:, row]], dim=2)
+        forced = sim.city_spec_forced[:, row]
+        spec = torch.cat([sim._city_spec_slots(row), torch.where(forced > 0, forced, torch.full_like(forced, -1))], dim=2)
         spec = spec.gather(1, order.unsqueeze(2).expand(-1, -1, spec.shape[2]))
     else:
         spec = torch.zeros(B, sim.RC, 0, dtype=torch.long, device=sim.device)
@@ -531,7 +532,7 @@ def _citizen_rows(sim, row: int, alive: torch.Tensor) -> tuple:
     tiles, valid = sim._work_window(row)                              # [B, RC, M]
     M = tiles.shape[2]
     tf = tiles.clamp(min=0).reshape(B, -1)
-    locked = sim.tile_locked.gather(1, tf).reshape(B, RC, M)
+    locked = sim.tile_forced.gather(1, tf).reshape(B, RC, M)
     valid = valid & alive.unsqueeze(2)
     bb, jj, mm = valid.nonzero(as_tuple=True)
     t_v = tiles[bb, jj, mm]

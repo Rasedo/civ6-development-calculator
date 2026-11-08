@@ -1622,8 +1622,9 @@ class SimOrders:
                         self.seat_route_course):
                 _pl[b, _mr] = -1
             ring = (self.pair_dist[c_t] <= 2) & (self.tile_seat[b] == 100 + s)
-            # a plot changing HANDS drops its LOCK (`setTileOwner`'s clear)
+            # a plot changing HANDS drops its worked mark and forced citizen (`setTileOwner`)
             self.tile_locked[b] &= ~ring
+            self.tile_forced[b] &= ~ring
             self.tile_seat[b] = torch.where(ring, torch.full_like(self.tile_seat[b], NO_SEAT), self.tile_seat[b])
             self._tile_owner_ver += 1
             if int(self.city_alive[b, row].sum()) >= max_cities:
@@ -1687,6 +1688,7 @@ class SimOrders:
                 getattr(self, _p)[b, row, col, :] = -1
             self.city_dist_tile[b, row, col, :] = self.city_dist_tile[b, self._CITY_MINOR0 + s, 0, :]
             self.city_spec_pin[b, row, col, :] = -1
+            self.city_spec_forced[b, row, col, :] = 0
             self.city_fav_food[b, row, col] = False
             self.city_wonder[b, row, col, :] = -1
             self.city_bldg[b, row, col, :] = self.city_bldg[b, self._CITY_MINOR0 + s, 0, :]

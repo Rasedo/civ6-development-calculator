@@ -1236,23 +1236,27 @@ class SimSeats:
         return carried
 
     def _apply_citizens(self, row: int, active: torch.Tensor, spec, lock, swap=None) -> None:
-        """The CITIZEN-ASSIGNMENT arm of the record. `spec` pins a count into
-        each district's specialist slots (-1 hands one back to the automatic
-        rule, SPEC_KEEP leaves it as it was); `lock` flips a plot's own pin;
-        `swap` [B, K, 2] moves plots between the row's own cities, each
-        (claimant's centre, tile), -1 padding. All re-validate here — a pin
-        needs a living city, a flip needs the plot to be this seat's ground, a
-        swap the whole of `_swap_tile_ok` against the swaps before it."""
+        """The CITIZEN-ASSIGNMENT arm of the record. `spec` forces a count into
+        each district's specialist slots (0 or less forces none, SPEC_KEEP
+        leaves it as it was), each city it sets re-placed whole once; `lock`
+        toggles a plot's citizen in its own city (`_toggle_citizen`); `swap`
+        [B, K, 2] moves plots between the row's own cities, each (claimant's
+        centre, tile), -1 padding. All re-validate here — a count needs a
+        living city, a toggle the plot's own city of this seat, a swap the
+        whole of `_swap_tile_ok` against the swaps before it."""
         ext = self.seat_ext[:, row]
         act = active & ext
         if spec is not None:
             v = spec.to(torch.long)
             take = (v > simbase.SPEC_KEEP) & self.city_alive[:, row].unsqueeze(2) & act.view(-1, 1, 1)
             if bool(take.count_nonzero()):
-                # every negative count means the same thing — hand the slot
-                # back to the automatic rule — so they store as one value.
-                self.city_spec_pin[:, row] = torch.where(take, v.clamp(min=-1), self.city_spec_pin[:, row])
+                self.city_spec_forced[:, row] = torch.where(take, v.clamp(min=0), self.city_spec_forced[:, row])
                 self._eff_version += 1
+                hit = take.any(dim=2)
+                for j in range(int(hit.shape[1])):
+                    if bool(hit[:, j].count_nonzero()):
+                        jc = torch.full((self.B,), j, dtype=torch.long, device=self.device)
+                        self._place_citizens(row, jc, hit[:, j], None, full=True, fav_food=self.city_fav_food[:, row, j])
         if lock is not None:
             lt = lock.to(torch.long)
             if lt.dim() == 1:
@@ -1260,10 +1264,13 @@ class SimSeats:
             for k in range(int(lt.shape[1])):
                 t = lt[:, k]
                 tc = t.clamp(min=0)
-                ok = act & (t >= 0) & (self.tile_seat.gather(1, tc.unsqueeze(1)).squeeze(1) == row)
+                ok = act & (t >= 0) & (self.tile_seat.gather(1, tc.unsqueeze(1)).squeeze(1) == int(self._ROW_SEAT[row]))
+                if not bool(ok.count_nonzero()):
+                    continue
+                held = (self.city_id[:, row] == self.tile_city.gather(1, tc.unsqueeze(1))) & self.city_alive[:, row]
+                ok = ok & held.any(dim=1)
                 if bool(ok.count_nonzero()):
-                    rows = ok.nonzero(as_tuple=True)[0]
-                    self.tile_locked[rows, tc[rows]] = ~self.tile_locked[rows, tc[rows]]
+                    self._toggle_citizen(row, held.long().argmax(dim=1), ok, t)
                     self._eff_version += 1
         if swap is not None:
             sw = swap.to(torch.long)
@@ -1309,7 +1316,7 @@ class SimSeats:
         """ONE recorded swap: the claimant is named by its CENTRE tile, the
         predicate re-validates against the live state, and the plot is
         retagged to the claimant — `setTileOwner` within one seat, which
-        keeps the plot's lock."""
+        drops the plot's forced citizen."""
         hit = self.city_alive[:, row] & (self.city_center[:, row] == centre.unsqueeze(1)) & (centre >= 0).unsqueeze(1)
         j = torch.where(hit.any(dim=1), hit.long().argmax(dim=1), torch.full_like(centre, -1))
         ok = act & self._swap_tile_ok(row, j.unsqueeze(1), t.unsqueeze(1)).squeeze(1)
@@ -1317,6 +1324,7 @@ class SimSeats:
             return
         rows = ok.nonzero(as_tuple=True)[0]
         self.tile_city[rows, t[rows]] = self.city_id[rows, row, j[rows]]
+        self.tile_forced[rows, t[rows]] = False
         self._tile_owner_ver += 1
         self._claim_version += 1
         self._eff_version += 1
@@ -11534,6 +11542,7 @@ class SimSeats:
             getattr(self, _p)[b, row, col, :] = -1
         self.city_dist_tile[b, row, col, :] = -1
         self.city_spec_pin[b, row, col, :] = -1
+        self.city_spec_forced[b, row, col, :] = 0
         self.city_idle[b, row, col] = 0
         self.city_fav_food[b, row, col] = False
         self.city_wonder[b, row, col, :] = -1
@@ -11913,8 +11922,9 @@ class SimSeats:
         # a row's tiles carry its SEAT id (the row itself for a major)
         src_seat, dst_seat = int(self._ROW_SEAT[src_row]), int(self._ROW_SEAT[dst_row])
         owned = (self.tile_seat[b] == src_seat) & (self.tile_city[b] == cid)
-        # a plot changing HANDS drops its LOCK (`setTileOwner`'s clear)
+        # a plot changing HANDS drops its worked mark and forced citizen (`setTileOwner`)
         self.tile_locked[b] &= ~owned
+        self.tile_forced[b] &= ~owned
         if conquest and int(self.city_alive[b, dst_row].sum()) >= int(self.rules.seats["maxCities"]):
             # The city simply ceases: tiles freed, centre unpaved (centre_slot_at
             # above — the `district` plane never encodes CITY_CENTER), no plunder.
@@ -12039,6 +12049,7 @@ class SimSeats:
         # the CONQUEROR manages nothing yet: TS's flipped literal carries no
         # `specialistPref`, so every slot goes back to the automatic rule.
         self.city_spec_pin[b, dst_row, col, :] = -1
+        self.city_spec_forced[b, dst_row, col, :] = 0
         self.city_idle[b, dst_row, col] = 0
         self.city_fav_food[b, dst_row, col] = False
         self.city_followed[b, dst_row, col] = old_fol
@@ -12189,9 +12200,10 @@ class SimSeats:
                 continue
             rr, tt = rows[take], tk[take]
             self._wipe_construction(rr, tt)   # reads the plot's OLD owner
-            # a plot changing HANDS drops its LOCK (`setTileOwner`'s clear);
-            # a same-seat retag between two of the row's cities keeps it
+            # `setTileOwner`'s clears: a plot changing HANDS drops its worked mark,
+            # a plot changing city its forced citizen
             self.tile_locked[rr, tt] &= self.tile_seat[rr, tt] == row
+            self.tile_forced[rr, tt] = False
             self.tile_seat[rr, tt] = row  # setTileOwner's two halves
             self.tile_city[rr, tt] = cid[take]
             self.city_acquired[rr, row, cols[take]] += 1
@@ -12532,6 +12544,7 @@ class SimSeats:
         for _p in ("city_gw_obj", "city_gw_maker", "city_gw_era", "city_gw_seat"):
             getattr(self, _p)[rows, row, slot, :] = -1
         self.city_spec_pin[rows, row, slot, :] = -1
+        self.city_spec_forced[rows, row, slot, :] = 0
         self.city_idle[rows, row, slot] = 0
         self.city_fav_food[rows, row, slot] = False
         self.city_loyalty[rows, row, slot] = 100.0
@@ -12562,6 +12575,7 @@ class SimSeats:
         # city are the two halves TS calls ownerSeat/ownerCity.
         self.tile_seat[rows, s_idx] = seat
         self.tile_city[rows, s_idx] = _new_cid
+        self.tile_forced[rows, s_idx] = False
         self._tile_owner_ver += 1
         # Founding strips like foundCity: the removable feature dies (tdef drops
         # to the hills component, feature yields vanish via feat_stripped, the
@@ -16675,8 +16689,9 @@ class SimSeats:
         take = hit & near
         if not bool(take.count_nonzero()):
             return
-        # `setTileOwner`'s two halves: a plot changing HANDS drops its LOCK
+        # `setTileOwner`'s two halves: a plot changing HANDS drops its worked mark and forced citizen
         self.tile_locked[bb[take], tiles[take]] = False
+        self.tile_forced[bb[take], tiles[take]] = False
         self.tile_seat[bb[take], tiles[take]] = int(self._ROW_SEAT[row])
         self.tile_city[bb[take], tiles[take]] = -1
         self._eff_version += 1

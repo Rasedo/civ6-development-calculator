@@ -1456,6 +1456,9 @@ CITY = {
     "specialistPref": lambda sim, b, rows: [
         [int(x) for x in sim.city_spec_pin[b, c, s].tolist()] for c, s in rows
     ],
+    "specialistForced": lambda sim, b, rows: [
+        [int(x) for x in sim.city_spec_forced[b, c, s].tolist()] for c, s in rows
+    ],
     "queueProgress": _cty("city_progress"),
     "queueCost": _queue_cost,
     "followedReligion": _cty("city_followed"),
@@ -1594,6 +1597,7 @@ TILE = {
     "road": _tile("road"),
     "roadTier": _tile("road_tier"),
     "locked": _tile("tile_locked"),
+    "forced": _tile("tile_forced"),
     "fertility": _tile("fertility"),
     "fertilityProd": _tile("fertility_prod"),
     "fertilitySci": _tile("fertility_sci"),

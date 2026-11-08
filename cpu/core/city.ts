@@ -213,8 +213,9 @@ export function citySpecialistSlots(state: GameState, city: City, seated = false
   return out;
 }
 
-/** WHO MANS THE SLOTS. The citizens the player PINNED (`specialistPref`, a
- * count per PLACEABLE_DISTRICTS index) go in first, clamped to the slots the
+/** WHO MANS THE SLOTS. The citizens placed in them (`specialistPref`, a
+ * count per PLACEABLE_DISTRICTS index: the citizen manager's, the forced
+ * ones among them) go in first, clamped to the slots the
  * district seats them (`citySpecialistSlots` seated: a pillaged building's
  * too) and to the city's population less its idle citizens; then the
  * automatic rule spends the

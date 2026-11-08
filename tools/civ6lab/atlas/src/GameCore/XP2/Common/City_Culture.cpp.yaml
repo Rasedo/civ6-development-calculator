@@ -87,6 +87,7 @@
     - "H-1: an annex re-places the citizens, the garrison's unit, a religious unit killed on a move — READ"
     - "C-100 / C-112: a city-state's power and its regional buildings, the citizen reassign's callers — a fit and a reading"
     - "H-1: the envoy annex counts the most envoys one player holds — READ (0x1abf40 -> 0x44c4b0), both twins"
+    - "C-112: the full re-place keeps the forced citizens — READ (0x196440, 0x1956b0, 0x197230), both twins"
   context:
     - "0x1a8b70 annexes one plot to a city (City_Culture.cpp): it writes the city culture's stored next p..."
     - "...(China's Dynastic Cycle boost, Oxford's techs: runs/h1_duelw1117 t44, t226); the annex 0x1a8b70 clears the city's stored next plot (+0x1c = -1) and counts no culture claim (+0x10 is t..."

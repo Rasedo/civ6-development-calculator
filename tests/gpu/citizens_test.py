@@ -3,10 +3,12 @@
     python tests/gpu/citizens_test.py
 
 Real Civ 6 lets the player place every citizen: click a plot to pin one there,
-click a district slot to make one a specialist. Both engines carry those as
-wire intents — `Tile.locked` / `tile_locked` and `City.specialistPref` /
-`city_spec_pin` — and fill everything left over with the automatic rule
-(overflow citizens into open slots, the rest onto the best-scoring plots).
+click a district slot to make one a specialist. Both engines carry the
+citizens' places as `Tile.locked` / `tile_locked` and `City.specialistPref` /
+`city_spec_pin`, the ones the player forced as `Tile.forced` / `tile_forced`
+and `City.specialistForced` / `city_spec_forced`, and the walk fills
+everything left over with the automatic rule (overflow citizens into open
+slots, the rest onto the best-scoring plots).
 
 The driven gate reaches a pin only late, once a city is big enough to spare a
 citizen, and reaches the plot lock only where a worked window holds a resource.
@@ -204,8 +206,9 @@ def main() -> None:
     assert food_prod(row, j) == keys[other], "the lock did not survive being set again"
     print(f"  a locked plot displaces the city's own pick ({base} -> {keys[other]})")
 
-    # --- 6) THE WIRE: a flip needs the seat's own ground --------------------
+    # --- 6) THE WIRE: a toggle forces a citizen in the plot's own city -----
     sim.tile_locked[0, :] = False
+    sim.tile_forced[0, :] = False
     foreign = next((t for t in range(sim.T) if int(sim.tile_seat[0, t]) != row), -1)
     assert foreign >= 0, "every plot on the map belongs to this seat"
     mine = win[0]
@@ -215,12 +218,13 @@ def main() -> None:
         None,
         torch.tensor([[mine, foreign]], dtype=torch.long),
     )
-    assert bool(sim.tile_locked[0, mine]), "a flip on the seat's own plot must land"
-    assert not bool(sim.tile_locked[0, foreign]), "a flip on someone else's plot must be refused"
+    assert bool(sim.tile_forced[0, mine]), "a toggle on the seat's own plot must force its citizen"
+    assert bool(sim.tile_locked[0, mine]), "the full re-place keeps the forced citizen on its plot"
+    assert not bool(sim.tile_forced[0, foreign]), "a toggle on someone else's plot must be refused"
     sim._apply_citizens(row, torch.ones(sim.B, dtype=torch.bool), None,
                         torch.tensor([[mine]], dtype=torch.long))
-    assert not bool(sim.tile_locked[0, mine]), "a second flip must clear the pin"
-    print("  a flip lands on the seat's own ground and nowhere else")
+    assert not bool(sim.tile_forced[0, mine]), "a second toggle must release it"
+    print("  a toggle lands on the seat's own ground and nowhere else")
 
     # --- 7) AN UNASSIGNED CITIZEN PAYS GOLD ---------------------------------
     # CIV6 (GlobalParameters GOLD_PERCENTAGE_YIELD_PER_UNASSIGNED_POP 50):

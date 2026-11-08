@@ -3661,7 +3661,18 @@
           "planes": [
             "city_spec_pin"
           ],
-          "note": "how many citizens the player PINNED into each district's slots, by PLACEABLE district index; -1 = the automatic rule decides."
+          "note": "the citizens working each district's slots, by PLACEABLE district index: the citizen manager's placement, the forced ones among them."
+        },
+        {
+          "name": "specialistForced",
+          "compare": "exact",
+          "covers": [
+            "City.specialistForced"
+          ],
+          "planes": [
+            "city_spec_forced"
+          ],
+          "note": "the citizens the player FORCED into each district's slots, by PLACEABLE district index (0 = none); the full re-place keeps them."
         },
         {
           "name": "queueFront",
@@ -4533,7 +4544,18 @@
           "planes": [
             "tile_locked"
           ],
-          "note": "the citizen PINNED to this plot — the work ranking takes every locked plot before it ranks anything by score"
+          "note": "a citizen works this plot (the citizen manager's placement) — the work ranking takes every locked plot before it ranks anything by score"
+        },
+        {
+          "name": "forced",
+          "compare": "exact",
+          "covers": [
+            "Tile.forced"
+          ],
+          "planes": [
+            "tile_forced"
+          ],
+          "note": "the plot's citizen FORCED by its city's player; the full re-place keeps it, a change of city drops it"
         },
         {
           "name": "fertility",

@@ -242,11 +242,15 @@ export interface Tile {
    *  boost (`randomEvent`). */
   eventFired?: number;
   /** a CITIZEN works this plot: the citizen manager's placement
-   *  (`placeCitizens`), or the seat's lock action. `assignWorkedTiles` takes
+   *  (`placeCitizens`), the forced one among them. `assignWorkedTiles` takes
    *  every locked plot the city can work before it ranks anything by score.
-   *  The lock lives on the PLOT and dies when the plot changes hands
-   *  (`setTileOwner`). */
+   *  It dies when the plot changes hands (`setTileOwner`). */
   locked?: boolean;
+  /** the plot's citizen is FORCED by its city's player (the citizens
+   *  object's forced count, `toggleCitizen`): the full re-place keeps it
+   *  (`replaceAllCitizens`). It is its city's, so it dies when the plot
+   *  changes city (`setTileOwner`). */
+  forced?: boolean;
   /** the floods of this tile's home river (`floodHome`) — the Great Bath's
    *  "+1 Faith for every time a tile belonging to this city has been
    *  Flooded" reads it. A flood counts once per episode (`countFlood`). */

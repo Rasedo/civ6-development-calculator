@@ -1404,7 +1404,7 @@ class SimEconomy:
         for _p in ("passable", "settle_ok", "d_usable", "d_usable0", "camp_ok",
                    "coastal_land", "coastal_water", "_sr_c", "district_complete", "hills",
                    "district_pillaged", "built_wonder_complete", "road", "railroad",
-                   "pillaged", "tile_flooded", "antiquity", "tile_locked", "feat_stripped"):
+                   "pillaged", "tile_flooded", "antiquity", "tile_locked", "tile_forced", "feat_stripped"):
             getattr(self, _p)[take] = False
         for _p, _v in (("improvement", -1), ("district", -1), ("built_wonder", -1),
                        ("res_id", -1), ("res_cat", 0), ("res_priority", 0),
@@ -7191,7 +7191,7 @@ class SimEconomy:
 
     def _city_specialists(self, row: int, sl: slice | None = None, workable: torch.Tensor | None = None) -> torch.Tensor:
         """[B, n, nD] long — the `effectiveSpecialists` twin for ANY seat row.
-        PINNED citizens (`city_spec_pin`) go in first, out of the population
+        The PLACED citizens (`city_spec_pin`) go in first, out of the population
         less its idle citizens (`city_idle`); then the OVERFLOW —
         population beyond the workable pool — fills whatever slots are still
         free, in PLACEABLE_DISTRICTS order. Slots = the district's standing
