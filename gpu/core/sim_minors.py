@@ -120,11 +120,13 @@ class SimMinors:
             self._mops_military_upgrade(s, alive)
             del self._cv_counted[s]
             del self._cv_yields_seen[s]
-            self._minor_trade(s)
             # the boosts its routes and the actions before them earned land
             # before its army's walk and its second hook's tree tick
             self._detect_minor_boosts(s, alive)
             self._minor_tactics(s)
+            # its Traders step on their routes after its units' turn
+            # (`minorPhase`)
+            self._minor_trade(s)
             # its knowledge base's route value K at its tactical turn, on the
             # trade list its City Analysis job kept as the turn opened
             # (`minorPhase`)

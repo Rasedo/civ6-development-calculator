@@ -263,7 +263,6 @@ export function minorPhase(state: GameState): void {
     minorMilitaryUpgrade(state, cityState);
     delete cityState.armyCounted;
     delete cityState.aiYields;
-    minorTrade(state, cityState);
     // the boosts its routes and the actions before them earned land before
     // its army's walk and its second hook's tree tick (runs/h1_duely1121
     // city-state 2 t47: Currency completed by the Trader's route, contract
@@ -271,6 +270,11 @@ export function minorPhase(state: GameState): void {
     // contract 123 posted by the t47 end look)
     detectBoosts(state, cityState.seat);
     if (!ordersHeld) cityStateMilitary(state, cityState);
+    // its Traders step on their routes after its units' turn, their route
+    // operation after the tactical moves (runs/h1_duelp1117 t225: city-state
+    // 4's Trader 655360 onto its centre 32:5 after its Field Cannon's and
+    // Ranger's moves; its Ski Resort tree's Check Plot found 32:5 empty)
+    minorTrade(state, cityState);
     // its knowledge base's route value K at its tactical turn, after its
     // city's update (whose builds read the K of the turn before), on the
     // trade list its City Analysis job kept as the turn opened: runs/h1_duelw1121

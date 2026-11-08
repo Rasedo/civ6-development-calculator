@@ -1617,13 +1617,17 @@ function minorAi(ctx: Ctx, b: TurnRecord, turn: number, made: ReadonlySet<Unit>,
   // Economic AI's contract purchase made in the turn at Movement 0, as a
   // unit bought stands its turn out (runs/h1_duely1124 t27: Granada's Builder
   // bought for its Farm tree's contract, the tree gone that turn, the Farm on
-  // 525 laid at t30)
+  // 525 laid at t30). A Trader stands where the first record holds it: its
+  // route's step comes after the units' turn (`minorPhase`; runs/h1_duelp1117
+  // t225: city-state 4's Trader 655360 steps onto its centre 32:5 after its
+  // units' moves, the Ski Resort tree's Check Plot that turn laying from the
+  // centre, the Resort on 33:5 laid from 32:5 at t232)
   const spentBuilders = new Set<Unit>();
   const boughtNow = new Set([...bought].map((u) => `${u.seat}:${u.id}`));
   for (const s of ctx.minorUnits) {
     const there = copy.units.find((x) => x.seat === s.seat && x.id === s.id);
     if (there) {
-      there.tileIndex = s.tileIndex;
+      if (s.type !== 'TRADER') there.tileIndex = s.tileIndex;
       there.charges = s.charges;
       continue;
     }
