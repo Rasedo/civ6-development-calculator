@@ -205,8 +205,10 @@ export function minorPhase(state: GameState): void {
     // route ended in its t135 turn begun again before its update, the
     // forecast's withheld Food 4.5 at a surplus of 6, m_foodLossAmounts
     // 1152; Civil Prestige 69 at t137 as logged). Its AI's later reads of the
-    // city's yields but the Food keep those before the route (City::GetYield
-    // 0x1cb8b0, cached from the first read while the game state is locked:
+    // city's yields keep those before the route, the Food apart and the
+    // totals' Production (City::GetYield 0x1cb8b0, each cached from its
+    // first read while the game state is locked, a re-placement in its
+    // update notwithstanding: `aiCityStats`):
     // runs/h1_duelz1117 t44 city-state 4's route Gold out of Democracy's
     // GOLD_PURCHASES, Political Philosophy 150.3 at t45; t46 city-state 3's
     // route Gold and Science out of Classical Republic's and Digital
@@ -241,11 +243,15 @@ export function minorPhase(state: GameState): void {
     // Kong t79 net -1 -> +1: the Archer's Maintenance at the t78 boost 0.2
     // takes it below the Warrior's 7.78)
     if (cityState.economy && cityState.centerIndex >= 0) cityState.economy.goldBoost = economicGoldBoost(cityState.netIncome ?? 0);
-    // the civics AI's government values on the city its update left: the
-    // Food focus it set re-placed its citizens (runs/h1_duely1128 city-state
-    // 3 t16-t30: the focus toggling a turn apart, its Production 4 / 3
-    // between the plots 399 and 445; Autocracy's wonder term and Political
-    // Philosophy 392.1 / 396.1 a turn apart as logged)
+    // the civics AI's government values on the city its update left, its
+    // yields as its AI read them before the dispatch, the Food and the
+    // totals' Production apart (`aiCityStats`): the Food focus it set
+    // re-placed its citizens
+    // (runs/h1_duely1128 city-state 3 t16-t30: the focus toggling a turn
+    // apart, its Production 4 / 3 between the plots 399 and 445; Autocracy's
+    // wonder term and Political Philosophy 392.1 / 396.1 a turn apart as
+    // logged; runs/h1_duelr1124 city-state 4 t218-230: its Culture 4.5 / 5.5
+    // read before the re-placement, Digital Democracy as logged)
     government();
     // its military AI's job (0x722690, the military's pass 2 after the
     // cities' in the Control Manager's first list): its operations' refresh

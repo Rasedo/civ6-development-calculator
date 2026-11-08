@@ -5,7 +5,9 @@
  * person classes' pseudo-yields, the governments' InfluencePointsThreshold,
  * and the AI lists the weights sum: System Yields and YieldSensitivities by
  * trait — a leader's traits through its InheritFrom chain, a
- * civilization's; the city-states' modifiers their envoys reach, the
+ * civilization's — and by strategy (Strategy_Priorities: the era
+ * strategies by era, every other by name); the city-states' modifiers
+ * their envoys reach, the
  * civics' modifiers (CivicModifiers), the technologies' modifiers
  * (TechnologyModifiers); the policies and governments in DATABASE ORDER
  * (the index the game's AI loops walk), the slot types, the great person
@@ -158,6 +160,24 @@ export const AI_LIST_ITEMS: Readonly<Record<string, readonly AiListItem[]>> = {
   {
    "item": "YIELD_CULTURE",
    "value": 20,
+   "favored": true,
+   "minDifficulty": null,
+   "maxDifficulty": null
+  }
+ ],
+ "CultureSensitivity": [
+  {
+   "item": "YIELD_CULTURE",
+   "value": 25,
+   "favored": true,
+   "minDifficulty": null,
+   "maxDifficulty": null
+  }
+ ],
+ "CultureVictoryYields": [
+  {
+   "item": "YIELD_CULTURE",
+   "value": 25,
    "favored": true,
    "minDifficulty": null,
    "maxDifficulty": null
@@ -388,6 +408,15 @@ export const AI_LIST_ITEMS: Readonly<Record<string, readonly AiListItem[]>> = {
    "maxDifficulty": null
   }
  ],
+ "MilitaryVictoryYields": [
+  {
+   "item": "YIELD_PRODUCTION",
+   "value": 25,
+   "favored": true,
+   "minDifficulty": null,
+   "maxDifficulty": null
+  }
+ ],
  "ModernSensitivity": [
   {
    "item": "YIELD_SCIENCE",
@@ -438,6 +467,15 @@ export const AI_LIST_ITEMS: Readonly<Record<string, readonly AiListItem[]>> = {
    "maxDifficulty": null
   }
  ],
+ "ReligiousVictoryYields": [
+  {
+   "item": "YIELD_FAITH",
+   "value": 75,
+   "favored": true,
+   "minDifficulty": null,
+   "maxDifficulty": null
+  }
+ ],
  "RenaissanceYields": [
   {
    "item": "YIELD_FOOD",
@@ -458,6 +496,24 @@ export const AI_LIST_ITEMS: Readonly<Record<string, readonly AiListItem[]>> = {
   {
    "item": "YIELD_SCIENCE",
    "value": 20,
+   "favored": true,
+   "minDifficulty": null,
+   "maxDifficulty": null
+  }
+ ],
+ "ScienceSensitivity": [
+  {
+   "item": "YIELD_SCIENCE",
+   "value": 25,
+   "favored": true,
+   "minDifficulty": null,
+   "maxDifficulty": null
+  }
+ ],
+ "ScienceVictoryYields": [
+  {
+   "item": "YIELD_SCIENCE",
+   "value": 50,
    "favored": true,
    "minDifficulty": null,
    "maxDifficulty": null
@@ -2225,6 +2281,52 @@ export const AI_ERA_STRATEGY_LISTS: Readonly<Record<string, readonly AiListRef[]
   },
   {
    "list": "ModernSensitivity",
+   "system": "YieldSensitivities",
+   "minDifficulty": null,
+   "maxDifficulty": null
+  }
+ ]
+};
+export const AI_STRATEGY_LISTS: Readonly<Record<string, readonly AiListRef[]>> = {
+ "VICTORY_STRATEGY_CULTURAL_VICTORY": [
+  {
+   "list": "CultureVictoryYields",
+   "system": "Yields",
+   "minDifficulty": null,
+   "maxDifficulty": null
+  },
+  {
+   "list": "CultureSensitivity",
+   "system": "YieldSensitivities",
+   "minDifficulty": null,
+   "maxDifficulty": null
+  }
+ ],
+ "VICTORY_STRATEGY_MILITARY_VICTORY": [
+  {
+   "list": "MilitaryVictoryYields",
+   "system": "Yields",
+   "minDifficulty": null,
+   "maxDifficulty": null
+  }
+ ],
+ "VICTORY_STRATEGY_RELIGIOUS_VICTORY": [
+  {
+   "list": "ReligiousVictoryYields",
+   "system": "Yields",
+   "minDifficulty": null,
+   "maxDifficulty": null
+  }
+ ],
+ "VICTORY_STRATEGY_SCIENCE_VICTORY": [
+  {
+   "list": "ScienceVictoryYields",
+   "system": "Yields",
+   "minDifficulty": null,
+   "maxDifficulty": null
+  },
+  {
+   "list": "ScienceSensitivity",
    "system": "YieldSensitivities",
    "minDifficulty": null,
    "maxDifficulty": null

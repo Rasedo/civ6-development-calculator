@@ -68,6 +68,7 @@
     - "C-130: the city update's Default Specialization on an empty queue, before the civics AI's turn; the dig sites a major's civic lays before the minors' turns — READ (0x5ce8f0, 0x6096c0's +0x370 list, CultureAI +0x208), both twins"
     - "C-126: the building contract purchase reads the turn's own City Analysis — READ (0x68afe0 -> 0x5d4920 on CityBuildAI +0xcf8, the analysis 0x5c24e0 on player signal +0x258 before the +0x370 list), both twins"
     - "C-98: a city-state's City Analysis counts its knowledge base as its last turn left it — READ (0x608580 at 0x6085c9, 0x5c24e0 / 0x6fae70 on player signal +0x258, 0x785f30 in 0x6096c0's +0x370 list), both twins"
+    - "C-130: the city yields' cache holds through the update's re-placement — READ (0x1cb8b0, 0x91e540), the split a fit, both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...its watched setter 0x731d10 on +0x220) and acts only in its own pass: the turn start 0x608870 sets the pass to 4 and runs the whole +0x370 list at 4, 3, 2, 1, 0; 0x608580 then runs..."

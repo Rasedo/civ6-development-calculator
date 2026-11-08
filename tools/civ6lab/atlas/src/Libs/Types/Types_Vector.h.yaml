@@ -427,11 +427,19 @@
     - recording: h1_duelv1124
       turn: 1
       value: Rome's Urban Planning 18 / God King 11 at 25 turns on DefaultYieldBias
-  impl: [cpu/core/aiValue.ts:AiValueView, cpu/core/aiWeights.ts:yieldWeights]
+    - recording: h1_duelr1128
+      turn: 82
+      value: "the victory manager's part: China under VICTORY_STRATEGY_SCIENCE_VICTORY (+0.5 Science), the Free Cities' K 6.41 t82-85; Rome under the religious victory (+0.75 Faith), city-states 2 and 4's K 5.39 t69-88, 4.64 from t127, as logged"
+  impl:
+    - cpu/core/aiValue.ts:AiValueView
+    - cpu/core/aiWeights.ts:yieldWeights
+    - cpu/core/aiWeights.ts:strategyRefs
+    - gpu/core/sim_minors.py:_major_lists
   readings:
     - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
     - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
     - "C-97: the government and policy choice — the choice READ, the values PARTLY READ"
+    - "C-130: a major's followed strategies in its yield weights — the records (AI_Victories.csv), both twins"
   notes:
     - "imported: READ in its section, no confirming case found beside it"
     - ".claude/scratchpad/cb/notes.txt: ...alue 0x7a6690  yieldValue = amt * fx(Yields.DefaultValue) (gold .5) * (1 + min(w[y], 9.0)) ; w[y] = 0x702ad0 = sum of 5 parts (player arrays).  + per entry extras: GA points (PSEUDOYIELD_GOLDENAGE_POINT) etc;..."

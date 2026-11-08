@@ -459,10 +459,9 @@ class SimInit:
         self._cv_counted: dict[int, torch.Tensor] = {}
         # per minor in its AI turn from its free Trader's dispatch, its city's
         # yields (the total [B, 6], the attribute base [B, 6]) as its AI read
-        # them before it and the games [B] where they hold (none once its
-        # citizens are re-placed): the reads but the Food take them
-        # (`CityState.aiYields`)
-        self._cv_yields_seen: dict[int, tuple[torch.Tensor, torch.Tensor, torch.Tensor]] = {}
+        # them before it: the totals' reads but the Food and the Production,
+        # the bases' but the Food take them (`CityState.aiYields`)
+        self._cv_yields_seen: dict[int, tuple[torch.Tensor, torch.Tensor]] = {}
         # per minor in its turn, its danger map ([B, T]) as its DoTurn built
         # it, after its growth (`Seat.dangerOpen`): its city trees read it
         self._minor_danger_open: dict[int, torch.Tensor] = {}
@@ -4689,13 +4688,17 @@ class SimInit:
         # YieldSensitivities system's (`majorYieldBias`): per
         # civilization-leader pair its traits' (flattened pair-major), per
         # agenda its traits' [NA, 12], per era every era strategy's up to it
-        # [n_eras, 12]; and each major's agendas (`Seat.agendas`)
+        # [n_eras, 12], per other strategy its lists [NST, 12]; and each
+        # major's agendas (`Seat.agendas`) and the strategies it follows
+        # (`Seat.strategies`)
         _av = rules.ai_value
         self._major_yield_bias = torch.tensor([int(v) for row in _av["majorYieldBias"] for v in row] or [0],
                                               dtype=torch.long, device=device)
         self._agenda_yield_bias = torch.tensor(_av["agendaYieldBias"] or [[0] * 12], dtype=torch.long, device=device)
         self._era_yield_bias = torch.tensor(_av["eraYieldBias"], dtype=torch.long, device=device)
+        self._strategy_yield_bias = torch.tensor(_av["strategyYieldBias"] or [[0] * 12], dtype=torch.long, device=device)
         self.civ_agendas = torch.zeros(B, self.n_majors, self._agenda_yield_bias.shape[0], dtype=torch.bool, device=device)
+        self.civ_strategies = torch.zeros(B, self.n_majors, self._strategy_yield_bias.shape[0], dtype=torch.bool, device=device)
         _ab = _uq["abilities"]
         self._iteru_mult = float(_ab["iteruProdMult"])
         self._knarr_heal = int(_ab["knarrNeutralHeal"])

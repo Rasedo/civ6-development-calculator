@@ -831,6 +831,7 @@ SEAT = {
     "sciRate": _civ_scalar("civ_sci_rate"),
     "culRate": _civ_scalar("civ_cul_rate"),
     "agendas": lambda sim, b, rows: [[i for i, on in enumerate(sim.civ_agendas[b, c].tolist()) if on] for c in rows],
+    "strategies": lambda sim, b, rows: [[i for i, on in enumerate(sim.civ_strategies[b, c].tolist()) if on] for c in rows],
     "tourRate": _civ_scalar("civ_tour_rate"),
     "tourismTo": lambda sim, b, rows: [
         [int(sim.civ_tourism_to[b, c, o]) if o != c else 0 for o in _civ_seats(sim)] for c in rows],

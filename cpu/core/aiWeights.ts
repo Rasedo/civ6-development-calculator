@@ -12,7 +12,8 @@
  * - the Economic AI's gold boost (0x687bf0, Gold only): -0.2 x the gold per
  *   turn while that is negative;
  * - the Yields lists (0x6fde70, 0x7ba440): the leader's and the
- *   civilization's trait lists (a list kept while the player's handicap lies
+ *   civilization's trait lists, a major's agendas' and the strategies it
+ *   follows' (`strategyRefs`; a list kept while the player's handicap lies
  *   in its MinDifficulty..MaxDifficulty), each row Value x 0.01 (subtracted
  *   where Favored is false; an item kept while the handicap lies in its own
  *   bounds);
@@ -29,7 +30,7 @@
  * (player +0x1358 +0xf8, Eras +0x1c).
  */
 import { AI_AGENDA_TRAITS, AI_CIVILIZATION_TRAITS, AI_DIFFICULTIES, AI_ERA_STRATEGY_LISTS, AI_LEADER_TRAITS, AI_LIST_ITEMS,
-  AI_TRAIT_LISTS } from '../data/aiTables';
+  AI_STRATEGY_LISTS, AI_TRAIT_LISTS } from '../data/aiTables';
 import { ERAS } from '../data/techs';
 import { CIV_LEADERS } from '../data/seats';
 import { FX, fmul, fxConst, type AiListItem, type AiListRef } from './aiValue';
@@ -62,13 +63,19 @@ function within(r: AiListRef | AiListItem, h: number): boolean {
 /** the weight lists a major carries beyond its traits': its agendas'
  *  (AgendaTraits, `Seat.agendas`) and its era strategies' — every era's up to
  *  its own (StrategyConditions "Is <Era>", started the AI turn the major
- *  first holds a technology or civic of the era, never stopped) */
+ *  first holds a technology or civic of the era, never stopped) and the
+ *  other strategies' it follows (`Seat.strategies`, `AI_STRATEGY_LISTS`:
+ *  runs/h1_duelr1128 China under VICTORY_STRATEGY_SCIENCE_VICTORY's +0.5
+ *  Science, its route to city-state 3 under Sovereignty's 2 Science the
+ *  Free Cities' K 6.41 t82-85; Rome under VICTORY_STRATEGY_RELIGIOUS_VICTORY's
+ *  +0.75 Faith t46-126, city-states 2 and 4's K 5.39 t69-89, 4.64 from t127) */
 function strategyRefs(seat: number, s: Seat): AiListRef[] {
   if (!isCiv(seat)) return [];
   const out: AiListRef[] = [];
   for (const a of s.agendas ?? []) for (const t of AI_AGENDA_TRAITS[a] ?? []) out.push(...(AI_TRAIT_LISTS[t] ?? []));
   const era = civEraIndex(s.research.techs, s.research.civics);
   for (let e = 0; e <= era; e++) out.push(...(AI_ERA_STRATEGY_LISTS[`ERA_${ERAS[e].toUpperCase()}`] ?? []));
+  for (const st of s.strategies ?? []) out.push(...(AI_STRATEGY_LISTS[st] ?? []));
   return out;
 }
 
@@ -118,6 +125,15 @@ export function majorYieldBias(civ: number): number[] {
 /** an agenda's lists (AgendaTraits) */
 export function agendaYieldBias(agenda: string): number[] {
   return weightRow((AI_AGENDA_TRAITS[agenda] ?? []).flatMap((t) => AI_TRAIT_LISTS[t] ?? []));
+}
+
+/** the strategies beside the era ones that carry a weight list, by name
+ *  (`Seat.strategies` indexes them) */
+export const AI_STRATEGIES: readonly string[] = Object.keys(AI_STRATEGY_LISTS);
+
+/** a strategy's lists (`AI_STRATEGY_LISTS`) */
+export function strategyYieldBias(strategy: string): number[] {
+  return weightRow(AI_STRATEGY_LISTS[strategy] ?? []);
 }
 
 /** the era strategies' lists of every era up to `era` (an Eras index) */

@@ -942,9 +942,11 @@ export interface Seat {
   armyCounted?: Record<string, number>;
   /** a city-state's city yields (the total and the attribute base) as its
    *  AI read them before its free Trader's dispatch, which its AI's later
-   *  reads in the turn take but the Food (the city's cached yields,
-   *  City::GetYield 0x1cb8b0, kept from their first read while the game
-   *  state is locked); absent outside that turn */
+   *  reads in the turn take, a re-placement of its citizens
+   *  notwithstanding: the totals but the Food and the Production, the
+   *  bases but the Food (the city's cached yields, City::GetYield 0x1cb8b0,
+   *  each kept from its first read while the game state is locked:
+   *  `aiCityStats`); absent outside that turn */
   aiYields?: { total: Yields; base: Yields };
   /** a city-state's danger map (`dangerPlane`) per plot as its DoTurn
    *  builds it (0x4e4560 -> 0x46cdd0 -> 0x717460, after its city's turn),
@@ -958,6 +960,12 @@ export interface Seat {
   /** a major's agendas (`agendas.ts`): its historical ones, then the random
    *  ones as drawn; absent, none */
   agendas?: string[];
+  /** the strategies a major's victory manager follows beside its era ones
+   *  (the victory strategies, Dark Age: AI_Victories.csv "Following" /
+   *  "Exclusive"), whose weight lists its yield weights sum
+   *  (`AI_STRATEGY_LISTS`); a major's AI chooses them, so the replay imports
+   *  the record's; absent, none */
+  strategies?: string[];
   /** the player its knowledge base last met (the trade record's +0x6e0,
    *  0x5ecb50), whose cities its route value walks; absent, itself */
   tradeSeat?: number;

@@ -341,7 +341,7 @@ const OP_DEFS = [...MINOR_OP_DEFS, FREE_RAID_DEF];
 import { AI_BUILDINGS, AI_DISTRICTS, AI_FEATURES, AI_IMPROVEMENTS, AI_PROJECTS, AI_RESOURCES, AI_UNITS } from '../data/aiBuildTables';
 import { unitEfficiency } from '../core/aiUnitEfficiency';
 import { minorDistrictVerdict } from '../core/minorCityAi';
-import { AI_YIELDS, agendaYieldBias, eraYieldBias, majorYieldBias } from '../core/aiWeights';
+import { AI_STRATEGIES, AI_YIELDS, agendaYieldBias, eraYieldBias, majorYieldBias, strategyYieldBias } from '../core/aiWeights';
 import { AI_AGENDAS } from '../data/aiTables';
 import { ERAS as ERA_NAMES } from '../data/techs';
 import type { Era } from '../data/techs';
@@ -1056,11 +1056,14 @@ export function buildRules() {
       // system's six then the YieldSensitivities system's (AI_YIELDS order) —
       // the major's weights the trade AI's walk reads: each
       // civilization-leader pair's traits', each agenda's (AI_AGENDAS order),
-      // every era strategy's up to each era (ERAS order)
+      // every era strategy's up to each era (ERAS order), each other
+      // strategy's (AI_STRATEGY_LISTS order)
       majorYieldBias: CIV_LEADERS.map((_, i) => majorYieldBias(i)),
       agendas: AI_AGENDAS,
       agendaYieldBias: AI_AGENDAS.map((a) => agendaYieldBias(a)),
       eraYieldBias: ERA_NAMES.map((_, e) => eraYieldBias(e)),
+      strategies: AI_STRATEGIES,
+      strategyYieldBias: AI_STRATEGIES.map((st) => strategyYieldBias(st)),
     },
     // the city build AI's value tables (`aiCityBuild.ts`, `aiPlotValue.ts`,
     // `aiDistrictValue.ts`, `aiProjectValue.ts`, `aiEconomic.ts`): the yields'

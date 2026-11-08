@@ -91,6 +91,7 @@ import { CAMP_DISPERSAL_GOLD, MP_SCALE, scaleByGameSpeed } from '../data/constan
 import { PROMOTE_HEAL, aiPromotionPick, attacksPerTurn, promoCount, takePromotion, unitPromoRows } from '../core/promotions';
 import { fireFeature } from '../data/disasters';
 import { civicAgendas, setupAgendas } from '../core/agendas';
+import { AI_STRATEGIES } from '../core/aiWeights';
 import { holdMinorOrders, holdMinorRoutePick, holdMinorStart, minorCombatDesire, minorResearch, minorSetItem, minorBuildFacts, minorKnowledge, minorKnownUnits, minorItemCost, minorItemInHand, minorItemKey, minorBuildingPrice, minorRaiseBuilding, minorUnitPrice, minorUpgradeUnit, minorUpgradeVisible, techContractsCompleted, traceMinorLays, traceMinorPolicyScores, traceMinorPurchases } from '../core/minorBuild';
 import { DEDICATED_IMPROVEMENTS, IMPROVEMENT_IDS, unitActionIndex } from '../core/unitActions';
 import { loadCatalog, type Catalog, type DumpCity, type TurnRecord } from './record';
@@ -329,6 +330,9 @@ interface Ctx {
   /** each major's civics at the agendas' last staging (`stageAgendas`); null
    *  before the set-up's */
   agendaCivics: Map<number, readonly string[]> | null;
+  /** the game's victory manager log (`<dump>.logs/AI_Victories.csv`): per
+   *  player its strategy rows in order (`stageStrategies`) */
+  strategyLog: Map<number, StrategyRow[]>;
   /** the civics AI's choices against the record's (`ResearchAiTally`, no
    *  log names the civic chosen), each seat's civic as the pair opened, the
    *  game's AI log of civics (`<dump>.logs/AI_GovtPolicies.csv`, per
@@ -387,6 +391,51 @@ export interface ResearchAiTally {
 }
 
 const newResearchTally = (): ResearchAiTally => ({ choices: 0, record: 0, logged: 0, log: 0, random: 0 });
+
+/** a victory manager row: at `turn` the player's AI took up (`on`:
+ *  "Following", "Exclusive") or left ("Stopped", "Forbidden") `strategy` */
+interface StrategyRow {
+  turn: number;
+  strategy: string;
+  on: boolean;
+}
+
+/** the game's victory manager log beside the dump (AI_Victories.csv "Game
+ *  Turn, Player, Strategy, Status"), the strategies carrying a weight list
+ *  (`AI_STRATEGIES`); an empty map without one */
+function loadStrategyLog(dumpPath: string): Map<number, StrategyRow[]> {
+  const out = new Map<number, StrategyRow[]>();
+  let text = '';
+  try {
+    text = readFileSync(dumpPath.replace(/\.jsonl$/, '.logs/AI_Victories.csv'), 'utf8');
+  } catch {
+    return out;
+  }
+  for (const line of text.split('\n').slice(1)) {
+    const p = line.split(',').map((x) => x.trim());
+    if (p.length < 4 || !AI_STRATEGIES.includes(p[2])) continue;
+    const player = Number(p[1]);
+    out.set(player, [...out.get(player) ?? [], { turn: Number(p[0]), strategy: p[2], on: p[3] === 'Following' || p[3] === 'Exclusive' }]);
+  }
+  return out;
+}
+
+/** THE MAJORS' STRATEGIES (`Seat.strategies`): a major's victory manager
+ *  is its AI's, so each major follows what the record's log has it follow
+ *  as of the turn — its rows up to it, in AI_STRATEGIES order */
+function stageStrategies(ctx: Ctx, turn: number): void {
+  for (const s of ctx.state.seats) {
+    if (!isCiv(s.seat)) continue;
+    const on = new Set<string>();
+    for (const r of ctx.strategyLog.get(ctx.playerOfSeat.get(s.seat) ?? -1) ?? []) {
+      if (r.turn > turn) break;
+      if (r.on) on.add(r.strategy);
+      else on.delete(r.strategy);
+    }
+    if (on.size) s.strategies = AI_STRATEGIES.filter((st) => on.has(st));
+    else delete s.strategies;
+  }
+}
 
 /** the game's AI research log beside the dump, or an empty map */
 function loadAiResearchLog(dumpPath: string): Map<string, AiResearchRows> {
@@ -5748,7 +5797,7 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
     state, cat, W: recs[0].head.W, seatOfPlayer: first.seatOfPlayer, playerOfSeat: first.playerOfSeat,
     units: new Map(), retained: new Map(), pendingMinors: new Map(), next: first, tally: new Map(), fellBack: new Map(), imposed: new Map(), reasons: new Map(),
     engineKilled: new Set(), paths: new Map(), walked: new Set(), steps: new Map(), barbBlows: new Map(), barbCentres: new Map(), gone: new Map(), barbSeized: [], minorBlows: new Map(), minorShots: [], minorPromoted: new Map(), minorBuys: [], minorImproves: [], minorClears: [], minorCleared: new Set(), minorClearItems: new Map(), minorClearUnits: [], barbBattles: [], barbFought: new Set(), barbDraws: [], promoteHp: new Map(), minorUnits: [], minorGround: [], buyTrace, lateBlows: [], upgradeInto: new Set(), upgradedFrom: new Map(), levyFrom: new Map(), barbSteps: [], barbPillaged: [], envoys: [], battled: new Set(), fortified: new Map(), undug: new Map(), streams: new Map(), applied: new Set(), barbNew: [], lateEnvoys: [], log: history.randLog, stream, prev: recs[0],
-    researchAi: report.researchAi, researchScores: report.researchScores, agendaCivics: null, researchBefore: new Map(), researchAtTurn: new Map(), aiResearchLog: loadAiResearchLog(dumpPath),
+    researchAi: report.researchAi, researchScores: report.researchScores, agendaCivics: null, strategyLog: loadStrategyLog(dumpPath), researchBefore: new Map(), researchAtTurn: new Map(), aiResearchLog: loadAiResearchLog(dumpPath),
     tactical: loadTactical(dumpPath), barbTally: report.barbTactics, minorTally: report.minorTactics, minorDraws: report.minorDraws,
     civicAi: report.civicAi, civicScores: report.civicScores, civicBefore: new Map(), aiCivicLog: govtLog.civics, aiPolicyLog: govtLog.policies,
     scores: report.scores, turn: recs[0].turn, memoryLogs: new MemoryLogs(dumpPath), gameMemory: GameMemory.of(dumpPath), armyLogged: new Map(), minorLookTypes: new Map(), minorDying: [],
@@ -5901,6 +5950,7 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
     activeBoosts(ctx, b, activePlayer(a));
     stageEnvoys(ctx, ds, a, b, history.randLog);
     stageAgendas(ctx, a.turn, history.randLog);
+    stageStrategies(ctx, a.turn);
     const staged = stagePolicies(ctx, ds);
     // the generator: held at each witnessed point (`streamHold`)
     const seed = turnSeed(b);

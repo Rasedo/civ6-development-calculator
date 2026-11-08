@@ -11,7 +11,11 @@
     - recording: h1_duely1128
       turn: 17
       value: city-state 3's government values on the Production its Food focus left (Political Philosophy 392.1 / 396.1 a turn apart as logged)
+    - recording: h1_duelr1124
+      turn: 218
+      value: the caches held through Bologna's update re-placement, the government values on the city before it as logged t218-230
   readings:
+    - "C-130: the city yields' cache holds through the update's re-placement — READ (0x1cb8b0, 0x91e540), the split a fit, both twins"
     - "C-130: a city-state's government values on the city its update left; the boosts its city's turn earns land at once — READ, both twins"
   context:
     - ...locked (game instance +0x458 at 1 or more), else computes afresh (0x1c5350). The lock 0x91e540 (from the AI turn start 0x608870 at 0x60889e) on its first count fires game signal +0x1...

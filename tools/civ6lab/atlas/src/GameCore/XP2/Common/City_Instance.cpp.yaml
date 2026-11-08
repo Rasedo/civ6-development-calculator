@@ -167,6 +167,9 @@
     - recording: h1_duelz1117
       turn: 44
       value: city-state 4's route Gold out of Democracy's GOLD_PURCHASES after its Trader's dispatch; Political Philosophy 150.3 at t45 as logged
+    - recording: h1_duelr1124
+      turn: 218
+      value: "Bologna's government values on the city before its update's Food focus re-placement (Culture 4.5 / 5.5): Digital Democracy 888.5 / 892.5 a turn apart t218-230 as logged"
   impl:
     - cpu/core/aiModifiers.ts:ANALYZERS
     - cpu/core/aiView.ts:aiCityStats
@@ -174,6 +177,7 @@
     - cpu/core/minorBuild.ts:seen
     - cpu/core/types.ts:Seat
   readings:
+    - "C-130: the city yields' cache holds through the update's re-placement — READ (0x1cb8b0, 0x91e540), the split a fit, both twins"
     - "C-130: a minor's levy home after its bank; its free Trader's route before its city update, the AI's yields cached before it; a deleted unit off its list at once; a major's founded city keeps its trade list at once — READ (0x4e4560 at 0x4e45ee / 0x4e4638, 0x6096c0's passes, 0x688eaa, 0x1cb8b0, 0x948500 at 0x9485e5, 0x1eae70 at 0x1eb335 -> 0x5cdd70 at 0x5ce191), the cache's span a fit, both twins"
     - "H-1: the citizen manager's placement and the yield flags — READ"
     - "C-97: the government and policy choice — the choice READ, the values PARTLY READ"
@@ -237,6 +241,7 @@
       value: city-state 3's government values on the Production its Food focus left (Political Philosophy 392.1 / 396.1 a turn apart as logged)
   readings:
     - "C-130: a city-state's government values on the city its update left; the boosts its city's turn earns land at once — READ, both twins"
+    - "C-130: the city yields' cache holds through the update's re-placement — READ (0x1cb8b0, 0x91e540), the split a fit, both twins"
   context:
     - ...; Player_Cities' handler 0x370080 (bound by 0x36fe20) clears every city's cached flags (0x1cd040). So the flat bonus's wonder term (0x6c5bcf) reads the city as it stands when the AI...
   review: reviewed

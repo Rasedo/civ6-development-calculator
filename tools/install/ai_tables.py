@@ -8,7 +8,8 @@ cpu/data/aiTables.ts (the value layer every party reads, cpu/core/aiValue.ts):
 the Yields' and PseudoYields' DefaultValue, the great person classes' pseudo
 yields, each government's InfluencePointsThreshold, and the AI lists the
 weights sum: per trait (a leader's through its InheritFrom chain, its
-civilization's; System Yields / YieldSensitivities), each item with its
+civilization's; System Yields / YieldSensitivities), per era strategy and per
+other strategy (Strategy_Priorities), each item with its
 difficulty bounds; the difficulties' order; the policies and governments in
 DATABASE ORDER (the index the AI's loops walk and its ties fall to; the
 order checked against every AI_GovtPolicies.csv beside the H-1 recordings,
@@ -253,11 +254,20 @@ def build() -> str:
                     if len(fs) == 1 and fs[0].startswith("Is ") and fs[0][3:] in era_by_word}
     weight_lists = {c["ListType"]: c["System"] for c in rows("AiLists") if c.get("ListType") and c.get("System") in WEIGHT_SYSTEMS}
     era_lists: dict[str, list] = collections.defaultdict(list)
+    # every other strategy's (the victory manager's: the victory strategies,
+    # Dark Age, ...) Strategy_Priorities lists of a weight system, by strategy
+    strategy_lists: dict[str, list] = collections.defaultdict(list)
     for c in rows("Strategy_Priorities"):
         st, lt = c.get("StrategyType"), c.get("ListType")
-        if st in era_strategy and lt in weight_lists:
-            era_lists[era_strategy[st]].append({"list": lt, "system": weight_lists[lt], "minDifficulty": None, "maxDifficulty": None})
-    wanted = {x["list"] for v in trait_lists.values() for x in v} | {x["list"] for v in era_lists.values() for x in v}
+        if lt not in weight_lists or not st:
+            continue
+        ref = {"list": lt, "system": weight_lists[lt], "minDifficulty": None, "maxDifficulty": None}
+        if st in era_strategy:
+            era_lists[era_strategy[st]].append(ref)
+        else:
+            strategy_lists[st].append(ref)
+    wanted = ({x["list"] for v in trait_lists.values() for x in v} | {x["list"] for v in era_lists.values() for x in v}
+              | {x["list"] for v in strategy_lists.values() for x in v})
     difficulties = [c["DifficultyType"] for c in keyed(rows("Difficulties"), "DifficultyType").values()]
 
     def lit(name, value, typ):
@@ -317,7 +327,9 @@ def build() -> str:
         " * person classes' pseudo-yields, the governments' InfluencePointsThreshold,\n"
         " * and the AI lists the weights sum: System Yields and YieldSensitivities by\n"
         " * trait — a leader's traits through its InheritFrom chain, a\n"
-        " * civilization's; the city-states' modifiers their envoys reach, the\n"
+        " * civilization's — and by strategy (Strategy_Priorities: the era\n"
+        " * strategies by era, every other by name); the city-states' modifiers\n"
+        " * their envoys reach, the\n"
         " * civics' modifiers (CivicModifiers), the technologies' modifiers\n"
         " * (TechnologyModifiers); the policies and governments in DATABASE ORDER\n"
         " * (the index the game's AI loops walk), the slot types, the great person\n"
@@ -342,6 +354,7 @@ def build() -> str:
         + lit("AI_EXCLUSIVE_AGENDAS", exclusive, "readonly (readonly [string, string])[]")
         + lit("AI_AGENDA_TRAITS", {a: agenda_traits[a] for a in agendas if agenda_traits[a]}, "Readonly<Record<string, readonly string[]>>")
         + lit("AI_ERA_STRATEGY_LISTS", dict(era_lists), "Readonly<Record<string, readonly AiListRef[]>>")
+        + lit("AI_STRATEGY_LISTS", dict(sorted(strategy_lists.items())), "Readonly<Record<string, readonly AiListRef[]>>")
         + lit("AI_MINOR_INFLUENCE_MODIFIERS", dict(sorted(minor_influence.items())), "Readonly<Record<string, readonly AiModifier[]>>")
         + lit("AI_CIVIC_MODIFIERS", {k: [modifier(m) for m in v] for k, v in sorted(civic_mods.items())},
               "Readonly<Record<string, readonly AiModifier[]>>")

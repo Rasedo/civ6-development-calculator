@@ -937,6 +937,17 @@
           "note": "a major's agendas (the replay imports them from the game's draws), as indices of the Agendas table ascending"
         },
         {
+          "name": "strategies",
+          "compare": "exact",
+          "covers": [
+            "Seat.strategies"
+          ],
+          "planes": [
+            "civ_strategies"
+          ],
+          "note": "the strategies a major follows beside its era ones (the replay imports the record's), as indices of AI_STRATEGIES ascending"
+        },
+        {
           "name": "tourRate",
           "compare": "exact",
           "covers": [

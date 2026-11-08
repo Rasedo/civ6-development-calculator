@@ -93,12 +93,11 @@ class SimMinors:
             self._minor_economic_disband(s, fell)
             # its Economic AI's turn ends on its free Trader's route, before
             # its city update reads the city (`minorTradePick`); its AI's
-            # reads of the city's yields but the Food keep those before it
-            # (`CityState.aiYields`)
+            # reads of the city's yields keep those before it, the Food and
+            # the totals' Production apart (`CityState.aiYields`)
             _row = self._CITY_MINOR0 + s
             self._cv_yields_seen[s] = (self._seat_city_stats(_row, record=False)[0][:, 0].clone(),
-                                       self._seat_city_base(_row)[:, 0].clone(),
-                                       torch.ones(self.B, dtype=torch.bool, device=self.device))
+                                       self._seat_city_base(_row)[:, 0].clone())
             # the route's values at the Gold boost the Economic AI's turn
             # writes before it, its city update's at the turn before's
             _boost_was = self.citystate_gold_boost[:, s].clone()
@@ -957,8 +956,10 @@ class SimMinors:
         """[B, 12] raw — the weight lists major row `r` carries, summed per
         item: its leader's and civilization's (`majorYieldBias`), its
         agendas' (`civ_agendas`, `agendaYieldBias`) and its era
-        strategies' — every era's up to its own (`eraYieldBias`, cumulative);
-        the Yields system's six, then the YieldSensitivities system's"""
+        strategies' — every era's up to its own (`eraYieldBias`, cumulative)
+        — and the other strategies' it follows (`civ_strategies`,
+        `strategyYieldBias`); the Yields system's six, then the
+        YieldSensitivities system's"""
         lead = self.row_leader[:, r]
         idx = lead.clamp(min=0).unsqueeze(1) * 12 + torch.arange(12, device=self.device).unsqueeze(0)
         out = torch.where((lead >= 0).unsqueeze(1), self._major_yield_bias.take(idx), torch.zeros_like(idx))
@@ -966,7 +967,7 @@ class SimMinors:
             out = out + (self.civ_agendas[:, r].long() @ self._agenda_yield_bias)
         era = self._civ_era(self.civ_techs[:, r], self.civ_civics[:, r]).long()
         out = out + self._era_yield_bias[era.clamp(min=0, max=self._era_yield_bias.shape[0] - 1)]
-        return out
+        return out + (self.civ_strategies[:, r].long() @ self._strategy_yield_bias)
 
     def _major_yield_w(self, r: int) -> dict:
         """`yieldWeights` of major row `r`, per YieldType [B] raw: the
@@ -3049,10 +3050,6 @@ class SimMinors:
         """`minorReplaceCitizens`: every citizen of minor `s`'s city re-placed
         where `mask` (0x196320)"""
         self._minor_place_citizens(s, mask, self.city_pop[:, self._CITY_MINOR0 + s, 0], full=True)
-        # the re-placed city's yields read afresh (`CityState.aiYields`)
-        seen = self._cv_yields_seen.get(s)
-        if seen is not None:
-            seen[2].logical_and_(~mask)
 
     def _minor_food_focus(self, s: int, mask: torch.Tensor) -> None:
         """`minorFoodFocus` where `mask`: Food favored below a surplus of 1.0

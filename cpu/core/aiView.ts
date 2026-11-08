@@ -84,14 +84,25 @@ const AI_YIELD_KEYS: readonly YieldKey[] = AI_YIELDS.map((y) => YIELD_KEY[y]);
 const govType = (id: string): string => gameTypeOf('government', id, 'GOVERNMENT_');
 const UNIT_ACTION = unitActionIndex(IMPROVEMENT_IDS);
 
-/** a city's stats as the AI reads them (City::GetYield 0x1cb8b0, cached on
- *  its first read while the game state is locked): a city-state's yields but
- *  the Food those its AI read before its free Trader's dispatch, while its
- *  citizens stand (`CityState.aiYields`) */
+/** a city's stats as the AI reads them (City::GetYield 0x1cb8b0, each yield
+ *  cached on its first read while the game state is locked; no re-placement
+ *  of its citizens clears it): a city-state's yields as its AI read them
+ *  before its free Trader's dispatch (`CityState.aiYields`) — the totals but
+ *  the Food and the Production, the attribute bases (the amenity terms'
+ *  yields) but the Food — the rest as its citizens stand. runs/h1_duelr1124
+ *  city-state 4 t218-230: its Food focus toggling a turn apart (Culture 4.5
+ *  / 5.5, Production 13 / 13.5), its government values on the city before
+ *  the update's re-placement, Digital Democracy 888.5 / 892.5 a turn apart
+ *  as logged; runs/h1_duelr1128 city-state 3 t16-t30: the total Production
+ *  4 / 3 after it, Political Philosophy 392.1 / 396.1 as logged */
 export function aiCityStats(st: CityStats, cs: CityState | undefined): CityStats {
   const seen = cs?.aiYields;
   if (!seen) return st;
-  return { ...st, total: { ...seen.total, food: st.total.food }, baseYields: { ...seen.base, food: st.baseYields.food } };
+  return {
+    ...st,
+    total: { ...seen.total, food: st.total.food, production: st.total.production },
+    baseYields: { ...seen.base, food: st.baseYields.food },
+  };
 }
 
 /** a city's growth as the growth forecast reads it (`CityGrowth`) */

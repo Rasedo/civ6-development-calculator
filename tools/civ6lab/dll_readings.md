@@ -11318,3 +11318,61 @@ gpu/core/sim_tactics.py.
   not keep: runs/h1_duelr1117 t86 city-state 4's centre holds 1048580
   (bought t85) and 1114113 (made t86), the game's garrison 1048580, ours
   1114113 (the player's unit order).
+
+## C-130: a major's followed strategies in its yield weights — the records (AI_Victories.csv), both twins
+
+`strategyRefs` / `AI_STRATEGIES` / `strategyYieldBias` (cpu/core/aiWeights.ts),
+`Seat.strategies`, `AI_STRATEGY_LISTS` (cpu/data/aiTables.ts, from
+tools/install/ai_tables.py), the replay's `loadStrategyLog` /
+`stageStrategies` (cpu/harness/replay.ts); GPU `civ_strategies`,
+`_strategy_yield_bias` (gpu/core/sim_init.py), `_major_lists`
+(gpu/core/sim_minors.py).
+
+- THE RULE: a major's yield weight (0x702ad0) sums, beside its traits',
+  agendas' and era strategies' lists, the victory manager's part
+  (GrandStrategic +0x508): the Yields and YieldSensitivities lists
+  (Strategy_Priorities) of every other strategy its victory manager follows
+  (VICTORY_STRATEGY_SCIENCE_VICTORY's ScienceVictoryYields +0.5 Science and
+  ScienceSensitivity 0.25, RELIGIOUS +0.75 Faith, CULTURAL +0.25 Culture and
+  CultureSensitivity 0.25, MILITARY +0.25 Production). The victory manager
+  is the major's AI: the replay imports the record's AI_Victories.csv
+  (Following / Exclusive on, Stopped / Forbidden off, every row up to the
+  turn); in self-play a major follows none.
+- Confirmed (one-seed trace, runs/h1_duelr1128): China under the science
+  victory from t5, its route to city-state 3 at 3 Gold and Sovereignty's 2
+  Science, the Free Cities' K 6.41 t82-85 as logged (5.41 without it),
+  Foreign Trade 332.2 at t83-86; Rome under the religious victory t46-126,
+  city-states 2 and 4's K 5.39 t69-88 (6 Gold, 1 Faith at Faith 1.20),
+  4.64 from t127 as logged.
+- Open: the major's strategy choice (its AI) unported; 1128 city-states 2
+  and 4's K 6.37 a turn early (ours t89, the game's t90).
+
+## C-130: the city yields' cache holds through the update's re-placement — READ (0x1cb8b0, 0x91e540), the split a fit, both twins
+
+`aiCityStats` (cpu/core/aiView.ts), `CityState.aiYields` (set in
+`minorPhase`, cpu/core/minorBuild.ts; `minorReplaceCitizens` in
+cpu/core/cityStates.ts keeps it). GPU `_cv_yields_seen`
+(gpu/core/sim_minors.py), `_MinorFacts._total` / `_base`
+(gpu/core/sim_cityvalue.py).
+
+- THE CACHE (City::GetYield 0x1cb8b0): one entry per yield at city +0x31d8
+  (its flag +4), filled on the yield's first read while the game state is
+  locked (game instance +0x458 at 1 or more) and cleared only at the
+  lock's first count (0x91e540: game signal +0x18f0 -> 0x370080 ->
+  0x1cd040, the one caller); the AI turn start 0x608870 takes the lock
+  (0x60889e) over its job passes. No citizen re-placement clears it.
+- AS PORTED (a fit on the cases below): from a city-state's free Trader's
+  dispatch to its turn's end its AI reads the city's yields as they stood
+  there — the totals but the Food and the Production, the attribute bases
+  (the amenity terms' yields, `amenityCityOf`) but the Food — a
+  re-placement in its update (the Food focus) notwithstanding; the rest as
+  its citizens stand.
+- Confirmed (one-seed traces): runs/h1_duelr1124 city-state 4 (Bologna)
+  t218-230, its Food focus toggling a turn apart (worked 386 / 296: Culture
+  4.5 / 5.5, Production 13 / 13.5), the government values on the city as
+  it stood before the re-placement, Digital Democracy 888.5 / 892.5 a turn
+  apart as logged; runs/h1_duelr1128 city-state 3 t16-30 (Production 3 / 4,
+  the total read after the re-placement), Political Philosophy 392.1 /
+  396.1 as logged, and city-state 2 t34.
+- Open: each yield's first reader, which would place the totals' Production
+  and the bases' apart.

@@ -38,6 +38,7 @@
 imports this.
  */
 import { AI_AGENDAS, AI_GOVERNMENTS, AI_GREAT_PERSON_CLASSES, AI_SLOT_TYPES } from '../data/aiTables';
+import { AI_STRATEGIES } from './aiWeights';
 import { GOVERNMENT_LIST, POLICY_LIST, SLOT_KINDS } from '../data/policies';
 import { LUXURY_IDS, RESOURCES } from '../../world/resources';
 import { installType } from './minorBuild';
@@ -798,6 +799,8 @@ const SEAT: Record<string, Extractor> = {
   culRate: overSeats((s) => s.culRate ?? 0),
   // a major's agendas, as AI_AGENDAS indices ascending
   agendas: overSeats((s) => (s.agendas ?? []).map((a) => AI_AGENDAS.indexOf(a)).sort((x, y) => x - y)),
+  // the strategies a major follows beside its era ones, as AI_STRATEGIES indices ascending
+  strategies: overSeats((s) => (s.strategies ?? []).map((a) => AI_STRATEGIES.indexOf(a)).sort((x, y) => x - y)),
   tourRate: overSeats((s) => s.tourRate ?? 0),
   tourismTo: overSeats((s, st) => perCiv(st, (seat) => (seat === s.seat ? 0 : s.tourismTo?.[seat] ?? 0))),
   tourismReligiousTo: overSeats((s, st) => perCiv(st, (seat) => (seat === s.seat ? 0 : s.tourismReligiousTo?.[seat] ?? 0))),
