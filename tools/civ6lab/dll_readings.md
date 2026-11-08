@@ -9474,3 +9474,55 @@ route walk through it (gpu/core/sim_seats.py); the driver's `A_PL`
   chop (percent 0) leaves 9.6, its Walls complete at t51 as logged.
 - Open: no case tells whether the idle store (`prodOverflow`) also lands
   with a lump; the Free Cities' lump is not this path.
+
+## C-95: a formation stands where each member may, a path's destination placed, CanEmbark by the type's technology — READ (0x586900, 0x586360 at 0x58640c..0x586494, 0x267650 at 0x2677e0..0x2677f7, 0x2714b0, 0x272880, 0x4ee3f0 at 0x4ee4e1..0x4ee548), both twins
+
+`groundOf`'s `embarks`, `placedOn` in `turnsToPlot` / `pathNodes`,
+`playerEmbarks` / `canEmbark` / `tradeWaterLevel` (cpu/core/tactical.ts,
+cpu/core/units.ts; `TechDef.embarkUnit`, cpu/data/techs.ts); GPU
+`_tac_embarks` over `_type_embark_tech`, `_tac_placed` in `_tac_search`,
+`_tac_search`'s / `_op_move_exec`'s `placed` over the mate
+(gpu/core/sim_tactics.py, sim_init.py).
+
+- THE FORMATION'S LOCATION TEST (0x586900): walks the formation's members
+  (+0x728, count +0x738) and asks each its own location test (0x586360);
+  any member refused refuses the plot. 0x586360's domain branch
+  (0x58640c..0x586494): a land unit (+0x650 2) on water is refused unless
+  0x56c480 lets it embark (or the plot's district word carries the land
+  bit); a sea unit (+0x650 0) off water is refused unless the plot's district
+  word carries the water bit (a city centre, a Canal: `hullPassage`). So a
+  formation steps onto water only where every member may embark: a
+  captive civilian embarking by its first owner stays ashore beside its
+  barbarian escort. The formation's own flag +0x338 (the tracked bool
+  +0x2e0, refreshed by 0x267650 at 0x2677e0..0x2677f7) is the OR of its
+  members' 0x56c480 and gates only the embark and disembark cost rules.
+- A PATH'S DESTINATION (0x272880 "Destination is invalid", the A*'s
+  destination test 0x2714b0): 0x586900 over the formation on the requested
+  plot, whatever the player revealed (only search flag 0x4000 passes an
+  unseen one), before any search; the search enters an unrevealed plot
+  whatever it is, but never ends on one its members cannot stand on.
+- CANEMBARK (0x4ee3f0): none for the barbarians; a game flag; the player's
+  embark list (+0x660); else a technology it holds whose EmbarkAll is set
+  (+0x70 bit 4: Shipbuilding) or whose EmbarkUnitType (+0x60 / +0x68)
+  names the unit's type by string (Sailing UNIT_BUILDER, Celestial
+  Navigation UNIT_TRADER); then the civics list (no install row sets
+  either). A Settler embarks on Shipbuilding alone.
+- CONFIRMED (one-seed aimem traces, AI_Operation.csv): runs/h1_duely1121
+  t96-t104 Builder Capture's Settler 3211277 and Man-At-Arms 2949124 walk
+  5:16 -> 6:17 -> 7:18 -> 7:19 -> 8:19 ... for 11:14, never by the water
+  10:12 (China, its first owner, holds Shipbuilding); runs/h1_duely1124
+  t88-t108 the Builder 4456474 and Archer 3997716 hold on 8:7 for 30:14 /
+  31:14 (the only way water) and t103-t104 Protect Units walks them to 8:10;
+  runs/h1_duely1117 t45-t53 the Settler 2293774 and Warrior 786443 as
+  logged; runs/h1_duely1121 t26-t42 the rampaging Quadrireme 786443 on 9:1
+  holds for city-state 2's Warrior on 10:4, no water beside it (the ring's
+  pasture 10:5, never revealed, no destination for a hull).
+- OPEN: the embark cost rules read the mover's own 0x56c480 where the
+  formation's OR is the game's (`stepCost`'s `shoreStep`, `search`'s
+  `cross`); runs/h1_duely1121 t105 the Settler 3211277 on 12:18 for 12:15
+  takes 11:17 beside player 1's unit on 11:16 (in the barbarians' sight),
+  the engines go round by 13:19; runs/h1_duely1124 t112 the capture's
+  backup 6:3 (the camp the knowledge base dropped at that turn's log
+  moment), the engines' 18:7; runs/h1_duely1128 t26-t106 the Settler
+  2228251 and Slinger 1441812 hold on 13:14 for 30:6 where the engines find
+  a path (t56 to 12:13).

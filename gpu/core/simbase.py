@@ -545,7 +545,7 @@ class Rules:
     t_ai_space: torch.Tensor  # long [NT, K] — the research AI value's space race projects, each its chain's length (`techUnlocks`' space, `projectChain`), 0 pad
     t_ai_mods: torch.Tensor  # long [NT, 3] — the research AI value's modifiers (TechnologyModifiers): spies, sea movement, tourism Amounts
     t_embark_all: torch.Tensor  # bool [NT] — CIV6 `EmbarkAll`
-    t_embark_unit: torch.Tensor  # bool [NT] — an EmbarkUnitType (`RESEARCH_AI_EMBARK_UNIT`)
+    t_embark_unit: torch.Tensor  # long [NT] — the unit type its EmbarkUnitType names (`TechDef.embarkUnit`), -1 none
     t_ai_res: list  # per tech the resources its improvement walk reaches, with repeats (`TECH_IMPROVEMENT_RESOURCES`)
     res_ai: list  # per resource {cls, happy, units: [{need, ver, obsT, obsC, eng}]} (`AI_RESOURCE_EXPORT`)
     c_ai_unlocks: torch.Tensor  # long [NC, 3] — what the civics AI's value counts: buildings, districts, wonders (`civicUnlocks`)
@@ -818,7 +818,7 @@ def load_rules(path: Path = FIXTURES / "rules.json") -> Rules:
                                 dtype=torch.long),
         t_ai_mods=torch.tensor([[int(t["aiSpies"]), int(t["aiSeaMoves"]), int(t["aiTourism"])] for t in r["techs"]], dtype=torch.long),
         t_embark_all=torch.tensor([bool(t["embarkAll"]) for t in r["techs"]], dtype=torch.bool),
-        t_embark_unit=torch.tensor([bool(t["embarkUnit"]) for t in r["techs"]], dtype=torch.bool),
+        t_embark_unit=torch.tensor([int(t["embarkUnit"]) for t in r["techs"]], dtype=torch.long),
         t_ai_res=[list(t["aiResources"]) for t in r["techs"]],
         res_ai=list(r["resources"]["ai"]),
         c_ai_unlocks=torch.tensor([[int(c["aiBuildings"]), int(c["aiDistricts"]), int(c["aiWonders"])] for c in r["civics"]], dtype=torch.long),

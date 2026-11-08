@@ -25,13 +25,19 @@
     - recording: h1_duely1124
       turn: 134
       value: the barbarians' captured Builder 5111833 stands embarked on 37:10 (t134-137), no barbarian military unit ever does (90 recorded duels)
-  impl: [cpu/core/tactical.ts:naval, cpu/core/units.ts:canEmbark, gpu/core/sim_tactics.py:_tac_embarks]
+  impl:
+    - cpu/core/tactical.ts:naval
+    - cpu/core/units.ts:canEmbark
+    - gpu/core/sim_tactics.py:_tac_embarks
+    - cpu/core/tactical.ts:embarks
+    - gpu/core/sim_tactics.py:_tac_search
   readings:
     - "C-95: the planning's valid wrapper on a district at war, and a land unit's embarking by its original owner — READ (0x26e570 at 0x26e5e2..0x26e7f1, 0x56c480), the first both twins"
     - "C-95: Explore Land and the barbarians' revealed plots — READ, ported (two tests below unread)"
     - "C-99: the pathfinder's later-turn pool, Heal's hull, the tactical list's explorers, Move Unit's planning — READ, both twins"
     - "C-99: the pathfinder's later-turn pool, Heal's hull, the tactical list's explorers, Move Unit's planning"
     - "C-93: Make Formation's formation outlives its operation, a captive embarks by its original owner — READ (0x7ee630, 0x94bbe0, 0x94bc70, 0x212825..0x2128f3, 0x56c480, 0x77b9a0 at 0x77bedd), both twins"
+    - "C-95: a formation stands where each member may, a path's destination placed, CanEmbark by the type's technology — READ (0x586900, 0x586360 at 0x58640c..0x586494, 0x267650 at 0x2677e0..0x2677f7, 0x2714b0, 0x272880, 0x4ee3f0 at 0x4ee4e1..0x4ee548), both twins"
   context:
     - ...r with it; +0x4c not above 0, taken as no unit on it; its own area unless it embarks (0x56c480), a hull on water; no city centre but its player's); its two counts over its sight (0x5...
   review: reviewed

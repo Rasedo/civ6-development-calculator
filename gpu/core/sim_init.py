@@ -4333,8 +4333,8 @@ class SimInit:
         self._dmg_max = int(cb["dmgMax"])
         # EMBARK: the Classical embarked pool, the rungs that raise it, the
         # Mathematics rung every hull and passenger reads, and the
-        # embark/ocean tech gate indices (military embarks on SHIPBUILDING,
-        # civilians on SAILING, OCEAN needs CARTOGRAPHY).
+        # embark/ocean tech gate indices (Shipbuilding embarks every land
+        # unit, Sailing the Builder, OCEAN needs CARTOGRAPHY).
         self._embark_moves = int(cb["embarkMoves"])
         self._embark_move_techs = [(int(a), int(b)) for a, b in cb["embarkMoveTechs"]
                                    if int(a) >= 0]
@@ -5048,6 +5048,14 @@ class SimInit:
         self._gen_aura_mp = int(rr["generalAuraMp"])  # the aura's movement half, already in mp_scale units
         self._gen_off = tiles_within_offsets(self._gen_aura_range).to(device)  # aura disk (hexDistance ≤ range)
 
+        # the technologies whose EmbarkUnitType names a unit type, per type
+        # (`TechDef.embarkUnit`: Sailing the Builder, Celestial Navigation the
+        # Trader), -1 none; every other land type embarks on EmbarkAll
+        # (Shipbuilding) alone (`playerEmbarks`)
+        self._type_embark_tech = torch.full((self.NU,), -1, dtype=torch.long, device=device)
+        for ti, ui in enumerate(rules.t_embark_unit.tolist()):
+            if 0 <= ui < self.NU:
+                self._type_embark_tech[ui] = ti
         self._t_repeat = rules.t_repeat.to(device)
         self._c_repeat = rules.c_repeat.to(device)
         self._arangeT = torch.arange(T, device=device)

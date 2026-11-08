@@ -22,7 +22,7 @@ import { engineId, gameTypeOf, installFeature } from '../data/aliases';
 import {
   canEmbark, cityAtIndex, crossesRiver, embarkTechMoves, escortUnit, inEscort, cliffBlocksStep, shoreCrossing, districtZones, encampmentBlocks, encampmentIntact, inEnemyZoc, rosterEmbarkMoves, stepCost, stepUnit, terrainMp, unitDomain, unitExertsZoc, unitFullMoves, unitIsNoncombat, mapLayer, unitReligious,
   setBarbStepLook, unitsHostile, unitVisibleTo,
-  waterEnterable, formationCS, setRecordFormation, formationMates, dropLoneRiders,
+  waterEnterable, waterWalks, formationCS, setRecordFormation, formationMates, dropLoneRiders,
 } from './units';
 import { BARB_SEAT, FREE_SEAT, NO_SEAT, campTiles, cityHolders, civsAtWar, isBarbSeat, isCityStateSeat, isCiv, isTerritorial, seatOf, tileCity, tileSeat } from './seats';
 import { OPEN_BORDERS_CIVIC } from '../data/seats';
@@ -281,7 +281,12 @@ function groundOf(state: GameState, unit: Unit, revealedOnly = true, planning = 
   // a unit that may embark (`canEmbark`, 0x56c480: the barbarians' land units
   // plan no water, none of 6,269 of their planning rows on runs/h1_duelw1117,
   // 1121 and 1124 holds a water plot, their captives by their first owners)
-  const embarks = canEmbark(state, unit);
+  // the location test of a formation (0x586900) asks each member's own
+  // (0x586360 -> 0x56c480): water only where every member may embark
+  // (runs/h1_duely1121 t96-t99: the captured Settler 3211277, China's
+  // Shipbuilding letting it embark, walks with its barbarian Man-At-Arms
+  // round by land 6:17 / 7:18 / 7:19 / 8:19 for 11:14, never over 10:12)
+  const embarks = [unit, ...mates].every((m) => canEmbark(state, m));
   const minor = isCityStateSeat(unit.seat);
   // the planning list's units of the mover's map layer alone (the plot list
   // of the formation's layer, 0x2665b0 -> 0x75c50 -> 0x585eb0): a religious
@@ -882,6 +887,18 @@ export function reachPlots(state: GameState, unit: Unit, maxTurns: number): Reac
   return out;
 }
 
+/** a path's destination placed (0x272880's "Destination is invalid" and the
+ *  destination test 0x2714b0, each 0x586900 over the formation's members ->
+ *  0x586360's domain at 0x58640c..0x586494), whatever the player revealed: a
+ *  hull on water or a hull's passage, a land unit on land or on water it may
+ *  embark onto (runs/h1_duely1121 t26: the rampaging Quadrireme on 9:1 for
+ *  city-state 2's Warrior on 10:4, no water beside it, holds — the ring's
+ *  pasture 10:5 it never revealed no plot for it) */
+function placedOn(state: GameState, members: readonly Unit[], t: Tile): boolean {
+  return members.every((m) => (UNITS[m.type]?.naval ? isWater(t) || hullPassage(t)
+    : !isWater(t) || waterWalks(m.type) || canEmbark(state, m)));
+}
+
 /** the turns the unit's path takes to stand on `dest` (0x272a60 -> 0x26f1d0
  *  under flag 0x1000: the path's search, its zone of control spending the
  *  Movement — the planning's breadth-first refusal 0x26e570 is not its
@@ -893,6 +910,7 @@ export function reachPlots(state: GameState, unit: Unit, maxTurns: number): Reac
  *  turn is none. */
 export function turnsToPlot(state: GameState, unit: Unit, dest: number, laterTurns = true): number {
   let turns = 0;
+  if (dest !== unit.tileIndex && !placedOn(state, [unit, ...formationMates(state, unit)], state.map.tiles[dest])) return turns;
   search(state, unit, Infinity, true, (n, ground) => {
     if (n.tile !== dest) return false;
     if (n.attack || n.tile === unit.tileIndex || ground.stand(n.tile)) turns = n.turns;
@@ -919,6 +937,7 @@ function pathNodes(state: GameState, unit: Unit, dest: number, laterTurns: boole
   // it (0x586360's best defender 0x208b80 under 0x108)
   if (dest !== unit.tileIndex && foreignAt(state, unit, dest)
     && plotsSeenNow(state, new Set([unit.seat]))[dest] !== 1) return [];
+  if (dest !== unit.tileIndex && !placedOn(state, [unit, ...mates], state.map.tiles[dest])) return [];
   // the destination at its stacking limit is no path (`search`'s stop)
   let found = null as PNode | null;
   search(state, unit, Infinity, true, (n) => {

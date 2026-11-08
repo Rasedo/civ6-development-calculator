@@ -126,9 +126,18 @@ export function ownerHasTech(
   return ownerTechs(state, unit).includes(tech);
 }
 
-/** can this LAND unit embark (0x56c480)? By its owner's CanEmbark (0x4ee3f0):
- * SAILING (civilians) or SHIPBUILDING (all land units incl. military), the
- * barbarians' passing none of their land types; failing that, by its
+/** the player's CanEmbark of a unit type (0x4ee3f0): none for the
+ * barbarians; else a technology it holds whose EmbarkAll is set
+ * (Shipbuilding) or whose EmbarkUnitType names the type (Sailing the Builder,
+ * Celestial Navigation the Trader) — a Settler, a Great Person, a religious
+ * unit embark on Shipbuilding alone */
+export function playerEmbarks(state: GameState, seat: number, type: string): boolean {
+  if (isBarbSeat(seat)) return false;
+  return ownerTechs(state, { seat }).some((t) => !!TECHS[t]?.embarkAll || TECHS[t]?.embarkUnit === type);
+}
+
+/** can this LAND unit embark (0x56c480)? By its owner's CanEmbark
+ * (`playerEmbarks`); failing that, by its
  * original owner's (+0x340) where that is another player still in the game
  * (runs/h1_duely1124 t134-137: the barbarians' captured Builder 5111833
  * embarked on 37:10). Naval units never "embark". */
@@ -137,8 +146,7 @@ export function canEmbark(
   unit: { type: string; seat: number; originalOwner?: number },
 ): boolean {
   if (UNITS[unit.type]?.naval) return false;
-  const tech = unitIsNoncombat(unit.type) ? 'SAILING' : 'SHIPBUILDING';
-  const by = (seat: number) => !isBarbSeat(seat) && ownerHasTech(state, { seat }, tech);
+  const by = (seat: number) => playerEmbarks(state, seat, unit.type);
   if (by(unit.seat)) return true;
   const o = unit.originalOwner;
   return o !== undefined && o !== unit.seat && seatOf(state, o) !== undefined && by(o);
@@ -341,8 +349,7 @@ export function ignoresShores(state: GameState, unit: { type: string; seat: numb
 }
 
 export function tradeWaterLevel(state: GameState, seat: number): number {
-  const techs = seatOf(state, seat)?.research.techs;
-  return techs?.includes('CELESTIAL_NAVIGATION') || techs?.includes('SHIPBUILDING') ? TRADE_WATER_OPEN : TRADE_WATER_NONE;
+  return playerEmbarks(state, seat, 'TRADER') ? TRADE_WATER_OPEN : TRADE_WATER_NONE;
 }
 
 /** The MP a river crossing adds to the step (GlobalParameters

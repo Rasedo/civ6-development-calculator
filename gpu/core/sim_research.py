@@ -261,7 +261,7 @@ class SimResearch:
             "space": rules.t_ai_space.to(dev),
             "mods": rules.t_ai_mods.to(dev),
             "embark": rules.t_embark_all.to(dev),
-            "embark_unit": rules.t_embark_unit.to(dev),
+            "embark_unit": rules.t_embark_unit.to(dev) >= 0,
             "era": rules.t_era.to(dev),
             "repeat": rules.t_repeat.to(dev),
             "horizon": int(av["horizon"]),

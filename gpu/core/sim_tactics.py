@@ -555,18 +555,22 @@ class SimTactics:
     def _tac_embarks(self, rows: torch.Tensor, utype: torch.Tensor, seat: int,
                      orig: torch.Tensor | None = None) -> torch.Tensor:
         """[N] bool — `canEmbark` (0x56c480) for land units of `utype` [N] of
-        `seat` in the games `rows`: by the owner's CanEmbark (0x4ee3f0) —
-        Sailing for a civilian, Shipbuilding for any other, the barbarians'
-        none —, else by the original owner's, `orig` [N] (the seat a capture
-        took the unit from, -1 none), where that is another player still in
-        the game."""
-        civ = self._type_civilian.take(utype) | self._type_support.take(utype)
+        `seat` in the games `rows`: by the owner's CanEmbark (0x4ee3f0,
+        `playerEmbarks`) — Shipbuilding (EmbarkAll) for any type, else the
+        technology whose EmbarkUnitType names it (`_type_embark_tech`:
+        Sailing the Builder, Celestial Navigation the Trader), the
+        barbarians' none —, else by the original owner's, `orig` [N] (the
+        seat a capture took the unit from, -1 none), where that is another
+        player still in the game."""
+        own_tech = self._type_embark_tech.take(utype)
 
         def by(s: int) -> torch.Tensor:
             if s == BARB_SEAT:
                 return torch.zeros_like(utype, dtype=torch.bool)
-            return torch.where(civ, self._tac_tech(s, self._sailing_tech)[rows],
-                               self._tac_tech(s, self._shipbuilding_tech)[rows])
+            ok = self._tac_tech(s, self._shipbuilding_tech)[rows]
+            for t in torch.unique(own_tech[own_tech >= 0]).tolist():
+                ok = ok | ((own_tech == t) & self._tac_tech(s, int(t))[rows])
+            return ok
 
         ok = by(seat)
         if orig is not None and bool((orig >= 0).any()):
@@ -577,6 +581,30 @@ class SimTactics:
                         else torch.ones_like(ok))
                 ok = ok | ((orig == o) & live & by(o))
         return ok & ~self.unit_naval.take(utype) & ~self.unit_water_walk.take(utype)
+
+    def _tac_placed(self, rows: torch.Tensor, slots: torch.Tensor, mate: torch.Tensor, pre: str, seat: int,
+                    dest: torch.Tensor) -> torch.Tensor:
+        """[N] bool — `placedOn`: a path's destination `dest` [N] placed for
+        the formation of the units at local `slots` of pool `pre` (its other
+        member `mate`, -1 none) — the destination tests 0x272880 / 0x2714b0,
+        0x586900 over the members -> 0x586360's domain: a hull on water or a
+        hull's passage, a land unit on land or on water it may embark onto."""
+        dc = dest.clamp(min=0)
+        wet = self.water[rows, dc]
+        hull = self._hull_pass()[rows, dc]
+        ty_p = getattr(self, f"{pre}_unit_type")
+        orig = getattr(self, f"{pre}_unit_orig_owner")
+
+        def ok(sl: torch.Tensor) -> torch.Tensor:
+            ty = ty_p[rows, sl].clamp(min=0, max=self.NU - 1)
+            emb = self._tac_embarks(rows, ty, seat, orig[rows, sl])
+            return torch.where(self.unit_naval.take(ty), wet | hull, ~wet | self.unit_water_walk.take(ty) | emb)
+
+        out = ok(slots.clamp(min=0))
+        on = mate >= 0
+        if bool(on.count_nonzero()):
+            out = out & (~on | ok(mate.clamp(min=0)))
+        return out
 
     def _tac_cliffs(self, seat: int) -> torch.Tensor:
         """[B, T, 6] bool, neighbour columns — `cliffBlocks` on a land/water
@@ -706,13 +734,23 @@ class SimTactics:
             boarded_n = by_layer(lambda r: self._tac_boarded(seat, r)) & emb_u.unsqueeze(1)
             rev_b = self._tac_known(seat)
             board_step = boarded_n & rev_b[rows] if rev_b is not None else boarded_n
-        embarks = self._tac_embarks(rows, utype, seat, getattr(self, f"{pre}_unit_orig_owner")[rows, slots])
-        ent_n = torch.where(naval.unsqueeze(1), wat[rows], land[rows] | (wat[rows] & embarks.unsqueeze(1)))  # [N, T]
+        orig_of = getattr(self, f"{pre}_unit_orig_owner")
+        embarks = self._tac_embarks(rows, utype, seat, orig_of[rows, slots])
+        # the formation's location test (0x586900) asks each member's own
+        # (0x586360 -> 0x56c480): water only where its mate may embark too
+        mate_on = mate >= 0
+        if bool(mate_on.count_nonzero()):
+            mc = mate.clamp(min=0)
+            m_type = getattr(self, f"{pre}_unit_type")[rows, mc].clamp(min=0, max=self.NU - 1)
+            placed = embarks & (~mate_on | self._tac_embarks(rows, m_type, seat, orig_of[rows, mc]))
+        else:
+            placed = embarks
+        ent_n = torch.where(naval.unsqueeze(1), wat[rows], land[rows] | (wat[rows] & placed.unsqueeze(1)))  # [N, T]
         if zoc:
             # a move order's path passes a unit at war with it out of its
             # sight (`groundOf`'s pass)
             land_p, wat_p = self._tac_enter(seat, False, foes_seen=True)
-            ent_n = torch.where(naval.unsqueeze(1), wat_p[rows], land_p[rows] | (wat_p[rows] & embarks.unsqueeze(1)))
+            ent_n = torch.where(naval.unsqueeze(1), wat_p[rows], land_p[rows] | (wat_p[rows] & placed.unsqueeze(1)))
         water_n = self.water[rows]
         # the plots each unit attacks into (`groundOf`'s attack): an enemy
         # unit's of its own domain (the planning's: one that fights, on its own
@@ -721,7 +759,7 @@ class SimTactics:
         # Movement it leaves
         a_land, a_nav, a_fw = self._tac_attack_planes(seat, not zoc, not zoc, stand)
         fights = self._type_combat.take(utype) > 0
-        atk_n = torch.where(naval.unsqueeze(1), a_nav[rows], a_land[rows] | (a_fw[rows] & embarks.unsqueeze(1))) \
+        atk_n = torch.where(naval.unsqueeze(1), a_nav[rows], a_land[rows] | (a_fw[rows] & placed.unsqueeze(1))) \
             & fights.unsqueeze(1) & ~ent_n
         # a district of hit points at war is no plot for a unit whose ranged
         # or bombard strength tops its combat strength (`groundOf`'s attack:
@@ -882,6 +920,9 @@ class SimTactics:
         seq = torch.zeros(N, dtype=torch.long, device=dev)
         cnt = torch.zeros(N, dtype=torch.long, device=dev)
         run = torch.ones(N, dtype=torch.bool, device=dev)
+        if zoc and dest is not None:
+            # a path's destination placed (`placedOn`), its own plot aside
+            run = run & ((dest == start) | self._tac_placed(rows, slots, mate, pre, seat, dest))
         found = torch.zeros(N, dtype=torch.bool, device=dev)
         cols = torch.tensor(list(self._DIRECTION_TYPES), device=dev)
         neigh = self.neigh[:, cols]  # [T, 6] in DirectionTypes order
@@ -1332,7 +1373,7 @@ class SimTactics:
         fits = torch.ones(N, T, dtype=torch.bool, device=dev)
         if rv_n is not None:
             land_f, wat_f = self._tac_enter(seat, False, foes=False)
-            fits = rv_n | torch.where(naval.unsqueeze(1), wat_f[rows], land_f[rows] | (wat_f[rows] & embarks.unsqueeze(1)))
+            fits = rv_n | torch.where(naval.unsqueeze(1), wat_f[rows], land_f[rows] | (wat_f[rows] & placed.unsqueeze(1)))
         if not zoc:
             stand = stand & fits
         if listed and not zoc:
@@ -3622,8 +3663,12 @@ class SimTactics:
                 # plot), then the location test (0x586360 with no flag: the
                 # ground, its domain, closed borders, a hostile unit, city
                 # centre or Encampment there); no path test
-                ent = torch.where(naval.unsqueeze(1), ent_w[rows],
-                                  ent_l[rows] | (ent_w[rows] & self._tac_embarks(rows, ut, seat, getattr(self, f"{pre}_unit_orig_owner")[rows, ur]).unsqueeze(1)))
+                # (its formation's: water where each member may embark)
+                o_of = getattr(self, f"{pre}_unit_orig_owner")
+                m_ty = getattr(self, f"{pre}_unit_type")[rows, mt.clamp(min=0)].clamp(min=0, max=self.NU - 1)
+                placed = self._tac_embarks(rows, ut, seat, o_of[rows, ur]) \
+                    & ((mt < 0) | self._tac_embarks(rows, m_ty, seat, o_of[rows, mt.clamp(min=0)]))
+                ent = torch.where(naval.unsqueeze(1), ent_w[rows], ent_l[rows] | (ent_w[rows] & placed.unsqueeze(1)))
                 best = torch.full_like(gr, -1)
                 best_d = torch.full_like(gr, -1)
                 best_in = torch.zeros_like(walk)

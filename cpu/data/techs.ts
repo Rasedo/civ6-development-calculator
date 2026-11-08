@@ -63,6 +63,8 @@ export interface TechDef {
   repeatable?: boolean;
   /** CIV6 (`EmbarkAll`): every land unit may embark once it lands. */
   embarkAll?: boolean;
+  /** CIV6 (`EmbarkUnitType`): the one land unit type the row lets embark. */
+  embarkUnit?: string;
   /** CIV6 (Technologies_XP2 `RandomPrereqs`): the row holds no
    *  TechnologyPrereqs row; the game draws its prerequisites at its start
    *  (`drawResearchTree`), its `prereqs` empty here */
@@ -106,6 +108,7 @@ const TECH_SRC: Readonly<Record<string, SrcMap>> = {
     prereqs: { derived: 'a tree root: the install writes no TechnologyPrereqs row for TECH_SAILING' },
     'effects.0.improvement': xml('Improvements', 'ImprovementType=IMPROVEMENT_FISHING_BOATS', 'PrereqTech', { expect: 'TECH_SAILING' }),
     'effects.1.improvement': xml('Improvements', 'ImprovementType=IMPROVEMENT_FISHERY', 'PrereqTech', { expect: 'TECH_SAILING' }),
+    embarkUnit: { derived: 'the row\'s EmbarkUnitType, UNIT_ dropped', inputs: [xml('Technologies', 'TechnologyType=TECH_SAILING', 'EmbarkUnitType', { expect: 'UNIT_BUILDER' })] },
   },
   ARCHERY: {
     era: xml('Technologies', 'TechnologyType=TECH_ARCHERY', 'EraType', { expect: 'ERA_ANCIENT' }),
@@ -159,6 +162,7 @@ const TECH_SRC: Readonly<Record<string, SrcMap>> = {
     prereqs: { derived: 'the TechnologyPrereqs rows of TECH_CELESTIAL_NAVIGATION, read as an AND-list', inputs: [xml('TechnologyPrereqs', 'Technology=TECH_CELESTIAL_NAVIGATION&PrereqTech=TECH_SAILING', 'PrereqTech', { expect: 'TECH_SAILING' }), xml('TechnologyPrereqs', 'Technology=TECH_CELESTIAL_NAVIGATION&PrereqTech=TECH_ASTROLOGY', 'PrereqTech', { expect: 'TECH_ASTROLOGY' })] },
     'effects.0.district': xml('Districts', 'DistrictType=DISTRICT_HARBOR', 'PrereqTech', { expect: 'TECH_CELESTIAL_NAVIGATION' }),
     'effects.1.building': xml('Buildings', 'BuildingType=BUILDING_LIGHTHOUSE', 'PrereqTech', { expect: 'TECH_CELESTIAL_NAVIGATION' }),
+    embarkUnit: { derived: 'the row\'s EmbarkUnitType, UNIT_ dropped', inputs: [xml('Technologies', 'TechnologyType=TECH_CELESTIAL_NAVIGATION', 'EmbarkUnitType', { expect: 'UNIT_TRADER' })] },
   },
   CURRENCY: {
     era: xml('Technologies', 'TechnologyType=TECH_CURRENCY', 'EraType', { expect: 'ERA_CLASSICAL' }),
@@ -613,12 +617,12 @@ export const TECHS: Record<string, TechDef> = Object.fromEntries(
       { kind: 'unlockImprovement', improvement: 'QUARRY' },
       { kind: 'unlockFeatureRemoval', feature: 'WOODS' },
     ]),
-    T('SAILING', 'Sailing', 'Ancient', 50, [], [
+    { ...T('SAILING', 'Sailing', 'Ancient', 50, [], [
       { kind: 'unlockImprovement', improvement: 'FISHING_BOATS' },
       // CIV6 (IMPROVEMENT_FISHERY, PrereqTech): the TECH opens the row; the
       // AQUACULTURE governor promotion opens the CITY.
       { kind: 'unlockImprovement', improvement: 'FISHERY' },
-    ]),
+    ]), embarkUnit: 'BUILDER' },
     T('ARCHERY', 'Archery', 'Ancient', 50, ['ANIMAL_HUSBANDRY']),
     T('ASTROLOGY', 'Astrology', 'Ancient', 50, [], [
       { kind: 'unlockDistrict', district: 'HOLY_SITE' },
@@ -646,10 +650,10 @@ export const TECHS: Record<string, TechDef> = Object.fromEntries(
       { kind: 'unlockBuilding', building: 'WATER_MILL' },
     ]),
 
-    T('CELESTIAL_NAVIGATION', 'Celestial Navigation', 'Classical', 120, ['SAILING', 'ASTROLOGY'], [
+    { ...T('CELESTIAL_NAVIGATION', 'Celestial Navigation', 'Classical', 120, ['SAILING', 'ASTROLOGY'], [
       { kind: 'unlockDistrict', district: 'HARBOR' },
       { kind: 'unlockBuilding', building: 'LIGHTHOUSE' },
-    ]),
+    ]), embarkUnit: 'TRADER' },
     T('CURRENCY', 'Currency', 'Classical', 120, ['WRITING'], [
       { kind: 'unlockDistrict', district: 'COMMERCIAL_HUB' },
       { kind: 'unlockBuilding', building: 'MARKET' },

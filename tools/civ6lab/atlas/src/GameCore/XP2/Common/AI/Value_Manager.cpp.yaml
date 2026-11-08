@@ -947,7 +947,7 @@
     - cpu/core/minorBuild.ts:minorResearchResources
     - cpu/core/minorBuild.ts:minorResearchTerms
     - cpu/core/minorBuild.ts:minorUnitTerm
-    - cpu/data/aiResearch.ts:RESEARCH_AI_EMBARK_UNIT
+    - cpu/data/techs.ts:embarkUnit
     - cpu/data/aiValue.ts:AI_PROJECT_SHARE
     - cpu/core/aiResearch.ts:researchAnalysis
     - cpu/data/aiValue.ts:AI_SPACE_RACE_SHARE

@@ -36,7 +36,7 @@ import {
   AI_DISCOUNT_PCT, AI_POLICY_HORIZON, AI_PROJECT_SHARE, AI_SPACE_RACE_SHARE, AI_UNLOCK_SHARE, AI_VALUE_HORIZON, PSEUDOYIELD_CIVIC, PSEUDOYIELD_DISTRICT, PSEUDOYIELD_NUCLEAR_WEAPON,
   PSEUDOYIELD_TECHNOLOGY, PSEUDOYIELD_WONDER,
 } from '../data/aiValue';
-import { RESEARCH_AI_EMBARK_ALL, RESEARCH_AI_EMBARK_UNIT, RESEARCH_AI_TASK_BIAS } from '../data/aiResearch';
+import { RESEARCH_AI_EMBARK_ALL, RESEARCH_AI_TASK_BIAS } from '../data/aiResearch';
 import { AI_GOVERNMENTS, AI_GREAT_PERSON_CLASSES, AI_POLICIES, AI_SLOT_TYPES, AI_SPACE_RACE_PROJECTS } from '../data/aiTables';
 import { CIVIC_AI_FORMATION_UNITS, CIVIC_AI_POLICY_FLOOR } from '../data/aiCivics';
 import { techUnlocks } from '../core/aiResearch';
@@ -2178,7 +2178,7 @@ export function buildRules() {
       // EMBARK: the Classical embarked pool and the rungs that raise it, the
       // Mathematics rung every hull and passenger reads, the LIVE water-step
       // master switch, and the embark/ocean tech gates (indices into rules
-      // techs; military embarks on SHIPBUILDING, civilians on SAILING, OCEAN
+      // techs; Shipbuilding embarks every land unit, Sailing the Builder, OCEAN
       // needs CARTOGRAPHY). The GPU mirrors these exactly.
       embarkMoves: EMBARK_MOVES,
       embarkMoveTechs: EMBARK_MOVE_TECHS.map(([id, v]) => [techIdx.get(id) ?? -1, v]),
@@ -3120,7 +3120,7 @@ export function buildRules() {
       aiSpace: techUnlocks(t.id).space,
       ...techAiModifiers(t.id),
       embarkAll: t.embarkAll ? 1 : 0,
-      embarkUnit: RESEARCH_AI_EMBARK_UNIT.includes(t.id) ? 1 : 0,
+      embarkUnit: t.embarkUnit ? Object.values(UNITS).findIndex((u) => u.id === t.embarkUnit) : -1,
       // the resources the research value's improvement walk reaches (`TECH_IMPROVEMENT_RESOURCES`)
       aiResources: aiTechResources(t.id).map((r) => RESOURCE_IDS.indexOf(r as never)).filter((i) => i >= 0),
     })),

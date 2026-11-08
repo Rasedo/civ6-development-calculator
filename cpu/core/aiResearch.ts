@@ -41,7 +41,7 @@ import { AI_BUILDINGS, AI_PROJECTS } from '../data/aiBuildTables';
 import {
   AI_PROJECT_SHARE, AI_SPACE_RACE_SHARE, AI_UNLOCK_SHARE, AI_VALUE_HORIZON, PSEUDOYIELD_DISTRICT, PSEUDOYIELD_NUCLEAR_WEAPON, PSEUDOYIELD_TECHNOLOGY, PSEUDOYIELD_WONDER,
 } from '../data/aiValue';
-import { RESEARCH_AI_EMBARK_ALL, RESEARCH_AI_EMBARK_UNIT, RESEARCH_AI_FAVORED, RESEARCH_AI_TASK_BIAS } from '../data/aiResearch';
+import { RESEARCH_AI_EMBARK_ALL, RESEARCH_AI_FAVORED, RESEARCH_AI_TASK_BIAS } from '../data/aiResearch';
 import { researchCost } from './economy';
 import { treePrereqs, requiredRows } from './researchTree';
 import { randRange } from './rand';
@@ -175,7 +175,7 @@ function techValueParts(state: GameState, seat: number, id: string, turns: numbe
   const def = TECHS[id];
   const w = (p: string): number => pw.get(p) ?? 0;
   let own = pseudoYield(PSEUDOYIELD_TECHNOLOGY, FX, w('PSEUDOYIELD_TECHNOLOGY'));
-  if (RESEARCH_AI_EMBARK_UNIT.includes(id)) own += FX;
+  if (def.embarkUnit) own += FX;
   if (def.embarkAll) own += fxConst(RESEARCH_AI_EMBARK_ALL);
   const era = ERAS.indexOf(def.era);
   const game = aiGameEra(state);
