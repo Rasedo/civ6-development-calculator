@@ -1578,6 +1578,7 @@ class SimOrders:
             if len(_army):
                 self._vacate("major", torch.full_like(_army, b), _army)
                 self.major_unit_alive[b, _army] = False
+            self._kb_forget_player(b, 100 + s)
             # CIV6: "City-state conquered: 50 (all civs gain Grievances against
             # you)", and "City-state razed: 100" when the captor is at its cap.
             _one = torch.zeros(self.B, dtype=torch.bool, device=dev)

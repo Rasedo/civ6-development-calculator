@@ -27,9 +27,9 @@ import { cityStateAt, isSuzerain, suzerainEffect } from './cityStates';
 import { MAX_CITIES_PER_SEAT, DED_SKY, SKY_AIR_XP_PCT } from '../data/seats';
 import { grievanceCityStateTaken } from './grievance';
 import { goldenDedication, worldEraIndex } from './eras';
-import { drawAndPayGoody, raiseBestTrained, recordAttacker, mapLayer, unitReligious, unitStackSlot } from './units';
+import { captureAnew, drawAndPayGoody, forgetPlayer, raiseBestTrained, recordAttacker, mapLayer, unitReligious, unitStackSlot } from './units';
 import { randRange } from './rand';
-import { formationCS, escortRiders, unitsAt, unitDomain, tileFreeForUnit, disbandUnit, unitsHostile, fortifyBonus, reseatUnit, cityAtIndex, encampmentBlocks, encampmentIntact, crossesRiver, cliffBlocks, stepUnit, stepRefusal, unitVisibleTo, unitExertsZoc, formationTierFor } from './units';
+import { formationCS, escortRiders, unitsAt, unitDomain, tileFreeForUnit, disbandUnit, unitsHostile, fortifyBonus, cityAtIndex, encampmentBlocks, encampmentIntact, crossesRiver, cliffBlocks, stepUnit, stepRefusal, unitVisibleTo, unitExertsZoc, formationTierFor } from './units';
 import { isAirUnit, airRange, airCoverAgainst, airPillageFit, airPillageOffers, airStrikeReaches, airStrikeOffers, airDefenseOf, antiAirAt, displaceAirFrom, interceptorAgainst, priorityDefender, PRIORITY_TARGET_DAMAGE } from './air';
 import { outerPool, wallsMax, wallsTier, encampOuterPool } from './rules';
 import { fuelShortCS } from './stockpile';
@@ -1932,7 +1932,7 @@ export function seizeCivilian(state: GameState, victim: Unit, by: { seat: number
     // its original owner the player it was taken from (the new unit's
     // +0x340 the victim's owner, 0x212825..0x2128f3)
     victim.originalOwner = victim.seat;
-    reseatUnit(state, victim, by.seat);
+    captureAnew(state, victim, by.seat);
     // the capture's event (AI_EVENT_UNIT_CAPTURED, 0x212500): the captive,
     // then its captor
     if (isBarbSeat(by.seat) && by.id >= 0) (state.barbCaptures ??= []).push({ captive: victim.id, captor: by.id });
@@ -2153,7 +2153,7 @@ function meleeAttackInner(state: GameState, attackerId: number, targetIndex: num
         // heal: CIV6 (Mongol Horde) — the loser changes hands where it fell,
         // its original owner the player it was taken from (0x212500)
         defender.originalOwner = defender.seat;
-        reseatUnit(state, defender, attacker.seat);
+        captureAnew(state, defender, attacker.seat);
         defender.hp = CAPTURED_UNIT_HP;
       } else {
         unitKillEvent(state, unitSeat(attacker), attacker, defender);
@@ -2461,6 +2461,11 @@ export function airStrike(
   warWearinessBattle(state, attacker.seat, defender.seat, targetIndex, {
     aDied: duel && attacker.hp <= 0, dDied: defender.hp <= 0,
   });
+  // the combat log's record of the attacker for the defender's player, on
+  // its base (runs/h1_duelz1124 t237: China's Jet Fighter 8978447 strikes
+  // the barbarians' Pike and Shot from 14:13, their record of it there at
+  // age 0)
+  if (attacker.hp > 0) recordAttacker(state, attacker, defender.seat);
   if (defender.hp <= 0) {
     killUnit(state, defender);
     if (attacker.hp > 0) healOnEliminate(state, attacker);
@@ -3057,9 +3062,11 @@ function csPatrons(state: GameState, cityState: CityState, captor: number): numb
 }
 
 /** CIV6: a conquered city-state is ELIMINATED, and its units leave the map
- *  with it — removed, not killed, so no death leaves a dig. */
+ *  with it — removed, not killed, so no death leaves a dig; every knowledge
+ *  base forgets its records (`forgetPlayer`). */
 function disbandMinorArmy(state: GameState, cityState: CityState): void {
   state.units = state.units.filter((u) => u.seat !== cityState.seat);
+  forgetPlayer(state, cityState.seat);
 }
 
 export function captureCityState(state: GameState, cityState: CityState, seat: number): void {

@@ -515,6 +515,15 @@
   context:
     - "...ic unheld, 0x4cb590 / 0x39d490; the one listener the research AI's 0x75d3d0, functor vt 0xd6f258 bound in 0x761d30: its m_turnsToResearchUnit (+0x388, data +0x3e0) at the unit is not 0..."
   review: imported
+- addr: 0xd703e8
+  kind: global
+  status: PARTLY
+  readings:
+    - "C-129: a killed player's records forgotten; a capture's new unit; an air strike's record — READ (0x534c50, 0x787fc0 -> 0x5ee370, 0x212500's create), both twins; the replay's later-player timings"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...s), the emergencies, the AI (0x724280) and every Targets (0x7864c0 at 0x786984, vtable @0xd703e8 -> 0x787fc0): 0x5ee370(kb, player) sets each of the player's army type lists empty and..."
+  review: imported
 - addr: 0xd70418
   kind: global
   semantics: the vtable of the meeting delegate 0x787f50 (bound at 0x7869f0 on game signal +0xc78).

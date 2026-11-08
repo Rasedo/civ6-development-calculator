@@ -10967,3 +10967,74 @@ per Artifact, a per-adjacent Science or Culture).
   recorded; Antioch t6 / t7 and Hunza t28 / t29's K as before).
 - Open: 0x5bcdc0's test; a city-state's founding list (none the turn it is
   founded, as ported).
+
+## C-129: a killed player's records forgotten; a capture's new unit; an air strike's record — READ (0x534c50, 0x787fc0 -> 0x5ee370, 0x212500's create), both twins; the replay's later-player timings
+
+`forgetPlayer` (`cpu/core/units.ts`, from `disbandMinorArmy` in
+`cpu/core/combat.ts`), `captureAnew` (`cpu/core/units.ts`, from
+`seizeCivilian` and the melee capture), `airStrike`'s `recordAttacker`
+(`cpu/core/combat.ts`). GPU `_kb_forget_player` (`gpu/core/sim_minors.py`, from
+`_capture_city_state` in `gpu/core/sim_orders.py`), `_capture_anew`
+(`gpu/core/sim_seats.py`, from `_capture_unit` and `_capture_beaten`),
+`_air_strike`'s `_kb_attacked`. The replay (`cpu/harness/replay.ts`): a
+recorded air battle through `airStrike`, `goneAfterBarbs`, the stealth
+striker's stamp before `minorAi`, a later city-state's upgraded unit in an
+earlier one's end look.
+
+- A PLAYER KILLED: Rules_Player 0x534c50(rules, player, id) kills each of
+  the player's units (0x4ef040, the delayed kill), then raises game signal
+  +0x900 with the player (0x534e7a -> 0x31b110). Its subscribers: the
+  trade manager (0x555c70), espionage (0x41d6e0, 0x41e450 erases the
+  player's entries), the emergencies, the AI (0x724280) and every Targets
+  (0x7864c0 at 0x786984, vtable @0xd703e8 -> 0x787fc0): 0x5ee370(kb, player)
+  sets each of the player's army type lists empty and erases its known
+  city records (0xe0 entries whose owner word +0 is the player, 0x5e73c0 ->
+  0x5f0b90). Ported: every knowledge base's records owned by a conquered
+  city-state go with it. Confirmed: runs/h1_duelz1127 t213, city-state 4
+  destroyed in player 1's turn — city-state 3's t213 records hold none of
+  its Bombard 1703944 (aimem, --from 208 --to 215: the one miss gone).
+- A CAPTURE'S NEW UNIT (0x212500): the victim is removed (the units
+  manager's +0x60) and a unit of the captured type created for the mover's
+  player (+0x50, off the map), given the victim's original owner, placed on
+  the victim's plot (0x586360, 0x586d40 — its look taken there, 0x58f3f0),
+  then the victim's charges (0x56cb00), damage (0x5705f0) and embarked
+  state (0x5706e0), its Movement spent (0x56d6f0) and its turn ended
+  (0x570b40). Ported: a new id and a new pool slot (`reseatUnit`), of its
+  type's own AI type and homed nowhere (the init 0x563cd0), its own look.
+  Every other record of the victim's id stays and ages out. runs/
+  h1_duelz1127 t74-t110 (the barbarians' captured Settler on 15:12): 180 /
+  180 knowledge.army rows on aimem.
+- AN AIR STRIKE'S RECORD: the combat log's defender signal (+0x78, 0x20d280)
+  follows an air unit's strike as any unit-vs-unit combat: the defender's
+  player records the striker on its base. runs/h1_duelz1124 t237: China's
+  Jet Fighter 8978447 strikes the barbarians' Pike and Shot from 14:13, their
+  record of it there at age 0 (aimem --from 228 --to 239: the t237 miss
+  gone). The replay lands a recorded air battle through `airStrike`.
+- THE REPLAY'S TURN T OF THE LATER PLAYERS: the city-states' and the
+  barbarians' copies run on the counter's next turn, so a stealth unit a
+  major's attack revealed in turn t (`revealedTurn`) is restamped t + 1 for
+  them: runs/h1_duelz1121 t234 China's Submarine 7733252 strikes the
+  barbarians' Galley 1114128 from 5:5 and their t234 look records it there
+  (a Galley two plots off sees the plot; no barbarian unit is adjacent);
+  t247 the Nuclear Submarine 8060959 on 24:5 (aimem --from 229 --to 236 and
+  --from 243 --to 249 clean). A unit the record takes off after the
+  barbarians' turn closed stands at their end look (`goneAfterBarbs`:
+  runs/h1_duelz1128 t132 city-state 3's Man-at-Arms 1572868 on 4:4, seen by
+  the end look from their Quadrireme's 2:3 and gone before t133; carried
+  t133-t153 clean). A later city-state's unit its start upgrades after an
+  earlier one's turn end stands in that end look as the old unit (runs/
+  h1_duelz1128 t177: Bologna's Warrior 2228224 on 6:9, seen from Hong Kong's
+  Trader on 8:9; the Line Infantry 2490374 at Bologna's start); a
+  city-state's own unit the log takes off before its turn's end is none of
+  its end look's (runs/h1_duelz1128 t179: Hong Kong's Warrior 2293764 steps
+  to 9:7 and leaves the map in its turn, its record the tactical look's
+  9:8). Carried, runs/h1_duelz1128 to t202: knowledge.army 1002 / 1002.
+- OPEN: the hidden-visibility test the look asks (0x5033a0 -> 0x503320,
+  the per-plot counts at visibility +0x570 keyed by [+0x98]+0x24) is unread:
+  what reveals a striking stealth unit to the players after it is the
+  recorded behaviour, not a reading; a major's own elimination (its units
+  stand on, no +0x900 in the engines); the known-city records a kill erases
+  (the engines keep none); a fighter's strike on a sea unit, which
+  `airStrikeOffers` refuses (runs/h1_duelz1124 t231: China's Jet Fighter
+  8978447 strikes the barbarians' Ironclad 6029330, CombatLog line 604; the
+  replay lands none).

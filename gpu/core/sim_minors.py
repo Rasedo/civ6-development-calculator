@@ -490,6 +490,18 @@ class SimMinors:
             sb = slot[bi]
             sb[sb == gi] = -1
 
+    def _kb_forget_player(self, b: int, seat: int) -> None:
+        """`forgetPlayer` — player `seat` killed in game `b` (Rules_Player
+        0x534c50, game signal +0x900 -> 0x787fc0 -> 0x5ee370): every
+        knowledge base's records of its units are freed"""
+        gone = (self.citystate_kb_slot[b] != -2) & (self.citystate_kb_owner[b] == seat)
+        if not bool(gone.any()):
+            return
+        self.citystate_kb_slot[b][gone] = -2
+        for q in (self.citystate_kb_owner, self.citystate_kb_type, self.citystate_kb_seen,
+                  self.citystate_kb_plot, self.citystate_kb_seq):
+            q[b][gone] = -1
+
     def _kb_attacked(self, att: torch.Tensor, d_seat: torch.Tensor, g: torch.Tensor, a_seat: torch.Tensor,
                      a_type: torch.Tensor, a_tile: torch.Tensor, a_hp: torch.Tensor) -> None:
         """`recordAttacker` — after a unit-vs-unit combat in the games `att`

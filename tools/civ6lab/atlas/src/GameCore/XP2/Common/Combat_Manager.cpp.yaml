@@ -467,6 +467,7 @@
   readings:
     - "C-34: the interception's damage, XP, weariness and the answers"
     - "C-96: the knowledge base's army records and the Combat Desire — READ (the records, the update, the desire), PARTLY READ (the signals' looks; the standing-army count in its own section below)"
+    - "C-129: a killed player's records forgotten; a capture's new unit; an air strike's record — READ (0x534c50, 0x787fc0 -> 0x5ee370, 0x212500's create), both twins; the replay's later-player timings"
   context:
     - "- War weariness (0x1fb680, from the combat log 0x20d280): it reads only the struct's [+0] and [+8] and the combat's location — the interceptor..."
   review: reviewed
@@ -497,7 +498,7 @@
 - addr: 0x212500
   kind: function
   name: Combat_Manager
-  semantics: "a retreat (sets the turn done). A unit info with the +0x1b8 bit 8 (CanRetreatWhenCaptured: the Great People, the Archaeologist, the Naturalist, the Rock Band) retreats to 0x530650's plot and returns 2, or 0 where none is valid; otherwise the type the unit info's UnitCaptures collection names first (+0x208, BecomesUnitType) — or, where the mover may capture combat units, its own type after the \"Unit Capture Chance\" draw — is created under the mover's player on the victim's plot with the victim's build charges (+0xed0, 0x56cb00), damage (+0xcf0, 0x5705f0) and embarked state, the victim removed (1); no type: 0. A civilian captured: the payload's units — the captive (r14 +0x100), then the captor (rsi +0x100; where its +0x7d0 is -1 or 0x56ee80 answers) — raised as AI_EVENT_UNIT_CAPTURED (@f2e088) on the player's signals (+0x2b8, 0x200e10); the barbarians' triggered tree (TRIGGER_CAPTURE_BARBARIAN: \"Escort Worker To Camp\", the operation \"Barbarian Builder Capture\") runs it. The new unit's original owner (the tracked +0x2e8, value +0x340) is the victim's owner (+0x2e0; 0x212825..0x2128f3)."
+  semantics: "a retreat (sets the turn done). A unit info with the +0x1b8 bit 8 (CanRetreatWhenCaptured: the Great People, the Archaeologist, the Naturalist, the Rock Band) retreats to 0x530650's plot and returns 2, or 0 where none is valid; otherwise the type the unit info's UnitCaptures collection names first (+0x208, BecomesUnitType) — or, where the mover may capture combat units, its own type after the \"Unit Capture Chance\" draw — is created under the mover's player on the victim's plot with the victim's build charges (+0xed0, 0x56cb00), damage (+0xcf0, 0x5705f0) and embarked state, the victim removed (1); no type: 0. A civilian captured: the payload's units — the captive (r14 +0x100), then the captor (rsi +0x100; where its +0x7d0 is -1 or 0x56ee80 answers) — raised as AI_EVENT_UNIT_CAPTURED (@f2e088) on the player's signals (+0x2b8, 0x200e10); the barbarians' triggered tree (TRIGGER_CAPTURE_BARBARIAN: \"Escort Worker To Camp\", the operation \"Barbarian Builder Capture\") runs it. The new unit's original owner (the tracked +0x2e8, value +0x340) is the victim's owner (+0x2e0; 0x212825..0x2128f3). The order: the victim removed (units manager +0x60), the unit created off the map (+0x50 at -9999, -9999), its original owner, then 0x586360 / 0x586d40 place it (its look taken), its charges, damage and embarked state (0x5706e0), its Movement spent (0x56d6f0) and its turn ended (0x570b40)."
   status: PARTLY
   cases:
     - recording: h1_duelw1121
@@ -513,7 +514,10 @@
     - cpu/core/types.ts:Unit
     - gpu/core/sim_seats.py:_capture_unit
     - gpu/core/sim_seats.py:_capture_beaten
+    - cpu/core/units.ts:captureAnew
+    - gpu/core/sim_seats.py:_capture_anew
   readings:
+    - "C-129: a killed player's records forgotten; a capture's new unit; an air strike's record — READ (0x534c50, 0x787fc0 -> 0x5ee370, 0x212500's create), both twins; the replay's later-player timings"
     - "H-1: a civilian stepped on — READ"
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"

@@ -4117,6 +4117,10 @@ class SimSeats:
             ranged=True, a_died=a_died, d_died=d_died)
         self._ww_battle(unit_att, row, self._row_of(d_seat), tgt,
                         a_died=a_died, d_died=d_died)
+        # the combat log's record of the attacker standing for the
+        # defender's player, on its base (`recordAttacker`)
+        self._kb_attacked(unit_att & ~a_died, d_seat, torch.full_like(ttc, u + self.POOL_LO[atk_kind]), a_seat,
+                          _type_p[:, u], _tile_p[:, u], _hp_p[:, u])
         dead = self.unit_hp[g, ds] <= 0
         gd, td = g[dead], ttc[g[dead]]
         if len(gd) > 0:
@@ -14436,7 +14440,17 @@ class SimSeats:
         self._occ_clear(rows, tile, src)
         self._occ_set(rows, tile, dst)
         cur[rows] += 1
+        self._capture_anew(rows, dst)
         self._gen_ver += 1
+
+    def _capture_anew(self, rows: torch.Tensor, dst: torch.Tensor) -> None:
+        """`captureAnew` — the capture's new units at merged `dst` [N] of the
+        games `rows` [N] (0x212500): of their types' own AI type, homed
+        nowhere (the unit's init 0x563cd0), each taking its own look where it
+        is placed (0x586d40 -> 0x58f3f0, `_take_look`)"""
+        self.unit_defender[rows, dst] = False
+        self.unit_homed[rows, dst] = False
+        self._take_look(rows, dst)
 
     def _seize_victim(self, slot: torch.Tensor, captor: torch.Tensor) -> torch.Tensor:
         """[B] — the unit at MERGED `slot` [B] (-1 none) is one a move of
@@ -15429,6 +15443,7 @@ class SimSeats:
         self._convert_unit(cr, d_slot[cr], atk_row[cr], tile_c[cr])
         self.unit_orig_owner[cr, dst] = was
         self.unit_hp[cr, dst] = self._captured_hp
+        self._capture_anew(cr, dst)
         self._gen_ver += 1
 
     def _ranged_unit_strengths(self, hostile: bool, a_slot: torch.Tensor, tgt: torch.Tensor,

@@ -462,6 +462,18 @@ export function reseatUnit(state: GameState, unit: Unit, seat: number): void {
   state.units.push(unit);
 }
 
+/** A CAPTURE'S NEW UNIT (Combat_Manager 0x212500): the victim removed, a
+ *  unit created under the captor (`reseatUnit`) — of its type's own AI
+ *  type and homed nowhere (the unit's init 0x563cd0) — and placed on the
+ *  victim's plot (0x586d40), where it takes its own look (0x58f3f0,
+ *  `takeLook`) */
+export function captureAnew(state: GameState, unit: Unit, seat: number): void {
+  reseatUnit(state, unit, seat);
+  delete unit.aiDefender;
+  delete unit.aiHomed;
+  takeLook(state, unit);
+}
+
 export function unitsHostile(
   state: GameState,
   a: { seat: number },
@@ -1970,6 +1982,21 @@ export function unitMadeAnew(state: GameState, u: Unit): void {
   delete u.aiHomed;
   for (const h of [...state.cityStates, ...(state.freeSeat ? [state.freeSeat] : []), state.barbSeat]) {
     for (const r of h.armyKnown ?? []) if (r.id === u.id) r.id = -1;
+  }
+}
+
+/** A PLAYER KILLED (Rules_Player 0x534c50: its units killed, then game
+ *  signal +0x900 with the player): every knowledge base forgets the
+ *  player's army records (0x787fc0 -> 0x5ee370: each of its type lists
+ *  emptied) — runs/h1_duelz1127 t213, city-state 4 destroyed in player 1's
+ *  turn: no record of its Bombard 1703944 at player 1's end look nor
+ *  city-state 3's tactical turn */
+export function forgetPlayer(state: GameState, seat: number): void {
+  for (const h of [...state.cityStates, ...(state.freeSeat ? [state.freeSeat] : []), state.barbSeat]) {
+    if (!h.armyKnown) continue;
+    const kept = h.armyKnown.filter((r) => r.owner !== seat);
+    if (kept.length) h.armyKnown = kept;
+    else delete h.armyKnown;
   }
 }
 

@@ -38,6 +38,24 @@
     - "- A plot first revealed to a player (0x534950, from the sight update 0x58aa90) names its river (0xa29730 → 0xa292a0, \"Random River\")..."
     - "...f the row; it tests no reveal itself. The reveal gate is the NAME: a plot first revealed (0x534950) names its rivers (0xa29730 -> \"Random River\" 0xa292a0, an unused name of the namer's civ..."
   review: reviewed
+- addr: 0x534c50
+  final: 0x37bd80
+  kind: function
+  name: killPlayer
+  semantics: "(rules, player, id): where the id is the player's (+0x128), every unit of the player (+0x12e8 +0xd8 list) is killed (0x4ef040, the delayed kill); the cities' loop (0x1ccfe0 / 0x1cf0e0 / 0x36f660) raises game signal +0x3d8 per city it finds; then game signal +0x900 with the player (0x534e7a -> 0x31b110), whose subscribers are the trade manager (0x555c70), espionage (0x41d6e0), the emergencies (0x25c460), the AI (0x724280) and every Targets (0x7864c0 at 0x786984 -> 0x787fc0); a human player's notification last (0x91e4a0)."
+  status: PARTLY
+  cases:
+    - recording: h1_duelz1127
+      turn: 213
+      value: city-state 4 destroyed in player 1's turn; city-state 3's t213 records hold none of its Bombard 1703944
+  impl:
+    - cpu/core/units.ts:forgetPlayer
+    - cpu/core/combat.ts:disbandMinorArmy
+    - gpu/core/sim_minors.py:_kb_forget_player
+    - gpu/core/sim_orders.py:_capture_city_state
+  readings:
+    - "C-129: a killed player's records forgotten; a capture's new unit; an air strike's record — READ (0x534c50, 0x787fc0 -> 0x5ee370, 0x212500's create), both twins; the replay's later-player timings"
+  review: reviewed
 - addr: 0x534ee0
   final: 0x37bf50
   kind: function

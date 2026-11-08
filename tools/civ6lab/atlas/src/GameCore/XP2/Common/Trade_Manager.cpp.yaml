@@ -489,6 +489,15 @@
   context:
     - "...air (0x541ae0) admits it, else a fresh search (0x553070 -> 0x559140). Starting a route (0x555380) takes the cached path the same way, else 0x5526a0. (`tradeMet`; `minorRouteCandidate`..."
   review: imported
+- addr: 0x555c70
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-129: a killed player's records forgotten; a capture's new unit; an air strike's record — READ (0x534c50, 0x787fc0 -> 0x5ee370, 0x212500's create), both twins; the replay's later-player timings"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...al +0x900 with the player (0x534e7a -> 0x31b110). Its subscribers: the trade manager (0x555c70), espionage (0x41d6e0, 0x41e450 erases the player's entries), the emergencies, the AI (..."
+  review: imported
 - addr: 0x556380
   kind: function
   semantics: "a Trader's trade graph update: a live MakeTradeRoute unit on no active route standing in a city of its owner updates the graph from that city (0x5457c0 -> 0x545020)"

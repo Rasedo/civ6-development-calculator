@@ -2141,6 +2141,16 @@
   readings:
     - "C-124 / C-95: every search but the planning's pays the stacking +1e6, the cost reads the child's revealed bit, Explore's flag 0x40 prices the unrevealed — READ (0x270dd0 at 0x270e55 / 0x270e86 / 0x270ff2 / 0x2711c3..0x271268 / 0x2713d3, 0x502aa0, 0x26df90's callers 0x716739 / 0x70aadd, 0x70ce90 at 0x70ced5, 0x803060 at 0x80316f), both twins"
   review: reviewed
+- addr: 0x503320
+  final: 0x357f90
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-129: a killed player's records forgotten; a capture's new unit; an air strike's record — READ (0x534c50, 0x787fc0 -> 0x5ee370, 0x212500's create), both twins; the replay's later-player timings"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "- OPEN: the hidden-visibility test the look asks (0x5033a0 -> 0x503320, the per-plot counts at visibility +0x570 keyed by [+0x98]+0x24) is unread: what reve..."
+  review: imported
 - addr: 0x5033a0
   final: 0x358010
   kind: function
@@ -2155,6 +2165,7 @@
     - "C-123: a formation's Movement and its path's stacking — READ (0x2673f0, 0x267650, 0x262cd0, 0x585eb0 in the path validity), both twins"
     - "C-124: the formation's kept path, and a path's other players' units — READ (0x272aa0, 0x26e3a0, 0x782d0, 0x586360 at 0x586542..0x5865a1), unported"
     - "C-95: the embark rules for a formation that may embark, a district's zone unseen, a city's kill in the planning, a raised unit's AI type, a move order's attack spot — READ (0x530420, 0x530240, 0x52fe90 at 0x52fed4, 0x530f50 at 0x531168, 0x791470 at 0x791677, 0x79b9c0), FIT (the move order's attack spot), both twins"
+    - "C-129: a killed player's records forgotten; a capture's new unit; an air strike's record — READ (0x534c50, 0x787fc0 -> 0x5ee370, 0x212500's create), both twins; the replay's later-player timings"
   notes:
     - ".claude/scratchpad/st1/reading.md: ....cpp 0x717460, m_influence): per player at   war with the player (0x469cd0), each unit it sees now (0x5033a0) with a   combat, ranged or bombard strength (0x56dc90, 0x56e3e0, 0x56daa0): its   strength (0x7164..."
   context:
@@ -2783,6 +2794,16 @@
     - "C-129: the bankruptcy's victim and every seat's upgrade to the furthest rung — READ (0x4e05e0, 0x5374c0), both twins"
     - "C-130: the Economic AI's disband of a falling treasury — READ (0x6877d0 from the savings turn 0x688b45..0x688e71, the delete command's can-start 0x948370), both twins"
   review: reviewed
+- addr: 0x5706e0
+  final: 0x3a5b50
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-129: a killed player's records forgotten; a capture's new unit; an air strike's record — READ (0x534c50, 0x787fc0 -> 0x5ee370, 0x212500's create), both twins; the replay's later-player timings"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...x58f3f0), then the victim's charges (0x56cb00), damage (0x5705f0) and embarked state (0x5706e0), its Movement spent (0x56d6f0) and its turn ended (0x570b40). Ported: a new id and a n..."
+  review: imported
 - addr: 0x5707b0
   final: 0x3a5c20
   kind: function
@@ -2833,6 +2854,7 @@
     - "C-123 / C-95: the Plunder Trade Route command and the AI's plunder after the move — READ (0x89dae0, 0x89dfc0, 0x9555a0, 0x9559a0, 0x5545e0 at 0x554667 / 0x554d4c, 0x58fc20, 0x7746a0, 0x70a440, 0x771f80 at 0x7722b6 / 0x77254e / 0x77277f, 0x776140 at 0x776424..0x776470), both twins"
     - "C-128: a city-state's Make Military Formation — READ (0x77a190, 0x770670, 0x536da0, 0x773e20, 0x94a870, 0x949930), both twins"
     - "C-129: the upgrade is a new unit, its old self dying in its pool slot to the turn's end — READ (0xa49cb0, 0x9402a0, 0x4ef040, 0x4ef6d0), both twins"
+    - "C-129: a killed player's records forgotten; a capture's new unit; an air strike's record — READ (0x534c50, 0x787fc0 -> 0x5ee370, 0x212500's create), both twins; the replay's later-player timings"
   notes:
     - ".claude/scratchpad/mu1/readings_c96.md: ...000, else the skip 0x95eae0 (\"Wander Back to City\", \"Move To\" the   city). The turn ends (0x56d6f0, 0x570b40). Confirmed: the turn's \"Random   Direction\" draws pair one to one with the AI_Tactical.csv rows \"W..."
   context:
@@ -2874,6 +2896,8 @@
     - cpu/core/units.ts:stepUnit
     - cpu/core/units.ts:upgradeAnew
     - gpu/core/sim_seats.py:_step_verb
+    - cpu/core/units.ts:captureAnew
+    - gpu/core/sim_seats.py:_capture_anew
   readings:
     - "C-129: a unit's look is its stored line-of-sight list — READ (0x58f3f0, the setters 0x56ce90 / 0x5704d0 / 0x570560), both twins"
     - "H-1: the raids — READ"
@@ -2883,6 +2907,7 @@
     - "H-1: the barbarians' turn (0x1514a0) — READ (the max camps and the sight LAB)"
     - "C-119: the rivers' names on the visibility count — READ (0x58aa90 -> 0x534950, 0x508d50, 0x508330), ported both twins"
     - "C-124: an attack order to a plot out of sight loses its attack flag — READ (0x962310), both twins"
+    - "C-129: a killed player's records forgotten; a capture's new unit; an air strike's record — READ (0x534c50, 0x787fc0 -> 0x5ee370, 0x212500's create), both twins; the replay's later-player timings"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...e — newly visible to the barbarian player, not to the scout alone. A move (0x586d40 → 0x58f3f0 with add) adds the new sight before it drops the old, so a plot both sights hold raises..."
@@ -3090,6 +3115,14 @@
     - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
   context:
     - "...turn (0x5ce680, from the player's AI turn 0x5c2650 over its cities). On a full update: 0x5d7e00, 0x5cadc0, 0x5cbd10 (the yield advantages and weights; logged by 0x5cdd70: Food Adv. /..."
+  review: reviewed
+- addr: 0x5e73c0
+  final: 0x3ef6d0
+  kind: function
+  semantics: "remove-if over the known city records (0xe0 each) whose owner word (+0) is the given player: the kept ones moved forward (0x5e85a0), the new end returned."
+  status: PARTLY
+  readings:
+    - "C-129: a killed player's records forgotten; a capture's new unit; an air strike's record — READ (0x534c50, 0x787fc0 -> 0x5ee370, 0x212500's create), both twins; the replay's later-player timings"
   review: reviewed
 - addr: 0x5f35d0
   final: 0x3f81d0
@@ -4494,6 +4527,7 @@
   impl: [cpu/core/minorBuild.ts:minorPhase]
   readings:
     - "C-130: the Combat Desire between the policy jobs and the government values; a released contract on its city's list — READ, both twins"
+    - "C-129: a killed player's records forgotten; a capture's new unit; an air strike's record — READ (0x534c50, 0x787fc0 -> 0x5ee370, 0x212500's create), both twins; the replay's later-player timings"
   review: reviewed
 - addr: 0x724dd0
   final: 0x4d0610
@@ -4887,6 +4921,20 @@
     - "C-129: an operation's enemy strength reads the knowledge base after the tactical look, before a later player's blows — the aimem sites read, the replay's copy"
   context:
     - ...s, not a unit; the lambda 0x783570 (one unit, through 0x5f0440) is referenced only from 0x787fb0, its caller unread.
+  review: reviewed
+- addr: 0x787fc0
+  final: 0x5164a0
+  kind: function
+  name: knowledgeKilledDelegate
+  semantics: "game signal +0x900's delegate (bound by 0x7864c0 at 0x786984, vtable @0xd703e8): the killed player's id (+0x128) to the Targets' knowledge base (+0x388) through 0x5ee370."
+  status: READ
+  cases:
+    - recording: h1_duelz1127
+      turn: 213
+      value: city-state 4's records gone from city-state 3's knowledge base at its destruction
+  impl: [cpu/core/units.ts:forgetPlayer, gpu/core/sim_minors.py:_kb_forget_player]
+  readings:
+    - "C-129: a killed player's records forgotten; a capture's new unit; an air strike's record — READ (0x534c50, 0x787fc0 -> 0x5ee370, 0x212500's create), both twins; the replay's later-player timings"
   review: reviewed
 - addr: 0x78cc40
   final: 0x5185b0

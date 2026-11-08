@@ -127,10 +127,13 @@
     - cpu/core/minorBuild.ts:minorUpgradeUnit
     - cpu/core/units.ts:unitMadeAnew
     - cpu/core/units.ts:upgradeAnew
+    - cpu/core/units.ts:captureAnew
+    - gpu/core/sim_seats.py:_capture_anew
   readings:
     - "C-128: the standing army's home and Garrison City's DEFENDER — READ, both twins"
     - "C-128: a unit made anew leaves its operation and its standing army — READ, both twins"
     - "C-129: the upgrade is a new unit, its old self dying in its pool slot to the turn's end — READ (0xa49cb0, 0x9402a0, 0x4ef040, 0x4ef6d0), both twins"
+    - "C-129: a killed player's records forgotten; a capture's new unit; an air strike's record — READ (0x534c50, 0x787fc0 -> 0x5ee370, 0x212500's create), both twins; the replay's later-player timings"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...s +0xf8) and where it drops one (-1). The other writers of the home: the unit's init (0x5657b2, -1) and a city's capture (0x5c9d40 from 0x1fdea0: the capturing unit's assignment -1,..."
