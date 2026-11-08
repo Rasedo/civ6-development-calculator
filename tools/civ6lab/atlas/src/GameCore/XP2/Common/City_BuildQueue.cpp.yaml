@@ -333,6 +333,14 @@
   context:
     - "...he cost is lost. The other writer: a building made by another path with its flag set (0x175da0 at 0x175eec) adds the progress kept on that building (+0x218[building]) into the store."
   review: imported
+- addr: 0x176210
+  final: 0xfbd90
+  kind: function
+  semantics: reads the district's zoning plot (m_aiZoningPlot) and calls 0x181700 (0x176276).
+  status: PARTLY
+  readings:
+    - "C-112: the majors' citizens by the citizen manager — READ (0x1fa1d0 at 0x1fa22d, 0x196320's callers), both twins"
+  review: imported
 - addr: 0x177d10
   kind: function
   name: City_BuildQueue
@@ -376,6 +384,7 @@
   status: PARTLY
   readings:
     - "C-130 / C-112: the domain strength's treasury carry and the city's turn's citizen re-place — READ, both twins"
+    - "C-112: the majors' citizens by the citizen manager — READ (0x1fa1d0 at 0x1fa22d, 0x196320's callers), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ...1d0, from Player DoTurn 0x4e4560 at 0x4e4813, over the player's cities) runs production 0x178310, growth 0x1b46e0, borders 0x1a9bc0, loyalty 0x19f8d0, then the citizens' (city +0x1b50,...
@@ -385,6 +394,7 @@
   status: PARTLY
   readings:
     - "C-130 / C-112: the domain strength's treasury carry and the city's turn's citizen re-place — READ, both twins"
+    - "C-112: the majors' citizens by the citizen manager — READ (0x1fa1d0 at 0x1fa22d, 0x196320's callers), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...growth 0x1b46e0, borders 0x1a9bc0, loyalty 0x19f8d0, then the citizens' (city +0x1b50, 0x1783b0) 0x194f80, a thunk to the full reassign 0x196320: every citizen re-placed every turn..."
@@ -911,9 +921,10 @@
 - addr: 0x180cb0
   final: 0x1020b0
   kind: function
-  semantics: "a building completion: runs the full citizen reassign 0x196320."
+  semantics: "a building set on its plot: with Buildings +0x159 bit 0x10 (0x180cc7) the placement path (from ORDER_CONSTRUCT 0x183db0) ends in the full citizen reassign 0x196320 (0x181159); clear, it takes 0x181165 with no reassign."
   status: PARTLY
   readings:
+    - "C-112: the majors' citizens by the citizen manager — READ (0x1fa1d0 at 0x1fa22d, 0x196320's callers), both twins"
     - "C-100 / C-112: a city-state's power and its regional buildings, the citizen reassign's callers — a fit and a reading"
     - "C-100 / C-112: a city-state's power and its regional buildings, the citizen reassign's callers"
   context:
@@ -922,9 +933,10 @@
 - addr: 0x181700
   final: 0x1029c0
   kind: function
-  semantics: "a building completion: runs the full citizen reassign 0x196320."
+  semantics: "a district set on its zoning plot (from 0x176210, m_aiZoningPlot): ends in the full citizen reassign 0x196320 (0x181bb8)."
   status: PARTLY
   readings:
+    - "C-112: the majors' citizens by the citizen manager — READ (0x1fa1d0 at 0x1fa22d, 0x196320's callers), both twins"
     - "C-100 / C-112: a city-state's power and its regional buildings, the citizen reassign's callers — a fit and a reading"
     - "C-100 / C-112: a city-state's power and its regional buildings, the citizen reassign's callers"
   context:
@@ -948,7 +960,9 @@
   final: 0x1049b0
   kind: function
   status: PARTLY
-  readings: ["H-1: the luxury allocation's rebuilds — PARTLY READ"]
+  readings:
+    - "H-1: the luxury allocation's rebuilds — PARTLY READ"
+    - "C-112: the majors' citizens by the citizen manager — READ (0x1fa1d0 at 0x1fa22d, 0x196320's callers), both twins"
   context:
     - "...on-accumulated import / export. Its callers: a production completion's strategic costs (0x18433d building, 0x184d95 project, 0x1856b3 / 0x185a2a unit), a plot's extracted resource chan..."
   review: imported

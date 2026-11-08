@@ -1399,6 +1399,8 @@ class SimInit:
         # CITIZENS LEFT IDLE, on neither a plot nor a slot (City.idleCitizens):
         # the walk works population less specialists less these.
         self.city_idle = torch.zeros(B, self.CITY_ROWS, civ_city_pad, dtype=torch.long, device=device)
+        # the city's Food favored, the citizen manager's yield flag (City.favoredFood)
+        self.city_fav_food = torch.zeros(B, self.CITY_ROWS, civ_city_pad, dtype=torch.bool, device=device)
         self.district_dead = torch.zeros(B, T, dtype=torch.bool, device=device)
         # Persistent city ids on the seat axis — the TS City.id, allocated per
         # seat from civ_next_city_id. tile_city stores THESE ids for every seat;

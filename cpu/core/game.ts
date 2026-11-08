@@ -6,6 +6,7 @@ import { createRelic } from './greatWorks';
 import { VALLETTA_FAITH_DISTRICTS, VALLETTA_WALLS_DISCOUNT_PCT, VATICAN_GP_PRESSURE } from '../data/cityStates';
 import { tilesWithin, hexDistance, neighbors } from '../../world/hex';
 import { claimTile, borderCandidates, newCityGrantUnit, seatBuildingSum } from './city';
+import { cityFlags, replaceAllCitizens } from './citizens';
 import { canFoundCity, availableBuildings, buildingCompletable, purchasableBuildings, worshipOffered, type RuleResult } from './rules';
 import { computeUnlocks, getModifiers, isCivicComplete, goldPrice, faithPrice } from './effects';
 import type { Modifiers, Unlocks } from './effects';
@@ -376,6 +377,9 @@ export function foundCityAt(state: GameState, seat: number, tile: Tile, owner: S
     }
     logPopWrite(state, city, 'fc');
   }
+  // the founding's annex places its citizens (AnnexPlots 0x1a8a30 ->
+  // 0x196320)
+  if (isCiv(seat)) replaceAllCitizens(state, city, cityFlags(city));
   // CIV6 (Pax Britannica / Treasure Fleet): a city founded on a continent
   // other than the HOME one. The first city can never qualify — `capitalTile`
   // is stamped by then, so its own continent IS the home one.
@@ -1585,8 +1589,10 @@ export function buyTile(state: GameState, cityId: number, tileIndex: number, sea
   // plots taken by culture alone (runs/h1_duelw1103 / 1104).
   claimTile(state, city, tileIndex);
   // the annex (0x1a8b70, the purchase's 0x977aa0 calls it) clears the city's
-  // stored next plot; its culture step draws one again
+  // stored next plot; its culture step draws one again; and re-places every
+  // citizen (0x1a8b70 -> 0x196320)
   city.nextPlot = -1;
+  replaceAllCitizens(state, city, cityFlags(city));
   return { ok: true };
 }
 

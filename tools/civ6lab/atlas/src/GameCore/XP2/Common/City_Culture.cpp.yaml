@@ -36,7 +36,10 @@
     - cpu/data/constants.ts:WONDER_FREE_TILES
     - cpu/harness/checks.ts:startDraws
     - gpu/core/sim_seats.py:_wonder_free_tiles
+    - cpu/core/game.ts:foundCityAt
+    - gpu/core/sim_seats.py:_found_city_at
   readings:
+    - "C-112: the majors' citizens by the citizen manager — READ (0x1fa1d0 at 0x1fa22d, 0x196320's callers), both twins"
     - "H-1: the annex, the purchase and the stored next plot — READ"
     - "H-1: every draw of a player's start (witnesses, RandCalls.csv)"
     - "H-1: the envoy annex — READ (settles the extra border picks)"
@@ -76,7 +79,9 @@
     - cpu/core/minorBuild.ts:minorGrowth
     - gpu/core/sim_minors.py:_minor_growth
     - gpu/core/sim_minors.py:_minor_envoy_tiles
+    - gpu/core/sim_seats.py:_seat_buy_ladder
   readings:
+    - "C-112: the majors' citizens by the citizen manager — READ (0x1fa1d0 at 0x1fa22d, 0x196320's callers), both twins"
     - "H-1: the annex, the purchase and the stored next plot — READ"
     - "H-1: every draw of a player's start (witnesses, RandCalls.csv)"
     - "H-1: an annex re-places the citizens, the garrison's unit, a religious unit killed on a move — READ"
@@ -115,6 +120,7 @@
     - "H-1: the border bank in fixed point — READ"
     - "H-1: an annex re-places the citizens, the garrison's unit, a religious unit killed on a move — READ"
     - "C-130 / C-112: the domain strength's treasury carry and the city's turn's citizen re-place — READ, both twins"
+    - "C-112: the majors' citizens by the citizen manager — READ (0x1fa1d0 at 0x1fa22d, 0x196320's callers), both twins"
   context:
     - "...is non-empty. BASE_MULTIPLIER and DISTANCE_DIVISOR are not read here. The turn's handler 0x1a9bc0 (City_Culture.cpp) banks culture × (100 + percent) / 100 when the civ level annexes with..."
     - "...stored next plot (+0x1c) to -1 and counts the plot (+0xc). Its callers: the culture turn (0x1a9bc0, which then draws and stores a fresh plot), AnnexPlots(n) (0x1a8a30: n picker draws, each..."

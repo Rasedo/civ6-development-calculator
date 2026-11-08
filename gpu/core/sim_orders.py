@@ -1013,6 +1013,8 @@ class SimOrders:
                 _rq = torch.where(self._res_hidden(row).gather(1, hc.unsqueeze(1)).squeeze(1),
                                   torch.full_like(_rq, -1), _rq)
                 did = torch.zeros(B, dtype=torch.bool, device=dev)
+                # the plot each game's builder laid on
+                laid_at = torch.full((B,), -1, dtype=torch.long, device=dev)
                 for _k in range(self._imp_unlock.numel()):
                     _col = self._A_IMP[_k] if _k < len(self._A_IMP) else -1
                     if _col < 0:
@@ -1083,6 +1085,7 @@ class SimOrders:
                         self.improvement[_r, hc[_r]] = _k
                         self.pillaged[_r, hc[_r]] = False
                         did[_r] = True
+                        laid_at[_r] = hc[_r]
                         if row < self.n_majors:
                             self._moment_disaster_improvement(row, _r, hc[_r])
                 # CIV6 (Mountain Tunnel, Qhapaq Ñan, Ski Resort): "Can only be built on an
@@ -1119,6 +1122,7 @@ class SimOrders:
                         self.improvement[_r, _tt[_r]] = _k
                         self.pillaged[_r, _tt[_r]] = False
                         did_adj[_r] = True
+                        laid_at[_r] = _tt[_r]
                         if row < self.n_majors:
                             self._moment_disaster_improvement(row, _r, _tt[_r])
                 # CIV6 (Mana): "Culture Bomb adjacent tiles" on the named
@@ -1158,6 +1162,16 @@ class SimOrders:
                     _r = did.nonzero(as_tuple=True)[0]
                     self._eff_version += 1
                     self._spend_build_charge(_r, sc, hc)
+                    # an improvement laid re-places the citizens of the
+                    # seat's own city the plot stands in (BuildImprovement
+                    # 0xa4cee0 / 0xa4e7a0 -> 0x196320)
+                    if row < self.n_majors:
+                        _lc = torch.full((B,), -1, dtype=torch.long, device=dev)
+                        _lc[_r] = self._city_col_at(row, _r, laid_at[_r].clamp(min=0))
+                        _lm = did & (laid_at >= 0) & (_lc >= 0)
+                        _lcc = _lc.clamp(min=0)
+                        self._place_citizens(row, _lcc, _lm, None, full=True,
+                                             fav_food=self.city_fav_food[self._bidx, row, _lcc])
                 # REPAIR (the TS applier's REPAIR arm): improvement first, else district;
                 # the turn is spent, NO charge.
                 if self._A_REPAIR in _acmd:
@@ -1673,6 +1687,7 @@ class SimOrders:
                 getattr(self, _p)[b, row, col, :] = -1
             self.city_dist_tile[b, row, col, :] = self.city_dist_tile[b, self._CITY_MINOR0 + s, 0, :]
             self.city_spec_pin[b, row, col, :] = -1
+            self.city_fav_food[b, row, col] = False
             self.city_wonder[b, row, col, :] = -1
             self.city_bldg[b, row, col, :] = self.city_bldg[b, self._CITY_MINOR0 + s, 0, :]
             self.city_bldg_pillaged[b, row, col, :] = self.city_bldg_pillaged[b, self._CITY_MINOR0 + s, 0, :]

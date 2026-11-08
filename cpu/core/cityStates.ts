@@ -13,7 +13,7 @@ import { FEATURES } from '../../world/features';
 // the border-growth pick and its claim: a minor's envoy plots are taken by
 // the city rule's OWN next-tile choice, never a second one
 import { drawBorderPlot, acquireTile } from './city';
-import { placeCitizens, replaceAllCitizens, type YieldFlags } from './citizens';
+import { cityFlags, placeCitizens, replaceAllCitizens } from './citizens';
 import { darkBuildings } from './yields';
 import type { RuleResult } from './rules';
 import { ALLIANCE_ECONOMIC, PEACE_TREATY_TURNS, WAR_MIN_TURNS } from '../data/seats';
@@ -84,17 +84,13 @@ export function placeCityStateAt(
   return cityState;
 }
 
-/** A city-state's yield flags: Food favored where its city AI set it
- *  (`minorFoodFocus`), else none */
-const minorFlags = (cs: CityState): YieldFlags => (cs.favoredFood ? 'F.....' : '');
-
 /** `n` citizens the minor's city gained placed beside the ones working
  *  (0x197230; `minorCity` is a view, so the pins and the idle are written
  *  back) */
 export function minorPlaceCitizens(state: GameState, cs: CityState, n: number): void {
   if (n <= 0) return;
   const city = minorCity(cs);
-  placeCitizens(state, city, n, minorFlags(cs));
+  placeCitizens(state, city, n, cityFlags(cs));
   cs.specialistPref = city.specialistPref;
   cs.idleCitizens = city.idleCitizens;
 }
@@ -103,7 +99,7 @@ export function minorPlaceCitizens(state: GameState, cs: CityState, n: number): 
  *  an annex, a citizen lost, an improvement laid, a yield flag set) */
 export function minorReplaceCitizens(state: GameState, cs: CityState): void {
   const city = minorCity(cs);
-  replaceAllCitizens(state, city, minorFlags(cs));
+  replaceAllCitizens(state, city, cityFlags(cs));
   cs.specialistPref = city.specialistPref;
   cs.idleCitizens = city.idleCitizens;
 }

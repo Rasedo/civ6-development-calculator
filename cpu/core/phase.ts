@@ -54,7 +54,8 @@ import { PANTHEONS, PANTHEON_FAITH_COST, PANTHEON_IDS } from '../data/religion';
 import { CITY_WORK_RADIUS, scaleByGameSpeed, GOLD_PURCHASE_MULT, MP_SCALE, RAILROAD_TECH, borderGrowthCost, FAITH_PURCHASE_MULT, amenityTierIndex } from '../data/constants';
 import { cityDistrictSum, darkBuildings, stampBuildingEra } from './yields';
 import type { CityStats } from './city';
-import { beliefSeatYields, computeCityStats, cityBuildingSum, luxuryAmenities, drawBorderPlot, acquireTile, placeIdleCitizens, refreshParkAmenities, seatBuildingSum, swapTileOk, wonderRegionalLoyalty } from './city';
+import { cityFlags, placeCitizens, replaceAllCitizens } from './citizens';
+import { beliefSeatYields, computeCityStats, cityBuildingSum, luxuryAmenities, drawBorderPlot, acquireTile, refreshParkAmenities, seatBuildingSum, swapTileOk, wonderRegionalLoyalty } from './city';
 import { accrueStockpiles, canTrainWithStockpile, capStockpiles, chargeUnitResource, chargeUnitUpkeep, layRailroad, resolveSeatPower } from './stockpile';
 import { ageReactors } from './disasters';
 import { droughtBars } from '../data/disasters';
@@ -665,6 +666,13 @@ export function freeCityLoyaltyDelta(state: GameState, city: City): number {
  * rebuild's third). One that did not move keeps the read it grew on. The GPU
  * twin is `_culture_after_growth`.
  */
+/** an improvement `seat` laid re-places the citizens of its own city the
+ *  plot stands in (BuildImprovement 0xa4cee0 / 0xa4e7a0 -> 0x196320) */
+function replaceCitizensAt(state: GameState, seat: number, tile: Tile): void {
+  const city = cityAtTile(state, tile);
+  if (city && city.seat === seat) replaceAllCitizens(state, city, cityFlags(city));
+}
+
 export function cultureAfterGrowth(state: GameState, city: City, popBefore: number, stats: CityStats,
   luxMap?: Map<number, number>): number {
   if (city.population === popBefore) return stats.total.culture;
@@ -2517,6 +2525,7 @@ export function applySeatUnitOrders(state: GameState, actor: Seat, steps: number
               unit.charges = (unit.charges ?? 0) - 1;
               unit.movesLeft = 0;
               if (unit.charges <= 0 && unitIsNoncombat(unit.type)) disbandUnit(state, unit.id);
+              replaceCitizensAt(state, actor.seat, state.map.tiles[tt]);
             }
             return;
           }
@@ -2551,6 +2560,7 @@ export function applySeatUnitOrders(state: GameState, actor: Seat, steps: number
             unit.movesLeft = 0;
             // CIV6 (Legion): a military chassis outlives its last charge.
             if (unit.charges <= 0 && unitIsNoncombat(unit.type)) disbandUnit(state, unit.id);
+            replaceCitizensAt(state, actor.seat, here);
           }
         }
       } else if (a >= A_SPREAD && a < A_SPREAD + 7) {
@@ -3003,7 +3013,6 @@ export function seatPhase(state: GameState, only?: { seats: ReadonlySet<number>;
       continue;
     }
 
-    placeIdleCitizens(actor.cities);
     // its cities' City Analysis jobs keep their trade lists (`majorTradeLists`)
     majorTradeLists(state, actor);
     // THE TURN'S RESOURCES, before anything reads them: every improved source
@@ -3556,10 +3565,18 @@ export function seatPhase(state: GameState, only?: { seats: ReadonlySet<number>;
       const stats = grown.get(civCity.id)!;
       const popBefore = civCity.population;
       seatGrowth(civCity, stats.effectiveFoodSurplus, stats.growthNeeded, state.turn);
+      // a citizen grown is placed beside the rest, a starved city re-places
+      // them all (0x1b41e0 -> 0x194fb0), before the border box banks
+      if (civCity.population > popBefore) placeCitizens(state, civCity, civCity.population - popBefore, cityFlags(civCity));
+      else if (civCity.population < popBefore) replaceAllCitizens(state, civCity, cityFlags(civCity));
       cityBorderGrowth(state, civCity, actor.seat, cultureAfterGrowth(state, civCity, popBefore, stats, luxMap));
       if (applyLoyalty(state, civCity, stats.amenities.tier.name, rGovIds.has(civCity.id), stats.foodSurplus < 0)) {
         civCityDefectors.push(civCity);
       }
+      // the city's turn ends re-placing every citizen (0x1fa1d0: after the
+      // production, growth, border and loyalty steps, 0x194f80 -> the full
+      // reassign 0x196320), its idle ones with them
+      replaceAllCitizens(state, civCity, cityFlags(civCity));
       cityStrikes(state, civCity, cityStrikeStrength(state, civCity));
     }
 

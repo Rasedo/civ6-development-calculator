@@ -1448,6 +1448,7 @@ CITY = {
     "queueFront": lambda sim, b, rows: [_qfront(sim, b, c, s) for c, s in rows],
     "specialists": _spec_rows,
     "idleCitizens": _cty("city_idle"),
+    "favoredFood": lambda sim, b, rows: [1 if bool(sim.city_fav_food[b, c, s]) else 0 for c, s in rows],
     "specialistPref": lambda sim, b, rows: [
         [int(x) for x in sim.city_spec_pin[b, c, s].tolist()] for c, s in rows
     ],

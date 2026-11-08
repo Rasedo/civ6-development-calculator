@@ -3605,7 +3605,18 @@
           "planes": [
             "city_idle"
           ],
-          "note": "the citizens the city holds on no plot and in no slot until the engine's next turn start places them."
+          "note": "the citizens the city holds on no plot and in no slot until the citizen manager's next re-place places them."
+        },
+        {
+          "name": "favoredFood",
+          "compare": "exact",
+          "covers": [
+            "City.favoredFood"
+          ],
+          "planes": [
+            "city_fav_food"
+          ],
+          "note": "the city's Food favored, the yield flag the citizen manager places under."
         },
         {
           "name": "specialistPref",
@@ -4884,14 +4895,6 @@
       {
         "path": "Unit.id",
         "why": "the join key is (tile, military/civilian); the GPU has no unit-id plane."
-      },
-      {
-        "path": "Tile.lockRank",
-        "why": "set only by a recorded game's replay (the record's citizens' order); no driver writes it, so every engine game holds it unset."
-      },
-      {
-        "path": "Tile.lockPop",
-        "why": "set only by a recorded game's replay (a citizen its growth moves off the plot, held for the turn's yields); no driver writes it, so every engine game holds it unset."
       },
       {
         "path": "Tile.col",

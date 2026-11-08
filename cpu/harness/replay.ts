@@ -3396,25 +3396,27 @@ const res = buyTile(state, city.id, d.plot, seat);        if (!res.ok) setTileOw
         break;
       }
       case 'worked': {
-        // a city-state's citizens are the engine's citizen manager's
-        // (cpu/core/citizens.ts), never imposed
+        // a major's citizens as record t+1 holds them after its turn, its
+        // yield flags the ones its city AI left set (CityFocusChanged); a
+        // city-state's are the engine's citizen manager's (cpu/core/citizens.ts),
+        // never imposed
         const city = cityAt(state, d.city);
         if (!city) break;
         for (const t of state.map.tiles) {
           if (t.ownerSeat !== city.seat || t.ownerCity !== city.id) continue;
           t.locked = false;
-          t.lockRank = undefined;
-          t.lockPop = undefined;
         }
-        d.plots.forEach((q, i) => {
+        for (const q of d.plots) {
           const t = state.map.tiles[q];
-          if (q === city.centerIndex || t.district) return;
+          if (q === city.centerIndex || t.district) continue;
           t.locked = true;
-          if (d.ranks?.[i]) t.lockRank = d.ranks[i];
-          if (d.upTo?.[i]) t.lockPop = d.upTo[i];
-        });
+        }
         const read = [...next.dumpOfCity].find(([, c]) => c.y * ctx.W + c.x === d.city)?.[0];
         if (read?.specialistPref) city.specialistPref = [...read.specialistPref];
+        if (read) {
+          city.idleCitizens = read.idleCitizens;
+          city.favoredFood = read.favoredFood;
+        }
         count(ctx, 'worked', 'applied');
         break;
       }

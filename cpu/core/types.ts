@@ -123,6 +123,9 @@ export interface City {
    *  neither a plot nor a slot. The walk works population less specialists
    *  less these, and each pays its Gold (`UNASSIGNED_CITIZEN_GOLD`). */
   idleCitizens?: number;
+  /** The city's Food favored (its m_favoredYields, the city AI's SET_FOCUS):
+   *  the citizen manager places under it (`cityFlags`). */
+  favoredFood?: boolean;
   focus: FocusId;
   queue: QueueItem[];
   isCapital: boolean;

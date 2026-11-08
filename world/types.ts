@@ -241,21 +241,12 @@ export interface Tile {
    *  centre. A site whose row has not yet fired carries the first-occurrence
    *  boost (`randomEvent`). */
   eventFired?: number;
-  /** a CITIZEN is PINNED to this plot. `assignWorkedTiles` takes every
-   *  locked plot the city can work before it ranks anything by score, so a
-   *  lock is how a player overrides the automatic allocation for tiles the
-   *  way a specialist pin overrides it for slots. The lock lives on the PLOT
-   *  and dies when the plot changes hands (`setTileOwner`). */
+  /** a CITIZEN works this plot: the citizen manager's placement
+   *  (`placeCitizens`), or the seat's lock action. `assignWorkedTiles` takes
+   *  every locked plot the city can work before it ranks anything by score.
+   *  The lock lives on the PLOT and dies when the plot changes hands
+   *  (`setTileOwner`). */
   locked?: boolean;
-  /** where a city holds more locked plots than citizens: the order its
-   *  citizens take them, the lower rank first (unset ranks 0), a rank's
-   *  plots in tile order. A recorded game's replay ranks the plots its
-   *  record says each citizen of a turn worked. */
-  lockRank?: number;
-  /** the lock holds while its city has at most this many citizens: a
-   *  recorded game's replay pins here a citizen the city's growth moves
-   *  off the plot, the turn's yields read before the growth */
-  lockPop?: number;
   /** the floods of this tile's home river (`floodHome`) — the Great Bath's
    *  "+1 Faith for every time a tile belonging to this city has been
    *  Flooded" reads it. A flood counts once per episode (`countFlood`). */

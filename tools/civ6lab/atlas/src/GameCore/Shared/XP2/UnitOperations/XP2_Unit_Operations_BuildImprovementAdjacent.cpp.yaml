@@ -15,7 +15,12 @@
     - recording: 1121
       turn: 41
       value: "Recorded: a city-state's envoy annex re-places before its growth (1121   Hunza t41: 229 annexed, the growth on surplus 3 where the record's set   read 4;"
+  impl:
+    - cpu/core/phase.ts:replaceCitizensAt
+    - gpu/core/sim_orders.py:_apply_seat_unit_actions
+    - gpu/core/sim_orders.py:_arms
   readings:
+    - "C-112: the majors' citizens by the citizen manager — READ (0x1fa1d0 at 0x1fa22d, 0x196320's callers), both twins"
     - "H-1: an annex re-places the citizens, the garrison's unit, a religious unit killed on a move — READ"
     - "C-100 / C-112: a city-state's power and its regional buildings, the citizen reassign's callers — a fit and a reading"
     - "C-112: the citizen manager has no turn of its own — READ (the event's raisers), the records' counts"

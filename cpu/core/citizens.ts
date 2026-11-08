@@ -55,6 +55,9 @@ function hexPlot(state: GameState, centre: Tile, dq: number, dr: number): Tile |
  *  order (food, production, gold, science, culture, faith) */
 export type YieldFlags = string;
 
+/** a city's yield flags: Food favored where its focus set it, else none */
+export const cityFlags = (c: { favoredFood?: boolean }): YieldFlags => (c.favoredFood ? 'F.....' : '');
+
 function score(y: Partial<Yields>, plot: number, flags: YieldFlags): Entry {
   let fav = 0;
   let other = 0;

@@ -2534,6 +2534,7 @@ export function importTurn(rec: TurnRecord, cat: Catalog, history?: History): Im
       unconvertedPressure,
       followedReligion: followed,
       specialistPref: pins,
+      ...(c.favored?.includes(0) ? { favoredFood: true } : {}),
       ...(pillaged.length ? { pillagedBuildings: pillaged } : {}),
       ...(outerHp !== undefined ? { outerHp } : {}),
       ...(history?.lastHit.has(`${c.owner}:${c.id}`) ? { lastHitTurn: history.lastHit.get(`${c.owner}:${c.id}`) } : {}),

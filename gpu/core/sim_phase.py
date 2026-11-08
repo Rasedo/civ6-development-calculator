@@ -210,9 +210,6 @@ class SimPhase:
                 self._geo_agreements(row)
             self._seat_buy_ladder(row, active, army0)
             return active
-        # the turn's processing places every citizen the player left idle
-        # (`placeIdleCitizens`)
-        self.city_idle[:, row] = 0
         # its cities' City Analysis jobs keep their trade lists (`majorTradeLists`)
         self._major_trade_lists(row, active)
         # THE TURN'S RESOURCES, before anything reads them: every improved
@@ -286,10 +283,21 @@ class SimPhase:
             jc = torch.full((B,), j, dtype=torch.long, device=dev)
             pop0 = self.city_pop[:, row, j].clone()
             self._seat_city_growth(row, jc, cact, eff[:, j], need[:, j])
+            # a citizen grown is placed beside the rest, a starved city
+            # re-places them all (0x1b41e0 -> 0x194fb0), before the border
+            # box banks
+            pop1 = self.city_pop[:, row, j]
+            fav = self.city_fav_food[:, row, j]
+            self._place_citizens(row, jc, cact & (pop1 > pop0), pop1 - pop0, fav_food=fav)
+            self._place_citizens(row, jc, cact & (pop1 < pop0), None, full=True, fav_food=fav)
             cul_c = torch.where(cact, self._culture_after_growth(row, j, pop0, total[:, j, 4], lux),
                                 torch.zeros_like(total[:, j, 4]))
             self._seat_border_growth(row, jc, cact, cul_c)
             flip[:, j] = self._seat_city_loyalty(row, jc, cact, tier_idx[:, j], gov[:, j], eff[:, j] < 0, loy_pre)
+            # the city's turn ends re-placing every citizen (0x1fa1d0: after
+            # the production, growth, border and loyalty steps, 0x194f80 ->
+            # the full reassign 0x196320), its idle ones with them
+            self._place_citizens(row, jc, cact, None, full=True, fav_food=self.city_fav_food[:, row, j])
             self._city_strikes(row, jc, cact)
 
         self._seat_loyalty_flips(row, flip)
@@ -1626,7 +1634,8 @@ class SimPhase:
             # CIV6 (the citizen manager, 0x194fb0 with a negative count): a
             # citizen lost unassigns them all and places them all again
             if row < self.n_majors:
-                self._place_citizens(row, col, made_s & ~_free, None, full=True)
+                self._place_citizens(row, col, made_s & ~_free, None, full=True,
+                                     fav_food=self.city_fav_food[bidx, row, col])
             if self._settler_idx >= 0:
                 self._spawn_unit(row, made_s, ctr, self._settler_idx, stack=True)
 

@@ -72,11 +72,7 @@ export type Decision = Base & (
    *  the log's steps had it on, the catalog's individual it names; a
    *  Prophet's founding is `religion`'s */
   | { kind: 'gpActivate'; player: number; unit: string; plot: number; individual: number }
-  | { kind: 'worked'; player: number; city: number; plots: number[];
-      /** each plot's lock rank (`Tile.lockRank`), all 0 when absent */
-      ranks?: number[];
-      /** each plot's lock size (`Tile.lockPop`), 0 for none, all 0 when absent */
-      upTo?: number[] }
+  | { kind: 'worked'; player: number; city: number; plots: number[] }
   | { kind: 'envoy'; player: number; minor: number; n: number }
   | { kind: 'pantheon'; player: number; belief: number }
   | { kind: 'religion'; player: number }
@@ -340,30 +336,9 @@ export class InferredActions implements ActionSource {
       const isMajor = b.players.find((p) => p.id === c1.owner)?.major === true;
       const queue = stepQueue(a, b, c0, c1, active);
       if (isMajor) out.push({ kind: 'queue', phase: ph, player: c1.owner, city: at, items: queue });
-      // the citizens the step works: the plots both records work, then, where
-      // the city's size moved, the plots record t+1 adds ahead of the ones it
-      // leaves, else the other way round. A citizen the city's growth gave is
-      // placed as it grows, before its border box banks (runs/h1_duelw1117
-      // Rome t19: the new citizen on the Culture plot 894, the box read with
-      // it; Xi'an t22: the Settler's citizen off 562, the regrown one on
-      // 563); a citizen moved with the size standing moved after the turn's
-      // yields (Rome t25: 894 to 806 with plot 850 claimed, the box and the
-      // Production read 894; 1118 Rome t28: 627 to 495 as the Water Mill
-      // completed, the growth read 627). Where the city grew, a citizen
-      // record t+1 no longer shows on its plot works it until the growth
-      // re-places the citizens: the turn's yields read it, the border box
-      // the plots record t+1 works (1127 Xi'an t13: 232 read for the Food
-      // and the Production, the growth moving it to 231 and 320)
-      const w0 = c0 ? c0.worked : c1.worked;
-      const both = c1.worked.filter((q) => w0.includes(q));
-      const added = c1.worked.filter((q) => !w0.includes(q));
-      const left = w0.filter((q) => !c1.worked.includes(q));
-      const grew = !!c0 && c1.pop > c0.pop;
-      const groups = grew ? [both, left, added] : c0 && c0.pop !== c1.pop ? [both, added, left] : [both, left, added];
-      out.push({ kind: 'worked', phase: 'before', player: c1.owner, city: at, plots: groups.flat(),
-        ranks: groups.flatMap((g, i) => g.map(() => i)),
-        ...(grew && left.length ? { upTo: groups.flatMap((g, i) => g.map(() => (i === 1 ? c0!.pop : 0))) } : {}) });
-      // and after the turn the city works what record t+1 shows
+      // the citizens: the turn's own are the engine's citizen manager's (the
+      // growth's, the city's turn end's), from the plots record t works;
+      // after the turn the city works what record t+1 shows
       out.push({ kind: 'worked', phase: 'after', player: c1.owner, city: at, plots: [...c1.worked] });
       if (!c0) continue;
       // plots bought: gained with gold spent, but the one the box paid for

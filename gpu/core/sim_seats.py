@@ -3120,6 +3120,8 @@ class SimSeats:
                     # and clears the city's stored next plot (`buyTile`)
                     self.city_next_plot[_rows, row, jt[_rows]] = -1
                     self._eff_version += 1
+                    # and re-places every citizen (0x1a8b70 -> 0x196320)
+                    self._place_citizens(row, jt, ok_t, None, full=True, fav_food=self.city_fav_food[bidx, row, jt])
                     bought = bought | ok_t
         # THE MISSILE SILO'S LAUNCH. The silo is an improvement, so the order
         # is the SEAT's; both engines re-validate the named (device, tile) pair.
@@ -11527,6 +11529,7 @@ class SimSeats:
         self.city_dist_tile[b, row, col, :] = -1
         self.city_spec_pin[b, row, col, :] = -1
         self.city_idle[b, row, col] = 0
+        self.city_fav_food[b, row, col] = False
         self.city_wonder[b, row, col, :] = -1
         self.city_bldg[b, row, col, :] = False
         self.city_bldg_pillaged[b, row, col, :] = False
@@ -12031,6 +12034,7 @@ class SimSeats:
         # `specialistPref`, so every slot goes back to the automatic rule.
         self.city_spec_pin[b, dst_row, col, :] = -1
         self.city_idle[b, dst_row, col] = 0
+        self.city_fav_food[b, dst_row, col] = False
         self.city_followed[b, dst_row, col] = old_fol
         self.city_pressure[b, dst_row, col, :] = old_pres
         self.city_unconverted[b, dst_row, col] = old_unconv
@@ -12523,6 +12527,7 @@ class SimSeats:
             getattr(self, _p)[rows, row, slot, :] = -1
         self.city_spec_pin[rows, row, slot, :] = -1
         self.city_idle[rows, row, slot] = 0
+        self.city_fav_food[rows, row, slot] = False
         self.city_loyalty[rows, row, slot] = 100.0
         self.city_acquired[rows, row, slot] = 0
         self.city_hp[rows, row, slot] = self.rules.combat["cityMaxHp"]
@@ -12625,11 +12630,16 @@ class SimSeats:
                     self._gain_population_pressure(rows[_fw], row, slot[_fw],
                                                    torch.full_like(slot[_fw], int(_cpop)))
                     self.city_pop[rows[_fw], row, slot[_fw]] += _cpop
-        # a major's city AI's analysis at the placement keeps its trade list
-        # (`majorCityTradeList`)
         if row < self.n_majors:
             _slot_b = torch.full((self.B,), -1, dtype=torch.long, device=self.device)
             _slot_b[rows] = slot.long()
+            # the founding's annex places its citizens (AnnexPlots 0x1a8a30
+            # -> 0x196320)
+            _col_b = _slot_b.clamp(min=0)
+            self._place_citizens(row, _col_b, found, None, full=True,
+                                 fav_food=self.city_fav_food[self._bidx, row, _col_b])
+            # a major's city AI's analysis at the placement keeps its trade
+            # list (`majorCityTradeList`)
             self._major_trade_lists(row, found, _slot_b)
         self._settle_incursion(row, found, tile)
         self._eff_version += 1

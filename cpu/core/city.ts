@@ -306,12 +306,6 @@ export function tileScore(y: Yields, focus: FocusId): number {
  * has it in hand, and passing it keeps this the ONE place the citizen count
  * is spelled.
  */
-/** The seat's processing puts every citizen the player left idle back to
- *  work: its stats walk works all of them again. */
-export function placeIdleCitizens(cities: readonly City[]): void {
-  for (const c of cities) c.idleCitizens = undefined;
-}
-
 export function workedTilesOf(state: GameState, city: City, ctx?: YieldCtx, spent?: number): number[] {
   const yctx = ctx ?? makeYieldCtx(state, city.seat);
   let specialistTotal = spent;
@@ -334,10 +328,9 @@ export function assignWorkedTiles(
     .map((t) => ({ index: t.index, score: tileScore(tileYields(yctx, t), city.focus) }))
     .sort((a, b) => b.score - a.score || a.index - b.index);
 
-  // LOCKED plots first, by rank then in tile order — the citizens the player
-  // placed by hand, ahead of anything the score would have chosen.
-  const lockedValid = candidates.filter((t) => t.locked && (t.lockPop === undefined || city.population <= t.lockPop))
-    .sort((a, b) => (a.lockRank ?? 0) - (b.lockRank ?? 0) || a.index - b.index).map((t) => t.index);
+  // LOCKED plots first, in tile order — the citizens the citizen manager
+  // placed, ahead of anything the score would have chosen.
+  const lockedValid = candidates.filter((t) => t.locked).sort((a, b) => a.index - b.index).map((t) => t.index);
   const worked: number[] = lockedValid.slice(0, workers);
   for (const s of scored) {
     if (worked.length >= workers) break;

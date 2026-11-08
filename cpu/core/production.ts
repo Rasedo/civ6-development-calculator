@@ -5,7 +5,7 @@ import { repairBuilding, stampBuildingEra } from './yields';
 import { scoreProject } from './competition';
 import type { QueueItem } from './types';
 import { citiesOf, seatOf, setTileOwner, tileCity, tileSeat, unitSeat, allianceFreePromo, moveCapital, civOf, isCiv } from './seats';
-import { replaceAllCitizens } from './citizens';
+import { cityFlags, replaceAllCitizens } from './citizens';
 import { NO_SEAT } from '../../world/types';
 import type { Tile } from '../../world/types';
 import { congressCultureBombSeat } from './congress';
@@ -424,7 +424,7 @@ export function completeQueueItem(
         // citizen lost unassigns them all and places them all again
         // (runs/h1_duelw1121 Xi'an t21: the Settler's citizen leaves a plot
         // of 2 Food 2 Production, the 4 Food one kept)
-        if (isCiv(city.seat)) replaceAllCitizens(state, city);
+        if (isCiv(city.seat)) replaceAllCitizens(state, city, cityFlags(city));
       }
       logPopWrite(state, city, 'se');
       break;

@@ -111,6 +111,7 @@
   status: PARTLY
   readings:
     - "C-130 / C-112: the domain strength's treasury carry and the city's turn's citizen re-place — READ, both twins"
+    - "C-112: the majors' citizens by the citizen manager — READ (0x1fa1d0 at 0x1fa22d, 0x196320's callers), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ...e player's cities) runs production 0x178310, growth 0x1b46e0, borders 0x1a9bc0, loyalty 0x19f8d0, then the citizens' (city +0x1b50, 0x1783b0) 0x194f80, a thunk to the full reassign 0x1...

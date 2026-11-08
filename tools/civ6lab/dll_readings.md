@@ -11844,3 +11844,45 @@ copy's rows before their turn opens (`barbarianAi`, cpu/harness/replay.ts).
   (Xi'an's Field Cannon Army completes in the engine's t168, the game's
   t174: the import prices a formation's queue item at the lone unit's 165,
   the game at 372).
+
+## C-112: the majors' citizens by the citizen manager — READ (0x1fa1d0 at 0x1fa22d, 0x196320's callers), both twins
+
+`placeCitizens` / `replaceAllCitizens` / `cityFlags` (cpu/core/citizens.ts) in
+`seatPhase` (cpu/core/phase.ts: the growth, the city's turn end,
+`replaceCitizensAt` for an improvement laid), `foundCityAt` and `buyTile`
+(cpu/core/game.ts), `City.favoredFood`; GPU `_place_citizens`
+(gpu/core/sim_minors.py) from `_seat_turn` (gpu/core/sim_phase.py),
+`_found_city_at` and
+`_seat_buy_ladder` (gpu/core/sim_seats.py), `_apply_seat_unit_actions`
+(gpu/core/sim_orders.py), `city_fav_food`.
+
+- THE CITY'S TURN (0x1fa1d0, every city of every player): production
+  0x178310, growth 0x1b46e0, the border turn 0x1a9bc0, loyalty 0x19f8d0,
+  then 0x1783b0's citizens object to 0x194f80 (at 0x1fa22d), a bare
+  `jmp 0x196320`: every citizen re-placed, the idle ones with them, under
+  the city's yield flags. The seat's processing no longer works idle
+  citizens back on its own: a citizen stays idle only where the re-place
+  finds no entry for it.
+- Within the turn: a grown citizen is placed beside the rest and a starved
+  city re-placed whole before the border box banks (0x1b41e0 -> 0x194fb0);
+  the founding's and a purchase's annex (0x1a8a30 / 0x1a8b70) and an
+  improvement laid in the seat's own city (0xa4cee0 / 0xa4e7a0) each
+  re-place all. A completion re-places none: 0x180cb0's one call (0x181159)
+  stands behind its Buildings +0x159 bit 0x10 test (0x180cc7), on the path
+  that sets a building on its own plot (ORDER_CONSTRUCT 0x183db0), and
+  0x181700's (0x181bb8) on the district set on its zoning plot (0x176210):
+  the placements, not the completions.
+- THE FLAGS: a major's city carries its Food favored (`City.favoredFood`,
+  the only flag the five duelp recordings show on any city); the replay
+  takes it from the record the city AI's turn left (the 'after' worked
+  decision), the import from the record.
+- Confirmed: a full re-place on each record's own state under its flags
+  reproduces its worked plots and specialists on 6,628 of 6,802 major
+  city-records (runs/h1_duelp1117 1,457 / 1,500, 1121 1,012 / 1,031, 1124
+  1,701 / 1,772, 1127 1,428 / 1,448, 1128 1,030 / 1,051; the rest beside
+  plots the lab's import holds without their storm fertility, as 1121
+  Hunza's t225 142 / 143 / 188 at 1 Food for the record's 2).
+- Open: the Free Cities' cities (their phase re-places none); a major's
+  wonder or district placed on its plot re-places none in the engines
+  (0x180cb0 / 0x181700); the walk's own fill by score (`assignWorkedTiles`)
+  where no re-place has run since a plot was lost.
