@@ -2191,7 +2191,7 @@ class _MinorWorld:
         self._ut = torch.stack(u, dim=1)
         self._evals = evals
         self._threat = threat
-        # its danger map as the trees first read it in the turn (`dangerPlane`)
+        # its danger map as its DoTurn built it (`_minor_danger_open`)
         self._danger = None
         # the units whose last charge an order took ([B] ids per order, -1 none)
         self._spent: list = []
@@ -2605,6 +2605,9 @@ class _MinorWorld:
         return self._reach_turns(plot, among, 1 << 30, False)
 
     def _danger_map(self):
+        # its danger map as its DoTurn built it (`_minor_danger_open`)
+        if self._danger is None:
+            self._danger = self.sim._minor_danger_open.get(self.s)
         if self._danger is None:
             need = torch.ones(self.sim.B, self.sim.T, dtype=torch.bool, device=self.sim.device)
             self._danger = self.sim._danger_plane(self.seat, need)

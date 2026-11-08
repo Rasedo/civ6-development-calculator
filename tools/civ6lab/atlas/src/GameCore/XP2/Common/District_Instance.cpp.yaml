@@ -71,7 +71,7 @@
 - addr: 0x249ee0
   final: 0x190be0
   kind: function
-  semantics: the city centre's ranged strike strength. Max(+0x150, m_iMaxRangedStrengthTrained 0x4bd030, COMBAT_MINIMUM_CITY_STRIKE_STRENGTH 3) plus the city's district attack bonus (+0x1890).
+  semantics: "the city centre's ranged strike strength. Max(+0x150, m_iMaxRangedStrengthTrained 0x4bd030, COMBAT_MINIMUM_CITY_STRIKE_STRENGTH 3) plus the city's district attack bonus (+0x1890). No damage term: the wounded loss is the caller's (0x51c2d0); with the flag (r8b) clear, 0 unless 0x24b960 holds."
   status: READ
   cases:
     - recording: h1_duelw1120
@@ -81,6 +81,8 @@
       turn: 50
       value: "Records:   1120 China's cities strike at 25 from t50 (an Archer made), 40, 60, 70 as   Crossbowmen, Field Cannons and Battleships come;"
   impl:
+    - cpu/core/combat.ts:cityStrikeBase
+    - gpu/core/sim_masks.py:_strike_base
     - cpu/core/combat.ts:cityStrikeStrength
     - gpu/core/sim_masks.py:_strike_strength
     - cpu/core/tactical.ts:dangerPlane
@@ -91,6 +93,7 @@
     - cpu/core/aiView.ts:centres
     - cpu/core/tactical.ts:wins
   readings:
+    - "C-130: a city's undamaged strike in Bastions' analyzer; a city-state's danger map at its DoTurn; the plot purchase analyzer — READ / PARTLY READ"
     - "H-1: the melee result, a ranged blow's domain, a city's shot — READ"
     - "C-97: the settle site evaluation — READ (the score, the choices), PARTLY READ (the danger, the plot yield)"
     - "C-97: the governor AI — the analysis, the choice and the seats READ, the analyzers PARTLY READ"
@@ -382,6 +385,7 @@
     - "C-95: the danger map and Move to Safety — READ, ported"
     - "C-94: the wounded law and the garrison"
     - "C-130: a city-state's Great Person points store, its Faith and its flat bonus; Bastions' strike on standing walls — READ, both twins"
+    - "C-130: a city's undamaged strike in Bastions' analyzer; a city-state's danger map at its DoTurn; the plot purchase analyzer — READ / PARTLY READ"
   context:
     - "...OuterDefenseStrength (+0x44) and the city's enhanced-walls bonus (+0x1888), paid while 0x24b960 holds: the district's outer damage (+0x8d8) below its outer maximum — a breached peri..."
   review: reviewed

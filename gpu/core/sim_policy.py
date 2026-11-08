@@ -607,7 +607,7 @@ class SimPolicy:
             pool = torch.minimum(self.city_outer_hp[:, row, sub["j"]].long(), walls)
             return torch.where(pool > 0, full(amount), zero)
         if eff == "EFFECT_ADJUST_CITY_RANGED_STRIKE":
-            # the centre's strike (0x249ee0), its whole part x Amount / 100;
+            # the centre's strike (0x249ee0, no damage loss) x Amount / 100;
             # none where its outer defence does not stand (0x24b960: the
             # walls' pool, `cityStrike`)
             if not city:
@@ -616,7 +616,7 @@ class SimPolicy:
             col = torch.full((B,), sub["j"], dtype=torch.long, device=dev)
             walls = self._walls_max_at(torch.full_like(col, row), col).long()
             pool = torch.minimum(self.city_outer_hp[:, row, sub["j"]].long(), walls)
-            strike = torch.trunc(self._strike_strength(row, col)).long()
+            strike = self._strike_base(row)
             return torch.where((pool > 0) & (strike > 0), torch.div(strike * amount, 100, rounding_mode="trunc"), zero)
         if eff == "EFFECT_ADJUST_POLICY_AMENITY":
             # the Amount's Amenities more in the city subject (0x79f7c0)

@@ -52,6 +52,7 @@
     - cpu/core/tactical.ts:moveUnitDanger
     - gpu/core/sim_minorai.py:order
     - gpu/core/sim_tactics.py:_move_unit_danger
+    - cpu/core/minorCityAi.ts:owned
   readings:
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
     - "C-95: the scout's tree \"Barbarian Found City\" — READ (the tree, its start, Protect Unit's update), PARTLY READ (the nodes' executions), unported"

@@ -19,7 +19,7 @@ import { aiDefenderOf, aiFormed, aiRanged, aiStrengths, districtHealth, planUnit
 import { AIR_REBASE_COLS, AIR_STRIKE_COLS, IMPROVEMENT_IDS, unitActionIndex } from './unitActions';
 import { airPillageTargets, airStrikeTargets, rebaseTargets } from './air';
 import { plotsSeenNow, ringPlots } from './barbarians';
-import { cityDefenseStrength, cityStrikeStrength, encircled, garrisonTerm, predictCityBlow, siegeAssist, unitAttackRange } from './combat';
+import { cityDefenseStrength, cityStrikeBase, cityStrikeStrength, encircled, garrisonTerm, predictCityBlow, siegeAssist, unitAttackRange } from './combat';
 import { outerPool, portalAt, wallsTier } from './rules';
 import { borderClosedTo, builderCost, cityAtIndex, embarkTechMoves, formationMates, traderCost, unitFullMoves, unitDomain, unitExertsZoc, unitsHostile, unitVisibleTo } from './units';
 import { CIVICS } from '../data/civics';
@@ -617,10 +617,10 @@ export function aiView(state: GameState, opts: { updated?: boolean } = {}): AiVi
       return !!city && outerPool(state, city) > 0;
     },
     // 0x249ee0 with its flag clear: none where the centre's strike does not
-    // stand (0x24b960, its walls' pool spent or none)
+    // stand (0x24b960, its walls' pool spent or none); no damage loss
     cityStrike: (i, id) => {
       const city = cityOf(i, id);
-      return city && outerPool(state, city) > 0 ? Math.trunc(cityStrikeStrength(state, city)) : 0;
+      return city && outerPool(state, city) > 0 ? cityStrikeBase(state, city) : 0;
     },
     // a city-state's train turns and expected count as its city's update
     // reads them (`minorItemTurns`), any other city's its queue's

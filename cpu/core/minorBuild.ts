@@ -55,7 +55,7 @@ import { BARB_SEAT, FREE_SEAT, freeSeatOf, hiddenResourcesFor, isCiv, majorityRe
 import { builderCost, cityNavalCapable, disbandUnit, raiseBestTrained, spawnUnit, traderCost, unitFullMoves, unitIsMilitary, unitMadeAnew, upgradeAnew } from './units';
 import { irradiated } from './nuclear';
 import { atRngPoint } from './rand';
-import { knowledgeLook } from './tactical';
+import { dangerPlane, knowledgeLook } from './tactical';
 import { plotsSeenNow } from './barbarians';
 import { cityStateMilitary, minorCampsLook, minorMilitaryUpgrade, minorOpsRefresh, upgradeTreesStart } from './minorOps';
 import { tilesWithin } from '../../world/hex';
@@ -154,6 +154,12 @@ export function minorPhase(state: GameState): void {
     // own the first turn
     cityState.aiGrowth = cityState.aiGrowthSeen ?? minorCityGrowth(state, cityState);
     minorGrowth(state, cityState);
+    // its danger map, built at its DoTurn after its city's turn (0x4e4560 ->
+    // 0x46cdd0 at 0x4e4aa4 -> 0x717460) and read by its city trees all turn:
+    // a unit its units kill later in the turn still counts (runs/h1_duelz1124
+    // city-state 3 t29: the barbarian Warrior on 41:10 its Warriors killed,
+    // its Builder kept off the Farm plot 41:11, laid t30)
+    cityState.dangerOpen = Array.from(dangerPlane(state, cityState.seat));
     // the boosts its growth earned land before its research AI's turn; its
     // research and civics AIs' turns to the policy jobs, then its military
     // AI's strengths: the Combat Desire and the favoured technology on the

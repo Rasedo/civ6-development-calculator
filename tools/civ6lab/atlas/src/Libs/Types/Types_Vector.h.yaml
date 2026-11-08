@@ -482,11 +482,19 @@
     - recording: h1_duelw1117-1128
       turn: all
       value: "the barbarians' logged Current Danger 114 of 240 equal; HL: Move To Safety ends 184 of 371"
+    - recording: h1_duelz1124
+      turn: 29
+      value: "city-state 3's Build City Improvement keeps its Builder off the Farm plot 41:11 at t29: the danger the barbarian Warrior on 41:10 adds at the DoTurn's build, though its Warriors kill it later in the turn; laid t30"
   impl:
+    - cpu/core/minorBuild.ts:minorPhase
+    - gpu/core/sim_minors.py:_city_state_phase
     - cpu/core/tactical.ts:dangerPlane
     - gpu/core/sim_tactics.py:_danger_plane
     - cpu/core/tactical.ts:featureDanger
+    - cpu/core/minorBuild.ts:prev
+    - cpu/core/types.ts:Seat
   readings:
+    - "C-130: a city's undamaged strike in Bastions' analyzer; a city-state's danger map at its DoTurn; the plot purchase analyzer — READ / PARTLY READ"
     - "H-1: why a seed does not replay — the AI's worker threads — READ, the replay patch MEASURED"
     - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
     - "C-97: the settle site evaluation — READ (the score, the choices), PARTLY READ (the danger, the plot yield)"

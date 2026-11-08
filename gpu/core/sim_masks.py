@@ -564,15 +564,12 @@ class SimMasks:
         return (row < self.n_majors) & (row >= 0) & (
             self.row_civ.gather(1, r.unsqueeze(1)).squeeze(1) == civ)
 
-    def _strike_strength(self, row: int, col: torch.Tensor) -> torch.Tensor:
-        """[B] f64 — `cityStrikeStrength` before a major's Bastions half: the
+    def _strike_base(self, row: int) -> torch.Tensor:
+        """[B] long — `cityStrikeBase` before a major's Bastions half: the
         holder's best Ranged Strength made (`civ_best_ranged`, a minor's
         `citystate_best_ranged`; the Free Cities none), at least
-        COMBAT_MINIMUM_CITY_STRIKE_STRENGTH, less the wounded law on the
-        walls' damage percent where the city has walls, else its hit points'
-        (GameCore_XP2_Release.dll 0x249ee0 / 0x51c2d0)."""
-        bidx = self._bidx
-        c0 = col.clamp(min=0)
+        COMBAT_MINIMUM_CITY_STRIKE_STRENGTH, no damage loss
+        (GameCore_XP2_Release.dll 0x249ee0)."""
         minor = self._CITY_MINOR0 <= row < self._CITY_MINOR0 + self.S
         if row < self.n_majors:
             best = self.civ_best_ranged[:, row].long()
@@ -580,7 +577,15 @@ class SimMasks:
             best = self.citystate_best_ranged[:, row - self._CITY_MINOR0].long()
         else:
             best = torch.zeros(self.B, dtype=torch.long, device=self.device)
-        best = best.clamp(min=self._city_min_strike)
+        return best.clamp(min=self._city_min_strike)
+
+    def _strike_strength(self, row: int, col: torch.Tensor) -> torch.Tensor:
+        """[B] f64 — `cityStrikeStrength` before a major's Bastions half:
+        `_strike_base` less the wounded law on the walls' damage percent
+        where the city has walls, else its hit points' (0x51c2d0)."""
+        bidx = self._bidx
+        c0 = col.clamp(min=0)
+        best = self._strike_base(row)
         rt = torch.full_like(c0, row)
         walls = self._walls_max_at(rt, c0).long()
         pool = torch.minimum(self.city_outer_hp[bidx, row, c0].long(), walls)

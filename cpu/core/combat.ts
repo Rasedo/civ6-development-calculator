@@ -1218,24 +1218,31 @@ export function cityDefenseStrength(state: GameState, city: City, garrisoned = t
 }
 
 /**
- * What the city FIRES at (GameCore_XP2_Release.dll 0x249ee0 / 0x51c2d0):
+ * The centre's strike before any damage (GameCore_XP2_Release.dll 0x249ee0):
  * the strongest Ranged Strength its holder has trained (`Seat.bestRangedCS`),
- * at least COMBAT_MINIMUM_CITY_STRIKE_STRENGTH, less the damaged district's
- * loss — the wounded law at COMBAT_WOUNDED_DISTRICT_DAMAGE_MULTIPLIER on the
- * walls' damage percent where the city has walls, else its hit points'
- * (`woundedLoss256`) — and a major's Bastions half ("+5 City Ranged
- * Strength"). runs/h1_duelw1120: China's cities strike at 25 from t50 (an
- * Archer trained), a city-state that trained no ranged unit at 3 (t217).
+ * at least COMBAT_MINIMUM_CITY_STRIKE_STRENGTH, plus a major's Bastions half
+ * ("+5 City Ranged Strength", the city's +0x1890). runs/h1_duelw1120:
+ * China's cities strike at 25 from t50 (an Archer trained), a city-state
+ * that trained no ranged unit at 3 (t217).
  */
-export function cityStrikeStrength(state: GameState, city: City): number {
+export function cityStrikeBase(state: GameState, city: City): number {
   // the Free Cities train toward no ranged base of their own
   const best = Math.max(isFreeSeat(city.seat) ? 0 : seatOf(state, city.seat)?.bestRangedCS ?? 0, CITY_MIN_STRIKE_CS);
+  return isCiv(city.seat) ? best + getModifiers(state, city.seat).cityRanged : best;
+}
+
+/**
+ * What the city FIRES at (0x51c2d0 over 0x249ee0): `cityStrikeBase` less the
+ * damaged district's loss — the wounded law at
+ * COMBAT_WOUNDED_DISTRICT_DAMAGE_MULTIPLIER on the walls' damage percent
+ * where the city has walls, else its hit points' (`woundedLoss256`).
+ */
+export function cityStrikeStrength(state: GameState, city: City): number {
   const walls = wallsMax(state, city);
   const pct = walls > 0
     ? Math.trunc(((walls - outerPool(state, city)) * 100) / walls)
     : Math.trunc(((CITY_MAX_HP - Math.min(CITY_MAX_HP, city.hp)) * 100) / CITY_MAX_HP);
-  const cs = best - woundedLoss256(Math.max(0, pct)) / 256;
-  return isCiv(city.seat) ? cs + getModifiers(state, city.seat).cityRanged : cs;
+  return cityStrikeBase(state, city) - woundedLoss256(Math.max(0, pct)) / 256;
 }
 
 /** CIV6 (Discipline): "+5 Combat Strength when fighting Barbarians." A

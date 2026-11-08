@@ -321,7 +321,7 @@ export interface AiValueView {
   /** a city centre's outer defence stands (0x24b290 on 0x6da56a3d above its
    *  damage, district +0x8d8): its walls' pool above 0 */
   cityOuterStands(seat: number, cityId: number): boolean;
-  /** a city centre's strike strength (0x249ee0), its whole part; 0 where
+  /** a city centre's strike strength (0x249ee0), undamaged, whole; 0 where
    *  its strike does not stand (0x24b960: its walls' pool spent or none) */
   cityStrike(seat: number, cityId: number): number;
   /** the turns a city builds a UnitType, BuildingType or DistrictType in

@@ -10514,3 +10514,44 @@ city-state leg of `_seat_route_income` (sim_seats.py); `_minor_look`,
   Lisbon and Armagh do not.
 - OPEN: the turn each of the lab's minors met the Free Cities (one record);
   the five duelz games seat no Free City.
+
+## C-130: a city's undamaged strike in Bastions' analyzer; a city-state's danger map at its DoTurn; the plot purchase analyzer — READ / PARTLY READ
+
+`cityStrikeBase` (cpu/core/combat.ts) read by `cityStrike` (cpu/core/aiView.ts)
+and EFFECT_ADJUST_CITY_RANGED_STRIKE (cpu/core/aiModifiers.ts); GPU
+`_strike_base` (gpu/core/sim_masks.py) in `_pol_analyze`
+(gpu/core/sim_policy.py). `Seat.dangerOpen` written in `minorPhase`
+(cpu/core/minorBuild.ts), read by `minorTreeWorld` (cpu/core/minorCityAi.ts);
+GPU `_minor_danger_open` written in `_city_state_phase`
+(gpu/core/sim_minors.py), read by `_MinorWorld._danger_map`
+(gpu/core/sim_minorai.py).
+
+- THE STRIKE 0x249ee0: (0x4bd030 m_iMaxRangedStrengthTrained << 8) plus the
+  city's +0x1890 << 8; with the flag r8b clear, 0 unless 0x24b960 holds. It
+  reads no damage: the wounded loss is the combat's (0x51c2d0). Bastions'
+  EFFECT_ADJUST_CITY_RANGED_STRIKE 0x6a69c0 calls it with the flag clear, so
+  a damaged wall pays the whole strike x Amount / 100.
+- Confirmed (aimem, one-seed traces): runs/h1_duelz1124 city-state 3 t124-127
+  Bastions 7.0 on its 25 with its walls at 92 of 200 (the wounded 19.6 gave
+  6); runs/h1_duelz1127 city-state 2 t110-113 8.0 as logged.
+- THE DANGER MAP a city-state's city trees read is the one its DoTurn builds
+  (0x4e4560 -> 0x46cdd0 at 0x4e4aa4 -> 0x717460), after its city's turn: a
+  barbarian its units kill later in the turn still makes its plots danger.
+  Move Unit without Allow Danger then takes no move onto them, and Build
+  Improvement waits.
+- Confirmed: runs/h1_duelz1124 city-state 3's Builder bought at t27 stands
+  on its centre at t28 and t29 (the barbarian Warrior on 41:10 its Warriors
+  kill at t29 makes 41:11 danger 20), its Farm on 41:11 laid at t30 as
+  recorded; the replay's copy reads the same map.
+- THE PLOT PURCHASE ANALYZER (EFFECT_ADJUST_PLOT_PURCHASE_COST, registry
+  object @f04000, vtable 0xd63340, slot 1 0x6b70f0): sets the context's yield
+  (+0x64) to @f2f97c (0, YIELD_FOOD); with the context's city whose
+  CityBuildAI +0x5e8 / +0x5ec plot is set (> -9999): that plot's price
+  (0x1b1cb0 on city +0x1688), the player's Gold per turn (0x4e0bf0, its
+  whole part above 0), turns = price / Gold, the discount powf(1 + rate
+  +0xbc, turns) (0xcef34e, @cfc9f8 1.0), trunc(price / discount) added to
+  the sum +0xc0. The Amount is not read. 0x7a4b20 then takes a context
+  naming a yield as (sum << 8) x that yield's DefaultValue, unclamped.
+- Open (not ported): CityBuildAI +0x5e8's writer (the constructor writes
+  -9999; the Economic AI's plot purchase 0x68a100 reads it); runs/h1_duelz1121
+  city-state 4 Expropriation 0.5 t236-249 is this analyzer's term.

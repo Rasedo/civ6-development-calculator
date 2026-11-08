@@ -983,6 +983,7 @@
     - "C-96: the improvement value — READ (0x7a58f0, 0x7b1320's yields, the feature removal 0x7a3010, the harvest 0x7a37d0, the build unit 0x7a2e20), PARTLY READ (the hazards' turns, 0x7b1320's tourism, defence, claimed plots, modifiers and neighbours terms), unwired"
     - "C-96: the district value — READ (0x7a51f0, 0x7aaf80's terms below, 0x366df0, the purchase price 0x1b1cb0, 0x1c77c0, 0x1b4450), PARTLY READ (the golden-age term, the claims, modifiers and neighbours terms, the domain's resources path), unwired"
     - "C-96: the improvement value — READ (0x7a58f0, 0x7b1320's yields, tourism and modifiers, the feature removal 0x7a3010, the harvest 0x7a37d0, the build unit 0x7a2e20, EFFECT_ADJUST_CITY_FREE_POWER), PARTLY READ (the hazards' turns, 0x7b1320's defence, claimed plots and neighbours terms)"
+    - "C-130: a city's undamaged strike in Bastions' analyzer; a city-state's danger map at its DoTurn; the plot purchase analyzer — READ / PARTLY READ"
   context:
     - "...bour within 3 of the city another owns, without a wonder or district: its purchase cost 0x1b1cb0 x 0.5 Gold discounted T, 0x79f0c0); its modifiers 0x7a4b20; at the top level its neighb..."
   review: reviewed
@@ -1874,9 +1875,11 @@
   cases:
     - recording: 1117
       value: "Each DISTRICT of such   a player (the player's +0x1308 -> +0xd8, its district list: every district   placed, built or not — the recordings' city district lists hold districts   under construction — an"
+  impl: [cpu/core/minorBuild.ts:prev, cpu/core/types.ts:Seat]
   readings:
     - "C-95: the danger map and Move to Safety — READ, ported"
     - "C-99: when the pool finder's +0x1bc is written — the danger map at DoTurn, the planning at the AI turn's start, nothing inside a pass — READ (0x46cdd0, 0x717460, 0x6096c0, 0x792c90, 0x7921a0, 0x790890, 0x47ffb0), unported"
+    - "C-130: a city's undamaged strike in Bastions' analyzer; a city-state's danger map at its DoTurn; the plot purchase analyzer — READ / PARTLY READ"
   context:
     - ...(DLC GranColombia_Maya), no other. The map is built at the player's DoTurn (0x4e4560 -> 0x46cdd0 at 0x4e4aa4); the engines build it as each tactical pass opens, the hostile units' sear...
   review: reviewed
@@ -2047,6 +2050,7 @@
   impl: [cpu/core/aiModifiers.ts:ANALYZERS, cpu/core/aiValue.ts:AiValueView]
   readings:
     - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
+    - "C-130: a city's undamaged strike in Bastions' analyzer; a city-state's danger map at its DoTurn; the plot purchase analyzer — READ / PARTLY READ"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...8) x the Amount as Gold weighted, discounted from the start, plus 0.5 x the Gold yield (0x4e0bf0, the player's gross: cities, tributaries, deals, interest ...) x the Amount, between —..."
@@ -8323,6 +8327,15 @@
   context:
     - ...the rank, L = ceil(+0x6420 x 0.25) / ceil(+0x6420 x 0.5) / +0x6420 by the mode (ceilf, 0xcef33c; +0x6420 the majors met counted by 0x647f10, the owner among them), 0 where n > L, else...
   review: reviewed
+- addr: 0xcef34e
+  final: 0x9b0fee
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-130: a city's undamaged strike in Bastions' analyzer; a city-state's danger map at its DoTurn; the plot purchase analyzer — READ / PARTLY READ"
+  context:
+    - ...whole part above 0), turns = price / Gold, the discount powf(1 + rate +0xbc, turns) (0xcef34e, @cfc9f8 1.0), trunc(price / discount) added to the sum +0xc0. The Amount is not read....
+  review: imported
 - addr: 0x39b140
   binary: F
   kind: function

@@ -176,6 +176,7 @@
       value: 1124 p3 t27 and t72 (Granada's Builder and Heavy   Chariot) pass only folded.
   readings:
     - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
+    - "C-130: a city's undamaged strike in Bastions' analyzer; a city-state's danger map at its DoTurn; the plot purchase analyzer — READ / PARTLY READ"
   context:
     - ...ue test against the city's analysis 0x5d4920; not ported). Then goldPatronage 0x6898b0, 0x68a100, 0x689610. The purchased unit binds to no tree (the completion signals are a queued con...
   review: imported

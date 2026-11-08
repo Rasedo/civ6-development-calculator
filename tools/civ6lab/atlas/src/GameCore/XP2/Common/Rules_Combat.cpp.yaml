@@ -113,7 +113,9 @@
       turn: 50
       value: "Records:   1120 China's cities strike at 25 from t50 (an Archer made), 40, 60, 70 as   Crossbowmen, Field Cannons and Battleships come;"
   impl: [cpu/core/combat.ts:cityStrikeStrength, gpu/core/sim_masks.py:_strike_strength]
-  readings: ["H-1: the melee result, a ranged blow's domain, a city's shot — READ"]
+  readings:
+    - "H-1: the melee result, a ranged blow's domain, a city's shot — READ"
+    - "C-130: a city's undamaged strike in Bastions' analyzer; a city-state's danger map at its DoTurn; the plot purchase analyzer — READ / PARTLY READ"
   context:
     - "...COMBAT_MINIMUM_CITY_STRIKE_STRENGTH 3) plus the city's district attack bonus (+0x1890); 0x51c2d0 takes off the damaged district's loss — the wounded law (0x522630) at COMBAT_WOUNDED_..."
   review: reviewed

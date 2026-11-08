@@ -926,6 +926,11 @@ export interface Seat {
    *  them, before the turn's ageing and look: the unit production table its
    *  city AI's turn reads (`minorKnownUnits`); absent outside that turn */
   armyCounted?: Record<string, number>;
+  /** a city-state's danger map (`dangerPlane`) per plot as its DoTurn
+   *  builds it (0x4e4560 -> 0x46cdd0 -> 0x717460, after its city's turn),
+   *  the one its city trees read all turn, the replay's copy's included;
+   *  rebuilt at each DoTurn */
+  dangerOpen?: number[];
   /** the military AI's Combat Desire of a city-state (`minorCombatDesire`)
    *  or the Free Cities (`freeCombatDesire`), raw 24.8: its
    *  PSEUDOYIELD_UNIT_COMBAT weight */

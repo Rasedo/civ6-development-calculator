@@ -58,6 +58,10 @@ class SimMinors:
             now = torch.where((seen[:, 5] > 0).unsqueeze(-1), seen[:, :5], now)
             self.citystate_ai_growth[:, s] = torch.where(alive.unsqueeze(-1), now, self.citystate_ai_growth[:, s])
             self._minor_growth(s)
+            # its danger map, built at its DoTurn after its city's turn and
+            # read by its city trees all turn (`minorPhase`)
+            self._minor_danger_open[s] = self._danger_plane(
+                100 + s, torch.ones(self.B, self.T, dtype=torch.bool, device=self.device))
             # the boosts its growth earned land before its research AI's turn;
             # its research and civics AIs' turns to the policy jobs, then its
             # military AI's strengths (the Combat Desire, the favoured
@@ -113,6 +117,7 @@ class SimMinors:
             # its turn's end holds each stockpile to its cap and erases its
             # dead from its unit list
             self._seat_cap_stockpile(self._CITY_MINOR0 + s)
+            del self._minor_danger_open[s]
             self._minor_end_turn_list(s, alive)
 
     def _minor_end_turn_list(self, s: int, alive: torch.Tensor) -> None:

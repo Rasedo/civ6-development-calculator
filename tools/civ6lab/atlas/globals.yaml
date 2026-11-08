@@ -385,6 +385,14 @@
   context:
     - "- THE MOUNTAIN PORTAL'S ANALYZER (EFFECT_MOUNTAIN_PORTAL -> the static 0xf04278, vtable 0xd632c8, slot 1 0x6b6610), the Mountain Tunnel's ImprovementModifiers row in 0x7b1320's modifie..."
   review: reviewed
+- addr: 0xd63340
+  kind: global
+  status: PARTLY
+  readings:
+    - "C-130: a city's undamaged strike in Bastions' analyzer; a city-state's danger map at its DoTurn; the plot purchase analyzer — READ / PARTLY READ"
+  context:
+    - "...OT PURCHASE ANALYZER (EFFECT_ADJUST_PLOT_PURCHASE_COST, registry object @f04000, vtable 0xd63340, slot 1 0x6b70f0): sets the context's yield (+0x64) to @f2f97c (0, YIELD_FOOD); with th..."
+  review: imported
 - addr: 0xd63400
   kind: global
   status: PARTLY

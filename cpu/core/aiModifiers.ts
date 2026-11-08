@@ -1178,11 +1178,12 @@ const ANALYZERS: Readonly<Record<string, Analyzer>> = {
   // damage below its maximum, 0x24ae50 / 0x24b290 on 0x6da56a3d): Amount, raw
   EFFECT_ADJUST_CITY_OUTER_DEFENSE: (t, args, s) =>
     s.kind === 'city' && t.view.cityOuterStands(s.seat, s.id) ? Number(args.Amount ?? 0) | 0 : 0,
-  // 0x6a69c0: a city subject whose centre's strike (0x249ee0, none where
-  // 0x24b960 finds no outer defence standing) has a whole part above 0:
-  // that whole part x Amount / 100, truncated, raw (runs/h1_duely1117
-  // city-state 2's Bastions unlogged t47-56 on an Archer's 25 and no walls,
-  // 7.0 from t57)
+  // 0x6a69c0: a city subject whose centre's strike (0x249ee0: no damage
+  // loss, none where 0x24b960 finds no outer defence standing) has a whole
+  // part above 0: that whole part x Amount / 100, truncated, raw
+  // (runs/h1_duely1117 city-state 2's Bastions unlogged t47-56 on an
+  // Archer's 25 and no walls, 7.0 from t57; runs/h1_duelz1124 city-state 3
+  // t124-127 7.0 on its 25 with its walls at 92 of 200)
   EFFECT_ADJUST_CITY_RANGED_STRIKE: (t, args, s) => {
     if (s.kind !== 'city') return 0;
     const strike = t.view.cityStrike(s.seat, s.id);

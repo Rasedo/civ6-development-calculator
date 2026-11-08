@@ -549,7 +549,6 @@ function minorTreeWorld(state: GameState, cs: CityState, ai: CityAi, city: CityT
   const spent = new Set<number>();
   const unitOf = (id: number): Unit | undefined => state.units.find((u) => u.id === id && u.seat === cs.seat);
   const owned = (plot: number) => tileSeat(state.map.tiles[plot]) === cs.seat;
-  let danger: Int16Array | undefined;
   return {
     turn: state.turn, seat: cs.seat, cities: [city],
     get units() {
@@ -594,8 +593,8 @@ function minorTreeWorld(state: GameState, cs: CityState, ai: CityAi, city: CityT
     plotGround: (plot) => plotGroundOf(state, cs.seat, plot),
     plotStanding: (plot) => plotStandingOf(state, plot),
     builderPlot: (plot) => builderPlotOf(state, cs.seat, plot),
-    // its danger map as the trees first read it in the turn (`dangerPlane`)
-    danger: (plot) => (danger ??= dangerPlane(state, cs.seat))[plot],
+    // its danger map as its DoTurn built it (`Seat.dangerOpen`)
+    danger: (plot) => (cs.dangerOpen ??= Array.from(dangerPlane(state, cs.seat)))[plot],
     buildersMakeDistricts: false,
     buildersMakeWonders: false,
     districtTie: () => randRange(state, 2, 'City Build District Choice'),
@@ -615,7 +614,7 @@ function minorTreeWorld(state: GameState, cs: CityState, ai: CityAi, city: CityT
         // Move Unit's execution (0x7eeba0): without Allow Danger a location
         // on the danger map takes no move (0x7eed65), and the order's path
         // flags are 0x100a (0x1000 with Allow Danger)
-        const plane = safe ? (danger ??= dangerPlane(state, cs.seat)) : null;
+        const plane = safe ? (cs.dangerOpen ??= Array.from(dangerPlane(state, cs.seat))) : null;
         if (plane && plane[plot] > 0) return;
         moveTo(state, unit, plot, false, true, true, plane ? moveUnitDanger(plane) : undefined);
         return;

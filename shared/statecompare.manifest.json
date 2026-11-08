@@ -4858,6 +4858,10 @@
         "why": "a city-state's unit production table for its city AI's turn (`minorKnownUnits`): written by minorPhase before minorAiTurn and deleted right after it, so it is never live at a turn boundary; the records it counts are compared as minorArmyKnown."
       },
       {
+        "path": "Seat.dangerOpen",
+        "why": "a city-state's danger map as its DoTurn builds it, read by its city trees inside its turn: a function of the units, districts and features at that point (each compared on their own), rebuilt by minorPhase after its growth before any read; the GPU twin builds it at the same point (`_minor_danger_open`, transient)."
+      },
+      {
         "path": "Tile.mountainRange",
         "why": "a derived MAP fact, not state, and static for a stronger reason than `continent`: `deriveMountainRanges` flood-fills the MOUNTAIN components once at map creation and the exporter ships the ids per tile, and mountains are the one terrain nothing in the game converts. A Mountain Tunnel is built ON a range and never changes which range a tile belongs to."
       },

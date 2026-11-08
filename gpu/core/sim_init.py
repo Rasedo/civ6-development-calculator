@@ -449,6 +449,9 @@ class SimInit:
         # per minor in its city AI's turn, its records by AI_UNITS row as its
         # military AI's turn counted them (`CityState.armyCounted`)
         self._cv_counted: dict[int, torch.Tensor] = {}
+        # per minor in its turn, its danger map ([B, T]) as its DoTurn built
+        # it, after its growth (`Seat.dangerOpen`): its city trees read it
+        self._minor_danger_open: dict[int, torch.Tensor] = {}
         # the district project (projects-table row, -1 none) its last turn's
         # Production went toward and did not finish — the queue head the
         # religious step reads (`buildProject`)
