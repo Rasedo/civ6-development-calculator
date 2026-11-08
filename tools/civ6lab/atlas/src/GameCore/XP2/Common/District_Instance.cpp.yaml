@@ -63,6 +63,7 @@
     - "C-97: the settle site evaluation — READ (the score, the choices), PARTLY READ (the danger, the plot yield)"
     - "C-95: the danger map and Move to Safety — READ, ported"
     - "C-97: the war operations — the war candidates, the city value's frame, the assault nodes and Attack Units READ; the loyalty lead's sources, the team update's danger and the assault's executions PARTLY READ"
+    - "C-95 / C-123: a formation's walk steps its own escort; the team update's district blow is the district's own — READ (0x26fe20 / 0x587ca0; 0x738f20 at 0x7393e5..0x7394c4 -> 0x408770, 0x249ee0, 0x249e40, 0x519370), both twins; the minors' and barbarians' copy keeps record t+1's unfinished districts"
   notes:
     - ".claude/scratchpad/st1/reading.md: ...e the player sees: its   strength (0x24ae80) on the centre, its strike (0x249ee0) over its reach   (0x249e40) or, with none, 1 on each plot beside it (0x715ff0). Then the   player's own cities: the centre 0,..."
   context:
@@ -94,6 +95,8 @@
     - cpu/core/tactical.ts:wins
     - cpu/core/combat.ts:predictCityShot
     - gpu/core/sim_tactics.py:_plan_city_shots
+    - cpu/core/opsOrders.ts:endangered
+    - cpu/core/opsOrders.ts:city
   readings:
     - "C-130: a city's undamaged strike in Bastions' analyzer; a city-state's danger map at its DoTurn; the plot purchase analyzer — READ / PARTLY READ"
     - "H-1: the melee result, a ranged blow's domain, a city's shot — READ"
@@ -105,6 +108,7 @@
     - "C-130: a city-state's Great Person points store, its Faith and its flat bonus; Bastions' strike on standing walls — READ, both twins"
     - "C-123 / C-95: a Trader stands on the trade layer; a city's shot is a COMBAT_DISTRICT spot's blow back — READ (0x901e0, 0x586360 -> 0x208b80, 0x585eb0 -> 0x585d90, 0x791470 at 0x7917f7..0x7918f7 -> 0x249ee0 / 0x205720, 0x776140 at 0x776780..0x7767fa), both twins"
     - "C-95: a damaged centre defends at its wounded strength, the planning's city shot needs standing walls, the barbarians plan on the turn's unhealed centres — READ (0x51eaf0, 0x791470 at 0x79181c..0x791827 -> 0x249ee0 / 0x24b960), both twins; the replay's barbarian copy"
+    - "C-95 / C-123: a formation's walk steps its own escort; the team update's district blow is the district's own — READ (0x26fe20 / 0x587ca0; 0x738f20 at 0x7393e5..0x7394c4 -> 0x408770, 0x249ee0, 0x249e40, 0x519370), both twins; the minors' and barbarians' copy keeps record t+1's unfinished districts"
   notes:
     - ".claude/scratchpad/st1/reading.md: .... Each such city whose centre the player sees: its   strength (0x24ae80) on the centre, its strike (0x249ee0) over its reach   (0x249e40) or, with none, 1 on each plot beside it (0x715ff0). Then the   player'..."
   context:
@@ -405,6 +409,7 @@
     - "C-130: a city-state's Great Person points store, its Faith and its flat bonus; Bastions' strike on standing walls — READ, both twins"
     - "C-130: a city's undamaged strike in Bastions' analyzer; a city-state's danger map at its DoTurn; the plot purchase analyzer — READ / PARTLY READ"
     - "C-95: a damaged centre defends at its wounded strength, the planning's city shot needs standing walls, the barbarians plan on the turn's unhealed centres — READ (0x51eaf0, 0x791470 at 0x79181c..0x791827 -> 0x249ee0 / 0x24b960), both twins; the replay's barbarian copy"
+    - "C-95 / C-123: a formation's walk steps its own escort; the team update's district blow is the district's own — READ (0x26fe20 / 0x587ca0; 0x738f20 at 0x7393e5..0x7394c4 -> 0x408770, 0x249ee0, 0x249e40, 0x519370), both twins; the minors' and barbarians' copy keeps record t+1's unfinished districts"
   context:
     - "...OuterDefenseStrength (+0x44) and the city's enhanced-walls bonus (+0x1888), paid while 0x24b960 holds: the district's outer damage (+0x8d8) below its outer maximum — a breached peri..."
   review: reviewed

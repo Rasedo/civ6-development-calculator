@@ -428,7 +428,11 @@
     - recording: AI_Planning.csv
       turn: 10
       value: AI_Planning.csv t10   lists the Warrior on 13:11, beside the camp, reaching 12:11 (1/1), one   Movement left;
+    - recording: h1_duelp1121
+      turn: 149
+      value: "a civilian's walk steps the escort it set out with on every plot: Builder Capture's Builder 4259860 and Bombard 3997700 walk from 15:19 over the Crossbowman 3735574 on 14:19 to 14:18"
   impl:
+    - cpu/core/tactical.ts:lead
     - cpu/core/combat.ts:seizeCivilian
     - cpu/core/combat.ts:seizable
     - cpu/core/game.ts:religiousUnitLost
@@ -458,6 +462,7 @@
     - "C-93: Operation Move takes its movers as the order opens, a carried formation member among them — READ (0x816cb0 at 0x817030..0x81719a, 0x817800, 0x817e6a; 0x265d80 -> 0x56cc70), both twins"
     - "C-93: Operation Pillage takes a member on its target alone; a capture is its step's; Wander asks Movement; a captor leaves the pass — READ (0x811390 at 0x811786..0x811838, 0x26fe20, 0x77b9a0 at 0x77baa1, 0x212500), both twins"
     - "C-99 / C-128: the swap's partner test and its step along its own path; Move Unit's update before the executions; a Trader no passenger — READ (0x972540, 0x56e760, 0x972a50 -> 0x26fe20, 0x7d3a00 -> 0x7f0020, 0x586360 -> 0x208b80 / 0x523d60), both twins"
+    - "C-95 / C-123: a formation's walk steps its own escort; the team update's district blow is the district's own — READ (0x26fe20 / 0x587ca0; 0x738f20 at 0x7393e5..0x7394c4 -> 0x408770, 0x249ee0, 0x249e40, 0x519370), both twins; the minors' and barbarians' copy keeps record t+1's unfinished districts"
     - "C-99: a move order's search sets out on the pool finder's +0x1bc, the last full-Movement search's GetMaxMoves — READ (0x26f330, 0x77d10, 0x270d70, 0x26e920, 0x26eea0, 0x26dcd0, 0x26df90, 0x26e2c0, 0x26fe20 at 0x270309), unported"
     - "C-99: Operation Move takes a planning plot of no region; a step off owned water caps the Movement it lands with — READ (0x816cb0 at 0x817a03..0x817a6a), a fit (the cap), both twins"
     - "C-99: the assignment's Movement and the swap's walk — READ (0x776140 at 0x776643 / 0x7768e4, 0x56d6f0, 0x972a50 -> 0x26fe20 under flag 4, 0x2720a0 at 0x27229b), both twins"

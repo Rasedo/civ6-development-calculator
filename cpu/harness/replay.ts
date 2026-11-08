@@ -1037,6 +1037,20 @@ function barbarianTurn(ctx: Ctx, b: TurnRecord, closing: number): void {
  *  barbarians' knowledge of 6:12 at 49; h1_duely1124 t55: player 1's Campus
  *  on 4:11 bought in its actions, the barbarians' at 30) */
 function landMajorDistricts(ctx: Ctx, b: TurnRecord, turn: number, copy: GameState): void {
+  // a major's district record t+1 still holds unfinished stands unfinished
+  // for them, whatever the engine's turn of its city completed (runs/
+  // h1_duelp1117 t74-t83: Xi'an's Harbor on 31:12, its CityProductionCompleted
+  // at t83; the barbarian Galleys 2228229 / 1835026 move to safety off it, no
+  // pillage)
+  for (const c of b.cities) {
+    const seat = ctx.seatOfPlayer.get(c.owner as number);
+    if (seat === undefined || !isCiv(seat)) continue;
+    for (const d of c.districts) {
+      if (d[3] !== false) continue;
+      const t = copy.map.tiles[(d[2] as number) * ctx.W + (d[1] as number)];
+      if (t.district && t.district !== 'CITY_CENTER' && t.ownerSeat === seat) t.districtComplete = false;
+    }
+  }
   for (const x of (b as { actions?: unknown[][] }).actions ?? []) {
     if (x[1] !== turn) continue;
     let plot = -1;

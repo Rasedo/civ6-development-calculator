@@ -4929,6 +4929,38 @@ class SimTactics:
                 out.append((placed, plot.clamp(min=0), zero, zero))
         return out
 
+    def _endangered_districts(self, ent_d: torch.Tensor, plot: torch.Tensor, mcb: torch.Tensor,
+                              on: torch.Tensor, skip_seat: int | None = None) -> torch.Tensor:
+        """[B] f64 — the team update's district blows (`endangered`'s
+        COMBAT_DISTRICT arm, 0x738f20 at 0x7393e5..0x7394c4) on the member
+        standing on `plot` [B] of AI combat `mcb` [B] in the games `on`: each
+        district entry of `ent_d` [B, T] whose district strikes (its
+        perimeter standing, `_danger_districts`), the member within its reach
+        of the district's own plot, adds the district's strike with no
+        damage term (`_strike_base` and a major's Bastions half) on the
+        member's strength; a city of `skip_seat` none"""
+        total = torch.zeros(self.B, dtype=torch.float64, device=self.device)
+        if not bool((ent_d & on.unsqueeze(1)).any()):
+            return total
+        b = self._bidx
+        for row in range(self.city_alive.shape[1]):
+            rs = int(self._ROW_SEAT[row])
+            if skip_seat is not None and rs == skip_seat:
+                continue
+            for col in range(self.city_alive.shape[2]):
+                alive = self.city_alive[:, row, col] & on
+                if not bool(alive.any()):
+                    continue
+                base = self._strike_base(row).double()
+                if row < self.n_majors:
+                    base = base + self._gov_mods(row)[12]["crng"].to(torch.float64)
+                hit = self._damage_expected(base - mcb.to(torch.float64))
+                for live_d, p, _def, strike in self._danger_districts(row, col, alive):
+                    ok = (live_d & (strike > 0) & ent_d[b, p]
+                          & (self.pair_dist[plot, p].to(torch.long) <= _CITY_STRIKE_RANGE))
+                    total = total + torch.where(ok, hit, torch.zeros_like(hit))
+        return total
+
     def _tac_min_step_mp(self) -> int:
         """the cheapest Movement a step may cost, in `mp_scale` units: a
         plain step's, a route tier's, a railroad's"""

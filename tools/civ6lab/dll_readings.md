@@ -12103,3 +12103,51 @@ flags (`cityFlags` / `city_fav_food`).
 - Open: no record tells the placements' reassign apart (the city turn's
   follows every placement a dump sees); no recording seats a Free City's
   city; the Free Cities' growth and border steps.
+
+## C-95 / C-123: a formation's walk steps its own escort; the team update's district blow is the district's own — READ (0x26fe20 / 0x587ca0; 0x738f20 at 0x7393e5..0x7394c4 -> 0x408770, 0x249ee0, 0x249e40, 0x519370), both twins; the minors' and barbarians' copy keeps record t+1's unfinished districts
+
+`walk`'s `lead` (cpu/core/tactical.ts); `endangered`'s COMBAT_DISTRICT arm
+(cpu/core/opsOrders.ts), `_endangered_districts` (gpu/core/sim_tactics.py,
+from `_bop_endangered` and `_mops_endangered`); `landMajorDistricts`
+(cpu/harness/replay.ts).
+
+- THE FORMATION'S WALK (0x26fe20): the formation's members (+0x728 / +0x738)
+  are placed at each step (0x587ca0), the formation moving only where every
+  member's placement holds. A civilian's walk steps its escort — the military
+  member it set out with — on every plot of the path: another military unit
+  of its player on a plot the pair passes is no member. The engine's link
+  (the rider's flag, the plot's military unit) is read once as the walk sets
+  out. The GPU walk already steps the escort the military plane names, the
+  walker writing itself over the unit it passes and handing the plot back
+  as it steps on (`_tac_move_to`'s `under`).
+- Confirmed (one-seed aimem trace): runs/h1_duelp1121 t149 Builder Capture's
+  Builder 4259860 and Bombard 3997700 walk from 15:19 over the Crossbowman
+  3735574 on 14:19 to 14:18, the Crossbowman staying for its Barbarian
+  Rampage to 13:18 (t149's six barb.move.plot rows equal).
+- THE DISTRICT BLOW (0x738f20): each target entry of kind COMBAT or PASSIVE
+  DISTRICT (its component's type 3 at +0xa) within twice the member's base
+  Movement is the district (0x408770 over the player's districts +0x1308 by
+  the id at +0xc); its strike 0x249ee0 with no flag: 0 unless 0x24b960 (its
+  perimeter stands), else m_iMaxRangedStrengthTrained (0x4bd030) << 8 plus
+  its city's +0x1890 (the city by the district's plot +0x158 / +0x15c and
+  its city id +0x1b8), no damage term; above 0, the member within its reach
+  (0x249e40) of the district's own plot (+0x158 / +0x15c) takes 0x519370's
+  blow (the strike against the member's GetCombat << 8). A passive district
+  has no perimeter: no blow. The engines: `dangerDistricts`' strike gate,
+  `cityStrikeBase`, the distance from the entry's plot.
+- Confirmed: runs/h1_duelp1121 t174 Builder Capture's Line Infantry 4128797
+  at 67 damage on 5:16, beside Xi'an's Encampment 5:15 striking at 77 (its
+  centre 6:12 four away), "Operation Protect Units, Move 3 16" (both rows).
+- THE COPY'S DISTRICTS (replay): a major's district record t+1 holds
+  unfinished stands unfinished in the minors' and the barbarians' copy,
+  whatever the engine's turn of its city completed; the log's completions
+  of the turn then land. runs/h1_duelp1117 t74 / t79: Xi'an's Harbor on
+  31:12, completed at t83 (CityProductionCompleted), finished at t74 in the
+  engine's turn: the Galleys 2228229 / 1835026 Move to safety, no Pillage
+  Improvement (four barb.move.plot rows, three barb.move.family rows).
+- Open: runs/h1_duelp1128 t106 Builder Capture's Swordsman 4456471 at 60
+  damage on 12:13 beside Xi'an's Encampment 13:13 (strike 40) is endangered
+  ("1 endangered", Protect Units to 13:14), our sum 36 (the captured Builder
+  5046293 on 13:13 beside it); runs/h1_duelp1121 t181 the Line Infantry
+  4653085 at 40 damage on 4:16, two from the Encampment 5:15 (77), is
+  endangered, our sum 52.

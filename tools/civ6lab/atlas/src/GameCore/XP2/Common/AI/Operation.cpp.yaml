@@ -223,7 +223,7 @@
 - addr: 0x738f20
   kind: function
   name: teamUpdate
-  semantics: "the team update (from 0x73f7d0; goals at team +0xe8 + 8 x slot): per member its axial column and row summed; per tactical target (kb +0x370) within twice its base Movement (0x56d9f0): the team's attack strength (+0x98) once per member that can strike it (0x791300), the damage the target would deal it (0x51a240 / 0x519370 under the danger map), the target into the team's list (+0xb8) and the enemy strength (+0x94); a member the expected damage would kill is endangered (+0xa0). Then slot 3 (+0x100) the centre; slot 5 (+0x110) the march point — the enemy not at war: from the target back toward the rally in single-precision axial steps (0x38070), the first plot P may enter (its own, no one's, open borders / alliance 0x3dab70, or an owner not enforcing its borders, diplomacy +0x6c0), the rally where reached; no enemy or at war: the target; with targets slot 4 (+0x108) the battle line, halfway between the centre and the targets' average, the team engaged (+0x90). Logged \"Battle line, %d:%d, %d endangered\". The endangered list (+0xa0, cleared each tick): a unit entry that fights adds its blow where no unit of the member's player stands on its ring (0x6b1b0 over 0x737610) and the member's plot holds danger or the entry is HIGH; a district's city (0x408770) its strike within range; a member joins where the sum is above 0 and it does not fight (a lone unit on land: 0x739659), else where its damage plus the sum passes its hit points — a captive in its escort's formation is never listed."
+  semantics: "the team update (from 0x73f7d0; goals at team +0xe8 + 8 x slot): per member its axial column and row summed; per tactical target (kb +0x370) within twice its base Movement (0x56d9f0): the team's attack strength (+0x98) once per member that can strike it (0x791300), the damage the target would deal it (0x51a240 / 0x519370 under the danger map), the target into the team's list (+0xb8) and the enemy strength (+0x94); a member the expected damage would kill is endangered (+0xa0). Then slot 3 (+0x100) the centre; slot 5 (+0x110) the march point — the enemy not at war: from the target back toward the rally in single-precision axial steps (0x38070), the first plot P may enter (its own, no one's, open borders / alliance 0x3dab70, or an owner not enforcing its borders, diplomacy +0x6c0), the rally where reached; no enemy or at war: the target; with targets slot 4 (+0x108) the battle line, halfway between the centre and the targets' average, the team engaged (+0x90). Logged \"Battle line, %d:%d, %d endangered\". The endangered list (+0xa0, cleared each tick): a unit entry that fights adds its blow where no unit of the member's player stands on its ring (0x6b1b0 over 0x737610) and the member's plot holds danger or the entry is HIGH; a district entry (kind COMBAT or PASSIVE DISTRICT, component type 3) is the district (0x408770), its strike 0x249ee0 with no flag (0 unless its perimeter stands, no damage term) above 0, the member within its reach 0x249e40 of the district's own plot (+0x158 / +0x15c), 0x519370's blow; a member joins where the sum is above 0 and it does not fight (a lone unit on land: 0x739659), else where its damage plus the sum passes its hit points — a captive in its escort's formation is never listed."
   status: PARTLY
   cases:
     - recording: h1_duely1128
@@ -235,7 +235,11 @@
     - recording: h1_duely1128
       turn: 85
       value: "a civilian is listed only alone in its formation (0x739659): Builder Capture's Settler 4718622 in its Swordsman's formation on 12:13 is not moved off; no barbarian civilian logs Operation Protect Units in the five duely duels"
+    - recording: h1_duelp1121
+      turn: 174
+      value: "the district's own plot: Builder Capture's Line Infantry 4128797 at 67 damage on 5:16 beside Xi'an's Encampment 5:15 (77), its centre 6:12 four away, Protect Units to 3:16"
   impl:
+    - gpu/core/sim_tactics.py:_endangered_districts
     - cpu/core/operations/assault.ts:WEIGHED
     - cpu/core/operations/assault.ts:marchPoint
     - cpu/core/operations/assault.ts:updateTeam
@@ -250,6 +254,7 @@
     - "C-97: the war operations — the war candidates, the city value's frame, the assault nodes and Attack Units READ; the loyalty lead's sources, the team update's danger and the assault's executions PARTLY READ"
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
     - "C-95: the danger map and Move to Safety — READ, ported"
+    - "C-95 / C-123: a formation's walk steps its own escort; the team update's district blow is the district's own — READ (0x26fe20 / 0x587ca0; 0x738f20 at 0x7393e5..0x7394c4 -> 0x408770, 0x249ee0, 0x249e40, 0x519370), both twins; the minors' and barbarians' copy keeps record t+1's unfinished districts"
   context:
     - "...ays Running); FAILURE where a team is in battle (+0x90, the team update's battle points 0x738f20) and the operation holds no unit — a team in battle has a member, so never in a turn...."
   review: reviewed

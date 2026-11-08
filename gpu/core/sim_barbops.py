@@ -25,7 +25,7 @@ from __future__ import annotations
 
 from .simbase import *  # noqa: F401,F403 — torch, constants, helpers: the shared floor
 from . import simbase
-from .sim_tactics import _AI_DEFENDER, _CITY_STRIKE_RANGE
+from .sim_tactics import _AI_DEFENDER
 
 # the interpreter's statuses
 _S, _R, _F = 1, 2, 3
@@ -790,8 +790,8 @@ class SimBarbOps:
         fights, where no barbarian unit stands beside the member and its plot
         holds danger or the entry is HIGH, within the unit's Movement or its
         range, adds its blow on the member (`damageExpected` on their
-        strengths); a combat district's city that strikes, the member within
-        its range of the centre, its strike — and the member the sum leaves
+        strengths); a combat district that strikes, the member within its
+        reach of the district's own plot, its strike (`_endangered_districts`) — and the member the sum leaves
         with no hit points is endangered; one that does not fight, any blow
         at all where it stands alone on land (in no formation of two,
         0x739659: `_tac_mate`)"""
@@ -829,26 +829,9 @@ class SimBarbOps:
                & ~beside.unsqueeze(1) & ((here > 0).unsqueeze(1) | (uk == 3)) & ((du <= emm) | (du <= erng)))
         dmg = self._damage_expected((torch.maximum(ecb, erg) - mcb.unsqueeze(1)).to(torch.float64))
         total = torch.where(ent, dmg, torch.zeros_like(dmg)).sum(dim=1)
-        # the combat districts' cities: each entry its city's strike
+        # the combat districts: each one that strikes, its own strike
         ent_d = (tg["dk"] == 1) & (d <= near.unsqueeze(1))
-        if bool((ent_d & on.unsqueeze(1)).any()):
-            for row in range(self.city_alive.shape[1]):
-                rs = int(self._ROW_SEAT[row])
-                for col in range(self.city_alive.shape[2]):
-                    alive = self.city_alive[:, row, col]
-                    if not bool((alive & on).any()):
-                        continue
-                    mine = ent_d & (self.tile_seat == rs) & (self.tile_city == self.city_id[:, row, col].unsqueeze(1))
-                    n = mine.sum(dim=1)
-                    if not bool((n > 0).any()):
-                        continue
-                    ctr = self.city_center[:, row, col].clamp(min=0)
-                    str_ = self._strike_strength(row, torch.full_like(ctr, col))
-                    if row < self.n_majors:
-                        str_ = str_ + self._gov_mods(row)[12]["crng"].to(str_.dtype)
-                    ok = alive & (n > 0) & (str_ > 0) & (self.pair_dist[plot, ctr].to(torch.long) <= _CITY_STRIKE_RANGE)
-                    hit = self._damage_expected(str_ - mcb.to(torch.float64))
-                    total = total + torch.where(ok, n * hit, torch.zeros_like(hit))
+        total = total + self._endangered_districts(ent_d, plot, mcb, on)
         hp_max = int(self.rules.combat["unitHp"])
         dmg_now = hp_max - self.barb_unit_hp[b, jc].long()
         weak = (total > 0) & ~fights

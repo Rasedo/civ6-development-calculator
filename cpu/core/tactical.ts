@@ -1236,9 +1236,16 @@ function walk(state: GameState, unit: Unit, path: number[], dest: number, mates:
   // plot it passes are another formation's (runs/h1_duely1128 t56: the Scout
   // 3538967 walks over 13:14, Builder Capture's Settler 2228251 stays there
   // with its Slinger)
-  const formed = escortRiders(state, escortOf(state, unit) ?? unit);
+  // with its escort too: a rider's steps are that escort's on every plot,
+  // another of its player's military units on a plot the pair passes is
+  // none of its formation (runs/h1_duelp1121 t149: Builder Capture's Builder
+  // 4259860 and Bombard 3997700 walk over the Crossbowman 3735574 on 14:19
+  // to 14:18)
+  const lead = escortOf(state, unit);
+  const formed = escortRiders(state, lead ?? unit);
   for (let i = 0; i < stop; i++) {
-    const r = stepUnit(state, unit, tiles[path[i]], formed);
+    const mover = lead && state.units.includes(lead) && lead.tileIndex === unit.tileIndex ? lead : unit;
+    const r = stepUnit(state, mover, tiles[path[i]], formed);
     if (r === 'halted') return false;
     if (r !== 'moved') return true;
   }

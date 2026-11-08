@@ -11,8 +11,8 @@ import type { GameState, Unit } from './types';
 import { UNITS } from '../data/units';
 import { gameTypeOf } from '../data/aliases';
 import { aiPromotionPick, attacksLeftOf, promoReady, takePromotion } from './promotions';
-import { cityStrikeStrength, damageExpected, hostilePillage, hostilePillageAmount, hostileRangedStrike, unitAttackRange } from './combat';
-import { aiStrengths, maxMoves, militaryAiTypeOf, moveTo, passAttack, passFinish, passMoveExec, passMoveUpdate, passNavalPillage, passPatrol, passSafePlot, plotDistance, rangeOf, swapUnits,
+import { cityStrikeBase, damageExpected, hostilePillage, hostilePillageAmount, hostileRangedStrike, unitAttackRange } from './combat';
+import { aiStrengths, dangerDistricts, maxMoves, militaryAiTypeOf, moveTo, passAttack, passFinish, passMoveExec, passMoveUpdate, passNavalPillage, passPatrol, passSafePlot, plotDistance, rangeOf, swapUnits,
   type Pass } from './tactical';
 import type { OpsEnv } from './operations/manager';
 import type { DefendOrders } from './operations/nodes';
@@ -104,8 +104,12 @@ const afloatInDanger = (state: GameState, pass: Pass, u: Unit): boolean =>
  * unit of the target that fights, where no unit of the member's player
  * stands beside it (0x6b1b0's ring) and the member's plot holds danger or
  * the target is HIGH, within the target's Movement or its range, adds the
- * blow it would strike the member (0x51a240 on their strengths); a city
- * that strikes, within its range, its strike (0x519370) — and the member
+ * blow it would strike the member (0x51a240 on their strengths); a combat
+ * district whose perimeter stands, the member within its reach of the
+ * district's own plot, its strike with no damage term (0x519370 on
+ * 0x249ee0: runs/h1_duelp1121 t174, Builder Capture's Line Infantry 4128797
+ * at 67 damage on 5:16 beside Xi'an's Encampment 5:15, its centre 6:12 four
+ * away, goes to safety on 3:16) — and the member
  * the sum would leave with no hit points is endangered; one that does not
  * fight, any blow at all where it stands alone (its formation of one unit,
  * 0x739659: no civilian of `formed`) on land.
@@ -130,11 +134,12 @@ function endangered(state: GameState, pass: Pass, members: readonly Unit[], form
             sum += damageExpected(Math.max(theirs.melee, theirs.ranged) - mine.melee);
           }
         } else if (e.type === 'COMBAT_DISTRICT') {
+          // the district itself (0x408770): its strike while its perimeter
+          // stands (0x249ee0 with no flag, no damage term), over its reach
+          // of its own plot (+0x158)
           const city = cityOfPlot(state, e.tile);
-          const str = city ? cityStrikeStrength(state, city) : 0;
-          if (city && str > 0 && plotDistance(state, u.tileIndex, city.centerIndex) <= CITY_STRIKE_RANGE) {
-            sum += damageExpected(str - mine.melee);
-          }
+          const strikes = city && dangerDistricts(state, city).some((x) => x.plot === e.tile && x.strike > 0);
+          if (city && strikes && d <= CITY_STRIKE_RANGE) sum += damageExpected(cityStrikeBase(state, city) - mine.melee);
         }
       }
       if (out.includes(u)) continue;

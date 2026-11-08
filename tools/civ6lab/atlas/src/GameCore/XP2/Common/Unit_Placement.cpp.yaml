@@ -465,4 +465,5 @@
     - "C-95: the barbarians' Builder Capture — READ (the event, the start, the tree's walk), ported"
     - "C-99: a move order carried on as the turn ends, the zone-of-control wait, the embark rule's TO plot — READ (0x962380, 0x52f50, 0x26fe20, 0x2675e0, 0x2673f0, 0x530420, 0x267650), both twins"
     - "C-128: a crowded plot's unit goes beside it as its AI player's turn ends — READ (0x775e50, 0x585d90, 0x93f870, 0x585940), both twins"
+    - "C-95 / C-123: a formation's walk steps its own escort; the team update's district blow is the district's own — READ (0x26fe20 / 0x587ca0; 0x738f20 at 0x7393e5..0x7394c4 -> 0x408770, 0x249ee0, 0x249e40, 0x519370), both twins; the minors' and barbarians' copy keeps record t+1's unfinished districts"
   review: reviewed
