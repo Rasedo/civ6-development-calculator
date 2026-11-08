@@ -33,6 +33,7 @@ import { DED_FREE_INQUIRY } from '../data/seats';
 import { dedicationEvent } from './eras';
 import { randRange } from './rand';
 import { spawnUnit, disbandUnit, bestUnlockedOfClass, unitFullMoves, unitsAt, unitStackSlot } from './units';
+import { lookAgain } from './fog';
 import { fitEncampOuter, repairDrip, urbanDefensesFit, wallsMax } from './rules';
 import { BUILDINGS } from '../data/buildings';
 import { itemCost } from './game';
@@ -504,6 +505,9 @@ export function activateGreatPerson(state: GameState, unit: Unit): boolean {
 
   // PERMANENT CHANNELS.
   for (const [k, n] of Object.entries(fx.perm ?? {})) permAdd(owner, GP_PERM.length, k, GP_PERM, n);
+  // CIV6 (Leif Erikson): "+1 sight range for all naval units" — each of the
+  // owner's naval units looks again with it (`lookAgain`)
+  if (fx.perm?.navalSight) for (const u of state.units) if (u.seat === unit.seat && UNITS[u.type]?.naval) lookAgain(state, u);
   if (city) for (const [k, n] of Object.entries(fx.cityPerm ?? {})) permAdd(city, GP_CITY_PERM.length, k, GP_CITY_PERM, n);
   // a RunOnce row: every city the seat holds now, none it gains after
   for (const c of 'cities' in owner ? owner.cities : []) {

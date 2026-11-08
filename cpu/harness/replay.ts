@@ -75,8 +75,8 @@ import { commitDedications, goodyMoment, pantheonMoment, religionMoment, unitKil
 import { cityStateSight, initFog, revealAround, unitSeesThrough, unitSight } from '../core/fog';
 import { holdFavor, seatFavor } from '../core/seatTurn';
 import { displaceAirFrom, isAirUnit } from '../core/air';
-import { BARB_SEAT, cityStateOfSeat, civsAtWar, delegationWith, FREE_SEAT, isBarbSeat, isCityStateSeat, isCiv, MISSION_DELEGATION, MISSION_EMBASSY, prophetsOf, seatOf, setDelegationWith, setPeaceTurnWith, setTileOwner, setWar, tileSeat, unitsOf } from '../core/seats';
-import { activateGreatPerson, gpActivateOk, gpClassOfUnit } from '../core/gpAbility';
+import { BARB_SEAT, cityStateOfSeat, civsAtWar, delegationWith, FREE_SEAT, isBarbSeat, isCityStateSeat, isCiv, MISSION_DELEGATION, MISSION_EMBASSY, prophetsOf, seatOf, setPeaceTurnWith, setTileOwner, setWar, tileSeat, unitsOf } from '../core/seats';
+import { activateGreatPerson, gpActivateOk, gpClassOfUnit, gpPersonOf } from '../core/gpAbility';
 import { BUILDINGS } from '../data/buildings';
 import { BUILT_WONDERS } from '../data/builtWonders';
 import { PROJECTS } from '../data/projects';
@@ -84,7 +84,7 @@ import { TECHS } from '../data/techs';
 import { CIVICS } from '../data/civics';
 import { GOVERNMENTS, GOVERNMENT_LIST, POLICIES } from '../data/policies';
 import { BELIEF_CATALOGS, BELIEF_CLASS_FOLLOWER, BELIEF_SLOTS, PANTHEONS, PANTHEON_IDS, RELIGION_TYPES, gainPopulationPressure } from '../data/religion';
-import { missionOf, missionPayable } from '../core/deals';
+import { establishMission, missionOf, missionPayable } from '../core/deals';
 import { DEAL_MISSION } from '../data/seats';
 import { CITY_MAX_HP, UNITS, UNIT_HP } from '../data/units';
 import { CAMP_DISPERSAL_GOLD, MP_SCALE, scaleByGameSpeed } from '../data/constants';
@@ -94,7 +94,7 @@ import { civicAgendas, setupAgendas } from '../core/agendas';
 import { holdMinorOrders, holdMinorRoutePick, holdMinorStart, minorCombatDesire, minorResearch, minorSetItem, minorBuildFacts, minorKnowledge, minorKnownUnits, minorItemCost, minorItemInHand, minorItemKey, minorBuildingPrice, minorRaiseBuilding, minorUnitPrice, minorUpgradeUnit, minorUpgradeVisible, techContractsCompleted, traceMinorLays, traceMinorPolicyScores, traceMinorPurchases } from '../core/minorBuild';
 import { DEDICATED_IMPROVEMENTS, IMPROVEMENT_IDS, unitActionIndex } from '../core/unitActions';
 import { loadCatalog, type Catalog, type DumpCity, type TurnRecord } from './record';
-import { num, bool } from './record';
+import { num, bool, revealedPlots } from './record';
 import { holdMinorClears, minorAiTurn, minorContractPurchases, minorGreatPersonClass, minorMilitaryTurn, minorSecondHook, traceMinorAi } from '../core/minorCityAi';
 import { UPGRADE_MOVE, cityStateMilitary, holdSecondHook, traceMinorOps, traceMinorUpgrade, unupgradedDeleted, upgradeMayGo, upgradeTreesStart } from '../core/minorOps';
 import { barbSpawnChange, holdBarbCaptures, traceBarbOps } from '../core/barbarianOps';
@@ -104,7 +104,7 @@ import { newCityAi } from '../core/aiCityTrees';
 import { newEconomicMemory, purchaseSpend, savingsTurn, upgradePurchase, type EconomicMemory } from '../core/aiEconomic';
 import { FX } from '../core/aiValue';
 import { advanceHistory, aliasOrPrefixed, engineRowOf, importTurn, minorHead, newHistory, recordRoutes, type History, type Imported } from './import';
-import { SightFold, TribeFold } from './windowFold';
+import { TribeFold } from './windowFold';
 import { AI_UNITS } from '../data/aiBuildTables';
 import { loadCityBuildCentre, loadCityBuildTables, newCityBuildTally, tallyBuildings, type CityBuildTally } from './cityBuildLog';
 import { buildingTable } from '../core/aiCityBuild';
@@ -115,10 +115,10 @@ import { holdRng, rngHold } from '../core/rand';
 import { seedMoments, stateChecks, transitionChecks, type CheckResult } from './checks';
 import { engineId, gameHash, gameTypeOf } from '../data/aliases';
 import { OperationsProbe, operationsMarkdown, type OperationsTally } from './operationsScore';
-import { GREAT_PEOPLE, gpChargesOf, personWorkObjects } from '../data/greatPeople';
+import { GP_CLASSES, GREAT_PEOPLE, gpChargesOf, gpEffectOf, personWorkObjects } from '../data/greatPeople';
 import { InferredActions, RecordedActions, activePlayer, type ActionSource, type Decision, type LogTally, type QueueSpec } from './replayActions';
 import { newScores, scoreDecision, scoreTable, memoryTable, type DecisionScores } from './aiScore';
-import { GameMemory, MemoryLogs, readGameMemory, readMemory, syncContracts, type ArmyLogged } from './aiMemory';
+import { GameMemory, MemoryLogs, readGameMemory, readMemory, readRevealed, syncContracts, type ArmyLogged } from './aiMemory';
 import { gameSpawnChanges, importCityAi, importOps, type GameSpawnChange } from './gameAiImport';
 import { NO_SCORE } from '../core/aiPolicyValue';
 
@@ -679,7 +679,52 @@ function spawnRecorded(ctx: Ctx, rec: TurnRecord, key: string): Unit | undefined
   ctx.units.set(key, unit);
   // the unit added answers the engine's Train Unit quests
   questUnitAdded(ctx.state, unit.seat, unit.type);
+  // ...and looks from where it is added, as `spawnUnit`'s does (runs/
+  // h1_duelr1128 t57: China's Settler 1245190 added on 17:13 reveals 18:16 /
+  // 19:16, three out); a barbarian's look waits for its player's turn
+  if (!isBarbSeat(unit.seat)) {
+    revealAround(ctx.state, unit.seat, unit.tileIndex, unitSight(unit, ctx.state),
+      { seeThrough: unitSeesThrough(unit), mover: { units: [unit], from: -1 } });
+  }
   return unit;
+}
+
+/** A NAVAL SIGHT THE ACTIVATION OF `person` RAISES (Leif Erikson's): each of
+ *  the seat's naval units looks from the steps the log has it take before
+ *  the activation with the sight it had then, and stands where they left it;
+ *  its steps after are the pair's walk (`syncUnits`; runs/h1_duelr1124 t80:
+ *  China's Quadrireme 1572876 steps 41:5 -> 38:7 before Leif Erikson, 41:2
+ *  dark, its look again from 38:7) */
+function stepsBeforeSight(ctx: Ctx, b: TurnRecord, person: string, seat: number): void {
+  const rows = ((b as { actions?: unknown }).actions ?? []) as unknown[][];
+  const ord = rows.find((x) => x[2] === 'UnitGreatPersonActivated' && `${x[3]}:${x[4]}` === person)?.[0] as number | undefined;
+  if (ord === undefined) return;
+  for (const [key, u] of ctx.units) {
+    if (u.seat !== seat || !UNITS[u.type]?.naval) continue;
+    const steps = ctx.steps.get(key) ?? [];
+    const before = steps.filter((s) => s.ord < ord);
+    if (!before.length) continue;
+    for (const s of before) revealAround(ctx.state, u.seat, s.plot, unitSight(u, ctx.state), { seeThrough: unitSeesThrough(u) });
+    u.tileIndex = before[before.length - 1].plot;
+    ctx.paths.set(key, steps.filter((s) => s.ord > ord).map((s) => s.plot));
+  }
+}
+
+/** THE GREAT PERSON THE PAIR MADE AND SPENT, which neither record holds: the
+ *  engine's own of its class the player holds that no record unit names,
+ *  else one added on the plot the log activates it on (runs/h1_duelr1124
+ *  t80: China's Great Admiral 2097156 added on 2:9 and activated as Leif
+ *  Erikson) */
+function pairPerson(ctx: Ctx, d: Extract<Decision, { kind: 'gpActivate' }>): Unit | undefined {
+  const id = aliasOrPrefixed(ctx.cat.greatPeople?.[d.individual] ?? '');
+  const cls = GP_CLASSES.find((c) => GREAT_PEOPLE[c].some((p) => p.id === id));
+  const seat = seatOfP(ctx, d.player);
+  if (!cls || !seatOf(ctx.state, seat)) return undefined;
+  const mapped = new Set(ctx.units.values());
+  const u = ctx.state.units.find((x) => x.seat === seat && x.type === cls && !mapped.has(x))
+    ?? spawnUnit(ctx.state, cls, d.plot, seat, 'stack', false) ?? undefined;
+  if (u) ctx.units.set(d.unit, u);
+  return u;
 }
 
 /** a barbarian unit the record raised, to the nearest living camp's tribe
@@ -2601,7 +2646,7 @@ function applyMissions(ctx: Ctx, events: readonly MissionEvent[]): void {
       continue;
     }
     const ok = offered && answerOffer(state, receiver, a) && delegationWith(state, a, b) === want;
-    if (!ok) setDelegationWith(state, a, b, want);
+    if (!ok) establishMission(state, a, b, want);
     count(ctx, 'diplo:missionAnswer', ok ? 'applied' : 'fallback', e.to, ok ? undefined : `${e.kind} ${e.from}->${e.to}`);
   }
 }
@@ -3384,7 +3429,7 @@ const res = buyTile(state, city.id, d.plot, seat);        if (!res.ok) setTileOw
       case 'gpActivate': {
         // the order is the player's, through the engine's verb from the plot
         // the log's steps had the person on: the effects, the charge
-        const u = unitOf(ctx, d.unit);
+        const u = unitOf(ctx, d.unit) ?? pairPerson(ctx, d);
         if (!u) { count(ctx, 'gpActivate', 'refused', d.player, 'a unit the replay does not hold'); break; }
         u.tileIndex = d.plot;
         // the person the log names: a unit the replay spawned from the
@@ -3404,6 +3449,8 @@ const res = buyTile(state, city.id, d.plot, seat);        if (!res.ok) setTileOw
             u.charges = Math.max(1, gpChargesOf(GREAT_PEOPLE[cls][at]) - made);
           }
         }
+        const person = gpPersonOf(u);
+        if (person && gpEffectOf(person).perm?.navalSight) stepsBeforeSight(ctx, b, d.unit, u.seat);
         if (!activateGreatPerson(state, u)) {
           if (TRACE.has('gpActivate')) console.error(`   ${d.unit} ${u.type} gpAt${u.gpAt} charges${u.charges} at ${u.tileIndex}`);
           count(ctx, 'gpActivate', 'refused', d.player, 'the engine refused the activation');
@@ -4361,10 +4408,14 @@ function syncUnits(ctx: Ctx, b: TurnRecord, only?: number, keepMoves = false): v
     // walked them all the same (runs/h1_duelw1127 t10: China's Scout steps
     // to (14,3), where a barbarian strikes it); a barbarian's looks wait for
     // its player's turn, whose planning reads the plots revealed before its
-    // moves (its steps kept)
-    if (moved || (ctx.paths.get(key)?.length && !ctx.walked.has(key))) {
+    // moves (its steps kept); a unit whose steps came back to its plot, no
+    // move of the pair, saw from each all the same (runs/h1_duelr1124 t87:
+    // city-state 4's Heavy Chariot 983040 steps 8:11 -> 8:12 -> 8:11, 7:13 /
+    // 7:14 / 8:14 revealed from 8:12)
+    const path = ctx.paths.get(key) ?? ctx.steps.get(key)?.map((s) => s.plot) ?? [];
+    if (moved || (path.length && !ctx.walked.has(key))) {
       ctx.walked.add(key);
-      const steps = [...(ctx.paths.get(key) ?? []), at];
+      const steps = [...path, at];
       if (!isBarbSeat(u.seat)) for (const p of steps) revealAround(ctx.state, u.seat, p, unitSight(u, ctx.state), { seeThrough: unitSeesThrough(u) });
       if (isBarbSeat(u.seat)) ctx.barbSteps.push({ u, plots: steps });
     }
@@ -4830,6 +4881,12 @@ export function compareState(state: GameState, read: Imported): Tallies {
       note(t, 'fog.revealed', missing.length + extra.length === 0, name, { n: missing.length, plots: missing.slice(0, 8) },
         { n: extra.length, plots: extra.slice(0, 8) },
         missing.length + extra.length);
+      // REPLAY_TRACE=fog: each major's plots the record and the engine differ on
+      if (TRACE.has('fog') && missing.length + extra.length) {
+        const W = state.map.width;
+        const at = (ps: number[]) => ps.map((p) => `${p % W}:${Math.floor(p / W)}`).join(' ');
+        console.error(`t${state.turn} fog ${name} lacks ${at(missing)} | extra ${at(extra)}`);
+      }
     }
   });
   // units: each seat's roster, by type
@@ -5405,7 +5462,11 @@ function perTurnWorld(ctx: Ctx, a: TurnRecord, imp: Imported, history: History, 
     carryFields(from, to, [...SEAT_MEMORY, ...SEAT_STORES]);
     carryFields(from.research, to.research, RESEARCH_MEMORY);
     if (minor) {
-      carryFields(from, to, [...MINOR_MEMORY, ...MINOR_STORES]);
+      // on the game's own memory (`--memory aimem`) the revealed plots are
+      // the record's, where it carries them
+      const plane = isBarbSeat(to.seat) ? 'explored' : 'revealed';
+      const recorded = fromAimem && !!(to as CityState)[plane]?.length;
+      carryFields(from, to, [...MINOR_MEMORY.filter((k) => !recorded || k !== plane), ...MINOR_STORES]);
       minorKeptCarried(from as CityState, to as CityState);
       // the record floors a district's or a project's progress
       // (queueProgress; a building's and a unit's are the city's memory's):
@@ -5596,11 +5657,9 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
   // ...and the city-states' savings each of those turns left (`foldSavings`)
   const savings = new Map<number, EconomicMemory>();
   const folding = opts.source ?? (source instanceof RecordedActions ? new RecordedActions() : new InferredActions());
-  // ...and the barbarians' tribes and the barbarians' and the city-states'
-  // revealed plots (`TribeFold`, `SightFold`)
+  // ...and the barbarians' tribes (`TribeFold`)
   const W0 = all[0]?.head.W ?? 0;
   const tribeFold = skipped.length ? new TribeFold(dumpPath, W0) : undefined;
-  const sightFold = skipped.length ? new SightFold(W0, W0 * all[0].head.H) : undefined;
   skipped.forEach((r, i) => {
     advanceHistory(history, r, cat);
     const imp = importTurn(r, cat, history);
@@ -5608,7 +5667,6 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
     const ds = next ? folding.decisions(r, next, cat) : [];
     if (next) foldSavings(savings, imp, ds, cat);
     tribeFold?.observe(r, imp, cat, ds);
-    sightFold?.observe(r, imp, cat);
   });
   // the game's combat log, where the recording kept it: each record carries
   // the battles of the turns its event log covers (`RecordedActions`)
@@ -5652,8 +5710,6 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
   const state = first.state;
   importedWorld(state, first, recs[0], history);
   tribeFold?.observe(recs[0], first, cat, []);
-  sightFold?.observe(recs[0], first, cat);
-  sightFold?.seed(state, first);
   // the city-states' city AI ran on the game's turns before the import's:
   // its first look ran no events (none contracted); its savings those turns'
   // (`foldSavings`), else, with no record before, the treasury taken whole;
@@ -6574,7 +6630,11 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
         const reads = ctx.gameMemory
           ? readGameMemory(ctx.gameMemory, cat, s, pid, a.turn, ctx.W, playerOf, logged, unitType)
           : readMemory(ctx.memoryLogs, s, pid, a.turn, ctx.W, playerOf, logged);
-        for (const m of reads) {
+        // the revealed plots as record t+1 reads them, which the player's
+        // cleanness leaves out
+        const plane = isBarbSeat(s.seat) ? s.explored : (s as CityState).revealed;
+        const revealed = readRevealed(plane, revealedPlots(b, pid, plane?.length ?? 0), ctx.W);
+        for (const m of revealed ? [...reads, revealed] : reads) {
           scoreDecision(report.memory, m.kind, a.turn, `p${pid}`, m.equal, m.ours, m.game);
           // REPLAY_TRACE=memory: each kind that differs
           if (!m.equal && TRACE.has('memory')) console.error(`t${a.turn} memory p${pid} ${m.kind} ours ${m.ours} | log ${m.game}`);        }

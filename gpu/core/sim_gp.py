@@ -492,6 +492,20 @@ class SimGp:
         _np = len(self._gp_perm_names)
         if _np:
             self.civ_gp_perm[:, row] = self.civ_gp_perm[:, row] + _rowfx[:, self._GP_PERM0:self._GP_PERM0 + _np] * m.to(self.civ_gp_perm.dtype).unsqueeze(1)
+            # CIV6 (Leif Erikson): "+1 sight range for all naval units" — each
+            # of the owner's naval units looks again with it (`lookAgain`)
+            if "navalSight" in self._gp_perm_names:
+                _ns = self._GP_PERM0 + self._gp_perm_names.index("navalSight")
+                _grew = m & (_rowfx[:, _ns] > 0)
+                if bool(_grew.count_nonzero()):
+                    _nav = (self.unit_alive & (self.unit_seat == row) & _grew.unsqueeze(1)
+                            & self.unit_naval.take(self.unit_type.clamp(min=0, max=self.NU - 1)))
+                    for _j in _nav.any(dim=0).nonzero(as_tuple=True)[0].tolist():
+                        _k = _nav[:, _j].nonzero(as_tuple=True)[0]
+                        _sl = torch.full_like(_k, _j)
+                        _rad, _thr = self._look_key(_k, _sl)
+                        self._reveal_around(_k, row, self.unit_tile[_k, _j], _rad, see_through=_thr)
+                        self._take_look(_k, _sl)
         _nc = len(self._gp_city_perm_names)
         if _nc and bool(has_city.count_nonzero()):
             _r = has_city.nonzero(as_tuple=True)[0]

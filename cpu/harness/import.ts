@@ -2179,6 +2179,14 @@ export function importTurn(rec: TurnRecord, cat: Catalog, history?: History): Im
       playerOfSeat.set(BARB_SEAT, p.id);
     }
   }
+  // the non-majors' revealed plots, where the record carries them: each
+  // city-state's (`CityState.revealed`) and the barbarians' (`Seat.explored`)
+  for (const [pid, cs] of minorOfPlayer) {
+    const r = revealedPlots(rec, pid, W * H);
+    if (r) cs.revealed = r;
+  }
+  const barbRead = revealedPlots(rec, playerOfSeat.get(BARB_SEAT) ?? -1, W * H);
+  if (barbRead) state.barbSeat.explored = barbRead;
   const seatOfGame = (pid: number) => seatOfPlayer.get(pid) ?? NO_SEAT;
 
   // the religions: an engine religion is named by its founder's seat

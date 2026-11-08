@@ -18,12 +18,28 @@
     - cpu/core/barbarians.ts:plotsSeenNow
     - gpu/core/sim_barb.py:_barb_seen
     - cpu/core/disasters.ts:nameRiversInLook
+    - cpu/core/fog.ts:suzerainSight
   readings:
     - "C-119: the rivers' names on the visibility count — READ (0x58aa90 -> 0x534950, 0x508d50, 0x508330), ported both twins"
     - "C-95: Explore Land and the barbarians' revealed plots — READ, ported (two tests below unread)"
     - "H-1: the barbarians' turn (0x1514a0) — READ (the max camps and the sight LAB)"
+    - "C-119: the revealed plots against the records' planes — an embassy reveals the capital, a new suzerain's reveal meets, a sight raised looks again — READ (0x238330 -> 0x3e6820 -> 0x508bd0 -> 0x507c00 -> 0x508d50, 0x508330 -> 0x50d390, 0x56ce90 -> 0x58f3f0), both twins; the replay's steps and added units"
   context:
     - ...al 0x50d390 is reached from the visibility count change 0x508d50 alone for a barbarian (0x508330 is the diplomatic sharing, 0x50ccc0 the war / peace one, 0x50d080 RevealAllPlots and th...
+  review: reviewed
+- addr: 0x508bd0
+  final: 0x35a730
+  kind: function
+  signature: void RevealPlotsInRadius(VisibilityManager* this, int player, int plot, int radius, int flag)
+  semantics: "for each plot within `radius` of `plot` (the map's range walk 0x6b000 with the functor @d4d930, whose call 0x50dc40 -> 0x507c00) the visibility count change 0x508d50 of `player` by 0: the plots revealed to it, no count raised. Callers: SetHasEmbassyAt 0x3e6820 (the capital, radius 1), the city-states' influence turn 0x44bb20, 0x2419e0, 0x44f3a0."
+  status: READ
+  cases:
+    - recording: h1_duelr1124
+      turn: 106
+      value: "China's Embassy to Rome: Rome 34:19 and the six beside it in China's plane at t107 (1121 t120 35:14, 1128 t165 42:20)"
+  impl: [cpu/core/deals.ts:establishMission, gpu/core/sim_deals.py:_deal_move_kind]
+  readings:
+    - "C-119: the revealed plots against the records' planes — an embassy reveals the capital, a new suzerain's reveal meets, a sight raised looks again — READ (0x238330 -> 0x3e6820 -> 0x508bd0 -> 0x507c00 -> 0x508d50, 0x508330 -> 0x50d390, 0x56ce90 -> 0x58f3f0), both twins; the replay's steps and added units"
   review: reviewed
 - addr: 0x508d50
   final: 0x35a7f0
@@ -37,6 +53,7 @@
     - cpu/core/fog.ts:minorLook
     - cpu/core/fog.ts:seatSeesPlot
     - cpu/core/disasters.ts:nameRiversInLook
+    - cpu/core/deals.ts:establishMission
   readings:
     - "C-119: the rivers' names on the visibility count — READ (0x58aa90 -> 0x534950, 0x508d50, 0x508330), ported both twins"
     - "H-1: the raids — READ"
@@ -45,6 +62,7 @@
     - "H-1: the sight rule — READ (the walk 0x58b1d0, emulated); a city's look — READ"
     - "H-1: the barbarians' turn (0x1514a0) — READ (the max camps and the sight LAB)"
     - "C-96: the city-states' tactical pass — READ (Wander Near City, Heal, the non-barbarian priorities, FindAlternateLocation), the families it needs PARTLY READ"
+    - "C-119: the revealed plots against the records' planes — an embassy reveals the capital, a new suzerain's reveal meets, a sight raised looks again — READ (0x238330 -> 0x3e6820 -> 0x508bd0 -> 0x507c00 -> 0x508d50, 0x508330 -> 0x50d390, 0x56ce90 -> 0x58f3f0), both twins; the replay's steps and added units"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...signal at signals +0x10c8, which the unit sight update 0x58aa90 raises per plot when 0x508d50 (Player_Visibility_Manager, the count change) answers 2: the plot's visibility count fo..."
@@ -140,11 +158,13 @@
     - cpu/core/moments.ts:momentKeysHeld
     - cpu/data/cityStates.ts:KANDY_WONDER_RELICS
     - cpu/data/seats.ts:MOMENT_CIRCUMNAVIGATED
+    - cpu/core/fog.ts:suzerainSight
   readings:
     - "H-1: a drought on a city centre, Monumentality's districts, Kandy's wonder Relic — PARTLY READ"
     - "H-1: a pillaged building's specialist, the centre's defence, three moments — READ"
     - "C-95: Explore Land and the barbarians' revealed plots — READ, ported (two tests below unread)"
     - "C-96: the city-states' tactical pass — READ (Wander Near City, Heal, the non-barbarian priorities, FindAlternateLocation), the families it needs PARTLY READ"
+    - "C-119: the revealed plots against the records' planes — an embassy reveals the capital, a new suzerain's reveal meets, a sight raised looks again — READ (0x238330 -> 0x3e6820 -> 0x508bd0 -> 0x507c00 -> 0x508d50, 0x508330 -> 0x50d390, 0x56ce90 -> 0x58f3f0), both twins; the replay's steps and added units"
   context:
     - "...Kandy's MINOR_CIV_KANDY_GRANT_RELIC_BONUS, Amount 1): the visibility manager's reveal 0x50d390 (Player_Visibility_Manager.cpp, the natural-wonder discovery notification), for i below..."
     - "- WORLD_CIRCUMNAVIGATED: on a plot revealed (0x50d390, the visibility manager), a player without the flag (+0x8a8) whose team has revealed a..."

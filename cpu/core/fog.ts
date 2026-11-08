@@ -221,6 +221,15 @@ export function takeLook(state: GameState, u: Unit): readonly number[] {
   return plots;
 }
 
+/** A UNIT'S SIGHT CHANGED where it stands: the sight's setter (0x56ce90 on
+ *  unit +0x1998) takes its look again (0x58f3f0), the new look revealed to
+ *  its owner and stored (runs/h1_duelr1124 t80: Leif Erikson activated,
+ *  China's Galley 655367 on 1:6 reveals 43:3, three out). */
+export function lookAgain(state: GameState, u: Unit): void {
+  revealAround(state, u.seat, u.tileIndex, unitSight(u, state), { seeThrough: unitSeesThrough(u) });
+  takeLook(state, u);
+}
+
 /** CIV6 (Sentry, the install's SENTRY_SEE_THROUGH_FEATURES row, CanSee): this unit's look
  *  counts no feature's height. */
 export function unitSeesThrough(u: { type: string; promos?: number }): boolean {
@@ -407,9 +416,15 @@ export function cityStateSight(state: GameState, seat: number, units = true): Ui
   return out;
 }
 
-/** A NEW SUZERAIN'S LOOK: the plots city-state `minor` has revealed
- *  (`CityState.revealed`) and those it sees now (`cityStateSight`) revealed
- *  to major `seat`. */
+/** A NEW SUZERAIN'S LOOK (AddOutgoingVisibility 0x508330): the plots
+ *  city-state `minor` has revealed (`CityState.revealed`) and those it sees
+ *  now (`cityStateSight`) revealed to major `seat`; each plot newly revealed
+ *  to it or seen goes to the reveal 0x50d390, which meets the plot's owner
+ *  (0x524890) and the owner of each unit on a plot seen (0x5249c0) — the
+ *  majors in seat order (`meetMajors`), then the city-states in their order
+ *  (`meetCityState`: runs/h1_duelr1127 t61, China made suzerain of Hattusa
+ *  meets Rome, then Muscat, Hattusa's revealed 43:14 / 43:15 Muscat's; its
+ *  centre and the six beside it show). */
 export function suzerainSight(state: GameState, minor: number, seat: number): void {
   if (!state.fogOfWar) return;
   const s = seatOf(state, seat);
@@ -417,7 +432,15 @@ export function suzerainSight(state: GameState, minor: number, seat: number): vo
   if (s.explored.length === 0) s.explored = new Array(state.map.tiles.length).fill(0);
   const seen = cityStateSight(state, minor);
   const known = state.cityStates.find((c) => c.seat === minor)?.revealed;
-  for (let i = 0; i < seen.length; i++) if (seen[i] || known?.[i] === 1) s.explored[i] = 1;
+  const owners = new Set<number>();
+  for (const t of state.map.tiles) {
+    const i = t.index;
+    if (seen[i] || (known?.[i] === 1 && s.explored[i] !== 1)) owners.add(tileSeat(t));
+    if (seen[i] || known?.[i] === 1) s.explored[i] = 1;
+  }
+  for (const u of state.units) if (seen[u.tileIndex]) owners.add(u.seat);
+  for (const o of state.seats) if (owners.has(o.seat)) meetMajors(state, seat, o.seat);
+  for (const cs of state.cityStates) if (cs.seat !== minor && owners.has(cs.seat)) meetCityState(state, cs, seat);
 }
 
 export function fogActive(state: GameState): boolean {

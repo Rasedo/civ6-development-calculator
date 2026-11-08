@@ -37,6 +37,7 @@ import {
 } from './seats';
 import { grantStockpile, spendStockpile, stockOf, stockpileCap } from './stockpile';
 import { spawnUnit } from './units';
+import { tilesWithin } from '../../world/hex';
 import { declareWar, transferCity } from './phase';
 import { grievanceWith, tickPromises } from './grievance';
 
@@ -105,6 +106,22 @@ export function capitalCityOf(state: GameState, seat: number): City | undefined 
   const s = seatOf(state, seat);
   if (!s || s.cities.length === 0) return undefined;
   return s.cities.find((c) => c.centerIndex === s.capitalTile) ?? s.cities[0];
+}
+
+/** A MISSION ESTABLISHED: `sender` holds `kind` (MISSION_DELEGATION or
+ *  MISSION_EMBASSY) with `target`. CIV6 (Resident Embassy): "...the
+ *  recipient's Capital will be revealed" — the embassy's setter
+ *  (SetHasEmbassyAt 0x3e6820, set) reveals the target's capital centre and
+ *  the six beside it to the sender, a write of the revealed plots alone
+ *  (0x508bd0 at radius 1, the visibility count change 0x508d50 by 0). */
+export function establishMission(state: GameState, sender: number, target: number, kind: number): void {
+  setDelegationWith(state, sender, target, kind);
+  const s = seatOf(state, sender);
+  const cap = kind === MISSION_EMBASSY && state.fogOfWar ? capitalCityOf(state, target) : undefined;
+  if (!s || !cap) return;
+  if (s.explored.length === 0) s.explored = new Array<number>(state.map.tiles.length).fill(0);
+  const c = state.map.tiles[cap.centerIndex];
+  for (const t of tilesWithin(state.map, c.col, c.row, 1)) s.explored[t.index] = 1;
 }
 
 /** CIV6 (Diplomacy): a city may change hands only "if they and their
@@ -306,7 +323,7 @@ function moveDealItem(state: GameState, giver: number, receiver: number, it: Dea
       const cost = missionCost(state, giver);
       gs.treasury -= cost;
       rs.treasury += cost;
-      setDelegationWith(state, giver, receiver, missionOf(state, giver));
+      establishMission(state, giver, receiver, missionOf(state, giver));
       state.eventLog.push(`${gs.name} sends a mission to ${rs.name}.`);
       break;
     }

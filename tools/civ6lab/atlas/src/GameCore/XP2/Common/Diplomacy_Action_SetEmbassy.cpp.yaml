@@ -5,7 +5,7 @@
 # set `review: reviewed`.
 - addr: 0x238330
   kind: function
-  semantics: "the Embassy's handler at the receiver: an AI receiver answers by 0x653f60; on acceptance the cost moves from sender to receiver and the embassy is set; then the sender's AI records the answer (0x6543a0)."
+  semantics: "the Embassy's handler at the receiver: an AI receiver answers by 0x653f60; on acceptance the cost moves from sender to receiver and the embassy is set (SetHasEmbassyAt 0x3e6820: the target's capital and the six beside it revealed to the sender), the access level rechecked (RecheckVisibilityOn 0x3e26d0); then the sender's AI records the answer (0x6543a0)."
   status: PARTLY
   cases:
     - recording: h1_duelv1127
@@ -16,6 +16,7 @@
   readings:
     - "C-97: the majors' diplomatic actions — the pick, the state machine and the receiver READ, the evaluator's terms PARTLY READ"
     - "C-97: the proposals and the religion's choices as seat actions — the price READ, the receiver's value READ but the trust term"
+    - "C-119: the revealed plots against the records' planes — an embassy reveals the capital, a new suzerain's reveal meets, a sight raised looks again — READ (0x238330 -> 0x3e6820 -> 0x508bd0 -> 0x507c00 -> 0x508d50, 0x508330 -> 0x50d390, 0x56ce90 -> 0x58f3f0), both twins; the replay's steps and added units"
   notes:
     - ".claude/scratchpad/dp2/readings_dp2.md: ...lowers the balance by the amount. - THE RECEIVER (the Delegation's handler 0x237c60, the Embassy's 0x238330):   an AI receiver answers by 0x653f60: an action outside its state's lists   toward the sender ref..."
   context:

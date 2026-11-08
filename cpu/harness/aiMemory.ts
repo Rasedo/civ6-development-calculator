@@ -11,7 +11,9 @@
  *     progress), each its item and its tree, from AI_CityBuild.csv's
  *     CONTRACT lines folded to that turn;
  *   - ops: the operations alive at the turn's end, by name, from
- *     AI_Operation.csv (running and started, less those complete).
+ *     AI_Operation.csv (running and started, less those complete);
+ *   - revealed: the city-states' and the barbarians' revealed plots against
+ *     the next record's (`readRevealed`), outside the player's cleanness.
  *
  * A recording with the game's own AI memory beside it (`<stem>.aimem.jsonl`,
  * `GameMemory`) is compared against that instead (`readGameMemory`): the
@@ -31,7 +33,7 @@ import { gameTypeOf } from '../data/aliases';
 import { CIVICS } from '../data/civics';
 
 export const MEMORY_KINDS = ['knowledge.army', 'knowledge.camps', 'cityAi.contracts', 'contracts', 'contracts.progress', 'ops',
-  'ops.targets', 'ops.members', 'ops.strength'] as const;
+  'ops.targets', 'ops.members', 'ops.strength', 'revealed'] as const;
 export type MemoryKind = typeof MEMORY_KINDS[number];
 
 const lines = (path: string): string[] => (existsSync(path) ? readFileSync(path, 'utf8').split(/\r?\n/).slice(1) : []);
@@ -397,6 +399,18 @@ export function readGameMemory(game: GameMemory, names: MemoryNames, seat: Seat,
     add('ops.strength', ops.map((o) => `${o.def}|${o.strength}|${o.enemyStrength}`), theirs.map((o) => `${o.name}|${o.opStrength}|${o.targetStrength}`));
   }
   return out;
+}
+
+/** a non-major's revealed plots (`CityState.revealed`, the barbarians'
+ *  `Seat.explored`) against the record's (`TurnRecord.revealed`): each side
+ *  its count and the plots only it holds (x:y, the first eight) */
+export function readRevealed(ours: readonly number[] | undefined, game: readonly number[] | null, W: number): MemoryRead | undefined {
+  if (!game || !ours?.length) return undefined;
+  const only = (x: readonly number[], y: readonly number[]) => x.flatMap((v, i) => (v === 1 && y[i] !== 1 ? [xy(i, W)] : []));
+  const [mine, theirs] = [only(ours, game), only(game, ours)];
+  const count = (x: readonly number[]) => x.reduce((n, v) => n + (v === 1 ? 1 : 0), 0);
+  const show = (n: number, plots: string[]) => `${n}${plots.length ? ` +${plots.length} ${plots.slice(0, 8).join(' ')}` : ''}`;
+  return { kind: 'revealed', equal: mine.length + theirs.length === 0, ours: show(count(ours), mine), game: show(count(game), theirs) };
 }
 
 /** one memory kind's comparison of a player at a turn: ours, the log's */

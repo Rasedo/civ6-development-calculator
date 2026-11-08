@@ -1,110 +1,19 @@
 /**
  * WHAT A `--from` WINDOW TAKES FROM THE RECORDS BEFORE IT, beside the import's
- * history (`advanceHistory`): the barbarians' tribes (`TribeFold`) and the
- * revealed plots of the barbarians and of each city-state (`SightFold`),
- * which no record holds and a run from the first record builds turn by turn.
- * Each fold observes every record before the window and the window's first,
- * in order, then answers the state the window opens on.
+ * history (`advanceHistory`): the barbarians' tribes (`TribeFold`), which no
+ * record holds and a run from the first record builds turn by turn. The fold
+ * observes every record before the window and the window's first, in order,
+ * then answers the state the window opens on.
  */
 import { existsSync, readFileSync } from 'node:fs';
 import type { BarbTribe, GameState } from '../core/types';
-import { BARB_SEAT, isBarbSeat, isCityStateSeat } from '../core/seats';
+import { BARB_SEAT } from '../core/seats';
 import { BARB_MAX_SCOUTS, BARB_NAMES_PER_KIND, BARB_TAG_UNITS, BARB_TRIBES, BARB_BOLD_KILL, BARB_BOLD_SCOUT_LOST,
   BARB_BOLD_TURN, BARB_BOLD_UNIT_LOST, BARB_PILLAGE_SCORE, BARB_SCOUT_WAIT, type BarbTribeKind } from '../data/barbarians';
-import { cityStateSight, losDisk, unitSeesThrough, unitSight } from '../core/fog';
 import { unitDomain } from '../core/units';
 import { engineRowOf, type Imported } from './import';
 import type { Catalog, TurnRecord } from './record';
 import type { Decision } from './replayActions';
-
-/** a record's units by `${owner}:${id}` beside the importer's engine unit
- *  (the importer's order: every unit of a player it seats whose type it maps) */
-function importedUnits(rec: TurnRecord, imp: Imported, cat: Catalog): Map<string, GameState['units'][number]> {
-  const out = new Map<string, GameState['units'][number]>();
-  let k = 0;
-  for (const r of rec.units) {
-    if (!imp.seatOfPlayer.has(r.owner) || !engineRowOf(cat, 'unit', r.type)) continue;
-    out.set(`${r.owner}:${r.id}`, imp.state.units[k++]);
-  }
-  return out;
-}
-
-/** the plots each unit's logged steps entered in the record's actions
- *  (`UnitMoved`), by `${owner}:${id}` */
-function loggedSteps(rec: TurnRecord, W: number): Map<string, number[]> {
-  const out = new Map<string, number[]>();
-  const rows = (rec as { actions?: unknown }).actions;
-  if (!Array.isArray(rows)) return out;
-  for (const x of rows as unknown[][]) {
-    if (x[2] !== 'UnitMoved') continue;
-    const k = `${x[3]}:${x[4]}`;
-    (out.get(k) ?? (out.set(k, []), out.get(k)!)).push((x[6] as number) * W + (x[5] as number));
-  }
-  return out;
-}
-
-/**
- * THE REVEALED PLOTS a run from the first record leaves the barbarians
- * (`Seat.explored`) and each city-state (`CityState.revealed`): over every
- * record, each of the player's units' look (`unitSight`, cut by `losDisk`)
- * from every plot its logged steps entered and from where the record holds
- * it, on that record's map; a city-state's look as its founding's Settler
- * and its ground's (`cityStateSight`) too, as its knowledge base's look
- * writes them each turn.
- */
-export class SightFold {
-  private readonly barb: Uint8Array;
-  /** per city-state player id */
-  private readonly minors = new Map<number, Uint8Array>();
-
-  constructor(private readonly W: number, plots: number) {
-    this.barb = new Uint8Array(plots);
-  }
-
-  observe(rec: TurnRecord, imp: Imported, cat: Catalog): void {
-    const { state } = imp;
-    const steps = loggedSteps(rec, this.W);
-    const plane = (seat: number): Uint8Array | undefined => {
-      if (isBarbSeat(seat)) return this.barb;
-      if (!isCityStateSeat(seat)) return undefined;
-      const pid = imp.playerOfSeat.get(seat)!;
-      let p = this.minors.get(pid);
-      if (!p) this.minors.set(pid, (p = new Uint8Array(this.barb.length)));
-      return p;
-    };
-    for (const [key, u] of importedUnits(rec, imp, cat)) {
-      const p = plane(u.seat);
-      if (!p) continue;
-      const sight = unitSight(u, state);
-      const through = unitSeesThrough(u);
-      for (const at of [...(steps.get(key) ?? []), u.tileIndex]) {
-        for (const n of losDisk(state.map, state.map.tiles[at], sight, through)) p[n] = 1;
-      }
-    }
-    for (const cs of state.cityStates) {
-      if (cs.centerIndex < 0) continue;
-      const p = plane(cs.seat)!;
-      cs.revealed?.forEach((v, i) => { if (v === 1) p[i] = 1; });
-      cityStateSight(state, cs.seat, false).forEach((v, i) => { if (v) p[i] = 1; });
-    }
-  }
-
-  /** the folded planes onto the window's first state: the barbarians'
-   *  explored plots and each city-state's revealed ones, joined with what
-   *  the state already holds */
-  seed(state: GameState, imp: Imported): void {
-    const join = (have: number[] | undefined, p: Uint8Array): number[] => {
-      const out = have?.length === p.length ? have.slice() : new Array<number>(p.length).fill(0);
-      p.forEach((v, i) => { if (v) out[i] = 1; });
-      return out;
-    };
-    if (state.fogOfWar) state.barbSeat.explored = join(state.barbSeat.explored, this.barb);
-    for (const cs of state.cityStates) {
-      const p = this.minors.get(imp.playerOfSeat.get(cs.seat) ?? -1);
-      if (p) cs.revealed = join(cs.revealed, p);
-    }
-  }
-}
 
 /** a camp's rise in Barbarians.csv: its turn, its tribe's kind and name, its
  *  defender's unit, its plot */

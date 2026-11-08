@@ -237,6 +237,15 @@ class SimDeals:
             held = self.seat_delegation[:, giver, taker]
             self.seat_delegation[:, giver, taker] = torch.where(
                 ok, torch.where(emb, torch.full_like(held, 2), torch.ones_like(held)), held)
+            # CIV6 (Resident Embassy): "...the recipient's Capital will be
+            # revealed" — the target's capital centre and the six beside it,
+            # the revealed plots alone (`establishMission`)
+            col, live = self._deal_capital_col(taker)
+            show = ok & emb & live
+            if self.fog_of_war and bool(show.count_nonzero()):
+                at = self.city_center[:, taker].gather(1, col.unsqueeze(1)).squeeze(1)
+                ring = (self.pair_dist[at.clamp(min=0)].long() <= 1) & show.unsqueeze(1)
+                self.seat_explored[:, giver] = self.seat_explored[:, giver] | ring
         elif kind == self._deal_k_friend:
             for _x, _y in ((giver, taker), (taker, giver)):
                 self.seat_friend_turns[:, _x, _y] = torch.where(

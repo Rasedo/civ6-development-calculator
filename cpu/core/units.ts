@@ -466,11 +466,14 @@ export function reseatUnit(state: GameState, unit: Unit, seat: number): void {
  *  unit created under the captor (`reseatUnit`) — of its type's own AI
  *  type and homed nowhere (the unit's init 0x563cd0) — and placed on the
  *  victim's plot (0x586d40), where it takes its own look (0x58f3f0,
- *  `takeLook`) */
+ *  `takeLook`), revealed to the captor as any placed unit's (runs/
+ *  h1_duelr1121 t153: China takes back the Settler 4522000 on 17:17, 19:19
+ *  and 16:20..19:20 revealed, three out) */
 export function captureAnew(state: GameState, unit: Unit, seat: number): void {
   reseatUnit(state, unit, seat);
   delete unit.aiDefender;
   delete unit.aiHomed;
+  revealAround(state, seat, unit.tileIndex, unitSight(unit, state), { seeThrough: unitSeesThrough(unit) });
   takeLook(state, unit);
 }
 

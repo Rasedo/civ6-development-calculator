@@ -11213,3 +11213,63 @@ Trader (cpu/harness/replay.ts); GPU `_minor_cities_look`,
   major's list reads no Free Cities' city (its route value to one through
   `_seat_route_income` unported); the Hong Kong K over Rome's cities (1128
   t69-t111 4.64 for the logged 5.39; Bologna t82-85 5.41 for 6.41).
+
+## C-119: the revealed plots against the records' planes — an embassy reveals the capital, a new suzerain's reveal meets, a sight raised looks again — READ (0x238330 -> 0x3e6820 -> 0x508bd0 -> 0x507c00 -> 0x508d50, 0x508330 -> 0x50d390, 0x56ce90 -> 0x58f3f0), both twins; the replay's steps and added units
+
+`establishMission` (cpu/core/deals.ts), `suzerainSight` and `lookAgain`
+(cpu/core/fog.ts), Leif Erikson's look in `activateGreatPerson`
+(cpu/core/gpAbility.ts); the mission branch of the deal (gpu/core/sim_deals.py),
+`_cs_resolve_suzerain` (gpu/core/sim_seats.py), the naval sight in the
+activation (gpu/core/sim_gp.py). The replay: `syncUnits`, `spawnRecorded`,
+`pairPerson`, `stepsBeforeSight` (cpu/harness/replay.ts); the memory kind
+`revealed` (`readRevealed`, cpu/harness/aiMemory.ts) scores each city-state's
+and the barbarians' plane against record t+1's (`TurnRecord.revealed`), and
+the importer seeds the non-majors' planes from the record (a `--from`
+window's start).
+
+- THE EMBASSY (Diplomacy_Action_SetEmbassy 0x238330, on acceptance):
+  SetHasEmbassyAt 0x3e6820(set) takes the target's capital (0x36f460 on its
+  cities, centre +0x158 / +0x15c) and calls 0x508bd0(visibility, sender,
+  plot, radius 1, 0): for each plot within 1 the functor 0x507c00 calls the
+  visibility count change 0x508d50 by 0 — the plots revealed, no count.
+  Then RecheckVisibilityOn 0x3e26d0 (the access level). Install text
+  (LOC_DIPLOACTION_RESIDENT_EMBASSY_DESCRIPTION): "the recipient's Capital
+  will be revealed". A Delegation reveals nothing. Confirmed:
+  runs/h1_duelr1124 t106 China's Embassy to Rome, Rome 34:19 and the six
+  beside it in China's plane at t107; 1121 t120 (35:14); 1128 t165 (42:20).
+- A NEW SUZERAIN (AddOutgoingVisibility 0x508330): over every plot, one the
+  receiver has not revealed that the source sees or has revealed is
+  revealed to it (0x367370), the source's counts are added to the
+  receiver's, and a plot newly revealed or come into view goes to the
+  reveal 0x50d390, whose meets name the plot's owner (0x524890) and a unit's
+  on a plot seen (0x5249c0). Ported: the minor's revealed and seen plots
+  revealed to the suzerain; the owners of those newly revealed or seen and
+  of the units on a plot seen met, the majors in seat order, then the
+  city-states (the record's DiplomacyMeet order). Confirmed: 1127 t61 China
+  made suzerain of Hattusa meets Rome, then Muscat (Hattusa's revealed
+  43:14 / 43:15 Muscat's), Muscat's centre 42:15 and the six beside it in
+  China's plane at t62.
+- A SIGHT RAISED (the sight's setter 0x56ce90 on +0x1998 retakes the look,
+  0x58f3f0): Leif Erikson's GREATPERSON_LEIF_ERIKSON_SIGHT_BONUS raises each
+  of the owner's naval units' sight, and each looks again from where it
+  stands. Confirmed: 1124 t80 China's Galley 655367 on 1:6 reveals 43:3,
+  three out; its Quadrireme 1572876's steps 41:5 -> 38:7 before the
+  activation reveal nothing three out (41:2 dark).
+- A CAPTURE'S NEW UNIT (0x212500, placed by 0x586d40 -> 0x58f3f0): its look
+  is revealed to the captor as any placed unit's (`captureAnew`;
+  `_capture_anew`). Confirmed: 1121 t153 China takes back the barbarians'
+  Settler 3211277 as 4522000 on 17:17 (UnitAddedToMap, UnitCaptured), 19:19
+  and 16:20..19:20 in China's plane, three out.
+- THE REPLAY: a unit whose logged steps come back to its plot (no move of
+  the pair) sees from each (1124 t87 Bologna's Heavy Chariot 983040 8:11 ->
+  8:12 -> 8:11: 7:13 / 7:14 / 8:14); a unit the record adds looks from its
+  plot as `spawnUnit`'s does (1128 t57 China's Settler 1245190 on 17:13:
+  18:16 / 19:16); a great person made
+  and spent inside the pair is the engine's own of its class, else one
+  added on its plot (1124 t80 Leif Erikson).
+- With them the four case seeds' planes (1121 to t161, 1124 to t118, 1127
+  to t65, 1128 to t178, on the game's memory): every city-state's and the
+  barbarians' plane equal to record t+1's each turn, and every major's.
+- Open: the Free Cities' plane (player 62's, recorded) has no engine plane;
+  0x50d390's meets read from the call sites, the function's own meet calls
+  not walked; a sight raised by a promotion (Spyglass) takes no look again.

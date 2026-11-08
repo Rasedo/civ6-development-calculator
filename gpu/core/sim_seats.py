@@ -5681,9 +5681,29 @@ class SimSeats:
                 if not bool(new[:, s].count_nonzero()):
                     continue
                 rows = new[:, s].nonzero(as_tuple=True)[0]
-                sight = self._minor_sight(s)[rows] | self.mops_revealed[rows, s]
+                seen = self._minor_sight(s)[rows]
+                sight = seen | self.mops_revealed[rows, s]
                 g = now[rows, s]
+                fresh = seen | (sight & ~self.seat_explored[rows, g])
                 self.seat_explored[rows, g] = self.seat_explored[rows, g] | sight
+                # ...whose reveal meets the owners of the plots newly revealed
+                # to it or seen, and of the units on a plot seen: the majors
+                # in seat order, then the city-states in theirs (`suzerainSight`)
+                own = torch.where(fresh, self.tile_seat[rows], torch.full_like(self.tile_seat[rows], -1))
+                uin = self.unit_alive[rows] & (self.unit_tile[rows] >= 0) \
+                    & seen.gather(1, self.unit_tile[rows].clamp(min=0))
+                us = self.unit_seat[rows]
+                for o in range(self.n_majors):
+                    sees = (own == o).any(dim=1) | (uin & (us == o)).any(dim=1)
+                    for a in sorted(set(g[sees].tolist())):
+                        m = torch.zeros(self.B, dtype=torch.bool, device=self.device)
+                        m[rows[sees & (g == a)]] = True
+                        self._meet_majors(m, a, o)
+                cs_seen = torch.stack([(own == 100 + x).any(dim=1) | (uin & (us == 100 + x)).any(dim=1)
+                                       for x in range(self.S)], dim=1)
+                cs_seen[:, s] = False
+                if bool(cs_seen.count_nonzero()):
+                    self._meet_citystates(rows, g, cs_seen)
 
     def _suzerain_masks_all(self, env: torch.Tensor | None = None) -> torch.Tensor:
         """[B, n_majors, S] — `_suzerain_mask` for every major row at once
@@ -14510,6 +14530,12 @@ class SimSeats:
         is placed (0x586d40 -> 0x58f3f0, `_take_look`)"""
         self.unit_defender[rows, dst] = False
         self.unit_homed[rows, dst] = False
+        # its look revealed to the captor as any placed unit's (the games
+        # one at a time: a game may hold two captives)
+        rad, thr = self._look_key(rows, dst)
+        for i in range(rows.numel()):
+            r, d = rows[i:i + 1], dst[i:i + 1]
+            self._reveal_around(r, self.unit_seat[r, d], self.unit_tile[r, d], rad[i:i + 1], see_through=thr[i:i + 1])
         self._take_look(rows, dst)
 
     def _seize_victim(self, slot: torch.Tensor, captor: torch.Tensor) -> torch.Tensor:
