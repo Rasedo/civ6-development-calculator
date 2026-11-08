@@ -30,6 +30,7 @@
   readings:
     - "C-112: the majors' citizens by the citizen manager — READ (0x1fa1d0 at 0x1fa22d, 0x196320's callers), both twins"
     - "C-130 / C-112: the domain strength's treasury carry and the city's turn's citizen re-place — READ, both twins"
+    - "C-112: the majors' citizens on a placement, the Free Cities' city turn — READ (0x180cb0, 0x181700, 0x1fa1d0), both twins"
   context:
     - "...46e0, borders 0x1a9bc0, loyalty 0x19f8d0, then the citizens' (city +0x1b50, 0x1783b0) 0x194f80, a thunk to the full reassign 0x196320: every citizen re-placed every turn after the bo..."
   review: reviewed
@@ -150,6 +151,12 @@
     - gpu/core/sim_phase.py:_seat_city_produce
     - gpu/core/sim_seats.py:_seat_buy_ladder
     - gpu/core/sim_seats.py:_found_city_at
+    - cpu/core/phase.ts:joiners
+    - cpu/core/phase.ts:paveDistrictTile
+    - cpu/core/phase.ts:placeSeatWonder
+    - gpu/core/sim_economy.py:_place_district
+    - gpu/core/sim_minors.py:_queue_wonder_at
+    - gpu/core/sim_phase.py:_free_cities_phase
   readings:
     - "C-112: the majors' citizens by the citizen manager — READ (0x1fa1d0 at 0x1fa22d, 0x196320's callers), both twins"
     - "H-1: the citizen manager's placement and the yield flags — READ"
@@ -159,6 +166,7 @@
     - "C-130 / C-112: the domain strength's treasury carry and the city's turn's citizen re-place — READ, both twins"
     - "C-100 / C-112: a city-state's power and its regional buildings, the citizen reassign's callers"
     - "H-1: the envoy annex counts the most envoys one player holds — READ (0x1abf40 -> 0x44c4b0), both twins"
+    - "C-112: the majors' citizens on a placement, the Free Cities' city turn — READ (0x180cb0, 0x181700, 0x1fa1d0), both twins"
   context:
     - "...1c79b0) adds to m_iNumUnassignedCitizens (+0x68): a negative count runs the full reassign 0x196320 (save the forced counts +0x08, unassign all 0x196440, assign 0x197230, lay the forced cou..."
     - "...nd writes the disfavored byte (+0x50); 0x1970e0 the converse; each runs the full reassign 0x196320 whatever the value was and fires the event (hash 0xe808a01e) — the city command 0x975920..."
@@ -176,9 +184,11 @@
 - addr: 0x196e30
   final: 0x110990
   kind: function
-  semantics: lays the forced counts back after a reassign.
+  semantics: "a plot's citizen count against the count saved before a reassign (edx the plot index below +0x18, r8d the saved count): where the plot's workers (+0x08[i]) plus +0x20[i] differ from it, raises the plot's change event (hash 0x67001fe1, 0x8b8340) and, on an owned plot whose improvement owner is the city's player, a second (0x8b79a0); it lays nothing back."
   status: PARTLY
-  readings: ["H-1: the citizen manager's placement and the yield flags — READ"]
+  readings:
+    - "H-1: the citizen manager's placement and the yield flags — READ"
+    - "C-112: the majors' citizens on a placement, the Free Cities' city turn — READ (0x180cb0, 0x181700, 0x1fa1d0), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ...e forced counts +0x08, unassign all 0x196440, assign 0x197230, lay the forced counts back 0x196e30), else 0x197230 places the unassigned ones beside the citizens already working. Growth (0...

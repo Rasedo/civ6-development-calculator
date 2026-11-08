@@ -1171,6 +1171,9 @@ export function freeCitiesPhase(state: GameState): void {
     const next = (city.loyalty ?? LOYALTY_MAX) + freeCityLoyaltyDelta(state, city);
     city.loyalty = Math.max(0, Math.min(LOYALTY_MAX, next));
     if (city.loyalty <= 0) joiners.push(city);
+    // its city's turn ends re-placing every citizen, as every player's city
+    // does (0x1fa1d0 at 0x1fa22d -> the full reassign 0x196320)
+    replaceAllCitizens(state, city, cityFlags(city));
   });
   // (a replay runs their units' turn on a copy beside the record's)
   if (!minorOrdersHeld()) freeCitiesMilitary(state);
@@ -1301,13 +1304,16 @@ export function paveGround(tile: Tile, keep: readonly FeatureId[] = []): void {
 }
 
 /** The GROUND a district takes when it is placed — the same writes whether the
- * city is going to build it over ten turns or bought it outright. */
+ * city is going to build it over ten turns or bought it outright. The
+ * district set on its plot re-places the city's citizens (City_BuildQueue
+ * 0x181700 -> the full reassign 0x196320 at 0x181bb8). */
 function paveDistrictTile(state: GameState, civCity: City, id: DistrictId, tileIndex: number): void {
   const tile = state.map.tiles[tileIndex];
   tile.district = id;
   tile.districtComplete = false;
   paveGround(tile);
   civCity.districts.push({ type: id, tileIndex });
+  replaceAllCitizens(state, civCity, cityFlags(civCity));
 }
 
 /**
@@ -1399,6 +1405,9 @@ export function placeSeatWonder(state: GameState, actor: Seat, civCity: City, de
   paveGround(tile, def.placement.onFeature);
   civCity.wonders.push({ id: def.id, tileIndex: tile.index });
   commitProduction(state, civCity.seat, civCity, { kind: 'wonder', wonder: def.id, tileIndex: tile.index, progress: 0 });
+  // a wonder set on its plot re-places the city's citizens (0x180cb0 under
+  // its Buildings +0x159 bit 0x10 -> the full reassign 0x196320 at 0x181159)
+  replaceAllCitizens(state, civCity, cityFlags(civCity));
   return true;
 }
 

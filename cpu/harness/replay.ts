@@ -110,6 +110,7 @@ import { AI_UNITS } from '../data/aiBuildTables';
 import { loadCityBuildCentre, loadCityBuildTables, newCityBuildTally, tallyBuildings, type CityBuildTally } from './cityBuildLog';
 import { buildingTable } from '../core/aiCityBuild';
 import { replayEvents } from './eventReplay';
+import { cityFlags, replaceAllCitizens } from '../core/citizens';
 import { loadCombatLog, loadRandLog, randLogPath, type RandLog } from './randLog';
 import { streamHold, type StreamHold } from './streamHold';
 import { holdRng, rngHold } from '../core/rand';
@@ -2514,6 +2515,8 @@ function placeHead(ctx: Ctx, actor: Seat, city: City, q: QueueItem): boolean {
       t.districtComplete = false;
       paveGround(t);
       if (!city.districts.some((d) => d.tileIndex === q.tileIndex)) city.districts.push({ type: q.district, tileIndex: q.tileIndex });
+      // set on its plot, the city's citizens re-placed (0x181700)
+      replaceAllCitizens(state, city, cityFlags(city));
       return false;
     }
     case 'wonder': {
@@ -2524,6 +2527,8 @@ function placeHead(ctx: Ctx, actor: Seat, city: City, q: QueueItem): boolean {
       t.builtWonderComplete = false;
       paveGround(t, BUILT_WONDERS[q.wonder]?.placement.onFeature);
       if (!city.wonders.some((w) => w.id === q.wonder)) city.wonders.push({ id: q.wonder, tileIndex: q.tileIndex });
+      // set on its plot, the city's citizens re-placed (0x180cb0)
+      replaceAllCitizens(state, city, cityFlags(city));
       return ok;
     }
   }

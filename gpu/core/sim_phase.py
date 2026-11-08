@@ -949,6 +949,10 @@ class SimPhase:
             nxt = torch.where(act, (loy + delta).clamp(min=0, max=lmax), loy)
             self.city_loyalty[bidx, row, jc] = nxt.to(self.city_loyalty.dtype)
             joins[:, j] = act & (self.city_loyalty[bidx, row, jc] <= 0)
+            # its city's turn ends re-placing every citizen, as every
+            # player's city does (0x1fa1d0 at 0x1fa22d -> the full reassign
+            # 0x196320)
+            self._place_citizens(row, jc, act, None, full=True, fav_food=self.city_fav_food[:, row, j])
         self._free_tactics(acting)
         # its knowledge base's look and its research AI's turns per unit at
         # its turn's end, in every game

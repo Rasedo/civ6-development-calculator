@@ -2836,6 +2836,9 @@ class SimMinors:
         self._q_push(row, j, has_w, _b1 * code_w,
                      _b1.to(self.city_cost.dtype) * float(wrow["cost"]))
         self._eff_version += 1
+        # a wonder set on its plot re-places the city's citizens (0x180cb0
+        # under its Buildings +0x159 bit 0x10 -> the full reassign 0x196320)
+        self._place_citizens(row, _b1 * j, has_w, None, full=True, fav_food=self.city_fav_food[:, row, j])
 
     # -- THE CITIZEN MANAGER (`citizens.ts`) for the city-states ------------
 

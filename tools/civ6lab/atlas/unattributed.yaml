@@ -253,6 +253,7 @@
       value: "The K the   analysis reads is the turn before's (the knowledge base's TRADE line of   t-1): the plotValueLab's Tunnel rows 163 -> 402 of 414 exact in   runs/h1_duelv1124, 0 -> 102 of 106 in runs/h1_du"
   readings:
     - "C-127: the improvement loop's housing — EFFECT_ADJUST_IMPROVEMENT_HOUSING READ (0x6ad2b0), the growth forecast as the last analysis read it (a LAB fit), the water arm's resource rows, the Mountain Tunnel's analysis rows"
+    - "C-112: the majors' citizens on a placement, the Free Cities' city turn — READ (0x180cb0, 0x181700, 0x1fa1d0), both twins"
   context:
     - "...hbour whose +0x47 (its route) is not -1 counts; one with none that the route manager (0x5d3c0 -> 0x88490, 0x88680: Route_Instance's plot lookup) holds an instance on refuses the who..."
   review: imported
@@ -1104,11 +1105,14 @@
     - cpu/core/phase.ts:seatPhase
     - gpu/core/sim_phase.py:_seat_turn
     - cpu/core/phase.ts:civCityDefectors
+    - cpu/core/phase.ts:joiners
+    - gpu/core/sim_phase.py:_free_cities_phase
   readings:
     - "C-112: the majors' citizens by the citizen manager — READ (0x1fa1d0 at 0x1fa22d, 0x196320's callers), both twins"
     - "H-1: every draw of a player's start (witnesses, RandCalls.csv)"
     - "H-1: the luxury allocation's rebuilds — PARTLY READ"
     - "C-130 / C-112: the domain strength's treasury carry and the city's turn's citizen re-place — READ, both twins"
+    - "C-112: the majors' citizens on a placement, the Free Cities' city turn — READ (0x180cb0, 0x181700, 0x1fa1d0), both twins"
   context:
     - "- each city in the player's order (0x4e4560 -> city turn 0x1fa1d0: production, growth, the border turn 0x1a9bc0, loyalty): a WONDER its production comp..."
     - ...ation), the governors' clocks (0x432980 at 0x4e46df), and only then each city's turn (0x1fa1d0 at 0x4e4813, in the loop over Player_Cities +0x12f0 from 0x4e47bc). 0x36f420 at 0x4e466...

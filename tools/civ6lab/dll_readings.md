@@ -12063,3 +12063,43 @@ and `_cv_charge_cost`. The lab: `cpu/harness/plotValueLab.ts`.
   t82-103: T 1, the log's value our T 0); turnsAt gives 1 there, so a term
   of the value differs, not T. The build rate on the analysis' Production
   (the yields a turn ahead, gc1's).
+
+## C-112: the majors' citizens on a placement, the Free Cities' city turn — READ (0x180cb0, 0x181700, 0x1fa1d0), both twins
+
+`paveDistrictTile` and `placeSeatWonder` (cpu/core/phase.ts), the replay's
+`placeHead` (cpu/harness/replay.ts), `freeCitiesPhase` (cpu/core/phase.ts);
+GPU `_place_district` (gpu/core/sim_economy.py), `_queue_wonder_at`
+(gpu/core/sim_minors.py), `_free_cities_phase` (gpu/core/sim_phase.py), each
+through `replaceAllCitizens` / `_place_citizens(full=True)` under the city's
+flags (`cityFlags` / `city_fav_food`).
+
+- A WONDER SET ON ITS PLOT (0x180cb0): a building whose Buildings +0x159
+  carries bit value 0x10 (a wonder: 0x5cadc0 passes a non-wonder's
+  dependents on the same bit, SetBuildingLocation 0x192de0 sets a plot under
+  it) is set on its plot (0x5d3c0, the plot's vcall +0x50; one already
+  holding production progress, 0x17d050 at 0x180d33, goes straight on) and
+  the path ends in the full reassign 0x196320 at 0x181159. Any other
+  building takes 0x181165, which calls no reassign.
+- A DISTRICT SET ON ITS ZONING PLOT (0x181700, from 0x176210 over
+  m_aiZoningPlot): the full reassign at 0x181bb8. The engines take both at
+  the placement, the queue's and a purchase's alike (a bought district is
+  set on its plot, then completed).
+- THE FREE CITIES: the city's turn 0x1fa1d0 is every player's city's, so a
+  Free City's turn ends in the same reassign (0x194f80 at 0x1fa22d) after
+  its production and loyalty; the engines re-place it there under the
+  city's own flags (none set).
+- 0x196e30, the reassign's last loop, lays nothing back: per plot it
+  compares the plot's workers with the count saved before the unassign and
+  raises the plot's change event where they differ.
+- THE RECORDS: on each record's own state (the import carrying the
+  replayed events' fertility) the full re-place reproduces the second
+  major's citizens on all but 102 of 6,802 major city-records (1117 20, 1121
+  19, 1124 27, 1127 20, 1128 16), every miss player 1's. The dump stands at
+  player 0's turn start, after its city turns: player 1's citizens are its
+  own city turn's, a turn before, and 83 of the misses carry a missed plot
+  whose yields the log changes after it (PlotYieldChanged / ImprovementChanged
+  / DistrictPillaged past its PlayerTurnActivated: a Builder's harvest, a
+  barbarian pillage, a repair); 11 differ in specialists alone, 8 in neither.
+- Open: no record tells the placements' reassign apart (the city turn's
+  follows every placement a dump sees); no recording seats a Free City's
+  city; the Free Cities' growth and border steps.

@@ -136,6 +136,17 @@
   context:
     - "- A wonder (0x18e160, and the city walk 0x18ffe0 over the city's wonders): TOURISM_BASE_FROM_WONDER (2, GP +0x6c4); when TOURISM_ADVANCE..."
   review: reviewed
+- addr: 0x192de0
+  final: 0x10e5e0
+  kind: function
+  name: SetBuildingLocation
+  status: PARTLY
+  readings:
+    - "C-112: the majors' citizens on a placement, the Free Cities' city turn — READ (0x180cb0, 0x181700, 0x1fa1d0), both twins"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...wonder: 0x5cadc0 passes a non-wonder's dependents on the same bit, SetBuildingLocation 0x192de0 sets a plot under it) is set on its plot (0x5d3c0, the plot's vcall +0x50; one already..."
+  review: imported
 - addr: 0x193190
   final: 0x10e8b0
   kind: function

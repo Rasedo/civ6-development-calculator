@@ -424,9 +424,11 @@
   offset: 0x159
   name: flags
   type: byte
-  semantics: bit 4 MustPurchase (no row sets it).
+  semantics: "bit value 4 MustPurchase (no row sets it); bit value 0x10 a wonder: 0x5cadc0 passes a non-wonder's dependents on it, 0x192de0 (SetBuildingLocation) and 0x180cb0 set a building on a plot under it."
   status: PARTLY
-  readings: ["C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"]
+  readings:
+    - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
+    - "C-112: the majors' citizens on a placement, the Free Cities' city turn — READ (0x180cb0, 0x181700, 0x1fa1d0), both twins"
   review: reviewed
 - kind: field
   owner: Buildings

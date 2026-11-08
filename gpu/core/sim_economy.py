@@ -5216,6 +5216,10 @@ class SimEconomy:
             else:
                 self.city_dist_tile[rows, row, j, di] = bt
             self._eff_version += 1
+            # the district set on its plot re-places the city's citizens
+            # (City_BuildQueue 0x181700 -> the full reassign 0x196320)
+            jc = torch.full((self.B,), j, dtype=torch.long, device=self.device)
+            self._place_citizens(row, jc, place, None, full=True, fav_food=self.city_fav_food[:, row, j])
         return place
 
     # ------------------------------------------------------------ GREAT WORKS
