@@ -122,6 +122,7 @@
     - "H-1: the research AI — READ (the choice), PARTLY READ (the value)"
     - "C-96: the improvement value — READ (0x7a58f0, 0x7b1320's yields, the feature removal 0x7a3010, the harvest 0x7a37d0, the build unit 0x7a2e20), PARTLY READ (the hazards' turns, 0x7b1320's tourism, defence, claimed plots, modifiers and neighbours terms), unwired"
     - "C-96: the improvement value — READ (0x7a58f0, 0x7b1320's yields, tourism and modifiers, the feature removal 0x7a3010, the harvest 0x7a37d0, the build unit 0x7a2e20, EFFECT_ADJUST_CITY_FREE_POWER), PARTLY READ (the hazards' turns, 0x7b1320's defence, claimed plots and neighbours terms)"
+    - "C-127: a boost completion's turns left; a minor Builder's clearing lump"
   context:
     - "...+0x58) written only by its turn (0x7609d7) and its completion's choice (0x7630ec), each 0x4ca120: the turns left on the research in hand; the analysis reads the value before its own..."
     - -1 where the queue is empty (+0x188 0) or its head is -1, else 0x4c9f90 -> 0x4ca000 at the player's Science
@@ -333,6 +334,15 @@
   context:
     - "...ets the receiver's progress on the item to its cost less one ((cost << 8) - 0x100 through 0x4cc950 / 0x3a1fb0), the item in hand or another. Records: runs/h1_duelw1121 Rome's Code of Laws..."
   review: reviewed
+- addr: 0x4cd020
+  final: 0x336230
+  kind: function
+  name: SetResearch
+  status: PARTLY
+  readings: ["C-127: a boost completion's turns left; a minor Builder's clearing lump"]
+  context:
+    - ...research AI's in-hand turns (0x731d10 on +0x4d0 at 0x762d96); the choice's SetResearch (0x4cd020 at 0x7630dc) is followed by GetTurnsLeft (0x4ca120 at 0x7630e4) at the player's Scien...
+  review: imported
 - addr: 0x4cd900
   final: 0x336940
   kind: function

@@ -4395,6 +4395,7 @@
     - "H-1: the military AI's favoured technology — READ (the pick, its use), PARTLY READ (the Free Cities' counts)"
     - "C-130: the Economic AI's Gold boost on the treasury's banked net income — READ (0x4e08f0, PlayerTreasury +0x1b8), both twins"
     - "C-130 / C-112: the domain strength's treasury carry and the city's turn's citizen re-place — READ, both twins"
+    - "C-127: a boost completion's turns left; a minor Builder's clearing lump"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ...ct Manager's check 0x7f2220 sets FAILED past the turn limit through the holder +0xa8 (0x731d10), removes it from the tree (0x7d22f0) and releases it (0x600b00); a city's list +0x3a8...

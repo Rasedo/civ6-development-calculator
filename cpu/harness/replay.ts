@@ -234,8 +234,12 @@ interface Ctx {
    *  (`minorClearsAfter`) */
   minorClears: Extract<Decision, { kind: 'clear' }>[];
   /** the plots a city-state's Builder cleared in the copy's units' turn,
-   *  unpaid, its charge spent there (`holdMinorClears`) */
+   *  its charge spent there (`holdMinorClears`) */
   minorCleared: Set<number>;
+  /** per city-state of the copy whose Builder cleared a plot, its item as
+   *  the first clearing found it: an item the copy's lump completed is the
+   *  item the record's lump lands on (`minorClearsAfter`) */
+  minorClearItems: Map<CityState, Pick<CityState, 'prodItem' | 'prodSite'>>;
   /** the record's new units of those city-states the engine has not made,
    *  matched once the clearings' lumps have landed (`minorClearsAfter`) */
   minorClearUnits: { d: Extract<Decision, { kind: 'unitNew' }>; ds: readonly Decision[] }[];
@@ -1599,6 +1603,14 @@ function minorAi(ctx: Ctx, b: TurnRecord, turn: number, made: ReadonlySet<Unit>,
   minorLaysAfter(ctx, lays);
   // the spent Builders gone again before the end look
   copy.units = copy.units.filter((c) => !spentBuilders.has(c));
+  // an item a clearing's lump completed in the copy stays the state's item,
+  // the record's lump completing it there (`minorClearsAfter`)
+  for (const [c, was] of ctx.minorClearItems) {
+    if (c.prodItem || !was.prodItem) continue;
+    c.prodItem = was.prodItem;
+    if (was.prodSite !== undefined) c.prodSite = was.prodSite;
+  }
+  ctx.minorClearItems = new Map();
   minorOpsAfter(ctx, b, turn, copy, twin, keyOf, upgraded);
   minorClearsAfter(ctx, b);
   // the boosts the city-states' units' turn earned land at its end, after
@@ -5229,7 +5241,7 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
   const ctx: Ctx = {
     state, cat, W: recs[0].head.W, seatOfPlayer: first.seatOfPlayer, playerOfSeat: first.playerOfSeat,
     units: new Map(), retained: new Map(), pendingMinors: new Map(), next: first, tally: new Map(), fellBack: new Map(), imposed: new Map(), reasons: new Map(),
-    engineKilled: new Set(), routeSpent: new Map(), paths: new Map(), walked: new Set(), steps: new Map(), barbBlows: new Map(), gone: new Map(), barbSeized: [], minorBlows: new Map(), minorShots: [], minorPromoted: new Map(), minorBuys: [], minorImproves: [], minorClears: [], minorCleared: new Set(), minorClearUnits: [], barbBattles: [], barbFought: new Set(), barbDraws: [], promoteHp: new Map(), minorUnits: [], minorGround: [], buyTrace, lateBlows: [], upgradeInto: new Set(), upgradedFrom: new Map(), levyFrom: new Map(), barbSteps: [], barbPillaged: [], envoys: [], battled: new Set(), fortified: new Map(), undug: new Map(), streams: new Map(), applied: new Set(), barbNew: [], lateEnvoys: [], log: history.randLog, stream, prev: recs[0],
+    engineKilled: new Set(), routeSpent: new Map(), paths: new Map(), walked: new Set(), steps: new Map(), barbBlows: new Map(), gone: new Map(), barbSeized: [], minorBlows: new Map(), minorShots: [], minorPromoted: new Map(), minorBuys: [], minorImproves: [], minorClears: [], minorCleared: new Set(), minorClearItems: new Map(), minorClearUnits: [], barbBattles: [], barbFought: new Set(), barbDraws: [], promoteHp: new Map(), minorUnits: [], minorGround: [], buyTrace, lateBlows: [], upgradeInto: new Set(), upgradedFrom: new Map(), levyFrom: new Map(), barbSteps: [], barbPillaged: [], envoys: [], battled: new Set(), fortified: new Map(), undug: new Map(), streams: new Map(), applied: new Set(), barbNew: [], lateEnvoys: [], log: history.randLog, stream, prev: recs[0],
     researchAi: report.researchAi, researchScores: report.researchScores, agendaCivics: null, researchBefore: new Map(), researchAtTurn: new Map(), aiResearchLog: loadAiResearchLog(dumpPath),
     tactical: loadTactical(dumpPath), barbTally: report.barbTactics, minorTally: report.minorTactics, minorDraws: report.minorDraws,
     civicAi: report.civicAi, civicScores: report.civicScores, civicBefore: new Map(), aiCivicLog: govtLog.civics, aiPolicyLog: govtLog.policies,
@@ -5271,17 +5283,19 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
   });
   // a feature or resource a city-state's Builder would clear that record
   // t+1 still holds stands: the game's Builder kept it (`minorAi:clear`);
-  // one it cleared goes unpaid in the copy's turn, the record's clearing's
-  // lump landing after it (`minorClearsAfter`)
-  holdMinorClears((plot, clears) => {
+  // one it cleared pays its lump in the copy's turn, for the trees that
+  // tick after it, the record's clearing's lump landing on the state after
+  // it (`minorClearsAfter`)
+  holdMinorClears((cs, plot, clears) => {
     const r = ctx.next.state.map.tiles[plot];
     if (!(clears === 'feature' ? r.feature : r.resource)) {
       ctx.minorCleared.add(plot);
-      return 'unpaid';
+      if (!ctx.minorClearItems.has(cs)) ctx.minorClearItems.set(cs, { prodItem: cs.prodItem, prodSite: cs.prodSite });
+      return false;
     }
     count(ctx, 'minorAi:clear', 'fallback', ctx.playerOfSeat.get(ctx.state.map.tiles[plot].ownerSeat),
       `plot ${plot}: the engine cleared its ${clears}, the game kept it`);
-    return 'kept';
+    return true;
   });
   // the record's units in the importer's order
   let k = 0;

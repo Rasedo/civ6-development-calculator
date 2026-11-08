@@ -2321,16 +2321,15 @@ export function cleanFallout(state: GameState, unit: Unit): RuleResult {
  * Remove a feature (chop) with the builder standing on the tile (1 charge).
  * Chops inside your borders grant an era-scaled yield lump (the Civ 6
  * "chop economy") — this is the only path that pays; the free calculator
- * mode's Remove action does not. `pay` false: the lump is the caller's to
- * land (the action replay's record clearing).
+ * mode's Remove action does not.
  */
-export function builderRemoveFeature(state: GameState, unitId: number, seat: number, pay = true): RuleResult {
+export function builderRemoveFeature(state: GameState, unitId: number, seat: number): RuleResult {
   const { unit, err } = builderOn(state, unitId);
   if (err) return err;
   const tile = state.map.tiles[unit!.tileIndex];
   const check = canRemoveFeature(state, tile, seat);
   if (!check.ok) return check;
-  const grants = state.sandbox || !pay ? [] : chopGrant(state, tile, seat);
+  const grants = state.sandbox ? [] : chopGrant(state, tile, seat);
   const feature = tile.feature;
   const featureName = feature ? FEATURES[feature]?.name ?? feature : '';
   // a Lumber Mill stands only on a feature it lists, and goes with it
@@ -2347,9 +2346,8 @@ export function builderRemoveFeature(state: GameState, unitId: number, seat: num
   return ok;
 }
 
-/** Harvest the resource the builder stands on (1 charge), its lump paid
- *  (`pay` false: the caller's to land, as `builderRemoveFeature`) */
-export function builderHarvest(state: GameState, unitId: number, pay = true): RuleResult {
+/** Harvest the resource the builder stands on (1 charge), its lump paid */
+export function builderHarvest(state: GameState, unitId: number): RuleResult {
   const { unit, err } = builderOn(state, unitId);
   if (err) return err;
   const tile = state.map.tiles[unit!.tileIndex];
@@ -2367,10 +2365,8 @@ export function builderHarvest(state: GameState, unitId: number, pay = true): Ru
   }
   const resName = RESOURCES[tile.resource]?.name ?? tile.resource;
   tile.resource = null;
-  if (pay) {
-    applyLumpYield(state, tile.index, grant, unit!.seat);
-    state.eventLog.push(`Harvested ${resName}: +${grant.amount} ${grant.key}.`);
-  }
+  applyLumpYield(state, tile.index, grant, unit!.seat);
+  state.eventLog.push(`Harvested ${resName}: +${grant.amount} ${grant.key}.`);
   spendCharge(state, unit!);
   return ok;
 }

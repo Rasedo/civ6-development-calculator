@@ -627,8 +627,8 @@ function takeChoice(r: ResearchState, c: ResearchChoice | null): void {
  *  choice over the analysis its last turn left, the completed row the key,
  *  whatever is in hand (0x762d60 reads no research in hand: runs/h1_duely1128
  *  city-state 2's Banking boosted complete at t117, Education 231.3 taken
- *  over the Gunpowder in hand); a civic in hand makes the civics AI's
- *  (0x6293e0) */
+ *  over the Gunpowder in hand), which writes the turns left on its pick; a
+ *  civic in hand makes the civics AI's (0x6293e0) */
 export function minorCompleteNow(state: GameState, seat: number, id: string): void {
   const r = seatOf(state, seat)?.research;
   if (!r) return;
@@ -654,8 +654,16 @@ export function minorCompleteNow(state: GameState, seat: number, id: string): vo
     r.tech = null;
     r.techProgress = 0;
   }
-  if (r.aiEntries) takeChoice(r, researchCompletionChoice(state, seat, r.aiEntries.map((e) => ({ ...e })), id, researchDraw(state),
+  if (!r.aiEntries) return;
+  takeChoice(r, researchCompletionChoice(state, seat, r.aiEntries.map((e) => ({ ...e })), id, researchDraw(state),
     cs ? minorTechContracts(cs) : []));
+  // the choice writes the turns left on its pick at the player's Science
+  // (0x763020 at 0x7630e4), which the next city build analysis reads
+  // (runs/h1_duely1124 Cardiff t60: Engineering boosted complete, Horseback
+  // Riding's 1 turn beside Apprenticeship's 41 values the Industrial Zone)
+  const cities = cs ? [minorCity(cs)] : (seatOf(state, seat) as { cities?: City[] }).cities ?? [];
+  const science = cities.reduce((n, c) => n + computeCityStats(state, c).total.science, 0);
+  r.aiLeft = researchInHandLeft(state, seat, r, fxOf(science));
 }
 
 /** the civics AI's choice taken */

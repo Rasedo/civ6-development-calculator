@@ -8685,3 +8685,36 @@ religious entry (gpu/core/sim_tactics.py); `_condemn_ok` /
 - Open (C-95): 1127 t43 the barbarian Archer's planning beside player 1's
   12:6 still lists 12:6 as an attack (2/0) and 11:9 before 14:7, the
   game's neither; the stand-to-attack's site in the validity.
+
+## C-127: a boost completion's turns left; a minor Builder's clearing lump
+
+- THE TURNS LEFT A COMPLETION'S CHOICE WRITES (0x762d60 -> researchChoice
+  0x763020): the completion zeroes the research AI's in-hand turns
+  (0x731d10 on +0x4d0 at 0x762d96); the choice's SetResearch (0x4cd020 at
+  0x7630dc) is followed by GetTurnsLeft (0x4ca120 at 0x7630e4) at the
+  player's Science, stored into +0x4d0 (0x7630fc). A boost that completes a
+  row outside the research step runs the same completion, so it writes the
+  turns left on its pick as the bank's completion does. Ported:
+  `minorCompleteNow` (`ResearchState.aiLeft` = `researchInHandLeft` at the
+  city's Science after the choice), GPU `_minor_complete_now`
+  (`citystate_ai_left` per fired row). The next turn's research turn moves
+  it to `aiLeftSeen`, which the city build analysis adds to a row's turns.
+- Confirmed (one-seed carried trace): runs/h1_duely1124 Cardiff t60:
+  Engineering boosted complete at t59's end, Horseback Riding picked at 1
+  turn; the Industrial Zone's T = 3 + Apprenticeship's 41 + 1 = 45, under
+  the horizon 50 (48 + 3 with Engineering's stale 7), "Build City District"
+  at 10:12 with its Apprenticeship contract started at t60 and failed at
+  t69 as the aimem records hold.
+- A CITY-STATE BUILDER'S CLEARING in the action replay's copy of the minors'
+  turn lands its lump on the copy's city at once, ahead of the trees that
+  tick after it; the copy's item that lump completed stays the state's item,
+  the record's lump completing it after the copy's turn
+  (`holdMinorClears`, `minorClearItems`). Confirmed: runs/h1_duely1127
+  Hattusa t91, the Forest on 3:15 chopped (33 Production, City_BuildQueue's
+  second t91 row) completes the Water Mill inside the tick, Build City
+  Building's tree ends at t91 (contract 277 out of the open set, the tree
+  gone in the t91 end look) and t92's building event starts the Castle's
+  with its Castles goal contract, as recorded; the Harbor project's progress
+  8.6 at t93 as logged.
+- Open: the game's contract 277 reads CANCELLED at t91, ours COMPLETED
+  (neither open; the tree ends either way).

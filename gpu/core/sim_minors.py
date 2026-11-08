@@ -157,7 +157,8 @@ class SimMinors:
         city-state `s`'s research step — held, the progress kept on them
         spent, Urban Defenses' walls fitted; each technology makes the
         completion's choice over the analysis its last turn left (none where
-        it has none), the completed row the key, whatever is in hand; a civic
+        it has none), the completed row the key, whatever is in hand, and
+        writes the turns left on its pick (`citystate_ai_left`); a civic
         in hand makes the civics AI's"""
         held = self.citystate_civics if is_civic else self.citystate_techs
         retain = self.citystate_civic_retain if is_civic else self.citystate_tech_retain
@@ -186,6 +187,9 @@ class SimMinors:
         valid = self.citystate_ai_valid[:, s]
         if not bool((full.any(dim=1) & valid).count_nonzero()):
             return
+        # each choice writes the turns left on its pick at the city's Science
+        # (0x763020 at 0x7630e4), which the next city build analysis reads
+        sci = self._seat_city_stats(self._CITY_MINOR0 + s, record=False)[0][:, 0][:, 3] * self.citystate_alive[:, s].double()
         for _i, idx in self._boost_tables()["to_tech"]:
             if idx >= full.shape[1]:
                 continue
@@ -198,6 +202,7 @@ class SimMinors:
             score = score + self._rai_contracts(s, score, self.citystate_ai_owned[:, s], live=True)
             pick, goal = self._rai_choice(s, fire, (turns, self.citystate_ai_next[:, s], base, score, self.citystate_ai_owned[:, s]), done)
             self._rai_take(s, pick, goal)
+            self.citystate_ai_left[:, s] = torch.where(fire, self._rai_left(s, sci), self.citystate_ai_left[:, s])
 
     def _minor_sight(self, s: int) -> torch.Tensor:
         """[B, T] bool — `cityStateSight`: the plots minor `s` sees now — its

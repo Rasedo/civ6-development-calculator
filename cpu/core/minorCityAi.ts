@@ -528,9 +528,9 @@ function minorTreeCity(state: GameState, cs: CityState, facts: CityBuildFacts, t
 }
 
 /** THE CLEARINGS HELD: the action replay names, of a minor's Builder's
- *  clearing, a plot that keeps its feature or resource ('kept') and one
- *  whose lump the replay lands itself ('unpaid'). Null outside a replay. */
-let clearHeld: ((plot: number, clears: 'feature' | 'resource') => 'kept' | 'unpaid') | null = null;
+ *  clearing, a plot that keeps its feature or resource (true), and sees the
+ *  city's item each clearing made lands on. Null outside a replay. */
+let clearHeld: ((cs: CityState, plot: number, clears: 'feature' | 'resource') => boolean) | null = null;
 export function holdMinorClears(held: typeof clearHeld): void {
   clearHeld = held;
 }
@@ -655,14 +655,17 @@ function minorTreeWorld(state: GameState, cs: CityState, ai: CityAi, city: CityT
         : tile.feature && canRemoveFeature(state, tile, cs.seat).ok ? 'feature' : null;
       if (!clears) return;
       // a clearing kept stands, the Builder's turn spent and its charge
-      // kept; an unpaid one lands no lump
-      const held = clearHeld?.(plot, clears) ?? null;
-      if (held === 'kept') {
+      // kept; one made lands its lump on the city's item at once, ahead of
+      // the trees that tick after it (runs/h1_duely1127 Hattusa t91: the
+      // Forest on 3:15 chopped in Build City Improvement's tick completes
+      // the Water Mill, Build City Building's tick then ends its tree and
+      // t92's building event starts the Castle's)
+      if (clearHeld?.(cs, plot, clears)) {
         unit.movesLeft = 0;
         return;
       }
       const last = (unit.charges ?? 0) <= 1;
-      const res = clears === 'feature' ? builderRemoveFeature(state, unit.id, cs.seat, held !== 'unpaid') : builderHarvest(state, unit.id, held !== 'unpaid');
+      const res = clears === 'feature' ? builderRemoveFeature(state, unit.id, cs.seat) : builderHarvest(state, unit.id);
       if (res.ok && last) spent.add(u);
     },
     unitAlive: (u) => !!unitOf(u) && !spent.has(u),

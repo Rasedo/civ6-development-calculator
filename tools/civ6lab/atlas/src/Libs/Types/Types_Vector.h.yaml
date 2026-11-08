@@ -708,16 +708,24 @@
     - recording: 1124
       turn: 1
       value: "else one draw \"BT Research Choice\" over   the researchable rows in table order (range 5 at 1124 t1: the five roots)."
+    - recording: h1_duely1124
+      turn: 60
+      value: "Cardiff: Engineering boosted complete, the choice's SetResearch (0x4cd020) then GetTurnsLeft (0x4ca120 at 0x7630e4) into +0x4d0: Horseback Riding's 1 turn, Apprenticeship 41 + 1 + the Industrial Zone's 3 under the horizon, Build City District started that turn"
   impl:
     - cpu/core/aiResearch.ts:researchDraw
     - cpu/core/aiResearch.ts:researchChoice
     - cpu/harness/drawSites.ts:DRAW_SITES
     - gpu/core/sim_research.py:_rai_choice
+    - cpu/core/minorBuild.ts:minorCompleteNow
+    - gpu/core/sim_minors.py:_minor_complete_now
+    - cpu/core/minorBuild.ts:cities
   readings:
     - "H-1: every draw of a player's start (witnesses, RandCalls.csv)"
     - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
     - "H-1: the research AI — READ (the choice), PARTLY READ (the value)"
     - "H-1: a city-state's boost completion and the research AI — READ"
+    - "C-127: a boost completion's turns left; a minor Builder's clearing lump"
+    - "C-127: a boost completion's turns left; a minor Builder's clearing lump"
   context:
     - "...es: a city-state whose research or civic completed picks the next (\"BT Research Choice\" 0x763020: the AI plan's tech, no draw, else ONE uniform draw over every researchable tech; \"Rand..."
     - "...t (+0x4d0, data +0x58) written only by its turn (0x7609d7) and its completion's choice (0x7630ec), each 0x4ca120: the turns left on the research in hand; the analysis reads the value b..."

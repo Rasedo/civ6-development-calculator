@@ -220,6 +220,7 @@
   readings:
     - "H-1: the research AI — READ (the choice), PARTLY READ (the value)"
     - "H-1: a city-state's boost completion and the research AI — READ"
+    - "C-127: a boost completion's turns left; a minor Builder's clearing lump"
   context:
     - "- A COMPLETION, 0x762d60 (the completed row): the propagation once more on the entries as they stand, then the c..."
   review: reviewed
