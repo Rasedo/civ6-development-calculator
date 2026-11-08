@@ -1086,7 +1086,10 @@ function withShortOrders(fn: () => void): void {
  *  destination, the step's next node a later turn's or a plot held. A unit
  *  whose last step of the turn ended in a zone of control waits (0x962793:
  *  the formation's +0x518), striking all the same where its path's next
- *  plot is the one it attacks into */
+ *  plot is the one it attacks into. The strike is the path's first node
+ *  reached this turn (0x962380: +4 at most 1): its step priced as any
+ *  step of the walk, one dearer than the Movement left once the unit moved
+ *  waits, the order kept */
 function orderOnce(state: GameState, unit: Unit, dest: number, strike: boolean,
   laterTurns: boolean, explore: boolean, danger: PathDanger | undefined, mates: readonly Unit[], scout: boolean): boolean {
   if (!state.units.includes(unit) || unit.movesLeft <= 0 || unit.tileIndex === dest) return false;
@@ -1112,7 +1115,17 @@ function orderOnce(state: GameState, unit: Unit, dest: number, strike: boolean,
   if (refused || !state.units.includes(unit)) return false;
   if (into) {
     if (plotDistance(state, unit.tileIndex, last) !== 1) return true;
-    if (strike && unit.movesLeft > 0 && attacksLeftOf(unit) > 0) meleeAttack(state, unit.id, last, unit.seat);
+    if (!strike) return false;
+    // the order's next run searches afresh from beside the plot (start carry
+    // 0): a step onto it dearer than the Movement left, the unit moved, is a
+    // later turn's (runs/h1_duelz1117 t10: the rampaging Warrior 589832 on
+    // 13:11 with 1 Movement holds for city-state 2's Warrior in the Woods of
+    // 14:10; 1121 t151 the Man-At-Arms 3080206 on 16:13 strikes the
+    // Cuirassier on the grassland 15:13)
+    const { tiles } = state.map;
+    const cost = stepCost(state, unit, tiles[unit.tileIndex], tiles[last], formationEmbarks(state, unit, mates));
+    if (unit.movesLeft < cost && unit.movesLeft < (unit.movesFull ?? unitFullMoves(state, unit))) return true;
+    if (unit.movesLeft > 0 && attacksLeftOf(unit) > 0) meleeAttack(state, unit.id, last, unit.seat);
     return false;
   }
   return unit.tileIndex !== dest;
@@ -3699,12 +3712,18 @@ function goalDistance(state: GameState, u: Unit | null, goal: number): number {
 
 /** a plot of the unit's planning (0x791300) within `turns`: with `range` 0
  *  the goal itself, else a plot exactly `range` from it with none of its own
- *  stacking there but its own plot (0x78fa10); `moves` asks Movement left */
+ *  there that stacks with it or a member of its formation, but its own plot
+ *  (0x78fa10: 0x585eb0 over its formation +0x1fb8; runs/h1_duelz1121 t160:
+ *  Builder Capture's Settler 4325384 on 6:18, its Musketman's goal the camp
+ *  3:19 its Skirmisher holds, plans no 4:18 under the Bombard 3997700 nor
+ *  4:19 under the Line Infantry 4456462 and goes for 2:19, as logged);
+ *  `moves` asks Movement left */
 function reachAt(state: GameState, pass: Pass, u: Unit, goal: number, turns: number, moves: boolean, range: number): number {
+  const mates = formationMates(state, u);
   for (const e of pass.reach.get(u.id) ?? []) {
     if (e.turns > turns || (moves && e.moves <= 0)) continue;
     if (range === 0 ? e.tile !== goal : plotDistance(state, e.tile, goal) !== range) continue;
-    if (range > 0 && stackedAt(state, u, e.tile) && e.tile !== u.tileIndex) continue;
+    if (range > 0 && e.tile !== u.tileIndex && stackedWith(state, u, mates, e.tile)) continue;
     return e.tile;
   }
   return -1;
@@ -3890,7 +3909,11 @@ export function passMoveExec(state: GameState, pass: Pass, members: readonly num
     const pRegion = p >= 0 ? state.map.tiles[p].region ?? -1 : -1;
     if (p >= 0 && (pRegion < 0 || region < 0 || pRegion === region)) dest = p;
     else if (r > 0) {
-      const ground = groundOf(state, u, false, false, true, mine);
+      // the unit's own location test, not its formation's: water where it
+      // may embark (runs/h1_duelz1121 t160: Builder Capture's Settler
+      // 4325384 and Builder 4522014, their first owner's embarking theirs,
+      // go for the coast 2:19 beside the camp 3:19, their escorts for 3:19)
+      const ground = groundOf(state, u, false, false, true, []);
       let best = -1;
       let bestD = -1;
       let bestIn = false;

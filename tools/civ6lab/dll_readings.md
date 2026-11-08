@@ -10762,3 +10762,56 @@ unit (`UNIT_MEMORY`). GPU `_unit_look` / `_unit_look_now` / `_take_look`
   site and player 0's t214 records hold none of its Bombard 1703944, age 8
   where seen), the path that empties them unread (not 0x5ecc10's signal);
   a capture's new unit (the engines' captive keeps its look).
+
+## C-95: a strike's step from beside its plot, a formation's planning plot at a radius, the ring walk's own location test — READ (0x962380 at 0x96267e..0x9626d2, 0x26ef40 at 0x26f0a4, 0x78fa10 at 0x78fab4..0x78facf, 0x815d50 -> 0x586360), both twins
+
+`orderOnce`'s strike, `reachAt`, `passMoveExec`'s ring walk
+(cpu/core/tactical.ts); `_tac_move_to`'s strike, `_op_reach_at`,
+`_op_move_exec`'s ring walk (gpu/core/sim_tactics.py).
+
+- THE STRIKE'S STEP (0x962380): a move order with the attack flag 0x10
+  strikes only where its path's first node (0x266690) is the attack plot
+  reached this turn (+4 at most 1, 0x96268f). The queue 0x52f50 runs the
+  order again after each step while the formation holds Movement, and each
+  run searches afresh from the plot it stands on, so the step onto the
+  attack plot is priced as any step (0x26e920): dearer than the Movement
+  left it is a later turn's, unless the unit has not moved this turn (the
+  search's 0x100, set by 0x26ef40 at 0x26f0a4 where the formation's +0x4b8
+  is clear), where it spends everything. Ported as the walk's own test
+  (`stepCost` / `_tac_step` against the Movement left and the full);
+  the order stays open, the unit beside the plot.
+- Confirmed (one-seed aimem traces): runs/h1_duelz1117 t10 the rampaging
+  Warrior 589832 on 13:11 (1 Movement left, the destination's exerter
+  waiving the zone) holds for city-state 2's Warrior in the Woods of 14:10;
+  runs/h1_duelz1127 t122 the Musketman 4456452 on 13:2 holds for player 0's
+  Scout on 13:1 (a step of 2); runs/h1_duelz1121 t151 the Man-At-Arms
+  3080206 on 16:13 strikes the Cuirassier on the grassland 15:13.
+- THE PLANNING PLOT AT A RADIUS (0x78fa10, Operation Move's execution and
+  update, the strikers): a plot holding a unit of the player that stacks
+  with any member of the unit's formation is none (0x585eb0 on the unit's
+  +0x1fb8 over the plot's units), the unit's own plot excepted. runs/
+  h1_duelz1121 t160: Builder Capture's Settler 4325384 on 6:18, its
+  Musketman 3538967's class holding 4:18 (the Bombard 3997700) and 4:19
+  (the Line Infantry 4456462), takes no planning plot round the camp 3:19.
+- THE RING WALK'S LOCATION TEST (0x815d50 -> 0x586360): the unit's own,
+  not its formation's (0x586900): a land unit that may embark takes water.
+  runs/h1_duelz1121 t160: the Settlers 4325384 / 4390925 and the Builder
+  4522014 go for the coast 2:19 of the camp's ring, their escorts for 3:19,
+  t162 the Settler 4390925 and the Builder for 4:20, as AI_Operation.csv
+  logs; the Settler's order then finds no path (its Musketman not
+  embarking) and its escort's order moves the pair.
+- Open (C-95): a rampaging ship that steps beside a foreign ship (not its
+  target) holds (runs/h1_duelz1127 t109 Galley 1048590 on 29:17 beside
+  city-state 3's Galley on 29:16, t199 the same on 29:14 beside 29:15; t103
+  / t198 Galley 589825), while Attack Units' move to a zoned spot keeps its
+  Movement for the strike (runs/h1_duelz1121 t83 Galley 524295 on 31:18 by
+  player 0's Quadrireme, t109 Man-At-Arms 3080206 on 15:13): the walk's
+  zone cost (0x270980 at 0x270a2d under the order's flags, no 0x800) reads
+  as spending everything, which the Attack Units cases contradict.
+- Open (C-95): the attack's spend (the cost adds the Movement left, 0x1d0
+  += 0x1d4) is the breadth-first searches' wrapper 0x26e570's, which a
+  move order's A* (0x7a630 over 0x26f330, cost 0x26e920) does not run;
+  pricing a move order's step onto an attack's plot as any step moves
+  runs/h1_duelz1121 t165 Crossbowman 3866651 (14:18 for 15:19) and t167
+  Crossbowman 3735574 (16:17 for 16:18) off the game's plots, no case
+  gained: the engines keep the spend.

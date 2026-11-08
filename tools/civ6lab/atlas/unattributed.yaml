@@ -4957,15 +4957,20 @@
   semantics: a planning plot exactly the range from a goal within the turns, Movement left where asked, none of its own stacking but its own plot
   status: READ
   cases:
+    - recording: h1_duelz1121
+      turn: 160
+      value: "Builder Capture's Settler 4325384 on 6:18 in formation with its Musketman 3538967, goal the camp 3:19 its Skirmisher holds: 0x585eb0 over the formation (+0x1fb8) refuses 4:18 (the Bombard 3997700) and 4:19 (the Line Infantry 4456462), no planning plot is taken and the ring walk gives 2:19, as logged"
     - recording: h1_duelw1117-1128
       turn: all
       value: "the action replay: the Operation rows end on the game's plot 416 of 1,265; barb:move imposed 1117 634 -> 421, 1121 1,325 -> 1,096"
   impl:
+    - gpu/core/sim_tactics.py:_op_reach_at
     - cpu/core/tactical.ts:reachAt
     - gpu/core/sim_tactics.py:_barb_reach_at
     - cpu/core/tactical.ts:strikers
     - cpu/core/aiViewTypes.ts:AiView
   readings:
+    - "C-95: a strike's step from beside its plot, a formation's planning plot at a radius, the ring walk's own location test — READ (0x962380 at 0x96267e..0x9626d2, 0x26ef40 at 0x26f0a4, 0x78fa10 at 0x78fab4..0x78facf, 0x815d50 -> 0x586360), both twins"
     - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
     - "C-95: Attack Units — READ, ported"
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
@@ -6398,6 +6403,9 @@
   semantics: "the ring walk's test: in the goal's region first, then strictly nearer (0x815d71..0x815dd4); off the mover's own plot (0x90290) each unit there of the mover's player put to 0x265ac0, which refuses it (0x815e40..0x815e60); then the location test 0x586360 (plot, flags 0 / 0, 0x7fffffff: the ground, the domain, closed borders, a hostile defender) on any plot, its own included. No path test: a plot the mover has no path to is taken."
   status: READ
   cases:
+    - recording: h1_duelz1121
+      turn: 160
+      value: "the Settler 4325384 and the Builder 4522014 (their first owner's embarking theirs) take the coast 2:19 of the camp 3:19's ring, their Musketman and Line Infantry 3:19: the location test is the unit's own, water where it may embark, not its formation's 0x586900"
     - recording: h1_duely1121
       turn: 59
       value: "t59-t65, t79-t91: the raid's Archer 2031620 and Warriors 589832 / 1310730 / 1769487 go for 6:13 / 7:12 beside the target 6:12 and step on while their own Scout 131073 holds the land bridge 11:18 / 9:19, every path to the ring through it (AI_Operation.csv Operation Move rows)"
@@ -6417,6 +6425,7 @@
     - cpu/core/tactical.ts:bestIn
     - gpu/core/sim_tactics.py:_op_move_exec
   readings:
+    - "C-95: a strike's step from beside its plot, a formation's planning plot at a radius, the ring walk's own location test — READ (0x962380 at 0x96267e..0x9626d2, 0x26ef40 at 0x26f0a4, 0x78fa10 at 0x78fab4..0x78facf, 0x815d50 -> 0x586360), both twins"
     - "C-97: the behaviour trees — READ (the interpreter), the nodes PARTLY READ"
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"

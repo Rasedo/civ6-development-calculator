@@ -1851,9 +1851,18 @@ class SimTactics:
         # and its Movement and attacks last beside the plot, under
         # `meleeAttack`'s own refusals: a unit that fights, no siege unit, and
         # the amphibious reach — an embarked unit strikes an open LAND shore,
-        # never a plot afloat nor one a cliff closes (`amphibiousReach`)
+        # never a plot afloat nor one a cliff closes (`amphibiousReach`) —
+        # its step priced afresh from beside the plot as any step of the
+        # walk: one dearer than the Movement left, the unit moved, is a later
+        # turn's, the order kept
         if strike and bool(into.count_nonzero()):
             here = tile_p[rows, sr].clamp(min=0)
+            beside = into & (self.pair_dist[here, dr].to(torch.long) == 1)
+            dcol = (self.neigh[here] == dr.unsqueeze(1)).long().argmax(dim=1)
+            c_at = self._tac_step(rows, here, dr, dcol, ut, ign_shore, waive)
+            left = mp_p[rows, sr]
+            held_off = beside & (left < c_at) & (left < full)
+            into = into & ~held_off
             hit = (into & ~refused & getattr(self, f"{pre}_unit_alive")[rows, sr] & (mp_p[rows, sr] > 0)
                    & (getattr(self, f"{pre}_unit_attacks")[rows, sr] > 0) & (self.pair_dist[here, dr].to(torch.long) == 1)
                    & (self._type_combat.take(ut) > 0) & (self._type_bombard.take(ut) <= 0))
@@ -3495,15 +3504,19 @@ class SimTactics:
         """`reachAt` for the unit at local slot `us` [N] of pool `pre` (its
         player `seat`) in the games `rows`: the first plot of its planning
         (closing order) within `turns` — the goal itself at range 0, else a
-        plot exactly `rng` from it with none of its own military there but its
-        own plot; `moves` asks Movement left. -1 none."""
+        plot exactly `rng` from it with none of its own there that stacks with
+        it or a member of its formation (`_tac_stacks`), but its own plot;
+        `moves` asks Movement left. -1 none."""
         n = rowof[rows, us]
         ok_row = n >= 0
         nn = n.clamp(min=0)
         rt, rk, mv = res["turns"][nn], res["rank"][nn], res["moves"][nn]
         dq = self.pair_dist[goal.clamp(min=0)].to(torch.long)                     # [N, T]
         here = getattr(self, f"{pre}_unit_tile")[rows, us]
-        own = self._tac_own_mil(seat, self._tac_hull(us, pre, rows))[rows]
+        lo = self.POOL_LO[pre]
+        mr = self._tac_mate(rows, us, pre)
+        none = torch.full_like(us, -1)
+        own = self._tac_stacks(rows, seat, (torch.where(us >= 0, us + lo, none), torch.where(mr >= 0, mr + lo, none)))
         at = torch.where(rng.unsqueeze(1) == 0, self._arange_bt[rows] == goal.unsqueeze(1),
                          (dq == rng.unsqueeze(1)) & (~own | (self._arange_bt[rows] == here.unsqueeze(1))))
         ok = at & (rt >= 0) & (rt <= turns) & ok_row.unsqueeze(1)
@@ -3717,12 +3730,11 @@ class SimTactics:
                 # own there (0x265ac0 refuses each: none on the leader's
                 # plot), then the location test (0x586360 with no flag: the
                 # ground, its domain, closed borders, a hostile unit, city
-                # centre or Encampment there); no path test
-                # (its formation's: water where each member may embark)
+                # centre or Encampment there); no path test — the unit's own
+                # test, water where it may embark, whatever its formation's
+                # other member
                 o_of = getattr(self, f"{pre}_unit_orig_owner")
-                m_ty = getattr(self, f"{pre}_unit_type")[rows, mt.clamp(min=0)].clamp(min=0, max=self.NU - 1)
-                placed = self._tac_embarks(rows, ut, seat, o_of[rows, ur]) \
-                    & ((mt < 0) | self._tac_embarks(rows, m_ty, seat, o_of[rows, mt.clamp(min=0)]))
+                placed = self._tac_embarks(rows, ut, seat, o_of[rows, ur])
                 ent = torch.where(naval.unsqueeze(1), ent_w[rows], ent_l[rows] | (ent_w[rows] & placed.unsqueeze(1)))
                 best = torch.full_like(gr, -1)
                 best_d = torch.full_like(gr, -1)
