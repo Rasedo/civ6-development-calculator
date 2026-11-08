@@ -818,8 +818,11 @@ const ANALYZERS: Readonly<Record<string, Analyzer>> = {
   // player's weight, PV(horizon) - PV(start)
   EFFECT_ADJUST_PLAYER_YIELD_CHANGE_PER_TRIBUTARY: (t, args) =>
     whole(span(t, yieldValue(t.view, t.seat, t.view.tributaries(t.seat) * amountOf(args), args.YieldType ?? ''))),
-  // 0x6b0840: over the player's units, the least of the amount and the
-  // unit's Maintenance, as unweighted Gold, PV(horizon) - PV(start)
+  // 0x6b0840: over the player's unit list (+0x12e8 +0xd8, the dead flag
+  // unread: a unit levied or deleted counts until its owner's end of turn),
+  // the least of the amount and the unit's Maintenance, as unweighted Gold,
+  // PV(horizon) - PV(start) (runs/h1_duely1117 city-state 4 t62:
+  // Conscription 7.0 on its Archer China levied before its turn)
   EFFECT_ADJUST_UNIT_MAINTENANCE_DISCOUNT: (t, args) => {
     const a = Number(args.Amount ?? 0) | 0;
     let sum = 0;
@@ -850,7 +853,10 @@ const ANALYZERS: Readonly<Record<string, Analyzer>> = {
   // (0x5953bf98): the most Production of its cities x PSEUDOYIELD_WONDER of
   // the Amount, likewise, then runs on into COMBAT_EXPERIENCE's term and
   // GREAT_PEOPLE's (runs/h1_duely1121 Hunza's Autocracy, its Warriors' term
-  // whole with the wonder's). COMBAT_EXPERIENCE (0xc819e0a3): its units x
+  // whole with the wonder's). COMBAT_EXPERIENCE (0xc819e0a3): its unit pool
+  // count (+0x12e8 +0xc0: a unit levied or deleted counts until its owner's
+  // end of turn; runs/h1_duely1117 city-state 3 t28, its three Warriors China
+  // levied before its turn, Political Philosophy 144.7 at t29 as logged) x
   // PSEUDOYIELD_UNIT_COMBAT of the Amount / 10.0, likewise, then GREAT_PEOPLE's
   // term (0xf8705d00, which the branch runs on into): per class its points a
   // turn (the player's store +0x1360 +0x168) x the Amount as the class's
@@ -889,7 +895,7 @@ const ANALYZERS: Readonly<Record<string, Analyzer>> = {
         }
         if (args.BonusType !== 'GOVERNMENTBONUS_GREAT_PEOPLE') {
           const pv = pseudoYieldValue(t.view, t.seat, a, 'PSEUDOYIELD_UNIT_COMBAT');
-          const x = t.view.playerUnits(t.seat).length * pv;
+          const x = t.view.unitPoolCount(t.seat) * pv;
           sum += valueBetween(fdiv(x, 10 * FX), t.start, t.horizon, t.rate);
         }
         if (t.seat === FREE_SEAT) break;

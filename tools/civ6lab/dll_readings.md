@@ -9410,3 +9410,47 @@ route walk through it (gpu/core/sim_seats.py); the driver's `A_PL`
   terrain to tell an embarked unit from a land one there; the sweep's
   empty reasons on every refusal leave unread whether the lab passed the
   reasons list at all.
+
+## C-130 / C-98: the unit list the policy analyzers walk, a city-state's route term and the losses the turn's players took — READ, both twins
+
+- EFFECT_ADJUST_UNIT_MAINTENANCE_DISCOUNT 0x6b0840 walks the player's unit
+  list (Player +0x12e8 +0xd8: node +0 the unit, +0x10 the next; the unit's
+  type +0x160 into Units, Maintenance +0x5c), the dead flag unread:
+  min(Amount, Maintenance) << 8 summed, bare Gold, span. A city-state's is
+  `minorListedUnits` (`aiView`'s unitMaintenances; GPU `_pol_analyze` on
+  `_minor_listed_units`). runs/h1_duely1117 city-state 4 t62: Conscription
+  7.0 on its Archer China levied before its turn.
+- EFFECT_ADJUST_FLAT_BONUS 0x6c5700's COMBAT_EXPERIENCE term reads the unit
+  pool count Player_Units +0xc0 (0x6c5caf), which falls only at the destroy:
+  a city-state's the sum of `minorListedUnits` (`unitPoolCount`; GPU the
+  same sum). runs/h1_duely1117 city-state 3 t28: its three Warriors China
+  levied before its turn still in Autocracy's and Oligarchy's flat bonus,
+  Political Philosophy and its five dependants as logged at t29 (144.7).
+- THE LOSSES OF THE TURN'S PLAYERS (the replay, `unlistTurnLosses`): a
+  city-state's unit the pair's decisions took off the map that record t+1's
+  log removes (UnitRemovedFromMap) before the turn's last
+  PlayerTurnDeactivated leaves the list its end of turn wrote — one lost in
+  its own turn its end of turn erased (runs/h1_duely1121 city-state 4 t116:
+  its upgraded Man-at-Arms folded into a corps, Conscription 29.0 at t117 on
+  four Musketmen), one a later player took died at once (runs/h1_duely1117
+  t48: city-state 4's Trader the barbarians plundered, Political Philosophy
+  173.6 at t50 on two units); one the turn's damage killed after every
+  player's turn stays (runs/h1_duely1128 city-state 3 t132, Gunpowder 281.1
+  at t133). Applied after the pair's decisions and again on the next pair's
+  world.
+- A CITY-STATE'S ROUTE TERM: the route it begins in its turn of t (record
+  t+1 the first to carry it) runs its term (0x552bc0, 0x960f40) from t; the
+  replay's route decision lands after the turn's change, so it dates the
+  route `b.turn - 1`. runs/h1_duely1117 Caguana's route to China's second
+  city, first in record 95, ends with its Trader home in t109 (record 110
+  without it): that turn's civics AI on its Culture without the route's 1
+  (Exploration 26 turns, 89.5; Reformed Church 94.6), renewed at t110, ended
+  at t133 as recorded (Exploration, Reformed Church, Colonialism and the
+  civics after them t110-133 as logged).
+- Open: a major's queue head the record completes mid-turn after a
+  Builder's operation (runs/h1_duely1117 t121: China's Entertainment Complex at Longxi
+  94 / 114, completed in China's actions after its Builder 2752523's
+  operation) is dropped by the replay's queue order before the lump lands,
+  the district standing only from record 122: Caguana's t121 civics AI on
+  Food 33 for the game's 34 (its route's Food 1 from the district), Civil
+  Prestige 80 / 65 for 65 / 87 at t121 / t122.

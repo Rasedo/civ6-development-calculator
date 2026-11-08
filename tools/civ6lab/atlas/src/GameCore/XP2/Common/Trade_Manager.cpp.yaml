@@ -274,6 +274,7 @@
   readings:
     - "C-108: a trade route's term and its end — READ (the MakeTradeRoute operation's check, the term), both twins"
     - "C-108: a trade route's term and its end"
+    - "C-130 / C-98: the unit list the policy analyzers walk, a city-state's route term and the losses the turn's players took — READ, both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...e.cpp 0x960f40 (FinalRelease 0x66bf70), the operation's per-turn check, and Trade_Manager 0x552bc0 (FinalRelease 0x38f720), the term. Check: runs/h1_duely1127 Hattusa (the records' route r..."

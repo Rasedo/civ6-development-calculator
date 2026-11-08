@@ -2237,6 +2237,35 @@ function placeHead(ctx: Ctx, actor: Seat, city: City, q: QueueItem): boolean {
   }
 }
 
+/** a city-state's unit the pair's decisions took off the map that the game
+ *  removed within the players' turns of turn t (record t+1's log: its
+ *  UnitRemovedFromMap before the turn's last PlayerTurnDeactivated) leaves
+ *  the unit list the city-state's end of turn wrote: one lost in its own
+ *  turn its end of turn erased (runs/h1_duely1121 t116: city-state 4's
+ *  upgraded Man-at-Arms folded into a corps, its Conscription 29.0 at t117
+ *  on the four standing), one a later player's turn took died at once
+ *  (runs/h1_duely1117 t48: city-state 4's Trader the barbarians plundered,
+ *  Political Philosophy 173.6 at t50 on its two units); one the turn's
+ *  damage killed after every player's turn stays listed until its next
+ *  (`minorListedUnits`). `keyOfId`: each engine unit's record key as the
+ *  decisions found it. */
+function unlistTurnLosses(b: TurnRecord, turn: number, keyOfId: ReadonlyMap<number, string>,
+  cityStates: readonly CityState[], live: ReadonlySet<number>): void {
+  const acts = ((b as { actions?: unknown[][] }).actions ?? []).filter((x) => x[1] === turn);
+  const removedAt = new Map<string, number>();
+  let end = -1;
+  for (const x of acts) {
+    if (x[2] === 'UnitRemovedFromMap' && !removedAt.has(`${x[3]}:${x[4]}`)) removedAt.set(`${x[3]}:${x[4]}`, x[0] as number);
+    if (x[2] === 'PlayerTurnDeactivated') end = Math.max(end, x[0] as number);
+  }
+  for (const cs of cityStates) {
+    for (const id of Object.keys(cs.unitsListed ?? {}).map(Number)) {
+      const at = live.has(id) ? undefined : removedAt.get(keyOfId.get(id) ?? '');
+      if (at !== undefined && at < end) delete cs.unitsListed![id];
+    }
+  }
+}
+
 function applyQueue(ctx: Ctx, d: Extract<Decision, { kind: 'queue' }>): void {
   const seat = seatOfP(ctx, d.player);
   const actor = seatOf(ctx.state, seat) as Seat | undefined;
@@ -3375,6 +3404,12 @@ const res = buyTile(state, city.id, d.plot, seat);        if (!res.ok) setTileOw
             res = r.toCs !== undefined ? minorRouteTo(state, minor, { from: -1, to: -1, toCs: r.toCs })
               : to ? minorRouteTo(state, minor, { from: -1, to: -1, toSeat: to.seat, toSeatCity: to.id })
                 : { ok: false, reason: 'no engine city at the destination' };
+            // the route began in the city-state's turn of record t, which
+            // this phase follows past the turn's change: its term runs from
+            // that turn (runs/h1_duely1117 Caguana's route to China's second
+            // city, first in record 95, ends with its Trader home in t109)
+            const made = res.ok ? minor.tradeRoutes?.at(-1) : undefined;
+            if (made) made.createdTurn = b.turn - 1;
             // the Trader the route spent, where the engine's turn made it
             const spent = traders.find((u) => !state.units.includes(u));
             if (spent && ctx.standing && !ctx.standing.has(spent)) {
@@ -5107,6 +5142,11 @@ function perTurnWorld(ctx: Ctx, a: TurnRecord, imp: Imported, history: History, 
   for (const cs of world.cityStates) {
     const o = state.cityStates.find((x) => x.id === cs.id);
     if (o) seatPair(o, cs, true);
+  }
+  unlistTurnLosses(a, a.turn - 1, new Map([...was].map(([k, u]) => [u.id, k] as const)), world.cityStates,
+    new Set(world.units.map((u) => u.id)));
+  for (const cs of world.cityStates) {
+    const o = state.cityStates.find((x) => x.id === cs.id);
     // a major the record shows the minor met where the engine's turn met it
     // not (a meeting in the major's start: runs/h1_duely1127 t47, China at
     // its Spearman's completion meets Hattusa): the meeting points the
@@ -6049,7 +6089,9 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
     // record t+1 shows of every unit (its loss, its health)
     // (a barbarian's own attack moves its tribe's boldness and counts after
     // their rules, `barbarianTurn`)
+    const keyOfId = new Map([...ctx.units].map(([k, u]) => [u.id, k] as const));
     applyPhase(ctx, ds, 'after', b, b);
+    unlistTurnLosses(b, a.turn, keyOfId, state.cityStates, new Set(state.units.map((u) => u.id)));
     for (const u of struckHp.keys()) {
       if (!state.units.includes(u) || u.hp >= UNIT_HP) continue;
       const rest = { ...u };

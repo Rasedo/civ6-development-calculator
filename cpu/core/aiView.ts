@@ -45,7 +45,7 @@ import { opsOf } from './operations/manager';
 import { opJobUnits } from './operations/operation';
 import { resourceValue } from './aiResource';
 import { stockFree, strategicSurplus } from './stockpile';
-import { minorItemTurns, minorKnownUnits, minorUpgradeVisible, minorResourceFacts, minorUnitExpected, minorUnitProduction, minorUnitVersion } from './minorBuild';
+import { minorItemTurns, minorKnownUnits, minorListedUnits, minorUpgradeVisible, minorResourceFacts, minorUnitExpected, minorUnitProduction, minorUnitVersion } from './minorBuild';
 import { majorItemTurns, majorTraits, majorUnitExpected, majorUnitVersion, seatResearchTurns } from './freeCityBuild';
 import { cityStateAt as cityStateAtPlot, envoysHere, envoysOf, minorCity, suzerainOf, suzerainProjectMult } from './cityStates';
 import { grievanceWith } from './grievance';
@@ -385,7 +385,21 @@ export function aiView(state: GameState, opts: { forecastNow?: boolean } = {}): 
     influenceTokensUsed: (i) => state.cityStates.reduce((n, cs) => n + envoysOf(cs, i), 0),
     tributaries: (i) => state.cityStates.filter((cs) => suzerainOf(cs) === i).length,
     cityStateCount: () => state.cityStates.filter((cs) => cs.centerIndex >= 0).length,
-    unitMaintenances: (i) => state.units.filter((u) => u.seat === i).map((u) => UNITS[u.type]?.maintenance ?? 0),
+    // over the seat's unit list (Player +0x12e8 +0xd8): a city-state's
+    // holds the units its last end of turn listed that the delayed kill
+    // took (`minorListedUnits`)
+    unitMaintenances: (i) => {
+      const cs = isCityStateSeat(i) ? (seatOf(state, i) as CityState | undefined) : undefined;
+      if (!cs) return state.units.filter((u) => u.seat === i).map((u) => UNITS[u.type]?.maintenance ?? 0);
+      return [...minorListedUnits(state, cs)].flatMap(([type, n]) => Array<number>(n).fill(UNITS[type]?.maintenance ?? 0));
+    },
+    unitPoolCount: (i) => {
+      const cs = isCityStateSeat(i) ? (seatOf(state, i) as CityState | undefined) : undefined;
+      if (!cs) return unitsOf(state, i).length;
+      let n = 0;
+      for (const k of minorListedUnits(state, cs).values()) n += k;
+      return n;
+    },
     // a city-state's units whose upgrade its research unlocks, each at the
     // city-state's upgrade price; another party's not read
     unitUpgradeGolds: (i) => {

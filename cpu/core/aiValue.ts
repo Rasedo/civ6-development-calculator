@@ -242,8 +242,12 @@ export interface AiValueView {
   tributaries(seat: number): number;
   /** the city-states the game holds (its minor list, game +0x3f8 +0x1650) */
   cityStateCount(): number;
-  /** each of the seat's units' Units.Maintenance */
+  /** each unit's Units.Maintenance over the seat's unit list (a
+   *  city-state's: `minorListedUnits`) */
   unitMaintenances(seat: number): readonly number[];
+  /** the seat's unit pool count (Player_Units +0xc0): every unit until
+   *  its end of turn destroys it, a city-state's by its list */
+  unitPoolCount(seat: number): number;
   /** per unit of the seat whose upgrade its research unlocks (0x58fff0, the
    *  visible test), the upgrade's Gold (0x590520) */
   unitUpgradeGolds(seat: number): readonly number[];

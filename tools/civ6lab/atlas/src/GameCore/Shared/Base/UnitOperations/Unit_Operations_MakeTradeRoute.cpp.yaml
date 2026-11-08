@@ -15,10 +15,14 @@
     - recording: h1_duely1127
       turn: 134
       value: Hattusa's China route home at t134, ended at t144
-  impl: [cpu/core/trade.ts:tradeRouteMinDuration]
+    - recording: h1_duely1117
+      turn: 109
+      value: "Caguana's route to China's second city, begun in its t94 turn (first in record 95), its Trader home at t109 = 94 + 15: ended there (record 110 without it), its Culture 1 gone from that turn's civics AI (Exploration 26 turns, 89.5 as logged); renewed at t110, ended t133 as recorded"
+  impl: [cpu/core/trade.ts:tradeRouteMinDuration, cpu/harness/replay.ts:applyPhase]
   readings:
     - "C-108: a trade route's term and its end — READ (the MakeTradeRoute operation's check, the term), both twins"
     - "C-108: a trade route's term and its end"
+    - "C-130 / C-98: the unit list the policy analyzers walk, a city-state's route term and the losses the turn's players took — READ, both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - Unit_Operations_MakeTradeRoute.cpp 0x960f40 (FinalRelease 0x66bf70), the operation's per-turn check, and Trade_Manager 0x552bc0 (Fina...

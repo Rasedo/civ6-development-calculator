@@ -665,8 +665,12 @@ class SimPolicy:
                 # the wonder's term runs on into COMBAT_EXPERIENCE's and that
                 # into GREAT_PEOPLE's, summed before the whole
                 if bonus != "GOVERNMENTBONUS_GREAT_PEOPLE":
-                    pre = "barb" if ctx["s"] == self.FR else "major"
-                    n = (getattr(self, f"{pre}_unit_alive") & (getattr(self, f"{pre}_unit_seat") == ctx["seat"])).long().sum(dim=1)
+                    # the unit pool count: a city-state's by its list
+                    # (`_minor_listed_units`)
+                    if ctx["s"] == self.FR:
+                        n = (self.barb_unit_alive & (self.barb_unit_seat == ctx["seat"])).long().sum(dim=1)
+                    else:
+                        n = self._minor_listed_units(ctx["s"]).sum(dim=1)
                     p = "PSEUDOYIELD_UNIT_COMBAT"
                     pv = self._cv_pseudo(full(pct), p, f0.pseudo_w(p))
                     x = torch.div(n * _FX * pv, _FX, rounding_mode="floor")
@@ -731,6 +735,12 @@ class SimPolicy:
             per = _fmul(v, torch.full_like(v, _fx_const(0.75))) >> 8
             return mine.long().sum(dim=1) * per
         if eff == "EFFECT_ADJUST_UNIT_MAINTENANCE_DISCOUNT":
+            # 0x6b0840 over the player's unit list: a city-state's the units
+            # its last end of turn listed (`_minor_listed_units`)
+            if ctx["s"] != self.FR:
+                per = torch.clamp(self._type_maintenance.long(), max=amount)
+                tot = (self._minor_listed_units(ctx["s"]) * per).sum(dim=1) * _FX
+                return span(self._cv_yield(tot, "YIELD_GOLD")) >> 8
             mine = self.major_unit_alive & (self.major_unit_seat == ctx["seat"])
             m = self._type_maintenance.take(self.major_unit_type.clamp(min=0, max=self.NU - 1)).long()
             tot = (torch.clamp(m, max=amount) * mine.long()).sum(dim=1) * _FX
