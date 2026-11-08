@@ -263,6 +263,7 @@
     - gpu/core/sim_tactics.py:_tac_safe_plot
     - cpu/core/aiModifiers.ts:ANALYZERS
     - cpu/core/aiValue.ts:playerUnits
+    - cpu/core/aiModifiers.ts:amountOf
   readings:
     - "C-34: the interception's damage, XP, weariness and the answers"
     - "C-99: an operation's start takes its strengths; a unit's AI strengths with its formation — READ (0x73a120, 0x56dc90, 0x56e3e0, 0x56daa0, 0x1497d0), both twins"

@@ -655,7 +655,7 @@ export function minorCompleteNow(state: GameState, seat: number, id: string): vo
     r.techProgress = 0;
   }
   if (!r.aiEntries) return;
-  takeChoice(r, researchCompletionChoice(state, seat, r.aiEntries.map((e) => ({ ...e })), id, researchDraw(state),
+  takeChoice(r, researchCompletionChoice(state, seat, r.aiEntries, id, researchDraw(state),
     cs ? minorTechContracts(cs) : []));
   // the choice writes the turns left on its pick at the player's Science
   // (0x763020 at 0x7630e4), which the next city build analysis reads

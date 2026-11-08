@@ -1212,6 +1212,32 @@
   context:
     - ...the amount from the start to the horizon when they outnumber), the unit-tag production 0x6bc9e0 (the military AI's unit of the class 0x4bcd30, CityBuildAI's production 0x6c8dd0, PSE...
   review: reviewed
+- addr: 0x6bd390
+  final: 0x46e470
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-98: a unit's value adds its abilities' modifiers; EFFECT_ADJUST_UNIT_MOVEMENT and REQUIREMENT_PLOT_ADJACENT_TO_OWNER; a second completion adds again — READ (0x7b62c0 at 0x7b7658..0x7b76d8, 0x6e11c7 / 0xc85140, 0x6bd520, 0x6d3200, 0x762d60's rows), both twins"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...T_UNIT_MOVEMENT (registry 0x6c9640 at 0x6cb139, object @f04110, vtable 0xd63688; parser 0x6bd390: Amount whole at +8; analyzer 0x6bd520): with the context's unit (+0x90) alive, fightin..."
+  review: imported
+- addr: 0x6bd520
+  kind: function
+  name: EFFECT_ADJUST_UNIT_MOVEMENT
+  semantics: "EFFECT_ADJUST_UNIT_MOVEMENT's analyzer (registry 0x6c9640 at 0x6cb139, object @f04110, vtable 0xd63688 slot 1; parser 0x6bd390 stores the Amount whole at +8): with the context's unit (+0x90) alive (+0x770 clear), fighting (GetCombat 0x56dc90 with 0, GetRangedCombat 0x56e3e0, GetBombardCombat 0x56daa0 above 0) on a plot (0x90290): float(Amount) x 0.33f (@d64108) x float(0x4f2b20, its type's current cost), as PSEUDOYIELD_UNIT_COMBAT with no player (0x7a60d0, r9 0), whole, +0xc0 = max(+0xc0, it); else with the context's city (+0x70): fx(Amount) x City::GetYield(@f2f978, Production) (0x16e7d0) as PSEUDOYIELD_UNIT_COMBAT from the start (+0xb4) to the horizon (+0xb8) (0x7a2140), whole, added."
+  status: READ
+  cases:
+    - recording: h1_duely1124
+      turn: 179
+      value: city-state 4's Supply Convoy table value -4.48 + 46 (its movement) -> Combustion 1313.8 as logged, t180-t185 likewise
+  impl:
+    - cpu/core/aiModifiers.ts:ANALYZERS
+    - cpu/core/aiModifiers.ts:SETS
+    - gpu/core/sim_policy.py:_unit_movement_value
+  readings:
+    - "C-98: a unit's value adds its abilities' modifiers; EFFECT_ADJUST_UNIT_MOVEMENT and REQUIREMENT_PLOT_ADJACENT_TO_OWNER; a second completion adds again — READ (0x7b62c0 at 0x7b7658..0x7b76d8, 0x6e11c7 / 0xc85140, 0x6bd520, 0x6d3200, 0x762d60's rows), both twins"
+  review: reviewed
 - addr: 0x6bdd40
   final: 0x46ee40
   kind: function

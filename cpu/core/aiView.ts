@@ -41,6 +41,8 @@ import { civicAnalysis } from './aiCivics';
 import { AI_BUILDING_INDEX, AI_UNIT_INDEX, amenityCityOf, growthForecast, housingValue, type CityGrowth } from './aiCityBuild';
 import { AI_BUILDINGS, AI_RESOURCES, AI_UNITS } from '../data/aiBuildTables';
 import { unitProductionTable } from './aiUnitProduction';
+import { opsOf } from './operations/manager';
+import { opJobUnits } from './operations/operation';
 import { resourceValue } from './aiResource';
 import { stockFree } from './stockpile';
 import { minorItemTurns, minorKnownUnits, minorUpgradeVisible, minorResourceFacts, minorUnitExpected, minorUnitProduction, minorUnitVersion } from './minorBuild';
@@ -435,8 +437,12 @@ export function aiView(state: GameState, opts: { forecastNow?: boolean } = {}): 
       }
       return table.get(type)?.value ?? 0;
     },
-    playerUnits: (i) => unitsOf(state, i).map((u) => ({ plot: u.tileIndex, type: gameTypeOf('unit', u.type, 'UNIT_'), moves: Math.floor(unitFullMoves(state, u) / MP_SCALE),
-      level: u.level ?? 1, combat: aiStrengths(state, u).melee })),
+    playerUnits: (i) => {
+      const ops = seatOf(state, i)?.ops;
+      const held = new Set(ops ? opsOf(ops).flatMap(opJobUnits) : []);
+      return unitsOf(state, i).map((u) => ({ plot: u.tileIndex, type: gameTypeOf('unit', u.type, 'UNIT_'), moves: Math.floor(unitFullMoves(state, u) / MP_SCALE),
+        level: u.level ?? 1, combat: aiStrengths(state, u).melee, inOperation: held.has(u.id) }));
+    },
     enemyUnitCounts: (i) => new Map(Object.entries(seatOf(state, i)?.enemyCounts ?? {}).map(([t, n]) => [gameTypeOf('unit', t, 'UNIT_'), n])),
     barbarianSeats: () => [BARB_SEAT],
     bestUnitOfClass: (i, cls) => {

@@ -404,6 +404,15 @@
   context:
     - ...6cf3c0's evaluation of it unread). The other analyzers (EFFECT_ADJUST_CITY_YIELD_MODIFIER 0xd63490 ...) are unread.
   review: imported
+- addr: 0xd63688
+  kind: global
+  status: PARTLY
+  readings:
+    - "C-98: a unit's value adds its abilities' modifiers; EFFECT_ADJUST_UNIT_MOVEMENT and REQUIREMENT_PLOT_ADJACENT_TO_OWNER; a second completion adds again — READ (0x7b62c0 at 0x7b7658..0x7b76d8, 0x6e11c7 / 0xc85140, 0x6bd520, 0x6d3200, 0x762d60's rows), both twins"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "- EFFECT_ADJUST_UNIT_MOVEMENT (registry 0x6c9640 at 0x6cb139, object @f04110, vtable 0xd63688; parser 0x6bd390: Amount whole at +8; analyzer 0x6bd520): with the context's unit (+0x9..."
+  review: imported
 - addr: 0xd63760
   kind: global
   status: READ
@@ -461,6 +470,15 @@
     - "H-1: the civics AI — READ (the choice, the walk, the propagation), PARTLY READ (the value)"
   context:
     - ...a walk over the city's trade set (+0x1ee0, 0x6c8660 -> 0x1fa000) with a functor (vtable 0xd64048) whose body is unread.
+  review: imported
+- addr: 0xd67790
+  kind: global
+  status: PARTLY
+  readings:
+    - "C-98: a unit's value adds its abilities' modifiers; EFFECT_ADJUST_UNIT_MOVEMENT and REQUIREMENT_PLOT_ADJACENT_TO_OWNER; a second completion adds again — READ (0x7b62c0 at 0x7b7658..0x7b76d8, 0x6e11c7 / 0xc85140, 0x6bd520, 0x6d3200, 0x762d60's rows), both twins"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "- REQUIREMENT_PLOT_ADJACENT_TO_OWNER (@f044a0, vtable 0xd67790, slot 1 0x6d3200): no player, unmet; no unit (+0x90), met; with a unit and a valued t..."
   review: imported
 - addr: 0xd6ced0
   kind: global

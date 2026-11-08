@@ -72,6 +72,7 @@
     - "C-97: the governor AI — the analysis, the choice and the seats READ, the analyzers PARTLY READ"
     - "C-96: the district value's remaining terms — READ (the envoys' term, the golden-age term's reader, the modifiers' list, the neighbours' functor), a LAB (the district's buildings), and the Farm's adjacency in the plot values"
     - "C-96: the district value's remaining terms"
+    - "C-98: a unit's value adds its abilities' modifiers; EFFECT_ADJUST_UNIT_MOVEMENT and REQUIREMENT_PLOT_ADJACENT_TO_OWNER; a second completion adds again — READ (0x7b62c0 at 0x7b7658..0x7b76d8, 0x6e11c7 / 0xc85140, 0x6bd520, 0x6d3200, 0x762d60's rows), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...odifier evaluator: a building's BuildingModifiers are analysed once, at GlobalAI's start (0x6dfc70 -> 0x6cef90 into GlobalAI +0x3948[building]): each entry holds an effect analyzer and a c..."

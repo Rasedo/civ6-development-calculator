@@ -554,6 +554,22 @@ def build_city(rows, modifier) -> str:
                     out.append(ab)
         mods = [modifier(r["ModifierId"]) for ab in out for r in ability_mods[ab]]
         return [m for m in mods if m["effect"] in strength_effects]
+
+    # a unit's value's modifiers (GlobalAI +0x3a50, built at 0x6e11c7 by
+    # 0xc85140's query): UnitAbilityModifiers joined to the UnitAbilities not
+    # Inactive and to their TypeTags whose Tag the unit carries — a row per
+    # ability tag the unit carries, in the abilities' order
+    ability_rows = list(keyed(rows("UnitAbilities"), "UnitAbilityType"))
+
+    def value_modifiers(u):
+        held = {t.get("Tag") for t in tags[u]}
+        out = []
+        for ab in ability_rows:
+            if ab in inactive:
+                continue
+            n = sum(1 for a in tags[ab] if a.get("Tag") in held)
+            out += [modifier(r["ModifierId"]) for r in ability_mods[ab] for _ in range(n)]
+        return out
     unit_bld = multi("Unit_BuildingPrereqs", "Unit")
     uxp2 = keyed(rows("Units_XP2"), "UnitType")
     units = []
@@ -572,6 +588,7 @@ def build_city(rows, modifier) -> str:
             "support": c.get("FormationClass") == "FORMATION_CLASS_SUPPORT",
             "tags": [t["Tag"] for t in tags[u]],
             "abilities": abilities(u),
+            "modifiers": value_modifiers(u),
             "pseudo": c.get("PseudoYieldType"), "promotionClass": c.get("PromotionClass"),
             "resource": c.get("StrategicResource"), "trait": c.get("TraitType"),
             "tech": c.get("PrereqTech"), "civic": c.get("PrereqCivic"), "district": c.get("PrereqDistrict"),

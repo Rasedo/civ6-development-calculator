@@ -257,8 +257,9 @@ export interface AiValueView {
   cityTrainingUnit(seat: number, cityId: number): boolean;
   /** the seat's units in its list's order, their plot, UnitType, whole
    *  Movement (0x56e130), level (the unit's experience +0x1bc0, its +0x10)
-   *  and combat strength as the AI reads it (0x56dc90 with 0, `aiStrengths`) */
-  playerUnits(seat: number): readonly { plot: number; type: string; moves: number; level: number; combat: number }[];
+   *  and combat strength as the AI reads it (0x56dc90 with 0, `aiStrengths`),
+   *  and whether an operation holds it (Unit +0x7d0, `opJobUnits`) */
+  playerUnits(seat: number): readonly { plot: number; type: string; moves: number; level: number; combat: number; inOperation: boolean }[];
   /** the knowledge base's enemy unit counts as its last ageing left them
    *  (`Seat.enemyCounts`, +0x618), by UnitType */
   enemyUnitCounts(seat: number): ReadonlyMap<string, number>;

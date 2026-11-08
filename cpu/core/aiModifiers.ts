@@ -93,6 +93,9 @@ export interface ValueTerms {
    *  COLLECTION_PLAYER_UNITS walk, kept through a granted ability's own
    *  modifiers; absent, none */
   unit?: { plot: number; type: string; moves: number; level: number; combat: number };
+  /** the UnitType the evaluation is of (context +0x5c): the unit a unit's
+   *  value values (0x7b62c0 at 0x7b716f); absent, none */
+  valued?: string;
   /** a resolution's target hint (0x67dd40's handlers), in the install's
    *  types: the luxury (+0x4c), the yield (+0x64), the government (+0x28),
    *  the great person class (+0x6c), the project (+0x68) */
@@ -288,6 +291,11 @@ const EVALUATORS: Readonly<Record<string, Evaluator>> = {
   // 0x6d22c0: with the context's unit (+0x90), its Units row's
   // PromotionClass is the argument's; with none, the context holds a city
   // (+0x70)
+  // 0x6d3200: with the context's unit (+0x90) and a valued UnitType
+  // (+0x5c), unmet where the player holds a unit of that type in no
+  // operation (Unit +0x7d0 -1); met otherwise, and with no unit
+  REQUIREMENT_PLOT_ADJACENT_TO_OWNER: (t, _args, s) => !((s.kind === 'unit' || t.unit) && t.valued
+    && t.view.playerUnits(t.seat).some((u) => u.type === t.valued && !u.inOperation)),
   REQUIREMENT_UNIT_PROMOTION_CLASS_MATCHES: (t, args, s) => s.kind === 'unit'
     ? AI_UNITS[AI_UNIT_INDEX.get(s.type) ?? -1]?.promotionClass === args.UnitPromotionClass
     : s.kind === 'city' || (s.kind !== 'nocity' && !!t.owner),
@@ -314,6 +322,12 @@ function admits(t: ValueTerms, set: AiRequirementSet | undefined, s: Subject): b
 type Analyzer = (t: ValueTerms, args: Readonly<Record<string, string>>, s: Subject) => number;
 
 const amountOf = (args: Readonly<Record<string, string>>): number => (Number(args.Amount ?? 0) | 0) * FX;
+/** a unit on a plot that fights: Combat (0x56dc90), RangedCombat or Bombard
+ *  above 0 */
+const fightsOnPlot = (u: { plot: number; type: string; combat: number }): boolean => {
+  const row = AI_UNITS[AI_UNIT_INDEX.get(u.type) ?? -1];
+  return u.plot >= 0 && (u.combat > 0 || (row?.rangedCombat ?? 0) > 0 || (row?.bombard ?? 0) > 0);
+};
 /** a unit's era (Unit_Manager 0x940740) as an Eras index: of its PrereqTech's
  *  and PrereqCivic's eras the later by chronology; with neither, the game's
  *  start era's ChronologyIndex read as an index (the start era Ancient's 1:
@@ -1060,6 +1074,24 @@ const ANALYZERS: Readonly<Record<string, Analyzer>> = {
     const v = fmul((Number(args.Amount ?? 0) | 0) * FX, t.view.unitProductionValue(t.seat, u.type));
     return whole(valueBetween(yieldValue(t.view, t.seat, fdiv(v, u.moves * FX), 'YIELD_PRODUCTION'), t.start, t.horizon, t.rate));
   },
+  // 0x6bd520 (Amount +8, whole): with the context's unit (+0x90) that fights
+  // (Combat, RangedCombat or Bombard above 0) on a plot, Amount x 0.33f x
+  // its type's current cost (0x4f2b20), float, as PSEUDOYIELD_UNIT_COMBAT at
+  // no player's weight, the whole part — the total the most of them
+  // (`SETS`); else on the context's city, the Amount x its Production as
+  // PSEUDOYIELD_UNIT_COMBAT from the start to the horizon (0x7a2140)
+  EFFECT_ADJUST_UNIT_MOVEMENT: (t, args) => {
+    const amount = Number(args.Amount ?? 0) | 0;
+    const u = t.unit;
+    if (u && fightsOnPlot(u)) {
+      const x = Math.fround(Math.fround(Math.fround(amount) * Math.fround(0.33)) * Math.fround(t.view.unitCost(t.seat, u.type)));
+      return whole(pseudoYieldValue(null, null, fxConst(x), 'PSEUDOYIELD_UNIT_COMBAT'));
+    }
+    const c = ownerCity(t);
+    if (!c || c.kind !== 'city') return 0;
+    const v = fmul(fxOf(t.view.cityYield(c.seat, c.id, 'YIELD_PRODUCTION')), amount * FX);
+    return whole(valueBetween(pseudoYieldValue(null, null, v, 'PSEUDOYIELD_UNIT_COMBAT'), t.start, t.horizon, t.rate));
+  },
   // 0x6b85d0 (Amount +8): with the context's unit, a naval one (+0x650 0)
   // of Movement: Amount x (its current cost, 0x4f2b20, x 0.5f) over its
   // Movement in float, as Production at the player's weight, discounted to
@@ -1226,8 +1258,10 @@ const ANALYZERS: Readonly<Record<string, Analyzer>> = {
  *  0x6b47f0's debuff keeps the greater, 0x6a3870's slot lost on the
  *  player's own subject sets it to 0 (its analyzer's NaN), 0x6bb020 sets
  *  it to its value */
-const SETS: Readonly<Record<string, (acc: number, v: number) => number>> = {
+const SETS: Readonly<Record<string, (acc: number, v: number, t: ValueTerms) => number>> = {
   EFFECT_ADJUST_PLAYER_BUFF_UNIT_PRODUCTION_YIELD: (acc, v) => Math.max(acc, v),
+  // 0x6bd520 keeps the greater on a unit that fights, adds on a city
+  EFFECT_ADJUST_UNIT_MOVEMENT: (acc, v, t) => (t.unit && fightsOnPlot(t.unit) ? Math.max(acc, v) : acc + v),
   EFFECT_ADJUST_PLAYER_STRENGTH_MODIFIER: (acc, v) => Math.max(acc, v),
   EFFECT_ADJUST_GOVERNMENT_SLOTS: (acc, v) => (Number.isNaN(v) ? 0 : acc + v),
   EFFECT_ADJUST_PLAYER_BAN_CITY_PRODUCTION: (_acc, v) => v,
@@ -1298,7 +1332,8 @@ function analysis(t: ValueTerms, m: AiModifier, depth: number): number | null {
     if (ok === null) return 0;
     if (!ok) continue;
     passed = true;
-    sum = (SETS[m.effect] ?? ((acc: number, v: number) => acc + v))(sum, an(onSubject(t, s), m.args, s));
+    const tt = onSubject(t, s);
+    sum = (SETS[m.effect] ?? ((acc: number, v: number) => acc + v))(sum, an(tt, m.args, s), tt);
   }
   // no subject passed: the analyzer's slot 2
   if (!passed) sum += NONE_ANALYZERS[m.effect]?.(t, m.args) ?? 0;

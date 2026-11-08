@@ -519,7 +519,7 @@ function scoreAgainstLog(ctx: Ctx, kind: ResearchParty, turn: number, player: nu
     const e = ours.get(tech);
     if (!e) continue;
     t.rows += 1;
-    const sc = e.score / 256;
+    const sc = e.logged / 256;
     if (e.turns === g.turns) t.turns += 1;
     const same = Math.abs(sc - g.score) <= 0.051;
     if (same) t.score += 1;

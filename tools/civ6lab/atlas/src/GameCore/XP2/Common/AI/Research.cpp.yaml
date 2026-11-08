@@ -187,7 +187,10 @@
   cases:
     - recording: AI_Research.csv
       value: "Its log is AI_Research.csv (0x762b40: \"%d, %d, Tech, %s, %3.1f, %s, %d\" — OWNED / RESEARCHING / GOAL / BOOSTED, the score and the turns;"
-  readings: ["H-1: the research AI — READ (the choice), PARTLY READ (the value)"]
+  impl: [cpu/core/aiResearch.ts:ResearchEntry]
+  readings:
+    - "H-1: the research AI — READ (the choice), PARTLY READ (the value)"
+    - "C-98: a unit's value adds its abilities' modifiers; EFFECT_ADJUST_UNIT_MOVEMENT and REQUIREMENT_PLOT_ADJACENT_TO_OWNER; a second completion adds again — READ (0x7b62c0 at 0x7b7658..0x7b76d8, 0x6e11c7 / 0xc85140, 0x6bd520, 0x6d3200, 0x762d60's rows), both twins"
   context:
     - "...(AiFavoredItems of the leader's Technologies list) at +0x4b0. Its log is AI_Research.csv (0x762b40: \"%d, %d, Tech, %s, %3.1f, %s, %d\" — OWNED / RESEARCHING / GOAL / BOOSTED, the score and..."
   review: reviewed
@@ -221,6 +224,7 @@
     - "H-1: the research AI — READ (the choice), PARTLY READ (the value)"
     - "H-1: a city-state's boost completion and the research AI — READ"
     - "C-127: a boost completion's turns left; a minor Builder's clearing lump"
+    - "C-98: a unit's value adds its abilities' modifiers; EFFECT_ADJUST_UNIT_MOVEMENT and REQUIREMENT_PLOT_ADJACENT_TO_OWNER; a second completion adds again — READ (0x7b62c0 at 0x7b7658..0x7b76d8, 0x6e11c7 / 0xc85140, 0x6bd520, 0x6d3200, 0x762d60's rows), both twins"
   context:
     - "- A COMPLETION, 0x762d60 (the completed row): the propagation once more on the entries as they stand, then the c..."
   review: reviewed

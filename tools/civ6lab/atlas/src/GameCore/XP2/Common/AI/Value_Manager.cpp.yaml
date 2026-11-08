@@ -125,6 +125,7 @@
     - "C-130: the flat bonus's wonder term runs on into the combat experience term — READ, both twins"
     - "C-98 / C-130: the player tourism analyzer, the city subject's context, the dark trade buildings — READ (0x6b0700, 0x6b0430, 0x69ea00's +0x70), a FIT (the capacity), both twins"
     - "C-130: Market Economy's per-destination-resource route analyzers — READ (0x6b2aa0, 0x6b44d0, 0x6c89b0, 0x6c87a0, 0x1f71b0's viewer), both twins"
+    - "C-98: a unit's value adds its abilities' modifiers; EFFECT_ADJUST_UNIT_MOVEMENT and REQUIREMENT_PLOT_ADJACENT_TO_OWNER; a second completion adds again — READ (0x7b62c0 at 0x7b7658..0x7b76d8, 0x6e11c7 / 0xc85140, 0x6bd520, 0x6d3200, 0x762d60's rows), both twins"
   context:
     - "...NonFoodYieldModifier change on the city's yield, at least 1.0, from T to the horizon (0x7a2140) — the Arena; a city-state's gold per turn counts its city's Gold (the Economic boost;..."
     - "...part to context +0xc0; \"span\" is PV(horizon) - PV(start) by two 0x7a16e0 calls, \"between\" 0x7a2140; \"weighted\" a yield through 0x7a6690 with the player, \"bare\" without):"
@@ -361,6 +362,8 @@
     - gpu/core/sim_cityvalue.py:_cv_improvement_yields
     - cpu/core/aiPlotValue.ts:PlotValueFacts
     - cpu/core/aiPlotValue.ts:improvementYieldsValue
+    - cpu/core/aiCityBuild.ts:unitValue
+    - gpu/core/sim_cityvalue.py:_cv_unit_mods
   readings:
     - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
     - "C-96 / C-97: the unit value — READ (the combat, trade, explorer branches, the tail, the military AI's unit production), PARTLY READ (its inputs)"
@@ -379,6 +382,7 @@
     - "C-96: the district value's remaining terms — READ (the envoys' term, the golden-age term's reader, the modifiers' list, the neighbours' functor), a LAB (the district's buildings), and the Farm's adjacency in the plot values"
     - "C-96: the improvement value — READ (0x7a58f0, 0x7b1320's yields, tourism and modifiers, the feature removal 0x7a3010, the harvest 0x7a37d0, the build unit 0x7a2e20, EFFECT_ADJUST_CITY_FREE_POWER), PARTLY READ (the hazards' turns, 0x7b1320's defence, claimed plots and neighbours terms)"
     - "C-130: the government values' parts at Hunza (live) — READ"
+    - "C-98: a unit's value adds its abilities' modifiers; EFFECT_ADJUST_UNIT_MOVEMENT and REQUIREMENT_PLOT_ADJACENT_TO_OWNER; a second completion adds again — READ (0x7b62c0 at 0x7b7658..0x7b76d8, 0x6e11c7 / 0xc85140, 0x6bd520, 0x6d3200, 0x762d60's rows), both twins"
   context:
     - "...st (0x39dcd0) through 0x7a10c0 (a Gold value per plot of a walk); the modifiers through 0x7a4b20 (\"the AI's yield weights and the modifier evaluator\" below). Column offsets from the..."
     - ...ceMaintenanceType (+0x50) whose stockpile is out zeroes the value before the modifiers (0x7a4b20, the per-unit list GlobalAI +0x3a50).
@@ -499,6 +503,7 @@
     - "C-96: the improvement value — READ (0x7a58f0, 0x7b1320's yields, tourism and modifiers, the feature removal 0x7a3010, the harvest 0x7a37d0, the build unit 0x7a2e20, EFFECT_ADJUST_CITY_FREE_POWER), PARTLY READ (the hazards' turns, 0x7b1320's defence, claimed plots and neighbours terms)"
     - "C-98 / C-130: the player tourism analyzer, the city subject's context, the dark trade buildings — READ (0x6b0700, 0x6b0430, 0x69ea00's +0x70), a FIT (the capacity), both twins"
     - "C-130: Online Communities' route tourism, the tourism toward a player — READ (0x6a1380, 0x6a1240, 0x394830's modifiers, 0x552fb0), both twins"
+    - "C-98: a unit's value adds its abilities' modifiers; EFFECT_ADJUST_UNIT_MOVEMENT and REQUIREMENT_PLOT_ADJACENT_TO_OWNER; a second completion adds again — READ (0x7b62c0 at 0x7b7658..0x7b76d8, 0x6e11c7 / 0xc85140, 0x6bd520, 0x6d3200, 0x762d60's rows), both twins"
   notes: ["label: pseudoYieldValue(out,&amt,pseudo,playerAI,..)"]
   context:
     - ...ds' +0x638, +0x7a8, the +0x6b0 list or +0x6c8); per row also pseudo-yield terms through 0x7a60d0 (PSEUDOYIELD_GOLDENAGE_POINT from 0x2c40b0, 0x2c4350 for Science, 0x2c3ed0, 0x2c4290 fo...
@@ -1011,6 +1016,8 @@
     - cpu/core/aiCityBuild.ts:v
     - cpu/core/aiCityBuild.ts:ARCHAEOLOGIST_ARTIFACTS_CAP
     - gpu/core/sim_cityvalue.py:_COMBAT_PSEUDO
+    - cpu/core/aiModifiers.ts:ValueTerms
+    - gpu/core/sim_cityvalue.py:_cv_unit_mods
   readings:
     - "C-127 / C-96: a minor's unit versions, the unit table's religion gate and the building value's era reasons — READ, both twins"
     - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
@@ -1023,6 +1030,7 @@
     - "C-127: the civic in hand's turns left carry the completion overflow (0x39c1f0 -> 0x39c070 -> 0x39c0e0) — READ, both twins"
     - "C-98: a religious unit's value at the city-states — READ (0x7b62c0's religious branch, CanTrain's religion and inquisition refusals), both twins"
     - "C-130 / C-98: the Archaeologist's value, the strength modifier's analysis, the knowledge base's enemy unit counts — READ (0x7b62c0 at 0x7b6a8c, 0x27fcf0, 0x6b2060, 0x69ed80, 0x5eab80, 0xbe4aa0), both twins"
+    - "C-98: a unit's value adds its abilities' modifiers; EFFECT_ADJUST_UNIT_MOVEMENT and REQUIREMENT_PLOT_ADJACENT_TO_OWNER; a second completion adds again — READ (0x7b62c0 at 0x7b7658..0x7b76d8, 0x6e11c7 / 0xc85140, 0x6bd520, 0x6d3200, 0x762d60's rows), both twins"
   notes:
     - ".claude/scratchpad/cb/notes.txt: ...req buildings...  value = 0x7a4d40(bld, turns, plot=-9999, horizon=H1=[globalAI+0x2f0][1]) ; units: 0x7b62c0(unit, turns...) horizon H1; wonders H2=[..][2].  rate = &[rbp+0xc8] from 0x6fec30(player+0x1290) ->..."
     - ".claude/scratchpad/cb/notes.txt: ...turns). regional (+0x2c) via 0x79f7c0 for cities in range. walls/defense terms at +0x54. UNIT value 0x7b62c0: combat units -> base 0x79ca90(military AI unit value) (x3 if 0x79d2d0), era terms, x(copies+1), x..."

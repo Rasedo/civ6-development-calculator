@@ -8777,3 +8777,56 @@ its player's turn opens, a land unit made in the turn embarked by its plot.
   524293 (tree 39:2) reaches its centre before the Warrior 262146 (tree
   38:3), whose path then ends its turn on 33:20 (seven minor-turns over the
   five duely duels).
+
+## C-98: a unit's value adds its abilities' modifiers; EFFECT_ADJUST_UNIT_MOVEMENT and REQUIREMENT_PLOT_ADJACENT_TO_OWNER; a second completion adds again — READ (0x7b62c0 at 0x7b7658..0x7b76d8, 0x6e11c7 / 0xc85140, 0x6bd520, 0x6d3200, 0x762d60's rows), both twins
+
+`unitValue`'s modifiers term and `AiUnitRow.modifiers` (cpu/core/aiCityBuild.ts,
+tools/install/ai_tables.py `value_modifiers`); `ANALYZERS.EFFECT_ADJUST_UNIT_MOVEMENT`,
+`SETS`, `EVALUATORS.REQUIREMENT_PLOT_ADJACENT_TO_OWNER`, `ValueTerms.valued`
+(cpu/core/aiModifiers.ts); `playerUnits`' `inOperation` (aiView.ts);
+`researchCompletionChoice` on the analysis's own rows, `ResearchEntry.logged`
+(cpu/core/aiResearch.ts, minorBuild.ts `minorCompleteNow`, the replay's
+`scoreAgainstLog`). GPU `_cv_unit_mods` / `_cv_check_unit_mod`
+(gpu/core/sim_cityvalue.py), `_unit_movement_value` / `_unit_movement_check`
+and the refused wrapper in `_pol_check_read` (gpu/core/sim_policy.py), the
+completions' score write-back in `_minor_complete_now` (sim_minors.py) and
+`_rai_completion` (sim_research.py).
+
+- THE UNIT VALUE'S MODIFIERS (0x7b62c0 at 0x7b7658..0x7b76d8): after PV(H) -
+  PV(T) a fresh context (0x6ccd50) of the player (+0x80), T (+0xb4), H
+  (+0xb8), the rate as a float (+0xbc) and the unit valued (+0x5c, r13d =
+  the unit argument at 0x7b716f), no city and no unit; 0x7a4b20 over
+  GlobalAI +0x3a50 [unit] adds its whole sum. The list (0x6dfc70 at 0x6e11c7)
+  is 0xc85140's query: UnitAbilityModifiers joined to UnitAbilities with
+  Inactive 0 and to their TypeTags whose Tag the unit carries — a row per
+  matching tag. A StrategicResource held nowhere returns 0 before it
+  (0x7b7255 -> 0x7b7051).
+- EFFECT_ADJUST_UNIT_MOVEMENT (registry 0x6c9640 at 0x6cb139, object
+  @f04110, vtable 0xd63688; parser 0x6bd390: Amount whole at +8; analyzer
+  0x6bd520): with the context's unit (+0x90) alive, fighting (GetCombat 0,
+  GetRangedCombat, GetBombardCombat above 0) on a plot (0x90290): x =
+  float(Amount) x 0.33f (@d64108) x float(the type's current cost,
+  0x4f2b20), through PSEUDOYIELD_UNIT_COMBAT with no player (0x7a60d0, r9
+  0), whole; +0xc0 = max(+0xc0, it). Else with the context's city (+0x70):
+  fx(Amount) x its Production (City::GetYield @f2f978) through
+  PSEUDOYIELD_UNIT_COMBAT, start to horizon (0x7a2140), whole, added.
+  EFFECT_ADJUST_UNIT_HEALING_MODIFIERS is not registered (the Medic's and
+  the Supply Convoy's heal worth 0).
+- REQUIREMENT_PLOT_ADJACENT_TO_OWNER (@f044a0, vtable 0xd67790, slot 1
+  0x6d3200): no player, unmet; no unit (+0x90), met; with a unit and a
+  valued type (+0x5c), unmet where the player holds a unit of that type
+  whose operation (+0x7d0) is -1, else met. REQUIREMENT_UNIT_DOMAIN_MATCHES
+  is not registered.
+- Confirmed (one-seed aimem trace t1-t186): runs/h1_duely1124 city-state 4
+  t179-t185, the Supply Convoy's table value -4.48 / -8.29 / -5.09 / -5.13 /
+  -6.12 plus its movement 46 (and above 51 at t185, the cap's 50 x 10):
+  Combustion 1313.8, 1001.3, 1042.8, 862.2, 419.9, 575.7 as logged, and the
+  rows that propagate it (Combined Arms, Plastics, Nuclear Fission,
+  Synthetic Materials); the t183 research pick (Combustion's rows) as logged.
+- A SECOND COMPLETION (0x762d60): the propagation and the live contracts add
+  onto the research AI's rows themselves (+0x318, +0x14), so two completions
+  before the next analysis add twice; the analysis's log (0x762b40) stands
+  before them. runs/h1_duely1117 city-state 4 t47: Irrigation then Horseback
+  Riding boosted complete, Masonry 253.5 + 74.0 twice (401.5) under
+  Mathematics 183.1 + Currency's 144.3 twice (471.8), Currency taken toward
+  Mathematics as logged (once each: 327.5 over 327.4, Masonry).

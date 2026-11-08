@@ -200,6 +200,9 @@ class SimMinors:
             turns, base = self.citystate_ai_turns[:, s], self.citystate_ai_base[:, s]
             score = self.citystate_ai_score[:, s] + self._rai_upstream(self.citystate_techs[:, s], base, turns)
             score = score + self._rai_contracts(s, score, self.citystate_ai_owned[:, s], live=True)
+            # the additions land on the analysis's rows: a second completion
+            # adds them again
+            self.citystate_ai_score[:, s] = torch.where(fire.unsqueeze(1), score, self.citystate_ai_score[:, s])
             pick, goal = self._rai_choice(s, fire, (turns, self.citystate_ai_next[:, s], base, score, self.citystate_ai_owned[:, s]), done)
             self._rai_take(s, pick, goal)
             self.citystate_ai_left[:, s] = torch.where(fire, self._rai_left(s, sci), self.citystate_ai_left[:, s])

@@ -24,7 +24,7 @@
   name: Unit_Manager
   semantics: "Unit_Manager's unit era: of its PrereqTech's and PrereqCivic's eras the later by ChronologyIndex; with neither the start era's ChronologyIndex returned as an Eras index (Classical for an Ancient start)."
   status: PARTLY
-  impl: [cpu/core/aiModifiers.ts:amountOf]
+  impl: [cpu/core/aiModifiers.ts:amountOf, cpu/core/aiModifiers.ts:fightsOnPlot]
   readings:
     - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
   notes: ["imported: READ in its section, no confirming case found beside it"]

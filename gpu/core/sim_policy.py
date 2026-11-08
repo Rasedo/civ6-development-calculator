@@ -136,6 +136,11 @@ class SimPolicy:
         if depth >= 4:
             return
         eff = m.get("effect")
+        wrapper = eff in ("EFFECT_ATTACH_MODIFIER", "EFFECT_ATTACH_MODIFIER_TO_PLAYERTYPE", "EFFECT_GRANT_ABILITY")
+        if wrapper and (self._pol_refused(m.get("subjectReqs"), reads) or m.get("collection") not in reads["collections"]):
+            # a wrapper its set refuses, or over a collection not read, is
+            # worth 0 whatever it nests
+            return
         for a in m.get("ability") or []:
             self._pol_check_read(a, reads, owner, depth + 1)
         if m.get("attach"):
@@ -149,6 +154,9 @@ class SimPolicy:
         if eff not in reads["analyzers"] or m.get("collection") not in reads["collections"]:
             return
         if self._pol_refused(m.get("subjectReqs"), reads) or m.get("collection") in _POL_NO_SUBJECTS:
+            return
+        if eff == "EFFECT_ADJUST_UNIT_MOVEMENT" and m.get("collection") == "COLLECTION_PLAYER_UNITS":
+            self._unit_movement_check(m, reads, owner)
             return
         if eff in reads["sets"] or eff in reads["none"]:
             raise NotImplementedError(f"{owner} {m.get('id')}: {eff}'s setting / slot-2 analysis not on the GPU")
@@ -1012,6 +1020,72 @@ class SimPolicy:
         v = _present_value(_fmul(per, level * _FX), T["rate"], hh) >> 8
         return torch.where(ok, v, torch.zeros_like(v)).sum(dim=1)
 
+    # the requirements EFFECT_ADJUST_UNIT_MOVEMENT's units are tested on here
+    _MOVE_REQS = ("REQUIREMENT_PLOT_ADJACENT_TO_OWNER", "REQUIREMENT_UNIT_PROMOTION_CLASS_MATCHES")
+
+    def _unit_movement_check(self, m: dict, reads: dict, owner: str) -> None:
+        """refuse an EFFECT_ADJUST_UNIT_MOVEMENT over COLLECTION_PLAYER_UNITS
+        whose units the TS tests by a requirement not here"""
+        for r in (m.get("subjectReqs") or {}).get("reqs", []):
+            if r["type"] in reads["evaluators"] and r["type"] not in self._MOVE_REQS:
+                raise NotImplementedError(f"{owner} {m.get('id')}: requirement {r['type']} on a movement modifier's units")
+
+    def _unit_movement_value(self, s: int, m: dict, valued: str | None = None) -> torch.Tensor:
+        """[B] the whole value of EFFECT_ADJUST_UNIT_MOVEMENT over
+        COLLECTION_PLAYER_UNITS of minor `s` (the Free Cities at `FR`), in a
+        context with no city: over its first 51 units in pool order
+        (`playerUnits`) its set admits — REQUIREMENT_PLOT_ADJACENT_TO_OWNER
+        (0x6d3200) unmet on every one where `valued` (the unit a unit's value
+        values, context +0x5c) is a type the minor holds a unit of in no
+        operation (`_mops_jobs`), REQUIREMENT_UNIT_PROMOTION_CLASS_MATCHES its
+        row's PromotionClass — the most, over those that fight (Combat,
+        RangedCombat or Bombard above 0), of Amount x 0.33f x its type's cost,
+        float32, as PSEUDOYIELD_UNIT_COMBAT unweighted, whole (0x6bd520); a
+        unit that fights not, with no city, adds nothing"""
+        T = self._cv_tables()
+        reads = T["reads"]
+        rows = T["unit_rows"]
+        dev = self.device
+        on, row, _moves, _rk = self._pol_units(s)
+        pre = "barb" if s == self.FR else "major"
+        typ = getattr(self, f"{pre}_unit_type").long()
+        ok = on
+        rs = m.get("subjectReqs")
+        if rs:
+            met = []
+            for q in rs["reqs"]:
+                if q["type"] not in reads["requirements"]:
+                    continue
+                if q["type"] == "REQUIREMENT_UNIT_PROMOTION_CLASS_MATCHES":
+                    cls = q["args"].get("UnitPromotionClass")
+                    hit = torch.tensor([r["promotionClass"] == cls for r in rows] + [False], dtype=torch.bool, device=dev).take(row)
+                elif q["type"] == "REQUIREMENT_PLOT_ADJACENT_TO_OWNER":
+                    hit = torch.ones_like(on)
+                    if valued is not None:
+                        e = T["engine"]["unit"][T["unit_index"][valued]]
+                        own = getattr(self, f"{pre}_unit_alive") & (getattr(self, f"{pre}_unit_seat") == (FREE_SEAT if s == self.FR else 100 + s))
+                        held = self._mops_jobs(s, torch.ones_like(self.mops_def[:, s], dtype=torch.bool))
+                        idle = (own & (typ == e) & ~held).any(dim=1) if e >= 0 else torch.zeros(self.B, dtype=torch.bool, device=dev)
+                        hit = hit & ~idle.unsqueeze(1)
+                else:
+                    raise NotImplementedError(f"{q['type']} on a movement modifier's units")
+                met.append(hit != bool(q.get("inverse")))
+            if met:
+                st = torch.stack(met, 0)
+                ok = ok & (st.any(0) if rs["test"] == "ANY" else ~st.any(0) if rs["test"] == "NONE" else st.all(0))
+            elif rs["test"] == "ANY":
+                ok = torch.zeros_like(ok)
+        rf = torch.tensor([int(r["rangedCombat"]) > 0 or int(r["bombard"]) > 0 for r in rows] + [False], dtype=torch.bool, device=dev)
+        tile = getattr(self, f"{pre}_unit_tile")
+        fight = ((self._ai_combat(pre) > 0) | rf.take(row)) & (tile >= 0)
+        amount = int(float((m.get("args") or {}).get("Amount", 0) or 0))
+        cost = torch.trunc(self._type_cost.take(typ.clamp(min=0, max=self.NU - 1)).to(torch.float32))
+        k = torch.tensor(_f32(_f32(float(amount)) * _f32(0.33)), dtype=torch.float32, device=dev)
+        x = _fx_const_t(k * cost)
+        v = self._cv_pseudo(x, "PSEUDOYIELD_UNIT_COMBAT") >> 8
+        v = torch.where(ok & fight, v, torch.zeros_like(v))
+        return v.max(dim=1).values.clamp(min=0)
+
     def _pol_mod_value(self, ctx: dict, m: dict, h: int) -> torch.Tensor:
         """one modifier's whole value [B] (`modifierValue`), 0 where refused"""
         reads = self._cv_tables()["reads"]
@@ -1025,6 +1099,8 @@ class SimPolicy:
             return zero
         if m.get("collection") == "COLLECTION_PLAYER_UNITS" and eff == "EFFECT_ADJUST_UNIT_EXPERIENCE_MODIFIER":
             return self._pol_unit_experience(ctx, m.get("args") or {}, m.get("subjectReqs"), h)
+        if m.get("collection") == "COLLECTION_PLAYER_UNITS" and eff == "EFFECT_ADJUST_UNIT_MOVEMENT":
+            return self._unit_movement_value(ctx["s"], m)
         acc = zero
         for sub in self._pol_subjects(ctx, m["collection"])[:51]:
             ok = self._pol_admits(m.get("subjectReqs"), sub) & sub["mask"]

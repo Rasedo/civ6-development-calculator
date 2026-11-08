@@ -95,6 +95,9 @@ export interface ResearchEntry {
   /** the row's own value and its score after the propagation, raw */
   base: number;
   score: number;
+  /** the score as the analysis left it and logged it (AI_Research.csv,
+   *  0x762b40), before a completion's additions (which land on `score`) */
+  logged: number;
 }
 
 /** 0x4ca000 / 0x8c4540: the turns a row needs at `rate` (raw Science a turn) —
@@ -278,9 +281,9 @@ export function researchAnalysis(state: GameState, seat: number, science: number
   let view: AiValueView | undefined;
   const fav = r.favTech && atWarForValue(state, seat) ? r.favTech : null;  const entries: ResearchEntry[] = TECH_TABLE_ORDER.filter((id) => TECHS[id]).map((id) => {
     const leaf = !required.has(id);
-    if (owned(r, id)) return { tech: id, next: id, turns: -1, owned: true, leaf, base: 0, score: 0 };
+    if (owned(r, id)) return { tech: id, next: id, turns: -1, owned: true, leaf, base: 0, score: 0, logged: 0 };
     const { turns, next } = walk(state, seat, r, id, rate);
-      if (turns < 0) return { tech: id, next, turns, owned: false, leaf, base: 0, score: 0 };
+      if (turns < 0) return { tech: id, next, turns, owned: false, leaf, base: 0, score: 0, logged: 0 };
     const v = techValueParts(state, seat, id, turns, pw, view ??= aiView(state));
     let own = v.own;
     if (turns <= AI_VALUE_HORIZON) {
@@ -288,11 +291,12 @@ export function researchAnalysis(state: GameState, seat: number, science: number
       if (id === fav) own = fmul(own, fxConst(1.5));
     }
     const base = own + v.mods;
-    return { tech: id, next, turns, owned: false, leaf, base, score: base };
+    return { tech: id, next, turns, owned: false, leaf, base, score: base, logged: 0 };
   });
   addContracts(entries, contracts);
   const leader = leaderOf(state, seat);
   propagate(state, r, entries, new Set(leader ? RESEARCH_AI_FAVORED[leader] ?? [] : []));
+  for (const e of entries) e.logged = e.score;
   return entries;
 }
 
@@ -382,7 +386,12 @@ export function researchTurnChoice(state: GameState, seat: number, entries: read
  *  values once more, then the live Tech Contracts their values once more
  *  (runs/h1_duelw1117 t14 Caguana: Celestial Navigation 477.1 + its
  *  contract's 40.0 over Iron Working's 480.7, Sailing taken), and the
- *  choice passes the completed row over */
+ *  choice passes the completed row over. The additions land on the
+ *  entries themselves (the research AI's +0x318 rows), so a second
+ *  completion before the next analysis adds them again (runs/h1_duely1117
+ *  city-state 4 t47: Irrigation then Horseback Riding boosted complete,
+ *  Mathematics 183.1 + Currency's 144.3 twice over Masonry's 253.5 + its
+ *  contract's 74.0 twice, Currency taken toward Mathematics as logged) */
 export function researchCompletionChoice(state: GameState, seat: number, entries: ResearchEntry[], done: string, draw: ResearchDraw,
   contracts: readonly TechContract[] = []): ResearchChoice | null {
   const r = researchOf(state, seat);

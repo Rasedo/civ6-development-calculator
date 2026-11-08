@@ -607,6 +607,9 @@ export interface AiUnitRow {
   tags: readonly string[];
   /** its active abilities' strength modifiers (UnitAbilityModifiers) */
   abilities: readonly AiModifier[];
+  /** the modifiers its value analyses (GlobalAI +0x3a50): its abilities not
+   *  Inactive, a copy per ability tag it carries */
+  modifiers: readonly AiModifier[];
   pseudo: string | null;
   promotionClass: string | null;
   /** StrategicResource */
@@ -668,7 +671,8 @@ export function unitTurns(f: CityBuildFacts, u: AiUnitRow): number {
  *  x (the city's extra copies + 1) x the promotion class weight, 0 outright
  *  for a strategic resource the player cannot reach, through its
  *  pseudo-yield, less its Maintenance as Gold below handicap 3, paid from
- *  `t` to `h`. Null where a term it needs is not read (an Archaeologist, a
+ *  `t` to `h`, plus its modifiers' whole values (its abilities', GlobalAI
+ *  +0x3a50, the unit valued in the context). Null where a term it needs is not read (an Archaeologist, a
  *  WMD, an air unit, a unit with a Units_XP2 maintenance resource; a full
  *  civilization's religious or park-charged unit). */
 export function unitValue(f: CityBuildFacts, u: AiUnitRow, t: number, h = AI_VALUE_HORIZON): number | null {
@@ -727,7 +731,12 @@ export function unitValue(f: CityBuildFacts, u: AiUnitRow, t: number, h = AI_VAL
   // 5 Maintenance at its Economic AI's boosted Gold, below the game's Scout
   // at 0.0)
   if (f.handicap < 3) v -= yieldValue(f.view, f.seat, Math.max(0, u.maintenance) * FX, 'YIELD_GOLD');
-  return presentValue(v, AI_RATE, h) - presentValue(v, AI_RATE, t);
+  // then its modifiers (0x7a4b20 at 0x7b76ce) in a context of the player
+  // and the unit valued (+0x5c), no city, from `t` to `h`, added whole
+  // (runs/h1_duely1124 city-state 4 t179-183: the Supply Convoy's movement
+  // 46 over its -4.48 .. -6.12, Combustion's unit term as logged)
+  return presentValue(v, AI_RATE, h) - presentValue(v, AI_RATE, t)
+    + modifiersValue({ view: f.view, seat: f.seat, start: t, horizon: h, rate: AI_RATE, valued: u.type }, u.modifiers);
 }
 
 /** THE UNITS TABLE of the city centre (0x5ce970's unit loop): a raw value per

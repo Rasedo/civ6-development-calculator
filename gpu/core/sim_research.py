@@ -877,6 +877,9 @@ class SimResearch:
         owned = torch.where(v, self.citystate_ai_owned[:, s], fresh[4])
         score = score + self._rai_upstream(self.citystate_techs[:, s], base, turns)
         score = score + self._rai_contracts(s, score, owned, live=True)
+        # the additions land on the analysis's rows where it has one
+        keep = (fire & self.citystate_ai_valid[:, s]).unsqueeze(1)
+        self.citystate_ai_score[:, s] = torch.where(keep, score, self.citystate_ai_score[:, s])
         pick, goal = self._rai_choice(s, fire, (turns, nxt, base, score, owned), done)
         self._rai_take(s, pick, goal)
         self.citystate_ai_left[:, s] = torch.where(fire, self._rai_left(s, sci), self.citystate_ai_left[:, s])

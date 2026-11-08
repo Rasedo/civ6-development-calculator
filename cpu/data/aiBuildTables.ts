@@ -10181,6 +10181,7 @@ export const AI_UNITS: readonly AiUnitRow[] = [
    "CLASS_SETTLER"
   ],
   "abilities": [],
+  "modifiers": [],
   "pseudo": "PSEUDOYIELD_UNIT_SETTLER",
   "promotionClass": null,
   "resource": null,
@@ -10230,6 +10231,7 @@ export const AI_UNITS: readonly AiUnitRow[] = [
    "CLASS_BUILDER"
   ],
   "abilities": [],
+  "modifiers": [],
   "pseudo": null,
   "promotionClass": null,
   "resource": null,
@@ -10279,6 +10281,7 @@ export const AI_UNITS: readonly AiUnitRow[] = [
    "CLASS_LANDCIVILIAN"
   ],
   "abilities": [],
+  "modifiers": [],
   "pseudo": "PSEUDOYIELD_UNIT_TRADE",
   "promotionClass": null,
   "resource": null,
@@ -10331,6 +10334,24 @@ export const AI_UNITS: readonly AiUnitRow[] = [
    "CLASS_MISSIONARY"
   ],
   "abilities": [],
+  "modifiers": [
+   {
+    "id": "MOD_ENTER_FOREIGN_LANDS",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADJUST_UNIT_ENTER_FOREIGN_LANDS",
+    "args": {
+     "Enter": "true"
+    }
+   },
+   {
+    "id": "CANNOT_ATTACK",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADJUST_UNIT_CANNOT_ATTACK",
+    "args": {
+     "Disable": "true"
+    }
+   }
+  ],
   "pseudo": "PSEUDOYIELD_UNIT_RELIGIOUS",
   "promotionClass": null,
   "resource": null,
@@ -10384,6 +10405,16 @@ export const AI_UNITS: readonly AiUnitRow[] = [
    "CLASS_RELIGIOUS_SPREAD"
   ],
   "abilities": [],
+  "modifiers": [
+   {
+    "id": "MOD_ENTER_FOREIGN_LANDS",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADJUST_UNIT_ENTER_FOREIGN_LANDS",
+    "args": {
+     "Enter": "true"
+    }
+   }
+  ],
   "pseudo": "PSEUDOYIELD_UNIT_RELIGIOUS",
   "promotionClass": "PROMOTION_CLASS_APOSTLE",
   "resource": null,
@@ -10439,6 +10470,24 @@ export const AI_UNITS: readonly AiUnitRow[] = [
    "CLASS_RELIGIOUS_SPREAD"
   ],
   "abilities": [],
+  "modifiers": [
+   {
+    "id": "FRIENDLY_TERRITORY_COMBAT",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADJUST_UNIT_FRIENDLY_TERRITORY_COMBAT",
+    "args": {
+     "Amount": "35"
+    }
+   },
+   {
+    "id": "NO_FOREIGN_SPREAD",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADJUST_UNIT_NO_FOREIGN_SPREAD",
+    "args": {
+     "NoSpread": "true"
+    }
+   }
+  ],
   "pseudo": "PSEUDOYIELD_UNIT_RELIGIOUS",
   "promotionClass": "PROMOTION_CLASS_INQUISITOR",
   "resource": null,
@@ -10495,6 +10544,24 @@ export const AI_UNITS: readonly AiUnitRow[] = [
    "CLASS_GURU"
   ],
   "abilities": [],
+  "modifiers": [
+   {
+    "id": "MOD_ENTER_FOREIGN_LANDS",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADJUST_UNIT_ENTER_FOREIGN_LANDS",
+    "args": {
+     "Enter": "true"
+    }
+   },
+   {
+    "id": "CANNOT_ATTACK",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADJUST_UNIT_CANNOT_ATTACK",
+    "args": {
+     "Disable": "true"
+    }
+   }
+  ],
   "pseudo": "PSEUDOYIELD_UNIT_RELIGIOUS",
   "promotionClass": null,
   "resource": null,
@@ -10547,6 +10614,7 @@ export const AI_UNITS: readonly AiUnitRow[] = [
    "CLASS_WARRIOR_MONK"
   ],
   "abilities": [],
+  "modifiers": [],
   "pseudo": null,
   "promotionClass": "PROMOTION_CLASS_MONK",
   "resource": null,
@@ -10600,6 +10668,7 @@ export const AI_UNITS: readonly AiUnitRow[] = [
    "CLASS_ARCHAEOLOGIST"
   ],
   "abilities": [],
+  "modifiers": [],
   "pseudo": "PSEUDOYIELD_UNIT_ARCHAEOLOGIST",
   "promotionClass": null,
   "resource": null,
@@ -10650,6 +10719,7 @@ export const AI_UNITS: readonly AiUnitRow[] = [
    "CLASS_LANDCIVILIAN"
   ],
   "abilities": [],
+  "modifiers": [],
   "pseudo": null,
   "promotionClass": null,
   "resource": null,
@@ -10696,6 +10766,7 @@ export const AI_UNITS: readonly AiUnitRow[] = [
   "support": false,
   "tags": [],
   "abilities": [],
+  "modifiers": [],
   "pseudo": null,
   "promotionClass": null,
   "resource": null,
@@ -10742,6 +10813,7 @@ export const AI_UNITS: readonly AiUnitRow[] = [
   "support": false,
   "tags": [],
   "abilities": [],
+  "modifiers": [],
   "pseudo": null,
   "promotionClass": null,
   "resource": null,
@@ -10790,6 +10862,7 @@ export const AI_UNITS: readonly AiUnitRow[] = [
    "CLASS_LANDCIVILIAN"
   ],
   "abilities": [],
+  "modifiers": [],
   "pseudo": null,
   "promotionClass": null,
   "resource": null,
@@ -10836,6 +10909,7 @@ export const AI_UNITS: readonly AiUnitRow[] = [
   "support": false,
   "tags": [],
   "abilities": [],
+  "modifiers": [],
   "pseudo": null,
   "promotionClass": null,
   "resource": null,
@@ -10884,6 +10958,7 @@ export const AI_UNITS: readonly AiUnitRow[] = [
    "CLASS_LANDCIVILIAN"
   ],
   "abilities": [],
+  "modifiers": [],
   "pseudo": null,
   "promotionClass": null,
   "resource": null,
@@ -10932,6 +11007,7 @@ export const AI_UNITS: readonly AiUnitRow[] = [
    "CLASS_LANDCIVILIAN"
   ],
   "abilities": [],
+  "modifiers": [],
   "pseudo": null,
   "promotionClass": null,
   "resource": null,
@@ -10980,6 +11056,7 @@ export const AI_UNITS: readonly AiUnitRow[] = [
    "CLASS_LANDCIVILIAN"
   ],
   "abilities": [],
+  "modifiers": [],
   "pseudo": null,
   "promotionClass": null,
   "resource": null,
@@ -11028,6 +11105,7 @@ export const AI_UNITS: readonly AiUnitRow[] = [
    "CLASS_LANDCIVILIAN"
   ],
   "abilities": [],
+  "modifiers": [],
   "pseudo": null,
   "promotionClass": null,
   "resource": null,
@@ -11076,6 +11154,7 @@ export const AI_UNITS: readonly AiUnitRow[] = [
    "CLASS_SPY"
   ],
   "abilities": [],
+  "modifiers": [],
   "pseudo": "PSEUDOYIELD_UNIT_SPY",
   "promotionClass": "PROMOTION_CLASS_SPY",
   "resource": null,
@@ -11124,6 +11203,7 @@ export const AI_UNITS: readonly AiUnitRow[] = [
    "CLASS_LANDCIVILIAN"
   ],
   "abilities": [],
+  "modifiers": [],
   "pseudo": "PSEUDOYIELD_UNIT_RELIGIOUS",
   "promotionClass": null,
   "resource": null,
@@ -11173,6 +11253,16 @@ export const AI_UNITS: readonly AiUnitRow[] = [
    "CLASS_REVEAL_STEALTH"
   ],
   "abilities": [],
+  "modifiers": [
+   {
+    "id": "UNIT_SEE_HIDDEN",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADJUST_UNIT_SEE_HIDDEN",
+    "args": {
+     "SeeHidden": "true"
+    }
+   }
+  ],
   "pseudo": "PSEUDOYIELD_UNIT_EXPLORER",
   "promotionClass": "PROMOTION_CLASS_RECON",
   "resource": null,
@@ -11221,6 +11311,28 @@ export const AI_UNITS: readonly AiUnitRow[] = [
    "CLASS_MELEE"
   ],
   "abilities": [
+   {
+    "id": "ANTI_SPEAR",
+    "collection": "COLLECTION_UNIT_COMBAT",
+    "effect": "EFFECT_ADJUST_PLAYER_STRENGTH_MODIFIER",
+    "args": {
+     "Amount": "5"
+    },
+    "subjectReqs": {
+     "test": "ALL",
+     "reqs": [
+      {
+       "type": "REQUIREMENT_OPPONENT_UNIT_PROMOTION_CLASS_MATCHES",
+       "inverse": false,
+       "args": {
+        "UnitPromotionClass": "PROMOTION_CLASS_ANTI_CAVALRY"
+       }
+      }
+     ]
+    }
+   }
+  ],
+  "modifiers": [
    {
     "id": "ANTI_SPEAR",
     "collection": "COLLECTION_UNIT_COMBAT",
@@ -11292,6 +11404,7 @@ export const AI_UNITS: readonly AiUnitRow[] = [
    "CLASS_RANGED"
   ],
   "abilities": [],
+  "modifiers": [],
   "pseudo": null,
   "promotionClass": "PROMOTION_CLASS_RANGED",
   "resource": null,
@@ -11342,6 +11455,16 @@ export const AI_UNITS: readonly AiUnitRow[] = [
    "CLASS_LIGHT_CAVALRY"
   ],
   "abilities": [],
+  "modifiers": [
+   {
+    "id": "IGNOREZOC_IGNORE_ZOC",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADJUST_UNIT_IGNORE_ZOC",
+    "args": {
+     "Ignore": "true"
+    }
+   }
+  ],
   "pseudo": null,
   "promotionClass": "PROMOTION_CLASS_LIGHT_CAVALRY",
   "resource": null,
@@ -11391,6 +11514,16 @@ export const AI_UNITS: readonly AiUnitRow[] = [
    "CLASS_MOBILE_RANGED"
   ],
   "abilities": [],
+  "modifiers": [
+   {
+    "id": "IGNOREZOC_IGNORE_ZOC",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADJUST_UNIT_IGNORE_ZOC",
+    "args": {
+     "Ignore": "true"
+    }
+   }
+  ],
   "pseudo": null,
   "promotionClass": "PROMOTION_CLASS_RANGED",
   "resource": null,
@@ -11440,6 +11573,24 @@ export const AI_UNITS: readonly AiUnitRow[] = [
    "CLASS_WAR_CART"
   ],
   "abilities": [],
+  "modifiers": [
+   {
+    "id": "HEAVYCHARIOT_FASTER_CLEAR_TERRAIN",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADJUST_UNIT_CLEAR_TERRAIN_START_MOVEMENT",
+    "args": {
+     "Amount": "1"
+    }
+   },
+   {
+    "id": "IGNOREZOC_IGNORE_ZOC",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADJUST_UNIT_IGNORE_ZOC",
+    "args": {
+     "Ignore": "true"
+    }
+   }
+  ],
   "pseudo": null,
   "promotionClass": "PROMOTION_CLASS_HEAVY_CAVALRY",
   "resource": null,
@@ -11490,6 +11641,7 @@ export const AI_UNITS: readonly AiUnitRow[] = [
    "CLASS_NAVAL_MELEE"
   ],
   "abilities": [],
+  "modifiers": [],
   "pseudo": "PSEUDOYIELD_UNIT_NAVAL_COMBAT",
   "promotionClass": "PROMOTION_CLASS_NAVAL_MELEE",
   "resource": null,
@@ -11541,6 +11693,36 @@ export const AI_UNITS: readonly AiUnitRow[] = [
    "CLASS_NAVAL_MELEE"
   ],
   "abilities": [],
+  "modifiers": [
+   {
+    "id": "IGNOREZOC_IGNORE_ZOC",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADJUST_UNIT_IGNORE_ZOC",
+    "args": {
+     "Ignore": "true"
+    }
+   },
+   {
+    "id": "LONGSHIP_FASTER_COAST",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADJUST_UNIT_SEA_MOVEMENT",
+    "args": {
+     "Amount": "1"
+    },
+    "subjectReqs": {
+     "test": "ALL",
+     "reqs": [
+      {
+       "type": "REQUIREMENT_PLOT_TERRAIN_TYPE_MATCHES",
+       "inverse": false,
+       "args": {
+        "TerrainType": "TERRAIN_COAST"
+       }
+      }
+     ]
+    }
+   }
+  ],
   "pseudo": "PSEUDOYIELD_UNIT_NAVAL_COMBAT",
   "promotionClass": "PROMOTION_CLASS_NAVAL_MELEE",
   "resource": null,
@@ -11591,6 +11773,7 @@ export const AI_UNITS: readonly AiUnitRow[] = [
    "CLASS_RANGED"
   ],
   "abilities": [],
+  "modifiers": [],
   "pseudo": null,
   "promotionClass": "PROMOTION_CLASS_RANGED",
   "resource": null,
@@ -11641,6 +11824,42 @@ export const AI_UNITS: readonly AiUnitRow[] = [
    "CLASS_ANTI_CAVALRY"
   ],
   "abilities": [
+   {
+    "id": "ANTI_CAVALRY_COMBAT_BONUS",
+    "collection": "COLLECTION_UNIT_COMBAT",
+    "effect": "EFFECT_ADJUST_PLAYER_STRENGTH_MODIFIER",
+    "args": {
+     "Amount": "10"
+    },
+    "subjectReqs": {
+     "test": "ANY",
+     "reqs": [
+      {
+       "type": "REQUIREMENT_OPPONENT_UNIT_TAG_MATCHES",
+       "inverse": false,
+       "args": {
+        "Tag": "CLASS_LIGHT_CAVALRY"
+       }
+      },
+      {
+       "type": "REQUIREMENT_OPPONENT_UNIT_TAG_MATCHES",
+       "inverse": false,
+       "args": {
+        "Tag": "CLASS_HEAVY_CAVALRY"
+       }
+      },
+      {
+       "type": "REQUIREMENT_OPPONENT_UNIT_TAG_MATCHES",
+       "inverse": false,
+       "args": {
+        "Tag": "CLASS_RANGED_CAVALRY"
+       }
+      }
+     ]
+    }
+   }
+  ],
+  "modifiers": [
    {
     "id": "ANTI_CAVALRY_COMBAT_BONUS",
     "collection": "COLLECTION_UNIT_COMBAT",
@@ -11727,6 +11946,24 @@ export const AI_UNITS: readonly AiUnitRow[] = [
    "CLASS_HEAVY_CHARIOT"
   ],
   "abilities": [],
+  "modifiers": [
+   {
+    "id": "HEAVYCHARIOT_FASTER_CLEAR_TERRAIN",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADJUST_UNIT_CLEAR_TERRAIN_START_MOVEMENT",
+    "args": {
+     "Amount": "1"
+    }
+   },
+   {
+    "id": "IGNOREZOC_IGNORE_ZOC",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADJUST_UNIT_IGNORE_ZOC",
+    "args": {
+     "Ignore": "true"
+    }
+   }
+  ],
   "pseudo": null,
   "promotionClass": "PROMOTION_CLASS_HEAVY_CAVALRY",
   "resource": null,
@@ -11778,6 +12015,24 @@ export const AI_UNITS: readonly AiUnitRow[] = [
    "CLASS_SUPPORT"
   ],
   "abilities": [],
+  "modifiers": [
+   {
+    "id": "ENABLE_WALL_ATTACK_MELEE",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADJUST_UNIT_ENABLE_WALL_ATTACK_PROMOTION_CLASS",
+    "args": {
+     "PromotionClass": "PROMOTION_CLASS_MELEE"
+    }
+   },
+   {
+    "id": "ENABLE_WALL_ATTACK_ANTI_CAVALRY",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADJUST_UNIT_ENABLE_WALL_ATTACK_PROMOTION_CLASS",
+    "args": {
+     "PromotionClass": "PROMOTION_CLASS_ANTI_CAVALRY"
+    }
+   }
+  ],
   "pseudo": null,
   "promotionClass": "PROMOTION_CLASS_SUPPORT",
   "resource": null,
@@ -11829,6 +12084,70 @@ export const AI_UNITS: readonly AiUnitRow[] = [
    "CLASS_HOPLITE"
   ],
   "abilities": [
+   {
+    "id": "ANTI_CAVALRY_COMBAT_BONUS",
+    "collection": "COLLECTION_UNIT_COMBAT",
+    "effect": "EFFECT_ADJUST_PLAYER_STRENGTH_MODIFIER",
+    "args": {
+     "Amount": "10"
+    },
+    "subjectReqs": {
+     "test": "ANY",
+     "reqs": [
+      {
+       "type": "REQUIREMENT_OPPONENT_UNIT_TAG_MATCHES",
+       "inverse": false,
+       "args": {
+        "Tag": "CLASS_LIGHT_CAVALRY"
+       }
+      },
+      {
+       "type": "REQUIREMENT_OPPONENT_UNIT_TAG_MATCHES",
+       "inverse": false,
+       "args": {
+        "Tag": "CLASS_HEAVY_CAVALRY"
+       }
+      },
+      {
+       "type": "REQUIREMENT_OPPONENT_UNIT_TAG_MATCHES",
+       "inverse": false,
+       "args": {
+        "Tag": "CLASS_RANGED_CAVALRY"
+       }
+      }
+     ]
+    }
+   },
+   {
+    "id": "HOPLITE_NEIGHBOR_COMBAT",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ATTACH_MODIFIER",
+    "args": {
+     "ModifierId": "HOPLITE_NEIGHBOR_COMBAT_MODIFIER"
+    },
+    "attach": {
+     "id": "HOPLITE_NEIGHBOR_COMBAT_MODIFIER",
+     "collection": "COLLECTION_UNIT_COMBAT",
+     "effect": "EFFECT_ADJUST_PLAYER_STRENGTH_MODIFIER",
+     "args": {
+      "Amount": "10"
+     }
+    },
+    "subjectReqs": {
+     "test": "ALL",
+     "reqs": [
+      {
+       "type": "REQUIREMENT_PLOT_ADJACENT_FRIENDLY_UNIT_TYPE_MATCHES",
+       "inverse": false,
+       "args": {
+        "UnitType": "UNIT_GREEK_HOPLITE"
+       }
+      }
+     ]
+    }
+   }
+  ],
+  "modifiers": [
    {
     "id": "ANTI_CAVALRY_COMBAT_BONUS",
     "collection": "COLLECTION_UNIT_COMBAT",
@@ -11963,6 +12282,28 @@ export const AI_UNITS: readonly AiUnitRow[] = [
     }
    }
   ],
+  "modifiers": [
+   {
+    "id": "ANTI_SPEAR",
+    "collection": "COLLECTION_UNIT_COMBAT",
+    "effect": "EFFECT_ADJUST_PLAYER_STRENGTH_MODIFIER",
+    "args": {
+     "Amount": "5"
+    },
+    "subjectReqs": {
+     "test": "ALL",
+     "reqs": [
+      {
+       "type": "REQUIREMENT_OPPONENT_UNIT_PROMOTION_CLASS_MATCHES",
+       "inverse": false,
+       "args": {
+        "UnitPromotionClass": "PROMOTION_CLASS_ANTI_CAVALRY"
+       }
+      }
+     ]
+    }
+   }
+  ],
   "pseudo": null,
   "promotionClass": "PROMOTION_CLASS_MELEE",
   "resource": "RESOURCE_IRON",
@@ -12013,6 +12354,16 @@ export const AI_UNITS: readonly AiUnitRow[] = [
    "CLASS_LIGHT_CAVALRY"
   ],
   "abilities": [],
+  "modifiers": [
+   {
+    "id": "IGNOREZOC_IGNORE_ZOC",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADJUST_UNIT_IGNORE_ZOC",
+    "args": {
+     "Ignore": "true"
+    }
+   }
+  ],
   "pseudo": null,
   "promotionClass": "PROMOTION_CLASS_LIGHT_CAVALRY",
   "resource": "RESOURCE_HORSES",
@@ -12064,6 +12415,16 @@ export const AI_UNITS: readonly AiUnitRow[] = [
    "CLASS_MOBILE_RANGED"
   ],
   "abilities": [],
+  "modifiers": [
+   {
+    "id": "IGNOREZOC_IGNORE_ZOC",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADJUST_UNIT_IGNORE_ZOC",
+    "args": {
+     "Ignore": "true"
+    }
+   }
+  ],
   "pseudo": null,
   "promotionClass": "PROMOTION_CLASS_RANGED",
   "resource": null,
@@ -12115,6 +12476,28 @@ export const AI_UNITS: readonly AiUnitRow[] = [
    "CLASS_LEGION"
   ],
   "abilities": [
+   {
+    "id": "ANTI_SPEAR",
+    "collection": "COLLECTION_UNIT_COMBAT",
+    "effect": "EFFECT_ADJUST_PLAYER_STRENGTH_MODIFIER",
+    "args": {
+     "Amount": "5"
+    },
+    "subjectReqs": {
+     "test": "ALL",
+     "reqs": [
+      {
+       "type": "REQUIREMENT_OPPONENT_UNIT_PROMOTION_CLASS_MATCHES",
+       "inverse": false,
+       "args": {
+        "UnitPromotionClass": "PROMOTION_CLASS_ANTI_CAVALRY"
+       }
+      }
+     ]
+    }
+   }
+  ],
+  "modifiers": [
    {
     "id": "ANTI_SPEAR",
     "collection": "COLLECTION_UNIT_COMBAT",
@@ -12233,6 +12616,70 @@ export const AI_UNITS: readonly AiUnitRow[] = [
     }
    }
   ],
+  "modifiers": [
+   {
+    "id": "ANTI_SPEAR",
+    "collection": "COLLECTION_UNIT_COMBAT",
+    "effect": "EFFECT_ADJUST_PLAYER_STRENGTH_MODIFIER",
+    "args": {
+     "Amount": "5"
+    },
+    "subjectReqs": {
+     "test": "ALL",
+     "reqs": [
+      {
+       "type": "REQUIREMENT_OPPONENT_UNIT_PROMOTION_CLASS_MATCHES",
+       "inverse": false,
+       "args": {
+        "UnitPromotionClass": "PROMOTION_CLASS_ANTI_CAVALRY"
+       }
+      }
+     ]
+    }
+   },
+   {
+    "id": "NAGAO_FOREST_SIGHT",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADJUST_UNIT_SEE_THROUGH_FEATURES",
+    "args": {
+     "CanSee": "true"
+    }
+   },
+   {
+    "id": "NAGAO_FOREST_MOVEMENT",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADJUST_UNIT_IGNORE_TERRAIN_COST",
+    "args": {
+     "Ignore": "true",
+     "Type": "FOREST"
+    }
+   },
+   {
+    "id": "NAGAO_RANGED_DEFENSE",
+    "collection": "COLLECTION_UNIT_COMBAT",
+    "effect": "EFFECT_ADJUST_PLAYER_STRENGTH_MODIFIER",
+    "args": {
+     "Amount": "10"
+    },
+    "subjectReqs": {
+     "test": "ALL",
+     "reqs": [
+      {
+       "type": "REQUIREMENT_COMBAT_TYPE_MATCHES",
+       "inverse": false,
+       "args": {
+        "CombatType": "COMBAT_RANGED"
+       }
+      },
+      {
+       "type": "REQUIREMENT_PLAYER_IS_ATTACKING",
+       "inverse": true,
+       "args": {}
+      }
+     ]
+    }
+   }
+  ],
   "pseudo": null,
   "promotionClass": "PROMOTION_CLASS_MELEE",
   "resource": "RESOURCE_IRON",
@@ -12285,6 +12732,36 @@ export const AI_UNITS: readonly AiUnitRow[] = [
    "CLASS_FORWARD_OBSERVER"
   ],
   "abilities": [],
+  "modifiers": [
+   {
+    "id": "NOMOVEANDSHOOT_MOVE_AND_ATTACK",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADJUST_UNIT_MOVE_AND_ATTACK",
+    "args": {
+     "CanAttack": "false"
+    }
+   },
+   {
+    "id": "RECEIVE_RANGE_BONUS",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADJUST_UNIT_ATTACK_RANGE",
+    "args": {
+     "Amount": "1"
+    },
+    "subjectReqs": {
+     "test": "ALL",
+     "reqs": [
+      {
+       "type": "REQUIREMENT_PLOT_ADJACENT_FRIENDLY_UNIT_TAG_MATCHES",
+       "inverse": false,
+       "args": {
+        "Tag": "CLASS_OBSERVATION"
+       }
+      }
+     ]
+    }
+   }
+  ],
   "pseudo": null,
   "promotionClass": "PROMOTION_CLASS_SIEGE",
   "resource": null,
@@ -12336,6 +12813,24 @@ export const AI_UNITS: readonly AiUnitRow[] = [
    "CLASS_SUPPORT"
   ],
   "abilities": [],
+  "modifiers": [
+   {
+    "id": "BYPASS_WALLS_MELEE",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADJUST_UNIT_BYPASS_WALLS_PROMOTION_CLASS",
+    "args": {
+     "PromotionClass": "PROMOTION_CLASS_MELEE"
+    }
+   },
+   {
+    "id": "BYPASS_WALLS_ANTI_CAVALRY",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADJUST_UNIT_BYPASS_WALLS_PROMOTION_CLASS",
+    "args": {
+     "PromotionClass": "PROMOTION_CLASS_ANTI_CAVALRY"
+    }
+   }
+  ],
   "pseudo": null,
   "promotionClass": "PROMOTION_CLASS_SUPPORT",
   "resource": null,
@@ -12386,6 +12881,7 @@ export const AI_UNITS: readonly AiUnitRow[] = [
    "CLASS_NAVAL_RANGED"
   ],
   "abilities": [],
+  "modifiers": [],
   "pseudo": "PSEUDOYIELD_UNIT_NAVAL_COMBAT",
   "promotionClass": "PROMOTION_CLASS_NAVAL_RANGED",
   "resource": null,
@@ -12437,6 +12933,24 @@ export const AI_UNITS: readonly AiUnitRow[] = [
    "CLASS_RANGED_CAVALRY"
   ],
   "abilities": [],
+  "modifiers": [
+   {
+    "id": "IGNOREZOC_IGNORE_ZOC",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADJUST_UNIT_IGNORE_ZOC",
+    "args": {
+     "Ignore": "true"
+    }
+   },
+   {
+    "id": "LIGHTCHARIOT_FASTER_CLEAR_TERRAIN",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADJUST_UNIT_CLEAR_TERRAIN_START_MOVEMENT",
+    "args": {
+     "Amount": "2"
+    }
+   }
+  ],
   "pseudo": null,
   "promotionClass": "PROMOTION_CLASS_RANGED",
   "resource": null,
@@ -12506,6 +13020,36 @@ export const AI_UNITS: readonly AiUnitRow[] = [
        }
       }
      ]
+    }
+   }
+  ],
+  "modifiers": [
+   {
+    "id": "ANTI_SPEAR",
+    "collection": "COLLECTION_UNIT_COMBAT",
+    "effect": "EFFECT_ADJUST_PLAYER_STRENGTH_MODIFIER",
+    "args": {
+     "Amount": "5"
+    },
+    "subjectReqs": {
+     "test": "ALL",
+     "reqs": [
+      {
+       "type": "REQUIREMENT_OPPONENT_UNIT_PROMOTION_CLASS_MATCHES",
+       "inverse": false,
+       "args": {
+        "UnitPromotionClass": "PROMOTION_CLASS_ANTI_CAVALRY"
+       }
+      }
+     ]
+    }
+   },
+   {
+    "id": "SAMURAI_NO_REDUCTION_DAMAGE",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADJUST_UNIT_NO_REDUCTION_DAMAGE",
+    "args": {
+     "NoReduction": "true"
     }
    }
   ],
@@ -12624,6 +13168,89 @@ export const AI_UNITS: readonly AiUnitRow[] = [
     }
    }
   ],
+  "modifiers": [
+   {
+    "id": "ANTI_SPEAR",
+    "collection": "COLLECTION_UNIT_COMBAT",
+    "effect": "EFFECT_ADJUST_PLAYER_STRENGTH_MODIFIER",
+    "args": {
+     "Amount": "5"
+    },
+    "subjectReqs": {
+     "test": "ALL",
+     "reqs": [
+      {
+       "type": "REQUIREMENT_OPPONENT_UNIT_PROMOTION_CLASS_MATCHES",
+       "inverse": false,
+       "args": {
+        "UnitPromotionClass": "PROMOTION_CLASS_ANTI_CAVALRY"
+       }
+      }
+     ]
+    }
+   },
+   {
+    "id": "UNIT_STRONG_WHEN_ATTACKING",
+    "collection": "COLLECTION_UNIT_COMBAT",
+    "effect": "EFFECT_ADJUST_PLAYER_STRENGTH_MODIFIER",
+    "args": {
+     "Amount": "10"
+    },
+    "subjectReqs": {
+     "test": "ALL",
+     "reqs": [
+      {
+       "type": "REQUIREMENT_PLAYER_IS_ATTACKING",
+       "inverse": false,
+       "args": {}
+      }
+     ]
+    }
+   },
+   {
+    "id": "UNIT_WEAK_WHEN_DEFENDING",
+    "collection": "COLLECTION_UNIT_COMBAT",
+    "effect": "EFFECT_ADJUST_PLAYER_STRENGTH_MODIFIER",
+    "args": {
+     "Amount": "-5"
+    },
+    "subjectReqs": {
+     "test": "ALL",
+     "reqs": [
+      {
+       "type": "REQUIREMENT_PLAYER_IS_ATTACKING",
+       "inverse": true,
+       "args": {}
+      },
+      {
+       "type": "REQUIREMENT_COMBAT_TYPE_MATCHES",
+       "inverse": false,
+       "args": {
+        "CombatType": "COMBAT_MELEE"
+       }
+      }
+     ]
+    }
+   },
+   {
+    "id": "BERSERKER_FASTER_ENEMY_TERRITORY",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADJUST_UNIT_MOVEMENT",
+    "args": {
+     "Amount": "2"
+    },
+    "subjectReqs": {
+     "test": "ALL",
+     "reqs": [
+      {
+       "type": "REQUIREMENT_UNIT_IN_ENEMY_TERRITORY",
+       "inverse": false,
+       "args": {}
+      }
+     ]
+    }
+   }
+  ],
   "pseudo": null,
   "promotionClass": "PROMOTION_CLASS_MELEE",
   "resource": "RESOURCE_IRON",
@@ -12674,6 +13301,16 @@ export const AI_UNITS: readonly AiUnitRow[] = [
    "CLASS_HEAVY_CAVALRY"
   ],
   "abilities": [],
+  "modifiers": [
+   {
+    "id": "IGNOREZOC_IGNORE_ZOC",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADJUST_UNIT_IGNORE_ZOC",
+    "args": {
+     "Ignore": "true"
+    }
+   }
+  ],
   "pseudo": null,
   "promotionClass": "PROMOTION_CLASS_HEAVY_CAVALRY",
   "resource": "RESOURCE_IRON",
@@ -12755,6 +13392,45 @@ export const AI_UNITS: readonly AiUnitRow[] = [
     }
    }
   ],
+  "modifiers": [
+   {
+    "id": "IGNOREZOC_IGNORE_ZOC",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADJUST_UNIT_IGNORE_ZOC",
+    "args": {
+     "Ignore": "true"
+    }
+   },
+   {
+    "id": "VARU_NEGATIVE_COMBAT",
+    "collection": "COLLECTION_ALL_UNITS",
+    "effect": "EFFECT_ATTACH_MODIFIER",
+    "args": {
+     "ModifierId": "VARU_NEGATIVE_COMBAT_MODIFIER"
+    },
+    "attach": {
+     "id": "VARU_NEGATIVE_COMBAT_MODIFIER",
+     "collection": "COLLECTION_UNIT_COMBAT",
+     "effect": "EFFECT_ADJUST_PLAYER_STRENGTH_MODIFIER",
+     "args": {
+      "Amount": "-5"
+     }
+    },
+    "subjectReqs": {
+     "test": "ALL",
+     "reqs": [
+      {
+       "type": "REQUIREMENT_PLOT_ADJACENT_TO_OWNER_AT_WAR",
+       "inverse": false,
+       "args": {
+        "MinDistance": "1",
+        "MaxDistance": "1"
+       }
+      }
+     ]
+    }
+   }
+  ],
   "pseudo": null,
   "promotionClass": "PROMOTION_CLASS_HEAVY_CAVALRY",
   "resource": null,
@@ -12806,6 +13482,22 @@ export const AI_UNITS: readonly AiUnitRow[] = [
    "CLASS_MAMLUK"
   ],
   "abilities": [],
+  "modifiers": [
+   {
+    "id": "IGNOREZOC_IGNORE_ZOC",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADJUST_UNIT_IGNORE_ZOC",
+    "args": {
+     "Ignore": "true"
+    }
+   },
+   {
+    "id": "MAMLUK_HEAL_EVERY_MOVE",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_GRANT_HEAL_AFTER_ACTION",
+    "args": {}
+   }
+  ],
   "pseudo": null,
   "promotionClass": "PROMOTION_CLASS_HEAVY_CAVALRY",
   "resource": "RESOURCE_IRON",
@@ -12856,6 +13548,7 @@ export const AI_UNITS: readonly AiUnitRow[] = [
    "CLASS_RANGED"
   ],
   "abilities": [],
+  "modifiers": [],
   "pseudo": null,
   "promotionClass": "PROMOTION_CLASS_RANGED",
   "resource": null,
@@ -12906,6 +13599,7 @@ export const AI_UNITS: readonly AiUnitRow[] = [
    "CLASS_RANGED"
   ],
   "abilities": [],
+  "modifiers": [],
   "pseudo": null,
   "promotionClass": "PROMOTION_CLASS_RANGED",
   "resource": null,
@@ -12956,6 +13650,7 @@ export const AI_UNITS: readonly AiUnitRow[] = [
    "CLASS_SUPPORT"
   ],
   "abilities": [],
+  "modifiers": [],
   "pseudo": null,
   "promotionClass": "PROMOTION_CLASS_SUPPORT",
   "resource": null,
@@ -13041,6 +13736,42 @@ export const AI_UNITS: readonly AiUnitRow[] = [
     }
    }
   ],
+  "modifiers": [
+   {
+    "id": "ANTI_CAVALRY_COMBAT_BONUS",
+    "collection": "COLLECTION_UNIT_COMBAT",
+    "effect": "EFFECT_ADJUST_PLAYER_STRENGTH_MODIFIER",
+    "args": {
+     "Amount": "10"
+    },
+    "subjectReqs": {
+     "test": "ANY",
+     "reqs": [
+      {
+       "type": "REQUIREMENT_OPPONENT_UNIT_TAG_MATCHES",
+       "inverse": false,
+       "args": {
+        "Tag": "CLASS_LIGHT_CAVALRY"
+       }
+      },
+      {
+       "type": "REQUIREMENT_OPPONENT_UNIT_TAG_MATCHES",
+       "inverse": false,
+       "args": {
+        "Tag": "CLASS_HEAVY_CAVALRY"
+       }
+      },
+      {
+       "type": "REQUIREMENT_OPPONENT_UNIT_TAG_MATCHES",
+       "inverse": false,
+       "args": {
+        "Tag": "CLASS_RANGED_CAVALRY"
+       }
+      }
+     ]
+    }
+   }
+  ],
   "pseudo": null,
   "promotionClass": "PROMOTION_CLASS_ANTI_CAVALRY",
   "resource": null,
@@ -13091,6 +13822,28 @@ export const AI_UNITS: readonly AiUnitRow[] = [
    "CLASS_MELEE"
   ],
   "abilities": [
+   {
+    "id": "ANTI_SPEAR",
+    "collection": "COLLECTION_UNIT_COMBAT",
+    "effect": "EFFECT_ADJUST_PLAYER_STRENGTH_MODIFIER",
+    "args": {
+     "Amount": "5"
+    },
+    "subjectReqs": {
+     "test": "ALL",
+     "reqs": [
+      {
+       "type": "REQUIREMENT_OPPONENT_UNIT_PROMOTION_CLASS_MATCHES",
+       "inverse": false,
+       "args": {
+        "UnitPromotionClass": "PROMOTION_CLASS_ANTI_CAVALRY"
+       }
+      }
+     ]
+    }
+   }
+  ],
+  "modifiers": [
    {
     "id": "ANTI_SPEAR",
     "collection": "COLLECTION_UNIT_COMBAT",
@@ -13205,6 +13958,57 @@ export const AI_UNITS: readonly AiUnitRow[] = [
     }
    }
   ],
+  "modifiers": [
+   {
+    "id": "ANTI_SPEAR",
+    "collection": "COLLECTION_UNIT_COMBAT",
+    "effect": "EFFECT_ADJUST_PLAYER_STRENGTH_MODIFIER",
+    "args": {
+     "Amount": "5"
+    },
+    "subjectReqs": {
+     "test": "ALL",
+     "reqs": [
+      {
+       "type": "REQUIREMENT_OPPONENT_UNIT_PROMOTION_CLASS_MATCHES",
+       "inverse": false,
+       "args": {
+        "UnitPromotionClass": "PROMOTION_CLASS_ANTI_CAVALRY"
+       }
+      }
+     ]
+    }
+   },
+   {
+    "id": "CONQUISTADOR_SPECIFIC_UNIT_COMBAT",
+    "collection": "COLLECTION_UNIT_COMBAT",
+    "effect": "EFFECT_ADJUST_PLAYER_STRENGTH_MODIFIER",
+    "args": {
+     "Amount": "10"
+    },
+    "subjectReqs": {
+     "test": "ANY",
+     "reqs": [
+      {
+       "type": "REQUIREMENT_PLOT_ADJACENT_FRIENDLY_UNIT_TAG_MATCHES",
+       "inverse": false,
+       "args": {
+        "Tag": "CLASS_RELIGIOUS_ALL",
+        "IncludeCenter": "true"
+       }
+      }
+     ]
+    }
+   },
+   {
+    "id": "CONQUISTADOR_CITY_RELIGION_COMBAT",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADJUST_CITY_RELIGION_ON_CAPTURE",
+    "args": {
+     "Enable": "true"
+    }
+   }
+  ],
   "pseudo": null,
   "promotionClass": "PROMOTION_CLASS_MELEE",
   "resource": "RESOURCE_NITER",
@@ -13255,6 +14059,7 @@ export const AI_UNITS: readonly AiUnitRow[] = [
    "CLASS_NAVAL_MELEE"
   ],
   "abilities": [],
+  "modifiers": [],
   "pseudo": "PSEUDOYIELD_UNIT_NAVAL_COMBAT",
   "promotionClass": "PROMOTION_CLASS_NAVAL_MELEE",
   "resource": null,
@@ -13307,6 +14112,36 @@ export const AI_UNITS: readonly AiUnitRow[] = [
    "CLASS_FORWARD_OBSERVER"
   ],
   "abilities": [],
+  "modifiers": [
+   {
+    "id": "NOMOVEANDSHOOT_MOVE_AND_ATTACK",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADJUST_UNIT_MOVE_AND_ATTACK",
+    "args": {
+     "CanAttack": "false"
+    }
+   },
+   {
+    "id": "RECEIVE_RANGE_BONUS",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADJUST_UNIT_ATTACK_RANGE",
+    "args": {
+     "Amount": "1"
+    },
+    "subjectReqs": {
+     "test": "ALL",
+     "reqs": [
+      {
+       "type": "REQUIREMENT_PLOT_ADJACENT_FRIENDLY_UNIT_TAG_MATCHES",
+       "inverse": false,
+       "args": {
+        "Tag": "CLASS_OBSERVATION"
+       }
+      }
+     ]
+    }
+   }
+  ],
   "pseudo": null,
   "promotionClass": "PROMOTION_CLASS_SIEGE",
   "resource": "RESOURCE_NITER",
@@ -13357,6 +14192,7 @@ export const AI_UNITS: readonly AiUnitRow[] = [
    "CLASS_NAVAL_RANGED"
   ],
   "abilities": [],
+  "modifiers": [],
   "pseudo": "PSEUDOYIELD_UNIT_NAVAL_COMBAT",
   "promotionClass": "PROMOTION_CLASS_NAVAL_RANGED",
   "resource": "RESOURCE_NITER",
@@ -13410,6 +14246,40 @@ export const AI_UNITS: readonly AiUnitRow[] = [
    "CLASS_REVEAL_STEALTH"
   ],
   "abilities": [],
+  "modifiers": [
+   {
+    "id": "IGNOREZOC_IGNORE_ZOC",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADJUST_UNIT_IGNORE_ZOC",
+    "args": {
+     "Ignore": "true"
+    }
+   },
+   {
+    "id": "UNIT_HIDDEN_VISIBILITY",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADJUST_UNIT_HIDDEN_VISIBILITY",
+    "args": {
+     "Hidden": "true"
+    }
+   },
+   {
+    "id": "UNIT_SEE_HIDDEN",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADJUST_UNIT_SEE_HIDDEN",
+    "args": {
+     "SeeHidden": "true"
+    }
+   },
+   {
+    "id": "UNIT_COASTAL_RAID",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADJUST_UNIT_RAIDING",
+    "args": {
+     "CanRaid": "true"
+    }
+   }
+  ],
   "pseudo": "PSEUDOYIELD_UNIT_NAVAL_COMBAT",
   "promotionClass": "PROMOTION_CLASS_NAVAL_RAIDER",
   "resource": null,
@@ -13464,6 +14334,48 @@ export const AI_UNITS: readonly AiUnitRow[] = [
    "CLASS_CAPTURE_SHIPS"
   ],
   "abilities": [],
+  "modifiers": [
+   {
+    "id": "IGNOREZOC_IGNORE_ZOC",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADJUST_UNIT_IGNORE_ZOC",
+    "args": {
+     "Ignore": "true"
+    }
+   },
+   {
+    "id": "UNIT_HIDDEN_VISIBILITY",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADJUST_UNIT_HIDDEN_VISIBILITY",
+    "args": {
+     "Hidden": "true"
+    }
+   },
+   {
+    "id": "UNIT_SEE_HIDDEN",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADJUST_UNIT_SEE_HIDDEN",
+    "args": {
+     "SeeHidden": "true"
+    }
+   },
+   {
+    "id": "UNIT_COASTAL_RAID",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADJUST_UNIT_RAIDING",
+    "args": {
+     "CanRaid": "true"
+    }
+   },
+   {
+    "id": "CAPTURE_PRIZE_SHIPS",
+    "collection": "COLLECTION_UNIT_COMBAT",
+    "effect": "EFFECT_ADJUST_UNIT_COMBAT_UNIT_CAPTURE",
+    "args": {
+     "CanCapture": "true"
+    }
+   }
+  ],
   "pseudo": "PSEUDOYIELD_UNIT_NAVAL_COMBAT",
   "promotionClass": "PROMOTION_CLASS_NAVAL_RAIDER",
   "resource": null,
@@ -13514,6 +14426,7 @@ export const AI_UNITS: readonly AiUnitRow[] = [
    "CLASS_RANGED"
   ],
   "abilities": [],
+  "modifiers": [],
   "pseudo": null,
   "promotionClass": "PROMOTION_CLASS_RANGED",
   "resource": null,
@@ -13564,6 +14477,16 @@ export const AI_UNITS: readonly AiUnitRow[] = [
    "CLASS_LIGHT_CAVALRY"
   ],
   "abilities": [],
+  "modifiers": [
+   {
+    "id": "IGNOREZOC_IGNORE_ZOC",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADJUST_UNIT_IGNORE_ZOC",
+    "args": {
+     "Ignore": "true"
+    }
+   }
+  ],
   "pseudo": null,
   "promotionClass": "PROMOTION_CLASS_LIGHT_CAVALRY",
   "resource": "RESOURCE_HORSES",
@@ -13634,6 +14557,47 @@ export const AI_UNITS: readonly AiUnitRow[] = [
        "args": {}
       }
      ]
+    }
+   }
+  ],
+  "modifiers": [
+   {
+    "id": "IGNOREZOC_IGNORE_ZOC",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADJUST_UNIT_IGNORE_ZOC",
+    "args": {
+     "Ignore": "true"
+    }
+   },
+   {
+    "id": "COSSACK_LOCAL_COMBAT",
+    "collection": "COLLECTION_UNIT_COMBAT",
+    "effect": "EFFECT_ADJUST_PLAYER_STRENGTH_MODIFIER",
+    "args": {
+     "Amount": "5"
+    },
+    "subjectReqs": {
+     "test": "ANY",
+     "reqs": [
+      {
+       "type": "REQUIREMENT_UNIT_ADJACENT_TO_OWNER_TERRITORY",
+       "inverse": false,
+       "args": {}
+      },
+      {
+       "type": "REQUIREMENT_UNIT_IN_OWNER_TERRITORY",
+       "inverse": false,
+       "args": {}
+      }
+     ]
+    }
+   },
+   {
+    "id": "COSSACK_MOVE_AND_ATTACK",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADJUST_UNIT_ATTACK_AND_MOVE",
+    "args": {
+     "CanMove": "true"
     }
    }
   ],
@@ -13725,6 +14689,54 @@ export const AI_UNITS: readonly AiUnitRow[] = [
     }
    }
   ],
+  "modifiers": [
+   {
+    "id": "ANTI_SPEAR",
+    "collection": "COLLECTION_UNIT_COMBAT",
+    "effect": "EFFECT_ADJUST_PLAYER_STRENGTH_MODIFIER",
+    "args": {
+     "Amount": "5"
+    },
+    "subjectReqs": {
+     "test": "ALL",
+     "reqs": [
+      {
+       "type": "REQUIREMENT_OPPONENT_UNIT_PROMOTION_CLASS_MATCHES",
+       "inverse": false,
+       "args": {
+        "UnitPromotionClass": "PROMOTION_CLASS_ANTI_CAVALRY"
+       }
+      }
+     ]
+    }
+   },
+   {
+    "id": "REDCOAT_FOREIGN_COMBAT",
+    "collection": "COLLECTION_UNIT_COMBAT",
+    "effect": "EFFECT_ADJUST_PLAYER_STRENGTH_MODIFIER",
+    "args": {
+     "Amount": "10"
+    },
+    "subjectReqs": {
+     "test": "ALL",
+     "reqs": [
+      {
+       "type": "REQUIREMENT_UNIT_ON_HOME_CONTINENT",
+       "inverse": true,
+       "args": {}
+      }
+     ]
+    }
+   },
+   {
+    "id": "REDCOAT_DISEMBARK",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADJUST_UNIT_IGNORE_SHORES",
+    "args": {
+     "Ignore": "true"
+    }
+   }
+  ],
   "pseudo": null,
   "promotionClass": "PROMOTION_CLASS_MELEE",
   "resource": "RESOURCE_NITER",
@@ -13813,6 +14825,55 @@ export const AI_UNITS: readonly AiUnitRow[] = [
     }
    }
   ],
+  "modifiers": [
+   {
+    "id": "ANTI_SPEAR",
+    "collection": "COLLECTION_UNIT_COMBAT",
+    "effect": "EFFECT_ADJUST_PLAYER_STRENGTH_MODIFIER",
+    "args": {
+     "Amount": "5"
+    },
+    "subjectReqs": {
+     "test": "ALL",
+     "reqs": [
+      {
+       "type": "REQUIREMENT_OPPONENT_UNIT_PROMOTION_CLASS_MATCHES",
+       "inverse": false,
+       "args": {
+        "UnitPromotionClass": "PROMOTION_CLASS_ANTI_CAVALRY"
+       }
+      }
+     ]
+    }
+   },
+   {
+    "id": "GARDE_GREAT_GENERAL_POINTS",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADJUST_GREAT_PEOPLE_POINTS_PER_KILL",
+    "args": {
+     "Amount": "10",
+     "GreatPersonClassType": "GREAT_PERSON_CLASS_GENERAL"
+    }
+   },
+   {
+    "id": "GARDE_CONTINENT_COMBAT",
+    "collection": "COLLECTION_UNIT_COMBAT",
+    "effect": "EFFECT_ADJUST_PLAYER_STRENGTH_MODIFIER",
+    "args": {
+     "Amount": "10"
+    },
+    "subjectReqs": {
+     "test": "ALL",
+     "reqs": [
+      {
+       "type": "REQUIREMENT_UNIT_ON_HOME_CONTINENT",
+       "inverse": false,
+       "args": {}
+      }
+     ]
+    }
+   }
+  ],
   "pseudo": null,
   "promotionClass": "PROMOTION_CLASS_MELEE",
   "resource": "RESOURCE_NITER",
@@ -13862,6 +14923,29 @@ export const AI_UNITS: readonly AiUnitRow[] = [
    "CLASS_SUPPORT"
   ],
   "abilities": [],
+  "modifiers": [
+   {
+    "id": "MEDIC_INCREASE_HEAL_RATE",
+    "collection": "COLLECTION_PLAYER_UNITS",
+    "effect": "EFFECT_ADJUST_UNIT_HEALING_MODIFIERS",
+    "args": {
+     "Amount": "20",
+     "Type": "ALL"
+    },
+    "subjectReqs": {
+     "test": "ALL",
+     "reqs": [
+      {
+       "type": "REQUIREMENT_PLOT_ADJACENT_TO_OWNER",
+       "inverse": false,
+       "args": {
+        "MinDistance": "0"
+       }
+      }
+     ]
+    }
+   }
+  ],
   "pseudo": null,
   "promotionClass": "PROMOTION_CLASS_SUPPORT",
   "resource": null,
@@ -13910,6 +14994,7 @@ export const AI_UNITS: readonly AiUnitRow[] = [
    "CLASS_NAVAL_MELEE"
   ],
   "abilities": [],
+  "modifiers": [],
   "pseudo": "PSEUDOYIELD_UNIT_NAVAL_COMBAT",
   "promotionClass": "PROMOTION_CLASS_NAVAL_MELEE",
   "resource": "RESOURCE_COAL",
@@ -13959,6 +15044,83 @@ export const AI_UNITS: readonly AiUnitRow[] = [
    "CLASS_ROUGH_RIDER"
   ],
   "abilities": [
+   {
+    "id": "ROUGH_RIDER_BONUS_ON_HILLS",
+    "collection": "COLLECTION_UNIT_COMBAT",
+    "effect": "EFFECT_ADJUST_PLAYER_STRENGTH_MODIFIER",
+    "args": {
+     "Amount": "10"
+    },
+    "subjectReqs": {
+     "test": "ANY",
+     "reqs": [
+      {
+       "type": "REQUIREMENT_PLOT_TERRAIN_TYPE_MATCHES",
+       "inverse": false,
+       "args": {
+        "TerrainType": "TERRAIN_GRASS_HILLS"
+       }
+      },
+      {
+       "type": "REQUIREMENT_PLOT_TERRAIN_TYPE_MATCHES",
+       "inverse": false,
+       "args": {
+        "TerrainType": "TERRAIN_PLAINS_HILLS"
+       }
+      },
+      {
+       "type": "REQUIREMENT_PLOT_TERRAIN_TYPE_MATCHES",
+       "inverse": false,
+       "args": {
+        "TerrainType": "TERRAIN_TUNDRA_HILLS"
+       }
+      },
+      {
+       "type": "REQUIREMENT_PLOT_TERRAIN_TYPE_MATCHES",
+       "inverse": false,
+       "args": {
+        "TerrainType": "TERRAIN_DESERT_HILLS"
+       }
+      },
+      {
+       "type": "REQUIREMENT_PLOT_TERRAIN_TYPE_MATCHES",
+       "inverse": false,
+       "args": {
+        "TerrainType": "TERRAIN_SNOW_HILLS"
+       }
+      }
+     ]
+    }
+   }
+  ],
+  "modifiers": [
+   {
+    "id": "IGNOREZOC_IGNORE_ZOC",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADJUST_UNIT_IGNORE_ZOC",
+    "args": {
+     "Ignore": "true"
+    }
+   },
+   {
+    "id": "ROUGH_RIDER_POST_COMBAT_CULTURE",
+    "collection": "COLLECTION_UNIT_COMBAT",
+    "effect": "EFFECT_ADJUST_UNIT_POST_COMBAT_YIELD",
+    "args": {
+     "PercentDefeatedStrength": "50",
+     "YieldType": "YIELD_CULTURE"
+    },
+    "subjectReqs": {
+     "test": "ALL",
+     "reqs": [
+      {
+       "type": "REQUIREMENT_UNIT_ON_HOME_CONTINENT",
+       "inverse": false,
+       "args": {}
+      }
+     ]
+    }
+   },
    {
     "id": "ROUGH_RIDER_BONUS_ON_HILLS",
     "collection": "COLLECTION_UNIT_COMBAT",
@@ -14060,6 +15222,7 @@ export const AI_UNITS: readonly AiUnitRow[] = [
    "CLASS_MOBILE_RANGED"
   ],
   "abilities": [],
+  "modifiers": [],
   "pseudo": null,
   "promotionClass": "PROMOTION_CLASS_RECON",
   "resource": null,
@@ -14109,6 +15272,24 @@ export const AI_UNITS: readonly AiUnitRow[] = [
    "CLASS_SUPPORT"
   ],
   "abilities": [],
+  "modifiers": [
+   {
+    "id": "UNOBSTRUCTED_VIEW",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADJUST_UNIT_SEE_THROUGH_FEATURES",
+    "args": {
+     "CanSee": "true"
+    }
+   },
+   {
+    "id": "UNOBSTRUCTED_VIEW_TERRAIN",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADJUST_UNIT_SEE_THROUGH_TERRAIN",
+    "args": {
+     "CanSee": "true"
+    }
+   }
+  ],
   "pseudo": null,
   "promotionClass": "PROMOTION_CLASS_SUPPORT",
   "resource": null,
@@ -14158,6 +15339,32 @@ export const AI_UNITS: readonly AiUnitRow[] = [
    "CLASS_AIR_FIGHTER"
   ],
   "abilities": [],
+  "modifiers": [
+   {
+    "id": "UNOBSTRUCTED_VIEW",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADJUST_UNIT_SEE_THROUGH_FEATURES",
+    "args": {
+     "CanSee": "true"
+    }
+   },
+   {
+    "id": "UNOBSTRUCTED_VIEW_TERRAIN",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADJUST_UNIT_SEE_THROUGH_TERRAIN",
+    "args": {
+     "CanSee": "true"
+    }
+   },
+   {
+    "id": "ATTACK_BYPASS_COMBAT_UNIT",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADJUST_UNIT_BYPASS_COMBAT_UNIT",
+    "args": {
+     "Bypass": "true"
+    }
+   }
+  ],
   "pseudo": "PSEUDOYIELD_UNIT_AIR_COMBAT",
   "promotionClass": "PROMOTION_CLASS_AIR_FIGHTER",
   "resource": "RESOURCE_OIL",
@@ -14206,6 +15413,28 @@ export const AI_UNITS: readonly AiUnitRow[] = [
    "CLASS_MELEE"
   ],
   "abilities": [
+   {
+    "id": "ANTI_SPEAR",
+    "collection": "COLLECTION_UNIT_COMBAT",
+    "effect": "EFFECT_ADJUST_PLAYER_STRENGTH_MODIFIER",
+    "args": {
+     "Amount": "5"
+    },
+    "subjectReqs": {
+     "test": "ALL",
+     "reqs": [
+      {
+       "type": "REQUIREMENT_OPPONENT_UNIT_PROMOTION_CLASS_MATCHES",
+       "inverse": false,
+       "args": {
+        "UnitPromotionClass": "PROMOTION_CLASS_ANTI_CAVALRY"
+       }
+      }
+     ]
+    }
+   }
+  ],
+  "modifiers": [
    {
     "id": "ANTI_SPEAR",
     "collection": "COLLECTION_UNIT_COMBAT",
@@ -14299,6 +15528,56 @@ export const AI_UNITS: readonly AiUnitRow[] = [
     }
    }
   ],
+  "modifiers": [
+   {
+    "id": "NOMOVEANDSHOOT_MOVE_AND_ATTACK",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADJUST_UNIT_MOVE_AND_ATTACK",
+    "args": {
+     "CanAttack": "false"
+    }
+   },
+   {
+    "id": "RECEIVE_RANGE_BONUS",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADJUST_UNIT_ATTACK_RANGE",
+    "args": {
+     "Amount": "1"
+    },
+    "subjectReqs": {
+     "test": "ALL",
+     "reqs": [
+      {
+       "type": "REQUIREMENT_PLOT_ADJACENT_FRIENDLY_UNIT_TAG_MATCHES",
+       "inverse": false,
+       "args": {
+        "Tag": "CLASS_OBSERVATION"
+       }
+      }
+     ]
+    }
+   },
+   {
+    "id": "BOMBARD_STR_BUFF_FROM_DRONE",
+    "collection": "COLLECTION_UNIT_COMBAT",
+    "effect": "EFFECT_ADJUST_PLAYER_STRENGTH_MODIFIER",
+    "args": {
+     "Amount": "5"
+    },
+    "subjectReqs": {
+     "test": "ALL",
+     "reqs": [
+      {
+       "type": "REQUIREMENT_PLOT_ADJACENT_FRIENDLY_UNIT_TAG_MATCHES",
+       "inverse": false,
+       "args": {
+        "Tag": "CLASS_DRONE"
+       }
+      }
+     ]
+    }
+   }
+  ],
   "pseudo": null,
   "promotionClass": "PROMOTION_CLASS_SIEGE",
   "resource": "RESOURCE_OIL",
@@ -14348,6 +15627,7 @@ export const AI_UNITS: readonly AiUnitRow[] = [
    "CLASS_ANTI_AIR"
   ],
   "abilities": [],
+  "modifiers": [],
   "pseudo": "PSEUDOYIELD_UNIT_NAVAL_COMBAT",
   "promotionClass": "PROMOTION_CLASS_NAVAL_RANGED",
   "resource": "RESOURCE_COAL",
@@ -14397,6 +15677,7 @@ export const AI_UNITS: readonly AiUnitRow[] = [
    "CLASS_ANTI_AIR"
   ],
   "abilities": [],
+  "modifiers": [],
   "pseudo": "PSEUDOYIELD_UNIT_NAVAL_COMBAT",
   "promotionClass": "PROMOTION_CLASS_NAVAL_RANGED",
   "resource": "RESOURCE_COAL",
@@ -14448,6 +15729,40 @@ export const AI_UNITS: readonly AiUnitRow[] = [
    "CLASS_REVEAL_STEALTH"
   ],
   "abilities": [],
+  "modifiers": [
+   {
+    "id": "IGNOREZOC_IGNORE_ZOC",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADJUST_UNIT_IGNORE_ZOC",
+    "args": {
+     "Ignore": "true"
+    }
+   },
+   {
+    "id": "UNIT_HIDDEN_VISIBILITY",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADJUST_UNIT_HIDDEN_VISIBILITY",
+    "args": {
+     "Hidden": "true"
+    }
+   },
+   {
+    "id": "UNIT_SEE_HIDDEN",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADJUST_UNIT_SEE_HIDDEN",
+    "args": {
+     "SeeHidden": "true"
+    }
+   },
+   {
+    "id": "UNIT_COASTAL_RAID",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADJUST_UNIT_RAIDING",
+    "args": {
+     "CanRaid": "true"
+    }
+   }
+  ],
   "pseudo": "PSEUDOYIELD_UNIT_NAVAL_COMBAT",
   "promotionClass": "PROMOTION_CLASS_NAVAL_RAIDER",
   "resource": "RESOURCE_OIL",
@@ -14500,6 +15815,60 @@ export const AI_UNITS: readonly AiUnitRow[] = [
    "CLASS_REVEAL_STEALTH"
   ],
   "abilities": [
+   {
+    "id": "UBOAT_OCEAN_COMBAT",
+    "collection": "COLLECTION_UNIT_COMBAT",
+    "effect": "EFFECT_ADJUST_PLAYER_STRENGTH_MODIFIER",
+    "args": {
+     "Amount": "10"
+    },
+    "subjectReqs": {
+     "test": "ALL",
+     "reqs": [
+      {
+       "type": "REQUIREMENT_PLOT_TERRAIN_TYPE_MATCHES",
+       "inverse": false,
+       "args": {
+        "TerrainType": "TERRAIN_OCEAN"
+       }
+      }
+     ]
+    }
+   }
+  ],
+  "modifiers": [
+   {
+    "id": "IGNOREZOC_IGNORE_ZOC",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADJUST_UNIT_IGNORE_ZOC",
+    "args": {
+     "Ignore": "true"
+    }
+   },
+   {
+    "id": "UNIT_HIDDEN_VISIBILITY",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADJUST_UNIT_HIDDEN_VISIBILITY",
+    "args": {
+     "Hidden": "true"
+    }
+   },
+   {
+    "id": "UNIT_SEE_HIDDEN",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADJUST_UNIT_SEE_HIDDEN",
+    "args": {
+     "SeeHidden": "true"
+    }
+   },
+   {
+    "id": "UNIT_COASTAL_RAID",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADJUST_UNIT_RAIDING",
+    "args": {
+     "CanRaid": "true"
+    }
+   },
    {
     "id": "UBOAT_OCEAN_COMBAT",
     "collection": "COLLECTION_UNIT_COMBAT",
@@ -14604,6 +15973,42 @@ export const AI_UNITS: readonly AiUnitRow[] = [
     }
    }
   ],
+  "modifiers": [
+   {
+    "id": "ANTI_CAVALRY_COMBAT_BONUS",
+    "collection": "COLLECTION_UNIT_COMBAT",
+    "effect": "EFFECT_ADJUST_PLAYER_STRENGTH_MODIFIER",
+    "args": {
+     "Amount": "10"
+    },
+    "subjectReqs": {
+     "test": "ANY",
+     "reqs": [
+      {
+       "type": "REQUIREMENT_OPPONENT_UNIT_TAG_MATCHES",
+       "inverse": false,
+       "args": {
+        "Tag": "CLASS_LIGHT_CAVALRY"
+       }
+      },
+      {
+       "type": "REQUIREMENT_OPPONENT_UNIT_TAG_MATCHES",
+       "inverse": false,
+       "args": {
+        "Tag": "CLASS_HEAVY_CAVALRY"
+       }
+      },
+      {
+       "type": "REQUIREMENT_OPPONENT_UNIT_TAG_MATCHES",
+       "inverse": false,
+       "args": {
+        "Tag": "CLASS_RANGED_CAVALRY"
+       }
+      }
+     ]
+    }
+   }
+  ],
   "pseudo": null,
   "promotionClass": "PROMOTION_CLASS_ANTI_CAVALRY",
   "resource": null,
@@ -14653,6 +16058,24 @@ export const AI_UNITS: readonly AiUnitRow[] = [
    "CLASS_HEAVY_CAVALRY"
   ],
   "abilities": [],
+  "modifiers": [
+   {
+    "id": "HEAVYCHARIOT_FASTER_CLEAR_TERRAIN",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADJUST_UNIT_CLEAR_TERRAIN_START_MOVEMENT",
+    "args": {
+     "Amount": "1"
+    }
+   },
+   {
+    "id": "IGNOREZOC_IGNORE_ZOC",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADJUST_UNIT_IGNORE_ZOC",
+    "args": {
+     "Ignore": "true"
+    }
+   }
+  ],
   "pseudo": null,
   "promotionClass": "PROMOTION_CLASS_HEAVY_CAVALRY",
   "resource": "RESOURCE_OIL",
@@ -14702,6 +16125,32 @@ export const AI_UNITS: readonly AiUnitRow[] = [
    "CLASS_AIR_FIGHTER"
   ],
   "abilities": [],
+  "modifiers": [
+   {
+    "id": "UNOBSTRUCTED_VIEW",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADJUST_UNIT_SEE_THROUGH_FEATURES",
+    "args": {
+     "CanSee": "true"
+    }
+   },
+   {
+    "id": "UNOBSTRUCTED_VIEW_TERRAIN",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADJUST_UNIT_SEE_THROUGH_TERRAIN",
+    "args": {
+     "CanSee": "true"
+    }
+   },
+   {
+    "id": "ATTACK_BYPASS_COMBAT_UNIT",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADJUST_UNIT_BYPASS_COMBAT_UNIT",
+    "args": {
+     "Bypass": "true"
+    }
+   }
+  ],
   "pseudo": "PSEUDOYIELD_UNIT_AIR_COMBAT",
   "promotionClass": "PROMOTION_CLASS_AIR_FIGHTER",
   "resource": "RESOURCE_ALUMINUM",
@@ -14773,6 +16222,60 @@ export const AI_UNITS: readonly AiUnitRow[] = [
     }
    }
   ],
+  "modifiers": [
+   {
+    "id": "UNOBSTRUCTED_VIEW",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADJUST_UNIT_SEE_THROUGH_FEATURES",
+    "args": {
+     "CanSee": "true"
+    }
+   },
+   {
+    "id": "UNOBSTRUCTED_VIEW_TERRAIN",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADJUST_UNIT_SEE_THROUGH_TERRAIN",
+    "args": {
+     "CanSee": "true"
+    }
+   },
+   {
+    "id": "ATTACK_BYPASS_COMBAT_UNIT",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADJUST_UNIT_BYPASS_COMBAT_UNIT",
+    "args": {
+     "Bypass": "true"
+    }
+   },
+   {
+    "id": "MUSTANG_MORE_EXPERIENCE",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADJUST_UNIT_EXPERIENCE_MODIFIER",
+    "args": {
+     "Amount": "50"
+    }
+   },
+   {
+    "id": "ANTI_FIGHTER_AIRCRAFT_COMBAT_BONUS",
+    "collection": "COLLECTION_UNIT_COMBAT",
+    "effect": "EFFECT_ADJUST_PLAYER_STRENGTH_MODIFIER",
+    "args": {
+     "Amount": "5"
+    },
+    "subjectReqs": {
+     "test": "ALL",
+     "reqs": [
+      {
+       "type": "REQUIREMENT_OPPONENT_UNIT_PROMOTION_CLASS_MATCHES",
+       "inverse": false,
+       "args": {
+        "UnitPromotionClass": "PROMOTION_CLASS_AIR_FIGHTER"
+       }
+      }
+     ]
+    }
+   }
+  ],
   "pseudo": "PSEUDOYIELD_UNIT_AIR_COMBAT",
   "promotionClass": "PROMOTION_CLASS_AIR_FIGHTER",
   "resource": "RESOURCE_ALUMINUM",
@@ -14822,6 +16325,32 @@ export const AI_UNITS: readonly AiUnitRow[] = [
    "CLASS_AIR_BOMBER"
   ],
   "abilities": [],
+  "modifiers": [
+   {
+    "id": "UNOBSTRUCTED_VIEW",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADJUST_UNIT_SEE_THROUGH_FEATURES",
+    "args": {
+     "CanSee": "true"
+    }
+   },
+   {
+    "id": "UNOBSTRUCTED_VIEW_TERRAIN",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADJUST_UNIT_SEE_THROUGH_TERRAIN",
+    "args": {
+     "CanSee": "true"
+    }
+   },
+   {
+    "id": "ATTACK_BYPASS_COMBAT_UNIT",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADJUST_UNIT_BYPASS_COMBAT_UNIT",
+    "args": {
+     "Bypass": "true"
+    }
+   }
+  ],
   "pseudo": "PSEUDOYIELD_UNIT_AIR_COMBAT",
   "promotionClass": "PROMOTION_CLASS_AIR_BOMBER",
   "resource": "RESOURCE_ALUMINUM",
@@ -14871,6 +16400,7 @@ export const AI_UNITS: readonly AiUnitRow[] = [
    "CLASS_SUPPORT"
   ],
   "abilities": [],
+  "modifiers": [],
   "pseudo": null,
   "promotionClass": "PROMOTION_CLASS_SUPPORT",
   "resource": null,
@@ -14919,6 +16449,7 @@ export const AI_UNITS: readonly AiUnitRow[] = [
    "CLASS_RANGED"
   ],
   "abilities": [],
+  "modifiers": [],
   "pseudo": null,
   "promotionClass": "PROMOTION_CLASS_RANGED",
   "resource": null,
@@ -14967,6 +16498,7 @@ export const AI_UNITS: readonly AiUnitRow[] = [
    "CLASS_NAVAL_CARRIER"
   ],
   "abilities": [],
+  "modifiers": [],
   "pseudo": "PSEUDOYIELD_UNIT_NAVAL_COMBAT",
   "promotionClass": "PROMOTION_CLASS_NAVAL_CARRIER",
   "resource": "",
@@ -15017,6 +16549,16 @@ export const AI_UNITS: readonly AiUnitRow[] = [
    "CLASS_ANTI_AIR"
   ],
   "abilities": [],
+  "modifiers": [
+   {
+    "id": "UNIT_SEE_HIDDEN",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADJUST_UNIT_SEE_HIDDEN",
+    "args": {
+     "SeeHidden": "true"
+    }
+   }
+  ],
   "pseudo": "PSEUDOYIELD_UNIT_NAVAL_COMBAT",
   "promotionClass": "PROMOTION_CLASS_NAVAL_MELEE",
   "resource": "RESOURCE_OIL",
@@ -15066,6 +16608,33 @@ export const AI_UNITS: readonly AiUnitRow[] = [
    "CLASS_HELICOPTER"
   ],
   "abilities": [],
+  "modifiers": [
+   {
+    "id": "MOD_IGNORE_TERRAIN_COST",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADJUST_UNIT_IGNORE_TERRAIN_COST",
+    "args": {
+     "Ignore": "true",
+     "Type": "ALL"
+    }
+   },
+   {
+    "id": "MOD_IGNORE_CROSSING_RIVERS_COST",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADJUST_UNIT_IGNORE_RIVERS",
+    "args": {
+     "Ignore": "true"
+    }
+   },
+   {
+    "id": "IGNOREZOC_IGNORE_ZOC",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADJUST_UNIT_IGNORE_ZOC",
+    "args": {
+     "Ignore": "true"
+    }
+   }
+  ],
   "pseudo": null,
   "promotionClass": "PROMOTION_CLASS_LIGHT_CAVALRY",
   "resource": "RESOURCE_ALUMINUM",
@@ -15117,6 +16686,40 @@ export const AI_UNITS: readonly AiUnitRow[] = [
    "CLASS_REVEAL_STEALTH"
   ],
   "abilities": [],
+  "modifiers": [
+   {
+    "id": "IGNOREZOC_IGNORE_ZOC",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADJUST_UNIT_IGNORE_ZOC",
+    "args": {
+     "Ignore": "true"
+    }
+   },
+   {
+    "id": "UNIT_HIDDEN_VISIBILITY",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADJUST_UNIT_HIDDEN_VISIBILITY",
+    "args": {
+     "Hidden": "true"
+    }
+   },
+   {
+    "id": "UNIT_SEE_HIDDEN",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADJUST_UNIT_SEE_HIDDEN",
+    "args": {
+     "SeeHidden": "true"
+    }
+   },
+   {
+    "id": "UNIT_COASTAL_RAID",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADJUST_UNIT_RAIDING",
+    "args": {
+     "CanRaid": "true"
+    }
+   }
+  ],
   "pseudo": "PSEUDOYIELD_UNIT_NAVAL_COMBAT",
   "promotionClass": "PROMOTION_CLASS_NAVAL_RAIDER",
   "resource": "",
@@ -15165,6 +16768,28 @@ export const AI_UNITS: readonly AiUnitRow[] = [
    "CLASS_MELEE"
   ],
   "abilities": [
+   {
+    "id": "ANTI_SPEAR",
+    "collection": "COLLECTION_UNIT_COMBAT",
+    "effect": "EFFECT_ADJUST_PLAYER_STRENGTH_MODIFIER",
+    "args": {
+     "Amount": "5"
+    },
+    "subjectReqs": {
+     "test": "ALL",
+     "reqs": [
+      {
+       "type": "REQUIREMENT_OPPONENT_UNIT_PROMOTION_CLASS_MATCHES",
+       "inverse": false,
+       "args": {
+        "UnitPromotionClass": "PROMOTION_CLASS_ANTI_CAVALRY"
+       }
+      }
+     ]
+    }
+   }
+  ],
+  "modifiers": [
    {
     "id": "ANTI_SPEAR",
     "collection": "COLLECTION_UNIT_COMBAT",
@@ -15258,6 +16883,56 @@ export const AI_UNITS: readonly AiUnitRow[] = [
     }
    }
   ],
+  "modifiers": [
+   {
+    "id": "NOMOVEANDSHOOT_MOVE_AND_ATTACK",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADJUST_UNIT_MOVE_AND_ATTACK",
+    "args": {
+     "CanAttack": "false"
+    }
+   },
+   {
+    "id": "RECEIVE_RANGE_BONUS",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADJUST_UNIT_ATTACK_RANGE",
+    "args": {
+     "Amount": "1"
+    },
+    "subjectReqs": {
+     "test": "ALL",
+     "reqs": [
+      {
+       "type": "REQUIREMENT_PLOT_ADJACENT_FRIENDLY_UNIT_TAG_MATCHES",
+       "inverse": false,
+       "args": {
+        "Tag": "CLASS_OBSERVATION"
+       }
+      }
+     ]
+    }
+   },
+   {
+    "id": "BOMBARD_STR_BUFF_FROM_DRONE",
+    "collection": "COLLECTION_UNIT_COMBAT",
+    "effect": "EFFECT_ADJUST_PLAYER_STRENGTH_MODIFIER",
+    "args": {
+     "Amount": "5"
+    },
+    "subjectReqs": {
+     "test": "ALL",
+     "reqs": [
+      {
+       "type": "REQUIREMENT_PLOT_ADJACENT_FRIENDLY_UNIT_TAG_MATCHES",
+       "inverse": false,
+       "args": {
+        "Tag": "CLASS_DRONE"
+       }
+      }
+     ]
+    }
+   }
+  ],
   "pseudo": null,
   "promotionClass": "PROMOTION_CLASS_SIEGE",
   "resource": "RESOURCE_OIL",
@@ -15307,6 +16982,7 @@ export const AI_UNITS: readonly AiUnitRow[] = [
    "CLASS_SUPPORT"
   ],
   "abilities": [],
+  "modifiers": [],
   "pseudo": null,
   "promotionClass": "PROMOTION_CLASS_SUPPORT",
   "resource": null,
@@ -15356,6 +17032,32 @@ export const AI_UNITS: readonly AiUnitRow[] = [
    "CLASS_AIR_FIGHTER"
   ],
   "abilities": [],
+  "modifiers": [
+   {
+    "id": "UNOBSTRUCTED_VIEW",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADJUST_UNIT_SEE_THROUGH_FEATURES",
+    "args": {
+     "CanSee": "true"
+    }
+   },
+   {
+    "id": "UNOBSTRUCTED_VIEW_TERRAIN",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADJUST_UNIT_SEE_THROUGH_TERRAIN",
+    "args": {
+     "CanSee": "true"
+    }
+   },
+   {
+    "id": "ATTACK_BYPASS_COMBAT_UNIT",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADJUST_UNIT_BYPASS_COMBAT_UNIT",
+    "args": {
+     "Bypass": "true"
+    }
+   }
+  ],
   "pseudo": "PSEUDOYIELD_UNIT_AIR_COMBAT",
   "promotionClass": "PROMOTION_CLASS_AIR_FIGHTER",
   "resource": "RESOURCE_ALUMINUM",
@@ -15405,6 +17107,32 @@ export const AI_UNITS: readonly AiUnitRow[] = [
    "CLASS_AIR_BOMBER"
   ],
   "abilities": [],
+  "modifiers": [
+   {
+    "id": "UNOBSTRUCTED_VIEW",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADJUST_UNIT_SEE_THROUGH_FEATURES",
+    "args": {
+     "CanSee": "true"
+    }
+   },
+   {
+    "id": "UNOBSTRUCTED_VIEW_TERRAIN",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADJUST_UNIT_SEE_THROUGH_TERRAIN",
+    "args": {
+     "CanSee": "true"
+    }
+   },
+   {
+    "id": "ATTACK_BYPASS_COMBAT_UNIT",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADJUST_UNIT_BYPASS_COMBAT_UNIT",
+    "args": {
+     "Bypass": "true"
+    }
+   }
+  ],
   "pseudo": "PSEUDOYIELD_UNIT_AIR_COMBAT",
   "promotionClass": "PROMOTION_CLASS_AIR_BOMBER",
   "resource": "RESOURCE_ALUMINUM",
@@ -15454,6 +17182,7 @@ export const AI_UNITS: readonly AiUnitRow[] = [
    "CLASS_ANTI_AIR"
   ],
   "abilities": [],
+  "modifiers": [],
   "pseudo": "PSEUDOYIELD_UNIT_NAVAL_COMBAT",
   "promotionClass": "PROMOTION_CLASS_NAVAL_RANGED",
   "resource": "RESOURCE_OIL",
@@ -15502,6 +17231,42 @@ export const AI_UNITS: readonly AiUnitRow[] = [
    "CLASS_ANTI_CAVALRY"
   ],
   "abilities": [
+   {
+    "id": "ANTI_CAVALRY_COMBAT_BONUS",
+    "collection": "COLLECTION_UNIT_COMBAT",
+    "effect": "EFFECT_ADJUST_PLAYER_STRENGTH_MODIFIER",
+    "args": {
+     "Amount": "10"
+    },
+    "subjectReqs": {
+     "test": "ANY",
+     "reqs": [
+      {
+       "type": "REQUIREMENT_OPPONENT_UNIT_TAG_MATCHES",
+       "inverse": false,
+       "args": {
+        "Tag": "CLASS_LIGHT_CAVALRY"
+       }
+      },
+      {
+       "type": "REQUIREMENT_OPPONENT_UNIT_TAG_MATCHES",
+       "inverse": false,
+       "args": {
+        "Tag": "CLASS_HEAVY_CAVALRY"
+       }
+      },
+      {
+       "type": "REQUIREMENT_OPPONENT_UNIT_TAG_MATCHES",
+       "inverse": false,
+       "args": {
+        "Tag": "CLASS_RANGED_CAVALRY"
+       }
+      }
+     ]
+    }
+   }
+  ],
+  "modifiers": [
    {
     "id": "ANTI_CAVALRY_COMBAT_BONUS",
     "collection": "COLLECTION_UNIT_COMBAT",
@@ -15586,6 +17351,24 @@ export const AI_UNITS: readonly AiUnitRow[] = [
    "CLASS_HEAVY_CAVALRY"
   ],
   "abilities": [],
+  "modifiers": [
+   {
+    "id": "HEAVYCHARIOT_FASTER_CLEAR_TERRAIN",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADJUST_UNIT_CLEAR_TERRAIN_START_MOVEMENT",
+    "args": {
+     "Amount": "1"
+    }
+   },
+   {
+    "id": "IGNOREZOC_IGNORE_ZOC",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADJUST_UNIT_IGNORE_ZOC",
+    "args": {
+     "Ignore": "true"
+    }
+   }
+  ],
   "pseudo": null,
   "promotionClass": "PROMOTION_CLASS_HEAVY_CAVALRY",
   "resource": "RESOURCE_OIL",
@@ -15634,6 +17417,28 @@ export const AI_UNITS: readonly AiUnitRow[] = [
    "CLASS_MELEE"
   ],
   "abilities": [
+   {
+    "id": "ANTI_SPEAR",
+    "collection": "COLLECTION_UNIT_COMBAT",
+    "effect": "EFFECT_ADJUST_PLAYER_STRENGTH_MODIFIER",
+    "args": {
+     "Amount": "5"
+    },
+    "subjectReqs": {
+     "test": "ALL",
+     "reqs": [
+      {
+       "type": "REQUIREMENT_OPPONENT_UNIT_PROMOTION_CLASS_MATCHES",
+       "inverse": false,
+       "args": {
+        "UnitPromotionClass": "PROMOTION_CLASS_ANTI_CAVALRY"
+       }
+      }
+     ]
+    }
+   }
+  ],
+  "modifiers": [
    {
     "id": "ANTI_SPEAR",
     "collection": "COLLECTION_UNIT_COMBAT",
@@ -15726,6 +17531,28 @@ export const AI_UNITS: readonly AiUnitRow[] = [
     }
    }
   ],
+  "modifiers": [
+   {
+    "id": "ANTI_SPEAR",
+    "collection": "COLLECTION_UNIT_COMBAT",
+    "effect": "EFFECT_ADJUST_PLAYER_STRENGTH_MODIFIER",
+    "args": {
+     "Amount": "5"
+    },
+    "subjectReqs": {
+     "test": "ALL",
+     "reqs": [
+      {
+       "type": "REQUIREMENT_OPPONENT_UNIT_PROMOTION_CLASS_MATCHES",
+       "inverse": false,
+       "args": {
+        "UnitPromotionClass": "PROMOTION_CLASS_ANTI_CAVALRY"
+       }
+      }
+     ]
+    }
+   }
+  ],
   "pseudo": null,
   "promotionClass": "PROMOTION_CLASS_MELEE",
   "resource": "RESOURCE_NITER",
@@ -15778,6 +17605,36 @@ export const AI_UNITS: readonly AiUnitRow[] = [
    "CLASS_FORWARD_OBSERVER"
   ],
   "abilities": [],
+  "modifiers": [
+   {
+    "id": "NOMOVEANDSHOOT_MOVE_AND_ATTACK",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADJUST_UNIT_MOVE_AND_ATTACK",
+    "args": {
+     "CanAttack": "false"
+    }
+   },
+   {
+    "id": "RECEIVE_RANGE_BONUS",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADJUST_UNIT_ATTACK_RANGE",
+    "args": {
+     "Amount": "1"
+    },
+    "subjectReqs": {
+     "test": "ALL",
+     "reqs": [
+      {
+       "type": "REQUIREMENT_PLOT_ADJACENT_FRIENDLY_UNIT_TAG_MATCHES",
+       "inverse": false,
+       "args": {
+        "Tag": "CLASS_OBSERVATION"
+       }
+      }
+     ]
+    }
+   }
+  ],
   "pseudo": null,
   "promotionClass": "PROMOTION_CLASS_SIEGE",
   "resource": null,
@@ -15847,6 +17704,37 @@ export const AI_UNITS: readonly AiUnitRow[] = [
        }
       }
      ]
+    }
+   }
+  ],
+  "modifiers": [
+   {
+    "id": "ANTI_SPEAR",
+    "collection": "COLLECTION_UNIT_COMBAT",
+    "effect": "EFFECT_ADJUST_PLAYER_STRENGTH_MODIFIER",
+    "args": {
+     "Amount": "5"
+    },
+    "subjectReqs": {
+     "test": "ALL",
+     "reqs": [
+      {
+       "type": "REQUIREMENT_OPPONENT_UNIT_PROMOTION_CLASS_MATCHES",
+       "inverse": false,
+       "args": {
+        "UnitPromotionClass": "PROMOTION_CLASS_ANTI_CAVALRY"
+       }
+      }
+     ]
+    }
+   },
+   {
+    "id": "CAPTURE_COMBAT_UNITS_AS_WORKERS",
+    "collection": "COLLECTION_UNIT_COMBAT",
+    "effect": "EFFECT_ADJUST_UNIT_COMBAT_UNIT_CAPTURE",
+    "args": {
+     "CanCapture": "true",
+     "UnitType": "UNIT_BUILDER"
     }
    }
   ],
@@ -15920,6 +17808,34 @@ export const AI_UNITS: readonly AiUnitRow[] = [
     }
    }
   ],
+  "modifiers": [
+   {
+    "id": "JONG_BONUS_IN_FORMATION",
+    "collection": "COLLECTION_UNIT_COMBAT",
+    "effect": "EFFECT_ADJUST_PLAYER_STRENGTH_MODIFIER",
+    "args": {
+     "Amount": "5"
+    },
+    "subjectReqs": {
+     "test": "ALL",
+     "reqs": [
+      {
+       "type": "REQUIREMENT_UNIT_IN_FORMATION",
+       "inverse": false,
+       "args": {}
+      }
+     ]
+    }
+   },
+   {
+    "id": "ESCORT_MOBILITY_SHARED_MOVEMENT",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADJUST_UNIT_ESCORT_MOBILITY",
+    "args": {
+     "EscortMobility": "true"
+    }
+   }
+  ],
   "pseudo": "PSEUDOYIELD_UNIT_NAVAL_COMBAT",
   "promotionClass": "PROMOTION_CLASS_NAVAL_RANGED",
   "resource": null,
@@ -15971,6 +17887,28 @@ export const AI_UNITS: readonly AiUnitRow[] = [
    "CLASS_FORWARD_OBSERVER"
   ],
   "abilities": [],
+  "modifiers": [
+   {
+    "id": "RECEIVE_RANGE_BONUS",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADJUST_UNIT_ATTACK_RANGE",
+    "args": {
+     "Amount": "1"
+    },
+    "subjectReqs": {
+     "test": "ALL",
+     "reqs": [
+      {
+       "type": "REQUIREMENT_PLOT_ADJACENT_FRIENDLY_UNIT_TAG_MATCHES",
+       "inverse": false,
+       "args": {
+        "Tag": "CLASS_OBSERVATION"
+       }
+      }
+     ]
+    }
+   }
+  ],
   "pseudo": null,
   "promotionClass": "PROMOTION_CLASS_SIEGE",
   "resource": null,
@@ -16022,6 +17960,24 @@ export const AI_UNITS: readonly AiUnitRow[] = [
    "CLASS_PUSHBACK"
   ],
   "abilities": [],
+  "modifiers": [
+   {
+    "id": "IGNOREZOC_IGNORE_ZOC",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADJUST_UNIT_IGNORE_ZOC",
+    "args": {
+     "Ignore": "true"
+    }
+   },
+   {
+    "id": "HUSSAR_FORCE_RETREAT",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADJUST_UNIT_FORCE_RETREAT",
+    "args": {
+     "ForceRetreat": "true"
+    }
+   }
+  ],
   "pseudo": null,
   "promotionClass": "PROMOTION_CLASS_HEAVY_CAVALRY",
   "resource": "RESOURCE_IRON",
@@ -16072,6 +18028,7 @@ export const AI_UNITS: readonly AiUnitRow[] = [
    "CLASS_RANGED"
   ],
   "abilities": [],
+  "modifiers": [],
   "pseudo": null,
   "promotionClass": "PROMOTION_CLASS_RANGED",
   "resource": null,
@@ -16162,6 +18119,54 @@ export const AI_UNITS: readonly AiUnitRow[] = [
     }
    }
   ],
+  "modifiers": [
+   {
+    "id": "ANTI_SPEAR",
+    "collection": "COLLECTION_UNIT_COMBAT",
+    "effect": "EFFECT_ADJUST_PLAYER_STRENGTH_MODIFIER",
+    "args": {
+     "Amount": "5"
+    },
+    "subjectReqs": {
+     "test": "ALL",
+     "reqs": [
+      {
+       "type": "REQUIREMENT_OPPONENT_UNIT_PROMOTION_CLASS_MATCHES",
+       "inverse": false,
+       "args": {
+        "UnitPromotionClass": "PROMOTION_CLASS_ANTI_CAVALRY"
+       }
+      }
+     ]
+    }
+   },
+   {
+    "id": "HYPASPIST_SIEGE_BONUS",
+    "collection": "COLLECTION_UNIT_COMBAT",
+    "effect": "EFFECT_ADJUST_PLAYER_STRENGTH_MODIFIER",
+    "args": {
+     "Amount": "5"
+    },
+    "subjectReqs": {
+     "test": "ALL",
+     "reqs": [
+      {
+       "type": "REQUIREMENT_OPPONENT_IS_DISTRICT",
+       "inverse": false,
+       "args": {}
+      }
+     ]
+    }
+   },
+   {
+    "id": "HYPASPIST_SUPPORT_BONUS",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADJUST_UNIT_SUPPORT_BONUS_MODIFIER",
+    "args": {
+     "Percent": "50"
+    }
+   }
+  ],
   "pseudo": null,
   "promotionClass": "PROMOTION_CLASS_MELEE",
   "resource": "RESOURCE_IRON",
@@ -16232,6 +18237,54 @@ export const AI_UNITS: readonly AiUnitRow[] = [
        }
       }
      ]
+    }
+   }
+  ],
+  "modifiers": [
+   {
+    "id": "IGNOREZOC_IGNORE_ZOC",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADJUST_UNIT_IGNORE_ZOC",
+    "args": {
+     "Ignore": "true"
+    }
+   },
+   {
+    "id": "HETAIROI_FREE_PROMOTION",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADJUST_UNIT_GRANT_EXPERIENCE",
+    "args": {
+     "Amount": "-1"
+    }
+   },
+   {
+    "id": "HETAIROI_GREAT_GENERAL_COMBAT_BONUS",
+    "collection": "COLLECTION_UNIT_COMBAT",
+    "effect": "EFFECT_ADJUST_PLAYER_STRENGTH_MODIFIER",
+    "args": {
+     "Amount": "5"
+    },
+    "subjectReqs": {
+     "test": "ALL",
+     "reqs": [
+      {
+       "type": "REQUIREMENT_PLOT_ADJACENT_FRIENDLY_UNIT_TYPE_MATCHES",
+       "inverse": false,
+       "args": {
+        "UnitType": "UNIT_GREAT_GENERAL",
+        "IncludeCenter": "true"
+       }
+      }
+     ]
+    }
+   },
+   {
+    "id": "HETAIROI_GREAT_GENERAL_POINTS",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADJUST_GREAT_PEOPLE_POINTS_PER_KILL",
+    "args": {
+     "Amount": "5",
+     "GreatPersonClassType": "GREAT_PERSON_CLASS_GENERAL"
     }
    }
   ],
@@ -16307,6 +18360,28 @@ export const AI_UNITS: readonly AiUnitRow[] = [
     }
    }
   ],
+  "modifiers": [
+   {
+    "id": "ANTI_SPEAR",
+    "collection": "COLLECTION_UNIT_COMBAT",
+    "effect": "EFFECT_ADJUST_PLAYER_STRENGTH_MODIFIER",
+    "args": {
+     "Amount": "5"
+    },
+    "subjectReqs": {
+     "test": "ALL",
+     "reqs": [
+      {
+       "type": "REQUIREMENT_OPPONENT_UNIT_PROMOTION_CLASS_MATCHES",
+       "inverse": false,
+       "args": {
+        "UnitPromotionClass": "PROMOTION_CLASS_ANTI_CAVALRY"
+       }
+      }
+     ]
+    }
+   }
+  ],
   "pseudo": null,
   "promotionClass": "PROMOTION_CLASS_MELEE",
   "resource": "RESOURCE_IRON",
@@ -16358,6 +18433,66 @@ export const AI_UNITS: readonly AiUnitRow[] = [
    "CLASS_DIGGER"
   ],
   "abilities": [
+   {
+    "id": "ANTI_SPEAR",
+    "collection": "COLLECTION_UNIT_COMBAT",
+    "effect": "EFFECT_ADJUST_PLAYER_STRENGTH_MODIFIER",
+    "args": {
+     "Amount": "5"
+    },
+    "subjectReqs": {
+     "test": "ALL",
+     "reqs": [
+      {
+       "type": "REQUIREMENT_OPPONENT_UNIT_PROMOTION_CLASS_MATCHES",
+       "inverse": false,
+       "args": {
+        "UnitPromotionClass": "PROMOTION_CLASS_ANTI_CAVALRY"
+       }
+      }
+     ]
+    }
+   },
+   {
+    "id": "DIGGER_BONUS_ON_COAST",
+    "collection": "COLLECTION_UNIT_COMBAT",
+    "effect": "EFFECT_ADJUST_PLAYER_STRENGTH_MODIFIER",
+    "args": {
+     "Amount": "10"
+    },
+    "subjectReqs": {
+     "test": "ANY",
+     "reqs": [
+      {
+       "type": "REQUIREMENT_UNIT_ON_COAST",
+       "inverse": false,
+       "args": {
+        "Water": "true"
+       }
+      }
+     ]
+    }
+   },
+   {
+    "id": "DIGGER_NON_DOMESTIC_BONUS",
+    "collection": "COLLECTION_UNIT_COMBAT",
+    "effect": "EFFECT_ADJUST_PLAYER_STRENGTH_MODIFIER",
+    "args": {
+     "Amount": "5"
+    },
+    "subjectReqs": {
+     "test": "ANY",
+     "reqs": [
+      {
+       "type": "REQUIREMENT_UNIT_IN_OWNER_TERRITORY",
+       "inverse": true,
+       "args": {}
+      }
+     ]
+    }
+   }
+  ],
+  "modifiers": [
    {
     "id": "ANTI_SPEAR",
     "collection": "COLLECTION_UNIT_COMBAT",
@@ -16501,6 +18636,58 @@ export const AI_UNITS: readonly AiUnitRow[] = [
     }
    }
   ],
+  "modifiers": [
+   {
+    "id": "ANTI_CAVALRY_COMBAT_BONUS",
+    "collection": "COLLECTION_UNIT_COMBAT",
+    "effect": "EFFECT_ADJUST_PLAYER_STRENGTH_MODIFIER",
+    "args": {
+     "Amount": "10"
+    },
+    "subjectReqs": {
+     "test": "ANY",
+     "reqs": [
+      {
+       "type": "REQUIREMENT_OPPONENT_UNIT_TAG_MATCHES",
+       "inverse": false,
+       "args": {
+        "Tag": "CLASS_LIGHT_CAVALRY"
+       }
+      },
+      {
+       "type": "REQUIREMENT_OPPONENT_UNIT_TAG_MATCHES",
+       "inverse": false,
+       "args": {
+        "Tag": "CLASS_HEAVY_CAVALRY"
+       }
+      },
+      {
+       "type": "REQUIREMENT_OPPONENT_UNIT_TAG_MATCHES",
+       "inverse": false,
+       "args": {
+        "Tag": "CLASS_RANGED_CAVALRY"
+       }
+      }
+     ]
+    }
+   },
+   {
+    "id": "IMPI_FASTER_COMBAT_XP",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADJUST_UNIT_EXPERIENCE_MODIFIER",
+    "args": {
+     "Amount": "25"
+    }
+   },
+   {
+    "id": "IMPI_INCREASED_FLANKING_BONUS",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADJUST_UNIT_FLANKING_BONUS_MODIFIER",
+    "args": {
+     "Percent": "100"
+    }
+   }
+  ],
   "pseudo": null,
   "promotionClass": "PROMOTION_CLASS_ANTI_CAVALRY",
   "resource": null,
@@ -16552,6 +18739,16 @@ export const AI_UNITS: readonly AiUnitRow[] = [
    "CLASS_FIELD_SETUP"
   ],
   "abilities": [],
+  "modifiers": [
+   {
+    "id": "NOMOVEANDSHOOT_MOVE_AND_ATTACK",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADJUST_UNIT_MOVE_AND_ATTACK",
+    "args": {
+     "CanAttack": "false"
+    }
+   }
+  ],
   "pseudo": null,
   "promotionClass": "PROMOTION_CLASS_RANGED",
   "resource": null,
@@ -16603,6 +18800,33 @@ export const AI_UNITS: readonly AiUnitRow[] = [
    "CLASS_SCOTTISH_HIGHLANDER"
   ],
   "abilities": [
+   {
+    "id": "HIGHLANDER_COMBAT_BONUS_FOREST_AND_HILLS",
+    "collection": "COLLECTION_UNIT_COMBAT",
+    "effect": "EFFECT_ADJUST_PLAYER_STRENGTH_MODIFIER",
+    "args": {
+     "Amount": "5"
+    },
+    "subjectReqs": {
+     "test": "ANY",
+     "reqs": [
+      {
+       "type": "REQUIREMENT_PLOT_IS_HILLS",
+       "inverse": false,
+       "args": {}
+      },
+      {
+       "type": "REQUIREMENT_PLOT_FEATURE_TYPE_MATCHES",
+       "inverse": false,
+       "args": {
+        "FeatureType": "FEATURE_FOREST"
+       }
+      }
+     ]
+    }
+   }
+  ],
+  "modifiers": [
    {
     "id": "HIGHLANDER_COMBAT_BONUS_FOREST_AND_HILLS",
     "collection": "COLLECTION_UNIT_COMBAT",
@@ -16697,6 +18921,26 @@ export const AI_UNITS: readonly AiUnitRow[] = [
     }
    }
   ],
+  "modifiers": [
+   {
+    "id": "ZEVEN_PROVINCIEN_BONUS_VS_DEF_DISTRICTS",
+    "collection": "COLLECTION_UNIT_COMBAT",
+    "effect": "EFFECT_ADJUST_PLAYER_STRENGTH_MODIFIER",
+    "args": {
+     "Amount": "7"
+    },
+    "subjectReqs": {
+     "test": "ALL",
+     "reqs": [
+      {
+       "type": "REQUIREMENT_OPPONENT_IS_DISTRICT",
+       "inverse": false,
+       "args": {}
+      }
+     ]
+    }
+   }
+  ],
   "pseudo": "PSEUDOYIELD_UNIT_NAVAL_COMBAT",
   "promotionClass": "PROMOTION_CLASS_NAVAL_RANGED",
   "resource": "RESOURCE_NITER",
@@ -16748,6 +18992,24 @@ export const AI_UNITS: readonly AiUnitRow[] = [
    "CLASS_RANGED_CAVALRY"
   ],
   "abilities": [],
+  "modifiers": [
+   {
+    "id": "IGNOREZOC_IGNORE_ZOC",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADJUST_UNIT_IGNORE_ZOC",
+    "args": {
+     "Ignore": "true"
+    }
+   },
+   {
+    "id": "ESCORT_MOBILITY_SHARED_MOVEMENT",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADJUST_UNIT_ESCORT_MOBILITY",
+    "args": {
+     "EscortMobility": "true"
+    }
+   }
+  ],
   "pseudo": null,
   "promotionClass": "PROMOTION_CLASS_RANGED",
   "resource": "RESOURCE_HORSES",
@@ -16838,6 +19100,55 @@ export const AI_UNITS: readonly AiUnitRow[] = [
     }
    }
   ],
+  "modifiers": [
+   {
+    "id": "ANTI_SPEAR",
+    "collection": "COLLECTION_UNIT_COMBAT",
+    "effect": "EFFECT_ADJUST_PLAYER_STRENGTH_MODIFIER",
+    "args": {
+     "Amount": "5"
+    },
+    "subjectReqs": {
+     "test": "ALL",
+     "reqs": [
+      {
+       "type": "REQUIREMENT_OPPONENT_UNIT_PROMOTION_CLASS_MATCHES",
+       "inverse": false,
+       "args": {
+        "UnitPromotionClass": "PROMOTION_CLASS_ANTI_CAVALRY"
+       }
+      }
+     ]
+    }
+   },
+   {
+    "id": "KHEVSURETI_HILLS_BUFF",
+    "collection": "COLLECTION_UNIT_COMBAT",
+    "effect": "EFFECT_ADJUST_PLAYER_STRENGTH_MODIFIER",
+    "args": {
+     "Amount": "7"
+    },
+    "subjectReqs": {
+     "test": "ALL",
+     "reqs": [
+      {
+       "type": "REQUIREMENT_PLOT_IS_HILLS",
+       "inverse": false,
+       "args": {}
+      }
+     ]
+    }
+   },
+   {
+    "id": "KHEVSURETI_IGNORE_HILLS",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADJUST_UNIT_IGNORE_TERRAIN_COST",
+    "args": {
+     "Ignore": "true",
+     "Type": "HILLS"
+    }
+   }
+  ],
   "pseudo": null,
   "promotionClass": "PROMOTION_CLASS_MELEE",
   "resource": "RESOURCE_IRON",
@@ -16911,6 +19222,45 @@ export const AI_UNITS: readonly AiUnitRow[] = [
     }
    }
   ],
+  "modifiers": [
+   {
+    "id": "IGNOREZOC_IGNORE_ZOC",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADJUST_UNIT_IGNORE_ZOC",
+    "args": {
+     "Ignore": "true"
+    }
+   },
+   {
+    "id": "MALON_RAIDER_TERRITORY_COMBAT_BONUS",
+    "collection": "COLLECTION_UNIT_COMBAT",
+    "effect": "EFFECT_ADJUST_PLAYER_STRENGTH_MODIFIER",
+    "args": {
+     "Amount": "5"
+    },
+    "subjectReqs": {
+     "test": "ALL",
+     "reqs": [
+      {
+       "type": "REQUIREMENT_PLOT_ADJACENT_FRIENDLY_TERRITORY",
+       "inverse": false,
+       "args": {
+        "MinRange": "0",
+        "MaxRange": "4"
+       }
+      }
+     ]
+    }
+   },
+   {
+    "id": "MALON_RAIDER_LESS_MOVEMENT_PILLAGE",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADJUST_UNIT_ADVANCED_PILLAGING",
+    "args": {
+     "UseAdvancedPillaging": "true"
+    }
+   }
+  ],
   "pseudo": null,
   "promotionClass": "PROMOTION_CLASS_LIGHT_CAVALRY",
   "resource": null,
@@ -16960,6 +19310,16 @@ export const AI_UNITS: readonly AiUnitRow[] = [
    "CLASS_CREE_OKIHTCITAW"
   ],
   "abilities": [],
+  "modifiers": [
+   {
+    "id": "OKIHTCITAW_FREE_PROMOTION",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADJUST_UNIT_GRANT_EXPERIENCE",
+    "args": {
+     "Amount": "-1"
+    }
+   }
+  ],
   "pseudo": null,
   "promotionClass": "PROMOTION_CLASS_RECON",
   "resource": null,
@@ -17010,6 +19370,24 @@ export const AI_UNITS: readonly AiUnitRow[] = [
    "CLASS_SNIPER"
   ],
   "abilities": [],
+  "modifiers": [
+   {
+    "id": "ATTACK_BYPASS_COMBAT_UNIT",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADJUST_UNIT_BYPASS_COMBAT_UNIT",
+    "args": {
+     "Bypass": "true"
+    }
+   },
+   {
+    "id": "SPEC_OPS_PARADROP_ABILITY",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADJUST_UNIT_PARADROP_ABILITY",
+    "args": {
+     "CanDrop": "true"
+    }
+   }
+  ],
   "pseudo": null,
   "promotionClass": "PROMOTION_CLASS_RECON",
   "resource": null,
@@ -17060,6 +19438,24 @@ export const AI_UNITS: readonly AiUnitRow[] = [
    "CLASS_SUPPORT"
   ],
   "abilities": [],
+  "modifiers": [
+   {
+    "id": "UNOBSTRUCTED_VIEW",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADJUST_UNIT_SEE_THROUGH_FEATURES",
+    "args": {
+     "CanSee": "true"
+    }
+   },
+   {
+    "id": "UNOBSTRUCTED_VIEW_TERRAIN",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADJUST_UNIT_SEE_THROUGH_TERRAIN",
+    "args": {
+     "CanSee": "true"
+    }
+   }
+  ],
   "pseudo": null,
   "promotionClass": "PROMOTION_CLASS_SUPPORT",
   "resource": null,
@@ -17108,6 +19504,42 @@ export const AI_UNITS: readonly AiUnitRow[] = [
    "CLASS_ANTI_CAVALRY"
   ],
   "abilities": [
+   {
+    "id": "ANTI_CAVALRY_COMBAT_BONUS",
+    "collection": "COLLECTION_UNIT_COMBAT",
+    "effect": "EFFECT_ADJUST_PLAYER_STRENGTH_MODIFIER",
+    "args": {
+     "Amount": "10"
+    },
+    "subjectReqs": {
+     "test": "ANY",
+     "reqs": [
+      {
+       "type": "REQUIREMENT_OPPONENT_UNIT_TAG_MATCHES",
+       "inverse": false,
+       "args": {
+        "Tag": "CLASS_LIGHT_CAVALRY"
+       }
+      },
+      {
+       "type": "REQUIREMENT_OPPONENT_UNIT_TAG_MATCHES",
+       "inverse": false,
+       "args": {
+        "Tag": "CLASS_HEAVY_CAVALRY"
+       }
+      },
+      {
+       "type": "REQUIREMENT_OPPONENT_UNIT_TAG_MATCHES",
+       "inverse": false,
+       "args": {
+        "Tag": "CLASS_RANGED_CAVALRY"
+       }
+      }
+     ]
+    }
+   }
+  ],
+  "modifiers": [
    {
     "id": "ANTI_CAVALRY_COMBAT_BONUS",
     "collection": "COLLECTION_UNIT_COMBAT",
@@ -17195,6 +19627,56 @@ export const AI_UNITS: readonly AiUnitRow[] = [
    "CLASS_SUPPORT"
   ],
   "abilities": [],
+  "modifiers": [
+   {
+    "id": "MEDIC_INCREASE_HEAL_RATE",
+    "collection": "COLLECTION_PLAYER_UNITS",
+    "effect": "EFFECT_ADJUST_UNIT_HEALING_MODIFIERS",
+    "args": {
+     "Amount": "20",
+     "Type": "ALL"
+    },
+    "subjectReqs": {
+     "test": "ALL",
+     "reqs": [
+      {
+       "type": "REQUIREMENT_PLOT_ADJACENT_TO_OWNER",
+       "inverse": false,
+       "args": {
+        "MinDistance": "0"
+       }
+      }
+     ]
+    }
+   },
+   {
+    "id": "SUPPLY_CONVOY_BONUS_MOVEMENT",
+    "collection": "COLLECTION_PLAYER_UNITS",
+    "effect": "EFFECT_ADJUST_UNIT_MOVEMENT",
+    "args": {
+     "Amount": "1"
+    },
+    "subjectReqs": {
+     "test": "ALL",
+     "reqs": [
+      {
+       "type": "REQUIREMENT_PLOT_ADJACENT_TO_OWNER",
+       "inverse": false,
+       "args": {
+        "MinDistance": "0"
+       }
+      },
+      {
+       "type": "REQUIREMENT_UNIT_DOMAIN_MATCHES",
+       "inverse": false,
+       "args": {
+        "UnitDomain": "DOMAIN_LAND"
+       }
+      }
+     ]
+    }
+   }
+  ],
   "pseudo": null,
   "promotionClass": "PROMOTION_CLASS_SUPPORT",
   "resource": null,
@@ -17244,6 +19726,7 @@ export const AI_UNITS: readonly AiUnitRow[] = [
    "CLASS_MOBILE_RANGED"
   ],
   "abilities": [],
+  "modifiers": [],
   "pseudo": null,
   "promotionClass": "PROMOTION_CLASS_RECON",
   "resource": null,
@@ -17292,6 +19775,16 @@ export const AI_UNITS: readonly AiUnitRow[] = [
    "CLASS_LIGHT_CAVALRY"
   ],
   "abilities": [],
+  "modifiers": [
+   {
+    "id": "IGNOREZOC_IGNORE_ZOC",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADJUST_UNIT_IGNORE_ZOC",
+    "args": {
+     "Ignore": "true"
+    }
+   }
+  ],
   "pseudo": null,
   "promotionClass": "PROMOTION_CLASS_LIGHT_CAVALRY",
   "resource": "RESOURCE_HORSES",
@@ -17342,6 +19835,16 @@ export const AI_UNITS: readonly AiUnitRow[] = [
    "CLASS_HEAVY_CAVALRY"
   ],
   "abilities": [],
+  "modifiers": [
+   {
+    "id": "IGNOREZOC_IGNORE_ZOC",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADJUST_UNIT_IGNORE_ZOC",
+    "args": {
+     "Ignore": "true"
+    }
+   }
+  ],
   "pseudo": null,
   "promotionClass": "PROMOTION_CLASS_HEAVY_CAVALRY",
   "resource": "RESOURCE_IRON",
@@ -17392,6 +19895,33 @@ export const AI_UNITS: readonly AiUnitRow[] = [
    "CLASS_GIANT_DEATH_ROBOT"
   ],
   "abilities": [],
+  "modifiers": [
+   {
+    "id": "GDR_WMD_RESISTANCE",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADJUST_UNIT_WMD_PROTECTION",
+    "args": {
+     "Blast": "50",
+     "Fallout": "100"
+    }
+   },
+   {
+    "id": "GDR_VETERAN_NAME",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADJUST_UNIT_EXPERIENCE_LEVEL",
+    "args": {
+     "Amount": "2"
+    }
+   },
+   {
+    "id": "GDR_FIGHT_WHILE_EMBARKED",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADJUST_UNIT_FIGHT_WHILE_EMBARKED",
+    "args": {
+     "CanFight": "true"
+    }
+   }
+  ],
   "pseudo": null,
   "promotionClass": "PROMOTION_CLASS_GIANT_DEATH_ROBOT",
   "resource": "RESOURCE_URANIUM",
@@ -17441,6 +19971,16 @@ export const AI_UNITS: readonly AiUnitRow[] = [
    "CLASS_ROCK_BAND"
   ],
   "abilities": [],
+  "modifiers": [
+   {
+    "id": "MOD_ENTER_FOREIGN_LANDS",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADJUST_UNIT_ENTER_FOREIGN_LANDS",
+    "args": {
+     "Enter": "true"
+    }
+   }
+  ],
   "pseudo": "PSEUDOYIELD_UNIT_RELIGIOUS",
   "promotionClass": "PROMOTION_CLASS_ROCK_BAND",
   "resource": null,
@@ -17490,6 +20030,60 @@ export const AI_UNITS: readonly AiUnitRow[] = [
    "CLASS_MOUNTIE"
   ],
   "abilities": [
+   {
+    "id": "ALL_PARK_COMBAT_BONUS",
+    "collection": "COLLECTION_UNIT_COMBAT",
+    "effect": "EFFECT_ADJUST_PLAYER_STRENGTH_MODIFIER",
+    "args": {
+     "Amount": "5"
+    },
+    "subjectReqs": {
+     "test": "ALL",
+     "reqs": [
+      {
+       "type": "REQUIREMENT_UNIT_PLOT_HAS_NATIONAL_PARK",
+       "inverse": false,
+       "args": {
+        "SameOwner": "False",
+        "MinDistance": "0",
+        "MaxDistance": "2"
+       }
+      }
+     ]
+    }
+   },
+   {
+    "id": "OWNER_PARK_COMBAT_BONUS",
+    "collection": "COLLECTION_UNIT_COMBAT",
+    "effect": "EFFECT_ADJUST_PLAYER_STRENGTH_MODIFIER",
+    "args": {
+     "Amount": "5"
+    },
+    "subjectReqs": {
+     "test": "ALL",
+     "reqs": [
+      {
+       "type": "REQUIREMENT_UNIT_PLOT_HAS_NATIONAL_PARK",
+       "inverse": false,
+       "args": {
+        "SameOwner": "True",
+        "MinDistance": "0",
+        "MaxDistance": "2"
+       }
+      }
+     ]
+    }
+   }
+  ],
+  "modifiers": [
+   {
+    "id": "IGNOREZOC_IGNORE_ZOC",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADJUST_UNIT_IGNORE_ZOC",
+    "args": {
+     "Ignore": "true"
+    }
+   },
    {
     "id": "ALL_PARK_COMBAT_BONUS",
     "collection": "COLLECTION_UNIT_COMBAT",
@@ -17593,6 +20187,24 @@ export const AI_UNITS: readonly AiUnitRow[] = [
     }
    }
   ],
+  "modifiers": [
+   {
+    "id": "IGNOREZOC_IGNORE_ZOC",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADJUST_UNIT_IGNORE_ZOC",
+    "args": {
+     "Ignore": "true"
+    }
+   },
+   {
+    "id": "BLACK_ARMY_ADJACENT_LEVY",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADJUST_ADJACENT_LEVIED_UNIT_COMBAT_BONUS",
+    "args": {
+     "Amount": "3"
+    }
+   }
+  ],
   "pseudo": null,
   "promotionClass": "PROMOTION_CLASS_LIGHT_CAVALRY",
   "resource": "RESOURCE_HORSES",
@@ -17653,6 +20265,24 @@ export const AI_UNITS: readonly AiUnitRow[] = [
     }
    }
   ],
+  "modifiers": [
+   {
+    "id": "IGNOREZOC_IGNORE_ZOC",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADJUST_UNIT_IGNORE_ZOC",
+    "args": {
+     "Ignore": "true"
+    }
+   },
+   {
+    "id": "HUSZAR_ALLIES_COMBAT_BONUS",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADJUST_NUMBER_ALLIES_UNIT_COMBAT_BONUS",
+    "args": {
+     "Amount": "3"
+    }
+   }
+  ],
   "pseudo": null,
   "promotionClass": "PROMOTION_CLASS_LIGHT_CAVALRY",
   "resource": "RESOURCE_HORSES",
@@ -17703,6 +20333,16 @@ export const AI_UNITS: readonly AiUnitRow[] = [
    "CLASS_WARAKAQ"
   ],
   "abilities": [],
+  "modifiers": [
+   {
+    "id": "EXPERT_MARKSMAN_ADDITIONAL_ATTACK",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADJUST_UNIT_NUM_ATTACKS",
+    "args": {
+     "Amount": "1"
+    }
+   }
+  ],
   "pseudo": null,
   "promotionClass": "PROMOTION_CLASS_RECON",
   "resource": null,
@@ -17752,6 +20392,57 @@ export const AI_UNITS: readonly AiUnitRow[] = [
    "CLASS_MANDEKALU"
   ],
   "abilities": [],
+  "modifiers": [
+   {
+    "id": "IGNOREZOC_IGNORE_ZOC",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADJUST_UNIT_IGNORE_ZOC",
+    "args": {
+     "Ignore": "true"
+    }
+   },
+   {
+    "id": "MANDEKALU_POST_COMBAT_GOLD",
+    "collection": "COLLECTION_UNIT_COMBAT",
+    "effect": "EFFECT_ADJUST_UNIT_POST_COMBAT_YIELD",
+    "args": {
+     "PercentDefeatedStrength": "100",
+     "YieldType": "YIELD_GOLD"
+    }
+   },
+   {
+    "id": "MANDEKALU_GRANT_TRADER_IMMUNITY",
+    "collection": "COLLECTION_PLAYER_UNITS",
+    "effect": "EFFECT_GRANT_ABILITY",
+    "args": {
+     "AbilityType": "ABILITY_TRADER_PROTECTED_BY_MANDEKALU"
+    },
+    "ability": [
+     {
+      "id": "TRADE_ROUTE_PLUNDER_IMMUNITY_LAND_NEAR_MANDEKALU",
+      "collection": "COLLECTION_OWNER",
+      "effect": "EFFECT_ADJUST_UNIT_TRADE_ROUTE_PLUNDER_IMMUNITY",
+      "args": {
+       "DomainType": "DOMAIN_LAND"
+      }
+     }
+    ],
+    "subjectReqs": {
+     "test": "ALL",
+     "reqs": [
+      {
+       "type": "REQUIREMENT_PLOT_NEARBY_UNIT_TAG_MATCHES",
+       "inverse": false,
+       "args": {
+        "MinDistance": "0",
+        "MaxDistance": "4",
+        "Tag": "CLASS_TRADER"
+       }
+      }
+     ]
+    }
+   }
+  ],
   "pseudo": null,
   "promotionClass": "PROMOTION_CLASS_HEAVY_CAVALRY",
   "resource": "RESOURCE_IRON",
@@ -17803,6 +20494,57 @@ export const AI_UNITS: readonly AiUnitRow[] = [
    "CLASS_TOA"
   ],
   "abilities": [
+   {
+    "id": "ANTI_SPEAR",
+    "collection": "COLLECTION_UNIT_COMBAT",
+    "effect": "EFFECT_ADJUST_PLAYER_STRENGTH_MODIFIER",
+    "args": {
+     "Amount": "5"
+    },
+    "subjectReqs": {
+     "test": "ALL",
+     "reqs": [
+      {
+       "type": "REQUIREMENT_OPPONENT_UNIT_PROMOTION_CLASS_MATCHES",
+       "inverse": false,
+       "args": {
+        "UnitPromotionClass": "PROMOTION_CLASS_ANTI_CAVALRY"
+       }
+      }
+     ]
+    }
+   },
+   {
+    "id": "TOA_NEGATIVE_COMBAT",
+    "collection": "COLLECTION_ALL_UNITS",
+    "effect": "EFFECT_ATTACH_MODIFIER",
+    "args": {
+     "ModifierId": "TOA_NEGATIVE_COMBAT_MODIFIER"
+    },
+    "attach": {
+     "id": "TOA_NEGATIVE_COMBAT_MODIFIER",
+     "collection": "COLLECTION_UNIT_COMBAT",
+     "effect": "EFFECT_ADJUST_PLAYER_STRENGTH_MODIFIER",
+     "args": {
+      "Amount": "-5"
+     }
+    },
+    "subjectReqs": {
+     "test": "ALL",
+     "reqs": [
+      {
+       "type": "REQUIREMENT_PLOT_ADJACENT_TO_OWNER_AT_WAR",
+       "inverse": false,
+       "args": {
+        "MinDistance": "1",
+        "MaxDistance": "1"
+       }
+      }
+     ]
+    }
+   }
+  ],
+  "modifiers": [
    {
     "id": "ANTI_SPEAR",
     "collection": "COLLECTION_UNIT_COMBAT",
@@ -17907,6 +20649,48 @@ export const AI_UNITS: readonly AiUnitRow[] = [
    "CLASS_CORSAIR"
   ],
   "abilities": [],
+  "modifiers": [
+   {
+    "id": "IGNOREZOC_IGNORE_ZOC",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADJUST_UNIT_IGNORE_ZOC",
+    "args": {
+     "Ignore": "true"
+    }
+   },
+   {
+    "id": "UNIT_HIDDEN_VISIBILITY",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADJUST_UNIT_HIDDEN_VISIBILITY",
+    "args": {
+     "Hidden": "true"
+    }
+   },
+   {
+    "id": "UNIT_SEE_HIDDEN",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADJUST_UNIT_SEE_HIDDEN",
+    "args": {
+     "SeeHidden": "true"
+    }
+   },
+   {
+    "id": "UNIT_COASTAL_RAID",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADJUST_UNIT_RAIDING",
+    "args": {
+     "CanRaid": "true"
+    }
+   },
+   {
+    "id": "CORSAIR_LESS_MOVEMENT_RAID",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADJUST_UNIT_ADVANCED_COASTAL_RAID",
+    "args": {
+     "UseAdvancedCoastalRaid": "true"
+    }
+   }
+  ],
   "pseudo": "PSEUDOYIELD_UNIT_NAVAL_COMBAT",
   "promotionClass": "PROMOTION_CLASS_NAVAL_RAIDER",
   "resource": null,
@@ -17958,6 +20742,40 @@ export const AI_UNITS: readonly AiUnitRow[] = [
    "CLASS_BIREME"
   ],
   "abilities": [],
+  "modifiers": [
+   {
+    "id": "BIREME_GRANT_TRADER_IMMUNITY",
+    "collection": "COLLECTION_PLAYER_UNITS",
+    "effect": "EFFECT_GRANT_ABILITY",
+    "args": {
+     "AbilityType": "ABILITY_TRADER_PROTECTED_BY_BIREME"
+    },
+    "ability": [
+     {
+      "id": "TRADE_ROUTE_PLUNDER_IMMUNITY_SEA_NEAR_BIREME",
+      "collection": "COLLECTION_OWNER",
+      "effect": "EFFECT_ADJUST_UNIT_TRADE_ROUTE_PLUNDER_IMMUNITY",
+      "args": {
+       "DomainType": "DOMAIN_SEA"
+      }
+     }
+    ],
+    "subjectReqs": {
+     "test": "ALL",
+     "reqs": [
+      {
+       "type": "REQUIREMENT_PLOT_NEARBY_UNIT_TAG_MATCHES",
+       "inverse": false,
+       "args": {
+        "MinDistance": "0",
+        "MaxDistance": "4",
+        "Tag": "CLASS_TRADER"
+       }
+      }
+     ]
+    }
+   }
+  ],
   "pseudo": "PSEUDOYIELD_UNIT_NAVAL_COMBAT",
   "promotionClass": "PROMOTION_CLASS_NAVAL_MELEE",
   "resource": null,
@@ -18030,6 +20848,36 @@ export const AI_UNITS: readonly AiUnitRow[] = [
     }
    }
   ],
+  "modifiers": [
+   {
+    "id": "ANTI_SPEAR",
+    "collection": "COLLECTION_UNIT_COMBAT",
+    "effect": "EFFECT_ADJUST_PLAYER_STRENGTH_MODIFIER",
+    "args": {
+     "Amount": "5"
+    },
+    "subjectReqs": {
+     "test": "ALL",
+     "reqs": [
+      {
+       "type": "REQUIREMENT_OPPONENT_UNIT_PROMOTION_CLASS_MATCHES",
+       "inverse": false,
+       "args": {
+        "UnitPromotionClass": "PROMOTION_CLASS_ANTI_CAVALRY"
+       }
+      }
+     ]
+    }
+   },
+   {
+    "id": "CORBACI_FREE_PROMOTION",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADJUST_UNIT_GRANT_EXPERIENCE",
+    "args": {
+     "Amount": "-1"
+    }
+   }
+  ],
   "pseudo": null,
   "promotionClass": "PROMOTION_CLASS_MELEE",
   "resource": "RESOURCE_NITER",
@@ -18081,6 +20929,50 @@ export const AI_UNITS: readonly AiUnitRow[] = [
    "CLASS_CAROLEAN"
   ],
   "abilities": [
+   {
+    "id": "ANTI_CAVALRY_COMBAT_BONUS",
+    "collection": "COLLECTION_UNIT_COMBAT",
+    "effect": "EFFECT_ADJUST_PLAYER_STRENGTH_MODIFIER",
+    "args": {
+     "Amount": "10"
+    },
+    "subjectReqs": {
+     "test": "ANY",
+     "reqs": [
+      {
+       "type": "REQUIREMENT_OPPONENT_UNIT_TAG_MATCHES",
+       "inverse": false,
+       "args": {
+        "Tag": "CLASS_LIGHT_CAVALRY"
+       }
+      },
+      {
+       "type": "REQUIREMENT_OPPONENT_UNIT_TAG_MATCHES",
+       "inverse": false,
+       "args": {
+        "Tag": "CLASS_HEAVY_CAVALRY"
+       }
+      },
+      {
+       "type": "REQUIREMENT_OPPONENT_UNIT_TAG_MATCHES",
+       "inverse": false,
+       "args": {
+        "Tag": "CLASS_RANGED_CAVALRY"
+       }
+      }
+     ]
+    }
+   },
+   {
+    "id": "CAROLEAN_UNUSED_MOVEMENT_COMBAT",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADJUST_UNIT_PER_UNUSED_MOVEMENT_COMBAT_BONUS",
+    "args": {
+     "Amount": "3"
+    }
+   }
+  ],
+  "modifiers": [
    {
     "id": "ANTI_CAVALRY_COMBAT_BONUS",
     "collection": "COLLECTION_UNIT_COMBAT",
@@ -18194,6 +21086,26 @@ export const AI_UNITS: readonly AiUnitRow[] = [
     }
    }
   ],
+  "modifiers": [
+   {
+    "id": "HULCHE_BONUS_VS_WOUNDED_UNITS",
+    "collection": "COLLECTION_UNIT_COMBAT",
+    "effect": "EFFECT_ADJUST_PLAYER_STRENGTH_MODIFIER",
+    "args": {
+     "Amount": "5"
+    },
+    "subjectReqs": {
+     "test": "ALL",
+     "reqs": [
+      {
+       "type": "REQUIREMENT_OPPONENT_IS_WOUNDED",
+       "inverse": false,
+       "args": {}
+      }
+     ]
+    }
+   }
+  ],
   "pseudo": null,
   "promotionClass": "PROMOTION_CLASS_RANGED",
   "resource": null,
@@ -18267,6 +21179,28 @@ export const AI_UNITS: readonly AiUnitRow[] = [
     }
    }
   ],
+  "modifiers": [
+   {
+    "id": "ANTI_SPEAR",
+    "collection": "COLLECTION_UNIT_COMBAT",
+    "effect": "EFFECT_ADJUST_PLAYER_STRENGTH_MODIFIER",
+    "args": {
+     "Amount": "5"
+    },
+    "subjectReqs": {
+     "test": "ALL",
+     "reqs": [
+      {
+       "type": "REQUIREMENT_OPPONENT_UNIT_PROMOTION_CLASS_MATCHES",
+       "inverse": false,
+       "args": {
+        "UnitPromotionClass": "PROMOTION_CLASS_ANTI_CAVALRY"
+       }
+      }
+     ]
+    }
+   }
+  ],
   "pseudo": null,
   "promotionClass": "PROMOTION_CLASS_NIHANG",
   "resource": null,
@@ -18316,6 +21250,7 @@ export const AI_UNITS: readonly AiUnitRow[] = [
    "CLASS_ALL_ERAS"
   ],
   "abilities": [],
+  "modifiers": [],
   "pseudo": null,
   "promotionClass": null,
   "resource": null,
@@ -18365,6 +21300,37 @@ export const AI_UNITS: readonly AiUnitRow[] = [
    "CLASS_LIGHT_CAVALRY"
   ],
   "abilities": [
+   {
+    "id": "LLANERO_ADJACENCY_STRENGTH",
+    "collection": "COLLECTION_UNIT_COMBAT",
+    "effect": "EFFECT_GRANT_STRENGTH_PER_ADJACENT_UNIT_TYPE",
+    "args": {
+     "Amount": "2",
+     "UnitType": "UNIT_COLOMBIAN_LLANERO"
+    },
+    "ownerReqs": {
+     "test": "ALL",
+     "reqs": [
+      {
+       "type": "REQUIREMENT_PLOT_ADJACENT_FRIENDLY_UNIT_TYPE_MATCHES",
+       "inverse": false,
+       "args": {
+        "UnitType": "UNIT_COLOMBIAN_LLANERO"
+       }
+      }
+     ]
+    }
+   }
+  ],
+  "modifiers": [
+   {
+    "id": "IGNOREZOC_IGNORE_ZOC",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADJUST_UNIT_IGNORE_ZOC",
+    "args": {
+     "Ignore": "true"
+    }
+   },
    {
     "id": "LLANERO_ADJACENCY_STRENGTH",
     "collection": "COLLECTION_UNIT_COMBAT",
@@ -18455,6 +21421,26 @@ export const AI_UNITS: readonly AiUnitRow[] = [
     }
    }
   ],
+  "modifiers": [
+   {
+    "id": "DROMON_COMBAT_STRENGTH_AGAINST_UNITS",
+    "collection": "COLLECTION_UNIT_COMBAT",
+    "effect": "EFFECT_ADJUST_PLAYER_STRENGTH_MODIFIER",
+    "args": {
+     "Amount": "10"
+    },
+    "subjectReqs": {
+     "test": "ANY",
+     "reqs": [
+      {
+       "type": "REQUIREMENT_OPPONENT_IS_DISTRICT",
+       "inverse": true,
+       "args": {}
+      }
+     ]
+    }
+   }
+  ],
   "pseudo": "PSEUDOYIELD_UNIT_NAVAL_COMBAT",
   "promotionClass": "PROMOTION_CLASS_NAVAL_RANGED",
   "resource": null,
@@ -18506,6 +21492,110 @@ export const AI_UNITS: readonly AiUnitRow[] = [
    "CLASS_TAGMA"
   ],
   "abilities": [],
+  "modifiers": [
+   {
+    "id": "IGNOREZOC_IGNORE_ZOC",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADJUST_UNIT_IGNORE_ZOC",
+    "args": {
+     "Ignore": "true"
+    }
+   },
+   {
+    "id": "TAGMA_GRANT_RELIGIOUS_AOE_STRENGTH",
+    "collection": "COLLECTION_PLAYER_UNITS",
+    "effect": "EFFECT_GRANT_ABILITY",
+    "args": {
+     "AbilityType": "ABILITY_TAGMA_RELIGIOUS_COMBAT"
+    },
+    "ability": [
+     {
+      "id": "TAGMA_RELIGIOUS_COMBAT",
+      "collection": "COLLECTION_UNIT_COMBAT",
+      "effect": "EFFECT_ADJUST_PLAYER_STRENGTH_MODIFIER",
+      "args": {
+       "Amount": "4"
+      },
+      "subjectReqs": {
+       "test": "ALL",
+       "reqs": [
+        {
+         "type": "REQUIREMENT_PLOT_ADJACENT_FRIENDLY_UNIT_TAG_MATCHES",
+         "inverse": false,
+         "args": {
+          "Tag": "CLASS_TAGMA",
+          "IncludeCenter": "true"
+         }
+        }
+       ]
+      }
+     }
+    ],
+    "subjectReqs": {
+     "test": "ALL",
+     "reqs": [
+      {
+       "type": "REQUIREMENT_PLOT_ADJACENT_FRIENDLY_UNIT_TAG_MATCHES",
+       "inverse": false,
+       "args": {
+        "Tag": "CLASS_RELIGIOUS_ALL"
+       }
+      }
+     ]
+    }
+   },
+   {
+    "id": "TAGMA_GRANT_NONRELIGIOUS_AOE_STRENGTH",
+    "collection": "COLLECTION_PLAYER_UNITS",
+    "effect": "EFFECT_GRANT_ABILITY",
+    "args": {
+     "AbilityType": "ABILITY_TAGMA_NONRELIGIOUS_COMBAT"
+    },
+    "ability": [
+     {
+      "id": "TAGMA_COMBAT_STRENGTH",
+      "collection": "COLLECTION_UNIT_COMBAT",
+      "effect": "EFFECT_ADJUST_PLAYER_STRENGTH_MODIFIER",
+      "args": {
+       "Amount": "4"
+      },
+      "subjectReqs": {
+       "test": "ALL",
+       "reqs": [
+        {
+         "type": "REQUIREMENT_PLOT_ADJACENT_FRIENDLY_UNIT_TAG_MATCHES",
+         "inverse": false,
+         "args": {
+          "Tag": "CLASS_TAGMA",
+          "IncludeCenter": "false"
+         }
+        }
+       ]
+      }
+     }
+    ],
+    "subjectReqs": {
+     "test": "ALL",
+     "reqs": [
+      {
+       "type": "REQUIREMENT_UNIT_DOMAIN_MATCHES",
+       "inverse": false,
+       "args": {
+        "UnitDomain": "DOMAIN_LAND"
+       }
+      },
+      {
+       "type": "REQUIREMENT_PLOT_ADJACENT_TO_OWNER",
+       "inverse": false,
+       "args": {
+        "MinDistance": "0",
+        "MaxDistance": "2"
+       }
+      }
+     ]
+    }
+   }
+  ],
   "pseudo": null,
   "promotionClass": "PROMOTION_CLASS_HEAVY_CAVALRY",
   "resource": "RESOURCE_IRON",
@@ -18614,6 +21704,64 @@ export const AI_UNITS: readonly AiUnitRow[] = [
     }
    }
   ],
+  "modifiers": [
+   {
+    "id": "ANTI_SPEAR",
+    "collection": "COLLECTION_UNIT_COMBAT",
+    "effect": "EFFECT_ADJUST_PLAYER_STRENGTH_MODIFIER",
+    "args": {
+     "Amount": "5"
+    },
+    "subjectReqs": {
+     "test": "ALL",
+     "reqs": [
+      {
+       "type": "REQUIREMENT_OPPONENT_UNIT_PROMOTION_CLASS_MATCHES",
+       "inverse": false,
+       "args": {
+        "UnitPromotionClass": "PROMOTION_CLASS_ANTI_CAVALRY"
+       }
+      }
+     ]
+    }
+   },
+   {
+    "id": "GAESATAE_STRONG_AGAINST_STRONGER_UNITS",
+    "collection": "COLLECTION_UNIT_COMBAT",
+    "effect": "EFFECT_ADJUST_PLAYER_STRENGTH_MODIFIER",
+    "args": {
+     "Amount": "10"
+    },
+    "subjectReqs": {
+     "test": "ALL",
+     "reqs": [
+      {
+       "type": "REQUIREMENT_OPPONENT_IS_STRONGER",
+       "inverse": false,
+       "args": {}
+      }
+     ]
+    }
+   },
+   {
+    "id": "GAESATAE_STRONG_AGAINST_DISTRICTS",
+    "collection": "COLLECTION_UNIT_COMBAT",
+    "effect": "EFFECT_ADJUST_PLAYER_STRENGTH_MODIFIER",
+    "args": {
+     "Amount": "5"
+    },
+    "subjectReqs": {
+     "test": "ALL",
+     "reqs": [
+      {
+       "type": "REQUIREMENT_OPPONENT_IS_DISTRICT",
+       "inverse": false,
+       "args": {}
+      }
+     ]
+    }
+   }
+  ],
   "pseudo": null,
   "promotionClass": "PROMOTION_CLASS_MELEE",
   "resource": null,
@@ -18665,6 +21813,16 @@ export const AI_UNITS: readonly AiUnitRow[] = [
    "CLASS_VOI_CHIEN"
   ],
   "abilities": [],
+  "modifiers": [
+   {
+    "id": "VOI_CHIEN_MOVE_AND_ATTACK",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADJUST_UNIT_ATTACK_AND_MOVE",
+    "args": {
+     "CanMove": "true"
+    }
+   }
+  ],
   "pseudo": null,
   "promotionClass": "PROMOTION_CLASS_RANGED",
   "resource": null,
@@ -18716,6 +21874,25 @@ export const AI_UNITS: readonly AiUnitRow[] = [
    "CLASS_ETHIOPIAN_OROMO_CAVALRY"
   ],
   "abilities": [],
+  "modifiers": [
+   {
+    "id": "IGNOREZOC_IGNORE_ZOC",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADJUST_UNIT_IGNORE_ZOC",
+    "args": {
+     "Ignore": "true"
+    }
+   },
+   {
+    "id": "ETHIOPIAN_OROMO_CAVALRY_IGNORE_HILLS_MOVEMENT_PENALTY",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADJUST_UNIT_IGNORE_TERRAIN_COST",
+    "args": {
+     "Ignore": "true",
+     "Type": "HILLS"
+    }
+   }
+  ],
   "pseudo": null,
   "promotionClass": "PROMOTION_CLASS_LIGHT_CAVALRY",
   "resource": "RESOURCE_HORSES",
@@ -18815,6 +21992,55 @@ export const AI_UNITS: readonly AiUnitRow[] = [
     }
    }
   ],
+  "modifiers": [
+   {
+    "id": "ANTI_SPEAR",
+    "collection": "COLLECTION_UNIT_COMBAT",
+    "effect": "EFFECT_ADJUST_PLAYER_STRENGTH_MODIFIER",
+    "args": {
+     "Amount": "5"
+    },
+    "subjectReqs": {
+     "test": "ALL",
+     "reqs": [
+      {
+       "type": "REQUIREMENT_OPPONENT_UNIT_PROMOTION_CLASS_MATCHES",
+       "inverse": false,
+       "args": {
+        "UnitPromotionClass": "PROMOTION_CLASS_ANTI_CAVALRY"
+       }
+      }
+     ]
+    }
+   },
+   {
+    "id": "SABUM_KIBITTUM_ANTI_CAVALRY",
+    "collection": "COLLECTION_UNIT_COMBAT",
+    "effect": "EFFECT_ADJUST_PLAYER_STRENGTH_MODIFIER",
+    "args": {
+     "Amount": "17"
+    },
+    "subjectReqs": {
+     "test": "ANY",
+     "reqs": [
+      {
+       "type": "REQUIREMENT_OPPONENT_UNIT_PROMOTION_CLASS_MATCHES",
+       "inverse": false,
+       "args": {
+        "UnitPromotionClass": "PROMOTION_CLASS_LIGHT_CAVALRY"
+       }
+      },
+      {
+       "type": "REQUIREMENT_OPPONENT_UNIT_PROMOTION_CLASS_MATCHES",
+       "inverse": false,
+       "args": {
+        "UnitPromotionClass": "PROMOTION_CLASS_HEAVY_CAVALRY"
+       }
+      }
+     ]
+    }
+   }
+  ],
   "pseudo": null,
   "promotionClass": "PROMOTION_CLASS_MELEE",
   "resource": null,
@@ -18866,6 +22092,16 @@ export const AI_UNITS: readonly AiUnitRow[] = [
    "CLASS_NAVAL_MELEE"
   ],
   "abilities": [],
+  "modifiers": [
+   {
+    "id": "NAU_FREE_PROMOTION",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADJUST_UNIT_GRANT_EXPERIENCE",
+    "args": {
+     "Amount": "-1"
+    }
+   }
+  ],
   "pseudo": "PSEUDOYIELD_UNIT_NAVAL_COMBAT",
   "promotionClass": "PROMOTION_CLASS_NAVAL_MELEE",
   "resource": null,

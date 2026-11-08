@@ -160,6 +160,10 @@ class SimCityValue:
         for row in rows:
             for m in row["modifiers"]:
                 self._cv_check_read(m, cached["reads"])
+        for u in cb["units"]:
+            if not u["trait"]:
+                for m in u["modifiers"]:
+                    self._cv_check_unit_mod(m, cached["reads"])
         return cached
 
     # -- the value primitives (aiValue.ts) --------------------------------
@@ -907,13 +911,48 @@ class SimCityValue:
         if f.handicap() < 3:
             # its Maintenance as Gold at the player's weight (0x7b72d1)
             v = v - self._cv_yield(torch.full_like(like, max(0, u["maintenance"]) * _FX), "YIELD_GOLD", f.yield_w("YIELD_GOLD"))
-        value = _present_value(v, r, h) - _present_value(v, r, t)
+        value = _present_value(v, r, h) - _present_value(v, r, t) + self._cv_unit_mods(f, unit, like)
         value = torch.where(noaccess, torch.zeros_like(value), value)
         trains = _t(f.trains_domain(u["domain"]), like).bool()
         value = torch.where(trains, value, torch.full_like(value, _FX_MIN))
         value = torch.where(ex, torch.full_like(value, _FX_MIN), value)
         read = read | ex | ~trains
         return value, read
+
+    def _cv_unit_mods(self, f, unit: str, like: torch.Tensor) -> torch.Tensor:
+        """`unitValue`'s modifiers (0x7a4b20 at 0x7b76ce), raw: each of the
+        unit's modifiers analysed in a context of the player and the unit
+        valued, no city — EFFECT_ADJUST_UNIT_MOVEMENT over
+        COLLECTION_PLAYER_UNITS (`_unit_movement_value`); every other worth
+        nothing here as in the TS (`_cv_check_unit_mod`)"""
+        T = self._cv_tables()
+        reads = T["reads"]
+        v = torch.zeros_like(like)
+        for m in T["unit"][unit]["modifiers"]:
+            if (m.get("effect") == "EFFECT_ADJUST_UNIT_MOVEMENT" and m.get("collection") == "COLLECTION_PLAYER_UNITS"
+                    and not self._pol_refused(m.get("subjectReqs"), reads)):
+                v = v + _t(self._unit_movement_value(f.s, m, unit), like).clamp(max=0x7FFFFF) * _FX
+        return v
+
+    def _cv_check_unit_mod(self, m: dict, reads: dict) -> None:
+        """refuse a unit's modifier its value's analysis (no city, no unit in
+        the context) takes to something here unread: a wrapper live inside,
+        an analyzer but EFFECT_ADJUST_PLAYER_STRENGTH_MODIFIER on
+        COLLECTION_UNIT_COMBAT (nothing with no unit) and
+        EFFECT_ADJUST_UNIT_MOVEMENT over COLLECTION_PLAYER_UNITS"""
+        eff, col = m.get("effect"), m.get("collection")
+        if col not in reads["collections"] or eff not in reads["analyzers"] or self._pol_refused(m.get("subjectReqs"), reads):
+            return
+        if eff in self._CV_WRAPPERS:
+            if self._pol_live_nested(m, reads):
+                raise NotImplementedError(f"unit modifier {m.get('id')}: {eff} analysed in TS, not on the GPU")
+            return
+        if eff == "EFFECT_ADJUST_PLAYER_STRENGTH_MODIFIER" and col == "COLLECTION_UNIT_COMBAT":
+            return
+        if eff == "EFFECT_ADJUST_UNIT_MOVEMENT" and col == "COLLECTION_PLAYER_UNITS":
+            self._unit_movement_check(m, reads, "unit")
+            return
+        raise NotImplementedError(f"unit modifier {m.get('id')}: effect {eff} on {col} analysed in TS, not on the GPU")
 
     def _cv_trader_value(self, f, extra: int, t: torch.Tensor, h: torch.Tensor):
         """`traderValue`: (value, read) — 0 where the Traders fill the

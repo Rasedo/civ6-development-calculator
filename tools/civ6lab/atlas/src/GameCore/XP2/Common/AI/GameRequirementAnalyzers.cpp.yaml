@@ -231,6 +231,19 @@
   context:
     - "...0 (the context's player is +0x40's — the evaluating player); PLAYER_IS_RELIGION_FOUNDER 0x6d27a0 (no religion: held; else 0x497cc0). A requirement the registry lacks (PLAYER_HAS_AT_L..."
   review: reviewed
+- addr: 0x6d3200
+  kind: function
+  name: REQUIREMENT_PLOT_ADJACENT_TO_OWNER
+  semantics: "REQUIREMENT_PLOT_ADJACENT_TO_OWNER's evaluator in the AI's analysis (@f044a0, vtable 0xd67790 slot 1): no player (+0x80), unmet; no unit (+0x90), met; with a unit and a valued UnitType (+0x5c, not -1), unmet where the player's units (+0x12e8 +0xd8) hold one of that type (+0x160) in no operation (+0x7d0 -1); else met (the unit's operation looked up by 0x800590 / 0x7cb790 or not)."
+  status: READ
+  cases:
+    - recording: h1_duely1124
+      turn: 179
+      value: "city-state 4, holding no Supply Convoy: the Convoy's SUPPLY_CONVOY_BONUS_MOVEMENT admitted on its units, Combustion 1313.8 as logged"
+  impl: [cpu/core/aiModifiers.ts:EVALUATORS, gpu/core/sim_policy.py:_unit_movement_value]
+  readings:
+    - "C-98: a unit's value adds its abilities' modifiers; EFFECT_ADJUST_UNIT_MOVEMENT and REQUIREMENT_PLOT_ADJACENT_TO_OWNER; a second completion adds again — READ (0x7b62c0 at 0x7b7658..0x7b76d8, 0x6e11c7 / 0xc85140, 0x6bd520, 0x6d3200, 0x762d60's rows), both twins"
+  review: reviewed
 - addr: 0x6d3830
   final: 0x490c90
   kind: function

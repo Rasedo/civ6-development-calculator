@@ -11,7 +11,7 @@ import { unitProductionTable } from '../../../cpu/core/aiUnitProduction';
 import { AI_BUILDING_INDEX, AI_UNIT_INDEX, buildingValue, defaultSpecialization, growthForecast, housingValue, unitValue, type CityBuildFacts, type PickFacts } from '../../../cpu/core/aiCityBuild';
 import type { AiValueView } from '../../../cpu/core/aiValue';
 
-const view = { yieldWeight: () => 0, pseudoYieldWeight: () => 0, tradeRouteCapacity: () => 0, bestCombatStrength: () => 0 } as unknown as AiValueView;
+const view = { yieldWeight: () => 0, pseudoYieldWeight: () => 0, tradeRouteCapacity: () => 0, bestCombatStrength: () => 0, enemyUnitCounts: () => new Map(), playerUnits: () => [] } as unknown as AiValueView;
 const facts: CityBuildFacts = {
   view, seat: 100, cityId: -1, population: 1, capital: true, districtCount: 1, hasWonder: false, atWar: false, era: 0,
   yieldPct: (y) => (y === 'YIELD_PRODUCTION' ? -50 : 0), version: (b) => b, hasBuilding: () => false,
