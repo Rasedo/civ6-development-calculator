@@ -1660,6 +1660,10 @@ export const UNITS: Record<string, UnitDef> = Object.fromEntries(
       combat: 85,
       cavalry: true,
       cavalryTag: 'heavy',
+      // CIV6 (TypeTags CLASS_HEAVY_CHARIOT, ABILITY_HEAVY_CHARIOT): "+1 Movement
+      // if starting in Desert, Plains, Grassland, or Tundra", the Heavy
+      // Chariot's ability on the same tag
+      openTerrainMoves: 1,
       requiresTech: 'COMBUSTION',
       requiresResource: 'OIL',
       resourceCost: 1,
@@ -1673,6 +1677,7 @@ export const UNITS: Record<string, UnitDef> = Object.fromEntries(
         combat: xml('Units', 'UnitType=UNIT_TANK', 'Combat'),
         cavalry: xml('Units', 'UnitType=UNIT_TANK', 'PromotionClass', { expect: 'PROMOTION_CLASS_HEAVY_CAVALRY' }),
         cavalryTag: xml('Units', 'UnitType=UNIT_TANK', 'PromotionClass', { expect: 'PROMOTION_CLASS_HEAVY_CAVALRY' }),
+        openTerrainMoves: { derived: 'HEAVYCHARIOT_FASTER_CLEAR_TERRAIN Amount, ABILITY_HEAVY_CHARIOT on the CLASS_HEAVY_CHARIOT tag the unit carries', inputs: [xml('ModifierArguments', 'ModifierId=HEAVYCHARIOT_FASTER_CLEAR_TERRAIN&Name=Amount', 'Value'), xml('TypeTags', 'Type=UNIT_TANK&Tag=CLASS_HEAVY_CHARIOT', 'Tag', { expect: 'CLASS_HEAVY_CHARIOT' })] },
         requiresTech: xml('Units', 'UnitType=UNIT_TANK', 'PrereqTech', { expect: 'TECH_COMBUSTION' }),
         requiresResource: xml('Units', 'UnitType=UNIT_TANK', 'StrategicResource', { expect: 'RESOURCE_OIL' }),
         resourceCost: xml('Units_XP2', 'UnitType=UNIT_TANK', 'ResourceCost'),
@@ -1985,6 +1990,10 @@ export const UNITS: Record<string, UnitDef> = Object.fromEntries(
       combat: 95,
       cavalry: true,
       cavalryTag: 'heavy',
+      // CIV6 (TypeTags CLASS_HEAVY_CHARIOT, ABILITY_HEAVY_CHARIOT): "+1 Movement
+      // if starting in Desert, Plains, Grassland, or Tundra", the Heavy
+      // Chariot's ability on the same tag
+      openTerrainMoves: 1,
       requiresTech: 'COMPOSITES',
       requiresResource: 'OIL',
       resourceCost: 1,
@@ -1997,6 +2006,7 @@ export const UNITS: Record<string, UnitDef> = Object.fromEntries(
         combat: xml('Units', 'UnitType=UNIT_MODERN_ARMOR', 'Combat'),
         cavalry: xml('Units', 'UnitType=UNIT_MODERN_ARMOR', 'PromotionClass', { expect: 'PROMOTION_CLASS_HEAVY_CAVALRY' }),
         cavalryTag: xml('Units', 'UnitType=UNIT_MODERN_ARMOR', 'PromotionClass', { expect: 'PROMOTION_CLASS_HEAVY_CAVALRY' }),
+        openTerrainMoves: { derived: 'HEAVYCHARIOT_FASTER_CLEAR_TERRAIN Amount, ABILITY_HEAVY_CHARIOT on the CLASS_HEAVY_CHARIOT tag the unit carries', inputs: [xml('ModifierArguments', 'ModifierId=HEAVYCHARIOT_FASTER_CLEAR_TERRAIN&Name=Amount', 'Value'), xml('TypeTags', 'Type=UNIT_MODERN_ARMOR&Tag=CLASS_HEAVY_CHARIOT', 'Tag', { expect: 'CLASS_HEAVY_CHARIOT' })] },
         requiresTech: xml('Units', 'UnitType=UNIT_MODERN_ARMOR', 'PrereqTech', { expect: 'TECH_COMPOSITES' }),
         requiresResource: xml('Units', 'UnitType=UNIT_MODERN_ARMOR', 'StrategicResource', { expect: 'RESOURCE_OIL' }),
         resourceCost: xml('Units_XP2', 'UnitType=UNIT_MODERN_ARMOR', 'ResourceCost'),
