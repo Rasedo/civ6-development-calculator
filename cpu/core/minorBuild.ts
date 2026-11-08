@@ -88,7 +88,7 @@ import { opsOf } from './operations/manager';
  *  district adjacency across the border, so the next minor's yields read it.
  *  The city's grid is resolved before its yields read it. Then, as every
  *  player's turn runs (tools/civ6lab/turn_order_civ6.md): its economy
- *  (`minorEconomy`) and the research that completes on it, a levied army
+ *  (`minorEconomy`) and the research that completes on it (each technology an "Upgrade Units" tree, `minorTechGained`), a levied army
  *  due home (`minorLevyReturn`), its roads at the era that brings
  *  (`upgradeRoads`), then its city — the Production its city
  *  makes now and the boosts that earns (`detectBoosts`), its strategic resources' income and its units' fuel, then growth and borders on the city as it stands after that
@@ -103,8 +103,8 @@ import { opsOf } from './operations/manager';
  *  turn (`minorMilitaryTurn`), then its knowledge base's look
  *  (`minorKnowledge`), its contract purchases (`minorContractPurchases`)
  *  and its savings turn's disband (`minorEconomicDisband`), its free
- *  Trader's route (`minorTradePick`), then its actions: a research
- *  completion's upgrades, its city AI's turn (`minorAiTurn`: its builds,
+ *  Trader's route (`minorTradePick`), then its actions: its city AI's
+ *  turn (`minorAiTurn`: its builds,
  *  purchases and trees, the trees' Builders' work), its civics AI's
  *  government values on the city it left, its operations' refresh
  *  (`minorOpsRefresh`) and its military AI's upgrade
@@ -122,7 +122,7 @@ export function minorPhase(state: GameState): void {
     if (prev) minorEndTurnList(state, prev);
     prev = cityState;
     minorPower(state, cityState);
-    const techs = minorEconomy(state, cityState);
+    minorEconomy(state, cityState);
     // its levied army home at its Influence turn (0x44bb20 -> 0x44da30), in
     // its DoTurn after the treasury, the culture and the Faith (0x4e4560 at
     // 0x4e4638): the bank pays no unit the return brings (runs/h1_duelz1121
@@ -224,13 +224,6 @@ export function minorPhase(state: GameState): void {
     if (ordersHeld) routePick?.(state, cityState);
     else minorTradePick(state, cityState);
     if (cityState.economy) cityState.economy.goldBoost = boostWas;
-    // its "Upgrade Units" trees' trigger: a tree per technology gained
-    // (TRIGGER_TECH_UPGRADE, AI_EVENT_GAIN_TECH). A civic gained alone starts
-    // none, its TRIGGER_CIVIC_UPGRADE row (AI_EVENT_GAIN_CIVIC) notwithstanding:
-    // over the five duely duels a tech gain is followed by a new tree on
-    // 1042 of 1061 minor-turns, a civic gain with no tech on 68 of 446
-    // (runs/h1_duely1124 t84 city-state 4, runs/h1_duely1128 t139 Bologna)
-    upgradeTreesStart(cityState, techs);
     minorAiTurn(state, cityState, fresh, units);
     // its Economic AI's Gold boost on the net income its gold step banked
     // (0x687bf0 at 0x6880a1: fx(-0.2) x the treasury's +0x1b8 while
@@ -520,10 +513,9 @@ export function minorResearchAi(state: GameState, cityState: CityState): () => v
  * 0x496fd0 -> 0x494090 -> 0x43c9a0 over the store +0x168), a city-state's
  * every class (`CityState.gpPoints`) (runs/h1_duely1124 Cardiff t230: the
  * civic it completed lifts its Gold 1.6 after the bank, the net -0.8 as the treasury
- * stat holds). Returns how many technologies it completed, the upgrade
- * trigger's count.
+ * stat holds).
  */
-export function minorEconomy(state: GameState, cityState: CityState): number {
+export function minorEconomy(state: GameState, cityState: CityState): void {
   let y = computeCityStats(state, minorCity(cityState)).total;
   const bank = (techs: number) => {
     const g = techs > 0 ? computeCityStats(state, minorCity(cityState)).total.gold : y.gold;
@@ -539,7 +531,6 @@ export function minorEconomy(state: GameState, cityState: CityState): number {
   if (gained.techs + gained.civics > 0) y = computeCityStats(state, minorCity(cityState)).total;
   cityState.faith += y.faith;
   for (const v of Object.values(cityState.gpPoints ?? {})) cityState.faith += v;
-  return gained.techs;
 }
 
 /**
@@ -587,7 +578,7 @@ export function minorGrowth(state: GameState, cityState: CityState): void {
  * completion's choice at the bank (`minorResearchBank`), then the AIs' turns
  * (`minorResearchTurn`); a pick resumes the progress kept on it
  * (`selectResearch`). The Free Cities run both at once. Returns how many
- * trees completed a row this turn — the upgrade trigger's count — and the
+ * trees completed a row this turn and the
  * government values' step (`minorResearchTurn`), `stood` false: a
  * city-state's turn before its city stood.
  */
@@ -609,7 +600,7 @@ export function minorResearch(state: GameState, r: ResearchState, seat: number, 
  * and their Encampment districts" — `urban` fits the holder's cities on its
  * completion. `terms` gives the analyses their city terms
  * (`minorResearchTerms`), `contracts` the seat's Tech Contracts; the after-technologies callback
- * runs between the technologies and the civics. Returns how
+ * runs between the technologies and the civics; a city-state's technology starts its "Upgrade Units" tree (`minorTechGained`). Returns how
  * many technologies and civics it completed.
  */
 export function minorResearchBank(state: GameState, r: ResearchState, seat: number, science: number, culture: number,
@@ -625,6 +616,7 @@ export function minorResearchBank(state: GameState, r: ResearchState, seat: numb
     r.techProgress -= cost;
     if (!r.techs.includes(cur)) r.techs.push(cur);
     delete r.techRetained[cur];
+    minorTechGained(state, seat);
     r.tech = null;
     takeChoice(r, researchCompletionChoice(state, seat, r.aiEntries ?? researchAnalysis(state, seat, science, terms()?.tech, contracts), cur,
       researchDraw(state), contracts));
@@ -754,6 +746,21 @@ export function minorCatchUp(state: GameState, gainer: number, id: string, civic
   }
 }
 
+/** A CITY-STATE'S TECHNOLOGY GAINED (SetTech 0x4cd4c0, its bank's or a
+ *  boost's completion): its AI_EVENT_GAIN_TECH (0x4cd7b5 -> 0x800c60,
+ *  TRIGGER_TECH_UPGRADE) starts an "Upgrade Units" tree at once
+ *  (`upgradeTreesStart`; runs/h1_duelp1128 t127 city-state 3's Banking,
+ *  boosted complete by Guilds, its tree holding Warriors 1900551 /
+ *  1835016). A civic starts none: the DLL names its event
+ *  "AI_EVENT_GAIN_civic" (0x5bc4dd), whose hash no AiEvents row holds, so
+ *  SetCivic signals event -1 (0x3a1d85) and the trigger handler drops it
+ *  (0x800c7d) — TRIGGER_CIVIC_UPGRADE's row (AI_EVENT_GAIN_CIVIC) is never
+ *  reached. The Free Cities hold no such tree. */
+function minorTechGained(state: GameState, seat: number): void {
+  const cs = state.cityStates.find((x) => x.seat === seat);
+  if (cs) upgradeTreesStart(cs, 1);
+}
+
 /** the research AI's choice taken: its research and its goal */
 function takeChoice(r: ResearchState, c: ResearchChoice | null): void {
   if (!c) return;
@@ -792,6 +799,7 @@ export function minorCompleteNow(state: GameState, seat: number, id: string): vo
   r.techs.push(id);
   delete r.techRetained[id];
   const cs = state.cityStates.find((x) => x.seat === seat);
+  minorTechGained(state, seat);
   if (id === URBAN_DEFENSES_TECH) {
     if (cs) minorUrbanFit(state, cs);
     else urbanDefensesFit(state, seat);

@@ -37,7 +37,7 @@ class SimMinors:
             if not bool(alive.count_nonzero()):
                 continue
             self._minor_power(s)
-            techs = self._minor_economy(s)
+            self._minor_economy(s)
             # its levied army home after the bank (`minorPhase`)
             self._minor_levy_return(s)
             # the era its research brings re-lays its roads at once, before
@@ -104,9 +104,6 @@ class SimMinors:
             self._minor_gold_boost(s)
             self._minor_trade_pick(s)
             self.citystate_gold_boost[:, s] = _boost_was
-            # its "Upgrade Units" trees' trigger: a tree per technology gained
-            # (`minorTurn`: a civic gained alone starts none)
-            self._mops_upgrade_start(s, torch.where(alive, techs.long(), torch.zeros_like(techs.long())))
             self._minor_ai_turn(s, units)
             # its Economic AI's Gold boost, after its city update
             self._minor_gold_boost(s)
@@ -262,6 +259,11 @@ class SimMinors:
         on_cur = (cur >= 0) & full.gather(1, cur.clamp(min=0).unsqueeze(1)).squeeze(1)
         curp[:, s] = torch.where(on_cur, torch.full_like(cur, -1), cur)
         prog[:, s] = torch.where(on_cur, torch.zeros_like(prog[:, s]), prog[:, s])
+        # each technology's gain starts its "Upgrade Units" tree at once
+        # (`minorTechGained`; the Free Cities hold none)
+        if s != self.FR:
+            self._mops_upgrade_start(s, torch.where(self.citystate_alive[:, s], full.sum(dim=1).long(),
+                                                    torch.zeros_like(full[:, 0], dtype=torch.long)))
         # every completed technology makes the completion's choice, in the
         # order the boosts landed (the Boosts rows' order, `detectBoosts`)
         # each completion's contract walk then COMPLETES the Tech Contracts on
@@ -1380,7 +1382,7 @@ class SimMinors:
         mt = self.major_unit_type.clamp(min=0, max=self.NU - 1)
         return (mine & self._type_military.take(mt)).sum(dim=1)
 
-    def _minor_economy(self, s: int) -> torch.Tensor:
+    def _minor_economy(self, s: int) -> None:
         """`minorEconomy` — THE MINOR'S ECONOMY, in the order every player's
         start of turn runs (tools/civ6lab/turn_order_civ6.md). CIV6
         (City-state): a city-state's city is an ordinary city — its Campus
@@ -1390,8 +1392,7 @@ class SimMinors:
         `citystate_treasury` and pays the minor's units' upkeep — each unit's
         own Maintenance, a minor carrying no card that cuts it — and meets
         the `_bankruptcy` every seat meets, then the civics complete
-        (`_minor_research_bank`), and Faith banks into `citystate_faith`, the store `citystate_gp_points` with it. Returns [B] long, the technologies completed (the upgrade trigger's
-        count)."""
+        (`_minor_research_bank`), and Faith banks into `citystate_faith`, the store `citystate_gp_points` with it."""
         row = self._CITY_MINOR0 + s
         alive = self.citystate_alive[:, s]
         keep = alive.double()
@@ -1422,7 +1423,6 @@ class SimMinors:
         # the city's Faith and the Great Person points a turn of every class
         # it cannot earn (GetFaithYield 0x494090 -> 0x43c9a0 over the store)
         self.citystate_faith[:, s] += (tot[:, 5] + self.citystate_gp_points[:, s].sum(dim=1)) * keep
-        return techs
 
     def _minor_production(self, s: int) -> torch.Tensor:
         """[B] — the Production minor `s`'s city makes as it stands now, for
@@ -1568,7 +1568,7 @@ class SimMinors:
         the overflow bank and complete the civic in hand at its cost, whose
         choice reads the civics AI's analysis of the turn before
         (`_cai_completion`); `after_techs` (the [B] technologies completed)
-        runs between the two. CIV6 (Urban Defenses): the tech "builds modern
+        runs between the two; a city-state's technology starts its "Upgrade Units" tree (`minorTechGained`). CIV6 (Urban Defenses): the tech "builds modern
         fortifications around the City Centers of all current and future
         cities and their Encampment districts", so the holder's perimeters
         reach the urban tier's maximum, their damage kept (`_minor_urban_fit`). Returns two [B] long, the technologies and
@@ -1591,6 +1591,10 @@ class SimMinors:
         techs = techs + fire.long()
         if bool(fire.count_nonzero()):
             self.citystate_techs[fire, s, c[fire]] = True
+            # a city-state's technology gained starts its "Upgrade Units"
+            # tree at once (`minorTechGained`)
+            if not free:
+                self._mops_upgrade_start(s, fire.long())
             prog[:, s] = torch.where(fire, prog[:, s] - cval, prog[:, s])
             col = torch.arange(rc.shape[1], device=self.device).unsqueeze(0)
             self.citystate_tech_retain[:, s] = torch.where(fire.unsqueeze(1) & (col == c.unsqueeze(1)),

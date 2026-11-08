@@ -48,6 +48,20 @@
     - "...x6c4); when TOURISM_ADVANCED_ERA_WONDER (GP +0x6c0) is set, plus the owner's era index (0x467eb0) less the wonder's — its PrereqTech's era (+0x210 → +0xc0), else its PrereqCivic's (+..."
     - "...of its PrereqTech's and PrereqCivic's, none for a unit with neither) the actor's era (0x467eb0: the latest era of its techs and civics); the picker draws \"Choosing random unit..."
   review: reviewed
+- addr: 0x467f20
+  final: 0x2f7f20
+  kind: function
+  semantics: the player's CivilizationLevel type (0x21ae10 on its configuration +0x128).
+  status: READ
+  cases:
+    - recording: h1_duelp1128
+      turn: 127
+      value: "city-state 3's Banking boosted complete by Guilds, no research completing: tree 5111814 holds Warriors 1900551 / 1835016"
+  readings:
+    - "C-99 / C-128: every technology gained starts an Upgrade Units tree, the civic event never fires; a tree's units after its tick; the Nearest City Search's resource test; the plot's unit list — READ (0x4cd4c0 -> 0x800c60, 0x5bbf80 -> 0x27a180, 0x3a1ac0, 0x7cb3d0 -> 0x7d2190, 0x7eba40 -> 0x510d30, 0x74f40 / 0x763b0), the trigger both twins"
+  context:
+    - "...index +0x14) skips each city where 0x510d30 fails: the owner's CivilizationLevel row (0x467f20) with IgnoresUnitStrategicResourceRequirements (+0x29 bit 1, CIVILIZATION_LEVEL_CITY_ST..."
+  review: reviewed
 - addr: 0x467f50
   final: 0x2f7f50
   kind: function

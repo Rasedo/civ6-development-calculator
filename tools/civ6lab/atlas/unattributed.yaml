@@ -1016,6 +1016,7 @@
     - "C-99: the city-states' Promotion move on the replay's copy, Garrison City's swap — READ, both twins"
     - "C-99: the city-states' Promotion move on the replay's copy, Garrison City's swap"
     - "C-98: the research bank with nothing in hand; a city-state's unit cost under Mercenary Companies"
+    - "C-99 / C-128: every technology gained starts an Upgrade Units tree, the civic event never fires; a tree's units after its tick; the Nearest City Search's resource test; the plot's unit list — READ (0x4cd4c0 -> 0x800c60, 0x5bbf80 -> 0x27a180, 0x3a1ac0, 0x7cb3d0 -> 0x7d2190, 0x7eba40 -> 0x510d30, 0x74f40 / 0x763b0), the trigger both twins"
   context:
     - "...+0x7d0 the operation's id and +0x770 clear) and sets each one's AI type (+0x168, setter 0x1e60f0) to its type's own (0x79b9c0: the highest UnitAiInfos flag of the type up to COMBAT 3,..."
   review: reviewed
@@ -1452,6 +1453,21 @@
   context:
     - "## C-60: the Free Cities Raid — READ (the start 0x274ea0, the record 0x277470, the signals 0x276d90 / 0x276e70 / 0x276ff0, the record's clear in 0x274010), the signal..."
     - "...last unit's owner; its event unread). Each finds the Free City's record by the plot (0x277470: the records' +0x0c / +0x10 plot, +0x14 live) and calls 0x274ea0."
+  review: reviewed
+- addr: 0x27a180
+  final: 0x1b00e0
+  kind: function
+  semantics: "an AiEvents row by its name's hash: the id itself under the table's count, else (above 0x7ff) a binary search on the rows' hash (+0x18), its index +0x14; -1 none."
+  status: READ
+  cases:
+    - recording: h1_duelp1128
+      turn: 127
+      value: "city-state 3's Banking boosted complete by Guilds, no research completing: tree 5111814 holds Warriors 1900551 / 1835016"
+  readings:
+    - "C-99 / C-128: every technology gained starts an Upgrade Units tree, the civic event never fires; a tree's units after its tick; the Nearest City Search's resource test; the plot's unit list — READ (0x4cd4c0 -> 0x800c60, 0x5bbf80 -> 0x27a180, 0x3a1ac0, 0x7cb3d0 -> 0x7d2190, 0x7eba40 -> 0x510d30, 0x74f40 / 0x763b0), the trigger both twins"
+  context:
+    - "...ty Search's resource test; the plot's unit list — READ (0x4cd4c0 -> 0x800c60, 0x5bbf80 -> 0x27a180, 0x3a1ac0, 0x7cb3d0 -> 0x7d2190, 0x7eba40 -> 0x510d30, 0x74f40 / 0x763b0), the trigger bo..."
+    - "...mes (0x8c4af0 -> 0xcd1390, a table CRC over the bytes as they stand, case kept) through 0x27a180 (a binary search on the rows' hash, -1 none). The DLL names the civic event \"AI_EVENT_G..."
   review: reviewed
 - addr: 0x27a680
   final: 0x1b05e0
@@ -2209,11 +2225,15 @@
 - addr: 0x510d30
   final: 0x35fa60
   kind: function
-  semantics: the city holds a district (the upgrade's needed one).
-  status: PARTLY
+  semantics: "the player may take an upgrade asking strategic resource r: its CivilizationLevel row (0x467f20) with IgnoresUnitStrategicResourceRequirements (+0x29 bit 1; CIVILIZATION_LEVEL_CITY_STATE true), else its count of r at ownership 0 less its reservations (0x4aa790, r9b 1) plus ownership 1 at least STRATEGIC_RESOURCE_MINIMUM_FOR_UNIT_UPGRADING (GlobalParameters +0x690, 1)."
+  status: READ
+  cases:
+    - recording: h1_duelp1128
+      turn: 127
+      value: "city-state 3's Banking boosted complete by Guilds, no research completing: tree 5111814 holds Warriors 1900551 / 1835016"
   readings:
     - "C-99: the upgrade trees — READ (the trigger, Find Available Unit's upgradeable offer, Find Unit Targets' job, Upgrade Units, the economic AI's upgrade, Move Unit with no Location), ported; the deletion of an excess obsolete unit unported"
-  notes: ["imported: READ in its section, no confirming case found beside it"]
+    - "C-99 / C-128: every technology gained starts an Upgrade Units tree, the civic event never fires; a tree's units after its tick; the Nearest City Search's resource test; the plot's unit list — READ (0x4cd4c0 -> 0x800c60, 0x5bbf80 -> 0x27a180, 0x3a1ac0, 0x7cb3d0 -> 0x7d2190, 0x7eba40 -> 0x510d30, 0x74f40 / 0x763b0), the trigger both twins"
   context:
     - ...r or coastal land; an upgrade asking a district (DB.Units +0x2c8 +0x14) the city lacks (0x510d30) skipped. SUCCESS where some unit has a target, else FAILURE.
   review: reviewed
@@ -2909,6 +2929,7 @@
     - "C-128: a city-state's Make Military Formation — READ (0x77a190, 0x770670, 0x536da0, 0x773e20, 0x94a870, 0x949930), both twins"
     - "C-129: the upgrade is a new unit, its old self dying in its pool slot to the turn's end — READ (0xa49cb0, 0x9402a0, 0x4ef040, 0x4ef6d0), both twins"
     - "C-129: a killed player's records forgotten; a capture's new unit; an air strike's record — READ (0x534c50, 0x787fc0 -> 0x5ee370, 0x212500's create), both twins; the replay's later-player timings"
+    - "C-99 / C-128: every technology gained starts an Upgrade Units tree, the civic event never fires; a tree's units after its tick; the Nearest City Search's resource test; the plot's unit list — READ (0x4cd4c0 -> 0x800c60, 0x5bbf80 -> 0x27a180, 0x3a1ac0, 0x7cb3d0 -> 0x7d2190, 0x7eba40 -> 0x510d30, 0x74f40 / 0x763b0), the trigger both twins"
   notes:
     - ".claude/scratchpad/mu1/readings_c96.md: ...000, else the skip 0x95eae0 (\"Wander Back to City\", \"Move To\" the   city). The turn ends (0x56d6f0, 0x570b40). Confirmed: the turn's \"Random   Direction\" draws pair one to one with the AI_Tactical.csv rows \"W..."
   context:
@@ -3010,6 +3031,7 @@
     - "C-129: the bankruptcy's victim and every seat's upgrade to the furthest rung — READ (0x4e05e0, 0x5374c0), both twins"
     - "C-129: the military AI's upgrade — READ (0x727db0, 0x6874d0), both twins"
     - "C-129: the upgrade is a new unit, its old self dying in its pool slot to the turn's end — READ (0xa49cb0, 0x9402a0, 0x4ef040, 0x4ef6d0), both twins"
+    - "C-99 / C-128: every technology gained starts an Upgrade Units tree, the civic event never fires; a tree's units after its tick; the Nearest City Search's resource test; the plot's unit list — READ (0x4cd4c0 -> 0x800c60, 0x5bbf80 -> 0x27a180, 0x3a1ac0, 0x7cb3d0 -> 0x7d2190, 0x7eba40 -> 0x510d30, 0x74f40 / 0x763b0), the trigger both twins"
   context:
     - "..., unit, test-visible 1) — not a barbarian's (0x56ee80) and an upgrade type it may take (0x5909a0 -> 0x5374c0) — the Amount x its upgrade's Gold (0x590520 << 8) as Gold at the player'..."
   review: reviewed
@@ -3071,12 +3093,14 @@
     - recording: 1124
       turn: 201
       value: "a   Neighborhood, an Aqueduct none: 1124 t201, the Ironclads pass the   Neighborhood at 17:15 for the Campus at 17:14), complete (+0xb08) and not   pillaged (0x24c3a0);"
+  impl: [cpu/core/minorBuild.ts:minorTechGained]
   readings:
     - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
     - "C-95: the tactical pass — READ (the barbarians' moves; the minors share it)"
     - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
     - "C-96: the city-states' tactical pass — READ (Wander Near City, Heal, the non-barbarian priorities, FindAlternateLocation), the families it needs PARTLY READ"
     - "C-96 / C-97: the unit value — READ (the combat, trade, explorer branches, the tail, the military AI's unit production), PARTLY READ (its inputs)"
+    - "C-99 / C-128: every technology gained starts an Upgrade Units tree, the civic event never fires; a tree's units after its tick; the Nearest City Search's resource test; the plot's unit list — READ (0x4cd4c0 -> 0x800c60, 0x5bbf80 -> 0x27a180, 0x3a1ac0, 0x7cb3d0 -> 0x7d2190, 0x7eba40 -> 0x510d30, 0x74f40 / 0x763b0), the trigger both twins"
   notes:
     - ".claude/scratchpad/bt/tacnames.txt: ...=== ann 0x5bbf80 2000 function 005bbf80..005bcdb2 (3634 bytes) 005bbf80 sub      rsp, 0x28 005bbf84 lea      rcx, [r..."
     - ".claude/scratchpad/cb/notes.txt: ...97c GOLD f2f980 SCI f2f984 CULT f2f988 FAITH (loader 0x8a0720 by hash). PSEUDOYIELD globals: loader 0x5bbf80, mapping in gnames.json (value = string BEFORE the previous lea; fixed).  DS CHOOSER 0x5d4d70: best..."
@@ -5898,12 +5922,12 @@
 - addr: 0x7eba40
   final: 0x553ea0
   kind: function
-  semantics: "the Nearest City Search job for a unit that is no Great Person: the nearest of the player's cities (+0x12f0 +0xd8) by plot distance — its centre; for a sea unit whose centre is not coastal land (0x82a10), the city's Harbor (0xcbecc739) plot (0x1ae530); an upgrade asking a district (DB.Units +0x2c8 +0x14) the city lacks (0x510d30) skipped."
+  semantics: "the Nearest City Search job for a unit that is no Great Person: the nearest of the player's cities (+0x12f0 +0xd8) by plot distance — its centre; for a sea unit whose centre is not coastal land (0x82a10), the city's Harbor (0xcbecc739) plot (0x1ae530). An upgrade (0x5909a0) asking a StrategicResource (Units +0x2c8, its index +0x14) skips each city where 0x510d30 fails (0x7ebed5..0x7ebf03): never for a city-state."
   status: PARTLY
   impl: [cpu/core/minorOps.ts:upgradeTreesTick, cpu/core/minorOps.ts:upgradeTarget]
   readings:
     - "C-99: the upgrade trees — READ (the trigger, Find Available Unit's upgradeable offer, Find Unit Targets' job, Upgrade Units, the economic AI's upgrade, Move Unit with no Location), ported; the deletion of an excess obsolete unit unported"
-  notes: ["imported: READ in its section, no confirming case found beside it"]
+    - "C-99 / C-128: every technology gained starts an Upgrade Units tree, the civic event never fires; a tree's units after its tick; the Nearest City Search's resource test; the plot's unit list — READ (0x4cd4c0 -> 0x800c60, 0x5bbf80 -> 0x27a180, 0x3a1ac0, 0x7cb3d0 -> 0x7d2190, 0x7eba40 -> 0x510d30, 0x74f40 / 0x763b0), the trigger both twins"
   context:
     - "...TARGETS (0x7ed200, \"Nearest City Search\"): a job per tree unit (its vtable @d741d8, run 0x7eba40); a plot found becomes the unit's target (+0x7d8 -> +0x830, 0x7eb220). The job for a un..."
   review: reviewed
@@ -6227,12 +6251,26 @@
   context:
     - "...680: the in-hand contract's check 0x5d7e00, the slots freed of trees no longer running (0x800590), the analysis the turn's job wrote (0x5ce910 -> 0x5ce970 per plot; no direct caller) r..."
   review: reviewed
+- addr: 0x8007a0
+  final: 0x564190
+  kind: function
+  semantics: "the player AI's tree-manager setup: loads the trigger rows (+0x388 via 0x800150) and binds the handlers: 0x800c60 on player signal +0x2b8 (0x800a33), the tree manager tick 0x7ffdd0."
+  status: PARTLY
+  cases:
+    - recording: h1_duelp1128
+      turn: 127
+      value: "city-state 3's Banking boosted complete by Guilds: the tree made at the boost (5111814) holds Warriors 1900551 / 1835016"
+  readings:
+    - "C-99 / C-128: every technology gained starts an Upgrade Units tree, the civic event never fires; a tree's units after its tick; the Nearest City Search's resource test; the plot's unit list — READ (0x4cd4c0 -> 0x800c60, 0x5bbf80 -> 0x27a180, 0x3a1ac0, 0x7cb3d0 -> 0x7d2190, 0x7eba40 -> 0x510d30, 0x74f40 / 0x763b0), the trigger both twins"
+  context:
+    - ...ts, the bank's completion and a boost's alike; the trigger handler 0x800c60 (bound by 0x8007a0 at 0x800a33) makes the row's tree at that moment. runs/h1_duelp1128 t127 city-state 3:...
+  review: reviewed
 - addr: 0x800c60
   final: 0x564650
   kind: function
   name: AI_EVENT_DESIRE_SETTLE
-  semantics: "starts the capture's operation at the event (no tick of its own). The named definition by 0x7265b0 with its flag, the target the first payload unit's plot (+0x220), the candidate's rally the plot; each payload unit to its team (addMember 0x737e80, the unit leaving the team it held). The start runs at the event, inside the trees' walks where a tree's blow took the civilian: its tree ticks in its priority's walk where that is yet to come; a capture of the tactical pass after the walks first ticks in the next turn's. A trigger row (+0x388) with no operation makes a tree in the manager (0x7fef20, its nodes 0x7faa60; none, dropped) and starts it at the row's priority (0x7cb230): one Upgrade Units tree per technology or civic gained (TRIGGER_TECH_UPGRADE / TRIGGER_CIVIC_UPGRADE, Priority 3), no test of a tree already running. For a city-state a civic gained starts no Upgrade Units tree (a FIT on the records: a technology gained is followed by a new tree on 1042 of 1061 minor-turns, a civic alone on 68 of 446); where the civic event's dispatch stops is unread. Ported: upgradeTreesStart (minorTurn), _minor_turn's _mops_upgrade_start."
-  status: PARTLY
+  semantics: "the AI event handler on player signal +0x2b8 (bound by 0x8007a0 at 0x800a33): an event id of -1 returns at once (0x800c7d), as one past the trigger rows' count (+0x398). A row with an operation starts the capture's operation at the event: the named definition by 0x7265b0 with its flag, the target the first payload unit's plot (+0x220), the candidate's rally the plot; each payload unit to its team (addMember 0x737e80, the unit leaving the team it held). A trigger row (+0x388) with no operation makes a tree in the manager (0x7fef20, its nodes 0x7faa60) and starts it at the row's priority (0x7cb230): an Upgrade Units tree for every technology set (SetTech 0x4cd4c0's AI_EVENT_GAIN_TECH, the bank's or a boost's), no test of a tree already running. TRIGGER_CIVIC_UPGRADE never fires: SetCivic raises the event @0xf2e084, -1 (the DLL's name \"AI_EVENT_GAIN_civic\" matches no AiEvents row). Ported: upgradeTreesStart (minorTechGained), _mops_upgrade_start."
+  status: READ
   cases:
     - recording: h1_duely1124
       turn: 84
@@ -6240,10 +6278,14 @@
     - recording: h1_duelw1128
       turn: 26
       value: the raid's Slinger to the capture (t25-26), the raid's team two Warriors
+    - recording: h1_duelp1128
+      turn: 127
+      value: "city-state 3's Banking boosted complete by Guilds, no research completing: tree 5111814 holds Warriors 1900551 / 1835016"
   impl:
     - cpu/core/barbarianOps.ts:barbarianCaptures
     - cpu/core/minorOps.ts:upgradeTreesStart
     - cpu/core/minorOps.ts:upgradeTreesTick
+    - cpu/core/minorBuild.ts:minorTechGained
   readings:
     - "C-97: the operations — the manager READ (no-enemy candidates), the war candidates unread"
     - "C-97: the operations — the manager and its candidates READ, the staging list and City Defense's start unread"
@@ -6254,7 +6296,7 @@
     - "C-99: the Upgrade Units trees start on a technology gained alone"
     - "C-99: a non-major player's tree pool — every city-state tree, its operations' and its \"Upgrade Units\" trees in one pool, ticked in slot order — READ (0x7ff9a0 / 0x7ff7b0 / 0x800c60 -> 0x7fef20, 0x7ffdd0 -> 0x7cb2e0), both twins"
     - "C-95: the barbarians' candidates before the look, a capture's rally, a formation's embark flag and fighter — READ (0x722d70, 0x746920, 0x747230, 0x7877e0, 0x7265b0, 0x747fa0, 0x73e610, 0x73e870, 0x267650), both twins"
-  notes: ["imported: READ in its section, no confirming case found beside it"]
+    - "C-99 / C-128: every technology gained starts an Upgrade Units tree, the civic event never fires; a tree's units after its tick; the Nearest City Search's resource test; the plot's unit list — READ (0x4cd4c0 -> 0x800c60, 0x5bbf80 -> 0x27a180, 0x3a1ac0, 0x7cb3d0 -> 0x7d2190, 0x7eba40 -> 0x510d30, 0x74f40 / 0x763b0), the trigger both twins"
   context:
     - "- AI_EVENT_DESIRE_SETTLE (0x800c60 -> 0x7265b0): the candidate of the named definition with no operation (with the call's..."
   review: reviewed
@@ -7252,6 +7294,7 @@
     - "C-125 / C-99: the swap's partner pays its step, the stacking count's classes, the walk's end among other players' units, a siege unit's RangedCombat — READ (0x972a50, 0x585d90, 0x26fe20 via 0x585eb0, 0x56e3e0), both twins"
     - "C-99 / C-128: the swap's partner test and its step along its own path; Move Unit's update before the executions — READ (0x972540, 0x56e760, 0x972a50 -> 0x26fe20, 0x7d3a00 -> 0x7f0020), both twins"
     - "C-99 / C-128: the swap's partner test and its step along its own path; Move Unit's update before the executions; a Trader no passenger — READ (0x972540, 0x56e760, 0x972a50 -> 0x26fe20, 0x7d3a00 -> 0x7f0020, 0x586360 -> 0x208b80 / 0x523d60), both twins"
+    - "C-99 / C-128: every technology gained starts an Upgrade Units tree, the civic event never fires; a tree's units after its tick; the Nearest City Search's resource test; the plot's unit list — READ (0x4cd4c0 -> 0x800c60, 0x5bbf80 -> 0x27a180, 0x3a1ac0, 0x7cb3d0 -> 0x7d2190, 0x7eba40 -> 0x510d30, 0x74f40 / 0x763b0), the trigger both twins"
   context:
     - "- THE SWAP'S PARTNER (0x972540, the operation's vt +0xc0, CanStart 0x9724c0 and Start 0x972a50 through it): the unit with Movement left (0x56c690), not moved into a zone of control (..."
   review: reviewed
@@ -8560,6 +8603,20 @@
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ...in the engine (Platform_JobManager.cpp; the DLL resolves the exports by name through 0xcc8d90).
+  review: reviewed
+- addr: 0xcd1390
+  final: 0x9975a0
+  kind: function
+  semantics: "the string hash: a table CRC (@0xf2fa20) over the bytes as they stand (movsx, no case folding), seed -1."
+  status: READ
+  cases:
+    - recording: h1_duelp1128
+      turn: 127
+      value: "city-state 3's Banking boosted complete by Guilds, no research completing: tree 5111814 holds Warriors 1900551 / 1835016"
+  readings:
+    - "C-99 / C-128: every technology gained starts an Upgrade Units tree, the civic event never fires; a tree's units after its tick; the Nearest City Search's resource test; the plot's unit list — READ (0x4cd4c0 -> 0x800c60, 0x5bbf80 -> 0x27a180, 0x3a1ac0, 0x7cb3d0 -> 0x7d2190, 0x7eba40 -> 0x510d30, 0x74f40 / 0x763b0), the trigger both twins"
+  context:
+    - ...the AI events' ids are the AiEvents rows found by the hash of their names (0x8c4af0 -> 0xcd1390, a table CRC over the bytes as they stand, case kept) through 0x27a180 (a binary search...
   review: reviewed
 - addr: 0xcef31e
   final: 0x9b0fbe

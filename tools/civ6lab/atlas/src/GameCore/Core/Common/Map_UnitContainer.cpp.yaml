@@ -3,6 +3,49 @@
 # `review: imported` = bootstrapped from dll_readings.md / code comments / saved
 # labels and not yet reviewed: verify against the disassembly, then edit and
 # set `review: reviewed`.
+- addr: 0x74f40
+  final: 0x55fc0
+  kind: function
+  semantics: "the plot list's add (layer container, the slot plot x width + ...): appends the unit (0x76ae0) unless listed."
+  status: READ
+  cases:
+    - recording: h1_duelp1117
+      turn: 86
+      value: "Antananarivo's Catapult 1048580 on its centre before record 86, then the Catapult 1114113 made there: the game's garrison the first"
+  readings:
+    - "C-99 / C-128: every technology gained starts an Upgrade Units tree, the civic event never fires; a tree's units after its tick; the Nearest City Search's resource test; the plot's unit list — READ (0x4cd4c0 -> 0x800c60, 0x5bbf80 -> 0x27a180, 0x3a1ac0, 0x7cb3d0 -> 0x7d2190, 0x7eba40 -> 0x510d30, 0x74f40 / 0x763b0), the trigger both twins"
+  context:
+    - ...-> 0x800c60, 0x5bbf80 -> 0x27a180, 0x3a1ac0, 0x7cb3d0 -> 0x7d2190, 0x7eba40 -> 0x510d30, 0x74f40 / 0x763b0), the trigger both twins
+    - "...UNIT LIST (0x75c50, per layer): a vector of unit ids; placement (0x586d40 -> 0x750e0 -> 0x74f40) appends a unit not listed (0x76ae0), removal (0x586a90 / 0x586d40 -> 0x763b0) erases i..."
+  review: reviewed
+- addr: 0x750e0
+  final: 0x56180
+  kind: function
+  semantics: "a unit placed on a plot's layer list (from the placement 0x586d40 at 0x5870e9): 0x74f40."
+  status: READ
+  cases:
+    - recording: h1_duelp1117
+      turn: 86
+      value: "Antananarivo's Catapult 1048580 on its centre before record 86, then the Catapult 1114113 made there: the game's garrison the first"
+  readings:
+    - "C-99 / C-128: every technology gained starts an Upgrade Units tree, the civic event never fires; a tree's units after its tick; the Nearest City Search's resource test; the plot's unit list — READ (0x4cd4c0 -> 0x800c60, 0x5bbf80 -> 0x27a180, 0x3a1ac0, 0x7cb3d0 -> 0x7d2190, 0x7eba40 -> 0x510d30, 0x74f40 / 0x763b0), the trigger both twins"
+  context:
+    - "...THE PLOT'S UNIT LIST (0x75c50, per layer): a vector of unit ids; placement (0x586d40 -> 0x750e0 -> 0x74f40) appends a unit not listed (0x76ae0), removal (0x586a90 / 0x586d40 -> 0x763b..."
+  review: reviewed
+- addr: 0x75280
+  final: 0x56240
+  kind: function
+  semantics: "a unit's layer change on its plot: removed from every layer (0x763b0), appended on the new one (0x74f40), the plot's unit count kept."
+  status: READ
+  cases:
+    - recording: h1_duelp1117
+      turn: 86
+      value: "Antananarivo's Catapult 1048580 on its centre before record 86, then the Catapult 1114113 made there: the game's garrison the first"
+  readings:
+    - "C-99 / C-128: every technology gained starts an Upgrade Units tree, the civic event never fires; a tree's units after its tick; the Nearest City Search's resource test; the plot's unit list — READ (0x4cd4c0 -> 0x800c60, 0x5bbf80 -> 0x27a180, 0x3a1ac0, 0x7cb3d0 -> 0x7d2190, 0x7eba40 -> 0x510d30, 0x74f40 / 0x763b0), the trigger both twins"
+  context:
+    - "...0 / 0x586d40 -> 0x763b0) erases it keeping the rest in order (0x76a10), a layer change (0x75280) removes then appends: the list is the units' arrival order. Not ported: the recordings..."
+  review: reviewed
 - addr: 0x75800
   final: 0x566c0
   kind: function
@@ -77,6 +120,7 @@
     - "C-128: a city-state's Make Military Formation — READ (0x77a190, 0x770670, 0x536da0, 0x773e20, 0x94a870, 0x949930), both twins"
     - "C-99: the assignment's Movement and the swap's walk — READ (0x776140 at 0x776643 / 0x7768e4, 0x56d6f0, 0x972a50 -> 0x26fe20 under flag 4, 0x2720a0 at 0x27229b), both twins"
     - "C-128: a crowded plot's unit goes beside it as its AI player's turn ends — READ (0x775e50, 0x585d90, 0x93f870, 0x585940), both twins"
+    - "C-99 / C-128: every technology gained starts an Upgrade Units tree, the civic event never fires; a tree's units after its tick; the Nearest City Search's resource test; the plot's unit list — READ (0x4cd4c0 -> 0x800c60, 0x5bbf80 -> 0x27a180, 0x3a1ac0, 0x7cb3d0 -> 0x7d2190, 0x7eba40 -> 0x510d30, 0x74f40 / 0x763b0), the trigger both twins"
   context:
     - "...x58 / +0x5c) on the plot, else (search flag +0x398 & 0x200 clear) any unit on the plot (0x75c50) of a player at war that fights (0x209dd0: combat, ranged or bombard above 0) — no doma..."
   review: reviewed
@@ -92,4 +136,45 @@
     - "C-95: the target list's knowledge-base entries"
   context:
     - "...0 — a city -> the known cities (0x5f0280), a district -> 0x5f0490 — each unit on it (0x75ce0's list), one hidden (+0x15f0, not +0x1650) only where 0x5033a0 lets the player see it,..."
+  review: reviewed
+- addr: 0x763b0
+  kind: function
+  semantics: "a unit off its plot's lists (from the removal 0x586a90 and the placement 0x586d40): each layer's vector (+0x50, count +0x60) erases it in place (0x76a10); an emptied list freed."
+  status: READ
+  cases:
+    - recording: h1_duelp1117
+      turn: 86
+      value: "Antananarivo's Catapult 1048580 on its centre before record 86, then the Catapult 1114113 made there: the game's garrison the first"
+  readings:
+    - "C-99 / C-128: every technology gained starts an Upgrade Units tree, the civic event never fires; a tree's units after its tick; the Nearest City Search's resource test; the plot's unit list — READ (0x4cd4c0 -> 0x800c60, 0x5bbf80 -> 0x27a180, 0x3a1ac0, 0x7cb3d0 -> 0x7d2190, 0x7eba40 -> 0x510d30, 0x74f40 / 0x763b0), the trigger both twins"
+  context:
+    - ...60, 0x5bbf80 -> 0x27a180, 0x3a1ac0, 0x7cb3d0 -> 0x7d2190, 0x7eba40 -> 0x510d30, 0x74f40 / 0x763b0), the trigger both twins
+    - ...x750e0 -> 0x74f40) appends a unit not listed (0x76ae0), removal (0x586a90 / 0x586d40 -> 0x763b0) erases it keeping the rest in order (0x76a10), a layer change (0x75280) removes then a...
+  review: reviewed
+- addr: 0x76a10
+  kind: function
+  semantics: "a vector erase: the entries after the iterator shift down one, their order kept."
+  status: READ
+  cases:
+    - recording: h1_duelp1117
+      turn: 86
+      value: "Antananarivo's Catapult 1048580 on its centre before record 86, then the Catapult 1114113 made there: the game's garrison the first"
+  readings:
+    - "C-99 / C-128: every technology gained starts an Upgrade Units tree, the civic event never fires; a tree's units after its tick; the Nearest City Search's resource test; the plot's unit list — READ (0x4cd4c0 -> 0x800c60, 0x5bbf80 -> 0x27a180, 0x3a1ac0, 0x7cb3d0 -> 0x7d2190, 0x7eba40 -> 0x510d30, 0x74f40 / 0x763b0), the trigger both twins"
+  context:
+    - "...0x76ae0), removal (0x586a90 / 0x586d40 -> 0x763b0) erases it keeping the rest in order (0x76a10), a layer change (0x75280) removes then appends: the list is the units' arrival order...."
+  review: reviewed
+- addr: 0x76ae0
+  final: 0x574f0
+  kind: function
+  semantics: a vector push_back of an 8-byte id (grown by 0x765d0 when full).
+  status: READ
+  cases:
+    - recording: h1_duelp1117
+      turn: 86
+      value: "Antananarivo's Catapult 1048580 on its centre before record 86, then the Catapult 1114113 made there: the game's garrison the first"
+  readings:
+    - "C-99 / C-128: every technology gained starts an Upgrade Units tree, the civic event never fires; a tree's units after its tick; the Nearest City Search's resource test; the plot's unit list — READ (0x4cd4c0 -> 0x800c60, 0x5bbf80 -> 0x27a180, 0x3a1ac0, 0x7cb3d0 -> 0x7d2190, 0x7eba40 -> 0x510d30, 0x74f40 / 0x763b0), the trigger both twins"
+  context:
+    - ...or of unit ids; placement (0x586d40 -> 0x750e0 -> 0x74f40) appends a unit not listed (0x76ae0), removal (0x586a90 / 0x586d40 -> 0x763b0) erases it keeping the rest in order (0x76a10...
   review: reviewed

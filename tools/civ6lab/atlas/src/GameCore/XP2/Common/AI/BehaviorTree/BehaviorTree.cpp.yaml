@@ -35,8 +35,22 @@
     - "C-97: the behaviour trees — READ (the interpreter), the nodes PARTLY READ"
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
     - "C-99: Naval Patrol's explore target — the list and the tests READ, two cases unexplained"
+    - "C-99 / C-128: every technology gained starts an Upgrade Units tree, the civic event never fires; a tree's units after its tick; the Nearest City Search's resource test; the plot's unit list — READ (0x4cd4c0 -> 0x800c60, 0x5bbf80 -> 0x27a180, 0x3a1ac0, 0x7cb3d0 -> 0x7d2190, 0x7eba40 -> 0x510d30, 0x74f40 / 0x763b0), the trigger both twins"
   context:
     - ...SUCCESS, RUNNING or FAILURE every node left SUCCESS or RUNNING executes in node order (0x7cb3d0); a root RUNNING or FRESH resets the tree for the next turn, else the tree is done (the...
+  review: reviewed
+- addr: 0x7cb7c0
+  kind: function
+  semantics: "a tree's root status: node 0's (+0x230[0]), 4 for a tree with no node."
+  status: READ
+  cases:
+    - recording: h1_duelp1128
+      turn: 175
+      value: Hong Kong's Upgrade Units tree 5308422 (temporary, RUNNING) at the log and end look; its Warrior 2490370, the swap partner, out of it at the end look
+  readings:
+    - "C-99 / C-128: every technology gained starts an Upgrade Units tree, the civic event never fires; a tree's units after its tick; the Nearest City Search's resource test; the plot's unit list — READ (0x4cd4c0 -> 0x800c60, 0x5bbf80 -> 0x27a180, 0x3a1ac0, 0x7cb3d0 -> 0x7d2190, 0x7eba40 -> 0x510d30, 0x74f40 / 0x763b0), the trigger both twins"
+  context:
+    - ...not marked for destroy (+0x368) that is not temporary (+0x308), or whose root status (0x7cb7c0, +0x230[0]) is RUNNING (2) or FRESH (0), runs 0x7d2190 over its units (0x6092c0 on +0x4...
   review: reviewed
 - addr: 0x7cb8b0
   final: 0x5401d0
@@ -146,16 +160,20 @@
 - addr: 0x7d2190
   final: 0x543a50
   kind: function
-  semantics: "a tree's units each tick, those not done: the tree marked (+0x3c8) with no operation (+0x888 == -1) releases them, else their turn is done (0x570b40)."
+  semantics: "a tree's units after its tick (from 0x7cb3d0 at 0x7cb75f), those not done (+0x530) of its job (0x6092c0 on +0x488): the tree's m_allowRecruiting (+0x3c8) set with no operation (+0x888 == -1) releases them (+0x778 -1 via 0x1e60f0), else their turn is done (0x570b40). Run for a tree not marked for destroy (+0x368) that is not temporary (+0x308) or whose root status (0x7cb7c0) is RUNNING or FRESH: an ended Upgrade Units tree runs none."
   status: READ
   cases:
     - recording: 1117
       turn: 9
       value: "yet 1117 city-state 2's Warrior 131073, its Attack   Barb Camp complete at t9, takes tactical moves from t10 — the path that   frees an ended operation's units is unread (0x73f7d0 rebuilds a team   fr"
+    - recording: h1_duelp1128
+      turn: 175
+      value: Hong Kong's Upgrade Units tree 5308422 (temporary, RUNNING) at the log and end look; its Warrior 2490370, the swap partner, out of it at the end look
   impl: [cpu/core/minorOps.ts:upgradeTreesTick]
   readings:
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
     - "C-99: the upgrade trees — READ (the trigger, Find Available Unit's upgradeable offer, Find Unit Targets' job, Upgrade Units, the economic AI's upgrade, Move Unit with no Location), ported; the deletion of an excess obsolete unit unported"
+    - "C-99 / C-128: every technology gained starts an Upgrade Units tree, the civic event never fires; a tree's units after its tick; the Nearest City Search's resource test; the plot's unit list — READ (0x4cd4c0 -> 0x800c60, 0x5bbf80 -> 0x27a180, 0x3a1ac0, 0x7cb3d0 -> 0x7d2190, 0x7eba40 -> 0x510d30, 0x74f40 / 0x763b0), the trigger both twins"
   context:
     - "...e homeland (0x70a370) release their units (-1) as they end. A tree's units each tick (0x7d2190 from the tree manager 0x7cb3d0), those not done: the tree marked (+0x3c8) with no opera..."
   review: reviewed

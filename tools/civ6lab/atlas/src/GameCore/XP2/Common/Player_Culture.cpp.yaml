@@ -729,11 +729,16 @@
 - addr: 0x3a1ac0
   final: 0x2841a0
   kind: function
-  semantics: completes a civic the moment its progress reaches the cost (from the setter at 0x3a22c5).
+  semantics: completes a civic the moment its progress reaches the cost (from the setter at 0x3a22c5); raises the event @0xf2e084 (AI_EVENT_GAIN_civic, -1) on player signal +0x2b8 at 0x3a1d85, which the trigger handler drops.
   status: PARTLY
-  impl: [cpu/core/phase.ts:completeResearchNow]
-  readings: ["H-1: a boost lands as progress — READ"]
-  notes: ["imported: READ in its section, no confirming case found beside it"]
+  cases:
+    - recording: h1_duelp1128
+      turn: 127
+      value: "city-state 3's Banking boosted complete by Guilds, no research completing: tree 5111814 holds Warriors 1900551 / 1835016"
+  impl: [cpu/core/phase.ts:completeResearchNow, cpu/core/minorBuild.ts:minorTechGained]
+  readings:
+    - "H-1: a boost lands as progress — READ"
+    - "C-99 / C-128: every technology gained starts an Upgrade Units tree, the civic event never fires; a tree's units after its tick; the Nearest City Search's resource test; the plot's unit list — READ (0x4cd4c0 -> 0x800c60, 0x5bbf80 -> 0x27a180, 0x3a1ac0, 0x7cb3d0 -> 0x7d2190, 0x7eba40 -> 0x510d30, 0x74f40 / 0x763b0), the trigger both twins"
   context:
     - "...not. The setter completes the item the moment its progress reaches the cost (0x3a22c5 -> 0x3a1ac0). The cost is never cut. Check: `dll_boost.py`, the recorded current-item boosts of the s..."
   review: reviewed

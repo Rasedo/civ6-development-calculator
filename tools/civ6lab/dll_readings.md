@@ -11640,3 +11640,62 @@ engines already search once per order run on the Movement left.
   Yields.DefaultValue, Gold's 0.5. Confirmed: runs/h1_duelp1121 city-state 4
   Expropriation 0.5 t236-249 as logged.
 - Open: a major's and the Free Cities' city build AI's best plot (none here).
+
+## C-99 / C-128: every technology gained starts an Upgrade Units tree, the civic event never fires; a tree's units after its tick; the Nearest City Search's resource test; the plot's unit list — READ (0x4cd4c0 -> 0x800c60, 0x5bbf80 -> 0x27a180, 0x3a1ac0, 0x7cb3d0 -> 0x7d2190, 0x7eba40 -> 0x510d30, 0x74f40 / 0x763b0), the trigger both twins
+
+`minorTechGained` (cpu/core/minorBuild.ts), run from `minorResearchBank`'s
+completion and from `minorCompleteNow`; GPU `_minor_research_bank` and
+`_minor_complete_now` (gpu/core/sim_minors.py) through `_mops_upgrade_start`.
+
+- THE TRIGGER: SetTech (0x4cd4c0) raises AI_EVENT_GAIN_TECH on player
+  signal +0x2b8 (0x4cd7a5..0x4cd7b5) for every technology it sets, the
+  bank's completion and a boost's alike; the trigger handler 0x800c60
+  (bound by 0x8007a0 at 0x800a33) makes the row's tree at that moment.
+  runs/h1_duelp1128 t127 city-state 3: Banking boosted complete by Guilds
+  with no research completing, the game's tree 5111814 holding Warriors
+  1900551 / 1835016 (ours the same id and units). Over the five duelp
+  duels a city-state's new trees each turn equal its technologies gained
+  (AI_Research.csv's OWNED count) but on 5 turns with two technologies
+  and one tree at the log and 2 with one and none (a tree ended before the
+  log), none with a tree and no technology.
+- THE CIVIC: the AI events' ids are the AiEvents rows found by the hash of
+  their names (0x8c4af0 -> 0xcd1390, a table CRC over the bytes as they
+  stand, case kept) through 0x27a180 (a binary search on the rows' hash,
+  -1 none). The DLL names the civic event "AI_EVENT_GAIN_civic" (0x5bc4dd,
+  stored @0xf2e084), a name no row holds (Leaders.xml: AI_EVENT_GAIN_CIVIC),
+  so the id is -1; SetCivic (0x3a1ac0) raises it (0x3a1d85) and 0x800c60
+  returns on -1 (0x800c7d). TRIGGER_CIVIC_UPGRADE never fires.
+- A TREE'S UNITS AFTER ITS TICK (0x7cb3d0 at 0x7cb722): a tree not marked
+  for destroy (+0x368) that is not temporary (+0x308), or whose root status
+  (0x7cb7c0, +0x230[0]) is RUNNING (2) or FRESH (0), runs 0x7d2190 over its
+  units (0x6092c0 on +0x488) whose turn is not done (+0x530): with
+  m_allowRecruiting (+0x3c8) and no operation (+0x888 -1) each is released
+  (+0x778 -1 through 0x1e60f0), else its turn is done (0x570b40). An Upgrade
+  Units tree is temporary: ending SUCCESS or FAILURE it runs none. Move
+  Unit's execution gives turn done only to a unit off its target (0x7eef38);
+  the swap's Start (0x972a50) leaves its partner's job as it is.
+- THE NEAREST CITY SEARCH's resource test (0x7eba40 at 0x7ebed5..0x7ebf03):
+  an upgrade (0x5909a0) asking a StrategicResource (Units +0x2c8, its index
+  +0x14) skips each city where 0x510d30 fails: the owner's CivilizationLevel
+  row (0x467f20) with IgnoresUnitStrategicResourceRequirements (+0x29 bit 1,
+  CIVILIZATION_LEVEL_CITY_STATE's true), else its stock less reservations
+  (0x4aa790 ownership 0, r9b 1) plus ownership 1 at least
+  STRATEGIC_RESOURCE_MINIMUM_FOR_UNIT_UPGRADING (GlobalParameters +0x690,
+  1). A city-state always passes: `upgradeTarget` reads none.
+- THE PLOT'S UNIT LIST (0x75c50, per layer): a vector of unit ids;
+  placement (0x586d40 -> 0x750e0 -> 0x74f40) appends a unit not listed
+  (0x76ae0), removal (0x586a90 / 0x586d40 -> 0x763b0) erases it keeping the
+  rest in order (0x76a10), a layer change (0x75280) removes then appends:
+  the list is the units' arrival order. Not ported: the recordings list
+  units by player (h1_dump_ig.lua's `Players[p]:GetUnits():Members()`), not
+  by plot, so the order of the units sharing a plot at a pair's start is not
+  in them (runs/h1_duelp1117 t86 Antananarivo's Garrison City garrison: the
+  game's Catapult 1048580, on its centre before record 86, ours the Catapult
+  1114113 made there that turn).
+- Open (C-128): which units of a RUNNING Upgrade Units tree the tactical
+  pass takes: runs/h1_duelp1128 t175 / t179 Hong Kong's Warrior 2490370 on
+  its centre, the swap partner of the Man-At-Arms 1507331, logs Attack Units
+  / Heal and is out of the tree at the end look, where 92 other units on
+  their target stay held with no row; the Corps Man-At-Arms 1179650 no tree
+  takes at t184 / t185 (Bologna's trees 8126471 / 8257540 end empty), which
+  t194's takes.
