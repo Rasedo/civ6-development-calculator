@@ -8976,3 +8976,39 @@ returns (cpu/core/aiEconomic.ts) through `minorMilitaryTurn`, called after
   1117 4 t62, 3 t74), the barbarians' two kills of t132 at t133 (1128
   city-state 3, Gunpowder 281.1 for 241.1): the delayed death's erase site
   unread.
+
+## C-126: the building contract purchase reads the turn's own City Analysis — READ (0x68afe0 -> 0x5d4920 on CityBuildAI +0xcf8, the analysis 0x5c24e0 on player signal +0x258 before the +0x370 list), both twins
+
+`minorBuildingPurchaseCity`'s `value` and `minorContractPurchases`' `units`
+(cpu/core/minorCityAi.ts); GPU `_minor_contract_purchases`' `table`, read by
+`_minor_contract_building` (gpu/core/sim_minorai.py).
+
+- THE VALUE: 0x68afe0's test (0x68b1cc) reads 0x5d4920 (flags 0, no plot):
+  the centre evaluation's (CityBuildAI +0xcf8, entry 0) BUILDINGS table
+  (+0x28) at the building's row. That table is written by the City Analysis
+  job only (0x5ce910, referenced from 0x5ce680's job set-up), which the City
+  AI manager's handler 0x5c24e0 runs on player signal +0x258; the player AI's
+  update 0x608580 fires that signal before the turn start 0x608870 runs the
+  +0x370 list (the Economic AI's purchases in pass 3, the cities' update in
+  pass 2). So the purchase reads the analysis of the turn it runs in, on the
+  city as the turn's own production and growth left it, not the update of
+  the turn before. The engines run the analysis for the purchase at the
+  purchase (after the knowledge base's look), on the units counted before the
+  savings turn's purchases, as the city AI turn's own analysis counts them.
+- The log's order agrees: in every verbose duel (runs/h1_duelv11{17,21,24,27,
+  28}) a player's PURCHASE lines precede its PLOT ANALYSIS LOG in the turn
+  (142 of 142 player-turns with both); the log is written by the update
+  (0x5d4030), the analysis having run before.
+- Confirmed: runs/h1_duely1121 t178 Hunza's Stock Exchange of contract 533
+  (submitted t177): t178's analysis, at 7.2 Production after the city fell to
+  12 (T 33 = 23 build turns + 10 for the project in hand), 121.0 over the
+  floor 0.25 x yieldValue(660) = 82.5, bought for 660 Gold (treasury 955.9 ->
+  307.2 as recorded; contracts.progress t178 / t179 equal, carried and
+  aimem). t177's table (4.8 Production, T 45) is 31.8 and refuses.
+- Open: the game's submission line for contract 533 reads VALUE 6.0 (the
+  tree's Present Value, the whole of the table's value at its decode): the
+  game's t177 analysis held Economics a turn away (its research at 427 / 428
+  in record t177), where the engines' t177 analysis holds it; the verbose
+  analogue runs/h1_duelv1121 t169 (same city, project, 4.8 Production, T 45)
+  logs 29.77 where the engines value 31.82 (the per-turn value 0.936 of
+  ours, t164-177 alike).

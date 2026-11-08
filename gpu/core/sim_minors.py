@@ -77,7 +77,7 @@ class SimMinors:
             before = self.citystate_kb_next[:, s].clone()
             self._minor_knowledge(s, True)
             after = self.citystate_kb_next[:, s].clone()
-            self._minor_contract_purchases(s, self.citystate_alive[:, s] & (self.citystate_center[:, s] >= 0))
+            self._minor_contract_purchases(s, self.citystate_alive[:, s] & (self.citystate_center[:, s] >= 0), units)
             self._minor_economic_disband(s, fell)
             self._cv_counted[s] = self._cv_known(s, before, after)
             # its "Upgrade Units" trees' trigger: a technology gained

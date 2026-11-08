@@ -12,8 +12,10 @@
     - recording: h1_duely1128
       turn: 47
       value: "Hong Kong's 272 (8:6), annexed in China's start, takes the Camp tree that turn: its Builder 983040 steps to 8:7 in Hong Kong's t47 actions and lays the Camp at t48"
+  impl: [cpu/core/minorCityAi.ts:minorBuildingPurchaseCity]
   readings:
     - "H-1: the City Analysis runs on player signal +0x258 and reads each plot's owner live — READ (0x5c27e0, 0x5c24e0, 0x5ce970), the 1117 t44 Mine unexplained"
+    - "C-126: the building contract purchase reads the turn's own City Analysis — READ (0x68afe0 -> 0x5d4920 on CityBuildAI +0xcf8, the analysis 0x5c24e0 on player signal +0x258 before the +0x370 list), both twins"
   review: reviewed
 - addr: 0x5c2610
   final: 0x3d90f0

@@ -178,13 +178,15 @@ class SimMinorAi:
         cols = torch.tensor(idx, dtype=torch.long, device=self.device)
         return (self.gp_offer[:, cols] != -2).any(dim=1)
 
-    def _minor_contract_purchases(self, s: int, act: torch.Tensor) -> None:
+    def _minor_contract_purchases(self, s: int, act: torch.Tensor, units: torch.Tensor | None = None) -> None:
         """`purchaseContracts` where `act` (0x687bf0 after the savings): the
         purchase list keeps the contracts alive, ACCEPTED and gold-bought;
         each unit's, the higher priority first, of equals in id order, tries TryPurchaseUnits in the minor's city
         (its price; the purchase request: the city may train the unit, the
         purse covers it, the centre takes the unit) and is COMPLETED where it
-        buys (`minorBuyUnit`)"""
+        buys (`minorBuyUnit`); a building's on the turn's own City Analysis
+        (`minorContractPurchases`), `units` [B] the units it counts (None:
+        those standing now)"""
         ai = self.cityai
         cs = (slice(None), s)
         live = ai.c_id[cs] >= 0
@@ -203,12 +205,17 @@ class SimMinorAi:
         order = torch.where(units | blds, key, torch.full_like(ai.c_id[cs], 1 << 40)).argsort(dim=1)
         seat = 100 + s
         ctr = self.citystate_center[:, s].clamp(min=0)
-        gold_w = self._cv_minor_facts(s).yield_w("YIELD_GOLD") if bool(blds.any()) else 0
+        gold_w, table = 0, None
+        if bool(blds.any()):
+            f = self._cv_minor_facts(s)
+            f.units_before = units
+            gold_w = f.yield_w("YIELD_GOLD")
+            table = torch.stack(self._cv_city_buildings_pass(f)[0], dim=1)
         for r in range(order.shape[1]):
             j = order[:, r]
             on_b = blds.gather(1, j.unsqueeze(1)).squeeze(1)
             if bool(on_b.any()):
-                self._minor_contract_building(s, j, on_b, eb, gold_w)
+                self._minor_contract_building(s, j, on_b, eb, gold_w, table)
             on = units.gather(1, j.unsqueeze(1)).squeeze(1)
             if not bool((on | on_b).any()):
                 break
@@ -232,10 +239,12 @@ class SimMinorAi:
             self._minor_buy_unit(s, bought, ui, price)
             _cset(ai.c_progress, s, j, CP_COMPLETED, bought)
 
-    def _minor_contract_building(self, s: int, j: torch.Tensor, on: torch.Tensor, eb: torch.Tensor, gold_w) -> None:
+    def _minor_contract_building(self, s: int, j: torch.Tensor, on: torch.Tensor, eb: torch.Tensor, gold_w,
+                                 table: torch.Tensor) -> None:
         """`tryPurchaseBuilding` (0x68afe0) of contract slot `j` [B] where
-        `on`: the queue's CanConstruct; the city's analysis value of the
-        building (its last update's) at least 0.25 x the player's value of
+        `on`: the queue's CanConstruct; the centre's BUILDINGS value of the
+        building in `table` [B, rows] (the turn's City Analysis, run on
+        player signal +0x258 before the Economic AI) at least 0.25 x the player's value of
         its Gold price; the price 0 or more, the UNITS and SLUSH slots
         together above it, UNITS above half or SLUSH above twice it; the
         purchase request (`minorBuyBuilding`); the spend; COMPLETED where it
@@ -250,7 +259,7 @@ class SimMinorAi:
         ok = on & self._minor_queue_ok(s, key, torch.full_like(bi, -1))
         price = self._purchase_step(self._minor_item_cost(s, key) * float(self.rules.gold_purchase_mult))
         cost = price.long() * _FX
-        value = self.citystate_building_values[:, s].gather(1, row_ai.unsqueeze(1)).squeeze(1)
+        value = table.gather(1, row_ai.unsqueeze(1)).squeeze(1)
         worth = _fmul(self._cv_yield(cost, "YIELD_GOLD", gold_w), torch.full_like(cost, _FX >> 2))
         ok = ok & (value >= worth) & (cost >= 0)
         sv = self.citystate_savings[:, s]

@@ -952,13 +952,16 @@ export function minorEconomicDisband(state: GameState, cs: CityState, delta: num
  * before, never count it (runs/h1_duely1117: city-state 3's t19 Warrior,
  * 2's t59 Archer, 4's t69 Heavy Chariot — Attack Barb Camp from t70 —, 3's
  * t102 Crossbowman; each absent at the aimem log site, at age 0 at the end
- * look).
+ * look). A building's value is the turn's own City Analysis, `units` the
+ * units its analysis counts (those standing before the savings turn's
+ * purchases).
  */
-export function minorContractPurchases(state: GameState, cs: CityState): void {
+export function minorContractPurchases(state: GameState, cs: CityState,
+  units = state.units.filter((u) => u.seat === cs.seat).length): void {
   if (cs.centerIndex < 0 || !cs.cityAi) return;
   const eco = (cs.economy ??= newEconomicMemory());
   const pcity = minorPurchaseCity(state, cs, cs.threat ?? -1);
-  const bcity = minorBuildingPurchaseCity(state, cs);
+  const bcity = minorBuildingPurchaseCity(state, cs, units);
   purchaseContracts(eco, cs.cityAi, false, (c) => (c.city === -1 || c.city === pcity.id ? [pcity] : []),
     (_c, u) => minorBuyInstall(state, cs, u), (c) => (c.city === -1 || c.city === pcity.id ? bcity : null));
 }
@@ -1001,13 +1004,19 @@ function minorPurchaseCity(state: GameState, cs: CityState, threat: number): Pur
 }
 
 /** the minor's city as the building purchase (0x68afe0) reads it: the
- *  queue's CanConstruct (`minorQueueOk`), its Gold price, the city's
- *  analysis of its last update (`CityState.buildingValues`), the player's
- *  value of Gold; the purchase request the purse covering the price
- *  (`minorBuyBuilding`) */
-function minorBuildingPurchaseCity(state: GameState, cs: CityState): BuildingPurchaseCity {
+ *  queue's CanConstruct (`minorQueueOk`), its Gold price, the centre's
+ *  BUILDINGS table of the turn's City Analysis (0x5d4920 on CityBuildAI
+ *  +0xcf8; the analysis 0x5c24e0 -> 0x5ce970 runs on player signal +0x258,
+ *  which the player AI's update fires before the job lists that hold the
+ *  Economic AI: runs/h1_duely1121 t178 Hunza's Stock Exchange of contract
+ *  533 at 121.0 on the turn's 7.2 Production, over the floor 82.5, bought
+ *  for 660 Gold; t177's table, before its Production rose, 31.8),
+ *  the player's value of Gold; the purchase request the purse covering the
+ *  price (`minorBuyBuilding`) */
+function minorBuildingPurchaseCity(state: GameState, cs: CityState, units: number): BuildingPurchaseCity {
   const id = (b: string) => engineId('building', b, 'BUILDING_', BUILDINGS);
   const view = aiView(state);
+  let table: readonly number[] | null = null;
   return {
     canConstruct: (b) => {
       const x = id(b);
@@ -1017,7 +1026,10 @@ function minorBuildingPurchaseCity(state: GameState, cs: CityState): BuildingPur
       const x = id(b);
       return x ? minorBuildingPrice(state, cs, x) : -1;
     },
-    value: (b) => cs.buildingValues?.[AI_BUILDING_INDEX.get(b) ?? -1] ?? FX_MIN,
+    value: (b) => {
+      table ??= cityBuildingsPass(minorBuildFacts(state, cs, minorKnownUnits(cs), false, units)).buildings;
+      return table[AI_BUILDING_INDEX.get(b) ?? -1] ?? FX_MIN;
+    },
     goldValue: (amount) => yieldValue(view, cs.seat, amount, 'YIELD_GOLD'),
     purchase: (b) => {
       const x = id(b);

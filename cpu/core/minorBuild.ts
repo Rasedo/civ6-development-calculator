@@ -169,7 +169,7 @@ export function minorPhase(state: GameState): void {
     const before = new Set(cityState.armyKnown ?? []);
     minorKnowledge(state, cityState, true);
     const sighted = new Set((cityState.armyKnown ?? []).filter((r) => !before.has(r)));
-    minorContractPurchases(state, cityState);
+    minorContractPurchases(state, cityState, units);
     minorEconomicDisband(state, cityState, fell);
     cityState.armyCounted = minorArmyCounts((cityState.armyKnown ?? []).filter((r) => !sighted.has(r)));
     // its "Upgrade Units" trees' trigger: a technology gained
