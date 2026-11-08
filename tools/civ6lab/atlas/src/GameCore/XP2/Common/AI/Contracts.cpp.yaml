@@ -16,6 +16,19 @@
   readings:
     - "H-1: the civics AI — READ (the choice, the walk, the propagation), PARTLY READ (the value)"
   review: reviewed
+- addr: 0x5f4530
+  final: 0x3f9070
+  kind: function
+  status: READ
+  cases:
+    - recording: 1121
+      turn: 89
+      value: "a new Build City Building tree whose goal technology is under   research with 1 turn left ends in its tick with no contract (runs/   h1_duely1124 Cardiff t89 Castles, h1_duely1121 Antioch t117 Siege  "
+  readings:
+    - "C-96: a completion's contract walk COMPLETES its Tech Contracts mid-turn; a city-state's route boosts land before its army's walk — READ (0x762d60 at 0x762ed0..0x762f8a, 0x5f5940), both twins"
+  context:
+    - ...no turn test in Add Goal Tech's update 0x7e7d20, its execution 0x7e7200, the creation 0x5f4530, the submission 0x60bb50 or the research AI's listener 0x7635c0.
+  review: imported
 - addr: 0x5f47c0
   final: 0x3f9300
   kind: function
@@ -88,8 +101,15 @@
     - recording: h1_duelv1124
       turn: 6
       value: "runs/h1_duelv1124 t6 player 4: Writing 251.0 = 124.0 + its   Tech Contract 127.0, Astrology 124.0 none)."
-  impl: [cpu/core/aiCityTrees.ts:goalsReached]
+    - recording: h1_duely1124
+      turn: 49
+      value: "city-state 2 (Cardiff): Masonry boosted complete by the Quarry its Improvement tree laid, Tech Contract 108 ACCEPTED at the log look, COMPLETED at the end look"
+  impl:
+    - cpu/core/aiCityTrees.ts:goalsReached
+    - cpu/core/minorBuild.ts:techContractsCompleted
+    - gpu/core/sim_minors.py:_tech_contracts_completed
   readings:
+    - "C-96: a completion's contract walk COMPLETES its Tech Contracts mid-turn; a city-state's route boosts land before its army's walk — READ (0x762d60 at 0x762ed0..0x762f8a, 0x5f5940), both twins"
     - "H-1: the research AI — READ (the choice), PARTLY READ (the value)"
     - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
   context:

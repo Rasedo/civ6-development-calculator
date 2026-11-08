@@ -91,7 +91,7 @@ import { CAMP_DISPERSAL_GOLD, MP_SCALE, scaleByGameSpeed } from '../data/constan
 import { PROMOTE_HEAL, aiPromotionPick, attacksPerTurn, promoCount, takePromotion, unitPromoRows } from '../core/promotions';
 import { fireFeature } from '../data/disasters';
 import { civicAgendas, setupAgendas } from '../core/agendas';
-import { holdMinorCatchUp, holdMinorOrders, holdMinorStart, minorCombatDesire, minorResearch, minorSetItem, minorBuildFacts, minorKnowledge, minorKnownUnits, minorItemCost, minorItemInHand, minorItemKey, minorBuildingPrice, minorRaiseBuilding, minorUnitPrice, minorUpgradeUnit, minorUpgradeVisible, traceMinorLays, traceMinorPolicyScores, traceMinorPurchases } from '../core/minorBuild';
+import { holdMinorCatchUp, holdMinorOrders, holdMinorStart, minorCombatDesire, minorResearch, minorSetItem, minorBuildFacts, minorKnowledge, minorKnownUnits, minorItemCost, minorItemInHand, minorItemKey, minorBuildingPrice, minorRaiseBuilding, minorUnitPrice, minorUpgradeUnit, minorUpgradeVisible, techContractsCompleted, traceMinorLays, traceMinorPolicyScores, traceMinorPurchases } from '../core/minorBuild';
 import { DEDICATED_IMPROVEMENTS, IMPROVEMENT_IDS, unitActionIndex } from '../core/unitActions';
 import { loadCatalog, type Catalog, type DumpCity, type TurnRecord } from './record';
 import { num, bool } from './record';
@@ -1475,10 +1475,20 @@ function minorAi(ctx: Ctx, b: TurnRecord, turn: number, made: ReadonlySet<Unit>,
   // — a technology record t+1 holds that a city-state's start left it short
   // of is one the game completed at that start: its "Upgrade Units" trees'
   // trigger (runs/h1_duely1128 Bologna t154-155: a tree each turn holds its
-  // units, no tactical row)
+  // units, no tactical row). One a route boosted complete (the route this
+  // phase lays after the turn, the game's city-state before its army's
+  // walk) has its completion's contract walk COMPLETE the Tech Contracts on
+  // it before the city's second hook (runs/h1_duely1121 city-state 2 t47:
+  // Currency on the Trader's route, the Build City District tree's
+  // Commercial Hub contract posted in the hook); one the units' turn
+  // boosted completes after the hook (1124 t49 Cardiff's Masonry on the
+  // Quarry its Improvement tree laid, the Walls contract at t50)
   for (const c of copy.cityStates) {
     const r = seatOf(ctx.next.state, c.seat)?.research;
-    if (r) upgradeTreesStart(c, r.techs.filter((x) => !c.research.techs.includes(x)).length);
+    if (!r) continue;
+    const gained = r.techs.filter((x) => !c.research.techs.includes(x));
+    upgradeTreesStart(c, gained.length);
+    for (const t of gained) if (BOOSTS[t]?.cls === 'MAINTAIN_X_TRADE_ROUTES') techContractsCompleted(c, t);
   }
   for (const s of [...copy.cityStates, ...copy.seats]) {
     const r = seatOf(ctx.next.state, s.seat)?.research;

@@ -200,6 +200,9 @@
   semantics: "a research completion (the row): the in-hand turns +0x528 zeroed (0x731d10 on +0x4d0), the propagation again, the contract list walked again (IN PROGRESS / ACCEPTED add their value and are called at +0x10, any other released), per row 0x68d090, then the choice with the row as the key. No test of the research in hand: any completed row of the player (the delegate bound by 0x761d30 at 0x761ffe on the player's signals +0x13b8), a boosted row not in hand included, makes the choice, which replaces the research in hand."
   status: READ
   cases:
+    - recording: h1_duely1121
+      turn: 41
+      value: "city-state 4: Currency boosted complete by its Trader's route, Tech Contract 83 IN PROGRESS at the log look, COMPLETED at the t41 end look"
     - recording: h1_duely1128
       turn: 117
       value: "city-state 2: Banking boosted complete (Game_Boosts.csv), Education 231.3 taken over the Gunpowder in hand"
@@ -213,6 +216,8 @@
       turn: 6
       value: "- A COMPLETION, 0x762d60 (the completed row): the propagation once more on   the entries as they stand, then the choice with the row as the key   (1124 t6: minors 2 and 3 pass Writing, Currency and Ir"
   impl:
+    - cpu/core/minorBuild.ts:techContractsCompleted
+    - gpu/core/sim_minors.py:_tech_contracts_completed
     - cpu/core/aiResearch.ts:researchCompletionChoice
     - cpu/core/minorBuild.ts:minorResearch
     - cpu/core/types.ts:ResearchState
@@ -220,7 +225,9 @@
     - cpu/core/minorBuild.ts:minorResearchBank
     - gpu/core/sim_research.py:_rai_contracts
     - gpu/core/sim_minors.py:_minor_complete_now
+    - gpu/core/sim_minors.py:_minor_completion_choice
   readings:
+    - "C-96: a completion's contract walk COMPLETES its Tech Contracts mid-turn; a city-state's route boosts land before its army's walk — READ (0x762d60 at 0x762ed0..0x762f8a, 0x5f5940), both twins"
     - "H-1: the research AI — READ (the choice), PARTLY READ (the value)"
     - "H-1: a city-state's boost completion and the research AI — READ"
     - "C-127: a boost completion's turns left; a minor Builder's clearing lump"

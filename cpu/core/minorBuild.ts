@@ -42,7 +42,7 @@ import { districtScaledBase, goldAffordable, projectCost, repairAvailable, repai
 import { civEraIndex, computeCityStats, withPercent256 } from './city';
 import { upgradeRoads } from './eras';
 import { researchCost, selectResearch } from './economy';
-import { CP_ACCEPTED, CP_CANCELLED, CP_FAILED, CP_IN_PROGRESS, contractById, newContractBook } from './aiContracts';
+import { CP_ACCEPTED, CP_CANCELLED, CP_COMPLETED, CP_FAILED, CP_IN_PROGRESS, contractById, newContractBook } from './aiContracts';
 import { researchAnalysis, researchCompletionChoice, researchDraw, researchTurnChoice, researchInHandLeft, type ResearchChoice, type TechContract } from './aiResearch';
 import { civicAnalysis, civicChoice, civicDraw, type CivicContract } from './aiCivics';
 import { minorCity, minorPlaceCitizens, minorReplaceCitizens, suzerainOf } from './cityStates';
@@ -109,7 +109,7 @@ import { opsOf } from './operations/manager';
  *  government values on the city it left, its operations' refresh
  *  (`minorOpsRefresh`) and its military AI's upgrade
  *  (`minorMilitaryUpgrade`), its routes' walk and a
- *  free Trader's route, its army's walk (`cityStateMilitary`, its city's
+ *  free Trader's route and the boosts they earned, its army's walk (`cityStateMilitary`, its city's
  *  ranged strikes after its units' planning), and last the
  *  boosts the turn earned (`detectBoosts`). */
 export function minorPhase(state: GameState): void {
@@ -214,6 +214,12 @@ export function minorPhase(state: GameState): void {
     minorMilitaryUpgrade(state, cityState);
     delete cityState.armyCounted;
     minorTrade(state, cityState, !ordersHeld);
+    // the boosts its routes and the actions before them earned land before
+    // its army's walk and its second hook's tree tick (runs/h1_duely1121
+    // city-state 2 t47: Currency completed by the Trader's route, contract
+    // 76 COMPLETED and its Build City District tree's Commercial Hub
+    // contract 123 posted by the t47 end look)
+    detectBoosts(state, cityState.seat);
     if (!ordersHeld) cityStateMilitary(state, cityState);
     // its knowledge base's route value K at its tactical turn, after its
     // city's update (whose builds read the K of the turn before), on the
@@ -365,6 +371,24 @@ function minorTechContracts(cityState: CityState): TechContract[] {
     if (tech) out.push({ tech, value: c.value, live: c.progress === CP_ACCEPTED || c.progress === CP_IN_PROGRESS });
   }
   return out;
+}
+
+/** a completion's contract walk (0x762d60 at 0x762ed0..0x762f8a: each
+ *  contract ACCEPTED or IN PROGRESS adds its value, +0x40, then takes its
+ *  check, +0x10 -> 0x5f5940): a Tech Contract on the technology just
+ *  completed COMPLETED at once, mid-turn (runs/h1_duely1121 city-state 4
+ *  t41: Currency completed by the Trader's route, contract 83 COMPLETED at
+ *  the t41 end look; 1124 t49 city-state 2's Masonry) */
+export function techContractsCompleted(cityState: CityState, id: string): void {
+  const ai = cityState.cityAi;
+  if (!ai) return;
+  for (const c of ai.contracts) {
+    const goal = ai.techContracts[c.id];
+    if (goal === undefined || (c.progress !== CP_ACCEPTED && c.progress !== CP_IN_PROGRESS)) continue;
+    if (engineId('tech', goal, 'TECH_', TECHS) !== id) continue;
+    c.progress = CP_COMPLETED;
+    c.goalHeld = false;
+  }
 }
 
 /** the minor's Civic Contracts (its city AI's Add Goal Tech contracts on a
@@ -714,9 +738,10 @@ export function minorCompleteNow(state: GameState, seat: number, id: string): vo
     r.tech = null;
     r.techProgress = 0;
   }
-  if (!r.aiEntries) return;
-  takeChoice(r, researchCompletionChoice(state, seat, r.aiEntries, id, researchDraw(state),
+  if (r.aiEntries) takeChoice(r, researchCompletionChoice(state, seat, r.aiEntries, id, researchDraw(state),
     cs ? minorTechContracts(cs) : []));
+  if (cs) techContractsCompleted(cs, id);
+  if (!r.aiEntries) return;
   // the choice writes the turns left on its pick at the player's Science
   // (0x763020 at 0x7630e4), which the next city build analysis reads
   // (runs/h1_duely1124 Cardiff t60: Engineering boosted complete, Horseback

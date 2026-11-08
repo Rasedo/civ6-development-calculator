@@ -334,6 +334,7 @@
   readings:
     - "H-1: the civics AI — READ (the choice, the walk, the propagation), PARTLY READ (the value)"
     - "C-97: the government and policy choice — the choice READ, the values PARTLY READ"
+    - "C-96: a completion's contract walk COMPLETES its Tech Contracts mid-turn; a city-state's route boosts land before its army's walk — READ (0x762d60 at 0x762ed0..0x762f8a, 0x5f5940), both twins"
   context:
     - "...h key -1 only where nothing is in hand (0x399a90 = -1). A COMPLETION fires the delegate 0x6293e0 — the government pass 0x625d70, then 0x626600 with the completed civic as the key — o..."
     - "- The choice (0x625d70; on the completed-civic event 0x6293e0 with the civic, and from the AI turn 0x620110 with -1 when +0x758 is set): on a civic..."

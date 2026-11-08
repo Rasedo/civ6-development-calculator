@@ -26,7 +26,7 @@ class SimMinors:
         # base's look; its contract purchases; then its actions — the
         # upgrades a completion triggers, its city AI's turn (`_minor_ai_turn`:
         # its builds, purchases and trees, the trees' Builders' work), its
-        # trade routes, its units' tactical turn (its city's ranged strikes in
+        # trade routes and the boosts they earned, its units' tactical turn (its city's ranged strikes in
         # it, after its units' planning: `_minor_tactics`); its look again; and the
         # boosts the turn earned (`_detect_minor_boosts`); its turn's end
         # holds each stockpile to its cap (`_seat_cap_stockpile`)
@@ -96,6 +96,9 @@ class SimMinors:
             self._mops_military_upgrade(s, alive)
             del self._cv_counted[s]
             self._minor_trade(s)
+            # the boosts its routes and the actions before them earned land
+            # before its army's walk and its second hook's tree tick
+            self._detect_minor_boosts(s, alive)
             self._minor_tactics(s)
             # its knowledge base's route value K at its tactical turn, on the
             # trade list of the turn before; then the City Analysis job's
@@ -221,28 +224,53 @@ class SimMinors:
             return
         # every completed technology makes the completion's choice, in the
         # order the boosts landed (the Boosts rows' order, `detectBoosts`)
+        # each completion's contract walk then COMPLETES the Tech Contracts on
+        # its technology (`techContractsCompleted`)
         valid = self.citystate_ai_valid[:, s]
-        if not bool((full.any(dim=1) & valid).count_nonzero()):
-            return
-        # each choice writes the turns left on its pick at the city's Science
-        # (0x763020 at 0x7630e4), which the next city build analysis reads
-        sci = self._seat_city_stats(self._CITY_MINOR0 + s, record=False)[0][:, 0][:, 3] * self.citystate_alive[:, s].double()
+        sci = None
         for _i, idx in self._boost_tables()["to_tech"]:
             if idx >= full.shape[1]:
                 continue
-            fire = full[:, idx] & valid
-            if not bool(fire.count_nonzero()):
+            hit = full[:, idx]
+            if not bool(hit.count_nonzero()):
                 continue
-            done = torch.full_like(cur, idx)
-            turns, base = self.citystate_ai_turns[:, s], self.citystate_ai_base[:, s]
-            score = self.citystate_ai_score[:, s] + self._rai_upstream(self.citystate_techs[:, s], base, turns)
-            score = score + self._rai_contracts(s, score, self.citystate_ai_owned[:, s], live=True)
-            # the additions land on the analysis's rows: a second completion
-            # adds them again
-            self.citystate_ai_score[:, s] = torch.where(fire.unsqueeze(1), score, self.citystate_ai_score[:, s])
-            pick, goal = self._rai_choice(s, fire, (turns, self.citystate_ai_next[:, s], base, score, self.citystate_ai_owned[:, s]), done)
-            self._rai_take(s, pick, goal)
-            self.citystate_ai_left[:, s] = torch.where(fire, self._rai_left(s, sci), self.citystate_ai_left[:, s])
+            fire = hit & valid
+            if bool(fire.count_nonzero()):
+                if sci is None:
+                    # each choice writes the turns left on its pick at the
+                    # city's Science (0x763020 at 0x7630e4), which the next
+                    # city build analysis reads
+                    sci = self._seat_city_stats(self._CITY_MINOR0 + s, record=False)[0][:, 0][:, 3] * self.citystate_alive[:, s].double()
+                self._minor_completion_choice(s, fire, idx, cur, sci)
+            self._tech_contracts_completed(s, hit, idx)
+
+    def _tech_contracts_completed(self, s: int, hit: torch.Tensor, idx: int) -> None:
+        """`techContractsCompleted` where `hit` [B]: city-state `s`'s Tech
+        Contracts ACCEPTED or IN PROGRESS on technology `idx` COMPLETED, no
+        longer held by the research AI"""
+        from .sim_citytrees import CP_ACCEPTED, CP_COMPLETED, CP_IN_PROGRESS, GOAL_TECH
+        ai = self.cityai
+        if s >= ai.S:
+            return
+        prog = ai.c_progress[:, s]
+        on = (hit.unsqueeze(1) & (ai.c_id[:, s] >= 0) & (ai.c_goal_kind[:, s] == GOAL_TECH) & (ai.c_goal[:, s] == idx)
+              & ((prog == CP_ACCEPTED) | (prog == CP_IN_PROGRESS)))
+        ai.c_progress[:, s] = torch.where(on, torch.full_like(prog, CP_COMPLETED), prog)
+        ai.c_goal_held[:, s] &= ~on
+
+    def _minor_completion_choice(self, s: int, fire: torch.Tensor, idx: int, cur: torch.Tensor, sci: torch.Tensor) -> None:
+        """the research AI's completion choice (0x762d60) where `fire` [B],
+        technology `idx` the completed row"""
+        done = torch.full_like(cur, idx)
+        turns, base = self.citystate_ai_turns[:, s], self.citystate_ai_base[:, s]
+        score = self.citystate_ai_score[:, s] + self._rai_upstream(self.citystate_techs[:, s], base, turns)
+        score = score + self._rai_contracts(s, score, self.citystate_ai_owned[:, s], live=True)
+        # the additions land on the analysis's rows: a second completion
+        # adds them again
+        self.citystate_ai_score[:, s] = torch.where(fire.unsqueeze(1), score, self.citystate_ai_score[:, s])
+        pick, goal = self._rai_choice(s, fire, (turns, self.citystate_ai_next[:, s], base, score, self.citystate_ai_owned[:, s]), done)
+        self._rai_take(s, pick, goal)
+        self.citystate_ai_left[:, s] = torch.where(fire, self._rai_left(s, sci), self.citystate_ai_left[:, s])
 
     def _minor_sight(self, s: int) -> torch.Tensor:
         """[B, T] bool — `cityStateSight`: the plots minor `s` sees now — its

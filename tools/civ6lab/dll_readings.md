@@ -9676,3 +9676,40 @@ Movement left and walks the path's first turn. The game:
   (aiTurnJobs; the planning job 0x792250 -> 0x791b20 is also pushed from
   0x790890 and 0x7921a0), the carried operations run as the turn
   activates, and which unit a planning ends on.
+
+## C-96: a completion's contract walk COMPLETES its Tech Contracts mid-turn; a city-state's route boosts land before its army's walk — READ (0x762d60 at 0x762ed0..0x762f8a, 0x5f5940), both twins
+
+`techContractsCompleted` (`cpu/core/minorBuild.ts`, from `minorCompleteNow`;
+the replay's copy for a route's boost), `minorPhase`'s `detectBoosts` after
+`minorTrade`; GPU `_tech_contracts_completed` (from `_minor_complete_now`),
+`_detect_minor_boosts` after `_minor_trade` (sim_minors.py).
+
+- THE WALK: a completion (0x762d60) walks the contract list (+0x210) at
+  0x762ed0..0x762f8a: a contract ACCEPTED (3) or IN PROGRESS (5) adds its
+  value (vt +0x40) then takes its check (vt +0x10 -> 0x5f5940); any other is
+  released (0x600b00). The check marks a Tech Contract whose tech is held
+  COMPLETED (0x5f59f2 HasTech -> 7), so a technology a boost completes inside
+  the city-state's own turn completes its contracts at once, not at the next
+  turn's research AI. The engines mark the completed technology's contracts
+  after the completion's choice (the value already added).
+- THE TIMING: a city-state's free Trader's route (`minorTrade`) is laid
+  before its army's walk and its second hook's tree tick, and the boost it
+  earns lands there; the trees the hook ticks then read the contract
+  COMPLETED. A boost the units' turn earns (a tree's Builder's improvement)
+  lands after the hook, at the turn's end.
+- Confirmed: runs/h1_duely1121 city-state 4 t41 Currency on the Trader's
+  route, contract 83 IN PROGRESS at the log look, COMPLETED at the end look;
+  city-state 2 t47 Currency on its route, contract 76 COMPLETED and the Build
+  City District tree's Commercial Hub contract 123 posted by the t47 end
+  look; runs/h1_duely1124 Cardiff t49 Masonry on the Quarry its Improvement
+  tree laid (Game_Boosts.csv), contract 108 COMPLETED at the end look, the
+  Walls contract 121 posted at t50.
+- Open (C-96): a Civic Contract's completion (the civics AI's 0x6293e0 walk
+  unread); a new Build City Building tree whose goal technology is under
+  research with 1 turn left ends in its tick with no contract (runs/
+  h1_duely1124 Cardiff t89 Castles, h1_duely1121 Antioch t117 Siege
+  Tactics, h1_duely1128 city-state 3 t206 Chemistry), one with 2 or more
+  turns left keeps its contract ACCEPTED (1121 Hunza t65 Celestial
+  Navigation 2 turns, 1124 Bologna t118 Siege Tactics 7) — no turn test in
+  Add Goal Tech's update 0x7e7d20, its execution 0x7e7200, the creation
+  0x5f4530, the submission 0x60bb50 or the research AI's listener 0x7635c0.

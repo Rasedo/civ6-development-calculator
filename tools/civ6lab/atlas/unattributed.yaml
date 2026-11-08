@@ -3118,6 +3118,7 @@
     - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
     - "H-1: the research AI — READ (the choice), PARTLY READ (the value)"
     - "H-1: the AI memory reader — READ (the hooks, the pointer paths, the contracts, the knowledge base, the operations, the trees), PARTLY READ (the religious AI's holder)"
+    - "C-96: a completion's contract walk COMPLETES its Tech Contracts mid-turn; a city-state's route boosts land before its army's walk — READ (0x762d60 at 0x762ed0..0x762f8a, 0x5f5940), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ...ugh the holder +0xa8 (0x731d10), removes it from the tree (0x7d22f0) and releases it (0x600b00); a city's list +0x3a8 holds weak handles, and 0x5d4d70's head skips an emptied one wit...
@@ -4609,7 +4610,9 @@
   kind: function
   semantics: "the research AI's submission listener (player signal +0x270): takes a contract its check passes (ACCEPTED) into +0x210."
   status: PARTLY
-  readings: ["H-1: the research AI — READ (the choice), PARTLY READ (the value)"]
+  readings:
+    - "H-1: the research AI — READ (the choice), PARTLY READ (the value)"
+    - "C-96: a completion's contract walk COMPLETES its Tech Contracts mid-turn; a city-state's route boosts land before its army's walk — READ (0x762d60 at 0x762ed0..0x762f8a, 0x5f5940), both twins"
   context:
     - "- THE TECH CONTRACT'S CHECK, vt +0x70 0x5f5940 (the research AI's submission listener 0x7635c0 on player signal +0x270 takes a contract it passes — ACCEPTED — into +0x210; the turn w..."
   review: reviewed
@@ -5496,6 +5499,7 @@
     - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
     - "H-1: the AI memory reader — READ (the hooks, the pointer paths, the contracts, the knowledge base, the operations, the trees), PARTLY READ (the religious AI's holder)"
     - "C-130 / C-96: a contract's priority in the expected unit count, the strength's treasury flag — READ, both twins"
+    - "C-96: a completion's contract walk COMPLETES its Tech Contracts mid-turn; a city-state's route boosts land before its army's walk — READ (0x762d60 at 0x762ed0..0x762f8a, 0x5f5940), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...the turn limit, reset when every contract it holds is alive); Add Goal Tech 0x7e7d20 / 0x7e7200; Build Unit 0x7f4e00 / 0x7f4240; Reserve Plot 0x7f7da0 (0x5d74c0: another tree's reserv..."
