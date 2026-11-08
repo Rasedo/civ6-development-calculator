@@ -8284,3 +8284,26 @@ ARCHAEOLOGIST branch and `_MinorFacts.artifacts` (sim_cityvalue.py),
   runs/h1_duely1128 t177 and 1124 t167 the game's minors value the
   Archaeologist on sites the replay imports a record later); 0x5eab80's
   list +0xfa0 read as every player but the barbarians.
+
+## C-99 / C-128: a danger feature is no step of a search, a land unit's danger stops at the shore — READ (0x271be0 at 0x271fd3, 0x2720a0 at 0x27216c, 0x26e570), both twins
+
+`groundOf`'s `hazard` and attack test, `search`'s step (cpu/core/tactical.ts).
+GPU `_tac_search`'s `haz_n`, `_tac_attack_planes` (gpu/core/sim_tactics.py).
+
+- THE DANGER FEATURE (0x271be0 at 0x271f31..0x272007, 0x2720a0 at 0x27216c):
+  on a plot the player sees now (+0x50 bit 2), a feature with
+  Features.DangerValue above 0 (the burning Woods and Rainforest 80, the
+  Bermuda Triangle 10) off the path's destination sets +0x52 bit 0 where the
+  player is not human (+0x1f6 clear) or +0x1f7 is set; the validity refuses
+  such a child outright, in every search (the planning's 0x26e570 and the
+  danger map's call it too). Every seat is taken as not human.
+- THE DANGER MAP'S STRIKE: its search strikes a unit at war on the mover's
+  own domain, and on water only where the mover's player may embark it, as
+  the planning's: a land unit that may not embark threatens no ship's water.
+- CONFIRMED (one-seed aimem traces): runs/h1_duely1128 t50-51 Bologna's
+  Warriors Wander over no burning 5:5 (AI_Planning.csv); runs/h1_duely1124
+  t106-126 city-state 3's Quadrireme 1048577 heals on 38:17 beside the
+  barbarian Man-At-Arms on 38:18; the danger rows (dangerLab): 1121 27,
+  1124 2, 1128 3 more equal, none fewer.
+- OPEN: a feature with the XP2 list (Features +0x180, its first entry's
+  +0x28 flags) unported.

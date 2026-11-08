@@ -349,6 +349,7 @@
     - cpu/core/tactical.ts:foesSeen
     - cpu/core/tactical.ts:crowded
     - cpu/core/tactical.ts:stacked
+    - cpu/core/tactical.ts:f
   readings:
     - "H-1: the garrison requirement — READ"
     - "H-1: a civilian stepped on — READ"

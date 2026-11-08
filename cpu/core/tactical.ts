@@ -188,6 +188,10 @@ interface Ground {
    *  peace of the mover's map layer but a Trader (the path cost 0x270dd0 at
    *  0x27102e..0x2710a0) */
   stacked: (i: number) => boolean;
+  /** on a plot the player sees now a feature of DangerValue above 0 (the
+   *  node's +0x52 bit 0, 0x271be0 at 0x271fd3: the burning Woods and
+   *  Rainforest, the Bermuda Triangle; an AI player's) */
+  hazard: (i: number) => boolean;
   /** the plot lies in a zone of control the player sees: a hostile unit of
    *  the mover's domain that exerts one beside it, or a district at war that
    *  exerts one (`districtZones`), on a plot the player sees now; a unit across
@@ -209,7 +213,7 @@ interface Ground {
 
 const NO_FOES: ReadonlySet<number> = new Set();
 
-function groundOf(state: GameState, unit: Unit, revealedOnly = true, planning = true, anyGround = true,
+function groundOf(state: GameState, unit: Unit, revealedOnly = true, planning = true, dangerSearch = true,
   mates: readonly Unit[] = formationMates(state, unit), dest = -1): Ground {
   const held = new Set<number>();
   const foes = new Set<number>();
@@ -240,7 +244,7 @@ function groundOf(state: GameState, unit: Unit, revealedOnly = true, planning = 
   // (runs/h1_duely1121 t97-99: the raid's Man-At-Arms on 6:14 lists China's
   // Great Scientist's 5:12 at (2/1); h1_duely1128 t35: the barbarian Warrior
   // on 15:13 lists player 1's Settler's 16:13 at (1/1), AI_Planning.csv)
-  const plainCivilians = planning && !anyGround;
+  const plainCivilians = planning && !dangerSearch;
   const enters = new Map<number, boolean>();
   const zocs = new Map<number, boolean>();
   const seenZocs = new Map<number, boolean>();
@@ -293,7 +297,14 @@ function groundOf(state: GameState, unit: Unit, revealedOnly = true, planning = 
   const crowded = (i: number) => own.has(i) || (held.has(i) && peaceHeld(i));
   const stacked = (i: number) => own.has(i) || (held.has(i) && state.units.some((x) => x.tileIndex === i && x.seat !== unit.seat
     && onLayer(x) && !UNITS[x.type]?.trader && !unitsHostile(state, unit, x)));
+  const hazard = (i: number): boolean => {
+    const f = state.map.tiles[i].feature;
+    if (!f || featureDanger(f) <= 0) return false;
+    seenNow ??= plotsSeenNow(state, new Set([unit.seat]));
+    return seenNow[i] === 1;
+  };
   return {
+    hazard,
     known,
     revealed,
     boarded,
@@ -379,10 +390,13 @@ function groundOf(state: GameState, unit: Unit, revealedOnly = true, planning = 
       // embark (runs/h1_duelw1117 t16: city-state 4's Warrior at 28:4 lists
       // 27:4 (1/0) and not the barbarian Galley's 26:4) and lists it for one
       // that may (runs/h1_dueld1121 t69: city-state 2's Swordsman at 10:7
-      // lists the barbarian Quadrireme's 8:5 (2/0) and chases it) —, on any
-      // ground in the danger map's (`anyGround`: a land unit's strike onto a
-      // ship's water as a ship's onto the shore, runs/h1_duelw1117 t73)
-      if ((fighters.has(t.index) && (anyGround || isWater(t) === naval || (embarks && isWater(t))))
+      // lists the barbarian Quadrireme's 8:5 (2/0) and chases it) —, in the
+      // danger map's search alike: a land unit that may not embark threatens
+      // no ship on its water (runs/h1_duely1124 t106-126: city-state 3's
+      // Quadrireme on 38:17 heals beside the barbarian Man-At-Arms on 38:18;
+      // 1121 t114-177 player 0's Move to safety rows on 2:19 / 3:20 log 30
+      // where a land unit's strike added 25, AI_Tactical.csv)
+      if ((fighters.has(t.index) && (isWater(t) === naval || (embarks && isWater(t))))
         || (!plainCivilians && foes.has(t.index) && isWater(t) === naval)) return true;
       const owner = tileSeat(t);
       if (t.district === 'CITY_CENTER' && owner !== unit.seat && unitsHostile(state, unit, { seat: owner })) return true;
@@ -580,6 +594,11 @@ function search(state: GameState, unit: Unit, maxTurns: number, zoc: boolean, on
         open.length = 0;
         break;
       }
+      // a plot of a danger feature in the player's sight is no step of any
+      // search but onto the path's destination (0x2720a0 at 0x27216c: the
+      // node's +0x52 bit 0) (runs/h1_duely1128 t50-51: Bologna's Warriors
+      // list no 5:5, its Woods burning, AI_Planning.csv)
+      if (to.index !== dest && ground.hazard(to.index)) continue;
       if (ground.revealed(to.index) && cliffBlocksStep(state, from, to, unit)) continue;
       if (attack && !ground.attack(to)) continue;
       if (zoned && !attack) continue;

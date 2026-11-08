@@ -366,19 +366,19 @@ class SimTactics:
         return fight
 
     def _tac_attack_planes(self, seat: int, revealed_only: bool = True, planning: bool = True,
-                           any_ground: bool = True) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+                           danger_search: bool = True) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         """[B, T] bool three times — the plots a LAND and a NAVAL unit of
         `seat` attacks into (`groundOf`'s attack): in the planning
         (`planning`) a unit of a player at war with it that fights (0x26e570
-        -> 0x209dd0), on the mover's own ground, on any with `any_ground` (the
-        danger map's); a city centre of such a player, an Encampment that
+        -> 0x209dd0), on the mover's own ground (the danger map's search,
+        `danger_search`, alike); a city centre of such a player, an Encampment that
         blocks a land mover; out of the planning's search (a move order's
         path, the danger map's) any unit at war on ground of the mover's
         domain too — on plots it revealed, a move order's path (not
         `planning`) on plots it sees now; and the fighters' water a land unit
         its player may embark attacks into too."""
         foe = self._tac_hostile(seat)
-        if planning and not any_ground:
+        if planning and not danger_search:
             # the planning's search: a civilian at war is a plain step
             foe = torch.zeros_like(foe)
         fight = self._tac_fighters(seat) if planning else torch.zeros_like(foe)
@@ -387,8 +387,8 @@ class SimTactics:
         land = self.passable & ((foe & ~self.water) | ctr)
         if self._encamp_didx >= 0:
             land = land | (self.passable & self._encamp_block_plane(seat))
-        land = land | (fight if any_ground else fight & ~self.water)
-        naval = (self.wpass & foe) | (self.passable & ctr) | (fight if any_ground else fight & self.water)
+        land = land | (fight & ~self.water)
+        naval = (self.wpass & foe) | (self.passable & ctr) | (fight & self.water)
         fight_w = fight & self.water
         known = self._tac_known(seat) if revealed_only else None
         if known is not None:
@@ -771,6 +771,13 @@ class SimTactics:
             # the count at the stacking limit whatever the player sees
             # (`groundOf`'s stacked): the path cost's +1e6 on a turn's end
             stack_n = full_n | peace_n
+        # a plot of a danger feature in the player's sight (`groundOf`'s
+        # hazard): no step of any search onto it but onto the destination
+        live_f = (self.feat_id >= 0) & ~self.feat_stripped
+        haz = live_f & (self._feat_danger[self.feat_id.clamp(min=0)] > 0)
+        haz_n = None
+        if bool(haz[rows].any()):
+            haz_n = haz[rows] & self._barb_seen("barbarians" if seat == BARB_SEAT else seat)[rows]
         # a zone of control's step on the path's destination (`groundOf`'s zoc)
         zp = self._tac_zoc_path(rows, seat, naval, self._tac_zoc_ignored(utype), dest, crowd_n) if zoc else None
         tseat = self.tile_seat
@@ -1034,6 +1041,11 @@ class SimTactics:
                 run = run & ~halt
                 act = act & ~halt
             ok = act.unsqueeze(1) & (nb >= 0) & (ent_n.gather(1, nbc) | a6 | unrev6) & (turns <= max_turns)
+            if haz_n is not None:
+                hz = haz_n.gather(1, nbc)
+                if dest is not None:
+                    hz = hz & (nb != dest.unsqueeze(1))
+                ok = ok & ~hz
             if zoc:
                 stacked = crowd_n.gather(1, b1) & (turns > bt)
                 if later_turns:

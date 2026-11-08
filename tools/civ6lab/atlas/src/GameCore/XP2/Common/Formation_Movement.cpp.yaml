@@ -23,9 +23,12 @@
   review: reviewed
 - addr: 0x26df90
   kind: function
-  semantics: "the reach search with flags: it adds 0x800 to the caller's (bts eax, 0xb at 0x26e12f; 0x100 more where the unit's +0x4b8 is clear) before the search 0x7a630 with no destination (-9999, -9999), so no reach search pays a zone of control (the cost 0x26e920 skips it under 0x800). The danger map's call (0x716739) passes 0x311: 0x200 skips the planning's zone refusal and the unit attack test of 0x26e570."
+  semantics: "the reach search with flags: it adds 0x800 to the caller's (bts eax, 0xb at 0x26e12f; 0x100 more where the unit's +0x4b8 is clear) before the search 0x7a630 with no destination (-9999, -9999), so no reach search pays a zone of control (the cost 0x26e920 skips it under 0x800). The danger map's call (0x716739) passes 0x311: 0x200 skips the planning's zone refusal and the unit attack test of 0x26e570. The danger map's reach strikes a unit at war on the mover's own domain, and on water only where the mover's player may embark it, as the planning's (0x26e570): a land unit that may not embark threatens no ship's water. Ported: groundOf's attack, _tac_attack_planes."
   status: READ
   cases:
+    - recording: h1_duely1124
+      turn: 106
+      value: "city-state 3's Quadrireme 1048577 on 38:17 heals (AI_Tactical.csv) at t106 / t116 / t120 / t126 beside a barbarian Man-At-Arms on 38:18; dangerLab: 1121 27, 1124 2, 1128 3 Move to safety rows equal more, none fewer"
     - recording: h1_duely1127
       turn: 4
       value: the barbarian Scout on 5:12 (hp 10) flees to 4:13, 5:13 beyond it in the danger of city-state 3's Warrior on 4:12 (its zone not paid)
@@ -33,6 +36,8 @@
       turn: 26
       value: the barbarian Scout on 4:18 (hp 53) flees to 5:19, its plot in the danger of player 1's Warrior on 5:16 through 4:17
   impl:
+    - cpu/core/tactical.ts:groundOf
+    - gpu/core/sim_tactics.py:_tac_attack_planes
     - cpu/core/tactical.ts:search
     - cpu/core/tactical.ts:dangerPlane
     - cpu/core/tactical.ts:exploreTarget
@@ -40,6 +45,7 @@
     - gpu/core/sim_tactics.py:_tac_search
     - cpu/core/tactical.ts:moves
   readings:
+    - "C-99 / C-128: a danger feature is no step of a search, a land unit's danger stops at the shore — READ (0x271be0 at 0x271fd3, 0x2720a0 at 0x27216c, 0x26e570), both twins"
     - "C-95: the danger map's search pays no zone of control, a ranged unit strikes from its range; the rampage strike's ring — READ (0x26df90, 0x26e920, 0x771670, 0x691f0, 0x76ecf0), FIT (the ranged unit's strike), both twins"
     - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
     - "C-97: the settle site evaluation — READ (the score, the choices), PARTLY READ (the danger, the plot yield)"
@@ -117,6 +123,7 @@
     - cpu/core/tactical.ts:crowded
     - cpu/core/tactical.ts:addOpen
     - cpu/core/tactical.ts:stacked
+    - cpu/core/tactical.ts:f
   readings:
     - "C-125: a civilian at war in the planning's search, a zone of control across a river, the attack's move onto a city — READ (0x26e570, 0x530f50 at 0x5310c8..0x5311c9, 0x771f80 at 0x772121), both twins"
     - "C-95: the planning's valid wrapper on a district at war, and a land unit's embarking by its original owner — READ (0x26e570 at 0x26e5e2..0x26e7f1, 0x56c480), the first both twins"
@@ -127,6 +134,7 @@
     - "C-95: a strike's move order onto a plot out of sight — READ (the strike), FIT (the path's sight test)"
     - "C-125: a district's zone of control in a move's path, waived on the path's destination; a city-state's strikes after its units' planning — READ (0x530f50 at 0x531127..0x531302, 0x26f980, 0x26f870), FIT (the strikes' place), both twins"
     - "C-124: a move order's path prices a turn's end at the stacking limit +1e6, and its destination there stops the search — READ (0x270dd0 at 0x27101e..0x2710a0, 0x2720a0 at 0x272230..0x272364, 0x77a50, 0x26dcd0's callbacks), both twins"
+    - "C-99 / C-128: a danger feature is no step of a search, a land unit's danger stops at the shore — READ (0x271be0 at 0x271fd3, 0x2720a0 at 0x27216c, 0x26e570), both twins"
   context:
     - "...or 2 turns, flags 0x115 | 0x800 | 0x100 where the unit has not moved; the valid wrapper 0x26e570 refuses a node past the turn limit): the list at planning +0x30 (16-byte entries x, y,..."
     - "...centre, an Encampment) as a node whose step spends the Movement left (the valid wrapper 0x26e570: the attack's cost adds the Movement left, 0x1d0 += 0x1d4) and links nothing from it (a..."
@@ -568,9 +576,12 @@
 - addr: 0x271be0
   final: 0x1a9a40
   kind: function
-  semantics: "a planning node's flags on its first visit (the list test's bits). +0x50 bit 0x20 the node's water as the search takes it: a revealed plot's own (bit 0x10, IsWater), an unrevealed one's own where its parent is revealed, else its parent's bit 0x20 (0x27203b / 0x27205b); +0x51 bit 0 revealed (0x154c0). +0x54 the count 0x585eb0 over the plot's units, less one on the formation's own plot (0x271d03..0x271d18); +0x51 bit 7 the count at the limit, bit 1 a city of a player not at war (seen), bit 2 one at war, bit 3 / 0x10 a district so; +0x52 bit 0 a feature of DangerValue above 0 off the destination."
+  semantics: "a planning node's flags on its first visit (the list test's bits). +0x50 bit 0x20 the node's water as the search takes it: a revealed plot's own (bit 0x10, IsWater), an unrevealed one's own where its parent is revealed, else its parent's bit 0x20 (0x27203b / 0x27205b); +0x51 bit 0 revealed (0x154c0). +0x54 the count 0x585eb0 over the plot's units, less one on the formation's own plot (0x271d03..0x271d18); +0x51 bit 7 the count at the limit, bit 1 a city of a player not at war (seen), bit 2 one at war, bit 3 / 0x10 a district so; +0x52 bit 0 a feature of DangerValue above 0 off the destination. +0x52 bit 0 is set only on a plot the player sees now (+0x50 bit 2), for a feature of Features.DangerValue above 0 (no XP2 list at +0x180) off the destination where the player is not human (+0x1f6 clear) or +0x1f7 is set; a feature with the XP2 list reads its first entry's flags (+0x28: bit 2 none, bit 1 off the destination, else always) — that branch unported."
   status: READ
   cases:
+    - recording: h1_duely1128
+      turn: 50
+      value: Bologna's Warriors around 5:5 (FEATURE_BURNING_FOREST t50-51) list no 5:5, player 0's (human) units list burning plots
     - recording: h1_duely1117
       turn: 24
       value: "the barbarian Galley 720906 on 31:2 takes HL: Explore cur area for the unrevealed coast 33:3 behind the ice (its path round the map through the plots never revealed) and walks to 29:0 as logged; 1121 t12 Scout 131073 on 12:20 cur region 9:18 past the unrevealed mountains 9:17 / 10:16 (ours fallback without the rule)"
@@ -584,12 +595,14 @@
       turn: 86
       value: "runs/h1_duely1121 t86: city-state 3's embarked Man-At-Arms on 40:20 plans 40:20 and 39:21 alone, the embarked units of player 0 on 40:19 and of city-state 4 on 41:20 closing the water beyond (AI_Planning.csv); t94 city-state 4's on 28:23 plans past player 0's Quadriremes."
   impl:
+    - cpu/core/tactical.ts:groundOf
     - cpu/core/tactical.ts:boarded
     - gpu/core/sim_tactics.py:_tac_search
     - cpu/core/tactical.ts:search
     - cpu/core/tactical.ts:PNode
     - cpu/core/tactical.ts:Ground
   readings:
+    - "C-99 / C-128: a danger feature is no step of a search, a land unit's danger stops at the shore — READ (0x271be0 at 0x271fd3, 0x2720a0 at 0x27216c, 0x26e570), both twins"
     - "C-99 / C-128: a shore crossing's cliff onto a revealed plot alone, Wander Back to Camp's path flag 0x1000, the path's destination count — READ (0x52fb90, 0x2720a0 at 0x272230..0x27229e / 0x272380, 0x270dd0 at 0x270f24, 0x271be0 at 0x271d03..0x271d18, 0x77b9a0 at 0x77be0b), both twins"
     - "C-124: a path enters a plot the player never revealed whatever it is — READ (0x2720a0 at 0x272372..0x27242e, 0x271be0's +0x50 bit 0x20, 0x26e920), both twins"
     - "C-95: the unit pathfinder and the planning's reach — READ, confirmed on the Wander draws"
@@ -610,9 +623,12 @@
 - addr: 0x2720a0
   final: 0x1a9f00
   kind: function
-  semantics: "the path validity: flag 1 lets no step leave a plot the player never revealed but the unit's own; 0x1000 lets a later turn end on its own stacking unit. Each node records (0x271be0) whether its player sees its plot (+0x50 & 2) and the count of the unit's own stacking units on it, the unit itself not counted (0x585eb0, +0x54); the walk back through the parents refuses the link, at each node after which a turn begins, where the plot is seen and the count reaches the stacking limit (+0x1b0), search flags +4 / +0x1000 clear. The other turn-end tests (0x272262..0x272313) on a seen node after which a turn begins: a mountain (+0x50 & 4, terrain bits 0x4924) or an impassable feature (+0x50 & 8) unless the finder's +0x1f6 lets it, water under flag 0x80 (+0x50 & 0x10), a city not at war (+0x51 & 2) — the stacking, mountain and city tests off under flag +4 (the planning's search carries it). After the walk (0x272372..0x272692): the embarking tests under the unit's +0x1f2 / +0x1f1 bytes on a revealed child, and the location test (+0x50 bit 0x40) on a revealed child alone — a child the player never revealed is valid whatever its terrain, domain or units; flag 2: a child owned by a player at war refused; a clans' tribe test (0x151550, 0x147c20); under the finder's +0x1f7 byte or flag 8, a child whose danger (0x716a90) is above 0 refused from a parent of turn 1 or less, under flag 0x8000 the same for a water child; flag 1: a parent not revealed refused unless it is the unit's own plot, and a child in a major's territory not at war refused unless the player may enter it (0x3dab70). The chain walk (0x272230..0x27235a): each node, its parent +0x0, its turn +0x2c, the newest from the instance's +0x1dc; a node ending a turn (+0x50 & 2) whose stacking count (+0x54) reaches the limit (+0x1b0) is refused unless +0x51 & 4 with +0x1f8, or flags & 4; with flags & 0x1000 (the validity's flag word +0xe0, 0x2721df) only where that node's turn is 1 or less (0x27229b): a turn after the first free to end on the unit's own stacking unit. Under 0x1000 a target its own stacking unit holds reached within the first turn is no path; reached later, the walk goes its first turn's way. Ported: moveTo(laterTurns) / pathTo, _tac_move_to(later_turns). The chain walk tests the child itself where it is the path's destination (+0xd8 / +0xdc; +0xe9 set when refused) as any node after which a turn begins: seen, its count +0x54 at the limit refuses at any turn without 0x1000, at turn 1 with it; a move order has no path to a destination its own stacking unit or another player's unit at peace in sight holds. The refusal of the destination child (0x27235f) sets the search's stop +0xe9 (0x272364), which 0x77a50 reads after each link: the first link onto a crowded destination within the first turn (any turn without 0x1000) ends the search with no path, a later turn's never reached (`search`'s stop, the GPU's halt)."
+  semantics: "the path validity: flag 1 lets no step leave a plot the player never revealed but the unit's own; 0x1000 lets a later turn end on its own stacking unit. Each node records (0x271be0) whether its player sees its plot (+0x50 & 2) and the count of the unit's own stacking units on it, the unit itself not counted (0x585eb0, +0x54); the walk back through the parents refuses the link, at each node after which a turn begins, where the plot is seen and the count reaches the stacking limit (+0x1b0), search flags +4 / +0x1000 clear. The other turn-end tests (0x272262..0x272313) on a seen node after which a turn begins: a mountain (+0x50 & 4, terrain bits 0x4924) or an impassable feature (+0x50 & 8) unless the finder's +0x1f6 lets it, water under flag 0x80 (+0x50 & 0x10), a city not at war (+0x51 & 2) — the stacking, mountain and city tests off under flag +4 (the planning's search carries it). After the walk (0x272372..0x272692): the embarking tests under the unit's +0x1f2 / +0x1f1 bytes on a revealed child, and the location test (+0x50 bit 0x40) on a revealed child alone — a child the player never revealed is valid whatever its terrain, domain or units; flag 2: a child owned by a player at war refused; a clans' tribe test (0x151550, 0x147c20); under the finder's +0x1f7 byte or flag 8, a child whose danger (0x716a90) is above 0 refused from a parent of turn 1 or less, under flag 0x8000 the same for a water child; flag 1: a parent not revealed refused unless it is the unit's own plot, and a child in a major's territory not at war refused unless the player may enter it (0x3dab70). The chain walk (0x272230..0x27235a): each node, its parent +0x0, its turn +0x2c, the newest from the instance's +0x1dc; a node ending a turn (+0x50 & 2) whose stacking count (+0x54) reaches the limit (+0x1b0) is refused unless +0x51 & 4 with +0x1f8, or flags & 4; with flags & 0x1000 (the validity's flag word +0xe0, 0x2721df) only where that node's turn is 1 or less (0x27229b): a turn after the first free to end on the unit's own stacking unit. Under 0x1000 a target its own stacking unit holds reached within the first turn is no path; reached later, the walk goes its first turn's way. Ported: moveTo(laterTurns) / pathTo, _tac_move_to(later_turns). The chain walk tests the child itself where it is the path's destination (+0xd8 / +0xdc; +0xe9 set when refused) as any node after which a turn begins: seen, its count +0x54 at the limit refuses at any turn without 0x1000, at turn 1 with it; a move order has no path to a destination its own stacking unit or another player's unit at peace in sight holds. The refusal of the destination child (0x27235f) sets the search's stop +0xe9 (0x272364), which 0x77a50 reads after each link: the first link onto a crowded destination within the first turn (any turn without 0x1000) ends the search with no path, a later turn's never reached (`search`'s stop, the GPU's halt). At 0x27216c a child whose node carries +0x52 bit 0 (0x271be0: a danger feature off the destination) is refused outright, before the chain walk, in every search. Ported: search's hazard, _tac_search's haz_n."
   status: READ
   cases:
+    - recording: h1_duely1128
+      turn: 50
+      value: Bologna's Warriors list no 5:5 t50-51, its Woods burning (AI_Planning.csv)
     - recording: h1_duely1124
       turn: 182
       value: the rampaging Galleys 1966102 / 1179665 hold t182-t196 for China's Water Park 19:8, the Galley 720906 on it, at their later turns (flags 0); 1121 t154 the Crossbowman 3801114 for 17:15
@@ -670,6 +686,7 @@
     - cpu/core/tactical.ts:before
     - cpu/core/tactical.ts:addOpen
   readings:
+    - "C-99 / C-128: a danger feature is no step of a search, a land unit's danger stops at the shore — READ (0x271be0 at 0x271fd3, 0x2720a0 at 0x27216c, 0x26e570), both twins"
     - "C-99 / C-128: a shore crossing's cliff onto a revealed plot alone, Wander Back to Camp's path flag 0x1000, the path's destination count — READ (0x52fb90, 0x2720a0 at 0x272230..0x27229e / 0x272380, 0x270dd0 at 0x270f24, 0x271be0 at 0x271d03..0x271d18, 0x77b9a0 at 0x77be0b), both twins"
     - "C-124: a path enters a plot the player never revealed whatever it is — READ (0x2720a0 at 0x272372..0x27242e, 0x271be0's +0x50 bit 0x20, 0x26e920), both twins"
     - "C-95: the unit pathfinder and the planning's reach — READ, confirmed on the Wander draws"
