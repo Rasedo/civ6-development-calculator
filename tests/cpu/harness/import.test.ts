@@ -396,14 +396,18 @@ describe('the build queue', () => {
   const queue = [{ UnitType: 3 }, { BuildingType: 2 }, { DistrictType: 1, Location: { x: 4, y: 2 } },
     { BuildingType: 4, Location: { x: 1, y: 2 } }, { ProjectType: 0 }];
 
-  it('carries each entry as the engine item, a unit\'s and a building\'s progress the city memory\'s, the rest where the record has it', () => {
+  it('carries each entry as the engine item, its progress and the overflow store the city memory\'s', () => {
     const rec = record(10, {
       cities: [city({ queue, queueProgress: [5, 7, 'err:no reader', 0, 2] }), record(10).cities[1]],
-      mem: { 0: { cities: [{ 'm_kBuildQueue.v': { 134: { n: 8, 2: 7 * 256 }, 140: { n: 4, 3: 5 * 256 + 128 } } }] } } as never,
+      mem: { 0: { cities: [{ m_kBuildQueue: { n: 200, 125: 3 * 256 },
+        'm_kBuildQueue.v': { 134: { n: 8, 2: 7 * 256 }, 140: { n: 4, 3: 5 * 256 + 128 }, 146: { n: 4, 1: 9 * 256 + 64 },
+          152: { n: 4, 0: 2 * 256 + 32 } } }] } } as never,
     });
     const imp = importTurn(rec, CAT);
-    const q = imp.state.seats[0].cities[0].queue;
-    expect(q.map((x) => [x.kind, x.progress])).toEqual([['settler', 5.5], ['building', 7], ['district', 0], ['wonder', 0], ['project', 2]]);
+    const c = imp.state.seats[0].cities[0];
+    const q = c.queue;
+    expect(q.map((x) => [x.kind, x.progress])).toEqual([['settler', 5.5], ['building', 7], ['district', 9.25], ['wonder', 0], ['project', 2.125]]);
+    expect(c.productionBank).toBe(3);
     // the price the engine would lock queueing it into an empty queue
     expect(q[0]).toMatchObject({ cost: settlerCost(importTurn(record(10), CAT).state, 0) });
     expect(q[1]).toMatchObject({ building: 'LIBRARY' });
@@ -411,13 +415,6 @@ describe('the build queue', () => {
     expect((q[2] as { cost: number }).cost).toBeGreaterThan(0);
     expect(q[3]).toMatchObject({ wonder: 'PYRAMIDS', tileIndex: 13 });
     expect(q[4]).toMatchObject({ project: 'RESEARCH_GRANTS' });
-    expect(imp.queueProgressRead).toBe(true);
-  });
-
-  it('stands every item at 0 when the record carries no progress', () => {
-    const imp = importTurn(record(10, { cities: [city({ queue }), record(10).cities[1]] }), CAT);
-    expect(imp.state.seats[0].cities[0].queue.every((x) => x.progress === 0)).toBe(true);
-    expect(imp.queueProgressRead).toBe(false);
   });
 });
 

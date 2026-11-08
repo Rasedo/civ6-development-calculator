@@ -143,12 +143,15 @@
     - gpu/core/sim_minors.py:_minor_build
     - cpu/harness/cityBuildLab.ts:done
     - gpu/core/sim_phase.py:_lump_step
+    - cpu/core/phase.ts:letGo
+    - cpu/core/phase.ts:headCost
   readings:
     - "H-1: a district project's yield conversion — READ"
     - "H-1: the build queue's overflow, the yields' fixed point, the dispersal Gold, the pantheon's price — READ"
     - "H-1: a completion's overflow and the item multiplier — READ"
     - "C-127: an idle city's store through the queue step (0x16f050), the build lab on it — READ (the engines unchanged)"
     - "C-130: a lump's queue step completes the head; a major's trade list tries what its last turn revealed; a city-state's researched technology lands its boosts before the Culture — READ, both twins"
+    - "C-111: a major's district lets go of the queue under a hostile unit, the queue's progress and overflow read from the city's memory — READ (0x184660 at 0x1847dc, 0x5313f0, 0x17f630), both twins"
   context:
     - ...e city's yield component) and its project id (+0x1360 = -1), then applies the Production (0x16f050), whose ORDER_ADVANCE arm 0x184ae0 walks the project's Project_YieldConversions rows (Pro...
     - "- The queue's step (City_BuildQueue 0x177d10 → 0x16f050) reads the city's Production twice through 0x1c5350: A with the head's id (the Producti..."
@@ -167,6 +170,7 @@
   impl: [cpu/core/economy.ts:applyLumpYield, gpu/core/sim_phase.py:_lump_step]
   readings:
     - "C-130: a lump's queue step completes the head; a major's trade list tries what its last turn revealed; a city-state's researched technology lands its boosts before the Culture — READ, both twins"
+    - "C-111: a major's district lets go of the queue under a hostile unit, the queue's progress and overflow read from the city's memory — READ (0x184660 at 0x1847dc, 0x5313f0, 0x17f630), both twins"
   review: reviewed
 - addr: 0x16f7b0
   kind: function
@@ -300,6 +304,14 @@
     - "C-60: the Free City's grant"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   review: reviewed
+- addr: 0x175140
+  final: 0xfafe0
+  kind: function
+  semantics: "ORDER_ZONE's completion in the queue step: the district's progress by type (+0x248) against its cost (0x179510) << 8; covered, the district completes on its plot (0x1ae340 / 0x1af5b0 for one standing, else 0x180450) with its completion events; no unit on the plot is asked."
+  status: PARTLY
+  readings:
+    - "C-111: a major's district lets go of the queue under a hostile unit, the queue's progress and overflow read from the city's memory — READ (0x184660 at 0x1847dc, 0x5313f0, 0x17f630), both twins"
+  review: reviewed
 - addr: 0x175730
   final: 0xfb520
   kind: function
@@ -378,6 +390,7 @@
   readings:
     - "C-96: the resource value and the research value's resources — READ (bonus, luxury, the call), PARTLY READ (the strategic stockpile terms)"
     - "C-96: the queue's strategic charge, a placed district's resource, the minors' resource turn — READ (0x17c2e0, 0x186460's names), a fit for the district, both twins"
+    - "C-111: a major's district lets go of the queue under a hostile unit, the queue's progress and overflow read from the city's memory — READ (0x184660 at 0x1847dc, 0x5313f0, 0x17f630), both twins"
   context:
     - "...s strategic queue (City_BuildQueue 0x17f3a0, the front check 0x17f070 the queue process 0x178250 runs where the queue changed, +0x3ac): the front unit not CanTrain leaves the front; a..."
   review: reviewed
@@ -1019,6 +1032,30 @@
   context:
     - "- The reservation (City_BuildQueue 0x17f3a0 from the front check 0x17f070): a unit at the queue's front with a strategic cost and n..."
   review: reviewed
+- addr: 0x17f5a0
+  final: 0x101370
+  kind: function
+  semantics: "before the front leaves (+0x3ac clear): the front item's progress asked by its kind (0x17d1a0 unit, 0x17d050 building, 0x17d130 project); none held runs 0x182b80 on the front."
+  status: PARTLY
+  readings:
+    - "C-111: a major's district lets go of the queue under a hostile unit, the queue's progress and overflow read from the city's memory — READ (0x184660 at 0x1847dc, 0x5313f0, 0x17f630), both twins"
+  review: reviewed
+- addr: 0x17f630
+  final: 0x101400
+  kind: function
+  semantics: "the queue's front removed: with more than one entry the entries shift down one (0x38 bytes each) and the count +0x1e0 falls; with one, the queue cleared (0x9cec0)."
+  status: READ
+  cases:
+    - recording: h1_duelp1117
+      turn: 74
+      value: Xi'an's Harbor leaves its one-entry queue; record t75 heads Hanging Gardens, the Harbor's progress kept
+  impl:
+    - cpu/core/phase.ts:letGo
+    - gpu/core/sim_seats.py:_q_pop
+    - gpu/core/sim_phase.py:_seat_city_produce
+  readings:
+    - "C-111: a major's district lets go of the queue under a hostile unit, the queue's progress and overflow read from the city's memory — READ (0x184660 at 0x1847dc, 0x5313f0, 0x17f630), both twins"
+  review: reviewed
 - addr: 0x17f870
   final: 0x101500
   kind: function
@@ -1113,6 +1150,25 @@
   context:
     - "...on-accumulated import / export. Its callers: a production completion's strategic costs (0x18433d building, 0x184d95 project, 0x1856b3 / 0x185a2a unit), a plot's extracted resource chan..."
   review: imported
+- addr: 0x184660
+  final: 0x104f40
+  kind: function
+  semantics: "the ORDER_ZONE step of the queue step 0x16f050: before it adds the Production it asks 0x5313f0 (the city's owner, the district's plot, flag 1); on true the head leaves the queue (0x17f5a0, 0x17f630, +0x3ac set, 0x178250). It then multiplies the Production by the district multipliers (0x16eb20) and adds it to the district's progress by type (+0x248, 0x16e6a0 / 0xac650) whether or not the head left."
+  status: READ
+  cases:
+    - recording: h1_duelp1117
+      turn: 74
+      value: Xi'an's Harbor on 31:12 at 95.8 of 90 under the barbarian Galley 2228229, off the queue, done at t83
+  impl:
+    - cpu/core/production.ts:districtPlotHostile
+    - cpu/core/phase.ts:letGo
+    - cpu/core/economy.ts:letGo
+    - gpu/core/sim_phase.py:_seat_city_produce
+    - gpu/core/sim_phase.py:_lump_step
+    - cpu/core/phase.ts:banked
+  readings:
+    - "C-111: a major's district lets go of the queue under a hostile unit, the queue's progress and overflow read from the city's memory — READ (0x184660 at 0x1847dc, 0x5313f0, 0x17f630), both twins"
+  review: reviewed
 - addr: 0x184ae0
   final: 0x105270
   kind: function
@@ -1157,6 +1213,7 @@
     - gpu/core/sim_phase.py:_seat_city_produce
     - cpu/core/minorBuild.ts:cost
     - gpu/core/sim_minors.py:_minor_finish
+    - cpu/core/phase.ts:letGo
   readings:
     - "H-1: the luxury allocation's rebuilds — PARTLY READ"
     - "H-1: a completion's overflow and the item multiplier — READ"

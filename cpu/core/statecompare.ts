@@ -1256,6 +1256,10 @@ const CITY: Record<string, Extractor> = {
       .sort((a, b) => a - b),
   ),
   productionBank: overCities((r) => r.city.productionBank ?? 0),
+  keptDistricts: overCities((r) => PLACEABLE_DISTRICTS.flatMap((t) => {
+    const k = r.city.keptDistricts?.[t];
+    return k ? [k.progress, k.cost] : [0, 0];
+  })),
   projectYield: overCities((r) => projectYieldCols(r.city.projectYield)),
   queueFront: overCities((r) => overQueue(r.city.queue, (q) => [queueItemColumn(q), queueTile(q)]).flat()),
   specialists: overCities((r, state) => {

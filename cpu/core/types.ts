@@ -148,6 +148,11 @@ export interface City {
   districts: { type: DistrictId; tileIndex: number }[];
   wonders: { id: string; tileIndex: number }[];
   productionBank?: number;
+  /** CIV6 (City_BuildQueue +0x248, the district progress kept by type): a
+   *  district item the queue let go unfinished (`districtPlotHostile`) — its
+   *  progress and its locked price, by district type, until the city queues
+   *  it again (`resumeDistrict`). Absent = none. */
+  keptDistricts?: Partial<Record<DistrictId, { progress: number; cost: number }>>;
   /** CIV6 (Project_YieldConversions; City_BuildQueue 0x184ae0): the yield
    *  the city's last production step converted from the Production it put
    *  into a district project — PercentOfProductionRate of that Production

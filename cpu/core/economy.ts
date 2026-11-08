@@ -19,7 +19,7 @@ import { RESOURCES } from '../../world/resources';
 import { minorLump } from './minorBuild';
 import { lumpFood } from './seatTurn';
 import { itemCost } from './game';
-import { completeQueueItem } from './production';
+import { completeQueueItem, districtPlotHostile, keepDistrict } from './production';
 
 /**
  * SELECT a tech or civic, keeping the progress on the one being left.
@@ -258,13 +258,22 @@ export function applyLumpYield(
   if (city.queue.length > 0) {
     const q = city.queue[0];
     const before = q.progress;
+    // the step's district a hostile unit stands on lets go of its head
+    // (`districtPlotHostile`, 0x184660 at 0x1847dc), the lump in its progress
+    const letGo = q.kind === 'district' && districtPlotHostile(state, city, q.tileIndex);
     q.progress += amount + (city.productionBank ?? 0);
     city.productionBank = 0;
     repairDrip(state, city, before);
     const cost = itemCost(q, state, city);
-    if (q.progress >= cost) {
+    if (letGo && q.kind === 'district') {
       city.queue.shift();
-      completeQueueItem(state, city, q, cost);
+      keepDistrict(city, q, cost);
+    }
+    const head = city.queue[0];
+    const headCost = head === q ? cost : head ? itemCost(head, state, city) : 0;
+    if (head && head.progress >= headCost) {
+      city.queue.shift();
+      completeQueueItem(state, city, head, headCost);
       const lacked = Math.max(0, cost - before);
       if (amount > lacked) city.productionBank = (city.productionBank ?? 0) + amount - lacked;
     }

@@ -3607,6 +3607,18 @@
           ]
         },
         {
+          "name": "keptDistricts",
+          "compare": "milli",
+          "covers": [
+            "City.keptDistricts"
+          ],
+          "planes": [
+            "city_dist_kept",
+            "city_dist_kept_cost"
+          ],
+          "note": "a flat [progress, locked price] pair per PLACEABLE district index: the district item the queue let go unfinished, kept by type; [0, 0] for none."
+        },
+        {
           "name": "projectYield",
           "compare": "milli",
           "covers": [

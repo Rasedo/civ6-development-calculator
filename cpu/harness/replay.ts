@@ -40,7 +40,7 @@ import { advanceTurn, minorTurns, turnChange, turnClose, foundCity, foundCityAt,
   buyWorshipBuilding, purchaseBuildingWithFaith, purchaseCivilianWithFaith, purchaseNaturalist, purchaseReligiousUnit, purchaseRockBand, purchaseUnitWithFaith,
   purchaseSettler, unitGoldPrice, availableProjects, goldAffordable, buildingFaithPrice, wonderChargeBoost, adoptBeliefs,
   serialize, deserialize, itemCost } from '../core/game';
-import { completeQueueItem } from '../core/production';
+import { completeQueueItem, keepDistrict, resumeDistrict } from '../core/production';
 import { applySeatUnitOrders, buySeatBuilding, declareWar, districtSiteCost, districtSiteLegal, foundPantheon, grantPantheonUnit, jumpMadeAnew, levyGoldCost, levyUnits, paveGround,
   placeSeatDistrict, putOffer, answerOffer, sueForPeace, transferCity, cityStrikeAt, holdCityStrikes, envoysAtStart, applySeatEnvoys,
   seatPhase, worldCongress, holdBankruptDisband, completeResearchNow } from '../core/phase';
@@ -1037,20 +1037,6 @@ function barbarianTurn(ctx: Ctx, b: TurnRecord, closing: number): void {
  *  barbarians' knowledge of 6:12 at 49; h1_duely1124 t55: player 1's Campus
  *  on 4:11 bought in its actions, the barbarians' at 30) */
 function landMajorDistricts(ctx: Ctx, b: TurnRecord, turn: number, copy: GameState): void {
-  // a major's district record t+1 still holds unfinished stands unfinished
-  // for them, whatever the engine's turn of its city completed (runs/
-  // h1_duelp1117 t74-t83: Xi'an's Harbor on 31:12, its CityProductionCompleted
-  // at t83; the barbarian Galleys 2228229 / 1835026 move to safety off it, no
-  // pillage)
-  for (const c of b.cities) {
-    const seat = ctx.seatOfPlayer.get(c.owner as number);
-    if (seat === undefined || !isCiv(seat)) continue;
-    for (const d of c.districts) {
-      if (d[3] !== false) continue;
-      const t = copy.map.tiles[(d[2] as number) * ctx.W + (d[1] as number)];
-      if (t.district && t.district !== 'CITY_CENTER' && t.ownerSeat === seat) t.districtComplete = false;
-    }
-  }
   for (const x of (b as { actions?: unknown[][] }).actions ?? []) {
     if (x[1] !== turn) continue;
     let plot = -1;
@@ -2612,13 +2598,22 @@ function applyQueue(ctx: Ctx, d: Extract<Decision, { kind: 'queue' }>): void {
   const items = d.items.map((s) => ({ s, q: queueItem(ctx, seat, city, s) })).filter((x): x is { s: QueueSpec; q: QueueItem } => !!x.q);
   const head = city.queue[0];
   const keep = head && items[0] && itemKey(head) === itemKey(items[0].q);
-  for (const q of city.queue.slice(keep ? 1 : 0)) if (q.progress > 0) ctx.retained.set(`${city.centerIndex}|${itemKey(q)}`, q.progress);
+  // a district's progress is the city's, kept by type (`keepDistrict`)
+  for (const q of city.queue.slice(keep ? 1 : 0)) {
+    if (q.progress <= 0) continue;
+    if (q.kind === 'district') keepDistrict(city, q, itemCost(q, ctx.state, city));
+    else ctx.retained.set(`${city.centerIndex}|${itemKey(q)}`, q.progress);
+  }
   const queue: QueueItem[] = keep ? [head] : [];
   items.forEach(({ q }, i) => {
     if (i === 0 && keep) return;
     const k = `${city.centerIndex}|${itemKey(q)}`;
-    q.progress = ctx.retained.get(k) ?? 0;
-    ctx.retained.delete(k);
+    if (q.kind === 'district') {
+      if (!resumeDistrict(city, q)) q.progress = 0;
+    } else {
+      q.progress = ctx.retained.get(k) ?? 0;
+      ctx.retained.delete(k);
+    }
     if (i === 0) {
       const ok = placeHead(ctx, actor, city, q);
       const why = ok ? undefined : q.kind === 'building' && city.buildings.includes(q.building) ? 'already standing in the engine city'
@@ -4923,13 +4918,8 @@ export function compareState(state: GameState, read: Imported): Tallies {
     const rh = rc.queue[0];
     if (rh || eh) {
       const same = !!eh && !!rh && itemKey(eh) === itemKey(rh);
-      // a building's, a wonder's and a unit's progress is the city's memory's
-      // (`buildRows`); a district's or a project's the record's, the game's
-      // 24.8 value truncated to whole points (every recorded `queueProgress`
-      // is whole)
-      const exact = eh && (eh.kind === 'building' || eh.kind === 'wonder' || eh.kind === 'unit' || eh.kind === 'settler');
-      const ok = same && (!read.queueProgressRead
-        || (exact ? near(eh.progress, rh.progress) : Math.floor(eh.progress + 1e-9) === rh.progress));
+      // every item's progress is the city's memory's (`buildRows`)
+      const ok = same && near(eh.progress, rh.progress);
       note(t, 'city.production', ok, name, rh ? `${itemKey(rh)} ${r3(rh.progress)}` : null, eh ? `${itemKey(eh)} ${r3(eh.progress)}` : null,
         same ? Math.abs(eh.progress - rh.progress) : 1000);
     }

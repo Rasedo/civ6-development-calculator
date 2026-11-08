@@ -1178,7 +1178,7 @@ class SimPhase:
         pyld = self.city_proj_yield[bidx, row, col].clone()
         self.city_prod_bank[bidx, row, col] = torch.where(act, torch.zeros_like(bank), bank)
         zero = torch.zeros(B, dtype=torch.float64, device=dev)
-        self._seat_city_produce(row, col, act, zero, plain=zero)
+        self._seat_city_produce(row, col, act, zero, plain=zero, let_go=False)
         self.city_prod_bank[bidx, row, col] = torch.where(act, bank, self.city_prod_bank[bidx, row, col])
         self.city_proj_conv[bidx, row, col] = torch.where(act, conv, self.city_proj_conv[bidx, row, col])
         self.city_proj_yield[bidx, row, col] = torch.where(act, pyld, self.city_proj_yield[bidx, row, col])
@@ -1194,23 +1194,52 @@ class SimPhase:
             self.city_prod_bank[b, row, j] += amount
             return
         before = float(self.city_progress[b, row, j, 0])
+        # the step's district a hostile unit stands on lets go of its head
+        # (`_district_plot_hostile`, 0x184660 at 0x1847dc), the lump in its
+        # progress, kept by type
+        _si = int(self.city_current[b, row, j, 0]) - self.DISTRICT_BASE
+        let_go = (row < self.n_majors and 0 <= _si < len(self._scaffold)
+                  and bool(self._district_plot_hostile(row, self.city_qtile[:, row, j, 0])[b]))
         drip = self.city_progress[:, row, :, 0].clone()
         self.city_progress[b, row, j, 0] += amount + self.city_prod_bank[b, row, j].double()
         self.city_prod_bank[b, row, j] = 0
         self._repair_drip(row, drip)
         self._reprice_live(row)
         cost = float(self.city_cost[b, row, j, 0])
-        if float(self.city_progress[b, row, j, 0]) < cost:
-            return
         dev = self.device
+        head_cost = cost
+        if let_go:
+            di = self._scaffold[_si][0]
+            self.city_dist_kept[b, row, j, di] = self.city_progress[b, row, j, 0].to(self.city_dist_kept.dtype)
+            self.city_dist_kept_cost[b, row, j, di] = cost
+            hit = torch.zeros(self.B, dtype=torch.bool, device=dev)
+            hit[b] = True
+            self._q_pop(row, torch.full((self.B,), j, dtype=torch.long, device=dev), hit)
+            if int(self.city_current[b, row, j, 0]) < 0:
+                return
+            head_cost = float(self.city_cost[b, row, j, 0])
+        if float(self.city_progress[b, row, j, 0]) < head_cost:
+            return
         self._complete_head_now(row, torch.tensor([b], device=dev), torch.tensor([j], device=dev))
         lacked = max(0.0, cost - before)
         if amount > lacked:
             self.city_prod_bank[b, row, j] += amount - lacked
 
+    def _district_plot_hostile(self, row: int, plot: torch.Tensor) -> torch.Tensor:
+        """[B] `districtPlotHostile` for major row `row` (0x5313f0 with its
+        major's flag): a living unit of a seat hostile to it, with a Combat,
+        Ranged or Bombard strength above 0, stands on `plot`."""
+        ut = self.unit_type.clamp(min=0, max=self.NU - 1)
+        armed = ((self._type_combat.take(ut) > 0) | (self._type_ranged_strength.take(ut) > 0)
+                 | (self._type_bombard.take(ut) > 0))
+        on = (self.unit_alive & (self.unit_tile == plot.clamp(min=0).unsqueeze(1)) & armed
+              & self._seats_hostile(row, self.unit_seat))
+        return (plot >= 0) & on.any(dim=1)
+
     def _seat_city_produce(self, row: int, col: torch.Tensor, act: torch.Tensor,
                            prod: torch.Tensor, sci_turn: torch.Tensor | None = None,
-                           pre: dict | None = None, plain: torch.Tensor | None = None) -> None:
+                           pre: dict | None = None, plain: torch.Tensor | None = None,
+                           let_go: bool = True) -> None:
         """The queue head's turn — the production add, the banked chop, the
         completion and every completion's payout. ONE body, every seat row, at
         the per-city seatPhase position (the city's first step, before its
@@ -1225,7 +1254,9 @@ class SimPhase:
         `pre` is `_produce_pre(row)`, the seat half of the multiplier chain;
         a caller with one city (every direct test) may leave it out. `plain`
         is the city's Production with no city-state flat toward the head
-        (`plainProduction`); left out, it is `prod`."""
+        (`plainProduction`); left out, it is `prod`. `let_go` False is a
+        completion outside the step (`_complete_head_now`), which no hostile
+        unit stops."""
         bidx = self._bidx
         if pre is None:
             pre = self._produce_pre(row)
@@ -1603,17 +1634,41 @@ class SimPhase:
                 _amt = torch.minimum(raw.double() + bank.double(), cost.double()) * self._proj_rate_t.take(_pic)
                 self.city_proj_conv[bidx, row, col] = torch.where(_pon, _amt, self.city_proj_conv[bidx, row, col])
                 self.city_proj_yield[bidx, row, col] = torch.where(_pon, _py, self.city_proj_yield[bidx, row, col])
-        done = has_q & (self.city_progress[bidx, row, col, 0] >= cost)
-        if not bool(done.count_nonzero()):
-            return
         # CIV6 (City_BuildQueue 0x16f050): a completion's OVERFLOW is the
         # smaller of the Production toward the item before its percents and
-        # the city's plain Production, less what the item still lacked before
+        # the city's plain Production, less what the head still lacked before
         # this step (the bank paid in not counted), never below 0. It goes to
         # the city's overflow store, which the next step pays into whatever
         # heads the queue then: one completion per city per turn.
         ovf = (torch.minimum(raw, raw if plain is None else plain.to(raw.dtype))
                - (cost - prog).clamp(min=0)).clamp(min=0)
+        # CIV6 (City_BuildQueue 0x184660 at 0x1847dc): a major's district
+        # whose plot a hostile unit holds (`_district_plot_hostile`) leaves
+        # the queue's head (0x17f630) once its step has put the turn's
+        # Production in; the city keeps its progress and locked price by type
+        # (+0x248) and the completion reads the head after it
+        nsc = len(self._scaffold)
+        if let_go and row < self.n_majors and nsc:
+            _si = cur - self.DISTRICT_BASE
+            let_go = has_q & (_si >= 0) & (_si < nsc)
+            if bool(let_go.count_nonzero()):
+                let_go = let_go & self._district_plot_hostile(row, qt0)
+            if bool(let_go.count_nonzero()):
+                _di = self._scaffold_di.take(_si.clamp(min=0, max=nsc - 1))
+                _lr = let_go.nonzero(as_tuple=True)[0]
+                _lc, _ld = col[_lr], _di[_lr]
+                self.city_dist_kept[_lr, row, _lc, _ld] = self.city_progress[_lr, row, _lc, 0].to(self.city_dist_kept.dtype)
+                self.city_dist_kept_cost[_lr, row, _lc, _ld] = cost[_lr].to(self.city_dist_kept_cost.dtype)
+                self._q_pop(row, col, let_go)
+                _nh = self.city_current[bidx, row, col, 0]
+                form_t = torch.where(let_go, self._q_form_tier(_nh), form_t)
+                cur = torch.where(let_go, self._q_unit_of(_nh), cur)
+                qt0 = torch.where(let_go, self.city_qtile[bidx, row, col, 0], qt0)
+                cost = torch.where(let_go, self.city_cost[bidx, row, col, 0].to(cost.dtype), cost)
+                has_q = has_q & (cur >= 0)
+        done = has_q & (self.city_progress[bidx, row, col, 0] >= cost)
+        if not bool(done.count_nonzero()):
+            return
         # queue.shift() — the head goes BEFORE completeQueueItem runs
         self._q_pop(row, col, done)
         _bk = self.city_prod_bank[bidx, row, col]

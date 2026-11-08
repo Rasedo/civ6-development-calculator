@@ -4178,6 +4178,11 @@ class SimInit:
         # row for family-shape consistency; every city starts with an empty bank,
         # so unlike the fixture-loaded city_* table it allocates plain).
         self.city_prod_bank = torch.zeros(B, self.CITY_ROWS, self.RC, dtype=dtype, device=device)
+        # a district item the queue let go unfinished, by placeable type: its
+        # progress and locked price (City_BuildQueue +0x248, `City.keptDistricts`),
+        # a price of 0 none
+        self.city_dist_kept = torch.zeros(self.city_dist_tile.shape, dtype=dtype, device=device)
+        self.city_dist_kept_cost = torch.zeros(self.city_dist_tile.shape, dtype=dtype, device=device)
         # a FREE CITY's count of turns toward its next grant (`City.freeGrantTurns`)
         self.city_free_grant = torch.zeros(B, self.CITY_ROWS, self.RC, dtype=torch.long, device=device)
         # a MAJOR's city's trade list (CityBuildAI +0x870, `majorTradeLists`)

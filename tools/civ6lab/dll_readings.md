@@ -12374,3 +12374,54 @@ read the knowledge base (`_mops_refresh_run`'s `_tac_targets(seat, kb)`).
   it. `setTileOwner` drops `Tile.forced` on any change of city.
 - Open: the lab records no forced count, so no recorded case confirms the
   population cut's order or the toggle's budget.
+
+## C-111: a major's district lets go of the queue under a hostile unit, the queue's progress and overflow read from the city's memory — READ (0x184660 at 0x1847dc, 0x5313f0, 0x17f630), both twins
+
+`districtPlotHostile`, `keepDistrict`, `resumeDistrict` (cpu/core/production.ts),
+the seat step (`seatPhase`, cpu/core/phase.ts) and the lump
+(`applyLumpYield`, cpu/core/economy.ts), `placeSeatDistrict`'s resume,
+`City.keptDistricts`; GPU `_district_plot_hostile`, `_seat_city_produce`'s
+`let_go`, `_lump_step` (gpu/core/sim_phase.py), the district arm's resume
+(gpu/core/sim_seats.py), `city_dist_kept` / `city_dist_kept_cost`. The
+import: `buildRows`, `buildOverflow`, `importQueue` (cpu/harness/import.ts).
+
+- THE STOP: the ORDER_ZONE step 0x184660 (the queue step 0x16f050's, and
+  so a lump's through AddProgress 0x16f6e0) asks 0x5313f0 (the city's
+  owner, the district's plot, flag 1) before it adds the Production:
+  a living unit of the plot's list (0x75c50, last argument 0) with GetCombat,
+  GetRangedCombat or GetBombardCombat above 0 whose owner the city's owner
+  is at war with (0x469cd0, the barbarians at war with all); with the flag
+  set, only for a FULL_CIV owner (0x469db0): a city-state's or a Free City's
+  district never stops. On true the head leaves the queue (0x17f5a0, then
+  0x17f630: the entries shift down, the count falls; +0x3ac set and the
+  queue process 0x178250 runs); the step still multiplies the Production
+  and adds it to the district's progress, kept by type in the queue's
+  +0x248 array, and the completion at 0x16f33a reads the head after it
+  (none: no completion, the overflow store 0). The completion 0x175140
+  (ORDER_ZONE) asks no unit.
+- THE QUEUE'S MEMORY (City m_kBuildQueue): +0x1f4 m_xProductionOverflow, the
+  store the next step pays in; +0x218 / +0x230 / +0x248 / +0x260 each
+  building's, unit's, district's and project's progress by row, 24.8. The
+  record's `queueProgress` is the head's floored.
+- Confirmed: runs/h1_duelp1117 Xi'an's Harbor on 31:12 (cost 90): 75.1 +
+  20.7 = 95.8 at t74 under the barbarian Galley 2228229, 95.8 + 33.3 =
+  129.1 at t79 under the Galley 1835026, each time off the queue (Hanging
+  Gardens, a Man-At-Arms next), done at t83 with 24.3 over (the whole
+  Production: nothing lacked); the Galleys' t74 / t79 Move to safety
+  (barb.move.plot 237 / 237 on t71-85). runs/h1_duelp1124 Xi'an t54: the
+  store 6.0 (the Lighthouse's t53 overflow), the Campus at 15 + 6 = 21;
+  runs/h1_duelp1121 t154 Xi'an's Water Park at 120.90 (the record's 120) +
+  27.9 = 148.8 of 148, done at t155.
+- THE LUMP'S PLACE (replay): a Builder's Remove Feature or Harvest
+  Resource lumps before its charge is spent (UnitChargesChanged), so an
+  owner's CityProductionCompleted between UnitOperationStarted and the
+  charge is the lump's: runs/h1_duelp1128 t56 Xi'an's Granary (13 + 21 of
+  32, BuildingChanged between), 1124 t55 Xi'an's Campus (48 + 26 of 61),
+  1117 t89 Longxi's Granary, 1124 t169 Chengdu's Flood Barrier (62.6 + 62
+  of 120).
+- Open: the +0x248 progress a completed district leaves, which its repair
+  resumes (runs/h1_duelp1121 Taiyuan's pillaged Harbor queued at t153 on
+  78 of 104, the engine's 0); a building's or unit's kept progress a
+  queue change resumes (+0x218 / +0x230; runs/h1_duelp1117 Xi'an's Builder
+  queued at t13 on 19, the engine's 0), the engines keeping none outside
+  the queue.

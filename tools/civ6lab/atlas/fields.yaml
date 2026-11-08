@@ -350,11 +350,27 @@
   offset: 0x1f4
   name: m_xProductionOverflow
   type: fx
-  semantics: the stored production overflow.
+  semantics: the stored production overflow, paid into the next step; the AI memory's m_kBuildQueue word 0x1f4 / 4.
   status: PARTLY
+  impl: [cpu/harness/import.ts:buildOverflow]
   writers: [0x16f050]
   readings:
     - "H-1: the build queue's overflow, the yields' fixed point, the dispersal Gold, the pantheon's price — READ"
+    - "C-111: a major's district lets go of the queue under a hostile unit, the queue's progress and overflow read from the city's memory — READ (0x184660 at 0x1847dc, 0x5313f0, 0x17f630), both twins"
+  review: reviewed
+- kind: field
+  owner: BuildQueue
+  offset: 0x248
+  name: districtProgress
+  semantics: "each district row's progress (24.8), kept by type whether or not the district is queued: the zone step 0x184660 adds to it, the completion 0x175140 reads it; a district off the queue resumes it."
+  status: READ
+  cases:
+    - recording: h1_duelp1121
+      turn: 154
+      value: Xi'an's Water Park row 24 at 30951 (120.90; the record's queueProgress 120)
+  impl: [cpu/harness/import.ts:buildRows, cpu/core/production.ts:keepDistrict]
+  readings:
+    - "C-111: a major's district lets go of the queue under a hostile unit, the queue's progress and overflow read from the city's memory — READ (0x184660 at 0x1847dc, 0x5313f0, 0x17f630), both twins"
   review: reviewed
 - kind: field
   owner: Buildings

@@ -93,11 +93,12 @@ class SimSeats:
 
     def _q_push(self, row: int, col, hit: torch.Tensor, code: torch.Tensor,
                 cost: torch.Tensor | None = None,
-                qtile: torch.Tensor | None = None) -> None:
+                qtile: torch.Tensor | None = None,
+                progress: torch.Tensor | None = None) -> None:
         """`queue.push` — append one item at the first free slot of column
-        `col`, on the batch rows `hit` selects. A FULL queue takes nothing: the
-        mask refuses it and the apply re-validates, so this is the last word
-        rather than the only one."""
+        `col`, on the batch rows `hit` selects, on `progress` (else none). A
+        FULL queue takes nothing: the mask refuses it and the apply
+        re-validates, so this is the last word rather than the only one."""
         bidx = self._bidx
         depth = (self.city_current[bidx, row, col] >= 0).sum(dim=1)
         take = hit & (depth < self.QD)
@@ -105,7 +106,7 @@ class SimSeats:
             return
         slot = depth.clamp(max=self.QD - 1)
         for plane, val in zip(self._q_planes(),
-                              (code, None, cost, qtile)):
+                              (code, progress, cost, qtile)):
             p, empty = plane
             old = p[bidx, row, col, slot]
             if val is None:                      # a new entry starts on zero
@@ -3301,6 +3302,25 @@ class SimSeats:
                     if not bool(want_d.count_nonzero()):
                         continue
                     has_tech = self._district_unlocked(row, si)
+                    # the city's own district standing unfinished on the plot,
+                    # its item let go, is queued again on its kept progress and
+                    # locked price (`placeSeatDistrict`'s resume)
+                    _dt = dtile[:, j, si]
+                    _dtc = _dt.clamp(min=0, max=self.T - 1)
+                    _kc = self.city_dist_kept_cost[:, row, j, di]
+                    resume = (want_d & has_tech & (_kc > 0) & (_dt >= 0) & (_dt < self.T)
+                              & (self.city_dist_tile[:, row, j, di] == _dt)
+                              & (self.district.gather(1, _dtc.unsqueeze(1)).squeeze(1) == di)
+                              & ~self.district_complete.gather(1, _dtc.unsqueeze(1)).squeeze(1)
+                              & (self.tile_seat.gather(1, _dtc.unsqueeze(1)).squeeze(1) == row)
+                              & (self.tile_city.gather(1, _dtc.unsqueeze(1)).squeeze(1) == self.city_id[:, row, j])
+                              & ~(self._fallout() | self._fire_plots()).gather(1, _dtc.unsqueeze(1)).squeeze(1))
+                    if bool(resume.count_nonzero()):
+                        self._q_push(row, j, resume, torch.full_like(a, self.DISTRICT_BASE + si), _kc, _dt,
+                                     progress=self.city_dist_kept[:, row, j, di])
+                        self.city_dist_kept[:, row, j, di] = torch.where(resume, torch.zeros_like(_kc), self.city_dist_kept[:, row, j, di])
+                        self.city_dist_kept_cost[:, row, j, di] = torch.where(resume, torch.zeros_like(_kc), _kc)
+                        want_d = want_d & ~resume
                     spec_si = bool(self._is_specialty[di])
                     under_cap = (spec_cnt < cap_j) if spec_si else torch.ones_like(want_d)
                     want_d = want_d & has_tech & self._district_slot_free(row, j, di) & under_cap
@@ -11526,6 +11546,8 @@ class SimSeats:
         self.city_last_hit[b, row, col] = 0
         self._q_clear(b, row, col)
         self.city_prod_bank[b, row, col] = 0
+        self.city_dist_kept[b, row, col] = 0
+        self.city_dist_kept_cost[b, row, col] = 0
         self.city_proj_conv[b, row, col] = 0
         self.city_proj_yield[b, row, col] = -1
         self.city_free_grant[b, row, col] = 0
@@ -12021,6 +12043,8 @@ class SimSeats:
         self.city_founded_turn[b, dst_row, col] = int(self.turn)
         self._q_clear(b, dst_row, col)           # TS queue: []
         self.city_prod_bank[b, dst_row, col] = 0  # TS pushes a FRESH literal, so productionBank is undefined there
+        self.city_dist_kept[b, dst_row, col] = 0
+        self.city_dist_kept_cost[b, dst_row, col] = 0
         self.city_proj_conv[b, dst_row, col] = 0
         self.city_proj_yield[b, dst_row, col] = -1
         self.city_lasers[b, dst_row, col] = old_lz  # the stations ride the flip with the Spaceport that holds them
@@ -12539,6 +12563,8 @@ class SimSeats:
                 self.city_pressure[rows[_ch], row, slot[_ch], colon_g[_ch]] = _cpres.to(self.city_pressure.dtype)
                 self.city_followed[rows[_ch], row, slot[_ch]] = colon_g[_ch]
         self.city_prod_bank[rows, row, slot] = 0
+        self.city_dist_kept[rows, row, slot] = 0
+        self.city_dist_kept_cost[rows, row, slot] = 0
         self.city_proj_conv[rows, row, slot] = 0
         self.city_proj_yield[rows, row, slot] = -1
         for _p in ("city_gw_obj", "city_gw_maker", "city_gw_era", "city_gw_seat"):

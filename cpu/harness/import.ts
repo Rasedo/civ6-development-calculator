@@ -166,9 +166,6 @@ export interface Imported {
   /** the government and cards a major's luxury allocation was ranked on,
    *  where they are not the record's (`luxuryCards`) */
   luxCardsOf: (seat: number) => LuxCards | undefined;
-  /** does the record carry the queues' banked production (`queueProgress`)?
-   *  Where it does not, every imported queue item stands at 0 */
-  queueProgressRead: boolean;
   /** the yield columns (YIELD_KEYS order) of each plot the importer read
    *  back from the record to set hidden state — a Great Bath plot's Faith
    *  gives its flood count (`importFloodCounts`). A read-back column cannot
@@ -2769,10 +2766,7 @@ export function importTurn(rec: TurnRecord, cat: Catalog, history?: History): Im
   const congressGaps = [...new Set([...now.gaps, ...before.gaps])];
   // (a queued row the engine lacks is the game's gap, no city's: nothing a
   // check reads comes from the queue)
-  let queueProgressRead = false;
-  for (const city of cityByKey.values()) {
-    if (importQueue(ctx, rec, state, dumpOfCity.get(city)!, city)) queueProgressRead = true;
-  }
+  for (const city of cityByKey.values()) importQueue(ctx, rec, state, dumpOfCity.get(city)!, city);
   // the record before is the last step's input where it is the turn before
   // and the owner's turn start ran once between each pair (`notStarted`)
   const b1 = history?.before?.turn === rec.turn - 1 ? history.before : null;
@@ -2841,7 +2835,7 @@ export function importTurn(rec: TurnRecord, cat: Catalog, history?: History): Im
   return {
     state, seatOfPlayer, playerOfSeat, cityByKey, dumpOfCity, minorOfPlayer, dumpOfMinor,
     gaps: ctx.gaps, seatGaps: ctx.seatGaps!, tileGaps: ctx.tileGaps!, cityGaps: ctx.cityGaps!, religionSeat,
-    congressGaps, congressOf, luxCardsOf: (seat: number) => luxCards.get(seat), queueProgressRead, readBack, lowlandsRead, projectYieldUnread, routes,
+    congressGaps, congressOf, luxCardsOf: (seat: number) => luxCards.get(seat), readBack, lowlandsRead, projectYieldUnread, routes,
     districtLocked: history?.districtLocked ?? new Map(), stockOverCap,
     tilesUnknown: new Set(rec.cities.filter((c) => cultureExpansions(rec, c) === undefined).map((c) => c.y * W + c.x)
       .filter((k) => !history || history.unknownSince.has(k))),
@@ -3848,13 +3842,15 @@ function importResearchHeld(rec: TurnRecord, cat: Catalog, pid: number, r: GameS
   }
 }
 
-/** The production a city holds on each building and each unit: its build
- *  queue's per-item progress in its memory (City m_kBuildQueue +0x218 the
- *  buildings', +0x230 the units'), in production points, by the catalog's
- *  row; its floor is the record's `queueProgress` of the item in hand on
- *  every record of the five runs/h1_duelz. A record without it is an import
+/** The production a city holds on each building, unit, district and
+ *  project: its build queue's per-item progress in its memory (City
+ *  m_kBuildQueue +0x218 the buildings', +0x230 the units', +0x248 the
+ *  districts', +0x260 the projects'), in production points, by the catalog's
+ *  row; its floor is the record's `queueProgress` of the item in hand
+ *  (runs/h1_duelp1121 t154 Xi'an's Water Park 120.90 for 120, 1117 t100
+ *  Valletta's Harbor project 19.91 for 19). A record without it is an import
  *  error. */
-function buildRows(rec: TurnRecord, c: DumpCity): { building: Map<number, number>; unit: Map<number, number> } {
+function buildRows(rec: TurnRecord, c: DumpCity): Record<'building' | 'unit' | 'district' | 'project', Map<number, number>> {
   const v = memCity(rec, c.owner, c.id)?.['m_kBuildQueue.v'] as unknown as Record<string, unknown> | undefined;
   const read = (rows: unknown) => {
     if (!rows || typeof rows !== 'object' || Array.isArray(rows)) {
@@ -3864,7 +3860,17 @@ function buildRows(rec: TurnRecord, c: DumpCity): { building: Map<number, number
     for (const [k, n] of Object.entries(rows as Record<string, number>)) if (k !== 'n' && n) out.set(Number(k), n / 256);
     return out;
   };
-  return { building: read(v?.['134']), unit: read(v?.['140']) };
+  return { building: read(v?.['134']), unit: read(v?.['140']), district: read(v?.['146']), project: read(v?.['152']) };
+}
+
+/** the city's overflow store (City m_kBuildQueue +0x1f4,
+ *  m_xProductionOverflow) at the record's hold, in production points: the
+ *  next step pays it in (runs/h1_duelp1124 Xi'an: 6.0 at t54 after the
+ *  Lighthouse's t53 completion, the Campus at 15 + 6 = 21 as logged) */
+function buildOverflow(rec: TurnRecord, c: DumpCity): number {
+  const w = memWords(memCity(rec, c.owner, c.id)?.m_kBuildQueue)?.[0x1f4 / 4];
+  if (w === undefined) throw new Error(`record t${rec.turn}: city ${c.owner}:${c.id} has no m_kBuildQueue overflow`);
+  return w / 256;
 }
 
 /** `buildRows` by the minors' item key (`building:<id>`, `unit:<id>`) */
@@ -3884,29 +3890,38 @@ function buildProgress(rec: TurnRecord, cat: Catalog, c: DumpCity): Map<string, 
  * A city's build queue in order. What each entry builds is its row (the
  * entry's one type key, a civilization's unique row read as the row it
  * replaces), a district or wonder on the entry's plot; a building's, a
- * wonder's and a unit's progress is the city's memory's (`buildRows`), a
- * district's and a project's the record's `queueProgress` where the record
- * carries it and 0 where it does not (`Imported.queueProgressRead`). A
- * district's locked price is the one
- * the record quotes for it; the other prices the engine locks at queueing (a
+ * every item's progress is the city's memory's (`buildRows`), and so is the
+ * overflow store (`buildOverflow`). A district's locked price is the one the
+ * record quotes for it; the other prices the engine locks at queueing (a
  * project's, a Settler's, a Builder's or a Trader's) are the engine's own for
- * the imported state.
+ * the imported state. A district standing unfinished outside the queue keeps
+ * its progress and locked price (`City.keptDistricts`).
  */
-function importQueue(ctx: Ctx, rec: TurnRecord, state: GameState, c: DumpCity, city: City): boolean {
+function importQueue(ctx: Ctx, rec: TurnRecord, state: GameState, c: DumpCity, city: City): void {
   const s = seatOf(state, city.seat);
-  if (!s) return false;
+  if (!s) return;
   const W = state.map.width;
-  let read = false;
   let unlocks: ReturnType<typeof computeUnlocks> | null = null;
   const queue: QueueItem[] = [];
   const rows = buildRows(rec, c);
-  c.queue.forEach((e, i) => {
+  const bank = buildOverflow(rec, c);
+  if (bank > 0) city.productionBank = bank;
+  else delete city.productionBank;
+  const lockedCost = (row: number, id: DistrictId): number => {
+    // the price the game locked when the district was placed: its cost
+    // reader quotes it for a district standing in the city (the record's
+    // buy row); the engine's own for the imported state where none is read
+    const locked = c.buy.find((b) => b[0] === 'D' && b[1] === row);
+    const n = locked ? num(locked[2]) : NaN;
+    unlocks ??= computeUnlocks(state, city.seat);
+    return Number.isFinite(n) && n > 0 ? n : districtSiteCost(state, s, id, unlocks);
+  };
+  c.queue.forEach((e) => {
     if (typeof e !== 'object' || e === null) return;
-    const pr = num(c.queueProgress?.[i]);
-    if (Number.isFinite(pr) && pr >= 0) read = true;
     const progress = e.UnitType !== undefined ? rows.unit.get(e.UnitType) ?? 0
       : e.BuildingType !== undefined ? rows.building.get(e.BuildingType) ?? 0
-        : Number.isFinite(pr) && pr >= 0 ? pr : 0;
+        : e.DistrictType !== undefined ? rows.district.get(e.DistrictType) ?? 0
+          : e.ProjectType !== undefined ? rows.project.get(e.ProjectType) ?? 0 : 0;
     const at = e.Location && e.Location.x >= 0 ? e.Location.y * W + e.Location.x : -1;
     if (e.UnitType !== undefined) {
       const id = engineRowOf(ctx.cat, 'unit', e.UnitType);
@@ -3932,14 +3947,7 @@ function importQueue(ctx: Ctx, rec: TurnRecord, state: GameState, c: DumpCity, c
     } else if (e.DistrictType !== undefined) {
       const id = engineRowOf(ctx.cat, 'district', e.DistrictType) as DistrictId | null;
       if (!id || at < 0) return gap(ctx, 'queue-district', ctx.cat.districts[e.DistrictType]);
-      // the price the game locked when the district was placed: its cost
-      // reader quotes it for a district standing in the city (the record's
-      // buy row); the engine's own for the imported state where none is read
-      const locked = c.buy.find((b) => b[0] === 'D' && b[1] === e.DistrictType);
-      const lockedCost = locked ? num(locked[2]) : NaN;
-      unlocks ??= computeUnlocks(state, city.seat);
-      queue.push({ kind: 'district', district: id, tileIndex: at, progress,
-        cost: Number.isFinite(lockedCost) && lockedCost > 0 ? lockedCost : districtSiteCost(state, s, id, unlocks) });
+      queue.push({ kind: 'district', district: id, tileIndex: at, progress, cost: lockedCost(e.DistrictType, id) });
     } else if (e.ProjectType !== undefined) {
       const name = ctx.cat.projects[e.ProjectType] ?? '';
       const id = engineId('project', name, 'PROJECT_', PROJECTS);
@@ -3948,7 +3956,14 @@ function importQueue(ctx: Ctx, rec: TurnRecord, state: GameState, c: DumpCity, c
     }
   });
   city.queue = queue;
-  return read;
+  delete city.keptDistricts;
+  for (const d of c.districts) {
+    const row = d[0] as number;
+    const progress = rows.district.get(row) ?? 0;
+    if (d[3] !== false || progress <= 0 || c.queue.some((e) => typeof e === 'object' && e !== null && e.DistrictType === row)) continue;
+    const id = engineRowOf(ctx.cat, 'district', row) as DistrictId | null;
+    if (id) (city.keptDistricts ??= {})[id] = { progress, cost: lockedCost(row, id) };
+  }
 }
 
 /**

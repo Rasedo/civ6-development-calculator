@@ -1,11 +1,11 @@
 
-import type { City, CityState, CongressVote, DistrictId, Emergency, GameState, ImprovementId, SeatActionRecord, Seat, Tile, Unit, YieldKey } from './types';
+import type { City, CityState, CongressVote, DistrictId, Emergency, GameState, ImprovementId, QueueItem, SeatActionRecord, Seat, Tile, Unit, YieldKey } from './types';
 import { logPopWrite } from './difflog';
 import { advanceGreatPeople, passGreatPerson, patronizeGreatPerson } from './greatPeople';
 import { activateGreatPerson } from './gpAbility';
 import { GW_KINDS } from '../data/greatWorks';
 import { drainRelicReserve, gwCountKind, gwHasRoom, gwLastOfKind, moveGreatWork } from './greatWorks';
-import { completeQueueItem, dropQueuedBuilding, cultureBomb, grantFreeResearch } from './production';
+import { completeQueueItem, dropQueuedBuilding, cultureBomb, grantFreeResearch, districtPlotHostile, keepDistrict, resumeDistrict } from './production';
 import { cityLook, fogActive, isExplored, meetMajors, revealAround, unitSight, unitSeesThrough } from './fog';
 import { tilesWithin, hexDistance, hexRingWalk, neighbors, neighborTile } from '../../world/hex';
 import { isWater, hasRiver, isCoastalLand } from '../../world/query';
@@ -1245,6 +1245,14 @@ export function placeSeatDistrict(
   const tile = state.map.tiles[tileIndex];
   if (!tile) return false;
   if (!districtSiteLegal(state, civCity, id, unlocks, tileIndex)) return false;
+  // the city's own district standing unfinished on the plot, its item let
+  // go, is queued again on its kept progress and locked price
+  const item: Extract<QueueItem, { kind: 'district' }> = { kind: 'district', district: id, tileIndex, progress: 0 };
+  if (tile.district === id && !tile.districtComplete
+    && civCity.districts.some((d) => d.tileIndex === tileIndex && d.type === id) && resumeDistrict(civCity, item)) {
+    commitProduction(state, civCity.seat, civCity, item);
+    return true;
+  }
   const cost = districtSiteCost(state, actor, id, unlocks);
   paveDistrictTile(state, civCity, id, tileIndex);
   commitProduction(state, civCity.seat, civCity, { kind: 'district', district: id, tileIndex, progress: 0, cost });
@@ -3520,6 +3528,14 @@ export function seatPhase(state: GameState, only?: { seats: ReadonlySet<number>;
         _em *= 1 + prodBoostPct(seatMods, q, actor.gpPerm) + _bpct;
         const progressBefore = q.progress;
         const banked = civCity.productionBank ?? 0;
+        // CIV6 (City_BuildQueue 0x184660 at 0x1847dc): a district whose plot
+        // a hostile unit holds (`districtPlotHostile`) leaves the queue's
+        // head (0x17f630) before its step; the step still puts the turn's
+        // Production into its progress, which the city keeps by type
+        // (+0x248), and the completion below reads the head after it
+        // (runs/h1_duelp1117 Xi'an's Harbor on 31:12: 95.8 of 90 at t74 and
+        // 129.1 at t79 under the barbarian Galleys, done at t83)
+        const letGo = q.kind === 'district' && districtPlotHostile(state, civCity, q.tileIndex);
         // CIV6 (City_BuildQueue 0x16f050 → the order's step, 0x1853d0 for a
         // unit): the turn's Production toward the item (with its envoys'
         // flat, `computeCityStats`) plus the overflow store, the SUM under
@@ -3539,9 +3555,15 @@ export function seatPhase(state: GameState, only?: { seats: ReadonlySet<number>;
         if (conv?.yield) {
           civCity.projectYield = { key: conv.yield, amount: Math.min(production + banked, cost) * projectConversionRate(conv) };
         }
-        if (q.progress >= cost) {
+        if (letGo && q.kind === 'district') {
           civCity.queue.shift();
-          completeQueueItem(state, civCity, q, cost, sciPerTurnSeat);
+          keepDistrict(civCity, q, cost);
+        }
+        const head = civCity.queue[0];
+        const headCost = head === q ? cost : head ? itemCost(head, state, civCity) : 0;
+        if (head && head.progress >= headCost) {
+          civCity.queue.shift();
+          completeQueueItem(state, civCity, head, headCost, sciPerTurnSeat);
           // CIV6 (City_BuildQueue 0x16f050): a completion's OVERFLOW is the
           // smaller of the Production toward the item before its percents
           // (0x16f3cb reads the step's own argument, not the multiplied sum)

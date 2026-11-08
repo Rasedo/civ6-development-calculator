@@ -615,8 +615,10 @@ export class RecordedActions implements ActionSource {
     const stand = new Map(a.units.map((u) => [unitKey(u), u.y * W + u.x]));
     const clearer = new Map<string, string>();
     // the clearings whose operation the log follows with its owner's
-    // CityProductionCompleted
+    // CityProductionCompleted, and each unit's clearing whose charge is not
+    // spent yet
     const completing = new Set<string>();
+    const clearing = new Map<string, string>();
     // each unit's last operation the log started
     const lastOp = new Map<string, number>();
     // the unit a formation just merged: the promotions the log names on it
@@ -654,9 +656,16 @@ export class RecordedActions implements ActionSource {
         const at = stand.get(k);
         const ck = `${n(r, 0)}:${at}:${n(r, 2) === OP_REMOVE_FEATURE ? 'feature' : 'resource'}`;
         if (at !== undefined) clearer.set(ck, k);
-        const nx = ev[ev.indexOf(r) + 1];
-        if (at !== undefined && nx?.[2] === 'CityProductionCompleted' && n(nx, 0) === n(r, 0)) completing.add(ck);
+        if (at !== undefined) clearing.set(k, ck);
       }
+      // the operation's lump lands before its charge is spent: an owner's
+      // completion between the two is the lump's (runs/h1_duelp1128 t56
+      // Xi'an's Granary, its BuildingChanged between; 1124 t55 Xi'an's
+      // Campus behind ResearchChanged; 1117 t89 Longxi's Granary)
+      if (name === 'CityProductionCompleted') {
+        for (const [k, ck] of clearing) if (k.startsWith(`${n(r, 0)}:`)) completing.add(ck);
+      }
+      if (name === 'UnitChargesChanged') clearing.delete(`${n(r, 0)}:${n(r, 1)}`);
       if (name === 'CityAddedToMap') {
         const plot = n(r, 3) * W + n(r, 2);
         const inf = inferred.find((d) => d.kind === 'found' && d.plot === plot) as Extract<Decision, { kind: 'found' }> | undefined;

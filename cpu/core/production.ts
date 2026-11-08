@@ -28,7 +28,7 @@ import { ERAS, TECHS, TECH_TABLE_RANK } from '../data/techs';
 import { CIVIC_TABLE_RANK } from '../data/civics';
 import { buildingDedications, canalMoment, dedicationEvent, wonderMoment } from './eras';
 import { districtMoment } from './moments';
-import { spawnUnit, bestTrainableNaval } from './units';
+import { spawnUnit, bestTrainableNaval, unitsHostile } from './units';
 import { grantFreeProphet } from './greatPeople';
 import { gpPermOf } from '../data/greatPeople';
 import { airTrainTile } from './air';
@@ -238,6 +238,40 @@ export function wipeConstruction(state: GameState, tile: Tile): void {
     tile.builtWonder = null;
     tile.builtWonderComplete = false;
   }
+}
+
+/**
+ * CIV6 (City_BuildQueue 0x184660 at 0x1847dc -> 0x5313f0 with its major's
+ * flag): a district item a major's city builds stops at its plot when a
+ * living unit of a player at war with the city's owner (0x469cd0, the
+ * barbarians at war with all) stands there with a Combat, Ranged or Bombard
+ * strength above 0. A city-state's or Free City's district never stops.
+ */
+export function districtPlotHostile(state: GameState, city: City, tileIndex: number): boolean {
+  if (!isCiv(city.seat)) return false;
+  return state.units.some((u) => {
+    if (u.tileIndex !== tileIndex || !unitsHostile(state, { seat: city.seat }, u)) return false;
+    const def = UNITS[u.type];
+    return !!def && ((def.combat ?? 0) > 0 || (def.ranged?.strength ?? 0) > 0 || (def.bombard ?? 0) > 0);
+  });
+}
+
+/** A district item the queue let go keeps its progress and locked price by
+ *  its type (City_BuildQueue +0x248). */
+export function keepDistrict(city: City, q: Extract<QueueItem, { kind: 'district' }>, cost: number): void {
+  (city.keptDistricts ??= {})[q.district] = { progress: q.progress, cost };
+}
+
+/** A district item queued again on its type's kept progress and locked
+ *  price, the kept entry spent; false where none is kept. */
+export function resumeDistrict(city: City, q: Extract<QueueItem, { kind: 'district' }>): boolean {
+  const kept = city.keptDistricts?.[q.district];
+  if (!kept) return false;
+  q.progress = kept.progress;
+  q.cost = kept.cost;
+  delete city.keptDistricts![q.district];
+  if (Object.keys(city.keptDistricts!).length === 0) delete city.keptDistricts;
+  return true;
 }
 
 export function completeQueueItem(
