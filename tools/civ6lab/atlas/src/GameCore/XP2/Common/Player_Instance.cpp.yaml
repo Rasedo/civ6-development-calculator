@@ -304,6 +304,7 @@
   readings:
     - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
     - "C-97: the settle site evaluation — READ (the score, the choices), PARTLY READ (the danger, the plot yield)"
+    - "C-128: a crowded plot's unit goes beside it as its AI player's turn ends — READ (0x775e50, 0x585d90, 0x93f870, 0x585940), both twins"
   notes:
     - ".claude/scratchpad/st1/reading.md: ...gate (pressure   above it), else pressure x value. A failed gate (-9999) is skipped for a   human (0x469d70: the slot status 3) and otherwise adds -100% to the stack:   the score 0. Less the danger << 8. AI_..."
   context:

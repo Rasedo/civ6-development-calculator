@@ -720,6 +720,7 @@
     - "C-95: the planning strikes a religious unit and a Trader on their plot, its foreign test reads the mover's map layer, the blow on them 1.5 x their health — READ (0x790c60 at 0x790f22, 0x790fc9..0x791016, 0x7910b3..0x791162; 0x791470 at 0x791703..0x79174a, 0x7917b1..0x7917f7; 0x793400), both twins"
     - "C-123 / C-95: a Trader stands on the trade layer; a city's shot is a COMBAT_DISTRICT spot's blow back — READ (0x901e0, 0x586360 -> 0x208b80, 0x585eb0 -> 0x585d90, 0x791470 at 0x7917f7..0x7918f7 -> 0x249ee0 / 0x205720, 0x776140 at 0x776780..0x7767fa), both twins"
     - "C-128: a city-state's Make Military Formation — READ (0x77a190, 0x770670, 0x536da0, 0x773e20, 0x94a870, 0x949930), both twins"
+    - "C-128: a crowded plot's unit goes beside it as its AI player's turn ends — READ (0x775e50, 0x585d90, 0x93f870, 0x585940), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...e (0x790fc9..0x791016) lists the target plot's units of the planning's +0x10 (0x793400: 0x901e0, the mover's map layer): a religious unit stands on its own, so a military unit lays th..."
@@ -2263,6 +2264,7 @@
     - "C-124: an attack order to a plot out of sight loses its attack flag — READ (0x962310), both twins"
     - "C-125: the safe plot's stacking test holds other players' units — READ (0x716b90 at 0x716d77 -> 0x585eb0 / 0x585d90), both twins"
     - "C-124: a move order's path opens a turn-end node beside each node with Movement left — READ (0x271920, 0x7a880, 0x271490, 0x775a0, 0x26f330), both twins"
+    - "C-128: a crowded plot's unit goes beside it as its AI player's turn ends — READ (0x775e50, 0x585d90, 0x93f870, 0x585940), both twins"
   context:
     - "...that keep it out (0x585d90: its own of its class, vtable +0xb8; another player's where 0x518f40 refuses the pair), none with MakeTradeRoute (+0x1b9 bit 64) or Spy (+0x1ba bit 2). Th..."
   review: reviewed
@@ -4899,6 +4901,16 @@
   impl: [cpu/core/tactical.ts:mergeSort]
   notes: ["imported: cited by the code, in no dll_readings section"]
   review: imported
+- addr: 0x77cd00
+  final: 0x50ea00
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-128: a crowded plot's unit goes beside it as its AI player's turn ends — READ (0x775e50, 0x585d90, 0x93f870, 0x585940), both twins"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "- THE CHECK (Tactical.cpp 0x775e50): the tactical AI's setup (0x775870, and 0x77cd00 on a load) binds it to player signal +0x228, the signal of the knowledge base's end loo..."
+  review: imported
 - addr: 0x77d100
   final: 0x50edf0
   kind: function
@@ -6938,6 +6950,29 @@
   context:
     - "...0x518f40 lets share a plot (owners apart, both +0x1ce0 above 0, their +0x1ce4 apart, 0x93f090 false: none on the five duels). 0x585eb0 takes the most over the formation's members."
   review: imported
+- addr: 0x93f7e0
+  final: 0x64f1f0
+  kind: function
+  semantics: "the unit manager's vt +0xc0 on two unit infos: their +0x20 equal."
+  status: PARTLY
+  impl: [cpu/core/tactical.ts:stackClass]
+  readings:
+    - "C-128: a crowded plot's unit goes beside it as its AI player's turn ends — READ (0x775e50, 0x585d90, 0x93f870, 0x585940), both twins"
+  review: reviewed
+- addr: 0x93f870
+  final: 0x64f280
+  kind: function
+  name: the unit manager's stacking-class test
+  semantics: "vt +0xb8 on two unit types: their info +0x1c equal (0x44c22cdb either matching any; never 0x5397d46f), neither a MakeTradeRoute unit (+0x1b9 bit 0x40), then vt +0xc0 (0x93f7e0): their info +0x20 equal."
+  status: READ
+  cases:
+    - recording: h1_duelp1128
+      turn: 177
+      value: city-state 3's Man-At-Arms 1179650 off its centre to 3:9 beside the Field Cannon 2424841 made there, its Trader 917509 on the plot keeping neither out
+  impl: [cpu/core/tactical.ts:stackClass, gpu/core/sim_tactics.py:_tac_stacks]
+  readings:
+    - "C-128: a crowded plot's unit goes beside it as its AI player's turn ends — READ (0x775e50, 0x585d90, 0x93f870, 0x585940), both twins"
+  review: reviewed
 - addr: 0x949930
   final: 0x6580f0
   kind: function

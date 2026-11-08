@@ -11461,3 +11461,50 @@ engines already search once per order run on the Movement left.
   after its one segment, where the engines carry its order on and step
   back to 28:14; 1117 t12 the Scout 524295 (HL Explore tertiary) walks on
   11:21, then 12:20 after the other units' runs, one segment in all.
+
+## C-128: a crowded plot's unit goes beside it as its AI player's turn ends — READ (0x775e50, 0x585d90, 0x93f870, 0x585940), both twins
+
+- THE CHECK (Tactical.cpp 0x775e50): the tactical AI's setup (0x775870, and
+  0x77cd00 on a load) binds it to player signal +0x228, the signal of the
+  knowledge base's end look; a human player's none (0x469d70). It walks the
+  player's unit list (+0x12e8 -> +0xd8, next +0x10) — a Spy (+0x1ba bit 2),
+  a MakeTradeRoute unit (+0x1b9 bit 0x40) or a dead one (+0x770) none, one
+  off the map none — and counts the units of the unit's map layer on its
+  plot that keep it out (0x75c50 -> 0x585d90, the unit itself among them);
+  above 1, FindAlternateLocation (0x585940) within 10 with its fourth
+  argument 1 (the plot itself skipped) and no filter, the unit's formation
+  placed there (0x587ca0 flag 1); with none the unit is listed and, after
+  the walk, given the delete command (0x9483a0).
+- THE CLASS TEST (the unit manager's vt +0xb8, 0x93f870, on two unit
+  types): their info +0x1c equal (0x44c22cdb either matching any; never
+  0x5397d46f), neither a MakeTradeRoute unit, then vt +0xc0 (0x93f7e0):
+  their info +0x20 equal. 0x585d90 counts an own unit it answers, another
+  player's not at war (0x3dcec0), but a Trader or a Spy and a pair 0x518f40
+  lets share.
+- FINDALTERNATELOCATION's units test reads the candidate plot's units of
+  the unit's map layer (0x75c50 at 0x585c42, the layer 0x901e0): another
+  player's keeps it out, its own where vt +0xb8 answers; another's Trader
+  on the trade layer none.
+- Ported: `unstackUnits` / `_unstack` (its own `crowded`, `_tac_stacks` and
+  `_tac_peaceful`), run at the end of a city-state's and the Free Cities'
+  tactical turn before the pool's dying slots (`cityStateTactics`,
+  `freeCityTactics`; `_minor_tactics`, `_free_tactics`) and at the
+  barbarians' before their captures (`barbarianTactics`,
+  `_barbarian_tactics`); a unit made in the turn takes its list slot first
+  (`seatPoolSlots`, `barbSlots`); `alternateLocation` / `_tac_alternate`
+  with `skipOrigin` / `skip_origin`, their range a parameter, the units
+  test on the mover's map layer and domain.
+- Confirmed (the end look's records, runs/h1_duelp*): 1128 t187 city-state
+  3's Scout 2752515 made on its centre 4:9 (slot 3), the Field Cannon
+  2555910 (slot 6) swapped onto it, the Scout to 4:10 at the turn's end
+  (UnitTeleported after the last move, before PlayerTurnDeactivated);
+  t177 the Man-At-Arms 1179650 (slot 2) to 3:9 off the Field Cannon 2424841
+  made there (slot 9); t130 Hong Kong's Warrior 2424833 (slot 1) to 8:7 off
+  2293764 (slot 4); t174 Hong Kong's Warrior 2293764, its swap's step onto
+  player 1's unit on 9:8, to 8:8 under city-state 3's Trader; 1124 t21
+  Granada's Warrior 327681 (slot 1) to 40:12 off the Warrior 393218 its
+  turn made (slot 2); 1117 t196 city-state 4's Scout 3014658 (slot 2) to
+  31:5 off 2949125 (slot 5).
+- Open: the order of the +0x228 handlers beyond the end look's (the
+  barbarians' captures); the +0x1c / +0x20 hashes read as the engine's
+  stacking classes (`stackClass`).

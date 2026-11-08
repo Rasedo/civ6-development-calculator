@@ -7,7 +7,7 @@
   final: 0x3affd0
   kind: function
   name: FindAlternateLocation
-  semantics: "FindAlternateLocation(unit, target, range): over the game's axial steps (dx, dy), dx outer from -range to range, dy inner, the plot at the step within range (0x1e000: x - y//2 + dx, then back; the distance max(|dx|, |dy|) where the signs differ, |dx| + |dy| else); the unit may enter it (0x586360 flag 0x40), the player revealed it, no other player's unit on it and none of its own that it may not stack with (0x9406e0); the nearest the target, a plot of another area (plot +8) counted three times as far; strictly nearer replaces. A placement's range 10."
+  semantics: "FindAlternateLocation(unit, target, range): over the game's axial steps (dx, dy), dx outer from -range to range, dy inner, the plot at the step within range (0x1e000: x - y//2 + dx, then back; the distance max(|dx|, |dy|) where the signs differ, |dx| + |dy| else); the unit may enter it (0x586360 flag 0x40), the player revealed it, of its units of the unit's map layer (0x75c50 at 0x585c42) no other player's and none of its own that it may not stack with (0x9406e0 vt +0xb8); with its fourth argument the target plot itself none (0x585b33); the nearest the target, a plot of another area (plot +8) counted three times as far; strictly nearer replaces. A placement's range 10."
   status: PARTLY
   cases:
     - recording: AI_Tactical.csv
@@ -17,10 +17,13 @@
     - cpu/core/tactical.ts:alternateLocation
     - gpu/core/sim_tactics.py:_WANDER_CITY_RANGE
     - gpu/core/sim_tactics.py:_tac_alt_table
+    - cpu/core/tactical.ts:UNSTACK_RANGE
+    - gpu/core/sim_tactics.py:_UNSTACK_RANGE
   readings:
     - "C-96: the city-states' tactical pass — READ (Wander Near City, Heal, the non-barbarian priorities, FindAlternateLocation), the families it needs PARTLY READ"
     - "C-96: the knowledge base's army records and the Combat Desire — READ (the records, the update, the desire), PARTLY READ (the signals' looks; the standing-army count in its own section below)"
     - "C-99: the pathfinder's later-turn pool, Heal's hull, the tactical list's explorers, Move Unit's planning — READ, both twins"
+    - "C-128: a crowded plot's unit goes beside it as its AI player's turn ends — READ (0x775e50, 0x585d90, 0x93f870, 0x585940), both twins"
   notes:
     - ".claude/scratchpad/mu1/readings_c96.md: ...move 0x962030 to the plot drawn (\"Wander\", \"Move To\" the plot). With none:   FindAlternateLocation (0x585940) round the city within 3, moved to with   flag 0x1000, else the skip 0x95eae0 (\"Wander Back to City..."
     - ".claude/scratchpad/mu1/readings_c96.md: ...'s ASK).   Their logs hold 23 such rows (runs/h1_duelw1114, 1123, 1130). - FIND ALTERNATE LOCATION (0x585940): over the game's axial steps (dx, dy),   dx outer from -range to range, dy inner, the plot at the..."
@@ -75,6 +78,7 @@
     - cpu/core/units.ts:tileFreeForUnit
     - cpu/core/units.ts:mapLayer
     - gpu/core/sim_init.py:__init__
+    - cpu/core/tactical.ts:crowded
   readings:
     - "C-124: a move order's path opens a turn-end node beside each node with Movement left — READ (0x271920, 0x7a880, 0x271490, 0x775a0, 0x26f330), both twins"
     - "C-97: the behaviour trees — READ (the interpreter), the nodes PARTLY READ"
@@ -91,6 +95,7 @@
     - "C-125 / C-99: the swap's partner pays its step, the stacking count's classes, the walk's end among other players' units, a siege unit's RangedCombat — READ (0x972a50, 0x585d90, 0x26fe20 via 0x585eb0, 0x56e3e0), both twins"
     - "C-99 / C-128: the swap's partner test and its step along its own path; Move Unit's update before the executions; a Trader no passenger — READ (0x972540, 0x56e760, 0x972a50 -> 0x26fe20, 0x7d3a00 -> 0x7f0020, 0x586360 -> 0x208b80 / 0x523d60), both twins"
     - "C-123 / C-95: a Trader stands on the trade layer; a city's shot is a COMBAT_DISTRICT spot's blow back — READ (0x901e0, 0x586360 -> 0x208b80, 0x585eb0 -> 0x585d90, 0x791470 at 0x7917f7..0x7918f7 -> 0x249ee0 / 0x205720, 0x776140 at 0x776780..0x7767fa), both twins"
+    - "C-128: a crowded plot's unit goes beside it as its AI player's turn ends — READ (0x775e50, 0x585d90, 0x93f870, 0x585940), both twins"
   context:
     - "...60), a visible enemy unit there (0x5862e0), a unit there that keeps it out (0x585eb0 -> 0x585d90: the owner's of a stacking class, another player's not at war) — and, the goal open,..."
   review: reviewed
@@ -445,8 +450,12 @@
   name: formation placement
   semantics: places each member of a formation (+0x728, count +0x738) through 0x586d40 with the step's flags; 1 only where every member's placement succeeds
   status: PARTLY
-  impl: [cpu/core/tactical.ts:walk, gpu/core/sim_tactics.py:_tac_move_to]
+  impl:
+    - cpu/core/tactical.ts:walk
+    - gpu/core/sim_tactics.py:_tac_move_to
+    - cpu/core/tactical.ts:unstackUnits
   readings:
     - "C-95: the barbarians' Builder Capture — READ (the event, the start, the tree's walk), ported"
     - "C-99: a move order carried on as the turn ends, the zone-of-control wait, the embark rule's TO plot — READ (0x962380, 0x52f50, 0x26fe20, 0x2675e0, 0x2673f0, 0x530420, 0x267650), both twins"
+    - "C-128: a crowded plot's unit goes beside it as its AI player's turn ends — READ (0x775e50, 0x585d90, 0x93f870, 0x585940), both twins"
   review: reviewed

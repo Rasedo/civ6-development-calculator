@@ -22,7 +22,7 @@ import { engineId, gameTypeOf, installFeature } from '../data/aliases';
 import {
   canEmbark, cityAtIndex, crossesRiver, embarkTechMoves, escortUnit, inEscort, cliffBlocksStep, shoreCrossing, districtZones, encampmentBlocks, encampmentIntact, inEnemyZoc, rosterEmbarkMoves, stepCost, stepUnit, terrainMp, unitDomain, unitExertsZoc, unitFullMoves, unitIsNoncombat, mapLayer, unitReligious,
   setBarbStepLook, unitsHostile, unitVisibleTo,
-  waterEnterable, waterWalks, formationBanned, formationCS, setRecordFormation, formationMates, dropLoneRiders, escortOf, escortRiders,
+  waterEnterable, waterWalks, formationBanned, formationCS, setRecordFormation, formationMates, dropLoneRiders, escortOf, escortRiders, disbandUnit,
 } from './units';
 import { BARB_SEAT, FREE_SEAT, NO_SEAT, campTiles, cityHolders, civsAtWar, isBarbSeat, isCityStateSeat, isCiv, isTerritorial, seatOf, tileCity, tileSeat } from './seats';
 import { OPEN_BORDERS_CIVIC } from '../data/seats';
@@ -3449,27 +3449,32 @@ function wanderNearCity(state: GameState, pass: Pass, home: number): void {
  * FIND ALTERNATE LOCATION (Unit_Placement 0x585940) for the unit round
  * `plot`: the plots within `range` of it (0x1e000) — the game's axial steps
  * (dx, dy) over -range..range, dx the outer — that the unit may enter
- * (0x586360: its ground, `groundOf`), where no other player's unit stands
- * and none of its own that stacks with it; the nearest `plot` wins, a plot
+ * (0x586360: its ground, `groundOf`), where of the plot's units of its map
+ * layer (0x75c50) no other player's stands and none of its own that stacks
+ * with it — another's Trader keeps it out of no plot (runs/h1_duelp1128
+ * t174: Hong Kong's Warrior 2293764 off player 1's unit on 9:8 to 8:8
+ * under city-state 3's Trader); the nearest `plot` wins, a plot
  * of another area than `plot`'s counted three times as far, the first of
- * equals. -1 none.
+ * equals; with `skipOrigin` (its fourth argument) `plot` itself is none.
+ * -1 none.
  */
-function alternateLocation(state: GameState, unit: Unit, plot: number, range: number): number {
+function alternateLocation(state: GameState, unit: Unit, plot: number, range: number, skipOrigin = false): number {
   const { map } = state;
   const at = map.tiles[plot];
   const [q0, r0] = offsetToAxial(at.col, at.row);
   const ground = groundOf(state, unit);
   const dom = unitDomain(unit.type);
+  const layer = mapLayer(unit.type);
   let best = -1;
   let bestScore = Infinity;
   for (let dx = -range; dx <= range; dx++) {
     for (let dy = -range; dy <= range; dy++) {
       const n = (dx < 0) !== (dy < 0) && dx !== 0 && dy !== 0 ? Math.max(Math.abs(dx), Math.abs(dy)) : Math.abs(dx) + Math.abs(dy);
-      if (n > range) continue;
+      if (n > range || (skipOrigin && dx === 0 && dy === 0)) continue;
       const [c, r] = axialToOffset(q0 + dx, r0 + dy);
       const t = tileAt(map, c, r);
       if (!t || !ground.known(t.index) || !ground.enter(t)) continue;
-      if (state.units.some((o) => o !== unit && o.tileIndex === t.index && onMap(o)
+      if (state.units.some((o) => o !== unit && o.tileIndex === t.index && onMap(o) && mapLayer(o.type) === layer
         && (o.seat !== unit.seat || unitDomain(o.type) === dom))) continue;
       let score = plotDistance(state, plot, t.index);
       if ((t.area ?? -1) !== (at.area ?? -1)) score *= 3;
@@ -3480,6 +3485,69 @@ function alternateLocation(state: GameState, unit: Unit, plot: number, range: nu
     }
   }
   return best;
+}
+
+/** the radius the turn's stacking check searches round a crowded plot
+ *  (0x775e50 -> 0x585940) */
+const UNSTACK_RANGE = 10;
+
+/** another unit on the unit's plot keeps it out (0x585d90's count over the
+ *  plot's units of its map layer above the unit itself): one of its own of
+ *  its stacking class, or another player's not at war with it, a Trader or
+ *  a Spy none */
+function crowded(state: GameState, u: Unit): boolean {
+  const layer = mapLayer(u.type);
+  const cls = stackClass(u.type);
+  return state.units.some((x) => x !== u && x.tileIndex === u.tileIndex && onMap(x) && mapLayer(x.type) === layer
+    && !UNITS[x.type]?.trader && (x.seat === u.seat ? stackClass(x.type) === cls : !unitsHostile(state, u, x)));
+}
+
+/**
+ * THE TURN'S STACKING CHECK (Tactical.cpp 0x775e50, which the tactical AI's
+ * setup 0x775870 binds to player signal +0x228 ahead of the knowledge
+ * base's end look; an AI player's alone): over the player's units in its
+ * list's order (`slot`), a Trader and a Spy none, each on a plot another
+ * unit keeps it out of (`crowded`) goes, with its formation (0x587ca0), to
+ * the plot FindAlternateLocation finds within 10 of it, its own plot none
+ * (`alternateLocation`'s `skipOrigin`); one with none is deleted after the
+ * walk (the delete command 0x9483a0, which refuses a damaged unit). A unit
+ * a city made on its centre stands there until its player's turn ends
+ * (`spawnUnit`'s 'stack'); a unit made in the turn holds the list slot it
+ * took at its making (`poolSlots`). runs/h1_duelp1128 t187: city-state 3's
+ * Scout 2752515 made on 4:9 in slot 3, its Field Cannon 2555910 (slot 6)
+ * swapped onto it, the Scout to 4:10; t177 its Man-At-Arms 1179650 (slot
+ * 2) off its centre to 3:9 beside the Field Cannon 2424841 made there (slot
+ * 9); runs/h1_duelp1124 t21 Granada's Warrior 327681 (slot 1) to 40:12
+ * beside the Warrior 393218 its turn made there (slot 2); runs/h1_duelp1117
+ * t196 city-state 4's Scout 3014658 (slot 2) off 32:5 to 31:5; each in the
+ * end look's record.
+ */
+export function unstackUnits(state: GameState, seat: number): void {
+  if (isBarbSeat(seat)) barbSlots(state);
+  else {
+    const s = seat === FREE_SEAT ? state.freeSeat : state.cityStates.find((c) => c.seat === seat);
+    if (s) seatPoolSlots(state, s);
+  }
+  const own = state.units.filter((u) => u.seat === seat && u.tileIndex >= 0 && onMap(u) && !UNITS[u.type]?.trader)
+    .sort((a, b) => (a.slot ?? 0) - (b.slot ?? 0));
+  const stuck: Unit[] = [];
+  for (const u of own) {
+    if (!state.units.includes(u) || !crowded(state, u)) continue;
+    const to = alternateLocation(state, u, u.tileIndex, UNSTACK_RANGE, true);
+    if (to < 0) {
+      stuck.push(u);
+      continue;
+    }
+    for (const m of [u, ...formationMates(state, u)]) m.tileIndex = to;
+  }
+  const cs = state.cityStates.find((c) => c.seat === seat);
+  for (const u of stuck) {
+    if (u.hp < UNIT_HP) continue;
+    disbandUnit(state, u.id);
+    // the DELETE destroys it at once, off its player's list (0x948500)
+    if (cs?.unitsListed) delete cs.unitsListed[u.id];
+    if (cs?.defendersListed) cs.defendersListed = cs.defendersListed.filter((id) => id !== u.id);
+  }
 }
 
 /** the chassis whose AI row's PseudoYieldType is PSEUDOYIELD_UNIT_SETTLER
@@ -3645,6 +3713,8 @@ export function cityStateTactics(state: GameState, cityState: CityState, operati
     costsHeld = null;
     movesEnded = null;
   }
+  // its turn's end: no unit left on a plot another keeps it out of
+  unstackUnits(state, cityState.seat);
   poolDying(pool, state.units.filter((u) => u.seat === cityState.seat));
 }
 
@@ -3681,6 +3751,8 @@ export function freeCityTactics(state: GameState, operations: (pass: Pass) => vo
     costsHeld = null;
     movesEnded = null;
   }
+  // their turn's end: no unit left on a plot another keeps it out of
+  unstackUnits(state, FREE_SEAT);
   poolDying(pool, state.units.filter((u) => u.seat === FREE_SEAT));
 }
 
@@ -4010,10 +4082,12 @@ export function barbarianTactics(state: GameState, acting: ReadonlySet<number>):
     costsHeld = null;
     movesEnded = null;
   }
-  // the turn's end: the turn's captures start their operations on the
+  // the turn's end: no unit left on a plot another keeps it out of
+  // (`unstackUnits`); the turn's captures start their operations on the
   // knowledge base the pass left, then it looks again (player signal +0x228)
   // (runs/h1_duely1117 t33: Builder Capture's start at Target Str 23, the
   // Scout 851971 on 33:12 in the end look's records only)
+  unstackUnits(state, BARB_SEAT);
   barbarianCaptures(state);
   const seen = plotsSeenNow(state, new Set([BARB_SEAT]));
   knowledgeLook(state, state.barbSeat, BARB_SEAT, seen, false);

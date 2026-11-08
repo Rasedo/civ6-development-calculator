@@ -499,6 +499,16 @@
     - ...), f2e120 Defend Camps (0x779010), f2e124 Attack Camps (0x778910), f2e130 Chase Target (0x775670 then 0x773030), f2e134 Wander (0x77b580), f2e138 / f2e13c Pillage Improvement / Distr...
     - "- CHASE TARGET (0x775670 then 0x773030): each land unit (+0x650 == 2) left, in pool order, takes (0x775170, 8) t..."
   review: reviewed
+- addr: 0x775870
+  final: 0x5078a0
+  kind: function
+  name: the tactical AI's setup
+  semantics: "binds the tactical AI's player-signal handlers: 0x771570 (+0x1f8), 0x771530 (+0x210), the pass's end 0x7715a0 (+0x240) and the stacking check 0x775e50 (+0x228)."
+  status: PARTLY
+  impl: [cpu/core/tactical.ts:unstackUnits]
+  readings:
+    - "C-128: a crowded plot's unit goes beside it as its AI player's turn ends — READ (0x775e50, 0x585d90, 0x93f870, 0x585940), both twins"
+  review: reviewed
 - addr: 0x775c60
   final: 0x507c90
   kind: function
@@ -513,6 +523,26 @@
   context:
     - "...h of this turn within its range (1 at least) of the city with none of its own stacking (0x775c60) and logs no row. Shadow check over 1124: of 446 rows the logged target is in the list..."
     - "...of this turn within its range (1 at least) of the target with none of its own stacking (0x775c60); the row's \"Move To\" is the target's plot."
+  review: reviewed
+- addr: 0x775e50
+  kind: function
+  name: the turn's stacking check
+  semantics: "on player signal +0x228 for an AI player (0x469d70): over its unit list (+0x12e8 -> +0xd8), a Spy (+0x1ba bit 2), a MakeTradeRoute unit (+0x1b9 bit 0x40), a dead or off-map unit none, the units of its map layer on its plot that keep it out (0x75c50 -> 0x585d90) above 1: FindAlternateLocation (0x585940) within 10, the plot itself skipped, its formation placed there (0x587ca0 flag 1); none, the unit listed and given the delete command (0x9483a0) after the walk."
+  status: READ
+  cases:
+    - recording: h1_duelp1128
+      turn: 187
+      value: city-state 3's Scout 2752515 made on 4:9 (slot 3) under the Field Cannon 2555910 (slot 6) to 4:10, UnitTeleported before PlayerTurnDeactivated
+    - recording: h1_duelp1124
+      turn: 21
+      value: Granada's Warrior 327681 (slot 1) to 40:12 off the Warrior 393218 made that turn (slot 2)
+  impl:
+    - cpu/core/tactical.ts:unstackUnits
+    - gpu/core/sim_tactics.py:_unstack
+    - cpu/core/tactical.ts:UNSTACK_RANGE
+    - gpu/core/sim_tactics.py:_UNSTACK_RANGE
+  readings:
+    - "C-128: a crowded plot's unit goes beside it as its AI player's turn ends — READ (0x775e50, 0x585d90, 0x93f870, 0x585940), both twins"
   review: reviewed
 - addr: 0x776140
   kind: function

@@ -169,6 +169,7 @@
     - gpu/core/sim_phase.py:_city_shot_def
     - gpu/core/sim_phase.py:_city_shot_atk
     - cpu/core/combat.ts:districtDamageLoss
+    - gpu/core/sim_tactics.py:_UNSTACK_RANGE
   readings:
     - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
     - "C-95: the planning's spots and the combat prediction — READ, ported"
