@@ -3674,14 +3674,14 @@ class SimTactics:
 
     def _tac_explore_ok(self, tile: torch.Tensor, ut: torch.Tensor, seat: int, revealed: torch.Tensor) -> torch.Tensor:
         """[B, T] bool — `exploreOk` for each game's explorer standing on
-        `tile` [B], of type `ut` [B]: a plot not its own, revealed, not
-        another player's ground but at war with it, no unit on it, of its
-        area (a hull on water too; an embarking non-barbarian anywhere), no
-        city centre but its player's."""
+        `tile` [B], of type `ut` [B]: a plot not its own, revealed, no other
+        player's ground (at war or not: the turn never short of the knowledge
+        base's +0x128 in a recorded turn), no unit on it, of its area (a hull
+        on water too; an embarking non-barbarian anywhere)."""
         B, T, dev = self.B, self.T, self.device
         bidx = torch.arange(B, device=dev)
         own = self.tile_seat
-        ok_owner = (own == NO_SEAT) | (own == seat) | self._seats_hostile(seat, own)
+        ok_owner = (own == NO_SEAT) | (own == seat)
         occ = torch.zeros(B, T, dtype=torch.bool, device=dev)
         for pl in (self.military_at, self.civilian_at, self.support_at, self.embarked_at):
             occ |= pl >= 0
@@ -3690,8 +3690,7 @@ class SimTactics:
         embark = self._tac_embarks(bidx, ut, seat)
         same = (area == area[bidx, tile.clamp(min=0)].unsqueeze(1)) | embark.unsqueeze(1) | (naval.unsqueeze(1) & self.water)
         not_here = torch.arange(T, device=dev).unsqueeze(0) != tile.unsqueeze(1)
-        foreign_ctr = self._centre_plane() & (own != seat)
-        return not_here & revealed & ok_owner & ~occ & same & ~foreign_ctr
+        return not_here & revealed & ok_owner & ~occ & same
 
     def _tac_seen_regions(self, seat: int) -> torch.Tensor:
         """[B, T] bool — the plots whose region holds a plot `seat` revealed

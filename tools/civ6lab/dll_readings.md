@@ -8499,3 +8499,50 @@ weighed entries (gpu/core/sim_minorops.py).
   moves onto its plot and kills it (the capture kill, C-101). 1124 t119
   Man-At-Arms 4849682 lays 36:16 where the game lays 35:17 with no Movement
   left (C-95).
+
+## C-95: HL Explore's plot test refuses every other player's ground, Explore Land's flags 0x40 — READ (0x70bd40 at 0x70bd87..0x70beee, 0x709d80 at 0x709da0..0x709dc2, 0x70ce90 at 0x70ced5), FIT (the knowledge base's +0x128 at or below the turn), both twins
+
+`exploreOk` (cpu/core/tactical.ts), `_tac_explore_ok` (gpu/core/sim_tactics.py).
+
+- ONE COMPARISON, TWO READERS: the game's turn (@f28c78 +0x110, the turn
+  0x153ef0's throttle reads) against the player's knowledge base
+  (Player +0x12b8) +0x128. HL Explore's plot test 0x70bd40, on another
+  player's ground at war with the explorer's (IsAtWarWith 0x469cd0),
+  answers turn < +0x128 (0x70beab setl); at peace it passes only open
+  borders (0x3dab70) or an alliance (0x3da560); then a district on the plot
+  but its own refuses it (0x70bf46). Explore Land's flags (0x709d80's
+  setge -> 0x70ce90's second argument) are 0x40 where turn >= +0x128, else
+  0x42: flag 2 (no step onto a player's ground at war, 0x2720a0 at
+  0x2724c8) exactly while the plot test lets war ground through.
+- FIT: +0x128 at or below the turn in every recorded turn. The barbarians'
+  1,142 HL Explore targets of runs/h1_duely1117-1128 (AI_Tactical.csv, the
+  target's owner in the turn's record) hold 94 on a player's ground, every
+  one a region fallback ("cur region" / "cur area" / "tertiary regions",
+  0x70b6f0, not tested by 0x70bd40) and no plain pick; and those fallbacks'
+  orders walk war ground: under flag 2 the engines leave the game's walk on
+  runs/h1_duely1127 t12 Scout 786442 (for 9:11), t25 / t26 Scout 1441809
+  (for player 1's 11:7), t28 Scout 1703936, t31 Scout 1441809. So the plot
+  test refuses every other player's ground and the flags stay 0x40.
+- CONFIRMED (one-seed aimem traces to t70, the five duels, against the head
+  46130f14): 189 move rows missed against 180, 9 gone, none come:
+  runs/h1_duely1117 t43 Scout 2490390; 1121 t31 Scout 1441809, t37 Scout
+  131073; 1124 t12 Scout 131073, t31 Scout 1900552; 1127 t27 Scout 1441809,
+  t61 Scout 2949130; 1128 t6 Scout 131073, t18 Scout 393221.
+- THE COST'S UNREVEALED COUNT reads the same plane as the node's revealed
+  bit: the pathfinder's +0x1a8 is the player's visibility (0x271be0 sets
+  +0x51 bit 0 from it, its +0x290 the visibility counts), +0x2f0 its
+  revealed bytes. So runs/h1_duely1127 t12 Scout 393221's 10:19 (n 3) for
+  10:16 (n 2) is the barbarians' revealed plane round them, which no record
+  holds for player 63 (`TurnRecord.revealed` is the majors').
+- NAVAL PATROL (runs/h1_duely1127 city-state 3's Galley 393216): t62 from
+  29:15 30:17 and 28:17 tie at 10 unrevealed in its sight (g 2004 each,
+  30:17 closing first, as the planning lists them), the game's 28:17; t63
+  from 28:17 30:17 and 30:18 tie at 7, the game's 30:18. Not the danger
+  map: the barbarian Galley on 31:20 (unseen by city-state 3 in the
+  engines) reaches 30:17 and 30:18 alike. The game's later pick both turns
+  reads as one more unrevealed plot round it in city-state 3's revealed
+  plane, unrecorded.
+- OPEN: the writer of the knowledge base's +0x128 (no direct store in the
+  Release DLL's CivKnowledge functions; the army records at +0x18 are a
+  vector, so +0x128 is a field of its own). City-state 3's and the
+  barbarians' revealed planes against the game's.

@@ -316,7 +316,10 @@
     - cpu/core/tactical.ts:barbarianPhase
     - cpu/core/units.ts:barbStepLook
     - gpu/core/sim_seats.py:_step_verb
-  readings: ["H-1: the raids — READ", "C-95: the scout's tree \"Barbarian Found City\" — READ, ported"]
+  readings:
+    - "H-1: the raids — READ"
+    - "C-95: the scout's tree \"Barbarian Found City\" — READ, ported"
+    - "C-95: HL Explore's plot test refuses every other player's ground, Explore Land's flags 0x40 — READ (0x70bd40 at 0x70bd87..0x70beee, 0x709d80 at 0x709da0..0x709dc2, 0x70ce90 at 0x70ced5), FIT (the knowledge base's +0x128 at or below the turn), both twins"
   context:
     - "- The report (0x153ef0, a barbarian unit's sight of a plot): a tribe's scout (unit +0x1c0 == 2) seeing an owne..."
     - "- The report's event: 0x153ef0 is bound (0x153b0d) to the game signal at signals +0x10c8, which the unit sight update..."

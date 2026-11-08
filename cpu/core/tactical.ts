@@ -2866,19 +2866,23 @@ function seenRegions(state: GameState, seat: number): Set<number> {
 }
 
 /** may the explorer go to the plot (0x70bd40): not its own; one its player
- *  revealed; another player's ground only at war with it; no unit on it
- *  (+0x4c); on its own area unless it embarks (the barbarians never), a
- *  hull on water; no city centre but its player's */
+ *  revealed; no other player's ground (at war with it only while the turn,
+ *  game +0x110, falls short of its knowledge base's +0x128 at 0x70beab — in
+ *  no recorded turn: of the barbarians' 1,142 HL Explore targets on
+ *  runs/h1_duely1117-1128 none of the plain picks lies on a player's
+ *  ground; at peace only through open borders or an alliance, 0x3dab70 /
+ *  0x3da560, which no explorer here holds); no unit on it (+0x4c); on its
+ *  own area unless it embarks (the barbarians never), a hull on water (a
+ *  foreign city centre is a player's ground) */
 function exploreOk(state: GameState, u: Unit, p: number, revealed: (i: number) => boolean): boolean {
   if (p === u.tileIndex || !revealed(p)) return false;
   const t = state.map.tiles[p];
   const owner = tileSeat(t);
-  if (owner !== NO_SEAT && owner !== u.seat && !unitsHostile(state, u, { seat: owner })) return false;
+  if (owner !== NO_SEAT && owner !== u.seat) return false;
   if (state.units.some((x) => x.tileIndex === p && onMap(x))) return false;
   const naval = !!UNITS[u.type]?.naval;
   const here = state.map.tiles[u.tileIndex];
-  if ((t.area ?? -1) !== (here.area ?? -1) && !canEmbark(state, u) && (!naval || !isWater(t))) return false;
-  return !(t.district === 'CITY_CENTER' && owner !== u.seat);
+  return (t.area ?? -1) === (here.area ?? -1) || canEmbark(state, u) || (naval && isWater(t));
 }
 
 /** the nearest plot the unit's player never revealed that the set takes and
