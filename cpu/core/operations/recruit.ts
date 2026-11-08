@@ -3,7 +3,7 @@
  * 0x73be10, the strength 0x73c7c0; the reading is tools/civ6lab/dll_readings.md
  * "C-97: the operations").
  *
- * The player's free units (in no operation, alive), in unit id order, are
+ * The player's free units (in no operation, alive), in their pool slot order, are
  * offered to each team in turn. A team's offer is cut to the units within
  * its Recruit Range of its goal; the team takes from it first its requirements' minimums, which leave the
  * offer, then, where its minimums are met or the recruit goes on an
@@ -157,16 +157,17 @@ export function desiredStrength(view: AiView, seat: number, enemy: number, advan
   return advantage * Math.min(ours, theirs);
 }
 
-/** One recruit (0x738050): the offer sorted by unit id (0x733060 over unit
- *  +0x100, ascending: the order the units were made), then each team takes
- *  from it (0x7383d0): its offer cut to its Recruit Range of its goal (the
+/** One recruit (0x738050): the teams take from a copy of the offer in the
+ *  offer's own order, the player's pool slot order (copied at
+ *  0x7380c8..0x738108; the sort by unit id, 0x733060, orders the original
+ *  alone, for the set difference at 0x738250 that drops the recruited from
+ *  it). Each team (0x7383d0): its offer cut to its Recruit Range of its goal (the
  *  target in progress, else the rally: 0x732e50), then of the units
  *  obsolete to the player (0x732db0), its minimums then its strength; the
  *  units taken join it in the list's order and leave the offer. Returns
  *  every unit recruited. */
 export function recruitOperation(view: AiView, seat: number, op: Operation, offer: AiUnitView[], inProgress: boolean, range: number,
   units: ReadonlyMap<number, AiUnitView>, log: RecruitLog | null): AiUnitView[] {
-  offer.sort((a, b) => a.id - b.id);
   const all: AiUnitView[] = [];
   for (const team of op.teams) {
     const goal = inProgress ? team.goals[1] : team.goals[0];

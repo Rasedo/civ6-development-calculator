@@ -25,12 +25,13 @@
   semantics: "0x733060's insertion sort: unit pointers by +0x100 (the id), unsigned ascending."
   status: READ
   cases:
-    - recording: h1_duely1128
-      turn: 176
-      value: "city-state 3's City Defense offer: 1179650 before 2228224"
+    - recording: h1_duelz1117
+      turn: 88
+      value: "city-state 4's City Defense takes Catapult 917509, then Catapult 1114113 (slot 1) before the Archer 786435 (slot 3), all three at 2 of 32:5 but the first: the teams' offer is the unsorted copy, the sorted original only the set difference's"
   impl: [cpu/core/operations/recruit.ts:recruitOperation]
   readings:
     - "C-129 / C-99: the known cities refresh at every look over revealed centres; the recruit's offer sorted by unit id — READ (0x7877e0 at 0x787c38..0x787ca7, 0x5f0280, 0x5f0490 -> 0x5eff10, 0x5ef9a0, 0x733060 -> 0x7328d0), both twins; the replay's majors' districts"
+    - "C-129: the teams recruit from the offer's copy in pool slot order; the id sort orders the original alone, for the set difference — READ (0x738050 at 0x7380c8..0x738108, 0x738152, 0x73819d, 0x7381e7, 0x738250..0x738288), both twins"
   review: reviewed
 - addr: 0x732cd0
   final: 0x4d7700
@@ -84,6 +85,7 @@
   readings:
     - "C-130 / C-129: the recruit's obsolete cut under the team's player; the government values' housing on the forecast of the city as its update read it — READ (0x7383d0 at 0x7384c0..0x7384ed, 0x732db0, 0x7325a0, 0x538460, 0x73a5e0 at 0x73a7d9), a fit (the forecast), both twins"
     - "C-129 / C-99: the known cities refresh at every look over revealed centres; the recruit's offer sorted by unit id — READ (0x7877e0 at 0x787c38..0x787ca7, 0x5f0280, 0x5f0490 -> 0x5eff10, 0x5ef9a0, 0x733060 -> 0x7328d0), both twins; the replay's majors' districts"
+    - "C-129: the teams recruit from the offer's copy in pool slot order; the id sort orders the original alone, for the set difference — READ (0x738050 at 0x7380c8..0x738108, 0x738152, 0x73819d, 0x7381e7, 0x738250..0x738288), both twins"
   review: reviewed
 - addr: 0x732e50
   kind: function
@@ -99,15 +101,19 @@
 - addr: 0x733060
   kind: function
   name: the recruit offer's sort
-  semantics: "the offer's introsort (0x7329b0 / 0x732ae0, the insertion pass 0x7328d0) by unit +0x100, the id, unsigned ascending: the order the units were made. 0x738050 sorts each offer at 0x738152 and the recruited at 0x7381e7."
+  semantics: "the introsort (0x7329b0 / 0x732ae0, the insertion pass 0x7328d0) of unit pointers by unit +0x100, the id, unsigned ascending. 0x738050 sorts at 0x738152 the ORIGINAL offer (its [r15], after copying it to the local vector at 0x7380c8..0x738108) and at 0x7381e7 the copy the teams left, for the set difference at 0x738250..0x738288 that drops the recruited from the original. The teams (0x7383d0, rdx = the copy at 0x73819d) walk the copy in the offer's own order, the player's pool slot order: no engine sorts the teams' offer."
   status: READ
   cases:
+    - recording: h1_duelz1117
+      turn: 88
+      value: "city-state 4's City Defense (32:5): Recruiting strength CATAPULT, CATAPULT, ARCHER, the team [917509, 1114113, 786435]: 917509 at 1, then of the three Catapults and the Archer at 2 the Catapult 1114113 (id 0x110001, slot 1) before the Archer 786435 (0xC0003, slot 3): slot order, not id order (aimem trace as logged)"
     - recording: h1_duely1128
       turn: 176
-      value: city-state 3's City Defense takes the Man-at-Arms 1179650 (serial 18) over the Warrior 2228224 (serial 34, pool slot 0), both one from 4:9
+      value: "city-state 3's City Defense takes the Man-at-Arms 1179650 (slot 2), the Warrior 2228224 (slot 0) obsolete and cut (0x732db0): aimem trace as logged in slot order"
   impl: [cpu/core/operations/recruit.ts:recruitOperation, gpu/core/sim_minorops.py:_mops_recruit]
   readings:
     - "C-129 / C-99: the known cities refresh at every look over revealed centres; the recruit's offer sorted by unit id — READ (0x7877e0 at 0x787c38..0x787ca7, 0x5f0280, 0x5f0490 -> 0x5eff10, 0x5ef9a0, 0x733060 -> 0x7328d0), both twins; the replay's majors' districts"
+    - "C-129: the teams recruit from the offer's copy in pool slot order; the id sort orders the original alone, for the set difference — READ (0x738050 at 0x7380c8..0x738108, 0x738152, 0x73819d, 0x7381e7, 0x738250..0x738288), both twins"
   review: reviewed
 - addr: 0x737610
   final: 0x4db690
@@ -175,7 +181,7 @@
   review: reviewed
 - addr: 0x738050
   kind: function
-  semantics: the team's evaluator of a recruit offer.
+  semantics: "the team's evaluator of a recruit offer: the offer copied to a local vector (0x7380c8..0x738108); the original sorted by id (0x733060 at 0x738152); per team 0x7383d0 on the copy (0x73819d), in the offer's own order (the player's pool slot order); the copy left sorted (0x7381e7) and set-differenced from the original (0x738250..0x738288), which keeps the units no team took."
   status: PARTLY
   impl:
     - cpu/core/operations/nodes.ts:recruitUnits
@@ -188,6 +194,7 @@
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
     - "C-129 / C-99: the known cities refresh at every look over revealed centres; the recruit's offer sorted by unit id — READ (0x7877e0 at 0x787c38..0x787ca7, 0x5f0280, 0x5f0490 -> 0x5eff10, 0x5ef9a0, 0x733060 -> 0x7328d0), both twins; the replay's majors' districts"
     - "C-130 / C-129: the recruit's obsolete cut under the team's player; the government values' housing on the forecast of the city as its update read it — READ (0x7383d0 at 0x7384c0..0x7384ed, 0x732db0, 0x7325a0, 0x538460, 0x73a5e0 at 0x73a7d9), a fit (the forecast), both twins"
+    - "C-129: the teams recruit from the offer's copy in pool slot order; the id sort orders the original alone, for the set difference — READ (0x738050 at 0x7380c8..0x738108, 0x738152, 0x73819d, 0x7381e7, 0x738250..0x738288), both twins"
   context:
     - "...e Unit 0x7ec7b0; Build Unit 0x7f4e00; Recruit Units 0x81c820 (the recruit 0x60a8c0 -> 0x738050: the free units, then the units of the lower-priority unlocked operations); Lock Units..."
   review: reviewed
@@ -199,7 +206,7 @@
   cases:
     - recording: h1_duely1128
       turn: 176
-      value: "city-state 3's City Defense: the Man-at-Arms 1179650 first of the offer's two at distance 1"
+      value: "city-state 3's City Defense: the Man-at-Arms 1179650 taken, the Warrior 2228224 (slot 0, first in the offer) obsolete and cut"
     - recording: h1_duely1128
       turn: 176
       value: "city-state 2's City Defense: the obsolete Warrior 2490370 cut from the offer, Recruited 0 as logged"
@@ -210,6 +217,7 @@
     - "C-130 / C-129: the recruit's obsolete cut under the team's player; the government values' housing on the forecast of the city as its update read it — READ (0x7383d0 at 0x7384c0..0x7384ed, 0x732db0, 0x7325a0, 0x538460, 0x73a5e0 at 0x73a7d9), a fit (the forecast), both twins"
     - "C-129 / C-99: the known cities refresh at every look over revealed centres; the recruit's offer sorted by unit id — READ (0x7877e0 at 0x787c38..0x787ca7, 0x5f0280, 0x5f0490 -> 0x5eff10, 0x5ef9a0, 0x733060 -> 0x7328d0), both twins; the replay's majors' districts"
     - "C-129: the recruit's minimums leave the offer, the strength counts the list as listed — READ (0x73be10 at 0x73c63e..0x73c77b, 0x73c7c0, 0x7383d0, 0x8fd8f0), both twins; the replay's upgrade a new id"
+    - "C-129: the teams recruit from the offer's copy in pool slot order; the id sort orders the original alone, for the set difference — READ (0x738050 at 0x7380c8..0x738108, 0x738152, 0x73819d, 0x7381e7, 0x738250..0x738288), both twins"
   review: reviewed
 - addr: 0x738f20
   kind: function
@@ -483,6 +491,7 @@
     - gpu/core/sim_minorops.py:_mops_recruit_team
   readings:
     - "C-129: the recruit's minimums leave the offer, the strength counts the list as listed — READ (0x73be10 at 0x73c63e..0x73c77b, 0x73c7c0, 0x7383d0, 0x8fd8f0), both twins; the replay's upgrade a new id"
+    - "C-129: the teams recruit from the offer's copy in pool slot order; the id sort orders the original alone, for the set difference — READ (0x738050 at 0x7380c8..0x738108, 0x738152, 0x73819d, 0x7381e7, 0x738250..0x738288), both twins"
   review: reviewed
 - addr: 0x73d1f0
   final: 0x4e09f0

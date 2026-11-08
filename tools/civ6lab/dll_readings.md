@@ -10106,3 +10106,45 @@ values (`minorResearchTurn`, cpu/core/minorBuild.ts); `_MinorFacts.updated` /
   prices dearer, out of range, or across a plot submerged since, are the
   cache's; Persia's Satrapies (+1 capacity with Political Philosophy) has
   no roster row.
+
+## C-129: the teams recruit from the offer's copy in pool slot order; the id sort orders the original alone, for the set difference — READ (0x738050 at 0x7380c8..0x738108, 0x738152, 0x73819d, 0x7381e7, 0x738250..0x738288), both twins
+
+`recruitOperation` (cpu/core/operations/recruit.ts), `_mops_recruit`
+(gpu/core/sim_minorops.py): the offer is walked as the caller made it, the
+minor's units in pool slot order (`minorView`'s units, `_mops_in_order` on
+`pslot`); no sort. The replay's recorded upgrade keeps the unit's engine id
+(cpu/harness/replay.ts).
+
+- 0x738050 (r15 = the offer): 0x7380c8..0x738108 copy the offer's pointers
+  to the local vector [rbp-0x19]; 0x738152 sorts the ORIGINAL ([r15], by
+  0x733060 on unit +0x100, the id, unsigned ascending); each team's
+  0x7383d0 gets the COPY (rdx = [rbp-0x19] at 0x73819d), whose order is the
+  offer's own; 0x7381e7 sorts what the teams left of the copy and
+  0x738250..0x738288 set-difference it from the sorted original (both by
+  +0x100), the original keeping the units no team took. The minimums' and
+  the strength's nearest-of-equals (0x73c7c0: GetPlotDistance to team
+  +0xe8/+0xec, `cmp eax, ebx; jge` keeps the first; the pick's erase an
+  order-keeping `rep movsq`) therefore take the earlier in slot order.
+- runs/h1_duelz1117 t88, city-state 4's new City Defense on 32:5: the offer
+  Archer 786435 (slot 3), Catapults 917509 (slot 5), 983046 (slot 6),
+  1048580 (slot 4), 1114113 (slot 1); 917509 stands at 1, the four others at
+  2. The game logs Recruiting strength CATAPULT, CATAPULT, ARCHER, the team
+  [917509, 1114113, 786435] (aimem endlook): slot order (1114113 before
+  786435), not id order (786435 first). The aimem and carried traces now
+  log the three lines as the game; 1117 cityState.move.plot to t91 as p39's.
+- runs/h1_duely1128 t176, city-state 3's City Defense: the Man-at-Arms
+  1179650 (slot 2) is taken because the Warrior 2228224 (slot 0, first in
+  the offer) is obsolete to the player and cut (0x732db0), not by id order;
+  the aimem trace logs "Recruiting strength ... UNIT_MAN_AT_ARMS" as the
+  game in slot order.
+- OPEN: the game's upgrade makes a new unit in a new slot (runs/h1_duely1128
+  t87 Warrior 655367, slot 7 -> Man-at-Arms 1179650, slot 2); the engines'
+  upgrade verbs and the replay keep the unit's id and slot, so a recruit
+  after an upgrade orders that unit by its old slot. The upgraded unit's old
+  self stays in its team for the turn, typed and counted as before
+  (runs/h1_duelz1127 t94 city-state 4's City Defense: "Ready,
+  UNIT_HEAVY_CHARIOT; UNIT_TREBUCHET", "No recruits to match strength ...
+  50.0", "1 units", endlook [720899, 983047] at 63 = 28 + 35 with 720899
+  upgraded to the Knight 1114117 in that turn; runs/h1_duely1117 t91 the
+  Catapult 1114113 upgraded, the team CATAPULT x4): the engines change the
+  member's type in place (Knight, Trebuchet).

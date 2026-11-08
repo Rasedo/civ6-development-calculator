@@ -3722,13 +3722,8 @@ const res = buyTile(state, city.id, d.plot, seat);        if (!res.ok) setTileOw
         ctx.units.delete(d.unit);
         ctx.units.set(d.into, u);
         // the game's upgraded unit is a new one, in none of the minor's
-        // "Upgrade Units" trees, its id the next made: the recruit's offer
-        // walks the units in the order they were made (runs/h1_duely1128
-        // t87 city-state 3's Warrior 655367 upgraded to the Man-at-Arms
-        // 1179650, serial 18, after the Man-at-Arms 983040, serial 15)
-        const was = u.id;
-        if (minor?.upgradeTrees) for (const t of minor.upgradeTrees) t.units = t.units.filter((id) => id !== was);
-        u.id = state.nextUnitId++;
+        // "Upgrade Units" trees
+        if (minor?.upgradeTrees) for (const t of minor.upgradeTrees) t.units = t.units.filter((id) => id !== u.id);
         if (!res.ok) {
           const t = r ? engineRowOf(ctx.cat, 'unit', r.type) : null;
           const s = seatOf(state, u.seat);

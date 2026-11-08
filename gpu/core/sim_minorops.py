@@ -1957,13 +1957,11 @@ class SimMinorOps:
 
     def _mops_recruit(self, s: int, k: int, offer: torch.Tensor, in_prog: bool, rng: int, u: dict,
                       mask: torch.Tensor) -> torch.Tensor:
-        """`recruitOperation` (0x738050): the offer [B, L] sorted by unit id
-        (0x733060 over unit +0x100: the pool index, the order the units were
-        made), then each team in turn takes from it, the units it takes
-        leaving it. [B, P] the units taken"""
+        """`recruitOperation` (0x738050): each team in turn takes from the
+        offer [B, L] in its own order, the pool slot order (the sort 0x733060
+        orders the original offer alone, for the set difference), the units
+        it takes leaving it. [B, P] the units taken"""
         P = self._mops_u(s, "alive").shape[1]
-        o = torch.where(offer >= 0, offer, torch.full_like(offer, P)).argsort(dim=1, stable=True)
-        offer = offer.gather(1, o)
         got = torch.zeros(self.B, P + 1, dtype=torch.bool, device=self.device)
         for ti in range(N_TEAMS):
             t = self._mops_recruit_team(s, k, ti, offer, in_prog, rng, u, mask)
