@@ -35,7 +35,7 @@ import { detectBoosts } from './boosts';
 import { canPlaceDistrictIn, fitEncampOuter, outerDamage, outerPool, urbanDefensesFit, wallsMax } from './rules';
 import { lumpFood, seatGrowth } from './seatTurn';
 import { freeCityBuildFacts, majorQueueItem, seatResearchTurns } from './freeCityBuild';
-import { freeCityThreat, minorAiTurn, minorContractPurchases, minorItemBuilt, minorMilitaryTurn } from './minorCityAi';
+import { freeCityThreat, minorAiTurn, minorContractPurchases, minorEconomicDisband, minorItemBuilt, minorMilitaryTurn } from './minorCityAi';
 import { bankruptcy, cityBorderGrowth, cultureAfterGrowth, jumpMadeAnew, paveGround } from './phase';
 import { applyTrainingGrants } from './combat';
 import { districtScaledBase, goldAffordable, projectCost, repairAvailable } from './game';
@@ -100,8 +100,9 @@ import { opsOf } from './operations/manager';
  *  and civics AIs' turns on the city so grown (`minorResearchAi`), its
  *  military AI's Combat Desire (`minorCombatDesire`), its savings and military AI's
  *  turn (`minorMilitaryTurn`), then its knowledge base's look
- *  (`minorKnowledge`), its contract purchases (`minorContractPurchases`),
- *  then its actions: a research
+ *  (`minorKnowledge`), its contract purchases (`minorContractPurchases`)
+ *  and its savings turn's disband (`minorEconomicDisband`), then its
+ *  actions: a research
  *  completion's upgrades, its city AI's turn (`minorAiTurn`: its builds,
  *  purchases and trees, the trees' Builders' work), its civics AI's
  *  government values on the city it left, its military AI's upgrade
@@ -156,7 +157,7 @@ export function minorPhase(state: GameState): void {
     // the units its City Analysis counts: those standing before its savings
     // turn's purchases
     const units = state.units.filter((u) => u.seat === cityState.seat).length;
-    minorMilitaryTurn(state, cityState);
+    const fell = minorMilitaryTurn(state, cityState);
     // its city AI's turn reads the unit production table on the records the
     // look's ageing keeps, none its sightings add (runs/h1_duely1121 Hunza
     // t9: the barbarian Quadrireme the look records not counted, its Warrior
@@ -164,11 +165,12 @@ export function minorPhase(state: GameState): void {
     // Warrior at 10.0; runs/h1_duely1128 Hong Kong t106: Bologna's two
     // Crossbowmen aged out uncounted, the game's Warrior); its contract
     // purchases after the look (`minorContractPurchases`), the record of a
-    // unit they make counted
+    // unit they make counted; then the savings turn's disband
     const before = new Set(cityState.armyKnown ?? []);
     minorKnowledge(state, cityState, true);
     const sighted = new Set((cityState.armyKnown ?? []).filter((r) => !before.has(r)));
     minorContractPurchases(state, cityState);
+    minorEconomicDisband(state, cityState, fell);
     cityState.armyCounted = minorArmyCounts((cityState.armyKnown ?? []).filter((r) => !sighted.has(r)));
     // its "Upgrade Units" trees' trigger: a technology gained
     // (TRIGGER_TECH_UPGRADE, AI_EVENT_GAIN_TECH). A civic gained alone starts

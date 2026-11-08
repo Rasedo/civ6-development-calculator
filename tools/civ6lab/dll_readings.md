@@ -8830,3 +8830,50 @@ completions' score write-back in `_minor_complete_now` (sim_minors.py) and
   Riding boosted complete, Masonry 253.5 + 74.0 twice (401.5) under
   Mathematics 183.1 + Currency's 144.3 twice (471.8), Currency taken toward
   Mathematics as logged (once each: 327.5 over 327.4, Masonry).
+
+## C-130: the Economic AI's disband of a falling treasury — READ (0x6877d0 from the savings turn 0x688b45..0x688e71, the delete command's can-start 0x948370), both twins
+
+`minorEconomicDisband` (cpu/core/minorCityAi.ts) on the change `savingsTurn`
+returns (cpu/core/aiEconomic.ts) through `minorMilitaryTurn`, called after
+`minorContractPurchases` in `minorPhase` (cpu/core/minorBuild.ts); GPU
+`_minor_economic_disband` on `_minor_military_turn`'s change
+(gpu/core/sim_minorai.py), after `_minor_contract_purchases` (gpu/core/sim_minors.py).
+
+- THE TEST (the savings turn's tail, after its purchases, a non-human): the
+  change its savings shared ([rbp+0x7c0], the treasury less the balance
+  +0x1b8 as the turn opened) below 0 (0x688b45); the treasury now (+0x13a0
+  +0xf8, after the purchases) below 3 x the fall (0x688c03) runs the disband
+  on the fall; else the falling-turns count +0x3f8 above 10 on max(1.0,
+  20 x the fall / the treasury); else on 0. +0x3f8 is +1 on a fall
+  (0x687d5d) and 0 on a rise, and set 0 at the end of this path (0x688e76),
+  so it holds 1 where it is read: the second arm never runs (not ported).
+- THE DISBAND (0x6877d0): while the amount is above 0, over the player's
+  units in pool order (Player +0x12e8 +0xd8, `seatPoolSlots`), each live, on
+  the map, in no job (+0x7d0 -1: no operation's team, no Upgrade Units
+  tree, `minorJobUnits` / `_mops_busy`) with Units.Maintenance (+0x5c, the
+  row's, not a formation's) above the per-unit discount (+0x338, 0 for a
+  minor): the first of the fewest promotions (0x55e710), then one on its own
+  ground, then the least Combat (0x56dc90 with 0, `aiStrengths` /
+  `_ai_combat`), the first on a tie. Its DELETE (0x9483a0) through the
+  command manager: the can-start 0x948370 refuses a damaged unit (+0xcf0
+  above 0), and a refusal ends the loop; else the amount less its
+  Maintenance << 8.
+- Confirmed (one-seed carried traces, every disband against the records'
+  units gone): runs/h1_duely1128 t226 Bologna 3.21 -> 0 Gold, its AT Crew
+  3407881 gone (Totalitarianism 1474.6 / 1444.2 at t227 / t228 as logged:
+  Fascism's attack term on its one unit at the government values);
+  1128 t92 / t98 (two) / t104 / t106 (two) / t107 / t117 (two Pikemen) /
+  t118 / t128 / t158 / t178 (the Bombard) / t204 (Ranger, Field Cannon);
+  1117 t104 (two Crossbowmen), t122, t168, t171, t179 (the Bombard 1638405),
+  t210, t240 (three); 1121 t98 (five Men-At-Arms), t165 and t219 a unit short
+  of the game's two and three (the carried units' state); 1124 t118
+  (as Attack Barb Camp released the two), t130 (three Musketmen), t206;
+  1127 t51 (four Swordsmen), t111, t114, t122, t125, t172. Refused on a
+  damaged pick: 1117 t189 / t190 / t196 (the Field Cannon at 37 / 22 / 50),
+  1121 t162-t164 (the Skirmisher Army 1638401 at 42; healed, gone t165),
+  1128 t121 / t122 (Man-At-Arms 2162690 at 68).
+- Open: Units +0x1b9 bit 4 and unit +0x890, which the can-start also
+  refuses, unidentified; 1121 t179 city-state 2 disbands two Line Infantry
+  the game kept: the record's building purchase of t178 (building 27, 648
+  Gold) its city AI made none of lowers the per-turn world's treasury, not
+  the carried balance, so the next savings turn reads a 633 Gold fall.

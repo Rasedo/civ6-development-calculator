@@ -32,11 +32,30 @@
   context:
     - "...30e0): an AI owner; the Economic AI affords the action's gold cost from savings slot 2 (0x6874d0: slot 2 >= half the cost and slot 0 + slot 2 >= the cost); CanDoAction; and the last..."
   review: reviewed
+- addr: 0x6877d0
+  final: 0x456d60
+  kind: function
+  name: economicDisband
+  semantics: "The Economic AI's disband (from the savings turn at 0x688e71, the amount 24.8 at *rdx): while the amount is above 0, over the player's units (Player +0x12e8 +0xd8, pool order) each live (+0x770 clear, damage below COMBAT_MAX_HIT_POINTS 0x56e0d0), on the map (+0x220 / +0x224 above -9999), in no job (+0x7d0 -1) and of Units.Maintenance (+0x5c) above the treasury's per-unit discount (+0x338) is a candidate; the first sets the pick, a later one replaces it holding strictly fewer promotions (0x55e710 on +0x1bc0), or as many and on the player's own plot (the plot's +0x1c owner) where the pick is not, or as many, the same ground and strictly less Combat (0x56dc90 with 0). The pick's DELETE (0x9483a0 builds UNITCOMMAND_DELETE; the command manager's can-start vt +0x48, 0x948370, refuses a damaged unit) ends the loop when refused; else the amount less (Maintenance - discount) << 8 and the command started (vt +0x58)."
+  status: READ
+  cases:
+    - recording: h1_duely1128
+      turn: 226
+      value: "Bologna 3.21 Gold to 0 (the bank's -5.0): its AT Crew 3407881 (Maintenance 4, no promotion) gone, the Infantry Corps (one promotion) kept; Totalitarianism 1474.6 at t227 as logged"
+    - recording: h1_duely1124
+      turn: 118
+      value: city-state 4's Trebuchet 1376263 and Man-At-Arms 1310728 gone as Attack Barb Camp released them; at t117 all four in the operation, none gone
+  impl:
+    - cpu/core/minorCityAi.ts:minorEconomicDisband
+    - gpu/core/sim_minorai.py:_minor_economic_disband
+  readings:
+    - "C-130: the Economic AI's disband of a falling treasury — READ (0x6877d0 from the savings turn 0x688b45..0x688e71, the delete command's can-start 0x948370), both twins"
+  review: reviewed
 - addr: 0x687bf0
   final: 0x457120
   kind: function
   name: savingsTurn
-  semantics: "The economic AI's turn: the gold boost; the savings — the treasury's change since the balance shared by the DefaultSavings weights, a slot below 0 cleared, slot 2 held at 150 with the excess to slot 0, slot 3 to slot 0 with no Great Person class left, the change the slots did not take (truncation, a cleared slot's debt) to slot 0, slot 0's debt met from the slots in order (all cleared at a treasury of 0 or less). Not for a barbarian or a human: delta = the treasury (player +0x13a0 +0xf8) less the balance (+0x1b8); per slot of the SavingTypes (4) its weight (+0x4b8[i]) over the total (+0x458) as float, to 24.8 (floor << 8 | trunc(frac x 256)); the share (fx x delta) >> 8 added to the slot (+0x540[i]), the shares summed; a slot below 0 (0x688045) cleared, its debt taken off the sum (0x688064). PLOTS (slot 2) above 0x9600 (150.0): the excess to slot 0. No Great Person class available (0x2f7eb0, 0x6882f0..0x688339): slot 3 to slot 0. The remainder (0x68845b..0x68851b): slot 0 += delta - sum. The debt (0x6885bd..0x68872b): slot 0 below 0 — the treasury at 0 or less clears every slot; else slot 0 set to 0 and each slot in order gives min(slot, owed). The balance set to the treasury (0x688836, the watched +0x160). Ported: savingsTurn (cpu/core/aiEconomic.ts), _cv_savings_turn (gpu/core/sim_cityvalue.py)."
+  semantics: "The economic AI's turn: the gold boost; the savings — the treasury's change since the balance shared by the DefaultSavings weights, a slot below 0 cleared, slot 2 held at 150 with the excess to slot 0, slot 3 to slot 0 with no Great Person class left, the change the slots did not take (truncation, a cleared slot's debt) to slot 0, slot 0's debt met from the slots in order (all cleared at a treasury of 0 or less). Not for a barbarian or a human: delta = the treasury (player +0x13a0 +0xf8) less the balance (+0x1b8); per slot of the SavingTypes (4) its weight (+0x4b8[i]) over the total (+0x458) as float, to 24.8 (floor << 8 | trunc(frac x 256)); the share (fx x delta) >> 8 added to the slot (+0x540[i]), the shares summed; a slot below 0 (0x688045) cleared, its debt taken off the sum (0x688064). PLOTS (slot 2) above 0x9600 (150.0): the excess to slot 0. No Great Person class available (0x2f7eb0, 0x6882f0..0x688339): slot 3 to slot 0. The remainder (0x68845b..0x68851b): slot 0 += delta - sum. The debt (0x6885bd..0x68872b): slot 0 below 0 — the treasury at 0 or less clears every slot; else slot 0 set to 0 and each slot in order gives min(slot, owed). The balance set to the treasury (0x688836, the watched +0x160). After the purchases, a non-human with the change below 0 (0x688b45): the treasury under 3 x the fall (0x688c03) runs the disband 0x6877d0 on the fall, else +0x3f8 (the falling turns, +1 at 0x687d5d, 0 on a rise) above 10 runs it on max(1.0, 20 x the fall / the treasury), else on 0; +0x3f8 then 0 (0x688e76). Ported: savingsTurn (cpu/core/aiEconomic.ts), _cv_savings_turn (gpu/core/sim_cityvalue.py)."
   status: READ
   cases:
     - recording: h1_duelu1117
@@ -61,7 +80,11 @@
     - cpu/core/aiWeights.ts:economicGoldBoost
     - gpu/core/sim_cityvalue.py:live_gold_boost
     - gpu/core/sim_cityvalue.py:_gold_boost_of
+    - cpu/core/minorCityAi.ts:minorMilitaryTurn
+    - gpu/core/sim_minorai.py:_minor_military_turn
+    - cpu/core/minorCityAi.ts:minorEconomicDisband
   readings:
+    - "C-130: the Economic AI's disband of a falling treasury — READ (0x6877d0 from the savings turn 0x688b45..0x688e71, the delete command's can-start 0x948370), both twins"
     - "C-129: a city-state's contract purchases come after its knowledge base's look"
     - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
     - "C-97: the majors' diplomatic actions — the pick, the state machine and the receiver READ, the evaluator's terms PARTLY READ"

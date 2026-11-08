@@ -98,13 +98,16 @@ class SimMinorAi:
 
     # -- the minor's AI turn -------------------------------------------------
 
-    def _minor_military_turn(self, s: int) -> None:
+    def _minor_military_turn(self, s: int) -> torch.Tensor:
         """`minorMilitaryTurn` — B: the savings and the military AI's turn, on
-        the knowledge base as its last look left it"""
+        the knowledge base as its last look left it. Returns [B] the
+        savings' change, raw (0 with no city), which its disband reads after
+        the purchases (`_minor_economic_disband`)"""
         alive = self.citystate_alive[:, s] & (self.citystate_center[:, s] >= 0)
         if not bool(alive.count_nonzero()):
-            return
+            return torch.zeros(self.B, dtype=torch.long, device=self.device)
         tre = torch.trunc(self.citystate_treasury[:, s] * _FX).long()
+        delta = torch.where(alive, tre - self.citystate_balance[:, s], torch.zeros_like(tre))
         # its GREAT_PEOPLE slot stands apart while the game has a class available
         sav, bal = self._cv_savings_turn(self.citystate_savings[:, s], self.citystate_balance[:, s], tre,
                                          self._minor_gp_class())
@@ -115,6 +118,56 @@ class SimMinorAi:
         boost = _gold_boost_of(self.citystate_net_income[:, s])
         self.citystate_gold_boost[:, s] = torch.where(alive, boost, self.citystate_gold_boost[:, s])
         self._mops_evaluate(s)
+        return delta
+
+    def _minor_economic_disband(self, s: int, delta: torch.Tensor) -> None:
+        """`minorEconomicDisband` (0x6877d0, the savings turn's last step):
+        where the treasury fell since the Economic AI's last turn (`delta`
+        [B] raw below 0) and now stands under three times the fall, units go
+        until their Maintenance covers it: over the minor's pool order
+        (`_seat_pool_slots`), each in no job (`_mops_busy`) whose
+        Units.Maintenance is above 0, the first of the fewest promotions, then
+        one on the minor's own ground, then the least Combat (`_ai_combat`)
+        is deleted and its Maintenance taken off the fall; the one picked
+        damaged (the delete command refuses it) ends it"""
+        alive = self.citystate_alive[:, s] & (self.citystate_center[:, s] >= 0)
+        tre = torch.trunc(self.citystate_treasury[:, s] * _FX).long()
+        go = alive & (delta < 0) & (tre < -3 * delta)
+        if not bool(go.count_nonzero()):
+            return
+        seat = 100 + s
+        self._seat_pool_slots(s, "major", seat, go)
+        left = torch.where(go, -delta, torch.zeros_like(delta))
+        busy = self._mops_busy(s)
+        P = busy.shape[1]
+        ut = self.major_unit_type.clamp(min=0, max=self.NU - 1)
+        maint = self._type_maintenance.take(ut).long()
+        own = self.tile_seat.gather(1, self.major_unit_tile.clamp(min=0)) == seat
+        held = self._popcount(self.major_unit_promos)
+        combat = self._ai_combat("major").long().clamp(min=0, max=4095)
+        hp_max = int(self.rules.combat["unitHp"])
+        slot = torch.arange(P, device=self.device).unsqueeze(0)
+        key = self.major_unit_pslot.clamp(min=0) * P + slot
+        span = P * P + P + 1
+        rank = ((held * 2 + (~own).long()) * 4096 + combat) * span + key
+        while bool((left > 0).count_nonzero()):
+            cand = ((left > 0).unsqueeze(1) & self.major_unit_alive & (self.major_unit_seat == seat)
+                    & (self.major_unit_tile >= 0) & ~busy & (maint > 0))
+            do = cand.any(dim=1)
+            if not bool(do.count_nonzero()):
+                break
+            victim = torch.where(cand, rank, torch.full_like(rank, 1 << 62)).argmin(dim=1)
+            # the delete command refuses a damaged unit, which ends the step
+            whole = self.major_unit_hp.gather(1, victim.unsqueeze(1)).squeeze(1) >= hp_max
+            left = torch.where(do & ~whole, torch.zeros_like(left), left)
+            do = do & whole
+            if not bool(do.count_nonzero()):
+                break
+            rows = do.nonzero(as_tuple=True)[0]
+            vslot = victim[rows]
+            self._occ_clear(rows, self.major_unit_tile[rows, vslot], vslot)
+            self.unit_alive[rows, vslot] = False
+            left = left - torch.where(do, maint.gather(1, victim.unsqueeze(1)).squeeze(1) * _FX, torch.zeros_like(left))
 
     def _minor_gp_class(self) -> torch.Tensor:
         """[B] `minorGreatPersonClass` (0x2f7eb0): a class of the AI's list

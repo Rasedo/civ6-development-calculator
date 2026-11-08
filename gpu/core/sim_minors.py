@@ -67,16 +67,18 @@ class SimMinors:
             # the units its City Analysis counts: those standing before its
             # savings turn's purchases
             units = (self.major_unit_alive & (self.major_unit_seat == 100 + s)).sum(dim=1)
-            self._minor_military_turn(s)
+            fell = self._minor_military_turn(s)
             # its city AI's turn reads the unit production table on the
             # records the look's ageing keeps, none its sightings add
             # (`CityState.armyCounted`: those numbered before the look); its
             # contract purchases after the look (`minorContractPurchases`),
-            # the record of a unit they make counted (numbered after it)
+            # the record of a unit they make counted (numbered after it); then
+            # the savings turn's disband (`minorEconomicDisband`)
             before = self.citystate_kb_next[:, s].clone()
             self._minor_knowledge(s, True)
             after = self.citystate_kb_next[:, s].clone()
             self._minor_contract_purchases(s, self.citystate_alive[:, s] & (self.citystate_center[:, s] >= 0))
+            self._minor_economic_disband(s, fell)
             self._cv_counted[s] = self._cv_known(s, before, after)
             # its "Upgrade Units" trees' trigger: a technology gained
             # (`minorTurn`: a civic gained alone starts none)

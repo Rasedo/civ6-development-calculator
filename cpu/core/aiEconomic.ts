@@ -56,8 +56,10 @@ export interface EconomicMemory {
 export const newEconomicMemory = (): EconomicMemory => ({ savings: AI_DEFAULT_SAVINGS.map(() => 0), balance: 0 });
 
 /** THE SAVINGS TURN (0x687bf0) on the treasury `treasury`, raw;
- *  `classAvailable` whether a Great Person class is available */
-export function savingsTurn(e: EconomicMemory, treasury: number, classAvailable: boolean): void {
+ *  `classAvailable` whether a Great Person class is available. Returns the
+ *  change since its last turn (the treasury less the balance, [rbp+0x7c0]),
+ *  which its disband reads after the purchases */
+export function savingsTurn(e: EconomicMemory, treasury: number, classAvailable: boolean): number {
   const delta = treasury - e.balance;
   // what the slots took: each share, and the debt of a slot cleared below 0
   let taken = 0;
@@ -95,6 +97,7 @@ export function savingsTurn(e: EconomicMemory, treasury: number, classAvailable:
     }
   }
   e.balance = treasury;
+  return delta;
 }
 
 /** a spend (0x68acd0): the overflow from slot 0, the slot no lower than 0,

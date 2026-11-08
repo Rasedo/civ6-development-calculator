@@ -1,0 +1,40 @@
+# The DLL atlas, curated layer (tools/civ6lab/atlas.py documents the record).
+# Records keyed by GameCore_XP2_Release.dll RVA; `final` the FinalRelease RVA.
+# `review: imported` = bootstrapped from dll_readings.md / code comments / saved
+# labels and not yet reviewed: verify against the disassembly, then edit and
+# set `review: reviewed`.
+- addr: 0x948370
+  kind: function
+  name: deleteCanStart
+  semantics: "The DELETE command's can-start (UNITCOMMAND_DELETE 0x73cd1698, the command object's vtable @0xd95490 slot 2): false for a unit whose type's Units +0x1b9 bit 4 is set or whose +0x890 byte is set; else true only where its damage (+0xcf0) is at most 0 — a damaged unit is never deleted."
+  status: READ
+  cases:
+    - recording: h1_duely1121
+      turn: 162
+      value: city-state 4's Economic AI disband picks its Skirmisher Army 1638401 (42 damage) at t162-t164 and deletes nothing; healed at t165 it goes with the Skirmisher 2293760
+    - recording: h1_duely1128
+      turn: 121
+      value: "Hong Kong's pick, its Man-At-Arms 2162690 at 68 damage on its own ground, refused at t121 / t122: no unit gone"
+  impl:
+    - cpu/core/minorCityAi.ts:minorEconomicDisband
+    - gpu/core/sim_minorai.py:_minor_economic_disband
+    - cpu/core/minorCityAi.ts:busy
+  readings:
+    - "C-130: the Economic AI's disband of a falling treasury — READ (0x6877d0 from the savings turn 0x688b45..0x688e71, the delete command's can-start 0x948370), both twins"
+  notes: [Units +0x1b9 bit 4 and unit +0x890 unidentified, not ported]
+  review: reviewed
+- addr: 0x9483a0
+  kind: function
+  name: deleteCommandType
+  semantics: "The DELETE command's type for a request: the unit command registry (0x50e00) asked through its vt +0x88 for 0x73cd1698 (UNITCOMMAND_DELETE); the Economic AI's disband (0x6877d0 at 0x6879fa) builds its request with it."
+  status: READ
+  cases:
+    - recording: h1_duely1128
+      turn: 226
+      value: Bologna's AT Crew 3407881 deleted by the Economic AI's disband (0x6877d0) through this request
+  impl:
+    - cpu/core/minorCityAi.ts:minorEconomicDisband
+    - gpu/core/sim_minorai.py:_minor_economic_disband
+  readings:
+    - "C-130: the Economic AI's disband of a falling treasury — READ (0x6877d0 from the savings turn 0x688b45..0x688e71, the delete command's can-start 0x948370), both twins"
+  review: reviewed

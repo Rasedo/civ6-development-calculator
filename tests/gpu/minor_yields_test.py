@@ -131,7 +131,7 @@ def test_clock(rules, path) -> None:
     tot = walk(sim, row)
     # the clock alone: the city AI's purchases and its units' walk (a camp
     # or a village it clears pays Gold) sit this phase out
-    sim._minor_military_turn = lambda s_: None
+    sim._minor_military_turn = lambda s_: torch.zeros(sim.B, dtype=torch.long, device=sim.device)
     sim._minor_ai_turn = lambda s_: None
     sim._minor_tactics = lambda s_: None
     try:

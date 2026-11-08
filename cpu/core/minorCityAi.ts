@@ -33,7 +33,7 @@
  */
 import type { City, CityState, DistrictId, GameState, Seat, Tile, Unit } from './types';
 import { BUILDINGS } from '../data/buildings';
-import { BUILDER_COST_STEP, UNITS } from '../data/units';
+import { BUILDER_COST_STEP, UNITS, UNIT_HP } from '../data/units';
 import { TECHS as TECHS_KNOWN } from '../data/techs';
 import { CIVICS as CIVICS_KNOWN } from '../data/civics';
 import { DISTRICTS } from '../data/districts';
@@ -80,7 +80,7 @@ import { computeUnlocksIn, makeYieldCtx } from './effects';
 import { eruptionHazardTurns, floodHazardTurns } from './disasters';
 import { baseAdjacency, buildingPillaged, improvementAdjacency } from './yields';
 import { tileAppeal } from './appeal';
-import { builderHarvest, builderRemoveFeature, purchaseSpotBlocked } from './units';
+import { builderHarvest, builderRemoveFeature, disbandUnit, promotionsHeld, purchaseSpotBlocked } from './units';
 import { aiStrengths, dangerPlane, moveTo, moveUnitDanger, reachPlots, seatPoolSlots, turnsToPlot } from './tactical';
 import { randRange } from './rand';
 import {
@@ -875,20 +875,73 @@ export function traceMinorAi(fn: ((line: string) => void) | null): void {
  * evaluation (runs/h1_duelv1124 player 2: the camp 8:14 placed in t5, in
  * its knowledge base's t6 log, its candidate from t7; so 1121 player 2's
  * 10:2 and player 4's 34:23, 1127 player 4's 6:8: each a camp placed on a
- * plot the minor had revealed).
+ * plot the minor had revealed). Returns the savings' change, raw (0 with no
+ * city), which its disband reads after the purchases (`minorEconomicDisband`).
  */
-export function minorMilitaryTurn(state: GameState, cs: CityState): void {
-  if (cs.centerIndex < 0) return;
+export function minorMilitaryTurn(state: GameState, cs: CityState): number {
+  if (cs.centerIndex < 0) return 0;
   const eco = (cs.economy ??= newEconomicMemory());
   // its GREAT_PEOPLE slot stands apart while the game has a class available
   // (0x2f7eb0 reads the game's classes, not the player's; runs/h1_duelw1124
   // Bologna's Warrior contract of t15 bought at t18, at 101 + 6 Gold, the
   // folded slot's savings passing from t16; 1127 p4's Builder at t46, p2's
   // at t210, as logged)
-  savingsTurn(eco, Math.trunc(cs.treasury * FX), minorGreatPersonClass(state));
+  const delta = savingsTurn(eco, Math.trunc(cs.treasury * FX), minorGreatPersonClass(state));
   // its Gold boost, which its Gold weight reads until its next turn
   eco.goldBoost = economicGoldBoost(cs.netIncome ?? 0);
   minorOpsEvaluate(state, cs);
+  return delta;
+}
+
+/**
+ * THE ECONOMIC AI'S DISBAND (0x6877d0, the savings turn's last step,
+ * 0x688b45..0x688e71, after its purchases): where the treasury fell since
+ * the Economic AI's last turn (`delta`, the savings' change, below 0) and now
+ * stands under three times the fall (0x688c03), units go until their
+ * Maintenance covers the fall: over the minor's units in its pool order
+ * (`seatPoolSlots`), each in no job (unit +0x7d0: `minorJobUnits`) whose
+ * Units.Maintenance (+0x5c) is above 0, the first of the fewest promotions,
+ * then one on the minor's own ground, then the least Combat (0x56dc90,
+ * `aiStrengths`) is deleted (UNITCOMMAND_DELETE) and its Maintenance taken
+ * off the fall; with none left, or the one picked damaged (the command
+ * refuses it), it stops. The count of falling turns the
+ * other arm reads (+0x3f8 above 10: the fall x 20 over the treasury) is
+ * cleared on this path every turn the treasury falls and set 0 on every
+ * other, so it holds 1 where it is read and that arm never runs.
+ * runs/h1_duely1128 t226 Bologna: 3.21 Gold to 0 (the bank's -5.0), its
+ * AT Crew 3407881 (Maintenance 4, no promotion) gone, its Infantry Corps
+ * (one promotion) kept; Fascism's attack term 10 for its one unit at the
+ * government values, Totalitarianism 1474.6 at t227 as logged.
+ */
+export function minorEconomicDisband(state: GameState, cs: CityState, delta: number): void {
+  if (delta >= 0 || cs.centerIndex < 0) return;
+  if (Math.trunc(cs.treasury * FX) >= -3 * delta) return;
+  let left = -delta;
+  seatPoolSlots(state, cs);
+  const busy = new Set(minorJobUnits(cs));
+  while (left > 0) {
+    let victim: Unit | undefined;
+    let held = 0;
+    let own = false;
+    let combat = 0;
+    const units = state.units.filter((u) => u.seat === cs.seat && u.tileIndex >= 0 && !busy.has(u.id) && (UNITS[u.type]?.maintenance ?? 0) > 0)
+      .sort((a, b) => (a.slot ?? 0) - (b.slot ?? 0));
+    for (const u of units) {
+      const h = promotionsHeld(u);
+      const o = tileSeat(state.map.tiles[u.tileIndex]) === cs.seat;
+      const c = aiStrengths(state, u).melee;
+      if (victim && (h > held || (h === held && (o !== own ? !o : c >= combat)))) continue;
+      victim = u;
+      held = h;
+      own = o;
+      combat = c;
+    }
+    // the delete command refuses a damaged unit (its can-start 0x948370:
+    // damage +0xcf0 at most 0), which ends the step
+    if (!victim || victim.hp < UNIT_HP) return;
+    disbandUnit(state, victim.id);
+    left -= UNITS[victim.type].maintenance * FX;
+  }
 }
 
 /**
