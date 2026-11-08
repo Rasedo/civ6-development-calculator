@@ -131,8 +131,13 @@
     - recording: 1117
       turn: 14
       value: "The log carries   one UnitDamageChanged for the three (1117 t14: a barbarian Warrior at 27 HP   on Valletta;"
-  impl: [cpu/core/combat.ts:districtHit, cpu/harness/replayActions.ts:combat]
-  readings: ["H-1: the melee result, a ranged blow's domain, a city's shot — READ"]
+  impl:
+    - cpu/core/combat.ts:districtHit
+    - cpu/harness/replayActions.ts:combat
+    - cpu/core/combat.ts:districtDamageLoss
+  readings:
+    - "H-1: the melee result, a ranged blow's domain, a city's shot — READ"
+    - "C-95: a damaged centre defends at its wounded strength, the planning's city shot needs standing walls, the barbarians plan on the turn's unhealed centres — READ (0x51eaf0, 0x791470 at 0x79181c..0x791827 -> 0x249ee0 / 0x24b960), both twins; the replay's barbarian copy"
   context:
     - ...E_DAMAGE_PERCENT_MELEE 15 (RANGED 50, BOMBARD 100; +0x1a4, +0x1a8, +0x1a0). The ranged (0x204b10) and bombard (0x2074b0) attacks draw twice (hit points, defense) and nothing for the at...
   review: reviewed
@@ -187,7 +192,10 @@
     - cpu/harness/replayActions.ts:unit
     - gpu/core/sim_seats.py:_attack_encampment
     - gpu/core/sim_seats.py:_assault_city
-  readings: ["H-1: the melee result, a ranged blow's domain, a city's shot — READ"]
+    - cpu/core/combat.ts:districtDamageLoss
+  readings:
+    - "H-1: the melee result, a ranged blow's domain, a city's shot — READ"
+    - "C-95: a damaged centre defends at its wounded strength, the planning's city shot needs standing walls, the barbarians plan on the turn's unhealed centres — READ (0x51eaf0, 0x791470 at 0x79181c..0x791827 -> 0x249ee0 / 0x24b960), both twins; the replay's barbarian copy"
   context:
     - "- A unit's attack on a city (0x206080, melee) draws three times: 0x519370 the attacker's damage, then 0x519440 the district's..."
   review: reviewed
@@ -265,8 +273,13 @@
     - recording: 1117
       turn: 14
       value: "The log carries   one UnitDamageChanged for the three (1117 t14: a barbarian Warrior at 27 HP   on Valletta;"
-  impl: [cpu/core/combat.ts:districtHit, cpu/harness/replayActions.ts:combat]
-  readings: ["H-1: the melee result, a ranged blow's domain, a city's shot — READ"]
+  impl:
+    - cpu/core/combat.ts:districtHit
+    - cpu/harness/replayActions.ts:combat
+    - cpu/core/combat.ts:districtDamageLoss
+  readings:
+    - "H-1: the melee result, a ranged blow's domain, a city's shot — READ"
+    - "C-95: a damaged centre defends at its wounded strength, the planning's city shot needs standing walls, the barbarians plan on the turn's unhealed centres — READ (0x51eaf0, 0x791470 at 0x79181c..0x791827 -> 0x249ee0 / 0x24b960), both twins; the replay's barbarian copy"
   context:
     - ...15 (RANGED 50, BOMBARD 100; +0x1a4, +0x1a8, +0x1a0). The ranged (0x204b10) and bombard (0x2074b0) attacks draw twice (hit points, defense) and nothing for the attacker. The log carries...
   review: reviewed
@@ -327,6 +340,7 @@
     - cpu/core/tactical.ts:fought
     - cpu/core/units.ts:mapLayer
     - gpu/core/sim_init.py:__init__
+    - cpu/core/combat.ts:bestDefender
   readings:
     - "H-1: an annex re-places the citizens, the garrison's unit, a religious unit killed on a move — READ"
     - "H-1: the garrison requirement — READ"

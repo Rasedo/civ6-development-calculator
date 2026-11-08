@@ -2332,7 +2332,8 @@ class SimTactics:
         branch: the combat with the sides swapped, its location the spot):
         the law at its expectation on the city's strike strength
         (`_city_shot_atk`) against the unit's strength under a city's shot
-        there (`_city_shot_def`)"""
+        there (`_city_shot_def`); none where the city's outer defence is down
+        or it has none (0x249ee0 with the flag clear)"""
         B, dev = self.B, self.device
         out = torch.zeros(B, 6, dtype=torch.long, device=dev)
         if not bool(on.any()):
@@ -2346,6 +2347,10 @@ class SimTactics:
             csx = self.citystate_at.gather(1, ttc.unsqueeze(1)).squeeze(1).clamp(min=0, max=self.S - 1)
             hrow = torch.where(city, hrow, self._CITY_MINOR0 + csx)
             hcol = torch.where(city, hcol, torch.zeros_like(hcol))
+        pool = torch.minimum(self.city_outer_hp[self._bidx, hrow, hcol].long(), self._walls_max_at(hrow, hcol).long())
+        on = on & (pool > 0)
+        if not bool(on.any()):
+            return out
         d_slot = torch.where(on, us + self.POOL_LO[pre], torch.full_like(us, -1))
         d_seat = torch.where(on, self.unit_seat[self._bidx, d_slot.clamp(min=0)], torch.full_like(us, -1))
         atk = torch.zeros(B, dtype=torch.float64, device=dev)

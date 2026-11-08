@@ -201,6 +201,10 @@ interface Ctx {
    *  it, `barbStart`): the barbarians' AI takes its turn from there
    *  (`barbarianAi`) */
   barbBlows: Map<Unit, Unit>;
+  /** every city centre's hit points and outer defence by plot before the
+   *  turn's close heals it: the barbarians, the turn's last player, take
+   *  their turn before that heal (`barbarianAi`) */
+  barbCentres: Map<number, { hp: number; outerHp?: number }>;
   /** each major's best strengths trained as the next turn's start opens,
    *  and the chassis of every unit then standing (`bestsBeforeStart`) */
   startBests?: { best: Map<number, [number, number | undefined]>; types: Map<Unit, string> };
@@ -1054,6 +1058,18 @@ function barbarianAi(ctx: Ctx, b: TurnRecord, closing: number, before: ReadonlyS
     }
     c.hp = snap.hp;
     c.tileIndex = snap.tileIndex;
+  }
+  // ...and every city centre as it stood before the turn's close healed it
+  // and before their battles of the pair struck it (runs/h1_duelz1128 t242:
+  // Rome on 42:20 at 21 hit points, 179 damage as the combat log's 39
+  // defence reads it, not the replay's sacked 100)
+  for (const [plot, was] of ctx.barbCentres) {
+    const major = cityAtIndex(copy, plot)?.city;
+    const minor = major ? undefined : cityStateAt(copy, plot);
+    const c = major ?? (minor?.centerIndex === plot ? minor : undefined);
+    if (!c) continue;
+    c.hp = was.hp;
+    c.outerHp = was.outerHp;
   }
   // a unit the game holds as their turn opens that the replay's battles
   // killed or its record took off stands on its plot with the log's damage
@@ -5677,7 +5693,7 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
   const ctx: Ctx = {
     state, cat, W: recs[0].head.W, seatOfPlayer: first.seatOfPlayer, playerOfSeat: first.playerOfSeat,
     units: new Map(), retained: new Map(), pendingMinors: new Map(), next: first, tally: new Map(), fellBack: new Map(), imposed: new Map(), reasons: new Map(),
-    engineKilled: new Set(), routeSpent: new Map(), paths: new Map(), walked: new Set(), steps: new Map(), barbBlows: new Map(), gone: new Map(), barbSeized: [], minorBlows: new Map(), minorShots: [], minorPromoted: new Map(), minorBuys: [], minorImproves: [], minorClears: [], minorCleared: new Set(), minorClearItems: new Map(), minorClearUnits: [], barbBattles: [], barbFought: new Set(), barbDraws: [], promoteHp: new Map(), minorUnits: [], minorGround: [], buyTrace, lateBlows: [], upgradeInto: new Set(), upgradedFrom: new Map(), levyFrom: new Map(), barbSteps: [], barbPillaged: [], envoys: [], battled: new Set(), fortified: new Map(), undug: new Map(), streams: new Map(), applied: new Set(), barbNew: [], lateEnvoys: [], log: history.randLog, stream, prev: recs[0],
+    engineKilled: new Set(), routeSpent: new Map(), paths: new Map(), walked: new Set(), steps: new Map(), barbBlows: new Map(), barbCentres: new Map(), gone: new Map(), barbSeized: [], minorBlows: new Map(), minorShots: [], minorPromoted: new Map(), minorBuys: [], minorImproves: [], minorClears: [], minorCleared: new Set(), minorClearItems: new Map(), minorClearUnits: [], barbBattles: [], barbFought: new Set(), barbDraws: [], promoteHp: new Map(), minorUnits: [], minorGround: [], buyTrace, lateBlows: [], upgradeInto: new Set(), upgradedFrom: new Map(), levyFrom: new Map(), barbSteps: [], barbPillaged: [], envoys: [], battled: new Set(), fortified: new Map(), undug: new Map(), streams: new Map(), applied: new Set(), barbNew: [], lateEnvoys: [], log: history.randLog, stream, prev: recs[0],
     researchAi: report.researchAi, researchScores: report.researchScores, agendaCivics: null, researchBefore: new Map(), researchAtTurn: new Map(), aiResearchLog: loadAiResearchLog(dumpPath),
     tactical: loadTactical(dumpPath), barbTally: report.barbTactics, minorTally: report.minorTactics, minorDraws: report.minorDraws,
     civicAi: report.civicAi, civicScores: report.civicScores, civicBefore: new Map(), aiCivicLog: govtLog.civics, aiPolicyLog: govtLog.policies,
@@ -6300,6 +6316,8 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
       ctx.minorDying = state.unitsDying ?? [];
       takeBarbs();
       worldCongress(state);
+      ctx.barbCentres = new Map([...state.seats.flatMap((s) => s.cities), ...state.freeSeat?.cities ?? [], ...state.cityStates]
+        .map((c) => [c.centerIndex, { hp: c.hp ?? CITY_MAX_HP, outerHp: c.outerHp }] as const));
       turnClose(state);
       const changing = barbs.filter((u) => barbAt.has(u));
       barbs.splice(0, barbs.length, ...barbs.filter((u) => !barbAt.has(u)));

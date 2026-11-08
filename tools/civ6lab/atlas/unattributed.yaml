@@ -2291,6 +2291,16 @@
     - "...ack on a city (0x206080, melee) draws three times: 0x519370 the attacker's damage, then 0x519440 the district's hit points (hash 0x5e97d629) and 0x519440 its outer defense (0x6da56a3d)..."
     - "- The district's hit (0x519440 builds the law's struct: +0 / +4 the two strengths, +8 the district's maximum hit point..."
   review: reviewed
+- addr: 0x522c10
+  final: 0x36d4b0
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-95: a damaged centre defends at its wounded strength, the planning's city shot needs standing walls, the barbarians plan on the turn's unhealed centres — READ (0x51eaf0, 0x791470 at 0x79181c..0x791827 -> 0x249ee0 / 0x24b960), both twins; the replay's barbarian copy"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - ...wn damage loss (the same 0x51eaf0 on its encampHp) is unported; 0x51eaf0's terrain term 0x522c10 and modifier lists unread; the engine's barbarian sack of a major's centre at 0 hit p...
+  review: imported
 - addr: 0x523520
   final: 0x36dca0
   kind: function
@@ -2330,7 +2340,7 @@
     - recording: 1121
       turn: 191
       value: "Recorded: 1121 Guangzhou t191, a Line Infantry Corps (75,   16 HP) over an Ironclad (70, 75 HP): 66.6015625 = 60 + 75 − 2150/256 − 60   (the strongest-by-term reading gave 67.5)."
-  impl: [cpu/core/combat.ts:garrisonCS]
+  impl: [cpu/core/combat.ts:garrisonCS, cpu/core/combat.ts:bestDefender]
   readings:
     - "H-1: an annex re-places the citizens, the garrison's unit, a religious unit killed on a move — READ"
     - "C-99: an embarked unit passes no other player's passenger — the step's flag-1 test READ (0x2720a0 at 0x272372, 0x271be0, 0x586360 at 0x586542, 0x208b80 under 0x108, 0x20a2a0), both twins"

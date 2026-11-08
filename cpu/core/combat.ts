@@ -1132,19 +1132,45 @@ export function woundedLoss256(damagePct: number, reductionPct = 0): number {
  * of 70 at 75 HP, 66.6015625). An aircraft and a passenger are no garrison.
  */
 function garrisonCS(state: GameState, city: City, base: number, plot = city.centerIndex): number {
+  const best = bestDefender(state, city.seat, plot);
+  if (!best) return 0;
+  const loss = woundedLoss256(Math.trunc(((UNIT_HP - best.unit.hp) * 100) / UNIT_HP), UNITS[best.unit.type]?.noWoundPenalty ? 100 : 0);
+  return Math.max(0, best.top - loss / 256 - base);
+}
+
+/** a district plot's best defender of `seat` (0x208b80 with the comparator
+ *  0x523d60): its military unit, not embarked, of the greatest Combat and
+ *  formation strength unwounded, the first on a tie */
+function bestDefender(state: GameState, seat: number, plot: number): { unit: Unit; top: number } | null {
   let pick: Unit | undefined;
   let top = -Infinity;
   for (const u of unitsAt(state, plot)) {
-    if (u.seat !== city.seat || unitDomain(u.type) !== 'military' || u.embarked) continue;
+    if (u.seat !== seat || unitDomain(u.type) !== 'military' || u.embarked) continue;
     const s = (UNITS[u.type]?.combat ?? 0) + formationCS(u);
     if (s > top) {
       top = s;
       pick = u;
     }
   }
-  if (!pick) return 0;
-  const loss = woundedLoss256(Math.trunc(((UNIT_HP - pick.hp) * 100) / UNIT_HP), UNITS[pick.type]?.noWoundPenalty ? 100 : 0);
-  return Math.max(0, top - loss / 256 - base);
+  return pick ? { unit: pick, top } : null;
+}
+
+/**
+ * THE DAMAGED DISTRICT'S LOSS in a fight it defends (0x51eaf0, the defending
+ * district's terms in melee 0x206080, ranged 0x204b10 and bombard 0x2074b0,
+ * the AI's simulated combat 0x791470 with them): the wounded law
+ * (`woundedLoss256`, COMBAT_WOUNDED_DISTRICT_DAMAGE_MULTIPLIER 10) on the
+ * percent of its hit points lost (GetDamage x 100 / GetMaxDamage on the hit
+ * points' hash, truncated), less the share its plot's best defender's
+ * NoReduction waives (0x24b170 -> +0x1868). runs/h1_duelz1128 t241-249:
+ * Rome's centre on 42:20 at 48 defends at 39 with 179 of 200 lost (the
+ * combat log's 35 + 4) and at 32 with 128 of its 38.
+ */
+export function districtDamageLoss(state: GameState, seat: number, plot: number, hp: number, max: number): number {
+  if (max <= 0) return 0;
+  const best = bestDefender(state, seat, plot);
+  const pct = Math.trunc(((max - Math.min(max, hp)) * 100) / max);
+  return woundedLoss256(Math.max(0, pct), best && UNITS[best.unit.type]?.noWoundPenalty ? 100 : 0) / 256;
 }
 
 /** CIV6 (Buildings.OuterDefenseStrength): each wall building the city has
@@ -1215,6 +1241,19 @@ export function districtGarrisonedStrength(state: GameState, city: City, plot: n
 export function cityDefenseStrength(state: GameState, city: City, garrisoned = true): number {
   return centreStrength(state, city, garrisoned) + (outerPool(state, city) > 0 ? getModifiers(state, city.seat).cityDefense : 0)
     + governorSum(state, city, (e) => e.cityDefense);
+}
+
+/** a major's or a Free City's centre defending a fight: its defence
+ *  (`cityDefenseStrength`) less the damaged district's loss
+ *  (`districtDamageLoss`) */
+export function cityCombatDefense(state: GameState, city: City): number {
+  return cityDefenseStrength(state, city) - districtDamageLoss(state, city.seat, city.centerIndex, city.hp, CITY_MAX_HP);
+}
+
+/** a city-state's centre defending a fight: its standing strength
+ *  (`centreStrength`) less the damaged district's loss */
+export function minorCombatDefense(state: GameState, cs: CityState): number {
+  return centreStrength(state, minorCity(cs)) - districtDamageLoss(state, cs.seat, cs.centerIndex, cs.hp ?? CITY_MAX_HP, CITY_MAX_HP);
 }
 
 /**
@@ -1592,7 +1631,7 @@ export function predictCityBlow(state: GameState, attacker: Unit, targetIndex: n
 /** the AI's predicted exchange with a city centre (0x791470's district
  *  branch, simulated as a unit is): the blow `attacker` deals it
  *  (`predictCityBlow`) and the damage a melee attacker takes from it, the
- *  law at its expectation on the city's defence against the assault's
+ *  law at its expectation on the city's defence in the fight (`cityCombatDefense`, `minorCombatDefense`: its damage's loss off) against the assault's
  *  strength (`damageExpected`; a ranged attacker none); 0 and 0
  *  where no city of a player hostile to it stands there */
 export function predictCityExchange(state: GameState, attacker: Unit, targetIndex: number): { dealt: number; taken: number } {
@@ -1600,7 +1639,7 @@ export function predictCityExchange(state: GameState, attacker: Unit, targetInde
   const cs = held ? undefined : cityStateAt(state, targetIndex);
   const shape = held ? held.city : cs && cs.centerIndex === targetIndex ? { buildings: cs.buildings ?? [], seat: cs.seat, outerHp: cs.outerHp } : null;
   if (!shape || !unitsHostile(state, attacker, { seat: shape.seat })) return { dealt: 0, taken: 0 };
-  const defCS = held ? cityDefenseStrength(state, held.city) : centreStrength(state, minorCity(cs!));
+  const defCS = held ? cityCombatDefense(state, held.city) : minorCombatDefense(state, cs!);
   const outer = outerPool(state, shape);
   const ranged = !!UNITS[attacker.type]?.ranged;
   const atkCS = ranged
@@ -1620,12 +1659,17 @@ export function predictCityExchange(state: GameState, attacker: Unit, targetInde
  *  at its expectation on the city's strike strength (`cityStrikeStrength`,
  *  its emergency term) against the unit's strength under a city's shot
  *  there (`cityStrikeDefenderCS`); 0 where no city of a player hostile to it
- *  stands there */
+ *  stands there, and 0 where its outer defence is down or it has none (the
+ *  strike strength 0x249ee0 asked with the flag clear, 0 unless 0x24b960's
+ *  perimeter stands, 0x79181c..0x791827: runs/h1_duelz1128 t248 the
+ *  Cavalry 7143430 at 25 hit points keeps its own 41:20 beside Rome's
+ *  breached 42:20) */
 export function predictCityShot(state: GameState, attacker: Unit, targetIndex: number, spot: number): number {
   const held = cityAtIndex(state, targetIndex);
   const cs = held ? undefined : cityStateAt(state, targetIndex);
   const city = held ? held.city : cs && cs.centerIndex === targetIndex ? minorCity(cs) : null;
   if (!city || !unitsHostile(state, attacker, { seat: city.seat })) return 0;
+  if (outerPool(state, held ? held.city : { buildings: cs!.buildings ?? [], seat: cs!.seat, outerHp: cs!.outerHp }) <= 0) return 0;
   const atk = cityStrikeStrength(state, city) + emergencyStrikeCS(state, city.seat, attacker.seat);
   return damageExpected(atk - cityStrikeDefenderCS(state, attacker, state.map.tiles[spot], city.seat));
 }
@@ -1645,7 +1689,7 @@ function cityAssault(
   kCity: string,
   kAttacker: string): void {
   const atkCS = assaultAtkCS(state, attacker, city.centerIndex);
-  const defCS = cityDefenseStrength(state, city);
+  const defCS = cityCombatDefense(state, city);
   if ((globalThis as { process?: { env?: Record<string, string | undefined> } }).process?.env?.CIV6_BATTLE_PROBE) {
     console.log(`TS-BATTLE seed=${state.map.seed} t=${state.turn} tgt=${city.centerIndex} atkCS=${atkCS} defCS=${defCS} ` +
       `combat=${UNITS[attacker.type]?.combat ?? 0} wound=${woundPenalty(attacker)} xp=${attacker.xp ?? 0} ` +
@@ -2529,7 +2573,7 @@ function rangedAttackInner(state: GameState, attackerId: number, targetIndex: nu
     : 0;
   const civCity = cityAtIndex(state, targetIndex);
   if (civCity && unitsHostile(state, attacker, { seat: civCity.holder.seat })) {
-    const defCS = cityDefenseStrength(state, civCity.city);
+    const defCS = cityCombatDefense(state, civCity.city);
     const outer = outerPool(state, civCity.city);
     const diff = (rangedCityAtkCS(state, attacker, outer, civCity.holder.seat, relCity) - defCS);
     const split = districtHit(state, diff, outer, wallsMax(state, civCity.city), CITY_MAX_HP, cityHitClass(attacker.type, true), 0, 'rngrc', targetIndex);
@@ -2558,7 +2602,7 @@ function rangedAttackInner(state: GameState, attackerId: number, targetIndex: nu
     // their share of the hit first, through the majors' own split.
     const csShape = { buildings: cityState.buildings ?? [], seat: cityState.seat, outerHp: cityState.outerHp };
     const csOuter = outerPool(state, csShape);
-    const defCS = centreStrength(state, minorCity(cityState));
+    const defCS = minorCombatDefense(state, cityState);
     const csDiff = (rangedCityAtkCS(state, attacker, csOuter, cityState.seat, relCity) - defCS);
     const csSplit = districtHit(state, csDiff, csOuter, wallsMax(state, csShape), CITY_MAX_HP, cityHitClass(attacker.type, true), 0, 'rngcs', targetIndex);
     if (csSplit.wall > 0) cityState.outerHp = csOuter - csSplit.wall;
@@ -2655,7 +2699,7 @@ function hostileRangedStrikeInner(state: GameState, attacker: Unit, targetIndex:
       ? held.city
       : undefined;
   if (enemyCity) {
-    const defCS = cityDefenseStrength(state, enemyCity);
+    const defCS = cityCombatDefense(state, enemyCity);
     const outer = outerPool(state, enemyCity);
     const diff = (rangedCityAtkCS(state, attacker, outer, held!.holder.seat, religionAttackCS(state, attacker, targetIndex)) - defCS);
     const split = districtHit(state, diff, outer, wallsMax(state, enemyCity), CITY_MAX_HP, cityHitClass(attacker.type, true), 0, 'vrngc', targetIndex);
@@ -2682,7 +2726,7 @@ function hostileRangedStrikeInner(state: GameState, attacker: Unit, targetIndex:
   if (csHere && csHere.centerIndex === targetIndex && cityStateAttackable(state, csHere, unitSeat(attacker))) {
     const csShape = { buildings: csHere.buildings ?? [], seat: csHere.seat, outerHp: csHere.outerHp };
     const csOuter = outerPool(state, csShape);
-    const defCS = centreStrength(state, minorCity(csHere));
+    const defCS = minorCombatDefense(state, csHere);
     const diff = (rangedCityAtkCS(state, attacker, csOuter, csHere.seat, religionAttackCS(state, attacker, targetIndex)) - defCS);
     const split = districtHit(state, diff, csOuter, wallsMax(state, csShape), CITY_MAX_HP, cityHitClass(attacker.type, true), 0, 'vrngcs', targetIndex);
     if (split.wall > 0) csHere.outerHp = csOuter - split.wall;
@@ -3021,7 +3065,7 @@ function attackCityState(state: GameState, attacker: Unit, cityState: CityState)
   // city rides the majors' own split, siege support included.
   const csShape = { buildings: cityState.buildings ?? [], seat: cityState.seat, outerHp: cityState.outerHp };
   const csTier = wallsTier(state, csShape);
-  const defCS = centreStrength(state, minorCity(cityState));
+  const defCS = minorCombatDefense(state, cityState);
   const csOuter = outerPool(state, csShape);
   const dmgToAttacker = damageRoll(state, defCS - atkCS, 'cstyc', cityState.centerIndex);
   const csSplit = districtHit(state, atkCS - defCS, csOuter, wallsMax(state, csShape), CITY_MAX_HP,

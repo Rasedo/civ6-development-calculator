@@ -151,6 +151,26 @@
     - "- A ranged blow's domain term (0x51c810, the unit-vs-unit attack strength): a bombard attack (combat type 0x4fc9163d) loses C..."
     - ...IER_UNIT_ADJUST_COMBAT_STRENGTH, the barbarian traits, the difficulty rows), no term of 0x51c810 / 0x51f070 read here, and the dumps' promotions are empty.
   review: reviewed
+- addr: 0x51eaf0
+  kind: function
+  name: districtDamageLoss
+  semantics: "the defending district's terms in melee 0x206080, ranged 0x204b10, bombard 0x2074b0 and the preview 0x202580: first the damaged district's loss, the wounded law 0x522630 at COMBAT_WOUNDED_DISTRICT_DAMAGE_MULTIPLIER (gp +0x23c, 10) on GetDamage x 100 / GetMaxDamage of the hit points' hash 0x5e97d629 (integer), the reduction the plot's best combat defender's +0x1868 (0x24b170), negated onto the strength; then the terrain term 0x522c10 and the modifier lists (unported, no recorded case moves)."
+  status: READ
+  cases:
+    - recording: h1_duelz1128
+      turn: 242
+      value: Rome's centre 42:20, standing 48 (record d[5]) with 179 of 200 lost, defends at 39.05 (CombatLog 35 + 4; the cuirassier's 11 and the Cavalry's 12 and 17 fit only 38-39); t241 128 lost, 38 - 6.4 = 32 (35 - 3)
+  impl:
+    - cpu/core/combat.ts:districtDamageLoss
+    - cpu/core/combat.ts:cityCombatDefense
+    - cpu/core/combat.ts:minorCombatDefense
+    - gpu/core/sim_seats.py:_district_damage_loss
+    - gpu/core/sim_seats.py:_city_combat_defense
+    - gpu/core/sim_seats.py:_minor_combat_defense
+  readings:
+    - "C-95: a damaged centre defends at its wounded strength, the planning's city shot needs standing walls, the barbarians plan on the turn's unhealed centres"
+    - "C-95: a damaged centre defends at its wounded strength, the planning's city shot needs standing walls, the barbarians plan on the turn's unhealed centres — READ (0x51eaf0, 0x791470 at 0x79181c..0x791827 -> 0x249ee0 / 0x24b960), both twins; the replay's barbarian copy"
+  review: reviewed
 - addr: 0x51f070
   kind: function
   semantics: "the defender's strength composer: 0x521ed0 for the combat type 0x5e2f7468, 0x5228c0 for every other; its modifier walk reads the unit abilities (ABILITY_SPEAR_OF_FIONN's +5)."

@@ -11038,3 +11038,42 @@ earlier one's end look.
   `airStrikeOffers` refuses (runs/h1_duelz1124 t231: China's Jet Fighter
   8978447 strikes the barbarians' Ironclad 6029330, CombatLog line 604; the
   replay lands none).
+
+## C-95: a damaged centre defends at its wounded strength, the planning's city shot needs standing walls, the barbarians plan on the turn's unhealed centres — READ (0x51eaf0, 0x791470 at 0x79181c..0x791827 -> 0x249ee0 / 0x24b960), both twins; the replay's barbarian copy
+
+`districtDamageLoss`, `cityCombatDefense`, `minorCombatDefense`,
+`predictCityShot` (cpu/core/combat.ts); `_district_damage_loss`,
+`_city_combat_defense`, `_minor_combat_defense` (gpu/core/sim_seats.py),
+`_plan_city_shots` (gpu/core/sim_tactics.py); `barbCentres` in
+`barbarianAi` (cpu/harness/replay.ts).
+
+- THE DAMAGED DISTRICT'S LOSS (0x51eaf0, called by the melee 0x206080,
+  ranged 0x204b10 and bombard 0x2074b0 combats, so by the AI's simulated
+  combat 0x791470 too): the wounded law 0x522630 at gp +0x23c
+  (COMBAT_WOUNDED_DISTRICT_DAMAGE_MULTIPLIER 10) on GetDamage x 100 /
+  GetMaxDamage of the hit points (integer division), the reduction the
+  plot's best combat defender's +0x1868 (0x24b170), off the defending
+  centre's strength. Ported on every centre combat site (assault, ranged,
+  hostile strike, city-state assault) and the planning's exchange; the
+  standing strength (knowledge, danger map, record d[5]) keeps none.
+  Confirmed: runs/h1_duelz1128 Rome 42:20, standing 48, 179 of 200 lost at
+  t242: 39.05, the CombatLog's 35 + 4 (t241, 128 lost: 31.6 as 35 - 3); the
+  attackers' damage t238-249 fits a defence of 38-39 only.
+- THE PLANNING'S CITY SHOT (0x791470 at 0x79181c): the strike strength
+  0x249ee0 is asked with r8b 0, which returns 0 unless 0x24b960 (the outer
+  defence below its maximum damage) holds; a 0 skips the shot, back taken
+  0. A breached or wall-less centre fires no predicted shot. Confirmed:
+  1128 t248 the Cavalry 7143430 at 25 hit points keeps its claim on its own
+  41:20 (taken 25 with no shot) and strikes from there, as logged.
+- THE BARBARIANS' COPY (harness): the barbarians move last in the turn,
+  before the turn's close heals the cities (0x4e4560's heal), while the
+  replay runs them after `turnClose`; their copy takes every centre's hit
+  points and outer defence as they stood before that close (the replay's
+  sack of a centre its replayed blows took to 0 undone with it). 1128 t242:
+  Rome at 21, not the healed 41 nor the sacked 100.
+- With the three: 1128 t242-248 City Attack's assignments as logged (the
+  15 Operation rows of the City Assault's swaps).
+- Open: the Encampment's own damage loss (the same 0x51eaf0 on its
+  encampHp) is unported; 0x51eaf0's terrain term 0x522c10 and modifier
+  lists unread; the engine's barbarian sack of a major's centre at 0 hit
+  points has no source (the game's Rome stands at 200 damage, t242-249).

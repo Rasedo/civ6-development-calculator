@@ -13552,6 +13552,47 @@ class SimSeats:
              - base.to(torch.float64)).clamp(min=0)
         return torch.where(gar, g, torch.zeros_like(g))
 
+    def _district_damage_loss(self, seat: torch.Tensor, plot: torch.Tensor, hp: torch.Tensor) -> torch.Tensor:
+        """[B] f64 — `districtDamageLoss`, THE DAMAGED DISTRICT'S LOSS in a
+        fight it defends (0x51eaf0): the wounded law (`_wounded_loss`,
+        COMBAT_WOUNDED_DISTRICT_DAMAGE_MULTIPLIER 10) on the truncated percent
+        of the centre's hit points lost, none where its plot's military unit
+        of `seat` (not embarked) suffers no wound penalty, in 1/256."""
+        bidx = self._bidx
+        p0 = plot.clamp(min=0)
+        gslot = self.military_at[bidx, p0]
+        gs0 = gslot.clamp(min=0)
+        gty = self.unit_type[bidx, gs0].clamp(min=0, max=self.NU - 1)
+        waived = ((gslot >= 0) & (self.unit_seat[bidx, gs0] == seat) & ~self.unit_emb[bidx, gs0]
+                  & self._type_no_wound.take(gty))
+        mx = self._city_max_hp
+        pct = torch.div((mx - hp.long().clamp(max=mx)) * 100, mx, rounding_mode="trunc").clamp(min=0, max=100)
+        loss = torch.where(waived, torch.zeros_like(pct), self._wounded_loss.take(pct))
+        return loss.to(torch.float64) / 256
+
+    def _city_combat_defense(self, hrow: torch.Tensor, hcol: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
+        """`cityCombatDefense`, [B] each: a major's or a Free City's centre
+        defending a fight — its defence (`_city_defense_cs`) less the damaged
+        district's loss (`_district_damage_loss`). Returns `(def_cs, walls_tier)`."""
+        hc0 = hcol.clamp(min=0)
+        def_cs, wtier = self._city_defense_cs(hrow, hcol)
+        ctr = self.city_center[self._bidx, hrow, hc0]
+        loss = self._district_damage_loss(self._ROW_SEAT.take(hrow), ctr, self.city_hp[self._bidx, hrow, hc0])
+        return def_cs - loss, wtier
+
+    def _minor_combat_defense(self, csx: torch.Tensor) -> torch.Tensor:
+        """[B] f64 — `minorCombatDefense`: city-state `csx`'s centre defending
+        a fight, its standing strength (`_centre_strength` on its row) less the
+        damaged district's loss"""
+        cs0 = csx.clamp(min=0, max=max(self.S - 1, 0))
+        row = self._CITY_MINOR0 + cs0
+        strength = self._centre_strength(row, torch.zeros_like(row))
+        if self.S == 0:
+            return strength
+        hp = self.citystate_hp.gather(1, cs0.unsqueeze(1)).squeeze(1)
+        ctr = self.citystate_center.gather(1, cs0.unsqueeze(1)).squeeze(1)
+        return strength - self._district_damage_loss(self._ROW_SEAT.take(row), ctr, hp)
+
     def _centre_strength(self, hrow: torch.Tensor, hcol: torch.Tensor,
                          garrisoned: bool = True) -> torch.Tensor:
         """[B] f64 — `centreStrength`, A CITY CENTRE'S STANDING STRENGTH, one
@@ -14972,13 +15013,13 @@ class SimSeats:
                 continue
             hrow = self._holder_row(ctr)
             hcol = self.centre_slot_at.gather(1, ttc.unsqueeze(1)).squeeze(1).clamp(min=0)
-            def_m, tier_m = self._city_defense_cs(hrow, hcol)
+            def_m, tier_m = self._city_combat_defense(hrow, hcol)
             outer_m = self.city_outer_hp[bidx, hrow, hcol]
             csx = self.citystate_at.gather(1, ttc.unsqueeze(1)).squeeze(1).clamp(min=0) if self.S > 0 else torch.zeros_like(tgt)
             cs_mrow = self._CITY_MINOR0 + csx.clamp(min=0, max=max(self.S - 1, 0))
             tier_c = self._minor_walls_tier_at(csx) if self.S > 0 else torch.zeros_like(tgt)
             outer_c = torch.minimum(self.city_outer_hp[bidx, cs_mrow, 0], self._walls_tier_hp[tier_c])
-            def_c = self._centre_strength(cs_mrow, torch.zeros_like(cs_mrow))
+            def_c = self._minor_combat_defense(csx)
             def_cs = torch.where(major, def_m, def_c)
             tier = torch.where(major, tier_m, tier_c)
             outer = torch.where(major, outer_m, outer_c)
@@ -15050,7 +15091,7 @@ class SimSeats:
         hseat = self.tile_seat.gather(1, ttc.unsqueeze(1)).squeeze(1)
         hrow = self._holder_row(hseat)
         slot = self.centre_slot_at.gather(1, ttc.unsqueeze(1)).squeeze(1).clamp(min=0)
-        def_cs, _wtier = self._city_defense_cs(hrow, slot)
+        def_cs, _wtier = self._city_combat_defense(hrow, slot)
         atk_e = self._city_assault_atk_cs(atk_kind, u, tgt)
         if getattr(self, "_battle_probe", False) and bool(att.count_nonzero()):
             for _b in att.nonzero(as_tuple=True)[0].tolist():
@@ -15244,7 +15285,7 @@ class SimSeats:
         _bax = torch.arange(self.B, device=self.device)
         cs_mrow = self._CITY_MINOR0 + citystate_sc.clamp(min=0, max=max(self.S - 1, 0))
         cs_outer = torch.minimum(self.city_outer_hp[_bax, cs_mrow, 0], self._walls_tier_hp[cs_tier])
-        def_cs = self._centre_strength(cs_mrow, torch.zeros_like(cs_mrow))
+        def_cs = self._minor_combat_defense(citystate_sc)
         atk_e = self._city_assault_atk_cs(atk_kind, u, tgt)
         d_atk = self._damage_roll(att, def_cs - atk_e, k="cstyc", tile=tgt)
         cs_assist = self._siege_assist(a_seat[:, u], at0, tgt, cs_tier)
@@ -15561,7 +15602,7 @@ class SimSeats:
         if bool(city_att.count_nonzero()):
             hrow = self._holder_row(ctr)
             hcol = self.centre_slot_at.gather(1, ttc.unsqueeze(1)).squeeze(1).clamp(min=0)
-            def_cs, _wtier = self._city_defense_cs(hrow, hcol)
+            def_cs, _wtier = self._city_combat_defense(hrow, hcol)
             outer_all = self.city_outer_hp[_bidx, hrow, hcol]
             atk_e = self._city_ranged_atk_cs(atk_kind, u, tgt, outer_all, ctr)
             _wmax = self._walls_tier_hp.take(_wtier)
@@ -15613,7 +15654,7 @@ class SimSeats:
             cs_tier = self._minor_walls_tier_at(csx)
             cs_mrow = self._CITY_MINOR0 + csx.clamp(min=0, max=max(self.S - 1, 0))
             cs_outer = torch.minimum(self.city_outer_hp[_bidx, cs_mrow, 0], self._walls_tier_hp[cs_tier])
-            def_cs = self._centre_strength(cs_mrow, torch.zeros_like(cs_mrow))
+            def_cs = self._minor_combat_defense(csx)
             atk_cs = self._city_ranged_atk_cs(atk_kind, u, tgt, cs_outer, ctr)
             cs_wall, cs_centre = self._district_hit(cs_att, atk_cs - def_cs, cs_outer, self._walls_tier_hp[cs_tier],
                                                     self._city_max_hp, _klass, None, "vrngcs", tgt)
@@ -15758,7 +15799,7 @@ class SimSeats:
             hseat = self.tile_seat.gather(1, ttc.unsqueeze(1)).squeeze(1)
             hrow = self._holder_row(hseat)
             slot = self.centre_slot_at.gather(1, ttc.unsqueeze(1)).squeeze(1).clamp(min=0)
-            def_cs, _wtier = self._city_defense_cs(hrow, slot)
+            def_cs, _wtier = self._city_combat_defense(hrow, slot)
             outer_all = self.city_outer_hp[bidx, hrow, slot]
             _rs = self._city_ranged_strength(at0, aseat, outer_all)
             _cpromo = self._assault_promo_cs(at0, a_promos, a_tile[:, u], ranged=True)
@@ -15791,7 +15832,7 @@ class SimSeats:
             _bax = torch.arange(self.B, device=self.device)
             cs_mrow = self._CITY_MINOR0 + csx.clamp(min=0, max=max(self.S - 1, 0))
             cs_outer = torch.minimum(self.city_outer_hp[_bax, cs_mrow, 0], self._walls_tier_hp[cs_tier])
-            def_cs = self._centre_strength(cs_mrow, torch.zeros_like(cs_mrow))
+            def_cs = self._minor_combat_defense(csx)
             _cs_rs = self._city_ranged_strength(at0, aseat, cs_outer)
             _cpromo = self._assault_promo_cs(at0, a_promos, a_tile[:, u], ranged=True)
             cs_wall, cs_centre = self._district_hit(cs_att,
