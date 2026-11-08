@@ -710,6 +710,20 @@
     - "...plot of danger > 0 (logged \"Current Danger\"): one with no strength, or in a formation (0x8be30); a hurt one at half its health or worse whose planning holds no fight it wins (+0x60),..."
     - "...x7737c0): each unit (+0x770 clear) that has taken damage (+0xcf0 > 0), in no formation (0x8be30), on a plot of no danger (the influence map 0x716a90 <= 0) is queued (\"Heal\"); the queu..."
   review: reviewed
+- addr: 0x8be70
+  final: 0x66a40
+  kind: function
+  semantics: "the unit's activity (+0x5f0) is HOLD, SLEEP, HEAL, SENTRY or INTERCEPT: the Fortify order's CanStart (0x95e970) refuses it."
+  status: READ
+  cases:
+    - recording: h1_duelp1117
+      turn: 10
+      value: "barbarian Scout 262147, ACTIVITY_HOLD from its t9 Skip Turn, logs HL: Move To Safety Fortify in place with no operation; record t11 fortify 0"
+  readings: ["C-110: the Fortify order and its ticks; the heal's plot gate — READ"]
+  context:
+    - "...unit) 0x56ef30 — a combat, ranged or bombard strength and domain 2 or 3 (land) — not 0x8be70 (the unit's activity +0x5f0 HOLD, SLEEP, HEAL, SENTRY or INTERCEPT), not embarked. The..."
+    - "- Open: the engines carry no activity, so 0x8be70's refusal is not taken: 1117 t10 the barbarian Scout 262147, in ACTIVITY_HOLD from its..."
+  review: reviewed
 - addr: 0x901e0
   final: 0x67990
   kind: function
@@ -2699,11 +2713,16 @@
 - addr: 0x538040
   final: 0x37e2a0
   kind: function
-  semantics: "a unit's heal (a vtable slot of the turn's unit manager): gated on the unit's m_bEligibleToHeal (+0x1590) and its plot's relation to the owner (0x530880; the owner's no-neutral / no-foreign flags +0x2f0 / +0x290 of +0x12e8)."
+  semantics: "a unit's heal (a vtable slot of the turn's unit manager): the unit's +0x1590, not dead, on a plot, its strategic resource held; the plot's relation (0x530880) 3 refused under the owner's m_bNoForeignHeal (+0x290 of +0x12e8), 2 under m_bNoNeutralHeal (+0x2f0); the amounts per relation after."
   status: PARTLY
+  cases:
+    - recording: h1_duelw1103-1118
+      turn: all
+      value: "5,099 damaged barbarian turns standing still, 1,544 on its camp, none healed (every gain a pillage's): a barbarian holds no plot, relation 2 or 3 everywhere"
+  impl: [cpu/core/units.ts:restUnit, gpu/core/sim_step.py:step]
   readings:
     - "H-1: the build queue's overflow, the yields' fixed point, the dispersal Gold, the pantheon's price — READ"
-  notes: ["imported: READ in its section, no confirming case found beside it"]
+    - "C-110: the Fortify order and its ticks; the heal's plot gate — READ"
   context:
     - "- A unit's heal (0x538040, a vtable slot of the turn's unit manager): gated on the unit's `m_bEligibleToHeal` (+0..."
   review: reviewed
@@ -2931,7 +2950,9 @@
   kind: function
   semantics: sets a unit's fortify turns.
   status: PARTLY
-  readings: ["H-1: the melee result, a ranged blow's domain, a city's shot — READ"]
+  readings:
+    - "H-1: the melee result, a ranged blow's domain, a city's shot — READ"
+    - "C-110: the Fortify order and its ticks; the heal's plot gate — READ"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "- An attack ends the attacker's fortification: 0x1fbae0 sets its fortify turns to 0 (0x5707b0(attacker, 0)) once the result is made (0x205da0). Fortification grows only in the Forti..."
@@ -7206,10 +7227,11 @@
 - addr: 0x959830
   final: 0x665200
   kind: function
-  semantics: the Fortify operation's tick (+1 fortify turn to FORTIFY_TURN_MAX).
+  semantics: "a third operation's tick (its CanStart 0x959350 wants a strength): +1 fortify turn where the unit may fortify and is below FORTIFY_TURN_MAX, no move test; at the max the activity SENTRY."
   status: PARTLY
-  readings: ["H-1: the melee result, a ranged blow's domain, a city's shot — READ"]
-  notes: ["imported: READ in its section, no confirming case found beside it"]
+  readings:
+    - "H-1: the melee result, a ranged blow's domain, a city's shot — READ"
+    - "C-110: the Fortify order and its ticks; the heal's plot gate — READ"
   context:
     - "...05da0). Fortification grows only in the Fortify operation's tick (0x95ebb0, 0x960800, 0x959830: +1 to FORTIFY_TURN_MAX), as the C-94 BUILD line says. The engines: `spendAttack` / `_s..."
   review: reviewed
@@ -7246,6 +7268,36 @@
   context:
     - ...nition's handler 0x962310 (its table @0xd99b40 +0x40; the sibling table @0xd98910 holds 0x95d8d0 at that slot) reads the order's target plot (the operation's vt +0x68) and, where the u...
   review: imported
+- addr: 0x95e970
+  final: 0x669a10
+  kind: function
+  name: fortifyCanStart
+  semantics: "the Fortify operation's CanStart: a formation; an AI's unit that may fortify (0x56ef30), its activity not one 0x8be70 names, not embarked."
+  status: READ
+  cases:
+    - recording: h1_duelp1117
+      turn: 16
+      value: "Rome's Warrior 327683 orders Fortify unmoved: Started, one segment row, SENTRY before Rome's turn closes; record t17 fortify 2, struck at +6 by the barbarian Warrior"
+  impl: [cpu/core/units.ts:fortifyOrder, gpu/core/sim_tactics.py:_fortify_order]
+  readings: ["C-110: the Fortify order and its ticks; the heal's plot gate — READ"]
+  context:
+    - "- UNITOPERATION_FORTIFY (0x95eae0 builds the request by its hash 0xd3a6f7e8). CanStart 0x95e970: a formation, then (an AI's unit) 0x56ef30 — a combat, ranged or bombard strength and d..."
+  review: reviewed
+- addr: 0x95ea70
+  final: 0x669b10
+  kind: function
+  name: fortifyUpdate
+  semantics: "the Fortify operation's update: at FORTIFY_TURN_MAX (GlobalParameters +0x374) the count set to it, the operation done, the activity SENTRY; else it runs on."
+  status: READ
+  cases:
+    - recording: h1_duelp1117
+      turn: 2
+      value: "barbarian Spearman 65536 Barb. Camp Defense at its camp: Started, two segment rows, 0 -> 1; t3 orders again 1 -> 2, SENTRY (cityState / barb.fortify trace t1-30: 164 of 165)"
+  impl: [cpu/core/units.ts:fortifyOrder, gpu/core/sim_tactics.py:_fortify_order]
+  readings: ["C-110: the Fortify order and its ticks; the heal's plot gate — READ"]
+  context:
+    - "...d at 0) where the unit has not moved (0x56e760: Movement left below full); the update 0x95ea70: at FORTIFY_TURN_MAX (GlobalParameters +0x374) the count set to it, the operation done,..."
+  review: reviewed
 - addr: 0x95eae0
   final: 0x669b80
   kind: function
@@ -7254,7 +7306,15 @@
   cases:
     - recording: AI_Tactical.csv
       value: "Confirmed: the turn's \"Random   Direction\" draws pair one to one with the AI_Tactical.csv rows \"Wander\" and   \"Garrison\", every player's in log order (1,199 of 1,199 turn-pairs of the   five seeds), a"
-  impl: [cpu/core/tactical.ts:heal, cpu/core/operations/assault.ts:garrisonExecute]
+  impl:
+    - cpu/core/tactical.ts:heal
+    - cpu/core/operations/assault.ts:garrisonExecute
+    - cpu/core/barbarianOps.ts:SCOUT_NODES
+    - cpu/core/operations/nodes.ts:OpsContext
+    - cpu/core/opsOrders.ts:us
+    - cpu/core/tactical.ts:homelandSafety
+    - cpu/core/tactical.ts:wanderNearCity
+    - cpu/core/units.ts:fortifyOrder
   readings:
     - "C-96: the city-states' tactical pass — READ (Wander Near City, Heal, the non-barbarian priorities, FindAlternateLocation), the families it needs PARTLY READ"
     - "C-95: the danger map and Move to Safety — READ, ported"
@@ -7263,6 +7323,7 @@
     - "C-126 / C-99: the purchase list's at-war sums, Garrison City's turn done and Operation Move's movers — READ, both twins"
     - "C-99: the pathfinder's later-turn pool, Heal's hull, the tactical list's explorers, Move Unit's planning — READ, both twins"
     - "C-99: Wander Near City ends its unit's moves; a unit whose moves an order ended runs its order no more — READ (0x77bf50 at 0x77c62a, 0x56d6f0, 0x52f50 at 0x530fd..0x53113), both twins"
+    - "C-110: the Fortify order and its ticks; the heal's plot gate — READ"
   notes:
     - ".claude/scratchpad/mu1/readings_c96.md: ...indAlternateLocation (0x585940) round the city within 3, moved to with   flag 0x1000, else the skip 0x95eae0 (\"Wander Back to City\", \"Move To\" the   city). The turn ends (0x56d6f0, 0x570b40). Confirmed: the t..."
     - ".claude/scratchpad/mu1/readings_c96.md: ...sea, 1 air, 2 land, the   gossip strings GOSSIP_LAND/NAVAL_UNIT_LEVEL) holds its plot — fortify   (0x95eae0) where 0x56ef30 allows, else sleep (0x9686d0); a hull outside   its own territory heads for its pla..."
@@ -7273,11 +7334,20 @@
 - addr: 0x95ebb0
   final: 0x669c50
   kind: function
-  semantics: "the Fortify operation's tick (with 0x960800, 0x959830): +1 fortify turn up to FORTIFY_TURN_MAX; the only place fortification grows."
-  status: PARTLY
-  impl: [cpu/harness/replay.ts:dugIn, cpu/harness/replay.ts:prev]
-  readings: ["H-1: the melee result, a ranged blow's domain, a city's shot — READ"]
-  notes: ["imported: READ in its section, no confirming case found beside it"]
+  name: fortifyTick
+  semantics: "the Fortify operation's tick: +1 fortify turn (0x5707b0) where the unit has not moved (0x56e760); it runs as the order starts and as its player's turn ends while the order runs."
+  status: READ
+  cases:
+    - recording: h1_duelp1117
+      turn: 16
+      value: "Rome's Warrior 327683 orders Fortify unmoved: Started, one segment row, SENTRY before Rome's turn closes; record t17 fortify 2, struck at +6 by the barbarian Warrior"
+  impl:
+    - cpu/core/units.ts:fortifyOrder
+    - gpu/core/sim_tactics.py:_fortify_order
+    - cpu/harness/replay.ts:dugIn
+  readings:
+    - "H-1: the melee result, a ranged blow's domain, a city's shot — READ"
+    - "C-110: the Fortify order and its ticks; the heal's plot gate — READ"
   context:
     - "...he result is made (0x205da0). Fortification grows only in the Fortify operation's tick (0x95ebb0, 0x960800, 0x959830: +1 to FORTIFY_TURN_MAX), as the C-94 BUILD line says. The engine..."
   review: reviewed
@@ -7292,13 +7362,23 @@
   context:
     - "...oval (0x967100); else, the node's \"Resource Harvesting\" (tag Harvest) set, the harvest (0x95fb20); else the feature's removal (0x965fd0). With \"Release on Complete\" (every city tree'..."
   review: reviewed
+- addr: 0x9606f0
+  final: 0x66b6e0
+  kind: function
+  semantics: "the HEAL operation's update: at no damage, or where the operation's vt +0xc0 answers, done (ACTIVITY_AWAKE); else it runs on."
+  status: PARTLY
+  readings: ["C-110: the Fortify order and its ticks; the heal's plot gate — READ"]
+  context:
+    - ...AL operation's tick 0x960800 adds +1 the same way (0x56ef30, below the max); its update 0x9606f0 ends it at no damage (ACTIVITY_AWAKE). The third's tick 0x959830 adds +1 with no move t...
+  review: reviewed
 - addr: 0x960800
   final: 0x66b840
   kind: function
-  semantics: the Fortify operation's tick (+1 fortify turn to FORTIFY_TURN_MAX).
+  semantics: "the HEAL operation's tick: +1 fortify turn where the unit has not moved, may fortify (0x56ef30) and is below FORTIFY_TURN_MAX."
   status: PARTLY
-  readings: ["H-1: the melee result, a ranged blow's domain, a city's shot — READ"]
-  notes: ["imported: READ in its section, no confirming case found beside it"]
+  readings:
+    - "H-1: the melee result, a ranged blow's domain, a city's shot — READ"
+    - "C-110: the Fortify order and its ticks; the heal's plot gate — READ"
   context:
     - "...made (0x205da0). Fortification grows only in the Fortify operation's tick (0x95ebb0, 0x960800, 0x959830: +1 to FORTIFY_TURN_MAX), as the C-94 BUILD line says. The engines: `spendAtt..."
   review: reviewed

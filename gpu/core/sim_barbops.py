@@ -1546,6 +1546,8 @@ class SimBarbOps:
             safe = self._tac_safe_plot(prot, su, "barb", BARB_SEAT, danger, rowof, res, torch.zeros(B, self.T, dtype=torch.bool, device=dev))
             mv = prot & (safe >= 0) & (safe != here)
             self._tac_move_to(mv, su, safe.clamp(min=0), strike=False)
+            # then the Fortify order (a moved unit's: no tick)
+            self._fortify_slot(mv, su, "barb", 1)
             done[bidx[prot], su[prot]] = True
         mexe = mu_on & ((m4 == _S) | (m4 == _R)) & self.tribe_home_mu[:, k] & alive
         if bool(mexe.any()):

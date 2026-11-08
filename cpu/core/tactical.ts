@@ -21,7 +21,7 @@ import { AI_UNIT_AI } from '../data/aiOperations';
 import { engineId, gameTypeOf, installFeature } from '../data/aliases';
 import {
   canEmbark, cityAtIndex, crossesRiver, embarkTechMoves, escortUnit, inEscort, cliffBlocksStep, shoreCrossing, districtZones, encampmentBlocks, encampmentIntact, inEnemyZoc, rosterEmbarkMoves, stepCost, stepUnit, terrainMp, unitDomain, unitExertsZoc, unitFullMoves, unitIsNoncombat, mapLayer, unitReligious,
-  setBarbStepLook, unitsHostile, unitVisibleTo,
+  setBarbStepLook, unitsHostile, unitVisibleTo, fortifyOrder,
   waterEnterable, waterWalks, formationBanned, formationCS, setRecordFormation, formationMates, dropLoneRiders, escortOf, escortRiders, disbandUnit,
 } from './units';
 import { BARB_SEAT, FREE_SEAT, NO_SEAT, campTiles, cityHolders, civsAtWar, isBarbSeat, isCityStateSeat, isCiv, isTerritorial, seatOf, tileCity, tileSeat } from './seats';
@@ -2206,6 +2206,20 @@ export const passReachAt = (state: GameState, pass: Pass, u: Unit, goal: number,
 export const passSafePlot = (state: GameState, pass: Pass, u: Unit, goal = -1, minMoves = 0): number =>
   safePlot(state, pass, u, new Set(), goal, minMoves);
 
+/** the Fortify order in the pass (`fortifyOrder`): a unit whose moves an
+ *  order ended (`Pass.ended`, 0x56d6f0) has moved, and ticks no more */
+export function passFortify(state: GameState, pass: Pass, u: Unit, ticks: 1 | 2): void {
+  if (!pass.ended.has(u.id)) fortifyOrder(state, u, ticks);
+}
+
+/** MOVE OR FORTIFY (0x773fb0, its flag clear): a unit on the plot takes the
+ *  Fortify order, any other the move to it (its moves end after, 0x56d6f0 at
+ *  0x7740b6: the order ticks once) */
+function moveOrFortify(state: GameState, pass: Pass, u: Unit, plot: number, strike = true): void {
+  if (u.tileIndex === plot) passFortify(state, pass, u, 1);
+  else moveTo(state, u, plot, strike);
+}
+
 /** a unit's turn in the pass ended by a tree's order, with no move logged */
 export function passEnd(pass: Pass, u: Unit): void {
   pass.done.add(u.id);
@@ -2243,7 +2257,7 @@ function defendCamps(state: GameState, pass: Pass): void {
     const u = pass.units.find((x) => live(state, pass, x) && pass.ai.get(x.id) === AI_DEFENDER
       && !!pass.reach.get(x.id)?.some((e) => e.tile === camp && e.turns <= DEFEND_CAMP_TURNS));
     if (!u) continue;
-    if (u.tileIndex !== camp) moveTo(state, u, camp);
+    moveOrFortify(state, pass, u, camp);
     finish(pass, u, 'Barb. Camp Defense', camp);
   }
 }
@@ -2412,7 +2426,7 @@ function rampage(state: GameState, pass: Pass): void {
     const spot = (pass.reach.get(u.id) ?? []).find((x) => x.turns === 1
       && plotDistance(state, x.tile, city) <= r && !stackedOther(state, u, x.tile));
     if (!spot) continue;
-    moveTo(state, u, spot.tile);
+    moveOrFortify(state, pass, u, spot.tile);
     finish(pass, u, 'Chasing target', spot.tile);
   }
 }
@@ -2979,7 +2993,7 @@ function chaseTarget(state: GameState, pass: Pass): void {
     const spot = reach.find((x) => x.turns === 1 && plotDistance(state, x.tile, tgt) <= r
       && !stackedOther(state, u, x.tile));
     if (!spot) continue;
-    moveTo(state, u, spot.tile, pass.strike);
+    moveOrFortify(state, pass, u, spot.tile, pass.strike);
     finish(pass, u, 'Chase Target', tgt);
   }
 }
@@ -3039,8 +3053,10 @@ function promotion(state: GameState, pass: Pass): void {
 
 /**
  * HEAL (0x779a70, its moves 0x7737c0): each unit left, in pool order, that
- * has taken damage (+0xcf0) is healed where it stands: a land unit
- * fortifies (0x95eae0) or sleeps (0x9686d0); a naval one outside its own
+ * has taken damage (+0xcf0) is healed where it stands: a unit that may
+ * fortify (0x56ef30) takes the Fortify order (0x95eae0 at 0x7739e5, its
+ * moves kept: `fortifyOrder`'s two ticks), any other sleeps (0x9686d0);
+ * a naval one outside its own
  * territory takes its player's nearest city (the first of equals) and
  * moves there (0x962030) only where the location test (0x586360, flag
  * 0x10) answers 0 — the city's plot refused and no plot within 10 of it
@@ -3052,6 +3068,7 @@ function promotion(state: GameState, pass: Pass): void {
 function heal(state: GameState, pass: Pass): void {
   for (const u of pass.units) {
     if (!live(state, pass, u) || u.hp >= UNIT_HP || !!u.embarked || pass.danger[u.tileIndex] > 0) continue;
+    passFortify(state, pass, u, 2);
     finish(pass, u, 'Heal');
   }
 }
@@ -3245,7 +3262,7 @@ function moveToSafety(state: GameState, pass: Pass): void {
     const p = safePlot(state, pass, u, taken);
     if (p < 0) continue;
     taken.add(p);
-    moveTo(state, u, p, false);
+    moveOrFortify(state, pass, u, p, false);
     finish(pass, u, 'Move to safety', p);
   }
 }
@@ -3254,7 +3271,8 @@ function moveToSafety(state: GameState, pass: Pass): void {
  * THE HOMELAND'S MOVE TO SAFETY (0x70f3b0, each unit 0x70bf90): each unit
  * left on a plot of danger that flees (`flees`, the homeland's test) goes to
  * its safe plot (`safePlot`, the plots the ones before it took left out);
- * with none a barbarian fortifies where it stands ("Fortify in place"), any
+ * with none a barbarian takes the Fortify order where it stands ("Fortify in
+ * place", 0x95eae0 at 0x70c2d4 on the move's command list: two ticks), any
  * other stays for the moves after.
  */
 function homelandSafety(state: GameState, pass: Pass): void {
@@ -3268,7 +3286,10 @@ function homelandSafety(state: GameState, pass: Pass): void {
       taken.add(p);
       moveTo(state, u, p, false);
       finish(pass, u, 'HL: Move To Safety', p);
-    } else if (isBarbSeat(u.seat)) finish(pass, u, 'HL: Move To Safety', u.tileIndex);
+    } else if (isBarbSeat(u.seat)) {
+      passFortify(state, pass, u, 2);
+      finish(pass, u, 'HL: Move To Safety', u.tileIndex);
+    }
   }
 }
 
@@ -3492,7 +3513,8 @@ const WANDER_BACK_RANGE = 3;
  * Direction" draw over their count picks the plot it moves to ("Wander") —
  * the weights the loop builds are never read. With none it moves to the
  * plot `alternateLocation` finds round the capital ("Wander Back to City",
- * the row naming the capital), else it stays. Its moves end (0x56d6f0 at
+ * the row naming the capital), else it takes the Fortify order where it
+ * stands (0x95eae0 at 0x77c53a, `fortifyOrder`'s one tick). Its moves end (0x56d6f0 at
  * 0x77c62a, after every branch: the queue runs its order no more,
  * runs/h1_duelp1121 t88 city-state 4's Man-At-Arms 1048577 holds on 43:22
  * with 0 Movement after its Wander Back to City step) and its turn is done.
@@ -3516,6 +3538,7 @@ function wanderNearCity(state: GameState, pass: Pass, home: number): void {
     }
     const to = alternateLocation(state, u, home, WANDER_BACK_RANGE);
     if (to >= 0) moveTo(state, u, to, pass.strike, true);
+    else if (!ghost) passFortify(state, pass, u, 1);
     pass.ended.add(u.id);
     finish(pass, u, 'Wander Back to City', home);
   }

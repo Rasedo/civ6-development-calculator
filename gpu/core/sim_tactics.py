@@ -2675,7 +2675,7 @@ class SimTactics:
                   & ~self._tac_stacked_other(u_b) & go.unsqueeze(1))
             spot = first_in_reach(row, ok)
             mv = go & (spot >= 0)
-            self._tac_move_to(mv, u_b, spot)
+            self._tac_move_or_fortify(mv, u_b, spot)
             done[bidx[mv], u_b[mv]] = True
 
     def _tac_reachers(self, cand: torch.Tensor, ai: torch.Tensor, order: torch.Tensor) -> torch.Tensor:
@@ -2923,8 +2923,43 @@ class SimTactics:
             key = torch.where(ok & (rk_ >= 0), rk_, torch.full_like(rk_, BIG))
             m, spot = key.min(dim=1)
             mv = on & (m < BIG)
-            self._tac_move_to(mv, u_b, spot, pre, seat, strike)
+            self._tac_move_or_fortify(mv, u_b, spot, pre, seat, strike)
             done[bidx[mv], u_b[mv]] = True
+
+    def _fortify_order(self, m: torch.Tensor, pre: str, ticks: int) -> None:
+        """THE FORTIFY ORDER (`fortifyOrder`) on pool `pre`'s units of `m`
+        [B, P]: a unit of a chassis that may fortify (0x56ef30: a combat,
+        ranged or bombard strength, neither naval nor of the air), not
+        embarked, its Movement whole and its moves not ended in the pass
+        (`passFortify`), takes `ticks` turns of fortification, up to 2"""
+        if not bool(m.count_nonzero()):
+            return
+        ut = getattr(self, f"{pre}_unit_type").clamp(min=0, max=self.NU - 1)
+        can = (((self._type_combat.take(ut) > 0) | (self._type_ranged_strength.take(ut) > 0)
+                | (self._type_bombard.take(ut) > 0)) & ~self.unit_naval.take(ut) & (self._type_air.take(ut) == 0))
+        go = m & getattr(self, f"{pre}_unit_alive") & can & ~getattr(self, f"{pre}_unit_emb") & ~self._spent_mp(pre)
+        ended = self._tac_moves_ended
+        if ended is not None:
+            lo = self.POOL_LO[pre]
+            go = go & ~ended[:, lo:lo + m.shape[1]]
+        f = getattr(self, f"{pre}_unit_fortify")
+        f.copy_(torch.where(go, (f + ticks).clamp(max=2), f))
+
+    def _fortify_slot(self, m: torch.Tensor, u_b: torch.Tensor, pre: str, ticks: int) -> None:
+        """`_fortify_order` on the unit at local slot `u_b` [B] of the games
+        of `m` [B]"""
+        sel = torch.zeros_like(getattr(self, f"{pre}_unit_alive"))
+        b = m.nonzero(as_tuple=True)[0]
+        sel[b, u_b[b]] = True
+        self._fortify_order(sel, pre, ticks)
+
+    def _tac_move_or_fortify(self, m: torch.Tensor, u_b: torch.Tensor, dest: torch.Tensor, pre: str = "barb",
+                             seat: int = BARB_SEAT, strike: bool = True) -> None:
+        """MOVE OR FORTIFY (`moveOrFortify`, 0x773fb0): a unit on `dest`
+        takes the Fortify order (one tick), any other the move to it"""
+        here = m & (getattr(self, f"{pre}_unit_tile")[torch.arange(self.B, device=self.device), u_b] == dest)
+        self._fortify_slot(here, u_b, pre, 1)
+        self._tac_move_to(m & ~here, u_b, dest, pre, seat, strike)
 
     def _tac_chase_city(self, on: torch.Tensor, k: torch.Tensor, seat: torch.Tensor) -> torch.Tensor:
         """`chaseCity` for tribe `k` [B] going after `seat` [B]: of the cities
@@ -4026,8 +4061,7 @@ class SimTactics:
             has, u_b = first_by_slot(cand)
             if not bool(has.count_nonzero()):
                 continue
-            away = has & (self.barb_unit_tile[bidx, u_b] != camp)
-            self._tac_move_to(away, u_b, camp)
+            self._tac_move_or_fortify(has, u_b, camp)
             done[bidx[has], u_b[has]] = True
 
         if rows.numel():
@@ -5112,8 +5146,10 @@ class SimTactics:
         `homelandSafety`): in slot order each unit left that flees
         (`_tac_flees`, listed as the move begins) goes
         to its safe plot (`_tac_safe_plot`, the plots the ones before it took
-        left out), its turn done; with none a barbarian of the homeland's
-        fortifies where it stands, any other stays."""
+        left out; outside the homeland one already there takes the Fortify
+        order, `_tac_move_or_fortify`), its turn done; with none a barbarian
+        of the homeland's takes the Fortify order where it stands (two
+        ticks), any other stays."""
         B, T, dev = self.B, self.T, self.device
         bidx = torch.arange(B, device=dev)
         listed = live() & self._tac_flees(pre, seat, danger, rowof, res, hl)
@@ -5129,8 +5165,14 @@ class SimTactics:
             moved = go & (p >= 0)
             if bool(moved.count_nonzero()):
                 taken[bidx[moved], p[moved]] = True
-                self._tac_move_to(moved, u_b, p, pre, seat, False)
-            fin = moved | (go & hl & (seat == BARB_SEAT))
+                if hl:
+                    self._tac_move_to(moved, u_b, p, pre, seat, False)
+                else:
+                    self._tac_move_or_fortify(moved, u_b, p, pre, seat, False)
+            # the homeland's Fortify in place: two ticks
+            stay = go & (p < 0) & (hl and seat == BARB_SEAT)
+            self._fortify_slot(stay, u_b, pre, 2)
+            fin = moved | stay
             done[bidx[fin], u_b[fin]] = True
 
     def _seat_reach_turns(self, op: dict, u_b: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
@@ -5412,10 +5454,13 @@ class SimTactics:
         if tg is not None:
             self._tac_attack_units(live, done, ai, order, op["rowof"], op["res"], tg, 1, peers, pre, seat)
         # HEAL: a hurt unit not embarked on a plot of no danger holds its
-        # plot, a hull outside its own waters too (`heal`)
+        # plot, a hull outside its own waters too, under the Fortify order
+        # where it may take it (two ticks, `heal`)
         hp_max = int(self.rules.combat["unitHp"])
-        done |= (live() & (self.major_unit_hp < hp_max) & ~self.major_unit_emb
-                 & (danger.gather(1, self.major_unit_tile.clamp(min=0)) <= 0))
+        hurt = (live() & (self.major_unit_hp < hp_max) & ~self.major_unit_emb
+                & (danger.gather(1, self.major_unit_tile.clamp(min=0)) <= 0))
+        self._fortify_order(hurt, pre, 2)
+        done |= hurt
         # CHASE TARGET: a LOW target within 8 of a unit (the list taken as the
         # pass began: only where a foe stands near is there one to take)
         if tg is not None:
@@ -5447,8 +5492,10 @@ class SimTactics:
                 ent = torch.where(nav_b.unsqueeze(1), wat_ent,
                                   land_ent | (wat_ent & emb_b.unsqueeze(1)))
                 alt = self._tac_alternate(back, u_b, home, pre, seat, ent)
-                # the move under the order's path flag 0x1000
+                # the move under the order's path flag 0x1000; with no plot
+                # the Fortify order where it stands (one tick)
                 self._tac_move_to(back & (alt >= 0), u_b, alt, pre, seat, False, later_turns=True)
+                self._fortify_slot(back & (alt < 0), u_b, pre, 1)
             # its moves end (0x56d6f0 at 0x77c62a, `wanderNearCity`)
             self._tac_moves_ended[bidx[ok], u_b[ok] + self.POOL_LO[pre]] = True
             done[bidx[ok], u_b[ok]] = True

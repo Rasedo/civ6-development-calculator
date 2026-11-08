@@ -50,6 +50,9 @@ export const KIND_NOTES: Record<string, string> = {
   'freeCities.move.plot': 'the same, the Free Cities',
   'barb.move.family': 'a barbarian unit\'s move vs AI_Tactical.csv',
   'barb.move.plot': 'its end plot vs record t+1\'s',
+  'cityState.fortify': 'a unit\'s fortification after its pass (the Fortify order) vs record t+1\'s, on the record\'s plot',
+  'freeCities.fortify': 'the same, the Free Cities',
+  'barb.fortify': 'the same, the barbarians',
   'barb.unit': 'a unit a camp raised vs record t+1\'s new barbarian units (barb:unitNew, barb:unit)',
   'trade.route.minor': 'the destination a city-state\'s Trader takes (minorRouteCandidate) vs record t+1\'s new route',
 };

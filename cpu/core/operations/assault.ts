@@ -227,15 +227,15 @@ const garrisonCity: BtHandler<OpsContext> = {
  *  garrison's branch a stronger candidate moves beside the city and swaps
  *  into it with the garrison (0x972880), its moves ended there (0x56d6f0),
  *  else a garrison of no Range
- *  fortifies, its moves ended (0x95eae0, 0x56d6f0; where every team's
+ *  takes the Fortify order, its moves ended (0x95eae0 at 0x81116f on its
+ *  operation queue, `fortifyOrder`'s one tick; 0x56d6f0; where every team's
  *  +0x98 less +0x94 is at most 10, those sums unported and the test taken
  *  as held). Each unit the execution takes has its turn done (0x570b40)
  *  and keeps its Movement otherwise: Operation Move moves a ranged
  *  garrison on (runs/h1_duely1117 Antananarivo t85 / t89, its Catapult
  *  32:5 -> 32:6 before the city's purchase; city-state 3's Crossbowman
  *  42:13 -> 41:13 t112-t121), a melee one stays (runs/h1_dueldA1117
- *  Antananarivo t24's Warrior on 32:5, no Operation Move row). The
- *  fortify commands are none in the action rows. The garrison it keeps
+ *  Antananarivo t24's Warrior on 32:5, no Operation Move row). The garrison it keeps
  *  takes AI type DEFENDER, a candidate swapped in takes it and the garrison
  *  its type's own (0x1e60f0 on unit +0x168), a candidate moved in with no
  *  garrison neither: Recruit Units having turned the operation's units
@@ -309,7 +309,10 @@ function garrisonExecute(_node: Parameters<BtHandler<OpsContext>['update']>[0], 
     ctx.ownAiType([garrison.id]);
     return;
   }
-  if (garrison.range === 0) ctx.endMoves?.(garrison.id);
+  if (garrison.range === 0) {
+    ctx.fortify?.(garrison.id);
+    ctx.endMoves?.(garrison.id);
+  }
   // the garrison takes AI type DEFENDER (0x8111c2 -> 0x81135e)
   ctx.defenderAiType(garrison.id);
 }

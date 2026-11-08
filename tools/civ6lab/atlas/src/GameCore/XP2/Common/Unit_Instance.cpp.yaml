@@ -177,6 +177,9 @@
     - gpu/core/sim_tactics.py:_tac_assign
     - cpu/core/tactical.ts:orderOnce
     - gpu/core/sim_tactics.py:_tac_move_to
+    - cpu/core/tactical.ts:passFortify
+    - cpu/core/tactical.ts:moveOrFortify
+    - cpu/core/units.ts:fortifyOrder
   readings:
     - "C-99: Wander Near City ends its unit's moves; a unit whose moves an order ended runs its order no more — READ (0x77bf50 at 0x77c62a, 0x56d6f0, 0x52f50 at 0x530fd..0x53113), both twins"
     - "C-99: the assignment's Movement and the swap's walk — READ (0x776140 at 0x776643 / 0x7768e4, 0x56d6f0, 0x972a50 -> 0x26fe20 under flag 4, 0x2720a0 at 0x27229b), both twins"
@@ -196,6 +199,7 @@
     - "C-123 / C-95: the Plunder Trade Route command and the AI's plunder after the move — READ (0x89dae0, 0x89dfc0, 0x9555a0, 0x9559a0, 0x5545e0 at 0x554667 / 0x554d4c, 0x58fc20, 0x7746a0, 0x70a440, 0x771f80 at 0x7722b6 / 0x77254e / 0x77277f, 0x776140 at 0x776424..0x776470), both twins"
     - "C-129: the upgrade is a new unit, its old self dying in its pool slot to the turn's end — READ (0xa49cb0, 0x9402a0, 0x4ef040, 0x4ef6d0), both twins"
     - "C-129: a killed player's records forgotten; a capture's new unit; an air strike's record — READ (0x534c50, 0x787fc0 -> 0x5ee370, 0x212500's create), both twins; the replay's later-player timings"
+    - "C-110: the Fortify order and its ticks; the heal's plot gate — READ"
   notes:
     - ".claude/scratchpad/mu1/readings_c96.md: ...flag 0x1000, else the skip 0x95eae0 (\"Wander Back to City\", \"Move To\" the   city). The turn ends (0x56d6f0, 0x570b40). Confirmed: the turn's \"Random   Direction\" draws pair one to one with the AI_Tactical.c..."
   context:
@@ -526,12 +530,16 @@
     - recording: h1_duely1128
       turn: 174
       value: Hong Kong's Warrior 2490370 on 8:7 swaps onto its centre 9:7; its Warrior 2293764 steps first onto 9:8, 8:7 beside the barbarians on 9:6; its Man-At-Arms 1507331 on 10:7 swaps not with 2490370, moved into the barbarians' zone (record t+1)
-  impl: [cpu/core/tactical.ts:swapPartner, gpu/core/sim_tactics.py:_tac_swap]
+  impl:
+    - cpu/core/tactical.ts:swapPartner
+    - gpu/core/sim_tactics.py:_tac_swap
+    - cpu/core/units.ts:fortifyOrder
   readings:
     - "C-99: Move Unit's no-Location execution, the swap's partner and the move order's first turn — READ, ported; the swap's path tests and 0x56e760 unread"
     - "C-99: Move Unit's no-Location execution, the swap's partner and the move order's first turn"
     - "C-99 / C-128: the swap's partner test and its step along its own path; Move Unit's update before the executions — READ (0x972540, 0x56e760, 0x972a50 -> 0x26fe20, 0x7d3a00 -> 0x7f0020), both twins"
     - "C-99 / C-128: the swap's partner test and its step along its own path; Move Unit's update before the executions; a Trader no passenger — READ (0x972540, 0x56e760, 0x972a50 -> 0x26fe20, 0x7d3a00 -> 0x7f0020, 0x586360 -> 0x208b80 / 0x523d60), both twins"
+    - "C-110: the Fortify order and its ticks; the heal's plot gate — READ"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...swap's partner and the move order's first turn — READ, ported; the swap's path tests and 0x56e760 unread"
@@ -568,8 +576,17 @@
 - addr: 0x56ef30
   final: 0x3a47e0
   kind: function
-  semantics: the fortify mission. The fortify mission (Heal's on a land unit or a hull at home, -> 0x95eae0).
-  status: PARTLY
+  name: canFortify
+  semantics: "can fortify: a combat, ranged or bombard strength and domain 2 or 3 (land)."
+  status: READ
+  cases:
+    - recording: h1_duelp1124
+      turn: 68
+      value: Rome's Warrior 1245192 0 -> 2 in the pair; the barbarian Archer 3801089's shot logs DefenderStrMod +3 at 66 HP (+6 less the wound's 3)
+  impl:
+    - cpu/core/units.ts:canFortify
+    - gpu/core/sim_tactics.py:_fortify_order
+    - cpu/core/tactical.ts:heal
   readings:
     - "C-96: the city-states' tactical pass — READ (Wander Near City, Heal, the non-barbarian priorities, FindAlternateLocation), the families it needs PARTLY READ"
     - "C-95: the scout's tree \"Barbarian Found City\" — READ (the tree, its start, Protect Unit's update), PARTLY READ (the nodes' executions), unported"
@@ -577,6 +594,7 @@
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
     - "C-99: the pathfinder's later-turn pool, Heal's hull, the tactical list's explorers, Move Unit's planning — READ, both twins"
     - "C-99: the pathfinder's later-turn pool, Heal's hull, the tactical list's explorers, Move Unit's planning"
+    - "C-110: the Fortify order and its ticks; the heal's plot gate — READ"
   notes:
     - ".claude/scratchpad/mu1/readings_c96.md: ...and, the   gossip strings GOSSIP_LAND/NAVAL_UNIT_LEVEL) holds its plot — fortify   (0x95eae0) where 0x56ef30 allows, else sleep (0x9686d0); a hull outside   its own territory heads for its player's nearest ci..."
   context:

@@ -309,11 +309,15 @@
     - recording: h1_duely1124
       turn: 93-126
       value: city-state 3's Quadrireme 1048577 heals on 38:17 off its territory every turn (record t+1 38:17); t157-177 its Frigate, t211-221 its Battleship hold too
-  impl: [cpu/core/tactical.ts:heal, gpu/core/sim_tactics.py:_minor_pass]
+  impl:
+    - cpu/core/tactical.ts:heal
+    - gpu/core/sim_tactics.py:_minor_pass
+    - cpu/core/units.ts:fortifyOrder
   readings:
     - "C-96: the city-states' tactical pass — READ (Wander Near City, Heal, the non-barbarian priorities, FindAlternateLocation), the families it needs PARTLY READ"
     - "C-99: the pathfinder's later-turn pool, Heal's hull, the tactical list's explorers, Move Unit's planning — READ, both twins"
     - "C-99: the pathfinder's later-turn pool, Heal's hull, the tactical list's explorers, Move Unit's planning"
+    - "C-110: the Fortify order and its ticks; the heal's plot gate — READ"
   notes:
     - ".claude/scratchpad/mu1/readings_c96.md: ...area (plot +8) counted three times as far; strictly nearer   replaces. - HEAL (0x779a70, its moves 0x7737c0): each unit (+0x770 clear) that has   taken damage (+0xcf0 > 0), in no formation (0x8be30), on a pl..."
   context:
@@ -363,14 +367,24 @@
 - addr: 0x773fb0
   final: 0x505fa0
   kind: function
-  semantics: a move onto a plot keeping the unit's Movement.
-  status: PARTLY
-  impl: [cpu/core/tactical.ts:moveToSafety, cpu/core/tactical.ts:plunderTraders]
+  name: moveOrFortify
+  semantics: "move or fortify: a unit on the plot that may fortify (0x56ef30) takes the Fortify order on its queue, any other the MoveTo (flag 0x10); its flag clear, its moves end (0x56d6f0 at 0x7740b6); its turn done (0x570b40)."
+  status: READ
+  cases:
+    - recording: h1_duelp1117
+      turn: 2
+      value: "barbarian Spearman 65536 Barb. Camp Defense at its camp: Started, two segment rows, 0 -> 1; t3 orders again 1 -> 2, SENTRY (cityState / barb.fortify trace t1-30: 164 of 165)"
+  impl:
+    - cpu/core/tactical.ts:moveOrFortify
+    - gpu/core/sim_tactics.py:_tac_move_or_fortify
+    - cpu/core/tactical.ts:moveToSafety
+    - cpu/core/tactical.ts:plunderTraders
+    - cpu/core/units.ts:fortifyOrder
   readings:
     - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
     - "C-95: the danger map and Move to Safety — READ, ported"
     - "C-123 / C-95: the Plunder Trade Route command and the AI's plunder after the move — READ (0x89dae0, 0x89dfc0, 0x9555a0, 0x9559a0, 0x5545e0 at 0x554667 / 0x554d4c, 0x58fc20, 0x7746a0, 0x70a440, 0x771f80 at 0x7722b6 / 0x77254e / 0x77277f, 0x776140 at 0x776424..0x776470), both twins"
-  notes: ["imported: READ in its section, no confirming case found beside it"]
+    - "C-110: the Fortify order and its ticks; the heal's plot gate — READ"
   context:
     - "...lot this turn (0x775340, 1 turn) go for it (0x7746a0): each that can act moves onto it (0x773fb0, its Movement kept) and plunders (PLUNDER_TRADE_ROUTE 0x955950), its turn done, until o..."
   review: reviewed
@@ -388,6 +402,7 @@
     - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
     - "C-95: the danger map and Move to Safety — READ, ported"
     - "C-125: Protect Units' safe plot toward the operation's target — READ (0x716b90 at 0x716ca5 / 0x716f9a..0x717007, 0x80d790 at 0x80db1a / 0x80e44a / 0x80e8ab, 0x497d20), both twins"
+    - "C-110: the Fortify order and its ticks; the heal's plot gate — READ"
   context:
     - "...however hurt; a whole one where the danger exceeds its strength + 20 — and moves them (0x774190, unread)."
   review: reviewed
@@ -537,6 +552,7 @@
   impl: [cpu/core/tactical.ts:rampage, cpu/core/tactical.ts:chaseTarget]
   readings:
     - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
+    - "C-110: the Fortify order and its ticks; the heal's plot gate — READ"
   context:
     - "...h of this turn within its range (1 at least) of the city with none of its own stacking (0x775c60) and logs no row. Shadow check over 1124: of 446 rows the logged target is in the list..."
     - "...of this turn within its range (1 at least) of the target with none of its own stacking (0x775c60); the row's \"Move To\" is the target's plot."
@@ -936,12 +952,14 @@
     - gpu/core/sim_tactics.py:_CHASE_SIGHT
     - cpu/core/tactical.ts:keptOut
     - gpu/core/sim_tactics.py:live
+    - cpu/core/units.ts:fortifyOrder
   readings:
     - "C-99: Wander Near City ends its unit's moves; a unit whose moves an order ended runs its order no more — READ (0x77bf50 at 0x77c62a, 0x56d6f0, 0x52f50 at 0x530fd..0x53113), both twins"
     - "C-96: the city-states' tactical pass — READ (Wander Near City, Heal, the non-barbarian priorities, FindAlternateLocation), the families it needs PARTLY READ"
     - "C-99: the stacking count holds other players' units, the wanders' kept-out plots, a Harbor's water no shore — READ (0x585d90, 0x585eb0, 0x2720a0, 0x77bf50, 0x77b9a0, 0x530240), both twins"
     - "C-99: the stacking count holds other players' units, the wanders' kept-out plots, a Harbor's water no shore — READ (0x585d90, 0x585eb0, 0x2720a0, 0x77bf50, 0x77b9a0, 0x530240), both twins"
     - "C-99 / C-128: a shore crossing's cliff onto a revealed plot alone, Wander Back to Camp's path flag 0x1000, the path's destination count — READ (0x52fb90, 0x2720a0 at 0x272230..0x27229e / 0x272380, 0x270dd0 at 0x270f24, 0x271be0 at 0x271d03..0x271d18, 0x77b9a0 at 0x77be0b), both twins"
+    - "C-110: the Fortify order and its ticks; the heal's plot gate — READ"
   notes:
     - ".claude/scratchpad/mu1/readings_c96.md: ...ore): f2e128 Heal (0x779a70), f2e12c Make Military Formation (0x77a190),   f2e164 Wander Near City (0x77bf50). - WANDER NEAR CITY (0x77bf50): nothing for a player with no city ([+0x12f0]   +0xc0, so a city-st..."
     - ".claude/scratchpad/mu1/readings_c96.md: ...2e12c Make Military Formation (0x77a190),   f2e164 Wander Near City (0x77bf50). - WANDER NEAR CITY (0x77bf50): nothing for a player with no city ([+0x12f0]   +0xc0, so a city-state's first turn, its Settler f..."

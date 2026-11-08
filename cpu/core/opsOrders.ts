@@ -12,7 +12,7 @@ import { UNITS } from '../data/units';
 import { gameTypeOf } from '../data/aliases';
 import { aiPromotionPick, attacksLeftOf, promoReady, takePromotion } from './promotions';
 import { cityStrikeBase, damageExpected, hostilePillage, hostilePillageAmount, hostileRangedStrike, unitAttackRange } from './combat';
-import { aiStrengths, dangerDistricts, maxMoves, militaryAiTypeOf, moveTo, passAttack, passFinish, passMoveExec, passMoveUpdate, passNavalPillage, passPatrol, passSafePlot, planningAt, plotDistance, rangeOf, swapUnits,
+import { aiStrengths, dangerDistricts, maxMoves, militaryAiTypeOf, moveTo, passAttack, passFinish, passFortify, passMoveExec, passMoveUpdate, passNavalPillage, passPatrol, passSafePlot, planningAt, plotDistance, rangeOf, swapUnits,
   type Pass } from './tactical';
 import type { OpsEnv } from './operations/manager';
 import type { DefendOrders } from './operations/nodes';
@@ -232,7 +232,9 @@ function passDefend(state: GameState, seat: number, pass: Pass, changed: () => v
             if (!state.units.includes(u)) continue;
           }
         }
-        // fortified, its moves end (0x56d6f0)
+        // the Fortify order (0x95eae0 at 0x80ea6b, `fortifyOrder`'s one
+        // tick), its moves end (0x56d6f0)
+        passFortify(state, pass, u, 1);
         pass.ended.add(u.id);
         passFinish(pass, u, 'Operation', u.tileIndex);
         lines.push({ type: type(u), what: 'Fortify' });
@@ -269,7 +271,7 @@ export function defenderAiType(state: GameState, seat: number, pass: Pass | null
 
 /** the orders of `seat`'s operations in `pass`; `changed` after each */
 export function passOrders(state: GameState, seat: number, pass: Pass, changed: () => void):
-  Pick<OpsEnv, 'move' | 'strike' | 'attack' | 'moveUpdate' | 'moveExec' | 'defend' | 'endTurn' | 'endMoves' | 'swap' | 'patrol' | 'pillage' | 'enterFormation' | 'exitFormation'> {
+  Pick<OpsEnv, 'move' | 'strike' | 'attack' | 'moveUpdate' | 'moveExec' | 'defend' | 'endTurn' | 'endMoves' | 'fortify' | 'swap' | 'patrol' | 'pillage' | 'enterFormation' | 'exitFormation'> {
   const unitOf = (id: number): Unit | undefined => state.units.find((u) => u.id === id && u.seat === seat);
   return {
     move: (id, dest, attack = false) => {
@@ -328,6 +330,10 @@ export function passOrders(state: GameState, seat: number, pass: Pass, changed: 
     endMoves: (id) => {
       const u = unitOf(id);
       if (u) pass.ended.add(u.id);
+    },
+    fortify: (id) => {
+      const u = unitOf(id);
+      if (u) passFortify(state, pass, u, 1);
     },
     // the units in the player's unit order (0x6092c0: pool order)
     patrol: (ids) => {

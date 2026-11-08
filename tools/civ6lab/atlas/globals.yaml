@@ -683,6 +683,14 @@
   context:
     - "...DELETE (the Economic AI's disband, 0x6877d0): the command's execution 0x948500 (vtable @0xd95490 slot 4) calls the units manager's destroy (vt +0x60) with the flag 0 (0x9485e5..0x9485f..."
   review: imported
+- addr: 0xd97970
+  kind: global
+  status: PARTLY
+  readings: ["C-110: the Fortify order and its ticks; the heal's plot gate — READ"]
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "Unit operations (vtables at 0xd98ef8 FORTIFY, 0xd99548 HEAL, 0xd97970 the third: slot 2 CanStart, slot 4 the tick, slot 5 the update)."
+  review: imported
 - addr: 0xd98910
   kind: global
   status: PARTLY
@@ -691,6 +699,22 @@
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ...the MoveTo definition's handler 0x962310 (its table @0xd99b40 +0x40; the sibling table @0xd98910 holds 0x95d8d0 at that slot) reads the order's target plot (the operation's vt +0x68) a...
+  review: imported
+- addr: 0xd98ef8
+  kind: global
+  status: PARTLY
+  readings: ["C-110: the Fortify order and its ticks; the heal's plot gate — READ"]
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "Unit operations (vtables at 0xd98ef8 FORTIFY, 0xd99548 HEAL, 0xd97970 the third: slot 2 CanStart, slot 4 the tick, slot 5 the..."
+  review: imported
+- addr: 0xd99548
+  kind: global
+  status: PARTLY
+  readings: ["C-110: the Fortify order and its ticks; the heal's plot gate — READ"]
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "Unit operations (vtables at 0xd98ef8 FORTIFY, 0xd99548 HEAL, 0xd97970 the third: slot 2 CanStart, slot 4 the tick, slot 5 the update)."
   review: imported
 - addr: 0xd99b40
   kind: global

@@ -9,7 +9,7 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { loadWorld } from '../../../cpu/world/load';
-import { refreshUnits } from '../../../cpu/core/units';
+import { fortifyOrder, refreshUnits } from '../../../cpu/core/units';
 import { captureCityState } from '../../../cpu/core/combat';
 import { MINOR_STARTING_UNIT, MINOR_STARTING_UNITS } from '../../../cpu/data/cityStates';
 import { neighbors } from '../../../world/hex';
@@ -48,12 +48,16 @@ describe("a city-state's starting army", () => {
     expect(onRing.hp).toBe(65);
   });
 
-  it('digs in where it stands', () => {
+  it('digs in under the Fortify order, not by standing', () => {
     const state = world();
     const cs = state.cityStates[0];
     refreshUnits(state);
     refreshUnits(state);
-    for (const u of state.units.filter((x) => x.seat === cs.seat)) expect(u.fortifyTurns).toBe(2);
+    for (const u of state.units.filter((x) => x.seat === cs.seat)) {
+      expect(u.fortifyTurns ?? 0).toBe(0);
+      fortifyOrder(state, u, 2);
+      expect(u.fortifyTurns).toBe(2);
+    }
   });
 
   it("leaves the map with the minor's conquest", () => {

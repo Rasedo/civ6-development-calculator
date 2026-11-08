@@ -116,6 +116,7 @@ export interface OpsEnv {
   defend?: OpsContext['defend'];
   endTurn?: OpsContext['endTurn'];
   endMoves?: OpsContext['endMoves'];
+  fortify?: OpsContext['fortify'];
   swap?: OpsContext['swap'];
   enterFormation?: OpsContext['enterFormation'];
   exitFormation?: OpsContext['exitFormation'];
@@ -423,6 +424,7 @@ function context(ai: OpsAi, env: OpsEnv, op: Operation): OpsContext {
     defend: env.defend,
     endTurn: env.endTurn,
     endMoves: env.endMoves,
+    fortify: env.fortify,
     swap: env.swap,
     enterFormation: env.enterFormation,
     exitFormation: env.exitFormation,

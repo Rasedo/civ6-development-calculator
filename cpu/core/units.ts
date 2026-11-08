@@ -666,6 +666,39 @@ export function grantedMoves(state: GameState, unit: Unit): number {
   return unit.movesFull ?? unitFullMoves(state, unit);
 }
 
+/** CAN FORTIFY (0x56ef30): a chassis with a combat, ranged or bombard
+ *  strength, of the land (its domain neither sea nor air) */
+export function canFortify(unit: Unit): boolean {
+  const def = UNITS[unit.type];
+  if (!def || def.naval || def.air) return false;
+  return (def.combat ?? 0) > 0 || (def.ranged?.strength ?? 0) > 0 || (def.bombard ?? 0) > 0;
+}
+
+/**
+ * THE FORTIFY ORDER (UNITOPERATION_FORTIFY, 0x95eae0; its CanStart 0x95e970:
+ * `canFortify`, not embarked). Fortification grows only in the operation's
+ * tick (0x95ebb0: +1 where the unit's Movement is whole, 0x56e760), and the
+ * operation ends at FORTIFY_TURN_MAX (0x95ea70: the count held there, the
+ * unit's activity SENTRY). The order ticks as it starts; an order the
+ * player's turn left running ticks again as that turn ends. An order the
+ * unit's operation queue holds (+0x60: Wander Near City 0x77c53a, the
+ * move-or-fortify 0x773fb0 under Chase Target, Defend Camps and Move to
+ * Safety, the operations' Protect Units and Garrison City, the barbarians'
+ * Protect Unit 0x7ef47d) has its moves ended after it (0x56d6f0; 0x7740b6
+ * in the move-or-fortify), so its second tick finds them spent: one tick
+ * (`ticks` 1). An order a move's command list carries (Heal 0x7739e5, the
+ * homeland's Fortify in place 0x70c2d4) keeps them: two
+ * (runs/h1_duelp1117-1128: 97 city-state units healing 0 -> 2 in the pair,
+ * one segment row, then SENTRY; 123 Barb. Camp Defense / Chase Target
+ * orders 0 -> 1, two segment
+ * rows; every unit at 1 ordering again 1 -> 2). A unit that has moved
+ * ticks neither time.
+ */
+export function fortifyOrder(state: GameState, unit: Unit, ticks: 1 | 2): void {
+  if (!canFortify(unit) || unit.embarked || unit.movesLeft < grantedMoves(state, unit)) return;
+  unit.fortifyTurns = Math.min(FORTIFY_MAX_TURNS, (unit.fortifyTurns ?? 0) + ticks);
+}
+
 /** FORTIFY: the defender-strength bonus a unit's fortifyTurns grants
  * (+3 CS at >=1, +6 at >=2; cap 2). Civilians never fortify (0). */
 export function fortifyBonus(unit: { fortifyTurns?: number }): number {
@@ -2386,13 +2419,13 @@ export function restUnit(state: GameState, unit: Unit, still: boolean,
       ? UNIT_HP
       : Math.min(UNIT_HP, unit.hp + heal);
   }
-  // FORTIFY: the EXACT heal gate (spent no MP since the last refresh). A
-  // military unit that stayed put digs in (+1, cap 2); any move/attack
-  // resets it. Symmetric across owners.
-  // NAVAL units never fortify (real Civ 6). (Embarked land units are still military but march every turn, so
-  // their fortify gate resets to 0 in practice.)
+  // FORTIFY: standing digs no unit in — fortification grows under the
+  // Fortify order alone (`fortifyOrder`; runs/h1_duelw1117: 41 barbarian
+  // Scouts and 6 city-state Warriors stood a turn unspent and stayed at 0).
+  // A military unit that spent no MP since the last refresh keeps what it
+  // holds; any move/attack resets it. NAVAL units never fortify.
   if (unitDomain(unit.type) === 'military' && !naval) {
-    const dug = still ? Math.min(2, (unit.fortifyTurns ?? 0) + 1) : 0;
+    const dug = still ? (unit.fortifyTurns ?? 0) : 0;
     // CIV6 (Alhambra, Mont St. Michel): a unit occupying the wonder
     // "automatically gains 2 turns of fortification" — a floor, not a step.
     // CIV6 (`Improvements.GrantFortification`): the Fort, the Great Wall and

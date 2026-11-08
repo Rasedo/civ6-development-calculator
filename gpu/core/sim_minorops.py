@@ -2983,9 +2983,12 @@ def _x_garrison(sim, c: _OpCtx, i: int, on: torch.Tensor) -> None:
         sim._mops_swap(s, pick, city, m)
         end_moves(pick, m & (U("tile")[b, pick.clamp(min=0)] == city))
     end_turn(pick, m)
-    # else a garrison of no Range fortifies, its moves ended
+    # else a garrison of no Range takes the Fortify order (one tick), its
+    # moves ended
     gt = U("type")[b, gar.clamp(min=0)].clamp(min=0, max=sim.NU - 1)
-    end_moves(gar, with_g & ~m & (sim._type_ranged_range.take(gt) == 0))
+    holds = with_g & ~m & (sim._type_ranged_range.take(gt) == 0) & (gar >= 0)
+    sim._fortify_slot(holds, gar.clamp(min=0), sim._mops_pre(s), 1)
+    end_moves(gar, holds)
     # the candidate swapped in takes AI type DEFENDER, the garrison its
     # type's own; with no stronger candidate the garrison takes DEFENDER
     # (0x1e60f0 on unit +0x168; `garrisonExecute`), its home kept
@@ -3254,7 +3257,8 @@ def _x_defend(sim, c: _OpCtx, i: int, on: torch.Tensor) -> None:
             dang = danger.gather(1, plot.unsqueeze(1)).squeeze(1) > 0
             to_safe(us, ok & (war | dang), False, no_goal)
             ok &= live(us)
-            # fortified, its moves end
+            # the Fortify order (one tick), its moves end
+            sim._fortify_slot(ok, uc, "major", 1)
             end(us, ok)
             done[b, uc] = torch.where(ok, True, done[b, uc])
 

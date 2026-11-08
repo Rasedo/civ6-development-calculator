@@ -8,7 +8,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import { makeMap, makeState, tileAtCoords, settleAt, holdWorks } from '../helpers';
-import { spawnUnit, trainableUnits, goldBuyableUnits, tileFreeForUnit, refreshUnits, unitExertsZoc, unitDomain, disbandUnit } from '../../../cpu/core/units';
+import { fortifyOrder, spawnUnit, trainableUnits, goldBuyableUnits, tileFreeForUnit, refreshUnits, unitExertsZoc, unitDomain, disbandUnit } from '../../../cpu/core/units';
 import { UNITS } from '../../../cpu/data/units';
 import { emptySeat, seatOf, setAllyTurnsWith, setTileOwner, unitsOf } from '../../../cpu/core/seats';
 import { applySeatUnitOrders } from '../../../cpu/core/phase';
@@ -146,13 +146,14 @@ describe('a spy is fielded, not stationed', () => {
     const spy = spyAt(state, 0, mine);
     expect(unitDomain(SPY_UNIT)).toBe('spy');
     expect(unitExertsZoc(spy)).toBe(false);
-    // the control: a WARRIOR that stands still digs in over two refreshes.
+    // the control: a WARRIOR under the Fortify order digs in.
     const open = state.map.tiles.find(
       (x) => x.index !== mine.centerIndex && !x.district && x.terrain !== 'OCEAN',
     )!;
     const w = spawnUnit(state, 'WARRIOR', open.index, 0)!;
     refreshUnits(state);
-    refreshUnits(state);
+    fortifyOrder(state, w, 2);
+    fortifyOrder(state, spy, 2);
     expect(w.fortifyTurns).toBe(2);
     expect(spy.fortifyTurns ?? 0).toBe(0);
   });

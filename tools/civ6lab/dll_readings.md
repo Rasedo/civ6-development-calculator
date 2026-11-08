@@ -12450,3 +12450,57 @@ import: `buildRows`, `buildOverflow`, `importQueue` (cpu/harness/import.ts).
 - OPEN: runs/h1_duelp1124 Granada's Alcazar on 42:12: its loss reads 20.11
   more at t24 / t26 (n = 1 where 0x3dfae0 counts no war: the record's wars
   the barbarians alone), 24-43 more from t31 on.
+
+## C-110: the Fortify order and its ticks; the heal's plot gate — READ
+
+Unit operations (vtables at 0xd98ef8 FORTIFY, 0xd99548 HEAL, 0xd97970 the
+third: slot 2 CanStart, slot 4 the tick, slot 5 the update).
+
+- UNITOPERATION_FORTIFY (0x95eae0 builds the request by its hash
+  0xd3a6f7e8). CanStart 0x95e970: a formation, then (an AI's unit) 0x56ef30
+  — a combat, ranged or bombard strength and domain 2 or 3 (land) — not
+  0x8be70 (the unit's activity +0x5f0 HOLD, SLEEP, HEAL, SENTRY or
+  INTERCEPT), not embarked. The tick 0x95ebb0: +1 (0x5707b0, floored at 0)
+  where the unit has not moved (0x56e760: Movement left below full); the
+  update 0x95ea70: at FORTIFY_TURN_MAX (GlobalParameters +0x374) the count
+  set to it, the operation done, the activity SENTRY (0xd0aed661). The order
+  ticks as it starts and once more as its player's turn ends while it runs.
+  The HEAL operation's tick 0x960800 adds +1 the same way (0x56ef30, below
+  the max); its update 0x9606f0 ends it at no damage (ACTIVITY_AWAKE). The
+  third's tick 0x959830 adds +1 with no move test (else SENTRY).
+- Which orders tick twice: an order the unit's operation queue holds (+0x60:
+  Wander Near City 0x77c53a where FindAlternateLocation finds no plot; the
+  move-or-fortify 0x773fb0 — at the plot and 0x56ef30, the order, else the
+  MoveTo; its flag clear, 0x56d6f0 at 0x7740b6 ends the moves — under Chase
+  Target 0x775c60, Move to Safety 0x774190, Defend Camps; Protect Units
+  0x80ea6b, Garrison City 0x81116f, the barbarians' Protect Unit 0x7ef47d
+  after its move) has its moves ended, so its second tick finds them spent:
+  one tick. An order a move's command list carries (Heal 0x7739e5, the
+  homeland's "Fortify in place" 0x70c2d4) keeps them: two. Ported:
+  `fortifyOrder` / `passFortify` / `moveOrFortify` (cpu/core/units.ts,
+  tactical.ts, opsOrders.ts, operations/assault.ts, barbarianOps.ts) and
+  `_fortify_order` / `_fortify_slot` / `_tac_move_or_fortify` (sim_tactics,
+  sim_minorops, sim_barbops); the rest digs no unit in (`restUnit`,
+  sim_step), it keeps or resets.
+- Confirmed (runs/h1_duelp1117-1128, records and AI_Tactical.csv): 97
+  city-state Heal orders 0 -> 2 with one segment row then SENTRY; 123 Barb.
+  Camp Defense / Chase Target orders 0 -> 1 with two segment rows; every
+  unit at 1 ordering again 1 -> 2 at once (SENTRY); a unit that moved
+  before its order 0 -> 0. 1117 Rome's Warrior 327683 t16: Started,
+  segment, SENTRY before Rome's turn closes, struck at +6 by the barbarian
+  Warrior; 1124 t68 Rome's Warrior 1245192 0 -> 2, the Archer's shot +3 at
+  66 HP (+6 less the wound's 3). Trace 1117 t1-30: cityState.fortify 30 of
+  30, barb.fortify 134 of 135.
+- Open: the engines carry no activity, so 0x8be70's refusal is not taken:
+  1117 t10 the barbarian Scout 262147, in ACTIVITY_HOLD from its t9 Skip
+  Turn, logs "Fortify in place" with no operation (ours 2, the game's 0).
+- THE HEAL'S PLOT GATE (0x538040): the unit's +0x1590, not dead, on a plot,
+  its strategic resource held; then the plot's relation to the owner
+  (0x530880: 1 its own, its suzerain's city-state's or an ally's, 2 no
+  one's, 3 another's) — relation 3 refused where the owner's units manager
+  +0x290 (m_bNoForeignHeal) is set, relation 2 where +0x2f0
+  (m_bNoNeutralHeal) is; the amounts per relation after. A barbarian holds
+  no plot, so every plot it stands on is 2 or 3: with both flags set it
+  never heals (the engines' BARB_SEAT gate). Open: the flags' writer —
+  the only byte writes are Player::Units' read (0x4e7f00); no install
+  effect names them.

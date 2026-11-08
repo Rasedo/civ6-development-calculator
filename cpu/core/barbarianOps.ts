@@ -28,7 +28,7 @@ import { NO_PLOT, addMember, opDef, opUnits, type Operation } from './operations
 import type { BarbarianHooks } from './operations/barbarian';
 import { BT_FAILURE, BT_FRESH, BT_RUNNING, BT_SUCCESS, compileTree, dataBool, dataFloat, dataInt, dataTag, tick, type BtHandler, type BtNode, type BtRun } from './behaviorTree';
 import { AI_OP_DEFS, AI_TREES } from '../data/aiOperations';
-import { moveTo, moveUnitDanger, passEnd, passPillage, passReachAt, passSafePlot, turnsToPlot, type Pass } from './tactical';
+import { moveTo, moveUnitDanger, passEnd, passFortify, passPillage, passReachAt, passSafePlot, turnsToPlot, type Pass } from './tactical';
 import { barbUnitFor, handicapOf, raidBoldness } from './barbarians';
 import { BARB_TAG_UNITS, barbForce, type BarbTag } from '../data/barbarians';
 import { gameTypeOf } from '../data/aliases';
@@ -495,7 +495,9 @@ const SCOUT_NODES: Readonly<Record<string, BtHandler<ScoutCtx>>> = {
   },
   // PROTECT UNIT (0x7f07c0 update, 0x7ef0e0 execution): none of its units
   // FAILS; one endangered RUNS, else SUCCESS. The execution: each endangered
-  // unit to its safe plot (0x716b90) where that is another, its turn ended
+  // unit to its safe plot (0x716b90) where that is another, then the Fortify
+  // order (0x95eae0 at 0x7ef47d on its operation queue, a moved unit's: no
+  // tick), its turn ended
   'Protect Unit': {
     update(node, run, c) {
       const us = scoutUnits(c);
@@ -509,7 +511,10 @@ const SCOUT_NODES: Readonly<Record<string, BtHandler<ScoutCtx>>> = {
       for (const u of scoutUnits(c)) {
         if (!endangered(c, node, u)) continue;
         const p = passSafePlot(c.state, c.pass, u);
-        if (p >= 0 && p !== u.tileIndex) moveTo(c.state, u, p, false);
+        if (p >= 0 && p !== u.tileIndex) {
+          moveTo(c.state, u, p, false);
+          passFortify(c.state, c.pass, u, 1);
+        }
         passEnd(c.pass, u);
       }
     },

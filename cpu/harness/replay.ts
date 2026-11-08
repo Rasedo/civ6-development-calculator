@@ -47,7 +47,7 @@ import { applySeatUnitOrders, buySeatBuilding, declareWar, districtSiteCost, dis
 import { addEnvoys, cityStateAt, declareWarOnCityState, minorCity, minorReplaceCitizens, placeCityStateAt, sueForPeaceWithCityState } from '../core/cityStates';
 import { CP_ACCEPTED, CP_CANCELLED, CP_IN_PROGRESS, contractById } from '../core/aiContracts';
 import { availableBuildings, canPlaceWonder, validImprovements, wallsMax } from '../core/rules';
-import { builderHarvest, builderRemoveFeature, spawnUnit, tallyUnitMade, trainableUnits, builderCost, traderCost, disbandUnit, escortable, drawAndPayGoody, grantedMoves, unitFullMoves, restUnit, upgradeUnit, upgradeAnew, unitsAt, unitDomain, fortifyBonus, crossesRiver, waterWalks, cityAtIndex, raiseBestTrained, recordAttacker, unitMadeAnew, FORTIFY_MAX_TURNS, ANTIQUITY_CIVIC, SHIPWRECK_CIVIC } from '../core/units';
+import { builderHarvest, builderRemoveFeature, spawnUnit, tallyUnitMade, trainableUnits, builderCost, traderCost, disbandUnit, escortable, drawAndPayGoody, grantedMoves, unitFullMoves, restUnit, canFortify, upgradeUnit, upgradeAnew, unitsAt, unitDomain, fortifyBonus, crossesRiver, waterWalks, cityAtIndex, raiseBestTrained, recordAttacker, unitMadeAnew, FORTIFY_MAX_TURNS, ANTIQUITY_CIVIC, SHIPWRECK_CIVIC } from '../core/units';
 import { availableCivicsIn, availableTechsIn, computeUnlocks, goldPrice, governmentSlots, policyWireOf, seatGovernment, darkAgeEra,
   unlockedPolicyIds } from '../core/effects';
 import { selectResearch, chopGrant, harvestGrant, applyLumpYield, holdResearchEra, researchCost } from '../core/economy';
@@ -1354,6 +1354,7 @@ function barbarianAi(ctx: Ctx, b: TurnRecord, closing: number, before: ReadonlyS
   for (const [c, u] of twin) if (copy.units.includes(c)) ended.set(u, c.tileIndex);
   const actors = [...twin].filter(([c]) => isBarbSeat(c.seat) && acting.has(c.id)).map(([, u]) => u);
   tallyTactics(ctx, b, closing, moves, actors, ended, danger);
+  scoreFortify(ctx, b, closing, copy, twin, (s) => (isBarbSeat(s) ? 'barb' : null));
 }
 
 /** the game's tactical log's category for a barbarian unit's move, the
@@ -1936,6 +1937,7 @@ function minorAi(ctx: Ctx, b: TurnRecord, turn: number, made: ReadonlySet<Unit>,
   const idle = new Set([...twin].filter(([c]) => upgraded.has(c) || boughtNow.has(`${c.seat}:${c.id}`))
     .map(([, u]) => u).filter((u) => !moves.has(u)));
   tallyMinorTactics(ctx, b, turn, moves, ended, opOf, idle);
+  scoreFortify(ctx, b, turn, copy, twin, (s) => (s === FREE_SEAT ? 'freeCities' : isCityStateSeat(s) ? 'cityState' : null));
 }
 
 /**
@@ -2008,6 +2010,28 @@ function tallyMinorTactics(ctx: Ctx, b: TurnRecord, turn: number, moves: Readonl
     }
     // REPLAY_TRACE=minorTactics: each unit's move beside the game's
     if (TRACE.has('minorTactics')) console.error(`t${turn} ${key} ${u.type} ${m.move}->${m.plot} at ${end} | game ${game ?? '-'} at ${want}`);
+  }
+}
+
+/** THE AI'S FORTIFY ORDERS (`fortifyOrder`): each unit of `party`'s
+ *  players that may fortify, its fortification after its pass on the copy
+ *  against record t+1's, where both records and the copy hold it on one
+ *  plot (a unit that stood) */
+function scoreFortify(ctx: Ctx, b: TurnRecord, turn: number, copy: GameState, twin: ReadonlyMap<Unit, Unit>,
+  party: (seat: number) => string | null): void {
+  const rec = new Map(b.units.map((r) => [`${r.owner}:${r.id}`, r]));
+  const was = new Map(ctx.prev.units.map((r) => [`${r.owner}:${r.id}`, r.y * ctx.W + r.x]));
+  const keyOf = new Map([...ctx.units].map(([k, u]) => [u, k] as const));
+  for (const [c, u] of twin) {
+    const kind = party(c.seat);
+    const key = keyOf.get(u);
+    const r = key ? rec.get(key) : undefined;
+    if (!kind || !key || !r || !copy.units.includes(c) || !canFortify(c)) continue;
+    const at = r.y * ctx.W + r.x;
+    if (at !== c.tileIndex || was.get(key) !== at) continue;
+    const ours = c.fortifyTurns ?? 0;
+    const game = num(r.fortify);
+    score(ctx, `${kind}.fortify`, turn, ownerOf(key), `${key} ${c.type}`, ours === game, ours, game);
   }
 }
 
@@ -4391,11 +4415,8 @@ function recordCityName(ctx: Ctx, seat: number, id: number): string {
 }
 
 /** THE FORTIFY ORDER is its player's decision: a unit digs in only while it
- *  holds the order, never by standing (runs/h1_duelw1117: 41 barbarian
- *  Scouts and 6 city-state Warriors stood a turn with every move unspent and
- *  stayed at 0; every unit that dug in spent its moves on the order). A unit
- *  record t+1 holds undug gave no order, so the engine's dig-in for standing
- *  does not land on it; a unit the pair killed, which record t+1 does not
+ *  holds the order, never by standing (`fortifyOrder`). A unit record t+1
+ *  holds undug lost what it held in the pair; a unit the pair killed, which record t+1 does not
  *  hold, digs in no further than record t had it (runs/h1_duelw1120 t13:
  *  Rome's Warrior 327683, undug at t13, struck twice by barbarians at +0).
  *  A unit that moved in the pair lost its fortification at its first step:
@@ -6688,19 +6709,18 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
     // ...and the active player's, sent in its start of the next turn
     settleEnvoys(ctx, b);
     // the barbarians' units sat the engine's turn out, so their rest — the
-    // fortification a unit holding the Fortify order digs in (`fortifyOrders`)
-    // — is the engine's own step, run here where their turn closes the log's.
-    // Being attacked spends nothing (runs/h1_duelw1117 t4: the camp's
-    // Spearman, struck at t4, still two turns dug in at t5, took 21 from a
-    // city-state's Warrior at -4)
+    // fortification a unit that stood keeps — is the engine's own step, run
+    // here where their turn closes the log's. Being attacked spends nothing
+    // (runs/h1_duelw1117 t4: the camp's Spearman, struck at t4, still two
+    // turns dug in at t5, took 21 from a city-state's Warrior at -4)
     for (const [u, stood] of barbRest) {
       if (state.units.includes(u)) restUnit(state, u, stood);
     }
-    // a Fortify order ticks the operation at once, its turn's rest again
-    // (the operation's tick 0x95ebb0): the unit stands dug in as record t+1
-    // reads it (runs/h1_duelw1127 t35: a barbarian Scout, moved the turn
-    // before, orders Fortify and reads 2, struck at +1 by Rome's Warrior
-    // next turn); the engines' rest has no order to tick
+    // the record's Fortify orders (every player's units move as the record
+    // has them; the minors' and the barbarians' AI runs on a copy): the unit
+    // stands dug in as record t+1 reads it (runs/h1_duelw1127 t35: a
+    // barbarian Scout, moved the turn before, orders Fortify and reads 2,
+    // struck at +1 by Rome's Warrior next turn)
     for (const [k, f] of ctx.fortified) {
       const u = unitOf(ctx, k);
       if (u && f.turns !== null && state.units.includes(u) && f.turns > (u.fortifyTurns ?? 0)) u.fortifyTurns = f.turns;

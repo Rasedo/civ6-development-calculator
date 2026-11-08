@@ -120,6 +120,15 @@
   context:
     - "...favour (0x37af10, 7): written by EFFECT_ADJUST_PLAYER_ANYONE_PLUNDER_TO_FAVOR alone (0x4d4ec5 its load), which no Modifiers row of the install carries; the engines take no such bran..."
   review: imported
+- addr: 0x4e7f00
+  final: 0x347bd0
+  kind: function
+  status: PARTLY
+  readings: ["C-110: the Fortify order and its ticks; the heal's plot gate — READ"]
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...ARB_SEAT gate). Open: the flags' writer — the only byte writes are Player::Units' read (0x4e7f00); no install effect names them."
+  review: imported
 - addr: 0x563cd0
   kind: function
   status: PARTLY

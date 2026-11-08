@@ -61,10 +61,10 @@ class SimStep:
                 # carrier and a Spy carries no Combat Strength — neither digs in.
                 _mil = ((self._type_combat.take(_typ) > 0) & ~self.unit_naval.take(_typ)
                         & (self._type_air.take(_typ) == 0))
-                _dug = torch.where(
-                    _alive & _mil & ~_spent, (_fort + 1).clamp(max=2),
-                    torch.where(_alive & _mil & _spent, torch.zeros_like(_fort), _fort),
-                )
+                # standing digs no unit in (the Fortify order alone does,
+                # `_fortify_order`): a unit that spent no MP keeps what it
+                # holds, one that spent any loses it
+                _dug = torch.where(_alive & _mil & _spent, torch.zeros_like(_fort), _fort)
                 # CIV6 (Alhambra, Mont St. Michel): a unit occupying the wonder
                 # "automatically gains 2 turns of fortification" — a floor.
                 _occ = self._occupy_def()

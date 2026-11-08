@@ -109,6 +109,9 @@ export interface OpsContext {
   /** the unit's moves ended (0x56d6f0): the operations' nodes read it with
    *  no Movement (its rest kept); none outside the seat's units' turn */
   endMoves?: (id: number) => void;
+  /** the Fortify order on the unit (0x95eae0 on its operation queue,
+   *  `fortifyOrder`'s one tick); none outside the seat's units' turn */
+  fortify?: (id: number) => void;
   /** NAVAL PATROL's execution for the units (0x803060), in the player's
    *  unit order: each with Movement left takes HL Explore's target and moves
    *  there, its turn done; none, the node moves no unit */

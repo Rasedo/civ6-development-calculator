@@ -3,7 +3,7 @@ import { MP_SCALE } from '../../../cpu/data/constants';
 import { describe, it, expect } from 'vitest';
 import { BARB_SEAT } from '../../../cpu/core/seats';
 import { seededGame } from '../helpers';
-import { spawnUnit, refreshUnits } from '../../../cpu/core/units';
+import { fortifyOrder, spawnUnit, refreshUnits } from '../../../cpu/core/units';
 import { generalAuraMP, GENERAL_AURA_MP, inGeneralAura } from '../../../cpu/core/aura';
 import { hexDistance } from '../../../world/hex';
 import { isImpassable, isWater } from '../../../world/query';
@@ -93,7 +93,7 @@ describe('general aura: +1 movement', () => {
     expect(still.hp).toBeGreaterThan(50);
   });
 
-  it('fortify accrues only for the unit that spent nothing', () => {
+  it('the Fortify order ticks only for the unit that spent nothing', () => {
     const state = newGame();
     const ctr = seatOf(state, 0)!.cities[0].centerIndex;
     spawnUnit(state, 'GENERAL', ctr, 0);
@@ -101,9 +101,10 @@ describe('general aura: +1 movement', () => {
     const still = spawnUnit(state, 'WARRIOR', tileAt(state, ctr, 2), 0)!;
     refreshUnits(state);
     moved.movesLeft = moved.movesFull! - 1;
-    refreshUnits(state);
-    expect(moved.fortifyTurns).toBe(0);
-    expect(still.fortifyTurns).toBe(2); // one per refresh, capped at 2
+    fortifyOrder(state, moved, 2);
+    fortifyOrder(state, still, 2);
+    expect(moved.fortifyTurns ?? 0).toBe(0);
+    expect(still.fortifyTurns).toBe(2);
   });
 
   // A NAVAL unit never digs in (real Civ 6 has no naval
@@ -118,10 +119,11 @@ describe('general aura: +1 movement', () => {
     const hull = spawnUnit(state, 'GALLEY', water.index, BARB_SEAT)!;
     const land = spawnUnit(state, 'WARRIOR', tileAt(state, ctr, 2), BARB_SEAT)!;
     refreshUnits(state);
-    refreshUnits(state);
+    fortifyOrder(state, hull, 2);
+    fortifyOrder(state, land, 2);
     refreshUnits(state);
     expect(hull.fortifyTurns ?? 0).toBe(0);
-    expect(land.fortifyTurns).toBe(2); // the land control: same idleness, digs in
+    expect(land.fortifyTurns).toBe(2); // the land control: the same order digs in
   });
 
   it('a NEW unit records the pool it was granted, so no gate falls back', () => {
