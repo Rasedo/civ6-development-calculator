@@ -135,6 +135,7 @@
     - "C-98: the unit efficiencies — READ (0x79a440, its simulated combats 0x205720 off the map), ported: every entry the logged table's"
     - "C-98: the unit efficiencies"
     - "C-123 / C-95: a Trader stands on the trade layer; a city's shot is a COMBAT_DISTRICT spot's blow back — READ (0x901e0, 0x586360 -> 0x208b80, 0x585eb0 -> 0x585d90, 0x791470 at 0x7917f7..0x7918f7 -> 0x249ee0 / 0x205720, 0x776140 at 0x776780..0x7767fa), both twins"
+    - "C-95: a move order's path steps on from an attack's plot, its attack child by the order's flags, a non-attack order's destination, a melee blow on a civilian — READ (0x2720a0 at 0x272434..0x272544, 0x2715a0 at 0x2717cd / 0x271870..0x2718d7, 0x1385c0, 0x889e0, 0x2714b0, 0x206960 at 0x206a1f), both twins"
   context:
     - "...ombat 0) 1.0; one without against one with 0.01 / 100.0; else two combat simulations (0x205720) of the neutral player's units, each attacking the other: the damage each takes in both..."
   review: reviewed
@@ -173,9 +174,12 @@
 - addr: 0x206960
   final: 0x157510
   kind: function
-  semantics: "the melee result (Combat_Manager): the defender's damage drawn first (0x51a240); the counter (the attacker's damage) is never drawn where the defender is embarked (0x8be30, byte +0x6b0) and does not fight embarked (+0x18c3, m_bFightWhileEmbarked). Both totals are then summed against COMBAT_MAX_HIT_POINTS (0x56e0d0): where both would fall, the side whose total overshoots further falls and the other is left at max - 1 damage (1 HP) — the attacker on a tie (0x206d01: jle). The experience reads the result after it (0x1975e0 at 0x206e98 / 0x206ee2). A defender of formation 2 takes nothing either way (0x206a1f); one of formation 1 (the support class) takes its whole hit points after the law (0x206bf0): the Anti-Air Gun and Mobile SAM at 165 a pair (100 + 65), their attacker 2."
+  semantics: "the melee result (Combat_Manager): the defender's damage drawn first (0x51a240); the counter (the attacker's damage) is never drawn where the defender is embarked (0x8be30, byte +0x6b0) and does not fight embarked (+0x18c3, m_bFightWhileEmbarked). Both totals are then summed against COMBAT_MAX_HIT_POINTS (0x56e0d0): where both would fall, the side whose total overshoots further falls and the other is left at max - 1 damage (1 HP) — the attacker on a tie (0x206d01: jle). The experience reads the result after it (0x1975e0 at 0x206e98 / 0x206ee2). A defender of formation 2 takes nothing either way (0x206a1f); one of formation 1 (the support class) takes its whole hit points after the law (0x206bf0): the Anti-Air Gun and Mobile SAM at 165 a pair (100 + 65), their attacker 2. GetFormationClass 2 is FORMATION_CLASS_CIVILIAN: a melee blow on a civilian deals and takes nothing, so the planning's prediction (0x791470) of a CIVILIAN, RELIGIOUS or TRADER target struck in melee takes 0 (predictBlow, _tac_predict_pool's d_civ)."
   status: READ
   cases:
+    - recording: h1_duely1128
+      turn: 37
+      value: the City Assault's Warrior 1114128 at 17 hit points kept by the survival filter on player 1's Settler on 16:13, takes it as logged
     - recording: h1_duelw1124
       turn: 13
       value: "a barbarian Warrior at 8 HP (32 taken, 24 over) on a city-state Warrior at 19 (31 drawn, 12 over): CombatLog 18 / 32, the Warrior stands at 1"
@@ -186,6 +190,8 @@
       turn: 13
       value: 1120 t13 17 / 32 (a defender at 18 HP).
   impl:
+    - cpu/core/tactical.ts:predictBlow
+    - gpu/core/sim_tactics.py:_tac_predict_pool
     - cpu/core/combat.ts:resolveMutualKill
     - cpu/core/combat.ts:atkCS
     - cpu/harness/replayActions.ts:melee
@@ -194,6 +200,7 @@
     - cpu/core/combat.ts:struck
     - cpu/core/aiUnitEfficiency.ts:blow
   readings:
+    - "C-95: a move order's path steps on from an attack's plot, its attack child by the order's flags, a non-attack order's destination, a melee blow on a civilian — READ (0x2720a0 at 0x272434..0x272544, 0x2715a0 at 0x2717cd / 0x271870..0x2718d7, 0x1385c0, 0x889e0, 0x2714b0, 0x206960 at 0x206a1f), both twins"
     - "H-1: the melee result, a ranged blow's domain, a city's shot — READ"
     - "C-98: the unit efficiencies — READ (0x79a440, its simulated combats 0x205720 off the map), ported: every entry the logged table's"
     - "C-98: the unit efficiencies"

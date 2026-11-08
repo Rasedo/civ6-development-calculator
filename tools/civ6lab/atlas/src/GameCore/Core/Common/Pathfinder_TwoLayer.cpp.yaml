@@ -11,10 +11,12 @@
     - recording: h1_duelw1128
       turn: 7
       value: "runs/h1_duelw1128 t7-t11: tribe 0's Scout reports Rome 42:20 from   39:20 beside China's Warrior and Scout, the planning's refusal shuts it   in (875 / 963 in the Warrior's zone), the path takes it ho"
+  impl: [cpu/core/tactical.ts:addOpen]
   readings:
     - "C-95: the scout's tree \"Barbarian Found City\" — READ, ported"
     - "C-95: the danger map's search pays no zone of control, a ranged unit strikes from its range; the rampage strike's ring — READ (0x26df90, 0x26e920, 0x771670, 0x691f0, 0x76ecf0), FIT (the ranged unit's strike), both twins"
     - "C-124: a move order's path opens a turn-end node beside each node with Movement left — READ (0x271920, 0x7a880, 0x271490, 0x775a0, 0x26f330), both twins"
+    - "C-95: a move order's path steps on from an attack's plot, its attack child by the order's flags, a non-attack order's destination, a melee blow on a civilian — READ (0x2720a0 at 0x272434..0x272544, 0x2715a0 at 0x2717cd / 0x271870..0x2718d7, 0x1385c0, 0x889e0, 0x2714b0, 0x206960 at 0x206a1f), both twins"
   context:
     - "...+0x4b8 is clear, 0x2000 for a unit +0x738 above 1 holding 0x2669d0 2 or 4; then the A* 0x7a630 over the callbacks 0x26f330 sets: the validity 0x2720a0, the cost 0x26e920), its turns..."
   review: reviewed

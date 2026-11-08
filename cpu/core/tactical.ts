@@ -188,6 +188,9 @@ interface Ground {
    *  both: 0x271be0 at 0x271e69 / 0x271f2e, 0x5861f0): an attack whose
    *  parent the path validity tests as a turn's end */
   strikeSite: (i: number) => boolean;
+  /** on a plot the player sees now a unit at war that fights (the node's
+   *  +0x51 bits 0x20 and 0x40 both), whatever the search */
+  fighterSeen: (i: number) => boolean;
   /** the path node's count +0x54 reaches the stacking limit (0x585eb0 ->
    *  0x585d90, the units of the mover's map layer not at war with it): one
    *  of its own that stacks with it, or on a plot the player sees now
@@ -369,6 +372,11 @@ function groundOf(state: GameState, unit: Unit, revealedOnly = true, planning = 
       const t = state.map.tiles[i];
       return cityCentre(state, t) && tileSeat(t) !== NO_SEAT && tileSeat(t) !== unit.seat && unitsHostile(state, unit, { seat: tileSeat(t) });
     },
+    fighterSeen: (i) => {
+      if (!fought.has(i)) return false;
+      seenNow ??= plotsSeenNow(state, new Set([unit.seat]));
+      return seenNow[i] === 1;
+    },
     crowded,
     stacked,
     foughtOn: (i) => {
@@ -535,7 +543,8 @@ export const moveUnitDanger = (plane: ArrayLike<number>): PathDanger => ({ plane
 
 function search(state: GameState, unit: Unit, maxTurns: number, zoc: boolean, onClose: (n: PNode, ground: Ground) => boolean,
   onLink?: (tile: number, from: number, turns: number, moves: number, attack: boolean) => void, reach: ReachSearch = 'planning',
-  laterTurns = false, fromFull = false, explore = true, danger?: PathDanger, mates: readonly Unit[] = formationMates(state, unit), dest = -1): void {
+  laterTurns = false, fromFull = false, explore = true, danger?: PathDanger, mates: readonly Unit[] = formationMates(state, unit), dest = -1,
+  strike = false): void {
   const { map } = state;
   const standToAttack = !zoc && reach === 'danger';
   // the cost 0x270dd0's stacking +1e6, paid by every search without flag 4
@@ -632,12 +641,15 @@ function search(state: GameState, unit: Unit, maxTurns: number, zoc: boolean, on
     }
     best.closed = true;
     if (onClose(best, ground)) break;
-    // an attack's plot is the path's end: no step leaves it — in the
-    // planning's search one a seen unit at war that fights holds (0x26e570
-    // at 0x26e5cd: the parent's +0x51 bit 0x40), so an attack on a city or
-    // Encampment alone goes on; nor one the player never revealed but the
-    // unit's own (0x2720a0 under the search's flag 1: the parent unrevealed)
-    if ((best.attack && (!planningSearch || ground.foughtOn(best.tile))) || (best !== start && !ground.known(best.tile))) continue;
+    // an attack's plot is the end of the breadth-first searches' paths
+    // (0x26e570): no step leaves it — in the planning's search one a seen
+    // unit at war that fights holds (0x26e570 at 0x26e5cd: the parent's
+    // +0x51 bit 0x40), so an attack on a city or Encampment alone goes on;
+    // a move order's path (the A* 0x7a630, whose validity 0x2720a0 runs no
+    // 0x26e570) steps on from one it links; nor one the player never
+    // revealed but the unit's own (0x2720a0 under the search's flag 1: the
+    // parent unrevealed)
+    if ((best.attack && !zoc && (!planningSearch || ground.foughtOn(best.tile))) || (best !== start && !ground.known(best.tile))) continue;
     // a move order's path under flag 1 (no `explore`) leaves no plot the
     // player never revealed but the unit's own
     if (!explore && best !== start && !ground.revealed(best.tile)) continue;
@@ -716,6 +728,22 @@ function search(state: GameState, unit: Unit, maxTurns: number, zoc: boolean, on
       if (danger?.war && tileSeat(to) !== NO_SEAT && tileSeat(to) !== unit.seat && unitsHostile(state, unit, { seat: tileSeat(to) })) continue;
       const s = price(best, to, di, attack, blind);
       if (s.turns > maxTurns) continue;
+      // a move order's attack child (0x2720a0 at 0x272434..0x272544): a
+      // plot the player sees holding a unit at war, or a city or district
+      // at war (+0x51 & 0x34), is linked only for a formation holding a
+      // fighter (the pathfinder's +0x1f8, 0x1385c0 over its members: `attack`
+      // asks the fighter's) — under the attack flag 0x10 the destination
+      // alone, else under flag 0x1000 at a turn after the first, where a
+      // seen fighter at war on a plot beside the start (0x889e0) is refused
+      // from a parent at its stacking limit (+0x51 bit 7) — so a path
+      // without the attack flag passes a seen unit at war in a later turn
+      // (runs/h1_duely1124 t112-118: Builder Capture's Builder 5111833 and
+      // Man-At-Arms 4784141 on 32:10 for 6:4, city-state 4's Trebuchets and
+      // Pikeman on the bridge 31:8 / 32:8 / 33:8, step to 31:11)
+      if (zoc && attack) {
+        if (strike ? dest >= 0 && to.index !== dest : !laterTurns || s.turns <= 1) continue;
+        if (!strike && ground.fighterSeen(to.index) && plotDistance(state, to.index, unit.tileIndex) === 1 && ground.crowded(best.tile)) continue;
+      }
       // a path's turn may not end on a plot its own stacking unit holds, nor
       // one another player's unit at peace holds in its sight (the path
       // validity 0x2720a0: each node where the next starts a turn, its count
@@ -936,21 +964,26 @@ export function turnsToPlot(state: GameState, unit: Unit, dest: number, laterTur
 /** the plots from the unit's to `dest`, the unit's own left out, by the
  *  pathfinder's path (its parents once `dest` closes); empty where none */
 export function pathTo(state: GameState, unit: Unit, dest: number, laterTurns = false, explore = true,
-  danger?: PathDanger, mates: readonly Unit[] = formationMates(state, unit), scout = false): number[] {
-  return pathNodes(state, unit, dest, laterTurns, explore, danger, mates, scout).map((n) => n.tile);
+  danger?: PathDanger, mates: readonly Unit[] = formationMates(state, unit), scout = false, strike = false): number[] {
+  return pathNodes(state, unit, dest, laterTurns, explore, danger, mates, scout, strike).map((n) => n.tile);
 }
 
-/** `pathTo`'s nodes, each with the turn it is reached in */
+/** `pathTo`'s nodes, each with the turn it is reached in; `strike` the
+ *  order's attack flag 0x10 */
 function pathNodes(state: GameState, unit: Unit, dest: number, laterTurns: boolean, explore: boolean,
-  danger: PathDanger | undefined, mates: readonly Unit[], scout = false): PNode[] {
+  danger: PathDanger | undefined, mates: readonly Unit[], scout = false, strike = false): PNode[] {
   // a destination another player's unit holds out of the player's sight is
   // no path, an attack order's too: the move order's request (0x962310)
   // drops the attack flag 0x10 where the owner's visibility count of its
   // plot is 0, and the destination test (0x2714b0) then tests the plot under
   // location flag 0, where another player's unit there, seen or not, refuses
-  // it (0x586360's best defender 0x208b80 under 0x108)
+  // it (0x586360's best defender 0x208b80 under 0x108); an order without the
+  // attack flag has no path to a plot another player's unit of its map layer
+  // holds, seen or not (runs/h1_duely1121 t36: Barbarian Attack's Archer
+  // 1835022 on 5:14 for player 1's Scout's 5:13 does not move for it)
   if (dest !== unit.tileIndex && foreignAt(state, unit, dest)
     && plotsSeenNow(state, new Set([unit.seat]))[dest] !== 1) return [];
+  if (!strike && dest !== unit.tileIndex && foreignOnLayer(state, unit, dest)) return [];
   if (dest !== unit.tileIndex && !placedOn(state, [unit, ...mates], state.map.tiles[dest])) return [];
   // the destination at its stacking limit is no path (`search`'s stop)
   let found = null as PNode | null;
@@ -958,7 +991,7 @@ function pathNodes(state: GameState, unit: Unit, dest: number, laterTurns: boole
     if (n.tile !== dest) return false;
     found = n;
     return true;
-  }, undefined, scout ? 'explore' : undefined, laterTurns, false, explore, danger, mates, dest);
+  }, undefined, scout ? 'explore' : undefined, laterTurns, false, explore, danger, mates, dest, strike);
   const out: PNode[] = [];
   for (let n: PNode | null = found; n && n.parent; n = n.parent) out.push(n);
   return out.reverse();
@@ -1057,7 +1090,7 @@ function withShortOrders(fn: () => void): void {
 function orderOnce(state: GameState, unit: Unit, dest: number, strike: boolean,
   laterTurns: boolean, explore: boolean, danger: PathDanger | undefined, mates: readonly Unit[], scout: boolean): boolean {
   if (!state.units.includes(unit) || unit.movesLeft <= 0 || unit.tileIndex === dest) return false;
-  let path = pathTo(state, unit, dest, laterTurns, explore, danger, mates, scout);
+  let path = pathTo(state, unit, dest, laterTurns, explore, danger, mates, scout, strike);
   if (!path.length) return false;
   // a path ending on a plot it attacks into: it walks to its side, and
   // strikes it where its Movement and attacks last (the order's attack flag)
@@ -1173,6 +1206,13 @@ function enemyOnLayer(state: GameState, unit: Unit, tile: number): boolean {
  *  spy or a Trader on the trade layer holds none) */
 function foreignAt(state: GameState, unit: Unit, tile: number): boolean {
   return state.units.some((u) => u.tileIndex === tile && u.seat !== unit.seat && onMap(u) && mapLayer(u.type) !== 'trade');
+}
+
+/** `foreignAt` on the unit's map layer (`mapLayer`: a religious unit's its
+ *  own, a Trader's the trade layer) */
+function foreignOnLayer(state: GameState, unit: Unit, tile: number): boolean {
+  const layer = mapLayer(unit.type);
+  return state.units.some((u) => u.tileIndex === tile && u.seat !== unit.seat && onMap(u) && mapLayer(u.type) === layer);
 }
 
 /** UNITOPERATION_SWAP_UNITS onto `tile` (0x972880; its partner 0x972540):
@@ -1625,12 +1665,16 @@ function targetUnit(state: GameState, e: Target): Unit | null {
 /** THE COMBAT PREDICTION (0x791470's simulation, Rules_Combat under the
  *  simulation flag): the blow `attacker` would strike `defender` on `at`
  *  with, from where it stands — the damage it deals and the damage it takes
- *  (none at range, none from an embarked defender) */
+ *  (none at range, none from an embarked defender; in melee none either way
+ *  on a defender of FORMATION_CLASS_CIVILIAN, 0x206960 at 0x206a1f:
+ *  runs/h1_duely1128 t37 the City Assault's Warrior 1114128 at 17 hit points
+ *  takes player 1's Settler on 16:13, as logged) */
 export function predictBlow(state: GameState, attacker: Unit, defender: Unit, at: number): { dealt: number; taken: number } {
   if (rangedStrength(attacker) > 0) {
     const s = rangedUnitStrengths(state, attacker, at, defender);
     return { dealt: damageExpected(s.atk - s.def), taken: 0 };
   }
+  if (unitDomain(defender.type) === 'civilian') return { dealt: 0, taken: 0 };
   const s = meleeUnitStrengths(state, attacker, at, defender);
   return { dealt: damageExpected(s.atk - s.def), taken: defender.embarked ? 0 : damageExpected(s.def - s.atk) };
 }

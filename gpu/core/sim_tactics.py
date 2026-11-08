@@ -632,7 +632,8 @@ class SimTactics:
                     dest: torch.Tensor | None = None, pre: str = "barb", plan: dict | None = None,
                     full: bool = False, stand: bool = False, later_turns: bool = False,
                     from_full: bool = False, explore: bool = True, danger: tuple | None = None,
-                    mate: torch.Tensor | None = None, listed: bool = False, reach: str = "planning") -> dict:
+                    mate: torch.Tensor | None = None, listed: bool = False, reach: str = "planning",
+                    strike: bool = False) -> dict:
         """THE PATHFINDER (`search`) for the units at local `slots` of pool
         `pre` in the games `rows` [N]: Dijkstra from each unit's plot over
         the open nodes by (key, cost, tie) — a move order's path opens a
@@ -654,7 +655,12 @@ class SimTactics:
         plots, "spot_turns" and "spot_n" [N, E]. With `full` each unit sets
         out on its full Movement (`unitFullMoves`); "closed" [N, T] is the
         turn of every plot the search closed, those it only passes or attacks
-        included. In every search but the planning's an attack onto a seen
+        included. A move order's path (`zoc`) steps on from an attack's plot:
+        with `strike` (the order's attack flag 0x10) its only attack child is
+        the destination, without it an attack child is linked under
+        `later_turns` at a turn after the first alone, a seen fighter's
+        beside the start not from a parent at its stacking limit (`search`).
+        In every search but the planning's an attack onto a seen
         city at war or unit at war that fights is struck only from a plot
         short of its stacking limit; with `stand` (the danger map's search) a
         step onto a unit's plot keeps its Movement left (only a
@@ -1141,9 +1147,11 @@ class SimTactics:
                 found |= hit
                 act &= ~hit
             run &= act
-            # an attack's plot is the path's end: no step leaves it; nor one
-            # the player never revealed but the unit's own
-            stop = atk_n.gather(1, b1).squeeze(1)
+            # an attack's plot is the end of the breadth-first searches'
+            # paths: no step leaves it — a move order's path (`zoc`) steps on
+            # from one it links (`search`); nor one the player never revealed
+            # but the unit's own
+            stop = atk_n.gather(1, b1).squeeze(1) & (not zoc)
             if fought_n is not None:
                 stop = stop & fought_n.gather(1, b1).squeeze(1)
             act = act & ~stop & (kn_n.gather(1, b1).squeeze(1) | (best == start))
@@ -1192,6 +1200,19 @@ class SimTactics:
                 if later_turns:
                     stood = stood & (bt <= 1)
                 ok = ok & ~stood
+            if zoc:
+                # a move order's attack child (0x2720a0 at 0x272434..
+                # 0x272544, `search`): with the attack flag the destination
+                # alone; without it under flag 0x1000 at a turn after the
+                # first, a seen fighter at war beside the start refused from
+                # a parent at its stacking limit
+                if strike:
+                    lone = a6 & False if dest is None else a6 & (nb != dest.unsqueeze(1))
+                else:
+                    lone = a6 & (turns <= 1) if later_turns else a6
+                    adj6 = (neigh[start].unsqueeze(2) == nb.unsqueeze(1)).any(dim=1)
+                    lone = lone | (a6 & fought[rows].gather(1, nbc) & adj6 & crowd_n.gather(1, b1))
+                ok = ok & ~lone
             if cliff6 is not None:
                 ok = ok & ~cliff6
             if danger is not None:
@@ -1624,11 +1645,18 @@ class SimTactics:
         # is no path, an attack order's too (`pathTo`): the order's request
         # (0x962310) drops the attack flag where the owner's visibility count
         # of the plot is 0, and the destination test (0x2714b0) under location
-        # flag 0 refuses a plot another player's unit holds, seen or not
+        # flag 0 refuses a plot another player's unit holds, seen or not; an
+        # order without the attack flag has no path to a plot another
+        # player's unit of its map layer holds, seen or not
         dc = dest.clamp(min=0).unsqueeze(1)
         at_u = getattr(self, f"{pre}_unit_tile").gather(1, us.clamp(min=0).unsqueeze(1)).squeeze(1)
         unseen = ~self._barb_seen("barbarians" if seat == BARB_SEAT else seat).gather(1, dc).squeeze(1)
         mask = mask & ~(self._tac_foreign(seat).gather(1, dc).squeeze(1) & unseen & (dest != at_u))
+        if not strike:
+            rel_m = self._rel_strength.take(getattr(self, f"{pre}_unit_type").gather(1, us.clamp(min=0).unsqueeze(1)).squeeze(1)
+                                            .clamp(min=0, max=self.NU - 1)) > 0
+            f_on = torch.where(rel_m.unsqueeze(1), self._tac_foreign_on(seat, True), self._tac_foreign_on(seat, False))
+            mask = mask & ~(f_on.gather(1, dc).squeeze(1) & (dest != at_u))
         if not bool(mask.count_nonzero()):
             return
         dev = self.device
@@ -1639,7 +1667,7 @@ class SimTactics:
         dg = None if danger is None else tuple(x[rows] for x in danger)
         mr = self._tac_mate(rows, sr, pre) if mate is None else mate[rows]
         res = self._tac_search(rows, sr, seat, 1 << 30, True, dr, pre=pre, later_turns=later_turns, explore=explore,
-                               danger=dg, mate=mr, reach="explore" if scout else "planning")
+                               danger=dg, mate=mr, reach="explore" if scout else "planning", strike=strike)
         par = res["parent"]
         start = res["start"]
         R = rows.shape[0]
@@ -2329,7 +2357,8 @@ class SimTactics:
         the strengths the blows resolve on (`_melee_unit_strengths`,
         `_ranged_unit_strengths`, the attacker's pool's terms) and the damage
         law's expectation (`_damage_expected`); a ranged blow and one on an
-        embarked defender take none. The jobs of one game run one call each,
+        embarked defender take none, a melee blow on a civilian neither deals
+        nor takes any. The jobs of one game run one call each,
         the games side by side, the two pools apart."""
         dev = self.device
         J = rows.numel()
@@ -2359,8 +2388,11 @@ class SimTactics:
         taken = torch.zeros_like(dealt)
         if not bool(ranged.all()):
             ma, md, d_emb = cls._melee_unit_strengths(g, major, a_slot, tiles, d_slot, d_seat)
-            dealt = torch.where(ranged, dealt, self._damage_expected(ma - md))
-            taken = torch.where(ranged | d_emb, taken, self._damage_expected(md - ma))
+            # in melee none either way on a civilian defender (`predictBlow`)
+            dt = g.unit_type.gather(1, d_slot.unsqueeze(1)).squeeze(1).clamp(min=0, max=self.NU - 1)
+            d_civ = self._dom_civilian(dt)
+            dealt = torch.where(ranged | d_civ, dealt, self._damage_expected(ma - md))
+            taken = torch.where(ranged | d_emb | d_civ, taken, self._damage_expected(md - ma))
         if bool(ranged.any()):
             ra, rd = cls._ranged_unit_strengths(g, not major, a_slot, tiles, d_slot, d_seat)
             dealt = torch.where(ranged, self._damage_expected(ra - rd), dealt)

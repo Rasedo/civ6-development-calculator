@@ -10342,3 +10342,57 @@ cpu/harness/replay.ts).
 - OPEN: the import starts the graph from the record's running routes alone
   (their courses); the pairs a single-turn dump admits off older paths
   (c108: 18 -> 14, 18 -> 5:589831, 54:11 -> 18:16) need the records before it.
+
+## C-95: a move order's path steps on from an attack's plot, its attack child by the order's flags, a non-attack order's destination, a melee blow on a civilian — READ (0x2720a0 at 0x272434..0x272544, 0x2715a0 at 0x2717cd / 0x271870..0x2718d7, 0x1385c0, 0x889e0, 0x2714b0, 0x206960 at 0x206a1f), both twins
+
+`search`'s attack child and its leaf rule, `pathNodes`' destination,
+`foreignOnLayer`, `groundOf`'s `fighterSeen`, `predictBlow`
+(cpu/core/tactical.ts); GPU `_tac_search`'s `strike` and `lone`,
+`_tac_move_to`'s destination mask, `_tac_predict_pool`'s `d_civ`
+(gpu/core/sim_tactics.py).
+
+- NO LEAF IN THE A*: the step refusal from an attack's plot (0x26e5cd) is
+  the breadth-first searches' wrapper 0x26e570 alone (the planning's, the
+  danger map's); a move order's path (the A* 0x7a630 over 0x26f330, its
+  validity 0x2720a0) links on from any node it accepted, an attack's
+  included.
+- THE ATTACK CHILD (0x2720a0 at 0x272434..0x272544): a child whose node
+  carries +0x51 & 0x34 (a city at war, a district at war, a unit at war:
+  set by 0x271be0 on a plot the player sees now) is refused, but for a
+  formation whose pathfinder +0x1f8 is set and the domain +0x1a0 is not air
+  (1), where it passes: under the order's attack flag 0x10 the child that is
+  the destination (+0xd8 / +0xdc, or none set); without 0x10, under 0x1000
+  at a child's turn (+0x1dc) above 1 — there refused where the child holds a
+  seen unit at war that fights (+0x51 bits 0x20 and 0x40), lies beside the
+  search's start (0x889e0: the six neighbours with the map's wrap) and its
+  parent is at the stacking limit (+0x51 bit 7). So a path without the
+  attack flag passes a seen unit at war in a later turn, and none at all in
+  its first.
+- THE FINDER'S BYTES (the pool's init 0x2715a0): +0x1f8 the OR over the
+  formation's members of 0x1385c0 (GetCombat, GetRangedCombat,
+  GetBombardCombat or the religious strength above 0, and unit +0x18ba
+  clear); +0x1a0 the domain: 0 a sea formation or one embarked, else 2 land,
+  1 air, 4 the rest.
+- THE DESTINATION (0x2714b0 under the order's flags): an order without the
+  attack flag has no path to a plot another player's unit of its map layer
+  holds, seen or not.
+- THE MELEE PREDICTION ON A CIVILIAN (0x791470 -> 0x205720 -> 0x206960): a
+  defender of FORMATION_CLASS_CIVILIAN (GetFormationClass 2, 0x206a1f) skips
+  both damages: the planning's taken is 0 for a CIVILIAN, a RELIGIOUS or a
+  TRADER target struck in melee (its dealt the 150 / 1.5 x health the entry
+  writes), so the assignment's survival filter keeps a hurt unit on it.
+- Confirmed (one-seed aimem traces): runs/h1_duely1124 t112 / t117 / t118
+  Builder Capture's Builder 5111833 and Man-At-Arms 4784141 (32:10 to 31:11,
+  31:10 to 30:9, 30:9 to 31:8 past city-state 4's units on the bridge
+  31:8 / 32:8 / 33:8), t111 city-state 2's four Men-At-Arms' Operation Move,
+  t119 the Men-At-Arms 4849682 / 4980762; runs/h1_duely1121 t105 the
+  Settler 3211277 and Man-At-Arms 2949124 on 12:18 to 12:15 past player 1's
+  Courser on 11:16, t102 the Warrior 1769487, t144 the Builder 4259860 /
+  Bombard 3997700 to 14:14; runs/h1_duely1128 t9 the Scout 393221, t35 the
+  Warrior 2490396, t37 the City Assault's Warrior 1114128 (17 hit points)
+  takes player 1's Settler on 16:13 and the captured Settler 3014684's HL
+  Move To Safety / End Turn t38-t50 as logged.
+- Open (C-95): runs/h1_duely1124 t114-t116 the pair on 31:11 / 30:11, its
+  only land way east past 33:6 / 33:7 / 34:8, plots the barbarians' revealed
+  plane (unrecorded) leaves unrevealed in ours; the A* cost of a step onto
+  an attack's plot it passes (the planning's spend kept).

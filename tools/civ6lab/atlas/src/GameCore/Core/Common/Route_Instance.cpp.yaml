@@ -91,12 +91,15 @@
 - addr: 0x889e0
   final: 0x63ff0
   kind: function
-  semantics: is a coordinate one of a plot's six neighbours (the axial tables 0xeff670 / 0xeff688, wrapping by its flags).
+  name: plots adjacent
+  semantics: "whether the plot (rdx: x, y) is one of the six beside the plot (rcx: x, y), the direction offsets at 0xeff670 / 0xeff688 (odd-row shift), wrapped by the map width r8 / height r9 under the wrap bytes (stack +0x60 / +0x68); 0x2720a0 asks it of the child against the search's start."
   status: READ
   cases:
-    - recording: c108_t225_20261108T115945Z
-      value: 1:65536 54:11 -> 1:196610 54:21 jumps 53:13 -> 52:15 (portalIn 2, portalOut 3), 10 plots; no game path stands on a tunnel
-  impl: [cpu/core/rules.ts:pathPortals, gpu/core/sim_masks.py:_path_portals]
+    - recording: h1_duely1124
+      turn: 112
+      value: the attack child's refusal beside the start in 0x2720a0 (no recorded refusal found)
+  impl: [cpu/core/tactical.ts:search, gpu/core/sim_tactics.py:_tac_search, cpu/core/tactical.ts:from]
   readings:
+    - "C-95: a move order's path steps on from an attack's plot, its attack child by the order's flags, a non-attack order's destination, a melee blow on a civilian — READ (0x2720a0 at 0x272434..0x272544, 0x2715a0 at 0x2717cd / 0x271870..0x2718d7, 0x1385c0, 0x889e0, 0x2714b0, 0x206960 at 0x206a1f), both twins"
     - "C-108: the trade path's portals, its open list and CanStartRoute's gates — READ, both twins"
   review: reviewed
