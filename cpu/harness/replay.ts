@@ -1155,7 +1155,8 @@ function barbarianAi(ctx: Ctx, b: TurnRecord, closing: number, before: ReadonlyS
   else delete state.barbSeat.campsKnown;
   const ended = new Map<Unit, number>();
   for (const [c, u] of twin) if (copy.units.includes(c)) ended.set(u, c.tileIndex);
-  tallyTactics(ctx, b, closing, moves, ended, danger);
+  const actors = [...twin].filter(([c]) => isBarbSeat(c.seat) && acting.has(c.id)).map(([, u]) => u);
+  tallyTactics(ctx, b, closing, moves, actors, ended, danger);
 }
 
 /** the game's tactical log's category for a barbarian unit's move, the
@@ -1165,17 +1166,19 @@ function tacticalCategory(cat: string): string {
 }
 
 /**
- * THE BARBARIANS' MOVES against the game's: per unit the AI moved, its move
- * beside the first row the game's tactical log (`AI_Tactical.csv`, the
- * barbarian player's rows of the turn) holds for it — an operation's units
- * hold none — and the plot it ended on (`ended`) beside record t+1's: the
- * game's move taken (`barb:move` applied), or the record's imposed. Tallied
- * by the game's move, with the first turn the engine's differed; each row
- * that logs a unit's "Current Danger" beside the engine's danger map there
- * (`danger`, the tally's "(danger)": rows, those equal).
+ * THE BARBARIANS' MOVES against the game's: per unit their turn handed the
+ * AI (`actors`), its move (`moves`; "(none)" where no order of the pass or
+ * of an operation named it, its plot alone scored) beside the first row the game's tactical log
+ * (`AI_Tactical.csv`, the barbarian player's rows of the turn) holds for it
+ * — an operation's units hold none — and the plot it ended on (`ended`)
+ * beside record t+1's: the game's move taken (`barb:move` applied), or the
+ * record's imposed. Tallied by the game's move, with the first turn the
+ * engine's differed; each row that logs a unit's "Current Danger" beside
+ * the engine's danger map there (`danger`, the tally's "(danger)": rows,
+ * those equal).
  */
 function tallyTactics(ctx: Ctx, b: TurnRecord, turn: number, moves: ReadonlyMap<Unit, { move: string; plot: number; attack: number; from: number }>,
-  ended: ReadonlyMap<Unit, number>, danger: ReadonlyMap<Unit, number>): void {
+  actors: readonly Unit[], ended: ReadonlyMap<Unit, number>, danger: ReadonlyMap<Unit, number>): void {
   const rowsOf = ctx.tactical?.first.get(turn);
   for (const [key, u] of ctx.units) {
     if (!isBarbSeat(u.seat)) continue;
@@ -1194,7 +1197,9 @@ function tallyTactics(ctx: Ctx, b: TurnRecord, turn: number, moves: ReadonlyMap<
   for (const [key, u] of ctx.units) keyOf.set(u, key);
   const rows = ctx.tactical?.first.get(turn);
   const at = new Map(b.units.map((r) => [`${r.owner}:${r.id}`, r.y * ctx.W + r.x]));
-  for (const [u, m] of moves) {
+  const all = new Map(moves);
+  for (const u of actors) if (!all.has(u)) all.set(u, { move: '(none)', plot: -1, attack: -1, from: -1 });
+  for (const [u, m] of all) {
     const key = keyOf.get(u);
     if (!key) continue;
     const id = Number(key.split(':')[1]);
@@ -1205,7 +1210,7 @@ function tallyTactics(ctx: Ctx, b: TurnRecord, turn: number, moves: ReadonlyMap<
     const same = game === undefined || game === tacticalCategory(m.move);
     if (same) t.move += 1;
     if (!same && t.firstMove === undefined) t.firstMove = turn;
-    if (game !== undefined) score(ctx, 'barb.move.family', turn, ownerOf(key), `${key} ${u.type}`, same, tacticalCategory(m.move), game);
+    if (game !== undefined && moves.has(u)) score(ctx, 'barb.move.family', turn, ownerOf(key), `${key} ${u.type}`, same, tacticalCategory(m.move), game);
     const want = at.get(key);
     const end = ended.get(u);
     if (want === undefined || end === undefined) continue;
