@@ -696,6 +696,15 @@
   context:
     - 0x4cb930 (techs; civics 0x39ec60, the same body), called from the handler 0x427bf0 that every player's object runs when a...
   review: reviewed
+- addr: 0x39efa0
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-130 / C-98: the civic queue, the best plot to buy and the plot purchase analyzer — READ, both twins"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...in hand. The civic in hand completed (0x3a1fb0 at 0x3a24c4..0x3a2534): the front pops (0x39efa0), then each front row the player holds pops (+0x900, the front 0x4c9c80); the first it..."
+  review: imported
 - addr: 0x39f610
   final: 0x282cb0
   kind: function
@@ -732,7 +741,7 @@
   final: 0x2844e0
   kind: function
   name: PlayerCulture
-  semantics: "PlayerCulture: sets the player's progress on a civic. Lifetime culture grows by every gain of civic progress, a boost's share included, and not by culture held with no civic chosen; the engines' cultureTotal / civ_culture sum the culture yield (AUDIT C-94)."
+  semantics: "PlayerCulture: sets the player's progress on a civic. The civic in progress (+0xad0[0]) completed (0x3a24c4..0x3a2534): the civic queue +0xa58 pops its front (0x39efa0), then pops each front row the player holds (+0x900, the front 0x4c9c80) and stops at the first it does not. Lifetime culture grows by every gain of civic progress, a boost's share included, and not by culture held with no civic chosen; the engines' cultureTotal / civ_culture sum the culture yield (AUDIT C-94)."
   status: READ
   cases:
     - recording: h1_duelw1121
@@ -749,7 +758,11 @@
     - cpu/core/seatTurn.ts:seatCitizens
     - cpu/harness/import.ts:History
     - cpu/harness/import.ts:foldCultureTourism
+    - cpu/core/minorBuild.ts:civicQueueNext
+    - gpu/core/sim_civics.py:_cai_queue_next
+    - cpu/core/types.ts:ResearchState
   readings:
+    - "C-130 / C-98: the civic queue, the best plot to buy and the plot purchase analyzer — READ, both twins"
     - "C-94: trade posts and cultural dominance — READ"
     - "H-1: a boost lands as progress — READ"
     - "H-1: a minor's research catch-up — READ"

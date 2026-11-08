@@ -271,6 +271,44 @@ export function minorDistrictVerdict(type: string, district: string): -1 | 0 | 1
  * positive district slot carries its district's buildings term
  * (`districtBuildings`, `cityBuildingsPass`'s; the centre's slots stay 0).
  */
+/**
+ * THE CITY'S BEST PLOT TO BUY (0x5c9700 at 0x5c983d..0x5c99e3, CityBuildAI
+ * m_bestPlotToBuy, after the improvement pick): over the update's plot
+ * evaluations in order, an unowned plot beside the city's (+0x57) holding a
+ * resource the player sees (+0x00): the first is taken at no value; a later
+ * one replaces it where the one taken has a feature (+0x04) and it has none,
+ * the most of its improvement values (+0x30) then the value taken, else where
+ * one of its improvement values tops the value taken, which it then holds;
+ * -1 none.
+ */
+export function minorBestPlotToBuy(state: GameState, cs: CityState, evals: readonly PlotEval[]): number {
+  const hidden = hiddenResourcesFor(state, cs.seat);
+  let best = -1;
+  let bestFeature = false;
+  let top = 0;
+  for (const e of evals) {
+    const tile = state.map.tiles[e.plot];
+    if (!e.nearOwned || !tile.resource || hidden.has(tile.resource)) continue;
+    const feature = !!tile.feature;
+    if (best < 0) {
+      best = e.plot;
+      bestFeature = feature;
+    } else if (bestFeature && !feature) {
+      best = e.plot;
+      bestFeature = feature;
+      top = Math.max(...e.improvements);
+    } else {
+      for (const v of e.improvements) {
+        if (v <= top) continue;
+        best = e.plot;
+        bestFeature = feature;
+        top = v;
+      }
+    }
+  }
+  return best;
+}
+
 export function minorPlotEvals(state: GameState, cs: CityState, facts: CityBuildFacts, districtBuildings: readonly number[]): PlotEval[] {
   const map = state.map;
   const city = minorCity(cs);
@@ -1106,6 +1144,7 @@ export function minorAiTurn(state: GameState, cs: CityState, fresh: boolean,
   const pf = minorPickFacts(state, cs, facts);
   cs.standingArmyShort = minorStandingArmy(state, cs);
   const evals = minorPlotEvals(state, cs, facts, pass.districts);
+  if (!fresh) cs.bestPlotToBuy = minorBestPlotToBuy(state, cs, evals);
   const city = minorTreeCity(state, cs, facts, tables, pf, evals, threat);
   const w = minorTreeWorld(state, cs, ai, city);
   const r = cs.research;

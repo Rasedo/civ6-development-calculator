@@ -242,6 +242,11 @@ export interface ResearchState {
   /** the civics AI's analysis of its last turn, which a completion's choice
    *  reads (`civicChoice`); absent before its first */
   civicAiEntries?: CivicEntry[];
+  /** the civics queued behind the civic in hand (PlayerCulture +0xa58, its
+   *  front the civic in hand): each choice of the civics AI joins its back
+   *  (0x626600), the civic in hand completed gives way to its first row not
+   *  held (0x3a1fb0 at 0x3a24c4); absent or empty, none */
+  civicQueue?: string[];
   /** the civics AI's government values (+0xb38, raw, by GOVERNMENT_ type),
    *  written by its turn (0x620110) after the propagation and read by the
    *  next turn's analysis (`civicAnalysis`); absent before its first */
@@ -1401,6 +1406,10 @@ export interface CityState extends Seat {
   buildingValues?: readonly number[];
   projectValues?: readonly number[];
   resourceCounts?: Record<string, number>;
+  /** its city's best plot to buy (CityBuildAI m_bestPlotToBuy +0x590, its
+   *  value +0x5e8) as its last update left it (`minorBestPlotToBuy`), -1 or
+   *  absent none */
+  bestPlotToBuy?: number;
   economy?: EconomicMemory;
   threat?: number;
   /** its city's enemy at the gates (CityBuildAI +0x218) as its last update

@@ -332,6 +332,9 @@ class SimMinorAi:
         self.citystate_standing_short[:, s] = torch.where(alive, self._minor_standing_army(s, alive),
                                                          self.citystate_standing_short[:, s])
         evals = self._minor_plot_evals(s, f, d_tab)
+        if bool(counted.count_nonzero()):
+            self.citystate_best_plot_buy[:, s] = torch.where(counted, self._minor_best_plot_buy(s, evals),
+                                                             self.citystate_best_plot_buy[:, s])
         w = _MinorWorld(self, s, f, (b_tab, u_tab, p_tab), evals, threat)
         goals_reached(ai, s, w, alive)
         free_slots(ai, s, w, alive)
@@ -1142,6 +1145,38 @@ class SimMinorAi:
         turns = torch.where(tot > 0, torch.div(fx_of(100) * 256, tot.clamp(min=1), rounding_mode="trunc"),
                             torch.full_like(tot, -fx_of(1)))
         return torch.where(member.any(dim=1), turns, torch.full_like(turns, -1))
+
+    def _minor_best_plot_buy(self, s: int, evals: dict) -> torch.Tensor:
+        """`minorBestPlotToBuy` [B] (0x5c9700, CityBuildAI m_bestPlotToBuy):
+        over the evaluations in order, an unowned plot beside the minor's
+        holding a resource it sees: the first taken at no value; a later one
+        where the one taken has a feature and it has none, at the most of its
+        improvement values, else where the most of them tops the value
+        taken; -1 none"""
+        row = self._CITY_MINOR0 + s
+        plots = evals["plot"]
+        p0 = plots.clamp(min=0)
+        res = (self._res_live() & ~self._res_hidden(row)).gather(1, p0)
+        feat = ((self.feat_id >= 0) & ~self.feat_stripped).gather(1, p0)
+        cand = evals["valid"] & evals["near_owned"] & res
+        imps = evals["imps"]
+        best = torch.full((self.B,), -1, dtype=torch.long, device=self.device)
+        bfeat = torch.zeros(self.B, dtype=torch.bool, device=self.device)
+        top = torch.zeros(self.B, dtype=torch.long, device=self.device)
+        for p in range(plots.shape[1]):
+            c = cand[:, p]
+            if not bool(c.count_nonzero()):
+                continue
+            fp = feat[:, p]
+            mx = imps[:, p].max(dim=-1).values
+            first = c & (best < 0)
+            repl = c & ~first & bfeat & ~fp
+            better = c & ~first & ~repl & (mx > top)
+            take = first | repl | better
+            best = torch.where(take, plots[:, p], best)
+            bfeat = torch.where(take, fp, bfeat)
+            top = torch.where(repl | better, mx, top)
+        return best
 
     def _minor_plot_evals(self, s: int, f: _MinorFacts, d_tab: list) -> dict:
         """`minorPlotEvals` — THE PLOT ANALYSIS of minor `s`'s city (0x5ce970

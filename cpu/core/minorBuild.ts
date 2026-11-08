@@ -644,6 +644,7 @@ export function minorResearchBank(state: GameState, r: ResearchState, seat: numb
     if (!r.civics.includes(civ)) r.civics.push(civ);
     delete r.civicRetained[civ];
     r.civic = null;
+    civicQueueNext(r);
     takeCivic(r, civicChoice(state, seat, r.civicAiEntries ?? civicAnalysis(state, seat, culture, terms()?.civic, terms()?.civicContracts), civ, civicDraw(state)));
   }
   return gained;
@@ -767,7 +768,11 @@ function takeChoice(r: ResearchState, c: ResearchChoice | null): void {
  *  whatever is in hand (0x762d60 reads no research in hand: runs/h1_duely1128
  *  city-state 2's Banking boosted complete at t117, Education 231.3 taken
  *  over the Gunpowder in hand), which writes the turns left on its pick; a
- *  civic in hand makes the civics AI's (0x6293e0) */
+ *  civic makes the civics AI's (0x6293e0), in hand or not: the civic in hand
+ *  completed gives way to the queue's next, the choice joins the queue
+ *  (runs/h1_duelp1121 city-state 4: Mobilization boosted complete at t150
+ *  behind Reformed Church queues Scorched Earth, studied at t154 before the
+ *  Urbanization chosen at t153, Natural History at t156) */
 export function minorCompleteNow(state: GameState, seat: number, id: string): void {
   const r = seatOf(state, seat)?.research;
   if (!r) return;
@@ -775,9 +780,11 @@ export function minorCompleteNow(state: GameState, seat: number, id: string): vo
     if (r.civics.includes(id)) return;
     r.civics.push(id);
     delete r.civicRetained[id];
-    if (r.civic !== id) return;
-    r.civic = null;
-    r.civicProgress = 0;
+    if (r.civic === id) {
+      r.civic = null;
+      r.civicProgress = 0;
+      civicQueueNext(r);
+    }
     if (r.civicAiEntries) takeCivic(r, civicChoice(state, seat, r.civicAiEntries, id, civicDraw(state)));
     return;
   }
@@ -806,9 +813,22 @@ export function minorCompleteNow(state: GameState, seat: number, id: string): vo
   r.aiLeft = researchInHandLeft(state, seat, r, fxOf(science));
 }
 
-/** the civics AI's choice taken */
+/** the civics AI's choice joins the queue's back (0x626600 on PlayerCulture
+ *  +0xa58): in hand where nothing is */
 function takeCivic(r: ResearchState, civic: string | null): void {
-  if (civic) selectResearch(r, civic, true);
+  if (!civic) return;
+  if (r.civic) (r.civicQueue ??= []).push(civic);
+  else selectResearch(r, civic, true);
+}
+
+/** the civic in hand completed (0x3a1fb0 at 0x3a24c4): the queue's held rows
+ *  leave its front, its first row not held goes in hand */
+function civicQueueNext(r: ResearchState): void {
+  const q = r.civicQueue;
+  if (!q) return;
+  while (q.length && r.civics.includes(q[0])) q.shift();
+  const next = q.shift();
+  if (next) selectResearch(r, next, true);
 }
 
 /** A MINOR UPGRADES ONE UNIT: one `minorCanUpgrade` passes, for

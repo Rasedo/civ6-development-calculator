@@ -244,15 +244,17 @@ class SimMinors:
         spent, Urban Defenses' walls fitted; each technology makes the
         completion's choice over the analysis its last turn left (none where
         it has none), the completed row the key, whatever is in hand, and
-        writes the turns left on its pick (`citystate_ai_left`); a civic
-        in hand makes the civics AI's"""
-        held = self.citystate_civics if is_civic else self.citystate_techs
-        retain = self.citystate_civic_retain if is_civic else self.citystate_tech_retain
-        prog = self.citystate_civic_prog if is_civic else self.citystate_tech_prog
-        curp = self.citystate_cur_civic if is_civic else self.citystate_cur_tech
+        writes the turns left on its pick (`citystate_ai_left`); each civic,
+        in the Boosts rows' order, makes the civics AI's, in hand or not:
+        the civic in hand completed gives way to the queue's next, the
+        choice joins the queue"""
+        if is_civic:
+            self._minor_civics_complete_now(s, full)
+            return
+        held, retain, prog, curp = self.citystate_techs, self.citystate_tech_retain, self.citystate_tech_prog, self.citystate_cur_tech
         held[:, s] |= full
         retain[:, s] = torch.where(full, torch.zeros_like(retain[:, s]), retain[:, s])
-        if not is_civic and 0 <= self._urban_def_tech < full.shape[1]:
+        if 0 <= self._urban_def_tech < full.shape[1]:
             hit = full[:, self._urban_def_tech]
             if bool(hit.count_nonzero()):
                 self._minor_urban_fit(s, hit)
@@ -260,14 +262,6 @@ class SimMinors:
         on_cur = (cur >= 0) & full.gather(1, cur.clamp(min=0).unsqueeze(1)).squeeze(1)
         curp[:, s] = torch.where(on_cur, torch.full_like(cur, -1), cur)
         prog[:, s] = torch.where(on_cur, torch.zeros_like(prog[:, s]), prog[:, s])
-        if is_civic:
-            done = torch.where(on_cur, cur, torch.full_like(cur, -1))
-            fire = on_cur & self.citystate_cai_valid[:, s]
-            if bool(fire.count_nonzero()):
-                ent = (self.citystate_cai_turns[:, s], self.citystate_cai_next[:, s], self.citystate_cai_base[:, s],
-                       self.citystate_cai_score[:, s], self.citystate_cai_owned[:, s])
-                self._cai_take(s, self._cai_choice(s, fire, ent, done))
-            return
         # every completed technology makes the completion's choice, in the
         # order the boosts landed (the Boosts rows' order, `detectBoosts`)
         # each completion's contract walk then COMPLETES the Tech Contracts on
@@ -289,6 +283,34 @@ class SimMinors:
                     sci = self._seat_city_stats(self._CITY_MINOR0 + s, record=False)[0][:, 0][:, 3] * self.citystate_alive[:, s].double()
                 self._minor_completion_choice(s, fire, idx, cur, sci)
             self._tech_contracts_completed(s, hit, idx)
+
+    def _minor_civics_complete_now(self, s: int, full: torch.Tensor) -> None:
+        """`minorCompleteNow` on the civics of `full` [B, N], one after
+        another in the Boosts rows' order: held, the progress kept on it
+        spent; in hand, the queue's next goes in hand (`_cai_queue_next`);
+        then the civics AI's choice over its last turn's analysis (0x6293e0),
+        the civic the key, joins the queue (`_cai_take`)"""
+        held, retain = self.citystate_civics, self.citystate_civic_retain
+        prog, curp = self.citystate_civic_prog, self.citystate_cur_civic
+        valid = self.citystate_cai_valid[:, s]
+        for _i, idx in self._boost_tables()["to_civic"]:
+            if idx >= full.shape[1]:
+                continue
+            hit = full[:, idx] & ~held[:, s, idx]
+            if not bool(hit.count_nonzero()):
+                continue
+            held[:, s, idx] |= hit
+            retain[:, s, idx] = torch.where(hit, torch.zeros_like(retain[:, s, idx]), retain[:, s, idx])
+            cur = curp[:, s]
+            on = hit & (cur == idx)
+            curp[:, s] = torch.where(on, torch.full_like(cur, -1), cur)
+            prog[:, s] = torch.where(on, torch.zeros_like(prog[:, s]), prog[:, s])
+            self._cai_queue_next(s, on)
+            fire = hit & valid
+            if bool(fire.count_nonzero()):
+                ent = (self.citystate_cai_turns[:, s], self.citystate_cai_next[:, s], self.citystate_cai_base[:, s],
+                       self.citystate_cai_score[:, s], self.citystate_cai_owned[:, s])
+                self._cai_take(s, self._cai_choice(s, fire, ent, torch.full_like(cur, idx)))
 
     def _tech_contracts_completed(self, s: int, hit: torch.Tensor, idx: int) -> None:
         """`techContractsCompleted` where `hit` [B]: city-state `s`'s Tech
@@ -1610,6 +1632,7 @@ class SimMinors:
             retain[:, s] = torch.where(fire.unsqueeze(1) & (col == c.unsqueeze(1)), torch.zeros_like(retain[:, s]), retain[:, s])
             cur[:, s] = torch.where(fire, torch.full_like(c, -1), c)
             self._eff_version += 1
+            self._cai_queue_next(s, fire)
             self._cai_completion(s, fire, torch.where(fire, c, torch.full_like(c, -1)), cul)
         return techs, civics
 

@@ -82,6 +82,16 @@
   context:
     - "- THE ORDER (DoTurn 0x4e4560): Player_Techs' turn 0x4c9640 (0x4e45df), then the treasury's 0x4e08f0 (0x4e45ee), then the deals, the culture 0x3968..."
   review: reviewed
+- addr: 0x4c9c80
+  final: 0x27de30
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-130 / C-98: the civic queue, the best plot to buy and the plot purchase analyzer — READ, both twins"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - ...the front pops (0x39efa0), then each front row the player holds pops (+0x900, the front 0x4c9c80); the first it does not hold stays, in hand. The completion delegate 0x6293e0 fires on...
+  review: imported
 - addr: 0x4c9cf0
   final: 0x333d30
   kind: function

@@ -148,6 +148,7 @@
   readings:
     - "H-1: the AI memory reader — READ (the hooks, the pointer paths, the contracts, the knowledge base, the operations, the trees), PARTLY READ (the religious AI's holder)"
     - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
+    - "C-130 / C-98: the civic queue, the best plot to buy and the plot purchase analyzer — READ, both twins"
   context:
     - "- THE HOLDERS: a CityBuild (constructor 0x5c4f40 (FinalRelease 0x3db2f0)): +0xa8 m_cityId, +0xc0 m_playerOwner, +0xd8 m_cityThreat, +0x1..."
   review: reviewed

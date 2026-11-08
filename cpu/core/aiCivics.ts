@@ -25,8 +25,10 @@
  * higher score, the first in table order on a tie; its next step is taken
  * where it is researchable, else one draw "Random Civic Choice" over the
  * researchable rows in table order. The AI's turn (0x620110) chooses with no
- * key where nothing is in hand; a COMPLETION (the delegate 0x6293e0) chooses
- * with the completed civic as the key over the entries its last turn left.
+ * key where nothing is in hand; a COMPLETION (the delegate 0x6293e0), of the
+ * civic in hand or any other, chooses with the completed civic as the key
+ * over the entries its last turn left. The pick joins the civic queue's back
+ * (PlayerCulture +0xa58, `takeCivic`), whose front is the civic in hand.
  */
 import { CIVICS, CIVIC_TABLE_ORDER } from '../data/civics';
 import { ERAS } from '../data/techs';

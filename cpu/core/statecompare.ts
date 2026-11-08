@@ -726,10 +726,17 @@ function tradeEdgesRecord(s: GameState): number[] {
   return rows.flat();
 }
 
+/** the civics queued behind the civic in hand behind their count */
+function civicQueueRow(r: ResearchState | undefined): number[] {
+  const q = r?.civicQueue ?? [];
+  return [q.length, ...q.map((x) => idx(CIVIC_IDX, x))];
+}
+
 /** a research record flat: the techs held behind their count, the civics
  *  held behind theirs, each tree's progress, the items in hand, the goal,
  *  the overflows, the AI's turns left, the progress kept per row, then each
- *  AI's last analysis behind a flag (none before the first) */
+ *  AI's last analysis behind a flag (none before the first), the favoured
+ *  technology, the civic queue, the government values */
 function researchRecord(r: ResearchState | undefined): number[] {
   const techs = (r?.techs ?? []).map((x) => idx(TECH_IDX, x)).sort((a, b) => a - b);
   const civics = (r?.civics ?? []).map((x) => idx(CIVIC_IDX, x)).sort((a, b) => a - b);
@@ -753,6 +760,7 @@ function researchRecord(r: ResearchState | undefined): number[] {
       return [e.turns, idx(CIVIC_IDX, e.next), e.base, e.score, e.owned ? 1 : 0];
     }) : []),
     idx(TECH_IDX, r?.favTech ?? null),
+    ...civicQueueRow(r),
     r?.civicGovValues ? 1 : 0,
     ...govValuesRow(r),
   ];
@@ -1043,6 +1051,7 @@ const CITY_STATE_G: Record<string, Extractor> = {
   civicProgress: overCityStates((cityState) => cityState.research.civicProgress),
   minorCurrentTech: overCityStates((cityState) => idx(TECH_IDX, cityState.research.tech)),
   minorCurrentCivic: overCityStates((cityState) => idx(CIVIC_IDX, cityState.research.civic)),
+  minorCivicQueue: overCityStates((cityState) => civicQueueRow(cityState.research)),
   minorTechGoal: overCityStates((cityState) => idx(TECH_IDX, cityState.research.goal ?? null)),
   minorFavTech: overCityStates((cityState) => idx(TECH_IDX, cityState.research.favTech ?? null)),
   minorResearchAi: overCityStates((cityState) => {
@@ -1151,6 +1160,7 @@ const CITY_STATE_G: Record<string, Extractor> = {
   minorProjectValues: overCityStates((cityState) => [...(cityState.projectValues ?? [])]),
   minorResourceCounts: overCityStates((cityState) =>
     Object.keys(RESOURCES).map((id) => cityState.resourceCounts?.[installType('resource', id, 'RESOURCE_')] ?? 0)),
+  minorBestPlotToBuy: overCityStates((cityState) => cityState.bestPlotToBuy ?? -1),
   minorTradeList: overCityStates((cityState) => [...(cityState.tradeCities ?? [])].sort((a, b) => a - b)
     .concat(-1, [...(cityState.tradeRejected ?? [])].sort((a, b) => a - b))),
   minorTradeValue: overCityStates((cityState) => cityState.tradeValue ?? 0),

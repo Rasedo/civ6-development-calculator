@@ -51,12 +51,12 @@ import { cityStateAt as cityStateAtPlot, envoysHere, envoysOf, minorCity, suzera
 import { grievanceWith } from './grievance';
 import { cityRouteDestPlots, tradeCapacity } from './trade';
 import { buildingVariantAdjacency, cityPower, effectiveAdjacency } from './yields';
-import { cityTourism, civEraIndex, computeCityStats, tourismTowardRaw, type CityStats } from './city';
+import { borderCandidates, cityTourism, civEraIndex, computeCityStats, tourismTowardRaw, type CityStats } from './city';
 import { PROJECTS } from '../data/projects';
 import { RESOURCES } from '../../world/resources';
 import { tileAppeal } from './appeal';
 import { DEFAULT_HANDICAP } from '../data/barbarians';
-import { availableProjects, districtCost, districtScaledBase, projectCost, settlerCost, unitProdCost } from './game';
+import { availableProjects, districtCost, districtScaledBase, projectCost, settlerCost, tilePurchaseCost, unitProdCost } from './game';
 
 const districtType = (id: string): string => `DISTRICT_${id}`;
 
@@ -441,6 +441,15 @@ export function aiView(state: GameState, opts: { updated?: boolean } = {}): AiVi
       const st = statsOf(i, c);
       return a + st.total.gold + st.maintenance;
     }, 0),
+    // a major's and the Free Cities' city build AI hold none here
+    cityPlotToBuyPrice: (i) => {
+      const cs = isCityStateSeat(i) ? (seatOf(state, i) as CityState | undefined) : undefined;
+      const plot = cs?.bestPlotToBuy ?? -1;
+      if (!cs || plot < 0 || cs.centerIndex < 0) return null;
+      const city = minorCity(cs);
+      if (state.map.tiles[plot].ownerSeat >= 0) return 0;
+      return borderCandidates(state, city).includes(plot) ? tilePurchaseCost(state, city, plot) : -1;
+    },
     // a city-state's table on its knowledge base's counts; a major's or the
     // Free Cities' on their own versions, the Free Cities knowing none
     unitProductionValue: (i, type) => {

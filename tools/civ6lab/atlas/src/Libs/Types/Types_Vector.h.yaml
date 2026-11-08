@@ -230,13 +230,20 @@
   final: 0x3de990
   kind: function
   name: resourceCounts
-  semantics: CityBuildAI +0x978[r] := the plot evaluations with resource r seen by the player, owned by it (+0x5a), unimproved (+0x50)
+  semantics: "CityBuildAI m_bestPlotToBuy (+0x590, value +0x5e8 / +0x5ec) := -9999, then over the plot evaluations (+0xcf8, stride 0x78): +0x978[r] counts those with resource r seen by the player, owned by it (+0x5a), unimproved (+0x50); the best plot to buy an unowned plot beside the player's (+0x57) with a resource (+0x00): the first at value 0, a later one where the one taken has a feature (+0x04) and it none (then at the most of its improvement values +0x30 over +0xcb8 rows), else where one of its improvement values tops the value taken; set through the watched setter 0x7eb220 on the plot +0x08."
   status: READ
   cases:
     - recording: h1_duelv1124
       value: every city-state PLOT ANALYSIS block lists 37 plots (747 of 747)
-  impl: [cpu/core/minorBuild.ts:minorResourceCounts]
+    - recording: h1_duelp1121
+      turn: 236
+      value: city-state 4's best plot to buy makes Expropriation 0.5 t236-249 as logged
+  impl:
+    - cpu/core/minorBuild.ts:minorResourceCounts
+    - cpu/core/minorCityAi.ts:minorBestPlotToBuy
+    - gpu/core/sim_minorai.py:_minor_best_plot_buy
   readings:
+    - "C-130 / C-98: the civic queue, the best plot to buy and the plot purchase analyzer — READ, both twins"
     - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
     - "C-96: the resource value and the research value's resources — READ (bonus, luxury, the call), PARTLY READ (the strategic stockpile terms)"
   context:

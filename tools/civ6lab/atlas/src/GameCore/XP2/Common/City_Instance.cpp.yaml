@@ -84,6 +84,7 @@
     - cpu/harness/plotValueLab.ts:df
     - cpu/core/minorCityAi.ts:minorPlotEvals
     - cpu/core/aiViewTypes.ts:AiView
+    - cpu/core/minorCityAi.ts:minorBestPlotToBuy
   readings:
     - "C-99: a unit bought in the turn sits out the operations, a Harbor trains ships"
     - "C-97: the operations — the manager and its candidates READ, the staging list and City Defense's start unread"

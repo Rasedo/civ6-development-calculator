@@ -484,9 +484,10 @@
             "citystate_cai_owned",
             "citystate_gov_values",
             "citystate_gov_valid",
-            "citystate_civic_pol_best"
+            "citystate_civic_pol_best",
+            "citystate_civic_queue"
           ],
-          "note": "the Free Cities' research (`minorResearch` on `freeSeat.research`; the research row `FR`): its techs and civics, progress, items in hand, goal, overflows, turns left, kept progress, the catch-up's counts, the two AIs' last analyses and the military AI's favoured technology; empty until its first turn makes the seat."
+          "note": "the Free Cities' research (`minorResearch` on `freeSeat.research`; the research row `FR`): its techs and civics, progress, items in hand, goal, overflows, turns left, kept progress, the catch-up's counts, the two AIs' last analyses, the military AI's favoured technology and the civics queued behind the civic in hand; empty until its first turn makes the seat."
         },
         {
           "name": "barbArmyKnown",
@@ -2347,6 +2348,17 @@
           ]
         },
         {
+          "name": "minorCivicQueue",
+          "compare": "exact",
+          "covers": [
+            "ResearchState.civicQueue"
+          ],
+          "planes": [
+            "citystate_civic_queue"
+          ],
+          "note": "the civics queued behind the civic in hand (PlayerCulture +0xa58) behind their count"
+        },
+        {
           "name": "minorResearchLeft",
           "compare": "exact",
           "covers": [
@@ -3035,6 +3047,17 @@
             "citystate_res_counts"
           ],
           "note": "the minor city's unimproved resources' counts as its city AI's last update counted them (CityBuildAI +0x978), per resource in the resource rows' order; zeros before its first count"
+        },
+        {
+          "name": "minorBestPlotToBuy",
+          "compare": "exact",
+          "covers": [
+            "CityState.bestPlotToBuy"
+          ],
+          "planes": [
+            "citystate_best_plot_buy"
+          ],
+          "note": "the minor city's best plot to buy (CityBuildAI m_bestPlotToBuy) as its city AI's last update chose it, -1 none"
         },
         {
           "name": "minorTradeList",

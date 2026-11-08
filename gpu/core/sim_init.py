@@ -264,6 +264,10 @@ class SimInit:
         # and the overflow a completion set aside — a major's own shape
         self.citystate_cur_tech = torch.full((B, r_pad), -1, dtype=torch.long, device=device)
         self.citystate_cur_civic = torch.full((B, r_pad), -1, dtype=torch.long, device=device)
+        # the civics queued behind the civic in hand, packed at the front, -1
+        # past them (`ResearchState.civicQueue`, PlayerCulture +0xa58), room
+        # for one row per civic
+        self.citystate_civic_queue = torch.full((B, r_pad, len(rules.c_cost)), -1, dtype=torch.long, device=device)
         self.citystate_tech_retain = torch.zeros(B, r_pad, len(rules.t_cost), dtype=torch.float64, device=device)
         self.citystate_civic_retain = torch.zeros(B, r_pad, len(rules.c_cost), dtype=torch.float64, device=device)
         # the boosts each row holds and its barbarian kills (`ResearchState.boosted`,
@@ -410,6 +414,9 @@ class SimInit:
         self.citystate_project_values = torch.full((B, s_pad, len(rules.ai_city_build["projects"])), -9999 * 256,
                                                    dtype=torch.long, device=device)
         self.citystate_res_counts = torch.zeros(B, s_pad, len(rules.res_ai), dtype=torch.long, device=device)
+        # its city's best plot to buy as its update left it, -1 none
+        # (`CityState.bestPlotToBuy`, `_minor_best_plot_buy`)
+        self.citystate_best_plot_buy = torch.full((B, s_pad), -1, dtype=torch.long, device=device)
         # the events' slots, the trees, the contracts and the reservations of
         # each minor's city (`CityAi`, gpu/core/sim_citytrees.py), then the
         # Free Cities' (the row `FR`: their tree pool, `newTreeId`):

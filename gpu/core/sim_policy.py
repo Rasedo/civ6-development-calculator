@@ -36,11 +36,13 @@ _POL_ANALYZERS = {
     "EFFECT_ADJUST_PLAYER_UNIT_UPGRADE_DISCOUNT_PERCENT", "EFFECT_ADJUST_FLAT_BONUS",
     "EFFECT_ADJUST_BUILDING_YIELD_MODIFIERS_FOR_DISTRICT", "EFFECT_ADJUST_PLAYER_TOURISM",
     "EFFECT_ADJUST_CITY_YIELD_PER_POPULATION", "EFFECT_ADJUST_CITY_YIELD_PER_DISTRICT",
-    "EFFECT_ADJUST_SPACE_RACE_PROJECTS_PRODUCTION",
+    "EFFECT_ADJUST_SPACE_RACE_PROJECTS_PRODUCTION", "EFFECT_ADJUST_PLOT_PURCHASE_COST",
     "EFFECT_ADJUST_PLAYER_TRADE_ROUTE_TOURISM_MODIFIER",
     "EFFECT_ADJUST_CITY_TRADE_ROUTE_YIELD_PER_DESTINATION_LUXURY_RESOURCE_FOR_INTERNATIONAL",
     "EFFECT_ADJUST_CITY_TRADE_ROUTE_YIELD_PER_DESTINATION_STRATEGIC_RESOURCE_FOR_INTERNATIONAL",
 }
+# the analyzers that name a yield in their context (`YIELD_NAMED`)
+_POL_YIELD_NAMED = {"EFFECT_ADJUST_PLOT_PURCHASE_COST": "YIELD_GOLD"}
 # worth 0 in a minor's policy context: the Influence a minor may not give,
 # its tributaries and placed envoys (none)
 _POL_ZERO = {
@@ -359,6 +361,37 @@ class SimPolicy:
         pill = self.district_pillaged.gather(1, t.unsqueeze(1)).squeeze(1)
         return torch.where(pill, torch.zeros_like(out), out)
 
+    def _pol_plot_purchase(self, ctx: dict, sub: dict) -> torch.Tensor:
+        """EFFECT_ADJUST_PLOT_PURCHASE_COST (0x6b70f0) [B] on a city-state's
+        city: its best plot to buy (`citystate_best_plot_buy`) at its price
+        (0 owned, `tilePurchaseCost` beside the city-state's ground, else -1),
+        over the whole gross Gold a turn (above 0) the turns, the price over
+        (1 + the rate) to those turns in single precision, truncated (the
+        modifiers' sum takes it as Gold, `_POL_YIELD_NAMED`)"""
+        B, dev = ctx["B"], ctx["dev"]
+        s, row, seat = ctx["s"], ctx["row"], ctx["seat"]
+        zero = torch.zeros(B, dtype=torch.long, device=dev)
+        plot = self.citystate_best_plot_buy[:, s]
+        ctr = self.citystate_center[:, s]
+        has = sub["mask"] & (plot >= 0) & (ctr >= 0)
+        if not bool(has.count_nonzero()):
+            return zero
+        p0, c0 = plot.clamp(min=0), ctr.clamp(min=0)
+        owner = self.tile_seat.gather(1, p0.unsqueeze(1)).squeeze(1)
+        nb = self.neigh[p0]
+        beside = ((self.tile_seat.gather(1, nb.clamp(min=0)) == seat) & (nb >= 0)).any(dim=1)
+        cost = self._seat_tile_price(row, c0, p0).long()
+        price = torch.where(owner >= 0, zero, torch.where(beside, cost, torch.full_like(cost, -1)))
+        maint = self._seat_housing(row)[0][:, 0].double()
+        gross = torch.as_tensor(ctx["f0"].city_yield("YIELD_GOLD"), dtype=torch.float64, device=dev) + maint
+        gold = torch.floor(gross * _FX + 0.5).long() >> 8
+        ok = has & (gold > 0)
+        turns = torch.div(price, gold.clamp(min=1), rounding_mode="trunc")
+        base = _f32(1.0 + float(self._cv_tables()["rate"]) / _FX)
+        disc = torch.pow(torch.full((B,), base, dtype=torch.float64, device=dev), turns.double()).to(torch.float32)
+        v = torch.trunc(price.to(torch.float32) / disc).long()
+        return torch.where(ok & (disc != 0), v, zero)
+
     def _pol_analyze(self, ctx: dict, eff: str, a: dict, sub: dict, h: int) -> torch.Tensor:
         """an analyzer's whole number [B] on one subject, start 0, horizon `h`"""
         T = self._cv_tables()
@@ -392,6 +425,8 @@ class SimPolicy:
             return self._pol_barbarian_combat(ctx) * per
         if eff in _POL_ZERO:
             return zero
+        if eff == "EFFECT_ADJUST_PLOT_PURCHASE_COST":
+            return self._pol_plot_purchase(ctx, sub) if city and ctx["s"] != self.FR else zero
         if eff == "EFFECT_ADJUST_BUILDING_PRODUCTION":
             return self._pol_building_production(ctx, a, sub, h) if city else zero
         if eff == "EFFECT_ADJUST_CITY_YIELD_CHANGE":
@@ -1122,11 +1157,15 @@ class SimPolicy:
 
     def _pol_mods_value(self, ctx: dict, mods: list, h: int) -> torch.Tensor:
         """`modifiersValue` [B] raw: each modifier's whole value held to
-        +-0x7fffff, in fixed point"""
+        +-0x7fffff, in fixed point; an analyzer naming a yield
+        (`_POL_YIELD_NAMED`) its whole value x that yield's DefaultValue,
+        unheld"""
         ctx = {**ctx, "h": h}
         v = torch.zeros(ctx["B"], dtype=torch.long, device=ctx["dev"])
         for m in mods:
-            v = v + self._pol_mod_value(ctx, m, h).clamp(min=-0x7FFFFF, max=0x7FFFFF) * _FX
+            w = self._pol_mod_value(ctx, m, h)
+            y = _POL_YIELD_NAMED.get(m.get("effect"))
+            v = v + (self._cv_yield(w * _FX, y) if y else w.clamp(min=-0x7FFFFF, max=0x7FFFFF) * _FX)
         return v
 
     # -- the scores and the values ----------------------------------------------

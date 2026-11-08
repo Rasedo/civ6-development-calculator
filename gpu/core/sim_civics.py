@@ -279,9 +279,48 @@ class SimCivics:
         return pick
 
     def _cai_take(self, s: int, pick: torch.Tensor) -> None:
-        """the choice taken (`selectResearch`): the civic in hand parks its
-        progress (or, with none, the pool goes to the overflow), the pick
-        resumes what it kept"""
+        """`takeCivic`: the choice joins the queue's back (0x626600 on
+        PlayerCulture +0xa58) where a civic is in hand, else goes in hand"""
+        go = pick >= 0
+        if not bool(go.count_nonzero()):
+            return
+        cur = self.citystate_cur_civic[:, s]
+        q = self.citystate_civic_queue[:, s]
+        n = (q >= 0).sum(dim=1)
+        push = go & (cur >= 0) & (n < q.shape[1])
+        col = torch.arange(q.shape[1], device=self.device).unsqueeze(0)
+        self.citystate_civic_queue[:, s] = torch.where(push.unsqueeze(1) & (col == n.unsqueeze(1)), pick.unsqueeze(1), q)
+        self._cai_select(s, torch.where(go & (cur < 0), pick, torch.full_like(pick, -1)))
+
+    def _cai_queue_next(self, s: int, done: torch.Tensor) -> None:
+        """`civicQueueNext` where the civic in hand completed (`done` [B],
+        0x3a1fb0 at 0x3a24c4): the queue's held rows leave its front, its
+        first row not held goes in hand"""
+        if not bool(done.count_nonzero()):
+            return
+        have = self.citystate_civics[:, s]
+
+        def shift(q: torch.Tensor, m: torch.Tensor) -> torch.Tensor:
+            moved = torch.cat([q[:, 1:], torch.full_like(q[:, :1], -1)], dim=1)
+            return torch.where(m.unsqueeze(1), moved, q)
+
+        q = self.citystate_civic_queue[:, s]
+        for _ in range(q.shape[1]):
+            front = q[:, 0]
+            held = (front >= 0) & have.gather(1, front.clamp(min=0).unsqueeze(1)).squeeze(1)
+            drop = done & held
+            if not bool(drop.count_nonzero()):
+                break
+            q = shift(q, drop)
+        front = q[:, 0]
+        take = done & (front >= 0)
+        self.citystate_civic_queue[:, s] = shift(q, take)
+        self._cai_select(s, torch.where(take, front, torch.full_like(front, -1)))
+
+    def _cai_select(self, s: int, pick: torch.Tensor) -> None:
+        """`selectResearch` on a civic where `pick` [B] >= 0: the civic in
+        hand parks its progress (or, with none, the pool goes to the
+        overflow), the pick resumes what it kept"""
         go = pick >= 0
         if not bool(go.count_nonzero()):
             return

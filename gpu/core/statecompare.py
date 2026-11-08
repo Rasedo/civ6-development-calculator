@@ -315,6 +315,13 @@ def _unit_pools_row(sim, b: int) -> list[int]:
     return out + row(sim.S, "barb", int(sim._ROW_SEAT[sim.FREE_ROW]))
 
 
+def _civic_queue_row(sim, b: int, s: int) -> list:
+    """`civicQueueRow`: the civics queued behind the civic in hand behind
+    their count"""
+    q = [int(x) for x in sim.citystate_civic_queue[b, s].tolist() if x >= 0]
+    return [len(q), *q]
+
+
 def _research_record(sim, b: int, s: int) -> list:
     """`researchRecord`'s twin for research row `s`: the techs held behind
     their count, the civics held behind theirs, each tree's progress, the
@@ -342,7 +349,8 @@ def _research_record(sim, b: int, s: int) -> list:
             int(sim.citystate_cai_turns[b, s, c]), int(sim.citystate_cai_next[b, s, c]), int(sim.citystate_cai_base[b, s, c]),
             int(sim.citystate_cai_score[b, s, c]), int(sim.citystate_cai_owned[b, s, c]))]
     out.append(int(sim.citystate_fav_tech[b, s]))
-    gv = bool(sim.citystate_gov_valid[b, s])
+    out += _civic_queue_row(sim, b, s)
+    gv =bool(sim.citystate_gov_valid[b, s])
     out.append(1 if gv else 0)
     return out + _gov_values_row(sim, b, s)
 
@@ -1021,6 +1029,7 @@ CITY_STATE = {
     "civicProgress": lambda sim, b, rows: [float(sim.citystate_civic_prog[b, s]) for s in rows],
     "minorCurrentTech": lambda sim, b, rows: [int(sim.citystate_cur_tech[b, s]) for s in rows],
     "minorCurrentCivic": lambda sim, b, rows: [int(sim.citystate_cur_civic[b, s]) for s in rows],
+    "minorCivicQueue": lambda sim, b, rows: [_civic_queue_row(sim, b, s) for s in rows],
     "minorTechGoal": lambda sim, b, rows: [int(sim.citystate_tech_goal[b, s]) for s in rows],
     "minorFavTech": lambda sim, b, rows: [int(sim.citystate_fav_tech[b, s]) for s in rows],
     "minorResearchAi": lambda sim, b, rows: [
@@ -1119,6 +1128,7 @@ CITY_STATE = {
     "minorProjectValues": lambda sim, b, rows: [[int(x) for x in sim.citystate_project_values[b, s].tolist()]
                                                 if bool(sim.citystate_unit_on[b, s]) else [] for s in rows],
     "minorResourceCounts": lambda sim, b, rows: [[int(x) for x in sim.citystate_res_counts[b, s].tolist()] for s in rows],
+    "minorBestPlotToBuy": lambda sim, b, rows: [int(sim.citystate_best_plot_buy[b, s]) for s in rows],
     "minorTradeList": lambda sim, b, rows: [_trade_list(sim, b, s) for s in rows],
     "minorTradeValue": lambda sim, b, rows: [int(sim.citystate_trade_value[b, s]) for s in rows],
     "minorTradeSeat": lambda sim, b, rows: [int(sim.citystate_trade_seat[b, s]) for s in rows],

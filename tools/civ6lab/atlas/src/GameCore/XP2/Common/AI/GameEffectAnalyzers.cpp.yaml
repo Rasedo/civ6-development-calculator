@@ -1066,9 +1066,15 @@
   final: 0x468aa0
   kind: function
   name: EFFECT_ADJUST_PLOT_PURCHASE_COST
-  semantics: "EFFECT_ADJUST_PLOT_PURCHASE_COST (@f04000, vtable 0xd63340): the context yield +0x64 set to @f2f97c (YIELD_FOOD); with the context city's CityBuildAI +0x5e8 / +0x5ec plot set, trunc(price 0x1b1cb0 / powf(1 + rate, price / whole Gold per turn 0x4e0bf0)) into the sum +0xc0; the Amount unread. Unported: +0x5e8's writer unread."
-  status: PARTLY
+  semantics: "EFFECT_ADJUST_PLOT_PURCHASE_COST (@f04000, vtable 0xd63340): the context yield +0x64 set to @f2f97c (the YIELD_GOLD index); with the context city's CityBuildAI m_bestPlotToBuy (+0x5e8 / +0x5ec, written by 0x5c9700) set, trunc(price 0x1b1cb0 / powf(1 + rate +0xbc, price / whole Gold per turn 0x4e0bf0)) into the sum +0xc0; the Amount unread. 0x7a4b20 takes the sum x Gold's DefaultValue 0.5."
+  status: READ
+  cases:
+    - recording: h1_duelp1121
+      turn: 236
+      value: city-state 4's Expropriation 0.5 t236-249 as logged
+  impl: [cpu/core/aiModifiers.ts:ANALYZERS, gpu/core/sim_policy.py:_pol_plot_purchase]
   readings:
+    - "C-130 / C-98: the civic queue, the best plot to buy and the plot purchase analyzer — READ, both twins"
     - "C-130: a city's undamaged strike in Bastions' analyzer; a city-state's danger map at its DoTurn; the plot purchase analyzer — READ / PARTLY READ"
   context:
     - "...ZER (EFFECT_ADJUST_PLOT_PURCHASE_COST, registry object @f04000, vtable 0xd63340, slot 1 0x6b70f0): sets the context's yield (+0x64) to @f2f97c (0, YIELD_FOOD); with the context's city..."

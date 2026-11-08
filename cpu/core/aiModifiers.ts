@@ -18,7 +18,7 @@
  * set holds), TEST_ANY when one does (an empty set fails), TEST_NONE when
  * none does.
  */
-import { AI_GOVERNMENT_INFLUENCE_THRESHOLD, AI_GP_CLASS_PSEUDOYIELD, AI_GREAT_PERSON_CLASSES, AI_MINOR_INFLUENCE_MODIFIERS, AI_SPACE_RACE_PROJECTS } from '../data/aiTables';
+import { AI_GOVERNMENT_INFLUENCE_THRESHOLD, AI_YIELD_DEFAULT, AI_GP_CLASS_PSEUDOYIELD, AI_GREAT_PERSON_CLASSES, AI_MINOR_INFLUENCE_MODIFIERS, AI_SPACE_RACE_PROJECTS } from '../data/aiTables';
 import { BUILT_WONDERS } from '../data/builtWonders';
 import { ERAS, TECHS } from '../data/techs';
 import { CIVICS } from '../data/civics';
@@ -406,6 +406,20 @@ const amenityTurn = (t: ValueTerms, c: { balance: number; yields: Readonly<Recor
   amenityPerTurn({ view: t.view, seat: t.seat }, c, n);
 
 const ANALYZERS: Readonly<Record<string, Analyzer>> = {
+  // 0x6b70f0 (Expropriation; it names YIELD_GOLD, `YIELD_NAMED`): on a city
+  // subject whose city build AI holds a best plot to buy (+0x5e8 / +0x5ec),
+  // that plot's price (0x1b1cb0) over the player's whole gross Gold a turn
+  // (0x4e0bf0, above 0) the turns, the price over (1 + the rate +0xbc) to
+  // those turns (single precision, powf), truncated; the Amount unread
+  EFFECT_ADJUST_PLOT_PURCHASE_COST: (t, _args, s) => {
+    if (s.kind !== 'city') return 0;
+    const price = t.view.cityPlotToBuyPrice(s.seat, s.id);
+    if (price === null) return 0;
+    const gold = fxOf(t.view.grossGoldYield(t.seat)) >> 8;
+    if (gold <= 0) return 0;
+    const discount = Math.fround(Math.pow(Math.fround(1 + t.rate / FX), Math.trunc(price / gold)));
+    return discount === 0 ? 0 : Math.trunc(Math.fround(Math.fround(price) / discount));
+  },
   // 0x6a8320 (the Luxury Policy, A): on the player's own subject, with a
   // luxury named (+0x4c) of which it holds more than one copy (0x4aa790),
   // the most one Amenity more is worth over its cities (0x79f7c0) from the
@@ -1386,10 +1400,20 @@ export function modifierValue(t: ValueTerms, m: AiModifier): number {
   return analysis(t, m, 1) ?? 0;
 }
 
+/** the analyzers that name a yield in their context (+0x64), by effect */
+const YIELD_NAMED: Readonly<Record<string, string>> = {
+  EFFECT_ADJUST_PLOT_PURCHASE_COST: 'YIELD_GOLD',
+};
+
 /** THE MODIFIERS' SUM (0x7a4b20): each modifier's whole value, held to
- *  +-0x7fffff, in fixed point */
+ *  +-0x7fffff, in fixed point; an analyzer naming a yield its whole value x
+ *  that yield's DefaultValue, unheld */
 export function modifiersValue(t: ValueTerms, mods: readonly AiModifier[]): number {
   let v = 0;
-  for (const m of mods) v += Math.min(Math.max(modifierValue(t, m), -0x7fffff), 0x7fffff) * FX;
+  for (const m of mods) {
+    const y = YIELD_NAMED[m.effect];
+    const w = modifierValue(t, m);
+    v += y ? fmul(w * FX, fxConst(AI_YIELD_DEFAULT[y] ?? 1)) : Math.min(Math.max(w, -0x7fffff), 0x7fffff) * FX;
+  }
   return v;
 }

@@ -11594,3 +11594,49 @@ engines already search once per order run on the Movement left.
   holds 5:19 out of its reach, the captured Settler taking it as logged; a
   major's formations are not in the record.
 - Open: runs/h1_duelp1121 t83 the Settler 2686993 (the start above).
+
+## C-130 / C-98: the civic queue, the best plot to buy and the plot purchase analyzer — READ, both twins
+
+`takeCivic`, `civicQueueNext`, `minorCompleteNow` (cpu/core/minorBuild.ts,
+`ResearchState.civicQueue`), `minorBestPlotToBuy` (cpu/core/minorCityAi.ts,
+`CityState.bestPlotToBuy`), the analyzer EFFECT_ADJUST_PLOT_PURCHASE_COST and
+`YIELD_NAMED` (cpu/core/aiModifiers.ts), `cityPlotToBuyPrice` (aiView); GPU
+`_cai_take`, `_cai_queue_next`, `_minor_civics_complete_now`
+(`citystate_civic_queue`), `_minor_best_plot_buy` (`citystate_best_plot_buy`),
+`_pol_plot_purchase`, `_POL_YIELD_NAMED`.
+
+- THE CIVIC QUEUE (PlayerCulture +0xa58, a vector, its front the civic in
+  hand): the civics AI's choice (0x626600) appends the best row's next step
+  to its back whatever is in hand. The civic in hand completed (0x3a1fb0 at
+  0x3a24c4..0x3a2534): the front pops (0x39efa0), then each front row the
+  player holds pops (+0x900, the front 0x4c9c80); the first it does not hold
+  stays, in hand. The completion delegate 0x6293e0 fires on every civic
+  completed, the civic in hand or another (a boost's), each appending a
+  choice keyed on it.
+- Confirmed: runs/h1_duelp1121 city-state 4 — Mobilization boosted complete
+  at t149 (Game_Boosts "Completed", its third corps) behind Reformed Church
+  appends Scorched Earth (the t149 walk's next through Mobilization); Reformed
+  Church done at t153 leaves Scorched Earth in hand (604 of 484), the t153
+  choice Urbanization behind it (t154), then Natural History, Mass Media,
+  Capitalism (t156-158) as recorded (the one-seed trace with that t149 choice
+  in place: t153 / t154 as logged); 1117 city-state 2's Mobilization in hand
+  at t224 behind Conservation, appended at its t200 Mass Media boost.
+- Open: the engine's t149 boost there waits on the corps the city-state's
+  two Skirmishers form (1638401 and 1966084, t149 -> t150).
+- THE BEST PLOT TO BUY (CityBuildAI m_bestPlotToBuy, the watched member +0x590
+  named by the constructor 0x5c4f40, its value +0x5e8 / +0x5ec): 0x5c9700 in
+  the city update after the improvement pick (0x5ce839) sets it -9999, then
+  over the plot evaluations (+0xcf8, 0x78 bytes: +0x00 resource, +0x04
+  feature, +0x08 / +0x0c plot, +0x30 improvement values over +0xcb8 rows,
+  +0x57 unowned beside the player's): a plot of +0x57 with a resource; the
+  first taken at value 0; a later one where the one taken has a feature and
+  it has none (then at the most of its values), else where one of its values
+  tops the value taken. The Economic AI's plot purchase 0x68a100 reads it.
+- THE PLOT PURCHASE ANALYZER (0x6b70f0): the context's yield +0x64 :=
+  @f2f97c, the YIELD_GOLD index; on a city whose best plot to buy is set, its
+  price (0x1b1cb0), the player's gross Gold a turn whole (0x4e0bf0, above 0),
+  trunc(price / powf(1 + rate +0xbc, price / Gold)) (+0xbc the 4.0 the value
+  runs at); 0x7a4b20 takes a context naming a yield as (sum << 8) x
+  Yields.DefaultValue, Gold's 0.5. Confirmed: runs/h1_duelp1121 city-state 4
+  Expropriation 0.5 t236-249 as logged.
+- Open: a major's and the Free Cities' city build AI's best plot (none here).

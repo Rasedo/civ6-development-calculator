@@ -257,6 +257,10 @@ export interface AiValueView {
    *  (0x4e0bf0: its cities' Gold before their buildings' Maintenance) */
   treasury(seat: number): number;
   grossGoldYield(seat: number): number;
+  /** the Gold price (0x1b1cb0: -1 where the city cannot buy it) of the
+   *  city's best plot to buy (CityBuildAI m_bestPlotToBuy), null where it
+   *  holds none: a city-state's as its last update left it */
+  cityPlotToBuyPrice(seat: number, cityId: number): number | null;
   /** a unit at the head of the city's build queue (0x179860 on city +0x2170) */
   cityTrainingUnit(seat: number, cityId: number): boolean;
   /** the seat's units in its list's order, their plot, UnitType, whole
