@@ -2122,16 +2122,17 @@ class SimMinorOps:
         bar = float(torch.tensor(hp_max, dtype=_F32) * torch.tensor(float(torch.tensor(pct, dtype=_F32) * torch.tensor(0.01, dtype=_F32)), dtype=_F32))
         return (hp_max - self._mops_u(s, "hp")[b, j.clamp(min=0)].long()).to(torch.float64) >= bar
 
-    def _mops_move(self, s: int, us: torch.Tensor, dest: torch.Tensor, mask: torch.Tensor) -> None:
-        """a member's move order to `dest` (tactical `moveTo`, no strike):
-        none where it stands there or has no Movement left"""
+    def _mops_move(self, s: int, us: torch.Tensor, dest: torch.Tensor, mask: torch.Tensor, attack: bool = False) -> None:
+        """a member's move order to `dest` (tactical `moveTo`, the attack flag
+        0x10 where `attack`): none where it stands there or has no Movement
+        left"""
         m = mask & (us >= 0)
         if not bool(m.any()):
             return
         b = torch.arange(self.B, device=self.device)
         uc = us.clamp(min=0)
         m &= (self._mops_u(s, "tile")[b, uc] != dest) & (self._mops_u(s, "mp")[b, uc] > 0) & (dest >= 0)
-        self._tac_move_to(m, uc, dest, self._mops_pre(s), self._mops_seat(s), strike=False)
+        self._tac_move_to(m, uc, dest, self._mops_pre(s), self._mops_seat(s), strike=attack)
 
     def _mops_upgrade_move(self, s: int, us: torch.Tensor, dest: torch.Tensor, mask: torch.Tensor, op: dict) -> None:
         """`upgradeMove` (MOVE UNIT's execution with no Location, 0x7eeba0):
@@ -2210,37 +2211,14 @@ class SimMinorOps:
 
     def _mops_plan_spot(self, s: int, view: dict, us: torch.Tensor, p: torch.Tensor, turns: int, need_moves: bool,
                         rng: torch.Tensor) -> torch.Tensor:
-        """`planSpot` on the pass's planning: [B] the first plot of the unit's
-        reach within `turns` exactly `rng` from `p` (Movement left there where
-        asked), its own plot, or one with no other unit of its domain that
-        fights as it does; -1 none"""
+        """`planSpot` on the pass's planning (`planningAt`, 0x791300): [B]
+        `_op_reach_at` of the unit over its reach within `turns`, `rng` from
+        `p`; -1 none"""
         op = view["op"]
-        B, T = self.B, self.T
-        dev = self.device
-        b = torch.arange(B, device=dev)
-        uc = us.clamp(min=0)
-        n = op["rowof"][b, uc]
-        res = op["res"]
-        nn = n.clamp(min=0)
-        rt, rk, mv = res["turns"][nn], res["rank"][nn], res["moves"][nn]
-        dq = self.pair_dist[p.clamp(min=0)].to(torch.long)
-        here = self._mops_u(s, "tile")[b, uc]
-        g = uc + self.POOL_LO[self._mops_pre(s)]
-        ut = self.unit_type.gather(1, g.unsqueeze(1)).squeeze(1).clamp(min=0, max=self.NU - 1)
-        fights = self._type_combat.take(ut) > 0
-        block = torch.zeros(B, T, dtype=torch.bool, device=dev)
-        for pl in (self.military_at, self.embarked_at):
-            x = pl
-            xt = self.unit_type.gather(1, x.clamp(min=0)).clamp(min=0, max=self.NU - 1)
-            block |= (x >= 0) & (x != g.unsqueeze(1)) & ((self._type_combat.take(xt) > 0) == fights.unsqueeze(1))
-        ok = (dq == rng.unsqueeze(1)) & (rt >= 0) & (rt <= turns) & ((self._arange_bt == here.unsqueeze(1)) | ~block)
-        if need_moves:
-            ok &= mv > 0
-        ok &= (n >= 0).unsqueeze(1) & (us >= 0).unsqueeze(1) & (p >= 0).unsqueeze(1)
-        big = 1 << 40
-        key = torch.where(ok, rk, torch.full_like(rk, big))
-        best = key.min(dim=1)
-        return torch.where(best.values < big, best.indices, torch.full_like(best.indices, -1))
+        b = torch.arange(self.B, device=self.device)
+        out = self._op_reach_at(b, us.clamp(min=0), p.clamp(min=0), turns, need_moves, rng, op["rowof"], op["res"],
+                                self._mops_pre(s), self._mops_seat(s))
+        return torch.where((us >= 0) & (p >= 0), out, torch.full_like(out, -1))
 
     def _mops_reach1(self, view: dict, us: torch.Tensor, p: torch.Tensor) -> torch.Tensor:
         """[B] the unit's planning reaches `p` this turn"""
@@ -2738,7 +2716,7 @@ def _x_operation_attack(sim, c: _OpCtx, i: int, on: torch.Tensor) -> None:
             if not bool(far.any()):
                 continue
             spot = sim._mops_plan_spot(s, view, us, target, 2, False, reach)
-            sim._mops_move(s, us, torch.where(spot >= 0, spot, target), far)
+            sim._mops_move(s, us, torch.where(spot >= 0, spot, target), far, attack=True)
         for j in range(NM):
             us, uc, ok = member(j)
             if not bool(ok.any()):

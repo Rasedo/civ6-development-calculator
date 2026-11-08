@@ -2329,6 +2329,7 @@
     - "C-125: the safe plot's stacking test holds other players' units — READ (0x716b90 at 0x716d77 -> 0x585eb0 / 0x585d90), both twins"
     - "C-124: a move order's path opens a turn-end node beside each node with Movement left — READ (0x271920, 0x7a880, 0x271490, 0x775a0, 0x26f330), both twins"
     - "C-128: a crowded plot's unit goes beside it as its AI player's turn ends — READ (0x775e50, 0x585d90, 0x93f870, 0x585940), both twins"
+    - "C-99: Operation Move's and Operation Attack's planning plot keeps out another player's unit at peace, not one at war; Operation Attack's march carries the attack flag; a refresh reads the knowledge base's target entries — READ (0x78fa10 -> 0x585eb0 -> 0x585d90, 0x791300's callers 0x80c397 / 0x810e98 / 0x811213, 0x80c180 at 0x80c3c4 / 0x80c4be / 0x80c7ee), both twins"
   context:
     - "...that keep it out (0x585d90: its own of its class, vtable +0xb8; another player's where 0x518f40 refuses the pair), none with MakeTradeRoute (+0x1b9 bit 64) or Spy (+0x1ba bit 2). Th..."
   review: reviewed
@@ -5241,18 +5242,27 @@
     - recording: h1_duelw1117-1128
       turn: all
       value: "the action replay: the Operation rows end on the game's plot 416 of 1,265; barb:move imposed 1117 634 -> 421, 1121 1,325 -> 1,096"
+    - recording: h1_duelp1127
+      turn: 109
+      value: "city-state 3's Naval Superiority Galley 393216 on 27:15, its target the barbarian Galley on 30:17: Operation Move's ring plot 29:17 (its planning's (2/2)), 30:16 (1/0) refused under player 0's embarked Warrior 2031642, as logged (27:15, 29:17, 29:16)"
+    - recording: h1_duelp1124
+      turn: 184
+      value: "city-state 3's Attack Barb Camp Cuirassier 1835008 on 40:13: Operation Attack's spot 40:20 under the barbarian Line Infantry 6094867 (a unit at war keeps none out), as logged (Move 40:20, Arrive 39:18)"
   impl:
     - gpu/core/sim_tactics.py:_op_reach_at
     - cpu/core/tactical.ts:reachAt
     - gpu/core/sim_tactics.py:_barb_reach_at
     - cpu/core/tactical.ts:strikers
     - cpu/core/aiViewTypes.ts:AiView
+    - cpu/core/tactical.ts:planningAt
+    - gpu/core/sim_minorops.py:_mops_plan_spot
   readings:
     - "C-95: a strike's step from beside its plot, a formation's planning plot at a radius, the ring walk's own location test — READ (0x962380 at 0x96267e..0x9626d2, 0x26ef40 at 0x26f0a4, 0x78fa10 at 0x78fab4..0x78facf, 0x815d50 -> 0x586360), both twins"
     - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
     - "C-95: Attack Units — READ, ported"
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
+    - "C-99: Operation Move's and Operation Attack's planning plot keeps out another player's unit at peace, not one at war; Operation Attack's march carries the attack flag; a refresh reads the knowledge base's target entries — READ (0x78fa10 -> 0x585eb0 -> 0x585d90, 0x791300's callers 0x80c397 / 0x810e98 / 0x811213, 0x80c180 at 0x80c3c4 / 0x80c4be / 0x80c7ee), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ...x775340; for MEDIUM / LOW a ranged unit's spot at exactly its range with Movement left, 0x78fa10), the targets of that type within 5 of it (0x76eb50), each unit's spots per target from...

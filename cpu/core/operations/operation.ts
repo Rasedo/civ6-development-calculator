@@ -241,10 +241,11 @@ export function targetGone(ctx: OpsContext, op: Operation): boolean {
 }
 
 /** a unit's move to a plot (the seat's move order, as far as its Movement
- *  carries it this turn), its formation with it */
-export function moveTo(ctx: OpsContext, u: AiUnitView, dest: number): void {
+ *  carries it this turn), its formation with it; `attack` the order's attack
+ *  flag 0x10 */
+export function moveTo(ctx: OpsContext, u: AiUnitView, dest: number, attack = false): void {
   if (u.plot === dest || u.movesLeft <= 0) return;
-  ctx.move(u.id, dest);
+  ctx.move(u.id, dest, attack);
 }
 
 /** a plot as the operation logs write it, x:y (-9999:-9999 for none) */

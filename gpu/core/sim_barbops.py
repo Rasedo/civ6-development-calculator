@@ -1199,13 +1199,12 @@ class SimBarbOps:
                 if not bool(cand.any()):
                     continue
                 # the planning holds its own plot within two turns with
-                # Movement left (none other of its domain and kind there)
+                # Movement left (`planningAt` at range 0)
                 spot_ok = torch.zeros_like(cand)
                 cb, cs = cand.nonzero(as_tuple=True)
                 pp = torch.full_like(cb, p)
                 sp = self._op_reach_at(cb, cs, pp, 2, True, torch.zeros_like(cb), rowof, res, "barb", seat)
-                blocked = self._bop_spot_held(cb, cs, pp)
-                spot_ok[cb, cs] = (sp >= 0) & ~blocked
+                spot_ok[cb, cs] = sp >= 0
                 key = torch.where(spot_ok, join.clamp(min=0), torch.full_like(join, 1 << 40))
                 best = key.min(dim=1)
                 go = best.values < (1 << 40)
@@ -1214,22 +1213,6 @@ class SimBarbOps:
                 us = best.indices
                 done[bidx[go], us[go]] = True
                 self._barb_pillage_here(go, us)
-
-    def _bop_spot_held(self, rows: torch.Tensor, us: torch.Tensor, plot: torch.Tensor) -> torch.Tensor:
-        """[N] another unit of the barbarian's domain and kind (one that fights,
-        one that does not) stands on `plot` (`planSpot`)"""
-        ut = self.barb_unit_type[rows, us].clamp(min=0, max=self.NU - 1)
-        fights = self._type_combat.take(ut) > 0
-        naval = self.unit_naval.take(ut)
-        mil = self.military_at[rows, plot]
-        civ = self.civilian_at[rows, plot]
-        lo = self.POOL_LO["barb"]
-        me = us + lo
-        held_m = (mil >= 0) & (mil != me)
-        held_c = (civ >= 0) & (civ != me)
-        mt = self.unit_type[rows, mil.clamp(min=0)].clamp(min=0, max=self.NU - 1)
-        same_dom = self.unit_naval.take(mt) == naval
-        return torch.where(fights, held_m & same_dom, held_c)
 
     def _bop_attack_city(self, on: torch.Tensor, k: int, ctx: dict) -> None:
         """OPERATION ATTACK CITY's execution (0x8109e0, `attackCityExecute`)

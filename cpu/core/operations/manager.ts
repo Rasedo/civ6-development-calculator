@@ -103,7 +103,7 @@ export interface OpsEnv {
    *  assignment over its units against the targets `keep` picks of its
    *  tactical target list, carried out (the tactical pass's 0x771f80) */
   act(rows: number[][]): void;
-  move(id: number, dest: number): void;
+  move(id: number, dest: number, attack?: boolean): void;
   strike(id: number, plot: number): void;
   attack(ids: readonly number[], keep: (k: number) => boolean, even: boolean, survive: boolean): readonly AiAttackView[];
   /** Operation Move's update and execution for a team (`OpsContext`) */

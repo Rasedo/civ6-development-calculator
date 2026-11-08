@@ -117,6 +117,7 @@
     - gpu/core/sim_tactics.py:_tac_pass
     - cpu/core/minorBuild.ts:prev
     - cpu/core/tactical.ts:tacticalPass
+    - cpu/core/aiView.ts:targetLists
   readings:
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
     - "C-96: the knowledge base's army records and the Combat Desire — READ (the records, the update, the desire), PARTLY READ (the signals' looks, the standing-army count)"

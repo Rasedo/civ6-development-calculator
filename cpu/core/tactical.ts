@@ -3893,18 +3893,32 @@ function goalDistance(state: GameState, u: Unit | null, goal: number): number {
 
 /** a plot of the unit's planning (0x791300) within `turns`: with `range` 0
  *  the goal itself, else a plot exactly `range` from it with none of its own
- *  there that stacks with it or a member of its formation, but its own plot
+ *  there that stacks with it or a member of its formation and no other
+ *  player's unit at peace with it (`peaceAt`: runs/h1_duelp1127 t109 city-state
+ *  3's Galley 393216 for its target 30:17 takes 29:17 past player 0's
+ *  embarked Warrior on 30:16, as logged), but its own plot
  *  (0x78fa10: 0x585eb0 over its formation +0x1fb8; runs/h1_duelz1121 t160:
  *  Builder Capture's Settler 4325384 on 6:18, its Musketman's goal the camp
  *  3:19 its Skirmisher holds, plans no 4:18 under the Bombard 3997700 nor
  *  4:19 under the Line Infantry 4456462 and goes for 2:19, as logged);
  *  `moves` asks Movement left */
 function reachAt(state: GameState, pass: Pass, u: Unit, goal: number, turns: number, moves: boolean, range: number): number {
+  return planningAt(state, u, pass.reach.get(u.id) ?? [], goal, turns, moves, range);
+}
+
+/** `reachAt` over the planning reach `reach` of the unit (0x791300 ->
+ *  0x78fa10): Operation Attack's spot (0x80c180 at 0x80c397) and Garrison
+ *  City's (0x810d30 at 0x810e98 / 0x811213) among its callers; a unit at war
+ *  on the plot keeps none out (0x585d90: runs/h1_duelp1124 t184 city-state
+ *  3's Cuirassier 1835008 goes for 40:20 under the barbarian Line Infantry
+ *  6094867, beside the camp, as logged) */
+export function planningAt(state: GameState, u: Unit, reach: readonly Reach[], goal: number, turns: number, moves: boolean,
+  range: number): number {
   const mates = formationMates(state, u);
-  for (const e of pass.reach.get(u.id) ?? []) {
+  for (const e of reach) {
     if (e.turns > turns || (moves && e.moves <= 0)) continue;
     if (range === 0 ? e.tile !== goal : plotDistance(state, e.tile, goal) !== range) continue;
-    if (range > 0 && e.tile !== u.tileIndex && stackedWith(state, u, mates, e.tile)) continue;
+    if (range > 0 && e.tile !== u.tileIndex && (stackedWith(state, u, mates, e.tile) || peaceAt(state, u, e.tile))) continue;
     return e.tile;
   }
   return -1;

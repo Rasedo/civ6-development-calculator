@@ -7,16 +7,22 @@
   final: 0x56c360
   kind: function
   name: Operation Attack (execution)
-  semantics: "Operation Attack's execution (Simple Operation Attack, the camps): per team with a target, each member alive with Movement left: beyond its reach (max(1, range)) to the planner's spot (0x791300) \"Attack Target Move\", none found straight to the target \"Attack Target Move Direct\"; a ranged member at the target where it holds units (Plot +0x4c) \"Attack Target Range Attack\"; each member left onto the target \"Attack Target Melee Attack\"."
+  semantics: "Operation Attack's execution (Simple Operation Attack, the camps): per team with a target, each member alive with Movement left: beyond its reach (max(1, range)) to the planner's spot (0x791300 at 0x80c397: turns 2, no Movement asked) \"Attack Target Move\", none found straight to the target \"Attack Target Move Direct\", both orders (0x962030) under the attack flag 0x10 (0x80c3c4 / 0x80c4be); its attack spot's order \"Attack Target Move Melee\" under none (0x80c7ee); a ranged member at the target where it holds units (Plot +0x4c) \"Attack Target Range Attack\"; each member left onto the target \"Attack Target Melee Attack\"."
   status: PARTLY
+  cases:
+    - recording: h1_duelp1124
+      turn: 184
+      value: "city-state 3's Attack Barb Camp Cuirassier 1835008 on 40:13: Attack Target Move to 40:20 under the barbarian Line Infantry, its walk to 39:18, as logged"
   impl:
     - cpu/core/operations/assault.ts:moveOnto
     - cpu/core/operations/assault.ts:operationAttackExecute
     - gpu/core/sim_minorops.py:_x_operation_attack
+    - cpu/core/tactical.ts:planningAt
   readings:
     - "C-97: the behaviour trees — READ (the interpreter), the nodes PARTLY READ"
     - "C-97: the war desires, the war operation's readiness and the assault's executions — the war value, the not-ready hook, the readiness and the executions READ; the leader's war factor, the WMD flags, the deal items and the war record's writer unread"
     - "C-99 / C-128: the swap's partner test and its step along its own path; Move Unit's update before the executions; a Trader no passenger — READ (0x972540, 0x56e760, 0x972a50 -> 0x26fe20, 0x7d3a00 -> 0x7f0020, 0x586360 -> 0x208b80 / 0x523d60), both twins"
+    - "C-99: Operation Move's and Operation Attack's planning plot keeps out another player's unit at peace, not one at war; Operation Attack's march carries the attack flag; a refresh reads the knowledge base's target entries — READ (0x78fa10 -> 0x585eb0 -> 0x585d90, 0x791300's callers 0x80c397 / 0x810e98 / 0x811213, 0x80c180 at 0x80c3c4 / 0x80c4be / 0x80c7ee), both twins"
   context:
     - "...unread: the port finds none and skips its children); the executions of Operation Attack 0x80c180 (Attack Target Move / Melee / Range lines), Attack Units 0x80ceb0, Defend Units 0x80d..."
   review: reviewed

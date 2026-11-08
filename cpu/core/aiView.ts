@@ -16,7 +16,7 @@ import { CITY_STRIKE_RANGE, plotPressureLead } from './phase';
 import { governorSum } from './governors';
 import { CITY_STATE_SUZERAIN_BONUS, MINOR_UPGRADE_GOLD, govInfluence } from '../data/cityStates';
 import { BARB_SEAT, FREE_SEAT, campTiles, cityHolders, citiesOf, civsAtWar, denounceActive, seatsAllied, seatsFriends, hiddenResourcesFor, homeContinent, isCiv, onHomeContinent, isCityStateSeat, tradeRoutesJoin, leaderOf, majorityReligionOf, seatOf, tileSeat, unitsOf, warsOf } from './seats';
-import { aiDefenderOf, aiFormed, aiRanged, aiStrengths, districtHealth, planUnit, reachPlots, tacticalTargets, type Target } from './tactical';
+import { aiDefenderOf, aiFormed, aiRanged, aiStrengths, districtHealth, planUnit, planningAt, reachPlots, tacticalTargets, type Target } from './tactical';
 import { AIR_REBASE_COLS, AIR_STRIKE_COLS, IMPROVEMENT_IDS, unitActionIndex } from './unitActions';
 import { airPillageTargets, airStrikeTargets, rebaseTargets } from './air';
 import { plotsSeenNow, ringPlots } from './barbarians';
@@ -138,11 +138,12 @@ export function aiView(state: GameState, opts: { updated?: boolean } = {}): AiVi
   };
   const { map } = state;
   let plots: AiMapPlotView[] | null = null;
-  // a seat's tactical target list on this state
+  // a seat's tactical target list on this state, its knowledge base's
+  // entries among them (the one list the look builds, 0x785f30)
   const targetLists = new Map<number, Target[]>();
   const targetsOf = (i: number): Target[] => {
     let t = targetLists.get(i);
-    if (!t) targetLists.set(i, (t = tacticalTargets(state, i, plotsSeenNow(state, new Set([i])), null, [])));
+    if (!t) targetLists.set(i, (t = tacticalTargets(state, i, plotsSeenNow(state, new Set([i])), null, seatOf(state, i)?.armyKnown ?? [])));
     return t;
   };
   const unitTables = new Map<number, ReadonlyMap<string, { value: number }>>();
@@ -734,16 +735,7 @@ export function aiView(state: GameState, opts: { updated?: boolean } = {}): AiVi
     planSpot: (id, p, turns, needMoves, range) => {
       const u = state.units.find((x) => x.id === id);
       if (!u) return -1;
-      const at = map.tiles[p];
-      const dom = unitDomain(u.type);
-      const fights = (x: Unit) => (UNITS[x.type]?.combat ?? 0) > 0;
-      for (const r of planUnit(state, u, targetsOf(u.seat)).reach) {
-        const t = map.tiles[r.tile];
-        if (hexDistance(map, t.col, t.row, at.col, at.row) !== range || r.turns > turns || (needMoves && r.moves <= 0)) continue;
-        if (r.tile === u.tileIndex) return r.tile;
-        if (!state.units.some((x) => x !== u && x.tileIndex === r.tile && unitDomain(x.type) === dom && fights(x) === fights(u))) return r.tile;
-      }
-      return -1;
+      return planningAt(state, u, planUnit(state, u, targetsOf(u.seat)).reach, p, turns, needMoves, range);
     },
     attackSpots: (id, p) => {
       const u = state.units.find((x) => x.id === id);

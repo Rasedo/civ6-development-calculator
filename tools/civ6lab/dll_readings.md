@@ -12286,3 +12286,50 @@ cpu/core/phase.ts); GPU `_minor_item_mult` (gpu/core/sim_minors.py),
   (0x4bcd30) and their units' expected count (0x5d4750's contract term) on
   no recorded row (their cards: Caravansaries alone; their civics past
   Political Philosophy none).
+
+## C-99: Operation Move's and Operation Attack's planning plot keeps out another player's unit at peace, not one at war; Operation Attack's march carries the attack flag; a refresh reads the knowledge base's target entries — READ (0x78fa10 -> 0x585eb0 -> 0x585d90, 0x791300's callers 0x80c397 / 0x810e98 / 0x811213, 0x80c180 at 0x80c3c4 / 0x80c4be / 0x80c7ee), both twins
+
+`planningAt` (`reachAt`'s body, and `planSpot` in the pass's view and the
+AI view; cpu/core/tactical.ts, opsOrders.ts, aiView.ts), `moveTo`'s
+`attack` (cpu/core/operations/operation.ts) through the operations' `move`,
+`operationAttackExecute`'s first pass (cpu/core/operations/assault.ts), the
+AI view's target list with the seat's `armyKnown` (aiView.ts `targetsOf`).
+GPU `_op_reach_at`'s `_tac_peaceful` term (gpu/core/sim_tactics.py),
+`_mops_plan_spot` over `_op_reach_at` and `_mops_move`'s `attack`
+(gpu/core/sim_minorops.py); the barbarians' pillage spot reads
+`_op_reach_at` alone (gpu/core/sim_barbops.py). The GPU refresh already
+read the knowledge base (`_mops_refresh_run`'s `_tac_targets(seat, kb)`).
+
+- THE PLANNING PLOT AT A RANGE (0x791300 -> 0x78fa10 at 0x78fab4..0x78facf):
+  a reach entry exactly the range from the goal, within the turns, Movement
+  left where asked, refused where 0x585eb0 over the unit's formation
+  (+0x1fb8, the plot's units of its map layer 0x75c50) counts one, its own
+  plot excepted. 0x585d90 skips a unit at war (IsAtWarWith 0x3dcec0), counts
+  its own player's by the class test (vt +0xb8), another player's but a
+  Trader, a Spy or a pair 0x518f40 lets share. At range 0 the goal itself,
+  no count. Operation Attack (0x80c180 at 0x80c397: turns 2, no Movement
+  asked) and Garrison City (0x810d30 at 0x810e98 / 0x811213) ask the same
+  function as Operation Move.
+- OPERATION ATTACK'S ORDERS (0x80c180): "Attack Target Move" and "Attack
+  Target Move Direct" (0x962030 at 0x80c3d0 / 0x80c4d9) carry the attack
+  flag 0x10 (r9d at 0x80c3c4 / 0x80c4be); "Attack Target Move Melee"
+  (0x80c800) none (0x80c7ee).
+- THE TEAM UPDATE'S TARGETS at the military AI's refresh (after the turn's
+  look) are the target list with the knowledge base's entries (age 1, out
+  of sight) among them, the one list the pass reads: a team with only a
+  remembered enemy near is engaged, and Operation Attack Units runs.
+- CONFIRMED (one-seed aimem traces): runs/h1_duelp1127 t109 city-state 3's
+  Galley 393216 (Naval Superiority, target 30:17) "27:15, 29:17, 29:16" as
+  logged, 30:16 under player 0's embarked Warrior 2031642; runs/h1_duelp1124
+  t184 its Cuirassier 1835008 "Attack Target Move ... Move 40:20, Arrive
+  39:18" as logged, 40:20 under the barbarian Line Infantry 6094867;
+  runs/h1_duelp1128 t199 city-state 3's Attack Barb Camp Man-At-Arms
+  1179650 / Field Cannon 2555910 run Operation Attack Units on the Pike and
+  Shot 6684692 on the camp 4:12, out of their sight and in their records,
+  "Move 5:12" / "Move 4:11" as logged.
+- OPEN: runs/h1_duelp1128 t199 the game logs both Recruit Units nodes (15
+  and 19) in the tick Operation Move arrives, the engines the second alone.
+  The Operation Attack Units spot of a ranged ship in its own city
+  (runs/h1_duelp1124 t73-75 city-state 3's Quadrireme 1048577 on Granada's
+  centre strikes 40:13 from 41:12, the engines move it to 41:13 first) is the
+  assignment's (0x776140), unread here.

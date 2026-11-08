@@ -3586,8 +3586,9 @@ class SimTactics:
         player `seat`) in the games `rows`: the first plot of its planning
         (closing order) within `turns` — the goal itself at range 0, else a
         plot exactly `rng` from it with none of its own there that stacks with
-        it or a member of its formation (`_tac_stacks`), but its own plot;
-        `moves` asks Movement left. -1 none."""
+        it or a member of its formation (`_tac_stacks`) and no other player's
+        unit at peace with it of its map layer (`_tac_peaceful`), but its own
+        plot; `moves` asks Movement left. -1 none."""
         n = rowof[rows, us]
         ok_row = n >= 0
         nn = n.clamp(min=0)
@@ -3598,6 +3599,9 @@ class SimTactics:
         mr = self._tac_mate(rows, us, pre)
         none = torch.full_like(us, -1)
         own = self._tac_stacks(rows, seat, (torch.where(us >= 0, us + lo, none), torch.where(mr >= 0, mr + lo, none)))
+        ut = getattr(self, f"{pre}_unit_type")[rows, us.clamp(min=0)].clamp(min=0, max=self.NU - 1)
+        rel_u = (self._rel_strength.take(ut) > 0).unsqueeze(1)
+        own = own | torch.where(rel_u, self._tac_peaceful(seat, True)[rows], self._tac_peaceful(seat, False)[rows])
         at = torch.where(rng.unsqueeze(1) == 0, self._arange_bt[rows] == goal.unsqueeze(1),
                          (dq == rng.unsqueeze(1)) & (~own | (self._arange_bt[rows] == here.unsqueeze(1))))
         ok = at & (rt >= 0) & (rt <= turns) & ok_row.unsqueeze(1)

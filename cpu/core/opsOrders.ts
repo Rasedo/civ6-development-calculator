@@ -12,11 +12,11 @@ import { UNITS } from '../data/units';
 import { gameTypeOf } from '../data/aliases';
 import { aiPromotionPick, attacksLeftOf, promoReady, takePromotion } from './promotions';
 import { cityStrikeBase, damageExpected, hostilePillage, hostilePillageAmount, hostileRangedStrike, unitAttackRange } from './combat';
-import { aiStrengths, dangerDistricts, maxMoves, militaryAiTypeOf, moveTo, passAttack, passFinish, passMoveExec, passMoveUpdate, passNavalPillage, passPatrol, passSafePlot, plotDistance, rangeOf, swapUnits,
+import { aiStrengths, dangerDistricts, maxMoves, militaryAiTypeOf, moveTo, passAttack, passFinish, passMoveExec, passMoveUpdate, passNavalPillage, passPatrol, passSafePlot, planningAt, plotDistance, rangeOf, swapUnits,
   type Pass } from './tactical';
 import type { OpsEnv } from './operations/manager';
 import type { DefendOrders } from './operations/nodes';
-import { breakEscort, escortRiders, escortUnit, mapLayer, unitDomain } from './units';
+import { breakEscort, escortRiders, escortUnit, unitDomain } from './units';
 import { CITY_STRIKE_RANGE } from './phase';
 import { allianceTypeWith, cityAtTile, cityStateOfSeat, civsAtWar, isBarbSeat, isCityStateSeat, tileSeat } from './seats';
 import { NO_SEAT, type City } from './types';
@@ -49,15 +49,7 @@ export function passView(state: GameState, seat: number, pass: Pass, base: AiVie
       const u = unitOf(id);
       const r = reach(id);
       if (!u || !r) return base.planSpot(id, p, turns, needMoves, range);
-      const dom = unitDomain(u.type);
-      const fights = (x: Unit) => (UNITS[x.type]?.combat ?? 0) > 0;
-      // a Trader on the trade layer holds no spot
-      for (const e of r) {
-        if (plotDistance(state, e.tile, p) !== range || e.turns > turns || (needMoves && e.moves <= 0)) continue;
-        if (e.tile === u.tileIndex) return e.tile;
-        if (!state.units.some((x) => x !== u && x.tileIndex === e.tile && mapLayer(x.type) !== 'trade' && unitDomain(x.type) === dom && fights(x) === fights(u))) return e.tile;
-      }
-      return -1;
+      return planningAt(state, u, r, p, turns, needMoves, range);
     },
     attackSpots: (id, p) => {
       const e = pass.plan.get(id)?.entries.find((x) => x.target.tile === p);
@@ -280,9 +272,9 @@ export function passOrders(state: GameState, seat: number, pass: Pass, changed: 
   Pick<OpsEnv, 'move' | 'strike' | 'attack' | 'moveUpdate' | 'moveExec' | 'defend' | 'endTurn' | 'endMoves' | 'swap' | 'patrol' | 'pillage' | 'enterFormation' | 'exitFormation'> {
   const unitOf = (id: number): Unit | undefined => state.units.find((u) => u.id === id && u.seat === seat);
   return {
-    move: (id, dest) => {
+    move: (id, dest, attack = false) => {
       const u = unitOf(id);
-      if (u) moveTo(state, u, dest, false);
+      if (u) moveTo(state, u, dest, attack);
       changed();
     },
     // a ranged unit within its range strikes from where it stands; any other

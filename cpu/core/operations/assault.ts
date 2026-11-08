@@ -847,7 +847,8 @@ function moveOnto(ctx: OpsContext, u: AiUnitView, plot: number): void {
 /** per team with a target (its goal slot 1), in four passes over its
  *  members alive with Movement left (0x56c690):
  *  - beyond its reach (max(1, its range)) of the target: to its planning's
- *    spot exactly that far within two turns ("Attack Target Move"), else
+ *    spot exactly that far within two turns (`planningAt`) under the move
+ *    order's attack flag 0x10 (0x80c3c4 / 0x80c4be) ("Attack Target Move"), else
  *    straight for the target ("Attack Target Move Direct"); on the target,
  *    UNITCOMMAND_TREAT_WITH_CLAN_DISPERSE (the Barbarian Clans mode's, none
  *    here);
@@ -872,7 +873,7 @@ function operationAttackExecute(_node: Parameters<BtHandler<OpsContext>['update'
       const v = ctx.view();
       if (v.plotDistance(u.plot, target) <= reach) continue;
       const spot = v.planSpot(id, target, 2, false, reach);
-      moveTo(ctx, u, spot >= 0 ? spot : target);
+      moveTo(ctx, u, spot >= 0 ? spot : target, true);
       const after = now(id)?.plot ?? u.plot;
       line(spot >= 0 ? 'Attack Target Move' : 'Attack Target Move Direct', u, u.plot,
         `, Move ${xy(v, spot)}, Arrive ${xy(v, after)}`);

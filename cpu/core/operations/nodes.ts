@@ -64,8 +64,8 @@ export interface OpsContext {
   /** carry out the seat's unit action rows now */
   act(rows: number[][]): void;
   /** the unit's move to the plot as far as its Movement carries it this
-   *  turn, its formation with it */
-  move(id: number, dest: number): void;
+   *  turn, its formation with it; `attack` the order's attack flag 0x10 */
+  move(id: number, dest: number, attack?: boolean): void;
   /** the unit's blow on the plot: from where it stands beside it or in its
    *  range, else along its path, the last step the attack */
   strike(id: number, plot: number): void;
