@@ -156,6 +156,12 @@ export interface PolicyEffects {
    *  supplies itself (MODIFIER_SINGLE_CITY_ADJUST_FREE_POWER behind
    *  REQUIREMENT_CITY_HAS_DISTRICT) */
   powerWithDistrict?: { district: DistrictId; power: number }[];
+  /** Power every city of the seat supplies itself
+   *  (MODIFIER_PLAYER_CITIES_ADJUST_FREE_POWER, FREE_POWER_SOURCE_MISC) */
+  freePower?: number;
+  /** the percent added to every city's Tourism, summed with the research
+   *  rows' (MODIFIER_PLAYER_ADJUST_TOURISM) */
+  tourismPct?: number;
   /** a strategic resource each such city pays into the stockpile every turn
    *  (MODIFIER_SINGLE_CITY_ADJUST_FREE_RESOURCE_EXTRACTION behind
    *  REQUIREMENT_CITY_HAS_DISTRICT) */
@@ -1565,6 +1571,14 @@ const GOVERNMENT_SRC: Record<string, SrcMap> = {
     'bonus.unitCombatCS.classes': { derived: 'the promotion classes of the CLASS_* TypeTags of ABILITY_DIGITAL_DEMOCRACY_DEBUFF', inputs: [xml('TypeTags', 'Type=ABILITY_DIGITAL_DEMOCRACY_DEBUFF&Tag=CLASS_RECON', 'Tag'), xml('TypeTags', 'Type=ABILITY_DIGITAL_DEMOCRACY_DEBUFF&Tag=CLASS_AIRCRAFT', 'Tag')] },
     'bonus.unitCombatCS.cs': xml('ModifierArguments', 'ModifierId=DIGITAL_DEMOCRACY_DEBUFF&Name=Amount', 'Value'),
   },
+  SYNTHETIC_TECHNOCRACY: {
+    tier: xml('Governments', 'GovernmentType=GOVERNMENT_SYNTHETIC_TECHNOCRACY', 'Tier', { expect: 'Tier4' }),
+    slots: { derived: 'the Government_SlotCounts rows of this government, one entry per slot', inputs: [xml('Government_SlotCounts', 'GovernmentType=GOVERNMENT_SYNTHETIC_TECHNOCRACY&GovernmentSlotType=SLOT_MILITARY', 'NumSlots'), xml('Government_SlotCounts', 'GovernmentType=GOVERNMENT_SYNTHETIC_TECHNOCRACY&GovernmentSlotType=SLOT_ECONOMIC', 'NumSlots'), xml('Government_SlotCounts', 'GovernmentType=GOVERNMENT_SYNTHETIC_TECHNOCRACY&GovernmentSlotType=SLOT_DIPLOMATIC', 'NumSlots'), xml('Government_SlotCounts', 'GovernmentType=GOVERNMENT_SYNTHETIC_TECHNOCRACY&GovernmentSlotType=SLOT_WILDCARD', 'NumSlots')] },
+    noLegacyCard: { derived: 'true where the install writes no PolicyToUnlock on the government row', inputs: [xml('Governments', 'GovernmentType=GOVERNMENT_SYNTHETIC_TECHNOCRACY', 'PolicyToUnlock')] },
+    'effects.freePower': xml('ModifierArguments', 'ModifierId=SYNTHETIC_TECHNOCRACY_CITY_POWER&Name=Amount', 'Value'),
+    'effects.projectProdMult': { derived: '1 + Amount/100 - the install writes the percentage, this catalog the multiplier', inputs: [xml('ModifierArguments', 'ModifierId=SYNTHETIC_TECHNOCRACY_CITY_PROJECT_PRODUCTION&Name=Amount', 'Value')] },
+    'effects.tourismPct': xml('ModifierArguments', 'ModifierId=SYNTHETIC_TECHNOCRACY_TOURISM_PENALTY&Name=Amount', 'Value'),
+  },
 };
 
 /** PROVENANCE (cpu/data/provenance.ts): where each column of a legacy policy card row came from in
@@ -1678,6 +1692,12 @@ export const GOVERNMENTS: Record<string, GovernmentDef> = Object.fromEntries(
     { ...G('DIGITAL_DEMOCRACY', 'Digital Democracy', 4, [M, E, D, D, D, W, W, W, W, W],
       { amenitiesAll: 2, yieldPerSpecialty: { culture: 2 } },
       '+2 amenities in all cities and +2 culture per specialty district; -3 combat strength for all units.'),
+    noLegacyCard: true },
+    // CIV6 (GS) INHERENT: "+3 Power in all cities. +30% Production towards
+    // city projects. -10% Tourism." No PolicyToUnlock, so no legacy card.
+    { ...G('SYNTHETIC_TECHNOCRACY', 'Synthetic Technocracy', 4, [M, E, E, E, D, W, W, W, W, W],
+      { freePower: 3, projectProdMult: 1.3, tourismPct: -10 },
+      '+3 power in all cities; +30% production toward city projects; -10% tourism.'),
     noLegacyCard: true },
   ].map((g) => [g.id, { ...g, ...(GOV_BONUS[g.id] ? { bonus: GOV_BONUS[g.id] } : {}), src: GOVERNMENT_SRC[g.id] }]),
 );

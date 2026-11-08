@@ -3914,6 +3914,10 @@ class SimEconomy:
             "envoy1": torch.zeros(B, dtype=torch.bool, device=dev),
             "envoy2": torch.zeros(B, dtype=torch.bool, device=dev),
             "tourroute": torch.zeros(B, dtype=torch.long, device=dev),
+            # the percent on every city's Tourism (`tourismPct`), the Power
+            # every city supplies itself (`freePower`)
+            "tourpct": torch.zeros(B, dtype=torch.long, device=dev),
+            "freepow": _z64.clone(),
             # the six-yield channels: route yields (every route, international,
             # city-state), the seat's own yields per suzerainty and per envoy,
             # the fraction per suzerainty, the yields per specialty district
@@ -4015,8 +4019,11 @@ class SimEconomy:
             fx["pillm"] = fx["pillm"] * torch.where(has_gov, self._gov_pillm.take(adopted), _o)
             fx["gppmult"] = fx["gppmult"] * torch.where(
                 has_gov, self._gov_gppmult.take(adopted), torch.ones_like(fx["gppmult"]))
-            for _k, _t in (("distprod", self._gov_distprod), ("inflmult", self._gov_inflmult)):
+            for _k, _t in (("distprod", self._gov_distprod), ("inflmult", self._gov_inflmult),
+                           ("projprod", self._gov_proj_prod)):
                 fx[_k] = fx[_k] * torch.where(has_gov, _t.take(adopted), _o)
+            fx["tourpct"] = fx["tourpct"] + self._gov_tour_pct.take(adopted) * has_gov.long()
+            fx["freepow"] = fx["freepow"] + self._gov_free_pow.take(adopted) * has_gov.double()
             fx["goldbuydisc"] = fx["goldbuydisc"] + self._gov_goldbuy.take(adopted) * _gf
             fx["faithbuydisc"] = fx["faithbuydisc"] + self._gov_faithbuy.take(adopted) * _gf
             fx["envoy1"] = fx["envoy1"] | (has_gov & self._gov_envoy1.take(adopted))
@@ -4124,6 +4131,8 @@ class SimEconomy:
                 fx["envoy1"] = fx["envoy1"] | (cards & self._pol_envoy1.unsqueeze(0)).any(dim=1)
                 fx["envoy2"] = fx["envoy2"] | (cards & self._pol_envoy2.unsqueeze(0)).any(dim=1)
                 fx["tourroute"] = fx["tourroute"] + (cards.long() * self._pol_tourroute.unsqueeze(0)).sum(dim=1)
+                fx["tourpct"] = fx["tourpct"] + (cards.long() * self._pol_tour_pct.unsqueeze(0)).sum(dim=1)
+                fx["freepow"] = fx["freepow"] + cards.double() @ self._pol_free_pow
                 fx["gpp"] = fx["gpp"] + cards.double() @ self._pol_gpp
                 _cd = cards.double()
                 for _k, _t in (("ryield", self._pol_ryield), ("iryield", self._pol_iryield),
@@ -6822,9 +6831,10 @@ class SimEconomy:
 
     def _seat_tourism_pct(self, row: int) -> torch.Tensor:
         """[B] long — CIV6 (MODIFIER_PLAYER_ADJUST_TOURISM): the percent the
-        row's research adds to every city's Tourism (`seatTourismPct`), a
-        minor's and the Free row's their own research record's."""
-        out = torch.zeros(self.B, dtype=torch.long, device=self.device)
+        row's research (a minor's and the Free row's their own research
+        record's) and its government and cards (`tourismPct`) add to every
+        city's Tourism (`seatTourismPct`)."""
+        out = self._gov_mods(row)[12]["tourpct"].clone()
         for kind, idx, pct in self._tour_pct_rows:
             if idx < 0:
                 continue

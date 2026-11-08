@@ -1392,13 +1392,13 @@ export function buildingTourism(state: GameState, seat: number, cities: readonly
   return t;
 }
 
-/** CIV6 (MODIFIER_PLAYER_ADJUST_TOURISM, `TOURISM_PCT_ROWS`): the percent the
- *  seat's research adds to every city's Tourism. `_seat_tourism_pct` is the
- *  twin. */
+/** CIV6 (MODIFIER_PLAYER_ADJUST_TOURISM): the percent the seat's research
+ *  (`TOURISM_PCT_ROWS`) and its government and cards (`tourismPct`) add to
+ *  every city's Tourism. `_seat_tourism_pct` is the twin. */
 export function seatTourismPct(state: GameState, seat: number): number {
   const r = seatOf(state, seat)?.research;
   if (!r) return 0;
-  let pct = 0;
+  let pct = getModifiers(state, seat).tourismPct;
   for (const x of TOURISM_PCT_ROWS) {
     if ((x.tech && r.techs.includes(x.tech)) || (x.civic && r.civics.includes(x.civic))) pct += x.pct;
   }

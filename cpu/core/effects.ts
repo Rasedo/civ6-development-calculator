@@ -414,6 +414,8 @@ export interface Modifiers {
   /** Power, and a strategic resource a turn, in each city holding a live
    *  district of the type */
   powerWithDistrict: readonly { district: DistrictId; power: number }[];
+  /** Power every city supplies itself */
+  freePower: number;
   extractionWithDistrict: readonly { district: DistrictId; resource: string; perTurn: number }[];
   /** percent production toward Space Race projects in a city holding one of
    *  the buildings */
@@ -427,6 +429,8 @@ export interface Modifiers {
   firstEnvoyDouble: boolean;
   envoyDoubleDiffGov: boolean;
   tourismRouteBonus: number;
+  /** the percent added to every city's Tourism (`seatTourismPct`) */
+  tourismPct: number;
   yieldPctPerSuzerain: Partial<Yields>;
   unitCombatCS: { classMask: number; all: boolean; cs: number }[];
   xpPct: number;
@@ -682,6 +686,7 @@ export function defaultModifiers(): Modifiers {
     loyaltyWithGarrison: 0,
     amenitiesWithBuilding: [],
     powerWithDistrict: [],
+    freePower: 0,
     extractionWithDistrict: [],
     spaceProjectProd: [],
     spyOffenseTimeCutPct: 0,
@@ -690,6 +695,7 @@ export function defaultModifiers(): Modifiers {
     firstEnvoyDouble: false,
     envoyDoubleDiffGov: false,
     tourismRouteBonus: 0,
+    tourismPct: 0,
     yieldPctPerSuzerain: {},
     unitCombatCS: [],
     xpPct: 0,
@@ -793,6 +799,7 @@ export function applyPolicyEffects(mods: Modifiers, fx: PolicyEffects): void {
   if (fx.loyaltyWithGarrison) mods.loyaltyWithGarrison += fx.loyaltyWithGarrison;
   if (fx.amenitiesWithBuilding?.length) mods.amenitiesWithBuilding = [...mods.amenitiesWithBuilding, ...fx.amenitiesWithBuilding];
   if (fx.powerWithDistrict?.length) mods.powerWithDistrict = [...mods.powerWithDistrict, ...fx.powerWithDistrict];
+  if (fx.freePower) mods.freePower += fx.freePower;
   if (fx.extractionWithDistrict?.length) mods.extractionWithDistrict = [...mods.extractionWithDistrict, ...fx.extractionWithDistrict];
   // the cards' per-building Great Person rows join the roster's
   if (fx.gppPerBuilding?.length) mods.gppBuildings = [...mods.gppBuildings, ...fx.gppPerBuilding];
@@ -803,6 +810,7 @@ export function applyPolicyEffects(mods: Modifiers, fx: PolicyEffects): void {
   if (fx.firstEnvoyDouble) mods.firstEnvoyDouble = true;
   if (fx.envoyDoubleDiffGov) mods.envoyDoubleDiffGov = true;
   if (fx.tourismRouteBonus) mods.tourismRouteBonus += fx.tourismRouteBonus;
+  if (fx.tourismPct) mods.tourismPct += fx.tourismPct;
   addPartial(mods.yieldPctPerSuzerain, fx.yieldPctPerSuzerain);
   if (fx.unitCombatCS) {
     let mask = 0;

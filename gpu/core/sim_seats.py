@@ -10552,9 +10552,13 @@ class SimSeats:
                 * self._suz_effect(row, self._suz_c_harbor_pow).double().unsqueeze(1)
         # CIV6 (Future Victory Science, FREE_POWER_SOURCE_MISC): Power in a
         # city holding a live district of the row's type (`powerWithDistrict`)
-        for _pon, _pd, _pp in self._gov_mods(row)[12]["dpow"]:
+        _gfx = self._gov_mods(row)[12]
+        for _pon, _pd, _pp in _gfx["dpow"]:
             _has = self._dist_counts(row)[:, :cols, _pd] > 0
             supply = supply + (_has & alive & _pon.unsqueeze(1)).double() * _pp
+        # CIV6 (Synthetic Technocracy, MODIFIER_PLAYER_CITIES_ADJUST_FREE_POWER,
+        # FREE_POWER_SOURCE_MISC): Power in every city (`freePower`)
+        supply = supply + alive.double() * _gfx["freepow"].unsqueeze(1)
         if self._iz_idx >= 0 and self._plant_bidx:
             st = dreg[:, :, self._iz_idx]
             stc = st.clamp(min=0)

@@ -738,9 +738,13 @@ export function cityPower(state: GameState, city: City): CityPower {
   }
   // CIV6 (Future Victory Science, FREE_POWER_SOURCE_MISC): Power in a city
   // holding a live district of the row's type, no renewable for Biosphere
-  for (const r of getModifiers(state, city.seat).powerWithDistrict) {
+  const mods = getModifiers(state, city.seat);
+  for (const r of mods.powerWithDistrict) {
     if (cityHasLiveDistrict(state, city, r.district)) supply += r.power;
   }
+  // CIV6 (Synthetic Technocracy, MODIFIER_PLAYER_CITIES_ADJUST_FREE_POWER,
+  // FREE_POWER_SOURCE_MISC): Power in every city, no renewable for Biosphere
+  supply += mods.freePower;
   return { demand, supply };
 }
 

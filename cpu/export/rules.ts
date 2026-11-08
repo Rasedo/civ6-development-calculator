@@ -248,6 +248,7 @@ const effectRow = (fx: PolicyEffects) => ({
   amenitiesWithBuilding: (fx.amenitiesWithBuilding ?? []).map((r) => [buildingIdx.get(r.building) ?? -3, r.amenities]),
   // [district index, Power] and [district index, STRATEGIC_IDS slot, per turn] rows
   powerWithDistrict: (fx.powerWithDistrict ?? []).map((r) => [PLACEABLE_DISTRICTS.indexOf(r.district), r.power]),
+  freePower: fx.freePower ?? 0,
   extractionWithDistrict: (fx.extractionWithDistrict ?? []).map((r) =>
     [PLACEABLE_DISTRICTS.indexOf(r.district), STRATEGIC_IDS.indexOf(r.resource), r.perTurn]),
   loyaltyWithGarrison: fx.loyaltyWithGarrison ?? 0,
@@ -261,6 +262,7 @@ const effectRow = (fx: PolicyEffects) => ({
   firstEnvoyDouble: fx.firstEnvoyDouble ? 1 : 0,
   envoyDoubleDiffGov: fx.envoyDoubleDiffGov ? 1 : 0,
   tourismRouteBonus: fx.tourismRouteBonus ?? 0,
+  tourismPct: fx.tourismPct ?? 0,
   yieldPctPerSuzerain: YIELD_KEYS.map((k) => fx.yieldPctPerSuzerain?.[k] ?? 0),
   // [promotion-class mask (CLASS_BIT bits), allCombat, cs]
   unitCombatCS: fx.unitCombatCS

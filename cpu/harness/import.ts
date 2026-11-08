@@ -3051,8 +3051,12 @@ function lockDistrictPrices(rec: TurnRecord, cat: Catalog, state: GameState, cit
  * were slotted anew (its clear stands before it). Where the slot count moved
  * alone, the clear is a run of the player's signals, unbroken by its other
  * events, one per card slotted then (the record before's cards and those
- * slotted since), at least as many as the fewer of the two records' cards,
- * and the cards signalled after the last such run were slotted anew. Null
+ * slotted since), at least as many as the fewer of the two records' cards
+ * and at most as many as the old slots (the clear walks them); the
+ * rebuild's lay-back leaves one slot empty, and the cards signalled after
+ * the last such run were slotted anew (1121 t203: Triangular Trade replaces
+ * Liberalism, Big Ben's rebuild clears the seven, lays them back into seven
+ * of the eight slots, and Liberalism slotted in the eighth pays). Null
  * where the record carries no log or no rebuild shows in it (1118 China
  * t202: the action phase clears its seven cards and slots Expropriation
  * alone, Liberalism laid back paying nothing to t208; 1117 China t162: six
@@ -3080,7 +3084,8 @@ function slottedAfterRebuild(rec: TurnRecord, cat: Catalog, pid: number, before:
   for (let i = 0; i < events.length && govAt < 0;) {
     let j = i;
     const run = new Set<string>();
-    while (j < events.length && events[j] !== null && held.has(events[j]!) && !run.has(events[j]!)) run.add(events[j++]!);
+    while (j < events.length && run.size < before.length && events[j] !== null && held.has(events[j]!)
+      && !run.has(events[j]!)) run.add(events[j++]!);
     if (run.size >= Math.max(1, n) && (i === 0 || events[i - 1] === null)) {
       from = j;
       i = j;

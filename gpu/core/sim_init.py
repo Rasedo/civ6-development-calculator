@@ -3145,6 +3145,11 @@ class SimInit:
             self._gov_inflmult = torch.tensor([float(r["influenceMult"]) for r in _govs], dtype=dtype, device=device)
             self._gov_goldbuy = torch.tensor([float(r["goldBuyDiscountPct"]) for r in _govs], dtype=dtype, device=device)
             self._gov_faithbuy = torch.tensor([float(r["faithBuyDiscountPct"]) for r in _govs], dtype=dtype, device=device)
+            # the project production multiplier, the Power every city supplies
+            # itself, the percent on every city's Tourism
+            self._gov_proj_prod = torch.tensor([float(r["projectProdMult"]) for r in _govs], dtype=dtype, device=device)
+            self._gov_free_pow = torch.tensor([float(r["freePower"]) for r in _govs], dtype=torch.float64, device=device)
+            self._gov_tour_pct = torch.tensor([int(r["tourismPct"]) for r in _govs], dtype=torch.long, device=device)
             self._gov_fx_mag = float(
                 (self._gov_prodb[:, 0] >= 0).sum()
                 + self._gov_bcharge.abs().sum() + self._gov_mcut.abs().sum()
@@ -3169,7 +3174,9 @@ class SimInit:
                 + self._gov_wallhouse.abs().sum() + self._gov_theocs.abs().sum()
                 + self._gov_govbldy.abs().sum()
                 + (self._gov_distprod - 1).abs().sum() + (self._gov_inflmult - 1).abs().sum()
-                + self._gov_goldbuy.abs().sum() + self._gov_faithbuy.abs().sum())
+                + self._gov_goldbuy.abs().sum() + self._gov_faithbuy.abs().sum()
+                + (self._gov_proj_prod - 1).abs().sum() + self._gov_free_pow.abs().sum()
+                + self._gov_tour_pct.abs().sum())
             self._gov_arange = torch.arange(self._ngov, dtype=torch.long, device=device)
         # Logistics' start-of-turn Movement: read only where some card carries it
         self._pol_home_moves_any = False
@@ -3260,6 +3267,8 @@ class SimInit:
             self._pol_envoy1 = torch.tensor([bool(r["firstEnvoyDouble"]) for r in _pols], dtype=torch.bool, device=device)
             self._pol_envoy2 = torch.tensor([bool(r["envoyDoubleDiffGov"]) for r in _pols], dtype=torch.bool, device=device)
             self._pol_tourroute = torch.tensor([int(r["tourismRouteBonus"]) for r in _pols], dtype=torch.long, device=device)
+            self._pol_free_pow = torch.tensor([float(r["freePower"]) for r in _pols], dtype=torch.float64, device=device)
+            self._pol_tour_pct = torch.tensor([int(r["tourismPct"]) for r in _pols], dtype=torch.long, device=device)
             self._pol_gpp = torch.tensor(
                 [[float(x) for x in r["gpp"]] for r in _pols],
                 dtype=torch.float64, device=device)
@@ -3353,7 +3362,8 @@ class SimInit:
                 + self._pol_govbldy.abs().sum()
                 + (self._pol_distprod - 1).abs().sum() + (self._pol_inflmult - 1).abs().sum()
                 + self._pol_goldbuy.abs().sum() + self._pol_faithbuy.abs().sum()
-                + self._pol_ally_route.abs().sum() + self._pol_ally_pts.abs().sum())
+                + self._pol_ally_route.abs().sum() + self._pol_ally_pts.abs().sum()
+                + self._pol_free_pow.abs().sum() + self._pol_tour_pct.abs().sum())
             self._pol_obsolete_civic = torch.tensor([int(p["obsoleteCivic"]) for p in _pols], dtype=torch.long, device=device)
         self._harbor_idx = next((i for i, d in enumerate(self.districts_cat) if d["id"] == "HARBOR"), -1)
         self._hs_idx = next((i for i, d in enumerate(self.districts_cat) if d["id"] == "HOLY_SITE"), -1)

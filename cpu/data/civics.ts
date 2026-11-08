@@ -470,6 +470,7 @@ const CIVIC_SRC: Readonly<Record<string, SrcMap>> = {
     era: xml('Civics', 'CivicType=CIVIC_SYNTHETIC_TECHNOCRACY', 'EraType', { expect: 'ERA_INFORMATION' }),
     cost: xml('Civics', 'CivicType=CIVIC_SYNTHETIC_TECHNOCRACY', 'Cost', { scale: GAME_SPEED }),
     prereqs: { derived: 'the CivicPrereqs rows of CIVIC_SYNTHETIC_TECHNOCRACY, read as an AND-list', inputs: [xml('CivicPrereqs', 'Civic=CIVIC_SYNTHETIC_TECHNOCRACY&PrereqCivic=CIVIC_GLOBALIZATION', 'PrereqCivic', { expect: 'CIVIC_GLOBALIZATION' }), xml('CivicPrereqs', 'Civic=CIVIC_SYNTHETIC_TECHNOCRACY&PrereqCivic=CIVIC_SOCIAL_MEDIA', 'PrereqCivic', { expect: 'CIVIC_SOCIAL_MEDIA' })] },
+    'effects.0.government': xml('Governments', 'GovernmentType=GOVERNMENT_SYNTHETIC_TECHNOCRACY', 'PrereqCivic', { expect: 'CIVIC_SYNTHETIC_TECHNOCRACY' }),
   },
   SMART_POWER_DOCTRINE: {
     era: xml('Civics', 'CivicType=CIVIC_SMART_POWER_DOCTRINE', 'EraType', { expect: 'ERA_FUTURE' }),
@@ -820,13 +821,15 @@ export const CIVICS: Record<string, CivicDef> = Object.fromEntries(
       { kind: 'unlockPolicy', policy: 'ONLINE_COMMUNITIES' },
     ]),
     // CIV6: the three Information-era government civics, each off
-    // Globalization and Social Media. Corporate Libertarianism and Synthetic
-    // Technocracy unlock governments this catalog does not carry.
+    // Globalization and Social Media. Corporate Libertarianism unlocks a
+    // government this catalog does not carry.
     C('CORPORATE_LIBERTARIANISM', 'Corporate Libertarianism', 'Information', 3000, ['GLOBALIZATION', 'SOCIAL_MEDIA']),
     C('DIGITAL_DEMOCRACY', 'Digital Democracy', 'Information', 3000, ['GLOBALIZATION', 'SOCIAL_MEDIA'], [
       { kind: 'unlockGovernment', government: 'DIGITAL_DEMOCRACY' },
     ]),
-    C('SYNTHETIC_TECHNOCRACY', 'Synthetic Technocracy', 'Information', 3000, ['GLOBALIZATION', 'SOCIAL_MEDIA']),
+    C('SYNTHETIC_TECHNOCRACY', 'Synthetic Technocracy', 'Information', 3000, ['GLOBALIZATION', 'SOCIAL_MEDIA'], [
+      { kind: 'unlockGovernment', government: 'SYNTHETIC_TECHNOCRACY' },
+    ]),
     C('NEAR_FUTURE_GOVERNANCE', 'Near Future Governance', 'Information', 3100, ['ENVIRONMENTALISM', 'GLOBALIZATION'], [
       // CIV6 (CivicModifiers CIVIC_AWARD_THREE_INFLUENCE_TOKENS): 3 envoys at completion
       { kind: 'award', envoys: 3 },

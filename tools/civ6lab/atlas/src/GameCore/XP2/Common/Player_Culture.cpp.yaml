@@ -6,10 +6,16 @@
 - addr: 0x391650
   final: 0x27a220
   kind: function
-  semantics: "builds the new slots: the government's rows, the player's extra slots, the removals, the per-government extras."
+  semantics: "builds the new slots: the government's rows, the player's extra slots, the removals, the per-government extras; then the lay-back (0x391eb4..0x391f45): for each new slot in order, while more than one slot stands empty (0x3996b0 > 1, else the walk ends), 0x398cf0 takes the first saved entry of the slot's type; a card 0x3930a0 admits under the government is written into the slot (no ADDED signal), a refused one is spent and the slot stays empty."
   status: PARTLY
-  readings: ["C-94: the slot rebuild — READ"]
-  notes: ["imported: READ in its section, no confirming case found beside it"]
+  cases:
+    - recording: h1_duelp1121
+      turn: 204
+      value: "China at t203: Triangular Trade replaces Liberalism, Big Ben's rebuild clears the seven (seven REMOVED signals), lays them back into seven of the eight slots, and Liberalism, signalled after into the eighth, pays (Xi'an / Shanghai civics amenity 2 -> 1, Civil Prestige lapsed)"
+  impl: [cpu/core/effects.ts:carryLayout, gpu/core/sim_economy.py:_carry_policies]
+  readings:
+    - "C-94: the slot rebuild — READ"
+    - "C-116: the lay-back leaves one slot empty, and a slot-count rebuild grants the free change — READ"
   context:
     - "...r every slot (0x3942d0 with -1: unflag and REMOVED for each card), build the new slots (0x391650: the government's rows, the player's extra slots, the removals, the per- government e..."
   review: reviewed
@@ -39,6 +45,7 @@
   readings:
     - "C-94: the slot rebuild — READ"
     - "C-97: the government and policy choice — the choice READ, the values PARTLY READ"
+    - "C-116: the lay-back leaves one slot empty, and a slot-count rebuild grants the free change — READ"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...saved entry whose SLOT type is the new slot's, spends it and flags its card slotted; 0x3930a0 (the card valid under the government) and the card is written into the slot directly —..."
@@ -148,7 +155,9 @@
   kind: function
   semantics: "clears a slot (-1: every slot): unflag and REMOVED for each card."
   status: PARTLY
-  readings: ["C-94: the slot rebuild — READ"]
+  readings:
+    - "C-94: the slot rebuild — READ"
+    - "C-116: the lay-back leaves one slot empty, and a slot-count rebuild grants the free change — READ"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...after, an empty slot last; insertion sort, so ties keep slot order), clear every slot (0x3942d0 with -1: unflag and REMOVED for each card), build the new slots (0x391650: the govern..."
@@ -225,7 +234,9 @@
   kind: function
   semantics: takes the first saved entry of a slot type, spends it and flags its card slotted.
   status: PARTLY
-  readings: ["C-94: the slot rebuild — READ"]
+  readings:
+    - "C-94: the slot rebuild — READ"
+    - "C-116: the lay-back leaves one slot empty, and a slot-count rebuild grants the free change — READ"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...k the new slots in order: while more than one slot stands empty (0x3996b0 counts them), 0x398cf0 takes the first saved entry whose SLOT type is the new slot's, spends it and flags its..."
@@ -276,10 +287,19 @@
 - addr: 0x3996b0
   final: 0x27e590
   kind: function
-  semantics: counts the empty slots.
-  status: PARTLY
-  readings: ["C-94: the slot rebuild — READ"]
-  notes: ["imported: READ in its section, no confirming case found beside it"]
+  semantics: "counts the empty slots (+0x430, count +0x440, 8-byte {type, policy}: policy -1 empty); 0 with no government (+0x158 -1) or no slots. The lay-back in 0x391650 stops once it answers 1 or less, so the walk always leaves one slot empty."
+  status: READ
+  cases:
+    - recording: h1_duelp1121
+      turn: 204
+      value: "China at t203: Triangular Trade replaces Liberalism, Big Ben's rebuild clears the seven (seven REMOVED signals), lays them back into seven of the eight slots, and Liberalism, signalled after into the eighth, pays (Xi'an / Shanghai civics amenity 2 -> 1, Civil Prestige lapsed)"
+  impl:
+    - cpu/core/effects.ts:carryLayout
+    - gpu/core/sim_economy.py:_carry_policies
+    - cpu/harness/import.ts:slottedAfterRebuild
+  readings:
+    - "C-94: the slot rebuild — READ"
+    - "C-116: the lay-back leaves one slot empty, and a slot-count rebuild grants the free change — READ"
   context:
     - "...nment extras), then walk the new slots in order: while more than one slot stands empty (0x3996b0 counts them), 0x398cf0 takes the first saved entry whose SLOT type is the new slot's, s..."
   review: reviewed
@@ -744,6 +764,15 @@
   context:
     - "...not. The setter completes the item the moment its progress reaches the cost (0x3a22c5 -> 0x3a1ac0). The cost is never cut. Check: `dll_boost.py`, the recorded current-item boosts of the s..."
   review: reviewed
+- addr: 0x3a1f20
+  final: 0x284490
+  kind: function
+  name: SetCivicCompletedThisTurn
+  semantics: sets the player's civic-completed-this-turn flag (+0xba8, through 0x42eb20) and signals it (0x8b9070 on the player); the flag opens the turn's free policy change.
+  status: PARTLY
+  readings:
+    - "C-116: the lay-back leaves one slot empty, and a slot-count rebuild grants the free change — READ"
+  review: reviewed
 - addr: 0x3a1fb0
   final: 0x2844e0
   kind: function
@@ -808,10 +837,16 @@
 - addr: 0x3a2e30
   final: 0x285090
   kind: function
-  semantics: a slot-count change (the slot rebuild as SetGovernment's).
-  status: PARTLY
-  readings: ["C-94: the slot rebuild — READ"]
-  notes: ["imported: READ in its section, no confirming case found beside it"]
+  semantics: "a slot-count change (player culture, slot type, flag): appends the slot type to the player's extra slots (+0x4b8 with the flag set, else +0x528), saves the slots (0x3a3b00), clears every slot (0x3942d0 with -1, a REMOVED signal each), builds the new slots and lays the saved cards back (0x391650), writes the watched field +0x16b8 (0x731d10) and ends in SetCivicCompletedThisTurn(true) (0x3a1f20): the turn's free policy change, which the AI then spends."
+  status: READ
+  cases:
+    - recording: h1_duelp1121
+      turn: 204
+      value: "China at t203: Triangular Trade replaces Liberalism, Big Ben's rebuild clears the seven (seven REMOVED signals), lays them back into seven of the eight slots, and Liberalism, signalled after into the eighth, pays (Xi'an / Shanghai civics amenity 2 -> 1, Civil Prestige lapsed)"
+  impl: [cpu/harness/import.ts:slottedAfterRebuild]
+  readings:
+    - "C-94: the slot rebuild — READ"
+    - "C-116: the lay-back leaves one slot empty, and a slot-count rebuild grants the free change — READ"
   context:
     - "- The rebuild (SetGovernment 0x3a25f0; the slot-count changes 0x39fc00, 0x3a2bf0, 0x3a2e30): save the slots (0x3a3b00 into +0x448, std::sort 0x386350 / 0x385b50 by the card's pol..."
   review: reviewed

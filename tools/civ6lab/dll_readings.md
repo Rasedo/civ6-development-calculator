@@ -12200,3 +12200,34 @@ from `_bop_endangered` and `_mops_endangered`); `landMajorDistricts`
   stacking count (0x585d90's +0xb8 on the units' +0x160, the unit type)
   holds.
 
+## C-116: the lay-back leaves one slot empty, and a slot-count rebuild grants the free change — READ
+
+Player_Culture.cpp, the slot rebuild's tail (dll_readings "C-94: the slot
+rebuild").
+
+- The lay-back (0x391650 at 0x391eb4..0x391f45): the new slots walked in
+  order; before each, 0x3996b0 counts the empty slots (+0x430 / +0x440,
+  policy -1) and the walk ENDS once one or none is empty; else 0x398cf0 takes
+  the first saved entry of the slot's type, and a card 0x3930a0 admits is
+  written with no ADDED signal (lapsed), a refused one spent. So a rebuild
+  always leaves one slot empty. Engines: `carryLayout` / `_carry_policies`
+  (the `placed` count).
+- The slot-count change 0x3a2e30 (a slot type added to +0x4b8, or +0x528):
+  save, clear (0x3942d0: one REMOVED signal per card the OLD slots held),
+  build and lay back (0x391650), then SetCivicCompletedThisTurn(true)
+  (0x3a1f20): the free policy change, which the AI spends at once — its
+  SetSlotPolicy signals follow the clear's run.
+- The importer (`slottedAfterRebuild`): the clear's run of signals is at most
+  the old slots' count; the cards signalled after it were slotted anew and
+  pay, the rest stand lapsed.
+- Confirmed: runs/h1_duelp1121 t203 (record t204): Triangular Trade replaces
+  Liberalism at the turn's start, Big Ben (79087) rebuilds 7 -> 8 slots, seven
+  REMOVED (Logistics .. Merchant Confederation), seven laid back, Liberalism
+  signalled into the eighth: Xi'an / Shanghai civics amenity 2 -> 1 (Civil
+  Prestige lapsed, Liberalism paying), Taiyuan 1; 1117 t235 the same shape
+  (Expropriation replaces Rationalism, ten cleared, Rationalism into the
+  eleventh).
+- Open: the engines do not run the slot-count rebuild (a wonder's, Adam
+  Smith's, a congress slot) — the free change it grants lands in the middle
+  of the player's city walk, after the civics step where the replay applies
+  the recorded layout.
