@@ -38,6 +38,7 @@ import { freeCityBuildFacts, majorQueueItem, seatResearchTurns } from './freeCit
 import { freeCityThreat, minorAiTurn, minorContractPurchases, minorEconomicDisband, minorItemBuilt, minorMilitaryTurn } from './minorCityAi';
 import { bankruptcy, cityBorderGrowth, cultureAfterGrowth, jumpMadeAnew, paveGround } from './phase';
 import { applyTrainingGrants } from './combat';
+import { keepItem, resumeItem } from './production';
 import { districtScaledBase, goldAffordable, projectCost, repairAvailable, repairWanted } from './game';
 import { civEraIndex, computeCityStats, withPercent256 } from './city';
 import { upgradeRoads } from './eras';
@@ -2448,7 +2449,10 @@ export function freeCityBuild(state: GameState, city: City, production: number):
   if (city.queue.length) return;
   const pick = defaultSpecialization(tables, pf);
   const item = pick ? majorQueueItem(state, FREE_SEAT, city, pick.type) : null;
-  if (item) city.queue = [item];
+  if (item) {
+    resumeItem(state, city, item);
+    city.queue = [item];
+  }
 }
 
 /** a FREE CITY under threat (0x5cdc50): its threat above -1 with its centre
@@ -2477,6 +2481,7 @@ function freeDefensiveCancel(city: City, tables: CityBuildTables, pf: PickFacts)
     bestPlainBuilding: () => specializationBests(tables, { ...pf, defense: false }).building.value,
     bestDefensiveUnit: () => specializationBests(tables, { ...pf, defense: true }).unit.value,
   }, () => {
+    if (q) keepItem(city, q);
     city.queue = [];
   });
 }

@@ -360,6 +360,44 @@
   review: reviewed
 - kind: field
   owner: BuildQueue
+  offset: 0x218
+  name: m_axBuildingProgress
+  semantics: each building row's progress (24.8, a wonder among them), kept by type whether or not the building is queued; zeroed when the building is set (0x17d910), set to its cost less PILLAGE_BUILDING_REPAIR_PERCENT at its pillage (0x183950).
+  status: READ
+  cases:
+    - recording: h1_duelp1121
+      turn: 135
+      value: Xi'an's pillaged Shrine row 5 at 26.0 (35 x 75 / 100), queued at t135 on 26
+  impl:
+    - cpu/harness/import.ts:buildRows
+    - cpu/core/production.ts:keepItem
+    - cpu/core/production.ts:resumeItem
+    - gpu/core/sim_seats.py:_q_push
+  writers: [0x17d910, 0x183950]
+  readings:
+    - "C-111: every item's progress kept by type outside the queue, a pillaged building's or district's repair on the share its pillage left, a district's locked price on the district — READ (0x17f5a0, 0x175730 at 0x175bd3, 0x17d910, 0x175140, 0x1af5b0 -> 0x17e770 -> 0x183a60, 0x193190 -> 0x183950), both twins"
+  review: reviewed
+- kind: field
+  owner: BuildQueue
+  offset: 0x230
+  name: m_axUnitProgress
+  semantics: each unit row's progress (24.8), kept by type whether or not the unit is queued; zeroed when the unit is trained (0x175730 at 0x175bd3).
+  status: READ
+  cases:
+    - recording: h1_duelp1117
+      turn: 14
+      value: Xi'an's Builder row 1 at 19.0 from t10 with the Monument queued, the Builder queued again at t14 on 19
+  impl:
+    - cpu/harness/import.ts:buildRows
+    - cpu/core/production.ts:keepItem
+    - cpu/core/production.ts:resumeItem
+    - gpu/core/sim_seats.py:_q_push
+  writers: [0x175730, 0x1853d0]
+  readings:
+    - "C-111: every item's progress kept by type outside the queue, a pillaged building's or district's repair on the share its pillage left, a district's locked price on the district — READ (0x17f5a0, 0x175730 at 0x175bd3, 0x17d910, 0x175140, 0x1af5b0 -> 0x17e770 -> 0x183a60, 0x193190 -> 0x183950), both twins"
+  review: reviewed
+- kind: field
+  owner: BuildQueue
   offset: 0x248
   name: districtProgress
   semantics: "each district row's progress (24.8), kept by type whether or not the district is queued: the zone step 0x184660 adds to it, the completion 0x175140 reads it; a district off the queue resumes it."
@@ -368,9 +406,24 @@
     - recording: h1_duelp1121
       turn: 154
       value: Xi'an's Water Park row 24 at 30951 (120.90; the record's queueProgress 120)
-  impl: [cpu/harness/import.ts:buildRows, cpu/core/production.ts:keepDistrict]
+  impl:
+    - cpu/harness/import.ts:buildRows
+    - cpu/core/production.ts:keepItem
+    - gpu/core/sim_seats.py:_q_keep_head
+  writers: [0x184660, 0x183a60]
   readings:
     - "C-111: a major's district lets go of the queue under a hostile unit, the queue's progress and overflow read from the city's memory — READ (0x184660 at 0x1847dc, 0x5313f0, 0x17f630), both twins"
+    - "C-111: every item's progress kept by type outside the queue, a pillaged building's or district's repair on the share its pillage left, a district's locked price on the district — READ (0x17f5a0, 0x175730 at 0x175bd3, 0x17d910, 0x175140, 0x1af5b0 -> 0x17e770 -> 0x183a60, 0x193190 -> 0x183950), both twins"
+  review: reviewed
+- kind: field
+  owner: BuildQueue
+  offset: 0x260
+  name: m_axProjectProgress
+  semantics: each project row's progress (24.8), kept by type whether or not the project is queued.
+  status: PARTLY
+  impl: [cpu/harness/import.ts:buildRows, cpu/core/production.ts:keepItem]
+  readings:
+    - "C-111: every item's progress kept by type outside the queue, a pillaged building's or district's repair on the share its pillage left, a district's locked price on the district — READ (0x17f5a0, 0x175730 at 0x175bd3, 0x17d910, 0x175140, 0x1af5b0 -> 0x17e770 -> 0x183a60, 0x193190 -> 0x183950), both twins"
   review: reviewed
 - kind: field
   owner: Buildings

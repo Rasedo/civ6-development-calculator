@@ -210,7 +210,7 @@ def _try_encampment_placement(rules, rj, path) -> bool:
             continue
         assert not bool((elig & (cc[0] >= 1)).any()), "an ENCAMPMENT tile adjacent to a city center is eligible"
         bt = int(elig.nonzero(as_tuple=True)[0][0])
-        placed_mask = sim._place_district(0, c, EN, torch.tensor([True]), 3, torch.tensor([bt]))
+        placed_mask = sim._place_district(0, c, EN, torch.tensor([True]), 3, torch.tensor([bt]), torch.zeros(sim.B, dtype=torch.float64))
         assert bool(placed_mask[0]), f"the engine refused an ELIGIBLE encampment tile {bt}"
         assert int(sim.city_dist_tile[0, 0, c, EN]) == bt, "the registry records another tile"
         assert int(cc[0, bt]) == 0, f"ENCAMPMENT placed adjacent to a city center (cc={int(cc[0, bt])})"

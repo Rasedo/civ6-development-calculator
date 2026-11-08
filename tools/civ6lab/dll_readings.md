@@ -12621,3 +12621,57 @@ third: slot 2 CanStart, slot 4 the tick, slot 5 the update).
   every city-state's city across its pair): equal on the five duelp
   recordings from each one's founding on.
 - OPEN: a religious unit's +0x1d00 and +0xcf0 (0x968e20) writers.
+
+## C-111: every item's progress kept by type outside the queue, a pillaged building's or district's repair on the share its pillage left, a district's locked price on the district — READ (0x17f5a0, 0x175730 at 0x175bd3, 0x17d910, 0x175140, 0x1af5b0 -> 0x17e770 -> 0x183a60, 0x193190 -> 0x183950), both twins
+
+`keptKey`, `keepItem`, `takeKept`, `resumeItem` (cpu/core/production.ts),
+`City.kept`, `City.districts`' `cost`, `commitProduction`'s resume
+(cpu/core/seatTurn.ts), the Free Cities' cancel and pick (`freeCityBuild`,
+cpu/core/minorBuild.ts), `dropQueuedBuilding`, the repair branch of
+`completeQueueItem`; GPU `city_kept` (by production code below FORM_BASE),
+`city_dist_cost`, `_q_push`'s resume, `_q_keep_head` (gpu/core/sim_seats.py),
+`_place_district`'s locked price (gpu/core/sim_economy.py), the Free City
+cancel's `clear` (gpu/core/sim_minorai.py). The import: `importQueue`
+(cpu/harness/import.ts); the replay's queue change (`applyQueue`) through the
+same calls.
+
+- THE STORE: the queue holds an item's progress in its per-type arrays
+  (+0x218 buildings, a wonder among them, +0x230 units, +0x248 districts,
+  +0x260 projects), never on the entry. An entry leaving the front
+  (0x17f5a0 then 0x17f630) drops the entry alone: 0x17f5a0 asks only
+  whether the type holds progress (0x17d1a0 / 0x17d050 / 0x17d130) and,
+  where none, releases the front's strategic reservations (0x182b80, majors
+  only). An item queued again stands on what its type holds.
+- WHEN IT GOES: a trained unit's +0x230 is zeroed at its completion
+  (0x175730 at 0x175bd3); a building placed by any path zeroes +0x218
+  (0x17d910, from the completion 0x180cb0, the other-path placement 0x175da0,
+  RemoveBuilding); a completed district's +0x248 reads 0 in the next record
+  (runs/h1_duelp1121 Taiyuan's Neighborhood at 131.1 at t140, gone at
+  t141). No era change or cancel clears it.
+- THE PILLAGE: a district's pillage (0x1af5b0 -> the queue's hook 0x17e770)
+  sets +0x248 to (cost x (100 - PILLAGE_BUILDING_REPAIR_PERCENT)) / 100
+  truncated, << 8 (0x183a60; cost the city's district's locked price +0xaa8,
+  else the player's cost 0x4088a0) where the district's zoning plot is -1 (a
+  completed district); a building's pillage (0x193190) does the same on
+  +0x218 at the building's cost (0x183950). The repair is the item at its
+  full price on that progress. The engines set it where the repair is
+  queued (`resumeItem`, `_q_push`: a pillaged item with no progress kept).
+- THE REPAIR'S COMPLETION: 0x175140 finds the district standing on the plot
+  (0x1ae340) and sets it whole (0x1af5b0) without the new district's
+  completion 0x180450 (`completeQueueItem`'s repair branch).
+- THE LOCKED PRICE: the cost reader 0x179960 returns the city's own
+  district's price +0xaa8 where above 0; it outlives the district's
+  completion (runs/h1_duelp1121 t153 Taiyuan's completed Harbor quoted 104,
+  the other districts 150). The engines hold it on the district
+  (`City.districts`' `cost`, `city_dist_cost`), written at its placement.
+- Confirmed (one-seed traces): runs/h1_duelp1117 t11-15 Xi'an's Builder
+  left at 19 at t10, queued again at t14 on 19; runs/h1_duelp1121 t150-156
+  Taiyuan's Harbor queued at t153 on 78 of 104 (+10 / +11 a turn after);
+  runs/h1_duelp1121 t135-136 Xi'an's pillaged Shrine queued on 26 of 35;
+  runs/h1_duelp1117 t70-85 Xi'an's Harbor let go at t74 / t79, done at t83.
+- Open: a held district's purchase (the engines refuse a plot holding the
+  city's own unfinished district; the DLL's purchase test for it unread);
+  a captured city's districts' locked prices and kept progress (the engines
+  keep none across a capture); a major's district repair outside the
+  replay (the engines' Builder REPAIR order clears a district's pillage,
+  `canPlaceDistrictIn` refuses a completed district's plot).

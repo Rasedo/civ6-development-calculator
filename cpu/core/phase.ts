@@ -1,11 +1,11 @@
 
-import type { City, CityState, CongressVote, DistrictId, Emergency, GameState, ImprovementId, QueueItem, SeatActionRecord, Seat, Tile, Unit, YieldKey } from './types';
+import type { City, CityState, CongressVote, DistrictId, Emergency, GameState, ImprovementId, SeatActionRecord, Seat, Tile, Unit, YieldKey } from './types';
 import { logPopWrite } from './difflog';
 import { advanceGreatPeople, passGreatPerson, patronizeGreatPerson } from './greatPeople';
 import { activateGreatPerson } from './gpAbility';
 import { GW_KINDS } from '../data/greatWorks';
 import { drainRelicReserve, gwCountKind, gwHasRoom, gwLastOfKind, moveGreatWork } from './greatWorks';
-import { completeQueueItem, dropQueuedBuilding, cultureBomb, grantFreeResearch, districtPlotHostile, keepDistrict, resumeDistrict } from './production';
+import { completeQueueItem, dropQueuedBuilding, cultureBomb, grantFreeResearch, districtPlotHostile, keepItem } from './production';
 import { cityLook, fogActive, isExplored, meetMajors, revealAround, unitSight, unitSeesThrough } from './fog';
 import { tilesWithin, hexDistance, hexRingWalk, neighbors, neighborTile } from '../../world/hex';
 import { isWater, hasRiver, isCoastalLand } from '../../world/query';
@@ -1244,16 +1244,12 @@ export function placeSeatDistrict(
   const tile = state.map.tiles[tileIndex];
   if (!tile) return false;
   if (!districtSiteLegal(state, civCity, id, unlocks, tileIndex)) return false;
-  // the city's own district standing unfinished on the plot, its item let
-  // go, is queued again on its kept progress and locked price
-  const item: Extract<QueueItem, { kind: 'district' }> = { kind: 'district', district: id, tileIndex, progress: 0 };
-  if (tile.district === id && !tile.districtComplete
-    && civCity.districts.some((d) => d.tileIndex === tileIndex && d.type === id) && resumeDistrict(civCity, item)) {
-    commitProduction(state, civCity.seat, civCity, item);
-    return true;
-  }
+  // the city's own district standing unfinished on the plot is queued again
+  // at its locked price and its kept progress (`resumeItem`)
+  const held = tile.district === id && !tile.districtComplete
+    && civCity.districts.some((d) => d.tileIndex === tileIndex && d.type === id);
   const cost = districtSiteCost(state, actor, id, unlocks);
-  paveDistrictTile(state, civCity, id, tileIndex);
+  if (!held) paveDistrictTile(state, civCity, id, tileIndex, cost);
   commitProduction(state, civCity.seat, civCity, { kind: 'district', district: id, tileIndex, progress: 0, cost });
   return true;
 }
@@ -1313,13 +1309,14 @@ export function paveGround(tile: Tile, keep: readonly FeatureId[] = []): void {
 /** The GROUND a district takes when it is placed — the same writes whether the
  * city is going to build it over ten turns or bought it outright. The
  * district set on its plot re-places the city's citizens (City_BuildQueue
- * 0x181700 -> the full reassign 0x196320 at 0x181bb8). */
-function paveDistrictTile(state: GameState, civCity: City, id: DistrictId, tileIndex: number): void {
+ * 0x181700 -> the full reassign 0x196320 at 0x181bb8); its price locks
+ * there (`City.districts`' `cost`). */
+function paveDistrictTile(state: GameState, civCity: City, id: DistrictId, tileIndex: number, cost: number): void {
   const tile = state.map.tiles[tileIndex];
   tile.district = id;
   tile.districtComplete = false;
   paveGround(tile);
-  civCity.districts.push({ type: id, tileIndex });
+  civCity.districts.push({ type: id, tileIndex, cost });
   replaceAllCitizens(state, civCity, cityFlags(civCity));
 }
 
@@ -1354,7 +1351,9 @@ export function purchaseSeatDistrict(
     : governorFlag(state, civCity, (e) => e.districtGoldBuy);
   if (!gate) return false;
   const unlocks = computeUnlocks(state, actor.seat);
-  if (!districtSiteLegal(state, civCity, id, unlocks, tileIndex)) return false;
+  // a plot the city's own unfinished district holds is the queue's to
+  // resume, not a purchase's to place again
+  if (tile.district || !districtSiteLegal(state, civCity, id, unlocks, tileIndex)) return false;
   // Priced off the BUILDER's number, so a variant or a discount is worth the
   // same to a buyer. Nothing is written until the purse has paid: a purchase
   // never touches the city's QUEUE or its production bank — the hammers a
@@ -1367,7 +1366,7 @@ export function purchaseSeatDistrict(
   if (!goldAffordable(purse, price)) return false;
   if (viaFaith) actor.faith = (actor.faith ?? 0) - price;
   else actor.treasury = (actor.treasury ?? 0) - price;
-  paveDistrictTile(state, civCity, id, tileIndex);
+  paveDistrictTile(state, civCity, id, tileIndex, cost);
   completeQueueItem(state, civCity, { kind: 'district', district: id, tileIndex, progress: cost, cost }, cost);
   return true;
 }
@@ -3556,7 +3555,7 @@ export function seatPhase(state: GameState, only?: { seats: ReadonlySet<number>;
         }
         if (letGo && q.kind === 'district') {
           civCity.queue.shift();
-          keepDistrict(civCity, q, cost);
+          keepItem(civCity, q);
         }
         const head = civCity.queue[0];
         const headCost = head === q ? cost : head ? itemCost(head, state, civCity) : 0;

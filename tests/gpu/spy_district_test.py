@@ -19,7 +19,8 @@ runs a spy mission end to end, so these scenes are the evidence:
      of its city, and a level higher within one hex of where it stands;
      Polygraph reads the whole city
   4. CIV6 (Sabotage Production) pillages the Zone's BUILDINGS: the yield
-     walk skips them, the queue offers the repair at a quarter of the price,
+     walk skips them, the queue offers the repair at the price on the progress
+     the pillage left,
      the gold arm does not, and the repair completing clears the flag
 """
 
@@ -238,18 +239,21 @@ def main() -> None:
     yf = sim._seat_amenity(foe)[2][:, theirs:theirs + 1]
     prod_dark = float(sim._seat_city_walk(foe, theirs, amen_yf=yf)[B0, 0, 1])
     assert prod_dark < prod_lit, f"the yield walk still pays the pillaged Workshop ({prod_lit} -> {prod_dark})"
-    # the REPAIR: the building's own column, at a quarter of the price, from the queue alone
+    # the REPAIR: the building's own column at its price, from the queue alone,
+    # on the progress its pillage left
     assert bool(sim._seat_buildable(foe)[B0, theirs, wk]), "the pillaged Workshop is not offered for repair"
     assert not bool(sim._seat_buildable(foe, purchase=True)[B0, theirs, wk]), "the gold arm sells a repair"
     full = float(sim.rules_dev.b_cost[wk])
     pct = float(sim.rules.pillage_building_repair_pct)
-    want = round(full * pct / 100.0)
     got = float(sim._building_cost_in(foe, theirs, torch.tensor([wk]))[B0])
-    assert got == want, f"the repair is priced {got}, want {want} ({pct}% of {full})"
+    assert got == full, f"the repair is priced {got}, want {full}"
+    left = float(int(full * (100.0 - pct) / 100.0))
+    want = full - left
     hit = torch.zeros(sim.B, dtype=torch.bool)
     hit[B0] = True
     sim._q_push(foe, theirs, hit, torch.full((sim.B,), wk, dtype=torch.long),
-                torch.full((sim.B,), want, dtype=sim.city_cost.dtype))
+                torch.full((sim.B,), full, dtype=sim.city_cost.dtype))
+    assert float(sim.city_progress[B0, foe, theirs, 0]) == left, "the repair does not start on what the pillage left"
     sim._seat_city_produce(foe, torch.full((sim.B,), theirs, dtype=torch.long), hit,
                            torch.full((sim.B,), want, dtype=torch.float64))
     assert not bool(sim.city_bldg_pillaged[B0, foe, theirs, wk]), "the repair completing did not clear the flag"

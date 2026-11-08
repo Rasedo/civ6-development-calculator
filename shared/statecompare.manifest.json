@@ -3607,16 +3607,24 @@
           ]
         },
         {
-          "name": "keptDistricts",
+          "name": "kept",
           "compare": "milli",
           "covers": [
-            "City.keptDistricts"
+            "City.kept"
           ],
           "planes": [
-            "city_dist_kept",
-            "city_dist_kept_cost"
+            "city_kept"
           ],
-          "note": "a flat [progress, locked price] pair per PLACEABLE district index: the district item the queue let go unfinished, kept by type; [0, 0] for none."
+          "note": "a flat [production column, progress] pair per type the city keeps progress on outside its queue, sorted by column (a formation's on its unit's column)."
+        },
+        {
+          "name": "districtCost",
+          "compare": "milli",
+          "covers": [],
+          "planes": [
+            "city_dist_cost"
+          ],
+          "note": "per PLACEABLE district index, the price locked at the placement (TS City.districts[].cost, inside the excluded City.districts) of the city's district of the type (a repeatable type's first); 0 where none stands or none was read."
         },
         {
           "name": "projectYield",

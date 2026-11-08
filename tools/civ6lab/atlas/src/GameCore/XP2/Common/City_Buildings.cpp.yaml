@@ -150,11 +150,13 @@
 - addr: 0x193190
   final: 0x10e8b0
   kind: function
-  semantics: the city's building pillage (the nuclear accident's plant, directly).
+  semantics: "the city's building pillage (the nuclear accident's plant, directly): the pillaged flag set, the building's progress +0x218 set to its cost less PILLAGE_BUILDING_REPAIR_PERCENT (0x183950 at 0x193365); cleared, to its full cost (0x19346f)."
   status: PARTLY
+  impl: [cpu/core/production.ts:resumeItem, gpu/core/sim_seats.py:_q_push]
   readings:
     - "C-1: the nuclear accident's plant and the spared unit's draw — CLOSED"
     - "C-1: the nuclear accident's plant and the spared unit's draw"
+    - "C-111: every item's progress kept by type outside the queue, a pillaged building's or district's repair on the share its pillage left, a district's locked price on the district — READ (0x17f5a0, 0x175730 at 0x175bd3, 0x17d910, 0x175140, 0x1af5b0 -> 0x17e770 -> 0x183a60, 0x193190 -> 0x183950), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...LDING_POWER_PLANT alone) in the city owning the plot, through the city's building pillage 0x193190 directly — not the damage applier 0x336a50 — when the plot's district is owned and not al..."

@@ -1821,7 +1821,7 @@ class SimMinorAi:
         over the row `FR`'s empty book (no contract in hand, none listed):
         its queue's head (a unit, a building, a wonder, a project — the walls'
         repair); a Free City holds no district item; the production cleared
-        empties its queue"""
+        empties its queue, the head's progress kept on its type"""
         if not bool(go.count_nonzero()):
             return
         dev = self.device
@@ -1843,8 +1843,10 @@ class SimMinorAi:
         heads = (ku, kb, kd, kp, kw, hu, hb, neg, hp, torch.zeros_like(code))
 
         def clear(m: torch.Tensor) -> None:
+            # the production cleared, its head keeps its progress on its type
             rows = m.nonzero(as_tuple=True)[0]
             if rows.numel():
+                self._q_keep_head(rows, row, j)
                 self._q_clear(rows, row, j)
         self._defensive_cancel(self.FR, f, tables, go, heads, clear)
 

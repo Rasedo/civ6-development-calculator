@@ -104,14 +104,14 @@ def poke_placement_rule(rules, path):
     sim.tile_seat[0, T] = r + 1
     sim.tile_city[0, T] = sib_id
 
-    placed = sim._place_district(r + 1, j, di, torch.tensor([True]), 0, torch.tensor([T]))
+    placed = sim._place_district(r + 1, j, di, torch.tensor([True]), 0, torch.tensor([T]), torch.zeros(sim.B, dtype=torch.float64))
     assert not bool(placed[0]), "district placed on a SIBLING-registered tile"
     assert int(sim.district[0, T]) < 0, "sibling tile was paved despite the refusal"
     assert int(sim.city_dist_tile[0, r + 1, j, di]) < 0, "registry gained a sibling tile"
 
     # Now register the same tile to THIS city -> placement succeeds and is coherent.
     sim.tile_city[0, T] = own_id
-    placed2 = sim._place_district(r + 1, j, di, torch.tensor([True]), 0, torch.tensor([T]))
+    placed2 = sim._place_district(r + 1, j, di, torch.tensor([True]), 0, torch.tensor([T]), torch.zeros(sim.B, dtype=torch.float64))
     assert bool(placed2[0]), "district refused its OWN registered tile"
     assert int(sim.district[0, T]) == di, "own tile not paved"
     assert int(sim.city_dist_tile[0, r + 1, j, di]) == T, "registry did not record the paved tile"
@@ -144,9 +144,9 @@ def poke_never_picks_sibling(rules, path):
     elig = sim._district_elig(r + 1, j, di, 0)[0]
     assert not bool(elig[T_sib]), "a sibling-registered tile is ELIGIBLE — adjacency could win it"
     assert bool(elig[T_own]), "the own-registered tile must be eligible"
-    refused = sim._place_district(r + 1, j, di, torch.tensor([True]), 0, torch.tensor([T_sib]))
+    refused = sim._place_district(r + 1, j, di, torch.tensor([True]), 0, torch.tensor([T_sib]), torch.zeros(sim.B, dtype=torch.float64))
     assert not bool(refused[0]), "the wire named a sibling tile and the engine took it"
-    placed = sim._place_district(r + 1, j, di, torch.tensor([True]), 0, torch.tensor([T_own]))
+    placed = sim._place_district(r + 1, j, di, torch.tensor([True]), 0, torch.tensor([T_own]), torch.zeros(sim.B, dtype=torch.float64))
     assert bool(placed[0]), "the engine refused its OWN registered tile"
     chosen = int(sim.city_dist_tile[0, r + 1, j, di])
     assert chosen == T_own, f"registry recorded {chosen}, not the named tile {T_own}"

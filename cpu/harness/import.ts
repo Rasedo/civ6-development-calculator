@@ -29,6 +29,7 @@
 import type { City, CityState, CityStateType, DistrictId, FeatureId, GameMap, GameState, GreatPersonClass, ImprovementId, Seat, TerrainId, Tile, TradeRoute, Unit, Yields } from '../core/types';
 import { NO_SEAT } from '../core/types';
 import { minorItemKey, minorRepairResumed, type MinorItem } from '../core/minorBuild';
+import { keptKey } from '../core/production';
 import { createGameFromMap } from '../core/game';
 import { BARB_SEAT, FREE_SEAT, civOf, emptySeat, isBarbSeat, isCityStateSeat, startMeleeCS, freeSeatOf, grantKey, isCiv, markCityCentre, seatOf, tileBelongsTo, seatOfCityState, setTileOwner, setWar, majorsMet, setMetTurnWith } from '../core/seats';
 import { routeDestCenter, routeOriginCenter, stampTradingPost } from '../core/trade';
@@ -3894,8 +3895,11 @@ function buildProgress(rec: TurnRecord, cat: Catalog, c: DumpCity): Map<string, 
  * overflow store (`buildOverflow`). A district's locked price is the one the
  * record quotes for it; the other prices the engine locks at queueing (a
  * project's, a Settler's, a Builder's or a Trader's) are the engine's own for
- * the imported state. A district standing unfinished outside the queue keeps
- * its progress and locked price (`City.keptDistricts`).
+ * the imported state, and each district of the city keeps its quoted price
+ * (`City.districts`' `cost`). The progress the city's memory holds on a type
+ * the queue does not is kept on it (`City.kept`: runs/h1_duelp1117 t13
+ * Xi'an's Builder on 19, re-queued at t14; runs/h1_duelp1121 t153 Taiyuan's
+ * pillaged Harbor on 78).
  */
 function importQueue(ctx: Ctx, rec: TurnRecord, state: GameState, c: DumpCity, city: City): void {
   const s = seatOf(state, city.seat);
@@ -3956,13 +3960,35 @@ function importQueue(ctx: Ctx, rec: TurnRecord, state: GameState, c: DumpCity, c
     }
   });
   city.queue = queue;
-  delete city.keptDistricts;
-  for (const d of c.districts) {
-    const row = d[0] as number;
-    const progress = rows.district.get(row) ?? 0;
-    if (d[3] !== false || progress <= 0 || c.queue.some((e) => typeof e === 'object' && e !== null && e.DistrictType === row)) continue;
+  // each district's locked price, by its row
+  for (const d of city.districts) {
+    const r = c.districts.find((x) => (x[2] as number) * W + (x[1] as number) === d.tileIndex);
+    if (r && d.type !== 'CITY_CENTER') d.cost = lockedCost(r[0] as number, d.type);
+  }
+  // the progress kept on every type the queue does not hold, a pillaged
+  // building's or district's what its pillage left
+  delete city.kept;
+  const queued = new Set(queue.map(keptKey));
+  const keep = (q: QueueItem | null) => {
+    if (q && q.progress > 0 && !queued.has(keptKey(q))) (city.kept ??= {})[keptKey(q)] = q.progress;
+  };
+  for (const [row, progress] of rows.building) {
+    const name = ctx.cat.buildings[row];
+    const wonder = ctx.wonders.has(name) ? engineId('wonder', name, 'BUILDING_', BUILT_WONDERS) : null;
+    const id = wonder ? null : engineRowOf(ctx.cat, 'building', row);
+    keep(wonder ? { kind: 'wonder', wonder, tileIndex: -1, progress } : id ? { kind: 'building', building: id, progress } : null);
+  }
+  for (const [row, progress] of rows.unit) {
+    const id = engineRowOf(ctx.cat, 'unit', row);
+    keep(id === 'SETTLER' ? { kind: 'settler', progress, cost: 0 } : id ? { kind: 'unit', unit: id, progress } : null);
+  }
+  for (const [row, progress] of rows.district) {
     const id = engineRowOf(ctx.cat, 'district', row) as DistrictId | null;
-    if (id) (city.keptDistricts ??= {})[id] = { progress, cost: lockedCost(row, id) };
+    keep(id ? { kind: 'district', district: id, tileIndex: -1, progress } : null);
+  }
+  for (const [row, progress] of rows.project) {
+    const id = engineId('project', ctx.cat.projects[row] ?? '', 'PROJECT_', PROJECTS);
+    keep(id ? { kind: 'project', project: id, progress, cost: 0 } : null);
   }
 }
 

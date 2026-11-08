@@ -30,14 +30,14 @@ import { NO_SEAT } from '../core/types';
 import { congressBorderFrozen } from '../core/congress';
 import { spreadFromUnit } from '../core/unitOrders';
 import { borderBestPlots, cityCentreYields, cityPlotBonus, cityTourism, cityYieldCtx, computeCityStats, buildingMaintenance, districtMaintenance, luxuryAmenities, refreshParkAmenities, seatTourism, seatTourismReligious } from '../core/city';
-import { buildingPillaged, tileYields } from '../core/yields';
+import { tileYields } from '../core/yields';
 import { baseYieldCtx, computeUnlocks, getModifiers, goldPrice, makeYieldCtx, unitUpkeep } from '../core/effects';
 import { centreStrength, cityDefenseStrength } from '../core/combat';
 import { minorCity, resolveSuzerains, suzerainMinorSeats } from '../core/cityStates';
 import { applyLoyalty, cityBorderGrowth, cultureAfterGrowth, districtSiteCost, loyaltyPerTurn, plotPressure } from '../core/phase';
 import { seatGrowth, lumpFood, lumpGrowth } from '../core/seatTurn';
 import { buildingFaithPrice, unitFaithPrice, buildingPurchaseCost, settlerCost, gpActivatedPressure, pressureFromCity, religiousUnitLost, spreadReligiousPressure, tilePurchaseCost, unitProdCost, unitGoldPrice, unitStepCost, unitsAcquired, wallsGoldBlocked } from '../core/game';
-import { buildingCostIn, buildingFullCost } from '../core/rules';
+import { buildingCostIn } from '../core/rules';
 import { builderCost, spawnUnit, traderCost, unitDomain, unitReligious } from '../core/units';
 import { minorRouteOriginYields, routeDestYields, routeOriginYields, routeYieldCut } from '../core/trade';
 import { monumentalityBuyMult } from '../core/eras';
@@ -1338,10 +1338,9 @@ export function stateChecks(rec: TurnRecord, cat: Catalog, imp: Imported = impor
         if (cat.wonders.includes(cat.buildings[idx])) continue;
         const id = engineRowOf(cat, 'building', idx);
         if (!id) continue;
-        // a pillaged building's row: the game's cost reader answers the full
-        // price (runs/h1_duelw1104, Xian's Library t41-53: 45, gold 180), not
-        // the repair the engine prices
-        const ours = buildingPillaged(city, id) ? buildingFullCost(state, city, id) : buildingCostIn(state, city, id);
+        // a pillaged building's row answers the full price too (runs/
+        // h1_duelw1104, Xian's Library t41-53: 45, gold 180)
+        const ours = buildingCostIn(state, city, id);
         // a Flood Barrier is priced off the city's Coastal Lowland plots, which
         // a record without the lowland columns does not carry (the importer's
         // map has only the engine's own derivation of them)

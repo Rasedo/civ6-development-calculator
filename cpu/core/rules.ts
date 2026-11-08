@@ -25,7 +25,7 @@ import { BUILT_WONDERS, type BuiltWonderDef } from '../data/builtWonders';
 import { CITY_MIN_DIST, type TerrainId } from '../../world/types';
 import { UNITS, URBAN_DEFENSES_TECH, WALLS_TIER_HP, WALLS_TIER_URBAN } from '../data/units';
 import { PROJECTS } from '../data/projects';
-import { CITY_WORK_RADIUS, PILLAGE_BUILDING_REPAIR_PERCENT, maxSpecialtyDistricts } from '../data/constants';
+import { CITY_WORK_RADIUS, maxSpecialtyDistricts } from '../data/constants';
 import { buildingPillaged } from './yields';
 import { gpCityPermOf } from '../data/greatPeople';
 import { worshipBuildingOf } from '../data/religion';
@@ -908,18 +908,10 @@ export function fitEncampOuter(state: GameState, city: City): void {
  * become the queue item that never finishes.
  *
  * The production MASK's column order still reads the catalog constant, so a
- * live price never reshuffles the wire.
+ * live price never reshuffles the wire. A pillaged building's repair is the
+ * building at this price, on the progress its pillage left (`resumeItem`).
  */
 export function buildingCostIn(state: GameState, city: City, id: string): number {
-  const full = buildingFullCost(state, city, id);
-  // CIV6 (PILLAGE_BUILDING_REPAIR_PERCENT 25): a building standing pillaged
-  // is REPAIRED for that share of its price
-  return buildingPillaged(city, id) ? Math.round((full * PILLAGE_BUILDING_REPAIR_PERCENT) / 100) : full;
-}
-
-/** A building's price to build it whole in `city`, pillaged or not: its
- *  seat's row, a Flood Barrier's off the city's lowlands. */
-export function buildingFullCost(state: GameState, city: City, id: string): number {
   const def = effectiveBuilding(civOf(state, city.seat), id);
   if (!def) return 0;
   return def.floodBarrier ? floodBarrierCost(state, city) : def.cost;
@@ -992,7 +984,7 @@ function buildableBuildings(state: GameState, city: City, purchase: boolean): Bu
     if (type === blockedD) continue;
     for (const def of buildingsForDistrict(type)) {
       // a HELD building standing PILLAGED is buildable again — that is its
-      // REPAIR, on its own column at `buildingCostIn`'s repair price; a
+      // REPAIR, on its own column on the progress its pillage left; a
       // purchase never sells one (CIV6 repairs from the queue alone)
       if ((have.has(def.id) && (purchase || !buildingPillaged(city, def.id))) || queued.has(def.id)) continue;
       if (def.worship) {

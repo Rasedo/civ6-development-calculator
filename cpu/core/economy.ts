@@ -19,7 +19,7 @@ import { RESOURCES } from '../../world/resources';
 import { minorLump } from './minorBuild';
 import { lumpFood } from './seatTurn';
 import { itemCost } from './game';
-import { completeQueueItem, districtPlotHostile, keepDistrict } from './production';
+import { completeQueueItem, districtPlotHostile, keepItem } from './production';
 
 /**
  * SELECT a tech or civic, keeping the progress on the one being left.
@@ -267,7 +267,7 @@ export function applyLumpYield(
     const cost = itemCost(q, state, city);
     if (letGo && q.kind === 'district') {
       city.queue.shift();
-      keepDistrict(city, q, cost);
+      keepItem(city, q);
     }
     const head = city.queue[0];
     const headCost = head === q ? cost : head ? itemCost(head, state, city) : 0;

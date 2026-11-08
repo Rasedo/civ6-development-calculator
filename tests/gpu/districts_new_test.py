@@ -137,7 +137,7 @@ def test_an_improved_plot_takes_a_district(sim) -> None:
     assert bool(sim._district_elig(row, col, di)[b, t]), "an improved plot stopped being a site"
     want = torch.zeros(sim.B, dtype=torch.bool)
     want[b] = True
-    placed = sim._place_district(row, col, di, want, 0, torch.full((sim.B,), t, dtype=torch.long))
+    placed = sim._place_district(row, col, di, want, 0, torch.full((sim.B,), t, dtype=torch.long), torch.zeros(sim.B, dtype=torch.float64))
     assert bool(placed[b]), "the district did not place on the improved plot"
     assert int(sim.improvement[b, t]) == -1, "the pave left the improvement standing"
     print("  an improved plot OK — the district takes it and removes the improvement")

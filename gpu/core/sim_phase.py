@@ -1209,9 +1209,7 @@ class SimPhase:
         dev = self.device
         head_cost = cost
         if let_go:
-            di = self._scaffold[_si][0]
-            self.city_dist_kept[b, row, j, di] = self.city_progress[b, row, j, 0].to(self.city_dist_kept.dtype)
-            self.city_dist_kept_cost[b, row, j, di] = cost
+            self._q_keep_head(torch.tensor([b], device=dev), row, j)
             hit = torch.zeros(self.B, dtype=torch.bool, device=dev)
             hit[b] = True
             self._q_pop(row, torch.full((self.B,), j, dtype=torch.long, device=dev), hit)
@@ -1645,8 +1643,8 @@ class SimPhase:
         # CIV6 (City_BuildQueue 0x184660 at 0x1847dc): a major's district
         # whose plot a hostile unit holds (`_district_plot_hostile`) leaves
         # the queue's head (0x17f630) once its step has put the turn's
-        # Production in; the city keeps its progress and locked price by type
-        # (+0x248) and the completion reads the head after it
+        # Production in; the city keeps its progress by type (+0x248,
+        # `_q_keep_head`) and the completion reads the head after it
         nsc = len(self._scaffold)
         if let_go and row < self.n_majors and nsc:
             _si = cur - self.DISTRICT_BASE
@@ -1654,11 +1652,8 @@ class SimPhase:
             if bool(let_go.count_nonzero()):
                 let_go = let_go & self._district_plot_hostile(row, qt0)
             if bool(let_go.count_nonzero()):
-                _di = self._scaffold_di.take(_si.clamp(min=0, max=nsc - 1))
                 _lr = let_go.nonzero(as_tuple=True)[0]
-                _lc, _ld = col[_lr], _di[_lr]
-                self.city_dist_kept[_lr, row, _lc, _ld] = self.city_progress[_lr, row, _lc, 0].to(self.city_dist_kept.dtype)
-                self.city_dist_kept_cost[_lr, row, _lc, _ld] = cost[_lr].to(self.city_dist_kept_cost.dtype)
+                self._q_keep_head(_lr, row, col[_lr])
                 self._q_pop(row, col, let_go)
                 _nh = self.city_current[bidx, row, col, 0]
                 form_t = torch.where(let_go, self._q_form_tier(_nh), form_t)

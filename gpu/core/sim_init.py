@@ -4180,11 +4180,10 @@ class SimInit:
         # row for family-shape consistency; every city starts with an empty bank,
         # so unlike the fixture-loaded city_* table it allocates plain).
         self.city_prod_bank = torch.zeros(B, self.CITY_ROWS, self.RC, dtype=dtype, device=device)
-        # a district item the queue let go unfinished, by placeable type: its
-        # progress and locked price (City_BuildQueue +0x248, `City.keptDistricts`),
-        # a price of 0 none
-        self.city_dist_kept = torch.zeros(self.city_dist_tile.shape, dtype=dtype, device=device)
-        self.city_dist_kept_cost = torch.zeros(self.city_dist_tile.shape, dtype=dtype, device=device)
+        # each district's price locked at its placement, by placeable type,
+        # where `city_dist_tile` registers one (the District's +0xaa8,
+        # `City.districts`' `cost`); 0 none read
+        self.city_dist_cost = torch.zeros(self.city_dist_tile.shape, dtype=dtype, device=device)
         # a FREE CITY's count of turns toward its next grant (`City.freeGrantTurns`)
         self.city_free_grant = torch.zeros(B, self.CITY_ROWS, self.RC, dtype=torch.long, device=device)
         # a MAJOR's city's trade list (CityBuildAI +0x870, `majorTradeLists`)
@@ -4482,6 +4481,11 @@ class SimInit:
         # bring forward (owner ruling, `PRODUCTION_QUEUE_MAX`).
         self.FORM_BASE = self.PROJECT_BASE + len(self._proj_rows)
         self.PROD_W = self.FORM_BASE + 2 * self.NU
+        # the progress each city keeps on an item outside its queue, by the
+        # item's production code below FORM_BASE (a formation's on its unit's):
+        # City_BuildQueue's per-type progress, +0x218 / +0x230 / +0x248 /
+        # +0x260 (`City.kept`); 0 none
+        self.city_kept = torch.zeros(B, self.CITY_ROWS, self.RC, self.FORM_BASE, dtype=dtype, device=device)
         self._type_cost = torch.tensor([u["cost"] for u in ru], dtype=dtype, device=device)
         # CIV6 (Units.xml, COST_PROGRESSION_PREVIOUS_COPIES): the flat
         # CostProgressionParam1 each copy already acquired adds to the next,

@@ -716,6 +716,11 @@ class SimGp:
             self.city_prod_bank[r, row, col] = (self.city_prod_bank[r, row, col]
                                                 + (prog * gone).sum(dim=1))
             self._q_drop(r, row, col, gone)
+        # ...and the progress kept on a granted building outside the queue
+        _kw = want[r, :nb]
+        _kp = self.city_kept[r, row, col, :nb]
+        self.city_prod_bank[r, row, col] = self.city_prod_bank[r, row, col] + (_kp * _kw).sum(dim=1).to(self.city_prod_bank.dtype)
+        self.city_kept[r, row, col, :nb] = torch.where(_kw, torch.zeros_like(_kp), _kp)
 
     def _gp_wonder_charge(self, row: int, m: torch.Tensor, cls: torch.Tensor,
                           at: torch.Tensor, cc: torch.Tensor, hc: torch.Tensor) -> None:

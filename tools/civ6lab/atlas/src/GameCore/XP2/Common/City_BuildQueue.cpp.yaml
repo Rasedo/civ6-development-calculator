@@ -310,18 +310,21 @@
 - addr: 0x175140
   final: 0xfafe0
   kind: function
-  semantics: "ORDER_ZONE's completion in the queue step: the district's progress by type (+0x248) against its cost (0x179510) << 8; covered, the district completes on its plot (0x1ae340 / 0x1af5b0 for one standing, else 0x180450) with its completion events; no unit on the plot is asked."
+  semantics: "ORDER_ZONE's completion in the queue step: the district's progress by type (+0x248) against its cost (0x179510) << 8; covered, a district standing on the plot (0x1ae340) is set whole (0x1af5b0, the repair, no completion grants), else the new district completes (0x180450) with its completion events; the zoning plot cleared (0x183b90 -1) unless Districts +0xe1 bit 0x10; no unit on the plot is asked."
   status: PARTLY
+  impl: [cpu/core/production.ts:completeQueueItem, cpu/core/production.ts:pct]
   readings:
     - "C-111: a major's district lets go of the queue under a hostile unit, the queue's progress and overflow read from the city's memory — READ (0x184660 at 0x1847dc, 0x5313f0, 0x17f630), both twins"
+    - "C-111: every item's progress kept by type outside the queue, a pillaged building's or district's repair on the share its pillage left, a district's locked price on the district — READ (0x17f5a0, 0x175730 at 0x175bd3, 0x17d910, 0x175140, 0x1af5b0 -> 0x17e770 -> 0x183a60, 0x193190 -> 0x183950), both twins"
   review: reviewed
 - addr: 0x175730
   final: 0xfb520
   kind: function
-  semantics: "the train order (\"pFront->eDirective == ORDER_TRAIN\"): makes each unit through the city's create 0x1e6570."
+  semantics: "the train order (\"pFront->eDirective == ORDER_TRAIN\"): makes each unit through the city's create 0x1e6570; the front leaves (0x17f5a0, 0x17f630) and the unit's progress by type +0x230 is zeroed (0x175bd3)."
   status: PARTLY
   readings:
     - "C-96: the knowledge base's army records and the Combat Desire — READ (the records, the update, the desire), PARTLY READ (the signals' looks; the standing-army count in its own section below)"
+    - "C-111: every item's progress kept by type outside the queue, a pillaged building's or district's repair on the share its pillage left, a district's locked price on the district — READ (0x17f5a0, 0x175730 at 0x175bd3, 0x17d910, 0x175140, 0x1af5b0 -> 0x17e770 -> 0x183a60, 0x193190 -> 0x183950), both twins"
   context:
     - "- A UNIT A CITY MAKES (READ): the train order (0x175730, \"pFront->eDirective == ORDER_TRAIN\") makes each unit through the city's create 0x1e657..."
   review: reviewed
@@ -342,8 +345,10 @@
   kind: function
   semantics: "a building made in the city by a path other than the queue step (16 callers): with its flag (r14b) and the percent at 100 or more (r12d), the progress kept on the building (+0x218[building]) is added to the store BuildQueue +0x1f4 (0x175eec), then the building is placed (0x17f870); the callers' paths unread."
   status: PARTLY
+  impl: [cpu/core/production.ts:dropQueuedBuilding]
   readings:
     - "C-127: an idle city's store through the queue step (0x16f050), the build lab on it — READ (the engines unchanged)"
+    - "C-111: every item's progress kept by type outside the queue, a pillaged building's or district's repair on the share its pillage left, a district's locked price on the district — READ (0x17f5a0, 0x175730 at 0x175bd3, 0x17d910, 0x175140, 0x1af5b0 -> 0x17e770 -> 0x183a60, 0x193190 -> 0x183950), both twins"
   notes:
     - "no recording case read: no city-state building bought or granted with progress kept on it in runs/h1_duelv1128"
   context:
@@ -538,9 +543,13 @@
     - recording: h1_duelp1128
       turn: 161
       value: "Bologna's Neighbourhood at the player's cost 143 after Military Science (SetTech's 0x409800 refresh), its store 57.6: 7 turns + Urbanization's 8 = T 15 as logged"
-  impl: [cpu/core/minorBuild.ts:minorItemCost]
+  impl:
+    - cpu/core/minorBuild.ts:minorItemCost
+    - cpu/core/production.ts:resumeItem
+    - cpu/core/types.ts:City
   readings:
     - "C-100: the build turns' store — a completion's overflow, an idle city's Production — and a Builder's charge at the count before the turn's contract purchases"
+    - "C-111: every item's progress kept by type outside the queue, a pillaged building's or district's repair on the share its pillage left, a district's locked price on the district — READ (0x17f5a0, 0x175730 at 0x175bd3, 0x17d910, 0x175140, 0x1af5b0 -> 0x17e770 -> 0x183a60, 0x193190 -> 0x183950), both twins"
   review: reviewed
 - addr: 0x179dd0
   kind: function
@@ -916,10 +925,21 @@
   status: PARTLY
   readings:
     - "C-112: the majors' citizens on a placement, the Free Cities' city turn — READ (0x180cb0, 0x181700, 0x1fa1d0), both twins"
+    - "C-111: every item's progress kept by type outside the queue, a pillaged building's or district's repair on the share its pillage left, a district's locked price on the district — READ (0x17f5a0, 0x175730 at 0x175bd3, 0x17d910, 0x175140, 0x1af5b0 -> 0x17e770 -> 0x183a60, 0x193190 -> 0x183950), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ...on its plot (0x5d3c0, the plot's vcall +0x50; one already holding production progress, 0x17d050 at 0x180d33, goes straight on) and the path ends in the full reassign 0x196320 at 0x181...
   review: imported
+- addr: 0x17d130
+  kind: function
+  semantics: "does the project hold progress in the city: +0x260[project] above 0."
+  status: PARTLY
+  readings:
+    - "C-111: every item's progress kept by type outside the queue, a pillaged building's or district's repair on the share its pillage left, a district's locked price on the district — READ (0x17f5a0, 0x175730 at 0x175bd3, 0x17d910, 0x175140, 0x1af5b0 -> 0x17e770 -> 0x183a60, 0x193190 -> 0x183950), both twins"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...entry alone: 0x17f5a0 asks only whether the type holds progress (0x17d1a0 / 0x17d050 / 0x17d130) and, where none, releases the front's strategic reservations (0x182b80, majors only)..."
+  review: reviewed
 - addr: 0x17d1a0
   kind: function
   semantics: the unit holds progress in the city.
@@ -929,6 +949,7 @@
     - "H-1: the luxury allocation's rebuilds — PARTLY READ"
     - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
     - "C-96: the resource value and the research value's resources — READ (bonus, luxury, the call), PARTLY READ (the strategic stockpile terms)"
+    - "C-111: every item's progress kept by type outside the queue, a pillaged building's or district's repair on the share its pillage left, a district's locked price on the district — READ (0x17f5a0, 0x175730 at 0x175bd3, 0x17d910, 0x175140, 0x1af5b0 -> 0x17e770 -> 0x183a60, 0x193190 -> 0x183950), both twins"
   context:
     - "...t check 0x17f070): a unit at the queue's front with a strategic cost and no progress (0x17d1a0) reserves its cost (0x4a7400) where the player's amount less its reservations covers it..."
   review: reviewed
@@ -974,6 +995,19 @@
     - ...unit not the player's version (player +0x12e8 +0x1c0); a domain the city cannot build (0x17d660); a player that is neither CIVILIZATION_LEVEL_FULL_CIV (0x469db0, hash 0x253718b0) nor...
     - ...nit not the player's version (player +0x12e8 +0x1c0), a domain the city cannot train (0x17d660), a non-full, non-tribe player at peace with more than five units, a Spy for a non-full...
   review: reviewed
+- addr: 0x17d910
+  final: 0xffc20
+  kind: function
+  semantics: "a building set in the city (from 0x180cb0, 0x175da0, RemoveBuilding 0x182540 and others): a wonder's plot cleared on a held one, every queue entry of the building dropped (0x17f5a0 / 0x17f630 at the front, 0x182460 deeper), the building's progress +0x218 zeroed (0x17dcc3)."
+  status: PARTLY
+  impl: [cpu/core/production.ts:dropQueuedBuilding, gpu/core/sim_seats.py:_drop_bought_building]
+  readings:
+    - "C-111: every item's progress kept by type outside the queue, a pillaged building's or district's repair on the share its pillage left, a district's locked price on the district — READ (0x17f5a0, 0x175730 at 0x175bd3, 0x17d910, 0x175140, 0x1af5b0 -> 0x17e770 -> 0x183a60, 0x193190 -> 0x183950), both twins"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...e left, a district's locked price on the district — READ (0x17f5a0, 0x175730 at 0x175bd3, 0x17d910, 0x175140, 0x1af5b0 -> 0x17e770 -> 0x183a60, 0x193190 -> 0x183950), both twins"
+    - ...t its completion (0x175730 at 0x175bd3); a building placed by any path zeroes +0x218 (0x17d910, from the completion 0x180cb0, the other-path placement 0x175da0, RemoveBuilding); a co...
+  review: reviewed
 - addr: 0x17e690
   final: 0x1005d0
   kind: function
@@ -1000,6 +1034,22 @@
     - ".claude/scratchpad/cb/notes.txt: ...AT ALL').  bestBuilding: value table plotEval(cityCenter)+0x28[bld]; skip if already in queue/has (0x17e690>0); adj via 0x5d2d10(list r15+0x528):    -1 -> +0.5 ; 1 -> +2.0 ; wonder(+0x159&4 && +0x228 == f2f9..."
   context:
     - "...rst in table order on a tie). Plain pick (flags 1, 0): the building not queued or held (0x17e690 > 0), CanConstruct (0x170450) true with its reason fields +0x54 / +0x68 clear, not Mu..."
+  review: reviewed
+- addr: 0x17e770
+  final: 0x100630
+  kind: function
+  semantics: "the queue's hook on a district's pillage (from 0x1af5b0): pillaged, with the type's zoning plot -1 (a completed district, 0x17cd50), the progress by type +0x248 set to (cost x (100 - PILLAGE_BUILDING_REPAIR_PERCENT)) / 100 (0x183a60) and the zoning plot set to the district's (0x183b90); returns 100 less the percent; not pillaged, 0x182870."
+  status: READ
+  cases:
+    - recording: h1_duelp1121
+      turn: 153
+      value: Taiyuan's pillaged Harbor queued on 78 of 104
+  impl: [cpu/core/production.ts:resumeItem]
+  readings:
+    - "C-111: every item's progress kept by type outside the queue, a pillaged building's or district's repair on the share its pillage left, a district's locked price on the district — READ (0x17f5a0, 0x175730 at 0x175bd3, 0x17d910, 0x175140, 0x1af5b0 -> 0x17e770 -> 0x183a60, 0x193190 -> 0x183950), both twins"
+  context:
+    - "...e on the district — READ (0x17f5a0, 0x175730 at 0x175bd3, 0x17d910, 0x175140, 0x1af5b0 -> 0x17e770 -> 0x183a60, 0x193190 -> 0x183950), both twins"
+    - "- THE PILLAGE: a district's pillage (0x1af5b0 -> the queue's hook 0x17e770) sets +0x248 to (cost x (100 - PILLAGE_BUILDING_REPAIR_PERCENT)) / 100 truncated, <<..."
   review: reviewed
 - addr: 0x17f070
   final: 0x100e80
@@ -1039,10 +1089,20 @@
 - addr: 0x17f5a0
   final: 0x101370
   kind: function
-  semantics: "before the front leaves (+0x3ac clear): the front item's progress asked by its kind (0x17d1a0 unit, 0x17d050 building, 0x17d130 project); none held runs 0x182b80 on the front."
-  status: PARTLY
+  semantics: "before the front leaves (+0x3ac clear): the front item's progress asked by its kind (0x17d1a0 unit, 0x17d050 building, 0x17d130 project); none held runs 0x182b80 on the front. The progress itself stays in the queue's per-type arrays (+0x218 / +0x230 / +0x248 / +0x260): an item queued again stands on it."
+  status: READ
+  cases:
+    - recording: h1_duelp1117
+      turn: 14
+      value: Xi'an's Builder left at 19 at t10, queued again on 19
+  impl:
+    - cpu/core/production.ts:keepItem
+    - cpu/core/production.ts:resumeItem
+    - gpu/core/sim_seats.py:_q_keep_head
+    - gpu/core/sim_seats.py:_q_push
   readings:
     - "C-111: a major's district lets go of the queue under a hostile unit, the queue's progress and overflow read from the city's memory — READ (0x184660 at 0x1847dc, 0x5313f0, 0x17f630), both twins"
+    - "C-111: every item's progress kept by type outside the queue, a pillaged building's or district's repair on the share its pillage left, a district's locked price on the district — READ (0x17f5a0, 0x175730 at 0x175bd3, 0x17d910, 0x175140, 0x1af5b0 -> 0x17e770 -> 0x183a60, 0x193190 -> 0x183950), both twins"
   review: reviewed
 - addr: 0x17f630
   final: 0x101400
@@ -1057,8 +1117,10 @@
     - cpu/core/phase.ts:letGo
     - gpu/core/sim_seats.py:_q_pop
     - gpu/core/sim_phase.py:_seat_city_produce
+    - cpu/core/production.ts:keepItem
   readings:
     - "C-111: a major's district lets go of the queue under a hostile unit, the queue's progress and overflow read from the city's memory — READ (0x184660 at 0x1847dc, 0x5313f0, 0x17f630), both twins"
+    - "C-111: every item's progress kept by type outside the queue, a pillaged building's or district's repair on the share its pillage left, a district's locked price on the district — READ (0x17f5a0, 0x175730 at 0x175bd3, 0x17d910, 0x175140, 0x1af5b0 -> 0x17e770 -> 0x183a60, 0x193190 -> 0x183950), both twins"
   review: reviewed
 - addr: 0x17f870
   final: 0x101500
@@ -1094,6 +1156,18 @@
     - ...WONDER its production completes annexes WONDER_FREE_TILES_UPON_COMPLETION (2) plots (0x17f870, building info +0x158 bit 0x40, -> 0x1a8a30), one picker draw each, before the wonder's...
     - "- A wonder's annex (0x17f870 → AnnexPlots 0x1a8a30) fires its CityTileOwnershipChanged rows BEFORE the WonderComplet..."
   review: reviewed
+- addr: 0x180450
+  final: 0x101ac0
+  kind: function
+  semantics: the new district's completion on its plot (0x175140's arm where no district stands there yet).
+  status: PARTLY
+  impl: [cpu/core/production.ts:completeQueueItem, cpu/core/production.ts:pct]
+  readings:
+    - "C-111: every item's progress kept by type outside the queue, a pillaged building's or district's repair on the share its pillage left, a district's locked price on the district — READ (0x17f5a0, 0x175730 at 0x175bd3, 0x17d910, 0x175140, 0x1af5b0 -> 0x17e770 -> 0x183a60, 0x193190 -> 0x183950), both twins"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...he plot (0x1ae340) and sets it whole (0x1af5b0) without the new district's completion 0x180450 (`completeQueueItem`'s repair branch)."
+  review: reviewed
 - addr: 0x180cb0
   final: 0x1020b0
   kind: function
@@ -1109,6 +1183,7 @@
     - "C-112: the majors' citizens by the citizen manager — READ (0x1fa1d0 at 0x1fa22d, 0x196320's callers), both twins"
     - "C-100 / C-112: a city-state's power and its regional buildings, the citizen reassign's callers — a fit and a reading"
     - "C-100 / C-112: a city-state's power and its regional buildings, the citizen reassign's callers"
+    - "C-111: every item's progress kept by type outside the queue, a pillaged building's or district's repair on the share its pillage left, a district's locked price on the district — READ (0x17f5a0, 0x175730 at 0x175bd3, 0x17d910, 0x175140, 0x1af5b0 -> 0x17e770 -> 0x183a60, 0x193190 -> 0x183950), both twins"
   context:
     - "...L CITIZEN REASSIGN 0x196320's callers (the DLL's call sites): the building completions (0x180cb0, 0x181700), the favored / disfavored yield setters (0x196f90, 0x1970e0), AnnexPlot (0x1..."
   review: reviewed
@@ -1129,6 +1204,49 @@
     - "C-100 / C-112: a city-state's power and its regional buildings, the citizen reassign's callers"
   context:
     - "...REASSIGN 0x196320's callers (the DLL's call sites): the building completions (0x180cb0, 0x181700), the favored / disfavored yield setters (0x196f90, 0x1970e0), AnnexPlot (0x1a8b70), th..."
+  review: reviewed
+- addr: 0x182b80
+  final: 0x103aa0
+  kind: function
+  semantics: "a front leaving with no progress held (from 0x17f5a0), a major's only (0x469db0): the unit's strategic reservation (0x17c2e0) and the building's and project's resource reservations released (0x4a7400 negative)."
+  status: PARTLY
+  readings:
+    - "C-111: every item's progress kept by type outside the queue, a pillaged building's or district's repair on the share its pillage left, a district's locked price on the district — READ (0x17f5a0, 0x175730 at 0x175bd3, 0x17d910, 0x175140, 0x1af5b0 -> 0x17e770 -> 0x183a60, 0x193190 -> 0x183950), both twins"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - ...a0 / 0x17d050 / 0x17d130) and, where none, releases the front's strategic reservations (0x182b80, majors only). An item queued again stands on what its type holds.
+  review: reviewed
+- addr: 0x183950
+  final: 0x104670
+  kind: function
+  semantics: a building's progress +0x218 set to trunc(cost x pct / 100) << 8 at the building's cost (0x1788b0); the pillage passes 100 - PILLAGE_BUILDING_REPAIR_PERCENT, the repair 100.
+  status: READ
+  cases:
+    - recording: h1_duelp1121
+      turn: 135
+      value: Xi'an's pillaged Shrine (35) on 26, queued at t135 on 26
+  impl: [cpu/core/production.ts:resumeItem, gpu/core/sim_seats.py:_q_push]
+  readings:
+    - "C-111: every item's progress kept by type outside the queue, a pillaged building's or district's repair on the share its pillage left, a district's locked price on the district — READ (0x17f5a0, 0x175730 at 0x175bd3, 0x17d910, 0x175140, 0x1af5b0 -> 0x17e770 -> 0x183a60, 0x193190 -> 0x183950), both twins"
+  context:
+    - ..., 0x175730 at 0x175bd3, 0x17d910, 0x175140, 0x1af5b0 -> 0x17e770 -> 0x183a60, 0x193190 -> 0x183950), both twins
+    - ...trict); a building's pillage (0x193190) does the same on +0x218 at the building's cost (0x183950). The repair is the item at its full price on that progress. The engines set it where t...
+  review: reviewed
+- addr: 0x183a60
+  final: 0x1046f0
+  kind: function
+  semantics: a district type's progress +0x248 set to trunc(cost x pct / 100) << 8, cost the city's own district's locked price (+0xaa8, 0x1ae530) else the player's cost (0x4088a0).
+  status: READ
+  cases:
+    - recording: h1_duelp1121
+      turn: 153
+      value: Taiyuan's Harbor 78 = trunc(104 x 75 / 100), the locked price 104 quoted where the type's other price is 150
+  impl: [cpu/core/production.ts:resumeItem]
+  readings:
+    - "C-111: every item's progress kept by type outside the queue, a pillaged building's or district's repair on the share its pillage left, a district's locked price on the district — READ (0x17f5a0, 0x175730 at 0x175bd3, 0x17d910, 0x175140, 0x1af5b0 -> 0x17e770 -> 0x183a60, 0x193190 -> 0x183950), both twins"
+  context:
+    - "...trict — READ (0x17f5a0, 0x175730 at 0x175bd3, 0x17d910, 0x175140, 0x1af5b0 -> 0x17e770 -> 0x183a60, 0x193190 -> 0x183950), both twins"
+    - ...sets +0x248 to (cost x (100 - PILLAGE_BUILDING_REPAIR_PERCENT)) / 100 truncated, << 8 (0x183a60; cost the city's district's locked price +0xaa8, else the player's cost 0x4088a0) where...
   review: reviewed
 - addr: 0x183b30
   final: 0x1047b0

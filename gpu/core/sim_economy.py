@@ -3015,24 +3015,22 @@ class SimEconomy:
     def _building_cost_in(self, row: int, j: int, bi: torch.Tensor) -> torch.Tensor:
         """[B] — `buildingCostIn`: the catalog price for every row but the
         FLOOD BARRIER, whose own is its city's lowland tiles and the sea
-        level."""
+        level. A pillaged building's repair is the building at this price, on
+        the progress its pillage left (`_q_push`)."""
         base = self._b_cols(row)["cost"].gather(1, bi.unsqueeze(1)).squeeze(1)
         if self._barrier_bidx >= 0:
             base = torch.where(bi == self._barrier_bidx,
                                self._flood_barrier_cost(row)[:, j].double(), base)
-        # CIV6 (PILLAGE_BUILDING_REPAIR_PERCENT 25): a building standing
-        # pillaged is REPAIRED for that share of its price
-        pil = self.city_bldg_pillaged[:, row, j].gather(1, bi.unsqueeze(1)).squeeze(1)
-        return torch.where(pil, js_round(base * self.rules.pillage_building_repair_pct / 100.0), base)
+        return base
 
     def _live_building_cost(self, row: int) -> torch.Tensor:
         """[B, RC, QD] — `buildingCostIn` for every BUILDING standing in this
         row's queues, and the stored price wherever an entry is not a building.
         TS locks no building price at all: it re-reads `buildingCostIn` at every
         completion check and again for its digest, so a price that can MOVE
-        while the item WAITS — the Flood Barrier's lowland formula, a repair —
-        has to be followed here rather than locked at queue, and it has to be
-        followed for a deeper entry too."""
+        while the item WAITS — the Flood Barrier's lowland formula — has to be
+        followed here rather than locked at queue, and it has to be followed
+        for a deeper entry too."""
         cur = self.city_current[:, row]                       # [B, RC, QD]
         bi = cur.clamp(min=0, max=self.NB - 1)
         base = self._b_cols(row)["cost"].unsqueeze(1).expand(
@@ -3046,11 +3044,8 @@ class SimEconomy:
                                    self._flood_barrier_cost(row).unsqueeze(2).double(), base)
             else:
                 base = base.to(torch.float64)   # the dtype the f64 price would have promoted it to
-        # a queued REPAIR keeps its repair price while the building stands pillaged
-        pil = self.city_bldg_pillaged[:, row].gather(2, bi)
-        live = torch.where(pil, js_round(base * self.rules.pillage_building_repair_pct / 100.0), base)
         return torch.where((cur >= 0) & (cur < self.NB),
-                           live.to(self.city_cost.dtype), self.city_cost[:, row])
+                           base.to(self.city_cost.dtype), self.city_cost[:, row])
 
     def _reprice_live(self, row: int) -> None:
         self.city_cost[:, row].copy_(self._live_building_cost(row))
@@ -5198,14 +5193,15 @@ class SimEconomy:
         return self._district_adj_floor(di)
 
     def _place_district(self, row: int, j: int, di: int, want: torch.Tensor,
-                        placement: int, tile: torch.Tensor) -> torch.Tensor:
+                        placement: int, tile: torch.Tensor, cost: torch.Tensor) -> torch.Tensor:
         """Queue district `di` in row `row`'s city slot j ON THE TILE THE RECORD
         NAMES. The engine does not choose the plot: `tile` [B] is the policy's
         pick and this body only re-validates it, so a tile that stopped being
         eligible since the mask REFUSES rather than sliding to a neighbour the
         policy never asked for. The completion TARGET rides the queue entry the
         caller pushes, not this body — one plot per entry, so a second district
-        queued behind the first keeps its own."""
+        queued behind the first keeps its own. The district's price `cost` [B]
+        locks at its placement (`city_dist_cost`, `City.districts`' `cost`)."""
         elig = self._district_elig(row, j, di, placement)
         bt_all = tile.clamp(min=0, max=self.T - 1)
         place = want & (tile >= 0) & (tile < self.T) & elig.gather(1, bt_all.unsqueeze(1)).squeeze(1)
@@ -5219,11 +5215,14 @@ class SimEconomy:
             # FIRST tile: nothing reads the entry for its own sake (no
             # buildings, no projects, no adjacency of its own), and
             # `_district_counts` reads the tile plane for it.
+            _cst = cost.to(self.city_dist_cost.dtype)[rows]
             if bool(self._is_repeatable[di]):
                 _held = self.city_dist_tile[rows, row, j, di]
                 self.city_dist_tile[rows, row, j, di] = torch.where(_held < 0, bt, _held)
+                self.city_dist_cost[rows, row, j, di] = torch.where(_held < 0, _cst, self.city_dist_cost[rows, row, j, di])
             else:
                 self.city_dist_tile[rows, row, j, di] = bt
+                self.city_dist_cost[rows, row, j, di] = _cst
             self._eff_version += 1
             # the district set on its plot re-places the city's citizens
             # (City_BuildQueue 0x181700 -> the full reassign 0x196320)

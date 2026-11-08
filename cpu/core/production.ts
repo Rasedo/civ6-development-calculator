@@ -1,7 +1,7 @@
 import type { City, GameState, Seat, Unit } from './types';
 import { boostPool, drawBoosts, markBoost } from './boosts';
 import { logPopWrite } from './difflog';
-import { repairBuilding, stampBuildingEra } from './yields';
+import { buildingPillaged, repairBuilding, stampBuildingEra } from './yields';
 import { scoreProject } from './competition';
 import type { QueueItem } from './types';
 import { citiesOf, seatOf, setTileOwner, tileCity, tileSeat, unitSeat, allianceFreePromo, moveCapital, civOf, isCiv } from './seats';
@@ -12,7 +12,7 @@ import { congressCultureBombSeat } from './congress';
 import { hexDistance, neighbors } from '../../world/hex';
 import { availableCivicsIn, availableTechsIn, getModifiers } from './effects';
 import { completedWonders, seatWonderFlag } from './wonders';
-import { grantEraBoosts, offerApostlePromotions, refreshDistrictDiscount } from './game';
+import { grantEraBoosts, itemCost, offerApostlePromotions, refreshDistrictDiscount } from './game';
 import { UNITS, UNIT_TYPE_IDX, ENCAMPMENT_HP, URBAN_DEFENSES_TECH, isLightCavalry } from '../data/units';
 import { isGreatEngineer } from './units';
 import { BUILDINGS } from '../data/buildings';
@@ -41,7 +41,7 @@ import { congressGppFactor } from './congress';
 import { BUILT_WONDERS, WONDER_ERA_INDEX } from '../data/builtWonders';
 import { randRange } from './rand';
 import { claimTile, drawBorderPlot } from './city';
-import { WONDER_FREE_TILES } from '../data/constants';
+import { PILLAGE_BUILDING_REPAIR_PERCENT, WONDER_FREE_TILES } from '../data/constants';
 import { questDistrictBuilt } from './quests';
 
 /** CIV6 (Oxford University, Bolshoi Theatre): the free technologies and civics
@@ -194,7 +194,9 @@ export function completeProject(state: GameState, city: City, projectId: string,
  * is where this model puts every carried-over hammer.
  *
  * Only the queue HEAD accrues (every `progress +=` in the engine reads
- * `queue[0]`), so a deeper item banks the zero it carries.
+ * `queue[0]`), so a deeper item banks the zero it carries. The progress the
+ * city keeps on the building outside the queue banks with it and the kept
+ * entry goes (0x175da0 adds +0x218[building] to the store, 0x17d910 clears it).
  */
 export function dropQueuedBuilding(city: City, buildingId: string): void {
   for (let i = city.queue.length - 1; i >= 0; i--) {
@@ -203,6 +205,8 @@ export function dropQueuedBuilding(city: City, buildingId: string): void {
     city.productionBank = (city.productionBank ?? 0) + it.progress;
     city.queue.splice(i, 1);
   }
+  const kept = takeKept(city, { kind: 'building', building: buildingId, progress: 0 });
+  if (kept > 0) city.productionBank = (city.productionBank ?? 0) + kept;
 }
 
 /**
@@ -256,22 +260,61 @@ export function districtPlotHostile(state: GameState, city: City, tileIndex: num
   });
 }
 
-/** A district item the queue let go keeps its progress and locked price by
- *  its type (City_BuildQueue +0x248). */
-export function keepDistrict(city: City, q: Extract<QueueItem, { kind: 'district' }>, cost: number): void {
-  (city.keptDistricts ??= {})[q.district] = { progress: q.progress, cost };
+/** The type a city keeps an item's progress under (City_BuildQueue's
+ *  per-type arrays: +0x218 the buildings', a wonder among them, +0x230 the
+ *  units', +0x248 the districts', +0x260 the projects'); a formation's is its
+ *  unit's, a Settler's the Settler's. */
+export function keptKey(q: QueueItem): string {
+  switch (q.kind) {
+    case 'building': return `building:${q.building}`;
+    case 'wonder': return `wonder:${q.wonder}`;
+    case 'unit': return `unit:${q.unit}`;
+    case 'settler': return 'unit:SETTLER';
+    case 'district': return `district:${q.district}`;
+    case 'project': return `project:${q.project}`;
+  }
 }
 
-/** A district item queued again on its type's kept progress and locked
- *  price, the kept entry spent; false where none is kept. */
-export function resumeDistrict(city: City, q: Extract<QueueItem, { kind: 'district' }>): boolean {
-  const kept = city.keptDistricts?.[q.district];
-  if (!kept) return false;
-  q.progress = kept.progress;
-  q.cost = kept.cost;
-  delete city.keptDistricts![q.district];
-  if (Object.keys(city.keptDistricts!).length === 0) delete city.keptDistricts;
-  return true;
+/** An item leaving the queue unfinished keeps its progress on its type
+ *  (the queue's per-type arrays hold it whether or not the item is queued:
+ *  0x17f5a0 / 0x17f630 drop the entry alone). */
+export function keepItem(city: City, q: QueueItem): void {
+  if (q.progress <= 0) return;
+  (city.kept ??= {})[keptKey(q)] = q.progress;
+}
+
+/** the progress the city keeps on the item's type, spent (0 where none) */
+export function takeKept(city: City, q: QueueItem): number {
+  const k = keptKey(q);
+  const p = city.kept?.[k] ?? 0;
+  if (city.kept && k in city.kept) {
+    delete city.kept[k];
+    if (Object.keys(city.kept).length === 0) delete city.kept;
+  }
+  return p;
+}
+
+/**
+ * AN ITEM QUEUED RESUMES its type's kept progress (`takeKept`). A district
+ * takes its plot's locked price (the city's district of the type with a
+ * price above 0, 0x179960: `City.districts`' `cost`). The repair of a
+ * pillaged district or building with no progress kept starts at the share
+ * its pillage left: the price less PILLAGE_BUILDING_REPAIR_PERCENT, truncated
+ * (a district's 0x17e770 -> 0x183a60, a building's 0x193190 -> 0x183950:
+ * (cost x (100 - 25)) / 100; runs/h1_duelp1121 Taiyuan's Harbor queued at
+ * t153 on 78 of 104, Xi'an's Shrine at t135 on 26 of 35).
+ */
+export function resumeItem(state: GameState, city: City, q: QueueItem): void {
+  const kept = takeKept(city, q);
+  q.progress = kept;
+  let pillaged = false;
+  if (q.kind === 'district') {
+    const locked = city.districts.find((d) => d.tileIndex === q.tileIndex && d.type === q.district)?.cost;
+    if (locked !== undefined && locked > 0) q.cost = locked;
+    const t = state.map.tiles[q.tileIndex];
+    pillaged = t?.district === q.district && !!t.districtComplete && !!t.districtPillaged;
+  } else if (q.kind === 'building') pillaged = buildingPillaged(city, q.building);
+  if (kept <= 0 && pillaged) q.progress = Math.floor((itemCost(q, state, city) * (100 - PILLAGE_BUILDING_REPAIR_PERCENT)) / 100);
 }
 
 export function completeQueueItem(
@@ -293,6 +336,13 @@ export function completeQueueItem(
   switch (item.kind) {
     case 'district': {
       const dt = state.map.tiles[item.tileIndex];
+      // a district standing complete on the plot is a pillaged one's repair:
+      // it is set whole and pays no completion (0x175140: 0x1ae340 finds it,
+      // 0x1af5b0, where a new one takes 0x180450)
+      if (dt.districtComplete) {
+        dt.districtPillaged = false;
+        break;
+      }
       dt.districtComplete = true;
       if (dt.district) questDistrictBuilt(state, city.seat, dt.district);
       // the type's own price takes the completed count afresh

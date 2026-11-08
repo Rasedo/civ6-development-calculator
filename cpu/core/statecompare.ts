@@ -45,7 +45,7 @@ import { governmentSlots, policyWireOf, wonderExtraSlots } from './effects';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
-import type { City, CityState, DealItem, GameState, ProjectYield, ResearchState, Seat, Tile, Unit, UnitPool } from './types';
+import type { City, CityState, DealItem, DistrictId, GameState, ProjectYield, ResearchState, Seat, Tile, Unit, UnitPool } from './types';
 import { YIELD_KEYS } from '../../world/types';
 import { DEAL_ITEMS, PRODUCTION_QUEUE_MAX } from '../data/seats';
 import { dealOfferOf, dealTermOf, spyHeldWith, spyLevelsHeld } from './deals';
@@ -339,6 +339,19 @@ const idx = (m: Map<string, number>, id: string | null | undefined): number =>
  *  cities. */
 function overQueue<T>(q: City['queue'], f: (it: City['queue'][number] | undefined) => T): T[] {
   return Array.from({ length: PRODUCTION_QUEUE_MAX }, (_, k) => f(q[k]));
+}
+
+/** a `City.kept` key's production column (the GPU's `city_kept` index) */
+function keptColumn(key: string): number {
+  const at = key.indexOf(':');
+  const kind = key.slice(0, at);
+  const id = key.slice(at + 1);
+  const q: City['queue'][number] | undefined = kind === 'building' ? { kind, building: id, progress: 0 }
+    : kind === 'wonder' ? { kind, wonder: id, tileIndex: -1, progress: 0 }
+      : kind === 'unit' ? (id === 'SETTLER' ? { kind: 'settler', progress: 0, cost: 0 } : { kind, unit: id, progress: 0 })
+        : kind === 'district' ? { kind, district: id as DistrictId, tileIndex: -1, progress: 0 }
+          : kind === 'project' ? { kind, project: id, progress: 0, cost: 0 } : undefined;
+  return queueItemColumn(q);
 }
 
 function queueTile(q: City['queue'][number] | undefined): number {
@@ -1256,10 +1269,11 @@ const CITY: Record<string, Extractor> = {
       .sort((a, b) => a - b),
   ),
   productionBank: overCities((r) => r.city.productionBank ?? 0),
-  keptDistricts: overCities((r) => PLACEABLE_DISTRICTS.flatMap((t) => {
-    const k = r.city.keptDistricts?.[t];
-    return k ? [k.progress, k.cost] : [0, 0];
-  })),
+  kept: overCities((r) => Object.entries(r.city.kept ?? {})
+    .map(([k, v]) => [keptColumn(k), v ?? 0] as const)
+    .sort((a, b) => a[0] - b[0])
+    .flat()),
+  districtCost: overCities((r) => PLACEABLE_DISTRICTS.map((t) => r.city.districts.find((d) => d.type === t)?.cost ?? 0)),
   projectYield: overCities((r) => projectYieldCols(r.city.projectYield)),
   queueFront: overCities((r) => overQueue(r.city.queue, (q) => [queueItemColumn(q), queueTile(q)]).flat()),
   specialists: overCities((r, state) => {

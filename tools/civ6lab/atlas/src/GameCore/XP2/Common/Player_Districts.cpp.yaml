@@ -73,6 +73,7 @@
   readings:
     - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
     - "C-100: the build turns' store — a completion's overflow, an idle city's Production — and a Builder's charge at the count before the turn's contract purchases"
+    - "C-111: every item's progress kept by type outside the queue, a pillaged building's or district's repair on the share its pillage left, a district's locked price on the district — READ (0x17f5a0, 0x175730 at 0x175bd3, 0x17d910, 0x175140, 0x1af5b0 -> 0x17e770 -> 0x183a60, 0x193190 -> 0x183950), both twins"
   context:
     - "...ds it), T0 / T1 turnsToBuildDistrict 0x17b5a0 each at least 1, the cost the player's (0x4088a0), the same value. The 0x5d4650 call's result is not read. Port: `aiModifiers.ts` (`rese..."
   review: reviewed

@@ -61,6 +61,9 @@ export type Decision = Base & (
    *  down, standing on a wonder under construction); `placed`: the wonder
    *  was placed in the pair, its queue head the step's own */
   | { kind: 'wonderCharge'; player: number; unit: string; plot: number; placed?: boolean }
+  /** a National Park designated where the unit spent its charge: the four
+   *  plots of record t+1's new park holding that plot */
+  | { kind: 'park'; player: number; unit: string; plot: number; plots: number[] }
   /** a city-state's army levied: its units leave it and come back the
    *  major's (`UnitRemovedFromMap` then `UnitAddedToMap`), each record key
    *  old → new and the plot the game adds it on */
@@ -145,6 +148,8 @@ export function activePlayer(rec: TurnRecord): number {
 
 const centreOf = (c: DumpCity, W: number) => c.y * W + c.x;
 const unitKey = (u: { owner: number; id: number }) => `${u.owner}:${u.id}`;
+/** the record's National Parks, each its name and plots */
+const parksOf = (rec: TurnRecord) => (Array.isArray(rec.parks) ? rec.parks as [string, number[]][] : []);
 
 /** a game queue entry as a `QueueSpec`, null for an entry naming nothing */
 export function queueSpec(e: DumpQueueEntry | string, W: number): QueueSpec | null {
@@ -724,11 +729,19 @@ export class RecordedActions implements ActionSource {
         const at = ev.indexOf(r);
         const captured = ev.slice(at + 1, at + 6).some((x) => x[2] === 'UnitCaptured' && n(x, 0) === n(r, 0) && n(x, 1) === n(r, 1));
         const u = captured ? undefined : units1.get(`${n(r, 0)}:${n(r, 1)}`) ?? a.units.find((x) => x.owner === n(r, 0) && x.id === n(r, 1));
-        const plot = u ? u.y * W + u.x : -1;
+        // where the Builder stands at the charge: its last move logged
+        // before it (runs/h1_duelp1117 t74: Builder 2097159 from 35:13 onto
+        // Hanging Gardens' 34:13, then its charge)
+        const plot = u ? paths.get(`${n(r, 0)}:${n(r, 1)}`)?.at(-1) ?? u.y * W + u.x : -1;
         const placed = plot >= 0 && (plotAt(a, plot)[P.wonder] as number) < 0 && (plotAt(b, plot)[P.wonder] as number) >= 0;
         if (u && cat.units[u.type] === 'UNIT_BUILDER' && plot >= 0 && ((plotAt(a, plot)[P.wonder] as number) >= 0 || placed) && !plotAt(a, plot)[P.wonderComplete]) {
           out0.push({ kind: 'wonderCharge', phase: phaseOf(n(r, 0)), player: n(r, 0), unit: `${n(r, 0)}:${n(r, 1)}`, plot, ...(placed ? { placed } : {}) });
         }
+        // a charge spent on a plot record t+1's new National Park holds is
+        // its designation (runs/h1_duelp1121 t211: China's Naturalist
+        // 6881307, Yosemite's park on 716 / 759 / 760 / 804 in record t212)
+        const park = plot >= 0 ? parksOf(b).find(([, ps]) => ps.includes(plot) && !parksOf(a).some(([, qs]) => qs.includes(plot))) : undefined;
+        if (u && park) out0.push({ kind: 'park', phase: phaseOf(n(r, 0)), player: n(r, 0), unit: `${n(r, 0)}:${n(r, 1)}`, plot, plots: [...park[1]] });
       } else if (name === 'UnitMoved') {
         const k = `${n(r, 0)}:${n(r, 1)}`;
         paths.set(k, [...(paths.get(k) ?? []), n(r, 3) * W + n(r, 2)]);

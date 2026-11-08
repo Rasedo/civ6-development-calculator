@@ -137,22 +137,26 @@ export interface City {
   buildings: string[];
   /** the members of `buildings` standing PILLAGED — dark until repaired.
    *  CIV6 (Sabotage Production): "Pillage all buildings in the industrial
-   *  zone"; a pillaged building is repaired from the city's own queue at
-   *  PILLAGE_BUILDING_REPAIR_PERCENT of its cost. ONE reader:
+   *  zone"; a pillaged building is repaired from the city's own queue, at
+   *  its price on the progress its pillage left (`resumeItem`). ONE reader:
    *  `buildingPillaged`. Absent = none. */
   pillagedBuildings?: string[];
   /** the game era each member of `buildings` that carries `yieldsPerEra`
    *  was constructed or last repaired in (`stampBuildingEra`), by building
    *  id. It rides the city through a capture or a flip. Absent = none. */
   buildingEras?: Record<string, number>;
-  districts: { type: DistrictId; tileIndex: number }[];
+  /** each district the city holds on its plot, with `cost` the price locked
+   *  at its placement (the District's +0xaa8, which the cost reader 0x179960
+   *  returns for the city's own district of the type; its repair and a
+   *  resumed item build at it). Absent = none read. */
+  districts: { type: DistrictId; tileIndex: number; cost?: number }[];
   wonders: { id: string; tileIndex: number }[];
   productionBank?: number;
-  /** CIV6 (City_BuildQueue +0x248, the district progress kept by type): a
-   *  district item the queue let go unfinished (`districtPlotHostile`) — its
-   *  progress and its locked price, by district type, until the city queues
-   *  it again (`resumeDistrict`). Absent = none. */
-  keptDistricts?: Partial<Record<DistrictId, { progress: number; cost: number }>>;
+  /** CIV6 (City_BuildQueue's per-type progress, +0x218 buildings, +0x230
+   *  units, +0x248 districts, +0x260 projects): the progress the city keeps
+   *  on an item outside its queue, by `keptKey`, until the city queues the
+   *  item again (`resumeItem`). Absent = none. */
+  kept?: Partial<Record<string, number>>;
   /** CIV6 (Project_YieldConversions; City_BuildQueue 0x184ae0): the yield
    *  the city's last production step converted from the Production it put
    *  into a district project — PercentOfProductionRate of that Production

@@ -446,8 +446,8 @@ export function pillageBuilding(city: { buildings?: string[]; pillagedBuildings?
   (city.pillagedBuildings ??= []).push(id);
 }
 
-/** the repair — the building's own queue column completing at
- *  PILLAGE_BUILDING_REPAIR_PERCENT of its price clears the mark. */
+/** the repair — the building's own queue column completing clears the
+ *  mark. */
 export function repairBuilding(city: { pillagedBuildings?: string[] }, id: string): void {
   if (!city.pillagedBuildings) return;
   city.pillagedBuildings = city.pillagedBuildings.filter((b) => b !== id);

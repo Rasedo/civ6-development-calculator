@@ -128,7 +128,7 @@ def main() -> None:
     bad.seat_ext[0, row] = True
     off = int(((bad.tile_seat[0] != row)).nonzero(as_tuple=True)[0][0])  # a tile this seat does not own
     assert not bool(bad._district_elig(row, j, di, plc)[0, off]), "the probe tile is eligible after all"
-    placed = bad._place_district(row, j, di, torch.tensor([True]), plc, torch.tensor([off]))
+    placed = bad._place_district(row, j, di, torch.tensor([True]), plc, torch.tensor([off]), torch.zeros(bad.B, dtype=torch.float64))
     assert not bool(placed[0]), "the engine took a tile this seat does not own"
     assert int(bad.district[0, off]) < 0, "an unowned tile was paved"
 
@@ -142,7 +142,7 @@ def main() -> None:
     assert len(c4) >= 2, "need two eligible tiles to prove the engine does not re-rank"
     best4 = int(ladder.pick_district_tile(e4, a4)[0])
     other = next(t for t in c4 if t != best4)
-    got4 = sub._place_district(row, j, di, torch.tensor([True]), plc, torch.tensor([other]))
+    got4 = sub._place_district(row, j, di, torch.tensor([True]), plc, torch.tensor([other]), torch.zeros(sub.B, dtype=torch.float64))
     assert bool(got4[0]), "the engine refused an eligible tile"
     assert int(sub.district[0, other]) == di, "the district did not land on the NAMED tile"
     assert int(sub.district[0, best4]) < 0, "the engine placed on its own favourite instead"

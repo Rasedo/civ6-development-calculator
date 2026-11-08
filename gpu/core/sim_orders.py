@@ -1680,8 +1680,8 @@ class SimOrders:
             self.city_outer_hp[b, row, col] = _m_outer
             self._q_clear(b, row, col)
             self.city_prod_bank[b, row, col] = 0
-            self.city_dist_kept[b, row, col] = 0
-            self.city_dist_kept_cost[b, row, col] = 0
+            self.city_kept[b, row, col] = 0
+            self.city_dist_cost[b, row, col] = 0
             self.city_proj_conv[b, row, col] = 0
             self.city_proj_yield[b, row, col] = -1
             for _p in ("city_gw_obj", "city_gw_maker", "city_gw_era", "city_gw_seat"):

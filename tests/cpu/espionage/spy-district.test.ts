@@ -24,7 +24,7 @@ import {
 } from '../../../cpu/data/espionage';
 import { buildingPillaged, cityBuildingYields, darkBuildings } from '../../../cpu/core/yields';
 import { availableBuildings, purchasableBuildings, buildingCostIn } from '../../../cpu/core/rules';
-import { completeQueueItem } from '../../../cpu/core/production';
+import { completeQueueItem, resumeItem } from '../../../cpu/core/production';
 import { makeYieldCtx } from '../../../cpu/core/effects';
 import { BUILDINGS } from '../../../cpu/data/buildings';
 import { PILLAGE_BUILDING_REPAIR_PERCENT } from '../../../cpu/data/constants';
@@ -242,7 +242,7 @@ describe('the counterspy defends the district it stands on and the adjacent ones
 });
 
 describe('Sabotage Production pillages the buildings', () => {
-  it('marks the Zone\'s buildings, the yield walk skips them, and the queue repairs them at a quarter', () => {
+  it('marks the Zone\'s buildings, the yield walk skips them, and the queue repairs them from three quarters', () => {
     const { state, theirs, them } = spyState();
     const iz = districtAt(state, theirs, 'INDUSTRIAL_ZONE', 1);
     theirs.buildings.push('WORKSHOP');
@@ -258,13 +258,17 @@ describe('Sabotage Production pillages the buildings', () => {
     expect(darkBuildings(state.map, theirs).has('WORKSHOP')).toBe(true);
     expect(cityBuildingYields(ctx, theirs).production).toBe(lit - (BUILDINGS.WORKSHOP.yields?.production ?? 0));
 
-    // THE REPAIR: the building's own column, at PILLAGE_BUILDING_REPAIR_PERCENT
-    // of its price, from the queue alone
+    // THE REPAIR: the building's own column at its price, from the queue
+    // alone, on the progress its pillage left (PILLAGE_BUILDING_REPAIR_PERCENT
+    // short of it)
     expect(availableBuildings(state, theirs).some((b) => b.id === 'WORKSHOP')).toBe(true);
     expect(purchasableBuildings(state, theirs).some((b) => b.id === 'WORKSHOP')).toBe(false);
     const price = buildingCostIn(state, theirs, 'WORKSHOP');
-    expect(price).toBe(Math.round((BUILDINGS.WORKSHOP.cost * PILLAGE_BUILDING_REPAIR_PERCENT) / 100));
-    const item: QueueItem = { kind: 'building', building: 'WORKSHOP', progress: price };
+    expect(price).toBe(BUILDINGS.WORKSHOP.cost);
+    const item: QueueItem = { kind: 'building', building: 'WORKSHOP', progress: 0 };
+    resumeItem(state, theirs, item);
+    expect(item.progress).toBe(Math.floor((price * (100 - PILLAGE_BUILDING_REPAIR_PERCENT)) / 100));
+    item.progress = price;
     completeQueueItem(state, theirs, item, price);
     expect(buildingPillaged(theirs, 'WORKSHOP')).toBe(false);
     expect(theirs.buildings.filter((b) => b === 'WORKSHOP')).toHaveLength(1);

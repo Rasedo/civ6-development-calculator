@@ -40,14 +40,14 @@ import { advanceTurn, minorTurns, turnChange, turnClose, foundCity, foundCityAt,
   buyWorshipBuilding, purchaseBuildingWithFaith, purchaseCivilianWithFaith, purchaseNaturalist, purchaseReligiousUnit, purchaseRockBand, purchaseUnitWithFaith,
   purchaseSettler, unitGoldPrice, availableProjects, goldAffordable, buildingFaithPrice, wonderChargeBoost, adoptBeliefs,
   serialize, deserialize, itemCost } from '../core/game';
-import { completeQueueItem, keepDistrict, resumeDistrict } from '../core/production';
+import { completeQueueItem, keepItem, keptKey, resumeItem, takeKept } from '../core/production';
 import { applySeatUnitOrders, buySeatBuilding, declareWar, districtSiteCost, districtSiteLegal, foundPantheon, grantPantheonUnit, jumpMadeAnew, levyGoldCost, levyUnits, paveGround,
   placeSeatDistrict, putOffer, answerOffer, sueForPeace, transferCity, cityStrikeAt, holdCityStrikes, envoysAtStart, applySeatEnvoys,
   seatPhase, worldCongress, holdBankruptDisband, completeResearchNow } from '../core/phase';
 import { addEnvoys, cityStateAt, declareWarOnCityState, minorCity, minorReplaceCitizens, placeCityStateAt, sueForPeaceWithCityState } from '../core/cityStates';
 import { CP_ACCEPTED, CP_CANCELLED, CP_IN_PROGRESS, contractById } from '../core/aiContracts';
 import { availableBuildings, canPlaceWonder, validImprovements, wallsMax } from '../core/rules';
-import { builderHarvest, builderRemoveFeature, spawnUnit, tallyUnitMade, trainableUnits, builderCost, traderCost, disbandUnit, escortable, drawAndPayGoody, grantedMoves, unitFullMoves, restUnit, canFortify, upgradeUnit, upgradeAnew, unitsAt, unitDomain, fortifyBonus, crossesRiver, waterWalks, cityAtIndex, raiseBestTrained, recordAttacker, unitMadeAnew, FORTIFY_MAX_TURNS, ANTIQUITY_CIVIC, SHIPWRECK_CIVIC } from '../core/units';
+import { builderHarvest, builderRemoveFeature, spawnUnit, tallyUnitMade, trainableUnits, builderCost, traderCost, disbandUnit, escortable, drawAndPayGoody, grantedMoves, unitFullMoves, restUnit, canFortify, upgradeUnit, naturalistPark, upgradeAnew, unitsAt, unitDomain, fortifyBonus, crossesRiver, waterWalks, cityAtIndex, raiseBestTrained, recordAttacker, unitMadeAnew, FORTIFY_MAX_TURNS, ANTIQUITY_CIVIC, SHIPWRECK_CIVIC } from '../core/units';
 import { availableCivicsIn, availableTechsIn, computeUnlocks, goldPrice, governmentSlots, policyWireOf, seatGovernment, darkAgeEra,
   unlockedPolicyIds } from '../core/effects';
 import { selectResearch, chopGrant, harvestGrant, applyLumpYield, holdResearchEra, researchCost } from '../core/economy';
@@ -165,9 +165,6 @@ interface Ctx {
   playerOfSeat: Map<number, number>;
   /** record unit `${owner}:${id}` -> the engine unit */
   units: Map<string, Unit>;
-  /** the production a city banked on an item it switched away from, by
-   *  `${centre}|${itemKey}` (the game keeps it on the item) */
-  retained: Map<string, number>;
   /** the city-states the first record holds no city for, by player id */
   pendingMinors: Map<number, CityState>;
   /** the importer's reading of record t+1, the ids every imposed outcome
@@ -2562,7 +2559,7 @@ function placeHead(ctx: Ctx, actor: Seat, city: City, q: QueueItem): boolean {
       t.district = q.district;
       t.districtComplete = false;
       paveGround(t);
-      if (!city.districts.some((d) => d.tileIndex === q.tileIndex)) city.districts.push({ type: q.district, tileIndex: q.tileIndex });
+      if (!city.districts.some((d) => d.tileIndex === q.tileIndex)) city.districts.push({ type: q.district, tileIndex: q.tileIndex, cost: q.cost });
       // set on its plot, the city's citizens re-placed (0x181700)
       replaceAllCitizens(state, city, cityFlags(city));
       return false;
@@ -2622,22 +2619,13 @@ function applyQueue(ctx: Ctx, d: Extract<Decision, { kind: 'queue' }>): void {
   const items = d.items.map((s) => ({ s, q: queueItem(ctx, seat, city, s) })).filter((x): x is { s: QueueSpec; q: QueueItem } => !!x.q);
   const head = city.queue[0];
   const keep = head && items[0] && itemKey(head) === itemKey(items[0].q);
-  // a district's progress is the city's, kept by type (`keepDistrict`)
-  for (const q of city.queue.slice(keep ? 1 : 0)) {
-    if (q.progress <= 0) continue;
-    if (q.kind === 'district') keepDistrict(city, q, itemCost(q, ctx.state, city));
-    else ctx.retained.set(`${city.centerIndex}|${itemKey(q)}`, q.progress);
-  }
+  // an item leaving the queue keeps its progress on its type, and one
+  // queued resumes it (`keepItem`, `resumeItem`)
+  for (const q of city.queue.slice(keep ? 1 : 0)) keepItem(city, q);
   const queue: QueueItem[] = keep ? [head] : [];
   items.forEach(({ q }, i) => {
     if (i === 0 && keep) return;
-    const k = `${city.centerIndex}|${itemKey(q)}`;
-    if (q.kind === 'district') {
-      if (!resumeDistrict(city, q)) q.progress = 0;
-    } else {
-      q.progress = ctx.retained.get(k) ?? 0;
-      ctx.retained.delete(k);
-    }
+    resumeItem(ctx.state, city, q);
     if (i === 0) {
       const ok = placeHead(ctx, actor, city, q);
       const why = ok ? undefined : q.kind === 'building' && city.buildings.includes(q.building) ? 'already standing in the engine city'
@@ -3383,7 +3371,7 @@ const A_PLUNDER = unitActionIndex(IMPROVEMENT_IDS).PLUNDER;
  *  boosts may complete what was in hand (runs/h1_duelw1117 t23: China's
  *  Slinger kill completed Archery, then Horseback Riding was picked) */
 const ORDER: Decision['kind'][] = ['found', 'capture', 'policies', 'pantheon', 'religion', 'governors', 'war',
-  'envoy', 'levy', 'levyEnd', 'routes', 'congress', 'buyPlot', 'buyBuilding', 'wonderCharge', 'queue', 'worked', 'improve', 'clear', 'buyUnit', 'move', 'village', 'gpActivate', 'unitNew', 'pillage', 'plunder', 'battle', 'seize', 'unitGone', 'combat', 'hit', 'kill', 'promote', 'upgrade', 'camp', 'research', 'civic'];
+  'envoy', 'levy', 'levyEnd', 'routes', 'congress', 'buyPlot', 'buyBuilding', 'wonderCharge', 'queue', 'worked', 'improve', 'clear', 'buyUnit', 'move', 'village', 'gpActivate', 'park', 'unitNew', 'pillage', 'plunder', 'battle', 'seize', 'unitGone', 'combat', 'hit', 'kill', 'promote', 'upgrade', 'camp', 'research', 'civic'];
 
 function applyPhase(ctx: Ctx, ds: Decision[], phase: Decision['phase'], b: TurnRecord, wit: TurnRecord,
   players?: ReadonlySet<number>): void {
@@ -3560,6 +3548,24 @@ const res = buyTile(state, city.id, d.plot, seat);        if (!res.ok) setTileOw
           cs.levyEnds = state.turn + LEVY_TURNS - 1;
         }
         count(ctx, 'levy', res.ok ? 'applied' : 'fallback', d.player, res.reason);
+        break;
+      }
+      case 'park': {
+        // the order is the player's, through the engine's verb from the plot
+        // the unit spent its charge on; the park the engine designates is the
+        // record's four plots, or the record's stands in its place
+        const u = unitOf(ctx, d.unit);
+        if (!u) { count(ctx, 'park', 'refused', d.player, 'a unit the replay does not hold'); break; }
+        u.tileIndex = d.plot;
+        const before = new Set(state.map.tiles.filter((t) => (t.park ?? -1) >= 0).map((t) => t.index));
+        const res = naturalistPark(state, u.id, seatOfP(ctx, d.player));
+        const anchor = Math.min(...d.plots);
+        const same = res.ok && d.plots.every((p) => state.map.tiles[p].park === anchor);
+        if (!same) {
+          for (const t of state.map.tiles) if ((t.park ?? -1) >= 0 && !before.has(t.index)) t.park = -1;
+          for (const p of d.plots) state.map.tiles[p].park = anchor;
+        }
+        count(ctx, 'park', same ? 'applied' : 'fallback', d.player, res.reason);
         break;
       }
       case 'gpActivate': {
@@ -4384,7 +4390,7 @@ function completeTrained(ctx: Ctx, b: TurnRecord, d: Extract<Decision, { kind: '
     const q = queueItem(ctx, seat, c, { kind: 'unit', row: d.type, plot: -1, ...(num(rec?.formation) > 0 ? { formation: num(rec?.formation) } : {}) });
     if (!q) continue;
     const k = itemKey(q);
-    if (!c.queue.some((x) => itemKey(x) === k) && !ctx.retained.has(`${c.centerIndex}|${k}`)) continue;
+    if (!c.queue.some((x) => itemKey(x) === k) && c.kept?.[keptKey(q)] === undefined) continue;
     [bd, city, item] = [dd, c, q];
   }
   if (!city || !item) {
@@ -4393,9 +4399,8 @@ function completeTrained(ctx: Ctx, b: TurnRecord, d: Extract<Decision, { kind: '
   }
   const k = itemKey(item);
   const held = city.queue.findIndex((x) => itemKey(x) === k);
-  const progress = held >= 0 ? city.queue[held].progress : ctx.retained.get(`${city.centerIndex}|${k}`) ?? 0;
+  const progress = held >= 0 ? city.queue[held].progress : takeKept(city, item);
   if (held >= 0) city.queue.splice(held, 1);
-  ctx.retained.delete(`${city.centerIndex}|${k}`);
   const cost = itemCost(item, state, city);
   completeQueueItem(state, city, item, cost);
   matchNewUnits(ctx, b);
@@ -5720,7 +5725,6 @@ function perTurnWorld(ctx: Ctx, a: TurnRecord, imp: Imported, history: History, 
     // Warrior 589824 made on slot 0, its Builder lost at t25)
     for (let k = 0; k < pool.size; k++) if (!held.has(k) && !pool.free.includes(k) && !pool.dying.includes(k)) pool.dying.push(k);
   }
-  ctx.retained = new Map();
 }
 
 /** A CITY-STATE'S SAVINGS over a record before the window (`savings`, by
@@ -5895,7 +5899,7 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
   const govtLog = loadAiCivicLog(dumpPath);
   const ctx: Ctx = {
     state, cat, W: recs[0].head.W, seatOfPlayer: first.seatOfPlayer, playerOfSeat: first.playerOfSeat,
-    units: new Map(), retained: new Map(), pendingMinors: new Map(), next: first, tally: new Map(), fellBack: new Map(), imposed: new Map(), reasons: new Map(),
+    units: new Map(), pendingMinors: new Map(), next: first, tally: new Map(), fellBack: new Map(), imposed: new Map(), reasons: new Map(),
     engineKilled: new Set(), paths: new Map(), walked: new Set(), steps: new Map(), barbBlows: new Map(), barbCentres: new Map(), gone: new Map(), barbSeized: [], minorBlows: new Map(), minorShots: [], minorPromoted: new Map(), minorBuys: [], minorImproves: [], minorClears: [], minorCleared: new Set(), minorClearItems: new Map(), minorClearUnits: [], barbBattles: [], barbFought: new Set(), barbDraws: [], promoteHp: new Map(), minorUnits: [], minorGround: [], buyTrace, lateBlows: [], upgradeInto: new Set(), upgradedFrom: new Map(), levyFrom: new Map(), barbSteps: [], barbPillaged: [], envoys: [], battled: new Set(), fortified: new Map(), undug: new Map(), streams: new Map(), applied: new Set(), barbNew: [], lateEnvoys: [], log: history.randLog, stream, prev: recs[0],
     researchAi: report.researchAi, researchScores: report.researchScores, agendaCivics: null, strategyLog: loadStrategyLog(dumpPath), researchBefore: new Map(), researchAtTurn: new Map(), aiResearchLog,
     tactical: loadTactical(dumpPath), barbTally: report.barbTactics, minorTally: report.minorTactics, minorDraws: report.minorDraws,

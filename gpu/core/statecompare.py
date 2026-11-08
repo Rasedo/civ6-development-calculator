@@ -1446,9 +1446,12 @@ CITY = {
     "productionBank": lambda sim, b, rows: [
         float(sim.city_prod_bank[b, c, s]) for c, s in rows
     ],
-    "keptDistricts": lambda sim, b, rows: [
-        [float(x) for p, k in zip(sim.city_dist_kept[b, c, s].tolist(), sim.city_dist_kept_cost[b, c, s].tolist())
-         for x in ((p, k) if k > 0 else (0.0, 0.0))]
+    "kept": lambda sim, b, rows: [
+        [x for i, v in enumerate(sim.city_kept[b, c, s].tolist()) if v != 0 for x in (i, float(v))]
+        for c, s in rows
+    ],
+    "districtCost": lambda sim, b, rows: [
+        [float(k) if t >= 0 else 0.0 for t, k in zip(sim.city_dist_tile[b, c, s].tolist(), sim.city_dist_cost[b, c, s].tolist())]
         for c, s in rows
     ],
     "projectYield": lambda sim, b, rows: [
