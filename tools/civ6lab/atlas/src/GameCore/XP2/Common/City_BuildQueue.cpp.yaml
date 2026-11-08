@@ -460,6 +460,7 @@
     - "C-96: the knowledge base's army records and the Combat Desire — READ (the records, the update, the desire), PARTLY READ (the signals' looks, the standing-army count)"
     - "C-96: the knowledge base's army records and the Combat Desire — READ (the records, the update, the desire), PARTLY READ (the signals' looks; the standing-army count in its own section below)"
     - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
+    - "C-130: the city update's Default Specialization on an empty queue, before the civics AI's turn; the dig sites a major's civic lays before the minors' turns — READ (0x5ce8f0, 0x6096c0's +0x370 list, CultureAI +0x208), both twins"
   context:
     - "...it plus 20 exceeds B; the player itself adds each city's unit at the head of its queue (0x179860 on city +0x2170) of such strength — Regional (+0x398); a player at war (0x469cd0) or..."
   review: reviewed

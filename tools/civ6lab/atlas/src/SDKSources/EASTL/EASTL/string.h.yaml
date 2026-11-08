@@ -161,6 +161,7 @@
   status: PARTLY
   readings:
     - "H-1: the AI memory reader — READ (the hooks, the pointer paths, the contracts, the knowledge base, the operations, the trees), PARTLY READ (the religious AI's holder)"
+    - "C-130: the city update's Default Specialization on an empty queue, before the civics AI's turn; the dig sites a major's civic lays before the minors' turns — READ (0x5ce8f0, 0x6096c0's +0x370 list, CultureAI +0x208), both twins"
   context:
     - "...x268, the purchases), Research (0x75e7a0 (FinalRelease 0x4f70f0): +0x178), CultureAi (0x6190d0 (FinalRelease 0x40e8c0): +0x218), Diplomatic (0x6419c0 (FinalRelease 0x4271a0): +0x6158..."
   review: reviewed

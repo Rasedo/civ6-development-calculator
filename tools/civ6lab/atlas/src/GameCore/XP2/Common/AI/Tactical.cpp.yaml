@@ -130,6 +130,16 @@
   context:
     - "- The pass (TacticalAI 0x771530, a vtable slot): the unit list (+0x240, 0x77d100 from the player's unit evaluator 0x60a..."
   review: reviewed
+- addr: 0x771570
+  final: 0x503560
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-130: the city update's Default Specialization on an empty queue, before the civics AI's turn; the dig sites a major's civic lays before the minors' turns — READ (0x5ce8f0, 0x6096c0's +0x370 list, CultureAI +0x208), both twins"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - ...0, 0x695660, 0x70a2a0, the civics AI's turn 0x620110 (0x609f34), the military 0x722690, 0x771570; 0x608870 runs the whole list pass by pass (4..0) before 0x608580 runs the +0x388 list....
+  review: imported
 - addr: 0x7715a0
   final: 0x503590
   kind: function

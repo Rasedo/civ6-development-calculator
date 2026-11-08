@@ -31,9 +31,12 @@
   review: reviewed
 - addr: 0x620110
   kind: function
-  semantics: "the civics AI's turn job (list B, before the Economic AI: the policy jobs read the gold boost its last turn wrote)."
+  semantics: "the civics AI's turn job: in the Control Manager's +0x370 list (registered at 0x609f34, after the cities' job 0x5c2650, research 0x760980 and the Economic AI 0x687bf0), acting only in the pass its +0x208 names (0x620127; 2, set at 0x619578): after the cities' update of pass 2, whose Default Specialization (0x5ce8f0) has queued an item a completion left, before the +0x388 list's second hook. The policy jobs read the gold boost its last turn wrote."
   status: PARTLY
   cases:
+    - recording: h1_duely1128
+      turn: 217
+      value: "Bologna's AT Crew queued by the t216 update: Totalitarianism 1509.5 at t217 on the t216 government values (UNIT_PRODUCTION flat bonus on the unit at the head)"
     - recording: h1_duely1117
       turn: 15
       value: "Caguana: Charismatic Leader first 14.0 at t15, Political Philosophy 1.5 above from t17"
@@ -60,6 +63,7 @@
     - "C-97: the government and policy choice — the choice READ, the values PARTLY READ"
     - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
     - "C-130: the government values' parts at Hunza (live) — READ"
+    - "C-130: the city update's Default Specialization on an empty queue, before the civics AI's turn; the dig sites a major's civic lays before the minors' turns — READ (0x5ce8f0, 0x6096c0's +0x370 list, CultureAI +0x208), both twins"
   context:
     - "- THE PROPAGATION, 0x61ee30 (the turn 0x620110's first step, on each entry): a row in reach scores its own value and its prerequisites..."
     - "- WHEN: the AI's turn (0x620110) chooses with key -1 only where nothing is in hand (0x399a90 = -1). A COMPLETION fires..."

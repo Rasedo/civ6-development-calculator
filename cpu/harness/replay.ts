@@ -47,7 +47,7 @@ import { applySeatUnitOrders, buySeatBuilding, declareWar, districtSiteCost, dis
 import { addEnvoys, cityStateAt, declareWarOnCityState, minorCity, minorReplaceCitizens, placeCityStateAt, sueForPeaceWithCityState } from '../core/cityStates';
 import { CP_ACCEPTED, CP_CANCELLED, CP_IN_PROGRESS, contractById } from '../core/aiContracts';
 import { availableBuildings, canPlaceWonder, validImprovements, wallsMax } from '../core/rules';
-import { builderHarvest, builderRemoveFeature, spawnUnit, trainableUnits, builderCost, traderCost, disbandUnit, drawAndPayGoody, grantedMoves, unitFullMoves, restUnit, upgradeUnit, unitsAt, unitDomain, fortifyBonus, crossesRiver, waterWalks, cityAtIndex, raiseBestTrained, recordAttacker, unitMadeAnew, FORTIFY_MAX_TURNS } from '../core/units';
+import { builderHarvest, builderRemoveFeature, spawnUnit, trainableUnits, builderCost, traderCost, disbandUnit, drawAndPayGoody, grantedMoves, unitFullMoves, restUnit, upgradeUnit, unitsAt, unitDomain, fortifyBonus, crossesRiver, waterWalks, cityAtIndex, raiseBestTrained, recordAttacker, unitMadeAnew, FORTIFY_MAX_TURNS, ANTIQUITY_CIVIC, SHIPWRECK_CIVIC } from '../core/units';
 import { availableCivicsIn, availableTechsIn, computeUnlocks, goldPrice, governmentSlots, policyWireOf, seatGovernment, darkAgeEra,
   unlockedPolicyIds } from '../core/effects';
 import { selectResearch, chopGrant, harvestGrant, applyLumpYield, holdResearchEra, researchCost } from '../core/economy';
@@ -4281,6 +4281,30 @@ function syncDedications(ctx: Ctx, seats?: ReadonlySet<number>): void {
   });
 }
 
+/** THE DIG SITES a revealing civic's first completion in the game lays (Game
+ *  Archaeology 0x27f640, once a game per kind: Natural History's Antiquity
+ *  Sites, Cultural Heritage's Shipwrecks), in the start of a major of `seats`
+ *  before the city-states' turns: record t+1's sites of that kind, which the
+ *  minors' AIs read in their turn of t (runs/h1_duely1128 t176: player 1's
+ *  Natural History, 12 sites; Bologna's t177 Natural History 541.3 on the
+ *  Archaeologist its t176 table counts) */
+function layDigSites(ctx: Ctx, before: Imported, seats: readonly number[]): void {
+  const { state, next } = ctx;
+  const holds = (s: GameState, civic: string, only?: readonly number[]) =>
+    [...s.seats, ...s.cityStates, ...(s.freeSeat ? [s.freeSeat] : [])]
+      .some((x) => (!only || only.includes(x.seat)) && x.research.civics.includes(civic));
+  for (const [civic, kind] of [[ANTIQUITY_CIVIC, 'antiquity'], [SHIPWRECK_CIVIC, 'shipwreck']] as const) {
+    if (holds(before.state, civic) || !holds(next.state, civic, seats)) continue;
+    let laid = 0;
+    for (const t of state.map.tiles) {
+      if (t[kind] || !next.state.map.tiles[t.index][kind]) continue;
+      t[kind] = true;
+      laid++;
+    }
+    if (laid) count(ctx, `digSites:${kind}`, 'fallback');
+  }
+}
+
 /** THE PILLAGES AND REPAIRS: a pillage is a unit's action (the barbarians'
  *  and the players' alike), which the record's units carry, and so is a
  *  Builder's repair: each improvement standing on both sides takes record
@@ -5502,6 +5526,7 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
       // ...taking into the turn's heal the moves their actions spent
       for (const [u, kept] of movesKept) if (others.includes(u.seat)) u.movesLeft = kept ? grantedMoves(state, u) : 0;
       for (const seat of others) detectBoosts(state, seat);
+      layDigSites(ctx, recordA, others);
       // the envoys the majors' actions sent land before the city-states'
       // turns, which bank on the ground they annex (runs/h1_duely1127 t60:
       // China's envoy to Hattusa in its actions annexes 573, Hattusa's

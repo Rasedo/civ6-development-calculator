@@ -24,6 +24,7 @@
   readings:
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
+    - "C-130: the city update's Default Specialization on an empty queue, before the civics AI's turn; the dig sites a major's civic lays before the minors' turns — READ (0x5ce8f0, 0x6096c0's +0x370 list, CultureAI +0x208), both twins"
   context:
     - ...s), the homeland (0x70a440), Defend Units, a conversion (0x590a30), the espionage AI (0x695660), a retreat (0x212500), and the unit-created handler 0x60a440 (player signals +0x60, ra...
   review: reviewed

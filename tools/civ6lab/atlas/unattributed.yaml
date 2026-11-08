@@ -4105,6 +4105,7 @@
     - "C-129: a city-state's contract purchases come after its knowledge base's look — the job order READ (0x6096c0), the birth record's timing off the aimem sites, both twins"
     - "C-129: the military AI's upgrade — READ (0x727db0, 0x6874d0), both twins"
     - "C-129: the military AI's upgrade after the look; the Free Cities buy none — READ (0x6096c0's lists, 0x687bf0), both twins"
+    - "C-130: the city update's Default Specialization on an empty queue, before the civics AI's turn; the dig sites a major's civic lays before the minors' turns — READ (0x5ce8f0, 0x6096c0's +0x370 list, CultureAI +0x208), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...om the behaviour tree — \"HL: Rock Band Move\" (0x710f40) and the CITY_ASSAULT operation (0x722690), each building a unit's name for its log (the band template over 118 and 155): the AI'..."

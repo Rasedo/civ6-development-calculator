@@ -8353,3 +8353,45 @@ Wander and the barbarian pass's `live` (gpu/core/sim_tactics.py).
   Apostles and Missionaries (32 rows in the duely logs, "Move 7 13 Attack
   -9999" beside its plot, "Move 4 18 Attack 4 18" onto it): runs/
   h1_duely1121 t92 Man-At-Arms 3014664 (C-95).
+
+## C-130: the city update's Default Specialization on an empty queue, before the civics AI's turn; the dig sites a major's civic lays before the minors' turns — READ (0x5ce8f0, 0x6096c0's +0x370 list, CultureAI +0x208), both twins
+
+`minorAiTurn`'s pick (cpu/core/minorCityAi.ts; `emptyQueuePick`); GPU
+`_minor_ai_turn`'s `idle` pick (gpu/core/sim_minorai.py, `_minor_empty_pick`);
+the replay's `layDigSites` (cpu/harness/replay.ts).
+
+- THE UPDATE'S PICK: the city update 0x5ce680 ends, for a player the AI
+  drives, with 0x5d4d70 where the queue (city +0x2170) is empty (0x5ce8da:
+  +0x2350 0 or +0x2340 null) — every turn, not the founding alone: an item
+  the city's production completed that turn is followed in the update, on
+  the update's own tables (the contract in hand where it takes the turn,
+  else the pick). The second hook (0x5ce5b0) repeats it on a queue still
+  empty.
+- THE ORDER: the Control Manager's +0x370 list (0x6096c0) holds the cities'
+  job 0x5c2650 first (0x6096f1), then ..., research 0x760980, the Economic AI
+  0x687bf0, 0x695660, 0x70a2a0, the civics AI's turn 0x620110 (0x609f34),
+  the military 0x722690, 0x771570; 0x608870 runs the whole list pass by pass
+  (4..0) before 0x608580 runs the +0x388 list. A job acts in its own pass:
+  0x620110 where the pass equals CultureAI +0x208 (0x620127), 2 (set at
+  0x619578), after the cities' update of pass 2. So the government values
+  0x7b0330 (0x620413) read the item the update queued.
+- Confirmed (one-seed aimem traces): runs/h1_duely1128 Bologna t216 its
+  Sewer completed, the AT Crew contract 775 queued at the update:
+  Totalitarianism (Fascism's UNIT_PRODUCTION flat bonus 0x179860) 1509.5 at
+  t217, the Builder of t225 1510.6 at t226, the Scouts of t228 on (1438.4,
+  1391.6, 1414.8 at t229-t235) as logged; cityState.build unchanged
+  (1117 / 1121 / 1124 to t100 no new miss).
+- THE DIG SITES: a revealing civic's first completion in the game lays the
+  sites (Game Archaeology 0x27f640), and a major's start before the
+  city-states' turns lays them before the minors' AIs read the map. The
+  replay lays record t+1's sites of the kind where another major (not the
+  pair's active player) first holds the civic in record t+1.
+  runs/h1_duely1128 t176 player 1's Natural History (12 sites):
+  Bologna's t177 Natural History 541.3 as logged; runs/h1_duely1124 t166
+  player 1's: city-state 2's t167-t169 558.1 / 567.6 / 654.8 as logged.
+- Open: the active player's completion inside its actions (an inspiration)
+  is not laid early; runs/h1_duely1124 city-state 4 t167 / t168 665.2 /
+  508.8 for 662.7 / 500.9, city-state 3 t171 424.3 for 433.8; 1128
+  Bologna t179 388.8 for 379.7 (the Archaeologist 9.1 at T 49); 1128
+  Bologna Totalitarianism 1494.6 / 1434.2 / 1414.8 at t227 / t228 / t236
+  for 1474.6 / 1444.2 / 1452.8.

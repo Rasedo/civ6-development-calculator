@@ -16,7 +16,8 @@
  *    `minorPlotEvals`), the improvement pick (0x5c9a00) and the events —
  *    City Defense (its operation manager's start, `minorOpsStart`), the
  *    building or unit event, the district event, the improvement event — a
- *    city its AI first sees this turn running none;
+ *    city its AI first sees this turn running none — and the Default
+ *    Specialization where the queue is empty (0x5ce8f0);
  *  - C: its units' turn (`cityStateMilitary`), its operations' trees by
  *    priority in the Control Manager's passes; in pass 2, after the trees of
  *    priority 4 and 3, the city's second hook (`minorSecondHook`): the
@@ -1038,16 +1039,23 @@ export function minorAiTurn(state: GameState, cs: CityState, fresh: boolean,
     districtEvent(ai, w, city, list.CITY_EVENT_DISTRICT);
     improvementEvent(ai, w, city, list.CITY_EVENT_IMPROVEMENT);
   }
-  // the founding turn's pick (the update's 0x5ce8f0 on an empty queue) on
-  // the founding City Analysis: the city's Production before its Palace
-  // and its PLAYER_CITIES modifiers (`foundingProduction`); the tables kept
-  // for the turn after are the turn's own (runs/h1_duely1117 Antananarivo
-  // t1: the Slinger at 8.3 over the Monument at 6.0; its t2 research
-  // reads the kept tables)
-  if (fresh && !cs.prodItem) {
-    const ff = minorBuildFacts(state, cs, known, fresh, units, true);
-    const ft: CityBuildTables = { buildings: buildingTable(ff), units: unitTable(ff).map((v) => v ?? FX_MIN), projects: projectTable(minorProjectFacts(state, cs, ff)) };
-    emptyQueuePick(state, cs, ai, city, ft, minorPickFacts(state, cs, ff));
+  // the update's Default Specialization on an empty queue (0x5ce8f0: city
+  // +0x2350 0 or +0x2340 null, the queue +0x2170's count and entries), on
+  // the turn's tables: an item the city's production completed this turn
+  // is followed before the civics AI's turn (list A, pass 2) reads the queue
+  // (runs/h1_duely1128 Bologna t216: the Sewer completed, the AT Crew
+  // contract queued, Totalitarianism's UNIT_PRODUCTION flat bonus 1509.5 at
+  // t217 as logged). A founding turn's on the founding City Analysis: the
+  // city's Production before its Palace and its PLAYER_CITIES modifiers
+  // (`foundingProduction`); the tables kept for the turn after are the
+  // turn's own (runs/h1_duely1117 Antananarivo t1: the Slinger at 8.3 over
+  // the Monument at 6.0; its t2 research reads the kept tables)
+  if (!cs.prodItem) {
+    if (fresh) {
+      const ff = minorBuildFacts(state, cs, known, fresh, units, true);
+      const ft: CityBuildTables = { buildings: buildingTable(ff), units: unitTable(ff).map((v) => v ?? FX_MIN), projects: projectTable(minorProjectFacts(state, cs, ff)) };
+      emptyQueuePick(state, cs, ai, city, ft, minorPickFacts(state, cs, ff));
+    } else emptyQueuePick(state, cs, ai, city, tables, pf);
   }
   if (tracer) {
     const b = specializationBests(tables, pf);

@@ -21,8 +21,13 @@
     - recording: 1117
       turn: 217
       value: "1117 t217: four Shipwrecks laid, three draws."
-  impl: [cpu/harness/checks.ts:doneBefore]
-  readings: ["H-1: a city's name, a citizen's name — READ"]
+    - recording: h1_duely1128
+      turn: 176
+      value: "player 1's Natural History in its start before the city-states' turns: 12 sites, Bologna's t177 Natural History 541.3 on the Archaeologist its t176 table counts"
+  impl: [cpu/harness/checks.ts:doneBefore, cpu/harness/replay.ts:layDigSites]
+  readings:
+    - "H-1: a city's name, a citizen's name — READ"
+    - "C-130: the city update's Default Specialization on an empty queue, before the civics AI's turn; the dig sites a major's civic lays before the minors' turns — READ (0x5ce8f0, 0x6096c0's +0x370 list, CultureAI +0x208), both twins"
   context:
     - "...7 t217's three draws over 35, 44 and 9 are n = 7, 8 and 3. The caller: Game_Archaeology 0x27f640 lays a kind's dig sites once a game (RESOURCE_ANTIQUITY_SITE / RESOURCE_SHIPWRECK, a do..."
   review: reviewed
@@ -66,7 +71,9 @@
     - recording: 1117
       turn: 217
       value: "1117 t217: four Shipwrecks laid, three draws."
-  readings: ["H-1: a city's name, a citizen's name — READ"]
+  readings:
+    - "H-1: a city's name, a citizen's name — READ"
+    - "C-130: the city update's Default Specialization on an empty queue, before the civics AI's turn; the dig sites a major's civic lays before the minors' turns — READ (0x5ce8f0, 0x6096c0's +0x370 list, CultureAI +0x208), both twins"
   context:
     - "...only for a site with none (the js at 0x280664 → 0x280752; n from the era of a player 0x27fe90 names). 1117 t217: four Shipwrecks laid, three draws. The history is in no record: the..."
   review: reviewed
@@ -101,7 +108,9 @@
       turn: 217
       value: "1117 t217: four Shipwrecks laid, three draws."
   impl: [cpu/harness/checks.ts:doneBefore, cpu/harness/drawSites.ts:DRAW_SITES]
-  readings: ["H-1: a city's name, a citizen's name — READ"]
+  readings:
+    - "H-1: a city's name, a citizen's name — READ"
+    - "C-130: the city update's Default Specialization on an empty queue, before the civics AI's turn; the dig sites a major's civic lays before the minors' turns — READ (0x5ce8f0, 0x6096c0's +0x370 list, CultureAI +0x208), both twins"
   context:
     - "- \"Random Era for Antiquity Site\" (0x280140, from 0x2805f0): with n the era row's +0x1c, era i < n weighs n − i + 1, one draw over..."
   review: reviewed
@@ -120,8 +129,10 @@
     - recording: 1117
       turn: 217
       value: "1117 t217: four Shipwrecks laid, three draws."
-  impl: [cpu/harness/checks.ts:doneBefore]
-  readings: ["H-1: a city's name, a citizen's name — READ"]
+  impl: [cpu/harness/checks.ts:doneBefore, cpu/harness/replay.ts:layDigSites]
+  readings:
+    - "H-1: a city's name, a citizen's name — READ"
+    - "C-130: the city update's Default Specialization on an empty queue, before the civics AI's turn; the dig sites a major's civic lays before the minors' turns — READ (0x5ce8f0, 0x6096c0's +0x370 list, CultureAI +0x208), both twins"
   context:
     - "- \"Random Era for Antiquity Site\" (0x280140, from 0x2805f0): with n the era row's +0x1c, era i < n weighs n − i + 1, one draw over n(n + 3) / 2:..."
   review: reviewed

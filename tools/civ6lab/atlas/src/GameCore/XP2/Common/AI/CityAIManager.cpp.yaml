@@ -45,6 +45,7 @@
     - "H-1: the AI memory reader — READ (the hooks, the pointer paths, the contracts, the knowledge base, the operations, the trees), PARTLY READ (the religious AI's holder)"
     - "C-96: the trade AI's route value — READ (0x5e9b20, 0x78f210, 0x78e010, 0x559140's use), PARTLY READ (0x526330's terms, the knowledge base's city order)"
     - "H-1: the City Analysis runs on player signal +0x258 and reads each plot's owner live — READ (0x5c27e0, 0x5c24e0, 0x5ce970), the 1117 t44 Mine unexplained"
+    - "C-130: the city update's Default Specialization on an empty queue, before the civics AI's turn; the dig sites a major's civic lays before the minors' turns — READ (0x5ce8f0, 0x6096c0's +0x370 list, CultureAI +0x208), both twins"
   context:
     - "- The city's turn (0x5ce680, from the player's AI turn 0x5c2650 over its cities). On a full update: 0x5d7e00, 0x5cadc0, 0x5cbd10 (the yield advantage..."
   review: reviewed

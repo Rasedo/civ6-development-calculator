@@ -272,9 +272,13 @@ class SimMinorAi:
             building_event(ai, s, w, ev)
             district_event(ai, s, w, ev)
             improvement_event(ai, s, w, best_imp, ev)
-        # the founding turn's pick (the update's 0x5ce8f0 on an empty queue)
-        # on the founding City Analysis (`foundingProduction`); the tables
-        # kept for the turn after are the turn's own (`minorAiTurn`)
+        # the update's Default Specialization on an empty queue (0x5ce8f0),
+        # on the turn's tables; a founding turn's on the founding City
+        # Analysis (`foundingProduction`), the tables kept for the turn after
+        # the turn's own (`minorAiTurn`)
+        idle = ev & (self.citystate_item[:, s] < 0)
+        if bool(idle.count_nonzero()):
+            self._minor_empty_pick(s, idle, f, w, (b_tab, u_tab, p_tab))
         first = fresh & (self.citystate_item[:, s] < 0)
         if bool(first.count_nonzero()):
             ff = self._cv_minor_facts(s)
