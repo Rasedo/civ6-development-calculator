@@ -14763,15 +14763,22 @@ class SimSeats:
         return atk_e
 
     def _predict_city_blow(self, pre: str, us: torch.Tensor, tgt: torch.Tensor) -> torch.Tensor:
-        """[B] `predictCityBlow`: the predicted damage the unit at local slot
-        `us` [B] of pool `pre` deals the city centre at `tgt` [B] — nothing
-        where no city of a holder at war with it stands there; a ranged
-        unit's by its ranged attack strength, any other's by its assault's
-        (its siege assist with it); the law at half the extra draw, less the
-        share the standing outer defense turns (none past a Siege Tower),
-        in [COMBAT_MINIMUM_DAMAGE, the city's hit points]"""
+        """[B] `predictCityBlow`: the exchange's blow (`_predict_city_exchange`)"""
+        return self._predict_city_exchange(pre, us, tgt)[0]
+
+    def _predict_city_exchange(self, pre: str, us: torch.Tensor, tgt: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
+        """[B] twice `predictCityExchange`: the predicted damage the unit at
+        local slot `us` [B] of pool `pre` deals the city centre at `tgt` [B]
+        — nothing where no city of a holder at war with it stands there; a
+        ranged unit's by its ranged attack strength, any other's by its
+        assault's (its siege assist with it); the law at half the extra draw,
+        less the share the standing outer defense turns (none past a Siege
+        Tower), in [COMBAT_MINIMUM_DAMAGE, the city's hit points] — and the
+        damage a melee unit takes from it (`_damage_expected` on the city's
+        defence less the assault's strength; a ranged unit none)"""
         B, dev = self.B, self.device
         out = torch.zeros(B, dtype=torch.long, device=dev)
+        took = torch.zeros(B, dtype=torch.long, device=dev)
         bidx = torch.arange(B, device=dev)
         ttc = tgt.clamp(min=0)
         ctr = self._centre_seat_plane().gather(1, ttc.unsqueeze(1)).squeeze(1)
@@ -14816,7 +14823,9 @@ class SimSeats:
             raw = self._damage_raw(roll, atk - def_cs.to(torch.float64))
             blow = torch.minimum(hp_max, (raw - torch.div(raw * share, 256, rounding_mode="floor")).clamp(min=self._dmg_min))
             out = torch.where(on, blow, out)
-        return out
+            back = self._damage_expected(def_cs.to(torch.float64) - atk)
+            took = torch.where(on & ~ranged, back, took)
+        return out, took
 
     def _centre_health(self, tk: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         """`districtHealth` for the plots `tk` [B, K]: a city's centre its

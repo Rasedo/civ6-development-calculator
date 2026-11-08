@@ -26,7 +26,7 @@ import {
 import { BARB_SEAT, FREE_SEAT, NO_SEAT, campTiles, cityHolders, civsAtWar, isBarbSeat, isCityStateSeat, isCiv, isTerritorial, seatOf, tileCity, tileSeat } from './seats';
 import { OPEN_BORDERS_CIVIC } from '../data/seats';
 import { randRange } from './rand';
-import { cityDefenseStrength, districtGarrisonedStrength, embarkedDefenseCS, cityStrikeStrength, coastalRaid, damageExpected, hostilePillage, hostileRangedStrike, meleeAttack, meleeUnitStrengths, movesAndShoots, predictCityBlow, rangedUnitStrengths, stackDefender, unitAttackRange } from './combat';
+import { cityDefenseStrength, districtGarrisonedStrength, embarkedDefenseCS, cityStrikeStrength, coastalRaid, damageExpected, hostilePillage, hostileRangedStrike, meleeAttack, meleeUnitStrengths, movesAndShoots, predictCityBlow, predictCityExchange, rangedUnitStrengths, stackDefender, unitAttackRange } from './combat';
 import { CITY_STRIKE_RANGE } from './phase';
 import { encampOuterPool, outerPool } from './rules';
 import { cityStateAt, minorCity } from './cityStates';
@@ -176,9 +176,11 @@ interface Ground {
   /** the player revealed the plot (node +0x51 bit 0), whatever the search */
   revealed: (i: number) => boolean;
   stand: (i: number) => boolean;
-  /** a unit of its own that stacks with it holds the plot (the unit itself
-   *  not counted) */
-  full: (i: number) => boolean;
+  /** on a plot the player sees now a city of a player at war with it or a
+   *  unit at war that fights (the node's +0x51 bit 4, or bits 0x20 and 0x40
+   *  both: 0x271be0 at 0x271e69 / 0x271f2e, 0x5861f0): an attack whose
+   *  parent the path validity tests as a turn's end */
+  strikeSite: (i: number) => boolean;
   /** the path node's count +0x54 reaches the stacking limit (0x585eb0 ->
    *  0x585d90, the units of the mover's map layer not at war with it): one
    *  of its own that stacks with it, or on a plot the player sees now
@@ -226,23 +228,29 @@ function groundOf(state: GameState, unit: Unit, revealedOnly = true, planning = 
   // a formation's stacking: any member's class (`stackClass`, 0x585eb0 over
   // its members), a Trader or a Spy none (0x585d90)
   const classes = new Set([unit, ...mates].map((m) => stackClass(m.type)));
-  const formation = new Set([unit, ...mates]);
+  // the formation's members by id, none of them counted (a search may run on
+  // a copy of the unit: the danger map's on its full Movement)
+  const formation = new Set([unit, ...mates].map((m) => m.id));
   let seenNow: Uint8Array | undefined;
   // the plots a unit at war with it that fights holds, whatever its domain
   // (the planning's attack test; a move order's path strikes its own domain)
   const fighters = new Set<number>();
+  // the same in every search (the node's +0x51 bits 0x20 and 0x40)
+  const fought = new Set<number>();
   for (const u of state.units) {
     // its own units that stack with it, a Trader none (0x585d90 counts none
     // with MakeTradeRoute: runs/h1_duely1124 Cardiff t95 / t113, its Builder
     // onto 582 under its Trader, the Farm laid)
-    if (!formation.has(u) && u.seat === unit.seat && classes.has(stackClass(u.type)) && !UNITS[u.type]?.trader
+    if (!formation.has(u.id) && u.seat === unit.seat && classes.has(stackClass(u.type)) && !UNITS[u.type]?.trader
       && stackClass(u.type) !== 'spy') own.add(u.tileIndex);
     if (u.seat === unit.seat || !onMap(u)) continue;
     held.add(u.tileIndex);
     if (!unitsHostile(state, unit, u)) continue;
     foes.add(u.tileIndex);
     const st = aiStrengths(state, u);
-    if (planning && (st.melee > 0 || st.ranged > 0 || st.bombard > 0)) fighters.add(u.tileIndex);
+    if (st.melee <= 0 && st.ranged <= 0 && st.bombard <= 0) continue;
+    fought.add(u.tileIndex);
+    if (planning) fighters.add(u.tileIndex);
   }
   // the planning's search (0x26e570): a plot of a unit at war that does not
   // fight (a civilian) is a plain step, neither barred nor attacked into
@@ -260,6 +268,10 @@ function groundOf(state: GameState, unit: Unit, revealedOnly = true, planning = 
   const known = (i: number) => !revealedOnly || revealed(i);
   const def = UNITS[unit.type];
   const melee = !!def && def.combat > 0;
+  // its ranged or bombard strength tops its combat strength (0x56dc90 /
+  // 0x56e3e0 / 0x56daa0)
+  const str = aiStrengths(state, unit);
+  const shoots = str.ranged > str.melee || str.bombard > str.melee;
   const naval = !!def?.naval;
   // a unit that may embark (`canEmbark`, 0x56c480: the barbarians' land units
   // plan no water, none of 6,269 of their planning rows on runs/h1_duelw1117,
@@ -328,7 +340,13 @@ function groundOf(state: GameState, unit: Unit, revealedOnly = true, planning = 
       // t45: it lists 7:10, city-state 3's Trader on it, AI_Planning.csv)
       return !peaceHeld(i);
     },
-    full: (i) => own.has(i),
+    strikeSite: (i) => {
+      seenNow ??= plotsSeenNow(state, new Set([unit.seat]));
+      if (seenNow[i] !== 1) return false;
+      if (fought.has(i)) return true;
+      const t = state.map.tiles[i];
+      return cityCentre(state, t) && tileSeat(t) !== NO_SEAT && tileSeat(t) !== unit.seat && unitsHostile(state, unit, { seat: tileSeat(t) });
+    },
     crowded,
     stacked,
     foughtOn: (i) => {
@@ -407,9 +425,16 @@ function groundOf(state: GameState, unit: Unit, revealedOnly = true, planning = 
       // Quadrireme on 38:17 heals beside the barbarian Man-At-Arms on 38:18;
       // 1121 t114-177 player 0's Move to safety rows on 2:19 / 3:20 log 30
       // where a land unit's strike added 25, AI_Tactical.csv)
+      // a district of hit points at war is no plot for a unit whose ranged
+      // or bombard strength tops its combat strength (the location test
+      // 0x586360 at 0x5866c9..0x58671f, the validity's +0x50 bit 0x40 on a
+      // revealed child): no search links it (runs/h1_duely1127 t43: the
+      // barbarian Archer on 13:8 lists no 12:6, player 1's centre, where its
+      // Warrior on 13:8 at t38 listed it (2/0), AI_Planning.csv)
+      const owner = tileSeat(t);
+      if (shoots && garrisonDistrict(state, t) && owner !== NO_SEAT && owner !== unit.seat && unitsHostile(state, unit, { seat: owner })) return false;
       if ((fighters.has(t.index) && (isWater(t) === naval || (embarks && isWater(t))))
         || (!plainCivilians && foes.has(t.index) && isWater(t) === naval)) return true;
-      const owner = tileSeat(t);
       if (t.district === 'CITY_CENTER' && owner !== unit.seat && unitsHostile(state, unit, { seat: owner })) return true;
       return !naval && encampmentBlocks(state, t, unit);
     },
@@ -462,10 +487,11 @@ function domainPool(state: GameState, unit: Unit, sea: boolean): number {
  * search with no `zoc` is the planning's (0x26dcd0, flag 4), the danger
  * map's (0x26df90 under 0x311), Explore Land's (0x26df90 under 0x40 / 0x42)
  * or Naval Patrol's (0x26df90 under 0); 'explore' on a move order's path is
- * HL Explore's order (0x962030 under 0x40 / 0x42). Standing to attack (the danger map's
- * search): an attack is struck only from the unit's own plot or one none of
- * its own stacking units holds, and a step onto a unit's plot keeps its
- * Movement left (only a district attack spends it). With laterTurns (the path's flag 0x1000) a
+ * HL Explore's order (0x962030 under 0x40 / 0x42). In every search but the
+ * planning's an attack on a city at war or a unit at war that fights, in the
+ * player's sight, is struck only from a plot short of its stacking limit;
+ * in the danger map's search a step onto a unit's plot keeps its Movement
+ * left (only a district attack spends it). With laterTurns (the path's flag 0x1000) a
  * path's turn may end on a plot its own stacking unit holds after its first.
  */
 type ReachSearch = 'planning' | 'danger' | 'explore' | 'patrol';
@@ -648,13 +674,17 @@ function search(state: GameState, unit: Unit, maxTurns: number, zoc: boolean, on
       // on 40:19 and city-state 4's Man-At-Arms on 41:20; t94: city-state
       // 4's at 28:23 plans 29:21 past player 0's Quadriremes, AI_Planning.csv)
       if (isWater(from) === isWater(to) && ground.revealed(to.index) && ground.boarded(to.index)) continue;
-      // the danger map's search (0x26df90, flags 0x311) and a move order's
-      // path: an attack is struck from a plot the unit may stand on, its own
-      // or one none of its own stacking units holds (runs/h1_duely1127 t128:
-      // the rampaging Galley 589825 on 30:17 for player 0's embarked Warrior
-      // on 29:15 goes round its Galley 1048590's 30:16 to 29:16 and strikes,
-      // as logged; t152 / t201-t237 its Galleys likewise)
-      if (attack && (standToAttack || zoc) && best !== start && ground.full(best.tile)) continue;
+      // the stand-to-attack site: in every search but the planning's (no
+      // flag 4), a child the player sees holding a city at war or a unit at
+      // war that fights has its parent tested as a turn's end (the path
+      // validity's chain walk, 0x2720a0 at 0x272315..0x272330 and
+      // 0x272255): its count +0x54 at the stacking limit (`crowded`, the
+      // unit itself not counted) refuses the link, under flag 0x1000 from a
+      // parent of the first turn alone (runs/h1_duely1127 t128: the
+      // rampaging Galley 589825 on 30:17 for player 0's embarked Warrior on
+      // 29:15 goes round its Galley 1048590's 30:16 to 29:16 and strikes, as
+      // logged; t152 / t201-t237 its Galleys likewise)
+      if (attack && paysStack && ground.strikeSite(to.index) && ground.crowded(best.tile) && (!laterTurns || best.turns <= 1)) continue;
       // a move order's danger flags (the path validity 0x2720a0 at
       // 0x272590..0x272612): from a node of the path's first turn, under
       // flag 8 no child of danger (the player's danger map 0x716a90 above
@@ -1665,7 +1695,9 @@ export function planUnit(state: GameState, unit: Unit, targets: readonly Target[
     // 52 hit points, their blows 59 / 55, hold and wander, as logged)
     if (E.target.type === 'COMBAT_DISTRICT') {
       const d = districtHealth(state, E.target.tile);
-      if (d && predictCityBlow(state, unit, E.target.tile) > d.hp) wins = true;
+      const x = predictCityExchange(state, unit, E.target.tile);
+      E.taken = x.taken;
+      if (d && x.dealt > d.hp) wins = true;
       continue;
     }
     const v = UNIT_TARGET.has(E.target.type) ? targetUnit(state, E.target) : null;
@@ -2399,7 +2431,7 @@ export interface Assigned { unit: Unit; move: number; attack: number; from: numb
  * THE ASSIGNMENT (0x776140) of `units` to the spots of `targets`:
  *  - each target's health (1.1 x its whole, less its damage): a unit's, a
  *    district's (a City Center's hit points; its blow the predicted one,
- *    `predictCityBlow`, the blow back unread and none);
+ *    `predictCityBlow`, the damage it takes the planning's, `predictCityExchange`);
  *  - per target, each unit with Movement left: its planning's spots (in
  *    order), save — but against a HIGH target — one where the damage it
  *    takes in the blow and the blow back passes the damage it deals in both,
@@ -2585,13 +2617,15 @@ function mergeSort<T>(a: T[], before: (x: T, y: T) => boolean): T[] {
  * 0x947dd0, its CanStart and Start: `condemnHeretic`; runs/h1_duely1124 t136
  * the Caravel 4587523 onto 26:13 kills the embarked Missionary 3407880,
  * t118 the Man-At-Arms 4849682 arrives on 35:16 with no Movement and the
- * Missionary stays); each one's turn done. The
- * assignments in the order their turns ended (the order an operation's
- * attack logs them: runs/h1_duelw1124 t16, the raid's Slinger before its
- * Warriors).
+ * Missionary stays); each one's turn done. A unit acts with Movement left,
+ * an operation's member whose turn the operation's move already took
+ * included (0x771f80 reads the unit's Movement alone: runs/h1_duely1128
+ * t241 the City Assault's Cuirassier 7405596 moves to 41:20 under Operation
+ * Move and strikes player 0's 42:20 under Operation City Attack, as
+ * logged).
  */
-function carryOut(state: GameState, pass: Pass, out: Assigned[], move = 'Attack Units'): Assigned[] {
-  const ended: Assigned[] = [];
+function carryOut(state: GameState, pass: Pass, out: Assigned[], move = 'Attack Units'): void {
+  const canAct = (u: Unit) => state.units.includes(u) && !pass.ended.has(u.id) && u.movesLeft > 0;
   for (const a of out) {
     const u = a.unit;
     if (!state.units.includes(u) || u.tileIndex === a.move) continue;
@@ -2610,39 +2644,38 @@ function carryOut(state: GameState, pass: Pass, out: Assigned[], move = 'Attack 
   const strikeAt = (u: Unit, p: number) => {
     if (p >= 0 && plotDistance(state, u.tileIndex, p) <= unitAttackRange(u) && attacksLeftOf(u) > 0) hostileRangedStrike(state, u, p);
   };
+  // the unit's turn done, its move the assignment's (one an operation's
+  // move already took keeps that)
+  const end = (a: Assigned) => {
+    if (!pass.done.has(a.unit.id)) finish(pass, a.unit, move, a.move, a.attack);
+  };
   for (const a of out) {
     const u = a.unit;
-    if (a.civilian || !canAct(state, pass, u) || UNITS[u.type]?.bombard === undefined) continue;
+    if (a.civilian || !canAct(u) || UNITS[u.type]?.bombard === undefined) continue;
     strikeAt(u, a.attack);
     if (a.religious) condemnHeretic(state, u);
     u.movesLeft = 0;
-    finish(pass, u, move, a.move, a.attack);
-    ended.push(a);
+    end(a);
   }
   for (const a of out) {
     const u = a.unit;
-    if (a.civilian || !canAct(state, pass, u) || rangedStrength(u) <= 0) continue;
+    if (a.civilian || !canAct(u) || rangedStrength(u) <= 0) continue;
     const melee = aiStrengths(state, u).melee > rangedStrength(u)
       && !!pass.reach.get(u.id)?.some((e) => e.tile === a.attack && e.turns <= 1);
     if (melee) continue;
     strikeAt(u, a.attack);
     if (a.religious) condemnHeretic(state, u);
     u.movesLeft = 0;
-    finish(pass, u, move, a.move, a.attack);
-    ended.push(a);
+    end(a);
   }
   for (const a of out) {
     const u = a.unit;
     if (!state.units.includes(u)) continue;
-    if (a.attack >= 0 && canAct(state, pass, u)) moveTo(state, u, a.attack);
+    if (a.attack >= 0 && canAct(u)) moveTo(state, u, a.attack);
     if (a.religious && state.units.includes(u)) condemnHeretic(state, u);
     if (state.units.includes(u)) u.movesLeft = 0;
-    if (!pass.done.has(u.id)) {
-      finish(pass, u, move, a.move, a.attack);
-      ended.push(a);
-    }
+    end(a);
   }
-  return ended;
 }
 
 /** an operation's attack in the pass: the assignment of the units (in the
@@ -2651,13 +2684,16 @@ function carryOut(state: GameState, pass: Pass, out: Assigned[], move = 'Attack 
  *  Camp's Warrior 196610, recruited first, claims 12:11 and 131073 takes
  *  13:11, as logged) over the pass's targets `keep` picks (their
  *  units still on the map), `exchange` and `survive` its filters, carried
- *  out (0x771f80): the assignments in the order their turns ended */
+ *  out (0x771f80); the assignment's entries in its order, which the
+ *  operation logs before it carries them out (0x80ceb0 at 0x80d6f9, 0x8109e0
+ *  at 0x810ca4, ahead of 0x771f80) */
 export function passAttack(state: GameState, pass: Pass, ids: readonly number[], keep: (k: number) => boolean, exchange: boolean,
   survive: boolean, move: string): Assigned[] {
   const units = ids.map((id) => state.units.find((u) => u.id === id)).filter((u): u is Unit => !!u && pass.plan.has(u.id));
   const targets = pass.targets.filter((t, k) => keep(k) && (!t.unit || state.units.includes(t.unit)));
   const out = assignTo(state, pass, units, targets, exchange, survive);
-  return carryOut(state, pass, out, move);
+  carryOut(state, pass, out, move);
+  return out;
 }
 
 /**
@@ -2818,7 +2854,12 @@ function flees(state: GameState, pass: Pass, u: Unit, d: number, hl: boolean): b
  *  centre, the Encampment and its replacement), a city-state's centre
  *  included. */
 function garrisonDistrict(state: GameState, t: Tile): boolean {
-  if (t.district === 'CITY_CENTER' || t.district === 'ENCAMPMENT') return true;
+  return t.district === 'ENCAMPMENT' || cityCentre(state, t);
+}
+
+/** a city's centre (IsCity 0x81120) */
+function cityCentre(state: GameState, t: Tile): boolean {
+  if (t.district === 'CITY_CENTER') return true;
   const cs = cityStateAt(state, t.index);
   return !!cs && cs.centerIndex === t.index;
 }

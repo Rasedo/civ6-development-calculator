@@ -8877,3 +8877,71 @@ returns (cpu/core/aiEconomic.ts) through `minorMilitaryTurn`, called after
   the game kept: the record's building purchase of t178 (building 27, 648
   Gold) its city AI made none of lowers the per-turn world's treasury, not
   the carried balance, so the next savings turn reads a 633 Gold fall.
+
+## C-95 / C-123 / C-125: the stand-to-attack site, a district closed to a ranged unit, City Attack's members and log, the siege gain's lift, a city's blow back, the units of no zone of control — READ (0x2720a0 at 0x272255..0x272330, 0x271be0 at 0x271e69 / 0x271f2e, 0x586360 at 0x5866c9..0x58671f, 0x8109e0, 0x80ceb0 at 0x80d6f9, 0x771f80, 0x80f6b0 at 0x80f75f / 0x80f824 / 0x80f95a, 0x791470, 0x56d6c0), both twins
+
+- THE STAND-TO-ATTACK SITE (the path validity's chain walk, 0x2720a0 at
+  0x272315..0x272330): a node whose +0x51 carries bit 4 (a city of a
+  player at war, on a plot the player sees now, 0x271be0 at 0x271e69) or
+  bits 0x20 and 0x40 both (0x5861f0's answer and out flag: a unit at war
+  that fights, seen, 0x271f2e) has its parent tested as a turn's end
+  whatever its turn (0x272255): seen, its count +0x54 at the stacking limit
+  (the mover not counted; its own stacking unit, or another player's at
+  peace but a Trader or a Spy) refuses the link; under flag 0x1000 only
+  from a parent of turn 1 or less (0x27229b). Every search but the
+  planning's (flag 4) runs it: the danger map's, Explore Land's, Naval
+  Patrol's, a move order's path (`search`'s strikeSite / crowded under
+  paysStack; GPU `_tac_search`'s site_n / crowd_n). An attack on a
+  civilian, an Encampment alone or a plot out of sight sets neither bit.
+  The engine's formation set counts the mover by id (the danger map
+  searches a copy of the unit at full Movement).
+- A DISTRICT CLOSED TO A RANGED UNIT (the location test 0x586360 at
+  0x5866c9..0x58671f, the validity's +0x50 bit 0x40 on a revealed child): a
+  plot of another player at war holding a district of hit points (the city
+  centre, the Encampment) is refused for a unit whose ranged strength
+  (0x56e3e0) or bombard strength (0x56daa0) tops its combat strength
+  (0x56dc90): no search links it, so the planning neither lists it nor
+  holds its node open (`groundOf`'s attack: shoots; GPU `_tac_search`'s
+  fort_w).
+- OPERATION ATTACK CITY'S EXECUTION (0x8109e0): per team, the members
+  alive with Movement left in the team's order, the knowledge base's
+  COMBAT_DISTRICT targets within 3 of the target, the assignment 0x776140
+  with no exchange filter and the survival filter; the result entries
+  logged in the assignment's order with each unit's plot before it moves
+  (0x810ca4), then carried out (0x771f80). Operation Attack Units (0x80ceb0)
+  logs its rows the same way (0x80d6f9 before 0x80d720) (`passAttack`
+  returns the assignment). The carrying out reads a unit's Movement alone:
+  a member whose turn the operation's own move took still acts (`carryOut`'s
+  canAct; GPU `_tac_carry_out`'s can_act; a unit whose moves an order ended,
+  `Pass.ended`, none).
+- A CITY'S BLOW BACK (0x791470's district branch, simulated as a unit
+  is): the planning entry of a COMBAT_DISTRICT holds the damage a melee
+  unit takes from the city, the law at its expectation on the city's
+  defence against the assault's strength (`predictCityExchange`'s taken,
+  `planUnit`'s E.taken; a ranged unit none), which the assignment's
+  filters read (GPU `_predict_city_exchange`, `_tac_plan`'s taken).
+- SIEGE CITY'S GAIN (0x80f6b0): the unit's own slot's count, and with a
+  zone of control its joined slots', lifted whatever turn the unit reaches
+  that slot (0x80f75f) and put back after (0x80f95a); every slot held and
+  none of this one returns 0 with the lift left standing (0x80f824). The
+  move (0x80f4a0) lifts and rings at turn 1 alone (`siegeCityExecute`'s
+  lift; GPU `_op_siege`'s ring).
+- A ZONE OF CONTROL (0x56d6c0: +0x1410, not embarked) is the unit info's
+  ZoneOfControl (Units +0x1ba bit 128 by `dll_rowmap.py`): false in the
+  install for the Ranger, the Skirmisher, Spec Ops, the Warak'aq and the
+  U-Boat besides the Submarines and the Ranged / Siege classes
+  (UNITS.exertsNoZoc; GPU `_type_zoc_none`).
+- Confirmed (one-seed aimem traces from t1): runs/h1_duely1127 t43 the
+  barbarian Archer on 13:8 plans 15 plots as AI_Planning.csv (no 12:6,
+  11:9 after 14:9) and takes Attack Units' Move 12:7; its Warrior on 13:8
+  at t38 lists 12:6 (2/0); 1128 t241 the City Assault's Cuirassier
+  7405596 moves to 41:20 and strikes 42:20 under Operation City Attack in
+  the same tick; t242 Siege City's four rows (the Ranger 39:17 for 42:19,
+  the Cavalry 40:17 for 41:19) and City Attack's Cuirassier and Ranger rows
+  as logged; 1124 t5-t53 the Scouts' HL Move To Safety held with the
+  danger map's stand test (the mover counted by id).
+- Open (C-123): 1128 t242 City Attack's first row: the game assigns the
+  Cavalry 7143430 on 41:19 to 42:21 at turn 2 and leaves out the hurt
+  Cavalry 7012372 on 42:21 (33 hit points, Movement left: it walks on to
+  41:21 under Operation Move); ours claims its own plot at turn 1 for it
+  (the city's blow back 22 under the survival filter's 33) and strikes.

@@ -22,18 +22,24 @@
 - addr: 0x8109e0
   kind: function
   name: Operation Attack City (execution)
-  semantics: "Operation Attack City's execution: the members with Movement left against the COMBAT_DISTRICT targets within 3 of the target (0x80f280) through 0x776140 (unequal blows dropped, no suicide), logged \"Operation City Attack\"; a district target's health floor(maxHP x ATTACK_HEALTH / 256) - damage, its blow the city combat prediction."
-  status: PARTLY
+  semantics: "Operation Attack City's execution: the members with Movement left against the COMBAT_DISTRICT targets within 3 of the target (0x80f280) through 0x776140 (unequal blows dropped, no suicide), logged \"Operation City Attack\"; a district target's health floor(maxHP x ATTACK_HEALTH / 256) - damage, its blow the city combat prediction. Per team (0x118 each): the members alive with Movement left (0x56c690) in the team's order (+0x18), the knowledge base's targets within 3 of the target (0x80f280, +0x368), 0x776140 with no exchange filter and the survival filter (0x810bf2 / 0x810bd7), then each result entry valid (+0x2c >= 0) logged in the assignment's order with the unit's plot before it moves (0x810ca4), then 0x771f80. A member the operation's move already took acts (0x771f80 reads its Movement alone)."
+  status: READ
+  cases:
+    - recording: h1_duely1128
+      turn: 241
+      value: the City Assault's Cuirassier 7405596 moves to 41:20 under Operation Move and strikes player 0's 42:20 under Operation City Attack in the same tick, as logged; t242 Cuirassier / Ranger rows as logged
   impl:
     - cpu/core/operations/assault.ts:CITY_ATTACK_RANGE
     - cpu/core/operations/assault.ts:attackCityExecute
     - gpu/core/sim_minorops.py:_x_attack_city
     - gpu/core/sim_barbops.py:_bop_attack_city
+    - cpu/core/tactical.ts:passAttack
   readings:
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
     - "C-97: the war operations — the war candidates, the city value's frame, the assault nodes and Attack Units READ; the loyalty lead's sources, the team update's danger and the assault's executions PARTLY READ"
     - "C-97: the war desires, the war operation's readiness and the assault's executions — the war value, the not-ready hook, the readiness and the executions READ; the leader's war factor, the WMD flags, the deal items and the war record's writer unread"
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
+    - "C-95 / C-123 / C-125: the stand-to-attack site, a district closed to a ranged unit, City Attack's members and log, the siege gain's lift, a city's blow back, the units of no zone of control — READ (0x2720a0 at 0x272255..0x272330, 0x271be0 at 0x271e69 / 0x271f2e, 0x586360 at 0x5866c9..0x58671f, 0x8109e0, 0x80ceb0 at 0x80d6f9, 0x771f80, 0x80f6b0 at 0x80f75f / 0x80f824 / 0x80f95a, 0x791470, 0x56d6c0), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ...0x811390; Operation Siege City 0x8136a0 / 0x811e80; Operation Attack City 0x813250 / 0x8109e0; Barbarian Raid Check 0x7c7330; Barbarian Recruit 0x7c7580; Barbarian Spawn Change 0x7c...

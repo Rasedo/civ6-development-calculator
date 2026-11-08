@@ -1574,10 +1574,22 @@ export function rangedCityAtkCS(state: GameState, attacker: Unit, outer: number,
  *  to [COMBAT_MINIMUM_DAMAGE, the centre's hit points]; 0 where no city of a
  *  player hostile to it stands there */
 export function predictCityBlow(state: GameState, attacker: Unit, targetIndex: number): number {
+  return predictCityExchange(state, attacker, targetIndex).dealt;
+}
+
+/** the AI's predicted exchange with a city centre (0x791470's district
+ *  branch, simulated as a unit is): the blow `attacker` deals it
+ *  (`predictCityBlow`) and the damage a melee attacker takes from it, the
+ *  law at its expectation on the city's defence against the assault's
+ *  strength (`damageExpected`; a ranged attacker none: runs/h1_duely1128
+ *  t242 the hurt barbarian Cavalry 7012372 on 42:21, 33 hit points, out of
+ *  City Attack's assignment by the survival filter, as logged); 0 and 0
+ *  where no city of a player hostile to it stands there */
+export function predictCityExchange(state: GameState, attacker: Unit, targetIndex: number): { dealt: number; taken: number } {
   const held = cityAtIndex(state, targetIndex);
   const cs = held ? undefined : cityStateAt(state, targetIndex);
   const shape = held ? held.city : cs && cs.centerIndex === targetIndex ? { buildings: cs.buildings ?? [], seat: cs.seat, outerHp: cs.outerHp } : null;
-  if (!shape || !unitsHostile(state, attacker, { seat: shape.seat })) return 0;
+  if (!shape || !unitsHostile(state, attacker, { seat: shape.seat })) return { dealt: 0, taken: 0 };
   const defCS = held ? cityDefenseStrength(state, held.city) : centreStrength(state, minorCity(cs!));
   const outer = outerPool(state, shape);
   const ranged = !!UNITS[attacker.type]?.ranged;
@@ -1588,7 +1600,8 @@ export function predictCityBlow(state: GameState, attacker: Unit, targetIndex: n
   const max = wallsMax(state, shape);
   const share = outer > 0 && max > 0 && (assist & ASSIST_TOWER) === 0 ? Math.floor((outer * 256) / max) : 0;
   const raw = damageRaw(COMBAT_MAX_EXTRA_DAMAGE >> 1, damageExponent(atkCS - defCS));
-  return Math.min(CITY_MAX_HP, Math.max(COMBAT_MINIMUM_DAMAGE, raw - Math.floor((raw * share) / 256)));
+  return { dealt: Math.min(CITY_MAX_HP, Math.max(COMBAT_MINIMUM_DAMAGE, raw - Math.floor((raw * share) / 256))),
+    taken: ranged ? 0 : damageExpected(defCS - atkCS) };
 }
 
 /**

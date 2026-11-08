@@ -135,6 +135,7 @@
     - cpu/core/units.ts:inEnemyZoc
     - cpu/core/tactical.ts:walk
     - cpu/core/tactical.ts:own
+    - cpu/core/tactical.ts:canAct
   readings:
     - "C-95: the tactical pass — READ (the barbarians' moves; the minors share it)"
     - "C-96: the city-states' tactical pass — READ (Wander Near City, Heal, the non-barbarian priorities, FindAlternateLocation), the families it needs PARTLY READ"
@@ -190,6 +191,7 @@
     - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
     - "C-124: the formation's kept path, and a path's other players' units — READ (0x272aa0, 0x26e3a0, 0x782d0, 0x586360 at 0x586542..0x5865a1), unported"
     - "C-124: the kept path is never taken; a move order's path passes other players' units out of sight — READ (0x272aa0, 0x2714b0, 0x586360 at 0x586542..0x5865a1, 0x26fe20), both twins"
+    - "C-95 / C-123 / C-125: the stand-to-attack site, a district closed to a ranged unit, City Attack's members and log, the siege gain's lift, a city's blow back, the units of no zone of control — READ (0x2720a0 at 0x272255..0x272330, 0x271be0 at 0x271e69 / 0x271f2e, 0x586360 at 0x5866c9..0x58671f, 0x8109e0, 0x80ceb0 at 0x80d6f9, 0x771f80, 0x80f6b0 at 0x80f75f / 0x80f824 / 0x80f95a, 0x791470, 0x56d6c0), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...eb0) with a unit of its own stacking with it (itself counted), none with a unit at war (0x5861f0); against the best so far, the first taken — of no danger over one of danger; of two..."
@@ -217,6 +219,7 @@
     - cpu/core/tactical.ts:wanderNearCamp
     - cpu/core/tactical.ts:wanderNearCity
     - cpu/core/tactical.ts:ended
+    - cpu/core/tactical.ts:canAct
   readings:
     - "C-95: the tactical pass — READ (the barbarians' moves; the minors share it)"
     - "C-96: the city-states' tactical pass — READ (Wander Near City, Heal, the non-barbarian priorities, FindAlternateLocation), the families it needs PARTLY READ"
@@ -236,7 +239,7 @@
 - addr: 0x586360
   final: 0x3b08e0
   kind: function
-  semantics: "the unit location test: refuses a plot for its terrain (impassable, the unit's domain), another player's closed borders, a unit type that needs a district off one, or a hostile defender there (0x208b80) — never for the owner's own units. The domain test reads the unit's domain (+0x650; DOMAIN_SEA 0, DOMAIN_LAND 2): a sea unit stands on water, on a plot not of water only where a district stands (plot virtual +0x40) whose info word +0x14 carries the water bit (0x81240 argument 0, bit 1); a land unit the same with the land bit (argument 2, bit 4) on water it may not embark onto. A City Centre's word answers both: a hull stands on its centre. With flag 0x10 (refused) or 0x20 (always) it answers 2 where FindAlternateLocation finds a plot within 10 (out-parameter that plot), 1 where the plot takes the unit (out-parameter the plot), 0 else; FindAlternateLocation reads it as nonzero = may enter (0x585ba5)."
+  semantics: "the unit location test: refuses a plot for its terrain (impassable, the unit's domain), another player's closed borders, a unit type that needs a district off one, or a hostile defender there (0x208b80) — never for the owner's own units. The domain test reads the unit's domain (+0x650; DOMAIN_SEA 0, DOMAIN_LAND 2): a sea unit stands on water, on a plot not of water only where a district stands (plot virtual +0x40) whose info word +0x14 carries the water bit (0x81240 argument 0, bit 1); a land unit the same with the land bit (argument 2, bit 4) on water it may not embark onto. A City Centre's word answers both: a hull stands on its centre. With flag 0x10 (refused) or 0x20 (always) it answers 2 where FindAlternateLocation finds a plot within 10 (out-parameter that plot), 1 where the plot takes the unit (out-parameter the plot), 0 else; FindAlternateLocation reads it as nonzero = may enter (0x585ba5). The district test (0x5866c9..0x58671f): on a plot of another player at war holding a district of hit points (0x57cf0 -> 0x24c2f0), refused for a unit whose ranged strength (0x56e3e0) or bombard strength (0x56daa0) tops its combat strength (0x56dc90), or under flag 0x40; else for a unit that fights (0x209dd0) refused unless flag 1. Ported: groundOf's attack (shoots), _tac_search's fort_w."
   status: READ
   cases:
     - recording: h1_dueld1128
@@ -254,6 +257,9 @@
     - recording: h1_duely1127
       turn: 70
       value: "runs/h1_duely1127 t70-74: city-state 4's Catapult on 10:10 lists none of 11:10, the barbarian Swordsman on player 1's closed ground, AI_Planning.csv."
+    - recording: h1_duely1127
+      turn: 43
+      value: the barbarian Archer on 13:8 lists no 12:6 (player 1's centre), 11:9 after 14:9, 15 plots as AI_Planning.csv; its Warrior on 13:8 at t38 listed 12:6 (2/0)
   impl:
     - cpu/core/units.ts:tileFreeForUnit
     - gpu/core/sim_masks.py:_spot_free
@@ -276,6 +282,8 @@
     - cpu/core/phase.ts:ok
     - cpu/core/tactical.ts:pathTo
     - cpu/core/tactical.ts:pathNodes
+    - cpu/core/tactical.ts:groundOf
+    - cpu/core/tactical.ts:owner
   readings:
     - "H-1: a civilian stepped on — READ"
     - "C-96: the city-states' tactical pass — READ (Wander Near City, Heal, the non-barbarian priorities, FindAlternateLocation), the families it needs PARTLY READ"
@@ -298,6 +306,7 @@
     - "C-124: the kept path is never taken; a move order's path passes other players' units out of sight — READ (0x272aa0, 0x2714b0, 0x586360 at 0x586542..0x5865a1, 0x26fe20), both twins"
     - "C-124: an attack order to a plot out of sight loses its attack flag — READ (0x962310), both twins"
     - "C-99 / C-128: the swap's partner test and its step along its own path; Move Unit's update before the executions; a Trader no passenger — READ (0x972540, 0x56e760, 0x972a50 -> 0x26fe20, 0x7d3a00 -> 0x7f0020, 0x586360 -> 0x208b80 / 0x523d60), both twins"
+    - "C-95 / C-123 / C-125: the stand-to-attack site, a district closed to a ranged unit, City Attack's members and log, the siege gain's lift, a city's blow back, the units of no zone of control — READ (0x2720a0 at 0x272255..0x272330, 0x271be0 at 0x271e69 / 0x271f2e, 0x586360 at 0x5866c9..0x58671f, 0x8109e0, 0x80ceb0 at 0x80d6f9, 0x771f80, 0x80f6b0 at 0x80f75f / 0x80f824 / 0x80f95a, 0x791470, 0x56d6c0), both twins"
   notes:
     - ".claude/scratchpad/mu1/readings_c96.md: ...k; the distance max(|dx|, |dy|) where the   signs differ, |dx| + |dy| else); the unit may enter it (0x586360 flag   0x40), the player revealed it, no other player's unit on it and none of   its own that it ma..."
     - ".claude/scratchpad/mu1/readings_c96.md: ...a hull outside   its own territory heads for its player's nearest city (first of equals) —   where 0x586360 (flag 0x10) allows it, PARTLY READ. The engines carry no   influence map: every plot reads no dange..."

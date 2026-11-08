@@ -627,10 +627,10 @@ class SimTactics:
         plots, "spot_turns" and "spot_n" [N, E]. With `full` each unit sets
         out on its full Movement (`unitFullMoves`); "closed" [N, T] is the
         turn of every plot the search closed, those it only passes or attacks
-        included. With `stand` (the danger map's search) or `zoc` (a move
-        order's path) an attack is struck only from the unit's own plot or
-        one none of its own stacking units holds; with `stand` a step onto a
-        unit's plot keeps its Movement left (only a
+        included. In every search but the planning's an attack onto a seen
+        city at war or unit at war that fights is struck only from a plot
+        short of its stacking limit; with `stand` (the danger map's search) a
+        step onto a unit's plot keeps its Movement left (only a
         district attack spends it), and no zone of control is paid (flag
         0x800). With `later_turns` (the path's flag 0x1000) a path's turn may
         end on a plot its own stacking unit holds after its first. With
@@ -724,6 +724,17 @@ class SimTactics:
         fights = self._type_combat.take(utype) > 0
         atk_n = torch.where(naval.unsqueeze(1), a_nav[rows], a_land[rows] | (a_fw[rows] & embarks.unsqueeze(1))) \
             & fights.unsqueeze(1) & ~ent_n
+        # a district of hit points at war is no plot for a unit whose ranged
+        # or bombard strength tops its combat strength (`groundOf`'s attack:
+        # the location test 0x586360 at 0x5866c9..0x58671f)
+        cmb = self._ai_combat(pre)[rows, slots]
+        shoots = (self._ai_ranged(pre)[rows, slots] > cmb) | (self._ai_bombard(pre)[rows, slots] > cmb)
+        if bool(shoots.any()):
+            fort_d = self._centre_plane()
+            if self._encamp_didx >= 0:
+                fort_d = fort_d | (self.district == self._encamp_didx)
+            fort_w = fort_d & (self.tile_seat >= 0) & (self.tile_seat != seat) & self._seats_hostile(seat, self.tile_seat)
+            atk_n = atk_n & ~(shoots.unsqueeze(1) & fort_w[rows])
         if rv_n is not None:
             # a plot the player never revealed is entered, never attacked into
             atk_n = atk_n & rv_n
@@ -763,19 +774,22 @@ class SimTactics:
         # seenZoc)
         zs = None
         fought_n = None
+        # the plots the player sees now a unit at war that fights holds (the
+        # node's +0x51 bits 0x20 and 0x40, `groundOf`'s foughtOn)
+        sn = self._barb_seen("barbarians" if seat == BARB_SEAT else seat)
+        fought = torch.zeros(self.B, self.T, dtype=torch.bool, device=dev)
+        for pl in (self.military_at, self.civilian_at, self.support_at, self.embarked_at):
+            pc = pl.clamp(min=0)
+            ut_ = self.unit_type.gather(1, pc).clamp(min=0, max=self.NU - 1)
+            st_ = (self._type_combat.take(ut_) > 0) | (self._type_ranged_strength.take(ut_) > 0) | (self._type_bombard.take(ut_) > 0)
+            sv_ = torch.where(pl >= 0, self.unit_seat.gather(1, pc), torch.full_like(pl, -1))
+            fought |= (pl >= 0) & st_ & self._seats_hostile(seat, sv_)
+        fought = fought & sn
         if not zoc and not stand:
-            sn = self._barb_seen("barbarians" if seat == BARB_SEAT else seat)
             # an attack's plot ends the planning's path where a seen unit at
             # war that fights holds it (the parent's +0x51 bit 0x40): an
             # attack on a city or Encampment alone goes on
-            fought = torch.zeros(self.B, self.T, dtype=torch.bool, device=dev)
-            for pl in (self.military_at, self.civilian_at, self.support_at, self.embarked_at):
-                pc = pl.clamp(min=0)
-                ut_ = self.unit_type.gather(1, pc).clamp(min=0, max=self.NU - 1)
-                st_ = (self._type_combat.take(ut_) > 0) | (self._type_ranged_strength.take(ut_) > 0) | (self._type_bombard.take(ut_) > 0)
-                sv_ = torch.where(pl >= 0, self.unit_seat.gather(1, pc), torch.full_like(pl, -1))
-                fought |= (pl >= 0) & st_ & self._seats_hostile(seat, sv_)
-            fought_n = (fought & sn)[rows]
+            fought_n = fought[rows]
             zs = torch.where(naval.unsqueeze(1), self._tac_zoc(seat, sn, True)[rows], self._tac_zoc(seat, sn, False)[rows])
             zs = zs & ~self._tac_zoc_ignored(utype).unsqueeze(1)
         # a path's turn may not end on a plot its own stacking unit holds (the
@@ -797,14 +811,18 @@ class SimTactics:
         # player sees now another player's unit at peace but a Trader
         crowd_n = None
         stack_n = None
+        site_n = None
         if pays_stack:
             peace_n = by_layer(lambda r: self._tac_peaceful(seat, r))
             # the count at the stacking limit whatever the player sees
             # (`groundOf`'s stacked): the cost's +1e6 on a turn's end
             stack_n = full_n | peace_n
-        if zoc:
-            sn_c = self._barb_seen("barbarians" if seat == BARB_SEAT else seat)[rows]
-            crowd_n = full_n | (peace_n & sn_c)
+            crowd_n = full_n | (peace_n & sn[rows])
+            # the stand-to-attack site's child (`groundOf`'s strikeSite): on
+            # a plot the player sees now a city of a player at war or a unit
+            # at war that fights
+            city_w = self._centre_plane() & (self.tile_seat >= 0) & (self.tile_seat != seat) & self._seats_hostile(seat, self.tile_seat)
+            site_n = (fought | (city_w & sn))[rows]
         # a plot of a danger feature in the player's sight (`groundOf`'s
         # hazard): no step of any search onto it but onto the destination
         live_f = (self.feat_id >= 0) & ~self.feat_stripped
@@ -1113,11 +1131,16 @@ class SimTactics:
                 # stand on under flag 1 (`search`)
                 same = water_n.gather(1, b1) == water_n.gather(1, nbc)
                 ok = ok & ~(board_step.gather(1, nbc) & same)
-            if stand or zoc:
-                # the danger map's search and a move order's path: an attack
-                # is struck from a plot the unit may stand on, its own or one
-                # none of its own stacking units holds (`search`)
-                ok = ok & ~(a6 & full_n.gather(1, b1) & (best != start).unsqueeze(1))
+            if site_n is not None:
+                # the stand-to-attack site (0x2720a0's chain walk): in every
+                # search but the planning's, an attack onto a seen city at
+                # war or unit at war that fights is struck from no parent at
+                # its stacking limit (`crowded`), under flag 0x1000 from no
+                # such parent of the first turn (`search`)
+                stood = a6 & site_n.gather(1, nbc) & crowd_n.gather(1, b1)
+                if later_turns:
+                    stood = stood & (bt <= 1)
+                ok = ok & ~stood
             if cliff6 is not None:
                 ok = ok & ~cliff6
             if danger is not None:
@@ -2172,7 +2195,7 @@ class SimTactics:
             dn_i, de_i = djob.nonzero(as_tuple=True)
             dplot = tpc[dn_i, de_i]
             g_i = rows[dn_i]
-            # one job a game at a time: `_predict_city_blow` takes a unit per game
+            # one job a game at a time: `_predict_city_exchange` takes a unit per game
             left = torch.ones_like(dn_i, dtype=torch.bool)
             while bool(left.any()):
                 first = torch.full((self.B,), -1, dtype=torch.long, device=dev)
@@ -2183,7 +2206,10 @@ class SimTactics:
                 tgt = torch.full((self.B,), -1, dtype=torch.long, device=dev)
                 us[g_i[pick]] = slots[dn_i[pick]]
                 tgt[g_i[pick]] = dplot[pick]
-                blow = self._predict_city_blow(pre, us, tgt)[g_i[pick]]
+                blow, took = self._predict_city_exchange(pre, us, tgt)
+                blow = blow[g_i[pick]]
+                # the damage the unit takes from the city (`planUnit`'s E.taken)
+                taken[dn_i[pick], de_i[pick]] = took[g_i[pick]]
                 dmax, dhp, _ = self._centre_health(tgt.clamp(min=0).unsqueeze(1))
                 kill = (dmax[g_i[pick], 0] > 0) & (blow > dhp[g_i[pick], 0])
                 wins[dn_i[pick[kill]]] = True
@@ -2807,8 +2833,8 @@ class SimTactics:
         to the spots in the order first claimed, and each assigned unit's
         move, sorted (`assignedBefore`). With `district` the targets are the
         list's COMBAT_DISTRICT entries over [B, T] — a city's centre, its health the
-        city's, the unit's blow its predicted one (`_predict_city_blow`), no
-        blow back. Returns "slot", "move", "attack" [B, U] in the order they
+        city's, the unit's blow its predicted one (`_predict_city_blow`), the
+        damage it takes its planning's, no blow back. Returns "slot", "move", "attack" [B, U] in the order they
         run, -1 past each game's."""
         dev = self.device
         B = self.B
@@ -2857,14 +2883,15 @@ class SimTactics:
         sturn = res["spot_turns"][nn, e_ix]
         sn = res["spot_n"][nn, e_ix]
         if district:
-            # the unit's predicted blow on each city (`predictCityBlow`), none back
+            # the unit's predicted blow on each city (`predictCityBlow`), the
+            # damage it takes its planning's (`predictCityExchange`)
             dealt = torch.zeros(B, U, K, dtype=torch.long, device=dev)
             for ui in range(U):
                 for ki in range(K):
                     m_ = uv[:, ui] & tgt_ok[:, ki] & has_e[:, ui, ki]
                     if bool(m_.any()):
                         dealt[:, ui, ki] = torch.where(m_, self._predict_city_blow(pre, us[:, ui], tplot[:, ki]), dealt[:, ui, ki])
-            taken = torch.zeros_like(dealt)
+            taken = torch.where(has_e, res["taken"][nn, e_ix], torch.zeros_like(dealt))
             bt = torch.zeros(B, U, K, 6, dtype=torch.long, device=dev)
             bd = torch.zeros_like(bt)
         else:
@@ -3217,9 +3244,19 @@ class SimTactics:
                      & ~self._tac_foreign(seat)[bidx, mc] & ~own & ~into[bidx, mc])
             self._tac_move_to(again, u_b, move[:, r], pre, seat)
 
+        # a unit acts with Movement left, an operation's member whose turn
+        # the operation's move already took included (`carryOut`'s canAct);
+        # none whose moves an order ended (`Pass.ended`)
+        ended = None
+        if self._tac_moves_ended is not None:
+            ended = self._tac_moves_ended[:, self.POOL_LO[pre]:self.POOL_HI[pre]]
+
         def can_act(r: int) -> torch.Tensor:
             u_b = sl[:, r]
-            return alive(r) & ~done[bidx, u_b] & (getattr(self, f"{pre}_unit_mp")[bidx, u_b] > 0)
+            ok = alive(r) & (getattr(self, f"{pre}_unit_mp")[bidx, u_b] > 0)
+            if ended is not None:
+                ok = ok & ~ended[bidx, u_b]
+            return ok
 
         rel_t = out["rel"]
 
@@ -3270,7 +3307,7 @@ class SimTactics:
             on = alive(r)
             if not bool(on.count_nonzero()):
                 continue
-            go = on & (att[:, r] >= 0) & ~done[bidx, u_b] & (getattr(self, f"{pre}_unit_mp")[bidx, u_b] > 0)
+            go = can_act(r) & (att[:, r] >= 0)
             self._tac_move_to(go, u_b, att[:, r], pre, seat)
             condemn(on, r)
             fin = on & getattr(self, f"{pre}_unit_alive")[bidx, u_b]

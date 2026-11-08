@@ -1382,10 +1382,22 @@ class SimBarbOps:
             count[bidx, jn] += torch.where(z & joins_n[bidx, jc], d, 0)
             count[bidx, jp] += torch.where(z & joins_p[bidx, jc], d, 0)
 
+        def ring(i: int, j: torch.Tensor, d: int, m: torch.Tensor) -> None:
+            # the gain's lift off the unit's own plot and its put back
+            # (0x80f6b0 at 0x80f75f / 0x80f95a): whatever turn its planning
+            # reaches that plot in
+            jc = j.clamp(min=0)
+            ok = m & (j >= 0)
+            count[bidx, jc] += torch.where(ok, d, 0)
+            z = ok & uz[:, i]
+            jn, jp = (jc + 1) % 6, (jc + 5) % 6
+            count[bidx, jn] += torch.where(z & joins_n[bidx, jc], d, 0)
+            count[bidx, jp] += torch.where(z & joins_p[bidx, jc], d, 0)
+
         def gain(i: int, j: int, cur: torch.Tensor, m: torch.Tensor) -> torch.Tensor:
             r_t = rt[:, i, j]
             live = m & valid[:, j] & (r_t >= 0)
-            take(i, cur, -1, live & (cur >= 0))
+            ring(i, cur, -1, live & (cur >= 0))
             mult = 1 + (r_t == 1).long() + (rm[:, i, j] != 0).long()
             empty = (count == 0).sum(dim=1)
             own = holder[:, j] == i
@@ -1403,7 +1415,7 @@ class SimBarbOps:
                 empty = torch.where(zz & ~own & (cn == 0), empty - 1, empty)
             full = full | (~own & (r_t == 1) & (empty == 0))
             ok = live & ~bail
-            take(i, cur, 1, ok & (cur >= 0))
+            ring(i, cur, 1, ok & (cur >= 0))
             return torch.where(ok, s_ * mult + torch.where(full, 100, 0), torch.zeros_like(s_))
 
         def move(i: int, j: int, cur: torch.Tensor, m: torch.Tensor) -> torch.Tensor:

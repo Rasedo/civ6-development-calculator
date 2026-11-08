@@ -717,9 +717,10 @@ function siegeSlots(view: AiView, city: number): SiegeSlot[] {
  *  and a planning: where the city on the target is not encircled (0x24bf70),
  *  the six slots about it shared out by the generalized assignment (three
  *  passes): a unit standing on a slot starts on it (λ 0x80f9d0); a slot's
- *  gain (λ 0x80f6b0) for a unit of its domain that reaches it — the unit
- *  taken off its own slot — is 0 where every slot is held and it holds none
- *  of this one, else (1 + 1 for the slot unheld or held by it alone) plus
+ *  gain (λ 0x80f6b0) for a unit of its domain that reaches it — the unit's
+ *  ring lifted off its own slot, whatever turn it reaches that slot in — is
+ *  0 where every slot is held and it holds none of this one (the lift left
+ *  standing), else (1 + 1 for the slot unheld or held by it alone) plus
  *  the same for each joined slot beside it where the unit holds a zone of
  *  control, times (1 + 1 reached this turn + 1 with Movement left there),
  *  + 100 where it completes the ring (holding it alone, or every slot held
@@ -761,16 +762,24 @@ function siegeCityExecute(_node: Parameters<BtHandler<OpsContext>['update']>[0],
     ring(j, d);
     if (zoc[i]) for (const n of neighbours(j)) ring(n, d);
   };
+  // the gain's lift off the unit's own slot and its put back (0x80f6b0 at
+  // 0x80f75f / 0x80f95a), whatever turn its planning reaches that slot in
+  const lift = (i: number, j: number, d: number) => {
+    ring(j, d);
+    if (zoc[i]) for (const n of neighbours(j)) ring(n, d);
+  };
   const gain = (i: number, j: number, cur: number): number => {
     const s = slots[j];
     if (s.plot < 0) return 0;
     const r = reach[i](s);
     if (!r) return 0;
-    if (cur >= 0) take(i, cur, -1);
+    if (cur >= 0) lift(i, cur, -1);
     const mult = 1 + (r.turns === 1 ? 1 : 0) + (r.moves !== 0 ? 1 : 0);
     let empty = slots.filter((x) => x.count === 0).length;
     const own = s.holder === i;
     let full = own && empty === 0;
+    // every slot held and none of this one: 0, the lift left standing
+    // (0x80f824 returns before the put back)
     if (empty === 0 && !own) return 0;
     let sum = 1 + (s.count === (own ? 1 : 0) ? 1 : 0);
     if (own) full = full && s.count === 1;
@@ -784,7 +793,7 @@ function siegeCityExecute(_node: Parameters<BtHandler<OpsContext>['update']>[0],
       }
     }
     if (!own && r.turns === 1 && empty === 0) full = true;
-    if (cur >= 0) take(i, cur, 1);
+    if (cur >= 0) lift(i, cur, 1);
     return sum * mult + (full ? 100 : 0);
   };
   const move = (i: number, j: number, cur: number): number => {

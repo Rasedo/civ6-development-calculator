@@ -546,6 +546,7 @@
       value: "Replayed: both recorded meteors land their plot with the pick over the record-before's unowned plots of the terrain list and two draws after it (runs/h1_duelw1115 t135 of 159 plots, runs/h1_duelw1116 "
     - recording: h1_duelw1124
       value: "A Canal is that two-mask plot: runs/h1_duelw1124 Cardiff ->   Xiurong through Shenyang's Canal, 11 plots, 4 water, pays its 6 Gold   district rows twice over (score 23 >= 11) — 12 Gold, which water al"
+  impl: [cpu/core/tactical.ts:cityCentre]
   readings:
     - "C-74: the one-off start — READ"
     - "H-1: a city centre's floors — READ"
@@ -6080,11 +6081,21 @@
   final: 0x56f690
   kind: function
   name: Siege City's assignment gain
-  semantics: Siege City's assignment gain (its multiplier the store at [rsp + 0x28]).
-  status: PARTLY
-  impl: [cpu/core/operations/assault.ts:siegeCityExecute]
+  semantics: "Siege City's assignment gain (its multiplier the store at [rsp + 0x28]). Its frame: a slot of no plot, another domain (+0x650 against slot +8) or out of the unit's planning (0x793300) 0; the unit's own slot's count and, exerting a zone of control (0x56d6c0), its joined slots' lifted whatever turn it reaches it (0x80f75f), the empty slots counted, every slot held and none of this one 0 with the lift left standing (0x80f824), else (1 + 1 at a count equal to its own hold) per slot and joined slot, x (1 + turn 1 + Movement left), + 100 completing the ring, the lift put back (0x80f95a). The move (0x80f4a0) lifts and rings at turn 1 alone."
+  status: READ
+  cases:
+    - recording: h1_duely1128
+      turn: 242
+      value: "Siege City: the Ranger 39:17 to 42:19, the Cavalry 40:17 to 41:19, 40:15 to 41:21, as logged (the Rangers exert no zone of control)"
+  impl:
+    - cpu/core/operations/assault.ts:siegeCityExecute
+    - gpu/core/sim_barbops.py:_op_siege
+    - cpu/core/operations/assault.ts:lift
+    - cpu/core/operations/assault.ts:gain
+    - gpu/core/sim_barbops.py:ring
   readings:
     - "C-97: the war desires, the war operation's readiness and the assault's executions — the war value, the not-ready hook, the readiness and the executions READ; the leader's war factor, the WMD flags, the deal items and the war record's writer unread"
+    - "C-95 / C-123 / C-125: the stand-to-attack site, a district closed to a ranged unit, City Attack's members and log, the siege gain's lift, a city's blow back, the units of no zone of control — READ (0x2720a0 at 0x272255..0x272330, 0x271be0 at 0x271e69 / 0x271f2e, 0x586360 at 0x5866c9..0x58671f, 0x8109e0, 0x80ceb0 at 0x80d6f9, 0x771f80, 0x80f6b0 at 0x80f75f / 0x80f824 / 0x80f95a, 0x791470, 0x56d6c0), both twins"
   context:
     - "...agents, the generalized assignment 0x8b5bf0 (three passes; the start 0x80f9d0, the gain 0x80f6b0 — its multiplier the store at [rsp + 0x28] that dis.sh dropped —, the move 0x80f4a0) lo..."
   review: reviewed
