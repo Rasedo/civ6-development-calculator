@@ -1803,7 +1803,7 @@ class SimOrders:
                 self.d_static_adj[rows[om], n_d[om], :] -= contrib[om]
         self._eff_version += 1
 
-    def _seat_upkeep_and_bankruptcy(self, row: int, active: torch.Tensor) -> None:
+    def _seat_upkeep_and_bankruptcy(self, row: int, active: torch.Tensor, income: torch.Tensor | None = None) -> None:
         """Unit upkeep + the bankruptcy rule for ONE seat row — a major's at
         the loop position right after its gold lands, the Free Cities seat's
         in its own phase after its cities' gold: charge maintenance for every
@@ -1813,7 +1813,8 @@ class SimOrders:
         turn charges nothing (`active`: the TS loop's eliminated-actor
         continue, the Free Cities phase's no-city return); a game with no
         units charges none and still meets the bankruptcy its balance
-        forces."""
+        forces. A major's `income` [B] f64, the Gold its step banked: its net
+        income less the charge (`Seat.netIncome`, `civ_net_income`)."""
         seat = int(self._ROW_SEAT[row])
         if self.units_mode:
             mine = self.unit_alive & (self.unit_seat == seat)
@@ -1826,6 +1827,8 @@ class SimOrders:
         if row < self.n_majors:
             upkeep = upkeep + self._wmd_upkeep(row)
         tre = self._treasury_of(row)
+        if income is not None and row < self.n_majors:
+            self.civ_net_income[:, row] = torch.where(active, income - upkeep.double(), self.civ_net_income[:, row])
         if self._log_diff:
             for _b in range(self.B):
                 self._diff_events.setdefault(_b, []).append(

@@ -373,7 +373,6 @@ export interface Modifiers {
    *  (`beliefSeatYields`) */
   beliefSeatYields: Partial<Yields>;
   beliefPerWonderCity: Partial<Yields>;
-  districtYieldAdd: Partial<Record<DistrictId, Partial<Yields>>>;
   prodBoosts: ProdBoost[];
   builderCharges: number;
   unitMaintenanceCut: number;
@@ -659,7 +658,6 @@ export function defaultModifiers(): Modifiers {
     beliefPerDistrict: {},
     beliefSeatYields: {},
     beliefPerWonderCity: {},
-    districtYieldAdd: {},
     prodBoosts: [],
     builderCharges: 0,
     unitMaintenanceCut: 0,

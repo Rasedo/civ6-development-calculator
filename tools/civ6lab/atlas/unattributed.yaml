@@ -4198,6 +4198,7 @@
     - "C-98 / C-130: the player tourism analyzer, the city subject's context, the dark trade buildings — READ (0x6b0700, 0x6b0430, 0x69ea00's +0x70), a FIT (the capacity), both twins"
     - "C-98: a unit's value adds its abilities' modifiers; EFFECT_ADJUST_UNIT_MOVEMENT and REQUIREMENT_PLOT_ADJACENT_TO_OWNER; a second completion adds again — READ (0x7b62c0 at 0x7b7658..0x7b76d8, 0x6e11c7 / 0xc85140, 0x6bd520, 0x6d3200, 0x762d60's rows), both twins"
     - "C-100: the plot's own subject, PLOT_IS_HILLS and the plot analysis' replaced camp — READ (0x69ed60 / 0x69ec20, 0x6d0970, 0x5cf160..0x5cf1ab), both twins"
+    - "C-130: the analyzers a minor's policy jobs never reach, the treaties on a minor's queue, a major's cached net income — READ, both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "- The registry (`reg.py` over 0x6c9640): 211 effect names, 27 collections, 66 requirements; the effects the policies and gover..."
@@ -8011,6 +8012,7 @@
   status: PARTLY
   readings:
     - "C-97: the governor AI — the analysis, the choice and the seats READ, the analyzers PARTLY READ"
+    - "C-130: the analyzers a minor's policy jobs never reach, the treaties on a minor's queue, a major's cached net income — READ, both twins"
   context:
     - "...riable each, data at +0x1d0 and +0x280): per governor in the Governors table's order (0xad57f0; the duels' eight, Ibrahim last) 0x40 bytes — +0x8 the governor, +0x10 the slots' citie..."
   review: reviewed
@@ -8518,6 +8520,21 @@
   context:
     - "...hTrained): 0x4c1a30, called as a unit is made (the city's 0x1e6570, 0xb02c60, 0xb67b30, 0xbd8be0, a hero 0x8ffac0) and the era's starting units (0x4580b0 through 0x4c1c10), raises it t..."
   review: reviewed
+- addr: 0xbe3670
+  final: 0x8a1af0
+  kind: function
+  status: READ
+  cases:
+    - recording: AI_Governors.csv
+      value: "EFFECT_ADJUST_PLAYER_GOVERNOR_POINTS 0x6c2720 is Amount x the best   of 0x6ed2d0 over the governors (0xad57f0: a held one's titles' +0x30, a   lacking one's entry values +0x1d0[g] +0x18 +0x28), from 0"
+    - recording: AI_Victories.csv
+      turn: 1
+      value: "the player's lists' projects (GrandStrategic +0x6e8, loaded by 0x6fece0 at   0x6ff1a0 from the leader's and the strategies' Projects lists): the   install's one Projects list is VICTORY_STRATEGY_SCIEN"
+  readings:
+    - "C-130: the analyzers a minor's policy jobs never reach, the treaties on a minor's queue, a major's cached net income — READ, both twins"
+  context:
+    - ...TION_PLAYER_TRAINED_UNITS is not in the registry 0x6c9640 (its string's only references 0xbe3673, 0xc1c0f6), so the modifier adds nothing (the minors' Public Works rows 1 / 2, 535 of t...
+  review: imported
 - addr: 0xbe4aa0
   final: 0x9b1040
   kind: function
@@ -8548,6 +8565,20 @@
   context:
     - "...: EFFECT_ADD_CULTURE_BOMB_TRIGGER (factory 0xc1c890, effect vtable 0xdde870, its object 0xc03070: BuildingType +8, DistrictType +0xc, ImprovementType +0x10, CaptureOwnedTerritory +0x14..."
   review: reviewed
+- addr: 0xc1c0d0
+  kind: function
+  status: READ
+  cases:
+    - recording: AI_Governors.csv
+      value: "EFFECT_ADJUST_PLAYER_GOVERNOR_POINTS 0x6c2720 is Amount x the best   of 0x6ed2d0 over the governors (0xad57f0: a held one's titles' +0x30, a   lacking one's entry values +0x1d0[g] +0x18 +0x28), from 0"
+    - recording: AI_Victories.csv
+      turn: 1
+      value: "the player's lists' projects (GrandStrategic +0x6e8, loaded by 0x6fece0 at   0x6ff1a0 from the leader's and the strategies' Projects lists): the   install's one Projects list is VICTORY_STRATEGY_SCIEN"
+  readings:
+    - "C-130: the analyzers a minor's policy jobs never reach, the treaties on a minor's queue, a major's cached net income — READ, both twins"
+  context:
+    - ...R_TRAINED_UNITS is not in the registry 0x6c9640 (its string's only references 0xbe3673, 0xc1c0f6), so the modifier adds nothing (the minors' Public Works rows 1 / 2, 535 of them, as lo...
+  review: imported
 - addr: 0xc1c890
   kind: function
   semantics: registers EFFECT_ADD_CULTURE_BOMB_TRIGGER (effect vtable 0xdde870)

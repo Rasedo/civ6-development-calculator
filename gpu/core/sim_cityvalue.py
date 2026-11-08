@@ -1992,15 +1992,22 @@ class _MinorFacts:
         return -1 if r is None else self.E["building"][self.T["bld_rows"].index(r)]
 
     def _item_rate_mult(self, item, rate):
-        """`minorItemMult` on a raw rate: the Urban Development Treaty's
-        outcome A doubles it toward a building of its district"""
+        """`congressQueueMult` on a raw rate: the Urban Development Treaty's
+        outcome A doubles it toward a building of its district, the Global
+        Energy Treaty's outcome B toward its plant, Public Works' outcome
+        toward its project"""
         sim = self.sim
+        if item.startswith("PROJECT_"):
+            pi = self._pidx(item)
+            return rate if pi < 0 else (rate.double() * sim._congress_project_mult(pi)).long()
         bi = self._building_index(item) if item.startswith("BUILDING_") else -1
         if bi < 0:
             return rate
         cp = sim._congress_udt()[0]
         hit = (cp != sim.UDT_NONE) & (sim._b_req_district[bi] == cp)
-        return torch.where(hit, (rate.double() * sim._c_prod_mult).long(), rate)
+        m = torch.where(hit, torch.full_like(rate, 1).double() * sim._c_prod_mult, torch.ones_like(rate).double())
+        m = torch.where(sim._congress_energy_boosted() == bi, m * sim._c_energy_prod_mult, m)
+        return (rate.double() * m).long()
 
     def _didx(self, d):
         r = [x["type"] for x in self.sim.rules.ai_city_build["districts"]]

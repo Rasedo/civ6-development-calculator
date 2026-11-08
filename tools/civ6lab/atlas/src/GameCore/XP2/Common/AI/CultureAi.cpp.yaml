@@ -203,8 +203,12 @@
 - addr: 0x623b90
   final: 0x416600
   kind: function
-  semantics: a policy card's score (the policy jobs' of the last turn).
-  status: PARTLY
+  semantics: "a policy card's score: the policy list +0x9e8's entry +0x48 at the index, 0 for -1 (the policy jobs' of the last turn)."
+  status: READ
+  cases:
+    - recording: h1_duelp1127
+      turn: 135
+      value: the civics' policy terms on the cards' scores of the turn before, as logged
   impl:
     - cpu/core/aiModifiers.ts:ValueTerms
     - cpu/core/aiCivics.ts:civicValue
@@ -218,6 +222,7 @@
   readings:
     - "H-1: the civics AI — READ (the choice, the walk, the propagation), PARTLY READ (the value)"
     - "C-97: the World Congress AI — the evaluation, the outcome, the votes, the hints, the option values and the targets READ"
+    - "C-130: the analyzers a minor's policy jobs never reach, the treaties on a minor's queue, a major's cached net income — READ, both twins"
   context:
     - "...he horizon; its policies: the best new policy's value less the weakest slotted one's (0x623b90, the policy AI's), at least 20.0 (0x7aacb1); and the civic's modifiers analysed (0x7a4b..."
   review: reviewed

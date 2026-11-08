@@ -411,11 +411,15 @@
 - addr: 0x6aaec0
   kind: function
   name: EFFECT_ADJUST_UNIT_BUILD_CHARGES
-  semantics: "on the context's unit with charges (+0xed0 above 0): per city of the player its CityBuildAI's best improvement (+0x648) at its best plot (0x5d1cb0), the most of their values (0x5d4ae0), x Amount, between the start and the horizon (0x7a2140), whole; registry object @f040a0, vtable 0xd62d40"
-  status: PARTLY
+  semantics: "on the context's unit with charges (+0xed0 above 0): per city of the player its CityBuildAI's best improvement (+0x648) at its best plot (0x5d1cb0), the most of their values (0x5d4ae0), x Amount, between the start and the horizon (0x7a2140), whole; registry object @f040a0, vtable 0xd62d40. Never called from a policy job: Public Works' COLLECTION_PLAYER_TRAINED_UNITS is not in the registry 0x6c9640, the modifier adds nothing."
+  status: READ
+  cases:
+    - recording: h1_duelp1117
+      turn: 130
+      value: the minors' POLICY_PUBLIC_WORKS 1 / 2 (the Builder's production alone), 535 rows of the five duelp recordings as logged
   readings:
     - "H-1: the civics AI — READ (the choice, the walk, the propagation), PARTLY READ (the value)"
-  notes: ["not ported: the policy jobs' COLLECTION_PLAYER_TRAINED_UNITS subjects unread"]
+    - "C-130: the analyzers a minor's policy jobs never reach, the treaties on a minor's queue, a major's cached net income — READ, both twins"
   review: reviewed
 - addr: 0x6ab400
   final: 0x4819a0
@@ -1444,6 +1448,16 @@
   context:
     - "...ce, the evaluation's city); EFFECT_ADJUST_UNIT_EXPERIENCE_MODIFIER 0x6c09b0 (its parser 0x6c0590 stores Amount x 0.01f as unweighted Gold; no unit: the city's Production, City::GetYiel..."
   review: reviewed
+- addr: 0x6c0740
+  final: 0x4714d0
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-130: the analyzers a minor's policy jobs never reach, the treaties on a minor's queue, a major's cached net income — READ, both twins"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - ...entry +0x48 at the index, 0 for -1. Its other caller 0x6c0b40 (vtable 0xd63820, parser 0x6c0740 GovernmentSlotType) adds whole(the most a card not active scores of the slot type +8,...
+  review: imported
 - addr: 0x6c09b0
   final: 0x471740
   kind: function
@@ -1464,6 +1478,19 @@
     - ".claude/scratchpad/cb4/NOTES.md: ...LLECTION_CITY_PLOT_YIELDS (0x69feb0, owned plots ring 3),   EFFECT_ADJUST_UNIT_EXPERIENCE_MODIFIER (0x6c09b0), EFFECT_ADJUST_PLOT_YIELD (0x6afa10),   EFFECT_ADJUST_TRADE_ROUTE_CAPACITY (0x6c0ff0), plot evalua..."
   context:
     - "...UNITS (0x69ffa0: once, the evaluation's city); EFFECT_ADJUST_UNIT_EXPERIENCE_MODIFIER 0x6c09b0 (its parser 0x6c0590 stores Amount x 0.01f as unweighted Gold; no unit: the city's Prod..."
+  review: reviewed
+- addr: 0x6c0b40
+  final: 0x4718d0
+  kind: function
+  name: the GovernmentSlotType analyzer
+  semantics: "vtable 0xd63820, parser 0x6c0740 (GovernmentSlotType +8): over the Policies (0xad5e90) not active (0x39dff0) of the slot type (+0x98 +0x14 at +8; any for -1), the most of their scores (0x623b90), whole into the sum (+0xc0). No card, government or civic a minor scores carries it."
+  status: READ
+  cases:
+    - recording: h1_duelp1127
+      turn: 135
+      value: "no modifier of the policies, governments and civics the minors score names GovernmentSlotType: their scores as logged without it"
+  readings:
+    - "C-130: the analyzers a minor's policy jobs never reach, the treaties on a minor's queue, a major's cached net income — READ, both twins"
   review: reviewed
 - addr: 0x6c0ff0
   final: 0x471d80
@@ -1516,11 +1543,16 @@
   final: 0x4732d0
   kind: function
   name: EFFECT_ADJUST_PLAYER_GOVERNOR_POINTS
-  semantics: "EFFECT_ADJUST_PLAYER_GOVERNOR_POINTS: Amount x the governor AI's point value (0x6eeee0 -> 0x6ed2d0), as PSEUDOYIELD_GOVERNOR (@0xf2e214), discounted from the start."
-  status: PARTLY
+  semantics: "EFFECT_ADJUST_PLAYER_GOVERNOR_POINTS: Amount x the governor AI's point value (0x6eeee0 -> 0x6ed2d0, at least 0), as PSEUDOYIELD_GOVERNOR (@0xf2e214), discounted from the start; 0 for a minor and the Free Cities, whose governor AI never runs."
+  status: READ
+  cases:
+    - recording: h1_duelp1127
+      turn: 63
+      value: the city-states' Early Empire, Guilds, Civil Engineering ... (CIVIC_GRANT_PLAYER_GOVERNOR_POINTS) with no governor term, as logged; AI_Governors.csv players 0 and 1 alone
+  impl: [cpu/core/aiModifiers.ts:ANALYZERS]
   readings:
     - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
-  notes: ["imported: READ in its section, no confirming case found beside it"]
+    - "C-130: the analyzers a minor's policy jobs never reach, the treaties on a minor's queue, a major's cached net income — READ, both twins"
   context:
     - ...h the player, discounted from the start 0x7a1240); EFFECT_ADJUST_PLAYER_GOVERNOR_POINTS 0x6c2720 PARTLY (Amount x the governor AI's point value 0x6eeee0 -> 0x6ed2d0, unread, as PSEUD...
   review: reviewed

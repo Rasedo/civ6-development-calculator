@@ -404,10 +404,15 @@
 - addr: 0x178610
   final: 0xfc770
   kind: function
-  semantics: a non-wonder building's multiplier for 0x17b1e0 (taken where above 1.0), its terms unread (+0x324, the plot 0x59270).
-  status: UNREAD
+  semantics: "a non-wonder building's multiplier for 0x17b1e0: the queue's +0x324 where above 1.0 and the building's district plot (0x179280 -> vt +0x60) adjacent (0x823c0) to the city's plot with the river bit of their direction (0x179890, plot +0x38): the across-the-river trait; else 1.0 (every minor)."
+  status: READ
+  cases:
+    - recording: h1_duelp1121
+      turn: 150
+      value: Hunza's building turns as logged with the multiplier 1.0 (no trait sets +0x324 for a minor)
   readings:
     - "C-98 / C-130: a city-state's building turns under the Urban Development Treaty — READ (0x17b1e0's rate), both twins"
+    - "C-130: the analyzers a minor's policy jobs never reach, the treaties on a minor's queue, a major's cached net income — READ, both twins"
   review: reviewed
 - addr: 0x178c50
   kind: function
@@ -423,6 +428,16 @@
   context:
     - "...roject's modifier 0x17a8c0 — the queue's per-project modifier +0x2f0 and its district's 0x178c50 —, the cost 0x17a680 (OuterDefenseRepair's own; else the cost progression model: game..."
   review: reviewed
+- addr: 0x179280
+  final: 0x142230
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-130: the analyzers a minor's policy jobs never reach, the treaties on a minor's queue, a major's cached net income — READ, both twins"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...building multiplier): the queue's +0x324 above 1.0 where the building's district plot (0x179280 -> vt +0x60) is adjacent (0x823c0) to the city's plot with the river bit of their direc..."
+  review: imported
 - addr: 0x179510
   final: 0xfd020
   kind: function
@@ -487,6 +502,16 @@
   context:
     - "...it plus 20 exceeds B; the player itself adds each city's unit at the head of its queue (0x179860 on city +0x2170) of such strength — Regional (+0x398); a player at war (0x469cd0) or..."
   review: reviewed
+- addr: 0x179890
+  final: 0xfd3a0
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-130: the analyzers a minor's policy jobs never reach, the treaties on a minor's queue, a major's cached net income — READ, both twins"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...0x60) is adjacent (0x823c0) to the city's plot with the river bit of their direction (0x179890, plot +0x38) — the across-the-river trait; 1.0 for a minor."
+  review: imported
 - addr: 0x179960
   final: 0xfd470
   kind: function
@@ -605,12 +630,14 @@
     - gpu/core/sim_cityvalue.py:_item_rate_mult
     - cpu/core/minorBuild.ts:minorItemMult
     - cpu/core/freeCityBuild.ts:base
+    - cpu/core/congress.ts:congressQueueMult
   readings:
     - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
     - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
     - "C-96: the unit value's unit count and the founding Production — READ, both twins"
     - "C-98 / C-130: a city-state's building turns under the Urban Development Treaty — READ (0x17b1e0's rate), both twins"
     - "A minor's items' turns at the Production its AI read before its free Trader's route — the C-130 cache applied to the build turns, both twins"
+    - "C-130: the analyzers a minor's policy jobs never reach, the treaties on a minor's queue, a major's cached net income — READ, both twins"
   notes:
     - ".claude/scratchpad/cb/notes.txt: ...(techTurns 0x7610e0, civicTurns 0x621920) + prereq district turns(+10 if not current) + build turns 0x17b1e0 (+10 if [rbp-0x60] && current != bld) + prereq buildings...  value = 0x7a4d40(bld, turns, plot=-999..."
   context:

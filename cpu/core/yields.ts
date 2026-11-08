@@ -528,8 +528,6 @@ export function cityDistrictYields(ctx: YieldCtx, city: City): Yields {
     const tile = ctx.map.tiles[d.tileIndex];
     if (!tile.districtComplete || tile.districtPillaged) continue; // pillaged = dark
     const def = DISTRICTS[d.type];
-    const cityStateAdd = ctx.mods.districtYieldAdd[d.type];
-    if (cityStateAdd) addYields(out, cityStateAdd);
     // CIV6 (M'banza, `MODIFIER_PLAYER_DISTRICT_ADJUST_BASE_YIELD_CHANGE`): a
     // unique district's own flat yields, on top of whatever it takes from its
     // neighbours.

@@ -2490,9 +2490,10 @@ class SimPhase:
         bank(self.civ_treasury, gold_sum)
         # a WON City-State Emergency pays +1 gold/turn per envoy, banked before
         # the upkeep
-        bank(self.civ_treasury, self._emergency_envoy_gold(row).to(self.civ_treasury.dtype))
+        envoy_gold = self._emergency_envoy_gold(row)
+        bank(self.civ_treasury, envoy_gold.to(self.civ_treasury.dtype))
         short0 = self.seat_shortfall[:, row].clone()
-        self._seat_upkeep_and_bankruptcy(row, active)
+        self._seat_upkeep_and_bankruptcy(row, active, gold_sum.double() + envoy_gold.double())
         for _gm, _gu in grants:
             _gm = _gm & (self.civ_cap_tile[:, row] >= 0)
             if bool(_gm.count_nonzero()):

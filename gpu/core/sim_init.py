@@ -806,6 +806,9 @@ class SimInit:
         # and whether a turn of it has closed (before one: its explored)
         self.seat_trade_seen = torch.zeros(B, self.n_majors, self.T, dtype=torch.bool, device=device)
         self.seat_trade_seen_on = torch.zeros(B, self.n_majors, dtype=torch.bool, device=device)
+        # each major's net Gold its last gold step banked (`Seat.netIncome`),
+        # 0 before the first
+        self.civ_net_income = torch.zeros(B, self.n_majors, dtype=torch.float64, device=device)
         # the barbarians' revealed plots (`barbSeat.explored`)
         self.barb_explored = torch.zeros(B, self.T, dtype=torch.bool, device=device)
 

@@ -3233,12 +3233,16 @@ export function seatPhase(state: GameState, only?: { seats: ReadonlySet<number>;
     actor.treasury = (actor.treasury ?? 0) + goldSum;
     // a WON City-State Emergency pays +1 gold/turn per envoy, banked before
     // the upkeep
-    actor.treasury += emergencyEnvoyIncome(state, actor.seat);
+    const envoyGold = emergencyEnvoyIncome(state, actor.seat);
+    actor.treasury += envoyGold;
     const upkMods = getModifiers(state, actor.seat);
     const _upk = state.units.reduce(
       (s, u) => s + (u.seat === actor.seat ? unitUpkeep(upkMods, u) : 0),
       0,
     );
+    // the net income the treasury caches as it banks (m_xCachedNetIncome),
+    // which its Economic AI's Gold boost reads until its next gold step
+    actor.netIncome = goldSum + envoyGold - _upk - wmdUpkeep(state, actor.seat);
     // WHAT the seat is charged and for HOW MANY units, before the charge
     // lands: a rate difference and a roster difference look identical in the
     // purse and are two different bugs.

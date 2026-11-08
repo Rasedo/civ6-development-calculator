@@ -75,8 +75,7 @@ import { economicGoldBoost } from './aiWeights';
 import { accrueStockpiles, canPayStockpile, capStockpiles, chargeUnitUpkeep, spendStockpile, stockFree, stockOf, stockpileCap, stockpileIncome, strategicSlot, strategicSurplus, unitResourceCost, unitUpkeepBill, upgradeGoldCost, upgradeType } from './stockpile';
 import { FX, FX_MIN, fmul, fxConst, fxOf, pseudoYieldValue, turnsAt, valueBetween, yieldValue } from './aiValue';
 import { aiCityStats, cityGrowth, aiView, storeUnitStrength } from './aiView';
-import { congressUdtProdDistrict } from './congress';
-import { CONGRESS_PROD_MULT } from '../data/seats';
+import { congressQueueMult } from './congress';
 import { civicPolicyBest, governmentValues, policyScores, slotTypeBest } from './aiPolicyValue';
 import { cityStateSight } from './fog';
 import { combatDesire, type CombatDesire } from './aiMilitary';
@@ -2123,17 +2122,15 @@ export function minorUnderThreat(cityState: CityState, threat: number): boolean 
 }
 
 /** The multiplier a minor's Production toward the item takes past its
- *  percents: the Urban Development Treaty's outcome A
- *  (MODIFIER_ALL_CITIES_ADJUST_DISTRICT_BUILDING_PRODUCTION, every city's,
- *  the city-states' too) doubles it toward a building of the treaty's
- *  district — the build turns' queue multiplier after Production x
- *  (percent + extra) (0x17b1e0 at 0x17b50c; runs/h1_duely1121 Hunza
- *  t142-161 under the City Centre treaty: Limes' Star Fort at 4 / 3 turns
- *  and Tsikhe at 10 / 5, its Star Fort done at t150) */
+ *  percents: the treaties' (`congressQueueMult`) — the build turns' queue
+ *  multiplier after Production x (percent + extra) (0x17b1e0 at 0x17b50c;
+ *  runs/h1_duely1121 Hunza t142-161 under the City Centre Urban
+ *  Development Treaty: Limes' Star Fort at 4 / 3 turns and Tsikhe at 10 / 5,
+ *  its Star Fort done at t150) */
 export function minorItemMult(state: GameState, item: MinorItem): number {
-  if (!('building' in item)) return 1;
-  const d = congressUdtProdDistrict(state);
-  return d !== null && BUILDINGS[item.building]?.district === d ? CONGRESS_PROD_MULT : 1;
+  if ('building' in item) return congressQueueMult(state, { building: item.building });
+  if ('project' in item) return congressQueueMult(state, { project: item.project });
+  return 1;
 }
 
 /** The percent a minor's step pays toward the item on top of its Production:

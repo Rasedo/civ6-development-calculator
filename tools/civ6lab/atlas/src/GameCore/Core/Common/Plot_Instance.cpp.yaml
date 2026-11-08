@@ -40,6 +40,7 @@
   status: PARTLY
   readings:
     - "C-128: a city-state's Make Military Formation — READ (0x77a190, 0x770670, 0x536da0, 0x773e20, 0x94a870, 0x949930), both twins"
+    - "C-130: the analyzers a minor's policy jobs never reach, the treaties on a minor's queue, a major's cached net income — READ, both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...r as target; CanStart (vt +0x48: Corps 0x94a870, Army 0x949930) — the partner adjacent (0x823c0), of the unit's owner and type, its +0x890 clear, in no formation; 0x536da0 with the..."

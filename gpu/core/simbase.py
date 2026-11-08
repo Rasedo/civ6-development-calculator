@@ -1357,6 +1357,7 @@ _MUTABLE = [
     "city_proj_conv", "city_proj_yield",  # a district project's converted yield, read until the next step
     "seat_explored", "barb_explored",
     "seat_trade_seen", "seat_trade_seen_on",  # a major's explored plots as its last turn closed, and whether one has
+    "civ_net_income",  # the net Gold its last gold step banked, which its Economic AI's Gold boost reads
     "civ_culture", "civ_faith", "civ_tourism", "civ_tourism_rel", "civ_gpp", "civ_grievance",
     "civ_tourism_to", "civ_tourism_rel_to",  # lifetime tourism SENT, per (from, to) major pair
     "civ_dominant",  # cultural dominance, per (from, to) major pair

@@ -807,6 +807,8 @@ const SEAT: Record<string, Extractor> = {
     return v?.length ? v : new Array(st.map.tiles.length).fill(0);
   }),
   treasury: overSeats((s) => s.treasury),
+  // the net Gold its last gold step banked (`Seat.netIncome`), 0 before the first
+  netIncome: overSeats((s) => s.netIncome ?? 0),
   goldShortfall: overSeats((s) => s.goldShortfall),
   co2: overSeats((s) => s.co2 ?? 0),
   co2Turn: overSeats((s) => s.co2Turn ?? 0),

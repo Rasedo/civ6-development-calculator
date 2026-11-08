@@ -1000,14 +1000,15 @@ class SimMinors:
 
     def _major_yield_w(self, r: int) -> dict:
         """`yieldWeights` of major row `r`, per YieldType [B] raw: the
-        Economic AI's Gold boost, -0.2 x its gold a turn while that is below
-        0 (`_major_gpt`); its weight lists' Yields (`_major_lists`); and per
+        Economic AI's Gold boost, -0.2 x the net income its last gold step
+        cached while that is below 0 (`civ_net_income`); its weight lists'
+        Yields (`_major_lists`); and per
         yield of sensitivity s above 0, over it and every major it has met,
         their yields a turn (its Science and Culture rates, its gold a turn):
         s x (max - its own) / sd where sd > 0 and its own is below the max"""
         from .sim_cityvalue import _YIELDS
         lists = self._major_lists(r)
-        gpt = self._major_gpt(r)
+        gpt = self.civ_net_income[:, r]
         boost = torch.where(gpt < 0, _fmul(torch.full_like(gpt, _fx_const(-0.2), dtype=torch.long), _fx_const_t(gpt)),
                             torch.zeros_like(gpt, dtype=torch.long))
         out = {y: lists[:, k].clone() for k, y in enumerate(_YIELDS)}
@@ -1854,15 +1855,23 @@ class SimMinors:
         return out
 
     def _minor_item_mult(self, key: torch.Tensor) -> torch.Tensor:
-        """[B] f64 — `minorItemMult`: the Urban Development Treaty's outcome A
-        doubles the Production toward a building of its district, past the
-        item's percents"""
-        is_b = (key >= self._mk_b0) & (key < self._mk_d0)
+        """[B] f64 — `minorItemMult` (`congressQueueMult`) past the item's
+        percents: the Urban Development Treaty's outcome A doubles the
+        Production toward a building of its district, the Global Energy
+        Treaty's outcome B toward its plant, Public Works' outcome toward its
+        project"""
+        _is_u, is_b, _is_d, is_p, _is_r = self._mk_kinds(key)
         bi = (key - self._mk_b0).clamp(min=0, max=self.NB - 1)
         cp = self._congress_udt()[0]
         hit = is_b & (cp != self.UDT_NONE) & (self._b_req_district.take(bi) == cp)
         one = torch.ones(self.B, dtype=torch.float64, device=self.device)
-        return torch.where(hit, one * float(self._c_prod_mult), one)
+        m = torch.where(hit, one * float(self._c_prod_mult), one)
+        m = torch.where(is_b & (self._congress_energy_boosted() == bi), m * float(self._c_energy_prod_mult), m)
+        pi = key - self._mk_p0
+        if bool(is_p.count_nonzero()):
+            for p in sorted({int(x) for x in pi[is_p].tolist()}):
+                m = torch.where(is_p & (pi == p), m * self._congress_project_mult(p), m)
+        return m
 
     def _minor_item_pct(self, s: int, key: torch.Tensor) -> torch.Tensor:
         """[B] f64 — `minorItemPct`: a Builder +200%, a unit not of the civilian formation +200%

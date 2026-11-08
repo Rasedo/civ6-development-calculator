@@ -446,6 +446,15 @@
   context:
     - "- READ, Discipline's EFFECT_ADJUST_UNIT_BARBARIAN_COMBAT 0x6bef40 (@f03c08, vtable 0xd63760; its parser 0x6bedb0 stores fx(expf(Amount x COMBAT_POWER_SCALING)) at +8, GlobalParame..."
   review: imported
+- addr: 0xd63820
+  kind: global
+  status: PARTLY
+  readings:
+    - "C-130: the analyzers a minor's policy jobs never reach, the treaties on a minor's queue, a major's cached net income — READ, both twins"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - ...olicy list +0x9e8 entry +0x48 at the index, 0 for -1. Its other caller 0x6c0b40 (vtable 0xd63820, parser 0x6c0740 GovernmentSlotType) adds whole(the most a card not active scores of th...
+  review: imported
 - addr: 0xd638e0
   kind: global
   status: PARTLY

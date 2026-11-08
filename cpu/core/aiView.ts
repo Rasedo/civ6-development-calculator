@@ -62,20 +62,16 @@ import { availableProjects, districtCost, districtScaledBase, projectCost, settl
 const districtType = (id: string): string => `DISTRICT_${id}`;
 
 /** a district's yield of a kind (0x24b5a0: District::GetYield 0x249850 and
- *  0x24aae0): its adjacency yield of that kind at its plot (0x366df0) and its
- *  flat yields; none on a pillaged plot. The city's buildings in it are no
- *  part of it (runs/h1_duelw1124 player 4 t40: Natural Philosophy 29 for a
- *  Campus of adjacency 2 beside its Library; 1121 Hunza's Commercial Hub of
- *  no adjacency beside its Market, none) */
+ *  0x24aae0): its adjacency yield of that kind at its plot (0x366df0); none
+ *  on a pillaged plot. The city's buildings in it are no part of it
+ *  (runs/h1_duelw1124 player 4 t40: Natural Philosophy 29 for a Campus of
+ *  adjacency 2 beside its Library; 1121 Hunza's Commercial Hub of no
+ *  adjacency beside its Market, none) */
 function districtYieldOf(state: GameState, seat: number, city: City, d: { type: DistrictId; tileIndex: number }, key: YieldKey): number {
   const tile = state.map.tiles[d.tileIndex];
-  if (tile.districtPillaged) return 0;
+  if (tile.districtPillaged || DISTRICTS[d.type].adjacencyYield !== key) return 0;
   const ctx = makeYieldCtx(state, seat);
-  const def = DISTRICTS[d.type];
-  let y = 0;
-  if (def.adjacencyYield === key) y += effectiveAdjacency(ctx, tile, d.type, buildingVariantAdjacency(ctx.mods.civ, city, d.type));
-  y += ctx.mods.districtYieldAdd[d.type]?.[key] ?? 0;
-  return y;
+  return effectiveAdjacency(ctx, tile, d.type, buildingVariantAdjacency(ctx.mods.civ, city, d.type));
 }
 const YIELD_KEY: Readonly<Record<string, YieldKey>> = {
   YIELD_FOOD: 'food', YIELD_PRODUCTION: 'production', YIELD_GOLD: 'gold',

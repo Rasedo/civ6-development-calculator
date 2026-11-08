@@ -560,6 +560,20 @@ export class RecordedActions implements ActionSource {
     const phaseOf = (pid: number): Phase => (pid === act ? 'before' : 'after');
     const ev = (rows as unknown[]).filter((r): r is ActionRow => Array.isArray(r) && typeof r[2] === 'string');
     const n = (r: ActionRow, k: number) => (typeof r[3 + k] === 'number' ? r[3 + k] as number : NaN);
+    // an improvement the turn's close removed, outside every player's turn
+    // (an event's, the engine's own at the turn change), is no owner's
+    // clearing (runs/h1_duelp1117 t188: player 1's Farms on 30:7 and 31:7
+    // gone after the barbarians' turn, Antananarivo's Farm on 31:6 still 6
+    // Food in its turn)
+    const closed = new Set<number>();
+    let inTurn = false;
+    for (const r of ev) {
+      if (r[1] !== a.turn) continue;
+      if (r[2] === 'PlayerTurnActivated') inTurn = true;
+      else if (r[2] === 'PlayerTurnDeactivated') inTurn = false;
+      else if (r[2] === 'ImprovementRemovedFromMap' && !inTurn) closed.add(n(r, 1) * W + n(r, 0));
+    }
+    inferred = inferred.filter((d) => !(d.kind === 'clear' && d.what === 'improvement' && closed.has(d.plot)));
     const cityPlot = (owner: number, id: number) => {
       const c = b.cities.find((x) => x.owner === owner && x.id === id) ?? a.cities.find((x) => x.owner === owner && x.id === id);
       return c ? centreOf(c, W) : -1;

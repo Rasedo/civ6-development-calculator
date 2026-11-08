@@ -951,6 +951,7 @@
     - "C-96: CanTrain's obsolescence and the contract purchase's refusal — READ (0x172820's prerequisite block, 0x538460, the callers' sixth argument), ported both twins"
     - "C-130 / C-96: a contract's priority in the expected unit count, the strength's treasury flag — READ, both twins"
     - "C-130: the Combat Desire between the policy jobs and the government values; a released contract on its city's list — READ, both twins"
+    - "C-130: the analyzers a minor's policy jobs never reach, the treaties on a minor's queue, a major's cached net income — READ, both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ...city, the train turns 0x17bb40 at and without the bonus, CityBuildAI's expected count 0x5d4750 x its Production [+0x1008], bare, from the start to start + the train turns), EFFECT_AD...

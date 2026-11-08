@@ -828,6 +828,7 @@ SEAT = {
     "tradeSeen": lambda sim, b, rows: [
         (sim.seat_trade_seen[b, c] if bool(sim.seat_trade_seen_on[b, c]) else sim.seat_explored[b, c]).tolist() for c in rows],
     "treasury": _civ_scalar("civ_treasury"),
+    "netIncome": lambda sim, b, rows: [float(sim.civ_net_income[b, c]) for c in rows],
     "goldShortfall": _civ_scalar("seat_shortfall"),
     "co2": _civ_scalar("civ_co2"),
     "co2Turn": _civ_scalar("civ_co2_turn"),

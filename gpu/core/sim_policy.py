@@ -91,13 +91,14 @@ class SimPolicy:
             return int(civ.get(name, -1)) if name else -1
 
         # a card with a great person class's obsolete row is obsolete to a
-        # minor (its civilization level earns none): its modifiers are never
+        # minor (its civilization level earns none), and a Dark or Golden Age
+        # card scores -1.0 (a minor knows no age): their modifiers are never
         # analysed
         # a card whose analysis the GPU lacks refuses where it comes alive
         # (`_pol_scores`); a government's always
         unported = {}
         for r in list(pols) + list(govs):
-            if any(o.get("gpClass") for o in r.get("obsolete", [])):
+            if any(o.get("gpClass") for o in r.get("obsolete", [])) or r.get("darkAge") or r.get("goldenAge"):
                 continue
             for m in r["modifiers"]:
                 try:

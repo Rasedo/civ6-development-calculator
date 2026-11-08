@@ -768,6 +768,17 @@
           ]
         },
         {
+          "name": "netIncome",
+          "compare": "milli",
+          "covers": [
+            "Seat.netIncome"
+          ],
+          "planes": [
+            "civ_net_income"
+          ],
+          "note": "the net Gold a major's last gold step banked (PlayerTreasury m_xCachedNetIncome, player +0x13a0 +0x1b8), which its Economic AI's Gold boost reads; 0 before the first"
+        },
+        {
           "name": "goldShortfall",
           "compare": "exact",
           "covers": [

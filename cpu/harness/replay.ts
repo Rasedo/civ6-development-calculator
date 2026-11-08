@@ -1068,6 +1068,30 @@ function landMajorDistricts(ctx: Ctx, b: TurnRecord, turn: number, copy: GameSta
   }
 }
 
+/** the improvements a major's Builder repaired in its turn stand repaired
+ *  for the players after it: the log's ImprovementChanged (x, y, type,
+ *  owner, resource, pillaged) clearing the pillage between the major's
+ *  PlayerTurnActivated and Deactivated, which record t+1 alone holds
+ *  otherwise (runs/h1_duelp1127 t135: player 1's Farm on 6:12, pillaged by
+ *  the turn 134 close, repaired in its turn before Hattusa's; the Farm on
+ *  5:13 beside it 5 Food in Hattusa's growth and its policy values) */
+function landMajorRepairs(ctx: Ctx, b: TurnRecord, turn: number, players: ReadonlySet<number>): void {
+  let acting = -1;
+  for (const x of (b as { actions?: unknown[][] }).actions ?? []) {
+    if (x[1] !== turn) continue;
+    if (x[2] === 'PlayerTurnActivated') acting = x[3] as number;
+    else if (x[2] === 'PlayerTurnDeactivated') acting = -1;
+    else if (x[2] === 'ImprovementChanged' && x[8] === 0 && players.has(acting)) {
+      const seat = ctx.seatOfPlayer.get(acting);
+      if (seat === undefined || !isCiv(seat)) continue;
+      const t = ctx.state.map.tiles[(x[4] as number) * ctx.W + (x[3] as number)];
+      if (!t.improvement || !t.pillaged) continue;
+      t.pillaged = false;
+      count(ctx, 'repair', 'applied', acting);
+    }
+  }
+}
+
 /** THE BARBARIANS' UNIT AI on a copy of the state, the units that stood
  *  before their camps raised this turn's back where the pair's first record
  *  holds them (`from`, else where they stand): its moves tallied
@@ -5355,7 +5379,7 @@ const GAME_MEMORY = ['barbTribes', 'barbPool', 'barbCampsBegun', 'barbSpotNext']
  *  its Faith a turn); the trade graph's paths (runs/h1_duelz1124 Shenyang ->
  *  Bologna t180 on the path laid at t147) */
 const GAME_STORES = ['warTurns', 'tradeEdges'] as const;
-const SEAT_STORES = ['barbKills'] as const;
+const SEAT_STORES = ['barbKills', 'netIncome'] as const;
 const MINOR_STORES = ['prodOverflow', 'repairWait', 'lastHitTurn', 'fuelShort', 'tradeRoutes', 'foundedTurn', 'stockpile', 'prodReserved', 'gpPoints'] as const;
 
 /** the progress a city-state's districts, projects and repairs it switched
@@ -6005,6 +6029,7 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
     stream.actions(a.turn);
     syncDedications(ctx, new Set([seatOfP(ctx, activePlayer(a))]));
     applyPhase(ctx, ds, 'before', b, a);
+    landMajorRepairs(ctx, b, a.turn, new Set([activePlayer(a)]));
     // the active player's units stand where its actions left them before its
     // next start (the engine's turn below): its moves reveal, and meet, there
     syncUnits(ctx, b, activePlayer(a));
@@ -6138,6 +6163,7 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
       // their missions of the turn, the record's
       applyMissions(ctx, missions.get(a.turn) ?? []);
       applyPhase(ctx, ds, 'after', b, b, otherMajors);
+      landMajorRepairs(ctx, b, a.turn, otherMajors);
       // their units stand where their actions left them: their looks reveal
       // and meet in their turn (runs/h1_duelv1127: China meets Rome at t61,
       // DiplomacySummary.csv, the record of t62 the first to show it; 1117

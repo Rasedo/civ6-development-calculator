@@ -183,10 +183,15 @@ export function yieldWeights(state: GameState, seat: number): Record<string, num
   const w: Record<string, number> = Object.fromEntries(AI_YIELDS.map((y) => [y, 0]));
   if (!s) return w;
   // the Economic AI's gold boost (0x687bf0): a city-state's as its turn
-  // stored it, written after its city update (`minorPhase`), any other
-  // seat's on its gold per turn now
+  // stored it, written after its city update (`minorPhase`); a major's on
+  // the net income its last gold step cached, its turn's later units and
+  // their Maintenance unread (runs/h1_duelp1128: Rome's unit of its t89
+  // start, Maintenance 5 -> 7, at -1.6 net from its t90 gold step;
+  // city-states 2 and 4's route value K over its weights 6.37 from t90 as
+  // logged); the Free Cities' on their gold per turn now
   const cs = state.cityStates.find((x) => x.seat === seat);
-  w.YIELD_GOLD += cs ? cs.economy?.goldBoost ?? 0 : economicGoldBoost(goldPerTurn(state, seat));
+  w.YIELD_GOLD += cs ? cs.economy?.goldBoost ?? 0
+    : economicGoldBoost(isCiv(seat) ? s.netIncome ?? 0 : goldPerTurn(state, seat));
   // the Yields lists
   for (const [y, v] of listSum(seat, s, 'Yields')) if (y in w) w[y] += v;
   // the sensitivity boost

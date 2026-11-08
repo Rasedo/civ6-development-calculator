@@ -12231,3 +12231,58 @@ rebuild").
   Smith's, a congress slot) — the free change it grants lands in the middle
   of the player's city walk, after the civics step where the replay applies
   the recorded layout.
+
+## C-130: the analyzers a minor's policy jobs never reach, the treaties on a minor's queue, a major's cached net income — READ, both twins
+
+`congressQueueMult` (cpu/core/congress.ts), `minorItemMult`
+(cpu/core/minorBuild.ts), `majorItemTurns` (cpu/core/freeCityBuild.ts),
+`yieldWeights` (cpu/core/aiWeights.ts), `Seat.netIncome` (the gold step in
+cpu/core/phase.ts); GPU `_minor_item_mult` (gpu/core/sim_minors.py),
+`_item_rate_mult` (gpu/core/sim_cityvalue.py), `_major_yield_w`,
+`civ_net_income` (`_seat_upkeep_and_bankruptcy`, gpu/core/sim_orders.py),
+`_pol_tables` (gpu/core/sim_policy.py).
+
+- NEVER REACHED FOR A MINOR OR THE FREE CITIES: a Dark or Golden Age card
+  (Collectivism) scores -1.0, its modifiers unanalysed (a minor knows no
+  age); EFFECT_ADJUST_PLAYER_GOVERNOR_POINTS 0x6c2720 is Amount x the best
+  of 0x6ed2d0 over the governors (0xad57f0: a held one's titles' +0x30, a
+  lacking one's entry values +0x1d0[g] +0x18 +0x28), from 0 — the governor
+  AI never runs for them (AI_Governors.csv logs players 0 and 1 alone), so
+  0 (the fourteen civics' CIVIC_GRANT_PLAYER_GOVERNOR_POINTS, Early Empire,
+  Guilds, Civil Engineering ... as logged); EFFECT_ADJUST_UNIT_BUILD_CHARGES
+  0x6aaec0 (on the context's unit +0x90 with charges +0xed0) is never called:
+  Public Works' COLLECTION_PLAYER_TRAINED_UNITS is not in the registry
+  0x6c9640 (its string's only references 0xbe3673, 0xc1c0f6), so the modifier
+  adds nothing (the minors' Public Works rows 1 / 2, 535 of them, as logged);
+  the player's lists' projects (GrandStrategic +0x6e8, loaded by 0x6fece0 at
+  0x6ff1a0 from the leader's and the strategies' Projects lists): the
+  install's one Projects list is VICTORY_STRATEGY_SCIENCE_VICTORY's, which
+  every minor and the Free Cities hold Forbidden (AI_Victories.csv t1).
+- 0x623b90: a card's score, the policy list +0x9e8 entry +0x48 at the index,
+  0 for -1. Its other caller 0x6c0b40 (vtable 0xd63820, parser 0x6c0740
+  GovernmentSlotType) adds whole(the most a card not active scores of the
+  slot type +8, any for -1): no card, government or civic a minor scores
+  carries it.
+- 0x178610 (0x17b1e0's building multiplier): the queue's +0x324 above 1.0
+  where the building's district plot (0x179280 -> vt +0x60) is adjacent
+  (0x823c0) to the city's plot with the river bit of their direction
+  (0x179890, plot +0x38) — the across-the-river trait; 1.0 for a minor.
+- THE TREATIES ON EVERY QUEUE: the Global Energy Treaty's outcome B
+  (MODIFIER_ALL_CITIES_ADJUST_BUILDING_PRODUCTION) toward its plant and
+  Public Works' (MODIFIER_ALL_CITIES_ADJUST_PROJECT_PRODUCTION) toward its
+  project, beside the Urban Development Treaty's (MODIFIER_ALL_CITIES_
+  ADJUST_DISTRICT_BUILDING_PRODUCTION), every city's: the queue's multiplier
+  past the minor's percents, on its step and its turns (no recording has a
+  minor build the project or plant a standing treaty names).
+- THE ECONOMIC AI'S GOLD BOOST (0x687bf0) reads the treasury's cached net
+  income (+0x13a0 +0x1b8) as the major's gold step banked it, not its
+  Maintenance after: runs/h1_duelp1128 Rome's t89 start's unit
+  (Maintenance 5 -> 7; the gold +0.40 at t89, -1.60 at t90), its Gold weight
+  raised from its t90 gold step; city-states 2 and 4's route value K over
+  its weights (Nazca 516's 6 Gold, 1 Faith) 5.39 to t89 and 6.37 from t90 as
+  logged, every K row of the seed's 361 to t92 as logged.
+- Open: the Free Cities' boost read live (no case); their flat bonus's
+  OVERALL_PRODUCTION, UNIT_PRODUCTION and GOLD_PURCHASES, their Agoge
+  (0x4bcd30) and their units' expected count (0x5d4750's contract term) on
+  no recorded row (their cards: Caravansaries alone; their civics past
+  Political Philosophy none).

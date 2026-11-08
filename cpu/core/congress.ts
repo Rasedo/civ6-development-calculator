@@ -42,12 +42,12 @@ import {
   CONGRESS_ESPIONAGE, CONGRESS_PACT_LEVELS, CONGRESS_ARMS_CONTROL, CONGRESS_LUXURY_POLICY,
   CONGRESS_PR_MULT_A, CONGRESS_PR_MULT_B, CONGRESS_ADVISORY_CS,
   CONGRESS_WORLD_RELIGION_RS, CONGRESS_WORLD_RELIGION_FAVOR,
-  CONGRESS_COMPETITIONS, CONGRESS_INTERVAL, CONGRESS_MIN_ERA,
+  CONGRESS_COMPETITIONS, CONGRESS_INTERVAL, CONGRESS_MIN_ERA, CONGRESS_PROD_MULT,
 } from '../data/seats';
 import { EMG_CALLED } from './emergency';
 import { seatGovernment } from './effects';
 import { envoysOf } from './cityStates';
-import { POWER_PLANT_IDS } from '../data/buildings';
+import { BUILDINGS, POWER_PLANT_IDS } from '../data/buildings';
 import { SPY_OFFENSIVE_MISSIONS } from '../data/espionage';
 import { startCompetition } from './competition';
 import { diploVictoryMoment } from './eras';
@@ -731,6 +731,24 @@ export function congressEnergyProdMult(state: GameState, buildingId: string): nu
   const e = congressEffect(state, CONGRESS_GLOBAL_ENERGY);
   if (!e || e.outcome !== 1 || POWER_PLANT_IDS[e.target] !== buildingId) return 1;
   return CONGRESS_ENERGY_PROD_MULT;
+}
+
+/** The treaties' multiplier on a city's Production toward a building or a
+ *  project past its percents (the queue's multipliers of 0x17b1e0): the
+ *  Urban Development Treaty's outcome A doubling it toward a building of its
+ *  district, the Global Energy Treaty's outcome B toward its plant, Public
+ *  Works' outcome toward its project — each an ALL_CITIES modifier
+ *  (MODIFIER_ALL_CITIES_ADJUST_DISTRICT_BUILDING_PRODUCTION, _BUILDING_
+ *  PRODUCTION, _PROJECT_PRODUCTION), every city's, the city-states' and the
+ *  Free Cities' too */
+export function congressQueueMult(state: GameState, item: { building?: string; project?: string }): number {
+  if (item.building !== undefined) {
+    const d = congressUdtProdDistrict(state);
+    const udt = d !== null && BUILDINGS[item.building]?.district === d ? CONGRESS_PROD_MULT : 1;
+    return udt * congressEnergyProdMult(state, item.building);
+  }
+  if (item.project !== undefined) return congressProjectMult(state, PROJECT_LIST.findIndex((p) => p.id === item.project));
+  return 1;
 }
 
 /** Outcome A (WC_RES_BUILDING_PRODUCTION_BAN): the plant whose production is

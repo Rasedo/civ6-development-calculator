@@ -1071,6 +1071,11 @@ export interface Seat {
   grantedTitles: number;
 
   treasury: number;
+  /** the net Gold its last gold step banked (PlayerTreasury
+   *  m_xCachedNetIncome, player +0x13a0 +0x1b8: its cities' Gold less its
+   *  units' Maintenance, written as the treasury banks it), which its
+   *  Economic AI's Gold boost reads; 0 before the first */
+  netIncome?: number;
   /** the whole Gold the seat's last upkeep fell short of its treasury
    *  (`goldShortfall`) — what its cities' bankruptcy amenities read */
   goldShortfall: number;
