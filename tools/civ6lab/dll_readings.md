@@ -11077,3 +11077,24 @@ earlier one's end look.
   encampHp) is unported; 0x51eaf0's terrain term 0x522c10 and modifier
   lists unread; the engine's barbarian sack of a major's centre at 0 hit
   points has no source (the game's Rome stands at 200 damage, t242-249).
+
+## A minor's items' turns at the Production its AI read before its free Trader's route — the C-130 cache applied to the build turns, both twins
+
+`minorBuildFacts` (its `buildTurns`) and `minorItemTurns` (cpu/core/minorBuild.ts)
+take the city's Production through `aiCityStats` (`CityState.aiYields`); GPU
+`_MinorFacts.build_turns` / `.item_turns` read it through `._total(1)`.
+
+- THE RULE: City::GetYield 0x1cb8b0 caches a city's yields on its first read
+  while the game state is locked (the C-130 section); the City Analysis's turn
+  estimates (0x17bb40 a unit, 0x17b1e0 a building, 0x17b5a0 a district) read the
+  Production through it, so a free Trader's route picked at the Economic AI's
+  dispatch (0x688eaa) adds nothing to the turns its city update prices.
+- Confirmed: runs/h1_duelr1124 (and duelz1124) Granada t190: its route to
+  Shanghai ended t189 and began again t190 (Game_TradeManager, Origin Yields
+  Production 1.00); its contract 764 (Neighbourhood on 41:11) FAILED at t189;
+  with the route's Production the Neighbourhood priced 46 turns (73.7 on the
+  unowned 39:10, the tree's Purchase Plot there); without it at the horizon of
+  50, every owned plot 0.0 and the unowned ones below, the tie's draws taking
+  40:12: contract 887 "Build City District" DISTRICT_NEIGHBORHOOD on 40:12,
+  VALUE 0.0, as AI_CityBuild.csv and the aimem log.
+- Open: none.

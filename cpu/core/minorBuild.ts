@@ -1342,7 +1342,8 @@ export function minorItemTurns(state: GameState, cityState: CityState, type: str
   const own = 'building' in item ? traitBuildingCost(state, cityState, type, item.building) : null;
   const kept = own !== null ? 0 : cityState.prodItem === k ? cityState.prodProgress ?? 0 : cityState.prodRetained?.[k] ?? 0;
   const progress = kept + (cityState.prodOverflow ?? 0);
-  const stats = computeCityStats(state, minorCity(cityState));
+  // the Production its AI read before its free Trader's dispatch (`aiCityStats`)
+  const stats = aiCityStats(computeCityStats(state, minorCity(cityState)), cityState);
   const pct = own === null ? minorItemPct(state, cityState, item) : 0;
   const base = fxOf(stats.total.production * (1 + pct / 100 + (scale ? 0 : extra / FX)));
   const rate = fmul(scale && extra ? fmul(base, extra) : base, minorItemMult(state, item) * FX);
@@ -1808,7 +1809,9 @@ export function minorCityGrowth(state: GameState, cityState: CityState): CityGro
 export function minorBuildFacts(state: GameState, cityState: CityState, known: (unit: string) => number, fresh = false,
   unitCount = minorListedCount(state, cityState), founding = false): CityBuildFacts {
   const city = minorCity(cityState);
-  const stats = computeCityStats(state, city);
+  // its yields but the Food as its AI read them before its free Trader's
+  // dispatch (`aiCityStats`): the items' turns at that Production
+  const stats = aiCityStats(computeCityStats(state, city), cityState);
   const r = cityState.research;
   const view = aiView(state);
   const current = minorItemType(cityState);
@@ -1821,7 +1824,7 @@ export function minorBuildFacts(state: GameState, cityState: CityState, known: (
   const has = new Set(city.buildings);
   const centre = state.map.tiles[cityState.centerIndex];
   const worship = minorWorship(state, cityState);
-  const amenity = amenityCityOf(aiCityStats(stats, cityState));
+  const amenity = amenityCityOf(stats);
   return {
     view,
     seat: cityState.seat,
