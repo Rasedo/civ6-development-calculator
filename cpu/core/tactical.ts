@@ -541,6 +541,12 @@ export interface PathDanger {
  *  and 8 */
 export const moveUnitDanger = (plane: ArrayLike<number>): PathDanger => ({ plane, any: true, water: false, war: true });
 
+/** a formation's full Movement (0x266660): the least GetMaxMoves (0x56e130)
+ *  of its members (0x262cd0), the unit and its `mates` */
+function formationFullMoves(state: GameState, unit: Unit, mates: readonly Unit[]): number {
+  return Math.min(unitFullMoves(state, unit), ...mates.map((m) => unitFullMoves(state, m)));
+}
+
 function search(state: GameState, unit: Unit, maxTurns: number, zoc: boolean, onClose: (n: PNode, ground: Ground) => boolean,
   onLink?: (tile: number, from: number, turns: number, moves: number, attack: boolean) => void, reach: ReachSearch = 'planning',
   laterTurns = false, fromFull = false, explore = true, danger?: PathDanger, mates: readonly Unit[] = formationMates(state, unit), dest = -1,
@@ -578,10 +584,11 @@ function search(state: GameState, unit: Unit, maxTurns: number, zoc: boolean, on
   const fullLand = domainPool(state, unit, false) * FIX;
   const fullSea = domainPool(state, unit, true) * FIX;
   const unmoved = unit.movesLeft >= (unit.movesFull ?? unitFullMoves(state, unit));
-  // the planning sets out on the unit's full Movement (0x791e00 -> 0x26dcd0
-  // with its third argument set: 0x26eea0 takes GetMaxMoves, 0x56e130), any
+  // the planning and the danger map set out on the formation's full Movement
+  // (0x791e00 -> 0x26dcd0 with its third argument set: 0x26eea0 takes
+  // 0x266660, the least GetMaxMoves 0x56e130 of its members, 0x262cd0), any
   // other search on its Movement left
-  const startMoves = fromFull ? unitFullMoves(state, unit) : unit.movesLeft;
+  const startMoves = fromFull ? formationFullMoves(state, unit, mates) : unit.movesLeft;
   // the planning's valid wrapper (0x26e570 at 0x26e5e2..0x26e7f1, the start
   // linked from itself too): a plot holding a district whose type has
   // HitPoints (DistrictInfo +0x58 / +0x5c: the city centre, the Encampment)
@@ -1969,7 +1976,10 @@ export function dangerPlane(state: GameState, seat: number): Int16Array {
       continue;
     }
     const reach: number[] = [];
-    const full = { ...u, movesLeft: unitFullMoves(state, u) };
+    // its search sets out on its formation's full Movement (0x26df90's
+    // start 0x26eea0: `formationFullMoves`)
+    const mates = formationMates(state, u);
+    const full = { ...u, movesLeft: formationFullMoves(state, u, mates) };
     // a ship's strike onto land is no plot of its reach: the land a ship
     // threatens is the range of its water plots
     const naval = !!UNITS[u.type]?.naval;
@@ -2140,6 +2150,11 @@ export interface Pass {
   /** the units a formation of the pass absorbed (`makeMilitaryFormation`):
    *  still on the tactical list, gone from the map */
   absorbed?: Set<Unit>;
+  /** the units done as the tactical move under way began: the move's own
+   *  stay on the list it walks (0x77d180 lists a unit done, +0x258; the
+   *  dispatcher 0x770ce0 takes those off the unit list +0x240 once the move
+   *  ends) */
+  listedFrom?: Set<number>;
 }
 
 /** the move that took the unit, as the game's tactical log names it, the
@@ -2193,6 +2208,15 @@ export function passPillage(state: GameState, pass: Pass, u: Unit): void {
  *  on 8:7 in Attack Civilian and logs no homeland move) */
 const live = (state: GameState, pass: Pass, u: Unit) => !pass.done.has(u.id) && state.units.includes(u) && u.seat === pass.seat
   && !(pass.capsFrom !== undefined && (state.barbCaptures ?? []).slice(pass.capsFrom).some((c) => c.captor === u.id));
+
+/** a unit on the list the move under way walks (0x775340 over +0x240, a dead
+ *  unit none): one yet to move as the move began, its turn since done by the
+ *  move itself or not (runs/h1_duelp1121 t183: the Line Infantry 4653085's
+ *  attack on 3:16 lets the camp's Spearman 1376265 in for the Warrior on
+ *  3:18; runs/h1_duelp1117 t75: the Archer 3604497's strike on 9:22 lets the
+ *  Spearman 458758 in for the Warrior on 8:23) */
+const onList = (state: GameState, pass: Pass, u: Unit) => !(pass.listedFrom ?? pass.done).has(u.id) && state.units.includes(u)
+  && u.seat === pass.seat && !(pass.capsFrom !== undefined && (state.barbCaptures ?? []).slice(pass.capsFrom).some((c) => c.captor === u.id));
 
 /**
  * DEFEND CAMPS (0x779010): each camp in plot order, the first DEFENDER in
@@ -2392,7 +2416,7 @@ function reachers(state: GameState, pass: Pass, plot: number, turns: number): Un
   const out: Unit[] = [];
   let held: Unit | null = null;
   for (const u of pass.units) {
-    if (!live(state, pass, u)) continue;
+    if (!onList(state, pass, u)) continue;
     const def = UNITS[u.type];
     if (!def || (def.combat <= 0 && rangedStrength(u) <= 0 && def.bombard === undefined)) continue;
     if (!(pass.reach.get(u.id) ?? []).some((e) => e.tile === plot && e.turns <= turns)) continue;
@@ -2421,6 +2445,7 @@ function reachers(state: GameState, pass: Pass, plot: number, turns: number): Un
  * ended in the homeland; t22 720905 takes it on 14:6, then Chase Target).
  */
 function attackCivilians(state: GameState, pass: Pass): void {
+  pass.listedFrom = new Set(pass.done);
   for (const e of pass.targets) {
     const v = e.unit;
     if (e.type !== 'CIVILIAN' || !v || !state.units.includes(v)) continue;
@@ -2446,6 +2471,7 @@ function attackCivilians(state: GameState, pass: Pass): void {
       finish(pass, u, 'Attack Civilian', at);
     }
   }
+  delete pass.listedFrom;
 }
 
 /**
@@ -2457,6 +2483,7 @@ function attackCivilians(state: GameState, pass: Pass): void {
  * until one stands on its plot.
  */
 function plunderTraders(state: GameState, pass: Pass): void {
+  pass.listedFrom = new Set(pass.done);
   for (const e of pass.targets) {
     if (e.type !== 'TRADER') continue;
     for (const u of reachers(state, pass, e.tile, 1)) {
@@ -2467,6 +2494,7 @@ function plunderTraders(state: GameState, pass: Pass): void {
       if (state.units.includes(u) && u.tileIndex === e.tile) break;
     }
   }
+  delete pass.listedFrom;
 }
 
 /**
@@ -2556,7 +2584,7 @@ function strikers(state: GameState, pass: Pass, plot: number): Unit[] {
   const out: Unit[] = [];
   let held: Unit | null = null;
   for (const u of pass.units) {
-    if (!live(state, pass, u) || !canFight(u)) continue;
+    if (!onList(state, pass, u) || !canFight(u)) continue;
     const reach = pass.reach.get(u.id) ?? [];
     const ranged = rangedStrength(u) > 0;
     const R = ranged ? rangeOf(u) : 0;
@@ -2894,6 +2922,7 @@ export function passAttack(state: GameState, pass: Pass, ids: readonly number[],
  * within 5 of it, and the assignment carried out (`carryOut`).
  */
 function attackUnits(state: GameState, pass: Pass, type: TargetType): void {
+  pass.listedFrom = new Set(pass.done);
   for (const e of pass.targets) {
     if (e.type !== type && !(type === 'LOW' && e.type === 'RELIGIOUS')) continue;
     const v = targetUnit(state, e);
@@ -2904,6 +2933,7 @@ function attackUnits(state: GameState, pass: Pass, type: TargetType): void {
       && plotDistance(state, t.unit!.tileIndex, v.tileIndex) <= ATTACK_TARGETS_RANGE);
     carryOut(state, pass, assignTo(state, pass, units, near, type !== 'HIGH', type !== 'HIGH'));
   }
+  delete pass.listedFrom;
 }
 
 /** CHASE TARGET's reach of a target (0x775170, 8 plots) */

@@ -47,7 +47,7 @@ import { applySeatUnitOrders, buySeatBuilding, declareWar, districtSiteCost, dis
 import { addEnvoys, cityStateAt, declareWarOnCityState, minorCity, minorReplaceCitizens, placeCityStateAt, sueForPeaceWithCityState } from '../core/cityStates';
 import { CP_ACCEPTED, CP_CANCELLED, CP_IN_PROGRESS, contractById } from '../core/aiContracts';
 import { availableBuildings, canPlaceWonder, validImprovements, wallsMax } from '../core/rules';
-import { builderHarvest, builderRemoveFeature, spawnUnit, tallyUnitMade, trainableUnits, builderCost, traderCost, disbandUnit, drawAndPayGoody, grantedMoves, unitFullMoves, restUnit, upgradeUnit, upgradeAnew, unitsAt, unitDomain, fortifyBonus, crossesRiver, waterWalks, cityAtIndex, raiseBestTrained, recordAttacker, unitMadeAnew, FORTIFY_MAX_TURNS, ANTIQUITY_CIVIC, SHIPWRECK_CIVIC } from '../core/units';
+import { builderHarvest, builderRemoveFeature, spawnUnit, tallyUnitMade, trainableUnits, builderCost, traderCost, disbandUnit, escortable, drawAndPayGoody, grantedMoves, unitFullMoves, restUnit, upgradeUnit, upgradeAnew, unitsAt, unitDomain, fortifyBonus, crossesRiver, waterWalks, cityAtIndex, raiseBestTrained, recordAttacker, unitMadeAnew, FORTIFY_MAX_TURNS, ANTIQUITY_CIVIC, SHIPWRECK_CIVIC } from '../core/units';
 import { availableCivicsIn, availableTechsIn, computeUnlocks, goldPrice, governmentSlots, policyWireOf, seatGovernment, darkAgeEra,
   unlockedPolicyIds } from '../core/effects';
 import { selectResearch, chopGrant, harvestGrant, applyLumpYield, holdResearchEra, researchCost } from '../core/economy';
@@ -104,7 +104,7 @@ import { opUnits } from '../core/operations/operation';
 import { newCityAi } from '../core/aiCityTrees';
 import { newEconomicMemory, purchaseSpend, savingsTurn, upgradePurchase, type EconomicMemory } from '../core/aiEconomic';
 import { FX } from '../core/aiValue';
-import { advanceHistory, aliasOrPrefixed, engineRowOf, importTurn, minorHead, newHistory, recordRoutes, type History, type Imported } from './import';
+import { advanceHistory, aliasOrPrefixed, engineRowOf, formationRows, importTurn, minorHead, newHistory, recordRoutes, type History, type Imported } from './import';
 import { TribeFold } from './windowFold';
 import { AI_UNITS } from '../data/aiBuildTables';
 import { loadCityBuildCentre, loadCityBuildTables, newCityBuildTally, tallyBuildings, type CityBuildTally } from './cityBuildLog';
@@ -1109,6 +1109,17 @@ function barbarianAi(ctx: Ctx, b: TurnRecord, closing: number, before: ReadonlyS
     const hurt = open === undefined ? undefined : damage.get(key) ?? startDamage.get(key);
     if (hurt !== undefined) c.hp = UNIT_HP - hurt;
   }
+  // ...and each major's formations as the log's rows before their turn left
+  // them (runs/h1_duelp1121 t83: player 1's Courser 1835015 escorts its Great
+  // Scientist 1900548 onto 6:15)
+  const formed = new Set<string>();
+  for (const c of copy.units) if (isCiv(c.seat) && c.escorted) formed.add(keyOf.get(twin.get(c)!) ?? '');
+  formationRows(formed, open === undefined ? [] : acts.filter((x) => (x[0] as number) < open!));
+  for (const c of copy.units) {
+    if (!isCiv(c.seat) || !escortable(c)) continue;
+    if (formed.has(keyOf.get(twin.get(c)!) ?? '')) c.escorted = true;
+    else delete c.escorted;
+  }
   // the plots stand as the barbarians' turn opens: their pillages of the
   // turn, which the record's actions landed, not yet made
   for (const { plot, was } of ctx.barbPillaged.splice(0)) {
@@ -1365,7 +1376,11 @@ function tallyTactics(ctx: Ctx, b: TurnRecord, turn: number, moves: ReadonlyMap<
     if (!key) continue;
     const id = Number(key.split(':')[1]);
     const row = rows?.get(id);
-    const game = rows ? tacticalCategory(row?.move ?? 'Operation') : undefined;
+    // (a unit with no row of its own where a row of its move names the
+    // first of several available units: one of the others, unnamed, its
+    // move unscored)
+    const unnamed = !row && !!ctx.tactical?.shared.get(turn)?.has(tacticalCategory(m.move));
+    const game = rows && !unnamed ? tacticalCategory(row?.move ?? 'Operation') : undefined;
     const t = (ctx.barbTally[game ?? m.move] ??= { units: 0, move: 0, plot: 0, plotOf: 0 });
     t.units += 1;
     const same = game === undefined || game === tacticalCategory(m.move);
@@ -5196,6 +5211,11 @@ export interface MinorDrawTally {
  *  "Random Direction" draw (Wander, Garrison), every player's, in order */
 interface Tactical {
   first: Map<number, Map<number, { move: string; extra: string }>>;
+  /** per turn, the moves of the barbarians' rows naming the first of
+   *  "Available Units: N" above 1 (0x77a810 and the attacks log the list's
+   *  first unit, 0x774380 moves them all: runs/h1_duelp1124 t186-196 the
+   *  Ironclad 6225934 beside the named 5701639 on 19:8) */
+  shared: Map<number, Set<string>>;
   wanders: Map<number, number[]>;
   others: Map<number, Map<string, string>>;
   drawRows: Map<number, string[]>;
@@ -5209,6 +5229,7 @@ function loadTactical(dumpPath: string): Tactical | undefined {
   const wanders = new Map<number, number[]>();
   const others = new Map<number, Map<string, string>>();
   const drawRows = new Map<number, string[]>();
+  const shared = new Map<number, Set<string>>();
   for (const line of readFileSync(path, 'utf8').split(/\r?\n/)) {
     const f = line.split(', ');
     if (f.length < 6) continue;
@@ -5225,6 +5246,8 @@ function loadTactical(dumpPath: string): Tactical | undefined {
       continue;
     }
     if (f[2] === 'Wander') wanders.set(turn, [...(wanders.get(turn) ?? []), id]);
+    const avail = /Available Units: (\d+)/.exec(line);
+    if (avail && Number(avail[1]) > 1) shared.set(turn, (shared.get(turn) ?? new Set()).add(f[2]));
     let t = out.get(turn);
     if (!t) out.set(turn, (t = new Map()));
     // a unit's Pillage rows that a later move of its turn follows name a
@@ -5235,7 +5258,7 @@ function loadTactical(dumpPath: string): Tactical | undefined {
       t.set(id, { move: f[2], extra: f.slice(6).join(", ") });
     }
   }
-  return { first: out, wanders, others, drawRows };
+  return { first: out, shared, wanders, others, drawRows };
 }
 
 /** the per-turn step check that reads each state subsystem */
@@ -5503,7 +5526,8 @@ function perTurnWorld(ctx: Ctx, a: TurnRecord, imp: Imported, history: History, 
     // damage to the game's 53, and stands on in record t+1)
     if (old && old.seat === u.seat) {
       u.id = old.id;
-      if (live.has(old)) carryFields(old, u, UNIT_MEMORY);
+      // ...a major's formation the record's (`History.formed`)
+      if (live.has(old)) carryFields(old, u, isCiv(u.seat) ? UNIT_MEMORY.filter((f) => f !== 'escorted') : UNIT_MEMORY);
       kept.add(u);
     }
     ctx.units.set(key, u);

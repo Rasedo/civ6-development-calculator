@@ -83,7 +83,7 @@ import { LUXURY_IDS } from '../../world/resources';
 import { SPY_MISSIONS, SPY_OFFENSIVE_MISSIONS } from '../data/espionage';
 import type { QueueItem } from '../core/types';
 import { projectCost, settlerCost } from '../core/game';
-import { alpineChassis, builderCost, fionnChassis, rangedCombatOf, traderCost, unitDomain } from '../core/units';
+import { alpineChassis, builderCost, escortable, fionnChassis, rangedCombatOf, traderCost, unitDomain } from '../core/units';
 import { carryLayout, computeUnlocks, governmentSlots } from '../core/effects';
 import { ERA_BEGINS, bestRoadTier, eraCountdownStep } from '../core/eras';
 import { standingRemovable } from '../core/climate';
@@ -497,6 +497,9 @@ export interface History {
   /** captured units, by the captor's `owner:id`, with the player id they
    *  were taken from (`UnitCaptured` in the records' action log) */
   captives: Map<string, number>;
+  /** the units in a formation, by `owner:id` (`UnitEnterFormation` /
+   *  `UnitExitFormation` in the records' action log) */
+  formed: Set<string>;
   /** units holding Alpine Training, by `owner:id` (`foldBeside`) */
   alpine: Set<string>;
   /** units holding the Spear of Fionn, by `owner:id` (`foldBeside`) */
@@ -852,7 +855,7 @@ export function eraBegan(a: TurnRecord, b: TurnRecord): boolean {
 }
 
 export function newHistory(): History {
-  return { firstTurn: -1, last: null, before: null, beforeThat: null, trained: new Map(), levied: new Map(), captives: new Map(), alpine: new Set(), fionn: new Set(), govSeated: new Map(), growthDrift: new Map(), lastHit: new Map(), gpSpent: new Map(), revealed: new Map(),
+  return { firstTurn: -1, last: null, before: null, beforeThat: null, trained: new Map(), levied: new Map(), captives: new Map(), formed: new Set(), alpine: new Set(), fionn: new Set(), govSeated: new Map(), growthDrift: new Map(), lastHit: new Map(), gpSpent: new Map(), revealed: new Map(),
     unknownSince: new Set(), cityFirstSeen: new Map(), nextPlotUnheld: new Set(), fireFood: new Map(), fireProd: new Map(), eventYields: new Map(), eventCounts: new Map(), openEvents: [], eventRead: new Map(), eventDraws: new Map(), droughts: [], bare: new Map(), discountDistricts: new Map(), discountPlaced: new Map(), ages: new Map(), moments: new Map(), momentsWorld: [],
     eraTurns: [], gameEra: 0, eraStartTurn: 1, eraCountdown: -1, routeSeen: new Map(), routeCourse: new Map(), trail: new Map(), legs: new Map(), posts: new Map(), policySlots: new Map(),
     competitionSeen: new Map(), competitionScore: new Map(), podium: new Map(), culture: new Map(), tourismTo: new Map(),
@@ -1306,6 +1309,22 @@ function unitsConstructed(rec: TurnRecord, cat: Catalog, pid: number): Map<strin
   return out;
 }
 
+/** the units in a formation (`formed`, by `owner:id`) as the action log's
+ *  rows leave them: UnitEnterFormation [.., kind, player, id, player, id]
+ *  joins the unit and the one it names, UnitExitFormation takes the unit out
+ *  (a unit leaving its formation logs its own row, its partner's naming none:
+ *  runs/h1_duelp1121 t82 player 1's Courser 1835015 and Great Scientist
+ *  1900548 out and in again as they step) */
+export function formationRows(formed: Set<string>, rows: readonly unknown[][]): void {
+  for (const r of rows) {
+    if (!Array.isArray(r)) continue;
+    if (r[2] === 'UnitEnterFormation') {
+      formed.add(`${r[3]}:${r[4]}`);
+      if ((r[6] as number) >= 0) formed.add(`${r[5]}:${r[6]}`);
+    } else if (r[2] === 'UnitExitFormation') formed.delete(`${r[3]}:${r[4]}`);
+  }
+}
+
 /** Fold one record into the history, in turn order. */
 export function advanceHistory(h: History, rec: TurnRecord, cat: Catalog): void {
   const W = rec.head.W;
@@ -1361,6 +1380,8 @@ export function advanceHistory(h: History, rec: TurnRecord, cat: Catalog): void 
   });
   const held = new Set(rec.units.map((u) => `${u.owner}:${u.id}`));
   for (const k of [...h.captives.keys()]) if (!held.has(k)) h.captives.delete(k);
+  formationRows(h.formed, rows);
+  for (const k of [...h.formed]) if (!held.has(k)) h.formed.delete(k);
   // a resource a player reads paying its yield without the revealing
   // technology: the grant (`GP_RESOURCE_REVEAL`) where the records name no
   // great person, and a reading no random event made either way. An unowned
@@ -2682,6 +2703,10 @@ export function importTurn(rec: TurnRecord, cat: Catalog, history?: History): Im
     if (levy !== undefined && seatOfGame(levy) !== NO_SEAT) unit.leviedFrom = seatOfGame(levy);
     const taken = history?.captives.get(`${u.owner}:${u.id}`);
     if (taken !== undefined && seatOfGame(taken) !== NO_SEAT && seatOfGame(taken) !== unit.seat) unit.originalOwner = seatOfGame(taken);
+    // a major's rider in its formation, its escort the fighter on its plot
+    // (its AI's own formations are the record's; the minors' and the
+    // barbarians' the engine's, carried)
+    if (isCiv(seat) && escortable(unit) && history?.formed.has(`${u.owner}:${u.id}`)) unit.escorted = true;
     state.units.push(unit);
     unitByKey.set(`${u.owner}:${u.id}`, unit);
     // the levy in force: the major holding the minor's army, and its term

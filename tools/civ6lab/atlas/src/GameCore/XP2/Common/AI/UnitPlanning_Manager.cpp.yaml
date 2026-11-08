@@ -210,6 +210,7 @@
     - cpu/core/tactical.ts:planUnit
     - cpu/core/tactical.ts:unmoved
     - gpu/core/sim_tactics.py:_tac_search
+    - cpu/core/tactical.ts:startMoves
   readings:
     - "H-1: why a seed does not replay — the AI's worker threads — READ, the replay patch MEASURED"
     - "C-95: the unit pathfinder and the planning's reach — READ, confirmed on the Wander draws"

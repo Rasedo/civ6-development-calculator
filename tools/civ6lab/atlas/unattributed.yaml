@@ -5018,14 +5018,21 @@
 - addr: 0x77d180
   final: 0x50ee70
   kind: function
-  semantics: removes a unit from the pass's list.
-  status: PARTLY
-  impl: [cpu/core/tactical.ts:makeMilitaryFormation]
+  semantics: "lists a unit of the pass's unit list (+0x240) as done: appends its id to +0x258 (count +0x268); removes nothing — the dispatcher 0x770ce0 takes the listed units off +0x240 once the move ends."
+  status: READ
+  cases:
+    - recording: h1_duelp1117
+      turn: 75
+      value: the Archer 3604497's strike on 9:22 leaves it on the list for the Spearman 458758's Warrior on 8:23
+  impl:
+    - cpu/core/tactical.ts:makeMilitaryFormation
+    - cpu/core/tactical.ts:Pass
+    - gpu/core/sim_tactics.py:_tac_on_list
   readings:
     - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
     - "C-96: the city-states' tactical pass — READ (Wander Near City, Heal, the non-barbarian priorities, FindAlternateLocation), the families it needs PARTLY READ"
     - "C-128: a city-state's Make Military Formation — READ (0x77a190, 0x770670, 0x536da0, 0x773e20, 0x94a870, 0x949930), both twins"
-  notes: ["imported: READ in its section, no confirming case found beside it"]
+    - "C-95: the full search sets out on the formation's least Movement, a major's formations from the log, a tactical move walks its own done units — READ (0x26eea0, 0x266660, 0x262cd0, 0x770ce0 at 0x770d30..0x771097, 0x77d180, 0x775340, 0x771f80 at 0x7723cb / 0x772663, 0x77a810, 0x774380), both twins"
   context:
     - ...flag 0x10), a unit with no ranged or bombard strength then done (0x56d6f0, 0x570b40, 0x77d180); the civilian taken ends the target; then each ranged one within range strikes it (0x9...
   review: reviewed

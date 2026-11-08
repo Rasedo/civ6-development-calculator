@@ -708,9 +708,16 @@ class SimTactics:
         unmoved = mp >= granted
         if from_full:
             # the planning sets out on the unit's full Movement (0x791e00 ->
-            # 0x26dcd0 -> 0x26eea0: GetMaxMoves), unmoved by its Movement left
+            # 0x26dcd0 -> 0x26eea0), unmoved by its Movement left
             unmoved = getattr(self, f"{pre}_unit_mp")[rows, slots] >= granted
             mp = self._tac_full_now(pre)[rows, slots]
+        if full or from_full:
+            # ...the formation's: the least GetMaxMoves of its members
+            # (0x266660 -> 0x262cd0, `formationFullMoves`)
+            mm = mate.clamp(min=0)
+            mp = torch.where(mate >= 0, torch.minimum(mp, self._tac_full_now(pre)[rows, mm]), mp)
+            if not from_full:
+                unmoved = mp >= granted
         # the planning's search passes a civilian at war (`plainCivilians`)
         land, wat = self._tac_enter(seat, False, plain_civ=not zoc and not stand)
         # the plots the player revealed (`groundOf`'s known; a path reads
@@ -2702,6 +2709,15 @@ class SimTactics:
         return ((self._type_combat.take(ut) > 0) | (self._type_ranged_strength.take(ut) > 0)
                 | (self._type_bombard.take(ut) > 0))
 
+    def _tac_on_list(self, live, done: torch.Tensor, pre: str):
+        """`onList`: the units on the list the move under way walks (0x775340
+        over +0x240) — those `live` as the move began, its own done since
+        among them while they stand (0x77d180 lists them, 0x770ce0 takes
+        them off once the move ends)"""
+        done0 = done.clone()
+        alive = getattr(self, f"{pre}_unit_alive")
+        return lambda: live() | (done & ~done0 & alive)
+
     def _tac_attack_civilians(self, live, done: torch.Tensor, ai: torch.Tensor, reach_at, tg: dict,
                               order: torch.Tensor, npass: torch.Tensor) -> None:
         """ATTACK CIVILIANS (`attackCivilians`): each CIVILIAN target of the
@@ -2720,6 +2736,7 @@ class SimTactics:
         ents = self._tac_in_order(civ, tg)
         U = civ.shape[1]
         fights = self._tac_can_fight()
+        on_list = self._tac_on_list(live, done, "barb")
         npos = int(npass.max())
         for j in range(J):
             e = ents[:, j].clamp(max=U - 1)
@@ -2736,7 +2753,7 @@ class SimTactics:
             if not bool(on.count_nonzero()):
                 continue
             rt = reach_at(t)
-            cand = self._tac_reachers(live() & fights & (rt >= 1) & (rt <= _PLAN_TURNS) & on.unsqueeze(1), ai, order)
+            cand = self._tac_reachers(on_list() & fights & (rt >= 1) & (rt <= _PLAN_TURNS) & on.unsqueeze(1), ai, order)
             if not bool(cand.count_nonzero()):
                 continue
             gone = torch.zeros(B, dtype=torch.bool, device=dev)
@@ -2835,12 +2852,13 @@ class SimTactics:
             return
         tiles = torch.where(trd, self._arange_bt, torch.full_like(self._arange_bt, T)).sort(dim=1).values
         fights = self._tac_can_fight()
+        on_list = self._tac_on_list(live, done, "barb")
         npos = int(npass.max())
         for j in range(J):
             t = tiles[:, j].clamp(max=T - 1)
             act = j < n
             rt = reach_at(t)
-            cand = self._tac_reachers(live() & fights & (rt == 1) & act.unsqueeze(1), ai, order)
+            cand = self._tac_reachers(on_list() & fights & (rt == 1) & act.unsqueeze(1), ai, order)
             if not bool(cand.count_nonzero()):
                 continue
             stood = torch.zeros(B, dtype=torch.bool, device=dev)
@@ -2982,6 +3000,7 @@ class SimTactics:
                     & (self.unit_tile.gather(1, sc) == ec % T) & (self.unit_seat.gather(1, sc) == seat_pl.gather(1, ec)))
 
         fights = self._tac_can_fight(pre)
+        on_list = self._tac_on_list(live, done, pre)
         ut = getattr(self, f"{pre}_unit_type").clamp(min=0, max=self.NU - 1)
         ranged = self._type_ranged_strength.take(ut) > 0
         sl = torch.arange(P, device=dev).unsqueeze(0).expand(B, P)
@@ -3004,7 +3023,7 @@ class SimTactics:
             rt_t = rturn[rsafe, t.unsqueeze(1).expand(B, P)]
             melee_ok = (urng == 0) & (rt_t >= 1) & (rt_t <= _PLAN_TURNS)
             rng_ok = torch.zeros(B, P, dtype=torch.bool, device=dev)
-            cand0 = live() & fights & (rowof >= 0) & on.unsqueeze(1)
+            cand0 = on_list() & fights & (rowof >= 0) & on.unsqueeze(1)
             rk = cand0 & (urng > 0)
             if bool(rk.count_nonzero()):
                 b_i, s_i = rk.nonzero(as_tuple=True)

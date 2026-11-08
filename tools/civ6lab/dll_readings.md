@@ -11786,3 +11786,61 @@ completion and from `minorCompleteNow`; GPU `_minor_research_bank` and
   orders (runs/h1_duelp1117 t33 the Warrior 2097152 and the Slinger
   1769487, second segments at 241 / 242). The engines run one carried walk,
   the queue run's; the Galley's hold in it is unread.
+
+## C-95: the full search sets out on the formation's least Movement, a major's formations from the log, a tactical move walks its own done units — READ (0x26eea0, 0x266660, 0x262cd0, 0x770ce0 at 0x770d30..0x771097, 0x77d180, 0x775340, 0x771f80 at 0x7723cb / 0x772663, 0x77a810, 0x774380), both twins
+
+`formationFullMoves` (the start of `search` under fromFull and of
+`dangerPlane`'s search), `onList` / `Pass.listedFrom` in `strikers` /
+`reachers` (`attackUnits`, `attackCivilians`, `plunderTraders`)
+(cpu/core/tactical.ts); GPU `_tac_search`'s `full` / `from_full` start over
+`mate`, `_tac_on_list` in `_tac_attack_units` / `_tac_attack_civilians` /
+`_tac_plunder` (gpu/core/sim_tactics.py). The replay's majors' formations:
+`History.formed` / `formationRows` (cpu/harness/import.ts), the barbarians'
+copy's rows before their turn opens (`barbarianAi`, cpu/harness/replay.ts).
+
+- THE FULL SEARCH'S START: 0x26eea0 (the start callback of 0x26dcd0 /
+  0x26df90 with their third argument set: the planning, the danger map)
+  writes +0x1bc = 0x266660(formation) << 8; 0x266660 is 0x262cd0 over the
+  formation's members (+0x708) with GetMaxMoves (0x56e130): the least of
+  them, raised to the most of the members with unit +0x1938 set (no
+  recorded member holds it; unported). The engines' "unmoved" stays the
+  unit's own Movement left against its full; the danger map's copy sets out
+  on the least, its unmoved read from it.
+- A MAJOR'S FORMATIONS are the action log's: UnitEnterFormation [.., kind,
+  player, id, player, id] joins the unit and the one it names,
+  UnitExitFormation [.., player, id, ..] takes the unit out (each member
+  logs its own exit: runs/h1_duelp1121 t82 player 1's Courser 1835015 and
+  Great Scientist 1900548 exit and enter again around their step). The
+  importer folds them over every record read (`History.formed`, the
+  civilian member escorted, its escort the fighter on its plot); a major's
+  unit carries no formation of the engine's across pairs; the barbarians'
+  copy applies the rows before their PlayerTurnActivated.
+- THE MOVE'S LIST (0x770ce0): before each tactical move the done list
+  (+0x258, count +0x268) is emptied; 0x77d180 appends a unit of the unit
+  list (+0x240) to it, it removes nothing; after the move the dispatcher
+  takes every unit of the done list off +0x240 (0x770f9a..0x771097). So
+  within one move (Attack High / Medium / Low over all their targets,
+  Attack Civilians, Plunder Trader) 0x775340 walks the units the move
+  itself finished — it checks only +0x770 (dead) — and a held DEFENDER
+  goes in behind one of them; the assignment (0x776140) gives no claim to a
+  unit without Movement. 0x771f80's bombard and ranged loops call 0x77d180
+  (0x7723cb, 0x772663), the melee attack loop not (its unit stays listed
+  past the move until its own done marks).
+- Confirmed (one-seed aimem traces): runs/h1_duelp1121 t83 the captured
+  Settler 2686993's HL Move To Safety to 5:19 (the Courser 1835015 with its
+  Great Scientist on 4, 4:17 on its own 5); t183 the Line Infantry
+  4653085's attack on 3:16 lets the camp's Spearman 1376265 strike the
+  Warrior on 3:18, t172 on 4:19; runs/h1_duelp1117 t75 the Archer 3604497's
+  strike on 9:22 lets the Spearman 458758 strike the Warrior on 8:23.
+- THE PILLAGE'S ROW (0x77a810): one row per target naming the first unit of
+  0x775340's list and its count ("Available Units: N"); 0x774380 moves each
+  listed unit with Movement left and a path, done, until one stands on the
+  target. The other N - 1 units log no row: runs/h1_duelp1124 t186-196 the
+  Ironclad 6225934 beside the named 5701639 for 19:8. The score leaves such
+  a unit's move unscored (`Tactical.shared`).
+- Open: runs/h1_duelp1128 t197 the Ranger 6750212 is out of the
+  barbarians' copy's pass; runs/h1_duelp1121 t170-173 the 6:10 team's
+  Protect Units move reads player 1's strike at 77 where the game's is 25
+  (Xi'an's Field Cannon Army completes in the engine's t168, the game's
+  t174: the import prices a formation's queue item at the lone unit's 165,
+  the game at 372).
