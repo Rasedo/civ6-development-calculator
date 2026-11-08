@@ -7,31 +7,55 @@
   final: 0x661870
   kind: function
   name: canPlunder
-  semantics: "The Plunder Trade Route command's can-do: a unit with movement left (0x56c690), a Combat (0x56dc90), Ranged (0x56e3e0) or Bombard (0x56daa0) strength above 0, unit +0x650 not 1, not embarked (0x8be30); then the plot's route tests."
-  status: PARTLY
+  semantics: "The Base Plunder Trade Route command's CanStart (Gathering Storm runs its XP2 twin 0x89dae0): a live unit (+0x770) with Movement left (0x56c690), a Combat (0x56dc90), Ranged (0x56e3e0) or Bombard (0x56daa0) strength above 0, domain (+0x650) not 1 (air), not embarked (0x8be30); on the unit's plot the trade layer's list (0x75c50, layer 1) holding a unit of another owner (true there when r9b is set); then each live unit of another owner on it at war (0x469cd0) and not immune for the plot's domain (0x58fc20: 2 on land, 0 on water) counts; true with one."
+  status: READ
   cases:
     - recording: h1_duely1124
       turn: 205
       value: the barbarians' captured Builder on Bologna's Trader's plot 431 t205-t206, the route standing to its expiry at t209 as logged
+    - recording: plunder_sweep_a1
+      turn: 102
+      value: the unit beside the Trader (60:18 by 60:17) answers false
   impl:
     - cpu/core/trade.ts:canPlunder
     - gpu/core/sim_seats.py:_trade_walk_tick
     - gpu/core/sim_seats.py:raider_seat
+    - cpu/core/trade.ts:plunderTargets
   readings:
     - "C-126 / C-130: who may plunder a route (0x9555a0) and the treasury turn's city term (0x4dd3b0) — READ, the plunder ported in both twins"
-  notes: [the plot's route tests past 0x955625 and unit +0x650 unread]
+    - "C-123 / C-95: a Trader stands on the trade layer; a city's shot is a COMBAT_DISTRICT spot's blow back — READ (0x901e0, 0x586360 -> 0x208b80, 0x585eb0 -> 0x585d90, 0x791470 at 0x7917f7..0x7918f7 -> 0x249ee0 / 0x205720, 0x776140 at 0x776780..0x7767fa), both twins"
+    - "C-123 / C-95: the Plunder Trade Route command and the AI's plunder after the move — READ (0x89dae0, 0x89dfc0, 0x9555a0, 0x9559a0, 0x5545e0 at 0x554667 / 0x554d4c, 0x58fc20, 0x7746a0, 0x70a440, 0x771f80 at 0x7722b6 / 0x77254e / 0x77277f, 0x776140 at 0x776424..0x776470), both twins"
   review: reviewed
 - addr: 0x955950
   final: 0x661b90
   kind: function
   name: PLUNDER_TRADE_ROUTE
-  semantics: PLUNDER_TRADE_ROUTE.
-  status: PARTLY
+  semantics: "PLUNDER_TRADE_ROUTE's command info: the hash 0x5ea751e8 looked up in the command table (0x50e00, vt +0x88), the rest cleared; the AI hands it to the command manager's CanStart (vt +0x48) and Start (vt +0x58), which run the XP2 0x89dae0 / 0x89dfc0."
+  status: READ
+  cases:
+    - recording: plunder_b31rt_burn0
+      turn: 101
+      value: the lab's requests through the same command plunder 110 / 60 from 53:18 / 66:17
+  impl: [cpu/core/trade.ts:plunderTrader, gpu/core/sim_seats.py:_plunder_trader]
   readings:
     - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
     - "C-95: the homeland's Plunder Trader — READ, ported"
     - "C-101 / C-95: the attack carried out condemns a religious target's heretics, a move order walks onto a religious unit's plot — READ (0x771f80 at 0x772331 / 0x7725c9 / 0x7727fa, 0x776140 at 0x776424..0x776470 / 0x777045, 0x947dd0, 0x89c6f0, 0x89cc00), both twins"
-  notes: ["imported: READ in its section, no confirming case found beside it"]
+    - "C-123 / C-95: the Plunder Trade Route command and the AI's plunder after the move — READ (0x89dae0, 0x89dfc0, 0x9555a0, 0x9559a0, 0x5545e0 at 0x554667 / 0x554d4c, 0x58fc20, 0x7746a0, 0x70a440, 0x771f80 at 0x7722b6 / 0x77254e / 0x77277f, 0x776140 at 0x776424..0x776470), both twins"
   context:
     - ...can act moves onto it (0x773fb0, its Movement kept) and plunders (PLUNDER_TRADE_ROUTE 0x955950), its turn done, until one stands on it.
+  review: reviewed
+- addr: 0x9559a0
+  final: 0x661be0
+  kind: function
+  name: plunderStartBase
+  semantics: "The Base Plunder Trade Route command's Start (Gathering Storm runs its XP2 twin 0x89dfc0): each live unit of another owner on the plot's trade layer (0x75c50, layer 1) at war (0x469cd0) and not immune for the plot's domain (0x58fc20) is plundered (Trade_Manager 0x5545e0) and given the delayed kill (0x4ef040); then the plunderer's Movement to 0 (0x56d6f0)."
+  status: READ
+  cases:
+    - recording: plunder_sweep_a0
+      turn: 101
+      value: Quebec -> Halifax's Trader 3342348 plundered on 62:17 for 50
+  impl: [cpu/core/trade.ts:plunderTrader]
+  readings:
+    - "C-123 / C-95: the Plunder Trade Route command and the AI's plunder after the move — READ (0x89dae0, 0x89dfc0, 0x9555a0, 0x9559a0, 0x5545e0 at 0x554667 / 0x554d4c, 0x58fc20, 0x7746a0, 0x70a440, 0x771f80 at 0x7722b6 / 0x77254e / 0x77277f, 0x776140 at 0x776424..0x776470), both twins"
   review: reviewed

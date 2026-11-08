@@ -1577,6 +1577,11 @@ class SimInit:
         # Admiral" — so a water tile holds a hull, an Admiral and ONE
         # passenger, and the passenger needs a plane of its own.
         self.embarked_at = torch.full((B, T), -1, dtype=torch.long, device=device)
+        # a Trader (MakeTradeRoute) stands on the trade layer, beside any
+        # unit of the four classes, embarked or not: it keeps no unit out
+        # (0x585d90), no location test reads it (0x586360 -> 0x208b80 on the
+        # mover's layer), a move onto it seizes nothing
+        self.trader_at = torch.full((B, T), -1, dtype=torch.long, device=device)
         self.gp_earned = torch.zeros(B, n_gp, dtype=torch.long, device=device)
         # the Great Person points each seat EARNED this turn, per class — the
         # `civ_co2_turn` shape, read once by a scored competition and cleared

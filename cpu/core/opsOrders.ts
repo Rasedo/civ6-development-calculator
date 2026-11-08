@@ -16,7 +16,7 @@ import { aiStrengths, maxMoves, militaryAiTypeOf, moveTo, passAttack, passFinish
   type Pass } from './tactical';
 import type { OpsEnv } from './operations/manager';
 import type { DefendOrders } from './operations/nodes';
-import { breakEscort, escortRiders, escortUnit, unitDomain } from './units';
+import { breakEscort, escortRiders, escortUnit, mapLayer, unitDomain } from './units';
 import { CITY_STRIKE_RANGE } from './phase';
 import { allianceTypeWith, cityAtTile, cityStateOfSeat, civsAtWar, isBarbSeat, isCityStateSeat, tileSeat } from './seats';
 import { NO_SEAT, type City } from './types';
@@ -51,10 +51,11 @@ export function passView(state: GameState, seat: number, pass: Pass, base: AiVie
       if (!u || !r) return base.planSpot(id, p, turns, needMoves, range);
       const dom = unitDomain(u.type);
       const fights = (x: Unit) => (UNITS[x.type]?.combat ?? 0) > 0;
+      // a Trader on the trade layer holds no spot
       for (const e of r) {
         if (plotDistance(state, e.tile, p) !== range || e.turns > turns || (needMoves && e.moves <= 0)) continue;
         if (e.tile === u.tileIndex) return e.tile;
-        if (!state.units.some((x) => x !== u && x.tileIndex === e.tile && unitDomain(x.type) === dom && fights(x) === fights(u))) return e.tile;
+        if (!state.units.some((x) => x !== u && x.tileIndex === e.tile && mapLayer(x.type) !== 'trade' && unitDomain(x.type) === dom && fights(x) === fights(u))) return e.tile;
       }
       return -1;
     },

@@ -9207,3 +9207,115 @@ cpu/core/game.ts; the queue's `minorQueueOk` on `repairAvailable`);
   repair t113).
 - Open: the Free Cities' pick keeps the quiet turns (no recorded case); the
   CanProduce argument that drops them (0x179650's callers) unread.
+
+## C-123 / C-95: a Trader stands on the trade layer; a city's shot is a COMBAT_DISTRICT spot's blow back — READ (0x901e0, 0x586360 -> 0x208b80, 0x585eb0 -> 0x585d90, 0x791470 at 0x7917f7..0x7918f7 -> 0x249ee0 / 0x205720, 0x776140 at 0x776780..0x7767fa), both twins
+
+`mapLayer` (cpu/core/units.ts) read by `tileFreeForUnit`, `seizable`,
+`meleeAttackInner`'s enemies (cpu/core/combat.ts), `groundOf`'s held / foes,
+`enemyOnLayer`, `foreignAt`, `peaceAt`, `planUnit`'s foreign
+(cpu/core/tactical.ts), `planSpot` (cpu/core/opsOrders.ts), the mask's
+`planeOf` (cpu/core/unitMask.ts) and the unit key's slot 4
+(cpu/core/statecompare.ts); GPU `trader_at`, `_occ_planes` / `_occ_split`
+(gpu/core/sim_seats.py), `_tac_targets`' TRADER entries
+(gpu/core/sim_tactics.py). `predictCityShot` (cpu/core/combat.ts) into
+`planUnit`'s per-spot backTaken; GPU `_plan_city_shots`, `_city_shot_atk` /
+`_city_shot_def` (gpu/core/sim_phase.py, shared with `_seat_city_strike`).
+
+- THE TRADE LAYER: a unit's map layer is the unit manager's (0x901e0 ->
+  0x75ae0 by the unit's id); the plot's unit list 0x75c50 is read per layer.
+  The location test's hostile defender (0x586360 -> 0x208b80) and the
+  stacking count (0x585eb0 -> 0x585d90) read the mover's layer; a Trader
+  stands on a layer of its own, so another player's Trader keeps no unit
+  off its plot, defends none, and a move onto it is a plain step (no
+  capture: the capture walks the layer-0 list). The flood's kill reads layer
+  0 as well (runs/h1_duelw1127 t160, `strikeUnits`). The engines model it
+  as a fifth plane: the GPU's `trader_at` holds a Trader, embarked or not,
+  beside a unit of each of the four classes; the four planes hold none.
+- PLUNDER TRADER's move: Plunder Trader (0x77aa20) and the homeland's
+  (0x70f610) move the unit onto the Trader's plot (0x962190); a civilian
+  stands there with it (`canPlunder` 0x9555a0 refuses a civilian).
+- THE BLOW BACK OF A CITY (0x791470's district branch, 0x7917f7..0x7918f7):
+  for a COMBAT_DISTRICT entry the city's strike strength (0x249ee0, never
+  below COMBAT_MINIMUM_CITY_STRIKE_STRENGTH 3) gates a second simulation
+  (0x205720) with the sides swapped (the district the attacker, 0x213c80 /
+  0x213d30, the unit the defender, 0x213e00), its location each spot (+0x1c
+  + 8 i): the unit's damage into the spot's back taken (+0x94), the
+  district's (none: a shot) into its back dealt (+0xac). The assignment's
+  filters (0x776140 at 0x776780..0x7767fa) read per spot taken + back taken
+  (+0x7c, +0x94) against dealt + back dealt and against the unit's health,
+  so a hurt melee unit drops every spot where the city's blow and its shot
+  together top its hit points. The shot is the city's strike as
+  `cityStrikeAt` resolves it (`cityStrikeStrength` with the emergency term,
+  against `cityStrikeDefenderCS` on the spot), the law at its expectation.
+- Confirmed (one-seed aimem traces from t1): runs/h1_duely1124 t137-151 the
+  barbarians' captured Builder 5111833 under Plunder Trader on city-state
+  4's Trader's plots 37:9, 36:9, 35:9, 35:8, 34:8, 33:8 and back as logged
+  (14 rows, t141 apart); runs/h1_duely1128 t180-181 the Builder 6619152 on
+  the Trader's plots; runs/h1_duely1128 t242 Operation City Attack leaves
+  the hurt Cavalry 7012372 on 42:21 (33 hit points) out and assigns the
+  Cavalry 7143430 on 41:19 to 42:21 at turn 2, the Cuirassier 7405596 and
+  the Ranger as logged, the four Siege City rows and t244's two Cavalry rows
+  with them.
+- Open: 1128 t242 the hurt Cavalry 7012372 then walks to 41:21 under
+  Operation Move, ours holds 42:21. The plunder after the move is the next
+  section's.
+
+## C-123 / C-95: the Plunder Trade Route command and the AI's plunder after the move — READ (0x89dae0, 0x89dfc0, 0x9555a0, 0x9559a0, 0x5545e0 at 0x554667 / 0x554d4c, 0x58fc20, 0x7746a0, 0x70a440, 0x771f80 at 0x7722b6 / 0x77254e / 0x77277f, 0x776140 at 0x776424..0x776470), both twins
+
+`plunderTargets` / `plunderTrader` / `traderImmune`, `routePlunderGold`'s
+no-route base (cpu/core/trade.ts); `plunderTraders`, `homelandPlunder`,
+`carryOut`'s `trader`, `Assigned.civilian` / `.trader` (cpu/core/tactical.ts);
+GPU `_plunder_ok` / `_plunder_trader` / `_trader_immune`
+(gpu/core/sim_seats.py), `_tac_plunder_cmd` from `_tac_plunder`,
+`_tac_homeland_plunder` and `_tac_carry_out`'s "trd", `_tac_assign`'s "civ"
+(gpu/core/sim_tactics.py).
+
+- THE COMMAND (Gathering Storm's XP2_Unit_Commands_PlunderTradeRoute.cpp;
+  the Base 0x9555a0 / 0x9559a0 the same less the embarked and favour
+  terms). CanStart 0x89dae0: the unit not dead (+0x770), Movement left
+  (0x56c690), a Combat, Ranged or Bombard strength above 0, domain not 1
+  (air), embarked only with +0x18c3; on the unit's own plot the trade
+  layer's list (0x75c50, layer 1) holding a unit of another player; then
+  each such Trader at war with the unit's player (0x469cd0, the barbarians
+  at war with all) and not immune for the plot's domain (0x58fc20 on Trader
+  +0x1eb8: the count of domain 2 on land, 0 on water, above 0). Start
+  0x89dfc0: each such Trader is plundered (Trade_Manager 0x5545e0) and given
+  the delayed kill (0x4ef040); then the plunderer's Movement goes to 0
+  (0x56d6f0). An owner's Player_Trade +0x1530 (m_iAnyonePlunderFavor) above
+  0 skips the war and immunity tests and pays the plunderer favour
+  (0x37af10, 7): written by EFFECT_ADJUST_PLAYER_ANYONE_PLUNDER_TO_FAVOR
+  alone (0x4d4ec5 its load), which no Modifiers row of the install carries;
+  the engines take no such branch.
+- THE PAYOUT of a Trader on no route: 0x5545e0 tests the Trader's route
+  (0x58fc40 at 0x554667) and, with none, goes to 0x554d4c with V 0: max(50,
+  0) = 50, plus the plunderer's +0x1858 percent, Gold, the
+  NO_ROUTE notification. With a route the payout of B-31r-S1 and the route
+  removed.
+- THE AI'S PLUNDER AFTER THE MOVE: Plunder Trader's moves (0x7746a0) move
+  each unit that can act onto the Trader's plot (0x773fb0), then, the unit
+  standing, CanStart (vt +0x48) and Start (vt +0x58) of PLUNDER_TRADE_ROUTE
+  (0x955950), its turn done (0x570b40); the homeland's queue (0x70a440)
+  runs a queued unit's move, then its queued command the same way. The
+  assignment (0x776140 at 0x776424..0x776470) sets +0x1d (the entry's
+  +0x33) for a TARGET_CIVILIAN_UNIT or TARGET_TRADER, +0x1e (+0x32) for
+  TARGET_RELIGIOUS_CIVILIAN and +0x20 (+0x34) for TARGET_TRADER; the
+  carry-out (0x771f80) skips the bombard and ranged strikes for +0x33 and
+  after every unit's attack move issues the plunder for +0x34 before the
+  condemnation for +0x32. A move onto a Trader's plot alone takes nothing
+  (the trade layer, the previous section).
+- CONFIRMED (the lab's PLUNDER_TRADE_ROUTE requests, runs/plunder_*: 64
+  CanStart answers): 35 of 37 on the Trader's plot with Movement answer
+  true (runs/plunder_sweep_a0 t101 the unit placed on the Trader 3342348's
+  62:17 with 2 Movement plunders Quebec -> Halifax for 50), every one with
+  no Movement false (runs/plunder_b31rt_burn0 t101 the unit 2555918 moved
+  onto 62:17 with 0 left refused, onto 53:18 / 66:17 with 1 left plundering
+  110 / 60), 20 of 21 off the plot false (runs/plunder_sweep_a1 t102 the
+  unit on 60:18 beside the Trader 4128787 on 60:17). The H-1 duels hold no
+  plunder (the movers a civilian or arriving with no Movement:
+  runs/h1_duely1117 t48 / t56, 1121 t228 / t231, 1127 t77; no Attack Units
+  TRADER entry); a one-seed aimem window runs/h1_duely1124 t135-152 runs
+  the barbarians' Plunder Trader of the captured Builder 5111833 unchanged.
+- Open: runs/plunder_sweep_a3 t104 two units on the Trader's plot with
+  Movement refused (54:22, 54:23, the routes to Lisbon), unread which test
+  refuses (Lisbon's ABILITY_TRADE_ROUTE_PLUNDER_IMMUNITY_SEA, an embarked
+  plunderer); Lisbon's suzerain immunity is in neither engine.

@@ -7,13 +7,13 @@ import { endTurn, foundCity, serialize, deserialize } from '../../../cpu/core/ga
 import { healCities, seatPhase } from '../../../cpu/core/phase';
 import { spawnUnit } from '../../../cpu/core/units';
 import { meleeAttack, rangedAttack, attackTargets, terrainDefense, FLANKING_CS, SUPPORT_CS, awardDefenseXp, trainXpPct, flankCount, supportCount, flankSupportLive, FLANK_SUPPORT_CIVIC, classMatchupCS, CLASS_MELEE_VS_ANTICAV, CLASS_ANTICAV_VS_CAV } from '../../../cpu/core/combat';
-import { barbarianPhase } from '../../../cpu/core/tactical';
+import { barbarianPhase, moveTo } from '../../../cpu/core/tactical';
 import {
   XP_PER_LEVEL, MAX_LEVEL, PROMOTE_HEAL, XP_BATTLE_CAP, XP_CITY_DEFEND,
   XP_BARB_VETERAN, battleXp, cityXp, bankXp, xpToNextLevel, unitLevel,
   promoAvailable, promoReady, takePromotion, promoCS, unitPromoRows,
 } from '../../../cpu/core/promotions';
-import { routePlunderer } from '../../../cpu/core/trade';
+import { PLUNDER_ROUTE_GOLD, plunderTargets, plunderTrader, routePlunderer } from '../../../cpu/core/trade';
 import { barbarianTechs, raiseCamp } from '../../../cpu/core/barbarians';
 import { CITY_MAX_HP } from '../../../cpu/data/units';
 import { neighbors } from '../../../world/hex';
@@ -163,16 +163,43 @@ describe('combat', () => {
     expect(state.units[state.units.length - 1]).toBe(builder);
   });
 
-  it('a civilian with no UnitCaptures row dies to the step; a barbarian-held one stays theirs', () => {
+  it('a melee onto a Trader is a plain step and the Plunder Trade Route command kills it; a barbarian-held Settler stays theirs', () => {
     const { state } = battlefield();
     const barb = spawnUnit(state, 'WARRIOR', tileAtCoords(state.map, 13, 9).index, BARB_SEAT)!;
     barb.tileIndex = tileAtCoords(state.map, 13, 9).index;
     const trader = spawnUnit(state, 'TRADER', tileAtCoords(state.map, 12, 9).index, 0)!;
     trader.tileIndex = tileAtCoords(state.map, 12, 9).index;
     barb.movesLeft = 2 * MP_SCALE;
-    expect(meleeAttack(state, barb.id, trader.tileIndex, 0).ok).toBe(true);
-    expect(state.units.includes(trader)).toBe(false);
+    // the Trader stands on the trade layer: the move order with the attack
+    // flag walks onto its plot, a plain step that leaves it standing
+    moveTo(state, barb, trader.tileIndex);
     expect(barb.tileIndex).toBe(trader.tileIndex);
+    expect(state.units.includes(trader)).toBe(true);
+    // PLUNDER_TRADE_ROUTE needs Movement left; the step left some
+    const left = barb.movesLeft;
+    expect(left).toBeGreaterThan(0);
+    barb.movesLeft = 0;
+    expect(plunderTargets(state, barb)).toEqual([]);
+    expect(plunderTrader(state, barb).ok).toBe(false);
+    barb.movesLeft = left;
+    expect(plunderTrader(state, barb).ok).toBe(true);
+    expect(state.units.includes(trader)).toBe(false);
+    expect(barb.movesLeft).toBe(0);
+
+    // a major at war banks the base 50 for a Trader on no route; at peace
+    // it may not plunder
+    seatOf(state, 1) ?? state.seats.push(emptySeat(1));
+    const t2 = spawnUnit(state, 'TRADER', tileAtCoords(state.map, 14, 12).index, 0)!;
+    t2.tileIndex = tileAtCoords(state.map, 14, 12).index;
+    const raider = spawnUnit(state, 'WARRIOR', t2.tileIndex, 1)!;
+    raider.tileIndex = t2.tileIndex;
+    raider.movesLeft = MP_SCALE;
+    expect(plunderTrader(state, raider).ok).toBe(false);
+    setWar(state, 0, 1, true);
+    const before = seatOf(state, 1)!.treasury;
+    expect(plunderTrader(state, raider).ok).toBe(true);
+    expect(seatOf(state, 1)!.treasury - before).toBe(PLUNDER_ROUTE_GOLD);
+    expect(state.units.includes(t2)).toBe(false);
 
     const settler = spawnUnit(state, 'SETTLER', tileAtCoords(state.map, 9, 9).index, BARB_SEAT)!;
     settler.tileIndex = tileAtCoords(state.map, 9, 9).index;

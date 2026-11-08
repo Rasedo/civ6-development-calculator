@@ -376,7 +376,12 @@
     - cpu/core/trade.ts:routePlunderGold
     - cpu/core/trade.ts:routeYieldValue
     - gpu/core/sim_seats.py:_trade_walk_tick
-  readings: ["B-31r-S1: the plunder payout — CLOSED", "B-31r-S1: the plunder payout"]
+    - cpu/core/trade.ts:plunderTrader
+    - gpu/core/sim_seats.py:_plunder_trader
+  readings:
+    - "B-31r-S1: the plunder payout — CLOSED"
+    - "B-31r-S1: the plunder payout"
+    - "C-123 / C-95: the Plunder Trade Route command and the AI's plunder after the move — READ (0x89dae0, 0x89dfc0, 0x9555a0, 0x9559a0, 0x5545e0 at 0x554667 / 0x554d4c, 0x58fc20, 0x7746a0, 0x70a440, 0x771f80 at 0x7722b6 / 0x77254e / 0x77277f, 0x776140 at 0x776424..0x776470), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - Trade_Manager plunder 0x5545e0 (yield loop 0x554860..0x554a4e, route yields 0x559b30 origin / 0x559bc0 destination, spee...

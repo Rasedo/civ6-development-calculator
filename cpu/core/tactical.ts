@@ -14,19 +14,20 @@ import { COMBAT_BOMBARD_VS_UNIT, EMBARK_MOVES, MP_SCALE } from '../data/constant
 import { CITY_MAX_HP, UNITS, UNIT_HP } from '../data/units';
 import { DISTRICTS } from '../data/districts';
 import { condemnHeretic } from './game';
+import { plunderTrader } from './trade';
 import { IMPROVEMENTS } from '../data/improvements';
 import { AI_FEATURES, AI_UNITS } from '../data/aiBuildTables';
 import { AI_UNIT_AI } from '../data/aiOperations';
 import { engineId, gameTypeOf, installFeature } from '../data/aliases';
 import {
-  canEmbark, cityAtIndex, crossesRiver, embarkTechMoves, escortUnit, inEscort, cliffBlocksStep, shoreCrossing, districtZones, encampmentBlocks, encampmentIntact, inEnemyZoc, rosterEmbarkMoves, stepCost, stepUnit, terrainMp, unitDomain, unitExertsZoc, unitFullMoves, unitIsNoncombat, unitReligious,
+  canEmbark, cityAtIndex, crossesRiver, embarkTechMoves, escortUnit, inEscort, cliffBlocksStep, shoreCrossing, districtZones, encampmentBlocks, encampmentIntact, inEnemyZoc, rosterEmbarkMoves, stepCost, stepUnit, terrainMp, unitDomain, unitExertsZoc, unitFullMoves, unitIsNoncombat, mapLayer, unitReligious,
   setBarbStepLook, unitsHostile, unitVisibleTo,
   waterEnterable, formationCS, setRecordFormation, formationMates, dropLoneRiders,
 } from './units';
 import { BARB_SEAT, FREE_SEAT, NO_SEAT, campTiles, cityHolders, civsAtWar, isBarbSeat, isCityStateSeat, isCiv, isTerritorial, seatOf, tileCity, tileSeat } from './seats';
 import { OPEN_BORDERS_CIVIC } from '../data/seats';
 import { randRange } from './rand';
-import { cityDefenseStrength, districtGarrisonedStrength, embarkedDefenseCS, cityStrikeStrength, coastalRaid, damageExpected, hostilePillage, hostileRangedStrike, meleeAttack, meleeUnitStrengths, movesAndShoots, predictCityBlow, predictCityExchange, rangedUnitStrengths, stackDefender, unitAttackRange } from './combat';
+import { cityDefenseStrength, districtGarrisonedStrength, embarkedDefenseCS, cityStrikeStrength, coastalRaid, damageExpected, hostilePillage, hostileRangedStrike, meleeAttack, meleeUnitStrengths, movesAndShoots, predictCityBlow, predictCityExchange, predictCityShot, rangedUnitStrengths, stackDefender, unitAttackRange } from './combat';
 import { CITY_STRIKE_RANGE } from './phase';
 import { encampOuterPool, outerPool } from './rules';
 import { cityStateAt, minorCity } from './cityStates';
@@ -243,7 +244,11 @@ function groundOf(state: GameState, unit: Unit, revealedOnly = true, planning = 
     // onto 582 under its Trader, the Farm laid)
     if (!formation.has(u.id) && u.seat === unit.seat && classes.has(stackClass(u.type)) && !UNITS[u.type]?.trader
       && stackClass(u.type) !== 'spy') own.add(u.tileIndex);
-    if (u.seat === unit.seat || !onMap(u)) continue;
+    // another player's Trader stands on the trade layer: no location test
+    // reads it (0x586360's defender 0x208b80 on the mover's layer), no stacking
+    // count holds it (runs/h1_duely1124 t138-151: the barbarians' captured
+    // Builder 5111833 on city-state 4's Trader's plots 37:9..33:8)
+    if (u.seat === unit.seat || !onMap(u) || mapLayer(u.type) === 'trade') continue;
     held.add(u.tileIndex);
     if (!unitsHostile(state, unit, u)) continue;
     foes.add(u.tileIndex);
@@ -282,32 +287,30 @@ function groundOf(state: GameState, unit: Unit, revealedOnly = true, planning = 
   // of the formation's layer, 0x2665b0 -> 0x75c50 -> 0x585eb0): a religious
   // unit stands on a layer of its own (runs/h1_duely1127 t80-91: city-state
   // 3's Swordsman plans 4:10, player 1's Missionary on it in sight,
-  // AI_Planning.csv)
-  const layer = unitReligious(unit.type);
-  const onLayer = (x: Unit) => onMap(x) && unitReligious(x.type) === layer;
+  // AI_Planning.csv), a Trader on the trade layer
+  const layer = mapLayer(unit.type);
+  const onLayer = (x: Unit) => onMap(x) && mapLayer(x.type) === layer;
   const boards = new Map<number, boolean>();
   const boarded = (i: number): boolean => {
     if (!unit.embarked || !held.has(i)) return false;
     let v = boards.get(i);
     if (v === undefined) {
-      // a Trader stands on a map layer of its own: no plot list the best
-      // defender reads (0x75c50 on the mover's layer) holds it
-      const others = state.units.filter((x) => x.tileIndex === i && x.seat !== unit.seat && onLayer(x) && !UNITS[x.type]?.trader);
+      // the plot list the best defender reads (0x75c50 on the mover's layer)
+      const others = state.units.filter((x) => x.tileIndex === i && x.seat !== unit.seat && onLayer(x));
       boards.set(i, (v = others.some((x) => !!x.embarked) && others.every((x) => !!x.embarked)));
     }
     return v;
   };
   // on a plot the player sees now (node +0x50 & 2, the visibility count
   // +0x290) a unit of another player not at war with it, of the mover's map
-  // layer, but a Trader (0x585d90 counts none with MakeTradeRoute or Spy: the
-  // node's +0x54)
+  // layer (0x585d90 counts none with MakeTradeRoute or Spy: the node's +0x54)
   const peaces = new Map<number, boolean>();
   const peaceHeld = (i: number): boolean => {
     let v = peaces.get(i);
     if (v === undefined) {
       seenNow ??= plotsSeenNow(state, new Set([unit.seat]));
       peaces.set(i, (v = seenNow[i] === 1 && state.units.some((x) => x.tileIndex === i && x.seat !== unit.seat && onLayer(x)
-        && !UNITS[x.type]?.trader && !unitsHostile(state, unit, x))));
+        && !unitsHostile(state, unit, x))));
     }
     return v;
   };
@@ -315,7 +318,7 @@ function groundOf(state: GameState, unit: Unit, revealedOnly = true, planning = 
   let foesSeen: Set<number> | undefined;
   const crowded = (i: number) => own.has(i) || (held.has(i) && peaceHeld(i));
   const stacked = (i: number) => own.has(i) || (held.has(i) && state.units.some((x) => x.tileIndex === i && x.seat !== unit.seat
-    && onLayer(x) && !UNITS[x.type]?.trader && !unitsHostile(state, unit, x)));
+    && onLayer(x) && !unitsHostile(state, unit, x)));
   const hazard = (i: number): boolean => {
     const f = state.map.tiles[i].feature;
     if (!f || featureDanger(f) <= 0) return false;
@@ -1120,16 +1123,17 @@ export function enemyAt(state: GameState, unit: Unit, tile: number): boolean {
   return state.units.some((u) => u.tileIndex === tile && onMap(u) && unitsHostile(state, unit, u));
 }
 
-/** `enemyAt` on the unit's map layer (a religious unit's its own) */
+/** `enemyAt` on the unit's map layer (`mapLayer`: a religious unit's its own, a
+ *  Trader's the trade layer) */
 function enemyOnLayer(state: GameState, unit: Unit, tile: number): boolean {
-  const layer = unitReligious(unit.type);
-  return state.units.some((u) => u.tileIndex === tile && onMap(u) && unitReligious(u.type) === layer && unitsHostile(state, unit, u));
+  const layer = mapLayer(unit.type);
+  return state.units.some((u) => u.tileIndex === tile && onMap(u) && mapLayer(u.type) === layer && unitsHostile(state, unit, u));
 }
 
-/** a unit of another player than the unit's on the plot (an aircraft or a
- *  spy holds none) */
+/** a unit of another player than the unit's on the plot (an aircraft, a
+ *  spy or a Trader on the trade layer holds none) */
 function foreignAt(state: GameState, unit: Unit, tile: number): boolean {
-  return state.units.some((u) => u.tileIndex === tile && u.seat !== unit.seat && onMap(u));
+  return state.units.some((u) => u.tileIndex === tile && u.seat !== unit.seat && onMap(u) && mapLayer(u.type) !== 'trade');
 }
 
 /** UNITOPERATION_SWAP_UNITS onto `tile` (0x972880; its partner 0x972540):
@@ -1237,11 +1241,11 @@ function keptOut(state: GameState, unit: Unit, tile: number): boolean {
 }
 
 /** another player's unit not at war with the unit on the plot, of its map
- *  layer, but a Trader (0x585d90's count of another player's units) */
+ *  layer (0x585d90's count of another player's units) */
 function peaceAt(state: GameState, unit: Unit, tile: number): boolean {
-  const layer = unitReligious(unit.type);
-  return state.units.some((x) => x.tileIndex === tile && x.seat !== unit.seat && onMap(x) && unitReligious(x.type) === layer
-    && !UNITS[x.type]?.trader && !unitsHostile(state, unit, x));
+  const layer = mapLayer(unit.type);
+  return state.units.some((x) => x.tileIndex === tile && x.seat !== unit.seat && onMap(x) && mapLayer(x.type) === layer
+    && !unitsHostile(state, unit, x));
 }
 
 /** the hex distance between two plots */
@@ -1615,7 +1619,8 @@ export function predictBlow(state: GameState, attacker: Unit, defender: Unit, at
  *  - per target with a spot the predicted blow from where it stands
  *    (`predictBlow`; a civilian taken 150, a religious unit or a Trader 1.5
  *    x its health, the blow no theological combat), copied to every spot, and per
- *    spot of a fighter the fighter's blow back on it standing there; a blow
+ *    spot of a fighter the fighter's blow back on it standing there, of a
+ *    COMBAT_DISTRICT the city's shot on it there (`predictCityShot`); a blow
  *    that kills marks the planning `wins`.
  */
 export function planUnit(state: GameState, unit: Unit, targets: readonly Target[]): Planner {
@@ -1638,9 +1643,9 @@ export function planUnit(state: GameState, unit: Unit, targets: readonly Target[
   // +0x10, 0x901e0, 0x790fc9..0x791016: a religious unit on its own; runs/
   // h1_duely1121 t92 the barbarian Man-At-Arms 3014664 plans 7:13 beside the
   // Apostle 2097152 on 6:13)
-  const layer = unitReligious(unit.type);
+  const layer = mapLayer(unit.type);
   const foreign = new Set(entries.filter((E) => state.units.some((u) => u.tileIndex === E.target.tile && u.seat !== unit.seat
-    && onMap(u) && unitReligious(u.type) === layer)).map((E) => E.target.tile));
+    && onMap(u) && mapLayer(u.type) === layer)).map((E) => E.target.tile));
   const reach: Reach[] = [];
   const onLink =(P: number, parent: number, T: number, M: number) => {
     for (const E of entries) {
@@ -1698,6 +1703,16 @@ export function planUnit(state: GameState, unit: Unit, targets: readonly Target[
       const x = predictCityExchange(state, unit, E.target.tile);
       E.taken = x.taken;
       if (d && x.dealt > d.hp) wins = true;
+      // per spot the city's shot on the unit standing there (the combat
+      // simulated with the sides swapped, its location the spot: 0x791470 at
+      // 0x7917f7..0x7918f7, the city's strike strength 0x249ee0 never 0),
+      // its blow back; the city takes none (runs/h1_duely1128 t242: the hurt
+      // Cavalry 7012372 on 42:21, 33 hit points, out of City Attack's
+      // assignment by the survival filter, as logged)
+      for (const s of E.spots) {
+        s.backTaken = predictCityShot(state, unit, E.target.tile, s.tile);
+        s.backDealt = 0;
+      }
       continue;
     }
     const v = UNIT_TARGET.has(E.target.type) ? targetUnit(state, E.target) : null;
@@ -2281,7 +2296,9 @@ function attackCivilians(state: GameState, pass: Pass): void {
 /**
  * PLUNDER TRADER (0x77aa20): each TRADER target of the list, the units whose
  * planning reaches its plot this turn (`reachers`) go for it in their order
- * (0x7746a0) — each that can act moves onto it, plundering it, its turn done,
+ * (0x7746a0) — each that can act moves onto it (0x773fb0), then, standing,
+ * plunders it where the command may (PLUNDER_TRADE_ROUTE's CanStart and
+ * Start: `plunderTrader`, Movement left after the move), its turn done,
  * until one stands on its plot.
  */
 function plunderTraders(state: GameState, pass: Pass): void {
@@ -2290,6 +2307,7 @@ function plunderTraders(state: GameState, pass: Pass): void {
     for (const u of reachers(state, pass, e.tile, 1)) {
       if (!canAct(state, pass, u)) continue;
       moveTo(state, u, e.tile);
+      if (state.units.includes(u)) plunderTrader(state, u);
       finish(pass, u, 'Plunder Trader', e.tile);
       if (state.units.includes(u) && u.tileIndex === e.tile) break;
     }
@@ -2302,9 +2320,11 @@ function plunderTraders(state: GameState, pass: Pass): void {
  * and not yet queued whose plot this turn's search closes on the target's
  * (0x791300: one turn, the plot itself) is queued with it ("Plunder
  * Trader"); the queue carried out as the move ends (0x70a440): each queued
- * unit that can act goes onto its plot (0x962190; a civilian stands beside
- * the trader, runs/h1_duelw1124 t137-t151 the captured Builder), its turn
- * done.
+ * unit that can act goes onto its plot (0x962190; the Trader on the trade
+ * layer keeps no unit out: runs/h1_duely1124 t138-151 the captured Builder
+ * 5111833 on city-state 4's Trader's plots 37:9..33:8), then its queued
+ * command, PLUNDER_TRADE_ROUTE, where its CanStart answers (`plunderTrader`:
+ * the Builder never), its turn done.
  */
 function homelandPlunder(state: GameState, pass: Pass): void {
   const queue: { u: Unit; plot: number }[] = [];
@@ -2326,6 +2346,7 @@ function homelandPlunder(state: GameState, pass: Pass): void {
   for (const q of queue) {
     if (!canAct(state, pass, q.u)) continue;
     moveTo(state, q.u, q.plot);
+    if (state.units.includes(q.u)) plunderTrader(state, q.u);
     finish(pass, q.u, 'Plunder Trader', q.plot);
   }
 }
@@ -2424,8 +2445,11 @@ interface Claim { unit: number; target: number; dealt: number; turns: number; va
 interface AssignSpot { tile: number; claims: Claim[]; holder: number; holderTarget: number }
 interface AssignTarget { target: Target; unit: Unit | null; health: number; damage: number; units: number[]; barb: boolean }
 /** one unit's assignment (0x38 entries): its spot, the plot it strikes (-1
- *  where the blow falls on a later turn), where it stands, its damage */
-export interface Assigned { unit: Unit; move: number; attack: number; from: number; damage: number; civilian: boolean; religious: boolean }
+ *  where the blow falls on a later turn), where it stands, its damage; its
+ *  flags (0x776140, copied at 0x777045..0x7770e7): +0x33 `civilian` a
+ *  CIVILIAN or a TRADER target (no strike), +0x32 `religious` a RELIGIOUS
+ *  one, +0x34 `trader` a TRADER */
+export interface Assigned { unit: Unit; move: number; attack: number; from: number; damage: number; civilian: boolean; religious: boolean; trader: boolean }
 
 /**
  * THE ASSIGNMENT (0x776140) of `units` to the spots of `targets`:
@@ -2567,7 +2591,8 @@ export function assignTo(state: GameState, pass: Pass, units: Unit[], targets: T
     if (!c) return null;
     const T = tg[c.target];
     return { unit: u, move: S.tile, attack: c.turns === 1 ? (T.unit ? T.unit.tileIndex : T.target.tile) : -1, from: u.tileIndex,
-      damage: UNIT_HP - healthOf(u), civilian: T.target.type === 'CIVILIAN', religious: T.target.type === 'RELIGIOUS' };
+      damage: UNIT_HP - healthOf(u), civilian: T.target.type === 'CIVILIAN' || T.target.type === 'TRADER',
+      religious: T.target.type === 'RELIGIOUS', trader: T.target.type === 'TRADER' };
   });
   return mergeSort(out, (a, b) => assignedBefore(state, a, b)).filter((a): a is Assigned => a !== null);
 }
@@ -2610,8 +2635,11 @@ function mergeSort<T>(a: T[], before: (x: T, y: T) => boolean): T[] {
  * short of it — the move where no unit at war or of
  * its own stands there); a siege unit strikes its attack; a ranged unit
  * strikes it unless its melee is the stronger and it can reach the plot this
- * turn; then every unit moves onto its attack (the attack flag) — a
- * civilian taken, a fighter struck in melee; after each strike and each
+ * turn (neither against a CIVILIAN or TRADER target, the entry's +0x33);
+ * then every unit moves onto its attack (the attack flag) — a civilian
+ * taken, a fighter struck in melee, a Trader's plot a plain step, its Trader
+ * then plundered where the command may (the entry's +0x34,
+ * PLUNDER_TRADE_ROUTE: `plunderTrader`); after each strike and each
  * attack move, against a religious target (the entry's +0x32) the unit
  * condemns the heretics on its plot where it may (UNITCOMMAND_CONDEMN_HERETIC
  * 0x947dd0, its CanStart and Start: `condemnHeretic`; runs/h1_duely1124 t136
@@ -2672,6 +2700,7 @@ function carryOut(state: GameState, pass: Pass, out: Assigned[], move = 'Attack 
     const u = a.unit;
     if (!state.units.includes(u)) continue;
     if (a.attack >= 0 && canAct(u)) moveTo(state, u, a.attack);
+    if (a.trader && state.units.includes(u)) plunderTrader(state, u);
     if (a.religious && state.units.includes(u)) condemnHeretic(state, u);
     if (state.units.includes(u)) u.movesLeft = 0;
     end(a);

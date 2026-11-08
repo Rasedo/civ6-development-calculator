@@ -219,6 +219,8 @@
     - "C-124: a move order's path opens a turn-end node beside each node with Movement left — READ (0x271920, 0x7a880, 0x271490, 0x775a0, 0x26f330), both twins"
     - "C-101 / C-95: the attack carried out condemns a religious target's heretics, a move order walks onto a religious unit's plot — READ (0x771f80 at 0x772331 / 0x7725c9 / 0x7727fa, 0x776140 at 0x776424..0x776470 / 0x777045, 0x947dd0, 0x89c6f0, 0x89cc00), both twins"
     - "C-95 / C-123 / C-125: the stand-to-attack site, a district closed to a ranged unit, City Attack's members and log, the siege gain's lift, a city's blow back, the units of no zone of control — READ (0x2720a0 at 0x272255..0x272330, 0x271be0 at 0x271e69 / 0x271f2e, 0x586360 at 0x5866c9..0x58671f, 0x8109e0, 0x80ceb0 at 0x80d6f9, 0x771f80, 0x80f6b0 at 0x80f75f / 0x80f824 / 0x80f95a, 0x791470, 0x56d6c0), both twins"
+    - "C-123 / C-95: a Trader stands on the trade layer; a city's shot is a COMBAT_DISTRICT spot's blow back — READ (0x901e0, 0x586360 -> 0x208b80, 0x585eb0 -> 0x585d90, 0x791470 at 0x7917f7..0x7918f7 -> 0x249ee0 / 0x205720, 0x776140 at 0x776780..0x7767fa), both twins"
+    - "C-123 / C-95: the Plunder Trade Route command and the AI's plunder after the move — READ (0x89dae0, 0x89dfc0, 0x9555a0, 0x9559a0, 0x5545e0 at 0x554667 / 0x554d4c, 0x58fc20, 0x7746a0, 0x70a440, 0x771f80 at 0x7722b6 / 0x77254e / 0x77277f, 0x776140 at 0x776424..0x776470), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "- THE EXECUTION (0x771f80): the moves (retried where not blocked), the bombard strikes, the ranged strikes (unles..."
@@ -315,10 +317,11 @@
   kind: function
   semantics: a move onto a plot keeping the unit's Movement.
   status: PARTLY
-  impl: [cpu/core/tactical.ts:moveToSafety]
+  impl: [cpu/core/tactical.ts:moveToSafety, cpu/core/tactical.ts:plunderTraders]
   readings:
     - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
     - "C-95: the danger map and Move to Safety — READ, ported"
+    - "C-123 / C-95: the Plunder Trade Route command and the AI's plunder after the move — READ (0x89dae0, 0x89dfc0, 0x9555a0, 0x9559a0, 0x5545e0 at 0x554667 / 0x554d4c, 0x58fc20, 0x7746a0, 0x70a440, 0x771f80 at 0x7722b6 / 0x77254e / 0x77277f, 0x776140 at 0x776424..0x776470), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...lot this turn (0x775340, 1 turn) go for it (0x7746a0): each that can act moves onto it (0x773fb0, its Movement kept) and plunders (PLUNDER_TRADE_ROUTE 0x955950), its turn done, until o..."
@@ -354,12 +357,16 @@
 - addr: 0x7746a0
   final: 0x5066f0
   kind: function
-  semantics: "Plunder Trader's moves: each unit that can act moves onto the Trader (0x773fb0, its Movement kept) and plunders (PLUNDER_TRADE_ROUTE 0x955950), its turn done, until one stands on it."
-  status: PARTLY
-  impl: [cpu/core/tactical.ts:plunderTraders]
+  semantics: "Plunder Trader's moves: over the units in order, each live (+0x770 clear, damage under its hit points) on the map with Movement left (0x56c690) whose formation reaches the plot (0x586900) moves onto it where it stands off it (0x773fb0, r9b 1); then, still standing, PLUNDER_TRADE_ROUTE (0x955950) where its CanStart (vt +0x48) answers, Start (vt +0x58); its turn done (0x77d180, 0x570b40); the walk ends with a unit on the plot."
+  status: READ
+  cases:
+    - recording: h1_duely1124
+      turn: 137-151
+      value: the captured Builder 5111833 moves onto city-state 4's Trader's plots under a Plunder Trader move (the homeland's queue the same carry-out), the command refused (a civilian)
+  impl: [cpu/core/tactical.ts:plunderTraders, gpu/core/sim_tactics.py:_tac_plunder]
   readings:
     - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
-  notes: ["imported: READ in its section, no confirming case found beside it"]
+    - "C-123 / C-95: the Plunder Trade Route command and the AI's plunder after the move — READ (0x89dae0, 0x89dfc0, 0x9555a0, 0x9559a0, 0x5545e0 at 0x554667 / 0x554d4c, 0x58fc20, 0x7746a0, 0x70a440, 0x771f80 at 0x7722b6 / 0x77254e / 0x77277f, 0x776140 at 0x776424..0x776470), both twins"
   context:
     - "...target, the units whose planning holds its plot this turn (0x775340, 1 turn) go for it (0x7746a0): each that can act moves onto it (0x773fb0, its Movement kept) and plunders (PLUNDER..."
   review: reviewed
@@ -481,6 +488,9 @@
     - recording: h1_duelw1124
       turn: 1-249
       value: "the action replay: 206 of 330 Attack Units rows take the logged move and attack; 5 seeds 70 of 126 end plots"
+    - recording: h1_duely1128
+      turn: 242
+      value: "City Attack's survival filter on a COMBAT_DISTRICT's per-spot taken + back taken (the city's shot): the hurt Cavalry 7012372 out, the Cavalry 7143430 to 42:21, the Cuirassier 7405596 and the Ranger as logged"
   impl:
     - cpu/core/aiViewTypes.ts:AiAttackView
     - cpu/core/aiViewTypes.ts:AiView
@@ -492,6 +502,7 @@
     - gpu/core/sim_tactics.py:_tac_assign
     - cpu/core/tactical.ts:spots
     - cpu/core/tactical.ts:passNavalPillage
+    - cpu/core/tactical.ts:Assigned
   readings:
     - "C-95: Attack Units — READ, ported"
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
@@ -504,6 +515,8 @@
     - "C-125: a melee unit's spot beside its target — READ (0x790c60 at 0x790faa..0x79103c, 0x776140's claim loop, 0x7702b0), both twins"
     - "C-101 / C-95: the attack carried out condemns a religious target's heretics, a move order walks onto a religious unit's plot — READ (0x771f80 at 0x772331 / 0x7725c9 / 0x7727fa, 0x776140 at 0x776424..0x776470 / 0x777045, 0x947dd0, 0x89c6f0, 0x89cc00), both twins"
     - "C-95 / C-123 / C-125: the stand-to-attack site, a district closed to a ranged unit, City Attack's members and log, the siege gain's lift, a city's blow back, the units of no zone of control — READ (0x2720a0 at 0x272255..0x272330, 0x271be0 at 0x271e69 / 0x271f2e, 0x586360 at 0x5866c9..0x58671f, 0x8109e0, 0x80ceb0 at 0x80d6f9, 0x771f80, 0x80f6b0 at 0x80f75f / 0x80f824 / 0x80f95a, 0x791470, 0x56d6c0), both twins"
+    - "C-123 / C-95: a Trader stands on the trade layer; a city's shot is a COMBAT_DISTRICT spot's blow back — READ (0x901e0, 0x586360 -> 0x208b80, 0x585eb0 -> 0x585d90, 0x791470 at 0x7917f7..0x7918f7 -> 0x249ee0 / 0x205720, 0x776140 at 0x776780..0x7767fa), both twins"
+    - "C-123 / C-95: the Plunder Trade Route command and the AI's plunder after the move — READ (0x89dae0, 0x89dfc0, 0x9555a0, 0x9559a0, 0x5545e0 at 0x554667 / 0x554d4c, 0x58fc20, 0x7746a0, 0x70a440, 0x771f80 at 0x7722b6 / 0x77254e / 0x77277f, 0x776140 at 0x776424..0x776470), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "- THE ASSIGNMENT (0x776140): a target's health floor(100 x 281 / 256) less its damage (1.1 in 24.8); for MEDIUM /..."
@@ -700,6 +713,7 @@
   readings:
     - "C-95: the tactical pass — READ (the barbarians' moves; the minors share it)"
     - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
+    - "C-123 / C-95: a Trader stands on the trade layer; a city's shot is a COMBAT_DISTRICT spot's blow back — READ (0x901e0, 0x586360 -> 0x208b80, 0x585eb0 -> 0x585d90, 0x791470 at 0x7917f7..0x7918f7 -> 0x249ee0 / 0x205720, 0x776140 at 0x776780..0x7767fa), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ...580), f2e138 / f2e13c Pillage Improvement / District (0x77a810), f2e140 Plunder Trader (0x77aa20), f2e158 Wander Near Camp (0x77b9a0), f2e168 Coastal Raid (0x7794b0), f2e17c Barbarian...

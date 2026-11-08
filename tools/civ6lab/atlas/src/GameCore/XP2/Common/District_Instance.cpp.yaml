@@ -89,6 +89,7 @@
     - cpu/core/tactical.ts:dangerDistricts
     - gpu/core/sim_policy.py:_pol_analyze
     - cpu/core/aiView.ts:centres
+    - cpu/core/tactical.ts:wins
   readings:
     - "H-1: the melee result, a ranged blow's domain, a city's shot — READ"
     - "C-97: the settle site evaluation — READ (the score, the choices), PARTLY READ (the danger, the plot yield)"
@@ -97,6 +98,7 @@
     - "C-97: the war operations — the war candidates, the city value's frame, the assault nodes and Attack Units READ; the loyalty lead's sources, the team update's danger and the assault's executions PARTLY READ"
     - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
     - "C-130: a city-state's Great Person points store, its Faith and its flat bonus; Bastions' strike on standing walls — READ, both twins"
+    - "C-123 / C-95: a Trader stands on the trade layer; a city's shot is a COMBAT_DISTRICT spot's blow back — READ (0x901e0, 0x586360 -> 0x208b80, 0x585eb0 -> 0x585d90, 0x791470 at 0x7917f7..0x7918f7 -> 0x249ee0 / 0x205720, 0x776140 at 0x776780..0x7767fa), both twins"
   notes:
     - ".claude/scratchpad/st1/reading.md: .... Each such city whose centre the player sees: its   strength (0x24ae80) on the centre, its strike (0x249ee0) over its reach   (0x249e40) or, with none, 1 on each plot beside it (0x715ff0). Then the   player'..."
   context:

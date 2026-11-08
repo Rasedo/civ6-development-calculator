@@ -111,6 +111,15 @@
   context:
     - "- The research and civic overflows (`m_xResearchOverflow`, serializer 0x4c6dc2; `m_xCulturalOverflow`, 0x38a93a): only the members are read; the records fit the produ..."
   review: imported
+- addr: 0x4d2860
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-123 / C-95: the Plunder Trade Route command and the AI's plunder after the move — READ (0x89dae0, 0x89dfc0, 0x9555a0, 0x9559a0, 0x5545e0 at 0x554667 / 0x554d4c, 0x58fc20, 0x7746a0, 0x70a440, 0x771f80 at 0x7722b6 / 0x77254e / 0x77277f, 0x776140 at 0x776424..0x776470), both twins"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...favour (0x37af10, 7): written by EFFECT_ADJUST_PLAYER_ANYONE_PLUNDER_TO_FAVOR alone (0x4d4ec5 its load), which no Modifiers row of the install carries; the engines take no such bran..."
+  review: imported
 - addr: 0x563cd0
   kind: function
   status: PARTLY

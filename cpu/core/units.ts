@@ -512,6 +512,20 @@ export function unitReligious(type: string): boolean {
   return (UNITS[type]?.religiousStrength ?? 0) > 0;
 }
 
+/** the map layer a unit stands on (0x901e0, the plot's unit list 0x75c50 of
+ *  that layer): a religious unit's its own, a Trader's (MakeTradeRoute) its
+ *  own, every other unit's the units' layer. A plot's units of another layer
+ *  than the mover's neither keep it out (0x585eb0 -> 0x585d90) nor defend
+ *  the plot (0x586360 -> 0x208b80): runs/h1_duely1124 t138-151 the
+ *  barbarians' captured Builder 5111833 stands on city-state 4's Trader's
+ *  plots 37:9..33:8 under Plunder Trader; runs/h1_duely1117 t56 the
+ *  barbarian Warrior 2883604 onto player 1's Trader's 34:13, the Trader
+ *  walking on */
+export function mapLayer(type: string): 'units' | 'religious' | 'trade' {
+  if (UNITS[type]?.trader) return 'trade';
+  return unitReligious(type) ? 'religious' : 'units';
+}
+
 /** Does this unit project a zone of control at all? CIV6 (Zone of Control):
  *  "Ranged and Bombard class units do not exert ZOC" — SUPPRESSION hands it
  *  back to a ranged unit. The two submarines carry "Does not exert zone of
@@ -774,7 +788,8 @@ export function tileFreeForUnit(
     ? (isWater(tile) && !naval && !walks ? 'embarked' : unitDomain(unit.type))
     : 'civilian';
   for (const u of unitsAt(state, tileIndex)) {
-    if (u.id === unit?.id || isAirUnit(u.type) || isSpy(u.type)) continue;
+    // a Trader stands on the trade layer: it keeps no unit out
+    if (u.id === unit?.id || isAirUnit(u.type) || isSpy(u.type) || mapLayer(u.type) === 'trade') continue;
     // a unit a city makes (`stacks`, the location test 0x586360) is refused
     // by a hostile defender alone, never by another's civilian (runs/h1_duely1127
     // t69: Mexico City's Heavy Chariot onto its centre 8:10, city-state 3's

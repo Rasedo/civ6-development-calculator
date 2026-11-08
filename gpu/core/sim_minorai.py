@@ -2484,7 +2484,7 @@ class _MinorWorld:
         b = sim._bidx
         p = plot.clamp(min=0)
         blocked = ~(sim.passable | sim.wpass)
-        held = (sim.military_at >= 0) | (sim.civilian_at >= 0) | (sim.support_at >= 0) | (sim.embarked_at >= 0)
+        held = (sim.military_at >= 0) | (sim.civilian_at >= 0) | (sim.support_at >= 0) | (sim.embarked_at >= 0) | (sim.trader_at >= 0)
         out = p.clone()
         found = ~blocked[b, p]
         for d in sim._RING_DIRS:

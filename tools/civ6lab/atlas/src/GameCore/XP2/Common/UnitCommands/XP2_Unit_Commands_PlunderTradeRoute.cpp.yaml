@@ -1,0 +1,43 @@
+# The DLL atlas, curated layer (tools/civ6lab/atlas.py documents the record).
+# Records keyed by GameCore_XP2_Release.dll RVA; `final` the FinalRelease RVA.
+# `review: imported` = bootstrapped from dll_readings.md / code comments / saved
+# labels and not yet reviewed: verify against the disassembly, then edit and
+# set `review: reviewed`.
+- addr: 0x89dae0
+  kind: function
+  name: plunderCanStart
+  semantics: "PLUNDER_TRADE_ROUTE's CanStart (Gathering Storm's): false for a dead unit (+0x770), one with no Movement (0x56c690), one with no Combat (0x56dc90), Ranged (0x56e3e0) or Bombard (0x56daa0) strength, an aircraft (+0x650 domain 1), an embarked one without +0x18c3; the plot's trade layer list (0x75c50 on the map's +0xb8, layer 1) must hold a unit of another owner (r9b set: true there); then over that list each live unit of another owner counts where its owner's Player_Trade +0x1530 (m_iAnyonePlunderFavor) is above 0, or where the owners are at war (0x469cd0) and the Trader's immunity for the plot's domain (0x58fc20 on +0x1eb8: 2 on land, 0 on water) is none; true with one counted, else the REQUIRES_WAR_DECLARATION / BLOCKED_BY_IMMUNITY reasons."
+  status: READ
+  cases:
+    - recording: plunder_sweep_a0
+      turn: 101
+      value: the unit placed on the Trader 3342348's 62:17 with 2 Movement answers true (35 of 37 on the plot with Movement, runs/plunder_*)
+    - recording: plunder_sweep_a1
+      turn: 102
+      value: the unit on 60:18 beside the Trader 4128787 on 60:17 answers false (20 of 21 off the plot)
+    - recording: plunder_b31rt_burn0
+      turn: 101
+      value: the unit 2555918 moved onto 62:17 with no Movement left answers false (every one with none)
+  impl: [cpu/core/trade.ts:plunderTargets, gpu/core/sim_seats.py:_plunder_ok]
+  readings:
+    - "C-123 / C-95: the Plunder Trade Route command and the AI's plunder after the move — READ (0x89dae0, 0x89dfc0, 0x9555a0, 0x9559a0, 0x5545e0 at 0x554667 / 0x554d4c, 0x58fc20, 0x7746a0, 0x70a440, 0x771f80 at 0x7722b6 / 0x77254e / 0x77277f, 0x776140 at 0x776424..0x776470), both twins"
+  notes:
+    - +0x18c3 (fights embarked) is set by no unit of the engines' roster; the +0x1530 branch is never taken (no Modifiers row writes it)
+  review: reviewed
+- addr: 0x89dfc0
+  final: 0x5e2df0
+  kind: function
+  name: plunderStart
+  semantics: "PLUNDER_TRADE_ROUTE's Start (Gathering Storm's): over the plot's trade layer list (0x75c50, layer 1) each live unit of another owner: with its owner's Player_Trade +0x1530 above 0, the plunder (Trade_Manager 0x5545e0), the delayed kill (0x4ef040) and the plunderer's favour by that count (0x37b760 -> 0x37af10, 7); else at war (0x469cd0) and not immune for the plot's domain (0x58fc20), the plunder and the delayed kill; then the plunderer's Movement to 0 (0x56d6f0) and the command's event (0x50360)."
+  status: READ
+  cases:
+    - recording: plunder_b31rt_burn0
+      turn: 101
+      value: the units moved onto 53:18 / 66:17 with 1 Movement left plunder 110 / 60 Gold, the Traders gone
+    - recording: plunder_sweep_a0
+      turn: 101
+      value: Quebec -> Halifax's Trader 3342348 plundered on 62:17 for 50
+  impl: [cpu/core/trade.ts:plunderTrader, gpu/core/sim_seats.py:_plunder_trader]
+  readings:
+    - "C-123 / C-95: the Plunder Trade Route command and the AI's plunder after the move — READ (0x89dae0, 0x89dfc0, 0x9555a0, 0x9559a0, 0x5545e0 at 0x554667 / 0x554d4c, 0x58fc20, 0x7746a0, 0x70a440, 0x771f80 at 0x7722b6 / 0x77254e / 0x77277f, 0x776140 at 0x776424..0x776470), both twins"
+  review: reviewed

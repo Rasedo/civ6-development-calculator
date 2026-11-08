@@ -209,13 +209,26 @@ def main() -> None:
     assert int(sim.unit_tile[0, bw + lo]) == b, "the barbarian did not step onto the plot"
     sim._barbarian_phase()
     assert bool(sim.unit_alive[0, got]) and int(sim.unit_tile[0, got]) == b, "the barbarians' captive moved"
+    # a Trader stands on the trade layer: the barbarian shares its plot and
+    # it lives; PLUNDER_TRADE_ROUTE (`_plunder_ok`, `_plunder_trader`) kills
+    # it, the plunderer's Movement spent
     trd = spawn(sim, FOE, type_id(sim, "TRADER"), c)
-    sim.unit_mp[0, bw + lo] = 2 * sim._mp_scale
-    sim.unit_attacks[0, bw + lo] = 1
-    sim._hostile_vs_unit(one, torch.full((sim.B,), c, dtype=torch.long), "barb", bw)
-    assert not bool(sim.unit_alive[0, trd]) and int(sim.unit_tile[0, bw + lo]) == c, (
-        "a Trader stepped on lived, or the barbarian stood off")
-    print("  4b a barbarian's seizure OK — the captive is theirs and holds; a Trader dies to the step")
+    r, g = torch.tensor([0]), torch.tensor([bw + lo])
+    sim._occ_clear(r, torch.tensor([int(sim.unit_tile[0, bw + lo])]), g)
+    sim.unit_tile[0, bw + lo] = c
+    sim._occ_set(r, torch.tensor([c]), g)
+    assert bool(sim.unit_alive[0, trd]) and int(sim.trader_at[0, c]) == trd, "the Trader left the trade layer"
+    gs = torch.full((sim.B,), bw + lo, dtype=torch.long)
+    sim.unit_mp[0, bw + lo] = 0
+    ok, _tc, _tr = sim._plunder_ok(one, gs)
+    assert not bool(ok[0]), "a plunderer with no Movement may plunder"
+    sim.unit_mp[0, bw + lo] = sim._mp_scale
+    ok, tc, tr = sim._plunder_ok(one, gs)
+    assert bool(ok[0]) and int(tr[0]) == trd, "the barbarian on the Trader's plot may not plunder"
+    sim._plunder_trader(ok, tc, tr, gs)
+    assert not bool(sim.unit_alive[0, trd]) and int(sim.trader_at[0, c]) == -1, "the plundered Trader lived"
+    assert int(sim.unit_mp[0, bw + lo]) == 0, "the plunder left Movement"
+    print("  4b a barbarian's seizure OK — the captive is theirs and holds; a Trader on its plot dies to the plunder")
 
     # -- 5: a shot from the ground never takes a lone Support chassis ----------
     # runs/b89t_fire_20260926.jsonl, runs/b89t_read_20260926.jsonl: a lone

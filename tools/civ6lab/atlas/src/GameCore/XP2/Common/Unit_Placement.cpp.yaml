@@ -46,6 +46,9 @@
     - recording: h1_duely1124
       turn: 82
       value: "city-state 3's Quadrireme 1048577 on 0:14 draws Random Direction over 10 plots (RandCalls.csv), Granada's centre 41:12 under its Catapult 1245186 and 42:13 under its embarked Heavy Chariot 1114117 among them: the type pair (vtable +0xb8) read as FormationClass"
+    - recording: h1_duely1117
+      turn: 56
+      value: the barbarian Warrior 2883604 under Plunder Trader onto player 1's Trader's 34:13, the Trader walking on to 33:13 at t57
   impl:
     - cpu/core/tactical.ts:minor
     - gpu/core/sim_tactics.py:_tac_search
@@ -69,6 +72,9 @@
     - gpu/core/sim_tactics.py:SimTactics
     - cpu/core/tactical.ts:classes
     - gpu/core/sim_tactics.py:_tac_stacks
+    - cpu/core/units.ts:tileFreeForUnit
+    - cpu/core/units.ts:mapLayer
+    - gpu/core/sim_init.py:__init__
   readings:
     - "C-124: a move order's path opens a turn-end node beside each node with Movement left — READ (0x271920, 0x7a880, 0x271490, 0x775a0, 0x26f330), both twins"
     - "C-97: the behaviour trees — READ (the interpreter), the nodes PARTLY READ"
@@ -84,6 +90,7 @@
     - "C-125: the safe plot's stacking test holds other players' units — READ (0x716b90 at 0x716d77 -> 0x585eb0 / 0x585d90), both twins"
     - "C-125 / C-99: the swap's partner pays its step, the stacking count's classes, the walk's end among other players' units, a siege unit's RangedCombat — READ (0x972a50, 0x585d90, 0x26fe20 via 0x585eb0, 0x56e3e0), both twins"
     - "C-99 / C-128: the swap's partner test and its step along its own path; Move Unit's update before the executions; a Trader no passenger — READ (0x972540, 0x56e760, 0x972a50 -> 0x26fe20, 0x7d3a00 -> 0x7f0020, 0x586360 -> 0x208b80 / 0x523d60), both twins"
+    - "C-123 / C-95: a Trader stands on the trade layer; a city's shot is a COMBAT_DISTRICT spot's blow back — READ (0x901e0, 0x586360 -> 0x208b80, 0x585eb0 -> 0x585d90, 0x791470 at 0x7917f7..0x7918f7 -> 0x249ee0 / 0x205720, 0x776140 at 0x776780..0x7767fa), both twins"
   context:
     - "...60), a visible enemy unit there (0x5862e0), a unit there that keeps it out (0x585eb0 -> 0x585d90: the owner's of a stacking class, another player's not at war) — and, the goal open,..."
   review: reviewed
@@ -136,6 +143,7 @@
     - cpu/core/tactical.ts:walk
     - cpu/core/tactical.ts:own
     - cpu/core/tactical.ts:canAct
+    - cpu/core/units.ts:mapLayer
   readings:
     - "C-95: the tactical pass — READ (the barbarians' moves; the minors share it)"
     - "C-96: the city-states' tactical pass — READ (Wander Near City, Heal, the non-barbarian priorities, FindAlternateLocation), the families it needs PARTLY READ"
@@ -159,6 +167,7 @@
     - "C-99 / C-128: a shore crossing's cliff onto a revealed plot alone, Wander Back to Camp's path flag 0x1000, the path's destination count — READ (0x52fb90, 0x2720a0 at 0x272230..0x27229e / 0x272380, 0x270dd0 at 0x270f24, 0x271be0 at 0x271d03..0x271d18, 0x77b9a0 at 0x77be0b), both twins"
     - "C-125 / C-99: the swap's partner pays its step, the stacking count's classes, the walk's end among other players' units, a siege unit's RangedCombat — READ (0x972a50, 0x585d90, 0x26fe20 via 0x585eb0, 0x56e3e0), both twins"
     - "C-124: a move order's path prices a turn's end at the stacking limit +1e6, and its destination there stops the search — READ (0x270dd0 at 0x27101e..0x2710a0, 0x2720a0 at 0x272230..0x272364, 0x77a50, 0x26dcd0's callbacks), both twins"
+    - "C-123 / C-95: a Trader stands on the trade layer; a city's shot is a COMBAT_DISTRICT spot's blow back — READ (0x901e0, 0x586360 -> 0x208b80, 0x585eb0 -> 0x585d90, 0x791470 at 0x7917f7..0x7918f7 -> 0x249ee0 / 0x205720, 0x776140 at 0x776780..0x7767fa), both twins"
   notes:
     - ".claude/scratchpad/mu1/readings_c96.md: ...hin 5 of the city (0x1deb0), no unit at war with it   (0x5862e0), none of its own stacking with it (0x585eb0); the weighted   vector's weights (influence 0x716a60, the plot's owner +0x60, revealed   0x2d2220)..."
   context:
@@ -260,6 +269,9 @@
     - recording: h1_duely1127
       turn: 43
       value: the barbarian Archer on 13:8 lists no 12:6 (player 1's centre), 11:9 after 14:9, 15 plots as AI_Planning.csv; its Warrior on 13:8 at t38 listed 12:6 (2/0)
+    - recording: h1_duely1124
+      turn: 138
+      value: "the barbarians' captured Builder 5111833 steps onto city-state 4's Trader's plot 36:9 (t138-151 on its plots): the hostile defender 0x208b80 reads the mover's layer, the Trader's none"
   impl:
     - cpu/core/units.ts:tileFreeForUnit
     - gpu/core/sim_masks.py:_spot_free
@@ -284,6 +296,11 @@
     - cpu/core/tactical.ts:pathNodes
     - cpu/core/tactical.ts:groundOf
     - cpu/core/tactical.ts:owner
+    - cpu/core/combat.ts:seizable
+    - cpu/core/tactical.ts:foreignAt
+    - cpu/core/tactical.ts:fought
+    - cpu/core/units.ts:mapLayer
+    - gpu/core/sim_init.py:__init__
   readings:
     - "H-1: a civilian stepped on — READ"
     - "C-96: the city-states' tactical pass — READ (Wander Near City, Heal, the non-barbarian priorities, FindAlternateLocation), the families it needs PARTLY READ"
@@ -307,6 +324,7 @@
     - "C-124: an attack order to a plot out of sight loses its attack flag — READ (0x962310), both twins"
     - "C-99 / C-128: the swap's partner test and its step along its own path; Move Unit's update before the executions; a Trader no passenger — READ (0x972540, 0x56e760, 0x972a50 -> 0x26fe20, 0x7d3a00 -> 0x7f0020, 0x586360 -> 0x208b80 / 0x523d60), both twins"
     - "C-95 / C-123 / C-125: the stand-to-attack site, a district closed to a ranged unit, City Attack's members and log, the siege gain's lift, a city's blow back, the units of no zone of control — READ (0x2720a0 at 0x272255..0x272330, 0x271be0 at 0x271e69 / 0x271f2e, 0x586360 at 0x5866c9..0x58671f, 0x8109e0, 0x80ceb0 at 0x80d6f9, 0x771f80, 0x80f6b0 at 0x80f75f / 0x80f824 / 0x80f95a, 0x791470, 0x56d6c0), both twins"
+    - "C-123 / C-95: a Trader stands on the trade layer; a city's shot is a COMBAT_DISTRICT spot's blow back — READ (0x901e0, 0x586360 -> 0x208b80, 0x585eb0 -> 0x585d90, 0x791470 at 0x7917f7..0x7918f7 -> 0x249ee0 / 0x205720, 0x776140 at 0x776780..0x7767fa), both twins"
   notes:
     - ".claude/scratchpad/mu1/readings_c96.md: ...k; the distance max(|dx|, |dy|) where the   signs differ, |dx| + |dy| else); the unit may enter it (0x586360 flag   0x40), the player revealed it, no other player's unit on it and none of   its own that it ma..."
     - ".claude/scratchpad/mu1/readings_c96.md: ...a hull outside   its own territory heads for its player's nearest city (first of equals) —   where 0x586360 (flag 0x10) allows it, PARTLY READ. The engines carry no   influence map: every plot reads no dange..."

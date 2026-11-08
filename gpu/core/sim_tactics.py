@@ -257,27 +257,26 @@ class SimTactics:
 
     def _tac_peaceful(self, seat: int, rel: bool = False) -> torch.Tensor:
         """[B, T] bool — a unit of another player than `seat` not at war with
-        it, a Trader none, holds the plot (an aircraft or a spy holds none),
-        on the map layer of a religious mover (`rel`) or of any other."""
+        it holds the plot (an aircraft, a spy or a Trader on the trade layer
+        holds none), on the map layer of a religious mover (`rel`) or of any
+        other."""
         out = torch.zeros(self.B, self.T, dtype=torch.bool, device=self.device)
         for pl in (self.military_at, self.civilian_at, self.support_at, self.embarked_at):
             pc = pl.clamp(min=0)
             s = torch.where(pl >= 0, self.unit_seat.gather(1, pc), torch.full_like(pl, seat))
-            trader = self.unit_type.gather(1, pc) == self._trader_idx
-            out |= (s != seat) & ~self._seats_hostile(seat, s) & ~trader & self._tac_layer(pl, rel)
+            out |= (s != seat) & ~self._seats_hostile(seat, s) & self._tac_layer(pl, rel)
         return out
 
     def _tac_boarded(self, seat: int, rel: bool = False) -> torch.Tensor:
         """[B, T] bool — `groundOf`'s boarded for an embarked mover of
         `seat`, on the map layer of a religious mover (`rel`) or of any
-        other: another player's passenger but a Trader holds the plot and no
-        other player's unit stands there unembarked (0x586360 under flag 1,
-        the best defender 0x208b80 under 0x108)."""
+        other: another player's passenger holds the plot (a Trader on the
+        trade layer none) and no other player's unit stands there unembarked
+        (0x586360 under flag 1, the best defender 0x208b80 under 0x108)."""
         ep = self.embarked_at
         epc = ep.clamp(min=0)
         es = torch.where(ep >= 0, self.unit_seat.gather(1, epc), torch.full_like(ep, seat))
-        trader = self.unit_type.gather(1, epc) == self._trader_idx
-        out = (es != seat) & ~trader & self._tac_layer(ep, rel)
+        out = (es != seat) & self._tac_layer(ep, rel)
         for pl in (self.military_at, self.civilian_at, self.support_at):
             s = torch.where(pl >= 0, self.unit_seat.gather(1, pl.clamp(min=0)), torch.full_like(pl, seat))
             out &= (s == seat) | ~self._tac_layer(pl, rel)
@@ -1494,7 +1493,7 @@ class SimTactics:
         rider = on & self.unit_escorted[rows, g] & (mil >= 0) & (mil != g) & (self.unit_seat[rows, mc] == seat)
         out = torch.where(rider, mil - lo, none)
         carrier = on & ~self._type_civilian.take(ty) & ~self._type_support.take(ty) & ~self.unit_emb[rows, g] & (mil == g)
-        for plane in (self.civilian_at, self.support_at, self.embarked_at):
+        for plane in (self.civilian_at, self.support_at, self.embarked_at, self.trader_at):
             r = plane[rows, tc]
             rc = r.clamp(min=0)
             hit = carrier & (out < 0) & (r >= 0) & (r != g) & self.unit_escorted[rows, rc] & (self.unit_seat[rows, rc] == seat)
@@ -1535,7 +1534,7 @@ class SimTactics:
         seat = self.unit_seat[rows, g]
         carrier = self.military_at[rows, tc] == g
         self.unit_escorted[rows, g] = False
-        for plane in (self.civilian_at, self.support_at, self.embarked_at):
+        for plane in (self.civilian_at, self.support_at, self.embarked_at, self.trader_at):
             r = plane[rows, tc]
             rc = r.clamp(min=0)
             hit = carrier & (r >= 0) & (self.unit_seat[rows, rc] == seat)
@@ -1910,15 +1909,17 @@ class SimTactics:
         ct = self.unit_type.gather(1, civ.clamp(min=0)).clamp(min=0, max=self.NU - 1)
         sup = self.support_at
         ss = seat_of(sup)
-        trader = (civ >= 0) & (ct == self._trader_idx)
+        trd = self.trader_at
+        trader = trd >= 0
+        ts_ = seat_of(trd)
         relig = (civ >= 0) & (self._rel_strength.take(ct) > 0)
         # the religious unit of the plot: the civilian plane's, or a passenger at sea
         erel = (emb >= 0) & (self._rel_strength.take(et) > 0)
         rel_slot = torch.where(relig, civ, torch.where(erel, emb, none))
         rel_seat = torch.where(relig, cs_, torch.where(erel, es, none))
-        n_civ = ((civ >= 0) & ~trader & ~relig).long() + (sup >= 0).long()
-        civ_seat = torch.where((civ >= 0) & ~trader & ~relig, cs_, ss)
-        civ_slot = torch.where((civ >= 0) & ~trader & ~relig, civ, sup)
+        n_civ = ((civ >= 0) & ~relig).long() + (sup >= 0).long()
+        civ_seat = torch.where((civ >= 0) & ~relig, cs_, ss)
+        civ_slot = torch.where((civ >= 0) & ~relig, civ, sup)
         camp = torch.zeros_like(seen)
         cp = self.camp_tile
         if cp.numel():
@@ -1933,7 +1934,7 @@ class SimTactics:
         taken = ~rest
         for kind, cond, who in (
             (4, camp, none), (5, goody, none),
-            (6, trader & hostile(cs_), cs_),
+            (6, trader & hostile(ts_), ts_),
             (7, n_civ == 1, civ_seat),
             (8, (rel_slot >= 0) & hostile(rel_seat), rel_seat),
             (9, (self.improvement >= 0) & ~self.pillaged & h_own & ~goody, none),
@@ -1959,7 +1960,7 @@ class SimTactics:
         # knowledge base's after them on plots it does not
         uk = torch.where(fight, 1, torch.where((okk == 6) | (okk == 7) | (okk == 8), okk, 0))
         us = torch.where(uk > 0, torch.where(fight, dseat, oss), none)
-        uu = torch.where(fight, dslot, torch.where(okk == 7, civ_slot, torch.where(okk == 6, civ, torch.where(okk == 8, rel_slot, none))))
+        uu = torch.where(fight, dslot, torch.where(okk == 7, civ_slot, torch.where(okk == 6, trd, torch.where(okk == 8, rel_slot, none))))
         uo = torch.where(uk > 0, self._arange_bt, torch.full_like(ts, 1 << 40))
         if kb >= 0:
             uk, uu, us, uo = self._tac_known_entries(seat, kb, seen, uk, uu, us, uo)
@@ -1971,7 +1972,7 @@ class SimTactics:
         # own unit: MEDIUM where a unit that cannot fight shares the plot
         efight = uk == 1
         eslot = uu.clamp(min=0)
-        nonc = (civ >= 0) | (sup >= 0)
+        nonc = (civ >= 0) | (sup >= 0) | trader
         lowk = torch.where(efight & rep(nonc), 2, torch.ones_like(uk))
         dt = self.unit_type.gather(1, eslot).clamp(min=0, max=self.NU - 1)
         rs = self._type_ranged_strength.take(dt)
@@ -2207,6 +2208,14 @@ class SimTactics:
                 us[g_i[pick]] = slots[dn_i[pick]]
                 tgt[g_i[pick]] = dplot[pick]
                 blow, took = self._predict_city_exchange(pre, us, tgt)
+                # per spot the city's shot on the unit standing there
+                # (`planUnit`'s backTaken; its backDealt none)
+                sp_b = torch.full((self.B, 6), -1, dtype=torch.long, device=dev)
+                sn_b = torch.zeros(self.B, dtype=torch.long, device=dev)
+                sp_b[g_i[pick]] = res["spot"][dn_i[pick], de_i[pick]]
+                sn_b[g_i[pick]] = sn[dn_i[pick], de_i[pick]].long()
+                shots = self._plan_city_shots(pre, us, tgt, blow > 0, sp_b, sn_b)
+                back_t[dn_i[pick], de_i[pick]] = shots[g_i[pick]]
                 blow = blow[g_i[pick]]
                 # the damage the unit takes from the city (`planUnit`'s E.taken)
                 taken[dn_i[pick], de_i[pick]] = took[g_i[pick]]
@@ -2217,6 +2226,43 @@ class SimTactics:
         res.update({"tp": tp, "te": te, "civ": civ, "other": other, "dealt": dealt, "taken": taken, "back_taken": back_t,
                     "back_dealt": back_d, "wins": wins})
         return res
+
+    def _plan_city_shots(self, pre: str, us: torch.Tensor, tgt: torch.Tensor, on: torch.Tensor,
+                         spots: torch.Tensor, n: torch.Tensor) -> torch.Tensor:
+        """[B, 6] long — `predictCityShot` for the unit at local slot `us` [B]
+        of pool `pre` on each of its `n` [B] spots `spots` [B, 6], the city
+        centre at `tgt` [B] a hostile one where `on` [B] (0x791470's district
+        branch: the combat with the sides swapped, its location the spot):
+        the law at its expectation on the city's strike strength
+        (`_city_shot_atk`) against the unit's strength under a city's shot
+        there (`_city_shot_def`)"""
+        B, dev = self.B, self.device
+        out = torch.zeros(B, 6, dtype=torch.long, device=dev)
+        if not bool(on.any()):
+            return out
+        ttc = tgt.clamp(min=0)
+        ctr = self._centre_seat_plane().gather(1, ttc.unsqueeze(1)).squeeze(1)
+        city = self._centre_target_seat(ctr) >= 0
+        hrow = self._holder_row(ctr)
+        hcol = self.centre_slot_at.gather(1, ttc.unsqueeze(1)).squeeze(1).clamp(min=0)
+        if self.S > 0:
+            csx = self.citystate_at.gather(1, ttc.unsqueeze(1)).squeeze(1).clamp(min=0, max=self.S - 1)
+            hrow = torch.where(city, hrow, self._CITY_MINOR0 + csx)
+            hcol = torch.where(city, hcol, torch.zeros_like(hcol))
+        d_slot = torch.where(on, us + self.POOL_LO[pre], torch.full_like(us, -1))
+        d_seat = torch.where(on, self.unit_seat[self._bidx, d_slot.clamp(min=0)], torch.full_like(us, -1))
+        atk = torch.zeros(B, dtype=torch.float64, device=dev)
+        for r in torch.unique(hrow[on]).tolist():
+            m = on & (hrow == r)
+            atk = torch.where(m, self._city_shot_atk(int(r), hcol, d_seat).to(torch.float64), atk)
+        for k in range(6):
+            live = on & (k < n)
+            if not bool(live.any()):
+                continue
+            de = self._city_shot_def(torch.where(live, d_slot, torch.full_like(d_slot, -1)), d_seat,
+                                     spots[:, k].clamp(min=0), ctr)
+            out[:, k] = torch.where(live, self._damage_expected(atk - de.to(torch.float64)), out[:, k])
+        return out
 
     def _tac_predict(self, rows: torch.Tensor, a_slot: torch.Tensor, d_slot: torch.Tensor,
                      tiles: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
@@ -2570,7 +2616,8 @@ class SimTactics:
         Movement, not yet queued, whose one-turn search closes on the target's
         plot where it may stand, queued with it; the queue carried out in its
         order — targets in plot order, units in pool order — each queued unit
-        that can act going onto its plot, its turn done."""
+        that can act going onto its plot, then plundering it where the
+        command may (`_tac_plunder_cmd`), its turn done."""
         B, T, dev = self.B, self.T, self.device
         bidx = torch.arange(B, device=dev)
         trd = tg["ok"] == 6
@@ -2601,13 +2648,27 @@ class SimTactics:
                 if not bool(go.count_nonzero()):
                     continue
                 self._tac_move_to(go, u_b, t)
+                self._tac_plunder_cmd(go, u_b)
                 done[bidx[go], u_b[go]] = True
+
+    def _tac_plunder_cmd(self, m: torch.Tensor, u_b: torch.Tensor, pre: str = "barb") -> None:
+        """PLUNDER_TRADE_ROUTE where its CanStart answers (`plunderTrader`):
+        the unit `u_b` [B] of pool `pre`, still standing, in the games `m`"""
+        bidx = torch.arange(self.B, device=self.device)
+        m = m & getattr(self, f"{pre}_unit_alive")[bidx, u_b]
+        if not bool(m.count_nonzero()):
+            return
+        gs = u_b + self.POOL_LO[pre]
+        ok, tc, tr = self._plunder_ok(m, gs)
+        if bool(ok.count_nonzero()):
+            self._plunder_trader(ok, tc, tr, gs)
 
     def _tac_plunder(self, live, done: torch.Tensor, ai: torch.Tensor, reach_at, tg: dict,
                      order: torch.Tensor, npass: torch.Tensor) -> None:
         """PLUNDER TRADER (`plunderTraders`): each TRADER target of the list
         in plot order, the units whose reach takes its plot this turn go for
-        it in pool order — each that can act moves onto it, its turn done,
+        it in pool order — each that can act moves onto it, then plunders it
+        where the command may (`_tac_plunder_cmd`), its turn done,
         until one stands on its plot."""
         dev = self.device
         B, T = self.B, self.T
@@ -2635,6 +2696,7 @@ class SimTactics:
                 if not bool(go.count_nonzero()):
                     continue
                 self._tac_move_to(go, u_b, t)
+                self._tac_plunder_cmd(go, u_b)
                 done[bidx[go], u_b[go]] = True
                 stood |= go & self.barb_unit_alive[bidx, u_b] & (self.barb_unit_tile[bidx, u_b] == t)
 
@@ -2884,7 +2946,8 @@ class SimTactics:
         sn = res["spot_n"][nn, e_ix]
         if district:
             # the unit's predicted blow on each city (`predictCityBlow`), the
-            # damage it takes its planning's (`predictCityExchange`)
+            # damage it takes its planning's (`predictCityExchange`), the
+            # city's shot on it per spot its planning's too (`predictCityShot`)
             dealt = torch.zeros(B, U, K, dtype=torch.long, device=dev)
             for ui in range(U):
                 for ki in range(K):
@@ -2892,7 +2955,7 @@ class SimTactics:
                     if bool(m_.any()):
                         dealt[:, ui, ki] = torch.where(m_, self._predict_city_blow(pre, us[:, ui], tplot[:, ki]), dealt[:, ui, ki])
             taken = torch.where(has_e, res["taken"][nn, e_ix], torch.zeros_like(dealt))
-            bt = torch.zeros(B, U, K, 6, dtype=torch.long, device=dev)
+            bt = torch.where(has_e.unsqueeze(3), res["back_taken"][nn, e_ix], torch.zeros_like(spot))
             bd = torch.zeros_like(bt)
         else:
             dealt = res["dealt"][nn, e_ix]                                    # [B, U, K]
@@ -3047,13 +3110,16 @@ class SimTactics:
         # the tie-break: the pool slot
         pslot = getattr(self, "barb_unit_slotno" if seat == BARB_SEAT else f"{pre}_unit_pslot").gather(1, us)
         perm = self._tac_merge_sort(uv.sum(dim=1), got, move, frm, dmg, pslot)
-        # a CIVILIAN target's: no strike, the move onto it captures
+        # a CIVILIAN or TRADER target's (+0x33): no strike, the move onto it
+        # captures a civilian, a Trader's plot a plain step
         kd = kinds.gather(1, tk.gather(1, ck.gather(1, c4c)))
-        civ = got & (kd == 7)
+        civ = got & ((kd == 7) | (kd == 6))
+        # a TRADER target's (+0x34): its Trader plundered after the move
+        trd = got & (kd == 6)
         # a RELIGIOUS target's: the heretics condemned after its strike or move
         rel = got & (kd == 8)
         return {"slot": slot.gather(1, perm), "move": move.gather(1, perm), "attack": att.gather(1, perm),
-                "civ": civ.gather(1, perm), "rel": rel.gather(1, perm),
+                "civ": civ.gather(1, perm), "rel": rel.gather(1, perm), "trd": trd.gather(1, perm),
                 "valid": got.gather(1, perm)}
 
     def _tac_merge_sort(self, n: torch.Tensor, got, move, frm, dmg, us) -> torch.Tensor:
@@ -3196,7 +3262,9 @@ class SimTactics:
         short of it — the move where no unit at war or of its own
         holds it); a siege unit strikes its attack (a civilian's none); a ranged unit strikes it
         unless its melee is the stronger and its reach takes the plot this
-        turn; then every unit moves onto its attack; after each strike and
+        turn (neither against a CIVILIAN or TRADER target); then every unit
+        moves onto its attack, a TRADER target's Trader then plundered where
+        the command may (`_tac_plunder_cmd`); after each strike and
         attack move, against a RELIGIOUS target, the heretics on its plot
         condemned where it may (`_condemn_ok`, `_condemn_heretic`) — each
         one's turn done."""
@@ -3259,6 +3327,7 @@ class SimTactics:
             return ok
 
         rel_t = out["rel"]
+        trd_t = out["trd"]
 
         def condemn(m: torch.Tensor, r: int) -> None:
             """against a RELIGIOUS target the unit condemns the heretics on
@@ -3309,6 +3378,9 @@ class SimTactics:
                 continue
             go = can_act(r) & (att[:, r] >= 0)
             self._tac_move_to(go, u_b, att[:, r], pre, seat)
+            trd_r = on & trd_t[:, r]
+            if bool(trd_r.count_nonzero()):
+                self._tac_plunder_cmd(trd_r, u_b, pre)
             condemn(on, r)
             fin = on & getattr(self, f"{pre}_unit_alive")[bidx, u_b]
             getattr(self, f"{pre}_unit_mp")[bidx[fin], u_b[fin]] = 0
@@ -3540,10 +3612,11 @@ class SimTactics:
             if bool(walk.count_nonzero()):
                 cand = ring[rows]                                                     # [N, 37]
                 n_c = 1 + 3 * r * r + 3 * r
-                anyown = (self.military_at[rows] >= 0) | (self.civilian_at[rows] >= 0) | (self.support_at[rows] >= 0)
+                anyown = ((self.military_at[rows] >= 0) | (self.civilian_at[rows] >= 0) | (self.support_at[rows] >= 0)
+                          | (self.trader_at[rows] >= 0))
                 seat_of = lambda pl: torch.where(pl >= 0, self.unit_seat.gather(1, pl.clamp(min=0)), torch.full_like(pl, -1))  # noqa: E731
                 mine = ((seat_of(self.military_at[rows]) == seat) | (seat_of(self.civilian_at[rows]) == seat)
-                        | (seat_of(self.support_at[rows]) == seat)) & anyown
+                        | (seat_of(self.support_at[rows]) == seat) | (seat_of(self.trader_at[rows]) == seat)) & anyown
                 # the ring test (0x815d50): off its own plot no unit of its
                 # own there (0x265ac0 refuses each: none on the leader's
                 # plot), then the location test (0x586360 with no flag: the
@@ -3862,7 +3935,7 @@ class SimTactics:
         own = self.tile_seat
         ok_owner = (own == NO_SEAT) | (own == seat)
         occ = torch.zeros(B, T, dtype=torch.bool, device=dev)
-        for pl in (self.military_at, self.civilian_at, self.support_at, self.embarked_at):
+        for pl in (self.military_at, self.civilian_at, self.support_at, self.embarked_at, self.trader_at):
             occ |= pl >= 0
         area = self.tile_area
         naval = self.unit_naval.take(ut)
@@ -4061,7 +4134,7 @@ class SimTactics:
         naval = self.unit_naval.take(ut)
         ent = torch.where(naval.unsqueeze(1), wat, land)
         occ = torch.zeros(B, T, dtype=torch.bool, device=dev)
-        for pl in (self.military_at, self.civilian_at, self.support_at, self.embarked_at):
+        for pl in (self.military_at, self.civilian_at, self.support_at, self.embarked_at, self.trader_at):
             occ |= pl >= 0
         d = self.pair_dist[here].to(torch.long)
 
@@ -4154,10 +4227,10 @@ class SimTactics:
 
     def _tac_own_class(self, plane: torch.Tensor, seat: int) -> torch.Tensor:
         """[B, T] — a unit of `seat` of the occupancy `plane`'s class (the
-        civilians' or the support units'), a Trader none, holds the plot
-        (`stackedAt` for a civilian or a support unit)."""
+        civilians' or the support units'; a Trader stands on the trade layer)
+        holds the plot (`stackedAt` for a civilian or a support unit)."""
         pc = plane.clamp(min=0)
-        return (plane >= 0) & (self.unit_seat.gather(1, pc) == seat) & (self.unit_type.gather(1, pc) != self._trader_idx)
+        return (plane >= 0) & (self.unit_seat.gather(1, pc) == seat)
 
     def _seat_pool_slots(self, k: int, pre: str, seat: int, act: torch.Tensor) -> None:
         """`poolSlots` for pool row `k` (a city-state's, or the Free Cities'

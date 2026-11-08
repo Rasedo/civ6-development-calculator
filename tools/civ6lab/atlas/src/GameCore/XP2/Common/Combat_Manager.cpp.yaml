@@ -134,6 +134,7 @@
     - "C-95: Attack Units — READ, ported"
     - "C-98: the unit efficiencies — READ (0x79a440, its simulated combats 0x205720 off the map), ported: every entry the logged table's"
     - "C-98: the unit efficiencies"
+    - "C-123 / C-95: a Trader stands on the trade layer; a city's shot is a COMBAT_DISTRICT spot's blow back — READ (0x901e0, 0x586360 -> 0x208b80, 0x585eb0 -> 0x585d90, 0x791470 at 0x7917f7..0x7918f7 -> 0x249ee0 / 0x205720, 0x776140 at 0x776780..0x7767fa), both twins"
   context:
     - "...ombat 0) 1.0; one without against one with 0.01 / 100.0; else two combat simulations (0x205720) of the neutral player's units, each attacking the other: the damage each takes in both..."
   review: reviewed
@@ -296,6 +297,9 @@
     - cpu/harness/checks.ts:fresh
     - gpu/core/sim_tactics.py:_tac_boarded
     - cpu/core/tactical.ts:pathNodes
+    - cpu/core/tactical.ts:fought
+    - cpu/core/units.ts:mapLayer
+    - gpu/core/sim_init.py:__init__
   readings:
     - "H-1: an annex re-places the citizens, the garrison's unit, a religious unit killed on a move — READ"
     - "H-1: the garrison requirement — READ"
@@ -311,6 +315,7 @@
     - "C-124: an attack order to a plot out of sight loses its attack flag — READ (0x962310), both twins"
     - "C-99 / C-128: the swap's partner test and its step along its own path; Move Unit's update before the executions — READ (0x972540, 0x56e760, 0x972a50 -> 0x26fe20, 0x7d3a00 -> 0x7f0020), both twins"
     - "C-99 / C-128: the swap's partner test and its step along its own path; Move Unit's update before the executions; a Trader no passenger — READ (0x972540, 0x56e760, 0x972a50 -> 0x26fe20, 0x7d3a00 -> 0x7f0020, 0x586360 -> 0x208b80 / 0x523d60), both twins"
+    - "C-123 / C-95: a Trader stands on the trade layer; a city's shot is a COMBAT_DISTRICT spot's blow back — READ (0x901e0, 0x586360 -> 0x208b80, 0x585eb0 -> 0x585d90, 0x791470 at 0x7917f7..0x7918f7 -> 0x249ee0 / 0x205720, 0x776140 at 0x776780..0x7767fa), both twins"
   context:
     - "- The centre's garrison term 0x24a180 takes ONE unit, the plot's best defender 0x208b80 (flag 0x10): among the plot's units in its own order the comparator 0x523d60 keeps the..."
     - "...s with HitPoints: the centre and the Encampment) 0x24b170 takes the plot's best defender (0x208b80) where it is a combat unit (0x209dd0: Combat, Ranged or Bombard above 0) and, with a Mili..."

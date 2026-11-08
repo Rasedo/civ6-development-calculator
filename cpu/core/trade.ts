@@ -15,7 +15,7 @@ import { hexDistance, tilesWithin } from '../../world/hex';
 import { isImpassable, isWater, isMountain, multiDomainPlot } from '../../world/query';
 import { RESOURCES } from '../../world/resources';
 import { BUILT_WONDERS } from '../data/builtWonders';
-import { disbandUnit, spawnUnit } from './units';
+import { disbandUnit, mapLayer, spawnUnit, unitDomain, unitsHostile } from './units';
 import { revealAround, unitSeesThrough, unitSight } from './fog';
 import { minorRouteCandidate } from './aiTrade';
 import { routeInRange, tradeCourse, tradeReach } from './tradePath';
@@ -370,6 +370,28 @@ function canPlunder(u: Unit): boolean {
 }
 
 /**
+ * Is `seat`'s Trader on `tileIndex` immune to plunder — the domain immunity
+ * the command reads off the Trader for the plot's ground (unit +0x1eb8 by
+ * domain, 0x58fc20: land 2, water 0)? CIV6 (Reform the Coinage, Golden face):
+ * "your Traders cannot be plundered." CIV6 (ABILITY_MANDEKALU /
+ * ABILITY_BIREME_PROTECT_TRADER, MODIFIER_PLAYER_UNITS_GRANT_ABILITY): the
+ * escort grants its OWN seat's Traders within TRADER_GUARD_RADIUS immunity,
+ * on the escort's ground alone (DomainType DOMAIN_LAND for the Mandekalu,
+ * DOMAIN_SEA for the Bireme).
+ */
+function traderImmune(state: GameState, seat: number, tileIndex: number): boolean {
+  if (goldenDedication(state, seat, DED_COINAGE)) return true;
+  const here = state.map.tiles[tileIndex];
+  if (!here) return false;
+  const ground = isWater(here) ? 'water' : 'land';
+  return state.units.some((g) => {
+    if (g.seat !== seat || g.hp <= 0 || UNITS[g.type]?.guardsTraders !== ground) return false;
+    const gt = state.map.tiles[g.tileIndex];
+    return !!gt && hexDistance(state.map, gt.col, gt.row, here.col, here.row) <= TRADER_GUARD_RADIUS;
+  });
+}
+
+/**
  * The seat that would PLUNDER a Trader standing on `tileIndex` — the LOWEST
  * hostile seat id with a unit there that may plunder (`canPlunder`;
  * barbarians always hostile, others by the war matrix), or null. CIV6
@@ -377,20 +399,7 @@ function canPlunder(u: Unit): boolean {
  */
 export function routePlunderer(state: GameState, tileIndex: number, seat: number): number | null {
   if (!state.unitsMode) return null;
-  if (goldenDedication(state, seat, DED_COINAGE)) return null;
-  // CIV6 (ABILITY_MANDEKALU / ABILITY_BIREME_PROTECT_TRADER,
-  // MODIFIER_PLAYER_UNITS_GRANT_ABILITY): the escort grants its OWN seat's
-  // Traders within TRADER_GUARD_RADIUS immunity, on the escort's ground alone
-  // (DomainType DOMAIN_LAND for the Mandekalu, DOMAIN_SEA for the Bireme).
-  const here = state.map.tiles[tileIndex];
-  if (here) {
-    const ground = isWater(here) ? 'water' : 'land';
-    if (state.units.some((g) => {
-      if (g.seat !== seat || g.hp <= 0 || UNITS[g.type]?.guardsTraders !== ground) return false;
-      const gt = state.map.tiles[g.tileIndex];
-      return !!gt && hexDistance(state.map, gt.col, gt.row, here.col, here.row) <= TRADER_GUARD_RADIUS;
-    })) return null;
-  }
+  if (traderImmune(state, seat, tileIndex)) return null;
   let raider: number | null = null;
   for (const u of state.units) {
     if (u.tileIndex !== tileIndex || !canPlunder(u)) continue;
@@ -421,15 +430,64 @@ export function plunderedByHull(state: GameState, tileIndex: number, raider: num
  *  +0x1858): the raider's policies' (Total War, Letter of Marque, every unit)
  *  plus the admirals' permanent percentage when its hull plunders
  *  (`plunderedByHull`) — each an EFFECT_ADJUST_UNIT_PLUNDER_YIELDS on the
- *  unit, so they add. A city-state raider carries no percent. */
-export function routePlunderGold(state: GameState, raider: number, owner: Seat, r: TradeRoute, tileIndex: number): number {
+ *  unit, so they add. A city-state raider carries no percent. A Trader on no
+ *  route (`r` null) is worth V 0 (0x5545e0's NO_ROUTE branch at 0x554d4c):
+ *  the base 50. */
+export function routePlunderGold(state: GameState, raider: number, owner: Seat, r: TradeRoute | null, tileIndex: number): number {
   const rs = seatOf(state, raider);
   if (!rs) return 0;
-  const base = Math.max(PLUNDER_ROUTE_GOLD, Math.floor(routeYieldValue(state, owner, r) * PLUNDER_ROUTE_TURNS));
+  const v = r ? routeYieldValue(state, owner, r) : 0;
+  const base = Math.max(PLUNDER_ROUTE_GOLD, Math.floor(v * PLUNDER_ROUTE_TURNS));
   if (isCityStateSeat(raider)) return base;
   const hull = plunderedByHull(state, tileIndex, raider) ? gpPermOf(rs, 'routePlunderPct') : 0;
   const pct = getModifiers(state, raider).routePlunderPct + hull;
   return base + Math.floor((base * pct) / 100);
+}
+
+/**
+ * THE PLUNDER TRADE ROUTE COMMAND's CanStart (XP2_Unit_Commands_PlunderTradeRoute
+ * 0x89dae0): the unit alive with Movement left (0x56c690), a Combat, Ranged
+ * or Bombard strength above 0, no aircraft (+0x650 domain 1), embarked only
+ * where it fights embarked (+0x18c3, none in the engines' roster); then the
+ * plot's trade layer (0x75c50 layer 1): every Trader of another player there
+ * at war with it (0x469cd0, the barbarians at war with all) and not immune
+ * on the plot's ground (`traderImmune`). The Traders it would plunder, none
+ * where it may not.
+ */
+export function plunderTargets(state: GameState, unit: Unit): Unit[] {
+  const def = UNITS[unit.type];
+  if (!def || !state.units.includes(unit) || unit.movesLeft <= 0 || unit.embarked) return [];
+  if (!((def.combat ?? 0) > 0 || (def.ranged?.strength ?? 0) > 0 || (def.bombard ?? 0) > 0) || unitDomain(unit.type) === 'air') return [];
+  return state.units.filter((t) => t.tileIndex === unit.tileIndex && t.seat !== unit.seat && mapLayer(t.type) === 'trade'
+    && unitsHostile(state, unit, t) && !traderImmune(state, t.seat, t.tileIndex));
+}
+
+/**
+ * THE PLUNDER TRADE ROUTE COMMAND (PLUNDER_TRADE_ROUTE 0x955950, its Start
+ * XP2 0x89dfc0): each Trader `plunderTargets` names is plundered (Trade_Manager
+ * 0x5545e0: the plunderer's player banks `routePlunderGold` — the route's
+ * worth, or the base 50 for a Trader on no route — and the route ends) and
+ * killed by the delayed kill (0x4ef040: `disbandUnit`, its owner's unit list
+ * holding it until its end of turn); then the plunderer's Movement is spent
+ * (0x56d6f0). A Trader the replay holds on a route (`routed`) is the walker
+ * of its owner's route on its plot. The XP2 branch for an owner whose Traders
+ * anyone may plunder (Player_Trade +0x1530 m_iAnyonePlunderFavor, written by
+ * EFFECT_ADJUST_PLAYER_ANYONE_PLUNDER_TO_FAVOR alone, which no modifier row
+ * carries) is never taken.
+ */
+export function plunderTrader(state: GameState, unit: Unit): RuleResult {
+  const traders = plunderTargets(state, unit);
+  if (!traders.length) return { ok: false, reason: 'No Trader to plunder here.' };
+  const rs = seatOf(state, unit.seat);
+  for (const t of traders) {
+    const owner = seatOf(state, t.seat);
+    const r = t.routed ? owner?.tradeRoutes?.find((x) => x.walkTile === t.tileIndex) ?? null : null;
+    if (rs && owner) rs.treasury += routePlunderGold(state, unit.seat, owner, r, t.tileIndex);
+    if (r && owner) owner.tradeRoutes = (owner.tradeRoutes ?? []).filter((x) => x !== r);
+    disbandUnit(state, t.id);
+  }
+  unit.movesLeft = 0;
+  return { ok: true };
 }
 
 /** The FREE Trader this seat owns on the LOWEST tile index — the unit the

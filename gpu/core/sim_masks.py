@@ -2580,13 +2580,9 @@ class SimMasks:
 
     def _purchase_blocked(self, ctr: torch.Tensor, seat, is_civilian, is_support=False) -> torch.Tensor:
         """[B] bool — `purchaseSpotBlocked` for a land unit bought at the
-        centre `ctr` [B]: its stacking slot there taken, a Trader holding none"""
-        blocked = self._blocked_for(ctr.unsqueeze(1), seat, is_civilian=is_civilian, is_support=is_support).squeeze(1)
-        cu = self.civilian_at.gather(1, ctr.clamp(min=0).unsqueeze(1)).squeeze(1)
-        trader = (cu >= 0) & (self.unit_type.gather(1, cu.clamp(min=0).unsqueeze(1)).squeeze(1) == self._trader_idx)
-        civ = is_civilian if isinstance(is_civilian, torch.Tensor) else torch.full_like(trader, bool(is_civilian))
-        sup = is_support if isinstance(is_support, torch.Tensor) else torch.full_like(trader, bool(is_support))
-        return blocked & ~(civ & ~sup & trader)
+        centre `ctr` [B]: its stacking slot there taken, a Trader holding none
+        (it stands on the trade layer, `trader_at`)"""
+        return self._blocked_for(ctr.unsqueeze(1), seat, is_civilian=is_civilian, is_support=is_support).squeeze(1)
 
     def _blocked_for(
         self,
@@ -5196,7 +5192,7 @@ class SimMasks:
         so a target is only offered where the blast reaches somebody else."""
         out = ((self.tile_seat >= 0) & (self.tile_seat != row)
                & ~self._allied_with(row, self.tile_seat))
-        for plane in ("military_at", "civilian_at", "support_at", "embarked_at"):
+        for plane in ("military_at", "civilian_at", "support_at", "embarked_at", "trader_at"):
             sl = getattr(self, plane)
             s = torch.where(sl >= 0, self.unit_seat.gather(1, sl.clamp(min=0)),
                             torch.full_like(sl, -1))

@@ -105,10 +105,39 @@ class SimPhase:
             tt, seat, _mil[bidx, tt], _mseat[bidx, tt], hm[bidx, tt])
         d_slot = torch.where(_okm, _ms_t, torch.full_like(tt, -1))
         d_seat = torch.where(_okm, _mq_t, torch.full_like(tt, -1))
-        ds0 = d_slot.clamp(min=0)
         # A MILITARY target whose seat class earns xp — never a barbarian and
         # never the Free Cities' own.
         is_vet_mil = _okm & (d_seat != BARB_SEAT) & (d_seat != FREE_SEAT)
+        def_e = self._city_shot_def(d_slot, d_seat, tt, torch.full_like(tt, seat))
+        atk_cs = self._city_shot_atk(row, col, d_seat)
+        def_hp = self.unit_hp[bidx, d_slot.clamp(min=0)]
+        self._city_strike_resolve(strike, tt, d_slot, d_seat, _okm, is_vet_mil,
+                                  atk_cs, def_e, def_hp, row, key)
+
+    def _city_shot_atk(self, row: int, col: torch.Tensor, d_seat: torch.Tensor) -> torch.Tensor:
+        """[B] f64 — the strength seat row `row`'s city at slot `col` [B]
+        strikes a unit of `d_seat` [B] with: the holder's best ranged made,
+        whoever holds it (`cityStrikeStrength`), a major's Bastions half on
+        top, and a SURVIVED Military Emergency's +2 CS on every City Strike
+        against a member, forever (`emergencyStrikeCS`)"""
+        atk_cs = self._strike_strength(row, col)
+        if row < self.n_majors:
+            atk_cs = atk_cs + self._gov_mods(row)[12]["crng"].to(atk_cs.dtype)
+        _emg_s = torch.zeros(self.B, dtype=torch.float64, device=self.device)
+        for _d in range(self.n_majors):
+            _emg_s = _emg_s + (d_seat == _d).double() * self._emergency_strike_cs(row, _d)
+        return atk_cs + _emg_s.to(atk_cs.dtype)
+
+    def _city_shot_def(self, d_slot: torch.Tensor, d_seat: torch.Tensor, tt: torch.Tensor,
+                       striker: torch.Tensor) -> torch.Tensor:
+        """[B] — `cityStrikeDefenderCS`: the strength of the merged-pool unit
+        `d_slot` [B] (of seat `d_seat`) under a city's shot on the plot `tt`
+        [B], the city of seat `striker` [B]"""
+        bidx = self._bidx
+        ds0 = d_slot.clamp(min=0)
+        # A MILITARY target whose seat class earns xp — never a barbarian and
+        # never the Free Cities' own.
+        is_vet_mil = (d_slot >= 0) & (d_seat != BARB_SEAT) & (d_seat != FREE_SEAT)
         d_type = self.unit_type[bidx, ds0]
         _t = torch.ones_like(tt, dtype=torch.bool)
         def_promo = self._promo_cs(
@@ -128,17 +157,6 @@ class SimPhase:
         # embarked target takes the era's flat override instead
         _ch = self._chassis_ability_cs(d_seat, d_type, tt, def_ranged=True, alpine=self.unit_alpine[bidx, ds0], fionn=self.unit_fionn[bidx, ds0])
         def_cs = def_cs + torch.where(d_emb, torch.zeros_like(_ch), _ch).to(def_cs.dtype)
-        # the holder's best ranged made, whoever holds it (`cityStrikeStrength`);
-        # a major's Bastions half rides on top
-        atk_cs = self._strike_strength(row, col)
-        if row < self.n_majors:
-            atk_cs = atk_cs + self._gov_mods(row)[12]["crng"].to(atk_cs.dtype)
-        # a SURVIVED Military Emergency pays its target +2 CS on every City
-        # Strike against a member, forever
-        _emg_s = torch.zeros(Bn, dtype=torch.float64, device=dev2)
-        for _d in range(self.n_majors):
-            _emg_s = _emg_s + (d_seat == _d).double() * self._emergency_strike_cs(row, _d)
-        atk_cs = atk_cs + _emg_s.to(atk_cs.dtype)
         def_hp = self.unit_hp[bidx, ds0]
         # a CITY STRIKE is a ranged attack, and "ranged attacks ignore any
         # Support received by the defender"
@@ -153,14 +171,12 @@ class SimPhase:
                          + self._gov_unit_cs(d_type, _def_seat)).to(def_e.dtype)
         # the roster's rows read the striking city's seat as the unit's
         # OPPONENT — a district, never wounded (`cityStrikeDefenderCS`)
-        def_e = def_e + self._roster_cs(_def_seat, d_type, tt, torch.full_like(tt, seat), None, True,
+        def_e = def_e + self._roster_cs(_def_seat, d_type, tt, striker, None, True,
                                         self.unit_formation[bidx, ds0],
                                         self.unit_levied[bidx, ds0]).to(def_e.dtype)
         # the diplomatic-visibility bonus against the striking seat (the
         # district attack's defender strength, `visibilityCS`)
-        def_e = def_e + self._vis_cs(d_seat, torch.full_like(tt, seat)).to(def_e.dtype)
-        self._city_strike_resolve(strike, tt, d_slot, d_seat, _okm, is_vet_mil,
-                                  atk_cs, def_e, def_hp, row, key)
+        return def_e + self._vis_cs(d_seat, striker).to(def_e.dtype)
 
     def _seat_turn(self, row: int) -> torch.Tensor:
         B, dev = self.B, self.device
@@ -3267,7 +3283,7 @@ class SimPhase:
                 live = moved < getattr(self, counter).unsqueeze(1)
                 tl = torch.where(mine_t, torch.where(live, moved + lo, torch.full_like(tl, -1)), tl)
                 tu.copy_(tl.reshape(tu.shape))
-        for m in ("military_at", "civilian_at", "support_at", "embarked_at"):
+        for m in ("military_at", "civilian_at", "support_at", "embarked_at", "trader_at"):
             at = getattr(self, m)
             mine = (at >= lo) & (at < hi)
             # gather evaluates EVERY lane, including the ones torch.where

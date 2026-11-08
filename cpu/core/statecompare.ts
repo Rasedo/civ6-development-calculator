@@ -97,7 +97,7 @@ import { AI_DISTRICTS, AI_IMPROVEMENTS } from '../data/aiBuildTables';
 import { AI_BUILDING_INDEX, AI_UNIT_INDEX } from './aiCityBuild';
 import { engineId } from '../data/aliases';
 import { PANTHEONS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, WORSHIP_BELIEFS, ENHANCER_BELIEFS, RELIGION_TYPES, unconvertedOf } from '../data/religion';
-import { grantedMoves, unitStackSlot } from './units';
+import { grantedMoves, mapLayer, unitStackSlot } from './units';
 import { GOODY_KINDS } from '../data/goodyHuts';
 import { BARB_TAG_UNITS, BARB_TRIBES, type BarbTag } from '../data/barbarians';
 
@@ -1369,9 +1369,11 @@ export function groupRows(state: GameState, group: string): readonly unknown[] {
 
 /** the stacking classes a unit key distinguishes, in the order it encodes
  *  them. An AIR or SPY unit holds no plot at all, so it keys where it always
- *  did — slot 0 — and its uniqueness rests on the same guard it always did. */
+ *  did — slot 0 — and its uniqueness rests on the same guard it always did.
+ *  A Trader stands on the trade layer, beside any civilian: slot 4. */
 const UNIT_KEY_SLOT: readonly string[] = ['military', 'civilian', 'support', 'embarked'];
 function unitKeySlot(u: Unit): number {
+  if (mapLayer(u.type) === 'trade') return 4;
   return Math.max(0, UNIT_KEY_SLOT.indexOf(unitStackSlot(u)));
 }
 
@@ -1386,11 +1388,12 @@ function groupKeys(group: string, rows: readonly unknown[]): number[] {
     case 'city':
       return (rows as CityRow[]).map((r) => r.city.centerIndex);
     case 'unit':
-      // FOUR slots per tile: a hull and its passenger share a hex, and so do
-      // a military unit, a civilian and a SUPPORT chassis. The key has to
-      // carry as many classes as the stacking rule allows, or two units merge
-      // into one row and the digest compares a unit against a stranger.
-      return (rows as Unit[]).map((u) => u.tileIndex * 4 + unitKeySlot(u));
+      // FIVE slots per tile: a hull and its passenger share a hex, and so do
+      // a military unit, a civilian, a SUPPORT chassis and a Trader. The key
+      // has to carry as many classes as the stacking rule allows, or two
+      // units merge into one row and the digest compares a unit against a
+      // stranger.
+      return (rows as Unit[]).map((u) => u.tileIndex * 5 + unitKeySlot(u));
     case 'tile':
       return (rows as Tile[]).map((t) => t.index);
     default:

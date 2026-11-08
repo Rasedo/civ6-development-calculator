@@ -132,6 +132,9 @@
     - recording: h1_duelw1124
       turn: 1-249
       value: "the action replay: 206 of 330 Attack Units rows take the logged move and attack; 5 seeds 70 of 126 end plots"
+    - recording: h1_duely1128
+      turn: 242
+      value: "Operation City Attack leaves the hurt Cavalry 7012372 on 42:21 (33 hit points) out: the city's blow 22 and its shot on the spot top its health; the Cavalry 7143430 on 41:19 takes 42:21 at turn 2, as logged"
   impl:
     - cpu/core/tactical.ts:predictBlow
     - gpu/core/sim_tactics.py:_tac_predict
@@ -148,6 +151,10 @@
     - gpu/core/sim_tactics.py:_tac_plan
     - cpu/core/tactical.ts:wins
     - cpu/core/combat.ts:predictCityExchange
+    - cpu/core/combat.ts:predictCityShot
+    - gpu/core/sim_tactics.py:_plan_city_shots
+    - gpu/core/sim_phase.py:_city_shot_def
+    - gpu/core/sim_phase.py:_city_shot_atk
   readings:
     - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
     - "C-95: the planning's spots and the combat prediction — READ, ported"
@@ -157,6 +164,7 @@
     - "C-95: the planning strikes a religious unit and a Trader on their plot, its foreign test reads the mover's map layer, the blow on them 1.5 x their health — READ (0x790c60 at 0x790f22, 0x790fc9..0x791016, 0x7910b3..0x791162; 0x791470 at 0x791703..0x79174a, 0x7917b1..0x7917f7; 0x793400), both twins"
     - "C-95: the embark rules for a formation that may embark, a district's zone unseen, a city's kill in the planning, a raised unit's AI type, a move order's attack spot — READ (0x530420, 0x530240, 0x52fe90 at 0x52fed4, 0x530f50 at 0x531168, 0x791470 at 0x791677, 0x79b9c0), FIT (the move order's attack spot), both twins"
     - "C-95 / C-123 / C-125: the stand-to-attack site, a district closed to a ranged unit, City Attack's members and log, the siege gain's lift, a city's blow back, the units of no zone of control — READ (0x2720a0 at 0x272255..0x272330, 0x271be0 at 0x271e69 / 0x271f2e, 0x586360 at 0x5866c9..0x58671f, 0x8109e0, 0x80ceb0 at 0x80d6f9, 0x771f80, 0x80f6b0 at 0x80f75f / 0x80f824 / 0x80f95a, 0x791470, 0x56d6c0), both twins"
+    - "C-123 / C-95: a Trader stands on the trade layer; a city's shot is a COMBAT_DISTRICT spot's blow back — READ (0x901e0, 0x586360 -> 0x208b80, 0x585eb0 -> 0x585d90, 0x791470 at 0x7917f7..0x7918f7 -> 0x249ee0 / 0x205720, 0x776140 at 0x776780..0x7767fa), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...each unit's spots per target from its planning (turns, the planning's combat simulation 0x791470: the damage dealt +0x64, received +0x7c, and against a counterattack +0x94 / +0xac); fo..."

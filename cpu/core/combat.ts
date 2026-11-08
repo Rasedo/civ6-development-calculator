@@ -7,7 +7,7 @@ import { isWater, isImpassable,  isCoastalLand } from '../../world/query';
 import { civEraIndex, seatBuildingSum } from './city';
 import { logUnitOrder } from './seatTurn';
 import { MODERN_ERA_INDEX } from '../data/techs';
-import { emergencyAttackCS, raiseEmergency, EMERGENCY_CITY_STATE } from './emergency';
+import { emergencyAttackCS, emergencyStrikeCS, raiseEmergency, EMERGENCY_CITY_STATE } from './emergency';
 import { NUCLEAR_DEVICES, NUKE_ROBOT_DAMAGE, NUKE_SILO_DEFENSE, NUKE_SUB_DEFENSE, NUKE_INTERCEPT_DAMAGE } from '../data/nuclear';
 import { AGE_GOLDEN, EMERGENCY_NUCLEAR } from '../data/seats';
 import { addWmd, nukeBlast, nukeCarrier, nukeInterceptStrength, nukeOffers, nukeVictims, wmdHeld } from './nuclear';
@@ -27,7 +27,7 @@ import { cityStateAt, isSuzerain, suzerainEffect } from './cityStates';
 import { MAX_CITIES_PER_SEAT, DED_SKY, SKY_AIR_XP_PCT } from '../data/seats';
 import { grievanceCityStateTaken } from './grievance';
 import { goldenDedication, worldEraIndex } from './eras';
-import { drawAndPayGoody, raiseBestTrained, recordAttacker, unitReligious, unitStackSlot } from './units';
+import { drawAndPayGoody, raiseBestTrained, recordAttacker, mapLayer, unitReligious, unitStackSlot } from './units';
 import { randRange } from './rand';
 import { formationCS, escortRiders, unitsAt, unitDomain, tileFreeForUnit, disbandUnit, unitsHostile, fortifyBonus, reseatUnit, cityAtIndex, encampmentBlocks, encampmentIntact, crossesRiver, cliffBlocks, stepUnit, stepRefusal, unitVisibleTo, unitExertsZoc, formationTierFor } from './units';
 import { isAirUnit, airRange, airCoverAgainst, airPillageFit, airPillageOffers, airStrikeReaches, airStrikeOffers, airDefenseOf, antiAirAt, displaceAirFrom, interceptorAgainst, priorityDefender, PRIORITY_TARGET_DAMAGE } from './air';
@@ -1586,9 +1586,7 @@ export function predictCityBlow(state: GameState, attacker: Unit, targetIndex: n
  *  branch, simulated as a unit is): the blow `attacker` deals it
  *  (`predictCityBlow`) and the damage a melee attacker takes from it, the
  *  law at its expectation on the city's defence against the assault's
- *  strength (`damageExpected`; a ranged attacker none: runs/h1_duely1128
- *  t242 the hurt barbarian Cavalry 7012372 on 42:21, 33 hit points, out of
- *  City Attack's assignment by the survival filter, as logged); 0 and 0
+ *  strength (`damageExpected`; a ranged attacker none); 0 and 0
  *  where no city of a player hostile to it stands there */
 export function predictCityExchange(state: GameState, attacker: Unit, targetIndex: number): { dealt: number; taken: number } {
   const held = cityAtIndex(state, targetIndex);
@@ -1607,6 +1605,22 @@ export function predictCityExchange(state: GameState, attacker: Unit, targetInde
   const raw = damageRaw(COMBAT_MAX_EXTRA_DAMAGE >> 1, damageExponent(atkCS - defCS));
   return { dealt: Math.min(CITY_MAX_HP, Math.max(COMBAT_MINIMUM_DAMAGE, raw - Math.floor((raw * share) / 256))),
     taken: ranged ? 0 : damageExpected(defCS - atkCS) };
+}
+
+/** the AI's predicted shot of the city centre on `targetIndex` at `attacker`
+ *  standing on `spot` (0x791470's district branch at 0x7917f7..0x7918f7: the
+ *  combat simulated with the sides swapped, its location the spot): the law
+ *  at its expectation on the city's strike strength (`cityStrikeStrength`,
+ *  its emergency term) against the unit's strength under a city's shot
+ *  there (`cityStrikeDefenderCS`); 0 where no city of a player hostile to it
+ *  stands there */
+export function predictCityShot(state: GameState, attacker: Unit, targetIndex: number, spot: number): number {
+  const held = cityAtIndex(state, targetIndex);
+  const cs = held ? undefined : cityStateAt(state, targetIndex);
+  const city = held ? held.city : cs && cs.centerIndex === targetIndex ? minorCity(cs) : null;
+  if (!city || !unitsHostile(state, attacker, { seat: city.seat })) return 0;
+  const atk = cityStrikeStrength(state, city) + emergencyStrikeCS(state, city.seat, attacker.seat);
+  return damageExpected(atk - cityStrikeDefenderCS(state, attacker, state.map.tiles[spot], city.seat));
 }
 
 /**
@@ -1923,13 +1937,13 @@ export function seizeCivilian(state: GameState, victim: Unit, by: { seat: number
 }
 
 /** the hostile civilians a move onto `targetIndex` takes, the plot's last
- *  first (the move 0x26fe20 walks the plot's units from the back) — never a
- *  religious unit or an aircraft; null where a hostile fighter still holds
+ *  first (the move 0x26fe20 walks the plot's units from the back) — none of
+ *  another map layer (a religious unit, a Trader) and no aircraft; null where a hostile fighter still holds
  *  the plot, or where the mover could not stand on it once they are gone
  *  (`tileFreeForUnit`, no embarking) */
 function seizable(state: GameState, mover: Unit, targetIndex: number): Unit[] | null {
   const foes = unitsAt(state, targetIndex).filter(
-    (u) => u.id !== mover.id && unitsHostile(state, mover, u) && !isAirUnit(u.type) && !unitReligious(u.type)
+    (u) => u.id !== mover.id && unitsHostile(state, mover, u) && !isAirUnit(u.type) && mapLayer(u.type) === 'units'
       && unitVisibleTo(state, u, mover.seat),
   );
   if (foes.some((u) => unitDomain(u.type) === 'military')) return null;
@@ -2018,9 +2032,10 @@ function meleeAttackInner(state: GameState, attackerId: number, targetIndex: num
   // A RELIGIOUS unit is no melee defender and is never taken: a melee order
   // onto one is a MOVE — the attacker shares its tile and nothing happens to
   // it (runs/religious_target_20260926T_fire.jsonl; a barbarian's
-  // too). Onto a Builder it still captures.
+  // too). Onto a Builder it still captures. A Trader on the trade layer is
+  // none either.
   const enemies = unitsAt(state, targetIndex).filter(
-    (u) => unitsHostile(state, attacker, u) && !isAirUnit(u.type) && !unitReligious(u.type)
+    (u) => unitsHostile(state, attacker, u) && !isAirUnit(u.type) && mapLayer(u.type) === 'units'
       && unitVisibleTo(state, u, attacker.seat),
   );
   const seatTarget = (() => {

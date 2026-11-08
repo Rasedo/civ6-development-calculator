@@ -72,6 +72,8 @@
     - "C-95: the homeland's Plunder Trader — READ, ported"
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
+    - "C-123 / C-95: a Trader stands on the trade layer; a city's shot is a COMBAT_DISTRICT spot's blow back — READ (0x901e0, 0x586360 -> 0x208b80, 0x585eb0 -> 0x585d90, 0x791470 at 0x7917f7..0x7918f7 -> 0x249ee0 / 0x205720, 0x776140 at 0x776780..0x7767fa), both twins"
+    - "C-123 / C-95: the Plunder Trade Route command and the AI's plunder after the move — READ (0x89dae0, 0x89dfc0, 0x9555a0, 0x9559a0, 0x5545e0 at 0x554667 / 0x554d4c, 0x58fc20, 0x7746a0, 0x70a440, 0x771f80 at 0x7722b6 / 0x77254e / 0x77277f, 0x776140 at 0x776424..0x776470), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ...he chosen list; the round's move orders (0x962030) are carried out together as it ends (0x70a440); another round only where one moved.
@@ -292,7 +294,10 @@
       turn: 137-151
       value: the barbarians' captured Builder stands each turn on the plot of player 4's Trader
   impl: [cpu/core/tactical.ts:homelandPlunder, gpu/core/sim_tactics.py:_tac_homeland_plunder]
-  readings: ["C-95: the homeland's Plunder Trader — READ, ported", "C-95: the homeland's Plunder Trader"]
+  readings:
+    - "C-95: the homeland's Plunder Trader — READ, ported"
+    - "C-95: the homeland's Plunder Trader"
+    - "C-123 / C-95: a Trader stands on the trade layer; a city's shot is a COMBAT_DISTRICT spot's blow back — READ (0x901e0, 0x586360 -> 0x208b80, 0x585eb0 -> 0x585d90, 0x791470 at 0x7917f7..0x7918f7 -> 0x249ee0 / 0x205720, 0x776140 at 0x776780..0x7767fa), both twins"
   context:
     - "- 0x70f610, first of \"Default Barbarian HL\": each TRADER entry of the player's target list (+0x12b..."
   review: reviewed

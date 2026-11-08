@@ -25,7 +25,7 @@ import {
 } from './unitActions';
 import {
   artifactHome, borderClosedTo, canCleanFallout, canUpgradeUnit, cliffBlocksStep, concertVenue, digUnderfoot,
-  encampmentBlocks, gdrJump, navalMelee, ownerHasTech, parkCluster, parkClusterLegal, unitDomain,
+  encampmentBlocks, gdrJump, mapLayer, navalMelee, ownerHasTech, parkCluster, parkClusterLegal, unitDomain,
   unitsHostile, unitVisibleTo, waterEnterable, waterWalks,
 } from './units';
 import {
@@ -107,13 +107,14 @@ const SETTLER_ID = Object.values(UNITS).find((u) => u.settler)?.id;
 const NATURALIST_ID = Object.values(UNITS).find((u) => u.naturalist)?.id;
 
 /** The stacking class a unit holds on its tile, as the GPU's four occupancy
- *  planes file it: an aircraft and a spy hold none. */
+ *  planes file it: an aircraft and a spy hold none, nor does a Trader on the
+ *  trade layer (`mapLayer`), which keeps no unit out and is struck by none. */
 type Plane = 'military' | 'civilian' | 'support' | 'embarked';
 const PLANES: readonly Plane[] = ['military', 'civilian', 'support', 'embarked'];
 
 function planeOf(u: Unit): Plane | null {
   const d = unitDomain(u.type);
-  if (d === 'air' || d === 'spy') return null;
+  if (d === 'air' || d === 'spy' || mapLayer(u.type) === 'trade') return null;
   if (u.embarked) return 'embarked';
   return d;
 }

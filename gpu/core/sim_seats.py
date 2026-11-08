@@ -3625,7 +3625,7 @@ class SimSeats:
         # them; reading only the head left the second rider one tile from
         # where the oracle put it, with every ordered step agreeing.
         # The planes are TS's own order: the civilian slot, then support,
-        # then a passenger at sea.
+        # then a passenger at sea, then a Trader on the trade layer.
         # CIV6 (Keshig): "Can escort moving civilian and support units at their
         # higher Movement speed" — Escort Mobility's clause, on the chassis,
         # so it is one fact about the MOVER and every rider rides on it.
@@ -3635,7 +3635,7 @@ class SimSeats:
         picks: list[torch.Tensor] = []
         okm = all_ok
         anylive = torch.zeros(self.B, dtype=torch.bool, device=self.device)
-        for _plane in (self.civilian_at, self.support_at, self.embarked_at):
+        for _plane in (self.civilian_at, self.support_at, self.embarked_at, self.trader_at):
             cand = _pick(_plane)
             # a slot an earlier plane already claimed is not a second rider
             for _prev in picks:
@@ -4854,7 +4854,7 @@ class SimSeats:
         out = (self._type_dom_mil.take(ty)
                & ~self.unit_emb.gather(1, s).squeeze(1) & (tile >= 0))
         hit = torch.zeros_like(out)
-        for plane in (self.civilian_at, self.support_at, self.embarked_at):
+        for plane in (self.civilian_at, self.support_at, self.embarked_at, self.trader_at):
             r = plane.gather(1, tile.clamp(min=0).unsqueeze(1)).squeeze(1)
             k = r.clamp(min=0).unsqueeze(1)
             hit = hit | ((r >= 0) & (r != slot)
@@ -5023,6 +5023,88 @@ class SimSeats:
         self.unit_alive[cr, rel[cr]] = False
         self._occ_clear(cr, dt, rel[cr])
         self.unit_mp[cr, sc[cr]] = 0
+        self._gen_ver += 1
+
+    def _trader_immune(self, owner: torch.Tensor, tile: torch.Tensor) -> torch.Tensor:
+        """`traderImmune` [B]: is `owner`'s Trader on `tile` immune to plunder?
+        CIV6 (Reform the Coinage, Golden face): "your Traders cannot be
+        plundered" — a major's alone. CIV6 (ABILITY_MANDEKALU /
+        ABILITY_BIREME_PROTECT_TRADER): an escort of the owner's within
+        `_trader_guard_radius` of the plot, on the plot's ground (1 land, 2
+        water)."""
+        maj = (owner >= 0) & (owner < self.n_majors)
+        out = maj & self._golden_ded(owner.clamp(min=0, max=self.n_majors - 1), self._ded_coinage)
+        if bool((self._type_guards_traders > 0).count_nonzero()):
+            mt = self.major_unit_tile.clamp(min=0)
+            near = self.pair_dist[tile.unsqueeze(1), mt] <= self._trader_guard_radius
+            want = torch.where(self.water.gather(1, tile.unsqueeze(1)), 2, 1)
+            guard = (self.major_unit_alive & near & (self.major_unit_hp > 0)
+                     & (self.major_unit_seat == owner.unsqueeze(1))
+                     & (self._type_guards_traders.take(self.major_unit_type.clamp(min=0, max=self.NU - 1)) == want)
+                     ).any(dim=1)
+            out = out | guard
+        return out
+
+    def _plunder_ok(self, m: torch.Tensor, sc: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+        """`plunderTargets`, PLUNDER_TRADE_ROUTE's CanStart (0x89dae0), for the
+        unit at merged slot `sc` [B] in the games `m`: alive with Movement
+        left, a combat, ranged or bombard strength, no aircraft, not embarked,
+        and on its plot's trade layer (`trader_at`) a Trader of another
+        player at war with it (`_seats_hostile`, the barbarians at war with
+        all), not immune (`_trader_immune`). Returns the games that may, the
+        plot and the Trader's merged slot."""
+        s1 = sc.clamp(min=0).unsqueeze(1)
+        seat = self.unit_seat.gather(1, s1).squeeze(1)
+        tile = self.unit_tile.gather(1, s1).squeeze(1)
+        tc = tile.clamp(min=0)
+        ut = self.unit_type.gather(1, s1).squeeze(1).clamp(min=0, max=self.NU - 1)
+        fights = ((self._type_combat.take(ut) > 0) | (self._type_ranged_strength.take(ut) > 0)
+                  | (self._type_bombard.take(ut) > 0)) & (self._type_air.take(ut) == 0)
+        tr = self.trader_at.gather(1, tc.unsqueeze(1)).squeeze(1)
+        ts = torch.where(tr >= 0, self.unit_seat.gather(1, tr.clamp(min=0).unsqueeze(1)).squeeze(1),
+                         torch.full_like(tr, -1))
+        ok = (m & (sc >= 0) & (tile >= 0) & self.unit_alive.gather(1, s1).squeeze(1)
+              & (self.unit_mp.gather(1, s1).squeeze(1) > 0) & fights
+              & ~self.unit_emb.gather(1, s1).squeeze(1).bool() & (tr >= 0) & (ts >= 0) & (ts != seat)
+              & self._seats_hostile(seat, ts.unsqueeze(1)).squeeze(1))
+        if bool(ok.count_nonzero()):
+            ok = ok & ~self._trader_immune(ts, tc)
+        return ok, tc, tr
+
+    def _plunder_trader(self, ok: torch.Tensor, tile: torch.Tensor, tr: torch.Tensor, sc: torch.Tensor) -> None:
+        """`plunderTrader` — PLUNDER_TRADE_ROUTE's Start (0x89dfc0) in the
+        games `ok` (`_plunder_ok`'s): the Trader `tr` on `tile` is plundered
+        and killed (the delayed kill: its owner's list keeps it to its end of
+        turn), the plunderer `sc` banking `routePlunderGold` for a Trader on
+        no route — the base 50 (0x5545e0, V 0) and, for a major, its plunder
+        percent (`rplun`, the admirals' too where its hull stands there); a
+        city-state the base — and its Movement spent."""
+        r = ok.nonzero(as_tuple=True)[0]
+        if r.numel() == 0:
+            return
+        g = sc[r]
+        seat = self.unit_seat[r, g]
+        t = tile[r]
+        mj = (seat >= 0) & (seat < self.n_majors)
+        if bool(mj.count_nonzero()):
+            rm, sm, tm = r[mj], seat[mj], t[mj]
+            ms = self.military_at[rm, tm]
+            hull = (ms >= 0) & (self.unit_seat[rm, ms.clamp(min=0)] == sm) & self.unit_naval[
+                self.unit_type[rm, ms.clamp(min=0)].clamp(min=0)]
+            base = torch.full((rm.numel(),), float(self._trade_plunder_gold), dtype=self.civ_treasury.dtype, device=self.device)
+            pp = self._gp_perm_at(sm, "routePlunderPct", rm).to(base.dtype)
+            pct = self._fx_at_seat("rplun", sm, rm).to(base.dtype) + torch.where(hull, pp, torch.zeros_like(pp))
+            self.civ_treasury.index_put_((rm, sm), base + torch.floor(base * pct / 100), accumulate=True)
+        cs = (seat >= 100) & (seat < 100 + self.citystate_treasury.shape[1])
+        if bool(cs.count_nonzero()):
+            rc = r[cs]
+            self.citystate_treasury.index_put_(
+                (rc, seat[cs] - 100),
+                torch.full((rc.numel(),), float(self._trade_plunder_gold), dtype=self.citystate_treasury.dtype, device=self.device),
+                accumulate=True)
+        self.unit_alive[r, tr[r]] = False
+        self._occ_clear(r, t, tr[r])
+        self.unit_mp[r, g] = 0
         self._gen_ver += 1
 
     def _theo_def_strength(self, seat: torch.Tensor, tile: torch.Tensor) -> torch.Tensor:
@@ -5243,18 +5325,33 @@ class SimSeats:
                     self._occ_set(_mv, _dst, _g)
         self._eff_version += 1
 
+    def _occ_planes(self) -> tuple[torch.Tensor, ...]:
+        """the five occupancy planes in class order (military, civilian,
+        support, embarked, trader)"""
+        return (self.military_at, self.civilian_at, self.support_at, self.embarked_at, self.trader_at)
+
+    def _occ_split(self, ty: torch.Tensor, emb: torch.Tensor) -> tuple[torch.Tensor, ...]:
+        """the plane each unit of clamped types `ty`, embarked `emb`, files
+        under, as five masks in `_occ_planes`' order: a Trader on the trade
+        layer whatever its domain; a passenger on the embarked plane; SUPPORT,
+        the slot inside the NONCOMBAT set (`_type_civilian`) that stacks on its
+        own, apart from the civilians, or the two classes would share one plane
+        and one of them would vanish"""
+        trd = ty == self._trader_idx
+        sup = self._type_support.take(ty) & ~trd
+        civ = self._type_civilian.take(ty) & ~sup & ~trd
+        dry = ~emb & ~trd
+        return (dry & ~civ & ~sup, dry & civ, dry & sup, emb & ~trd, trd)
+
     def _occ_class(self, rows: torch.Tensor) -> tuple[torch.Tensor, ...]:
-        """[N, U] bool per occupancy plane (military, civilian, support,
-        embarked) — the units of the games `rows` that plane holds, alive and
-        on a plot (`_occ_set`'s split; an aircraft and a Spy hold none)"""
+        """[N, U] bool per occupancy plane (`_occ_planes`' order) — the units
+        of the games `rows` that plane holds, alive and on a plot
+        (`_occ_split`; an aircraft and a Spy hold none)"""
         ty = self.unit_type[rows].clamp(min=0, max=self.NU - 1)
-        emb = self.unit_emb[rows]
-        sup = self._type_support.take(ty)
-        civ = self._type_civilian.take(ty) & ~sup
         here = self.unit_alive[rows] & (self.unit_tile[rows] >= 0) & ~(self._type_air.take(ty) > 0)
         if self._spy_idx >= 0:
             here = here & (ty != self._spy_idx)
-        return (here & ~civ & ~sup & ~emb, here & civ & ~emb, here & sup & ~emb, here & emb)
+        return tuple(here & m for m in self._occ_split(ty, self.unit_emb[rows]))
 
     def _occ_clear(self, rows: torch.Tensor, tiles: torch.Tensor, gslots: torch.Tensor) -> None:
         """Clear whichever occupancy plane holds these SLOTS on these tiles.
@@ -5264,7 +5361,7 @@ class SimSeats:
         `_spawn_unit`'s `stack`) the plane takes it, the lowest slot."""
         if rows.numel() == 0:
             return
-        for p, plane in enumerate((self.military_at, self.civilian_at, self.support_at, self.embarked_at)):
+        for p, plane in enumerate(self._occ_planes()):
             hit = plane[rows, tiles] == gslots
             if bool(hit.count_nonzero()):
                 r, t, g = rows[hit], tiles[hit], gslots[hit]
@@ -5280,33 +5377,20 @@ class SimSeats:
         the plot (the owner's own, a city's stacking spawn) keeps it"""
         if rows.numel() == 0:
             return
-        emb = self.unit_emb[rows, gslots]
         _ty = self.unit_type[rows, gslots].clamp(min=0, max=self.NU - 1)
-        sup = self._type_support.take(_ty)
-        civ = self._type_civilian.take(_ty) & ~sup
-        held = torch.zeros_like(emb)
-        for plane, on in ((self.embarked_at, emb), (self.support_at, sup & ~emb),
-                          (self.civilian_at, civ & ~emb), (self.military_at, ~civ & ~sup & ~emb)):
+        held = torch.zeros_like(rows, dtype=torch.bool)
+        for plane, on in zip(self._occ_planes(), self._occ_split(_ty, self.unit_emb[rows, gslots])):
             held = held | (on & (plane[rows, tiles] >= 0))
         self._occ_set(rows[~held], tiles[~held], gslots[~held])
 
     def _occ_set(self, rows: torch.Tensor, tiles: torch.Tensor, gslots: torch.Tensor) -> None:
         """Put these SLOTS on these tiles, in the plane their stacking class
-        names. Reads `unit_emb`, so a caller flipping a unit's embarked state
-        writes that first."""
+        names (`_occ_split`). Reads `unit_emb`, so a caller flipping a unit's
+        embarked state writes that first."""
         if rows.numel() == 0:
             return
-        emb = self.unit_emb[rows, gslots]
         _ty = self.unit_type[rows, gslots].clamp(min=0, max=self.NU - 1)
-        # `_type_civilian` is the NONCOMBAT set; SUPPORT is the slot inside it
-        # that stacks on its own, so the civilian arm has to exclude it or the
-        # two classes would share one plane and one of them would vanish.
-        sup = self._type_support.take(_ty)
-        civ = self._type_civilian.take(_ty) & ~sup
-        for plane, hit in ((self.embarked_at, emb),
-                           (self.support_at, sup & ~emb),
-                           (self.civilian_at, civ & ~emb),
-                           (self.military_at, ~civ & ~sup & ~emb)):
+        for plane, hit in zip(self._occ_planes(), self._occ_split(_ty, self.unit_emb[rows, gslots])):
             if bool(hit.count_nonzero()):
                 plane[(rows[hit], tiles[hit])] = gslots[hit]
 

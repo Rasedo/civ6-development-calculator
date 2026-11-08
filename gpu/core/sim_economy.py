@@ -2848,9 +2848,9 @@ class SimEconomy:
                 # branch with the fighters
                 civilian = self._type_noncombat[utype] & ~self._type_support[utype]
                 hull = self.unit_naval[utype]
-                # the kill walks the plot's unit layer 0: a Trader stands in a
-                # layer of its own and survives
-                kill = on & civilian & civ_hit & ~spared & (utype != self._trader_idx)
+                # the kill walks the plot's unit layer 0: a Trader stands on
+                # the trade layer (`trader_at`, no plane walked here) and survives
+                kill = on & civilian & civ_hit & ~spared
                 l_hit, l_dmg = drawn(land, slot)
                 n_hit, n_dmg = drawn(naval, slot)
                 base = torch.where(hull, n_dmg, l_dmg)
