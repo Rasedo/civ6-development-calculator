@@ -467,12 +467,18 @@ export function projectCost(state: GameState, seat: number, projectId: string, c
  *  Walls and have not been attacked in the last three turns." One perimeter
  *  serves the centre and its Encampment here, so one pool answers both. */
 export function repairAvailable(state: GameState, city: City): boolean {
+  return repairWanted(state, city) && state.turn - (city.lastHitTurn ?? 0) > REPAIR_QUIET_TURNS;
+}
+
+/** the repair but its three quiet turns: walls standing and damaged, the
+ *  centre's or its Encampment's, out of any fallout — what the AI's
+ *  Default Specialization pick lets through (`minorPickFacts`) */
+export function repairWanted(state: GameState, city: City): boolean {
   const max = wallsMax(state, city);
   if (max <= 0 || (outerPool(state, city) >= max && encampOuterMissing(state, city) <= 0)) return false;
   // CIV6 (a City Center or Encampment caught in a blast): "Healing is
   // impossible and Repair Outer Defenses is unusable while the fallout lasts."
-  if (irradiated(state.map.tiles[city.centerIndex])) return false;
-  return state.turn - (city.lastHitTurn ?? 0) > REPAIR_QUIET_TURNS;
+  return !irradiated(state.map.tiles[city.centerIndex]);
 }
 
 /** May this seat run a project at all? A civilization-UNIQUE row (`civ` /

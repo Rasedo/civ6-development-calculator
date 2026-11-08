@@ -4993,8 +4993,9 @@ function importGameKnowledge(ctx: Ctx, world: GameState, imp: Imported, turn: nu
     // city trees, every tree's contracts and the holders (`importCityAi`);
     // another seat's contracts take the game's progress, value and times
     // (`syncContracts`)
-    const w = { names: ctx.cat, W: ctx.W, unitOf: (gameId: number) => ctx.units.get(`${pid}:${gameId}`)?.id, turnShift: s === world.barbSeat ? 1 : 0 };
     const cityState = world.cityStates.includes(s as CityState);
+    const w = { names: ctx.cat, W: ctx.W, unitOf: (gameId: number) => ctx.units.get(`${pid}:${gameId}`)?.id, turnShift: s === world.barbSeat ? 1 : 0,
+      keepsGone: cityState };
     const nodes = Object.values(read.trees ?? {}).some((t) => t.nodes?.[0]?.[4]);
     // a seat the game holds operations of opens its manager for them (a
     // window's first turn, before the engine's turn has run one)

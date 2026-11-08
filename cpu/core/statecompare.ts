@@ -90,6 +90,7 @@ import { MINOR_OP_DEFS } from './minorOps';
 import { barbHomingRecord, barbOpRecord } from './barbarianOps';
 import { treeFirstGen, treeHeld, treeSlot } from './treePool';
 import { opsOf, type OpsAi } from './operations/manager';
+import { teamTwice } from './operations/operation';
 import { FREE_RAID_DEF } from './freeOps';
 import { AI_OP_TEAMS } from '../data/aiOperations';
 import { AI_DISTRICTS, AI_IMPROVEMENTS } from '../data/aiBuildTables';
@@ -226,7 +227,9 @@ function cityAiTrees(cs: CityState, state: GameState): number[] {
  *  [definition (-1 free), id, target, rally, backup target and rally, enemy
  *  strength, strength] and per team (two) [its team (-1 none), its members'
  *  count and each one's pool slot in join order (-1 unslotted, -2 gone),
- *  each one released by Defend Units (1) or not (0), its
+ *  each one released by Defend Units (1) or not (0), each one's slot as the
+ *  last keep saw it (-1 none), the units listed again (their count, then
+ *  their pool slots ascending, -2 gone), its
  *  requirements' counts behind their number, the six goals, engaged,
  *  minimums met, ready, ongoing, the unit to build (AI row), strength] */
 function minorOpsRecord(cs: CityState, state: GameState): number[] {
@@ -258,7 +261,13 @@ function opsRecord(ai: OpsAi | undefined, seat: number, defs: readonly string[],
         return u ? u.slot ?? -1 : -2;
       });
       const released = t.members.map((id) => (op.released?.includes(id) ? 1 : 0));
-      out.push((AI_OP_TEAMS[op.def] ?? []).findIndex((x) => x.team === t.team), slots.length, ...slots, ...released, t.counts.length, ...t.counts,
+      const seen = t.members.map((id) => t.slots[id] ?? -1);
+      const twice = teamTwice(t).map((id) => {
+        const u = state.units.find((x) => x.id === id && x.seat === seat);
+        return u ? u.slot ?? -1 : -2;
+      });
+      out.push((AI_OP_TEAMS[op.def] ?? []).findIndex((x) => x.team === t.team), slots.length, ...slots, ...released, ...seen,
+        twice.length, ...twice.sort((a, b) => a - b), t.counts.length, ...t.counts,
         ...t.goals, t.engaged ? 1 : 0, t.minsMet ? 1 : 0, t.ready ? 1 : 0, t.ongoing ? 1 : 0,
         t.unit ? AI_UNIT_INDEX.get(t.unit) ?? -1 : -1, t.strength);
     }

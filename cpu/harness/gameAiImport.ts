@@ -81,6 +81,9 @@ export interface ImportWorld {
    *  own (0) — runs/h1_duely1117 t9: the raid's Turn Limiter begun at the
    *  game's 9, ours at 10 */
   turnShift: number;
+  /** a team member gone stays for the operation's next keep (a
+   *  city-state's, `keepMembers`) */
+  keepsGone: boolean;
 }
 
 const LISTS: Readonly<Record<number, keyof MemoryNames>> = { 0: 'units', 1: 'techs', 2: 'buildings', 7: 'improvements', 10: 'districts', 11: 'civics' };
@@ -189,9 +192,22 @@ const plotOf = (w: ImportWorld, x: number, y: number): number => (x < 0 || y < 0
 
 /** a game team's bytes onto our team of the definition's row `name` */
 function teamOf(w: ImportWorld, name: string, members: GameOperation['teams'][number], counts: number[], hex: string, ours: OpTeam | undefined): OpTeam {
+  // each member's slot its game id's low half; one the game still lists
+  // whose unit is gone stands, where the seat keeps it, as the negative of
+  // its game id for the next keep to resolve (`keepMembers`)
+  const ids: number[] = [];
+  const slots: Record<number, number> = {};
+  for (const m of members) {
+    const u = w.unitOf(m[0]) ?? (w.keepsGone ? -m[0] : undefined);
+    if (u === undefined) continue;
+    ids.push(u);
+    slots[u] = m[0] & 0xffff;
+  }
   return {
     team: name,
-    members: members.flatMap((m) => { const u = w.unitOf(m[0]); return u === undefined ? [] : [u]; }),
+    members: ids,
+    twice: [],
+    slots,
     counts,
     goals: [0, 1, 2, 3, 4, 5].map((s) => plotOf(w, readInt(hex, 0xe8 + 8 * s), readInt(hex, 0xec + 8 * s))),
     engaged: readByte(hex, 0x90) !== 0,

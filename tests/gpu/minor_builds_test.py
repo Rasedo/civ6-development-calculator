@@ -366,7 +366,7 @@ def test_the_repair_project(rules, path) -> None:
     full = int(sim._walls_tier_hp[sim._minor_walls_tier(s)][B0])
     sim.city_outer_hp[B0, row, 0] = full - 7
     sim.city_last_hit[B0, row, 0] = int(sim.turn) - 10
-    ok, cost = sim._minor_repair(s)
+    ok, cost, _wanted = sim._minor_repair(s)
     assert bool(ok[B0]) and float(cost[B0]) == 7.0, "the repair's price is the HP it puts back"
     in_hand(sim, s, sim._mk_p0 + sim._repair_proj_idx, 7.0)
     sim._minor_build(s, sim._minor_production(s))

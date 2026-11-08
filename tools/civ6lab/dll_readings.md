@@ -9148,3 +9148,62 @@ Units" trees, and the pool from the controls the look lists.
   read; every logged UnitKilledInCombat behaves so); the military AI's unit
   production table (0x7989e0, its +0x20 counts and the obsolete entry's
   hold) left on the units standing, no case telling the two apart.
+
+## C-99 / C-129: a team member gone resolves by its pool slot — READ (0x732cd0 -> 0x4f2310), both twins
+
+`keepMembers`, `teamList`, `OpTeam.twice` / `OpTeam.slots` (cpu/core/operations/operation.ts),
+called by `operationsEvaluate` (manager.ts) over the minor's pool brought up to
+date (`minorOpsEvaluate`: `seatPoolSlots`); `_mops_keep_members`,
+`_mops_member_times`, `mops_twice` / `mops_mslot` (gpu/core/sim_minorops.py).
+
+- THE KEEP (0x732cd0, the team update's remove_if): a member stays where
+  Player::Units (0x4f2310) finds it alive (+0x770 clear) and assigned to the
+  operation (+0x7d0). 0x4f2310 finds a unit by the id's low 16 bits alone (its
+  pool slot: movzx at 0x4f232d, the page >> 3, the place & 7, 24-byte
+  entries), no serial test: a member gone whose slot a living unit in a job
+  of the operation now holds stays, standing for that unit, which the team's
+  list then holds twice. The team update counts every entry: the counts, the
+  strength (each entry's unit's max(Combat, Ranged) less a tenth of its
+  damage), the members' number its percentages read; the recruit's too.
+- Ported: each team keeps its members once (the orders give a unit one
+  move), the repeats beside them (`OpTeam.twice`), and each member's slot as
+  the last keep saw it (`OpTeam.slots`): a member gone takes the unit its slot
+  holds where that unit is in a job of the operation (`opJobUnits`), a
+  repeat likewise, else it leaves. The replay's import keeps a member the
+  game lists whose unit is gone (the negative of its game id, its slot the
+  id's low half) for the next keep (`gameAiImport.ts` `teamOf`, a
+  city-state's seat).
+- runs/h1_duely1124 t119-t156, city-state 4's Attack Barb Camp: its Pikeman
+  1048582 (slot 6) killed attacking at t119; the Trebuchet 1441798 its
+  contract built takes slot 6; t120's tactical site lists [1245189, 1048582]
+  with 1048582's type 96 (the Trebuchet), the endlook [1245189, 1048582,
+  1441798] at 105, the log "Not Ready, UNIT_TREBUCHET; x3" and three
+  Operation Move lines; 105 / 104 / 102 / 99 as the Trebuchets take damage to
+  t154, 70 at t155-156. Both modes match from t120.
+- Open: a unit that joins and dies between two keeps has no slot seen (the
+  keep alone records slots); the barbarians' and the Free Cities' teams keep
+  no slot (`barbarianOpsTurn`, `freeOps`).
+
+## C-96: the Default Specialization's walls repair asks no quiet turns, the queue does — FIT (records), both twins
+
+`minorPickFacts`' canProduce on `repairWanted` (cpu/core/minorBuild.ts,
+cpu/core/game.ts; the queue's `minorQueueOk` on `repairAvailable`);
+`_MinorFacts.can_produce` on `_minor_repair`'s third value
+(gpu/core/sim_cityvalue.py, gpu/core/sim_minors.py).
+
+- The pick (0x5d4d70 -> 0x5d1f10) takes PROJECT_REPAIR_OUTER_DEFENSES while
+  the walls stand damaged (the centre's or its Encampment's, out of
+  fallout), the three quiet turns since the city's last hit unasked; the
+  queue refuses it until they pass, and the turn ends with nothing ("NO
+  BUILDS AT ALL"). Its value (the outer-defence term, thousands) also
+  outweighs the contract in hand (`takesTurn`), so no contract is queued
+  meanwhile.
+- runs/h1_duely1124 Granada t124-126 (hit t123): its Encampment repair
+  contract 424 (3317.0) unqueued, NO BUILDS AT ALL; the repair at t127
+  (21971.3), the Encampment at t128; t159-162 / t163 / t164 (contract 674,
+  6612.0, repair 22552.5) and t167-169 / t170 / t171 (contract 721, 8507.0,
+  repair 10695.0) the same. runs/h1_duely1124 Cardiff t87-88 (its Builder
+  contract unqueued, the repair t89); runs/h1_duely1127 Muscat t111-112 (the
+  repair t113).
+- Open: the Free Cities' pick keeps the quiet turns (no recorded case); the
+  CanProduce argument that drops them (0x179650's callers) unread.

@@ -1126,11 +1126,12 @@ class SimMinors:
             most = torch.where(live, torch.maximum(most, mx - ecur), most)
         return most.clamp(min=0)
 
-    def _minor_repair(self, s: int) -> tuple[torch.Tensor, torch.Tensor]:
-        """([B] bool, [B] f64) — `repairAvailable` and `projectCost` for minor
-        `s`'s city: walls standing and breached (the centre's pool or its
-        Encampment's), the centre clean, more than three turns since its last hit;
-        the price `_repair_price`."""
+    def _minor_repair(self, s: int) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+        """([B] bool, [B] f64, [B] bool) — `repairAvailable`, `projectCost`
+        and `repairWanted` for minor `s`'s city: walls standing and breached
+        (the centre's pool or its Encampment's), the centre clean (wanted),
+        more than three turns since its last hit (available); the price
+        `_repair_price`."""
         row = self._CITY_MINOR0 + s
         mx = self._walls_tier_hp.take(self._minor_walls_tier(s)).long()
         outer = torch.minimum(self.city_outer_hp[:, row, 0], mx)
@@ -1144,10 +1145,10 @@ class SimMinors:
         breached = (outer < mx) | (enc_missing > 0)
         ctr = self.citystate_center[:, s]
         clean = (ctr >= 0) & ~self._fallout().gather(1, ctr.clamp(min=0).unsqueeze(1)).squeeze(1)
-        ok = ((mx > 0) & breached & clean
-              & ((int(self.turn) - self.city_last_hit[:, row, 0]) > self._repair_quiet))
+        wanted = (mx > 0) & breached & clean
+        ok = wanted & ((int(self.turn) - self.city_last_hit[:, row, 0]) > self._repair_quiet)
         cost = self._repair_price((mx - outer) + enc_missing)
-        return ok, cost
+        return ok, cost, wanted
 
     def _minor_worship(self, s: int) -> torch.Tensor:
         """[B] long — `minorWorship`: the worship building minor `s`'s majority

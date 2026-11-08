@@ -26,7 +26,7 @@ import type { ArmyRecord, CityState, GameState, Unit, UpgradeTree } from './type
 import { UNITS } from '../data/units';
 import { gameTypeOf } from '../data/aliases';
 import { aiView } from './aiView';
-import { cityStateTactics, moveTo, moveUnitDanger, passEnd, passFinish, passReachAt, plotDistance, stackedAt, swapUnits, type Pass } from './tactical';
+import { cityStateTactics, moveTo, moveUnitDanger, passEnd, passFinish, passReachAt, plotDistance, seatPoolSlots, stackedAt, swapUnits, type Pass } from './tactical';
 import { defenderAiType, ownAiType, passOrders, passView } from './opsOrders';
 import { newOpsAi, operationsEvaluate, operationsRun, opContracts, opsOf, startOperationNamed, type OpsAi, type OpsEnv } from './operations/manager';
 import { ARMY_READ_AGE, lookCamps, type KnownUnit } from './operations/knowledge';
@@ -181,7 +181,9 @@ const outsidePass: Pick<OpsEnv, 'move' | 'strike' | 'attack' | 'moveUpdate' | 'm
 
 /** B: the minor's military AI's turn */
 export function minorOpsEvaluate(state: GameState, cs: CityState): void {
-  operationsEvaluate(opsOfMinor(cs), minorEnv(state, cs, null));
+  seatPoolSlots(state, cs);
+  const slotOf = new Map(state.units.filter((u) => u.seat === cs.seat && u.slot !== undefined).map((u) => [u.id, u.slot!] as const));
+  operationsEvaluate(opsOfMinor(cs), minorEnv(state, cs, null), slotOf);
 }
 
 /** A: the defence event's start (0x7265b0): the operation's id */

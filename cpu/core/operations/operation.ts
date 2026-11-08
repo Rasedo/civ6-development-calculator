@@ -21,8 +21,15 @@ export const NO_PLOT = -1;
 export interface OpTeam {
   /** its AiOperationTeams row's TeamName (`teamDef`, `teamReqs`) */
   team: string;
-  /** the members' unit ids in the order they joined */
+  /** the members' unit ids in the order they joined, each once */
   members: number[];
+  /** the members the team's list holds again (`keepMembers`: a member gone
+   *  resolved by its slot to a unit listed already), each once more: the
+   *  team update counts them, the orders give each unit one */
+  twice: number[];
+  /** each member's pool slot as the team's last keep saw it (`keepMembers`):
+   *  the player's unit list resolves a member by its slot alone */
+  slots: Record<number, number>;
   /** per requirement, the members carrying its AI type */
   counts: number[];
   /** the team's goal plots by Operation Move's "Move To (enum)" (team
@@ -105,7 +112,7 @@ export function newTeams(def: AiOpDef, view: AiView, target: number): OpTeam[] {
   return (AI_OP_TEAMS[def.name] ?? []).filter((t) => teamApplies(t, view, target)).map((t) => {
     const reqs = AI_TEAM_REQS[t.team] ?? [];
     return { team: t.team, members: [], counts: reqs.map(() => 0), goals: [NO_PLOT, NO_PLOT, NO_PLOT, NO_PLOT, NO_PLOT, NO_PLOT], engaged: false,
-      minsMet: false, ready: false, ongoing: false, unit: null, strength: 0, joined: 0 };
+      minsMet: false, ready: false, ongoing: false, unit: null, strength: 0, joined: 0, twice: [], slots: {} };
   });
 }
 
@@ -136,6 +143,57 @@ export function addMember(team: OpTeam, u: Pick<AiUnitView, 'id' | 'type'>): voi
     if (hasAiType(u.type, r.aiType)) team.counts[i]++;
   });
 }
+
+/** THE TEAMS' KEEP (0x732cd0, as the team update 0x73fba0 runs it): of each
+ *  team's members those the player's unit list holds (0x4f2310), alive and
+ *  assigned to the operation (unit +0x7d0). The list finds a unit by its
+ *  id's low 16 bits, its pool slot, alone: a member gone whose slot a unit
+ *  in a job of the operation (`opJobUnits`) now holds stays, as that unit,
+ *  which the list then holds twice (`OpTeam.twice`; runs/h1_duely1124 t120:
+ *  city-state 4's Pikeman 1048582 killed at t119, its slot 6 taken by the
+ *  Trebuchet 1441798 built for Attack Barb Camp, the team three Trebuchets
+ *  at 105). `live` the seat's units, `slotOf` their pool slots by id; each
+ *  member's slot is kept for the next keep. */
+export function keepMembers(op: Operation, live: ReadonlySet<number>, slotOf: ReadonlyMap<number, number>): void {
+  const bySlot = new Map<number, number>();
+  for (const [id, s] of slotOf) bySlot.set(s, id);
+  const jobs = new Set(opJobUnits(op).filter((id) => live.has(id)));
+  const bySlotOf = (t: OpTeam, id: number): number | undefined => (t.slots[id] === undefined ? undefined : bySlot.get(t.slots[id]));
+  for (const t of op.teams) {
+    // the members, each once in its first place, then the repeats, each
+    // beside a member of its own
+    const once = new Set<number>();
+    const twice: number[] = [];
+    const members: number[] = [];
+    for (const id of t.members) {
+      const now = live.has(id) ? id : bySlotOf(t, id);
+      if (now === undefined || (now !== id && !jobs.has(now))) continue;
+      if (once.has(now)) twice.push(now);
+      else {
+        once.add(now);
+        members.push(now);
+      }
+    }
+    for (const id of t.twice) {
+      const now = live.has(id) ? id : bySlotOf(t, id);
+      if (now !== undefined && jobs.has(now) && once.has(now)) twice.push(now);
+    }
+    t.members = members;
+    t.twice = twice;
+    t.slots = {};
+    for (const id of once) {
+      const s = slotOf.get(id);
+      if (s !== undefined) t.slots[id] = s;
+    }
+  }
+}
+
+/** a team's list as the team update counts it: its members, then the ones
+ *  it holds again (`OpTeam.twice`) that are members still */
+export const teamList = (t: OpTeam): number[] => [...t.members, ...teamTwice(t)];
+
+/** the members a team's list holds again, those that are members still */
+export const teamTwice = (t: OpTeam): number[] => t.twice.filter((id) => t.members.includes(id));
 
 /** the operation's unit to build (0x739cd0): the first team's that names
  *  one, null for none */

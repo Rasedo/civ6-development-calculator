@@ -127,9 +127,15 @@
 - addr: 0x4f2310
   final: 0x2c4360
   kind: function
-  semantics: "Player::Units' unit by id: the units' pages (FinalRelease +0x98, laid as the controls'); a unit's type +0xc8 (FinalRelease)."
-  status: PARTLY
+  semantics: "Player::Units' unit by id: the id's low 16 bits alone (movzx edx -> edi at 0x4f232d), its page (>> 3) and its place in the page (& 7, 24-byte entries, the unit pointer at +0) — no serial test, so a stale id finds whatever unit holds its slot now; the units' pages (FinalRelease +0x98, laid as the controls'); a unit's type +0xc8 (FinalRelease)."
+  status: READ
+  cases:
+    - recording: h1_duely1124
+      turn: 120
+      value: "city-state 4's Attack Barb Camp: its Pikeman 1048582 (slot 6) killed at t119, the team still listing 1048582 at t120's tactical site with type 96 (the Trebuchet 1441798 on slot 6), three Trebuchets at 105"
+  impl: [cpu/core/operations/operation.ts:keepMembers, gpu/core/sim_minorops.py:_mops_keep_members]
   readings:
+    - "C-99 / C-129: a team member gone resolves by its pool slot — READ (0x732cd0 -> 0x4f2310), both twins"
     - "C-95: the target list's knowledge-base entries — READ, ported (two records on one plot below)"
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
     - "H-1: the AI memory reader — READ (the hooks, the pointer paths, the contracts, the knowledge base, the operations, the trees), PARTLY READ (the religious AI's holder)"

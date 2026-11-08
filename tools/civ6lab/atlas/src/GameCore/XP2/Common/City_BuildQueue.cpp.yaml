@@ -440,6 +440,7 @@
   readings:
     - "C-94: the religious spread — READ"
     - "C-96: the project value — READ (0x7b28c0, the PROJECTS table 0x5ce970), PARTLY READ (the space-race standing 0x7b8a30, the diplomatic-victory rows, the repair count), unwired"
+    - "C-96: the Default Specialization's walls repair asks no quiet turns, the queue does — FIT (records), both twins"
   context:
     - "..., then the game speed (0x525590). The queue term: the city's build queue (+0x2170, head 0x179650; -1 when empty) names an item whose Projects row (0xad5f10, +0x1c its index) has a Pr..."
   review: reviewed

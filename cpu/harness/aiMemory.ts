@@ -25,6 +25,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { CP_ACCEPTED, CP_CANCELLED, CP_CLAIMED, CP_IN_PROGRESS, CP_NAMES, CP_SUBMITTED, type AiContract } from '../core/aiContracts';
 import type { CityAi } from '../core/aiCityTrees';
 import { opsOf } from '../core/operations/manager';
+import { teamList } from '../core/operations/operation';
 import type { ArmyRecord, Seat } from '../core/types';
 import { gameTypeOf } from '../data/aliases';
 import { CIVICS } from '../data/civics';
@@ -391,7 +392,7 @@ export function readGameMemory(game: GameMemory, names: MemoryNames, seat: Seat,
     const theirs = end.ops;
     add('ops', ops.map((o) => o.def), theirs.map((o) => o.name ?? '-'));
     add('ops.targets', ops.map((o) => `${o.def}|${o.enemy}|${xy(o.target, W)}`), theirs.map((o) => `${o.name}|${o.enemy}|${o.targetX}:${o.targetY}`));
-    add('ops.members', ops.map((o) => `${o.def}|${o.teams.flatMap((t) => t.members.map((id) => unitType(id) ?? '?')).sort().join('+')}`),
+    add('ops.members', ops.map((o) => `${o.def}|${o.teams.flatMap((t) => teamList(t).map((id) => unitType(id) ?? '?')).sort().join('+')}`),
       theirs.map((o) => `${o.name}|${o.teams.flatMap((t) => t.map((m) => names.units[m[1] ?? -1] ?? '?')).sort().join('+')}`));
     add('ops.strength', ops.map((o) => `${o.def}|${o.strength}|${o.enemyStrength}`), theirs.map((o) => `${o.name}|${o.opStrength}|${o.targetStrength}`));
   }

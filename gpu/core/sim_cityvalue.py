@@ -2611,14 +2611,15 @@ class _MinorFacts:
         return ok
 
     def can_produce(self, p):
-        """the repair while it is available; a district project while its
-        district stands complete and clean"""
+        """the repair while its walls stand damaged, its quiet turns unasked
+        (`repairWanted`); a district project while its district stands
+        complete and clean"""
         sim = self.sim
         pi = self._pidx(p)
         if pi < 0:
             return self._bools(False)
         if pi == sim._repair_proj_idx:
-            return sim._minor_repair(self.s)[0]
+            return sim._minor_repair(self.s)[2]
         dv = int(sim._proj_rows[pi]["d"])
         if dv < 0:
             return self._bools(False)

@@ -9,7 +9,7 @@
 import type { OpsSettle } from './types';
 import { BT_ERROR, BT_FAILURE, BT_FRESH, BT_RUNNING, BT_SKIPPED, BT_SUCCESS, dataBool, dataFloat, dataInt, dataTag, dataValue,
   type BtHandler, type BtNode, type BtRun } from '../behaviorTree';
-import { NO_PLOT, addMember, hasAiType, memberStrength, moveTo, opDef, opJobUnits, opUnit, opUnits, robbedOps, targetGone, teamDef, teamReqs, unitsById, xy,
+import { NO_PLOT, addMember, hasAiType, memberStrength, moveTo, opDef, opJobUnits, opUnit, opUnits, robbedOps, targetGone, teamDef, teamList, teamReqs, unitsById, xy,
   type OpTeam, type Operation } from './operation';
 import { chooseUnit, keepUnit } from './unitChoice';
 import type { UnitProductionRow } from '../aiUnitProduction';
@@ -483,14 +483,15 @@ function teamUpdate(ctx: OpsContext, t: OpTeam): void {
   const { op } = ctx;
   const view = ctx.view();
   const units = unitsById(view, ctx.seat);
-  const types = t.members.map((id) => units.get(id)?.type).filter((x): x is string => !!x);
+  const list = teamList(t);
+  const types = list.map((id) => units.get(id)?.type).filter((x): x is string => !!x);
   const reqs = teamReqs(t);
   t.counts = reqs.map((r) => types.filter((u) => hasAiType(u, r.aiType)).length);
-  t.strength = t.members.reduce((s, id) => {
+  t.strength = list.reduce((s, id) => {
     const u = units.get(id);
     return u ? s + memberStrength(u) : s;
   }, 0);
-  const n = t.members.length;
+  const n = list.length;
   const need: string[] = [];
   const have: string[] = [];
   const full: string[] = [];

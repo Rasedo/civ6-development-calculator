@@ -281,6 +281,11 @@ class SimMinorOps:
         # holder's pool: still members until the next team update drops
         # them, in no job of the operation (`Operation.released`)
         self.mops_rel = torch.zeros(B, S, NO, P, dtype=torch.bool, device=device)
+        # beside each listed member (`mops_mem`'s places): its pool slot as
+        # the team's last keep saw it (`OpTeam.slots`, -1 none) and the times
+        # the team's list holds it again (`OpTeam.twice`, `_mops_keep_members`)
+        self.mops_mslot = torch.full((B, S, NO, NTM, NM), -1, dtype=L, device=device)
+        self.mops_twice = torch.zeros(B, S, NO, NTM, NM, dtype=L, device=device)
         # Operation Move's stores: per move node per team the members held out
         # (over the holder's pool, its first slots) and the goal they are held
         # for (-1 none: no store yet)
@@ -671,13 +676,24 @@ class SimMinorOps:
         out.scatter_(1, torch.where(m >= 0, m, P), True)
         return out[:, :P]
 
-    def _mops_member_rank(self, s: int, k: int, ti: int) -> torch.Tensor:
-        """[B, P] each listed member's place in the team's list, -1 none"""
+    def _mops_member_times(self, s: int, k: int, ti: int) -> torch.Tensor:
+        """[B, P] the times the team's list holds each unit: its place and
+        the times it holds it again (`teamList`)"""
         P = self._mops_u(s, "alive").shape[1]
         m = self.mops_mem[:, s, k, ti]
-        out = torch.full((self.B, P + 1), -1, dtype=torch.long, device=self.device)
-        pos = torch.arange(m.shape[1], device=self.device).unsqueeze(0).expand_as(m)
-        out.scatter_(1, torch.where(m >= 0, m, P), pos)
+        out = torch.zeros(self.B, P + 1, dtype=torch.long, device=self.device)
+        out.scatter_add_(1, torch.where(m >= 0, m, P), torch.where(m >= 0, 1 + self.mops_twice[:, s, k, ti], torch.zeros_like(m)))
+        return out[:, :P]
+
+    def _mops_member_rank(self, s: int, k: int, ti: int) -> torch.Tensor:
+        """[B, P] each listed member's first place in the team's list, -1 none"""
+        P = self._mops_u(s, "alive").shape[1]
+        m = self.mops_mem[:, s, k, ti]
+        NM = m.shape[1]
+        out = torch.full((self.B, P + 1), NM, dtype=torch.long, device=self.device)
+        pos = torch.arange(NM, device=self.device).unsqueeze(0).expand_as(m)
+        out.scatter_reduce_(1, torch.where(m >= 0, m, P), pos, reduce="amin")
+        out = torch.where(out >= NM, torch.full_like(out, -1), out)
         return out[:, :P]
 
     def _mops_held(self, s: int) -> torch.Tensor:
@@ -716,6 +732,8 @@ class SimMinorOps:
         j = free.long().argmax(dim=1)
         rows = m.nonzero(as_tuple=True)[0]
         mem[rows, j[rows]] = uid[rows]
+        self.mops_mslot[rows, s, k, ti, j[rows]] = -1
+        self.mops_twice[rows, s, k, ti, j[rows]] = 0
         self.mops_join[rows, s, k, ti] += 1
         Tm = self._mops_tables()
         d = self.mops_def[:, s, k]
@@ -744,12 +762,13 @@ class SimMinorOps:
         on = live & (tm >= 0)
         if not bool(on.any()):
             return
-        memm = self._mops_member_mask(s, k, ti)
-        alive = memm & u["own"]
-        n = (self.mops_mem[:, s, k, ti] >= 0).sum(dim=1)
+        # a unit the list holds again (`keepMembers`) counts again
+        times = self._mops_member_times(s, k, ti) * u["own"].long()
+        alive = times > 0
+        n = (self.mops_mem[:, s, k, ti] >= 0).sum(dim=1) + self.mops_twice[:, s, k, ti].sum(dim=1)
         ua = Tm.unit_ai.to(dev)
         urow = u["row"].clamp(min=0)
-        strength = torch.where(alive, self._mops_strength(u), torch.zeros_like(u["combat"])).sum(dim=1)
+        strength = (torch.where(alive, self._mops_strength(u), torch.zeros_like(u["combat"])) * times).sum(dim=1)
         estr = self.mops_estr[:, s, k]
         ours = self._mops_best(s)
         NAT = len(Tm.ai_types)
@@ -762,7 +781,7 @@ class SimMinorOps:
                 R = tr["n"]
                 tix = tr["type"].to(dev)
                 carries = ua[urow][:, :, tix] & alive.unsqueeze(2) & (u["row"] >= 0).unsqueeze(2)   # [B, P, R]
-                cnt = carries.sum(dim=1)                                                          # [B, R]
+                cnt = (carries.long() * times.unsqueeze(2)).sum(dim=1)                            # [B, R]
                 self.mops_cnt[:, s, k, ti, :R] = torch.where(g.unsqueeze(1), cnt, self.mops_cnt[:, s, k, ti, :R])
                 need = torch.zeros(B, NAT, dtype=torch.bool, device=dev)
                 have = torch.zeros(B, NAT, dtype=torch.bool, device=dev)
@@ -1034,6 +1053,8 @@ class SimMinorOps:
             self.mops_tstr[rows, s, kk] = 0
             self.mops_join[rows, s, kk] = 0
             self.mops_rel[rows, s, kk] = False
+            self.mops_mslot[rows, s, kk] = -1
+            self.mops_twice[rows, s, kk] = 0
             self.mops_mvs[rows, s, kk] = False
             self.mops_mvg[rows, s, kk] = -1
             # the definition's teams, those whose Condition holds, in order
@@ -1079,6 +1100,8 @@ class SimMinorOps:
         self.mops_tm[rows, s, k] = -1
         self.mops_mem[rows, s, k] = -1
         self.mops_rel[rows, s, k] = False
+        self.mops_mslot[rows, s, k] = -1
+        self.mops_twice[rows, s, k] = 0
         nf = self.mops_nfree[rows, s]
         self.mops_free[rows, s, nf] = k
         self.mops_nfree[rows, s] = nf + 1
@@ -1103,25 +1126,65 @@ class SimMinorOps:
         return self._mops_jobs(s, self.mops_def[:, s] >= 0)
 
     def _mops_compact(self, s: int, k: int, ti: int, keep: torch.Tensor, mask: torch.Tensor) -> None:
-        """the team's members kept where `keep` [B, NM] (in order) where `mask`"""
+        """the team's members kept where `keep` [B, NM] (in order) where
+        `mask`, each with its slot seen and its repeats"""
         mem = self.mops_mem[:, s, k, ti]
         kk = keep & (mem >= 0)
         o = (~kk).to(torch.int8).argsort(dim=1, stable=True)
-        new = mem.gather(1, o)
         n = kk.sum(dim=1)
-        new = torch.where(torch.arange(mem.shape[1], device=self.device).unsqueeze(0) < n.unsqueeze(1), new, torch.full_like(new, -1))
-        self.mops_mem[:, s, k, ti] = torch.where(mask.unsqueeze(1), new, mem)
+        on = torch.arange(mem.shape[1], device=self.device).unsqueeze(0) < n.unsqueeze(1)
+        for plane, empty in ((self.mops_mem, -1), (self.mops_mslot, -1), (self.mops_twice, 0)):
+            cur = plane[:, s, k, ti]
+            new = torch.where(on, cur.gather(1, o), torch.full_like(cur, empty))
+            plane[:, s, k, ti] = torch.where(mask.unsqueeze(1), new, cur)
 
-    def _mops_drop_gone(self, s: int, mask: torch.Tensor, u: dict) -> None:
-        """the units gone leave their operations"""
+    def _mops_keep_members(self, s: int, mask: torch.Tensor, u: dict) -> None:
+        """`keepMembers` (0x732cd0): of each team's members those alive; one
+        gone whose pool slot (as the last keep saw it) a unit in a job of the
+        operation now holds stays as that unit, which the list then holds
+        again (`mops_twice` beside its first place); the repeats before stay
+        on their unit while it is in a job, else on the job unit in its slot;
+        each member's slot kept for the next keep"""
+        own = u["own"]
+        pslot = self._mops_u(s, "pslot")
+        P = own.shape[1]
+        SP = simbase.SEAT_POOL_MAX
+        dev = self.device
+        ar = torch.arange(P, device=dev).unsqueeze(0).expand(self.B, P)
+        later = torch.ones(N_MEMBERS, N_MEMBERS, dtype=torch.bool, device=dev).triu(1)   # [f, j]: f before j
         for k in range(N_OPS):
             on = mask & (self.mops_def[:, s, k] >= 0)
             if not bool(on.any()):
                 continue
+            jobs = torch.zeros_like(own)
+            for ti in range(N_TEAMS):
+                jobs |= self._mops_member_mask(s, k, ti)
+            jobs &= own & ~self.mops_rel[:, s, k, :P]
+            # the job unit holding each pool slot (-1 none)
+            inv = torch.full((self.B, SP + 1), -1, dtype=torch.long, device=dev)
+            inv.scatter_(1, torch.where(jobs & (pslot >= 0), pslot, SP).clamp(max=SP), ar)
+            inv[:, SP] = -1
             for ti in range(N_TEAMS):
                 mem = self.mops_mem[:, s, k, ti]
-                alive = (mem >= 0) & u["own"].gather(1, mem.clamp(min=0))
-                self._mops_compact(s, k, ti, alive, on)
+                ms = self.mops_mslot[:, s, k, ti]
+                tw = self.mops_twice[:, s, k, ti]
+                listed = mem >= 0
+                mc = mem.clamp(min=0)
+                alive = listed & own.gather(1, mc)
+                to = torch.where(listed & ~alive & (ms >= 0), inv.gather(1, ms.clamp(min=0, max=SP)), torch.full_like(mem, -1))
+                now = torch.where(alive, mem, to)
+                rep = torch.where(alive, torch.where(jobs.gather(1, mc), mem, torch.full_like(mem, -1)), to)
+                same = (now.unsqueeze(2) == now.unsqueeze(1)) & (now >= 0).unsqueeze(2)            # [B, f, j]
+                dup = (same & later.unsqueeze(0)).any(dim=1)
+                first = (now >= 0) & ~dup
+                again = (same & dup.unsqueeze(1)).sum(dim=2)
+                hold = (rep.unsqueeze(1) == now.unsqueeze(2)) & (rep >= 0).unsqueeze(1)           # [B, f, j]
+                again = again + (hold.long() * tw.unsqueeze(1)).sum(dim=2)
+                o = on.unsqueeze(1)
+                self.mops_mem[:, s, k, ti] = torch.where(o, torch.where(first, now, torch.full_like(now, -1)), mem)
+                self.mops_twice[:, s, k, ti] = torch.where(o, torch.where(first, again, torch.zeros_like(tw)), tw)
+                self.mops_mslot[:, s, k, ti] = torch.where(o, torch.where(first, pslot.gather(1, now.clamp(min=0)), torch.full_like(ms, -1)), ms)
+                self._mops_compact(s, k, ti, first, on)
 
     # -- the military AI's turn (B) ------------------------------------------
 
@@ -1222,8 +1285,9 @@ class SimMinorOps:
         if not bool(alive.any()):
             return
         Tm = self._mops_tables()
+        self._seat_pool_slots(s, "major", 100 + s, alive)
         u = self._mops_units(s)
-        self._mops_drop_gone(s, alive, u)
+        self._mops_keep_members(s, alive, u)
         sea = self._mops_naval_target(s)
         # the running operations' candidates name their backups, on the
         # strengths the last run refreshed (`operationsEvaluate`)
@@ -1723,9 +1787,8 @@ class SimMinorOps:
         ostr = ustr.gather(1, oc)
         estr = self.mops_estr[:, s, k]
         ours = self._mops_best(s)
-        members = (self.mops_mem[:, s, k, ti] >= 0).sum(dim=1)
-        memm = self._mops_member_mask(s, k, ti) & u["own"]
-        cur_mem = torch.where(memm, ustr, torch.zeros_like(ustr)).sum(dim=1)
+        members = (self.mops_mem[:, s, k, ti] >= 0).sum(dim=1) + self.mops_twice[:, s, k, ti].sum(dim=1)
+        cur_mem = (ustr * self._mops_member_times(s, k, ti) * u["own"].long()).sum(dim=1)
         ready = self.mops_ready[:, s, k, ti]
         for dd, ts in Tm.team_reqs.items():
             for tj, tr in enumerate(ts):

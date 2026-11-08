@@ -7,7 +7,7 @@
   final: 0x4d7700
   kind: function
   name: the team's members kept
-  semantics: "remove_if over a team's member ids (from 0x73fba0 at 0x73fcac, the predicate's state [r8]: the team, the operation's id): a member is kept where Player::Units holds it (0x4f2310), alive (+0x770 clear) and assigned to the operation (+0x7d0 == the id); the caller cuts the count (+0x28) to the kept. A member Defend Units released (0x73d1f0) or killed leaves its team here."
+  semantics: "remove_if over a team's member ids (from 0x73fba0 at 0x73fcac, the predicate's state [r8]: the team, the operation's id): a member is kept where Player::Units holds it (0x4f2310), alive (+0x770 clear) and assigned to the operation (+0x7d0 == the id); the caller cuts the count (+0x28) to the kept. A member Defend Units released (0x73d1f0) or killed leaves its team here — unless the unit list (0x4f2310, by the id's slot alone) finds in its slot a living unit assigned to the operation: the stale id stays, standing for that unit, which the list then holds twice."
   status: READ
   cases:
     - recording: h1_duely1127
@@ -16,7 +16,12 @@
     - recording: h1_duely1117
       turn: 92
       value: "city-state 4's City Defense garrison Catapult upgraded at t91: its Trebuchet 1179651 in no operation (Wander at t92), City Defense three units"
+    - recording: h1_duely1124
+      turn: 120
+      value: "city-state 4's Attack Barb Camp: the killed Pikeman 1048582's slot 6 held by the Trebuchet 1441798 built for it, the team UNIT_TREBUCHET x3 at 105 (endlook) to t154, 70 at t155-156"
   impl:
+    - cpu/core/operations/operation.ts:keepMembers
+    - gpu/core/sim_minorops.py:_mops_keep_members
     - cpu/core/minorBuild.ts:minorUpgradeUnit
     - gpu/core/sim_minors.py:_minor_upgrade_unit
     - cpu/core/operations/nodes.ts:refreshStrengths
@@ -26,6 +31,7 @@
   readings:
     - "C-99: Defend Units' ship release and the team update's members — READ (0x73d1f0, 0x73fba0 at 0x73fc75 -> 0x732cd0), both twins"
     - "C-128: a unit made anew leaves its operation and its standing army — READ, both twins"
+    - "C-99 / C-129: a team member gone resolves by its pool slot — READ (0x732cd0 -> 0x4f2310), both twins"
   review: reviewed
 - addr: 0x737610
   final: 0x4db690
@@ -550,6 +556,7 @@
     - cpu/core/operations/nodes.ts:targets
     - gpu/core/sim_minorops.py:_mops_refresh
     - cpu/core/minorBuild.ts:minorUpgradeUnit
+    - cpu/core/operations/operation.ts:keepMembers
   readings:
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
     - "C-97: City Defense and the assault target's validity — the city's threat, the defence event, Is City Threatened, Garrison City and the district target's validity READ; the threat's level terms, the garrison's swap and the team's unit to build unread"

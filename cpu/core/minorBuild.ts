@@ -38,7 +38,7 @@ import { freeCityBuildFacts, majorQueueItem, seatResearchTurns } from './freeCit
 import { freeCityThreat, minorAiTurn, minorContractPurchases, minorEconomicDisband, minorItemBuilt, minorMilitaryTurn } from './minorCityAi';
 import { bankruptcy, cityBorderGrowth, cultureAfterGrowth, jumpMadeAnew, paveGround } from './phase';
 import { applyTrainingGrants } from './combat';
-import { districtScaledBase, goldAffordable, projectCost, repairAvailable } from './game';
+import { districtScaledBase, goldAffordable, projectCost, repairAvailable, repairWanted } from './game';
 import { civEraIndex, computeCityStats, withPercent256 } from './city';
 import { upgradeRoads } from './eras';
 import { researchCost, selectResearch } from './economy';
@@ -1957,7 +1957,12 @@ export function minorPickFacts(state: GameState, cityState: CityState, facts: Ci
     },
     canProduce: (p) => {
       const id = engineId('project', p, 'PROJECT_', PROJECTS);
-      if (id === 'REPAIR_DEFENSES') return repairAvailable(state, minorCity(cityState));
+      // the walls' repair while its walls stand damaged, its quiet turns
+      // unasked: the queue's refusal leaves the turn with nothing
+      // (runs/h1_duely1124 Granada t124-126: the repair 21971 over its
+      // Encampment contract 3317, NO BUILDS AT ALL; the repair queued at
+      // t127, the Encampment at t128)
+      if (id === 'REPAIR_DEFENSES') return repairWanted(state, minorCity(cityState));
       return !!id && minorProjectOk(state, cityState, id);
     },
     favored: () => 0,

@@ -35,7 +35,7 @@
 import { AI_LEADER_OP_LISTS, AI_OP_DEFS, AI_OP_LIMIT_LISTS, AI_OP_LISTS, AI_TREES } from '../../data/aiOperations';
 import { compileTree, tick, BT_FRESH, type BtNode, type BtRun } from '../behaviorTree';
 import { treeSlot } from '../treePool';
-import { NO_PLOT, addMember, newTeams, opDef, opJobUnits, opUnits, robbedOps, xy, type Operation } from './operation';
+import { NO_PLOT, addMember, keepMembers, newTeams, opDef, opJobUnits, opUnits, robbedOps, xy, type Operation } from './operation';
 import { OP_NODES, refreshStrengths, switchToBackup, type DiplomacyRequest, type OpsContext } from './nodes';
 import type { ContractBook, ContractCity, ContractNodeWorld } from '../aiContracts';
 import { evaluate, type Candidate } from './evaluate';
@@ -270,19 +270,18 @@ export function joinBuilt(ai: OpsAi, tree: number, unit: Pick<AiUnitView, 'id' |
 /** the contracts the seat's running operations hold */
 export const opContracts = (ai: OpsAi): number[] => opsOf(ai).flatMap((o) => o.contracts);
 
-/** THE MILITARY AI'S TURN (list B): the units gone leave their operations;
- *  the settle start; the candidates evaluated, logged, the backups named and
- *  the new one to start chosen */
-export function operationsEvaluate(ai: OpsAi, env: OpsEnv): void {
+/** THE MILITARY AI'S TURN (list B): the units gone leave their operations
+ *  (`keepMembers`, over the seat's units' pool slots by id `slotOf`, the
+ *  pool brought up to date); the settle start; the candidates evaluated,
+ *  logged, the backups named and the new one to start chosen */
+export function operationsEvaluate(ai: OpsAi, env: OpsEnv, slotOf: ReadonlyMap<number, number>): void {
   const view = env.view();
   // the seat's operations lose the units gone; their strengths stand as the
   // last run's refresh left them — the running operations' candidates, and
   // so their backups, read them before the run refreshes them (0x727510:
   // the candidates 0x72763d, the enemy strength 0x727c74 after)
   const live = new Set(view.units(ai.seat).map((u) => u.id));
-  for (const op of opsOf(ai)) {
-    for (const t of op.teams) t.members = t.members.filter((id) => live.has(id));
-  }
+  for (const op of opsOf(ai)) keepMembers(op, live, slotOf);
   const allowed = env.defs ? env.defs.map((n) => AI_OP_DEFS[n]) : allowedOps(view.leaderType(ai.seat));
   const staging = stagingPlots(view, ai.seat);
   const blank = (def: AiOpDef, enemy: number): Candidate => ({ def, enemy, presetRally: NO_PLOT, presetStrength: null, op: null,

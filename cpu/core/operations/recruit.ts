@@ -11,7 +11,7 @@
  * times the smaller of the two players' best combat strengths. The units a
  * team takes leave the offer.
  */
-import { NO_PLOT, addMember, hasAiType, teamDef, teamReqs, unitStrength, type Operation, type OpTeam } from './operation';
+import { NO_PLOT, addMember, hasAiType, teamDef, teamList, teamReqs, unitStrength, type Operation, type OpTeam } from './operation';
 import type { AiUnitView, AiView } from '../aiViewTypes';
 
 export interface RecruitLog {
@@ -29,7 +29,7 @@ function passesOthers(team: OpTeam, unitType: string, skip: number, extra: numbe
     const r = reqs[j];
     if (hasAiType(unitType, r.aiType)) {
       if (r.max !== null && r.max >= 0 && team.counts[j] >= r.max) return false;
-      if (r.maxPercentage >= 0 && team.counts[j] + extra > (team.members.length + extra) * r.maxPercentage) return false;
+      if (r.maxPercentage >= 0 && team.counts[j] + extra > (teamList(team).length + extra) * r.maxPercentage) return false;
     } else if (r.minPercentage > 0 && r.minPercentage === 1) return false;
   }
   return true;
@@ -46,7 +46,7 @@ export function recruitMinimums(view: AiView, team: OpTeam, offer: readonly AiUn
   if (offer.length === 0) return { met: team.ready, taken: [] };
   let met = true;
   const out: AiUnitView[] = [];
-  const members = team.members.length;
+  const members = teamList(team).length;
   teamReqs(team).forEach((r, i) => {
     let need = r.min ?? 0;
     const have = team.counts[i];
@@ -93,7 +93,7 @@ export function recruitStrength(view: AiView, team: OpTeam, offer: readonly AiUn
   const target = enemyStrength + desired;
   if (target <= 0 || offer.length === 0) return { reached: true, taken: [] };
   let current = 0;
-  for (const id of team.members) {
+  for (const id of teamList(team)) {
     const u = units.get(id);
     if (u) current += unitStrength(u);
   }
@@ -106,7 +106,7 @@ export function recruitStrength(view: AiView, team: OpTeam, offer: readonly AiUn
       const r = reqs[j];
       if (hasAiType(u.type, r.aiType)) {
         if (r.max !== null && r.max >= 0 && team.counts[j] >= r.max) return false;
-        if (r.maxPercentage >= 0 && team.counts[j] + 1 > (team.members.length + extra + 1) * r.maxPercentage) return false;
+        if (r.maxPercentage >= 0 && team.counts[j] + 1 > (teamList(team).length + extra + 1) * r.maxPercentage) return false;
         matched = true;
       } else if (r.minPercentage > 0 && r.minPercentage === 1) return false;
     }

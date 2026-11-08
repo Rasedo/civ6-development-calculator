@@ -1164,8 +1164,9 @@ def _minor_ops(sim, b: int, s: int) -> list[int]:
     `opsRecord` reads them: the pool's
     size, its free slots, the pick, per slot its definition (-1 free), id,
     target, rally, backup, strengths, per team its team, its members' pool
-    slots (-1 unslotted, -2 gone), each one released (1) or not, its
-    requirements' counts, goals, flags,
+    slots (-1 unslotted, -2 gone), each one released (1) or not, each one's
+    slot as the last keep saw it, the units listed again (their count, their
+    pool slots ascending, -2 gone), its requirements' counts, goals, flags,
     unit, strength"""
     from .sim_minorops import minor_ops_tables
     T = minor_ops_tables(sim.rules)
@@ -1197,7 +1198,12 @@ def _minor_ops(sim, b: int, s: int) -> list[int]:
                 slots.append(int(sim.unit_pslot[b, g]) if alive else -2)
             R = T.team_reqs[d][tm]["n"]
             rel = [int(bool(sim.mops_rel[b, s, k, u])) for u in mem]
-            out += [tm, len(slots)] + slots + rel + [R] + [int(x) for x in sim.mops_cnt[b, s, k, ti, :R].tolist()]
+            seen = [int(x) for x in sim.mops_mslot[b, s, k, ti, :len(mem)].tolist()]
+            twice = []
+            for j, n in enumerate(sim.mops_twice[b, s, k, ti, :len(mem)].tolist()):
+                twice += [slots[j]] * int(n)
+            twice.sort()
+            out += [tm, len(slots)] + slots + rel + seen + [len(twice)] + twice + [R] + [int(x) for x in sim.mops_cnt[b, s, k, ti, :R].tolist()]
             out += [int(x) for x in sim.mops_goal[b, s, k, ti].tolist()]
             out += [int(bool(sim.mops_eng[b, s, k, ti])), int(bool(sim.mops_mins[b, s, k, ti])),
                     int(bool(sim.mops_ready[b, s, k, ti])), int(bool(sim.mops_ong[b, s, k, ti])),
