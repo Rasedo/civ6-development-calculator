@@ -57,6 +57,7 @@
     - cpu/core/disasters.ts:strikeUnits
     - cpu/core/tactical.ts:layer
     - cpu/core/game.ts:condemnHeretic
+    - cpu/core/tactical.ts:others
   readings:
     - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
     - "C-96: an event's civilian kill spares a Trader — PARTLY READ"

@@ -240,8 +240,12 @@ const UPGRADE_TREE_PRIORITY = AI_TRIGGERED_TREES.find((t) => t.tree === 'Upgrade
  *    trees (runs/h1_duelw1121 city-state 3's Galley, taken from Naval
  *    Superiority at t89 as Cartography lands, the operation completing
  *    empty, home by t91, a Caravel from t92);
- *  - MOVE UNIT'S UPDATE (`upgradeArrived`): every unit reaching its target
- *    this turn, the trees end SUCCESS, their units' turns done;
+ *  - MOVE UNIT'S UPDATE (`upgradeArrived`), in the walk before any
+ *    execution: every unit reaching its target this turn, the trees end
+ *    SUCCESS once the executions below ran — the moves among them (the
+ *    interpreter executes each SUCCESS or RUNNING action: runs/h1_duely1124
+ *    t91 Granada's Heavy Chariot 1114117 on 39:11 goes to its centre 41:12
+ *    as its tree ends, upgraded by the next turn's tree);
  *  - FIND UNIT TARGETS (0x7ed200, Nearest Owned City; its job 0x7eba40) and
  *    MOVE UNIT'S EXECUTION (0x7eeba0, no Location, `upgradeMove`): each unit
  *    left goes for the minor's city centre, a ship for a coastal centre or
@@ -297,6 +301,9 @@ export function upgradeTreesTick(state: GameState, cs: CityState, pass: Pass): v
     delete cs.upgrading;
     return;
   }
+  // Move Unit's update in the walk, before any execution (btTick 0x7d3a00):
+  // its SUCCESS ends the trees once the executions ran
+  const arrived = upgradeArrived(state, pass, order(held), targets);
   // Upgrade Units' execution (Can Delete: the node holds no data, true),
   // then Move Unit's
   const eco = (cs.economy ??= newEconomicMemory());
@@ -321,15 +328,10 @@ export function upgradeTreesTick(state: GameState, cs: CityState, pass: Pass): v
     }
     if (unupgradedDeleted(state, cs, u)) drop(u);
   }
-  // Move Unit's update: SUCCESS ends the trees, their units' turns done
-  if (upgradeArrived(state, pass, order(held), targets)) {
-    for (const u of order(held)) passFinish(pass, u, UPGRADE_MOVE, u.tileIndex);
-    delete cs.upgrading;
-    return;
-  }
   for (const u of order(held)) upgradeMove(state, pass, u, targets.get(u.id) ?? -1);
   for (const u of order(held)) passFinish(pass, u, UPGRADE_MOVE, u.tileIndex);
-  cs.upgrading = order(held).map((u) => u.id);
+  if (arrived) delete cs.upgrading;
+  else cs.upgrading = order(held).map((u) => u.id);
 }
 
 /** MOVE UNIT'S UPDATE with no Location (0x7f0020 at 0x7f067c): SUCCESS where
@@ -370,7 +372,7 @@ function upgradeMove(state: GameState, pass: Pass, u: Unit, p: number): void {
   if (p < 0 || u.tileIndex === p || u.movesLeft <= 0) return;
   if (pass.danger[p] > 0 && passReachAt(state, pass, u, p, 1, true, 0) < 0) return;
   if (plotDistance(state, u.tileIndex, p) === 1 && stackedAt(state, u, p)) {
-    swapUnits(state, pass, u, p);
+    swapUnits(state, pass, u, p, true, moveUnitDanger(pass.danger));
     return;
   }
   moveTo(state, u, p, false, true, true, moveUnitDanger(pass.danger));

@@ -387,6 +387,7 @@
     - cpu/core/tactical.ts:withShortOrders
     - cpu/core/tactical.ts:swapUnits
     - cpu/core/combat.ts:taken
+    - gpu/core/sim_tactics.py:_tac_swap
   readings:
     - "C-99: a move order carried on as the turn ends, the zone-of-control wait, the embark rule's TO plot — READ (0x962380, 0x52f50, 0x26fe20, 0x2675e0, 0x2673f0, 0x530420, 0x267650), both twins"
     - "H-1: an annex re-places the citizens, the garrison's unit, a religious unit killed on a move — READ"
@@ -401,6 +402,7 @@
     - "C-125 / C-99: the swap's partner pays its step, the stacking count's classes, the walk's end among other players' units, a siege unit's RangedCombat — READ (0x972a50, 0x585d90, 0x26fe20 via 0x585eb0, 0x56e3e0), both twins"
     - "C-93: Operation Move takes its movers as the order opens, a carried formation member among them — READ (0x816cb0 at 0x817030..0x81719a, 0x817800, 0x817e6a; 0x265d80 -> 0x56cc70), both twins"
     - "C-93: Operation Pillage takes a member on its target alone; a capture is its step's; Wander asks Movement; a captor leaves the pass — READ (0x811390 at 0x811786..0x811838, 0x26fe20, 0x77b9a0 at 0x77baa1, 0x212500), both twins"
+    - "C-99 / C-128: the swap's partner test and its step along its own path; Move Unit's update before the executions; a Trader no passenger — READ (0x972540, 0x56e760, 0x972a50 -> 0x26fe20, 0x7d3a00 -> 0x7f0020, 0x586360 -> 0x208b80 / 0x523d60), both twins"
   context:
     - "- A unit's move onto a plot holding a religious unit it kills (0x26fe20 → 0x493f80 with the capture flag 1) swings religion: RELIGION_SPREAD_ UNIT_CAPTURE (g..."
     - "- The move 0x26fe20 walks the destination plot's units from the last to the first; for each one not dead (+..."
@@ -528,7 +530,10 @@
     - recording: h1_duely1117
       turn: 80
       value: "the Attack Civilian movers hold for a civilian out of their sight (t80 Warrior 3670030 for the Settler on 31:13, t85 / t88 / t97 / t100 / t103) and go for one in it (t31-t36, t68): the order's request 0x962310 drops 0x10 for a plot out of sight, so this test runs under location flag 0"
-  impl: [cpu/core/tactical.ts:pathTo, gpu/core/sim_tactics.py:_tac_move_to]
+  impl:
+    - cpu/core/tactical.ts:pathTo
+    - gpu/core/sim_tactics.py:_tac_move_to
+    - cpu/core/tactical.ts:pathNodes
   readings:
     - "C-124: the kept path is never taken; a move order's path passes other players' units out of sight — READ (0x272aa0, 0x2714b0, 0x586360 at 0x586542..0x5865a1, 0x26fe20), both twins"
     - "C-124: an attack order to a plot out of sight loses its attack flag — READ (0x962310), both twins"
@@ -748,12 +753,14 @@
     - recording: h1_duely1121
       turn: 160
       value: Builder 4522014 for 2:19 (water) and Line Infantry 4128797 for 3:19 on 9:12 stay
+  impl: [cpu/core/tactical.ts:swapPartner]
   readings:
     - "C-99: Move Unit's no-Location execution, the swap's partner and the move order's first turn — READ, ported; the swap's path tests and 0x56e760 unread"
     - "C-123: Operation Move's danger flags, the MoveTo execution and m_blockedTurns — READ (0x816cb0 at 0x816e70 / 0x817839, 0x962380, 0x73e610), both twins"
     - "C-123: Protect Units' plunder at the barbarians' turn open and Operation Move's formation bar — READ (0x80d790 at 0x80de60..0x80e7dc, 0x816cb0 at 0x81794d..0x817985 -> 0x585eb0), both twins and the replay's copy"
     - "C-124: the formation's kept path, and a path's other players' units — READ (0x272aa0, 0x26e3a0, 0x782d0, 0x586360 at 0x586542..0x5865a1), unported"
     - "C-99: a move order carried on as the turn ends, the zone-of-control wait, the embark rule's TO plot — READ (0x962380, 0x52f50, 0x26fe20, 0x2675e0, 0x2673f0, 0x530420, 0x267650), both twins"
+    - "C-99 / C-128: the swap's partner test and its step along its own path; Move Unit's update before the executions; a Trader no passenger — READ (0x972540, 0x56e760, 0x972a50 -> 0x26fe20, 0x7d3a00 -> 0x7f0020, 0x586360 -> 0x208b80 / 0x523d60), both twins"
   context:
     - "...cost (plot vt +0x18) << 8 needs 0x56e760 clear), and the destinations valid both ways (0x2726b0 flag 4). Start (0x972a50): the unit's formation to the target (flags | 4), then the p..."
   review: imported

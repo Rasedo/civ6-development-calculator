@@ -48,6 +48,7 @@
     - cpu/core/opsOrders.ts:us
     - cpu/core/tactical.ts:swapUnits
     - cpu/core/game.ts:condemnHeretic
+    - cpu/core/tactical.ts:swapPartner
   readings:
     - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
@@ -58,6 +59,7 @@
     - "C-126 / C-130: who may plunder a route (0x9555a0) and the treasury turn's city term (0x4dd3b0) — READ, the plunder ported in both twins"
     - "C-99: a move order carried on as the turn ends, the zone-of-control wait, the embark rule's TO plot — READ (0x962380, 0x52f50, 0x26fe20, 0x2675e0, 0x2673f0, 0x530420, 0x267650), both twins"
     - "C-101 / C-95: the attack carried out condemns a religious target's heretics, a move order walks onto a religious unit's plot — READ (0x771f80 at 0x772331 / 0x7725c9 / 0x7727fa, 0x776140 at 0x776424..0x776470 / 0x777045, 0x947dd0, 0x89c6f0, 0x89cc00), both twins"
+    - "C-99 / C-128: the swap's partner test and its step along its own path; Move Unit's update before the executions; a Trader no passenger — READ (0x972540, 0x56e760, 0x972a50 -> 0x26fe20, 0x7d3a00 -> 0x7f0020, 0x586360 -> 0x208b80 / 0x523d60), both twins"
   notes: [read; no recorded decision of the five verbose duels tells it apart yet]
   context:
     - "...6f210 is on +8, -1 for all — stable), go for it in order (0x773270): each that can act (0x56c690) takes the move order onto it (0x962190, flag 0x10), a unit with no ranged or bombard s..."
@@ -435,11 +437,19 @@
 - addr: 0x56e760
   final: 0x3a4000
   kind: function
-  semantics: "a unit flag the swap's partner test reads: set, the path test (0x272a60 flag 4) and the partner's Movement against the plot's cost are skipped; its meaning unread."
-  status: PARTLY
+  name: hasMoved
+  semantics: the unit's Movement left (+0xdb0) below its full Movement (GetMaxMoves 0x56e130 << 8).
+  status: READ
+  cases:
+    - recording: h1_duely1128
+      turn: 174
+      value: Hong Kong's Warrior 2490370 on 8:7 swaps onto its centre 9:7; its Warrior 2293764 steps first onto 9:8, 8:7 beside the barbarians on 9:6; its Man-At-Arms 1507331 on 10:7 swaps not with 2490370, moved into the barbarians' zone (record t+1)
+  impl: [cpu/core/tactical.ts:swapPartner, gpu/core/sim_tactics.py:_tac_swap]
   readings:
     - "C-99: Move Unit's no-Location execution, the swap's partner and the move order's first turn — READ, ported; the swap's path tests and 0x56e760 unread"
     - "C-99: Move Unit's no-Location execution, the swap's partner and the move order's first turn"
+    - "C-99 / C-128: the swap's partner test and its step along its own path; Move Unit's update before the executions — READ (0x972540, 0x56e760, 0x972a50 -> 0x26fe20, 0x7d3a00 -> 0x7f0020), both twins"
+    - "C-99 / C-128: the swap's partner test and its step along its own path; Move Unit's update before the executions; a Trader no passenger — READ (0x972540, 0x56e760, 0x972a50 -> 0x26fe20, 0x7d3a00 -> 0x7f0020, 0x586360 -> 0x208b80 / 0x523d60), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...swap's partner and the move order's first turn — READ, ported; the swap's path tests and 0x56e760 unread"
@@ -453,6 +463,7 @@
   readings:
     - "C-99: Move Unit's no-Location execution, the swap's partner and the move order's first turn — READ, ported; the swap's path tests and 0x56e760 unread"
     - "C-99: Move Unit's no-Location execution, the swap's partner and the move order's first turn"
+    - "C-99 / C-128: the swap's partner test and its step along its own path; Move Unit's update before the executions; a Trader no passenger — READ (0x972540, 0x56e760, 0x972a50 -> 0x26fe20, 0x7d3a00 -> 0x7f0020, 0x586360 -> 0x208b80 / 0x523d60), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...through it): the unit with Movement left (0x56c690), not moved into a zone of control (0x56e780), the target at distance 1 (0x1deb0); (0x56e760 set: the path test 0x272a60 flag 4); ov..."

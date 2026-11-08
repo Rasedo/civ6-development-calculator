@@ -1430,11 +1430,12 @@ class SimMinorOps:
         those of its operations of a lower priority, which leave them) each
         whose upgrade its research unlocks joining, none held ending the
         trees; Find Unit Targets (the city centre, a ship's a coastal centre
-        or else the Harbor's plot), none ending the trees; Upgrade Units'
-        execution (in pool order, the full test and the treasury, the
-        economic AI's purchase; Can Delete's deletion of the units it does
-        not upgrade); Move Unit's (each left for its target); the units'
-        turns done"""
+        or else the Harbor's plot), none ending the trees; Move Unit's
+        update before any execution (`upgradeArrived`: its SUCCESS ends the
+        trees once the executions ran); Upgrade Units' execution (in pool
+        order, the full test and the treasury, the economic AI's purchase;
+        Can Delete's deletion of the units it does not upgrade); Move Unit's
+        (each left for its target); the units' turns done"""
         Tm = self._mops_tables()
         trig = act & self.mops_upg_trig[:, s]
         self.mops_upg_trig[:, s] &= ~act
@@ -1482,6 +1483,17 @@ class SimMinorOps:
         aimed = (held & (target >= 0)).any(dim=1)
         live = go & some & aimed
         held &= live.unsqueeze(1)
+        # MOVE UNIT'S UPDATE in the walk (`upgradeArrived`), before any
+        # execution: every held unit with a target whose planning in the pass
+        # reaches it this turn — on the danger map, or with Movement left —
+        # the trees end SUCCESS once their executions ran
+        row = op["rowof"][:, :P]
+        rc, tc = row.clamp(min=0), target.clamp(min=0)
+        rt = op["res"]["turns"][rc, tc]
+        rm = op["res"]["moves"][rc, tc]
+        hot = op["danger"].gather(1, tc) > 0
+        passes = (target < 0) | ((row >= 0) & (rt == 1) & (hot | (rm > 0)))
+        ended = live & (~held | passes).all(dim=1)
         # Upgrade Units' execution, then Move Unit's, in pool order
         order, _n = self._mops_in_order(held, u["key"])
         cost = torch.full_like(self.citystate_balance[:, s], int(self._mb_upgrade_gold * _FX))
@@ -1540,19 +1552,6 @@ class SimMinorOps:
             self._occ_clear(rows, self.major_unit_tile[rows, slots], slots + self.POOL_LO["major"])
             self.major_unit_alive[rows, slots] = False
             held &= ~drop
-        # MOVE UNIT'S UPDATE (`upgradeArrived`): every held unit with a target
-        # whose planning in the pass reaches it this turn — on the danger map,
-        # or with Movement left — the trees end SUCCESS, their units' turns done
-        row = op["rowof"][:, :P]
-        rc, tc = row.clamp(min=0), target.clamp(min=0)
-        rt = op["res"]["turns"][rc, tc]
-        rm = op["res"]["moves"][rc, tc]
-        hot = op["danger"].gather(1, tc) > 0
-        passes = (target < 0) | ((row >= 0) & (rt == 1) & (hot | (rm > 0)))
-        ended = live & (~held | passes).all(dim=1)
-        done |= held & ended.unsqueeze(1)
-        held &= ~ended.unsqueeze(1)
-        live = live & ~ended
         order, _n = self._mops_in_order(held, u["key"])
         for j in range(order.shape[1]):
             us = order[:, j]
@@ -1562,6 +1561,8 @@ class SimMinorOps:
             dest = target.gather(1, us.clamp(min=0).unsqueeze(1)).squeeze(1)
             self._mops_upgrade_move(s, us, dest, m, op)
         done |= held
+        held &= ~ended.unsqueeze(1)
+        live = live & ~ended
         self.mops_upg[:, s, :P] = torch.where(go.unsqueeze(1), held, self.mops_upg[:, s, :P])
         self.mops_upg_on[:, s] = torch.where(go, live, self.mops_upg_on[:, s])
 
@@ -1974,15 +1975,18 @@ class SimMinorOps:
             m = m & (~hot | ok)
         if not bool(m.any()):
             return
-        beside = self._mops_swap(s, us, dest, m)
-        self._tac_move_to(m & ~beside, uc, dc, pre, seat, strike=False, danger=self._move_unit_danger(op["danger"]), later_turns=True)
+        danger = self._move_unit_danger(op["danger"])
+        beside = self._mops_swap(s, us, dest, m, True, danger)
+        self._tac_move_to(m & ~beside, uc, dc, pre, seat, strike=False, danger=danger, later_turns=True)
 
-    def _mops_swap(self, s: int, us: torch.Tensor, dest: torch.Tensor, mask: torch.Tensor) -> torch.Tensor:
+    def _mops_swap(self, s: int, us: torch.Tensor, dest: torch.Tensor, mask: torch.Tensor, later_turns: bool = False,
+                   danger: tuple | None = None) -> torch.Tensor:
         """`swapUnits` (UNITOPERATION_SWAP_UNITS 0x972880) for the unit at
         local slot `us` [B] onto `dest` [B] where `mask`: its own military
         unit there beside it, both with Movement left, changes places with it
-        (`_tac_swap`); [B] the games where such a unit of its own stood beside
-        it"""
+        where it is its partner (`_tac_swap`, the partner's step under the
+        order's path flags `later_turns` / `danger`); [B] the games where
+        such a unit of its own stood beside it"""
         pre, seat = self._mops_pre(s), self._mops_seat(s)
         b = torch.arange(self.B, device=self.device)
         uc = us.clamp(min=0)
@@ -1997,7 +2001,7 @@ class SimMinorOps:
         beside = m & own & (self.pair_dist[here, dc].to(torch.long) == 1)
         sw = beside & (mp[b, other] > 0)
         if bool(sw.any()):
-            self._tac_swap(sw, uc, here, dc, occ, pre, seat)
+            self._tac_swap(sw, uc, here, dc, occ, pre, seat, later_turns, danger)
         return beside
 
     def _mops_strike(self, s: int, us: torch.Tensor, plot: torch.Tensor, mask: torch.Tensor) -> None:

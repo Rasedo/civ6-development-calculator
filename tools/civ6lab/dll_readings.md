@@ -8718,3 +8718,62 @@ religious entry (gpu/core/sim_tactics.py); `_condemn_ok` /
   8.6 at t93 as logged.
 - Open: the game's contract 277 reads CANCELLED at t91, ours COMPLETED
   (neither open; the tree ends either way).
+
+## C-99 / C-128: the swap's partner test and its step along its own path; Move Unit's update before the executions; a Trader no passenger — READ (0x972540, 0x56e760, 0x972a50 -> 0x26fe20, 0x7d3a00 -> 0x7f0020, 0x586360 -> 0x208b80 / 0x523d60), both twins
+
+`swapUnits`, `swapPartner`, `pathNodes`, `groundOf`'s `boarded`
+(cpu/core/tactical.ts); `upgradeTreesTick`'s `arrived` (cpu/core/minorOps.ts).
+GPU `_tac_swap`, `_tac_boarded` (gpu/core/sim_tactics.py); `_mops_swap`'s
+`later_turns` / `danger`, `_mops_upgrade_trees` (gpu/core/sim_minorops.py).
+The replay's copy (`minorAi`, cpu/harness/replay.ts): a unit teleported before
+its player's turn opens, a land unit made in the turn embarked by its plot.
+
+- THE PARTNER (0x972540): the unit with Movement (0x56c690), not moved into
+  a zone of control (0x56e780: the formation's +0x518, `zocMoved`), the
+  target at distance 1; where it has moved (0x56e760: Movement +0xdb0 below
+  GetMaxMoves << 8) the path test 0x272a60 flag 4. Over the units on the
+  target's layer, one of its owner and type pair (vt +0xc8) with Movement,
+  not moved into a zone of control, its Movement at least the unit's plot's
+  own cost (plot vt +0x18 << 8, a centre 1) unless at its full Movement
+  (0x56e760 clear), and each placeable on the other's plot (0x2726b0 flag
+  4: a seen goal another player's unit at peace holds is none).
+- THE PARTNER'S STEP (0x972a50 at 0x972bff..0x972c1a): 0x26fe20 toward the
+  unit's old plot (+0x220 / +0x224, read before the unit walks) with the
+  order's flags — Move Unit's 0x100a (0x7eeba0's r13d), carryOut's and
+  Garrison City's 0 — one node a call: the first node of its path where it
+  lies in the first turn, none else; the step's zone test after it.
+- MOVE UNIT'S UPDATE BEFORE THE EXECUTIONS: btTick (0x7d3a00) updates every
+  node in order, then executes each SUCCESS / RUNNING action in node order.
+  Move Unit's update with no Location (0x7f0020 from 0x7f067c) is taken on
+  every held unit before Upgrade Units' execution (0x7ef850); on its SUCCESS
+  the executions still run — the upgrades, then the moves (0x7eeba0) — and
+  the tree ends after them.
+- THE PASSENGER (0x586360 under flag 1 at 0x586542..0x5865a1): the best
+  defender 0x208b80 under 0x108 (flag 8: no combat test) takes the first
+  unit of the mover's layer's plot list (0x523d60: no best yet, the
+  candidate), a civilian too; a Trader stands on no such list (as the
+  stacking count 0x585d90 counts none), so another player's Trader at sea
+  bars no embarked unit's step.
+- OPERATION ATTACK'S MOVES (0x80c180 at 0x80c4d9..0x80c535): each member's
+  MOVE_TO walks at its push (the queue's vt +0x60), the line's "Arrive" its
+  plot after it: the members' paths are found one after another as they walk.
+- CONFIRMED (one-seed aimem traces against the head 3b3fa24e, to t110-t180):
+  runs/h1_duely1128 t174 Hong Kong's Warrior 2490370 on 8:7 swaps onto 9:7,
+  the Warrior 2293764 there steps first onto 9:8 (8:7 beside the barbarians
+  on 9:6), the Man-At-Arms 1507331 on 10:7 swaps not (2490370 moved into the
+  barbarians' zone); t178 the same; t164 city-state 4's Courser 786436 onto
+  its centre the turn its tree ends; t154 Bologna's Warriors 2228224 /
+  2162692. runs/h1_duely1124 t91 Granada's Heavy Chariot 1114117 39:11 ->
+  41:12 as its tree ends; t110-t136 city-state 3's embarked units past player
+  1's Trader at sea (AI_Planning.csv), the Wander draws over 18 and 21 as
+  logged; t118 city-state 2's Man-At-Arms plans no 9:9 under player 1's
+  embarked Builder.
+- OPEN: runs/h1_duely1128 t174 the game steps the Warrior 2293764 onto 9:8
+  under player 1's Trebuchet and teleports it to 8:8 once Hong Kong's Trader
+  enters 9:8 (UnitTeleported); the engines leave it on 9:8. THE TREES' ORDER:
+  the Upgrade Units trees tick in the tree pool's slot order (0x7fef20, a
+  freed slot reused: a newer tree may tick first), the engines' one list in
+  the player's unit order: runs/h1_duely1121 t71 city-state 4's Warrior
+  524293 (tree 39:2) reaches its centre before the Warrior 262146 (tree
+  38:3), whose path then ends its turn on 33:20 (seven minor-turns over the
+  five duely duels).

@@ -65,6 +65,7 @@
     - "C-99: Move Unit's no-Location execution, the swap's partner and the move order's first turn"
     - "C-99: the pathfinder's later-turn pool, Heal's hull, the tactical list's explorers, Move Unit's planning"
     - "C-99: an owned water plot no shore, a move order carried on as the turn ends — READ (0x530240, 0x66790, 0x66a90, 0x66680, 0x814e0, 0x81240, 0x7eeba0), both twins"
+    - "C-99 / C-128: the swap's partner test and its step along its own path; Move Unit's update before the executions; a Trader no passenger — READ (0x972540, 0x56e760, 0x972a50 -> 0x26fe20, 0x7d3a00 -> 0x7f0020, 0x586360 -> 0x208b80 / 0x523d60), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ...e Formation 0x7efd70 / 0x7ee630; Protect Unit 0x7f07c0 / 0x7ef0e0; Move Unit 0x7f0020 / 0x7eeba0; Operation Change Target 0x8196d0 / 0x8163a0; Operation Is Ready 0x81a090.
@@ -117,6 +118,7 @@
     - "C-99: the upgrade trees — READ (the trigger, Find Available Unit's upgradeable offer, Find Unit Targets' job, Upgrade Units, the economic AI's upgrade, Move Unit with no Location), ported; the deletion of an excess obsolete unit unported"
     - "C-96: the upgrade trees' deletion — READ (0x7ef850's branches, 0x591000), both twins"
     - "C-96: the upgrade trees' deletion"
+    - "C-99 / C-128: the swap's partner test and its step along its own path; Move Unit's update before the executions; a Trader no passenger — READ (0x972540, 0x56e760, 0x972a50 -> 0x26fe20, 0x7d3a00 -> 0x7f0020, 0x586360 -> 0x208b80 / 0x523d60), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...s tables): Find Unit Targets update 0x7ed200, Upgrade Units update 0x7f0ea0 / execution 0x7ef850."
@@ -142,6 +144,9 @@
   semantics: "Move Unit's update: its kept unit (+0x50, kept across turns; an id of 0 or -1 none) alive with a planning: SUCCESS where the planning reaches the location within one turn (0x791300, the flag clear), else RUNNING. None kept: over its units in order, the first reaching it this turn with Movement left (the flag set) is kept and it SUCCEEDS; else the first reaching it this turn, where none is kept yet, or the one whose path (0x272a60) takes the fewest turns, is kept, RUNNING; none FAILURE. \"Allow Danger\" 0 (every city tree's): the location read on the player's danger map (0x7f040d: 0x716a60 on player +0x12d8, x + y x width into 0x716a90); a location of danger lets the kept unit that reaches it go (+0x50 -1, SUCCESS), and a unit is kept by its path only where the location is clear (0x7f057e). With no Location (0x7f067c) SUCCESS where every tree unit with a target is done. No Location SUCCESS, no unit SUCCESS; the unit it holds (the node's memory): its planning reaching a plot at To Range of the location this turn (0x791300) SUCCESS, else RUNNING, a held unit with no planning FAILURE; none held, the unit whose planning reaches the location this turn — one with Movement left there first —, else the one whose path (0x272a60 on the unit's path finder +0x1fb8, flag 0x1000, at 0x7f05a0) takes the fewest turns (above 0, fewer than the best so far) is held: SUCCESS where it reaches it with Movement left, else RUNNING; none FAILURE. A camp its own defender holds is such a goal. With no Location (from 0x7f067c): over the tree's units, each with a target (+0x830) reaching it within a turn with Movement left (0x791300) or whose target holds danger (0x716a60, Allow Danger false) passes; one with no planning (+0x1fc0) or none reaching it RUNNING, else SUCCESS. At 0x7f067c: with no Location: no unit in the tree, SUCCESS; else over the tree's units (0x6092c0) each with a target (+0x830 / +0x834 valid): with a planning reaching the target this turn (0x791300: 1 turn, no Movement asked) and Allow Danger false, a target on the danger map (0x716a60) passes; else its planning reaching the target this turn with Movement left (r9b 1) passes; no planning, or neither, RUNNING. Every unit passing, SUCCESS: the tree ends and frees its units. Ported: upgradeArrived in upgradeTreesTick (cpu/core/minorOps.ts), Move Unit's update in _mops_upgrade_trees."
   status: PARTLY
   cases:
+    - recording: h1_duely1124
+      turn: 91
+      value: Granada's Heavy Chariot 1114117 on 39:11 goes to its centre 41:12 the turn its Upgrade Units tree ends (record t+1, the tree gone at t92's log)
     - recording: h1_duely1128
       turn: 154
       value: "Bologna at 0 Gold: its Upgrade Units tree 5963782 holds four units t151-153 that walk to its centre; the tree gone at t154, the units wander from t156"
@@ -153,9 +158,10 @@
       value: Bologna's Upgrade Units tree 5963782 holds four units at 0 Gold t151-153, gone at t154 once they reach the centre; the units wander from t156
   impl:
     - cpu/core/aiCityTrees.ts:moveUnit
-    - gpu/core/sim_citytrees.py:_u_move
     - cpu/core/barbarianOps.ts:SCOUT_NODES
     - cpu/core/minorOps.ts:upgradeArrived
+    - gpu/core/sim_citytrees.py:_u_move
+    - gpu/core/sim_minorops.py:_mops_upgrade_trees
   readings:
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
     - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
@@ -166,6 +172,8 @@
     - "C-99: Move Unit's update with no Location ends the Upgrade Units trees — READ, both twins"
     - "C-99: Move Unit's update with no Location ends the Upgrade Units trees"
     - "C-127: a unit bought this turn holds no planning, so the tree that bought it ends — READ (records, aimem), both twins"
+    - "C-99 / C-128: the swap's partner test and its step along its own path; Move Unit's update before the executions — READ (0x972540, 0x56e760, 0x972a50 -> 0x26fe20, 0x7d3a00 -> 0x7f0020), both twins"
+    - "C-99 / C-128: the swap's partner test and its step along its own path; Move Unit's update before the executions; a Trader no passenger — READ (0x972540, 0x56e760, 0x972a50 -> 0x26fe20, 0x7d3a00 -> 0x7f0020, 0x586360 -> 0x208b80 / 0x523d60), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ...7f1d70; Make Formation 0x7efd70 / 0x7ee630; Protect Unit 0x7f07c0 / 0x7ef0e0; Move Unit 0x7f0020 / 0x7eeba0; Operation Change Target 0x8196d0 / 0x8163a0; Operation Is Ready 0x81a090.

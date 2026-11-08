@@ -19,7 +19,7 @@ import { AI_FEATURES, AI_UNITS } from '../data/aiBuildTables';
 import { AI_UNIT_AI } from '../data/aiOperations';
 import { engineId, gameTypeOf, installFeature } from '../data/aliases';
 import {
-  canEmbark, cityAtIndex, crossesRiver, embarkTechMoves, escortUnit, inEscort, cliffBlocksStep, shoreCrossing, districtZones, encampmentBlocks, encampmentIntact, inEnemyZoc, rosterEmbarkMoves, stepCost, stepUnit, unitDomain, unitExertsZoc, unitFullMoves, unitIsNoncombat, unitReligious,
+  canEmbark, cityAtIndex, crossesRiver, embarkTechMoves, escortUnit, inEscort, cliffBlocksStep, shoreCrossing, districtZones, encampmentBlocks, encampmentIntact, inEnemyZoc, rosterEmbarkMoves, stepCost, stepUnit, terrainMp, unitDomain, unitExertsZoc, unitFullMoves, unitIsNoncombat, unitReligious,
   setBarbStepLook, unitsHostile, unitVisibleTo,
   waterEnterable, formationCS, setRecordFormation, formationMates, dropLoneRiders,
 } from './units';
@@ -204,9 +204,13 @@ interface Ground {
   /** the unit embarked, and the best of the other players' units on the
    *  plot embarked too (0x586360 under flag 1 at 0x586542..0x5865a1: the
    *  best defender 0x208b80 under 0x108 — any other player's unit, seen or
-   *  not —, read as a passenger where no other player's hull stands beside
-   *  it): the unit may neither end there nor pass (the node's +0x50 bit 0x40
-   *  clear) */
+   *  not, a civilian among them, a Trader none —, read as a passenger where
+   *  no other player's hull stands beside it): the unit may neither end
+   *  there nor pass (the node's +0x50 bit 0x40 clear; runs/h1_duely1124
+   *  t136: city-state 3's embarked Bombard on 42:13 plans 41:13 (1/2) under
+   *  player 1's Trader at sea, and 42:12 (1/1) by it; t118 city-state 2's
+   *  embarked Man-At-Arms on 9:10 plans no 9:9, player 1's embarked Builder
+   *  on it, AI_Planning.csv) */
   boarded: (i: number) => boolean;
   /** another player's ground closed to a city-state's unit (`closedToMinor`) */
   closed: (i: number) => boolean;
@@ -274,7 +278,9 @@ function groundOf(state: GameState, unit: Unit, revealedOnly = true, planning = 
     if (!unit.embarked || !held.has(i)) return false;
     let v = boards.get(i);
     if (v === undefined) {
-      const others = state.units.filter((x) => x.tileIndex === i && x.seat !== unit.seat && onLayer(x));
+      // a Trader stands on a map layer of its own: no plot list the best
+      // defender reads (0x75c50 on the mover's layer) holds it
+      const others = state.units.filter((x) => x.tileIndex === i && x.seat !== unit.seat && onLayer(x) && !UNITS[x.type]?.trader);
       boards.set(i, (v = others.some((x) => !!x.embarked) && others.every((x) => !!x.embarked)));
     }
     return v;
@@ -866,6 +872,12 @@ export function turnsToPlot(state: GameState, unit: Unit, dest: number, laterTur
  *  pathfinder's path (its parents once `dest` closes); empty where none */
 export function pathTo(state: GameState, unit: Unit, dest: number, laterTurns = false, explore = true,
   danger?: PathDanger, mates: readonly Unit[] = formationMates(state, unit), scout = false): number[] {
+  return pathNodes(state, unit, dest, laterTurns, explore, danger, mates, scout).map((n) => n.tile);
+}
+
+/** `pathTo`'s nodes, each with the turn it is reached in */
+function pathNodes(state: GameState, unit: Unit, dest: number, laterTurns: boolean, explore: boolean,
+  danger: PathDanger | undefined, mates: readonly Unit[], scout = false): PNode[] {
   // a destination another player's unit holds out of the player's sight is
   // no path, an attack order's too: the move order's request (0x962310)
   // drops the attack flag 0x10 where the owner's visibility count of its
@@ -881,8 +893,8 @@ export function pathTo(state: GameState, unit: Unit, dest: number, laterTurns = 
     found = n;
     return true;
   }, undefined, scout ? 'explore' : undefined, laterTurns, false, explore, danger, mates, dest);
-  const out: number[] = [];
-  for (let n: PNode | null = found; n && n.parent; n = n.parent) out.push(n.tile);
+  const out: PNode[] = [];
+  for (let n: PNode | null = found; n && n.parent; n = n.parent) out.push(n);
   return out.reverse();
 }
 
@@ -1093,25 +1105,60 @@ function foreignAt(state: GameState, unit: Unit, tile: number): boolean {
 /** UNITOPERATION_SWAP_UNITS onto `tile` (0x972880; its partner 0x972540):
  *  with a unit of its own stacking with it on the plot beside it, both with
  *  Movement left (0x56c690; one whose moves an order of the pass ended has
- *  none), the unit steps there with its Movement, then the other steps onto
- *  its plot with its own (Start 0x972a50: the partner's formation walked by
- *  0x26fe20, the step's cost spent); none, nothing (runs/h1_duely1128 t146:
+ *  none), the unit steps there with its Movement, then the other takes one
+ *  step of its own path to the unit's old plot under the order's path flags
+ *  (`laterTurns` 0x1000, `danger` 2 / 8), the step's cost spent — the path's
+ *  first node where it lies in the first turn, none else (Start 0x972a50:
+ *  the partner's formation walked by 0x26fe20, one node a call; runs/h1_duely1128
+ *  t174: Hong Kong's Warrior 2490370 on 8:7 swaps onto its centre 9:7 under
+ *  Move Unit's 0x100a, 8:7 beside the barbarians on 9:6, so the Warrior
+ *  2293764's path to it steps first onto 9:8); none, nothing (runs/h1_duely1128 t146:
  *  Hong Kong's Warrior 2424833 on 9:6 stays beside its centre, whose City
  *  Defense garrison fortified; Bologna t154: its Warrior 2228224 swaps with
  *  the Trebuchet its completed City Defense let go; runs/h1_duely1124 t12:
  *  city-state 4's Warrior 196610 swaps onto 36:7, its Warrior 131073 on
  *  35:7 left one Movement, short of the Marsh 36:8 it wanders to) */
-export function swapUnits(state: GameState, pass: Pass, unit: Unit, tile: number): void {
+export function swapUnits(state: GameState, pass: Pass, unit: Unit, tile: number, laterTurns = false, danger?: PathDanger): void {
   if (unit.movesLeft <= 0 || pass.ended.has(unit.id) || tile < 0 || plotDistance(state, unit.tileIndex, tile) !== 1) return;
-  const dom = unitDomain(unit.type);
-  const other = state.units.find((u) => u !== unit && u.tileIndex === tile && u.seat === unit.seat && unitDomain(u.type) === dom
-    && u.movesLeft > 0 && !pass.ended.has(u.id));
-  if (!other) return;
   const from = unit.tileIndex;
+  const other = swapPartner(state, pass, unit, tile);
+  if (!other) return;
   other.tileIndex = from;
   moveTo(state, unit, tile, false);
   other.tileIndex = tile;
-  if (unit.tileIndex === tile) stepUnit(state, other, state.map.tiles[from]);
+  if (unit.tileIndex !== tile) return;
+  const step = pathNodes(state, other, from, laterTurns, true, danger, formationMates(state, other))[0];
+  if (!step || step.turns > 1 || step.tile === tile) return;
+  stepUnit(state, other, state.map.tiles[step.tile]);
+  // the step's zone test on the plot it stands on (0x26fe20 at 0x270800)
+  if (zocMoved && other.tileIndex !== tile) {
+    if (inEnemyZoc(state, other.tileIndex, other)) zocMoved.add(other);
+    else zocMoved.delete(other);
+  }
+}
+
+/** the plot's own movement cost (the plot's vt +0x18): a city's centre 1,
+ *  else its terrain's and feature's */
+const plotMoveCost = (t: Tile): number => (t.district === 'CITY_CENTER' ? MP_SCALE : terrainMp(t));
+
+/** THE SWAP'S PARTNER (0x972540): a unit of the unit's player and domain on
+ *  the plot (vt +0xc8 on the two types) with Movement left (0x56c690; one
+ *  whose moves an order of the pass ended has none) as much as the unit's
+ *  plot costs (its vt +0x18) unless at its full Movement (0x56e760), and
+ *  each placeable on the other's plot (0x2726b0 flag 4: a goal it sees
+ *  where another player's unit at peace stands is none) — runs/h1_duely1128
+ *  t174: Hong Kong's Man-At-Arms 1507331 on 10:7 does not swap onto its
+ *  centre with the Warrior 2490370 left 1 Movement, 10:7 Woods; its Warrior
+ *  2293764 on 9:8, player 1's Trebuchet there, none */
+function swapPartner(state: GameState, pass: Pass, unit: Unit, tile: number): Unit | undefined {
+  const dom = unitDomain(unit.type);
+  const from = state.map.tiles[unit.tileIndex];
+  const seen = plotsSeenNow(state, new Set([unit.seat]));
+  if (zocMoved?.has(unit) || (seen[tile] === 1 && peaceAt(state, unit, tile))) return undefined;
+  return state.units.find((u) => u !== unit && u.tileIndex === tile && u.seat === unit.seat && unitDomain(u.type) === dom
+    && u.movesLeft > 0 && !pass.ended.has(u.id) && !zocMoved?.has(u)
+    && (u.movesLeft >= plotMoveCost(from) || u.movesLeft >= (u.movesFull ?? unitFullMoves(state, u)))
+    && !(seen[unit.tileIndex] === 1 && peaceAt(state, u, unit.tileIndex)));
 }
 
 /** a unit of the unit's player on the plot that stacks with it or with a

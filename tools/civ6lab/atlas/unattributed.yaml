@@ -1247,6 +1247,7 @@
     - "C-99: Move Unit's no-Location execution, the swap's partner and the move order's first turn — READ, ported; the swap's path tests and 0x56e760 unread"
     - "C-95: the danger map's search pays no zone of control, a ranged unit strikes from its range; the rampage strike's ring — READ (0x26df90, 0x26e920, 0x771670, 0x691f0, 0x76ecf0), FIT (the ranged unit's strike), both twins"
     - "C-127: a unit bought this turn holds no planning, so the tree that bought it ends — READ (records, aimem), both twins"
+    - "C-99 / C-128: the swap's partner test and its step along its own path; Move Unit's update before the executions; a Trader no passenger — READ (0x972540, 0x56e760, 0x972a50 -> 0x26fe20, 0x7d3a00 -> 0x7f0020, 0x586360 -> 0x208b80 / 0x523d60), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...order, strictly nearer replaces, +0x4c clear, enterable 0x586360), with a path to it (0x272a60), not chosen (\"HL: Explore cur region\"); a unit off any region the nearest of its area..."
@@ -2221,9 +2222,12 @@
 - addr: 0x523d60
   final: 0x36e340
   kind: function
-  semantics: "the best defender's comparator: strictly greater unwounded strength."
+  semantics: "the best defender's comparator: no best yet, the candidate (true); else the candidate's combat strength (GetCombat 0x56dc90, no modifiers) strictly above the best's."
   status: READ
   cases:
+    - recording: h1_duely1124
+      turn: 136
+      value: city-state 3's embarked Bombard 1638401 on 42:13 plans 41:13 (1/2) under player 1's Trader at sea and 42:12 (1/1) by it; t118 city-state 2's embarked Man-At-Arms 1114117 on 9:10 plans no 9:9 under player 1's embarked Builder (AI_Planning.csv)
     - recording: 1121
       turn: 191
       value: "Recorded: 1121 Guangzhou t191, a Line Infantry Corps (75,   16 HP) over an Ironclad (70, 75 HP): 66.6015625 = 60 + 75 − 2150/256 − 60   (the strongest-by-term reading gave 67.5)."
@@ -2231,6 +2235,8 @@
   readings:
     - "H-1: an annex re-places the citizens, the garrison's unit, a religious unit killed on a move — READ"
     - "C-99: an embarked unit passes no other player's passenger — the step's flag-1 test READ (0x2720a0 at 0x272372, 0x271be0, 0x586360 at 0x586542, 0x208b80 under 0x108, 0x20a2a0), both twins"
+    - "C-99 / C-128: the swap's partner test and its step along its own path; Move Unit's update before the executions — READ (0x972540, 0x56e760, 0x972a50 -> 0x26fe20, 0x7d3a00 -> 0x7f0020), both twins"
+    - "C-99 / C-128: the swap's partner test and its step along its own path; Move Unit's update before the executions; a Trader no passenger — READ (0x972540, 0x56e760, 0x972a50 -> 0x26fe20, 0x7d3a00 -> 0x7f0020, 0x586360 -> 0x208b80 / 0x523d60), both twins"
   context:
     - "...defender 0x208b80 (flag 0x10): among the plot's units in its own order the comparator 0x523d60 keeps the first whose unwounded strength (0x56dc90 with the formation's) is strictly gr..."
   review: reviewed
@@ -5775,6 +5781,7 @@
   readings:
     - "C-99: the upgrade trees — READ (the trigger, Find Available Unit's upgradeable offer, Find Unit Targets' job, Upgrade Units, the economic AI's upgrade, Move Unit with no Location), ported; the deletion of an excess obsolete unit unported"
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
+    - "C-99 / C-128: the swap's partner test and its step along its own path; Move Unit's update before the executions; a Trader no passenger — READ (0x972540, 0x56e760, 0x972a50 -> 0x26fe20, 0x7d3a00 -> 0x7f0020, 0x586360 -> 0x208b80 / 0x523d60), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...0x800c60 (the trigger row +0x388): a row with no operation makes a tree in the manager (0x7fef20, its nodes 0x7faa60; none, it is dropped) and starts it at the row's priority (0x7cb230..."
@@ -6715,23 +6722,30 @@
   final: 0x67c350
   kind: function
   name: swapPartner
-  semantics: "the swap's partner (the operation's vt +0xc0; CanStart 0x9724c0 and Start 0x972a50 through it): the unit with Movement left (0x56c690), not moved into a zone of control (0x56e780), the target at distance 1 (0x1deb0); (0x56e760 set: the path test 0x272a60 flag 4); over the units on the target's layer (0x75c50) one of the same owner (+0x2e0) and relation (vt +0xc8 on +0x160) with Movement left, not moved into a zone of control, (its Movement +0xdb0 under the unit's plot's cost << 8 needs 0x56e760 clear), and the destinations valid both ways (0x2726b0 flag 4). Ported: swapUnits (cpu/core/tactical.ts), _tac_carry_out's swap."
+  semantics: "the swap's partner (the operation's vt +0xc0; CanStart 0x9724c0 and Start 0x972a50 through it): the unit with Movement left (0x56c690), not moved into a zone of control (0x56e780), the target at distance 1 (0x1deb0); where it has moved (0x56e760) the path test 0x272a60 flag 4. Over the units on the target's layer (0x75c50) one of the same owner (+0x2e0) and type pair (vt +0xc8 on +0x160) with Movement left, not moved into a zone of control, its Movement (+0xdb0) at least the unit's plot's own cost (plot vt +0x18 << 8) unless at its full Movement (0x56e760 clear), and the destinations valid both ways (0x2726b0 flag 4: a seen goal where another player's unit at peace stands none)."
   status: READ
   cases:
+    - recording: h1_duely1128
+      turn: 174
+      value: Hong Kong's Warrior 2490370 on 8:7 swaps onto its centre 9:7; its Warrior 2293764 steps first onto 9:8, 8:7 beside the barbarians on 9:6; its Man-At-Arms 1507331 on 10:7 swaps not with 2490370, moved into the barbarians' zone (record t+1)
     - recording: h1_duely1128
       turn: 154
       value: "Bologna: its Warrior 2228224 on 4:10 swaps onto its centre with the Trebuchet, then Warrior 2162692 on 5:8 swaps onto it with the first (record t+1)"
     - recording: h1_duely1128
       value: t154 Bologna's Warriors 2228224 and 2162692 swap onto its centre in turn; t146 Hong Kong's Warrior 2424833 stays beside its centre, the fortified garrison there with no Movement
   impl:
+    - cpu/core/tactical.ts:swapPartner
     - cpu/core/tactical.ts:swapUnits
-    - gpu/core/sim_tactics.py:_tac_carry_out
     - gpu/core/sim_minorops.py:_mops_upgrade_move
+    - gpu/core/sim_tactics.py:_tac_carry_out
+    - gpu/core/sim_tactics.py:_tac_swap
   readings:
     - "C-99: Move Unit's no-Location execution, the swap's partner and the move order's first turn — READ, ported; the swap's path tests and 0x56e760 unread"
     - "C-99: the city-states' Promotion move on the replay's copy, Garrison City's swap — READ, both twins"
     - "C-99: Move Unit's no-Location execution, the swap's partner and the move order's first turn"
     - "C-125 / C-99: the swap's partner pays its step, the stacking count's classes, the walk's end among other players' units, a siege unit's RangedCombat — READ (0x972a50, 0x585d90, 0x26fe20 via 0x585eb0, 0x56e3e0), both twins"
+    - "C-99 / C-128: the swap's partner test and its step along its own path; Move Unit's update before the executions — READ (0x972540, 0x56e760, 0x972a50 -> 0x26fe20, 0x7d3a00 -> 0x7f0020), both twins"
+    - "C-99 / C-128: the swap's partner test and its step along its own path; Move Unit's update before the executions; a Trader no passenger — READ (0x972540, 0x56e760, 0x972a50 -> 0x26fe20, 0x7d3a00 -> 0x7f0020, 0x586360 -> 0x208b80 / 0x523d60), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "- THE SWAP'S PARTNER (0x972540, the operation's vt +0xc0, CanStart 0x9724c0 and Start 0x972a50 through it): the unit w..."
@@ -6739,9 +6753,12 @@
 - addr: 0x972a50
   final: 0x67c860
   kind: function
-  semantics: "UNITOPERATION_SWAP_UNITS' Start: the partner (0x972540); the unit's formation walks to the target by the move 0x26fe20 (the order's flags | 4), then the partner's formation to the unit's old plot by 0x26fe20 with the order's flags, its step's cost spent."
+  semantics: "UNITOPERATION_SWAP_UNITS' Start: the partner (0x972540); the unit's formation walks to the target by the move 0x26fe20 (the order's flags | 4), then the partner's formation by 0x26fe20 toward the unit's old plot (+0x220 / +0x224 read before the unit walks) with the order's flags: one node of its own path, the path's first node where it lies in the first turn, its step's cost spent."
   status: READ
   cases:
+    - recording: h1_duely1128
+      turn: 174
+      value: Hong Kong's Warrior 2490370 on 8:7 swaps onto its centre 9:7; its Warrior 2293764 steps first onto 9:8, 8:7 beside the barbarians on 9:6; its Man-At-Arms 1507331 on 10:7 swaps not with 2490370, moved into the barbarians' zone (record t+1)
     - recording: h1_duely1128
       turn: 154
       value: "Bologna: its Warrior 2228224 on 4:10 swaps onto its centre with the Trebuchet, then Warrior 2162692 on 5:8 swaps onto it with the first (record t+1)"
@@ -6753,6 +6770,8 @@
     - "C-99: Move Unit's no-Location execution, the swap's partner and the move order's first turn — READ, ported; the swap's path tests and 0x56e760 unread"
     - "C-99: Move Unit's no-Location execution, the swap's partner and the move order's first turn"
     - "C-125 / C-99: the swap's partner pays its step, the stacking count's classes, the walk's end among other players' units, a siege unit's RangedCombat — READ (0x972a50, 0x585d90, 0x26fe20 via 0x585eb0, 0x56e3e0), both twins"
+    - "C-99 / C-128: the swap's partner test and its step along its own path; Move Unit's update before the executions — READ (0x972540, 0x56e760, 0x972a50 -> 0x26fe20, 0x7d3a00 -> 0x7f0020), both twins"
+    - "C-99 / C-128: the swap's partner test and its step along its own path; Move Unit's update before the executions; a Trader no passenger — READ (0x972540, 0x56e760, 0x972a50 -> 0x26fe20, 0x7d3a00 -> 0x7f0020, 0x586360 -> 0x208b80 / 0x523d60), both twins"
   context:
     - "- THE SWAP'S PARTNER (0x972540, the operation's vt +0xc0, CanStart 0x9724c0 and Start 0x972a50 through it): the unit with Movement left (0x56c690), not moved into a zone of control (..."
   review: reviewed

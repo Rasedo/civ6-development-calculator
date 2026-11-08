@@ -270,12 +270,14 @@ class SimTactics:
     def _tac_boarded(self, seat: int, rel: bool = False) -> torch.Tensor:
         """[B, T] bool — `groundOf`'s boarded for an embarked mover of
         `seat`, on the map layer of a religious mover (`rel`) or of any
-        other: another player's passenger holds the plot and no other
-        player's unit stands there unembarked (0x586360 under flag 1, the
-        best defender 0x208b80 under 0x108)."""
+        other: another player's passenger but a Trader holds the plot and no
+        other player's unit stands there unembarked (0x586360 under flag 1,
+        the best defender 0x208b80 under 0x108)."""
         ep = self.embarked_at
-        es = torch.where(ep >= 0, self.unit_seat.gather(1, ep.clamp(min=0)), torch.full_like(ep, seat))
-        out = (es != seat) & self._tac_layer(ep, rel)
+        epc = ep.clamp(min=0)
+        es = torch.where(ep >= 0, self.unit_seat.gather(1, epc), torch.full_like(ep, seat))
+        trader = self.unit_type.gather(1, epc) == self._trader_idx
+        out = (es != seat) & ~trader & self._tac_layer(ep, rel)
         for pl in (self.military_at, self.civilian_at, self.support_at):
             s = torch.where(pl >= 0, self.unit_seat.gather(1, pl.clamp(min=0)), torch.full_like(pl, seat))
             out &= (s == seat) | ~self._tac_layer(pl, rel)
@@ -3076,15 +3078,39 @@ class SimTactics:
         return perm
 
     def _tac_swap(self, sw: torch.Tensor, u_b: torch.Tensor, here: torch.Tensor, dest: torch.Tensor, occ: torch.Tensor,
-                  pre: str, seat: int) -> None:
+                  pre: str, seat: int, later_turns: bool = False, danger: tuple | None = None) -> None:
         """`swapUnits`' exchange in the games of `sw`: the unit at local slot
-        `u_b` of pool `pre` on `here` [B] moves onto `dest` [B], held by its
-        own unit `occ` [B] (a merged slot), the other read on `here` while it
-        moves; arrived, the other steps onto `here` with its own Movement
-        (`stepUnit`, the step's cost spent; a step it cannot afford leaves it
-        on `dest`), else it keeps `dest`"""
-        bidx = torch.arange(self.B, device=self.device)
+        `u_b` of pool `pre` on `here` [B], held by its own unit `occ` [B] (a
+        merged slot) on `dest` [B], where that one is its partner
+        (`swapPartner`, 0x972540: neither moved into a zone of control, the
+        other's Movement as much as `here`'s own cost or full, each placeable
+        on the other's plot — no unit of another player at peace on a plot
+        the player sees), moves onto `dest`, the other read on `here` while
+        it moves; arrived, the other takes the first node of its own path to
+        `here` under the order's flags (`later_turns`, `danger`) where it
+        lies in the first turn (`stepUnit`, the step's cost spent), else it
+        keeps `dest`"""
+        B, T, dev = self.B, self.T, self.device
+        bidx = torch.arange(B, device=dev)
         tile_p = getattr(self, f"{pre}_unit_tile")
+        mp_p = getattr(self, f"{pre}_unit_mp")
+        lo = self.POOL_LO[pre]
+        other = (occ.clamp(min=0) - lo).clamp(min=0, max=mp_p.shape[1] - 1)
+        # the partner test (`swapPartner`)
+        here_c = here.clamp(min=0)
+        dest_c = dest.clamp(min=0)
+        cost = torch.where(self._centre_plane().gather(1, here_c.unsqueeze(1)).squeeze(1),
+                           torch.full_like(here_c, self._mp_scale), self._mp_scale + self.tmove.gather(1, here_c.unsqueeze(1)).squeeze(1))
+        omp = mp_p[bidx, other]
+        enough = (omp >= cost) | (omp >= getattr(self, f"{pre}_unit_mp_full")[bidx, other])
+        zm = self._tac_zoc_moved_of(pre)
+        zoned = torch.zeros_like(sw) if zm is None else zm[bidx, u_b] | zm[bidx, other]
+        seen = self._barb_seen("barbarians" if seat == BARB_SEAT else seat)
+        peace = self._tac_peaceful(seat) & seen
+        held = peace.gather(1, dest_c.unsqueeze(1)).squeeze(1) | peace.gather(1, here_c.unsqueeze(1)).squeeze(1)
+        sw = sw & enough & ~zoned & ~held
+        if not bool(sw.count_nonzero()):
+            return
         rs, oc = bidx[sw], occ[sw].clamp(min=0)
         self.military_at[rs, dest[sw]] = -1
         self.unit_tile[rs, oc] = here[sw]
@@ -3093,10 +3119,48 @@ class SimTactics:
         there = sw & (tile_p[bidx, u_b] == dest)
         back = sw & ~there
         self.military_at[bidx[back], dest[back]] = occ[back]
-        if bool(there.count_nonzero()):
-            dirs = (self.neigh[dest] == here.unsqueeze(1)).long().argmax(dim=1)
-            self._step_verb(there, occ.clamp(min=0), dest, here, dirs, seat, torch.zeros_like(there),
-                            clear_camp=seat != BARB_SEAT)
+        if not bool(there.count_nonzero()):
+            return
+        # the partner's path to `here`, its first node (0x26fe20 one node a
+        # call): a node of the first turn off its plot
+        rows = there.nonzero(as_tuple=True)[0]
+        sr = other[rows]
+        dr = here[rows]
+        dg = None if danger is None else tuple(x[rows] for x in danger)
+        res = self._tac_search(rows, sr, seat, 1 << 30, True, dr, pre=pre, later_turns=later_turns, danger=dg,
+                               mate=self._tac_mate(rows, sr, pre))
+        par, start = res["parent"], res["start"]
+        R = rows.shape[0]
+        ar = torch.arange(R, device=dev)
+        cur = torch.where(res["found"], dr, start)
+        for _ in range(2 * T):
+            nxt = par[ar, cur]
+            more = (cur != start) & (nxt != start)
+            if not bool(more.count_nonzero()):
+                break
+            cur = torch.where(more, nxt, cur)
+        first = cur % T
+        step = (res["found"] & (cur != start) & (cur < T) & (first != start)
+                & (res["closed"][ar, first.clamp(min=0)] == 1))
+        if not bool(step.count_nonzero()):
+            return
+        okB = torch.zeros(B, dtype=torch.bool, device=dev)
+        okB[rows[step]] = True
+        toB = dest.clone()
+        toB[rows] = torch.where(step, first, dr)
+        dirs = (self.neigh[dest_c] == toB.unsqueeze(1)).long().argmax(dim=1)
+        self._step_verb(okB, occ.clamp(min=0), dest, toB, dirs, seat, torch.zeros_like(okB),
+                        clear_camp=seat != BARB_SEAT)
+        # the step's zone test on the plot it stands on (0x26fe20 at 0x270800)
+        if zm is not None:
+            ut = getattr(self, f"{pre}_unit_type")[rows, sr].clamp(min=0, max=self.NU - 1)
+            naval = self.unit_naval.take(ut)
+            no_end = torch.zeros(R, T, dtype=torch.bool, device=dev)
+            now = tile_p[rows, sr]
+            moved = step & (now != dest[rows])
+            if bool(moved.count_nonzero()):
+                z = self._tac_zoc_path(rows, seat, naval, self._tac_zoc_ignored(ut), None, no_end)[ar, now.clamp(min=0)]
+                zm[rows[moved], sr[moved]] = z[moved]
 
     def _tac_carry_out(self, out: dict, done: torch.Tensor, rowof: torch.Tensor, res: dict, pre: str = "barb",
                        seat: int = BARB_SEAT) -> None:

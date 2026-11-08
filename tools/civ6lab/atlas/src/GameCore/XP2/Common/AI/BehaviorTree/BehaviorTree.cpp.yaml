@@ -178,6 +178,9 @@
   semantics: "one tick of a behaviour tree: the walk, then each SUCCESS / RUNNING action executed in node order Statuses FRESH 0, SUCCESS 1, RUNNING 2, FAILURE 3, ERROR 4, SKIPPED 5; shapes (NodeDefinitions.ShapeId) 0 selector, 1 action, 2 decision, 3 decorator; handler tables by shape: selector update @f2ed50, parent function @f2ed70, decorator update @f2ed90, leaf update @f2edb0, decision update @f2edd0, execution @f2edf0, the next-node function @f2ee10 (default i + 1). Runs where the root is FRESH or SKIPPED: each node in order updated (0x7d3d30; a SKIPPED parent skips it), the walk's next node the larger of its own next and the parent propagation's (0x7d1750); with the root SUCCESS, RUNNING or FAILURE every node left SUCCESS or RUNNING executes in node order; a root RUNNING or FRESH resets the tree for the next turn, else the tree is done (the operation complete)."
   status: READ
   cases:
+    - recording: h1_duely1124
+      turn: 91
+      value: Granada's Heavy Chariot 1114117 on 39:11 goes to its centre 41:12 the turn its Upgrade Units tree ends (record t+1, the tree gone at t92's log)
     - recording: h1_duelw1117-1128
       turn: all
       value: "the action replay: the Operation rows end on the game's plot 416 of 1,265; barb:move imposed 1117 634 -> 421, 1121 1,325 -> 1,096"
@@ -188,6 +191,7 @@
     - cpu/core/behaviorTree.ts:AiTreeNode
     - gpu/core/sim_citytrees.py:tick_tree
     - cpu/core/operations/manager.ts:operationsRun
+    - cpu/core/minorOps.ts:upgradeTreesTick
   readings:
     - "C-97: the behaviour trees — READ (the interpreter), the nodes PARTLY READ"
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
@@ -196,6 +200,8 @@
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
     - "C-95: the scout's tree \"Barbarian Found City\" — READ, ported"
     - "H-1: the AI memory reader — READ (the hooks, the pointer paths, the contracts, the knowledge base, the operations, the trees), PARTLY READ (the religious AI's holder)"
+    - "C-99 / C-128: the swap's partner test and its step along its own path; Move Unit's update before the executions — READ (0x972540, 0x56e760, 0x972a50 -> 0x26fe20, 0x7d3a00 -> 0x7f0020), both twins"
+    - "C-99 / C-128: the swap's partner test and its step along its own path; Move Unit's update before the executions; a Trader no passenger — READ (0x972540, 0x56e760, 0x972a50 -> 0x26fe20, 0x7d3a00 -> 0x7f0020, 0x586360 -> 0x208b80 / 0x523d60), both twins"
   context:
     - "- The tick 0x7d3a00 runs where the root is FRESH or SKIPPED: each node in order is updated (0x7d3d30; a SKI..."
   review: reviewed

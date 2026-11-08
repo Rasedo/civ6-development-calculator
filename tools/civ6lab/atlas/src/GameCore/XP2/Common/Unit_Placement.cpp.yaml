@@ -83,6 +83,7 @@
     - "C-124: an attack order to a plot out of sight loses its attack flag — READ (0x962310), both twins"
     - "C-125: the safe plot's stacking test holds other players' units — READ (0x716b90 at 0x716d77 -> 0x585eb0 / 0x585d90), both twins"
     - "C-125 / C-99: the swap's partner pays its step, the stacking count's classes, the walk's end among other players' units, a siege unit's RangedCombat — READ (0x972a50, 0x585d90, 0x26fe20 via 0x585eb0, 0x56e3e0), both twins"
+    - "C-99 / C-128: the swap's partner test and its step along its own path; Move Unit's update before the executions; a Trader no passenger — READ (0x972540, 0x56e760, 0x972a50 -> 0x26fe20, 0x7d3a00 -> 0x7f0020, 0x586360 -> 0x208b80 / 0x523d60), both twins"
   context:
     - "...60), a visible enemy unit there (0x5862e0), a unit there that keeps it out (0x585eb0 -> 0x585d90: the owner's of a stacking class, another player's not at war) — and, the goal open,..."
   review: reviewed
@@ -274,6 +275,7 @@
     - gpu/core/sim_minors.py:_jump_made_anew
     - cpu/core/phase.ts:ok
     - cpu/core/tactical.ts:pathTo
+    - cpu/core/tactical.ts:pathNodes
   readings:
     - "H-1: a civilian stepped on — READ"
     - "C-96: the city-states' tactical pass — READ (Wander Near City, Heal, the non-barbarian priorities, FindAlternateLocation), the families it needs PARTLY READ"
@@ -295,6 +297,7 @@
     - "C-124: the formation's kept path, and a path's other players' units — READ (0x272aa0, 0x26e3a0, 0x782d0, 0x586360 at 0x586542..0x5865a1), unported"
     - "C-124: the kept path is never taken; a move order's path passes other players' units out of sight — READ (0x272aa0, 0x2714b0, 0x586360 at 0x586542..0x5865a1, 0x26fe20), both twins"
     - "C-124: an attack order to a plot out of sight loses its attack flag — READ (0x962310), both twins"
+    - "C-99 / C-128: the swap's partner test and its step along its own path; Move Unit's update before the executions; a Trader no passenger — READ (0x972540, 0x56e760, 0x972a50 -> 0x26fe20, 0x7d3a00 -> 0x7f0020, 0x586360 -> 0x208b80 / 0x523d60), both twins"
   notes:
     - ".claude/scratchpad/mu1/readings_c96.md: ...k; the distance max(|dx|, |dy|) where the   signs differ, |dx| + |dy| else); the unit may enter it (0x586360 flag   0x40), the player revealed it, no other player's unit on it and none of   its own that it ma..."
     - ".claude/scratchpad/mu1/readings_c96.md: ...a hull outside   its own territory heads for its player's nearest city (first of equals) —   where 0x586360 (flag 0x10) allows it, PARTLY READ. The engines carry no   influence map: every plot reads no dange..."

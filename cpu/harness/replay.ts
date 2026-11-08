@@ -1282,6 +1282,23 @@ function minorAi(ctx: Ctx, b: TurnRecord, turn: number, made: ReadonlySet<Unit>,
   const fortWas = new Map(ctx.prev.units.flatMap((r) => (typeof r.fortify === 'number' ? [[`${r.owner}:${r.id}` as string, r.fortify] as const] : [])));
   const xpWas = new Map(ctx.prev.units.flatMap((r) => (typeof r.xp === 'number' ? [[`${r.owner}:${r.id}` as string, r.xp] as const] : [])));
   const embWas = new Map(ctx.prev.units.flatMap((r) => (typeof r.embarked === 'boolean' ? [[`${r.owner}:${r.id}` as string, r.embarked] as const] : [])));
+  // ...a unit the log teleports before its own player's turn opens where the
+  // teleport put it, a plot another's borders took (runs/h1_duely1121 t131:
+  // city-state 2's Horseman 786438 on 8:6, player 1's from its start,
+  // teleported to 9:4, its planning from 9:4, AI_Planning.csv); an
+  // addition's own teleport is the unit's birth
+  const teleportedTo = new Map<string, number>();
+  {
+    const acts = (b as { actions?: unknown[][] }).actions ?? [];
+    const opens = new Map<number, number>();
+    for (const x of acts) if (x[2] === 'PlayerTurnActivated' && !opens.has(x[3] as number)) opens.set(x[3] as number, x[0] as number);
+    acts.forEach((x, j) => {
+      const key = `${x[3]}:${x[4]}`;
+      if (x[2] !== 'UnitTeleported' || (acts[j - 1]?.[2] === 'UnitAddedToMap' && `${acts[j - 1][3]}:${acts[j - 1][4]}` === key)) return;
+      const open = opens.get(x[3] as number);
+      if (open !== undefined && (x[0] as number) < open) teleportedTo.set(key, (x[6] as number) * ctx.W + (x[5] as number));
+    });
+  }
   // the units the minors' and the barbarians' battles of the pair struck (or
   // lost) stand as they were before the first blow: the game fought a
   // minor's in its own pass, the barbarians' after it (runs/h1_duelw1121 t9:
@@ -1309,6 +1326,7 @@ function minorAi(ctx: Ctx, b: TurnRecord, turn: number, made: ReadonlySet<Unit>,
   }
   const gone = new Set<Unit>();
   const upgraded = new Set<Unit>();
+  const madeAshore = new Set<Unit>();
   const mine: Unit[] = [];
   for (const [c, u] of twin) {
     if (!minorAiSeat(c.seat) && !isBarbSeat(c.seat)) continue;
@@ -1326,7 +1344,7 @@ function minorAi(ctx: Ctx, b: TurnRecord, turn: number, made: ReadonlySet<Unit>,
     // Ironclad 6553622 on 38:22, city-state 3's 1376259 from then)
     const home = key && !was.has(key) ? ctx.levyFrom.get(key) : undefined;
     const first = home ?? (old !== undefined && !was.has(key!) ? old : key);
-    const at = first ? was.get(first) : undefined;
+    const at = first ? (teleportedTo.get(first) ?? was.get(first)) : undefined;
     // ...and one home from a levy that the pair's upgrade order renamed as
     // well stands in record t+1's chassis with no Movement left (runs/
     // h1_duely1121 t154: city-state 2's Musketman 2424833, home from China's
@@ -1375,6 +1393,7 @@ function minorAi(ctx: Ctx, b: TurnRecord, turn: number, made: ReadonlySet<Unit>,
     // Movement is composed on
     const e0 = embWas.get(first!);
     if (e0 !== undefined) c.embarked = e0;
+    else if (made.has(u) && !UNITS[c.type]?.naval) madeAshore.add(c);
     // ...and its fortification, which the planning's blow back on it reads
     // (runs/h1_duelw1117 t9: city-state 2's Warrior 131073, fortified 2 on
     // 14:10, attacks the camp's Warrior with 30 taken and 26 back against 60
@@ -1418,6 +1437,11 @@ function minorAi(ctx: Ctx, b: TurnRecord, turn: number, made: ReadonlySet<Unit>,
     c.movesFull = unitFullMoves(copy, c);
     c.movesLeft = boughtNow.has(`${c.seat}:${c.id}`) ? 0 : c.movesFull;
   }
+  // ...a land unit its city made in the turn embarked or ashore as the plot
+  // it was made on stands it, not as record t+1 does (runs/h1_duely1117
+  // t163: Caguana's new Pike and Shot 1900546 plans from its centre 42:13 on
+  // its 2 Movement, embarked on 42:15 by the record after, AI_Planning.csv)
+  for (const c of madeAshore) c.embarked = isWater(copy.map.tiles[c.tileIndex]) || undefined;
   // a city-state's research in its actions is its start's, which record
   // t+1 holds (its embarking), and the majors' as their actions left it
   // (the open-borders civic that closes their ground)

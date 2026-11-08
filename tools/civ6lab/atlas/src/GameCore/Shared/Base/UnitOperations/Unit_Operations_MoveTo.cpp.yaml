@@ -82,6 +82,7 @@
     - cpu/core/tactical.ts:pathTo
     - gpu/core/sim_tactics.py:_tac_move_to
     - cpu/core/tactical.ts:Ground
+    - cpu/core/tactical.ts:pathNodes
   readings:
     - "C-124: an attack order to a plot out of sight loses its attack flag — READ (0x962310), both twins"
   review: reviewed
