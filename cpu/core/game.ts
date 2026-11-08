@@ -50,6 +50,7 @@ import { randRange } from './rand';
 import { srcConst, xml } from '../data/provenance';
 import { rowIsFor } from '../data/civilizations';
 import type { CivId, LeaderId } from '../../world/roster';
+import { majorCityTradeList } from './aiTrade';
 import { BARB_SEAT, allCities, grantFoundingPressure, majorityReligionOf, prophetsOf, citiesOf, civOf, emptySeat, isBarbSeat, isCityStateSeat, isCiv, markCityCentre, seatOf, setTileOwner, tileClaimed, tileSeat, unitSeat, visibilityCS, allianceTheoCS, alliedAtLevel, civVariantOf , leaderOf, onHomeContinent, civLevelOf } from './seats';
 import { irradiated } from './nuclear';
 import { formationBanned } from './units';
@@ -385,6 +386,9 @@ export function foundCityAt(state: GameState, seat: number, tile: Tile, owner: S
     const id = g.unit ?? (g.promoClass ? bestTrainableOfClass(state, seat, g.promoClass) : null);
     if (id) spawnUnit(state, id, tile.index, seat);
   }
+  // a major's city AI's analysis at the placement keeps its trade list
+  // (`majorCityTradeList`)
+  if (owner && isCiv(seat)) majorCityTradeList(state, owner, city);
   settleIncursion(state, seat, tile);
   return city;
 }

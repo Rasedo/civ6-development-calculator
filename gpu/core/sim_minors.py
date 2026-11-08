@@ -13,8 +13,9 @@ class SimMinors:
             return
         # each minor in turn — the `minorPhase` order, one minor at a time
         # because a district one minor lands may lend a neighbour's district
-        # adjacency across the border: its levied army home when due, its
-        # grid; its economy and the research it completes, its roads at the
+        # adjacency across the border: its grid; its economy and the
+        # research it completes, its levied army home when due (its
+        # Influence turn, after the treasury), its roads at the
         # era that brings; its city — the step works the item in hand, the
         # boosts that earns landing at once; its
         # strategic resources' income (`_seat_accrue_stockpile`, a major's body
@@ -22,8 +23,9 @@ class SimMinors:
         # it stands after that (its city presses a religion it follows on the
         # founder's turn); the boosts its growth earned, its research and
         # civics AIs' turns, its military AI's Combat Desire; its savings and
-        # military AI's turn (`_minor_military_turn`); its knowledge
-        # base's look; its contract purchases; then its actions — the
+        # military AI's turn (`_minor_military_turn`); its City Analysis'
+        # trade list; its knowledge base's look; its contract purchases; its
+        # free Trader's route (`_minor_trade_pick`); then its actions — the
         # upgrades a completion triggers, its city AI's turn (`_minor_ai_turn`:
         # its builds, purchases and trees, the trees' Builders' work), its
         # trade routes and the boosts they earned, its units' tactical turn (its city's ranged strikes in
@@ -34,9 +36,10 @@ class SimMinors:
             alive = self.citystate_alive[:, s]
             if not bool(alive.count_nonzero()):
                 continue
-            self._minor_levy_return(s)
             self._minor_power(s)
             techs = self._minor_economy(s)
+            # its levied army home after the bank (`minorPhase`)
+            self._minor_levy_return(s)
             # the era its research brings re-lays its roads at once, before
             # its units move (`upgradeRoads`)
             self._upgrade_roads(self.n_majors + s)
@@ -79,16 +82,32 @@ class SimMinors:
             # (`CityState.armyCounted`); its contract purchases after the
             # look (`minorContractPurchases`) read the same; then the savings
             # turn's disband (`minorEconomicDisband`)
+            # its City Analysis job keeps its city's trade list, none the turn
+            # the city is founded (its city AI ran before this turn), on the
+            # plots revealed since its last turn (`minorPhase`)
+            ran = self.citystate_ai_on[:, s].clone()
+            self._minor_trade_list(s, alive & ran & (self.citystate_center[:, s] >= 0))
             self._cv_counted[s] = self._cv_known(s)
             self._minor_knowledge(s, True)
             self._minor_contract_purchases(s, self.citystate_alive[:, s] & (self.citystate_center[:, s] >= 0), units)
             self._minor_economic_disband(s, fell)
+            # its Economic AI's turn ends on its free Trader's route, before
+            # its city update reads the city (`minorTradePick`); its AI's
+            # reads of the city's yields but the Food keep those before it
+            # (`CityState.aiYields`)
+            _row = self._CITY_MINOR0 + s
+            self._cv_yields_seen[s] = (self._seat_city_stats(_row, record=False)[0][:, 0].clone(),
+                                       self._seat_city_base(_row)[:, 0].clone(),
+                                       torch.ones(self.B, dtype=torch.bool, device=self.device))
+            # the route's values at the Gold boost the Economic AI's turn
+            # writes before it, its city update's at the turn before's
+            _boost_was = self.citystate_gold_boost[:, s].clone()
+            self._minor_gold_boost(s)
+            self._minor_trade_pick(s)
+            self.citystate_gold_boost[:, s] = _boost_was
             # its "Upgrade Units" trees' trigger: a tree per technology gained
             # (`minorTurn`: a civic gained alone starts none)
             self._mops_upgrade_start(s, torch.where(alive, techs.long(), torch.zeros_like(techs.long())))
-            # its city AI ran before this turn (the City Analysis job's list
-            # takes none the turn the city is founded)
-            ran = self.citystate_ai_on[:, s].clone()
             self._minor_ai_turn(s, units)
             # its Economic AI's Gold boost, after its city update
             self._minor_gold_boost(s)
@@ -101,16 +120,16 @@ class SimMinors:
             self._mops_refresh_run(s, alive)
             self._mops_military_upgrade(s, alive)
             del self._cv_counted[s]
+            del self._cv_yields_seen[s]
             self._minor_trade(s)
             # the boosts its routes and the actions before them earned land
             # before its army's walk and its second hook's tree tick
             self._detect_minor_boosts(s, alive)
             self._minor_tactics(s)
             # its knowledge base's route value K at its tactical turn, on the
-            # trade list of the turn before; then the City Analysis job's
-            # list of the turn (`minorPhase`)
+            # trade list its City Analysis job kept as the turn opened
+            # (`minorPhase`)
             self._minor_trade_value(s, alive)
-            self._minor_trade_list(s, alive & ran & (self.citystate_center[:, s] >= 0))
             self._minor_knowledge(s, False)
             # the boosts its turn earned
             self._detect_minor_boosts(s, alive)
@@ -829,16 +848,19 @@ class SimMinors:
         self.citystate_trade_ok[:, s] = ok
         self.citystate_trade_no[:, s] = no
 
-    def _major_trade_lists(self, r: int, mask: torch.Tensor) -> None:
+    def _major_trade_lists(self, r: int, mask: torch.Tensor, slot: torch.Tensor | None = None) -> None:
         """`majorTradeLists` where `mask` [B]: each city of major row `r` its
         trade list (`city_trade_ok` / `city_trade_no`) kept a turn on, at its
         turn's start — the plots it had explored as its last turn closed
         revealed (`seat_trade_seen`, its explored before one has), every
-        plot with the fog off"""
+        plot with the fog off. With `slot` [B], that city's alone
+        (`majorCityTradeList`: a city founded keeps its own at once)."""
         seen = (torch.where(self.seat_trade_seen_on[:, r].unsqueeze(1), self.seat_trade_seen[:, r], self.seat_explored[:, r])
                 if self.fog_of_war else torch.ones(self.B, self.T, dtype=torch.bool, device=self.device))
         for j in range(self.RC):
             act = mask & self.city_alive[:, r, j]
+            if slot is not None:
+                act = act & (slot == j)
             if not bool(act.count_nonzero()):
                 continue
             centre = self.city_center[:, r, j]
@@ -1056,16 +1078,22 @@ class SimMinors:
         self.free_trade_value.copy_(torch.where(mask, v, self.free_trade_value))
 
     def _minor_trade(self, s: int) -> None:
-        """`minorTrade` — minor `s`'s routes walk and meet their raiders
-        (`_trade_walk_tick`); a free Trader under its capacity takes the
-        scorer's destination (`_minor_route_candidate`) and is spent on it —
-        the commit `commitRoute` makes: the term, the stored course, the
-        walker at the centre on leg 0, road on the centre, its first plot
-        taken at once (`_trade_first_step`); then the round
-        trips that are done end (`_expire_seat_routes`)."""
+        """`minorTrade` — minor `s`'s routes begun before this turn walk and
+        meet their raiders (`_trade_walk_tick`); then the round trips that
+        are done end (`_expire_seat_routes`)."""
         row = self._CITY_MINOR0 + s
         alive = self.citystate_alive[:, s]
-        self._trade_walk_tick(row, alive)
+        self._trade_walk_tick(row, alive, skip=self.seat_route_born[:, row] == int(self.turn))
+        self._expire_seat_routes(row)
+
+    def _minor_trade_pick(self, s: int) -> None:
+        """`minorTradePick` — a free Trader under minor `s`'s capacity takes
+        the scorer's destination (`_minor_route_candidate`) and is spent on
+        it — the commit `commitRoute` makes: the term, the stored course, the
+        walker at the centre on leg 0, road on the centre, its first plot
+        taken at once (`_trade_first_step`)."""
+        row = self._CITY_MINOR0 + s
+        alive = self.citystate_alive[:, s]
         if self._trader_idx >= 0:
             used = (self.seat_routes[:, row, :, 0] >= 0).sum(dim=1)
             t_has, t_slot, t_tile = self._free_trader(row)
@@ -1091,7 +1119,6 @@ class SimMinors:
                     self._trade_first_step(row, rows, slot)
                     self.major_unit_alive[rows, t_slot[rows]] = False
                     self._occ_clear(rows, t_tile[rows], t_slot[rows] + self.POOL_LO["major"])
-        self._expire_seat_routes(row)
 
     def _minor_route_income(self, s: int) -> torch.Tensor | None:
         """[B, RC, 6] f64 — `minorRouteYields` over minor `s`'s routes, on its
@@ -2947,6 +2974,10 @@ class SimMinors:
         """`minorReplaceCitizens`: every citizen of minor `s`'s city re-placed
         where `mask` (0x196320)"""
         self._minor_place_citizens(s, mask, self.city_pop[:, self._CITY_MINOR0 + s, 0], full=True)
+        # the re-placed city's yields read afresh (`CityState.aiYields`)
+        seen = self._cv_yields_seen.get(s)
+        if seen is not None:
+            seen[2].logical_and_(~mask)
 
     def _minor_food_focus(self, s: int, mask: torch.Tensor) -> None:
         """`minorFoodFocus` where `mask`: Food favored below a surplus of 1.0

@@ -216,6 +216,7 @@
     - "C-94: trade posts and cultural dominance — READ"
     - "H-1: the luxury allocation's rebuilds — PARTLY READ"
     - "C-130: the minor's treasury turn between its technologies and its civics; a pillaged building's Maintenance — READ (0x4e4560's order, 0x18c590), both twins"
+    - "C-130: a minor's levy home after its bank; its free Trader's route before its city update, the AI's yields cached before it; a deleted unit off its list at once; a major's founded city keeps its trade list at once — READ (0x4e4560 at 0x4e45ee / 0x4e4638, 0x6096c0's passes, 0x688eaa, 0x1cb8b0, 0x948500 at 0x9485e5, 0x1eae70 at 0x1eb335 -> 0x5cdd70 at 0x5ce191), the cache's span a fit, both twins"
   context:
     - "- PlayerCulture's turn (0x396860), a major's: the culture lands (lifetime culture +0x1050, 24.8, grows by every gain of..."
     - "- Player DoTurn 0x4e4560, in order: the culture (+0x1310, 0x396860: the civic progress), the resources (+0x1320, 0x4a8ed0 at 0x4e46c0: the holdings reco..."

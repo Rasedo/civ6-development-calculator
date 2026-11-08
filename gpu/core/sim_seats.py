@@ -12574,6 +12574,12 @@ class SimSeats:
                     self._gain_population_pressure(rows[_fw], row, slot[_fw],
                                                    torch.full_like(slot[_fw], int(_cpop)))
                     self.city_pop[rows[_fw], row, slot[_fw]] += _cpop
+        # a major's city AI's analysis at the placement keeps its trade list
+        # (`majorCityTradeList`)
+        if row < self.n_majors:
+            _slot_b = torch.full((self.B,), -1, dtype=torch.long, device=self.device)
+            _slot_b[rows] = slot.long()
+            self._major_trade_lists(row, found, _slot_b)
         self._settle_incursion(row, found, tile)
         self._eff_version += 1
         return found
@@ -16650,11 +16656,13 @@ class SimSeats:
         active[rows] = True
         self._trade_walk_tick(row, active, only)
 
-    def _trade_walk_tick(self, row: int, active: torch.Tensor, only: torch.Tensor | None = None) -> None:
+    def _trade_walk_tick(self, row: int, active: torch.Tensor, only: torch.Tensor | None = None,
+                         skip: torch.Tensor | None = None) -> None:
         """The Trader's WALK, then PLUNDER — phase.ts's trade-block head.
         With `only` [B, K], the walk of those route slots alone and no
         plunder: a route's first plot the turn it starts (`commitRoute`'s
-        `tradeRouteStep`).
+        `tradeRouteStep`). With `skip` [B, K], those route slots neither walk
+        nor meet a raider (a city-state's routes begun this turn: `minorTrade`).
 
         WALK: every route's walker takes one plot along the route's stored
         course (`seat_route_course`) toward its leg's end (dest out, origin
@@ -16671,6 +16679,8 @@ class SimSeats:
         immune walker (`_trader_immune`) is never plundered.
         """
         act = self.seat_routes[:, row, :, 0] >= 0  # [B, K]
+        if skip is not None:
+            act = act & ~skip
         leg = self.seat_route_leg[:, row]
         walking = act & (leg >= 0) & active.unsqueeze(1)
         if only is not None:

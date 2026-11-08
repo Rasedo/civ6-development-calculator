@@ -242,6 +242,7 @@ export function civicAnalysis(state: GameState, seat: number, culture: number,
     if (owned(r, id)) return { civic: id, next: id, turns: -1, owned: true, base: 0, score: 0 };
     const { turns, next } = walk(state, seat, r, id, rate);
     const base = turns < 0 ? 0 : civicValue(state, seat, id, turns, pw, view ??= aiView(state)) + (cityTerm && turns < AI_VALUE_HORIZON ? cityTerm(id, turns) : 0);
+    if (process.env.DBG_CV && id === "MILITARY_TRAINING" && seat === 102) console.error(`DBGCV t${state.turn} ${id} turns ${turns} base ${base / 256} city ${cityTerm && turns < AI_VALUE_HORIZON ? cityTerm(id, turns) / 256 : 0} pb ${JSON.stringify(r.civicPolicyBest?.["CIVIC_MILITARY_TRAINING"])} gov ${JSON.stringify(r.civicGovValues)}`);
     return { civic: id, next, turns, owned: false, base, score: base };
   });
   const leader = leaderOf(state, seat);

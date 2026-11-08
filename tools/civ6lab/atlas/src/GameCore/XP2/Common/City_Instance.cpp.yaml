@@ -163,8 +163,18 @@
   name: City::GetYield
   semantics: "City::GetYield: while the game state is locked (game instance +0x458 at 1 or more) the city's cached yield (+0x31d8, the entry's flag +4), computed (0x1c5350) and kept on a miss; unlocked, computed afresh. The lock's first count clears the caches (0x91e540 -> 0x370080 -> 0x1cd040)."
   status: PARTLY
-  impl: [cpu/core/aiModifiers.ts:ANALYZERS]
+  cases:
+    - recording: h1_duelz1117
+      turn: 44
+      value: city-state 4's route Gold out of Democracy's GOLD_PURCHASES after its Trader's dispatch; Political Philosophy 150.3 at t45 as logged
+  impl:
+    - cpu/core/aiModifiers.ts:ANALYZERS
+    - cpu/core/aiView.ts:aiCityStats
+    - gpu/core/sim_cityvalue.py:_MinorFacts
+    - cpu/core/minorBuild.ts:seen
+    - cpu/core/types.ts:Seat
   readings:
+    - "C-130: a minor's levy home after its bank; its free Trader's route before its city update, the AI's yields cached before it; a deleted unit off its list at once; a major's founded city keeps its trade list at once — READ (0x4e4560 at 0x4e45ee / 0x4e4638, 0x6096c0's passes, 0x688eaa, 0x1cb8b0, 0x948500 at 0x9485e5, 0x1eae70 at 0x1eb335 -> 0x5cdd70 at 0x5ce191), the cache's span a fit, both twins"
     - "H-1: the citizen manager's placement and the yield flags — READ"
     - "C-97: the government and policy choice — the choice READ, the values PARTLY READ"
     - "C-130: the Economic AI's Gold boost on the treasury's banked net income — READ (0x4e08f0, PlayerTreasury +0x1b8), both twins"

@@ -40,7 +40,7 @@ import { civsAtWar, freeSeatOf, isCiv, isCityStateSeat, seatOf } from './seats';
 import { congressIntlBanned } from './congress';
 import { minorRouteOriginYields, routeDestYields, routeOriginYields, routePostGold, tradeMet } from './trade';
 import { routeInRange, tradeAdmits, tradePath, tradeReach } from './tradePath';
-import type { CityState, GameState, Seat, TradeRoute, Yields } from './types';
+import type { City, CityState, GameState, Seat, TradeRoute, Yields } from './types';
 
 /** a known city a trade AI reads: its centre, its holder and the route
  *  there from `from` (a major's city id, -1 for a city-state's one city) */
@@ -104,11 +104,20 @@ export function minorTradeList(state: GameState, cs: CityState): void {
  *  record 11, China's list holding it from its t12 turn, K 2.10 at t12;
  *  1127: China meets Mexico City in its own t2 turn, K 2.10 at t3) */
 export function majorTradeLists(state: GameState, seat: Seat): void {
+  for (const c of seat.cities) majorCityTradeList(state, seat, c);
+}
+
+/** one city of a major its trade list (0x78f210), on the plots its turn
+ *  start's lists read revealed (`majorTradeLists`); a city founded keeps its
+ *  own at once: the placement (0x1eae70 at 0x1eb335) runs its city AI's
+ *  0x5cdd70 -> City Analysis 0x5ce3f0 at 0x5ce191 (runs/h1_duelz1124 t26:
+ *  China's second city on 3:14 in the route value K that turn, city-state
+ *  3's Foreign Trade 235.9 and the Free Cities' 156.7 at t27 as logged;
+ *  1128 t86 the Free Cities' K, Foreign Trade 354.2 at t87) */
+export function majorCityTradeList(state: GameState, seat: Seat, c: City): void {
   const known = seat.tradeSeen ?? seat.explored;
   const seen = (p: number): boolean => known.length === 0 || known[p] === 1;
-  for (const c of seat.cities) {
-    keepTradeList(state, seat.seat, c.centerIndex, knownTradeCities(state, c.centerIndex, c.id, seat.seat), seen, c);
-  }
+  keepTradeList(state, seat.seat, c.centerIndex, knownTradeCities(state, c.centerIndex, c.id, seat.seat), seen, c);
 }
 
 const ROUTE_YIELDS: readonly [keyof Yields, string][] = [

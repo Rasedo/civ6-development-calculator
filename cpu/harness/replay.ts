@@ -91,7 +91,7 @@ import { CAMP_DISPERSAL_GOLD, MP_SCALE, scaleByGameSpeed } from '../data/constan
 import { PROMOTE_HEAL, aiPromotionPick, attacksPerTurn, promoCount, takePromotion, unitPromoRows } from '../core/promotions';
 import { fireFeature } from '../data/disasters';
 import { civicAgendas, setupAgendas } from '../core/agendas';
-import { holdMinorOrders, holdMinorStart, minorCombatDesire, minorResearch, minorSetItem, minorBuildFacts, minorKnowledge, minorKnownUnits, minorItemCost, minorItemInHand, minorItemKey, minorBuildingPrice, minorRaiseBuilding, minorUnitPrice, minorUpgradeUnit, minorUpgradeVisible, techContractsCompleted, traceMinorLays, traceMinorPolicyScores, traceMinorPurchases } from '../core/minorBuild';
+import { holdMinorOrders, holdMinorRoutePick, holdMinorStart, minorCombatDesire, minorResearch, minorSetItem, minorBuildFacts, minorKnowledge, minorKnownUnits, minorItemCost, minorItemInHand, minorItemKey, minorBuildingPrice, minorRaiseBuilding, minorUnitPrice, minorUpgradeUnit, minorUpgradeVisible, techContractsCompleted, traceMinorLays, traceMinorPolicyScores, traceMinorPurchases } from '../core/minorBuild';
 import { DEDICATED_IMPROVEMENTS, IMPROVEMENT_IDS, unitActionIndex } from '../core/unitActions';
 import { loadCatalog, type Catalog, type DumpCity, type TurnRecord } from './record';
 import { num, bool } from './record';
@@ -1747,9 +1747,9 @@ function minorAi(ctx: Ctx, b: TurnRecord, turn: number, made: ReadonlySet<Unit>,
   minorOpsAfter(ctx, b, turn, copy, twin, keyOf, upgraded);
   minorClearsAfter(ctx, b);
   // the boosts the city-states' units' turn earned land at its end, after
-  // their research AI's turn (runs/h1_duely1121 t41 city-state 4's Currency
-  // on its Trader's route: Archery taken in record t42)
-  ctx.researchAtTurn = new Map(ctx.state.cityStates.map((cs) => [cs.seat, cs.research.tech]));
+  // their research AI's turn, whose research in hand the AI turn noted (one
+  // with none noted the research as the units' turn left it)
+  for (const cs of ctx.state.cityStates) if (!ctx.researchAtTurn.has(cs.seat)) ctx.researchAtTurn.set(cs.seat, cs.research.tech);
   for (const cs of ctx.state.cityStates) detectBoosts(ctx.state, cs.seat);
   const ended = new Map<Unit, number>();
   for (const [c, u] of twin) if (copy.units.includes(c) && minorAiSeat(c.seat)) ended.set(u, c.tileIndex);
@@ -5662,9 +5662,13 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
     score(ctx, `op.start.${party}`, turn, player, `p${player}`, same, ours.join('; ') || 'none', log.join('; ') || 'none');
   };
   // the minors' policy scores of their civics AI's turn, against the log's
+  // (and the research in hand at that AI turn, which the log's research
+  // row names: `tallyResearchAi`)
   traceMinorPolicyScores((seat, scores) => {
     const player = ctx.playerOfSeat.get(seat);
     if (player !== undefined) policyScoreAgainstLog(ctx, seat === FREE_SEAT ? 'free' : 'minor', ctx.turn, player, scores);
+    const cs = ctx.state.cityStates.find((c) => c.seat === seat);
+    if (cs) ctx.researchAtTurn.set(seat, cs.research.tech);
   });
   // ...and the Free Cities': their raid's start in the pair's actions, its
   // run in their units' turn
@@ -6203,6 +6207,30 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
         applyPhase(ctx, [d], 'after', b, b, new Set([p]));
         state.rngState = rng;
       });
+      // each minor's free Trader takes the record's route at its Economic
+      // AI's pick, before its city update reads the city (`minorTradePick`),
+      // and stays on the map on its route, as the game's does: its unit
+      // list holds it (runs/h1_duelz1117 t44: city-state 4's Trader 393218,
+      // trained that turn, in its government values' unit count)
+      holdMinorRoutePick((_st, cs) => {
+        const p = ctx.playerOfSeat.get(cs.seat);
+        const d = ds.find((x) => x.kind === 'routes' && x.player === p && !landed.has(x));
+        if (p === undefined || !d) return;
+        landed.add(d);
+        const free = state.units.flatMap((u, i) => (u.seat === cs.seat && u.type === 'TRADER' && !u.routed ? [[u, i] as const] : []));
+        const rng = state.rngState;
+        applyPhase(ctx, [d], 'after', b, b, new Set([p]));
+        state.rngState = rng;
+        // ...one Trader on the map per route: none where the record's own
+        // stands on it already
+        let routed = state.units.filter((u) => u.seat === cs.seat && u.type === 'TRADER' && u.routed).length;
+        for (const [u, i] of free) {
+          if (state.units.includes(u) || routed >= (cs.tradeRoutes ?? []).length) continue;
+          u.routed = true;
+          routed += 1;
+          state.units.splice(Math.min(i, state.units.length), 0, u);
+        }
+      });
       try {
         minorTurns(state);
         // ...and the last city-state's, its units where its turn left them and
@@ -6219,6 +6247,7 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
         unrestore();
         unhurt();
         holdMinorStart(null);
+        holdMinorRoutePick(null);
         traceMinorUpgrade(null);
         for (const [u, i] of fallen.reverse()) state.units.splice(Math.min(i, state.units.length), 0, u);
       }

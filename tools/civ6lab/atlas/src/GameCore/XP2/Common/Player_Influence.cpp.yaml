@@ -72,6 +72,23 @@
   context:
     - "...ELD_CHANGE_PER_TRIBUTARY 0x6ac7f0 (the same filter): the city-states it is suzerain of (0x44a5a0) x Amount, weighted, span."
   review: reviewed
+- addr: 0x44bb20
+  kind: function
+  name: influenceTurn
+  semantics: "The player's Influence turn, from its DoTurn 0x4e4560 at 0x4e4638: after Player_Techs (0x4e45df), the treasury 0x4e08f0 (0x4e45ee), the culture 0x396860, PlayerReligion 0x4967f0 and 0x43c190; it runs the minor's levy counter 0x44da30, whose term sends the levied army home (0x4502b0) — after the bank, which pays none of it."
+  status: PARTLY
+  cases:
+    - recording: h1_duelz1121
+      turn: 215
+      value: city-state 3's levied Ironclad home after its CivicChanged; record 216's m_xCachedNetIncome 2.30 without its Maintenance, record 217's -1.80 with it
+  impl:
+    - cpu/core/minorBuild.ts:minorPhase
+    - gpu/core/sim_minors.py:_city_state_phase
+    - cpu/core/minorBuild.ts:techs
+  readings:
+    - "C-130: a minor's levy home after its bank; its free Trader's route before its city update, the AI's yields cached before it; a deleted unit off its list at once; a major's founded city keeps its trade list at once — READ (0x4e4560 at 0x4e45ee / 0x4e4638, 0x6096c0's passes, 0x688eaa, 0x1cb8b0, 0x948500 at 0x9485e5, 0x1eae70 at 0x1eb335 -> 0x5cdd70 at 0x5ce191), the cache's span a fit, both twins"
+  notes: [the rest of its body unread]
+  review: reviewed
 - addr: 0x44c4b0
   kind: function
   semantics: "GetMostTokensReceived: over the player list (+0x4a0), the greatest of the store +0x5d0[p] plus 0x44caa0(p) (a posted governor's share), 0 with none — the city centre's envoy term (0x24a180) and the envoy annex's count (0x1abf40)."
@@ -187,8 +204,10 @@
     - recording: 1117
       turn: 28
       value: 1117 t28 -> t42, 1121 t42 -> t56).
-  impl: [cpu/data/cityStates.ts:LEVY_TURNS]
-  readings: ["H-1: the levy's term — READ"]
+  impl: [cpu/data/cityStates.ts:LEVY_TURNS, cpu/core/minorBuild.ts:techs]
+  readings:
+    - "H-1: the levy's term — READ"
+    - "C-130: a minor's levy home after its bank; its free Trader's route before its city update, the AI's yields cached before it; a deleted unit off its list at once; a major's founded city keeps its trade list at once — READ (0x4e4560 at 0x4e45ee / 0x4e4638, 0x6096c0's passes, 0x688eaa, 0x1cb8b0, 0x948500 at 0x9485e5, 0x1eae70 at 0x1eb335 -> 0x5cdd70 at 0x5ce191), the cache's span a fit, both twins"
   context:
     - "- Player_Influence 0x44da30 (the minor's levy counter, m_iLevyTurnCounter +0xc90): +1, then against 0x5254d0(LEVY_M..."
   review: reviewed
@@ -253,6 +272,7 @@
   readings:
     - "H-1: the levy's term — READ"
     - "C-129: a unit made anew that no plot takes is destroyed, its own plot refused by a hostile defender alone; a bankruptcy's disband before the look — READ, both twins"
+    - "C-130: a minor's levy home after its bank; its free Trader's route before its city update, the AI's yields cached before it; a deleted unit off its list at once; a major's founded city keeps its trade list at once — READ (0x4e4560 at 0x4e45ee / 0x4e4638, 0x6096c0's passes, 0x688eaa, 0x1cb8b0, 0x948500 at 0x9485e5, 0x1eae70 at 0x1eb335 -> 0x5cdd70 at 0x5ce191), the cache's span a fit, both twins"
   context:
     - "...ultiplier, 15 online, not GameSpeed_Durations' 21 — and at it the levied units go home (0x4502b0); 0x4501c0 resets it at the levy. The counter ticks at the minor's own turn starts, t..."
   review: reviewed

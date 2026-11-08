@@ -50,7 +50,7 @@ import { computeUnlocksIn, purchaseStep, unitMaintenance, type Unlocks } from '.
 import { buildingPillaged, cityPower, repairBuilding } from './yields';
 import { centerBuildingIds } from './prodLayout';
 import { cityLowlands, coastalLowlandCounts, floodBarrierCost, repairBehindBarrier } from './climate';
-import { minorTrade, tradeCapacity, tradeGraphTurn } from './trade';
+import { minorTrade, minorTradePick, tradeCapacity, tradeGraphTurn } from './trade';
 import { BARB_SEAT, FREE_SEAT, freeSeatOf, hiddenResourcesFor, isCiv, majorityReligionOf, majorsAlive, seatOf, tileSeat } from './seats';
 import { builderCost, cityNavalCapable, disbandUnit, raiseBestTrained, spawnUnit, traderCost, unitFullMoves, unitIsMilitary, unitMadeAnew, upgradeAnew } from './units';
 import { irradiated } from './nuclear';
@@ -74,7 +74,7 @@ import { projectTable, type ProjectTableFacts } from './aiProjectValue';
 import { economicGoldBoost } from './aiWeights';
 import { accrueStockpiles, canPayStockpile, capStockpiles, chargeUnitUpkeep, spendStockpile, stockFree, stockOf, stockpileCap, stockpileIncome, strategicSlot, strategicSurplus, unitResourceCost, unitUpkeepBill, upgradeGoldCost, upgradeType } from './stockpile';
 import { FX, FX_MIN, fmul, fxConst, fxOf, pseudoYieldValue, turnsAt, valueBetween, yieldValue } from './aiValue';
-import { cityGrowth, aiView, storeUnitStrength } from './aiView';
+import { aiCityStats, cityGrowth, aiView, storeUnitStrength } from './aiView';
 import { congressUdtProdDistrict } from './congress';
 import { CONGRESS_PROD_MULT } from '../data/seats';
 import { civicPolicyBest, governmentValues, policyScores, slotTypeBest } from './aiPolicyValue';
@@ -86,10 +86,10 @@ import { opsOf } from './operations/manager';
 
 /** One minor at a time — a district one minor lands may lend a neighbour's
  *  district adjacency across the border, so the next minor's yields read it.
- *  A levied army due home comes home first; the city's grid is resolved
- *  before its yields read it. Then, as every player's turn runs
- *  (tools/civ6lab/turn_order_civ6.md): its economy (`minorEconomy`) and the
- *  research that completes on it, its roads at the era that brings
+ *  The city's grid is resolved before its yields read it. Then, as every
+ *  player's turn runs (tools/civ6lab/turn_order_civ6.md): its economy
+ *  (`minorEconomy`) and the research that completes on it, a levied army
+ *  due home (`minorLevyReturn`), its roads at the era that brings
  *  (`upgradeRoads`), then its city — the Production its city
  *  makes now and the boosts that earns (`detectBoosts`), its strategic resources' income and its units' fuel, then growth and borders on the city as it stands after that
  *  (`minorGrowth`) — its city presses a religion it follows on that
@@ -102,14 +102,14 @@ import { opsOf } from './operations/manager';
  *  military AI's Combat Desire (`minorCombatDesire`), its savings and military AI's
  *  turn (`minorMilitaryTurn`), then its knowledge base's look
  *  (`minorKnowledge`), its contract purchases (`minorContractPurchases`)
- *  and its savings turn's disband (`minorEconomicDisband`), then its
- *  actions: a research
+ *  and its savings turn's disband (`minorEconomicDisband`), its free
+ *  Trader's route (`minorTradePick`), then its actions: a research
  *  completion's upgrades, its city AI's turn (`minorAiTurn`: its builds,
  *  purchases and trees, the trees' Builders' work), its civics AI's
  *  government values on the city it left, its operations' refresh
  *  (`minorOpsRefresh`) and its military AI's upgrade
- *  (`minorMilitaryUpgrade`), its routes' walk and a
- *  free Trader's route and the boosts they earned, its army's walk (`cityStateMilitary`, its city's
+ *  (`minorMilitaryUpgrade`), its routes' walk (`minorTrade`) and the
+ *  boosts they earned, its army's walk (`cityStateMilitary`, its city's
  *  ranged strikes after its units' planning), and last the
  *  boosts the turn earned (`detectBoosts`). */
 export function minorPhase(state: GameState): void {
@@ -121,9 +121,14 @@ export function minorPhase(state: GameState): void {
     // (the replay's hook lands their turns here; nothing moves otherwise)
     if (prev) minorEndTurnList(state, prev);
     prev = cityState;
-    minorLevyReturn(state, cityState);
     minorPower(state, cityState);
     const techs = minorEconomy(state, cityState);
+    // its levied army home at its Influence turn (0x44bb20 -> 0x44da30), in
+    // its DoTurn after the treasury, the culture and the Faith (0x4e4560 at
+    // 0x4e4638): the bank pays no unit the return brings (runs/h1_duelz1121
+    // city-state 3 t215: China's levied Ironclad home, record 216's net 2.30
+    // without its Maintenance, record 217's -1.80 with it)
+    minorLevyReturn(state, cityState);
     // the era its research brings re-lays its roads at once (the era signal
     // 0x4d9a70 -> 0x5134c0), before its units move (runs/h1_duely1128 Hong
     // Kong t156: its Industrial era, its new Builder from the centre to 9:9
@@ -185,10 +190,38 @@ export function minorPhase(state: GameState): void {
     // not counted); its contract purchases after the look
     // (`minorContractPurchases`) read the same analysis; then the savings
     // turn's disband
+    // its City Analysis job keeps its city's trade list (0x5ce3f0 ->
+    // 0x78f210), none the turn the city is founded, on the plots revealed
+    // since its last turn (runs/h1_duelz1121 t41: Rome's centre revealed to
+    // city-state 4 after its t40 turn, its free Trader to Rome that turn)
+    if (!fresh) minorTradeList(state, cityState);
     cityState.armyCounted = minorArmyCounts(cityState.armyKnown ?? []);
     minorKnowledge(state, cityState, true);
     minorContractPurchases(state, cityState, units);
     minorEconomicDisband(state, cityState, fell);
+    // its Economic AI's turn ends on its free Trader's route (0x78e0a0 at
+    // 0x688eaa), in the job pass before the city update's: the update's
+    // growth forecast holds the route (runs/h1_duelz1117 Caguana t136: the
+    // route ended in its t135 turn begun again before its update, the
+    // forecast's withheld Food 4.5 at a surplus of 6, m_foodLossAmounts
+    // 1152; Civil Prestige 69 at t137 as logged). Its AI's later reads of the
+    // city's yields but the Food keep those before the route (City::GetYield
+    // 0x1cb8b0, cached from the first read while the game state is locked:
+    // runs/h1_duelz1117 t44 city-state 4's route Gold out of Democracy's
+    // GOLD_PURCHASES, Political Philosophy 150.3 at t45; t46 city-state 3's
+    // route Gold and Science out of Classical Republic's and Digital
+    // Democracy's amenity terms, 314.5 at t47)
+    const seen = computeCityStats(state, minorCity(cityState));
+    cityState.aiYields = { total: { ...seen.total }, base: { ...seen.baseYields } };
+    // the route's values at the Gold boost the Economic AI's turn wrote
+    // before it (0x6880a1), its city update's at the turn before's
+    // (runs/h1_duelz1121 Hunza t87: its Trader to Taiyuan, as recorded, on
+    // the boost of the net income its t87 bank wrote)
+    const boostWas = cityState.economy?.goldBoost;
+    if (cityState.economy && cityState.centerIndex >= 0) cityState.economy.goldBoost = economicGoldBoost(cityState.netIncome ?? 0);
+    if (ordersHeld) routePick?.(state, cityState);
+    else minorTradePick(state, cityState);
+    if (cityState.economy) cityState.economy.goldBoost = boostWas;
     // its "Upgrade Units" trees' trigger: a tree per technology gained
     // (TRIGGER_TECH_UPGRADE, AI_EVENT_GAIN_TECH). A civic gained alone starts
     // none, its TRIGGER_CIVIC_UPGRADE row (AI_EVENT_GAIN_CIVIC) notwithstanding:
@@ -223,7 +256,8 @@ export function minorPhase(state: GameState): void {
     minorOpsRefresh(state, cityState);
     minorMilitaryUpgrade(state, cityState);
     delete cityState.armyCounted;
-    minorTrade(state, cityState, !ordersHeld);
+    delete cityState.aiYields;
+    minorTrade(state, cityState);
     // the boosts its routes and the actions before them earned land before
     // its army's walk and its second hook's tree tick (runs/h1_duely1121
     // city-state 2 t47: Currency completed by the Trader's route, contract
@@ -233,12 +267,10 @@ export function minorPhase(state: GameState): void {
     if (!ordersHeld) cityStateMilitary(state, cityState);
     // its knowledge base's route value K at its tactical turn, after its
     // city's update (whose builds read the K of the turn before), on the
-    // trade list its City Analysis job kept the turn before; then that job's
-    // list of the turn (none the turn the city is founded): runs/h1_duelw1121
+    // trade list its City Analysis job kept as the turn opened: runs/h1_duelw1121
     // Antioch meets Rome at t6, its K 1.80 from t7; Hunza meets China at t28,
     // its K 2.10 from t29, its t29 build a Warrior
     minorTradeValue(state, cityState);
-    if (!fresh) minorTradeList(state, cityState);
     // its end look; under the replay's hold its units still stand where its
     // turn found them, and the replay's copy (`minorAi`) takes the look on
     // the record's plots (runs/h1_dueld1128 t48: Hong Kong's Builder at 8:7)
@@ -884,6 +916,13 @@ export function holdMinorOrders(on: boolean): void {
 
 /** the replay holds the minors' and the Free Cities' unit orders */
 export const minorOrdersHeld = (): boolean => ordersHeld;
+
+/** the replay's hook at a minor's free Trader's pick under the hold (its
+ *  record's route lands there); null outside a replay */
+let routePick: ((state: GameState, cityState: CityState) => void) | null = null;
+export function holdMinorRoutePick(fn: typeof routePick): void {
+  routePick = fn;
+}
 
 /** A MINOR'S BUILDER LAYS AN IMPROVEMENT: from the plot (an adjacent-plot
  *  row from beside it) it spends a charge and its turn, and is gone with its
@@ -1604,7 +1643,7 @@ export function minorResourceFacts(state: GameState, cityState: CityState): Reso
   const era = civEraIndex(r.techs, r.civics);
   const stats = computeCityStats(state, minorCity(cityState));
   const view = aiView(state);
-  const amenity = amenityCityOf(stats);
+  const amenity = amenityCityOf(aiCityStats(stats, cityState));
   const extracted = new Map<string, number>();
   for (const t of state.map.tiles) {
     if (tileSeat(t) !== cityState.seat || !t.resource || !extractsResource(t)) continue;
@@ -1782,7 +1821,7 @@ export function minorBuildFacts(state: GameState, cityState: CityState, known: (
   const has = new Set(city.buildings);
   const centre = state.map.tiles[cityState.centerIndex];
   const worship = minorWorship(state, cityState);
-  const amenity = amenityCityOf(stats);
+  const amenity = amenityCityOf(aiCityStats(stats, cityState));
   return {
     view,
     seat: cityState.seat,

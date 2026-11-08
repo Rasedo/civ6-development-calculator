@@ -9,7 +9,7 @@ origin coded 0 for its one city):
   1. its capacity is its Foreign Trade civic and its city's Market or
      Lighthouse (`_trade_capacity`'s minor arm);
   2. its free Trader takes the scorer's destination (`_minor_route_candidate`)
-     and is spent on it (`_minor_trade`): the term, the walker at the centre,
+     and is spent on it (`_minor_trade_pick`): the term, the walker at the centre,
      the stored course;
   3. the route pays its city the destination's rows (`_minor_route_income`);
   4. it walks and comes home with its Trader at the end of its term;
@@ -73,6 +73,7 @@ def main() -> int:
     found, code, dseat, dcity, dct = sim._minor_route_candidate(s, torch.ones(sim.B, dtype=torch.bool))
     a_trader(sim, s)
     t0 = traders(sim, s)
+    sim._minor_trade_pick(s)
     sim._minor_trade(s)
     rr = sim.seat_routes[B0, row]
     live = (rr[:, 0] >= 0).nonzero().flatten().tolist()
@@ -109,6 +110,7 @@ def main() -> int:
     for turn in range(int(sim.turn) + 1, exp + sim._trade_walk_rail + 2):
         sim.turn = turn
         at = int(sim.seat_route_walk[B0, row, k])
+        sim._minor_trade_pick(s)
         sim._minor_trade(s)
         if int(sim.seat_routes[B0, row, k, 0]) < 0:
             break
@@ -123,6 +125,7 @@ def main() -> int:
     assert bool(sim.trading_post[B0, row, int(sim.citystate_center[B0, s])]), "no post at home"
     assert bool(sim.trading_post[B0, row, int(dct[B0])]), "no post at the destination"
     a_trader(sim, s)
+    sim._minor_trade_pick(s)
     sim._minor_trade(s)
     again = sim._minor_route_income(s)
     assert again is not None and abs(float(again[B0, 0, 2]) - (y[2] + 1)) < 1e-9, \
@@ -143,6 +146,7 @@ def main() -> int:
         if not bool(f2[0][B0]) or int(f2[2][B0]) != r2:
             continue
         a_trader(sim, s)
+        sim._minor_trade_pick(s)
         sim._minor_trade(s)
         assert bool((sim.seat_route_dseat[B0, row] == r2).any()), "no route to the major"
         tb = traders(sim, s)

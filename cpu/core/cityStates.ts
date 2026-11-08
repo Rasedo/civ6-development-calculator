@@ -106,6 +106,10 @@ export function minorReplaceCitizens(state: GameState, cs: CityState): void {
   replaceAllCitizens(state, city, minorFlags(cs));
   cs.specialistPref = city.specialistPref;
   cs.idleCitizens = city.idleCitizens;
+  // the re-placed city's yields read afresh (`CityState.aiYields`):
+  // runs/h1_duelz1128 city-state 3 t16-t30, its Food focus toggling a turn
+  // apart, Political Philosophy 392.1 / 396.1 as logged
+  delete cs.aiYields;
 }
 
 /** THE CITY AI'S FOOD FOCUS (0x5cdae0, the city's update before its events):

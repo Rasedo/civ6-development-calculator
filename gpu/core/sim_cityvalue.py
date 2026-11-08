@@ -1888,7 +1888,13 @@ class _MinorFacts:
         return self._get("stats", lambda: self.sim._seat_city_stats(self.row, record=False))
 
     def _total(self, k: int) -> torch.Tensor:
-        return self._stats()[0][:, 0, k]
+        # a yield but the Food its AI read before its free Trader's dispatch
+        # (`CityState.aiYields`)
+        live = self._stats()[0][:, 0, k]
+        seen = self.sim._cv_yields_seen.get(self.s)
+        if seen is not None and k != 0:
+            return torch.where(seen[2], seen[0][:, k], live)
+        return live
 
     def _mine(self):
         sim = self.sim
@@ -2050,8 +2056,18 @@ class _MinorFacts:
         return (sim._stock_bank(self.row) - sim._stock_reserved(self.row))[:, k] > 0
 
     def _base(self):
-        """the city yields' attribute bases (`amenityCityOf`)"""
-        return self._get("base", lambda: self.sim._seat_city_base(self.row))
+        """the city yields' attribute bases (`amenityCityOf`); those but the
+        Food its AI read before its free Trader's dispatch
+        (`CityState.aiYields`)"""
+        def read():
+            base = self.sim._seat_city_base(self.row)
+            seen = self.sim._cv_yields_seen.get(self.s)
+            if seen is None:
+                return base
+            out = base.clone()
+            out[:, 0, 1:] = torch.where(seen[2].unsqueeze(1), seen[1][:, 1:], base[:, 0, 1:])
+            return out
+        return self._get("base", read)
 
     def amenity(self):
         tot = self._base()[:, 0]

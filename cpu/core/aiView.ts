@@ -51,7 +51,7 @@ import { cityStateAt as cityStateAtPlot, envoysHere, envoysOf, minorCity, suzera
 import { grievanceWith } from './grievance';
 import { cityRouteDestPlots, tradeCapacity } from './trade';
 import { buildingVariantAdjacency, cityPower, effectiveAdjacency } from './yields';
-import { cityTourism, civEraIndex, computeCityStats, tourismTowardRaw } from './city';
+import { cityTourism, civEraIndex, computeCityStats, tourismTowardRaw, type CityStats } from './city';
 import { PROJECTS } from '../data/projects';
 import { RESOURCES } from '../../world/resources';
 import { tileAppeal } from './appeal';
@@ -83,6 +83,16 @@ const YIELD_KEY: Readonly<Record<string, YieldKey>> = {
 const AI_YIELD_KEYS: readonly YieldKey[] = AI_YIELDS.map((y) => YIELD_KEY[y]);
 const govType = (id: string): string => gameTypeOf('government', id, 'GOVERNMENT_');
 const UNIT_ACTION = unitActionIndex(IMPROVEMENT_IDS);
+
+/** a city's stats as the AI reads them (City::GetYield 0x1cb8b0, cached on
+ *  its first read while the game state is locked): a city-state's yields but
+ *  the Food those its AI read before its free Trader's dispatch, while its
+ *  citizens stand (`CityState.aiYields`) */
+export function aiCityStats(st: CityStats, cs: CityState | undefined): CityStats {
+  const seen = cs?.aiYields;
+  if (!seen) return st;
+  return { ...st, total: { ...seen.total, food: st.total.food }, baseYields: { ...seen.base, food: st.baseYields.food } };
+}
 
 /** a city's growth as the growth forecast reads it (`CityGrowth`) */
 export function cityGrowth(state: GameState, city: City): CityGrowth {
@@ -143,6 +153,9 @@ export function aiView(state: GameState, opts: { updated?: boolean } = {}): AiVi
     }
     return citiesOf(state, i).find((c) => c.id === id);
   };
+  // a city's stats as the AI reads them (`aiCityStats`)
+  const statsOf = (i: number, city: City): CityStats =>
+    aiCityStats(computeCityStats(state, city), isCityStateSeat(i) ? (seatOf(state, i) as CityState | undefined) : undefined);
   // a seat's cities; a city-state's its one city (`minorCity`)
   const seatCities = (i: number): City[] => {
     if (!isCityStateSeat(i)) return citiesOf(state, i);
@@ -254,7 +267,7 @@ export function aiView(state: GameState, opts: { updated?: boolean } = {}): AiVi
       const minor = isCityStateSeat(i) ? (seatOf(state, i) as CityState | undefined) : undefined;
       const city = minor ? minorCity(minor) : citiesOf(state, i).find((c) => c.id === id);
       const key = YIELD_KEY[type];
-      return city && key ? computeCityStats(state, city).total[key] : 0;
+      return city && key ? statsOf(i, city).total[key] : 0;
     },
     yieldWeight: (i, type) => weightsOf(i)[type] ?? 0,
     pseudoYieldWeight: (i, type) => pseudoOf(i).get(type) ?? 0,
@@ -414,7 +427,7 @@ export function aiView(state: GameState, opts: { updated?: boolean } = {}): AiVi
       return !!cs?.prodItem?.startsWith('unit:');
     },
     grossGoldYield: (i) => seatCities(i).reduce((a, c) => {
-      const st = computeCityStats(state, c);
+      const st = statsOf(i, c);
       return a + st.total.gold + st.maintenance;
     }, 0),
     // a city-state's table on its knowledge base's counts; a major's or the
@@ -540,7 +553,7 @@ export function aiView(state: GameState, opts: { updated?: boolean } = {}): AiVi
     cityAmenity: (i, id) => {
       const city = cityOf(i, id);
       if (!city) return { balance: 0, yields: {} };
-      return amenityCityOf(computeCityStats(state, city));
+      return amenityCityOf(statsOf(i, city));
     },
     // a city-state's forecast is its turn's (`CityState.aiGrowth`), or with
     // `updated` its city as its update this turn read it — before the build

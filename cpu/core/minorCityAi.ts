@@ -960,6 +960,14 @@ export function minorEconomicDisband(state: GameState, cs: CityState, delta: num
     // damage +0xcf0 at most 0), which ends the step
     if (!victim || victim.hp < UNIT_HP) return;
     disbandUnit(state, victim.id);
+    // the DELETE destroys it at once, off its player's list (0x948500 at
+    // 0x9485e5..0x9485f1: the units manager's destroy, vt +0x60, the flag
+    // 0; the delayed kill's is 1): runs/h1_duelz1124 city-state 2 t130, two
+    // of its standing army's Musketmen deleted, its m_defendersNeeded 1 at
+    // that turn's update, Combat Desire 0.1 at t131 and Nationalism 731.8 at
+    // t132 as logged
+    if (cs.unitsListed) delete cs.unitsListed[victim.id];
+    if (cs.defendersListed) cs.defendersListed = cs.defendersListed.filter((id) => id !== victim!.id);
     left -= UNITS[victim.type].maintenance * FX;
   }
 }

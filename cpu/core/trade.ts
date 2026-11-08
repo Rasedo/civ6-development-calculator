@@ -1450,16 +1450,27 @@ export function tradeRouteExpiry(state: GameState, actor: Seat): void {
   }
 }
 
-export function minorTrade(state: GameState, cityState: CityState, pick: boolean): void {
-  tradeRouteWalk(state, cityState);
+/** A CITY-STATE'S FREE TRADER takes its AI's route (`minorRouteCandidate`)
+ *  under its trade capacity: the Economic AI's turn ends on it (0x687bf0 ->
+ *  0x78e0a0 at 0x688eaa), in the turn's job pass 3, before the city update's
+ *  pass 2 reads the city's growth (0x6096c0's +0x370 list run 4..0) */
+export function minorTradePick(state: GameState, cityState: CityState): void {
   const routes = cityState.tradeRoutes ?? [];
-  if (pick && routes.length < tradeCapacity(state, cityState.seat) && freeTrader(state, cityState.seat)) {
-    const r = minorRouteCandidate(state, cityState);
-    if (r) {
-      const dest = routeDestCenter(state, cityState, r);
-      commitRoute(state, cityState.seat, cityState.centerIndex, dest, r);
-    }
-  }
+  if (routes.length >= tradeCapacity(state, cityState.seat) || !freeTrader(state, cityState.seat)) return;
+  const r = minorRouteCandidate(state, cityState);
+  if (!r) return;
+  commitRoute(state, cityState.seat, cityState.centerIndex, routeDestCenter(state, cityState, r), r);
+}
+
+/** A city-state's routes in its units' turn: the walk and plunder of those
+ *  begun before this turn (one begun in it took its first plot at its
+ *  commit), then the round-trip expiry */
+export function minorTrade(state: GameState, cityState: CityState): void {
+  const all = cityState.tradeRoutes ?? [];
+  const fresh = all.filter((r) => r.createdTurn === state.turn);
+  cityState.tradeRoutes = all.filter((r) => !fresh.includes(r));
+  tradeRouteWalk(state, cityState);
+  cityState.tradeRoutes = [...cityState.tradeRoutes, ...fresh];
   tradeRouteExpiry(state, cityState);
 }
 

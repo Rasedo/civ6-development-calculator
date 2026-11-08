@@ -630,6 +630,15 @@
   context:
     - "- THE TRANSFER (0x93fa10, the unit manager's vtable +0x80 at 0xd92c18; the levy's return 0x4502b0 calls it with the 5th argument 1): the old unit is destro..."
   review: reviewed
+- addr: 0xd95490
+  kind: global
+  status: PARTLY
+  readings:
+    - "C-130: a minor's levy home after its bank; its free Trader's route before its city update, the AI's yields cached before it; a deleted unit off its list at once; a major's founded city keeps its trade list at once — READ (0x4e4560 at 0x4e45ee / 0x4e4638, 0x6096c0's passes, 0x688eaa, 0x1cb8b0, 0x948500 at 0x9485e5, 0x1eae70 at 0x1eb335 -> 0x5cdd70 at 0x5ce191), the cache's span a fit, both twins"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...DELETE (the Economic AI's disband, 0x6877d0): the command's execution 0x948500 (vtable @0xd95490 slot 4) calls the units manager's destroy (vt +0x60) with the flag 0 (0x9485e5..0x9485f..."
+  review: imported
 - addr: 0xd98910
   kind: global
   status: PARTLY

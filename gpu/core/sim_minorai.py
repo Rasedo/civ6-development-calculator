@@ -172,6 +172,15 @@ class SimMinorAi:
             vslot = victim[rows]
             self._occ_clear(rows, self.major_unit_tile[rows, vslot], vslot)
             self.unit_alive[rows, vslot] = False
+            # the DELETE destroys it at once, off its player's list
+            # (`minorEconomicDisband`)
+            lo = self.POOL_LO["major"]
+            on = self.unit_list_seat[rows, lo + vslot] == seat
+            if bool(on.count_nonzero()):
+                rl, vl = rows[on], vslot[on]
+                lt = self.unit_list_type[rl, lo + vl].long().clamp(min=0, max=self.NU - 1)
+                self.citystate_list_count[rl, s, lt] -= 1
+                self.unit_list_seat[rl, lo + vl] = -1
             left = left - torch.where(do, maint.gather(1, victim.unsqueeze(1)).squeeze(1) * _FX, torch.zeros_like(left))
 
     def _minor_gp_class(self) -> torch.Tensor:

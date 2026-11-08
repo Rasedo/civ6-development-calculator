@@ -38,3 +38,20 @@
   readings:
     - "C-130: the Economic AI's disband of a falling treasury — READ (0x6877d0 from the savings turn 0x688b45..0x688e71, the delete command's can-start 0x948370), both twins"
   review: reviewed
+- addr: 0x948500
+  kind: function
+  name: deleteExecute
+  semantics: "The DELETE command's execution (vtable @0xd95490 slot 4): logs a Great Person's deletion; the units manager's destroy (vt +0x60) with the flag 0 (0x9485e5..0x9485f1): the unit gone at once, off its player's list, not the delayed kill (flag 1, 0x4ef040)."
+  status: PARTLY
+  cases:
+    - recording: h1_duelz1124
+      turn: 130
+      value: "city-state 2's three Musketmen deleted by its Economic AI's disband: m_defendersNeeded 1 at that turn's update, Combat Desire 0.1 at t131, Nationalism 731.8 at t132 as logged"
+  impl:
+    - cpu/core/minorCityAi.ts:minorEconomicDisband
+    - gpu/core/sim_minorai.py:_minor_economic_disband
+    - cpu/core/minorCityAi.ts:busy
+  readings:
+    - "C-130: a minor's levy home after its bank; its free Trader's route before its city update, the AI's yields cached before it; a deleted unit off its list at once; a major's founded city keeps its trade list at once — READ (0x4e4560 at 0x4e45ee / 0x4e4638, 0x6096c0's passes, 0x688eaa, 0x1cb8b0, 0x948500 at 0x9485e5, 0x1eae70 at 0x1eb335 -> 0x5cdd70 at 0x5ce191), the cache's span a fit, both twins"
+  notes: [the Great Person log and the calls after the destroy unread]
+  review: reviewed

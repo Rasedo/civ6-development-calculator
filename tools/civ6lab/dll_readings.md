@@ -10886,3 +10886,84 @@ per Artifact, a per-adjacent Science or Culture).
 - OPEN: Add Goal Tech's kept contracts (0x7e7d20: SUBMITTED / FAILED /
   COMPLETED / 0 released, IN PROGRESS RUNNING) unported; the first block of
   0x35fd60's feature walk (0x36076d, [rax+0x28] & 1) unread.
+
+## C-130: a minor's levy home after its bank; its free Trader's route before its city update, the AI's yields cached before it; a deleted unit off its list at once; a major's founded city keeps its trade list at once — READ (0x4e4560 at 0x4e45ee / 0x4e4638, 0x6096c0's passes, 0x688eaa, 0x1cb8b0, 0x948500 at 0x9485e5, 0x1eae70 at 0x1eb335 -> 0x5cdd70 at 0x5ce191), the cache's span a fit, both twins
+
+`minorPhase`, `minorLevyReturn`, `minorTradePick` / `minorTrade`
+(cpu/core/minorBuild.ts, cpu/core/trade.ts), `aiCityStats` /
+`CityState.aiYields` (cpu/core/aiView.ts), `majorCityTradeList`
+(cpu/core/aiTrade.ts, from `foundCityAt`); the replay's
+`holdMinorRoutePick`; GPU `_minor_trade_pick` / `_minor_trade` (the walk's
+`skip`), `_cv_yields_seen` (`_MinorFacts._total` / `._base`), the founding
+`_major_trade_lists(..., slot)`.
+
+- THE LEVY'S RETURN: the player's DoTurn 0x4e4560 runs Player_Techs
+  (0x4e45df), the treasury 0x4e08f0 (0x4e45ee), the culture 0x396860,
+  PlayerReligion 0x4967f0, 0x43c190, then the Influence turn 0x44bb20
+  (0x4e4638), which ticks the levy counter and sends the army home
+  (0x44da30 -> 0x4502b0). The bank pays no unit the return brings.
+  Confirmed: runs/h1_duelz1121 city-state 3 t215, China's levied Ironclad
+  home as 1376259 (UnitAddedToMap after its CivicChanged): record 216's
+  m_xCachedNetIncome 2.30 (6.30 less 4) without its Maintenance, record
+  217's -1.80 (7.20 less 9) with it; its t216 Triangular Trade 87 and
+  Liberalism 65 at the Gold weight with no boost, as logged.
+- THE TRADER'S DISPATCH: the Economic AI's turn 0x687bf0 ends on 0x78e0a0
+  (0x688eaa); its job acts in pass 3 of the Control Manager's +0x370 list
+  (run 4..0, `C-96: the city events, trees and contracts`), the cities'
+  update 0x5ce680 in pass 2, so the update's growth forecast 0x5cb570
+  holds the route begun. The log agrees: TradeRouteAddedToMap precedes the
+  update's CityProductionChanged and PlayerTurnActivated (runs/h1_duelz1117
+  t44 city-state 4, 9640 / 9645 / 9648). Confirmed: runs/h1_duelz1117
+  Caguana t136, its route to China's capital ended in its t135 units' turn
+  and begun again before its update: the game's m_foodLossAmounts 1152
+  (4.5 withheld at a surplus of 6, the Farm 41:14 lays later that turn),
+  Civil Prestige 69 at t137 as logged (47 with the route after the update).
+- THE CACHE: City::GetYield 0x1cb8b0 keeps a yield computed on its first
+  read while the game state is locked (+0x458), the lock's first count
+  clearing it. A route begun at the dispatch is out of the yields the AI
+  read before it (the Economic AI's Gold; the research and civics AIs'
+  Science and Culture) for the rest of its turn, the Food its update's
+  forecast reads first after it in; a citizen re-placement (the Food
+  focus) reads them afresh. A fit on the records: runs/h1_duelz1117 t44
+  city-state 4's route Gold (3) out of Democracy's GOLD_PURCHASES,
+  Political Philosophy 150.3 at t45; t46 Caguana's route Gold and Science
+  out of Classical Republic's and Digital Democracy's amenity terms, 314.5
+  at t47; runs/h1_duelz1128 city-state 3 t16-t30, the focus toggling, 392.1
+  / 396.1 as logged. The lock's span and each yield's first reader are
+  unread.
+- THE TRADER ON ITS ROUTE stays a unit of its owner's list (the records
+  hold it): the replay keeps the record's Trader standing (`Unit.routed`)
+  where its route lands at the dispatch (runs/h1_duelz1117 t44 city-state
+  4's Trader 393218, trained that turn, in Oligarchy's COMBAT_EXPERIENCE
+  unit count).
+- A FOUNDED CITY'S TRADE LIST: the placement 0x1eae70, for a player 0x5bcdc0
+  admits with a CityBuildAI (+0x31d0), runs the city AI's 0x5cdd70
+  (0x1eb335), whose City Analysis 0x5ce3f0 (0x5ce191) keeps the city's
+  trade list (0x78f210): a major's city founded in its turn is in the
+  route value K the city-states' tactical turns take that turn. Confirmed:
+  runs/h1_duelz1124 t26 China's second city on 3:14, city-state 3's Foreign
+  Trade 235.9 and the Free Cities' 156.7 at t27 as logged; runs/h1_duelz1128
+  t86 the Free Cities' K, Foreign Trade 354.2 at t87.
+- THE DELETE (the Economic AI's disband, 0x6877d0): the command's execution
+  0x948500 (vtable @0xd95490 slot 4) calls the units manager's destroy (vt
+  +0x60) with the flag 0 (0x9485e5..0x9485f1), not the delayed kill's 1:
+  the unit leaves its player's list at once, the standing army's walk and
+  the unit counts no longer read it (`minorEconomicDisband`: off
+  `CityState.unitsListed` / `.defendersListed`; GPU `unit_list_seat`,
+  `citystate_list_count`). Confirmed: runs/h1_duelz1124 city-state 2 t130,
+  three Musketmen deleted (two of its standing army): m_defendersNeeded 1
+  at that turn's update (aimem), Combat Desire 0.1 at t131 (AI_Military),
+  Nationalism 731.8 at t132 as logged (its Corps' PSEUDOYIELD_UNIT_COMBAT
+  term on the desire).
+- THE DISPATCH'S WEIGHTS: the Economic AI writes its Gold boost (0x6880a1)
+  before its dispatch (0x688eaa): the route's values read this turn's boost,
+  the city update the turn before's (a records fit: runs/h1_duelz1121 Hunza
+  t87, its Trader to Taiyuan as recorded, not Shanghai).
+- THE TRADE LIST at the City Analysis (0x5ce3f0 -> 0x78f210, signal +0x258,
+  before the turn's job list): a city-state's list kept as its turn opens,
+  on the plots revealed since its last turn, which the dispatch and the
+  tactical turn's K read (runs/h1_duelz1121 t41: Rome's centre revealed to
+  city-state 4 between its t40 and t41 turns, its Trader to Rome at t41 as
+  recorded; Antioch t6 / t7 and Hunza t28 / t29's K as before).
+- Open: 0x5bcdc0's test; a city-state's founding list (none the turn it is
+  founded, as ported).

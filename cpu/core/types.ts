@@ -1,4 +1,5 @@
 export * from '../../world/types';
+import type { Yields } from '../../world/types';
 import type { ResearchEntry } from './aiResearch';
 import type { CivicEntry } from './aiCivics';
 import type { ResearchTree } from './researchTree';
@@ -939,6 +940,12 @@ export interface Seat {
    *  them, before the turn's ageing and look: the unit production table its
    *  city AI's turn reads (`minorKnownUnits`); absent outside that turn */
   armyCounted?: Record<string, number>;
+  /** a city-state's city yields (the total and the attribute base) as its
+   *  AI read them before its free Trader's dispatch, which its AI's later
+   *  reads in the turn take but the Food (the city's cached yields,
+   *  City::GetYield 0x1cb8b0, kept from their first read while the game
+   *  state is locked); absent outside that turn */
+  aiYields?: { total: Yields; base: Yields };
   /** a city-state's danger map (`dangerPlane`) per plot as its DoTurn
    *  builds it (0x4e4560 -> 0x46cdd0 -> 0x717460, after its city's turn),
    *  the one its city trees read all turn, the replay's copy's included;

@@ -3005,6 +3005,17 @@
     - "...ader, Move to Safety, Explore Land, End Turn) takes what is left. The moves' globals (0x5bbf80, AllowedMoves hashes): f2e0f4 Move to Safety, f2e100/104/108 Attack High/Medium/Low (0x..."
     - ...b0 RELIGIOUS, 1b4 TRADER, 1b8 CIVILIAN, 1bc LOW, 1c0 MEDIUM, 1c4 HIGH, 1c8 IMPROVEMENT (0x5bcb80's table, each global the id of the string loaded before it).
   review: reviewed
+- addr: 0x5bcdc0
+  final: 0x3d50b0
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-130: a minor's levy home after its bank; its free Trader's route before its city update, the AI's yields cached before it; a deleted unit off its list at once; a major's founded city keeps its trade list at once — READ (0x4e4560 at 0x4e45ee / 0x4e4638, 0x6096c0's passes, 0x688eaa, 0x1cb8b0, 0x948500 at 0x9485e5, 0x1eae70 at 0x1eb335 -> 0x5cdd70 at 0x5ce191), the cache's span a fit, both twins"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "- A FOUNDED CITY'S TRADE LIST: the placement 0x1eae70, for a player 0x5bcdc0 admits with a CityBuildAI (+0x31d0), runs the city AI's 0x5cdd70 (0x1eb335), whose Ci..."
+    - "- Open: 0x5bcdc0's test; a city-state's founding list (none the turn it is founded, as ported)."
+  review: imported
 - addr: 0x5bce20
   final: 0x3d5110
   kind: function
@@ -4961,12 +4972,15 @@
     - cpu/core/aiTrade.ts:keepTradeList
     - cpu/core/aiTrade.ts:majorTradeLists
     - gpu/core/sim_minors.py:_keep_trade_list
+    - cpu/core/aiTrade.ts:majorCityTradeList
+    - cpu/core/minorBuild.ts:prev
   readings:
     - "C-96: the trade AI's route value — READ (0x5e9b20, 0x78f210, 0x78e010, 0x559140's use), PARTLY READ (0x526330's terms, the knowledge base's city order)"
     - "H-1: the trade record's player — READ (0x5ecb50, 0x787f50, 0x5e9b20's walk), PARTLY READ (the city-states' meetings with each other, the majors' weights)"
     - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
     - "C-130: a lump's queue step completes the head; a major's trade list tries what its last turn revealed; a city-state's researched technology lands its boosts before the Culture — READ, both twins"
     - "C-108: the trade graph's paths — READ, both twins"
+    - "C-130: a minor's levy home after its bank; its free Trader's route before its city update, the AI's yields cached before it; a deleted unit off its list at once; a major's founded city keeps its trade list at once — READ (0x4e4560 at 0x4e45ee / 0x4e4638, 0x6096c0's passes, 0x688eaa, 0x1cb8b0, 0x948500 at 0x9485e5, 0x1eae70 at 0x1eb335 -> 0x5cdd70 at 0x5ce191), the cache's span a fit, both twins"
   context:
     - "## C-96: the trade AI's route value — READ (0x5e9b20, 0x78f210, 0x78e010, 0x559140's use), PARTLY READ (0x526330's terms, the knowledge base's city orde..."
     - "...at +0x10 / count +0x20, a rejected list of 8-byte entries at +0x28 / +0x38), kept by 0x78f210 from the city's analysis (0x5ce3f0 \"City Analysis\"): per city entry of the owner's know..."
