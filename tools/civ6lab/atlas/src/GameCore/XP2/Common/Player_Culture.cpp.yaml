@@ -183,10 +183,11 @@
     - recording: 1122
       turn: 200
       value: "both give the   same answer on the recorded cases: 1122 t200, Reyna established in   Changsha (Civil Prestige's amenity) leaves the ranking standing to t201   (the rebuild precedes her clock), and the"
-  impl: [cpu/core/governors.ts:governorClocks]
+  impl: [cpu/core/governors.ts:governorClocks, cpu/core/minorBuild.ts:minorEconomy]
   readings:
     - "C-94: trade posts and cultural dominance — READ"
     - "H-1: the luxury allocation's rebuilds — PARTLY READ"
+    - "C-130: the minor's treasury turn between its technologies and its civics; a pillaged building's Maintenance — READ (0x4e4560's order, 0x18c590), both twins"
   context:
     - "- PlayerCulture's turn (0x396860), a major's: the culture lands (lifetime culture +0x1050, 24.8, grows by every gain of..."
     - "- Player DoTurn 0x4e4560, in order: the culture (+0x1310, 0x396860: the civic progress), the resources (+0x1320, 0x4a8ed0 at 0x4e46c0: the holdings reco..."

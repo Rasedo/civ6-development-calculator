@@ -6919,6 +6919,23 @@
   context:
     - "...a560 / 0x3de4e0): the \"ALLY\" ones. PrepareForWarWith (0x724f30; Lua PrepareForWarWith 0x9bbaa0) is set by the war declarations' not-ready hook (DiplomaticActions slot +0x68 = 0x6742d..."
   review: imported
+- addr: 0x9c05e0
+  final: 0x6cabd0
+  kind: function
+  name: GetBuildingMaintenance
+  status: READ
+  cases:
+    - recording: 1121
+      turn: 216
+      value: "The records'   maintTotal equals maintBuildings + maintDistricts + maintUnits less each   pillaged building's Maintenance on every player-turn of runs/h1_duely1124   and 1121 (1124 Granada's pillaged "
+    - recording: 1121
+      turn: 195
+      value: 1121 Hunza's Shipyard t195-222).
+  readings:
+    - "C-130: the minor's treasury turn between its technologies and its civics; a pillaged building's Maintenance — READ (0x4e4560's order, 0x18c590), both twins"
+  context:
+    - "...uildings 0x18c590, the treasury's loop 0x4dee60 at 0x4def4e, Lua GetBuildingMaintenance 0x9c05e0): 0 for a building whose per-building flag (component +0x20 vector) is set, the pillage..."
+  review: imported
 - addr: 0x9c0c80
   final: 0x6cb250
   kind: function

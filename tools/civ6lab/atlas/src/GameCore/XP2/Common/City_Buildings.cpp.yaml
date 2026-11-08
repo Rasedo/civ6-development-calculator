@@ -3,6 +3,20 @@
 # `review: imported` = bootstrapped from dll_readings.md / code comments / saved
 # labels and not yet reviewed: verify against the disassembly, then edit and
 # set `review: reviewed`.
+- addr: 0x18c590
+  final: 0x10ac10
+  kind: function
+  name: GetBuildingMaintenance
+  semantics: "a building's Maintenance in the city (City_Buildings, the treasury's loop 0x4dee60 at 0x4def4e, Lua GetBuildingMaintenance 0x9c05e0): 0 for a building the city does not hold or whose per-building flag (the component's +0x20 byte vector) is set, the pillaged one; else Buildings.Maintenance (+0x38), or a scaled row (0x28c390) where the building's +0x18 row carries one."
+  status: READ
+  cases:
+    - recording: h1_duely1124
+      turn: 243
+      value: "Granada's pillaged Barracks pays none: m_xCachedNetIncome -307 = 20.8 Gold less 22 (maintTotal), maintBuildings 3 listing it"
+  impl: [cpu/core/city.ts:cityMaintenance, gpu/core/sim_seats.py:_seat_housing]
+  readings:
+    - "C-130: the minor's treasury turn between its technologies and its civics; a pillaged building's Maintenance — READ (0x4e4560's order, 0x18c590), both twins"
+  review: reviewed
 - addr: 0x18ddf0
   final: 0x10bc50
   kind: function

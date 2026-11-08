@@ -30,6 +30,18 @@
     - "...olshoi, a Great Person's free tech): ONE pool of the rows researchable before the grants (0x4c8c40), each draw erasing its pick — a row the first grant opens is not offered (1117 t226: two..."
     - ...er to rate x the truncated quotient; with no Science the cost); a row not researchable (0x4c8c40) adds its unowned prerequisites, each level's rows once, the next step the last one add...
   review: reviewed
+- addr: 0x4c9640
+  final: 0x3337a0
+  kind: function
+  name: Player_Techs
+  status: PARTLY
+  impl: [cpu/core/minorBuild.ts:minorEconomy]
+  readings:
+    - "C-130: the minor's treasury turn between its technologies and its civics; a pillaged building's Maintenance — READ (0x4e4560's order, 0x18c590), both twins"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "- THE ORDER (DoTurn 0x4e4560): Player_Techs' turn 0x4c9640 (0x4e45df), then the treasury's 0x4e08f0 (0x4e45ee), then the deals, the culture 0x3968..."
+  review: imported
 - addr: 0x4c9cf0
   final: 0x333d30
   kind: function

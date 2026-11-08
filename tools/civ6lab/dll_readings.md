@@ -8546,3 +8546,42 @@ weighed entries (gpu/core/sim_minorops.py).
   Release DLL's CivKnowledge functions; the army records at +0x18 are a
   vector, so +0x128 is a field of its own). City-state 3's and the
   barbarians' revealed planes against the game's.
+
+## C-130: the minor's treasury turn between its technologies and its civics; a pillaged building's Maintenance — READ (0x4e4560's order, 0x18c590), both twins
+
+`minorEconomy`'s `bank` and `minorResearchBank`'s `afterTechs`
+(cpu/core/minorBuild.ts), `cityMaintenance` (cpu/core/city.ts); GPU
+`_minor_economy`'s `bank` and `_minor_research_bank`'s `after_techs`
+(gpu/core/sim_minors.py), `_seat_housing`'s `paying` (gpu/core/sim_seats.py).
+
+- THE ORDER (DoTurn 0x4e4560): Player_Techs' turn 0x4c9640 (0x4e45df), then
+  the treasury's 0x4e08f0 (0x4e45ee), then the deals, the culture 0x396860
+  (0x4e460b) and the religion 0x4967f0 (0x4e461a). So the Gold banks off
+  the city as the technologies left it and before a civic completes; the
+  Faith after both.
+- Confirmed (one-seed aimem trace): runs/h1_duely1124 Cardiff t230 completes
+  Predictive Systems and a civic; m_xCachedNetIncome -204 (-0.797) in record
+  t231 = 19.2 Gold less 20 (the civic's +1.6 lands after the bank, 20.8 in
+  record t231); its Gold boost 0.159, Market Economy 83 at t231 as logged
+  (Third Alternative 155, E-Commerce 71, Civil Prestige 133, Digital
+  Democracy 496.3 with it).
+- A BUILDING'S MAINTENANCE (City_Buildings 0x18c590, the treasury's loop
+  0x4dee60 at 0x4def4e, Lua GetBuildingMaintenance 0x9c05e0): 0 for a building
+  whose per-building flag (component +0x20 vector) is set, the pillaged one;
+  else Buildings.Maintenance (+0x38) or its scaled row. The records'
+  maintTotal equals maintBuildings + maintDistricts + maintUnits less each
+  pillaged building's Maintenance on every player-turn of runs/h1_duely1124
+  and 1121 (1124 Granada's pillaged Barracks t216-250: m_xCachedNetIncome
+  -307 = 20.8 Gold less 22 at t243; 1121 Hunza's Shipyard t195-222).
+- Confirmed (one-seed aimem traces): runs/h1_duely1124 Granada's Market
+  Economy 137 / 144 at t245-249 as logged (the net -2.2 / -4.45, its luxury
+  term 21); runs/h1_duely1121 Hunza t196-224 Triangular Trade, Liberalism,
+  Civil Prestige, E-Commerce and Globalization as logged (31 rows).
+- Open: runs/h1_duely1128 Bologna's net -5.0 / -4.7 at t226 / t234 (records
+  t227 / t235) where the engines hold -5.0 / -1.9 at t234: Totalitarianism
+  1414.8 for 1452.8 / 1426.7 at t236 / t237; 1494.6 / 1434.2 for 1474.6 /
+  1444.2 at t227 / t228. runs/h1_duely1127 city-state 2's Logistics
+  (0x6ac440: Amount x 0x79ca90(unit +0x160 its type) / GetMaxMoves 0x56e130,
+  each whole) 1-4 over the log t206-247 while its knowledge base's counts
+  (0x5eb650 reads the per-type count vector, AI_Knowledge.csv's ARMY lines)
+  equal the game's.

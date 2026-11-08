@@ -1149,32 +1149,40 @@ class SimMinors:
         start of turn runs (tools/civ6lab/turn_order_civ6.md). CIV6
         (City-state): a city-state's city is an ordinary city — its Campus
         yields Science, its Commercial Hub Gold. Its Science and Culture as
-        the turn opens feed the two research pots and the research completes
-        on them (`_minor_research_bank`); then, off the city as that research left
-        it, Gold banks into `citystate_treasury` and pays the minor's units'
-        upkeep — each unit's own Maintenance, a minor carrying no card that
-        cuts it — and meets the `_bankruptcy` every seat meets, and Faith
-        banks into `citystate_faith`, the store `citystate_gp_points` with it. Returns [B] long, the technologies completed (the upgrade trigger's
+        the turn opens feed the two research pots: the technologies complete
+        on them, then, off the city as they left it, Gold banks into
+        `citystate_treasury` and pays the minor's units' upkeep — each unit's
+        own Maintenance, a minor carrying no card that cuts it — and meets
+        the `_bankruptcy` every seat meets, then the civics complete
+        (`_minor_research_bank`), and Faith banks into `citystate_faith`, the store `citystate_gp_points` with it. Returns [B] long, the technologies completed (the upgrade trigger's
         count)."""
         row = self._CITY_MINOR0 + s
         alive = self.citystate_alive[:, s]
         keep = alive.double()
         tot = self._seat_city_stats(row, record=False)[0][:, 0]  # [B, 6], zero where the city is dead
-        techs, civics = self._minor_research_bank(s, tot[:, 3] * keep, tot[:, 4] * keep)
+
+        def bank(techs: torch.Tensor) -> None:
+            # the Gold off the city as the technologies left it (the
+            # treasury's turn 0x4e08f0, before the culture)
+            gold = tot[:, 2]
+            if bool((techs > 0).count_nonzero()):
+                gold = torch.where(techs > 0, self._seat_city_stats(row, record=False)[0][:, 0, 2], gold)
+            mine = self.major_unit_alive & (self.major_unit_seat == 100 + s)
+            upkeep = (self._unit_maintenance(self.major_unit_type, self.major_unit_formation,
+                                             self.major_unit_levied).double() * mine.double()).sum(dim=1)
+            tre = self.citystate_treasury[:, s] + gold * keep
+            paid = torch.where(alive, tre - upkeep, tre)
+            # the net income the treasury banks (m_xCachedNetIncome), which the
+            # Economic AI's Gold boost reads
+            self.citystate_net_income[:, s] = torch.where(alive, gold - upkeep, self.citystate_net_income[:, s])
+            maint = self._unit_maintenance(self.unit_type, self.unit_formation, self.unit_levied).double()
+            self.citystate_treasury[:, s] = self._bankruptcy(row, paid, alive, maint)
+
+        techs, civics = self._minor_research_bank(s, tot[:, 3] * keep, tot[:, 4] * keep, bank)
         gained = techs + civics
         if bool((gained > 0).count_nonzero()):
             fresh = self._seat_city_stats(row, record=False)[0][:, 0]
             tot = torch.where((gained > 0).unsqueeze(1), fresh, tot)
-        mine = self.major_unit_alive & (self.major_unit_seat == 100 + s)
-        upkeep = (self._unit_maintenance(self.major_unit_type, self.major_unit_formation,
-                                         self.major_unit_levied).double() * mine.double()).sum(dim=1)
-        tre = self.citystate_treasury[:, s] + tot[:, 2] * keep
-        paid = torch.where(alive, tre - upkeep, tre)
-        # the net income the treasury banks (m_xCachedNetIncome), which the
-        # Economic AI's Gold boost reads
-        self.citystate_net_income[:, s] = torch.where(alive, tot[:, 2] - upkeep, self.citystate_net_income[:, s])
-        maint = self._unit_maintenance(self.unit_type, self.unit_formation, self.unit_levied).double()
-        self.citystate_treasury[:, s] = self._bankruptcy(row, paid, alive, maint)
         # the city's Faith and the Great Person points a turn of every class
         # it cannot earn (GetFaithYield 0x494090 -> 0x43c9a0 over the store)
         self.citystate_faith[:, s] += (tot[:, 5] + self.citystate_gp_points[:, s].sum(dim=1)) * keep
@@ -1314,7 +1322,7 @@ class SimMinors:
         tot = self._seat_city_stats(self._CITY_MINOR0 + s, record=False)[0][:, 0]
         return self._minor_research_turn(s, tot[:, 3] * keep, tot[:, 4] * keep)
 
-    def _minor_research_bank(self, s: int, sci: torch.Tensor, cul: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
+    def _minor_research_bank(self, s: int, sci: torch.Tensor, cul: torch.Tensor, after_techs=None) -> tuple[torch.Tensor, torch.Tensor]:
         """`minorResearchBank` for research row `s` — a city-state's, or the
         Free Cities' — the TECHNOLOGIES first: the CATCH-UP (`minorCatchUp`,
         read inline), the turn's Science (`sci` [B]) and the overflow bank, a
@@ -1323,7 +1331,8 @@ class SimMinors:
         the CIVICS the same way: the catch-up, the turn's Culture (`cul`) and
         the overflow bank and complete the civic in hand at its cost, whose
         choice reads the civics AI's analysis of the turn before
-        (`_cai_completion`). CIV6 (Urban Defenses): the tech "builds modern
+        (`_cai_completion`); `after_techs` (the [B] technologies completed)
+        runs between the two. CIV6 (Urban Defenses): the tech "builds modern
         fortifications around the City Centers of all current and future
         cities and their Encampment districts", so the holder's perimeters
         arrive at the urban tier's full pool. Returns two [B] long, the technologies and
@@ -1385,6 +1394,8 @@ class SimMinors:
                 else:
                     self._minor_urban_fit(s, hit)
 
+        if after_techs is not None:
+            after_techs(techs)
         # THE CIVICS
         have, prog, cur = self.citystate_civics, self.citystate_civic_prog, self.citystate_cur_civic
         retain, ovf = self.citystate_civic_retain, self.citystate_civic_ovf

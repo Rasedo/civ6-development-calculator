@@ -155,14 +155,19 @@ export function newCityGrantUnit(state: GameState, seat: number): string | null 
 /** CIV6: a city's upkeep — each COMPLETE district's, a PILLAGED one paying
  *  none (the game's `maintDistricts` falls to 0 across three pillage windows
  *  of one Campus, runs/h1_duelw1104), and every building's, a pillaged one
- *  still paying. */
+ *  paying none: the record's `maintTotal` (the treasury's total, which the
+ *  net income m_xCachedNetIncome subtracts) leaves out a pillaged building's
+ *  Maintenance that `maintBuildings` lists (runs/h1_duely1124 Granada's
+ *  pillaged Barracks t216-250, its net -1.2 at t243 for the 20.8 Gold and 22;
+ *  China's pillaged buildings t219-250; runs/h1_duely1121 a Temple / Shrine /
+ *  Library / Shipyard each) */
 export function cityMaintenance(state: GameState, city: City): number {
   let total = 0;
   for (const d of city.districts) {
     const t = state.map.tiles[d.tileIndex];
     if (t.districtComplete && !t.districtPillaged) total += districtMaintenance(d.type);
   }
-  for (const b of city.buildings) total += buildingMaintenance(state, city, b);
+  for (const b of city.buildings) if (!city.pillagedBuildings?.includes(b)) total += buildingMaintenance(state, city, b);
   return total;
 }
 

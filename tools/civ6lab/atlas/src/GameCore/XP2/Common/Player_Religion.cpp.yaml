@@ -57,7 +57,10 @@
     - cpu/core/game.ts:spreadReligiousPressure
     - cpu/core/phase.ts:seatPhase
     - gpu/core/sim_economy.py:_spread_religious_pressure
-  readings: ["C-94: the religious spread — READ"]
+    - cpu/core/minorBuild.ts:minorEconomy
+  readings:
+    - "C-94: the religious spread — READ"
+    - "C-130: the minor's treasury turn between its technologies and its civics; a pillaged building's Maintenance — READ (0x4e4560's order, 0x18c590), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "- The spread (0x4967f0 PlayerReligion's turn: faith, the purchase notification, then 0x498570): a player whose..."

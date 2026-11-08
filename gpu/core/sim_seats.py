@@ -10955,26 +10955,28 @@ class SimSeats:
         is_cap_a = (self._palace_at(row, slice(0, cols)) & alive).double()
         ctr = self.city_center[:, row, :cols].clamp(min=0)
         bldg = self.city_bldg[:, row, :cols]
+        # the buildings that pay: a pillaged one pays none
+        paying = bldg & ~self.city_bldg_pillaged[:, row, :cols]
         dreg = self.city_dist_tile[:, row, :cols]
         dflat = dreg.clamp(min=0).reshape(B, -1)
         dcomp = (dreg >= 0) & self.district_complete.gather(1, dflat).reshape_as(dreg)
         # cityMaintenance — per-type district upkeep over COMPLETED, UNPILLAGED
-        # districts + buildingMaintenance over EVERY building (a pillaged one
-        # still pays, and no regional skip), + the
+        # districts + buildingMaintenance over every unpillaged building (no
+        # regional skip), + the
         # capital's PALACE, which TS carries as an autoCapital entry in
         # city.buildings and the GPU carries as an is_cap bonus.
         # per INSTANCE off the tile plane — the registry keeps one per type
         maint = (self._d_maint.double().reshape(1, 1, -1)
                  * self._dist_counts(row)[:, :cols].double()).sum(dim=2)
-        maint = maint + torch.einsum("bjn,bn->bj", bldg.double(), self._b_cols(row)["maintenance"])
-        if self._barrier_bidx >= 0 and bool(bldg[:, :, self._barrier_bidx].any()):
+        maint = maint + torch.einsum("bjn,bn->bj", paying.double(), self._b_cols(row)["maintenance"])
+        if self._barrier_bidx >= 0 and bool(paying[:, :, self._barrier_bidx].any()):
             # a Flood Barrier's upkeep scales as its price does
             # (`floodBarrierScale`): its row's Maintenance per coastal lowland
             # tile, once more per flood level
             fb = self._barrier_bidx
             scale = (self._city_lowland_count(row)[:, :cols]
                      * (1 + self._flood_level().unsqueeze(1))).double()
-            maint = maint + bldg[:, :, fb].double() * self._b_cols(row)["maintenance"][:, fb].unsqueeze(1) * (scale - 1)
+            maint = maint + paying[:, :, fb].double() * self._b_cols(row)["maintenance"][:, fb].unsqueeze(1) * (scale - 1)
         maint = maint + float(self.rules.palace_maintenance) * is_cap_a
         # WATER: fresh > coastal > none, then the Aqueduct — a fresh city gains
         # aqFreshBonus, a dry one is raised to aqNoFreshTotal. A pillaged

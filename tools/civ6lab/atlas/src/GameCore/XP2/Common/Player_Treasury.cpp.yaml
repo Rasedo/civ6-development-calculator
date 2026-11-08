@@ -9,6 +9,7 @@
   status: PARTLY
   readings:
     - "C-130: the Economic AI's Gold boost on the treasury's banked net income — READ (0x4e08f0, PlayerTreasury +0x1b8), both twins"
+    - "C-130: the minor's treasury turn between its technologies and its civics; a pillaged building's Maintenance — READ (0x4e4560's order, 0x18c590), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "- +0x1b8's writers: the reset 0x4e11b0 (0), the load 0x4dcd20, and the treasury's turn 0x4e08f0, the first call of the player's DoTurn 0x4e4560 (0x..."
@@ -57,6 +58,22 @@
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ...> GameAttribute::Value) less 0x4dd3b0's sum less the total Maintenance (0x4df2d0); then 0x4deb70 stores the income excluding trade (+0x278) and 0x4e02e0 banks +0x1b8 into the balance...
+  review: imported
+- addr: 0x4dee60
+  final: 0x342330
+  kind: function
+  status: READ
+  cases:
+    - recording: 1121
+      turn: 216
+      value: "The records'   maintTotal equals maintBuildings + maintDistricts + maintUnits less each   pillaged building's Maintenance on every player-turn of runs/h1_duely1124   and 1121 (1124 Granada's pillaged "
+    - recording: 1121
+      turn: 195
+      value: 1121 Hunza's Shipyard t195-222).
+  readings:
+    - "C-130: the minor's treasury turn between its technologies and its civics; a pillaged building's Maintenance — READ (0x4e4560's order, 0x18c590), both twins"
+  context:
+    - "- A BUILDING'S MAINTENANCE (City_Buildings 0x18c590, the treasury's loop 0x4dee60 at 0x4def4e, Lua GetBuildingMaintenance 0x9c05e0): 0 for a building whose per-building..."
   review: imported
 - addr: 0x4df2d0
   final: 0x342620
@@ -107,15 +124,22 @@
   final: 0x343780
   kind: function
   name: treasuryTurn
-  semantics: "The treasury's turn, the first call of the player's DoTurn (0x4e45ee): m_xCachedNetIncome (+0x160, data +0x1b8) = GetGoldYield (0x4ddc70) less 0x4dd3b0's sum less the total Maintenance (0x4df2d0); 0x4deb70 stores the income excluding trade (+0x220, data +0x278); 0x4e02e0 banks +0x1b8 into the balance (+0xf8); a balance below 0 runs 0x4dd270 / 0x4e1300."
+  semantics: "The treasury's turn, in the player's DoTurn after Player_Techs' turn 0x4c9640 and before the culture 0x396860 (0x4e45ee): m_xCachedNetIncome (+0x160, data +0x1b8) = GetGoldYield (0x4ddc70) less 0x4dd3b0's sum less the total Maintenance (0x4df2d0); 0x4deb70 stores the income excluding trade (+0x220, data +0x278); 0x4e02e0 banks +0x1b8 into the balance (+0xf8); a balance below 0 runs 0x4dd270 / 0x4e1300."
   status: READ
   cases:
     - recording: h1_duely1121
       turn: 80
       value: Hunza's m_xCachedNetIncome -1126 (-4.398) = the record t79's Gold 9.60 less Maintenance 14, the balance's change t79 -> t80; the engine's banked net equal t73-t92 but t85
-  impl: [cpu/core/minorBuild.ts:minorEconomy, gpu/core/sim_minors.py:_minor_economy]
+    - recording: h1_duely1124
+      turn: 230
+      value: "Cardiff banks -0.797 (record t231): after Player_Techs' turn 0x4c9640, before its civic's +1.6 Gold (the culture 0x396860 after it)"
+  impl:
+    - cpu/core/minorBuild.ts:minorEconomy
+    - gpu/core/sim_minors.py:_minor_economy
+    - gpu/core/sim_minors.py:bank
   readings:
     - "C-130: the Economic AI's Gold boost on the treasury's banked net income — READ (0x4e08f0, PlayerTreasury +0x1b8), both twins"
+    - "C-130: the minor's treasury turn between its technologies and its civics; a pillaged building's Maintenance — READ (0x4e4560's order, 0x18c590), both twins"
   review: reviewed
 - addr: 0x4e11b0
   final: 0x343be0
