@@ -218,7 +218,10 @@ function groundOf(state: GameState, unit: Unit, revealedOnly = true, planning = 
   // (the planning's attack test; a move order's path strikes its own domain)
   const fighters = new Set<number>();
   for (const u of state.units) {
-    if (!formation.has(u) && u.seat === unit.seat && doms.has(unitDomain(u.type))) own.add(u.tileIndex);
+    // its own units that stack with it, a Trader none (0x585d90 counts none
+    // with MakeTradeRoute: runs/h1_duely1124 Cardiff t95 / t113, its Builder
+    // onto 582 under its Trader, the Farm laid)
+    if (!formation.has(u) && u.seat === unit.seat && doms.has(unitDomain(u.type)) && !UNITS[u.type]?.trader) own.add(u.tileIndex);
     if (u.seat === unit.seat || !onMap(u)) continue;
     held.add(u.tileIndex);
     if (!unitsHostile(state, unit, u)) continue;

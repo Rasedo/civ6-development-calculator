@@ -65,6 +65,8 @@
     - cpu/core/tactical.ts:walk
     - gpu/core/sim_tactics.py:_tac_own_mil
     - gpu/core/sim_tactics.py:_tac_stacked_other
+    - cpu/core/tactical.ts:groundOf
+    - gpu/core/sim_tactics.py:SimTactics
   readings:
     - "C-124: a move order's path opens a turn-end node beside each node with Movement left — READ (0x271920, 0x7a880, 0x271490, 0x775a0, 0x26f330), both twins"
     - "C-97: the behaviour trees — READ (the interpreter), the nodes PARTLY READ"

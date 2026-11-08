@@ -757,9 +757,13 @@ class SimTactics:
         if zoc or stand:
             me = (slots + self.POOL_LO[pre]).unsqueeze(1)
 
+            # its own units that stack with it, a Trader none (0x585d90
+            # counts none with MakeTradeRoute)
             def own_at(pl: torch.Tensor) -> torch.Tensor:
                 pr = pl[rows]
-                return (pr >= 0) & (pr != me) & (self.unit_seat[rows].gather(1, pr.clamp(min=0)) == seat)
+                pc = pr.clamp(min=0)
+                return (pr >= 0) & (pr != me) & (self.unit_seat[rows].gather(1, pc) == seat) \
+                    & (self.unit_type[rows].gather(1, pc) != self._trader_idx)
 
             civ_u = self._type_civilian.take(utype).unsqueeze(1)
             sup_u = self._type_support.take(utype).unsqueeze(1)
