@@ -2930,20 +2930,18 @@ class SimSeats:
                 self.city_dist_tile[bidx, row, jr], self.city_bldg_pillaged[bidx, row, jr])
             exo_chg = exo_chg + (_bl_r.long() * self._b_rel_spreads.unsqueeze(0)).sum(dim=1)
             if self._missionary_idx >= 0:
-                n_live_m = (self.major_unit_alive & (self.major_unit_seat == row) & (self.major_unit_type == self._missionary_idx)).sum(dim=1)
                 mcost = self._faith_price(row, self._unit_faith_cost(row, self._missionary_idx),
                                           self._unit_buy_off(row, self._missionary_idx))
-                buy_m = base_r & (rel_kind == 5) & (n_live_m < self._missionary_cap) & self._afford(self.civ_faith[:, row], mcost)
+                buy_m = base_r & (rel_kind == 5) & self._afford(self.civ_faith[:, row], mcost)
                 if bool(buy_m.count_nonzero()):
                     chg_m = self._type_charges[self._missionary_idx] + self._enh["mchg"][self.civ_enhancer[:, row] + 1] + exo_chg
                     landed_m = self._spawn_unit(row, buy_m, at_r, self._missionary_idx, charges=chg_m)
                     self.civ_faith[:, row] = torch.where(landed_m, self.civ_faith[:, row] - mcost, self.civ_faith[:, row])
                     bought_relig = bought_relig | landed_m
             if self._apostle_idx >= 0:
-                n_live_a = (self.major_unit_alive & (self.major_unit_seat == row) & (self.major_unit_type == self._apostle_idx)).sum(dim=1)
                 acost = self._faith_price(row, self._unit_faith_cost(row, self._apostle_idx),
                                       self._unit_buy_off(row, self._apostle_idx))
-                buy_a = base_t & (rel_kind == 6) & ~bought_relig & (n_live_a < self._apostle_cap) \
+                buy_a = base_t & (rel_kind == 6) & ~bought_relig \
                     & self._afford(self.civ_faith[:, row], acost)
                 if bool(buy_a.count_nonzero()):
                     landed_a = self._spawn_unit(row, buy_a, at_r, self._apostle_idx, charges=self._type_charges[self._apostle_idx].expand(B) + exo_chg)
@@ -2952,10 +2950,8 @@ class SimSeats:
                     self._patron_saint(row, landed_a, jr)
                     bought_relig = bought_relig | landed_a
             if self._inquisitor_idx >= 0:
-                n_live_q = (self.major_unit_alive & (self.major_unit_seat == row) & (self.major_unit_type == self._inquisitor_idx)).sum(dim=1)
                 qcost = self._faith_price(row, self._unit_faith_cost(row, self._inquisitor_idx))
                 buy_q = (base_t & (rel_kind == 11) & ~bought_relig & self.civ_inquisition[:, row]
-                         & (n_live_q < self._inquisitor_cap)
                          & self._afford(self.civ_faith[:, row], qcost))
                 if bool(buy_q.count_nonzero()):
                     landed_q = self._spawn_unit(row, buy_q, at_r, self._inquisitor_idx,
@@ -2964,10 +2960,9 @@ class SimSeats:
             if self._guru_idx >= 0:
                 # the Guru's charges heal: neither the Exodus nor a Mosque
                 # adds to them
-                n_live_g = (self.major_unit_alive & (self.major_unit_seat == row) & (self.major_unit_type == self._guru_idx)).sum(dim=1)
                 gcost = self._faith_price(row, self._unit_faith_cost(row, self._guru_idx),
                                       self._unit_buy_off(row, self._guru_idx))
-                buy_g = (base_t & (rel_kind == 18) & ~bought_relig & (n_live_g < self._guru_cap)
+                buy_g = (base_t & (rel_kind == 18) & ~bought_relig
                          & self._afford(self.civ_faith[:, row], gcost))
                 if bool(buy_g.count_nonzero()):
                     landed_g = self._spawn_unit(row, buy_g, at_r, self._guru_idx)

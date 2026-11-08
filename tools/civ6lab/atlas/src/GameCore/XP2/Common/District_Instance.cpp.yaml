@@ -213,8 +213,19 @@
     - recording: 1121
       turn: 40
       value: every minor turn the game lists Bastions equal (1121 t40-75, 1117 t32-75).
-  impl: [cpu/core/aiModifiers.ts:ANALYZERS, cpu/core/tactical.ts:planUnit, cpu/core/tactical.ts:wins]
+    - recording: h1_duelz1127
+      turn: 238
+      value: "Muscat at Steel: the damage stays 63 as the maximum rises 300 -> 400 (record districts [.., 63, 300] -> [.., 63, 400]); its t239 Repair Outer Defenses valued on the 63 (17088.8 = 63 x 14 x 2 x 10 x 248/256)"
+  impl:
+    - cpu/core/aiModifiers.ts:ANALYZERS
+    - cpu/core/tactical.ts:planUnit
+    - cpu/core/tactical.ts:wins
+    - cpu/core/rules.ts:urbanFit
+    - gpu/core/sim_masks.py:_urban_defenses_fit
+    - gpu/core/sim_minors.py:_minor_urban_fit
+    - cpu/core/rules.ts:urbanDefensesFit
   readings:
+    - "C-126: Urban Defenses keeps the outer damage, a faith-only unit's purchase and no live-count cap on a religious unit's purchase — READ on the records (the damage +0x8d8 held, the maximum 0x24b290 derived), both twins"
     - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
     - "C-96: the project value — READ (0x7b28c0, the PROJECTS table 0x5ce970), PARTLY READ (the space-race standing 0x7b8a30, the diplomatic-victory rows, the repair count), unwired"
     - "C-95: the embark rules for a formation that may embark, a district's zone unseen, a city's kill in the planning, a raised unit's AI type, a move order's attack spot — READ (0x530420, 0x530240, 0x52fe90 at 0x52fed4, 0x530f50 at 0x531168, 0x791470 at 0x791677, 0x79b9c0), FIT (the move order's attack spot), both twins"
@@ -303,6 +314,7 @@
     - "H-1: the melee result, a ranged blow's domain, a city's shot — READ"
     - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
     - "C-95: the embark rules for a formation that may embark, a district's zone unseen, a city's kill in the planning, a raised unit's AI type, a move order's attack spot — READ (0x530420, 0x530240, 0x52fe90 at 0x52fed4, 0x530f50 at 0x531168, 0x791470 at 0x791677, 0x79b9c0), FIT (the move order's attack spot), both twins"
+    - "C-126: Urban Defenses keeps the outer damage, a faith-only unit's purchase and no live-count cap on a religious unit's purchase — READ on the records (the damage +0x8d8 held, the maximum 0x24b290 derived), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...uilds the law's struct: +0 / +4 the two strengths, +8 the district's maximum hit points 0x24b290, +0xc / +0x10 the outer defense's damage and maximum, +0x14 the pool's hash, +0x1c CO..."

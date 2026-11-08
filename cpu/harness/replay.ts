@@ -37,7 +37,7 @@ import { hexDistance, neighbors } from '../../world/hex';
 import { isWater } from '../../world/query';
 import { NO_SEAT } from '../core/types';
 import { advanceTurn, minorTurns, turnChange, turnClose, foundCity, foundCityAt, buyTile, settlerCost, projectCost, unitStepCost, unitsAcquired, buildingPurchaseCost,
-  buyWorshipBuilding, purchaseBuildingWithFaith, purchaseCivilianWithFaith, purchaseReligiousUnit, purchaseUnitWithFaith,
+  buyWorshipBuilding, purchaseBuildingWithFaith, purchaseCivilianWithFaith, purchaseNaturalist, purchaseReligiousUnit, purchaseRockBand, purchaseUnitWithFaith,
   purchaseSettler, unitGoldPrice, availableProjects, goldAffordable, buildingFaithPrice, wonderChargeBoost, adoptBeliefs,
   serialize, deserialize, itemCost } from '../core/game';
 import { completeQueueItem } from '../core/production';
@@ -3109,7 +3109,9 @@ function applyBuyUnit(ctx: Ctx, d: Extract<Decision, { kind: 'buyUnit' }>, rec: 
     ok = purchaseReligiousUnit(state, city.id, id, seat).ok;
   } else if (id === 'BUILDER' || id === 'SETTLER') {
     ok = purchaseCivilianWithFaith(state, city.id, id, seat).ok;
-  } else ok = purchaseUnitWithFaith(state, city.id, id, seat).ok;
+  } else if (id === 'ROCK_BAND') ok = purchaseRockBand(state, city.id, seat).ok;
+  else if (id === 'NATURALIST') ok = purchaseNaturalist(state, city.id, seat).ok;
+  else ok = purchaseUnitWithFaith(state, city.id, id, seat).ok;
   const made = state.units.find((u) => !before.has(u) && u.seat === seat && u.type === id);
   if (ok && made) ctx.units.set(d.unit, made);
   else if (ok) spawnRecorded(ctx, rec, d.unit);

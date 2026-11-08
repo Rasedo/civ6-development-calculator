@@ -818,21 +818,34 @@ export function outerPool(state: GameState, city: { buildings: string[]; seat: n
 /**
  * CIV6: unlocking Urban Defenses "builds modern fortifications around the City
  * Centers of all current and future cities and their Encampment districts" —
- * no production, no building row, so the perimeter simply arrives at the new
- * tier's full pool. Cities founded afterwards read the same tier through
- * `wallsMax` and need no write; only the standing ones do, because a breach
- * they are already carrying is what the fortifications replace.
+ * no production, no building row: the perimeter's maximum rises to the urban
+ * tier's and the damage it carries stays (the game keeps a district's outer
+ * damage, GetDamage 0x24ae50, and reads the maximum off the tier:
+ * runs/h1_duelz1127 Muscat at Steel t238, 63 down of 300 -> 63 down of 400,
+ * its Repair Outer Defenses at t239 valued on the 63). Cities founded
+ * afterwards read the same tier through `wallsMax` and need no write. The
+ * damage is read on the walls the city's buildings supply, the tier before
+ * the tech, wherever the tech already stands in the research.
  */
 export function urbanDefensesFit(state: GameState, seat: number): void {
-  for (const c of seatOf(state, seat)?.cities ?? []) {
-    c.outerHp = WALLS_TIER_HP[WALLS_TIER_URBAN];
-    // every completion hook fires BEFORE the tech lands in `research.techs`,
-    // so the encampment write uses the same constant the centre does —
-    // `fitEncampOuter`'s `wallsMax` recompute would still answer the old tier
-    for (const d of c.districts) {
-      const t = state.map.tiles[d.tileIndex];
-      if (t.district === 'ENCAMPMENT' && t.districtComplete) t.encampOuterHp = WALLS_TIER_HP[WALLS_TIER_URBAN];
-    }
+  for (const c of seatOf(state, seat)?.cities ?? []) urbanFit(state, c, c.districts);
+}
+
+/** `urbanDefensesFit` for one city or city-state: its centre's and each
+ *  complete Encampment's pool at the urban tier's full pool less the damage
+ *  it carried */
+export function urbanFit(state: GameState, c: { buildings?: string[]; seat: number; outerHp?: number },
+  districts: readonly { tileIndex: number }[]): void {
+  const full = WALLS_TIER_HP[WALLS_TIER_URBAN];
+  const civ = civOf(state, c.seat);
+  const buildings = c.buildings ?? [];
+  let was = WALLS_TIER_HP[wallsLevel({ buildings })] ?? 0;
+  for (const b of buildings) was += buildingVariantFor(civ, b)?.wallsHpBonus ?? 0;
+  const down = (hp: number | undefined) => Math.max(0, was - Math.min(hp ?? was, was));
+  c.outerHp = full - down(c.outerHp);
+  for (const d of districts) {
+    const t = state.map.tiles[d.tileIndex];
+    if (t.district === 'ENCAMPMENT' && t.districtComplete) t.encampOuterHp = full - down(t.encampOuterHp);
   }
 }
 

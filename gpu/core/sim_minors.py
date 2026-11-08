@@ -1440,7 +1440,7 @@ class SimMinors:
         runs between the two. CIV6 (Urban Defenses): the tech "builds modern
         fortifications around the City Centers of all current and future
         cities and their Encampment districts", so the holder's perimeters
-        arrive at the urban tier's full pool. Returns two [B] long, the technologies and
+        reach the urban tier's maximum, their damage kept (`_minor_urban_fit`). Returns two [B] long, the technologies and
         the civics completed."""
         free = s == self.FR
         alive = (torch.ones(self.B, dtype=torch.bool, device=self.device) if free
@@ -1541,20 +1541,24 @@ class SimMinors:
         retain.copy_(torch.where(kept, floor.to(retain.dtype).unsqueeze(2), retain))
 
     def _minor_urban_fit(self, s: int, hit: torch.Tensor) -> None:
-        """`minorResearch`'s Urban Defenses fit: the centre's perimeter and its
-        Encampment's own pool arrive at the urban tier's full pool."""
+        """`minorResearch`'s Urban Defenses fit (`urbanFit`): the centre's
+        perimeter and its Encampment's own pool at the urban tier's full pool
+        less the damage each carried on the walls its buildings supply."""
         if not bool(hit.count_nonzero()):
             return
         row = self._CITY_MINOR0 + s
         full = int(self._walls_tier_hp[self._walls_tier_urban])
-        self.city_outer_hp[:, row, 0] = torch.where(hit, torch.full_like(self.city_outer_hp[:, row, 0], full),
-                                                    self.city_outer_hp[:, row, 0])
+        was = self._walls_tier_hp.take(self._walls_level_all(row)[:, 0]).long()
+        oh = self.city_outer_hp[:, row, 0]
+        down = (was - torch.minimum(oh, was)).clamp(min=0)
+        self.city_outer_hp[:, row, 0] = torch.where(hit, full - down, oh)
         if self._encamp_didx >= 0:
             et = self.city_dist_tile[:, row, 0, self._encamp_didx]
             w = (hit & (et >= 0) & self.district_complete.gather(1, et.clamp(min=0).unsqueeze(1)).squeeze(1)
                  ).nonzero(as_tuple=True)[0]
             if w.numel():
-                self.encamp_outer_hp[w, et[w]] = full
+                eh = self.encamp_outer_hp[w, et[w]]
+                self.encamp_outer_hp[w, et[w]] = full - (was[w] - torch.minimum(eh, was[w])).clamp(min=0)
 
 
     def _minor_walls_tier(self, s: int) -> torch.Tensor:

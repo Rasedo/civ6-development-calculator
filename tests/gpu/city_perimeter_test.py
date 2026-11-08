@@ -310,13 +310,13 @@ def test_walls_tiers(rules, path) -> None:
     sim.civ_techs[0, 0, sim._urban_def_tech] = True
     assert int(sim._walls_tier_at(row0, col)[0]) == sim._walls_tier_urban
     assert int(sim._walls_max_at(row0, col)[0]) == 400
-    # ...and it FITS the standing cities, breach and all
+    # ...and a standing city with no walls (no damage to keep) stands at the full 400
     sim.civ_techs[0, 0, sim._urban_def_tech] = False
     sim.city_outer_hp[0, 0, 0] = 0
     sim._urban_defenses_fit(0, torch.tensor([True], device=sim.device))
     sim.civ_techs[0, 0, sim._urban_def_tech] = True
     assert int(sim.city_outer_hp[0, 0, 0]) == 400, int(sim.city_outer_hp[0, 0, 0])
-    print("  tiers OK: 100/200/300 stacked, +3 CS each, Steel alone gives 400 and refits a breach")
+    print("  tiers OK: 100/200/300 stacked, +3 CS each, Steel alone gives 400 and fits a wall-less city full")
 
 
 def test_repair_project(rules, path) -> None:

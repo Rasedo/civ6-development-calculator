@@ -43,7 +43,7 @@ import { BUILDINGS, effectiveBuilding } from '../data/buildings';
 import { governorFlag, governorSum, governorTileMult } from './governors';
 import { BUILT_WONDERS, WONDER_ERA_INDEX } from '../data/builtWonders';
 import { ERAS } from '../data/techs';
-import { ENHANCER_BELIEFS, colonizeFoundingPressure, BELIEF_CATALOGS, BELIEF_CLASS_FOLLOWER, BELIEF_SLOTS, RELIGION_INITIAL_BELIEFS, beliefIdAt, RELIGION_TYPES, religionName, RELIGION_PRESSURE_RANGE, RELIGION_PRESSURE_PER_TURN, HOLY_CITY_PRESSURE_MULT, HOLY_SITE_PRESSURE_MULT, followedReligionOf, unconvertedOf, gainPopulationPressure, ATHEISM_PRESSURE_PER_POP, ROUTE_PRESSURE_DESTINATION, ROUTE_PRESSURE_ORIGIN, MISSIONARY_CAP, APOSTLE_CAP, INQUISITOR_CAP, GURU_CAP, GURU_HEAL, THEO_PRESSURE_SWING, THEO_PRESSURE_RANGE, LAUNCH_INQUISITION_CHARGES, REMOVE_HERESY_PCT, CONDEMN_PRESSURE_RANGE, CONDEMN_PRESSURE_SWING } from '../data/religion';
+import { ENHANCER_BELIEFS, colonizeFoundingPressure, BELIEF_CATALOGS, BELIEF_CLASS_FOLLOWER, BELIEF_SLOTS, RELIGION_INITIAL_BELIEFS, beliefIdAt, RELIGION_TYPES, religionName, RELIGION_PRESSURE_RANGE, RELIGION_PRESSURE_PER_TURN, HOLY_CITY_PRESSURE_MULT, HOLY_SITE_PRESSURE_MULT, followedReligionOf, unconvertedOf, gainPopulationPressure, ATHEISM_PRESSURE_PER_POP, ROUTE_PRESSURE_DESTINATION, ROUTE_PRESSURE_ORIGIN, GURU_HEAL, THEO_PRESSURE_SWING, THEO_PRESSURE_RANGE, LAUNCH_INQUISITION_CHARGES, REMOVE_HERESY_PCT, CONDEMN_PRESSURE_RANGE, CONDEMN_PRESSURE_SWING } from '../data/religion';
 import { PROJECTS, SPACE_FLIGHT_LY, type ProjectDef } from '../data/projects';
 import { CITY_NAMES, CITY_NAME_DRAW, GOLD_PURCHASE_MULT, FAITH_PURCHASE_MULT, scaleByGameSpeed, gameProgressPct, gameProgressK, progressCost, plotPrice } from '../data/constants';
 import { randRange } from './rand';
@@ -1198,10 +1198,9 @@ export function purchaseReligiousUnit(
   if (unitType === 'INQUISITOR' && !buyer.religion.inquisition) {
     return { ok: false, reason: 'No Inquisition has been launched.' };
   }
-  const cap = unitType === 'MISSIONARY' ? MISSIONARY_CAP
-    : unitType === 'APOSTLE' ? APOSTLE_CAP : unitType === 'GURU' ? GURU_CAP : INQUISITOR_CAP;
-  const live = state.units.filter((u) => u.seat === seat && u.type === unitType).length;
-  if (live >= cap) return { ok: false, reason: `${unitType} cap reached.` };
+  // no count of the seat's live units of the type bars the purchase (the
+  // install caps none: runs/h1_duelz1128 t174 China buys Apostle 3670018
+  // beside its standing 3473421)
   const eb = buyer.religion.enhancer ? ENHANCER_BELIEFS[buyer.religion.enhancer]?.effects : undefined;
   const cost = unitFaithPrice(state, seat, unitType)!;
   if (!goldAffordable(buyer.faith ?? 0, cost)) return { ok: false, reason: `Not enough faith (${cost} needed).` };

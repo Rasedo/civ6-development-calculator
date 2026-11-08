@@ -10669,3 +10669,38 @@ GPU `_op_move_exec`'s `pin` and the walk's `cross` (gpu/core/sim_tactics.py),
   Bologna's district contract on 1:9 (t154-202) as the game's. The duelz
   logs hold no DISTRICTS or IMPROVEMENTS rows: the plot values themselves
   stand unscored on them.
+
+## C-126: Urban Defenses keeps the outer damage, a faith-only unit's purchase and no live-count cap on a religious unit's purchase — READ on the records (the damage +0x8d8 held, the maximum 0x24b290 derived), both twins
+
+`urbanFit` / `urbanDefensesFit` (cpu/core/rules.ts), `minorUrbanFit`
+(cpu/core/minorBuild.ts); `_urban_defenses_fit` (gpu/core/sim_masks.py),
+`_minor_urban_fit` (gpu/core/sim_minors.py). `purchaseReligiousUnit`
+(cpu/core/game.ts) and the religious purchases of `_seat_buy_ladder`
+(gpu/core/sim_seats.py); the replay's `currencyOf` (replayActions.ts) and
+`applyBuyUnit` (replay.ts).
+
+- THE DAMAGE STAYS: a district holds its outer damage (+0x8d8, GetDamage
+  0x24ae50) and derives its maximum (GetMaxDamage 0x24b290 -> City +0x1880),
+  so Urban Defenses (Steel) raises the maximum to the urban tier's 400 and
+  the damage the centre and each Encampment carried stays: the pool is 400
+  less the damage read on the walls the city's buildings supply (the tier
+  before the tech, a unique walls row's bonus included).
+- Confirmed: runs/h1_duelz1127 Muscat, struck t230-231 (outer damage 63 of
+  300), Steel at t238: record t238 63 of 400; its Repair Outer Defenses at
+  t239 valued 17088.8 = 63 x pop 14 x 2 districts x 10 x 248/256 as logged;
+  the engine's pick now the game's, and its t240-241 Bank repair (1127
+  cityState.build clean to t242 from turn 2). The only Steel-under-damage
+  case in the five duelz games.
+- A FAITH-ONLY UNIT (Units.PurchaseYield YIELD_FAITH, `faithOnly`) is bought
+  with Faith: the replay reads its purchase so, and buys a Rock Band through
+  `purchaseRockBand`, a Naturalist through `purchaseNaturalist`.
+  runs/h1_duelz1121 t176 China's Rock Band in Taiyuan at 255 (300 less
+  Theocracy's 15%), record t177's Faith 52.61 as the engine's; runs/h1_duelz1128
+  t229 China's Rock Band applied.
+- NO LIVE-COUNT CAP: the install caps no religious unit's purchase by the
+  buyer's standing units of the type; the rule's appliers take none (the
+  scripted driver's candidate lists keep their ceilings, `buyCandidates`,
+  `_seat_faith_buy_candidates` twin). runs/h1_duelz1128 t174 China buys Apostle 3670018
+  in Xi'an beside its standing Apostle 3473421 (Faith 220.67 + 34.5 - 240 =
+  15.17 at record t175).
+- OPEN: none of the three.

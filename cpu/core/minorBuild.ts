@@ -25,14 +25,14 @@ import {
   MINOR_MILITARY_PROD_PCT, MINOR_SMALL_MILITARY, MINOR_TYPE_DISTRICT_PROD_PCT, MINOR_UPGRADE_GOLD,
   MINOR_WALLS_PROD_PCT, MINOR_REPAIR_RESUME_PCT, MINOR_CATCHUP_PCT,
 } from '../data/cityStates';
-import { CITY_MAX_HP, ENCAMPMENT_HP, UNITS, URBAN_DEFENSES_TECH, WALLS_TIER_HP, WALLS_TIER_URBAN, type UnitDef } from '../data/units';
+import { CITY_MAX_HP, ENCAMPMENT_HP, UNITS, URBAN_DEFENSES_TECH, type UnitDef } from '../data/units';
 import { UNIT_PROMO_CLASS, type PromoClass } from '../data/promotions';
 import { PROJECTS, projectConversionRate } from '../data/projects';
 import { worshipBuildingOf } from '../data/religion';
 import { CIV_LEVELS } from '../data/civLevels';
 import { CITY_MIN_STRIKE_CS, FAITH_PURCHASE_MULT, GOLD_PURCHASE_MULT, amenityTier, gameProgressPct } from '../data/constants';
 import { boostOnResearch, detectBoosts } from './boosts';
-import { canPlaceDistrictIn, fitEncampOuter, outerDamage, outerPool, urbanDefensesFit, wallsMax } from './rules';
+import { canPlaceDistrictIn, fitEncampOuter, outerDamage, outerPool, urbanDefensesFit, urbanFit, wallsMax } from './rules';
 import { lumpFood, seatGrowth } from './seatTurn';
 import { freeCityBuildFacts, majorQueueItem, seatResearchTurns } from './freeCityBuild';
 import { freeCityThreat, minorAiTurn, minorContractPurchases, minorEconomicDisband, minorItemBuilt, minorMilitaryTurn } from './minorCityAi';
@@ -660,14 +660,9 @@ export function traceMinorPolicyScores(fn: ((seat: number, scores: ReadonlyMap<s
   policyTracer = fn;
 }
 
-/** Urban Defenses on a city-state: its centre's perimeter and its
- *  Encampment's own pool at the urban tier's full pool */
+/** Urban Defenses on a city-state (`urbanFit`) */
 function minorUrbanFit(state: GameState, cityState: CityState): void {
-  cityState.outerHp = WALLS_TIER_HP[WALLS_TIER_URBAN];
-  for (const d of cityState.districts ?? []) {
-    const t = state.map.tiles[d.tileIndex];
-    if (t.district === 'ENCAMPMENT' && t.districtComplete) t.encampOuterHp = WALLS_TIER_HP[WALLS_TIER_URBAN];
-  }
+  urbanFit(state, cityState, cityState.districts ?? []);
 }
 
 /**

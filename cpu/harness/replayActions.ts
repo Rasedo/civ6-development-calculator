@@ -596,8 +596,12 @@ export class RecordedActions implements ActionSource {
       if (!p0 || !p1) return 0;
       return num(p0[field]) + num(p0[field === 'gold' ? 'goldYield' : 'faithYield']) - num(p1[field]);
     };
-    /** the purse that paid at least the price record t quotes for the row */
+    /** the purse that paid: Faith for a unit only Faith buys (Units.PurchaseYield
+     *  YIELD_FAITH: runs/h1_duelz1121 t176 China's Rock Band at 255 under
+     *  Theocracy, record t176 quoting 300), else the one that paid at least
+     *  the price record t quotes for the row */
     const currencyOf = (owner: number, centre: number, kind: 'U' | 'B', idx: number): 'gold' | 'faith' => {
+      if (kind === 'U' && UNITS[engineId('unit', cat.units[idx] ?? '', 'UNIT_', UNITS) ?? '']?.faithOnly) return 'faith';
       const row = a.cities.find((c) => centreOf(c, W) === centre)?.buy.find((x) => x[0] === kind && x[1] === idx);
       if (row && num(row[4]) > 0 && spent(owner, 'faith') >= num(row[4]) - 1 && !(num(row[3]) > 0 && spent(owner, 'gold') >= num(row[3]) - 1)) return 'faith';
       return 'gold';

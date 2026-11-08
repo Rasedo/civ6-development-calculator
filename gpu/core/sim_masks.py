@@ -604,22 +604,27 @@ class SimMasks:
         """`urbanDefensesFit` — CIV6: unlocking Urban Defenses "builds modern
         fortifications around the City Centers of all current and future
         cities and their Encampment districts", with no production and no
-        building row at all, so the perimeter simply arrives at the new tier's
-        full pool. A city founded afterwards starts full at that tier
-        (`_found_city_at`); the standing ones are written here, because a
-        breach they are already carrying is what the fortifications replace."""
+        building row at all: the maximum rises to the urban tier's and the
+        damage each pool carried on the walls its city's buildings supply
+        stays (`urbanFit`). A city founded afterwards starts full at that tier
+        (`_found_city_at`)."""
         if self._urban_def_tech < 0 or not bool(hit.count_nonzero()):
             return
         full = int(self._walls_tier_hp[self._walls_tier_urban])
+        was = self._walls_tier_hp.take(self._walls_level_all(row)).long() + self._walls_hp_bonus_all(row)
         oh = self.city_outer_hp[:, row]
         alive_hit = hit.unsqueeze(1) & self.city_alive[:, row]
-        self.city_outer_hp[:, row] = torch.where(alive_hit, torch.full_like(oh, full), oh)
+        down = (was - torch.minimum(oh, was)).clamp(min=0)
+        self.city_outer_hp[:, row] = torch.where(alive_hit, full - down, oh)
         if self._encamp_didx >= 0:
             et = self.city_dist_tile[:, row, :, self._encamp_didx]
             e0 = et.clamp(min=0)
             w = (alive_hit & (et >= 0) & self.district_complete.gather(1, e0)).nonzero(as_tuple=True)
             if w[0].numel():
-                self.encamp_outer_hp[w[0], et[w[0], w[1]]] = full
+                tw = et[w[0], w[1]]
+                ew = was[w[0], w[1]]
+                eh = self.encamp_outer_hp[w[0], tw]
+                self.encamp_outer_hp[w[0], tw] = full - (ew - torch.minimum(eh, ew)).clamp(min=0)
 
     def _walls_tier_all(self, row: int) -> torch.Tensor:
         """[B, RC] the walls tier of every one of this seat row's city columns

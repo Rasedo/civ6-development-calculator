@@ -239,7 +239,7 @@ describe("the minor's Urban Defenses", () => {
     expect(wallsTier(state, minorCity(cs))).toBe(WALLS_TIER_URBAN);
   });
 
-  it("its research landing on the tech fits the perimeter at the urban tier's pool", () => {
+  it("its research landing on the tech raises the perimeter to the urban tier's maximum, its damage kept", () => {
     const state = makeState(makeMap(24, 24));
     const cs = addCs(state, 12, 12, { buildings: ['ANCIENT_WALLS'], outerHp: 30 });
     cs.research.techs = Object.keys(TECHS).filter((t) => t !== URBAN_DEFENSES_TECH);
@@ -248,7 +248,7 @@ describe("the minor's Urban Defenses", () => {
     state.turn = 1;
     minorPhase(state);
     expect(cs.research.techs).toContain(URBAN_DEFENSES_TECH);
-    expect(cs.outerHp).toBe(WALLS_TIER_HP[WALLS_TIER_URBAN]);
+    expect(cs.outerHp).toBe(WALLS_TIER_HP[WALLS_TIER_URBAN] - 70);
   });
 });
 
