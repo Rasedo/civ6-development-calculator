@@ -1207,10 +1207,10 @@ class SimTactics:
                 ok = ok & ~(zs.gather(1, b1) & (best != start).unsqueeze(1) & ~a6)
             if board_step is not None:
                 # the step's validity (0x2720a0 at 0x272372..0x27242e): onto
-                # a revealed plot of the domain it leaves, one the unit may
-                # stand on under flag 1 (`search`)
-                same = water_n.gather(1, b1) == water_n.gather(1, nbc)
-                ok = ok & ~(board_step.gather(1, nbc) & same)
+                # a revealed plot one the unit may stand on under flag 1, an
+                # embarking step's by the embark test's own location test
+                # (0x52fe90 at 0x530024, `search`)
+                ok = ok & ~board_step.gather(1, nbc)
             if site_n is not None:
                 # the stand-to-attack site (0x2720a0's chain walk): in every
                 # search but the planning's, an attack onto a seen city at
@@ -1671,18 +1671,18 @@ class SimTactics:
         # is no path, an attack order's too (`pathTo`): the order's request
         # (0x962310) drops the attack flag where the owner's visibility count
         # of the plot is 0, and the destination test (0x2714b0) under location
-        # flag 0 refuses a plot another player's unit holds, seen or not; an
-        # order without the attack flag has no path to a plot another
-        # player's unit of its map layer holds, seen or not
+        # flag 0 refuses a plot another player's unit of the mover's map layer
+        # holds, seen or not (0x208b80 reads the mover's layer's list); an
+        # order without the attack flag has no path to such a plot, seen or not
         dc = dest.clamp(min=0).unsqueeze(1)
         at_u = getattr(self, f"{pre}_unit_tile").gather(1, us.clamp(min=0).unsqueeze(1)).squeeze(1)
-        unseen = ~self._barb_seen("barbarians" if seat == BARB_SEAT else seat).gather(1, dc).squeeze(1)
-        mask = mask & ~(self._tac_foreign(seat).gather(1, dc).squeeze(1) & unseen & (dest != at_u))
-        if not strike:
-            rel_m = self._rel_strength.take(getattr(self, f"{pre}_unit_type").gather(1, us.clamp(min=0).unsqueeze(1)).squeeze(1)
-                                            .clamp(min=0, max=self.NU - 1)) > 0
-            f_on = torch.where(rel_m.unsqueeze(1), self._tac_foreign_on(seat, True), self._tac_foreign_on(seat, False))
-            mask = mask & ~(f_on.gather(1, dc).squeeze(1) & (dest != at_u))
+        rel_m = self._rel_strength.take(getattr(self, f"{pre}_unit_type").gather(1, us.clamp(min=0).unsqueeze(1)).squeeze(1)
+                                        .clamp(min=0, max=self.NU - 1)) > 0
+        f_on = torch.where(rel_m.unsqueeze(1), self._tac_foreign_on(seat, True), self._tac_foreign_on(seat, False))
+        barred = f_on.gather(1, dc).squeeze(1) & (dest != at_u)
+        if strike:
+            barred = barred & ~self._barb_seen("barbarians" if seat == BARB_SEAT else seat).gather(1, dc).squeeze(1)
+        mask = mask & ~barred
         if not bool(mask.count_nonzero()):
             return
         dev = self.device

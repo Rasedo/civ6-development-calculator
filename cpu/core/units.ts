@@ -952,7 +952,8 @@ export function gdrJump(state: GameState, unit: { type: string; seat: number } |
  *  (Berserker Movement) "+2 Movement if this unit starts in enemy
  *  territory"; (Longship Movement) "+1 Movement while in coastal waters";
  *  (Logistics) "+1 Movement if starting turn in friendly territory" — the
- *  seat's own ground, every unit of a civilization. */
+ *  seat's own ground, every unit of a civilization; (Supply Convoy) +1
+ *  Movement for a land unit within 1 of its player's convoy. */
 export function startTileMoves(state: GameState, unit: { type: string; seat: number; tileIndex?: number }): number {
   const def = UNITS[unit.type];
   if (!def || unit.tileIndex === undefined) return 0;
@@ -970,6 +971,21 @@ export function startTileMoves(state: GameState, unit: { type: string; seat: num
   }
   if (def.coastMoves && tile.terrain === 'COAST') m += def.coastMoves;
   if (isCiv(unit.seat) && tileSeat(tile) === unit.seat) m += getModifiers(state, unit.seat).homeStartMoves;
+  // (SUPPLY_CONVOY_BONUS_MOVEMENT) a land unit within 1 of its player's
+  // Supply Convoy, the convoy itself included, once however many stand by
+  // (runs/h1_duelp1124 t216: city-state 2's Mechanized Infantry 2293765 on
+  // 12:14 beside its convoy on 11:13 plans on 4 Movement, the convoy on 5,
+  // AI_Planning.csv)
+  if (!def.naval) {
+    let best = 0;
+    for (const o of state.units) {
+      const g = UNITS[o.type]?.logisticMoves ?? 0;
+      if (g <= best || o.seat !== unit.seat || o.tileIndex < 0) continue;
+      const t = state.map.tiles[o.tileIndex];
+      if (hexDistance(state.map, tile.col, tile.row, t.col, t.row) <= 1) best = g;
+    }
+    m += best;
+  }
   return m;
 }
 

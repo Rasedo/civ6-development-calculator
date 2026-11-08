@@ -96,6 +96,7 @@
     - "C-99 / C-128: the swap's partner test and its step along its own path; Move Unit's update before the executions; a Trader no passenger — READ (0x972540, 0x56e760, 0x972a50 -> 0x26fe20, 0x7d3a00 -> 0x7f0020, 0x586360 -> 0x208b80 / 0x523d60), both twins"
     - "C-123 / C-95: a Trader stands on the trade layer; a city's shot is a COMBAT_DISTRICT spot's blow back — READ (0x901e0, 0x586360 -> 0x208b80, 0x585eb0 -> 0x585d90, 0x791470 at 0x7917f7..0x7918f7 -> 0x249ee0 / 0x205720, 0x776140 at 0x776780..0x7767fa), both twins"
     - "C-128: a crowded plot's unit goes beside it as its AI player's turn ends — READ (0x775e50, 0x585d90, 0x93f870, 0x585940), both twins"
+    - "C-99 / C-128: the embark step's location test, the destination test's map layer; the Supply Convoy's Movement — READ (0x52fe90 at 0x530024, 0x208b80 at 0x208bbf -> 0x901e0 -> 0x75c50), both twins"
   context:
     - "...60), a visible enemy unit there (0x5862e0), a unit there that keeps it out (0x585eb0 -> 0x585d90: the owner's of a stacking class, another player's not at war) — and, the goal open,..."
   review: reviewed
@@ -343,6 +344,7 @@
     - "C-95: a formation stands where each member may, a path's destination placed, CanEmbark by the type's technology — READ (0x586900, 0x586360 at 0x58640c..0x586494, 0x267650 at 0x2677e0..0x2677f7, 0x2714b0, 0x272880, 0x4ee3f0 at 0x4ee4e1..0x4ee548), both twins"
     - "C-95: a strike's step from beside its plot, a formation's planning plot at a radius, the ring walk's own location test — READ (0x962380 at 0x96267e..0x9626d2, 0x26ef40 at 0x26f0a4, 0x78fa10 at 0x78fab4..0x78facf, 0x815d50 -> 0x586360), both twins"
     - "C-129: a killed player's records forgotten; a capture's new unit; an air strike's record — READ (0x534c50, 0x787fc0 -> 0x5ee370, 0x212500's create), both twins; the replay's later-player timings"
+    - "C-99 / C-128: the embark step's location test, the destination test's map layer; the Supply Convoy's Movement — READ (0x52fe90 at 0x530024, 0x208b80 at 0x208bbf -> 0x901e0 -> 0x75c50), both twins"
   notes:
     - ".claude/scratchpad/mu1/readings_c96.md: ...k; the distance max(|dx|, |dy|) where the   signs differ, |dx| + |dy| else); the unit may enter it (0x586360 flag   0x40), the player revealed it, no other player's unit on it and none of   its own that it ma..."
     - ".claude/scratchpad/mu1/readings_c96.md: ...a hull outside   its own territory heads for its player's nearest city (first of equals) —   where 0x586360 (flag 0x10) allows it, PARTLY READ. The engines carry no   influence map: every plot reads no dange..."
@@ -386,6 +388,7 @@
     - cpu/core/tactical.ts:embarks
     - cpu/core/tactical.ts:placedOn
     - gpu/core/sim_tactics.py:_tac_placed
+    - cpu/core/tactical.ts:from
   readings:
     - "C-96: the city-states' tactical pass — READ (Wander Near City, Heal, the non-barbarian priorities, FindAlternateLocation), the families it needs PARTLY READ"
     - "C-95: the scout's tree \"Barbarian Found City\" — READ, ported"
@@ -401,6 +404,7 @@
     - "C-95: a formation stands where each member may, a path's destination placed, CanEmbark by the type's technology — READ (0x586900, 0x586360 at 0x58640c..0x586494, 0x267650 at 0x2677e0..0x2677f7, 0x2714b0, 0x272880, 0x4ee3f0 at 0x4ee4e1..0x4ee548), both twins"
     - "C-95: the barbarians' candidates before the look, a capture's rally, a formation's embark flag and fighter — READ (0x722d70, 0x746920, 0x747230, 0x7877e0, 0x7265b0, 0x747fa0, 0x73e610, 0x73e870, 0x267650), both twins"
     - "C-95: a strike's step from beside its plot, a formation's planning plot at a radius, the ring walk's own location test — READ (0x962380 at 0x96267e..0x9626d2, 0x26ef40 at 0x26f0a4, 0x78fa10 at 0x78fab4..0x78facf, 0x815d50 -> 0x586360), both twins"
+    - "C-99 / C-128: the embark step's location test, the destination test's map layer; the Supply Convoy's Movement — READ (0x52fe90 at 0x530024, 0x208b80 at 0x208bbf -> 0x901e0 -> 0x75c50), both twins"
   notes:
     - ".claude/scratchpad/mu1/readings_c96.md: ...it. - THE PLANNING'S GROUND, beside the barbarians': the list (0x26d890) keeps a   plot only where 0x586900 lets the unit end — another player's unit at   peace it passes and never ends on (runs/h1_duelw1117..."
   context:

@@ -106,6 +106,7 @@
     - cpu/core/units.ts:mapLayer
     - cpu/core/trade.ts:plunderTargets
     - cpu/core/tactical.ts:alternateLocation
+    - cpu/core/tactical.ts:pathNodes
   readings:
     - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
     - "C-96: an event's civilian kill spares a Trader — PARTLY READ"
@@ -121,6 +122,7 @@
     - "C-99: the assignment's Movement and the swap's walk — READ (0x776140 at 0x776643 / 0x7768e4, 0x56d6f0, 0x972a50 -> 0x26fe20 under flag 4, 0x2720a0 at 0x27229b), both twins"
     - "C-128: a crowded plot's unit goes beside it as its AI player's turn ends — READ (0x775e50, 0x585d90, 0x93f870, 0x585940), both twins"
     - "C-99 / C-128: every technology gained starts an Upgrade Units tree, the civic event never fires; a tree's units after its tick; the Nearest City Search's resource test; the plot's unit list — READ (0x4cd4c0 -> 0x800c60, 0x5bbf80 -> 0x27a180, 0x3a1ac0, 0x7cb3d0 -> 0x7d2190, 0x7eba40 -> 0x510d30, 0x74f40 / 0x763b0), the trigger both twins"
+    - "C-99 / C-128: the embark step's location test, the destination test's map layer; the Supply Convoy's Movement — READ (0x52fe90 at 0x530024, 0x208b80 at 0x208bbf -> 0x901e0 -> 0x75c50), both twins"
   context:
     - "...x58 / +0x5c) on the plot, else (search flag +0x398 & 0x200 clear) any unit on the plot (0x75c50) of a player at war that fights (0x209dd0: combat, ranged or bombard above 0) — no doma..."
   review: reviewed

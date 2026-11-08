@@ -2352,6 +2352,7 @@ export function buildRules() {
       openMoves: u.openTerrainMoves ?? 0,
       enemyMoves: u.enemyTerritoryMoves ?? 0,
       coastMoves: u.coastMoves ?? 0,
+      logisticMoves: u.logisticMoves ?? 0,
       atkCs: u.attackCS ?? 0,
       defMeleeCs: u.defendMeleeCS ?? 0,
       fortBuilder: u.fortBuilder ? 1 : 0,

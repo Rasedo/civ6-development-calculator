@@ -300,9 +300,12 @@
 - addr: 0x208b80
   final: 0x159250
   kind: function
-  semantics: "the plot's best defender. Flag 0x10: among the plot's units in its own order the comparator 0x523d60 keeps the first whose unwounded strength (0x56dc90 with the formation's) is strictly greater, and only then takes its wounds off (0x522630): ONE unit."
+  semantics: "the plot's best defender, over the plot's unit list of the mover's map layer where a mover is given (0x901e0 on it at 0x208bbf, then 0x75c50; the default layer without one). Flag 0x10: among the plot's units in its own order the comparator 0x523d60 keeps the first whose unwounded strength (0x56dc90 with the formation's) is strictly greater, and only then takes its wounds off (0x522630): ONE unit."
   status: READ
   cases:
+    - recording: h1_duelp1127
+      turn: 108
+      value: "city-state 4's Knight 1114117 wanders onto 4:8 (Move To: 4 8, as logged), player 1's Missionary 1572870 on it out of its sight: the destination test (0x586360 -> 0x208b80, the Knight's layer) refuses no religious unit"
     - recording: h1_duely1124
       turn: 136
       value: city-state 3's embarked Bombard 1638401 on 42:13 plans 41:13 (1/2) under player 1's Trader at sea and 42:12 (1/1) by it; t118 city-state 2's embarked Man-At-Arms 1114117 on 9:10 plans no 9:9 under player 1's embarked Builder (AI_Planning.csv)
@@ -341,7 +344,9 @@
     - cpu/core/units.ts:mapLayer
     - gpu/core/sim_init.py:__init__
     - cpu/core/combat.ts:bestDefender
+    - gpu/core/sim_tactics.py:_tac_move_to
   readings:
+    - "C-99 / C-128: the embark step's location test, the destination test's map layer; the Supply Convoy's Movement — READ (0x52fe90 at 0x530024, 0x208b80 at 0x208bbf -> 0x901e0 -> 0x75c50), both twins"
     - "H-1: an annex re-places the citizens, the garrison's unit, a religious unit killed on a move — READ"
     - "H-1: the garrison requirement — READ"
     - "H-1: a pillaged building's specialist, the centre's defence, three moments — READ"

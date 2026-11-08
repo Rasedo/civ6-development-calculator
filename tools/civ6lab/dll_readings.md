@@ -12151,3 +12151,51 @@ from `_bop_endangered` and `_mops_endangered`); `landMajorDistricts`
   5046293 on 13:13 beside it); runs/h1_duelp1121 t181 the Line Infantry
   4653085 at 40 damage on 4:16, two from the Encampment 5:15 (77), is
   endangered, our sum 52.
+
+## C-99 / C-128: the embark step's location test, the destination test's map layer; the Supply Convoy's Movement — READ (0x52fe90 at 0x530024, 0x208b80 at 0x208bbf -> 0x901e0 -> 0x75c50), both twins
+
+`search`'s step validity and `pathNodes`' destination test (cpu/core/tactical.ts),
+`startTileMoves` (cpu/core/units.ts); GPU `_tac_search`'s `board_step`,
+`_tac_move_to`'s `barred` (gpu/core/sim_tactics.py), `_start_tile_mp`
+(gpu/core/sim_economy.py).
+
+- THE EMBARK TEST (0x52fe90) ends, past its cliff and city tests, in the
+  location test 0x586900 under flag 1 on the plot entered (at 0x530024,
+  == 1), as the disembark test 0x52fb90 does: a shore crossing onto a
+  revealed plot is refused where a same-domain step there would be — an
+  embarked unit embarks onto no water another player's embarked unit holds
+  (`boarded`).
+- THE DESTINATION TEST's best defender (0x586360 at 0x586560 -> 0x208b80,
+  r9 the mover) reads the plot's unit list of the mover's map layer
+  (0x208b80 at 0x208bbf: 0x901e0 on the mover, then 0x75c50): another
+  player's unit on another layer (a religious unit, a Trader) refuses no
+  move order's destination, seen or not; one on its layer refuses an order
+  without the attack flag, and an attack order's where its plot is out of
+  the player's sight.
+- THE SUPPLY CONVOY (install XML, Expansion1_UnitAbilities.xml:
+  ABILITY_GRANT_MOVEMENT_BONUS on CLASS_LOGISTIC_MOVEMENT, modifier
+  SUPPLY_CONVOY_BONUS_MOVEMENT, MODIFIER_PLAYER_UNITS_ADJUST_MOVEMENT Amount
+  1, SubjectStackLimit 1, SUPPLY_CONVOY_MOVEMENT_REQUIREMENTS =
+  ADJACENT_UNIT_REQUIREMENT (REQUIREMENT_PLOT_ADJACENT_TO_OWNER,
+  MinDistance 0) + UNIT_IS_DOMAIN_LAND): +1 Movement for each of its
+  player's land units within 1 of it, itself included, once however many
+  stand by; a GetMaxMoves term, none of the pathfinder's later-turn pool.
+- CONFIRMED (one-seed traces, `--memory aimem`): runs/h1_duelp1124 t216:
+  city-state 2's Mechanized Infantry 2293765 on 12:14 beside its convoy on
+  11:13 plans on 4 Movement (12:14(1/4), 11:17 / 10:16 / 12:10 at (1/0)),
+  the convoy on 5, its Builder on 3, AI_Planning.csv; its Wander over 16
+  plots to 10:11 as logged, and t214-250 every one of its Wanders as
+  logged. runs/h1_duelp1117 t220: city-state 2's embarked Line Infantry
+  1179654 on 14:6 links no 15:5 (player 0's embarked Warrior 1114113 on
+  it) from the shore's 15:6, its open list's dearest no longer that node,
+  14:10 / 12:9 / 12:8 after their equals as logged, its Wander to 14:10.
+  runs/h1_duelp1127 t108: city-state 4's Knight 1114117 wanders onto 4:8,
+  player 1's Missionary 1572870 there out of its sight, as logged.
+- OPEN: runs/h1_duelp1117 t188 the Line Infantry 1179654's Wander to 16:4
+  steps through 15:6 under player 0's Warrior 458757 and ends on 16:6 (two
+  move segments in the log); the engine's walk refuses the first step.
+  runs/h1_duelp1117 t243 the Infantry 1376263's embark step from 15:6 onto
+  city-state 2's Harbor 14:7 closes before 15:7 in the game, dearer in the
+  engine (its waiting step's price). The embarked mover's own class in the
+  stacking count (0x585d90's +0xb8 on the units' +0x160, the unit type)
+  holds.

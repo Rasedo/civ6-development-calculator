@@ -720,14 +720,20 @@ function search(state: GameState, unit: Unit, maxTurns: number, zoc: boolean, on
       if (attack && !fortBlind && !ground.attack(to)) continue;
       if (zoned && !attack) continue;
       // the step's validity (0x2720a0 at 0x272372..0x27242e): onto a revealed
-      // plot of the domain it leaves (an embarking or a landing step tested
-      // apart, 0x52fe90 / 0x52fb90), one the unit may stand on under flag 1
-      // (+0x50 bit 0x40): an embarked unit passes no water another player's
-      // embarked unit holds (runs/h1_duely1121 t86: city-state 3's embarked
-      // Man-At-Arms at 40:20 plans 39:21 alone, player 0's embarked Warrior
-      // on 40:19 and city-state 4's Man-At-Arms on 41:20; t94: city-state
-      // 4's at 28:23 plans 29:21 past player 0's Quadriremes, AI_Planning.csv)
-      if (isWater(from) === isWater(to) && ground.revealed(to.index) && ground.boarded(to.index)) continue;
+      // plot one the unit may stand on under flag 1 (+0x50 bit 0x40) — of
+      // the domain it leaves by the location test, an embarking or a landing
+      // step by the embark and disembark tests (0x52fe90 / 0x52fb90), which
+      // end in the same location test 0x586900 under flag 1 on the plot
+      // entered (0x52fe90 at 0x530024): an embarked unit passes no water
+      // another player's embarked unit holds, nor embarks onto it
+      // (runs/h1_duely1121 t86: city-state 3's embarked Man-At-Arms at 40:20
+      // plans 39:21 alone, player 0's embarked Warrior on 40:19 and
+      // city-state 4's Man-At-Arms on 41:20; t94: city-state 4's at 28:23
+      // plans 29:21 past player 0's Quadriremes; runs/h1_duelp1117 t220:
+      // city-state 2's embarked Line Infantry 1179654 on 14:6 links no 15:5
+      // from the shore's 15:6, player 0's embarked Warrior 1114113 on it,
+      // AI_Planning.csv)
+      if (ground.revealed(to.index) && ground.boarded(to.index)) continue;
       // the stand-to-attack site: in every search but the planning's (no
       // flag 4), a child the player sees holding a city at war or a unit at
       // war that fights has its parent tested as a turn's end (the path
@@ -996,14 +1002,16 @@ function pathNodes(state: GameState, unit: Unit, dest: number, laterTurns: boole
   // no path, an attack order's too: the move order's request (0x962310)
   // drops the attack flag 0x10 where the owner's visibility count of its
   // plot is 0, and the destination test (0x2714b0) then tests the plot under
-  // location flag 0, where another player's unit there, seen or not, refuses
-  // it (0x586360's best defender 0x208b80 under 0x108); an order without the
-  // attack flag has no path to a plot another player's unit of its map layer
-  // holds, seen or not (runs/h1_duely1121 t36: Barbarian Attack's Archer
-  // 1835022 on 5:14 for player 1's Scout's 5:13 does not move for it)
-  if (dest !== unit.tileIndex && foreignAt(state, unit, dest)
-    && plotsSeenNow(state, new Set([unit.seat]))[dest] !== 1) return [];
-  if (!strike && dest !== unit.tileIndex && foreignOnLayer(state, unit, dest)) return [];
+  // location flag 0, where another player's unit there of the mover's map
+  // layer, seen or not, refuses it (0x586360's best defender 0x208b80 under
+  // 0x108, the plot's list of the mover's layer: 0x208b80 at 0x208bbf ->
+  // 0x901e0 -> 0x75c50); an order without the attack flag has no path to such
+  // a plot, seen or not (runs/h1_duely1121 t36: Barbarian Attack's Archer
+  // 1835022 on 5:14 for player 1's Scout's 5:13 does not move for it;
+  // runs/h1_duelp1127 t108: city-state 4's Knight 1114117 wanders onto 4:8,
+  // player 1's Missionary 1572870 on it out of its sight)
+  if (dest !== unit.tileIndex && foreignOnLayer(state, unit, dest)
+    && (!strike || plotsSeenNow(state, new Set([unit.seat]))[dest] !== 1)) return [];
   if (dest !== unit.tileIndex && !placedOn(state, [unit, ...mates], state.map.tiles[dest])) return [];
   // the destination at its stacking limit is no path (`search`'s stop)
   let found = null as PNode | null;

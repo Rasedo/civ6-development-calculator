@@ -722,12 +722,17 @@
     - recording: h1_duely1124
       turn: 138
       value: "the barbarians' captured Builder 5111833 under Plunder Trader on city-state 4's Trader's plots 37:9..33:8 (t138-151): a Trader stands on a layer of its own"
-  impl: [cpu/core/tactical.ts:layer, cpu/core/units.ts:mapLayer, gpu/core/sim_seats.py:_occ_split]
+  impl:
+    - cpu/core/tactical.ts:layer
+    - cpu/core/units.ts:mapLayer
+    - gpu/core/sim_seats.py:_occ_split
+    - cpu/core/tactical.ts:pathNodes
   readings:
     - "C-95: the planning strikes a religious unit and a Trader on their plot, its foreign test reads the mover's map layer, the blow on them 1.5 x their health — READ (0x790c60 at 0x790f22, 0x790fc9..0x791016, 0x7910b3..0x791162; 0x791470 at 0x791703..0x79174a, 0x7917b1..0x7917f7; 0x793400), both twins"
     - "C-123 / C-95: a Trader stands on the trade layer; a city's shot is a COMBAT_DISTRICT spot's blow back — READ (0x901e0, 0x586360 -> 0x208b80, 0x585eb0 -> 0x585d90, 0x791470 at 0x7917f7..0x7918f7 -> 0x249ee0 / 0x205720, 0x776140 at 0x776780..0x7767fa), both twins"
     - "C-128: a city-state's Make Military Formation — READ (0x77a190, 0x770670, 0x536da0, 0x773e20, 0x94a870, 0x949930), both twins"
     - "C-128: a crowded plot's unit goes beside it as its AI player's turn ends — READ (0x775e50, 0x585d90, 0x93f870, 0x585940), both twins"
+    - "C-99 / C-128: the embark step's location test, the destination test's map layer; the Supply Convoy's Movement — READ (0x52fe90 at 0x530024, 0x208b80 at 0x208bbf -> 0x901e0 -> 0x75c50), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...e (0x790fc9..0x791016) lists the target plot's units of the planning's +0x10 (0x793400: 0x901e0, the mover's map layer): a religious unit stands on its own, so a military unit lays th..."
@@ -2588,15 +2593,19 @@
     - "C-96: the city-states' tactical pass — READ (Wander Near City, Heal, the non-barbarian priorities, FindAlternateLocation), the families it needs PARTLY READ"
     - "C-99: an embarked unit passes no other player's passenger — the step's flag-1 test READ (0x2720a0 at 0x272372, 0x271be0, 0x586360 at 0x586542, 0x208b80 under 0x108, 0x20a2a0), both twins"
     - "C-124: a path enters a plot the player never revealed whatever it is — READ (0x2720a0 at 0x272372..0x27242e, 0x271be0's +0x50 bit 0x20, 0x26e920), both twins"
+    - "C-99 / C-128: the embark step's location test, the destination test's map layer; the Supply Convoy's Movement — READ (0x52fe90 at 0x530024, 0x208b80 at 0x208bbf -> 0x901e0 -> 0x75c50), both twins"
   context:
     - "...v — the row equal once priced so). The embark and disembark tests beside it (0x52fe90 / 0x52fb90, +1e6 where refused) and the mountain and canyon +1e6 the engines leave to the links..."
   review: reviewed
 - addr: 0x52fe90
   final: 0x377a90
   kind: function
-  semantics: "the embark test (+1e6 where refused): refused where the TO plot is water and the formation may not embark (+0x338 clear, 0x52fed4); run on a revealed child by the validity (0x2720a0) and the cost (0x270dd0)"
-  status: PARTLY
+  semantics: "the embark test (+1e6 where refused): refused where the TO plot is water and the formation may not embark (+0x338 clear, 0x52fed4) or the FROM plot is not beside shallow water; the water plot's cliff bit toward the land refuses it unless either plot is a city or 0x266250 lets the formation cross; else the TO plot's location test 0x586900 under flag 1 answers (== 1, at 0x530024). Run on a revealed child by the validity (0x2720a0) and the cost (0x270dd0)"
+  status: READ
   cases:
+    - recording: h1_duelp1117
+      turn: 220
+      value: city-state 2's embarked Line Infantry 1179654 on 14:6 links no 15:5 from the shore's 15:6, player 0's embarked Warrior 1114113 on it; 14:10 / 12:9 / 12:8 close after their equals and it wanders to 14:10, as logged (AI_Planning.csv, AI_Tactical.csv)
     - recording: h1_duely1128
       turn: 39
       value: city-state 3's Warrior on 4:4 links no attack on the barbarian Quadrireme's 2:3 in its danger reach; the Galley 524295 explores onto 2:3 as logged
@@ -2610,12 +2619,16 @@
     - cpu/core/tactical.ts:groundOf
     - gpu/core/sim_tactics.py:_tac_attack_planes
     - cpu/core/tactical.ts:enterable
+    - cpu/core/tactical.ts:search
+    - gpu/core/sim_tactics.py:_tac_search
+    - gpu/core/sim_tactics.py:update_parents
   readings:
     - "C-99 / C-128: a shore crossing's cliff onto a revealed plot alone, Wander Back to Camp's path flag 0x1000, the path's destination count — READ (0x52fb90, 0x2720a0 at 0x272230..0x27229e / 0x272380, 0x270dd0 at 0x270f24, 0x271be0 at 0x271d03..0x271d18, 0x77b9a0 at 0x77be0b), both twins"
     - "C-96: the city-states' tactical pass — READ (Wander Near City, Heal, the non-barbarian priorities, FindAlternateLocation), the families it needs PARTLY READ"
     - "C-99: an embarked unit passes no other player's passenger — the step's flag-1 test READ (0x2720a0 at 0x272372, 0x271be0, 0x586360 at 0x586542, 0x208b80 under 0x108, 0x20a2a0), both twins"
     - "C-124: a path enters a plot the player never revealed whatever it is — READ (0x2720a0 at 0x272372..0x27242e, 0x271be0's +0x50 bit 0x20, 0x26e920), both twins"
     - "C-95: the embark rules for a formation that may embark, a district's zone unseen, a city's kill in the planning, a raised unit's AI type, a move order's attack spot — READ (0x530420, 0x530240, 0x52fe90 at 0x52fed4, 0x530f50 at 0x531168, 0x791470 at 0x791677, 0x79b9c0), FIT (the move order's attack spot), both twins"
+    - "C-99 / C-128: the embark step's location test, the destination test's map layer; the Supply Convoy's Movement — READ (0x52fe90 at 0x530024, 0x208b80 at 0x208bbf -> 0x901e0 -> 0x75c50), both twins"
   context:
     - "...Planning.csv — the row equal once priced so). The embark and disembark tests beside it (0x52fe90 / 0x52fb90, +1e6 where refused) and the mountain and canyon +1e6 the engines leave to t..."
   review: reviewed

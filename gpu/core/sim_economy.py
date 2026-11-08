@@ -6542,8 +6542,9 @@ class SimEconomy:
         if this unit starts in enemy territory"; (Longship Movement) "+1
         Movement while in coastal waters"; (Logistics) "+1 Movement if
         starting turn in friendly territory" — a civilization's unit on its
-        seat's own ground. The barbarian pool trains no unique, and the Heavy
-        Chariot's term reads the same for every pool."""
+        seat's own ground; (Supply Convoy) +1 Movement for a land unit within
+        1 of its player's convoy. The barbarian pool trains no unique, and the
+        Heavy Chariot's term reads the same for every pool."""
         tile = getattr(self, f"{pre}_unit_tile").clamp(min=0)
         out = torch.zeros_like(typ)
         terr = self.terrain.gather(1, tile)
@@ -6569,6 +6570,19 @@ class SimEconomy:
             hm = self._fx_by_row("homemove").gather(1, seat.clamp(min=0, max=self.n_majors - 1))
             home = civ & (self.tile_seat.gather(1, tile) == seat)
             out = out + hm * home.long()
+        # (SUPPLY_CONVOY_BONUS_MOVEMENT) a land unit within 1 of its player's
+        # Supply Convoy, the convoy itself included, once however many stand by
+        alive = getattr(self, f"{pre}_unit_alive")
+        raw = getattr(self, f"{pre}_unit_tile")
+        conv = self._type_logistic_mp.take(getattr(self, f"{pre}_unit_type").clamp(min=0, max=self.NU - 1))
+        conv = conv * (alive & (raw >= 0)).long()
+        if bool(conv.count_nonzero()):
+            seat = getattr(self, f"{pre}_unit_seat")
+            T = self.pair_dist.shape[0]
+            near = self.pair_dist.reshape(-1).take(tile.unsqueeze(2) * T + tile.unsqueeze(1)).long() <= 1
+            mine = seat.unsqueeze(2) == seat.unsqueeze(1)
+            g = torch.where(near & mine, conv.unsqueeze(1), torch.zeros_like(conv).unsqueeze(1)).amax(dim=2)
+            out = out + g * (~self.unit_naval.take(typ)).long()
         return out
 
     def _attacks_after_moving(self, utype: torch.Tensor, promos: torch.Tensor) -> torch.Tensor:

@@ -318,6 +318,11 @@ export interface UnitDef {
   enemyTerritoryMoves?: number;
   /** CIV6 (Longship Movement): extra Movement while in coastal waters. */
   coastMoves?: number;
+  /** CIV6 (ABILITY_GRANT_MOVEMENT_BONUS on CLASS_LOGISTIC_MOVEMENT,
+   *  MODIFIER_PLAYER_UNITS_ADJUST_MOVEMENT, stack limit 1): extra Movement
+   *  for each of its player's land units within 1 of it (itself included:
+   *  ADJACENT_UNIT_REQUIREMENT MinDistance 0) at the turn's start. */
+  logisticMoves?: number;
   /** CIV6 (Berserker Rage): Combat Strength when attacking, and when
    *  defending against a melee attack. */
   attackCS?: number;
@@ -1702,9 +1707,13 @@ export const UNITS: Record<string, UnitDef> = Object.fromEntries(
       moves: 4,
       combat: 0,
       charges: 0,
+      // CIV6 (SUPPLY_CONVOY_BONUS_MOVEMENT): +1 Movement to the player's
+      // land units within 1 of it
+      logisticMoves: 1,
       requiresTech: 'COMBUSTION',
       description: 'Modern support chassis.',
       src: {
+        logisticMoves: xml('ModifierArguments', 'ModifierId=SUPPLY_CONVOY_BONUS_MOVEMENT&Name=Amount', 'Value'),
         support: xml('Units', 'UnitType=UNIT_SUPPLY_CONVOY', 'FormationClass', { expect: 'FORMATION_CLASS_SUPPORT' }),
         cost: xml('Units', 'UnitType=UNIT_SUPPLY_CONVOY', 'Cost', { scale: GAME_SPEED }),
         maintenance: xml('Units', 'UnitType=UNIT_SUPPLY_CONVOY', 'Maintenance'),

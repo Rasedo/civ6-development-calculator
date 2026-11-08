@@ -4613,6 +4613,7 @@ class SimInit:
         self._type_open_mp = torch.tensor([int(u["openMoves"]) for u in ru], dtype=torch.long, device=device)
         self._type_enemy_mp = torch.tensor([int(u["enemyMoves"]) for u in ru], dtype=torch.long, device=device)
         self._type_coast_mp = torch.tensor([int(u["coastMoves"]) for u in ru], dtype=torch.long, device=device)
+        self._type_logistic_mp = torch.tensor([int(u["logisticMoves"]) for u in ru], dtype=torch.long, device=device)
         self._type_atk_cs = torch.tensor([int(u["atkCs"]) for u in ru], dtype=torch.long, device=device)
         self._type_def_melee_cs = torch.tensor([int(u["defMeleeCs"]) for u in ru], dtype=torch.long, device=device)
         self._type_fort_builder = torch.tensor([bool(u["fortBuilder"]) for u in ru], dtype=torch.bool, device=device)
