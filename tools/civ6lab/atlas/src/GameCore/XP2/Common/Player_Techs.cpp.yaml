@@ -340,9 +340,12 @@
 - addr: 0x4cc950
   final: 0x335c20
   kind: function
-  semantics: sets the player's progress on a technology.
+  semantics: "sets the player's progress on a technology: writes it (0x4cca70), then at or above the cost << 8 (0x4cca89..0x4ccaa5) completes the row (SetTech 0x4cd4c0 at 0x4ccab3) and clears the progress — a boost on a row already past its cost completes it."
   status: READ
   cases:
+    - recording: h1_duely1117
+      turn: 38
+      value: "city-state 2's Early Empire at 34 of 28 (its catch-up under the Ancient price) completes on its boost: the t38 civics rows as logged"
     - recording: h1_duelw1121
       turn: 4
       value: "Records: runs/h1_duelw1121 Rome's Code of Laws at its start of t4 puts every minor's and the Free Cities' at 9 of 10 (the log's CivicChanged for players 2, 3, 4 and 62 just before Rome's CivicComplete"
@@ -352,7 +355,13 @@
     - recording: 1121
       turn: 4
       value: A major's progress is not touched (China's Code of Laws 4.59 of 10 at 1121 t4).
-  readings: ["H-1: a minor's research catch-up — READ"]
+  impl:
+    - cpu/core/boosts.ts:markBoost
+    - gpu/core/sim_minors.py:_land_minor_boosts
+    - gpu/core/sim_economy.py:_land_boosts
+  readings:
+    - "H-1: a minor's research catch-up — READ"
+    - "C-98: a boost on an item at or past its cost completes it; a minor's parked progress and project conversion in the replay — READ (0x4cc950 at 0x4cca70..0x4ccab3), both twins"
   context:
     - "...ets the receiver's progress on the item to its cost less one ((cost << 8) - 0x100 through 0x4cc950 / 0x3a1fb0), the item in hand or another. Records: runs/h1_duelw1121 Rome's Code of Laws..."
   review: reviewed
@@ -364,6 +373,17 @@
   readings: ["C-127: a boost completion's turns left; a minor Builder's clearing lump"]
   context:
     - ...research AI's in-hand turns (0x731d10 on +0x4d0 at 0x762d96); the choice's SetResearch (0x4cd020 at 0x7630dc) is followed by GetTurnsLeft (0x4ca120 at 0x7630e4) at the player's Scien...
+  review: imported
+- addr: 0x4cd4c0
+  final: 0x3365f0
+  kind: function
+  name: SetTech
+  status: PARTLY
+  readings:
+    - "C-98: a boost on an item at or past its cost completes it; a minor's parked progress and project conversion in the replay — READ (0x4cc950 at 0x4cca70..0x4ccab3), both twins"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - ...echnology's cost << 8 (0x4cca89..0x4ccaa5) and, at or above, completes the row (SetTech 0x4cd4c0 at 0x4ccab3) and clears the progress. A boost lands through the setter, so a row whose...
   review: imported
 - addr: 0x4cd900
   final: 0x336940

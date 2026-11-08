@@ -5227,6 +5227,28 @@ function perTurnWorld(ctx: Ctx, a: TurnRecord, imp: Imported, history: History, 
       const f = from as CityState;
       const t = to as CityState;
       if (f.prodItem !== undefined && f.prodItem === t.prodItem && Math.floor(f.prodProgress ?? 0) === (t.prodProgress ?? 0)) t.prodProgress = f.prodProgress;
+      // a district project's conversion the record cannot give (its step
+      // paid in an overflow no record holds) is the engine's own step's
+      // (runs/h1_duely1124 city-state 4 t36: Campus Research Grants begun
+      // on the overflow, 1.56 Science banked at t37 as the game's research)
+      const im = imp.state.cityStates.find((x) => x.id === t.id);
+      const d = im && imp.dumpOfMinor.get(im);
+      if (d && imp.projectYieldUnread.has(`${d.owner}:${d.id}`)) {
+        if (f.projectYield) t.projectYield = f.projectYield;
+        else delete t.projectYield;
+      }
+      // the progress the minor parked on an item it left is the engine's
+      // own where it holds one: the record shows the item in hand alone,
+      // and an item picked on a completion's overflow shows none of it
+      // (runs/h1_duely1128 city-state 2's Mathematics: 0 in record t66 on
+      // the 44.5 overflow, 48.5 parked for Irrigation at t66, 8 turns at t67)
+      for (const civic of [false, true]) {
+        const fr = civic ? f.research.civicRetained : f.research.techRetained;
+        const tr = civic ? t.research.civicRetained : t.research.techRetained;
+        const have = civic ? t.research.civics : t.research.techs;
+        const cur = civic ? t.research.civic : t.research.tech;
+        for (const [id, v] of Object.entries(fr)) if (id !== cur && !have.includes(id)) tr[id] = v;
+      }
     }
     for (const c of to.cities ?? []) {
       const o = from.cities?.find((x) => x.centerIndex === c.centerIndex);

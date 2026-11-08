@@ -67,7 +67,10 @@ export function researchOwed(rsr: ResearchState, id: string, cost: number): numb
  * (`boostAmount`) lands as progress on it — the current item's pool or the
  * progress the seat parked on it —, never past its cost; reaching the cost
  * completes the item there (`completeResearchNow`). A row with no
- * `Boosts` row takes nothing, as does one held or boosted already. Whether
+ * `Boosts` row takes nothing, as does one held or boosted already; one whose
+ * progress already stands at or past its cost (a catch-up set at an earlier
+ * era's higher price: runs/h1_duely1117 city-state 2's Early Empire, 34 of
+ * 28, boosted complete at t38) completes on its boost. Whether
  * the trigger pays a dedication is the caller's.
  */
 export function markBoost(state: GameState, seat: number, id: string): boolean {
@@ -81,8 +84,7 @@ export function markBoost(state: GameState, seat: number, id: string): boolean {
   const civic = !TECHS[id];
   const cost = researchCost(state, id, civic, seat);
   const have = progressOn(rsr, id);
-  const add = Math.min(cost - have, boostAmount(cost, def.pct, boostPoints(state, seat, civic)));
-  if (add <= 0) return true;
+  const add = Math.max(0, Math.min(cost - have, boostAmount(cost, def.pct, boostPoints(state, seat, civic))));
   if (rsr.tech === id) rsr.techProgress += add;
   else if (rsr.civic === id) rsr.civicProgress += add;
   else if (civic) rsr.civicRetained[id] = have + add;

@@ -9843,3 +9843,37 @@ full-Movement search runs, and those run at four places:
   TREBUCHET); the knowledge base's district-only entries (no centre
   revealed) not modelled: `knownCities` lists a revealed centre's city
   alone.
+
+## C-98: a boost on an item at or past its cost completes it; a minor's parked progress and project conversion in the replay — READ (0x4cc950 at 0x4cca70..0x4ccab3), both twins
+
+`markBoost` (cpu/core/boosts.ts); GPU `_land_boosts` (gpu/core/sim_economy.py),
+`_land_minor_boosts` (gpu/core/sim_minors.py). The replay's carry
+(`perTurnWorld`'s `seatPair`, cpu/harness/replay.ts) and the minors'
+`projectYieldUnread` (cpu/harness/import.ts).
+
+- THE PROGRESS SETTER 0x4cc950 writes the new progress (0x4cca70), then
+  compares it with the technology's cost << 8 (0x4cca89..0x4ccaa5) and, at or
+  above, completes the row (SetTech 0x4cd4c0 at 0x4ccab3) and clears the
+  progress. A boost lands through the setter, so a row whose progress already
+  stands at or past its cost completes on its boost even where the boost adds
+  nothing: a catch-up SET at cost - 1 under an earlier era keeps its value
+  when a later era lowers the price (runs/h1_duely1124 city-state 4's Bronze
+  Working at 39 of 40 from Rome's, 39 of 32 in hand at record t38;
+  runs/h1_duely1117 city-state 2's Early Empire, 34 of 28 from t31, boosted
+  complete at t38, the t38 civics rows as logged).
+- THE REPLAY (not the game's rule; what the records cannot show): a minor's
+  progress parked on an item it left is the engine's own where the engine
+  holds one — the record shows the item in hand alone, and an item picked on
+  a completion's overflow shows 0 (runs/h1_duely1128 city-state 2's
+  Mathematics: 0 in record t66 on the 44.5 overflow, 48.5 parked for
+  Irrigation, 8 turns at t67 as logged); a minor's district project
+  conversion that its first step paid out of an overflow no record holds
+  (`importProjectYield`'s unread column) is the engine's own step's
+  (runs/h1_duely1124 city-state 4 t36: Campus Research Grants begun on the
+  overflow, 9.06 Science at its t37 bank; the t37-t39 research turns, the
+  Catapult's T and Engineering / Machinery as logged).
+- Confirmed (aimem, one-seed traces, b8736742 against this patch):
+  researchScore.minor 1124 t1-140 67 -> 13, 1128 t1-120 8 -> 0;
+  civicScore.minor 1124 20 -> 12, 1121 4 -> 2; policyScore.minor 1121 6 ->
+  0, 1124 8 -> 6, 1117 5 -> 4; no kind worse on 1117 / 1121 / 1124 / 1127 /
+  1128.

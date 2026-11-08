@@ -718,7 +718,7 @@ class SimEconomy:
         [B, N] neither held nor boosted that carry a `Boosts` row are marked
         boosted and their percent (`_boost_amount`) lands as progress — the
         current item's pool or its parked progress —, never past the cost; an
-        item that reaches its cost completes at once
+        item at or past its cost after it completes at once
         (`_complete_research_now`). Returns the items newly boosted [B, N]."""
         held = (self.civ_civics if is_civic else self.civ_techs)[:, row]
         boosted = self.civ_civic_boosted if is_civic else self.civ_tech_boosted
@@ -738,8 +738,10 @@ class SimEconomy:
         have = torch.where(is_cur, prog[:, row].unsqueeze(1), retain[:, row, :n])
         amt = self._boost_amount(cost_n, pct[:n].long().unsqueeze(0),
                                  self._boost_points(row, is_civic).unsqueeze(1)).to(have.dtype)
-        add = torch.minimum(cost_n.to(have.dtype) - have, amt)
-        go = newly[:, :n] & (add > 0)
+        add = torch.minimum(cost_n.to(have.dtype) - have, amt).clamp(min=0)
+        # an item already at or past its cost (a catch-up set at an earlier
+        # era's higher price) completes on its boost
+        go = newly[:, :n]
         add = torch.where(go, add, torch.zeros_like(add))
         prog[:, row] += (add * is_cur.to(add.dtype)).sum(dim=1)
         retain[:, row, :n] += torch.where(is_cur, torch.zeros_like(add), add)

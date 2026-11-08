@@ -2767,10 +2767,12 @@ export function importTurn(rec: TurnRecord, cat: Catalog, history?: History): Im
     if (col >= 0) projectYieldUnread.set(key, col);
   }
   // a minor's city as its last production step left it, by the same rule:
-  // its next gold step banks the conversion
+  // its next gold step banks the conversion; one the records cannot give is
+  // the engine's own (the replay carries it)
   for (const [minor, c] of dumpOfMinor) {
     const city = { ...minorCity(minor), projectYield: undefined };
-    importProjectYield(state, ctx.cat, c, prevCities.get(`${c.owner}:${c.id}`), !!b2 && !late.has(c.owner), city);
+    const col = importProjectYield(state, ctx.cat, c, prevCities.get(`${c.owner}:${c.id}`), !!b2 && !late.has(c.owner), city);
+    if (col >= 0) projectYieldUnread.set(`${c.owner}:${c.id}`, col);
     if (city.projectYield) minor.projectYield = city.projectYield;
     else delete minor.projectYield;
   }

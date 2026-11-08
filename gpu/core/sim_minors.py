@@ -177,7 +177,7 @@ class SimMinors:
         `want` [B, N] neither held nor boosted that carry a `Boosts` row are
         marked boosted and their percent (`_boost_amount`, no points) lands as
         progress — the item in hand's pool or the progress kept on it —,
-        never past its cost; an item that reaches its cost completes at once
+        never past its cost; an item at or past its cost after it completes at once
         (`_minor_complete_now`). Returns the items newly boosted."""
         held = (self.citystate_civics if is_civic else self.citystate_techs)[:, s]
         boosted = (self.citystate_civic_boosted if is_civic else self.citystate_tech_boosted)[:, s]
@@ -195,8 +195,10 @@ class SimMinors:
         is_cur = torch.arange(n, device=self.device).unsqueeze(0) == cur.unsqueeze(1)
         have = torch.where(is_cur, prog[:, s].unsqueeze(1), retain[:, s, :n])
         amt = self._boost_amount(cost_n, pct[:n].long().unsqueeze(0), torch.zeros_like(cost_n[:, :1])).to(have.dtype)
-        add = torch.minimum(cost_n.to(have.dtype) - have, amt)
-        go = newly[:, :n] & (add > 0)
+        add = torch.minimum(cost_n.to(have.dtype) - have, amt).clamp(min=0)
+        # an item already at or past its cost (a catch-up set at an earlier
+        # era's higher price) completes on its boost
+        go = newly[:, :n]
         add = torch.where(go, add, torch.zeros_like(add))
         prog[:, s] += (add * is_cur.to(add.dtype)).sum(dim=1)
         retain[:, s, :n] += torch.where(is_cur, torch.zeros_like(add), add)
