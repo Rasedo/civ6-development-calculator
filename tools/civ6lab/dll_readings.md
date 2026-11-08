@@ -12547,3 +12547,43 @@ third: slot 2 CanStart, slot 4 the tick, slot 5 the update).
   _FROM_AGES, _PER_CITIZEN): which carries the age's ±0.5 and the nuclear
   emergency's −1 (the engines cut the citizens, `emergencyPressureCut`); no
   duelp case.
+
+## C-125 / C-99: the attack assignment's stacking block is by formation class; a garrison on a defending district is no striker against a target not HIGH — READ (0x776140 at 0x776890..0x776909, 0x8bcd0, 0x775340 at 0x77541f..0x7754ab, 0x7784b0 at 0x7785ad, 0x61ddb0 at 0x61de20..0x61de2f), both twins
+
+- THE STACKING BLOCK of a claim (0x776140 at 0x776890..0x776909): over the
+  spot's units of the mover's map layer (0x75c50 with 0x901e0), alive, not
+  the target, a unit blocks the spot unless it is the mover's player's, in
+  its job (+0x7d0) with Movement left (+0xdb0); the block holds only where
+  the two formation classes (0x8bcd0: LAND_COMBAT 0, SUPPORT 1, CIVILIAN 2,
+  NAVAL 3, AIR 4) are equal, so a land garrison keeps no ship off its
+  city's centre (`assignTo`'s `stackClass`; the GPU's planes compared on
+  `unit_naval`).
+- THE STRIKERS' GARRISON CLAUSE (0x775340 at 0x77541f..0x7754ab, its fifth
+  argument, which Attack Units sets for a target not HIGH: 0x7784b0 at
+  0x7785a4..0x7785c3): a unit with no range (GetRange 0x56e3d0) and no
+  bombard strength (0x56daa0) standing on a district whose row defends
+  (DistrictInfo +0x58 set, +0x5c above 0: a city's centre, an Encampment)
+  is left out (`strikers`' `garrisons`, `_tac_attack_units`' `held_out`).
+- THE TIE: the knapsack at capacity 1 (0x61ddb0 at 0x61de20..0x61de2f,
+  `cmp [best], cur; cmovl`) keeps the first largest value; the gain λ
+  (0x77df80 -> 0x7702b0) ignores the agent's current slot; the strikers'
+  sort (0x76f210 -> 0x76efc0) orders on +8, -1 for every entry
+  (0x7755be), so the units go to the assignment in the tactical list's
+  order (0x7784b0 at 0x778609..0x77868b).
+- CONFIRMED (one-seed aimem traces): runs/h1_duelp1124 t73 / t74
+  city-state 3's Quadrireme 1048577 on Granada's centre 41:12, its Warrior
+  garrison beside it, claims 41:12 (turn 1) and strikes 40:13 from it, as
+  logged (cityState.move.plot 569 // 569; it stepped to 41:13 before).
+- OPEN: the garrison clause met no case in runs/h1_duelp1124 / 1128
+  t1-60. runs/h1_duelp1128 t22 (Warriors 196610 on 10:5 and 327683 on
+  10:7 for the Scout 262147 on 12:6, both on 11:6 at turn 2) and t35
+  (Swordsmen 589827 on 10:9 and 655364 on 9:6 for the Warrior 1572886 on
+  11:6, both on 10:7 at turn 2): the engines weigh both claims alike
+  (trunc(36 / 2) x 0.8 = 14; trunc(48 / 2) x 0.8 = 19) and the first in
+  pool order takes the spot; the game's takes the later unit, the one
+  standing on its own territory both times, so either its predicted blow
+  (0x791470 from where it stands) or the tactical list's order (0x77d100
+  from 0x60a8c0) differs; runs/h1_duelp1124 t50 the game drops the claims
+  of city-state 4's Warriors 131073 (37:8, its own plot) and 196610 (37:9)
+  on the barbarian Warrior 3080212 on 38:8 that the engines' exchange
+  filter keeps (taken 58 / 56 against 62 / 64).

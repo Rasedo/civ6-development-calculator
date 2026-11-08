@@ -3043,6 +3043,17 @@ class SimTactics:
         rsafe = rowof.clamp(min=0)
         rturn, rmoves = res["turns"], res["moves"]
         all_e = torch.arange(U, device=dev).unsqueeze(0).expand(B, U)
+        # against a target not HIGH a melee unit with no bombard strength on a
+        # district that defends (a city's centre, an Encampment) is none of
+        # the strikers (0x775340 at 0x77541f..0x7754ab)
+        held_out = torch.zeros(B, P, dtype=torch.bool, device=dev)
+        if kind != 3:
+            garrison = self._centre_plane()
+            if self._encamp_didx >= 0:
+                garrison = garrison | (self.district == self._encamp_didx)
+            u_tile = getattr(self, f"{pre}_unit_tile")
+            held_out = ((urng == 0) & (self._type_bombard.take(ut) <= 0) & (u_tile >= 0)
+                        & garrison.gather(1, u_tile.clamp(min=0)))
         for j in range(J):
             t = ents[:, j].clamp(max=U - 1) % T
             on = (j < cnt) & standing(ents[:, j:j + 1]).squeeze(1)
@@ -3058,7 +3069,7 @@ class SimTactics:
             rt_t = rturn[rsafe, t.unsqueeze(1).expand(B, P)]
             melee_ok = (urng == 0) & (rt_t >= 1) & (rt_t <= _PLAN_TURNS)
             rng_ok = torch.zeros(B, P, dtype=torch.bool, device=dev)
-            cand0 = on_list() & fights & (rowof >= 0) & on.unsqueeze(1)
+            cand0 = on_list() & fights & ~held_out & (rowof >= 0) & on.unsqueeze(1)
             rk = cand0 & (urng > 0)
             if bool(rk.count_nonzero()):
                 b_i, s_i = rk.nonzero(as_tuple=True)
@@ -3188,9 +3199,12 @@ class SimTactics:
         h4 = here.view(B, U, 1, 1)
         ok &= ~(defender.view(B, U, 1, 1) & (spot != h4))
         ok &= ~((sturn == 1) & moved.view(B, U, 1, 1) & (spot != h4))
-        # no spot another unit holds that stacks with it, its own units of
-        # its job with Movement left aside
+        # no spot another unit of its formation class holds (0x8bcd0: a
+        # ship's NAVAL apart from a land unit's LAND_COMBAT, embarked or
+        # not), its own units of its job with Movement left aside
         spc = spot.clamp(min=0).view(B, -1)
+        u_ty = self.unit_type.gather(1, us + self.POOL_LO[pre]).clamp(min=0, max=self.NU - 1)
+        u_nav = self.unit_naval.take(u_ty).view(B, U, 1, 1).expand(B, U, K, 6).reshape(B, -1)
         for pl in (self.military_at, self.embarked_at):
             x = pl.gather(1, spc)
             xs = x.clamp(min=0)
@@ -3199,7 +3213,7 @@ class SimTactics:
             if ended is not None:
                 x_mp = torch.where(ended.gather(1, xs), torch.zeros_like(x_mp), x_mp)
             mine = (self.unit_seat.gather(1, xs) == seat) & peers.gather(1, xs) & (x_mp > 0)
-            blk = (x >= 0) & self._type_dom_mil.take(xt) & ~mine
+            blk = (x >= 0) & self._type_dom_mil.take(xt) & (self.unit_naval.take(xt) == u_nav) & ~mine
             blk = blk.view(B, U, K, 6) & (x.view(B, U, K, 6) != tslot.view(B, 1, K, 1))
             ok &= ~blk
         # the claims, in the order the targets, the units and the spots run

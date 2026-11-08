@@ -26,6 +26,7 @@
     - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
     - "C-95: Attack Units — READ, ported"
     - "C-125: a melee unit's spot beside its target — READ (0x790c60 at 0x790faa..0x79103c, 0x776140's claim loop, 0x7702b0), both twins"
+    - "C-125 / C-99: the attack assignment's stacking block is by formation class; a garrison on a defending district is no striker against a target not HIGH — READ (0x776140 at 0x776890..0x776909, 0x8bcd0, 0x775340 at 0x77541f..0x7754ab, 0x7784b0 at 0x7785ad, 0x61ddb0 at 0x61de20..0x61de2f), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...alizedAssignmentProblem.cpp) runs ONE pass over the spots: per spot each unit's gain (λ 0x7702b0: the best of its entries there, dealt / turns, a kill +100 where the target's damage re..."
@@ -490,7 +491,7 @@
   final: 0x507370
   kind: function
   name: attackStrikers
-  semantics: the units whose planning holds the target within two turns (a ranged one at exactly its range, Movement left); a DEFENDER on its own plot
+  semantics: "the units whose planning holds the target within two turns (a ranged one at exactly its range, Movement left); a DEFENDER on its own plot. With its fifth argument (Attack Units for a target not HIGH) a unit with no range and no bombard strength on a district that defends (DistrictInfo +0x58 / +0x5c: a city's centre, an Encampment) is left out (0x77541f..0x7754ab); the list sorted by 0x76f210 on +8, -1 for every entry."
   status: READ
   cases:
     - recording: h1_duelp1121
@@ -505,6 +506,7 @@
     - cpu/core/tactical.ts:reachers
     - cpu/core/tactical.ts:onList
     - gpu/core/sim_tactics.py:_tac_on_list
+    - gpu/core/sim_tactics.py:_tac_attack_units
   readings:
     - "C-95: the tactical pass — READ (the barbarians' moves; the minors share it)"
     - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
@@ -512,6 +514,7 @@
     - "C-96: the standing army and the Combat Desire's city terms — READ (0x5ca7e0, the watched setter 0x731d10, 0x79b9c0), the unit table's orientation READ"
     - "C-95: the danger map and Move to Safety — READ, ported"
     - "C-95: the full search sets out on the formation's least Movement, a major's formations from the log, a tactical move walks its own done units — READ (0x26eea0, 0x266660, 0x262cd0, 0x770ce0 at 0x770d30..0x771097, 0x77d180, 0x775340, 0x771f80 at 0x7723cb / 0x772663, 0x77a810, 0x774380), both twins"
+    - "C-125 / C-99: the attack assignment's stacking block is by formation class; a garrison on a defending district is no striker against a target not HIGH — READ (0x776140 at 0x776890..0x776909, 0x8bcd0, 0x775340 at 0x77541f..0x7754ab, 0x7784b0 at 0x7785ad, 0x61ddb0 at 0x61de20..0x61de2f), both twins"
   context:
     - "...rovement — the units of AI type EXPLORE or above whose planning reaches it this turn (0x775340, 1 turn) in pool order, none standing on a plot of the kind itself (0x774380), go to it..."
     - "...79240): each CIVILIAN target, the units whose planning holds its plot within two turns (0x775340: pool order, a strength to fight with, a DEFENDER held until another unit goes in; the..."
@@ -580,9 +583,12 @@
 - addr: 0x776140
   kind: function
   name: assignAttacks
-  semantics: "the claims (unit, target, spot), the MEDIUM / LOW exchange filter, one Generalized Assignment pass, the merge-sorted results The filters (0x776780..0x7767fa), per spot i of a claim unless the target is HIGH or the unit info's +0x1ba bit 0x20 (UseMaxMeleeTrainedStrength) is set: with the fifth argument, dropped where taken + back taken (+0x7c, +0x94) tops dealt + back dealt (+0x64, +0xac); with the sixth (Operation Attack Units passes it always, 0x80d63a), dropped where taken + back taken tops the unit's health (0x56e0d0 less +0xcf0). A target's health is floor(100 x 281 / 256) less its damage (1.1 in 24.8). A unit that moved with turns 1 takes only its own plot. The stacking block (0x776890..0x776909): a unit on the spot not the target, of the mover's formation class, blocks unless it is the player's, in the mover's job (unit +0x7d0: the pass's, an operation's) with Movement left (+0xdb0); a unit raised this turn, in no job, blocks. Claims in target, unit, spot order (the outer loop 0x776244..0x7766f3 walks the targets, 0x28 each, the inner the units; the innermost 0x776780..0x7769cb the unit's planning entry's spots in their laid order, entry +0x18 the count, +0x1c the plots, +0x4c / +0x64 / +0x7c / +0x94 / +0xac the per-spot turns, dealt, taken, back taken, back dealt); a spot's place is its first claim's (0x77695a: the spot list searched by plot, a new one appended at 0x776a0c); ONE pass of 0x8b5bf0; the results sorted by 0x7704e0 through EASTL's merge sort (halves n / 2)."
+  semantics: "the claims (unit, target, spot), the MEDIUM / LOW exchange filter, one Generalized Assignment pass, the merge-sorted results The filters (0x776780..0x7767fa), per spot i of a claim unless the target is HIGH or the unit info's +0x1ba bit 0x20 (UseMaxMeleeTrainedStrength) is set: with the fifth argument, dropped where taken + back taken (+0x7c, +0x94) tops dealt + back dealt (+0x64, +0xac); with the sixth (Operation Attack Units passes it always, 0x80d63a), dropped where taken + back taken tops the unit's health (0x56e0d0 less +0xcf0). A target's health is floor(100 x 281 / 256) less its damage (1.1 in 24.8). A unit that moved with turns 1 takes only its own plot. The stacking block (0x776890..0x776909): a unit on the spot not the target, of the mover's formation class, blocks unless it is the player's, in the mover's job (unit +0x7d0: the pass's, an operation's) with Movement left (+0xdb0); a unit raised this turn, in no job, blocks. Claims in target, unit, spot order (the outer loop 0x776244..0x7766f3 walks the targets, 0x28 each, the inner the units; the innermost 0x776780..0x7769cb the unit's planning entry's spots in their laid order, entry +0x18 the count, +0x1c the plots, +0x4c / +0x64 / +0x7c / +0x94 / +0xac the per-spot turns, dealt, taken, back taken, back dealt); a spot's place is its first claim's (0x77695a: the spot list searched by plot, a new one appended at 0x776a0c); ONE pass of 0x8b5bf0; the results sorted by 0x7704e0 through EASTL's merge sort (halves n / 2). The stacking block compares formation classes (0x8bcd0): a land unit keeps no ship off its spot."
   status: READ
   cases:
+    - recording: h1_duelp1124
+      turn: 73
+      value: city-state 3's Quadrireme 1048577 on Granada's centre 41:12 beside its Warrior garrison claims 41:12 (turn 1) and strikes 40:13 from it, as logged; t74 the same
     - recording: h1_duelr1124
       turn: 22
       value: "Granada's City Defense: the garrison Warrior 393218 on 41:12, its moves ended by Garrison City (0x56d6f0 zeroes +0xdb0), blocks the Warrior 327681's spot there; 327681 takes 40:11 (turn 2, no attack), as logged"
@@ -611,6 +617,7 @@
     - cpu/core/tactical.ts:passNavalPillage
     - cpu/core/tactical.ts:Assigned
     - cpu/core/tactical.ts:left
+    - cpu/core/tactical.ts:stackClass
   readings:
     - "C-99: the assignment's Movement and the swap's walk — READ (0x776140 at 0x776643 / 0x7768e4, 0x56d6f0, 0x972a50 -> 0x26fe20 under flag 4, 0x2720a0 at 0x27229b), both twins"
     - "C-95: Attack Units — READ, ported"
@@ -629,6 +636,7 @@
     - "C-125: the attack results' last tie-break is the unit id — READ (0x7704e0 at 0x770642..0x770648, 0x776f1a..0x776f27), both twins"
     - "C-95: the full search sets out on the formation's least Movement, a major's formations from the log, a tactical move walks its own done units — READ (0x26eea0, 0x266660, 0x262cd0, 0x770ce0 at 0x770d30..0x771097, 0x77d180, 0x775340, 0x771f80 at 0x7723cb / 0x772663, 0x77a810, 0x774380), both twins"
     - "C-99: Operation Move's and Operation Attack's planning plot keeps out another player's unit at peace, not one at war; Operation Attack's march carries the attack flag; a refresh reads the knowledge base's target entries — READ (0x78fa10 -> 0x585eb0 -> 0x585d90, 0x791300's callers 0x80c397 / 0x810e98 / 0x811213, 0x80c180 at 0x80c3c4 / 0x80c4be / 0x80c7ee), both twins"
+    - "C-125 / C-99: the attack assignment's stacking block is by formation class; a garrison on a defending district is no striker against a target not HIGH — READ (0x776140 at 0x776890..0x776909, 0x8bcd0, 0x775340 at 0x77541f..0x7754ab, 0x7784b0 at 0x7785ad, 0x61ddb0 at 0x61de20..0x61de2f), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "- THE ASSIGNMENT (0x776140): a target's health floor(100 x 281 / 256) less its damage (1.1 in 24.8); for MEDIUM /..."
@@ -642,11 +650,15 @@
     - recording: h1_duelw1124
       turn: 1-249
       value: "the action replay: 206 of 330 Attack Units rows take the logged move and attack; 5 seeds 70 of 126 end plots"
-  impl: [cpu/core/tactical.ts:attackUnits, gpu/core/sim_tactics.py:_tac_attack_units]
+  impl:
+    - cpu/core/tactical.ts:attackUnits
+    - gpu/core/sim_tactics.py:_tac_attack_units
+    - cpu/core/tactical.ts:strikers
   readings:
     - "C-95: the tactical pass — READ (the barbarians' moves; the minors share it)"
     - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
     - "C-95: Attack Units — READ, ported"
+    - "C-125 / C-99: the attack assignment's stacking block is by formation class; a garrison on a defending district is no striker against a target not HIGH — READ (0x776140 at 0x776890..0x776909, 0x8bcd0, 0x775340 at 0x77541f..0x7754ab, 0x7784b0 at 0x7785ad, 0x61ddb0 at 0x61de20..0x61de2f), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...80, AllowedMoves hashes): f2e0f4 Move to Safety, f2e100/104/108 Attack High/Medium/Low (0x7784b0 with TARGET_HIGH/MEDIUM/LOW_PRIORITY_UNIT), f2e10c Attack Civilians (0x779240), f2e120..."

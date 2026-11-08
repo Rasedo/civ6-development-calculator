@@ -669,6 +669,9 @@
   semantics: "GetFormationClass (-> 0xadd5e0 over the class's hash, ~CRC32 of its name): LAND_COMBAT 0, SUPPORT 1, CIVILIAN 2, NAVAL 3, AIR 4."
   status: PARTLY
   cases:
+    - recording: h1_duelp1124
+      turn: 73
+      value: city-state 3's Quadrireme 1048577 on Granada's centre 41:12 beside its Warrior garrison claims 41:12 (turn 1) and strikes 40:13 from it, as logged; t74 the same
     - recording: h1_duelw1105
       turn: 34
       value: "The minors: runs/h1_duelw1105 city-state 3's five Warriors to   its captured Settler at 5 15 (t34) and 3 15 (t64), none while the Settler   stands in a formation;"
@@ -678,9 +681,11 @@
     - recording: 1128
       turn: 251
       value: "A minor's   pass walks its military units alone, so the support half finds none (1128   t251: its Supply Convoy, alone beside the Spec Ops, ends its turn)."
+  impl: [gpu/core/sim_tactics.py:_tac_assign]
   readings:
     - "C-96: the city-states' tactical pass — READ (Wander Near City, Heal, the non-barbarian priorities, FindAlternateLocation), the families it needs PARTLY READ"
     - "C-95: the danger map and Move to Safety — READ, ported"
+    - "C-125 / C-99: the attack assignment's stacking block is by formation class; a garrison on a defending district is no striker against a target not HIGH — READ (0x776140 at 0x776890..0x776909, 0x8bcd0, 0x775340 at 0x77541f..0x7754ab, 0x7784b0 at 0x7785ad, 0x61ddb0 at 0x61de20..0x61de2f), both twins"
   context:
     - "...ac_support_formation`): per unit of the pass's list (+0x240), alive. GetFormationClass (0x8bcd0 -> 0xadd5e0, over the class's hash, ~CRC32 of its name): LAND_COMBAT 0, SUPPORT 1, CI..."
   review: reviewed
@@ -748,6 +753,7 @@
     - "C-128: a city-state's Make Military Formation — READ (0x77a190, 0x770670, 0x536da0, 0x773e20, 0x94a870, 0x949930), both twins"
     - "C-128: a crowded plot's unit goes beside it as its AI player's turn ends — READ (0x775e50, 0x585d90, 0x93f870, 0x585940), both twins"
     - "C-99 / C-128: the embark step's location test, the destination test's map layer; the Supply Convoy's Movement — READ (0x52fe90 at 0x530024, 0x208b80 at 0x208bbf -> 0x901e0 -> 0x75c50), both twins"
+    - "C-125 / C-99: the attack assignment's stacking block is by formation class; a garrison on a defending district is no striker against a target not HIGH — READ (0x776140 at 0x776890..0x776909, 0x8bcd0, 0x775340 at 0x77541f..0x7754ab, 0x7784b0 at 0x7785ad, 0x61ddb0 at 0x61de20..0x61de2f), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...e (0x790fc9..0x791016) lists the target plot's units of the planning's +0x10 (0x793400: 0x901e0, the mover's map layer): a religious unit stands on its own, so a military unit lays th..."
@@ -3615,6 +3621,7 @@
     - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
     - "C-95: Attack Units — READ, ported"
     - "C-97: the governor AI — the analysis, the choice and the seats READ, the analyzers PARTLY READ"
+    - "C-125 / C-99: the attack assignment's stacking block is by formation class; a garrison on a defending district is no striker against a target not HIGH — READ (0x776140 at 0x776890..0x776909, 0x8bcd0, 0x775340 at 0x77541f..0x7754ab, 0x7784b0 at 0x7785ad, 0x61ddb0 at 0x61de20..0x61de2f), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...erkill (health - damage) + 100; minus its value where it stands assigned), the knapsack 0x61ddb0 at capacity 1 takes the first largest positive gain, and the move (λ 0x770710) re-assig..."
@@ -5061,7 +5068,9 @@
   kind: function
   semantics: the tactical pass's unit list (from the player's unit evaluator 0x60a8c0 / 0x6092c0), in the unit pool's slot order (a unit's ID is its serial << 16 | its slot).
   status: PARTLY
-  readings: ["C-95: the tactical pass — READ (the barbarians' moves; the minors share it)"]
+  readings:
+    - "C-95: the tactical pass — READ (the barbarians' moves; the minors share it)"
+    - "C-125 / C-99: the attack assignment's stacking block is by formation class; a garrison on a defending district is no striker against a target not HIGH — READ (0x776140 at 0x776890..0x776909, 0x8bcd0, 0x775340 at 0x77541f..0x7754ab, 0x7784b0 at 0x7785ad, 0x61ddb0 at 0x61de20..0x61de2f), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "- The pass (TacticalAI 0x771530, a vtable slot): the unit list (+0x240, 0x77d100 from the player's unit evaluator 0x60a8c0 / 0x6092c0), then the moves (0x770ce0) in the..."
@@ -5087,6 +5096,16 @@
   context:
     - ...flag 0x10), a unit with no ranged or bombard strength then done (0x56d6f0, 0x570b40, 0x77d180); the civilian taken ends the target; then each ranged one within range strikes it (0x9...
   review: reviewed
+- addr: 0x77df80
+  final: 0x50f8e0
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-125 / C-99: the attack assignment's stacking block is by formation class; a garrison on a defending district is no striker against a target not HIGH — READ (0x776140 at 0x776890..0x776909, 0x8bcd0, 0x775340 at 0x77541f..0x7754ab, 0x7784b0 at 0x7785ad, 0x61ddb0 at 0x61de20..0x61de2f), both twins"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...1de20..0x61de2f, `cmp [best], cur; cmovl`) keeps the first largest value; the gain λ (0x77df80 -> 0x7702b0) ignores the agent's current slot; the strikers' sort (0x76f210 -> 0x76efc0..."
+  review: imported
 - addr: 0x7803d0
   final: 0x50fd30
   kind: function

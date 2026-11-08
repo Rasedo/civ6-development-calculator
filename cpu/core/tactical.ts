@@ -2607,13 +2607,19 @@ const ATTACK_BARB = Math.fround(0.8);
  * whose planning reach holds — in melee the plot within two turns, at range
  * a plot exactly its range from it within two turns with Movement left and
  * none of its own units stacking there unless it is its own (0x78fa10); a
- * camp's DEFENDER goes in only before another unit.
+ * camp's DEFENDER goes in only before another unit. With `garrisons` (a
+ * target not HIGH, 0x7784b0 at 0x7785ad) a melee unit with no bombard
+ * strength standing on a district that defends (a city's centre, an
+ * Encampment: DistrictInfo +0x58 / +0x5c) is left out (0x775340 at
+ * 0x77541f..0x7754ab).
  */
-function strikers(state: GameState, pass: Pass, plot: number): Unit[] {
+function strikers(state: GameState, pass: Pass, plot: number, garrisons: boolean): Unit[] {
   const out: Unit[] = [];
   let held: Unit | null = null;
   for (const u of pass.units) {
     if (!onList(state, pass, u) || !canFight(u)) continue;
+    if (garrisons && rangeOf(u) === 0 && UNITS[u.type]?.bombard === undefined
+      && garrisonDistrict(state, state.map.tiles[u.tileIndex])) continue;
     const reach = pass.reach.get(u.id) ?? [];
     const ranged = rangedStrength(u) > 0;
     const R = ranged ? rangeOf(u) : 0;
@@ -2725,9 +2731,9 @@ export function assignTo(state: GameState, pass: Pass, units: Unit[], targets: T
         if (T.target.type !== 'HIGH' && ((exchange && takes > dealt + s.backDealt) || (survive && takes > healthOf(u)))) continue;
         if (pass.ai.get(u.id) === AI_DEFENDER && s.tile !== u.tileIndex) continue;
         if (s.turns === 1 && moved && s.tile !== u.tileIndex) continue;
-        const dom = unitDomain(u.type);
+        const cls = stackClass(u.type);
         if (state.units.some((x) => x.tileIndex === s.tile && onMap(x) && x !== T.unit
-          && !(x.seat === u.seat && jobOf(state, pass, x) === job && left(x) > 0) && unitDomain(x.type) === dom)) continue;
+          && !(x.seat === u.seat && jobOf(state, pass, x) === job && left(x) > 0) && stackClass(x.type) === cls)) continue;
         let sp = spots.find((x) => x.tile === s.tile);
         if (!sp) spots.push((sp = { tile: s.tile, claims: [], holder: -1, holderTarget: -1 }));
         sp.claims.push({ unit: i, target: k, dealt, turns: s.turns, value: 0 });
@@ -2956,7 +2962,7 @@ function attackUnits(state: GameState, pass: Pass, type: TargetType): void {
     if (e.type !== type && !(type === 'LOW' && e.type === 'RELIGIOUS')) continue;
     const v = targetUnit(state, e);
     if (!v) continue;
-    const units = strikers(state, pass, v.tileIndex);
+    const units = strikers(state, pass, v.tileIndex, type !== 'HIGH');
     if (!units.length) continue;
     const near = pass.targets.filter((t) => t.type === e.type && targetUnit(state, t)
       && plotDistance(state, t.unit!.tileIndex, v.tileIndex) <= ATTACK_TARGETS_RANGE);
