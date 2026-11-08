@@ -2083,7 +2083,22 @@ function minorOpsAfter(ctx: Ctx, b: TurnRecord, turn: number, copy: GameState, t
           // a step and falls in the barbarians' turn, its record 8:14;
           // h1_duely1124 t46: city-state 3's Builder steps to 41:11, which
           // the barbarians seize in their turn)
-          if (x.seat !== c.seat) continue;
+          // another player's unit the log takes off after this turn's end (a
+          // formation of a later minor's turn absorbing it) stands where the
+          // log holds it at the end, not where the copy's pass moved it
+          // (runs/h1_duely1121 t150: city-state 4's Line Infantry 1900549 on
+          // 34:19, absorbed into 2031622's Army in its turn, in city-state
+          // 3's end look at age 0)
+          if (x.seat !== c.seat) {
+            const key = keyOf.get(u) ?? '';
+            const off = removedAt.get(key);
+            if (end === undefined || off === undefined || off < end) continue;
+            const at = plotAt(key, end) ?? startAt.get(key);
+            if (at === undefined) continue;
+            held.push([x, x.tileIndex, x.hp]);
+            x.tileIndex = at;
+            continue;
+          }
           const key = keyOf.get(u) ?? '';
           const steps = ctx.paths.get(key);
           const at = steps?.length ? steps[steps.length - 1] : startAt.get(key);
