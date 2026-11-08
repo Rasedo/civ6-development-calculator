@@ -37,8 +37,7 @@
  * the browser build
 imports this.
  */
-import { AI_AGENDAS, AI_GOVERNMENTS, AI_GREAT_PERSON_CLASSES, AI_SLOT_TYPES } from '../data/aiTables';
-import { AI_STRATEGIES } from './aiWeights';
+import { AI_AGENDAS, AI_GOVERNMENTS, AI_GREAT_PERSON_CLASSES, AI_SLOT_TYPES, AI_STRATEGY_LISTS } from '../data/aiTables';
 import { GOVERNMENT_LIST, POLICY_LIST, SLOT_KINDS } from '../data/policies';
 import { LUXURY_IDS, RESOURCES } from '../../world/resources';
 import { installType } from './minorBuild';
@@ -380,6 +379,10 @@ interface CityRow {
 const civSeats = (state: GameState): Seat[] => state.seats;
 
 const POLICY_IDX = new Map(POLICY_LIST.map((p, i) => [p.id, i] as const));
+/** the strategies that carry a weight list, in the table's order (the order
+ *  aiWeights' AI_STRATEGIES reads; the table read here, as aiWeights' import
+ *  chain loads aiView, which reads aiWeights at load) */
+const STRATEGY_NAMES = Object.keys(AI_STRATEGY_LISTS);
 const overSeats = (fn: (s: Seat, state: GameState) => Val): Extractor =>
   (state, rows) => (rows as Seat[]).map((s) => fn(s, state));
 const overCities = (fn: (r: CityRow, state: GameState) => Val): Extractor =>
@@ -799,8 +802,9 @@ const SEAT: Record<string, Extractor> = {
   culRate: overSeats((s) => s.culRate ?? 0),
   // a major's agendas, as AI_AGENDAS indices ascending
   agendas: overSeats((s) => (s.agendas ?? []).map((a) => AI_AGENDAS.indexOf(a)).sort((x, y) => x - y)),
-  // the strategies a major follows beside its era ones, as AI_STRATEGIES indices ascending
-  strategies: overSeats((s) => (s.strategies ?? []).map((a) => AI_STRATEGIES.indexOf(a)).sort((x, y) => x - y)),
+  // the strategies a major follows beside its era ones, as STRATEGY_NAMES
+  // indices ascending
+  strategies: overSeats((s) => (s.strategies ?? []).map((a) => STRATEGY_NAMES.indexOf(a)).sort((x, y) => x - y)),
   tourRate: overSeats((s) => s.tourRate ?? 0),
   tourismTo: overSeats((s, st) => perCiv(st, (seat) => (seat === s.seat ? 0 : s.tourismTo?.[seat] ?? 0))),
   tourismReligiousTo: overSeats((s, st) => perCiv(st, (seat) => (seat === s.seat ? 0 : s.tourismReligiousTo?.[seat] ?? 0))),

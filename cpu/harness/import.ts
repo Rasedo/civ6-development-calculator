@@ -491,6 +491,9 @@ export interface History {
    *  city-state's player id: a city-state's unit gone at t+1 beside a new
    *  one of its type under the major */
   levied: Map<string, number>;
+  /** captured units, by the captor's `owner:id`, with the player id they
+   *  were taken from (`UnitCaptured` in the records' action log) */
+  captives: Map<string, number>;
   /** units holding Alpine Training, by `owner:id` (`foldBeside`) */
   alpine: Set<string>;
   /** units holding the Spear of Fionn, by `owner:id` (`foldBeside`) */
@@ -846,7 +849,7 @@ export function eraBegan(a: TurnRecord, b: TurnRecord): boolean {
 }
 
 export function newHistory(): History {
-  return { firstTurn: -1, last: null, before: null, beforeThat: null, trained: new Map(), levied: new Map(), alpine: new Set(), fionn: new Set(), govSeated: new Map(), growthDrift: new Map(), lastHit: new Map(), gpSpent: new Map(), revealed: new Map(),
+  return { firstTurn: -1, last: null, before: null, beforeThat: null, trained: new Map(), levied: new Map(), captives: new Map(), alpine: new Set(), fionn: new Set(), govSeated: new Map(), growthDrift: new Map(), lastHit: new Map(), gpSpent: new Map(), revealed: new Map(),
     unknownSince: new Set(), cityFirstSeen: new Map(), nextPlotUnheld: new Set(), fireFood: new Map(), fireProd: new Map(), eventYields: new Map(), eventCounts: new Map(), openEvents: [], eventRead: new Map(), eventDraws: new Map(), droughts: [], bare: new Map(), discountDistricts: new Map(), discountPlaced: new Map(), ages: new Map(), moments: new Map(), momentsWorld: [],
     eraTurns: [], gameEra: 0, eraStartTurn: 1, eraCountdown: -1, routeSeen: new Map(), routeCourse: new Map(), trail: new Map(), legs: new Map(), posts: new Map(), policySlots: new Map(),
     competitionSeen: new Map(), competitionScore: new Map(), podium: new Map(), culture: new Map(), tourismTo: new Map(),
@@ -1340,6 +1343,21 @@ export function advanceHistory(h: History, rec: TurnRecord, cat: Catalog): void 
   for (const r of Array.isArray(logged) ? logged : []) {
     if (Array.isArray(r) && r[2] === 'GovernorAssigned') h.govSeated.set(`${r[5]}:${r[6]}`, r[1] as number);
   }
+  // a capture: [.., turn, kind, victim's player, victim's id, .., captor's
+  // player], the captive re-added under the captor just before it
+  // (`UnitAddedToMap`: [.., kind, player, id, x, y]); the captive's original
+  // owner is the victim's player (unit +0x340, 0x212825), which the record's
+  // units do not show (runs/h1_duelp1124 t111: city-state 4's Builder
+  // 1114113 taken as the barbarians' 5111833, embarked on city-state 4's
+  // Sailing on 37:10 t133-137)
+  const rows = Array.isArray(logged) ? (logged as unknown[][]) : [];
+  rows.forEach((r, i) => {
+    if (!Array.isArray(r) || r[2] !== 'UnitCaptured') return;
+    const added = rows.slice(Math.max(0, i - 8), i).reverse().find((x) => Array.isArray(x) && x[2] === 'UnitAddedToMap' && x[3] === r[6]);
+    if (added) h.captives.set(`${added[3]}:${added[4]}`, r[3] as number);
+  });
+  const held = new Set(rec.units.map((u) => `${u.owner}:${u.id}`));
+  for (const k of [...h.captives.keys()]) if (!held.has(k)) h.captives.delete(k);
   // a resource a player reads paying its yield without the revealing
   // technology: the grant (`GP_RESOURCE_REVEAL`) where the records name no
   // great person, and a reading no random event made either way. An unowned
@@ -2659,6 +2677,8 @@ export function importTurn(rec: TurnRecord, cat: Catalog, history?: History): Im
     if (history?.fionn.has(`${u.owner}:${u.id}`) && fionnChassis(unit.type)) unit.fionn = true;
     const levy = history?.levied.get(`${u.owner}:${u.id}`);
     if (levy !== undefined && seatOfGame(levy) !== NO_SEAT) unit.leviedFrom = seatOfGame(levy);
+    const taken = history?.captives.get(`${u.owner}:${u.id}`);
+    if (taken !== undefined && seatOfGame(taken) !== NO_SEAT && seatOfGame(taken) !== unit.seat) unit.originalOwner = seatOfGame(taken);
     state.units.push(unit);
     unitByKey.set(`${u.owner}:${u.id}`, unit);
     // the levy in force: the major holding the minor's army, and its term

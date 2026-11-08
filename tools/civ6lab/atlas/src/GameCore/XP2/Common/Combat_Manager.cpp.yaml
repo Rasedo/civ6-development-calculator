@@ -534,6 +534,7 @@
     - gpu/core/sim_seats.py:_capture_beaten
     - cpu/core/units.ts:captureAnew
     - gpu/core/sim_seats.py:_capture_anew
+    - cpu/harness/import.ts:rows
   readings:
     - "C-129: a killed player's records forgotten; a capture's new unit; an air strike's record — READ (0x534c50, 0x787fc0 -> 0x5ee370, 0x212500's create), both twins; the replay's later-player timings"
     - "H-1: a civilian stepped on — READ"

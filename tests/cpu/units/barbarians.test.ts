@@ -6,7 +6,7 @@ import { spawnUnit } from '../../../cpu/core/units';
 import { barbScoutLook, barbarianRules, barbarianTechs, barbSlots, barbUnitFor, raiseCamp, ringPlots, tribeKindAt } from '../../../cpu/core/barbarians';
 import { barbOp, barbOpStart } from '../../../cpu/core/barbarianOps';
 import { addMember } from '../../../cpu/core/operations/operation';
-import { barbarianTactics, plotDistance, refreshBarbarians } from '../../../cpu/core/tactical';
+import { barbarianTactics, plotDistance, refreshBarbarians, traceTactics } from '../../../cpu/core/tactical';
 import { BARB_TRIBES } from '../../../cpu/data/barbarians';
 import type { GameState, Unit } from '../../../cpu/core/types';
 
@@ -224,7 +224,7 @@ describe("a raid's tree", () => {
   }
 
   it('marches on the target, raids there, goes home and lists the city', () => {
-    const { state, camp, city, tribe, op, w, tick, to } = scene();
+    const { state, city, tribe, op, w, tick, to } = scene();
     const dist = (u: Unit) => plotDistance(state, u.tileIndex, city.centerIndex);
     const before = w.map(dist);
     tick();
@@ -241,13 +241,20 @@ describe("a raid's tree", () => {
     tribe.score = 10;
     tick();
     expect(op.mem[0].resume).toBe(22);
-    // home: Notify Owner lists the city, the tree ends its operation
+    // home: Notify Owner lists the city, the tree ends its operation, which
+    // holds its units no more: the pass takes the Movement they kept
     to(w[0], 5, 10);
     to(w[1], 4, 11);
-    tick();
+    const moved: Unit[] = [];
+    traceTactics((u) => { if (w.includes(u)) moved.push(u); });
+    try {
+      tick();
+    } finally {
+      traceTactics(null);
+    }
     expect(barbOp(state, op.id)).toBeNull();
     expect(tribe.assaultTargets).toEqual([{ seat: 0, plot: city.centerIndex }]);
-    expect(plotDistance(state, w[0].tileIndex, camp.index)).toBeLessThanOrEqual(1);
+    expect(moved).toContain(w[0]);
   });
 
   it('ends once no unit of it lives through its raid', () => {
