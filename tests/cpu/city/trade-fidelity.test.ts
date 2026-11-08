@@ -103,6 +103,8 @@ function addCiv(state: GameState, col: number, row: number, opts: Partial<Seat> 
   }
   civ.cities.push(city);
   state.seats.push(civ);
+  // a route asks the two players have met (`tradeMet`, 0x553410)
+  meetAll(state);
   return civ;
 }
 
@@ -842,10 +844,11 @@ describe('the route path term (transportation efficiency)', () => {
     expect(r.course!.length).toBe(3);
     // 15 of 3 plots saturates: the whole of D
     expect(routePathGold(state, 0, r, 4)).toBe(4);
-    // a longer walk: 15 over its n plots
-    const rf = coursed(state, from, tileAtCoords(state.map, 31, 5).index);
+    // a longer walk: 15 over its n plots; the range (TRADE_BASE_RANGE steps,
+    // no refuel off a city) ends it at 15 steps, 16 plots
+    const rf = coursed(state, from, tileAtCoords(state.map, 24, 5).index);
     const n = rf.course!.length;
-    expect(n).toBe(23);
+    expect(n).toBe(16);
     expect(routePathGold(state, 0, rf, 4)).toBe((4 * Math.min(256, Math.floor((256 * 15) / n))) / 256);
   });
 });
