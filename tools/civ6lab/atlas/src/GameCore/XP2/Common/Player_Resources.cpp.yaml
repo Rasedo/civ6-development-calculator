@@ -205,6 +205,7 @@
     - cpu/harness/import.ts:importPower
     - cpu/core/minorBuild.ts:minorPhase
     - gpu/core/sim_seats.py:_seat_cap_stockpile
+    - cpu/core/minorBuild.ts:prev
   readings: ["H-1: the luxury allocation's rebuilds — PARTLY READ"]
   context:
     - "...::Processor::DoTurnDeactivate 0x7eb60 -> 0x4e4ad0, which tail-jumps to Player_Resources 0x4a8f10): for each accumulated resource, the stockpile less the player's reserved amount (0x4..."

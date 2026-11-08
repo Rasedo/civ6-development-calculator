@@ -9118,3 +9118,33 @@ Units" trees, and the pool from the controls the look lists.
   contract and the Scout over the Field Cannon; runs/h1_duely1128 Hong Kong
   t79 (net -1 -> +1) the Warrior over the Archer, whose Maintenance 1 at the
   t78 boost 0.2 takes its 8.04 below the Warrior's 7.78.
+
+## C-98: a unit off the map counts on its owner's list until its end of turn
+
+- THE DELAYED KILL 0x4ef040 (37 callers: the unit commands — delete,
+  upgrade, plunder —, the spy's loss, a Great Person's activation, a levy)
+  sets the unit's dead flag (unit +0x770, the watched field +0x718, the
+  serialized m_bDelayedDeath) and takes it off the map (0x586a90); the unit
+  stays on its player's list (+0xd8). THE DESTROY 0x4ef100 also erases it
+  from the container (+0xa0, 0x4f32d0). The owner's end of turn
+  (Player::Processor::EndTurn 0x7ecc0 at 0x7ede9 -> 0x4e44e0 -> 0x4ef6d0)
+  gathers the flagged units over the list and destroys each.
+- The count of a type 0x4f2c90 walks the list and reads no dead flag, so a
+  unit the delayed kill took counts until its owner's next end of turn:
+  `minorListedUnits` (the units standing plus those the last end of turn
+  listed, `CityState.unitsListed`, `minorEndTurnList`) in the research
+  value's upgrade sources (`minorUnitTerm`); GPU `unit_list_seat` /
+  `unit_list_type`, `citystate_list_count`, `_minor_end_turn_list`,
+  `_minor_listed_units` in `_rai_unit_term`. A combat's dead leaves the list
+  at once (`killUnit`; `_dig_at`'s slots). runs/h1_duely1124 city-state 3
+  t68: its Warrior levied by player 1 before its turn, Iron Working 241.2 as
+  logged, 221.2 at t69 (city-state 4 t69 alike); runs/h1_duely1128
+  city-state 3 t133: two units the damage after the barbarians' turn of t132
+  killed, Gunpowder 281.1; t132 a unit deleted in its own turn before its
+  analysis, 207.4; 1127 city-state 4 t54, 1117 city-state 4 t62 and 3 t74
+  (levies) as logged; runs/h1_duely1124 city-state 4 t55: its Warrior the
+  barbarians killed in combat in t54 not counted, 124.7.
+- Open: which combat kills take the destroy (the combat's kill path not
+  read; every logged UnitKilledInCombat behaves so); the military AI's unit
+  production table (0x7989e0, its +0x20 counts and the obsolete entry's
+  hold) left on the units standing, no case telling the two apart.

@@ -391,6 +391,9 @@ class SimInit:
         self.citystate_unit_values = torch.full((B, s_pad, len(rules.ai_city_build["units"])), -9999 * 256,
                                                 dtype=torch.long, device=device)
         self.citystate_unit_on = torch.zeros(B, s_pad, dtype=torch.bool, device=device)
+        # its unit list's units by type as its last end of turn left it
+        # (`CityState.unitsListed`, `_minor_end_turn_list`)
+        self.citystate_list_count = torch.zeros(B, s_pad, len(rules.units) or 1, dtype=torch.long, device=device)
         # its BUILDINGS and PROJECTS tables as its city's update of the turn
         # left them, its second hook's (`CityState.buildingValues`, `projectValues`)
         self.citystate_building_values = torch.full((B, s_pad, len(rules.ai_city_build["buildings"])), -9999 * 256,
@@ -1531,6 +1534,11 @@ class SimInit:
             # its place in a city-state's or the Free Cities' unit pool (`poolSlots`,
             # the order their tactical AI walks their units in), -1 none yet
             ("pslot", torch.long),
+            # on a city-state's unit list as its last end of turn left it: the
+            # minor's seat (-1 none) and the unit's type then
+            # (`CityState.unitsListed`, `_minor_end_turn_list`)
+            ("list_seat", torch.long),
+            ("list_type", torch.long),
         ):
             _base = torch.zeros(B, self.UNIT_MAX, dtype=_dt, device=device)
             setattr(self, f"unit_{_pl}", _base)
@@ -1549,6 +1557,7 @@ class SimInit:
         self.unit_patrol.fill_(-1)
         self.unit_free_city.fill_(-1)
         self.unit_pslot.fill_(-1)
+        self.unit_list_seat.fill_(-1)
         self.unit_levy_src.fill_(-1)
         self.unit_orig_owner.fill_(-1)
         self.unit_spy_mission.fill_(self._spy_idle)

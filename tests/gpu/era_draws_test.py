@@ -165,7 +165,7 @@ def test_dig_civilization(rules, path) -> None:
     gd = torch.tensor([0], dtype=torch.long, device=sim.device)
     td = torch.tensor([land], dtype=torch.long, device=sim.device)
     victim = torch.tensor([BARB_SEAT], dtype=torch.long, device=sim.device)
-    sim._dig_at(gd, td, victim)  # a BARBARIAN dies here
+    sim._dig_at(gd, td, victim, torch.zeros(1, dtype=torch.long, device=sim.device))  # a BARBARIAN dies here
     assert bool(sim.antiquity[0, land]), "no dig was stamped"
     assert int(sim.antiquity_seat[0, land]) == BARB_SEAT, \
         f"the dig recorded seat {int(sim.antiquity_seat[0, land])}, not the dead unit's"
@@ -176,7 +176,7 @@ def test_dig_civilization(rules, path) -> None:
     sea = int(sim.water[0].nonzero()[0])
     gd2 = torch.tensor([0], dtype=torch.long, device=sim.device)
     td2 = torch.tensor([sea], dtype=torch.long, device=sim.device)
-    sim._dig_at(gd2, td2, torch.zeros(1, dtype=torch.long, device=sim.device))
+    sim._dig_at(gd2, td2, torch.zeros(1, dtype=torch.long, device=sim.device), torch.zeros(1, dtype=torch.long, device=sim.device))
     assert bool(sim.shipwreck[0, sea]), "no wreck was stamped"
     assert int(sim.shipwreck_seat[0, sea]) == 0
     print("  _dig_at OK: the EVENT's civilization, the ACTOR's era")

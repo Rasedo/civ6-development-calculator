@@ -102,7 +102,7 @@
   kind: function
   semantics: Player_Trade's era handler (-> the roads' upgrade 0x5134c0).
   status: PARTLY
-  impl: [cpu/core/eras.ts:upgradeRoads, cpu/core/minorBuild.ts:minorPhase]
+  impl: [cpu/core/eras.ts:upgradeRoads, cpu/core/minorBuild.ts:minorPhase, cpu/core/minorBuild.ts:prev]
   readings:
     - "C-95: the roads' type per plot — READ (Route_Builder, Player_Trade, Trade_Manager, Rules_Movement), both twins"
     - "C-127: a city-state's roads re-laid at its research step"

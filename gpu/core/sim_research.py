@@ -415,10 +415,9 @@ class SimResearch:
             return out
         tab = self.citystate_unit_values[:, s]
         on = self.citystate_unit_on[:, s]
-        seat = 100 + s
         row = self._CITY_MINOR0 + s
-        mine = self.major_unit_alive & (self.major_unit_seat == seat)
-        ut = self.major_unit_type.clamp(min=0, max=self.NU - 1)
+        # the units its list holds (`minorListedUnits`)
+        listed = self._minor_listed_units(s)
         floor = 20 * _FX
         cap = 50 * _FX
         for i, ks in rows.items():
@@ -435,7 +434,7 @@ class SimResearch:
                 if eng < 0:
                     continue
                 for src in (self._type_up_to == eng).nonzero(as_tuple=True)[0].tolist():
-                    n = (mine & (ut == src)).sum(dim=1)
+                    n = listed[:, src]
                     if not bool(n.count_nonzero()):
                         continue
                     gold = self._upgrade_gold_cost(row, torch.full((self.B,), src, dtype=torch.long, device=self.device),

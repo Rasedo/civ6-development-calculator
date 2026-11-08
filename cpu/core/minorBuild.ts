@@ -112,9 +112,14 @@ import { opsOf } from './operations/manager';
  *  ranged strikes after its units' planning), and last the
  *  boosts the turn earned (`detectBoosts`). */
 export function minorPhase(state: GameState): void {
+  let prev: CityState | undefined;
   for (const cityState of state.cityStates) {
     atRngPoint(state, { kind: 'seat', seat: cityState.seat, turn: state.turn });
     minorStart?.(state, cityState);
+    // the minor before it ends its turn as the players before this one stand
+    // (the replay's hook lands their turns here; nothing moves otherwise)
+    if (prev) minorEndTurnList(state, prev);
+    prev = cityState;
     minorLevyReturn(state, cityState);
     minorPower(state, cityState);
     const techs = minorEconomy(state, cityState);
@@ -222,9 +227,47 @@ export function minorPhase(state: GameState): void {
     // the boosts its turn earned (runs/h1_duelw1117 t1: every city-state
     // takes Pottery before its coastal city's Sailing eureka lands)
     detectBoosts(state, cityState.seat);
-    // its turn's end holds each stockpile to its cap (0x4a8f10)
+    // its turn's end holds each stockpile to its cap (0x4a8f10) and erases
+    // its dead from its unit list (`minorEndTurnList`)
     capStockpiles(state, cityState.seat);
+    minorEndTurnList(state, cityState);
   }
+}
+
+/** THE MINOR'S END OF TURN on its unit list (Player::Processor::EndTurn
+ *  0x7ecc0 -> 0x4e44e0 -> Player_Units 0x4ef6d0): the units killed since
+ *  its last by the delayed kill (0x4ef040, unit +0x770: the unit commands,
+ *  a levy, the turn's damage) are destroyed (0x4ef100 -> 0x4f32d0), so the
+ *  list holds the units standing now; a combat's dead leaves it at once
+ *  (`killUnit`) */
+function minorEndTurnList(state: GameState, cityState: CityState): void {
+  const listed: Record<number, string> = {};
+  for (const u of state.units) if (u.seat === cityState.seat) listed[u.id] = u.type;
+  cityState.unitsListed = listed;
+}
+
+/** A MINOR'S UNIT LIST BY TYPE, as its counts walk it (0x4f2c90 over the
+ *  player's list +0xd8, the dead flag unread): its units standing and those
+ *  its last end of turn listed that are no longer its own on the map —
+ *  levied, deleted, killed off a combat — until its next
+ *  (`minorEndTurnList`). runs/h1_duely1124 city-state 3 t68: its Warrior
+ *  levied by Rome before its turn, Iron Working's upgrade source 241.2 as
+ *  logged, 221.2 at t69; runs/h1_duely1128 city-state 3 t133: the two units
+ *  the damage after the barbarians' turn of t132 killed, Gunpowder 281.1 as
+ *  logged; runs/h1_duely1124 city-state 4 t55: its Warrior the barbarians
+ *  killed in t54 not counted, 124.7 as logged. Engine unit types. */
+export function minorListedUnits(state: GameState, cityState: CityState): Map<string, number> {
+  const n = new Map<string, number>();
+  const mine = new Set<number>();
+  for (const u of state.units) {
+    if (u.seat !== cityState.seat) continue;
+    mine.add(u.id);
+    n.set(u.type, (n.get(u.type) ?? 0) + 1);
+  }
+  for (const [id, type] of Object.entries(cityState.unitsListed ?? {})) {
+    if (!mine.has(Number(id))) n.set(type, (n.get(type) ?? 0) + 1);
+  }
+  return n;
 }
 
 /**
@@ -1609,12 +1652,13 @@ const UNIT_CITY_VALUE_CAP = fxConst(50);
  * the unit's domain, the average of the City Analysis unit values above 0
  * (0x5d4cd0) — a technology's (0x7b3e50) each at most 50.0 and the average
  * taken 10 times, a civic's (0x7a9a10) as they stand and once; and per
- * upgrade source of the unit (UnitUpgrades), each of the minor's units of it
- * (0x4f2c90) adds that average less the upgrade's Gold valued as a yield
+ * upgrade source of the unit (UnitUpgrades), each of the units its list holds
+ * (0x4f2c90, `minorListedUnits`) adds that average less the upgrade's Gold valued as a yield
  * (0x5376d0 -> 0x7a6690), at least 20.0.
  */
 function minorUnitTerm(state: GameState, cityState: CityState, table: readonly (number | null)[] | undefined): (units: readonly AiUnitRow[], civic: boolean) => number {
   let facts: CityBuildFacts | undefined;
+  let listed: Map<string, number> | undefined;
   return (units, civic) => {
     let v = 0;
     for (const u of units) {
@@ -1628,7 +1672,7 @@ function minorUnitTerm(state: GameState, cityState: CityState, table: readonly (
       const id = engineId('unit', u.type, 'UNIT_', UNITS);
       for (const src of Object.values(UNITS)) {
         if (!id || src.upgradesTo !== id) continue;
-        const n = state.units.filter((x) => x.seat === cityState.seat && x.type === src.id).length;
+        const n = (listed ??= minorListedUnits(state, cityState)).get(src.id) ?? 0;
         if (n === 0) continue;
         const gold = yieldValue(facts.view, cityState.seat, upgradeGoldCost(state, cityState.seat, src.id, id) * FX, 'YIELD_GOLD');
         v += n * Math.max(avg - gold, UPGRADE_SOURCE_FLOOR);

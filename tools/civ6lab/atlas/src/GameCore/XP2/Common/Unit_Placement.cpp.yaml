@@ -361,6 +361,14 @@
   context:
     - "...PLANNING'S GROUND, beside the barbarians': the list (0x26d890) keeps a plot only where 0x586900 lets the unit end — another player's unit at peace it passes and never ends on (runs/h1..."
   review: reviewed
+- addr: 0x586a90
+  final: 0x3b0fd0
+  kind: function
+  status: PARTLY
+  readings: ["C-98: a unit off the map counts on its owner's list until its end of turn"]
+  context:
+    - ...70, the watched field +0x718, the serialized m_bDelayedDeath) and takes it off the map (0x586a90); the unit stays on its player's list (+0xd8). THE DESTROY 0x4ef100 also erases it fr...
+  review: imported
 - addr: 0x586d40
   final: 0x3b11b0
   kind: function

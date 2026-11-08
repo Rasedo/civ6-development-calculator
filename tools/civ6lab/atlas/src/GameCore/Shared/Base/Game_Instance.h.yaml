@@ -30,6 +30,7 @@
     - cpu/harness/checks.ts:standing
     - cpu/harness/import.ts:luxuryCards
     - cpu/core/minorBuild.ts:minorPhase
+    - cpu/core/minorBuild.ts:prev
   readings:
     - "H-1: every draw of a player's start (witnesses, RandCalls.csv)"
     - "H-1: the luxury allocation's rebuilds — PARTLY READ"

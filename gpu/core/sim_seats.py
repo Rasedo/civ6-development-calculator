@@ -4130,7 +4130,7 @@ class SimSeats:
         gd, td = g[dead], ttc[g[dead]]
         if len(gd) > 0:
             self.unit_alive[gd, ds[dead]] = False
-            self._dig_at(gd, td, d_seat[gd])
+            self._dig_at(gd, td, d_seat[gd], ds[dead])
             self._occ_clear(gd, td, ds[dead])
             self._unit_kill_event(a_seat, d_type, d_seat == BARB_SEAT, d_died, at0,
                                   vict_form=self._form_tier(ds0), killer_promos=a_promos,
@@ -12809,7 +12809,7 @@ class SimSeats:
             if bool(atk_dead.count_nonzero()):
                 ar = atk_dead.nonzero(as_tuple=True)[0]
                 a_alive[:, u] = a_alive[:, u] & ~atk_dead
-                self._dig_at(ar, here[ar], a_seat[ar, u])
+                self._dig_at(ar, here[ar], a_seat[ar, u], torch.full_like(ar, u + self.POOL_LO[atk_kind]))
                 self._occ_clear(ar, here[ar], torch.full_like(ar, u + a_lo))
             # the victor's ADVANCE is a move onto the plot it emptied, which
             # takes the hostile civilians the fallen fighter guarded
@@ -14016,7 +14016,7 @@ class SimSeats:
             dr = died.nonzero(as_tuple=True)[0]
             _as = self._atk_seat(atk_kind, u)[dr]
             a_alive[:, u] = a_alive[:, u] & ~died
-            self._dig_at(dr, a_tile[dr, u], _as)
+            self._dig_at(dr, a_tile[dr, u], _as, torch.full_like(dr, u + self.POOL_LO[atk_kind]))
             self._occ_clear(dr, a_tile[dr, u], torch.full_like(dr, u + self.POOL_LO[atk_kind]))
 
     def _plot_defense_mod(self, tiles: torch.Tensor) -> torch.Tensor:
@@ -14158,7 +14158,7 @@ class SimSeats:
                 self._unit_kill_event(row, self.unit_type[b_[j], u_[j]].reshape(1).expand(B),
                                       (ds[j] == BARB_SEAT).reshape(1).expand(B), one,
                                       vict_form=self.unit_formation[b_[j], u_[j]].reshape(1).expand(B))
-            self._dig_at(b_, dt, ds)
+            self._dig_at(b_, dt, ds, u_)
             self._occ_clear(b_, dt, u_)
             self.unit_alive[b_, u_] = False
             self._rp_kill_version += 1
@@ -14349,7 +14349,7 @@ class SimSeats:
             die = ~take & ~moved
             if bool(die.count_nonzero()):
                 dr, ds = hr[die], hs[die]
-                self._dig_at(dr, ht[die], self.unit_seat[dr, ds])
+                self._dig_at(dr, ht[die], self.unit_seat[dr, ds], ds)
                 self._occ_clear(dr, ht[die], ds)
                 self.unit_alive[dr, ds] = False
                 self._gen_ver += 1
@@ -14917,7 +14917,7 @@ class SimSeats:
         if bool(died.count_nonzero()):
             dr = died.nonzero(as_tuple=True)[0]
             a_alive[:, u] = a_alive[:, u] & ~died
-            self._dig_at(dr, a_tile[dr, u], a_seat[dr, u])
+            self._dig_at(dr, a_tile[dr, u], a_seat[dr, u], torch.full_like(dr, u + self.POOL_LO[atk_kind]))
             self._occ_clear(dr, a_tile[dr, u], torch.full_like(dr, u + self.POOL_LO[atk_kind]))
         return rows, hrow, slot, died, ttc
 
@@ -14938,7 +14938,7 @@ class SimSeats:
                 continue
             ri, si = hit.nonzero(as_tuple=True)
             gr = rows[ri]
-            self._dig_at(gr, centres[ri], seats[ri, si])
+            self._dig_at(gr, centres[ri], seats[ri, si], si + self.POOL_LO[pool])
             getattr(self, f"{pool}_unit_alive")[gr, si] = False
             self._vacate(pool, gr, si)
 
@@ -15100,7 +15100,7 @@ class SimSeats:
         if bool(atk_dead.count_nonzero()):
             ar = atk_dead.nonzero(as_tuple=True)[0]
             a_alive[:, u] = a_alive[:, u] & ~atk_dead
-            self._dig_at(ar, here[ar], a_seat[ar, u])
+            self._dig_at(ar, here[ar], a_seat[ar, u], torch.full_like(ar, u + self.POOL_LO[atk_kind]))
             self._occ_clear(ar, here[ar], torch.full_like(ar, u + self.POOL_LO[atk_kind]))
         self._ww_battle(att, self._row_of(a_seat[:, u]), self._row_of(100 + citystate_sc), tgt,
                         a_died=atk_dead, city=True)
@@ -15135,7 +15135,7 @@ class SimSeats:
             self.unit_alive[gd, ds[dead]] = False
             # a combat death leaves a DIG on the tile the dead unit stood on —
             # `combat.ts:killUnit`, not only at a razed outpost.
-            self._dig_at(gd, td, d_seat.take(gd))
+            self._dig_at(gd, td, d_seat.take(gd), ds[dead])
             if bool(dead.count_nonzero()):
                 self._rp_kill_version += 1
         # a surviving MILITARY defender banks the flat defense base; the
@@ -15241,7 +15241,7 @@ class SimSeats:
             gd, td = rows[dead], tile_c[rows[dead]]
             self.unit_alive[gd, ds[dead]] = False
             self._occ_clear(gd, td, ds[dead])
-            self._dig_at(gd, td, self.unit_seat[gd, ds[dead]])
+            self._dig_at(gd, td, self.unit_seat[gd, ds[dead]], ds[dead])
         a_hp[:, u] = a_new
         atk_dead = att & (a_hp[:, u] <= 0)
         # The WAR DEPARTMENT's heal, both ways: the attacker whose blow landed
@@ -15492,7 +15492,7 @@ class SimSeats:
                 dead = self.unit_hp[g, ds] <= 0
                 gd, td = g[dead], ttc[g[dead]]
                 self.unit_alive[gd, ds[dead]] = False
-                self._dig_at(gd, td, d_seat[gd])
+                self._dig_at(gd, td, d_seat[gd], ds[dead])
                 # Clearing both maps is branch-free and exact: only one of them is
                 # set on that tile.
                 self._occ_clear(gd, td, ds[dead])
@@ -15717,7 +15717,7 @@ class SimSeats:
             dead = self.unit_hp[g, ds] <= 0
             gd, td = g[dead], ttc[g[dead]]
             self.unit_alive[gd, ds[dead]] = False
-            self._dig_at(gd, td, d_seat[gd])
+            self._dig_at(gd, td, d_seat[gd], ds[dead])
             # Clearing both maps is branch-free and exact: only one of them is
             # set on that tile.
             self._occ_clear(gd, td, ds[dead])

@@ -88,6 +88,7 @@
     - cpu/core/minorCityAi.ts:minorMilitaryTurn
     - gpu/core/sim_minorai.py:_minor_military_turn
     - cpu/core/minorCityAi.ts:minorEconomicDisband
+    - cpu/core/minorBuild.ts:prev
   readings:
     - "C-96: the city update's analysis reads the Economic AI's Gold boost of the turn before"
     - "C-130: the Economic AI's disband of a falling treasury — READ (0x6877d0 from the savings turn 0x688b45..0x688e71, the delete command's can-start 0x948370), both twins"

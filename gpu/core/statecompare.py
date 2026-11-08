@@ -1080,6 +1080,7 @@ CITY_STATE = {
     "minorUnitStrength": lambda sim, b, rows: [int(sim.citystate_unit_strength[b, s]) for s in rows],
     "minorArmyAged": lambda sim, b, rows: [int(sim.citystate_kb_aged[b, s]) for s in rows],
     "minorEnemyCounts": lambda sim, b, rows: [_enemy_counts(sim, b, s) for s in rows],
+    "minorUnitsListed": lambda sim, b, rows: [[x for t, n in enumerate(sim.citystate_list_count[b, s].tolist()) if n > 0 for x in (t, int(n))] for s in rows],
     "minorRevealed": lambda sim, b, rows: [[int(p) for p in sim.mops_revealed[b, s].nonzero(as_tuple=True)[0].tolist()]
                                            for s in rows],
     "minorSavings": lambda sim, b, rows: [[int(x) for x in sim.citystate_savings[b, s].tolist()] + [int(sim.citystate_balance[b, s]),

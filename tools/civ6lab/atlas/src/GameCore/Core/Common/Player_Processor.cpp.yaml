@@ -19,8 +19,10 @@
   kind: function
   name: Player::Processor::EndTurn
   status: PARTLY
+  impl: [cpu/core/minorBuild.ts:minorEndTurnList, cpu/core/types.ts:CityState]
   readings:
     - "H-1: why a seed does not replay — the AI's worker threads — READ, the replay patch MEASURED"
+    - "C-98: a unit off the map counts on its owner's list until its end of turn"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ...ed profiler (0x8c05a0 / 0x8c0640) and timing totals (0x5bce20, Player::Processor::EndTurn 0x7ed0a); none is compared to a limit.

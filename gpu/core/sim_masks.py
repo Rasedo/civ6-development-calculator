@@ -2874,6 +2874,7 @@ class SimMasks:
             unit_type[rows] if isinstance(unit_type, torch.Tensor) else unit_type)
         self.barb_unit_free_city[rows, slot] = -1 if home is None else home[rows]
         self.barb_unit_pslot[rows, slot] = -1  # no pool slot until its player's pass (`poolSlots`)
+        self.barb_unit_list_seat[rows, slot] = -1
         # no tribe's until the raise that made it says so (`_barb_raise`)
         self.barb_unit_tribe[rows, slot] = -1
         self.barb_unit_scout[rows, slot] = False
@@ -3633,6 +3634,7 @@ class SimMasks:
         getattr(self, f"{pre}_unit_alive")[rows, slot] = True
         self.major_unit_seat[rows, slot] = seat
         self.major_unit_pslot[rows, slot] = -1  # no pool slot until its player's pass (`poolSlots`)
+        self.major_unit_list_seat[rows, slot] = -1  # on no unit list until its owner's end of turn
         getattr(self, f"{pre}_unit_type")[rows, slot] = type_idx.take(rows)
         getattr(self, f"{pre}_unit_tile")[rows, slot] = spot.take(rows)
         # a city-state's knowledge base records the unit it made (`spawnUnit`)
@@ -3767,7 +3769,7 @@ class SimMasks:
         return can
 
 
-    def _dig_at(self, gd: torch.Tensor, td: torch.Tensor, civ) -> None:
+    def _dig_at(self, gd: torch.Tensor, td: torch.Tensor, civ, slots: torch.Tensor) -> None:
         """Mark a DIG for the games in `gd` on the tiles in `td` — the
         row-index form of `_mark_antiquity`, which takes a [B] mask.
         Every COMBAT death goes through here, exactly as every TS combat death
@@ -3776,9 +3778,18 @@ class SimMasks:
 
         `civ` is the EVENT's own civilization as a SEAT id: the unit that
         died, or the barbarians whose outpost was razed — an int or a tensor
-        ALIGNED WITH `gd`, like `td`."""
+        ALIGNED WITH `gd`, like `td`. `slots` are the dead units' merged
+        slots, aligned with `gd`: a combat's dead leaves its owner's unit
+        list at once (`killUnit`, `_minor_listed_units`)."""
         if len(gd) == 0:
             return
+        ls = self.unit_list_seat[gd, slots]
+        on = (ls >= 100) & (ls < 100 + self.citystate_list_count.shape[1])
+        if bool(on.count_nonzero()):
+            g = gd[on]
+            self.citystate_list_count.index_put_((g, ls[on] - 100, self.unit_list_type[g, slots[on]]),
+                                                 torch.full_like(g, -1), accumulate=True)
+        self.unit_list_seat[gd, slots] = -1
         m = torch.zeros(self.B, dtype=torch.bool, device=self.device)
         m[gd] = True
         t = torch.full((self.B,), -1, dtype=torch.long, device=self.device)

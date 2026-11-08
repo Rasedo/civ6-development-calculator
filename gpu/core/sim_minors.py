@@ -106,7 +106,41 @@ class SimMinors:
             self._minor_knowledge(s, False)
             # the boosts its turn earned
             self._detect_minor_boosts(s, alive)
+            # its turn's end holds each stockpile to its cap and erases its
+            # dead from its unit list
             self._seat_cap_stockpile(self._CITY_MINOR0 + s)
+            self._minor_end_turn_list(s, alive)
+
+    def _minor_end_turn_list(self, s: int, alive: torch.Tensor) -> None:
+        """`minorEndTurnList`: city-state `s`'s unit list as its end of turn
+        leaves it, the units standing now (the delayed kill's dead erased) —
+        each slot's listing seat and type, and the count by type"""
+        seat = 100 + s
+        lo, hi = self.POOL_LO["major"], self.POOL_HI["major"]
+        ls = self.unit_list_seat[:, lo:hi]
+        mine = self.major_unit_alive & (self.major_unit_seat == seat)
+        a = alive.unsqueeze(1)
+        ls.copy_(torch.where(a & mine, torch.full_like(ls, seat), torch.where(a & (ls == seat), torch.full_like(ls, -1), ls)))
+        lt = self.unit_list_type[:, lo:hi]
+        lt.copy_(torch.where(a & mine, self.major_unit_type, lt))
+        cnt = torch.zeros_like(self.citystate_list_count[:, s])
+        cnt.scatter_add_(1, self.major_unit_type.clamp(min=0), mine.long())
+        self.citystate_list_count[:, s] = torch.where(a, cnt, self.citystate_list_count[:, s])
+
+    def _minor_listed_units(self, s: int) -> torch.Tensor:
+        """`minorListedUnits` [B, NU]: city-state `s`'s units by type as its
+        counts walk its list — those standing, and those its last end of
+        turn listed that are no longer its own on the map"""
+        seat = 100 + s
+        lo, hi = self.POOL_LO["major"], self.POOL_HI["major"]
+        mine = self.major_unit_alive & (self.major_unit_seat == seat)
+        ut = self.major_unit_type.clamp(min=0)
+        now = torch.zeros_like(self.citystate_list_count[:, s])
+        now.scatter_add_(1, ut, mine.long())
+        kept = mine & (self.unit_list_seat[:, lo:hi] == seat)
+        stay = torch.zeros_like(now)
+        stay.scatter_add_(1, self.unit_list_type[:, lo:hi].clamp(min=0), kept.long())
+        return now + self.citystate_list_count[:, s] - stay
 
     def _detect_minor_boosts(self, s: int, active: torch.Tensor) -> None:
         """`detectBoosts` for city-state `s`: every trigger read off the state

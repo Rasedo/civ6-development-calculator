@@ -3057,6 +3057,19 @@
           "note": "the minor's knowledge base's enemy unit counts as its last ageing left them (`knowledgeLook`): per unit type the records of the units of the players at war with it, the barbarians left out, as (unit type, count) by unit type"
         },
         {
+          "name": "minorUnitsListed",
+          "compare": "exact",
+          "covers": [
+            "CityState.unitsListed"
+          ],
+          "planes": [
+            "citystate_list_count",
+            "unit_list_seat",
+            "unit_list_type"
+          ],
+          "note": "the minor's unit list as its last end of turn left it, less the combat's dead since (`minorEndTurnList`, `killUnit`): (unit type, count) by unit type"
+        },
+        {
           "name": "minorRevealed",
           "compare": "exact",
           "covers": [

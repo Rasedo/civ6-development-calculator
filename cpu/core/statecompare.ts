@@ -384,6 +384,12 @@ const treePoolRecord = (s: Seat | undefined, seat: number): number[] => [s?.opsN
  *  unit index, flat */
 const enemyCountsRecord = (n: Record<string, number> | undefined): number[] =>
   Object.entries(n ?? {}).map(([t, c]) => [idx(UNIT_IDX, t), c]).sort((a, b) => a[0] - b[0]).flat();
+/** a minor's unit list (unit id -> type) as counts by type */
+const listedCounts = (listed: Record<number, string> | undefined): Record<string, number> => {
+  const n: Record<string, number> = {};
+  for (const t of Object.values(listed ?? {})) n[t] = (n[t] ?? 0) + 1;
+  return n;
+};
 /** a district project's converted yield as [yield index, amount], [-1, 0] for none */
 const projectYieldCols = (p: ProjectYield | undefined): number[] =>
   (p ? [YIELD_KEYS.indexOf(p.key), p.amount] : [-1, 0]);
@@ -1103,6 +1109,7 @@ const CITY_STATE_G: Record<string, Extractor> = {
   minorUnitStrength: overCityStates((cityState) => cityState.unitStrength ?? 0),
   minorArmyAged: overCityStates((cityState) => cityState.armyAged ?? -1),
   minorEnemyCounts: overCityStates((cityState) => enemyCountsRecord(cityState.enemyCounts)),
+  minorUnitsListed: overCityStates((cityState) => enemyCountsRecord(listedCounts(cityState.unitsListed))),
   minorRevealed: overCityStates((cityState) => (cityState.revealed ?? []).flatMap((v, p) => (v === 1 ? [p] : []))),
   minorSavings: overCityStates((cityState) => [...(cityState.economy?.savings ?? [0, 0, 0, 0]), cityState.economy?.balance ?? 0,
     cityState.economy?.goldBoost ?? 0]),

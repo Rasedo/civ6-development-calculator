@@ -66,6 +66,7 @@
     - cpu/core/eras.ts:upgradeRoads
     - cpu/core/minorBuild.ts:minorPhase
     - gpu/core/sim_seats.py:_upgrade_roads
+    - cpu/core/minorBuild.ts:prev
   readings:
     - "C-95: the roads' type per plot — READ (Route_Builder, Player_Trade, Trade_Manager, Rules_Movement), both twins"
     - "C-127: a city-state's roads re-laid at its research step"

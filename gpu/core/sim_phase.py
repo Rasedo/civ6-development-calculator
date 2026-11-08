@@ -3173,8 +3173,9 @@ class SimPhase:
 
     #: Reset on an ownership change: a captured unit never carries its old
     #: fortification, its old owner's aura, or movement — movesLeft = 0
-    #: (acted) so the heal skips it this turn.
-    _CAPTURE_RESET = {"fortify": 0, "aura_mp": 0, "mp": 0, "pslot": -1}
+    #: (acted) so the heal skips it this turn. The new slot is on no unit
+    #: list; the old one stays on its owner's (`CityState.unitsListed`).
+    _CAPTURE_RESET = {"fortify": 0, "aura_mp": 0, "mp": 0, "pslot": -1, "list_seat": -1}
     #: Written by the capture itself, from its own arguments.
     _CAPTURE_SET = ("alive", "seat", "tile")
 

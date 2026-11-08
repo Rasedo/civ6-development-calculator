@@ -1329,6 +1329,12 @@ export interface CityState extends Seat {
    *  city terms read them (0x5d4cd0, 0x5d45c0); a founding turn's first look
    *  counts none */
   unitValues?: readonly number[];
+  /** its unit list as its turn's end left it, unit id -> type: the end of
+   *  turn (Player::Processor::EndTurn 0x7ecc0 -> 0x4e44e0 -> 0x4ef6d0)
+   *  erases the units killed since (unit +0x770), so a unit gone off the map
+   *  stays on the list its counts walk (0x4f2c90) until then
+   *  (`minorListedUnits`) */
+  unitsListed?: Record<number, string>;
   /** its city's BUILDINGS and PROJECTS tables (raw, `AI_BUILDINGS`' and
    *  `AI_PROJECTS`' order) as its city's update of the turn left them: its
    *  second hook's Default Specialization reads them (`minorSecondHook`) */
