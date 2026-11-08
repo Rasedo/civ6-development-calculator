@@ -127,7 +127,8 @@ function record(turn: number, over: Partial<TurnRecord> = {}): TurnRecord {
 }
 
 /** the game's memory every record carries: each player's units made, research
- *  and culture banks, each city's build progress, all empty, under `extra`'s
+ *  and culture banks, each city's build queue (its overflow store and its
+ *  buildings', units', districts' and projects' progress), all empty, under `extra`'s
  *  components and cities */
 function memOf(players: readonly { id: number }[], cities: readonly { owner: number }[], extra: TurnRecord['mem'] = {}): TurnRecord['mem'] {
   const out: NonNullable<TurnRecord['mem']> = {};
@@ -141,7 +142,12 @@ function memOf(players: readonly { id: number }[], cities: readonly { owner: num
       PlayerTechs: { m_axResearchProgress: { n: CAT.techs.length }, m_xResearchOverflow: 0, ...(x.PlayerTechs as object) },
       PlayerCulture: { m_axCulturalProgress: { n: CAT.civics.length }, m_xCulturalOverflow: 0, m_xLifetimeCulture: 0,
         m_axTourismOn: { n: 64 }, ...(x.PlayerCulture as object) },
-      cities: mine.map((_c, i) => ({ 'm_kBuildQueue.v': { 134: { n: CAT.buildings.length }, 140: { n: CAT.units.length } }, ...given[i] })),
+      cities: mine.map((_c, i) => ({
+        m_kBuildQueue: { n: 246 },
+        'm_kBuildQueue.v': { 134: { n: CAT.buildings.length }, 140: { n: CAT.units.length }, 146: { n: CAT.districts.length },
+          152: { n: CAT.projects.length } },
+        ...given[i],
+      })),
     } as never;
   }
   return out;
