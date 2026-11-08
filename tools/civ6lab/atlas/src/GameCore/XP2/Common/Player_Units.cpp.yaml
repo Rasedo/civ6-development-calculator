@@ -179,6 +179,7 @@
   impl: [cpu/core/aiCivics.ts:civicValue]
   readings:
     - "H-1: the civics AI — READ (the choice, the walk, the propagation), PARTLY READ (the value)"
+    - "C-128: a city-state's Make Military Formation — READ (0x77a190, 0x770670, 0x536da0, 0x773e20, 0x94a870, 0x949930), both twins"
   context:
     - ...and the upgrades' gold (0x5376d0, 20.0 at least); PSEUDOYIELD [0xf2e254] of 100 where 0x4f2ac0 names the row; per building the player's version 0.5, a wonder PSEUDOYIELD_WONDER of 0....
   review: reviewed
@@ -187,7 +188,9 @@
   kind: function
   semantics: the units manager's Corps / Army TECH (-1 in the install).
   status: PARTLY
-  readings: ["H-1: the research AI — READ (the choice), PARTLY READ (the value)"]
+  readings:
+    - "H-1: the research AI — READ (the choice), PARTLY READ (the value)"
+    - "C-128: a city-state's Make Military Formation — READ (0x77a190, 0x770670, 0x536da0, 0x773e20, 0x94a870, 0x949930), both twins"
   context:
     - ...ts upgrade sources' gold (0x5376d0 -> 0x7a6690); PSEUDOYIELD_UNIT_COMBAT of 100 where 0x4f2af0 names the row; PSEUDOYIELD_TOURISM of the +0xe8 list's count; per building 0.5, a wonde...
   review: reviewed

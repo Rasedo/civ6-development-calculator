@@ -1,0 +1,15 @@
+# The DLL atlas, curated layer (tools/civ6lab/atlas.py documents the record).
+# Records keyed by GameCore_XP2_Release.dll RVA; `final` the FinalRelease RVA.
+# `review: imported` = bootstrapped from dll_readings.md / code comments / saved
+# labels and not yet reviewed: verify against the disassembly, then edit and
+# set `review: reviewed`.
+- addr: 0x94a220
+  final: 0x658930
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-128: a city-state's Make Military Formation — READ (0x77a190, 0x770670, 0x536da0, 0x773e20, 0x94a870, 0x949930), both twins"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...its live: the Form Corps command (0x94ade0) for a unit in no formation, else Form Army (0x94a220), with the partner as target; CanStart (vt +0x48: Corps 0x94a870, Army 0x949930) — the..."
+  review: imported

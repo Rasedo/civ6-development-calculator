@@ -10148,3 +10148,59 @@ minor's units in pool slot order (`minorView`'s units, `_mops_in_order` on
   upgraded to the Knight 1114117 in that turn; runs/h1_duely1117 t91 the
   Catapult 1114113 upgraded, the team CATAPULT x4): the engines change the
   member's type in place (Knight, Trebuchet).
+
+## C-128: a city-state's Make Military Formation — READ (0x77a190, 0x770670, 0x536da0, 0x773e20, 0x94a870, 0x949930), both twins
+
+`makeMilitaryFormation`, `Pass.absorbed`, `wanderNearCity`'s draw for an
+absorbed unit (cpu/core/tactical.ts), `mergeFormation` / `formationCivicIn`
+(cpu/core/game.ts, shared with `formUp`); GPU `_tac_make_formation`, the
+Wander loop's `gj` (gpu/core/sim_tactics.py), `_form_up`. The replay's copy
+(`minorAi`): the absorbed partner re-added by the next removal of its player
+after the formation, no upgrade's nor kill's; a civic the log completes
+inside the city-state's own turn none of its start's; each unit's FIRST
+traced move scored, as the game's first row is.
+
+- THE MOVE (0x77a190, "Minor Civ Tactical" after Promotion, before Attack
+  Low Priority): each unit of the tactical list (+0x240), live, of a chassis
+  with a combat, ranged or bombard strength, in less than an Army (+0xc90
+  below 2), whose player passes 0x536da0 for its domain (+0x650: land or
+  sea) and level + 1 — the units manager's Corps / Army civic and tech
+  (0x4f2ac0 / 0x4f2af0: land +0xaa8 / +0xb08, sea +0xb68 / +0xbc8; techs
+  +0xc28 .. +0xd48, -1 none) — walks the ring of radius 1 round its plot
+  (0x6b1b0 -> GetRingPlots 0x6b130, `RING_DIRS`) with the functor 0x770670:
+  on each plot's units of its map layer (0x75c50 with 0x901e0's layer) the
+  first of its owner and type (+0x160) in no formation is its partner. A
+  unit with one is queued (0x7803d0: unit, partner) and logged with the
+  string "Heal". No Movement test in the loop.
+- THE QUEUE (0x773e20, run once the loop ends): each entry in order, both
+  units live: the Form Corps command (0x94ade0) for a unit in no formation,
+  else Form Army (0x94a220), with the partner as target; CanStart (vt +0x48:
+  Corps 0x94a870, Army 0x949930) — the partner adjacent (0x823c0), of the
+  unit's owner and type, its +0x890 clear, in no formation; 0x536da0 with
+  the unit: no anti-air strength (0x56d940), not of the air, its Units_XP2
+  row's CanFormMilitaryFormation, not UseMaxMeleeTrainedStrength (Units
+  +0x1ba bit 32), Movement left (0x56c690), its +0x890 clear — then Start
+  (vt +0x58), the unit's turn done (0x570b40 +0x530, 0x77d180). The unit
+  survives on its plot; the partner leaves the map.
+- THE PARTNER STAYS LISTED: the merged partner keeps its place on the
+  tactical list, and Wander Near City takes its "Random Direction" draw over
+  its planning's candidates (its move goes nowhere). runs/h1_duely1117 t152:
+  city-state 4's Bombards 1638405 (33:6), 1703942 (31:7), 1769480 (32:6)
+  logged Heal; 1638405's Corps takes 1769480 (W in the ring), 1703942's
+  entry finds its partner gone and it wanders to 31:6, and 1769480's Wander
+  row is logged: 58 Wander rows, 58 Random Direction draws that turn.
+- Confirmed (one-seed aimem traces): runs/h1_duely1117 t138-200 (t142,
+  t152, t153, t161 Corps, t164 Army, t171, t179, t193), runs/h1_duely1121
+  t112-164 (t116, t126 two Corps, t133, t149, t150 Army, t154, t160 Army),
+  runs/h1_duely1124 t149 / t156 / t157, runs/h1_duely1127 t153 / t154,
+  runs/h1_duely1128 t175 / t185: the formed unit's "Heal" family and its
+  plot, its partner gone. runs/h1_duely1121 t149: city-state 4's third
+  Corps (1638401 with the embarked 1966084) lands Mobilization's boost after
+  the formation (CivicCompleted 38 in its turn), so its Line Infantry Corps
+  2031622 forms no Army until t150.
+- Open: +0x890 (a unit flag both CanStarts refuse) unread; the engines carry
+  no UseMaxMeleeTrainedStrength (the Vampire alone); the Start's merge
+  (the survivor's experience, promotions and hit points) is `mergeFormation`'s
+  veteran rule, not read from the command's Start; a unit an operation holds
+  is no tactical unit, yet the game forms one (runs/h1_duely1128 t179 Hong
+  Kong's Warrior 2490370 under Upgrade Units logs Heal).

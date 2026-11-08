@@ -1353,18 +1353,32 @@ function minorAi(ctx: Ctx, b: TurnRecord, turn: number, made: ReadonlySet<Unit>,
     c.hp = snap.hp;
     c.fortifyTurns = snap.fortifyTurns;
   }
-  // — and a unit a formation of its minor's turn absorbed (the log's
-  // UnitFormCorps / UnitFormArmy, then its removal), which stood for the
-  // turn's operations before the formation (runs/h1_duely1117 t142: city-state
-  // 3's Crossbowman 1376257, City Defense's member, Operation Move to 42:12,
-  // then absorbed into 1310722's Corps; the team's Recruit counts it, the
-  // strength 75 to the end look)
+  // — and a unit a formation of its minor's turn absorbed, which stood for
+  // the turn's operations before the formation (runs/h1_duely1117 t142:
+  // city-state 3's Crossbowman 1376257, City Defense's member, Operation Move
+  // to 42:12, then absorbed into 1310722's Corps; the team's Recruit counts
+  // it, the strength 75 to the end look): after the log's UnitFormCorps /
+  // UnitFormArmy of a unit the first record holds (a levy's return is made
+  // anew as one), the next removal of its player that is no upgrade's (a
+  // removal the new chassis' UnitAddedToMap follows) nor a kill's. The
+  // formation's promotions and boosts may stand between (runs/h1_duely1121
+  // t149: city-state 4's UnitFormCorps 1638401, CivicCompleted Mobilization,
+  // then 1966084's removal; t126 city-state 2's 1966080, UnitPromoted,
+  // 2097159's removal), and the partner's own activity may end first
+  // (runs/h1_duely1124 t149: city-state 3's Cuirassier 1769478 moved to
+  // safety on 41:13, 1835008's UnitFormCorps, the Frigate's moves, then
+  // 1769478's removal)
   const acts = (b as { actions?: unknown[][] }).actions ?? [];
-  for (let j = 1; j < acts.length; j++) {
+  const pending = new Map<number, number>();
+  const killed = new Set(acts.flatMap((x) => (x[2] === 'UnitKilledInCombat' ? [`${x[3]}:${x[4]}`] : [])));
+  for (let j = 0; j < acts.length; j++) {
     const x = acts[j];
-    const p = acts[j - 1];
-    if (x[2] !== 'UnitRemovedFromMap' || (p[2] !== 'UnitFormCorps' && p[2] !== 'UnitFormArmy') || p[3] !== x[3]) continue;
+    const player = x[3] as number;
+    if ((x[2] === 'UnitFormCorps' || x[2] === 'UnitFormArmy') && was.has(`${x[3]}:${x[4]}`)) pending.set(player, (pending.get(player) ?? 0) + 1);
+    if (x[2] !== 'UnitRemovedFromMap' || !pending.get(player) || acts[j + 1]?.[2] === 'UnitAddedToMap') continue;
     const key = `${x[3]}:${x[4]}`;
+    if (killed.has(key)) continue;
+    pending.set(player, pending.get(player)! - 1);
     const u = ctx.gone.get(key);
     if (!u || !minorAiSeat(u.seat) || back.has(u) || !was.has(key)) continue;
     const c = structuredClone(u);
@@ -1518,9 +1532,30 @@ function minorAi(ctx: Ctx, b: TurnRecord, turn: number, made: ReadonlySet<Unit>,
     upgradeTreesStart(c, gained.length);
     for (const t of gained) if (BOOSTS[t]?.cls === 'MAINTAIN_X_TRADE_ROUTES') techContractsCompleted(c, t);
   }
+  // — but a civic the log completes inside a city-state's own turn, after its
+  // activation, is a boost its units' turn lands, none of its start's
+  // (runs/h1_duely1121 t149: city-state 4's third Corps, 1638401's, lands
+  // Mobilization's boost; its Line Infantry Corps 2031622 forms no Army
+  // that turn)
+  const midTurn = new Map<number, Set<string>>();
+  {
+    const active = new Set<number>();
+    for (const a of (b as { actions?: unknown[][] }).actions ?? []) {
+      if (!Array.isArray(a) || a[1] !== turn) continue;
+      const p = Number(a[3]);
+      if (a[2] === 'PlayerTurnActivated') active.add(p);
+      if (a[2] !== 'CivicCompleted' || !active.has(p)) continue;
+      const seat = ctx.seatOfPlayer.get(p);
+      const id = engineId('civic', ctx.cat.civics[Number(a[4])], 'CIVIC_', CIVICS);
+      if (seat === undefined || !isCityStateSeat(seat) || !id) continue;
+      if (!midTurn.has(seat)) midTurn.set(seat, new Set());
+      midTurn.get(seat)!.add(id);
+    }
+  }
   for (const s of [...copy.cityStates, ...copy.seats]) {
     const r = seatOf(ctx.next.state, s.seat)?.research;
-    if (r) s.research = { ...s.research, techs: [...r.techs], civics: [...r.civics] };
+    const late = midTurn.get(s.seat);
+    if (r) s.research = { ...s.research, techs: [...r.techs], civics: r.civics.filter((x) => !late?.has(x)) };
   }
   // each unit's Movement whole (an upgraded one's none), its pool composed
   // on that research where the
@@ -1607,10 +1642,12 @@ function minorAi(ctx: Ctx, b: TurnRecord, turn: number, made: ReadonlySet<Unit>,
       if (TRACE.has('minorTactics')) console.error(`t${turn} ${key} draw over ${max} | game ${log.draws[j].range} v ${log.draws[j].value}`);
     },
   });
+  // each unit's first move of the pass, as the game's log rows are read (a
+  // unit Make Military Formation queued logs "Heal", then its Wander)
   const moves = new Map<Unit, { move: string; plot: number }>();
   traceTactics((c, move, plot) => {
     const u = twin.get(c);
-    if (u) moves.set(u, { move, plot });
+    if (u && !moves.has(u)) moves.set(u, { move, plot });
   });
   const playerOf = (seat: number) => ctx.playerOfSeat.get(seat) ?? seat;
   // a city-state its first record holds no city of founds it in its

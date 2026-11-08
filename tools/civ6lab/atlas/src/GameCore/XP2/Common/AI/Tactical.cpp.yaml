@@ -43,6 +43,20 @@
   context:
     - "...at capacity 1 (the first largest positive), the move λ 0x770710. The results sorted by 0x7704e0 through EASTL's merge sort (halves n / 2)."
   review: reviewed
+- addr: 0x770670
+  final: 0x5028e0
+  kind: function
+  name: the formation partner functor
+  semantics: "Make Military Formation's ring functor (vtable 0xd6fc98 +0x10 -> here, the captured type +0, owner +4, unit container +8, out +0x10, map layer +0x18): on the plot's units of the layer (0x75c50) the first of the owner and type (+0x160) in no formation (+0xc90 0) writes its id (+0x100) to the out slot, where it is still -1."
+  status: READ
+  cases:
+    - recording: h1_duely1117
+      turn: 152
+      value: city-state 4's Bombard 1638405 on 33:6 takes 1769480 on 32:6 (W, the ring's second) as partner
+  impl: [cpu/core/tactical.ts:makeMilitaryFormation, gpu/core/sim_tactics.py:_tac_make_formation]
+  readings:
+    - "C-128: a city-state's Make Military Formation — READ (0x77a190, 0x770670, 0x536da0, 0x773e20, 0x94a870, 0x949930), both twins"
+  review: reviewed
 - addr: 0x770710
   kind: function
   name: attackMove
@@ -311,6 +325,26 @@
     - "C-96: the city-states' tactical pass — READ (Wander Near City, Heal, the non-barbarian priorities, FindAlternateLocation), the families it needs PARTLY READ"
   context:
     - "...nd logged \"Support Formation, <unit> (<id>), x y\" (the other's plot); then the moves (0x773bd0, also called at 0x779d00): per entry the unit woken (0x53e20), sent to the plot (the mo..."
+  review: reviewed
+- addr: 0x773e20
+  final: 0x505e10
+  kind: function
+  name: the formation queue's moves
+  semantics: "Make Military Formation's moves: each queued entry (+0x270, 0x30 apart, count +0x280: unit +0, partner +4), both live (+0x770 clear): the Form Corps command's parameters (0x94ade0) for a unit in no formation (+0xc90 0), Form Army's (0x94a220) else, the partner its target; CanStart (commands manager 0x50e00 vt +0x48) then Start (vt +0x58), the unit's turn done (0x570b40 with 1) and its id marked done on the tactical list (0x77d180)."
+  status: READ
+  cases:
+    - recording: h1_duely1117
+      turn: 152
+      value: "three Bombards queued (1638405, 1703942, 1769480): 1638405's Corps takes 1769480, the other two entries find a partner or unit gone"
+    - recording: h1_duely1121
+      turn: 126
+      value: city-state 2's two Corps, 1966080 with 2097159 and 1900545 with 2031620, in the queue's order
+  impl:
+    - cpu/core/tactical.ts:makeMilitaryFormation
+    - gpu/core/sim_tactics.py:_tac_make_formation
+    - cpu/core/game.ts:mergeFormation
+  readings:
+    - "C-128: a city-state's Make Military Formation — READ (0x77a190, 0x770670, 0x536da0, 0x773e20, 0x94a870, 0x949930), both twins"
   review: reviewed
 - addr: 0x773fb0
   final: 0x505fa0
@@ -661,14 +695,20 @@
 - addr: 0x77a190
   final: 0x50c0b0
   kind: function
-  semantics: Make Military Formation (a tactical move).
-  status: PARTLY
+  name: makeMilitaryFormation
+  semantics: "MAKE MILITARY FORMATION: each unit of the tactical list (+0x240 / +0x250), live, with a plot, with a combat, ranged or bombard strength, in less than an Army (+0xc90 not 2), whose player passes 0x536da0 for its domain (+0x650) and level + 1 (no unit): the ring of radius 1 round its plot (0x6b1b0) through the functor 0x770670 finds its partner; one with a partner is queued (0x7803d0) and logged \"Heal\" (the string at 0xd590a8). With any queued, 0x773e20 carries them out."
+  status: READ
+  cases:
+    - recording: h1_duely1117
+      turn: 152
+      value: city-state 4's Bombards 1638405, 1703942 and 1769480 logged Heal; 1638405 forms a Corps (UnitFormCorps), 1769480 removed, its Wander row still logged and drawn (58 rows, 58 draws)
+    - recording: h1_duely1121
+      turn: 149
+      value: "city-state 4's embarked Skirmisher 1638401 on 31:25 with 1966084 on 31:24: UnitFormCorps, Mobilization's boost after it; its Line Infantry Corps 2031622 forms no Army until t150"
+  impl: [cpu/core/tactical.ts:makeMilitaryFormation, gpu/core/sim_tactics.py:_tac_make_formation]
   readings:
     - "C-96: the city-states' tactical pass — READ (Wander Near City, Heal, the non-barbarian priorities, FindAlternateLocation), the families it needs PARTLY READ"
-  notes:
-    - ".claude/scratchpad/mu1/readings_c96.md: ...h of the string loaded before its   store): f2e128 Heal (0x779a70), f2e12c Make Military Formation (0x77a190),   f2e164 Wander Near City (0x77bf50). - WANDER NEAR CITY (0x77bf50): nothing for a player with no..."
-  context:
-    - "...tring loaded before its store): f2e128 Heal (0x779a70), f2e12c Make Military Formation (0x77a190), f2e164 Wander Near City (0x77bf50)."
+    - "C-128: a city-state's Make Military Formation — READ (0x77a190, 0x770670, 0x536da0, 0x773e20, 0x94a870, 0x949930), both twins"
   review: reviewed
 - addr: 0x77a4b0
   final: 0x50c3d0

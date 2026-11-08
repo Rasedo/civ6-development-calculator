@@ -422,8 +422,10 @@
   kind: function
   name: GetRingPlots
   status: PARTLY
+  impl: [cpu/core/tactical.ts:makeMilitaryFormation]
   readings:
     - "C-95: the danger map's search pays no zone of control, a ranged unit strikes from its range; the rampage strike's ring — READ (0x26df90, 0x26e920, 0x771670, 0x691f0, 0x76ecf0), FIT (the ranged unit's strike), both twins"
+    - "C-128: a city-state's Make Military Formation — READ (0x77a190, 0x770670, 0x536da0, 0x773e20, 0x94a870, 0x949930), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "....0x771b17); with none, the ring of the target at max(range, 1) (0x6b1b0 -> GetRingPlots 0x6b130 -> 0x691f0: the ring at that radius, its six corners (0,1), (-1,0), (1,-1), (0,-1), (..."
@@ -461,6 +463,7 @@
     - "C-96: the improvement value — READ (0x7a58f0, 0x7b1320's yields, tourism and modifiers, the feature removal 0x7a3010, the harvest 0x7a37d0, the build unit 0x7a2e20, EFFECT_ADJUST_CITY_FREE_POWER), PARTLY READ (the hazards' turns, 0x7b1320's defence, claimed plots and neighbours terms)"
     - "C-100: a district on a feature it may not stand on, and the Mountain Portal's analyzer — READ"
     - "C-95: the danger map's search pays no zone of control, a ranged unit strikes from its range; the rampage strike's ring — READ (0x26df90, 0x26e920, 0x771670, 0x691f0, 0x76ecf0), FIT (the ranged unit's strike), both twins"
+    - "C-128: a city-state's Make Military Formation — READ (0x77a190, 0x770670, 0x536da0, 0x773e20, 0x94a870, 0x949930), both twins"
   context:
     - "SPREAD (0x336a50's last arm → 0x33b580): the plot's neighbours within 1 (0x6b1b0), each that passes 0x339960 — for a one-off, the event's own start test 0x28ec10 (its Ran..."
     - ...e pillaged, -1 for its own pillaged improvement (+0x4d bit 0), then the ring of radius 1 (0x6b1b0 -> 0x691f0, the centre not in it) through 0x513780, and last +1 when the plot's owner hol...
@@ -716,6 +719,7 @@
   readings:
     - "C-95: the planning strikes a religious unit and a Trader on their plot, its foreign test reads the mover's map layer, the blow on them 1.5 x their health — READ (0x790c60 at 0x790f22, 0x790fc9..0x791016, 0x7910b3..0x791162; 0x791470 at 0x791703..0x79174a, 0x7917b1..0x7917f7; 0x793400), both twins"
     - "C-123 / C-95: a Trader stands on the trade layer; a city's shot is a COMBAT_DISTRICT spot's blow back — READ (0x901e0, 0x586360 -> 0x208b80, 0x585eb0 -> 0x585d90, 0x791470 at 0x7917f7..0x7918f7 -> 0x249ee0 / 0x205720, 0x776140 at 0x776780..0x7767fa), both twins"
+    - "C-128: a city-state's Make Military Formation — READ (0x77a190, 0x770670, 0x536da0, 0x773e20, 0x94a870, 0x949930), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...e (0x790fc9..0x791016) lists the target plot's units of the planning's +0x10 (0x793400: 0x901e0, the mover's map layer): a religious unit stands on its own, so a military unit lays th..."
@@ -2481,18 +2485,24 @@
 - addr: 0x536da0
   final: 0x37d730
   kind: function
-  semantics: the player holds the Corps / Army civic and tech.
-  status: PARTLY
+  name: the formation test
+  semantics: "may the player (edx) form a formation of level r9 (1 Corps / Fleet, 2 Army / Armada) in domain r8 (sea 0 or land 2; any other refused): the units manager's civic (0x4f2ac0: land +0xaa8 / +0xb08, sea +0xb68 / +0xbc8) held (HasCivic) and its tech (0x4f2af0: +0xc28 .. +0xd48) held, each -1 none. With a unit (the fifth argument): a combat, ranged or bombard strength; no anti-air strength (0x56d940); not of the air (+0x650 1); its Units_XP2 row's bit 4 of +0x48 (CanFormMilitaryFormation) where the row exists; for a Corps the unit in no formation, for an Army not in one; not Units +0x1ba bit 32 (UseMaxMeleeTrainedStrength); Movement left (0x56c690); +0x890 clear."
+  status: READ
   cases:
-    - recording: h1_duelv1127
-      turn: 120
-      value: "then a civic of an era before [player+0x1358]+0x158   (the game's era, as the research value reads it) is taken (that - era)   times — no +1 here (runs/h1_duelv1127: every city-state's Ancient civic a"
+    - recording: h1_duely1121
+      turn: 149
+      value: city-state 4's Line Infantry Corps 2031622 queues no Army before Mobilization lands (CivicCompleted 38 after the turn's third Corps); Army at t150
     - recording: AI_Military.csv
       value: "EFFECT_GRANT_COMBAT_ADJACENCY 0x6c4060 (Enable: the   player's strength over every domain 0x4bd0d0(-1) = PlayerStats +0x210 -   +0x390, bare, landing to the horizon — 20 a Warrior, AI_Military.csv's  "
-  impl: [cpu/data/aiCivics.ts:CIVIC_AI_FORMATION_UNITS]
+  impl:
+    - cpu/data/aiCivics.ts:CIVIC_AI_FORMATION_UNITS
+    - cpu/core/tactical.ts:makeMilitaryFormation
+    - cpu/core/game.ts:formationCivicIn
+    - gpu/core/sim_tactics.py:_tac_make_formation
   readings:
     - "H-1: the research AI — READ (the choice), PARTLY READ (the value)"
     - "H-1: the civics AI — READ (the choice, the walk, the propagation), PARTLY READ (the value)"
+    - "C-128: a city-state's Make Military Formation — READ (0x77a190, 0x770670, 0x536da0, 0x773e20, 0x94a870, 0x949930), both twins"
   context:
     - "...0x4f2af0 (the units manager's Corps / Army TECH, -1 in the install) names the row and 0x536da0 (the player holds that civic and tech) fails — never. PSEUDOYIELD_TOURISM of the +0xe8..."
     - "...ionalism, Mobilization, a trait's EFFECT_ADJUST_CORPS_ARMY_PREREQ — names the row and 0x536da0 fails; per building the player's version 0.5, a wonder PSEUDOYIELD_WONDER of 0.5; per d..."
@@ -2710,6 +2720,7 @@
     - gpu/core/sim_minorops.py:end_turn
     - cpu/core/minorOps.ts:cities
     - cpu/core/operations/assault.ts:pillageExecute
+    - cpu/core/tactical.ts:makeMilitaryFormation
   readings:
     - "C-95: the tactical pass — READ (the barbarians' moves; the minors share it)"
     - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
@@ -2729,6 +2740,7 @@
     - "C-93: Make Formation's formation outlives its operation, a captive embarks by its original owner — READ (0x7ee630, 0x94bbe0, 0x94bc70, 0x212825..0x2128f3, 0x56c480, 0x77b9a0 at 0x77bedd), both twins"
     - "C-93: Operation Pillage takes a member on its target alone; a capture is its step's; Wander asks Movement; a captor leaves the pass — READ (0x811390 at 0x811786..0x811838, 0x26fe20, 0x77b9a0 at 0x77baa1, 0x212500), both twins"
     - "C-123 / C-95: the Plunder Trade Route command and the AI's plunder after the move — READ (0x89dae0, 0x89dfc0, 0x9555a0, 0x9559a0, 0x5545e0 at 0x554667 / 0x554d4c, 0x58fc20, 0x7746a0, 0x70a440, 0x771f80 at 0x7722b6 / 0x77254e / 0x77277f, 0x776140 at 0x776424..0x776470), both twins"
+    - "C-128: a city-state's Make Military Formation — READ (0x77a190, 0x770670, 0x536da0, 0x773e20, 0x94a870, 0x949930), both twins"
   notes:
     - ".claude/scratchpad/mu1/readings_c96.md: ...000, else the skip 0x95eae0 (\"Wander Back to City\", \"Move To\" the   city). The turn ends (0x56d6f0, 0x570b40). Confirmed: the turn's \"Random   Direction\" draws pair one to one with the AI_Tactical.csv rows \"W..."
   context:
@@ -4698,9 +4710,11 @@
   kind: function
   semantics: removes a unit from the pass's list.
   status: PARTLY
+  impl: [cpu/core/tactical.ts:makeMilitaryFormation]
   readings:
     - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
     - "C-96: the city-states' tactical pass — READ (Wander Near City, Heal, the non-barbarian priorities, FindAlternateLocation), the families it needs PARTLY READ"
+    - "C-128: a city-state's Make Military Formation — READ (0x77a190, 0x770670, 0x536da0, 0x773e20, 0x94a870, 0x949930), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ...flag 0x10), a unit with no ranged or bombard strength then done (0x56d6f0, 0x570b40, 0x77d180); the civilian taken ends the target; then each ranged one within range strikes it (0x9...
@@ -4710,7 +4724,10 @@
   kind: function
   semantics: "queues a unit with its target for the tactical move (\"Coastal Raid\")."
   status: PARTLY
-  readings: ["C-95: Coastal Raid — READ, ported", "C-95: Coastal Raid"]
+  readings:
+    - "C-95: Coastal Raid — READ, ported"
+    - "C-95: Coastal Raid"
+    - "C-128: a city-state's Make Military Formation — READ (0x77a190, 0x770670, 0x536da0, 0x773e20, 0x94a870, 0x949930), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...18bd) whose planning of two turns holds a plot at range 1 (0x791300) is queued with it (0x7803d0, \"Coastal Raid\"); the queue carried out (0x7735d0): each queued unit that can act moves..."
@@ -6673,6 +6690,34 @@
   context:
     - "...0x518f40 lets share a plot (owners apart, both +0x1ce0 above 0, their +0x1ce4 apart, 0x93f090 false: none on the five duels). 0x585eb0 takes the most over the formation's members."
   review: imported
+- addr: 0x949930
+  final: 0x6580f0
+  kind: function
+  name: Form Army's CanStart
+  semantics: "UNITCOMMAND_FORM_ARMY's CanStart: 0x536da0 for the unit's owner, domain and level 2 with the unit; with a target unit in the parameters: it exists, fights (0x209dd0), its plot beside the unit's (0x823c0), of the unit's owner and type (+0x160), its +0x890 clear, and the pair a Corps with a unit in no formation either way round (+0xc90 0 / 1); with none, the plots beside the unit searched (GetAdjacentPlot) for such a unit."
+  status: READ
+  cases:
+    - recording: h1_duely1121
+      turn: 150
+      value: city-state 4's Line Infantry Corps 2031622 forms its Army with 1900549 (UnitFormArmy) once Mobilization is in
+  impl: [cpu/core/tactical.ts:makeMilitaryFormation, gpu/core/sim_tactics.py:_tac_make_formation]
+  readings:
+    - "C-128: a city-state's Make Military Formation — READ (0x77a190, 0x770670, 0x536da0, 0x773e20, 0x94a870, 0x949930), both twins"
+  review: reviewed
+- addr: 0x94a870
+  final: 0x658e20
+  kind: function
+  name: Form Corps's CanStart
+  semantics: "UNITCOMMAND_FORM_CORPS's CanStart: 0x536da0 for the unit's owner, domain and level 1 with the unit; with a target unit: of the unit's owner and type, its +0x890 clear, in no formation (+0xc90 0), beside the unit."
+  status: READ
+  cases:
+    - recording: h1_duely1117
+      turn: 152
+      value: city-state 4's Bombard 1638405 with 1769480 (UnitFormCorps); 1703942's entry, its partner 1769480 gone, forms nothing
+  impl: [cpu/core/tactical.ts:makeMilitaryFormation, gpu/core/sim_tactics.py:_tac_make_formation]
+  readings:
+    - "C-128: a city-state's Make Military Formation — READ (0x77a190, 0x770670, 0x536da0, 0x773e20, 0x94a870, 0x949930), both twins"
+  review: reviewed
 - addr: 0x94bbe0
   kind: function
   name: UNITCOMMAND_ENTER_FORMATION's command

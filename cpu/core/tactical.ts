@@ -8,12 +8,12 @@
  * the Free Cities' turn for theirs (`freeCityTactics`).
  */
 import type { ArmyRecord, City, CityState, GameState, Seat, Tile, Unit, UnitPool } from './types';
-import { DIRECTION_TYPES, axialToOffset, hexDistance, neighborTile, neighbors, offsetToAxial, tileAt, tilesWithin } from '../../world/hex';
+import { DIRECTION_TYPES, RING_DIRS, axialToOffset, hexDistance, neighborTile, neighbors, offsetToAxial, tileAt, tilesWithin } from '../../world/hex';
 import { hullPassage, isCoastalLand, isImpassable, isWater } from '../../world/query';
 import { COMBAT_BOMBARD_VS_UNIT, EMBARK_MOVES, MP_SCALE } from '../data/constants';
-import { CITY_MAX_HP, UNITS, UNIT_HP } from '../data/units';
+import { CITY_MAX_HP, FORMATION_MAX, UNITS, UNIT_HP } from '../data/units';
 import { DISTRICTS } from '../data/districts';
-import { condemnHeretic } from './game';
+import { condemnHeretic, formationCivicIn, mergeFormation } from './game';
 import { plunderTrader } from './trade';
 import { IMPROVEMENTS } from '../data/improvements';
 import { AI_FEATURES, AI_UNITS } from '../data/aiBuildTables';
@@ -22,7 +22,7 @@ import { engineId, gameTypeOf, installFeature } from '../data/aliases';
 import {
   canEmbark, cityAtIndex, crossesRiver, embarkTechMoves, escortUnit, inEscort, cliffBlocksStep, shoreCrossing, districtZones, encampmentBlocks, encampmentIntact, inEnemyZoc, rosterEmbarkMoves, stepCost, stepUnit, terrainMp, unitDomain, unitExertsZoc, unitFullMoves, unitIsNoncombat, mapLayer, unitReligious,
   setBarbStepLook, unitsHostile, unitVisibleTo,
-  waterEnterable, waterWalks, formationCS, setRecordFormation, formationMates, dropLoneRiders, escortOf, escortRiders,
+  waterEnterable, waterWalks, formationBanned, formationCS, setRecordFormation, formationMates, dropLoneRiders, escortOf, escortRiders,
 } from './units';
 import { BARB_SEAT, FREE_SEAT, NO_SEAT, campTiles, cityHolders, civsAtWar, isBarbSeat, isCityStateSeat, isCiv, isTerritorial, seatOf, tileCity, tileSeat } from './seats';
 import { OPEN_BORDERS_CIVIC } from '../data/seats';
@@ -2024,6 +2024,9 @@ export interface Pass {
   /** the barbarians' captures the pass's own moves took start at their index
    *  of `GameState.barbCaptures` (undefined outside their pass) */
   capsFrom?: number;
+  /** the units a formation of the pass absorbed (`makeMilitaryFormation`):
+   *  still on the tactical list, gone from the map */
+  absorbed?: Set<Unit>;
 }
 
 /** the move that took the unit, as the game's tactical log names it, the
@@ -2889,6 +2892,62 @@ function heal(state: GameState, pass: Pass): void {
   }
 }
 
+/** a chassis with a combat, ranged or bombard strength (GetCombat 0x56dc90,
+ *  GetRangedCombat 0x56e3e0, GetBombardCombat 0x56daa0 above 0) */
+function fights(type: string): boolean {
+  const def = UNITS[type];
+  return (def?.combat ?? 0) > 0 || (def?.ranged?.strength ?? 0) > 0 || (def?.bombard ?? 0) > 0;
+}
+
+/**
+ * MAKE MILITARY FORMATION (0x77a190, its moves 0x773e20): each unit left, in
+ * pool order, of a chassis that fights, in less than an Army (+0xc90 below 2),
+ * not of the air, whose player has the civic of its domain's next formation
+ * (0x536da0: the units manager's Corps / Army civics and techs, +0xaa8 ..
+ * +0xd48), takes the first unit of its own player and chassis in no
+ * formation on the plots beside it — the ring walk's order (`RING_DIRS`,
+ * GetRingPlots 0x6b130 at radius 1), each plot's units of its map layer
+ * (the functor 0x770670) — and is queued with it, its row logged "Heal"
+ * (the move's own log string). The queue is then carried out in its order:
+ * where both still stand, the Form Corps command for a unit in no formation,
+ * the Form Army command else, under its CanStart (0x94a870 / 0x949930: the
+ * partner in no formation; 0x536da0 with the unit: no anti-air strength
+ * (0x56d940), a chassis that may form (Units_XP2 CanFormMilitaryFormation),
+ * Movement left (0x56c690))
+ * merges the partner into the unit (`mergeFormation`), and the unit's turn
+ * is done (0x570b40, 0x77d180). The partner stays on the tactical list, off
+ * the map (`Pass.absorbed`): Wander Near City still draws for it
+ * (runs/h1_duely1117 t152: city-state 4's Bombards 1638405, 1703942 and
+ * 1769480 queued, 1638405's Corps takes 1769480, 1703942 wanders to 31:6
+ * and 1769480's Wander row draws; 58 Wander rows, 58 Random Direction draws).
+ */
+function makeMilitaryFormation(state: GameState, pass: Pass): void {
+  const queue: [Unit, Unit][] = [];
+  for (const u of pass.units) {
+    if (!live(state, pass, u) || !fights(u.type) || (u.formation ?? 0) >= FORMATION_MAX || unitDomain(u.type) === 'air') continue;
+    if (!formationCivicIn(state, u.seat, !!UNITS[u.type]?.naval, (u.formation ?? 0) + 1)) continue;
+    const layer = mapLayer(u.type);
+    const at = state.map.tiles[u.tileIndex];
+    let partner: Unit | undefined;
+    for (const d of RING_DIRS) {
+      const t = neighborTile(state.map, at, d);
+      partner = t ? state.units.find((x) => x.tileIndex === t.index && mapLayer(x.type) === layer && x.seat === u.seat
+        && x.type === u.type && !(x.formation ?? 0)) : undefined;
+      if (partner) break;
+    }
+    if (!partner) continue;
+    queue.push([u, partner]);
+    tacticsTrace?.(u, 'Heal', -1, -1);
+  }
+  for (const [u, p] of queue) {
+    if (!state.units.includes(u) || !state.units.includes(p) || (p.formation ?? 0) > 0
+      || (UNITS[u.type]?.antiAir ?? 0) > 0 || formationBanned(u.type) || u.movesLeft <= 0) continue;
+    mergeFormation(state, u, p, (u.formation ?? 0) + 1);
+    pass.done.add(u.id);
+    (pass.absorbed ??= new Set()).add(p);
+  }
+}
+
 /**
  * Does the unit on a plot of danger `d` (> 0) flee — MOVE TO SAFETY's test
  * (0x77a4b0), `hl` the homeland's (0x70f3b0)? One with no strength or
@@ -3269,18 +3328,21 @@ const WANDER_BACK_RANGE = 3;
  * Direction" draw over their count picks the plot it moves to ("Wander") —
  * the weights the loop builds are never read. With none it moves to the
  * plot `alternateLocation` finds round the capital ("Wander Back to City",
- * the row naming the capital), else it stays. Its turn is done.
+ * the row naming the capital), else it stays. Its turn is done. A unit a
+ * formation absorbed in the pass (`Pass.absorbed`) takes its draw and moves
+ * nowhere.
  */
 function wanderNearCity(state: GameState, pass: Pass, home: number): void {
   for (const u of pass.units) {
-    if (!live(state, pass, u) || (pass.ai.get(u.id) ?? -1) < AI_EXPLORE || u.movesLeft <= 0) continue;
+    const ghost = !!pass.absorbed?.has(u) && !pass.done.has(u.id);
+    if (!(ghost || live(state, pass, u)) || (pass.ai.get(u.id) ?? -1) < AI_EXPLORE || u.movesLeft <= 0) continue;
     const cands = (pass.reach.get(u.id) ?? []).filter((e) => e.turns === 1
       && plotDistance(state, home, e.tile) <= WANDER_CITY_RANGE && !enemyAt(state, u, e.tile) && !keptOut(state, u, e.tile));
     if (cands.length) {
       drawing = u;
       const to = cands[randRange(state, cands.length, 'Random Direction')].tile;
       drawing = null;
-      moveTo(state, u, to, pass.strike);
+      if (!ghost) moveTo(state, u, to, pass.strike);
       finish(pass, u, 'Wander', to);
       continue;
     }
@@ -3437,9 +3499,9 @@ export function seatPoolSlots(state: GameState, s: Seat): UnitPool | undefined {
  * the tactical list's units (`tacticalUnit`) the moves in the
  * list's order, each walking the units the moves before it left, in pool
  * order — Support Formation, Attack High Priority, Move to Safety, Attack
- * Medium Priority, Promotion, Attack Low Priority, Heal, Chase Target (no
- * strike), Wander Near City (Attack Civilians and Make Military Formation
- * not ported); the homeland's Move to Safety over every unit, then its End
+ * Medium Priority, Promotion, Make Military Formation, Attack Low Priority,
+ * Heal, Chase Target (no strike), Wander Near City (Attack Civilians not
+ * ported); the homeland's Move to Safety over every unit, then its End
  * Turn takes the rest (its Promotion finds no unit the tactical one left
  * due).
  */
@@ -3477,6 +3539,7 @@ export function cityStateTactics(state: GameState, cityState: CityState, operati
       moveToSafety(state, pass);
       attackUnits(state, pass, 'MEDIUM');
       promotion(state, pass);
+      makeMilitaryFormation(state, pass);
       attackUnits(state, pass, 'LOW');
       heal(state, pass);
       chaseTarget(state, pass);

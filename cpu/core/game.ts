@@ -933,13 +933,26 @@ export function formUp(state: GameState, unit: Unit, tileIndex: number): RuleRes
   if (!host) return { ok: false, reason: 'No unit of this type to join.' };
   const tier = (host.formation ?? 0) + (unit.formation ?? 0) + 1;
   if (tier > FORMATION_MAX) return { ok: false, reason: 'Nothing larger than an Army.' };
-  // CIV6 (EFFECT_ADJUST_CORPS_ARMY_PREREQ): the roster's own civic for this
-  // TIER and domain — Shaka's land Corps, Spain's Fleets
-  const naval = !!UNITS[unit.type]?.naval;
+  if (!formationCivicIn(state, seat, !!UNITS[unit.type]?.naval, tier)) return { ok: false, reason: 'Its civic is not in.' };
+  mergeFormation(state, host, unit, tier);
+  return { ok: true };
+}
+
+/** is the civic a formation of `tier` (1 Corps or Fleet, 2 Army or Armada)
+ *  needs in for the seat — CIV6 (EFFECT_ADJUST_CORPS_ARMY_PREREQ): the
+ *  roster's own civic for this tier and domain (Shaka's land Corps, Spain's
+ *  Fleets), else the game's */
+export function formationCivicIn(state: GameState, seat: number, naval: boolean, tier: number): boolean {
   const row = getModifiers(state, seat).formations.find((r) => r.tier === tier && r.naval === naval && r.civic !== undefined);
   const civic = row?.civic ?? FORMATION_CIVIC[tier];
-  if (civic && !isCivicComplete(state, civic, seat)) return { ok: false, reason: `${civic} is not in.` };
-  const vet = veteranOf(host, unit);
+  return !civic || isCivicComplete(state, civic, seat);
+}
+
+/** `host` takes `absorbed` into a formation of `tier`: the veteran's
+ *  experience, promotions and hit points, its moves ended; `absorbed` leaves
+ *  the map */
+export function mergeFormation(state: GameState, host: Unit, absorbed: Unit, tier: number): void {
+  const vet = veteranOf(host, absorbed);
   host.formation = tier;
   host.level = vet.level;
   host.xp = vet.xp;
@@ -951,8 +964,7 @@ export function formUp(state: GameState, unit: Unit, tileIndex: number): RuleRes
   host.hp = vet.hp;
   host.movesLeft = 0;
   host.fortifyTurns = 0;
-  disbandUnit(state, unit.id);
-  return { ok: true };
+  disbandUnit(state, absorbed.id);
 }
 
 /** CIV6 (Monastic Isolation, EFFECT_ADJUST_RELIGIOUS_COMBAT_LOSS): the

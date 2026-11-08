@@ -33,6 +33,16 @@
     - "...ds the plot's appeal (vcall +0x28); any other source the plot's yield of that type from 0x82280 (→ 0x538a60) with its last flag false less the same with it true, times ScalingFactor /..."
     - ...always 0); at distance 1..CITY_MIN_RANGE every yield (the plot's yield for the player, 0x82280 -> 0x538a60) into the total, at 1 into the inner ring; a feature within 2 counted; a re...
   review: reviewed
+- addr: 0x823c0
+  final: 0x5f7b0
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-128: a city-state's Make Military Formation — READ (0x77a190, 0x770670, 0x536da0, 0x773e20, 0x94a870, 0x949930), both twins"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...r as target; CanStart (vt +0x48: Corps 0x94a870, Army 0x949930) — the partner adjacent (0x823c0), of the unit's owner and type, its +0x890 clear, in no formation; 0x536da0 with the..."
+  review: imported
 - addr: 0x82a10
   final: 0x5fe00
   kind: function

@@ -4867,6 +4867,7 @@ class SimTactics:
         Formation, Attack High Priority, Move to Safety, Attack Medium and Low
         Priority, Heal,
         Chase Target (no strike) and Wander Near City in pool order (Promotion
+        and Make Military Formation
         after Attack Medium Priority), the
         homeland's Move to Safety; the rest end their turn."""
         seat = 100 + s
@@ -4913,6 +4914,77 @@ class SimTactics:
         self._take_promotion(r, sc[r, j], pick[r, j], utp[r, j])
         done |= has
         self._gen_ver += 1
+
+    def _tac_make_formation(self, live, done: torch.Tensor, order: torch.Tensor, npass: torch.Tensor,
+                            pre: str, s: int) -> torch.Tensor:
+        """MAKE MILITARY FORMATION (`makeMilitaryFormation`, 0x77a190, its
+        moves 0x773e20) for minor `s`: each unit left, by slot, of a chassis
+        that fights, in less than an Army, not of the air, whose civic of its
+        next formation is in, is queued with the first unit of its player and
+        chassis in no formation on the plots beside it in the ring walk's
+        order (`_RING_DIRS`); then the queue in order: where both still
+        stand, the partner in no formation, the unit of no anti-air strength,
+        no Giant Death Robot and with Movement left, the partner merges into
+        the unit (`_form_up`) and the unit's turn is done. Returns [B, P] the
+        partners merged (`Pass.absorbed`)."""
+        dev = self.device
+        B = self.B
+        bidx = torch.arange(B, device=dev)
+        lo = self.POOL_LO[pre]
+        alive = getattr(self, f"{pre}_unit_alive")
+        absorbed = torch.zeros_like(alive)
+        useat = getattr(self, f"{pre}_unit_seat")
+        utile = getattr(self, f"{pre}_unit_tile")
+        utype = getattr(self, f"{pre}_unit_type")
+        uform = getattr(self, f"{pre}_unit_formation")
+        ump = getattr(self, f"{pre}_unit_mp")
+        seat = 100 + s
+        queue = []
+        for j in range(int(npass.max()) if B else 0):
+            u_b = order[:, j]
+            ut = utype[bidx, u_b].clamp(min=0, max=self.NU - 1)
+            fu = uform[bidx, u_b]
+            fights = ((self._type_combat.take(ut) > 0) | (self._type_ranged_strength.take(ut) > 0)
+                      | (self._type_bombard.take(ut) > 0))
+            ok = (j < npass) & live()[bidx, u_b] & fights & (fu < self._form_max) & (self._type_air.take(ut) == 0)
+            if not bool(ok.count_nonzero()):
+                continue
+            civ_ok = torch.zeros_like(ok)
+            for k in range(1, self._form_max + 1):
+                ci = self._formation_civic[k] if k < len(self._formation_civic) else -1
+                have = self.citystate_civics[:, s, ci] if ci >= 0 else torch.ones_like(ok)
+                civ_ok = civ_ok | ((fu + 1 == k) & have)
+            ok = ok & civ_ok
+            if not bool(ok.count_nonzero()):
+                continue
+            here = utile[bidx, u_b].clamp(min=0)
+            partner = torch.full_like(u_b, -1)
+            for d in self._RING_DIRS:
+                n = self.neigh[here, d]
+                nn = n.clamp(min=0)
+                for plane in (self.military_at, self.embarked_at):
+                    o = plane[bidx, nn]
+                    oc = o.clamp(min=0)
+                    hit = (ok & (partner < 0) & (n >= 0) & (o >= 0) & self.unit_alive[bidx, oc]
+                           & (self.unit_seat[bidx, oc] == seat) & (self.unit_type[bidx, oc] == utype[bidx, u_b])
+                           & (self.unit_formation[bidx, oc] == 0))
+                    partner = torch.where(hit, o, partner)
+            ok = ok & (partner >= 0)
+            if bool(ok.count_nonzero()):
+                queue.append((ok, u_b, partner))
+        for ok, u_b, partner in queue:
+            host = u_b + lo
+            pc = partner.clamp(min=0)
+            ut = utype[bidx, u_b].clamp(min=0, max=self.NU - 1)
+            go = (ok & alive[bidx, u_b] & self.unit_alive[bidx, pc] & (self.unit_formation[bidx, pc] == 0)
+                  & (self._type_anti_air.take(ut) <= 0) & (ut != self._gdr_idx) & (ump[bidx, u_b] > 0))
+            if not bool(go.count_nonzero()):
+                continue
+            self._form_up(seat, go, host, pc, uform[bidx, u_b] + 1)
+            done[bidx[go], u_b[go]] = True
+            pl = (pc - lo).clamp(min=0, max=alive.shape[1] - 1)
+            absorbed[bidx[go], pl[go]] = True
+        return absorbed
 
     def _tac_settler_types(self) -> torch.Tensor:
         """[NU] bool — the chassis whose AI row's PseudoYieldType is
@@ -5045,8 +5117,9 @@ class SimTactics:
         self._tac_move_to_safety(live, done, order, npass, op["rowof"], op["res"], danger, pre, seat, False)
         if tg is not None:
             self._tac_attack_units(live, done, ai, order, op["rowof"], op["res"], tg, 2, peers, pre, seat)
-        # PROMOTION
+        # PROMOTION, MAKE MILITARY FORMATION
         self._tac_promotion(live, done, pre)
+        ghost = self._tac_make_formation(live, done, order, npass, pre, s) & units & tac
         if tg is not None:
             self._tac_attack_units(live, done, ai, order, op["rowof"], op["res"], tg, 1, peers, pre, seat)
         # HEAL: a hurt unit not embarked on a plot of no danger holds its
@@ -5058,11 +5131,13 @@ class SimTactics:
         # pass began: only where a foe stands near is there one to take)
         if tg is not None:
             self._tac_chase(live, done, op["rowof"], op["res"], tg, order, npass, pre, seat, False)
-        # WANDER NEAR CITY: by slot, each unit with Movement left
+        # WANDER NEAR CITY: by slot, each unit with Movement left; a unit a
+        # formation absorbed takes its draw and moves nowhere
         land_ent, wat_ent = self._tac_enter(seat)
         for j in range(npos):
             u_b = order[:, j]
-            ok = (j < npass) & live()[bidx, u_b] & (self.major_unit_mp[bidx, u_b] > 0)
+            gj = ghost[bidx, u_b] & ~done[bidx, u_b]
+            ok = (j < npass) & (live()[bidx, u_b] | gj) & (self.major_unit_mp[bidx, u_b] > 0)
             if not bool(ok.count_nonzero()):
                 continue
             rt, rk = self._seat_reach_turns(op, u_b)
@@ -5074,8 +5149,8 @@ class SimTactics:
             pick = self._rand_range(wander, count)
             by_rank = torch.where(cand, rk, torch.full_like(rk, 1 << 40)).argsort(dim=1, stable=True)
             dest = by_rank.gather(1, pick.clamp(min=0, max=T - 1).unsqueeze(1)).squeeze(1)
-            self._tac_move_to(wander, u_b, dest, pre, seat, False)
-            back = ok & (count == 0)
+            self._tac_move_to(wander & ~gj, u_b, dest, pre, seat, False)
+            back = ok & (count == 0) & ~gj
             if bool(back.count_nonzero()):
                 ut_b = self.major_unit_type[bidx, u_b].clamp(min=0, max=self.NU - 1)
                 nav_b = self.unit_naval.take(ut_b)

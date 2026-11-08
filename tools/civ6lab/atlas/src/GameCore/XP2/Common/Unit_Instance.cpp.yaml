@@ -57,6 +57,7 @@
     - cpu/core/game.ts:condemnHeretic
     - cpu/core/tactical.ts:swapPartner
     - cpu/core/trade.ts:plunderTargets
+    - cpu/core/tactical.ts:makeMilitaryFormation
   readings:
     - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
@@ -69,6 +70,7 @@
     - "C-101 / C-95: the attack carried out condemns a religious target's heretics, a move order walks onto a religious unit's plot — READ (0x771f80 at 0x772331 / 0x7725c9 / 0x7727fa, 0x776140 at 0x776424..0x776470 / 0x777045, 0x947dd0, 0x89c6f0, 0x89cc00), both twins"
     - "C-99 / C-128: the swap's partner test and its step along its own path; Move Unit's update before the executions; a Trader no passenger — READ (0x972540, 0x56e760, 0x972a50 -> 0x26fe20, 0x7d3a00 -> 0x7f0020, 0x586360 -> 0x208b80 / 0x523d60), both twins"
     - "C-123 / C-95: the Plunder Trade Route command and the AI's plunder after the move — READ (0x89dae0, 0x89dfc0, 0x9555a0, 0x9559a0, 0x5545e0 at 0x554667 / 0x554d4c, 0x58fc20, 0x7746a0, 0x70a440, 0x771f80 at 0x7722b6 / 0x77254e / 0x77277f, 0x776140 at 0x776424..0x776470), both twins"
+    - "C-128: a city-state's Make Military Formation — READ (0x77a190, 0x770670, 0x536da0, 0x773e20, 0x94a870, 0x949930), both twins"
   notes: [read; no recorded decision of the five verbose duels tells it apart yet]
   context:
     - "...6f210 is on +8, -1 for all — stable), go for it in order (0x773270): each that can act (0x56c690) takes the move order onto it (0x962190, flag 0x10), a unit with no ranged or bombard s..."
@@ -165,6 +167,17 @@
     - ...der onto it (0x962190, flag 0x10), a unit with no ranged or bombard strength then done (0x56d6f0, 0x570b40, 0x77d180); the civilian taken ends the target; then each ranged one within...
     - "...000, else the skip 0x95eae0 (\"Wander Back to City\", \"Move To\" the city). The turn ends (0x56d6f0, 0x570b40). Confirmed: the turn's \"Random Direction\" draws pair one to one with the AI_..."
   review: reviewed
+- addr: 0x56d940
+  final: 0x3a3320
+  kind: function
+  status: PARTLY
+  impl: [cpu/core/tactical.ts:makeMilitaryFormation]
+  readings:
+    - "C-128: a city-state's Make Military Formation — READ (0x77a190, 0x770670, 0x536da0, 0x773e20, 0x94a870, 0x949930), both twins"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...type, its +0x890 clear, in no formation; 0x536da0 with the unit: no anti-air strength (0x56d940), not of the air, its Units_XP2 row's CanFormMilitaryFormation, not UseMaxMeleeTrainedS..."
+  review: imported
 - addr: 0x56d9f0
   final: 0x3a33d0
   kind: function
@@ -205,6 +218,7 @@
     - cpu/core/tactical.ts:aiFormed
     - gpu/core/sim_tactics.py:_ai_formed
     - cpu/core/tactical.ts:str
+    - cpu/core/tactical.ts:fights
   readings:
     - "H-1: the melee result, a ranged blow's domain, a city's shot — READ"
     - "C-99: an operation's start takes its strengths; a unit's AI strengths with its formation — READ (0x73a120, 0x56dc90, 0x56e3e0, 0x56daa0, 0x1497d0), both twins"
@@ -284,6 +298,7 @@
     - cpu/core/aiModifiers.ts:amountOf
     - cpu/core/minorCityAi.ts:minorEconomicDisband
     - cpu/core/tactical.ts:melee
+    - cpu/core/tactical.ts:fights
   readings:
     - "C-34: the interception's damage, XP, weariness and the answers"
     - "C-99: an operation's start takes its strengths; a unit's AI strengths with its formation — READ (0x73a120, 0x56dc90, 0x56e3e0, 0x56daa0, 0x1497d0), both twins"
@@ -440,6 +455,7 @@
     - cpu/core/tactical.ts:aiFormed
     - gpu/core/sim_tactics.py:_ai_formed
     - cpu/core/tactical.ts:str
+    - cpu/core/tactical.ts:fights
   readings:
     - "H-1: the melee result, a ranged blow's domain, a city's shot — READ"
     - "C-99: an operation's start takes its strengths; a unit's AI strengths with its formation — READ (0x73a120, 0x56dc90, 0x56e3e0, 0x56daa0, 0x1497d0), both twins"
