@@ -3,6 +3,23 @@
 # `review: imported` = bootstrapped from dll_readings.md / code comments / saved
 # labels and not yet reviewed: verify against the disassembly, then edit and
 # set `review: reviewed`.
+- addr: 0x89c6f0
+  kind: function
+  name: CanStart
+  semantics: "CONDEMN HERETIC's CanStart: the unit alive, with Movement left (0x56c690), a combat, ranged or bombard strength, not an aircraft, embarked only with +0x18c3; a unit of its plot's religious layer (0x75c50 layer 3) of another player, not of the condemner's own religion (0x497520), of a religion entry with +0x80 > 0 or a player at war (0x469cd0)."
+  status: READ
+  cases:
+    - recording: h1_duely1124
+      turn: 136
+      value: the barbarian Caravel 4587523 moves onto 26:13 in Attack Units and the embarked Missionary 3407880 is removed (UnitRemovedFromMap before its deferred UnitMoved, no CombatLog row)
+  impl: [cpu/core/game.ts:condemnHeretic, gpu/core/sim_seats.py:_condemn_ok]
+  readings:
+    - "C-101 / C-95: the attack carried out condemns a religious target's heretics, a move order walks onto a religious unit's plot — READ (0x771f80 at 0x772331 / 0x7725c9 / 0x7727fa, 0x776140 at 0x776424..0x776470 / 0x777045, 0x947dd0, 0x89c6f0, 0x89cc00), both twins"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - ...0 at 0x772331 / 0x7725c9 / 0x7727fa, 0x776140 at 0x776424..0x776470 / 0x777045, 0x947dd0, 0x89c6f0, 0x89cc00), both twins
+    - "- CONDEMN'S CanStart (0x89c6f0): the unit alive, with Movement left (0x56c690), a combat, ranged or bombard strength,..."
+  review: reviewed
 - addr: 0x89cc00
   kind: function
   semantics: the condemn command (-> 0x493f80 with the capture flag).
@@ -11,9 +28,10 @@
     - recording: 1121
       turn: 110
       value: "Recorded: 1121 t110, a barbarian   on China's Missionary beside Taiyuan, −125 in Xi'an and Taiyuan   (`religiousUnitLost`, the harness replaying the log's kill)."
-  impl: [cpu/core/game.ts:religiousUnitLost]
+  impl: [cpu/core/game.ts:religiousUnitLost, cpu/core/game.ts:condemnHeretic]
   readings:
     - "H-1: an annex re-places the citizens, the garrison's unit, a religious unit killed on a move — READ"
+    - "C-101 / C-95: the attack carried out condemns a religious target's heretics, a move order walks onto a religious unit's plot — READ (0x771f80 at 0x772331 / 0x7725c9 / 0x7727fa, 0x776140 at 0x776424..0x776470 / 0x777045, 0x947dd0, 0x89c6f0, 0x89cc00), both twins"
   context:
     - "...off the victim's religion, scaled by its player's +0x4f0 percent; the condemn command (0x89cc00, 0x947f10) and a combat kill (0x20e720, 0x212c30) pass the same flag. Recorded: 1121 t1..."
   review: reviewed

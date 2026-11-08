@@ -415,9 +415,10 @@ export function unitMask(ctx: MaskCtx, u: Unit): number[] {
   if (promoReady(u)) {
     for (let k = 0; k < PROMO_COLS; k++) if (promoAvailable(u, k)) out.add(A_PROMOTE + k);
   }
-  // CONDEMN: a fighter on the tile of a religious unit (the civilian
-  // occupant, else the passenger) of a seat this one is at WAR with.
-  if (fights) {
+  // CONDEMN (`condemnHeretic`'s CanStart): a unit with a combat, ranged or
+  // bombard strength, not embarked, on the tile of a religious unit (the
+  // civilian occupant, else the passenger) of a seat this one is at WAR with.
+  if ((fights || (def?.ranged?.strength ?? 0) > 0 || (def?.bombard ?? 0) > 0) && !u.embarked) {
     const r = religiousAt(ctx, here.index);
     if (r && r.seat !== seat && civsAtWar(state, seat, r.seat)) out.add(A_CONDEMN);
   }

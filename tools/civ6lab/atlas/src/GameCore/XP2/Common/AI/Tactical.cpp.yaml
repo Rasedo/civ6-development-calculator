@@ -217,6 +217,7 @@
     - "C-95: the danger map and Move to Safety — READ, ported"
     - "C-97: the behaviour trees — READ (the interpreter), the nodes PARTLY READ"
     - "C-124: a move order's path opens a turn-end node beside each node with Movement left — READ (0x271920, 0x7a880, 0x271490, 0x775a0, 0x26f330), both twins"
+    - "C-101 / C-95: the attack carried out condemns a religious target's heretics, a move order walks onto a religious unit's plot — READ (0x771f80 at 0x772331 / 0x7725c9 / 0x7727fa, 0x776140 at 0x776424..0x776470 / 0x777045, 0x947dd0, 0x89c6f0, 0x89cc00), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "- THE EXECUTION (0x771f80): the moves (retried where not blocked), the bombard strikes, the ranged strikes (unles..."
@@ -500,6 +501,7 @@
     - "C-96: the standing army and the Combat Desire's city terms — READ (0x5ca7e0, the watched setter 0x731d10, 0x79b9c0), the unit table's orientation READ"
     - "C-97: the behaviour trees — READ (the interpreter), the nodes PARTLY READ"
     - "C-125: a melee unit's spot beside its target — READ (0x790c60 at 0x790faa..0x79103c, 0x776140's claim loop, 0x7702b0), both twins"
+    - "C-101 / C-95: the attack carried out condemns a religious target's heretics, a move order walks onto a religious unit's plot — READ (0x771f80 at 0x772331 / 0x7725c9 / 0x7727fa, 0x776140 at 0x776424..0x776470 / 0x777045, 0x947dd0, 0x89c6f0, 0x89cc00), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "- THE ASSIGNMENT (0x776140): a target's health floor(100 x 281 / 256) less its damage (1.1 in 24.8); for MEDIUM /..."

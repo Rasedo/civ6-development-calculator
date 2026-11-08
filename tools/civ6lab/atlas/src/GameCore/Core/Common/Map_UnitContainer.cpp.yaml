@@ -53,7 +53,10 @@
     - recording: 1124
       turn: 1
       value: With them   the planning rows of 1124 t1-60 the reach reproduces exactly went 705 ->   758 of 1,241, the game's plots within ours 862 -> 1,192.
-  impl: [cpu/core/disasters.ts:strikeUnits, cpu/core/tactical.ts:layer]
+  impl:
+    - cpu/core/disasters.ts:strikeUnits
+    - cpu/core/tactical.ts:layer
+    - cpu/core/game.ts:condemnHeretic
   readings:
     - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
     - "C-96: an event's civilian kill spares a Trader — PARTLY READ"
@@ -62,6 +65,7 @@
     - "C-99: the stacking count holds other players' units, the wanders' kept-out plots, a Harbor's water no shore — READ (0x585d90, 0x585eb0, 0x2720a0, 0x77bf50, 0x77b9a0, 0x530240), both twins"
     - "C-125: a melee unit's spot beside its target — READ (0x790c60 at 0x790faa..0x79103c, 0x776140's claim loop, 0x7702b0), both twins"
     - "C-124: a move order's path prices a turn's end at the stacking limit +1e6, and its destination there stops the search — READ (0x270dd0 at 0x27101e..0x2710a0, 0x2720a0 at 0x272230..0x272364, 0x77a50, 0x26dcd0's callbacks), both twins"
+    - "C-101 / C-95: the attack carried out condemns a religious target's heretics, a move order walks onto a religious unit's plot — READ (0x771f80 at 0x772331 / 0x7725c9 / 0x7727fa, 0x776140 at 0x776424..0x776470 / 0x777045, 0x947dd0, 0x89c6f0, 0x89cc00), both twins"
   context:
     - "...x58 / +0x5c) on the plot, else (search flag +0x398 & 0x200 clear) any unit on the plot (0x75c50) of a player at war that fights (0x209dd0: combat, ranged or bombard above 0) — no doma..."
   review: reviewed

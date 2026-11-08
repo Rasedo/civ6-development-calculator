@@ -4964,6 +4964,26 @@ class SimSeats:
         keep = torch.where(maj, self._enh["theoKeep"][self.civ_enhancer[b, sr] + 1], torch.zeros_like(rel))
         return torch.div(int(swing) * (100 - keep.clamp(max=100)), 100, rounding_mode="floor")
 
+    def _condemn_ok(self, seat: int, m: torch.Tensor, sc: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+        """`condemnHeretic`'s CanStart (0x89c6f0) for the unit at merged slot
+        `sc` [B] of `seat` in the games `m`: Movement left, a combat, ranged
+        or bombard strength, no aircraft, not embarked, and on its plot a
+        religious unit of another player at war with it. Returns the games
+        that may, the plot and the religious unit's merged slot."""
+        s1 = sc.clamp(min=0).unsqueeze(1)
+        tile = self.unit_tile.gather(1, s1).squeeze(1)
+        tc = tile.clamp(min=0)
+        ut = self.unit_type.gather(1, s1).squeeze(1).clamp(min=0, max=self.NU - 1)
+        fights = ((self._type_combat.take(ut) > 0) | (self._type_ranged_strength.take(ut) > 0)
+                  | (self._type_bombard.take(ut) > 0)) & (self._type_air.take(ut) == 0)
+        rel = self._religious_at(tc.unsqueeze(1)).squeeze(1)
+        rsx = torch.where(rel >= 0, self.unit_seat.gather(1, rel.clamp(min=0).unsqueeze(1)).squeeze(1),
+                          torch.full_like(rel, -1))
+        ok = (m & (sc >= 0) & (tile >= 0) & (self.unit_mp.gather(1, s1).squeeze(1) > 0) & fights
+              & ~self.unit_emb.gather(1, s1).squeeze(1).bool() & (rel >= 0) & (rsx >= 0) & (rsx != seat)
+              & self._seats_hostile(seat, rsx))
+        return ok, tc, rel
+
     def _condemn_heretic(self, row: int, live: torch.Tensor, tile: torch.Tensor,
                          rel: torch.Tensor, sc: torch.Tensor) -> None:
         """`condemnHeretic` — a military unit kills the religious unit on its
@@ -4996,8 +5016,10 @@ class SimSeats:
             self.city_pressure[cr[k], msk, los[k]] = (_cur - _loss[k]).clamp(min=0)
         _rel_all = torch.full((self.B,), -1, dtype=torch.long, device=self.device)
         _rel_all[cr] = los
-        self.civ_diplo_favor[:, row] = (self.civ_diplo_favor[:, row]
-                                        + self._congress_condemn_favor(_rel_all) * live.long())
+        # a major's favor (the minors and the barbarians hold none)
+        if 0 <= row < nrow:
+            self.civ_diplo_favor[:, row] = (self.civ_diplo_favor[:, row]
+                                            + self._congress_condemn_favor(_rel_all) * live.long())
         self.unit_alive[cr, rel[cr]] = False
         self._occ_clear(cr, dt, rel[cr])
         self.unit_mp[cr, sc[cr]] = 0

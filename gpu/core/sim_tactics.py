@@ -290,6 +290,15 @@ class SimTactics:
             out |= (pl >= 0) & self._seats_hostile(seat, s)
         return out
 
+    def _tac_hostile_on(self, seat: int, rel: bool) -> torch.Tensor:
+        """[B, T] bool — `_tac_hostile` on the map layer of a religious mover
+        (`rel`) or of any other (`enemyOnLayer`)"""
+        out = torch.zeros(self.B, self.T, dtype=torch.bool, device=self.device)
+        for pl in (self.military_at, self.civilian_at, self.support_at, self.embarked_at):
+            s = torch.where(pl >= 0, self.unit_seat.gather(1, pl.clamp(min=0)), torch.full_like(pl, -1))
+            out |= self._tac_layer(pl, rel) & self._seats_hostile(seat, s)
+        return out
+
     def _tac_closed(self, seat: int) -> torch.Tensor:
         """[B, T] bool — `closedToMinor`: for a city-state's `seat`, a major's
         or another city-state's territory whose owner holds the open-borders
@@ -1578,6 +1587,15 @@ class SimTactics:
         has_path = res["found"] & (plen > 0)
         # a path ending on a plot it attacks into: it walks to its side
         into = res["found"] & res["attack"][ar, dr] & (plen > 0)
+        # (`attackPlot`: a unit at war on its map layer, a hostile city centre
+        # or Encampment; a plot of the other layer's units alone it walks onto)
+        rel0 = self._rel_strength.take(getattr(self, f"{pre}_unit_type")[rows, sr].clamp(min=0, max=self.NU - 1)) > 0
+        h_any = self._tac_hostile(seat)[rows, dr]
+        h_lay = torch.where(rel0, self._tac_hostile_on(seat, True)[rows, dr], self._tac_hostile_on(seat, False)[rows, dr])
+        city_in = self._centre_plane() & (self.tile_seat != seat) & self._seats_hostile(seat, self.tile_seat)
+        if self._encamp_didx >= 0:
+            city_in = city_in | self._encamp_block_plane(seat)
+        into = into & ~(h_any & ~h_lay & ~city_in[rows, dr])
         plen = plen - into.long()
         # a unit whose last step of the turn ended in a zone of control waits
         # (`zocMoved`), striking all the same from beside its target
@@ -1625,7 +1643,11 @@ class SimTactics:
         f_land_w, f_sea_w = self._tac_pool(pre)
         fl_w, fs_w = f_land_w[rows, sr], f_sea_w[rows, sr]
         ww = self.unit_water_walk.take(ut)
-        foe_n = self._tac_hostile(seat)[rows]
+        # a unit at war on its map layer (`enemyOnLayer`: a religious unit on
+        # its own, walked onto)
+        foe_n = self._tac_hostile_on(seat, False)[rows]
+        if bool(rel_u.count_nonzero()):
+            foe_n = torch.where(rel_u, self._tac_hostile_on(seat, True)[rows], foe_n)
         for i in range(L):
             p = path[:, i]
             on = on & (i < plen)
@@ -1859,6 +1881,10 @@ class SimTactics:
         ss = seat_of(sup)
         trader = (civ >= 0) & (ct == self._trader_idx)
         relig = (civ >= 0) & (self._rel_strength.take(ct) > 0)
+        # the religious unit of the plot: the civilian plane's, or a passenger at sea
+        erel = (emb >= 0) & (self._rel_strength.take(et) > 0)
+        rel_slot = torch.where(relig, civ, torch.where(erel, emb, none))
+        rel_seat = torch.where(relig, cs_, torch.where(erel, es, none))
         n_civ = ((civ >= 0) & ~trader & ~relig).long() + (sup >= 0).long()
         civ_seat = torch.where((civ >= 0) & ~trader & ~relig, cs_, ss)
         civ_slot = torch.where((civ >= 0) & ~trader & ~relig, civ, sup)
@@ -1878,7 +1904,7 @@ class SimTactics:
             (4, camp, none), (5, goody, none),
             (6, trader & hostile(cs_), cs_),
             (7, n_civ == 1, civ_seat),
-            (8, relig & hostile(cs_), cs_),
+            (8, (rel_slot >= 0) & hostile(rel_seat), rel_seat),
             (9, (self.improvement >= 0) & ~self.pillaged & h_own & ~goody, none),
         ):
             hit = cond & ~taken
@@ -1902,7 +1928,7 @@ class SimTactics:
         # knowledge base's after them on plots it does not
         uk = torch.where(fight, 1, torch.where((okk == 6) | (okk == 7) | (okk == 8), okk, 0))
         us = torch.where(uk > 0, torch.where(fight, dseat, oss), none)
-        uu = torch.where(fight, dslot, torch.where(okk == 7, civ_slot, torch.where((okk == 6) | (okk == 8), civ, none)))
+        uu = torch.where(fight, dslot, torch.where(okk == 7, civ_slot, torch.where(okk == 6, civ, torch.where(okk == 8, rel_slot, none))))
         uo = torch.where(uk > 0, self._arange_bt, torch.full_like(ts, 1 << 40))
         if kb >= 0:
             uk, uu, us, uo = self._tac_known_entries(seat, kb, seen, uk, uu, us, uo)
@@ -2962,9 +2988,12 @@ class SimTactics:
         pslot = getattr(self, "barb_unit_slotno" if seat == BARB_SEAT else f"{pre}_unit_pslot").gather(1, us)
         perm = self._tac_merge_sort(uv.sum(dim=1), got, move, frm, dmg, pslot)
         # a CIVILIAN target's: no strike, the move onto it captures
-        civ = got & (kinds.gather(1, tk.gather(1, ck.gather(1, c4c))) == 7)
+        kd = kinds.gather(1, tk.gather(1, ck.gather(1, c4c)))
+        civ = got & (kd == 7)
+        # a RELIGIOUS target's: the heretics condemned after its strike or move
+        rel = got & (kd == 8)
         return {"slot": slot.gather(1, perm), "move": move.gather(1, perm), "attack": att.gather(1, perm),
-                "civ": civ.gather(1, perm),
+                "civ": civ.gather(1, perm), "rel": rel.gather(1, perm),
                 "valid": got.gather(1, perm)}
 
     def _tac_merge_sort(self, n: torch.Tensor, got, move, frm, dmg, us) -> torch.Tensor:
@@ -3045,7 +3074,10 @@ class SimTactics:
         short of it — the move where no unit at war or of its own
         holds it); a siege unit strikes its attack (a civilian's none); a ranged unit strikes it
         unless its melee is the stronger and its reach takes the plot this
-        turn; then every unit moves onto its attack — each one's turn done."""
+        turn; then every unit moves onto its attack; after each strike and
+        attack move, against a RELIGIOUS target, the heretics on its plot
+        condemned where it may (`_condemn_ok`, `_condemn_heretic`) — each
+        one's turn done."""
         dev = self.device
         B = self.B
         bidx = torch.arange(B, device=dev)
@@ -3094,6 +3126,19 @@ class SimTactics:
             u_b = sl[:, r]
             return alive(r) & ~done[bidx, u_b] & (getattr(self, f"{pre}_unit_mp")[bidx, u_b] > 0)
 
+        rel_t = out["rel"]
+
+        def condemn(m: torch.Tensor, r: int) -> None:
+            """against a RELIGIOUS target the unit condemns the heretics on
+            its plot where it may (`condemnHeretic`)"""
+            m = m & rel_t[:, r] & getattr(self, f"{pre}_unit_alive")[bidx, sl[:, r]]
+            if not bool(m.count_nonzero()):
+                return
+            gs = sl[:, r] + self.POOL_LO[pre]
+            ok, tc, rl = self._condemn_ok(seat, m, gs)
+            if bool(ok.count_nonzero()):
+                self._condemn_heretic(seat, ok, tc, rl, gs)
+
         def strike(m: torch.Tensor, r: int) -> None:
             u_b = sl[:, r]
             here = getattr(self, f"{pre}_unit_tile")[bidx, u_b].clamp(min=0)
@@ -3104,6 +3149,7 @@ class SimTactics:
                     & (getattr(self, f"{pre}_unit_attacks")[bidx, u_b] > 0))
             for u in torch.unique(u_b[fire]).tolist():
                 self._hostile_ranged_strike(fire & (u_b == u), a.clamp(min=0), pre, u)
+            condemn(m, r)
             getattr(self, f"{pre}_unit_mp")[bidx[m], u_b[m]] = 0
             done[bidx[m], u_b[m]] = True
 
@@ -3131,6 +3177,7 @@ class SimTactics:
                 continue
             go = on & (att[:, r] >= 0) & ~done[bidx, u_b] & (getattr(self, f"{pre}_unit_mp")[bidx, u_b] > 0)
             self._tac_move_to(go, u_b, att[:, r], pre, seat)
+            condemn(on, r)
             fin = on & getattr(self, f"{pre}_unit_alive")[bidx, u_b]
             getattr(self, f"{pre}_unit_mp")[bidx[fin], u_b[fin]] = 0
             done[bidx[on], u_b[on]] = True

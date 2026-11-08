@@ -8585,3 +8585,47 @@ weighed entries (gpu/core/sim_minorops.py).
   each whole) 1-4 over the log t206-247 while its knowledge base's counts
   (0x5eb650 reads the per-type count vector, AI_Knowledge.csv's ARMY lines)
   equal the game's.
+
+## C-101 / C-95: the attack carried out condemns a religious target's heretics, a move order walks onto a religious unit's plot — READ (0x771f80 at 0x772331 / 0x7725c9 / 0x7727fa, 0x776140 at 0x776424..0x776470 / 0x777045, 0x947dd0, 0x89c6f0, 0x89cc00), both twins
+
+`carryOut`'s condemnations, `Assigned.religious`, `condemnHeretic`'s
+CanStart, `attackPlot` / `walk`'s `enemyOnLayer` (cpu/core/tactical.ts,
+cpu/core/game.ts), the CONDEMN mask (cpu/core/unitMask.ts);
+`_tac_carry_out`'s `condemn`, `_tac_assign`'s "rel", `_tac_move_to`'s
+layered `into` and `foe_n` (`_tac_hostile_on`), `_tac_targets`' embarked
+religious entry (gpu/core/sim_tactics.py); `_condemn_ok` /
+`_condemn_heretic` (gpu/core/sim_seats.py), the order and mask
+(gpu/core/sim_orders.py, gpu/core/sim_masks.py).
+
+- THE ASSIGNMENT'S FLAGS (0x776140 at 0x776424..0x776470, copied to the
+  0x38 entry at 0x777045..0x7770e7): +0x32 the target RELIGIOUS, +0x33 a
+  CIVILIAN or a TRADER (no strike), +0x34 a TRADER.
+- THE CARRY-OUT (0x771f80): after a siege unit's bombard (0x772331), a
+  ranged unit's strike (0x7725c9) and every unit's attack move (MOVE_TO
+  with flag 0x10, 0x962190; 0x7727fa), an entry with +0x34 issues
+  PLUNDER_TRADE_ROUTE (0x955950) and one with +0x32
+  UNITCOMMAND_CONDEMN_HERETIC (0x947dd0, hash 0xdc60e164), each where its
+  CanStart (vt +0x48) answers, then Start (vt +0x58).
+- CONDEMN'S CanStart (0x89c6f0): the unit alive, with Movement left
+  (0x56c690), a combat, ranged or bombard strength, not an aircraft
+  (+0x650 1), embarked only with +0x18c3; a unit of the plot's religious
+  layer (0x75c50 layer 3) of another player whose religion is not the
+  condemner's own (0x497520) and of a religion with +0x80 > 0 or a player
+  at war (0x469cd0). Its Start (0x89cc00) kills every such unit (0x493f80
+  with the capture flag each) and ends the condemner's moves (0x56d6f0).
+- A MOVE ORDER onto a plot whose only units at war stand on the religious
+  layer walks onto it, no attack: runs/h1_duely1124 t118 the Man-At-Arms
+  4849682 ends on 35:16 with the Missionary 3080203, which lives (no
+  Movement left to condemn).
+- CONFIRMED (UnitRemovedFromMap of the Missionary between the attack's
+  order and its deferred UnitMoved, no CombatLog row): runs/h1_duely1124
+  t134 Galley 1376265 onto 30:7, t136 Caravel 4587523 onto 26:13, t147
+  Caravel 4587523 onto 23:6 (the embarked Missionaries 3604494, 3407880,
+  3080203), t113 Man-At-Arms 4980762 onto 39:19; runs/h1_duely1128 t182
+  Man-At-Arms 5636119 onto 42:13. One-seed aimem windows: the 1124 rows of
+  t134 / t136 / t147 end on the target's plot as logged.
+- OPEN: +0x80 of the religion entry (0x340490) and +0x18c3 (an embarked
+  unit that fights) unread, both read as none; PLUNDER_TRADE_ROUTE after a
+  Trader target's move not ported (no TRADER entry is assigned by Attack
+  Units); the GPU condemns the one religious unit its planes hold on the
+  plot.

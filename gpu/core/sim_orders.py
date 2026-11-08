@@ -369,16 +369,7 @@ class SimOrders:
                 # CONDEMN HERETIC, on the condemner's OWN tile
                 cdm = act & (a == _cn)
                 if bool(cdm.count_nonzero()):
-                    ctc = hc
-                    rel = self._religious_at(ctc.unsqueeze(1)).squeeze(1)
-                    rsx = torch.where(rel >= 0,
-                                      self.unit_seat.gather(1, rel.clamp(min=0).unsqueeze(1)).squeeze(1),
-                                      torch.full_like(rel, -1))
-                    okc = (
-                        cdm & u_moves & (here >= 0) & (rel >= 0) & (rsx >= 0) & (rsx != row)
-                        & (self._type_combat[utp.clamp(min=0)] > 0)
-                        & self.war[:, row].gather(1, self._seat_row[rsx.clamp(min=0)].unsqueeze(1)).squeeze(1)
-                    )
+                    okc, ctc, rel = self._condemn_ok(row, cdm, sc)
                     if bool(okc.count_nonzero()):
                         self._condemn_heretic(row, okc, ctc, rel, sc)
 

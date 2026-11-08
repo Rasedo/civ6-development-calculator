@@ -4832,7 +4832,12 @@ class SimMasks:
                               torch.full_like(tc, -1))
             _hw = self.war[:, row].gather(
                 1, self._seat_row.take(_hs.clamp(min=0))) & (_hs >= 0) & (_hs != row)
-            _cd = [(present & (self._type_combat.take(utype.clamp(min=0)) > 0) & _hw).unsqueeze(2)]
+            # `_condemn_ok`'s unit: a combat, ranged or bombard strength, not
+            # embarked
+            _ut0 = utype.clamp(min=0)
+            _cf = ((self._type_combat.take(_ut0) > 0) | (self._type_ranged_strength.take(_ut0) > 0)
+                   | (self._type_bombard.take(_ut0) > 0)) & ~u_emb.bool()
+            _cd = [(present & _cf & _hw).unsqueeze(2)]
 
         _rh: list[torch.Tensor] = []
         if self._A_HERESY >= 0 and self._inquisitor_idx >= 0:

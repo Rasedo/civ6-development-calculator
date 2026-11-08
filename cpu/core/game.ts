@@ -10,7 +10,7 @@ import { canFoundCity, availableBuildings, buildingCompletable, purchasableBuild
 import { computeUnlocks, getModifiers, isCivicComplete, goldPrice, faithPrice } from './effects';
 import type { Modifiers, Unlocks } from './effects';
 import { boostPool, drawBoosts } from './boosts';
-import { spawnUnit, refreshUnits, trainableUnits, disbandUnit, reseatUnit, tileFreeForUnit, builderCost, traderCost, unitsAt, unitDomain, bestTrainableOfClass, purchaseSpotBlocked, raiseBestTrained } from './units';
+import { unitsHostile, spawnUnit, refreshUnits, trainableUnits, disbandUnit, reseatUnit, tileFreeForUnit, builderCost, traderCost, unitsAt, unitDomain, bestTrainableOfClass, purchaseSpotBlocked, raiseBestTrained } from './units';
 import { drawPromoOffer, promoFlag, unitPromoRows } from './promotions';
 import { logXpWrite, logPopWrite } from './difflog';
 import { applyTrainingGrants, damageRoll, theoStrength, theoFlankCount, theoSupportCount, theoDefenseStrength, FLANKING_CS, SUPPORT_CS } from './combat';
@@ -50,7 +50,7 @@ import { randRange } from './rand';
 import { srcConst, xml } from '../data/provenance';
 import { rowIsFor } from '../data/civilizations';
 import type { CivId, LeaderId } from '../../world/roster';
-import { BARB_SEAT, allCities, grantFoundingPressure, majorityReligionOf, prophetsOf, citiesOf, civOf, civsAtWar, emptySeat, isBarbSeat, isCityStateSeat, markCityCentre, seatOf, setTileOwner, tileClaimed, tileSeat, unitSeat, visibilityCS, allianceTheoCS, alliedAtLevel, civVariantOf , leaderOf, onHomeContinent, civLevelOf } from './seats';
+import { BARB_SEAT, allCities, grantFoundingPressure, majorityReligionOf, prophetsOf, citiesOf, civOf, emptySeat, isBarbSeat, isCityStateSeat, markCityCentre, seatOf, setTileOwner, tileClaimed, tileSeat, unitSeat, visibilityCS, allianceTheoCS, alliedAtLevel, civVariantOf , leaderOf, onHomeContinent, civLevelOf } from './seats';
 import { irradiated } from './nuclear';
 import { formationBanned } from './units';
 import { giveEraQuests } from './quests';
@@ -966,26 +966,36 @@ function theoLoss(state: GameState, rel: number, swing: number): number {
  * It is an OWN-TILE verb: legal only on the heretic's own tile, never from
  * beside it (runs/religious_target_20260926T_*.jsonl:
  * `CanStartCommand` false from every adjacent tile, true on the heretic's,
- * spawned there or moved in by the melee order); it kills the religious unit
- * and ends the condemner's moves.
+ * spawned there or moved in by the melee order). Its CanStart (0x89c6f0): the
+ * condemner with Movement left (0x56c690), a combat, ranged or bombard
+ * strength, no aircraft, not embarked; on its plot a religious unit of
+ * another player at war with it (the religious layer's list, 0x75c50 layer
+ * 3; the barbarians at war with all). Its Start (0x89cc00) kills every such
+ * unit (0x493f80 with the capture flag each) and ends the condemner's moves
+ * (0x56d6f0).
  */
 export function condemnHeretic(state: GameState, unit: Unit): RuleResult {
-  if ((UNITS[unit.type]?.combat ?? 0) <= 0) return { ok: false, reason: 'Not a military unit.' };
-  const tileIndex = unit.tileIndex;
-  const target = state.units.find(
-    (u) => u.tileIndex === tileIndex && (UNITS[u.type]?.religiousStrength ?? 0) > 0
-      && unitSeat(u) !== unitSeat(unit),
-  );
-  if (!target) return { ok: false, reason: 'No enemy religious unit there.' };
-  if (!civsAtWar(state, unitSeat(unit), unitSeat(target))) {
-    return { ok: false, reason: 'Not at war with its owner.' };
+  const def = UNITS[unit.type];
+  if (!def || !((def.combat ?? 0) > 0 || (def.ranged?.strength ?? 0) > 0 || (def.bombard ?? 0) > 0) || unitDomain(unit.type) === 'air') {
+    return { ok: false, reason: 'Not a military unit.' };
   }
-  const loser = unitSeat(target);
-  // WORLD RELIGION outcome B pays the CONDEMNER for the act.
-  const condemner = seatOf(state, unitSeat(unit));
-  if (condemner) condemner.diplomaticFavor += congressCondemnFavor(state, loser);
-  religiousUnitLost(state, loser, tileIndex);
-  disbandUnit(state, target.id);
+  if (unit.movesLeft <= 0) return { ok: false, reason: 'No movement left.' };
+  if (unit.embarked) return { ok: false, reason: 'Embarked.' };
+  const tileIndex = unit.tileIndex;
+  const targets = state.units.filter(
+    (u) => u.tileIndex === tileIndex && (UNITS[u.type]?.religiousStrength ?? 0) > 0
+      && unitSeat(u) !== unitSeat(unit) && unitsHostile(state, unit, u),
+  );
+  if (!targets.length) return { ok: false, reason: 'No enemy religious unit there.' };
+  // a major's favor (the minors and the barbarians hold none)
+  const condemner = state.seats.find((s) => s === seatOf(state, unitSeat(unit)));
+  for (const target of targets) {
+    const loser = unitSeat(target);
+    // WORLD RELIGION outcome B pays the CONDEMNER for the act.
+    if (condemner) condemner.diplomaticFavor += congressCondemnFavor(state, loser);
+    religiousUnitLost(state, loser, tileIndex);
+    disbandUnit(state, target.id);
+  }
   unit.movesLeft = 0;
   return { ok: true };
 }

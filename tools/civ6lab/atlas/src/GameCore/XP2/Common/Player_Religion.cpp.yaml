@@ -15,10 +15,14 @@
     - recording: 1121
       turn: 110
       value: "Recorded: 1121 t110, a barbarian   on China's Missionary beside Taiyuan, −125 in Xi'an and Taiyuan   (`religiousUnitLost`, the harness replaying the log's kill)."
-  impl: [cpu/core/game.ts:religiousUnitLost, cpu/data/religion.ts:THEO_PRESSURE_RANGE]
+  impl:
+    - cpu/core/game.ts:religiousUnitLost
+    - cpu/data/religion.ts:THEO_PRESSURE_RANGE
+    - cpu/core/game.ts:condemnHeretic
   readings:
     - "H-1: an annex re-places the citizens, the garrison's unit, a religious unit killed on a move — READ"
     - "H-1: a civilian stepped on — READ"
+    - "C-101 / C-95: the attack carried out condemns a religious target's heretics, a move order walks onto a religious unit's plot — READ (0x771f80 at 0x772331 / 0x7725c9 / 0x7727fa, 0x776140 at 0x776424..0x776470 / 0x777045, 0x947dd0, 0x89c6f0, 0x89cc00), both twins"
   context:
     - "- A unit's move onto a plot holding a religious unit it kills (0x26fe20 → 0x493f80 with the capture flag 1) swings religion: RELIGION_SPREAD_ UNIT_CAPTURE (gp +0x600, 125..."
     - ...ls 0x212500(victim, mover, plot, ...); a 0 back destroys the victim (the religion swing 0x493f80 with the capture flag 1), a 1 or a 2 leaves it be. The mover then completes its step.
@@ -140,6 +144,7 @@
   status: PARTLY
   readings:
     - "C-97: the religion AI — the belief scores READ (the job, the value, the analysis's attach), the picks READ, the analyzers PARTLY READ"
+    - "C-101 / C-95: the attack carried out condemns a religious target's heretics, a move order walks onto a religious unit's plot — READ (0x771f80 at 0x772331 / 0x7725c9 / 0x7727fa, 0x776140 at 0x776424..0x776470 / 0x777045, 0x947dd0, 0x89c6f0, 0x89cc00), both twins"
   context:
     - "...text of the player (+0x40 its id, +0x80 it) and a religion (+0x48): the one it founded (0x497520), else its majority religion (0x497240)."
   review: reviewed

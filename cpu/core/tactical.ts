@@ -13,6 +13,7 @@ import { hullPassage, isCoastalLand, isImpassable, isWater } from '../../world/q
 import { COMBAT_BOMBARD_VS_UNIT, EMBARK_MOVES, MP_SCALE } from '../data/constants';
 import { CITY_MAX_HP, UNITS, UNIT_HP } from '../data/units';
 import { DISTRICTS } from '../data/districts';
+import { condemnHeretic } from './game';
 import { IMPROVEMENTS } from '../data/improvements';
 import { AI_FEATURES, AI_UNITS } from '../data/aiBuildTables';
 import { AI_UNIT_AI } from '../data/aiOperations';
@@ -998,10 +999,14 @@ function orderOnce(state: GameState, unit: Unit, dest: number, strike: boolean,
 }
 
 /** a plot the unit would attack into rather than enter: one a unit of a
- *  player at war with it holds, or a hostile city centre or Encampment */
+ *  player at war with it holds on its map layer (a religious unit on its
+ *  own: a move order walks onto it, runs/h1_duely1124 t118 the barbarian
+ *  Man-At-Arms 4849682 onto the Missionary on 35:16, t136 the Caravel
+ *  4587523 onto the embarked Missionary on 26:13), or a hostile city centre
+ *  or Encampment */
 function attackPlot(state: GameState, unit: Unit, p: number): boolean {
   const t = state.map.tiles[p];
-  if (enemyAt(state, unit, p)) return true;
+  if (enemyOnLayer(state, unit, p)) return true;
   const owner = tileSeat(t);
   if (t.district === 'CITY_CENTER' && owner !== unit.seat && unitsHostile(state, unit, { seat: owner })) return true;
   return encampmentBlocks(state, t, unit);
@@ -1033,7 +1038,7 @@ function walk(state: GameState, unit: Unit, path: number[], dest: number, mates:
     // walk short of it: the order moves one node at a time on a path found
     // afresh (0x962380 -> 0x26fe20 to the node after its start), its first
     // step ending the order unmoved on a defender at war it sees (0x209e30)
-    if (enemyAt(state, unit, p)) break;
+    if (enemyOnLayer(state, unit, p)) break;
     const cost = stepCost(state, unit, tiles[from], tiles[p]) + carry;
     if (mp < cost && mp < full) break;
     const cross = shoreCrossing(unit.type, tiles[from], tiles[p]);
@@ -1062,6 +1067,12 @@ function onMap(u: Unit): boolean {
 /** a unit of another player at war with the unit's on the plot (0x5862e0) */
 export function enemyAt(state: GameState, unit: Unit, tile: number): boolean {
   return state.units.some((u) => u.tileIndex === tile && onMap(u) && unitsHostile(state, unit, u));
+}
+
+/** `enemyAt` on the unit's map layer (a religious unit's its own) */
+function enemyOnLayer(state: GameState, unit: Unit, tile: number): boolean {
+  const layer = unitReligious(unit.type);
+  return state.units.some((u) => u.tileIndex === tile && onMap(u) && unitReligious(u.type) === layer && unitsHostile(state, unit, u));
 }
 
 /** a unit of another player than the unit's on the plot (an aircraft or a
@@ -2307,7 +2318,7 @@ interface AssignSpot { tile: number; claims: Claim[]; holder: number; holderTarg
 interface AssignTarget { target: Target; unit: Unit | null; health: number; damage: number; units: number[]; barb: boolean }
 /** one unit's assignment (0x38 entries): its spot, the plot it strikes (-1
  *  where the blow falls on a later turn), where it stands, its damage */
-export interface Assigned { unit: Unit; move: number; attack: number; from: number; damage: number; civilian: boolean }
+export interface Assigned { unit: Unit; move: number; attack: number; from: number; damage: number; civilian: boolean; religious: boolean }
 
 /**
  * THE ASSIGNMENT (0x776140) of `units` to the spots of `targets`:
@@ -2449,7 +2460,7 @@ export function assignTo(state: GameState, pass: Pass, units: Unit[], targets: T
     if (!c) return null;
     const T = tg[c.target];
     return { unit: u, move: S.tile, attack: c.turns === 1 ? (T.unit ? T.unit.tileIndex : T.target.tile) : -1, from: u.tileIndex,
-      damage: UNIT_HP - healthOf(u), civilian: T.target.type === 'CIVILIAN' };
+      damage: UNIT_HP - healthOf(u), civilian: T.target.type === 'CIVILIAN', religious: T.target.type === 'RELIGIOUS' };
   });
   return mergeSort(out, (a, b) => assignedBefore(state, a, b)).filter((a): a is Assigned => a !== null);
 }
@@ -2493,7 +2504,13 @@ function mergeSort<T>(a: T[], before: (x: T, y: T) => boolean): T[] {
  * its own stands there); a siege unit strikes its attack; a ranged unit
  * strikes it unless its melee is the stronger and it can reach the plot this
  * turn; then every unit moves onto its attack (the attack flag) — a
- * civilian taken, a fighter struck in melee; each one's turn done. The
+ * civilian taken, a fighter struck in melee; after each strike and each
+ * attack move, against a religious target (the entry's +0x32) the unit
+ * condemns the heretics on its plot where it may (UNITCOMMAND_CONDEMN_HERETIC
+ * 0x947dd0, its CanStart and Start: `condemnHeretic`; runs/h1_duely1124 t136
+ * the Caravel 4587523 onto 26:13 kills the embarked Missionary 3407880,
+ * t118 the Man-At-Arms 4849682 arrives on 35:16 with no Movement and the
+ * Missionary stays); each one's turn done. The
  * assignments in the order their turns ended (the order an operation's
  * attack logs them: runs/h1_duelw1124 t16, the raid's Slinger before its
  * Warriors).
@@ -2522,6 +2539,7 @@ function carryOut(state: GameState, pass: Pass, out: Assigned[], move = 'Attack 
     const u = a.unit;
     if (a.civilian || !canAct(state, pass, u) || UNITS[u.type]?.bombard === undefined) continue;
     strikeAt(u, a.attack);
+    if (a.religious) condemnHeretic(state, u);
     u.movesLeft = 0;
     finish(pass, u, move, a.move, a.attack);
     ended.push(a);
@@ -2533,6 +2551,7 @@ function carryOut(state: GameState, pass: Pass, out: Assigned[], move = 'Attack 
       && !!pass.reach.get(u.id)?.some((e) => e.tile === a.attack && e.turns <= 1);
     if (melee) continue;
     strikeAt(u, a.attack);
+    if (a.religious) condemnHeretic(state, u);
     u.movesLeft = 0;
     finish(pass, u, move, a.move, a.attack);
     ended.push(a);
@@ -2541,6 +2560,7 @@ function carryOut(state: GameState, pass: Pass, out: Assigned[], move = 'Attack 
     const u = a.unit;
     if (!state.units.includes(u)) continue;
     if (a.attack >= 0 && canAct(state, pass, u)) moveTo(state, u, a.attack);
+    if (a.religious && state.units.includes(u)) condemnHeretic(state, u);
     if (state.units.includes(u)) u.movesLeft = 0;
     if (!pass.done.has(u.id)) {
       finish(pass, u, move, a.move, a.attack);

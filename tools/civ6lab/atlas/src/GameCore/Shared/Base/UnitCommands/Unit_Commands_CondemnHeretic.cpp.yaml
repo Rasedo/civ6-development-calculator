@@ -3,6 +3,24 @@
 # `review: imported` = bootstrapped from dll_readings.md / code comments / saved
 # labels and not yet reviewed: verify against the disassembly, then edit and
 # set `review: reviewed`.
+- addr: 0x947dd0
+  final: 0x656a00
+  kind: function
+  name: UNITCOMMAND_CONDEMN_HERETIC
+  semantics: UNITCOMMAND_CONDEMN_HERETIC's command (hash 0xdc60e164 through the command manager +0x88), issued by the attack carry-out 0x771f80 for an entry whose target is RELIGIOUS (+0x32).
+  status: READ
+  cases:
+    - recording: h1_duely1124
+      turn: 136
+      value: the barbarian Caravel 4587523 moves onto 26:13 in Attack Units and the embarked Missionary 3407880 is removed (UnitRemovedFromMap before its deferred UnitMoved, no CombatLog row)
+  impl: [cpu/core/tactical.ts:carryOut]
+  readings:
+    - "C-101 / C-95: the attack carried out condemns a religious target's heretics, a move order walks onto a religious unit's plot — READ (0x771f80 at 0x772331 / 0x7725c9 / 0x7727fa, 0x776140 at 0x776424..0x776470 / 0x777045, 0x947dd0, 0x89c6f0, 0x89cc00), both twins"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - ...D (0x771f80 at 0x772331 / 0x7725c9 / 0x7727fa, 0x776140 at 0x776424..0x776470 / 0x777045, 0x947dd0, 0x89c6f0, 0x89cc00), both twins
+    - ...issues PLUNDER_TRADE_ROUTE (0x955950) and one with +0x32 UNITCOMMAND_CONDEMN_HERETIC (0x947dd0, hash 0xdc60e164), each where its CanStart (vt +0x48) answers, then Start (vt +0x58).
+  review: reviewed
 - addr: 0x947f10
   kind: function
   semantics: the condemn command's operation (-> 0x493f80 with the capture flag).
