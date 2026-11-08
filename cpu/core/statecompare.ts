@@ -1126,6 +1126,8 @@ const CITY_STATE_G: Record<string, Extractor> = {
   minorArmyAged: overCityStates((cityState) => cityState.armyAged ?? -1),
   minorEnemyCounts: overCityStates((cityState) => enemyCountsRecord(cityState.enemyCounts)),
   minorUnitsListed: overCityStates((cityState) => enemyCountsRecord(listedCounts(cityState.unitsListed))),
+  minorDefendersListed: overCityStates((cityState) => enemyCountsRecord(listedCounts(Object.fromEntries((cityState.defendersListed ?? [])
+    .filter((id) => cityState.unitsListed?.[id] !== undefined).map((id) => [id, cityState.unitsListed![id]]))))),
   minorRevealed: overCityStates((cityState) => (cityState.revealed ?? []).flatMap((v, p) => (v === 1 ? [p] : []))),
   minorSavings: overCityStates((cityState) => [...(cityState.economy?.savings ?? [0, 0, 0, 0]), cityState.economy?.balance ?? 0,
     cityState.economy?.goldBoost ?? 0]),

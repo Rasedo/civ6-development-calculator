@@ -5030,7 +5030,7 @@ function turnSeed(rec: TurnRecord): number | undefined {
  * city-state: its city AI's item value, its
  * Food focus, trade list and value, the city-states it met, UNITS and BUILDINGS tables, resource counts, economic
  * memory (savings), threat, enemy at the gates, growth forecast, revealed
- * plots, standing army's lack, "Upgrade Units" trees, unit list as its last end of turn left it. Per Free City: its threat, enemy at the gates
+ * plots, standing army's lack, "Upgrade Units" trees, unit list and its standing army's members as its last end of turn left them. Per Free City: its threat, enemy at the gates
  * and raid; per major's city its trade list. Per unit: its id, its pool slot, its DEFENDER type, its formation, the player a capture took it from. The
  * barbarians' tribes (their clocks, raids, scouts' trees), unit pool, camp
  * step's start and scout throttle. The non-majors' explored plots.
@@ -5039,7 +5039,7 @@ const SEAT_MEMORY = ['unitPool', 'armyKnown', 'armyAged', 'enemyCounts', 'combat
 const RESEARCH_MEMORY = ['goal', 'aiEntries', 'civicAiEntries', 'civicGovValues', 'civicPolicyBest', 'civicSlotBest', 'aiLeft', 'aiLeftSeen', 'aiTechSeen',
   'techCatchUp', 'civicCatchUp', 'favTech'] as const;
 const MINOR_MEMORY = ['prodSetValue', 'favoredFood', 'tradeCities', 'tradeRejected', 'tradeValue', 'metMinors', 'unitValues', 'buildingValues', 'resourceCounts',
-  'economy', 'threat', 'threatNear', 'aiGrowth', 'aiGrowthSeen', 'revealed', 'standingArmyShort', 'explored', 'upgradeTrees', 'unitsListed'] as const;
+  'economy', 'threat', 'threatNear', 'aiGrowth', 'aiGrowthSeen', 'revealed', 'standingArmyShort', 'explored', 'upgradeTrees', 'unitsListed', 'defendersListed'] as const;
 const CITY_MEMORY = ['aiThreat', 'aiThreatNear', 'freeRaid', 'tradeCities', 'tradeRejected'] as const;
 const UNIT_MEMORY = ['slot', 'aiDefender', 'aiHomed', 'escorted', 'originalOwner'] as const;
 const GAME_MEMORY = ['barbTribes', 'barbPool', 'barbCampsBegun', 'barbSpotNext'] as const;
@@ -5300,6 +5300,13 @@ function perTurnWorld(ctx: Ctx, a: TurnRecord, imp: Imported, history: History, 
   }
   unlistTurnLosses(a, a.turn - 1, new Map([...was].map(([k, u]) => [u.id, k] as const)), world.cityStates,
     new Set(world.units.map((u) => u.id)));
+  // a unit the pair's engine made that no record unit stands for was never
+  // on the game's list (runs/h1_duely1121 t116: an engine-only Trader of
+  // city-state 4, its t117 City Analysis on the record's five units)
+  const recorded = new Set([...was.values()].map((u) => u.id));
+  for (const cs of world.cityStates) {
+    for (const id of Object.keys(cs.unitsListed ?? {}).map(Number)) if (!recorded.has(id)) delete cs.unitsListed![id];
+  }
   for (const cs of world.cityStates) {
     const o = state.cityStates.find((x) => x.id === cs.id);
     // a major the record shows the minor met where the engine's turn met it

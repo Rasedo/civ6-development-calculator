@@ -989,6 +989,9 @@
     - recording: h1_duely1124
       turn: 19
       value: "Bologna: Archery 267.5, Wheel 330, Horseback Riding 312.9, Engineering 377.8 as logged on the t18 table counted before its purchase; the six-unit table cut them"
+    - recording: h1_duely1121
+      turn: 42
+      value: "the more-than-five clause (0x7b63aa) reads Player_Units +0xc0, the container's size, which the delayed kill leaves: Hunza's five Warriors levied before its turn, six counted, every unit FX(-9999), NO BUILDS AT ALL, Engineering 106.4 at t43 as logged (minorListedCount)"
     - recording: h1_duelv1121
       value: every minor's Rock Band row of the five verbose duels 10.0 a turn from T to H (165.30 at T 5 .. 2.28 at T 49); runs/lab2_cw1121 Antioch t196-202 6.13 .. 17.80 at T 46 .. 40, player 3 t198-202 2.28 .. 6.62 at T 49 .. 44
     - recording: h1_duelv1121
@@ -1018,6 +1021,7 @@
     - gpu/core/sim_cityvalue.py:_COMBAT_PSEUDO
     - cpu/core/aiModifiers.ts:ValueTerms
     - gpu/core/sim_cityvalue.py:_cv_unit_mods
+    - cpu/core/minorBuild.ts:minorListedCount
   readings:
     - "C-127 / C-96: a minor's unit versions, the unit table's religion gate and the building value's era reasons — READ, both twins"
     - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
@@ -1031,6 +1035,7 @@
     - "C-98: a religious unit's value at the city-states — READ (0x7b62c0's religious branch, CanTrain's religion and inquisition refusals), both twins"
     - "C-130 / C-98: the Archaeologist's value, the strength modifier's analysis, the knowledge base's enemy unit counts — READ (0x7b62c0 at 0x7b6a8c, 0x27fcf0, 0x6b2060, 0x69ed80, 0x5eab80, 0xbe4aa0), both twins"
     - "C-98: a unit's value adds its abilities' modifiers; EFFECT_ADJUST_UNIT_MOVEMENT and REQUIREMENT_PLOT_ADJACENT_TO_OWNER; a second completion adds again — READ (0x7b62c0 at 0x7b7658..0x7b76d8, 0x6e11c7 / 0xc85140, 0x6bd520, 0x6d3200, 0x762d60's rows), both twins"
+    - "C-98 / C-96: a city-state's unit count and standing army read its list with the delayed kill's dead — READ (0x7b62c0 at 0x7b63aa, 0x5ca7e0 at 0x5ca978 / 0x5caa88, 0x4ef6d0), both twins"
   notes:
     - ".claude/scratchpad/cb/notes.txt: ...req buildings...  value = 0x7a4d40(bld, turns, plot=-9999, horizon=H1=[globalAI+0x2f0][1]) ; units: 0x7b62c0(unit, turns...) horizon H1; wonders H2=[..][2].  rate = &[rbp+0xc8] from 0x6fec30(player+0x1290) ->..."
     - ".claude/scratchpad/cb/notes.txt: ...turns). regional (+0x2c) via 0x79f7c0 for cities in range. walls/defense terms at +0x54. UNIT value 0x7b62c0: combat units -> base 0x79ca90(military AI unit value) (x3 if 0x79d2d0), era terms, x(copies+1), x..."

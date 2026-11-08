@@ -10204,3 +10204,38 @@ traced move scored, as the game's first row is.
   veteran rule, not read from the command's Start; a unit an operation holds
   is no tactical unit, yet the game forms one (runs/h1_duely1128 t179 Hong
   Kong's Warrior 2490370 under Upgrade Units logs Heal).
+
+## C-98 / C-96: a city-state's unit count and standing army read its list with the delayed kill's dead — READ (0x7b62c0 at 0x7b63aa, 0x5ca7e0 at 0x5ca978 / 0x5caa88, 0x4ef6d0), both twins
+
+`minorListedCount`, `minorEndTurnList` (`CityState.defendersListed`),
+`minorStandingArmy` (cpu/core/minorBuild.ts, cpu/core/minorCityAi.ts); GPU
+`_minor_listed_units` in `_MinorFacts.unit_count` and `_city_state_phase`'s
+`units`, `unit_list_def` (`_minor_end_turn_list`), `_minor_standing_army`;
+statecompare `minorDefendersListed`. The replay drops from the carried list
+a unit the pair's engine made that no record unit stands for
+(`perTurnWorld`).
+
+- THE COUNT: the unit value's more-than-five clause (0x7b63aa) reads
+  Player_Units +0xc0, the size of the container only the destroy 0x4ef100
+  lowers; the delayed kill (0x4ef040: a levy, the unit commands, an upgrade)
+  leaves a unit there until its owner's end of turn
+  (0x4ef6d0). So the City Analysis counts the standing units and those its
+  last end of turn listed that have gone off the map since.
+- THE STANDING ARMY: both walks of 0x5ca7e0 over the list +0xd8 (0x5ca978,
+  0x5caa88) read the AI type (+0x1c0) and the home (+0x11d0), no dead flag:
+  a member of the army taken by the delayed kill stays a member, at its
+  Combat, until the list drops it. The engines keep the army's members as
+  the end of turn listed them and count a gone one first, at its type's
+  Combat.
+- Confirmed (one-seed aimem traces): runs/h1_duely1121 Hunza t42 — its five
+  Warriors levied before its turn, six counted: every unit FX(-9999), NO
+  BUILDS AT ALL as logged, Engineering 106.4 at t43 (the Catapult's term 0);
+  the levied army still standing, no shortfall, the Combat Desire 0.0 at
+  t43, the Catapult 3.90 at T 32 and Engineering 145.4 at t44 as logged;
+  1121 research, builds and contracts as logged through t143 (Rifling
+  t141-142). runs/h1_duely1124 city-state 4 t71, runs/h1_duely1117
+  city-state 3 t30 / t93 / t108 as logged.
+- Open: a gone unit that was not of the army (COMBAT, its operation slot
+  +0x7d0 after the kill unread) joining the walk below the quota; the gone
+  members' Combat as the unit stood (promotions, damage) and their place in
+  the pool order.

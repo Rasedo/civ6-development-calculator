@@ -45,7 +45,7 @@ import { opsOf } from './operations/manager';
 import { opJobUnits } from './operations/operation';
 import { resourceValue } from './aiResource';
 import { stockFree, strategicSurplus } from './stockpile';
-import { minorItemTurns, minorKnownUnits, unitObsoleteIn, minorListedUnits, minorUpgradeVisible, minorResourceFacts, minorUnitExpected, minorUnitProduction, minorUnitVersion } from './minorBuild';
+import { minorItemTurns, minorKnownUnits, unitObsoleteIn, minorListedCount, minorListedUnits, minorUpgradeVisible, minorResourceFacts, minorUnitExpected, minorUnitProduction, minorUnitVersion } from './minorBuild';
 import { majorItemTurns, majorTraits, majorUnitExpected, majorUnitVersion, seatResearchTurns } from './freeCityBuild';
 import { cityStateAt as cityStateAtPlot, envoysHere, envoysOf, minorCity, suzerainOf, suzerainProjectMult } from './cityStates';
 import { grievanceWith } from './grievance';
@@ -396,10 +396,7 @@ export function aiView(state: GameState, opts: { updated?: boolean } = {}): AiVi
     },
     unitPoolCount: (i) => {
       const cs = isCityStateSeat(i) ? (seatOf(state, i) as CityState | undefined) : undefined;
-      if (!cs) return unitsOf(state, i).length;
-      let n = 0;
-      for (const k of minorListedUnits(state, cs).values()) n += k;
-      return n;
+      return cs ? minorListedCount(state, cs) : unitsOf(state, i).length;
     },
     // a city-state's units whose upgrade its research unlocks, each at the
     // city-state's upgrade price; another party's not read

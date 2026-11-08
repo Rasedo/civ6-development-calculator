@@ -972,7 +972,9 @@ class SimMinorAi:
         weight) times the square root of its population (float32, as the
         game's fixed point); its list the units of AI type DEFENDER
         (`unit_defender`) homed on the city (`unit_homed`) in pool order, in
-        an operation or not, then each COMBAT unit (not civilian, not recon,
+        an operation or not, those its last end of turn listed so that are
+        gone off the map since first at their type's Combat (`unit_list_def`),
+        then each COMBAT unit (not civilian, not recon,
         a fighter) outside every running operation, of the land or — the
         city coastal — the sea, in pool order, joining homed while the list
         is below the quota, else replacing the list's weakest (the first of
@@ -1004,7 +1006,16 @@ class SimMinorAi:
         self._seat_pool_slots(s, "major", 100 + s, act)
         own = self.major_unit_alive & (self.major_unit_seat == 100 + s) & act.unsqueeze(1)
         dfd = self.major_unit_defender & own
-        flag = dfd & self.major_unit_homed
+        # a member the delayed kill took since its last end of turn is still
+        # on its list at its Combat of type, ahead of the standing members
+        lo, hi = self.POOL_LO["major"], self.POOL_HI["major"]
+        gone = (act.unsqueeze(1) & ~(self.major_unit_alive & (self.major_unit_seat == 100 + s))
+                & (self.unit_list_seat[:, lo:hi] == 100 + s) & self.unit_list_def[:, lo:hi])
+        lt = self.unit_list_type[:, lo:hi].clamp(min=0, max=self.NU - 1)
+        type_combat = torch.tensor([int(r["combat"]) for r in rows] + [0], dtype=torch.long, device=dev)
+        gar = er.take(lt)
+        g_comb = type_combat.take(torch.where(gar >= 0, gar, torch.full_like(gar, len(rows))))
+        flag = (dfd & self.major_unit_homed) | gone
         ok = own & ~dfd & ~self._mops_busy(s) & fights.take(ar) & (land.take(ar) | (sea.take(ar) & coastal.unsqueeze(1)))
         P = own.shape[1]
         BIG = 1 << 40
@@ -1012,10 +1023,11 @@ class SimMinorAi:
         order = torch.where(own, torch.where(pslot >= 0, pslot, torch.full_like(pslot, P)), torch.full_like(pslot, BIG))
         order = order.argsort(dim=1, stable=True)
         n_own = own.sum(dim=1)
-        comb = self._ai_combat("major")
-        # each member's place in the list: the DEFENDERs in pool order, a
-        # joiner after them all
-        place = torch.where(flag, order.argsort(dim=1), torch.full_like(pslot, BIG))
+        comb = torch.where(gone, g_comb, self._ai_combat("major"))
+        # each member's place in the list: the gone members first, the
+        # DEFENDERs in pool order, a joiner after them all
+        place = torch.where(gone, -P + torch.arange(P, device=dev).expand_as(pslot),
+                            torch.where(flag, order.argsort(dim=1), torch.full_like(pslot, BIG)))
         n = flag.sum(dim=1)
         ever = flag.clone()
         bidx = torch.arange(B, device=dev)

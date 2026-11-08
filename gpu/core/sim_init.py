@@ -1545,9 +1545,12 @@ class SimInit:
             ("pslot", torch.long),
             # on a city-state's unit list as its last end of turn left it: the
             # minor's seat (-1 none) and the unit's type then
-            # (`CityState.unitsListed`, `_minor_end_turn_list`)
+            # (`CityState.unitsListed`, `_minor_end_turn_list`), and whether
+            # it was then of its standing army (a DEFENDER homed on the city:
+            # `CityState.defendersListed`)
             ("list_seat", torch.long),
             ("list_type", torch.long),
+            ("list_def", torch.bool),
         ):
             _base = torch.zeros(B, self.UNIT_MAX, dtype=_dt, device=device)
             setattr(self, f"unit_{_pl}", _base)

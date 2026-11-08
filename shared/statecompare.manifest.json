@@ -3101,6 +3101,19 @@
           "note": "the minor's unit list as its last end of turn left it, less the combat's dead since (`minorEndTurnList`, `killUnit`): (unit type, count) by unit type"
         },
         {
+          "name": "minorDefendersListed",
+          "compare": "exact",
+          "covers": [
+            "CityState.defendersListed"
+          ],
+          "planes": [
+            "unit_list_def",
+            "unit_list_seat",
+            "unit_list_type"
+          ],
+          "note": "the minor's standing army members (DEFENDER, homed) on its unit list as its last end of turn left it, less the combat's dead since (`minorEndTurnList`, `minorStandingArmy`): (unit type, count) by unit type"
+        },
+        {
           "name": "minorRevealed",
           "compare": "exact",
           "covers": [

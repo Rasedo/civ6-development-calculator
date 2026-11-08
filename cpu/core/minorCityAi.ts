@@ -86,7 +86,7 @@ import { randRange } from './rand';
 import {
   installType, minorBuildFacts, minorBuilderLays, minorBuildingPrice, minorBuyBuilding, minorBuyUnit, minorItemFor, minorItemOfType, minorItemType, minorKnownUnits, minorPickFacts, minorRepairsDistrictAt, minorUnderThreat,
   minorProjectFacts, minorResourceCounts, minorResourceFacts, minorSetItem, minorUnitPrice, minorUnitVersion, minorQueueOk,
-  minorCanTrain, researchHolds, unitObsoleteIn,
+  minorCanTrain, minorListedCount, researchHolds, unitObsoleteIn,
 } from './minorBuild';
 
 /** the city's plots, the centre first, as axial offsets from it (the city's
@@ -741,7 +741,12 @@ function purchaseEntries(state: GameState, cs: CityState): PurchaseEntry[] {
  * the square root of its population (float32, as the game's fixed point).
  * Its list: the minor's units of AI type DEFENDER (`aiDefender`) homed on
  * its city (`aiHomed`, +0x11d0), in pool order (`seatPoolSlots`), in an
- * operation or not; then each unit of AI type COMBAT (a fighting
+ * operation or not — first those its last end of turn listed so that the
+ * delayed kill took since (`CityState.defendersListed`), at their type's
+ * Combat: the walk over the player's list (+0xd8) reads no dead flag
+ * (runs/h1_duely1121 Hunza t42: two of its five levied Warriors the
+ * army, no shortfall, its t43 Combat Desire 0.0 and the Catapult 3.90 in
+ * Engineering's t44 value as logged); then each unit of AI type COMBAT (a fighting
  * unit, not civilian, not recon) outside every running operation, of the
  * land or — where the city is coastal — the sea, in that order, joins as a
  * DEFENDER homed on the city while the list is below the quota, else takes
@@ -768,28 +773,35 @@ export function minorStandingArmy(state: GameState, cs: CityState): number {
   // on slot 0 joins ahead of the older ones)
   seatPoolSlots(state, cs);
   const own = state.units.filter((u) => u.seat === cs.seat).sort((a, b) => (a.slot ?? 0) - (b.slot ?? 0));
-  const list = own.filter((u) => u.aiDefender && u.aiHomed);
-  const combat = (u: Unit) => aiStrengths(state, u).melee;
-  const weakest = (): Unit | null => list.reduce<Unit | null>((w, u) => (w === null || combat(u) < combat(w) ? u : w), null);
+  // a member the delayed kill took since its last end of turn is still on
+  // its list (+0xd8, the walk reads no dead flag) at its Combat of type
+  const mine = new Set(own.map((u) => u.id));
+  const gone = (cs.defendersListed ?? []).filter((id) => !mine.has(id) && cs.unitsListed?.[id] !== undefined)
+    .map((id) => ({ unit: null as Unit | null, combat: AI_UNITS[AI_UNIT_INDEX.get(installType('unit', cs.unitsListed![id], 'UNIT_')) ?? -1]?.combat ?? 0 }));
+  const list = [...gone, ...own.filter((u) => u.aiDefender && u.aiHomed).map((u) => ({ unit: u as Unit | null, combat: aiStrengths(state, u).melee }))];
+  const weakest = () => list.reduce<(typeof list)[number] | null>((w, m) => (w === null || m.combat < w.combat ? m : w), null);
   for (const u of own) {
     if (u.aiDefender || busy.has(u.id)) continue;
     const row = AI_UNITS[AI_UNIT_INDEX.get(installType('unit', u.type, 'UNIT_')) ?? -1];
     if (!row || row.civilian || row.recon || Math.max(row.combat, row.rangedCombat, row.bombard) <= 0) continue;
     if (row.domain !== 'DOMAIN_LAND' && !(row.domain === 'DOMAIN_SEA' && coastal)) continue;
+    const m = { unit: u as Unit | null, combat: aiStrengths(state, u).melee };
     if (list.length < quota) {
       u.aiDefender = true;
       u.aiHomed = true;
-      list.push(u);
+      list.push(m);
       continue;
     }
     const w = weakest();
-    if (!w || combat(w) >= combat(u)) continue;
-    delete w.aiDefender;
-    delete w.aiHomed;
+    if (!w || w.combat >= m.combat) continue;
+    if (w.unit) {
+      delete w.unit.aiDefender;
+      delete w.unit.aiHomed;
+    }
     list.splice(list.indexOf(w), 1);
     u.aiDefender = true;
     u.aiHomed = true;
-    list.push(u);
+    list.push(m);
   }
   return quota - list.length;
 }
@@ -956,7 +968,7 @@ export function minorEconomicDisband(state: GameState, cs: CityState, delta: num
  * purchases).
  */
 export function minorContractPurchases(state: GameState, cs: CityState,
-  units = state.units.filter((u) => u.seat === cs.seat).length): void {
+  units = minorListedCount(state, cs)): void {
   if (cs.centerIndex < 0 || !cs.cityAi) return;
   const eco = (cs.economy ??= newEconomicMemory());
   const pcity = minorPurchaseCity(state, cs, cs.threat ?? -1);
@@ -1050,7 +1062,7 @@ function minorBuyInstall(state: GameState, cs: CityState, u: string): void {
  * before this turn (the founding turn's first look).
  */
 export function minorAiTurn(state: GameState, cs: CityState, fresh: boolean,
-  units = state.units.filter((u) => u.seat === cs.seat).length): void {
+  units = minorListedCount(state, cs)): void {
   if (cs.centerIndex < 0) return;
   const ai = (cs.cityAi ??= newCityAi());
   // A: the city's update

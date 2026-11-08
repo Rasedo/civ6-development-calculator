@@ -64,9 +64,9 @@ class SimMinors:
             government = self._minor_research_ai(s)
             self._minor_combat_desire(s)
             self._military_fav_tech(s, alive)
-            # the units its City Analysis counts: those standing before its
-            # savings turn's purchases
-            units = (self.major_unit_alive & (self.major_unit_seat == 100 + s)).sum(dim=1)
+            # the units its City Analysis counts: its list before its
+            # savings turn's purchases (`minorListedCount`)
+            units = self._minor_listed_units(s).sum(dim=1)
             fell = self._minor_military_turn(s)
             # its unit production table and City Analysis read the records
             # as its last turn left them, before the turn's ageing and look
@@ -116,7 +116,8 @@ class SimMinors:
     def _minor_end_turn_list(self, s: int, alive: torch.Tensor) -> None:
         """`minorEndTurnList`: city-state `s`'s unit list as its end of turn
         leaves it, the units standing now (the delayed kill's dead erased) —
-        each slot's listing seat and type, and the count by type"""
+        each slot's listing seat, type and standing army membership, and the
+        count by type"""
         seat = 100 + s
         lo, hi = self.POOL_LO["major"], self.POOL_HI["major"]
         ls = self.unit_list_seat[:, lo:hi]
@@ -125,6 +126,8 @@ class SimMinors:
         ls.copy_(torch.where(a & mine, torch.full_like(ls, seat), torch.where(a & (ls == seat), torch.full_like(ls, -1), ls)))
         lt = self.unit_list_type[:, lo:hi]
         lt.copy_(torch.where(a & mine, self.major_unit_type, lt))
+        ld = self.unit_list_def[:, lo:hi]
+        ld.copy_(torch.where(a & mine, self.major_unit_defender & self.major_unit_homed, ld))
         cnt = torch.zeros_like(self.citystate_list_count[:, s])
         cnt.scatter_add_(1, self.major_unit_type.clamp(min=0), mine.long())
         self.citystate_list_count[:, s] = torch.where(a, cnt, self.citystate_list_count[:, s])

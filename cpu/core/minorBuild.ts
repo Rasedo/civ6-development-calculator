@@ -161,9 +161,9 @@ export function minorPhase(state: GameState): void {
     cityState.research.favTech = militaryFavTech(state, cityState.seat, cityState.armyKnown ?? [],
       (p) => p === BARB_SEAT || wars.includes(p));
     const fresh = !cityState.cityAi;
-    // the units its City Analysis counts: those standing before its savings
-    // turn's purchases
-    const units = state.units.filter((u) => u.seat === cityState.seat).length;
+    // the units its City Analysis counts: its list before its savings
+    // turn's purchases (`minorListedCount`)
+    const units = minorListedCount(state, cityState);
     const fell = minorMilitaryTurn(state, cityState);
     // its military AI's unit production table and its City Analysis (both
     // on player signal +0x258, fired before the turn start's +0x370 list
@@ -247,12 +247,15 @@ export function minorPhase(state: GameState): void {
  *  0x7ecc0 -> 0x4e44e0 -> Player_Units 0x4ef6d0): the units killed since
  *  its last by the delayed kill (0x4ef040, unit +0x770: the unit commands,
  *  a levy, the turn's damage) are destroyed (0x4ef100 -> 0x4f32d0), so the
- *  list holds the units standing now; a combat's dead leaves it at once
+ *  list holds the units standing now, its standing army's members marked
+ *  (`CityState.defendersListed`); a combat's dead leaves it at once
  *  (`killUnit`) */
 function minorEndTurnList(state: GameState, cityState: CityState): void {
   const listed: Record<number, string> = {};
-  for (const u of state.units) if (u.seat === cityState.seat) listed[u.id] = u.type;
+  const own = state.units.filter((u) => u.seat === cityState.seat);
+  for (const u of own) listed[u.id] = u.type;
   cityState.unitsListed = listed;
+  cityState.defendersListed = own.filter((u) => u.aiDefender && u.aiHomed).sort((a, b) => (a.slot ?? 0) - (b.slot ?? 0)).map((u) => u.id);
 }
 
 /** A MINOR'S UNIT LIST BY TYPE, as its counts walk it (0x4f2c90 over the
@@ -276,6 +279,19 @@ export function minorListedUnits(state: GameState, cityState: CityState): Map<st
   for (const [id, type] of Object.entries(cityState.unitsListed ?? {})) {
     if (!mine.has(Number(id))) n.set(type, (n.get(type) ?? 0) + 1);
   }
+  return n;
+}
+
+/** A MINOR'S UNIT COUNT (Player_Units +0xc0, the container's size, which
+ *  only the destroy 0x4ef100 lowers): its list as `minorListedUnits` walks
+ *  it, the units the delayed kill took since its last end of turn included.
+ *  The unit value's more-than-five clause reads it (0x7b62c0 at 0x7b63aa):
+ *  runs/h1_duely1121 Hunza t42, its five Warriors levied before its turn,
+ *  six counted: every unit at FX(-9999), NO BUILDS AT ALL, the Catapult's
+ *  term in Engineering's t43 value 0. */
+export function minorListedCount(state: GameState, cityState: CityState): number {
+  let n = 0;
+  for (const k of minorListedUnits(state, cityState).values()) n += k;
   return n;
 }
 
@@ -1761,7 +1777,7 @@ export function minorCityGrowth(state: GameState, cityState: CityState): CityGro
  *  MINOR_CIV_PRODUCTION_BUILDERS, their Archer past the horizon on
  *  Archery's 37 turns) */
 export function minorBuildFacts(state: GameState, cityState: CityState, known: (unit: string) => number, fresh = false,
-  unitCount = state.units.filter((u) => u.seat === cityState.seat).length, founding = false): CityBuildFacts {
+  unitCount = minorListedCount(state, cityState), founding = false): CityBuildFacts {
   const city = minorCity(cityState);
   const stats = computeCityStats(state, city);
   const r = cityState.research;

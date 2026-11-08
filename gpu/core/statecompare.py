@@ -235,6 +235,18 @@ def _enemy_counts(sim, b: int, r: int) -> list[int]:
     return [x for t, n in enumerate(sim.citystate_kb_enemy[b, r].tolist()) if n > 0 for x in (t, int(n))]
 
 
+def _defenders_listed(sim, b: int, s: int) -> list[int]:
+    """city-state `s`'s standing army members on its unit list as its last
+    end of turn left it, as (unit index, count) pairs by unit index, flat
+    (`CityState.defendersListed`)"""
+    lo, hi = sim.POOL_LO["major"], sim.POOL_HI["major"]
+    on = (sim.unit_list_seat[b, lo:hi] == 100 + s) & sim.unit_list_def[b, lo:hi]
+    n: dict[int, int] = {}
+    for t in sim.unit_list_type[b, lo:hi][on].tolist():
+        n[int(t)] = n.get(int(t), 0) + 1
+    return [x for t in sorted(n) for x in (t, n[t])]
+
+
 def _wars_of(sim, b: int, seat: int) -> list[int]:
     row = sim.war[b, _seat_row(sim, seat)].tolist()
     return sorted(int(sim._ROW_SEAT[j]) for j, on in enumerate(row) if on)
@@ -1086,6 +1098,7 @@ CITY_STATE = {
     "minorArmyAged": lambda sim, b, rows: [int(sim.citystate_kb_aged[b, s]) for s in rows],
     "minorEnemyCounts": lambda sim, b, rows: [_enemy_counts(sim, b, s) for s in rows],
     "minorUnitsListed": lambda sim, b, rows: [[x for t, n in enumerate(sim.citystate_list_count[b, s].tolist()) if n > 0 for x in (t, int(n))] for s in rows],
+    "minorDefendersListed": lambda sim, b, rows: [_defenders_listed(sim, b, s) for s in rows],
     "minorRevealed": lambda sim, b, rows: [[int(p) for p in sim.mops_revealed[b, s].nonzero(as_tuple=True)[0].tolist()]
                                            for s in rows],
     "minorSavings": lambda sim, b, rows: [[int(x) for x in sim.citystate_savings[b, s].tolist()] + [int(sim.citystate_balance[b, s]),

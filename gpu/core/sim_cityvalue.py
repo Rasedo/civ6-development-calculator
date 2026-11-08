@@ -2060,11 +2060,12 @@ class _MinorFacts:
         return False
 
     def unit_count(self):
-        # the units the City Analysis counts (`minorAiTurn`'s `units`: those
-        # standing before the savings turn's purchases), else those now
+        # the units the City Analysis counts (`minorAiTurn`'s `units`: its
+        # list before the savings turn's purchases), else its list now
+        # (`minorListedCount`)
         if self.units_before is not None:
             return self.units_before
-        return self._mine().sum(dim=1)
+        return self.sim._minor_listed_units(self.s).sum(dim=1)
 
     def _production_table(self):
         def build():

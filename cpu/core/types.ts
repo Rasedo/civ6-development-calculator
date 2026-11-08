@@ -1348,6 +1348,11 @@ export interface CityState extends Seat {
    *  stays on the list its counts walk (0x4f2c90) until then
    *  (`minorListedUnits`) */
   unitsListed?: Record<number, string>;
+  /** the units of that list of AI type DEFENDER homed on its city (its
+   *  standing army) as its turn's end left them, in pool order: one gone
+   *  off the map since stays in the army its next city update walks
+   *  (`minorStandingArmy`) */
+  defendersListed?: number[];
   /** its city's BUILDINGS and PROJECTS tables (raw, `AI_BUILDINGS`' and
    *  `AI_PROJECTS`' order) as its city's update of the turn left them: its
    *  second hook's Default Specialization reads them (`minorSecondHook`) */
