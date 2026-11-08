@@ -1046,11 +1046,23 @@ export function shoreCrossing(type: string, from: Tile, to: Tile): boolean {
   return !(isWater(from) && from.ownerSeat !== NO_SEAT);
 }
 
+/** a shore crossing the embark and disembark rules (0x530420 / 0x530240)
+ *  price: they run for a formation that may embark alone (+0x338,
+ *  `canEmbark`) */
+function shoreStep(state: GameState, unit: { type: string; seat: number; originalOwner?: number }, from: Tile, to: Tile): boolean {
+  return shoreCrossing(unit.type, from, to) && canEmbark(state, unit);
+}
+
 /** What one step from `from` into its neighbour `to` costs this unit, in
  *  MP_SCALE units: the tile's own cost plus a river crossing, or, crossing
- *  the shore, the embark penalty in place of the river. */
-export function stepCost(state: GameState, unit: { type: string; seat: number; promos?: number; alpine?: boolean }, from: Tile, to: Tile): number {
-  const transition = shoreCrossing(unit.type, from, to);
+ *  the shore (`shoreStep`), the embark penalty in place of the river. A unit
+ *  that may not embark pays the plot's own cost onto water it never
+ *  revealed, its search entering such a plot whatever it is
+ *  (runs/h1_duely1127 t2: the barbarian Scout on 6:9 closes the unrevealed
+ *  coast 3:9 at (1/0) beside 4:10, so 4:10 lands after 5:10 and 5:7 and
+ *  Move To Safety takes 5:10, AI_Planning.csv). */
+export function stepCost(state: GameState, unit: { type: string; seat: number; promos?: number; alpine?: boolean; originalOwner?: number }, from: Tile, to: Tile): number {
+  const transition = shoreStep(state, unit, from, to);
   let cost: number;
   if (!transition) cost = moveCostInto(state, from, to, unit) + riverCharge(state, from, to, unit);
   else {

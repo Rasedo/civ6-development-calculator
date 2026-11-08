@@ -2065,6 +2065,7 @@
     - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
     - "C-123: a formation's Movement and its path's stacking — READ (0x2673f0, 0x267650, 0x262cd0, 0x585eb0 in the path validity), both twins"
     - "C-124: the formation's kept path, and a path's other players' units — READ (0x272aa0, 0x26e3a0, 0x782d0, 0x586360 at 0x586542..0x5865a1), unported"
+    - "C-95: the embark rules for a formation that may embark, a district's zone unseen, a city's kill in the planning, a raised unit's AI type, a move order's attack spot — READ (0x530420, 0x530240, 0x52fe90 at 0x52fed4, 0x530f50 at 0x531168, 0x791470 at 0x791677, 0x79b9c0), FIT (the move order's attack spot), both twins"
   notes:
     - ".claude/scratchpad/st1/reading.md: ....cpp 0x717460, m_influence): per player at   war with the player (0x469cd0), each unit it sees now (0x5033a0) with a   combat, ranged or bombard strength (0x56dc90, 0x56e3e0, 0x56daa0): its   strength (0x7164..."
   context:
@@ -2374,18 +2375,28 @@
 - addr: 0x52fe90
   final: 0x377a90
   kind: function
-  semantics: the embark test (+1e6 where refused).
+  semantics: "the embark test (+1e6 where refused): refused where the TO plot is water and the formation may not embark (+0x338 clear, 0x52fed4); run on a revealed child by the validity (0x2720a0) and the cost (0x270dd0)"
   status: PARTLY
   cases:
+    - recording: h1_duely1128
+      turn: 39
+      value: city-state 3's Warrior on 4:4 links no attack on the barbarian Quadrireme's 2:3 in its danger reach; the Galley 524295 explores onto 2:3 as logged
     - recording: AI_Planning.csv
       turn: 69
       value: "So an AI land unit's reach and path take   water as one Movement dearer a plot (runs/h1_duely1117 t69: Valletta's   Archer on 13:8 closes its Harbor's 14:7 (1/0) and the coast's 12:7 after   the land'"
-  impl: [cpu/core/tactical.ts:from, cpu/core/tactical.ts:blind, gpu/core/sim_tactics.py:price6]
+  impl:
+    - cpu/core/tactical.ts:from
+    - cpu/core/tactical.ts:blind
+    - gpu/core/sim_tactics.py:price6
+    - cpu/core/tactical.ts:groundOf
+    - gpu/core/sim_tactics.py:_tac_attack_planes
+    - cpu/core/tactical.ts:enterable
   readings:
     - "C-99 / C-128: a shore crossing's cliff onto a revealed plot alone, Wander Back to Camp's path flag 0x1000, the path's destination count — READ (0x52fb90, 0x2720a0 at 0x272230..0x27229e / 0x272380, 0x270dd0 at 0x270f24, 0x271be0 at 0x271d03..0x271d18, 0x77b9a0 at 0x77be0b), both twins"
     - "C-96: the city-states' tactical pass — READ (Wander Near City, Heal, the non-barbarian priorities, FindAlternateLocation), the families it needs PARTLY READ"
     - "C-99: an embarked unit passes no other player's passenger — the step's flag-1 test READ (0x2720a0 at 0x272372, 0x271be0, 0x586360 at 0x586542, 0x208b80 under 0x108, 0x20a2a0), both twins"
     - "C-124: a path enters a plot the player never revealed whatever it is — READ (0x2720a0 at 0x272372..0x27242e, 0x271be0's +0x50 bit 0x20, 0x26e920), both twins"
+    - "C-95: the embark rules for a formation that may embark, a district's zone unseen, a city's kill in the planning, a raised unit's AI type, a move order's attack spot — READ (0x530420, 0x530240, 0x52fe90 at 0x52fed4, 0x530f50 at 0x531168, 0x791470 at 0x791677, 0x79b9c0), FIT (the move order's attack spot), both twins"
   context:
     - "...Planning.csv — the row equal once priced so). The embark and disembark tests beside it (0x52fe90 / 0x52fb90, +1e6 where refused) and the mountain and canyon +1e6 the engines leave to t..."
   review: reviewed

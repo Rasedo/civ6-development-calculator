@@ -1847,6 +1847,22 @@
   review: reviewed
 - kind: field
   owner: Formation
+  offset: 0x338
+  name: mayEmbark
+  type: byte
+  semantics: "the formation may embark (`canEmbark`): the embark and disembark rules (0x530420 at 0x53044d, 0x530240 at 0x53026d) add no cost and carry nothing where it is clear; the embark test (0x52fe90 at 0x52fed4) and the disembark test (0x52fb90 at 0x52fb9d) refuse; set 0 by the constructor (0x263240 at 0x263d2b)"
+  status: PARTLY
+  cases:
+    - recording: h1_duely1127
+      turn: 2
+      value: the barbarian Scout 131073 on 6:9 closes the unrevealed coast 3:9 at (1/0) as AI_Planning.csv's order says
+  impl: [cpu/core/units.ts:canEmbark, cpu/core/units.ts:stepCost, gpu/core/sim_tactics.py:_tac_embarks]
+  writers: [0x263240]
+  readings:
+    - "C-95: the embark rules for a formation that may embark, a district's zone unseen, a city's kill in the planning, a raised unit's AI type, a move order's attack spot — READ (0x530420, 0x530240, 0x52fe90 at 0x52fed4, 0x530f50 at 0x531168, 0x791470 at 0x791677, 0x79b9c0), FIT (the move order's attack spot), both twins"
+  review: reviewed
+- kind: field
+  owner: Formation
   offset: 0x518
   name: zocAnswer
   semantics: "m_bHasMovedIntoZOC: the zone test 0x26f980 of the plot the formation's last step this turn ended on (the sync value of +0x4c0, set by 0x2675e0 from the step 0x26fe20, cleared by the turn start 0x2673f0); the MoveTo execution 0x962380 waits unmoved while it holds"

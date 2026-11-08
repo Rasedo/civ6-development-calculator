@@ -100,6 +100,9 @@
   semantics: "a unit type's own AI type: the highest UnitAiInfos flag of the type up to COMBAT 3, -1 none (Recruit Units' reset and the standing army's EXPLORE clause read it). EXPLORE for the military chassis with UNITAI_EXPLORE and no UNITAI_COMBAT (Units.xml: the Scout, the Skirmisher, the Ranger, Spec Ops, the Highlander, the Okihtcitaw, the Warak'aq)."
   status: READ
   cases:
+    - recording: h1_duely1128
+      turn: 239
+      value: the Rangers 7274504 / 7340037 a cavalry tribe raised as units are EXPLORE and take HL Explore as logged
     - recording: h1_duely1124
       value: "every city-state Scout's AI_Tactical.csv row of the five duely duels HL: End Turn (165 of 165); its Skirmishers and Rangers wander (180, 69 rows)"
   impl:
@@ -114,6 +117,7 @@
     - "C-96: the standing army and the Combat Desire's city terms"
     - "C-99: the pathfinder's later-turn pool, Heal's hull, the tactical list's explorers, Move Unit's planning"
     - "C-128: the standing army's home and Garrison City's DEFENDER — READ, both twins"
+    - "C-95: the embark rules for a formation that may embark, a district's zone unseen, a city's kill in the planning, a raised unit's AI type, a move order's attack spot — READ (0x530420, 0x530240, 0x52fe90 at 0x52fed4, 0x530f50 at 0x531168, 0x791470 at 0x791677, 0x79b9c0), FIT (the move order's attack spot), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...ng army and the Combat Desire's city terms — READ (0x5ca7e0, the watched setter 0x731d10, 0x79b9c0), the unit table's orientation READ"

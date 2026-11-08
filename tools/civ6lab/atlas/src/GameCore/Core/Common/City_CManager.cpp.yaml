@@ -25,3 +25,18 @@
   context:
     - ...isted (0x78d630) or rejected passes; the city itself passes; a city no longer standing (0x57960 null) leaves the list (0x78d6d0 / 0x78f5d0); the destination's plot asked of the player...
   review: reviewed
+- addr: 0x57b20
+  final: 0x42e40
+  kind: function
+  semantics: the district standing on a plot (x, y), null none.
+  status: PARTLY
+  cases:
+    - recording: h1_duely1127
+      turn: 43
+      value: Rules_Movement's zone test takes player 1's centre 12:6 by it, out of the barbarians' sight
+  impl: [cpu/core/units.ts:districtZones]
+  readings:
+    - "C-95: the embark rules for a formation that may embark, a district's zone unseen, a city's kill in the planning, a raised unit's AI type, a move order's attack spot — READ (0x530420, 0x530240, 0x52fe90 at 0x52fed4, 0x530f50 at 0x531168, 0x791470 at 0x791677, 0x79b9c0), FIT (the move order's attack spot), both twins"
+  context:
+    - "- THE ZONE OF CONTROL (0x530f50): the district test (0x57b20 -> 0x24c2f0, IsAtWarWith at 0x531181) runs on each neighbour before any sight test; a..."
+  review: reviewed

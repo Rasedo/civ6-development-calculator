@@ -208,10 +208,11 @@
     - recording: 1121
       turn: 40
       value: every minor turn the game lists Bastions equal (1121 t40-75, 1117 t32-75).
-  impl: [cpu/core/aiModifiers.ts:ANALYZERS]
+  impl: [cpu/core/aiModifiers.ts:ANALYZERS, cpu/core/tactical.ts:planUnit, cpu/core/tactical.ts:wins]
   readings:
     - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
     - "C-96: the project value — READ (0x7b28c0, the PROJECTS table 0x5ce970), PARTLY READ (the space-race standing 0x7b8a30, the diplomatic-victory rows, the repair count), unwired"
+    - "C-95: the embark rules for a formation that may embark, a district's zone unseen, a city's kill in the planning, a raised unit's AI type, a move order's attack spot — READ (0x530420, 0x530240, 0x52fe90 at 0x52fed4, 0x530f50 at 0x531168, 0x791470 at 0x791677, 0x79b9c0), FIT (the move order's attack spot), both twins"
   context:
     - "...ble 0xd63a18 slot 1): with arguments and the context's city, its centre's outer damage (0x24ae50 on 0x6da56a3d: district +0x8d8) below its outer maximum (0x24b290 -> City +0x1880, 0x..."
   review: reviewed
@@ -288,10 +289,15 @@
   kind: function
   semantics: a district's outer defence maximum (-> City +0x1880, 0x198310).
   status: PARTLY
-  impl: [cpu/core/aiModifiers.ts:ANALYZERS, cpu/core/aiValue.ts:AiValueView]
+  impl:
+    - cpu/core/aiModifiers.ts:ANALYZERS
+    - cpu/core/aiValue.ts:AiValueView
+    - cpu/core/tactical.ts:planUnit
+    - cpu/core/tactical.ts:wins
   readings:
     - "H-1: the melee result, a ranged blow's domain, a city's shot — READ"
     - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
+    - "C-95: the embark rules for a formation that may embark, a district's zone unseen, a city's kill in the planning, a raised unit's AI type, a move order's attack spot — READ (0x530420, 0x530240, 0x52fe90 at 0x52fed4, 0x530f50 at 0x531168, 0x791470 at 0x791677, 0x79b9c0), FIT (the move order's attack spot), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...uilds the law's struct: +0 / +4 the two strengths, +8 the district's maximum hit points 0x24b290, +0xc / +0x10 the outer defense's damage and maximum, +0x14 the pool's hash, +0x1c CO..."
@@ -404,11 +410,14 @@
     - gpu/core/sim_tactics.py:_tac_zoc
     - cpu/core/units.ts:districtZones
     - gpu/core/sim_tactics.py:_tac_zoc_dirs
+    - cpu/core/tactical.ts:groundOf
+    - cpu/core/tactical.ts:t
   readings:
     - "C-125: a district's zone of control in a move's path, waived on the path's destination; a city-state's strikes after its units' planning — READ (0x530f50 at 0x531127..0x531302, 0x26f980, 0x26f870), FIT (the strikes' place), both twins"
     - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
     - "H-1: the sight rule — READ (the walk 0x58b1d0, emulated); a city's look — READ"
     - "C-125: a civilian at war in the planning's search, a zone of control across a river, the attack's move onto a city — READ (0x26e570, 0x530f50 at 0x5310c8..0x5311c9, 0x771f80 at 0x772121), both twins"
+    - "C-95: the embark rules for a formation that may embark, a district's zone unseen, a city's kill in the planning, a raised unit's AI type, a move order's attack spot — READ (0x530420, 0x530240, 0x52fe90 at 0x52fed4, 0x530f50 at 0x531168, 0x791470 at 0x791677, 0x79b9c0), FIT (the move order's attack spot), both twins"
   context:
     - "...IENDLY_CITY; a player's at war (0x469cd0) a COMBAT_DISTRICT where the district defends (0x24c2f0: a City Center, an Encampment) — and then nothing else of the plot — and a PASSIVE_DIST..."
   review: reviewed

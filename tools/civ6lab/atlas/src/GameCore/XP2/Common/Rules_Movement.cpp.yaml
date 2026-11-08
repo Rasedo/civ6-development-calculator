@@ -44,12 +44,14 @@
     - cpu/core/units.ts:shoreCrossing
     - gpu/core/sim_tactics.py:_owned_exit
     - cpu/core/units.ts:stepUnit
+    - cpu/core/units.ts:shoreStep
   readings:
     - "C-96: the city-states' tactical pass — READ (Wander Near City, Heal, the non-barbarian priorities, FindAlternateLocation), the families it needs PARTLY READ"
     - "C-99: a shore crossing's carried Movement — READ (0x26e920, 0x530420, 0x530240), both twins"
     - "C-99: a shore crossing's carried Movement"
     - "C-99: the stacking count holds other players' units, the wanders' kept-out plots, a Harbor's water no shore — READ (0x585d90, 0x585eb0, 0x2720a0, 0x77bf50, 0x77b9a0, 0x530240), both twins"
     - "C-99: an owned water plot no shore, a move order carried on as the turn ends — READ (0x530240, 0x66790, 0x66a90, 0x66680, 0x814e0, 0x81240, 0x7eeba0), both twins"
+    - "C-95: the embark rules for a formation that may embark, a district's zone unseen, a city's kill in the planning, a raised unit's AI type, a move order's attack spot — READ (0x530420, 0x530240, 0x52fe90 at 0x52fed4, 0x530f50 at 0x531168, 0x791470 at 0x791677, 0x79b9c0), FIT (the move order's attack spot), both twins"
   notes:
     - ".claude/scratchpad/mu1/readings_c96.md: ...plot is a city's or water (0x531510); the embark   rule 0x530420 (land to water) and the disembark 0x530240 waive   MOVEMENT_EMBARK_COST where a district with FreeEmbark (Districts +0xe1   bit 2, `dll_rowmap..."
   context:
@@ -58,9 +60,12 @@
 - addr: 0x530420
   final: 0x378010
   kind: function
-  semantics: "the embark rule (land to water): none where the TO water plot passes vt +0x40 and its domain mask takes the formation's domain +0x278 (0x530467..0x530499): a land formation asks bit 4, set on land plots alone (0x66a90, 0x66680), so no water plot passes and every embarking step pays (runs/h1_duely1124 t73-t91 city-state 3's Heavy Chariots onto its owned 40:14 / 41:14 / 42:13, AI_Planning.csv); else it waives MOVEMENT_EMBARK_COST at a FreeEmbark district (completion read off the FROM plot). Then, FreeEmbark or not, where the Movement the step starts with exceeds the TO domain's full Movement, the excess (0x774c0: +0x20 - +0x18) is carried."
+  semantics: "the embark rule (land to water): none for a formation that may not embark (+0x338 clear, 0x53044d), which pays the plot's own cost; none where the TO water plot passes vt +0x40 and its domain mask takes the formation's domain +0x278 (0x530467..0x530499): a land formation asks bit 4, set on land plots alone (0x66a90, 0x66680), so no water plot passes and every embarking step pays (runs/h1_duely1124 t73-t91 city-state 3's Heavy Chariots onto its owned 40:14 / 41:14 / 42:13, AI_Planning.csv); else it waives MOVEMENT_EMBARK_COST at a FreeEmbark district (completion read off the FROM plot). Then, FreeEmbark or not, where the Movement the step starts with exceeds the TO domain's full Movement, the excess (0x774c0: +0x20 - +0x18) is carried."
   status: READ
   cases:
+    - recording: h1_duely1127
+      turn: 2
+      value: the barbarian Scout 131073 on 6:9 closes the unrevealed coast 3:9 at (1/0), 4:10 after 5:10 and 5:7 as AI_Planning.csv lists; Move To Safety takes 5:10
     - recording: h1_duely1128
       turn: 88
       value: Nazca's Horseman 31:6 (1/4) -> 31:5 (1/1) carrying 2, 32:4 (2/0) (AI_Planning.csv)
@@ -77,12 +82,14 @@
     - cpu/core/tactical.ts:cross
     - gpu/core/sim_tactics.py:price6
     - cpu/core/units.ts:shoreCrossing
+    - cpu/core/units.ts:shoreStep
   readings:
     - "C-96: the city-states' tactical pass — READ (Wander Near City, Heal, the non-barbarian priorities, FindAlternateLocation), the families it needs PARTLY READ"
     - "C-99: a shore crossing's carried Movement — READ (0x26e920, 0x530420, 0x530240), both twins"
     - "C-99: a shore crossing's carried Movement"
     - "C-99: an owned water plot no shore, a move order carried on as the turn ends — READ (0x530240, 0x66790, 0x66a90, 0x66680, 0x814e0, 0x81240, 0x7eeba0), both twins"
     - "C-99: a move order carried on as the turn ends, the zone-of-control wait, the embark rule's TO plot — READ (0x962380, 0x52f50, 0x26fe20, 0x2675e0, 0x2673f0, 0x530420, 0x267650), both twins"
+    - "C-95: the embark rules for a formation that may embark, a district's zone unseen, a city's kill in the planning, a raised unit's AI type, a move order's attack spot — READ (0x530420, 0x530240, 0x52fe90 at 0x52fed4, 0x530f50 at 0x531168, 0x791470 at 0x791677, 0x79b9c0), FIT (the move order's attack spot), both twins"
   notes:
     - ".claude/scratchpad/mu1/readings_c96.md: ...0x272ca0), no river   crossing where either plot is a city's or water (0x531510); the embark   rule 0x530420 (land to water) and the disembark 0x530240 waive   MOVEMENT_EMBARK_COST where a district with FreeE..."
   context:
@@ -133,6 +140,9 @@
   semantics: "Rules_Movement's zone of control test (via 0x26f980 from the path cost 0x26e920, the step cost 0x270980 and the walk 0x26fe20 at 0x270800, the answer stored on the formation +0x518): the plot entered (x, y, the formation's layer 0x2665b0, 3 religious) is in a zone where the functor 0x52f710 over its ring (0x6aef0) finds one, else a neighbour holds a district of a player at war that exerts one (0x24c2f0) or a unit not the mover's player's, of a player at war (religious layer: another religion +0x1ce4), alive, of the mover's domain (0x266720), exerting (0x56d6c0) and seen by the mover's player (0x5033a0). An exerter on the path's destination answers no zone unless the plot's stacking count is at its limit (0x585eb0 against +0x58c). The costs then take max(cost, Movement left) (0x26eb7c, 0x270a2d) unless the path flags hold 0x800."
   status: READ
   cases:
+    - recording: h1_duely1127
+      turn: 43
+      value: "the barbarian Archer on 13:8 plans nothing past 12:7, player 1's centre 12:6 beside it out of its sight: the district zones unseen (0x531168)"
     - recording: h1_duely1121
       turn: 97-103
       value: "the plot entered and its six neighbours (0x5310c8, ebx -1 the plot itself): a district at war that exerts one (0x24c2f0) zones before any river test, so China's city 6:12 zones 5:13 across the river; a unit only where the neighbour's river bit toward the plot (+0x38, 0x2133b0) is clear or the neighbour is a city (IsCity, 0x5311c2)"
@@ -159,12 +169,16 @@
     - cpu/core/units.ts:relMover
     - cpu/core/units.ts:navalMover
     - cpu/core/units.ts:zoned
+    - cpu/core/tactical.ts:groundOf
+    - cpu/core/tactical.ts:v
+    - cpu/core/tactical.ts:t
   readings:
     - "C-125: a district's zone of control in a move's path, waived on the path's destination; a city-state's strikes after its units' planning — READ (0x530f50 at 0x531127..0x531302, 0x26f980, 0x26f870), FIT (the strikes' place), both twins"
     - "C-125: a civilian at war in the planning's search, a zone of control across a river, the attack's move onto a city — READ (0x26e570, 0x530f50 at 0x5310c8..0x5311c9, 0x771f80 at 0x772121), both twins"
     - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
     - "C-124: the formation's kept path, and a path's other players' units — READ (0x272aa0, 0x26e3a0, 0x782d0, 0x586360 at 0x586542..0x5865a1), unported"
     - "C-99: the zone-of-control wait's test names no destination — READ (0x26fe20 at 0x2707f4..0x270813, 0x26f980, 0x530f50 at 0x53118a / 0x53129f), both twins"
+    - "C-95: the embark rules for a formation that may embark, a district's zone unseen, a city's kill in the planning, a raised unit's AI type, a move order's attack spot — READ (0x530420, 0x530240, 0x52fe90 at 0x52fed4, 0x530f50 at 0x531168, 0x791470 at 0x791677, 0x79b9c0), FIT (the move order's attack spot), both twins"
   context:
     - ...nit's own plot and lies in the unit's enemy zone of control (0x26f980 -> Rules_Movement 0x530f50, the mover's owner, its stacking count 0x585eb0) is refused unless it is an attack (r14...
     - "...mpments exert the zone of control on the land beside them (Civ 6's rule; Rules_Movement 0x530f50 unread). runs/h1_duelw1124 t7-t52: city-state 4's city at 32:8 — the barbarian Scouts b..."

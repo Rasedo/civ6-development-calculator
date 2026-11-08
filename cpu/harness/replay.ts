@@ -1071,9 +1071,10 @@ function barbarianAi(ctx: Ctx, b: TurnRecord, closing: number, before: ReadonlyS
     },
   });
   const moves = new Map<Unit, { move: string; plot: number; attack: number; from: number }>();
+  // a unit's first logged move of the turn, as the game's first row
   traceTactics((c, move, plot, attack) => {
     const u = twin.get(c);
-    if (u) moves.set(u, { move, plot, attack, from: from.get(u) ?? u.tileIndex });
+    if (u && !moves.has(u)) moves.set(u, { move, plot, attack, from: from.get(u) ?? u.tileIndex });
   });
   // the danger map the barbarians' turn opens on, beside the game's logged
   // "Current Danger" of each unit it moved to safety

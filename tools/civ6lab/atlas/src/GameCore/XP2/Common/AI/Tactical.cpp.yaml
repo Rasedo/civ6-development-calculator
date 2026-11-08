@@ -573,10 +573,15 @@
   kind: function
   semantics: "ATTACK CIVILIANS: each CIVILIAN target, the units whose planning holds its plot within two turns (0x775340; the sort 0x76f210 on +8, stable), go for it in order (0x773270)."
   status: PARTLY
+  cases:
+    - recording: h1_duely1127
+      turn: 21
+      value: "one row for player 1's Builder on 13:5, Available Units: 2, naming the Slinger 720905; both Slingers walk for it (14:5, 13:4)"
   impl: [cpu/core/tactical.ts:attackCivilians]
   readings:
     - "C-95: the tactical pass — READ (the barbarians' moves; the minors share it)"
     - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
+    - "C-95: the embark rules for a formation that may embark, a district's zone unseen, a city's kill in the planning, a raised unit's AI type, a move order's attack spot — READ (0x530420, 0x530240, 0x52fe90 at 0x52fed4, 0x530f50 at 0x531168, 0x791470 at 0x791677, 0x79b9c0), FIT (the move order's attack spot), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ...dium/Low (0x7784b0 with TARGET_HIGH/MEDIUM/LOW_PRIORITY_UNIT), f2e10c Attack Civilians (0x779240), f2e120 Defend Camps (0x779010), f2e124 Attack Camps (0x778910), f2e130 Chase Target (...

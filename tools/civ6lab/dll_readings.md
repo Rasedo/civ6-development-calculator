@@ -8629,3 +8629,59 @@ religious entry (gpu/core/sim_tactics.py); `_condemn_ok` /
   Trader target's move not ported (no TRADER entry is assigned by Attack
   Units); the GPU condemns the one religious unit its planes hold on the
   plot.
+
+## C-95: the embark rules for a formation that may embark, a district's zone unseen, a city's kill in the planning, a raised unit's AI type, a move order's attack spot — READ (0x530420, 0x530240, 0x52fe90 at 0x52fed4, 0x530f50 at 0x531168, 0x791470 at 0x791677, 0x79b9c0), FIT (the move order's attack spot), both twins
+
+- THE EMBARK RULES (0x530420 land to water, 0x530240 water to land, from
+  the step cost 0x26e920): both return at once where the formation's
+  +0x338 byte (may embark) is clear, so a land unit that may not embark
+  pays the plot's own cost onto water (Coast 1) and carries nothing. Its
+  search enters a plot the player never revealed whatever it is, so the
+  cost reaches such water (`shoreStep` in `stepCost`, `search`'s `cross`;
+  GPU `price6`'s `tcost` / `cross`, `_tac_move_to`'s `ign_shore`).
+- THE EMBARK TEST (0x52fe90, the validity's on a revealed child): refused
+  where TO is water and +0x338 is clear (0x52fed4), so no land unit that
+  may not embark links a revealed water plot, an attack on a ship there
+  included, the danger map's search too (`enterable`'s `embarks`,
+  `groundOf`'s attack: a land unit's water by `embarks` alone; GPU
+  `_tac_attack_planes`' `land` / `fight_w`).
+- THE ZONE OF CONTROL (0x530f50): the district test (0x57b20 -> 0x24c2f0,
+  IsAtWarWith at 0x531181) runs on each neighbour before any sight test; a
+  unit exerts one only seen (0x5033a0). The planning's no-expansion from a
+  zone (`groundOf`'s seenZoc) takes a district at war whatever the player
+  sees (GPU `_tac_zoc_dirs`' `town` unmasked by `seen`).
+- THE PLANNING'S COMBAT (0x791470): a TARGET_ENEMY_COMBAT_DISTRICT entry
+  (0x791677) is simulated as a unit is, its health the district's hit
+  points left (0x24b290 less 0x24ae50 on 0x5e97d629), and a blow that tops
+  them sets +0x60 (wins) (`planUnit`: `predictCityBlow` against
+  `districtHealth`; GPU `_tac_plan`'s district jobs over
+  `_predict_city_blow` / `_centre_health`). A hurt unit holding a win does
+  not flee (`flees`).
+- A barbarian unit of no tribe role takes its type's own AI type
+  (0x79b9c0, `ownMilitaryAi`): a Ranger, a Skirmisher a tribe raises as a
+  unit is EXPLORE (`aiTypeOf`, GPU `_tac_ai`).
+- Attack Civilian's row (0x779240): one per target, "Available Units: N",
+  naming the first unit that moves; a ranged unit's turn goes on (the
+  replay keeps a unit's first logged move, `tacticsTrace` before the walk).
+- A move order's path, as the danger map's search, strikes an attack only
+  from a plot no other of the unit's own stacking units holds (`search`'s
+  stand-to-attack under `zoc`; GPU `_tac_search`'s `stand or zoc`): a fit
+  on the recorded rampages, its site in 0x2720a0 unread.
+- Confirmed (one-seed aimem traces): runs/h1_duely1127 t2 the barbarian
+  Scout 131073 on 6:9 closes the unrevealed coast 3:9 at (1/0), so 4:10
+  lands after 5:10 and 5:7 (AI_Planning.csv's order) and Move To Safety
+  takes 5:10; 1128 t39 city-state 3's Warrior on 4:4 puts no danger on the
+  barbarian Quadrireme's 2:3 and the Galley 524295 explores onto it; 1127
+  t21 the Slingers 720905 and 1114127 walk for player 1's
+  Builder on 13:5 under one Attack Civilian row, 720905's; 1128 t239 the
+  Cavalry 7012372 / 7077911, more than half their health lost, beside
+  player 0's 42:20 at 52 hit points (their blows 59 / 55) wander as
+  logged; t239-240 the Rangers 7274504 / 7340037 take HL Explore; 1127
+  t128 the rampaging Galley 589825 on 30:17 goes round its Galley's 30:16
+  to 29:16 and strikes player 0's embarked Warrior on 29:15, t152 /
+  t201-t237 likewise; 1127 t43 the barbarian Archer on 13:8 plans nothing
+  past 12:7, player 1's centre 12:6 beside it out of its sight (11:7 /
+  11:6 / 11:8 off its list, as AI_Planning.csv).
+- Open (C-95): 1127 t43 the barbarian Archer's planning beside player 1's
+  12:6 still lists 12:6 as an attack (2/0) and 11:9 before 14:7, the
+  game's neither; the stand-to-attack's site in the validity.

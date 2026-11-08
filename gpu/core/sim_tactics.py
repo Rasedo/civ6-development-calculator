@@ -433,8 +433,8 @@ class SimTactics:
         none of a chassis that exerts none), of the mover's domain (`naval`: a
         ship's or a land unit's), none across a river but from a city
         centre's plot (0x5311a0..0x5311c9). With `seen` [B, T] (`groundOf`'s
-        seenZoc) only an exerter on a plot it sees. The mover's own ignoring
-        is the caller's."""
+        seenZoc) only a unit on a plot it sees, a district whatever it sees
+        (0x531168). The mover's own ignoring is the caller's."""
         mil = self.military_at
         here = mil >= 0
         ms = mil.clamp(min=0)
@@ -454,7 +454,6 @@ class SimTactics:
             town = town | self._encamp_block_plane(seat)
         if seen is not None:
             ex = ex & seen
-            town = town & seen
         nb = self.neigh.clamp(min=0)
         bits = torch.arange(6, device=self.device).view(1, 1, 6)
         riv = (self.river_mask.unsqueeze(2) >> bits) & 1
@@ -626,9 +625,10 @@ class SimTactics:
         plots, "spot_turns" and "spot_n" [N, E]. With `full` each unit sets
         out on its full Movement (`unitFullMoves`); "closed" [N, T] is the
         turn of every plot the search closed, those it only passes or attacks
-        included. With `stand` (the danger map's search) an attack is struck
-        only from the unit's own plot or one none of its own stacking units
-        holds, a step onto a unit's plot keeps its Movement left (only a
+        included. With `stand` (the danger map's search) or `zoc` (a move
+        order's path) an attack is struck only from the unit's own plot or
+        one none of its own stacking units holds; with `stand` a step onto a
+        unit's plot keeps its Movement left (only a
         district attack spends it), and no zone of control is paid (flag
         0x800). With `later_turns` (the path's flag 0x1000) a path's turn may
         end on a plot its own stacking unit holds after its first. With
@@ -915,7 +915,10 @@ class SimTactics:
                 tr = (fw != tw) & (nb >= 0)
                 dock = self._embark_waived(best.unsqueeze(1).expand(-1, 6), nbc, rows) | hx
                 tcost = torch.where(tw, torch.full_like(cst, self._mp_scale), entry_n.gather(1, nbc))
-                tcost = tcost + torch.where(dock | ign_shore.unsqueeze(1), 0, self._embark_transition_mp)
+                # the embark and disembark rules run for a formation that
+                # may embark alone (+0x338, `shoreStep`): one that may not
+                # pays the plot's own cost onto water it never revealed
+                tcost = tcost + torch.where(dock | (ign_shore | ~embarks).unsqueeze(1), 0, self._embark_transition_mp)
                 tcost = torch.where(ctr_n.gather(1, nbc), tcost.clamp(max=self._mp_scale), tcost)
                 cst = torch.where(fw & tw, self._mp_scale, torch.where(tr, tcost, cst))
                 # a cliff bars a shore crossing onto a revealed plot alone (the
@@ -945,7 +948,7 @@ class SimTactics:
             cst = torch.where(blind6, torch.where(crp > 0, crp, _FIX).expand(-1, 6), cst)
             tw6 = water_n.gather(1, nbc)
             wet6 = torch.where(blind6, pw.expand(-1, 6), tw6)
-            cross = (fw != tw6) & (nb >= 0) & ~naval.unsqueeze(1) & ~ww_n.unsqueeze(1) & ~hx & ~blind6
+            cross = (fw != tw6) & (nb >= 0) & (~naval & ~ww_n & embarks).unsqueeze(1) & ~hx & ~blind6
             max_to = torch.where(wet6, full_s.unsqueeze(1), full_l.unsqueeze(1))
             carry6 = torch.where(cross & (pm > max_to), pm - max_to, torch.zeros_like(pm))
             moves = pm - cst
@@ -1108,10 +1111,10 @@ class SimTactics:
                 # stand on under flag 1 (`search`)
                 same = water_n.gather(1, b1) == water_n.gather(1, nbc)
                 ok = ok & ~(board_step.gather(1, nbc) & same)
-            if stand:
-                # the danger map's search: an attack is struck from a plot
-                # the unit may stand on, its own or one none of its own
-                # stacking units holds
+            if stand or zoc:
+                # the danger map's search and a move order's path: an attack
+                # is struck from a plot the unit may stand on, its own or one
+                # none of its own stacking units holds (`search`)
                 ok = ok & ~(a6 & full_n.gather(1, b1) & (best != start).unsqueeze(1))
             if cliff6 is not None:
                 ok = ok & ~cliff6
@@ -1609,7 +1612,10 @@ class SimTactics:
         ut_pool = getattr(self, f"{pre}_unit_type")
         ut = ut_pool[rows, sr].clamp(min=0, max=self.NU - 1)
         naval = self.unit_naval.take(ut)
-        ign_shore = self._ignore_shores(torch.full_like(ut_pool, seat), ut_pool)[rows, sr]
+        # no embark penalty where the shores are ignored, or for a formation
+        # that may not embark (`shoreStep`)
+        ign_shore = self._ignore_shores(torch.full_like(ut_pool, seat), ut_pool)[rows, sr] \
+            | ~self._tac_embarks(rows, ut, seat, getattr(self, f"{pre}_unit_orig_owner")[rows, sr])
         # its terrain waivers (`terrainMp`: hills, Woods)
         waive = self._tac_waive_code(ut, getattr(self, f"{pre}_unit_promos")[rows, sr],
                                      getattr(self, f"{pre}_unit_alpine")[rows, sr])
@@ -2043,7 +2049,7 @@ class SimTactics:
     def _tac_ai(self) -> tuple[torch.Tensor, torch.Tensor]:
         """[B, P] long twice — each barbarian's AI type (`aiTypeOf`: its
         tribe's camp defender DEFENDER while the camp stands, its scouts
-        EXPLORE, a civilian none (-1), every other COMBAT) and the tribe that
+        EXPLORE, a civilian none (-1), every other its type's own) and the tribe that
         raised it (`tribeOf`, its defender included; -1 none)."""
         dev = self.device
         ut = self.barb_unit_type.clamp(min=0, max=self.NU - 1)
@@ -2058,7 +2064,9 @@ class SimTactics:
             tribe[b_i, d] = k_i
             isdef[b_i, d] = self.tribe_alive[b_i, k_i]
         scout = self.barb_unit_scout & (self.barb_unit_tribe >= 0)
-        ai = torch.where(isdef, _AI_DEFENDER, torch.where(scout, _AI_EXPLORE, _AI_COMBAT))
+        # every other its type's own (`ownMilitaryAi`)
+        own = torch.where(self._bop_combat_ai.take(ut), _AI_COMBAT, _AI_EXPLORE)
+        ai = torch.where(isdef, _AI_DEFENDER, torch.where(scout, _AI_EXPLORE, own))
         return torch.where(fighter, ai, torch.full_like(ai, -1)), tribe
 
     def _tac_tactical(self, ai: torch.Tensor, utribe: torch.Tensor) -> torch.Tensor:
@@ -2155,6 +2163,29 @@ class SimTactics:
                 bd, bt = self._tac_predict(rows[n_i[j_i]], d_j[j_i], a_slot[j_i], sp[j_i, s_i])
                 back_t[n_i[j_i], e_i[j_i], s_i] = bd
                 back_d[n_i[j_i], e_i[j_i], s_i] = bt
+        # a city centre's blow kills where it tops its hit points left
+        # (`planUnit`: 0x791470's district branch)
+        djob = (sn > 0) & has & ~other
+        if bool(djob.count_nonzero()):
+            dn_i, de_i = djob.nonzero(as_tuple=True)
+            dplot = tpc[dn_i, de_i]
+            g_i = rows[dn_i]
+            # one job a game at a time: `_predict_city_blow` takes a unit per game
+            left = torch.ones_like(dn_i, dtype=torch.bool)
+            while bool(left.any()):
+                first = torch.full((self.B,), -1, dtype=torch.long, device=dev)
+                ji = left.nonzero(as_tuple=True)[0]
+                first.scatter_reduce_(0, g_i[ji], ji, reduce="amin", include_self=False)
+                pick = first[first >= 0]
+                us = torch.zeros(self.B, dtype=torch.long, device=dev)
+                tgt = torch.full((self.B,), -1, dtype=torch.long, device=dev)
+                us[g_i[pick]] = slots[dn_i[pick]]
+                tgt[g_i[pick]] = dplot[pick]
+                blow = self._predict_city_blow(pre, us, tgt)[g_i[pick]]
+                dmax, dhp, _ = self._centre_health(tgt.clamp(min=0).unsqueeze(1))
+                kill = (dmax[g_i[pick], 0] > 0) & (blow > dhp[g_i[pick], 0])
+                wins[dn_i[pick[kill]]] = True
+                left[pick] = False
         res.update({"tp": tp, "te": te, "civ": civ, "other": other, "dealt": dealt, "taken": taken, "back_taken": back_t,
                     "back_dealt": back_d, "wins": wins})
         return res

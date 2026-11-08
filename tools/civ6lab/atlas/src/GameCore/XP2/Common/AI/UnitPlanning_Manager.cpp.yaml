@@ -124,6 +124,9 @@
   semantics: "the planning's combat simulation: the blow from where the attacker stands at the expected roll (COMBAT_MAX_EXTRA_DAMAGE/2); dealt +0x64, taken +0x7c, per spot the target's blow back +0x94 / +0xac; a kill sets +0x60 At 0x79174a: per spot dealt = the larger of the simulation's two results ([rbp-0xc], [rbp-8]; 150 a civilian or a Trader; a RELIGIOUS or TRADER target in a combat other than COMBAT_RELIGIOUS 0x5e2f7468 trunc(health x 1.5), 0x791703..0x79174a), the kill byte (+0xc4) dealt >= the target's health, `wins` (+0x60) dealt > it; the blow back per spot re-simulated (0x205720 with the sides swapped through 0x213e00, the location the spot) into +0x94 / +0xac, for a LOW..HIGH target or a RELIGIOUS one struck by a religious mover alone (0x7917b1..0x7917f7). The roll at COMBAT_MAX_EXTRA_DAMAGE / 2 (damageExpected); the strengths the blow resolves on from the plot the attacker stands on (meleeUnitStrengths, rangedUnitStrengths); a ranged blow and one on an embarked defender take none. Ported: predictBlow, _tac_predict."
   status: READ
   cases:
+    - recording: h1_duely1128
+      turn: 239
+      value: "the barbarian Cavalry 7012372 / 7077911, more than half their health lost, beside player 0's 42:20 at 52 hit points, their predicted blows 59 / 55: the district branch (0x791677) sets wins, they hold and wander as logged"
     - recording: h1_duelw1124
       value: "the barbarians' Attack Units rows: 206 of 330 take the logged move and attack"
     - recording: h1_duelw1124
@@ -141,6 +144,9 @@
     - cpu/core/combat.ts:predictCityBlow
     - cpu/core/aiViewTypes.ts:AiView
     - cpu/core/tactical.ts:RELIGIOUS_TAKEN
+    - cpu/core/tactical.ts:planUnit
+    - gpu/core/sim_tactics.py:_tac_plan
+    - cpu/core/tactical.ts:wins
   readings:
     - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
     - "C-95: the planning's spots and the combat prediction — READ, ported"
@@ -148,6 +154,7 @@
     - "C-95: Attack Units — READ, ported"
     - "C-95: the planning's spots and the combat prediction"
     - "C-95: the planning strikes a religious unit and a Trader on their plot, its foreign test reads the mover's map layer, the blow on them 1.5 x their health — READ (0x790c60 at 0x790f22, 0x790fc9..0x791016, 0x7910b3..0x791162; 0x791470 at 0x791703..0x79174a, 0x7917b1..0x7917f7; 0x793400), both twins"
+    - "C-95: the embark rules for a formation that may embark, a district's zone unseen, a city's kill in the planning, a raised unit's AI type, a move order's attack spot — READ (0x530420, 0x530240, 0x52fe90 at 0x52fed4, 0x530f50 at 0x531168, 0x791470 at 0x791677, 0x79b9c0), FIT (the move order's attack spot), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...each unit's spots per target from its planning (turns, the planning's combat simulation 0x791470: the damage dealt +0x64, received +0x7c, and against a counterattack +0x94 / +0xac); fo..."

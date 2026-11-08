@@ -116,13 +116,13 @@ function closedToMinor(state: GameState, seat: number, t: Tile): boolean {
 }
 
 /** the steps' costs a tactical pass holds while it runs, per chassis and
- *  promotions and Alpine Training, by plot and DirectionTypes link: the ground holds still but
+ *  promotions, Alpine Training and the embarking, by plot and DirectionTypes link: the ground holds still but
  *  for a pillage, which drops them (`dropHeldCosts`) */
 let costsHeld: Map<string, Int32Array> | null = null;
 
 function heldCostsOf(state: GameState, unit: Unit): Int32Array | null {
   if (!costsHeld) return null;
-  const k = `${unit.type}:${unit.promos ?? 0}:${unit.alpine ? 1 : 0}`;
+  const k = `${unit.type}:${unit.promos ?? 0}:${unit.alpine ? 1 : 0}:${canEmbark(state, unit) ? 1 : 0}`;
   let a = costsHeld.get(k);
   if (!a) costsHeld.set(k, (a = new Int32Array(state.map.tiles.length * 6).fill(-1)));
   return a;
@@ -339,9 +339,13 @@ function groundOf(state: GameState, unit: Unit, revealedOnly = true, planning = 
         const sn = seenNow;
         const t = state.map.tiles[i];
         for (const n of neighbors(state.map, t)) {
+          // a district at war zones whatever the player sees (0x530f50 at
+          // 0x531168: 0x24c2f0 and the war test alone; runs/h1_duely1127
+          // t43: the barbarian Archer on 13:8 plans nothing past 12:7, player
+          // 1's centre 12:6 beside it out of its sight, AI_Planning.csv)
+          if (districtZones(state, n, unit)) { v = true; break; }
           if (!sn[n.index]) continue;
           const river = crossesRiver(state.map, t, n);
-          if (districtZones(state, n, unit)) { v = true; break; }
           if (river && n.district !== 'CITY_CENTER') continue;
           if (state.units.some((x) => x.tileIndex === n.index && onMap(x) && !unitReligious(x.type) && unitExertsZoc(x)
             && !!UNITS[x.type]?.naval === naval && unitsHostile(state, x, unit))) { v = true; break; }
@@ -502,6 +506,8 @@ function search(state: GameState, unit: Unit, maxTurns: number, zoc: boolean, on
   // district attack: DistrictInfo +0x58 / +0x5c)
   const districtAttack = (t: Tile) => garrisonDistrict(state, t) && unitsHostile(state, unit, { seat: tileSeat(t) });
   const held = heldCostsOf(state, unit);
+  // the formation may embark (+0x338): the embark and disembark rules run
+  const embarks = canEmbark(state, unit);
   const nodes = new Map<number, PNode>();
   // a later turn starts on the pathfinder's pool of the domain its plot holds
   // the unit in (`domainPool`): embarked on water, a land unit's own ashore
@@ -636,10 +642,13 @@ function search(state: GameState, unit: Unit, maxTurns: number, zoc: boolean, on
       // on 40:19 and city-state 4's Man-At-Arms on 41:20; t94: city-state
       // 4's at 28:23 plans 29:21 past player 0's Quadriremes, AI_Planning.csv)
       if (isWater(from) === isWater(to) && ground.revealed(to.index) && ground.boarded(to.index)) continue;
-      // the danger map's search (0x26df90, flags 0x311): an attack is struck
-      // from a plot the unit may stand on, its own or one none of its own
-      // stacking units holds
-      if (attack && standToAttack && best !== start && ground.full(best.tile)) continue;
+      // the danger map's search (0x26df90, flags 0x311) and a move order's
+      // path: an attack is struck from a plot the unit may stand on, its own
+      // or one none of its own stacking units holds (runs/h1_duely1127 t128:
+      // the rampaging Galley 589825 on 30:17 for player 0's embarked Warrior
+      // on 29:15 goes round its Galley 1048590's 30:16 to 29:16 and strikes,
+      // as logged; t152 / t201-t237 its Galleys likewise)
+      if (attack && (standToAttack || zoc) && best !== start && ground.full(best.tile)) continue;
       // a move order's danger flags (the path validity 0x2720a0 at
       // 0x272590..0x272612): from a node of the path's first turn, under
       // flag 8 no child of danger (the player's danger map 0x716a90 above
@@ -731,7 +740,7 @@ function search(state: GameState, unit: Unit, maxTurns: number, zoc: boolean, on
     // the domain's, a FreeEmbark district's crossing too; runs/h1_duely1128
     // t88: Nazca's Horseman 31:6 (1/4) embarks onto 31:5 (1/1) carrying 2,
     // 32:4 beyond it (2/0), AI_Planning.csv)
-    const cross = !blind && shoreCrossing(unit.type, from, to);
+    const cross = !blind && embarks && shoreCrossing(unit.type, from, to);
     const maxTo = wet ? fullSea : fullLand;
     let carry = cross && pm > maxTo ? pm - maxTo : 0;
     let moves = pm - cost;
@@ -1602,6 +1611,16 @@ export function planUnit(state: GameState, unit: Unit, targets: readonly Target[
   let wins = false;
   for (const E of entries) {
     if (!E.spots.length) continue;
+    // a city centre's blow (0x791470's district branch at 0x791677: its hit
+    // points left, the district's 0x24b290 less 0x24ae50) kills where it
+    // tops them (runs/h1_duely1128 t239: the barbarian Cavalry 7012372 and
+    // 7077911, more than half their health lost, beside player 0's 42:20 at
+    // 52 hit points, their blows 59 / 55, hold and wander, as logged)
+    if (E.target.type === 'COMBAT_DISTRICT') {
+      const d = districtHealth(state, E.target.tile);
+      if (d && predictCityBlow(state, unit, E.target.tile) > d.hp) wins = true;
+      continue;
+    }
     const v = UNIT_TARGET.has(E.target.type) ? targetUnit(state, E.target) : null;
     if (!v) continue;
     const blow = predictBlow(state, unit, v, v.tileIndex);
@@ -1817,13 +1836,15 @@ const AI_DEFENDER = 4;
 
 /** a barbarian unit's AI type: its tribe's camp defender DEFENDER while the
  *  camp stands (0x154830 turns the DEFENDER units of a fallen camp's tribe
- *  COMBAT), its scouts EXPLORE, a civilian none, every other COMBAT */
+ *  COMBAT), its scouts EXPLORE, a civilian none, every other its type's own
+ *  (`ownMilitaryAi`: runs/h1_duely1128 t239-240 the Rangers 7274504 and
+ *  7340037 a tribe raised as units take HL Explore, as logged) */
 function aiTypeOf(state: GameState, u: Unit): number {
   if (unitDomain(u.type) !== 'military') return -1;
   const tr = tribeOf(state, u.id);
   if (tr?.alive && tr.defender === u.id) return AI_DEFENDER;
   if (tr?.scouts.includes(u.id)) return AI_EXPLORE;
-  return AI_COMBAT;
+  return ownMilitaryAi(u.type);
 }
 
 /** A UNIT THE TACTICAL PASS TAKES (the tactical unit selector 0x7710f0 over
@@ -2144,7 +2165,11 @@ function reachers(state: GameState, pass: Pass, plot: number, turns: number): Un
  * whose planning reaches its plot within two turns (`reachers`) go for it in
  * their order (0x773270) — each that can act moves onto it with the attack
  * flag, a melee one's turn then done, until the civilian is taken; then each
- * ranged one within its range strikes it.
+ * ranged one within its range strikes it. The target's one row ("Available
+ * Units: N") names the first that moves, a ranged one's turn going on
+ * (runs/h1_duely1127 t21: the barbarian Slingers 720905 and 1114127 both
+ * walk for player 1's Builder on 13:5, the row 720905's, 1114127's turn
+ * ended in the homeland; t22 720905 takes it on 14:6, then Chase Target).
  */
 function attackCivilians(state: GameState, pass: Pass): void {
   for (const e of pass.targets) {
@@ -2155,8 +2180,11 @@ function attackCivilians(state: GameState, pass: Pass): void {
     if (!cands.length) continue;
     const taken = () => !state.units.includes(v) || v.seat !== e.seat || v.tileIndex !== at;
     let gone = false;
+    let logged = false;
     for (const u of cands) {
       if (!canAct(state, pass, u)) continue;
+      if (!logged) tacticsTrace?.(u, 'Attack Civilian', at, -1);
+      logged = true;
       moveTo(state, u, at);
       if (rangeOf(u) === 0) finish(pass, u, 'Attack Civilian', at);
       if (taken()) { gone = true; break; }
