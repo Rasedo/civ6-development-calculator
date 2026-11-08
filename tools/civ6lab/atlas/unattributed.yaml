@@ -2565,6 +2565,7 @@
     - "C-95: the unit pathfinder and the planning's reach — READ, confirmed on the Wander draws"
     - "C-96: the city-states' tactical pass — READ (Wander Near City, Heal, the non-barbarian priorities, FindAlternateLocation), the families it needs PARTLY READ"
     - "C-95 / C-123: a move order's step costs by the formation's fighter flag; an operation that ends in its tick lets its units go — READ (0x26fe20 at 0x27021b, 0x270980, 0x270be0, 0x267650 at 0x2677fa), FIT (the release), both twins"
+    - "C-99: the assignment's Movement and the swap's walk — READ (0x776140 at 0x776643 / 0x7768e4, 0x56d6f0, 0x972a50 -> 0x26fe20 under flag 4, 0x2720a0 at 0x27229b), both twins"
   notes:
     - ".claude/scratchpad/mu1/readings_c96.md: ...ld a   water plot; the majors' and the minors' do from t62-69). The step's cost   (0x26e920's rules 0x531660..0x530240): into a city at most   CITY_MOVEMENT_COST 1 (0x531660 caps the step, 0x272ca0), no river..."
     - ".claude/scratchpad/mu1/readings_c96.md: ...he step's cost   (0x26e920's rules 0x531660..0x530240): into a city at most   CITY_MOVEMENT_COST 1 (0x531660 caps the step, 0x272ca0), no river   crossing where either plot is a city's or water (0x531510); th..."
@@ -7177,6 +7178,9 @@
   semantics: "UNITOPERATION_SWAP_UNITS' Start: the partner (0x972540); the unit's formation walks to the target by the move 0x26fe20 (the order's flags | 4), then the partner's formation by 0x26fe20 toward the unit's old plot (+0x220 / +0x224 read before the unit walks) with the order's flags: one node of its own path, the path's first node where it lies in the first turn, its step's cost spent."
   status: READ
   cases:
+    - recording: h1_duelr1128
+      turn: 132
+      value: city-state 2's Man-At-Arms 1507331 on 9:6 swaps onto its centre 9:7 with the garrison Warrior 2424833, the Warrior 2490370 made there that turn standing on it (the walk's flag 4 counts no stacking at its destination); 2424833 to 9:6, Operation Move to 8:6, as logged
     - recording: h1_duely1128
       turn: 174
       value: Hong Kong's Warrior 2490370 on 8:7 swaps onto its centre 9:7; its Warrior 2293764 steps first onto 9:8, 8:7 beside the barbarians on 9:6; its Man-At-Arms 1507331 on 10:7 swaps not with 2490370, moved into the barbarians' zone (record t+1)
@@ -7188,6 +7192,7 @@
       value: city-state 4's Warrior 196610 swaps onto 36:7; its Warrior 131073 steps onto 35:7 with its own Movement (1 of 2 left) and cannot pay the Marsh 36:8 it wanders to, ending on 35:7 (record t+1)
   impl: [cpu/core/tactical.ts:swapUnits, gpu/core/sim_tactics.py:_tac_swap]
   readings:
+    - "C-99: the assignment's Movement and the swap's walk — READ (0x776140 at 0x776643 / 0x7768e4, 0x56d6f0, 0x972a50 -> 0x26fe20 under flag 4, 0x2720a0 at 0x27229b), both twins"
     - "C-99: Move Unit's no-Location execution, the swap's partner and the move order's first turn — READ, ported; the swap's path tests and 0x56e760 unread"
     - "C-99: Move Unit's no-Location execution, the swap's partner and the move order's first turn"
     - "C-125 / C-99: the swap's partner pays its step, the stacking count's classes, the walk's end among other players' units, a siege unit's RangedCombat — READ (0x972a50, 0x585d90, 0x26fe20 via 0x585eb0, 0x56e3e0), both twins"

@@ -103,6 +103,7 @@
     - gpu/core/sim_tactics.py:_op_move_exec
   readings:
     - "C-93: Operation Move takes its movers as the order opens, a carried formation member among them — READ (0x816cb0 at 0x817030..0x81719a, 0x817800, 0x817e6a; 0x265d80 -> 0x56cc70), both twins"
+    - "C-99: the assignment's Movement and the swap's walk — READ (0x776140 at 0x776643 / 0x7768e4, 0x56d6f0, 0x972a50 -> 0x26fe20 under flag 4, 0x2720a0 at 0x27229b), both twins"
   review: reviewed
 - addr: 0x56ce90
   final: 0x3a2ca0
@@ -138,6 +139,9 @@
   semantics: "sets a unit's Movement left (+0xdb0, through +0xd58) to 0: later nodes' units with Movement leave it out; the unit still rests."
   status: READ
   cases:
+    - recording: h1_duelr1124
+      turn: 22
+      value: the garrison Warrior 393218's moves ended on Granada's centre read as no Movement in the attack assignment's stacking block (0x776140 at 0x7768e4)
     - recording: AI_Tactical.csv
       value: "Confirmed: the turn's \"Random   Direction\" draws pair one to one with the AI_Tactical.csv rows \"Wander\" and   \"Garrison\", every player's in log order (1,199 of 1,199 turn-pairs of the   five seeds), a"
   impl:
@@ -162,7 +166,10 @@
     - cpu/core/trade.ts:plunderTrader
     - cpu/core/units.ts:canUpgradeUnit
     - cpu/core/units.ts:upgradeAnew
+    - cpu/core/tactical.ts:left
+    - gpu/core/sim_tactics.py:_tac_assign
   readings:
+    - "C-99: the assignment's Movement and the swap's walk — READ (0x776140 at 0x776643 / 0x7768e4, 0x56d6f0, 0x972a50 -> 0x26fe20 under flag 4, 0x2720a0 at 0x27229b), both twins"
     - "C-95: the tactical pass — READ (the barbarians' moves; the minors share it)"
     - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
     - "C-96: the city-states' tactical pass — READ (Wander Near City, Heal, the non-barbarian priorities, FindAlternateLocation), the families it needs PARTLY READ"

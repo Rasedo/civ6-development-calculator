@@ -1271,9 +1271,17 @@ export function swapUnits(state: GameState, pass: Pass, unit: Unit, tile: number
   const from = unit.tileIndex;
   const other = swapPartner(state, pass, unit, tile);
   if (!other) return;
-  other.tileIndex = from;
+  // the unit's walk onto the partner's plot carries flag 4, which counts no
+  // stacking at its destination (0x2720a0 at 0x27229b): another of its own
+  // units there that stacks with it keeps it out no more than the partner
+  // (runs/h1_duelr1128 t132: city-state 2's Man-At-Arms 1507331 on 9:6
+  // swaps onto its centre 9:7 with its garrison, the Warrior 2490370 made
+  // there that turn standing on it)
+  const held = [other, ...state.units.filter((u) => u !== unit && u !== other && u.tileIndex === tile
+    && u.seat === unit.seat && stackClass(u.type) === stackClass(unit.type))];
+  for (const u of held) u.tileIndex = from;
   moveTo(state, unit, tile, false);
-  other.tileIndex = tile;
+  for (const u of held) u.tileIndex = tile;
   if (unit.tileIndex !== tile) return;
   const step = pathNodes(state, other, from, laterTurns, true, danger, formationMates(state, other))[0];
   if (!step || step.turns > 1 || step.tile === tile) return;
@@ -2583,7 +2591,10 @@ export interface Assigned { unit: Unit; move: number; attack: number; from: numb
  *    or would kill it; a DEFENDER's only on its own plot, a unit that has
  *    moved only its own plot this turn, and no spot another unit holds that
  *    stacks with it (its own unit of its job with Movement left aside,
- *    `jobOf`); each a claim on
+ *    `jobOf`; none left to a unit whose moves an order ended: runs/
+ *    h1_duelr1124 t22 Granada's City Defense garrison 393218, its moves
+ *    ended by Garrison City, keeps the Warrior 327681 off 41:12 for 40:11);
+ *    each a claim on
  *    the spot (the spots in the order first claimed);
  *  - the Generalized Assignment (MathAlgorithm_GeneralizedAssignmentProblem
  *    0x8b5bf0, one pass): spot by spot each unit's gain there (`gain`, less
@@ -2611,11 +2622,14 @@ export function assignTo(state: GameState, pass: Pass, units: Unit[], targets: T
       damage: 0, units: [], barb: isBarbSeat(t.seat) });
   }
   const spots: AssignSpot[] = [];
+  // a unit's Movement left (+0xdb0), none where an order of the pass ended
+  // its moves (0x56d6f0 zeroes it)
+  const left = (x: Unit) => (pass.ended.has(x.id) ? 0 : x.movesLeft);
   // the claims in target, unit, spot order (0x776140's outer loop walks the
   // targets)
   tg.forEach((T, k) => {
     units.forEach((u, i) => {
-      if (u.movesLeft <= 0) return;
+      if (left(u) <= 0) return;
       const p = pass.plan.get(u.id);
       if (!p) return;
       const moved = u.movesLeft < (u.movesFull ?? unitFullMoves(state, u));
@@ -2630,7 +2644,7 @@ export function assignTo(state: GameState, pass: Pass, units: Unit[], targets: T
         if (s.turns === 1 && moved && s.tile !== u.tileIndex) continue;
         const dom = unitDomain(u.type);
         if (state.units.some((x) => x.tileIndex === s.tile && onMap(x) && x !== T.unit
-          && !(x.seat === u.seat && jobOf(state, pass, x) === job && x.movesLeft > 0) && unitDomain(x.type) === dom)) continue;
+          && !(x.seat === u.seat && jobOf(state, pass, x) === job && left(x) > 0) && unitDomain(x.type) === dom)) continue;
         let sp = spots.find((x) => x.tile === s.tile);
         if (!sp) spots.push((sp = { tile: s.tile, claims: [], holder: -1, holderTarget: -1 }));
         sp.claims.push({ unit: i, target: k, dealt, turns: s.turns, value: 0 });

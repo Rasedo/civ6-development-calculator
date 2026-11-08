@@ -11273,3 +11273,48 @@ window's start).
 - Open: the Free Cities' plane (player 62's, recorded) has no engine plane;
   0x50d390's meets read from the call sites, the function's own meet calls
   not walked; a sight raised by a promotion (Spyglass) takes no look again.
+
+## C-99: the assignment's Movement and the swap's walk — READ (0x776140 at 0x776643 / 0x7768e4, 0x56d6f0, 0x972a50 -> 0x26fe20 under flag 4, 0x2720a0 at 0x27229b), both twins
+
+`assignTo` (`left`) and `swapUnits` (cpu/core/tactical.ts); `_tac_assign`
+(`ended` on the mover's and the occupant's Movement) in
+gpu/core/sim_tactics.py.
+
+- THE ASSIGNMENT'S MOVEMENT (0x776140): the claim loop takes a unit with
+  Movement (+0xdb0 > 0 at 0x776643) and the stacking block lets its own
+  unit of its job through only with Movement (+0xdb0 at 0x7768e4). An order
+  that ended a unit's moves (0x56d6f0) zeroes +0xdb0 through its tracked
+  value +0xd58, so such a unit — Garrison City's garrison among them —
+  reads as none in both tests and blocks the spot it stands on.
+- Confirmed: runs/h1_duelr1124 t22 Granada's City Defense: the garrison
+  Warrior 393218 on 41:12 ended there by Garrison City keeps the Warrior
+  327681 off its turn-2 spot 41:12; 327681 takes 40:11, "At 40:12, Move
+  40:11, Attack -9999:-9999" as logged.
+- THE SWAP'S WALK (0x972a50): the unit's formation walks onto the partner's
+  plot by 0x26fe20 with the order's flags | 4, and under flag 4 the path's
+  destination count (0x2720a0 at 0x27229b) refuses nothing: another of the
+  player's units there that stacks with the unit keeps it out no more than
+  the partner. The engine's plot holds a second land unit only on the
+  replay's copy (a unit made on its occupied centre); the GPU's plot holds
+  one, its swap clearing it.
+- Confirmed: runs/h1_duelr1128 t132 city-state 2's Man-At-Arms 1507331 on
+  9:6 swaps onto its centre 9:7 with the garrison Warrior 2424833, the
+  Warrior 2490370 made there that turn standing on it; 2424833 to 9:6 and
+  Operation Move on to 8:6, 2490370's Wander to 9:6, 2097159 to 9:5, as
+  logged. runs/h1_duelr1117 t86 city-state 4's Catapult 917509 on 32:6
+  swaps onto its centre 32:5, two Catapults standing there, as logged.
+- THE WALK'S MOVEMENT ON A DOMAIN CHANGE (0x26fe20 at 0x270215..0x2702f6):
+  the step is priced by the movement rules chain 0x270be0 (0x531660 ..
+  0x530420 / 0x530240) from the formation's Movement (+0x218) and the
+  destination domain's full Movement (0x266660 << 8 after 0x266220 sets the
+  domain by IsWater of the plot); the members' Movement then changes by the
+  walk (0x265d80 -> ChangeMoves 0x56cc70, the only runtime writer of +0xdb0
+  beside 0x56d6f0). The engines' cap on a step ashore off owned water
+  (`stepUnit`) stays a fit: the rules chain's use of those two inputs is
+  unread.
+- Open: Garrison City's garrison of no operation (0x810fdc..0x81101b) is
+  the first unit of the city plot's unit list (0x75c50, +0x50 / +0x60) of
+  formation class 0 or 3, the plot's arrival order, which the engines do
+  not keep: runs/h1_duelr1117 t86 city-state 4's centre holds 1048580
+  (bought t85) and 1114113 (made t86), the game's garrison 1048580, ours
+  1114113 (the player's unit order).

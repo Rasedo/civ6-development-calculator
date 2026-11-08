@@ -94,8 +94,19 @@
   readings:
     - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
     - "C-93: Operation Move takes its movers as the order opens, a carried formation member among them — READ (0x816cb0 at 0x817030..0x81719a, 0x817800, 0x817e6a; 0x265d80 -> 0x56cc70), both twins"
+    - "C-99: the assignment's Movement and the swap's walk — READ (0x776140 at 0x776643 / 0x7768e4, 0x56d6f0, 0x972a50 -> 0x26fe20 under flag 4, 0x2720a0 at 0x27229b), both twins"
   context:
     - ".... How the cost's \"spend everything\" leaves the Movement is unread (the walk's deduction 0x265d80 of [rsp+0x60]). The engines: a walk halts on a plot of an enemy's zone with its Movemen..."
+  review: imported
+- addr: 0x266220
+  final: 0x1a3ae0
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-99: the assignment's Movement and the swap's walk — READ (0x776140 at 0x776643 / 0x7768e4, 0x56d6f0, 0x972a50 -> 0x26fe20 under flag 4, 0x2720a0 at 0x27229b), both twins"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - ...ion's Movement (+0x218) and the destination domain's full Movement (0x266660 << 8 after 0x266220 sets the domain by IsWater of the plot); the members' Movement then changes by the wa...
   review: imported
 - addr: 0x266250
   final: 0x1a3b10
@@ -166,6 +177,7 @@
     - "C-95: the planning sets out on the full Movement, the walk on the turn's restored — READ (the planning), FIT (the restore's place)"
     - "C-95: the planning sets out on the full Movement, the walk on the turn's restored"
     - "C-99: a move order's search sets out on the pool finder's +0x1bc, the last full-Movement search's GetMaxMoves — READ (0x26f330, 0x77d10, 0x270d70, 0x26e920, 0x26eea0, 0x26dcd0, 0x26df90, 0x26e2c0, 0x26fe20 at 0x270309), unported"
+    - "C-99: the assignment's Movement and the swap's walk — READ (0x776140 at 0x776643 / 0x7768e4, 0x56d6f0, 0x972a50 -> 0x26fe20 under flag 4, 0x2720a0 at 0x27229b), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...+0x1bc, read by the step cost 0x26e920 for the start) to GetMaxMoves (0x56e130, through 0x266660 on the formation) << 8 — the unit's full Movement, not its Movement left. The \"unmove..."

@@ -439,6 +439,7 @@
     - "C-99 / C-128: the swap's partner test and its step along its own path; Move Unit's update before the executions; a Trader no passenger — READ (0x972540, 0x56e760, 0x972a50 -> 0x26fe20, 0x7d3a00 -> 0x7f0020, 0x586360 -> 0x208b80 / 0x523d60), both twins"
     - "C-99: a move order's search sets out on the pool finder's +0x1bc, the last full-Movement search's GetMaxMoves — READ (0x26f330, 0x77d10, 0x270d70, 0x26e920, 0x26eea0, 0x26dcd0, 0x26df90, 0x26e2c0, 0x26fe20 at 0x270309), unported"
     - "C-99: Operation Move takes a planning plot of no region; a step off owned water caps the Movement it lands with — READ (0x816cb0 at 0x817a03..0x817a6a), a fit (the cap), both twins"
+    - "C-99: the assignment's Movement and the swap's walk — READ (0x776140 at 0x776643 / 0x7768e4, 0x56d6f0, 0x972a50 -> 0x26fe20 under flag 4, 0x2720a0 at 0x27229b), both twins"
   context:
     - "- A unit's move onto a plot holding a religious unit it kills (0x26fe20 → 0x493f80 with the capture flag 1) swings religion: RELIGION_SPREAD_ UNIT_CAPTURE (g..."
     - "- The move 0x26fe20 walks the destination plot's units from the last to the first; for each one not dead (+..."
@@ -494,6 +495,7 @@
     - "C-95: a river crossing's Movement — READ"
     - "C-95: a river crossing's Movement"
     - "C-99: a move order's search sets out on the pool finder's +0x1bc, the last full-Movement search's GetMaxMoves — READ (0x26f330, 0x77d10, 0x270d70, 0x26e920, 0x26eea0, 0x26dcd0, 0x26df90, 0x26e2c0, 0x26fe20 at 0x270309), unported"
+    - "C-99: the assignment's Movement and the swap's walk — READ (0x776140 at 0x776643 / 0x7768e4, 0x56d6f0, 0x972a50 -> 0x26fe20 under flag 4, 0x2720a0 at 0x27229b), both twins"
   context:
     - "...river term 0x5301e0, called from the three movement-cost callbacks (0x26e920, 0x270980, 0x270be0): when the step crosses a river (0x531510 on the from / to plots) and the unit is not..."
   review: reviewed
@@ -804,6 +806,7 @@
     - cpu/core/tactical.ts:blind
     - cpu/core/tactical.ts:before
     - cpu/core/tactical.ts:addOpen
+    - cpu/core/tactical.ts:held
   readings:
     - "C-95: a move order's path steps on from an attack's plot, its attack child by the order's flags, a non-attack order's destination, a melee blow on a civilian — READ (0x2720a0 at 0x272434..0x272544, 0x2715a0 at 0x2717cd / 0x271870..0x2718d7, 0x1385c0, 0x889e0, 0x2714b0, 0x206960 at 0x206a1f), both twins"
     - "C-99 / C-128: a danger feature is no step of a search, a land unit's danger stops at the shore — READ (0x271be0 at 0x271fd3, 0x2720a0 at 0x27216c, 0x26e570), both twins"
@@ -834,6 +837,7 @@
     - "C-95: the embark rules for a formation that may embark, a district's zone unseen, a city's kill in the planning, a raised unit's AI type, a move order's attack spot — READ (0x530420, 0x530240, 0x52fe90 at 0x52fed4, 0x530f50 at 0x531168, 0x791470 at 0x791677, 0x79b9c0), FIT (the move order's attack spot), both twins"
     - "C-95 / C-123 / C-125: the stand-to-attack site, a district closed to a ranged unit, City Attack's members and log, the siege gain's lift, a city's blow back, the units of no zone of control — READ (0x2720a0 at 0x272255..0x272330, 0x271be0 at 0x271e69 / 0x271f2e, 0x586360 at 0x5866c9..0x58671f, 0x8109e0, 0x80ceb0 at 0x80d6f9, 0x771f80, 0x80f6b0 at 0x80f75f / 0x80f824 / 0x80f95a, 0x791470, 0x56d6c0), both twins"
     - "C-95: the barbarians' candidates before the look, a capture's rally, a formation's embark flag and fighter — READ (0x722d70, 0x746920, 0x747230, 0x7877e0, 0x7265b0, 0x747fa0, 0x73e610, 0x73e870, 0x267650), both twins"
+    - "C-99: the assignment's Movement and the swap's walk — READ (0x776140 at 0x776643 / 0x7768e4, 0x56d6f0, 0x972a50 -> 0x26fe20 under flag 4, 0x2720a0 at 0x27229b), both twins"
   context:
     - "- THE PATH'S TURN ENDS (0x2720a0, the move order's validity at the end of 0x26e570): each node records (0x271be0) whethe..."
     - "- A plot the player never revealed is the reach's leaf (READ): the validity 0x2720a0 under the search's flag 1 (0x115) refuses a step whose parent is not revealed (node +0x..."

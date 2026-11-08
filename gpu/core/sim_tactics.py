@@ -3097,6 +3097,11 @@ class SimTactics:
         k6 = torch.arange(6, device=dev).view(1, 1, 1, 6)
         here = getattr(self, f"{pre}_unit_tile").gather(1, us)                              # [B, U]
         mp = getattr(self, f"{pre}_unit_mp").gather(1, us)
+        # a unit's Movement left, none where an order of the pass ended its
+        # moves (0x56d6f0 zeroes +0xdb0)
+        ended = self._tac_moves_ended
+        if ended is not None:
+            mp = torch.where(ended.gather(1, us + self.POOL_LO[pre]), torch.zeros_like(mp), mp)
         moved = mp < getattr(self, f"{pre}_unit_mp_full").gather(1, us)
         defender = ai.gather(1, us) == _AI_DEFENDER
         ok = (uv & (mp > 0)).view(B, U, 1, 1) & tgt_ok.view(B, 1, K, 1) & has_e.unsqueeze(3) & (k6 < sn.unsqueeze(3))
@@ -3113,7 +3118,10 @@ class SimTactics:
             x = pl.gather(1, spc)
             xs = x.clamp(min=0)
             xt = self.unit_type.gather(1, xs).clamp(min=0, max=self.NU - 1)
-            mine = (self.unit_seat.gather(1, xs) == seat) & peers.gather(1, xs) & (self.unit_mp.gather(1, xs) > 0)
+            x_mp = self.unit_mp.gather(1, xs)
+            if ended is not None:
+                x_mp = torch.where(ended.gather(1, xs), torch.zeros_like(x_mp), x_mp)
+            mine = (self.unit_seat.gather(1, xs) == seat) & peers.gather(1, xs) & (x_mp > 0)
             blk = (x >= 0) & self._type_dom_mil.take(xt) & ~mine
             blk = blk.view(B, U, K, 6) & (x.view(B, U, K, 6) != tslot.view(B, 1, K, 1))
             ok &= ~blk
