@@ -751,6 +751,25 @@ class SimEconomy:
             self._complete_research_now(row, full, is_civic)
         return newly
 
+    def _research_lump(self, row: int, amount: torch.Tensor, is_civic: bool) -> None:
+        """`researchLump`'s twin: a lump of Science / Culture `amount` [B] on
+        the item in hand (the DLL's 0x4c8e60 / 0x3938e0): the pool takes it;
+        past the item's cost the bank is SET to the excess, and at or past it
+        the item completes at once (`_complete_research_now`)."""
+        prog = self.civ_civic_prog if is_civic else self.civ_tech_prog
+        ovf = self.civ_civic_ovf if is_civic else self.civ_tech_ovf
+        cur = (self.civ_cur_civic if is_civic else self.civ_cur_tech)[:, row]
+        prog[:, row] = prog[:, row] + amount.to(prog.dtype)
+        cost = self._research_cost(is_civic).gather(1, cur.clamp(min=0).unsqueeze(1)).squeeze(1).to(prog.dtype)
+        fin = (cur >= 0) & (amount != 0) & (prog[:, row] >= cost)
+        if not bool(fin.count_nonzero()):
+            return
+        now = prog[:, row]
+        ovf[:, row] = torch.where(fin & (now > cost), (now - cost).to(ovf.dtype), ovf[:, row])
+        full = torch.zeros_like(self.civ_civics[:, row] if is_civic else self.civ_techs[:, row])
+        full.scatter_(1, cur.clamp(min=0).unsqueeze(1), fin.unsqueeze(1))
+        self._complete_research_now(row, full, is_civic)
+
     def _complete_research_now(self, row: int, full: torch.Tensor, is_civic: bool) -> None:
         """`completeResearchNow`'s twin: the items of `full` [B, N] COMPLETED
         at once outside the research step (a boost that filled them) — the

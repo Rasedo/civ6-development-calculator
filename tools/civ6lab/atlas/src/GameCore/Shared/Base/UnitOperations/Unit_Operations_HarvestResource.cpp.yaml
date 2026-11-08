@@ -14,6 +14,7 @@
   impl: [cpu/core/economy.ts:lumpValue]
   readings:
     - "H-1: the best melee, the drought's turns, the Trader's sea, the harvest's lump, the district discount — READ"
+    - "C-98: a lump of Science or Culture completes the item in hand — READ (0x4c8e60, 0x4c8ea0, 0x3938e0, 0x393670), both twins"
   context:
     - "- A harvest's or feature removal's lump: the harvest 0x95fbf0 calls 0x5256d0 once per yield row (`Resource_Harvests.Amount`, `Feature_Removes.Yield..."
   review: reviewed

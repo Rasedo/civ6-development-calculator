@@ -9,6 +9,7 @@ import { computeCityStats, luxuryAmenities } from '../../../cpu/core/city';
 import { getModifiers, unitUpkeep } from '../../../cpu/core/effects';
 import { worldEraIndex } from '../../../cpu/core/eras';
 import { researchCost } from '../../../cpu/core/economy';
+import { minorCatchUp } from '../../../cpu/core/minorBuild';
 import { FREE_SEAT, atWarWithAny, emptySeat, isBarbSeat, isTerritorial, seatOf, setTileOwner, tileCity, tileSeat } from '../../../cpu/core/seats';
 import { CIV_LEADERS, FREE_CITY_GRANT_CAP, FREE_CITY_GRANT_CLASSES, FREE_CITY_GRANT_PERIOD, FREE_CITY_PAIR_COUNT, FREE_CITY_LOYALTY_PER_TURN, LOYALTY_MAX } from '../../../cpu/data/seats';
 import { CITY_MAX_HP } from '../../../cpu/data/units';
@@ -52,8 +53,12 @@ function scene(rivalPop = 30, rivalCiv = -1) {
 describe('the Free City step', () => {
   it('the Free Cities research as a city-state does, every turn, with no city', () => {
     const { state } = scene();
-    // every major holds Pottery: the catch-up stands it at its cost less one
-    for (const s of state.seats) s.research.techs.push('POTTERY');
+    // every major gains Pottery: each gain's catch-up stands it at its cost
+    // less one
+    for (const s of state.seats) {
+      s.research.techs.push('POTTERY');
+      minorCatchUp(state, s.seat, 'POTTERY', false);
+    }
     freeCitiesPhase(state);
     const r = state.freeSeat!.research;
     const cost = researchCost(state, 'POTTERY', false, FREE_SEAT);

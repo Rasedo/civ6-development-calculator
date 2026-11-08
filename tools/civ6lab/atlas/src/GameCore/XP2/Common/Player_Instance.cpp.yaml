@@ -144,6 +144,18 @@
   context:
     - "...0x78f5d0); the destination's plot revealed to the player (0x2d2220 on its visibility 0x468320: the byte at visibility +0x2f0; unrevealed -> the next entry, neither tried nor counted..."
   review: reviewed
+- addr: 0x468540
+  final: 0x2f8340
+  kind: function
+  name: GrantYield
+  status: PARTLY
+  impl: [cpu/core/phase.ts:researchLump]
+  readings:
+    - "C-98: a lump of Science or Culture completes the item in hand — READ (0x4c8e60, 0x4c8ea0, 0x3938e0, 0x393670), both twins"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...the city-states' catch-up runs on that gain. Callers of 0x4c8e60 / 0x3938e0: GrantYield 0x468540, the harvest 0x95fbf0, 0x93ec40, 0x536480, 0x1fc390, 0x1fce20."
+  review: imported
 - addr: 0x469790
   final: 0x2f9350
   kind: function

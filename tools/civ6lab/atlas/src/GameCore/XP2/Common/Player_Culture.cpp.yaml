@@ -74,12 +74,33 @@
 - addr: 0x393670
   final: 0x27bf30
   kind: function
-  semantics: adds progress to a civic (-> 0x3a1fb0).
-  status: PARTLY
-  readings: ["H-1: a boost lands as progress — READ"]
-  notes: ["imported: READ in its section, no confirming case found beside it"]
+  semantics: "a civic's progress changed by a delta (civic, &delta), the twin of the techs' 0x4c8ea0: a civic in the game, not held or Repeatable (+0x70 bit 2): new = progress + delta; above the cost (<< 8, 0x39376b..0x39378b) the bank (+0xae8, through 0x731d10) is SET to new - cost; the progress set to new (0x3a1fb0, which completes the civic at the cost). Else the bank takes +0xb40 + delta."
+  status: READ
+  cases:
+    - recording: h1_duelz1121
+      turn: 117
+      value: "the techs' twin 0x4c8ea0 on China's Great Scientist: Siege Tactics 363.26 of 292 completed, 71.26 banked (record 119 Metal Casting 129.21); no civic case recorded."
+  impl: [cpu/core/phase.ts:researchLump]
+  readings:
+    - "H-1: a boost lands as progress — READ"
+    - "C-98: a lump of Science or Culture completes the item in hand"
+    - "C-98: a lump of Science or Culture completes the item in hand — READ (0x4c8e60, 0x4c8ea0, 0x3938e0, 0x393670), both twins"
   context:
     - "...ropped (`and 0xffffff00`); min(cost - progress, amount) is added to THAT item's progress (0x393670 -> 0x3a1fb0), current or not. The setter completes the item the moment its progress reach..."
+  review: reviewed
+- addr: 0x3938e0
+  final: 0x27c070
+  kind: function
+  semantics: "a lump of Culture on the civic in hand (player, &delta), the twin of the techs' 0x4c8e60: with no civic in hand (+0xae0 == 0) 0x393670 on -1 (the bank takes it); else on the civic in hand (+0xad0). Called by GrantYield 0x468540, the harvest 0x95fbf0, 0x93ec40, 0x536480, 0x1fc390, 0x1fce20."
+  status: READ
+  cases:
+    - recording: h1_duelz1121
+      turn: 117
+      value: the techs' twin 0x4c8e60 on China's Great Scientist (Siege Tactics completed in China's actions, 71.26 banked); no civic case recorded.
+  impl: [cpu/core/phase.ts:researchLump, gpu/core/sim_economy.py:_research_lump]
+  readings:
+    - "C-98: a lump of Science or Culture completes the item in hand"
+    - "C-98: a lump of Science or Culture completes the item in hand — READ (0x4c8e60, 0x4c8ea0, 0x3938e0, 0x393670), both twins"
   review: reviewed
 - addr: 0x3939b0
   kind: function

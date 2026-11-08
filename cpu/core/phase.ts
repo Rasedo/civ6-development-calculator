@@ -2912,6 +2912,36 @@ export function completeResearchNow(state: GameState, seat: number, id: string):
 }
 
 /**
+ * A LUMP OF SCIENCE OR CULTURE on the item in hand (the DLL's 0x4c8e60
+ * techs / 0x3938e0 civics, from a Great Person's GrantYield 0x468540, through
+ * 0x4c8ea0 / 0x393670): the item's progress takes the lump; where that
+ * passes the cost the bank (the overflow the next turn's yield pays in) is
+ * SET to the excess, and at or past the cost the item completes at once
+ * (`completeResearchNow`). With nothing in hand the pool takes it
+ * (runs/h1_duelz1121 t117: China's Great Scientist lifts Siege Tactics from
+ * 238.26 to 363.26 of 292, completed in China's turn before the city-states'
+ * catch-up; Metal Casting at 0 in record 118, 129.21 with the 71.26 banked
+ * in record 119).
+ */
+export function researchLump(state: GameState, seat: number, amount: number, civic: boolean): void {
+  const s = seatOf(state, seat);
+  if (!s || amount === 0) return;
+  const r = s.research;
+  if (civic) r.civicProgress += amount;
+  else r.techProgress += amount;
+  const id = civic ? r.civic : r.tech;
+  if (!id) return;
+  const cost = researchCost(state, id, civic, seat);
+  const now = civic ? r.civicProgress : r.techProgress;
+  if (now < cost) return;
+  if (now > cost) {
+    if (civic) r.civicOverflow = now - cost;
+    else r.techOverflow = now - cost;
+  }
+  completeResearchNow(state, seat, id);
+}
+
+/**
  * THE MAJORS' STARTS AND ACTIONS, each seat in ascending order. `only` runs
  * the seats it names alone (the action replay runs each player's start in
  * the place its record's pair holds it), the standing deals' turn with them

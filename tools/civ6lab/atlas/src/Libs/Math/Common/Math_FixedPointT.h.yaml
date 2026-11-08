@@ -654,6 +654,16 @@
     - "...] and the bank [+0x1e8] read through max(0, ·), ceil over the Science rate 0x4c9f40 — 0x8c4540 compares the remainder to rate x the truncated quotient; with no Science the cost); a r..."
     - "...29a010 less the progress kept on it and the bank [+0xb40] — no max(0, ·) here — through 0x8c4540; -1 with no Culture, then the cost), a row not researchable (0x3932d0) adds its unowned..."
   review: reviewed
+- addr: 0x93ec40
+  final: 0x64e8e0
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-98: a lump of Science or Culture completes the item in hand — READ (0x4c8e60, 0x4c8ea0, 0x3938e0, 0x393670), both twins"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...that gain. Callers of 0x4c8e60 / 0x3938e0: GrantYield 0x468540, the harvest 0x95fbf0, 0x93ec40, 0x536480, 0x1fc390, 0x1fce20."
+  review: imported
 - addr: 0x968e20
   final: 0x673490
   kind: function

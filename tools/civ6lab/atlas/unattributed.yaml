@@ -2522,6 +2522,16 @@
     - "...ent starts the next turn at the domain's full Movement; the step's cost (Rules_Movement 0x531660..0x530240: the terrain's MovementCost, the feature's and the improvement's MovementChan..."
     - "...er plot; the majors' and the minors' do from t62-69). The step's cost (0x26e920's rules 0x531660..0x530240): into a city at most CITY_MOVEMENT_COST 1 (0x531660 caps the step, 0x272ca0)..."
   review: reviewed
+- addr: 0x536480
+  final: 0x37cee0
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-98: a lump of Science or Culture completes the item in hand — READ (0x4c8e60, 0x4c8ea0, 0x3938e0, 0x393670), both twins"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...Callers of 0x4c8e60 / 0x3938e0: GrantYield 0x468540, the harvest 0x95fbf0, 0x93ec40, 0x536480, 0x1fc390, 0x1fce20."
+  review: imported
 - addr: 0x536da0
   final: 0x37d730
   kind: function

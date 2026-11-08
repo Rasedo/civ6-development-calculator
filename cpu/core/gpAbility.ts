@@ -15,6 +15,7 @@ import { cityAtTile, citiesOf, civOf, civsAtWar, isCityStateSeat, leaderOf, seat
 import { captureCityStateFor } from './combat';
 import { adjacentBarbarians, convertAdjacentBarbarians, gpActivatedPressure } from './game';
 import { boostPool, drawBoosts, markBoost } from './boosts';
+import { researchLump } from './phase';
 import {
   GP_CITY_PERM, GP_CLASSES, GP_PERM, GP_TILE_PERM, GREAT_PEOPLE, GW_WORK_CLASSES,
   gpEffectOf, gpNoMilitaryOf, gpSiteOf, personWorkObjects,
@@ -279,10 +280,10 @@ export function activateGreatPerson(state: GameState, unit: Unit): boolean {
   const fx = gpEffectOf(person);
   const era = person.era;
 
-  if (fx.science) owner.research.techProgress += fx.science;
+  if (fx.science) researchLump(state, unit.seat, fx.science, false);
   // CIV6 (Mary Leakey): "Gain 350 Science for every Artifact in this city."
   if (fx.artifactScience && city) {
-    owner.research.techProgress += fx.artifactScience * gwCountsByObj(city)[GWO_ARTIFACT]!;
+    researchLump(state, unit.seat, fx.artifactScience * gwCountsByObj(city)[GWO_ARTIFACT]!, false);
   }
   // CIV6 (Marina Raskova): "District in this tile gains +1 air unit slots."
   if (fx.airSlotBonus) tile.airSlotBonus = (tile.airSlotBonus ?? 0) + fx.airSlotBonus;
@@ -381,8 +382,8 @@ export function activateGreatPerson(state: GameState, unit: Unit): boolean {
     const n = perAdjacentCount(state, tile, fx.perAdjacent);
     const amount = n * fx.perAdjacent.amount;
     if (amount > 0) {
-      if (fx.perAdjacent.yield === 'science') owner.research.techProgress += amount;
-      else if (fx.perAdjacent.yield === 'culture') owner.research.civicProgress += amount;
+      if (fx.perAdjacent.yield === 'science') researchLump(state, unit.seat, amount, false);
+      else if (fx.perAdjacent.yield === 'culture') researchLump(state, unit.seat, amount, true);
       else if (fx.perAdjacent.yield === 'gold') owner.treasury += amount;
       else owner.faith += amount;
     }

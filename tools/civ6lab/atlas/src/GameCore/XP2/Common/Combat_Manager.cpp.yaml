@@ -47,6 +47,26 @@
   context:
     - "...(the Unit constructor FinalRelease 0x39b140), its object +0x970 (the Release's +0x1bc0; 0x1fc100 (FinalRelease 0x14fa10) asks 0x116f80 (FinalRelease 0x2af30) of unit +0x970): +8 the..."
   review: reviewed
+- addr: 0x1fc390
+  final: 0x14fca0
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-98: a lump of Science or Culture completes the item in hand — READ (0x4c8e60, 0x4c8ea0, 0x3938e0, 0x393670), both twins"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...of 0x4c8e60 / 0x3938e0: GrantYield 0x468540, the harvest 0x95fbf0, 0x93ec40, 0x536480, 0x1fc390, 0x1fce20."
+  review: imported
+- addr: 0x1fce20
+  final: 0x1508e0
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-98: a lump of Science or Culture completes the item in hand — READ (0x4c8e60, 0x4c8ea0, 0x3938e0, 0x393670), both twins"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...60 / 0x3938e0: GrantYield 0x468540, the harvest 0x95fbf0, 0x93ec40, 0x536480, 0x1fc390, 0x1fce20."
+  review: imported
 - addr: 0x1fdea0
   final: 0x151910
   kind: function

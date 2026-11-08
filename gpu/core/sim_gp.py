@@ -369,14 +369,13 @@ class SimGp:
         cc = ccol.clamp(min=0)
 
         # ---- the lumps
-        self.civ_tech_prog[:, row] = self.civ_tech_prog[:, row] + col("science")
+        self._research_lump(row, col("science"), False)
         # CIV6 (Mary Leakey): "Gain 350 Science for every Artifact in this
         # city."
         _asci = col("artifactScience")
         if bool(_asci.count_nonzero()):
             _n = self._gw_counts_by_obj(row)[:, :, 4].gather(1, cc.unsqueeze(1)).squeeze(1)
-            self.civ_tech_prog[:, row] = (self.civ_tech_prog[:, row]
-                                          + _asci * (_n.to(dt) * has_city.to(dt)))
+            self._research_lump(row, _asci * (_n.to(dt) * has_city.to(dt)), False)
         # CIV6 (Marina Raskova): "District in this tile gains +1 air unit
         # slots" — permanent, on the activating tile.
         _asb = col("airSlotBonus")
@@ -773,8 +772,8 @@ class SimGp:
         if not bool(amount.count_nonzero()):
             return
         y = self._gp_fx(cls, at, "perAdjYield").long()
-        self.civ_tech_prog[:, row] = self.civ_tech_prog[:, row] + amount * (y == 0).to(torch.float64)
-        self.civ_civic_prog[:, row] = self.civ_civic_prog[:, row] + amount * (y == 1).to(torch.float64)
+        self._research_lump(row, amount * (y == 0).to(torch.float64), False)
+        self._research_lump(row, amount * (y == 1).to(torch.float64), True)
         self.civ_treasury[:, row] = self.civ_treasury[:, row] + amount * (y == 2).to(torch.float64)
         self.civ_faith[:, row] = self.civ_faith[:, row] + amount * (y == 3).to(torch.float64)
 

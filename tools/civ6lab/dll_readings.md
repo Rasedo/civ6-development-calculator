@@ -10815,3 +10815,39 @@ unit (`UNIT_MEMORY`). GPU `_unit_look` / `_unit_look_now` / `_take_look`
   runs/h1_duelz1121 t165 Crossbowman 3866651 (14:18 for 15:19) and t167
   Crossbowman 3735574 (16:17 for 16:18) off the game's plots, no case
   gained: the engines keep the spend.
+
+## C-98: a lump of Science or Culture completes the item in hand — READ (0x4c8e60, 0x4c8ea0, 0x3938e0, 0x393670), both twins
+
+`researchLump` (cpu/core/phase.ts), GPU `_research_lump`
+(gpu/core/sim_economy.py), from a Great Person's lumps
+(`activateGreatPerson` / `_gp_apply`: its Science, Mary Leakey's Science
+per Artifact, a per-adjacent Science or Culture).
+
+- THE RULE: a lump goes to the item in hand through 0x4c8e60 (techs) /
+  0x3938e0 (civics): with nothing in hand the bank takes it; else
+  0x4c8ea0 / 0x393670 add it to the item's progress. Where the sum passes
+  the cost, the bank (the overflow the next turn's yield pays in,
+  `techOverflow` / `civ_tech_ovf`) is SET to the excess. At or past the
+  cost the progress setter completes the item at once
+  (`completeResearchNow`), and the city-states' catch-up runs on that gain.
+  Callers of 0x4c8e60 / 0x3938e0: GrantYield 0x468540, the harvest
+  0x95fbf0, 0x93ec40, 0x536480, 0x1fc390, 0x1fce20.
+- CONFIRMED (one-seed trace, `--memory aimem`): runs/h1_duelz1121 t117:
+  China's Great Scientist (UnitGreatPersonActivated, its turn) lifts Siege
+  Tactics from 238.26 to 363.26 of 292. ResearchCompleted comes in China's
+  actions, and city-states 2, 3 and 4 then hold it at 291 (AI_Research.csv
+  t117: 1 turn, city-state 4 RESEARCHING). Metal Casting is at 0 in record
+  118 and at 129.21 in record 119 (71.26 banked + 57.95 Science), as the
+  engine now has it.
+- THE REPLAY'S MAJORS: a ResearchCompleted / CivicCompleted that the log
+  holds for a major in turn t and the engine's major has not made is
+  imposed before the city-states' turns (`completeRecordedResearch`,
+  `research:completed`), so their catch-up runs on it (runs/h1_duelz1128
+  t220: China's Erwin Schrödinger, a unit the engine's Great Person points
+  never recruited, boosts Advanced Flight complete; city-states 2 and 3
+  research it at t220 as logged).
+- OPEN: the other callers of 0x4c8e60 / 0x3938e0 still add to the pool
+  with no completion in both twins: the harvest's and a feature removal's
+  Science / Culture (`applyLumpYield`), the pillage plunder (`payPlunder`),
+  a kill's Science / Culture lumps (cpu/core/eras.ts). No recording
+  yet shows one of them completing an item.

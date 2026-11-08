@@ -43,7 +43,7 @@ import { advanceTurn, minorTurns, turnChange, turnClose, foundCity, foundCityAt,
 import { completeQueueItem } from '../core/production';
 import { applySeatUnitOrders, buySeatBuilding, declareWar, districtSiteCost, districtSiteLegal, foundPantheon, grantPantheonUnit, jumpMadeAnew, levyGoldCost, levyUnits, paveGround,
   placeSeatDistrict, putOffer, answerOffer, sueForPeace, transferCity, cityStrikeAt, holdCityStrikes, envoysAtStart, applySeatEnvoys,
-  seatPhase, worldCongress, holdBankruptDisband } from '../core/phase';
+  seatPhase, worldCongress, holdBankruptDisband, completeResearchNow } from '../core/phase';
 import { addEnvoys, cityStateAt, declareWarOnCityState, minorCity, minorReplaceCitizens, placeCityStateAt, sueForPeaceWithCityState } from '../core/cityStates';
 import { CP_ACCEPTED, CP_CANCELLED, CP_IN_PROGRESS, contractById } from '../core/aiContracts';
 import { availableBuildings, canPlaceWonder, validImprovements, wallsMax } from '../core/rules';
@@ -2464,6 +2464,33 @@ function turnStartCompletions(ctx: Ctx, b: TurnRecord, turn: number): Map<number
     (civic ? out.get(seat)!.civics : out.get(seat)!.techs).push(id);
   }
   return out;
+}
+
+/** A MAJOR'S COMPLETION the engine's research did not make (its Science
+ *  short, a Great Person the engine's points never recruited): the record's,
+ *  imposed through the engine's own completion (`completeResearchNow`: its
+ *  effects, the city-states' catch-up), before the city-states' turns. Each
+ *  ResearchCompleted / CivicCompleted the log holds in turn `turn` for a
+ *  major, its start's (record t for the active player, t+1 for the others)
+ *  and its actions' (runs/h1_duelz1128 t220: China's Schrödinger, whom the
+ *  engine never recruited, boosts Advanced Flight complete in China's
+ *  actions; city-states 2 and 3 take it at its cost less one and research
+ *  it). Counted as `research:completed`. */
+function completeRecordedResearch(ctx: Ctx, a: TurnRecord, b: TurnRecord, turn: number): void {
+  const seen = new Set<number>();
+  for (const x of [...((a as { actions?: unknown[][] }).actions ?? []), ...((b as { actions?: unknown[][] }).actions ?? [])]) {
+    if (!Array.isArray(x) || x[1] !== turn || seen.has(Number(x[0]))) continue;
+    seen.add(Number(x[0]));
+    if (x[2] !== 'ResearchCompleted' && x[2] !== 'CivicCompleted') continue;
+    const seat = ctx.seatOfPlayer.get(Number(x[3]));
+    if (seat === undefined || !isCiv(seat)) continue;
+    const civic = x[2] === 'CivicCompleted';
+    const id = civic ? engineId('civic', ctx.cat.civics[Number(x[4])], 'CIVIC_', CIVICS) : engineId('tech', ctx.cat.techs[Number(x[4])], 'TECH_', TECHS);
+    const r = ctx.state.seats[seat]?.research;
+    if (!id || !r || (civic ? r.civics : r.techs).includes(id)) continue;
+    completeResearchNow(ctx.state, seat, id);
+    count(ctx, 'research:completed', 'fallback', Number(x[3]), `${id} the engine had not completed`);
+  }
 }
 
 /** a Delegation or Resident Embassy a major proposed — DiplomacyManager.csv's
@@ -5913,6 +5940,7 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
       seatPhase(state, { seats: new Set(others), deals: true });
       stream.actions(a.turn);
       otherMajorsTurn();
+      completeRecordedResearch(ctx, a, b, a.turn);
       // a levied unit the game makes anew on a plot its minor may not stand
       // on is added where the game jumps it (`jumpMadeAnew`), its return
       // landing after the players before the minor moved it (runs/h1_duely1117

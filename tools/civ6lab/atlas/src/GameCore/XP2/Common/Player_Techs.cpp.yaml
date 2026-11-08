@@ -30,6 +30,20 @@
     - "...olshoi, a Great Person's free tech): ONE pool of the rows researchable before the grants (0x4c8c40), each draw erasing its pick — a row the first grant opens is not offered (1117 t226: two..."
     - ...er to rate x the truncated quotient; with no Science the cost); a row not researchable (0x4c8c40) adds its unowned prerequisites, each level's rows once, the next step the last one add...
   review: reviewed
+- addr: 0x4c8e60
+  final: 0x333620
+  kind: function
+  semantics: "a lump of Science on the research in hand (player, &delta): with the queue (+0x188) empty, 0x4c8ea0 on no tech (-1: the bank takes it); else on the queue's head (+0x178), so past the cost the bank is SET to the excess and the row completes (0x4cc950). Called by GrantYield 0x468540 (a Great Person's Science), the harvest 0x95fbf0, 0x93ec40, 0x536480, 0x1fc390, 0x1fce20."
+  status: READ
+  cases:
+    - recording: h1_duelz1121
+      turn: 117
+      value: "China's Great Scientist (UnitGreatPersonActivated) lifts Siege Tactics from 238.26 to 363.26 of 292: ResearchCompleted in China's actions, before city-states 2, 3 and 4 take it at 291; Metal Casting at 0 in record 118, 129.21 (71.26 banked + 57.95) in record 119."
+  impl: [cpu/core/phase.ts:researchLump, gpu/core/sim_economy.py:_research_lump]
+  readings:
+    - "C-98: a lump of Science or Culture completes the item in hand"
+    - "C-98: a lump of Science or Culture completes the item in hand — READ (0x4c8e60, 0x4c8ea0, 0x3938e0, 0x393670), both twins"
+  review: reviewed
 - addr: 0x4c8ea0
   final: 0x333660
   kind: function
@@ -39,9 +53,14 @@
     - recording: h1_duely1127
       turn: 92
       value: "city-state 3: Apprenticeship completed at t92 with no choice taken; every row's turns read the 72.4 banked (Stirrups 1, Castles 10, Military Tactics 6 as logged)."
-  impl: [cpu/core/minorBuild.ts:minorResearchBank, cpu/core/economy.ts:selectResearch]
+  impl:
+    - cpu/core/minorBuild.ts:minorResearchBank
+    - cpu/core/economy.ts:selectResearch
+    - cpu/core/phase.ts:researchLump
   readings:
     - "C-98: the research bank with nothing in hand; a city-state's unit cost under Mercenary Companies"
+    - "C-98: a lump of Science or Culture completes the item in hand"
+    - "C-98: a lump of Science or Culture completes the item in hand — READ (0x4c8e60, 0x4c8ea0, 0x3938e0, 0x393670), both twins"
   review: reviewed
 - addr: 0x4c9640
   final: 0x3337a0
