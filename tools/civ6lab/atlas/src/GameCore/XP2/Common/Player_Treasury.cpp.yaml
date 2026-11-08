@@ -85,6 +85,13 @@
   context:
     - ...ield (0x4ddc70 -> GameAttribute::Value) less 0x4dd3b0's sum less the total Maintenance (0x4df2d0); then 0x4deb70 stores the income excluding trade (+0x278) and 0x4e02e0 banks +0x1b8 in...
   review: imported
+- addr: 0x4df7b0
+  final: 0x342b00
+  kind: function
+  status: PARTLY
+  impl: [cpu/data/units.ts:FORMATION_MAINTENANCE_MULT]
+  notes: ["imported: cited by the code, in no dll_readings section"]
+  review: imported
 - addr: 0x4e02e0
   final: 0x3432e0
   kind: function

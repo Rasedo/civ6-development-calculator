@@ -32,7 +32,7 @@ import { gpPermOf } from '../data/greatPeople';
 import { ALLIANCE_RELIGIOUS, ALLIANCE_REL3_PRESSURE_PCT, DIPLO_VICTORY_POINTS, DED_EXODUS, DED_MONUMENTALITY, COMPETITIONS } from '../data/seats';
 import { recordMoments } from './moments';
 import { foundingMoments, religionMoment, gameEraTurn, upgradeAllRoads, buildingDedications, dedicationEvent, goldenDedication, monumentalityBuyMult } from './eras';
-import { UNITS, CITY_MAX_HP, UNIT_HP, REPAIR_QUIET_TURNS, REPAIR_HP_PER_COST, FORMATION_CIVIC, FORMATION_MAX, SETTLER_COST_STEP } from '../data/units';
+import { UNITS, CITY_MAX_HP, UNIT_HP, REPAIR_QUIET_TURNS, REPAIR_HP_PER_COST, FORMATION_CIVIC, FORMATION_MAX, SETTLER_COST_STEP, formationCost } from '../data/units';
 import { buildingCostIn, outerPool, wallsMax, fitEncampOuter, encampOuterMissing } from './rules';
 import { darkBuildings, laserSpeed, stampBuildingEra } from './yields';
 import { competitionOf } from './competition';
@@ -1384,7 +1384,9 @@ export function itemCost(item: QueueItem, state?: GameState, city?: City): numbe
   if (item.kind === 'district') return item.cost ?? DISTRICTS[item.district].cost;
   if (item.kind === 'wonder') return BUILT_WONDERS[item.wonder].cost;
   if (item.kind === 'settler') return item.cost;
-  if (item.kind === 'unit') return item.cost ?? UNITS[item.unit]?.cost ?? 54; // builders lock at queue
+  // a Builder's, a Trader's and a stepped unit's price locks at queue; a
+  // formation's is its unit's through `formationCost`
+  if (item.kind === 'unit') return item.cost ?? formationCost(UNITS[item.unit]?.cost ?? 54, item.formation ?? 0);
   if (item.kind === 'project') return item.cost;
   return state && city ? buildingCostIn(state, city, item.building) : BUILDINGS[item.building].cost;
 }

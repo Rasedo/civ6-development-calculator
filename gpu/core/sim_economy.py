@@ -4556,7 +4556,7 @@ class SimEconomy:
     def _unit_maintenance(self, types: torch.Tensor, formation: torch.Tensor | None = None,
                           levied: torch.Tensor | None = None) -> torch.Tensor:
         """`unitMaintenance` — a unit's own Maintenance before any card: the
-        chassis' row, a Corps' and an Army's at the formation's cost modifier
+        chassis' row, a Corps' and an Army's at the formation's maintenance modifier
         rounded up, nothing for a unit levied from a city-state (`levied`).
         No `formation` / `levied` reads a lone, unlevied unit of each type."""
         if formation is None:
@@ -4564,7 +4564,7 @@ class SimEconomy:
         if levied is None:
             levied = torch.zeros_like(types, dtype=torch.bool)
         base = self._type_maintenance.take(types.clamp(min=0, max=self.NU - 1))
-        mult = self._form_cost_mult.take(formation.clamp(min=0, max=self._form_max)).to(base.dtype)
+        mult = self._form_maint_mult.take(formation.clamp(min=0, max=self._form_max)).to(base.dtype)
         return torch.where(levied, torch.zeros_like(base), torch.ceil(base * mult))
 
     def _unit_upkeep(self, row: int, types: torch.Tensor, formation: torch.Tensor | None = None,

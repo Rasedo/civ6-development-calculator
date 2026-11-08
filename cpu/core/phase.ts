@@ -48,8 +48,8 @@ import { BUILDINGS, SCRIPTED_HELD_BUILDINGS } from '../data/buildings';
 import { prodLayout } from './prodLayout';   // ONE column layout, shared with the exporter
 import { CIVICS } from '../data/civics';
 import { RESOURCES } from '../../world/resources';
-import { UNITS, UNIT_TYPE_IDX, CITY_HEAL_PER_TURN, ENCAMPMENT_HP, CITY_MAX_HP, URBAN_DEFENSES_TECH, FORMATION_CIVIC, FORMATION_COST_MULT, FORMATION_TRAIN_DISCOUNT, FORMATION_TRAIN_BUILDING } from '../data/units';
-import { availableBuildings, buildingCompletable, buildingCostIn, purchasableBuildings, outerPool, wallsMax, urbanDefensesFit, repairDrip, fitEncampOuter, encampOuterPool } from './rules';
+import { UNITS, UNIT_TYPE_IDX, CITY_HEAL_PER_TURN, ENCAMPMENT_HP, CITY_MAX_HP, URBAN_DEFENSES_TECH, FORMATION_CIVIC, FORMATION_TRAIN_BUILDING } from '../data/units';
+import { availableBuildings, buildingCompletable, purchasableBuildings, outerPool, wallsMax, urbanDefensesFit, repairDrip, fitEncampOuter, encampOuterPool } from './rules';
 import { generalAuraMP } from './aura'; // the aura's +1 MP half
 import { PANTHEONS, PANTHEON_FAITH_COST, PANTHEON_IDS } from '../data/religion';
 import { CITY_WORK_RADIUS, scaleByGameSpeed, GOLD_PURCHASE_MULT, MP_SCALE, RAILROAD_TECH, borderGrowthCost, FAITH_PURCHASE_MULT, amenityTierIndex } from '../data/constants';
@@ -2093,17 +2093,13 @@ export function applySeatActionRecord(state: GameState, actor: Seat, rec: SeatAc
     } else if (a >= formLo && a < formLo + 2 * NU) {
       // CIV6 (Military Academy, Seaport): the building lets the city train a
       // Corps or Army (a Fleet or Armada at sea) DIRECTLY once the
-      // formation's own civic is in — 150% / 225% of the unit's cost, 25%
-      // off for the building that enables the order. Every clause here is
-      // re-validated at apply, like the plain unit arm above it.
+      // formation's own civic is in, priced by `itemCost` (`formationCost`).
+      // Every clause here is re-validated at apply, like the plain unit arm
+      // above it.
       const tier = a < formLo + NU ? 1 : 2;
       const id = units[(a - formLo) % NU];
-      const def = id ? UNITS[id] : undefined;
-      if (def && formationOrderOk(state, actor, civCity, id, tier)) {
-        commitProduction(state, civCity.seat, civCity, {
-          kind: 'unit', unit: id, formation: tier, progress: 0,
-          cost: Math.round(def.cost * FORMATION_COST_MULT[tier] * FORMATION_TRAIN_DISCOUNT),
-        });
+      if (id && UNITS[id] && formationOrderOk(state, actor, civCity, id, tier)) {
+        commitProduction(state, civCity.seat, civCity, { kind: 'unit', unit: id, formation: tier, progress: 0 });
       }
     } else if (a >= NB + 2 + NU) {
       // DISTRICT: the file names the TYPE **and the TILE**. Which plot a
@@ -3513,14 +3509,7 @@ export function seatPhase(state: GameState, only?: { seats: ReadonlySet<number>;
         q.progress += (production + banked) * _em;
         civCity.productionBank = 0;
         repairDrip(state, civCity, progressBefore);
-        const cost =
-          q.kind === 'unit'
-            ? q.cost ?? UNITS[q.unit]?.cost ?? 54 // builders lock at queue
-            : q.kind === 'building'
-              ? buildingCostIn(state, civCity, q.building)
-              : q.kind === 'wonder'
-                ? BUILT_WONDERS[q.wonder]?.cost ?? 54 // catalog cost (already speed-scaled)
-                : q.cost ?? 54; // settler / district / project carry their own cost
+        const cost = itemCost(q, state, civCity);
         // CIV6 (Project_YieldConversions; City_BuildQueue 0x184ae0): a
         // district project converts PercentOfProductionRate of the Production
         // the step put into it — before the item's own percents, with the

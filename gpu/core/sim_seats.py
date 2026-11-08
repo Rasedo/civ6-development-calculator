@@ -3402,10 +3402,7 @@ class SimSeats:
                     _land_a, _sea_a = self._form_civic_ok(row, _fk)
                     civ_ok_f = torch.where(f_naval, _sea_a, _land_a)
                     is_f = is_f & ((ftier != _fk) | civ_ok_f)
-                # Math.round is half-UP; torch.round is half-even, so spell it
-                cost_f = torch.floor(self._type_cost.gather(0, fui).double()
-                                     * self._form_cost_mult.gather(0, ftier.clamp(max=self._form_cost_mult.shape[0] - 1))
-                                     * self._form_train_disc + 0.5)
+                cost_f = self._formation_cost(self._type_cost.gather(0, fui).double(), ftier)
                 self._q_push(row, j, is_f, a, cost_f)
                 for _ui, _sl, _c in self._res_slot_units:
                     self._charge_unit_resource(row, is_f & (fui == _ui), _ui, at=j, mult_tier=ftier)
@@ -4271,14 +4268,19 @@ class SimSeats:
             for _k in range(stock.shape[1]):
                 self._log_stock(range(self.B), row, _k, "up")
 
+    def _formation_cost(self, c: torch.Tensor, tier) -> torch.Tensor:
+        """`formationCost`: the unit's `c` times the formation's multiple, a
+        Corps or Army less trunc(k c x the trained-formation discount); a lone
+        unit's `c` stands (dtype of `c`)"""
+        mult_t = torch.tensor(self._form_unit_mult, dtype=c.dtype, device=self.device)
+        tier_t = tier if isinstance(tier, torch.Tensor) else torch.full(c.shape, int(tier), dtype=torch.long, device=self.device)
+        k = c * mult_t[tier_t.clamp(min=0, max=len(self._form_unit_mult) - 1)]
+        return torch.where(tier_t > 0, k - torch.floor(k.double() * (1.0 - self._form_train_disc)).to(c.dtype), k)
+
     def _formation_res_cost(self, base: torch.Tensor, tier, off: torch.Tensor | None = None) -> torch.Tensor:
-        """`formationResourceCost`: the base times the formation's multiple, a
-        Corps or Army less the trained-formation discount (truncated), less
+        """`formationResourceCost`: the base through `_formation_cost`, less
         the city's percent off rounded half up, at least 1 (long)"""
-        mult_t = torch.tensor(self._form_res_mult, dtype=torch.long, device=self.device)
-        tier_t = tier if isinstance(tier, torch.Tensor) else torch.full_like(base, int(tier))
-        c = base * mult_t[tier_t.clamp(min=0, max=len(self._form_res_mult) - 1)]
-        c = torch.where(tier_t > 0, c - torch.floor(c.double() * (1.0 - self._form_train_disc)).long(), c)
+        c = self._formation_cost(base, tier)
         if off is not None:
             c = c - torch.floor(c.double() * off.double() / 100.0 + 0.5).long()
         return c.clamp(min=1)

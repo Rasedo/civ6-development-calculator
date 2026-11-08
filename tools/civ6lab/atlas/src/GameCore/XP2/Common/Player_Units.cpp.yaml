@@ -236,6 +236,7 @@
     - cpu/core/aiModifiers.ts:ANALYZERS
     - cpu/core/aiValue.ts:AiValueView
     - cpu/core/aiPlotValue.ts:PlotValueFacts
+    - cpu/data/units.ts:FORMATION_UNIT_MULT
   readings:
     - "H-1: the upgrade's gold — READ"
     - "H-1: a unit's Production cost in the queue — READ"
@@ -245,6 +246,7 @@
     - "C-96: the improvement value — READ (0x7a58f0, 0x7b1320's yields, tourism and modifiers, the feature removal 0x7a3010, the harvest 0x7a37d0, the build unit 0x7a2e20, EFFECT_ADJUST_CITY_FREE_POWER), PARTLY READ (the hazards' turns, 0x7b1320's defence, claimed plots and neighbours terms)"
     - "C-98: a unit's value adds its abilities' modifiers; EFFECT_ADJUST_UNIT_MOVEMENT and REQUIREMENT_PLOT_ADJACENT_TO_OWNER; a second completion adds again — READ (0x7b62c0 at 0x7b7658..0x7b76d8, 0x6e11c7 / 0xc85140, 0x6bd520, 0x6d3200, 0x762d60's rows), both twins"
     - "C-98: the research bank with nothing in hand; a city-state's unit cost under Mercenary Companies"
+    - "H-1: a formation's Production cost in the queue — READ (0x17bfa0 -> 0x17bef0 / 0x17be50), both twins"
   context:
     - "...at the game's speed (0x525400); net = (the new chassis' production cost − the old one's, 0x4f2b20) x UPGRADE_NET_PRODUCTION_PERCENT_COST (+0x74c, 100) / 100, never below 0; cost = base +..."
     - "...90 fills per unit row: c = the owner's unit manager (+0x12e8) current cost array (+0x3c0, 0x4f2b20, `m_aCurrentUnitCost`, an int); where c > 0, the row's +0x20 class does not read 2 throug..."
@@ -302,7 +304,7 @@
     - recording: h1_duely1128
       turn: 33
       value: "Nazca, Horses from its pillaged Holy Site alone: Equestrian Orders 25.0 (20 Horses) through t31, 25.0 from t33 (10 Horses) after its first Horseman"
-  impl: [cpu/core/stockpile.ts:formationResourceCost]
+  impl: [cpu/core/stockpile.ts:formationResourceCost, cpu/data/units.ts:FORMATION_UNIT_MULT]
   readings:
     - "C-96: a unit's strategic cost through the game speed, the pick's pillaged district and the queue's pillaged project — READ (0x17c2e0, 0x4f2cc0, 0x4f2df0 / 0x4f31f0), a fit for the project, both twins"
     - "C-96: the queue's strategic charge, a placed district's resource, the minors' resource turn — READ (0x17c2e0, 0x186460's names), a fit for the district, both twins"

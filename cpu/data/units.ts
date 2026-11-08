@@ -57,27 +57,24 @@ export const FORMATION_CIVIC: readonly string[] = ['', 'NATIONALISM', 'MOBILIZAT
 
 export const FORMATION_MAX = 2;
 
-/** CIV6 (Military Academy, Seaport): the building lets its city train a
- *  formation DIRECTLY — a Corps or Army from the Academy, a Fleet or Armada
- *  from the Seaport — once the formation's own civic is in. The order costs
- *  UNIT_CORPS_COST_MODIFIER 1.5 of the unit for the two-step and
- *  UNIT_ARMY_COST_MODIFIER 2.0 for the three-step (GlobalParameters.xml — the
- *  civilopedia's "225%" is contradicted by the table), and the enabling
- *  building takes 25% off that price. */
-export const FORMATION_COST_MULT: readonly number[] = [
-  srcConst('combat.formationCostMult.0', 1,
-    { derived: 'a LONE unit pays the chassis price — the install carries a cost modifier only for the Corps and the Army' }),
-  srcConst('combat.formationCostMult.1', 1.5, gp('UNIT_CORPS_COST_MODIFIER')),
-  srcConst('combat.formationCostMult.2', 2.0, gp('UNIT_ARMY_COST_MODIFIER')),
+/** A Corps' and an Army's MAINTENANCE as a multiple of the unit's:
+ *  UNIT_CORPS_COST_MODIFIER 1.5 and UNIT_ARMY_COST_MODIFIER 2.0
+ *  (GlobalParameters.xml), read by the maintenance alone (0x4df7b0 /
+ *  0x9b82e0). Indexed by formation tier. */
+export const FORMATION_MAINTENANCE_MULT: readonly number[] = [
+  srcConst('combat.formationMaintenanceMult.0', 1,
+    { derived: 'a LONE unit pays the chassis maintenance — the install carries a modifier only for the Corps and the Army' }),
+  srcConst('combat.formationMaintenanceMult.1', 1.5, gp('UNIT_CORPS_COST_MODIFIER')),
+  srcConst('combat.formationMaintenanceMult.2', 2.0, gp('UNIT_ARMY_COST_MODIFIER')),
 ];
-/** CIV6 (Formations, two agreeing secondary sources — the Gathering Storm
- *  strategic-resources guide and the Unit page): a Corps costs DOUBLE the
- *  chassis' strategic resource up front and an Army TRIPLE, maintenance
- *  unchanged. No install row carries it. Indexed by formation tier.
- *  A merge (`formUp`) pays nothing — only a DIRECT train charges. */
-export const FORMATION_RESOURCE_MULT: readonly number[] = srcConst(
-  'combat.formationResourceMult', [1, 2, 3] as const, {
-    stylized: 'CIV6 (Formations), TWO AGREEING SECONDARY SOURCES and no install row: the Gathering Storm strategic-resources guide and the Unit page both say a Corps costs DOUBLE the chassis\' strategic resource up front and an Army TRIPLE, maintenance unchanged',
+/** A formation trained directly as a multiple of its unit, indexed by tier:
+ *  the Production cost (City_BuildQueue::GetUnitCost 0x17bfa0: 0x17bef0 the Corps' 2c, 0x17be50
+ *  the Army's 3c, c the unit's current cost 0x4f2b20) and the strategic
+ *  cost (0x4f2cc0) alike. A merge (`formUp`) pays nothing — only a DIRECT
+ *  train charges. */
+export const FORMATION_UNIT_MULT: readonly number[] = srcConst(
+  'combat.formationUnitMult', [1, 2, 3] as const, {
+    lab: 'tools/civ6lab/dll_readings.md H-1: a formation\'s Production cost in the queue (0x17bfa0 -> 0x17bef0: add ebx, ebx; 0x17be50: lea ebx, [rax+rax*2]); C-96: a unit\'s strategic cost (0x4f2cc0)',
   });
 
 export const FORMATION_TRAIN_DISCOUNT = srcConst('combat.formationTrainDiscount', 0.75, {
@@ -89,6 +86,17 @@ export const FORMATION_TRAIN_DISCOUNT = srcConst('combat.formationTrainDiscount'
       'ModifierId=SEAPORT_TRAINED_CORPS_ARMY_DISCOUNT&Name=Amount', 'Value'),
   ],
 });
+/** A formation's price from its unit's `c`, Production or strategic alike:
+ *  the tier's multiple (`FORMATION_UNIT_MULT`), a Corps or Army less
+ *  trunc(k c x m_xCorpsArmyDiscount) (City_BuildQueue +0x390 by unit,
+ *  MODIFIER_CITY_CORPS_ARMY_ADJUST_DISCOUNT's 25 of the building the order
+ *  stands on; 0x17bef0 / 0x17be50 through the 24.8 multiply 0x16e7d0, and
+ *  0x17c2e0). A lone unit's `c` stands. 0x17bfa0 then takes Mercenary
+ *  Companies off the formation's price as off a lone unit's (`unitProdCost`). */
+export function formationCost(c: number, tier: number): number {
+  const k = c * (FORMATION_UNIT_MULT[tier] ?? 1);
+  return tier > 0 ? k - Math.floor(k * (1 - FORMATION_TRAIN_DISCOUNT)) : k;
+}
 /** the install names each building as a formation-train discount carrier through its own
  *  `BuildingModifiers` row (`MODIFIER_CITY_CORPS_ARMY_ADJUST_DISCOUNT`). */
 export const FORMATION_TRAIN_BUILDING = {

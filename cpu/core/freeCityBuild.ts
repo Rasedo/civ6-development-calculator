@@ -8,7 +8,7 @@
  */
 import type { City, DistrictId, GameState, QueueItem, YieldKey } from './types';
 import { BUILDINGS } from '../data/buildings';
-import { UNITS } from '../data/units';
+import { UNITS, formationCost } from '../data/units';
 import { DISTRICTS } from '../data/districts';
 import { PROJECTS } from '../data/projects';
 import { TECHS } from '../data/techs';
@@ -86,7 +86,7 @@ export function majorQueueItem(state: GameState, seat: number, city: City, type:
 /** an engine queue item's price in a major's city */
 function itemPrice(state: GameState, city: City, q: QueueItem): number {
   if (q.kind === 'building') return buildingCostIn(state, city, q.building);
-  if (q.kind === 'unit') return q.cost ?? UNITS[q.unit]?.cost ?? 0;
+  if (q.kind === 'unit') return q.cost ?? formationCost(UNITS[q.unit]?.cost ?? 0, q.formation ?? 0);
   if (q.kind === 'settler' || q.kind === 'project') return q.cost;
   if (q.kind === 'district') return q.cost ?? DISTRICTS[q.district].cost;
   return 0;

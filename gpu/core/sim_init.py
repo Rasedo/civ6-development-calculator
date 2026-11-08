@@ -3668,12 +3668,12 @@ class SimInit:
         self._formation_cs = torch.tensor(
             [int(x) for x in rules.combat["formationCs"]], dtype=torch.long, device=device)
         self._formation_civic = [int(x) for x in rules.combat["formationCivic"]]
-        self._form_cost_mult = torch.tensor(
-            [float(x) for x in rules.combat["formationCostMult"]],
+        self._form_maint_mult = torch.tensor(
+            [float(x) for x in rules.combat["formationMaintenanceMult"]],
             dtype=torch.float64, device=device)
-        # CIV6 (Formations): a DIRECT-trained Corps pays DOUBLE the chassis'
-        # strategic resource and an Army TRIPLE, by tier.
-        self._form_res_mult = [int(x) for x in rules.combat["formationResourceMult"]]
+        # a DIRECT-trained Corps pays DOUBLE its unit's Production and
+        # strategic cost and an Army TRIPLE, by tier (`FORMATION_UNIT_MULT`)
+        self._form_unit_mult = [int(x) for x in rules.combat["formationUnitMult"]]
         self._form_train_disc = float(rules.combat["formationTrainDiscount"])
         self._form_max = self._formation_cs.numel() - 1
         # The ENCAMPMENT garrison pool cap (TS ENCAMPMENT_HP).

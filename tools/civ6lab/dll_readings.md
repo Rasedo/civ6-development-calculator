@@ -11939,3 +11939,36 @@ statecompare `minorResearchTurns`, `freeResearch`.
   Pikeman 12.99, Crossbowman 10.76 where the game's are 0) is not the
   listing — Military Tactics 1 turn and Machinery 10 at t81's end, both
   listed — and not the six-unit cut (five units in record 83).
+
+## H-1: a formation's Production cost in the queue — READ (0x17bfa0 -> 0x17bef0 / 0x17be50), both twins
+
+- THE COST (City_BuildQueue::GetUnitCost 0x17bfa0, r8 the formation): 0 the
+  unit manager's current cost c (0x4f2b20); 1 the Corps' 0x17bef0, 2c less
+  trunc(2c x m_xCorpsArmyDiscount[unit]) (+0x390, 24.8, through 0x16e7d0);
+  2 the Army's 0x17be50, 3c less trunc(3c x +0x390[unit]); any other -1
+  ("Unknown military formation"). Then Mercenary Companies (+0x10a8) comes
+  off every formation's price alike. +0x390 is
+  MODIFIER_CITY_CORPS_ARMY_ADJUST_DISCOUNT's 25 (Military Academy on land,
+  Seaport at sea, Ikanda), so a formation trained where the order stands
+  costs 1.5c / 2.25c. UNIT_CORPS_COST_MODIFIER 1.5 / UNIT_ARMY_COST_MODIFIER
+  2.0 are the maintenance alone. The cache fills 0x17c5d0 (corps, cache
+  +0xc8) and 0x17c410 (army, +0xe0), read by the Lua GetUnitCorpsCost /
+  GetUnitArmyCost (0x9838c0 / 0x983850), use the same law with no
+  Mercenary Companies term.
+- PORTED: `formationCost` (cpu/data/units.ts; `FORMATION_UNIT_MULT` [1, 2, 3],
+  shared with the strategic charge `formationResourceCost`), read by
+  `itemCost` for every unit queue item with no locked price (the import's,
+  the replay's queue item, a major's direct order), `freeCityBuild`'s
+  `itemPrice`, statecompare's `queueItemCost`; GPU `_formation_cost`
+  (gpu/core/sim_seats.py) at the direct order's push. The maintenance
+  multiple is `FORMATION_MAINTENANCE_MULT` / `_form_maint_mult`.
+- CONFIRMED: runs/h1_duelp1121 Xi'an's Field Cannon Army (c 165) at 372:
+  progress 350 at t174 on 38 completes it at t174 as recorded (3c 495 and
+  the lone 165 do not); the barbarians' t170-173 moves around 6:10 and
+  their Builder Capture members now as logged on the game's memory.
+  runs/h1_duelp1124 Taiyuan's Nuclear Submarine Armada (c 340) at 765:
+  progress 755 at t234 completes it that turn, a new item at t235.
+- Open: a city summing two discounts (an Ikanda with a Military Academy)
+  takes the engines' single 25; no recording trains a Corps, so 0x17bef0
+  stands on its structure alone; the gold purchase of a formation is not
+  modelled (no recorded case).

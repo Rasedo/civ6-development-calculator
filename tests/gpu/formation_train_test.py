@@ -75,10 +75,10 @@ def grant(sim, j: int, ma: bool = False, sp: bool = False, civ1: bool = False, c
 
 
 def expected_cost(sim, ui: int, tier: int) -> float:
-    """Math.round's half-UP, the TS spelling."""
+    """`formationCost`: k c less trunc(k c x the trained-formation discount)."""
     import math
-    return math.floor(float(sim._type_cost[ui]) * float(sim._form_cost_mult[tier])
-                      * sim._form_train_disc + 0.5)
+    k = float(sim._type_cost[ui]) * sim._form_unit_mult[tier]
+    return k - math.floor(k * (1.0 - sim._form_train_disc))
 
 
 def apply_code(sim, j: int, code: int) -> None:
@@ -182,8 +182,8 @@ def test_the_order_charges_the_tier_s_resource(rules, path) -> None:
     sim._eff_version += 1
     assert bool(sim._trainable_units(ROW)[B0, j, ui]), (
         "the granted chassis is still untrainable — the check below would be vacuous")
-    assert sim._form_res_mult[1] == 2 and sim._form_res_mult[2] == 3, (
-        f"the tier table must be 1/2/3, read {sim._form_res_mult}")
+    assert sim._form_unit_mult[1] == 2 and sim._form_unit_mult[2] == 3, (
+        f"the tier table must be 1/2/3, read {sim._form_unit_mult}")
 
     for tier, code in ((1, sim.FORM_BASE + ui), (2, sim.FORM_BASE + sim.NU + ui)):
         clear_queue(sim, j)
@@ -192,7 +192,7 @@ def test_the_order_charges_the_tier_s_resource(rules, path) -> None:
         before = float(sim.civ_stockpile[B0, ROW, slot])
         apply_code(sim, j, code)
         paid = before - float(sim.civ_stockpile[B0, ROW, slot])
-        want = cost * sim._form_res_mult[tier]
+        want = cost * sim._form_unit_mult[tier]
         assert paid == want, f"tier {tier} paid {paid}, wanted {want}"
 
     # the COLUMN asks for what the applier will charge: a bank that covers the

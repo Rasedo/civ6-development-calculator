@@ -24,7 +24,7 @@ import { neighbors } from '../../world/hex';
 import { tileAppeal, appealBand, type GpAppeal } from './appeal';
 import { addYields, emptyYields } from './types';
 import { BUILT_WONDERS, WONDER_ERA_INDEX } from '../data/builtWonders';
-import { FORMATION_COST_MULT, UNITS, UNIT_ERA_INDEX, unitHasClass } from '../data/units';
+import { FORMATION_MAINTENANCE_MULT, UNITS, UNIT_ERA_INDEX, unitHasClass } from '../data/units';
 import { cityStateEnvoyBonuses, isSuzerain, suzerainEffect, suzerainOf, suzerainSciencePct } from './cityStates';
 import { CITY_STATE_GOVERNMENT, NAN_MADOL_WATER_CULTURE, AUCKLAND_PLOT_ROWS } from '../data/cityStates';
 import { IMPROVEMENTS } from '../data/improvements';
@@ -1489,7 +1489,7 @@ export function governmentXpPct(state: GameState, seat: number): number {
 }
 
 /** A unit's own Maintenance before any card: the chassis' Units.Maintenance,
- *  a Corps' and an Army's at the formation's cost modifier rounded up
+ *  a Corps' and an Army's at the formation's maintenance multiple rounded up
  *  (UNIT_CORPS_COST_MODIFIER 1.5, UNIT_ARMY_COST_MODIFIER 2.0 — the recorded
  *  upkeep, runs/h1_duelw1103..1107: a Corps of 1, 4, 5 and 6 cost 2, 6, 8 and
  *  9, an Army of 4 and 5 cost 8 and 10), and nothing for a unit levied from a
@@ -1497,7 +1497,7 @@ export function governmentXpPct(state: GameState, seat: number): number {
  *  Musketmen and a Pikeman t110-113, cost nothing). */
 export function unitMaintenance(unit: { type: string; formation?: number; leviedFrom?: number }): number {
   if (unit.leviedFrom !== undefined) return 0;
-  return Math.ceil((UNITS[unit.type]?.maintenance ?? 0) * (FORMATION_COST_MULT[unit.formation ?? 0] ?? 1));
+  return Math.ceil((UNITS[unit.type]?.maintenance ?? 0) * (FORMATION_MAINTENANCE_MULT[unit.formation ?? 0] ?? 1));
 }
 
 /** The gold per turn one unit costs a seat carrying `mods` — Conscription

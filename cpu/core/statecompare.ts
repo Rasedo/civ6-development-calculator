@@ -80,7 +80,7 @@ import { IMPROVEMENT_IDS } from './unitActions';
 import { TECHS } from '../data/techs';
 import { PROJECTS } from '../data/projects';
 import { CIVICS } from '../data/civics';
-import { CITY_MAX_HP, UNITS, UNIT_INDEX } from '../data/units';
+import { CITY_MAX_HP, UNITS, UNIT_INDEX, formationCost } from '../data/units';
 import { SPY_IDLE } from '../data/espionage';
 import { buildingCostIn, outerPool } from './rules';
 import { governorsOf } from './governors';
@@ -348,7 +348,8 @@ function queueTile(q: City['queue'][number] | undefined): number {
 
 /** The price of the front queue item, the way the GPU's `city_cost` holds it.
  *  Settler/project/district items carry their own `cost`; a unit item may LOCK
- *  one (escalated builders) and otherwise takes the roster price; building and
+ *  one (escalated builders) and otherwise takes the roster price, a
+ *  formation's through `formationCost`; building and
  *  wonder items carry none at all and are priced from the catalog. The same
  *  rule as `the deleted trace, queueItemCost`, which is the derivation the
  *  trace's `civCity.cost` column is green against. */
@@ -360,7 +361,7 @@ function queueItemCost(state: GameState, city: City, q: City['queue'][number] | 
     case 'district':
       return q.cost ?? 0;
     case 'unit':
-      return q.cost ?? UNITS[q.unit]?.cost ?? 0;
+      return q.cost ?? formationCost(UNITS[q.unit]?.cost ?? 0, q.formation ?? 0);
     case 'building':
       return buildingCostIn(state, city, q.building);
     case 'wonder':

@@ -7,7 +7,7 @@ import { trainableUnits, refreshUnits, spawnUnit } from '../../../cpu/core/units
 import { BARB_SEAT, NO_SEAT, civHasStrategic, seatOf, setTileOwner, tileCity } from '../../../cpu/core/seats';
 import { accrueStockpiles, canTrainWithStockpile, capStockpiles, chargeUnitUpkeep, fuelShortCS, stockOf, stockpileCap, strategicSlot, unitResourceCost } from '../../../cpu/core/stockpile';
 import { commitProduction } from '../../../cpu/core/seatTurn';
-import { FORMATION_RESOURCE_MULT } from '../../../cpu/data/units';
+import { FORMATION_UNIT_MULT } from '../../../cpu/data/units';
 import { stackDefenceCS } from '../../../cpu/core/combat';
 import { STRATEGIC_IDS, STRATEGIC_PER_TURN, STOCKPILE_CAP_BASE, STOCKPILE_CAP_PER_ENCAMPMENT_BUILDING, FUEL_SHORT_CS } from '../../../cpu/data/constants';
 
@@ -147,8 +147,8 @@ describe('a formation pays a multiple of the chassis charge', () => {
     expect(one.n).toBeGreaterThan(0);
     expect(unitResourceCost(gated.id, 1)!.n).toBe(one.n * 2 - Math.floor(one.n * 2 / 4));
     expect(unitResourceCost(gated.id, 2)!.n).toBe(one.n * 3 - Math.floor(one.n * 3 / 4));
-    expect(FORMATION_RESOURCE_MULT[1]).toBe(2);
-    expect(FORMATION_RESOURCE_MULT[2]).toBe(3);
+    expect(FORMATION_UNIT_MULT[1]).toBe(2);
+    expect(FORMATION_UNIT_MULT[2]).toBe(3);
     // the resource is the same one either way — only the amount moves
     expect(unitResourceCost(gated.id, 2)!.id).toBe(one.id);
   });

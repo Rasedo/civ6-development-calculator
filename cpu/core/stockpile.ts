@@ -9,7 +9,7 @@
 import { logStockWrite } from './difflog';
 import { STRATEGIC_IDS, STRATEGIC_PER_TURN, STOCKPILE_CAP_BASE, STOCKPILE_CAP_PER_ENCAMPMENT_BUILDING, UNIT_RESOURCE_COST, FUEL_SHORT_CS, RAILROAD_COST, emptyStockpile,
   PURCHASE_DIVISOR, UPGRADE_BASE_COST, UPGRADE_MINIMUM_COST, UPGRADE_MINIMUM_COST_LEVY, UPGRADE_NET_PRODUCTION_PERCENT_COST, scaleByGameSpeed } from '../data/constants';
-import { UNITS, civUpgradeTarget, FORMATION_RESOURCE_MULT, FORMATION_TRAIN_DISCOUNT } from '../data/units';
+import { UNITS, civUpgradeTarget, formationCost } from '../data/units';
 import { PROJECTS } from '../data/projects';
 import { DED_AUTOMATON, DED_SKY, SKY_ALUMINUM_PER_TURN, AUTOMATON_URANIUM_PER_TURN, AUTOMATON_URANIUM_PER_MINE } from '../data/seats';
 import { BUILDINGS, POWER_PLANT_IDS, buildingVariantFor } from '../data/buildings';
@@ -312,15 +312,13 @@ export function unitBaseResourceCost(def: { resourceCost?: number }): number {
   return scaleByGameSpeed(def.resourceCost ?? UNIT_RESOURCE_COST);
 }
 
-/** THE CHARGE (City_BuildQueue 0x17c2e0): the base times the formation's
- *  multiple (0x4f2cc0), a Corps or Army less its training city's
- *  m_xCorpsArmyDiscount (+0x390, MODIFIER_CITY_CORPS_ARMY_ADJUST_DISCOUNT's
- *  25 — the building a directly trained formation needs), truncated, then
- *  less the city's m_xStrategicResourceRequirementModifier (+0x3b0, Black
- *  Marketeer's 80) rounded half up, at least 1 */
+/** THE CHARGE (City_BuildQueue 0x17c2e0): the base through `formationCost`
+ *  (the formation's multiple 0x4f2cc0, a Corps or Army less its training
+ *  city's m_xCorpsArmyDiscount), then less the city's
+ *  m_xStrategicResourceRequirementModifier (+0x3b0, Black Marketeer's 80)
+ *  rounded half up, at least 1 */
 export function formationResourceCost(base: number, formation: number, offPct = 0): number {
-  let c = base * (FORMATION_RESOURCE_MULT[formation] ?? 1);
-  if (formation > 0) c -= Math.floor(c * (1 - FORMATION_TRAIN_DISCOUNT));
+  let c = formationCost(base, formation);
   if (offPct > 0) c -= Math.round((c * Math.min(100, offPct)) / 100);
   return Math.max(1, c);
 }

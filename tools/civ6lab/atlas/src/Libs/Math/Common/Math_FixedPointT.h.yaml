@@ -700,6 +700,13 @@
   context:
     - "0x968e20 (the spread's pressure, a unit's): max(0, ReligiousStrength (unit +0x1ce0) x RELIGION_SPR..."
   review: reviewed
+- addr: 0x9b82e0
+  final: 0x6c2bc0
+  kind: function
+  status: PARTLY
+  impl: [cpu/data/units.ts:FORMATION_MAINTENANCE_MULT]
+  notes: ["imported: cited by the code, in no dll_readings section"]
+  review: imported
 - addr: 0xb6ff10
   kind: function
   name: PLAYER_YIELD_LEAD

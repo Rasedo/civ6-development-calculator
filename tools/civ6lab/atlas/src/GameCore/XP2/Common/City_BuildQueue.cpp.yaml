@@ -18,7 +18,7 @@
   kind: function
   semantics: "fixed-point multiply: (a b) >> 8 (24.8)."
   status: PARTLY
-  impl: [cpu/core/operations/evaluate.ts:mul, cpu/core/tactical.ts:c]
+  impl: [cpu/core/operations/evaluate.ts:mul, cpu/core/tactical.ts:c, cpu/data/units.ts:formationCost]
   readings:
     - "H-1: a boost lands as progress — READ"
     - "H-1: the melee result, a ranged blow's domain, a city's shot — READ"
@@ -30,6 +30,7 @@
     - "C-100: a district on a feature it may not stand on, and the Mountain Portal's analyzer — READ"
     - "C-98 / C-130: the player tourism analyzer, the city subject's context, the dark trade buildings — READ (0x6b0700, 0x6b0430, 0x69ea00's +0x70), a FIT (the capacity), both twins"
     - "C-124: a move order's path opens a turn-end node beside each node with Movement left — READ (0x271920, 0x7a880, 0x271490, 0x775a0, 0x26f330), both twins"
+    - "H-1: a formation's Production cost in the queue — READ (0x17bfa0 -> 0x17bef0 / 0x17be50), both twins"
   notes:
     - "imported: READ in its section, no confirming case found beside it"
     - ".claude/scratchpad/cb/notes.txt: ...*256)&0xff ; fx(0.01)=2 (!), fx(0.5)=128, fx(1/6 const 0.16667)=42. fx_mul a*b>>8 (0x16eb20 assign, 0x16e7d0 new), fx_div (a<<8)/b trunc (0x16e940), add 0xac650, sub 0x16ec10. FX_MIN=-9999.0 (@f04cb0 = 0xffd8..."
@@ -678,12 +679,54 @@
     - "...buildings' turns (+0x258), then, but for MustPurchase (+0x1b9 bit 128), the train turns 0x17bb40 and +10 while the city builds another item; negative T values FX(-9999). Measured: the..."
     - "...eir inputs unported): EFFECT_ADJUST_UNIT_PRODUCTION 0x6b2350 (per city, the train turns 0x17bb40 at and without the bonus, CityBuildAI's expected count 0x5d4750 x its Production [+0x10..."
   review: reviewed
+- addr: 0x17be50
+  kind: function
+  name: City_BuildQueue army cost
+  semantics: "a unit's Production cost as an Army / Armada: 3c (lea ebx, [rax+rax*2]) less trunc(3c x m_xCorpsArmyDiscount[unit] +0x390), as 0x17bef0; -1 for no row."
+  status: READ
+  cases:
+    - recording: h1_duelp1121
+      turn: 174
+      value: "Xi'an's Field Cannon Army (c 165, Military Academy): 3 x 165 - trunc(495 x 0.25) = 372; queue progress 350 at t174 on 38 Production completes it at t174 as recorded (the lone 165 completed it at t168)"
+    - recording: h1_duelp1124
+      turn: 234
+      value: "Taiyuan's Nuclear Submarine Armada (c 340, Seaport): 1020 - 255 = 765; progress 755 at t234 completes it that turn, the queue's next item at t235"
+  impl:
+    - cpu/data/units.ts:formationCost
+    - gpu/core/sim_seats.py:_formation_cost
+    - cpu/data/units.ts:FORMATION_UNIT_MULT
+  readings:
+    - "H-1: a formation's Production cost in the queue — READ (0x17bfa0 -> 0x17bef0 / 0x17be50), both twins"
+  review: reviewed
+- addr: 0x17bef0
+  kind: function
+  name: City_BuildQueue corps cost
+  semantics: "a unit's Production cost as a Corps / Fleet: c = the owner's unit manager (+0x12e8) current cost 0x4f2b20 of the unit row (0x27b210); 2c less (2c << 8) x the build queue's m_xCorpsArmyDiscount[unit] (+0x390, 24.8) through 0x16e7d0, >> 8 (trunc); -1 for no row."
+  status: READ
+  cases:
+    - recording: h1_duelp1121
+      turn: 174
+      value: "Xi'an's Field Cannon Army (c 165, Military Academy): 3 x 165 - trunc(495 x 0.25) = 372; queue progress 350 at t174 on 38 Production completes it at t174 as recorded (the lone 165 completed it at t168)"
+    - recording: h1_duelp1124
+      turn: 234
+      value: "Taiyuan's Nuclear Submarine Armada (c 340, Seaport): 1020 - 255 = 765; progress 755 at t234 completes it that turn, the queue's next item at t235"
+  impl:
+    - cpu/data/units.ts:formationCost
+    - gpu/core/sim_seats.py:_formation_cost
+    - cpu/data/units.ts:FORMATION_UNIT_MULT
+  readings:
+    - "H-1: a formation's Production cost in the queue — READ (0x17bfa0 -> 0x17bef0 / 0x17be50), both twins"
+  review: reviewed
 - addr: 0x17bfa0
   final: 0xfeb80
   kind: function
-  semantics: a unit's cost in the city.
+  name: City_BuildQueue::GetUnitCost
+  semantics: "a unit's Production cost in the city by formation (r8): 0 the unit manager's current cost 0x4f2b20, 1 the Corps' 0x17bef0, 2 the Army's 0x17be50, else -1 asserting 'Unknown military formation'; then, the row's class not 2 (0xadd5e0) and the player's +0x1048 the currency global 0xf2f978, less floor(c x the player's +0x10a8 / 256) (Mercenary Companies) for every formation alike."
   status: READ
   cases:
+    - recording: h1_duelp1121
+      turn: 174
+      value: Xi'an's Field Cannon Army priced 372 (0x17be50), completed at t174 as recorded
     - recording: h1_duelw1117
       turn: 16
       value: "its   other writer is unread — LAB: read as 1 for a listed contract   (runs/h1_duelw1117 Valletta's Ilkum 1 while its Builder contract 47 stays   listed, t16-24, 0 with the list read empty)."
@@ -692,7 +735,13 @@
     - recording: 1124
       turn: 40
       value: the rest   our contracts' or queues' divergence (1124 Cardiff t40-48 a Builder's   kept 24 of 25 where the game built a Granary).
+  impl:
+    - cpu/core/game.ts:itemCost
+    - cpu/core/game.ts:unitProdCost
+    - cpu/data/units.ts:FORMATION_UNIT_MULT
+    - cpu/data/units.ts:formationCost
   readings:
+    - "H-1: a formation's Production cost in the queue — READ (0x17bfa0 -> 0x17bef0 / 0x17be50), both twins"
     - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
   context:
     - "...Production (0x1cb9f0) x (the unit's production multiplier 0x17c1c0 + extra), the cost (0x17bfa0) less the unit's progress (+0x230). The expected count 0x5d4750: 1.0 where the unit hol..."
@@ -723,7 +772,10 @@
     - recording: h1_duely1128
       turn: 33
       value: Nazca's Horseman trained on 10 Horses (ResourceCost 20 online 10)
-  impl: [cpu/core/stockpile.ts:unitBaseResourceCost, cpu/core/stockpile.ts:formationResourceCost]
+  impl:
+    - cpu/core/stockpile.ts:unitBaseResourceCost
+    - cpu/core/stockpile.ts:formationResourceCost
+    - cpu/data/units.ts:formationCost
   readings:
     - "C-96: the resource value and the research value's resources — READ (bonus, luxury, the call), PARTLY READ (the strategic stockpile terms)"
     - "C-96: a unit's strategic cost through the game speed, the pick's pillaged district and the queue's pillaged project — READ (0x17c2e0, 0x4f2cc0, 0x4f2df0 / 0x4f31f0), a fit for the project, both twins"
@@ -731,6 +783,38 @@
     - "C-96: a unit's strategic cost through the game speed, the pick's pillaged district and the queue's pillaged project"
   context:
     - ...8 / +0x1a0), no progress (0x17d1a0) and a StrategicResource (+0x2c8) reserves its cost (0x17c2e0, its formation's) where the stock less the reservations (0x4aa790) covers it (0x4a7400)...
+  review: reviewed
+- addr: 0x17c410
+  kind: function
+  name: Cache_City_BuildQueue army costs
+  semantics: "Cache_City_BuildQueue: fills m_aiUnitArmyCost per unit row with 0x17be50's law (3c less trunc(3c x +0x390[unit])), no Mercenary Companies term (the Lua GetUnitArmyCost 0x983850 reads it, cache +0xe0)."
+  status: READ
+  cases:
+    - recording: h1_duelp1121
+      turn: 174
+      value: "Xi'an's Field Cannon Army (c 165, Military Academy): 3 x 165 - trunc(495 x 0.25) = 372; queue progress 350 at t174 on 38 Production completes it at t174 as recorded (the lone 165 completed it at t168)"
+    - recording: h1_duelp1124
+      turn: 234
+      value: "Taiyuan's Nuclear Submarine Armada (c 340, Seaport): 1020 - 255 = 765; progress 755 at t234 completes it that turn, the queue's next item at t235"
+  impl: [cpu/data/units.ts:formationCost]
+  readings:
+    - "H-1: a formation's Production cost in the queue — READ (0x17bfa0 -> 0x17bef0 / 0x17be50), both twins"
+  review: reviewed
+- addr: 0x17c5d0
+  kind: function
+  name: Cache_City_BuildQueue corps costs
+  semantics: "Cache_City_BuildQueue: fills m_aiUnitCorpsCost per unit row with 0x17bef0's law (2c less trunc(2c x +0x390[unit])), no Mercenary Companies term (the Lua GetUnitCorpsCost 0x9838c0 reads it, cache +0xc8)."
+  status: READ
+  cases:
+    - recording: h1_duelp1121
+      turn: 174
+      value: "Xi'an's Field Cannon Army (c 165, Military Academy): 3 x 165 - trunc(495 x 0.25) = 372; queue progress 350 at t174 on 38 Production completes it at t174 as recorded (the lone 165 completed it at t168)"
+    - recording: h1_duelp1124
+      turn: 234
+      value: "Taiyuan's Nuclear Submarine Armada (c 340, Seaport): 1020 - 255 = 765; progress 755 at t234 completes it that turn, the queue's next item at t235"
+  impl: [cpu/data/units.ts:formationCost]
+  readings:
+    - "H-1: a formation's Production cost in the queue — READ (0x17bfa0 -> 0x17bef0 / 0x17be50), both twins"
   review: reviewed
 - addr: 0x17c790
   final: 0xff1b0
