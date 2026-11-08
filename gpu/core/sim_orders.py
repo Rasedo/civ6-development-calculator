@@ -804,14 +804,9 @@ class SimOrders:
                 # ENTERABLE by anything — `portalAt`'s twin, on the jump's own site
                 if self._imp_portal_any:
                     terr = terr | self._portal_plane().gather(1, _tc1).squeeze(1)
-                _scale = self._promo_flag(ut, self.unit_promos.gather(1, sc.unsqueeze(1)).squeeze(1), "CLIFFS")
-                clf = self._cliff_block_dirs(
-                    hc.unsqueeze(1), nb.unsqueeze(1), own_tile,
-                    (_scale | is_nav | self.unit_water_walk.take(ut)).unsqueeze(1),
-                )[:, 0].gather(1, dirs.unsqueeze(1)).squeeze(1)
                 mp = self.unit_mp.gather(1, sc.unsqueeze(1)).squeeze(1)
                 shut = self._border_closed(tgt.unsqueeze(1), row, ut.unsqueeze(1)).squeeze(1)
-                ok = mv & (tgt >= 0) & terr & ~blocked & ~clf & ~shut & (mp > 0)
+                ok = mv & (tgt >= 0) & terr & ~blocked & ~shut & (mp > 0)
                 _stepped = (self._step_verb(ok, sc, here, tgt, dirs, row, is_civ)
                             if bool(ok.count_nonzero()) else torch.zeros_like(ok))
                 # the STEP half of the decomposition log, and it belongs HERE

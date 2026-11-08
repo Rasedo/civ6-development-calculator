@@ -4105,7 +4105,7 @@ class SimMasks:
         N=1. The mask lives on the LAND tile, so read it there and test the bit
         pointing at the water side — from the water side that is the OPPOSITE
         direction ((d + 3) % 6 on this hex layout). Sourced exceptions: a city
-        centre and a HARBOR ignore cliffs, and CIV6 (Commando) "can scale Cliff
+        centre (a major's or a minor's, `_centre_plane`) and a HARBOR ignore cliffs, and CIV6 (Commando) "can scale Cliff
         walls" — `waive` [B, N] is that promotion. Cliffs never touch
         land-to-land steps.
 
@@ -4128,7 +4128,7 @@ class SimMasks:
         land = torch.where(cw, nbc3, c.unsqueeze(2)).reshape(B, N * 6)
         dl = torch.where(cw, (dirs + 3) % 6, dirs).expand(B, N, 6).reshape(B, N * 6)
         bit = ((self.cliff_mask.gather(1, land) >> dl) & 1).bool()
-        free = self.centre_slot_at.gather(1, land) >= 0
+        free = self._centre_plane().gather(1, land)
         if self._harbor_idx >= 0 and own is not None:
             free = free | ((self.district.gather(1, land) == self._harbor_idx) & own.gather(1, land))
         out = trans & bit.reshape(B, N, 6) & ~free.reshape(B, N, 6)

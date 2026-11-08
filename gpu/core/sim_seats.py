@@ -13559,9 +13559,10 @@ class SimSeats:
             tile or a coastal City Center land tile; leftover MP transfers to
             the new mode, capped at its full pool. A water->water step enters
             at 1 with no river charge.
+          * CLIFF — a cliff closes the shore crossing (`cliffBlocksStep`, the
+            lead's): the step is refused.
             The candidate scan stays with the caller: which neighbours are
-            enterable, and the cliff that closes a transition edge, are
-            target-choice questions.
+            enterable is a target-choice question.
           * the camp clear, for any landing unit. `clear_camp=False` is the
             BARBARIAN mover — clearCampFor no-ops for them.
 
@@ -13598,6 +13599,17 @@ class SimSeats:
         full = self.unit_mp_full.gather(1, gs1).squeeze(1)
         _ut = u_type.clamp(min=0, max=self.NU - 1)
         naval = self.unit_naval.take(_ut)
+        # the cliff that closes a shore crossing (`stepRefusal`'s
+        # `cliffBlocksStep`), asked of the formation's lead: a hull and a
+        # chassis water is ground to never cross, a unit that scales cliffs
+        # passes, and a city centre or the lead's own Harbor opens the wall
+        if self._has_cliffs:
+            waive = (naval | self.unit_water_walk.take(_ut)
+                     | self._promo_flag(_ut, u_promos, "CLIFFS"))
+            own = self.tile_seat == self.unit_seat.gather(1, gs1)
+            ok = ok & ~self._cliff_block_dirs(
+                hc.unsqueeze(1), self.neigh[hc].unsqueeze(1), own, waive.unsqueeze(1),
+            )[:, 0].gather(1, dir_i.unsqueeze(1)).squeeze(1)
         emb = self.unit_emb.gather(1, gs1).squeeze(1)
         dc1 = dest.clamp(min=0).unsqueeze(1)
         to_water = self.wpass.gather(1, dc1).squeeze(1)
