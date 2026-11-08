@@ -104,6 +104,7 @@ import { newCityAi } from '../core/aiCityTrees';
 import { newEconomicMemory, purchaseSpend, savingsTurn, upgradePurchase, type EconomicMemory } from '../core/aiEconomic';
 import { FX } from '../core/aiValue';
 import { advanceHistory, aliasOrPrefixed, engineRowOf, importTurn, minorHead, newHistory, recordRoutes, type History, type Imported } from './import';
+import { SightFold, TribeFold } from './windowFold';
 import { AI_UNITS } from '../data/aiBuildTables';
 import { loadCityBuildCentre, loadCityBuildTables, newCityBuildTally, tallyBuildings, type CityBuildTally } from './cityBuildLog';
 import { buildingTable } from '../core/aiCityBuild';
@@ -5162,11 +5163,19 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
   // ...and the city-states' savings each of those turns left (`foldSavings`)
   const savings = new Map<number, EconomicMemory>();
   const folding = opts.source ?? (source instanceof RecordedActions ? new RecordedActions() : new InferredActions());
+  // ...and the barbarians' tribes and the barbarians' and the city-states'
+  // revealed plots (`TribeFold`, `SightFold`)
+  const W0 = all[0]?.head.W ?? 0;
+  const tribeFold = skipped.length ? new TribeFold(dumpPath, W0) : undefined;
+  const sightFold = skipped.length ? new SightFold(W0, W0 * all[0].head.H) : undefined;
   skipped.forEach((r, i) => {
     advanceHistory(history, r, cat);
     const imp = importTurn(r, cat, history);
     const next = skipped[i + 1] ?? recs[0];
-    if (next) foldSavings(savings, imp, folding.decisions(r, next, cat), cat);
+    const ds = next ? folding.decisions(r, next, cat) : [];
+    if (next) foldSavings(savings, imp, ds, cat);
+    tribeFold?.observe(r, imp, cat, ds);
+    sightFold?.observe(r, imp, cat);
   });
   // the game's combat log, where the recording kept it: each record carries
   // the battles of the turns its event log covers (`RecordedActions`)
@@ -5204,6 +5213,9 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
   traceMinorPurchases(buyTrace);
   const state = first.state;
   importedWorld(state, first, recs[0], history);
+  tribeFold?.observe(recs[0], first, cat, []);
+  sightFold?.observe(recs[0], first, cat);
+  sightFold?.seed(state, first);
   // the city-states' city AI ran on the game's turns before the import's:
   // its first look ran no events (none contracted); its savings those turns'
   // (`foldSavings`), else, with no record before, the treasury taken whole;
@@ -5303,6 +5315,7 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
     if (!first.seatOfPlayer.has(u.owner) || !engineRowOf(cat, 'unit', u.type)) continue;
     ctx.units.set(`${u.owner}:${u.id}`, state.units[k++]);
   }
+  if (tribeFold?.logged) tribeFold.seed(state, (key) => ctx.units.get(key)?.id);
   // a window started past the first turn opens on the game's memory of the
   // turn before, as every later pair does (`perTurnWorld`)
   if (opts.aiScore && recs[0].turn > 1) takeGameMemory(ctx, state, first, recs[0].turn - 1, opts.memoryFromLog ?? false, opts.memoryFromAimem ?? false);
