@@ -209,9 +209,9 @@ function groundOf(state: GameState, unit: Unit, revealedOnly = true, planning = 
   const held = new Set<number>();
   const foes = new Set<number>();
   const own = new Set<number>();
-  const dom = unitDomain(unit.type);
-  // a formation's stacking: any member's class (0x585eb0 over its members)
-  const doms = new Set([dom, ...mates.map((m) => unitDomain(m.type))]);
+  // a formation's stacking: any member's class (`stackClass`, 0x585eb0 over
+  // its members), a Trader or a Spy none (0x585d90)
+  const classes = new Set([unit, ...mates].map((m) => stackClass(m.type)));
   const formation = new Set([unit, ...mates]);
   let seenNow: Uint8Array | undefined;
   // the plots a unit at war with it that fights holds, whatever its domain
@@ -221,7 +221,8 @@ function groundOf(state: GameState, unit: Unit, revealedOnly = true, planning = 
     // its own units that stack with it, a Trader none (0x585d90 counts none
     // with MakeTradeRoute: runs/h1_duely1124 Cardiff t95 / t113, its Builder
     // onto 582 under its Trader, the Farm laid)
-    if (!formation.has(u) && u.seat === unit.seat && doms.has(unitDomain(u.type)) && !UNITS[u.type]?.trader) own.add(u.tileIndex);
+    if (!formation.has(u) && u.seat === unit.seat && classes.has(stackClass(u.type)) && !UNITS[u.type]?.trader
+      && stackClass(u.type) !== 'spy') own.add(u.tileIndex);
     if (u.seat === unit.seat || !onMap(u)) continue;
     held.add(u.tileIndex);
     if (!unitsHostile(state, unit, u)) continue;

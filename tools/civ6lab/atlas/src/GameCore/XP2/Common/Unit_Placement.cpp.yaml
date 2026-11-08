@@ -67,6 +67,8 @@
     - gpu/core/sim_tactics.py:_tac_stacked_other
     - cpu/core/tactical.ts:groundOf
     - gpu/core/sim_tactics.py:SimTactics
+    - cpu/core/tactical.ts:classes
+    - gpu/core/sim_tactics.py:_tac_stacks
   readings:
     - "C-124: a move order's path opens a turn-end node beside each node with Movement left — READ (0x271920, 0x7a880, 0x271490, 0x775a0, 0x26f330), both twins"
     - "C-97: the behaviour trees — READ (the interpreter), the nodes PARTLY READ"
@@ -125,12 +127,13 @@
     - gpu/core/sim_tactics.py:_tac_own_class
     - cpu/core/tactical.ts:dom
     - cpu/core/tactical.ts:stackedWith
-    - gpu/core/sim_tactics.py:own_at
+    - gpu/core/sim_tactics.py:_tac_stacks
     - cpu/core/tactical.ts:layer
     - cpu/core/tactical.ts:keptOut
     - cpu/core/tactical.ts:crowded
     - cpu/core/units.ts:inEnemyZoc
     - cpu/core/tactical.ts:walk
+    - cpu/core/tactical.ts:own
   readings:
     - "C-95: the tactical pass — READ (the barbarians' moves; the minors share it)"
     - "C-96: the city-states' tactical pass — READ (Wander Near City, Heal, the non-barbarian priorities, FindAlternateLocation), the families it needs PARTLY READ"

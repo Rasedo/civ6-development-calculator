@@ -752,36 +752,13 @@ class SimTactics:
             zs = zs & ~self._tac_zoc_ignored(utype).unsqueeze(1)
         # a path's turn may not end on a plot its own stacking unit holds (the
         # path validity 0x2720a0; `groundOf`'s full; under flag 0x1000 its
-        # first turn alone)
+        # first turn alone); a formation (`mate` [N] its other member's local
+        # slot, -1 none) stacks by either member's class, its members not
+        # counted
         full_n = None
         if zoc or stand:
-            me = (slots + self.POOL_LO[pre]).unsqueeze(1)
-
-            # its own units that stack with it, a Trader none (0x585d90
-            # counts none with MakeTradeRoute)
-            def own_at(pl: torch.Tensor) -> torch.Tensor:
-                pr = pl[rows]
-                pc = pr.clamp(min=0)
-                return (pr >= 0) & (pr != me) & (self.unit_seat[rows].gather(1, pc) == seat) \
-                    & (self.unit_type[rows].gather(1, pc) != self._trader_idx)
-
-            civ_u = self._type_civilian.take(utype).unsqueeze(1)
-            sup_u = self._type_support.take(utype).unsqueeze(1)
-            full_n = torch.where(civ_u, own_at(self.civilian_at),
-                                 torch.where(sup_u, own_at(self.support_at), own_at(self.military_at) | own_at(self.embarked_at)))
-            if mate is not None:
-                # a formation (`mate` [N] its other member's local slot, -1
-                # none: Make Formation's pair, a civilian and a fighter)
-                # stacks by either member's class, its own members not counted
-                # (0x585eb0 over the members)
-                mg = torch.where(mate >= 0, mate + self.POOL_LO[pre], torch.full_like(mate, -2)).unsqueeze(1)
-
-                def own_f(pl: torch.Tensor) -> torch.Tensor:
-                    pr = pl[rows]
-                    return own_at(pl) & (pr != mg)
-
-                form = own_f(self.civilian_at) | own_f(self.military_at) | own_f(self.embarked_at)
-                full_n = torch.where((mate >= 0).unsqueeze(1), form, full_n)
+            full_n = self._tac_stacks(rows, seat, (slots + self.POOL_LO[pre],
+                                                   torch.where(mate >= 0, mate + self.POOL_LO[pre], torch.full_like(mate, -1))))
         # the path node's count +0x54 against the stacking limit at a turn's
         # end (`groundOf`'s crowded): its own stacking unit, or on a plot the
         # player sees now another player's unit at peace but a Trader
@@ -891,8 +868,10 @@ class SimTactics:
                 cst = torch.where(fw & tw, self._mp_scale, torch.where(tr, tcost, cst))
                 # a cliff bars a shore crossing onto a revealed plot alone (the
                 # embark and disembark tests 0x52fe90 / 0x52fb90 run on a
-                # revealed child, `search`)
-                cliff6 = cliffs_b[rows, best][:, cols] & tr & ~waive_cliff.unsqueeze(1) & ~unrev6 & ~naval.unsqueeze(1)
+                # revealed child, `search`); a hull or a water walker crosses
+                # no shore (`cliffBlocksStep`)
+                cliff6 = (cliffs_b[rows, best][:, cols] & tr & ~waive_cliff.unsqueeze(1) & ~unrev6
+                          & ~(naval | ww_n).unsqueeze(1))
             # a hull's step costs one Movement; its strike ashore, or its step
             # onto land it never revealed, the plot's own cost (`stepCost`: no
             # transition for a hull)
@@ -1541,30 +1520,10 @@ class SimTactics:
         waive = self._tac_waive_code(ut, getattr(self, f"{pre}_unit_promos")[rows, sr],
                                      getattr(self, f"{pre}_unit_alpine")[rows, sr])
 
-        def own_at(pl: torch.Tensor) -> torch.Tensor:
-            return (pl >= 0) & (self.unit_seat[rows].gather(1, pl.clamp(min=0)) == seat)
-
-        # where it may not end: its own unit of its own stacking class (a
-        # hull, a land combat unit ashore or embarked; a civilian; a support
-        # unit), any other player's unit
-        civ_u = self._type_civilian.take(ut).unsqueeze(1)
-        sup_u = self._type_support.take(ut).unsqueeze(1)
-        hull_b = torch.zeros(B, dtype=torch.bool, device=dev)
-        hull_b[rows] = naval
-        own_mil = self._tac_own_mil(seat, hull_b)[rows]
-        # a Trader (MakeTradeRoute) keeps none of its player's units out
-        # (0x585d90)
-        civ_pl = self.civilian_at[rows]
-        civ_trader = (civ_pl >= 0) & (self.unit_type[rows].gather(1, civ_pl.clamp(min=0)) == self._trader_idx)
-        own_same = torch.where(civ_u, own_at(civ_pl) & ~civ_trader,
-                               torch.where(sup_u, own_at(self.support_at[rows]), own_mil))
-        if mr is not None:
-            # a formation: either member's class, its other member not counted
-            mg = torch.where(mr >= 0, mr + self.POOL_LO[pre], torch.full_like(mr, -2)).unsqueeze(1)
-            not_m = lambda pl: pl != mg  # noqa: E731
-            form = ((own_at(civ_pl) & ~civ_trader & not_m(civ_pl)) | (own_at(self.military_at[rows]) & not_m(self.military_at[rows]))
-                    | (own_at(self.embarked_at[rows]) & not_m(self.embarked_at[rows])))
-            own_same = torch.where((mr >= 0).unsqueeze(1), form, own_same)
+        # where it may not end: its own unit of its formation's stacking
+        # classes (`stackedWith`)...
+        own_same = self._tac_stacks(rows, seat, (sr + self.POOL_LO[pre],
+                                                 torch.where(mr >= 0, mr + self.POOL_LO[pre], torch.full_like(mr, -1))))
         # ...or another player's unit at peace with it of its map layer, a
         # Trader none (`walk`'s `peaceAt`)
         rel_u = (self._rel_strength.take(ut) > 0).unsqueeze(1)
@@ -2968,13 +2927,17 @@ class SimTactics:
                   pre: str, seat: int) -> None:
         """`swapUnits`' exchange in the games of `sw`: the unit at local slot
         `u_b` of pool `pre` on `here` [B] moves onto `dest` [B], held by its
-        own unit `occ` [B] (a merged slot); arrived, the other steps onto
-        `here` with its own Movement (`stepUnit`, the step's cost spent; a
-        step it cannot afford leaves it on `dest`), else it keeps `dest`"""
+        own unit `occ` [B] (a merged slot), the other read on `here` while it
+        moves; arrived, the other steps onto `here` with its own Movement
+        (`stepUnit`, the step's cost spent; a step it cannot afford leaves it
+        on `dest`), else it keeps `dest`"""
         bidx = torch.arange(self.B, device=self.device)
         tile_p = getattr(self, f"{pre}_unit_tile")
-        self.military_at[bidx[sw], dest[sw]] = -1
+        rs, oc = bidx[sw], occ[sw].clamp(min=0)
+        self.military_at[rs, dest[sw]] = -1
+        self.unit_tile[rs, oc] = here[sw]
         self._tac_move_to(sw, u_b, dest, pre, seat, strike=False)
+        self.unit_tile[rs, oc] = dest[sw]
         there = sw & (tile_p[bidx, u_b] == dest)
         back = sw & ~there
         self.military_at[bidx[back], dest[back]] = occ[back]
@@ -3867,6 +3830,39 @@ class SimTactics:
         out = torch.zeros(self.B, self.T, dtype=torch.long, device=self.device)
         out.scatter_add_(1, self.unit_tile.clamp(min=0), same.long())
         return out > 0
+
+    def _tac_stacks(self, rows: torch.Tensor, seat: int, members: tuple) -> torch.Tensor:
+        """[N, T] bool — `stackedWith` for a formation of `seat` in the games
+        `rows` [N] (`members`: its units' merged slots, each [N], -1 none): a
+        unit of `seat` of any member's stacking class (`stackClass`: a
+        civilian, a support unit, a land combat unit ashore or embarked, a
+        hull), a Trader, an aircraft or a spy none, holds the plot, the
+        members not counted (0x585eb0 -> 0x585d90 over the members)."""
+        dev = self.device
+        N, T = rows.shape[0], self.T
+        ar = torch.arange(N, device=dev)
+        ty = self.unit_type.clamp(min=0, max=self.NU - 1)
+        sup = self._type_support.take(ty)
+        cls = torch.where(sup, 1, torch.where(self._type_civilian.take(ty), 0,
+                                              torch.where(self.unit_naval.take(ty), 3, 2)))
+        none = self._type_air.take(ty) > 0
+        if self._spy_idx >= 0:
+            none = none | (ty == self._spy_idx)
+        cls = torch.where(none, -1, cls)
+        ok = self.unit_alive & (self.unit_seat == seat) & (self.unit_tile >= 0) & (cls >= 0) & (ty != self._trader_idx)
+        cnt = torch.zeros(self.B, 4 * T, dtype=torch.long, device=dev)
+        cnt.scatter_add_(1, cls.clamp(min=0) * T + self.unit_tile.clamp(min=0), ok.long())
+        cnt = cnt[rows].view(N, 4, T)
+        want = torch.zeros(N, 4, dtype=torch.bool, device=dev)
+        for g in members:
+            v = g >= 0
+            gc = g.clamp(min=0)
+            c = cls[rows, gc]
+            cc = c.clamp(min=0)
+            tc = self.unit_tile[rows, gc].clamp(min=0)
+            cnt[ar, cc, tc] = cnt[ar, cc, tc] - (v & ok[rows, gc]).long()
+            want[ar, cc] = want[ar, cc] | (v & (c >= 0))
+        return ((cnt > 0) & want.unsqueeze(2)).any(dim=1)
 
     def _tac_hull(self, us: torch.Tensor, pre: str, rows: torch.Tensor | None = None) -> torch.Tensor:
         """[B] bool — the unit at local slot `us` of pool `pre` is a hull (in
