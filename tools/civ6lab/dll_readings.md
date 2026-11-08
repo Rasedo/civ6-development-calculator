@@ -9877,3 +9877,65 @@ full-Movement search runs, and those run at four places:
   civicScore.minor 1124 20 -> 12, 1121 4 -> 2; policyScore.minor 1121 6 ->
   0, 1124 8 -> 6, 1117 5 -> 4; no kind worse on 1117 / 1121 / 1124 / 1127 /
   1128.
+
+## C-95: the barbarians' candidates before the look, a capture's rally, a formation's embark flag and fighter — READ (0x722d70, 0x746920, 0x747230, 0x7877e0, 0x7265b0, 0x747fa0, 0x73e610, 0x73e870, 0x267650), both twins
+
+`barbarianOpsEvaluate`, `barbarianOpsTurn`, `barbarianCaptures`
+(cpu/core/barbarianOps.ts; `Seat.captureRally`), `formationEmbarks`, `walk`,
+`groundOf`'s `fighter` (cpu/core/tactical.ts), `stepCost` / `stepUnit`'s
+`formed` (cpu/core/units.ts); GPU `_barb_ops_evaluate`, `_barb_camp_pick`,
+`_barb_captures` (`barb_cap_rally`, gpu/core/sim_barbops.py), `_tac_search`'s
+`embarks` / `fights`, `_tac_move_to`'s `ign_shore` (gpu/core/sim_tactics.py).
+
+- THE MILITARY AI'S TURN of the barbarians runs before their tactical pass's
+  knowledge look (0x785f30: the update 0x5ebb30 drops an empty camp, then the
+  look): the candidates (0x722d70) are weighed on the knowledge base the last
+  look left. The staging plots (m_operationStartPoints, +0xb00 / +0xb58) are
+  rebuilt at the end of every look (0x7877e0 at 0x787b3d..0x787cf3): a
+  barbarian's the knowledge base's camps (+0x638) in their order. The target
+  walk's BARBARIAN_CAMP branch (0x747230 at 0x7476e8) reads +0x638, 50 a camp.
+- A RUNNING OPERATION'S CANDIDATE (0x747fa0: +0x40 its target, +0x48 the teams'
+  +0x4b0, +0x4c its id) is weighed from its target alone (0x746b80..0x746bab):
+  its backup (0x73e610) the best camp from the target at the strength the last
+  refresh left — at strength 0 the odds' base is negative and the farthest
+  camp wins. Its candidate line is logged beside the one against no enemy.
+- THE CANDIDATES AGAINST NO ENEMY: each "Barbarian Ops" definition
+  (LEADER_BARBARIAN); Barbarian Attack and City Assault (TARGET_ENEMY_*_DISTRICT,
+  enemy none) find no target; Barbarian Builder Capture weighs the camps as
+  targets against the camps as rallies, ours the barbarians' own records
+  within 10 of the rally (0x5eadb0), the later of the best value x odds.
+- THE CAPTURE'S START (0x800c60 -> 0x7265b0 with its flag): the target the
+  captive's plot, the rally the Barbarian Builder Capture candidate's (+0x5c,
+  0x7267b0), none (-9999) where it was not valid; the start finds the
+  candidate in +0x328 alone (0x72666b..0x726704).
+- THE SWITCH (0x73e870): the backup's value (+0x3d8: enemy, target +8, rally
+  +0x10) into the target's (+0x248 autovariable: +0x2a8, +0x2b0, the enemy put
+  back), the teams' goals +0xf0 / +0xe8; the rally the AI memory reader names
+  (+0x318, 0x7eb220's) is not written.
+- A FORMATION'S EMBARK FLAG (+0x338, 0x267650 at 0x2677e0..0x2677f7: the OR
+  of its members' 0x56c480) gates the embark and disembark cost rules of its
+  search and of its walk; its location test stays every member's (0x586900).
+- A FORMATION'S SEARCH is the formation's: a formed civilian's attacks are
+  its escort's (its AI_Planning.csv row is the escort's row).
+- A WALK carries the formation it set out with: a rider on a plot it passes
+  stays with its own escort.
+- CONFIRMED (one-seed aimem traces): runs/h1_duely1124 t3-t250 every
+  barbarian AI_Operation_Eval.csv line (100.0 at t3 on the two camps of the
+  t2 look; t88 / t112 two 200.0 lines, the running capture's and the one
+  against no enemy); t112 the capture 327682's target 32:10 switches to 6:3
+  (the camp the t112 look drops), ops.targets as the game's; the captures'
+  rallies: 1124 41:7 (t46), 18:7 (t87, t111); 1121 12:14 (t68-t143), none
+  (t150-t191); 1128 38:13 (t25), 16:3 (t63-t170); runs/h1_duely1128 t56 the
+  Scout 3538967 walks over 13:14, Builder Capture's Settler 2228251 stays
+  there with its Slinger 1441812 (held to t102 as the game's); runs/h1_duely1121
+  t105 the Settler 3211277's planning lists player 1's Courser's 11:16 (2/0)
+  as its Man-At-Arms 2949124's does; 1124 t90 / t100 the Builder 4456474 and
+  Archer 3997716, 1128 t40 / t56 the Settler 2228251 and Slinger 1441812: one
+  list.
+- OPEN: runs/h1_duely1121 t105 the Settler 3211277 and Man-At-Arms 2949124
+  on 12:18 for 12:15 step to 11:17, the only land way on 11:16 where player
+  1's Courser 1835015 stands seen (the barbarians' t105 record, age 0;
+  12:16 Yosemite, 10:16 / 10:17 Coast): the move order's path passes a seen
+  fighting unit's plot in a later turn, or the coast on the formation's
+  embark flag — 0x2720a0 at 0x272434..0x2724c2 unread; the engines go round
+  by 13:18.

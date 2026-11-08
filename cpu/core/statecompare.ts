@@ -670,6 +670,7 @@ const GAME: Record<string, Extractor> = {
   barbArmyAged: (s) => [s.barbSeat.armyAged ?? -1],
   barbEnemyCounts: (s) => [enemyCountsRecord(s.barbSeat.enemyCounts)],
   barbCampsKnown: (s) => [[...(s.barbSeat.campsKnown ?? [])]],
+  barbCaptureRally: (s) => [s.barbSeat.captureRally ?? -1],
   freeUnitStrength: (s) => [s.freeSeat?.unitStrength ?? 0],
   // the Free Cities' knowledge base's army records (`freeKnowledge`), as the
   // barbarians'; their last ageing; their military AI's Combat Desire

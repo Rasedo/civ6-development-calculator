@@ -262,7 +262,7 @@ class SimBarbOps:
     def _barb_captures(self) -> None:
         """`barbarianCaptures`: each of the turn's captures starts "Barbarian
         Builder Capture" by name (0x7265b0) on the captive's plot, its rally
-        the plot, its tree the player's next; the captive, then its captor,
+        the candidate's (`barb_cap_rally`), its tree the player's next; the captive, then its captor,
         join its team (0x737e80), the captor leaving the operation it held"""
         for j in range(self.barb_capq.shape[1]):
             civ = self.barb_capq[:, j, 0]
@@ -292,7 +292,7 @@ class SimBarbOps:
             self.bcap_civ[r, ci] = cs[r]
             self.bcap_esc[r, ci] = torch.where(esc_ok[r], es[r], torch.full_like(es[r], -1))
             self.bcap_target[r, ci] = plot
-            self.bcap_rally[r, ci] = plot
+            self.bcap_rally[r, ci] = self.barb_cap_rally[r]
             self.bcap_bk_target[r, ci] = -1
             self.bcap_bk_rally[r, ci] = -1
             self.bcap_resume[r, ci] = -1
@@ -321,25 +321,15 @@ class SimBarbOps:
         """the captures' part of `barbarianOpsTurn`: each team's update
         (0x73fba0: a civilian and a UNITAI_COMBAT member — the
         InitialStrengthAdvantage 0 asks no strength — the members' strength),
-        the enemy's about the target (`_ops_enemy_str`), and the running
-        operation's candidate as its backup (0x73e610, `evaluate`, before
-        the strengths' refresh: of the knowledge base's camps in its order, the one of the
-        best odds from the target at the strength the last refresh left —
-        none on the turn after the start — against the walk's 6; a camp on
-        the target, or off its area, none)"""
+        the enemy's about the target (`_ops_enemy_str`)"""
         self._bcap_bury()
-        B, dev = self.B, self.device
         bidx = self._bidx
         ut = self.barb_unit_type.clamp(min=0, max=self.NU - 1)
         civ_ai = self._bop_civ_ai.take(ut)
-        cp = self.barb_camps_known
-        n_camps = (cp >= 0).sum(dim=1)
-        best = 1  # the barbarians' best trained strength none: max(1, 0)
         for c in range(self.bcap_id.shape[1]):
             on = self.bcap_id[:, c] >= 0
             if not bool(on.any()):
                 continue
-            ours = self.bcap_str[:, c].clone()
             cs, es = self.bcap_civ[:, c], self.bcap_esc[:, c]
             civ_in = on & (cs >= 0) & civ_ai[bidx, cs.clamp(min=0)]
             esc_in = on & (es >= 0) & combat_ai[bidx, es.clamp(min=0)]
@@ -350,34 +340,61 @@ class SimBarbOps:
             tgt = self.bcap_target[:, c]
             self.bcap_estr[:, c] = torch.where(on, self._ops_enemy_str(BARB_SEAT, self.BK, tgt, torch.full_like(tgt, -1)),
                                                self.bcap_estr[:, c])
-            # the backup: the knowledge base's camps in its order, the last
-            # of the best
-            rally = tgt
-            rc = rally.clamp(min=0)
-            value = n_camps * 50 * 256
-            got_t = torch.full_like(tgt, -1)
-            got_v = torch.zeros_like(tgt)
-            got_o = torch.zeros(B, dtype=torch.float64, device=dev)
-            for j in range(cp.shape[1]):
-                camp = cp[:, j]
-                ok = on & (rally >= 0) & (camp >= 0)
-                if not bool(ok.any()):
-                    continue
-                cc = camp.clamp(min=0)
-                d = self.pair_dist[rc, cc].to(torch.long)
-                same_area = self.tile_area[bidx, rc] == self.tile_area[bidx, cc]
-                ok &= (d > 0) & same_area
-                enemy = torch.full_like(ours, 6)
-                odds = self._mops_odds(ours, enemy, d, torch.full_like(ours, best))
-                prod = torch.div(self._mops_fixed(odds) * value, 256, rounding_mode="trunc")
-                held = torch.div(got_v * self._mops_fixed(got_o), 256, rounding_mode="trunc")
-                take = ok & ((got_t < 0) | ~(prod < held))
-                got_t = torch.where(take, camp, got_t)
-                got_v = torch.where(take, value, got_v)
-                got_o = torch.where(take, odds, got_o)
-            has = on & (got_t >= 0)
+
+    def _barb_camp_pick(self, rally: torch.Tensor, ours: torch.Tensor, ok: torch.Tensor):
+        """`evaluate`'s pick of the barbarians' camp candidates: the
+        knowledge base's camps [B, N] as targets against the rallies `rally`
+        [B, R] at the strengths `ours` [B, R] (`ok` [B, R] the rallies
+        weighed), the target walk outer, the rallies inner, a pair on one plot
+        or across areas none, each valued 50 a camp against the walk's 6; the
+        last of the best value x odds. [B] valid, target, rally"""
+        bidx = self._bidx
+        cp = self.barb_camps_known
+        N, R = cp.shape[1], rally.shape[1]
+        n_camps = (cp >= 0).sum(dim=1)
+        tc, rc = cp.clamp(min=0), rally.clamp(min=0)
+        d = self.pair_dist[rc.unsqueeze(1), tc.unsqueeze(2)].to(torch.long)
+        ta = self.tile_area[bidx.unsqueeze(1), tc]
+        ra = self.tile_area[bidx.unsqueeze(1), rc]
+        pair = (cp >= 0).unsqueeze(2) & ok.unsqueeze(1) & (d > 0) & (ta.unsqueeze(2) == ra.unsqueeze(1))
+        o3 = ours.unsqueeze(1).expand(-1, N, -1)
+        # the barbarians' best trained strength none: max(1, 0)
+        odds = self._mops_odds(o3, torch.full_like(o3, 6), d, torch.ones_like(o3))
+        value = (n_camps * 50 * 256).view(-1, 1, 1)
+        prod = torch.div(self._mops_fixed(odds) * value, 256, rounding_mode="trunc")
+        flat = torch.where(pair, prod, torch.full_like(prod, -(1 << 50))).reshape(self.B, N * R)
+        last = N * R - 1 - flat.flip(1).argmax(dim=1)
+        valid = pair.reshape(self.B, N * R).any(dim=1)
+        target = torch.where(valid, cp.gather(1, (last // R).unsqueeze(1)).squeeze(1), torch.full_like(n_camps, -1))
+        at = torch.where(valid, rally.gather(1, (last % R).unsqueeze(1)).squeeze(1), torch.full_like(n_camps, -1))
+        return valid, target, at
+
+    def _barb_ops_evaluate(self) -> None:
+        """`barbarianOpsEvaluate`, before the tactical pass's knowledge look:
+        each running capture's candidate names its backup (0x73e610: its
+        target the fixed rally, at the strength its last refresh left — none
+        on the turn after the start); the Barbarian Builder Capture candidate
+        against no enemy over the camps as targets and as rallies, the
+        barbarians' own records within 10 of the rally their strength, its
+        rally the one a capture's start takes (`barb_cap_rally`)"""
+        bidx = self._bidx
+        for c in range(self.bcap_id.shape[1]):
+            on = self.bcap_id[:, c] >= 0
+            if not bool(on.any()):
+                continue
+            tgt = self.bcap_target[:, c]
+            valid, got_t, got_r = self._barb_camp_pick(tgt.unsqueeze(1), self.bcap_str[:, c].unsqueeze(1), (on & (tgt >= 0)).unsqueeze(1))
+            has = on & valid
             self.bcap_bk_target[:, c] = torch.where(has, got_t, self.bcap_bk_target[:, c])
-            self.bcap_bk_rally[:, c] = torch.where(has, rally, self.bcap_bk_rally[:, c])
+            self.bcap_bk_rally[:, c] = torch.where(has, got_r, self.bcap_bk_rally[:, c])
+        cp = self.barb_camps_known
+        rec = self._mops_records(self.BK)
+        term = self._mops_army_term(rec["combat"], rec["ranged"], rec["dmg"], rec["form"])
+        own = rec["recent"] & (rec["owner"] == BARB_SEAT) & (rec["plot"] >= 0)
+        rd = self.pair_dist[rec["plot"].clamp(min=0).unsqueeze(2), cp.clamp(min=0).unsqueeze(1)].to(torch.long)
+        ours = torch.where(own.unsqueeze(2) & (rd <= 10), term.unsqueeze(2), torch.zeros_like(rd)).sum(dim=1)
+        valid, _, at = self._barb_camp_pick(cp, ours, cp >= 0)
+        self.barb_cap_rally = torch.where(valid, at, torch.full_like(at, -1))
 
     def _bop_capture_tick(self, m: torch.Tensor, c: int, ctx: dict) -> None:
         """"Escort Worker To Camp"'s tick for capture `c` in the games `m`:

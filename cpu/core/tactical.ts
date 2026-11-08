@@ -22,7 +22,7 @@ import { engineId, gameTypeOf, installFeature } from '../data/aliases';
 import {
   canEmbark, cityAtIndex, crossesRiver, embarkTechMoves, escortUnit, inEscort, cliffBlocksStep, shoreCrossing, districtZones, encampmentBlocks, encampmentIntact, inEnemyZoc, rosterEmbarkMoves, stepCost, stepUnit, terrainMp, unitDomain, unitExertsZoc, unitFullMoves, unitIsNoncombat, mapLayer, unitReligious,
   setBarbStepLook, unitsHostile, unitVisibleTo,
-  waterEnterable, waterWalks, formationCS, setRecordFormation, formationMates, dropLoneRiders,
+  waterEnterable, waterWalks, formationCS, setRecordFormation, formationMates, dropLoneRiders, escortOf, escortRiders,
 } from './units';
 import { BARB_SEAT, FREE_SEAT, NO_SEAT, campTiles, cityHolders, civsAtWar, isBarbSeat, isCityStateSeat, isCiv, isTerritorial, seatOf, tileCity, tileSeat } from './seats';
 import { OPEN_BORDERS_CIVIC } from '../data/seats';
@@ -34,7 +34,7 @@ import { cityStateAt, minorCity } from './cityStates';
 import { irradiated } from './nuclear';
 import { canSee, losDisk, unitSight } from './fog';
 import { barbScoutLook, barbarianRules, barbSlots, barbSlotsDying, plotsSeenNow, poolDying, poolSlots, ringPlots, tribeOf } from './barbarians';
-import { barbarianCaptures, barbarianOpsTurn, barbarianTrees } from './barbarianOps';
+import { barbarianCaptures, barbarianOpsEvaluate, barbarianOpsTurn, barbarianTrees } from './barbarianOps';
 import { opsOf } from './operations/manager';
 import { lookCamps } from './operations/knowledge';
 import { opJobUnits } from './operations/operation';
@@ -121,20 +121,26 @@ function closedToMinor(state: GameState, seat: number, t: Tile): boolean {
  *  for a pillage, which drops them (`dropHeldCosts`) */
 let costsHeld: Map<string, Int32Array> | null = null;
 
-function heldCostsOf(state: GameState, unit: Unit): Int32Array | null {
+function heldCostsOf(state: GameState, unit: Unit, mayEmbark: boolean): Int32Array | null {
   if (!costsHeld) return null;
-  const k = `${unit.type}:${unit.promos ?? 0}:${unit.alpine ? 1 : 0}:${canEmbark(state, unit) ? 1 : 0}`;
+  const k = `${unit.type}:${unit.promos ?? 0}:${unit.alpine ? 1 : 0}:${mayEmbark ? 1 : 0}`;
   let a = costsHeld.get(k);
   if (!a) costsHeld.set(k, (a = new Int32Array(state.map.tiles.length * 6).fill(-1)));
   return a;
 }
 
-function stepCostHeld(state: GameState, unit: Unit, from: Tile, to: Tile, di: number, held: Int32Array | null): number {
-  if (!held) return stepCost(state, unit, from, to);
+function stepCostHeld(state: GameState, unit: Unit, from: Tile, to: Tile, di: number, held: Int32Array | null, mayEmbark: boolean): number {
+  if (!held) return stepCost(state, unit, from, to, mayEmbark);
   const at = from.index * 6 + di;
-  if (held[at] < 0) held[at] = stepCost(state, unit, from, to);
+  if (held[at] < 0) held[at] = stepCost(state, unit, from, to, mayEmbark);
   return held[at];
 }
+
+/** a formation's flag of its embark and disembark cost rules (+0x338, the
+ *  tracked bool refreshed by 0x267650 at 0x2677e0..0x2677f7): the OR of its
+ *  members' `canEmbark`, the unit's own where it moves alone */
+const formationEmbarks = (state: GameState, unit: Unit, mates: readonly Unit[]): boolean =>
+  [unit, ...mates].some((m) => canEmbark(state, m));
 
 function dropHeldCosts(): void {
   if (costsHeld) costsHeld = new Map();
@@ -272,10 +278,18 @@ function groundOf(state: GameState, unit: Unit, revealedOnly = true, planning = 
   const revealed = revealedOf(state, unit.seat);
   const known = (i: number) => !revealedOnly || revealed(i);
   const def = UNITS[unit.type];
-  const melee = !!def && def.combat > 0;
+  // the search runs for the formation: its attacks are its fighter's, a
+  // formed civilian's those of the escort beside it (runs/h1_duely1121
+  // t105: the captured Settler 3211277 lists player 1's Courser's 11:16 at
+  // (2/0) as its Man-At-Arms 2949124 does; every formation pair's two
+  // AI_Planning.csv rows are one list — 1124 t90 / t100 the Builder 4456474
+  // and Archer 3997716, 1128 t40 / t56 the Settler 2228251 and Slinger
+  // 1441812)
+  const fighter = def && def.combat > 0 ? unit : mates.find((m) => (UNITS[m.type]?.combat ?? 0) > 0) ?? unit;
+  const melee = (UNITS[fighter.type]?.combat ?? 0) > 0;
   // its ranged or bombard strength tops its combat strength (0x56dc90 /
   // 0x56e3e0 / 0x56daa0)
-  const str = aiStrengths(state, unit);
+  const str = aiStrengths(state, fighter);
   const shoots = str.ranged > str.melee || str.bombard > str.melee;
   const naval = !!def?.naval;
   // a unit that may embark (`canEmbark`, 0x56c480: the barbarians' land units
@@ -545,9 +559,9 @@ function search(state: GameState, unit: Unit, maxTurns: number, zoc: boolean, on
   // a plot of a district with hit points of a player at war (0x26e570's
   // district attack: DistrictInfo +0x58 / +0x5c)
   const districtAttack = (t: Tile) => garrisonDistrict(state, t) && unitsHostile(state, unit, { seat: tileSeat(t) });
-  const held = heldCostsOf(state, unit);
   // the formation may embark (+0x338): the embark and disembark rules run
-  const embarks = canEmbark(state, unit);
+  const embarks = formationEmbarks(state, unit, mates);
+  const held = heldCostsOf(state, unit, embarks);
   const nodes = new Map<number, PNode>();
   // a later turn starts on the pathfinder's pool of the domain its plot holds
   // the unit in (`domainPool`): embarked on water, a land unit's own ashore
@@ -777,7 +791,7 @@ function search(state: GameState, unit: Unit, maxTurns: number, zoc: boolean, on
     // the step's rules, then the parent's carry on top (0x26e920: the
     // parent's +0x20 added to the step's cost); between two plots the
     // player never revealed no rule runs: the parent's carry, else 1
-    let cost = blind ? (p.carry || FIX) : Math.floor(stepCostHeld(state, unit, from, to, di, held) * FIX / MP_SCALE) + (p.carry ?? 0);
+    let cost = blind ? (p.carry || FIX) : Math.floor(stepCostHeld(state, unit, from, to, di, held, embarks) * FIX / MP_SCALE) + (p.carry ?? 0);
     const wet = blind ? p.wet : isWater(to);
     // a shore crossing carries the Movement held past the new domain's full
     // Movement to the next step (0x530420 / 0x530240: Movement left above
@@ -1106,13 +1120,14 @@ function walk(state: GameState, unit: Unit, path: number[], dest: number, mates:
   // a shore crossing's Movement past the new domain's full, paid by the next
   // step (the pathfinder's `carry`)
   let carry = 0;
+  const embarks = formationEmbarks(state, unit, mates);
   for (const p of path) {
     // a plot a unit at war with it holds, passed out of its sight, ends the
     // walk short of it: the order moves one node at a time on a path found
     // afresh (0x962380 -> 0x26fe20 to the node after its start), its first
     // step ending the order unmoved on a defender at war it sees (0x209e30)
     if (enemyOnLayer(state, unit, p)) break;
-    const cost = stepCost(state, unit, tiles[from], tiles[p]) + carry;
+    const cost = stepCost(state, unit, tiles[from], tiles[p], embarks) + carry;
     if (mp < cost && mp < full) break;
     const cross = shoreCrossing(unit.type, tiles[from], tiles[p]);
     const maxTo = domainPool(state, unit, isWater(tiles[p])) * MP_SCALE;
@@ -1123,8 +1138,13 @@ function walk(state: GameState, unit: Unit, path: number[], dest: number, mates:
     if (mp <= 0 || inEnemyZoc(state, p, unit, dest, stackedWith(state, unit, mates, p) || peaceAt(state, unit, p))) break;
   }
   while (stop > 0 && (stackedWith(state, unit, mates, path[stop - 1]) || peaceAt(state, unit, path[stop - 1]))) stop -= 1;
+  // the formation the walk sets out with (unit +0x1fb8): the riders on a
+  // plot it passes are another formation's (runs/h1_duely1128 t56: the Scout
+  // 3538967 walks over 13:14, Builder Capture's Settler 2228251 stays there
+  // with its Slinger)
+  const formed = escortRiders(state, escortOf(state, unit) ?? unit);
   for (let i = 0; i < stop; i++) {
-    const r = stepUnit(state, unit, tiles[path[i]]);
+    const r = stepUnit(state, unit, tiles[path[i]], formed);
     if (r === 'halted') return false;
     if (r !== 'moved') return true;
   }
@@ -3804,7 +3824,8 @@ export function passMoveExec(state: GameState, pass: Pass, members: readonly num
  * "Default Barbarian" and "Default Barbarian HL" lists) for the units that
  * stood before their camps raised this turn's (a unit raised this turn acts
  * from the next): its riders whose escort fell out of their formations
- * (`dropLoneRiders`), the knowledge base's ageing and look (`knowledgeLook`),
+ * (`dropLoneRiders`), the military AI's candidates (`barbarianOpsEvaluate`),
+ * the knowledge base's ageing and look (`knowledgeLook`),
  * the units in their pool's order (`slot`), each one's
  * planning reach taken before any moves (0x792c90), the operations' trees
  * (`barbarianTrees`), then the moves in the
@@ -3837,6 +3858,8 @@ function tacticalPass(state: GameState, acting: ReadonlySet<number>): void {
   for (const u of all) ai.set(u.id, aiTypeOf(state, u));
   const seen = plotsSeenNow(state, new Set([BARB_SEAT]));
   const ex = state.barbSeat.explored;
+  // the military AI's candidates on the knowledge base the last look left
+  barbarianOpsEvaluate(state);
   // the knowledge base ages and looks, then the target list (0x785f30)
   knowledgeLook(state, state.barbSeat, BARB_SEAT, seen, true);
   barbCampsLook(state, seen);

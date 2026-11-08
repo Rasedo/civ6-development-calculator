@@ -1214,7 +1214,7 @@ _MUTABLE = [
     "barb_unit_join", "barb_unit_fresh", "barb_spot_next", "barb_tree_next", "barb_tree_slots", "barb_tree_free",
     "barb_tree_nfree",
     "bcap_id", "bcap_civ", "bcap_esc", "bcap_target", "bcap_rally", "bcap_bk_target", "bcap_bk_rally", "bcap_resume",
-    "bcap_ready", "bcap_str", "bcap_estr", "bcap_store", "bcap_store_goal", "barb_capq",
+    "bcap_ready", "bcap_str", "bcap_estr", "bcap_store", "bcap_store_goal", "barb_capq", "barb_cap_rally",
     # their unit pool and each tribe's camp defender (`barbSlots`, `cpu/core/tactical.ts`)
     "barb_unit_slotno", "barb_pool_size", "barb_pool_free", "barb_pool_nfree", "barb_pool_dying", "tribe_defender",
     # each city-state's unit pool, then the Free Cities' (`poolSlots`, `cpu/core/tactical.ts`)

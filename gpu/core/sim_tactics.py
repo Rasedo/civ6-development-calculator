@@ -737,12 +737,16 @@ class SimTactics:
         orig_of = getattr(self, f"{pre}_unit_orig_owner")
         embarks = self._tac_embarks(rows, utype, seat, orig_of[rows, slots])
         # the formation's location test (0x586900) asks each member's own
-        # (0x586360 -> 0x56c480): water only where its mate may embark too
+        # (0x586360 -> 0x56c480): water only where its mate may embark too;
+        # the embark and disembark cost rules run on the formation's flag
+        # (+0x338): the OR of its members' (`formationEmbarks`)
         mate_on = mate >= 0
         if bool(mate_on.count_nonzero()):
             mc = mate.clamp(min=0)
             m_type = getattr(self, f"{pre}_unit_type")[rows, mc].clamp(min=0, max=self.NU - 1)
-            placed = embarks & (~mate_on | self._tac_embarks(rows, m_type, seat, orig_of[rows, mc]))
+            m_emb = mate_on & self._tac_embarks(rows, m_type, seat, orig_of[rows, mc])
+            placed = embarks & (~mate_on | m_emb)
+            embarks = embarks | m_emb
         else:
             placed = embarks
         ent_n = torch.where(naval.unsqueeze(1), wat[rows], land[rows] | (wat[rows] & placed.unsqueeze(1)))  # [N, T]
@@ -758,14 +762,21 @@ class SimTactics:
         # path's end, the attack's step priced as any step and spending the
         # Movement it leaves
         a_land, a_nav, a_fw = self._tac_attack_planes(seat, not zoc, not zoc, stand)
+        # the formation's attacks are its fighter's: a formed civilian's its
+        # escort's (`groundOf`'s `fighter`)
         fights = self._type_combat.take(utype) > 0
+        fslot = slots
+        if bool(mate_on.count_nonzero()):
+            m_fights = mate_on & (self._type_combat.take(m_type) > 0)
+            fslot = torch.where(~fights & m_fights, mc, slots)
+            fights = fights | m_fights
         atk_n = torch.where(naval.unsqueeze(1), a_nav[rows], a_land[rows] | (a_fw[rows] & placed.unsqueeze(1))) \
             & fights.unsqueeze(1) & ~ent_n
         # a district of hit points at war is no plot for a unit whose ranged
         # or bombard strength tops its combat strength (`groundOf`'s attack:
         # the location test 0x586360 at 0x5866c9..0x58671f)
-        cmb = self._ai_combat(pre)[rows, slots]
-        shoots = (self._ai_ranged(pre)[rows, slots] > cmb) | (self._ai_bombard(pre)[rows, slots] > cmb)
+        cmb = self._ai_combat(pre)[rows, fslot]
+        shoots = (self._ai_ranged(pre)[rows, fslot] > cmb) | (self._ai_bombard(pre)[rows, fslot] > cmb)
         if bool(shoots.any()):
             fort_d = self._centre_plane()
             if self._encamp_didx >= 0:
@@ -1678,9 +1689,14 @@ class SimTactics:
         ut = ut_pool[rows, sr].clamp(min=0, max=self.NU - 1)
         naval = self.unit_naval.take(ut)
         # no embark penalty where the shores are ignored, or for a formation
-        # that may not embark (`shoreStep`)
-        ign_shore = self._ignore_shores(torch.full_like(ut_pool, seat), ut_pool)[rows, sr] \
-            | ~self._tac_embarks(rows, ut, seat, getattr(self, f"{pre}_unit_orig_owner")[rows, sr])
+        # that may not embark (`shoreStep`: no member may, `formationEmbarks`)
+        orig_p = getattr(self, f"{pre}_unit_orig_owner")
+        emb = self._tac_embarks(rows, ut, seat, orig_p[rows, sr])
+        m_on = mr >= 0
+        if bool(m_on.count_nonzero()):
+            mcl = mr.clamp(min=0)
+            emb = emb | (m_on & self._tac_embarks(rows, ut_pool[rows, mcl].clamp(min=0, max=self.NU - 1), seat, orig_p[rows, mcl]))
+        ign_shore = self._ignore_shores(torch.full_like(ut_pool, seat), ut_pool)[rows, sr] | ~emb
         # its terrain waivers (`terrainMp`: hills, Woods)
         waive = self._tac_waive_code(ut, getattr(self, f"{pre}_unit_promos")[rows, sr],
                                      getattr(self, f"{pre}_unit_alpine")[rows, sr])
@@ -3786,6 +3802,9 @@ class SimTactics:
         # the knowledge base ages and looks, then the tactical target list
         # (0x785f30), and its set of the regions the barbarians revealed
         seen0 = self._barb_seen("barbarians")
+        # the military AI's candidates on the knowledge base the last look
+        # left (`barbarianOpsEvaluate`)
+        self._barb_ops_evaluate()
         self._knowledge_look(self.BK, BARB_SEAT, seen0, torch.ones(B, dtype=torch.bool, device=dev), True)
         self._barb_kb_camps(seen0)
         # the military AI's part of the turn after the look: the operations

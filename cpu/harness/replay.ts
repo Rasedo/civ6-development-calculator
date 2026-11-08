@@ -834,7 +834,8 @@ function barbarianTurn(ctx: Ctx, b: TurnRecord, closing: number): void {
   // the barbarians' operation lines of the turn: their tribes' starts, their
   // run in the tactical pass, a scout's report's start
   const opLines: string[] = [];
-  traceBarbOps((l) => opLines.push(l));
+  const opEvals: string[] = [];
+  traceBarbOps((l, candidate) => (candidate ? opEvals : opLines).push(l));
   // their Movement as the turn opens, before their rules grant its techs
   const opened = barbMovesNow(state);
   barbarianRules(state, closing);
@@ -903,7 +904,7 @@ function barbarianTurn(ctx: Ctx, b: TurnRecord, closing: number): void {
   }
   traceBarbOps(null);
   const barbPlayer = ctx.playerOfSeat.get(BARB_SEAT);
-  if (barbPlayer !== undefined) ctx.operations.minorTurn(closing, barbPlayer, opLines, []);
+  if (barbPlayer !== undefined) ctx.operations.minorTurn(closing, barbPlayer, opLines, opEvals);
   barbSlotsDying(state);
   // the barbarians' units look round where the record holds them (their
   // moves are the record's, set without a step)

@@ -110,6 +110,7 @@
     - gpu/core/sim_minors.py:_knowledge_look
     - gpu/core/sim_tactics.py:_tac_pass
     - cpu/core/minorBuild.ts:prev
+    - cpu/core/tactical.ts:tacticalPass
   readings:
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
     - "C-96: the knowledge base's army records and the Combat Desire — READ (the records, the update, the desire), PARTLY READ (the signals' looks, the standing-army count)"
@@ -123,6 +124,7 @@
     - "C-96 / C-129: a city-state's unit production table counts the records its look's ageing keeps, none its sightings add"
     - "C-129: a unit made anew that no plot takes is destroyed, its own plot refused by a hostile defender alone; a bankruptcy's disband before the look — READ, both twins"
     - "C-98: a city-state's City Analysis counts its knowledge base as its last turn left it — READ (0x608580 at 0x6085c9, 0x5c24e0 / 0x6fae70 on player signal +0x258, 0x785f30 in 0x6096c0's +0x370 list), both twins"
+    - "C-95: the barbarians' candidates before the look, a capture's rally, a formation's embark flag and fighter — READ (0x722d70, 0x746920, 0x747230, 0x7877e0, 0x7265b0, 0x747fa0, 0x73e610, 0x73e870, 0x267650), both twins"
   context:
     - "- THE AGEING (0x5ebb30, the first step of the tactical AI's turn 0x785f30 on player signal +0x1f8): every record's age + 1; one whose age before the step was a..."
     - "...877e0, Targets.cpp, \"Invalid unit when updating AI knowledge base\"; after the ageing in 0x785f30 and again on player signal +0x228): over every plot the player's visibility count (+0x2..."
@@ -251,7 +253,7 @@
   final: 0x515d70
   kind: function
   name: knowledgeLook
-  semantics: "over the plots the player's visibility count holds above 0: cities 0x5f0280, districts 0x5f0490, each unit (a hidden one where 0x5033a0 lets it) 0x5f0440, a barbarian camp 0x5f0110; also on player signal +0x228. A seen plot's units are those of the map's layer 0 (0x75800(map, 0) -> 0x75ce0): no Trader is one of them. Ported: knowledgeLook (cpu/core/tactical.ts, Seat.armyKnown), _knowledge_look (gpu/core/sim_minors.py)."
+  semantics: "over the plots the player's visibility count holds above 0: cities 0x5f0280, districts 0x5f0490, each unit (a hidden one where 0x5033a0 lets it) 0x5f0440, a barbarian camp 0x5f0110; also on player signal +0x228. A seen plot's units are those of the map's layer 0 (0x75800(map, 0) -> 0x75ce0): no Trader is one of them. Ported: knowledgeLook (cpu/core/tactical.ts, Seat.armyKnown), _knowledge_look (gpu/core/sim_minors.py). At its end (0x787b3d..0x787cf3) the staging plots m_operationStartPoints (+0xb00, data +0xb58) are rebuilt: a barbarian's the knowledge base's camps (+0x638) in their order, else its cities."
   status: READ
   cases:
     - recording: h1_duelw1117
@@ -267,6 +269,7 @@
     - cpu/core/tactical.ts:knowledgeLook
     - cpu/core/operations/knowledge.ts:lookCamps
     - cpu/core/tactical.ts:barbCampsLook
+    - cpu/core/barbarianOps.ts:barbarianOpsEvaluate
   readings:
     - "C-96: the knowledge base's army records and the Combat Desire — READ (the records, the update, the desire), PARTLY READ (the signals' looks, the standing-army count)"
     - "C-97: the war operations — the war candidates, the city value's frame, the assault nodes and Attack Units READ; the loyalty lead's sources, the team update's danger and the assault's executions PARTLY READ"
@@ -281,6 +284,7 @@
     - "C-95: the target list's knowledge-base entries"
     - "C-98: a city-state's City Analysis counts its knowledge base as its last turn left it — READ (0x608580 at 0x6085c9, 0x5c24e0 / 0x6fae70 on player signal +0x258, 0x785f30 in 0x6096c0's +0x370 list), both twins"
     - "C-129 / C-99: the known cities refresh at every look over revealed centres; the recruit's offer sorted by unit id — READ (0x7877e0 at 0x787c38..0x787ca7, 0x5f0280, 0x5f0490 -> 0x5eff10, 0x5ef9a0, 0x733060 -> 0x7328d0), both twins; the replay's majors' districts"
+    - "C-95: the barbarians' candidates before the look, a capture's rally, a formation's embark flag and fighter — READ (0x722d70, 0x746920, 0x747230, 0x7877e0, 0x7265b0, 0x747fa0, 0x73e610, 0x73e870, 0x267650), both twins"
   context:
     - "- THE LOOK (0x7877e0, Targets.cpp, \"Invalid unit when updating AI knowledge base\"; after the ageing in 0x785..."
   review: reviewed

@@ -4391,9 +4391,15 @@
   final: 0x4d19e0
   kind: function
   name: AI_EVENT_DESIRE_SETTLE
-  semantics: "the player's operation manager starts an operation of a list (CITY_UNDER_THREAT: City Defense) at a plot. AI_EVENT_DESIRE_SETTLE's start: the candidate of the named definition with no operation (with the call's flag any, else a valid one), under the limit: the trigger's plot as the target (else the candidate's), the candidate's rally; with the flag and no target the candidate is weighed again for the new operation (0x747fa0, vt +8) and switched to (0x73e610, 0x73e870)."
+  semantics: "the player's operation manager starts an operation of a list (CITY_UNDER_THREAT: City Defense) at a plot. AI_EVENT_DESIRE_SETTLE's start: the candidate of the named definition with no operation (with the call's flag any, else a valid one), under the limit: the trigger's plot as the target (else the candidate's), the candidate's rally; with the flag and no target the candidate is weighed again for the new operation (0x747fa0, vt +8) and switched to (0x73e610, 0x73e870). A player of no candidate of the definition starts none (0x72666b..0x726704 walk +0x328 alone). The barbarians' capture (0x800c60, its flag set) takes the Barbarian Builder Capture candidate their military AI's turn weighed: its rally (+0x5c) the capture's (0x7267b0)."
   status: PARTLY
+  cases:
+    - recording: h1_duely1124
+      turn: 87
+      value: the capture on 8:7 starts with the rally 18:7, the Barbarian Builder Capture candidate's (t111 the capture on 32:10 too); runs/h1_duely1121 t68-t143 every capture's rally 12:14, t150-t191 none (-9999); 1128 38:13 then 16:3; 1117 34:19; 1127 6:8, 13:1
   impl:
+    - cpu/core/barbarianOps.ts:barbarianOpsEvaluate
+    - gpu/core/sim_barbops.py:_barb_ops_evaluate
     - cpu/core/aiCityTrees.ts:CityTreeWorld
     - cpu/core/operations/manager.ts:operationsRun
     - cpu/core/minorOps.ts:minorOpsStart
@@ -4412,7 +4418,7 @@
     - "C-60: the Free Cities Raid — READ (the start 0x274ea0, the record 0x277470, the signals 0x276d90 / 0x276e70 / 0x276ff0, the record's clear in 0x274010), the signal 0x276a40's event unread, ported"
     - "C-99: an operation's start takes its strengths; a unit's AI strengths with its formation — READ (0x73a120, 0x56dc90, 0x56e3e0, 0x56daa0, 0x1497d0), both twins"
     - "C-128: the army records' formation in the army strength; a capture's start before the end look — READ (0x5eadb0 at 0x5eaf79), both twins"
-  notes: ["imported: READ in its section, no confirming case found beside it"]
+    - "C-95: the barbarians' candidates before the look, a capture's rally, a formation's embark flag and fighter — READ (0x722d70, 0x746920, 0x747230, 0x7877e0, 0x7265b0, 0x747fa0, 0x73e610, 0x73e870, 0x267650), both twins"
   context:
     - "- AI_EVENT_DESIRE_SETTLE (0x800c60 -> 0x7265b0): the candidate of the named definition with no operation (with the call's flag any, el..."
   review: reviewed
@@ -4538,12 +4544,17 @@
 - addr: 0x747fa0
   final: 0x4e7450
   kind: function
-  semantics: "weighs a candidate for an operation (vt +8): its target as the fixed rally, its teams' strength as ours, its id."
-  status: PARTLY
+  semantics: "presets a candidate for a running operation (vt +8): the candidate's +0x40 the plot its second argument names (the operation's target +0x2a8, from 0x722d70 at 0x722f16 and 0x7265b0 at 0x7267ff), +0x48 the strength (the teams' +0x4b0), +0x4c the operation's id (+0x1d0). The evaluation 0x746920 takes +0x40 as the rally it walks alone (0x746b80..0x746bab) and writes the rally +0x5c and the target +0x64 of the best pair."
+  status: READ
+  cases:
+    - recording: h1_duely1124
+      turn: 113
+      value: "Builder Capture 327682 on 6:3 names the backup 18:7, the nearest camp from 6:3, its rally the target; the switch at t112 from 32:10 to 6:3 (AI_Operation_Eval.csv two 200.0 lines: the running candidate and the one against no enemy)"
+  impl: [cpu/core/barbarianOps.ts:barbarianOpsEvaluate, gpu/core/sim_barbops.py:_barb_ops_evaluate]
   readings:
     - "C-97: the operations — the manager READ (no-enemy candidates), the war candidates unread"
     - "C-97: the operations — the manager and its candidates READ, the staging list and City Defense's start unread"
-  notes: ["imported: READ in its section, no confirming case found beside it"]
+    - "C-95: the barbarians' candidates before the look, a capture's rally, a formation's embark flag and fighter — READ (0x722d70, 0x746920, 0x747230, 0x7877e0, 0x7265b0, 0x747fa0, 0x73e610, 0x73e870, 0x267650), both twins"
   context:
     - "..., built and evaluated before the turn's triggers: one per running operation (0x747f30 + 0x747fa0: its definition and enemy, its target as the fixed rally +0x40, its teams' strength +0x..."
     - ...ally; with the flag and no target the candidate is weighed again for the new operation (0x747fa0, vt +8) and switched to (0x73e610, 0x73e870).
@@ -5590,6 +5601,7 @@
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
     - "C-99: the upgrade trees — READ (the trigger, Find Available Unit's upgradeable offer, Find Unit Targets' job, Upgrade Units, the economic AI's upgrade, Move Unit with no Location), ported; the deletion of an excess obsolete unit unported"
     - "C-124: the kept path is never taken; a move order's path passes other players' units out of sight — READ (0x272aa0, 0x2714b0, 0x586360 at 0x586542..0x5865a1, 0x26fe20), both twins"
+    - "C-95: the barbarians' candidates before the look, a capture's rally, a formation's embark flag and fighter — READ (0x722d70, 0x746920, 0x747230, 0x7877e0, 0x7265b0, 0x747fa0, 0x73e610, 0x73e870, 0x267650), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...tribe +0x10): the target to op +0x2a8, the rally through the autovariable at op +0x2c0 (0x7eb220) to op +0x318, then each team's goals, slot 0 (+0xe8) the rally and slot 1 (+0xf0) th..."
@@ -5952,6 +5964,7 @@
     - "C-99: the Upgrade Units trees start on a technology gained alone — FIT (records), both twins"
     - "C-99: the Upgrade Units trees start on a technology gained alone"
     - "C-99: a non-major player's tree pool — every city-state tree, its operations' and its \"Upgrade Units\" trees in one pool, ticked in slot order — READ (0x7ff9a0 / 0x7ff7b0 / 0x800c60 -> 0x7fef20, 0x7ffdd0 -> 0x7cb2e0), both twins"
+    - "C-95: the barbarians' candidates before the look, a capture's rally, a formation's embark flag and fighter — READ (0x722d70, 0x746920, 0x747230, 0x7877e0, 0x7265b0, 0x747fa0, 0x73e610, 0x73e870, 0x267650), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "- AI_EVENT_DESIRE_SETTLE (0x800c60 -> 0x7265b0): the candidate of the named definition with no operation (with the call's..."

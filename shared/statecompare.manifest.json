@@ -530,6 +530,17 @@
           ]
         },
         {
+          "name": "barbCaptureRally",
+          "compare": "exact",
+          "note": "the rally of the barbarians' Barbarian Builder Capture candidate their military AI's turn weighed, -1 none valid (`barbarianOpsEvaluate` on `barbSeat.captureRally`).",
+          "covers": [
+            "Seat.captureRally"
+          ],
+          "planes": [
+            "barb_cap_rally"
+          ]
+        },
+        {
           "name": "freeUnitStrength",
           "compare": "exact",
           "note": "the Free Cities' strength over every domain as their turn start stored it (`storeUnitStrength` on `freeSeat.unitStrength`; the row `FR`); 0 until the seat is made.",

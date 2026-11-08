@@ -567,12 +567,17 @@
     - recording: h1_duelv1117
       turn: 20
       value: China's Attack Enemy City against Caguana (3) once prepared for war, no war declared
-  impl: [cpu/core/operations/manager.ts:blank, cpu/core/operations/manager.ts:operationsRun]
+  impl:
+    - cpu/core/operations/manager.ts:blank
+    - cpu/core/operations/manager.ts:operationsRun
+    - cpu/core/barbarianOps.ts:barbarianOpsEvaluate
+    - gpu/core/sim_barbops.py:_barb_ops_evaluate
   readings:
     - "C-97: the operations — the manager READ (no-enemy candidates), the war candidates unread"
     - "C-97: the operations — the manager and its candidates READ, the staging list and City Defense's start unread"
     - "C-97: the war operations — the war candidates, the city value's frame, the assault nodes and Attack Units READ; the loyalty lead's sources, the team update's danger and the assault's executions PARTLY READ"
     - "C-130: the Combat Desire between the policy jobs and the government values; a released contract on its city's list — READ, both twins"
+    - "C-95: the barbarians' candidates before the look, a capture's rally, a formation's embark flag and fighter — READ (0x722d70, 0x746920, 0x747230, 0x7877e0, 0x7265b0, 0x747fa0, 0x73e610, 0x73e870, 0x267650), both twins"
   context:
     - "- The manager (0x722690 -> 0x727510). The candidates (0x722d70, 0x70-byte entries at +0x328), built and evaluated before the turn's triggers: one pe..."
   review: reviewed
@@ -669,6 +674,7 @@
     - "C-97: the war operations — the war candidates, the city value's frame, the assault nodes and Attack Units READ; the loyalty lead's sources, the team update's danger and the assault's executions PARTLY READ"
     - "C-95: an operation's enemy strength — READ (0x73eb60), ported"
     - "C-99: a unit bought in the turn sits out the operations, a Harbor trains ships — the recruit's turn-done offer READ (0x60a8c0, 0x60a440), 0x1c77c0's district arm READ, the candidates' own strength a FIT, both twins"
+    - "C-95: the barbarians' candidates before the look, a capture's rally, a formation's embark flag and fighter — READ (0x722d70, 0x746920, 0x747230, 0x7877e0, 0x7265b0, 0x747fa0, 0x73e610, 0x73e870, 0x267650), both twins"
   context:
     - "...an a given plot (0x6fe2b0) is the \"Settle New City\" operation's target (the target list 0x747230, TARGET_SETTLE_ LOCATION); its \"Operation Change Target\" takes the best top other than..."
     - ...stHaveNukes, MustHaveUnits (player +0x12e8 +0xc0) first; then each target of the walk 0x747230 (an enemy's target needs a value above 0) against each staging plot (player +0x12b8 +0x...

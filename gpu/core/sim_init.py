@@ -4310,6 +4310,9 @@ class SimInit:
         self.bcap_store = torch.zeros(B, _nc, 2, simbase.BARB_POOL_MAX, dtype=torch.bool, device=device)
         self.bcap_store_goal = torch.full((B, _nc, 2), -1, dtype=torch.long, device=device)
         self.barb_capq = torch.full((B, simbase.BARB_CAP_MAX, 2), -1, dtype=torch.long, device=device)
+        # the rally of the Barbarian Builder Capture candidate the military
+        # AI's turn weighed (`barbSeat.captureRally`), -1 none valid
+        self.barb_cap_rally = torch.full((B,), -1, dtype=torch.long, device=device)
         self.tribe_store_goal = torch.full((B, self.KT, 3), -1, dtype=torch.long, device=device)
         self.barb_spot_next = torch.zeros(B, max(self.n_majors, 1), dtype=torch.long, device=device)
         # the plots three rings round each plot in the game's ring order

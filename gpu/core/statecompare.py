@@ -473,6 +473,7 @@ GAME = {
     "barbArmyAged": lambda sim, b, rows: [int(sim.citystate_kb_aged[b, sim.BK])],
     "barbEnemyCounts": lambda sim, b, rows: [_enemy_counts(sim, b, sim.BK)],
     "barbCampsKnown": lambda sim, b, rows: [[int(x) for x in sim.barb_camps_known[b].tolist() if x >= 0]],
+    "barbCaptureRally": lambda sim, b, rows: [int(sim.barb_cap_rally[b])],
     "freeUnitStrength": lambda sim, b, rows: [int(sim.citystate_unit_strength[b, sim.FR])],
     "freeArmyKnown": lambda sim, b, rows: [[x for r in sorted(
         (int(o), int(t), int(n), int(p), int(d), int(f)) for k, o, t, n, p, d, f in zip(

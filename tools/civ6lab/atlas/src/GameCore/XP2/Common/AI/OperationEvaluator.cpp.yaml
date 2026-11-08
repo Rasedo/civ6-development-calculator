@@ -15,11 +15,16 @@
     - recording: h1_duely1117
       turn: 69
       value: "city-state 4's Heavy Chariot 589825 bought: no Attack Barb Camp candidate until t70 (weighed before the purchases, which come after the look)"
+    - recording: h1_duely1124
+      turn: 3
+      value: the barbarians' Barbarian Builder Capture 100.0 on the two camps their look knew at t2, 150.0 / 200.0 / 250.0 at t4-t6 (AI_Operation_Eval.csv); the rally 41:7 of the t46 capture, 18:7 of t87's
   impl:
     - cpu/core/operations/evaluate.ts:distLimit
     - cpu/core/operations/evaluate.ts:evaluate
     - cpu/core/operations/evaluate.ts:oddsOf
     - cpu/export/rules.ts:rules
+    - cpu/core/barbarianOps.ts:barbarianOpsEvaluate
+    - gpu/core/sim_barbops.py:_barb_camp_pick
   readings:
     - "C-99: a unit bought in the turn sits out the operations, a Harbor trains ships"
     - "C-97: the operations — the manager and its candidates READ, the staging list and City Defense's start unread"
@@ -27,6 +32,7 @@
     - "C-95: the barbarians' Builder Capture — READ (the event, the start, the tree's walk), ported"
     - "C-95: an operation's enemy strength — READ (0x73eb60), ported"
     - "C-99: a unit bought in the turn sits out the operations, a Harbor trains ships — the recruit's turn-done offer READ (0x60a8c0, 0x60a440), 0x1c77c0's district arm READ, the candidates' own strength a FIT, both twins"
+    - "C-95: the barbarians' candidates before the look, a capture's rally, a formation's embark flag and fighter — READ (0x722d70, 0x746920, 0x747230, 0x7877e0, 0x7265b0, 0x747fa0, 0x73e610, 0x73e870, 0x267650), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "- The evaluation (job \"Op Evaluation\", 0x746920): MustBeAtWar, MustHaveNukes, MustHaveUnits (player +0x12e8 +0xc0) first; then each tar..."

@@ -8,12 +8,13 @@
  * start by name (0x149980 / 0x1497d0), the tree's Tribe tag its index, the
  * assault against the target's owner; a scout that saw a city walks home
  * under the tree "Barbarian Found City" (`homing`). The player's turn: the
- * military AI's part logs and refreshes the operations
- * (`barbarianOpsTurn`, in the tactical pass once the knowledge base aged and
- * looked); then, once each unit's planning is taken, every tree ticks in the
- * order it was made
- * (`barbarianTrees`), and the trees' units are theirs. The barbarians weigh
- * no candidate, and a member killed stays in its team.
+ * military AI weighs its candidates before the knowledge base ages and looks
+ * (`barbarianOpsEvaluate`: the running operations' backups, the candidates
+ * against no enemy, none of which starts itself), then logs and refreshes
+ * the operations (`barbarianOpsTurn`, in the tactical pass once the
+ * knowledge base aged and looked); then, once each unit's planning is taken,
+ * every tree ticks in the order it was made (`barbarianTrees`), and the
+ * trees' units are theirs.
  */
 import type { BarbHoming, BarbTarget, BarbTribe, GameState, Unit } from './types';
 import { BARB_SEAT, isBarbSeat } from './seats';
@@ -21,7 +22,7 @@ import { freeEndedTrees, newTreeId, treeSlot } from './treePool';
 import { aiView } from './aiView';
 import { passOrders, passView } from './opsOrders';
 import { recentOf } from './minorOps';
-import { newOpsAi, operationsRefresh, opsOf, startOperationAt, tickOperation, type OpsAi, type OpsEnv } from './operations/manager';
+import { allowedOps, newOpsAi, operationsRefresh, opsOf, startOperationAt, tickOperation, type OpsAi, type OpsEnv } from './operations/manager';
 import { evaluate, type Candidate, type EvalInputs } from './operations/evaluate';
 import { NO_PLOT, addMember, opDef, opUnits, type Operation } from './operations/operation';
 import type { BarbarianHooks } from './operations/barbarian';
@@ -55,9 +56,10 @@ export function holdBarbCaptures(held: typeof captureHeld): void {
   captureHeld = held;
 }
 
-/** the replay's view of the barbarians' operation lines (null off) */
-let tracer: ((line: string) => void) | null = null;
-export function traceBarbOps(fn: ((line: string) => void) | null): void {
+/** the replay's view of the barbarians' operation lines and (`candidate`)
+ *  their candidate lines (null off) */
+let tracer: ((line: string, candidate: boolean) => void) | null = null;
+export function traceBarbOps(fn: ((line: string, candidate: boolean) => void) | null): void {
   tracer = fn;
 }
 
@@ -226,8 +228,8 @@ function barbEnv(state: GameState, pass: Pass | null): OpsEnv {
     defenderAiType: () => {
       throw new Error('the barbarians\' operations garrison no city');
     },
-    log: (l) => tracer?.(l),
-    logEval: () => undefined,
+    log: (l) => tracer?.(l, false),
+    logEval: (l) => tracer?.(l, true),
   };
 }
 
@@ -283,16 +285,62 @@ export function barbOpRecord(state: GameState, tribe: BarbTribe): number[] {
     at(m.seq, 'resume'), at(m.recruit, 'start'), at(m.raid, 'start'), living, (op.killed ?? 0) + members.length - living];
 }
 
+/** the definitions the barbarians run (LEADER_BARBARIAN's "Barbarian Ops") */
+const BARB_DEFS = allowedOps('LEADER_BARBARIAN');
+
+/**
+ * THE BARBARIANS' MILITARY AI'S TURN (the candidates 0x722d70 and their
+ * evaluation 0x746920), before their tactical pass's knowledge look: on the
+ * knowledge base the last look left, its camps the staging plots
+ * (m_operationStartPoints, rebuilt by each look 0x7877e0 from +0x638). Each
+ * running operation's candidate names its backup (0x73e610): its target the
+ * fixed rally, at the strength its last refresh left (none on the turn after
+ * its start); a camp's enemy strength the walk's 6 alone. Each "Barbarian
+ * Ops" definition against no enemy is weighed over the camps as targets and
+ * as rallies, the barbarians' own records within 10 of the rally their
+ * strength; a valid one logs its value (AI_Operation_Eval.csv: runs/h1_duely1124
+ * "Barbarian Builder Capture" 100.0 at t3 on the two camps its look knew at
+ * t2) — Barbarian Builder Capture's rally the one a capture's start takes
+ * (`captureRally`). runs/h1_duely1124 t112: the capture's target 32:10 no
+ * camp, its backup 6:3 on the camps before the look drops 6:3.
+ */
+export function barbarianOpsEvaluate(state: GameState): void {
+  const env = barbEnv(state, null);
+  const view = env.view();
+  const camps = campsKnown(state);
+  const running = state.barbSeat.ops ? opsOf(state.barbSeat.ops) : [];
+  const inputs: EvalInputs = {
+    settle: null, camps, taken: new Set(running.map((o) => o.target)), known: () => view.knownCities(BARB_SEAT), army: env.army,
+  };
+  const blank = (op: Operation | null, def = op ? opDef(op) : BARB_DEFS[0]): Candidate => ({ def, enemy: op ? op.enemy : -1,
+    presetRally: op ? op.target : NO_PLOT, presetStrength: op ? op.strength : null, op, valid: false, odds: 0, value: 0, target: NO_PLOT, rally: NO_PLOT });
+  for (const op of running) {
+    const c = blank(op);
+    evaluate(view, BARB_SEAT, c, camps, inputs);
+    if (!c.valid) continue;
+    env.logEval(`${c.enemy}, ${c.def.name}, ${(c.value / 256).toFixed(1)}`);
+    op.backup = { target: c.target, rally: c.rally, enemy: c.enemy };
+  }
+  delete state.barbSeat.captureRally;
+  for (const def of BARB_DEFS) {
+    if (def.enemyType !== 'NONE') continue;
+    const c = blank(null, def);
+    evaluate(view, BARB_SEAT, c, camps, inputs);
+    if (!c.valid) continue;
+    env.logEval(`${c.enemy}, ${c.def.name}, ${(c.value / 256).toFixed(1)}`);
+    if (def.name === BARB_CAPTURE_DEF) state.barbSeat.captureRally = c.rally;
+  }
+}
+
 /**
  * THE BARBARIANS' OPERATIONS' RUN in their tactical pass (the operation
- * manager 0x727510, opening the player's turn): each running operation's
- * target and teams logged and refreshed, its tree ticked, in slot order;
- * their units' turns are the operations'. The ids of the operations' units.
+ * manager 0x727510): each running operation's target and teams logged and
+ * refreshed on the knowledge base the look left, its tree ticked, in slot
+ * order; their units' turns are the operations'.
  */
 export function barbarianOpsTurn(state: GameState): void {
   const ai = state.barbSeat.ops;
   if (!ai || !opsOf(ai).length) return;
-  const env = barbEnv(state, null);
   // the members killed leave their teams, counted to their operation
   for (const op of opsOf(ai)) {
     for (const t of op.teams) {
@@ -303,34 +351,21 @@ export function barbarianOpsTurn(state: GameState): void {
       op.killed = (op.killed ?? 0) + gone;
     }
   }
-  // a running operation's candidate names its backup (0x727510 -> 0x73e610,
-  // before the operations' strengths are refreshed at 0x727c74): its target
-  // from its own, at the strength its last refresh left (none on the turn
-  // after its start); a camp's enemy strength the walk's 6 alone, the
-  // barbarians' army about it counted only for another player (0x7476f9)
-  const view = env.view();
-  const inputs: EvalInputs = {
-    settle: null, camps: campsKnown(state), taken: new Set(opsOf(ai).map((o) => o.target)), known: () => view.knownCities(BARB_SEAT),
-    army: (p) => (p === BARB_SEAT ? [] : env.army(p)),
-  };
-  for (const op of opsOf(ai)) {
-    const c: Candidate = { def: opDef(op), enemy: op.enemy, presetRally: op.target, presetStrength: op.strength, op,
-      valid: false, odds: 0, value: 0, target: NO_PLOT, rally: NO_PLOT };
-    evaluate(view, BARB_SEAT, c, [], inputs);
-    if (c.valid) op.backup = { target: c.target, rally: c.rally, enemy: c.enemy };
-  }
-  operationsRefresh(ai, env);
+  operationsRefresh(ai, barbEnv(state, null));
 }
 
 /**
  * THE CAPTURES' OPERATIONS (AI_EVENT_UNIT_CAPTURED
  * from the capture 0x212500, the triggered tree 0x800c60): each capture
- * starts "Barbarian Builder Capture" by name (0x7265b0) on the captive's
- * plot, its rally the plot, the event's units — the captive, then its
- * captor — joining its team (0x737e80), the captor leaving the operation it
- * held. A capture inside the trees' walks starts at once and its tree ticks
- * in its priority's walk where that is yet to come (`barbarianTrees`); one
- * of the tactical pass after them first ticks in the next turn's walk.
+ * starts "Barbarian Builder Capture" by name (0x7265b0, with its flag: the
+ * definition's candidate valid or not) on the captive's plot, its rally the
+ * candidate's (`captureRally`, none where it was not valid: runs/h1_duely1124
+ * t87 8:7's capture rallies at the camp 18:7), the event's units — the
+ * captive, then its captor — joining its team (0x737e80), the captor leaving
+ * the operation it held. A capture inside the trees' walks starts at once
+ * and its tree ticks in its priority's walk where that is yet to come
+ * (`barbarianTrees`); one of the tactical pass after them first ticks in the
+ * next turn's walk.
  */
 export function barbarianCaptures(state: GameState, ticked: ReadonlySet<number> | null = null): void {
   const caps = state.barbCaptures ?? [];
@@ -347,9 +382,8 @@ export function barbarianCaptures(state: GameState, ticked: ReadonlySet<number> 
     if (!cu) continue;
     const units = [cu, unitOf(state, captor)].filter((u): u is Unit => !!u);
     for (const o of opsOf(ai)) for (const t of o.teams) t.members = t.members.filter((id) => !units.some((u) => u.id === id));
-    const op = startOperationAt(ai, barbEnv(state, null), BARB_CAPTURE_DEF, -1, cu.tileIndex, cu.tileIndex);
-    op.triggerUnits = units.map((u) => u.id);
-    for (const u of units) addMember(op.teams[0], { id: u.id, type: gameTypeOf('unit', u.type, 'UNIT_') });
+    const op = startOperationAt(ai, barbEnv(state, null), BARB_CAPTURE_DEF, -1, cu.tileIndex, state.barbSeat.captureRally ?? NO_PLOT);
+    op.triggerUnits = units.map((u) => u.id);    for (const u of units) addMember(op.teams[0], { id: u.id, type: gameTypeOf('unit', u.type, 'UNIT_') });
   }
 }
 

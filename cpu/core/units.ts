@@ -829,7 +829,7 @@ type StepOutcome =
  * not a formation, which is what frees the civilian the moment its escort
  * dies — no sweep, and no stale link to clear at a capture.
  */
-function escortOf(state: GameState, unit: Unit): Unit | undefined {
+export function escortOf(state: GameState, unit: Unit): Unit | undefined {
   if (!unit.escorted) return undefined;
   return state.units.find(
     (u) => u.id !== unit.id && u.tileIndex === unit.tileIndex && u.seat === unit.seat
@@ -1069,10 +1069,10 @@ export function shoreCrossing(type: string, from: Tile, to: Tile): boolean {
 }
 
 /** a shore crossing the embark and disembark rules (0x530420 / 0x530240)
- *  price: they run for a formation that may embark alone (+0x338,
- *  `canEmbark`) */
-function shoreStep(state: GameState, unit: { type: string; seat: number; originalOwner?: number }, from: Tile, to: Tile): boolean {
-  return shoreCrossing(unit.type, from, to) && canEmbark(state, unit);
+ *  price: they run for a formation that may embark alone (`mayEmbark`, its
+ *  +0x338: the OR of its members' `canEmbark`) */
+function shoreStep(type: string, from: Tile, to: Tile, mayEmbark: boolean): boolean {
+  return shoreCrossing(type, from, to) && mayEmbark;
 }
 
 /** What one step from `from` into its neighbour `to` costs this unit, in
@@ -1082,9 +1082,11 @@ function shoreStep(state: GameState, unit: { type: string; seat: number; origina
  *  revealed, its search entering such a plot whatever it is
  *  (runs/h1_duely1127 t2: the barbarian Scout on 6:9 closes the unrevealed
  *  coast 3:9 at (1/0) beside 4:10, so 4:10 lands after 5:10 and 5:7 and
- *  Move To Safety takes 5:10, AI_Planning.csv). */
-export function stepCost(state: GameState, unit: { type: string; seat: number; promos?: number; alpine?: boolean; originalOwner?: number }, from: Tile, to: Tile): number {
-  const transition = shoreStep(state, unit, from, to);
+ *  Move To Safety takes 5:10, AI_Planning.csv). `mayEmbark` the formation's
+ *  flag, the unit's own where it moves alone. */
+export function stepCost(state: GameState, unit: { type: string; seat: number; promos?: number; alpine?: boolean; originalOwner?: number }, from: Tile, to: Tile,
+  mayEmbark = canEmbark(state, unit)): number {
+  const transition = shoreStep(unit.type, from, to, mayEmbark);
   let cost: number;
   if (!transition) cost = moveCostInto(state, from, to, unit) + riverCharge(state, from, to, unit);
   else {
@@ -1176,14 +1178,14 @@ export function stepRefusal(state: GameState, unit: Unit, to: Tile): 'blocked' |
   return null;
 }
 
-export function stepUnit(state: GameState, unit: Unit, to: Tile): StepOutcome {
+export function stepUnit(state: GameState, unit: Unit, to: Tile, formed?: readonly Unit[]): StepOutcome {
   const seat = unit.seat;
   // a formed civilian's step is its formation's: the escort steps and carries
   // it (runs/h1_duely1128 t38-49: the captured Settler 3014684's moves are
   // its captor Warrior 1114128's, each UnitMoved the Warrior's then the
   // Settler's)
   const lead = escortOf(state, unit);
-  if (lead) return stepUnit(state, lead, to);
+  if (lead) return stepUnit(state, lead, to, formed);
   // a flag whose escort is gone is no formation: the unit steps alone and
   // leaves it (runs/h1_duely1128 t51: the Settler 3014684, its Warrior
   // killed, walks to 17:13 past the Warrior on 16:13 alone)
@@ -1193,8 +1195,12 @@ export function stepUnit(state: GameState, unit: Unit, to: Tile): StepOutcome {
   const from = state.map.tiles[unit.tileIndex];
   const naval = !!UNITS[unit.type]?.naval;
   const transition = !naval && !waterWalks(unit.type) && isWater(from) !== isWater(to);
-  const cost = stepCost(state, unit, from, to);
-  const riders = escortRiders(state, unit);
+  // its formation's riders: those a walk set out with (`formed`, its
+  // formation's membership: another formation's rider on a plot it passes
+  // stays with its own escort), else those on its plot; the step priced on
+  // the formation's embark flag (the OR of its members')
+  const riders = formed ? formed.filter((r) => r !== unit && r.tileIndex === unit.tileIndex && state.units.includes(r)) : escortRiders(state, unit);
+  const cost = stepCost(state, unit, from, to, [unit, ...riders].some((m) => canEmbark(state, m)));
   const riderFree = riders.length > 0
     && (promoFlag(unit, 'ESCORT_SPEED') || !!UNITS[unit.type]?.escortSpeed);
   if (transition) unit.embarked = isWater(to);

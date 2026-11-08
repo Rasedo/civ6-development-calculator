@@ -931,6 +931,10 @@ export interface Seat {
   /** the barbarians' knowledge base's camps (`barbCampsLook`), in its
    *  order. Absent = none. */
   campsKnown?: number[];
+  /** the rally of the barbarians' Barbarian Builder Capture candidate the
+   *  military AI's turn weighed (`barbarianOpsEvaluate`), a capture's start
+   *  reads it (`barbarianCaptures`); absent, none valid */
+  captureRally?: number;
   /** the city AI of a city-state (`minorAiTurn`: the events' slots, the
    *  trees, the contracts and reservations) or the Free Cities (their
    *  operations' contracts, `freeOps.ts`) (`CityAi`) */
