@@ -516,11 +516,10 @@ export function levyUnits(state: GameState, cityStateId: number, seat: number): 
  *  `emergencyPressureCut`, never below 0 — press at base + capital + age
  *  each, weighted by (CUTOFF − d) / CUTOFF (CUTOFF = LOYALTY_RANGE + 1,
  *  CITIZEN_IDENTITY_PRESSURE_RADIUS_CUTOFF), all in the DLL's 24.8 fixed
- *  point: the weight floored to 256ths, each city's product floored
- *  (runs/h1_duelw1112 Yiyang t192: own 3.79, foreign 3.59 in 256ths read
- *  the game's 0.546875 where the reals read 0.411; the H-1 duels' recorded
- *  terms 2,036 -> 2,092 of 2,097 on 1112, 2,038 -> 2,092 of 2,114 on 1106,
- *  1,619 -> 1,751 of 1,843 on 1110). A major culturally dominant over the
+ *  point (0x1a1640): the weight the fixed divide's floor(256 (CUTOFF − d) /
+ *  CUTOFF), each city's product floored (runs/h1_duelw1112 Yiyang t192
+ *  0.546875; runs/h1_duelp1128 Guangzhou t240-245 10.859375, −4.296875,
+ *  −1.953125, −2.34375). A major culturally dominant over the
  *  pressed city's owner presses CITIZEN_PRESSURE_DOMINANCE_PCT harder per
  *  citizen (`pct`; 0x1a1640: runs/h1_duelw1130 Rome t95 reads 18.671875 and
  *  t100 18.4375 with China's Taiyuan and Handan at 1.875 a citizen). The sum

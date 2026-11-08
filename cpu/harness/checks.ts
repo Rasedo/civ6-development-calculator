@@ -34,7 +34,7 @@ import { buildingPillaged, tileYields } from '../core/yields';
 import { baseYieldCtx, computeUnlocks, getModifiers, goldPrice, makeYieldCtx, unitUpkeep } from '../core/effects';
 import { centreStrength, cityDefenseStrength } from '../core/combat';
 import { minorCity, resolveSuzerains, suzerainMinorSeats } from '../core/cityStates';
-import { applyLoyalty, cityBorderGrowth, cultureAfterGrowth, districtSiteCost, loyaltyPerTurn } from '../core/phase';
+import { applyLoyalty, cityBorderGrowth, cultureAfterGrowth, districtSiteCost, loyaltyPerTurn, plotPressure } from '../core/phase';
 import { seatGrowth, lumpFood, lumpGrowth } from '../core/seatTurn';
 import { buildingFaithPrice, unitFaithPrice, buildingPurchaseCost, settlerCost, gpActivatedPressure, pressureFromCity, religiousUnitLost, spreadReligiousPressure, tilePurchaseCost, unitProdCost, unitGoldPrice, unitStepCost, unitsAcquired, wallsGoldBlocked } from '../core/game';
 import { buildingCostIn, buildingFullCost } from '../core/rules';
@@ -42,7 +42,7 @@ import { builderCost, spawnUnit, traderCost, unitDomain, unitReligious } from '.
 import { minorRouteOriginYields, routeDestYields, routeOriginYields, routeYieldCut } from '../core/trade';
 import { monumentalityBuyMult } from '../core/eras';
 import { FREE_SEAT, hiddenResourcesFor, isCityStateSeat, seatOf, setTileOwner, BARB_SEAT, tileBelongsTo, tileClaimed } from '../core/seats';
-import { establishedGovernorCityIds, governorClocks, governorFlag } from '../core/governors';
+import { establishedGovernorCityIds, governorClocks, governorFlag, governorLoyaltyAura } from '../core/governors';
 import { chopGrant, harvestGrant, type LumpGrant } from '../core/economy';
 import { growthFoodNeeded, amenityTierIndex, AMENITY_TIERS, BORDER_MAX_RADIUS, GOLD_PURCHASE_MULT, WONDER_FREE_TILES } from '../data/constants';
 import { CITIZEN_NAMED_UNITS, PROMO_OFFER_UNITS, UNITS, UNIT_HP } from '../data/units';
@@ -73,7 +73,7 @@ import {
 import { LARGEST_KEY, districtMoment, improvementMoment, mitigatedFloodMoment, momentKeyId, momentKeysHeld, recordMoment, researchKeys } from '../core/moments';
 import { citiesOf, isCiv, tileSeat } from '../core/seats';
 import { riverReach, riverShield } from '../core/disasters';
-import { AGE_GOLDEN, DED_COINAGE, DED_FREE_INQUIRY, DED_MONUMENTALITY, DED_PEN_BRUSH_AND_VOICE, goldShortfall } from '../data/seats';
+import { AGE_GOLDEN, DED_COINAGE, DED_FREE_INQUIRY, DED_MONUMENTALITY, DED_PEN_BRUSH_AND_VOICE, goldShortfall, GOVERNOR_LOYALTY, LOYALTY_AMENITY } from '../data/seats';
 import { SRC_REGISTRY } from '../data/provenance';
 import { BUILT_WONDERS, WONDER_ERA_INDEX } from '../data/builtWonders';
 import { engineId, gameHash } from '../data/aliases';
@@ -1280,8 +1280,13 @@ export function stateChecks(rec: TurnRecord, cat: Catalog, imp: Imported = impor
       // (1107 t242: China's cities read the new session's loyalty terms
       // beside their old amenities)
       const ours = loyaltyPerTurn(state, city, standing.tier.name, num(c.governor) >= 0, stats.foodSurplus < 0);
+      const press = plotPressure(state, city.seat, state.map.tiles[city.centerIndex]);
+      const happy = LOYALTY_AMENITY[standing.tier.name] ?? 0;
+      const gov = (num(c.governor) >= 0 ? GOVERNOR_LOYALTY : 0) + governorLoyaltyAura(state, city);
       push('city.loyaltyPerTurn', near(ours, gameLpt, 0.05), gameLpt, round3(ours),
-        { breakdown: c.loyaltyBreakdown, tier: standing.tier.name });
+        { breakdown: c.loyaltyBreakdown, tier: standing.tier.name,
+          // ours split as the breakdown is: pressure, governors, amenities, the rest
+          parts: [round3(press), gov, happy, round3(ours - press - gov - happy)] });
     }
     // the centre's defense reads the plot's units live (0x24ae80 -> 0x24a180's
     // best defender 0x208b80) where the record's unit list stands before

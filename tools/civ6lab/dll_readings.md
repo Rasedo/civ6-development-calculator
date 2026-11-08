@@ -12504,3 +12504,46 @@ third: slot 2 CanStart, slot 4 the tick, slot 5 the update).
   never heals (the engines' BARB_SEAT gate). Open: the flags' writer —
   the only byte writes are Player::Units' read (0x4e7f00); no install
   effect names them.
+
+## C-102: the citizen pressure's falloff and the per-citizen term — READ; Stamford Raffles' city
+
+- THE FALLOFF (0x1a1640, after the dominance raise): d = GetPlotDistance
+  (0x1deb0) from the city's centre (+0x158 / +0x15c) to the plot, << 8; R =
+  CITIZEN_IDENTITY_PRESSURE_RADIUS_CUTOFF (gp +0xf0, 10) << 8. d > R or R = 0:
+  the city presses 0. Else w = (R − d) / R by the fixed divide 0x16e940
+  ((a << 8) / b, truncated): floor(256 · (10 − d) / 10); the pressure ×= w by
+  fx_mul_assign 0x16eb20 ((a · b) >> 8), kept where above 0. A city at 10
+  presses 0, so the walk's reach is 9 (`LOYALTY_RANGE`).
+- THE PRESSURE BEFORE IT: (population +0x588 + Great Works × +0x1aec) << 8,
+  × the per-citizen term (0x16e7d0, (a · b) >> 8); where the owner dominates
+  the plot's owner, × (100 + gp +0xec) << 8, divided by 25600 toward zero
+  (the magic 0xa3d70a3d70a3d70b, sar 14). Per-citizen terms are halves, so
+  the engines' order (`citizenPressure`: the raised term, then the citizens,
+  then the weight, each product floored) reads the same 256ths.
+- THE PER-CITIZEN TERM 0x1a1370: the player's 0x381040 (on player +0x1390):
+  CITIZEN_IDENTITY_PRESSURE_BASE (gp +0xe4) << 8, plus the capital's +0x3068
+  while a capital stands, plus the player property 0xdee04aee read through
+  LOYALTY_FROM_EXCESS_SCORE_MULTIPLIER (gp +0x46c, 0.0 in Expansion2, so 0
+  here). 0x1a1370 takes the capital's +0x3068 back off and adds the city's own
+  +0x5f0 (while a capital stands); + CITIZEN_IDENTITY_PRESSURE_CAPITAL (gp
+  +0xe8) << 8 in the capital (+0x5e8); + the head of the build queue's
+  Projects_XP1 IdentityPerCitizenChange (0x179650 on +0x2170 -> the project
+  row's +0x1c -> 0x28a940, a float cut to 256ths): PROJECT_BREAD_AND_CIRCUSES
+  and PROJECT_WATER_BREAD_AND_CIRCUSES 1.0. The engines carry no Bread and
+  Circuses project.
+- Confirmed: runs/h1_duelp1128 Guangzhou t240-245 reads 10.859375,
+  −4.296875, −1.953125, −2.34375 as recorded (`citizenPressure`,
+  `pressureTerm`); across the five duelp recordings every loyalty failure is
+  another check's (the amenities, a starving city's −4 on its Food, a
+  neighbour's growth) or the Raffles city below.
+- STAMFORD RAFFLES (GREATPERSON_CITY_STATE_ABSORB_EXPANSIONS, Babylon
+  Expansion2: MODIFIER_UNIT_ABSORB_CITY_STATE_AS_GIFT_AND_APPLY_MODIFIER with
+  MODIFIER_SINGLE_CITY_ADJUST_IDENTITY_PER_TURN 10): the +10 lands on the
+  absorbed city. The importer lays a person's city channel on its player's
+  city holding the person's plot when the person absorbs a city-state
+  (`importPeople`): runs/h1_duelp1127 Raffles spent on 7:12 t213, Mexico
+  City's "Other" 12 from t214, Xi'an without it.
+- Open: the +0x3068 / +0x5f0 writers (EFFECT_ADJUST_CITY_IDENTITY_PRESSURE,
+  _FROM_AGES, _PER_CITIZEN): which carries the age's ±0.5 and the nuclear
+  emergency's −1 (the engines cut the citizens, `emergencyPressureCut`); no
+  duelp case.

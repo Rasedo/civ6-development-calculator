@@ -31,6 +31,7 @@
     - "C-98 / C-130: the player tourism analyzer, the city subject's context, the dark trade buildings — READ (0x6b0700, 0x6b0430, 0x69ea00's +0x70), a FIT (the capacity), both twins"
     - "C-124: a move order's path opens a turn-end node beside each node with Movement left — READ (0x271920, 0x7a880, 0x271490, 0x775a0, 0x26f330), both twins"
     - "H-1: a formation's Production cost in the queue — READ (0x17bfa0 -> 0x17bef0 / 0x17be50), both twins"
+    - "C-102: the citizen pressure's falloff and the per-citizen term — READ; Stamford Raffles' city"
   notes:
     - "imported: READ in its section, no confirming case found beside it"
     - ".claude/scratchpad/cb/notes.txt: ...*256)&0xff ; fx(0.01)=2 (!), fx(0.5)=128, fx(1/6 const 0.16667)=42. fx_mul a*b>>8 (0x16eb20 assign, 0x16e7d0 new), fx_div (a<<8)/b trunc (0x16e940), add 0xac650, sub 0x16ec10. FX_MIN=-9999.0 (@f04cb0 = 0xffd8..."
@@ -68,6 +69,7 @@
     - "C-97: the governor AI — the analysis, the choice and the seats READ, the analyzers PARTLY READ"
     - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
     - "C-130 / C-112: the domain strength's treasury carry and the city's turn's citizen re-place — READ, both twins"
+    - "C-102: the citizen pressure's falloff and the per-citizen term — READ; Stamford Raffles' city"
   notes:
     - ".claude/scratchpad/cb/notes.txt: ...28, fx(1/6 const 0.16667)=42. fx_mul a*b>>8 (0x16eb20 assign, 0x16e7d0 new), fx_div (a<<8)/b trunc (0x16e940), add 0xac650, sub 0x16ec10. FX_MIN=-9999.0 (@f04cb0 = 0xffd8f100).  LOG: AI_CityBuild.csv lines: D..."
   context:
@@ -91,6 +93,7 @@
     - "C-97: the religion AI — the belief scores READ (the job, the value, the analysis's attach), the picks READ, the analyzers PARTLY READ"
     - "C-97: the governor AI — the analysis, the choice and the seats READ, the analyzers PARTLY READ"
     - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
+    - "C-102: the citizen pressure's falloff and the per-citizen term — READ; Stamford Raffles' city"
   notes:
     - "label: fx_mul_assign(a*=b)"
     - ".claude/scratchpad/cb/notes.txt: ...| trunc((f-floor)*256)&0xff ; fx(0.01)=2 (!), fx(0.5)=128, fx(1/6 const 0.16667)=42. fx_mul a*b>>8 (0x16eb20 assign, 0x16e7d0 new), fx_div (a<<8)/b trunc (0x16e940), add 0xac650, sub 0x16ec10. FX_MIN=-9999.0..."
@@ -491,6 +494,7 @@
     - "C-96: the project value — READ (0x7b28c0, the PROJECTS table 0x5ce970), PARTLY READ (the space-race standing 0x7b8a30, the diplomatic-victory rows, the repair count), unwired"
     - "C-96: the Default Specialization's walls repair asks no quiet turns, the queue does — FIT (records), both twins"
     - "C-96 / C-127: a plot purchase contract lives to its Turn Limit, the pick's best project asks no CanProduce, Build Unit's tree takes only an ACCEPTED contract — READ (0x7f7bf0, 0x5d1f10, 0x7f4240 at 0x7f4270 / 0x7f48db), both twins"
+    - "C-102: the citizen pressure's falloff and the per-citizen term — READ; Stamford Raffles' city"
   context:
     - "..., then the game speed (0x525590). The queue term: the city's build queue (+0x2170, head 0x179650; -1 when empty) names an item whose Projects row (0xad5f10, +0x1c its index) has a Pr..."
   review: reviewed

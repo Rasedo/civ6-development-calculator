@@ -4226,8 +4226,13 @@ function importPeople(ctx: Ctx, rec: TurnRecord, state: GameState, people: Map<n
         // laid in it (runs/h1_duelw1110: Ibn Khaldun spent on Rome's Campus at
         // t123, its +2 Housing and +1 Amenity gone when China took Rome at
         // t142); a person spent on no city of its own pays the capital
-        const city = p.city >= 0 ? cityByKey.get(`${p.player}:${p.city}`)
-          : s.cities.find((c) => c.isCapital);
+        // a person that absorbs a city-state lays its city channel on the
+        // absorbed city, the plot's city now its player's (runs/h1_duelp1127
+        // Stamford Raffles spent at 7:12 t213, Mexico City's "Other" 2 -> 12)
+        const absorbed = fx.absorbCityState
+          ? s.cities.find((c) => tileBelongsTo(tile, c)) : undefined;
+        const city = absorbed ?? (p.city >= 0 ? cityByKey.get(`${p.player}:${p.city}`)
+          : s.cities.find((c) => c.isCapital));
         for (const [k, n] of cityPerm) {
           if (!city) continue;
           // the city's plot appeal the game refreshes at its owner's turn
