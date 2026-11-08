@@ -32,11 +32,12 @@
  *
  * The known cities: a city-state's, its knowledge base's (`citiesKnown`, the
  * look's city arm `minorCitiesLook`) in their order, the Free Cities' among
- * them; a major's, the city-states in id order, then every major's cities.
+ * them; a major's, the city-states in id order, then every major's cities
+ * and the Free Cities' (a route to a Free City is international).
  */
 import { fxOf, yieldValue, type AiValueView } from './aiValue';
 import { aiView } from './aiView';
-import { civsAtWar, freeSeatOf, isCiv, isCityStateSeat, seatOf } from './seats';
+import { cityHolders, civsAtWar, freeSeatOf, isCiv, isCityStateSeat, seatOf } from './seats';
 import { congressIntlBanned } from './congress';
 import { minorRouteOriginYields, routeDestYields, routeOriginYields, routePostGold, tradeMet } from './trade';
 import { routeInRange, tradeAdmits, tradePath, tradeReach } from './tradePath';
@@ -74,10 +75,10 @@ function knownTradeCities(state: GameState, selfCentre: number, from: number, ow
     }
     return out;
   }
-  // a major's: the city-states in id order, then every major's cities in
-  // seat and array order
+  // a major's: the city-states in id order, then every major's cities and
+  // the Free Cities' in seat and array order
   for (const d of [...state.cityStates].sort((a, b) => a.id - b.id)) add(d.seat, undefined, d);
-  for (const s of state.seats) for (const c of s.cities) add(s.seat, c, undefined);
+  for (const s of cityHolders(state)) for (const c of s.cities) add(s.seat, c, undefined);
   return out;
 }
 

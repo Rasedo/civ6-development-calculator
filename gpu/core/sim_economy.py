@@ -3306,11 +3306,12 @@ class SimEconomy:
             _air = (self._type_air > 0).reshape(1, 1, -1)
             out = out & (~_air | (self._air_train_tile(row) >= 0).unsqueeze(2))
         # CIV6: "when the number of Traders equals the Trading Capacity you
-        # cannot build more" — free Traders plus active routes, against
-        # tradeCapacity. The trainableUnits twin of the same gate.
+        # cannot build more" — free Traders plus active routes (each counts
+        # the Trader walking it), against tradeCapacity. The trainableUnits
+        # twin of the same gate.
         owned = (
             (self.major_unit_alive & (self.major_unit_seat == row)
-             & (self.major_unit_type == self._trader_idx)).sum(dim=1)
+             & (self.major_unit_type == self._trader_idx) & ~self._routed_slots(row)).sum(dim=1)
             + (self.seat_routes[:, row, :, 0] >= 0).sum(dim=1)
         )
         cap_ok = owned < self._trade_capacity(row)

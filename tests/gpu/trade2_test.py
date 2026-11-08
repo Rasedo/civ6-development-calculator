@@ -98,14 +98,21 @@ def main() -> None:
         assert abs(float(inc[0, 0, col])) < 1e-9, f"intl route must not pay {name}"
 
     # a DECLARED war CANCELS the pair's routes (no per-read suspension in
-    # real Civ 6) — and the cancel hands a Trader back at the origin.
+    # real Civ 6) — and the cancel hands its walking Trader back at the origin.
+    o_tile = int(sim.city_center[0, 1, 0])
+    assert bool(sim._spawn_unit(1, torch.ones(sim.B, dtype=torch.bool), torch.full((sim.B,), o_tile, dtype=torch.long), sim._trader_idx)[0])
+    w_slot = int(((sim.major_unit_seat[0] == 1) & sim.major_unit_alive[0]
+                  & (sim.major_unit_type[0] == sim._trader_idx)).long().argmax())
+    sim.seat_route_unit[0, 1, 0] = w_slot
     tr_before = int((sim.major_unit_alive[0] & (sim.major_unit_seat[0] == 1)
                      & (sim.major_unit_type[0] == sim._trader_idx)).sum())
     sim._cancel_routes_pair(1, 0, torch.ones(sim.B, dtype=torch.bool))
     assert int(sim.seat_routes[0, 1, 0, 0]) == -1, "war must cancel the pair's routes"
     tr_after = int((sim.major_unit_alive[0] & (sim.major_unit_seat[0] == 1)
                     & (sim.major_unit_type[0] == sim._trader_idx)).sum())
-    assert tr_after == tr_before + 1, "the cancelled route must hand its Trader back"
+    assert tr_after == tr_before, "the cancelled route's Trader survives"
+    assert int(sim.seat_route_unit[0, 1, 0]) == -1 and int(sim.major_unit_tile[0, w_slot]) == o_tile, \
+        "the cancelled route's Trader is home at the origin, on no route"
     # replant the route for the specialty half below
     sim.seat_routes[0, 1, 0, 0] = int(sim.city_id[0, 1, 0])
     sim.seat_routes[0, 1, 0, 1] = -1
@@ -373,7 +380,8 @@ def main() -> None:
     assert int(s7.seat_route_walk[0, 1, 0]) == int(f7b[0])
     tr7 = int((s7.major_unit_alive[0] & (s7.major_unit_seat[0] == 1)
                & (s7.major_unit_type[0] == s7._trader_idx)).sum())
-    assert tr7 == 0, "the applied route must SPEND the Trader"
+    assert tr7 == 1, "the applied route's Trader stays a unit"
+    assert int(s7.seat_route_unit[0, 1, 0]) >= 0, "the applied route names its walking Trader"
     print("candidate + apply ok")
 
     # --- SEA LEGS: the water level, the refuels, and roads on land only -----

@@ -807,13 +807,11 @@ class SimMinors:
         r2, j = divmod(d - self.S, self.RC)
         return (r2 if r2 < self.n_majors else self.FREE_ROW), j
 
-    def _known_trade_cands(self, centre: torch.Tensor, free: bool = False) -> tuple[torch.Tensor, torch.Tensor]:
+    def _known_trade_cands(self, centre: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
         """the known-city slots a trade AI reads from the city at `centre`
         [B] (`knownTradeCities`): ([B, ND] standing, [B, ND] centre) over the
         city-states by index, then every major's cities and the Free Cities'
-        in row and slot order, the city itself passed; the Free Cities'
-        stand only with `free` (a city-state's knowledge base; a major's list
-        reads the majors' cities)"""
+        in row and slot order, the city itself passed"""
         S = self.S
         live, ctr = [], []
         for s2 in range(S):
@@ -822,7 +820,7 @@ class SimMinors:
             ctr.append(c)
         for r2 in [*range(self.n_majors), self.FREE_ROW]:
             for j in range(self.RC):
-                live.append(self.city_alive[:, r2, j] & (free or r2 != self.FREE_ROW))
+                live.append(self.city_alive[:, r2, j])
                 ctr.append(self.city_center[:, r2, j])
         lv, ct = torch.stack(live, dim=1), torch.stack(ctr, dim=1)
         return lv & (ct != centre.unsqueeze(1)), ct
@@ -841,7 +839,7 @@ class SimMinors:
         known-city slot whose city stands with its centre revealed
         (`mops_revealed`) and holds no entry of that city's id joins the end
         of the list, in centre plot order"""
-        live, ctr = self._known_trade_cands(torch.full((self.B,), -1, dtype=torch.long, device=self.device), free=True)
+        live, ctr = self._known_trade_cands(torch.full((self.B,), -1, dtype=torch.long, device=self.device))
         ids = self._known_trade_ids()
         rank = self.citystate_kb_city_rank[:, s]
         rev = self.mops_revealed[:, s].gather(1, ctr.clamp(min=0))
@@ -861,7 +859,7 @@ class SimMinors:
         """the known cities of minor `s`'s trade AI: the known-city slots
         (`_known_trade_cands` from its centre) its knowledge base holds an
         entry of for the city standing there (`_minor_cities_look`)"""
-        live, ctr = self._known_trade_cands(self.citystate_center[:, s], free=True)
+        live, ctr = self._known_trade_cands(self.citystate_center[:, s])
         held = (self.citystate_kb_city_rank[:, s] >= 0) & (self.citystate_kb_city_id[:, s] == self._known_trade_ids())
         return live & held, ctr
 
@@ -1050,9 +1048,10 @@ class SimMinors:
     def _major_route_value(self, r: int) -> torch.Tensor:
         """0x5e9b20's walk over major row `r`'s cities ([B] raw): per city, per
         known city in its trade list, the most a route there pays — an
-        international one, its holder not at war with the major, the route's
-        origin yields with no course (`_seat_route_income`'s potential
-        routes); a domestic one those and its destination's (the destination
+        international one (a Free City's among them), its holder not at war
+        with the major, the route's origin yields with no course
+        (`_seat_route_income`'s potential routes); a domestic one those and
+        its destination's (the destination
         improvement rows) — each valued at the major's weights
         (`_major_yield_w`) and summed; never below 0"""
         from .sim_cityvalue import _YIELDS
@@ -1062,9 +1061,9 @@ class SimMinors:
             live, _ctr = self._known_trade_cands(self.city_center[:, r, j])
             on = self.city_trade_ok[:, r, j] & live & self.city_alive[:, r, j].unsqueeze(1)
             fid = torch.where(on, self.city_id[:, r, j].unsqueeze(1), torch.full_like(on, -1, dtype=torch.long))
-            # a major's list holds the city-states' and the majors' cities
-            nd = S + self.n_majors * RC
-            for d in range(nd):
+            # a major's list holds the city-states', the majors' and the Free
+            # Cities' cities
+            for d in range(live.shape[1]):
                 f_d = fid[:, d]
                 if d < S:
                     hold = self._CITY_MINOR0 + d

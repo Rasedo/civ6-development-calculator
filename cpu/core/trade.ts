@@ -15,7 +15,7 @@ import { hexDistance, tilesWithin } from '../../world/hex';
 import { isWater, isMountain, multiDomainPlot } from '../../world/query';
 import { RESOURCES } from '../../world/resources';
 import { BUILT_WONDERS } from '../data/builtWonders';
-import { disbandUnit, mapLayer, spawnUnit, unitDomain, unitsHostile } from './units';
+import { disbandUnit, mapLayer, unitDomain, unitsHostile } from './units';
 import { revealAround, unitSeesThrough, unitSight } from './fog';
 import { minorRouteCandidate } from './aiTrade';
 import { refreshTradeEdges, setTradeEdge, tradeAdmits, tradeCourse, tradePath, tradeReach } from './tradePath';
@@ -1247,20 +1247,19 @@ export function addTradeRoute(state: GameState, from: number, to: number, seat: 
 }
 
 /** Send the Trader, stamp the walk fields, push the route and take its
- * Trader's first plot — the one committer all three route kinds share. A
- * city-state's Trader stays a unit of its list, walking the route from its
- * origin (`Unit.routed`, `TradeRoute.trader`: the economic AI's pick wakes
- * the idle Trader standing in its city with MAKE_TRADE_ROUTE, 0x78e0a0 ->
- * 0x53e20; runs/h1_duelr1128 Hong Kong's Trader 1310726 walking its route to Bologna
- * t82-t103, the same unit home and sent again at t104); a major's is spent. */
+ * Trader's first plot — the one committer all three route kinds share.
+ * Every seat's Trader stays a unit of its list, walking the route from its
+ * origin (`Unit.routed`, `TradeRoute.trader`: the route is the unit's
+ * operation, MAKE_TRADE_ROUTE, 0x78e0a0 -> 0x53e20; runs/h1_duelr1128 Hong
+ * Kong's Trader 1310726 walking its route to Bologna t82-t103, the same unit
+ * home and sent again at t104; runs/h1_duelr1117 China's Trader 1310732 on
+ * its Xi'an routes t40-t238). */
 function commitRoute(state: GameState, seat: number, originCenter: number, destCenter: number, route: TradeRoute): void {
-  if (state.unitsMode) {
-    const t = freeTrader(state, seat);
-    if (t && isCityStateSeat(seat)) {
-      t.routed = true;
-      t.tileIndex = originCenter;
-      route.trader = t.id;
-    } else if (t) disbandUnit(state, t.id);
+  const t = state.unitsMode ? freeTrader(state, seat) : undefined;
+  if (t) {
+    t.routed = true;
+    t.tileIndex = originCenter;
+    route.trader = t.id;
   }
   route.createdTurn = state.turn;
   // the COURSE, laid once here and walked for the route's life: the trade
@@ -1412,8 +1411,8 @@ export function tradeRouteWalk(state: GameState, actor: Seat): void {
   if (plundered.size > 0) actor.tradeRoutes = routes.filter((r) => !plundered.has(r));
 }
 
-/** the Trader unit walking route `r` (`TradeRoute.trader`), none where its
- *  Trader was spent on it or is gone */
+/** the Trader unit walking route `r` (`TradeRoute.trader`), none where no
+ *  living unit walks it */
 export function routeTrader(state: GameState, r: TradeRoute): Unit | undefined {
   return r.trader === undefined ? undefined : state.units.find((u) => u.id === r.trader && u.routed);
 }
@@ -1430,15 +1429,14 @@ export function dropRoutes(state: GameState, holder: Seat, hit: (r: TradeRoute) 
   holder.tradeRoutes = holder.tradeRoutes!.filter((r) => !cut.includes(r));
 }
 
-/** route `r` of `actor` ends: its Trader home at the origin, on no route —
- *  the unit walking it, else (a spent one) a new Trader there */
+/** route `r` of `actor` ends: the Trader walking it home at the origin, on
+ *  no route */
 function traderHome(state: GameState, actor: Seat, r: TradeRoute): void {
   const oc = routeOriginCenter(state, actor, r);
   const walker = routeTrader(state, r);
-  if (walker) {
-    delete walker.routed;
-    if (oc >= 0) walker.tileIndex = oc;
-  } else if (state.unitsMode && r.trader === undefined && oc >= 0) spawnUnit(state, 'TRADER', oc, actor.seat);
+  if (!walker) return;
+  delete walker.routed;
+  if (oc >= 0) walker.tileIndex = oc;
 }
 
 /**

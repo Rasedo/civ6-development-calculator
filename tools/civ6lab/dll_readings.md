@@ -11376,3 +11376,36 @@ cpu/core/cityStates.ts keeps it). GPU `_cv_yields_seen`
   396.1 as logged, and city-state 2 t34.
 - Open: each yield's first reader, which would place the totals' Production
   and the bases' apart.
+
+## C-108: every seat's Trader walks its route; a major's trade list and route value read the Free Cities' cities — READ (0x5f0280, 0x78f210, 0x5e9b20), both twins
+
+`commitRoute` / `traderHome` (cpu/core/trade.ts), `knownTradeCities` /
+`routeValueOver` (cpu/core/aiTrade.ts); GPU `_apply_route`, `_routes_home`,
+`_seat_route_income`'s international leg, `_city_lux_plots`,
+`_city_strat_plots` (gpu/core/sim_seats.py), `_city_improvement_count`
+(gpu/core/sim_masks.py), `_known_trade_cands`, `_major_route_value`
+(gpu/core/sim_minors.py), the Trader training gate (gpu/core/sim_economy.py).
+
+- THE TRADER: a route is the Trader's unit operation (UNITOPERATION_MAKE_TRADE_ROUTE,
+  UnitOperations.xml) for every player, a major's as a city-state's: the
+  unit stays on its owner's list, walking the route (`Unit.routed`,
+  `TradeRoute.trader`), dies with it at a plunder, comes home at the origin
+  at its end or a cancel. No route spends its Trader and none hands a new
+  one back. The training gate counts the free Traders and the routes (each
+  the Trader walking it).
+- THE MAJOR'S KNOWN CITIES: a major's lists (0x78f210) and its route value
+  K (0x5e9b20) walk its knowledge base's city entries, which the look's city
+  arm 0x5f0280 appends with no owner filter: the Free Cities' cities are
+  known cities of a major's list, after the majors' (`cityHolders`). A route
+  to a Free City is international: its origin yields are the international
+  leg's, the destination's terms read on the Free Cities' row (its luxury,
+  strategic and improvement counts, its research for the progress rows),
+  no leader, alliance or ally term (the Free Cities hold none).
+- CONFIRMED (one-seed aimem trace): runs/h1_duelr1117 t40 China's Trader
+  1310732 on its route Xi'an -> Caguana, linked to the route and on the
+  record's plot t40-t45 (the record holds the same unit on each of Xi'an's
+  routes to t238). No recording holds a Free City (player 62 owns none in
+  runs/h1_duelr1117..1128): the Free City arm of a major's list has no
+  recorded case.
+- OPEN: a major's list's order is the city-states' then the cities' seat
+  order, not its knowledge base's stored order.

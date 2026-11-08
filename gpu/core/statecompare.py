@@ -1172,7 +1172,7 @@ def _cities_known(sim, b: int, s: int) -> list[int]:
     """minor `s`'s knowledge base's cities standing, in its order, as their
     centre plots"""
     none = sim.citystate_center[:, s].clone().fill_(-1)
-    live, ctr = sim._known_trade_cands(none, free=True)
+    live, ctr = sim._known_trade_cands(none)
     rank = sim.citystate_kb_city_rank[b, s]
     held = live[b] & (rank >= 0) & (sim.citystate_kb_city_id[b, s] == sim._known_trade_ids()[b])
     return [int(ctr[b, d]) for _r, d in sorted((int(rank[d]), d) for d in held.nonzero(as_tuple=True)[0].tolist())]

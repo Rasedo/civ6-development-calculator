@@ -1234,8 +1234,8 @@ export interface TradeRoute {
   createdTurn?: number;
   /** the servicing Trader's CURRENT tile (walks 1 tile/turn) */
   walkTile?: number;
-  /** the id of the Trader unit walking it (`Unit.routed`), absent where its
-   *  Trader was spent on it */
+  /** the id of the Trader unit walking it (`Unit.routed`), absent where no
+   *  unit walks it (no units on the map) */
   trader?: number;
   /** 0 walking out, 1 walking home */
   walkLeg?: number;

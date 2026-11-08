@@ -1547,11 +1547,12 @@ class SimMasks:
         return m
 
     def _city_improvement_count(self, imp: int) -> torch.Tensor:
-        """[B, NM, RC] long — `cityImprovementCount`: how many of each city's
-        tiles carry the named improvement, every major's cities."""
-        out = torch.zeros(self.B, self.n_majors, self.RC, dtype=torch.long, device=self.device)
+        """[B, CITY_ROWS, RC] long — `cityImprovementCount`: how many of each
+        city's tiles carry the named improvement, every major's cities and
+        the Free Cities' (the city-states' rows 0)."""
+        out = torch.zeros(self.B, self.CITY_ROWS, self.RC, dtype=torch.long, device=self.device)
         hit = self.improvement == imp
-        for r in range(self.n_majors):
+        for r in [*range(self.n_majors), self.FREE_ROW]:
             sl = self.city_slot_at(r)
             out[:, r].scatter_add_(1, sl.clamp(min=0), (hit & (sl >= 0)).long())
         return out

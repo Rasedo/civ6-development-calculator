@@ -1424,7 +1424,7 @@ class SimInit:
         self.seat_route_walk = torch.full((B, self.NS, k_routes), -1, dtype=torch.long, device=device)
         self.seat_route_leg = torch.full((B, self.NS, k_routes), -1, dtype=torch.long, device=device)
         # the WALKER: the major-pool slot of the Trader unit walking the route
-        # (`TradeRoute.trader`, a city-state's), -1 where its Trader was spent
+        # (`TradeRoute.trader`), -1 where no unit walks it
         self.seat_route_unit = torch.full((B, self.NS, k_routes), -1, dtype=torch.long, device=device)
         # the stored COURSE (`TradeRoute.course`): the plots of the route's
         # path, origin to destination, -1-padded — `tradeCourse` computes it

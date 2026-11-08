@@ -380,8 +380,8 @@ export function aiView(state: GameState, opts: { updated?: boolean } = {}): AiVi
       }));
     },
     tradeRouteCapacity: (i) => tradeCapacity(state, i),
-    // a Trader out on a route is one of them: the engine's route spent its
-    // unit, a record's stands on the map, `routed`
+    // a Trader out on a route is one of them: the route counts the unit
+    // walking it, `routed`
     traders: (i) => (seatOf(state, i)?.tradeRoutes ?? []).length
       + unitsOf(state, i).filter((u) => UNITS[u.type]?.trader && !u.routed).length,
     // a city-state's or the Free Cities' trade AI's route value

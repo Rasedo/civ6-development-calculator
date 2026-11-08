@@ -26,13 +26,17 @@
     - recording: h1_duelr1128
       turn: 82
       value: Hong Kong's Trader 1310726 woken with MAKE_TRADE_ROUTE walks its route on the map t82-t103
-  impl: [cpu/core/trade.ts:commitRoute]
+    - recording: h1_duelr1117
+      turn: 40
+      value: China's Trader 1310732 on its route Xi'an -> Caguana from t40, the same unit on each of Xi'an's routes to t238
+  impl: [cpu/core/trade.ts:commitRoute, gpu/core/sim_seats.py:_apply_route]
   readings:
     - "C-95: the scout's tree \"Barbarian Found City\" — READ (the tree, its start, Protect Unit's update), PARTLY READ (the nodes' executions), unported"
     - "C-95: the scout's tree \"Barbarian Found City\" — READ, ported"
     - "C-96: the city-states' tactical pass — READ (Wander Near City, Heal, the non-barbarian priorities, FindAlternateLocation), the families it needs PARTLY READ"
     - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
     - "C-108 / C-127: the trade AI's list searches fresh over its knowledge base's cities, the Free Cities' among them; a city-state's Trader walks its route — READ (0x78f210 at 0x78f400..0x78f41b, 0x559140, 0x77d10's +0xe0, 0x5f0280, 0x78e0a0 -> 0x53e20), both twins"
+    - "C-108: every seat's Trader walks its route; a major's trade list and route value read the Free Cities' cities — READ (0x5f0280, 0x78f210, 0x5e9b20), both twins"
   context:
     - ...is turn (0x791300), else the location; a plot of danger only where Allow Danger; woken (0x53e20) and moved (0x972880 / 0x962030).
   review: reviewed

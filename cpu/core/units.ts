@@ -1443,7 +1443,7 @@ export function trainableUnits(
     }
     // CIV6: "when the number of Traders equals the Trading Capacity you
     // cannot build more Traders" — the count is free Trader units plus
-    // active routes (each active route embodies a spent Trader).
+    // active routes (each route counts the Trader walking it, `routed`).
     if (d.trader && !state.sandbox) {
       const owned =
         state.units.filter((u) => u.seat === seat && u.type === 'TRADER' && !u.routed).length +

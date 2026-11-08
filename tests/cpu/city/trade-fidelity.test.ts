@@ -158,12 +158,15 @@ describe('international route yields', () => {
     const { state, origin } = twoCitySandbox();
     const civ = addCiv(state, 12, 6);
     addCompletedCampus(state, civ.cities[0], 12, 7);
+    // the route is its Trader's walk: the Trader stands in the origin and
+    // stays a unit on the route (0x78e0a0 -> 0x53e20)
+    state.unitsMode = true;
+    spawnUnit(state, 'TRADER', origin.centerIndex, 0);
     expect(addIntlTradeRoute(state, origin.id, civ.seat, civ.cities[0].id, 0).ok).toBe(true);
 
     meetAll(state);
     const col = warTargets(state, 0).indexOf(civ.seat);
     expect(col).toBeGreaterThanOrEqual(0);
-    state.unitsMode = true;
     applySeatActionRecord(state, seatOf(state, 0)!, {
       production: [], tech: null, civic: null, units: [], war: col,
     });
@@ -252,7 +255,7 @@ describe('civ international pick + income', () => {
 });
 
 describe('the Trader unit', () => {
-  it('the route verb SPENDS a free Trader; capacity gates training; the ended route returns it', () => {
+  it('the route verb sends a free Trader; capacity gates training; the ended route brings it home', () => {
     const state = makeState(makeMap(24, 24));
     state.unitsMode = true;
     const origin = settleAt(state, tileAtCoords(state.map, 6, 6).index);
@@ -270,7 +273,8 @@ describe('the Trader unit', () => {
     expect(trainableUnits(state, 0).some((d) => d.id === 'TRADER')).toBe(false);
 
     expect(addTradeRoute(state, origin.id, dest.id, 0).ok).toBe(true);
-    expect(freeTrader(state, 0)).toBeUndefined(); // spent into the route
+    expect(freeTrader(state, 0)).toBeUndefined(); // walking the route
+    expect(state.seats[0].tradeRoutes![0].trader).toBe(t.id);
     // the active route still counts against capacity for training
     expect(trainableUnits(state, 0).some((d) => d.id === 'TRADER')).toBe(false);
 

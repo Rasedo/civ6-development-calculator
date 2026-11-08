@@ -3684,8 +3684,8 @@ const res = buyTile(state, city.id, d.plot, seat);        if (!res.ok) setTileOw
         const theirs = seatOf(next.state, seat)?.tradeRoutes;
         if (!s || !theirs) { count(ctx, 'routes', 'refused', d.player); break; }
         // each route record t+1 runs that the engine does not is the
-        // player's order, through the engine's own verb for its kind (a
-        // Trader spent, the course laid); a route the engine refuses is the
+        // player's order, through the engine's own verb for its kind (its
+        // Trader sent, the course laid); a route the engine refuses is the
         // record's. Routes that ended are the engine's to end.
         const nextOwner = seatOf(next.state, seat)!;
         const key = (o: number, dst: number) => `${o}>${dst}`;

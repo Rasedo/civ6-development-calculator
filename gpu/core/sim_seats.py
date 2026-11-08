@@ -5866,14 +5866,16 @@ class SimSeats:
         return self._suz_effect_rows(code)[:, row]
 
     def _city_lux_plots(self) -> torch.Tensor:
-        """[B, n_majors, RC] long — `routeDestLuxuryGold`'s count: each city's
-        own luxury plots within 3 rings of its centre, a copy counting again
-        (City_Resources 0x1f71b0). Ownership is the gate, not an improvement."""
-        B, NM, RC = self.B, self.n_majors, self.RC
-        out = torch.zeros(B, NM, RC, dtype=torch.long, device=self.device)
+        """[B, CITY_ROWS, RC] long — `routeDestLuxuryGold`'s count: each
+        city's own luxury plots within 3 rings of its centre, a copy counting
+        again (City_Resources 0x1f71b0), the majors' cities and the Free
+        Cities' (the city-states' rows 0). Ownership is the gate, not an
+        improvement."""
+        B, RC = self.B, self.RC
+        out = torch.zeros(B, self.CITY_ROWS, RC, dtype=torch.long, device=self.device)
         has = self.lux_id >= 0
         tix = torch.arange(self.T, device=self.device)
-        for r in range(NM):
+        for r in [*range(self.n_majors), self.FREE_ROW]:
             sl = self.city_slot_at(r)  # [B, T] owning column, -1 none
             slc = sl.clamp(min=0)
             ctr = self.city_center[:, r, :RC].gather(1, slc).clamp(min=0)    # [B, T]
@@ -5899,15 +5901,16 @@ class SimSeats:
         return out
 
     def _city_strat_plots(self) -> torch.Tensor:
-        """[B, n_majors, RC] long — `routeRockefellerGold`'s count: each
+        """[B, CITY_ROWS, RC] long — `routeRockefellerGold`'s count: each
         city's own plots within 3 rings of its centre carrying a strategic
         resource its owner sees, improved or not, a copy counting again
-        (City_Resources 0x1f71b0)."""
-        B, NM, RC = self.B, self.n_majors, self.RC
-        out = torch.zeros(B, NM, RC, dtype=torch.long, device=self.device)
+        (City_Resources 0x1f71b0), the majors' cities and the Free Cities'
+        (the city-states' rows 0)."""
+        B, RC = self.B, self.RC
+        out = torch.zeros(B, self.CITY_ROWS, RC, dtype=torch.long, device=self.device)
         live = self._res_live() & (self.res_cat == 2)
         tix = torch.arange(self.T, device=self.device)
-        for r in range(NM):
+        for r in [*range(self.n_majors), self.FREE_ROW]:
             has = live & ~self._res_hidden(r)
             sl = self.city_slot_at(r)  # [B, T] owning column, -1 none
             slc = sl.clamp(min=0)
@@ -9760,7 +9763,11 @@ class SimSeats:
                 _fper = torch.zeros(B, self.RC, dtype=torch.float64, device=self.device)
                 _fper.scatter_reduce_(1, _fcs.clamp(min=0), _fg, reduce="amax")
                 gold_i = gold_i + _fper.gather(1, from_j)
-            _cleo_d = self._leads_vec("CLEOPATRA").gather(1, dr)  # [B, K]
+            # the destination row's leader: a major's (the Free Cities lead none)
+            _nm = self.n_majors
+            _dmaj = dr < _nm  # [B, K]
+            _drm = dr.clamp(max=_nm - 1)
+            _cleo_d = self._leads_vec("CLEOPATRA").gather(1, _drm) & _dmaj  # [B, K]
             # CIV6 (Reform the Coinage, Golden face): "International Trade
             # Routes provide +3 Gold per specialty district in the foreign
             # city."
@@ -9774,8 +9781,7 @@ class SimSeats:
             # a route from a row culturally dominant over the destination's
             # (Trade_Manager 0x54c6c0)
             if row < self.n_majors:
-                _nm = self.n_majors
-                _dom = self.civ_dominant[:, row].gather(1, dr.clamp(max=_nm - 1)) & (dr < _nm)
+                _dom = self.civ_dominant[:, row].gather(1, _drm) & _dmaj
                 gold_i = gold_i + self._route_dom_gold * _dom.double()
             # CIV6 (Amsterdam, Antioch): "+1 Gold for each Luxury resource at
             # the destination" of an international route, per suzerainty.
@@ -9791,10 +9797,8 @@ class SimSeats:
             if bool(_fgd.count_nonzero()):
                 gold_i = gold_i + _fgd.gather(1, _rx).gather(2, _col).squeeze(2).double()
             if bool(_rkf.count_nonzero()):
-                _kall = torch.zeros(B, self.city_id.shape[1], RCw, dtype=torch.float64, device=self.device)
                 _ks = self._city_strat_plots().double()
-                _kall[:, : _ks.shape[1], : _ks.shape[2]] = _ks
-                gold_i = gold_i + _rkf.unsqueeze(1) * _kall.gather(1, _rx).gather(2, _col).squeeze(2)
+                gold_i = gold_i + _rkf.unsqueeze(1) * _ks.gather(1, _rx).gather(2, _col).squeeze(2)
             # CIV6 (University of Sankore): "Other Civilizations' Trade Routes
             # to this city provide +1 Science and +1 Gold for them" — the
             # DESTINATION's wonder registry pays the sender.
@@ -9859,9 +9863,13 @@ class SimSeats:
                 _mine_c = self.civ_civics[:, row].sum(dim=1)
                 _all_t = self.civ_techs[:, : self.n_majors].sum(dim=2)   # [B, NM]
                 _all_c = self.civ_civics[:, : self.n_majors].sum(dim=2)
-                _drow = dr.clamp(min=0, max=self.n_majors - 1)
-                _ah_t = (_all_t.gather(1, _drow) - _mine_t.unsqueeze(1)).clamp(min=0)
-                _ah_c = (_all_c.gather(1, _drow) - _mine_c.unsqueeze(1)).clamp(min=0)
+                # a Free City's: the Free Cities' own research
+                _fr_t = self.citystate_techs[:, self.FR].sum(dim=1).unsqueeze(1)
+                _fr_c = self.citystate_civics[:, self.FR].sum(dim=1).unsqueeze(1)
+                _th_t = torch.where(_dmaj, _all_t.gather(1, _drm), _fr_t)
+                _th_c = torch.where(_dmaj, _all_c.gather(1, _drm), _fr_c)
+                _ah_t = (_th_t - _mine_t.unsqueeze(1)).clamp(min=0)
+                _ah_c = (_th_c - _mine_c.unsqueeze(1)).clamp(min=0)
                 _ok = pays_i & _pw.unsqueeze(1)  # `pays_i` already carries valid_dest
                 _rk_add(3,
                                  torch.div(_ah_t, _pper, rounding_mode="floor").double() * _ok.double())
@@ -9881,7 +9889,7 @@ class SimSeats:
                 _rk_add(3, snd_s * pays_i.double())
             # CIV6 (Alliance, level 1): the typed alliance pays its route
             # bonus on every paying leg - the sender half.
-            _aty = self.seat_alliance_type[:, row].gather(1, dr)
+            _aty = torch.where(_dmaj, self.seat_alliance_type[:, row].gather(1, _drm), torch.full_like(dr, -1))
             _yc = self._al_route_ycol[_aty.clamp(min=0)]
             _hit = pays_i & (_aty >= 0) & (_yc >= 0)
             if bool(_hit.count_nonzero()):
@@ -9892,7 +9900,7 @@ class SimSeats:
             # seat's own half, on a route to an ALLY.
             _ar = self._gov_mods(row)[12]["allyroute"].double()
             if bool(_ar.count_nonzero()):
-                _ally_d = pays_i & (self.seat_ally_turns[:, row].gather(1, dr) > 0)
+                _ally_d = pays_i & _dmaj & (self.seat_ally_turns[:, row].gather(1, _drm) > 0)
                 if bool(_ally_d.count_nonzero()):
                     for _kc in range(6):
                         _rk_add(_kc,
@@ -16578,18 +16586,11 @@ class SimSeats:
     def _routes_home(self, row: int, drop: torch.Tensor) -> None:
         """`traderHome` over the route slots `drop` [B, K] of row `row`, in
         slot order: the living Trader walking each (`seat_route_unit`) home at
-        the route's origin on no route; a route whose Trader was spent hands
-        a new one back there"""
+        the route's origin on no route"""
         oc, _dc = self._route_centres(row)
         wu = self.seat_route_unit[:, row]
         for k in range(self.seat_routes.shape[2]):
-            m = drop[:, k] & (oc[:, k] >= 0)
-            if not bool(m.count_nonzero()):
-                continue
-            spent = m & (wu[:, k] < 0)
-            if bool(spent.count_nonzero()):
-                self._spawn_unit(row, spent, oc[:, k].clamp(min=0), self._trader_idx)
-            walked = m & (wu[:, k] >= 0)
+            walked = drop[:, k] & (oc[:, k] >= 0) & (wu[:, k] >= 0)
             walked = walked & self.major_unit_alive.gather(1, wu[:, k].clamp(min=0).unsqueeze(1)).squeeze(1)
             if bool(walked.count_nonzero()):
                 rb = walked.nonzero(as_tuple=True)[0]
@@ -16999,10 +17000,9 @@ class SimSeats:
         """Apply the wire's route intent for seat row `row` — [origin CENTRE,
         dest code (a CENTRE tile, or -(2+csIndex))]. Re-validates what canAdd*
         validates — origin resolves, capacity, no duplicate, CanStartRoute's
-        path (`_trade_admit_rows`), a free Trader — then SPENDS the
-        Trader and creates the route: exp = turn + the era minimum, born =
-        turn, the stored course, the walker at the origin on leg 0, road on
-        the origin."""
+        path (`_trade_admit_rows`), a free Trader — then creates the route
+        that Trader walks (`seat_route_unit`): born = turn, the stored
+        course, the walker at the origin on leg 0, road on the origin."""
         B, S, dev = self.B, self.S, self.device
         want = frm >= 0
         if not bool(want.count_nonzero()):
@@ -17015,7 +17015,7 @@ class SimSeats:
         has_o = fm.any(dim=1)
         o_j = fm.long().argmax(dim=1)
         used = (rr[:, :, 0] >= 0).sum(dim=1)
-        t_has, t_slot, t_tile = self._free_trader(row)
+        t_has, t_slot, _t_tile = self._free_trader(row)
         ok = want & has_o & (used < self._trade_capacity(row)) & t_has
         if not bool(ok.count_nonzero()):
             return
@@ -17086,7 +17086,10 @@ class SimSeats:
         self.seat_route_born[rows, row, slot] = int(self.turn)
         self.seat_route_walk[rows, row, slot] = o_ct[rows]
         self.seat_route_leg[rows, row, slot] = 0
-        self.seat_route_unit[rows, row, slot] = -1
+        # the Trader stays a unit of its list, walking the route from its
+        # origin (`Unit.routed`, `TradeRoute.trader`)
+        self.seat_route_unit[rows, row, slot] = t_slot[rows]
+        self._trader_to(rows, t_slot[rows], o_ct[rows])
         # the COURSE, laid once here and walked for the route's life
         self._trade_store_course(row, rows, slot, o_ct[rows], dest_ct[rows])
         # the walker lays road on every LAND tile it stands on; the origin is turn 0
@@ -17102,9 +17105,6 @@ class SimSeats:
             if bool(_mw.count_nonzero()):
                 _mr = rows[_mw]
                 self.trading_post[_mr, row, dest_ct[_mr]] = True
-        # SPEND the Trader
-        self.major_unit_alive[rows, t_slot[rows]] = False
-        self._occ_clear(rows, t_tile[rows], t_slot[rows] + self.POOL_LO["major"])
 
     def _cancel_routes_pair(self, i: int, j: int, mask: torch.Tensor) -> None:
         """cancelRoutesBetween's twin — a DECLARED war cancels every route
