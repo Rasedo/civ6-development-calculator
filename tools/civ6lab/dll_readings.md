@@ -12425,3 +12425,28 @@ import: `buildRows`, `buildOverflow`, `importQueue` (cpu/harness/import.ts).
   queue change resumes (+0x218 / +0x230; runs/h1_duelp1117 Xi'an's Builder
   queued at t13 on 19, the engine's 0), the engines keeping none outside
   the queue.
+
+## C-100: an idle city-state's store takes its Builder's lump; the plot-value lab's turn (the engines unchanged)
+
+- THE LUMP ON AN IDLE CITY (`minorLump`, as the engines already hold it):
+  a harvest or feature removal landing while the city holds no item adds
+  its Production to the store (BuildQueue.m_xProductionOverflow +0x1f4),
+  which the next item takes at its percent; on an item the city's analysis
+  chose that turn it pays that item and logs a City_BuildQueue row (the
+  progress (store + lump) x the percent, the overflow the lump past the
+  price). runs/h1_duelp1121 Antioch t172 (Forest 32:22 cleared, the turn's
+  analysis NO BUILDS): the Neighbourhood's T 15 / 13 / 12 / 11 at t173-176
+  as logged on the store 61 above the idle Production, its Field Cannon's
+  319.8 at t177; t188 the same (the t191 Commercial Hub's 88.6 store).
+  runs/h1_duelp1128 Bologna t191: the chop lands on the Scout chosen that
+  turn, the row 310.8 with overflow 46.0, no lump in the store.
+- `plotValueLab.ts` builds the analysed city-state on that rule (a lump of a
+  turn whose analysis logged NO BUILDS AT ALL), with the building or
+  district its production step completed standing, the gold shortfall its
+  turn start banked (the record after's), and the event yields the run's
+  replay lays (`replayEvents`).
+- 0x7b1320's defence term read: min(max(n, 1), DefenseModifier +0x34) +
+  min(n, GrantFortification +0x3c), n = 0x3dfae0 on the player (+0x1300).
+- OPEN: runs/h1_duelp1124 Granada's Alcazar on 42:12: its loss reads 20.11
+  more at t24 / t26 (n = 1 where 0x3dfae0 counts no war: the record's wars
+  the barbarians alone), 24-43 more from t31 on.

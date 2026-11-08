@@ -21,8 +21,12 @@
  * progress on the item in hand the record after holds; the Builders the
  * record holds and the one its production step trained (none its contract
  * purchases bought); the store its step left (City_BuildQueue.csv): an item
- * it completed, its overflow and no item in hand, an idle city's store with
- * the Production the step made (the city as the record after holds it);
+ * it completed, its overflow and no item in hand, the building or district
+ * standing, an idle city's store with the Production the step made (the
+ * city as the record after holds it) and its Builder's lumps of a turn its
+ * analysis chose nothing (AI_CityBuild.csv); the gold shortfall its turn's
+ * start banked; the plots' event yields as the run's replay lays them
+ * (`replayEvents`);
  * --rows prints the store and the item in hand; its grid met (`minorPower`), the
  * Economic AI's Gold boost on the net income the record's treasury cached;
  * the research AI's turns from AI_Research.csv, the civics AI's as its turn
@@ -47,7 +51,7 @@ import { districtValue, type DistrictValueFacts } from '../core/aiDistrictValue'
 import { baseAdjacency } from '../core/yields';
 import { tilePurchaseCost } from '../core/game';
 import { canPlaceDistrictIn } from '../core/rules';
-import { minorBuildFacts, minorGrowth, minorPower, minorResourceFacts } from '../core/minorBuild';
+import { minorBuildFacts, minorGrowth, minorItemInHand, minorPower, minorRaiseBuilding, minorResourceFacts } from '../core/minorBuild';
 import { economicGoldBoost } from '../core/aiWeights';
 import { newEconomicMemory } from '../core/aiEconomic';
 import { minorCity } from '../core/cityStates';
@@ -55,6 +59,7 @@ import { plotImprovementType } from '../core/minorCityAi';
 import { campTiles } from '../core/seats';
 import { civicAnalysis } from '../core/aiCivics';
 import { borderCandidates, computeCityStats } from '../core/city';
+import { chopGrant, harvestGrant } from '../core/economy';
 import { resourceValue } from '../core/aiResource';
 import { AI_BUILDING_INDEX, BUILDING_DEPENDENTS, buildingsPass, growthForecast, housingValue, type CityGrowth } from '../core/aiCityBuild';
 import { accumulationPct } from '../core/stockpile';
@@ -71,6 +76,8 @@ import { tileAppeal } from '../core/appeal';
 import { cityAppealResolver } from '../core/governors';
 import { eruptionHazardTurns, floodHazardTurns } from '../core/disasters';
 import { loadCityBuildCentre, loadCityBuildPlots } from './cityBuildLog';
+import { replayEvents } from './eventReplay';
+import { loadRandLog, randLogPath } from './randLog';
 import { AI_BUILDINGS } from '../data/aiBuildTables';
 
 const args = process.argv.slice(2).filter((a) => a !== '--');
@@ -84,8 +91,8 @@ const show = args.includes('--show') ? Number(args[args.indexOf('--show') + 1]) 
 const allRows = args.includes('--all');
 
 const cat = loadCatalog(dump);
-const recs: TurnRecord[] = readFileSync(dump, 'utf8').split('\n').filter((l) => l.trim()).map((l) => JSON.parse(l) as TurnRecord)
-  .filter((r) => !r.moved).sort((a, b) => a.turn - b.turn);
+const read: TurnRecord[] = readFileSync(dump, 'utf8').split('\n').filter((l) => l.trim()).map((l) => JSON.parse(l) as TurnRecord);
+const recs = read.filter((r) => !r.moved).sort((a, b) => a.turn - b.turn);
 const plots = loadCityBuildPlots(dump);
 const centreRows = loadCityBuildCentre(dump);
 
@@ -129,6 +136,18 @@ const stepRow = new Map<string, [number, number, number, string]>();
     }
   }
 }
+/** AI_CityBuild.csv's turns a city's analysis chose nothing to build:
+ *  `${turn}:${player}` */
+const noBuild = new Set<string>();
+{
+  const path = dump.replace(/\.jsonl$/, '.logs/AI_CityBuild.csv');
+  if (existsSync(path)) {
+    for (const line of readFileSync(path, 'utf8').split('\n')) {
+      const p = line.split(',').map((x) => x.trim());
+      if (p[5]?.startsWith('NO BUILDS AT ALL')) noBuild.add(`${p[0]}:${p[1]}`);
+    }
+  }
+}
 const W = recs[0].head.W;
 const RES = new Map(AI_RESOURCES.map((r) => [r.type, r] as const));
 /** an engine district's install type: the traitless AI row whose engine id it is */
@@ -142,6 +161,13 @@ const tally = new Map<string, Tally>();
 const tallyOf = (k: string): Tally => tally.get(k) ?? (tally.set(k, { exact: 0, close: 0, far: 0, miss: [] }), tally.get(k)!);
 
 const history = newHistory();
+// the recorded random events replayed on the game's generator, with its draw
+// log where the recording kept it (`replayEvents`, as run.ts builds them)
+{
+  const logPath = randLogPath(dump);
+  if (logPath) history.randLog = loadRandLog(logPath, recs.flatMap((r) => (r.witness ?? []).flatMap((w) => (typeof w.seed === 'number' ? [w.seed] : []))));
+  history.replay = replayEvents(recs, cat, history.randLog, read.filter((r) => r.moved));
+}
 /** the players whose city stood in an earlier record */
 const hadCity = new Set<number>();
 /** per player the production its idle city has stored, the turn's own in (the record keeps
@@ -150,13 +176,18 @@ const hadCity = new Set<number>();
 const idleStore = new Map<number, number>();
 /** per player the growth its city AI's last analysis read */
 const growthSeen = new Map<number, CityGrowth>();
-let held: { imp: ReturnType<typeof importTurn>; turn: number; rec: TurnRecord } | null = null;
+type Held = { imp: ReturnType<typeof importTurn>; turn: number; rec: TurnRecord };
+let held: Held | null = null;
+/** the record before the one analysed, as its own analysis left it */
+let prev: Held | null = null;
 for (const rec of recs) {
   advanceHistory(history, rec, cat);
   const after = importTurn(rec, cat, history);
   const cur = held;
   held = { imp: after, turn: rec.turn, rec };
   if (!cur) continue;
+  const last = prev;
+  prev = cur;
   const imp = cur.imp;
   const state = imp.state;
   // the rivers named by the city-states' turn: the look over the next
@@ -210,12 +241,36 @@ for (const rec of recs) {
     // Production the step made, the city as the record after holds it; an
     // item the step completed leaves its overflow and no item in hand
     const made = nextCs ? computeCityStats(after.state, minorCity(nextCs)).total.production : Number(dc?.productionYield ?? 0);
-    idleStore.set(player, idle ? (idleStore.get(player) ?? 0) + made : completed ? step[2] : 0);
+    // and the Production its Builder's harvests and feature removals of the
+    // turn before landed where that turn's analysis chose nothing
+    // (`minorLump`: an idle city's store takes the lump; one landing on an
+    // item it chose is that item's, logged as a step row): each of its plots
+    // whose feature or resource the record lacks that the record before
+    // held, priced on the record before
+    let lump = 0;
+    const prevCs = last?.imp.minorOfPlayer.get(player);
+    if (idle && noBuild.has(`${turn - 1}:${player}`) && last && prevCs) {
+      for (const t0 of last.imp.state.map.tiles) {
+        const t1 = state.map.tiles[t0.index];
+        if (t0.ownerSeat !== prevCs.seat) continue;
+        const grants = [...(t0.feature && t1.feature !== t0.feature ? chopGrant(last.imp.state, t0, prevCs.seat) : []),
+          ...(t0.resource && t1.resource !== t0.resource ? [harvestGrant(last.imp.state, t0, prevCs.seat)].filter((g) => !!g) : [])];
+        for (const g of grants) if (g!.key === 'production') lump += g!.amount;
+      }
+    }
+    idleStore.set(player, idle ? (idleStore.get(player) ?? 0) + made + lump : completed ? step[2] : 0);
     cs.prodOverflow = idleStore.get(player)!;
+    // the building or district it completed stands (`minorRaiseBuilding`)
     if (completed) {
+      const done = minorItemInHand(cs);
+      if (done && 'building' in done && !(cs.buildings ?? []).includes(done.building)) minorRaiseBuilding(state, cs, done.building);
+      else if (done && 'district' in done) state.map.tiles[done.site].districtComplete = true;
       cs.prodItem = undefined;
       cs.prodProgress = 0;
     }
+    // the gold shortfall its turn's start banked (its bankruptcy amenities):
+    // the one the record after reads off this record's treasury
+    if (nextCs) cs.goldShortfall = nextCs.goldShortfall;
     // its grid as its turn meets it (`minorPower`)
     minorPower(state, cs);
     if (nextCs && nextCs.prodItem === cs.prodItem) {
@@ -425,7 +480,7 @@ for (const rec of recs) {
         const d = Math.abs(ours - lv);
         const k = tallyOf(row.type);
         // --all: every row, with its modifiers' part and its plot's facts
-        if (allRows) console.log(`ALL t${turn} p${player} (${lp.x},${lp.y}) ${row.type} log ${lv.toFixed(2)} ours ${ours.toFixed(2)} t=${t} mods ${(f.modifiers(row.modifiers, t, AI_VALUE_HORIZON) / FX).toFixed(2)} own=${lp.owned} imp=${f.improvement} res=${f.resource} feat=${f.feature} hz=${f.floodTurns}/${f.eruptionTurns}`);
+        if (allRows) console.log(`ALL t${turn} p${player} (${lp.x},${lp.y}) ${row.type} log ${lv.toFixed(2)} ours ${ours.toFixed(2)} t=${t} mods ${(f.modifiers(row.modifiers, t, AI_VALUE_HORIZON) / FX).toFixed(2)} own=${lp.owned} imp=${f.improvement} res=${f.resource} feat=${f.feature} hz=${f.floodTurns}/${f.eruptionTurns} appeal=${f.appeal}`);
         if (d <= 0.01) k.exact++;
         else if (d <= 1) k.close++;
         else {
