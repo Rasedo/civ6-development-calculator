@@ -44,6 +44,9 @@ export interface AiUnitView {
   plot: number;
   /** Units.FoundCity */
   founder: boolean;
+  /** its type obsolete to its owner (0x538460: its ObsoleteTech,
+   *  ObsoleteCivic or their Mandatory columns held) */
+  obsolete: boolean;
   /** the unit's combat strength as the AI reads it (0x56dc90 with 0: an
    *  embarked land combat unit its owner's era's embarked strength), its
    *  ranged strength (the install's), its damage (0 to 100) and its Movement

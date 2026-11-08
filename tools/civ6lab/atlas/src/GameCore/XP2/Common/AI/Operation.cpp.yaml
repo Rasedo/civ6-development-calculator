@@ -3,6 +3,22 @@
 # `review: imported` = bootstrapped from dll_readings.md / code comments / saved
 # labels and not yet reviewed: verify against the disassembly, then edit and
 # set `review: reviewed`.
+- addr: 0x7325a0
+  final: 0x4d6fd0
+  kind: function
+  name: the obsolete cut's find
+  semantics: "find_if over the offer: the first unit whose type (+0x160) is obsolete to the player [r8] (0x538460); 0x732db0 removes from it on."
+  status: READ
+  cases:
+    - recording: h1_duely1128
+      turn: 176
+      value: "city-state 2's City Defense offer: the Warrior 2490370 found and cut"
+  impl:
+    - cpu/core/operations/recruit.ts:recruitOperation
+    - gpu/core/sim_minorops.py:_mops_recruit_team
+  readings:
+    - "C-130 / C-129: the recruit's obsolete cut under the team's player; the government values' housing on the forecast of the city as its update read it — READ (0x7383d0 at 0x7384c0..0x7384ed, 0x732db0, 0x7325a0, 0x538460, 0x73a5e0 at 0x73a7d9), a fit (the forecast), both twins"
+  review: reviewed
 - addr: 0x7328d0
   kind: function
   name: the recruit offer's insertion pass
@@ -50,9 +66,22 @@
 - addr: 0x732db0
   kind: function
   name: the recruit offer's obsolete cut
-  semantics: "remove_if over the offer (0x7325a0 finds the first): a unit whose type is obsolete for the player (0x537460 -> 0x538460) leaves. Called by 0x7383d0 where the team's +0x0 is set. Unported."
-  status: PARTLY
+  semantics: "remove_if over the offer (0x7325a0 finds the first): a unit whose type (+0x160) is obsolete to the player [r8] (0x537460 -> 0x538460: its ObsoleteTech, ObsoleteCivic or their Mandatory columns held) leaves. Called by 0x7383d0 with the team's +0x0, the operation's player (0x73a5e0 at 0x73a7d9 writes op +0x98 there for every team): every team's offer is cut. Ported: recruitOperation's obsolete cut (AiUnitView.obsolete), _mops_recruit_team (_mops_units' obsolete)."
+  status: READ
+  cases:
+    - recording: h1_duely1128
+      turn: 176
+      value: city-state 2's City Defense recruits none (Operation Recruit, 0 units), its Warrior 2490370 past Gunpowder taken by the Upgrade Units tree 5308422 at the walk; its standing army's Man-at-Arms keep AI type DEFENDER, m_defendersNeeded 0 and Mobilization t185-188 as logged
+    - recording: h1_duely1117
+      value: no logged recruit (Recruiting minimums / strength) of the five duely duels a unit obsolete to its player (0 of 1406, AI_Operation.csv against the records' techs)
+  impl:
+    - cpu/core/operations/recruit.ts:recruitOperation
+    - cpu/core/aiView.ts:unitView
+    - gpu/core/sim_minorops.py:_mops_recruit_team
+    - gpu/core/sim_minorops.py:_mops_units
+    - cpu/core/operations/recruit.ts:all
   readings:
+    - "C-130 / C-129: the recruit's obsolete cut under the team's player; the government values' housing on the forecast of the city as its update read it — READ (0x7383d0 at 0x7384c0..0x7384ed, 0x732db0, 0x7325a0, 0x538460, 0x73a5e0 at 0x73a7d9), a fit (the forecast), both twins"
     - "C-129 / C-99: the known cities refresh at every look over revealed centres; the recruit's offer sorted by unit id — READ (0x7877e0 at 0x787c38..0x787ca7, 0x5f0280, 0x5f0490 -> 0x5eff10, 0x5ef9a0, 0x733060 -> 0x7328d0), both twins; the replay's majors' districts"
   review: reviewed
 - addr: 0x733060
@@ -145,20 +174,27 @@
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
     - "C-129 / C-99: the known cities refresh at every look over revealed centres; the recruit's offer sorted by unit id — READ (0x7877e0 at 0x787c38..0x787ca7, 0x5f0280, 0x5f0490 -> 0x5eff10, 0x5ef9a0, 0x733060 -> 0x7328d0), both twins; the replay's majors' districts"
+    - "C-130 / C-129: the recruit's obsolete cut under the team's player; the government values' housing on the forecast of the city as its update read it — READ (0x7383d0 at 0x7384c0..0x7384ed, 0x732db0, 0x7325a0, 0x538460, 0x73a5e0 at 0x73a7d9), a fit (the forecast), both twins"
   context:
     - "...e Unit 0x7ec7b0; Build Unit 0x7f4e00; Recruit Units 0x81c820 (the recruit 0x60a8c0 -> 0x738050: the free units, then the units of the lower-priority unlocked operations); Lock Units..."
   review: reviewed
 - addr: 0x7383d0
   final: 0x4dc3f0
   kind: function
-  semantics: "a team's recruit (from 0x738050): with a Recruit Range the offer cut to the units within it of the goal (0x732e50); with the team's +0x0 set the obsolete units cut (0x732db0); the minimums 0x73be10, the desired strength 0x723ab0, the strength 0x73c7c0, the joins 0x737f90, the team update 0x73fba0."
+  semantics: "a team's recruit (from 0x738050, on the team's copy of the offer): with a Recruit Range the offer cut to the units within it of the goal (0x732e50); with the team's +0x0 (the operation's player, always written) the obsolete units cut (0x732db0 at 0x7384c0..0x7384ed); the minimums 0x73be10, the desired strength 0x723ab0, the strength 0x73c7c0, the joins 0x737f90, the team update 0x73fba0."
   status: PARTLY
   cases:
     - recording: h1_duely1128
       turn: 176
       value: "city-state 3's City Defense: the Man-at-Arms 1179650 first of the offer's two at distance 1"
-  impl: [cpu/core/operations/recruit.ts:recruitOperation]
+    - recording: h1_duely1128
+      turn: 176
+      value: "city-state 2's City Defense: the obsolete Warrior 2490370 cut from the offer, Recruited 0 as logged"
+  impl:
+    - cpu/core/operations/recruit.ts:recruitOperation
+    - gpu/core/sim_minorops.py:_mops_recruit_team
   readings:
+    - "C-130 / C-129: the recruit's obsolete cut under the team's player; the government values' housing on the forecast of the city as its update read it — READ (0x7383d0 at 0x7384c0..0x7384ed, 0x732db0, 0x7325a0, 0x538460, 0x73a5e0 at 0x73a7d9), a fit (the forecast), both twins"
     - "C-129 / C-99: the known cities refresh at every look over revealed centres; the recruit's offer sorted by unit id — READ (0x7877e0 at 0x787c38..0x787ca7, 0x5f0280, 0x5f0490 -> 0x5eff10, 0x5ef9a0, 0x733060 -> 0x7328d0), both twins; the replay's majors' districts"
   review: reviewed
 - addr: 0x738f20
@@ -252,9 +288,11 @@
 - addr: 0x73a5e0
   final: 0x4de200
   kind: function
-  semantics: "an operation's teams from its definition (the assert \"Trying to initialize an operation with n... m_opDefinition->Teams.size() > 0\"), called by the start 0x73a120 before the target (0x73e7d0); its team conditions read as newTeams / the GPU's IsCoastalTarget, the body itself unread."
+  semantics: "an operation's teams from its definition (the assert \"Trying to initialize an operation with n... m_opDefinition->Teams.size() > 0\"), called by the start 0x73a120 before the target (0x73e7d0); its team conditions read as newTeams / the GPU's IsCoastalTarget; each team made (0x735260) takes the operation's player (op +0x98) at +0x0 and its definition at +0x8 (0x73a7d9..0x73a7ff), the player the recruit's obsolete cut reads (0x732db0)."
   status: PARTLY
+  impl: [cpu/core/operations/recruit.ts:all]
   readings:
+    - "C-130 / C-129: the recruit's obsolete cut under the team's player; the government values' housing on the forecast of the city as its update read it — READ (0x7383d0 at 0x7384c0..0x7384ed, 0x732db0, 0x7325a0, 0x538460, 0x73a5e0 at 0x73a7d9), a fit (the forecast), both twins"
     - "C-99: an operation's start takes its strengths; a unit's AI strengths with its formation — READ (0x73a120, 0x56dc90, 0x56e3e0, 0x56daa0, 0x1497d0), both twins"
   context:
     - "- THE START (0x73a120): after the teams (0x73a5e0) and the target and rally (0x73e7d0), before the \"Started\" line, the enemy's strength a..."

@@ -325,7 +325,7 @@ class SimMinorOps:
         (its pool slot, an unslotted unit as slot 0, the pool's order among
         equals), its AI unit row, plot, combat, ranged and bombard strengths,
         base range, damage, Movement left (in the pool's scale and whole),
-        base Movement, AI type DEFENDER"""
+        base Movement, AI type DEFENDER, its chassis obsolete to the holder"""
         seat = self._mops_seat(s)
         pu = lambda n: self._mops_u(s, n)  # noqa: E731
         P = pu("alive").shape[1]
@@ -347,8 +347,13 @@ class SimMinorOps:
                     extra = extra + techs[:, t].long() * v
             base = torch.where(emb, self._embark_moves + extra.unsqueeze(1), base)
         mp = pu("mp")
+        # its chassis obsolete to the holder (0x538460, `AiUnitView.obsolete`)
+        ct, cc = self._unit_obsolete_cols()
+        ht, hc = self.citystate_techs[:, s], self.citystate_civics[:, s]
+        obs = (((ct >= 0) & ht[:, ct.clamp(min=0)]).any(dim=2)
+               | ((cc >= 0) & hc[:, cc.clamp(min=0)]).any(dim=2))                                  # [B, NU]
         return {
-            "own": own, "key": key, "row": row, "tile": pu("tile"),
+            "own": own, "key": key, "row": row, "tile": pu("tile"), "obsolete": obs.gather(1, ut),
             "combat": self._ai_combat(self._mops_pre(s)), "ranged": self._ai_ranged(self._mops_pre(s)),
             "bombard": self._ai_bombard(self._mops_pre(s)), "range": self._type_ranged_range.take(ut),
             "dmg": hp_max - pu("hp"), "mp": mp, "mp_whole": torch.div(mp, self._mp_scale, rounding_mode="floor"),
@@ -1803,6 +1808,9 @@ class SimMinorOps:
         if rng > 0:
             dg = self.pair_dist[tile.clamp(min=0), goal.clamp(min=0).unsqueeze(1)].to(torch.long)
             valid &= ~((goal >= 0).unsqueeze(1) & (dg > rng))
+        # the obsolete cut (0x732db0 under the team's player): no unit
+        # obsolete to the holder is offered
+        valid &= ~u["obsolete"].gather(1, oc)
         drally = torch.where((rally >= 0).unsqueeze(1), self.pair_dist[tile.clamp(min=0), rally.clamp(min=0).unsqueeze(1)].to(torch.long),
                              torch.zeros_like(tile))
         pos = torch.arange(L, device=dev).unsqueeze(0).expand(B, L)

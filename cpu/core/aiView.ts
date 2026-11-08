@@ -45,7 +45,7 @@ import { opsOf } from './operations/manager';
 import { opJobUnits } from './operations/operation';
 import { resourceValue } from './aiResource';
 import { stockFree, strategicSurplus } from './stockpile';
-import { minorItemTurns, minorKnownUnits, minorListedUnits, minorUpgradeVisible, minorResourceFacts, minorUnitExpected, minorUnitProduction, minorUnitVersion } from './minorBuild';
+import { minorItemTurns, minorKnownUnits, unitObsoleteIn, minorListedUnits, minorUpgradeVisible, minorResourceFacts, minorUnitExpected, minorUnitProduction, minorUnitVersion } from './minorBuild';
 import { majorItemTurns, majorTraits, majorUnitExpected, majorUnitVersion, seatResearchTurns } from './freeCityBuild';
 import { cityStateAt as cityStateAtPlot, envoysHere, envoysOf, minorCity, suzerainOf, suzerainProjectMult } from './cityStates';
 import { grievanceWith } from './grievance';
@@ -96,10 +96,11 @@ export function cityGrowth(state: GameState, city: City): CityGrowth {
   };
 }
 
-/** `forecastNow`: a city-state's housing value on the forecast of its city's
- *  growth as it stands (the civics AI's government values) instead of the
- *  one its city AI's last update read (`CityState.aiGrowth`) */
-export function aiView(state: GameState, opts: { forecastNow?: boolean } = {}): AiView {
+/** `updated`: a city-state's housing value on the forecast of its city as
+ *  its city AI's update this turn read it (`CityState.aiGrowthSeen`: the
+ *  civics AI's government values) instead of the one its turn's production
+ *  set (`CityState.aiGrowth`) */
+export function aiView(state: GameState, opts: { updated?: boolean } = {}): AiView {
   const seat = (i: number) => {
     const s = seatOf(state, i);
     if (!s) throw new Error(`aiView: no seat ${i}`);
@@ -543,14 +544,19 @@ export function aiView(state: GameState, opts: { forecastNow?: boolean } = {}): 
       if (!city) return { balance: 0, yields: {} };
       return amenityCityOf(computeCityStats(state, city));
     },
-    // a city-state's forecast is its city's update's (`CityState.aiGrowth`),
-    // any other city's its growth as it stands
+    // a city-state's forecast is its turn's (`CityState.aiGrowth`), or with
+    // `updated` its city as its update this turn read it — before the build
+    // the update places (runs/h1_duely1124 Cardiff t108: the Industrial Zone
+    // placed on its worked 11:12 takes the surplus 4 -> 2, the government
+    // values' Monarchy walls housing on the forecast of 4, Divine Right
+    // 363.5 at t109 as logged; t106 the Food a t105 harvest landed in the
+    // forecast, 272.5 at t107); any other city's its growth as it stands
     cityHousingValue: (i, id, housing, t, h) => {
       const city = cityOf(i, id);
       if (!city) return 0;
       const g = cityGrowth(state, city);
       const cs = isCityStateSeat(i) ? (seatOf(state, i) as CityState | undefined) : undefined;
-      return housingValue(g, growthForecast(opts.forecastNow ? g : cs?.aiGrowth ?? g), housing, t, h);
+      return housingValue(g, growthForecast((opts.updated ? cs?.aiGrowthSeen : undefined) ?? cs?.aiGrowth ?? g), housing, t, h);
     },
     // a city-state's its store (`CityState.gpPoints`, +0x1360 +0x168), which
     // only its district projects fill
@@ -820,7 +826,9 @@ export function storeUnitStrength(state: GameState, seat: number): void {
 /** a unit as the AI reads it */
 function unitView(state: GameState, u: Unit): AiUnitView {
   const d = UNITS[u.type];
-  return { id: u.id, type: gameTypeOf('unit', u.type, 'UNIT_'), plot: u.tileIndex, founder: !!d?.settler,
+  const type = gameTypeOf('unit', u.type, 'UNIT_');
+  const r = seatOf(state, u.seat)?.research;
+  return { id: u.id, type, plot: u.tileIndex, founder: !!d?.settler, obsolete: !!r && unitObsoleteIn(r, type),
     combat: aiStrengths(state, u).melee, ranged: aiRanged(u), range: d?.ranged?.range ?? 0, damage: UNIT_HP - u.hp,
     movesLeft: Math.trunc(u.movesLeft * 256 / MP_SCALE),
     baseMoves: u.embarked && !d?.naval ? EMBARK_MOVES + embarkTechMoves(state, u.seat) : d?.moves ?? 0,

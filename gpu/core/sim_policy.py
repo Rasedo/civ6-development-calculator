@@ -186,12 +186,12 @@ class SimPolicy:
 
     # -- the context ---------------------------------------------------------
 
-    def _pol_ctx(self, s: int, forecast_now: bool = False) -> dict:
+    def _pol_ctx(self, s: int, updated: bool = False) -> dict:
         """minor `s`'s policy context (the Free Cities at `FR`): its row, its
         cities' facts with their live masks and capital flags, its seat;
-        `forecast_now` a city-state's housing value on the forecast of its
-        growth as it stands (the government values, `aiView`'s
-        forecastNow)"""
+        `updated` a city-state's housing value on the forecast of its city
+        as its update this turn read it (the government values, `aiView`'s
+        updated)"""
         B, dev = self.B, self.device
         if s == self.FR:
             row = self.FREE_ROW
@@ -199,7 +199,7 @@ class SimPolicy:
             seat = FREE_SEAT
         else:
             row = self._CITY_MINOR0 + s
-            f = _MinorFacts(self, s, forecast_now=forecast_now)
+            f = _MinorFacts(self, s, updated=updated)
             cities = [(f, self.citystate_center[:, s] >= 0, True)]
             seat = 100 + s
         return {"s": s, "row": row, "seat": seat, "cities": cities, "f0": cities[0][0], "B": B, "dev": dev}

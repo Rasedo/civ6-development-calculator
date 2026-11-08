@@ -148,7 +148,8 @@ export function desiredStrength(view: AiView, seat: number, enemy: number, advan
 
 /** One recruit (0x738050): the offer sorted by unit id (0x733060 over unit
  *  +0x100, ascending: the order the units were made), then each team takes
- *  from it, its minimums then its strength; the units taken join it and leave
+ *  from it (0x7383d0: cut to its Recruit Range, then of the units obsolete
+ *  to the player), its minimums then its strength; the units taken join it and leave
  *  the offer. Returns every unit recruited. */
 export function recruitOperation(view: AiView, seat: number, op: Operation, offer: AiUnitView[], inProgress: boolean, range: number,
   units: ReadonlyMap<number, AiUnitView>, log: RecruitLog | null): AiUnitView[] {
@@ -158,6 +159,13 @@ export function recruitOperation(view: AiView, seat: number, op: Operation, offe
     let pool = offer;
     const goal = inProgress ? team.goals[1] : team.goals[0];
     if (range > 0 && goal !== NO_PLOT) pool = pool.filter((u) => view.plotDistance(u.plot, goal) <= range);
+    // the obsolete cut (0x732db0 under the team's player, +0x0, which the
+    // operation's start writes for every team: 0x73a7d9): a unit whose type
+    // is obsolete to the player is offered to no team (runs/h1_duely1128
+    // t176 city-state 2's City Defense recruits none, its Warrior 2490370
+    // past Gunpowder left to the Upgrade Units tree; no logged recruit of
+    // the five duely duels an obsolete unit, 0 of 1406)
+    pool = pool.filter((u) => !u.obsolete);
     const mins = recruitMinimums(view, team, pool, log, op.def);
     let taken = dedupe(mins.taken);
     if (mins.met || inProgress) {

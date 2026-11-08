@@ -616,12 +616,12 @@ export function minorResearchTurn(state: GameState, r: ResearchState, seat: numb
   // turn's own (Autocracy's flat bonus 14 / 13 at t11 / t12 on the desire
   // 1.3 / 0.1: the next turns' Political Philosophy 483.0 / 498.0 at t12 /
   // t13 as logged) — and a city-state's after its city AI's update. Their
-  // housing on the forecast of the city's growth as it stands, the policy
-  // jobs' on its city AI's last (runs/h1_duely1121 Hunza t55: Monarchy's
-  // walls housing 12 in the game's Divine Right, the forecast of the city
-  // grown to 7 that turn, ours a turn later on the forecast of 6)
+  // housing on the forecast of the city as that update read it, the policy
+  // jobs' on the turn's (`cityHousingValue`; runs/h1_duely1121 Hunza t55:
+  // Monarchy's walls housing 12 in the game's Divine Right, the forecast of
+  // the city grown to 7 that turn)
   return () => {
-    r.civicGovValues = governmentValues(aiView(state, { forecastNow: true }), seat,
+    r.civicGovValues = governmentValues(aiView(state, { updated: true }), seat,
       r.civicSlotBest ? new Map(Object.entries(r.civicSlotBest)) : slotTypeBest(new Map()));
     r.civicSlotBest = Object.fromEntries(slotTypeBest(scores));
   };

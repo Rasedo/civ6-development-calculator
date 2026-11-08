@@ -2532,12 +2532,15 @@
     - cpu/core/minorBuild.ts:minorCanTrain
     - gpu/core/sim_cityvalue.py:can_train
     - gpu/core/sim_minors.py:_minor_can_train
+    - cpu/core/aiViewTypes.ts:AiUnitView
+    - gpu/core/sim_minorops.py:_mops_units
   readings:
     - "C-96 / C-97: the team's unit to build, the recruit's contract and the knowledge base's camps — the team update's requirements and readiness, the unit choice, Recruit Units' result and contract, the camps READ; the maintenance resource test, the recruit's stealing and levy unread"
     - "C-96 / C-97: the unit value — READ (the combat, trade, explorer branches, the tail, the military AI's unit production), PARTLY READ (its inputs)"
     - "C-96: CanTrain's obsolescence and the contract purchase's refusal — READ (0x172820's prerequisite block, 0x538460, the callers' sixth argument), ported both twins"
     - "C-96: CanTrain's obsolescence and the contract purchase's refusal"
     - "C-129 / C-99: the known cities refresh at every look over revealed centres; the recruit's offer sorted by unit id — READ (0x7877e0 at 0x787c38..0x787ca7, 0x5f0280, 0x5f0490 -> 0x5eff10, 0x5ef9a0, 0x733060 -> 0x7328d0), both twins; the replay's majors' districts"
+    - "C-130 / C-129: the recruit's obsolete cut under the team's player; the government values' housing on the forecast of the city as its update read it — READ (0x7383d0 at 0x7384c0..0x7384ed, 0x732db0, 0x7325a0, 0x538460, 0x73a5e0 at 0x73a7d9), a fit (the forecast), both twins"
   notes:
     - true where the player holds the unit's MandatoryObsoleteTech +0x240, MandatoryObsoleteCivic +0x238, ObsoleteTech +0x250 or ObsoleteCivic +0x248
   context:

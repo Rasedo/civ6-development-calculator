@@ -9981,3 +9981,42 @@ sim_cityvalue.py), `_u_reserve_plot` (sim_citytrees.py), `_minor_lump`
   contract; the difference is unread (Add Goal Tech 0x7e7d20 / 0x7e7200, the
   creation 0x5f4530, the submission 0x60bb50 and the listener 0x7635c0 hold
   no turn test).
+
+## C-130 / C-129: the recruit's obsolete cut under the team's player; the government values' housing on the forecast of the city as its update read it — READ (0x7383d0 at 0x7384c0..0x7384ed, 0x732db0, 0x7325a0, 0x538460, 0x73a5e0 at 0x73a7d9), a fit (the forecast), both twins
+
+`recruitOperation` (cpu/core/operations/recruit.ts, `AiUnitView.obsolete` in
+`unitView`, cpu/core/aiView.ts); `_mops_recruit_team` over `_mops_units`'
+`obsolete` (gpu/core/sim_minorops.py). `aiView`'s `updated`
+(`cityHousingValue`, cpu/core/aiView.ts) for the civics AI's government
+values (`minorResearchTurn`, cpu/core/minorBuild.ts); `_MinorFacts.updated` /
+`forecast_growth` (gpu/core/sim_cityvalue.py) through `_pol_ctx(updated=True)`
+(gpu/core/sim_policy.py, sim_civics.py).
+
+- THE OBSOLETE CUT (0x7383d0 at 0x7384c0..0x7384ed, on the team's copy of
+  the offer 0x738050 makes): with the team's +0x0 set, 0x732db0 (find
+  0x7325a0, then remove_if) drops each unit whose type (+0x160) is obsolete
+  to that player (0x538460: ObsoleteTech, ObsoleteCivic or the Mandatory
+  columns held), after the Recruit Range's cut and before the minimums.
+  The team's +0x0 is the operation's player: the teams' init (0x73a5e0 at
+  0x73a7d9..0x73a7ff) writes op +0x98 there and the definition at +0x8 for
+  every team, so every recruit cuts.
+- CONFIRMED (one-seed aimem trace to t189): runs/h1_duely1128 t176
+  city-state 2's City Defense recruits none (its Warrior 2490370 past
+  Gunpowder left to the Upgrade Units tree 5308422), no swap with the
+  garrison Man-at-Arms, which keeps AI type DEFENDER: the standing army's
+  shortfall 0 (m_defendersNeeded 0) and Mobilization t185-188 as logged.
+  No logged recruit of the five duely duels is of a unit obsolete to its
+  player (0 of 1406).
+- THE GOVERNMENT VALUES' FORECAST (a fit, off the records): a city-state's
+  housing value in the civics AI's government values reads the growth
+  forecast of its city as its city AI's update read it that turn
+  (`CityState.aiGrowthSeen`), before the build that update places; the
+  policy jobs, before the update, the turn's (`CityState.aiGrowth`).
+  runs/h1_duely1124 Cardiff t108: the Industrial Zone placed on its worked
+  11:12 takes the surplus 4 -> 2 after the update; Monarchy's walls housing
+  on the forecast of 4 (241.9, 121.9 on the forecast as it stands): Divine
+  Right 363.5 and Reformed Church 582.5 at t109 as logged; t106 the Food a
+  t105 harvest landed in the update's read (164.0), 272.5 at t107; t107-110
+  every row exact.
+- OPEN: the forecast's writer (CityBuildAI +0x6c8 / +0x738 / +0x7a8,
+  0x5cb570) and its call in the update unread.

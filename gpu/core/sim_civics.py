@@ -343,7 +343,7 @@ class SimCivics:
         def government() -> None:
             slots = self._pol_tables()["slots"]
             was = {st: self.citystate_slot_best[:, s, k] for k, st in enumerate(slots)}
-            gov = self._pol_gov_values(s, self._pol_ctx(s, forecast_now=True), was)
+            gov = self._pol_gov_values(s, self._pol_ctx(s, updated=True), was)
             self.citystate_gov_values[:, s] = torch.where(m, gov, self.citystate_gov_values[:, s])
             self.citystate_slot_best[:, s] = torch.where(m, torch.stack([now[st] for st in slots], dim=1), self.citystate_slot_best[:, s])
             self.citystate_gov_valid[:, s] = self.citystate_gov_valid[:, s] | alive
