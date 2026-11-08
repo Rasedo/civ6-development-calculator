@@ -66,6 +66,7 @@ Hand-weighted 1–8 by the size of what is LEFT to build. One row per entry, no 
 | C-106 plot and city yields, appeal | 1 | Appeal's terms and refresh, drowned plots, a few city yields (LAB, BUILD) |
 | C-107 borders and culture claims | 1 | lifetime culture (BUILD); captured counts, a city-state's ring, Amani's annex (LAB) |
 | C-108 trade routes' yields and paths | 1 | route.originYields' rest, the trade graph's path cache, Persia's roster row (BUILD) |
+| C-131 the DLC packs' civilizations | 6 | every standalone pack's civilization and leader, their uniques and traits (BUILD, owner: later) |
 | C-109 war weariness | 1 | the game's ledger read (BUILD), per opponent (LAB) |
 | C-110 combat strength, fortification and healing | 1 | the Fortify order (BUILD); the +5s, fortification jumps, barbarian rest (LAB) |
 | C-111 unit rules | 1 | an embarked civilian's capture, a stale embarked flag (BUILD); 0x4bffa0's rows, withdrawals, goody gates (LAB) |
@@ -77,8 +78,8 @@ Hand-weighted 1–8 by the size of what is LEFT to build. One row per entry, no 
 | C-117 city-state bonuses, the roster's residue | 1 | the city-states with no roster row (BUILD); fits on 1119-1124 (LAB) |
 | C-118 tourism and great works | 1 | Improvement_Tourism's rows (BUILD); the sums and the far misses (LAB) |
 | C-119 the revealed plots and naming | 1 | river naming, natural wonders' finds, suzerain-shared plots (LAB) |
-| **C. Absent systems** | **44** | |
-| **OPEN, TOTAL** | **51** | |
+| **C. Absent systems** | **50** | |
+| **OPEN, TOTAL** | **57** | |
 
 ## The question ledger — owner asks
 
@@ -218,6 +219,9 @@ A question the SOURCE under-determines; neither engine ships a branch until the 
   - LAB: 1124 Shanghai's Tourism +9 the turn Liang establishes there (t194; the engines pay it from t189); 1124 Xi'an's Science moving with the Great Works it shuffles (t137–150); the World Games' gold and Campus tourism tiers by rank, a fit (1118 t201 China's Training Athletes t191 and Rome's t193 tied, China took the Campus tourism, Rome alone the Favor; 1108 t201 Rome alone both); a great work's ScalingFactor (Heritage Tourism, Satellite Broadcasts, Printing) and a themed holder's ThemingTourismMultiplier summing as percents on the base, a fit (1112 Beijing and Guangzhou, three themed Religious works each, +9 over the product from t216); the far misses (1103 China t230 394 for 150; 1107 Rome's non-capital cities +2 each from its Metal Casting at t201, Antium holding no wonder, work or tourism plot; 1117 China t222+ ours 3 a Great Work above, Guangzhou 36 / 30 on two; 1118 Longxi and Beijing t201+ ours 3 below, no work in Longxi); a second Future Tech or Civic's cost (both engines charge the row's Cost again) and a seat's Future Tech count (the dump holds the tech's bit; `researchProjectPct` 0). BUILD: Improvement_Tourism's PrereqTech-Flight rows past the Batey, Colossal Head and Sphinx (Pasture, Plantation, Great Wall, City Park, Chateau and the rest, the Mine's 0).
 - **C-119. THE REVEALED PLOTS AND NAMING.** Weight 1.
   - LAB: the revealed plots (runs/h1_duelw1126–1128): a river is not named when a major's revealed plots first reach it (1128 river 3 revealed by record t25, its "Random River" draw t37; the event pick, eventPick.ts, keeps the union of each record's sight); the replay's fog against the records' (`fog.revealed` fails from t2 on all three): a founded city reveals ring 2 whole and ring 3 in part at t2 (1126 Rome 13 / 18, Xi'an 11 / 18); FIND_NATURAL_WONDER* on the dumps without revealed plots (13 failures over 1117 / 1118 / 1121); 1121 t73 China lacks plot 103, its suzerained Hunza's Swordsman's (14,4) step's; 1127 t49 China reveals 582 / 625 / 626 the game does not (the game's once China's units stand on 39:9 / 40:9): how far the sight test reaches a river's plots unread; the rivers' names: a plot's owner change inside a turn (0x84760's count) unreplayed by the importer; an ally's shared sight (Poundmaker) no receiver of 0x508d50.
+
+- **C-131. THE DLC PACKS' CIVILIZATIONS.** Weight 6.
+  - BUILD (owner 2026-11-08: to port, later): the standalone packs' civilizations and leaders (Persia and Macedon, Nubia, Poland, Australia, Khmer and Indonesia, the New Frontier passes, the Leader Pass leaders such as Ramses) have no roster row (world/roster.ts, docs/ROSTER.md): their civilization and leader ids, trait modifiers, unique units and infrastructure, the GPU roster and the seeder's draw; the lab game lab4_t225 seats Persia (Cyrus), Nubia (Amanitore), Maya (Lady Six Sky) and Egypt (Ramses), and Persia's TRAIT_SATRAPIES_POLITICAL_PHILOSOPHY_TRADE_ROUTE alone refuses 252 of its trade pairs; recordings seating them are needed to check the port.
 
 ## Harness — not weighted
 

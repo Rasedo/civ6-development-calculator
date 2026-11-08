@@ -34,8 +34,8 @@ install ships. Barbarians, Free Cities and the city-states are not seats.
 
 The standalone DLC packs' civilizations (Persia and Macedon, Nubia, Poland,
 Australia, Khmer and Indonesia, and the New Frontier passes) have no seat
-here, so their uniques have no row: a Hypaspist or an Immortal is out of
-scope by construction, not an open item.
+here, so their uniques have no row: a Hypaspist or an Immortal has none.
+Their port is open work, AUDIT C-131.
 
 Trait MODIFIERS only. A seat's unique units and unique infrastructure are
 catalog rows, not trait modifiers: they live in the unit, building, district
