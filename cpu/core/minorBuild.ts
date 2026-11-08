@@ -2009,7 +2009,7 @@ export function minorItemCost(state: GameState, cityState: CityState, item: Excl
 /** THE MINOR'S BUILDING RISES (its production's completion or its purchase):
  *  the Flood Barrier repairs behind it, the walls refit the centre's and the
  *  Encampment's outer pools */
-function minorRaiseBuilding(state: GameState, cityState: CityState, id: string): void {
+export function minorRaiseBuilding(state: GameState, cityState: CityState, id: string): void {
   const b = BUILDINGS[id];
   cityState.buildings = [...(cityState.buildings ?? []), id];
   if (b.floodBarrier) repairBehindBarrier(state, minorCity(cityState));

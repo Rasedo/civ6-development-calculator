@@ -91,7 +91,7 @@ import { CAMP_DISPERSAL_GOLD, MP_SCALE, scaleByGameSpeed } from '../data/constan
 import { PROMOTE_HEAL, aiPromotionPick, attacksPerTurn, promoCount, takePromotion, unitPromoRows } from '../core/promotions';
 import { fireFeature } from '../data/disasters';
 import { civicAgendas, setupAgendas } from '../core/agendas';
-import { holdMinorCatchUp, holdMinorOrders, holdMinorStart, minorCombatDesire, minorResearch, minorSetItem, minorBuildFacts, minorKnowledge, minorKnownUnits, minorItemCost, minorItemInHand, minorItemKey, minorBuildingPrice, minorUnitPrice, minorUpgradeUnit, minorUpgradeVisible, traceMinorLays, traceMinorPolicyScores, traceMinorPurchases } from '../core/minorBuild';
+import { holdMinorCatchUp, holdMinorOrders, holdMinorStart, minorCombatDesire, minorResearch, minorSetItem, minorBuildFacts, minorKnowledge, minorKnownUnits, minorItemCost, minorItemInHand, minorItemKey, minorBuildingPrice, minorRaiseBuilding, minorUnitPrice, minorUpgradeUnit, minorUpgradeVisible, traceMinorLays, traceMinorPolicyScores, traceMinorPurchases } from '../core/minorBuild';
 import { DEDICATED_IMPROVEMENTS, IMPROVEMENT_IDS, unitActionIndex } from '../core/unitActions';
 import { loadCatalog, type Catalog, type DumpCity, type TurnRecord } from './record';
 import { num, bool } from './record';
@@ -2860,6 +2860,23 @@ function applyBuyBuilding(ctx: Ctx, d: Extract<Decision, { kind: 'buyBuilding' }
   const actor = seatOf(state, seat) as Seat | undefined;
   const city = cityAt(state, d.city);
   const id = engineRowOf(ctx.cat, 'building', d.building);
+  // a city-state's purchase is its Economic AI's, its contract purchases in
+  // its turn (`minorContractPurchases`): one the engine's turn made stands;
+  // one it made none of is imposed at its price, paid from what the
+  // treasury holds and spent through the building purchase's spend on its
+  // savings (`purchaseSpend`, the UNITS slot then the SLUSH slot), so its
+  // next savings turn shares only the treasury's own change (runs/h1_duely1121
+  // t178 Hunza's Stock Exchange: no fall at t179, its Line Infantry kept)
+  const minor = state.cityStates.find((c) => c.centerIndex === d.city && c.seat === seat);
+  if (minor && id && d.currency === 'gold') {
+    if ((minor.buildings ?? []).includes(id)) return void count(ctx, 'minorAi:buyBuilding', 'applied', d.player);
+    const price = minorBuildingPrice(state, minor, id);
+    minor.treasury -= Math.min(price, Math.max(0, minor.treasury));
+    if (minor.economy) purchaseSpend(minor.economy, price * FX, false);
+    if (minor.prodItem === minorItemKey({ building: id })) minorSetItem(state, minor, null);
+    minorRaiseBuilding(state, minor, id);
+    return void count(ctx, 'minorAi:buyBuilding', 'fallback', d.player, `${id}: the engine bought none (gold ${minor.treasury})`);
+  }
   if (!actor || !city || !id) return void count(ctx, 'buyBuilding', 'refused', d.player);
   if (city.buildings.includes(id)) return void count(ctx, 'buyBuilding', 'refused', d.player);
   let ok = false;
@@ -5689,6 +5706,10 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
         // t201: city-state 3's Builder trained on 41:12 steps to 42:12, out of
         // Granada's look)
         matchNewUnits(ctx, b, player);
+        // ...each seeing from every plot its logged steps entered, as the
+        // game's units do (runs/h1_duely1127 record 7: city-state 3's
+        // Warrior 131073 steps 6:18 -> 5:18, 7:20 revealed from 6:18)
+        for (const d of ds) if (d.kind === 'move' && d.player === player && d.path) ctx.paths.set(d.unit, d.path);
         syncUnits(ctx, b, player, true);
         // ...its upgrades made in its turn, which no later look sees undone
         // (runs/h1_dueld1128 t41: Hong Kong's Warrior upgraded to a
