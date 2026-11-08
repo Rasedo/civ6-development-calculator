@@ -33,7 +33,7 @@ import { GP_PERM, GP_UNIT_PROD_CLASSES } from '../data/greatPeople';
 import { unitIsMilitary } from './units';
 import { CLASS_BIT, classBitOf, UNIT_PROMO_CLASS } from '../data/promotions';
 import { isSpaceProject } from '../data/projects';
-import { cityAppealResolver, cityGovernorEffects, cityGovernorEstablished, cityGovernorPromos, cityGovernorTitles, cityHasGovernor } from './governors';
+import { cityAppealResolver, cityGovernorEffects, cityGovernorEstablished, cityGovernorPromos, cityGovernorTitles } from './governors';
 import { GWO_NAMES, type GreatWorkObject } from '../data/greatWorks';
 import { WATER_WORKS_HOUSING, WATER_WORKS_AMENITIES } from '../data/governors';
 import type { AdjacencyRule } from '../data/districts';
@@ -2042,15 +2042,14 @@ export function followerBeliefForReligion(state: GameState, g: number): BeliefDe
  * CIV6 (Governor): the abilities apply only once the governor is
  * ESTABLISHED, and so do the Audience Chamber's amenities and housing
  * (REQUIREMENT_CITY_HAS_GOVERNOR: 1104 Taiyuan's +4 Housing and +2 Amenities
- * open the turn Reyna establishes, t153, five turns after her seating).
- * Theocracy's and Communism's per-citizen yields read the seating alone.
- * Merchant Republic's gold names the ESTABLISHED governor and gets it.
+ * open the turn Reyna establishes, t153, five turns after her seating), and
+ * so do Theocracy's and Communism's per-citizen yields, the same requirement
+ * (runs/h1_duelp1121 Chengdu t201-203 and Shenyang t237-241 under Theocracy
+ * no Faith until their governors establish) and Merchant Republic's gold.
  */
 export function withGovernor(state: GameState, base: Modifiers, city: City): Modifiers {
-  const seated = cityHasGovernor(state, city);
-  if (!seated) return base;
-  const established = cityGovernorEstablished(state, city);
-  const fx = established ? cityGovernorEffects(state, city) : [];
+  if (!cityGovernorEstablished(state, city)) return base;
+  const fx = cityGovernorEffects(state, city);
   const m: Modifiers = {
     ...base,
     cityYields: { ...base.cityYields },
@@ -2061,11 +2060,9 @@ export function withGovernor(state: GameState, base: Modifiers, city: City): Mod
   for (const k of Object.keys(base.governorPerCitizen) as YieldKey[]) {
     m.perCitizen[k] = (m.perCitizen[k] ?? 0) + (base.governorPerCitizen[k] ?? 0);
   }
-  if (established) {
-    m.amenitiesAll += seatBuildingSum(state, city.seat, 'amenitiesWithGovernor');
-    m.housingAll += seatBuildingSum(state, city.seat, 'housingWithGovernor');
-  }
-  if (established && base.governorTitles.length) {
+  m.amenitiesAll += seatBuildingSum(state, city.seat, 'amenitiesWithGovernor');
+  m.housingAll += seatBuildingSum(state, city.seat, 'housingWithGovernor');
+  if (base.governorTitles.length) {
     // CIV6 (Civil Prestige, REQUIREMENT_CITY_HAS_GOVERNOR_WITH_X_TITLES)
     const titles = cityGovernorTitles(state, city);
     for (const r of base.governorTitles) {
@@ -2074,10 +2071,8 @@ export function withGovernor(state: GameState, base: Modifiers, city: City): Mod
       m.housingAll += r.housing;
     }
   }
-  if (established) {
-    for (const k of Object.keys(base.governorYieldMult) as YieldKey[]) {
-      m.yieldMult[k] = (m.yieldMult[k] ?? 1) + ((base.governorYieldMult[k] ?? 1) - 1);
-    }
+  for (const k of Object.keys(base.governorYieldMult) as YieldKey[]) {
+    m.yieldMult[k] = (m.yieldMult[k] ?? 1) + ((base.governorYieldMult[k] ?? 1) - 1);
   }
   for (const e of fx) {
     for (const k of Object.keys(e.cityYields ?? {}) as YieldKey[]) {

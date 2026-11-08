@@ -629,13 +629,13 @@ class SimGovernors:
         promotions' plus the two governments that pay by citizen in a governed
         city), and the faith per SPECIALTY district.
 
-        `gov_percit` is the seat's `governorPerCitizen` [B, 6], which wants a
-        SEATED governor where every promotion channel wants an established
-        one."""
-        seated = (self._governor_at(row) >= 0).double().unsqueeze(2)      # [B, RC, 1]
+        `gov_percit` is the seat's `governorPerCitizen` [B, 6], which wants an
+        ESTABLISHED governor (REQUIREMENT_CITY_HAS_GOVERNOR), as every
+        promotion channel does."""
+        est = self._governor_established(row).double().unsqueeze(2)       # [B, RC, 1]
         out = self._governor_vec(row, "cityYields")
         out = out + (self._governor_vec(row, "perCitizen")
-                     + gov_percit.double().unsqueeze(1) * seated) * pop.double().unsqueeze(2)
+                     + gov_percit.double().unsqueeze(1) * est) * pop.double().unsqueeze(2)
         out[:, :, 5] = out[:, :, 5] + self._governor_sum(row, "faithPerSpecialty") * spec.double()
         out[:, :, 2] = out[:, :, 2] + self._governor_pass_route_gold(row)
         return out + self._governor_building_yields(row)

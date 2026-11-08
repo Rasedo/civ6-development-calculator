@@ -13,7 +13,9 @@
  * subject failing with the same numbers and the same importer gaps is one row
  * with its first and last turn and its count — and the gap table; and prints
  * the per-check table. A record whose counter moved during its dump is not
- * read. `--replay` runs the action replay instead (`replay.ts`): the engine
+ * read. `--from` reports the turns from T on, every record before them read
+ * into the history as the whole run reads it (the event replay's fertility,
+ * the moments, the trained bests). `--replay` runs the action replay instead (`replay.ts`): the engine
  * free from the first record on the recorded decisions, its report and
  * Markdown summary written to the named file. `--aiscore` runs the replay
  * with each pair from the record's world and the AI's memory carried
@@ -80,7 +82,7 @@ export function runReport(dumpPath: string, from = -Infinity, to = Infinity) {
   for (const line of readFileSync(dumpPath, 'utf8').split('\n')) {
     if (!line.trim()) continue;
     const rec = JSON.parse(line) as TurnRecord;
-    if (rec.turn < from || rec.turn > to) continue;
+    if (rec.turn > to) continue;
     const events = Array.isArray(rec.events) ? rec.events as unknown[][] : [];
     if (rec.moved) {
       unread.push(...events);
@@ -128,7 +130,8 @@ export function runReport(dumpPath: string, from = -Infinity, to = Infinity) {
   const starts: StartReplay[] = [];
   const picks = new EventPicks(cat, history.randLog, loadClimateLog(dumpPath, seeds, byTurn.get(turns[0])!.head.W));
   const add = (r: CheckResult) => {
-    const t = tallies.get(r.check) ?? { pass: 0, fail: 0, failGapped: 0, skip: {} };
+    if (r.turn < from) return;
+    const t =tallies.get(r.check) ?? { pass: 0, fail: 0, failGapped: 0, skip: {} };
     tallies.set(r.check, t);
     if (r.skip) {
       t.skip[r.skip] = (t.skip[r.skip] ?? 0) + 1;
@@ -154,7 +157,7 @@ export function runReport(dumpPath: string, from = -Infinity, to = Infinity) {
     const rec = byTurn.get(t)!;
     advanceHistory(history, rec, cat);
     const imp = importTurn(rec, cat, history);
-    for (const [g, n] of imp.gaps) gaps.set(g, Math.max(gaps.get(g) ?? 0, n));
+    if (t >= from) for (const [g, n] of imp.gaps) gaps.set(g, Math.max(gaps.get(g) ?? 0, n));
     for (const r of picks.check(rec, byTurn.get(t + 1), imp)) add(r);
     for (const r of stateChecks(rec, cat, imp, starts, byTurn.get(t + 1))) add(r);
     const next = byTurn.get(t + 1);
@@ -166,10 +169,11 @@ export function runReport(dumpPath: string, from = -Infinity, to = Infinity) {
     for (const r of td.results) add(r);
     draws = td.ledger;
   }
+  const reported = turns.filter((t) => t >= from);
   return {
     dump: dumpPath,
-    turns: turns.length ? [turns[0], turns[turns.length - 1]] : [],
-    records: turns.length,
+    turns: reported.length ? [reported[0], reported[reported.length - 1]] : [],
+    records: reported.length,
     ...(draws ? { draws } : {}),
     checks: Object.fromEntries([...tallies].sort(([a], [b]) => a.localeCompare(b))),
     gaps: Object.fromEntries([...gaps].sort(([a], [b]) => a.localeCompare(b))),
