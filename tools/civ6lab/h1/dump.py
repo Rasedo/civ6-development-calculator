@@ -19,9 +19,10 @@ owner and owning city are the city's; its `favored` / `disfavored` Yields
 indices, the citizen manager's flags; its `luxAlloc`, the luxury
 allocation's [resource, amount] entries naming it), `units`, `volcanoes` (`h1_dump_gc.lua`:
 the volcano vector's named entries in its order, [plot, NamedVolcanoes
-index], and the vector's size), `revealed` (per major player id its revealed
-plots, a hex string of plot bits, four plots a digit, plot 4k the digit's
-lowest bit), and from the turn-start
+index], and the vector's size), `revealed` (per player id, every alive player
+and the barbarians: majors, city-states, Free Cities, its revealed plots,
+a hex string of plot bits, four plots a digit, plot 4k the digit's lowest
+bit), and from the turn-start
 witness (`h1_starts.lua`, armed by `play`) `starts` (per player the last turn
 its PlayerTurnStarted and PlayerTurnStartComplete fired, read before the
 dump; `startsMoved: true` when one fired while it read) and `witness` (each
