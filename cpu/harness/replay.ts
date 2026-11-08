@@ -1670,21 +1670,28 @@ function minorAi(ctx: Ctx, b: TurnRecord, turn: number, made: ReadonlySet<Unit>,
  */
 /** the job of the game's unit `id` that logs no tactical row of the turn,
  *  by the game's AI memory: "Operation" for an operation's member at the
- *  tactical turn's or the end look (its moves AI_Operation.csv's: runs/
+ *  end look, else an "Upgrade Units" tree's at the end look, else an
+ *  operation's at the tactical turn (its moves AI_Operation.csv's: runs/
  *  h1_duely1127 t3, city-state 4's Warriors in Attack Barb Camp from its
- *  start), "Upgrade Units" for a unit an "Upgrade Units" tree holds, else
- *  "(no row)" */
+ *  start), else an "Upgrade Units" tree's at the log's look, else "(no row)" */
 function gameJob(ctx: Ctx, turn: number, player: number, id: number): string {
   const mem = ctx.gameMemory;
   if (!mem) return '(no row)';
-  for (const site of ['tactical', 'endlook'] as const) {
-    if (mem.at(site, turn, player)?.ops?.some((o) => o.teams.some((t) => t.some((x) => x[0] === id)))) return 'Operation';
-  }
-  for (const site of ['log', 'endlook'] as const) {
+  const inOp = (site: 'tactical' | 'endlook') => !!mem.at(site, turn, player)?.ops?.some((o) => o.teams.some((t) => t.some((x) => x[0] === id)));
+  const upgrading = (site: 'log' | 'endlook') => {
     const r = mem.at(site, turn, player);
     const c = r?.assigned?.[String(id)];
-    if (c !== undefined && r?.trees?.[String(c)]?.name === UPGRADE_MOVE) return UPGRADE_MOVE;
-  }
+    return c !== undefined && r?.trees?.[String(c)]?.name === UPGRADE_MOVE;
+  };
+  // the end look's job first: a unit an operation held as the turn opened
+  // that an "Upgrade Units" tree holds at its end, the operation's
+  // membership gone, was the tree's (runs/h1_duely1121 t69: city-state 4's
+  // City Defense completes with no move, 41:4 takes and moves its Warrior
+  // 524293)
+  if (inOp('endlook')) return 'Operation';
+  if (upgrading('endlook')) return UPGRADE_MOVE;
+  if (inOp('tactical')) return 'Operation';
+  if (upgrading('log')) return UPGRADE_MOVE;
   return '(no row)';
 }
 
