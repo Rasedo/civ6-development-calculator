@@ -660,6 +660,20 @@
   context:
     - "0x335040 reads the volcano component's counts (vtable 0xdb11b8): +0x68(b) 0xa1d2b0 counts the volcano entries (+0x1a0, stride 0xa0), with b true only th..."
   review: reviewed
+- addr: 0xdca710
+  kind: string
+  semantics: the Improvements row loader's SELECT (rowid, AdjacentSeaResource, AdjacentToLand, AirSlots, Appeal, BarbarianCamp, Buildable, ...), read by column index in 0xac6bb0
+  status: READ
+  cases:
+    - recording: h1_duelz1124
+      turn: 230
+      value: column 6 Buildable -> Improvements +0x108 & 8, unset on the Wind Farm
+  readings:
+    - "C-127: the plot test takes a removable feature for a Buildable row alone; a completion releases the research AI's other Tech Contracts — READ (0x35fd60 at 0x36079e / 0x36085d, 0xac6bb0, 0x762d60 at 0x762f7b), both twins"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...0x80 or above (Removable); else the row fails. The loader 0xac6bb0 reads the SELECT at 0xdca710 by column: 1 AdjacentSeaResource (+0x108 & 1), 2 AdjacentToLand (& 2), 3 AirSlots (+0..."
+  review: reviewed
 - addr: 0xdde870
   kind: global
   semantics: EFFECT_ADD_CULTURE_BOMB_TRIGGER's effect vtable (+0x10 its name, +0x28 0xb03850 makes the object 0xc03070)

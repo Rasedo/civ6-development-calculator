@@ -273,16 +273,24 @@ class SimMinors:
     def _tech_contracts_completed(self, s: int, hit: torch.Tensor, idx: int) -> None:
         """`techContractsCompleted` where `hit` [B]: city-state `s`'s Tech
         Contracts ACCEPTED or IN PROGRESS on technology `idx` COMPLETED, no
-        longer held by the research AI"""
-        from .sim_citytrees import CP_ACCEPTED, CP_COMPLETED, CP_IN_PROGRESS, GOAL_TECH
+        longer held by the research AI; every other one it holds released,
+        gone where no tree, hand or city list holds it"""
+        from .sim_citytrees import CP_ACCEPTED, CP_COMPLETED, CP_IN_PROGRESS, GOAL_TECH, tree_live
         ai = self.cityai
         if s >= ai.S:
             return
         prog = ai.c_progress[:, s]
-        on = (hit.unsqueeze(1) & (ai.c_id[:, s] >= 0) & (ai.c_goal_kind[:, s] == GOAL_TECH) & (ai.c_goal[:, s] == idx)
-              & ((prog == CP_ACCEPTED) | (prog == CP_IN_PROGRESS)))
+        tech = hit.unsqueeze(1) & (ai.c_id[:, s] >= 0) & (ai.c_goal_kind[:, s] == GOAL_TECH)
+        open_ = (prog == CP_ACCEPTED) | (prog == CP_IN_PROGRESS)
+        rel = tech & ~open_ & ai.c_goal_held[:, s]
+        in_tree = ai.c_in_tree[:, s] & tree_live(ai, s, ai.c_tree[:, s])
+        gone = rel & ~in_tree & ~ai.c_listed[:, s] & (ai.c_id[:, s] != ai.in_hand[:, s].unsqueeze(1))
+        on = tech & (ai.c_goal[:, s] == idx) & open_
         ai.c_progress[:, s] = torch.where(on, torch.full_like(prog, CP_COMPLETED), prog)
-        ai.c_goal_held[:, s] &= ~on
+        ai.c_goal_held[:, s] &= ~(on | rel)
+        ai.c_id[:, s] = torch.where(gone, torch.full_like(ai.c_id[:, s], -1), ai.c_id[:, s])
+        for f in (ai.c_purchase, ai.c_in_tree, ai.c_queued, ai.c_released):
+            f[:, s] &= ~gone
 
     def _minor_completion_choice(self, s: int, fire: torch.Tensor, idx: int, cur: torch.Tensor, sci: torch.Tensor) -> None:
         """the research AI's completion choice (0x762d60) where `fire` [B],

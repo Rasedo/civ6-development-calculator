@@ -10851,3 +10851,38 @@ per Artifact, a per-adjacent Science or Culture).
   Science / Culture (`applyLumpYield`), the pillage plunder (`payPlunder`),
   a kill's Science / Culture lumps (cpu/core/eras.ts). No recording
   yet shows one of them completing an item.
+
+## C-127: the plot test takes a removable feature for a Buildable row alone; a completion releases the research AI's other Tech Contracts — READ (0x35fd60 at 0x36079e / 0x36085d, 0xac6bb0, 0x762d60 at 0x762f7b), both twins
+
+`groundImprovements` / `BUILDABLE` (cpu/core/minorCityAi.ts), `_minor_ground_imps` /
+`_imp_buildable` (gpu/core/sim_minorai.py); `techContractsCompleted`
+(cpu/core/minorBuild.ts), `_tech_contracts_completed` (gpu/core/sim_minors.py).
+
+- THE FEATURE CLAUSE: with its fifth argument 1 (the City Analysis's
+  improvable test), 0x35fd60 lets a plot's feature the row neither lists nor
+  keeps (0x363a20 false) through only where the row's Improvements +0x108 & 8
+  is set and the feature's Features +0xc1 is 0x80 or above (Removable); else
+  the row fails. The loader 0xac6bb0 reads the SELECT at 0xdca710 by column:
+  1 AdjacentSeaResource (+0x108 & 1), 2 AdjacentToLand (& 2), 3 AirSlots
+  (+0x2c), 4 Appeal (+0x30), 5 BarbarianCamp (& 4), 6 Buildable (& 8), 7
+  BuildInLine (& 0x10), 8 BuildOnFrontier (& 0x20), 9 CanBuildOutsideTerritory
+  (& 0x40), 10 Capturable (& 0x80). Buildable is unset on the Solar Farm, the
+  Wind Farm, the Offshore Wind Farm, the Geothermal Plant, the Oil Well, the
+  Offshore Oil Rig and the Seastead: none is valued on a plot it must clear.
+- Confirmed: runs/h1_duelz1124 Bologna t227 / t230: plot 426 (Forest on Plains
+  Hills, its Lumber Mill pillaged) values no Wind Farm (ours 185.45 before), the
+  improvement trees on 382's Wind Farm (128.56; the game's tree
+  11665415 at PV 128 from t228), the Wind Farm laid there at t230 as
+  recorded; runs/h1_duelv1124 t235 Bologna's 30:9 (Forest, Lumber Mill) Wind Farm
+  row FX(-9999) beside the Farm and Mine at 23.78, 30:8's Wind Farm 16.63.
+- THE RELEASE: a completion's contract walk (0x762d60) releases every held
+  contract neither IN PROGRESS nor ACCEPTED (0x762f7b -> 0x600b00, the
+  holder's handle -1); a FAILED Tech Contract no tree, hand or city list
+  holds is gone with it. runs/h1_duelz1124 city-state 2: contract 233 on
+  Castles, FAILED in its tree's t88 tick (Turn Limit 5), research holder [-1]
+  and the contract gone at the t89 log look after t89's completion (Castles
+  chosen); contract 205, FAILED at t81 with no completion at t82, held to the
+  t82 log look and gone by its end look (the research AI's turn).
+- OPEN: Add Goal Tech's kept contracts (0x7e7d20: SUBMITTED / FAILED /
+  COMPLETED / 0 released, IN PROGRESS RUNNING) unported; the first block of
+  0x35fd60's feature walk (0x36076d, [rax+0x28] & 1) unread.

@@ -207,6 +207,9 @@
   semantics: "a research completion (the row): the in-hand turns +0x528 zeroed (0x731d10 on +0x4d0), the propagation again, the contract list walked again (IN PROGRESS / ACCEPTED add their value and are called at +0x10, any other released), per row 0x68d090, then the choice with the row as the key. No test of the research in hand: any completed row of the player (the delegate bound by 0x761d30 at 0x761ffe on the player's signals +0x13b8), a boosted row not in hand included, makes the choice, which replaces the research in hand."
   status: READ
   cases:
+    - recording: h1_duelz1124
+      turn: 89
+      value: "city-state 2: contract 233 on Castles, FAILED in its tree's t88 tick, released at t89's completion (the research holder [-1]) and gone at the t89 log look"
     - recording: h1_duely1121
       turn: 41
       value: "city-state 4: Currency boosted complete by its Trader's route, Tech Contract 83 IN PROGRESS at the log look, COMPLETED at the t41 end look"
@@ -239,6 +242,7 @@
     - "H-1: a city-state's boost completion and the research AI — READ"
     - "C-127: a boost completion's turns left; a minor Builder's clearing lump"
     - "C-98: a unit's value adds its abilities' modifiers; EFFECT_ADJUST_UNIT_MOVEMENT and REQUIREMENT_PLOT_ADJACENT_TO_OWNER; a second completion adds again — READ (0x7b62c0 at 0x7b7658..0x7b76d8, 0x6e11c7 / 0xc85140, 0x6bd520, 0x6d3200, 0x762d60's rows), both twins"
+    - "C-127: the plot test takes a removable feature for a Buildable row alone; a completion releases the research AI's other Tech Contracts — READ (0x35fd60 at 0x36079e / 0x36085d, 0xac6bb0, 0x762d60 at 0x762f7b), both twins"
   context:
     - "- A COMPLETION, 0x762d60 (the completed row): the propagation once more on the entries as they stand, then the c..."
   review: reviewed

@@ -2267,10 +2267,16 @@
   owner: Improvements
   offset: 0x108
   name: flags
-  semantics: & 0x40 CanBuildOutsideTerritory; +0x34 DefenseModifier.
-  status: PARTLY
+  semantics: "the loader's booleans by its SELECT's column (0xdca710): & 1 AdjacentSeaResource, & 2 AdjacentToLand, & 4 BarbarianCamp, & 8 Buildable, & 0x10 BuildInLine, & 0x20 BuildOnFrontier, & 0x40 CanBuildOutsideTerritory, & 0x80 Capturable; +0x34 DefenseModifier."
+  status: READ
+  cases:
+    - recording: h1_duelz1124
+      turn: 230
+      value: the Wind Farm (Buildable unset) values no row on Bologna's Forest plot 426; the plot test 0x35fd60 reads & 8
+  impl: [cpu/core/minorCityAi.ts:BUILDABLE, gpu/core/sim_minorai.py:_imp_buildable]
   writers: [0xac6bb0]
   readings:
+    - "C-127: the plot test takes a removable feature for a Buildable row alone; a completion releases the research AI's other Tech Contracts — READ (0x35fd60 at 0x36079e / 0x36085d, 0xac6bb0, 0x762d60 at 0x762f7b), both twins"
     - "C-97: the war desires, the war operation's readiness and the assault's executions — the war value, the not-ready hook, the readiness and the executions READ; the leader's war factor, the WMD flags, the deal items and the war record's writer unread"
   review: reviewed
 - kind: field

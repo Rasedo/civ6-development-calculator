@@ -404,17 +404,34 @@ function minorTechContracts(cityState: CityState): TechContract[] {
  *  check, +0x10 -> 0x5f5940): a Tech Contract on the technology just
  *  completed COMPLETED at once, mid-turn (runs/h1_duely1121 city-state 4
  *  t41: Currency completed by the Trader's route, contract 83 COMPLETED at
- *  the t41 end look; 1124 t49 city-state 2's Masonry) */
+ *  the t41 end look; 1124 t49 city-state 2's Masonry). Every other Tech
+ *  Contract the research AI holds the walk releases (0x762f7b -> 0x600b00,
+ *  its handle -1); one no tree, hand or city list holds is gone with it
+ *  (runs/h1_duelz1124 city-state 2's contract 233 on Castles, FAILED in its
+ *  tree's t88 tick, gone at the t89 log look after t89's completion;
+ *  contract 205, FAILED at t81 with no completion at t82, held to the t82
+ *  log look) */
 export function techContractsCompleted(cityState: CityState, id: string): void {
   const ai = cityState.cityAi;
   if (!ai) return;
+  const listed = new Set([...Object.values(ai.city).flat(), ...Object.values(ai.inHand)]);
+  const gone = new Set<number>();
   for (const c of ai.contracts) {
     const goal = ai.techContracts[c.id];
-    if (goal === undefined || (c.progress !== CP_ACCEPTED && c.progress !== CP_IN_PROGRESS)) continue;
+    if (goal === undefined || !goal.startsWith('TECH_')) continue;
+    if (c.progress !== CP_ACCEPTED && c.progress !== CP_IN_PROGRESS) {
+      if (!c.goalHeld) continue;
+      c.goalHeld = false;
+      if (!listed.has(c.id) && !ai.trees.some((t) => t.contracts.includes(c.id))) gone.add(c.id);
+      continue;
+    }
     if (engineId('tech', goal, 'TECH_', TECHS) !== id) continue;
     c.progress = CP_COMPLETED;
     c.goalHeld = false;
   }
+  if (!gone.size) return;
+  ai.contracts = ai.contracts.filter((c) => !gone.has(c.id));
+  for (const g of gone) delete ai.techContracts[g];
 }
 
 /** the minor's Civic Contracts (its city AI's Add Goal Tech contracts on a

@@ -122,6 +122,8 @@ const YIELD_KEY: Record<string, string> = {
 const DISTRICT_ENGINE = new Map(AI_DISTRICTS.map((r) => [r.type, engineId('district', r.type, 'DISTRICT_', DISTRICTS) as DistrictId | null]));
 /** per AI improvement row its engine improvement, null none */
 const IMPROVEMENT_ENGINE = new Map(AI_IMPROVEMENTS.map((r) => [r.type, engineId('improvement', r.type, 'IMPROVEMENT_', IMPROVEMENTS)]));
+/** the engine improvements whose install row is Buildable */
+const BUILDABLE = new Set(AI_IMPROVEMENTS.filter((r) => r.buildable).map((r) => IMPROVEMENT_ENGINE.get(r.type)).filter((x): x is string => !!x));
 /** an engine district's install type: the traitless AI row whose engine id it is */
 const districtType = (id: string): string =>
   AI_DISTRICTS.find((r) => r.trait === null && engineId('district', r.type, 'DISTRICT_', DISTRICTS) === id)?.type ?? `DISTRICT_${id}`;
@@ -222,7 +224,13 @@ function groundImprovements(state: GameState, cs: CityState, actual: Tile): Set<
   for (const [harvest, clear] of [[true, false], [false, true], [true, true]]) {
     if ((harvest && !harvestable) || (clear && !clearable)) continue;
     const ground = { ...tile, resource: harvest ? null : tile.resource, feature: clear ? null : tile.feature };
-    for (const id of validImprovementsIn(ground, opts)) out.add(id);
+    // the plot test takes a removable feature only for a Buildable row
+    // (0x35fd60's fifth argument at 0x36079e / 0x36085d: Improvements +0x108
+    // & 8, the loader's Buildable): no Solar or Wind Farm on a Forest
+    // (runs/h1_duelz1124 Bologna t227 / t230: plot 426's Forest Hills, its
+    // Lumber Mill pillaged, no Wind Farm tree, the Wind Farm laid on 382;
+    // runs/h1_duelv1124 t235: Bologna's 30:9 Wind Farm row FX(-9999), 30:8's 16.63)
+    for (const id of validImprovementsIn(ground, opts)) if (!clear || BUILDABLE.has(id)) out.add(id);
   }
   return out;
 }

@@ -721,6 +721,21 @@ class SimMinorAi:
 
     # -- the plot analysis ---------------------------------------------------
 
+    def _imp_buildable(self) -> list[bool]:
+        """per engine improvement whether its install row is Buildable (an
+        AI improvement row of it so marked)"""
+        cached = getattr(self, "_imp_buildable_cache", None)
+        if cached is not None:
+            return cached
+        K = int(self._imp_unlock.numel())
+        out = [False] * K
+        eng = self._cv_tables()["engine"]["improvement"]
+        for r, k in zip(self.rules.ai_city_build["improvements"], eng):
+            if 0 <= int(k) < K and r["buildable"]:
+                out[int(k)] = True
+        self._imp_buildable_cache = out
+        return out
+
     def _minor_ground_imps(self, s: int, standing: bool = False, drought: bool = True) -> torch.Tensor:
         """[B, T, K] — `groundImprovements` (with `standing`,
         `standingImprovements`: the plot as it stands alone, the trees'
@@ -785,24 +800,31 @@ class SimMinorAi:
         sea_c = base & clearable & (~res | harvestable) & self.water & keep
         any_c = bool(land_c.any()) or bool(sea_c.any())
         out = torch.zeros(B, T, K, dtype=torch.bool, device=dev)
+        bld = self._imp_buildable()
         for k in range(K):
+            # the plot test takes a removable feature only for a Buildable
+            # row (0x35fd60's fifth argument: Improvements +0x108 & 8)
+            if not bld[k]:
+                land_c_k, sea_c_k = torch.zeros_like(land_c), torch.zeros_like(sea_c)
+            else:
+                land_c_k, sea_c_k = land_c, sea_c
             ok = base & res & (self.res_imp == k)
             gov = self._imp_gov_promo[k] < 0
             if self._imp_water[k]:
                 if self._imp_uniq[k] < 0 and gov:
                     ok = ok | ((sea | sea_h) & self._imp_ground_ok(k))
                     if any_c:
-                        ok = ok | (sea_c & self._imp_ground_compute(k, cleared=True))
+                        ok = ok | (sea_c_k & self._imp_ground_compute(k, cleared=True))
             elif k == self.FARM:
                 ok = (ok | (land & (self.farm_flat | (self.farm_hill & hf)))
                       | (land_h & (nr_farm_flat | (nr_farm_hill & hf)))
-                      | (land_c & (nr["_fa_f_c"] | (nr["_fa_h_c"] & hf))))
+                      | (land_c_k & (nr["_fa_f_c"] | (nr["_fa_h_c"] & hf))))
             elif k == self.MINE:
-                ok = ok | (land & self.mine_ok) | (land_h & nr_mine) | (land_c & nr["_mi_c"])
+                ok = ok | (land & self.mine_ok) | (land_h & nr_mine) | (land_c_k & nr["_mi_c"])
             elif k == self.LUMBER:
                 ok = ok | (land & self.lumber_ok & lumber_live) | (land_h & nr["lumber_ok"] & lumber_live)
             elif self.SEASIDE >= 0 and k == self.SEASIDE:
-                ok = ok | (((land & self._sr_c & bare) | (land_h & nr["_sr_c"] & bare) | (land_c & nr["_sr_c"]))
+                ok = ok | (((land & self._sr_c & bare) | (land_h & nr["_sr_c"] & bare) | (land_c_k & nr["_sr_c"]))
                            & appeal_ok)
             elif self._imp_eng[k] and not self._imp_adj_plot[k]:
                 # the Military Engineer's own rows (the Fort): its land as it
@@ -820,12 +842,12 @@ class SimMinorAi:
                     mine_k = (self.citystate_suz_imp[:, s] == k).unsqueeze(1)
                     ok = ok | ((land | land_h) & mine_k & self._imp_ground_ok(k))
                     if any_c:
-                        ok = ok | (land_c & mine_k & self._imp_ground_compute(k, cleared=True))
+                        ok = ok | (land_c_k & mine_k & self._imp_ground_compute(k, cleared=True))
             elif self._imp_ground[k] and self._imp_built_by[k] < 0 and self._imp_uniq[k] < 0:
                 if gov:
                     ok = ok | ((land | land_h) & self._imp_ground_ok(k))
                     if any_c:
-                        ok = ok | (land_c & self._imp_ground_compute(k, cleared=True))
+                        ok = ok | (land_c_k & self._imp_ground_compute(k, cleared=True))
             if drought and k in self._drought_imps:
                 ok = ok & ~dry
             out[:, :, k] = ok
