@@ -9794,3 +9794,52 @@ full-Movement search runs, and those run at four places:
   +9.77 (the standing army's shortfall 1 where the game's
   m_defendersNeeded is 0: its Man-at-Arms 119 homed in an operation, turned
   COMBAT by 0x79b9c0, out of the list).
+
+## C-129 / C-99: the known cities refresh at every look over revealed centres; the recruit's offer sorted by unit id — READ (0x7877e0 at 0x787c38..0x787ca7, 0x5f0280, 0x5f0490 -> 0x5eff10, 0x5ef9a0, 0x733060 -> 0x7328d0), both twins; the replay's majors' districts
+
+`recruitOperation` (cpu/core/operations/recruit.ts), `_mops_recruit`
+(gpu/core/sim_minorops.py); `landMajorDistricts` in `minorAi` /
+`barbarianAi` (cpu/harness/replay.ts, replay only); `knownCities`
+(cpu/core/aiView.ts) unchanged.
+
+- THE LOOK'S CITY ARM (0x7877e0, plot order): a plot of visibility count
+  above 0 takes the city arm (0x5f0280) where it is a city's centre, the
+  district arm (0x5f0490) where it holds a district; a plot not seen but
+  revealed (+0x2f0) takes the city arm too (0x787c38..0x787ca7). 0x5f0280
+  finds the entry (owner word, type 2, city id) or appends one and refills it
+  (0x5efaf0: the record 0x5ef9a0 where its age +0x18 is not 0 — the ageing
+  0x5ebb30 adds 1 to every entry, 0x5ef9a0 sets 0 — then the centre's
+  district entry: GetDefenseStrength, the same where the outer damage is
+  below its most, the strike). So every revealed centre is refreshed at each
+  look, as `knownCities` reads the city live; every CITY line of
+  AI_Knowledge.csv logs age 0 (5190 of 5190, runs/h1_duely1121). The
+  district arm (0x5eff10) refreshes the record alone and marks the wonders:
+  a city known by a district plot with its centre never revealed holds no
+  district entry (runs/h1_duely1121 player 2's 6:12, "0, 0, 0" t60-80).
+- THE MAJORS' DISTRICTS (the replay): a district a major completes or
+  repairs in its turn (the log's CityProductionCompleted of a district, its
+  DistrictPillaged with the pillage cleared) stands so for the minors and
+  the barbarians after it: runs/h1_duely1121 t78 player 1's Campus on 8:14
+  repaired at its turn start (the barbarians' 6:12 at 49, Barbarian Attack
+  139), t79 its Holy Site on 7:15 (51, 141); runs/h1_duely1124 t55 its
+  Campus on 4:11 bought in its actions (the barbarians' 443 at 30, 60).
+  One-seed aimem traces: 1121 to t129 ops.strength 645 of 645 (the seven
+  barbarian rows t78-123 of the measure's), 1124 t55 as logged.
+- THE RECRUIT'S OFFER ORDER (0x738050 at 0x738152 and 0x7381e7: 0x733060,
+  an introsort over 0x7328d0's insertion pass, compares unit +0x100, the id,
+  unsigned ascending): each offer is walked in the order the units were
+  made; the minimums' and the strength's nearest-of-equals take the lower
+  id. runs/h1_duely1128 t176 city-state 3's City Defense takes the
+  Man-at-Arms 1179650 (serial 18, slot 2) over the Warrior 2228224 (serial
+  34, slot 0), both one from 4:9, "Recruiting strength ... UNIT_MAN_AT_ARMS"
+  alone, as the trace now does (the pool order took the Warrior first).
+- OPEN: 0x7383d0's obsolete filter (0x732db0 over 0x538460, gated by the
+  team's +0x0) unported; the replay's carried ids follow the game's id order
+  only where the import made the units in serial order (runs/h1_duely1128
+  t121 983040, serial 15, id 59 beside 1179650's 8); 1128 city-state 3's
+  Man-at-Arms 1179650 offered not at t121 (Move to safety after) nor t148
+  (Wander after), its turn not done there by any setter read: with the id
+  order the trace takes it at t148 (City Defense MAN_AT_ARMS for the game's
+  TREBUCHET); the knowledge base's district-only entries (no centre
+  revealed) not modelled: `knownCities` lists a revealed centre's city
+  alone.

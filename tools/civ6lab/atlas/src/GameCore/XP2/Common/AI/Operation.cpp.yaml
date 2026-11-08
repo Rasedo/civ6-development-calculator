@@ -3,6 +3,19 @@
 # `review: imported` = bootstrapped from dll_readings.md / code comments / saved
 # labels and not yet reviewed: verify against the disassembly, then edit and
 # set `review: reviewed`.
+- addr: 0x7328d0
+  kind: function
+  name: the recruit offer's insertion pass
+  semantics: "0x733060's insertion sort: unit pointers by +0x100 (the id), unsigned ascending."
+  status: READ
+  cases:
+    - recording: h1_duely1128
+      turn: 176
+      value: "city-state 3's City Defense offer: 1179650 before 2228224"
+  impl: [cpu/core/operations/recruit.ts:recruitOperation]
+  readings:
+    - "C-129 / C-99: the known cities refresh at every look over revealed centres; the recruit's offer sorted by unit id — READ (0x7877e0 at 0x787c38..0x787ca7, 0x5f0280, 0x5f0490 -> 0x5eff10, 0x5ef9a0, 0x733060 -> 0x7328d0), both twins; the replay's majors' districts"
+  review: reviewed
 - addr: 0x732cd0
   final: 0x4d7700
   kind: function
@@ -33,6 +46,27 @@
     - "C-99: Defend Units' ship release and the team update's members — READ (0x73d1f0, 0x73fba0 at 0x73fc75 -> 0x732cd0), both twins"
     - "C-128: a unit made anew leaves its operation and its standing army — READ, both twins"
     - "C-99 / C-129: a team member gone resolves by its pool slot — READ (0x732cd0 -> 0x4f2310), both twins"
+  review: reviewed
+- addr: 0x732db0
+  kind: function
+  name: the recruit offer's obsolete cut
+  semantics: "remove_if over the offer (0x7325a0 finds the first): a unit whose type is obsolete for the player (0x537460 -> 0x538460) leaves. Called by 0x7383d0 where the team's +0x0 is set. Unported."
+  status: PARTLY
+  readings:
+    - "C-129 / C-99: the known cities refresh at every look over revealed centres; the recruit's offer sorted by unit id — READ (0x7877e0 at 0x787c38..0x787ca7, 0x5f0280, 0x5f0490 -> 0x5eff10, 0x5ef9a0, 0x733060 -> 0x7328d0), both twins; the replay's majors' districts"
+  review: reviewed
+- addr: 0x733060
+  kind: function
+  name: the recruit offer's sort
+  semantics: "the offer's introsort (0x7329b0 / 0x732ae0, the insertion pass 0x7328d0) by unit +0x100, the id, unsigned ascending: the order the units were made. 0x738050 sorts each offer at 0x738152 and the recruited at 0x7381e7."
+  status: READ
+  cases:
+    - recording: h1_duely1128
+      turn: 176
+      value: city-state 3's City Defense takes the Man-at-Arms 1179650 (serial 18) over the Warrior 2228224 (serial 34, pool slot 0), both one from 4:9
+  impl: [cpu/core/operations/recruit.ts:recruitOperation, gpu/core/sim_minorops.py:_mops_recruit]
+  readings:
+    - "C-129 / C-99: the known cities refresh at every look over revealed centres; the recruit's offer sorted by unit id — READ (0x7877e0 at 0x787c38..0x787ca7, 0x5f0280, 0x5f0490 -> 0x5eff10, 0x5ef9a0, 0x733060 -> 0x7328d0), both twins; the replay's majors' districts"
   review: reviewed
 - addr: 0x737610
   final: 0x4db690
@@ -110,15 +144,23 @@
     - "C-97: the behaviour trees — READ (the interpreter), the nodes PARTLY READ"
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
+    - "C-129 / C-99: the known cities refresh at every look over revealed centres; the recruit's offer sorted by unit id — READ (0x7877e0 at 0x787c38..0x787ca7, 0x5f0280, 0x5f0490 -> 0x5eff10, 0x5ef9a0, 0x733060 -> 0x7328d0), both twins; the replay's majors' districts"
   context:
     - "...e Unit 0x7ec7b0; Build Unit 0x7f4e00; Recruit Units 0x81c820 (the recruit 0x60a8c0 -> 0x738050: the free units, then the units of the lower-priority unlocked operations); Lock Units..."
   review: reviewed
 - addr: 0x7383d0
   final: 0x4dc3f0
   kind: function
+  semantics: "a team's recruit (from 0x738050): with a Recruit Range the offer cut to the units within it of the goal (0x732e50); with the team's +0x0 set the obsolete units cut (0x732db0); the minimums 0x73be10, the desired strength 0x723ab0, the strength 0x73c7c0, the joins 0x737f90, the team update 0x73fba0."
   status: PARTLY
-  notes: ["imported: cited by the code, in no dll_readings section"]
-  review: imported
+  cases:
+    - recording: h1_duely1128
+      turn: 176
+      value: "city-state 3's City Defense: the Man-at-Arms 1179650 first of the offer's two at distance 1"
+  impl: [cpu/core/operations/recruit.ts:recruitOperation]
+  readings:
+    - "C-129 / C-99: the known cities refresh at every look over revealed centres; the recruit's offer sorted by unit id — READ (0x7877e0 at 0x787c38..0x787ca7, 0x5f0280, 0x5f0490 -> 0x5eff10, 0x5ef9a0, 0x733060 -> 0x7328d0), both twins; the replay's majors' districts"
+  review: reviewed
 - addr: 0x738f20
   kind: function
   name: teamUpdate

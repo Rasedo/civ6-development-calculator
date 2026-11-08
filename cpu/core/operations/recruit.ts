@@ -146,11 +146,13 @@ export function desiredStrength(view: AiView, seat: number, enemy: number, advan
   return advantage * Math.min(ours, theirs);
 }
 
-/** One recruit (0x738050): each team takes from the offer, its minimums then
- *  its strength; the units taken join it and leave the offer. Returns every
- *  unit recruited. */
+/** One recruit (0x738050): the offer sorted by unit id (0x733060 over unit
+ *  +0x100, ascending: the order the units were made), then each team takes
+ *  from it, its minimums then its strength; the units taken join it and leave
+ *  the offer. Returns every unit recruited. */
 export function recruitOperation(view: AiView, seat: number, op: Operation, offer: AiUnitView[], inProgress: boolean, range: number,
   units: ReadonlyMap<number, AiUnitView>, log: RecruitLog | null): AiUnitView[] {
+  offer.sort((a, b) => a.id - b.id);
   const all: AiUnitView[] = [];
   for (const team of op.teams) {
     let pool = offer;

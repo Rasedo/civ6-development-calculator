@@ -306,6 +306,7 @@
     - "C-97: the AI's knowledge of the map's cities"
     - "C-130 / C-98: the Archaeologist's value, the strength modifier's analysis, the knowledge base's enemy unit counts — READ (0x7b62c0 at 0x7b6a8c, 0x27fcf0, 0x6b2060, 0x69ed80, 0x5eab80, 0xbe4aa0), both twins"
     - "C-98: a city-state's City Analysis counts its knowledge base as its last turn left it — READ (0x608580 at 0x6085c9, 0x5c24e0 / 0x6fae70 on player signal +0x258, 0x785f30 in 0x6096c0's +0x370 list), both twins"
+    - "C-129 / C-99: the known cities refresh at every look over revealed centres; the recruit's offer sorted by unit id — READ (0x7877e0 at 0x787c38..0x787ca7, 0x5f0280, 0x5f0490 -> 0x5eff10, 0x5ef9a0, 0x733060 -> 0x7328d0), both twins; the replay's majors' districts"
   context:
     - "- The update (0x5ebb30): every entry ages; one whose plot the player sees with no city of its owner there is d..."
   review: reviewed
@@ -447,6 +448,7 @@
   readings:
     - "C-97: the AI's knowledge of the map's cities — READ (the record, the update, the statistics, the advantage), PARTLY READ (the city AI's stored yields)"
     - "C-97: the AI's knowledge of the map's cities"
+    - "C-129 / C-99: the known cities refresh at every look over revealed centres; the recruit's offer sorted by unit id — READ (0x7877e0 at 0x787c38..0x787ca7, 0x5f0280, 0x5f0490 -> 0x5eff10, 0x5ef9a0, 0x733060 -> 0x7328d0), both twins; the replay's majors' districts"
   context:
     - "- The record (0x5ef9a0): an entry per city the player knows (its own and those it sees): the yields truncated,..."
   review: reviewed
@@ -469,9 +471,23 @@
     - cpu/core/aiView.ts:knownCities
   readings:
     - "C-97: the war operations — the war candidates, the city value's frame, the assault nodes and Attack Units READ; the loyalty lead's sources, the team update's danger and the assault's executions PARTLY READ"
+    - "C-129 / C-99: the known cities refresh at every look over revealed centres; the recruit's offer sorted by unit id — READ (0x7877e0 at 0x787c38..0x787ca7, 0x5f0280, 0x5f0490 -> 0x5eff10, 0x5ef9a0, 0x733060 -> 0x7328d0), both twins; the replay's majors' districts"
   context:
     - "- THE KNOWN CITY RECORD (0x5efaf0, 0xe0 bytes; AI_Knowledge.csv's CITY lines 0x5ed0b0): +0x8 / +0xc the plot, +0x1c the p..."
     - ...he records of the turn before and logs the CITY VALUES on the turn's (the city records' 0x5efaf0 and the look 0x7877e0).
+  review: reviewed
+- addr: 0x5eff10
+  final: 0x3f5b10
+  kind: function
+  name: the known city's district sighting
+  semantics: "from 0x5f0490: the plot's city (0x57960); where the entry's age +0x18 is not 0 the record 0x5ef9a0; the wonder marks +0x90 (complete) and +0x78 by IsWonderComplete. No district entry."
+  status: READ
+  cases:
+    - recording: h1_duely1121
+      turn: 60
+      value: player 2's entry of 6:12 refreshed (population 11) with no district
+  readings:
+    - "C-129 / C-99: the known cities refresh at every look over revealed centres; the recruit's offer sorted by unit id — READ (0x7877e0 at 0x787c38..0x787ca7, 0x5f0280, 0x5f0490 -> 0x5eff10, 0x5ef9a0, 0x733060 -> 0x7328d0), both twins; the replay's majors' districts"
   review: reviewed
 - addr: 0x5f0020
   kind: function
@@ -511,13 +527,18 @@
 - addr: 0x5f0280
   final: 0x3f5db0
   kind: function
-  semantics: "the look's city arm: a city on a seen plot into the known cities."
-  status: PARTLY
+  name: the look's city arm
+  semantics: "the look's city arm (from 0x7877e0 on a seen centre, and on a revealed one not seen at 0x787ca7): the known city's entry (owner word, type 2, city id) found or appended (0x5e7ae0), then refilled (0x5efaf0): the record 0x5ef9a0 where its age +0x18 is not 0, the centre's district entry. Every revealed centre is refreshed at each look."
+  status: READ
+  cases:
+    - recording: h1_duely1121
+      turn: 78
+      value: every AI_Knowledge.csv CITY line logs age 0 (5190 of 5190); the barbarians' 6:12 at 49 the turn player 1's Campus is repaired
+  impl: [cpu/core/aiView.ts:knownCities]
   readings:
     - "C-96: the knowledge base's army records and the Combat Desire — READ (the records, the update, the desire), PARTLY READ (the signals' looks, the standing-army count)"
+    - "C-129 / C-99: the known cities refresh at every look over revealed centres; the recruit's offer sorted by unit id — READ (0x7877e0 at 0x787c38..0x787ca7, 0x5f0280, 0x5f0490 -> 0x5eff10, 0x5ef9a0, 0x733060 -> 0x7328d0), both twins; the replay's majors' districts"
     - "C-96: the knowledge base's army records and the Combat Desire — READ (the records, the update, the desire), PARTLY READ (the signals' looks; the standing-army count in its own section below)"
-  context:
-    - "...plot the player's visibility count (+0x290) holds above 0 — a city -> the known cities (0x5f0280), a district -> 0x5f0490 — each unit on it (0x75ce0's list), one hidden (+0x15f0, not +..."
   review: reviewed
 - addr: 0x5f0440
   final: 0x3f5f20
@@ -541,13 +562,17 @@
 - addr: 0x5f0490
   final: 0x3f5f70
   kind: function
-  semantics: "the look's district arm: a district on a seen plot into the knowledge base."
-  status: PARTLY
+  name: the look's district arm
+  semantics: "the look's district arm (0x7877e0 on a seen plot holding a district, not a centre): the district's city's entry found or appended, then 0x5eff10: the record 0x5ef9a0 where its age is not 0, the wonder marks (+0x78 / +0x90); no district entry. A city known by its district plots alone holds none."
+  status: READ
+  cases:
+    - recording: h1_duely1121
+      turn: 60
+      value: "player 2's entry of 6:12: population 11, no district (0, 0, 0) t60-80, its centre never seen"
   readings:
     - "C-96: the knowledge base's army records and the Combat Desire — READ (the records, the update, the desire), PARTLY READ (the signals' looks, the standing-army count)"
+    - "C-129 / C-99: the known cities refresh at every look over revealed centres; the recruit's offer sorted by unit id — READ (0x7877e0 at 0x787c38..0x787ca7, 0x5f0280, 0x5f0490 -> 0x5eff10, 0x5ef9a0, 0x733060 -> 0x7328d0), both twins; the replay's majors' districts"
     - "C-96: the knowledge base's army records and the Combat Desire — READ (the records, the update, the desire), PARTLY READ (the signals' looks; the standing-army count in its own section below)"
-  context:
-    - "...ity count (+0x290) holds above 0 — a city -> the known cities (0x5f0280), a district -> 0x5f0490 — each unit on it (0x75ce0's list), one hidden (+0x15f0, not +0x1650) only where 0x50..."
   review: reviewed
 - addr: 0x5f09b0
   final: 0x3f2da0

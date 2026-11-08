@@ -912,6 +912,31 @@ function barbarianTurn(ctx: Ctx, b: TurnRecord, closing: number): void {
   }
 }
 
+/** the districts a major completed or repaired in its turn stand so for the
+ *  players after it (`copy`, the minors' and the barbarians'): the log's
+ *  CityProductionCompleted of a district and its DistrictPillaged clearing
+ *  the pillage, which record t+1 alone holds otherwise (runs/h1_duely1121
+ *  t78: player 1's Campus on 8:14 repaired at its turn start, the
+ *  barbarians' knowledge of 6:12 at 49; h1_duely1124 t55: player 1's Campus
+ *  on 4:11 bought in its actions, the barbarians' at 30) */
+function landMajorDistricts(ctx: Ctx, b: TurnRecord, turn: number, copy: GameState): void {
+  for (const x of (b as { actions?: unknown[][] }).actions ?? []) {
+    if (x[1] !== turn) continue;
+    let plot = -1;
+    if (x[2] === 'DistrictPillaged' && x[10] === 0) plot = (x[7] as number) * ctx.W + (x[6] as number);
+    else if (x[2] === 'CityProductionCompleted' && x[5] === 2) {
+      const d = b.cities.find((c) => c.owner === x[3] && c.id === x[4])?.districts.find((y) => y[0] === x[6]);
+      if (d) plot = (d[2] as number) * ctx.W + (d[1] as number);
+    }
+    const seat = ctx.seatOfPlayer.get(x[3] as number);
+    if (plot < 0 || seat === undefined || !isCiv(seat)) continue;
+    const t = copy.map.tiles[plot];
+    if (!t.district || t.ownerSeat !== seat) continue;
+    t.districtComplete = true;
+    t.districtPillaged = false;
+  }
+}
+
 /** THE BARBARIANS' UNIT AI on a copy of the state, the units that stood
  *  before their camps raised this turn's back where the pair's first record
  *  holds them (`from`, else where they stand): its moves tallied
@@ -920,6 +945,7 @@ function barbarianAi(ctx: Ctx, b: TurnRecord, closing: number, before: ReadonlyS
   opened: ReadonlyMap<number, number>): void {
   const { state } = ctx;
   const copy = deserialize(serialize(state));
+  landMajorDistricts(ctx, b, closing, copy);
   const twin = new Map<Unit, Unit>();
   state.units.forEach((u, i) => twin.set(copy.units[i], u));
   // their turn closes turn t: no unit the next turn's start made stands in
@@ -1262,6 +1288,7 @@ function minorAi(ctx: Ctx, b: TurnRecord, turn: number, made: ReadonlySet<Unit>,
   revealedWas: ReadonlyMap<number, number[] | undefined>): void {
   const { state } = ctx;
   const copy = deserialize(serialize(state));
+  landMajorDistricts(ctx, b, turn, copy);
   // the revealed plots as the turn opened and those its ground sees as its
   // turn comes, a plot annexed in a major's start revealing the plots beside
   // it (runs/h1_duely1117 t44: Antananarivo's 210 annexed in China's start,
