@@ -240,9 +240,14 @@ function majorBuildFacts(state: GameState, city: City, known: (unit: string) => 
 
 /** THE RESEARCH AND CIVICS AIS' TURNS to a TECH_ / CIVIC_ type of a seat as
  *  its city build AI reads them (`analysedTurns`): a city-state's and the
- *  Free Cities' over their research AIs' last analyses, the research's turns
- *  left as its last choice set them, the civic's read live; a major's over
- *  analyses made now on its cities' Science and Culture */
+ *  Free Cities' over their research AIs' last analyses, the research in hand
+ *  and its turns left as the research AI's turn found them, before its
+ *  choice (0x7610e0: GetResearchingTech and +0x528; runs/h1_duely1121
+ *  Antioch t117: Siege Tactics caught up to 1 turn and taken that turn,
+ *  read at its 1 turn plus Metal Casting's left: no Star Fort tree on it,
+ *  the Warrior's Build City Building tree as recorded), the civic's read
+ *  live; a major's over analyses made now
+ *  on its cities' Science and Culture */
 export function seatResearchTurns(state: GameState, seat: number): (type: string | null) => number {
   const r = seatOf(state, seat)!.research;
   const stored = isCityStateSeat(seat) || isFreeSeat(seat);
@@ -252,10 +257,12 @@ export function seatResearchTurns(state: GameState, seat: number): (type: string
   let tech: { id: string; next: string; turns: number; owned: boolean }[];
   let civic: { id: string; next: string; turns: number; owned: boolean }[];
   let techLeft: number;
+  let techNow = r.tech;
   if (stored) {
     tech = (r.aiEntries ?? []).map((e) => ({ id: e.tech, next: e.next, turns: e.turns, owned: e.owned }));
     civic = (r.civicAiEntries ?? []).map((e) => ({ id: e.civic, next: e.next, turns: e.turns, owned: e.owned }));
     techLeft = r.aiLeftSeen ?? 0;
+    techNow = r.aiTechSeen ?? null;
   } else {
     const science = sum('science');
     tech = researchAnalysis(state, seat, science).map((e) => ({ id: e.tech, next: e.next, turns: e.turns, owned: e.owned }));
@@ -267,7 +274,7 @@ export function seatResearchTurns(state: GameState, seat: number): (type: string
   const civicLeft = r.civic ? turnsAt(researchCost(state, r.civic, true, seat) * FX - fxOf(r.civicProgress + (r.civicOverflow ?? 0)), fxOf(culture)) : -1;
   return (type) => {
     if (type?.startsWith('CIVIC_')) return analysedTurns(civic, engineId('civic', type, 'CIVIC_', CIVICS), r.civics, r.civic, civicLeft);
-    return analysedTurns(tech, type ? engineId('tech', type, 'TECH_', TECHS) : null, r.techs, r.tech, techLeft);
+    return analysedTurns(tech, type ? engineId('tech', type, 'TECH_', TECHS) : null, r.techs, techNow, techLeft);
   };
 }
 

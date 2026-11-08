@@ -263,6 +263,11 @@ export interface ResearchState {
    *  reads — the one before this turn's choice (`aiCityBuild.ts`) */
   aiLeft?: number;
   aiLeftSeen?: number;
+  /** the research in hand as the research AI's turn found it, before its
+   *  choice: the one the city build analysis of this turn reads beside
+   *  `aiLeftSeen` (0x7610e0's GetResearchingTech); absent before the AI's
+   *  first turn, null with nothing in hand */
+  aiTechSeen?: string | null;
   /** the military AI's favoured technology (AI::Military +0xd88,
    *  AI_Military.csv's "Fav Tech"; `militaryFavTech`), written at its turn
    *  and read by the next research analysis; absent or null, none */

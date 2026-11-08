@@ -678,7 +678,7 @@ const addGoalTech: BtHandler<Ctx> = {
 
 
 // RESERVE PLOT (0x7f7da0): the plot, which must be one of the player's, its
-// evaluation reserved for the tree at its value (0x5d74c0: another running
+// evaluation reserved for the tree at its value (0x5d74c0: another pooled
 // tree's reservation yields only to a value above its own + 20.0)
 const reservePlot: BtHandler<Ctx> = {
   update(node, run, ctx) {
@@ -690,7 +690,12 @@ const reservePlot: BtHandler<Ctx> = {
     const value = (Number(tagOf(run, node, 'Value')) || 0) * FX;
     const tag = String(dataTag(node, 'Tag') ?? '');
     const r = ctx.ai.reservations.find((x) => x.plot === plot);
-    if (r && r.tree !== ctx.tree.id && live(ctx.ai, r.tree) && value <= r.value + 20 * FX) return BT_FAILURE;
+    // the holder found by its id among the Control Manager's controls
+    // (0x609060): a tree that ended earlier in this tick stands until the
+    // destroy after it (runs/h1_duely1127 Mexico City t135: the Improvement
+    // tree's Farm laid on 491 ends it, its reservation still turns away the
+    // District tree's Industrial Zone there, both trees gone, no contract)
+    if (r && r.tree !== ctx.tree.id && ctx.ai.trees.some((t) => t.id === r.tree) && value <= r.value + 20 * FX) return BT_FAILURE;
     if (r) Object.assign(r, { tree: ctx.tree.id, value, tag });
     else ctx.ai.reservations.push({ plot, tree: ctx.tree.id, value, tag });
     return BT_SUCCESS;

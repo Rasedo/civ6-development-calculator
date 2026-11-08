@@ -893,6 +893,7 @@ class SimResearch:
         ent = self._rai_analysis(s, sci)
         self._rai_store(s, alive, ent)
         self.citystate_ai_left_seen[:, s] = torch.where(alive, self.citystate_ai_left[:, s], self.citystate_ai_left_seen[:, s])
+        self.citystate_ai_tech_seen[:, s] = torch.where(alive, self.citystate_cur_tech[:, s], self.citystate_ai_tech_seen[:, s])
         turns, nxt, _base, score, owned = ent
         cur = self.citystate_cur_tech[:, s]
         goal = self.citystate_tech_goal[:, s]

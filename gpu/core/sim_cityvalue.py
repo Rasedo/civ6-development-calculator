@@ -2226,7 +2226,7 @@ class _MinorFacts:
 
     def _tech_turns(self, t):
         sim, s = self.sim, self.s
-        return self._analysed(t, self.E["tech"], sim.citystate_techs[:, s], sim.citystate_cur_tech[:, s],
+        return self._analysed(t, self.E["tech"], sim.citystate_techs[:, s], sim.citystate_ai_tech_seen[:, s],
                               sim.citystate_ai_left_seen[:, s],
                               (sim.citystate_ai_turns[:, s], sim.citystate_ai_next[:, s], sim.citystate_ai_owned[:, s],
                                sim.citystate_ai_valid[:, s]))

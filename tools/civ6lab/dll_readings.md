@@ -9939,3 +9939,45 @@ full-Movement search runs, and those run at four places:
   fighting unit's plot in a later turn, or the coast on the formation's
   embark flag — 0x2720a0 at 0x272434..0x2724c2 unread; the engines go round
   by 13:18.
+
+## C-96: the city build analysis reads the research in hand as the research AI's turn found it; a reservation's holder stands to the tick's end; a Builder's lump takes the idle store — READ (0x7610e0, 0x5d74c0 -> 0x609060, City_BuildQueue.csv), both twins
+
+`seatResearchTurns` (`ResearchState.aiTechSeen`, written beside `aiLeftSeen`
+in `minorResearchTurn`), `reservePlot` (`cpu/core/aiCityTrees.ts`),
+`minorLump`; GPU `citystate_ai_tech_seen` (`_rai_turn`, `_tech_turns` in
+sim_cityvalue.py), `_u_reserve_plot` (sim_citytrees.py), `_minor_lump`
+(sim_minorai.py).
+
+- THE RESEARCH IN HAND: 0x7610e0 adds +0x528 (the turns left on the
+  research in hand) to a row whose walk does not lead through the research
+  GetResearchingTech answers. The city build analysis reads +0x528 as it
+  stood before the research AI's turn rewrote it, and the research in hand
+  of that same moment: a row the turn's choice takes is read at its turns
+  plus the left of the research it replaced. runs/h1_duely1121 Antioch t117:
+  Siege Tactics caught up to 1 turn and taken over Metal Casting (60 turns
+  left), no Star Fort tree, the Warrior's Build City Building tree as
+  recorded; runs/h1_duely1128 Bologna t206 Chemistry over Radio, the
+  Warrior's tree as recorded. The analysis' rows themselves are the turn's.
+- THE RESERVATION'S HOLDER: Reserve Plot's yield (0x5d74c0) finds the
+  holding tree by its id among the Control Manager's controls (0x609060,
+  the pages at +0x280: no test of its state), so a tree that ended earlier
+  in the tick holds its plot until the destroy after the walk. runs/
+  h1_duely1127 Mexico City t135: the Build City Improvement tree (pool slot
+  3) lays its Farm on 491 and ends; the Build City District tree (slot 5) on
+  the same plot is turned away, both gone with no contract, the District
+  tree on 492 at t136 as recorded.
+- THE IDLE STORE: a Builder's lump into the item in hand pays the store an
+  idle step or a completion left with it, at the item's percent, as the
+  step pays. runs/h1_duely1121 Antioch t191: the chop of 61 and the store
+  of 88.6 at the Commercial Hub's +500% = 897.7 of 165 (City_BuildQueue.csv),
+  overflow 0.0, the Market from 0 (14.4 at t193) as recorded.
+- THE CIVIC COMPLETION: the civics AI's delegate 0x6293e0 is the government
+  pass 0x625d70 and the choice 0x626600 alone — no contract walk; a Civic
+  Contract keeps its state to the culture AI's next turn (no city-state
+  case in the five duels).
+- Open (C-96): runs/h1_duely1124 Cardiff t89: the game's Castle tree 48
+  (Castles caught up, taken at the bank's completion) ends in its tick with
+  no contract, where 1117 Caguana t124's (the same shape) keeps its Castles
+  contract; the difference is unread (Add Goal Tech 0x7e7d20 / 0x7e7200, the
+  creation 0x5f4530, the submission 0x60bb50 and the listener 0x7635c0 hold
+  no turn test).

@@ -1516,7 +1516,7 @@ class SimMinorAi:
     def _minor_lump(self, s: int, mask: torch.Tensor, ykey: int, amount: torch.Tensor) -> None:
         """`minorLump` and `applyLumpYield` for minor `s` where `mask`: Gold
         and Faith to its purse, Science and Culture to its research, Food to
-        its city's box (a full box grows it), Production to the item in hand
+        its city's box (a full box grows it), Production with the store to the item in hand
         at the item's percent (`_minor_item_pct`, `_minor_item_mult`) —
         completing it at its price, the rest stored as a step's overflow — or
         to the store with nothing in hand, a district in hand on its site
@@ -1551,7 +1551,11 @@ class SimMinorAi:
             return
         before = self.citystate_prod[:, s].clone()
         pct = self._minor_item_pct(s, key)
-        after = before + amt * ((100 + pct) / 100) * self._minor_item_mult(key)
+        # the store an idle step or a completion left lands with the lump
+        ovf = self.citystate_ovf[:, s]
+        paid = amt + torch.where(has, ovf, torch.zeros_like(ovf)).to(amt.dtype)
+        self.citystate_ovf[:, s] = torch.where(has, torch.zeros_like(ovf), ovf)
+        after = before + paid * ((100 + pct) / 100) * self._minor_item_mult(key)
         self.citystate_prod[:, s] = torch.where(has, after, before)
         cost = self._minor_item_cost(s, key)
         done = has & (self.citystate_prod[:, s] >= cost)

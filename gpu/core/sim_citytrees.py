@@ -1039,7 +1039,10 @@ def _u_reserve_plot(c: _Ctx, i: int, at: torch.Tensor) -> torch.Tensor:
     j = _first(hit)
     rt = _pick(ai.r_tree[:, s], j)
     rv = torch.where(j >= 0, ai.r_value[:, s].gather(1, j.clamp(min=0).unsqueeze(1)).squeeze(1), 0)
-    blocked = (j >= 0) & (rt != c.ref) & tree_live(ai, s, rt) & (val <= rv + 20 * _FX)
+    # the holder found among the controls by its id: a tree ended earlier in
+    # this tick stands until the tick's end (`reservePlot`)
+    pooled = ((ai.tr_id[:, s] == rt.unsqueeze(1)) & (rt.unsqueeze(1) >= 0)).any(dim=1)
+    blocked = (j >= 0) & (rt != c.ref) & pooled & (val <= rv + 20 * _FX)
     go = at & ~none & ~no_city & ~blocked
     free = _first(rp < 0)
     j2 = torch.where(j >= 0, j, free)

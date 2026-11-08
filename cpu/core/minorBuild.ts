@@ -589,6 +589,7 @@ export function minorResearchTurn(state: GameState, r: ResearchState, seat: numb
   const city = () => (held === null ? (held = terms()) : held);
   r.aiEntries = researchAnalysis(state, seat, science, city()?.tech, contracts);
   r.aiLeftSeen = r.aiLeft ?? 0;
+  r.aiTechSeen = r.tech;
   takeChoice(r, researchTurnChoice(state, seat, r.aiEntries, researchDraw(state)));
   r.aiLeft = researchInHandLeft(state, seat, r, fxOf(science));
   // the analysis on the government values and cards its last turn wrote,
@@ -2234,7 +2235,7 @@ function minorFinish(state: GameState, cityState: CityState, item: Exclude<Minor
  * A LUMP OF FOOD OR PRODUCTION lands in the minor's city (`applyLumpYield`:
  * its Builder's harvest or feature removal) and acts at once: Food fills the
  * box and a full box grows the city, Production goes to the item in hand
- * at the item's percent, as the step pays (`minorItemPct`, `minorItemMult`)
+ * with the store, at the item's percent, as the step pays (`minorItemPct`, `minorItemMult`)
  * — completing it at its price, the rest stored as a step's overflow — or
  * to the store with nothing in hand (runs/h1_duelw1124 t21: Granada's
  * Builder clears a Rainforest in its actions, 6 Food and 6 Production; the
@@ -2259,15 +2260,21 @@ export function minorLump(state: GameState, cityState: CityState, key: 'food' | 
     cityState.prodOverflow = (cityState.prodOverflow ?? 0) + amount;
     return;
   }
+  // the store an idle step or a completion left lands with the lump, as
+  // the step pays it (runs/h1_duely1121 Antioch t191: the chop of 61 and
+  // the idle store of 88.6 at the Commercial Hub's +500%, 897.7 of 165 in
+  // City_BuildQueue.csv, overflow 0.0; the Market from 0 at t193)
   const before = cityState.prodProgress ?? 0;
-  cityState.prodProgress = before + amount * ((100 + minorItemPct(state, cityState, item)) / 100) * minorItemMult(state, item);
+  const paid = amount + (cityState.prodOverflow ?? 0);
+  cityState.prodOverflow = 0;
+  cityState.prodProgress = before + paid * ((100 + minorItemPct(state, cityState, item)) / 100) * minorItemMult(state, item);
   const cost = minorItemCost(state, cityState, item);
   if (cityState.prodProgress < cost) return;
   // the overflow the lump's own amount leaves past the price, unscaled
   // (runs/h1_duely1117 Caguana t38: the Harbor's chop leaves none, the
   // Lighthouse picked as logged; runs/h1_duely1127 Mexico City t49-51: the
   // Water Mill's chop leaves 9.6, its Walls done at t51)
-  if (minorFinish(state, cityState, item)) cityState.prodOverflow = (cityState.prodOverflow ?? 0) + Math.max(0, before + amount - cost);
+  if (minorFinish(state, cityState, item)) cityState.prodOverflow = Math.max(0, before + amount - cost);
 }
 
 /** May the Free City raise building `id` now? The Free Cities' research

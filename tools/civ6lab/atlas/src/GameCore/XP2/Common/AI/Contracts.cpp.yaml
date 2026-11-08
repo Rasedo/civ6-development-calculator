@@ -26,6 +26,7 @@
       value: "a new Build City Building tree whose goal technology is under   research with 1 turn left ends in its tick with no contract (runs/   h1_duely1124 Cardiff t89 Castles, h1_duely1121 Antioch t117 Siege  "
   readings:
     - "C-96: a completion's contract walk COMPLETES its Tech Contracts mid-turn; a city-state's route boosts land before its army's walk — READ (0x762d60 at 0x762ed0..0x762f8a, 0x5f5940), both twins"
+    - "C-96: the city build analysis reads the research in hand as the research AI's turn found it; a reservation's holder stands to the tick's end; a Builder's lump takes the idle store — READ (0x7610e0, 0x5d74c0 -> 0x609060, City_BuildQueue.csv), both twins"
   context:
     - ...no turn test in Add Goal Tech's update 0x7e7d20, its execution 0x7e7200, the creation 0x5f4530, the submission 0x60bb50 or the research AI's listener 0x7635c0.
   review: imported

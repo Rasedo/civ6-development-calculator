@@ -1033,7 +1033,7 @@ const CITY_STATE_G: Record<string, Extractor> = {
   // the civics AI's government values (+0xb38) in the governments' database
   // order; empty before its first turn
   minorCivicGovValues: overCityStates((cityState) => govValuesRow(cityState.research)),
-  minorResearchLeft: overCityStates((cityState) => [cityState.research.aiLeft ?? 0, cityState.research.aiLeftSeen ?? 0]),
+  minorResearchLeft: overCityStates((cityState) => [cityState.research.aiLeft ?? 0, cityState.research.aiLeftSeen ?? 0, idx(TECH_IDX, cityState.research.aiTechSeen ?? null)]),
   minorTechOverflow: overCityStates((cityState) => cityState.research.techOverflow ?? 0),
   minorRoadTier: overCityStates((cityState) => cityState.research.roadTier ?? 0),
   minorCivicOverflow: overCityStates((cityState) => cityState.research.civicOverflow ?? 0),

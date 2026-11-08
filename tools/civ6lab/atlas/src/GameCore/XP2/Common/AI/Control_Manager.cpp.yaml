@@ -78,11 +78,19 @@
   semantics: "the Control Manager's control by id: its pages (+0x110 in FinalRelease; 8 entries of 0x18 a page, the entry's +0 the control: +0 its id, +4 its kind, +0x10 its object; a free entry holds the next free index)."
   status: PARTLY
   cases:
+    - recording: h1_duely1127
+      turn: 135
+      value: "Mexico City: the tree ended earlier in the tick is found by its id, its reservation standing"
     - recording: 1117
       turn: 11
       value: "MEASURED: every CONTRACT line of   t11-t20 whose contract still stands at that turn's end look carries the   line's id, item and value (seed 1117: 8 SUBMITTED lines ACCEPTED by then, 1   CANCELLED)."
-  impl: [cpu/core/aiContracts.ts:reapContracts]
+  impl:
+    - cpu/core/aiContracts.ts:reapContracts
+    - cpu/core/aiCityTrees.ts:reservePlot
+    - gpu/core/sim_citytrees.py:_u_reserve_plot
+    - cpu/core/aiCityTrees.ts:update
   readings:
+    - "C-96: the city build analysis reads the research in hand as the research AI's turn found it; a reservation's holder stands to the tick's end; a Builder's lump takes the idle store — READ (0x7610e0, 0x5d74c0 -> 0x609060, City_BuildQueue.csv), both twins"
     - "H-1: the AI memory reader — READ (the hooks, the pointer paths, the contracts, the knowledge base, the operations, the trees), PARTLY READ (the religious AI's holder)"
     - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
     - "C-130: the Combat Desire between the policy jobs and the government values; a released contract on its city's list — READ, both twins"
@@ -282,6 +290,7 @@
     - "C-96 / C-97: the team's unit to build, the recruit's contract and the knowledge base's camps — the team update's requirements and readiness, the unit choice, Recruit Units' result and contract, the camps READ; the maintenance resource test, the recruit's stealing and levy unread"
     - "C-96 / C-127: a plot purchase contract lives to its Turn Limit, the pick's best project asks no CanProduce, Build Unit's tree takes only an ACCEPTED contract — READ (0x7f7bf0, 0x5d1f10, 0x7f4240 at 0x7f4270 / 0x7f48db), both twins"
     - "C-96: a completion's contract walk COMPLETES its Tech Contracts mid-turn; a city-state's route boosts land before its army's walk — READ (0x762d60 at 0x762ed0..0x762f8a, 0x5f5940), both twins"
+    - "C-96: the city build analysis reads the research in hand as the research AI's turn found it; a reservation's holder stands to the tick's end; a Builder's lump takes the idle store — READ (0x7610e0, 0x5d74c0 -> 0x609060, City_BuildQueue.csv), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "- The submission 0x60bb50: SUBMITTED, then the player's signal +0x270 runs each city's listener 0x5d6050 in city..."

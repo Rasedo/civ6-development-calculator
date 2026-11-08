@@ -991,7 +991,7 @@ CITY_STATE = {
             int(sim.citystate_cai_score[b, s, c]), int(sim.citystate_cai_owned[b, s, c]))]
         if bool(sim.citystate_cai_valid[b, s]) else [] for s in rows],
     "minorCivicGovValues": lambda sim, b, rows: [_gov_values_row(sim, b, s) for s in rows],
-    "minorResearchLeft": lambda sim, b, rows: [[int(sim.citystate_ai_left[b, s]), int(sim.citystate_ai_left_seen[b, s])] for s in rows],
+    "minorResearchLeft": lambda sim, b, rows: [[int(sim.citystate_ai_left[b, s]), int(sim.citystate_ai_left_seen[b, s]), int(sim.citystate_ai_tech_seen[b, s])] for s in rows],
     "minorTechOverflow": lambda sim, b, rows: [float(sim.citystate_tech_ovf[b, s]) for s in rows],
     "minorRoadTier": lambda sim, b, rows: [int(sim.citystate_road_tier[b, s]) for s in rows],
     "minorCivicOverflow": lambda sim, b, rows: [float(sim.citystate_civic_ovf[b, s]) for s in rows],

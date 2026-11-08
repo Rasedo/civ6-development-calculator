@@ -4999,7 +4999,7 @@ function turnSeed(rec: TurnRecord): number | undefined {
  * step's start and scout throttle. The non-majors' explored plots.
  */
 const SEAT_MEMORY = ['unitPool', 'armyKnown', 'armyAged', 'enemyCounts', 'combatDesire', 'tradeSeat', 'tradeSeen', 'agendas', 'campsKnown', 'cityAi', 'ops', 'opsNext', 'treeSlots', 'treeFree', 'unitStrength'] as const;
-const RESEARCH_MEMORY = ['goal', 'aiEntries', 'civicAiEntries', 'civicGovValues', 'civicPolicyBest', 'civicSlotBest', 'aiLeft', 'aiLeftSeen',
+const RESEARCH_MEMORY = ['goal', 'aiEntries', 'civicAiEntries', 'civicGovValues', 'civicPolicyBest', 'civicSlotBest', 'aiLeft', 'aiLeftSeen', 'aiTechSeen',
   'techCatchUp', 'civicCatchUp', 'favTech'] as const;
 const MINOR_MEMORY = ['prodSetValue', 'favoredFood', 'tradeCities', 'tradeRejected', 'tradeValue', 'metMinors', 'unitValues', 'buildingValues', 'resourceCounts',
   'economy', 'threat', 'threatNear', 'aiGrowth', 'aiGrowthSeen', 'revealed', 'standingArmyShort', 'explored', 'upgradeTrees', 'unitsListed'] as const;

@@ -299,6 +299,9 @@ class SimInit:
         # (`ResearchState.aiLeft`, `aiLeftSeen`)
         self.citystate_ai_left = torch.zeros(B, r_pad, dtype=torch.long, device=device)
         self.citystate_ai_left_seen = torch.zeros(B, r_pad, dtype=torch.long, device=device)
+        # the research in hand as the research AI's turn found it, which the
+        # city build analysis reads beside it (`ResearchState.aiTechSeen`)
+        self.citystate_ai_tech_seen = torch.full((B, r_pad), -1, dtype=torch.long, device=device)
         # the civics AI's analysis of the minor's last turn, which a
         # completion's choice reads (`ResearchState.civicAiEntries`): per row
         # its turns, next step, own value and score (raw 24.8) and owned flag
