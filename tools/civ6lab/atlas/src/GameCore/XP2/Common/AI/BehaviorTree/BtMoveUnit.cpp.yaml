@@ -38,6 +38,9 @@
     - recording: h1_duely1128
       turn: 154
       value: "Bologna: its Warrior 2228224 on 4:10 swaps onto its centre with the Trebuchet, then Warrior 2162692 on 5:8 swaps onto it with the first (record t+1)"
+    - recording: h1_duelp1128
+      turn: 185
+      value: "Bologna's Man-At-Arms 1179650 on its centre 4:9, taken by the new Upgrade Units tree 8257540, on its target as Move Unit's execution reaches it (no turn done at 0x7eef4c): the tree ends SUCCESS, the unit logs Wander (t195 the same; t205 Heal; t242 its Infantry 3342340 Wander)"
   impl:
     - cpu/core/barbarianOps.ts:SCOUT_NODES
     - cpu/core/aiCityTrees.ts:execute
@@ -53,6 +56,8 @@
     - gpu/core/sim_minorai.py:order
     - gpu/core/sim_tactics.py:_move_unit_danger
     - cpu/core/minorCityAi.ts:owned
+    - cpu/core/minorOps.ts:done
+    - gpu/core/sim_minorops.py:_mops_upgrade_tree
   readings:
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
     - "C-95: the scout's tree \"Barbarian Found City\" — READ (the tree, its start, Protect Unit's update), PARTLY READ (the nodes' executions), unported"
@@ -68,6 +73,7 @@
     - "C-99: an owned water plot no shore, a move order carried on as the turn ends — READ (0x530240, 0x66790, 0x66a90, 0x66680, 0x814e0, 0x81240, 0x7eeba0), both twins"
     - "C-99 / C-128: the swap's partner test and its step along its own path; Move Unit's update before the executions; a Trader no passenger — READ (0x972540, 0x56e760, 0x972a50 -> 0x26fe20, 0x7d3a00 -> 0x7f0020, 0x586360 -> 0x208b80 / 0x523d60), both twins"
     - "C-99 / C-128: every technology gained starts an Upgrade Units tree, the civic event never fires; a tree's units after its tick; the Nearest City Search's resource test; the plot's unit list — READ (0x4cd4c0 -> 0x800c60, 0x5bbf80 -> 0x27a180, 0x3a1ac0, 0x7cb3d0 -> 0x7d2190, 0x7eba40 -> 0x510d30, 0x74f40 / 0x763b0), the trigger both twins"
+    - "C-128 / C-99: an Upgrade Units tree lets go to the tactical pass each unit whose turn is not done — READ (0x7cb3d0 -> 0x7d2190, 0x7eeba0 at 0x7eef4c), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ...e Formation 0x7efd70 / 0x7ee630; Protect Unit 0x7f07c0 / 0x7ef0e0; Move Unit 0x7f0020 / 0x7eeba0; Operation Change Target 0x8196d0 / 0x8163a0; Operation Is Ready 0x81a090.

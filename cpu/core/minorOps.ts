@@ -310,10 +310,23 @@ const UPGRADE_TREE_PRIORITY = AI_TRIGGERED_TREES.find((t) => t.tree === 'Upgrade
  *    else a move none of its own holds the target against, a target in
  *    danger only within its reach this turn; every unit with none, the tree
  *    FAILS;
- *  - each unit the trees hold has its turn done (0x7d2190): no tactical
- *    move, no operation's offer (runs/h1_duelw1128 Hong Kong t144-250, its
- *    six units held from Gunpowder on with no Gold to upgrade: no tactical
- *    row, City Defense recruiting none and completing each turn).
+ *  - Move Unit's execution gives turn done to each unit off its target as it
+ *    is reached (0x7eef4c): no tactical move, no operation's offer
+ *    (runs/h1_duelw1128 Hong Kong t144-250, its six units held from
+ *    Gunpowder on with no Gold to upgrade: no tactical row, City Defense
+ *    recruiting none and completing each turn); after the tick (0x7cb3d0
+ *    -> 0x7d2190) a tree running on releases each unit whose turn is not
+ *    done — one on its target as it was reached — to the tactical pass,
+ *    the tree marked (m_allowRecruiting, set by its reset 0x7d3670) with no
+ *    operation (runs/h1_duelp1128 t175: Hong Kong's Warrior 2490370 on its
+ *    centre, reached before the Man-At-Arms 1507331 swaps it off, logs
+ *    Attack Units, out of the tree at the end look; t174: its Warrior
+ *    2293764, swapped off its centre by the Warrior 2490370 reached
+ *    before it, held); a tree that ends runs no such release (temporary,
+ *    its root SUCCESS or FAILURE), its units all let go, those whose turn
+ *    is not done to the tactical pass (runs/h1_duelp1128 t185 / t195:
+ *    Bologna's Man-At-Arms 1179650 on its centre, its tree ending, logs
+ *    Wander).
  *  - THE DELETION (0x7ef850 with Can Delete, the node's data absent: true):
  *    a unit whose upgrade the treasury cannot buy (the full test failing, the
  *    visible one passing) is deleted on the minor's own ground where its
@@ -391,9 +404,22 @@ export function upgradeTreesTick(state: GameState, cs: CityState, pass: Pass, tr
     if (unupgradedDeleted(state, cs, u)) drop(u);
   }
   tree.units = order(held).map((u) => u.id);
-  for (const u of order(held)) upgradeMove(state, pass, u, targets.get(u.id) ?? -1);
-  for (const u of order(held)) passFinish(pass, u, UPGRADE_MOVE, u.tileIndex);
+  // Move Unit's execution in the player's order: a unit off its target as
+  // it is reached has its turn done (0x7eef4c), then moves; one on it is
+  // left as it is, even where a later unit's swap takes it off
+  const done = new Set<number>();
+  for (const u of order(held)) {
+    const p = targets.get(u.id) ?? -1;
+    if (p >= 0 && u.tileIndex !== p) done.add(u.id);
+    upgradeMove(state, pass, u, p);
+  }
+  for (const u of order(held)) if (done.has(u.id)) passFinish(pass, u, UPGRADE_MOVE, u.tileIndex);
+  // after the tick (0x7cb3d0 -> 0x7d2190): a tree running on, marked
+  // (m_allowRecruiting) with no operation, releases its units whose turn is
+  // not done to the tactical pass; one that ends releases them all, those
+  // whose turn is not done to the tactical pass alike
   if (arrived) end();
+  else tree.units = order(held).filter((u) => done.has(u.id)).map((u) => u.id);
 }
 
 /** MOVE UNIT'S UPDATE with no Location (0x7f0020 at 0x7f067c): SUCCESS where

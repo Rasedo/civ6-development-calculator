@@ -1612,7 +1612,9 @@ class SimMinorOps:
         tree once the executions ran); Upgrade Units' execution (in pool
         order, the full test and the treasury, the economic AI's purchase;
         Can Delete's deletion of the units it does not upgrade); Move Unit's
-        (each left for its target); the units' turns done"""
+        (each left for its target, the turn of each off it as it is reached
+        done); the release after the tick (each unit whose turn is not done
+        let go to the tactical pass)"""
         Tm = self._mops_tables()
         u = self._mops_units(s)
         P = u["own"].shape[1]
@@ -1727,14 +1729,29 @@ class SimMinorOps:
             self.major_unit_alive[rows, slots] = False
             held &= ~drop
         order, _n = self._mops_in_order(held, u["key"])
+        # Move Unit's execution in pool order: a unit off its target as it is
+        # reached has its turn done (0x7eef4c), then moves; one on it is left
+        # as it is, even where a later unit's swap takes it off
+        off = torch.zeros_like(held)
+        b = torch.arange(self.B, device=self.device)
         for j in range(order.shape[1]):
             us = order[:, j]
             m = live & (us >= 0)
             if not bool(m.any()):
                 continue
-            dest = target.gather(1, us.clamp(min=0).unsqueeze(1)).squeeze(1)
+            uc = us.clamp(min=0)
+            dest = target.gather(1, uc.unsqueeze(1)).squeeze(1)
+            away = m & (dest >= 0) & (self._mops_u(s, "tile")[b, uc] != dest)
+            if bool(away.any()):
+                rr = away.nonzero(as_tuple=True)[0]
+                off[rr, us[rr]] = True
             self._mops_upgrade_move(s, us, dest, m, op)
-        done |= held
+        done |= held & off
+        # after the tick (0x7cb3d0 -> 0x7d2190): a tree running on, marked
+        # (m_allowRecruiting) with no operation, releases its units whose
+        # turn is not done to the tactical pass; one that ends releases them
+        # all, those whose turn is not done to the tactical pass alike
+        held &= off
         held &= ~ended.unsqueeze(1)
         live = live & ~ended
         # the units it holds where it runs on; one that ended lets its units

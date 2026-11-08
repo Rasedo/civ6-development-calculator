@@ -11972,3 +11972,39 @@ statecompare `minorResearchTurns`, `freeResearch`.
   takes the engines' single 25; no recording trains a Corps, so 0x17bef0
   stands on its structure alone; the gold purchase of a formation is not
   modelled (no recorded case).
+
+## C-128 / C-99: an Upgrade Units tree lets go to the tactical pass each unit whose turn is not done — READ (0x7cb3d0 -> 0x7d2190, 0x7eeba0 at 0x7eef4c), both twins
+
+`upgradeTreesTick`'s Move Unit loop and its release (cpu/core/minorOps.ts);
+GPU `_mops_upgrade_tree`'s `off` (gpu/core/sim_minorops.py).
+
+- MOVE UNIT'S EXECUTION with no Location (0x7eeba0 at 0x7eef0c..0x7eef51)
+  walks the tree's units in the player's order and gives turn done
+  (0x570b40, dl 1) to each with a target (+0x830 / +0x834) off its plot as
+  it is reached, then swaps or moves it; a unit on its target, or with
+  none, is skipped, its turn left as it is, even where a later unit's swap
+  then takes it off.
+- THE RELEASE (0x7cb3d0 at 0x7cb722 -> 0x7d2190), for a tree running on
+  (temporary, its root RUNNING or FRESH): each of its units whose turn is
+  not done (+0x530) is let go (+0x778 -1) where the tree is marked
+  (m_allowRecruiting +0x3c8, which its reset 0x7d3670 sets: every Upgrade
+  Units tree's at the look) with no operation (+0x888 -1) — every Upgrade
+  Units tree — and takes the tactical pass's moves. A tree that ends
+  (SUCCESS or FAILURE) runs none; its units all go as it is destroyed, the
+  ones whose turn is not done to the tactical pass alike.
+- CONFIRMED (one-seed traces, `--memory aimem`): runs/h1_duelp1128 t175
+  Hong Kong's Warrior 2490370 on its centre, reached before the Man-At-Arms
+  1507331 swaps it off, logs Attack Units and leaves the tree (t179 Heal);
+  t174 its Warrior 2293764, swapped off by the Warrior 2490370 reached
+  before it, held; Bologna's Man-At-Arms 1179650 on its centre, its new
+  tree ending, Wander at t185 / t195, Heal at t205, its Infantry 3342340
+  Wander at t242. Over the five duelp duels every on-target unit an
+  Upgrade Units tree holds at the end look (92, all 1128 Hong Kong) ends
+  the turn short of its Movement or off its plot: each was swapped off its
+  target before it was reached, none left untouched.
+- OPEN: a unit a tree takes and lets go within one tick (a tree the log
+  lists, made by a technology, gone at the end look as Move Unit's update
+  ends it) is in no tree at either look, so its no-row move reads "(no
+  row)" in the replay's `gameJob`
+  (runs/h1_duelp1128 t180 Warrior 2490370 under 7929859, t184 Man-At-Arms
+  1179650 under 8126471, t243 Infantry 3342340).

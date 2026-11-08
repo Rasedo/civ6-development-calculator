@@ -31,11 +31,14 @@
     - cpu/core/behaviorTree.ts:AiTreeNode
     - cpu/core/operations/manager.ts:operationsRun
     - cpu/core/barbarianOps.ts:barbarianTrees
+    - cpu/core/minorOps.ts:upgradeTreesTick
+    - gpu/core/sim_minorops.py:_mops_upgrade_tree
   readings:
     - "C-97: the behaviour trees — READ (the interpreter), the nodes PARTLY READ"
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
     - "C-99: Naval Patrol's explore target — the list and the tests READ, two cases unexplained"
     - "C-99 / C-128: every technology gained starts an Upgrade Units tree, the civic event never fires; a tree's units after its tick; the Nearest City Search's resource test; the plot's unit list — READ (0x4cd4c0 -> 0x800c60, 0x5bbf80 -> 0x27a180, 0x3a1ac0, 0x7cb3d0 -> 0x7d2190, 0x7eba40 -> 0x510d30, 0x74f40 / 0x763b0), the trigger both twins"
+    - "C-128 / C-99: an Upgrade Units tree lets go to the tactical pass each unit whose turn is not done — READ (0x7cb3d0 -> 0x7d2190, 0x7eeba0 at 0x7eef4c), both twins"
   context:
     - ...SUCCESS, RUNNING or FAILURE every node left SUCCESS or RUNNING executes in node order (0x7cb3d0); a root RUNNING or FRESH resets the tree for the next turn, else the tree is done (the...
   review: reviewed
@@ -168,12 +171,16 @@
       value: "yet 1117 city-state 2's Warrior 131073, its Attack   Barb Camp complete at t9, takes tactical moves from t10 — the path that   frees an ended operation's units is unread (0x73f7d0 rebuilds a team   fr"
     - recording: h1_duelp1128
       turn: 175
-      value: Hong Kong's Upgrade Units tree 5308422 (temporary, RUNNING) at the log and end look; its Warrior 2490370, the swap partner, out of it at the end look
-  impl: [cpu/core/minorOps.ts:upgradeTreesTick]
+      value: "Hong Kong's Upgrade Units tree 5308422 (temporary, allowRecruiting 1, no operation, RUNNING): its Warrior 2490370 on the centre, reached before the Man-At-Arms 1507331 swaps it off, its turn not done, released: Attack Units, out of the tree at the end look (t179 the same, Heal)"
+    - recording: h1_duelp1128
+      turn: 174
+      value: "the same tree: its Warrior 2293764 on the centre, swapped off by the Warrior 2490370 reached before it, off its target as it is reached (turn done): held, no row; over the five duelp duels no on-target unit of a running tree is held but one moved off its target before it was reached (every held one ends the turn short of its Movement or off its plot)"
+  impl: [cpu/core/minorOps.ts:upgradeTreesTick, gpu/core/sim_minorops.py:_mops_upgrade_tree]
   readings:
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
     - "C-99: the upgrade trees — READ (the trigger, Find Available Unit's upgradeable offer, Find Unit Targets' job, Upgrade Units, the economic AI's upgrade, Move Unit with no Location), ported; the deletion of an excess obsolete unit unported"
     - "C-99 / C-128: every technology gained starts an Upgrade Units tree, the civic event never fires; a tree's units after its tick; the Nearest City Search's resource test; the plot's unit list — READ (0x4cd4c0 -> 0x800c60, 0x5bbf80 -> 0x27a180, 0x3a1ac0, 0x7cb3d0 -> 0x7d2190, 0x7eba40 -> 0x510d30, 0x74f40 / 0x763b0), the trigger both twins"
+    - "C-128 / C-99: an Upgrade Units tree lets go to the tactical pass each unit whose turn is not done — READ (0x7cb3d0 -> 0x7d2190, 0x7eeba0 at 0x7eef4c), both twins"
   context:
     - "...e homeland (0x70a370) release their units (-1) as they end. A tree's units each tick (0x7d2190 from the tree manager 0x7cb3d0), those not done: the tree marked (+0x3c8) with no opera..."
   review: reviewed
@@ -197,9 +204,11 @@
     - recording: h1_duelv1121
       turn: 7
       value: "runs/h1_duelv1121 t7: city-state 2's Attack Barb Camp logs its \"No   recruits\" pair twice — the Builder made at t6 held by a city tree;"
+  impl: [cpu/core/minorOps.ts:upgradeTreesTick]
   readings:
     - "C-96 / C-97: the team's unit to build, the recruit's contract and the knowledge base's camps — the team update's requirements and readiness, the unit choice, Recruit Units' result and contract, the camps READ; the maintenance resource test, the recruit's stealing and levy unread"
     - "H-1: the AI memory reader — READ (the hooks, the pointer paths, the contracts, the knowledge base, the operations, the trees), PARTLY READ (the religious AI's holder)"
+    - "C-128 / C-99: an Upgrade Units tree lets go to the tactical pass each unit whose turn is not done — READ (0x7cb3d0 -> 0x7d2190, 0x7eeba0 at 0x7eef4c), both twins"
   context:
     - "...e +0x628 to 0x7d1e40): a tree not the requester's job, marked (+0x3c8, set by its reset 0x7d3670) or asked with Allow Stealing, of a priority below the request's (or marked, of equal..."
   review: reviewed
