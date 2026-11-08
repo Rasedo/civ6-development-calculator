@@ -755,6 +755,12 @@ const SEAT: Record<string, Extractor> = {
   // all-zeros, the GPU plane's zeros init. Every seat spawns (and reveals)
   // at t0, so the empty state never survives to a digest in practice.
   explored: overSeats((s, st) => (s.explored?.length ? s.explored : new Array(st.map.tiles.length).fill(0))),
+  // the plots its next turn's trade lists try (`Seat.tradeSeen`, its
+  // explored before a turn of it has closed), dense as `explored`
+  tradeSeen: overSeats((s, st) => {
+    const v = s.tradeSeen ?? s.explored;
+    return v?.length ? v : new Array(st.map.tiles.length).fill(0);
+  }),
   treasury: overSeats((s) => s.treasury),
   goldShortfall: overSeats((s) => s.goldShortfall),
   co2: overSeats((s) => s.co2 ?? 0),

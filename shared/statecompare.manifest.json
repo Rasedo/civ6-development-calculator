@@ -709,6 +709,18 @@
           "note": "per-seat fog, dense 0/1 over tiles. TS's empty array (nothing revealed yet) renders dense-zero; every seat reveals at its t0 spawn, so the empty state never reaches a digest."
         },
         {
+          "name": "tradeSeen",
+          "compare": "exact",
+          "covers": [
+            "Seat.tradeSeen"
+          ],
+          "planes": [
+            "seat_trade_seen",
+            "seat_trade_seen_on"
+          ],
+          "note": "the plots a major's next turn's trade lists try: its explored as its last turn closed, its explored before one has; dense 0/1 as explored."
+        },
+        {
           "name": "treasury",
           "compare": "milli",
           "covers": [

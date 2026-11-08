@@ -141,11 +141,13 @@
     - gpu/core/sim_phase.py:_seat_city_produce
     - gpu/core/sim_minors.py:_minor_build
     - cpu/harness/cityBuildLab.ts:done
+    - gpu/core/sim_phase.py:_lump_step
   readings:
     - "H-1: a district project's yield conversion — READ"
     - "H-1: the build queue's overflow, the yields' fixed point, the dispersal Gold, the pantheon's price — READ"
     - "H-1: a completion's overflow and the item multiplier — READ"
     - "C-127: an idle city's store through the queue step (0x16f050), the build lab on it — READ (the engines unchanged)"
+    - "C-130: a lump's queue step completes the head; a major's trade list tries what its last turn revealed; a city-state's researched technology lands its boosts before the Culture — READ, both twins"
   context:
     - ...e city's yield component) and its project id (+0x1360 = -1), then applies the Production (0x16f050), whose ORDER_ADVANCE arm 0x184ae0 walks the project's Project_YieldConversions rows (Pro...
     - "- The queue's step (City_BuildQueue 0x177d10 → 0x16f050) reads the city's Production twice through 0x1c5350: A with the head's id (the Producti..."
@@ -155,9 +157,16 @@
   final: 0xf5520
   kind: function
   name: AddProgress
-  status: PARTLY
-  notes: ["imported: cited by the code, in no dll_readings section"]
-  review: imported
+  semantics: "a lump of Production into the city's queue: the queue step 0x16f050 with A = B = the amount (both pointers at the copied dword) and its flag r9b 1, so the step pays the overflow store in with it, completes the head it fills at once and stores min(A, B) less what the head lacked before it as the overflow (0x16f3bf; flag 0 stores none)."
+  status: READ
+  cases:
+    - recording: h1_duely1117
+      turn: 121
+      value: "China's harvest at Longxi (Builder 2752523's UnitOperationStarted, then CityProductionCompleted 131073 district 7 twice): the Entertainment Complex completes inside China's actions, Caguana's t121 civics and Civil Prestige read its route's Food from it"
+  impl: [cpu/core/economy.ts:applyLumpYield, gpu/core/sim_phase.py:_lump_step]
+  readings:
+    - "C-130: a lump's queue step completes the head; a major's trade list tries what its last turn revealed; a city-state's researched technology lands its boosts before the Culture — READ, both twins"
+  review: reviewed
 - addr: 0x16f7b0
   kind: function
   semantics: one of the player's cities may advance the project.

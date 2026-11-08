@@ -3071,7 +3071,12 @@ function applyPhase(ctx: Ctx, ds: Decision[], phase: Decision['phase'], b: TurnR
   // t2: Rome's Settler steps (34,20) -> (34,19) and its look of three shows
   // (37,19) before the city stands)
   const founders = new Set(ds.flatMap((d) => (d.kind === 'found' && d.unit ? [d.unit] : [])));
+  // ...and a clearing whose lump the log shows completing its city's head
+  // lands before the queue the record holds after it (runs/h1_duely1117
+  // t121: China's harvest completes Longxi's Entertainment Complex, its
+  // queue then empty)
   const order = (d: Decision) => (d.kind === 'wonderCharge' && d.placed ? ORDER.indexOf('queue') + 0.5
+    : d.kind === 'clear' && d.completes ? ORDER.indexOf('queue') - 0.5
     : d.kind === 'move' && founders.has(d.unit) ? ORDER.indexOf('found') - 0.5 : ORDER.indexOf(d.kind));
   // `players`: the actions of those players' turns alone (their rank); else
   // every decision of the phase no earlier call took
@@ -4950,7 +4955,7 @@ function turnSeed(rec: TurnRecord): number | undefined {
  * barbarians' tribes (their clocks, raids, scouts' trees), unit pool, camp
  * step's start and scout throttle. The non-majors' explored plots.
  */
-const SEAT_MEMORY = ['unitPool', 'armyKnown', 'armyAged', 'enemyCounts', 'combatDesire', 'tradeSeat', 'agendas', 'campsKnown', 'cityAi', 'ops', 'opsNext', 'treeSlots', 'treeFree', 'unitStrength'] as const;
+const SEAT_MEMORY = ['unitPool', 'armyKnown', 'armyAged', 'enemyCounts', 'combatDesire', 'tradeSeat', 'tradeSeen', 'agendas', 'campsKnown', 'cityAi', 'ops', 'opsNext', 'treeSlots', 'treeFree', 'unitStrength'] as const;
 const RESEARCH_MEMORY = ['goal', 'aiEntries', 'civicAiEntries', 'civicGovValues', 'civicPolicyBest', 'civicSlotBest', 'aiLeft', 'aiLeftSeen',
   'techCatchUp', 'civicCatchUp', 'favTech'] as const;
 const MINOR_MEMORY = ['prodSetValue', 'favoredFood', 'tradeCities', 'tradeRejected', 'tradeValue', 'metMinors', 'unitValues', 'buildingValues', 'resourceCounts',
@@ -5570,6 +5575,10 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
     // the active player's units stand where its actions left them before its
     // next start (the engine's turn below): its moves reveal, and meet, there
     syncUnits(ctx, b, activePlayer(a));
+    // ...and what it has revealed as its turn closes is what its next start's
+    // trade lists try (`Seat.tradeSeen`)
+    const actor0 = state.seats[seatOfP(ctx, activePlayer(a))];
+    if (actor0) actor0.tradeSeen = [...actor0.explored];
     activeBoosts(ctx, b, activePlayer(a));
     stageEnvoys(ctx, ds, a, b, history.randLog);
     stageAgendas(ctx, a.turn, history.randLog);
@@ -5725,6 +5734,7 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
       // DiplomacySummary.csv, the record of t62 the first to show it; 1117
       // t20: China's Scout gone from 41:12 by city-state 3's look)
       for (const p of otherMajors) syncUnits(ctx, b, p);
+      for (const seat of others) state.seats[seat].tradeSeen = [...state.seats[seat].explored];
       // ...taking into the turn's heal the moves their actions spent
       for (const [u, kept] of movesKept) if (others.includes(u.seat)) u.movesLeft = kept ? grantedMoves(state, u) : 0;
       for (const seat of others) detectBoosts(state, seat);

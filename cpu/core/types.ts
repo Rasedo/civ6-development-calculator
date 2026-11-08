@@ -1128,6 +1128,10 @@ export interface Seat {
    *  Empty = nothing hidden from it. One seat's scouting never lifts another's
    *  fog, so this is the seat's own knowledge, not the world's. */
   explored: number[];
+  /** a major's `explored` as its last turn closed: the plots its cities'
+   *  trade lists may try at its next turn start (`majorTradeLists`); unset
+   *  before its first turn closes (its `explored` then) */
+  tradeSeen?: number[];
   name: string;
   color: string;
   /** CIV6: the civilization this seat plays — an index into `CIV_LEADERS`

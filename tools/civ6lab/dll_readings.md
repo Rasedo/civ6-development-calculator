@@ -9749,3 +9749,48 @@ full-Movement search runs, and those run at four places:
   last unit; the danger map's last seen unit at DoTurn (the engines' sight
   at that moment against the game's); the carried operations at the turn's
   activation, which the engines do not keep across turns.
+
+## C-130: a lump's queue step completes the head; a major's trade list tries what its last turn revealed; a city-state's researched technology lands its boosts before the Culture — READ, both twins
+
+- A LUMP'S QUEUE STEP (AddProgress 0x16f6e0 -> City_BuildQueue 0x16f050,
+  A = B = the amount, flag r9b 1): the overflow store paid in with it, the
+  head it fills completes at once, the overflow store taking the amount
+  less what the head lacked before it (0x16f3bf; the step's flag 0 stores
+  none). `applyLumpYield` (cpu/core/economy.ts), GPU `_lump_step`
+  (gpu/core/sim_phase.py) under the harvest and chop arms of
+  gpu/core/sim_orders.py. The replay lands a major's clearing whose
+  UnitOperationStarted the log follows with its owner's
+  CityProductionCompleted before the queue the record holds after it (the
+  `clear` decision's `completes`, cpu/harness/replayActions.ts; its order in
+  `applyPhase`). runs/h1_duely1117 t121: China's harvest at Longxi
+  (Builder 2752523) completes its Entertainment Complex inside China's
+  actions, the queue then empty; Caguana's t121 civics (Food 34 off its
+  route) and Civil Prestige 65 / 87 at t121 / t122 as logged.
+- A MAJOR'S TRADE LIST (0x78f210, kept at its turn start) tries the centres
+  it had revealed as its last turn closed (`Seat.tradeSeen`, set at the end
+  of the seat's block in `seatPhase` and, in the replay, after its actions;
+  GPU `seat_trade_seen` / `seat_trade_seen_on`, `_major_trade_lists`), its
+  explored before its first turn closes. A FIT on the records:
+  runs/h1_duely1124 city-state 3 meets China in its own t10 turn (Granada
+  revealed to China in record 11), China's m_cityTrade empty at its t11 turn
+  and holding Granada at t12, city-state 3's and the Free Cities' K 2.10 from
+  t12, Foreign Trade 81.2 / 170.2 at t12 / t13 as logged; 1127: China meets
+  Mexico City in its own t2 turn, K 2.10 at t3. The knowledge base's city
+  entries 0x786160 that the walk reads are the likely writer, unread.
+- A TECHNOLOGY A CITY-STATE RESEARCHES lands the BOOST_TRIGGER_RESEARCH_TECH
+  boosts it triggers at once (`boostOnResearch`, cpu/core/boosts.ts, from
+  `minorResearchBank`; GPU `_minor_research_boosts` from
+  `_minor_research_bank`), before its Culture banks; the boost itself
+  0x3a3c00's, capped at the cost. runs/h1_duely1117 Caguana t139: Astronomy
+  researched (ResearchCompleted then CivicCompleted Colonialism in the log),
+  Colonialism's inspiration to 397.97 of 400, the turn's 8.33 Culture
+  completing it 6.30 over: Exploration, Reformed Church and Opera and Ballet
+  21 / 20 / 19 turns at t139-141 as logged (102.0, 112.3, 109.3).
+- Open: a major's own RESEARCH_TECH boost lands at its block's
+  `detectBoosts`, after its Culture (no case); 1124 city-state 2 t109
+  Divine Right 243.5 for 363.5 (Monarchy's government value of t108 121.9
+  where t107 read 164.0: Cardiff's walls housing on its Food surplus 4 -> 2,
+  the district placed at 11:12); 1128 city-state 2 t185-188 Mobilization
+  +9.77 (the standing army's shortfall 1 where the game's
+  m_defendersNeeded is 0: its Man-at-Arms 119 homed in an operation, turned
+  COMBAT by 0x79b9c0, out of the list).

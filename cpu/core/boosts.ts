@@ -311,6 +311,22 @@ function earnsBoosts(seat: number): boolean {
   return isCiv(seat) || isCityStateSeat(seat);
 }
 
+/** CIV6 (BOOST_TRIGGER_RESEARCH_TECH): the boosts technology `tech`
+ *  triggers, landed the moment a city-state researches it — before its
+ *  Culture banks (runs/h1_duely1117 Caguana t139: Astronomy researched,
+ *  Colonialism's inspiration at 397.97 of 400, the turn's 8.33 Culture
+ *  completing it with 6.3 over, the civics AI's turns a turn shorter
+ *  t139-141) */
+export function boostOnResearch(state: GameState, seat: number, tech: string): void {
+  // the technologies' rows, then the civics' (`detectBoosts`' landing on a
+  // city-state)
+  for (const civic of [false, true]) {
+    for (const [id, def] of Object.entries(BOOSTS)) {
+      if (def.cls === 'RESEARCH_TECH' && def.tech === tech && !TECHS[id] === civic) markBoost(state, seat, id);
+    }
+  }
+}
+
 export function isBoosted(state: GameState, id: string, seat: number): boolean {
   return seatOf(state, seat)!.research.boosted.includes(id);
 }

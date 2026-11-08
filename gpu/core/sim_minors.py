@@ -158,6 +158,20 @@ class SimMinors:
             if bool(w.count_nonzero()):
                 self._land_minor_boosts(s, w, target == "civic")
 
+    def _minor_research_boosts(self, s: int, tech: torch.Tensor) -> None:
+        """`boostOnResearch` for city-state `s`: the BOOST_TRIGGER_RESEARCH_TECH
+        rows of the technology `tech` [B] (-1 none) researched now, landed
+        at once (`_land_minor_boosts`), techs first"""
+        tab = self._boost_tables()
+        for target, held in (("tech", self.citystate_techs), ("civic", self.citystate_civics)):
+            w = torch.zeros_like(held[:, s])
+            for i, idx in tab["to_" + target]:
+                b = tab["rows"][i]
+                if b["cls"] == "RESEARCH_TECH" and idx < w.shape[1]:
+                    w[:, idx] |= tech == int(b["tech"])
+            if bool(w.count_nonzero()):
+                self._land_minor_boosts(s, w, target == "civic")
+
     def _land_minor_boosts(self, s: int, want: torch.Tensor, is_civic: bool) -> torch.Tensor:
         """`markBoost` on city-state `s` over every item at once: the items of
         `want` [B, N] neither held nor boosted that carry a `Boosts` row are
@@ -797,10 +811,11 @@ class SimMinors:
     def _major_trade_lists(self, r: int, mask: torch.Tensor) -> None:
         """`majorTradeLists` where `mask` [B]: each city of major row `r` its
         trade list (`city_trade_ok` / `city_trade_no`) kept a turn on, at its
-        turn's start — the plots it has explored revealed, every plot with
-        the fog off"""
-        seen = (self.seat_explored[:, r] if self.fog_of_war
-                else torch.ones(self.B, self.T, dtype=torch.bool, device=self.device))
+        turn's start — the plots it had explored as its last turn closed
+        revealed (`seat_trade_seen`, its explored before one has), every
+        plot with the fog off"""
+        seen = (torch.where(self.seat_trade_seen_on[:, r].unsqueeze(1), self.seat_trade_seen[:, r], self.seat_explored[:, r])
+                if self.fog_of_war else torch.ones(self.B, self.T, dtype=torch.bool, device=self.device))
         for j in range(self.RC):
             act = mask & self.city_alive[:, r, j]
             if not bool(act.count_nonzero()):
@@ -1467,6 +1482,9 @@ class SimMinors:
                     self._urban_defenses_fit(self.FREE_ROW, hit)
                 else:
                     self._minor_urban_fit(s, hit)
+            # the boosts it triggers land at once, before the Culture banks
+            if not free:
+                self._minor_research_boosts(s, torch.where(fire, c, torch.full_like(c, -1)))
 
         if after_techs is not None:
             after_techs(techs)

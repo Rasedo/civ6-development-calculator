@@ -31,7 +31,7 @@ import { PROJECTS, projectConversionRate } from '../data/projects';
 import { worshipBuildingOf } from '../data/religion';
 import { CIV_LEVELS } from '../data/civLevels';
 import { CITY_MIN_STRIKE_CS, FAITH_PURCHASE_MULT, GOLD_PURCHASE_MULT, amenityTier, gameProgressPct } from '../data/constants';
-import { detectBoosts } from './boosts';
+import { boostOnResearch, detectBoosts } from './boosts';
 import { canPlaceDistrictIn, fitEncampOuter, outerDamage, outerPool, urbanDefensesFit, wallsMax } from './rules';
 import { lumpFood, seatGrowth } from './seatTurn';
 import { freeCityBuildFacts, majorQueueItem, seatResearchTurns } from './freeCityBuild';
@@ -546,6 +546,8 @@ export function minorResearchBank(state: GameState, r: ResearchState, seat: numb
       researchDraw(state), contracts));
     r.aiLeft = researchInHandLeft(state, seat, r, fxOf(science));
     if (cur === URBAN_DEFENSES_TECH) urban();
+    // the boosts it triggers land at once, before the Culture banks
+    if (seat !== FREE_SEAT) boostOnResearch(state, seat, cur);
   }
   afterTechs?.(gained.techs);
   minorCatchUp(state, r, true, seat);

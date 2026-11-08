@@ -773,6 +773,10 @@ class SimInit:
         self.appeal_over = torch.tensor([[int(t.get("apo", -999)) for t in f["tiles"]] for f in fixtures], dtype=torch.long, device=device)
         self.civ_alive = torch.zeros(B, self.n_majors, dtype=torch.bool, device=device)
         self.seat_explored = torch.zeros(B, self.n_majors, self.T, dtype=torch.bool, device=device)
+        # each major's explored plots as its last turn closed (`Seat.tradeSeen`),
+        # and whether a turn of it has closed (before one: its explored)
+        self.seat_trade_seen = torch.zeros(B, self.n_majors, self.T, dtype=torch.bool, device=device)
+        self.seat_trade_seen_on = torch.zeros(B, self.n_majors, dtype=torch.bool, device=device)
         # the barbarians' revealed plots (`barbSeat.explored`)
         self.barb_explored = torch.zeros(B, self.T, dtype=torch.bool, device=device)
 

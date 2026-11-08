@@ -773,6 +773,8 @@ SEAT = {
     # Fog — the seat_explored [n_majors, T] row per seat, dense 0/1 (the TS
     # extractor renders its empty-array state dense the same way).
     "explored": _civ_scalar("seat_explored"),
+    "tradeSeen": lambda sim, b, rows: [
+        (sim.seat_trade_seen[b, c] if bool(sim.seat_trade_seen_on[b, c]) else sim.seat_explored[b, c]).tolist() for c in rows],
     "treasury": _civ_scalar("civ_treasury"),
     "goldShortfall": _civ_scalar("seat_shortfall"),
     "co2": _civ_scalar("civ_co2"),

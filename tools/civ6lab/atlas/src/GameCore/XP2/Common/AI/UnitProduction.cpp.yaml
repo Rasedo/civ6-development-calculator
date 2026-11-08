@@ -128,6 +128,7 @@
     - "C-99: the pathfinder's later-turn pool, Heal's hull, the tactical list's explorers, Move Unit's planning"
     - "C-128: the standing army's home and Garrison City's DEFENDER — READ, both twins"
     - "C-95: the embark rules for a formation that may embark, a district's zone unseen, a city's kill in the planning, a raised unit's AI type, a move order's attack spot — READ (0x530420, 0x530240, 0x52fe90 at 0x52fed4, 0x530f50 at 0x531168, 0x791470 at 0x791677, 0x79b9c0), FIT (the move order's attack spot), both twins"
+    - "C-130: a lump's queue step completes the head; a major's trade list tries what its last turn revealed; a city-state's researched technology lands its boosts before the Culture — READ, both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...ng army and the Combat Desire's city terms — READ (0x5ca7e0, the watched setter 0x731d10, 0x79b9c0), the unit table's orientation READ"

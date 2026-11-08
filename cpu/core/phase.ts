@@ -2969,6 +2969,8 @@ export function seatPhase(state: GameState, only?: { seats: ReadonlySet<number>;
       }
       if (recU) applySeatUnitOrders(state, actor, recU.units);
       capStockpiles(state, actor.seat);
+      // what it has revealed as its turn closes: its next turn's trade lists
+      actor.tradeSeen = [...actor.explored];
       continue;
     }
 
@@ -3823,6 +3825,9 @@ export function seatPhase(state: GameState, only?: { seats: ReadonlySet<number>;
     // founded: runs/h1_duelw1115 China t2); the block top's detection takes
     // what other seats' turns gave it
     detectBoosts(state, actor.seat);
+    // what it has revealed as its turn closes: its next turn's trade lists
+    // (`majorTradeLists`)
+    actor.tradeSeen = [...actor.explored];
   }
 
   // Env-gated registry coherence check at the phase tail (after every

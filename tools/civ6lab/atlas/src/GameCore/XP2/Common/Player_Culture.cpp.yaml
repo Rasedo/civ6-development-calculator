@@ -784,7 +784,9 @@
     - recording: h1_duelw1117
       value: "dll_boost.py: 29 of 32 current-item boosts land exactly (Rome Astrology 25 -> 9, Writing 40 -> 15)"
   impl: [cpu/core/boosts.ts:boostAmount, gpu/core/sim_economy.py:_boost_amount]
-  readings: ["H-1: a boost lands as progress — READ"]
+  readings:
+    - "H-1: a boost lands as progress — READ"
+    - "C-130: a lump's queue step completes the head; a major's trade list tries what its last turn revealed; a city-state's researched technology lands its boosts before the Culture — READ, both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "The trigger 0x4cd900 (techs, \"LOC_NOTIFICATION_TECH_BOOST_MESSAGE\"; civics 0x3a3c00, \"Cannot trigger a boost for a civic that is not in this game\"), past its \"already held /..."

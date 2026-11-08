@@ -53,8 +53,10 @@ export type Decision = Base & (
   /** `unit`: the unit that laid it (the log's acting unit of its owner), where named */
   | { kind: 'improve'; player: number; plot: number; improvement: number; unit?: string }
   /** a feature, resource or improvement taken off a plot; `unit`: the unit
-   *  the log names starting the removal or harvest there */
-  | { kind: 'clear'; player: number; plot: number; what: 'feature' | 'resource' | 'improvement'; unit?: string }
+   *  the log names starting the removal or harvest there; `completes`: the
+   *  log completes its owner's production right after the operation, its
+   *  lump filling the queue head */
+  | { kind: 'clear'; player: number; plot: number; what: 'feature' | 'resource' | 'improvement'; unit?: string; completes?: true }
   /** a Builder's charge spent on the wonder its plot holds (`UnitChargesChanged`
    *  down, standing on a wonder under construction); `placed`: the wonder
    *  was placed in the pair, its queue head the step's own */
@@ -619,6 +621,9 @@ export class RecordedActions implements ActionSource {
     // unit starting the operation on the plot
     const stand = new Map(a.units.map((u) => [unitKey(u), u.y * W + u.x]));
     const clearer = new Map<string, string>();
+    // the clearings whose operation the log follows with its owner's
+    // CityProductionCompleted
+    const completing = new Set<string>();
     // each unit's last operation the log started
     const lastOp = new Map<string, number>();
     // the unit a formation just merged: the promotions the log names on it
@@ -654,7 +659,10 @@ export class RecordedActions implements ActionSource {
       if (name === 'UnitOperationStarted' && (n(r, 2) === OP_REMOVE_FEATURE || n(r, 2) === OP_HARVEST)) {
         const k = `${n(r, 0)}:${n(r, 1)}`;
         const at = stand.get(k);
-        if (at !== undefined) clearer.set(`${n(r, 0)}:${at}:${n(r, 2) === OP_REMOVE_FEATURE ? 'feature' : 'resource'}`, k);
+        const ck = `${n(r, 0)}:${at}:${n(r, 2) === OP_REMOVE_FEATURE ? 'feature' : 'resource'}`;
+        if (at !== undefined) clearer.set(ck, k);
+        const nx = ev[ev.indexOf(r) + 1];
+        if (at !== undefined && nx?.[2] === 'CityProductionCompleted' && n(nx, 0) === n(r, 0)) completing.add(ck);
       }
       if (name === 'CityAddedToMap') {
         const plot = n(r, 3) * W + n(r, 2);
@@ -1127,6 +1135,7 @@ export class RecordedActions implements ActionSource {
     for (const d of inferred) {
       const by = d.kind === 'clear' ? clearer.get(`${d.player}:${d.plot}:${d.what}`) : undefined;
       if (d.kind === 'clear' && by) d.unit = by;
+      if (d.kind === 'clear' && completing.has(`${d.player}:${d.plot}:${d.what}`)) d.completes = true;
     }
     // ...the steps a unit the pair lost took before it fell, and those a unit
     // the pair made took from where it arrived (runs/h1_duelw1117 t6: China's

@@ -21,6 +21,10 @@ class SimPhase:
             # the eurekas and inspirations the seat's processing and actions
             # earned land within its turn (`detectBoosts` at the block's end)
             self._detect_seat_boosts(row, active)
+            # what it has revealed as its turn closes: its next turn's trade
+            # lists (`Seat.tradeSeen`)
+            self.seat_trade_seen[:, row] = self.seat_explored[:, row]
+            self.seat_trade_seen_on[:, row] = True
 
         # a promise's keep answers every asker's settlement this phase, and is
         # for THIS turn alone
@@ -1163,6 +1167,31 @@ class SimPhase:
         self.city_prod_bank[bidx, row, col] = torch.where(act, bank, self.city_prod_bank[bidx, row, col])
         self.city_proj_conv[bidx, row, col] = torch.where(act, conv, self.city_proj_conv[bidx, row, col])
         self.city_proj_yield[bidx, row, col] = torch.where(act, pyld, self.city_proj_yield[bidx, row, col])
+
+    def _lump_step(self, row: int, b: int, j: int, amount: float) -> None:
+        """A Production lump into city `j` of seat row `row` on game `b`
+        (`applyLumpYield`; AddProgress 0x16f6e0 -> City_BuildQueue 0x16f050):
+        a queue step of its own, the overflow store paid in with it; a head
+        it fills completes at once, the overflow store taking the lump less
+        what the head lacked before it (0x16f3bf, the flag set). With nothing
+        queued the lump goes to the overflow store."""
+        if int(self.city_current[b, row, j, 0]) < 0:
+            self.city_prod_bank[b, row, j] += amount
+            return
+        before = float(self.city_progress[b, row, j, 0])
+        drip = self.city_progress[:, row, :, 0].clone()
+        self.city_progress[b, row, j, 0] += amount + self.city_prod_bank[b, row, j].double()
+        self.city_prod_bank[b, row, j] = 0
+        self._repair_drip(row, drip)
+        self._reprice_live(row)
+        cost = float(self.city_cost[b, row, j, 0])
+        if float(self.city_progress[b, row, j, 0]) < cost:
+            return
+        dev = self.device
+        self._complete_head_now(row, torch.tensor([b], device=dev), torch.tensor([j], device=dev))
+        lacked = max(0.0, cost - before)
+        if amount > lacked:
+            self.city_prod_bank[b, row, j] += amount - lacked
 
     def _seat_city_produce(self, row: int, col: torch.Tensor, act: torch.Tensor,
                            prod: torch.Tensor, sci_turn: torch.Tensor | None = None,

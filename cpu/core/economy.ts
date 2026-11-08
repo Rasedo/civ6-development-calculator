@@ -18,6 +18,8 @@ import { treeBaseCost } from './researchTree';
 import { RESOURCES } from '../../world/resources';
 import { minorLump } from './minorBuild';
 import { lumpFood } from './seatTurn';
+import { itemCost } from './game';
+import { completeQueueItem } from './production';
 
 /**
  * SELECT a tech or civic, keeping the progress on the one being left.
@@ -248,12 +250,24 @@ export function applyLumpYield(
   // CIV6 (the harvest's AddProgress 0x16f6e0 → City_BuildQueue 0x16f050):
   // the lump is a queue step of its own, paying the overflow store in with
   // it (runs/h1_duelw1121 Xi'an t11: the Monument's 8 overflow and the
-  // Woods' 11 put the Great Bath at 19 before the turn's step)
+  // Woods' 11 put the Great Bath at 19 before the turn's step). The step
+  // completes the head it fills at once, AddProgress's flag (r9b 1) storing
+  // the lump less what the head lacked before it as the overflow (0x16f3bf;
+  // runs/h1_duely1117 t121: China's harvest at Longxi completes its
+  // Entertainment Complex inside its actions)
   if (city.queue.length > 0) {
-    const before = city.queue[0].progress;
-    city.queue[0].progress += amount + (city.productionBank ?? 0);
+    const q = city.queue[0];
+    const before = q.progress;
+    q.progress += amount + (city.productionBank ?? 0);
     city.productionBank = 0;
     repairDrip(state, city, before);
+    const cost = itemCost(q, state, city);
+    if (q.progress >= cost) {
+      city.queue.shift();
+      completeQueueItem(state, city, q, cost);
+      const lacked = Math.max(0, cost - before);
+      if (amount > lacked) city.productionBank = (city.productionBank ?? 0) + amount - lacked;
+    }
   } else {
     city.productionBank = (city.productionBank ?? 0) + amount;
   }

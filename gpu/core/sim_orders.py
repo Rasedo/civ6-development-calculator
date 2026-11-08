@@ -538,7 +538,6 @@ class SimOrders:
                     _amt = self._lump_value(row, _hamt[_r], _r, _t).double()
                     self._drop_resource(_r, _t)
                     _col_h = self._city_col_at(row, _r, _t)
-                    _drip_h = self.city_progress[:, row, :, 0].clone()
                     for _i in range(len(_r)):
                         _b, _j = int(_r[_i]), int(_col_h[_i])
                         _v = float(_amt[_i])
@@ -553,13 +552,8 @@ class SimOrders:
                             continue
                         if _k == 0:        # FOOD lands in the city's own box (`lumpFood`)
                             self._lump_food(_b, row, _j, _v)
-                        elif int(self.city_current[_b, row, _j, 0]) >= 0:
-                            # a queue step of its own: the overflow store paid in with it
-                            self.city_progress[_b, row, _j, 0] += _v + self.city_prod_bank[_b, row, _j].double()
-                            self.city_prod_bank[_b, row, _j] = 0
                         else:
-                            self.city_prod_bank[_b, row, _j] += _v
-                    self._repair_drip(row, _drip_h)
+                            self._lump_step(row, _b, _j, _v)
                     self._spend_build_charge(_r, sc, hc)
                     self._eff_version += 1
 
@@ -948,7 +942,6 @@ class SimOrders:
                     # decided over the WHOLE batch, because `ct` is narrowed
                     _dgold = self._congress_chop(self.feat_id.gather(1, hc.unsqueeze(1)).squeeze(1))[1]
                     col_c = self._city_col_at(row, cr, ct)
-                    _drip_c = self.city_progress[:, row, :, 0].clone()
                     for i2 in range(len(cr)):
                         b2, j2 = int(cr[i2]), int(col_c[i2])
                         f_amt, p_amt = float(food_c[i2]), float(prod_c[i2])
@@ -961,13 +954,7 @@ class SimOrders:
                             self._lump_food(b2, row, j2, f_amt)
                         if p_amt <= 0:
                             continue
-                        if int(self.city_current[b2, row, j2, 0]) >= 0:
-                            # a queue step of its own: the overflow store paid in with it
-                            self.city_progress[b2, row, j2, 0] += p_amt + self.city_prod_bank[b2, row, j2].double()
-                            self.city_prod_bank[b2, row, j2] = 0
-                        else:
-                            self.city_prod_bank[b2, row, j2] += p_amt
-                    self._repair_drip(row, _drip_c)
+                        self._lump_step(row, b2, j2, p_amt)
                     self.unit_charges[cr, sc[cr]] -= 1
                     spent = chp & (self.unit_charges.gather(1, sc.unsqueeze(1)).squeeze(1) <= 0)
                     if bool(spent.count_nonzero()):

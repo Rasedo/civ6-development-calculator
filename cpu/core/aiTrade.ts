@@ -96,10 +96,16 @@ export function minorTradeList(state: GameState, cs: CityState): void {
 }
 
 /** 0x78f210: each city of a major its trade list kept a turn on, at its
- *  turn's start (`City.tradeCities`, `.tradeRejected`) — the plots it has
- *  explored revealed, every plot where its fog hides none */
+ *  turn's start (`City.tradeCities`, `.tradeRejected`) — the plots it had
+ *  explored as its last turn closed revealed (`Seat.tradeSeen`), every plot
+ *  where its fog hides none. A centre revealed in another player's turn is
+ *  tried at the start after the major's next turn (runs/h1_duely1124:
+ *  city-state 3 meets China in its t10 turn, Granada revealed to China in
+ *  record 11, China's list holding it from its t12 turn, K 2.10 at t12;
+ *  1127: China meets Mexico City in its own t2 turn, K 2.10 at t3) */
 export function majorTradeLists(state: GameState, seat: Seat): void {
-  const seen = (p: number): boolean => seat.explored.length === 0 || seat.explored[p] === 1;
+  const known = seat.tradeSeen ?? seat.explored;
+  const seen = (p: number): boolean => known.length === 0 || known[p] === 1;
   for (const c of seat.cities) {
     keepTradeList(state, seat.seat, c.centerIndex, knownTradeCities(state, c.centerIndex, c.id, seat.seat), seen, c);
   }
