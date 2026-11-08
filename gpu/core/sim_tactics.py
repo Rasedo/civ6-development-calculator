@@ -586,7 +586,7 @@ class SimTactics:
                     dest: torch.Tensor | None = None, pre: str = "barb", plan: dict | None = None,
                     full: bool = False, stand: bool = False, later_turns: bool = False,
                     from_full: bool = False, explore: bool = True, danger: tuple | None = None,
-                    mate: torch.Tensor | None = None, listed: bool = False) -> dict:
+                    mate: torch.Tensor | None = None, listed: bool = False, reach: str = "planning") -> dict:
         """THE PATHFINDER (`search`) for the units at local `slots` of pool
         `pre` in the games `rows` [N]: Dijkstra from each unit's plot over
         the open nodes by (key, cost, tie) — a move order's path opens a
@@ -624,7 +624,15 @@ class SimTactics:
         2 no node links a child on the ground of a player at war with the
         unit's. With `listed` (the planning's list, `reachPlots` /
         `planUnit`) no plot of ground closed to a city-state is kept, an
-        attack's neither."""
+        attack's neither. `reach` names the search's flags (`search`'s
+        reach): with no `zoc` "explore" is Explore Land's 0x26df90 (0x40 /
+        0x42) and "patrol" Naval Patrol's (0), which like `stand` (the danger
+        map's) and a move order's path pay the stacking +1e6 on a turn's end
+        (no flag 4, the planning's alone); "explore" on a move order's path
+        is HL Explore's order (0x40). Under 0x40 a turn's end on a revealed
+        plot but a hill costs +300 more, an unrevealed plot +2 as a revealed
+        one, and every step +10 x (7 - the plots never revealed among the
+        child and the six beside it)."""
         dev = self.device
         N, T = rows.shape[0], self.T
         NONE = _KEY_NONE
@@ -756,7 +764,12 @@ class SimTactics:
         # slot, -1 none) stacks by either member's class, its members not
         # counted
         full_n = None
-        if zoc or stand:
+        # every search but the planning's pays the stacking +1e6 (`search`'s
+        # paysStack: 0x270dd0 not under flag 4)
+        pays_stack = zoc or stand or reach != "planning"
+        # the search's flag 0x40 (Explore Land's): the cost's exploring terms
+        scout = reach == "explore"
+        if pays_stack:
             full_n = self._tac_stacks(rows, seat, (slots + self.POOL_LO[pre],
                                                    torch.where(mate >= 0, mate + self.POOL_LO[pre], torch.full_like(mate, -1))))
         # the path node's count +0x54 against the stacking limit at a turn's
@@ -764,13 +777,14 @@ class SimTactics:
         # player sees now another player's unit at peace but a Trader
         crowd_n = None
         stack_n = None
+        if pays_stack:
+            peace_n = by_layer(lambda r: self._tac_peaceful(seat, r))
+            # the count at the stacking limit whatever the player sees
+            # (`groundOf`'s stacked): the cost's +1e6 on a turn's end
+            stack_n = full_n | peace_n
         if zoc:
             sn_c = self._barb_seen("barbarians" if seat == BARB_SEAT else seat)[rows]
-            peace_n = by_layer(lambda r: self._tac_peaceful(seat, r))
             crowd_n = full_n | (peace_n & sn_c)
-            # the count at the stacking limit whatever the player sees
-            # (`groundOf`'s stacked): the path cost's +1e6 on a turn's end
-            stack_n = full_n | peace_n
         # a plot of a danger feature in the player's sight (`groundOf`'s
         # hazard): no step of any search onto it but onto the destination
         live_f = (self.feat_id >= 0) & ~self.feat_stripped
@@ -834,6 +848,14 @@ class SimTactics:
         found = torch.zeros(N, dtype=torch.bool, device=dev)
         cols = torch.tensor(list(self._DIRECTION_TYPES), device=dev)
         neigh = self.neigh[:, cols]  # [T, 6] in DirectionTypes order
+        hills_n = blind_n = None
+        if scout:
+            # the plots never revealed among each plot and the six beside it
+            # (0x502aa0 over the player's revealed bytes)
+            ur = (~rv_n).long() if rv_n is not None else torch.zeros(N, T, dtype=torch.long, device=dev)
+            nbv = neigh >= 0
+            blind_n = ur + (ur[:, neigh.clamp(min=0)] * nbv.long()).sum(dim=2)
+            hills_n = self.hills[rows]
         link = None
         if plan is not None:
             link = self._tac_spot_link(rows, start, naval, plan)
@@ -937,16 +959,25 @@ class SimTactics:
             moves = torch.where(spend6, 0, moves)
             # +4 where the step leaves no Movement, +3 more off the unit's
             # territory on a revealed plot; +2 a revealed plot, +3 an
-            # unrevealed one; +1000 a land unit's revealed water (0x2712be)
-            seen6 = kn_n.gather(1, nbc)
+            # unrevealed one; +1000 a land unit's revealed water (0x2712be):
+            # each the child's revealed bit (+0x51 bit 0), a path's as any
+            seen6 = ~unrev6
             ends = torch.where(moves <= 0, ((tseat[rows.unsqueeze(1), nbc] != seat) & seen6).long() * 3 + 4, 0)
-            # a move order's path: +1e6 more where the step ends the turn on
-            # a revealed plot at its stacking limit (0x270dd0 at
+            # every search but the planning's: +1e6 more where the step ends
+            # the turn on a revealed plot at its stacking limit (0x270dd0 at
             # 0x27102e..0x2710a0, `search`'s price)
             if stack_n is not None:
                 ends = ends + (stack_n.gather(1, nbc) & seen6 & (moves <= 0)).long() * 1_000_000
             wet = (seen6 & water_n.gather(1, nbc) & ~naval.unsqueeze(1)).long() * 1000
-            gn = bg + cst * 1000 + (ends + 3 - seen6.long() + wet) * _FIX
+            unrev_c = 1 - seen6.long()
+            if scout:
+                # flag 0x40: +300 a turn's end on a revealed plot but a hill,
+                # an unrevealed plot +2, +10 x (7 - the plots never revealed
+                # among the child and the six beside it)
+                ends = ends + (seen6 & (moves <= 0) & ~hills_n.gather(1, nbc)).long() * 300
+                unrev_c = torch.zeros_like(unrev_c)
+                wet = wet + (7 - blind_n.gather(1, nbc)) * 10
+            gn = bg + cst * 1000 + (ends + 2 + unrev_c + wet) * _FIX
             return nb, nbc, a6, turns, moves, gn, cliff6, bt, carry6, wet6, unrev6
 
         def update_parents(rm: torch.Tensor, node: torch.Tensor, seq: torch.Tensor, lo: torch.Tensor) -> tuple:
@@ -1466,7 +1497,7 @@ class SimTactics:
     def _tac_move_to(self, mask: torch.Tensor, us: torch.Tensor, dest: torch.Tensor, pre: str = "barb",
                      seat: int = BARB_SEAT, strike: bool = True,
                      later_turns: bool = False, explore: bool = True, danger: tuple | None = None,
-                     mate: torch.Tensor | None = None) -> None:
+                     mate: torch.Tensor | None = None, scout: bool = False) -> None:
         """`moveTo` for the unit at local slot `us` [B] of pool `pre` (its
         player `seat`) in the games of `mask`: the pathfinder's path to `dest`
         with zones of control, walked as far as its Movement carries it this
@@ -1485,7 +1516,9 @@ class SimTactics:
         never revealed; with `danger` (the danger map [B, T], the order's
         flag 8 [B], flag 0x8000 [B] and flag 2 [B]) its first turn steps onto
         no plot of danger, and under flag 2 no step onto the ground of a
-        player at war with it. In an AI player's pass a unit whose last step
+        player at war with it; with `scout` (its flag 0x40, HL Explore's
+        order) its path prices its steps as Explore Land's (`_tac_search`'s
+        reach). In an AI player's pass a unit whose last step
         of the turn ended in a zone of control does not move (`orderOnce`)."""
         if not bool(mask.count_nonzero()):
             return
@@ -1508,7 +1541,7 @@ class SimTactics:
         dg = None if danger is None else tuple(x[rows] for x in danger)
         mr = self._tac_mate(rows, sr, pre) if mate is None else mate[rows]
         res = self._tac_search(rows, sr, seat, 1 << 30, True, dr, pre=pre, later_turns=later_turns, explore=explore,
-                               danger=dg, mate=mr)
+                               danger=dg, mate=mr, reach="explore" if scout else "planning")
         par = res["parent"]
         start = res["start"]
         R = rows.shape[0]
@@ -1693,7 +1726,7 @@ class SimTactics:
                 sm = torch.zeros(B, dtype=torch.bool, device=dev)
                 sm[rows[short]] = True
                 pend.append((sm, us.clone(), dest.clone(), dict(pre=pre, seat=seat, strike=strike, later_turns=later_turns,
-                                                                explore=explore, danger=danger, mate=mate)))
+                                                                explore=explore, danger=danger, mate=mate, scout=scout)))
 
     def _tac_zoc_moved_of(self, pre: str) -> torch.Tensor | None:
         """[B, U] bool of pool `pre` — `zocMoved`: the units whose last step
@@ -3680,7 +3713,7 @@ class SimTactics:
             # what its player revealed as the round opens (the moves before lift it)
             known = self._tac_known(seat)
             revealed = known if known is not None else torch.ones(B, T, dtype=torch.bool, device=dev)
-            res, v1, v2, rt = self._tac_explore_counts(rows, slots, pre, seat, danger, revealed, seen_now)
+            res, v1, v2, rt = self._tac_explore_counts(rows, slots, pre, seat, danger, revealed, seen_now, "explore")
             rowof = torch.full((B, P), -1, dtype=torch.long, device=dev)
             rowof[rows, slots] = torch.arange(rows.numel(), device=dev)
             dest = torch.full((B, P), -1, dtype=torch.long, device=dev)
@@ -3703,7 +3736,7 @@ class SimTactics:
                 u_b = order[:, j]
                 m = (j < npass) & act[bidx, u_b]
                 if bool(m.count_nonzero()):
-                    self._tac_move_to(m, u_b, dest[bidx, u_b], pre, seat, False)
+                    self._tac_move_to(m, u_b, dest[bidx, u_b], pre, seat, False, scout=True)
             went = torch.where(act, dest, went)
             first = torch.where(act & ~moved_any, dest, first)
             moved_any |= act
@@ -3711,9 +3744,9 @@ class SimTactics:
         return first
 
     def _tac_explore_counts(self, rows: torch.Tensor, slots: torch.Tensor, pre: str, seat: int, danger: torch.Tensor,
-                            revealed: torch.Tensor, seen_now: torch.Tensor):
-        """`exploreTarget`'s search for the units at local `slots` of games
-        `rows` ([n]): the search of this turn on their Movement left (`res`)
+                            revealed: torch.Tensor, seen_now: torch.Tensor, reach: str):
+        """`exploreTarget`'s search (`reach`: Explore Land's "explore", Naval
+        Patrol's "patrol") for the units at local `slots` of games `rows` ([n]): the search of this turn on their Movement left (`res`)
         and per plot closed this turn with no danger and no other player's
         unit its two sight counts — the plots its player never revealed
         (`v1`), those it does not see now (`v2`) — and whether its look
@@ -3721,7 +3754,7 @@ class SimTactics:
         candidates"""
         T, dev = self.T, self.device
         NEG = -(1 << 40)
-        res = self._tac_search(rows, slots, seat, 1, False, pre=pre)
+        res = self._tac_search(rows, slots, seat, 1, False, pre=pre, reach=reach)
         stand = ~self._tac_foreign(seat)[rows]
         reach = (res["turns"] == 1) & stand & (danger[rows] <= 0)
         n_i, t_i = reach.nonzero(as_tuple=True)

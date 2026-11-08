@@ -8395,3 +8395,56 @@ the replay's `layDigSites` (cpu/harness/replay.ts).
   Bologna t179 388.8 for 379.7 (the Archaeologist 9.1 at T 49); 1128
   Bologna Totalitarianism 1494.6 / 1434.2 / 1414.8 at t227 / t228 / t236
   for 1474.6 / 1444.2 / 1452.8.
+
+## C-124 / C-95: every search but the planning's pays the stacking +1e6, the cost reads the child's revealed bit, Explore's flag 0x40 prices the unrevealed — READ (0x270dd0 at 0x270e55 / 0x270e86 / 0x270ff2 / 0x2711c3..0x271268 / 0x2713d3, 0x502aa0, 0x26df90's callers 0x716739 / 0x70aadd, 0x70ce90 at 0x70ced5, 0x803060 at 0x80316f), both twins
+
+`search`'s `reach` ('planning' / 'danger' / 'explore' / 'patrol'),
+`paysStack`, `scout`, `blindNear` and `price`'s `seen` / `flat` / `look`;
+`exploreTarget`'s `reach`, `moveTo` / `orderOnce` / `pathTo`'s `scout`
+(cpu/core/tactical.ts). GPU `_tac_search`'s `reach`, `pays_stack`, `scout`,
+`blind_n` / `hills_n` in `price6`, `_tac_explore_counts`' `reach`,
+`_tac_move_to`'s `scout` (gpu/core/sim_tactics.py), Naval Patrol's
+"patrol" (gpu/core/sim_minorops.py).
+
+- WHICH SEARCHES CARRY FLAG 4: the planning alone (0x26dcd0, 0x115). The
+  breadth-first 0x26df90 takes its caller's flags (the fifth argument,
+  0x800 added at 0x26e12f) and keeps the cost 0x270dd0: the danger map's
+  0x311 (0x716739), Explore Land's 0x40 or 0x42 (0x70ce90 at 0x70ced5:
+  0x40 where gp +0x110 >= the knowledge base's +0x128, else 0x42, passed to
+  HL Explore 0x70aa40 and on to its search at 0x70aadd and its MoveTo
+  0x962030 at 0x70d0b5), Naval Patrol's 0 (0x803060 at 0x80316f, its MoveTo
+  flags 0 at 0x8031b2). So the danger map, Explore and Naval Patrol pay the
+  +1e6 on a turn's end at the stacking limit as a move order's path does.
+  The homeland's Plunder Trader reads the planning's reach (0x791300), no
+  search of its own.
+- THE REVEALED BIT: 0x270dd0 reads the child's +0x51 bit 0 once
+  (0x270e55 -> [rsp+0xa8]) and every term after it tests that byte: the
+  +3 off the territory, the +1e6, the +1000 of a land unit's water
+  (0x2712be) and +2 revealed / +3 unrevealed (0x271352 / 0x2713cd). A move
+  order's path reads it as any search does (the plot the player revealed,
+  `ground.revealed`), not every plot as known.
+- FLAG 0x40 (0x270e86: the search flags' bit 6, r13b): on a step that
+  leaves no Movement onto a revealed plot that is not a hill (IsHills
+  0x82e30 on the child) +300 (0x12c00, 0x27100b); an unrevealed child +2
+  as a revealed one (0x2713d3), not +3; and on every step +10 x (7 - n)
+  (0x27125c: (7 - n) x 5 << 9 raw), n the plots the player's team never
+  revealed (Player_Visibility +0x2f0 byte 0) among the child (0x271246)
+  and the six beside it (0x502aa0: 0x502bc0 by direction 0..5 with the
+  map's wrap, an off-map neighbour not counted).
+- CONFIRMED (one-seed aimem traces to t70, the five duels, against the head
+  3ecbcb46): 211 move rows missed against 223, 14 gone, 2 come; gone:
+  runs/h1_duely1117 t3 the barbarian Scout 262147 on 33:19 takes 33:17
+  (the 34:17 / 33:17 tie at 9 unrevealed, as logged), t38 Scout 1441799,
+  t38 city-state 4's Warrior 131073 (Operation); 1121 t7 / t18 Scout 131073
+  (the two Explore rounds' order), t15 Galley 524295, t17 city-state 4's
+  Warrior 327680 (Operation); 1124 t8 Galley 262147, t9 / t11 Scout 131073,
+  t11 Scout 524295, t18 Scout 1638420; 1128 t5 / t33 Scout 131073.
+- OPEN: runs/h1_duely1127 t12 the barbarian Scout 393221 on 11:17: 10:19
+  (n 3) closes 10 before 10:16 (n 2), both 6 unrevealed in its sight, the
+  game's 10:16 (Move To 10 16); the revealed plane round 9:15 / 9:16 / 9:19 /
+  10:20 / 11:20 at that moment, or the sight count, unread. 1117 t39 Scout
+  1441799 783 for 785 after its t38 now as logged. Explore Land's flag 2
+  (0x42: no step onto the ground of a player at war, the validity
+  0x2720a0 at 0x2724c8) unported in the explore search and order; what gp
+  +0x110 and the knowledge base's +0x128 count is unread. 1127 t62 / t63
+  city-state 3's Galley 393216 under Naval Patrol unmoved.

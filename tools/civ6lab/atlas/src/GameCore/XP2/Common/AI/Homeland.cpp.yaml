@@ -113,6 +113,7 @@
     - "C-97: the behaviour trees — READ (the interpreter), the nodes PARTLY READ"
     - "C-95: Explore Land and the barbarians' revealed plots — READ, ported (two tests below unread)"
     - "C-99: Naval Patrol's explore target — the list and the tests READ, two cases unexplained"
+    - "C-124 / C-95: every search but the planning's pays the stacking +1e6, the cost reads the child's revealed bit, Explore's flag 0x40 prices the unrevealed — READ (0x270dd0 at 0x270e55 / 0x270e86 / 0x270ff2 / 0x2711c3..0x271268 / 0x2713d3, 0x502aa0, 0x26df90's callers 0x716739 / 0x70aadd, 0x70ce90 at 0x70ced5, 0x803060 at 0x80316f), both twins"
   context:
     - "...d Units 0x80d790 (\"Operation Protect Units\"), Naval Patrol 0x803060 (the explore move 0x70aa40), Naval Pillage 0x803250, Naval Escort 0x817f60; Operation Move's unit tactical block (..."
   review: reviewed
@@ -195,20 +196,26 @@
   final: 0x4bdb20
   kind: function
   name: exploreLand
-  semantics: "Explore Land: up to three rounds of HL Explore over EXPLORE units with Movement left and at most half their health lost, each round's moves together Each unit not done (+0x770) with Movement left (+0xdb0), of AI type EXPLORE (+0x1c0 == 2), its damage at most half its health (0x56e0d0 >> 1), in a later round not still on its way (0x26f830), takes HL Explore (0x70aa40, the region fallbacks on the first round alone); the round's move orders (0x962030) carried out together as it ends (0x70a440); another round only where one moved."
+  semantics: "Explore Land: up to three rounds of HL Explore over EXPLORE units with Movement left and at most half their health lost, each round's moves together Each unit not done (+0x770) with Movement left (+0xdb0), of AI type EXPLORE (+0x1c0 == 2), its damage at most half its health (0x56e0d0 >> 1), in a later round not still on its way (0x26f830), takes HL Explore (0x70aa40, the region fallbacks on the first round alone); the round's move orders (0x962030) carried out together as it ends (0x70a440); another round only where one moved. Its search and order flags (0x70ced5..0x70cefd -> [rbp+0x88]): 0x40 where its fifth byte (0x709d80's gp +0x110 >= the knowledge base's +0x128) is set, else 0x42; HL Explore's search (0x70d027) and its MoveTo 0x962030 (0x70d0b5) take them."
   status: READ
   cases:
     - recording: h1_duelw1117-1128
       turn: all
       value: "HL: Explore ends on the game's plot 407 of 1,056 (128 with the stand-in)"
+    - recording: h1_duely1117
+      turn: 3
+      value: the barbarian Scout 262147 on 33:19 takes 33:17 over 34:17 (9 unrevealed each in its sight) as logged, the flag-0x40 terms ordering the closes
   impl:
     - cpu/core/tactical.ts:exploreLand
     - gpu/core/sim_tactics.py:_tac_explore
     - cpu/core/tactical.ts:EXPLORE_ROUNDS
     - gpu/core/sim_tactics.py:_CITY_STRIKE_RANGE
+    - cpu/core/tactical.ts:exploreLand
+    - gpu/core/sim_tactics.py:_tac_explore_counts
   readings:
     - "C-95: Explore Land and the barbarians' revealed plots — READ, ported (two tests below unread)"
     - "C-124: an attack order to a plot out of sight loses its attack flag — READ (0x962310), both twins"
+    - "C-124 / C-95: every search but the planning's pays the stacking +1e6, the cost reads the child's revealed bit, Explore's flag 0x40 prices the unrevealed — READ (0x270dd0 at 0x270e55 / 0x270e86 / 0x270ff2 / 0x2711c3..0x271268 / 0x2713d3, 0x502aa0, 0x26df90's callers 0x716739 / 0x70aadd, 0x70ce90 at 0x70ced5, 0x803060 at 0x80316f), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "- EXPLORE LAND (0x70ce90): up to three rounds over the homeland's units; each unit not done (+0x770) with Moveme..."

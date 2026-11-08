@@ -3117,7 +3117,7 @@ def _x_naval_patrol(sim, c: _OpCtx, i: int, on: torch.Tensor) -> None:
         revealed = known if known is not None else torch.ones(B, T, dtype=torch.bool, device=dev)
         seen_now = sim._barb_seen(seat)
         rows = ok.nonzero(as_tuple=True)[0]
-        res, v1, v2, rt = sim._tac_explore_counts(rows, uc[rows], "major", seat, danger, revealed, seen_now)
+        res, v1, v2, rt = sim._tac_explore_counts(rows, uc[rows], "major", seat, danger, revealed, seen_now, "patrol")
         r = torch.zeros(B, dtype=torch.long, device=dev)
         r[rows] = torch.arange(rows.numel(), device=dev)
         chosen = torch.zeros(B, T, dtype=torch.bool, device=dev)

@@ -26,7 +26,10 @@
   name: GeneratePath
   semantics: "GeneratePath (Pathfinder_Instance): Dijkstra — the pool's instances (0x26f330) carry no heuristic (the +0x30/+0x38 pair null), so a node's key is its cost; repeats the step 0x793f0."
   status: PARTLY
-  impl: [cpu/core/tactical.ts:search, cpu/core/tactical.ts:PathDanger]
+  impl:
+    - cpu/core/tactical.ts:search
+    - cpu/core/tactical.ts:PathDanger
+    - cpu/core/tactical.ts:ReachSearch
   readings:
     - "The map's regions (AnalyzeChokepoints, Region_Builder) — READ, ported"
     - "H-1: the trade path's search, its score and the Canal — READ"
@@ -88,7 +91,10 @@
   name: SearchStep
   semantics: "one search step: pops the head (0x781e0: NotifyList 2 then 3, closed) and links its neighbours in DirectionTypes order (0xeff730), each the valid callback admits (LinkChild 0x78750)."
   status: PARTLY
-  impl: [cpu/core/tactical.ts:search, cpu/core/tactical.ts:PathDanger]
+  impl:
+    - cpu/core/tactical.ts:search
+    - cpu/core/tactical.ts:PathDanger
+    - cpu/core/tactical.ts:ReachSearch
   readings:
     - "H-1: the trade path's search, its score and the Canal — READ"
     - "C-95: the unit pathfinder and the planning's reach — READ, confirmed on the Wander draws"
@@ -103,7 +109,11 @@
   name: UpdateOpenNode
   semantics: "UpdateOpenNode: moves a node made cheaper toward the head past those of higher f only (after its new equals)."
   status: PARTLY
-  impl: [cpu/core/tactical.ts:search, cpu/core/tactical.ts:reparent, cpu/core/tactical.ts:PathDanger]
+  impl:
+    - cpu/core/tactical.ts:search
+    - cpu/core/tactical.ts:reparent
+    - cpu/core/tactical.ts:PathDanger
+    - cpu/core/tactical.ts:ReachSearch
   readings:
     - "H-1: the trade path's search, its score and the Canal — READ"
     - "C-95: the unit pathfinder and the planning's reach — READ, confirmed on the Wander draws"
@@ -126,6 +136,7 @@
     - cpu/core/tactical.ts:from
     - gpu/core/sim_tactics.py:update_parents
     - cpu/core/tactical.ts:PathDanger
+    - cpu/core/tactical.ts:ReachSearch
   readings:
     - "H-1: the trade path's search, its score and the Canal — READ"
     - "C-95: the unit pathfinder and the planning's reach — READ, confirmed on the Wander draws"

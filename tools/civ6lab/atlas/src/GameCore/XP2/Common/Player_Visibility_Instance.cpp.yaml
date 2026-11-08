@@ -1,0 +1,18 @@
+# The DLL atlas, curated layer (tools/civ6lab/atlas.py documents the record).
+# Records keyed by GameCore_XP2_Release.dll RVA; `final` the FinalRelease RVA.
+# `review: imported` = bootstrapped from dll_readings.md / code comments / saved
+# labels and not yet reviewed: verify against the disassembly, then edit and
+# set `review: reviewed`.
+- addr: 0x502bc0
+  final: 0x3578d0
+  kind: function
+  semantics: the plot beside (x, y) in direction r9d (0..5, the axial tables 0xeff670 / 0xeff688), wrapped where the map wraps (the width, height and two wrap bytes on the stack), (-9999, -9999) off the map.
+  status: READ
+  cases:
+    - recording: h1_duely1117
+      turn: 3
+      value: the barbarian Scout 262147 on 33:19 takes 33:17 over 34:17 as logged, the unrevealed counts round each plot by this walk
+  impl: [cpu/core/tactical.ts:blindNear, gpu/core/sim_tactics.py:blind_n]
+  readings:
+    - "C-124 / C-95: every search but the planning's pays the stacking +1e6, the cost reads the child's revealed bit, Explore's flag 0x40 prices the unrevealed — READ (0x270dd0 at 0x270e55 / 0x270e86 / 0x270ff2 / 0x2711c3..0x271268 / 0x2713d3, 0x502aa0, 0x26df90's callers 0x716739 / 0x70aadd, 0x70ce90 at 0x70ced5, 0x803060 at 0x80316f), both twins"
+  review: reviewed

@@ -447,12 +447,18 @@ function domainPool(state: GameState, unit: Unit, sea: boolean): number {
  * search stops where it answers true. `onLink` sees each link the search
  * prices (the cost callback 0x26d6f0): the plot, the plot it is linked from,
  * the turn and Movement the step reaches it with, and whether it attacks —
- * the start first, linked from itself. Standing to attack (the danger map's
+ * the start first, linked from itself. `reach` names the search's flags: a
+ * search with no `zoc` is the planning's (0x26dcd0, flag 4), the danger
+ * map's (0x26df90 under 0x311), Explore Land's (0x26df90 under 0x40 / 0x42)
+ * or Naval Patrol's (0x26df90 under 0); 'explore' on a move order's path is
+ * HL Explore's order (0x962030 under 0x40 / 0x42). Standing to attack (the danger map's
  * search): an attack is struck only from the unit's own plot or one none of
  * its own stacking units holds, and a step onto a unit's plot keeps its
  * Movement left (only a district attack spends it). With laterTurns (the path's flag 0x1000) a
  * path's turn may end on a plot its own stacking unit holds after its first.
  */
+type ReachSearch = 'planning' | 'danger' | 'explore' | 'patrol';
+
 /** a move order's danger flags over the player's danger map (`dangerPlane`):
  *  `any` its flag 8, every plot of danger; `water` its flag 0x8000, a water
  *  plot of danger; `war` its flag 2, the ground of a player at war with the
@@ -469,9 +475,27 @@ export interface PathDanger {
 export const moveUnitDanger = (plane: ArrayLike<number>): PathDanger => ({ plane, any: true, water: false, war: true });
 
 function search(state: GameState, unit: Unit, maxTurns: number, zoc: boolean, onClose: (n: PNode, ground: Ground) => boolean,
-  onLink?: (tile: number, from: number, turns: number, moves: number, attack: boolean) => void, standToAttack = false,
+  onLink?: (tile: number, from: number, turns: number, moves: number, attack: boolean) => void, reach: ReachSearch = 'planning',
   laterTurns = false, fromFull = false, explore = true, danger?: PathDanger, mates: readonly Unit[] = formationMates(state, unit), dest = -1): void {
   const { map } = state;
+  const standToAttack = !zoc && reach === 'danger';
+  // the cost 0x270dd0's stacking +1e6, paid by every search without flag 4
+  // (the planning's 0x115 alone carries it)
+  const paysStack = zoc || reach !== 'planning';
+  // the search's flag 0x40 (Explore Land's): the cost's exploring terms
+  const scout = reach === 'explore';
+  // the plots the player never revealed among a plot and the six beside it
+  // (0x502aa0 over the player's revealed bytes, Player_Visibility +0x2f0)
+  const unrevealedNear = new Map<number, number>();
+  const blindNear = (t: Tile): number => {
+    let v = unrevealedNear.get(t.index);
+    if (v === undefined) {
+      v = ground.revealed(t.index) ? 0 : 1;
+      for (const n of neighbors(map, t)) if (!ground.revealed(n.index)) v += 1;
+      unrevealedNear.set(t.index, v);
+    }
+    return v;
+  };
   const ground = groundOf(state, unit, !zoc, !zoc, standToAttack, mates, dest);
   // a plot of a district with hit points of a player at war (0x26e570's
   // district attack: DistrictInfo +0x58 / +0x5c)
@@ -754,17 +778,26 @@ function search(state: GameState, unit: Unit, maxTurns: number, zoc: boolean, on
     // human (0x2712be: the formation's land domain +0x1f2; runs/h1_duely1117
     // t69: Valletta's Archer on 13:8 closes the Harbor's 14:7 (1/0) after
     // 12:8 and 12:9 and its water to the north after the land, AI_Planning.csv)
-    // A move order's path (0x270dd0 at 0x27102e..0x2710a0, not under flag 4)
+    // Every search but the planning's (0x270dd0 at 0x27102e..0x2710a0, not
+    // under flag 4: a move order's path, the danger map's and HL Explore's)
     // prices a step that ends the turn on a revealed plot at its stacking
     // limit (`stacked`, against +0x58c) +1e6 more, so its node sorts last
     // (runs/h1_duely1127 t17: the barbarian Slinger 1114127 on 14:2 for 14:5,
     // its camp's Spearman on 13:1: 15:4 lands from the head before 14:4 and
     // the path takes 14:3 / 15:4)
-    const seen = ground.known(to.index);
-    const stack = zoc && moves <= 0 && seen && ground.stacked(to.index) ? 1e6 : 0;
-    const ends = moves <= 0 ? 4 + stack + (seen && tileSeat(to) !== unit.seat ? 3 : 0) : 0;
+    // Each term reads the child's revealed bit (+0x51 bit 0, [rsp+0xa8] from
+    // 0x270e55), a move order's path as any search. Under flag 0x40 (0x270e86:
+    // the flags' bit 6) a turn's end on a revealed plot but a hill costs +300
+    // more (0x270ff2..0x271019), an unrevealed plot +2 as a revealed one
+    // (0x2713d3), and every step +10 x (7 - the plots never revealed among
+    // the child and the six beside it) (0x2711c3..0x271268)
+    const seen = ground.revealed(to.index);
+    const stack = paysStack && moves <= 0 && seen && ground.stacked(to.index) ? 1e6 : 0;
+    const flat = scout && moves <= 0 && seen && to.elevation !== 'HILLS' ? 300 : 0;
+    const ends = moves <= 0 ? 4 + stack + flat + (seen && tileSeat(to) !== unit.seat ? 3 : 0) : 0;
     const sea = seen && !naval && isWater(to) ? 1000 : 0;
-    return { g: p.g + cost * 1000 + (ends + (seen ? 2 : 3) + sea) * FIX, moves, turns, carry, wet };
+    const look = scout ? 10 * (7 - blindNear(to)) : 0;
+    return { g: p.g + cost * 1000 + (ends + (seen || scout ? 2 : 3) + sea + look) * FIX, moves, turns, carry, wet };
   }
 
   /** a node made cheaper from `p`: an open one re-keyed after its new
@@ -815,14 +848,14 @@ export function turnsToPlot(state: GameState, unit: Unit, dest: number, laterTur
     if (n.tile !== dest) return false;
     if (n.attack || n.tile === unit.tileIndex || ground.stand(n.tile)) turns = n.turns;
     return true;
-  }, undefined, false, laterTurns, false, true, undefined, formationMates(state, unit), dest);
+  }, undefined, undefined, laterTurns, false, true, undefined, formationMates(state, unit), dest);
   return turns;
 }
 
 /** the plots from the unit's to `dest`, the unit's own left out, by the
  *  pathfinder's path (its parents once `dest` closes); empty where none */
 export function pathTo(state: GameState, unit: Unit, dest: number, laterTurns = false, explore = true,
-  danger?: PathDanger, mates: readonly Unit[] = formationMates(state, unit)): number[] {
+  danger?: PathDanger, mates: readonly Unit[] = formationMates(state, unit), scout = false): number[] {
   // a destination another player's unit holds out of the player's sight is
   // no path, an attack order's too: the move order's request (0x962310)
   // drops the attack flag 0x10 where the owner's visibility count of its
@@ -837,7 +870,7 @@ export function pathTo(state: GameState, unit: Unit, dest: number, laterTurns = 
     if (n.tile !== dest) return false;
     found = n;
     return true;
-  }, undefined, false, laterTurns, false, explore, danger, mates, dest);
+  }, undefined, scout ? 'explore' : undefined, laterTurns, false, explore, danger, mates, dest);
   const out: number[] = [];
   for (let n: PNode | null = found; n && n.parent; n = n.parent) out.push(n.tile);
   return out.reverse();
@@ -857,16 +890,19 @@ export function pathTo(state: GameState, unit: Unit, dest: number, laterTurns = 
  *  own stacking unit holds, its first not; with no `explore` (its flag 1) the
  *  path leaves no plot the player never revealed; with `danger` (its flags
  *  8 / 0x8000) its first turn steps onto no plot of danger, (its flag 2)
- *  no step onto the ground of a player at war with it. In an AI player's
+ *  no step onto the ground of a player at war with it; with `scout` (its
+ *  flag 0x40, HL Explore's order) the path prices its steps as Explore
+ *  Land's (`search`'s reach 'explore'). In an AI player's
  *  pass a unit whose last step of the turn ended in a zone of control does
  *  not move (`orderOnce`). */
 export function moveTo(state: GameState, unit: Unit, dest: number, strike = true,
-  laterTurns = false, explore = true, danger?: PathDanger, mates: readonly Unit[] = formationMates(state, unit)): void {
-  const open = orderOnce(state, unit, dest, strike, laterTurns, explore, danger, mates);
+  laterTurns = false, explore = true, danger?: PathDanger, mates: readonly Unit[] = formationMates(state, unit),
+  scout = false): void {
+  const open = orderOnce(state, unit, dest, strike, laterTurns, explore, danger, mates, scout);
   // an order its walk left short of its destination, Movement left, stays
   // on the unit, carried on as the player's turn ends
   if (shortOrders && open && state.units.includes(unit) && unit.movesLeft > 0 && unit.tileIndex !== dest) {
-    shortOrders.push(() => orderOnce(state, unit, dest, strike, laterTurns, explore, danger, mates));
+    shortOrders.push(() => orderOnce(state, unit, dest, strike, laterTurns, explore, danger, mates, scout));
   }
 }
 
@@ -931,9 +967,9 @@ function withShortOrders(fn: () => void): void {
  *  the formation's +0x518), striking all the same where its path's next
  *  plot is the one it attacks into */
 function orderOnce(state: GameState, unit: Unit, dest: number, strike: boolean,
-  laterTurns: boolean, explore: boolean, danger: PathDanger | undefined, mates: readonly Unit[]): boolean {
+  laterTurns: boolean, explore: boolean, danger: PathDanger | undefined, mates: readonly Unit[], scout: boolean): boolean {
   if (!state.units.includes(unit) || unit.movesLeft <= 0 || unit.tileIndex === dest) return false;
-  let path = pathTo(state, unit, dest, laterTurns, explore, danger, mates);
+  let path = pathTo(state, unit, dest, laterTurns, explore, danger, mates, scout);
   if (!path.length) return false;
   // a path ending on a plot it attacks into: it walks to its side, and
   // strikes it where its Movement and attacks last (the order's attack flag)
@@ -1540,7 +1576,7 @@ export function planUnit(state: GameState, unit: Unit, targets: readonly Target[
     // 11:10, the barbarian Swordsman's on player 1's ground, AI_Planning.csv)
     if (n.tile === unit.tileIndex || (!ground.closed(n.tile) && (n.attack || (ground.stand(n.tile) && ground.fits(n.tile))))) reach.push({ tile: n.tile, turns: n.turns, moves: n.moves, attack: !!n.attack });
     return false;
-  }, entries.length ? onLink : undefined, false, false, true);
+  }, entries.length ? onLink : undefined, undefined, false, true);
   let wins = false;
   for (const E of entries) {
     if (!E.spots.length) continue;
@@ -1656,7 +1692,7 @@ export function dangerPlane(state: GameState, seat: number): Int16Array {
       if (R > 0 && n.moves <= 0) return false;
       if (!naval || isWater(map.tiles[n.tile])) reach.push(n.tile);
       return false;
-    }, undefined, true);
+    }, undefined, 'danger');
     const inReach = new Set(reach);
     const extra: number[] = [];
     const inExtra = new Set<number>();
@@ -2848,7 +2884,8 @@ function nearestUnrevealed(state: GameState, u: Unit, revealed: (i: number) => b
 
 /**
  * HL EXPLORE (0x70aa40) for one explorer: of the plots its search of this
- * turn closes (0x26df90 on its Movement left) with no danger, none chosen
+ * turn closes (0x26df90 on its Movement left, under `reach`'s flags: Explore
+ * Land's 0x40 / 0x42, Naval Patrol's 0) with no danger, none chosen
  * this move and one it may go to (`exploreOk`), the one whose sight (the
  * plots within its sight it sees from there, `losDisk`) holds the most plots
  * its player never revealed (0x70a6c0, the first of equals, above 0); else,
@@ -2864,7 +2901,7 @@ function nearestUnrevealed(state: GameState, u: Unit, revealed: (i: number) => b
  * plot joins the chosen.
  */
 function exploreTarget(state: GameState, pass: Pass, u: Unit, chosen: Set<number>, first: boolean,
-  revealed: (i: number) => boolean, seenNow: Uint8Array): { plot: number; move: string } | null {
+  revealed: (i: number) => boolean, seenNow: Uint8Array, reach: 'explore' | 'patrol'): { plot: number; move: string } | null {
   const { map } = state;
   const sight = unitSight(u, state);
   const look = (p: number) => {
@@ -2900,7 +2937,7 @@ function exploreTarget(state: GameState, pass: Pass, u: Unit, chosen: Set<number
       v2Best = v2;
     }
     return false;
-  });
+  }, undefined, reach);
   chosen.add(u.tileIndex);
   if (best1 >= 0) return { plot: best1, move: 'HL: Explore' };
   if (!first) return null;
@@ -2946,13 +2983,13 @@ function exploreLand(state: GameState, pass: Pass): void {
       if (UNIT_HP - u.hp > UNIT_HP >> 1) continue;
       const last = went.get(u.id);
       if (last !== undefined && u.tileIndex !== last) continue;
-      const t = exploreTarget(state, pass, u, chosen, round === 1, revealed, seenNow);
+      const t = exploreTarget(state, pass, u, chosen, round === 1, revealed, seenNow, 'explore');
       if (!t) continue;
       chosen.add(t.plot);
       moves.push({ u, ...t });
     }
     for (const m of moves) {
-      moveTo(state, m.u, m.plot, false);
+      moveTo(state, m.u, m.plot, false, false, true, undefined, formationMates(state, m.u), true);
       if (!firstMove.has(m.u)) firstMove.set(m.u, { move: m.move, plot: m.plot });
       went.set(m.u.id, m.plot);
     }
@@ -2965,7 +3002,7 @@ function exploreLand(state: GameState, pass: Pass): void {
  *  Explore's target (`exploreTarget`) on a chosen list of its own, the
  *  fallbacks taken (the first round); its turn done, it moves there */
 export function passPatrol(state: GameState, pass: Pass, u: Unit): void {
-  const t = exploreTarget(state, pass, u, new Set(), true, revealedOf(state, pass.seat), plotsSeenNow(state, new Set([pass.seat])));
+  const t = exploreTarget(state, pass, u, new Set(), true, revealedOf(state, pass.seat), plotsSeenNow(state, new Set([pass.seat])), 'patrol');
   passFinish(pass, u, 'Operation', t ? t.plot : u.tileIndex);
   if (t) moveTo(state, u, t.plot, false);
 }

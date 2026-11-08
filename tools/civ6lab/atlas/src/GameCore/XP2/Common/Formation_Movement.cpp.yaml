@@ -11,19 +11,21 @@
     - cpu/core/tactical.ts:reachPlots
     - cpu/core/tactical.ts:unmoved
     - gpu/core/sim_tactics.py:_tac_search
+    - cpu/core/tactical.ts:ReachSearch
   readings:
     - "C-95: the unit pathfinder and the planning's reach — READ, confirmed on the Wander draws"
     - "C-95: the scout's tree \"Barbarian Found City\" — READ, ported"
     - "C-96: the city-states' tactical pass — READ (Wander Near City, Heal, the non-barbarian priorities, FindAlternateLocation), the families it needs PARTLY READ"
     - "C-95: the planning sets out on the full Movement, the walk on the turn's restored — READ (the planning), FIT (the restore's place)"
     - "C-124: a move order's path prices a turn's end at the stacking limit +1e6, and its destination there stops the search — READ (0x270dd0 at 0x27101e..0x2710a0, 0x2720a0 at 0x272230..0x272364, 0x77a50, 0x26dcd0's callbacks), both twins"
+    - "C-124 / C-95: every search but the planning's pays the stacking +1e6, the cost reads the child's revealed bit, Explore's flag 0x40 prices the unrevealed — READ (0x270dd0 at 0x270e55 / 0x270e86 / 0x270ff2 / 0x2711c3..0x271268 / 0x2713d3, 0x502aa0, 0x26df90's callers 0x716739 / 0x70aadd, 0x70ce90 at 0x70ced5, 0x803060 at 0x80316f), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ...The planning's reach (AI Unit Planning 0x792c90 -> 0x791e00 -> the breadth-first search 0x26dcd0 for 2 turns, flags 0x115 | 0x800 | 0x100 where the unit has not moved; the valid wrappe...
   review: reviewed
 - addr: 0x26df90
   kind: function
-  semantics: "the reach search with flags: it adds 0x800 to the caller's (bts eax, 0xb at 0x26e12f; 0x100 more where the unit's +0x4b8 is clear) before the search 0x7a630 with no destination (-9999, -9999), so no reach search pays a zone of control (the cost 0x26e920 skips it under 0x800). The danger map's call (0x716739) passes 0x311: 0x200 skips the planning's zone refusal and the unit attack test of 0x26e570. The danger map's reach strikes a unit at war on the mover's own domain, and on water only where the mover's player may embark it, as the planning's (0x26e570): a land unit that may not embark threatens no ship's water. Ported: groundOf's attack, _tac_attack_planes."
+  semantics: "the reach search with flags: it adds 0x800 to the caller's (bts eax, 0xb at 0x26e12f; 0x100 more where the unit's +0x4b8 is clear) before the search 0x7a630 with no destination (-9999, -9999), so no reach search pays a zone of control (the cost 0x26e920 skips it under 0x800). The danger map's call (0x716739) passes 0x311: 0x200 skips the planning's zone refusal and the unit attack test of 0x26e570. Its callers' flags: the danger map 0x311 (0x716739), HL Explore its caller's (0x70aadd: Explore Land's 0x40 / 0x42, Naval Patrol's 0); none carries 4, so each pays the cost's stacking +1e6."
   status: READ
   cases:
     - recording: h1_duely1124
@@ -44,6 +46,7 @@
     - cpu/core/tactical.ts:from
     - gpu/core/sim_tactics.py:_tac_search
     - cpu/core/tactical.ts:moves
+    - cpu/core/tactical.ts:ReachSearch
   readings:
     - "C-99 / C-128: a danger feature is no step of a search, a land unit's danger stops at the shore — READ (0x271be0 at 0x271fd3, 0x2720a0 at 0x27216c, 0x26e570), both twins"
     - "C-95: the danger map's search pays no zone of control, a ranged unit strikes from its range; the rampage strike's ring — READ (0x26df90, 0x26e920, 0x771670, 0x691f0, 0x76ecf0), FIT (the ranged unit's strike), both twins"
@@ -56,6 +59,7 @@
     - "C-99: Naval Patrol's explore target — the list and the tests READ, two cases unexplained"
     - "C-95: a ranged unit's danger reach holds only plots with Movement left — READ (0x7921e0, 0x791270, 0x26dab0), both twins"
     - "C-124: a move order's path prices a turn's end at the stacking limit +1e6, and its destination there stops the search — READ (0x270dd0 at 0x27101e..0x2710a0, 0x2720a0 at 0x272230..0x272364, 0x77a50, 0x26dcd0's callbacks), both twins"
+    - "C-124 / C-95: every search but the planning's pays the stacking +1e6, the cost reads the child's revealed bit, Explore's flag 0x40 prices the unrevealed — READ (0x270dd0 at 0x270e55 / 0x270e86 / 0x270ff2 / 0x2711c3..0x271268 / 0x2713d3, 0x502aa0, 0x26df90's callers 0x716739 / 0x70aadd, 0x70ce90 at 0x70ced5, 0x803060 at 0x80316f), both twins"
   notes:
     - "imported: READ in its section, no confirming case found beside it"
     - ".claude/scratchpad/st1/reading.md: ...herwise the larger of combat and ranged) onto the plots of its 1-turn   planning reach (0x7921e0 -> 0x26df90) and every plot within its range   (0x56e3d0) of them; a unit with the flag +0x18bd also onto the l..."
@@ -167,6 +171,7 @@
     - cpu/core/tactical.ts:PathDanger
     - cpu/core/tactical.ts:blind
     - gpu/core/sim_tactics.py:_tac_search
+    - cpu/core/tactical.ts:ReachSearch
   readings:
     - "C-124: a path enters a plot the player never revealed whatever it is — READ (0x2720a0 at 0x272372..0x27242e, 0x271be0's +0x50 bit 0x20, 0x26e920), both twins"
     - "C-95: a river crossing's Movement — READ"
@@ -263,7 +268,10 @@
     - recording: h1_duelw1128
       turn: 7
       value: "runs/h1_duelw1128 t7-t11: tribe 0's Scout reports Rome 42:20 from   39:20 beside China's Warrior and Scout, the planning's refusal shuts it   in (875 / 963 in the Warrior's zone), the path takes it ho"
-  impl: [cpu/core/tactical.ts:search, cpu/core/tactical.ts:PathDanger]
+  impl:
+    - cpu/core/tactical.ts:search
+    - cpu/core/tactical.ts:PathDanger
+    - cpu/core/tactical.ts:ReachSearch
   readings:
     - "C-95: the unit pathfinder and the planning's reach — READ, confirmed on the Wander draws"
     - "C-95: the scout's tree \"Barbarian Found City\" — READ, ported"
@@ -440,7 +448,7 @@
 - addr: 0x270dd0
   final: 0x1a9060
   kind: function
-  semantics: "a step's path cost: an unrevealed plot's step +3 with no +3 off the territory, a revealed one +2 and +3 more off it where it ends the turn; at 0x2712be, on a revealed water plot for a formation of the land domain (finder +0x1f2 = 0x2669d0(formation, 2)) +1000 (0x3e800) where its player is not human (+0x1f6 clear) or one of its units holds +0x590 (the path and the planning's lists alike); the embark / disembark tests (0x52fe90 / 0x52fb90, +1e6 where refused), mountain and canyon +1e6. 1000 x the step's Movement (0x16e7d0, the 0x3e800 constant); where the step leaves no Movement +4, and on a revealed plot then the 1e6 penalties (mountain, impassable) and +3 off the player's territory; then +2 on a revealed plot, +3 on an unrevealed one. The embark / disembark penalties run on a revealed child alone (0x270f24). At 0x27101e..0x2710a0, on that branch: where the stacking limit ([0xf28c80] +0x58c) is above 0 and the search's flags (+0xe0) hold no 4, 0x585eb0 over the formation (the sixth argument) and the child's unit list on its layer (0x75c50, +0x1a4) at the limit or above adds +1e6 (0xf424000), at any turn and whatever the player sees; the planning (0x26dcd0, flag 4 in 0x115) shares this cost and pays none."
+  semantics: "a step's path cost: an unrevealed plot's step +3 with no +3 off the territory, a revealed one +2 and +3 more off it where it ends the turn; at 0x2712be, on a revealed water plot for a formation of the land domain (finder +0x1f2 = 0x2669d0(formation, 2)) +1000 (0x3e800) where its player is not human (+0x1f6 clear) or one of its units holds +0x590 (the path and the planning's lists alike); the embark / disembark tests (0x52fe90 / 0x52fb90, +1e6 where refused), mountain and canyon +1e6. 1000 x the step's Movement (0x16e7d0, the 0x3e800 constant); where the step leaves no Movement +4, and on a revealed plot then the 1e6 penalties (mountain, impassable) and +3 off the player's territory; then +2 on a revealed plot, +3 on an unrevealed one. The embark / disembark penalties run on a revealed child alone (0x270f24). At 0x27101e..0x2710a0, on that branch: where the stacking limit ([0xf28c80] +0x58c) is above 0 and the search's flags (+0xe0) hold no 4, 0x585eb0 over the formation (the sixth argument) and the child's unit list on its layer (0x75c50, +0x1a4) at the limit or above adds +1e6 (0xf424000), at any turn and whatever the player sees; the planning (0x26dcd0, flag 4 in 0x115) shares this cost and pays none. The child's +0x51 bit 0 is read once (0x270e55 -> [rsp+0xa8]) and gates every term after it, a move order's path's as any search's (the plot the player revealed). Under the search flags' bit 6 (0x40, 0x270e86): a step leaving no Movement onto a revealed plot but a hill +300 (0x12c00 at 0x27100b), an unrevealed child +2 as a revealed one (0x2713d3), and every step +10 x (7 - n) (0x2711c3..0x271268), n the plots never revealed among the child and its six neighbours (0x502aa0 + the child's own byte at 0x271246)."
   status: READ
   cases:
     - recording: h1_duely1117
@@ -452,6 +460,9 @@
     - recording: h1_duely1127
       turn: 17
       value: "the barbarian Slinger 1114127 on 14:2 for 14:5, its camp's Spearman on 13:1: 13:1 (1/0) sorts last, 15:4 lands from the head before 14:4, the path 14:3 / 15:4 as logged"
+    - recording: h1_duely1117
+      turn: 3
+      value: the barbarian Scout 262147 on 33:19 takes 33:17 over 34:17 (9 unrevealed each in its sight) as logged, the flag-0x40 terms ordering the closes
   impl:
     - cpu/core/tactical.ts:search
     - cpu/core/tactical.ts:price
@@ -462,6 +473,11 @@
     - cpu/core/tactical.ts:stacked
     - gpu/core/sim_tactics.py:stack_n
     - cpu/core/tactical.ts:Ground
+    - cpu/core/tactical.ts:blindNear
+    - gpu/core/sim_tactics.py:blind_n
+    - cpu/core/tactical.ts:ReachSearch
+    - cpu/core/tactical.ts:standToAttack
+    - gpu/core/sim_tactics.py:_tac_search
   readings:
     - "C-99 / C-128: a shore crossing's cliff onto a revealed plot alone, Wander Back to Camp's path flag 0x1000, the path's destination count — READ (0x52fb90, 0x2720a0 at 0x272230..0x27229e / 0x272380, 0x270dd0 at 0x270f24, 0x271be0 at 0x271d03..0x271d18, 0x77b9a0 at 0x77be0b), both twins"
     - "C-95: the unit pathfinder and the planning's reach — READ, confirmed on the Wander draws"
@@ -469,6 +485,7 @@
     - "C-96: the city-states' tactical pass — READ (Wander Near City, Heal, the non-barbarian priorities, FindAlternateLocation), the families it needs PARTLY READ"
     - "C-124: a move order's path opens a turn-end node beside each node with Movement left — READ (0x271920, 0x7a880, 0x271490, 0x775a0, 0x26f330), both twins"
     - "C-124: a move order's path prices a turn's end at the stacking limit +1e6, and its destination there stops the search — READ (0x270dd0 at 0x27101e..0x2710a0, 0x2720a0 at 0x272230..0x272364, 0x77a50, 0x26dcd0's callbacks), both twins"
+    - "C-124 / C-95: every search but the planning's pays the stacking +1e6, the cost reads the child's revealed bit, Explore's flag 0x40 prices the unrevealed — READ (0x270dd0 at 0x270e55 / 0x270e86 / 0x270ff2 / 0x2711c3..0x271268 / 0x2713d3, 0x502aa0, 0x26df90's callers 0x716739 / 0x70aadd, 0x70ce90 at 0x70ced5, 0x803060 at 0x80316f), both twins"
   context:
     - "- The cost (0x270dd0): 1000 x the step's Movement (0x16e7d0, the 0x3e800 constant); where the step leaves no..."
     - ...tep), its step costing +3 where a revealed plot's costs +2 and no +3 off the territory (0x270dd0); a path (the move order's pathfinder) reads every plot as revealed. A plot only reve...
@@ -711,6 +728,7 @@
     - "C-124: a move order's path opens a turn-end node beside each node with Movement left — READ (0x271920, 0x7a880, 0x271490, 0x775a0, 0x26f330), both twins"
     - "C-125 / C-99: the swap's partner pays its step, the stacking count's classes, the walk's end among other players' units, a siege unit's RangedCombat — READ (0x972a50, 0x585d90, 0x26fe20 via 0x585eb0, 0x56e3e0), both twins"
     - "C-124: a move order's path prices a turn's end at the stacking limit +1e6, and its destination there stops the search — READ (0x270dd0 at 0x27101e..0x2710a0, 0x2720a0 at 0x272230..0x272364, 0x77a50, 0x26dcd0's callbacks), both twins"
+    - "C-124 / C-95: every search but the planning's pays the stacking +1e6, the cost reads the child's revealed bit, Explore's flag 0x40 prices the unrevealed — READ (0x270dd0 at 0x270e55 / 0x270e86 / 0x270ff2 / 0x2711c3..0x271268 / 0x2713d3, 0x502aa0, 0x26df90's callers 0x716739 / 0x70aadd, 0x70ce90 at 0x70ced5, 0x803060 at 0x80316f), both twins"
   context:
     - "- THE PATH'S TURN ENDS (0x2720a0, the move order's validity at the end of 0x26e570): each node records (0x271be0) whethe..."
     - "- A plot the player never revealed is the reach's leaf (READ): the validity 0x2720a0 under the search's flag 1 (0x115) refuses a step whose parent is not revealed (node +0x..."
