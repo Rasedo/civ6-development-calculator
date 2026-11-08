@@ -1869,10 +1869,22 @@ function minorClearsAfter(ctx: Ctx, b: TurnRecord): void {
   ctx.minorClears = [];
   ctx.minorClearUnits = [];
   ctx.minorCleared = new Set();
+  // a unit the copy's lump made holds the id the state's lump makes it
+  // under (the copy's unit ids the state's, cloned), its record already in
+  // the knowledge base the copy's end look left: the birth's record is that
+  // one (runs/h1_duely1124 t21: Granada's Warrior 393218 from its Builder's
+  // Rainforest lump, one record on 41:12 at age 0 on t22's line)
+  const had = new Map(ctx.state.cityStates.map((cs) => [cs, cs.armyKnown?.length ?? 0] as const));
   for (const d of open) applyClear(ctx, d, cleared.has(d.plot));
   // the record's new units of those city-states: a lump's completion
   // among them
   for (const { d, ds } of units) applyUnitNew(ctx, b, d, ds, false);
+  for (const [cs, n] of had) {
+    const recs = cs.armyKnown;
+    if (!recs || recs.length <= n) continue;
+    const old = recs.slice(0, n);
+    cs.armyKnown = [...old, ...recs.slice(n).filter((r) => !old.some((x) => x.id === r.id && x.owner === r.owner && x.type === r.type))];
+  }
 }
 
 /** THE CITY-STATES' OPERATIONS after their units' turn on the copy: their
