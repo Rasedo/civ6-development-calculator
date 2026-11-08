@@ -1106,10 +1106,14 @@ function withShortOrders(fn: () => void): void {
  *  t199 the rampaging Galley 1048590 steps beside city-state 3's Galley
  *  into its zone and holds there short of the embarked Warrior, as logged);
  *  else its step priced as any step of the walk, one dearer than the
- *  Movement left once the unit moved waits, the order kept */
+ *  Movement left once the unit moved waits, the order kept. A unit whose
+ *  moves an order of the pass ended
+ *  (`movesEnded`, 0x56d6f0) runs it no more: the queue 0x52f50 executes an
+ *  operation only for a unit with Movement (0x56c690) or a formation with
+ *  Movement (0x265d70, +0x218 the least its members hold) */
 function orderOnce(state: GameState, unit: Unit, dest: number, strike: boolean,
   laterTurns: boolean, explore: boolean, danger: PathDanger | undefined, mates: readonly Unit[], scout: boolean): boolean {
-  if (!state.units.includes(unit) || unit.movesLeft <= 0 || unit.tileIndex === dest) return false;
+  if (!state.units.includes(unit) || unit.movesLeft <= 0 || movesEnded?.has(unit.id) || unit.tileIndex === dest) return false;
   const nodes = pathNodes(state, unit, dest, laterTurns, explore, danger, mates, scout, strike);
   let path = nodes.map((n) => n.tile);
   if (!path.length) return false;
@@ -3443,9 +3447,12 @@ const WANDER_BACK_RANGE = 3;
  * Direction" draw over their count picks the plot it moves to ("Wander") —
  * the weights the loop builds are never read. With none it moves to the
  * plot `alternateLocation` finds round the capital ("Wander Back to City",
- * the row naming the capital), else it stays. Its turn is done. A unit a
- * formation absorbed in the pass (`Pass.absorbed`) takes its draw and moves
- * nowhere.
+ * the row naming the capital), else it stays. Its moves end (0x56d6f0 at
+ * 0x77c62a, after every branch: the queue runs its order no more,
+ * runs/h1_duelp1121 t88 city-state 4's Man-At-Arms 1048577 holds on 43:22
+ * with 0 Movement after its Wander Back to City step) and its turn is done.
+ * A unit a formation absorbed in the pass (`Pass.absorbed`) takes its draw
+ * and moves nowhere.
  */
 function wanderNearCity(state: GameState, pass: Pass, home: number): void {
   for (const u of pass.units) {
@@ -3458,11 +3465,13 @@ function wanderNearCity(state: GameState, pass: Pass, home: number): void {
       const to = cands[randRange(state, cands.length, 'Random Direction')].tile;
       drawing = null;
       if (!ghost) moveTo(state, u, to, pass.strike);
+      pass.ended.add(u.id);
       finish(pass, u, 'Wander', to);
       continue;
     }
     const to = alternateLocation(state, u, home, WANDER_BACK_RANGE);
     if (to >= 0) moveTo(state, u, to, pass.strike, true);
+    pass.ended.add(u.id);
     finish(pass, u, 'Wander Back to City', home);
   }
 }

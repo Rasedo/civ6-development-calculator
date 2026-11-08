@@ -11745,3 +11745,44 @@ completion and from `minorCompleteNow`; GPU `_minor_research_bank` and
   (a district plot's rows 0); a Builder bought before the analysis priced
   at the count before the purchase on some turns (runs/h1_duelp1117
   Caguana t62 / t140 / t148, t42 after).
+
+## C-99: Wander Near City ends its unit's moves; a unit whose moves an order ended runs its order no more — READ (0x77bf50 at 0x77c62a, 0x56d6f0, 0x52f50 at 0x530fd..0x53113), both twins
+
+`wanderNearCity` (its `pass.ended`), `orderOnce`'s gate on `movesEnded`
+(cpu/core/tactical.ts); GPU the Wander Near City loop of `_minor_pass`
+(`_tac_moves_ended`), `_tac_move_to`'s gate (gpu/core/sim_tactics.py).
+
+- THE END: every unit Wander Near City takes, whichever branch — the drawn
+  plot ("Wander", 0x962030 at 0x77c3ed), FindAlternateLocation's plot under
+  flag 0x1000 or the skip 0x95eae0 ("Wander Back to City") — reaches
+  0x77c62a after its order: 0x56d6f0 sets its Movement +0xdb0 to 0 (the
+  formation's +0x218 to the least its members hold, 0x267b00), then
+  0x570b40 with 1. Wander Near Camp's 0x77bedd is the same call.
+- THE QUEUE: a run of the unit's operations (0x52f50) executes its front
+  operation only where the unit holds Movement (0x56c690 at 0x53100) or its
+  formation does (0x265d70 at 0x5310c, +0x218 above 0); with neither it
+  ends the segment unmoved. So an order a Wander or a Wander Back to City
+  left short is never walked again that turn, by the queue nor at the
+  turn's end.
+- Confirmed (one-seed aimem traces): runs/h1_duelp1121 t88 city-state 4's
+  Man-At-Arms 1048577 (Wander Back to City for 32:21) steps 42:21 -> 43:22
+  and holds there, 0 Movement in record 89, two
+  UnitOperationSegmentComplete and no UnitMoved after its step; t91 the
+  same on 43:22. Wander Near Camp's units (the barbarians' Slinger 1769487,
+  Wander Back to Camp, runs/h1_duelp1117 t33: two segments, no step) hold
+  as before.
+- Open (C-99): the barbarian Galley 720906 (runs/h1_duelp1117 t33, HL
+  Explore for 21:17) stops on 27:14 through 27:14's turn-end node with 1
+  Movement, its next node 26:15 (the barbarian Galley
+  1114125 on it) a second turn's; the game's queue run (its one
+  UnitOperationSegmentComplete, before HL End Turn's operation 745019656)
+  moves nothing, where the engines' carried run from 27:14 on 1 Movement
+  steps back to 28:14. The record's phases: the order's first walk carries
+  no segment event; one queue run per pending order follows the pass's
+  moves (the Scout 524295 at t12 walks 11:21 -> 12:20 there, its next node
+  12:21 not the path's first out of sight: 13:21 is, so 0x272aa0's bit-1
+  re-search at 0x272bd3 is not what moves it); HL End Turn then takes the
+  explorers (both cases), and a turn-end run follows for the other pending
+  orders (runs/h1_duelp1117 t33 the Warrior 2097152 and the Slinger
+  1769487, second segments at 241 / 242). The engines run one carried walk,
+  the queue run's; the Galley's hold in it is unread.

@@ -58,6 +58,7 @@
     - cpu/core/tactical.ts:swapPartner
     - cpu/core/trade.ts:plunderTargets
     - cpu/core/tactical.ts:makeMilitaryFormation
+    - cpu/core/tactical.ts:orderOnce
   readings:
     - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
@@ -71,6 +72,7 @@
     - "C-99 / C-128: the swap's partner test and its step along its own path; Move Unit's update before the executions; a Trader no passenger — READ (0x972540, 0x56e760, 0x972a50 -> 0x26fe20, 0x7d3a00 -> 0x7f0020, 0x586360 -> 0x208b80 / 0x523d60), both twins"
     - "C-123 / C-95: the Plunder Trade Route command and the AI's plunder after the move — READ (0x89dae0, 0x89dfc0, 0x9555a0, 0x9559a0, 0x5545e0 at 0x554667 / 0x554d4c, 0x58fc20, 0x7746a0, 0x70a440, 0x771f80 at 0x7722b6 / 0x77254e / 0x77277f, 0x776140 at 0x776424..0x776470), both twins"
     - "C-128: a city-state's Make Military Formation — READ (0x77a190, 0x770670, 0x536da0, 0x773e20, 0x94a870, 0x949930), both twins"
+    - "C-99: Wander Near City ends its unit's moves; a unit whose moves an order ended runs its order no more — READ (0x77bf50 at 0x77c62a, 0x56d6f0, 0x52f50 at 0x530fd..0x53113), both twins"
   notes: [read; no recorded decision of the five verbose duels tells it apart yet]
   context:
     - "...6f210 is on +8, -1 for all — stable), go for it in order (0x773270): each that can act (0x56c690) takes the move order onto it (0x962190, flag 0x10), a unit with no ranged or bombard s..."
@@ -139,12 +141,17 @@
   semantics: "sets a unit's Movement left (+0xdb0, through +0xd58) to 0: later nodes' units with Movement leave it out; the unit still rests."
   status: READ
   cases:
+    - recording: h1_duelp1121
+      turn: 88
+      value: "Wander Near City's call (0x77c62a) on city-state 4's Man-At-Arms 1048577 after its step to 43:22: 0 Movement at the turn's end (record 89), its order run twice more unmoved"
     - recording: h1_duelr1124
       turn: 22
       value: the garrison Warrior 393218's moves ended on Granada's centre read as no Movement in the attack assignment's stacking block (0x776140 at 0x7768e4)
     - recording: AI_Tactical.csv
       value: "Confirmed: the turn's \"Random   Direction\" draws pair one to one with the AI_Tactical.csv rows \"Wander\" and   \"Garrison\", every player's in log order (1,199 of 1,199 turn-pairs of the   five seeds), a"
   impl:
+    - cpu/core/tactical.ts:wanderNearCity
+    - gpu/core/sim_tactics.py:_minor_pass
     - cpu/core/opsOrders.ts:to
     - cpu/core/opsOrders.ts:us
     - cpu/core/tactical.ts:Pass
@@ -168,7 +175,10 @@
     - cpu/core/units.ts:upgradeAnew
     - cpu/core/tactical.ts:left
     - gpu/core/sim_tactics.py:_tac_assign
+    - cpu/core/tactical.ts:orderOnce
+    - gpu/core/sim_tactics.py:_tac_move_to
   readings:
+    - "C-99: Wander Near City ends its unit's moves; a unit whose moves an order ended runs its order no more — READ (0x77bf50 at 0x77c62a, 0x56d6f0, 0x52f50 at 0x530fd..0x53113), both twins"
     - "C-99: the assignment's Movement and the swap's walk — READ (0x776140 at 0x776643 / 0x7768e4, 0x56d6f0, 0x972a50 -> 0x26fe20 under flag 4, 0x2720a0 at 0x27229b), both twins"
     - "C-95: the tactical pass — READ (the barbarians' moves; the minors share it)"
     - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"

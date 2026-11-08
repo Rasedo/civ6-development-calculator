@@ -1652,7 +1652,12 @@ class SimTactics:
         player at war with it; with `scout` (its flag 0x40, HL Explore's
         order) its path prices its steps as Explore Land's (`_tac_search`'s
         reach). In an AI player's pass a unit whose last step
-        of the turn ended in a zone of control does not move (`orderOnce`)."""
+        of the turn ended in a zone of control does not move, nor one whose
+        moves an order of the pass ended (`_tac_moves_ended`, 0x56d6f0: the
+        queue 0x52f50 runs no operation for it) (`orderOnce`)."""
+        if self._tac_moves_ended is not None:
+            bix = torch.arange(self.B, device=self.device)
+            mask = mask & ~self._tac_moves_ended[bix, us.clamp(min=0) + self.POOL_LO[pre]]
         if not bool(mask.count_nonzero()):
             return
         # a destination another player's unit holds out of the player's sight
@@ -5389,6 +5394,8 @@ class SimTactics:
                 alt = self._tac_alternate(back, u_b, home, pre, seat, ent)
                 # the move under the order's path flag 0x1000
                 self._tac_move_to(back & (alt >= 0), u_b, alt, pre, seat, False, later_turns=True)
+            # its moves end (0x56d6f0 at 0x77c62a, `wanderNearCity`)
+            self._tac_moves_ended[bidx[ok], u_b[ok] + self.POOL_LO[pre]] = True
             done[bidx[ok], u_b[ok]] = True
         # THE HOMELAND: Move to Safety over every unit; the rest end their turn
         self._tac_move_to_safety(live_all, done, order, npass, op["rowof"], op["res"], danger, pre, seat, True)

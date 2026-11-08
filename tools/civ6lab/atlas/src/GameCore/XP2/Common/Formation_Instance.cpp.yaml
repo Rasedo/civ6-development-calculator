@@ -75,8 +75,10 @@
   final: 0x1a3710
   kind: function
   status: PARTLY
+  impl: [cpu/core/tactical.ts:orderOnce]
   readings:
     - "C-99: a move order carried on as the turn ends, the zone-of-control wait, the embark rule's TO plot — READ (0x962380, 0x52f50, 0x26fe20, 0x2675e0, 0x2673f0, 0x530420, 0x267650), both twins"
+    - "C-99: Wander Near City ends its unit's moves; a unit whose moves an order ended runs its order no more — READ (0x77bf50 at 0x77c62a, 0x56d6f0, 0x52f50 at 0x530fd..0x53113), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ...; while it moved and neither done nor waiting, with Movement left (the formation test 0x265d70), it runs again (one step a run, 100 at most); done, the operation leaves the queue (vt...
