@@ -23,13 +23,12 @@ TreeData by data name with its default and tag), the unit AI types
 (UnitAiTypes in rowid order, UnitAiInfos per unit type) and the triggered
 behaviour trees. Read through `xml_check.Install` (the layered install,
 the game's load order, Update and Delete applied); where the game's own
-database (DebugGameplay.sqlite in the game's cache) is present, each query's
+database (DebugGameplay.sqlite in a lab instance's cache) is present, each query's
 row order is checked against it.
 """
 from __future__ import annotations
 
 import json
-import os
 import pathlib
 import sqlite3
 import sys
@@ -39,7 +38,11 @@ from xml_check import Install
 ROOT = pathlib.Path(__file__).resolve().parent.parent.parent
 OUT = ROOT / "cpu" / "data" / "aiOperations.ts"
 CITY_OUT = ROOT / "cpu" / "data" / "aiCityTrees.ts"
-GAME_DB = pathlib.Path(os.path.expandvars(r"%LOCALAPPDATA%/Firaxis Games/Sid Meier's Civilization VI/Cache/DebugGameplay.sqlite"))
+# the game's own database as a lab instance last loaded the duel's ruleset
+# (each instance writes its Cache under its own profile, tools/civ6lab/game.py PROFILES)
+GAME_DB = max(pathlib.Path(r"C:/civ6lab_profiles").glob(
+    "*/AppData/Local/Firaxis Games/Sid Meier's Civilization VI/Cache/DebugGameplay.sqlite"),
+    key=lambda p: p.stat().st_mtime, default=pathlib.Path(r"C:/civ6lab_profiles/DebugGameplay.sqlite"))
 
 
 def num(v, default=0):

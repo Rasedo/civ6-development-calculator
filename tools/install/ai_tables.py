@@ -25,7 +25,6 @@ from __future__ import annotations
 import collections
 import glob
 import json
-import os
 import pathlib
 import sqlite3
 import sys
@@ -39,8 +38,12 @@ OUT_CORE = ROOT / "cpu" / "data" / "aiTables.ts"
 OUT_CITY = ROOT / "cpu" / "data" / "aiBuildTables.ts"
 # the World Congress's valid targets (cpu/core/congress.ts)
 OUT_CONGRESS = ROOT / "cpu" / "data" / "congressTargets.ts"
-# the game's own database, as it last loaded the ruleset: its row order
-GAME_DB = pathlib.Path(os.path.expandvars(r"%LOCALAPPDATA%/Firaxis Games/Sid Meier's Civilization VI/Cache/DebugGameplay.sqlite"))
+# the game's own database as a lab instance last loaded the duel's ruleset
+# (each instance writes its Cache under its own profile, tools/civ6lab/game.py
+# PROFILES): its row order
+GAME_DB = max(pathlib.Path(r"C:/civ6lab_profiles").glob(
+    "*/AppData/Local/Firaxis Games/Sid Meier's Civilization VI/Cache/DebugGameplay.sqlite"),
+    key=lambda p: p.stat().st_mtime, default=pathlib.Path(r"C:/civ6lab_profiles/DebugGameplay.sqlite"))
 # the systems the yield weight reads by trait
 WEIGHT_SYSTEMS = ("Yields", "YieldSensitivities")
 # the recordings live in the checkout (a worktree under .claude/worktrees reads its parent's)
@@ -358,21 +361,28 @@ def build() -> str:
     return core, city, build_congress(rows)
 
 
+def game_db() -> sqlite3.Connection:
+    """the game's own database, read only"""
+    if not GAME_DB.exists():
+        raise SystemExit(f"{GAME_DB}: no lab instance has loaded the ruleset (tools/civ6lab/game.py launch)")
+    return sqlite3.connect(f"file:{GAME_DB}?mode=ro", uri=True)
+
+
 def congress_order(table: str, key: str, have: dict[str, dict]) -> list[tuple[str, dict]]:
     """the game's database rows in its order (its index); an install row the
     game did not load (a pack the recordings ran without) has none"""
-    db = sqlite3.connect(GAME_DB)
+    db = game_db()
     return [(k, have[k]) for (k,) in db.execute(f"select {key} from {table} order by rowid") if k in have]
 
 
 def in_game_order(table: str, key: str, rows: dict[str, dict]) -> list[tuple[str, dict]]:
     """the install's rows in the game's DATABASE ORDER: the rowid order of the
-    game's own database (DebugGameplay.sqlite in the game's cache, written as
+    game's own database (DebugGameplay.sqlite in a lab instance's cache, written as
     it loads its packs — the DLC civilizations' rows before Expansion1's, the
     later packs' after Expansion2's, an order the packs' .modinfo files do not
     state). A row the install has and the database lacks, or the reverse, is
     an error."""
-    db = sqlite3.connect(GAME_DB)
+    db = game_db()
     order = [r[0] for r in db.execute(f"select {key} from {table} order by rowid")]
     if set(order) != set(rows):
         raise SystemExit(f"{table}: the install and {GAME_DB.name} differ: "
@@ -685,7 +695,7 @@ def build_city(rows, modifier) -> str:
     d_xp2 = keyed(rows("Districts_XP2"), "DistrictType")
     d_projects = collections.defaultdict(list)
     project_rows = keyed(rows("Projects"), "ProjectType")
-    for (pr,) in sqlite3.connect(GAME_DB).execute("select ProjectType from Projects order by rowid"):
+    for (pr,) in game_db().execute("select ProjectType from Projects order by rowid"):
         if project_rows.get(pr, {}).get("PrereqDistrict"):
             d_projects[project_rows[pr]["PrereqDistrict"]].append(pr)
 
@@ -698,7 +708,7 @@ def build_city(rows, modifier) -> str:
         if c.get("PrereqDistrict") and not c.get("TraitType"):
             d_range[c["PrereqDistrict"]] = max(d_range[c["PrereqDistrict"]], num(c, "RegionalRange"))
     d_appeal = collections.defaultdict(list)
-    for dt, mv, ch in sqlite3.connect(GAME_DB).execute(
+    for dt, mv, ch in game_db().execute(
             "select DistrictType, MinimumValue, AppealChange from AppealHousingChanges order by rowid"):
         d_appeal[dt].append([mv, ch])
 
@@ -762,7 +772,7 @@ def build_city(rows, modifier) -> str:
                 "createBuilding": p_xp2.get(pt, {}).get("CreateBuilding"),
                 "consumes": [r["ConsumedBuildingType"] for r in p_consumes[pt]],
                 "modifiers": [modifier(r["ModifierId"]) for r in p_mods[pt]]}
-    projects = [prow(r[0]) for r in sqlite3.connect(GAME_DB).execute("select ProjectType from Projects order by rowid")]
+    projects = [prow(r[0]) for r in game_db().execute("select ProjectType from Projects order by rowid")]
     return (
         "/**\n * THE CITY BUILD AI'S TABLES (cpu/core/aiCityBuild.ts), written by\n"
         " * tools/install/ai_tables.py from the layered install (`--check` reports a\n"
