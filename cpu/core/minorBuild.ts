@@ -1295,10 +1295,11 @@ function minorPlaceDistrict(state: GameState, cityState: CityState, district: Di
   t.district = district;
   t.districtComplete = false;
   paveGround(t);
-  // its price locks at the placement (runs/h1_duelv1124 Granada's Harbor
+  // its price locks at the placement, a second of the type at the first's
+  // (`minorDistrictFull`; runs/h1_duelv1124 Granada's Harbor
   // at 53 from t42 to its completion at t44, Production Needed in
   // City_BuildQueue.csv, through a civic that took the fresh price to 58)
-  (cityState.districts ??= []).push({ type: district, tileIndex: site, cost: districtScaledBase(cityState.research, district) });
+  (cityState.districts ??= []).push({ type: district, tileIndex: site, cost: minorDistrictFull(cityState, district) });
   minorReplaceCitizens(state, cityState);
 }
 
@@ -2158,19 +2159,24 @@ export function minorItemPct(state: GameState, cityState: CityState, item: Minor
   return 0;
 }
 
-/** A minor's district's price: the price it locked at its placement on the
- *  plot, else the row's own base at its research now; its repair, the
+/** A minor's district's price: the price its city locked at the type's
+ *  placement (`minorDistrictFull`), else the row's own base at its research
+ *  now; its repair, the
  *  district standing pillaged on the plot, the rest past
  *  `MINOR_REPAIR_RESUME_PCT` as a building's (runs/h1_duelw1127 Muscat t168:
  *  the Commercial Hub resumed at 85 of 114) */
 function minorDistrictCost(state: GameState, cityState: CityState, district: DistrictId, site: number): number {
-  return minorDistrictFull(cityState, district, site) - minorRepairResumed(state, cityState, { district, site });
+  return minorDistrictFull(cityState, district) - minorRepairResumed(state, cityState, { district, site });
 }
 
-/** a minor's district's full price: the price it locked at its placement on
- *  the plot, else the row's own base at its research now */
-function minorDistrictFull(cityState: CityState, district: DistrictId, site: number): number {
-  const placed = site >= 0 ? (cityState.districts ?? []).find((d) => d.type === district && d.tileIndex === site) : undefined;
+/** a minor's district's full price: the price its city locked when it placed
+ *  the type, complete or not, on any plot (the city's cost reader, its buy
+ *  row: runs/h1_duelp1121 Ayutthaya's Neighbourhood placed t188 at 170,
+ *  quoted 170 through t250 while every other district climbs 175 -> 214;
+ *  its analysis's second Neighbourhood at 170, T 31 / 27 at 5.6 / 6.4
+ *  Production t216-221), else the row's own base at its research now */
+function minorDistrictFull(cityState: CityState, district: DistrictId): number {
+  const placed = (cityState.districts ?? []).find((d) => d.type === district && d.cost !== undefined);
   return placed?.cost ?? districtScaledBase(cityState.research, district);
 }
 
@@ -2185,7 +2191,7 @@ export function minorRepairResumed(state: GameState, cityState: CityState, item:
   if (!('district' in item)) return 0;
   const { district, site } = item;
   if (site < 0 || state.map.tiles[site].district !== district || !minorRepairsDistrictAt(state, cityState, site)) return 0;
-  return Math.floor((minorDistrictFull(cityState, district, site) * MINOR_REPAIR_RESUME_PCT) / 100);
+  return Math.floor((minorDistrictFull(cityState, district) * MINOR_REPAIR_RESUME_PCT) / 100);
 }
 
 /** A minor's item's price: a unit's Production cost (a Builder's and a

@@ -1628,6 +1628,15 @@ export function advanceHistory(h: History, rec: TurnRecord, cat: Catalog): void 
     for (let i = 0; i < W * rec.head.H; i++) {
       const was = fwas(i);
       const now = fname(i);
+      const res = plotAt(rec, i)[P.resource] as number;
+      const bareKey = `${plotAt(rec, i)[P.feature]}|${plotAt(rec, i)[P.owner]}|${res}`;
+      const y1 = plotAt(rec, i)[P.yields] as number[];
+      // a Barbarian Outpost or a Tribal Village pays its plot nothing
+      const unimproved = (r: TurnRecord) => (plotAt(r, i)[P.improvement] as number) < 0
+        || plotAt(r, i)[P.improvementPillaged] === 1 || payless.has(plotAt(r, i)[P.improvement] as number);
+      const bare = unimproved(rec) && (plotAt(rec, i)[P.district] as number) < 0
+        && (plotAt(rec, i)[P.wonder] as number) < 0 && Array.isArray(y1)
+        && (res < 0 || !RESOURCES[strip(cat.resources[res] ?? '', 'RESOURCE_')]?.revealTech);
       if (was === now) {
         // an improvement gone or pillaged with nothing else about the plot
         // moving (a flood's wash): its draw is what the bare plot reads above
@@ -1642,15 +1651,6 @@ export function advanceHistory(h: History, rec: TurnRecord, cat: Catalog): void 
         // plot reads bare (runs/h1_duelw1108, plots 699 and 744: Farms 3 Food
         // at t34, pillaged at t35 still reading 3 where the bare plots read 2
         // and 2)
-        const res = plotAt(rec, i)[P.resource] as number;
-        const bareKey = `${plotAt(rec, i)[P.feature]}|${plotAt(rec, i)[P.owner]}|${res}`;
-        const y1 = plotAt(rec, i)[P.yields] as number[];
-        // a Barbarian Outpost or a Tribal Village pays its plot nothing
-        const unimproved = (r: TurnRecord) => (plotAt(r, i)[P.improvement] as number) < 0
-          || plotAt(r, i)[P.improvementPillaged] === 1 || payless.has(plotAt(r, i)[P.improvement] as number);
-        const bare = unimproved(rec) && (plotAt(rec, i)[P.district] as number) < 0
-          && (plotAt(rec, i)[P.wonder] as number) < 0 && Array.isArray(y1)
-          && (res < 0 || !RESOURCES[strip(cat.resources[res] ?? '', 'RESOURCE_')]?.revealTech);
         const acc = h.eventYields.get(i) ?? [0, 0, 0, 0];
         // the plot stood under a working improvement, a district or a wonder
         // the record before (runs/h1_duelw1112, plot 622: a wonder site from
@@ -1709,6 +1709,13 @@ export function advanceHistory(h: History, rec: TurnRecord, cat: Catalog): void 
         if (!y || !y0) continue;
         addEvent(i, y[0] - y0[0], y[1] - y0[1], y[3] - y0[3]);
         continue;
+      }
+      // a feature cleared or laid by no event: the bare plot's reading on
+      // the new ground (runs/h1_duelp1117, plot 571: its Woods cleared t37 to
+      // a bare 2 Food, Farmed t38, the Farm taken by the t51 storm reading 3,
+      // the storm's +1 Food)
+      if (bare && now !== 'FEATURE_VOLCANIC_SOIL' && !now.startsWith('FEATURE_BURNT_')) {
+        h.bare.set(i, { key: bareKey, y: [...y1], ev: [...(h.eventYields.get(i) ?? [0, 0, 0, 0])] });
       }
       if (now === 'FEATURE_VOLCANIC_SOIL') {
         const y = plotAt(rec, i)[P.yields] as number[];
@@ -2406,14 +2413,15 @@ export function importTurn(rec: TurnRecord, cat: Catalog, history?: History): Im
         t.districtPillaged = dpil === true;
       }
       districts.push({ type: id, tileIndex: at });
-      // a district under construction keeps the price locked at its
-      // placement, which the city's cost reader quotes (its buy row): the
-      // minor's item cost (`minorDistrictCost`; runs/h1_duely1124 Granada's
-      // Harbor at 53 through t44's civic, which took the fresh price to 58);
-      // a pillaged one its repair's full price (runs/h1_duely1124 Granada's
-      // Encampment quoted at 107 while pillaged, its repair 80 + 24 + 24 of
-      // 107, the fresh price 165)
-      if (id !== 'CITY_CENTER' && (complete !== true || dpil === true)) {
+      // a district keeps the price locked at its placement, under
+      // construction and after, which the city's cost reader quotes (its buy
+      // row): the minor's item cost (`minorDistrictCost`; runs/h1_duely1124
+      // Granada's Harbor at 53 through t44's civic, which took the fresh
+      // price to 58; runs/h1_duelp1121 Ayutthaya's Neighbourhood at 170
+      // t188-250); a pillaged one its repair's full price (runs/h1_duely1124
+      // Granada's Encampment quoted at 107 while pillaged, its repair 80 + 24
+      // + 24 of 107, the fresh price 165)
+      if (id !== 'CITY_CENTER') {
         const locked = num(c.buy.find((b) => b[0] === 'D' && b[1] === ti)?.[2]);
         if (locked > 0) lockedDistrictCost.set(at, locked);
       }
@@ -2440,6 +2448,10 @@ export function importTurn(rec: TurnRecord, cat: Catalog, history?: History): Im
       minor.centerIndex = center;
       minor.population = c.pop;
       minor.foodBox = num(c.food);
+      // its city AI's Food focus (`minorFoodFocus`): the citizen manager's
+      // favored Food
+      if (c.favored?.includes(0)) minor.favoredFood = true;
+      else delete minor.favoredFood;
       minor.cultureBox = num(c.culture);
       minor.nextPlot = num(c.nextPlot);
       // its ledger of plots taken since its founding ring (`envoyTiles`): a

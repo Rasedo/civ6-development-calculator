@@ -12,9 +12,12 @@
  * within 1.0, and further, and the first further ones (with the landing turn
  * that would give the log's value); --rows every district row with its T's
  * parts, the landing turn that gives the log's value and its value
- * two turns either side. The world: the record of the turn, and the minor as
- * its city AI's turn finds it after its economy's accrual and its city's
- * production step (`minorPhase`): the technologies, the civics and the
+ * two turns either side. The world: the record of the turn, every plot no
+ * city-state holds as the record after holds it (the majors' turns before
+ * the city-states'), and the minor as its city AI's turn finds it after its
+ * economy's accrual and its city's production and growth steps (`minorPhase`,
+ * `minorGrowth`: its citizens re-placed), its growth forecast on the growth
+ * its last analysis read (`CityState.aiGrowthSeen`): the technologies, the civics and the
  * progress on the item in hand the record after holds; the Builders the
  * record holds and the one its production step trained (none its contract
  * purchases bought); the store its step left (City_BuildQueue.csv): an item
@@ -44,7 +47,7 @@ import { districtValue, type DistrictValueFacts } from '../core/aiDistrictValue'
 import { baseAdjacency } from '../core/yields';
 import { tilePurchaseCost } from '../core/game';
 import { canPlaceDistrictIn } from '../core/rules';
-import { minorBuildFacts, minorPower, minorResourceFacts } from '../core/minorBuild';
+import { minorBuildFacts, minorGrowth, minorPower, minorResourceFacts } from '../core/minorBuild';
 import { economicGoldBoost } from '../core/aiWeights';
 import { newEconomicMemory } from '../core/aiEconomic';
 import { minorCity } from '../core/cityStates';
@@ -53,7 +56,7 @@ import { campTiles } from '../core/seats';
 import { civicAnalysis } from '../core/aiCivics';
 import { borderCandidates, computeCityStats } from '../core/city';
 import { resourceValue } from '../core/aiResource';
-import { AI_BUILDING_INDEX, BUILDING_DEPENDENTS, buildingsPass, growthForecast, housingValue } from '../core/aiCityBuild';
+import { AI_BUILDING_INDEX, BUILDING_DEPENDENTS, buildingsPass, growthForecast, housingValue, type CityGrowth } from '../core/aiCityBuild';
 import { accumulationPct } from '../core/stockpile';
 import { makeYieldCtx } from '../core/effects';
 import { improvementAdjacency } from '../core/yields';
@@ -65,6 +68,7 @@ import { GAME_COST_ESCALATION, gameProgressPct, scaleByGameSpeed } from '../data
 import { neighbors } from '../../world/hex';
 import { RESOURCES } from '../../world/resources';
 import { tileAppeal } from '../core/appeal';
+import { cityAppealResolver } from '../core/governors';
 import { eruptionHazardTurns, floodHazardTurns } from '../core/disasters';
 import { loadCityBuildCentre, loadCityBuildPlots } from './cityBuildLog';
 import { AI_BUILDINGS } from '../data/aiBuildTables';
@@ -144,6 +148,8 @@ const hadCity = new Set<number>();
  *  none: each record its city stands with an empty queue adds the turn's
  *  production; a record with an item clears it) */
 const idleStore = new Map<number, number>();
+/** per player the growth its city AI's last analysis read */
+const growthSeen = new Map<number, CityGrowth>();
 let held: { imp: ReturnType<typeof importTurn>; turn: number; rec: TurnRecord } | null = null;
 for (const rec of recs) {
   advanceHistory(history, rec, cat);
@@ -157,6 +163,30 @@ for (const rec of recs) {
   // record's positions, the majors' actions of the turn done (the engine's
   // turn reads them so)
   state.riverNamed = after.state.riverNamed;
+  // the map as the majors' turns left it: every plot no city-state holds in
+  // either record as the record after holds it (its owner, improvement,
+  // feature, district, road), an owning city the record lacks kept out
+  const minorSeats = new Set([...state.cityStates, ...after.state.cityStates].map((c) => c.seat));
+  const cityIds = new Set([...state.seats, ...(state.freeSeat ? [state.freeSeat] : [])].flatMap((s) => s.cities.map((c) => c.id)));
+  for (const tile of state.map.tiles) {
+    const next = after.state.map.tiles[tile.index];
+    if (minorSeats.has(tile.ownerSeat) || minorSeats.has(next.ownerSeat)) continue;
+    if (next.ownerSeat < 0 || cityIds.has(next.ownerCity)) {
+      tile.ownerSeat = next.ownerSeat;
+      tile.ownerCity = next.ownerCity;
+    }
+    tile.improvement = next.improvement;
+    tile.pillaged = next.pillaged;
+    tile.feature = next.feature;
+    tile.resource = next.resource;
+    tile.district = next.district;
+    tile.districtComplete = next.districtComplete;
+    tile.districtPillaged = next.districtPillaged;
+    tile.builtWonder = next.builtWonder;
+    tile.builtWonderComplete = next.builtWonderComplete;
+    tile.road = next.road;
+    tile.roadTier = next.roadTier;
+  }
   const turn = cur.turn;
   for (const [player, cs] of imp.minorOfPlayer) {
     if (onlyPlayer !== null && player !== onlyPlayer) continue;
@@ -205,6 +235,9 @@ for (const rec of recs) {
       cs.research.techProgress = n.techProgress;
       cs.research.techRetained = { ...n.techRetained };
     }
+    // its city's growth step (`minorGrowth`): the citizen it grows placed,
+    // every citizen re-placed, on the map the turns before its own left
+    minorGrowth(state, cs);
     // the civics AI's entries as its turn would write them (cityBuildLab.ts)
     cs.research.civicAiEntries = civicAnalysis(state, cs.seat, computeCityStats(state, minorCity(cs)).total.culture);
     // the Economic AI's Gold boost its last turn wrote: on the net income
@@ -213,13 +246,10 @@ for (const rec of recs) {
     if (typeof net === 'number') cs.economy = { ...(cs.economy ?? newEconomicMemory()), goldBoost: economicGoldBoost(net / 256) };
     const facts = minorBuildFacts(state, cs, () => 0);
     const resFacts = minorResourceFacts(state, cs);
-    // the growth's surplus as the city stood at its turn: the record's
-    // (its plots can lag its city's yields a builder's action:
-    // runs/h1_duelv1117 Caguana's Farm on plot 571 off in the t51 record its
-    // Food counts, the surplus 5 where the plots give 4 from t51; the Farm
-    // rows' 15.03 a Food of housing value)
-    if (dc?.foodSurplus !== undefined) facts.growth.surplus = Math.round(Number(dc.foodSurplus) * 256);
-    const forecast = growthForecast(facts.growth);
+    // the forecast on the growth its city AI's last turn read
+    // (`CityState.aiGrowthSeen`), its own the first turn
+    const forecast = growthForecast(growthSeen.get(player) ?? facts.growth);
+    growthSeen.set(player, { ...facts.growth });
     // the modifiers' housing on the same growth (`cityHousingValue`)
     const k = tradeVal.get(`${turn - 1}:${player}`);
     const modView = { ...facts.view, cityHousingValue: (i: number, id: number, housing: number, t: number, h: number) =>
@@ -260,6 +290,8 @@ for (const rec of recs) {
       }
     }
     const passDistricts = buildingsPass(facts, own).districts;
+    const camps = campTiles(state);
+    const gp = cityAppealResolver(state);
     for (const lp of logged) {
       // a plot the analysis left unvalued keeps its row at 0 (the city centre,
       // a district's plot)
@@ -272,7 +304,7 @@ for (const rec of recs) {
       if (!districtsMode && (plot === cs.centerIndex || tile.district)) continue;
       const f: PlotValueFacts = {
         view: facts.view, seat: cs.seat,
-        improvement: plotImprovementType(tile, campTiles(state)),
+        improvement: plotImprovementType(tile, camps),
         pillaged: !!tile.pillaged,
         // the resource the player sees: its RevealedByTech held
         resource: tile.resource && (!RESOURCES[tile.resource]?.revealTech || r.techs.includes(RESOURCES[tile.resource].revealTech!))
@@ -281,7 +313,7 @@ for (const rec of recs) {
         floodTurns: floodHazardTurns(state, tile.index),
         eruptionTurns: eruptionHazardTurns(state, tile.index),
         drought: tile.droughtTurns > 0,
-        appeal: tileAppeal(state.map, tile),
+        appeal: tileAppeal(state.map, tile, camps, gp),
         besideHousingDistrict: neighbors(state.map, tile).some((n) => n.district !== null && (DISTRICTS[n.district]?.housing ?? 0) > 0),
         unitCost: (u) => (u === 'UNIT_BUILDER' ? UNITS.BUILDER.cost + scaleByGameSpeed(BUILDER_COST_STEP) * builders
           : UNITS[engineId('unit', u, 'UNIT_', UNITS) ?? '']?.cost ?? 0),
@@ -326,12 +358,12 @@ for (const rec of recs) {
           districtAdjacency: districtAdj,
           rowsAdjacency: districtAdj,
           // the districts the player may have (no other civilization's), the
-          // city lacks and the plot takes, research waived
+          // city lacks and the plot takes, research and the district limit waived
           otherDistricts: (d) => AI_DISTRICTS.filter((x) => {
             if (x.type === d || x.trait !== null || x.type === 'DISTRICT_CITY_CENTER' || x.type === 'DISTRICT_WONDER') return false;
             const id = engineId('district', x.type, 'DISTRICT_', DISTRICTS) as keyof typeof DISTRICTS | null;
             if (!id || (cs.districts ?? []).some((c) => c.type === id)) return false;
-            return canPlaceDistrictIn(state, city, id, plot, { unlocks: null, ownsTile: () => true }).ok;
+            return canPlaceDistrictIn(state, city, id, plot, { unlocks: null, ownsTile: () => true, anyCount: true }).ok;
           }).map((x) => x.type),
           chronology: facts.era + 1,
           districtCount: specialty,

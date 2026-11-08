@@ -1808,7 +1808,7 @@ class SimMinors:
         """[B] f64 — `minorItemCost` of the key per game: a unit's Production
         cost (a Builder's and a Trader's climbing), a building's (the Flood
         Barrier's off the lowland it covers), a district's own base (the
-        price it locked at its placement where it stands on its plot), a
+        price its city locked at the type's placement, on any plot), a
         project's (the walls' repair the HP it puts back), a repair's rest
         past `MINOR_REPAIR_RESUME_PCT`"""
         row = self._CITY_MINOR0 + s
@@ -1832,11 +1832,11 @@ class SimMinors:
         if bool(is_d.any()):
             dv = (key - self._mk_d0).clamp(min=0, max=int(self._mb_d_base.shape[0]) - 1)
             dfull = self._progress_cost(self._mb_d_base.take(dv), self._mb_d_k.take(dv), pct).double()
-            # one placed on the plot: the price it locked at its placement
+            # the type placed on any plot, complete or not: the price the city
+            # locked at its placement
             site = self.citystate_prod_site[:, s]
-            on = (site >= 0) & (self.district.gather(1, site.clamp(min=0).unsqueeze(1)).squeeze(1) == dv)
             lk = self.citystate_dist_cost[:, s].gather(1, dv.unsqueeze(1)).squeeze(1)
-            dfull = torch.where(on & (lk > 0), lk.double(), dfull)
+            dfull = torch.where(lk > 0, lk.double(), dfull)
             # a district's repair: the rest past the repair's resume percent
             rep = torch.zeros_like(is_d)
             for d in sorted({int(x) for x in dv[is_d].tolist()}):
@@ -1953,9 +1953,11 @@ class SimMinors:
         self.district[rr, tt] = dv
         self.district_complete[rr, tt] = False
         self._pave_plot(rr, tt)
-        # its price locks at the placement, on the research as it stands
+        # its price locks at the placement, on the research as it stands; a
+        # second of the type at the first's
         pct = self._progress_pct_of(self.citystate_techs[rr, s].sum(dim=1), self.citystate_civics[rr, s].sum(dim=1))
-        locked = self._progress_cost(self._mb_d_base.take(dv), self._mb_d_k.take(dv), pct)
+        held = self.citystate_dist_cost[rr, s].gather(1, dv.unsqueeze(1)).squeeze(1)
+        locked = torch.where(held > 0, held, self._progress_cost(self._mb_d_base.take(dv), self._mb_d_k.take(dv), pct))
         for d in sorted(set(dv.tolist())):
             k = dv == d
             r_d, t_d = rr[k], tt[k]
