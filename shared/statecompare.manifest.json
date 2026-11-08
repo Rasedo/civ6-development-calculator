@@ -3306,6 +3306,17 @@
           "note": "the Builders the minor has trained, which price its next (`builderCost`); the Seat field a minor's record carries."
         },
         {
+          "name": "minorAiBuilders",
+          "compare": "exact",
+          "covers": [
+            "CityState.aiBuilders"
+          ],
+          "planes": [
+            "citystate_ai_builders"
+          ],
+          "note": "the Builders the minor had trained as its City Analysis read them, before its turn's contract purchases: its plot values' Builder charge (`minorPlotEvals`)."
+        },
+        {
           "name": "minorBestMeleeCS",
           "compare": "exact",
           "covers": [],

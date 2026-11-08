@@ -210,6 +210,7 @@
   readings:
     - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
     - "C-96: the unit value's unit count and the founding Production — READ, both twins"
+    - "C-100: the build turns' store — a completion's overflow, an idle city's Production — and a Builder's charge at the count before the turn's contract purchases"
   context:
     - "...its whole part added. The train turns 0x17bb40(unit, 0, &extra): the city's Production (0x1cb9f0) x (the unit's production multiplier 0x17c1c0 + extra), the cost (0x17bfa0) less the un..."
   review: reviewed

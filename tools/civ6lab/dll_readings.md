@@ -12008,3 +12008,58 @@ GPU `_mops_upgrade_tree`'s `off` (gpu/core/sim_minorops.py).
   row)" in the replay's `gameJob`
   (runs/h1_duelp1128 t180 Warrior 2490370 under 7929859, t184 Man-At-Arms
   1179650 under 8126471, t243 Infantry 3342340).
+
+## C-100: the build turns' store — a completion's overflow, an idle city's Production — and a Builder's charge at the count before the turn's contract purchases
+
+`minorBuildFacts`' `buildTurns` / `minorItemTurns` (cpu/core/minorBuild.ts,
+the store `CityState.prodOverflow`); `CityState.aiBuilders`, set in
+`minorPhase` before `minorContractPurchases`, read by `minorPlotEvals`'
+`unitCost`; GPU `citystate_ai_builders` (gpu/core/sim_minors.py) read by
+`_MinorFacts.plot_unit_cost` (gpu/core/sim_cityvalue.py) in `_cv_build_unit`
+and `_cv_charge_cost`. The lab: `cpu/harness/plotValueLab.ts`.
+
+- THE DISTRICT'S TURNS (0x17b5a0, from the plot analysis at 0x5d0040 with no
+  feature and no extra): the rate the city's Production (0x1cb9f0) times the
+  queue's district multipliers; the cost 0x179960: the city's own district of
+  the type at its locked price (+0xaa8 above 0), else the player's cost
+  (0x4088a0: Player_Districts +0x200, the data of the vector object +0x1a8
+  that 0x409870 writes); the progress the queue's kept part (+0x248) plus
+  m_xProductionOverflow (+0x1f4); turnsAt 0x8c4540: -1 at a rate of 0 or
+  below, 1 where the progress covers the cost, else ceil. The player's costs
+  are refreshed by 0x409800 (every Districts row through 0x409870) from
+  SetTech (0x4cd7f1), SetCivic (0x3a1dbd), 0x4cc740 and the city placement
+  (0x1eb312), so the analysis prices a district on the technologies and
+  civics the turn has landed. The engine's rule stands: the lab's world was
+  wrong.
+- THE STORE THE ANALYSIS READS: an idle city's holds the Production its
+  production steps made, each the city as the turn left it (the record
+  after's Production, its fraction kept — the record's productionYield is
+  floored); an item its step completed leaves its overflow (City_BuildQueue.csv's
+  Overflow: the turn's Production less what the item still needed, the rest
+  of the store lost) and no item in hand. runs/h1_duelp1128 Bologna (idle
+  from t157, Production 9.6 / 12.8): store 44.8 / 57.6 / 70.4 / 83.6 at
+  t160-163, the Neighbourhood 8 / 7 / 6 / 5 turns at 138 / 143 / 146 / 146 +
+  Urbanization's 9 / 8 / 7 / 6 = T 17 / 15 / 13 / 11 as logged (the store
+  on the floored yields: 16 / 14 / 12); the Campus (+500%) 2 / 2 / 1 / 1 as
+  logged. runs/h1_duelp1127 Mexico City t43: the Monument completed with
+  1.1 over, the Industrial Zone 3 turns + Apprenticeship's 41 + Horseback
+  Riding's 4 = T 48 as logged (no store: 4 + 45). City_BuildQueue.csv's
+  t168 row for Bologna (149.2 into a repair needing 2, overflow 11.2) is the
+  engine's `minorBuild` overflow (made − needed).
+- THE BUILDER'S CHARGE (FIT, records): the plot values price a Builder (the
+  improvement's build unit 0x7a2e20 at 0x4f2b20's current cost, a charge
+  cost / 3) at the Builders trained before the turn's contract purchases:
+  the one its production step trained counts, the one its Build City
+  Improvement contract buys (AI_CityBuild.csv's PURCHASE line, logged
+  before the PLOT ANALYSIS LOG) does not. runs/h1_duelp1117 Caguana t62 /
+  t140 / t148: Builders at 31 / 35 / 37 (the record's buy rows 33 / 37 /
+  39 after the purchase), every Builder charge row as logged; t42's 27 / 29
+  give the same whole charge (9). 0x1e6570 (a unit made) raises
+  m_aiNumUnitsConstructed (0x4c1a30) and refreshes the type's current cost
+  (0x4f2fc0) at once, so the City Analysis job's tables are computed before
+  the contract purchases, as its unit count already is (`minorListedCount`).
+- Open (C-100): a 1-turn district under a store past its cost logs the
+  value at landing 0 (runs/h1_duelp1121 Antioch's Commercial Hub t52-72,
+  t82-103: T 1, the log's value our T 0); turnsAt gives 1 there, so a term
+  of the value differs, not T. The build rate on the analysis' Production
+  (the yields a turn ahead, gc1's).

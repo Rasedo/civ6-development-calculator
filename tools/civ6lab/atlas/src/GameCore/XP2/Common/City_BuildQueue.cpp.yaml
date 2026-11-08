@@ -486,6 +486,19 @@
   context:
     - "...it plus 20 exceeds B; the player itself adds each city's unit at the head of its queue (0x179860 on city +0x2170) of such strength — Regional (+0x398); a player at war (0x469cd0) or..."
   review: reviewed
+- addr: 0x179960
+  final: 0xfd470
+  kind: function
+  semantics: "a district's cost for the queue (district, feature, ...): the city's own district of the type (0x1ae530 on city +0x1a48) with a price locked above 0 (+0xaa8) returns it; else the player's cost (0x4088a0 on the player's districts +0x1308), plus, where a feature is passed (not -1) whose removal list (+0x118..+0x120) is empty, half (0x17bfa0) a Builder's turns; -1 for an invalid type. The plot analysis's district turns (0x5d0040 -> 0x17b5a0) pass no feature."
+  status: READ
+  cases:
+    - recording: h1_duelp1128
+      turn: 161
+      value: "Bologna's Neighbourhood at the player's cost 143 after Military Science (SetTech's 0x409800 refresh), its store 57.6: 7 turns + Urbanization's 8 = T 15 as logged"
+  impl: [cpu/core/minorBuild.ts:minorItemCost]
+  readings:
+    - "C-100: the build turns' store — a completion's overflow, an idle city's Production — and a Builder's charge at the count before the turn's contract purchases"
+  review: reviewed
 - addr: 0x179dd0
   kind: function
   semantics: the city's extra copies of a unit a training yields (the unit value's x(copies + 1)).
@@ -627,6 +640,7 @@
     - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
     - "C-96: the unit value's unit count and the founding Production — READ, both twins"
     - "A minor's items' turns at the Production its AI read before its free Trader's route — the C-130 cache applied to the build turns, both twins"
+    - "C-100: the build turns' store — a completion's overflow, an idle city's Production — and a Builder's charge at the count before the turn's contract purchases"
   context:
     - ...T = max(tech turns 0x7610e0, civic turns 0x621920) + the prerequisite district's turns (0x17b5a0, +10 when not the current production) + the build turns (0x17b1e0, the queue's own es...
   review: reviewed

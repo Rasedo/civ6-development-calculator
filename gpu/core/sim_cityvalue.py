@@ -312,7 +312,7 @@ class SimCityValue:
         cost = torch.zeros_like(like)
         for k, (unit, consumes) in enumerate(imp["buildUnits"]):
             ok = _t(f.builds_unit(unit), like).bool()
-            c = _t(f.unit_cost(unit), like) if consumes else torch.zeros_like(like)
+            c = _t(f.plot_unit_cost(unit), like) if consumes else torch.zeros_like(like)
             take = ok & ((best < 0) | (c < cost))
             best = torch.where(take, torch.full_like(best, k), best)
             cost = torch.where(take, c, cost)
@@ -322,7 +322,7 @@ class SimCityValue:
         """a charge of the unit at the Production's DefaultValue, discounted"""
         like = f.like()
         charges = (_t(f.extra_charges(unit), like) + _BASE_CHARGES).clamp(min=1)
-        per = torch.div(_t(f.unit_cost(unit), like), charges, rounding_mode="trunc") * _FX
+        per = torch.div(_t(f.plot_unit_cost(unit), like), charges, rounding_mode="trunc") * _FX
         return _discounted(self._cv_yield(per, "YIELD_PRODUCTION"), self._cv_tables()["rate"], t)
 
     def _cv_feature_removal(self, f, feature: str, t: torch.Tensor, h: torch.Tensor) -> torch.Tensor:
@@ -2607,6 +2607,14 @@ class _MinorFacts:
             return 0
         return self._item_cost(u).long() if ui in (self.sim._builder_idx, self.sim._trader_idx) else int(self.sim._type_cost[ui])
 
+    def plot_unit_cost(self, u):
+        # the plot values' build unit: a Builder at the count its City
+        # Analysis read, before its turn's contract purchases
+        # (`CityState.aiBuilders`)
+        if self._uidx(u) == self.sim._builder_idx:
+            return self.sim._builder_cost(self.sim.citystate_ai_builders[:, self.s]).long()
+        return self.unit_cost(u)
+
     # the pick's facts: no favoured items; the defensive pick where the city
     # is under threat on the threat its city AI stored (`minorUnderThreat`)
     def defense(self):
@@ -3105,6 +3113,9 @@ class _FreeFacts(_MinorFacts):
         if ui < 0:
             return 0
         return self._item_cost(u).long() if ui in (self.sim._builder_idx, self.sim._trader_idx) else int(self.sim._type_cost[ui])
+
+    def plot_unit_cost(self, u):
+        return self.unit_cost(u)
 
     def can_construct(self, b):
         sim = self.sim

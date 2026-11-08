@@ -377,6 +377,15 @@
   context:
     - 0x4cb930 (techs; civics 0x39ec60, the same body), called from the handler 0x427bf0 that every play...
   review: reviewed
+- addr: 0x4cc740
+  final: 0x335a30
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-100: the build turns' store — a completion's overflow, an idle city's Production — and a Builder's charge at the count before the turn's contract purchases"
+  context:
+    - ...00 (every Districts row through 0x409870) from SetTech (0x4cd7f1), SetCivic (0x3a1dbd), 0x4cc740 and the city placement (0x1eb312), so the analysis prices a district on the technologie...
+  review: imported
 - addr: 0x4cc950
   final: 0x335c20
   kind: function
@@ -428,6 +437,7 @@
   readings:
     - "C-98: a boost on an item at or past its cost completes it; a minor's parked progress and project conversion in the replay — READ (0x4cc950 at 0x4cca70..0x4ccab3), both twins"
     - "C-99 / C-128: every technology gained starts an Upgrade Units tree, the civic event never fires; a tree's units after its tick; the Nearest City Search's resource test; the plot's unit list — READ (0x4cd4c0 -> 0x800c60, 0x5bbf80 -> 0x27a180, 0x3a1ac0, 0x7cb3d0 -> 0x7d2190, 0x7eba40 -> 0x510d30, 0x74f40 / 0x763b0), the trigger both twins"
+    - "C-100: the build turns' store — a completion's overflow, an idle city's Production — and a Builder's charge at the count before the turn's contract purchases"
   context:
     - ...echnology's cost << 8 (0x4cca89..0x4ccaa5) and, at or above, completes the row (SetTech 0x4cd4c0 at 0x4ccab3) and clears the progress. A boost lands through the setter, so a row whose...
   review: imported

@@ -76,6 +76,10 @@ class SimMinors:
             # the units its City Analysis counts: its list before its
             # savings turn's purchases (`minorListedCount`)
             units = self._minor_listed_units(s).sum(dim=1)
+            # and the Builders it has trained, before the Builder its
+            # contract purchases buy: its plot values price a charge at that
+            # count (`CityState.aiBuilders`)
+            self.citystate_ai_builders[:, s] = torch.where(alive, self.citystate_builders_trained[:, s], self.citystate_ai_builders[:, s])
             fell = self._minor_military_turn(s)
             # its unit production table and City Analysis read the records
             # as its last turn left them, before the turn's ageing and look

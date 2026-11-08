@@ -1422,6 +1422,10 @@ export interface CityState extends Seat {
    *  absent none */
   bestPlotToBuy?: number;
   economy?: EconomicMemory;
+  /** the Builders it had trained as its City Analysis read them: before its
+   *  turn's contract purchases (`minorPhase`); its plot values price a
+   *  Builder's charge at this count (`minorPlotEvals`) */
+  aiBuilders?: number;
   threat?: number;
   /** its city's enemy at the gates (CityBuildAI +0x218) as its last update
    *  left it (`cityThreat`); absent, none */

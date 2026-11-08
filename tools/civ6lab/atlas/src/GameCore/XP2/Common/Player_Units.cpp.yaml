@@ -247,6 +247,7 @@
     - "C-98: a unit's value adds its abilities' modifiers; EFFECT_ADJUST_UNIT_MOVEMENT and REQUIREMENT_PLOT_ADJACENT_TO_OWNER; a second completion adds again — READ (0x7b62c0 at 0x7b7658..0x7b76d8, 0x6e11c7 / 0xc85140, 0x6bd520, 0x6d3200, 0x762d60's rows), both twins"
     - "C-98: the research bank with nothing in hand; a city-state's unit cost under Mercenary Companies"
     - "H-1: a formation's Production cost in the queue — READ (0x17bfa0 -> 0x17bef0 / 0x17be50), both twins"
+    - "C-100: the build turns' store — a completion's overflow, an idle city's Production — and a Builder's charge at the count before the turn's contract purchases"
   context:
     - "...at the game's speed (0x525400); net = (the new chassis' production cost − the old one's, 0x4f2b20) x UPGRADE_NET_PRODUCTION_PERCENT_COST (+0x74c, 100) / 100, never below 0; cost = base +..."
     - "...90 fills per unit row: c = the owner's unit manager (+0x12e8) current cost array (+0x3c0, 0x4f2b20, `m_aCurrentUnitCost`, an int); where c > 0, the row's +0x20 class does not read 2 throug..."
@@ -374,6 +375,7 @@
   readings:
     - Units made, kept progress and the culture banks from the game's memory
     - "Units made, kept progress and the culture banks from the game's memory — READ (0x4c1a30, 0x4bed20, 0x4f2fc0, 0x3939b0, 0x3a1fb0), both twins; the importer reads them"
+    - "C-100: the build turns' store — a completion's overflow, an idle city's Production — and a Builder's charge at the count before the turn's contract purchases"
   review: reviewed
 - addr: 0x4f31f0
   final: 0x34fb20

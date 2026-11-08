@@ -55,12 +55,16 @@
 - addr: 0x4088a0
   kind: function
   name: DistrictType
-  semantics: the player's cost of a district.
-  status: PARTLY
-  impl: [cpu/core/aiValue.ts:AiValueView]
+  semantics: "the player's cost of a district: the int at the type's index of +0x200, the data of the cost vector object +0x1a8 that 0x409870 writes (0x9034b0 on +0x1a8 at 0x409d94, stored at 0x409e01)."
+  status: READ
+  cases:
+    - recording: h1_duelp1128
+      turn: 161
+      value: Bologna's Neighbourhood priced 143 the turn Military Science landed (the record's buy rows 138 -> 143)
+  impl: [cpu/core/aiValue.ts:AiValueView, cpu/core/minorBuild.ts:minorItemCost]
   readings:
     - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
-  notes: ["imported: READ in its section, no confirming case found beside it"]
+    - "C-100: the build turns' store — a completion's overflow, an idle city's Production — and a Builder's charge at the count before the turn's contract purchases"
   context:
     - "...ds it), T0 / T1 turnsToBuildDistrict 0x17b5a0 each at least 1, the cost the player's (0x4088a0), the same value. The 0x5d4650 call's result is not read. Port: `aiModifiers.ts` (`rese..."
   review: reviewed
@@ -74,6 +78,18 @@
     - "C-96: the district value — READ (0x7a51f0, 0x7aaf80's terms below, 0x366df0, the purchase price 0x1b1cb0, 0x1c77c0, 0x1b4450), PARTLY READ (the golden-age term, the claims, modifiers and neighbours terms, the domain's resources path), unwired"
   context:
     - "..., the positive summed, added only where its SpaceRace ones value above 0 — shared by (0x408b60 all + 1) while 0x408b60 complete stands within ceil(0.5 x their count) and the plot lac..."
+  review: reviewed
+- addr: 0x409800
+  kind: function
+  semantics: "every district's cost refreshed: 0x409870 per Districts row. Called by SetTech (0x4cd7f1), SetCivic (0x3a1dbd), 0x4cc740 (0x4cc84a) and the city placement (0x1eb312)."
+  status: READ
+  cases:
+    - recording: h1_duelp1128
+      turn: 161
+      value: Bologna's district quotes 138 -> 143 with Military Science, 146 with Metal Casting at t162
+  impl: [cpu/core/game.ts:districtScaledBase]
+  readings:
+    - "C-100: the build turns' store — a completion's overflow, an idle city's Production — and a Builder's charge at the count before the turn's contract purchases"
   review: reviewed
 - addr: 0x409870
   final: 0x2c4f10
@@ -89,6 +105,7 @@
   impl: [cpu/core/game.ts:districtDiscounted]
   readings:
     - "H-1: the best melee, the drought's turns, the Trader's sea, the harvest's lump, the district discount — READ"
+    - "C-100: the build turns' store — a completion's overflow, an idle city's Production — and a Builder's charge at the count before the turn's contract purchases"
   context:
     - "- The district discount (0x409870's under-average models): the type's count 0x4bdd70 (placed districts included) against..."
   review: reviewed

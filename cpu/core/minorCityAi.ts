@@ -366,7 +366,7 @@ export function minorPlotEvals(state: GameState, cs: CityState, facts: CityBuild
       drought: tile.droughtTurns > 0,
       appeal: tileAppeal(map, tile, camps, gp),
       besideHousingDistrict: neighbors(map, tile).some((n) => n.district !== null && (DISTRICTS[n.district]?.housing ?? 0) > 0),
-      unitCost: (u) => (u === 'UNIT_BUILDER' ? UNITS.BUILDER.cost + scaleByGameSpeed(BUILDER_COST_STEP) * cs.buildersTrained
+      unitCost: (u) => (u === 'UNIT_BUILDER' ? UNITS.BUILDER.cost + scaleByGameSpeed(BUILDER_COST_STEP) * (cs.aiBuilders ?? cs.buildersTrained)
         : UNITS[engineId('unit', u, 'UNIT_', UNITS) ?? '']?.cost ?? 0),
       buildsUnit: (u) => minorUnitVersion(u) === u,
       extraCharges: () => 0,

@@ -1160,6 +1160,7 @@ CITY_STATE = {
     "minorAiHand": lambda sim, b, rows: [[int(sim.cai_in_hand[b, s]), int(sim.cai_c_serial[b, s]), *_tree_pool(sim, b, s),
                                           int(bool(sim.citystate_ai_on[b, s]))] for s in rows],
     "minorBuildersTrained": lambda sim, b, rows: [int(sim.citystate_builders_trained[b, s]) for s in rows],
+    "minorAiBuilders": lambda sim, b, rows: [int(sim.citystate_ai_builders[b, s]) for s in rows],
     "minorBestMeleeCS": lambda sim, b, rows: [int(sim.citystate_best_melee[b, s]) for s in rows],
     "minorBestRangedCS": lambda sim, b, rows: [int(sim.citystate_best_ranged[b, s]) for s in rows],
     "warTurns": lambda sim, b, rows: [_war_clock_line(sim, b, 100 + s) for s in rows],

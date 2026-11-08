@@ -342,6 +342,7 @@ class SimInit:
         # (`builderCost`).
         self.citystate_prod = torch.zeros(B, s_pad, dtype=torch.float64, device=device)
         self.citystate_builders_trained = torch.zeros(B, s_pad, dtype=torch.long, device=device)
+        self.citystate_ai_builders = torch.zeros(B, s_pad, dtype=torch.long, device=device)
         # its city AI (`minorAiTurn`): the plot of its district in hand (-1),
         # the item's value as its AI set it
         # (raw 24.8), its city's threat (-1 none), the Economic AI's savings

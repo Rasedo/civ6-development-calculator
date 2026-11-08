@@ -94,6 +94,9 @@ class Plot:
     def unit_cost(self, unit):
         return 25
 
+    def plot_unit_cost(self, unit):
+        return self.unit_cost(unit)
+
     def builds_unit(self, unit):
         return 1
 

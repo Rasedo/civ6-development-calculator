@@ -1327,7 +1327,7 @@ _MUTABLE = [
     "citystate_unit_strength",  # the strength over every domain its turn start stored
     "citystate_item", "citystate_ovf", "citystate_kept",  # the minor's item in hand, overflow store and kept progress
     "citystate_treasury", "citystate_net_income", "citystate_faith", "citystate_gp_points",
-    "citystate_builders_trained", "citystate_best_melee", "citystate_best_ranged",
+    "citystate_builders_trained", "citystate_ai_builders", "citystate_best_melee", "citystate_best_ranged",
     # its city AI: the district's plot, the item's turn and value, the threat, its update's growth, the savings
     "citystate_prod_site", "citystate_dist_cost", "citystate_founded_turn", "citystate_prod_set_value", "citystate_threat", "citystate_fav_food", "citystate_ai_growth", "citystate_ai_seen", "citystate_combat_desire", "citystate_standing_short",
     "citystate_savings", "citystate_balance", "citystate_gold_boost", "citystate_ai_on", "citystate_unit_values", "citystate_unit_on", "citystate_list_count", "citystate_building_values", "citystate_project_values", "citystate_res_counts", "citystate_best_plot_buy", "citystate_trade_ok", "citystate_trade_no", "citystate_kb_city_rank", "citystate_kb_city_id", "citystate_kb_city_n", "citystate_trade_value", "citystate_trade_seat", "citystate_met_minor", "citystate_met_free", "free_trade_value", "city_trade_ok", "city_trade_no", "civ_agendas", "civ_strategies",

@@ -1194,6 +1194,7 @@ const CITY_STATE_G: Record<string, Extractor> = {
   minorAiHand: overCityStates((cityState) => [cityState.cityAi?.inHand[-1] ?? -1, cityState.cityAi?.nextContract ?? 1, ...treePoolRecord(cityState, cityState.seat),
     cityState.cityAi ? 1 : 0]),
   minorBuildersTrained: overCityStates((cityState) => cityState.buildersTrained),
+  minorAiBuilders: overCityStates((cityState) => cityState.aiBuilders ?? 0),
   minorBestMeleeCS: overCityStates((cityState) => cityState.bestMeleeCS),
   minorBestRangedCS: overCityStates((cityState) => cityState.bestRangedCS ?? 0),
   warTurns: overCityStates((cityState, state) => warClockLine(state, cityState.seat)),

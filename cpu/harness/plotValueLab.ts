@@ -14,9 +14,13 @@
  * parts, the landing turn that gives the log's value and its value
  * two turns either side. The world: the record of the turn, and the minor as
  * its city AI's turn finds it after its economy's accrual and its city's
- * production step (`minorPhase`): the Builders, the technologies, the civics
- * and the progress on the item in hand the record after holds, an idle
- * city's store with the turn's production, its grid met (`minorPower`), the
+ * production step (`minorPhase`): the technologies, the civics and the
+ * progress on the item in hand the record after holds; the Builders the
+ * record holds and the one its production step trained (none its contract
+ * purchases bought); the store its step left (City_BuildQueue.csv): an item
+ * it completed, its overflow and no item in hand, an idle city's store with
+ * the Production the step made (the city as the record after holds it);
+ * --rows prints the store and the item in hand; its grid met (`minorPower`), the
  * Economic AI's Gold boost on the net income the record's treasury cached;
  * the research AI's turns from AI_Research.csv, the civics AI's as its turn
  * would write them. A plot's improvement: its own, a barbarian camp, a
@@ -108,6 +112,19 @@ const tradeVal = new Map<string, number>();
     }
   }
 }
+/** City_BuildQueue.csv's production step of each city each turn, its first
+ *  row: `${turn}:${city}` -> [the progress it left, the cost, the overflow, the item] */
+const stepRow = new Map<string, [number, number, number, string]>();
+{
+  const path = dump.replace(/\.jsonl$/, '.logs/City_BuildQueue.csv');
+  if (existsSync(path)) {
+    for (const line of readFileSync(path, 'utf8').split('\n')) {
+      const p = line.split(',').map((x) => x.trim());
+      const k = `${p[0]}:${p[1]}`;
+      if (p.length >= 7 && !stepRow.has(k)) stepRow.set(k, [Number(p[4]), Number(p[5]), Number(p[6]), p[3]]);
+    }
+  }
+}
 const W = recs[0].head.W;
 const RES = new Map(AI_RESOURCES.map((r) => [r.type, r] as const));
 /** an engine district's install type: the traitless AI row whose engine id it is */
@@ -148,17 +165,29 @@ for (const rec of recs) {
     const founded = !hadCity.has(player);
     if (imp.dumpOfMinor.get(cs)) hadCity.add(player);
     if (!logged) continue;
-    // the Builders the player has as its city acts: the record after the
-    // turn's (the turn start's training and the Economic AI's purchases
-    // come before the cities)
-    const builders = after.minorOfPlayer.get(player)?.buildersTrained ?? cs.buildersTrained;
     const dc = imp.dumpOfMinor.get(cs);
     const idle = !!dc && (dc.queueProgress ?? []).length === 0;
-    idleStore.set(player, idle ? (idleStore.get(player) ?? 0) + Number(dc?.productionYield ?? 0) : 0);
+    const nextCs = after.minorOfPlayer.get(player);
+    // the turn's production step (City_BuildQueue.csv's first row of the
+    // turn) and whether it completed the item in hand
+    const step = name ? stepRow.get(`${turn}:${name}`) : undefined;
+    const completed = !idle && !!step && step[0] >= step[1];
+    // the Builders its City Analysis prices a charge at
+    // (`CityState.aiBuilders`): the record's, with the one its production
+    // step trained, none its contract purchases bought
+    const builders = cs.buildersTrained + (completed && step[3] === 'UNIT_BUILDER' ? 1 : 0);
+    // the store the turn's production step leaves: an idle city's adds the
+    // Production the step made, the city as the record after holds it; an
+    // item the step completed leaves its overflow and no item in hand
+    const made = nextCs ? computeCityStats(after.state, minorCity(nextCs)).total.production : Number(dc?.productionYield ?? 0);
+    idleStore.set(player, idle ? (idleStore.get(player) ?? 0) + made : completed ? step[2] : 0);
     cs.prodOverflow = idleStore.get(player)!;
+    if (completed) {
+      cs.prodItem = undefined;
+      cs.prodProgress = 0;
+    }
     // its grid as its turn meets it (`minorPower`)
     minorPower(state, cs);
-    const nextCs = after.minorOfPlayer.get(player);
     if (nextCs && nextCs.prodItem === cs.prodItem) {
       cs.prodProgress = nextCs.prodProgress;
       cs.prodRetained = nextCs.prodRetained ? { ...nextCs.prodRetained } : undefined;
@@ -339,7 +368,7 @@ for (const rec of recs) {
           const d = Math.abs(ours - lv);
           let rowFit = -1;
           if (rowsOut) for (let x = 0; x < AI_VALUE_HORIZON + 2 && rowFit < 0; x++) if (Math.abs(slot(i, x) / FX - lv) <= 0.01) rowFit = x;
-          if (rowsOut) console.log(`ROW T=${t} fit=${rowFit} tp=${tparts} ${[-2, -1, 1, 2].map((dt) => (slot(i, t + dt) / FX).toFixed(2)).join(',')} t${turn} p${player} (${lp.x},${lp.y}) ${row.type} log ${lv.toFixed(2)} ours ${ours.toFixed(2)} adj ${['YIELD_SCIENCE', 'YIELD_FAITH', 'YIELD_GOLD', 'YIELD_PRODUCTION', 'YIELD_CULTURE'].map((y) => districtAdj(row.type, y)).join('/')} own=${lp.owned} pc=${df.purchaseCost} feat=${f.feature} res=${f.resource}`);
+          if (rowsOut) console.log(`ROW T=${t} fit=${rowFit} tp=${tparts} ${[-2, -1, 1, 2].map((dt) => (slot(i, t + dt) / FX).toFixed(2)).join(',')} t${turn} p${player} (${lp.x},${lp.y}) ${row.type} log ${lv.toFixed(2)} ours ${ours.toFixed(2)} adj ${['YIELD_SCIENCE', 'YIELD_FAITH', 'YIELD_GOLD', 'YIELD_PRODUCTION', 'YIELD_CULTURE'].map((y) => districtAdj(row.type, y)).join('/')} own=${lp.owned} pc=${df.purchaseCost} feat=${f.feature} res=${f.resource} store=${cs.prodOverflow} item=${cs.prodItem} pp=${cs.prodProgress}`);
           const k = tallyOf(row.type);
           if (d <= 0.01) k.exact++;
           else if (d <= 1) k.close++;

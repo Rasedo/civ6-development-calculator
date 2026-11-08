@@ -179,6 +179,12 @@ export function minorPhase(state: GameState): void {
     // the units its City Analysis counts: its list before its savings
     // turn's purchases (`minorListedCount`)
     const units = minorListedCount(state, cityState);
+    // and the Builders it has trained, before the Builder its contract
+    // purchases buy: its plot values price a charge at that count
+    // (runs/h1_duelp1117 Caguana t62 / t140 / t148: a Builder bought on its
+    // Build City Improvement contract, every Builder row at 31 / 35 / 37,
+    // the count before the purchase)
+    cityState.aiBuilders = cityState.buildersTrained;
     const fell = minorMilitaryTurn(state, cityState);
     // its military AI's unit production table and its City Analysis (both
     // on player signal +0x258, fired before the turn start's +0x370 list
