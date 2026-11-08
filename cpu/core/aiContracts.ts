@@ -569,10 +569,16 @@ export function buildUnitNode<C>(world: (ctx: C) => ContractNodeWorld): BtHandle
       maxTurns: 0, turns: -1, progress: CP_CLAIMED,
       assign: !(dataBool(node, 'Release Unit When Built') ?? false),
     };
-    w.tree.contracts.push(c.id);
     m.contract = c.id;
     submitContract(w.book, c, w.cities, w.turn, (city) => w.clearProduction(city), (city, k) => w.submitted(city, k));
-    if (c.progress === CP_ACCEPTED) setTag(run, node, 'Contract ID', c.id);
+    // the tree takes the contract (0x7d1570) and its tag only where a taker
+    // ACCEPTED it (0x7f48db); one none took is held by none and goes, the
+    // node FAILING its next tick (runs/h1_duely1117 Caguana t222: its Flood
+    // Barrier, bought by none, no city taking a building under threat, the
+    // Build City Building tree RUNNING with no contract, gone at t223)
+    if (c.progress !== CP_ACCEPTED) return;
+    w.tree.contracts.push(c.id);
+    setTag(run, node, 'Contract ID', c.id);
   },
   };
 }

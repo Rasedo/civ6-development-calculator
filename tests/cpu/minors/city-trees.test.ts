@@ -154,7 +154,7 @@ function runScenario(sc: Scenario, variant: { ties: number[] }): unknown[] {
       unitAlive: (u) => tree.some((x) => x.id === u) && !spent.has(u),
       startOperation: () => null, operationLive: () => false, heldContracts: () => [],
     };
-    goalsReached(ai, (g) => techs.has(g) || civics.has(g), (g) => g === researching, (p) => sc.owned.includes(p));
+    goalsReached(ai, (g) => techs.has(g) || civics.has(g), (g) => g === researching);
     freeSlots(ai, w, sc.city);
     inHandCheck(ai, city, () => {
       cleared += 1;

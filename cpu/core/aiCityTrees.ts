@@ -21,7 +21,7 @@ import { AI_BUILDINGS, AI_DISTRICTS, AI_FEATURES, AI_IMPROVEMENTS, AI_RESOURCES,
 import { AI_BUILDING_INDEX, AI_UNIT_INDEX } from './aiCityBuild';
 import { BT_ERROR, BT_FAILURE, BT_FRESH, BT_RUNNING, BT_SUCCESS, compileTree, dataBool, dataTag, tick,
   type BtHandler, type BtNode, type BtRun } from './behaviorTree';
-import { CP_ACCEPTED, CP_CANCELLED, CP_CLAIMED, CP_COMPLETED, CP_FAILED, CP_IN_PROGRESS, buildUnitNode, contractById, contractManagerNode, prereqsOf, reapContracts,
+import { CP_ACCEPTED, CP_CANCELLED, CP_COMPLETED, CP_FAILED, CP_IN_PROGRESS, buildUnitNode, contractById, contractManagerNode, prereqsOf, reapContracts,
   treeContractOf, type AiContract, type ContractBook, type ContractCity, type ContractNodeWorld } from './aiContracts';
 import { FX, FX_MIN } from './aiValue';
 import { treeSlot } from './treePool';
@@ -93,18 +93,20 @@ export const newCityAi = (): CityAi => ({
 
 /** the tech and civic contracts whose goal the player now holds COMPLETED,
  *  the one under research IN PROGRESS (ACCEPTED again when the research moves
- *  off it: the research AI's check 0x5f5940), and the plot contracts whose
- *  plot it now owns COMPLETED (the research and civics AIs' and the Economic
- *  AI's turns, before the cities'). The research and culture AIs hold a
+ *  off it: the research AI's check 0x5f5940; the research and civics AIs'
+ *  turns, before the cities'). The research and culture AIs hold a
  *  goal contract while it is accepted or in progress and drop it on their
  *  turn once it is neither: a contract its tree FAILED stays held to that
  *  turn (runs/h1_duely1121 p2 tech contract 8 on Masonry, its Build City
  *  Building tree gone t8, FAILED in the research list at the t8 end look,
  *  gone by t9's; civic contract 65 of runs/h1_duely1117 Antananarivo held
- *  ACCEPTED t23-t44 past its tree) */
-export function goalsReached(
-  ai: CityAi, held: (goal: string) => boolean, researching: (goal: string) => boolean, owns: (plot: number) => boolean,
-): void {
+ *  ACCEPTED t23-t44 past its tree). A plot purchase contract stays ACCEPTED
+ *  once its plot is the player's: its tree's Purchase Plot runs while the
+ *  contract lives, to the Contract Manager's Turn Limit (runs/h1_duely1121
+ *  city-state 3's contract 505 on 43:20, posted t170, the plot owned t176,
+ *  ACCEPTED to t180, gone with its Build City District tree at t181; the
+ *  district placed there at t182 by the next tree) */
+export function goalsReached(ai: CityAi, held: (goal: string) => boolean, researching: (goal: string) => boolean): void {
   for (const c of ai.contracts) {
     const goal = ai.techContracts[c.id];
     if (goal !== undefined) {
@@ -113,11 +115,7 @@ export function goalsReached(
         else c.progress = researching(goal) ? CP_IN_PROGRESS : CP_ACCEPTED;
       }
       c.goalHeld = c.progress === CP_ACCEPTED || c.progress === CP_IN_PROGRESS;
-      continue;
     }
-    if (c.progress !== CP_CLAIMED && c.progress !== CP_ACCEPTED) continue;
-    const plot = ai.plotContracts[c.id];
-    if (plot !== undefined && owns(plot)) c.progress = CP_COMPLETED;
   }
 }
 

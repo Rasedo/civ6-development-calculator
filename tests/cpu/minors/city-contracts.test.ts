@@ -125,11 +125,11 @@ describe('the city events and trees (CityBuild.cpp, the tree nodes)', () => {
     const ai = newCityAi();
     ai.contracts.push(contract({ id: 4, building: null, progress: CP_ACCEPTED }));
     ai.techContracts[4] = 'TECH_MASONRY';
-    goalsReached(ai, () => false, (g) => g === 'TECH_MASONRY', () => false);
+    goalsReached(ai, () => false, (g) => g === 'TECH_MASONRY');
     expect(ai.contracts[0].progress).toBe(CP_IN_PROGRESS);
-    goalsReached(ai, () => false, () => false, () => false);
+    goalsReached(ai, () => false, () => false);
     expect(ai.contracts[0].progress).toBe(CP_ACCEPTED);
-    goalsReached(ai, (g) => g === 'TECH_MASONRY', () => false, () => false);
+    goalsReached(ai, (g) => g === 'TECH_MASONRY', () => false);
     expect(ai.contracts[0].progress).toBe(CP_COMPLETED);
   });
 

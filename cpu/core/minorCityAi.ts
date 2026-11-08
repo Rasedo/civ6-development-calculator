@@ -1082,8 +1082,7 @@ export function minorAiTurn(state: GameState, cs: CityState, fresh: boolean,
   const w = minorTreeWorld(state, cs, ai, city);
   const r = cs.research;
   goalsReached(ai, (g) => w.techHeld(g) || w.civicHeld(g),
-    (g) => (r.tech !== null && g === installType('tech', r.tech, 'TECH_')) || (r.civic !== null && g === installType('civic', r.civic, 'CIVIC_')),
-    (p) => tileSeat(state.map.tiles[p]) === cs.seat);
+    (g) => (r.tech !== null && g === installType('tech', r.tech, 'TECH_')) || (r.civic !== null && g === installType('civic', r.civic, 'CIVIC_')));
   freeSlots(ai, w, city.id);
   inHandCheck(ai, city, () => minorSetItem(state, cs, null));
   city.current = currentItem(cs);

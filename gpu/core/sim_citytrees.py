@@ -617,9 +617,10 @@ def reap_contracts(ai: CityAi, s: int, w) -> None:
 def goals_reached(ai: CityAi, s: int, w, mask: torch.Tensor) -> None:
     """`goalsReached` where `mask`: the tech and civic contracts whose goal
     the seat holds COMPLETED, the one under research IN PROGRESS (ACCEPTED
-    again off it), the plot contracts whose plot it owns COMPLETED; the
-    research and culture AIs hold a goal contract while it is accepted or in
-    progress (`c_goal_held`)"""
+    again off it); the research and culture AIs hold a goal contract while
+    it is accepted or in progress (`c_goal_held`); a plot purchase contract
+    stays ACCEPTED once its plot is the seat's, to its Contract Manager's
+    Turn Limit"""
     m = mask.unsqueeze(1) & (ai.c_id[:, s] >= 0)
     prog = ai.c_progress[:, s]
     kind = ai.c_goal_kind[:, s]
@@ -631,8 +632,7 @@ def goals_reached(ai: CityAi, s: int, w, mask: torch.Tensor) -> None:
     prog = torch.where(tc, new, prog)
     gk = m & ((kind == GOAL_TECH) | (kind == GOAL_CIVIC))
     ai.c_goal_held[:, s] = torch.where(gk, (prog == CP_ACCEPTED) | (prog == CP_IN_PROGRESS), ai.c_goal_held[:, s])
-    pc = m & (kind == GOAL_PLOT) & ((prog == CP_CLAIMED) | (prog == CP_ACCEPTED)) & _b(w.owns(ai.c_plot[:, s]), goal)
-    ai.c_progress[:, s] = torch.where(pc, torch.full_like(prog, CP_COMPLETED), prog)
+    ai.c_progress[:, s] = prog
 
 
 # -- the events -----------------------------------------------------------
@@ -1476,7 +1476,9 @@ def _x_build_unit(c: _Ctx, i: int, at: torch.Tensor) -> None:
                      progress=CP_CLAIMED, assign=not (rel or False), in_tree=True)
     c.mb[:, i] = torch.where(go, _cget(ai.c_id, s, j), c.mb[:, i])
     submit_contract(ai, s, j, w, c.turn, go)
+    # the tree takes the contract and its tag only where a taker ACCEPTED it
     acc = go & (_cget(ai.c_progress, s, j) == CP_ACCEPTED)
+    _cset(ai.c_in_tree, s, j, False, go & ~acc)
     c.set_tag(i, "Contract ID", _cget(ai.c_id, s, j), acc)
 
 

@@ -9319,3 +9319,45 @@ GPU `_plunder_ok` / `_plunder_trader` / `_trader_immune`
   Movement refused (54:22, 54:23, the routes to Lisbon), unread which test
   refuses (Lisbon's ABILITY_TRADE_ROUTE_PLUNDER_IMMUNITY_SEA, an embarked
   plunderer); Lisbon's suzerain immunity is in neither engine.
+
+## C-96 / C-127: a plot purchase contract lives to its Turn Limit, the pick's best project asks no CanProduce, Build Unit's tree takes only an ACCEPTED contract — READ (0x7f7bf0, 0x5d1f10, 0x7f4240 at 0x7f4270 / 0x7f48db), both twins
+
+- PURCHASE PLOT (0x7f7bf0): the node's contract (+0x30) found (0x7cb8b0)
+  RUNS, whatever the plot's owner; only with none does the owner decide
+  (the player's SUCCEEDS, none RUNS and submits, another FAILS). Nothing
+  marks a plot contract COMPLETED when its plot becomes the player's: it
+  stays ACCEPTED, the Economic AI's purchase list dropping it, to the
+  Build City District tree's Contract Manager (Turn Limit 10), which FAILS
+  it and ends the tree; the next district event re-picks the plot, now
+  owned, and places the district (`goalsReached` / `goals_reached` hold
+  no plot clause). runs/h1_duely1121 city-state 3's contract 505 on 43:20:
+  posted t170, the plot the player's t176 (the purchase list's handle gone,
+  refs 2 -> 1), ACCEPTED to t180, gone with its tree at t181, the
+  Neighbourhood contract 549 at 43:20 at t182; city-state 4's 536 on 31:22
+  (t178, owned t185, gone t189). Unowned, the same limit FAILS it at t+11
+  (every plot contract of the five recordings).
+- THE BEST PROJECT (0x5d1f10): every row of the evaluation's PROJECTS table
+  (+0x38) but the queue head's project (0x179650), strictly higher wins; no
+  CanProduce. The table's gates (0x5ce970) hold no quiet turns, so the
+  walls' repair (OuterDefenseRepair) is valued and picked inside the three
+  turns after a hit; the queue refuses it and the turn builds nothing, the
+  contract in hand losing the turn to the repair's value
+  (`minorPickFacts.canProduce` on `repairWanted`; `_MinorFacts.can_produce`
+  on `_minor_repair`'s wanted; the queue keeps `repairAvailable` /
+  `_minor_repair`). runs/h1_duely1124 Granada t124-126 NO BUILDS AT ALL
+  (its Encampment contract 424 in hand at 3317.0), the repair at 21971.3
+  at t127, the Encampment queued t128; t159-162 / t163; t167-169 / t170;
+  Cardiff t86-88 / t89; runs/h1_duely1128 Hong Kong t139-140 / t141.
+- BUILD UNIT'S EXECUTION (0x7f4240): runs only where the update set +0x98
+  (0x7f4270); after the submission (0x60bb50) +0x90 takes the contract's
+  id, and only an ACCEPTED one (0x7f48db) joins the tree (0x7d1570) and the
+  Contract ID tag. One no taker accepted is held by none and goes; the
+  next tick's update FAILS on +0x90 (`buildUnitNode`, `_x_build_unit`).
+  runs/h1_duely1117 Caguana t222: its new Build City Building tree's Flood
+  Barrier (no PurchaseYield, the city under threat), Build Unit RUNNING,
+  the tree holding no contract, gone at t223.
+- Open: the Free Cities' pick keeps the quiet turns (their queue's refusal
+  not ported); CanConstruct's pillaged-district refusal (+0x2a) is not the
+  eligibility's "for good" byte (+0x1), so what CANCELS runs/h1_duely1124
+  Granada's Barracks contract 693 at t167 (its Encampment pillaged again
+  after t166) is unread.

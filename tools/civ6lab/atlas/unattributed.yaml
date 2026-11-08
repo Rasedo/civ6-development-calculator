@@ -5752,15 +5752,24 @@
 - addr: 0x7f4240
   final: 0x55ba40
   kind: function
-  status: PARTLY
-  impl: [cpu/core/aiContracts.ts:buildUnitNode, gpu/core/sim_citytrees.py:_x_build_unit]
+  name: Build Unit (execution)
+  semantics: runs only where the update set +0x98 (0x7f4270) and the node holds no live contract; makes the contract (0x5f46c0 / 0x5f47c0 / 0x5f45c0 by item), submits it (0x60bb50), +0x90 its id; only an ACCEPTED one (0x7f48db) joins the tree (0x7d1570) and the Contract ID tag (+0x40 / +0x4c).
+  status: READ
+  cases:
+    - recording: h1_duely1117
+      turn: 222
+      value: "Caguana's Build City Building tree, its Flood Barrier taken by none (no PurchaseYield, the city under threat): Build Unit RUNNING, no contract held, the tree gone t223"
+  impl:
+    - cpu/core/aiContracts.ts:buildUnitNode
+    - gpu/core/sim_citytrees.py:_x_build_unit
+    - cpu/core/aiContracts.ts:execute
   readings:
+    - "C-96 / C-127: a plot purchase contract lives to its Turn Limit, the pick's best project asks no CanProduce, Build Unit's tree takes only an ACCEPTED contract — READ (0x7f7bf0, 0x5d1f10, 0x7f4240 at 0x7f4270 / 0x7f48db), both twins"
     - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
     - "C-130 / C-96: a contract's priority in the expected unit count, the strength's treasury flag — READ, both twins"
-  notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...y contract it holds is alive); Add Goal Tech 0x7e7d20 / 0x7e7200; Build Unit 0x7f4e00 / 0x7f4240; Reserve Plot 0x7f7da0 (0x5d74c0: another tree's reservation yields to a value 20.0 a..."
-  review: imported
+  review: reviewed
 - addr: 0x7f4980
   final: 0x55c160
   kind: function

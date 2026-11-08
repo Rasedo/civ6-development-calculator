@@ -356,7 +356,7 @@ for (let i = 0; i + 1 < recs.length; i++) {
     }
     // A: the city's full update, its events, the Default Specialization
     goalsReached(ai, (g) => world.techHeld(g) || world.civicHeld(g),
-      (g) => g === research.tech || g === research.civic, (p) => state.map.tiles[p].ownerSeat === cs.seat);
+      (g) => g === research.tech || g === research.civic);
     freeSlots(ai, world, cityId);
     inHandCheck(ai, cityFacts, () => undefined);
     cityFacts.bestImprovement = pickImprovement(ai, world, evals);

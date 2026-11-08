@@ -1955,6 +1955,12 @@ export function minorPickFacts(state: GameState, cityState: CityState, facts: Ci
       const id = engineId('unit', u, 'UNIT_', UNITS);
       return !!id && minorCanTrain(state, cityState, id);
     },
+    // the pick's best project (0x5d1f10) asks no CanProduce, the PROJECTS
+    // table's gates (0x5ce970) no quiet turns: the repair of damaged walls
+    // is picked inside its three quiet turns, the queue refuses it and the
+    // turn builds nothing (runs/h1_duely1124 Granada t124-126 NO BUILDS AT
+    // ALL, the Encampment contract in hand at 3317.0, the repair at 21971.3
+    // from t127; t159-162 / t163, t167-169 / t170; Cardiff t86-88 / t89)
     canProduce: (p) => {
       const id = engineId('project', p, 'PROJECT_', PROJECTS);
       // the walls' repair while its walls stand damaged, its quiet turns

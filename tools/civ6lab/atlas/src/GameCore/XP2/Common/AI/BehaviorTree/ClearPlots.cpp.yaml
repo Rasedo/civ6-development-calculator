@@ -60,11 +60,21 @@
 - addr: 0x7f7bf0
   final: 0x55ed80
   kind: function
-  status: PARTLY
-  impl: [cpu/core/aiCityTrees.ts:purchasePlot, gpu/core/sim_citytrees.py:_u_purchase]
+  name: Purchase Plot (update)
+  semantics: "the node's contract (+0x30) found (0x7cb8b0) RUNS whatever the plot's owner; with none the plot's owner (+0x1c) decides: the player's SUCCEEDS, none RUNS (+0x34 set: the execution submits), another FAILS. The contract stays ACCEPTED once the plot is owned, to the tree's Contract Manager Turn Limit."
+  status: READ
+  cases:
+    - recording: h1_duely1121
+      turn: 176
+      value: city-state 3's contract 505 on 43:20 posted t170, the plot owned t176, ACCEPTED to t180, gone t181; the district contract 549 at 43:20 t182
+  impl:
+    - cpu/core/aiCityTrees.ts:purchasePlot
+    - cpu/core/aiCityTrees.ts:goalsReached
+    - gpu/core/sim_citytrees.py:_u_purchase
+    - gpu/core/sim_citytrees.py:goals_reached
   readings:
+    - "C-96 / C-127: a plot purchase contract lives to its Turn Limit, the pick's best project asks no CanProduce, Build Unit's tree takes only an ACCEPTED contract — READ (0x7f7bf0, 0x5d1f10, 0x7f4240 at 0x7f4270 / 0x7f48db), both twins"
     - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
-  notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ...0; Move Unit 0x7f0020; Clear Plot 0x7f7960; Build Improvement 0x7e9670; Purchase Plot 0x7f7bf0 / 0x7f6820; Has Player Ability 0x7f1fa0.
-  review: imported
+  review: reviewed
