@@ -144,6 +144,19 @@
   context:
     - "...0x78f5d0); the destination's plot revealed to the player (0x2d2220 on its visibility 0x468320: the byte at visibility +0x2f0; unrevealed -> the next entry, neither tried nor counted..."
   review: reviewed
+- addr: 0x469790
+  final: 0x2f9350
+  kind: function
+  semantics: "the player's AI creation: for an AI player under the game's AI mode its managers' set-up (+0x12d0 0x6093f0, the planning's 0x7921a0, +0x12d8 0x7170b0, the cities' 0x5c27e0, ...); called by the Free Cities' and a tribe's conversion to a minor (0x31d140, 0x8e0c10)."
+  status: READ
+  cases:
+    - recording: AI_Planning.csv
+      value: 0x792c90 plans the units serially on the one   finder (pool count 1) walking its array forward (0x792d05 / 0x792d0a,   0x68 a unit), the order AI_Planning.csv logs;
+  readings:
+    - "C-99: when the pool finder's +0x1bc is written — the danger map at DoTurn, the planning at the AI turn's start, nothing inside a pass — READ (0x46cdd0, 0x717460, 0x6096c0, 0x792c90, 0x7921a0, 0x790890, 0x47ffb0), unported"
+  context:
+    - ...t unit's GetMaxMoves. 0x7921a0 pushes the same job once, at the player's AI creation (0x469790, flag +0x98); 0x790890 at the load (0x480d7e).
+  review: imported
 - addr: 0x469cd0
   final: 0x2f9780
   kind: function

@@ -1857,7 +1857,9 @@
   cases:
     - recording: 1117
       value: "Each DISTRICT of such   a player (the player's +0x1308 -> +0xd8, its district list: every district   placed, built or not — the recordings' city district lists hold districts   under construction — an"
-  readings: ["C-95: the danger map and Move to Safety — READ, ported"]
+  readings:
+    - "C-95: the danger map and Move to Safety — READ, ported"
+    - "C-99: when the pool finder's +0x1bc is written — the danger map at DoTurn, the planning at the AI turn's start, nothing inside a pass — READ (0x46cdd0, 0x717460, 0x6096c0, 0x792c90, 0x7921a0, 0x790890, 0x47ffb0), unported"
   context:
     - ...(DLC GranColombia_Maya), no other. The map is built at the player's DoTurn (0x4e4560 -> 0x46cdd0 at 0x4e4aa4); the engines build it as each tactical pass opens, the hostile units' sear...
   review: reviewed

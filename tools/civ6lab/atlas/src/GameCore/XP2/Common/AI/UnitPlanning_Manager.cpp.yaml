@@ -6,9 +6,11 @@
 - addr: 0x790890
   final: 0x51ba30
   kind: function
+  semantics: "the load's planning: reads the planning manager's state, then pushes the planning job (0x792250) and logs AI_Planning.csv, flag +0x98 set (0x47ffb0 at 0x480d7e)."
   status: PARTLY
   readings:
     - "C-99: a move order's search sets out on the pool finder's +0x1bc, the last full-Movement search's GetMaxMoves — READ (0x26f330, 0x77d10, 0x270d70, 0x26e920, 0x26eea0, 0x26dcd0, 0x26df90, 0x26e2c0, 0x26fe20 at 0x270309), unported"
+    - "C-99: when the pool finder's +0x1bc is written — the danger map at DoTurn, the planning at the AI turn's start, nothing inside a pass — READ (0x46cdd0, 0x717460, 0x6096c0, 0x792c90, 0x7921a0, 0x790890, 0x47ffb0), unported"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ...nits' planning (aiTurnJobs; the planning job 0x792250 -> 0x791b20 is also pushed from 0x790890 and 0x7921a0), the carried operations run as the turn activates, and which unit a plann...
@@ -188,6 +190,7 @@
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
     - "C-99: a move order's search sets out on the pool finder's +0x1bc, the last full-Movement search's GetMaxMoves — READ (0x26f330, 0x77d10, 0x270d70, 0x26e920, 0x26eea0, 0x26dcd0, 0x26df90, 0x26e2c0, 0x26fe20 at 0x270309), unported"
+    - "C-99: when the pool finder's +0x1bc is written — the danger map at DoTurn, the planning at the AI turn's start, nothing inside a pass — READ (0x46cdd0, 0x717460, 0x6096c0, 0x792c90, 0x7921a0, 0x790890, 0x47ffb0), unported"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...aluator 0x5c2650, the barbarian manager's turn 0x1514a0 (barbarians only), the planning 0x791b20, the target list 0x785f30, ..., the operation manager 0x722690 (0x727510: each operatio..."
@@ -225,9 +228,11 @@
 - addr: 0x7921a0
   final: 0x51ce80
   kind: function
+  semantics: "pushes the planning job (0x792250 -> 0x791b20) and logs AI_Planning.csv, once: its flag +0x98 set after; called by the player's AI creation 0x469790."
   status: PARTLY
   readings:
     - "C-99: a move order's search sets out on the pool finder's +0x1bc, the last full-Movement search's GetMaxMoves — READ (0x26f330, 0x77d10, 0x270d70, 0x26e920, 0x26eea0, 0x26dcd0, 0x26df90, 0x26e2c0, 0x26fe20 at 0x270309), unported"
+    - "C-99: when the pool finder's +0x1bc is written — the danger map at DoTurn, the planning at the AI turn's start, nothing inside a pass — READ (0x46cdd0, 0x717460, 0x6096c0, 0x792c90, 0x7921a0, 0x790890, 0x47ffb0), unported"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ...g (aiTurnJobs; the planning job 0x792250 -> 0x791b20 is also pushed from 0x790890 and 0x7921a0), the carried operations run as the turn activates, and which unit a planning ends on.
@@ -280,6 +285,7 @@
     - "H-1: why a seed does not replay — the AI's worker threads — READ, the replay patch MEASURED"
     - "C-95: the unit pathfinder and the planning's reach — READ, confirmed on the Wander draws"
     - "C-96: the city-states' tactical pass — READ (Wander Near City, Heal, the non-barbarian priorities, FindAlternateLocation), the families it needs PARTLY READ"
+    - "C-99: when the pool finder's +0x1bc is written — the danger map at DoTurn, the planning at the AI turn's start, nothing inside a pass — READ (0x46cdd0, 0x717460, 0x6096c0, 0x792c90, 0x7921a0, 0x790890, 0x47ffb0), unported"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "- \"AI Unit Planning\" (0x792c90) is a fork-join: N = min(units, the path finder pool's count) chunks; N <= 1 plans each..."

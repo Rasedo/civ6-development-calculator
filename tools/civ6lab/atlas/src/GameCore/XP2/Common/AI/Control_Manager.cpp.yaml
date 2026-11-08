@@ -167,6 +167,7 @@
     - "C-129: the military AI's upgrade after the look; the Free Cities buy none — READ (0x6096c0's lists, 0x687bf0), both twins"
     - "C-130: the city update's Default Specialization on an empty queue, before the civics AI's turn; the dig sites a major's civic lays before the minors' turns — READ (0x5ce8f0, 0x6096c0's +0x370 list, CultureAI +0x208), both twins"
     - "C-98: a city-state's City Analysis counts its knowledge base as its last turn left it — READ (0x608580 at 0x6085c9, 0x5c24e0 / 0x6fae70 on player signal +0x258, 0x785f30 in 0x6096c0's +0x370 list), both twins"
+    - "C-99: when the pool finder's +0x1bc is written — the danger map at DoTurn, the planning at the AI turn's start, nothing inside a pass — READ (0x46cdd0, 0x717460, 0x6096c0, 0x792c90, 0x7921a0, 0x790890, 0x47ffb0), unported"
   context:
     - "...(0x60a8c0, unread) taken by the player's first job (0x5c2650, before the tribes' turn in 0x6096c0) would not hold a unit raised in the turn. The raid's end: \"C-95: the barbarians' raid\" (..."
     - "- THE TURN (0x6096c0, the player AI's jobs): a first list — the unit evaluator 0x5c2650, the barbarian manag..."

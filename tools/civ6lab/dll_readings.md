@@ -9713,3 +9713,39 @@ the replay's copy for a route's boost), `minorPhase`'s `detectBoosts` after
   Navigation 2 turns, 1124 Bologna t118 Siege Tactics 7) — no turn test in
   Add Goal Tech's update 0x7e7d20, its execution 0x7e7200, the creation
   0x5f4530, the submission 0x60bb50 or the research AI's listener 0x7635c0.
+
+## C-99: when the pool finder's +0x1bc is written — the danger map at DoTurn, the planning at the AI turn's start, nothing inside a pass — READ (0x46cdd0, 0x717460, 0x6096c0, 0x792c90, 0x7921a0, 0x790890, 0x47ffb0), unported
+
+The start Movement of a move order (the section above) changes only where a
+full-Movement search runs, and those run at four places:
+
+- THE DANGER MAP: the player's DoTurn tail (0x4e4560 at 0x4e4aa4 ->
+  0x46cdd0 -> 0x717460), one reach a seen fighting unit of each player at
+  war, in player order then the unit list's; +0x1bc is left at the last
+  one's GetMaxMoves. Its only other caller is the load (0x47ffb0 at
+  0x480d6f).
+- THE PLANNING: aiTurnJobs (0x6096c0) puts the planning job 0x791b20 in its
+  first group (0x6099a2); 0x792c90 plans the units serially on the one
+  finder (pool count 1) walking its array forward (0x792d05 / 0x792d0a,
+  0x68 a unit), the order AI_Planning.csv logs; +0x1bc is left at the last
+  unit's GetMaxMoves. 0x7921a0 pushes the same job once, at the player's AI
+  creation (0x469790, flag +0x98); 0x790890 at the load (0x480d7e).
+- No other reach or planning sets it: the homeland's, the tactical pass's
+  and the trees' searches (Explore, Move Unit, the reaches without the full
+  flag) only read it. Inside a player's pass after its planning the start
+  is one value.
+- The recorded walks against it (runs/h1_duely1124, city-state 4, its last
+  planned unit each turn a 2-Movement one — t91 the Pikeman, t93 the
+  Trebuchet, t94 the Man-At-Arms 1310728): t91 after the planning the Heavy
+  Chariot 983040's 15:10 -> 16:10 fits a start of 2; t94 after the
+  planning its 17:7 -> 18:8 does not (a start of 2 makes 17:7's next node
+  18:6 a later turn's). The moves before the turn's first
+  UnitOperationSegmentComplete (t91 the Catapult 917507, the Warrior
+  851972 and the Catapult 786437; t93 and t94 the Heavy Chariot) are the
+  units' carried operations run as the turn activates, before the planning:
+  they would set out on the danger map's last unit (t94 a 2, t93 a 3 or 4,
+  t91 the Warrior's 1 or 4).
+- Open: the t94 run after the planning (17:7 -> 18:8) against the planning's
+  last unit; the danger map's last seen unit at DoTurn (the engines' sight
+  at that moment against the game's); the carried operations at the turn's
+  activation, which the engines do not keep across turns.
