@@ -3,6 +3,16 @@
 # `review: imported` = bootstrapped from dll_readings.md / code comments / saved
 # labels and not yet reviewed: verify against the disassembly, then edit and
 # set `review: reviewed`.
+- addr: 0x790890
+  final: 0x51ba30
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-99: a move order's search sets out on the pool finder's +0x1bc, the last full-Movement search's GetMaxMoves — READ (0x26f330, 0x77d10, 0x270d70, 0x26e920, 0x26eea0, 0x26dcd0, 0x26df90, 0x26e2c0, 0x26fe20 at 0x270309), unported"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - ...nits' planning (aiTurnJobs; the planning job 0x792250 -> 0x791b20 is also pushed from 0x790890 and 0x7921a0), the carried operations run as the turn activates, and which unit a plann...
+  review: imported
 - addr: 0x790c60
   final: 0x51bd50
   kind: function
@@ -177,6 +187,7 @@
   readings:
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
+    - "C-99: a move order's search sets out on the pool finder's +0x1bc, the last full-Movement search's GetMaxMoves — READ (0x26f330, 0x77d10, 0x270d70, 0x26e920, 0x26eea0, 0x26dcd0, 0x26df90, 0x26e2c0, 0x26fe20 at 0x270309), unported"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...aluator 0x5c2650, the barbarian manager's turn 0x1514a0 (barbarians only), the planning 0x791b20, the target list 0x785f30, ..., the operation manager 0x722690 (0x727510: each operatio..."
@@ -196,6 +207,7 @@
     - "C-95: the unit pathfinder and the planning's reach — READ, confirmed on the Wander draws"
     - "C-95: the planning sets out on the full Movement, the walk on the turn's restored — READ (the planning), FIT (the restore's place)"
     - "C-95: the planning sets out on the full Movement, the walk on the turn's restored"
+    - "C-99: a move order's search sets out on the pool finder's +0x1bc, the last full-Movement search's GetMaxMoves — READ (0x26f330, 0x77d10, 0x270d70, 0x26e920, 0x26eea0, 0x26dcd0, 0x26df90, 0x26e2c0, 0x26fe20 at 0x270309), unported"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ...h finder pool's count) chunks; N <= 1 plans each unit serially on the calling thread (0x791e00 per unit), else N-1 jobs, chunk 0 inline, then the wait. The pool (0xf01920, count at +...
@@ -209,6 +221,16 @@
     - gpu/core/sim_tactics.py:_WANDER_CAMP_RANGE
     - cpu/core/tactical.ts:planUnit
   notes: ["imported: cited by the code, in no dll_readings section"]
+  review: imported
+- addr: 0x7921a0
+  final: 0x51ce80
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-99: a move order's search sets out on the pool finder's +0x1bc, the last full-Movement search's GetMaxMoves — READ (0x26f330, 0x77d10, 0x270d70, 0x26e920, 0x26eea0, 0x26dcd0, 0x26df90, 0x26e2c0, 0x26fe20 at 0x270309), unported"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - ...g (aiTurnJobs; the planning job 0x792250 -> 0x791b20 is also pushed from 0x790890 and 0x7921a0), the carried operations run as the turn activates, and which unit a planning ends on.
   review: imported
 - addr: 0x7921e0
   final: 0x51cec0
@@ -234,6 +256,16 @@
   context:
     - ...otherwise the larger of combat and ranged) onto the plots of its 1-turn planning reach (0x7921e0 -> 0x26df90) and every plot within its range (0x56e3d0) of them; a unit with the flag +...
   review: reviewed
+- addr: 0x792250
+  final: 0x51cf30
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-99: a move order's search sets out on the pool finder's +0x1bc, the last full-Movement search's GetMaxMoves — READ (0x26f330, 0x77d10, 0x270d70, 0x26e920, 0x26eea0, 0x26dcd0, 0x26df90, 0x26e2c0, 0x26fe20 at 0x270309), unported"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - ...ch player's danger map at its DoTurn, its units' planning (aiTurnJobs; the planning job 0x792250 -> 0x791b20 is also pushed from 0x790890 and 0x7921a0), the carried operations run as t...
+  review: imported
 - addr: 0x792c90
   kind: function
   semantics: "the planning's turn-start read of the revealed plots (once at the AI's turn start). \"AI Unit Planning\": a fork-join over N = min(units, the path finder pool's count) chunks; N <= 1 plans each unit serially on the calling thread (0x791e00 per unit), else N-1 jobs, chunk 0 inline, then the wait."

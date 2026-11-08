@@ -9627,3 +9627,52 @@ gpu/core/sim_cityvalue.py `_cv_known`).
   the records at the operations' tick) reads the table +0x258 built — the
   stored table's sums would then hold the same records; no recorded case
   tells the two apart.
+
+## C-99: a move order's search sets out on the pool finder's +0x1bc, the last full-Movement search's GetMaxMoves — READ (0x26f330, 0x77d10, 0x270d70, 0x26e920, 0x26eea0, 0x26dcd0, 0x26df90, 0x26e2c0, 0x26fe20 at 0x270309), unported
+
+The engines' move order (`orderOnce` / `walk`, cpu/core/tactical.ts;
+`_tac_move_to`, gpu/core/sim_tactics.py) searches once on the unit's
+Movement left and walks the path's first turn. The game:
+
+- THE START NODE: GeneratePath (0x77d10) prices its start through the
+  instance's +0x60 / +0x68 callback with no parent (0x7804b..0x7805d: edx
+  0, r9d 0). The pool's instances (0x26f330) lay 0x270d70 there; it calls
+  the step cost 0x26e920, which with no parent takes the Movement from the
+  finder's +0x1bc (0x26e98a), turn 1, carry 0, stored as the node's +0x28 /
+  +0x2c / +0x20. The pool's own start callback (+0xa0 / +0xa8) is the pool
+  init 0x2715a0, which writes no +0x1bc.
+- THE ONE WRITER: 0x26eea0 (+0x1bc = the formation's GetMaxMoves 0x266660
+  << 8), laid at +0xa8 only by the breadth-first searches with their third
+  argument set (0x26dcd0 at 0x26de4c, 0x26df90 at 0x26e10c); they put the
+  pool's callbacks back afterwards, not +0x1bc. Callers with it set: AI
+  Unit Planning (0x791e00 -> 0x26dcd0, r8b 1) and the danger map's reach
+  (0x716400 -> 0x26df90 at 0x716739, r8b 1); Explore (0x70aadd),
+  GetReachableMovement (0x1395e0) and the Lua reaches at 0x13975d /
+  0x139aa1 pass 0. No other store to a finder's +0x1bc in either build
+  (FinalRelease: 0x1a74e0 alone).
+- THE POOL: 0x26e2c0 hands out the first free finder of the pool at
+  0xf01920; under the recordings' MaxGameCoreUnitMovementThreads 1 (H-1)
+  it holds one. So every move order, Explore reach and other reach without
+  the full flag sets out on the GetMaxMoves of the formation the last
+  planning or danger search began from, whoever's, held across players and
+  turns; the order's own Movement only bounds its step.
+- THE STEP (0x26fe20) searches again from the formation's plot each run and
+  takes the node after its start: one of a later turn waits (-1,
+  0x26ff81); else the step's cost on the formation's own Movement (+0x218,
+  0x270215 -> 0x270be0 / 0x270980), above it once the formation moved
+  (+0x4b8 set), waits too (0x270309, -1).
+- The recorded walks (one-seed traces of runs/h1_duely1124, the path from
+  each plot under each start): t93 city-state 4's Heavy Chariot 983040 for
+  32:8, 18:9 -> 17:9 -> 16:9 -> 16:8, steps from 16:9 only on a start of 3
+  or 4 (on its 1 left the path turns back to 17:9); t94 the same order run
+  as the turn activates, 16:8 -> 17:8 -> 17:7, waits there with 1 left —
+  only a start of 2 makes 17:7's next node (18:6) a later turn's — and its
+  later run steps 17:7 -> 18:8 (a start of 1, 3 or 4); t91 the Warrior
+  851972 36:7 -> 35:7 -> 35:8 (from 35:7 a start of 1 or 4) and later in
+  the pass the Heavy Chariot 14:10 -> 15:10 -> 16:10 -> 17:10 (from 15:10 a
+  start of 2 only).
+- Open: the order of the full searches through a turn, which the start
+  follows — each player's danger map at its DoTurn, its units' planning
+  (aiTurnJobs; the planning job 0x792250 -> 0x791b20 is also pushed from
+  0x790890 and 0x7921a0), the carried operations run as the turn
+  activates, and which unit a planning ends on.
