@@ -23,6 +23,7 @@
     - "H-1: an annex re-places the citizens, the garrison's unit, a religious unit killed on a move — READ"
     - "H-1: a civilian stepped on — READ"
     - "C-101 / C-95: the attack carried out condemns a religious target's heretics, a move order walks onto a religious unit's plot — READ (0x771f80 at 0x772331 / 0x7725c9 / 0x7727fa, 0x776140 at 0x776424..0x776470 / 0x777045, 0x947dd0, 0x89c6f0, 0x89cc00), both twins"
+    - "C-101: the owner's religion percent is Scripture's, a religion swing walks every player's cities — READ, both twins"
   context:
     - "- A unit's move onto a plot holding a religious unit it kills (0x26fe20 → 0x493f80 with the capture flag 1) swings religion: RELIGION_SPREAD_ UNIT_CAPTURE (gp +0x600, 125..."
     - ...ls 0x212500(victim, mover, plot, ...); a 0 back destroys the victim (the religion swing 0x493f80 with the capture flag 1), a 1 or a 2 leaves it be. The mover then completes its step.
@@ -152,7 +153,7 @@
 - addr: 0x4975a0
   final: 0x315650
   kind: function
-  semantics: "the owner religion's pressure percent: +0x6d0, plus +0x790 while its +0x730 entry holds."
+  semantics: "the city owner's PlayerReligion pressure percent: m_iSpreadMultiplier (+0x6d0), plus m_iTechEnabledSpreadMultiplier (+0x790) while the player knows m_eSpreadEnhancingTech (+0x730); written by EFFECT_ADJUST_RELIGIOUS_SPREAD_STRENGTH (Scripture 25, TECH_PRINTING, 25)."
   status: READ
   cases:
     - recording: h1_duelw1118
@@ -160,7 +161,17 @@
       value: "Recorded: runs/h1_duelw1118   Armagh, a city-state with a Holy Site, reads GetPressureFromCity 8 on every   record whose queue Prayers heads (t68–85, t116–130, t139–156, t212 on) and   4 on the rest ("
     - recording: 1107
       value: 1107 Kandy's 8 against 4.
-  readings: ["C-94: the religious spread — READ"]
+    - recording: h1_duelp1117
+      value: "no Scripture founder on the five duelp recordings: city.pressureOut equal (the owner's percent 0) on every record"
+  impl:
+    - cpu/core/game.ts:pressureFromCity
+    - cpu/data/religion.ts:ENHANCER_BELIEFS
+    - gpu/core/sim_economy.py:_spread_religious_pressure
+    - cpu/core/game.ts:project
+    - cpu/data/religion.ts:BeliefEffects
+  readings:
+    - "C-94: the religious spread — READ"
+    - "C-101: the owner's religion percent is Scripture's, a religion swing walks every player's cities — READ, both twins"
   context:
     - ..._SITE_PRESSURE_MULTIPLIER (+0x5e8) with a Holy Site; then x (100 + the owner religion's 0x4975a0 + the city's +0xd4 (MODIFIER_SINGLE_CITY_RELIGION_PRESSURE, the Bishop) + the queue t...
   review: reviewed
@@ -226,6 +237,8 @@
     - cpu/data/cityStates.ts:VATICAN_GP_PRESSURE
     - cpu/data/religion.ts:THEO_PRESSURE_RANGE
     - gpu/core/sim_gp.py:_gp_activated_pressure
+  readings:
+    - "C-101: the owner's religion percent is Scripture's, a religion swing walks every player's cities — READ, both twins"
   notes: ["imported: cited by the code, in no dll_readings section"]
   review: imported
 - addr: 0x498570
@@ -262,7 +275,16 @@
 - addr: 0x498860
   final: 0x3165b0
   kind: function
-  status: PARTLY
-  impl: [cpu/data/cityStates.ts:VATICAN_GP_PRESSURE]
-  notes: ["imported: cited by the code, in no dll_readings section"]
-  review: imported
+  semantics: "a religion swing or pressure burst over the cities in range: walks the game's player list (+0x7f8), every player's cities (the majors', the city-states', the Free Cities'), from 0x493f80 (a religious unit's loss) and 0x497d40 (the Great Person burst)."
+  status: READ
+  cases:
+    - recording: h1_duelp1124
+      turn: 134
+      value: "a barbarian kills China's embarked Missionary 1:3604494 off 30:7: Bologna (a city-state) -125 beside the route's +0.5"
+  impl:
+    - cpu/core/game.ts:swingCities
+    - cpu/data/cityStates.ts:VATICAN_GP_PRESSURE
+    - gpu/core/sim_seats.py:_condemn_heretic
+  readings:
+    - "C-101: the owner's religion percent is Scripture's, a religion swing walks every player's cities — READ, both twins"
+  review: reviewed

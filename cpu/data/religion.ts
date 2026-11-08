@@ -71,7 +71,11 @@ export interface BeliefEffects {
   /** NO BELIEF CARRIES THIS since GS's SCRIPTURE dropped the charge clause —
    *  see `tradeReligionYields`; cpu/core/game.ts still reads the field. */
   missionaryChargeBonus?: number;
-  spreadPressureMult?: number;
+  /** CIV6 (EFFECT_ADJUST_RELIGIOUS_SPREAD_STRENGTH): the founder's
+   *  SpreadMultiplier, a percent on each of its cities' pressure step, and
+   *  TechEnabledSpreadMultiplier beside it while the founder knows
+   *  EnhancingTechType (GameCore_XP2 0x4975a0 in 0x1f33e0). */
+  cityPressurePct?: { pct: number; tech: string; techPct: number };
   /** CIV6 (MODIFIER_PLAYER_CITIES_ADJUST_UNIT_PURCHASE_COST): the percent off
    *  each named unit's purchase. */
   unitBuyOffPct?: Partial<Record<string, number>>;
@@ -368,10 +372,12 @@ const BELIEF_SRC: Readonly<Record<string, SrcMap>> = {
       xml('ModifierArguments', 'ModifierId=ITINERANT_PREACHERS_SPREAD_DISTANCE&Name=DistanceChange', 'Value'),
   },
   SCRIPTURE: {
-    'effects.spreadPressureMult': {
-      derived: '1 + SpreadMultiplier/100 — the install writes the PERCENT (25), the catalog the multiplier',
-      inputs: [xml('ModifierArguments', 'ModifierId=SCRIPTURE_SPEAD_STRENGTH&Name=SpreadMultiplier', 'Value')],
+    'effects.cityPressurePct.pct': xml('ModifierArguments', 'ModifierId=SCRIPTURE_SPEAD_STRENGTH&Name=SpreadMultiplier', 'Value'),
+    'effects.cityPressurePct.tech': {
+      derived: 'EnhancingTechType less its TECH_ prefix',
+      inputs: [xml('ModifierArguments', 'ModifierId=SCRIPTURE_SPEAD_STRENGTH&Name=EnhancingTechType', 'Value', { expect: 'TECH_PRINTING' })],
     },
+    'effects.cityPressurePct.techPct': xml('ModifierArguments', 'ModifierId=SCRIPTURE_SPEAD_STRENGTH&Name=TechEnabledSpreadMultiplier', 'Value'),
   },
   JUST_WAR: {
     'effects.combatNearFollowing':
@@ -570,11 +576,13 @@ export const ENHANCER_BELIEFS: Record<string, BeliefDef> = Object.fromEntries(
     B('ITINERANT_PREACHERS', 'Itinerant Preachers', 'Religious pressure spreads three tiles further.', {
       pressureRangeBonus: 3,
     }),
-    // GS's SCRIPTURE_SPEAD_STRENGTH carries SpreadMultiplier 25 and nothing
-    // else that this catalog has a column for: no spread-charge argument
-    // anywhere in the install, so this row grants no missionary charge.
-    B('SCRIPTURE', 'Scripture', 'Religious spreads land 25% more pressure.', {
-      spreadPressureMult: 1.25, // lump 200 → 250
+    // GS's SCRIPTURE_SPEAD_STRENGTH (EFFECT_ADJUST_RELIGIOUS_SPREAD_STRENGTH)
+    // writes the founder's PlayerReligion m_iSpreadMultiplier,
+    // m_eSpreadEnhancingTech and m_iTechEnabledSpreadMultiplier, which the
+    // city pressure step reads (0x4975a0) and a religious unit's spread does
+    // not; no spread-charge argument anywhere in the install.
+    B('SCRIPTURE', 'Scripture', 'Religious spread from adjacent city pressure is 25% stronger, 50% once Printing is researched.', {
+      cityPressurePct: { pct: 25, tech: 'PRINTING', techPct: 25 },
     }),
     B('JUST_WAR', 'Just War', '+10 combat strength near cities following your religion.', {
       combatNearFollowing: 10, // within JUST_WAR_RANGE, unit-vs-unit
@@ -761,8 +769,7 @@ export function gainPopulationPressure(
 /** CIV6 (RELIGION_SPREAD_STRENGTH_MULTIPLIER 200): a full-health Spread
  * lands this percent of the unit's ReligiousStrength on the target city — a
  * Missionary 200, an Apostle 220 (runs/h1_duelw1104 Nanjing t233, 1108 Rome
- * t108); SCRIPTURE multiplies it x1.25 — SCRIPTURE_SPEAD_STRENGTH's
- * SpreadMultiplier is a PERCENT. */
+ * t108). */
 export const SPREAD_STRENGTH_PCT = 200;
 
 /** how a city's citizens are shared among its religions and THE UNCONVERTED

@@ -52,7 +52,7 @@ import { srcConst, xml } from '../data/provenance';
 import { rowIsFor } from '../data/civilizations';
 import type { CivId, LeaderId } from '../../world/roster';
 import { majorCityTradeList } from './aiTrade';
-import { BARB_SEAT, allCities, grantFoundingPressure, majorityReligionOf, prophetsOf, citiesOf, civOf, emptySeat, isBarbSeat, isCityStateSeat, isCiv, markCityCentre, seatOf, setTileOwner, tileClaimed, tileSeat, unitSeat, visibilityCS, allianceTheoCS, alliedAtLevel, civVariantOf , leaderOf, onHomeContinent, civLevelOf } from './seats';
+import { BARB_SEAT, grantFoundingPressure, majorityReligionOf, prophetsOf, citiesOf, civOf, emptySeat, isBarbSeat, isCityStateSeat, isCiv, markCityCentre, seatOf, setTileOwner, tileClaimed, tileSeat, unitSeat, visibilityCS, allianceTheoCS, alliedAtLevel, civVariantOf , leaderOf, onHomeContinent, civLevelOf } from './seats';
 import { irradiated } from './nuclear';
 import { formationBanned } from './units';
 import { giveEraQuests } from './quests';
@@ -1030,17 +1030,27 @@ export function condemnHeretic(state: GameState, unit: Unit): RuleResult {
   return { ok: true };
 }
 
+/** The cities a religion swing or a pressure burst walks (GameCore_XP2
+ *  0x498860: every player of the game's list, +0x7f8): the majors' cities,
+ *  the living city-states' and the Free Cities' (runs/h1_duelp1124 t134: a
+ *  barbarian kills China's embarked Missionary by Bologna, -125 in the
+ *  city-state). */
+function swingCities(state: GameState): { centerIndex: number; religionPressure?: number[] }[] {
+  return [...state.seats.flatMap((sx) => sx.cities), ...(state.cityStates ?? []).filter((cs) => cs.centerIndex >= 0),
+    ...(state.freeSeat?.cities ?? [])];
+}
+
 /** A religious unit of religion `loser` killed by a military unit at
  *  `tileIndex` — condemned, or one a moving unit kills on its path (the DLL's
  *  religion swing 0x493f80 with its capture flag, from the condemn command
- *  0x89cc00 and the move 0x26fe20 alike): every city within
+ *  0x89cc00 and the move 0x26fe20 alike): every city of every player within
  *  RELIGION_SPREAD_RANGE_UNIT_CAPTURE sheds RELIGION_SPREAD_UNIT_CAPTURE of
  *  that religion's pressure (`theoLoss`), floored at 0. */
 export function religiousUnitLost(state: GameState, loser: number, tileIndex: number): void {
   const nRel = state.seats.length;
   const dt = state.map.tiles[tileIndex];
   const loss = theoLoss(state, loser, CONDEMN_PRESSURE_SWING);
-  for (const c of allCities(state)) {
+  for (const c of swingCities(state)) {
     const ct = state.map.tiles[c.centerIndex];
     if (hexDistance(state.map, dt.col, dt.row, ct.col, ct.row) > CONDEMN_PRESSURE_RANGE) continue;
     let pres = c.religionPressure;
@@ -1902,7 +1912,7 @@ function theologicalCombatPhase(state: GameState): void {
     if (winnerRel >= 0) {
       const dt = state.map.tiles[def.hp <= 0 ? def.tileIndex : att.tileIndex];
       const loss = loserRel >= 0 ? theoLoss(state, loserRel, THEO_PRESSURE_SWING) : 0;
-      for (const c of allCities(state)) {
+      for (const c of swingCities(state)) {
         const ct = state.map.tiles[c.centerIndex];
         if (hexDistance(state.map, dt.col, dt.row, ct.col, ct.row) > THEO_PRESSURE_RANGE) continue;
         let pres = c.religionPressure;
@@ -1963,8 +1973,14 @@ export function pressureFromCity(state: GameState, city: City, g: number): numbe
   // heads its queue, 4 otherwise
   const head = city.queue[0];
   const project = head?.kind === 'project' ? head.project : cityStateAt(state, city.centerIndex)?.buildProject;
+  // the OWNER's religion percent (0x4975a0: Scripture's SpreadMultiplier, its
+  // TechEnabledSpreadMultiplier once the owner knows Printing), whatever
+  // religion the city follows
+  const owner = isCiv(city.seat) ? seatOf(state, city.seat) : undefined;
+  const sp = owner?.religion.founded && owner.religion.enhancer ? ENHANCER_BELIEFS[owner.religion.enhancer]?.effects.cityPressurePct : undefined;
+  const ownerPct = sp ? sp.pct + (owner!.research.techs.includes(sp.tech) ? sp.techPct : 0) : 0;
   const pct = (governorTileMult(state, tiles[city.centerIndex], (e) => e.pressureMult) - 1) * 100
-    + (project ? PROJECTS[project]?.pressurePct ?? 0 : 0);
+    + (project ? PROJECTS[project]?.pressurePct ?? 0 : 0) + ownerPct;
   return (RELIGION_PRESSURE_PER_TURN * mult * (100 + pct)) / 100;
 }
 
@@ -1984,10 +2000,7 @@ export function gpActivatedPressure(state: GameState, seat: number, tileIndex: n
   if (g < 0) return;
   const nRel = state.seats.length;
   const at = state.map.tiles[tileIndex];
-  const minors = (state.cityStates ?? []).filter((cs) => cs.centerIndex >= 0);
-  const cities: { centerIndex: number; religionPressure?: number[] }[] = [
-    ...state.seats.flatMap((sx) => sx.cities), ...minors, ...(state.freeSeat?.cities ?? [])];
-  for (const c of cities) {
+  for (const c of swingCities(state)) {
     const ct = state.map.tiles[c.centerIndex];
     if (hexDistance(state.map, at.col, at.row, ct.col, ct.row) > THEO_PRESSURE_RANGE) continue;
     if (!c.religionPressure || c.religionPressure.length !== nRel) c.religionPressure = new Array(nRel).fill(0);

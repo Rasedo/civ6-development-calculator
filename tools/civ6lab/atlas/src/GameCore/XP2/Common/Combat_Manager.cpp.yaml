@@ -63,6 +63,7 @@
   status: PARTLY
   readings:
     - "C-98: a lump of Science or Culture completes the item in hand — READ (0x4c8e60, 0x4c8ea0, 0x3938e0, 0x393670), both twins"
+    - "C-101: the owner's religion percent is Scripture's, a religion swing walks every player's cities — READ, both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...60 / 0x3938e0: GrantYield 0x468540, the harvest 0x95fbf0, 0x93ec40, 0x536480, 0x1fc390, 0x1fce20."
@@ -505,6 +506,7 @@
       value: "Recorded: 1121 t110, a barbarian   on China's Missionary beside Taiyuan, −125 in Xi'an and Taiyuan   (`religiousUnitLost`, the harness replaying the log's kill)."
   readings:
     - "H-1: an annex re-places the citizens, the garrison's unit, a religious unit killed on a move — READ"
+    - "C-101: the owner's religion percent is Scripture's, a religion swing walks every player's cities — READ, both twins"
   context:
     - "...player's +0x4f0 percent; the condemn command (0x89cc00, 0x947f10) and a combat kill (0x20e720, 0x212c30) pass the same flag. Recorded: 1121 t110, a barbarian on China's Missionary b..."
   review: reviewed
@@ -565,6 +567,7 @@
       value: "Recorded: 1121 t110, a barbarian   on China's Missionary beside Taiyuan, −125 in Xi'an and Taiyuan   (`religiousUnitLost`, the harness replaying the log's kill)."
   readings:
     - "H-1: an annex re-places the citizens, the garrison's unit, a religious unit killed on a move — READ"
+    - "C-101: the owner's religion percent is Scripture's, a religion swing walks every player's cities — READ, both twins"
   context:
     - "...+0x4f0 percent; the condemn command (0x89cc00, 0x947f10) and a combat kill (0x20e720, 0x212c30) pass the same flag. Recorded: 1121 t110, a barbarian on China's Missionary beside Taiy..."
   review: reviewed

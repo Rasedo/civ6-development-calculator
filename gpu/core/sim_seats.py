@@ -5022,15 +5022,16 @@ class SimSeats:
         los = self.unit_seat[cr, rel[cr]]
         dt = tile[cr]
         n = cr.numel()
-        ctr = self.city_center[cr][:, :nrow]
+        # every player's city rows, the city-states' and the Free Cities' with
+        # the majors' (`swingCities`)
+        ctr = self.city_center[cr]
         near = (
             self.pair_dist[ctr.clamp(min=0).reshape(n, -1), dt.unsqueeze(1)]
-            .reshape(n, nrow, self.RC) <= self._condemn_range
-        ) & self.city_alive[cr][:, :nrow]
+            .reshape(ctr.shape) <= self._condemn_range
+        ) & self.city_alive[cr]
         _loss = self._theo_loss(cr, los, self._condemn_swing)
         for k in range(n):
-            msk = torch.zeros_like(self.city_alive[cr[k]])
-            msk[:nrow] = near[k]
+            msk = near[k]
             if not bool(msk.count_nonzero()):
                 continue
             _cur = self.city_pressure[cr[k], msk, los[k]]
@@ -5289,15 +5290,15 @@ class SimSeats:
                 dr, dt = rows[any_dead], dead_tile[any_dead]
                 wr, lr = win[any_dead], los[any_dead]
                 n = dr.numel()
-                ctr = self.city_center[dr][:, :nrow]
+                # every player's city rows (`swingCities`)
+                ctr = self.city_center[dr]
                 near = (
                     self.pair_dist[ctr.clamp(min=0).reshape(n, -1), dt.unsqueeze(1)]
-                    .reshape(n, nrow, self.RC) <= self._theo_range
-                ) & self.city_alive[dr][:, :nrow]
+                    .reshape(ctr.shape) <= self._theo_range
+                ) & self.city_alive[dr]
                 _loss = self._theo_loss(dr, lr, sw)
                 for k in range(n):
-                    msk = torch.zeros_like(self.city_alive[dr[k]])
-                    msk[:nrow] = near[k]
+                    msk = near[k]
                     if not bool(msk.count_nonzero()):
                         continue
                     self.city_pressure[dr[k], msk, wr[k]] += sw

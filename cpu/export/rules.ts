@@ -433,7 +433,10 @@ const beliefRow = (def: { effects: BeliefEffects }) => ({
   // Missionary channels — pre-rounded INTEGERS so both engines read the
   // identical value (the GPU indexes these by civ_only_enhancer + a base-value pad):
   mchg: def.effects.missionaryChargeBonus ?? 0,  // Scripture +1 charge
-  spreadMult: def.effects.spreadPressureMult ?? 1,  // Scripture 1.25
+  // Scripture: the founder's city pressure percent, and its tech's (-1 none)
+  presPct: def.effects.cityPressurePct?.pct ?? 0,
+  presTechPct: def.effects.cityPressurePct?.techPct ?? 0,
+  presTech: def.effects.cityPressurePct ? techIdx.get(def.effects.cityPressurePct.tech) ?? -1 : -1,
   // Holy Order: the percent off each unit's purchase, in unit table order
   buyOff: Object.keys(UNITS).map((id) => def.effects.unitBuyOffPct?.[id] ?? 0),
   impY: IMPROVEMENT_IDS.map((id) => YIELD_KEYS.map((k) => def.effects.improvementYields?.[id]?.[k] ?? 0)),

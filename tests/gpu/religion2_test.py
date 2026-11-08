@@ -21,7 +21,7 @@ Covered (all gate-unreachable):
   3. Missionary BUY gating — cap 2 (no third), no Shrine (no buy), incomplete /
      pillaged Holy Site (no buy).
   4. Missionary WALK — driver policy, not engine; only the SPREAD half is poked.
-  5. Missionary SPREAD — the +200 lump (250 SCRIPTURE, x1.25) into the target city's
+  5. Missionary SPREAD — the +200 lump (SCRIPTURE leaves it be) into the target city's
      accumulator for g, charge −1, and death (major_unit_alive False, tile cleared) at 0.
   6. ITINERANT_PREACHERS presR — widens the religion's spread range by exactly 3.
   7. Enhancer COMBAT CS — JUST_WAR near (atk+def +10), DEFENDER of the faith on
@@ -83,7 +83,7 @@ def enh_rows(sim) -> dict:
 
     return {
         "ITINERANT": row(e["presR"] > 0),
-        "SCRIPTURE": row(e["spreadMult"] != e["spreadMult"][0]),
+        "SCRIPTURE": row(e["presPct"] > 0),
         "JUST_WAR": row(e["cnear"] != 0),
         "DEFENDER": row(e["cdef"] != 0),
         "HOLY_ORDER": row(e["buyOff"].sum(dim=1) > 0),
@@ -403,8 +403,8 @@ def drive_spread(sim, r: int, u: int, target: int) -> None:
 
 
 def poke_missionary_spread(rules, rj, path):
-    """5. A missionary within 1 of a non-following target adds the lump (200 base,
-    250 SCRIPTURE) to that city's accumulator for g, spends a charge, and dies at
+    """5. A missionary within 1 of a non-following target adds the lump (200, with
+    SCRIPTURE too) to that city's accumulator for g, spends a charge, and dies at
     0 charges (tile cleared)."""
     def run(enh_idx, expect_lump, charges):
         sim = build(rules, path)
@@ -431,15 +431,15 @@ def poke_missionary_spread(rules, rj, path):
         return sim, u, nb
 
     # base lump 10, charges 2 -> survives at 1
-    # CIV6 (RELIGION_SPREAD_STRENGTH_MULTIPLIER 200): the full-health lump; Scripture x1.25
+    # CIV6 (RELIGION_SPREAD_STRENGTH_MULTIPLIER 200): the full-health lump
     sim, u, nb = run(None, 200, charges=2)
     assert bool(sim.major_unit_alive[0, u]) and int(sim.major_unit_charges[0, u]) == 1, "spread must drop a charge and survive at 1"
 
-    # SCRIPTURE lump 250 (SpreadMultiplier 25 is a percent), charges 1 -> dies at 0
-    sim2, u2, nb2 = run("SCRIPTURE", 250, charges=1)
+    # SCRIPTURE raises the city pressure step, not a unit's spread; charges 1 -> dies at 0
+    sim2, u2, nb2 = run("SCRIPTURE", 200, charges=1)
     assert not bool(sim2.major_unit_alive[0, u2]), "missionary must die at 0 charges"
     assert int(sim2.civilian_at[0, nb2]) < 0, "dead missionary's tile must be cleared"
-    print("  5 missionary spread OK (+200 base / +250 SCRIPTURE, charge -1, death at 0)")
+    print("  5 missionary spread OK (+200 base and SCRIPTURE, charge -1, death at 0)")
 
 
 def poke_presr(rules, rj, path):

@@ -12587,3 +12587,37 @@ third: slot 2 CanStart, slot 4 the tick, slot 5 the update).
   of city-state 4's Warriors 131073 (37:8, its own plot) and 196610 (37:9)
   on the barbarian Warrior 3080212 on 38:8 that the engines' exchange
   filter keeps (taken 58 / 56 against 62 / 64).
+
+## C-101: the owner's religion percent is Scripture's, a religion swing walks every player's cities — READ, both twins
+
+- THE OWNER'S PERCENT in the city step 0x1f33e0 (0x4975a0 on the city
+  owner's PlayerReligion, player +0x1340): m_iSpreadMultiplier (+0x6d0),
+  plus m_iTechEnabledSpreadMultiplier (+0x790) while the owner knows
+  m_eSpreadEnhancingTech (+0x730, HasTech 0x4cb2f0); the property names
+  from PlayerReligion's constructor (0x490180 at 0x4916b8 / 0x49174f /
+  0x4917ed). Their one writer in the install is
+  EFFECT_ADJUST_RELIGIOUS_SPREAD_STRENGTH (its argument parse 0xb69d50:
+  SpreadMultiplier, EnhancingTechType, TechEnabledSpreadMultiplier),
+  Scripture's SCRIPTURE_SPEAD_STRENGTH: 25, TECH_PRINTING, 25
+  (LOC_BELIEF_SCRIPTURE_DESCRIPTION "Religious spread from adjacent city
+  pressure is 25% stronger. Boosted to 50% once Printing is researched").
+  The percent sums with the Bishop's and the queue project's; a religious
+  unit's spread (0x968e20) does not read it. Ported as the founder's
+  `cityPressurePct` in `pressureFromCity` / `_spread_religious_pressure`,
+  the unit spread's Scripture multiplier deleted (`spreadFromUnit`, the
+  GPU's Spread arm). No duelp recording founds Scripture (the five hold
+  Choral Music / Feed the World, Cathedral / Wat, Missionary Zeal, Lay
+  Ministry): no case.
+- THE SWING'S CITIES: 0x493f80 (a religious unit's loss, condemned, killed
+  in combat or on a move) hands its winner, victim and amounts to
+  0x498860, which walks the game's player list (+0x7f8) as the spread and
+  the Great Person burst (0x497d40) do: the majors', the city-states' and
+  the Free Cities' cities (`swingCities`, `_condemn_heretic`). The engines'
+  theological combat swing takes the same cities (its caller of 0x493f80
+  among 0x1fce20 / 0x20e720 / 0x212c30 unread). runs/h1_duelp1124 t134: a barbarian (63:1966102) kills China's
+  embarked Missionary 1:3604494 off 30:7, Bologna (a city-state) -125 with
+  the route's +0.5 (step.pressure, its only miss across the five).
+- The per-turn check takes the city-states' pressure (step.pressure on
+  every city-state's city across its pair): equal on the five duelp
+  recordings from each one's founding on.
+- OPEN: a religious unit's +0x1d00 and +0xcf0 (0x968e20) writers.

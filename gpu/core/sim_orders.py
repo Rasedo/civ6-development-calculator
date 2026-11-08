@@ -1430,11 +1430,9 @@ class SimOrders:
                         # the minor by centre tile the same way)
                         nrows = self.n_majors + self.S
                         tc_sp = tgt_sp.clamp(min=0)
-                        # the unit's ReligiousStrength at the spread's
-                        # percent, times the enhancer's multiplier
+                        # the unit's ReligiousStrength at the spread's percent
                         _rs = self._rel_strength[utp.clamp(min=0)].double()
-                        lump = js_round(_rs * self._spread_strength_pct / 100
-                                        * self._enh["spreadMult"][self.civ_enhancer[:, row] + 1]).long()
+                        lump = js_round(_rs * self._spread_strength_pct / 100).long()
                         pm = (
                             ok_sp.reshape(B, 1, 1)
                             & self.city_alive[:, :nrows]

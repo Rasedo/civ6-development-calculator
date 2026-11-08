@@ -3,7 +3,7 @@ import type { GameState, Seat, Tile, Unit } from './types';
 import { disbandUnit } from './units';
 import { neighbors } from '../../world/hex';
 import { allCities } from './seats';
-import { ENHANCER_BELIEFS, SPREAD_STRENGTH_PCT, followedReligionOf, unconvertedOf } from '../data/religion';
+import { SPREAD_STRENGTH_PCT, followedReligionOf, unconvertedOf } from '../data/religion';
 import { UNITS } from '../data/units';
 import { promoFirstUse, promoValue } from './promotions';
 
@@ -36,13 +36,12 @@ export function spreadFromUnit(state: GameState, unit: Unit, actor: Seat, toTile
   const target = tcity ?? tcs;
   if (!target) return;
   const nRel = state.seats.length;
-  const eb = actor.religion.enhancer ? ENHANCER_BELIEFS[actor.religion.enhancer]?.effects : undefined;
   // CIV6 (Translator): "Religious spread is triple strength in cities of other
   // civilizations" — and the page's note extends it to city-states.
   const foreign = target.seat !== actor.seat ? Math.max(1, promoValue(unit, 'TRANSLATOR')) : 1;
   // CIV6 (Spread Religion): "Pressure = 2.2 * Apostle's current HP" — the
   // unit's ReligiousStrength at SPREAD_STRENGTH_PCT, scaled by its health.
-  const full = Math.round((SPREAD_STRENGTH_PCT * (UNITS[unit.type].religiousStrength ?? 0) / 100) * (eb?.spreadPressureMult ?? 1));
+  const full = Math.round(SPREAD_STRENGTH_PCT * (UNITS[unit.type].religiousStrength ?? 0) / 100);
   const lump = Math.floor(full * unit.hp / 100) * foreign;
   let pres = target.religionPressure;
   if (!pres || pres.length !== nRel) {

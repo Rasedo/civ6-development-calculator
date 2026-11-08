@@ -90,6 +90,15 @@
   context:
     - ...ayer's PlayerEras holds it ([player+0x1358]+0x158, m_eGameEra, named in the constructor 0x411770; its writer unread), the era before through the players' starts of the turn a new era b...
   review: reviewed
+- addr: 0x490180
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-101: the owner's religion percent is Scripture's, a religion swing walks every player's cities — READ, both twins"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - ...gTech (+0x730, HasTech 0x4cb2f0); the property names from PlayerReligion's constructor (0x490180 at 0x4916b8 / 0x49174f / 0x4917ed). Their one writer in the install is EFFECT_ADJUST_...
+  review: imported
 - addr: 0x4a2f60
   final: 0x31b820
   kind: function

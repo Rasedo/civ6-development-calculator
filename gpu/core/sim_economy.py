@@ -5809,6 +5809,18 @@ class SimEconomy:
             if self.n_governors:
                 for r in range(M):
                     pct[:, r] = pct[:, r] + 100.0 * self._governor_sum_less1(r, "pressureMult").double()
+            # the OWNER's religion percent (0x4975a0: Scripture's
+            # SpreadMultiplier, its TechEnabledSpreadMultiplier once the owner
+            # knows Printing), whatever religion the city follows
+            if self._enh_any:
+                for r in range(M):
+                    e = torch.where(self.civ_religion_done[:, r], self.civ_enhancer[:, r] + 1,
+                                    torch.zeros_like(self.civ_enhancer[:, r]))
+                    tq = self._enh["presTech"].take(e)
+                    known = (tq >= 0) & self.civ_techs[:, r].gather(1, tq.clamp(min=0).unsqueeze(1)).squeeze(1)
+                    own = self._enh["presPct"].take(e) + torch.where(known, self._enh["presTechPct"].take(e),
+                                                                      torch.zeros_like(e))
+                    pct[:, r] = pct[:, r] + own.double().unsqueeze(1)
             if self._proj_rp_any:
                 head = self.city_current[:, :M, :RC, 0] - self.PROJECT_BASE
                 okh = (head >= 0) & (head < self._proj_rp_t.numel())

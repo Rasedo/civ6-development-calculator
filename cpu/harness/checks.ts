@@ -2788,6 +2788,40 @@ export function transitionChecks(a: TurnRecord, b: TurnRecord, cat: Catalog, his
     eventStep();
   }
 
+  // A CITY-STATE'S RELIGIOUS PRESSURE across the pair: the founders' spreads,
+  // the religious units, the Great People and the growth above, as a major's
+  // city takes them
+  for (const [cs, c] of spreadImp.dumpOfMinor) {
+    const k = `${c.owner}:${c.id}`;
+    const next = after.get(k);
+    const subject = subjectOf(c);
+    const skip = !next || acts.cityChanged.has(k) ? 'city changed hands or vanished'
+      : late.has(c.owner) || lateCities.has(k) ? 'a turn start missing from a record'
+        : unclear.some((at) => tileDistance(spreadState, at, cs.centerIndex) <= 3) ? 'a religious unit spread nearby'
+          : !Array.isArray(c.religions) || !Array.isArray(next.religions) ? 'no reader' : null;
+    const r0 = c.religions;
+    const r1 = next?.religions;
+    if (skip || !Array.isArray(r0) || !Array.isArray(r1)) {
+      out.push({ turn, check: 'step.pressure', subject, ok: true, skip: skip ?? 'no t+1' });
+      continue;
+    }
+    const oursD: Record<number, number> = {};
+    const gameD: Record<number, number> = {};
+    for (const [relType, g] of spreadImp.religionSeat) {
+      const g0 = (r0.find((r) => r.Religion === relType)?.Pressure) ?? 0;
+      const g1 = (r1.find((r) => r.Religion === relType)?.Pressure) ?? 0;
+      gameD[relType] = round3(g1 - g0);
+      oursD[relType] = round3((cs.religionPressure?.[g] ?? 0) - g0);
+    }
+    const keys = Object.keys(gameD).map(Number);
+    if (keys.length === 0) out.push({ turn, check: 'step.pressure', subject, ok: true, skip: 'no religion' });
+    else {
+      const ok = keys.every((r) => near(gameD[r], oursD[r], 0.05));
+      out.push({ turn, check: 'step.pressure', subject, ok, game: gameD, ours: oursD,
+        ...(ok ? {} : { state: { followersBefore: c.religions, majority: num(c.majorityReligion), minor: true } }) });
+    }
+  }
+
   // A CITY-STATE'S GROWTH on its own turn (`minorGrowth`): its city as
   // record t holds it, the buildings and districts record t+1 shows landed
   // first, as a major's production lands before its growth

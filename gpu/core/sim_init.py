@@ -1815,8 +1815,7 @@ class SimInit:
                     "neither a feature nor a terrain — _adj_src_count cannot count it")
         _erows = _bl["enhancers"]
         # The missionary chassis anchors + per-enhancer channels: a Spread
-        # lands `_spread_strength_pct` of the unit's ReligiousStrength times
-        # the enhancer's `spreadMult` (the pad row, no enhancer, 1).
+        # lands `_spread_strength_pct` of the unit's ReligiousStrength.
         self._spread_strength_pct = int(_bl["spreadStrengthPct"])
         self._missionary_idx = int(_bl["missionaryIdx"])
         self._missionary_cap = int(_bl["missionaryCap"])
@@ -1857,7 +1856,10 @@ class SimInit:
             "cdef": torch.tensor([0.0] + [float(x["cdef"]) for x in _erows], dtype=torch.float64, device=device),
             "cvs": torch.tensor([0.0] + [float(x["cvs"]) for x in _erows], dtype=torch.float64, device=device),
             "mchg": torch.tensor([0] + [int(x["mchg"]) for x in _erows], dtype=torch.long, device=device),
-            "spreadMult": torch.tensor([1.0] + [float(x["spreadMult"]) for x in _erows], dtype=torch.float64, device=device),
+            # Scripture: the founder's city pressure percent, and its tech's
+            "presPct": torch.tensor([0] + [int(x["presPct"]) for x in _erows], dtype=torch.long, device=device),
+            "presTechPct": torch.tensor([0] + [int(x["presTechPct"]) for x in _erows], dtype=torch.long, device=device),
+            "presTech": torch.tensor([-1] + [int(x["presTech"]) for x in _erows], dtype=torch.long, device=device),
             # Holy Order: the percent off each unit's purchase [nEnh + 1, NU]
             "buyOff": torch.tensor([[0.0] * len(rules.units)] + [[float(v) for v in x["buyOff"]] for x in _erows],
                                    dtype=torch.float64, device=device),

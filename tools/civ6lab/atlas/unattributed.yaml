@@ -8450,6 +8450,16 @@
   context:
     - "...leeStrengthTrained): 0x4c1a30, called as a unit is made (the city's 0x1e6570, 0xb02c60, 0xb67b30, 0xbd8be0, a hero 0x8ffac0) and the era's starting units (0x4580b0 through 0x4c1c10), r..."
   review: reviewed
+- addr: 0xb69d50
+  final: 0x801630
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-101: the owner's religion percent is Scripture's, a religion swing walks every player's cities — READ, both twins"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...ne writer in the install is EFFECT_ADJUST_RELIGIOUS_SPREAD_STRENGTH (its argument parse 0xb69d50: SpreadMultiplier, EnhancingTechType, TechEnabledSpreadMultiplier), Scripture's SCRIP..."
+  review: imported
 - addr: 0xb76b20
   kind: function
   semantics: "the clear-terrain start Movement's unit apply: adds Amount to the block 0x9034b0 of unit +0x18c8, field +4."

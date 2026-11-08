@@ -697,7 +697,9 @@
     - recording: 1103
       turn: 144
       value: "Unread: what +0xcf0 holds (the engines scale by health) and who writes +0x1d00 — 1103 t144 / t191 and 1106 t179 Missionaries land 250 with no Scripture in the religion, while 1103 t124 and 1108 land 2"
-  readings: ["H-1: a religious unit's spread — PARTLY READ"]
+  readings:
+    - "H-1: a religious unit's spread — PARTLY READ"
+    - "C-101: the owner's religion percent is Scripture's, a religion swing walks every player's cities — READ, both twins"
   context:
     - "0x968e20 (the spread's pressure, a unit's): max(0, ReligiousStrength (unit +0x1ce0) x RELIGION_SPR..."
   review: reviewed
