@@ -526,6 +526,7 @@ class SimMinorOps:
             for nm in (r["tech"], r["civic"]):
                 if nm:
                     buildable[:, k] &= holds(nm)
+        listed = self._unit_listed(s)
         buildable &= self._mops_stock_buildable(s)
         srow = self._CITY_MINOR0 + s
         # the table maintenance resource's turn income above its units' fuel
@@ -535,7 +536,7 @@ class SimMinorOps:
         own = torch.zeros(B, nu + 1, dtype=torch.long, device=dev)
         own.scatter_add_(1, torch.where(u["own"] & (u["row"] >= 0), u["row"], torch.full_like(u["row"], nu)), u["own"].long())
         own = own[:, :nu]
-        entry = cache["version"].unsqueeze(0) & ~(obsolete & (own <= 0))
+        entry = cache["version"].unsqueeze(0) & ~(obsolete & (own <= 0)) & listed
         rec = self._mops_records(self._mops_kb(s))
         live = rec["live"] & (rec["row"] >= 0)
         n_all = torch.zeros(B, nu + 1, dtype=torch.long, device=dev)
@@ -550,52 +551,86 @@ class SimMinorOps:
         n_all = torch.where(opp, n_all, torch.zeros_like(n_all))
         n_war = torch.where(opp, n_war, torch.zeros_like(n_war))
         eff_t = T["eff"].to(dev).t()                                  # [opposing, entry]
+        s_all, s_war = n_all @ eff_t, n_war @ eff_t
+        # no opposing unit at all: every entry's sums read 1.0 (0x7997bd)
+        none = (n_all.sum(dim=1) == 0).unsqueeze(1)
+        s_all = torch.where(none, torch.full_like(s_all, 256), s_all)
+        s_war = torch.where(none, torch.full_like(s_war, 256), s_war)
         return {"entry": entry, "obsolete": obsolete, "buildable": buildable, "maintained": maintained,
-                "all": n_all @ eff_t, "war": n_war @ eff_t,
+                "all": s_all, "war": s_war,
                 "strength": cache["strength"].unsqueeze(0).expand(B, -1)}
+
+    def _research_listed(self, s: int) -> torch.Tensor:
+        """`researchListed`'s listener [B, NU] for research row `s`: per AI
+        unit row, its PrereqTech's turns as the research AI's last end of turn
+        kept them (`citystate_research_turns`) not 0; a row with no
+        PrereqTech never answers"""
+        T = self._cv_tables()
+        rows = T["unit_rows"]
+        E = T["engine"]
+        ti = getattr(self, "_research_listed_tech", None)
+        if ti is None:
+            ti = self._research_listed_tech = torch.tensor(
+                [E["tech"].get(r["tech"], -1) if r["tech"] else -1 for r in rows], dtype=torch.long, device=self.device)
+        turns = self.citystate_research_turns[:, s].gather(1, ti.clamp(min=0).unsqueeze(0).expand(self.B, -1))
+        return (ti >= 0).unsqueeze(0) & (turns != 0)
+
+    def _unit_listed(self, s: int) -> torch.Tensor:
+        """`researchListed` [B, NU] for research row `s`: per AI unit row,
+        its PrereqTech and PrereqCivic held (none counting as held), or the
+        research AI's listener answering for it (`_research_listed`)"""
+        T = self._cv_tables()
+        rows = T["unit_rows"]
+        E = T["engine"]
+        cache = getattr(self, "_unit_listed_prereq", None)
+        if cache is None:
+            ti = torch.tensor([E["tech"].get(r["tech"], -1) if r["tech"] else -1 for r in rows], dtype=torch.long, device=self.device)
+            ci = torch.tensor([E["civic"].get(r["civic"], -1) if r["civic"] else -1 for r in rows], dtype=torch.long, device=self.device)
+            tn = torch.tensor([bool(r["tech"]) for r in rows], dtype=torch.bool, device=self.device)
+            cn = torch.tensor([bool(r["civic"]) for r in rows], dtype=torch.bool, device=self.device)
+            cache = self._unit_listed_prereq = (ti, ci, tn, cn)
+        ti, ci, tn, cn = cache
+        B = self.B
+        th = self.citystate_techs[:, s].gather(1, ti.clamp(min=0).unsqueeze(0).expand(B, -1)) & (ti >= 0).unsqueeze(0)
+        ch = self.citystate_civics[:, s].gather(1, ci.clamp(min=0).unsqueeze(0).expand(B, -1)) & (ci >= 0).unsqueeze(0)
+        trainable = (~tn.unsqueeze(0) | th) & (~cn.unsqueeze(0) | ch)
+        return trainable | self._research_listed(s)
 
     def _military_fav_tech(self, s: int, mask: torch.Tensor) -> None:
         """`militaryFavTech` for holder `s` (a city-state, or the Free Cities'
         `FR`) where `mask` [B]: THE MILITARY AI'S FAVOURED TECHNOLOGY
-        (`citystate_fav_tech`, -1 none) over the unit production entries in
-        the Units' database order (`_mops_unit_rows`) — an entry not of the
-        sea, not buildable, whose at-war players' sum is above the best so far
-        (from 0) and whose PrereqTech the holder may research now sets it.
-        A city-state's counts are its knowledge base's records, the
-        barbarians at war with it; the Free Cities' every unit of each major,
-        the majors and the barbarians the players they fight"""
+        (`citystate_fav_tech`, -1 none) over the unit production table as the
+        military AI stores it (`_mops_unit_rows` on its knowledge base's
+        records, stable-sorted by 0x79d3a0: the buildable first, then the
+        at-war sum, the sum over every player, the strength, each greater
+        first) — an entry not of the sea, not buildable, whose at-war
+        players' sum is above the best so far (from 0) and whose PrereqTech
+        the holder may research now sets it: of those the greatest under the
+        sort's keys, the first in the Units' order on a tie"""
         T = self._cv_tables()
         rows = T["unit_rows"]
         E = T["engine"]
         B, dev = self.B, self.device
-        nu = len(rows)
         u = self._mops_units(s)
         ur = self._mops_unit_rows(s, u)
-        er = T["engine_row"].to(dev)
-        n_war = torch.zeros(B, nu + 1, dtype=torch.long, device=dev)
-        if s == self.FR:
-            al = self.major_unit_alive & (self.major_unit_seat >= 0) & (self.major_unit_seat < self.n_majors)
-            rw = er.take(self.major_unit_type.clamp(min=0, max=self.NU - 1))
-            on = al & (rw >= 0)
-            n_war.scatter_add_(1, torch.where(on, rw, torch.full_like(rw, nu)), on.long())
-        else:
-            rec = self._mops_records(self._mops_kb(s))
-            war = rec["live"] & (rec["row"] >= 0) & (self._mops_fights(s, rec["owner"]) | (rec["owner"] == BARB_SEAT))
-            n_war.scatter_add_(1, torch.where(war, rec["row"], torch.full_like(rec["row"], nu)), war.long())
-        n_war = n_war[:, :nu]
-        opp = self._mops_rows_static["combat"].unsqueeze(0) & ~ur["obsolete"]
-        wsum = torch.where(opp, n_war, torch.zeros_like(n_war)) @ T["eff"].to(dev).t()
+        war, al, st = ur["war"], ur["all"], ur["strength"]
         rt = self._rai_tables()
         res = self._available_mask(self.citystate_techs[:, s], self._prereq_t, rt["repeat"])
         fav = torch.full((B,), -1, dtype=torch.long, device=dev)
-        best = torch.zeros(B, dtype=torch.long, device=dev)
+        bw = torch.zeros(B, dtype=war.dtype, device=dev)
+        ba = torch.zeros(B, dtype=al.dtype, device=dev)
+        bs = torch.zeros(B, dtype=st.dtype, device=dev)
         for k, r in enumerate(rows):
             ti = E["tech"].get(r["tech"], -1) if r["tech"] else -1
             if ti < 0 or r["domain"] == "DOMAIN_SEA":
                 continue
-            take = ur["entry"][:, k] & ~ur["buildable"][:, k] & (wsum[:, k] > best) & res[:, ti]
+            w, a, t = war[:, k], al[:, k], st[:, k]
+            better = (fav < 0) | (w > bw) | ((w == bw) & ((a > ba) | ((a == ba) & (t > bs))))
+            take = ur["entry"][:, k] & ~ur["buildable"][:, k] & (w > 0) & res[:, ti] & better
             fav = torch.where(take, torch.full_like(fav, ti), fav)
-            best = torch.where(take, wsum[:, k], best)
+            bw = torch.where(take, w, bw)
+            ba = torch.where(take, a, ba)
+            bs = torch.where(take, t, bs)
         self.citystate_fav_tech[:, s] = torch.where(mask, fav, self.citystate_fav_tech[:, s])
 
     def _mops_fits(self, rows: dict, need: torch.Tensor, full: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:

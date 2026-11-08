@@ -353,7 +353,7 @@ class City:
         known = torch.zeros(1, nu, dtype=torch.long)
         known[0, idx["UNIT_WARRIOR"]] = 2
         one = torch.ones(1, nu, dtype=torch.bool)
-        self.val, self.entry = v._cv_unit_production(one, ~one, torch.zeros(1, nu, dtype=torch.long), known,
+        self.val, self.entry = v._cv_unit_production(one, ~one, one, torch.zeros(1, nu, dtype=torch.long), known,
                                                        torch.zeros(1, nu, dtype=torch.long))
         self.idx = idx
 

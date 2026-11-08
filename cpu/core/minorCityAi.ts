@@ -60,7 +60,7 @@ import {
 } from './aiCityTrees';
 import { cityContracts, contractBuilt, inHandCheck, queueContract, takesTurn, type AiContract, type ContractItem } from './aiContracts';
 import { newEconomicMemory, purchaseContracts, purchaseTurn, purchasePick, savingsTurn, type BuildingPurchaseCity, type PurchaseCity, type PurchaseEntry } from './aiEconomic';
-import { unitProductionEntries } from './aiUnitProduction';
+import { seatListed, unitProductionEntries } from './aiUnitProduction';
 import { cityThreat, type CityThreat } from './operations/cityThreat';
 import { aiView } from './aiView';
 import { AI_GREAT_PERSON_CLASSES } from '../data/aiTables';
@@ -780,6 +780,7 @@ function purchaseEntries(state: GameState, cs: CityState): PurchaseEntry[] {
   const rows = unitProductionEntries({
     isVersion: (u) => minorUnitVersion(u) === u,
     obsolete: (u) => unitObsoleteIn(r, u),
+    listed: seatListed(r, holds, false),
     owned: (u) => own.get(u) ?? 0,
     known: (u) => known.get(u) ?? 0,
     knownBy: (u, p) => by.get(`${u}:${p}`) ?? 0,

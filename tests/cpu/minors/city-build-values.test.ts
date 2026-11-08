@@ -29,7 +29,7 @@ describe('the city build AI\'s unit value', () => {
   // Warriors; the analysis logs the Warrior 10.73 and the Slinger 8.34, both at
   // T 13 (3 and 3 turns to train, +10 for the Monument in hand)
   const table = unitProductionTable({
-    isVersion: () => true, obsolete: () => false, owned: () => 0, known: (u) => (u === 'UNIT_WARRIOR' ? 2 : 0),
+    isVersion: () => true, obsolete: () => false, listed: () => true, owned: () => 0, known: (u) => (u === 'UNIT_WARRIOR' ? 2 : 0),
     surplus: () => 0,
   });
   const cardiff = { ...facts, unitProduction: table };
@@ -78,7 +78,7 @@ describe('the city build AI\'s building value', () => {
 // Cardiff's unit table, the amenity's yields 3 Food, 4 Gold, 2.5 Science)
 describe('the values the GPU twin pins', () => {
   const table = unitProductionTable({
-    isVersion: () => true, obsolete: () => false, owned: () => 0, known: (u) => (u === 'UNIT_WARRIOR' ? 2 : 0),
+    isVersion: () => true, obsolete: () => false, listed: () => true, owned: () => 0, known: (u) => (u === 'UNIT_WARRIOR' ? 2 : 0),
     surplus: () => 0,
   });
   const f = { ...facts, unitProduction: table, amenity: { balance: 0, yields: { YIELD_FOOD: 3, YIELD_GOLD: 4, YIELD_SCIENCE: 2.5 } } };

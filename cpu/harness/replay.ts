@@ -54,7 +54,7 @@ import { selectResearch, chopGrant, harvestGrant, applyLumpYield, holdResearchEr
 import { treePrereqs } from '../core/researchTree';
 import { computeCityStats } from '../core/city';
 import { getModifiers } from '../core/effects';
-import type { ResearchEntry } from '../core/aiResearch';
+import { researchUnitTurns, type ResearchEntry } from '../core/aiResearch';
 import type { CivicEntry } from '../core/aiCivics';
 import { detectBoosts, grantBoost, markBoost } from '../core/boosts';
 import { recordMoments } from '../core/moments';
@@ -3115,8 +3115,11 @@ function applyFound(ctx: Ctx, d: Extract<Decision, { kind: 'found' }>): void {
     // first look's unit values read: runs/h1_duelw1117 Antananarivo's Default
     // Specialization a Slinger at 8.3), its savings and military AI's turn,
     // its knowledge base's look, which that military AI reads on its next
-    // turn, and its city AI's first look,
-    // which runs no events and picks the Default Specialization. A minor's founding lands after the
+    // turn, its city AI's first look,
+    // which runs no events and picks the Default Specialization, and its
+    // research AI's end of turn (`researchUnitTurns`: runs/h1_duelp1127 t3
+    // every city-state's Archery 182.9 / 201.3 / 197.6 with the t2 table's
+    // Archer, listed on that turn's 37 turns). A minor's founding lands after the
     // engine's turn (its player is never the active one), the clock already
     // on the record's next turn: that turn stamps the founding turn's, the
     // city's founding turn first among them (runs/h1_duelw1124 Bologna:
@@ -3137,6 +3140,7 @@ function applyFound(ctx: Ctx, d: Extract<Decision, { kind: 'found' }>): void {
       government();
       minorSecondHook(state, placed, fresh);
       detectBoosts(state, placed.seat);
+      researchUnitTurns(placed.research);
     } finally {
       state.turn += 1;
     }
@@ -5299,7 +5303,7 @@ function turnSeed(rec: TurnRecord): number | undefined {
  * contracts, reservations), the operation manager and its next id, the
  * strength its turn start stored. Per research: the research AI's goal, its
  * analyses, its turns left, the civics AI's government values and best cards,
- * the military AI's favoured technology. Per
+ * the military AI's favoured technology, the research AI's turns per unit. Per
  * city-state: its city AI's item value, its
  * Food focus, trade list and value, the city-states it met, UNITS and BUILDINGS tables, resource counts, economic
  * memory (savings), threat, enemy at the gates, growth forecast, revealed
@@ -5310,7 +5314,7 @@ function turnSeed(rec: TurnRecord): number | undefined {
  */
 const SEAT_MEMORY = ['unitPool', 'armyKnown', 'armyAged', 'enemyCounts', 'combatDesire', 'tradeSeat', 'tradeSeen', 'agendas', 'campsKnown', 'cityAi', 'ops', 'opsNext', 'treeSlots', 'treeFree', 'unitStrength'] as const;
 const RESEARCH_MEMORY = ['goal', 'aiEntries', 'civicAiEntries', 'civicGovValues', 'civicPolicyBest', 'civicSlotBest', 'aiLeft', 'aiLeftSeen', 'aiTechSeen',
-  'favTech', 'civicQueue'] as const;
+  'favTech', 'civicQueue', 'researchTurns'] as const;
 const MINOR_MEMORY = ['prodSetValue', 'favoredFood', 'tradeCities', 'tradeRejected', 'citiesKnown', 'tradeValue', 'metMinors', 'unitValues', 'buildingValues', 'resourceCounts',
   'economy', 'threat', 'threatNear', 'aiGrowth', 'aiGrowthSeen', 'revealed', 'standingArmyShort', 'explored', 'upgradeTrees', 'unitsListed', 'defendersListed',
   'bestPlotToBuy'] as const;
@@ -5809,6 +5813,17 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
   // their knowledge bases hold the look of the import's turn, which their
   // military AI reads on the next
   for (const cs of state.cityStates) if (cs.centerIndex >= 0) minorKnowledge(state, cs, false);
+  // their research AIs' turns per unit as the import's turn's end left them
+  // (`researchUnitTurns`), which their next unit production table reads:
+  // the turns above 0 AI_Research.csv logs that turn
+  const aiResearchLog = loadAiResearchLog(dumpPath);
+  for (const [seat, player] of first.playerOfSeat) {
+    if (!isCityStateSeat(seat) && seat !== FREE_SEAT) continue;
+    const s = seatOf(state, seat);
+    const rows = aiResearchLog.get(`${state.turn - 1}:${player}`)?.rows;
+    if (!s || !rows) continue;
+    s.research.researchTurns = Object.fromEntries([...rows].filter(([, r]) => r.turns > 0).map(([t, r]) => [t, r.turns]));
+  }
   // the majors: every major seat the record's first turn names
   const majorSeats = new Map<number, number>();
   for (const p of recs[0].players) {
@@ -5828,7 +5843,7 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
     state, cat, W: recs[0].head.W, seatOfPlayer: first.seatOfPlayer, playerOfSeat: first.playerOfSeat,
     units: new Map(), retained: new Map(), pendingMinors: new Map(), next: first, tally: new Map(), fellBack: new Map(), imposed: new Map(), reasons: new Map(),
     engineKilled: new Set(), paths: new Map(), walked: new Set(), steps: new Map(), barbBlows: new Map(), barbCentres: new Map(), gone: new Map(), barbSeized: [], minorBlows: new Map(), minorShots: [], minorPromoted: new Map(), minorBuys: [], minorImproves: [], minorClears: [], minorCleared: new Set(), minorClearItems: new Map(), minorClearUnits: [], barbBattles: [], barbFought: new Set(), barbDraws: [], promoteHp: new Map(), minorUnits: [], minorGround: [], buyTrace, lateBlows: [], upgradeInto: new Set(), upgradedFrom: new Map(), levyFrom: new Map(), barbSteps: [], barbPillaged: [], envoys: [], battled: new Set(), fortified: new Map(), undug: new Map(), streams: new Map(), applied: new Set(), barbNew: [], lateEnvoys: [], log: history.randLog, stream, prev: recs[0],
-    researchAi: report.researchAi, researchScores: report.researchScores, agendaCivics: null, strategyLog: loadStrategyLog(dumpPath), researchBefore: new Map(), researchAtTurn: new Map(), aiResearchLog: loadAiResearchLog(dumpPath),
+    researchAi: report.researchAi, researchScores: report.researchScores, agendaCivics: null, strategyLog: loadStrategyLog(dumpPath), researchBefore: new Map(), researchAtTurn: new Map(), aiResearchLog,
     tactical: loadTactical(dumpPath), barbTally: report.barbTactics, minorTally: report.minorTactics, minorDraws: report.minorDraws,
     civicAi: report.civicAi, civicScores: report.civicScores, civicBefore: new Map(), aiCivicLog: govtLog.civics, aiPolicyLog: govtLog.policies,
     scores: report.scores, turn: recs[0].turn, memoryLogs: new MemoryLogs(dumpPath), gameMemory: GameMemory.of(dumpPath), armyLogged: new Map(), minorLookTypes: new Map(), minorDying: [],

@@ -850,10 +850,12 @@ class SimCityValue:
                 out[:, i] = net[:, k]
         return out
 
-    def _cv_unit_production(self, version: torch.Tensor, obsolete: torch.Tensor, owned: torch.Tensor,
+    def _cv_unit_production(self, version: torch.Tensor, obsolete: torch.Tensor, listed: torch.Tensor, owned: torch.Tensor,
                             known: torch.Tensor, surplus: torch.Tensor):
         """0x7989e0, `unitProductionTable` ([..., NU] each, AI_UNITS' order):
-        per unit its value and whether it is an entry; an entry's value N
+        per unit its value and whether it is an entry (its own version, an
+        obsolete one only while owned, one not yet trainable only where
+        `listed`, `_unit_listed`); an entry's value N
         over the sum of its efficiencies against the known combat units
         (1.0 with none known), x1.25 a civilization's unique unit; where the
         surplus (`_cv_unit_surplus`) of its table maintenance resource falls
@@ -862,7 +864,7 @@ class SimCityValue:
         T = self._cv_tables()
         rows = T["unit_rows"]
         dev = known.device
-        entry = version & ~(obsolete & (owned <= 0))
+        entry = version & ~(obsolete & (owned <= 0)) & listed
         combat = torch.tensor([r["combat"] != 0 and (not r["pseudo"] or r["pseudo"] in _COMBAT_PSEUDO) for r in rows],
                               dtype=torch.bool, device=dev)
         n = torch.where(combat & ~obsolete & (known > 0), known, torch.zeros_like(known))
@@ -2139,7 +2141,7 @@ class _MinorFacts:
             known = sim._cv_known(s)
             if self.no_known is not None:
                 known = torch.where(self.no_known.unsqueeze(1), torch.zeros_like(known), known)
-            return sim._cv_unit_production(version.unsqueeze(0).expand(sim.B, -1), obs, owned, known, sim._cv_unit_surplus(self.row))
+            return sim._cv_unit_production(version.unsqueeze(0).expand(sim.B, -1), obs, sim._unit_listed(s), owned, known, sim._cv_unit_surplus(self.row))
         return self._get("uprod", build)
 
     def _obsolete(self):
@@ -2871,7 +2873,7 @@ class _FreeFacts(_MinorFacts):
                 if ei >= 0:
                     owned[:, k] = (mine & (sim.barb_unit_type == ei)).sum(dim=1)
             known = torch.zeros(sim.B, nu, dtype=torch.long, device=dev)
-            return sim._cv_unit_production(version.unsqueeze(0).expand(sim.B, -1), obs, owned, known, sim._cv_unit_surplus(self.row))
+            return sim._cv_unit_production(version.unsqueeze(0).expand(sim.B, -1), obs, sim._unit_listed(sim.FR), owned, known, sim._cv_unit_surplus(self.row))
         return self._get("uprod", build)
 
     def trains_domain(self, d):

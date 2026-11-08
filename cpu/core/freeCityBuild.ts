@@ -24,7 +24,7 @@ import { hasRiver } from '../../world/query';
 import { hexDistance, tilesWithin } from '../../world/hex';
 import { AI_BUILDING_INDEX, AI_UNIT_INDEX, amenityCityOf, growthForecast, worldArtifacts, type AmenityCity, type CityBuildFacts } from './aiCityBuild';
 import { FX, fmul, fxOf, turnsAt } from './aiValue';
-import { unitProductionTable } from './aiUnitProduction';
+import { seatListed, unitProductionTable } from './aiUnitProduction';
 import { researchAnalysis } from './aiResearch';
 import { civicAnalysis } from './aiCivics';
 import { cityGrowth, aiView } from './aiView';
@@ -212,6 +212,7 @@ function majorBuildFacts(state: GameState, city: City, known: (unit: string) => 
     unitProduction: unitProductionTable({
       isVersion: (u) => unitVersion(u) === u,
       obsolete: (u) => AI_UNITS[AI_UNIT_INDEX.get(u)!].obsolete.some(holds),
+      listed: seatListed(r, holds, !isFreeSeat(seat)),
       owned: (u) => own_units.get(u) ?? 0,
       known,
       surplus: strategicSurplus(state, seat),

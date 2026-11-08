@@ -294,6 +294,10 @@ class SimInit:
         self.citystate_ai_score = torch.zeros(B, r_pad, nt_ai, dtype=torch.long, device=device)
         self.citystate_ai_owned = torch.zeros(B, r_pad, nt_ai, dtype=torch.bool, device=device)
         self.citystate_ai_valid = torch.zeros(B, r_pad, dtype=torch.bool, device=device)
+        # the research AI's m_turnsToResearchUnit as its end of turn filled it
+        # (`ResearchState.researchTurns`, `_research_unit_turns`): per
+        # technology the turns above 0 of its last analysis, 0 none
+        self.citystate_research_turns = torch.zeros(B, r_pad, nt_ai, dtype=torch.long, device=device)
         # the research AI's turns left on its research as its last choice set
         # them, and the value the city build analysis of the turn reads
         # (`ResearchState.aiLeft`, `aiLeftSeen`)

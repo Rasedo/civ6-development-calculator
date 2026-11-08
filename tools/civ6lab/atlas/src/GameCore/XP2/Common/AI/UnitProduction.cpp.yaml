@@ -6,7 +6,7 @@
 - addr: 0x7989e0
   kind: function
   name: the military AI's unit production table
-  semantics: "the military AI's unit production table (AI/UnitProduction.cpp; run from 0x6fae70 at the player AI's turn while 0x79d320 — the built flag +0x28 — is clear): entries, in the Units' order, for each unit the player's version of itself, an obsolete one (0x538460) only while the player holds one (0x4f2c90), a unit not yet trainable only where the player signal +0x168 (0x79ba50) answers. Per entry its flags (+0x08 obsolete, +0x0b Units +0x1ba bit 128, +0x0c TraitType +0x2d0, +0x0e a held strategic resource), Cost +0x38, Range +0x68, max(Combat, RangedCombat), Combat, the maintenance resource and amount (+0x24 / +0x28) of the Units_XP2 row 0x28a940 returns for the unit's Units index (0x798b2d..0x798df2: the row at that position while the index is below Units_XP2's count, none past it), a per-player vector of 64. The opposition: per Units row of Combat above 0 not obsolete to the player with a combat pseudo-yield (or none), over the player list (0x483b50 +0x4a0) the knowledge base's count of it (0x5eb650), N their total (the at-war ones, 0x469cd0, apart); each entry's +0x30 sums count x efficiency[that row][the entry] (GlobalAI +0x3c8), +0x2c the at-war counts, the per-player vector likewise. With N = 0 every entry reads 1.0. Value +0x160 = N / +0x30 (0x16e940, truncated); x1.25 (@0xd70c98) for a TraitType unit; then (0x799f04..0x79a0e9) with a maintenance resource: the surplus = Player_Resources +0x350[resource] less the units' fuel bill 0x4ab270; below the amount << 8, d = amount << 8 less the surplus, and d above 1.0 divides +0x160, +0x30 and +0x2c (0x3640e0); the player's units of each type counted into +0x20; sorted by 0x79d3a0 (+0x0e, +0x2c, +0x30, strength). The value 0x799b9d computes from the counts (+0x510, +0x4a0) feeds asserts only. The efficiency read at 0x7992b9 is data[width x opposing + entry] (the matrix +0x28 width, +0x30 data, the opposing type the loop's index [rbp+0xc00], the entry's unit +0 of its record): the log (0x79b8a0) prints row r, column c as data[width x r + c], so the value reads AI_UnitEfficiency.csv's row the opposing unit, column the entry (unitEfficiency()[i][k]). At 0x798cc2: the entry's buildable byte +0x0e (to 0x798d11): PrereqTech and PrereqCivic held and the StrategicResource stocked above 0 (0x4aa790, ownership 0)."
+  semantics: "the military AI's unit production table (AI/UnitProduction.cpp; run from 0x6fae70 at the player AI's turn while 0x79d320 — the built flag +0x28 — is clear): entries, in the Units' order, for each unit the player's version of itself, an obsolete one (0x538460) only while the player holds one (0x4f2c90), a unit not yet trainable only where the player signal +0x168 (0x79ba50) answers. Per entry its flags (+0x08 obsolete, +0x0b Units +0x1ba bit 128, +0x0c TraitType +0x2d0, +0x0e a held strategic resource), Cost +0x38, Range +0x68, max(Combat, RangedCombat), Combat, the maintenance resource and amount (+0x24 / +0x28) of the Units_XP2 row 0x28a940 returns for the unit's Units index (0x798b2d..0x798df2: the row at that position while the index is below Units_XP2's count, none past it), a per-player vector of 64. The opposition: per Units row of Combat above 0 not obsolete to the player with a combat pseudo-yield (or none), over the player list (0x483b50 +0x4a0) the knowledge base's count of it (0x5eb650), N their total (the at-war ones, 0x469cd0, apart); each entry's +0x30 sums count x efficiency[that row][the entry] (GlobalAI +0x3c8), +0x2c the at-war counts, the per-player vector likewise. With N = 0 (0x7997bd..0x799924) N reads 1 and every entry's +0x30, +0x2c and per-player vector (64) 1.0, its value 1.0 (runs/h1_duelp1127 / 1128: the Free Cities, no army record, Fav Tech t33-36 Archery, The Wheel, Iron Working, Horseback Riding by strength as logged). Value +0x160 = N / +0x30 (0x16e940, truncated); x1.25 (@0xd70c98) for a TraitType unit; then (0x799f04..0x79a0e9) with a maintenance resource: the surplus = Player_Resources +0x350[resource] less the units' fuel bill 0x4ab270; below the amount << 8, d = amount << 8 less the surplus, and d above 1.0 divides +0x160, +0x30 and +0x2c (0x3640e0); the player's units of each type counted into +0x20; sorted by 0x79d3a0 (+0x0e, +0x2c, +0x30, strength). The value 0x799b9d computes from the counts (+0x510, +0x4a0) feeds asserts only. The efficiency read at 0x7992b9 is data[width x opposing + entry] (the matrix +0x28 width, +0x30 data, the opposing type the loop's index [rbp+0xc00], the entry's unit +0 of its record): the log (0x79b8a0) prints row r, column c as data[width x r + c], so the value reads AI_UnitEfficiency.csv's row the opposing unit, column the entry (unitEfficiency()[i][k]). At 0x798cc2: the entry's buildable byte +0x0e (to 0x798d11): PrereqTech and PrereqCivic held and the StrategicResource stocked above 0 (0x4aa790, ownership 0)."
   status: READ
   cases:
     - recording: h1_duelv1117
@@ -33,6 +33,7 @@
     - cpu/core/stockpile.ts:strategicSurplus
     - gpu/core/sim_cityvalue.py:_cv_unit_surplus
     - cpu/core/aiCityBuild.ts:AiUnitRow
+    - cpu/core/aiUnitProduction.ts:researchListed
   readings:
     - "C-130: the unit production table's maintenance resource by the Units index and its shortfall divide — READ, both twins"
     - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
@@ -48,6 +49,7 @@
     - "C-130: the unit production table's maintenance resource by the Units index and its shortfall divide — READ (0x7989e0 at 0x798ac3..0x798df2 via 0x28a940, 0x799f04..0x79a0e9, 0x4ab270, 0x3640e0), both twins"
     - "C-98: a unit off the map counts on its owner's list until its end of turn"
     - "C-98: a city-state's City Analysis counts its knowledge base as its last turn left it — READ (0x608580 at 0x6085c9, 0x5c24e0 / 0x6fae70 on player signal +0x258, 0x785f30 in 0x6096c0's +0x370 list), both twins"
+    - "C-98 / C-130: the unit production table's research listing and its no-opposition sums; the favoured technology over the stored table — READ (0x7989e0 at 0x798c26..0x798c4c and 0x7997bd..0x799924, 0x79ba50, 0x75d3d0, 0x761090, 0x763b00, 0x761b70, 0x71fb80 at 0x721b12), both twins"
   notes:
     - ".claude/scratchpad/cb5/NOTES.md: ...scratchpad/final.patch.  DONE: the UNIT value (0x7b62c0) + the military AI's unit production table (0x7989e0, cpu/core/aiUnitProduction.ts),   unit T (+5 on PrereqTech/Civic turns), maintenance as plain Gold..."
   context:
@@ -136,12 +138,16 @@
   review: reviewed
 - addr: 0x79ba50
   kind: function
-  semantics: raises the player signal +0x168 for a not-yet-trainable unit (its PrereqTech or PrereqCivic unheld, 0x4cb590 / 0x39d490); its one listener the research AI's 0x75d3d0.
-  status: PARTLY
+  semantics: "raises player signal +0x168 for a unit of the table not yet trainable (0x7989e0 at 0x798c26..0x798c4c: its PrereqTech or PrereqCivic unheld, 0x4cb590 / 0x39d490): over the signal's links (+0x48 functor, vt +0x10) the OR of their answers; its one listener the research AI's 0x75d3d0. A unit it does not answer for is left out of the table."
+  status: READ
   cases:
+    - recording: h1_duelp1127
+      value: t3 every city-state's Archery 182.9 / 201.3 / 197.6 as logged
     - recording: AI_Knowledge.csv
       value: "The opposition: per Units row of Combat above 0 not obsolete to the player   with a combat pseudo-yield (or none), over the player list (0x483b50   +0x4a0) the knowledge base's count of it (CivKnowled"
+  impl: [cpu/core/aiUnitProduction.ts:unitProductionEntries, gpu/core/sim_minorops.py:_unit_listed]
   readings:
+    - "C-98 / C-130: the unit production table's research listing and its no-opposition sums; the favoured technology over the stored table — READ (0x7989e0 at 0x798c26..0x798c4c and 0x7997bd..0x799924, 0x79ba50, 0x75d3d0, 0x761090, 0x763b00, 0x761b70, 0x71fb80 at 0x721b12), both twins"
     - "C-96 / C-97: the unit value — READ (the combat, trade, explorer branches, the tail, the military AI's unit production), PARTLY READ (its inputs)"
     - "C-96 / C-97: the team's unit to build, the recruit's contract and the knowledge base's camps — the team update's requirements and readiness, the unit choice, Recruit Units' result and contract, the camps READ; the maintenance resource test, the recruit's stealing and levy unread"
   context:

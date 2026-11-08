@@ -11886,3 +11886,56 @@ copy's rows before their turn opens (`barbarianAi`, cpu/harness/replay.ts).
   wonder or district placed on its plot re-places none in the engines
   (0x180cb0 / 0x181700); the walk's own fill by score (`assignWorkedTiles`)
   where no re-place has run since a plot was lost.
+
+## C-98 / C-130: the unit production table's research listing and its no-opposition sums; the favoured technology over the stored table — READ (0x7989e0 at 0x798c26..0x798c4c and 0x7997bd..0x799924, 0x79ba50, 0x75d3d0, 0x761090, 0x763b00, 0x761b70, 0x71fb80 at 0x721b12), both twins
+
+`researchUnitTurns` (`cpu/core/aiResearch.ts`, `ResearchState.researchTurns`),
+`researchListed` / `seatListed` and `unitProductionEntries`
+(`cpu/core/aiUnitProduction.ts`), `militaryFavTech` over `storedTable`
+(`cpu/core/operations/unitRows.ts`, `unitChoice.ts`); the replay's founding
+turn and import seed (`cpu/harness/replay.ts`); GPU `_research_unit_turns`
+(sim_research.py, `citystate_research_turns`), `_research_listed` /
+`_unit_listed` and `_mops_unit_rows`' fill, `_military_fav_tech`
+(sim_minorops.py), `_cv_unit_production`'s `listed` (sim_cityvalue.py);
+statecompare `minorResearchTurns`, `freeResearch`.
+
+- THE LISTING (0x798b65..0x798c4c): a unit whose PrereqTech (0x4cb590 ->
+  HasTech) and PrereqCivic (0x39d490 -> HasCivic) are held, none counting as
+  held, is listed; any other only where player signal +0x168 answers
+  (0x79ba50: the OR over its links). Its one listener, the research AI's
+  0x75d3d0, answers where m_turnsToResearchUnit (+0x388, data +0x3e0) at the
+  unit is not 0.
+- THE TURNS (0x761090 on player signal +0x228, the turn's end after the city
+  AI -> 0x763b00): the vector zeroed, then per technology entry of the last
+  analysis (+0x370, stride 0x50) whose turns (+0x1c) are >= 0 each unit of
+  its list (+0x20, count +0x30: 0x761b70 fills it with the Units rows whose
+  PrereqTech is the row) takes those turns. The analysis (0x761170) writes
+  -1 for a spent row and an out-of-reach one, max(0, sum) else, so a unit
+  locked by its civic alone, or whose technology is spent or out of reach,
+  or at 0 turns, is left out of the next turn's table. The replay's
+  founding turn runs the end of turn; its import seeds the turns above 0
+  AI_Research.csv logs the turn before.
+- NO OPPOSITION (0x7997bd..0x799924): where N, the opposing count over every
+  player, is 0, N reads 1 and every entry's +0x30, +0x2c and its 64-player
+  vector 1.0, its value 1.0 (before the unique unit's x1.25).
+- THE FAVOURED TECHNOLOGY (0x71fb80 at 0x721b12) walks the stored table
+  ([+0x1290]+0x268), stable-sorted at its build by 0x79d3a0 (+0x0e, then
+  +0x2c, +0x30, strength +0x18, each greater first): the first entry not
+  buildable, not of the sea, with +0x2c above 0 and its PrereqTech
+  researchable sets it — of those the greatest under the sort, the first in
+  the Units' order on a tie.
+- Confirmed: the Free Cities' knowledge base holds no army record (runs/h1_duelp1127
+  / 1128 aimem and AI_Knowledge.csv, t1-t249): every sum 1.0, the Fav Tech
+  the strongest researchable entry — NO_TECH to t32, Archery t33 (Animal
+  Husbandry held; Horseback Riding behind Archery, 80 turns), The Wheel t34
+  (Mining held: the Heavy Chariot's 28 over the Archer's and Spearman's 25),
+  Iron Working t35 (Bronze Working held: the Swordsman's 35), Horseback
+  Riding t36-t249 (Archery held: the Horseman's 36), as logged in both;
+  researchScore.free t35 (Archery 83.7, The Wheel 51.8) as logged.
+  runs/h1_duelp1127 t3: every city-state's Archery 182.9 / 201.3 / 197.6 on
+  the t2 table's Archer, listed on Archery's 37 turns of t1's end.
+- Open: a major's research AI is not run in the engine, its listener read as
+  answering for every unit; runs/h1_duelp1124 p3 t83 (Granada's t82 table:
+  Pikeman 12.99, Crossbowman 10.76 where the game's are 0) is not the
+  listing — Military Tactics 1 turn and Machinery 10 at t81's end, both
+  listed — and not the six-unit cut (five units in record 83).

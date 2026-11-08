@@ -6,16 +6,17 @@
  */
 import { AI_UNITS } from '../../data/aiBuildTables';
 import { AI_UNIT_INDEX } from '../aiCityBuild';
-import { unitProductionEntries, type UnitProductionRow } from '../aiUnitProduction';
+import { seatListed, unitProductionEntries, type UnitProductionRow } from '../aiUnitProduction';
 import { majorTraits } from '../freeCityBuild';
 import { installType } from '../minorBuild';
-import { isCityStateSeat, seatOf } from '../seats';
+import { isCityStateSeat, isFreeSeat, seatOf } from '../seats';
 import { CIVICS } from '../../data/civics';
 import { RESOURCES } from '../../../world/resources';
 import { TECHS } from '../../data/techs';
 import { UNITS } from '../../data/units';
 import { engineId } from '../../data/aliases';
 import { researchable } from '../aiResearch';
+import { storedTable } from './unitChoice';
 import type { GameState } from '../types';
 import { stockFree, strategicSurplus } from '../stockpile';
 
@@ -43,15 +44,21 @@ function majorVersion(traits: readonly string[]): (u: string) => string | null {
 
 /**
  * THE MILITARY AI'S FAVOURED TECHNOLOGY (AI::Military +0xd88, AI_Military.csv's
- * "Fav Tech"; 0x71fb80 at 0x721b12): over the seat's unit production entries
- * in the Units' database order (`seatUnitRows` on its knowledge base's
- * records `records`, the players it fights `atWar`) — an entry not of the
- * sea (+0x0a), not buildable (+0x0e), whose at-war players' sum (+0x2c) is
- * above the best so far (from 0) and whose PrereqTech the seat may research
- * now (0x4c8c40) sets it, its sum the best; null (NO_TECH) for none.
- * runs/h1_duely1127 t1-t130: 466 of 513 city-state and Free Cities turns as
- * logged (the Free Cities' Archery at t33, Iron Working t35, Horseback
- * Riding from t36).
+ * "Fav Tech"; 0x71fb80 at 0x721b12): over the seat's unit production table
+ * as the military AI stores it (`storedTable`: its entries, `seatUnitRows`
+ * on its knowledge base's records `records` and the players it fights
+ * `atWar`, stable-sorted by 0x79d3a0) — an entry not of the sea (+0x0a),
+ * not buildable (+0x0e), whose at-war players' sum (+0x2c) is above the
+ * best so far (from 0) and whose PrereqTech the seat may research now
+ * (0x4c8c40) sets it, its sum the best; null (NO_TECH) for none. With no
+ * record at all every sum reads 1.0, so the first such entry of the stored
+ * order, the strongest, sets it: the Free Cities' knowledge base holds no
+ * army record (runs/h1_duelp1127 / 1128 t1-t249) and their Fav Tech runs
+ * NO_TECH to t32, Archery at t33 (Animal Husbandry held, Horseback Riding
+ * behind Archery), The Wheel at t34 (Mining held: the Heavy Chariot's 28
+ * over the Archer's 25), Iron Working at t35 (Bronze Working held: the
+ * Swordsman's 35), Horseback Riding from t36 (Archery held: the Horseman's
+ * 36), as logged in both.
  */
 export function militaryFavTech(state: GameState, seat: number, records: readonly { type: string; owner: number }[],
                                 atWar: (player: number) => boolean): string | null {
@@ -67,7 +74,7 @@ export function militaryFavTech(state: GameState, seat: number, records: readonl
   const rows = seatUnitRows(state, seat, (u, p) => by.get(`${u}|${p}`) ?? 0, [...players].sort((a, b) => a - b), atWar);
   let fav: string | null = null;
   let best = 0;
-  for (const row of rows) {
+  for (const row of storedTable(rows)) {
     const u = AI_UNITS[AI_UNIT_INDEX.get(row.unit)!];
     if (u.domain === 'DOMAIN_SEA' || row.buildable || row.atWar <= best || !u.tech) continue;
     const tech = engineId('tech', u.tech, 'TECH_', TECHS);
@@ -115,6 +122,7 @@ export function seatUnitRows(state: GameState, seat: number, knownBy: (unit: str
   return unitProductionEntries({
     isVersion: (u) => version(u) === u,
     obsolete: (u) => AI_UNITS[AI_UNIT_INDEX.get(u)!].obsolete.some(holds),
+    listed: seatListed(r, holds, !isCityStateSeat(seat) && !isFreeSeat(seat)),
     owned: (u) => own.get(u) ?? 0,
     known: (u) => players.reduce((n, p) => n + knownBy(u, p), 0),
     knownBy,

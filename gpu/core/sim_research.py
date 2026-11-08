@@ -864,6 +864,15 @@ class SimResearch:
         self.citystate_ai_owned[:, s] = torch.where(m, owned, self.citystate_ai_owned[:, s])
         self.citystate_ai_valid[:, s] = self.citystate_ai_valid[:, s] | mask
 
+    def _research_unit_turns(self, s: int, mask: torch.Tensor) -> None:
+        """`researchUnitTurns` for research row `s` where `mask` [B]: the
+        research AI's end of turn (0x763b00) keeps per technology the turns
+        above 0 of its last analysis (`citystate_research_turns`), 0 none"""
+        v = self.citystate_ai_valid[:, s].unsqueeze(1)
+        t = self.citystate_ai_turns[:, s]
+        keep = torch.where(v & (t > 0), t, torch.zeros_like(t))
+        self.citystate_research_turns[:, s] = torch.where(mask.unsqueeze(1), keep, self.citystate_research_turns[:, s])
+
     def _rai_completion(self, s: int, fire: torch.Tensor, done: torch.Tensor, sci: torch.Tensor) -> None:
         """`researchCompletionChoice` where `fire` [B] completed row `done`:
         the turn before's analysis (a fresh one before the first) adds its

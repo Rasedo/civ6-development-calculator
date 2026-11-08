@@ -41,6 +41,9 @@ describe('the resource value in the research value', () => {
     const state = makeState(makeMap(12, 12));
     const cs = minor(state);
     cs.research.techs = ['BRONZE_WORKING'];
+    // the Iron units are listed on Iron Working's turns at the last turn's
+    // end (the research AI's m_turnsToResearchUnit, `researchListed`)
+    cs.research.researchTurns = { IRON_WORKING: 5 };
     const iron = tileAtCoords(state.map, 6, 5);
     iron.resource = 'IRON';
     iron.ownerSeat = cs.seat;

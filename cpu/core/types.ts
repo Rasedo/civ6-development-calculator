@@ -277,6 +277,14 @@ export interface ResearchState {
    *  AI_Military.csv's "Fav Tech"; `militaryFavTech`), written at its turn
    *  and read by the next research analysis; absent or null, none */
   favTech?: string | null;
+  /** the research AI's m_turnsToResearchUnit (+0x388) as its end of turn
+   *  filled it (0x763b00 on player signal +0x228, `researchUnitTurns`), held
+   *  by technology: each row whose analysis turns were above 0, those turns
+   *  — every unit whose PrereqTech it is takes them, every other unit 0.
+   *  Its one reader, the unit production table's listener 0x75d3d0,
+   *  answers for a unit not yet trainable where they are not 0; absent
+   *  before the first turn's end */
+  researchTurns?: Record<string, number>;
 }
 
 export interface GovernmentState {

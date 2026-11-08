@@ -32,6 +32,7 @@ import { allRoadsLeadToRome, addTradeRoute, addCsTradeRoute, addIntlTradeRoute, 
 import { addEnvoys, allianceSuzInfluence, cityStateById, declareWarOnCityState, envoysOf, hasMet, isSuzerain, minorCity, resolveSuzerains, sueForPeaceWithCityState, suzerainBuildingLoyalty, suzerainProjectMult, suzerainWonderPct, suzerainGpCultureMult, meetCityState } from './cityStates';
 import { LEVY_TURNS, govInfluence } from '../data/cityStates';
 import { freeCityBuild, freeCombatDesire, freeKnowledge, minorBestOfClass, minorCatchUp, minorCompleteNow, minorOrdersHeld, minorResearch, trainableIn } from './minorBuild';
+import { researchUnitTurns } from './aiResearch';
 import { storeUnitStrength } from './aiView';
 import { militaryFavTech } from './operations/unitRows';
 import { freeTradeValue, majorTradeLists } from './aiTrade';
@@ -1118,6 +1119,7 @@ export function freeCitiesPhase(state: GameState): void {
     government();
     freeMilitaryTurn(state);
     freeKnowledge(state, false);
+    researchUnitTurns(free.research);
     return;
   }
   // a Free City's reactor keeps its clock: the seat resolves no power, so the
@@ -1172,8 +1174,10 @@ export function freeCitiesPhase(state: GameState): void {
   });
   // (a replay runs their units' turn on a copy beside the record's)
   if (!minorOrdersHeld()) freeCitiesMilitary(state);
-  // its knowledge base's look at its turn's end
+  // its knowledge base's look and its research AI's turns per unit
+  // (`researchUnitTurns`) at its turn's end
   freeKnowledge(state, false);
+  researchUnitTurns(free.research);
   for (const city of joiners) joinFromFreeCity(state, city);
 }
 
@@ -1190,12 +1194,8 @@ function freeDesire(state: GameState): void {
  *  (`freeKnowledge`) and keeps its route value (`freeTradeValue`) */
 function freeMilitaryTurn(state: GameState): void {
   const free = freeSeatOf(state);
-  // the counts its unit production table reads are every unit of each
-  // major — the players it met at the start — whatever its records hold
-  // (runs/h1_duely1127: no ARMY record, its Fav Tech as logged on 58 of the
-  // turns t1-t59); the majors and the barbarians are the players it fights
-  const majors = state.units.filter((u) => isCiv(u.seat)).map((u) => ({ type: u.type, owner: u.seat }));
-  free.research.favTech = militaryFavTech(state, FREE_SEAT, majors, (p) => isCiv(p) || p === BARB_SEAT);
+  // the majors and the barbarians are the players it fights
+  free.research.favTech = militaryFavTech(state, FREE_SEAT, free.armyKnown ?? [], (p) => isCiv(p) || p === BARB_SEAT);
   freeKnowledge(state, true);
   // the route value K at the ageing's tail (`freeTradeValue`)
   freeTradeValue(state);

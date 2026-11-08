@@ -350,6 +350,7 @@ def _research_record(sim, b: int, s: int) -> list:
             int(sim.citystate_cai_score[b, s, c]), int(sim.citystate_cai_owned[b, s, c]))]
     out.append(int(sim.citystate_fav_tech[b, s]))
     out += _civic_queue_row(sim, b, s)
+    out += [int(x) for x in sim.citystate_research_turns[b, s].tolist()]
     gv =bool(sim.citystate_gov_valid[b, s])
     out.append(1 if gv else 0)
     return out + _gov_values_row(sim, b, s)
@@ -1032,6 +1033,7 @@ CITY_STATE = {
     "minorCivicQueue": lambda sim, b, rows: [_civic_queue_row(sim, b, s) for s in rows],
     "minorTechGoal": lambda sim, b, rows: [int(sim.citystate_tech_goal[b, s]) for s in rows],
     "minorFavTech": lambda sim, b, rows: [int(sim.citystate_fav_tech[b, s]) for s in rows],
+    "minorResearchTurns": lambda sim, b, rows: [[int(x) for x in sim.citystate_research_turns[b, s].tolist()] for s in rows],
     "minorResearchAi": lambda sim, b, rows: [
         [v for t in range(sim.citystate_ai_turns.shape[2]) for v in (
             int(sim.citystate_ai_turns[b, s, t]), int(sim.citystate_ai_next[b, s, t]), int(sim.citystate_ai_base[b, s, t]),

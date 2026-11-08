@@ -43,7 +43,7 @@ import { civEraIndex, computeCityStats, withPercent256 } from './city';
 import { upgradeRoads } from './eras';
 import { researchCost, selectResearch } from './economy';
 import { CP_ACCEPTED, CP_CANCELLED, CP_COMPLETED, CP_FAILED, CP_IN_PROGRESS, contractById, newContractBook } from './aiContracts';
-import { researchAnalysis, researchCompletionChoice, researchDraw, researchTurnChoice, researchInHandLeft, type ResearchChoice, type TechContract } from './aiResearch';
+import { researchAnalysis, researchCompletionChoice, researchUnitTurns, researchDraw, researchTurnChoice, researchInHandLeft, type ResearchChoice, type TechContract } from './aiResearch';
 import { civicAnalysis, civicChoice, civicDraw, type CivicContract } from './aiCivics';
 import { minorCity, minorPlaceCitizens, minorReplaceCitizens, suzerainOf } from './cityStates';
 import { computeUnlocksIn, purchaseStep, unitMaintenance, type Unlocks } from './effects';
@@ -67,7 +67,7 @@ import { AI_GP_CLASS_PSEUDOYIELD, AI_GREAT_PERSON_CLASSES } from '../data/aiTabl
 import { AI_VALUE_HORIZON } from '../data/aiValue';
 import { TECH_IMPROVEMENT_RESOURCES, resourceValue, type ResourceFacts } from './aiResource';
 import { RESOURCES, extractsResource } from '../../world/resources';
-import { unitProductionTable } from './aiUnitProduction';
+import { seatListed, unitProductionTable } from './aiUnitProduction';
 import { AI_BUILDING_INDEX, AI_UNIT_INDEX, amenityCityOf, amenityPerTurn, buildingTable, buildingValue, constructibleNow, defaultSpecialization, growthForecast, specializationBests, unitTable, worldArtifacts, type AiUnitRow, type CityBuildFacts, type CityGrowth, type CityBuildTables, type PickFacts } from './aiCityBuild';
 import { defensiveCancel } from './aiCityTrees';
 import { projectTable, type ProjectTableFacts } from './aiProjectValue';
@@ -281,10 +281,13 @@ export function minorPhase(state: GameState): void {
     // the boosts its turn earned (runs/h1_duelw1117 t1: every city-state
     // takes Pottery before its coastal city's Sailing eureka lands)
     detectBoosts(state, cityState.seat);
-    // its turn's end holds each stockpile to its cap (0x4a8f10) and erases
-    // its dead from its unit list (`minorEndTurnList`)
+    // its turn's end holds each stockpile to its cap (0x4a8f10), erases its
+    // dead from its unit list (`minorEndTurnList`) and keeps its research
+    // AI's turns per unit for the next turn's unit production table
+    // (`researchUnitTurns`)
     capStockpiles(state, cityState.seat);
     minorEndTurnList(state, cityState);
+    researchUnitTurns(cityState.research);
   }
 }
 
@@ -1538,6 +1541,7 @@ export function minorUnitProduction(state: GameState, cityState: CityState, know
   return unitProductionTable({
     isVersion: (u) => minorUnitVersion(u) === u,
     obsolete: (u) => unitObsoleteIn(r, u),
+    listed: seatListed(r, (x) => researchHolds(r, x), false),
     owned: (u) => own.get(u) ?? 0,
     known,
     surplus: strategicSurplus(state, cityState.seat),

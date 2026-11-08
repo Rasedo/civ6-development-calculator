@@ -7,14 +7,20 @@
  *  - its entries, in the Units' database order: each unit that is the
  *    player's own version of itself, and, where the unit is obsolete to the
  *    player (its ObsoleteTech / ObsoleteCivic or their Mandatory columns
- *    held, 0x538460), only while the player still holds one;
+ *    held, 0x538460), only while the player still holds one; a unit not
+ *    yet trainable (its PrereqTech or PrereqCivic unheld, 0x4cb590 /
+ *    0x39d490) only where player signal +0x168 answers for it (0x798c26):
+ *    its one listener, the research AI's 0x75d3d0, where
+ *    m_turnsToResearchUnit is not 0 for it (`researchListed`);
  *  - the opposition: per unit type of Combat above 0 that is not obsolete to
  *    the player and whose PseudoYieldType is none or a combat one, the count
  *    the knowledge base holds of it over every player (0x5eb650) — N in all;
  *  - per entry the sum of each such count times the efficiency of the entry
  *    against that type (`unitEfficiency`, row the opposing type);
- *  - the entry's value N over that sum (1.0 for every entry where N is 0),
- *    x1.25 for a civilization's unique unit (TraitType);
+ *  - the entry's value N over that sum, x1.25 for a civilization's unique
+ *    unit (TraitType); where N is 0 (0x7997bd..0x799924) N reads 1 and
+ *    every entry's sums over every player (+0x30) and over those at war
+ *    (+0x2c) and its per-player sums (the 64 players) 1.0, its value 1.0;
  *  - the entry's maintenance resource and amount are Units_XP2's row at the
  *    unit's Units index (0x28a940 on the Units index; none past the table's
  *    count: `tableMaintenanceResource`), so the Field Cannon carries the
@@ -33,6 +39,8 @@
  * RangedCombat)) and its maintenance resource (+0x24).
  */
 import { AI_UNITS } from '../data/aiBuildTables';
+import { engineId } from '../data/aliases';
+import { TECHS } from '../data/techs';
 import { unitEfficiency } from './aiUnitEfficiency';
 import { FX, fdiv, fmul, fxConst } from './aiValue';
 
@@ -42,6 +50,9 @@ export interface UnitProductionFacts {
   isVersion(unit: string): boolean;
   /** the unit is obsolete to the player (0x538460) */
   obsolete(unit: string): boolean;
+  /** the unit trainable or the research AI's listener answering for it
+   *  (`researchListed`) */
+  listed(unit: string): boolean;
   /** the player's units of the type (0x4f2c90) */
   owned(unit: string): number;
   /** the knowledge base's count of the unit type over every player (the
@@ -73,7 +84,7 @@ export interface UnitProductionRow extends UnitProductionEntry {
    *  24.8, and per player (+0x38) */
   atWar: number;
   all: number;
-  perPlayer: ReadonlyMap<number, number>;
+  perPlayer(player: number): number;
   /** max(Combat, RangedCombat) (+0x18) */
   strength: number;
   /** its maintenance resource (+0x24: Units_XP2's row at its Units index), null for none */
@@ -87,6 +98,32 @@ export interface UnitProductionRow extends UnitProductionEntry {
 const COMBAT_PSEUDO = new Set(['PSEUDOYIELD_UNIT_COMBAT', 'PSEUDOYIELD_UNIT_NAVAL_COMBAT', 'PSEUDOYIELD_UNIT_AIR_COMBAT']);
 const UNIQUE = fxConst(1.25);
 
+const AI_UNIT_ROW = new Map(AI_UNITS.map((u, i) => [u.type, i]));
+
+/** 0x798b65..0x798c4c: the install unit `unit` stands in the table where
+ *  its PrereqTech and PrereqCivic are held (`holds`: 0x4cb590 / 0x39d490,
+ *  none counting as held), else where the research AI's listener 0x75d3d0
+ *  answers — its m_turnsToResearchUnit at the unit, the turns its end of
+ *  turn kept on the unit's PrereqTech (`ResearchState.researchTurns`, by
+ *  engine technology), not 0: a unit with no PrereqTech, or locked by its
+ *  civic alone, never answers */
+export function researchListed(holds: (x: string) => boolean, turns: Readonly<Record<string, number>> | undefined, unit: string): boolean {
+  const u = AI_UNITS[AI_UNIT_ROW.get(unit) ?? -1];
+  if (!u) return false;
+  if ((!u.tech || holds(u.tech)) && (!u.civic || holds(u.civic))) return true;
+  const tech = u.tech ? engineId('tech', u.tech, 'TECH_', TECHS) : null;
+  return !!tech && (turns?.[tech] ?? 0) !== 0;
+}
+
+/** the table's listing test for a seat of research `r`: a city-state's and
+ *  the Free Cities' through their research AI (`researchListed`); a major's
+ *  research AI is not run in the engine, its listener read as answering for
+ *  every unit */
+export function seatListed(r: { researchTurns?: Readonly<Record<string, number>> }, holds: (x: string) => boolean,
+                           major: boolean): (unit: string) => boolean {
+  return major ? () => true : (u) => researchListed(holds, r.researchTurns, u);
+}
+
 /** 0x7989e0: the table, by unit type */
 export function unitProductionTable(f: UnitProductionFacts): Map<string, UnitProductionEntry> {
   return new Map(unitProductionEntries(f).map((e) => [e.unit, { value: e.value, obsolete: e.obsolete }]));
@@ -98,6 +135,7 @@ export function unitProductionEntries(f: UnitProductionFacts): UnitProductionRow
   AI_UNITS.forEach((u, k) => {
     if (!f.isVersion(u.type)) return;
     if (f.obsolete(u.type) && f.owned(u.type) <= 0) return;
+    if (!f.listed(u.type)) return;
     entries.push(k);
   });
   const sums = new Map<number, number>(entries.map((k) => [k, 0]));
@@ -131,7 +169,14 @@ export function unitProductionEntries(f: UnitProductionFacts): UnitProductionRow
       }
     }
   });
+  if (total === 0) {
+    for (const k of entries) {
+      all.set(k, FX);
+      atWar.set(k, FX);
+    }
+  }
   return entries.map((k) => {
+    const per = perPlayer.get(k)!;
     const u = AI_UNITS[k];
     let v = total === 0 ? FX : sums.get(k)! > 0 ? fdiv(total * FX, sums.get(k)!) : 0;
     if (u.trait) v = fmul(v, UNIQUE);
@@ -143,7 +188,8 @@ export function unitProductionEntries(f: UnitProductionFacts): UnitProductionRow
     }
     return {
       unit: u.type, value: v, obsolete: f.obsolete(u.type), buildable: f.buildable?.(u.type) ?? false,
-      atWar: atWar.get(k)!, all: all.get(k)!, perPlayer: perPlayer.get(k)!, strength: Math.max(u.combat, u.rangedCombat),
+      atWar: atWar.get(k)!, all: all.get(k)!, perPlayer: (p) => (total === 0 ? FX : per.get(p) ?? 0),
+      strength: Math.max(u.combat, u.rangedCombat),
       maintenance: res,
       maintained: !res || surplus > 0,
     };

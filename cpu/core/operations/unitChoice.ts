@@ -14,7 +14,7 @@ import { hasAiType } from './operation';
  *  order) stable-sorted (0x797980, std::stable_sort) under 0x79d3a0 — a
  *  buildable entry first, then the at-war sum, the sum over every player,
  *  the strength, each greater first. */
-function storedTable(rows: readonly UnitProductionRow[]): UnitProductionRow[] {
+export function storedTable(rows: readonly UnitProductionRow[]): UnitProductionRow[] {
   return [...rows].sort((a, b) => {
     if (a.buildable !== b.buildable) return a.buildable ? -1 : 1;
     if (a.atWar !== b.atWar) return b.atWar - a.atWar;
@@ -33,8 +33,8 @@ export function choiceOrder(rows: readonly UnitProductionRow[], player: number):
   return stdSort(storedTable(rows), (a, b) => {
     if (a.buildable !== b.buildable) return a.buildable;
     if (player >= 0) {
-      const pa = a.perPlayer.get(player) ?? 0;
-      const pb = b.perPlayer.get(player) ?? 0;
+      const pa = a.perPlayer(player);
+      const pb = b.perPlayer(player);
       if (pa !== pb) return pa > pb;
     }
     if (a.atWar !== b.atWar) return a.atWar > b.atWar;

@@ -590,6 +590,7 @@
     - "C-96: the standing army and the Combat Desire's city terms"
     - "C-96: a city-state's City Center projects, Build Unit's pillaged building, the pick's pillaged district and the war footing's writer"
     - "C-130: the Combat Desire between the policy jobs and the government values; a released contract on its city's list — READ, both twins"
+    - "C-98 / C-130: the unit production table's research listing and its no-opposition sums; the favoured technology over the stored table — READ (0x7989e0 at 0x798c26..0x798c4c and 0x7997bd..0x799924, 0x79ba50, 0x75d3d0, 0x761090, 0x763b00, 0x761b70, 0x71fb80 at 0x721b12), both twins"
   notes:
     - ".claude/scratchpad/cb5/NOTES.md: ...cpp 0x5eb8b0/0x5eadb0 from the tactical target list 0x783980 + 0x73abf0/0x747230),   Combat Desire (0x71fb80 0x721302..), support units (Ram/Siege Tower), project value 0x7b28c0 (district projects,   Manhatta..."
   context:
@@ -733,12 +734,19 @@
   review: reviewed
 - addr: 0x75d3d0
   kind: function
-  semantics: "the research AI's listener on player signal +0x168 (functor vt 0xd6f258 bound in 0x761d30): answers where m_turnsToResearchUnit (+0x388, data +0x3e0) at the unit is not 0; a unit locked by a civic alone never answers."
-  status: PARTLY
+  semantics: "the research AI's listener on player signal +0x168 (functor vt 0xd6f258 bound in 0x761d30): answers where m_turnsToResearchUnit (+0x388, data +0x3e0, count +0x3f0) at the unit is not 0; a unit with no PrereqTech, or locked by its civic alone, never answers."
+  status: READ
   cases:
+    - recording: h1_duelp1127
+      value: t3 every city-state's Archery 182.9 / 201.3 / 197.6 with the Archer listed, Archery unheld
     - recording: AI_Knowledge.csv
       value: "The opposition: per Units row of Combat above 0 not obsolete to the player   with a combat pseudo-yield (or none), over the player list (0x483b50   +0x4a0) the knowledge base's count of it (CivKnowled"
+  impl:
+    - cpu/core/aiUnitProduction.ts:researchListed
+    - gpu/core/sim_minorops.py:_research_listed
+    - cpu/core/types.ts:ResearchState
   readings:
+    - "C-98 / C-130: the unit production table's research listing and its no-opposition sums; the favoured technology over the stored table — READ (0x7989e0 at 0x798c26..0x798c4c and 0x7997bd..0x799924, 0x79ba50, 0x75d3d0, 0x761090, 0x763b00, 0x761b70, 0x71fb80 at 0x721b12), both twins"
     - "C-96 / C-97: the unit value — READ (the combat, trade, explorer branches, the tail, the military AI's unit production), PARTLY READ (its inputs)"
   context:
     - "...ereqTech or PrereqCivic unheld, 0x4cb590 / 0x39d490; the one listener the research AI's 0x75d3d0, functor vt 0xd6f258 bound in 0x761d30: its m_turnsToResearchUnit (+0x388, data +0x3e0)..."
@@ -787,12 +795,19 @@
 - addr: 0x763b00
   final: 0x4fb250
   kind: function
-  semantics: "fills m_turnsToResearchUnit (research AI +0x388) from 0x761090 on player signal +0x228 (the turn's end after the city AI): zeroed, then per technology entry whose turns (+0x1c) are >= 0 each unit the technology unlocks (the entry's list +0x20, 0x761b70) takes those turns."
-  status: PARTLY
+  semantics: "fills m_turnsToResearchUnit (research AI +0x388) from 0x761090 on player signal +0x228 (the turn's end after the city AI): zeroed, then per technology entry (stride 0x50, research AI +0x370) whose turns (+0x1c) are >= 0 each unit of the entry's list (+0x20, count +0x30: the Units rows whose PrereqTech is the entry's row, 0x761b70) takes those turns; a spent row's -1 and an out-of-reach row's -1 give none."
+  status: READ
   cases:
+    - recording: h1_duelp1127
+      value: "t3 every city-state's Archery 182.9 / 201.3 / 197.6: the t2 table lists the Archer on Archery's 37 turns of t1's end"
     - recording: AI_Knowledge.csv
       value: "The opposition: per Units row of Combat above 0 not obsolete to the player   with a combat pseudo-yield (or none), over the player list (0x483b50   +0x4a0) the knowledge base's count of it (CivKnowled"
+  impl:
+    - cpu/core/aiResearch.ts:researchUnitTurns
+    - gpu/core/sim_research.py:_research_unit_turns
+    - cpu/core/types.ts:ResearchState
   readings:
+    - "C-98 / C-130: the unit production table's research listing and its no-opposition sums; the favoured technology over the stored table — READ (0x7989e0 at 0x798c26..0x798c4c and 0x7997bd..0x799924, 0x79ba50, 0x75d3d0, 0x761090, 0x763b00, 0x761b70, 0x71fb80 at 0x721b12), both twins"
     - "C-96 / C-97: the unit value — READ (the combat, trade, explorer branches, the tail, the military AI's unit production), PARTLY READ (its inputs)"
   context:
     - "...30: its m_turnsToResearchUnit (+0x388, data +0x3e0) at the unit is not 0 — the vector 0x763b00 fills from 0x761090 on player signal +0x228, the turn's end after the city AI: zeroed,..."

@@ -41,7 +41,7 @@ import { computeUnlocks } from './effects';
 import { civicAnalysis } from './aiCivics';
 import { AI_BUILDING_INDEX, AI_UNIT_INDEX, amenityCityOf, growthForecast, housingValue, type CityGrowth } from './aiCityBuild';
 import { AI_BUILDINGS, AI_RESOURCES, AI_UNITS } from '../data/aiBuildTables';
-import { unitProductionTable } from './aiUnitProduction';
+import { seatListed, unitProductionTable } from './aiUnitProduction';
 import { opsOf } from './operations/manager';
 import { opJobUnits } from './operations/operation';
 import { resourceValue } from './aiResource';
@@ -479,6 +479,7 @@ export function aiView(state: GameState, opts: { updated?: boolean } = {}): AiVi
           table = unitProductionTable({
             isVersion: (u) => majorUnitVersion(traits, u) === u,
             obsolete: (u) => AI_UNITS[AI_UNIT_INDEX.get(u)!].obsolete.some(holds),
+            listed: seatListed(r, holds, i !== FREE_SEAT),
             owned: (u) => own.get(u) ?? 0,
             known,
             surplus: strategicSurplus(state, i),

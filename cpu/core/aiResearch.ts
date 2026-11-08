@@ -100,6 +100,18 @@ export interface ResearchEntry {
   logged: number;
 }
 
+/** THE RESEARCH AI'S END OF TURN (0x761090 on player signal +0x228 ->
+ *  0x763b00): m_turnsToResearchUnit (+0x388) zeroed, then each technology
+ *  entry of the last analysis whose turns (+0x1c) are not negative gives
+ *  them to every unit its list (+0x20, 0x761b70: the Units rows whose
+ *  PrereqTech it is) holds — kept by technology (`ResearchState.researchTurns`),
+ *  the rows at 0 left out with the spent and the out of reach */
+export function researchUnitTurns(r: ResearchState): void {
+  const out: Record<string, number> = {};
+  for (const e of r.aiEntries ?? []) if (e.turns > 0) out[e.tech] = e.turns;
+  r.researchTurns = out;
+}
+
 /** 0x4ca000 / 0x8c4540: the turns a row needs at `rate` (raw Science a turn) —
  *  ceil of what is left over the rate, 1 where nothing is left, -1 where the
  *  seat makes no Science. Every row reads the bank (Player_Techs +0x1e8): the

@@ -874,6 +874,7 @@ class SimPhase:
             government()
             self._free_military_turn(ones)
             self._free_knowledge(ones, False)
+            self._research_unit_turns(self.FR, ones)
             return
         # a Free City's reactor keeps its clock: the seat resolves no power,
         # so the age is kept here (`ageReactors`)
@@ -949,8 +950,10 @@ class SimPhase:
             self.city_loyalty[bidx, row, jc] = nxt.to(self.city_loyalty.dtype)
             joins[:, j] = act & (self.city_loyalty[bidx, row, jc] <= 0)
         self._free_tactics(acting)
-        # its knowledge base's look at its turn's end, in every game
+        # its knowledge base's look and its research AI's turns per unit at
+        # its turn's end, in every game
         self._free_knowledge(ones, False)
+        self._research_unit_turns(self.FR, ones)
         for j in range(self.RC):
             jl = joins[:, j] & self.city_alive[:, row, j]
             if not bool(jl.count_nonzero()):

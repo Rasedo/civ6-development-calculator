@@ -732,6 +732,12 @@ function civicQueueRow(r: ResearchState | undefined): number[] {
   return [q.length, ...q.map((x) => idx(CIVIC_IDX, x))];
 }
 
+/** the research AI's turns per unit as its last end of turn kept them, per
+ *  technology in table order, 0 none */
+function researchTurnsRow(r: ResearchState | undefined): number[] {
+  return [...TECH_IDX.keys()].map((id) => r?.researchTurns?.[id] ?? 0);
+}
+
 /** a research record flat: the techs held behind their count, the civics
  *  held behind theirs, each tree's progress, the items in hand, the goal,
  *  the overflows, the AI's turns left, the progress kept per row, then each
@@ -761,6 +767,7 @@ function researchRecord(r: ResearchState | undefined): number[] {
     }) : []),
     idx(TECH_IDX, r?.favTech ?? null),
     ...civicQueueRow(r),
+    ...researchTurnsRow(r),
     r?.civicGovValues ? 1 : 0,
     ...govValuesRow(r),
   ];
@@ -1054,6 +1061,7 @@ const CITY_STATE_G: Record<string, Extractor> = {
   minorCivicQueue: overCityStates((cityState) => civicQueueRow(cityState.research)),
   minorTechGoal: overCityStates((cityState) => idx(TECH_IDX, cityState.research.goal ?? null)),
   minorFavTech: overCityStates((cityState) => idx(TECH_IDX, cityState.research.favTech ?? null)),
+  minorResearchTurns: overCityStates((cityState) => researchTurnsRow(cityState.research)),
   minorResearchAi: overCityStates((cityState) => {
     const ents = new Map((cityState.research.aiEntries ?? []).map((e) => [e.tech, e]));
     if (!ents.size) return [];

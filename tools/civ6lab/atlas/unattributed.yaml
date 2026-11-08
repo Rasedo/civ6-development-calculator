@@ -5469,6 +5469,8 @@
     - gpu/core/sim_minorai.py:_minor_purchase_rows
     - cpu/core/operations/unitChoice.ts:storedTable
     - gpu/core/sim_minorops.py:_mops_choice_order
+    - cpu/core/operations/unitRows.ts:militaryFavTech
+    - gpu/core/sim_minorops.py:_military_fav_tech
   readings:
     - "C-96 / C-97: the unit value — READ (the combat, trade, explorer branches, the tail, the military AI's unit production), PARTLY READ (its inputs)"
     - "C-126: the purchase list's buildable test and the upgrade's furthest rung — READ, both twins"
@@ -5476,6 +5478,7 @@
     - "C-126: the purchase list's buildable test and the upgrade's furthest rung"
     - "C-126 / C-99: the purchase list's at-war sums, Garrison City's turn done and Operation Move's movers"
     - "C-126: the unit choice walks the stored table, stable-sorted at its build, and the table is rebuilt every turn — 0x797980 / 0x79d3a0 and the build's signals READ, both twins; the sea entries' absence open"
+    - "C-98 / C-130: the unit production table's research listing and its no-opposition sums; the favoured technology over the stored table — READ (0x7989e0 at 0x798c26..0x798c4c and 0x7997bd..0x799924, 0x79ba50, 0x75d3d0, 0x761090, 0x763b00, 0x761b70, 0x71fb80 at 0x721b12), both twins"
   context:
     - ...nance resource scales it; the player's units of each type counted into +0x20; sorted by 0x79d3a0 (+0x0e, +0x2c, +0x30, strength). The value 0x799b9d computes from the player's counts (...
   review: reviewed

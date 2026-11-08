@@ -131,11 +131,12 @@ class SimMinors:
             self._minor_knowledge(s, False)
             # the boosts its turn earned
             self._detect_minor_boosts(s, alive)
-            # its turn's end holds each stockpile to its cap and erases its
-            # dead from its unit list
+            # its turn's end holds each stockpile to its cap, erases its dead
+            # from its unit list and keeps its research AI's turns per unit
             self._seat_cap_stockpile(self._CITY_MINOR0 + s)
             del self._minor_danger_open[s]
             self._minor_end_turn_list(s, alive)
+            self._research_unit_turns(s, alive)
 
     def _minor_end_turn_list(self, s: int, alive: torch.Tensor) -> None:
         """`minorEndTurnList`: city-state `s`'s unit list as its end of turn
