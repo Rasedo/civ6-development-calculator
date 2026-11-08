@@ -10,18 +10,23 @@
  *
  * Prints, per improvement or district, the values within 0.01 of the log's,
  * within 1.0, and further, and the first further ones (with the landing turn
- * that would give the log's value); --rows every district row with its value
- * two turns either side. The world: the record of the turn, the Builders the
- * record after holds (the turn start's and the Economic AI's come before the
- * cities), the research AI's turns from AI_Research.csv, the civics AI's as
- * its turn would write them. A district's facts: the engine's adjacency
+ * that would give the log's value); --rows every district row with its T's
+ * parts, the landing turn that gives the log's value and its value
+ * two turns either side. The world: the record of the turn, and the minor as
+ * its city AI's turn finds it after its economy's accrual and its city's
+ * production step (`minorPhase`): the Builders, the technologies, the civics
+ * and the progress on the item in hand the record after holds, an idle
+ * city's store with the turn's production, its grid met (`minorPower`), the
+ * Economic AI's Gold boost on the net income the record's treasury cached;
+ * the research AI's turns from AI_Research.csv, the civics AI's as its turn
+ * would write them. A district's facts: the engine's adjacency
  * (`baseAdjacency`) for both the whole and the rows, the plot's price where
  * the city may buy it (`borderCandidates`), one city (no regional reach, no
  * Dam, Canal or projects); LAB: an inland city-state on a river trains ships
  * (0x1c77c0's sea test unread).
  */
 import { existsSync, readFileSync } from 'node:fs';
-import { loadCatalog, type TurnRecord } from './record';
+import { loadCatalog, memField, type TurnRecord } from './record';
 import { advanceHistory, importTurn, newHistory } from './import';
 import { AI_DISTRICTS, AI_IMPROVEMENTS, AI_RESOURCES } from '../data/aiBuildTables';
 import { AI_RATE, FX, FX_MIN } from '../core/aiValue';
@@ -32,7 +37,9 @@ import { districtValue, type DistrictValueFacts } from '../core/aiDistrictValue'
 import { baseAdjacency } from '../core/yields';
 import { tilePurchaseCost } from '../core/game';
 import { canPlaceDistrictIn } from '../core/rules';
-import { minorBuildFacts, minorResourceFacts } from '../core/minorBuild';
+import { minorBuildFacts, minorPower, minorResourceFacts } from '../core/minorBuild';
+import { economicGoldBoost } from '../core/aiWeights';
+import { newEconomicMemory } from '../core/aiEconomic';
 import { minorCity } from '../core/cityStates';
 import { civicAnalysis } from '../core/aiCivics';
 import { borderCandidates, computeCityStats } from '../core/city';
@@ -111,16 +118,16 @@ const tallyOf = (k: string): Tally => tally.get(k) ?? (tally.set(k, { exact: 0, 
 const history = newHistory();
 /** the players whose city stood in an earlier record */
 const hadCity = new Set<number>();
-/** per player the production its idle city has stored (the record keeps
+/** per player the production its idle city has stored, the turn's own in (the record keeps
  *  none: each record its city stands with an empty queue adds the turn's
  *  production; a record with an item clears it) */
 const idleStore = new Map<number, number>();
-let held: { imp: ReturnType<typeof importTurn>; turn: number } | null = null;
+let held: { imp: ReturnType<typeof importTurn>; turn: number; rec: TurnRecord } | null = null;
 for (const rec of recs) {
   advanceHistory(history, rec, cat);
   const after = importTurn(rec, cat, history);
   const cur = held;
-  held = { imp: after, turn: rec.turn };
+  held = { imp: after, turn: rec.turn, rec };
   if (!cur) continue;
   const imp = cur.imp;
   const state = imp.state;
@@ -142,10 +149,34 @@ for (const rec of recs) {
     const builders = after.minorOfPlayer.get(player)?.buildersTrained ?? cs.buildersTrained;
     const dc = imp.dumpOfMinor.get(cs);
     const idle = !!dc && (dc.queueProgress ?? []).length === 0;
-    cs.prodOverflow = idle ? idleStore.get(player) ?? 0 : 0;
     idleStore.set(player, idle ? (idleStore.get(player) ?? 0) + Number(dc?.productionYield ?? 0) : 0);
+    cs.prodOverflow = idleStore.get(player)!;
+    // its grid as its turn meets it (`minorPower`)
+    minorPower(state, cs);
+    const nextCs = after.minorOfPlayer.get(player);
+    if (nextCs && nextCs.prodItem === cs.prodItem) {
+      cs.prodProgress = nextCs.prodProgress;
+      cs.prodRetained = nextCs.prodRetained ? { ...nextCs.prodRetained } : undefined;
+    }
+    if (nextCs) {
+      const n = nextCs.research;
+      cs.research.civics = [...n.civics];
+      cs.research.civic = n.civic;
+      cs.research.civicProgress = n.civicProgress;
+      cs.research.civicRetained = { ...n.civicRetained };
+      if (n.civicOverflow) cs.research.civicOverflow = n.civicOverflow;
+      else delete cs.research.civicOverflow;
+      cs.research.techs = [...n.techs];
+      cs.research.tech = n.tech;
+      cs.research.techProgress = n.techProgress;
+      cs.research.techRetained = { ...n.techRetained };
+    }
     // the civics AI's entries as its turn would write them (cityBuildLab.ts)
     cs.research.civicAiEntries = civicAnalysis(state, cs.seat, computeCityStats(state, minorCity(cs)).total.culture);
+    // the Economic AI's Gold boost its last turn wrote: on the net income
+    // its treasury cached at its last bank (m_xCachedNetIncome)
+    const net = memField(cur.rec, player, 'PlayerTreasury', 'm_xCachedNetIncome');
+    if (typeof net === 'number') cs.economy = { ...(cs.economy ?? newEconomicMemory()), goldBoost: economicGoldBoost(net / 256) };
     const facts = minorBuildFacts(state, cs, () => 0);
     const resFacts = minorResourceFacts(state, cs);
     // the growth's surplus as the city stood at its turn: the record's
@@ -211,6 +242,7 @@ for (const rec of recs) {
         feature: tile.feature ? installFeature(tile.feature) : null,
         floodTurns: floodHazardTurns(state, tile.index),
         eruptionTurns: eruptionHazardTurns(state, tile.index),
+        drought: tile.droughtTurns > 0,
         appeal: tileAppeal(state.map, tile),
         besideHousingDistrict: neighbors(state.map, tile).some((n) => n.district !== null && (DISTRICTS[n.district]?.housing ?? 0) > 0),
         unitCost: (u) => (u === 'UNIT_BUILDER' ? UNITS.BUILDER.cost + scaleByGameSpeed(BUILDER_COST_STEP) * builders
@@ -296,7 +328,9 @@ for (const rec of recs) {
           const tparts = `${facts.buildTurns(row.type)}+${inHand}+${techTurns(row.tech)}/${facts.civicTurns(row.civic)}`;
           const ours = slot(i, t) / FX;
           const d = Math.abs(ours - lv);
-          if (rowsOut) console.log(`ROW T=${t} ${[-2, -1, 1, 2].map((dt) => (slot(i, t + dt) / FX).toFixed(2)).join(',')} t${turn} p${player} (${lp.x},${lp.y}) ${row.type} log ${lv.toFixed(2)} ours ${ours.toFixed(2)} adj ${['YIELD_SCIENCE', 'YIELD_FAITH', 'YIELD_GOLD', 'YIELD_PRODUCTION', 'YIELD_CULTURE'].map((y) => districtAdj(row.type, y)).join('/')} own=${lp.owned} pc=${df.purchaseCost} feat=${f.feature} res=${f.resource}`);
+          let rowFit = -1;
+          if (rowsOut) for (let x = 0; x < AI_VALUE_HORIZON + 2 && rowFit < 0; x++) if (Math.abs(slot(i, x) / FX - lv) <= 0.01) rowFit = x;
+          if (rowsOut) console.log(`ROW T=${t} fit=${rowFit} tp=${tparts} ${[-2, -1, 1, 2].map((dt) => (slot(i, t + dt) / FX).toFixed(2)).join(',')} t${turn} p${player} (${lp.x},${lp.y}) ${row.type} log ${lv.toFixed(2)} ours ${ours.toFixed(2)} adj ${['YIELD_SCIENCE', 'YIELD_FAITH', 'YIELD_GOLD', 'YIELD_PRODUCTION', 'YIELD_CULTURE'].map((y) => districtAdj(row.type, y)).join('/')} own=${lp.owned} pc=${df.purchaseCost} feat=${f.feature} res=${f.resource}`);
           const k = tallyOf(row.type);
           if (d <= 0.01) k.exact++;
           else if (d <= 1) k.close++;

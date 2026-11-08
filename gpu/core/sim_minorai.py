@@ -1188,16 +1188,14 @@ class SimMinorAi:
                            torch.zeros(B, P, NI, dtype=torch.long, device=dev))
         dists = torch.where(ev.unsqueeze(-1), torch.full((B, P, ND), _FX_MIN, dtype=torch.long, device=dev),
                             torch.zeros(B, P, ND, dtype=torch.long, device=dev))
-        ground = self._minor_ground_imps(s)
+        # the plot test asks no drought; the value of an improvement a
+        # drought on the plot lists is 0 (`_cv_improvement`)
+        ground = self._minor_ground_imps(s, drought=False)
         K = ground.shape[2]
         g = ground.gather(1, p0.unsqueeze(-1).expand(-1, -1, K)) & (owned & ev).unsqueeze(-1)
-        # an improvement a drought on the plot bars, which its ground takes
-        # otherwise, is valued 0: the plot test asks no drought
-        dry_ground = self._minor_ground_imps(s, drought=False) if bool((self.drought > 0).any()) else ground
-        gd = dry_ground.gather(1, p0.unsqueeze(-1).expand(-1, -1, K)) & (owned & ev).unsqueeze(-1)
         # 0x5ce970's +0x54: an improvement the plot test takes, a plot
         # holding one among them, its own valued 0
-        improvable = owned & ev & gd.any(-1)
+        improvable = owned & ev & g.any(-1)
         # the plot of the city's own pillaged district values that district
         # alone, its repair (`minorRepairsDistrictAt`): per district row its
         # plots, each other value FX(-9999)
@@ -1273,15 +1271,12 @@ class SimMinorAi:
                 if ke < 0:
                     continue
                 gi = g[bb, pp, ke]
-                gdi = gd[bb, pp, ke]
                 ti = impT[i][bb]
                 # landing at or past the horizon: FX(-9999)
-                if not bool(gdi.any()) or bool((ti >= hz).all()):
+                if not bool(gi.any()) or bool((ti >= hz).all()):
                     continue
-                v = (self._cv_improvement(pf, r["type"], ti, torch.full_like(bb, hz)) if bool(gi.any())
-                     else torch.zeros_like(bb))
-                barred = torch.where(gdi & (ti < hz), torch.zeros_like(v), torch.full_like(v, _FX_MIN))
-                imps[bb, pp, i] = torch.where(gi, v, barred)
+                v = self._cv_improvement(pf, r["type"], ti, torch.full_like(bb, hz))
+                imps[bb, pp, i] = torch.where(gi, v, torch.full_like(v, _FX_MIN))
             for (i, name, _dv, pl, ok_t) in cand_rows:
                 ci = pl[bb, pp] & ok_t[bb]
                 passed[bb, pp] = passed[bb, pp] | ci
@@ -2032,6 +2027,9 @@ class _PlotFacts:
 
     def eruption_turns(self):
         return self.ctx.get("erupt", self.sim._minor_eruption_turns)[self.bb, self.tiles]
+
+    def in_drought(self):
+        return (self.sim.drought[self.bb, self.tiles] > 0).long()
 
     def appeal(self):
         return self.sim._tile_appeal()[self.bb, self.tiles].long()

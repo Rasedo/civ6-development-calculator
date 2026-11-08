@@ -379,13 +379,24 @@ class SimCityValue:
             dead = dead | (cut & (h <= t))
         return h, dead
 
+    def _cv_drought_struck(self, f, imp: str) -> torch.Tensor:
+        """`droughtStruck`: a live drought on the plot lists the improvement
+        (0x28b490's footprint, 0x28e550's list: `_drought_imps`)"""
+        names = [r["type"] for r in self.rules.ai_city_build["improvements"]]
+        k = int(self._cv_tables()["engine"]["improvement"][names.index(imp)]) if imp in names else -1
+        if k < 0 or k not in self._drought_imps:
+            return torch.zeros_like(f.like(), dtype=torch.bool)
+        return _t(f.in_drought(), f.like()).bool()
+
     def _cv_improvement_yields(self, f, imp: str, t: torch.Tensor, h: torch.Tensor) -> torch.Tensor:
-        """0x7b1320, `improvementYieldsValue`"""
+        """0x7b1320, `improvementYieldsValue`: 0 where a live drought on the
+        plot lists the improvement"""
         T = self._cv_tables()
         row = T["imp"][imp]
         like = f.like()
         past = t >= h
         h, dead = self._cv_cut(f, t, h)
+        dead = dead | self._cv_drought_struck(f, imp)
         v = self._cv_pseudo(torch.full_like(like, _FX), "PSEUDOYIELD_IMPROVEMENT", f.pseudo_w("PSEUDOYIELD_IMPROVEMENT"))
         for y, a in row["yields"]:
             v = v + self._cv_yield(torch.full_like(like, a * _FX), y, f.yield_w(y))
@@ -429,7 +440,8 @@ class SimCityValue:
     def _cv_improvement(self, f, imp: str, t: torch.Tensor, h: torch.Tensor) -> torch.Tensor:
         """0x7a58f0, `improvementValue`: the improvement on the plot landing in
         `t` turns (the plot's improvement, resource and feature facts as
-        type names or None — one plot's, or a batch sharing them)"""
+        type names or None — one plot's, or a batch sharing them); 0 where a
+        live drought on the plot lists it"""
         T = self._cv_tables()
         like = f.like()
         row = T["imp"].get(imp)
@@ -473,6 +485,8 @@ class SimCityValue:
                 value = value + f.resource_value(keep_res, self._cv_resource_copies(f, keep_res, t, h), t, h)
             out = torch.where(zero, torch.zeros_like(value), value)
         out = torch.where(none, torch.full_like(out, _FX_MIN), out)
+        # a live drought on the plot listing it: 0
+        out = torch.where(self._cv_drought_struck(f, imp), torch.zeros_like(out), out)
         return torch.where(past, torch.full_like(out, _FX_MIN), out)
 
     def _cv_resource_copies(self, f, res: str, t: torch.Tensor, h: torch.Tensor):

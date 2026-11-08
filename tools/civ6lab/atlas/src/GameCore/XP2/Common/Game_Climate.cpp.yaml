@@ -341,6 +341,20 @@
   context:
     - "- EXPLORE'S PLOT TEST (0x70bd40) first refuses a plot under a live storm (0x28b120 -> 0x28b5d0 GetActiveStormAtPlot: the plot in a live storm's footprint, 0x28d6b0) — unp..."
   review: reviewed
+- addr: 0x28b490
+  final: 0x1bcf70
+  kind: function
+  name: GetActiveDroughtTypeAtPlot
+  semantics: the type (+0) of the first live drought (+0x968..+0x970, each an index into m_aDroughts +0x948, 0x48-byte entries, +0x38 live) whose plot list (+0x18) holds the plot, else -1.
+  status: READ
+  cases:
+    - recording: h1_duelp1128
+      turn: 5
+      value: Hong Kong's Farm rows 0.00 on the t5 drought's footprint (9:6 owned, 8:5 / 7:7 / 7:6 unowned), 72.45 the turn before
+  impl: [cpu/core/aiPlotValue.ts:droughtStruck, gpu/core/sim_cityvalue.py:_cv_drought_struck]
+  readings:
+    - "C-100: a live drought zeroes the values of the improvements it lists — READ (0x28b490, 0x28e550 in 0x7a58f0 / 0x7b1320), both twins"
+  review: reviewed
 - addr: 0x28b5d0
   final: 0x1bd0a0
   kind: function
@@ -551,6 +565,19 @@
   readings: ["C-74: the drought's storm bar — READ"]
   context:
     - "...) and drops its handle from the live list (+0x8d0) — the record and its struck list stay (0x28e240 rebuilds the live list from +0x58 on a load). So a plot any storm's walk ever struck bars..."
+  review: reviewed
+- addr: 0x28e550
+  final: 0x1bfa60
+  kind: function
+  semantics: "a drought type's row (0xad60b0 -> 0x28a940) lists the improvement: its +0x108..+0x110 list of names (RandomEvent_PillagedImprovements) resolved through DB.Improvements (+0x14 the index); false for none."
+  status: READ
+  cases:
+    - recording: h1_duelp1128
+      turn: 16
+      value: "the t16 drought: 8:5's, 7:6's and 7:7's Farms and 8:6's Camp 0.00, 7:5's Mine 71.45 (a Mine unlisted)"
+  impl: [cpu/core/aiPlotValue.ts:droughtStruck, gpu/core/sim_cityvalue.py:_cv_drought_struck]
+  readings:
+    - "C-100: a live drought zeroes the values of the improvements it lists — READ (0x28b490, 0x28e550 in 0x7a58f0 / 0x7b1320), both twins"
   review: reviewed
 - addr: 0x28e740
   final: 0x1bfbe0

@@ -79,6 +79,9 @@ class Plot:
     def eruption_turns(self):
         return self.o["eruption"]
 
+    def in_drought(self):
+        return 0
+
     def appeal(self):
         return self.o["appeal"]
 

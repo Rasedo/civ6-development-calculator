@@ -11508,3 +11508,37 @@ engines already search once per order run on the Movement left.
 - Open: the order of the +0x228 handlers beyond the end look's (the
   barbarians' captures); the +0x1c / +0x20 hashes read as the engine's
   stacking classes (`stackClass`).
+
+## C-100: a live drought zeroes the values of the improvements it lists — READ (0x28b490, 0x28e550 in 0x7a58f0 / 0x7b1320), both twins
+
+- 0x7a58f0 (the improvement value) and 0x7b1320 (its yields value), past
+  their T >= H test: GetActiveDroughtTypeAtPlot 0x28b490 (the climate's
+  live list +0x968..+0x970 into m_aDroughts +0x948, 0x48-byte entries, +0x38
+  live, +0x18 the plot list, +0 the type) and 0x28e550 (the drought row's
+  +0x108 list, RandomEvent_PillagedImprovements, through DB.Improvements):
+  a live drought on the plot listing the improvement gives 0. Both droughts
+  list the same rows (`DROUGHT_IMPROVEMENTS`).
+- Ported: `droughtStruck` in `improvementValue` / `improvementYieldsValue`
+  (cpu/core/aiPlotValue.ts, the fact `PlotValueFacts.drought`);
+  `_cv_drought_struck` in `_cv_improvement` / `_cv_improvement_yields`
+  (gpu/core/sim_cityvalue.py, `_PlotFacts.in_drought`). The minor's plot
+  analysis asks its ground test with no drought (`minorPlotEvals`,
+  `_minor_plot_evals`): the 0 comes from the value. A replaced
+  improvement's yields under a drought count 0 too (a district's plot, a
+  new improvement over a listed one).
+- Confirmed: runs/h1_duelp1128 Hong Kong t5-t9 (9:6, 8:5, 7:7, 7:6 Farms
+  0.00, owned and unowned), t16-t17 (8:5 / 7:6 / 7:7 Farms and 8:6's Camp
+  0.00, 7:5's Mine 71.45).
+- The lab's world (`cpu/harness/plotValueLab.ts`, MEASURED on the five
+  duelp seeds): the city AI's turn finds the minor after its economy's
+  accrual and its production step (`minorPhase`): its technologies, civics
+  (the catch-up a major's gain raised among them) and the progress on the
+  item in hand as the record after holds them, an idle city's store with
+  the turn's production, its grid met (`minorPower`: Cardiff's powered
+  Factory, runs/h1_duelp1124 t146+ Production 14.4 as recorded), the
+  Economic AI's Gold boost on the record's m_xCachedNetIncome
+  (runs/h1_duelp1128 Bologna's Campus rows from t68: net -1.5 / -3.5 / -5.5
+  at t68 / t70 / t73, the rows 2.87 / 6.79 / 10.72 lower).
+- Open (C-100): Nazca's Nazca Line rows 40.00 above ours on every plot
+  (runs/h1_duelp1128 p4 t2-t249, Appeal 1, no yields); the Neighbourhood's
+  housing on a surplus the record's turn start does not hold.

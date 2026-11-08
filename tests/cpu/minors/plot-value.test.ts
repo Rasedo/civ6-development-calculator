@@ -8,7 +8,7 @@ const view = { yieldWeight: () => 0, pseudoYieldWeight: () => 0, warCount: () =>
 
 const plot = (over: Partial<PlotValueFacts> = {}): PlotValueFacts => ({
   view, seat: 0, improvement: null, pillaged: false, resource: null, feature: null,
-  floodTurns: null, eruptionTurns: null, appeal: 0, besideHousingDistrict: false,
+  floodTurns: null, eruptionTurns: null, drought: false, appeal: 0, besideHousingDistrict: false,
   unitCost: () => 25, buildsUnit: () => true, extraCharges: () => 0, progressPct: 0, escalation: 1000,
   speedScaled: (n) => Math.floor(n / 2), adjacency: () => 0, housingValue: () => 0, resourceValue: () => 0,
   accumulationPct: 0,

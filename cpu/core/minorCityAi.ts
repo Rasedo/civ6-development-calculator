@@ -313,6 +313,7 @@ export function minorPlotEvals(state: GameState, cs: CityState, facts: CityBuild
       feature: tile.feature ? installFeature(tile.feature) : null,
       floodTurns: floodHazardTurns(state, plot),
       eruptionTurns: eruptionHazardTurns(state, plot),
+      drought: tile.droughtTurns > 0,
       appeal: tileAppeal(map, tile, camps, gp),
       besideHousingDistrict: neighbors(map, tile).some((n) => n.district !== null && (DISTRICTS[n.district]?.housing ?? 0) > 0),
       unitCost: (u) => (u === 'UNIT_BUILDER' ? UNITS.BUILDER.cost + scaleByGameSpeed(BUILDER_COST_STEP) * cs.buildersTrained
@@ -337,17 +338,15 @@ export function minorPlotEvals(state: GameState, cs: CityState, facts: CityBuild
       modifiers: (mods, t, h) => modifiersValue({ view: facts.view, seat: cs.seat, start: t, horizon: h, rate: AI_RATE,
         owner: { cityId: facts.cityId, capital: facts.capital }, plot }, mods),
     };
-    const ground = owned && !repair ? groundImprovements(state, cs, tile) : new Set<string>();
-    // an improvement a drought on the plot bars, which its ground takes
-    // otherwise, is valued 0: the plot test asks no drought (runs/h1_duelv1128
-    // Hong Kong: the Farm at 9:6 72.45 to t4, 0.00 through the drought of
-    // t5-t9, 71.45 at t10; the drought of t16-t17 makes 8:5's, 7:6's and
-    // 7:7's Farms and 8:6's Camp 0.00, 7:5's Mine 71.45)
-    const dry = owned && !repair && tile.droughtTurns > 0 ? groundImprovements(state, cs, { ...tile, droughtTurns: 0 }) : ground;
+    // the plot test asks no drought; the value of an improvement a drought
+    // on the plot lists is 0 (`improvementValue`; runs/h1_duelv1128 Hong
+    // Kong: the Farm at 9:6 72.45 to t4, 0.00 through the drought of t5-t9,
+    // 71.45 at t10; the drought of t16-t17 makes 8:5's, 7:6's and 7:7's
+    // Farms and 8:6's Camp 0.00, 7:5's Mine 71.45)
+    const ground = owned && !repair ? groundImprovements(state, cs, { ...tile, droughtTurns: 0 }) : new Set<string>();
     const improvements = AI_IMPROVEMENTS.map((row, i) => {
       const id = IMPROVEMENT_ENGINE.get(row.type);
-      if (!id || !dry.has(id)) return FX_MIN;
-      if (!ground.has(id)) return impT[i] >= AI_VALUE_HORIZON ? FX_MIN : 0;
+      if (!id || !ground.has(id)) return FX_MIN;
       return improvementValue(f, row.type, impT[i], AI_VALUE_HORIZON);
     });
     // a district's adjacency at the plot, once per district
@@ -426,7 +425,7 @@ export function minorPlotEvals(state: GameState, cs: CityState, facts: CityBuild
       // one among them, its own valued 0 (runs/h1_duelv1117 Valletta t10-t14:
       // its improved Farms' 0.00 the researched pick over plot 321's Mine
       // without Mining, no tree until Mining at t15)
-      improvable: owned && dry.size > 0,
+      improvable: owned && ground.size > 0,
       districtOk: passed,
       improvements, districts,
     });

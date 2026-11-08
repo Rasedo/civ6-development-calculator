@@ -14,7 +14,8 @@ import type { AiModifier } from './aiModifiers';
 import { AI_YIELD_DEFAULT } from '../data/aiTables';
 import { AI_RATE, FX, FX_MIN, discounted, fmul, fxConst, presentValue, pseudoYieldValue, valueBetween, whole, yieldValue, type AiValueView } from './aiValue';
 import { STRATEGIC_PER_TURN } from '../data/constants';
-import { engineId } from '../data/aliases';
+import { engineId, gameTypeOf } from '../data/aliases';
+import { DROUGHT_IMPROVEMENTS } from '../data/disasters';
 import { RESOURCES } from '../../world/resources';
 
 /** the unit 0x7a3010 and 0x7a37d0 price a charge of (the type by its hash
@@ -40,6 +41,8 @@ export interface PlotValueFacts {
    *  null none */
   floodTurns: number | null;
   eruptionTurns: number | null;
+  /** the plot lies in a live drought's footprint */
+  drought: boolean;
   /** the plot's Appeal (the plot's +0x28) */
   appeal: number;
   /** a plot beside the plot holds a district whose Housing is above 0 (the
@@ -77,6 +80,15 @@ export interface PlotValueFacts {
 }
 
 const IMPROVEMENT = new Map(AI_IMPROVEMENTS.map((r) => [r.type, r] as const));
+
+/** the improvements a drought lists (RandomEvent_PillagedImprovements; both
+ *  droughts list the same), as install types */
+const DROUGHT_LISTED = new Set(DROUGHT_IMPROVEMENTS.map((id) => gameTypeOf('improvement', id, 'IMPROVEMENT_')));
+
+/** a live drought on the plot lists the improvement (GetActiveDroughtTypeAtPlot
+ *  0x28b490: a live entry of the climate's m_aDroughts whose footprint holds
+ *  the plot; 0x28e550 its row's improvement list) */
+const droughtStruck = (f: PlotValueFacts, improvement: string): boolean => f.drought && DROUGHT_LISTED.has(improvement);
 const FEATURE = new Map(AI_FEATURES.map((r) => [r.type, r] as const));
 const RESOURCE = new Map(AI_RESOURCES.map((r) => [r.type, r] as const));
 
@@ -150,9 +162,10 @@ export function harvestValue(f: PlotValueFacts, resource: string, t: number, h: 
  *  adjacency once) and its
  *  YieldFromAppeal at the plot's Appeal, each at the player's value; its Housing over its TilesRequired at the city's housing
  *  value; a flood or an eruption the AI expects before the horizon ends it
- *  there */
+ *  there; 0 where a live drought on the plot lists the improvement */
 export function improvementYieldsValue(f: PlotValueFacts, imp: AiImprovementRow, t: number, h: number): number {
   if (t >= h) return FX_MIN;
+  if (droughtStruck(f, imp.type)) return 0;
   // a flood or an eruption the AI expects sooner ends the horizon there
   for (const hazard of [f.floodTurns, f.eruptionTurns]) {
     if (hazard === null || hazard >= h * FX) continue;
@@ -198,9 +211,10 @@ export function improvementYieldsValue(f: PlotValueFacts, imp: AiImprovementRow,
 }
 
 /** 0x7a58f0: the improvement on the plot landing in `t` turns, to the
- *  horizon `h` */
+ *  horizon `h`; 0 where a live drought on the plot lists it */
 export function improvementValue(f: PlotValueFacts, improvement: string, t: number, h: number): number {
   if (t >= h) return FX_MIN;
+  if (droughtStruck(f, improvement)) return 0;
   const imp = IMPROVEMENT.get(improvement);
   if (!imp) return FX_MIN;
   const unit = buildUnit(f, imp);
