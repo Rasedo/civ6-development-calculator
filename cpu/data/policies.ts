@@ -1482,6 +1482,9 @@ const GOV_BONUS: Record<string, PolicyEffects> = {
       cs: -3,
     },
   },
+  // SYNTHETIC_TECHNOCRACY_TOURISM_PENALTY: "-10% Tourism."
+  // (LOC_GOVT_ACCUMULATED_BONUS_BRIEF_SYNTHETIC_TECHNOCRACY)
+  SYNTHETIC_TECHNOCRACY: { tourismPct: -10 },
 };
 
 const M = 'military' as const;
@@ -1577,7 +1580,7 @@ const GOVERNMENT_SRC: Record<string, SrcMap> = {
     noLegacyCard: { derived: 'true where the install writes no PolicyToUnlock on the government row', inputs: [xml('Governments', 'GovernmentType=GOVERNMENT_SYNTHETIC_TECHNOCRACY', 'PolicyToUnlock')] },
     'effects.freePower': xml('ModifierArguments', 'ModifierId=SYNTHETIC_TECHNOCRACY_CITY_POWER&Name=Amount', 'Value'),
     'effects.projectProdMult': { derived: '1 + Amount/100 - the install writes the percentage, this catalog the multiplier', inputs: [xml('ModifierArguments', 'ModifierId=SYNTHETIC_TECHNOCRACY_CITY_PROJECT_PRODUCTION&Name=Amount', 'Value')] },
-    'effects.tourismPct': xml('ModifierArguments', 'ModifierId=SYNTHETIC_TECHNOCRACY_TOURISM_PENALTY&Name=Amount', 'Value'),
+    'bonus.tourismPct': xml('ModifierArguments', 'ModifierId=SYNTHETIC_TECHNOCRACY_TOURISM_PENALTY&Name=Amount', 'Value'),
   },
 };
 
@@ -1693,10 +1696,11 @@ export const GOVERNMENTS: Record<string, GovernmentDef> = Object.fromEntries(
       { amenitiesAll: 2, yieldPerSpecialty: { culture: 2 } },
       '+2 amenities in all cities and +2 culture per specialty district; -3 combat strength for all units.'),
     noLegacyCard: true },
-    // CIV6 (GS) INHERENT: "+3 Power in all cities. +30% Production towards
-    // city projects. -10% Tourism." No PolicyToUnlock, so no legacy card.
+    // CIV6 (GS) INHERENT: "+3 Power in all cities, and +30% Production
+    // towards all city projects." Its flat bonus (`GOV_BONUS`) is the -10%
+    // Tourism. No PolicyToUnlock, so no legacy card.
     { ...G('SYNTHETIC_TECHNOCRACY', 'Synthetic Technocracy', 4, [M, E, E, E, D, W, W, W, W, W],
-      { freePower: 3, projectProdMult: 1.3, tourismPct: -10 },
+      { freePower: 3, projectProdMult: 1.3 },
       '+3 power in all cities; +30% production toward city projects; -10% tourism.'),
     noLegacyCard: true },
   ].map((g) => [g.id, { ...g, ...(GOV_BONUS[g.id] ? { bonus: GOV_BONUS[g.id] } : {}), src: GOVERNMENT_SRC[g.id] }]),
