@@ -4037,6 +4037,7 @@
     - "H-1: why a seed does not replay — the AI's worker threads — READ, the replay patch MEASURED"
     - "C-96 / C-97: the unit value — READ (the combat, trade, explorer branches, the tail, the military AI's unit production), PARTLY READ (its inputs)"
     - "C-126: the unit choice walks the stored table, stable-sorted at its build, and the table is rebuilt every turn — 0x797980 / 0x79d3a0 and the build's signals READ, both twins; the sea entries' absence open"
+    - "C-98: a city-state's City Analysis counts its knowledge base as its last turn left it — READ (0x608580 at 0x6085c9, 0x5c24e0 / 0x6fae70 on player signal +0x258, 0x785f30 in 0x6096c0's +0x370 list), both twins"
   context:
     - ...(0x45cf70), Governor Analyzer (0x4a79b0), Victory Conditions + Settle City Evaluation (0x4b13f0), Belief Analysis (0x4ec440), Tech Tree Analysis (0x4f87e0). Spawned and waited at once...
     - "- THE UNIT PRODUCTION TABLE 0x7989e0 (AI/UnitProduction.cpp; run from 0x6fae70 at the player AI's turn while 0x79d320 — the built flag +0x28 — is clear): entries, in..."

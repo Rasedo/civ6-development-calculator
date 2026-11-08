@@ -911,9 +911,9 @@ export interface Seat {
    *  the units of the players at war with the seat, the barbarians and the
    *  seat itself left out. Absent = none. */
   enemyCounts?: Record<string, number>;
-  /** a city-state's records by install unit type as the turn's look ages
-   *  them, before its sightings add any: the unit production table its city
-   *  AI's turn reads (`minorKnownUnits`); absent outside that turn */
+  /** a city-state's records by install unit type as its last turn left
+   *  them, before the turn's ageing and look: the unit production table its
+   *  city AI's turn reads (`minorKnownUnits`); absent outside that turn */
   armyCounted?: Record<string, number>;
   /** the military AI's Combat Desire of a city-state (`minorCombatDesire`)
    *  or the Free Cities (`freeCombatDesire`), raw 24.8: its

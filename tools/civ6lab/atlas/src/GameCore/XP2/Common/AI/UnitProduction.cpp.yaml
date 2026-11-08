@@ -47,6 +47,7 @@
     - "C-126: the unit choice walks the stored table, stable-sorted at its build, and the table is rebuilt every turn — 0x797980 / 0x79d3a0 and the build's signals READ, both twins; the sea entries' absence open"
     - "C-130: the unit production table's maintenance resource by the Units index and its shortfall divide — READ (0x7989e0 at 0x798ac3..0x798df2 via 0x28a940, 0x799f04..0x79a0e9, 0x4ab270, 0x3640e0), both twins"
     - "C-98: a unit off the map counts on its owner's list until its end of turn"
+    - "C-98: a city-state's City Analysis counts its knowledge base as its last turn left it — READ (0x608580 at 0x6085c9, 0x5c24e0 / 0x6fae70 on player signal +0x258, 0x785f30 in 0x6096c0's +0x370 list), both twins"
   notes:
     - ".claude/scratchpad/cb5/NOTES.md: ...scratchpad/final.patch.  DONE: the UNIT value (0x7b62c0) + the military AI's unit production table (0x7989e0, cpu/core/aiUnitProduction.ts),   unit T (+5 on PrereqTech/Civic turns), maintenance as plain Gold..."
   context:
@@ -168,6 +169,7 @@
     - "C-97: City Defense and the assault target's validity — the city's threat, the defence event, Is City Threatened, Garrison City and the district target's validity READ; the threat's level terms, the garrison's swap and the team's unit to build unread"
     - "C-96 / C-97: the team's unit to build, the recruit's contract and the knowledge base's camps — the team update's requirements and readiness, the unit choice, Recruit Units' result and contract, the camps READ; the maintenance resource test, the recruit's stealing and levy unread"
     - "C-126: the unit choice walks the stored table, stable-sorted at its build, and the table is rebuilt every turn — 0x797980 / 0x79d3a0 and the build's signals READ, both twins; the sea entries' absence open"
+    - "C-98: a city-state's City Analysis counts its knowledge base as its last turn left it — READ (0x608580 at 0x6085c9, 0x5c24e0 / 0x6fae70 on player signal +0x258, 0x785f30 in 0x6096c0's +0x370 list), both twins"
   context:
     - ...I's unit list (+0x268, the cities' lists handed over by 0x79a320; the choice 0x79cba0 / 0x79bd30 over its ranked 0x168-byte entries, unread). Without it the port's CITY_ASSAULT operati...
   review: reviewed

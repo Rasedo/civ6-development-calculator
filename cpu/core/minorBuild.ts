@@ -165,20 +165,20 @@ export function minorPhase(state: GameState): void {
     // turn's purchases
     const units = state.units.filter((u) => u.seat === cityState.seat).length;
     const fell = minorMilitaryTurn(state, cityState);
-    // its city AI's turn reads the unit production table on the records the
-    // look's ageing keeps, none its sightings add (runs/h1_duely1121 Hunza
-    // t9: the barbarian Quadrireme the look records not counted, its Warrior
-    // 10.1 over the Walls' 9.96, the game's Build City Building on the
-    // Warrior at 10.0; runs/h1_duely1128 Hong Kong t106: Bologna's two
-    // Crossbowmen aged out uncounted, the game's Warrior); its contract
-    // purchases after the look (`minorContractPurchases`), the record of a
-    // unit they make counted; then the savings turn's disband
-    const before = new Set(cityState.armyKnown ?? []);
+    // its military AI's unit production table and its City Analysis (both
+    // on player signal +0x258, fired before the turn start's +0x370 list
+    // that runs the knowledge base's step 0x785f30) read the records as its
+    // last turn left them: none this turn's ageing erases, none its look
+    // adds (runs/h1_duely1124 city-state 4 t46: a Warrior record past 21
+    // turns still counted, the Catapult 11.95 and Engineering 312.4 at t47
+    // as logged; 1121 Hunza t9: the barbarian Quadrireme the look records
+    // not counted); its contract purchases after the look
+    // (`minorContractPurchases`) read the same analysis; then the savings
+    // turn's disband
+    cityState.armyCounted = minorArmyCounts(cityState.armyKnown ?? []);
     minorKnowledge(state, cityState, true);
-    const sighted = new Set((cityState.armyKnown ?? []).filter((r) => !before.has(r)));
     minorContractPurchases(state, cityState, units);
     minorEconomicDisband(state, cityState, fell);
-    cityState.armyCounted = minorArmyCounts((cityState.armyKnown ?? []).filter((r) => !sighted.has(r)));
     // its "Upgrade Units" trees' trigger: a tree per technology gained
     // (TRIGGER_TECH_UPGRADE, AI_EVENT_GAIN_TECH). A civic gained alone starts
     // none, its TRIGGER_CIVIC_UPGRADE row (AI_EVENT_GAIN_CIVIC) notwithstanding:

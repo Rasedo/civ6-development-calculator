@@ -230,6 +230,7 @@
     - "H-1: the military AI's favoured technology — READ (the pick, its use), PARTLY READ (the Free Cities' counts)"
     - "C-96: the unit value's Maintenance at the player's Gold weight — READ (0x7b62c0 at 0x7b729e..0x7b72de), both twins"
     - "C-130: the minor's treasury turn between its technologies and its civics; a pillaged building's Maintenance — READ (0x4e4560's order, 0x18c590), both twins"
+    - "C-98: a city-state's City Analysis counts its knowledge base as its last turn left it — READ (0x608580 at 0x6085c9, 0x5c24e0 / 0x6fae70 on player signal +0x258, 0x785f30 in 0x6096c0's +0x370 list), both twins"
   context:
     - "..., over the player list (0x483b50 +0x4a0) the knowledge base's count of it (CivKnowledge 0x5eb650: the player's army records, AI_Knowledge.csv's ARMY lines \"UNIT_X count age\"), N thei..."
   review: reviewed
@@ -304,6 +305,7 @@
     - "C-95: the barbarians' Builder Capture — READ (the event, the start, the tree's walk), ported"
     - "C-97: the AI's knowledge of the map's cities"
     - "C-130 / C-98: the Archaeologist's value, the strength modifier's analysis, the knowledge base's enemy unit counts — READ (0x7b62c0 at 0x7b6a8c, 0x27fcf0, 0x6b2060, 0x69ed80, 0x5eab80, 0xbe4aa0), both twins"
+    - "C-98: a city-state's City Analysis counts its knowledge base as its last turn left it — READ (0x608580 at 0x6085c9, 0x5c24e0 / 0x6fae70 on player signal +0x258, 0x785f30 in 0x6096c0's +0x370 list), both twins"
   context:
     - "- The update (0x5ebb30): every entry ages; one whose plot the player sees with no city of its owner there is d..."
   review: reviewed

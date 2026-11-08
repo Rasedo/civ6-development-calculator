@@ -87,7 +87,7 @@
   final: 0x5146e0
   kind: function
   name: tacticalKnowledgeTurn
-  semantics: "player signal +0x1f8: the knowledge update (0x5ebb30, the ageing) then the look (0x7877e0), then the target list 0x783980. A city-state's unit production table (0x7989e0) reads the army records the ageing keeps, before the look's sightings: the table stands between them. Ported: CityState.armyCounted (minorKnownUnits), GPU _cv_counted on citystate_kb_seq (_cv_known)."
+  semantics: "player signal +0x1f8: the knowledge update (0x5ebb30, the ageing) then the look (0x7877e0), then the target list 0x783980. A city-state's unit production table (0x7989e0) and City Analysis, on player signal +0x258 an update before this step, read the army records as the last turn left them: none the ageing erases, none the look adds. Ported: CityState.armyCounted taken before minorKnowledge (minorKnownUnits), GPU _cv_counted (_cv_known) before _minor_knowledge."
   status: READ
   cases:
     - recording: h1_duely1121
@@ -98,6 +98,9 @@
     - recording: h1_duelv1124
       turn: 17
       value: minor 3's dead Warrior 131073 stays on its ARMY line from t17 to t38, gone at t39
+    - recording: h1_duely1124
+      turn: 46
+      value: "city-state 4: a Warrior record aged out by the t46 step still counted, the Catapult 11.95 (W6 HC1 S3), Engineering 312.4 at t47 as logged; t44 11.74 / 1.9, city-state 3 t53 Catapult 7.01, t77 Crossbowman 4.58 as logged"
   impl:
     - cpu/core/minorBuild.ts:minorKnowledge
     - cpu/harness/cityBuildLab.ts:kbUpdate
@@ -106,6 +109,7 @@
     - cpu/core/tactical.ts:ex
     - gpu/core/sim_minors.py:_knowledge_look
     - gpu/core/sim_tactics.py:_tac_pass
+    - cpu/core/minorBuild.ts:prev
   readings:
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
     - "C-96: the knowledge base's army records and the Combat Desire — READ (the records, the update, the desire), PARTLY READ (the signals' looks, the standing-army count)"
@@ -118,6 +122,7 @@
     - "C-129: a city-state's contract purchases come after its knowledge base's look — the job order READ (0x6096c0), the birth record's timing off the aimem sites, both twins"
     - "C-96 / C-129: a city-state's unit production table counts the records its look's ageing keeps, none its sightings add"
     - "C-129: a unit made anew that no plot takes is destroyed, its own plot refused by a hostile defender alone; a bankruptcy's disband before the look — READ, both twins"
+    - "C-98: a city-state's City Analysis counts its knowledge base as its last turn left it — READ (0x608580 at 0x6085c9, 0x5c24e0 / 0x6fae70 on player signal +0x258, 0x785f30 in 0x6096c0's +0x370 list), both twins"
   context:
     - "- THE AGEING (0x5ebb30, the first step of the tactical AI's turn 0x785f30 on player signal +0x1f8): every record's age + 1; one whose age before the step was a..."
     - "...877e0, Targets.cpp, \"Invalid unit when updating AI knowledge base\"; after the ageing in 0x785f30 and again on player signal +0x228): over every plot the player's visibility count (+0x2..."
@@ -273,6 +278,7 @@
     - "C-96 / C-129: a city-state's unit production table counts the records its look's ageing keeps, none its sightings add — the aimem sites read, both twins"
     - "C-129: a city-state's contract purchases come after its knowledge base's look — the job order READ (0x6096c0), the birth record's timing off the aimem sites, both twins"
     - "C-95: the target list's knowledge-base entries"
+    - "C-98: a city-state's City Analysis counts its knowledge base as its last turn left it — READ (0x608580 at 0x6085c9, 0x5c24e0 / 0x6fae70 on player signal +0x258, 0x785f30 in 0x6096c0's +0x370 list), both twins"
   context:
     - "- THE LOOK (0x7877e0, Targets.cpp, \"Invalid unit when updating AI knowledge base\"; after the ageing in 0x785..."
   review: reviewed

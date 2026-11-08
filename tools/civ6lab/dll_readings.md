@@ -9595,3 +9595,35 @@ cpu/core/phase.ts). Replay only: the engines' own order is the game's.
   Camp at 13, Protect Units' Promote after.
 - A major's bankruptcy disband is the record's: runs/h1_duely1124 t242-244
   player 1's AT Crew 6946843 on 37:18, in city-state 3's t244 look.
+
+## C-98: a city-state's City Analysis counts its knowledge base as its last turn left it — READ (0x608580 at 0x6085c9, 0x5c24e0 / 0x6fae70 on player signal +0x258, 0x785f30 in 0x6096c0's +0x370 list), both twins
+
+`CityState.armyCounted` taken before `minorKnowledge` in `minorPhase`
+(cpu/core/minorBuild.ts; read by `minorKnownUnits`); GPU `_cv_counted[s] =
+_cv_known(s)` before `_minor_knowledge` (gpu/core/sim_minors.py,
+gpu/core/sim_cityvalue.py `_cv_known`).
+
+- THE ORDER: the player AI's update 0x608580, with the player's +0x7e8
+  clear, fires player signal +0x258 (0x6085c9) and returns; a later update
+  runs the turn start 0x608870 and its +0x370 list, whose first group holds
+  the knowledge step 0x785f30 (the ageing 0x5ebb30, then the look 0x7877e0).
+  The military AI's table rebuild 0x6fae70 and the City Analysis 0x5c24e0
+  are both on +0x258, so the unit production table (0x7989e0's counts,
+  0x5eb650) and the analysis's unit values read the records as the last turn
+  left them: a record this turn's ageing erases still counts, a record its
+  look adds does not. The contract purchases (+0x370, pass 3) read that
+  analysis (`minorContractPurchases`), the military upgrade the same table.
+- Confirmed (aimem, one-seed traces): runs/h1_duely1124 city-state 4 t46,
+  a Warrior record past 21 turns erased by the t46 ageing still counted
+  (Warrior 6, Heavy Chariot 1, Scout 3): the Catapult 11.95 for the 11.65
+  the aged records gave, Engineering 312.4 / Machinery 475.3 at t47 as
+  logged (the 0.3 the research's unit term took ten times); t44 Catapult
+  11.74 (Engineering -1.9 at t45), city-state 3 t53 Catapult 7.01 and t77
+  Crossbowman 4.58 as logged; runs/h1_duely1121 Hunza t9, the barbarian
+  Quadrireme its look records not counted. researchScore.minor misses over
+  1117 t1-140 / 1121 t1-145 / 1124 t1-140 / 1127 t1-110 / 1128 t1-120:
+  231 / 28 / 161 / 74 / 48 -> 181 / 15 / 72 / 4 / 8, no other kind worse.
+- Open: whether the operations' unit choice (0x79bd30, `seatUnitRows` on
+  the records at the operations' tick) reads the table +0x258 built — the
+  stored table's sums would then hold the same records; no recorded case
+  tells the two apart.
