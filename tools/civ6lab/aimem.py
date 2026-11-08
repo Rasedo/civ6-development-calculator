@@ -416,9 +416,10 @@ class Reader:
         layout of `vector`) its items as int32s; any other member (a
         component, City's m_kGrowth, m_kCulture, m_kBuildQueue ...) its value
         bytes as int32s, and under `<name>.v` the items of every {begin,
-        capacity, count} vector its words hold (by the word its header
-        starts at: the build queue's per-type progress) — the int lists
-        sparse {index: value} where mostly zero"""
+        capacity, count} or EASTL {begin, end, capacity end} vector its
+        words hold (by the word its header starts at: the build queue's
+        per-type progress, PlayerStats' m_aiNumUnitsConstructed per unit
+        type) — the int lists sparse {index: value} where mostly zero"""
         def ints_of(raw: bytes):
             ints = struct.unpack(f"<{len(raw) // 4}i", raw[:len(raw) // 4 * 4])
             nz = sum(1 for v in ints if v)
@@ -444,13 +445,22 @@ class Reader:
             region = b[off + 0x10:off + sz]
             out[name] = ints_of(region)
             inner = {}
-            for k in range(0, len(region) - 0x17, 8):
-                p, cap, n = struct.unpack_from("<QQQ", region, k)
-                if ptr(p) and 0 < n <= cap <= 0x400:
-                    try:
-                        inner[k // 4] = ints_of(self.pm.read(p, 4 * n))
-                    except MemError:
-                        continue
+            k = 0
+            while k <= len(region) - 0x18:
+                p, q1, q2 = struct.unpack_from("<QQQ", region, k)
+                if ptr(p) and 0 < q2 <= q1 <= 0x400:
+                    size = 4 * q2
+                elif ptr(p) and ptr(q1) and p < q1 <= q2 and q1 - p <= 0x4000:
+                    size = q1 - p
+                else:
+                    k += 8
+                    continue
+                try:
+                    inner[k // 4] = ints_of(self.pm.read(p, size))
+                except MemError:
+                    k += 8
+                    continue
+                k += 0x18
             if inner:
                 out[name + ".v"] = inner
         return out
