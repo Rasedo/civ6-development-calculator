@@ -6,7 +6,7 @@
 - addr: 0x2bf3e0
   final: 0x1e2800
   kind: function
-  semantics: adds the Amount to the era manager's player entry +0x34 (the +0x560 vector, stride 0x78).
+  semantics: adds the Amount to the era manager's player entry +0x34 (the +0x560 handle of the +0x5b8 vector, stride 0x78), the record 0x2c41d0 reads; the one writer of +0x34.
   status: PARTLY
   cases:
     - recording: 1109
@@ -14,6 +14,7 @@
       value: "the records fit \"a   specialty district (RequiresPopulation) completed pays\": an Aqueduct pays   nothing under the dedication (1109 t99, 1110 t107, 1120 t94, 1124 t97),   nor a Dam (1118 t98) nor the "
   readings:
     - "H-1: a drought on a city centre, Monumentality's districts, Kandy's wonder Relic — PARTLY READ"
+    - "C-100: the plot values' golden-age, claims and tourism-percent terms, the required features, the power value's negative Amount — READ"
   context:
     - "...E_QUEST): the factory 0xc25910, the effect vtable 0xdf85f8, its player apply 0xb83b00 → 0x2bf3e0 adds the Amount to the era manager's player entry +0x34 (the +0x560 vector, stride 0x78..."
   review: reviewed
@@ -59,6 +60,7 @@
     - "C-96: the district value's remaining terms — READ (the envoys' term, the golden-age term's reader, the modifiers' list, the neighbours' functor), a LAB (the district's buildings), and the Farm's adjacency in the plot values"
     - "C-108: a trade route's term and its end — READ (the MakeTradeRoute operation's check, the term), both twins"
     - "C-108: a trade route's term and its end"
+    - "C-100: the plot values' golden-age, claims and tourism-percent terms, the required features, the power value's negative Amount — READ"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ...d (pseudo index in [@0xf2e218, @0xf2e238]) adds 0x2c4230(player) [the record +0x6c of the 0x2c3660 manager's per-player vector] valued as PSEUDOYIELD_GOLDENAGE_POINT through 0x7a60d0, and...
@@ -180,13 +182,14 @@
   final: 0x1e5d40
   kind: function
   name: the player's era record +0x34
-  semantics: the player's era record (0x78 bytes each, at the era manager's +0x5b8) +0x34; 0 for a player past the list. What +0x34 holds is unread.
+  semantics: "the player's era record (0x78 bytes each, at the era manager's +0x5b8) +0x34; 0 for a player past the list. +0x34 is the era score a district completed pays: its one writer 0x2bf3e0, the apply of EFFECT_ADJUST_PLAYER_ERA_SCORE_PER_DISTRICT_CONSTRUCTED (COMMEMORATION_INFRASTRUCTURE_QUEST, a dedication). The district value body (0x7ab2a4) values it at PSEUDOYIELD_GOLDENAGE_POINT a turn; a city-state and the Free Cities hold no dedication, 0."
   status: READ
   cases:
-    - recording: 1121
-      turn: 11
-      value: "The residuals:   per (turn, player) a constant across plots (Campus, Holy Site: 0.4 to   5.5), an Encampment's 0.5 a turn (the player's CITY_DEFENSES weight   reads 0 where the logs fit +0.25), Snow c"
+    - recording: h1_duelz1124
+      value: "no city-state holds a dedication: the term 0 in every city-state's district value; Cardiff's Industrial Zone on 11:12 at t108, Granada's Neighbourhood on 40:12 at t201 as recorded (--memory aimem)"
+  impl: [cpu/core/aiDistrictValue.ts:districtBodyValue, gpu/core/sim_cityvalue.py:_cv_district_body]
   readings:
+    - "C-100: the plot values' golden-age, claims and tourism-percent terms, the required features, the power value's negative Amount — READ"
     - "C-96: the district value's remaining terms — READ (the envoys' term, the golden-age term's reader, the modifiers' list, the neighbours' functor), a LAB (the district's buildings), and the Farm's adjacency in the plot values"
     - "C-96: the district value — READ (0x7a51f0, 0x7aaf80's terms below, 0x366df0, the purchase price 0x1b1cb0, 0x1c77c0, 0x1b4450), PARTLY READ (the golden-age term, the claims, modifiers and neighbours terms, the domain's resources path), unwired"
     - "C-96: the district value's remaining terms"

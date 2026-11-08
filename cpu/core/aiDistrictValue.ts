@@ -122,6 +122,10 @@ export function districtBodyValue(f: DistrictValueFacts, row: AiDistrictRow, t: 
     if (h <= t) return 0;
   }
   const pd = pseudoYieldValue(f.view, f.seat, FX, 'PSEUDOYIELD_DISTRICT');
+  // the turn's PSEUDOYIELD_GOLDENAGE_POINT term reads the player's era
+  // record +0x34, the era score a district completed pays under the
+  // Monumentality dedication: no city-state holds a dedication, so it adds
+  // nothing
   let v = pd;
   // the whole adjacency counts on an owned plot only (0x366df0 reads 0 at
   // a plot without an owner); the rows count on any
@@ -173,6 +177,9 @@ export function districtBodyValue(f: DistrictValueFacts, row: AiDistrictRow, t: 
     const band = row.appealHousing.find(([min]) => f.appeal >= min);
     value += f.housingValue(housing + (band ? band[1] : 0), t, h);
   }
+  // the claimed plots (0x7a10c0) count only for a district on the player's
+  // culture-bomb list (+0x1380: founder beliefs, leader and civilization
+  // traits, Great People), which no city-state holds
   // a Dam: 100.0 an improved plot and 300.0 a district's along its rivers
   if (row.preventsFloods) {
     const r = f.riverPlots();

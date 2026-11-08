@@ -395,7 +395,9 @@ class SimCityValue:
             amt = _fmul(_t(f.appeal(), like) * _FX, torch.full_like(like, _fx_const(row["appealPct"] * 0.01)))
             v = v + self._cv_yield(amt, row["appealYield"], f.yield_w(row["appealYield"]))
         # its tourism: a TOURISMSOURCE_APPEAL row's Appeal x ScalingFactor /
-        # 100 at PSEUDOYIELD_TOURISM x the era weight (`improvementYieldsValue`)
+        # 100 at PSEUDOYIELD_TOURISM x the era weight, the city's percent
+        # (+0x1b20, the Golden Gate Bridge's) none in a city-state's city
+        # (`improvementYieldsValue`)
         for source, scale in row["tourism"]:
             if source != "TOURISMSOURCE_APPEAL":
                 continue
@@ -416,6 +418,8 @@ class SimCityValue:
         if row["housing"] > 0:
             hv = f.housing_value(row["housing"], t, h)
             value = value + torch.div(hv * _FX, max(row["tilesRequired"], 1) * _FX, rounding_mode="trunc")
+        # the claimed plots (0x7a10c0) count only for an improvement on the
+        # player's culture-bomb list (+0x1380), which no city-state holds;
         # its modifiers in the plot's city's analysis (0x7a4b20)
         if row.get("modifiers"):
             value = value + self._cv_modifiers(f, row["modifiers"], t, h)
@@ -516,6 +520,9 @@ class SimCityValue:
         bad = (t >= h) | (_t(f.lake(), like).bool() & bool(row["coast"]))
         h, dead = self._cv_cut(f, t, h, floods=not row["preventsFloods"])
         pd = self._cv_pseudo(torch.full_like(like, _FX), "PSEUDOYIELD_DISTRICT", f.pseudo_w("PSEUDOYIELD_DISTRICT"))
+        # the turn's PSEUDOYIELD_GOLDENAGE_POINT term reads the era record's
+        # +0x34 (Monumentality's era score a district): no city-state holds a
+        # dedication, so it adds nothing (`districtBodyValue`)
         v = pd.clone()
         owned = _t(f.owned(), like).bool()
         for y in _YIELDS:
@@ -576,6 +583,8 @@ class SimCityValue:
                 band = torch.where(hit, torch.full_like(band, ch), band)
                 done = done | hit
             value = value + f.housing_value(housing + band, t, h)
+        # the claimed plots (0x7a10c0) count only for a district on the
+        # player's culture-bomb list (+0x1380), which no city-state holds
         if row["preventsFloods"]:
             imp_n, dis_n = f.river_plots()
             value = value + (_t(imp_n, like) * 100 + _t(dis_n, like) * 300) * _FX

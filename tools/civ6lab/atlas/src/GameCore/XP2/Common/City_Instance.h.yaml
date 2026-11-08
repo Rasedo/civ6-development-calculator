@@ -18,6 +18,15 @@
   context:
     - "...y the score lines they miss, with their analyzers and whether they reach CityBuildAI (0xa5c20): `.claude` analysis `anlist.py` / `ancalls.py`."
   review: reviewed
+- addr: 0xb42cb0
+  kind: function
+  semantics: "EFFECT_ADJUST_CITY_IMPROVEMENT_TOURISM's apply (object vtable 0xdebe68 slot +0x60): adds the Amount (+8) into the city's watched block +0x1a70 (0x9034b0: its data at +0x58) at +0x58, city +0x1b20, the improvement tourism percent 0x1aba40 reads; its one install user GOLDENGATE_IMPROVEMENT_TOURISM"
+  status: PARTLY
+  readings:
+    - "C-100: the plot values' golden-age, claims and tourism-percent terms, the required features, the power value's negative Amount — READ"
+  context:
+    - "...abb05 (0x1aba40, applied where above 0). EFFECT_ADJUST_CITY_IMPROVEMENT_TOURISM's apply 0xb42cb0 adds the Amount into the city's watched block +0x1a70 (0x9034b0: its data at +0x58, c..."
+  review: reviewed
 - addr: 0xb48710
   kind: function
   semantics: "EFFECT_ADJUST_YIELD_BY_NUMBER_OF_RESOURCES' apply: registers the yield type and Amount on the city's +0x1da8 table (0xc705d0)."

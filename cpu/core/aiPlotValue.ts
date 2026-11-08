@@ -166,7 +166,9 @@ export function improvementYieldsValue(f: PlotValueFacts, imp: AiImprovementRow,
   // its tourism (Improvement_Tourism, 0x7b19a0): a TOURISMSOURCE_APPEAL row's
   // the plot's Appeal x ScalingFactor / 100 (0x1aba40) at PSEUDOYIELD_TOURISM,
   // x (1 - 0.1 for each era the player stands before the sixth) a turn; the
-  // yield sources' rows are not valued
+  // city's percent on it (+0x1b20, EFFECT_ADJUST_CITY_IMPROVEMENT_TOURISM:
+  // the Golden Gate Bridge's) is none in a city-state's city; the yield
+  // sources' rows are not valued
   for (const [source, scale] of imp.tourism) {
     if (source !== 'TOURISMSOURCE_APPEAL') continue;
     const amount = scale === 100 ? f.appeal : Math.trunc((f.appeal * scale) / 100);
@@ -184,6 +186,8 @@ export function improvementYieldsValue(f: PlotValueFacts, imp: AiImprovementRow,
     const hv = f.housingValue(imp.housing, t, h);
     value += Math.trunc((hv * FX) / (Math.max(imp.tilesRequired, 1) * FX));
   }
+  // the claimed plots (0x7a10c0) count only for an improvement on the
+  // player's culture-bomb list (+0x1380), which no city-state holds
   // its modifiers (ImprovementModifiers) in the plot's city's analysis
   // (0x7a4b20 at 0x7b23d8): a Solar Farm's 2 Power 40.00 over a city-state's
   // horizon (runs/h1_duelv1117); the Farm's FARM_HOUSING_WITH_MAYAB_TRAIT

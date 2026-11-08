@@ -98,6 +98,7 @@
     - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
     - "C-127: the improvement loop's housing — EFFECT_ADJUST_IMPROVEMENT_HOUSING READ (0x6ad2b0), the growth forecast as the last analysis read it (a LAB fit), the water arm's resource rows, the Mountain Tunnel's analysis rows"
     - "C-129: the military AI's upgrade — READ (0x727db0, 0x6874d0), both twins"
+    - "C-100: the plot values' golden-age, claims and tourism-percent terms, the required features, the power value's negative Amount — READ"
   context:
     - "...the knowledge base's update 0x783980 from a per-plot visibility word > 0) above 0.5 (0xd20458) sets +0x440 and decides: coastal plots >= trunc(total x 20 / 100) sets the island, els..."
   review: reviewed
@@ -658,6 +659,15 @@
   readings: ["C-74: the volcano roll's gate — READ"]
   context:
     - "0x335040 reads the volcano component's counts (vtable 0xdb11b8): +0x68(b) 0xa1d2b0 counts the volcano entries (+0x1a0, stride 0xa0), with b true only th..."
+  review: reviewed
+- addr: 0xdde870
+  kind: global
+  semantics: EFFECT_ADD_CULTURE_BOMB_TRIGGER's effect vtable (+0x10 its name, +0x28 0xb03850 makes the object 0xc03070)
+  status: PARTLY
+  readings:
+    - "C-100: the plot values' golden-age, claims and tourism-percent terms, the required features, the power value's negative Amount — READ"
+  context:
+    - "...culture-bomb triggers: EFFECT_ADD_CULTURE_BOMB_TRIGGER (factory 0xc1c890, effect vtable 0xdde870, its object 0xc03070: BuildingType +8, DistrictType +0xc, ImprovementType +0x10, Captur..."
   review: reviewed
 - addr: 0xdecb08
   kind: global

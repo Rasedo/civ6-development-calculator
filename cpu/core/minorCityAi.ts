@@ -233,7 +233,9 @@ function groundImprovements(state: GameState, cs: CityState, actual: Tile): Set<
  *  disfavoured — the analysis values no district it disfavours
  *  (runs/h1_duelv1117: no city-state's plot ever values a Holy Site; the
  *  cultural Antananarivo values Theaters, the militaristic Valletta
- *  Encampments) — 0 neither */
+ *  Encampments) — 0 neither. The Dam, one of the two districts the
+ *  placement test's required features (+0x218, District_RequiredFeatures)
+ *  hold to a plot, is among the disfavoured; the other is Kongo's Mbanza */
 export function minorDistrictVerdict(type: string, district: string): -1 | 0 | 1 {
   const v = (AI_DISTRICT_LISTS.MINOR_CIV_DEFAULT_TRAIT?.[district] ?? 0)
     + (AI_DISTRICT_LISTS[`MINOR_CIV_${type.toUpperCase()}_TRAIT`]?.[district] ?? 0);

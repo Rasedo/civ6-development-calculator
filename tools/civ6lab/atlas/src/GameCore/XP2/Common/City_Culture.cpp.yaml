@@ -264,7 +264,7 @@
 - addr: 0x1aba40
   final: 0x11cc40
   kind: function
-  semantics: the player's plots of an improvement (the Tourism term).
+  semantics: "the improvement tourism of a plot (source, plot, ScalingFactor): source 6 (TOURISMSOURCE_APPEAL) the plot's Appeal (vcall +0x28), any other the plot's yield of that type for its owner 0x82280 with the last flag false less with it true; x ScalingFactor / 100 (unless 100); x (100 + the plot's city's +0x1b20) / 100 where that is above 0"
   status: PARTLY
   cases:
     - recording: 1117
@@ -275,6 +275,7 @@
     - "H-1: a wonder's and an improvement's tourism — PARTLY READ"
     - "H-1: the research AI — READ (the choice), PARTLY READ (the value)"
     - "C-96: the improvement value — READ (0x7a58f0, 0x7b1320's yields, tourism and modifiers, the feature removal 0x7a3010, the harvest 0x7a37d0, the build unit 0x7a2e20, EFFECT_ADJUST_CITY_FREE_POWER), PARTLY READ (the hazards' turns, 0x7b1320's defence, claimed plots and neighbours terms)"
+    - "C-100: the plot values' golden-age, claims and tourism-percent terms, the required features, the power value's negative Amount — READ"
   context:
     - "- An improvement (the lens 0x399e10 at 0x39a73c, the city 0x1aba40): its Improvement_Tourism row pays only with its PrereqTech (+0x60, the player's tech..."
   review: reviewed

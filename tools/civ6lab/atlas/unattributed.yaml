@@ -1041,6 +1041,7 @@
       value: "The term is gone once no Great Scientist stands on the present timeline   (Game_GreatPeople.csv: 1124 after Carl Sagan's grant at t232, 1117 after   Stephanie Kwolek's at t246, no scientist added;"
   readings:
     - "C-96: the improvement value — READ (0x7a58f0, 0x7b1320's yields, tourism and modifiers, the feature removal 0x7a3010, the harvest 0x7a37d0, the build unit 0x7a2e20, EFFECT_ADJUST_CITY_FREE_POWER), PARTLY READ (the hazards' turns, 0x7b1320's defence, claimed plots and neighbours terms)"
+    - "C-100: the plot values' golden-age, claims and tourism-percent terms, the required features, the power value's negative Amount — READ"
   context:
     - "...0x1f0020, +0x08 x (100 + +0xa8)% where +0xa8 > 0) is below its required power (+0x58, 0x1f02f0; the unpowered notification 0x1ee5c0 prints +0x58 against +0x30 plus the free power), h..."
   review: reviewed
@@ -6682,6 +6683,7 @@
     - "C-127 / C-100: the buildings' dependents and the districts' buildings (0x5cadc0) — ported, both twins"
     - "C-95: the clear-terrain start Movement"
     - "C-124: the kept path is never taken; a move order's path passes other players' units out of sight — READ (0x272aa0, 0x2714b0, 0x586360 at 0x586542..0x5865a1, 0x26fe20), both twins"
+    - "C-100: the plot values' golden-age, claims and tourism-percent terms, the required features, the power value's negative Amount — READ"
   notes:
     - "a synced variable's mutable access: marks the holder changed (0xccf080) where it is tracked (+0x50), returns the holder + 0x58 (CityBuildAI +0xd10 -> +0xd68, +0xd80 -> +0xdd8)"
   context:
@@ -7696,6 +7698,16 @@
   status: PARTLY
   notes: ["imported: a saved label (.claude/scratchpad/cb/labels.json), no reading"]
   review: imported
+- addr: 0xad6290
+  final: 0x7d1720
+  kind: function
+  semantics: "a database table accessor; the power value's negative branch reads its rows +0x28 (PowerProvided) and +0x50 -> +0x14 (the resource's index): Resource_Consumption"
+  status: PARTLY
+  readings:
+    - "C-100: the plot values' golden-age, claims and tourism-percent terms, the required features, the power value's negative Amount — READ"
+  context:
+    - "...ts required power (0x1f02f0, City_Power +0x58) plus |A|. Else the fuel F = the sum over 0xad6290's rows with +0x28 above 0 (Resource_Consumption PowerProvided: Coal 4, Oil 4, Uranium 1..."
+  review: reviewed
 - addr: 0xad6670
   final: 0x7d1b00
   kind: function
@@ -7996,6 +8008,7 @@
       value: "the records fit \"a   specialty district (RequiresPopulation) completed pays\": an Aqueduct pays   nothing under the dedication (1109 t99, 1110 t107, 1120 t94, 1124 t97),   nor a Dam (1118 t98) nor the "
   readings:
     - "H-1: a drought on a city centre, Monumentality's districts, Kandy's wonder Relic — PARTLY READ"
+    - "C-100: the plot values' golden-age, claims and tourism-percent terms, the required features, the power value's negative Amount — READ"
   context:
     - "...FRASTRUCTURE_QUEST): the factory 0xc25910, the effect vtable 0xdf85f8, its player apply 0xb83b00 → 0x2bf3e0 adds the Amount to the era manager's player entry +0x34 (the +0x560 vector,..."
   review: reviewed
@@ -8142,6 +8155,25 @@
     - "C-130 / C-98: the Archaeologist's value, the strength modifier's analysis, the knowledge base's enemy unit counts — READ (0x7b62c0 at 0x7b6a8c, 0x27fcf0, 0x6b2060, 0x69ed80, 0x5eab80, 0xbe4aa0), both twins"
   context:
     - ...adds each ability modifier's analysis. Where no subject passes, the analyzer's slot 2 (0xbe4aa0, nothing, but for EFFECT_ADJUST_DISTRICT_GREAT_PERSON_POINTS 0x6a4750).
+  review: reviewed
+- addr: 0xc03070
+  final: 0x8a3d80
+  kind: function
+  semantics: "EFFECT_ADD_CULTURE_BOMB_TRIGGER's object: BuildingType +8, DistrictType +0xc, ImprovementType +0x10, CaptureOwnedTerritory +0x14 (the player's culture-bomb triggers +0x1380 entries)"
+  status: PARTLY
+  readings:
+    - "C-100: the plot values' golden-age, claims and tourism-percent terms, the required features, the power value's negative Amount — READ"
+  context:
+    - "...: EFFECT_ADD_CULTURE_BOMB_TRIGGER (factory 0xc1c890, effect vtable 0xdde870, its object 0xc03070: BuildingType +8, DistrictType +0xc, ImprovementType +0x10, CaptureOwnedTerritory +0x14..."
+  review: reviewed
+- addr: 0xc1c890
+  kind: function
+  semantics: registers EFFECT_ADD_CULTURE_BOMB_TRIGGER (effect vtable 0xdde870)
+  status: PARTLY
+  readings:
+    - "C-100: the plot values' golden-age, claims and tourism-percent terms, the required features, the power value's negative Amount — READ"
+  context:
+    - "...ment) is the player's culture-bomb triggers: EFFECT_ADD_CULTURE_BOMB_TRIGGER (factory 0xc1c890, effect vtable 0xdde870, its object 0xc03070: BuildingType +8, DistrictType +0xc, Impro..."
   review: reviewed
 - addr: 0xc1e610
   kind: function

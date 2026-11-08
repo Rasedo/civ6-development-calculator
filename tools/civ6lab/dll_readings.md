@@ -10609,3 +10609,63 @@ GPU `_op_move_exec`'s `pin` and the walk's `cross` (gpu/core/sim_tactics.py),
   after 0x26fe20) is unread; a formation's riders keep their own rule.
 - Open: 1117 t188 the same unit's step 14:7 -> 15:6 (an unowned water
   plot by our borders), 1117 t220 its Wander target.
+
+## C-100: the plot values' golden-age, claims and tourism-percent terms, the required features, the power value's negative Amount — READ
+
+- GOLDEN AGE (0x7aaf80 at 0x7ab294): a turn adds PSEUDOYIELD_GOLDENAGE_POINT
+  of the player's era record +0x34 (0x2c41d0: the era manager 0x2c3660's
+  +0x5b8 vector, 0x78-byte entries) beside PSEUDOYIELD_DISTRICT. +0x34's one
+  writer is 0x2bf3e0 (the same vector through its +0x560 handle), the apply
+  0xb83b00 of EFFECT_ADJUST_PLAYER_ERA_SCORE_PER_DISTRICT_CONSTRUCTED, whose
+  one install user is COMMEMORATION_INFRASTRUCTURE_QUEST
+  (Expansion1_Moments.xml, PLAYER_ELIGIBLE_FOR_COMMEMORATION_QUEST): a
+  dedication. A city-state and the Free Cities hold none, so the term is 0
+  for every party the plot values run for (`districtBodyValue` /
+  `_cv_district_body`: no term).
+- CLAIMS: the list +0x1380 (0x10-byte entries; 0x39dd20 matches a district at
+  +4 through the player's version 0x408860, 0x39de20 an improvement) is the
+  player's culture-bomb triggers: EFFECT_ADD_CULTURE_BOMB_TRIGGER (factory
+  0xc1c890, effect vtable 0xdde870, its object 0xc03070: BuildingType +8,
+  DistrictType +0xc, ImprovementType +0x10, CaptureOwnedTerritory +0x14).
+  Its install users: Warrior Monks (MODIFIER_ALL_PLAYERS_ATTACH_MODIFIER on
+  PLAYER_FOUNDED_RELIGION_REQUIREMENTS), leader and civilization traits,
+  Great Engineers. None reaches a city-state, so 0x7a10c0 never runs for one
+  (`improvementYieldsValue`, `districtBodyValue`: no term).
+- TOURISM PERCENT: city +0x1b20 is read only at 0x1abb05 (0x1aba40, applied
+  where above 0). EFFECT_ADJUST_CITY_IMPROVEMENT_TOURISM's apply 0xb42cb0 adds
+  the Amount into the city's watched block +0x1a70 (0x9034b0: its data at
+  +0x58, city +0x1ac8) at +0x58: city +0x1b20. Its one install user is
+  GOLDENGATE_IMPROVEMENT_TOURISM (Expansion2_Buildings_Major.xml); a
+  city-state builds no wonder, so the percent is 0 in its city.
+- THE YIELD SOURCES' ROWS: 0x7b19a0 walks every Improvement_Tourism row
+  (+0x168) with no PrereqTech test (Flight's rows count before Flight);
+  0x1aba40 for a source other than 6 reads 0x82280(plot, source, owner,
+  false) less the same with true. That flag (0x538a60's fifth argument,
+  [rbp + 0x7f]) skips the plot's district yields (0x538b69), its improvement's
+  (0x538fae), the per-yield district rows (0x5392c7) and the tail
+  0x53943c..0x53983c. The amount reads the plot as it stands, not the
+  improvement valued. OPEN: what the tail holds; the rows unported (C-100).
+- REQUIRED FEATURES (Districts +0x218, District_RequiredFeatures): the Dam
+  (FEATURE_FLOODPLAINS, _GRASSLAND, _PLAINS) and Kongo's Mbanza (FOREST,
+  JUNGLE). MINOR_CIV_DEFAULT_TRAIT disfavours the Dam (AiLists), so neither
+  reaches a city-state's plot analysis (`minorDistrictVerdict`).
+- THE POWER VALUE, Amount A below 0 (0x7a67f0 to 0x7a6c52): 0 where the city's
+  free power (0x1f0020) reaches its required power (0x1f02f0, City_Power
+  +0x58) plus |A|. Else the fuel F = the sum over 0xad6290's rows with +0x28
+  above 0 (Resource_Consumption PowerProvided: Coal 4, Oil 4, Uranium 16) of
+  the player's +0x1320 +0x350 entry of the row's resource (+0x50 -> +0x14),
+  where above 0, times +0x28; 0 where F reaches |A|; else minus half the
+  city's Production (City::GetYield x 0.5f, @0xd20458) at its value (0x7a6690)
+  from T to H (0x7a16e0 twice; at T = H minus 0x7a1240 at T). No
+  GPP_SCIENTIST term. Its caller valueConstructible 0x7a9209: a building's
+  Buildings_XP2 RequiredPower above 0 at minus RequiredPower (Factory 2,
+  Electronics Factory 2, Stock Exchange 3, Research Lab 3, Stadium 2, ...),
+  added after the Entertainment term, before BlocksCoastalFlooding. OPEN: the
+  term unported, a city-state's City_Power free and required power unread
+  (C-100 LAB: "a minor never power-short").
+- DUELZ PLACEMENTS (one-seed traces, `--memory aimem`): runs/h1_duelz1124
+  Cardiff's Industrial Zone on 11:12 at t108 and Granada's Neighbourhood on
+  40:12 at t201, as the records place them (t109 / t202); runs/h1_duelz1128
+  Bologna's district contract on 1:9 (t154-202) as the game's. The duelz
+  logs hold no DISTRICTS or IMPROVEMENTS rows: the plot values themselves
+  stand unscored on them.
