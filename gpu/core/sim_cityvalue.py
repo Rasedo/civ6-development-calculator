@@ -1431,13 +1431,13 @@ class SimCityValue:
     # the subjects COLLECTION_PLAYER_CITIES' walk gives at least
     _CV_PLAYER_CITIES_WALK = 5
     _CV_COLLECTIONS = ("COLLECTION_OWNER", "COLLECTION_PLAYER_CITIES", "COLLECTION_CITY_DISTRICTS",
-                       "COLLECTION_CITY_TRAINED_UNITS", "COLLECTION_CITY_PLOT_YIELDS")
+                       "COLLECTION_CITY_TRAINED_UNITS", "COLLECTION_CITY_PLOT_YIELDS", "COLLECTION_PLAYER_PLOT_YIELDS")
     _CV_EVALUATORS = ("REQUIREMENT_PLOT_TERRAIN_TYPE_MATCHES", "REQUIREMENT_PLOT_FEATURE_TYPE_MATCHES",
                       "REQUIREMENT_PLOT_RESOURCE_TYPE_MATCHES", "REQUIREMENT_PLOT_RESOURCE_VISIBLE",
                       "REQUIREMENT_PLOT_HAS_ANY_IMPROVEMENT", "REQUIREMENT_DISTRICT_TYPE_MATCHES",
                       "REQUIREMENT_CITY_HAS_BUILDING", "REQUIREMENT_CITY_IS_OWNER_CAPITAL_CONTINENT",
                       "REQUIREMENT_CITY_HAS_GARRISON_UNIT", "REQUIREMENT_CITY_HAS_X_SPECIALTY_DISTRICTS",
-                      "REQUIREMENT_CITY_HAS_X_POPULATION")
+                      "REQUIREMENT_CITY_HAS_X_POPULATION", "REQUIREMENT_PLOT_IS_HILLS", "REQUIREMENT_PLOT_ADJACENT_TO_OWNER")
     _CV_ANALYZERS = ("EFFECT_ADJUST_PLOT_YIELD", "EFFECT_ADJUST_CITY_YIELD_CHANGE", "EFFECT_ADJUST_UNIT_EXPERIENCE_MODIFIER",
                      "EFFECT_ADJUST_CITY_INNER_DEFENSE", "EFFECT_ADJUST_TRADE_ROUTE_CAPACITY",
                      "EFFECT_ADJUST_PLAYER_EXTRA_FAVOR_PER_TURN", "EFFECT_ADJUST_INFLUENCE_POINTS_PER_TURN",
@@ -1520,16 +1520,26 @@ class SimCityValue:
             a = r["args"]
             k = sub["kind"]
             no = torch.zeros_like(shape)
+
+            def pl(kind, name):
+                # the city's owned plots, or the analysis's own plot
+                return f.plot_is(kind, name) if k == "plots" else f.own_plot_is(kind, name) if k == "plot" else no
             if ty == "REQUIREMENT_PLOT_TERRAIN_TYPE_MATCHES":
-                v = f.plot_is("terrain", a.get("TerrainType")) if k == "plots" else no
+                v = pl("terrain", a.get("TerrainType"))
             elif ty == "REQUIREMENT_PLOT_FEATURE_TYPE_MATCHES":
-                v = f.plot_is("feature", a.get("FeatureType")) if k == "plots" else no
+                v = pl("feature", a.get("FeatureType"))
             elif ty == "REQUIREMENT_PLOT_RESOURCE_TYPE_MATCHES":
-                v = f.plot_is("resource", a.get("ResourceType")) if k == "plots" else no
+                v = pl("resource", a.get("ResourceType"))
             elif ty == "REQUIREMENT_PLOT_RESOURCE_VISIBLE":
-                v = f.plot_is("resourceVisible", None) if k == "plots" else no
+                v = pl("resourceVisible", None)
             elif ty == "REQUIREMENT_PLOT_HAS_ANY_IMPROVEMENT":
-                v = f.plot_is("improvement", None) if k == "plots" else no
+                v = pl("improvement", None)
+            elif ty == "REQUIREMENT_PLOT_IS_HILLS":
+                # 0x6d0970: the plot's terrain is hills (IsHills 0x82e30)
+                v = pl("hills", None)
+            elif ty == "REQUIREMENT_PLOT_ADJACENT_TO_OWNER":
+                # 0x6d3200: met with no unit in the context
+                v = torch.ones_like(shape)
             elif ty == "REQUIREMENT_DISTRICT_TYPE_MATCHES":
                 v = torch.full_like(shape, sub.get("type") == a.get("DistrictType")) if k == "district" else no
             elif ty == "REQUIREMENT_CITY_HAS_BUILDING":
@@ -1595,6 +1605,9 @@ class SimCityValue:
             return [{"kind": "district", "type": d, "mask": _t(held, like).bool()} for d, held in f.city_districts()]
         if collection == "COLLECTION_CITY_PLOT_YIELDS":
             return [{"kind": "plots", "mask": f.plot_valid()}]
+        if collection == "COLLECTION_PLAYER_PLOT_YIELDS":
+            # 0x69ed60 / 0x69ec20: once, the analysis's plot (context +0x88)
+            return [{"kind": "plot", "mask": one}] if getattr(f, "has_plot", False) else []
         if collection == "COLLECTION_PLAYER_UNITS":
             # the units read nothing here (`_cv_check_units`)
             return []
@@ -1621,6 +1634,10 @@ class SimCityValue:
         sf = sub.get("f", f)
         none = sub["kind"] == "nocity" or (nocity and not city)
         zero = torch.zeros_like(like)
+        if eff == "EFFECT_ADJUST_PLOT_YIELD" and sub["kind"] == "plot":
+            v = span(torch.full_like(like, amount * _FX))
+            v = self._cv_yield(_fmul(v, torch.full_like(v, _fx_const(0.5))), a.get("YieldType", ""))
+            return torch.where(f.own_plot_is("impassable", None), zero, v >> 8)
         if eff == "EFFECT_ADJUST_PLOT_YIELD":
             if sub["kind"] != "plots":
                 return zero
@@ -2518,14 +2535,16 @@ class _MinorFacts:
 
     def plot_is(self, kind, name):
         """per owned plot [B, 37]: its install terrain / feature / resource
-        is `name`; its resource is seen; it holds an improvement; it bars
-        passage"""
+        is `name`; its resource is seen; it holds an improvement; it is
+        hills; it bars passage"""
         sim = self.sim
         d0 = self._disk().clamp(min=0)
         pn = self.T["plot_names"]
 
         def at(plane):
             return plane.gather(1, d0)
+        if kind == "hills":
+            return (at(sim.hills.long()) + 2 * at(sim.tile_mountain.long())) == 1
         if kind == "terrain":
             elev = at(sim.hills.long()) + 2 * at(sim.tile_mountain.long())
             ter = at(sim.terrain)

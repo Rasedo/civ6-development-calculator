@@ -7,6 +7,7 @@
 import type { AiCityDefenceView, AiKnownCityView, AiMapPlotView, AiUnitView, AiView } from './aiViewTypes';
 import { DIRECTION_TYPES, hexDistance, neighborTile, neighbors, tilesWithin } from '../../world/hex';
 import { isCoastalLand, isImpassable, isMountain, isWater } from '../../world/query';
+import type { Tile } from '../../world/types';
 import { FX, fmul, fxOf, turnsAt, type AiCityView, type AiDistrictView, type AiPlotView } from './aiValue';
 import { AI_YIELDS, pseudoYieldWeights, yieldWeights } from './aiWeights';
 import { engineId, gameTypeOf, installFeature, installTerrain } from '../data/aliases';
@@ -155,6 +156,18 @@ export function aiView(state: GameState, opts: { updated?: boolean } = {}): AiVi
     if (!h) hidden.set(i, (h = hiddenResourcesFor(state, i)));
     return h;
   };
+  // a plot as seat i's analysis reads it
+  const plotViewOf = (i: number, t: Tile): AiPlotView => ({
+    terrain: installTerrain(t.terrain, t.elevation),
+    feature: t.feature ? installFeature(t.feature) : null,
+    resource: t.resource ? `RESOURCE_${t.resource}` : null,
+    resourceVisible: !!t.resource && !hiddenOf(i).has(t.resource),
+    improvement: t.improvement,
+    impassable: isImpassable(t),
+    resourceClass: t.resource && RESOURCES[t.resource] ? `RESOURCECLASS_${RESOURCES[t.resource].category.toUpperCase()}` : null,
+    improved: !!t.resource && !!t.improvement && RESOURCES[t.resource]?.improvement === t.improvement,
+    appeal: tileAppeal(map, t),
+  });
   // a seat's city by id; a city-state's one city is its own view
   // (`minorCity`, id -1)
   const cityOf = (i: number, id: number): City | undefined => {
@@ -261,18 +274,9 @@ export function aiView(state: GameState, opts: { updated?: boolean } = {}): AiVi
       const centre = map.tiles[city.centerIndex];
       return tilesWithin(map, centre.col, centre.row, 3)
         .filter((t) => tileSeat(t) === i && (minor || t.ownerCity === city.id))
-        .map((t) => ({
-          terrain: installTerrain(t.terrain, t.elevation),
-          feature: t.feature ? installFeature(t.feature) : null,
-          resource: t.resource ? `RESOURCE_${t.resource}` : null,
-          resourceVisible: !!t.resource && !hiddenOf(i).has(t.resource),
-          improvement: t.improvement,
-          impassable: isImpassable(t),
-          resourceClass: t.resource && RESOURCES[t.resource] ? `RESOURCECLASS_${RESOURCES[t.resource].category.toUpperCase()}` : null,
-          improved: !!t.resource && !!t.improvement && RESOURCES[t.resource]?.improvement === t.improvement,
-          appeal: tileAppeal(map, t),
-        }));
+        .map((t) => plotViewOf(i, t));
     },
+    plotView: (i, plot) => plotViewOf(i, map.tiles[plot]),
     cityYield: (i, id, type) => {
       // a city-state's one city is its own view (`minorCity`, id -1)
       const minor = isCityStateSeat(i) ? (seatOf(state, i) as CityState | undefined) : undefined;

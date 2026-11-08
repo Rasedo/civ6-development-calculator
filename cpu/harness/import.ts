@@ -404,10 +404,12 @@ function tileOf(ctx: Ctx, rec: TurnRecord, i: number): Tile {
   }
   let improvement: string | null = null;
   let goodyHut = false;
+  let meteor = false;
   const ii = p[P.improvement] as number;
   if (ii >= 0) {
     const iname = ctx.cat.improvements[ii];
     if (iname === 'IMPROVEMENT_GOODY_HUT') goodyHut = true;
+    else if (iname === 'IMPROVEMENT_METEOR_GOODY') meteor = true;
     else if (iname !== 'IMPROVEMENT_BARBARIAN_CAMP') {
       const id = engineId('improvement', iname, 'IMPROVEMENT_', IMPROVEMENTS);
       if (id) improvement = id as ImprovementId;
@@ -434,6 +436,7 @@ function tileOf(ctx: Ctx, rec: TurnRecord, i: number): Tile {
     pillaged: p[P.improvementPillaged] === 1,
     districtPillaged: false,
     goodyHut,
+    ...(meteor ? { meteor } : {}),
     volcano,
     fertility: 0,
     fertilityProd: 0,

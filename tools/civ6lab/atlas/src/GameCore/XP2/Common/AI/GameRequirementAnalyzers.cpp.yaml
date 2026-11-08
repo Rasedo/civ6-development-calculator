@@ -115,6 +115,21 @@
   context:
     - "...so a subject passes only by 0x6cf3c0. Read evaluators: REQUIREMENT_DISTRICT_TYPE_MATCHES 0x6d08c0 (the district subject's type, context +0x78; else the district type the evaluation is of,..."
   review: reviewed
+- addr: 0x6d0970
+  kind: function
+  name: REQUIREMENT_PLOT_IS_HILLS
+  semantics: "REQUIREMENT_PLOT_IS_HILLS' evaluate: the context plot (+0x88) is hills (IsHills 0x82e30); no plot fails."
+  status: READ
+  cases:
+    - recording: h1_duelp1128
+      value: Nazca's NAZCA_LINE_ADJACENCY_PRODUCTION_FLAT_MASS_PRODUCTION (inverse) 10.00 on its flat desert plots
+  impl: [cpu/core/aiModifiers.ts:EVALUATORS, gpu/core/sim_cityvalue.py:_cv_admits]
+  readings:
+    - "C-100: the plot's own subject, PLOT_IS_HILLS and the plot analysis' replaced camp — READ (0x69ed60 / 0x69ec20, 0x6d0970, 0x5cf160..0x5cf1ab), both twins"
+  context:
+    - "...subject, PLOT_IS_HILLS and the plot analysis' replaced camp — READ (0x69ed60 / 0x69ec20, 0x6d0970, 0x5cf160..0x5cf1ab), both twins"
+    - "- REQUIREMENT_PLOT_IS_HILLS (registry at 0x6ccb37, @f04508, vtable 0xd674c0, evaluate 0x6d0970): the context plot (+0x88) is hills (IsHills 0x82e30, the Terrains row's +0x48 bit 0);..."
+  review: reviewed
 - addr: 0x6d0af0
   final: 0x492f30
   kind: function
@@ -240,7 +255,10 @@
     - recording: h1_duely1124
       turn: 179
       value: "city-state 4, holding no Supply Convoy: the Convoy's SUPPLY_CONVOY_BONUS_MOVEMENT admitted on its units, Combustion 1313.8 as logged"
-  impl: [cpu/core/aiModifiers.ts:EVALUATORS, gpu/core/sim_policy.py:_unit_movement_value]
+  impl:
+    - cpu/core/aiModifiers.ts:EVALUATORS
+    - gpu/core/sim_policy.py:_unit_movement_value
+    - gpu/core/sim_cityvalue.py:_cv_admits
   readings:
     - "C-98: a unit's value adds its abilities' modifiers; EFFECT_ADJUST_UNIT_MOVEMENT and REQUIREMENT_PLOT_ADJACENT_TO_OWNER; a second completion adds again — READ (0x7b62c0 at 0x7b7658..0x7b76d8, 0x6e11c7 / 0xc85140, 0x6bd520, 0x6d3200, 0x762d60's rows), both twins"
   review: reviewed

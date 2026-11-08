@@ -93,8 +93,10 @@
   kind: function
   name: IsHills
   status: PARTLY
+  impl: [cpu/core/aiModifiers.ts:EVALUATORS, gpu/core/sim_cityvalue.py:_cv_admits]
   readings:
     - "C-124 / C-95: every search but the planning's pays the stacking +1e6, the cost reads the child's revealed bit, Explore's flag 0x40 prices the unrevealed — READ (0x270dd0 at 0x270e55 / 0x270e86 / 0x270ff2 / 0x2711c3..0x271268 / 0x2713d3, 0x502aa0, 0x26df90's callers 0x716739 / 0x70aadd, 0x70ce90 at 0x70ced5, 0x803060 at 0x80316f), both twins"
+    - "C-100: the plot's own subject, PLOT_IS_HILLS and the plot analysis' replaced camp — READ (0x69ed60 / 0x69ec20, 0x6d0970, 0x5cf160..0x5cf1ab), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...): on a step that leaves no Movement onto a revealed plot that is not a hill (IsHills 0x82e30 on the child) +300 (0x12c00, 0x27100b); an unrevealed child +2 as a revealed one (0x271..."

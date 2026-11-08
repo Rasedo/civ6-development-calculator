@@ -250,6 +250,18 @@ export function minorDistrictVerdict(type: string, district: string): -1 | 0 | 1
   return v > 0 ? 1 : v < 0 ? -1 : 0;
 }
 
+/** the improvement the plot analysis reads on a plot (its +0x44, 0x7a58f0's
+ *  improvement replaced): its own, else a barbarian camp, a tribal village
+ *  or a meteor site, which the engine keeps beside the plot's improvement
+ *  (runs/h1_duelp1127 t2 6:8's camp: the Farm on Woods -6.00, 60.34 under
+ *  6:9's; 1128 t15-51 Hong Kong's Mine on the meteor site 11:7 11.11) */
+export function plotImprovementType(tile: Tile, camps: ReadonlySet<number>): string | null {
+  if (tile.improvement) return gameTypeOf('improvement', tile.improvement, 'IMPROVEMENT_');
+  if (camps.has(tile.index)) return 'IMPROVEMENT_BARBARIAN_CAMP';
+  if (tile.goodyHut) return 'IMPROVEMENT_GOODY_HUT';
+  return tile.meteor ? 'IMPROVEMENT_METEOR_GOODY' : null;
+}
+
 /**
  * THE PLOT ANALYSIS of a minor's city (0x5ce970 per plot, the centre first):
  * per plot its flags — the seat owns it, an improvement may stand on its
@@ -345,7 +357,7 @@ export function minorPlotEvals(state: GameState, cs: CityState, facts: CityBuild
     }
     const f: PlotValueFacts = {
       view: facts.view, seat: cs.seat,
-      improvement: tile.improvement ? gameTypeOf('improvement', tile.improvement, 'IMPROVEMENT_') : null,
+      improvement: plotImprovementType(tile, camps),
       pillaged: !!tile.pillaged,
       resource: tile.resource && !hidden(tile.resource) ? gameTypeOf('resource', tile.resource, 'RESOURCE_') : null,
       feature: tile.feature ? installFeature(tile.feature) : null,

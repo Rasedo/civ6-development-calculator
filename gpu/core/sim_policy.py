@@ -60,9 +60,10 @@ _KNOWN_AGE = 10
 # the subjects COLLECTION_PLAYER_CITIES' walk gives at least: the player's
 # cities, then empty ones (`subjects`)
 _PLAYER_CITIES_WALK = 5
-# the collections of the context's own city, which a policy's context has
-# not: no subject (`subjects`' empty walks)
-_POL_NO_SUBJECTS = {"COLLECTION_CITY_DISTRICTS", "COLLECTION_CITY_TRAINED_UNITS", "COLLECTION_CITY_PLOT_YIELDS", "COLLECTION_ALL_CITIES"}
+# the collections of the context's own city or plot, which a policy's
+# context has not: no subject (`subjects`' empty walks)
+_POL_NO_SUBJECTS = {"COLLECTION_CITY_DISTRICTS", "COLLECTION_CITY_TRAINED_UNITS", "COLLECTION_CITY_PLOT_YIELDS", "COLLECTION_ALL_CITIES",
+                    "COLLECTION_PLAYER_PLOT_YIELDS"}
 _POL_EVALUATORS = {"REQUIREMENT_DISTRICT_TYPE_MATCHES", "REQUIREMENT_CITY_HAS_BUILDING", "REQUIREMENT_PLOT_IS_APPEAL_BETWEEN",
                    "REQUIREMENT_CITY_HAS_GARRISON_UNIT", "REQUIREMENT_CITY_HAS_X_SPECIALTY_DISTRICTS",
                    "REQUIREMENT_CITY_IS_OWNER_CAPITAL_CONTINENT", "REQUIREMENT_PLAYER_IS_MINOR",

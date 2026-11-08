@@ -593,6 +593,7 @@
     - cpu/core/minorCityAi.ts:minorBuildingPurchaseCity
     - cpu/core/minorBuild.ts:minorPickFacts
     - cpu/core/minorCityAi.ts:minorBestPlotToBuy
+    - cpu/harness/plotValueLab.ts:passDistricts
   readings:
     - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
     - "C-96 / C-97: the unit value — READ (the combat, trade, explorer branches, the tail, the military AI's unit production), PARTLY READ (its inputs)"
@@ -611,6 +612,7 @@
     - "H-1: the City Analysis runs on player signal +0x258 and reads each plot's owner live — READ (0x5c27e0, 0x5c24e0, 0x5ce970), the 1117 t44 Mine unexplained"
     - "C-127: the plot analysis values the Military Engineer's own rows (the Fort) — READ (records, aimem), both twins"
     - "C-96 / C-127: a plot purchase contract lives to its Turn Limit, the pick's best project asks no CanProduce, Build Unit's tree takes only an ACCEPTED contract — READ (0x7f7bf0, 0x5d1f10, 0x7f4240 at 0x7f4270 / 0x7f48db), both twins"
+    - "C-100: the plot's own subject, PLOT_IS_HILLS and the plot analysis' replaced camp — READ (0x69ed60 / 0x69ec20, 0x6d0970, 0x5cf160..0x5cf1ab), both twins"
   notes:
     - ".claude/scratchpad/cb/notes.txt: ...== f2f988?) & cond -> +5.0. Initial best FX(-9999). CITY ANALYSIS job vtable d59af0 -> 0x5ce910 -> 0x5ce970 (per PLOT eval): +0x20 districts, +0x28 buildings, +0x30 improvements, +0x38 projects, +0x40 units...."
   context:

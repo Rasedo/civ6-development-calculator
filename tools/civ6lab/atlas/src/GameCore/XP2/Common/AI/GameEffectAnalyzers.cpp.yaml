@@ -655,7 +655,9 @@
     - recording: 1124
       value: "COLLECTION_CITY_PLOT_YIELDS (0x69feb0: the city's plots of   index below 0x5cbc0(2) + 18 that it owns) with EFFECT_ADJUST_PLOT_YIELD   0x6afa10 (a plot not impassable: half the Amount's PV(H) - PV(T),"
   impl: [cpu/core/aiModifiers.ts:ANALYZERS]
-  readings: ["C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"]
+  readings:
+    - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
+    - "C-100: the plot's own subject, PLOT_IS_HILLS and the plot analysis' replaced camp — READ (0x69ed60 / 0x69ec20, 0x6d0970, 0x5cf160..0x5cf1ab), both twins"
   notes:
     - ".claude/scratchpad/cb4/NOTES.md: ...owned plots ring 3),   EFFECT_ADJUST_UNIT_EXPERIENCE_MODIFIER (0x6c09b0), EFFECT_ADJUST_PLOT_YIELD (0x6afa10),   EFFECT_ADJUST_TRADE_ROUTE_CAPACITY (0x6c0ff0), plot evaluators TERRAIN/FEATURE/RESOURCE_TYPE/RE..."
   context:

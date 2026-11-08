@@ -288,6 +288,9 @@ export interface AiValueView {
   /** the plots the city owns within its three rings (the
    *  COLLECTION_CITY_PLOT_YIELDS walk, 0x69feb0) */
   cityOwnedPlots(seat: number, cityId: number): readonly AiPlotView[];
+  /** the plot as the seat's analysis reads it (the COLLECTION_PLAYER_PLOT_YIELDS
+   *  subject, context +0x88) */
+  plotView(seat: number, plot: number): AiPlotView;
   /** the seat's trade units (Units +0x1b9 bit 6), those out on its routes
    *  with them */
   traders(seat: number): number;

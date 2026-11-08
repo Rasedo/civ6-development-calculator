@@ -533,6 +533,7 @@
     - "C-95: the scout's tree \"Barbarian Found City\" — READ, ported"
     - "C-95: the planning's valid wrapper on a district at war, and a land unit's embarking by its original owner — READ (0x26e570 at 0x26e5e2..0x26e7f1, 0x56c480), the first both twins"
     - "C-95: the danger map's search goes on past a civilian, the target list's own civilian, a district the player never revealed, a strike a later turn's — READ (0x26e570 at 0x26e5cd, 0x271be0 at 0x271f0c..0x271f2e, 0x5861f0, 0x523520, 0x783980 at 0x784c4b..0x784c5f, 0x26e570 at 0x26e5e2..0x26e6c4), FIT (0x962380's strike on the walked path), both twins"
+    - "C-100: the plot's own subject, PLOT_IS_HILLS and the plot analysis' replaced camp — READ (0x69ed60 / 0x69ec20, 0x6d0970, 0x5cf160..0x5cf1ab), both twins"
   context:
     - "...330); OtherDistrictAdjacent: the neighbour's owner (+0x1c) is the player, its district (0x810d0) is not InternalOnly (Districts +0xe1 bit 4 — the Wonder district), is complete (Dist..."
     - "...rovement (+0x44, read as none while pillaged, +0x4d bit 0) and, when the plot's district (0x810d0, the district at the plot's id) is complete (district +0xb08, Lua `District:IsComplete` 0..."
@@ -554,6 +555,7 @@
     - "C-74: the one-off start — READ"
     - "H-1: a city centre's floors — READ"
     - "H-1: the trade path's search, its score and the Canal — READ"
+    - "C-100: the plot's own subject, PLOT_IS_HILLS and the plot analysis' replaced camp — READ (0x69ed60 / 0x69ec20, 0x6d0970, 0x5cf160..0x5cf1ab), both twins"
   context:
     - ...erritory (+0xc8 bit 1) the plot unowned (its info +0x1c is 0xff); with +0xc8 bit 4 a test 0x81120 on the plot's info (unread; no recorded case needs it); the terrain in the event's Random...
     - "- The plot yield 0x538a60 sums the plot's own rows, then, on a plot holding a city (0x81120), raises Food to YIELD_FOOD_CITY_TERRAIN_REPLACE 2 and Production to YIELD_PRODUCTION_C..."
@@ -637,7 +639,10 @@
       value: 1123 480 and 612;
     - recording: 1112
       value: 1112 two of three;
-  readings: ["H-1: the district adjacency — READ", "H-1: the flood's river walk — READ"]
+  readings:
+    - "H-1: the district adjacency — READ"
+    - "H-1: the flood's river walk — READ"
+    - "C-100: the plot's own subject, PLOT_IS_HILLS and the plot analysis' replaced camp — READ (0x69ed60 / 0x69ec20, 0x6d0970, 0x5cf160..0x5cf1ab), both twins"
   context:
     - "...e, on water for AdjacentSeaResource, by class name for AdjacentResourceClass; a wonder (0x81330); OtherDistrictAdjacent: the neighbour's owner (+0x1c) is the player, its district (0x8..."
     - "...(0xa2b200: the district flagged +0x48 & 0x40) on a plot of the list whose city holds it (0x81330) — the list, not the river's whole network (`riverShielded` over `riverReach`). The engin..."
@@ -806,6 +811,20 @@
     - "C-125: Protect Units' safe plot toward the operation's target — READ (0x716b90 at 0x716ca5 / 0x716f9a..0x717007, 0x80d790 at 0x80db1a / 0x80e44a / 0x80e8ab, 0x497d20), both twins"
   context:
     - "...ion (0x77ac30): each unit of the pool (+0x240) alive (+0x770 clear) with a promotion due (0x116f80 on +0x1bc0) joins the move list (logged \"Promote\" in AI_Tactical.csv); 0x774970 then runs..."
+  review: reviewed
+- addr: 0x12e2a0
+  final: 0x8972d0
+  kind: function
+  name: retZero
+  semantics: returns 0 (a collection's end slot, COLLECTION_PLAYER_PLOT_YIELDS' among them).
+  status: READ
+  cases:
+    - recording: h1_duelp1128
+      value: COLLECTION_PLAYER_PLOT_YIELDS' end slot (vtable 0xd62500 +0x10)
+  readings:
+    - "C-100: the plot's own subject, PLOT_IS_HILLS and the plot analysis' replaced camp — READ (0x69ed60 / 0x69ec20, 0x6d0970, 0x5cf160..0x5cf1ab), both twins"
+  context:
+    - "...stry 0x6c9640 at 0x6cc067, @f03bc8, vtable 0xd62500: begin 0x69ed60, next 0x69ec20, end 0x12e2a0): one subject, the analysis's plot (context +0x88), none without one. With EFFECT_ADJ..."
   review: reviewed
 - addr: 0x1385c0
   final: 0xd00f0
@@ -3897,6 +3916,22 @@
   context:
     - "...gistry's object @f03bb8: begin 0x69e9e0 clears +0x70 and the counters +0xd0 / +0xd4; next 0x69ea00 sets +0x70 to each of the player's cities, +0x12f0 +0xa0, counting +0xd4; past the last c..."
   review: reviewed
+- addr: 0x69ec20
+  final: 0x4636b0
+  kind: function
+  name: collectionPlayerPlotYieldsNext
+  semantics: "COLLECTION_PLAYER_PLOT_YIELDS' next: one subject, the context's plot (+0x88), while +0xd0 is 0; none without a plot."
+  status: READ
+  cases:
+    - recording: h1_duelp1128
+      value: "Nazca's Nazca Line rows 92.34 (t2-t249): its five ImprovementModifiers on its own plot"
+  impl: [cpu/core/aiModifiers.ts:subjects, gpu/core/sim_cityvalue.py:_cv_subjects]
+  readings:
+    - "C-100: the plot's own subject, PLOT_IS_HILLS and the plot analysis' replaced camp — READ (0x69ed60 / 0x69ec20, 0x6d0970, 0x5cf160..0x5cf1ab), both twins"
+  context:
+    - "...plot's own subject, PLOT_IS_HILLS and the plot analysis' replaced camp — READ (0x69ed60 / 0x69ec20, 0x6d0970, 0x5cf160..0x5cf1ab), both twins"
+    - "...T_YIELDS (registry 0x6c9640 at 0x6cc067, @f03bc8, vtable 0xd62500: begin 0x69ed60, next 0x69ec20, end 0x12e2a0): one subject, the analysis's plot (context +0x88), none without one. Wit..."
+  review: reviewed
 - addr: 0x69ec70
   final: 0x463700
   kind: function
@@ -3907,6 +3942,22 @@
     - "C-97: the religion AI — the belief scores READ (the job, the value, the analysis's attach), the picks READ, the analyzers PARTLY READ"
   context:
     - ...TY_DISTRICTS 0x69fdf0 the city's districts (+0x78, plot +0x88); COLLECTION_PLAYER_UNITS 0x69ec70 (+0x90).
+  review: reviewed
+- addr: 0x69ed60
+  final: 0x4637b0
+  kind: function
+  name: collectionPlayerPlotYieldsBegin
+  semantics: "COLLECTION_PLAYER_PLOT_YIELDS' begin: with a plot in the context (+0x88) clears the subject count +0xd0."
+  status: READ
+  cases:
+    - recording: h1_duelp1128
+      value: Nazca's Nazca Line rows 92.34 (t2-t249, 1,722 of 1,736 rows)
+  impl: [cpu/core/aiModifiers.ts:subjects, gpu/core/sim_cityvalue.py:_cv_subjects]
+  readings:
+    - "C-100: the plot's own subject, PLOT_IS_HILLS and the plot analysis' replaced camp — READ (0x69ed60 / 0x69ec20, 0x6d0970, 0x5cf160..0x5cf1ab), both twins"
+  context:
+    - "...C-100: the plot's own subject, PLOT_IS_HILLS and the plot analysis' replaced camp — READ (0x69ed60 / 0x69ec20, 0x6d0970, 0x5cf160..0x5cf1ab), both twins"
+    - "...TION_PLAYER_PLOT_YIELDS (registry 0x6c9640 at 0x6cc067, @f03bc8, vtable 0xd62500: begin 0x69ed60, next 0x69ec20, end 0x12e2a0): one subject, the analysis's plot (context +0x88), none w..."
   review: reviewed
 - addr: 0x69efa0
   kind: function
@@ -4116,6 +4167,7 @@
     - "C-127: the improvement loop's housing"
     - "C-98 / C-130: the player tourism analyzer, the city subject's context, the dark trade buildings — READ (0x6b0700, 0x6b0430, 0x69ea00's +0x70), a FIT (the capacity), both twins"
     - "C-98: a unit's value adds its abilities' modifiers; EFFECT_ADJUST_UNIT_MOVEMENT and REQUIREMENT_PLOT_ADJACENT_TO_OWNER; a second completion adds again — READ (0x7b62c0 at 0x7b7658..0x7b76d8, 0x6e11c7 / 0xc85140, 0x6bd520, 0x6d3200, 0x762d60's rows), both twins"
+    - "C-100: the plot's own subject, PLOT_IS_HILLS and the plot analysis' replaced camp — READ (0x69ed60 / 0x69ec20, 0x6d0970, 0x5cf160..0x5cf1ab), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "- The registry (`reg.py` over 0x6c9640): 211 effect names, 27 collections, 66 requirements; the effects the policies and gover..."
@@ -4150,6 +4202,7 @@
   impl: [cpu/core/aiModifiers.ts:admits]
   readings:
     - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
+    - "C-100: the plot's own subject, PLOT_IS_HILLS and the plot analysis' replaced camp — READ (0x69ed60 / 0x69ec20, 0x6d0970, 0x5cf160..0x5cf1ab), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "THE REQUIREMENT SET of a modifier the AI analyses (0x6cef90 -> 0x6ccec0, into the map at registry +0xc0, i.e. GlobalAI +0x4d0): RequirementSetType TEST_ANY -> 1,..."
@@ -8132,6 +8185,7 @@
   readings:
     - "C-96 / C-97: the team's unit to build, the recruit's contract and the knowledge base's camps — the team update's requirements and readiness, the unit choice, Recruit Units' result and contract, the camps READ; the maintenance resource test, the recruit's stealing and levy unread"
     - "C-124: a move order's path opens a turn-end node beside each node with Movement left — READ (0x271920, 0x7a880, 0x271490, 0x775a0, 0x26f330), both twins"
+    - "C-100: the plot's own subject, PLOT_IS_HILLS and the plot analysis' replaced camp — READ (0x69ed60 / 0x69ec20, 0x6d0970, 0x5cf160..0x5cf1ab), both twins"
   context:
     - "...read. THE SECOND OFFER (0x60a8c0): the evaluator's satisfied test (vtable @0xd760f8 +8, 0xb3c380) answers false always, so after the first offer (the units in no job, not done, alive)..."
   review: reviewed

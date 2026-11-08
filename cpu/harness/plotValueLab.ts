@@ -19,7 +19,10 @@
  * city's store with the turn's production, its grid met (`minorPower`), the
  * Economic AI's Gold boost on the net income the record's treasury cached;
  * the research AI's turns from AI_Research.csv, the civics AI's as its turn
- * would write them. A district's facts: the engine's adjacency
+ * would write them. A plot's improvement: its own, a barbarian camp, a
+ * tribal village or a meteor site (`plotImprovementType`); a plot holding
+ * the city or a district is not compared in the IMPROVEMENTS mode (the
+ * analysis skips it, its row an earlier analysis's). A district's facts: the engine's adjacency
  * (`baseAdjacency`) for both the whole and the rows, the plot's price where
  * the city may buy it (`borderCandidates`), one city (no regional reach, no
  * Dam, Canal or projects); LAB: an inland city-state on a river trains ships
@@ -41,6 +44,8 @@ import { minorBuildFacts, minorPower, minorResourceFacts } from '../core/minorBu
 import { economicGoldBoost } from '../core/aiWeights';
 import { newEconomicMemory } from '../core/aiEconomic';
 import { minorCity } from '../core/cityStates';
+import { plotImprovementType } from '../core/minorCityAi';
+import { campTiles } from '../core/seats';
 import { civicAnalysis } from '../core/aiCivics';
 import { borderCandidates, computeCityStats } from '../core/city';
 import { resourceValue } from '../core/aiResource';
@@ -232,9 +237,13 @@ for (const rec of recs) {
       if ((districtsMode ? lp.districts : lp.improvements).every((v) => v === 0)) continue;
       const plot = lp.y * W + lp.x;
       const tile = state.map.tiles[plot];
+      // a plot holding a city, a district or a wonder: the analysis skips its
+      // improvements (0x5cf160..0x5cf1ab: IsCity, GetDistrictType, the
+      // wonder +0x1e, IsCanyon), its rows an earlier analysis's
+      if (!districtsMode && (plot === cs.centerIndex || tile.district)) continue;
       const f: PlotValueFacts = {
         view: facts.view, seat: cs.seat,
-        improvement: tile.improvement ? gameTypeOf('improvement', tile.improvement, 'IMPROVEMENT_') : null,
+        improvement: plotImprovementType(tile, campTiles(state)),
         pillaged: !!tile.pillaged,
         // the resource the player sees: its RevealedByTech held
         resource: tile.resource && (!RESOURCES[tile.resource]?.revealTech || r.techs.includes(RESOURCES[tile.resource].revealTech!))
@@ -354,8 +363,8 @@ for (const rec of recs) {
         const ours = improvementValue(f, row.type, t, AI_VALUE_HORIZON) / FX;
         const d = Math.abs(ours - lv);
         const k = tallyOf(row.type);
-        // --all: every row, with its modifiers' part
-        if (allRows) console.log(`ALL t${turn} p${player} (${lp.x},${lp.y}) log ${lv.toFixed(2)} ours ${ours.toFixed(2)} t=${t} mods ${(f.modifiers(row.modifiers, t, AI_VALUE_HORIZON) / FX).toFixed(2)}`);
+        // --all: every row, with its modifiers' part and its plot's facts
+        if (allRows) console.log(`ALL t${turn} p${player} (${lp.x},${lp.y}) ${row.type} log ${lv.toFixed(2)} ours ${ours.toFixed(2)} t=${t} mods ${(f.modifiers(row.modifiers, t, AI_VALUE_HORIZON) / FX).toFixed(2)} own=${lp.owned} imp=${f.improvement} res=${f.resource} feat=${f.feature} hz=${f.floodTurns}/${f.eruptionTurns}`);
         if (d <= 0.01) k.exact++;
         else if (d <= 1) k.close++;
         else {

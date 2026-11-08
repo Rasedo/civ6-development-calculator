@@ -166,6 +166,9 @@ function subjects(t: ValueTerms, collection: string): Subject[] | null {
     }
     // 0x69feb0: the evaluation city's plots of its three rings that it owns
     case 'COLLECTION_CITY_PLOT_YIELDS': return t.owner ? t.view.cityOwnedPlots(t.owner.seat ?? t.seat, t.owner.cityId).map((plot) => ({ kind: 'plot', plot })) : [];
+    // 0x69ed60 / 0x69ec20: once, the evaluation's plot (context +0x88),
+    // none without one
+    case 'COLLECTION_PLAYER_PLOT_YIELDS': return t.plot === undefined ? [] : [{ kind: 'plot', plot: t.view.plotView(t.seat, t.plot) }];
     // 0x69f320 / 0x69f340: the player's knowledge base's cities, in its order
     case 'COLLECTION_ALL_CITIES': return t.known ? t.known.map((c) => ({ kind: 'city', seat: c.seat, id: c.id, capital: c.capital })) : null;
     // 0x69f6c0 / 0x69f6e0: with a player in the context, that player once
@@ -220,6 +223,9 @@ const EVALUATORS: Readonly<Record<string, Evaluator>> = {
   // resource revealed to the player (0x6d1c00), an improvement (0x6cfcd0:
   // plot +0x44)
   REQUIREMENT_PLOT_TERRAIN_TYPE_MATCHES: (_t, args, s) => s.kind === 'plot' && s.plot.terrain === args.TerrainType,
+  // 0x6d0970: the plot subject's terrain is hills (IsHills 0x82e30: the
+  // Terrains row's Hills)
+  REQUIREMENT_PLOT_IS_HILLS: (_t, _args, s) => s.kind === 'plot' && s.plot.terrain.endsWith('_HILLS'),
   // 0xbe4aa0 (@f04430's evaluate): always met in an analysis
   REQUIREMENT_PLAYER_IS_ATTACKING: () => true,
   REQUIREMENT_PLOT_FEATURE_TYPE_MATCHES: (_t, args, s) => s.kind === 'plot' && s.plot.feature === args.FeatureType,
@@ -1389,7 +1395,7 @@ export const AI_MODIFIER_READS = {
   sets: Object.keys(SETS),
   none: Object.keys(NONE_ANALYZERS),
   collections: ['COLLECTION_OWNER', 'COLLECTION_PLAYER_CITIES', 'COLLECTION_PLAYER_CAPITAL_CITY', 'COLLECTION_PLAYER_DISTRICTS',
-    'COLLECTION_CITY_DISTRICTS', 'COLLECTION_CITY_TRAINED_UNITS', 'COLLECTION_CITY_PLOT_YIELDS', 'COLLECTION_ALL_CITIES',
+    'COLLECTION_CITY_DISTRICTS', 'COLLECTION_CITY_TRAINED_UNITS', 'COLLECTION_CITY_PLOT_YIELDS', 'COLLECTION_PLAYER_PLOT_YIELDS', 'COLLECTION_ALL_CITIES',
     'COLLECTION_ALL_PLAYERS', 'COLLECTION_MAJOR_PLAYERS', 'COLLECTION_PLAYER_UNITS', 'COLLECTION_UNIT_COMBAT'],
   /** the wonders CITY_HAS_BUILDING never holds outside its own city */
   wonders: Object.keys(BUILT_WONDERS),

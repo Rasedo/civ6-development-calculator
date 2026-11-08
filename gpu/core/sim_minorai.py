@@ -1282,7 +1282,19 @@ class SimMinorAi:
         # each plot's facts, the plots grouped by their improvement,
         # resource and feature
         PN = T["plot_names"]
+        # the improvement the analysis reads (`plotImprovementType`): the
+        # plot's own, else a barbarian camp, a tribal village or a meteor
+        # site, coded past the engine's improvements
+        NI = len(PN["improvement"])
+        imp_names = list(PN["improvement"]) + ["IMPROVEMENT_BARBARIAN_CAMP", "IMPROVEMENT_GOODY_HUT", "IMPROVEMENT_METEOR_GOODY"]
+        cp = self.camp_tile
+        camp = torch.zeros_like(self.tile_goody)
+        camp.scatter_(1, cp.clamp(min=0), cp >= 0)
+        camp[:, 0] = (cp == 0).any(dim=1)
         imp = self.improvement.gather(1, p0)
+        imp = torch.where(imp >= 0, imp, torch.where(camp.gather(1, p0), torch.full_like(imp, NI),
+                          torch.where(self.tile_goody.gather(1, p0), torch.full_like(imp, NI + 1),
+                                      torch.where(self.tile_meteor.gather(1, p0), torch.full_like(imp, NI + 2), torch.full_like(imp, -1)))))
         rid = torch.where(self._res_live() & ~self._res_hidden(row), self.res_id, torch.full_like(self.res_id, -1)).gather(1, p0)
         fid = torch.where((self.feat_id >= 0) & ~self.feat_stripped, self.feat_id, torch.full_like(self.feat_id, -1)).gather(1, p0)
         NR = max(len(PN["resourceType"]), 1) + 1
@@ -1297,7 +1309,7 @@ class SimMinorAi:
             ri = int(rid[bb[0], pp[0]])
             fi = int(fid[bb[0], pp[0]])
             pf = _PlotFacts(ctx, bb, pp,
-                            PN["improvement"][ii] if ii >= 0 else None,
+                            imp_names[ii] if ii >= 0 else None,
                             PN["resourceType"][ri] if ri >= 0 else None,
                             PN["feature"][fi] if fi >= 0 else None,
                             [(name, pl[bb, pp]) for (_i, name, _dv, pl, _ok) in cand_rows])
@@ -1331,7 +1343,7 @@ class SimMinorAi:
                 ri = int(rid[bb[0], pp[0]])
                 fi = int(fid[bb[0], pp[0]])
                 pf = _PlotFacts(ctx, bb, pp,
-                                PN["improvement"][ii] if ii >= 0 else None,
+                                imp_names[ii] if ii >= 0 else None,
                                 PN["resourceType"][ri] if ri >= 0 else None,
                                 PN["feature"][fi] if fi >= 0 else None,
                                 [(name, torch.zeros_like(bb, dtype=torch.bool)) for (_i, name, _dv, _pl, _ok) in cand_rows])
@@ -2047,6 +2059,47 @@ class _PlotFacts:
 
     def plot_improvement(self):
         return self._imp
+
+    # the analysis's plot (context +0x88): COLLECTION_PLAYER_PLOT_YIELDS'
+    # one subject (`plotView`)
+    has_plot = True
+
+    def own_plot_is(self, kind, name):
+        """per element its plot's install terrain / feature / resource is
+        `name`; its resource is seen; it holds an improvement; it is hills;
+        it bars passage (`plotView`, `_cv_admits`)"""
+        sim, bb, tl = self.sim, self.bb, self.tiles
+        pn = sim._cv_tables()["plot_names"]
+        if kind in ("terrain", "hills"):
+            elev = sim.hills[bb, tl].long() + 2 * sim.tile_mountain[bb, tl].long()
+            if kind == "hills":
+                return elev == 1
+            ter = sim.terrain[bb, tl]
+            out = torch.zeros_like(tl, dtype=torch.bool)
+            for k, base in enumerate(pn["terrain"]):
+                for e, suffix in enumerate(("", "_HILLS", "_MOUNTAIN")):
+                    if base + suffix == name:
+                        out = out | ((ter == k) & (elev == e))
+            return out
+        fid = sim.feat_id[bb, tl]
+        if kind == "feature":
+            ks = [k for k, f in enumerate(pn["feature"]) if f == name]
+            return (fid.unsqueeze(-1) == torch.tensor(ks, dtype=torch.long, device=sim.device)).any(-1) if ks \
+                else torch.zeros_like(tl, dtype=torch.bool)
+        if kind == "impassable":
+            imp = torch.tensor(pn["featureImpassable"], dtype=torch.bool, device=sim.device)
+            return sim.tile_mountain[bb, tl] | ((fid >= 0) & imp[fid.clamp(min=0)])
+        if kind == "improvement":
+            return sim.improvement[bb, tl] >= 0
+        live = sim._res_live()[bb, tl]
+        if kind == "resource":
+            ks = [k for k, r in enumerate(pn["resource"]) if r == name]
+            rid = sim.res_id[bb, tl]
+            return live & (rid.unsqueeze(-1) == torch.tensor(ks, dtype=torch.long, device=sim.device)).any(-1) if ks \
+                else torch.zeros_like(tl, dtype=torch.bool)
+        if kind == "resourceVisible":
+            return live & ~sim._res_hidden(self.ctx.row)[bb, tl]
+        raise NotImplementedError(kind)
 
     def resource(self):
         return self._res

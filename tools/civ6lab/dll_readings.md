@@ -11699,3 +11699,49 @@ completion and from `minorCompleteNow`; GPU `_minor_research_bank` and
   their target stay held with no row; the Corps Man-At-Arms 1179650 no tree
   takes at t184 / t185 (Bologna's trees 8126471 / 8257540 end empty), which
   t194's takes.
+
+## C-100: the plot's own subject, PLOT_IS_HILLS and the plot analysis' replaced camp — READ (0x69ed60 / 0x69ec20, 0x6d0970, 0x5cf160..0x5cf1ab), both twins
+
+- COLLECTION_PLAYER_PLOT_YIELDS (registry 0x6c9640 at 0x6cc067, @f03bc8,
+  vtable 0xd62500: begin 0x69ed60, next 0x69ec20, end 0x12e2a0): one
+  subject, the analysis's plot (context +0x88), none without one. With
+  EFFECT_ADJUST_PLOT_YIELD 0x6afa10 (half the Amount's span, unweighted,
+  none on an impassable plot) an improvement's ImprovementModifiers value
+  their yields on the improvement's own plot.
+- REQUIREMENT_PLOT_IS_HILLS (registry at 0x6ccb37, @f04508, vtable
+  0xd674c0, evaluate 0x6d0970): the context plot (+0x88) is hills (IsHills
+  0x82e30, the Terrains row's +0x48 bit 0); no plot fails it. Nazca's
+  NAZCA_LINE_ADJACENCY_PRODUCTION_FLAT_MASS_PRODUCTION (inverse) counts on a
+  flat plot; the set's PLAYER_HAS_CIVIC / PLAYER_HAS_TECHNOLOGY /
+  PLOT_HAS_ANY_RESOURCE rows are unregistered and left out (0x6ccec0), so a
+  flat desert Nazca Line counts four of its five rows at 10.00 each.
+- Ported: `subjects` COLLECTION_PLAYER_PLOT_YIELDS on `AiValueView.plotView`
+  and the evaluator REQUIREMENT_PLOT_IS_HILLS (cpu/core/aiModifiers.ts);
+  `_cv_subjects` / `_cv_admits` / `_cv_analyze` on the subject kind "plot"
+  (`_PlotFacts.has_plot`, `_PlotFacts.own_plot_is`), the city plots' "hills"
+  (gpu/core/sim_cityvalue.py, sim_minorai.py); a policy's context holds no
+  plot (`_POL_NO_SUBJECTS`).
+- Confirmed: runs/h1_duelp1128 Nazca's Nazca Line rows 92.34 at t2 (ours
+  52.34 before), 1,722 of 1,736 rows within 0.01 over t2-t249.
+- THE REPLACED CAMP (0x7a58f0's other improvement, the plot's +0x44): a
+  barbarian camp, a tribal village or a meteor site on the plot is the
+  improvement a new one replaces, its 0x7b1320 off (PSEUDOYIELD_IMPROVEMENT
+  a turn, 60.34 from T 0). The engine keeps the three beside the plot's
+  improvement (`campTiles`, `Tile.goodyHut`, `Tile.meteor`):
+  `plotImprovementType` (cpu/core/minorCityAi.ts) and the plot analysis'
+  `imp_names` codes (gpu/core/sim_minorai.py `_minor_plot_evals`); the
+  importer reads IMPROVEMENT_METEOR_GOODY as `Tile.meteor`.
+- Confirmed: runs/h1_duelp1127 t2-t13 city-state 4's Farm on Woods at 6:8
+  (a camp) -6.00 / -8.00, 6:9's 54.34; runs/h1_duelp1121 t13-14 city-state
+  2's Mine at 10:2 (a camp) 10.14 / 11.39; runs/h1_duelp1128 t15-51 Hong
+  Kong's Mine at 11:7 (the meteor site) 11.11, 71.45 beside it.
+- THE SKIPPED PLOT (0x5cf160..0x5cf1ab): a plot that is a city (IsCity
+  0x81120), holds a district (GetDistrictType 0x810d0, any), a wonder (the
+  plot info's +0x1e, IsWonderComplete 0x81330's field) or is a canyon
+  (0xb3c380) skips the improvement loop: its IMPROVEMENTS row stays as an
+  earlier analysis wrote it (runs/h1_duelp1128 Nazca's 33:10 Farm 115.24
+  from t13 on through the Holy Site placed there t14, Horses revealed).
+- Open (C-100): the plot analysis' stale rows are not kept by the engine
+  (a district plot's rows 0); a Builder bought before the analysis priced
+  at the count before the purchase on some turns (runs/h1_duelp1117
+  Caguana t62 / t140 / t148, t42 after).
