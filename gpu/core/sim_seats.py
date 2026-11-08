@@ -12623,10 +12623,8 @@ class SimSeats:
             if not course:
                 continue
             at = torch.tensor(course, dtype=torch.long, device=self.device)
-            # passable land only: a portal's mountain carries no road
-            _imp = self.improvement[b, at]
-            land = ~self.water[b, at] & ~(self._imp_portal[_imp.clamp(min=0)] & (_imp >= 0))
-            _at = at[land]
+            # land only
+            _at = at[~self.water[b, at]]
             self._lay_road(torch.full_like(_at, b), _at, row)
 
     def _found_city_grants(self, row: int, made: torch.Tensor, tile: torch.Tensor) -> None:
@@ -16627,9 +16625,8 @@ class SimSeats:
                 i = torch.where(lg == 0, at + 1, at - 1).clamp(min=0, max=crs.shape[1] - 1)
                 nxt = torch.where(on, crs.gather(1, i.unsqueeze(1)).squeeze(1), cur)
                 self.seat_route_walk[bb, row, kk] = nxt
-                # roads go on passable LAND only — a sea leg lays nothing, and
-                # neither does a portal's mountain
-                moved = on & self.passable[bb, nxt.clamp(min=0)]
+                # roads go on LAND only — a sea leg lays nothing
+                moved = on & ~self.water[bb, nxt.clamp(min=0)]
                 if bool(moved.count_nonzero()):
                     self._lay_road(bb[moved], nxt[moved], row)
                 self._claim_tile_en_route(row, bb, nxt, on)

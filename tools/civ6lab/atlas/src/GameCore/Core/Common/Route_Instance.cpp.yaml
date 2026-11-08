@@ -3,6 +3,77 @@
 # `review: imported` = bootstrapped from dll_readings.md / code comments / saved
 # labels and not yet reviewed: verify against the disassembly, then edit and
 # set `review: reviewed`.
+- addr: 0x87080
+  final: 0x630f0
+  kind: function
+  semantics: adds a plot index to a portal's exits (+0x50, 4-byte entries) unless already held.
+  status: READ
+  cases:
+    - recording: c108_t225_20261108T115945Z
+      value: 1:65536 54:11 -> 1:196610 54:21 jumps 53:13 -> 52:15 (portalIn 2, portalOut 3), 10 plots; no game path stands on a tunnel
+  impl: [cpu/core/rules.ts:pathPortals, gpu/core/sim_masks.py:_path_portals]
+  readings:
+    - "C-108: the trade path's portals, its open list and CanStartRoute's gates — READ, both twins"
+  review: reviewed
+- addr: 0x87100
+  final: 0x63170
+  kind: function
+  semantics: makes (or finds) the portal at a plot (the manager's per-plot index +0x20, its portals +0x40, stride 0xd8; the portal's plot +8), adds the network key plot to it (vtable +8) and links it (0x871e0).
+  status: READ
+  cases:
+    - recording: c108_t225_20261108T115945Z
+      value: 1:65536 54:11 -> 1:196610 54:21 jumps 53:13 -> 52:15 (portalIn 2, portalOut 3), 10 plots; no game path stands on a tunnel
+  impl: [cpu/core/rules.ts:pathPortals, gpu/core/sim_masks.py:_path_portals]
+  readings:
+    - "C-108: the trade path's portals, its open list and CanStartRoute's gates — READ, both twins"
+  review: reviewed
+- addr: 0x871e0
+  final: 0x63240
+  kind: function
+  semantics: "links a new portal: every other portal sharing a key (+0x98..+0xa0) whose plot is not beside the new one's (0x889e0) takes the new plot as an exit (0x87080) and gives its own plot to the new one's exits (+0x50)."
+  status: READ
+  cases:
+    - recording: c108_t225_20261108T115945Z
+      value: 1:65536 54:11 -> 1:196610 54:21 jumps 53:13 -> 52:15 (portalIn 2, portalOut 3), 10 plots; no game path stands on a tunnel
+  impl: [cpu/core/rules.ts:pathPortals, gpu/core/sim_masks.py:_path_portals]
+  readings:
+    - "C-108: the trade path's portals, its open list and CanStartRoute's gates — READ, both twins"
+  review: reviewed
+- addr: 0x884d0
+  final: 0x63c70
+  kind: function
+  semantics: the route manager (portals) instance.
+  status: READ
+  cases:
+    - recording: c108_t225_20261108T115945Z
+      value: 1:65536 54:11 -> 1:196610 54:21 jumps 53:13 -> 52:15 (portalIn 2, portalOut 3), 10 plots; no game path stands on a tunnel
+  impl: [cpu/core/rules.ts:pathPortals, gpu/core/sim_masks.py:_path_portals]
+  readings:
+    - "C-108: the trade path's portals, its open list and CanStartRoute's gates — READ, both twins"
+  review: reviewed
+- addr: 0x88530
+  final: 0x63b90
+  kind: function
+  semantics: a portal's i-th exit (+0x50 vector of plot indices) as a coordinate.
+  status: READ
+  cases:
+    - recording: c108_t225_20261108T115945Z
+      value: 1:65536 54:11 -> 1:196610 54:21 jumps 53:13 -> 52:15 (portalIn 2, portalOut 3), 10 plots; no game path stands on a tunnel
+  impl: [cpu/core/rules.ts:pathPortals, gpu/core/sim_masks.py:_path_portals]
+  readings:
+    - "C-108: the trade path's portals, its open list and CanStartRoute's gates — READ, both twins"
+  review: reviewed
+- addr: 0x88630
+  kind: function
+  semantics: the portal at (x, y), null where none stands (the per-plot index +0x20 into +0x40).
+  status: READ
+  cases:
+    - recording: c108_t225_20261108T115945Z
+      value: 1:65536 54:11 -> 1:196610 54:21 jumps 53:13 -> 52:15 (portalIn 2, portalOut 3), 10 plots; no game path stands on a tunnel
+  impl: [cpu/core/rules.ts:pathPortals, gpu/core/sim_masks.py:_path_portals]
+  readings:
+    - "C-108: the trade path's portals, its open list and CanStartRoute's gates — READ, both twins"
+  review: reviewed
 - addr: 0x88680
   final: 0x63cb0
   kind: function
@@ -16,4 +87,16 @@
     - "C-100: a district on a feature it may not stand on, and the Mountain Portal's analyzer — READ"
   context:
     - ...ghbour with a route (plot +0x47 not 0xff) counts, one without a route holding a portal (0x88680, the route manager's per-plot portal) refuses the term, and one of the five mountain...
+  review: reviewed
+- addr: 0x889e0
+  final: 0x63ff0
+  kind: function
+  semantics: is a coordinate one of a plot's six neighbours (the axial tables 0xeff670 / 0xeff688, wrapping by its flags).
+  status: READ
+  cases:
+    - recording: c108_t225_20261108T115945Z
+      value: 1:65536 54:11 -> 1:196610 54:21 jumps 53:13 -> 52:15 (portalIn 2, portalOut 3), 10 plots; no game path stands on a tunnel
+  impl: [cpu/core/rules.ts:pathPortals, gpu/core/sim_masks.py:_path_portals]
+  readings:
+    - "C-108: the trade path's portals, its open list and CanStartRoute's gates — READ, both twins"
   review: reviewed

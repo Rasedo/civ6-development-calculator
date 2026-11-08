@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import heapq
 import sys
 
 from .simbase import *  # noqa: F401,F403 — torch, constants, helpers
@@ -2117,15 +2116,36 @@ class SimMasks:
 
     def _trade_walkable(self, rows: torch.Tensor, tiles: torch.Tensor, water: torch.Tensor) -> torch.Tensor:
         """`plotOpen`'s ground half — may a Trader at this water level stand
-        here? A portal's mountain is ground to walk onto, as it is to every
-        unit. `water` broadcasts against `tiles`."""
-        out = (
+        here? No mountain is, a portal's among them (no portal stands on
+        one). `water` broadcasts against `tiles`."""
+        return (
             self.passable[rows, tiles]
             | ((water >= 1) & self.wpass[rows, tiles])
         )
-        if self._imp_portal_any:
-            imp = self.improvement[rows, tiles]
-            out = out | (self._imp_portal.take(imp.clamp(min=0)) & (imp >= 0))
+
+    def _path_portals(self, b: int, portal: list) -> dict:
+        """`pathPortals` for game `b` (`portal` its `_portal_plane` row as a
+        list): per portal plot — beside a portal's mountain, neither a
+        mountain nor water — the portals of its network (a mountain range)
+        not beside it, ascending."""
+        rng = self.tile_range[b].tolist()
+        mtn = self.tile_mountain[b].tolist()
+        wat = self.water[b].tolist()
+        neigh = self._neigh_list
+        ranges: dict = {}
+        for t, on in enumerate(portal):
+            if not on or rng[t] < 0:
+                continue
+            for n in neigh[t]:
+                if n >= 0 and not mtn[n] and not wat[n]:
+                    ranges.setdefault(n, set()).add(rng[t])
+        plots = sorted(ranges)
+        out = {}
+        for p in plots:
+            near = set(neigh[p])
+            links = [q for q in plots if q != p and q not in near and ranges[q] & ranges[p]]
+            if links:
+                out[p] = links
         return out
 
     def _trade_graphs(self, row: int, games: list[int]) -> dict[int, tuple]:
@@ -2142,7 +2162,7 @@ class SimMasks:
         at a post: an embark plot of a city whose centre holds the row's
         Trading Post, its holder not at war with the row. danger: a feature
         with a DangerValue. term: `plotTerm`, what stepping onto the plot adds.
-        exit: the portal exit (`_portal_exit`), -1 elsewhere."""
+        exit: per portal plot the portals it jumps to (`_path_portals`)."""
         if not games:
             return {}
         dev, T = self.device, self.T
@@ -2184,17 +2204,13 @@ class SimMasks:
         term = torch.where(self.water[gi] & ~self.road[gi], torch.full_like(land, self._trade_cost_water), term)
         term = torch.where(self.railroad[gi], torch.full_like(land, self._trade_cost_rail), term)
         neither = centre | self._multi_domain_plot()[gi]
-        term = torch.where(neither | portal, torch.zeros_like(land), term)
-        exit_ = torch.full((n, T), -1, dtype=torch.long, device=dev)
-        if bool(portal.count_nonzero()):
-            for i in range(n):
-                pt = portal[i].nonzero(as_tuple=True)[0]
-                if len(pt):
-                    exit_[i, pt] = self._portal_exit(pt, gi[i].expand(len(pt)))
-        cols = [x.tolist() for x in (opn, water, neither, embark, refuel, danger, term, exit_)]
+        term = torch.where(neither, torch.zeros_like(land), term)
+        cols = [x.tolist() for x in (opn, water, neither, embark, refuel, danger, term)]
+        pl = portal.tolist()
         out = {}
         for i, b in enumerate(games):
             gr = [c[i] for c in cols]
+            gr.append(self._path_portals(b, pl[i]) if any(pl[i]) else {})
             # the TradeEmbark plots short of a centre, ascending
             gr.append([p for p, e in enumerate(gr[3]) if e >= 0 and e != p])
             out[b] = tuple(gr)
@@ -2203,10 +2219,13 @@ class SimMasks:
     def _trade_reach(self, b: int, row: int, origin: int, gr: tuple, dest: int = -1) -> tuple:
         """`tradeReach`'s twin (`walk`), plot for plot: the walk from `origin`
         over every plot for game `b`, row `row` — (g, left, parent, steps)
-        lists, g -1 where unreached. Dijkstra's walk, one label per plot: the
-        least cost pops first, the lower plot index on a tie; a label is
-        replaced by a cheaper one, or by an equally cheap one leaving more
-        range; edges in neighbour-direction order, then the portal exit. A
+        lists, g -1 where unreached. The pathfinder's walk with no
+        heuristic: the open list sorted by cost, a new node placed as
+        AddToOpen does (below the head first, above the tail last, else
+        strictly nearer the tail after its equals, else before them), the
+        head popped, its children in DirectionTypes order then its portal
+        jumps (`_path_portals`); an open node re-parented only where strictly
+        cheaper and re-keyed after its new equals. A
         land<->water step with no neither plot (a centre, a Canal) at either
         end caps the range at 1 and, where `u` refuels nothing, costs
         `_trade_cost_switch` more; a refuel onto a neither plot is the larger
@@ -2228,20 +2247,45 @@ class SimMasks:
         done = [False] * T
         g[origin] = 0
         left[origin] = self._trade_base_range
-        heap = [origin]
+        # the open list, dearest first: the head is the last entry
+        oplot, ocost = [origin], [0]
+
+        def put(p: int, c: int, before_equals: bool) -> None:
+            # the entries dearer than c (or as dear, `before_equals`): the
+            # list order head-first puts the new one after them
+            lo, hi = 0, len(ocost)
+            while lo < hi:
+                m = (lo + hi) >> 1
+                if ocost[m] > c or (before_equals and ocost[m] == c):
+                    lo = m + 1
+                else:
+                    hi = m
+            oplot.insert(lo, p)
+            ocost.insert(lo, c)
+
+        def add(p: int, c: int) -> None:
+            n = len(ocost)
+            if n == 0 or c < ocost[-1]:
+                oplot.append(p)
+                ocost.append(c)
+            elif c > ocost[0]:
+                oplot.insert(0, p)
+                ocost.insert(0, c)
+            else:
+                put(p, c, abs(c - ocost[0]) >= abs(c - ocost[-1]))
+
         step, swc = self._trade_cost_step, self._trade_cost_switch
         lref, wref, dref = self._trade_land_refuel, self._trade_water_refuel, self._trade_dest_refuel
-        while heap:
-            k = heapq.heappop(heap)
-            u = k % T
-            if done[u] or (k - u) // T != g[u]:
-                continue
+        dirs = self._DIRECTION_TYPES
+        while oplot:
+            ocost.pop()
+            u = oplot.pop()
             done[u] = True
             if u != origin and danger[u]:
                 continue
-            nb = [x for x in neigh[u] if x >= 0]
-            if exit_[u] >= 0:
-                nb.append(exit_[u])
+            nu = neigh[u]
+            nb = [nu[d] for d in dirs if nu[d] >= 0]
+            nb.extend(exit_.get(u, ()))
             wu, cu, eu = water[u], neither[u], embark[u] >= 0
             fuel = embark[u] >= 0 and (embark[u] == origin or refuel[u])
             dfuel = not fuel and dest >= 0 and embark[u] == dest
@@ -2261,12 +2305,20 @@ class SimMasks:
                 if lv < 0:
                     continue
                 gv = g[u] + step + term[v] + (swc if sw and not fuel and not dfuel else 0)
-                if g[v] < 0 or gv < g[v] or (gv == g[v] and lv > left[v]):
-                    g[v] = gv
-                    left[v] = lv
-                    parent[v] = u
-                    steps[v] = steps[u] + 1
-                    heapq.heappush(heap, gv * T + v)
+                fresh = g[v] < 0
+                if not fresh and gv >= g[v]:
+                    continue
+                g[v] = gv
+                left[v] = lv
+                parent[v] = u
+                steps[v] = steps[u] + 1
+                if fresh:
+                    add(v, gv)
+                else:
+                    i = oplot.index(v)
+                    del oplot[i]
+                    del ocost[i]
+                    put(v, gv, False)
         out = (g, left, parent, steps)
         self._trade_reach_memo[key] = (gr, out)
         return out

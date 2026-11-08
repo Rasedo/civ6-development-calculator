@@ -830,7 +830,7 @@ describe('the route path term (transportation efficiency)', () => {
   });
 
   it('pays 15 per portal the Trader takes', () => {
-    const state = makeState(makeMap(16, 16));
+    const state = makeState(makeMap(32, 16));
     for (let r = 0; r < 16; r++) for (const c of [7, 8, 9]) tileAtCoords(state.map, c, r).elevation = 'MOUNTAIN';
     deriveMountainRanges(state.map);
     tileAtCoords(state.map, 7, 5).improvement = 'MOUNTAIN_TUNNEL';
@@ -838,13 +838,14 @@ describe('the route path term (transportation efficiency)', () => {
     const from = tileAtCoords(state.map, 6, 5).index;
     const to = tileAtCoords(state.map, 11, 5).index;
     const r = coursed(state, from, to);
-    expect(r.course!.length).toBe(5);
-    // 15 of 5 plots saturates: the whole of D
+    // 6:5, the jump to 10:5, 11:5
+    expect(r.course!.length).toBe(3);
+    // 15 of 3 plots saturates: the whole of D
     expect(routePathGold(state, 0, r, 4)).toBe(4);
     // a longer walk: 15 over its n plots
-    const rf = coursed(state, from, tileAtCoords(state.map, 15, 5).index);
+    const rf = coursed(state, from, tileAtCoords(state.map, 31, 5).index);
     const n = rf.course!.length;
-    expect(n).toBe(9);
+    expect(n).toBe(23);
     expect(routePathGold(state, 0, rf, 4)).toBe((4 * Math.min(256, Math.floor((256 * 15) / n))) / 256);
   });
 });

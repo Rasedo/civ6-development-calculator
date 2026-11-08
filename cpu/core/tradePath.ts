@@ -14,23 +14,25 @@
  * where the walk reaches such a district short of the centre, and only there
  * does `tradeCourse` walk again for that one destination.
  *
- * THIS ENGINE'S READING where the DLL's own order is unread (the A*
- * heuristic 0x271490 and its heap): the heuristic is 0, so the search is
- * Dijkstra's, one label per plot. The open plot popped next is the one with
- * the least cost, the LOWER plot index on a tie. A plot's label is replaced by
- * a strictly cheaper one, or by an equally cheap one leaving MORE range; on a
- * full tie the first label stays. Edges are tried in neighbour-direction
- * order, then the portal exit. The GPU twin (`_trade_reach`) runs the same
- * walk plot for plot.
+ * The search is the pathfinder's (CvAStar, GeneratePath 0x77d10 over
+ * SearchStep 0x793f0) with no heuristic: the open list is sorted by cost, a
+ * new node placed by AddToOpen 0x775a0 (below the head first, above the tail
+ * last, else from the nearer end by cost: strictly nearer the tail after its
+ * equals, else before them), the head popped (GetBest 0x781e0), its children
+ * the six neighbours in DirectionTypes order and then its portal jumps
+ * (0x77a50, `pathPortals`), each linked where the node test passes; an open
+ * node is re-parented only where strictly cheaper (LinkChild 0x78750),
+ * re-keyed after its new equals (0x79560), its range taken again from the new
+ * parent. The GPU twin (`_trade_reach`) runs the same walk plot for plot.
  */
 import type { GameState, Tile } from './types';
 import { srcConst, xml } from '../data/provenance';
 import { MP_SCALE, TRADE_COURSE_MAX } from '../data/constants';
-import { neighborTile } from '../../world/hex';
+import { DIRECTION_TYPES, neighborTile } from '../../world/hex';
 import { isImpassable, isWater, multiDomainPlot } from '../../world/query';
 import { civsAtWar, isCityStateSeat, seatOf } from './seats';
 import { isExplored } from './fog';
-import { portalAt, portalExit } from './rules';
+import { pathPortals } from './rules';
 import { terrainMp, tradeWaterLevel, TRADE_WATER_OPEN } from './units';
 
 export const TRADE_BASE_RANGE = srcConst('trade.baseRange', 15,
@@ -95,7 +97,8 @@ interface TradeGraph {
   embark: Map<number, number>;
   /** the embark plots this walk refuels at */
   refuel: Set<number>;
-  exit: Map<number, number>;
+  /** portal plot -> the portals it jumps to (`pathPortals`) */
+  exit: Map<number, number[]>;
 }
 
 /** One origin's walk: per plot the least cost found (-1 unreached), the
@@ -132,20 +135,18 @@ function tradeGraph(state: GameState, seat: number, origin: number): TradeGraph 
     const who = holder.get(centre)!;
     if (centre === origin || (posts.includes(centre) && (who === seat || !civsAtWar(state, seat, who)))) refuel.add(plot);
   }
-  const exit = new Map<number, number>();
   const neither = new Set(holder.keys());
-  for (const t of state.map.tiles) {
-    if (portalAt(t)) exit.set(t.index, portalExit(state.map, t));
-    if (multiDomainPlot(t)) neither.add(t.index);
-  }
+  for (const t of state.map.tiles) if (multiDomainPlot(t)) neither.add(t.index);
+  const exit = pathPortals(state.map);
   return { water: tradeWaterLevel(state, seat), major: !isCityStateSeat(seat), holder, neither, embark, refuel, exit };
 }
 
-/** 0x558db0: may the walk enter this plot? Impassable ground and a mountain
- *  with no tunnel, a plot a major has not revealed, water where the seat's
- *  Trader cannot embark, and a foreign centre of a holder at war are closed. */
+/** 0x558db0: may the walk enter this plot? Impassable ground and every
+ *  mountain (no portal stands on one), a plot a major has not revealed, water
+ *  where the seat's Trader cannot embark, and a foreign centre of a holder at
+ *  war are closed. */
 function plotOpen(state: GameState, gr: TradeGraph, seat: number, t: Tile): boolean {
-  if (!portalAt(t) && isImpassable(t)) return false;
+  if (isImpassable(t)) return false;
   if (isWater(t) && gr.water < TRADE_WATER_OPEN) return false;
   if (gr.major && !isExplored(state, seat, t.index)) return false;
   const who = gr.holder.get(t.index);
@@ -154,46 +155,53 @@ function plotOpen(state: GameState, gr: TradeGraph, seat: number, t: Tile): bool
 
 /** 0x558970's plot term: what stepping ONTO this plot adds. */
 function plotTerm(gr: TradeGraph, t: Tile): number {
-  if (gr.neither.has(t.index) || portalAt(t)) return 0;
+  if (gr.neither.has(t.index)) return 0;
   if (t.railroad) return TRADE_COST_RAIL;
   if (t.road) return TRADE_COST_ROUTE;
   if (isWater(t)) return TRADE_COST_WATER;
   return (TRADE_COST_LAND * terrainMp(t)) / MP_SCALE;
 }
 
-/** A binary min-heap of packed (cost, plot) keys. */
-class KeyHeap {
-  private a: number[] = [];
-  get size(): number { return this.a.length; }
-  push(k: number): void {
-    const a = this.a;
-    a.push(k);
-    let i = a.length - 1;
-    while (i > 0) {
-      const p = (i - 1) >> 1;
-      if (a[p] <= k) break;
-      a[i] = a[p];
-      i = p;
-    }
-    a[i] = k;
-  }
+/** The pathfinder's open list, sorted by cost: kept dearest first, so the
+ *  head (the cheapest) is the array's last entry. */
+class OpenList {
+  private plot: number[] = [];
+  private cost: number[] = [];
+  get size(): number { return this.plot.length; }
+  /** GetBest 0x781e0: the head */
   pop(): number {
-    const a = this.a;
-    const top = a[0];
-    const last = a.pop()!;
-    if (a.length > 0) {
-      let i = 0;
-      for (;;) {
-        const l = 2 * i + 1;
-        if (l >= a.length) break;
-        const c = l + 1 < a.length && a[l + 1] < a[l] ? l + 1 : l;
-        if (a[c] >= last) break;
-        a[i] = a[c];
-        i = c;
-      }
-      a[i] = last;
+    this.cost.pop();
+    return this.plot.pop()!;
+  }
+  /** the entries dearer than c, or as dear too where orEqual is set */
+  private count(c: number, orEqual: boolean): number {
+    let lo = 0;
+    let hi = this.cost.length;
+    while (lo < hi) {
+      const m = (lo + hi) >> 1;
+      if (this.cost[m] > c || (orEqual && this.cost[m] === c)) lo = m + 1;
+      else hi = m;
     }
-    return top;
+    return lo;
+  }
+  private put(at: number, p: number, c: number): void {
+    this.plot.splice(at, 0, p);
+    this.cost.splice(at, 0, c);
+  }
+  /** AddToOpen 0x775a0: below the head first, above the tail last; else
+   *  strictly nearer the tail by cost after its equals, else before them */
+  add(p: number, c: number): void {
+    const n = this.cost.length;
+    if (n === 0 || c < this.cost[n - 1]) this.put(n, p, c);
+    else if (c > this.cost[0]) this.put(0, p, c);
+    else this.put(this.count(c, Math.abs(c - this.cost[0]) >= Math.abs(c - this.cost[n - 1])), p, c);
+  }
+  /** 0x79560: an open node made cheaper goes after its new equals */
+  rekey(p: number, c: number): void {
+    const i = this.plot.indexOf(p);
+    this.plot.splice(i, 1);
+    this.cost.splice(i, 1);
+    this.put(this.count(c, false), p, c);
   }
 }
 
@@ -220,25 +228,22 @@ function walk(state: GameState, seat: number, origin: number, gr: TradeGraph, de
   const parent = new Int32Array(T).fill(-1);
   const steps = new Int32Array(T);
   const done = new Uint8Array(T);
-  const heap = new KeyHeap();
+  const open = new OpenList();
   g[origin] = 0;
   left[origin] = TRADE_BASE_RANGE;
-  heap.push(origin);
+  open.add(origin, 0);
   const nb: number[] = [];
-  while (heap.size > 0) {
-    const key = heap.pop();
-    const u = key % T;
-    if (done[u] || (key - u) / T !== g[u]) continue;
+  while (open.size > 0) {
+    const u = open.pop();
     done[u] = 1;
     const at = tiles[u];
     if (u !== origin && at.feature && TRADE_DANGER_FEATURES.includes(at.feature)) continue;
     nb.length = 0;
-    for (let d = 0; d < 6; d++) {
+    for (const d of DIRECTION_TYPES) {
       const n = neighborTile(map, at, d);
       if (n) nb.push(n.index);
     }
-    const ex = gr.exit.get(u) ?? -1;
-    if (ex >= 0) nb.push(ex);
+    for (const ex of gr.exit.get(u) ?? []) nb.push(ex);
     const wu = isWater(at);
     const cu = gr.neither.has(u);
     const eu = gr.embark.has(u);
@@ -258,13 +263,14 @@ function walk(state: GameState, seat: number, origin: number, gr: TradeGraph, de
       const lv = r - 1;
       if (lv < 0) continue;
       const gv = g[u] + TRADE_COST_STEP + plotTerm(gr, to) + (sw && !fuel && !dfuel ? TRADE_COST_SWITCH : 0);
-      if (g[v] < 0 || gv < g[v] || (gv === g[v] && lv > left[v])) {
-        g[v] = gv;
-        left[v] = lv;
-        parent[v] = u;
-        steps[v] = steps[u] + 1;
-        heap.push(gv * T + v);
-      }
+      const fresh = g[v] < 0;
+      if (!fresh && gv >= g[v]) continue;
+      g[v] = gv;
+      left[v] = lv;
+      parent[v] = u;
+      steps[v] = steps[u] + 1;
+      if (fresh) open.add(v, gv);
+      else open.rekey(v, gv);
     }
   }
   return { state, seat, origin, graph: gr, g, left, parent, steps };

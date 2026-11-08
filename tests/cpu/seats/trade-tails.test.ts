@@ -4,7 +4,7 @@ import { emptySeat, seatOf } from '../../../cpu/core/seats';
 import { spawnUnit } from '../../../cpu/core/units';
 import { TRADE_COST_LAND, TRADE_COST_STEP, tradeCourse, tradeReach } from '../../../cpu/core/tradePath';
 import { plunderedByHull, routePlunderGold, routeOriginYields, routeYieldValue, PLUNDER_ROUTE_GOLD, PLUNDER_ROUTE_TURNS, GOLD_EQUIVALENT_OTHER_YIELDS } from '../../../cpu/core/trade';
-import { portalExit } from '../../../cpu/core/rules';
+import { pathPortals } from '../../../cpu/core/rules';
 import { GP_ABILITY, GP_PERM } from '../../../cpu/data/greatPeople';
 import { deriveMountainRanges } from '../../../world/query';
 import { settleAt } from '../helpers';
@@ -20,7 +20,8 @@ import type { DistrictId, GameState, TradeRoute } from '../../../cpu/core/types'
  * the plain amount.
  *
  * CIV6 (Mountain Tunnel, Qhapaq Ñan): "Trade Routes traveling through it" — a
- * Trader walks onto a portal's mountain and takes the portal as a unit does.
+ * Trader's path jumps from the plot beside one portal's mountain to the plot
+ * beside another of its range, never standing on the mountain (`pathPortals`).
  *
  * The GPU twin is tests/gpu/trade_tails_test.py.
  */
@@ -132,28 +133,22 @@ function ridgeScene(portal: 'MOUNTAIN_TUNNEL' | 'MOUNTAIN_ROAD'): GameState {
 describe('a Trader through a mountain portal', () => {
   const course = (state: GameState, from: number, to: number) => tradeCourse(tradeReach(state, 0, from), to);
 
-  it('walks onto a portal and nowhere else on the ridge', () => {
+  it('stands on no mountain of the ridge, a portal\'s neither', () => {
     const state = ridgeScene('MOUNTAIN_TUNNEL');
     const reach = tradeReach(state, 0, tileAtCoords(state.map, 6, 5).index);
-    expect(reach.g[tileAtCoords(state.map, 7, 5).index]).toBeGreaterThan(0);
-    expect(reach.g[tileAtCoords(state.map, 8, 5).index]).toBe(-1);
+    for (const c of [7, 8, 9]) expect(reach.g[tileAtCoords(state.map, c, 5).index]).toBe(-1);
     expect(reach.g[tileAtCoords(state.map, 7, 4).index]).toBe(-1);
   });
 
-  it('takes the portal across a wall it could not cross, onto the portal free of cost', () => {
+  it('jumps from the plot beside one portal to the plots beside the other, at a step\'s cost', () => {
     const state = ridgeScene('MOUNTAIN_TUNNEL');
-    const from = tileAtCoords(state.map, 6, 5).index;
-    const to = tileAtCoords(state.map, 10, 5).index;
-    const west = tileAtCoords(state.map, 7, 5).index;
-    const east = tileAtCoords(state.map, 9, 5).index;
-    expect(portalExit(state.map, state.map.tiles[west])).toBe(east);
-    // the step ONTO the west face, then the jump to the east face
-    expect(course(state, from, to)).toEqual([from, west, east, to]);
-    // a step onto a portal pays the step alone; onto flat ground 100 more
-    const reach = tradeReach(state, 0, from);
-    expect(reach.g[west]).toBe(TRADE_COST_STEP);
-    expect(reach.g[east]).toBe(2 * TRADE_COST_STEP);
-    expect(reach.g[to]).toBe(3 * TRADE_COST_STEP + TRADE_COST_LAND);
+    const at = (c: number, r: number) => tileAtCoords(state.map, c, r).index;
+    const from = at(6, 5);
+    const to = at(10, 5);
+    // the west portal's one land neighbour links to the east portal's three
+    expect(pathPortals(state.map).get(from)).toEqual([at(10, 4), at(10, 5), at(10, 6)]);
+    expect(course(state, from, to)).toEqual([from, to]);
+    expect(tradeReach(state, 0, from).g[to]).toBe(TRADE_COST_STEP + TRADE_COST_LAND);
     // without the portals the wall stands
     tileAtCoords(state.map, 7, 5).improvement = null;
     tileAtCoords(state.map, 9, 5).improvement = null;

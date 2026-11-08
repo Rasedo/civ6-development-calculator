@@ -8,11 +8,11 @@
 import { FEATURES } from '../../world/features';
 import { addYields, emptyYields, type City, type CityState, type GameState, type Seat, type TradeRoute, type Unit, type YieldKey, type Yields } from './types';
 import { BUILDINGS } from '../data/buildings';
-import { NO_SEAT, seatOf, citiesOf, isBarbSeat, civsAtWar, allianceTypeWith, isCityStateSeat, seatsAllied, setTileOwner, tileBelongsTo, civOf, tileSeat , leaderOf, routeIntercontinental, onHomeContinent, hiddenResourcesFor } from './seats';
+import { NO_SEAT, seatOf, citiesOf, isBarbSeat, civsAtWar, majorsMet, allianceTypeWith, isCityStateSeat, seatsAllied, setTileOwner, tileBelongsTo, civOf, tileSeat , leaderOf, routeIntercontinental, onHomeContinent, hiddenResourcesFor } from './seats';
 import { ROME_OWN_POST_GOLD, CLEOPATRA_INTL_ROUTE_GOLD, CLEOPATRA_INCOMING_ROUTE_FOOD, CLEOPATRA_INCOMING_ROUTE_GOLD, ROUTE_CAPACITY_ROWS, rowIsFor, type RouteYieldRow } from '../data/civilizations';
 import { ALLIANCE_ROUTE_TO, ALLIANCE_ROUTE_YKEY } from '../data/seats';
 import { hexDistance, tilesWithin } from '../../world/hex';
-import { isImpassable, isWater, isMountain, multiDomainPlot } from '../../world/query';
+import { isWater, isMountain, multiDomainPlot } from '../../world/query';
 import { RESOURCES } from '../../world/resources';
 import { BUILT_WONDERS } from '../data/builtWonders';
 import { disbandUnit, mapLayer, spawnUnit, unitDomain, unitsHostile } from './units';
@@ -69,7 +69,7 @@ export function stampTradingPost(owner: Seat, centerIndex: number): void {
  * CIV6 (All Roads Lead to Rome): "All cities you found or conquer start with
  * a Trading Post and, if within Trade Route range of your Capital, a road to
  * it." The road is a route's course from the city to the capital
- * (`tradeCourse`), laid on every passable land plot of it, both ends
+ * (`tradeCourse`), laid on every land plot of it, both ends
  * included.
  */
 export function allRoadsLeadToRome(state: GameState, seat: number, centerIndex: number): void {
@@ -81,8 +81,8 @@ export function allRoadsLeadToRome(state: GameState, seat: number, centerIndex: 
   const course = tradeCourse(tradeReach(state, seat, centerIndex), cap.centerIndex);
   if (!course) return;
   const tiles = state.map.tiles;
-  // passable land only: a portal's mountain carries no road
-  for (const at of course) if (!isWater(tiles[at]) && !isImpassable(tiles[at])) layRoad(state, seat, tiles[at]);
+  // land only
+  for (const at of course) if (!isWater(tiles[at])) layRoad(state, seat, tiles[at]);
 }
 
 /** The Trading Post this seat holds at a route's foreign DESTINATION: +1
@@ -1305,6 +1305,7 @@ export function canAddIntlTradeRoute(state: GameState, from: number, toSeat: num
   const civSeat = seatOf(state, toSeat);
   const civCity = civSeat?.cities.find((c) => c.id === seatCity);
   if (!a || !civSeat || !civCity) return { ok: false, reason: 'No such city / actor city.' };
+  if (!tradeMet(state, seat, toSeat)) return { ok: false, reason: 'You have not met this civilization.' };
   // TRADE POLICY outcome B: no international route may touch the named seat,
   // as sender or as destination.
   if (congressIntlBanned(state, seat) || congressIntlBanned(state, toSeat)) {
@@ -1348,9 +1349,8 @@ function tradeRouteStep(state: GameState, actor: Seat, r: TradeRoute): void {
   const i = r.walkLeg === 0 ? at + 1 : at - 1;
   const next = course[i];
   r.walkTile = next;
-  // roads go on passable LAND only — a sea leg lays nothing, and
-  // neither does a portal's mountain
-  if (!isWater(state.map.tiles[next]) && !isImpassable(state.map.tiles[next])) layRoad(state, actor.seat, state.map.tiles[next]);
+  // roads go on LAND only — a sea leg lays nothing
+  if (!isWater(state.map.tiles[next])) layRoad(state, actor.seat, state.map.tiles[next]);
   claimTileEnRoute(state, actor.seat, next);
   // the Trader is a unit on the map and looks from the plot it reaches, as
   // a unit's step does (a major's fog and meetings, a city-state's revealed
@@ -1447,14 +1447,33 @@ export function minorTrade(state: GameState, cityState: CityState, pick: boolean
   tradeRouteExpiry(state, cityState);
 }
 
+/** CanStartRoute's meeting (0x553410 -> HasMet 0x3daaf0): a route between two
+ *  players asks that its origin's player has met the destination's, whoever
+ *  they are — a city-state another city-state (`metMinors`), a major a
+ *  city-state or a city-state a major (`met`), two majors (`majorsMet`). The
+ *  Free Cities meet every major. */
+export function tradeMet(state: GameState, seat: number, other: number): boolean {
+  if (seat === other) return true;
+  const cs = (s: number) => state.cityStates?.find((c) => c.seat === s);
+  const a = cs(seat);
+  const b = cs(other);
+  if (a && b) return a.metMinors?.includes(other) ?? false;
+  if (a) return hasMet(a, other);
+  if (b) return hasMet(b, seat);
+  if (seat === state.freeSeat?.seat || other === state.freeSeat?.seat) return true;
+  return majorsMet(state, seat, other);
+}
+
 /** A CITY-STATE SENDS ITS FREE TRADER on a route its AI picked (to another
  *  city-state, `toCs`, or a major's city, `toSeat` / `toSeatCity`): under its
  *  trade capacity, a Trader standing, the route not already running, its
- *  destination within reach and not at war with it. */
+ *  destination's player met (`tradeMet`), within reach and not at war with it. */
 export function minorRouteTo(state: GameState, cityState: CityState, route: TradeRoute): RuleResult {
   const routes = cityState.tradeRoutes ?? [];
   if (routes.length >= tradeCapacity(state, cityState.seat)) return { ok: false, reason: 'No spare trading capacity.' };
   if (state.unitsMode && !freeTrader(state, cityState.seat)) return { ok: false, reason: 'No free Trader to spend.' };
+  const toPlayer = route.toCs !== undefined ? state.cityStates?.find((c) => c.id === route.toCs)?.seat : route.toSeat;
+  if (toPlayer !== undefined && !tradeMet(state, cityState.seat, toPlayer)) return { ok: false, reason: 'The destination has not been met.' };
   if (routes.some((x) => (route.toCs !== undefined && x.toCs === route.toCs)
     || (route.toSeatCity !== undefined && x.toSeat === route.toSeat && x.toSeatCity === route.toSeatCity))) {
     return { ok: false, reason: 'That route already runs.' };

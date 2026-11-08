@@ -477,20 +477,19 @@
       turn: 41
       value: "city-state 4's Horseman 589827 on 30:7: 31:9 links 32:9 then 32:10 (769536 each); with 30:6 at (1/0) near 1027000 at the tail both land from the head and 32:9 closes first, as AI_Planning.csv lists"
   impl:
-    - cpu/core/tactical.ts:search
-    - cpu/core/tactical.ts:PathDanger
-    - gpu/core/sim_tactics.py:_tac_search
+    - cpu/core/tradePath.ts:OpenList
+    - gpu/core/sim_masks.py:_trade_reach
+    - cpu/core/tactical.ts:ReachSearch
     - cpu/core/tactical.ts:before
     - gpu/core/sim_tactics.py:place
-    - cpu/core/tactical.ts:ReachSearch
   readings:
+    - "C-108: the trade path's portals, its open list and CanStartRoute's gates — READ, both twins"
     - "C-124: a move order's path opens a turn-end node beside each node with Movement left — READ (0x271920, 0x7a880, 0x271490, 0x775a0, 0x26f330), both twins"
     - "H-1: the trade path's search, its score and the Canal — READ"
     - "C-95: the unit pathfinder and the planning's reach — READ, confirmed on the Wander draws"
     - "C-96: the city-states' tactical pass — READ (Wander Near City, Heal, the non-barbarian priorities, FindAlternateLocation), the families it needs PARTLY READ"
     - "C-124: an attack order to a plot out of sight loses its attack flag — READ (0x962310), both twins"
     - "C-124: a move order's path prices a turn's end at the stacking limit +1e6, and its destination there stops the search — READ (0x270dd0 at 0x27101e..0x2710a0, 0x2720a0 at 0x272230..0x272364, 0x77a50, 0x26dcd0's callbacks), both twins"
-  notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ...st. The open list is a list sorted by total cost, equal totals by known cost (AddToOpen 0x775a0 scans from the head or the tail by a float midpoint, so a tie lands first or last by th...
     - "...is its cost. The open list (+0xf0 head, +0xf8 tail, doubly linked) is sorted by (f, g) (0x775a0): a key below the head's goes first, above the tail's last; otherwise the insertion s..."
@@ -2568,10 +2567,15 @@
 - addr: 0x558d60
   final: 0x3937f0
   kind: function
-  semantics: the trade path's neighbours callback.
-  status: PARTLY
-  readings: ["H-1: the trade path's search, its score and the Canal — READ"]
-  notes: ["imported: READ in its section, no confirming case found beside it"]
+  semantics: "the trade path's extra-neighbour count: the exits (+0x50) of the portal at the node's plot (0x884d0 / 0x88630), 0 where none stands."
+  status: READ
+  cases:
+    - recording: c108_t225_20261108T115945Z
+      value: 1:65536 54:11 -> 1:196610 54:21 jumps 53:13 -> 52:15 (portalIn 2, portalOut 3), 10 plots; no game path stands on a tunnel
+  impl: [cpu/core/rules.ts:pathPortals, gpu/core/sim_masks.py:_path_portals]
+  readings:
+    - "C-108: the trade path's portals, its open list and CanStartRoute's gates — READ, both twins"
+    - "H-1: the trade path's search, its score and the Canal — READ"
   context:
     - ...00 (type 5 a no-op; 1, 2, 4 store the child's range off the range callback), neighbours 0x558d60 / 0x271b50, context 0x558ba0. The range callback 0x5579b0 memoises its answer on the (p...
   review: reviewed
@@ -2588,10 +2592,12 @@
     - cpu/core/tradePath.ts:TRADE_DANGER_FEATURES
     - cpu/core/tradePath.ts:plotOpen
     - cpu/core/tradePath.ts:walk
+    - cpu/core/rules.ts:pathPortals
   readings:
     - "C-20: the Trader's path and range"
     - "H-1: the best melee, the drought's turns, the Trader's sea, the harvest's lump, the district discount — READ"
     - "H-1: the trade path's search, its score and the Canal — READ"
+    - "C-108: the trade path's portals, its open list and CanStartRoute's gates — READ, both twins"
   context:
     - "...cpp: the pathfinder's callbacks are installed at 0x557fd0: step cost 0x558970, node valid 0x558db0, node init 0x558900, context 0x558ba0, range 0x5579b0. Check: `dll_tradepath.py`."
     - ...tination's own district to 3; the step costs 1. An edge leaving less than 0 is refused (0x5590a9).
@@ -2608,6 +2614,7 @@
       value: Valletta's TRADE, TO -1, VAL 2.10 (0.00 before t14)
   readings:
     - "C-96: the trade AI's route value — READ (0x5e9b20, 0x78f210, 0x78e010, 0x559140's use), PARTLY READ (0x526330's terms, the knowledge base's city order)"
+    - "C-108: the trade path's portals, its open list and CanStartRoute's gates — READ, both twins"
   context:
     - "## C-96: the trade AI's route value — READ (0x5e9b20, 0x78f210, 0x78e010, 0x559140's use), PARTLY READ (0x526330's terms, the knowledge base's city order)"
     - "...rt, a counter allows two tries a turn (r13 > 2 skips); the try is the trade pathfinder (0x559140: the Trade_Movement finder 0xf2dc70 from the city's plot +0x158 to the destination's,..."
@@ -8110,6 +8117,18 @@
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...se). A card's modifiers attach on the \"policy added\" signal (GameSignals +0x11a0, handler 0xc97410, \"Policy Enacted - Attaching modifiers\") and detach on \"policy removed\" (+0x11b8, 0xc9778..."
+  review: reviewed
+- addr: 0xcad980
+  final: 0x97fef0
+  kind: function
+  semantics: "a portal effect's per-plot functor: a plot neither a mountain (terrain bits 0x4924) nor water (0x834d0) gets a portal (0x87100) keyed by the functor's +8 coordinate."
+  status: READ
+  cases:
+    - recording: c108_t225_20261108T115945Z
+      value: 1:65536 54:11 -> 1:196610 54:21 jumps 53:13 -> 52:15 (portalIn 2, portalOut 3), 10 plots; no game path stands on a tunnel
+  impl: [cpu/core/rules.ts:pathPortals, gpu/core/sim_masks.py:_path_portals]
+  readings:
+    - "C-108: the trade path's portals, its open list and CanStartRoute's gates — READ, both twins"
   review: reviewed
 - addr: 0xcb67d0
   final: 0x5ed260

@@ -156,21 +156,26 @@
   final: 0x38cf50
   kind: function
   name: CanStartRoute
-  status: PARTLY
+  semantics: "CanStartRoute: the gates 0x553410 (meeting, war, bans, revealed centres, a running route, capacity), then a path (0x552ed0: the trade graph's cached path, else a fresh search)."
+  status: READ
   cases:
     - recording: Game_TradeManager.csv
       turn: 53
       value: "Game_TradeManager.csv's Route Started   rows (origin yields per route) confirm the values: runs/h1_duely1127   Mexico City t53 takes Hattusa (3 Gold 1 Science, x2) over Xi'an (its   post there;"
-  impl: [cpu/core/aiTrade.ts:minorRouteCandidate]
-  readings: ["C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"]
+  impl: [cpu/core/aiTrade.ts:minorRouteCandidate, cpu/core/trade.ts:tradeMet]
+  readings:
+    - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
+    - "C-108: the trade path's portals, its open list and CanStartRoute's gates — READ, both twins"
   context:
     - ...cc40 at 32 entries or fewer, ties keeping the list's order); the first CanStartRoute (0x54efc0) admits is the order (WakeUnit, MAKE_TRADE_ROUTE). A city-state has no diplomatic focus...
-  review: imported
+  review: reviewed
 - addr: 0x54fe20
   final: 0x38dab0
   kind: function
   status: PARTLY
   impl: [cpu/core/goodyHuts.ts:goodyEligible, gpu/core/sim_seats.py:_trader_room]
+  readings:
+    - "C-108: the trade path's portals, its open list and CanStartRoute's gates — READ, both twins"
   notes: ["imported: cited by the code, in no dll_readings section"]
   review: imported
 - addr: 0x54ff90
@@ -250,6 +255,7 @@
   readings:
     - "H-1: a route's yield per path plot (Hunza) — READ"
     - "H-1: the trade path's search, its score and the Canal — READ"
+    - "C-108: the trade path's portals, its open list and CanStartRoute's gates — READ, both twins"
   context:
     - "...one type): the route's path from the trade manager's cache (0x541ae0; else a fresh path, 0x5526a0), n its plots (4-byte entries, both ends included); the posts counted on it (0x5500b0) ti..."
     - ...41ae0 over the trade network graph's edges, 0x5419a0) answers a pair before any search (0x5526a0); whether an edge holds the reverse route's path is unread.
@@ -304,6 +310,17 @@
   context:
     - "...58ba0) sets +0x1a1 from 0x553680, the player's CanEmbark (0x4ee3f0) of its Trader type (0x552dd0): a game flag, the player's embark list, or a researched technology with EmbarkAll (T..."
   review: reviewed
+- addr: 0x552ed0
+  final: 0x38f920
+  kind: function
+  semantics: "CanStartRoute's path: the trade graph's cached path for the pair (0x541ae0) admits it, else a fresh search (0x553070)."
+  status: READ
+  cases:
+    - recording: c108_t225_20261108T115945Z
+      value: the game admits 1:65536 54:11 -> 4:524294 18:16 (52 plots) beyond the fresh walk's range
+  readings:
+    - "C-108: the trade path's portals, its open list and CanStartRoute's gates — READ, both twins"
+  review: reviewed
 - addr: 0x552fb0
   kind: function
   name: a trade route joins two players
@@ -323,6 +340,25 @@
     - "H-1: the civics AI — READ (the choice, the walk, the propagation), PARTLY READ (the value)"
     - "C-130: Online Communities' route tourism, the tourism toward a player — READ (0x6a1380, 0x6a1240, 0x394830's modifiers, 0x552fb0), both twins"
   review: reviewed
+- addr: 0x553070
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-108: the trade path's portals, its open list and CanStartRoute's gates — READ, both twins"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - ...the trade graph's cached path for the pair (0x541ae0) admits it, else a fresh search (0x553070 -> 0x559140). Starting a route (0x555380) takes the cached path the same way, else 0x55...
+  review: imported
+- addr: 0x5531b0
+  final: 0x38fb50
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-108: the trade path's portals, its open list and CanStartRoute's gates — READ, both twins"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - ...the destination's) revealed to the origin (0x2d2220); no route running between the two (0x5531b0); unless its last argument is set, the running routes (0x54fe20) below the capacity (0x...
+  review: imported
 - addr: 0x553210
   final: 0x38fbb0
   kind: function
@@ -334,6 +370,22 @@
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ...n and destination cities (0x57580 on the operation's plots); with the route still held (0x553210) and the Trader standing on the origin plot (unit +0x220 / +0x224 against the origin),...
+  review: reviewed
+- addr: 0x553410
+  final: 0x38fdb0
+  kind: function
+  semantics: "CanStartRoute's gates: not one city; between two players the origin's HasMet (0x3daaf0) of the destination's and no war (0x469cd0); the trade bans 0x4d9a40 (domestic) / 0x4d9a50 / 0x4d9a60; the origin's centre (for a major the destination's too) revealed to the origin (0x2d2220); no route running between the two (0x5531b0); unless the last argument is set, the running routes (0x54fe20) below the capacity (0x4d9320)."
+  status: READ
+  cases:
+    - recording: c108_t225_20261108T115945Z
+      value: Maori (4 routes, capacity 3) and Nubia (1 / 1) refused on every pair; city-state 16's pairs to Persia, not met, refused; eligibility 5,904 / 6,162 scored
+  impl:
+    - cpu/core/trade.ts:tradeMet
+    - cpu/core/aiTrade.ts:minorRouteCandidate
+    - gpu/core/sim_minors.py:_minor_route_candidate
+    - cpu/core/trade.ts:canAddIntlTradeRoute
+  readings:
+    - "C-108: the trade path's portals, its open list and CanStartRoute's gates — READ, both twins"
   review: reviewed
 - addr: 0x553680
   kind: function
@@ -387,3 +439,12 @@
   context:
     - Trade_Manager plunder 0x5545e0 (yield loop 0x554860..0x554a4e, route yields 0x559b30 origin / 0x559bc0 destination, spee...
   review: reviewed
+- addr: 0x555380
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-108: the trade path's portals, its open list and CanStartRoute's gates — READ, both twins"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...air (0x541ae0) admits it, else a fresh search (0x553070 -> 0x559140). Starting a route (0x555380) takes the cached path the same way, else 0x5526a0. (`tradeMet`; `minorRouteCandidate`..."
+  review: imported

@@ -14,9 +14,9 @@ tests/cpu/units/unique-{land,sea-air}-units.test.ts.
     ability of the naval classes, so a hull on the Trader's tile is paid it
     and a land raider the plain amount; an embarked unit plunders nothing
     (the command's can-do 0x9555a0).
-  * CIV6 (Mountain Tunnel, Qhapaq Ñan): a Trader walks onto a portal's
-    mountain and takes the portal as a unit does, a seventh candidate taken
-    only when strictly closer.
+  * CIV6 (Mountain Tunnel, Qhapaq Ñan): a Trader's path jumps from the plot
+    beside one portal's mountain to the plot beside another of its range,
+    never standing on the mountain (`_path_portals`).
 """
 
 from __future__ import annotations
@@ -186,28 +186,27 @@ def test_walk_through_a_portal(rules, path) -> None:
         print("  3 the portal walk SKIPPED — this fixture has no range long enough")
         return
     a, b, tgt = pick
+    src = [int(x) for x in sim.neigh[a].tolist() if x >= 0 and bool(sim.passable[0, x])
+           and int(sim.pair_dist[x, tgt]) >= 2]
+    if not src:
+        print("  3 the portal walk SKIPPED — the near portal has no land beside it")
+        return
+    src = src[0]
     tunnel = sim.TUNNEL
     sim.seat_explored[:] = True
     sim.road[0] = False
     sim.railroad[0] = False
-    assert not bool(sim._trade_walkable(rows, torch.tensor([a]), water)[0]), "a bare mountain is walkable"
-    assert not sim._trade_graphs(0, [0])[0][0][a], "the walk entered a bare mountain"
     sim.improvement[0, a] = tunnel
     sim.improvement[0, b] = tunnel
-    assert bool(sim._trade_walkable(rows, torch.tensor([a]), water)[0]), "a portal's mountain must be walkable"
-    assert int(sim._portal_exit(torch.tensor([a]), rows)[0]) == b
-    # from the portal, the exit (one step, onto a plot costing nothing) is the
-    # cheapest way to the plot beside the far portal: at least 3 plots overland
+    assert not bool(sim._trade_walkable(rows, torch.tensor([a]), water)[0]), "a portal's mountain is walkable"
+    links = sim._path_portals(0, sim._portal_plane()[0].tolist())
+    assert tgt in links.get(src, []), f"the plot beside {a} does not jump to {tgt}"
+    # the jump is one step: cheaper than any walk of two or more plots
     gr = sim._trade_graphs(0, [0])[0]
-    course = sim._trade_course(0, 0, a, tgt, gr)
-    assert course == [a, b, tgt], f"the course from the portal is {course}, not through to {b}"
-    # heading AWAY from the exit, the course never takes it
-    away = [int(x) for x in sim.neigh[a].tolist() if x >= 0 and bool(sim.passable[0, x])
-            and int(sim.pair_dist[b, x]) > int(sim.pair_dist[b, a])]
-    if away:
-        back = sim._trade_course(0, 0, a, away[0], gr)
-        assert back is not None and b not in back, "the portal was taken away from the target"
-    print("  4 the portal walk OK — onto the mountain, and through to the next portal")
+    course = sim._trade_course(0, 0, src, tgt, gr)
+    assert course == [src, tgt], f"the course is {course}, not the jump to {tgt}"
+    assert a not in course and b not in course, "the course stood on a portal's mountain"
+    print("  4 the portal walk OK — the jump between the plots beside the portals")
 
 
 def main() -> int:

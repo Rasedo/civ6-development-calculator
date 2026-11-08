@@ -47,6 +47,8 @@ function scene() {
   cs.research.civics = ['FOREIGN_TRADE'];
   // its city's trade list (`minorTradeList`) holds both minors
   cs.tradeCities = [near.centerIndex, far.centerIndex];
+  // a route asks the origin's player has met the destination's (`tradeMet`)
+  cs.metMinors = [near.seat, far.seat];
   return { state, cs, near, far };
 }
 

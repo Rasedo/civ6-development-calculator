@@ -12,10 +12,15 @@
     - recording: h1_duely1127
       turn: 41
       value: "city-state 2's Warrior 327683 on 42:17 holds for 42:15, its Warrior there: the search stops at the first link onto 42:15"
-  impl: [cpu/core/tactical.ts:search, gpu/core/sim_tactics.py:_tac_search, cpu/core/tactical.ts:from]
+  impl:
+    - cpu/core/tactical.ts:search
+    - gpu/core/sim_tactics.py:_tac_search
+    - cpu/core/tactical.ts:from
+    - cpu/core/rules.ts:pathPortals
   readings:
     - "H-1: the trade path's search, its score and the Canal — READ"
     - "C-124: a move order's path prices a turn's end at the stacking limit +1e6, and its destination there stops the search — READ (0x270dd0 at 0x27101e..0x2710a0, 0x2720a0 at 0x272230..0x272364, 0x77a50, 0x26dcd0's callbacks), both twins"
+    - "C-108: the trade path's portals, its open list and CanStartRoute's gates — READ, both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...SearchStep 0x793f0 — GetBest 0x781e0 pops the open list's head, the children are made (0x77a50: the six neighbours from the axial tables, then the callback's extra neighbours, a port..."
@@ -49,10 +54,12 @@
   name: GetBest
   semantics: "GetBest: pops the open list's head (+0xf0), NotifyList 2 then 3, closes it."
   status: PARTLY
+  impl: [cpu/core/tradePath.ts:OpenList]
   readings:
     - "H-1: the trade path's search, its score and the Canal — READ"
     - "C-95: the unit pathfinder and the planning's reach — READ, confirmed on the Wander draws"
     - "C-99: Naval Patrol's explore target — the list and the tests READ, two cases unexplained"
+    - "C-108: the trade path's portals, its open list and CanStartRoute's gates — READ, both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...0xd02108): GeneratePath 0x77d10 seeds the origin and loops SearchStep 0x793f0 — GetBest 0x781e0 pops the open list's head, the children are made (0x77a50: the six neighbours from the..."
@@ -81,6 +88,7 @@
     - "H-1: the trade path's search, its score and the Canal — READ"
     - "C-95: the unit pathfinder and the planning's reach — READ, confirmed on the Wander draws"
     - "C-96: the city-states' tactical pass — READ (Wander Near City, Heal, the non-barbarian priorities, FindAlternateLocation), the families it needs PARTLY READ"
+    - "C-108: the trade path's portals, its open list and CanStartRoute's gates — READ, both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...a float midpoint, so a tie lands first or last by the side it scanned from). LinkChild 0x78750: a child is linked only when the valid callback passed; an open child is re-parented on..."
@@ -115,10 +123,12 @@
     - cpu/core/tactical.ts:reparent
     - cpu/core/tactical.ts:PathDanger
     - cpu/core/tactical.ts:ReachSearch
+    - cpu/core/tradePath.ts:OpenList
   readings:
     - "H-1: the trade path's search, its score and the Canal — READ"
     - "C-95: the unit pathfinder and the planning's reach — READ, confirmed on the Wander draws"
     - "C-96: the city-states' tactical pass — READ (Wander Near City, Heal, the non-barbarian priorities, FindAlternateLocation), the families it needs PARTLY READ"
+    - "C-108: the trade path's portals, its open list and CanStartRoute's gates — READ, both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ...allback passed; an open child is re-parented on a STRICTLY cheaper cost (UpdateOpenNode 0x79560), a closed one likewise with UpdateParents 0x79660, a new one opened. The trade path's...

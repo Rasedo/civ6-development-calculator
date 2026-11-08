@@ -804,7 +804,9 @@
     - cpu/core/tactical.ts:search
     - cpu/core/tactical.ts:PathDanger
     - cpu/core/tactical.ts:ReachSearch
-  readings: ["C-95: the unit pathfinder and the planning's reach — READ, confirmed on the Wander draws"]
+  readings:
+    - "C-95: the unit pathfinder and the planning's reach — READ, confirmed on the Wander draws"
+    - "C-108: the trade path's portals, its open list and CanStartRoute's gates — READ, both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...0x781e0: NotifyList 2 then 3, closed) and links its neighbours in DirectionTypes order (0xeff730: (0,1) (1,0) (1,-1) (0,-1) (-1,0) (-1,1) in the game's (x - y//2, y) — NE, E, SE, SW, W..."

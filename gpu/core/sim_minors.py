@@ -661,7 +661,8 @@ class SimMinors:
         """`minorRouteCandidate` — where minor `s`'s free Trader goes, in the
         games `want` (the economic AI's turn 0x687bf0 -> 0x78e0a0). Over the
         known cities in `_known_trade_cands`' order that its city's trade list
-        holds (`citystate_trade_ok`), each whose holder it is not at war with:
+        holds (`citystate_trade_ok`), each whose holder it is not at war with
+        and has met (`tradeMet`: `citystate_met_minor`, `seat_citystate_met`):
         not one its routes already run to, not under Trade Policy's ban, one
         the potential course (`_trade_course`) reaches — the route's value,
         its origin yields on that course (`_minor_dest_y6`, the path term
@@ -685,7 +686,7 @@ class SimMinors:
         for d in range(ND):
             if d < S:
                 has = (act & (rr[:, :, 1] == -(2 + d))).any(dim=1)
-                gate = free[d] & ~has
+                gate = free[d] & ~has & self.citystate_met_minor[:, s, d]
                 codes.append(torch.full((B,), -(2 + d), dtype=torch.long, device=dev))
                 seats.append(torch.full((B,), -1, dtype=torch.long, device=dev))
                 cids.append(torch.full((B,), -1, dtype=torch.long, device=dev))
@@ -695,7 +696,7 @@ class SimMinors:
                 cid = self.city_id[:, r2, j]
                 has = (act & (self.seat_route_dseat[:, row] == r2)
                        & (self.seat_route_dcity[:, row] == cid.unsqueeze(1))).any(dim=1)
-                gate = free[d] & ~has & ~self._congress_intl_banned(r2)
+                gate = free[d] & ~has & ~self._congress_intl_banned(r2) & self.seat_citystate_met[:, r2, s]
                 codes.append(torch.full((B,), -1, dtype=torch.long, device=dev))
                 seats.append(torch.full((B,), r2, dtype=torch.long, device=dev))
                 cids.append(cid)

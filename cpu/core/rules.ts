@@ -161,6 +161,40 @@ export function portalExit(map: GameMap, tile: Tile): number {
 }
 
 /**
+ * THE PATH'S PORTALS (GameCore_XP2 Route_Instance.cpp: 0xcad980 makes one
+ * through 0x87100 on every plot beside a portal's mountain that is neither a
+ * mountain nor water; 0x871e0 links it both ways with every other portal of
+ * its network that is not beside it). A path's node on a portal plot takes
+ * each linked portal as an extra neighbour after its six (0x77a50 over
+ * 0x271b50): the jump goes from the plot beside one tunnelled mountain to the
+ * plot beside another, never onto the mountain, which no portal stands on
+ * (0x558db0 closes a mountain without one). A network is a mountain range.
+ * Per portal plot its linked portals, ascending.
+ */
+export function pathPortals(map: GameMap): Map<number, number[]> {
+  const ranges = new Map<number, Set<number>>();
+  for (const t of map.tiles) {
+    if (!portalAt(t) || (t.mountainRange ?? -1) < 0) continue;
+    for (const n of neighbors(map, t)) {
+      if (isMountain(n) || isWater(n)) continue;
+      let s = ranges.get(n.index);
+      if (!s) ranges.set(n.index, (s = new Set()));
+      s.add(t.mountainRange!);
+    }
+  }
+  const plots = [...ranges.keys()].sort((a, b) => a - b);
+  const out = new Map<number, number[]>();
+  for (const p of plots) {
+    const here = map.tiles[p];
+    const mine = ranges.get(p)!;
+    const links = plots.filter((q) => q !== p && [...ranges.get(q)!].some((r) => mine.has(r))
+      && hexDistance(map, here.col, here.row, map.tiles[q].col, map.tiles[q].row) > 1);
+    if (links.length > 0) out.set(p, links);
+  }
+  return out;
+}
+
+/**
  * CIV6 (`Improvements_XP2.BuildOnAdjacentPlot`: the Mountain Tunnel, Qhapaq
  * Ñan, the Ski Resort): "Can only be built on an adjacent Mountain tile."
  *

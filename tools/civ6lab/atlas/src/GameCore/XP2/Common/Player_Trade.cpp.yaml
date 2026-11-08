@@ -42,6 +42,7 @@
     - "C-95: an operation's enemy strength — READ (0x73eb60), ported"
     - "C-96: the Trader's value — READ (0x7a7110, its call from 0x7b62c0)"
     - "H-1: the AI memory reader — READ (the hooks, the pointer paths, the contracts, the knowledge base, the operations, the trees), PARTLY READ (the religious AI's holder)"
+    - "C-108: the trade path's portals, its open list and CanStartRoute's gates — READ, both twins"
   context:
     - "...derValue`): 0 once the player's MakeTradeRoute units (+0x1b9 bit 64) fill its capacity (0x4d9320, + the extra the caller adds); else the trade AI's route value K (its knowledge base +0..."
     - "...08, 0x79d2d0) is set, + fx(0.5 x (player +0x12f0 +0xc0)) where Combat (+0x48) exceeds 0x4d9320 (PlayerTrade +0xf0) — a city-state's logs read no such term (its count read 0); AIR + 3..."
@@ -97,6 +98,36 @@
   context:
     - "...focus player +0x6780) names the owner, + (1 + the Player_Diplomacy +0x480 sum) where 0x4d9830 finds no Trading Post of the player in any city of the owner. A domestic one: (origin +..."
   review: reviewed
+- addr: 0x4d9a40
+  final: 0x33e220
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-108: the trade path's portals, its open list and CanStartRoute's gates — READ, both twins"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - ...of the destination's, whoever either is, and not at war (0x469cd0); the trade bans of 0x4d9a40 / 0x4d9a50 / 0x4d9a60; the origin's centre (and, for a major, the destination's) reveal...
+  review: imported
+- addr: 0x4d9a50
+  final: 0x33e230
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-108: the trade path's portals, its open list and CanStartRoute's gates — READ, both twins"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - ...ination's, whoever either is, and not at war (0x469cd0); the trade bans of 0x4d9a40 / 0x4d9a50 / 0x4d9a60; the origin's centre (and, for a major, the destination's) revealed to the o...
+  review: imported
+- addr: 0x4d9a60
+  final: 0x33e240
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-108: the trade path's portals, its open list and CanStartRoute's gates — READ, both twins"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - ...whoever either is, and not at war (0x469cd0); the trade bans of 0x4d9a40 / 0x4d9a50 / 0x4d9a60; the origin's centre (and, for a major, the destination's) revealed to the origin (0x2d...
+  review: imported
 - addr: 0x4d9a70
   final: 0x33e250
   kind: function

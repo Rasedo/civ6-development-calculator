@@ -10058,3 +10058,51 @@ values (`minorResearchTurn`, cpu/core/minorBuild.ts); `_MinorFacts.updated` /
 - OPEN: which writer moves 1128 t121's goal 0 to 4:4 within the turn; the
   engine's upgrade verbs (`minorUpgradeUnit`, `upgradeUnit`, both twins)
   keep the unit's id and pool slot.
+
+## C-108: the trade path's portals, its open list and CanStartRoute's gates — READ, both twins
+
+- THE PORTALS (Route_Instance.cpp): 0xcad980, over the plots beside a
+  portal's mountain, makes one (0x87100) on each plot that is neither a
+  mountain (terrain bits 0x4924) nor water (0x834d0); 0x871e0 links the new
+  portal both ways (its exits +0x50, 0x87080 on the other's) with every
+  portal sharing a network key (+0x98) not beside it (0x889e0). A path
+  node's extra neighbours are its plot's portal's exits (0x271b50 over
+  0x884d0 / 0x88630 / 0x88530, count 0x558d60), linked after the six
+  (0x77a50). No portal stands on a mountain, and the trade node test
+  0x558db0 opens a mountain only where one does: the Trader's path never
+  stands on a tunnel and jumps between the plots beside it. The network is
+  the mountain range (`pathPortals` / `_path_portals`; the exits ascending,
+  the creation order unread).
+- THE OPEN LIST: the trade search is the pathfinder's (AddToOpen 0x775a0,
+  GetBest 0x781e0, LinkChild 0x78750 strictly cheaper, the re-key 0x79560
+  after its new equals), its children in DirectionTypes order (0xeff730),
+  (`walk` / `_trade_reach`); the heuristic 0x271490 (1 on the destination
+  alone) is left out, the walk serving every destination at once.
+  The notify 0x558900 takes a linked child's range off its parent (the
+  origin's set to the base range first).
+- THE BEST ROUTE (0x512050): the Routes row of the greatest PlacementValue
+  (+0x1c), the Railroad, is the context's +0x1b4 that the step cost charges
+  +10 (0x558a8b).
+- CANSTARTROUTE 0x54efc0 = 0x553410 then 0x552ed0. 0x553410: not one city;
+  between two players the origin's HasMet (0x3daaf0) of the destination's,
+  whoever either is, and not at war (0x469cd0); the trade bans of
+  0x4d9a40 / 0x4d9a50 / 0x4d9a60; the origin's centre (and, for a major,
+  the destination's) revealed to the origin (0x2d2220); no route running
+  between the two (0x5531b0); unless its last argument is set, the running
+  routes (0x54fe20) below the capacity (0x4d9320). 0x552ed0: the trade
+  graph's cached path for the pair (0x541ae0) admits it, else a fresh
+  search (0x553070 -> 0x559140). Starting a route (0x555380) takes the
+  cached path the same way, else 0x5526a0. (`tradeMet`; `minorRouteCandidate`
+  / `_minor_route_candidate`; `canAddIntlTradeRoute`.)
+- CONFIRMED, runs/c108_t225_20261108T115945Z (lab4_t225, every city pair
+  scored by `cpu/harness/tradePathLab.ts`): 1:65536 54:11 -> 1:196610 54:21
+  jumps 53:13 -> 52:15 (portalIn 2, portalOut 3), 10 plots; 407 / 595
+  tunnel paths and 1,411 / 1,946 paths equal; Maori's 4 routes at capacity
+  3 and Nubia's 1 / 1 refuse every pair; city-state 16's pairs to Persia,
+  not met, refused; eligibility 5,904 / 6,162, no pair admitted that the
+  game refuses.
+- OPEN: who writes the trade graph's cache and when it is dropped (Trade_Graph.cpp
+  0x53d630..0x5457be): the game's paths and admissions that our fresh walk
+  prices dearer, out of range, or across a plot submerged since, are the
+  cache's; Persia's Satrapies (+1 capacity with Political Philosophy) has
+  no roster row.

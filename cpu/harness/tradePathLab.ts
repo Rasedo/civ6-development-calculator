@@ -12,9 +12,10 @@
  * stamped on each holder's `tradingPosts` in place of the importer's
  * history. Per pair the engine answers the course `tradeCourse` lays from
  * the origin's walk (`tradeReach`) and its eligibility as its route rules
- * test it, capacity, Traders and running routes aside: the course exists,
- * and a city-state destination is met (`canAddCsTradeRoute`), and no World
- * Congress ban touches an international pair (`canAddIntlTradeRoute`).
+ * test it, Traders aside: the origin's player has a spare route
+ * (`tradeCapacity`), has met the destination's (`tradeMet`), runs no route
+ * between the two cities already, the course exists, and no World Congress ban touches an international pair
+ * (`canAddIntlTradeRoute`).
  *
  * Prints the eligibility table (game x engine), the path agreement over the
  * pairs both admit (equal, first differing plot), the paths the game's cache
@@ -25,9 +26,9 @@ import { existsSync, readFileSync } from 'node:fs';
 import { loadCatalog, type TurnRecord } from './record';
 import { advanceHistory, importTurn, newHistory } from './import';
 import { tradeCourse, tradeReach, type TradeReach } from '../core/tradePath';
-import { hasMet } from '../core/cityStates';
 import { congressIntlBanned } from '../core/congress';
 import { isCityStateSeat, seatOf } from '../core/seats';
+import { routeDestCenter, routeOriginCenter, tradeCapacity, tradeMet } from '../core/trade';
 import type { GameState } from '../core/types';
 
 interface PairRow {
@@ -95,11 +96,10 @@ for (const r of pairs) {
   let reach = reaches.get(key);
   if (!reach) { reach = tradeReach(state, seat, r.oplot); reaches.set(key, reach); }
   const course = tradeCourse(reach, r.dplot);
-  let why = course ? '' : 'beyond range';
-  if (course && isCityStateSeat(dseat) && !isCityStateSeat(seat)) {
-    const cs = state.cityStates.find((c) => c.seat === dseat);
-    if (cs && !hasMet(cs, seat)) why = 'city-state not met';
-  }
+  const owner = seatOf(state, seat)!;
+  const running = (owner.tradeRoutes ?? []).some((x) => routeOriginCenter(state, owner, x) === r.oplot && routeDestCenter(state, owner, x) === r.dplot);
+  let why = (owner.tradeRoutes?.length ?? 0) >= tradeCapacity(state, seat) ? 'capacity full'
+    : !tradeMet(state, seat, dseat) ? 'not met' : running ? 'running' : course ? '' : 'beyond range';
   if (course && !why && dseat !== seat && !isCityStateSeat(dseat) && !isCityStateSeat(seat)
     && (congressIntlBanned(state, seat) || congressIntlBanned(state, dseat))) why = 'congress ban';
   const ours = why === '';

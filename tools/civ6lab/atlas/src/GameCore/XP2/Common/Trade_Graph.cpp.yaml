@@ -3,6 +3,16 @@
 # `review: imported` = bootstrapped from dll_readings.md / code comments / saved
 # labels and not yet reviewed: verify against the disassembly, then edit and
 # set `review: reviewed`.
+- addr: 0x53d630
+  final: 0x382c60
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-108: the trade path's portals, its open list and CanStartRoute's gates — READ, both twins"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "- OPEN: who writes the trade graph's cache and when it is dropped (Trade_Graph.cpp 0x53d630..0x5457be): the game's paths and admissions that our fresh walk prices dearer, out of r..."
+  review: imported
 - addr: 0x5419a0
   final: 0x385c80
   kind: function
@@ -30,6 +40,7 @@
   readings:
     - "H-1: a route's yield per path plot (Hunza) — READ"
     - "H-1: the trade path's search, its score and the Canal — READ"
+    - "C-108: the trade path's portals, its open list and CanStartRoute's gates — READ, both twins"
   context:
     - "...0x54bdb0 (a route's yield of one type): the route's path from the trade manager's cache (0x541ae0; else a fresh path, 0x5526a0), n its plots (4-byte entries, both ends included); the post..."
     - ...no Trading Post there (the route's own yield counts none until t223). The path cache (0x541ae0 over the trade network graph's edges, 0x5419a0) answers a pair before any search (0x552...

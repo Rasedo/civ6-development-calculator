@@ -14,6 +14,18 @@
   context:
     - "...player on a plot (0x512120): the route of the highest PlacementValue valid on the plot (0x511700) whose PlacementRequiresOwnedTile is met, whose PrereqEra the player's era (GetEra 0x..."
   review: reviewed
+- addr: 0x512050
+  final: 0x360850
+  kind: function
+  semantics: "the Routes row of the greatest PlacementValue (+0x1c), its index (+0x14): the Railroad (5)."
+  status: READ
+  cases:
+    - recording: c108_t225_20261108T115945Z
+      value: "rail +10 against road +50 for all: 1,411 paths equal against 912"
+  impl: [cpu/core/tradePath.ts:TRADE_COST_RAIL]
+  readings:
+    - "C-108: the trade path's portals, its open list and CanStartRoute's gates — READ, both twins"
+  review: reviewed
 - addr: 0x512120
   final: 0x360920
   kind: function

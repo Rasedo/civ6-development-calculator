@@ -134,6 +134,7 @@
   readings:
     - "C-20: the Trader's path and range"
     - "H-1: the trade path's search, its score and the Canal — READ"
+    - "C-108: the trade path's portals, its open list and CanStartRoute's gates — READ, both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...s callbacks are installed at 0x557fd0: step cost 0x558970, node valid 0x558db0, node init 0x558900, context 0x558ba0, range 0x5579b0. Check: `dll_tradepath.py`."
@@ -153,6 +154,7 @@
     - "C-20 tail: the trade path's land and water tests and the switch — READ"
     - "H-1: the trade path's search, its score and the Canal — READ"
     - "C-20 tail: the trade path's land and water tests and the switch"
+    - "C-108: the trade path's portals, its open list and CanStartRoute's gates — READ, both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "XP2 Trade_Movement.cpp: the pathfinder's callbacks are installed at 0x557fd0: step cost 0x558970, node valid 0x558db0, node init 0x558900, context 0x558ba0, range 0x5579b0. Check: `dll_t..."

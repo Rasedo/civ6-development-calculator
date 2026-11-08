@@ -38,7 +38,7 @@ import { fxOf, yieldValue, type AiValueView } from './aiValue';
 import { aiView } from './aiView';
 import { civsAtWar, freeSeatOf, isCiv, isCityStateSeat, seatOf } from './seats';
 import { congressIntlBanned } from './congress';
-import { minorRouteOriginYields, routeDestYields, routeOriginYields, routePostGold } from './trade';
+import { minorRouteOriginYields, routeDestYields, routeOriginYields, routePostGold, tradeMet } from './trade';
 import { routeInRange, tradeCourse, tradeReach } from './tradePath';
 import type { CityState, GameState, Seat, TradeRoute, Yields } from './types';
 
@@ -164,7 +164,8 @@ export function routeValueOver(state: GameState, seat: number): number {
  * 0x687bf0 -> 0x78e0a0, per idle Trader in its city). Over the known cities
  * in the knowledge base's order that its city's trade list holds
  * (`CityState.tradeCities`, 0x78e010), each whose holder it is not at war
- * with (0x469cd0): the route's value — its origin yields on its potential
+ * with (0x469cd0) and has met (`tradeMet`, CanStartRoute's 0x553410): the
+ * route's value — its origin yields on its potential
  * course, the path term with it (0x526330 with its last argument 0:
  * `minorRouteOriginYields` on the course `tradeCourse` lays, the Trading
  * Post there and on the way), each valued at the minor's weights
@@ -187,7 +188,7 @@ export function minorRouteCandidate(state: GameState, cs: CityState): TradeRoute
   const view = aiView(state);
   const cands: { route: TradeRoute; value: number }[] = [];
   for (const k of knownTradeCities(state, cs.centerIndex, -1, cs.seat)) {
-    if (!listed.has(k.centre) || civsAtWar(state, cs.seat, k.holder)) continue;
+    if (!listed.has(k.centre) || civsAtWar(state, cs.seat, k.holder) || !tradeMet(state, cs.seat, k.holder)) continue;
     const r = k.route;
     if (r.toCs !== undefined ? routes.some((x) => x.toCs === r.toCs)
       : routes.some((x) => x.toSeat === r.toSeat && x.toSeatCity === r.toSeatCity)) continue;
