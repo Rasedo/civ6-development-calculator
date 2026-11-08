@@ -47,7 +47,7 @@ import { applySeatUnitOrders, buySeatBuilding, declareWar, districtSiteCost, dis
 import { addEnvoys, cityStateAt, declareWarOnCityState, minorCity, minorReplaceCitizens, placeCityStateAt, sueForPeaceWithCityState } from '../core/cityStates';
 import { CP_ACCEPTED, CP_CANCELLED, CP_IN_PROGRESS, contractById } from '../core/aiContracts';
 import { availableBuildings, canPlaceWonder, validImprovements, wallsMax } from '../core/rules';
-import { builderHarvest, builderRemoveFeature, spawnUnit, tallyUnitMade, trainableUnits, builderCost, traderCost, disbandUnit, escortable, drawAndPayGoody, grantedMoves, unitFullMoves, restUnit, canFortify, upgradeUnit, naturalistPark, upgradeAnew, unitsAt, unitDomain, fortifyBonus, crossesRiver, waterWalks, cityAtIndex, raiseBestTrained, recordAttacker, unitMadeAnew, FORTIFY_MAX_TURNS, ANTIQUITY_CIVIC, SHIPWRECK_CIVIC } from '../core/units';
+import { arrive, arriveAll, builderHarvest, builderRemoveFeature, spawnUnit, tallyUnitMade, trainableUnits, builderCost, traderCost, disbandUnit, escortable, drawAndPayGoody, grantedMoves, unitFullMoves, restUnit, canFortify, upgradeUnit, naturalistPark, upgradeAnew, unitsAt, unitDomain, fortifyBonus, crossesRiver, waterWalks, cityAtIndex, raiseBestTrained, recordAttacker, unitMadeAnew, FORTIFY_MAX_TURNS, ANTIQUITY_CIVIC, SHIPWRECK_CIVIC } from '../core/units';
 import { availableCivicsIn, availableTechsIn, computeUnlocks, goldPrice, governmentSlots, policyWireOf, seatGovernment, darkAgeEra,
   unlockedPolicyIds } from '../core/effects';
 import { selectResearch, chopGrant, harvestGrant, applyLumpYield, holdResearchEra, researchCost } from '../core/economy';
@@ -3426,6 +3426,8 @@ function applyPhase(ctx: Ctx, ds: Decision[], phase: Decision['phase'], b: TurnR
   const streams = ctx.streams;
   let drawing: number | undefined;
   for (const d of mine) {
+    // the units the last action placed take their places in their plots' lists
+    arriveAll(state);
     const p = 'player' in d ? d.player : undefined;
     if (p !== undefined && p !== drawing) {
       if (drawing !== undefined) streams.set(drawing, state.rngState);
@@ -4298,6 +4300,7 @@ const res = buyTile(state, city.id, d.plot, seat);        if (!res.ok) setTileOw
       }
     }
   }
+  arriveAll(state);
   if (drawing !== undefined) streams.set(drawing, state.rngState);
 }
 
@@ -4558,6 +4561,7 @@ function syncUnits(ctx: Ctx, b: TurnRecord, only?: number, keepMoves = false): v
       if (isBarbSeat(u.seat)) ctx.barbSteps.push({ u, plots: steps });
     }
     u.tileIndex = at;
+    arrive(ctx.state, u);
     if (!keepMoves || moved) u.movesLeft = num(r.moves) * MP_SCALE;
     u.embarked = bool(r.embarked) || undefined;
     if (UNITS[u.type]?.charges !== undefined) u.charges = num(r.buildCharges) || num(r.spreadCharges) || u.charges;

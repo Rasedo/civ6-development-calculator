@@ -304,6 +304,9 @@
   semantics: "the plot's best defender, over the plot's unit list of the mover's map layer where a mover is given (0x901e0 on it at 0x208bbf, then 0x75c50; the default layer without one). Flag 0x10: among the plot's units in its own order the comparator 0x523d60 keeps the first whose unwounded strength (0x56dc90 with the formation's) is strictly greater, and only then takes its wounds off (0x522630): ONE unit."
   status: READ
   cases:
+    - recording: h1_duelp1117
+      turn: 20
+      value: "Rome's centre: the wounded Warrior 393220 there from t19 (row 3047) over the Warrior 655361 made there t20 (row 3254), city.defense 13.4296875 as the game's"
     - recording: h1_duelp1127
       turn: 108
       value: "city-state 4's Knight 1114117 wanders onto 4:8 (Move To: 4 8, as logged), player 1's Missionary 1572870 on it out of its sight: the destination test (0x586360 -> 0x208b80, the Knight's layer) refuses no religious unit"
@@ -344,9 +347,11 @@
     - cpu/core/tactical.ts:fought
     - cpu/core/units.ts:mapLayer
     - gpu/core/sim_init.py:__init__
-    - cpu/core/combat.ts:bestDefender
+    - cpu/core/units.ts:bestDefender
     - gpu/core/sim_tactics.py:_tac_move_to
+    - gpu/core/sim_seats.py:_best_defender
   readings:
+    - "C-102 / C-99: the plot's unit list as an arrival stamp, the best defender's tie and Garrison City's standing unit — READ (0x75c50, 0x74f40 / 0x763b0 / 0x75280, 0x208b80 / 0x523d60, 0x810fd7..0x81101b), both twins"
     - "C-99 / C-128: the embark step's location test, the destination test's map layer; the Supply Convoy's Movement — READ (0x52fe90 at 0x530024, 0x208b80 at 0x208bbf -> 0x901e0 -> 0x75c50), both twins"
     - "H-1: an annex re-places the citizens, the garrison's unit, a religious unit killed on a move — READ"
     - "H-1: the garrison requirement — READ"

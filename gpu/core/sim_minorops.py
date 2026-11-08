@@ -2877,8 +2877,9 @@ def _x_garrison(sim, c: _OpCtx, i: int, on: torch.Tensor) -> None:
     the player's unit order, the one on the city its garrison; of those whose
     planning reaches
     the city this turn the candidate (the ranged, the bombard, the combat
-    strength above the best and the garrison's); with no garrison a military
-    unit of the holder on the city its garrison at no strength; with neither
+    strength above the best and the garrison's); with no garrison the city plot's
+    first unit of class LAND_COMBAT or NAVAL in its arrival order its
+    garrison at no strength; with neither
     the candidate moves in, its moves ended (0x56d6f0) on the city with no
     ranged strength; with a stronger candidate it moves beside the city,
     else a garrison of no Range fortifies, its moves ended (`garrisonExecute`).
@@ -2953,15 +2954,20 @@ def _x_garrison(sim, c: _OpCtx, i: int, on: torch.Tensor) -> None:
         U("mp")[r, uc] = 0
     no_g = g & (gar < 0)
     if bool(no_g.any()):
-        # a military unit of the minor on the city takes the garrison's
-        # branch at no strength
+        # the city plot's first unit of formation class LAND_COMBAT or NAVAL
+        # in its list (0x75c50, 0x8bcd0 0 / 3: `plotFighters`) takes the
+        # garrison's branch at no strength
         cc = city.clamp(min=0)
         own = U("alive") & (U("seat") == seat) & (U("tile") == cc.unsqueeze(1))
         ut = U("type").clamp(min=0, max=sim.NU - 1)
-        fights = (sim._type_combat.take(ut) + sim._type_ranged_strength.take(ut) + sim._type_bombard.take(ut)) > 0
+        fights = (~sim._type_civilian.take(ut) & ~sim._type_support.take(ut) & ~(sim._type_air.take(ut) > 0)
+                  & (ut != sim._trader_idx))
+        if sim._spy_idx >= 0:
+            fights = fights & (ut != sim._spy_idx)
         held = (own & fights).any(dim=1)
-        # the first such unit in the player's unit order (pool order)
-        okey = torch.where(own & fights, U("pslot"), torch.full_like(U("pslot"), 1 << 30))
+        lo = sim.POOL_LO[pre]
+        akey = sim._arrival_key()[:, lo:lo + own.shape[1]]
+        okey = torch.where(own & fights, akey, torch.full_like(akey, 1 << 50))
         standing = okey.argmin(dim=1)
         gar = torch.where(no_g & held, standing, gar)
         go = no_g & ~held & (pick >= 0)

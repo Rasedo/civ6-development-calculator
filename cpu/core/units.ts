@@ -368,18 +368,72 @@ export function unitsAt(state: GameState, tileIndex: number): Unit[] {
   return state.units.filter((u) => u.tileIndex === tileIndex);
 }
 
+/**
+ * THE PLOT'S UNIT LIST (0x75c50, per map layer): each plot keeps its units in
+ * the order they arrived. A placement appends a unit not listed (0x586d40 ->
+ * 0x750e0 -> 0x74f40 -> 0x76ae0), a removal erases it keeping the rest in
+ * order (0x763b0 -> 0x76a10), a layer change removes then appends (0x75280).
+ * The engine holds the order as a stamp: `arrive` gives the unit the next one
+ * where it stands on a plot it took none on, and always where `fresh` (a new
+ * unit: a spawn, a capture's, an upgrade's). The GPU twin is `_arrive`.
+ */
+export function arrive(state: GameState, u: Unit, fresh = false): void {
+  if (u.tileIndex < 0 || (!fresh && u.arrivalTile === u.tileIndex)) return;
+  state.arrivals = (state.arrivals ?? 0) + 1;
+  u.arrival = state.arrivals;
+  u.arrivalTile = u.tileIndex;
+}
+
+/** `arrive` over every unit in the units' order: the units a recorded action
+ *  placed, stamped as the action lands */
+export function arriveAll(state: GameState): void {
+  for (const u of state.units) arrive(state, u);
+}
+
+/** the units in their plot's arrival order (0x75c50): a unit holding no
+ *  stamp on its plot after every one that does, in the order given */
+export function arrivalOrder(units: readonly Unit[]): Unit[] {
+  const key = (u: Unit) => (u.arrivalTile === u.tileIndex ? u.arrival ?? 0 : Number.MAX_SAFE_INTEGER);
+  return [...units].sort((a, b) => key(a) - key(b));
+}
+
+/** the plot's units in its list's order (`arrivalOrder`) */
+export function plotUnits(state: GameState, tileIndex: number): Unit[] {
+  return arrivalOrder(unitsAt(state, tileIndex));
+}
+
+/** a district plot's best defender of `seat` (0x208b80 with the comparator
+ *  0x523d60 over the plot's list in its order, `plotUnits`): its military
+ *  unit, not embarked, of the greatest Combat and formation strength
+ *  unwounded, the earliest arrival on a tie (runs/h1_duelp1117 Rome t20:
+ *  the wounded Warrior 393220 there from t19 over the Warrior 655361 made
+ *  there t20) */
+export function bestDefender(state: GameState, seat: number, plot: number): { unit: Unit; top: number } | null {
+  let pick: Unit | undefined;
+  let top = -Infinity;
+  for (const u of plotUnits(state, plot)) {
+    if (u.seat !== seat || unitDomain(u.type) !== 'military' || u.embarked) continue;
+    const s = (UNITS[u.type]?.combat ?? 0) + formationCS(u);
+    if (s > top) {
+      top = s;
+      pick = u;
+    }
+  }
+  return pick ? { unit: pick, top } : null;
+}
+
 /** CIV6 (REQUIREMENT_CITY_HAS_GARRISON_UNIT, the requirement 0xbbb1a0): the
  *  units garrisoning the city — on each of its districts that seats a
  *  garrison (its centre and its Encampment, the districts with HitPoints),
  *  the city's own combat unit standing there (0x24b170: the plot's best
- *  defender, a combat unit). 1121 Xi'an t152: a Field Cannon in its
+ *  defender, `bestDefender`). 1121 Xi'an t152: a Field Cannon in its
  *  Encampment pays Retainers' amenity with no unit on the centre. */
 export function cityGarrisons(state: GameState, city: City): Unit[] {
   const plots = [city.centerIndex, ...city.districts
     .filter((d) => d.type === 'ENCAMPMENT' && state.map.tiles[d.tileIndex].districtComplete).map((d) => d.tileIndex)];
   const out: Unit[] = [];
   for (const p of plots) {
-    const u = unitsAt(state, p).find((v) => v.seat === city.seat && unitDomain(v.type) === 'military');
+    const u = bestDefender(state, city.seat, p)?.unit;
     if (u) out.push(u);
   }
   return out;
@@ -460,6 +514,7 @@ export function reseatUnit(state: GameState, unit: Unit, seat: number): void {
   state.units = state.units.filter((u) => u.id !== unit.id);
   unit.id = state.nextUnitId++;
   state.units.push(unit);
+  arrive(state, unit, true);
 }
 
 /** A CAPTURE'S NEW UNIT (Combat_Manager 0x212500): the victim removed, a
@@ -1270,6 +1325,7 @@ export function stepUnit(state: GameState, unit: Unit, to: Tile, formed?: readon
     && (promoFlag(unit, 'ESCORT_SPEED') || !!UNITS[unit.type]?.escortSpeed);
   if (transition) unit.embarked = isWater(to);
   unit.tileIndex = to.index;
+  arrive(state, unit);
   carryAirWith(state, unit, from.index);
   logUnitOrder(state, unit.seat, unit.id, 'move', to.index);
   // a step off an owned water plot (no shore crossing to the pathfinder) lands
@@ -1292,6 +1348,7 @@ export function stepUnit(state: GameState, unit: Unit, to: Tile, formed?: readon
       && isWater(from) !== isWater(to);
     if (rTrans) rider.embarked = isWater(to);
     rider.tileIndex = to.index;
+    arrive(state, rider);
     if (!riderFree) rider.movesLeft = Math.max(0, rider.movesLeft - cost);
     if (rTrans) {
       const rModeFull = unitFullMoves(state, rider);
@@ -1584,6 +1641,7 @@ export function upgradeAnew(state: GameState, unit: Unit, next: string): void {
   // its placement looks from the plot (0x586d40 -> 0x58f3f0)
   takeLook(state, unit);
   state.units.push(unit);
+  arrive(state, unit, true);
 }
 
 /** the promotions a unit holds: the set bits of its `promos` (the set flags
@@ -2157,6 +2215,7 @@ export function spawnUnit(
   }
   grantFeatureAbilities(state, unit);
   state.units.push(unit);
+  arrive(state, unit, true);
   // the player's knowledge base records the unit it made at once (player
   // signal +0xc0 -> 0x7874a0, no sight asked): a Trader, which no look
   // takes, is known so from its birth until its record ages out. The record

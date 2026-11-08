@@ -1505,6 +1505,22 @@ def _unit_routed(sim, b, rows):
     return [1 if int(s) in on else 0 for s in rows]
 
 
+def _unit_arrival_rank(sim, b, rows):
+    """each unit's place among its plot's military units in the plot's list
+    order (`_arrival_key`, `plotUnits`), -1 for a unit of another class"""
+    ty = sim.unit_type[b].clamp(min=0, max=sim.NU - 1)
+    mil = (sim.unit_alive[b] & (sim.unit_tile[b] >= 0) & ~sim._type_civilian.take(ty) & ~sim._type_support.take(ty)
+           & ~(sim._type_air.take(ty) > 0) & (ty != sim._trader_idx))
+    if sim._spy_idx >= 0:
+        mil = mil & (ty != sim._spy_idx)
+    tile, key, mil = sim.unit_tile[b].tolist(), sim._arrival_key()[b].tolist(), mil.tolist()
+    on: dict[int, list[int]] = {}
+    for v, m in enumerate(mil):
+        if m:
+            on.setdefault(tile[v], []).append(key[v])
+    return [-1 if not mil[int(s)] else sum(1 for k in on[tile[int(s)]] if k < key[int(s)]) for s in rows]
+
+
 def _unit_look_rows(sim, b, rows):
     """each unit's look as it holds it, ascending (`_unit_look_now`)"""
     import torch
@@ -1553,6 +1569,7 @@ UNIT = {
     "noResourceUpkeep": _unit("unit_no_res_upkeep"),
     "alpine": _unit("unit_alpine"),
     "fionn": _unit("unit_fionn"),
+    "arrivalRank": _unit_arrival_rank,
     "look": lambda sim, b, rows: _unit_look_rows(sim, b, rows),
 }
 

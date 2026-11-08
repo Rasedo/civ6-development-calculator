@@ -14,7 +14,7 @@ import type { FeatureId } from '../../world/types';
 import { ITERU_RIVER_PROD_MULT, EPIC_QUEST_LEVY_DISCOUNT_PCT, CLEOPATRA_TRADE_QP_MULT, HARDRADA_NAVAL_MELEE_PROD_MULT, ENKIDU_COMMON_FOE_QP, SKIP_FREE_CITY_ROWS, rowIsFor } from '../data/civilizations';
 import { atRngPoint, randRange } from './rand';
 import { emergencyEnvoyIncome, seatAccumulators, seatTallies, seatGrowth, commitProduction } from './seatTurn';
-import { cityAtIndex, spawnUnit, unitsAt, unitsHostile, unitIsMilitary, encampmentIntact, stepUnit, unitFullMoves, ownerHasTech, tileFreeForUnit, visibleHostilesAt , navalMelee, crossesRiver, builderHarvest, unitIsNoncombat } from './units';
+import { arrive, cityAtIndex, spawnUnit, unitsAt, unitsHostile, unitIsMilitary, encampmentIntact, stepUnit, unitFullMoves, ownerHasTech, tileFreeForUnit, visibleHostilesAt , navalMelee, crossesRiver, builderHarvest, unitIsNoncombat } from './units';
 import { cityStrikeStrength, cityStrikeDefenderCS, airPillage, airStrike, detonate, nukeTargets, siloReaches, shootable } from './combat';
 import { nukeOffers } from './nuclear';
 import { NUCLEAR_DEVICES } from '../data/nuclear';
@@ -450,6 +450,7 @@ export function jumpMadeAnew(state: GameState, u: Unit): boolean {
   for (const p of ringPlots(state, here, JUMP_RADIUS)) {
     if (!ok(p)) continue;
     u.tileIndex = p;
+    arrive(state, u);
     return true;
   }
   return false;
@@ -2618,6 +2619,7 @@ export function applySeatUnitOrders(state: GameState, actor: Seat, steps: number
         if (exit >= 0 && unit.movesLeft >= PORTAL_MP * MP_SCALE
             && tileFreeForUnit(state, exit, unit.seat, unit)) {
           unit.tileIndex = exit;
+          arrive(state, unit);
           unit.movesLeft -= PORTAL_MP * MP_SCALE;
           revealAround(state, unit.seat, exit, unitSight(unit, state), { seeThrough: unitSeesThrough(unit), mover: { units: [unit], from: here.index } });
         }

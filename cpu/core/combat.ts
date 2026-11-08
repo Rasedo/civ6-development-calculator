@@ -29,7 +29,7 @@ import { grievanceCityStateTaken } from './grievance';
 import { goldenDedication, worldEraIndex } from './eras';
 import { captureAnew, drawAndPayGoody, forgetPlayer, raiseBestTrained, recordAttacker, mapLayer, unitReligious, unitStackSlot } from './units';
 import { randRange } from './rand';
-import { formationCS, escortRiders, unitsAt, unitDomain, tileFreeForUnit, disbandUnit, unitsHostile, fortifyBonus, cityAtIndex, encampmentBlocks, encampmentIntact, crossesRiver, cliffBlocks, stepUnit, stepRefusal, unitVisibleTo, unitExertsZoc, formationTierFor } from './units';
+import { arrive, bestDefender, formationCS, escortRiders, unitsAt, unitDomain, tileFreeForUnit, disbandUnit, unitsHostile, fortifyBonus, cityAtIndex, encampmentBlocks, encampmentIntact, crossesRiver, cliffBlocks, stepUnit, stepRefusal, unitVisibleTo, unitExertsZoc, formationTierFor } from './units';
 import { isAirUnit, airRange, airCoverAgainst, airPillageFit, airPillageOffers, airStrikeReaches, airStrikeOffers, airDefenseOf, antiAirAt, displaceAirFrom, interceptorAgainst, priorityDefender, PRIORITY_TARGET_DAMAGE } from './air';
 import { outerPool, wallsMax, wallsTier, encampOuterPool } from './rules';
 import { fuelShortCS } from './stockpile';
@@ -1128,7 +1128,7 @@ export function woundedLoss256(damagePct: number, reductionPct = 0): number {
  * unit does (runs/h1_duelw1103: a Galley, a Caravel, a Battleship). With
  * several on the centre, the plot's best defender (0x208b80 with the
  * comparator 0x523d60): the greatest Combat and formation strength unwounded,
- * the first on a tie, its own wounds then taken off (runs/h1_duelw1121
+ * the earliest arrival on a tie (`bestDefender`), its own wounds then taken off (runs/h1_duelw1121
  * Guangzhou t191: a Line Infantry Corps of 75 at 16 HP over an Ironclad
  * of 70 at 75 HP, 66.6015625). An aircraft and a passenger are no garrison.
  */
@@ -1137,23 +1137,6 @@ function garrisonCS(state: GameState, city: City, base: number, plot = city.cent
   if (!best) return 0;
   const loss = woundedLoss256(Math.trunc(((UNIT_HP - best.unit.hp) * 100) / UNIT_HP), UNITS[best.unit.type]?.noWoundPenalty ? 100 : 0);
   return Math.max(0, best.top - loss / 256 - base);
-}
-
-/** a district plot's best defender of `seat` (0x208b80 with the comparator
- *  0x523d60): its military unit, not embarked, of the greatest Combat and
- *  formation strength unwounded, the first on a tie */
-function bestDefender(state: GameState, seat: number, plot: number): { unit: Unit; top: number } | null {
-  let pick: Unit | undefined;
-  let top = -Infinity;
-  for (const u of unitsAt(state, plot)) {
-    if (u.seat !== seat || unitDomain(u.type) !== 'military' || u.embarked) continue;
-    const s = (UNITS[u.type]?.combat ?? 0) + formationCS(u);
-    if (s > top) {
-      top = s;
-      pick = u;
-    }
-  }
-  return pick ? { unit: pick, top } : null;
 }
 
 /**
@@ -1984,7 +1967,10 @@ export function seizeCivilian(state: GameState, victim: Unit, by: { seat: number
     return;
   }
   const to = def?.retreatsWhenCaptured ? retreatPlot(state, victim) : -1;
-  if (to >= 0) victim.tileIndex = to;
+  if (to >= 0) {
+    victim.tileIndex = to;
+    arrive(state, victim);
+  }
   else killUnit(state, victim);
 }
 
@@ -2224,6 +2210,7 @@ function meleeAttackInner(state: GameState, attackerId: number, targetIndex: num
     for (const u of taken) seizeCivilian(state, u, attacker);
     const left = attacker.tileIndex;
     attacker.tileIndex = targetIndex;
+    arrive(state, attacker);
     // an amphibious victor comes ashore: `stepUnit`'s own transition rule
     if (!def.naval && !waterWalks(attacker.type)) {
       attacker.embarked = isWater(state.map.tiles[targetIndex]);

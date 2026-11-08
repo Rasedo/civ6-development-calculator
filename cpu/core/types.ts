@@ -651,6 +651,8 @@ export interface GameState {
    *  type and strength (`upgradeAnew`, `turnClose`) */
   unitsDying?: Unit[];
   nextUnitId: number;
+  /** the last arrival stamp given (`arrive`) */
+  arrivals?: number;
   rngState: number;
   /** the Future tree the game drew at its start (`drawResearchTree`): its
    *  RandomPrereqs rows' prerequisites and its random-cost rows' Costs */
@@ -826,6 +828,11 @@ export interface Unit {
    *  Giant's Causeway, `grantFeatureAbilities`): +5 Combat Strength in every
    *  fight (SPEAR_OF_FIONN_ADJUST_COMBAT_STRENGTH), through any upgrade. */
   fionn?: boolean;
+  /** ITS PLACE IN ITS PLOT'S UNIT LIST (0x75c50, the arrival order,
+   *  `arrive`): the stamp its last placement took and the plot it took it
+   *  on; a unit standing elsewhere has none on its plot */
+  arrival?: number;
+  arrivalTile?: number;
   /** ITS LOOK (`unitLook`): the plots its line of sight took in at its last
    *  look — the plot it looked from, the sight and the see-through it looked
    *  with — kept until it looks again, however the map changes meanwhile. */

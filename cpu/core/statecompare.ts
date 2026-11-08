@@ -98,7 +98,7 @@ import { AI_DISTRICTS, AI_IMPROVEMENTS } from '../data/aiBuildTables';
 import { AI_BUILDING_INDEX, AI_UNIT_INDEX } from './aiCityBuild';
 import { engineId } from '../data/aliases';
 import { PANTHEONS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, WORSHIP_BELIEFS, ENHANCER_BELIEFS, RELIGION_TYPES, unconvertedOf } from '../data/religion';
-import { grantedMoves, mapLayer, unitStackSlot } from './units';
+import { grantedMoves, mapLayer, plotUnits, unitDomain, unitStackSlot } from './units';
 import { GOODY_KINDS } from '../data/goodyHuts';
 import { BARB_TAG_UNITS, BARB_TRIBES, type BarbTag } from '../data/barbarians';
 import { unitLookNow } from './fog';
@@ -1369,6 +1369,10 @@ const UNIT_G: Record<string, Extractor> = {
   noResourceUpkeep: overUnits((u) => (u.noResourceUpkeep ? 1 : 0)),
   alpine: overUnits((u) => (u.alpine ? 1 : 0)),
   fionn: overUnits((u) => (u.fionn ? 1 : 0)),
+  // its place among its plot's military units in the plot's list order
+  // (`plotUnits`, 0x75c50), -1 for a unit of another class
+  arrivalRank: ((state, rows) => (rows as Unit[]).map((u) => (unitDomain(u.type) !== 'military' || u.tileIndex < 0 ? -1
+    : plotUnits(state, u.tileIndex).filter((v) => unitDomain(v.type) === 'military').indexOf(u)))) as Extractor,
   look: (state, rows) => (rows as Unit[]).map((u) => [...unitLookNow(state, u)]),
 };
 

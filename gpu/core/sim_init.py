@@ -1591,6 +1591,11 @@ class SimInit:
             # ABILITY_SPEAR_OF_FIONN (`Unit.fionn`), granted for good on a
             # plot beside the Giant's Causeway, through any upgrade
             ("fionn", torch.bool),
+            # its place in its plot's unit list (0x75c50, the arrival order,
+            # `_arrive`): the stamp its last placement took and the plot it
+            # took it on (-1 none)
+            ("arrival", torch.long),
+            ("arrival_tile", torch.long),
             # its place in a city-state's or the Free Cities' unit pool (`poolSlots`,
             # the order their tactical AI walks their units in), -1 none yet
             ("pslot", torch.long),
@@ -1628,6 +1633,7 @@ class SimInit:
         self.unit_patrol.fill_(-1)
         self.unit_free_city.fill_(-1)
         self.unit_pslot.fill_(-1)
+        self.unit_arrival_tile.fill_(-1)
         self.unit_list_seat.fill_(-1)
         self.unit_look_at.fill_(-1)
         self.unit_levy_src.fill_(-1)
@@ -1638,6 +1644,8 @@ class SimInit:
         self.major_unit_seat.fill_(1)
 
         self.unit_next = torch.zeros(B, dtype=torch.long, device=device)
+        # the last arrival stamp each game gave (`GameState.arrivals`)
+        self.arrival_next = torch.zeros(B, dtype=torch.long, device=device)
         self.military_at = torch.full((B, T), -1, dtype=torch.long, device=device)
         self.civilian_at = torch.full((B, T), -1, dtype=torch.long, device=device)
         # CIV6 (FORMATION_CLASS_SUPPORT): the nine support chassis hold a
@@ -5267,6 +5275,10 @@ class SimInit:
                     self.major_unit_seat[b, i] = seat
                     self.major_unit_type[b, i] = ti
                     self.major_unit_tile[b, i] = int(u_["tile"])
+                    # spawnUnit's placement: the next arrival stamp (`arrive`)
+                    self.arrival_next[b] += 1
+                    self.major_unit_arrival[b, i] = self.arrival_next[b]
+                    self.major_unit_arrival_tile[b, i] = int(u_["tile"])
                     self.major_unit_hp[b, i] = rules.combat["unitHp"]
                     self.major_unit_charges[b, i] = int(self._type_charges[ti])
                     _m0u = self._mp_scale * int(self._type_moves[ti])

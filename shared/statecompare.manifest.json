@@ -4318,6 +4318,19 @@
           "note": "ABILITY_SPEAR_OF_FIONN, granted for good beside the Giant's Causeway: +5 Combat Strength in every fight, through any upgrade."
         },
         {
+          "name": "arrivalRank",
+          "compare": "exact",
+          "covers": [
+            "Unit.arrival",
+            "Unit.arrivalTile"
+          ],
+          "planes": [
+            "unit_arrival",
+            "unit_arrival_tile"
+          ],
+          "note": "the plot's unit list order (0x75c50): the unit's place among its plot's military units ordered by arrival stamp, a unit with no stamp on its plot after the stamped ones; -1 for a unit of another class. The stamps themselves are allocator values and are not compared."
+        },
+        {
           "name": "look",
           "compare": "exact",
           "covers": [
@@ -4885,6 +4898,10 @@
         "why": "TS's unit-id allocator. The GPU allocates slots (`unit_next` for the major window, `next_slot` for the barbarian one) in a different space, and the unit join key is (tile, military/civilian), so no unit id is ever compared."
       },
       {
+        "path": "GameState.arrivals",
+        "why": "the arrival stamps' allocator (`arrive`); the order the stamps give is compared as the units' `arrivalRank`."
+      },
+      {
         "path": "GameState.eventLog",
         "why": "a human-readable log; no rule reads it."
       },
@@ -5038,6 +5055,10 @@
       }
     ],
     "gpu": [
+      {
+        "plane": "arrival_next",
+        "why": "the arrival stamps' allocator per game (`_arrive`, `GameState.arrivals`); the order the stamps give is compared as the units' `arrivalRank`."
+      },
       {
         "plane": "mops_join",
         "why": "the units each minor operation's team has taken in (`OpTeam.joined`, team +0x58), which gates its Attack Units' execution: compared through its effect, the members' attacks."

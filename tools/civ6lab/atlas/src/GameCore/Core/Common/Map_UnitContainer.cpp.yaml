@@ -10,9 +10,11 @@
   status: READ
   cases:
     - recording: h1_duelp1117
-      turn: 86
-      value: "Antananarivo's Catapult 1048580 on its centre before record 86, then the Catapult 1114113 made there: the game's garrison the first"
+      turn: 20
+      value: "Rome's centre: the wounded Warrior 393220 there from t19 (row 3047) over the Warrior 655361 made there t20 (row 3254), city.defense 13.4296875 as the game's"
+  impl: [cpu/core/units.ts:arrive, gpu/core/sim_seats.py:_arrive]
   readings:
+    - "C-102 / C-99: the plot's unit list as an arrival stamp, the best defender's tie and Garrison City's standing unit — READ (0x75c50, 0x74f40 / 0x763b0 / 0x75280, 0x208b80 / 0x523d60, 0x810fd7..0x81101b), both twins"
     - "C-99 / C-128: every technology gained starts an Upgrade Units tree, the civic event never fires; a tree's units after its tick; the Nearest City Search's resource test; the plot's unit list — READ (0x4cd4c0 -> 0x800c60, 0x5bbf80 -> 0x27a180, 0x3a1ac0, 0x7cb3d0 -> 0x7d2190, 0x7eba40 -> 0x510d30, 0x74f40 / 0x763b0), the trigger both twins"
   context:
     - ...-> 0x800c60, 0x5bbf80 -> 0x27a180, 0x3a1ac0, 0x7cb3d0 -> 0x7d2190, 0x7eba40 -> 0x510d30, 0x74f40 / 0x763b0), the trigger both twins
@@ -25,9 +27,11 @@
   status: READ
   cases:
     - recording: h1_duelp1117
-      turn: 86
-      value: "Antananarivo's Catapult 1048580 on its centre before record 86, then the Catapult 1114113 made there: the game's garrison the first"
+      turn: 20
+      value: "Rome's centre: the wounded Warrior 393220 there from t19 (row 3047) over the Warrior 655361 made there t20 (row 3254), city.defense 13.4296875 as the game's"
+  impl: [cpu/core/units.ts:arrive, gpu/core/sim_seats.py:_arrive]
   readings:
+    - "C-102 / C-99: the plot's unit list as an arrival stamp, the best defender's tie and Garrison City's standing unit — READ (0x75c50, 0x74f40 / 0x763b0 / 0x75280, 0x208b80 / 0x523d60, 0x810fd7..0x81101b), both twins"
     - "C-99 / C-128: every technology gained starts an Upgrade Units tree, the civic event never fires; a tree's units after its tick; the Nearest City Search's resource test; the plot's unit list — READ (0x4cd4c0 -> 0x800c60, 0x5bbf80 -> 0x27a180, 0x3a1ac0, 0x7cb3d0 -> 0x7d2190, 0x7eba40 -> 0x510d30, 0x74f40 / 0x763b0), the trigger both twins"
   context:
     - "...THE PLOT'S UNIT LIST (0x75c50, per layer): a vector of unit ids; placement (0x586d40 -> 0x750e0 -> 0x74f40) appends a unit not listed (0x76ae0), removal (0x586a90 / 0x586d40 -> 0x763b..."
@@ -39,9 +43,11 @@
   status: READ
   cases:
     - recording: h1_duelp1117
-      turn: 86
-      value: "Antananarivo's Catapult 1048580 on its centre before record 86, then the Catapult 1114113 made there: the game's garrison the first"
+      turn: 20
+      value: "Rome's centre: the wounded Warrior 393220 there from t19 (row 3047) over the Warrior 655361 made there t20 (row 3254), city.defense 13.4296875 as the game's"
+  impl: [cpu/core/units.ts:arrive, gpu/core/sim_seats.py:_arrive]
   readings:
+    - "C-102 / C-99: the plot's unit list as an arrival stamp, the best defender's tie and Garrison City's standing unit — READ (0x75c50, 0x74f40 / 0x763b0 / 0x75280, 0x208b80 / 0x523d60, 0x810fd7..0x81101b), both twins"
     - "C-99 / C-128: every technology gained starts an Upgrade Units tree, the civic event never fires; a tree's units after its tick; the Nearest City Search's resource test; the plot's unit list — READ (0x4cd4c0 -> 0x800c60, 0x5bbf80 -> 0x27a180, 0x3a1ac0, 0x7cb3d0 -> 0x7d2190, 0x7eba40 -> 0x510d30, 0x74f40 / 0x763b0), the trigger both twins"
   context:
     - "...0 / 0x586d40 -> 0x763b0) erases it keeping the rest in order (0x76a10), a layer change (0x75280) removes then appends: the list is the units' arrival order. Not ported: the recordings..."
@@ -107,7 +113,21 @@
     - cpu/core/trade.ts:plunderTargets
     - cpu/core/tactical.ts:alternateLocation
     - cpu/core/tactical.ts:pathNodes
+    - cpu/core/units.ts:plotUnits
+    - cpu/core/units.ts:arrivalOrder
+    - gpu/core/sim_seats.py:_arrival_key
+    - cpu/core/aiView.ts:plotFighters
+    - cpu/core/aiViewTypes.ts:AiView
+    - cpu/core/operations/assault.ts:garrisonExecute
+    - cpu/core/statecompare.ts:UNIT_G
+    - cpu/core/types.ts:Unit
+    - cpu/core/units.ts:arrive
+    - cpu/harness/import.ts:advanceHistory
+    - gpu/core/sim_init.py:ften
+    - gpu/core/sim_minorops.py:end_moves
+    - gpu/core/sim_seats.py:_arrive
   readings:
+    - "C-102 / C-99: the plot's unit list as an arrival stamp, the best defender's tie and Garrison City's standing unit — READ (0x75c50, 0x74f40 / 0x763b0 / 0x75280, 0x208b80 / 0x523d60, 0x810fd7..0x81101b), both twins"
     - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
     - "C-96: an event's civilian kill spares a Trader — PARTLY READ"
     - "C-99: Move Unit's no-Location execution, the swap's partner and the move order's first turn — READ, ported; the swap's path tests and 0x56e760 unread"
@@ -148,9 +168,11 @@
   status: READ
   cases:
     - recording: h1_duelp1117
-      turn: 86
-      value: "Antananarivo's Catapult 1048580 on its centre before record 86, then the Catapult 1114113 made there: the game's garrison the first"
+      turn: 20
+      value: "Rome's centre: the wounded Warrior 393220 there from t19 (row 3047) over the Warrior 655361 made there t20 (row 3254), city.defense 13.4296875 as the game's"
+  impl: [cpu/core/units.ts:arrivalOrder, gpu/core/sim_seats.py:_arrival_key, cpu/core/units.ts:arrive]
   readings:
+    - "C-102 / C-99: the plot's unit list as an arrival stamp, the best defender's tie and Garrison City's standing unit — READ (0x75c50, 0x74f40 / 0x763b0 / 0x75280, 0x208b80 / 0x523d60, 0x810fd7..0x81101b), both twins"
     - "C-99 / C-128: every technology gained starts an Upgrade Units tree, the civic event never fires; a tree's units after its tick; the Nearest City Search's resource test; the plot's unit list — READ (0x4cd4c0 -> 0x800c60, 0x5bbf80 -> 0x27a180, 0x3a1ac0, 0x7cb3d0 -> 0x7d2190, 0x7eba40 -> 0x510d30, 0x74f40 / 0x763b0), the trigger both twins"
   context:
     - ...60, 0x5bbf80 -> 0x27a180, 0x3a1ac0, 0x7cb3d0 -> 0x7d2190, 0x7eba40 -> 0x510d30, 0x74f40 / 0x763b0), the trigger both twins
@@ -162,9 +184,11 @@
   status: READ
   cases:
     - recording: h1_duelp1117
-      turn: 86
-      value: "Antananarivo's Catapult 1048580 on its centre before record 86, then the Catapult 1114113 made there: the game's garrison the first"
+      turn: 20
+      value: "Rome's centre: the wounded Warrior 393220 there from t19 (row 3047) over the Warrior 655361 made there t20 (row 3254), city.defense 13.4296875 as the game's"
+  impl: [cpu/core/units.ts:arrivalOrder, gpu/core/sim_seats.py:_arrival_key, cpu/core/units.ts:arrive]
   readings:
+    - "C-102 / C-99: the plot's unit list as an arrival stamp, the best defender's tie and Garrison City's standing unit — READ (0x75c50, 0x74f40 / 0x763b0 / 0x75280, 0x208b80 / 0x523d60, 0x810fd7..0x81101b), both twins"
     - "C-99 / C-128: every technology gained starts an Upgrade Units tree, the civic event never fires; a tree's units after its tick; the Nearest City Search's resource test; the plot's unit list — READ (0x4cd4c0 -> 0x800c60, 0x5bbf80 -> 0x27a180, 0x3a1ac0, 0x7cb3d0 -> 0x7d2190, 0x7eba40 -> 0x510d30, 0x74f40 / 0x763b0), the trigger both twins"
   context:
     - "...0x76ae0), removal (0x586a90 / 0x586d40 -> 0x763b0) erases it keeping the rest in order (0x76a10), a layer change (0x75280) removes then appends: the list is the units' arrival order...."
@@ -176,9 +200,11 @@
   status: READ
   cases:
     - recording: h1_duelp1117
-      turn: 86
-      value: "Antananarivo's Catapult 1048580 on its centre before record 86, then the Catapult 1114113 made there: the game's garrison the first"
+      turn: 20
+      value: "Rome's centre: the wounded Warrior 393220 there from t19 (row 3047) over the Warrior 655361 made there t20 (row 3254), city.defense 13.4296875 as the game's"
+  impl: [cpu/core/units.ts:arrive, gpu/core/sim_seats.py:_arrive]
   readings:
+    - "C-102 / C-99: the plot's unit list as an arrival stamp, the best defender's tie and Garrison City's standing unit — READ (0x75c50, 0x74f40 / 0x763b0 / 0x75280, 0x208b80 / 0x523d60, 0x810fd7..0x81101b), both twins"
     - "C-99 / C-128: every technology gained starts an Upgrade Units tree, the civic event never fires; a tree's units after its tick; the Nearest City Search's resource test; the plot's unit list — READ (0x4cd4c0 -> 0x800c60, 0x5bbf80 -> 0x27a180, 0x3a1ac0, 0x7cb3d0 -> 0x7d2190, 0x7eba40 -> 0x510d30, 0x74f40 / 0x763b0), the trigger both twins"
   context:
     - ...or of unit ids; placement (0x586d40 -> 0x750e0 -> 0x74f40) appends a unit not listed (0x76ae0), removal (0x586a90 / 0x586d40 -> 0x763b0) erases it keeping the rest in order (0x76a10...

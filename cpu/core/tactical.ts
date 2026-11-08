@@ -20,7 +20,7 @@ import { AI_FEATURES, AI_UNITS } from '../data/aiBuildTables';
 import { AI_UNIT_AI } from '../data/aiOperations';
 import { engineId, gameTypeOf, installFeature } from '../data/aliases';
 import {
-  canEmbark, cityAtIndex, crossesRiver, embarkTechMoves, escortUnit, inEscort, cliffBlocksStep, shoreCrossing, districtZones, encampmentBlocks, encampmentIntact, inEnemyZoc, rosterEmbarkMoves, stepCost, stepUnit, terrainMp, unitDomain, unitExertsZoc, unitFullMoves, unitIsNoncombat, mapLayer, unitReligious,
+  arrive, canEmbark, cityAtIndex, crossesRiver, embarkTechMoves, escortUnit, inEscort, cliffBlocksStep, shoreCrossing, districtZones, encampmentBlocks, encampmentIntact, inEnemyZoc, rosterEmbarkMoves, stepCost, stepUnit, terrainMp, unitDomain, unitExertsZoc, unitFullMoves, unitIsNoncombat, mapLayer, unitReligious,
   setBarbStepLook, unitsHostile, unitVisibleTo, fortifyOrder,
   waterEnterable, waterWalks, formationBanned, formationCS, setRecordFormation, formationMates, dropLoneRiders, escortOf, escortRiders, disbandUnit,
 } from './units';
@@ -3643,7 +3643,10 @@ export function unstackUnits(state: GameState, seat: number): void {
       stuck.push(u);
       continue;
     }
-    for (const m of [u, ...formationMates(state, u)]) m.tileIndex = to;
+    for (const m of [u, ...formationMates(state, u)]) {
+      m.tileIndex = to;
+      arrive(state, m);
+    }
   }
   const cs = state.cityStates.find((c) => c.seat === seat);
   for (const u of stuck) {

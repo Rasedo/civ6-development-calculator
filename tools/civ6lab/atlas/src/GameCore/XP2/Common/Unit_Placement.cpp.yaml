@@ -437,6 +437,7 @@
     - cpu/core/units.ts:upgradeAnew
     - cpu/core/units.ts:captureAnew
     - gpu/core/sim_seats.py:_capture_anew
+    - cpu/core/units.ts:arrive
   readings:
     - "H-1: the raids — READ"
     - "C-97: the majors' meeting — READ (the triggers, the effects), PARTLY READ (the shared sight)"

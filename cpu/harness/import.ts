@@ -498,6 +498,9 @@ export interface History {
   /** the units in a formation, by `owner:id` (`UnitEnterFormation` /
    *  `UnitExitFormation` in the records' action log) */
   formed: Set<string>;
+  /** each unit's last placement row in the records' action log, by
+   *  `owner:id`: the row's number and the plot's x, y (`arrive`) */
+  arrivals: Map<string, [number, number, number]>;
   /** units holding Alpine Training, by `owner:id` (`foldBeside`) */
   alpine: Set<string>;
   /** units holding the Spear of Fionn, by `owner:id` (`foldBeside`) */
@@ -853,7 +856,7 @@ export function eraBegan(a: TurnRecord, b: TurnRecord): boolean {
 }
 
 export function newHistory(): History {
-  return { firstTurn: -1, last: null, before: null, beforeThat: null, trained: new Map(), levied: new Map(), captives: new Map(), formed: new Set(), alpine: new Set(), fionn: new Set(), govSeated: new Map(), growthDrift: new Map(), lastHit: new Map(), gpSpent: new Map(), revealed: new Map(),
+  return { firstTurn: -1, last: null, before: null, beforeThat: null, trained: new Map(), levied: new Map(), captives: new Map(), formed: new Set(), arrivals: new Map(), alpine: new Set(), fionn: new Set(), govSeated: new Map(), growthDrift: new Map(), lastHit: new Map(), gpSpent: new Map(), revealed: new Map(),
     unknownSince: new Set(), cityFirstSeen: new Map(), nextPlotUnheld: new Set(), fireFood: new Map(), fireProd: new Map(), eventYields: new Map(), eventCounts: new Map(), openEvents: [], eventRead: new Map(), eventDraws: new Map(), droughts: [], bare: new Map(), discountDistricts: new Map(), discountPlaced: new Map(), ages: new Map(), moments: new Map(), momentsWorld: [],
     eraTurns: [], gameEra: 0, eraStartTurn: 1, eraCountdown: -1, routeSeen: new Map(), routeCourse: new Map(), trail: new Map(), legs: new Map(), posts: new Map(), policySlots: new Map(),
     competitionSeen: new Map(), competitionScore: new Map(), podium: new Map(), culture: new Map(), tourismTo: new Map(),
@@ -1323,6 +1326,9 @@ export function formationRows(formed: Set<string>, rows: readonly unknown[][]): 
   }
 }
 
+/** the action log's rows that place a unit on a plot */
+const PLACEMENT_ROWS = new Set(['UnitAddedToMap', 'UnitMoved', 'UnitTeleported']);
+
 /** Fold one record into the history, in turn order. */
 export function advanceHistory(h: History, rec: TurnRecord, cat: Catalog): void {
   const W = rec.head.W;
@@ -1379,6 +1385,12 @@ export function advanceHistory(h: History, rec: TurnRecord, cat: Catalog): void 
   const held = new Set(rec.units.map((u) => `${u.owner}:${u.id}`));
   for (const k of [...h.captives.keys()]) if (!held.has(k)) h.captives.delete(k);
   formationRows(h.formed, rows);
+  // each unit's last placement in the action log (UnitAddedToMap, UnitMoved,
+  // UnitTeleported: [row, turn, kind, player, id, x, y]): the row's number and
+  // plot, its place in that plot's unit list (0x75c50, `arrive`)
+  for (const r of rows) {
+    if (Array.isArray(r) && PLACEMENT_ROWS.has(r[2] as string)) h.arrivals.set(`${r[3]}:${r[4]}`, [r[0] as number, r[5] as number, r[6] as number]);
+  }
   for (const k of [...h.formed]) if (!held.has(k)) h.formed.delete(k);
   // a resource a player reads paying its yield without the revealing
   // technology: the grant (`GP_RESOURCE_REVEAL`) where the records name no
@@ -2718,6 +2730,15 @@ export function importTurn(rec: TurnRecord, cat: Catalog, history?: History): Im
     // (its AI's own formations are the record's; the minors' and the
     // barbarians' the engine's, carried)
     if (isCiv(seat) && escortable(unit) && history?.formed.has(`${u.owner}:${u.id}`)) unit.escorted = true;
+    // its place in its plot's list (`arrive`): its last placement row's
+    // number where that row put it on the plot it stands on, the earliest
+    // (0) where no row placed it, none where its last row put it elsewhere
+    const placed = history?.arrivals.get(`${u.owner}:${u.id}`);
+    if (!placed || (placed[1] === u.x && placed[2] === u.y)) {
+      unit.arrival = placed?.[0] ?? 0;
+      unit.arrivalTile = unit.tileIndex;
+      state.arrivals = Math.max(state.arrivals ?? 0, unit.arrival);
+    }
     state.units.push(unit);
     unitByKey.set(`${u.owner}:${u.id}`, unit);
     // the levy in force: the major holding the minor's army, and its term

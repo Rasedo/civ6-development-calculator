@@ -143,6 +143,9 @@ export interface AiView extends AiValueView {
   cityPlots(seat: number): readonly number[];
   leaderType(seat: number): string | null;
   units(seat: number): readonly AiUnitView[];
+  /** the ids of the plot's units of formation class LAND_COMBAT or NAVAL
+   *  (0x8bcd0 0 / 3), in the plot's list order (0x75c50, its arrivals) */
+  plotFighters(plot: number): readonly number[];
   /** the seat's units an upgrade took off this turn, as they stood
    *  (`GameState.unitsDying`): the player's unit list still finds them by id */
   unitsDying(seat: number): readonly AiUnitView[];

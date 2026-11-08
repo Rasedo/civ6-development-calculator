@@ -11,7 +11,7 @@ import { canFoundCity, availableBuildings, buildingCompletable, purchasableBuild
 import { computeUnlocks, getModifiers, isCivicComplete, goldPrice, faithPrice } from './effects';
 import type { Modifiers, Unlocks } from './effects';
 import { boostPool, drawBoosts } from './boosts';
-import { unitsHostile, spawnUnit, refreshUnits, trainableUnits, disbandUnit, reseatUnit, tileFreeForUnit, builderCost, traderCost, unitsAt, unitDomain, bestTrainableOfClass, purchaseSpotBlocked, raiseBestTrained } from './units';
+import { arrive, unitsHostile, spawnUnit, refreshUnits, trainableUnits, disbandUnit, reseatUnit, tileFreeForUnit, builderCost, traderCost, unitsAt, unitDomain, bestTrainableOfClass, purchaseSpotBlocked, raiseBestTrained } from './units';
 import { drawPromoOffer, promoFlag, unitPromoRows } from './promotions';
 import { logXpWrite, logPopWrite } from './difflog';
 import { applyTrainingGrants, damageRoll, theoStrength, theoFlankCount, theoSupportCount, theoDefenseStrength, FLANKING_CS, SUPPORT_CS } from './combat';
@@ -1939,6 +1939,7 @@ function theologicalCombatPhase(state: GameState): void {
     // in melee combat" — the ATTACKER's advance only, and only if it survived.
     if (def.hp <= 0 && att.hp > 0 && tileFreeForUnit(state, def.tileIndex, 0, att)) {
       att.tileIndex = def.tileIndex;
+      arrive(state, att);
       // a victor that comes ashore stops being embarked: `stepUnit`'s own
       // transition rule, which a direct tile write does not reach.
       att.embarked = isWater(state.map.tiles[def.tileIndex]);

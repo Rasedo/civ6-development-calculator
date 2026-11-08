@@ -22,7 +22,7 @@ import { airPillageTargets, airStrikeTargets, rebaseTargets } from './air';
 import { plotsSeenNow, ringPlots } from './barbarians';
 import { cityDefenseStrength, cityStrikeBase, cityStrikeStrength, encircled, garrisonTerm, predictCityBlow, siegeAssist, unitAttackRange } from './combat';
 import { outerPool, portalAt, wallsTier } from './rules';
-import { borderClosedTo, builderCost, cityAtIndex, embarkTechMoves, formationMates, traderCost, unitFullMoves, unitDomain, unitExertsZoc, unitsHostile, unitVisibleTo } from './units';
+import { borderClosedTo, builderCost, cityAtIndex, embarkTechMoves, formationMates, plotUnits, traderCost, unitFullMoves, unitDomain, unitExertsZoc, unitsHostile, unitVisibleTo } from './units';
 import { CIVICS } from '../data/civics';
 import { TECHS } from '../data/techs';
 import { COST_MULTIPLIER_PCT, EMBARK_MOVES, MP_SCALE } from '../data/constants';
@@ -213,6 +213,7 @@ export function aiView(state: GameState, opts: { updated?: boolean } = {}): AiVi
       return l ? gameTypeOf('leader', l, 'LEADER_') : null;
     },
     units: (i) => unitsOf(state, i).map((u) => unitView(state, u)),
+    plotFighters: (p) => plotUnits(state, p).filter((u) => unitDomain(u.type) === 'military').map((u) => u.id),
     unitsDying: (i) => (state.unitsDying ?? []).filter((u) => u.seat === i).map((u) => unitView(state, u)),
     unitReach: (id, turns) => {
       const u = state.units.find((x) => x.id === id);

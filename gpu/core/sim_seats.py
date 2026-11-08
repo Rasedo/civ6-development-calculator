@@ -5453,18 +5453,66 @@ class SimSeats:
         the plot (the owner's own, a city's stacking spawn) keeps it"""
         if rows.numel() == 0:
             return
+        self._arrive(rows, gslots, tiles, fresh=True)
         _ty = self.unit_type[rows, gslots].clamp(min=0, max=self.NU - 1)
         held = torch.zeros_like(rows, dtype=torch.bool)
         for plane, on in zip(self._occ_planes(), self._occ_split(_ty, self.unit_emb[rows, gslots])):
             held = held | (on & (plane[rows, tiles] >= 0))
         self._occ_set(rows[~held], tiles[~held], gslots[~held])
 
-    def _occ_set(self, rows: torch.Tensor, tiles: torch.Tensor, gslots: torch.Tensor) -> None:
-        """Put these SLOTS on these tiles, in the plane their stacking class
-        names (`_occ_split`). Reads `unit_emb`, so a caller flipping a unit's
-        embarked state writes that first."""
+    def _arrive(self, rows: torch.Tensor, gslots: torch.Tensor, tiles: torch.Tensor, fresh: bool = False) -> None:
+        """`arrive` — THE PLOT'S UNIT LIST (0x75c50) as each unit's arrival
+        stamp: these SLOTS placed on these tiles take each game's next stamp
+        where they took none on that tile, always where `fresh` (a new unit),
+        several of one game in the order listed"""
         if rows.numel() == 0:
             return
+        on = tiles >= 0
+        if not fresh:
+            on = on & (self.unit_arrival_tile[rows, gslots] != tiles)
+        if not bool(on.any()):
+            return
+        r, g, t = rows[on], gslots[on], tiles[on]
+        n = r.numel()
+        before = torch.tril(r.unsqueeze(0) == r.unsqueeze(1), diagonal=-1).sum(dim=1)
+        self.unit_arrival[r, g] = self.arrival_next[r] + before + 1
+        self.unit_arrival_tile[r, g] = t
+        self.arrival_next.index_add_(0, r, torch.ones(n, dtype=torch.long, device=self.device))
+
+    def _arrival_key(self) -> torch.Tensor:
+        """[B, U] long — each unit's place in its plot's list (`arrivalOrder`):
+        its stamp where it took it on the plot it stands on, else after every
+        stamped unit in slot order"""
+        idx = torch.arange(self.unit_tile.shape[1], device=self.device).unsqueeze(0)
+        return torch.where(self.unit_arrival_tile == self.unit_tile, self.unit_arrival, (1 << 40) + idx)
+
+    def _best_defender(self, seat: torch.Tensor, plot: torch.Tensor) -> torch.Tensor:
+        """[B] or [B, K] long — `bestDefender`, a district plot's best
+        defender of `seat` [B] on `plot` [B] or [B, K] (0x208b80 with the
+        comparator 0x523d60 over the plot's list): its military unit, not
+        embarked, of the greatest Combat and formation strength unwounded, the
+        earliest arrival on a tie (`_arrival_key`); the global slot, -1 none"""
+        flat = plot.dim() == 1
+        p = plot.unsqueeze(1) if flat else plot
+        mil = self._occ_class(self._bidx)[0] & (self.unit_seat == seat.unsqueeze(1))
+        here = mil.unsqueeze(1) & (self.unit_tile.unsqueeze(1) == p.unsqueeze(2)) & (p >= 0).unsqueeze(2)
+        ty = self.unit_type.clamp(min=0, max=self.NU - 1)
+        s = (self._type_combat.take(ty)
+             + self._formation_cs.take(self.unit_formation.clamp(min=0, max=self._form_max))).unsqueeze(1)
+        low = torch.full_like(s, torch.iinfo(s.dtype).min)
+        top = torch.where(here, s, low).max(dim=2, keepdim=True).values
+        key = torch.where(here & (s == top), self._arrival_key().unsqueeze(1), torch.full_like(here, 1 << 50, dtype=torch.long))
+        out = torch.where(here.any(dim=2), key.argmin(dim=2), torch.full_like(p, -1))
+        return out.squeeze(1) if flat else out
+
+    def _occ_set(self, rows: torch.Tensor, tiles: torch.Tensor, gslots: torch.Tensor) -> None:
+        """Put these SLOTS on these tiles, in the plane their stacking class
+        names (`_occ_split`), each placed on its plot's list (`_arrive`).
+        Reads `unit_emb`, so a caller flipping a unit's embarked state writes
+        that first."""
+        if rows.numel() == 0:
+            return
+        self._arrive(rows, gslots, tiles)
         _ty = self.unit_type[rows, gslots].clamp(min=0, max=self.NU - 1)
         for plane, hit in zip(self._occ_planes(), self._occ_split(_ty, self.unit_emb[rows, gslots])):
             if bool(hit.count_nonzero()):
@@ -13639,18 +13687,19 @@ class SimSeats:
         """[B, RC] bool twice — CIV6 (REQUIREMENT_CITY_HAS_GARRISON_UNIT, the
         requirement 0xbbb1a0): does each of this seat row's cities hold a
         garrison — the row's own military unit on its centre or on its
-        complete Encampment, the districts with HitPoints — and is one of
-        those garrisons a Corps or an Army (`cityGarrisons`)."""
+        complete Encampment, the districts with HitPoints, the plot's best
+        defender (`_best_defender`) — and is one of those garrisons a Corps or
+        an Army (`cityGarrisons`)."""
         gar = torch.zeros(self.B, self.RC, dtype=torch.bool, device=self.device)
         form = torch.zeros_like(gar)
         plots = [(self.city_center[:, row], None)]
         if self._encamp_didx >= 0:
             et = self.city_dist_tile[:, row, :, self._encamp_didx]
             plots.append((et, self.district_complete.gather(1, et.clamp(min=0))))
+        seat = torch.full((self.B,), int(self._ROW_SEAT[row]), dtype=torch.long, device=self.device)
         for tiles, live in plots:
-            t0 = tiles.clamp(min=0)
-            slot = self.military_at.gather(1, t0)
-            here = (tiles >= 0) & (slot >= 0) & (self.unit_seat.gather(1, slot.clamp(min=0)) == row)
+            slot = self._best_defender(seat, tiles)
+            here = (tiles >= 0) & (slot >= 0)
             if live is not None:
                 here = here & live
             gar = gar | here
@@ -13663,16 +13712,16 @@ class SimSeats:
         holder on the centre, a hull included, adds max(0, its Combat and its
         formation's strength less its wounded loss in 1/256 (`_wounded_loss`,
         none for a chassis with no wound penalty) - `base`), associated as TS
-        writes it. An aircraft and a passenger are no garrison; the tile seats
-        one military unit. `plot` [B] another of the city's districts to read
-        the garrison on (an Encampment's, 0x24a180), else the centre."""
+        writes it. An aircraft and a passenger are no garrison; with several,
+        the plot's best defender (`_best_defender`). `plot` [B] another of the
+        city's districts to read the garrison on (an Encampment's, 0x24a180),
+        else the centre."""
         bidx = self._bidx
         ctr = (self.city_center[bidx, hrow, hcol.clamp(min=0)] if plot is None else plot).clamp(min=0)
-        gslot = self.military_at[bidx, ctr]
+        gslot = self._best_defender(seat, ctr)
         gs0 = gslot.clamp(min=0)
         gty = self.unit_type[bidx, gs0].clamp(min=0, max=self.NU - 1)
-        gar = ((gslot >= 0) & (self.unit_seat[bidx, gs0] == seat)
-               & ~self.unit_emb[bidx, gs0])
+        gar = gslot >= 0
         hp_max = int(self.rules.combat["unitHp"])
         dpct = torch.div((hp_max - self.unit_hp[bidx, gs0]).long() * 100, hp_max, rounding_mode="trunc")
         loss = self._wounded_loss.take(dpct.clamp(min=0, max=100))
@@ -13686,15 +13735,13 @@ class SimSeats:
         """[B] f64 — `districtDamageLoss`, THE DAMAGED DISTRICT'S LOSS in a
         fight it defends (0x51eaf0): the wounded law (`_wounded_loss`,
         COMBAT_WOUNDED_DISTRICT_DAMAGE_MULTIPLIER 10) on the truncated percent
-        of the centre's hit points lost, none where its plot's military unit
-        of `seat` (not embarked) suffers no wound penalty, in 1/256."""
+        of the centre's hit points lost, none where its plot's best defender
+        of `seat` (`_best_defender`) suffers no wound penalty, in 1/256."""
         bidx = self._bidx
-        p0 = plot.clamp(min=0)
-        gslot = self.military_at[bidx, p0]
+        gslot = self._best_defender(seat, plot)
         gs0 = gslot.clamp(min=0)
         gty = self.unit_type[bidx, gs0].clamp(min=0, max=self.NU - 1)
-        waived = ((gslot >= 0) & (self.unit_seat[bidx, gs0] == seat) & ~self.unit_emb[bidx, gs0]
-                  & self._type_no_wound.take(gty))
+        waived = (gslot >= 0) & self._type_no_wound.take(gty)
         mx = self._city_max_hp
         pct = torch.div((mx - hp.long().clamp(max=mx)) * 100, mx, rounding_mode="trunc").clamp(min=0, max=100)
         loss = torch.where(waived, torch.zeros_like(pct), self._wounded_loss.take(pct))

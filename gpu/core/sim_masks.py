@@ -3130,6 +3130,8 @@ class SimMasks:
         self.barb_unit_mp[rows, slot] = _m
         self.barb_unit_mp_full[rows, slot] = _m
         self.barb_unit_attacks[rows, slot] = 1
+        # its placement on its plot's list (`spawnUnit`'s `arrive`)
+        self._arrive(rows, slot + self.POOL_LO["barb"], spot[rows], fresh=True)
         # the plane keeps a unit already there (a stacking spawn's)
         cv = torch.zeros_like(rows, dtype=torch.bool) if civ is None else civ[rows]
         for plane, on in ((self.military_at, ~cv), (self.civilian_at, cv)):

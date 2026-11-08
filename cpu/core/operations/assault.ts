@@ -220,8 +220,8 @@ const garrisonCity: BtHandler<OpsContext> = {
  *  best so far and the garrison's, else a Bombard less 5 above the best with
  *  the garrison holding no ranged strength, else (none chosen, the garrison
  *  no ranged strength, no ranged best) a Combat above the best and the
- *  garrison's. With no garrison of the operation's, a military unit of the
- *  seat on the city takes the garrison's branch at no strength (0x81100a ->
+ *  garrison's. With no garrison of the operation's, the city plot's first unit
+ *  of class LAND_COMBAT or NAVAL in its arrival order takes the garrison's branch at no strength (0x81100a ->
  *  0x811129); with neither, the candidate moves in, its moves ended
  *  (0x56d6f0) where it stands on the city with no RangedCombat. In the
  *  garrison's branch a stronger candidate moves beside the city and swaps
@@ -282,7 +282,14 @@ function garrisonExecute(_node: Parameters<BtHandler<OpsContext>['update']>[0], 
     }
   }
   // each unit the execution takes has its turn done (0x570b40, dl 1)
-  if (!garrison) garrison = view.units(ctx.seat).find((u) => u.plot === city && u.combat + u.ranged + u.bombard > 0) ?? null;
+  // with none of the operation's, the city plot's first unit of formation
+  // class LAND_COMBAT or NAVAL in its list (0x75c50 at 0x810fd7, 0x8bcd0 at
+  // 0x811003..0x81101b; runs/h1_duelp1117 t86 Antananarivo: the Catapult
+  // 1048580 there before the Catapult 1114113 made that turn)
+  if (!garrison) {
+    const first = view.plotFighters(city)[0];
+    garrison = first === undefined ? null : units.get(first) ?? null;
+  }
   if (!garrison) {
     if (!pick) return;
     const p = pick;

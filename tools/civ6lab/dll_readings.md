@@ -12675,3 +12675,49 @@ same calls.
   keep none across a capture); a major's district repair outside the
   replay (the engines' Builder REPAIR order clears a district's pillage,
   `canPlaceDistrictIn` refuses a completed district's plot).
+
+## C-102 / C-99: the plot's unit list as an arrival stamp, the best defender's tie and Garrison City's standing unit — READ (0x75c50, 0x74f40 / 0x763b0 / 0x75280, 0x208b80 / 0x523d60, 0x810fd7..0x81101b), both twins
+
+`arrive` / `arriveAll` / `arrivalOrder` / `plotUnits` / `bestDefender`
+(cpu/core/units.ts), `cityGarrisons`, `garrisonCS` / `districtDamageLoss`
+(cpu/core/combat.ts), `AiView.plotFighters` (cpu/core/aiView.ts),
+`garrisonExecute` (cpu/core/operations/assault.ts); GPU `_arrive`,
+`_arrival_key`, `_best_defender` (gpu/core/sim_seats.py, through
+`_occ_set` / `_occ_set_new`), `_garrison_cs`, `_district_damage_loss`,
+`_city_garrisoned`, `_x_garrison` (gpu/core/sim_minorops.py); the importer
+`advanceHistory` / `importTurn` (cpu/harness/import.ts).
+
+- THE LIST AS A STAMP: the plot's list (0x75c50) is the units' arrival
+  order (placement appends 0x74f40 -> 0x76ae0, removal erases in place
+  0x763b0 -> 0x76a10, a layer change removes and appends 0x75280). The
+  engines give a unit the next stamp of a per-game counter where it is
+  placed on a plot it holds none on (a step, a formation's rider, an
+  advance, a retreat, a jump, a portal, an unstack), and always on a new
+  unit (a spawn, a capture's or a conversion's unit, an upgrade's); a unit
+  whose stamp names another plot sorts after the stamped ones. The replay
+  stamps the recorded actions as they land and each unit `syncUnits`
+  moves, in the order of its first logged step.
+- THE IMPORT: each unit's last placement row in the action log
+  (UnitAddedToMap, UnitMoved, UnitTeleported) before the record gives its
+  stamp, the row's number, where that row put it on the plot it stands
+  on; a unit no row placed is the earliest (0). An upgrade logs its new
+  unit's UnitAddedToMap (runs/h1_duelp1117 t24 524289, t90 786439).
+- THE BEST DEFENDER (0x208b80 with 0x523d60 over the list in order): the
+  holder's military unit not embarked of the greatest Combat and formation
+  strength, the earliest arrival on a tie; it is the garrison the centre's
+  strength, the damaged district's waiver and REQUIREMENT_CITY_HAS_GARRISON_UNIT
+  (0x24b170) read.
+- GARRISON CITY'S STANDING UNIT (0x810fd7..0x81101b): with no operation
+  unit on the city, the first unit of the plot's list whose formation class
+  (0x8bcd0) is LAND_COMBAT (0) or NAVAL (3) takes the garrison's branch;
+  no owner test (only the holder's units stand on its city).
+- CONFIRMED (one-seed check traces): runs/h1_duelp1117 Rome t20 city.defense
+  13.4296875 as the game's (the wounded Warrior 393220, there from row 3047
+  of t19, over the Warrior 655361 made there at row 3254; 23 by the units'
+  order); runs/h1_duelp1128 Rome t207-213 36 as the game's (27.40625 /
+  34.4375 by the units' order, 4 checks).
+- OPEN: runs/h1_duelp1117 t86 Antananarivo's Garrison City does not reach
+  the standing-unit pick on the game's terms: in ours the operation's
+  Catapult 1048580 (on 32:5 from t85) has left for 32:6 under Operation
+  Move before Garrison City's execution, so the branch finds only the
+  Catapult 1114113 made there that turn; which runs first is unread.

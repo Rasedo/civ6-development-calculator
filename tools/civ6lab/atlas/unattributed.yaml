@@ -681,11 +681,16 @@
     - recording: 1128
       turn: 251
       value: "A minor's   pass walks its military units alone, so the support half finds none (1128   t251: its Supply Convoy, alone beside the Spec Ops, ends its turn)."
-  impl: [gpu/core/sim_tactics.py:_tac_assign]
+  impl:
+    - gpu/core/sim_tactics.py:_tac_assign
+    - cpu/core/aiViewTypes.ts:AiView
+    - cpu/core/operations/assault.ts:garrisonExecute
+    - gpu/core/sim_minorops.py:end_moves
   readings:
     - "C-96: the city-states' tactical pass — READ (Wander Near City, Heal, the non-barbarian priorities, FindAlternateLocation), the families it needs PARTLY READ"
     - "C-95: the danger map and Move to Safety — READ, ported"
     - "C-125 / C-99: the attack assignment's stacking block is by formation class; a garrison on a defending district is no striker against a target not HIGH — READ (0x776140 at 0x776890..0x776909, 0x8bcd0, 0x775340 at 0x77541f..0x7754ab, 0x7784b0 at 0x7785ad, 0x61ddb0 at 0x61de20..0x61de2f), both twins"
+    - "C-102 / C-99: the plot's unit list as an arrival stamp, the best defender's tie and Garrison City's standing unit — READ (0x75c50, 0x74f40 / 0x763b0 / 0x75280, 0x208b80 / 0x523d60, 0x810fd7..0x81101b), both twins"
   context:
     - "...ac_support_formation`): per unit of the pass's list (+0x240), alive. GetFormationClass (0x8bcd0 -> 0xadd5e0, over the class's hash, ~CRC32 of its name): LAND_COMBAT 0, SUPPORT 1, CI..."
   review: reviewed
@@ -2449,14 +2454,21 @@
   semantics: "the best defender's comparator: no best yet, the candidate (true); else the candidate's combat strength (GetCombat 0x56dc90, no modifiers) strictly above the best's."
   status: READ
   cases:
+    - recording: h1_duelp1117
+      turn: 20
+      value: "Rome's centre: the wounded Warrior 393220 there from t19 (row 3047) over the Warrior 655361 made there t20 (row 3254), city.defense 13.4296875 as the game's"
     - recording: h1_duely1124
       turn: 136
       value: city-state 3's embarked Bombard 1638401 on 42:13 plans 41:13 (1/2) under player 1's Trader at sea and 42:12 (1/1) by it; t118 city-state 2's embarked Man-At-Arms 1114117 on 9:10 plans no 9:9 under player 1's embarked Builder (AI_Planning.csv)
     - recording: 1121
       turn: 191
       value: "Recorded: 1121 Guangzhou t191, a Line Infantry Corps (75,   16 HP) over an Ironclad (70, 75 HP): 66.6015625 = 60 + 75 − 2150/256 − 60   (the strongest-by-term reading gave 67.5)."
-  impl: [cpu/core/combat.ts:garrisonCS, cpu/core/combat.ts:bestDefender]
+  impl:
+    - cpu/core/combat.ts:garrisonCS
+    - cpu/core/units.ts:bestDefender
+    - gpu/core/sim_seats.py:_best_defender
   readings:
+    - "C-102 / C-99: the plot's unit list as an arrival stamp, the best defender's tie and Garrison City's standing unit — READ (0x75c50, 0x74f40 / 0x763b0 / 0x75280, 0x208b80 / 0x523d60, 0x810fd7..0x81101b), both twins"
     - "H-1: an annex re-places the citizens, the garrison's unit, a religious unit killed on a move — READ"
     - "C-99: an embarked unit passes no other player's passenger — the step's flag-1 test READ (0x2720a0 at 0x272372, 0x271be0, 0x586360 at 0x586542, 0x208b80 under 0x108, 0x20a2a0), both twins"
     - "C-99 / C-128: the swap's partner test and its step along its own path; Move Unit's update before the executions — READ (0x972540, 0x56e760, 0x972a50 -> 0x26fe20, 0x7d3a00 -> 0x7f0020), both twins"
