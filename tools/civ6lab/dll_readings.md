@@ -7274,6 +7274,8 @@ and the cap in `_step_verb` (gpu/core/sim_seats.py).
 
 ## C-124: the kept path is never taken; a move order's path passes other players' units out of sight — READ (0x272aa0, 0x2714b0, 0x586360 at 0x586542..0x5865a1, 0x26fe20), both twins
 
+WRONG IN PART: within one queue run (0x52f50) the kept-path flag is set and steps after the first walk the first search's path (0x272aa0 at 0x272bd7); see 'C-99: every pool search sets out on its own formation's value, a queue run walks its first search's path'.
+
 `Ground.pass` in `search`, `pathTo` and `walk` (cpu/core/tactical.ts);
 `_tac_enter(foes_seen=True)` in `_tac_search`, `_tac_move_to`'s destination
 mask and its walk's `foe_n` (gpu/core/sim_tactics.py).
@@ -9630,6 +9632,8 @@ gpu/core/sim_cityvalue.py `_cv_known`).
 
 ## C-99: a move order's search sets out on the pool finder's +0x1bc, the last full-Movement search's GetMaxMoves — READ (0x26f330, 0x77d10, 0x270d70, 0x26e920, 0x26eea0, 0x26dcd0, 0x26df90, 0x26e2c0, 0x26fe20 at 0x270309), unported
 
+WRONG IN PART: the pool's start callback 0x2715a0 (at 0x271909..0x271910) sets +0x1bc to the searching formation's own Movement +0x218 at every search, so no value carries from one search to the next; the rule in force is the section 'C-99: every pool search sets out on its own formation's value, a queue run walks its first search's path'.
+
 The engines' move order (`orderOnce` / `walk`, cpu/core/tactical.ts;
 `_tac_move_to`, gpu/core/sim_tactics.py) searches once on the unit's
 Movement left and walks the path's first turn. The game:
@@ -9715,6 +9719,8 @@ the replay's copy for a route's boost), `minorPhase`'s `detectBoosts` after
   0x5f4530, the submission 0x60bb50 or the research AI's listener 0x7635c0.
 
 ## C-99: when the pool finder's +0x1bc is written — the danger map at DoTurn, the planning at the AI turn's start, nothing inside a pass — READ (0x46cdd0, 0x717460, 0x6096c0, 0x792c90, 0x7921a0, 0x790890, 0x47ffb0), unported
+
+WRONG IN PART: +0x1bc has the second writer 0x2715a0, run at every search's start; the rule in force is the section 'C-99: every pool search sets out on its own formation's value, a queue run walks its first search's path'.
 
 The start Movement of a move order (the section above) changes only where a
 full-Movement search runs, and those run at four places:
@@ -11409,3 +11415,49 @@ cpu/core/cityStates.ts keeps it). GPU `_cv_yields_seen`
   recorded case.
 - OPEN: a major's list's order is the city-states' then the cities' seat
   order, not its knowledge base's stored order.
+
+## C-99: every pool search sets out on its own formation's value, a queue run walks its first search's path — READ (0x2715a0 at 0x271909..0x271910, 0x77d10 at 0x77d8b..0x77db0 / 0x77f0b / 0x78007 / 0x7805d, 0x52f50 at 0x52f9e / 0x52fce / 0x53394, 0x265fd0, 0x272aa0 at 0x272ad7..0x272c24, 0x26e3a0), the engines' model
+
+`search`'s `startMoves`, `orderOnce`, `walk`, `withShortOrders`
+(cpu/core/tactical.ts); GPU `_tac_search`'s start, `_tac_move_to`,
+`_tac_with_short` (gpu/core/sim_tactics.py). No engine change: the
+engines already search once per order run on the Movement left.
+
+- THE START: GeneratePath (0x77d10) calls the instance's start callback
+  (+0xa0 / +0xa8, 0x77d8b..0x77db0) first, every search. The pool's
+  (0x26f330) is 0x2715a0, which sets the finder's +0x1bc (r14 + 0x3c,
+  0x271909..0x271910; r14 = finder + 0x180) to the formation's Movement
+  +0x218 (the least its members hold, the refresh 0x267650) and clears the
+  step cost's pair cache +0x1c0 / +0x1c8 (0x2718f1 / 0x2718f5). The
+  full-Movement searches' callback 0x26eea0 calls 0x2715a0, then sets
+  +0x1bc to GetMaxMoves << 8. So a move order's, HL Explore's and every
+  reach's search sets out on the formation's Movement left, the
+  planning's and the danger map's on GetMaxMoves; no value carries from one
+  search to the next, whoever's.
+- THE START NODE is cleared (0x77f0b..0x77f2c) and told the open
+  notification (+0x78, 0x78007) before its pricing (+0x68, 0x7805d): its
+  Movement 0 there, it opens no turn-end node.
+- THE QUEUE RUN (0x52f50) clears the formation's kept path at its entry
+  (0x265fd0 at 0x52f9e: the path +0x638 emptied, the goal +0x6a8 -9999) and
+  holds the kept-path flag (the tracked bool +0x580, value +0x5d8) from
+  0x52fce to 0x53394. Inside a run the steps after the first take the kept
+  path unsearched (0x272aa0 at 0x272bd7), searching afresh only where the
+  goal was out of sight at the search and is seen now (0x272af9..0x272b95)
+  or the next node was the path's first out of sight (0x26e3a0's bit 1;
+  0x272bc4..0x272c24, to the node ending turn 1, 0x782d0). The walk
+  0x26fe20 pops the node it left (0x272d20). Every run, the carried ones
+  too, emits its UnitOperationSegmentComplete from 0x52f50 alone (0x53319).
+- Confirmed: runs/h1_duelr1117 t18 the barbarian Galley 720906 25:6 ->
+  25:3 on its own 3 Movement (the last planned barbarian a 2-Movement
+  Warrior); t33 29:14 -> 28:14 -> 27:14 in one run, its path's next node
+  26:15 a second turn's.
+- Open (C-99): a carried run's hold. runs/h1_duelr1121 t88 city-state 4's
+  Man-At-Arms 1048577 (Wander Back to City for 32:21) steps 42:21 -> 43:22
+  and its second run (a second UnitOperationSegmentComplete, no UnitMoved)
+  holds on 43:22 with 1 Movement, where the engines' fresh search on 1
+  steps back to 42:21 for a northern route: the game's search from there
+  keeps the southern one (42:23 a second turn's). 1117 t33 the Galley
+  720906 has no second run: HL End Turn's operation (745019656) starts
+  after its one segment, where the engines carry its order on and step
+  back to 28:14; 1117 t12 the Scout 524295 (HL Explore tertiary) walks on
+  11:21, then 12:20 after the other units' runs, one segment in all.

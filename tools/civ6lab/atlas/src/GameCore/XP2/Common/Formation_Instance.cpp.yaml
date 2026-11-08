@@ -98,6 +98,20 @@
   context:
     - ".... How the cost's \"spend everything\" leaves the Movement is unread (the walk's deduction 0x265d80 of [rsp+0x60]). The engines: a walk halts on a plot of an enemy's zone with its Movemen..."
   review: imported
+- addr: 0x265fd0
+  final: 0x1a3890
+  kind: function
+  name: the formation's kept path cleared
+  semantics: the formation's kept path (the tracked vector +0x5e0, its value +0x638) emptied (count +0x10 0) and its goal (+0x650's value +0x6a8 / +0x6ac) set to -9999, -9999; called at each operation-queue run's entry (0x52f50 at 0x52f9e), by the walk 0x26fe20 where its step is refused or ends its path, and by 0x2726b0 where the goal takes no member
+  status: READ
+  cases:
+    - recording: h1_duelr1117
+      turn: 33
+      value: "the Galley 720906 for 21:17: 29:14 -> 28:14 -> 27:14 in one queue run (two UnitMoved, then its segment waits on its path's next node 26:15, a second turn's), one search from 29:14 on 3 Movement"
+  impl: [cpu/core/tactical.ts:orderOnce, gpu/core/sim_tactics.py:_tac_move_to]
+  readings:
+    - "C-99: every pool search sets out on its own formation's value, a queue run walks its first search's path — READ (0x2715a0 at 0x271909..0x271910, 0x77d10 at 0x77d8b..0x77db0 / 0x77f0b / 0x78007 / 0x7805d, 0x52f50 at 0x52f9e / 0x52fce / 0x53394, 0x265fd0, 0x272aa0 at 0x272ad7..0x272c24, 0x26e3a0), the engines' model"
+  review: reviewed
 - addr: 0x266220
   final: 0x1a3ae0
   kind: function
@@ -340,4 +354,5 @@
     - "C-123: a formation's Movement and its path's stacking — READ (0x2673f0, 0x267650, 0x262cd0, 0x585eb0 in the path validity), both twins"
     - "C-95: a formation stands where each member may, a path's destination placed, CanEmbark by the type's technology — READ (0x586900, 0x586360 at 0x58640c..0x586494, 0x267650 at 0x2677e0..0x2677f7, 0x2714b0, 0x272880, 0x4ee3f0 at 0x4ee4e1..0x4ee548), both twins"
     - "C-95: the barbarians' candidates before the look, a capture's rally, a formation's embark flag and fighter — READ (0x722d70, 0x746920, 0x747230, 0x7877e0, 0x7265b0, 0x747fa0, 0x73e610, 0x73e870, 0x267650), both twins"
+    - "C-99: every pool search sets out on its own formation's value, a queue run walks its first search's path — READ (0x2715a0 at 0x271909..0x271910, 0x77d10 at 0x77d8b..0x77db0 / 0x77f0b / 0x78007 / 0x7805d, 0x52f50 at 0x52f9e / 0x52fce / 0x53394, 0x265fd0, 0x272aa0 at 0x272ad7..0x272c24, 0x26e3a0), the engines' model"
   review: reviewed

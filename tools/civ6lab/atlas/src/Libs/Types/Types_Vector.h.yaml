@@ -25,6 +25,15 @@
   context:
     - "...x P + W x P / r^2, r one less per running competition it ranks in the top quarter of, 0x25d5f0); PLAYER_GRIEVANCE_GENERATION 0x6c3bc0 (on itself gaining: its grievances x Amount / 10..."
   review: reviewed
+- addr: 0x272d20
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-99: every pool search sets out on its own formation's value, a queue run walks its first search's path — READ (0x2715a0 at 0x271909..0x271910, 0x77d10 at 0x77d8b..0x77db0 / 0x77f0b / 0x78007 / 0x7805d, 0x52f50 at 0x52f9e / 0x52fce / 0x53394, 0x265fd0, 0x272aa0 at 0x272ad7..0x272c24, 0x26e3a0), the engines' model"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - ...0x272c24, to the node ending turn 1, 0x782d0). The walk 0x26fe20 pops the node it left (0x272d20). Every run, the carried ones too, emits its UnitOperationSegmentComplete from 0x52f50...
+  review: imported
 - addr: 0x273a40
   final: 0x1ab5c0
   kind: function
