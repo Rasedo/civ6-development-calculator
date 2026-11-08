@@ -2263,8 +2263,9 @@ class SimTactics:
                         spot = first_in_reach(row, ok)
                         # with none, the first plot of the target's ring at
                         # its range (1 at least; 0x6b1b0 -> 0x691f0) with a
-                        # path under flags 0 (0x272a60 from 0x76ecf0: none its
-                        # own stacking unit holds) (`strike`)
+                        # path under flags 0 (0x272a60 from 0x76ecf0: the
+                        # search's stop on a destination at its stacking
+                        # limit) (`strike`)
                         fb = far & (spot < 0)
                         if bool(fb.count_nonzero()):
                             R = urng.clamp(min=1, max=3)
@@ -2272,7 +2273,6 @@ class SimTactics:
                             jr = torch.arange(ring.shape[1], device=dev).unsqueeze(0)
                             inr = ((jr >= (1 + 3 * R * (R - 1)).unsqueeze(1)) & (jr < (1 + 3 * R * (R + 1)).unsqueeze(1))
                                    & (ring >= 0))
-                            inr = inr & ~self._tac_stacked_other(u_b).gather(1, ring.clamp(min=0))
                             ring_p = torch.full_like(spot, -1)
                             for jj in range(ring.shape[1]):
                                 need = fb & (ring_p < 0) & inr[:, jj]

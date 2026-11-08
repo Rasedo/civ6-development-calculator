@@ -788,9 +788,9 @@ export function reachPlots(state: GameState, unit: Unit, maxTurns: number): Reac
  *  unit stands; stopped once `dest` closes, or with none where `dest` at
  *  its stacking limit is linked within the first turn); 0 where it cannot. With no
  *  `laterTurns` (the path's flags 0) no turn of it ends where its own
- *  stacking unit stands, `dest` the last turn's end. */
+ *  stacking unit stands, and `dest` at its stacking limit linked at any
+ *  turn is none. */
 export function turnsToPlot(state: GameState, unit: Unit, dest: number, laterTurns = true): number {
-  if (!laterTurns && dest !== unit.tileIndex && stackedOther(state, unit, dest)) return 0;
   let turns = 0;
   search(state, unit, Infinity, true, (n, ground) => {
     if (n.tile !== dest) return false;
