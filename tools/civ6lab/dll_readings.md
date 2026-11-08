@@ -10020,3 +10020,41 @@ values (`minorResearchTurn`, cpu/core/minorBuild.ts); `_MinorFacts.updated` /
   every row exact.
 - OPEN: the forecast's writer (CityBuildAI +0x6c8 / +0x738 / +0x7a8,
   0x5cb570) and its call in the update unread.
+
+## C-129: the recruit's minimums leave the offer, the strength counts the list as listed — READ (0x73be10 at 0x73c63e..0x73c77b, 0x73c7c0, 0x7383d0, 0x8fd8f0), both twins; the replay's upgrade a new id
+
+`recruitMinimums`, `recruitStrength`, `recruitOperation`
+(cpu/core/operations/recruit.ts); `_mops_recruit_team`
+(gpu/core/sim_minorops.py); the replay's upgrade (cpu/harness/replay.ts).
+
+- ONE LIST PER TEAM (0x7383d0's [rbp-0x39]): the minimums (0x73be10) append
+  per requirement, a unit two requirements take standing in it twice; then
+  each entry is erased from the team's offer and logged "Recruiting
+  minimums". The strength (0x73c7c0) runs only where the target is above 0
+  and the offer left is not empty; its current strength is the members'
+  plus every entry's (a unit listed twice counted twice), its MaxPercentage
+  test over members + entries + 1; it appends its picks (nearest team goal
+  0, the first of equals; a hero's type, 0x8fd8f0 over the heroes' table,
+  taken over any other, the last of them — none in these games) and logs
+  "Recruiting strength" for EVERY entry of the list, the minimums' among
+  them. The units join (0x737f90) in the list's order, once each.
+  runs/h1_duely1128 t121 city-state 3's Attack Barb Camp: minimums WARRIOR,
+  WARRIOR (1835016 twice, COMBAT and MELEE), the second Warrior 1900551 at
+  40 + 20, the Man-at-Arms 983040 to 105 of 99, logged WARRIOR x3,
+  MAN_AT_ARMS, "3 units" — the trace's lines now as logged.
+- THE TEAM'S GOAL 0 at the recruit is team +0xe8, written only by 0x73e7d0
+  (the op's rally +0x318) and the switch to the backup 0x73e870 (the target
+  struct's +0x2b0; from 0x73eb60 where op +0x450 is set, Change Target,
+  Operation Move's Leader Tag arm). runs/h1_duely1128 t121: the in-progress
+  recruit (node 15) takes the Man-at-Arms 1572868 (3:3) over 1179650 (2:4)
+  — the team's goal 0 stands on 4:4 at the end look (the op's rally 4:9
+  untouched), distance 1 against 2; at 4:9 1179650 is the nearer (5 to 6).
+  No offer check excludes 1179650: its turn is not done (Move to safety
+  after), its type not obsolete.
+- THE REPLAY'S UPGRADE: the game's upgraded unit is a new unit with the next
+  serial (runs/h1_duely1128 t87 city-state 3's Warrior 655367 -> Man-at-Arms
+  1179650, serial 18, after 983040's 15); the replay gives it the next
+  engine id, so the recruit's id order follows the game's.
+- OPEN: which writer moves 1128 t121's goal 0 to 4:4 within the turn; the
+  engine's upgrade verbs (`minorUpgradeUnit`, `upgradeUnit`, both twins)
+  keep the unit's id and pool slot.

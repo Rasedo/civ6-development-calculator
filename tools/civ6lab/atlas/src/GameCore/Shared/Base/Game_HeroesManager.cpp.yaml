@@ -3,6 +3,18 @@
 # `review: imported` = bootstrapped from dll_readings.md / code comments / saved
 # labels and not yet reviewed: verify against the disassembly, then edit and
 # set `review: reviewed`.
+- addr: 0x8fd8f0
+  final: 0x635570
+  kind: function
+  name: the hero of a unit type
+  semantics: "(unit type index): the heroes' table (0xad59f0) walked, the first entry whose unit row (+0x90) has the type (+0x14) answers its index (+0x14), else -1. The recruit's strength (0x73c7c0) prefers a hero's type."
+  status: PARTLY
+  readings:
+    - "C-129: the recruit's minimums leave the offer, the strength counts the list as listed — READ (0x73be10 at 0x73c63e..0x73c77b, 0x73c7c0, 0x7383d0, 0x8fd8f0), both twins; the replay's upgrade a new id"
+  context:
+    - "...gth counts the list as listed — READ (0x73be10 at 0x73c63e..0x73c77b, 0x73c7c0, 0x7383d0, 0x8fd8f0), both twins; the replay's upgrade a new id"
+    - "...ies + 1; it appends its picks (nearest team goal 0, the first of equals; a hero's type, 0x8fd8f0 over the heroes' table, taken over any other, the last of them — none in these games) a..."
+  review: imported
 - addr: 0x8ffac0
   kind: function
   semantics: a hero made (raises the best strengths through 0x4c1a30).

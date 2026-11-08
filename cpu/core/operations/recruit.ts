@@ -3,13 +3,14 @@
  * 0x73be10, the strength 0x73c7c0; the reading is tools/civ6lab/dll_readings.md
  * "C-97: the operations").
  *
- * The player's free units (in no operation, alive), in its unit order, are
- * offered to each team in turn; a team takes from them first its
- * requirements' minimums, then, where its minimums are met or the recruit
- * goes on an operation already in progress, the strength its target asks:
- * the enemy strength about the target and the team's strength advantage
- * times the smaller of the two players' best combat strengths. The units a
- * team takes leave the offer.
+ * The player's free units (in no operation, alive), in unit id order, are
+ * offered to each team in turn. A team's offer is cut to the units within
+ * its Recruit Range of its goal; the team takes from it first its requirements' minimums, which leave the
+ * offer, then, where its minimums are met or the recruit goes on an
+ * operation already in progress, from what is left the strength its target
+ * asks: the enemy strength about the target and the team's strength
+ * advantage times the smaller of the two players' best combat strengths.
+ * The units a team takes leave the player's offer.
  */
 import { NO_PLOT, addMember, hasAiType, teamDef, teamList, teamReqs, unitStrength, type Operation, type OpTeam } from './operation';
 import type { AiUnitView, AiView } from '../aiViewTypes';
@@ -39,10 +40,10 @@ function passesOthers(team: OpTeam, unitType: string, skip: number, extra: numbe
  *  its MinPercentage of the members) takes, of the offered units carrying its
  *  AI type that break no other requirement's maximum, all where they do not
  *  exceed the shortfall, else the shortfall's count nearest the team's rally
- *  (the first of equals). Returns whether every minimum could be met and the
- *  units taken, in the order taken (a unit may be taken for two
- *  requirements; it joins once). */
-export function recruitMinimums(view: AiView, team: OpTeam, offer: readonly AiUnitView[], log: RecruitLog | null, opName: string): { met: boolean; taken: AiUnitView[] } {
+ *  (the first of equals). A unit two requirements take stands in the list
+ *  twice. Then each listed unit leaves the offer and is logged. Returns
+ *  whether every minimum could be met and the list. */
+export function recruitMinimums(view: AiView, team: OpTeam, offer: AiUnitView[], log: RecruitLog | null, opName: string): { met: boolean; taken: AiUnitView[] } {
   if (offer.length === 0) return { met: team.ready, taken: [] };
   let met = true;
   const out: AiUnitView[] = [];
@@ -78,27 +79,34 @@ export function recruitMinimums(view: AiView, team: OpTeam, offer: readonly AiUn
     }
   });
   if (out.length === 0) log?.(`${opName}, No recruits to reach minimum, , , `);
-  for (const u of out) log?.(`${opName}, Recruiting minimums, , , ${u.type}`);
+  for (const u of out) {
+    const k = offer.indexOf(u);
+    if (k >= 0) offer.splice(k, 1);
+    log?.(`${opName}, Recruiting minimums, , , ${u.type}`);
+  }
   return { met, taken: out };
 }
 
-/** The strength (0x73c7c0): while the team's strength (its members' and the
- *  units taken so far) is below the enemy strength plus the desired, the
- *  offered unit that fits a requirement and breaks no maximum — of those
- *  the last whose type has a build entry, else the nearest the rally —
- *  joins. Returns whether the strength was reached and the units taken. */
-export function recruitStrength(view: AiView, team: OpTeam, offer: readonly AiUnitView[], taken: readonly AiUnitView[],
+/** The strength (0x73c7c0): with a target above 0 and an offer left, while
+ *  the team's strength (its members' and every entry of the list so far,
+ *  a unit listed twice counted twice) is below the enemy strength plus the
+ *  desired, the offered unit that fits a requirement and breaks no maximum,
+ *  the nearest the team's goal (the first of equals), joins the list. Then
+ *  each entry of the whole list leaves the offer and is logged. Returns
+ *  whether the strength was reached and the list. */
+export function recruitStrength(view: AiView, team: OpTeam, offer: AiUnitView[], taken: readonly AiUnitView[],
   enemyStrength: number, desired: number, log: RecruitLog | null, opName: string,
   units: ReadonlyMap<number, AiUnitView>): { reached: boolean; taken: AiUnitView[] } {
   const target = enemyStrength + desired;
-  if (target <= 0 || offer.length === 0) return { reached: true, taken: [] };
+  const out = [...taken];
+  if (target <= 0 || offer.length === 0) return { reached: true, taken: out };
   let current = 0;
   for (const id of teamList(team)) {
     const u = units.get(id);
     if (u) current += unitStrength(u);
   }
-  for (const u of taken) current += unitStrength(u);
-  const extra = taken.length;
+  for (const u of out) current += unitStrength(u);
+  const listed = out.length;
   const eligible = offer.filter((u) => {
     let matched = false;
     const reqs = teamReqs(team);
@@ -106,19 +114,18 @@ export function recruitStrength(view: AiView, team: OpTeam, offer: readonly AiUn
       const r = reqs[j];
       if (hasAiType(u.type, r.aiType)) {
         if (r.max !== null && r.max >= 0 && team.counts[j] >= r.max) return false;
-        if (r.maxPercentage >= 0 && team.counts[j] + 1 > (teamList(team).length + extra + 1) * r.maxPercentage) return false;
+        if (r.maxPercentage >= 0 && team.counts[j] + 1 > (teamList(team).length + listed + 1) * r.maxPercentage) return false;
         matched = true;
       } else if (r.minPercentage > 0 && r.minPercentage === 1) return false;
     }
     return matched;
   });
-  const out: AiUnitView[] = [];
-  const rally = team.goals[0];
+  const goal = team.goals[0];
   while (current < Math.trunc(target) && eligible.length) {
     let best = 0;
     let bestD = -1;
     eligible.forEach((u, k) => {
-      const d = rally === NO_PLOT ? 0 : view.plotDistance(u.plot, rally);
+      const d = goal === NO_PLOT ? 0 : view.plotDistance(u.plot, goal);
       if (bestD < 0 || d < bestD) {
         best = k;
         bestD = d;
@@ -131,7 +138,11 @@ export function recruitStrength(view: AiView, team: OpTeam, offer: readonly AiUn
   }
   const strLine = `Enemy Str: ${Math.trunc(enemyStrength)} / ${desired.toFixed(1)}`;
   if (out.length === 0) log?.(`${opName}, No recruits to match strength, , ${strLine}, `);
-  for (const u of out) log?.(`${opName}, Recruiting strength, , ${strLine}, ${u.type}`);
+  for (const u of out) {
+    const k = offer.indexOf(u);
+    if (k >= 0) offer.splice(k, 1);
+    log?.(`${opName}, Recruiting strength, , ${strLine}, ${u.type}`);
+  }
   return { reached: current >= Math.trunc(target), taken: out };
 }
 
@@ -148,17 +159,18 @@ export function desiredStrength(view: AiView, seat: number, enemy: number, advan
 
 /** One recruit (0x738050): the offer sorted by unit id (0x733060 over unit
  *  +0x100, ascending: the order the units were made), then each team takes
- *  from it (0x7383d0: cut to its Recruit Range, then of the units obsolete
- *  to the player), its minimums then its strength; the units taken join it and leave
- *  the offer. Returns every unit recruited. */
+ *  from it (0x7383d0): its offer cut to its Recruit Range of its goal (the
+ *  target in progress, else the rally: 0x732e50), then of the units
+ *  obsolete to the player (0x732db0), its minimums then its strength; the
+ *  units taken join it in the list's order and leave the offer. Returns
+ *  every unit recruited. */
 export function recruitOperation(view: AiView, seat: number, op: Operation, offer: AiUnitView[], inProgress: boolean, range: number,
   units: ReadonlyMap<number, AiUnitView>, log: RecruitLog | null): AiUnitView[] {
   offer.sort((a, b) => a.id - b.id);
   const all: AiUnitView[] = [];
   for (const team of op.teams) {
-    let pool = offer;
     const goal = inProgress ? team.goals[1] : team.goals[0];
-    if (range > 0 && goal !== NO_PLOT) pool = pool.filter((u) => view.plotDistance(u.plot, goal) <= range);
+    let pool = offer.filter((u) => range <= 0 || goal === NO_PLOT || view.plotDistance(u.plot, goal) <= range);
     // the obsolete cut (0x732db0 under the team's player, +0x0, which the
     // operation's start writes for every team: 0x73a7d9): a unit whose type
     // is obsolete to the player is offered to no team (runs/h1_duely1128
@@ -167,20 +179,15 @@ export function recruitOperation(view: AiView, seat: number, op: Operation, offe
     // the five duely duels an obsolete unit, 0 of 1406)
     pool = pool.filter((u) => !u.obsolete);
     const mins = recruitMinimums(view, team, pool, log, op.def);
-    let taken = dedupe(mins.taken);
+    let taken = mins.taken;
     if (mins.met || inProgress) {
       const t = teamDef(op, team);
       const adv = inProgress ? t.ongoingStrengthAdvantage : t.initialStrengthAdvantage;
       const desired = desiredStrength(view, seat, op.enemy, adv, op.enemyStrength);
-      // the strength's offer is the team's whole, the units the minimums
-      // took among them (runs/h1_duely1127 t68: city-state 3's one Galley,
-      // "Recruiting minimums" then "Recruiting strength"; 165 of the five
-      // duely duels' 332 minimums lines followed so, none by "No recruits to
-      // match strength")
-      const str = recruitStrength(view, team, pool, taken, op.enemyStrength, desired, log, op.def, units);
-      taken = dedupe([...taken, ...str.taken]);
+      taken = recruitStrength(view, team, pool, taken, op.enemyStrength, desired, log, op.def, units).taken;
     }
     for (const u of taken) {
+      if (all.includes(u)) continue;
       addMember(team, u);
       all.push(u);
       const k = offer.indexOf(u);
@@ -189,5 +196,3 @@ export function recruitOperation(view: AiView, seat: number, op: Operation, offe
   }
   return all;
 }
-
-const dedupe = (us: readonly AiUnitView[]): AiUnitView[] => us.filter((u, i) => us.indexOf(u) === i);

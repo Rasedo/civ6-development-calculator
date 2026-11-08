@@ -1888,7 +1888,8 @@ class SimMinorOps:
                     seq, n_out = self._mops_seq_append(seq, n_out, picked, take_n)
                 taken = self._mops_dedupe(seq)
                 # THE STRENGTH, where the minimums were met or the recruit goes
-                # on an operation in progress
+                # on an operation in progress: the minimums' list (a unit two
+                # requirements took in it twice) left the offer
                 if in_prog:
                     go = gg.clone()
                 else:
@@ -1901,13 +1902,14 @@ class SimMinorOps:
                     desired = adv * ours.to(torch.float64)
                 tgt = estr.to(torch.float64) + desired
                 in_taken = (offer.unsqueeze(2) == taken.unsqueeze(1)).any(dim=2) & valid
-                # the strength's offer is the team's whole, the minimums'
-                # units among them
-                rest = valid
+                rest = valid & ~in_taken
                 go &= (tgt > 0) & rest.any(dim=1)
                 if bool(go.any()):
-                    ntak = (taken >= 0).sum(dim=1)
-                    cur = cur_mem + torch.where(in_taken, ostr, torch.zeros_like(ostr)).sum(dim=1)
+                    # the list's entries counted each time listed
+                    ntak = n_out
+                    sq = seq >= 0
+                    sstr = ustr.gather(1, seq.clamp(min=0))
+                    cur = cur_mem + torch.where(sq, sstr, torch.zeros_like(sstr)).sum(dim=1)
                     elig = rest.clone()
                     matched = torch.zeros(B, L, dtype=torch.bool, device=dev)
                     for j in range(R):
@@ -1941,7 +1943,7 @@ class SimMinorOps:
                     picked = picked.gather(1, o4)
                     ns = take.sum(dim=1)
                     seq2 = torch.full((B, Q), -1, dtype=torch.long, device=dev)
-                    seq2, n2 = self._mops_seq_append(seq2, torch.zeros_like(ns), taken[:, :min(Q, taken.shape[1])], ntak)
+                    seq2, n2 = self._mops_seq_append(seq2, torch.zeros_like(ns), seq, ntak)
                     seq2, n2 = self._mops_seq_append(seq2, n2, picked, ns)
                     taken = torch.where(go.unsqueeze(1), self._mops_dedupe(seq2), taken)
                 # the units taken join, in order

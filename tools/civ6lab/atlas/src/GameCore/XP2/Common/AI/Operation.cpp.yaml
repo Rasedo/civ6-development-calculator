@@ -80,9 +80,21 @@
     - gpu/core/sim_minorops.py:_mops_recruit_team
     - gpu/core/sim_minorops.py:_mops_units
     - cpu/core/operations/recruit.ts:all
+    - cpu/core/operations/recruit.ts:pool
   readings:
     - "C-130 / C-129: the recruit's obsolete cut under the team's player; the government values' housing on the forecast of the city as its update read it — READ (0x7383d0 at 0x7384c0..0x7384ed, 0x732db0, 0x7325a0, 0x538460, 0x73a5e0 at 0x73a7d9), a fit (the forecast), both twins"
     - "C-129 / C-99: the known cities refresh at every look over revealed centres; the recruit's offer sorted by unit id — READ (0x7877e0 at 0x787c38..0x787ca7, 0x5f0280, 0x5f0490 -> 0x5eff10, 0x5ef9a0, 0x733060 -> 0x7328d0), both twins; the replay's majors' districts"
+  review: reviewed
+- addr: 0x732e50
+  kind: function
+  name: the recruit offer's range cut
+  semantics: "from 0x7383d0 where the node's Recruit Range is above 0: remove_if over the offer, a unit farther than the range from the team's goal (+0xf0 in progress, else +0xe8) leaves."
+  status: PARTLY
+  impl:
+    - cpu/core/operations/recruit.ts:recruitOperation
+    - gpu/core/sim_minorops.py:_mops_recruit_team
+  readings:
+    - "C-129: the recruit's minimums leave the offer, the strength counts the list as listed — READ (0x73be10 at 0x73c63e..0x73c77b, 0x73c7c0, 0x7383d0, 0x8fd8f0), both twins; the replay's upgrade a new id"
   review: reviewed
 - addr: 0x733060
   kind: function
@@ -158,6 +170,7 @@
   impl: [cpu/core/operations/operation.ts:addMember]
   readings:
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
+    - "C-129: the recruit's minimums leave the offer, the strength counts the list as listed — READ (0x73be10 at 0x73c63e..0x73c77b, 0x73c7c0, 0x7383d0, 0x8fd8f0), both twins; the replay's upgrade a new id"
   notes: ["imported: cited by the code, in no dll_readings section"]
   review: reviewed
 - addr: 0x738050
@@ -196,6 +209,7 @@
   readings:
     - "C-130 / C-129: the recruit's obsolete cut under the team's player; the government values' housing on the forecast of the city as its update read it — READ (0x7383d0 at 0x7384c0..0x7384ed, 0x732db0, 0x7325a0, 0x538460, 0x73a5e0 at 0x73a7d9), a fit (the forecast), both twins"
     - "C-129 / C-99: the known cities refresh at every look over revealed centres; the recruit's offer sorted by unit id — READ (0x7877e0 at 0x787c38..0x787ca7, 0x5f0280, 0x5f0490 -> 0x5eff10, 0x5ef9a0, 0x733060 -> 0x7328d0), both twins; the replay's majors' districts"
+    - "C-129: the recruit's minimums leave the offer, the strength counts the list as listed — READ (0x73be10 at 0x73c63e..0x73c77b, 0x73c7c0, 0x7383d0, 0x8fd8f0), both twins; the replay's upgrade a new id"
   review: reviewed
 - addr: 0x738f20
   kind: function
@@ -440,22 +454,36 @@
   review: reviewed
 - addr: 0x73be10
   kind: function
-  status: PARTLY
+  name: the recruit's minimums
+  semantics: "per requirement short of its MinNumber (or MinPercentage of the members) the offered units carrying its AI type within the other requirements' maxima: all where no more than the shortfall, else the shortfall's count nearest the team's goal 0 (+0xe8), the first of equals, appended to the list (a unit two requirements take listed twice). Then per list entry (0x73c63e..0x73c77b): found in the offer and erased, and logged Recruiting minimums (an entry listed twice logged twice); No recruits to reach minimum where the list is empty. Returns every minimum met."
+  status: READ
+  cases:
+    - recording: h1_duely1128
+      turn: 121
+      value: "city-state 3's Attack Barb Camp: minimums UNIT_WARRIOR twice, then Recruiting strength WARRIOR x3, MAN_AT_ARMS (the list's two entries, the second Warrior, the Man-at-Arms 983040), 3 units"
   impl:
-    - cpu/core/operations/recruit.ts:passesOthers
     - cpu/core/operations/recruit.ts:passesOthers
     - cpu/core/operations/recruit.ts:recruitMinimums
-  notes: ["imported: cited by the code, in no dll_readings section"]
-  review: imported
+    - gpu/core/sim_minorops.py:_mops_recruit_team
+  readings:
+    - "C-129: the recruit's minimums leave the offer, the strength counts the list as listed — READ (0x73be10 at 0x73c63e..0x73c77b, 0x73c7c0, 0x7383d0, 0x8fd8f0), both twins; the replay's upgrade a new id"
+  review: reviewed
 - addr: 0x73c7c0
   kind: function
-  status: PARTLY
+  name: the recruit's strength
+  semantics: "where the target (enemy + desired, fixed point) is above 0 and the offer (after the minimums' erasures) not empty: the current strength the members' (0x4f2310, max of GetCombat 0x56dc90 and GetRangedCombat 0x56e3e0) plus every list entry's (an entry listed twice counted twice); the eligible offer (a requirement it carries, none's MaxNumber reached, MaxPercentage over members + list + 1, MinPercentage 1 barring the rest); while below the target the pick: a hero's type (0x8fd8f0 not -1) taken over any other, the last of them; else the nearest team goal 0 (+0xe8), the first of equals; appended to the list and out of the eligible. Then per list entry: erased from the offer, logged Recruiting strength; No recruits to match strength where the list is empty. Returns the strength reached."
+  status: READ
+  cases:
+    - recording: h1_duely1128
+      turn: 121
+      value: "city-state 3's Attack Barb Camp: the two minimum Warriors' entries 40, the second Warrior 60, the Man-at-Arms 983040 105 of 99"
   impl:
-    - cpu/core/operations/recruit.ts:passesOthers
-    - cpu/core/operations/operation.ts:unitStrength
     - cpu/core/operations/recruit.ts:recruitStrength
-  notes: ["imported: cited by the code, in no dll_readings section"]
-  review: imported
+    - cpu/core/operations/operation.ts:unitStrength
+    - gpu/core/sim_minorops.py:_mops_recruit_team
+  readings:
+    - "C-129: the recruit's minimums leave the offer, the strength counts the list as listed — READ (0x73be10 at 0x73c63e..0x73c77b, 0x73c7c0, 0x7383d0, 0x8fd8f0), both twins; the replay's upgrade a new id"
+  review: reviewed
 - addr: 0x73d1f0
   final: 0x4e09f0
   kind: function
@@ -527,6 +555,7 @@
     - "C-60: the Free Cities Raid — READ (the start 0x274ea0, the record 0x277470, the signals 0x276d90 / 0x276e70 / 0x276ff0, the record's clear in 0x274010), the signal 0x276a40's event unread, ported"
     - "C-60: the Free Cities Raid"
     - "C-99: an operation's start takes its strengths; a unit's AI strengths with its formation — READ (0x73a120, 0x56dc90, 0x56e3e0, 0x56daa0, 0x1497d0), both twins"
+    - "C-129: the recruit's minimums leave the offer, the strength counts the list as listed — READ (0x73be10 at 0x73c63e..0x73c77b, 0x73c7c0, 0x7383d0, 0x8fd8f0), both twins; the replay's upgrade a new id"
   notes: ["imported: cited by the code, in no dll_readings section"]
   review: reviewed
 - addr: 0x73e870
@@ -543,6 +572,7 @@
     - "C-97: the operations — the manager READ (no-enemy candidates), the war candidates unread"
     - "C-97: the operations — the manager and its candidates READ, the staging list and City Defense's start unread"
     - "C-95: the barbarians' candidates before the look, a capture's rally, a formation's embark flag and fighter — READ (0x722d70, 0x746920, 0x747230, 0x7877e0, 0x7265b0, 0x747fa0, 0x73e610, 0x73e870, 0x267650), both twins"
+    - "C-129: the recruit's minimums leave the offer, the strength counts the list as listed — READ (0x73be10 at 0x73c63e..0x73c77b, 0x73c7c0, 0x7383d0, 0x8fd8f0), both twins; the replay's upgrade a new id"
   context:
     - ...ate is weighed again for the new operation (0x747fa0, vt +8) and switched to (0x73e610, 0x73e870).
   review: reviewed
@@ -595,6 +625,7 @@
     - "C-99: an operation's start takes its strengths; a unit's AI strengths with its formation — READ (0x73a120, 0x56dc90, 0x56e3e0, 0x56daa0, 0x1497d0), both twins"
     - "C-128: the army records' formation in the army strength; a capture's start before the end look — READ (0x5eadb0 at 0x5eaf79), both twins"
     - "C-99 / C-129: the military AI's job refreshes the operations before its upgrade; Recruit Units updates the teams only on a changed count — READ (0x722690, 0x81c820), both twins"
+    - "C-129: the recruit's minimums leave the offer, the strength counts the list as listed — READ (0x73be10 at 0x73c63e..0x73c77b, 0x73c7c0, 0x7383d0, 0x8fd8f0), both twins; the replay's upgrade a new id"
   context:
     - "...; a type of none has no limit. The running lines (\"%s running, TARGET\"), the strengths (0x73eb60, 0x73f7d0) and team lines (0x73b360) come first, then the start (0x726470 -> 0x73a120,..."
   review: reviewed
