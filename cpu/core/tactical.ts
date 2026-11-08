@@ -642,14 +642,18 @@ function search(state: GameState, unit: Unit, maxTurns: number, zoc: boolean, on
     best.closed = true;
     if (onClose(best, ground)) break;
     // an attack's plot is the end of the breadth-first searches' paths
-    // (0x26e570): no step leaves it — in the planning's search one a seen
-    // unit at war that fights holds (0x26e570 at 0x26e5cd: the parent's
-    // +0x51 bit 0x40), so an attack on a city or Encampment alone goes on;
-    // a move order's path (the A* 0x7a630, whose validity 0x2720a0 runs no
-    // 0x26e570) steps on from one it links; nor one the player never
+    // (0x26e570): no step leaves one a seen unit at war that fights holds
+    // (0x26e570 at 0x26e5cd: the parent's +0x51 bit 0x40, 0x271be0 at
+    // 0x271f0c..0x271f2e from 0x5861f0 -> 0x523520's fighting out-flag), in
+    // the planning's, Explore's and the danger map's search alike, so an
+    // attack on a city or Encampment or onto a civilian goes on (runs/
+    // h1_duelp1121 t90: player 1's Courser on 5:19 reaches 5:21 / 4:20 / 4:21
+    // past the barbarians' captured Settler on 5:20, which takes 4:19 as
+    // logged); a move order's path (the A* 0x7a630, whose validity 0x2720a0
+    // runs no 0x26e570) steps on from one it links; nor one the player never
     // revealed but the unit's own (0x2720a0 under the search's flag 1: the
     // parent unrevealed)
-    if ((best.attack && !zoc && (!planningSearch || ground.foughtOn(best.tile))) || (best !== start && !ground.known(best.tile))) continue;
+    if ((best.attack && !zoc && ground.foughtOn(best.tile)) || (best !== start && !ground.known(best.tile))) continue;
     // a move order's path under flag 1 (no `explore`) leaves no plot the
     // player never revealed but the unit's own
     if (!explore && best !== start && !ground.revealed(best.tile)) continue;
@@ -675,7 +679,16 @@ function search(state: GameState, unit: Unit, maxTurns: number, zoc: boolean, on
       const blind = blindStep(best, to);
       // a move order's path passes a unit at war with it out of its sight
       // (`pass`)
-      const attack = ground.revealed(to.index) && !(zoc ? ground.pass(to) : ground.enter(to));
+      // the breadth-first searches' valid wrapper (0x26e570 at
+      // 0x26e5e2..0x26e6c4) tests the plot's own district, not the player's
+      // knowledge of it: a city centre or Encampment of a player at war on a
+      // plot the player never revealed is an attack whatever the mover, a
+      // step from a zone of control onto it allowed and its Movement spent
+      // (runs/h1_duelp1117 t56: the barbarian Warrior 3080209 on 33:8 plans
+      // city-state 4's unrevealed centre 32:5 at (2/0) from the zoned 32:6
+      // and moves there for the Archer in it, AI_Planning.csv)
+      const fortBlind = !zoc && !ground.revealed(to.index) && districtAttack(to);
+      const attack = fortBlind || (ground.revealed(to.index) && !(zoc ? ground.pass(to) : ground.enter(to)));
       // the destination at its stacking limit (`crowded`), linked at any
       // turn without flag 0x1000 or within the first under it, ends the
       // search with no path: the validity 0x2720a0 tests the child on the
@@ -697,7 +710,7 @@ function search(state: GameState, unit: Unit, maxTurns: number, zoc: boolean, on
       // list no 5:5, its Woods burning, AI_Planning.csv)
       if (to.index !== dest && ground.hazard(to.index)) continue;
       if (ground.revealed(to.index) && cliffBlocksStep(state, from, to, unit)) continue;
-      if (attack && !ground.attack(to)) continue;
+      if (attack && !fortBlind && !ground.attack(to)) continue;
       if (zoned && !attack) continue;
       // the step's validity (0x2720a0 at 0x272372..0x27242e): onto a revealed
       // plot of the domain it leaves (an embarking or a landing step tested
@@ -1087,13 +1100,18 @@ function withShortOrders(fn: () => void): void {
  *  whose last step of the turn ended in a zone of control waits (0x962793:
  *  the formation's +0x518), striking all the same where its path's next
  *  plot is the one it attacks into. The strike is the path's first node
- *  reached this turn (0x962380: +4 at most 1): its step priced as any
- *  step of the walk, one dearer than the Movement left once the unit moved
- *  waits, the order kept */
+ *  reached this turn (0x962380: +4 at most 1): the attack node of the path
+ *  the order walked a later turn's — a zone of control on the way spending
+ *  the path's turn — holds it for the turn (a FIT: runs/h1_duelp1127 t109 /
+ *  t199 the rampaging Galley 1048590 steps beside city-state 3's Galley
+ *  into its zone and holds there short of the embarked Warrior, as logged);
+ *  else its step priced as any step of the walk, one dearer than the
+ *  Movement left once the unit moved waits, the order kept */
 function orderOnce(state: GameState, unit: Unit, dest: number, strike: boolean,
   laterTurns: boolean, explore: boolean, danger: PathDanger | undefined, mates: readonly Unit[], scout: boolean): boolean {
   if (!state.units.includes(unit) || unit.movesLeft <= 0 || unit.tileIndex === dest) return false;
-  let path = pathTo(state, unit, dest, laterTurns, explore, danger, mates, scout, strike);
+  const nodes = pathNodes(state, unit, dest, laterTurns, explore, danger, mates, scout, strike);
+  let path = nodes.map((n) => n.tile);
   if (!path.length) return false;
   // a path ending on a plot it attacks into: it walks to its side, and
   // strikes it where its Movement and attacks last (the order's attack flag)
@@ -1115,7 +1133,7 @@ function orderOnce(state: GameState, unit: Unit, dest: number, strike: boolean,
   if (refused || !state.units.includes(unit)) return false;
   if (into) {
     if (plotDistance(state, unit.tileIndex, last) !== 1) return true;
-    if (!strike) return false;
+    if (!strike || nodes[nodes.length - 1].turns > 1) return false;
     // the order's next run searches afresh from beside the plot (start carry
     // 0): a step onto it dearer than the Movement left, the unit moved, is a
     // later turn's (runs/h1_duelz1117 t10: the rampaging Warrior 589832 on
@@ -1596,9 +1614,13 @@ export function tacticalTargets(state: GameState, seat: number, seen: ArrayLike<
       continue;
     }
     const civs = here.filter((u) => unitIsNoncombat(u.type) && !UNITS[u.type]?.trader && !unitReligious(u.type));
-    // the plot's one civilian ends its chain, the player's own included
-    // (a NEUTRAL_CIVILIAN, no entry)
-    if (civs.length === 1) {
+    // the plot's one civilian of another player ends its chain (a
+    // NEUTRAL_CIVILIAN, no entry); the player's own goes on to the religious
+    // unit and the improvement (0x784c4b..0x784c5f, the layer's one unit's
+    // owner against the player: runs/h1_duelp1121 t127 the barbarians'
+    // Man-At-Arms 2949124 pillages the Mine on 8:12 under their own Builder
+    // 3604504)
+    if (civs.length === 1 && civs[0].seat !== seat) {
       if (unitsHostile(state, me, civs[0])) out.push({ type: 'CIVILIAN', tile: t.index, seat: civs[0].seat, unit: civs[0] });
       continue;
     }

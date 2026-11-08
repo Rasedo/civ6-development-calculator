@@ -122,6 +122,9 @@
     - recording: 1124
       turn: 1
       value: With them   the planning rows of 1124 t1-60 the reach reproduces exactly went 705 ->   758 of 1,241, the game's plots within ours 862 -> 1,192.
+    - recording: h1_duelp1117
+      turn: 56
+      value: "the district test (0x26e5e2..0x26e6c4) reads the plot's own district, not the player's revealed bytes: the barbarian Warrior 3080209 on 33:8 plans city-state 4's unrevealed centre 32:5 at (2/0) from the zoned 32:6 and moves there, as logged"
   impl:
     - cpu/core/tactical.ts:fortAtWar
     - cpu/core/tactical.ts:garrisonDistrict
@@ -146,6 +149,9 @@
     - cpu/core/tactical.ts:addOpen
     - cpu/core/tactical.ts:stacked
     - cpu/core/tactical.ts:f
+    - cpu/core/tactical.ts:search
+    - gpu/core/sim_tactics.py:_tac_search
+    - cpu/core/tactical.ts:fortBlind
   readings:
     - "C-125: a civilian at war in the planning's search, a zone of control across a river, the attack's move onto a city — READ (0x26e570, 0x530f50 at 0x5310c8..0x5311c9, 0x771f80 at 0x772121), both twins"
     - "C-95: the planning's valid wrapper on a district at war, and a land unit's embarking by its original owner — READ (0x26e570 at 0x26e5e2..0x26e7f1, 0x56c480), the first both twins"
@@ -159,6 +165,7 @@
     - "C-99 / C-128: a danger feature is no step of a search, a land unit's danger stops at the shore — READ (0x271be0 at 0x271fd3, 0x2720a0 at 0x27216c, 0x26e570), both twins"
     - "C-95: a move order's path steps on from an attack's plot, its attack child by the order's flags, a non-attack order's destination, a melee blow on a civilian — READ (0x2720a0 at 0x272434..0x272544, 0x2715a0 at 0x2717cd / 0x271870..0x2718d7, 0x1385c0, 0x889e0, 0x2714b0, 0x206960 at 0x206a1f), both twins"
     - "C-95: a strike's step from beside its plot, a formation's planning plot at a radius, the ring walk's own location test — READ (0x962380 at 0x96267e..0x9626d2, 0x26ef40 at 0x26f0a4, 0x78fa10 at 0x78fab4..0x78facf, 0x815d50 -> 0x586360), both twins"
+    - "C-95: the danger map's search goes on past a civilian, the target list's own civilian, a district the player never revealed, a strike a later turn's — READ (0x26e570 at 0x26e5cd, 0x271be0 at 0x271f0c..0x271f2e, 0x5861f0, 0x523520, 0x783980 at 0x784c4b..0x784c5f, 0x26e570 at 0x26e5e2..0x26e6c4), FIT (0x962380's strike on the walked path), both twins"
   context:
     - "...or 2 turns, flags 0x115 | 0x800 | 0x100 where the unit has not moved; the valid wrapper 0x26e570 refuses a node past the turn limit): the list at planning +0x30 (16-byte entries x, y,..."
     - "...centre, an Encampment) as a node whose step spends the Movement left (the valid wrapper 0x26e570: the attack's cost adds the Movement left, 0x1d0 += 0x1d4) and links nothing from it (a..."
@@ -254,6 +261,7 @@
     - "C-99: the pathfinder's later-turn pool, Heal's hull, the tactical list's explorers, Move Unit's planning"
     - "C-99: a move order's search sets out on the pool finder's +0x1bc, the last full-Movement search's GetMaxMoves — READ (0x26f330, 0x77d10, 0x270d70, 0x26e920, 0x26eea0, 0x26dcd0, 0x26df90, 0x26e2c0, 0x26fe20 at 0x270309), unported"
     - "C-99: every pool search sets out on its own formation's value, a queue run walks its first search's path — READ (0x2715a0 at 0x271909..0x271910, 0x77d10 at 0x77d8b..0x77db0 / 0x77f0b / 0x78007 / 0x7805d, 0x52f50 at 0x52f9e / 0x52fce / 0x53394, 0x265fd0, 0x272aa0 at 0x272ad7..0x272c24, 0x26e3a0), the engines' model"
+    - "C-95: the danger map's search goes on past a civilian, the target list's own civilian, a district the player never revealed, a strike a later turn's — READ (0x26e570 at 0x26e5cd, 0x271be0 at 0x271f0c..0x271f2e, 0x5861f0, 0x523520, 0x783980 at 0x784c4b..0x784c5f, 0x26e570 at 0x26e5e2..0x26e6c4), FIT (0x962380's strike on the walked path), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ...rch 0x26dcd0 with its third argument 1 (flags 0x115), which installs the start callback 0x26eea0 at +0xa8; GeneratePath calls it first, and it sets the start node's Movement (+0x1bc, r...
@@ -722,6 +730,7 @@
     - cpu/core/tactical.ts:search
     - cpu/core/tactical.ts:PNode
     - cpu/core/tactical.ts:Ground
+    - cpu/core/tactical.ts:addOpen
   readings:
     - "C-99 / C-128: a danger feature is no step of a search, a land unit's danger stops at the shore — READ (0x271be0 at 0x271fd3, 0x2720a0 at 0x27216c, 0x26e570), both twins"
     - "C-99 / C-128: a shore crossing's cliff onto a revealed plot alone, Wander Back to Camp's path flag 0x1000, the path's destination count — READ (0x52fb90, 0x2720a0 at 0x272230..0x27229e / 0x272380, 0x270dd0 at 0x270f24, 0x271be0 at 0x271d03..0x271d18, 0x77b9a0 at 0x77be0b), both twins"
@@ -740,6 +749,7 @@
     - "C-95: HL Explore's plot test refuses every other player's ground, Explore Land's flags 0x40 — READ (0x70bd40 at 0x70bd87..0x70beee, 0x709d80 at 0x709da0..0x709dc2, 0x70ce90 at 0x70ced5), FIT (the knowledge base's +0x128 at or below the turn), both twins"
     - "C-95 / C-123 / C-125: the stand-to-attack site, a district closed to a ranged unit, City Attack's members and log, the siege gain's lift, a city's blow back, the units of no zone of control — READ (0x2720a0 at 0x272255..0x272330, 0x271be0 at 0x271e69 / 0x271f2e, 0x586360 at 0x5866c9..0x58671f, 0x8109e0, 0x80ceb0 at 0x80d6f9, 0x771f80, 0x80f6b0 at 0x80f75f / 0x80f824 / 0x80f95a, 0x791470, 0x56d6c0), both twins"
     - "C-95: a move order's path steps on from an attack's plot, its attack child by the order's flags, a non-attack order's destination, a melee blow on a civilian — READ (0x2720a0 at 0x272434..0x272544, 0x2715a0 at 0x2717cd / 0x271870..0x2718d7, 0x1385c0, 0x889e0, 0x2714b0, 0x206960 at 0x206a1f), both twins"
+    - "C-95: the danger map's search goes on past a civilian, the target list's own civilian, a district the player never revealed, a strike a later turn's — READ (0x26e570 at 0x26e5cd, 0x271be0 at 0x271f0c..0x271f2e, 0x5861f0, 0x523520, 0x783980 at 0x784c4b..0x784c5f, 0x26e570 at 0x26e5e2..0x26e6c4), FIT (0x962380's strike on the walked path), both twins"
   context:
     - "...N ENDS (0x2720a0, the move order's validity at the end of 0x26e570): each node records (0x271be0) whether its player sees its plot (+0x50 bit 2) and the count of the unit's own stackin..."
     - "- THE PLANNING'S LIST TEST (0x26d890, a node closing, code 3), READ: the node's flags (0x271be0 on its first visit): +0x50 bit 1 the plot seen now (the player's visibility count +0x29..."

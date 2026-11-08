@@ -11542,3 +11542,55 @@ engines already search once per order run on the Movement left.
 - Open (C-100): Nazca's Nazca Line rows 40.00 above ours on every plot
   (runs/h1_duelp1128 p4 t2-t249, Appeal 1, no yields); the Neighbourhood's
   housing on a surplus the record's turn start does not hold.
+
+## C-95: the danger map's search goes on past a civilian, the target list's own civilian, a district the player never revealed, a strike a later turn's — READ (0x26e570 at 0x26e5cd, 0x271be0 at 0x271f0c..0x271f2e, 0x5861f0, 0x523520, 0x783980 at 0x784c4b..0x784c5f, 0x26e570 at 0x26e5e2..0x26e6c4), FIT (0x962380's strike on the walked path), both twins
+
+`search`'s end of an attack node and `fortBlind`, `orderOnce`'s strike
+(cpu/core/tactical.ts), `tacticalTargets`' civilian; GPU `_tac_search`'s
+`fought_n` / `atk_n`, `_tac_move_to`'s `late`, `_tac_targets`' kind 7
+(gpu/core/sim_tactics.py).
+
+- THE NODE'S AT-WAR BITS (0x271be0 at 0x271f0c..0x271f2e): 0x5861f0 ->
+  0x523520 returns whether any unit of a player at war stands on the plot
+  (bit 0x20) and sets its out-flag where one of them has a Combat, Ranged or
+  Bombard strength (bit 0x40). The valid wrapper's refusal (0x26e570 at
+  0x26e5cd) reads bit 0x40 alone, under every flag: no step leaves a seen
+  fighter's plot in the planning's, Explore's or the danger map's search; a
+  civilian's plot (bit 0x20 alone) is passed. Confirmed: runs/h1_duelp1121
+  t90 player 1's Courser on 5:19 reaches 5:21 / 4:20 / 4:21 past the
+  barbarians' captured Settler on 5:20, the strengthless Settler skips that
+  dangerous water and takes 4:19 as logged; t70 / t92 / t94 its HL Move To
+  Safety plots as logged.
+- THE TARGET LIST'S CIVILIAN (0x783980 at 0x784c4b..0x784c5f): the plot's
+  civilian layer holding one unit whose owner is the player itself goes on
+  to the religious test and the improvement (0x784f5c -> 0x785103), another
+  player's ends the chain. Confirmed: runs/h1_duelp1121 t127 the barbarian
+  Man-At-Arms 2949124 pillages the Mine on 8:12 under its own Builder
+  3604504 (seven "Pillage Improvement" rows, the Mine pillaged by record
+  t128), and the Builder's HL Move To Safety order to 8:13 holds with its
+  formation, as logged.
+- A DISTRICT NEVER REVEALED (0x26e570 at 0x26e5e2..0x26e6c4): the wrapper's
+  district test reads the plot's own district (0x810d0) and owner, not the
+  player's revealed bytes: in the breadth-first searches a city centre or
+  Encampment of a player at war on a plot the player never revealed is an
+  attack whatever the mover, a step from a zone of control onto it allowed
+  and its Movement spent. Confirmed: runs/h1_duelp1117 t56 the barbarian
+  Warrior 3080209 on 33:8 plans city-state 4's unrevealed centre 32:5 at
+  (2/0) from the zoned 32:6 (AI_Planning.csv) and Attack Units moves it to
+  32:6 for the Archer in it, as logged.
+- THE STRIKE OF A MOVE ORDER (FIT on 0x962380 at 0x96268f, the first node
+  reached this turn): a move order whose walked path reaches its attack node
+  only in a later turn — a zone of control on the way spending the path's
+  turn — holds beside it for the turn. Confirmed: runs/h1_duelp1127 t109 /
+  t199 the rampaging Galley 1048590 steps beside city-state 3's Galley into
+  its zone (29:17, 29:14) and holds short of the embarked Warrior its other
+  Galley struck, as logged; runs/h1_duelr1121 t83's Galley 524295 strikes
+  from its spot by a second order, its path fresh from there.
+- THE FULL SEARCH'S START (read, unported): 0x26eea0 sets the start
+  Movement of the planning's and the danger map's searches to the
+  formation's least GetMaxMoves (0x266660 -> 0x262cd0 over its members):
+  runs/h1_duelp1121 t82-84 player 1's Courser 1835015 escorting its Builder
+  1900548 plans on 4 (AI_Planning.csv), and the barbarians' t83 danger map
+  holds 5:19 out of its reach, the captured Settler taking it as logged; a
+  major's formations are not in the record.
+- Open: runs/h1_duelp1121 t83 the Settler 2686993 (the start above).

@@ -794,7 +794,16 @@ class SimTactics:
             atk_n = atk_n & ~(shoots.unsqueeze(1) & fort_w[rows])
         if rv_n is not None:
             # a plot the player never revealed is entered, never attacked into
+            # — but in the breadth-first searches (the valid wrapper 0x26e570
+            # reads the plot's own district) a city centre or Encampment of a
+            # player at war on it, whatever the mover (`search`'s fortBlind)
             atk_n = atk_n & rv_n
+            if not zoc:
+                fort_x = self._centre_plane()
+                if self._encamp_didx >= 0:
+                    fort_x = fort_x | (self.district == self._encamp_didx)
+                fort_x = fort_x & (self.tile_seat >= 0) & (self.tile_seat != seat) & self._seats_hostile(seat, self.tile_seat)
+                atk_n = atk_n | (~rv_n & fort_x[rows])
         # the danger map's search (flag 0x200) pays the attack's spend on a
         # district alone (`search`'s districtAttack: a city centre or an
         # Encampment of a player at war); a step onto a unit's plot is priced
@@ -842,11 +851,13 @@ class SimTactics:
             sv_ = torch.where(pl >= 0, self.unit_seat.gather(1, pc), torch.full_like(pl, -1))
             fought |= (pl >= 0) & st_ & self._seats_hostile(seat, sv_)
         fought = fought & sn
-        if not zoc and not stand:
-            # an attack's plot ends the planning's path where a seen unit at
-            # war that fights holds it (the parent's +0x51 bit 0x40): an
-            # attack on a city or Encampment alone goes on
+        if not zoc:
+            # an attack's plot ends the breadth-first searches' paths (the
+            # planning's, Explore's, the danger map's) where a seen unit at war
+            # that fights holds it (the parent's +0x51 bit 0x40): an attack on
+            # a city or Encampment or onto a civilian goes on
             fought_n = fought[rows]
+        if not zoc and not stand:
             zs = torch.where(naval.unsqueeze(1), self._tac_zoc(seat, sn, True)[rows], self._tac_zoc(seat, sn, False)[rows])
             zs = zs & ~self._tac_zoc_ignored(utype).unsqueeze(1)
         # a path's turn may not end on a plot its own stacking unit holds (the
@@ -1707,6 +1718,9 @@ class SimTactics:
             city_in = city_in | self._encamp_block_plane(seat)
         into = into & ~(h_any & ~h_lay & ~city_in[rows, dr])
         plen = plen - into.long()
+        # the path's attack node a later turn's (a zone of control on the way
+        # spending the path's turn): no strike this turn (`orderOnce`)
+        late = into & (res["turns"][ar, dr] > 1)
         # a unit whose last step of the turn ended in a zone of control waits
         # (`zocMoved`), striking all the same from beside its target
         zm = self._tac_zoc_moved_of(pre)
@@ -1892,7 +1906,7 @@ class SimTactics:
             left = mp_p[rows, sr]
             held_off = beside & (left < c_at) & (left < full)
             into = into & ~held_off
-            hit = (into & ~refused & getattr(self, f"{pre}_unit_alive")[rows, sr] & (mp_p[rows, sr] > 0)
+            hit = (into & ~late & ~refused & getattr(self, f"{pre}_unit_alive")[rows, sr] & (mp_p[rows, sr] > 0)
                    & (getattr(self, f"{pre}_unit_attacks")[rows, sr] > 0) & (self.pair_dist[here, dr].to(torch.long) == 1)
                    & (self._type_combat.take(ut) > 0) & (self._type_bombard.take(ut) <= 0))
             emb = getattr(self, f"{pre}_unit_emb")[rows, sr]
@@ -2061,7 +2075,9 @@ class SimTactics:
         for kind, cond, who in (
             (4, camp, none), (5, goody, none),
             (6, trader & hostile(ts_), ts_),
-            (7, n_civ == 1, civ_seat),
+            # the plot's one civilian of another player ends its chain; the
+            # player's own goes on to the religious unit and the improvement
+            (7, (n_civ == 1) & (civ_seat != seat), civ_seat),
             (8, (rel_slot >= 0) & hostile(rel_seat), rel_seat),
             (9, (self.improvement >= 0) & ~self.pillaged & h_own & ~goody, none),
         ):
@@ -2069,9 +2085,6 @@ class SimTactics:
             okk = torch.where(hit, kind, okk)
             oss = torch.where(hit, who, oss)
             taken = taken | hit
-            if kind in (6, 7):
-                # a Trader or a lone civilian ends the plot's chain, ours or not
-                taken = taken | (cond & ~taken)
         if rev is not None:
             # a plot revealed, not seen, with no district: its camp, goody hut
             # or unpillaged improvement of a player at war
