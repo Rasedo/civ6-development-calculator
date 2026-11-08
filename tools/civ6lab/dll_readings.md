@@ -10396,3 +10396,37 @@ cpu/harness/replay.ts).
   only land way east past 33:6 / 33:7 / 34:8, plots the barbarians' revealed
   plane (unrecorded) leaves unrevealed in ours; the A* cost of a step onto
   an attack's plot it passes (the planning's spend kept).
+
+## C-98: a minor's catch-up lands at the major's gain — READ (0x427bf0, 0x4cb930, 0x39ec60), both twins
+
+`minorCatchUp` (cpu/core/minorBuild.ts), GPU `_minor_catch_up`
+(gpu/core/sim_minors.py), called where a major's tree takes a row: the
+research step's completions (`seatPhase` / `_seat_economy`),
+`completeResearchNow` / `_complete_research_now`, `grantFreeResearch` / `_grant_free_research` and the
+ability's free techs, a Great Person's boosted eureka (`activateGreatPerson` /
+`_gp_named_eurekas`), a village's tech (`drawAndPayGoody` / `_draw_and_pay_goody`).
+
+- THE RULE: 0x427bf0, the gain handler every player's object runs the moment
+  a player takes a row, calls 0x4cb930 (techs) / 0x39ec60 (civics) for each
+  receiver; a FULL_CIV gainer, a receiver lacking the row that is neither
+  FULL_CIV nor TRIBE (every city-state and the Free Cities), at least
+  max(1, (majors + 1) x 50 / 100) of the living majors holding it: the
+  receiver's progress on it is SET to its cost of the moment less one, in
+  hand or kept. Nothing is counted at the minor's own turn; the engines keep
+  no per-row count.
+- CONFIRMED (one-seed traces, `minor.researchKept`): runs/h1_duelz1121 t10
+  Mining 11 of 12 for city-states 2, 3 and 4 at record t10 (Rome's start of
+  t10), t2-20 clean; runs/h1_duelz1128 t62 Irrigation 19 of 20 for Hong
+  Kong and Bologna at record t62. AI score windows that now match the logs:
+  runs/h1_duelz1117 t30 (Caguana's six research rows, its Maritime
+  Industries row), t32 (four civic rows), t62 (Caguana's Engineering,
+  Machinery, Printing: the Catapult at T 26); runs/h1_duelz1127 t42 and t53
+  (city-state 3's six civic rows each); runs/h1_duelz1121 t42 Hunza's queue
+  (none, no Horseman) and t43-44 its Engineering rows; runs/h1_duelz1124 t71
+  city-state 4's six research rows.
+- NOT THE CATCH-UP: runs/h1_duelz1128 t64 Bologna's Construction 31 of 62 is
+  its own boost (techBoosts bit set at record t64; no major holds
+  Construction before t75).
+- OPEN: a start's free techs (a roster's TECH rows, `_apply_roster_start`)
+  are laid before the handler can run and set no catch-up; no recording
+  starts a major with one.

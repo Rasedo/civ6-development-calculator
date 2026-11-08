@@ -634,6 +634,8 @@ class SimGp:
         newly = self._land_boosts(row, land, False)
         if bool(done.count_nonzero()):
             self.civ_techs[:, row, :nt] |= done
+            for _col in done.any(dim=0).nonzero(as_tuple=True)[0].tolist():
+                self._minor_catch_up(row, torch.full((self.B,), _col, dtype=torch.long, device=self.device), done[:, _col], False)
             self.civ_tech_retain[:, row, :nt] = torch.where(
                 done, torch.zeros_like(self.civ_tech_retain[:, row, :nt]), self.civ_tech_retain[:, row, :nt])
             cur = self.civ_cur_tech[:, row]

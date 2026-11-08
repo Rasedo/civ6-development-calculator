@@ -535,8 +535,8 @@ export function minorResearch(state: GameState, r: ResearchState, seat: number, 
 }
 
 /**
- * THE BANK, at the minor's start of turn: first the CATCH-UP
- * (`minorCatchUp`); each tree banks the turn's yield; a completion takes the
+ * THE BANK, at the minor's start of turn: each tree banks the turn's yield
+ * (its catch-up set at each major's gain, `minorCatchUp`); a completion takes the
  * AI's completion choice on its analysis of the turn before (0x762d60, the
  * civics' 0x6293e0, the completed row its key). Early Empire is the row
  * `borderClosedTo` reads. CIV6 (Urban Defenses): the tech "builds modern
@@ -551,7 +551,6 @@ export function minorResearchBank(state: GameState, r: ResearchState, seat: numb
   terms: () => ReturnType<typeof minorResearchTerms> | undefined, urban: () => void,
   contracts: readonly TechContract[], afterTechs?: (techs: number) => void): { techs: number; civics: number } {
   const gained = { techs: 0, civics: 0 };
-  minorCatchUp(state, r, false, seat);
   r.techProgress += science + (r.techOverflow ?? 0);
   r.techOverflow = 0;
   const cur = r.tech;
@@ -570,7 +569,6 @@ export function minorResearchBank(state: GameState, r: ResearchState, seat: numb
     if (seat !== FREE_SEAT) boostOnResearch(state, seat, cur);
   }
   afterTechs?.(gained.techs);
-  minorCatchUp(state, r, true, seat);
   r.civicProgress += culture + (r.civicOverflow ?? 0);
   r.civicOverflow = 0;
   const civ = r.civic;
@@ -667,58 +665,32 @@ function minorUrbanFit(state: GameState, cityState: CityState): void {
 }
 
 /**
- * A MINOR'S CATCH-UP (0x4cb930 techs, 0x39ec60 civics, on every major's
- * acquisition; `tools/civ6lab/dll_readings.md` "H-1: a minor's research
- * catch-up"): a row the minor lacks that at least max(1, (MINOR_CATCHUP_PCT
- * x majors + 50) / 100) of the majors still in the game hold stands at its
- * cost less one — the item in hand or the progress kept on another — so its
- * next turn on it completes it (runs/h1_duelw1121: Rome's Code of Laws at t4
- * puts every minor's at 9 of 10, its Pottery at t6 theirs at 11 of 12;
- * China's Craftsmanship at t11 completes Ayutthaya's from 8.98 of 20). Read
- * at the minor's turn, after every major's of the turn: a row whose holders
- * grew since its last turn (`ResearchState.techCatchUp`, the count it last
- * saw) is SET at its cost less one, as each acquisition sets it — a later
- * major's acquisition lowers what the first left where the row's cost fell
- * between (runs/h1_duelv1128 Bologna's Iron Working: 59 of 60 from Rome's
- * at t32, 47 of 48 from China's at t63, as recorded).
+ * A MINOR'S CATCH-UP (0x4cb930 techs, 0x39ec60 civics; `tools/civ6lab/
+ * dll_readings.md` "H-1: a minor's research catch-up"), run by the handler
+ * 0x427bf0 the moment a major (FULL_CIV) gains a row: where at least max(1,
+ * (MINOR_CATCHUP_PCT x majors + 50) / 100) of the majors still in the game
+ * hold it, every city-state and the Free Cities lacking it SETS its progress
+ * on it at its cost of the moment less one — the item in hand or the progress
+ * kept on another — so its next turn on it completes it (runs/h1_duelz1121
+ * t10: Rome's Mining at its start puts city-states 2, 3 and 4 at 11 of 12
+ * before the record; runs/h1_duelv1128 Bologna's Iron Working 59 of 60 from
+ * Rome's at t32, 47 of 48 from China's at t63). A major's progress is not
+ * touched.
  */
-function minorCatchUp(state: GameState, r: ResearchState, civic: boolean, seat: number): void {
-  const majors = majorsAlive(state).map((s) => catchUpHold?.get(s) ?? state.seats[s].research);
+export function minorCatchUp(state: GameState, gainer: number, id: string, civic: boolean): void {
+  if (!isCiv(gainer)) return;
+  const majors = majorsAlive(state).map((s) => state.seats[s].research);
   const need = Math.max(1, Math.floor((MINOR_CATCHUP_PCT * majors.length + 50) / 100));
-  const catalog: Record<string, { cost: number }> = civic ? CIVICS : TECHS;
-  const have = civic ? r.civics : r.techs;
-  const seen: Record<string, number> = {};
-  const was = (civic ? r.civicCatchUp : r.techCatchUp) ?? {};
-  for (const id of Object.keys(catalog)) {
-    if (have.includes(id)) continue;
-    const held = majors.filter((m) => (civic ? m.civics : m.techs).includes(id)).length;
-    if (held) seen[id] = held;
-    if (held < need || held <= (was[id] ?? 0)) continue;
-    const floor = researchCost(state, id, civic, seat) - 1;
+  if (majors.filter((m) => (civic ? m.civics : m.techs).includes(id)).length < need) return;
+  for (const m of [...state.cityStates, freeSeatOf(state)]) {
+    const r = m.research;
+    if ((civic ? r.civics : r.techs).includes(id)) continue;
+    const floor = researchCost(state, id, civic, m.seat) - 1;
     if ((civic ? r.civic : r.tech) === id) {
       if (civic) r.civicProgress = floor;
       else r.techProgress = floor;
-    } else {
-      const kept = civic ? r.civicRetained : r.techRetained;
-      kept[id] = floor;
-    }
+    } else (civic ? r.civicRetained : r.techRetained)[id] = floor;
   }
-  const any = Object.keys(seen).length > 0;
-  if (civic) {
-    if (any) r.civicCatchUp = seen;
-    else delete r.civicCatchUp;
-  } else if (any) r.techCatchUp = seen;
-  else delete r.techCatchUp;
-}
-
-let catchUpHold: Map<number, { techs: readonly string[]; civics: readonly string[] }> | null = null;
-
-/** The action replay's hold on the catch-up's count (`cpu/harness/
- *  replay.ts`): the research a major held at the minors' turn in the game's
- *  order, by seat, where the engine's turn has run that major's next start
- *  ahead of theirs. Null outside a replay. */
-export function holdMinorCatchUp(held: Map<number, { techs: readonly string[]; civics: readonly string[] }> | null): void {
-  catchUpHold = held;
 }
 
 /** the research AI's choice taken: its research and its goal */

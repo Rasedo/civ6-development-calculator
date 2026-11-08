@@ -769,12 +769,14 @@ class SimEconomy:
             idx = torch.full((self.B,), col, dtype=torch.long, device=self.device)
             if is_civic:
                 self.civ_civics[:, row, col] |= fin
+                self._minor_catch_up(row, idx, fin, True)
                 self.civ_civic_turn[:, row] = torch.where(fin, torch.full_like(self.civ_civic_turn[:, row], self.turn),
                                                           self.civ_civic_turn[:, row])
             else:
                 if col == self._urban_def_tech:
                     self._urban_defenses_fit(row, fin)
                 self.civ_techs[:, row, col] |= fin
+                self._minor_catch_up(row, idx, fin, False)
             self._eff_version += 1
             self._research_award(row, fin, idx, is_civic)
             if not is_civic:

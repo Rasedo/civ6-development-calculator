@@ -7426,6 +7426,7 @@ class SimSeats:
             held = self.civ_techs[b, srow]
             for col in self._goody_pool_draw(one, b, ~held, amt):
                 self.civ_techs[b, srow, col] = True
+                self._minor_catch_up(srow, torch.full((self.B,), int(col), dtype=torch.long, device=self.device), one, False)
                 self._eff_version += 1
         elif pay == ch["unitByClass"]:
             pcl = list(self.rules.promo_classes)
@@ -8456,12 +8457,14 @@ class SimSeats:
                 avail[r, pick[r]] = False
                 if is_civic:
                     self.civ_civics[r, row, pick[r]] = True
+                    self._minor_catch_up(row, pick, hit, True)
                     self.civ_civic_retain[r, row, pick[r]] = 0
                     self.civ_civic_turn[r, row] = self.turn
                     cur = self.civ_cur_civic[:, row]
                     self.civ_cur_civic[:, row] = torch.where(hit & (cur == pick), torch.full_like(cur, -1), cur)
                 else:
                     self.civ_techs[r, row, pick[r]] = True
+                    self._minor_catch_up(row, pick, hit, False)
                     self.civ_tech_retain[r, row, pick[r]] = 0
                     cur = self.civ_cur_tech[:, row]
                     self.civ_cur_tech[:, row] = torch.where(hit & (cur == pick), torch.full_like(cur, -1), cur)

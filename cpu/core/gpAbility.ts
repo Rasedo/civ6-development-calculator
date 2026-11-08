@@ -39,6 +39,7 @@ import { UNITS, URBAN_DEFENSES_TECH, civReplacement } from '../data/units';
 import { xpToNextLevel } from './promotions';
 import { logXpWrite } from './difflog';
 import { treePrereqs } from './researchTree';
+import { minorCatchUp } from './minorBuild';
 
 /** the CLASS a Great Person chassis carries — the unit id IS the class name. */
 export function gpClassOfUnit(unit: { type: string }): GreatPersonClass | undefined {
@@ -219,6 +220,7 @@ function freeTechs(state: GameState, seat: number, n: number): void {
     const pick = open.splice(randRange(state, open.length, 'Choosing random tech to grant based on era'), 1)[0];
     if (pick.id === URBAN_DEFENSES_TECH) urbanDefensesFit(state, seat);
     rsr.techs.push(pick.id);
+    minorCatchUp(state, seat, pick.id, false);
     delete rsr.techRetained[pick.id];
     if (rsr.tech === pick.id) rsr.tech = null;
   }
@@ -314,6 +316,7 @@ export function activateGreatPerson(state: GameState, unit: Unit): boolean {
       if (rsr.boosted.includes(id)) {
         if (id === URBAN_DEFENSES_TECH) urbanDefensesFit(state, unit.seat);
         rsr.techs.push(id);
+        minorCatchUp(state, unit.seat, id, false);
         delete rsr.techRetained[id];
         if (rsr.tech === id) rsr.tech = null;
       } else if (markBoost(state, unit.seat, id)) {

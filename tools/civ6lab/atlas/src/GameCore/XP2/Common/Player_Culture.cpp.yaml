@@ -655,10 +655,12 @@
       value: A major's progress is not touched (China's Code of Laws 4.59 of 10 at 1121 t4).
   impl:
     - cpu/core/minorBuild.ts:minorCatchUp
+    - gpu/core/sim_minors.py:_minor_catch_up
     - cpu/core/seats.ts:majorsAlive
     - cpu/data/cityStates.ts:MINOR_CATCHUP_PCT
   readings:
     - "H-1: a minor's research catch-up — READ"
+    - "C-98: a minor's catch-up lands at the major's gain — READ (0x427bf0, 0x4cb930, 0x39ec60), both twins"
     - "C-60: the Free Cities' research — READ (the catch-up's receivers), ported"
   context:
     - 0x4cb930 (techs; civics 0x39ec60, the same body), called from the handler 0x427bf0 that every player's object runs when a...

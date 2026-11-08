@@ -88,6 +88,7 @@ import { gpPermOf } from '../data/greatPeople';
 import { irradiated } from './nuclear';
 import { FALLOUT_DAMAGE } from '../data/nuclear';
 import { questUnitAdded } from './quests';
+import { minorCatchUp } from './minorBuild';
 const ok: RuleResult = { ok: true };
 const no = (reason: string): RuleResult => ({ ok: false, reason });
 
@@ -2557,7 +2558,9 @@ export function drawAndPayGoody(state: GameState, unit: Unit, tile: Tile): void 
     case 'tech': {
       const pool = Object.keys(TECHS).filter((id) => !owner.research.techs.includes(id));
       for (let i = 0; i < amount && pool.length; i++) {
-        owner.research.techs.push(pool.splice(randRange(state, pool.length, 'Choosing random tech to grant based on era'), 1)[0]);
+        const id = pool.splice(randRange(state, pool.length, 'Choosing random tech to grant based on era'), 1)[0];
+        owner.research.techs.push(id);
+        minorCatchUp(state, unit.seat, id, false);
       }
       break;
     }

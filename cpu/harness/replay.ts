@@ -91,7 +91,7 @@ import { CAMP_DISPERSAL_GOLD, MP_SCALE, scaleByGameSpeed } from '../data/constan
 import { PROMOTE_HEAL, aiPromotionPick, attacksPerTurn, promoCount, takePromotion, unitPromoRows } from '../core/promotions';
 import { fireFeature } from '../data/disasters';
 import { civicAgendas, setupAgendas } from '../core/agendas';
-import { holdMinorCatchUp, holdMinorOrders, holdMinorStart, minorCombatDesire, minorResearch, minorSetItem, minorBuildFacts, minorKnowledge, minorKnownUnits, minorItemCost, minorItemInHand, minorItemKey, minorBuildingPrice, minorRaiseBuilding, minorUnitPrice, minorUpgradeUnit, minorUpgradeVisible, techContractsCompleted, traceMinorLays, traceMinorPolicyScores, traceMinorPurchases } from '../core/minorBuild';
+import { holdMinorOrders, holdMinorStart, minorCombatDesire, minorResearch, minorSetItem, minorBuildFacts, minorKnowledge, minorKnownUnits, minorItemCost, minorItemInHand, minorItemKey, minorBuildingPrice, minorRaiseBuilding, minorUnitPrice, minorUpgradeUnit, minorUpgradeVisible, techContractsCompleted, traceMinorLays, traceMinorPolicyScores, traceMinorPurchases } from '../core/minorBuild';
 import { DEDICATED_IMPROVEMENTS, IMPROVEMENT_IDS, unitActionIndex } from '../core/unitActions';
 import { loadCatalog, type Catalog, type DumpCity, type TurnRecord } from './record';
 import { num, bool } from './record';
@@ -5073,7 +5073,7 @@ function turnSeed(rec: TurnRecord): number | undefined {
  * contracts, reservations), the operation manager and its next id, the
  * strength its turn start stored. Per research: the research AI's goal, its
  * analyses, its turns left, the civics AI's government values and best cards,
- * the minors' catch-up counts, the military AI's favoured technology. Per
+ * the military AI's favoured technology. Per
  * city-state: its city AI's item value, its
  * Food focus, trade list and value, the city-states it met, UNITS and BUILDINGS tables, resource counts, economic
  * memory (savings), threat, enemy at the gates, growth forecast, revealed
@@ -5084,7 +5084,7 @@ function turnSeed(rec: TurnRecord): number | undefined {
  */
 const SEAT_MEMORY = ['unitPool', 'armyKnown', 'armyAged', 'enemyCounts', 'combatDesire', 'tradeSeat', 'tradeSeen', 'agendas', 'campsKnown', 'cityAi', 'ops', 'opsNext', 'treeSlots', 'treeFree', 'unitStrength'] as const;
 const RESEARCH_MEMORY = ['goal', 'aiEntries', 'civicAiEntries', 'civicGovValues', 'civicPolicyBest', 'civicSlotBest', 'aiLeft', 'aiLeftSeen', 'aiTechSeen',
-  'techCatchUp', 'civicCatchUp', 'favTech'] as const;
+  'favTech'] as const;
 const MINOR_MEMORY = ['prodSetValue', 'favoredFood', 'tradeCities', 'tradeRejected', 'tradeValue', 'metMinors', 'unitValues', 'buildingValues', 'resourceCounts',
   'economy', 'threat', 'threatNear', 'aiGrowth', 'aiGrowthSeen', 'revealed', 'standingArmyShort', 'explored', 'upgradeTrees', 'unitsListed', 'defendersListed'] as const;
 const CITY_MEMORY = ['aiThreat', 'aiThreatNear', 'freeRaid', 'tradeCities', 'tradeRejected'] as const;
@@ -5851,32 +5851,13 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
       state.units = state.units.filter((u) => !isBarbSeat(u.seat));
     };
     const tribesBefore = state.barbTribes?.length ?? 0;
-    // THE CATCH-UP'S COUNT: the majors' research as the record holds it at
-    // the city-states' starts — the majors' research is their decisions and
-    // their economy, not the city-states', so the count reads the game's.
     // THE ACTIVE PLAYER'S START closes the engine's turn, after the
     // city-states' starts the record's pair holds (record t+1 is read in its
-    // turn): theirs counts its research as record t holds it
-    // (runs/h1_duelw1121: Rome's Code of Laws at its start of t4, every
-    // minor's done at its own start of t4); every other major's start came
-    // before theirs, its research as record t+1 holds it. What the active
-    // player's actions of the turn completed (a boost) it holds at their
-    // starts too: the engine's completions record t+1 confirms
-    // (runs/h1_duelv1128 t20: Rome's Bronze Working boosted complete in its
-    // turn, Bologna's done at its own start of t20)
-    const active = state.seats[seatOfP(ctx, activeP)];
-    holdMinorCatchUp(new Map(state.seats.map((s) => {
-      const r = seatOf(s === active ? recordA.state : read.state, s.seat)?.research ?? s.research;
-      if (s !== active) return [s.seat, { techs: [...r.techs], civics: [...r.civics] }] as const;
-      const b = seatOf(read.state, s.seat)?.research;
-      const done = (have: readonly string[], ours: readonly string[], next: readonly string[] | undefined) =>
-        [...have, ...ours.filter((x) => !have.includes(x) && (next ?? []).includes(x))];
-      return [s.seat, { techs: done(r.techs, s.research.techs, b?.techs), civics: done(r.civics, s.research.civics, b?.civics) }] as const;
-    })));
-    // ...and the game era it opens comes after every other player's start and
-    // actions of the pair: their research prices read the era before
+    // turn), and the game era it opens comes after every other player's start
+    // and actions of the pair: their research prices read the era before
     // (runs/h1_duelw1121: Horseback Riding at 72 for the minors through their
     // turn 30, Rome's Wheel at 32 in its start of t31)
+    const active = state.seats[seatOfP(ctx, activeP)];
     const eraWas = state.gameEra ?? 0;
     holdResearchEra(new Map([...state.seats.filter((s) => s !== active).map((s) => s.seat), ...state.cityStates.map((c) => c.seat), FREE_SEAT]
       .map((seat) => [seat, eraWas] as const)));
@@ -6227,7 +6208,6 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
     } finally {
       holdFavor(null);
     }
-    holdMinorCatchUp(null);
     stream.actions(a.turn);
     // ...nor any of its fortification: the turn's dig-in is a standing
     // unit's (runs/h1_duelw1128 t17: Rome's Warrior, two turns dug in,
@@ -6585,7 +6565,6 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
   traceMinorOps(null);
   traceKnowledge(null);
   traceFreeOps(null);
-  holdMinorCatchUp(null);
   holdResearchEra(null);
   holdMinorOrders(false);
   holdCityStrikes(false);

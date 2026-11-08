@@ -459,8 +459,6 @@
             "citystate_ai_left_seen",
             "citystate_tech_retain",
             "citystate_civic_retain",
-            "citystate_tech_catch",
-            "citystate_civic_catch",
             "citystate_ai_valid",
             "citystate_ai_turns",
             "citystate_ai_next",
@@ -2412,28 +2410,6 @@
           "planes": [
             "citystate_civic_retain"
           ]
-        },
-        {
-          "name": "minorTechCatchUp",
-          "compare": "exact",
-          "covers": [
-            "ResearchState.techCatchUp"
-          ],
-          "planes": [
-            "citystate_tech_catch"
-          ],
-          "note": "the catch-up's count per tech it lacks: the majors holding it at its last turn, in table order"
-        },
-        {
-          "name": "minorCivicCatchUp",
-          "compare": "exact",
-          "covers": [
-            "ResearchState.civicCatchUp"
-          ],
-          "planes": [
-            "citystate_civic_catch"
-          ],
-          "note": "the catch-up's count per civic it lacks: the majors holding it at its last turn, in table order"
         },
         {
           "name": "prodProgress",

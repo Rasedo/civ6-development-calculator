@@ -2445,6 +2445,7 @@ class SimPhase:
             tech_done = tech_done | fin
             rows = fin.nonzero(as_tuple=True)[0]
             self.civ_techs[rows, row, curt[rows]] = True
+            self._minor_catch_up(row, curt, fin, False)
             self._eff_version += 1
             for _gc, _gl, _gu, _gt, _gf, _gp, _gx in self._live_rows(row, self._grant_unit_rows):
                 if _gt < 0 or _gu < 0:
@@ -2540,6 +2541,7 @@ class SimPhase:
             civic_done = civic_done | fin
             rows = fin.nonzero(as_tuple=True)[0]
             self.civ_civics[rows, row, curc[rows]] = True
+            self._minor_catch_up(row, curc, fin, True)
             self.civ_civic_turn[rows, row] = self.turn
             self._eff_version += 1
             # CIV6 (Global Warming Mitigation): "Awards 3 Envoys / Awards 1

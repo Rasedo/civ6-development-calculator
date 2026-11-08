@@ -1424,11 +1424,11 @@ class SimMinors:
 
     def _minor_research_bank(self, s: int, sci: torch.Tensor, cul: torch.Tensor, after_techs=None) -> tuple[torch.Tensor, torch.Tensor]:
         """`minorResearchBank` for research row `s` — a city-state's, or the
-        Free Cities' — the TECHNOLOGIES first: the CATCH-UP (`minorCatchUp`,
-        read inline), the turn's Science (`sci` [B]) and the overflow bank, a
+        Free Cities' — the TECHNOLOGIES first (the catch-up set at each
+        major's gain, `_minor_catch_up`): the turn's Science (`sci` [B]) and the overflow bank, a
         completion at the cost leaving the rest, whose choice reads the
         research AI's analysis of the turn before (`_rai_completion`). Then
-        the CIVICS the same way: the catch-up, the turn's Culture (`cul`) and
+        the CIVICS the same way: the turn's Culture (`cul`) and
         the overflow bank and complete the civic in hand at its cost, whose
         choice reads the civics AI's analysis of the turn before
         (`_cai_completion`); `after_techs` (the [B] technologies completed)
@@ -1442,31 +1442,8 @@ class SimMinors:
                  else self.citystate_alive[:, s])
         techs = torch.zeros(self.B, dtype=torch.long, device=self.device)
         civics = torch.zeros_like(techs)
-        live = self._barb_majors_alive()
-        need = ((int(self.rules.citystate["catchUpPct"]) * live.sum(dim=1) + 50) // 100).clamp(min=1)
-
-        def catch_up(have, prog, cur, retain, rc, majors, seen):
-            # THE CATCH-UP: a row the minor lacks that `need` living majors
-            # hold, their count grown since its last turn (`seen`), is set at
-            # its cost less one
-            n = rc.shape[1]
-            col = torch.arange(n, device=self.device).unsqueeze(0)
-            held = (majors[:, : self.n_majors] & live.unsqueeze(2)).sum(dim=1)
-            lack = ~have[:, s] & alive.unsqueeze(1)
-            hit = (held >= need.unsqueeze(1)) & (held > seen[:, s]) & lack
-            if bool(hit.count_nonzero()):
-                c0 = cur[:, s]
-                floor = (rc - 1).to(retain.dtype)
-                on_cur = hit & (col == c0.unsqueeze(1))
-                retain[:, s] = torch.where(hit & ~on_cur, floor, retain[:, s])
-                cfloor = (rc - 1).gather(1, c0.clamp(min=0).unsqueeze(1)).squeeze(1).to(prog.dtype)
-                prog[:, s] = torch.where(on_cur.any(dim=1), cfloor, prog[:, s])
-            seen[:, s] = torch.where(alive.unsqueeze(1), torch.where(lack, held, torch.zeros_like(held)), seen[:, s])
-
         # THE TECHNOLOGIES
         rc = self._research_cost(False)
-        catch_up(self.citystate_techs, self.citystate_tech_prog, self.citystate_cur_tech, self.citystate_tech_retain, rc,
-                 self.civ_techs, self.citystate_tech_catch)
         prog = self.citystate_tech_prog
         prog[:, s] = torch.where(alive, prog[:, s] + sci + self.citystate_tech_ovf[:, s], prog[:, s])
         self.citystate_tech_ovf[:, s] = torch.where(alive, torch.zeros_like(self.citystate_tech_ovf[:, s]),
@@ -1504,7 +1481,6 @@ class SimMinors:
         retain, ovf = self.citystate_civic_retain, self.citystate_civic_ovf
         rc = self._research_cost(True)
         col = torch.arange(rc.shape[1], device=self.device).unsqueeze(0)
-        catch_up(have, prog, cur, retain, rc, self.civ_civics, self.citystate_civic_catch)
         # the turn's yield and the overflow
         prog[:, s] = torch.where(alive, prog[:, s] + cul + ovf[:, s], prog[:, s])
         ovf[:, s] = torch.where(alive, torch.zeros_like(ovf[:, s]), ovf[:, s])
@@ -1522,6 +1498,42 @@ class SimMinors:
             self._eff_version += 1
             self._cai_completion(s, fire, torch.where(fire, c, torch.full_like(c, -1)), cul)
         return techs, civics
+
+    def _minor_catch_up(self, row: int, item: torch.Tensor, hit: torch.Tensor, is_civic: bool) -> None:
+        """`minorCatchUp` (0x4cb930 techs, 0x39ec60 civics, from the handler
+        0x427bf0): major `row` gained `item` [B] where `hit` [B]; where at
+        least max(1, (catchUpPct x majors + 50) / 100) of the living majors
+        hold it, every city-state and the Free Cities lacking it SET their
+        progress on it at its cost of the moment less one — the item in hand
+        or the progress kept on another."""
+        if row >= self.n_majors:
+            return
+        hit = hit & (item >= 0)
+        if not bool(hit.count_nonzero()):
+            return
+        it = item.clamp(min=0)
+        live = self._barb_majors_alive()
+        need = ((int(self.rules.citystate["catchUpPct"]) * live.sum(dim=1) + 50) // 100).clamp(min=1)
+        majors = (self.civ_civics if is_civic else self.civ_techs)[:, : self.n_majors]
+        held = (majors.gather(2, it.view(-1, 1, 1).expand(-1, self.n_majors, 1)).squeeze(2) & live).sum(dim=1)
+        hit = hit & (held >= need)
+        if not bool(hit.count_nonzero()):
+            return
+        have = self.citystate_civics if is_civic else self.citystate_techs
+        prog = self.citystate_civic_prog if is_civic else self.citystate_tech_prog
+        cur = self.citystate_cur_civic if is_civic else self.citystate_cur_tech
+        retain = self.citystate_civic_retain if is_civic else self.citystate_tech_retain
+        rows = have.shape[1]
+        alive = torch.ones(self.B, rows, dtype=torch.bool, device=self.device)
+        alive[:, : self.citystate_alive.shape[1]] = self.citystate_alive
+        lack = ~have.gather(2, it.view(-1, 1, 1).expand(-1, rows, 1)).squeeze(2)
+        go = hit.unsqueeze(1) & alive & lack
+        floor = (self._research_cost(is_civic).gather(1, it.unsqueeze(1)) - 1).to(prog.dtype)
+        on_cur = go & (cur == it.unsqueeze(1))
+        prog.copy_(torch.where(on_cur, floor.expand(-1, rows), prog))
+        col = torch.arange(retain.shape[2], device=self.device).view(1, 1, -1)
+        kept = (go & ~on_cur).unsqueeze(2) & (col == it.view(-1, 1, 1))
+        retain.copy_(torch.where(kept, floor.to(retain.dtype).unsqueeze(2), retain))
 
     def _minor_urban_fit(self, s: int, hit: torch.Tensor) -> None:
         """`minorResearch`'s Urban Defenses fit: the centre's perimeter and its

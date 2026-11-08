@@ -36,6 +36,7 @@ import { wallsMax, urbanDefensesFit, fitEncampOuter } from './rules';
 import { applyTrainingGrants } from './combat';
 import { unitPromoRows, xpToNextLevel } from './promotions';
 import { applyLumpYield } from './economy';
+import { minorCatchUp } from './minorBuild';
 import { congressGppFactor } from './congress';
 import { BUILT_WONDERS, WONDER_ERA_INDEX } from '../data/builtWonders';
 import { randRange } from './rand';
@@ -60,10 +61,12 @@ export function grantFreeResearch(state: GameState, owner: Seat, kind: 'tech' | 
     if (kind === 'tech') {
       if (next.id === URBAN_DEFENSES_TECH) urbanDefensesFit(state, owner.seat);
       if (!rsr.techs.includes(next.id)) rsr.techs.push(next.id);
+      minorCatchUp(state, owner.seat, next.id, false);
       delete rsr.techRetained[next.id];
       if (rsr.tech === next.id) rsr.tech = null;
     } else {
       if (!rsr.civics.includes(next.id)) rsr.civics.push(next.id);
+      minorCatchUp(state, owner.seat, next.id, true);
       delete rsr.civicRetained[next.id];
       owner.government.civicTurn = state.turn;
       if (rsr.civic === next.id) rsr.civic = null;

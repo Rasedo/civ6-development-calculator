@@ -31,7 +31,7 @@ import { containmentBonus, sameReligionToken, getModifiers, makeYieldCtx, prodBo
 import { allRoadsLeadToRome, addTradeRoute, addCsTradeRoute, addIntlTradeRoute, cancelRoutesBetween, congressCancelBannedIntl, plunderTrader, tradeGraphTurn, tradeRouteExpiry, tradeRouteWalk } from './trade';
 import { addEnvoys, allianceSuzInfluence, cityStateById, declareWarOnCityState, envoysOf, hasMet, isSuzerain, minorCity, resolveSuzerains, sueForPeaceWithCityState, suzerainBuildingLoyalty, suzerainProjectMult, suzerainWonderPct, suzerainGpCultureMult, meetCityState } from './cityStates';
 import { LEVY_TURNS, govInfluence } from '../data/cityStates';
-import { freeCityBuild, freeCombatDesire, freeKnowledge, minorBestOfClass, minorCompleteNow, minorOrdersHeld, minorResearch, trainableIn } from './minorBuild';
+import { freeCityBuild, freeCombatDesire, freeKnowledge, minorBestOfClass, minorCatchUp, minorCompleteNow, minorOrdersHeld, minorResearch, trainableIn } from './minorBuild';
 import { storeUnitStrength } from './aiView';
 import { militaryFavTech } from './operations/unitRows';
 import { freeTradeValue, majorTradeLists } from './aiTrade';
@@ -1078,7 +1078,7 @@ function joinFromFreeCity(state: GameState, city: City): void {
 
 /** The FREE CITIES player's turn, after every major's and city-state's,
  *  every turn of the game: its research is a city-state's (`minorResearch`:
- *  the catch-up, its cities' Science and Culture, the research and civics
+ *  its cities' Science and Culture, the research and civics
  *  AIs, its Combat Desire between their policy jobs and government values,
  *  `freeDesire`), with no city on no yield. Each Free City's
  *  amenities are the ordinary composer's over the Free Cities seat — the full
@@ -2880,6 +2880,7 @@ export function completeResearchNow(state: GameState, seat: number, id: string):
     if (id === URBAN_DEFENSES_TECH) urbanDefensesFit(state, seat);
     researchAward(actor, TECHS[id].effects);
     rsr.techs.push(id);
+    minorCatchUp(state, seat, id, false);
     delete rsr.techRetained[id];
     if (rsr.tech === id) {
       rsr.tech = null;
@@ -2896,6 +2897,7 @@ export function completeResearchNow(state: GameState, seat: number, id: string):
     const slotsBefore = governmentSlots(state, seat);
     researchAward(actor, CIVICS[id].effects);
     rsr.civics.push(id);
+    minorCatchUp(state, seat, id, true);
     delete rsr.civicRetained[id];
     actor.government.civicTurn = state.turn;
     if (rsr.civic === id) {
@@ -3165,6 +3167,7 @@ export function seatPhase(state: GameState, only?: { seats: ReadonlySet<number>;
       if (rsr.tech === URBAN_DEFENSES_TECH) urbanDefensesFit(state, actor.seat);
       researchAward(actor, TECHS[rsr.tech].effects);
       if (!rsr.techs.includes(rsr.tech)) rsr.techs.push(rsr.tech);
+      minorCatchUp(state, actor.seat, rsr.tech, false);
       // CIV6 (EFFECT_GRANT_UNIT_IN_CITY): the roster's free unit at this
       // technology. The SPAWN waits for the upkeep charge below — a unit
       // granted this turn starts paying next turn, and the GPU's grant sits on
@@ -3252,6 +3255,7 @@ export function seatPhase(state: GameState, only?: { seats: ReadonlySet<number>;
       rsr.civicProgress -= researchCost(state, rsr.civic, true, actor.seat);
       researchAward(actor, CIVICS[rsr.civic].effects);
       if (!rsr.civics.includes(rsr.civic)) rsr.civics.push(rsr.civic);
+      minorCatchUp(state, actor.seat, rsr.civic, true);
       delete rsr.civicRetained[rsr.civic];
       actor.government.civicTurn = state.turn;
       rsr.civic = null;

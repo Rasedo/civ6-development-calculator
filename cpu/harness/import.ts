@@ -30,7 +30,7 @@ import type { City, CityState, CityStateType, DistrictId, FeatureId, GameMap, Ga
 import { NO_SEAT } from '../core/types';
 import { minorItemKey, minorRepairResumed, type MinorItem } from '../core/minorBuild';
 import { createGameFromMap } from '../core/game';
-import { BARB_SEAT, FREE_SEAT, civOf, emptySeat, isBarbSeat, isCityStateSeat, startMeleeCS, freeSeatOf, grantKey, isCiv, markCityCentre, seatOf, tileBelongsTo, seatOfCityState, setTileOwner, setWar, majorsMet, majorsAlive, setMetTurnWith } from '../core/seats';
+import { BARB_SEAT, FREE_SEAT, civOf, emptySeat, isBarbSeat, isCityStateSeat, startMeleeCS, freeSeatOf, grantKey, isCiv, markCityCentre, seatOf, tileBelongsTo, seatOfCityState, setTileOwner, setWar, majorsMet, setMetTurnWith } from '../core/seats';
 import { routeDestCenter, routeOriginCenter, stampTradingPost } from '../core/trade';
 import { setTradeEdge, tradeCourse, tradeReach } from '../core/tradePath';
 import { civEraIndex, cityCentreYields, cityPlotBonus, cityYieldCtx, growthDetachResidue, luxuryAmenities, luxuryHoldings, parkAmenities } from '../core/city';
@@ -2762,28 +2762,6 @@ export function importTurn(rec: TurnRecord, cat: Catalog, history?: History): Im
   // which the minor's step prices out of the repair (`minorRepairResumed`)
   for (const [minor, item] of repairsInHand) {
     if (item && !('none' in item)) minor.prodProgress = Math.max(0, (minor.prodProgress ?? 0) - minorRepairResumed(state, minor, item));
-  }
-  // A MINOR'S CATCH-UP as the record leaves it: the counts its catch-up has
-  // seen are the record's majors'
-  const catchUpMajors = majorsAlive(state).map((s) => state.seats[s].research);
-  for (const m of [...state.cityStates, ...(state.freeSeat ? [state.freeSeat] : [])]) {
-    const r = m.research;
-    const seen = (civic: boolean) => {
-      const have = civic ? r.civics : r.techs;
-      const out: Record<string, number> = {};
-      for (const id of Object.keys(civic ? CIVICS : TECHS)) {
-        if (have.includes(id)) continue;
-        const n = catchUpMajors.filter((x) => (civic ? x.civics : x.techs).includes(id)).length;
-        if (n) out[id] = n;
-      }
-      return Object.keys(out).length ? out : undefined;
-    };
-    const t = seen(false);
-    const c = seen(true);
-    if (t) r.techCatchUp = t;
-    else delete r.techCatchUp;
-    if (c) r.civicCatchUp = c;
-    else delete r.civicCatchUp;
   }
   // the road tier each player's era last gave its roads (`upgradeRoads`): its
   // era's, the upgrade landing at the turn's end before the record
