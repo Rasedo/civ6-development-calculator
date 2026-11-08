@@ -36,7 +36,7 @@ import { newCityAi } from './aiCityTrees';
 import { freeEndedTrees, newTreeId, treeSlot } from './treePool';
 import { installType, minorCanUpgrade, minorKnownUnits, minorOrdersHeld, minorSetItem, minorUnitProduction, minorUpgradeUnit, minorUpgradeVisible } from './minorBuild';
 import { minorContractCity, minorSecondHook } from './minorCityAi';
-import { BARB_SEAT, campTiles, tileSeat } from './seats';
+import { BARB_SEAT, campTiles, cityHolders, tileSeat } from './seats';
 import { disbandUnit, promotionsHeld } from './units';
 import { upgradeType } from './stockpile';
 import { goldAffordable } from './game';
@@ -107,6 +107,26 @@ export function minorCampsLook(state: GameState, cs: CityState): void {
   const camps = lookCamps(cs.campsKnown ?? [], (p) => revealed[p] === 1, campTiles(state));
   if (camps.length) cs.campsKnown = camps;
   else delete cs.campsKnown;
+}
+
+/** the knowledge base's cities (its look 0x7877e0 -> the city arm 0x5f0280,
+ *  in plot order): every city whose centre the minor has revealed, of any
+ *  owner (the Free Cities' included), joins the end of its list where no
+ *  entry of its owner and id stands (0x5e7ae0). An entry whose city stands
+ *  no more never resolves again (a capture mints a new id) */
+export function minorCitiesLook(state: GameState, cs: CityState): void {
+  const revealed = cs.revealed ?? [];
+  const known = cs.citiesKnown ?? [];
+  const has = new Set(known.map((k) => `${k.owner}:${k.id}`));
+  const found: { plot: number; owner: number; id: number }[] = [];
+  for (const h of cityHolders(state)) for (const c of h.cities) found.push({ plot: c.centerIndex, owner: h.seat, id: c.id });
+  for (const o of state.cityStates) if (o.centerIndex >= 0) found.push({ plot: o.centerIndex, owner: o.seat, id: -1 });
+  found.sort((a, b) => a.plot - b.plot);
+  for (const f of found) {
+    if (revealed[f.plot] !== 1 || has.has(`${f.owner}:${f.id}`)) continue;
+    known.push({ owner: f.owner, id: f.id });
+  }
+  if (known.length) cs.citiesKnown = known;
 }
 
 function minorEnv(state: GameState, cs: CityState, pass: Pass | null): OpsEnv {

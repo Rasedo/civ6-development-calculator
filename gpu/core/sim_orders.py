@@ -1588,13 +1588,24 @@ class SimOrders:
             # A route dies with its endpoint, for WHICHEVER seat holds it — the
             # minor is encoded -(2+s) in every row's dest column.
             dead_cs = self.seat_routes[b, :, :, 1] == -(2 + s)  # [NS, K]
+            # the Trader unit walking such a route dies with it (`dropRoutes`)
+            _wu = self.seat_route_unit[b]
+            _walk = (dead_cs & (_wu >= 0)).nonzero(as_tuple=True)
+            if len(_walk[0]):
+                _sl = _wu[_walk]
+                _sl = _sl[self.major_unit_alive[b, _sl]]
+                if len(_sl):
+                    self._vacate("major", torch.full_like(_sl, b), _sl)
+                    self.major_unit_alive[b, _sl] = False
+            self.seat_route_unit[b] = torch.where(dead_cs, torch.full_like(_wu, -1), _wu)
             self.seat_routes[b] = torch.where(dead_cs.unsqueeze(2), torch.full_like(self.seat_routes[b], -1), self.seat_routes[b])
             self.seat_route_dseat[b] = torch.where(dead_cs, torch.full_like(self.seat_route_dseat[b], -1), self.seat_route_dseat[b])
             self.seat_route_dcity[b] = torch.where(dead_cs, torch.full_like(self.seat_route_dcity[b], -1), self.seat_route_dcity[b])
             # ...and the minor's own routes end with it: its record is gone
             _mr = self._CITY_MINOR0 + s
             for _pl in (self.seat_routes, self.seat_route_dseat, self.seat_route_dcity,
-                        self.seat_route_born, self.seat_route_walk, self.seat_route_leg, self.seat_route_course):
+                        self.seat_route_born, self.seat_route_walk, self.seat_route_leg, self.seat_route_unit,
+                        self.seat_route_course):
                 _pl[b, _mr] = -1
             ring = (self.pair_dist[c_t] <= 2) & (self.tile_seat[b] == 100 + s)
             # a plot changing HANDS drops its LOCK (`setTileOwner`'s clear)

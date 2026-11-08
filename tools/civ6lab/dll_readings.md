@@ -11154,3 +11154,62 @@ set (cpu/core/barbarianOps.ts); the trees' `done` in the barbarians' pass
   search per walk (1117 t18 Galley 720906 25:6 -> 25:3 needs a start of 3
   where the last planned unit is a Warrior); the per-step search also
   reads each step's newly revealed plots.
+
+## C-108 / C-127: the trade AI's list searches fresh over its knowledge base's cities, the Free Cities' among them; a city-state's Trader walks its route — READ (0x78f210 at 0x78f400..0x78f41b, 0x559140, 0x77d10's +0xe0, 0x5f0280, 0x78e0a0 -> 0x53e20), both twins
+
+`knownTradeCities` (cpu/core/aiTrade.ts), `minorCitiesLook` (cpu/core/minorOps.ts,
+from `minorKnowledge`), `commitRoute` / `routeTrader` / `traderHome` /
+`dropRoutes` (cpu/core/trade.ts), `markRoutedTraders` and the record's gone
+Trader (cpu/harness/replay.ts); GPU `_minor_cities_look`,
+`_minor_trade_cands`, `_minor_trade_order`, `_keep_trade_list`'s order,
+`_minor_route_candidate` (gpu/core/sim_minors.py), `seat_route_unit`,
+`_routed_slots`, `_trader_to`, `_routes_home`, `_routes_kill_walkers`,
+`_plunder_trader` (gpu/core/sim_seats.py).
+
+- THE LIST'S PATH (0x78f210 at 0x78f400..0x78f41b): the try calls the trade
+  pathfinder 0x559140 directly (player the owner +0x128, from the city's
+  plot +0x158 to the destination's, r9 1, no path out); 0x559140 hands r9
+  to GeneratePath as its info (+0xe0), which GeneratePath only compares for
+  the finder's reuse (0x77d51) and no callback of the Trade_Movement
+  finder reads (0x557e40's set). So the list asks a fresh search alone; the
+  trade graph's edges (0x541ae0) are CanStartRoute's and a route's start's,
+  never the list's (`routeInRange`, unchanged).
+- THE KNOWN CITIES (0x78f210 walks the knowledge base's city entries,
+  0x786160 +0, 0xe0 bytes each, in their order): the look's city arm
+  0x5f0280 (from 0x7877e0 in plot order, on every centre the player sees or
+  has revealed) appends an entry (owner word, type 2, city id) where none
+  of that owner and id stands — no owner filter, so a Free Cities' city is
+  one. A city founded in the majors' turn joins a city-state's base at its
+  next look, which its turn takes after its City Analysis (the list) and
+  before its Economic AI (the pick): the list tries it a turn later.
+  `CityState.citiesKnown` / `citystate_kb_city_rank` (the order) and
+  `citystate_kb_city_id`; the list, the pick (its tie the first in that
+  order) and K read them. An entry of a city gone never resolves again (a
+  capture mints a new id), so its ageing's drop is not stored.
+- THE PICK'S FREE CITIES: 0x78e0a0 values an international destination by
+  its owner's war state alone; a Free City is a destination like any other
+  (CanStartRoute's meeting: the minor met the Free Cities).
+- THE TRADER (0x78e0a0, per idle Trader standing in the city: WakeUnit
+  0x53e20 with MAKE_TRADE_ROUTE): the route is the unit's operation; the
+  unit stays on its owner's list, walking the route on the trade layer,
+  home and idle at its end, sent again from there. `Unit.routed`,
+  `TradeRoute.trader`: the walker steps with the route (`tradeRouteStep`),
+  a plunder kills it with the route, the route's end or a cancel brings it
+  home at the origin, a fallen destination city-state's route dies with it.
+  The barbarians' Plunder Trader takes it as a TRADER target on its plot.
+- CONFIRMED (one-seed aimem traces): runs/h1_duelr1128 t106 Bologna's route
+  to Hong Kong as recorded (trade.route.minor 4 of 4 to t108): China's
+  Taiyuan (7:11), founded in China's t106 turn, is in Bologna's t106
+  knowledge log but not its t106 list; Bologna's K 7.04 / 8.49 from t103 /
+  8.88 at t110 as logged. runs/h1_duelr1128 Hong Kong's Trader 1310726 on
+  its route t82-t103, sent again at t104 (the records' unit). runs/h1_duelr1121
+  Hunza's route to Taiyuan (born t197) ends in its t226 turn and its Trader,
+  home, takes it again at t227 (Origin Yields 1/0/7/1/1/0 as logged).
+  runs/h1_duelr1117 t48 city-state 4's Trader 393218, plundered by the
+  barbarian Warrior 2752527 (AI_Tactical "Plunder Trader"), its route gone
+  in ours from t49. Misses unchanged to t49 (1117), t227 (1121), t108 (1128)
+  but the Bologna row.
+- OPEN: a major's Trader is still spent at its route (`commitRoute`); a
+  major's list reads no Free Cities' city (its route value to one through
+  `_seat_route_income` unported); the Hong Kong K over Rome's cities (1128
+  t69-t111 4.64 for the logged 5.39; Bologna t82-85 5.41 for 6.41).

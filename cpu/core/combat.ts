@@ -69,6 +69,7 @@ import { boostOnEvent } from './boosts';
 import { gpPermOf } from '../data/greatPeople';
 import { barbBattleBoldness, barbPillageScore, tribeDies } from './barbarians';
 import { questCampCleared } from './quests';
+import { dropRoutes } from './trade';
 const ok: RuleResult = { ok: true };
 const no = (reason: string): RuleResult => ({ ok: false, reason });
 
@@ -3119,7 +3120,7 @@ export function captureCityState(state: GameState, cityState: CityState, seat: n
   state.cityStates = state.cityStates.filter((c) => c.id !== cityState.id);
   disbandMinorArmy(state, cityState);
   for (const sx of [...state.seats, ...state.cityStates]) {
-    sx.tradeRoutes = sx.tradeRoutes?.filter((x) => x.toCs !== cityState.id);
+    dropRoutes(state, sx, (x) => x.toCs === cityState.id);
   }
   const center = state.map.tiles[cityState.centerIndex];
   if (seatOf(state, seat)!.cities.length >= MAX_CITIES_PER_SEAT) {
@@ -3181,7 +3182,7 @@ export function captureCityStateFor(state: GameState, actor: Seat, cityState: Ci
   state.cityStates = state.cityStates.filter((c) => c.id !== cityState.id);
   disbandMinorArmy(state, cityState);
   for (const sx of [...state.seats, ...state.cityStates]) {
-    sx.tradeRoutes = sx.tradeRoutes?.filter((x) => x.toCs !== cityState.id);
+    dropRoutes(state, sx, (x) => x.toCs === cityState.id);
   }
   const center = state.map.tiles[cityState.centerIndex];
   if (actor.cities.length >= MAX_CITIES_PER_SEAT) {

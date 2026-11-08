@@ -778,10 +778,10 @@ export interface Unit {
    *  LEVY (`levyUnits`); absent on every other unit. It survives an upgrade
    *  (the Raven King's discount reads it) and clears when the unit returns. */
   leviedFrom?: number;
-  /** a Trader walking one of its owner's routes while it stands on the map
-   *  (the replay's record of it): the route already counts it against the
-   *  trade capacity, and no route verb spends it. An engine route spends its
-   *  Trader, so no engine game sets it. */
+  /** a Trader walking one of its owner's routes, on the map on the route's
+   *  walk plot (`TradeRoute.trader`; a record's Trader on a record route in
+   *  the replay): the route already counts it against the trade capacity,
+   *  and no route verb spends it */
   routed?: boolean;
   /** CIV6 (GOODY_METEOR_UNIT_REFUND_COST, IGNORE_RESOURCE_MAINTENANCE): a
    *  Meteor Site's grant "has no resource maintenance cost" — it burns no
@@ -1226,6 +1226,9 @@ export interface TradeRoute {
   createdTurn?: number;
   /** the servicing Trader's CURRENT tile (walks 1 tile/turn) */
   walkTile?: number;
+  /** the id of the Trader unit walking it (`Unit.routed`), absent where its
+   *  Trader was spent on it */
+  trader?: number;
   /** 0 walking out, 1 walking home */
   walkLeg?: number;
   /** the route's COURSE: the plots of its path, origin to destination,
@@ -1406,6 +1409,11 @@ export interface CityState extends Seat {
   /** the camps its knowledge base holds, in their order (m_barbarians
    *  +0x638) */
   campsKnown?: number[];
+  /** the cities its knowledge base holds, in their order (m_knownCities,
+   *  `minorCitiesLook`): each its owner's seat and its city id (-1 a
+   *  city-state's one city), appended at the look that first finds its
+   *  centre revealed */
+  citiesKnown?: { owner: number; id: number }[];
   /** per plot 1 where its knowledge base's looks have seen it or a meeting
    *  revealed it (the player's revealed plots, visibility +0x2f0, as
    *  `minorCampsLook` and `minorTradeList` read them; `meetCityState`) */

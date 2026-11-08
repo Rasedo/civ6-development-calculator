@@ -1691,6 +1691,7 @@
             "TradeRoute.createdTurn",
             "TradeRoute.walkTile",
             "TradeRoute.walkLeg",
+            "TradeRoute.trader",
             "TradeRoute.course"
           ],
           "planes": [
@@ -1700,9 +1701,10 @@
             "seat_route_born",
             "seat_route_walk",
             "seat_route_leg",
+            "seat_route_unit",
             "seat_route_course"
           ],
-          "note": "per-route [fromTile, destTile, kind, createdTurn, walkTile, walkLeg, course x courseMax], sorted; destinations in CENTRE-TILE space because city ids are not compared. The walk triple IS the Trader while it services the route."
+          "note": "per-route [fromTile, destTile, kind, createdTurn, walkTile, walkLeg, walker, course x courseMax], sorted; destinations in CENTRE-TILE space because city ids are not compared. The walk triple is the Trader's walk; walker 1 where a living Trader unit walks it (the unit id the GPU does not hold: its pool slot `seat_route_unit`)."
         },
         {
           "name": "tradingPosts",
@@ -2548,6 +2550,19 @@
             "mops_camps"
           ],
           "note": "the camps the minor's knowledge base holds, in its order"
+        },
+        {
+          "name": "minorCitiesKnown",
+          "compare": "exact",
+          "covers": [
+            "CityState.citiesKnown"
+          ],
+          "planes": [
+            "citystate_kb_city_rank",
+            "citystate_kb_city_id",
+            "citystate_kb_city_n"
+          ],
+          "note": "the cities the minor's knowledge base holds (`minorCitiesLook`), those standing in its order, as their centre plots (the GPU's known-city slots read through their centres); an entry of a city gone never resolves again"
         },
         {
           "name": "minorProjectYield",
@@ -4071,6 +4086,18 @@
           "note": "compared as the minor's seat (`unit_levy_src`), -1 on every other unit; `unit_levied` is the mark the combat and upgrade readers take, set and cleared with it"
         },
         {
+          "name": "routed",
+          "compare": "exact",
+          "why": "a Trader walking one of its owner's routes: no route verb sends it, the trade capacity counts it through its route",
+          "covers": [
+            "Unit.routed"
+          ],
+          "planes": [
+            "seat_route_unit"
+          ],
+          "note": "1 for a unit some route of its row names as its walker (`seat_route_unit`), else 0"
+        },
+        {
           "name": "formation",
           "compare": "exact",
           "covers": [
@@ -4819,10 +4846,6 @@
       {
         "path": "City.wonders",
         "why": "the per-city wonder registry (see City.districts); placements are compared per tile."
-      },
-      {
-        "path": "Unit.routed",
-        "why": "set only by a recorded game's replay (the record's Trader standing on the map while its route runs); an engine route spends its Trader, so every engine game holds it unset."
       },
       {
         "path": "Unit.id",

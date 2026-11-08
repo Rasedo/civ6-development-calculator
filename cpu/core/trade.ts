@@ -467,8 +467,8 @@ export function plunderTargets(state: GameState, unit: Unit): Unit[] {
  * worth, or the base 50 for a Trader on no route — and the route ends) and
  * killed by the delayed kill (0x4ef040: `disbandUnit`, its owner's unit list
  * holding it until its end of turn); then the plunderer's Movement is spent
- * (0x56d6f0). A Trader the replay holds on a route (`routed`) is the walker
- * of its owner's route on its plot. The XP2 branch for an owner whose Traders
+ * (0x56d6f0). A Trader on a route (`routed`) is the walker of the route that
+ * names it (`TradeRoute.trader`). The XP2 branch for an owner whose Traders
  * anyone may plunder (Player_Trade +0x1530 m_iAnyonePlunderFavor, written by
  * EFFECT_ADJUST_PLAYER_ANYONE_PLUNDER_TO_FAVOR alone, which no modifier row
  * carries) is never taken.
@@ -479,7 +479,7 @@ export function plunderTrader(state: GameState, unit: Unit): RuleResult {
   const rs = seatOf(state, unit.seat);
   for (const t of traders) {
     const owner = seatOf(state, t.seat);
-    const r = t.routed ? owner?.tradeRoutes?.find((x) => x.walkTile === t.tileIndex) ?? null : null;
+    const r = t.routed ? owner?.tradeRoutes?.find((x) => x.trader === t.id) ?? null : null;
     if (rs && owner) rs.treasury += routePlunderGold(state, unit.seat, owner, r, t.tileIndex);
     if (r && owner) owner.tradeRoutes = (owner.tradeRoutes ?? []).filter((x) => x !== r);
     disbandUnit(state, t.id);
@@ -550,12 +550,7 @@ export function cancelRoutes(state: GameState, seat: number, hit: (r: TradeRoute
   if (!s?.tradeRoutes?.length) return;
   const cut = s.tradeRoutes.filter(hit);
   if (!cut.length) return;
-  if (state.unitsMode) {
-    for (const r of cut) {
-      const oc = routeOriginCenter(state, s, r);
-      if (oc >= 0) spawnUnit(state, 'TRADER', oc, seat);
-    }
-  }
+  for (const r of cut) traderHome(state, s, r);
   s.tradeRoutes = s.tradeRoutes.filter((r) => !cut.includes(r));
 }
 
@@ -1251,13 +1246,21 @@ export function addTradeRoute(state: GameState, from: number, to: number, seat: 
   return { ok: true };
 }
 
-/** Spend the Trader, stamp the walk fields, push the route and take its
- * Trader's first plot — the one
- * committer all three route kinds share. */
+/** Send the Trader, stamp the walk fields, push the route and take its
+ * Trader's first plot — the one committer all three route kinds share. A
+ * city-state's Trader stays a unit of its list, walking the route from its
+ * origin (`Unit.routed`, `TradeRoute.trader`: the economic AI's pick wakes
+ * the idle Trader standing in its city with MAKE_TRADE_ROUTE, 0x78e0a0 ->
+ * 0x53e20; runs/h1_duelr1128 Hong Kong's Trader 1310726 walking its route to Bologna
+ * t82-t103, the same unit home and sent again at t104); a major's is spent. */
 function commitRoute(state: GameState, seat: number, originCenter: number, destCenter: number, route: TradeRoute): void {
   if (state.unitsMode) {
     const t = freeTrader(state, seat);
-    if (t) disbandUnit(state, t.id);
+    if (t && isCityStateSeat(seat)) {
+      t.routed = true;
+      t.tileIndex = originCenter;
+      route.trader = t.id;
+    } else if (t) disbandUnit(state, t.id);
   }
   route.createdTurn = state.turn;
   // the COURSE, laid once here and walked for the route's life: the trade
@@ -1365,6 +1368,8 @@ function tradeRouteStep(state: GameState, actor: Seat, r: TradeRoute): void {
   const i = r.walkLeg === 0 ? at + 1 : at - 1;
   const next = course[i];
   r.walkTile = next;
+  const walker = routeTrader(state, r);
+  if (walker) walker.tileIndex = next;
   // roads go on LAND only — a sea leg lays nothing
   if (!isWater(state.map.tiles[next])) layRoad(state, actor.seat, state.map.tiles[next]);
   claimTileEnRoute(state, actor.seat, next);
@@ -1401,8 +1406,39 @@ export function tradeRouteWalk(state: GameState, actor: Seat): void {
     plundered.add(r);
     const rs = seatOf(state, raider);
     if (rs) rs.treasury += routePlunderGold(state, raider, actor, r, r.walkTile!);
+    const walker = routeTrader(state, r);
+    if (walker) disbandUnit(state, walker.id);
   }
   if (plundered.size > 0) actor.tradeRoutes = routes.filter((r) => !plundered.has(r));
+}
+
+/** the Trader unit walking route `r` (`TradeRoute.trader`), none where its
+ *  Trader was spent on it or is gone */
+export function routeTrader(state: GameState, r: TradeRoute): Unit | undefined {
+  return r.trader === undefined ? undefined : state.units.find((u) => u.id === r.trader && u.routed);
+}
+
+/** the routes of `holder` that `hit` names end with their Traders: the unit
+ *  walking each dies with it (a route whose destination city-state falls) */
+export function dropRoutes(state: GameState, holder: Seat, hit: (r: TradeRoute) => boolean): void {
+  const cut = (holder.tradeRoutes ?? []).filter(hit);
+  if (!cut.length) return;
+  for (const r of cut) {
+    const walker = routeTrader(state, r);
+    if (walker) disbandUnit(state, walker.id);
+  }
+  holder.tradeRoutes = holder.tradeRoutes!.filter((r) => !cut.includes(r));
+}
+
+/** route `r` of `actor` ends: its Trader home at the origin, on no route —
+ *  the unit walking it, else (a spent one) a new Trader there */
+function traderHome(state: GameState, actor: Seat, r: TradeRoute): void {
+  const oc = routeOriginCenter(state, actor, r);
+  const walker = routeTrader(state, r);
+  if (walker) {
+    delete walker.routed;
+    if (oc >= 0) walker.tileIndex = oc;
+  } else if (state.unitsMode && r.trader === undefined && oc >= 0) spawnUnit(state, 'TRADER', oc, actor.seat);
 }
 
 /**
@@ -1440,12 +1476,7 @@ export function tradeRouteExpiry(state: GameState, actor: Seat): void {
   }
   const ended = cur.filter((x) => isDone(x) || destGone(x));
   if (ended.length > 0) {
-    if (state.unitsMode) {
-      for (const r of ended) {
-        const oc = routeOriginCenter(state, actor, r);
-        if (oc >= 0) spawnUnit(state, 'TRADER', oc, actor.seat);
-      }
-    }
+    for (const r of ended) traderHome(state, actor, r);
     actor.tradeRoutes = cur.filter((x) => !ended.includes(x));
   }
 }

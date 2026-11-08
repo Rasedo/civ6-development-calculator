@@ -489,7 +489,7 @@
 - addr: 0x78e0a0
   final: 0x5199e0
   kind: function
-  semantics: "the trader's destination (from 0x687bf0, the economic AI's turn, per idle Trader standing in a city): over the city's trade list (CityBuildAI +0x870) and the knowledge base's +0xe0 city entries in their order, each 0x78e010 admits: an international one whose owner the player is not at war with (0x469cd0) is valued sum yieldValue(0x7a6690) over the route's origin yields 0x526330 (last argument 0), times 1, x3 where the diplomatic AI's vt+0x30 (focus player +0x6780) names the owner, + (1 + the Player_Diplomacy +0x480 sum) where 0x4d9830 finds no Trading Post of the player in any city of the owner; a domestic one (origin + destination) yields, x3 where 0x54ad70 is 0. Sorted highest first (0x78d510); the first CanStartRoute (0x54efc0) admits is the order (WakeUnit, MAKE_TRADE_ROUTE). A city-state's multiplier is 2 to an owner without its post, 1 with."
+  semantics: "the trader's destination (from 0x687bf0, the economic AI's turn, per idle Trader standing in a city): over the city's trade list (CityBuildAI +0x870) and the knowledge base's +0xe0 city entries in their order, each 0x78e010 admits: an international one whose owner the player is not at war with (0x469cd0) is valued sum yieldValue(0x7a6690) over the route's origin yields 0x526330 (last argument 0), times 1, x3 where the diplomatic AI's vt+0x30 (focus player +0x6780) names the owner, + (1 + the Player_Diplomacy +0x480 sum) where 0x4d9830 finds no Trading Post of the player in any city of the owner; a domestic one (origin + destination) yields, x3 where 0x54ad70 is 0. Sorted highest first (0x78d510); the first CanStartRoute (0x54efc0) admits is the order (WakeUnit, MAKE_TRADE_ROUTE). A city-state's multiplier is 2 to an owner without its post, 1 with. The known cities its knowledge base's (a Free City one of them); the Trader woken stays on its owner's list walking the route."
   status: PARTLY
   cases:
     - recording: h1_duely1127
@@ -501,15 +501,21 @@
       value: "else the trade AI's route value K (its knowledge base +0x6d8, logged as   AI_Knowledge.csv \"TRADE, TO -1, VAL\" by 0x5ed280;"
     - recording: 1124
       value: the analysis reads the K the turn before   logged (Lighthouse 96 -> 110, Market 91 -> 107 of 1124's at the same T).
+    - recording: h1_duelr1128
+      turn: 104
+      value: Hong Kong's Trader 1310726, home from its route at t103, sent again to Bologna
   impl:
     - cpu/core/aiTrade.ts:minorRouteCandidate
     - gpu/core/sim_minors.py:_minor_route_candidate
     - cpu/core/trade.ts:minorTradePick
     - gpu/core/sim_minors.py:_minor_trade_pick
     - cpu/core/minorBuild.ts:prev
+    - cpu/core/trade.ts:commitRoute
+    - gpu/core/sim_seats.py:_trader_to
   readings:
     - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
     - "C-130: a minor's levy home after its bank; its free Trader's route before its city update, the AI's yields cached before it; a deleted unit off its list at once; a major's founded city keeps its trade list at once — READ (0x4e4560 at 0x4e45ee / 0x4e4638, 0x6096c0's passes, 0x688eaa, 0x1cb8b0, 0x948500 at 0x9485e5, 0x1eae70 at 0x1eb335 -> 0x5cdd70 at 0x5ce191), the cache's span a fit, both twins"
+    - "C-108 / C-127: the trade AI's list searches fresh over its knowledge base's cities, the Free Cities' among them; a city-state's Trader walks its route — READ (0x78f210 at 0x78f400..0x78f41b, 0x559140, 0x77d10's +0xe0, 0x5f0280, 0x78e0a0 -> 0x53e20), both twins"
   notes:
     - ".claude/scratchpad/cb3/NOTES.md: ...MIN sums,  trader value (knowledge base +0x6d8), plot-yield modifiers (Lighthouse/Shipyard), units (0x78e0a0 military table),  projects 0x7b28c0, resource value 0x7a21e0, districts/improvements, scorer/DS pic..."
   context:

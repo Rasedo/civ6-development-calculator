@@ -57,7 +57,7 @@ import { irradiated } from './nuclear';
 import { atRngPoint } from './rand';
 import { dangerPlane, knowledgeLook } from './tactical';
 import { plotsSeenNow } from './barbarians';
-import { cityStateMilitary, minorCampsLook, minorMilitaryUpgrade, minorOpsRefresh, upgradeTreesStart } from './minorOps';
+import { cityStateMilitary, minorCampsLook, minorCitiesLook, minorMilitaryUpgrade, minorOpsRefresh, upgradeTreesStart } from './minorOps';
 import { tilesWithin } from '../../world/hex';
 import { hasRiver } from '../../world/query';
 import { aliases, engineId, gameTypeOf } from '../data/aliases';
@@ -1506,11 +1506,13 @@ export function minorUnitProduction(state: GameState, cityState: CityState, know
   });
 }
 
-/** A city-state's knowledge base's army update (`knowledgeLook`) over the
- *  plots it sees (`cityStateSight`). */
+/** A city-state's knowledge base's look: its army records (`knowledgeLook`)
+ *  over the plots it sees (`cityStateSight`), its camps and its cities
+ *  (`minorCampsLook`, `minorCitiesLook`) over the plots it has revealed. */
 export function minorKnowledge(state: GameState, cityState: CityState, age: boolean): void {
   knowledgeLook(state, cityState, cityState.seat, cityStateSight(state, cityState.seat), age);
   minorCampsLook(state, cityState);
+  minorCitiesLook(state, cityState);
 }
 /** A CITY'S PRIMARY REGIONS (0x700630, from the city analysis 0x5cdd70, into
  *  the military AI's list +0x1290 +0x2f0): the region of its centre and, the

@@ -350,14 +350,16 @@ class SimMinors:
         return seen
 
     def _minor_knowledge(self, s: int, age: bool) -> None:
-        """`minorKnowledge` — minor `s`'s knowledge base's look over the plots
-        it sees (`_minor_sight`): its army records, its camps."""
+        """`minorKnowledge` — minor `s`'s knowledge base's look: its army
+        records over the plots it sees (`_minor_sight`), its camps and its
+        cities over the plots it has revealed."""
         alive = self.citystate_alive[:, s]
         if not bool(alive.count_nonzero()):
             return
         sight = self._minor_sight(s)
         self._knowledge_look(s, 100 + s, sight, alive, age)
         self._mops_camps_look(s, sight, alive)
+        self._minor_cities_look(s, alive)
 
     def _knowledge_look(self, r: int, seat: int, sight: torch.Tensor, alive: torch.Tensor, age: bool) -> None:
         """`knowledgeLook` — the knowledge base's army records on row `r` of
@@ -669,7 +671,7 @@ class SimMinors:
         out = (self.seat_routes[:, row, :, 0] >= 0).sum(dim=1)
         if self._trader_idx >= 0:
             out = out + (self.major_unit_alive & (self.major_unit_seat == 100 + s)
-                         & (self.major_unit_type == self._trader_idx)).sum(dim=1)
+                         & (self.major_unit_type == self._trader_idx) & ~self._routed_slots(row)).sum(dim=1)
         return out
 
     def _minor_dest_y6(self, s: int) -> tuple[list[torch.Tensor], list[torch.Tensor]]:
@@ -689,7 +691,7 @@ class SimMinors:
         comp = (reg >= 0) & self.district_complete.gather(1, reg.clamp(min=0).reshape(B, -1)).reshape_as(reg)
         fgk = self._gp_city_perm_names.index("foreignRouteGold")
         wond = getattr(self, "_wond_sender_gold", None) is not None
-        for r2 in range(self.n_majors):
+        for r2 in [*range(self.n_majors), self.FREE_ROW]:
             for j in range(self.RC):
                 y = self._route_centre_intl.reshape(1, 6).double() + comp[:, r2, j].double() @ self._route_intl_y
                 y = y.clone()
@@ -706,17 +708,17 @@ class SimMinors:
     def _minor_route_candidate(self, s: int, want: torch.Tensor):
         """`minorRouteCandidate` — where minor `s`'s free Trader goes, in the
         games `want` (the economic AI's turn 0x687bf0 -> 0x78e0a0). Over the
-        known cities in `_known_trade_cands`' order that its city's trade list
+        known cities its knowledge base holds (`_minor_trade_cands`) that its city's trade list
         holds (`citystate_trade_ok`), each whose holder it is not at war with
-        and has met (`tradeMet`: `citystate_met_minor`, `seat_citystate_met`):
+        and has met (`tradeMet`: `citystate_met_minor`, `seat_citystate_met`, `citystate_met_free`):
         not one its routes already run to, not under Trade Policy's ban, one
         CanStartRoute's path admits (`_trade_admits`) — the route's value,
         its origin yields on the route's path (`_trade_path`; `_minor_dest_y6`,
         the path term `_route_path_gold` over it, the Trading Post at the
         destination `_route_post_gold`) valued at the minor's weights and
         summed, times 2 where the minor holds no Trading Post in any city of
-        the destination's holder (0x4d9830). The greatest wins, the first in
-        the order on a tie. Returns ([B] found, [B] dest code (-(2+cs) or -1),
+        the destination's holder (0x4d9830). The greatest wins, the first in the
+        knowledge base's order on a tie. Returns ([B] found, [B] dest code (-(2+cs) or -1),
         [B] dest seat row, [B] dest city id, [B] dest centre)."""
         from .sim_cityvalue import _YIELDS
         B, S, RC, dev = self.B, self.S, self.RC, self.device
@@ -738,11 +740,12 @@ class SimMinors:
                 cids.append(torch.full((B,), -1, dtype=torch.long, device=dev))
                 posts.append(tp.gather(1, ctr[:, d].clamp(min=0).unsqueeze(1)).squeeze(1))
             else:
-                r2, j = divmod(d - S, RC)
+                r2, j = self._trade_cand_row(d)
                 cid = self.city_id[:, r2, j]
                 has = (act & (self.seat_route_dseat[:, row] == r2)
                        & (self.seat_route_dcity[:, row] == cid.unsqueeze(1))).any(dim=1)
-                gate = free[d] & ~has & ~self._congress_intl_banned(r2) & self.seat_citystate_met[:, r2, s]
+                gate = free[d] & ~has & (self.citystate_met_free[:, s] if r2 == self.FREE_ROW
+                                         else ~self._congress_intl_banned(r2) & self.seat_citystate_met[:, r2, s])
                 codes.append(torch.full((B,), -1, dtype=torch.long, device=dev))
                 seats.append(torch.full((B,), r2, dtype=torch.long, device=dev))
                 cids.append(cid)
@@ -775,58 +778,111 @@ class SimMinors:
         y[:, :, 2] += self._route_path_gold(row, y[:, :, 2], on, crs) \
             + (self._route_post_gold(row, ctr) * on.long()).double()
         f = self._cv_minor_facts(s)
-        best = torch.zeros(B, dtype=torch.long, device=dev)
+        V = torch.zeros(B, ND, dtype=torch.long, device=dev)
         for d in range(ND):
-            o_d = on[:, d]
-            if not bool(o_d.count_nonzero()):
+            if not bool(on[:, d].count_nonzero()):
                 continue
             v = torch.zeros(B, dtype=torch.long, device=dev)
             for k, name in enumerate(_YIELDS):
                 amt = torch.floor(y[:, d, k] * 256 + 0.5).long()
                 v = v + self._cv_yield(amt, name, f.yield_w(name))
-            v = v * torch.where(posts[d], 1, 2)
-            take = o_d & (~found | (v > best))
-            best = torch.where(take, v, best)
-            found = found | take
-            code = torch.where(take, codes[d], code)
-            dseat = torch.where(take, seats[d], dseat)
-            dcity = torch.where(take, cids[d], dcity)
-            dct = torch.where(take, ctr[:, d], dct)
+            V[:, d] = v * torch.where(posts[d], 1, 2)
+        # the greatest, the first in the knowledge base's order on a tie
+        found = on.any(dim=1)
+        vmax = torch.where(on, V, torch.full_like(V, -(1 << 62))).max(dim=1).values
+        rank = self.citystate_kb_city_rank[:, s]
+        tie = on & (V == vmax.unsqueeze(1))
+        pick = torch.where(tie, rank, torch.full_like(rank, 1 << 40)).argmin(dim=1)
+        CD = torch.stack(codes, dim=1).gather(1, pick.unsqueeze(1)).squeeze(1)
+        SD = torch.stack(seats, dim=1).gather(1, pick.unsqueeze(1)).squeeze(1)
+        ID = torch.stack(cids, dim=1).gather(1, pick.unsqueeze(1)).squeeze(1)
+        code = torch.where(found, CD, code)
+        dseat = torch.where(found, SD, dseat)
+        dcity = torch.where(found, ID, dcity)
+        dct = torch.where(found, ctr.gather(1, pick.unsqueeze(1)).squeeze(1), dct)
         return found, code, dseat, dcity, dct
 
-    def _known_trade_cands(self, centre: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
-        """the known cities a trade AI reads from the city at `centre` [B]
-        (`knownTradeCities`): ([B, ND] standing, [B, ND] centre) over the
-        city-states by index, then every major's cities in row and slot
-        order, the city itself passed"""
+    def _trade_cand_row(self, d: int) -> tuple[int, int]:
+        """the city row and slot of known-city slot `d` >= S: the majors'
+        rows, then the Free Cities' (`FREE_ROW`)"""
+        r2, j = divmod(d - self.S, self.RC)
+        return (r2 if r2 < self.n_majors else self.FREE_ROW), j
+
+    def _known_trade_cands(self, centre: torch.Tensor, free: bool = False) -> tuple[torch.Tensor, torch.Tensor]:
+        """the known-city slots a trade AI reads from the city at `centre`
+        [B] (`knownTradeCities`): ([B, ND] standing, [B, ND] centre) over the
+        city-states by index, then every major's cities and the Free Cities'
+        in row and slot order, the city itself passed; the Free Cities'
+        stand only with `free` (a city-state's knowledge base; a major's list
+        reads the majors' cities)"""
         S = self.S
         live, ctr = [], []
         for s2 in range(S):
             c = self.citystate_center[:, s2]
             live.append(self.citystate_alive[:, s2] & (c >= 0))
             ctr.append(c)
-        for r2 in range(self.n_majors):
+        for r2 in [*range(self.n_majors), self.FREE_ROW]:
             for j in range(self.RC):
-                live.append(self.city_alive[:, r2, j])
+                live.append(self.city_alive[:, r2, j] & (free or r2 != self.FREE_ROW))
                 ctr.append(self.city_center[:, r2, j])
         lv, ct = torch.stack(live, dim=1), torch.stack(ctr, dim=1)
         return lv & (ct != centre.unsqueeze(1)), ct
 
+    def _known_trade_ids(self) -> torch.Tensor:
+        """[B, ND] the city id standing in each known-city slot (-1 a
+        city-state's)"""
+        ids = [torch.full((self.B,), -1, dtype=torch.long, device=self.device)] * self.S
+        for r2 in [*range(self.n_majors), self.FREE_ROW]:
+            for j in range(self.RC):
+                ids.append(self.city_id[:, r2, j].long())
+        return torch.stack(ids, dim=1)
+
+    def _minor_cities_look(self, s: int, alive: torch.Tensor) -> None:
+        """`minorCitiesLook` — minor `s`'s knowledge base's cities: every
+        known-city slot whose city stands with its centre revealed
+        (`mops_revealed`) and holds no entry of that city's id joins the end
+        of the list, in centre plot order"""
+        live, ctr = self._known_trade_cands(torch.full((self.B,), -1, dtype=torch.long, device=self.device), free=True)
+        ids = self._known_trade_ids()
+        rank = self.citystate_kb_city_rank[:, s]
+        rev = self.mops_revealed[:, s].gather(1, ctr.clamp(min=0))
+        new = alive.unsqueeze(1) & live & rev & ((rank < 0) | (self.citystate_kb_city_id[:, s] != ids))
+        if not bool(new.count_nonzero()):
+            return
+        big = 1 << 40
+        order = torch.argsort(torch.where(new, ctr, torch.full_like(ctr, big)), dim=1, stable=True)
+        pos = torch.empty_like(order)
+        pos.scatter_(1, order, torch.arange(order.shape[1], device=self.device).unsqueeze(0).expand_as(order).contiguous())
+        n = self.citystate_kb_city_n[:, s]
+        self.citystate_kb_city_rank[:, s] = torch.where(new, n.unsqueeze(1) + pos, rank)
+        self.citystate_kb_city_id[:, s] = torch.where(new, ids, self.citystate_kb_city_id[:, s])
+        self.citystate_kb_city_n[:, s] = n + new.sum(dim=1)
+
     def _minor_trade_cands(self, s: int) -> tuple[torch.Tensor, torch.Tensor]:
-        """the known cities of minor `s`'s trade AI (`_known_trade_cands` from
-        its centre)"""
-        return self._known_trade_cands(self.citystate_center[:, s])
+        """the known cities of minor `s`'s trade AI: the known-city slots
+        (`_known_trade_cands` from its centre) its knowledge base holds an
+        entry of for the city standing there (`_minor_cities_look`)"""
+        live, ctr = self._known_trade_cands(self.citystate_center[:, s], free=True)
+        held = (self.citystate_kb_city_rank[:, s] >= 0) & (self.citystate_kb_city_id[:, s] == self._known_trade_ids())
+        return live & held, ctr
+
+    def _minor_trade_order(self, s: int) -> torch.Tensor:
+        """[B, ND] the known-city slots of minor `s` in its knowledge base's
+        order, those it holds no entry of last"""
+        rank = self.citystate_kb_city_rank[:, s]
+        return torch.argsort(torch.where(rank >= 0, rank, torch.full_like(rank, 1 << 40)), dim=1, stable=True)
 
     def _keep_trade_list(self, row: int, origin: torch.Tensor, live: torch.Tensor, ctr: torch.Tensor,
                          ok: torch.Tensor, no: torch.Tensor, seen: torch.Tensor,
-                         mask: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
+                         mask: torch.Tensor, order: torch.Tensor | None = None) -> tuple[torch.Tensor, torch.Tensor]:
         """0x78f210 (`keepTradeList`) where `mask` [B]: the trade list ([B, ND]
         listed `ok`, rejected `no`) of the city at `origin` [B] of seat row
         `row` kept a turn on — each known city not yet sorted whose centre
         `seen` [B, T] reveals that a trade path from the city reaches is
-        listed, any other tried rejected; once the list holds a city at most
-        two are tried a turn; a turn that tries none clears the rejected; a
-        city gone leaves the list. Returns the new (ok, no)."""
+        listed, any other tried rejected, in the slots' order `order` [B, ND]
+        (the slot order where none); once the list holds a city at most two
+        are tried a turn; a turn that tries none clears the rejected; a city
+        gone leaves the list. Returns the new (ok, no)."""
         ok_l = ok & live
         no_l = no.clone()
         limited = ok_l.any(dim=1)
@@ -836,15 +892,19 @@ class SimMinors:
         games = todo.any(dim=1).nonzero(as_tuple=True)[0].tolist()
         if games:
             reach = self._trade_reach_rows(row, games, origin.unsqueeze(1))[:, 0]   # [B, T]
-            for d in range(todo.shape[1]):
-                t = todo[:, d]
+            if order is None:
+                order = torch.arange(todo.shape[1], device=self.device).unsqueeze(0).expand(self.B, -1)
+            ar = torch.arange(self.B, device=self.device)
+            for k in range(todo.shape[1]):
+                d = order[:, k]
+                t = todo[ar, d]
                 if not bool(t.count_nonzero()):
                     continue
                 tried = tried + (t & limited).long()
                 go = t & (~limited | (tried <= 2))
-                inr = reach.gather(1, ctr[:, d].clamp(min=0).unsqueeze(1)).squeeze(1)
-                ok_l[:, d] = ok_l[:, d] | (go & inr)
-                no_l[:, d] = no_l[:, d] | (go & ~inr)
+                inr = reach.gather(1, ctr[ar, d].clamp(min=0).unsqueeze(1)).squeeze(1)
+                ok_l[ar, d] = ok_l[ar, d] | (go & inr)
+                no_l[ar, d] = no_l[ar, d] | (go & ~inr)
         no_l = no_l & ~(tried == 0).unsqueeze(1)
         m = mask.unsqueeze(1)
         return torch.where(m, ok_l, ok), torch.where(m, no_l, no)
@@ -856,7 +916,7 @@ class SimMinors:
         live, ctr = self._minor_trade_cands(s)
         ok, no = self._keep_trade_list(self._CITY_MINOR0 + s, self.citystate_center[:, s], live, ctr,
                                        self.citystate_trade_ok[:, s], self.citystate_trade_no[:, s],
-                                       self.mops_revealed[:, s], mask)
+                                       self.mops_revealed[:, s], mask, self._minor_trade_order(s))
         self.citystate_trade_ok[:, s] = ok
         self.citystate_trade_no[:, s] = no
 
@@ -1001,7 +1061,8 @@ class SimMinors:
             live, _ctr = self._known_trade_cands(self.city_center[:, r, j])
             on = self.city_trade_ok[:, r, j] & live & self.city_alive[:, r, j].unsqueeze(1)
             fid = torch.where(on, self.city_id[:, r, j].unsqueeze(1), torch.full_like(on, -1, dtype=torch.long))
-            nd = on.shape[1]
+            # a major's list holds the city-states' and the majors' cities
+            nd = S + self.n_majors * RC
             for d in range(nd):
                 f_d = fid[:, d]
                 if d < S:
@@ -1012,7 +1073,7 @@ class SimMinors:
                     is_dom = False
                     jj = 0
                 else:
-                    r2, jj = divmod(d - S, RC)
+                    r2, jj = self._trade_cand_row(d)
                     hold = r2
                     is_dom = r2 == r
                     cid = self.city_id[:, r2, jj]
@@ -1100,15 +1161,15 @@ class SimMinors:
 
     def _minor_trade_pick(self, s: int) -> None:
         """`minorTradePick` — a free Trader under minor `s`'s capacity takes
-        the scorer's destination (`_minor_route_candidate`) and is spent on
-        it — the commit `commitRoute` makes: the term, the stored course, the
-        walker at the centre on leg 0, road on the centre, its first plot
-        taken at once (`_trade_first_step`)."""
+        the scorer's destination (`_minor_route_candidate`) and walks it —
+        the commit `commitRoute` makes: the term, the stored course, the
+        Trader unit the walker at the centre on leg 0, road on the centre,
+        its first plot taken at once (`_trade_first_step`)."""
         row = self._CITY_MINOR0 + s
         alive = self.citystate_alive[:, s]
         if self._trader_idx >= 0:
             used = (self.seat_routes[:, row, :, 0] >= 0).sum(dim=1)
-            t_has, t_slot, t_tile = self._free_trader(row)
+            t_has, t_slot, _t_tile = self._free_trader(row)
             want = alive & (used < self._trade_capacity(row)) & t_has
             if bool(want.count_nonzero()):
                 found, code, dseat, dcity, dct = self._minor_route_candidate(s, want)
@@ -1124,13 +1185,15 @@ class SimMinors:
                     self.seat_route_born[rows, row, slot] = int(self.turn)
                     self.seat_route_walk[rows, row, slot] = o_ct[rows]
                     self.seat_route_leg[rows, row, slot] = 0
+                    # the Trader stays a unit of its list, walking the route
+                    # from its origin (`Unit.routed`, `TradeRoute.trader`)
+                    self.seat_route_unit[rows, row, slot] = t_slot[rows]
+                    self._trader_to(rows, t_slot[rows], o_ct[rows])
                     self._trade_store_course(row, rows, slot, o_ct[rows], dct[rows])
                     lr = rows[~self.water[rows, o_ct[rows]]]
                     if len(lr) > 0:
                         self._lay_road(lr, o_ct[lr], row)
                     self._trade_first_step(row, rows, slot)
-                    self.major_unit_alive[rows, t_slot[rows]] = False
-                    self._occ_clear(rows, t_tile[rows], t_slot[rows] + self.POOL_LO["major"])
 
     def _minor_route_income(self, s: int) -> torch.Tensor | None:
         """[B, RC, 6] f64 — `minorRouteYields` over minor `s`'s routes, on its

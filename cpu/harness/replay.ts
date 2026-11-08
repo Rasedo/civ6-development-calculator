@@ -32,7 +32,7 @@
  * from the game's draw log where the recording kept it.
  */
 import { existsSync, readFileSync } from 'node:fs';
-import type { ArmyRecord, BarbTribe, City, CityState, DistrictId, GameState, QueueItem, Seat, SeatActionRecord, Tile, Unit } from '../core/types';
+import type { ArmyRecord, BarbTribe, City, CityState, DistrictId, GameState, QueueItem, Seat, SeatActionRecord, Tile, TradeRoute, Unit } from '../core/types';
 import { hexDistance, neighbors } from '../../world/hex';
 import { isWater } from '../../world/query';
 import { NO_SEAT } from '../core/types';
@@ -183,11 +183,6 @@ interface Ctx {
   reasons: Map<string, Map<string, number>>;
   /** the record's units (`owner:id`) the engine's own turn destroyed */
   engineKilled: Set<string>;
-  /** the units standing as the pair's engine turn opened, and the types of
-   *  the units that turn made which a record route of the pair then spent
-   *  (by seat): a Trader a city-state trained and sent out in its turn */
-  standing?: ReadonlySet<Unit>;
-  routeSpent: Map<number, string[]>;
   /** this pair's moved units' steps (`move`'s path), by `owner:id` */
   paths: Map<string, number[]>;
   /** the units (`owner:id`) whose logged steps of this pair `syncUnits`
@@ -2258,6 +2253,7 @@ function minorOpsAfter(ctx: Ctx, b: TurnRecord, turn: number, copy: GameState, t
       else delete cs.armyKnown;
       if (c.campsKnown) cs.campsKnown = c.campsKnown;
       else delete cs.campsKnown;
+      if (c.citiesKnown) cs.citiesKnown = c.citiesKnown;
       if (c.revealed) cs.revealed = c.revealed;
     }
     // the item its second hook set (or a submission cleared)
@@ -3100,17 +3096,6 @@ function applyUnitNew(ctx: Ctx, b: TurnRecord, d: Extract<Decision, { kind: 'uni
   // a captive is the seizure's (`seize`)
   if (ds.some((x) => x.kind === 'seize' && x.into === d.unit)) return;
   spawnRecorded(ctx, b, d.unit);
-  // a Trader the engine's city-state made and the record's route then sent
-  // out (the engine's route spends its Trader; the record's stands on the
-  // map): the record's, made by the engine (runs/h1_duelu1117 t44:
-  // Antananarivo's Trader 393218, trained and routed to Caguana in its turn)
-  const sent = ctx.routeSpent.get(seat) ?? [];
-  const k = sent.indexOf(engineRowOf(ctx.cat, 'unit', d.type) ?? '');
-  if (!major && k >= 0) {
-    sent.splice(k, 1);
-    count(ctx, 'minorAi:unitNew', 'applied', d.player);
-    return;
-  }
   count(ctx, major ? 'unitNew:other' : 'minorAi:unitNew', 'fallback', d.player, `${d.unit} ${ctx.cat.units[d.type]} ${d.why}: the engine made none`);
 }
 
@@ -3624,7 +3609,6 @@ const res = buyTile(state, city.id, d.plot, seat);        if (!res.ok) setTileOw
             const ours = pick ? routeDestCenter(state, minor, pick) : -1;
             const named = (c: number) => (c < 0 ? 'none' : cityAt(state, c)?.name ?? state.cityStates.find((x) => x.centerIndex === c)?.name ?? `plot ${c}`);
             score(ctx, 'trade.route.minor', state.turn, d.player, `p${d.player} ${minor.name}`, ours === dst, named(ours), named(dst));
-            const traders = state.units.filter((u) => u.seat === seat && u.type === 'TRADER');
             res = r.toCs !== undefined ? minorRouteTo(state, minor, { from: -1, to: -1, toCs: r.toCs })
               : to ? minorRouteTo(state, minor, { from: -1, to: -1, toSeat: to.seat, toSeatCity: to.id })
                 : { ok: false, reason: 'no engine city at the destination' };
@@ -3634,11 +3618,6 @@ const res = buyTile(state, city.id, d.plot, seat);        if (!res.ok) setTileOw
             // city, first in record 95, ends with its Trader home in t109)
             const made = res.ok ? minor.tradeRoutes?.at(-1) : undefined;
             if (made) made.createdTurn = b.turn - 1;
-            // the Trader the route spent, where the engine's turn made it
-            const spent = traders.find((u) => !state.units.includes(u));
-            if (spent && ctx.standing && !ctx.standing.has(spent)) {
-              ctx.routeSpent.set(seat, [...(ctx.routeSpent.get(seat) ?? []), spent.type]);
-            }
           } else if (from && from.seat === seat) {
             if (r.toCs !== undefined) res = addCsTradeRoute(state, from.id, r.toCs, seat);
             else if (r.toSeat !== undefined && r.toSeat !== seat) {
@@ -3709,6 +3688,11 @@ const res = buyTile(state, city.id, d.plot, seat);        if (!res.ok) setTileOw
         if (was && !rekeyed) ctx.gone.set(d.unit, was);
         ctx.units.delete(d.unit);
         if (!u) { count(ctx, `unitGone:${d.why}`, 'applied'); break; }
+        // a Trader gone ends the route it walked (runs/h1_duelr1117 t48:
+        // city-state 4's Trader 393218, plundered by the barbarian Warrior
+        // 2752527 in their turn, Route Ended (Plundered))
+        const owner = u.routed ? seatOf(state, u.seat) : undefined;
+        if (owner?.tradeRoutes) owner.tradeRoutes = owner.tradeRoutes.filter((r) => r.trader !== u.id);
         disbandUnit(state, u.id);
         if (TRACE.has('unitGone') && d.why !== 'founded') console.error(`   ${d.unit} ${u.type} hp${u.hp} at ${u.tileIndex} charges${u.charges ?? '-'}`);
         count(ctx, `unitGone:${d.why}`, d.why === 'founded' ? 'applied' : 'fallback', d.player);
@@ -4320,18 +4304,32 @@ function unitKeyOf(ctx: Ctx, u: Unit): string {
  *  route counts it against the trade capacity and no route verb spends it
  *  (runs/h1_duely1127 t78: Hattusa's Trader 90 on its route, one Trader of a
  *  capacity of 2, the game's UNIT_TRADER at 197.2); no more of a player's
- *  than the routes `st` carries for it. `twin`: the unit of `st` a replay unit is */
+ *  than the routes `st` carries for it, each the walker of the route of
+ *  `st` between the record route's two centres (`TradeRoute.trader`).
+ *  `twin`: the unit of `st` a replay unit is */
 function markRoutedTraders(ctx: Ctx, a: TurnRecord, st = ctx.state, twin: (u: Unit) => Unit | undefined = (u) => u): void {
-  const out = new Set(recordRoutes(a).map((r) => `${r.TraderUnitPlayer}:${r.TraderUnitID}`));
+  const on = new Map<string, Record<string, number>>(recordRoutes(a).map((r) => [`${r.TraderUnitPlayer}:${r.TraderUnitID}`, r]));
+  const centre = new Map(a.cities.map((c) => [`${c.owner}:${c.id}`, c.y * ctx.W + c.x]));
   const left = new Map<number, number>();
+  const linked = new Set<TradeRoute>();
   for (const [k, x] of ctx.units) {
     const u = twin(x);
     if (!u || u.type !== 'TRADER') continue;
     delete u.routed;
-    if (!out.has(k) || !st.units.includes(u)) continue;
-    const n = left.get(u.seat) ?? (seatOf(st, u.seat)?.tradeRoutes ?? []).length;
-    if (n > 0) u.routed = true;
+    const r = on.get(k);
+    const owner = seatOf(st, u.seat);
+    if (!r || !owner || !st.units.includes(u)) continue;
+    const n = left.get(u.seat) ?? (owner.tradeRoutes ?? []).length;
     left.set(u.seat, n - 1);
+    if (n <= 0) continue;
+    u.routed = true;
+    const o = centre.get(`${r.OriginCityPlayer}:${r.OriginCityID}`);
+    const dst = centre.get(`${r.DestinationCityPlayer}:${r.DestinationCityID}`);
+    const walked = owner.tradeRoutes?.find((x) => !linked.has(x) && routeOriginCenter(st, owner, x) === o && routeDestCenter(st, owner, x) === dst);
+    if (walked) {
+      walked.trader = u.id;
+      linked.add(walked);
+    }
   }
 }
 
@@ -5178,7 +5176,7 @@ function turnSeed(rec: TurnRecord): number | undefined {
 const SEAT_MEMORY = ['unitPool', 'armyKnown', 'armyAged', 'enemyCounts', 'combatDesire', 'tradeSeat', 'tradeSeen', 'agendas', 'campsKnown', 'cityAi', 'ops', 'opsNext', 'treeSlots', 'treeFree', 'unitStrength'] as const;
 const RESEARCH_MEMORY = ['goal', 'aiEntries', 'civicAiEntries', 'civicGovValues', 'civicPolicyBest', 'civicSlotBest', 'aiLeft', 'aiLeftSeen', 'aiTechSeen',
   'favTech'] as const;
-const MINOR_MEMORY = ['prodSetValue', 'favoredFood', 'tradeCities', 'tradeRejected', 'tradeValue', 'metMinors', 'unitValues', 'buildingValues', 'resourceCounts',
+const MINOR_MEMORY = ['prodSetValue', 'favoredFood', 'tradeCities', 'tradeRejected', 'citiesKnown', 'tradeValue', 'metMinors', 'unitValues', 'buildingValues', 'resourceCounts',
   'economy', 'threat', 'threatNear', 'aiGrowth', 'aiGrowthSeen', 'revealed', 'standingArmyShort', 'explored', 'upgradeTrees', 'unitsListed', 'defendersListed'] as const;
 const CITY_MEMORY = ['aiThreat', 'aiThreatNear', 'freeRaid', 'tradeCities', 'tradeRejected'] as const;
 const UNIT_MEMORY = ['slot', 'aiDefender', 'aiHomed', 'escorted', 'originalOwner', 'look'] as const;
@@ -5693,7 +5691,7 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
   const ctx: Ctx = {
     state, cat, W: recs[0].head.W, seatOfPlayer: first.seatOfPlayer, playerOfSeat: first.playerOfSeat,
     units: new Map(), retained: new Map(), pendingMinors: new Map(), next: first, tally: new Map(), fellBack: new Map(), imposed: new Map(), reasons: new Map(),
-    engineKilled: new Set(), routeSpent: new Map(), paths: new Map(), walked: new Set(), steps: new Map(), barbBlows: new Map(), barbCentres: new Map(), gone: new Map(), barbSeized: [], minorBlows: new Map(), minorShots: [], minorPromoted: new Map(), minorBuys: [], minorImproves: [], minorClears: [], minorCleared: new Set(), minorClearItems: new Map(), minorClearUnits: [], barbBattles: [], barbFought: new Set(), barbDraws: [], promoteHp: new Map(), minorUnits: [], minorGround: [], buyTrace, lateBlows: [], upgradeInto: new Set(), upgradedFrom: new Map(), levyFrom: new Map(), barbSteps: [], barbPillaged: [], envoys: [], battled: new Set(), fortified: new Map(), undug: new Map(), streams: new Map(), applied: new Set(), barbNew: [], lateEnvoys: [], log: history.randLog, stream, prev: recs[0],
+    engineKilled: new Set(), paths: new Map(), walked: new Set(), steps: new Map(), barbBlows: new Map(), barbCentres: new Map(), gone: new Map(), barbSeized: [], minorBlows: new Map(), minorShots: [], minorPromoted: new Map(), minorBuys: [], minorImproves: [], minorClears: [], minorCleared: new Set(), minorClearItems: new Map(), minorClearUnits: [], barbBattles: [], barbFought: new Set(), barbDraws: [], promoteHp: new Map(), minorUnits: [], minorGround: [], buyTrace, lateBlows: [], upgradeInto: new Set(), upgradedFrom: new Map(), levyFrom: new Map(), barbSteps: [], barbPillaged: [], envoys: [], battled: new Set(), fortified: new Map(), undug: new Map(), streams: new Map(), applied: new Set(), barbNew: [], lateEnvoys: [], log: history.randLog, stream, prev: recs[0],
     researchAi: report.researchAi, researchScores: report.researchScores, agendaCivics: null, researchBefore: new Map(), researchAtTurn: new Map(), aiResearchLog: loadAiResearchLog(dumpPath),
     tactical: loadTactical(dumpPath), barbTally: report.barbTactics, minorTally: report.minorTactics, minorDraws: report.minorDraws,
     civicAi: report.civicAi, civicScores: report.civicScores, civicBefore: new Map(), aiCivicLog: govtLog.civics, aiPolicyLog: govtLog.policies,
@@ -5852,12 +5850,6 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
     const seed = turnSeed(b);
     markRoutedTraders(ctx, a);
     const standing = new Set(state.units);
-    ctx.standing = standing;
-    ctx.routeSpent = new Map();
-    // each city-state's routes as its turn opens: one its turn ends hands its
-    // Trader back (`spawnUnit` at the route's origin), which the record holds
-    // as the Trader it always was
-    const routesBefore = new Map(state.cityStates.map((c) => [c.seat, [...(c.tradeRoutes ?? [])]] as const));
     const improvements = state.map.tiles.map((x) => x.improvement ?? null);
     // the plots whose improvement the turn's change (its random events, its
     // climate) took or laid: no Builder's
@@ -6268,28 +6260,18 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
         state.rngState = rng;
       });
       // each minor's free Trader takes the record's route at its Economic
-      // AI's pick, before its city update reads the city (`minorTradePick`),
-      // and stays on the map on its route, as the game's does: its unit
-      // list holds it (runs/h1_duelz1117 t44: city-state 4's Trader 393218,
-      // trained that turn, in its government values' unit count)
+      // AI's pick, before its city update reads the city (`minorTradePick`);
+      // the Trader stays on the map walking its route, its unit list holding
+      // it (runs/h1_duelz1117 t44: city-state 4's Trader 393218, trained that
+      // turn, in its government values' unit count)
       holdMinorRoutePick((_st, cs) => {
         const p = ctx.playerOfSeat.get(cs.seat);
         const d = ds.find((x) => x.kind === 'routes' && x.player === p && !landed.has(x));
         if (p === undefined || !d) return;
         landed.add(d);
-        const free = state.units.flatMap((u, i) => (u.seat === cs.seat && u.type === 'TRADER' && !u.routed ? [[u, i] as const] : []));
         const rng = state.rngState;
         applyPhase(ctx, [d], 'after', b, b, new Set([p]));
         state.rngState = rng;
-        // ...one Trader on the map per route: none where the record's own
-        // stands on it already
-        let routed = state.units.filter((u) => u.seat === cs.seat && u.type === 'TRADER' && u.routed).length;
-        for (const [u, i] of free) {
-          if (state.units.includes(u) || routed >= (cs.tradeRoutes ?? []).length) continue;
-          u.routed = true;
-          routed += 1;
-          state.units.splice(Math.min(i, state.units.length), 0, u);
-        }
       });
       try {
         minorTurns(state);
@@ -6378,12 +6360,6 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
     // Defense's threat, which the game never bought; kept spent, the purse
     // ran 124 short to the bankruptcy that disbanded its Bombard at t149)
     const mapped = new Set(ctx.units.values());
-    // the Traders the city-states' ended routes handed back: the record's
-    // own, each on the map through its route, none a unit their cities made
-    const returned = new Map(state.cityStates.map((c) => {
-      const now = new Set(c.tradeRoutes ?? []);
-      return [c.seat, (routesBefore.get(c.seat) ?? []).filter((r) => !now.has(r)).length] as const;
-    }));
     // the units each player's log adds in the pair that record t+1 lost: a
     // unit made and gone within its turn
     const madeGone = new Map<number, number>();
@@ -6403,15 +6379,6 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
       disbandUnit(state, u.id);
       const cs = state.cityStates.find((c) => c.seat === u.seat);
       const paid = minorBought.get(u);
-      if (!paid && u.type === 'TRADER' && (returned.get(u.seat) ?? 0) > 0) {
-        // ...and none the game's knowledge bases record: the engine's own
-        // Trader made at the route's end (runs/h1_dueld1128 Hong Kong's
-        // Trader on 10:7, t119-t137 and t164-t179 in the engine's records
-        // alone)
-        returned.set(u.seat, returned.get(u.seat)! - 1);
-        forget(u);
-        continue;
-      }
       // a purchase the game never made leaves no record in any knowledge
       // base: its own minor's would count it gone in its army two turns on
       // (runs/h1_duelw1127 t17: city-state 4's Warrior bought at t16,

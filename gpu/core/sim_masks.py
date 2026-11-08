@@ -2471,7 +2471,7 @@ class SimMasks:
     def _trade_graph_turn(self, row: int, mask: torch.Tensor) -> None:
         """`tradeGraphTurn` (0x4d8a40, the player's DoTurn after the
         governors' clocks and before the cities): in the games `mask` [B],
-        each living Trader of row `row` standing in a city of the row updates
+        each living Trader of row `row` on no route standing in a city of the row updates
         the trade graph from that city (`refreshTradeEdges`, 0x545020): every
         other living city's edge with no route of the row running on it
         takes the pathfinder's course; an edge it no longer reaches keeps its
@@ -2479,7 +2479,8 @@ class SimMasks:
         if self._trader_idx < 0:
             return
         al = (mask.unsqueeze(1) & self.major_unit_alive
-              & (self.major_unit_seat == int(self._ROW_SEAT[row])) & (self.major_unit_type == self._trader_idx))
+              & (self.major_unit_seat == int(self._ROW_SEAT[row])) & (self.major_unit_type == self._trader_idx)
+              & ~self._routed_slots(row))
         games = al.any(dim=1).nonzero(as_tuple=True)[0].tolist()
         if not games:
             return

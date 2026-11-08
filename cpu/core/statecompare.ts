@@ -49,13 +49,13 @@ import type { City, CityState, DealItem, GameState, ProjectYield, ResearchState,
 import { YIELD_KEYS } from '../../world/types';
 import { DEAL_ITEMS, PRODUCTION_QUEUE_MAX } from '../data/seats';
 import { dealOfferOf, dealTermOf, spyHeldWith, spyLevelsHeld } from './deals';
-import { alliancePtsWith, allianceTypeWith, allyTurnsWith, BARB_SEAT, borderTurnsFrom, citiesOf, cityHolders, delegationWith, FREE_SEAT, friendTurnsWith, isCiv, metTurnWith, peaceTurnWith, prophetsOf, seatOf, treatyTurnsWith, warsOf, warTurnsWith } from './seats';
+import { alliancePtsWith, allianceTypeWith, allyTurnsWith, BARB_SEAT, borderTurnsFrom, citiesOf, cityHolders, delegationWith, FREE_SEAT, friendTurnsWith, isCityStateSeat, isCiv, metTurnWith, peaceTurnWith, prophetsOf, seatOf, treatyTurnsWith, warsOf, warTurnsWith } from './seats';
 import { grievanceWith, promiseBrokenWith, promiseWith } from './grievance';
 import { PROMISES } from '../data/promises';
 import { isWater } from '../../world/query';
 import { FEATURES } from '../../world/features';
 import { TERRAINS } from '../../world/terrains';
-import { routeOriginCenter } from './trade';
+import { routeOriginCenter, routeTrader } from './trade';
 import { tradeVertices } from './tradePath';
 import { treeBaseCost, treePrereqs } from './researchTree';
 import { floodRivers } from './disasters';
@@ -406,7 +406,8 @@ const projectYieldCols = (p: ProjectYield | undefined): number[] =>
   (p ? [YIELD_KEYS.indexOf(p.key), p.amount] : [-1, 0]);
 
 /** Every route of one holder — a major or a city-state — as flattened
- *  [fromTile, destTile, kind, exp, born, walkTile, leg, course...] rows, sorted.
+ *  [fromTile, destTile, kind, born, walkTile, leg, walker, course...] rows, sorted
+ *  (walker 1 where a living Trader unit walks it, `routeTrader`).
  *  Destinations are keyed by CENTRE TILE — the digest's own city join key — so
  *  the comparison does not ride on city-id minting, which the city group
  *  deliberately does not compare. Kind: 0 domestic, 1 city-state, 2
@@ -424,7 +425,7 @@ function routeRowsOf(state: GameState, s: Seat): number[] {
           ? centreOf(r.toSeat!, r.toSeatCity ?? -1)
           : centreOf(s.seat, r.to ?? -1);
     return [routeOriginCenter(state, s, r), dest, kind,
-      r.createdTurn ?? -1, r.walkTile ?? -1, r.walkLeg ?? -1,
+      r.createdTurn ?? -1, r.walkTile ?? -1, r.walkLeg ?? -1, routeTrader(state, r) ? 1 : 0,
       ...Array.from({ length: TRADE_COURSE_MAX }, (_, i) => (r.course ?? [])[i] ?? -1)];
   });
   rows.sort((a, b) => a[0] - b[0] || a[1] - b[1] || a[2] - b[2] || a[3] - b[3]);
@@ -1087,6 +1088,11 @@ const CITY_STATE_G: Record<string, Extractor> = {
     })];
   }),
   minorCampsKnown: overCityStates((cityState) => [...(cityState.campsKnown ?? [])]),
+  minorCitiesKnown: overCityStates((cityState, state) => (cityState.citiesKnown ?? []).flatMap((k) => {
+    const cs = isCityStateSeat(k.owner) ? state.cityStates.find((x) => x.seat === k.owner) : undefined;
+    const at = cs ? cs.centerIndex : seatOf(state, k.owner)?.cities.find((c) => c.id === k.id)?.centerIndex ?? -1;
+    return at >= 0 ? [at] : [];
+  })),
   minorProjectYield: overCityStates((cityState) => projectYieldCols(cityState.projectYield)),
   minorTreasury: overCityStates((cityState) => cityState.treasury),
   minorNetIncome: overCityStates((cityState) => cityState.netIncome ?? 0),
@@ -1296,6 +1302,7 @@ const UNIT_G: Record<string, Extractor> = {
   attacksLeft: overUnits((u) => u.attacksLeft ?? 1),
   revealedTurn: overUnits((u) => u.revealedTurn ?? -1),
   levied: overUnits((u) => u.leviedFrom ?? -1),
+  routed: overUnits((u) => (u.routed ? 1 : 0)),
   formation: overUnits((u) => u.formation ?? 0),
   escorted: overUnits((u) => (u.escorted ? 1 : 0)),
   originalOwner: overUnits((u) => u.originalOwner ?? -1),

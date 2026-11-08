@@ -1243,7 +1243,7 @@ _MUTABLE = [
     "city_dist_tile",
     "seat_routes",  # domestic trade routes (rc-id pairs)
     "seat_route_dseat", "seat_route_dcity",  # international dest (seat row, city id), else -1/-1 (domestic/CS)
-    "seat_route_born", "seat_route_walk", "seat_route_leg",  # the Trader's walk (birth turn, tile, leg)
+    "seat_route_born", "seat_route_walk", "seat_route_leg", "seat_route_unit",  # the Trader's walk (birth turn, tile, leg) and its walker
     "seat_route_course",  # the stored course (the path's plots, origin to destination, -1-padded)
     "trade_edge_o",  # the trade graph's edges: origin centre
     "trade_edge_ok",  # origin city key (-1 an empty slot)
@@ -1328,7 +1328,7 @@ _MUTABLE = [
     "citystate_builders_trained", "citystate_best_melee", "citystate_best_ranged",
     # its city AI: the district's plot, the item's turn and value, the threat, its update's growth, the savings
     "citystate_prod_site", "citystate_dist_cost", "citystate_founded_turn", "citystate_prod_set_value", "citystate_threat", "citystate_fav_food", "citystate_ai_growth", "citystate_ai_seen", "citystate_combat_desire", "citystate_standing_short",
-    "citystate_savings", "citystate_balance", "citystate_gold_boost", "citystate_ai_on", "citystate_unit_values", "citystate_unit_on", "citystate_list_count", "citystate_building_values", "citystate_project_values", "citystate_res_counts", "citystate_trade_ok", "citystate_trade_no", "citystate_trade_value", "citystate_trade_seat", "citystate_met_minor", "citystate_met_free", "free_trade_value", "city_trade_ok", "city_trade_no", "civ_agendas",
+    "citystate_savings", "citystate_balance", "citystate_gold_boost", "citystate_ai_on", "citystate_unit_values", "citystate_unit_on", "citystate_list_count", "citystate_building_values", "citystate_project_values", "citystate_res_counts", "citystate_trade_ok", "citystate_trade_no", "citystate_kb_city_rank", "citystate_kb_city_id", "citystate_kb_city_n", "citystate_trade_value", "citystate_trade_seat", "citystate_met_minor", "citystate_met_free", "free_trade_value", "city_trade_ok", "city_trade_no", "civ_agendas",
     # its events' slots, trees, contracts and reservations (`CityAi`)
     "cai_slots", "cai_tr_alive", "cai_tr_id", "cai_tr_status", "cai_tr_mem_a", "cai_tr_mem_b", "cai_tr_bb", "cai_tr_trigger",
     "cai_tr_units", "cai_c_id", "cai_c_tree", "cai_c_unit", "cai_c_building", "cai_c_district", "cai_c_goal_kind", "cai_c_goal",

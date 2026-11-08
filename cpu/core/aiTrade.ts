@@ -8,8 +8,8 @@
  * per known city in the knowledge base's order not yet sorted (the city
  * itself passes) whose centre the owner has revealed (0x2d2220,
  * `CityState.revealed`, a major's explored plots; an unrevealed one is not
- * tried), a trade path from the city (the Trade_Movement pathfinder
- * 0x559140, `routeInRange`) lists it, else it goes on the rejected list.
+ * tried), a fresh search of the Trade_Movement pathfinder from the city (0x559140
+ * at 0x78f41b, `routeInRange`; the trade graph's edges unread) reaching it lists it, else it goes on the rejected list.
  * Once the list holds a city, at most two new cities are tried a turn; a
  * turn that tries none clears the rejected list. A known city gone leaves
  * the list.
@@ -30,9 +30,9 @@
  * after its city's update and before its City Analysis job: the city build
  * AI's Trader value reads the K of the turn before (`traderValue`).
  *
- * The known cities are the route scorer's (`minorRouteCandidate`): the
- * city-states in id order, then every major's cities in seat and array
- * order.
+ * The known cities: a city-state's, its knowledge base's (`citiesKnown`, the
+ * look's city arm `minorCitiesLook`) in their order, the Free Cities' among
+ * them; a major's, the city-states in id order, then every major's cities.
  */
 import { fxOf, yieldValue, type AiValueView } from './aiValue';
 import { aiView } from './aiView';
@@ -52,19 +52,32 @@ interface KnownTradeCity {
 
 function knownTradeCities(state: GameState, selfCentre: number, from: number, owner: number): KnownTradeCity[] {
   const out: KnownTradeCity[] = [];
-  for (const d of [...state.cityStates].sort((a, b) => a.id - b.id)) {
-    if (d.centerIndex < 0 || d.centerIndex === selfCentre) continue;
-    out.push({ centre: d.centerIndex, holder: d.seat, route: { from, to: -1, toCs: d.id } });
-  }
-  for (const s of state.seats) {
-    for (const c of s.cities) {
-      if (c.centerIndex === selfCentre) continue;
-      out.push({
-        centre: c.centerIndex, holder: s.seat,
-        route: s.seat === owner ? { from, to: c.id } : { from, to: -1, toSeat: s.seat, toSeatCity: c.id },
-      });
+  const add = (holder: number, c: City | undefined, cs: CityState | undefined): void => {
+    const centre = cs ? cs.centerIndex : c?.centerIndex ?? -1;
+    if (centre < 0 || centre === selfCentre) return;
+    out.push({
+      centre, holder,
+      route: cs ? { from, to: -1, toCs: cs.id } : holder === owner ? { from, to: c!.id } : { from, to: -1, toSeat: holder, toSeatCity: c!.id },
+    });
+  };
+  const minor = isCityStateSeat(owner) ? state.cityStates.find((x) => x.seat === owner) : undefined;
+  if (minor) {
+    // a city-state's: its knowledge base's cities in their order, those
+    // standing (`minorCitiesLook`)
+    for (const k of minor.citiesKnown ?? []) {
+      const cs = isCityStateSeat(k.owner) ? state.cityStates.find((x) => x.seat === k.owner) : undefined;
+      if (cs) add(k.owner, undefined, cs);
+      else {
+        const c = seatOf(state, k.owner)?.cities.find((x) => x.id === k.id);
+        if (c) add(k.owner, c, undefined);
+      }
     }
+    return out;
   }
+  // a major's: the city-states in id order, then every major's cities in
+  // seat and array order
+  for (const d of [...state.cityStates].sort((a, b) => a.id - b.id)) add(d.seat, undefined, d);
+  for (const s of state.seats) for (const c of s.cities) add(s.seat, c, undefined);
   return out;
 }
 

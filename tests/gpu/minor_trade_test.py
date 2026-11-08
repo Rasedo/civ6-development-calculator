@@ -9,7 +9,7 @@ origin coded 0 for its one city):
   1. its capacity is its Foreign Trade civic and its city's Market or
      Lighthouse (`_trade_capacity`'s minor arm);
   2. its free Trader takes the scorer's destination (`_minor_route_candidate`)
-     and is spent on it (`_minor_trade_pick`): the term, the walker at the centre,
+     and walks it (`_minor_trade_pick`): the term, the walker at the centre,
      the stored course;
   3. the route pays its city the destination's rows (`_minor_route_income`);
   4. it walks and comes home with its Trader at the end of its term;
@@ -86,8 +86,11 @@ def main() -> int:
     assert int(sim.seat_route_walk[B0, row, k]) == crs[1], "the walker takes its first plot out at the start"
     assert crs and crs[0] == int(sim.citystate_center[B0, s]) and crs[-1] == int(dct[B0]), \
         f"the stored course {crs} does not run from the minor's centre to its destination"
-    assert traders(sim, s) == t0 - 1, "the Trader was not spent"
-    print(f"  2 route OK — to code {int(code[B0])} (seat row {int(dseat[B0])}), the Trader spent")
+    assert traders(sim, s) == t0, "the Trader left its list"
+    w = int(sim.seat_route_unit[B0, row, k])
+    assert w >= 0 and int(sim.major_unit_tile[B0, w]) == int(sim.seat_route_walk[B0, row, k]), \
+        "the Trader unit does not walk its route"
+    print(f"  2 route OK — to code {int(code[B0])} (seat row {int(dseat[B0])}), the Trader walking it")
 
     # -- 3 income -------------------------------------------------------------
     inc = sim._minor_route_income(s)

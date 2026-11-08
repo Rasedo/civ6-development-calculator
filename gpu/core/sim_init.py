@@ -373,11 +373,19 @@ class SimInit:
         # +0x978; none on a founding turn's first look) — the research and
         # civics values' city terms (`CityState.unitValues`, `.resourceCounts`)
         # its city's trade list (CityBuildAI +0x870, `_minor_trade_list`) over
-        # the known cities (the other city-states, then the majors' slots):
-        # listed, rejected; its trade AI's route value K (raw)
-        _nd = max(self.S + self.n_majors * self.RC, 1)
+        # the known-city slots (the city-states, then the majors' and the Free
+        # Cities' city slots, `_known_trade_cands`): listed, rejected; its
+        # trade AI's route value K (raw)
+        _nd = max(self.S + (self.n_majors + 1) * self.RC, 1)
         self.citystate_trade_ok = torch.zeros(B, s_pad, _nd, dtype=torch.bool, device=device)
         self.citystate_trade_no = torch.zeros(B, s_pad, _nd, dtype=torch.bool, device=device)
+        # its knowledge base's cities (`CityState.citiesKnown`,
+        # `_minor_cities_look`): per known-city slot its place in the list
+        # (-1 none) and the city id its entry was made for (-1 a city-state's),
+        # and the entries made so far
+        self.citystate_kb_city_rank = torch.full((B, s_pad, _nd), -1, dtype=torch.long, device=device)
+        self.citystate_kb_city_id = torch.full((B, s_pad, _nd), -1, dtype=torch.long, device=device)
+        self.citystate_kb_city_n = torch.zeros(B, s_pad, dtype=torch.long, device=device)
         self.citystate_trade_value = torch.zeros(B, s_pad, dtype=torch.long, device=device)
         # the player its knowledge base last met, whose cities the route
         # value walks (the trade record's +0x6e0; its own seat before any),
@@ -1416,6 +1424,9 @@ class SimInit:
         self.seat_route_born = torch.full((B, self.NS, k_routes), -1, dtype=torch.long, device=device)
         self.seat_route_walk = torch.full((B, self.NS, k_routes), -1, dtype=torch.long, device=device)
         self.seat_route_leg = torch.full((B, self.NS, k_routes), -1, dtype=torch.long, device=device)
+        # the WALKER: the major-pool slot of the Trader unit walking the route
+        # (`TradeRoute.trader`, a city-state's), -1 where its Trader was spent
+        self.seat_route_unit = torch.full((B, self.NS, k_routes), -1, dtype=torch.long, device=device)
         # the stored COURSE (`TradeRoute.course`): the plots of the route's
         # path, origin to destination, -1-padded — `tradeCourse` computes it
         # ONCE at commit on both engines, the walker, the path term and the
@@ -4139,9 +4150,9 @@ class SimInit:
         # a FREE CITY's count of turns toward its next grant (`City.freeGrantTurns`)
         self.city_free_grant = torch.zeros(B, self.CITY_ROWS, self.RC, dtype=torch.long, device=device)
         # a MAJOR's city's trade list (CityBuildAI +0x870, `majorTradeLists`)
-        # over its known cities (the city-states, then the majors' slots):
-        # listed, rejected
-        _nd = max(self.S + self.n_majors * self.RC, 1)
+        # over its known cities (the city-states, then the majors' and the
+        # Free Cities' slots): listed, rejected
+        _nd = max(self.S + (self.n_majors + 1) * self.RC, 1)
         self.city_trade_ok = torch.zeros(B, self.n_majors, self.RC, _nd, dtype=torch.bool, device=device)
         self.city_trade_no = torch.zeros(B, self.n_majors, self.RC, _nd, dtype=torch.bool, device=device)
         # a FREE CITY's threat as its city AI's last update left it (`City.aiThreat`), -1 none

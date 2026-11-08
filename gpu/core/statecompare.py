@@ -769,12 +769,13 @@ def _centre_of(sim, b: int, row: int, city_id: int) -> int:
 
 def _routes_of(sim, b: int, seat: int) -> list[int]:
     """Every live route of `seat`, as flattened [fromTile, destTile, kind,
-    born, walkTile, leg, course x courseMax] rows sorted ascending — the `routes`
+    born, walkTile, leg, walker, course x courseMax] rows sorted ascending — the `routes`
     extractor's twin. Kind: 0 domestic, 1 city-state, 2 international.
     `seat_routes[..., 1]` carries the domestic destination city id, or
     -(2 + city-state index), or -1 for international (whose destination is
     the dseat/dcity pair). The walk triple is the Trader: its birth turn,
-    current tile and leg (0 out, 1 home)."""
+    current tile and leg (0 out, 1 home); walker 1 where a living Trader
+    unit walks it (`seat_route_unit`)."""
     row = _seat_row(sim, seat)
     rr = sim.seat_routes[b, row].tolist()
     ds = sim.seat_route_dseat[b, row].tolist()
@@ -783,6 +784,8 @@ def _routes_of(sim, b: int, seat: int) -> list[int]:
     wk = sim.seat_route_walk[b, row].tolist()
     lg = sim.seat_route_leg[b, row].tolist()
     ch = sim.seat_route_course[b, row].tolist()
+    wu = sim.seat_route_unit[b, row].tolist()
+    ua = sim.unit_alive[b].tolist()
     out: list[list[int]] = []
     for k, pair in enumerate(rr):
         frm = int(pair[0])
@@ -802,8 +805,9 @@ def _routes_of(sim, b: int, seat: int) -> list[int]:
         # a city-state's routes leave its one city, origin code 0
         org = (int(sim.citystate_center[b, row - sim._CITY_MINOR0])
                if sim._CITY_MINOR0 <= row < sim.FREE_ROW else _centre_of(sim, b, row, frm))
+        walker = 1 if int(wu[k]) >= 0 and ua[int(wu[k])] else 0
         out.append([org, dest, kind, int(bo[k]),
-                    int(wk[k]), int(lg[k])] + [int(x) for x in ch[k]])
+                    int(wk[k]), int(lg[k]), walker] + [int(x) for x in ch[k]])
     out.sort()
     return [x for t in out for x in t]
 
@@ -1054,6 +1058,7 @@ CITY_STATE = {
     "minorOps": lambda sim, b, rows: [_minor_ops(sim, b, s) for s in rows],
     "minorUpgrading": lambda sim, b, rows: [_minor_upgrading(sim, b, s) for s in rows],
     "minorCampsKnown": lambda sim, b, rows: [[int(x) for x in sim.mops_camps[b, s].tolist() if x >= 0] for s in rows],
+    "minorCitiesKnown": lambda sim, b, rows: [_cities_known(sim, b, s) for s in rows],
     "minorProjectYield": lambda sim, b, rows: [
         [int(sim.city_proj_yield[b, sim._CITY_MINOR0 + s, 0]), float(sim.city_proj_conv[b, sim._CITY_MINOR0 + s, 0])]
         for s in rows
@@ -1160,6 +1165,16 @@ def _city_trade_list(sim, b: int, c: int, s: int) -> list[int]:
     no = sim.city_trade_no[b, c, s].tolist()
     return (sorted(int(x) for x, on in zip(ctr, ok) if on) + [-1]
             + sorted(int(x) for x, on in zip(ctr, no) if on))
+
+
+def _cities_known(sim, b: int, s: int) -> list[int]:
+    """minor `s`'s knowledge base's cities standing, in its order, as their
+    centre plots"""
+    none = sim.citystate_center[:, s].clone().fill_(-1)
+    live, ctr = sim._known_trade_cands(none, free=True)
+    rank = sim.citystate_kb_city_rank[b, s]
+    held = live[b] & (rank >= 0) & (sim.citystate_kb_city_id[b, s] == sim._known_trade_ids()[b])
+    return [int(ctr[b, d]) for _r, d in sorted((int(rank[d]), d) for d in held.nonzero(as_tuple=True)[0].tolist())]
 
 
 def _trade_list(sim, b: int, s: int) -> list[int]:
@@ -1457,6 +1472,12 @@ def _unit(plane: str):
     return get
 
 
+def _unit_routed(sim, b, rows):
+    """1 for a unit walking a route of its row (`seat_route_unit`), else 0"""
+    on = {int(x) for x in sim.seat_route_unit[b].flatten().tolist() if x >= 0}
+    return [1 if int(s) in on else 0 for s in rows]
+
+
 def _unit_look_rows(sim, b, rows):
     """each unit's look as it holds it, ascending (`_unit_look_now`)"""
     import torch
@@ -1494,6 +1515,7 @@ UNIT = {
     "gpAt": _unit("unit_gp_at"),
     "revealedTurn": _unit("unit_revealed_turn"),
     "levied": _unit("unit_levy_src"),
+    "routed": _unit_routed,
     "formation": _unit("unit_formation"),
         "escorted": _unit("unit_escorted"),
         "originalOwner": _unit("unit_orig_owner"),

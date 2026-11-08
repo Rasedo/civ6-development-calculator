@@ -570,11 +570,7 @@ class SimSeats:
         kill = (self.seat_routes[:, row, :, 0] >= 0) & (self.seat_routes[:, row, :, 1] == code) & mask.unsqueeze(1)
         if not bool(kill.count_nonzero()):
             return
-        oc, _dc = self._route_centres(row)
-        for k in range(self.seat_routes.shape[2]):
-            m = kill[:, k] & (oc[:, k] >= 0)
-            if bool(m.count_nonzero()):
-                self._spawn_unit(row, m, oc[:, k].clamp(min=0), self._trader_idx)
+        self._routes_home(row, kill)
         for plane in (self.seat_route_dseat, self.seat_route_dcity,
                       self.seat_route_born, self.seat_route_walk, self.seat_route_leg):
             plane[:, row][kill] = -1
@@ -5084,13 +5080,37 @@ class SimSeats:
         g = sc[r]
         seat = self.unit_seat[r, g]
         t = tile[r]
+        # a Trader walking a route of its city-state (`seat_route_unit`): the
+        # route's worth, max(50, floor(V x the turns)), and the route ends
+        base_all = torch.full((r.numel(),), float(self._trade_plunder_gold), dtype=torch.float64, device=self.device)
+        owner = self.unit_seat[r, tr[r]]
+        for s2 in range(self.S):
+            m2 = owner == 100 + s2
+            if not bool(m2.count_nonzero()):
+                continue
+            mrow = self._CITY_MINOR0 + s2
+            hitk = (self.seat_route_unit[r, mrow] == tr[r].unsqueeze(1)) & (self.seat_routes[r, mrow, :, 0] >= 0)
+            on = m2 & hitk.any(dim=1)
+            if not bool(on.count_nonzero()):
+                continue
+            hb, hk = r[on], hitk[on].long().argmax(dim=1)
+            v = self._route_yield_value(mrow, hb, hk)
+            base_all[on] = torch.maximum(torch.full_like(v, float(self._trade_plunder_gold)),
+                                         torch.floor(v * self._trade_plunder_turns))
+            _drop = torch.zeros(self.B, self.seat_routes.shape[2], dtype=torch.bool, device=self.device)
+            _drop[hb, hk] = True
+            for _p in (self.seat_route_dseat, self.seat_route_dcity, self.seat_route_born,
+                       self.seat_route_walk, self.seat_route_leg, self.seat_route_unit):
+                _p[:, mrow][_drop] = -1
+            self.seat_routes[:, mrow][_drop] = -1
+            self._compact_routes(mrow)
         mj = (seat >= 0) & (seat < self.n_majors)
         if bool(mj.count_nonzero()):
             rm, sm, tm = r[mj], seat[mj], t[mj]
             ms = self.military_at[rm, tm]
             hull = (ms >= 0) & (self.unit_seat[rm, ms.clamp(min=0)] == sm) & self.unit_naval[
                 self.unit_type[rm, ms.clamp(min=0)].clamp(min=0)]
-            base = torch.full((rm.numel(),), float(self._trade_plunder_gold), dtype=self.civ_treasury.dtype, device=self.device)
+            base = base_all[mj].to(self.civ_treasury.dtype)
             pp = self._gp_perm_at(sm, "routePlunderPct", rm).to(base.dtype)
             pct = self._fx_at_seat("rplun", sm, rm).to(base.dtype) + torch.where(hull, pp, torch.zeros_like(pp))
             self.civ_treasury.index_put_((rm, sm), base + torch.floor(base * pct / 100), accumulate=True)
@@ -5098,9 +5118,7 @@ class SimSeats:
         if bool(cs.count_nonzero()):
             rc = r[cs]
             self.citystate_treasury.index_put_(
-                (rc, seat[cs] - 100),
-                torch.full((rc.numel(),), float(self._trade_plunder_gold), dtype=self.citystate_treasury.dtype, device=self.device),
-                accumulate=True)
+                (rc, seat[cs] - 100), base_all[cs].to(self.citystate_treasury.dtype), accumulate=True)
         self.unit_alive[r, tr[r]] = False
         self._occ_clear(r, t, tr[r])
         self.unit_mp[r, g] = 0
@@ -11853,6 +11871,7 @@ class SimSeats:
         self.seat_route_born[b, src_row][kill] = -1
         self.seat_route_walk[b, src_row][kill] = -1
         self.seat_route_leg[b, src_row][kill] = -1
+        self.seat_route_unit[b, src_row][kill] = -1
         self._compact_routes(src_row)
         # a row's tiles carry its SEAT id (the row itself for a major)
         src_seat, dst_seat = int(self._ROW_SEAT[src_row]), int(self._ROW_SEAT[dst_row])
@@ -16513,14 +16532,71 @@ class SimSeats:
             cap = cap + who.long() * _amt
         return cap
 
+    def _routed_slots(self, row: int) -> torch.Tensor:
+        """[B, major pool] the units walking a route of row `row`
+        (`Unit.routed`: `seat_route_unit`)"""
+        wu = self.seat_route_unit[:, row]
+        U = self.major_unit_alive.shape[1]
+        return (torch.arange(U, device=self.device).reshape(1, 1, U) == wu.unsqueeze(2)).any(dim=1)
+
+    def _trader_to(self, rows: torch.Tensor, slots: torch.Tensor, tiles: torch.Tensor) -> None:
+        """the Traders at major-pool `slots` of the games `rows` stand on
+        `tiles` (a walker's step, its start at its origin, its way home)"""
+        if rows.numel() == 0:
+            return
+        g = slots + self.POOL_LO["major"]
+        self._occ_clear(rows, self.major_unit_tile[rows, slots], g)
+        self.major_unit_tile[rows, slots] = tiles
+        self._occ_set(rows, tiles, g)
+
+    def _routes_home(self, row: int, drop: torch.Tensor) -> None:
+        """`traderHome` over the route slots `drop` [B, K] of row `row`, in
+        slot order: the living Trader walking each (`seat_route_unit`) home at
+        the route's origin on no route; a route whose Trader was spent hands
+        a new one back there"""
+        oc, _dc = self._route_centres(row)
+        wu = self.seat_route_unit[:, row]
+        for k in range(self.seat_routes.shape[2]):
+            m = drop[:, k] & (oc[:, k] >= 0)
+            if not bool(m.count_nonzero()):
+                continue
+            spent = m & (wu[:, k] < 0)
+            if bool(spent.count_nonzero()):
+                self._spawn_unit(row, spent, oc[:, k].clamp(min=0), self._trader_idx)
+            walked = m & (wu[:, k] >= 0)
+            walked = walked & self.major_unit_alive.gather(1, wu[:, k].clamp(min=0).unsqueeze(1)).squeeze(1)
+            if bool(walked.count_nonzero()):
+                rb = walked.nonzero(as_tuple=True)[0]
+                self._trader_to(rb, wu[rb, k], oc[rb, k])
+        self.seat_route_unit[:, row][drop] = -1
+
+    def _routes_kill_walkers(self, row: int, drop: torch.Tensor) -> None:
+        """the living Traders walking the route slots `drop` [B, K] of row
+        `row` die with them (`dropRoutes`, a plunder)"""
+        wu = self.seat_route_unit[:, row]
+        hit = drop & (wu >= 0)
+        if not bool(hit.count_nonzero()):
+            return
+        bb, kk = hit.nonzero(as_tuple=True)
+        sl = wu[bb, kk]
+        live = self.major_unit_alive[bb, sl]
+        bb, sl = bb[live], sl[live]
+        if bb.numel() == 0:
+            return
+        self.major_unit_alive[bb, sl] = False
+        self._occ_clear(bb, self.major_unit_tile[bb, sl], sl + self.POOL_LO["major"])
+        self._gen_ver += 1
+
     def _free_trader(self, row: int) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         """The seat's FREE Trader on the LOWEST tile — `freeTrader`'s twin.
-        (has [B] bool, major-pool slot [B], tile [B]). The tile is the
-        cross-engine key: one civilian per tile makes it unique."""
+        (has [B] bool, major-pool slot [B], tile [B]): a living Trader of the
+        seat on no route. The tile is the cross-engine key: one civilian per
+        tile makes it unique."""
         al = (
             self.major_unit_alive
             & (self.major_unit_seat == int(self._ROW_SEAT[row]))
             & (self.major_unit_type == self._trader_idx)
+            & ~self._routed_slots(row)
         )
         t = torch.where(al, self.major_unit_tile, torch.full_like(self.major_unit_tile, 1 << 30))
         tile_min, slot = t.min(dim=1)
@@ -16756,6 +16832,12 @@ class SimSeats:
                 i = torch.where(lg == 0, at + 1, at - 1).clamp(min=0, max=crs.shape[1] - 1)
                 nxt = torch.where(on, crs.gather(1, i.unsqueeze(1)).squeeze(1), cur)
                 self.seat_route_walk[bb, row, kk] = nxt
+                # the Trader unit walking it takes the plot
+                wu = self.seat_route_unit[bb, row, kk]
+                stp = on & (wu >= 0)
+                stp = stp & self.major_unit_alive[bb, wu.clamp(min=0)]
+                if bool(stp.count_nonzero()):
+                    self._trader_to(bb[stp], wu[stp], nxt[stp])
                 # roads go on LAND only — a sea leg lays nothing
                 moved = on & ~self.water[bb, nxt.clamp(min=0)]
                 if bool(moved.count_nonzero()):
@@ -16842,12 +16924,17 @@ class SimSeats:
         cs = (hr >= 100) & (hr < 100 + self.citystate_treasury.shape[1])
         if bool(cs.count_nonzero()):
             self.citystate_treasury.index_put_((hb[cs], hr[cs] - 100), _base[cs], accumulate=True)
+        # ...and the Trader unit walking it dies with it
+        _drop = torch.zeros_like(act)
+        _drop[hb, hk] = True
+        self._routes_kill_walkers(row, _drop)
         self.seat_routes[hb, row, hk] = -1
         self.seat_route_dseat[hb, row, hk] = -1
         self.seat_route_dcity[hb, row, hk] = -1
         self.seat_route_born[hb, row, hk] = -1
         self.seat_route_walk[hb, row, hk] = -1
         self.seat_route_leg[hb, row, hk] = -1
+        self.seat_route_unit[hb, row, hk] = -1
         self._compact_routes(row)
 
     def _compact_routes(self, row: int) -> None:
@@ -16869,7 +16956,7 @@ class SimSeats:
         # dead behind them. Idempotent where a row already has no holes.
         idx = torch.argsort((~live).long(), dim=1, stable=True)
         for _p in (self.seat_route_dseat, self.seat_route_dcity,
-                   self.seat_route_born, self.seat_route_walk, self.seat_route_leg):
+                   self.seat_route_born, self.seat_route_walk, self.seat_route_leg, self.seat_route_unit):
             _p[:, row] = _p[:, row].gather(1, idx)
         for _w in (self.seat_routes, self.seat_route_course):
             _w[:, row] = _w[:, row].gather(
@@ -16973,6 +17060,7 @@ class SimSeats:
         self.seat_route_born[rows, row, slot] = int(self.turn)
         self.seat_route_walk[rows, row, slot] = o_ct[rows]
         self.seat_route_leg[rows, row, slot] = 0
+        self.seat_route_unit[rows, row, slot] = -1
         # the COURSE, laid once here and walked for the route's life
         self._trade_store_course(row, rows, slot, o_ct[rows], dest_ct[rows])
         # the walker lays road on every LAND tile it stands on; the origin is turn 0
@@ -17000,12 +17088,7 @@ class SimSeats:
             kill = (self.seat_routes[:, a, :, 0] >= 0) & (self.seat_route_dseat[:, a] == b) & mask.unsqueeze(1)
             if not bool(kill.count_nonzero()):
                 continue
-            oc, _dc = self._route_centres(a)
-            K = self.seat_routes.shape[2]
-            for k in range(K):
-                m = kill[:, k] & (oc[:, k] >= 0)
-                if bool(m.count_nonzero()):
-                    self._spawn_unit(a, m, oc[:, k].clamp(min=0), self._trader_idx)
+            self._routes_home(a, kill)
             self.seat_routes[:, a][kill] = -1
             self.seat_route_dseat[:, a][kill] = -1
             self.seat_route_dcity[:, a][kill] = -1
@@ -17021,11 +17104,7 @@ class SimSeats:
         kill = (self.seat_routes[:, row, :, 0] >= 0) & (self.seat_route_dseat[:, row] >= 0) & mask.unsqueeze(1)
         if not bool(kill.count_nonzero()):
             return
-        oc, _dc = self._route_centres(row)
-        for k in range(self.seat_routes.shape[2]):
-            m = kill[:, k] & (oc[:, k] >= 0)
-            if bool(m.count_nonzero()):
-                self._spawn_unit(row, m, oc[:, k].clamp(min=0), self._trader_idx)
+        self._routes_home(row, kill)
         self.seat_routes[:, row][kill] = -1
         self.seat_route_dseat[:, row][kill] = -1
         self.seat_route_dcity[:, row][kill] = -1
@@ -17287,13 +17366,9 @@ class SimSeats:
         drop = completed | dest_gone
         if bool(drop.count_nonzero()):
             # ended routes hand their Traders back at the origin, in slot
-            # order (TS array order) — the spot search fills outward when the
-            # centre is taken.
-            K = self.seat_routes.shape[2]
-            for k in range(K):
-                m = drop[:, k] & (oc[:, k] >= 0)
-                if bool(m.count_nonzero()):
-                    self._spawn_unit(row, m, oc[:, k].clamp(min=0), self._trader_idx)
+            # order (TS array order): the walker home, a spent one anew — the
+            # spot search fills outward when the centre is taken.
+            self._routes_home(row, drop)
             self.seat_routes[:, row][drop] = -1
             self.seat_route_dseat[:, row][drop] = -1
             self.seat_route_dcity[:, row][drop] = -1

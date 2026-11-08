@@ -51,7 +51,9 @@ function scene() {
   const near = addCs(state, 15, 5, 'trade');
   const far = addCs(state, 34, 34, 'cultural');
   cs.research.civics = ['FOREIGN_TRADE'];
-  // its city's trade list (`minorTradeList`) holds both minors
+  // its knowledge base knows both minors (`minorCitiesLook`), its city's
+  // trade list (`minorTradeList`) holds both
+  cs.citiesKnown = [{ owner: near.seat, id: -1 }, { owner: far.seat, id: -1 }];
   cs.tradeCities = [near.centerIndex, far.centerIndex];
   // a route asks the origin's player has met the destination's (`tradeMet`)
   cs.metMinors = [near.seat, far.seat];
@@ -70,7 +72,7 @@ describe("a city-state's trade capacity", () => {
 });
 
 describe("a city-state's route", () => {
-  it('its free Trader takes a listed destination in range and is spent on it', () => {
+  it('its free Trader takes a listed destination in range and walks it', () => {
     const { state, cs, near, far } = scene();
     // the minor out of range never competes
     const pick = minorRouteCandidate(state, cs)!;
@@ -79,9 +81,13 @@ describe("a city-state's route", () => {
 
     const trader = spawnUnit(state, 'TRADER', cs.centerIndex, cs.seat)!;
     tradeTurn(state, cs);
-    expect(state.units.includes(trader)).toBe(false);
     expect(cs.tradeRoutes).toHaveLength(1);
     const r = cs.tradeRoutes![0];
+    // the Trader stays a unit of its list, on the route's walk plot
+    expect(state.units.includes(trader)).toBe(true);
+    expect(trader.routed).toBe(true);
+    expect(r.trader).toBe(trader.id);
+    expect(trader.tileIndex).toBe(r.walkTile);
     expect(r.from).toBe(-1);
     expect(routeOriginCenter(state, cs, r)).toBe(cs.centerIndex);
     expect(r.createdTurn).toBe(state.turn);
@@ -135,6 +141,7 @@ describe("a city-state's route", () => {
     near.centerIndex = tileAtCoords(state.map, 30, 30).index; // out of range: the major's city is the only one
     const cap = settleAt(state, tileAtCoords(state.map, 5, 14).index, 0);
     cs.met = [0];
+    cs.citiesKnown = [{ owner: 0, id: cap.id }];
     cs.tradeCities = [cap.centerIndex];
     spawnUnit(state, 'TRADER', cs.centerIndex, cs.seat);
     tradeTurn(state, cs);
