@@ -8448,3 +8448,54 @@ the replay's `layDigSites` (cpu/harness/replay.ts).
   0x2720a0 at 0x2724c8) unported in the explore search and order; what gp
   +0x110 and the knowledge base's +0x128 count is unread. 1127 t62 / t63
   city-state 3's Galley 393216 under Naval Patrol unmoved.
+
+## C-95: the planning strikes a religious unit and a Trader on their plot, its foreign test reads the mover's map layer, the blow on them 1.5 x their health — READ (0x790c60 at 0x790f22, 0x790fc9..0x791016, 0x7910b3..0x791162; 0x791470 at 0x791703..0x79174a, 0x7917b1..0x7917f7; 0x793400), both twins
+
+`planUnit`'s `UNIT_TARGET` / `STRUCK` / `ON_PLOT_TARGET`, its layer-read
+`foreign`, `RELIGIOUS_TAKEN` (cpu/core/tactical.ts); `_tac_targets`' unit
+entries 6 / 8, `_tac_plan`'s `plotonly` and `_tac_foreign_on`,
+`_tac_spot_link`'s `onplot`, `_tac_attack_units`' LOW with RELIGIOUS,
+`_tac_rampage`'s unit entries (gpu/core/sim_tactics.py); the team update's
+weighed entries (gpu/core/sim_minorops.py).
+
+- THE TARGET TYPES are the TargetTypes rows' indices (Operations.xml:
+  CIVILIAN 6, RELIGIOUS_CIVILIAN 7, TRADER 8, LOW 9, MEDIUM 10, HIGH 11).
+  The spot callback 0x790c60 takes a COMBAT_DISTRICT and every type from
+  CIVILIAN to HIGH (0x790f22..0x790f41, again at 0x791162 for the unit's
+  live test): a RELIGIOUS and a TRADER entry are unit targets.
+- THEIR SPOTS: as a CIVILIAN's, only on the target's plot (0x7910b3: a
+  distance above 0 drops CIVILIAN, RELIGIOUS and TRADER). A melee unit's spot
+  is the plot the link onto the target's plot comes from; a ranged unit's
+  is the target's plot itself (only a CIVILIAN takes the parent at range,
+  0x790f4d), its turn the step's or the next (0x791021..0x79103c).
+- THE FOREIGN TEST of the spot beside (0x790fc9..0x791016) lists the target
+  plot's units of the planning's +0x10 (0x793400: 0x901e0, the mover's map
+  layer): a religious unit stands on its own, so a military unit lays the
+  plot beside a religious unit's plot.
+- THE MOVER (0x7910dd..0x791159): a RELIGIOUS target takes a mover with a
+  religious strength (+0x2a, 0x793400 at 0x793483) or one with a fighting
+  strength (+0x29) whose owner's diplomatic relationship with the target's
+  (0x2a7750 -> 0x2a8460 -> 0x29fb10) is not -1 (-1 only for one player with
+  itself); every other target a mover with a fighting strength.
+- THE PREDICTION (0x791470): dealt = the larger of the simulation's two
+  results; 150 for a CIVILIAN or a TRADER; for a RELIGIOUS or a TRADER entry
+  in a combat other than COMBAT_RELIGIOUS (0x5e2f7468, the CRC of
+  "COMBAT_RELIGIOUS" with its inversion) trunc(health x 1.5) (@0xd2f32c),
+  the health COMBAT_MAX_HIT_POINTS less the damage: a kill, `wins` set. The
+  blow back is simulated for a LOW..HIGH target or a RELIGIOUS one struck by
+  a religious mover (0x7917b1..0x7917e1), none for a military unit's strike
+  on a religious unit.
+- CONFIRMED (one-seed aimem windows over the 32 Attack Units rows of the
+  duely logs on an Apostle or a Missionary): the family on 30, family and
+  end plot on 25. runs/h1_duely1121 t92: the Man-At-Arms 3014664 on 8:14
+  plans 7:13 (turn 2, dealt 150) beside the Apostle 2097152 on 6:13 and
+  takes it. t150: the Skirmisher 3342353 (range 1) takes the Missionary's
+  own plot 4:18. runs/h1_duely1124 t113: Man-At-Arms 4980762 strikes the
+  Missionary on 39:19 from 39:20.
+- OPEN: a religious mover's arm (+0x2a: its theological blow) is not
+  ported, no pass of a city-state, the Free Cities or the barbarians holding
+  a religious unit. runs/h1_duely1124 t134 / t136 / t147: the Galley and
+  Caravels assigned to the embarked Missionary end beside it where the game
+  moves onto its plot and kills it (the capture kill, C-101). 1124 t119
+  Man-At-Arms 4849682 lays 36:16 where the game lays 35:17 with no Movement
+  left (C-95).

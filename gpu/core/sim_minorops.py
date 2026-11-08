@@ -853,8 +853,10 @@ class SimMinorOps:
         g[:, G_CENTRE] = torch.where(go, plot_at(cq + torch.div(cy, 2, rounding_mode="floor"), cy), g[:, G_CENTRE])
         g[:, G_MARCH] = torch.where(go, g[:, G_TARGET], g[:, G_MARCH])
         # the list's weighed entries: a plot's district entry (COMBAT or
-        # PASSIVE) and each of its unit entries one
-        ent = (tg["dk"] > 0).long() + (tg["uk"] > 0).view(B, -1, T).sum(dim=1)     # [B, T]
+        # PASSIVE) and each of its unit entries one, a Trader's and a
+        # religious unit's none
+        wk = (tg["uk"] > 0) & (tg["uk"] != 6) & (tg["uk"] != 8)
+        ent = (tg["dk"] > 0).long() + wk.view(B, -1, T).sum(dim=1)     # [B, T]
         reach = 2 * u["base_moves"]
         near = torch.zeros(B, T, dtype=torch.bool, device=dev)
         for j in memm.any(dim=0).nonzero(as_tuple=True)[0].tolist():

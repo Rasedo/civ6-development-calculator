@@ -189,6 +189,7 @@ def scalar_spots(sim, b, slot, tg):
     def link(P, par, T, M):
         for k in keys:
             tp, civ = k // 2, k % 2 == 1 and uk[k // 2] == 7
+            onplot = k % 2 == 1 and uk[k // 2] in (6, 7, 8)
             d = int(sim.pair_dist[P, tp])
             spot, turns, dd, fixed = P, T, d, False
             taken = (civ and d == 0) if rng != 0 else d == 0
@@ -205,7 +206,7 @@ def scalar_spots(sim, b, slot, tg):
                 continue
             if not naval and (water[tp] if rng == 0 else water[spot]):
                 continue
-            if dd > 0 and civ:
+            if dd > 0 and onplot:
                 continue
             if any(s == spot for s, _ in sp) or not fights:
                 continue

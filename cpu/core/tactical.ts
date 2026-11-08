@@ -1458,10 +1458,13 @@ export interface Planner {
   wins: boolean;
 }
 
-/** the targets a unit strikes or takes */
-const STRUCK = new Set<TargetType>(['COMBAT_DISTRICT', 'CIVILIAN', 'LOW', 'MEDIUM', 'HIGH']);
-const UNIT_TARGET = new Set<TargetType>(['CIVILIAN', 'LOW', 'MEDIUM', 'HIGH']);
+/** the targets a unit strikes or takes: a COMBAT_DISTRICT and the unit
+ *  targets, TargetTypes CIVILIAN through HIGH (0x790c60 at 0x790f22) */
+const UNIT_TARGET = new Set<TargetType>(['CIVILIAN', 'RELIGIOUS', 'TRADER', 'LOW', 'MEDIUM', 'HIGH']);
+const STRUCK = new Set<TargetType>(['COMBAT_DISTRICT', ...UNIT_TARGET]);
 const FIGHTER_TARGET = new Set<TargetType>(['LOW', 'MEDIUM', 'HIGH']);
+/** the unit targets struck only on their own plot (0x790c60 at 0x7910b3) */
+const ON_PLOT_TARGET = new Set<TargetType>(['CIVILIAN', 'RELIGIOUS', 'TRADER']);
 
 /** a unit's health in the AI's reckoning (0x56e0d0 less its damage) */
 function healthOf(u: Unit): number {
@@ -1506,12 +1509,15 @@ export function predictBlow(state: GameState, attacker: Unit, defender: Unit, at
  *    own plot; in melee the plot an
  *    attack on the target's plot is linked from, of the attack's turn, and —
  *    where no other player's unit stands on the target's plot (0x790fc9..
- *    0x791016: a COMBAT_DISTRICT nobody holds, never a unit) — a plot beside it
+ *    0x791016: of the unit's map layer, so a COMBAT_DISTRICT nobody holds or a
+ *    religious unit's plot, never another unit's) — a plot beside it
  *    that the step ends on with no Movement (the next turn) or that is the
  *    unit's own (this turn); a civilian's plot taken from the plot it is
- *    linked from;
+ *    linked from; a civilian, a religious unit or a Trader struck only on
+ *    its plot;
  *  - per target with a spot the predicted blow from where it stands
- *    (`predictBlow`; a civilian taken 150), copied to every spot, and per
+ *    (`predictBlow`; a civilian taken 150, a religious unit or a Trader 1.5
+ *    x its health, the blow no theological combat), copied to every spot, and per
  *    spot of a fighter the fighter's blow back on it standing there; a blow
  *    that kills marks the planning `wins`.
  */
@@ -1530,9 +1536,14 @@ export function planUnit(state: GameState, unit: Unit, targets: readonly Target[
   }
   const { tiles } = state.map;
   const water = (p: number) => isWater(tiles[p]);
-  // the targets' plots another player's unit stands on, of any class (the
-  // target plot's unit list, 0x790fc9..0x791016)
-  const foreign = new Set(entries.filter((E) => foreignAt(state, unit, E.target.tile)).map((E) => E.target.tile));
+  // the targets' plots another player's unit stands on, of any class, on
+  // the unit's map layer (the target plot's unit list of the planning's
+  // +0x10, 0x901e0, 0x790fc9..0x791016: a religious unit on its own; runs/
+  // h1_duely1121 t92 the barbarian Man-At-Arms 3014664 plans 7:13 beside the
+  // Apostle 2097152 on 6:13)
+  const layer = unitReligious(unit.type);
+  const foreign = new Set(entries.filter((E) => state.units.some((u) => u.tileIndex === E.target.tile && u.seat !== unit.seat
+    && onMap(u) && unitReligious(u.type) === layer)).map((E) => E.target.tile));
   const reach: Reach[] = [];
   const onLink =(P: number, parent: number, T: number, M: number) => {
     for (const E of entries) {
@@ -1558,7 +1569,7 @@ export function planUnit(state: GameState, unit: Unit, targets: readonly Target[
       if (!fixed && (M === 0 || (spot !== unit.tileIndex && !shoots))) turns = T + 1;
       if (dd > R || E.spots.length >= 6) continue;
       if (!naval && (R === 0 ? water(TP) : water(spot))) continue;
-      if (dd > 0 && ty === 'CIVILIAN') continue;
+      if (dd > 0 && ON_PLOT_TARGET.has(ty)) continue;
       if (E.spots.some((s) => s.tile === spot)) continue;
       if (!fights) continue;
       if (UNIT_TARGET.has(ty) ? !targetUnit(state, E.target) : tiles[TP].district === null) continue;
@@ -1583,7 +1594,8 @@ export function planUnit(state: GameState, unit: Unit, targets: readonly Target[
     const v = UNIT_TARGET.has(E.target.type) ? targetUnit(state, E.target) : null;
     if (!v) continue;
     const blow = predictBlow(state, unit, v, v.tileIndex);
-    E.dealt = E.target.type === 'CIVILIAN' ? CIVILIAN_TAKEN : blow.dealt;
+    E.dealt = E.target.type === 'CIVILIAN' ? CIVILIAN_TAKEN
+      : E.target.type === 'RELIGIOUS' || E.target.type === 'TRADER' ? Math.trunc(healthOf(v) * RELIGIOUS_TAKEN) : blow.dealt;
     E.taken = blow.taken;
     if (E.dealt > healthOf(v)) wins = true;
     if (!FIGHTER_TARGET.has(E.target.type)) continue;
@@ -1782,6 +1794,10 @@ export function dangerDistricts(state: GameState, c: City): { plot: number; def:
 
 /** the predicted damage of taking a civilian (0x791470: 150) */
 const CIVILIAN_TAKEN = 150;
+/** the predicted damage on a religious unit or a Trader in a blow that is no
+ *  theological combat, of its health (0x791470 at 0x79172f..0x791746:
+ *  @0xd2f32c 1.5) */
+const RELIGIOUS_TAKEN = 1.5;
 
 /** UnitAiTypes: a unit's AI type (unit +0x1c0) */
 const AI_EXPLORE = 2;

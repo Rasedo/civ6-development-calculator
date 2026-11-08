@@ -239,6 +239,15 @@ class SimTactics:
             out |= s != seat
         return out
 
+    def _tac_foreign_on(self, seat: int, rel: bool) -> torch.Tensor:
+        """[B, T] bool — `_tac_foreign` on the map layer of a religious mover
+        (`rel`) or of any other"""
+        out = torch.zeros(self.B, self.T, dtype=torch.bool, device=self.device)
+        for pl in (self.military_at, self.civilian_at, self.support_at, self.embarked_at):
+            s = torch.where(pl >= 0, self.unit_seat.gather(1, pl.clamp(min=0)), torch.full_like(pl, seat))
+            out |= (s != seat) & self._tac_layer(pl, rel)
+        return out
+
     def _tac_layer(self, pl: torch.Tensor, rel: bool) -> torch.Tensor:
         """[B, T] bool — the plane's unit stands on the map layer of a
         religious mover (`rel`) or of any other (a religious unit, Units'
@@ -1312,6 +1321,7 @@ class SimTactics:
         dev = self.device
         tp = plan["tp"]                      # [N, E] the entries' plots, -1 none
         civ = plan["civ"]                    # [N, E] a CIVILIAN entry
+        onplot = civ | plan["plotonly"]      # [N, E] a CIVILIAN, TRADER or RELIGIOUS entry
         R = plan["rng"].unsqueeze(1)         # [N, 1] the unit's range, 0 in melee
         fights = plan["fights"].unsqueeze(1)
         # [N, 1, 1] it may shoot after moving (`movesAndShoots`): else a spot
@@ -1352,7 +1362,7 @@ class SimTactics:
             w_sp = water.gather(1, sp.reshape(N, K * E)).reshape(N, K, E)
             ok = (valid.unsqueeze(2) & (tpk >= 0) & ~bad & (dd <= Rk) & fights.unsqueeze(1)
                   & ~(~nav.unsqueeze(1) & torch.where(Rk == 0, w_tp.unsqueeze(1), w_sp))
-                  & ~((dd > 0) & civk))
+                  & ~((dd > 0) & onplot.unsqueeze(1)))
             ok &= ~((spot.unsqueeze(1) == sp.unsqueeze(3)) & (k6 < sn.unsqueeze(2)).unsqueeze(1)).any(dim=3)
             los = ok & (Rk > 1) & (dd > 1)
             if bool(los.count_nonzero()):
@@ -1804,7 +1814,8 @@ class SimTactics:
         knowledge tensors, -1 none; `_tac_known_entries`) after the walk's,
         over [B, L * T] — entry `l * T + p` the `l`-th unit entry of plot `p`,
         the walk's in layer 0, L as many as the most entries one plot takes:
-        `uk` the kind (0 none, 1 LOW, 2 MEDIUM, 3 HIGH, 7 CIVILIAN), `uu` the
+        `uk` the kind (0 none, 1 LOW, 2 MEDIUM, 3 HIGH, 6 TRADER, 7 CIVILIAN,
+        8 RELIGIOUS), `uu` the
         unit's global slot, `us` its player and `uo` the entry's place in the
         list (its plot for the walk's, the plots' count and after for the
         knowledge base's). The barbarians' prioritization makes HIGH a unit
@@ -1892,9 +1903,9 @@ class SimTactics:
         okk = torch.where(((okk == 7) | (okk == 8)) & ~hostile(oss), 0, okk)
         # the walk's unit entries in layer 0 on the plots it sees, the
         # knowledge base's after them on plots it does not
-        uk = torch.where(fight, 1, torch.where(okk == 7, 7, 0))
+        uk = torch.where(fight, 1, torch.where((okk == 6) | (okk == 7) | (okk == 8), okk, 0))
         us = torch.where(uk > 0, torch.where(fight, dseat, oss), none)
-        uu = torch.where(fight, dslot, torch.where(okk == 7, civ_slot, none))
+        uu = torch.where(fight, dslot, torch.where(okk == 7, civ_slot, torch.where((okk == 6) | (okk == 8), civ, none)))
         uo = torch.where(uk > 0, self._arange_bt, torch.full_like(ts, 1 << 40))
         if kb >= 0:
             uk, uu, us, uo = self._tac_known_entries(seat, kb, seen, uk, uu, us, uo)
@@ -2047,7 +2058,8 @@ class SimTactics:
         list's order, -1 past each row's; "te" a unit entry's entry of the
         list's unit planes, -1 a district's or none), the planning search of
         two turns laying their spots, then per target with a spot its predicted blow from where the
-        unit stands ("dealt", "taken" [N, E]; a civilian taken 150), and per
+        unit stands ("dealt", "taken" [N, E]; a civilian taken 150, a Trader
+        or a religious unit 1.5 x its health), and per
         spot of a fighter its blow back on the unit standing there
         ("back_taken", "back_dealt" [N, E, 6]); "wins" [N] a blow that kills."""
         dev = self.device
@@ -2075,11 +2087,21 @@ class SimTactics:
         te = torch.where(other, srt - T, torch.full_like(srt, -1))   # [N, E] a unit entry's entry
         tpc = tp.clamp(min=0)
         tec = te.clamp(min=0)
-        civ = other & (uk.gather(1, tec) == 7)
-        # [N, E] another player's unit, of any class, stands on the entry's plot
-        foreign = self._tac_foreign(seat)[rows].gather(1, tpc) & has
-        plan = {"tp": tp, "civ": civ, "rng": rng, "fights": self._tac_can_fight(pre)[rows, slots], "foreign": foreign,
-                "shoots": self._moves_and_shoots(pre)[rows, slots]}
+        ek = uk.gather(1, tec)
+        civ = other & (ek == 7)
+        # [N, E] a TRADER or a RELIGIOUS entry: struck, like a CIVILIAN, only
+        # on its plot, its predicted damage 1.5 x its health
+        plotonly = other & ((ek == 6) | (ek == 8))
+        # [N, E] another player's unit, of any class, stands on the entry's
+        # plot on the unit's map layer (a religious unit on its own)
+        utype = getattr(self, f"{pre}_unit_type")[rows, slots].clamp(min=0, max=self.NU - 1)
+        rel_u = (self._rel_strength.take(utype) > 0).unsqueeze(1)
+        foreign = self._tac_foreign_on(seat, False)[rows]
+        if bool(rel_u.count_nonzero()):
+            foreign = torch.where(rel_u, self._tac_foreign_on(seat, True)[rows], foreign)
+        foreign = foreign.gather(1, tpc) & has
+        plan = {"tp": tp, "civ": civ, "plotonly": plotonly, "rng": rng, "fights": self._tac_can_fight(pre)[rows, slots],
+                "foreign": foreign, "shoots": self._moves_and_shoots(pre)[rows, slots]}
         res = self._tac_search(rows, slots, seat, _PLAN_TURNS, False, pre=pre, plan=plan, from_full=True, listed=True)
         sn = res["spot_n"]
         dealt = torch.zeros(N, E, dtype=torch.long, device=dev)
@@ -2094,10 +2116,11 @@ class SimTactics:
             a_slot = slots[n_i] + self.POOL_LO[pre]
             d_j = dslot[n_i, e_i]
             dl, tk = self._tac_predict(rows[n_i], a_slot, d_j, tpc[n_i, e_i])
+            hp = self.unit_hp[rows[n_i], d_j]
             dl = torch.where(civ[n_i, e_i], torch.full_like(dl, _CIVILIAN_TAKEN), dl)
+            dl = torch.where(plotonly[n_i, e_i], torch.div(3 * hp, 2, rounding_mode="floor"), dl)
             dealt[n_i, e_i] = dl
             taken[n_i, e_i] = tk
-            hp = self.unit_hp[rows[n_i], d_j]
             wins[n_i[dl > hp]] = True
             # the fighter's blow back on the unit standing on each spot
             fj = fight[n_i, tec[n_i, e_i]]
@@ -2251,24 +2274,19 @@ class SimTactics:
         spot_a[kk[has & ~oth], tp[has & ~oth]] = True
         spot_u[kk[has & oth], te[has & oth]] = True
         dk, ds = tg["dk"][b_k], tg["ds"][b_k]
-        okk, os_ = tg["ok"][b_k], tg["os"][b_k]
         cand_a = (dk > 0) & (ds == Pk.unsqueeze(1)) & inplan
-        # a plot's other entries: its units' (the walk's or the knowledge
-        # base's, in the list's place), else a Trader's or a religious
-        # unit's (no spot: the planning strikes neither)
+        # a plot's other entries of the player: its units' (the walk's or the
+        # knowledge base's, in the list's place; a camp, a goody hut or an
+        # improvement is no player's)
         cand_u = (uk > 0) & (us_ == Pk.unsqueeze(1)) & inplan.repeat(1, L)
-        cand_b = (okk >= 4) & (okk != 7) & (os_ == Pk.unsqueeze(1)) & inplan
         ar = torch.arange(T, device=dev).unsqueeze(0)
         W2 = 4 * T + 2
         MAXK = 1 << 60
         ka = torch.where(cand_a, (~spot_a).long() * (W2 * W2) + d * W2 + 2 * ar, MAXK)
         ku = torch.where(cand_u, (~spot_u).long() * (W2 * W2) + d.repeat(1, L) * W2 + 2 * uo.clamp(max=2 * T) + 1, MAXK)
-        kb = torch.where(cand_b, W2 * W2 + d * W2 + 2 * ar + 1, MAXK)
         ma, ia = ka.min(dim=1)
-        mu, iu = ku.min(dim=1)
-        mb, ib = kb.min(dim=1)
-        ib = torch.where(mu < mb, iu % T, ib)
-        mb = torch.minimum(mu, mb)
+        mb, iu = ku.min(dim=1)
+        ib = iu % T
         use_b = mb < ma
         pick = torch.full((B, P), -1, dtype=torch.long, device=dev)
         pick_cd = torch.zeros(B, P, dtype=torch.bool, device=dev)
@@ -2636,7 +2654,7 @@ class SimTactics:
                           rowof: torch.Tensor, res: dict, tg: dict, kind: int, peers: torch.Tensor, pre: str = "barb",
                           seat: int = BARB_SEAT) -> None:
         """ATTACK HIGH / MEDIUM / LOW PRIORITY (`attackUnits`, `kind` the
-        list's LOW 1, MEDIUM 2, HIGH 3): each target of the kind in the list's
+        list's LOW 1 — the RELIGIOUS 8 with it —, MEDIUM 2, HIGH 3): each target of the kind in the list's
         order, its unit still standing, the units that can strike its plot
         (`strikers`) assigned over the targets of the kind within 5 of it
         (`_tac_assign`, `peers` the pass's units) and the assignment carried
@@ -2645,7 +2663,8 @@ class SimTactics:
         B, T = self.B, self.T
         P = getattr(self, f"{pre}_unit_alive").shape[1]
         bidx = torch.arange(B, device=dev)
-        isk = tg["uk"] == kind
+        # LOW takes the RELIGIOUS entries too
+        isk = (tg["uk"] == kind) | ((tg["uk"] == 8) if kind == 1 else torch.zeros_like(tg["uk"], dtype=torch.bool))
         cnt = isk.sum(dim=1)
         J = int(cnt.max()) if B else 0
         if not J:
@@ -2699,7 +2718,9 @@ class SimTactics:
             cand = self._tac_reachers(cand0 & (melee_ok | rng_ok), ai, order)
             if not bool(cand.count_nonzero()):
                 continue
-            near = isk & standing(all_e) & (self.pair_dist[t].to(torch.long) <= _ATTACK_TARGETS_RANGE).repeat(1, L)
+            # the targets of the target's own kind within 5 of it
+            ek = tg["uk"].gather(1, ents[:, j:j + 1].clamp(max=U - 1))
+            near = (tg["uk"] == ek) & standing(all_e) & (self.pair_dist[t].to(torch.long) <= _ATTACK_TARGETS_RANGE).repeat(1, L)
             near &= on.unsqueeze(1)
             plain = torch.full((B,), kind != 3, dtype=torch.bool, device=dev)
             out = self._tac_assign(cand, order, ai, near, res, rowof, unit_pl, plain, kind != 3, tg["uk"], tg["uo"], peers, pre, seat)

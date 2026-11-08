@@ -144,10 +144,12 @@
   kind: global
   semantics: "1.5f: the favored multiplier."
   status: PARTLY
+  impl: [cpu/core/tactical.ts:RELIGIOUS_TAKEN]
   readings:
     - "H-1: the civics AI — READ (the choice, the walk, the propagation), PARTLY READ (the value)"
     - "C-96: the project value — READ (0x7b28c0, the PROJECTS table 0x5ce970), PARTLY READ (the space-race standing 0x7b8a30, the diplomatic-victory rows, the repair count), unwired"
     - "C-96: the district value — READ (0x7a51f0, 0x7aaf80's terms below, 0x366df0, the purchase price 0x1b1cb0, 0x1c77c0, 0x1b4450), PARTLY READ (the golden-age term, the claims, modifiers and neighbours terms, the domain's resources path), unwired"
+    - "C-95: the planning strikes a religious unit and a Trader on their plot, its foreign test reads the mover's map layer, the blow on them 1.5 x their health — READ (0x790c60 at 0x790f22, 0x790fc9..0x791016, 0x7910b3..0x791162; 0x791470 at 0x791703..0x79174a, 0x7917b1..0x7917f7; 0x793400), both twins"
   context:
     - ...nothing), x1.5 if favored ([+0x268], the leader's Civics lists' AiFavoredItems; 1.5 at 0xd2f32c).
   review: reviewed
