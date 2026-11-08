@@ -93,6 +93,7 @@
       value: AI_Planning.csv t10   lists the Warrior on 13:11, beside the camp, reaching 12:11 (1/1), one   Movement left;
   readings:
     - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
+    - "C-93: Operation Move takes its movers as the order opens, a carried formation member among them — READ (0x816cb0 at 0x817030..0x81719a, 0x817800, 0x817e6a; 0x265d80 -> 0x56cc70), both twins"
   context:
     - ".... How the cost's \"spend everything\" leaves the Movement is unread (the walk's deduction 0x265d80 of [rsp+0x60]). The engines: a walk halts on a plot of an enemy's zone with its Movemen..."
   review: imported

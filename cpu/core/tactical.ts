@@ -3391,9 +3391,9 @@ function moveBarred(state: GameState, u: Unit, goal: number, paths: ReadonlySet<
  * for, in the order they moved. Nothing where the operation is ready
  * (0x73aa60: its units may be built, or every team ready), the update found
  * the team arrived and the node names no Leader Tag (+0x7c, its UnitAiType);
- * else each member alive with Movement left (+0x770, +0xdb0: its turn done
- * or not, 0x81705b..0x81706f; a unit whose moves an order ended has none),
- * nearest the goal first, takes a move
+ * else each member alive with Movement left as the order opens (+0x770,
+ * +0xdb0: its turn done or not, 0x81705b..0x81706f; a unit whose moves an
+ * order ended has none), nearest the goal first, takes a move
  * order (0x962030): its radius the smaller of `range` (the node's Unit
  * distance) and its Range (GetRange, unit +0x19f8: 0 for a melee unit; 0
  * for a ship) — runs/h1_duelw1121 t73-t74: the raid's Archer (Range 2)
@@ -3436,8 +3436,12 @@ export function passMoveExec(state: GameState, pass: Pass, members: readonly num
   // each member's Movement as the order opens: a formation's is the least
   // of its members' (the formation moves once, its members together)
   const opened = new Map(state.units.filter((x) => x.seat === pass.seat).map((x) => [x, pass.ended.has(x.id) ? 0 : x.movesLeft] as const));
+  // the movers are taken as the order opens (0x817030..0x81719a); each then
+  // takes its order alive (0x817800), a member its formation's walk carried
+  // at no Movement among them: its order logged on the plot it was carried
+  // to, its formation walking no more
   for (const u of movers) {
-    if (!moves(u)) continue;
+    if (!state.units.includes(u) || u.seat !== pass.seat) continue;
     const z = zero(u);
     let r = UNITS[u.type]?.naval || z ? 0 : Math.min(range, rangeOf(u));
     const paths = pathPlots(state, u);
@@ -3483,7 +3487,7 @@ export function passMoveExec(state: GameState, pass: Pass, members: readonly num
     // (0x267650 at 0x2679f9, refreshed as a member's order ends its moves,
     // 0x56d6f0 -> 0x267b00), each member set to it
     const live = mine.filter((m) => state.units.includes(m));
-    const held = Math.min(u.movesLeft, ...live.map((m) => opened.get(m) ?? 0));
+    const held = Math.min(pass.ended.has(u.id) ? 0 : u.movesLeft, ...live.map((m) => opened.get(m) ?? 0));
     if (held <= 0) continue;
     u.movesLeft = held;
     moveTo(state, u, dest, strike, true, false, danger, live);

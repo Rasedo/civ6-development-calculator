@@ -70,6 +70,23 @@
   context:
     - "...mover's player on the victim's plot with the victim's build charges (+0xed0, through 0x56cb00) and damage (+0xcf0, 0x5705f0) and embarked state, the victim removed (1); no type: 0...."
   review: reviewed
+- addr: 0x56cc70
+  final: 0x3a2af0
+  kind: function
+  name: ChangeMoves
+  semantics: the unit's Movement +0xdb0 changed by the delta (floored at 0) through its tracked value +0xd58 (0x1e60f0), the change event 0xc50d66d6 (and 0xe992f3cd at 0), then its formation's refresh (0x267b00); false where the value stands. The formation's walk (0x265d80) calls it on every member.
+  status: READ
+  cases:
+    - recording: h1_duely1117
+      turn: 34
+      value: Builder Capture's Warrior 786443 carried by the Settler's walk logs its own Operation Move from 30:15 to 30:15
+  impl:
+    - cpu/core/units.ts:stepUnit
+    - cpu/core/tactical.ts:passMoveExec
+    - gpu/core/sim_tactics.py:_op_move_exec
+  readings:
+    - "C-93: Operation Move takes its movers as the order opens, a carried formation member among them — READ (0x816cb0 at 0x817030..0x81719a, 0x817800, 0x817e6a; 0x265d80 -> 0x56cc70), both twins"
+  review: reviewed
 - addr: 0x56d6c0
   final: 0x3a30f0
   kind: function

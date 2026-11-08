@@ -8143,3 +8143,28 @@ effects (sim_policy.py), `_route_dest_plots` (sim_seats.py).
   game 21). `routeDestStrategicPlots` (Rockefeller's route Gold) still reads
   the route owner's visibility where 0x1f71b0 reads the destination
   owner's.
+
+## C-93: Operation Move takes its movers as the order opens, a carried formation member among them — READ (0x816cb0 at 0x817030..0x81719a, 0x817800, 0x817e6a; 0x265d80 -> 0x56cc70), both twins
+
+`passMoveExec`'s mover loop and `held` (cpu/core/tactical.ts); `_op_move_exec`'s
+`act` (gpu/core/sim_tactics.py).
+
+- THE MOVERS (0x817030..0x81719a): the team's members alive (+0x770) with
+  Movement (+0xdb0) are copied to a list before any of them moves; the list
+  sorted (0x814d10), each takes its order with only the alive test (0x817800).
+  A formation's walk (0x26fe20 -> 0x265d80) spends each member's Movement
+  (0x56cc70 on every member, +0xdb0 through the tracked value +0xd58), so a
+  member the walk carried takes its order at no Movement: its radius, its
+  destination, its turn done, the move order (its formation walks no further
+  on +0x218), and its line "%d, %d, %s, Operation Move, %s, from, dest,
+  after" with from and after the plot it was carried to.
+- CONFIRMED (one-seed aimem trace): runs/h1_duely1117 t34-t43 Builder
+  Capture's Settler 2293774 walks the pair, its Warrior 786443 logs
+  "Operation Move, UNIT_WARRIOR, 30:15, 34:7, 30:15" (t34) and the like each
+  turn; barb.move.family t1-44 634 -> 641 rows, all equal.
+- OPEN: Operation Pillage's walk (0x811390 at 0x81183e..0x811a50 -> 0x962030
+  with flags 0): no recorded line walks (31 of 31 "Operation Pillage City"
+  lines across runs/ stand on their target), while the engines walk a
+  member within twice its formation's Movement whose planning reaches the
+  target; runs/h1_duely1128 t17-t19 the raid on 15:10's Warrior 1114128 on
+  15:14 stays beside Xi'an's Farm 16:12 (planning 16:12(2/1)) (C-123).

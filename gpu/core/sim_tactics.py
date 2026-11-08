@@ -3225,9 +3225,12 @@ class SimTactics:
             atk = atk | self._encamp_block_plane(seat)
         ent_l, ent_w = self._tac_enter(seat, False)
         ring = self._barb_ring[goal.clamp(min=0)]                                   # [B, 37]
+        # the movers taken as the order opens; each takes its order alive, a
+        # member its formation's walk carried at no Movement among them (its
+        # order on the plot it was carried to, no walk)
         for j in range(int(nm.max()) if B else 0):
             us = order[:, j]
-            act = (j < nm) & alive_p[bidx, us] & (mp_p[bidx, us] > 0)
+            act = (j < nm) & alive_p[bidx, us]
             if not bool(act.count_nonzero()):
                 continue
             rows = act.nonzero(as_tuple=True)[0]

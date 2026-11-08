@@ -6029,6 +6029,7 @@
   readings:
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
+    - "C-93: Operation Move takes its movers as the order opens, a carried formation member among them — READ (0x816cb0 at 0x817030..0x81719a, 0x817800, 0x817e6a; 0x265d80 -> 0x56cc70), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...ess Validate new units. The members not listed, nearest the goal first (the stable sort 0x814d10): the nearest within Range to goal has the team arrived (+0x70); else its planning reac..."
