@@ -1457,6 +1457,16 @@ def _unit(plane: str):
     return get
 
 
+def _unit_look_rows(sim, b, rows):
+    """each unit's look as it holds it, ascending (`_unit_look_now`)"""
+    import torch
+    if not len(rows):
+        return []
+    s = torch.as_tensor([int(x) for x in rows], dtype=torch.long, device=sim.device)
+    disk = sim._unit_look_now(torch.full_like(s, int(b)), s)
+    return [d.nonzero(as_tuple=True)[0].tolist() for d in disk]
+
+
 UNIT = {
     "seat": _unit("unit_seat"),
     "type": _unit("unit_type"),
@@ -1494,6 +1504,7 @@ UNIT = {
     "noResourceUpkeep": _unit("unit_no_res_upkeep"),
     "alpine": _unit("unit_alpine"),
     "fionn": _unit("unit_fionn"),
+    "look": lambda sim, b, rows: _unit_look_rows(sim, b, rows),
 }
 
 

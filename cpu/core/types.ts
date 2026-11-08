@@ -736,6 +736,15 @@ export interface BarbOp {
   target: BarbTarget;
 }
 
+/** A unit's look (Unit +0x1f40, the list 0x58f3f0 stores): the plot it
+ *  looked from, the sight and see-through it looked with, the plots seen */
+export interface UnitLook {
+  at: number;
+  sight: number;
+  through: boolean;
+  plots: number[];
+}
+
 export interface Unit {
   id: number;
   type: string;
@@ -786,6 +795,10 @@ export interface Unit {
    *  Giant's Causeway, `grantFeatureAbilities`): +5 Combat Strength in every
    *  fight (SPEAR_OF_FIONN_ADJUST_COMBAT_STRENGTH), through any upgrade. */
   fionn?: boolean;
+  /** ITS LOOK (`unitLook`): the plots its line of sight took in at its last
+   *  look — the plot it looked from, the sight and the see-through it looked
+   *  with — kept until it looks again, however the map changes meanwhile. */
+  look?: UnitLook;
   /** SPY STATE. `spyMission` is SPY_IDLE, SPY_TRAVELLING or a `SPY_MISSIONS`
    *  index; `spyTurns` is the clock it is running; `spyTarget` the centre tile
    *  it is in transit to; `spyLevel` its rank, capped at Master Spy. */

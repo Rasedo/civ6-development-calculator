@@ -203,6 +203,7 @@
     - "C-100: the rivers' names and the flood cut — READ (0x534950's river call, 0xa29730, the plot-to-rivers map), MEASURED (the naming sight)"
     - "C-95: the scout's tree \"Barbarian Found City\" — READ, ported"
     - "C-100: the rivers' names and the flood cut"
+    - "C-129: a unit's look is its stored line-of-sight list — READ (0x58f3f0, the setters 0x56ce90 / 0x5704d0 / 0x570560), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ...is bound (0x153b0d) to the game signal at signals +0x10c8, which the unit sight update 0x58aa90 raises per plot when 0x508d50 (Player_Visibility_Manager, the count change) answers 2:...

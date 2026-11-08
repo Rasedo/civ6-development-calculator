@@ -1566,6 +1566,14 @@ class SimInit:
             ("list_seat", torch.long),
             ("list_type", torch.long),
             ("list_def", torch.bool),
+            # its look as it last took it (`Unit.look`, `_unit_look`): the
+            # plot it looked from (-1 none), the sight and see-through it
+            # looked with, the walk places it saw as two 64-bit words
+            ("look_at", torch.long),
+            ("look_rad", torch.long),
+            ("look_thru", torch.bool),
+            ("look_lo", torch.long),
+            ("look_hi", torch.long),
         ):
             _base = torch.zeros(B, self.UNIT_MAX, dtype=_dt, device=device)
             setattr(self, f"unit_{_pl}", _base)
@@ -1585,6 +1593,7 @@ class SimInit:
         self.unit_free_city.fill_(-1)
         self.unit_pslot.fill_(-1)
         self.unit_list_seat.fill_(-1)
+        self.unit_look_at.fill_(-1)
         self.unit_levy_src.fill_(-1)
         self.unit_orig_owner.fill_(-1)
         self.unit_spy_mission.fill_(self._spy_idle)
@@ -2026,6 +2035,8 @@ class SimInit:
         self._sight_max = int(rules.improvements["sightMax"])
         _lt, _lp, _lk = sight_tables(self.W, self.H, self.wrap_x, self._sight_max)
         self._los_tgt, self._los_par, self._los_pick = _lt.to(device), _lp.to(device), _lk.to(device)
+        # a unit's stored look holds its walk places in two 64-bit words (`_look_pack`)
+        assert self._los_tgt.shape[1] <= 128, "a look's walk places pass two words"
         # each walk place's ring (ring k at places 3k(k-1) .. 3k(k+1) - 1)
         self._los_ring = torch.tensor([k for k in range(1, self._sight_max + 1) for _ in range(6 * k)],
                                       dtype=torch.long, device=device)

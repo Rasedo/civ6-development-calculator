@@ -26,7 +26,7 @@ import { RESOURCES } from '../../world/resources';
 import { randRange, randWeighted, atRngPoint } from './rand';
 import { BARB_SEAT, FREE_SEAT, NO_SEAT, allCities, campTiles, isBarbSeat, isTerritorial, majorsAlive, seatOfCityState, tileCity, tileSeat } from './seats';
 import { suzerainOf } from './cityStates';
-import { losDisk, unitSight, unitSeesThrough } from './fog';
+import { losDisk, unitLook, unitSight, unitSeesThrough } from './fog';
 import { spawnUnit, tileFreeForUnit, unitDomain } from './units';
 import { UNITS } from '../data/units';
 import { TECHS } from '../data/techs';
@@ -61,8 +61,8 @@ export function barbarianTechs(state: GameState): void {
 }
 
 /**
- * THE PLOTS THESE SEATS SEE NOW: each unit's sight across the plots its
- * line reaches (`losDisk`), each city's centre two plots round, each
+ * THE PLOTS THESE SEATS SEE NOW: each unit's look as it last took it
+ * (`unitLook`), each city's centre two plots round, each
  * owned plot with its ring, and — the barbarians' — each camp with its ring
  * (the improvement's owner, `CAMP_SIGHT`). A seat sees what each city-state
  * it is suzerain of sees: the suzerain update (0x451b20) adds the minor's
@@ -82,7 +82,7 @@ export function plotsSeenNow(state: GameState, given: ReadonlySet<number>, share
   const seen = new Uint8Array(map.tiles.length);
   for (const u of state.units) {
     if (!seats.has(u.seat)) continue;
-    for (const p of losDisk(map, map.tiles[u.tileIndex], unitSight(u, state), unitSeesThrough(u))) seen[p] = 1;
+    for (const p of unitLook(state, u)) seen[p] = 1;
   }
   const centres: number[] = [];
   for (const s of state.seats) if (seats.has(s.seat)) for (const c of s.cities) centres.push(c.centerIndex);
@@ -482,10 +482,9 @@ function cityCentreOf(state: GameState, t: Tile): number {
 function othersSee(state: GameState, unit: Unit, plots: readonly number[]): Set<number> {
   const out = new Set<number>();
   if (!plots.length) return out;
-  const { map } = state;
   for (const o of state.units) {
     if (o === unit || !isBarbSeat(o.seat) || o.tileIndex < 0 || unitDomain(o.type) === 'civilian') continue;
-    const sees = losDisk(map, map.tiles[o.tileIndex], unitSight(o, state), unitSeesThrough(o));
+    const sees = new Set(unitLook(state, o));
     for (const p of plots) if (sees.has(p)) out.add(p);
   }
   return out;

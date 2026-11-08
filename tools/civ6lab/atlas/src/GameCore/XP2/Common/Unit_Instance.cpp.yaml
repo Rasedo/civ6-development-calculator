@@ -102,6 +102,18 @@
   readings:
     - "C-93: Operation Move takes its movers as the order opens, a carried formation member among them — READ (0x816cb0 at 0x817030..0x81719a, 0x817800, 0x817e6a; 0x265d80 -> 0x56cc70), both twins"
   review: reviewed
+- addr: 0x56ce90
+  final: 0x3a2ca0
+  kind: function
+  status: PARTLY
+  impl: [cpu/core/fog.ts:unitLook]
+  readings:
+    - "C-129: a unit's look is its stored line-of-sight list — READ (0x58f3f0, the setters 0x56ce90 / 0x5704d0 / 0x570560), both twins"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "## C-129: a unit's look is its stored line-of-sight list — READ (0x58f3f0, the setters 0x56ce90 / 0x5704d0 / 0x570560), both twins"
+    - ...lacement and the step (0x586d40), the removal (0x586a90), and the setters of the sight (0x56ce90 on +0x1998), of the see-through features (0x5704d0, +0x1470) and terrain (0x570560, +0x...
+  review: imported
 - addr: 0x56d6c0
   final: 0x3a30f0
   kind: function
@@ -544,6 +556,30 @@
   context:
     - "...gossip strings GOSSIP_LAND/NAVAL_UNIT_LEVEL) holds its plot — fortify (0x95eae0) where 0x56ef30 allows, else sleep (0x9686d0); a hull outside its own territory heads for its player's..."
   review: reviewed
+- addr: 0x5704d0
+  final: 0x3a5940
+  kind: function
+  status: PARTLY
+  impl: [cpu/core/fog.ts:unitLook]
+  readings:
+    - "C-129: a unit's look is its stored line-of-sight list — READ (0x58f3f0, the setters 0x56ce90 / 0x5704d0 / 0x570560), both twins"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...: a unit's look is its stored line-of-sight list — READ (0x58f3f0, the setters 0x56ce90 / 0x5704d0 / 0x570560), both twins"
+    - "...6a90), and the setters of the sight (0x56ce90 on +0x1998), of the see-through features (0x5704d0, +0x1470) and terrain (0x570560, +0x14d0). Nothing else calls 0x58f3f0: a feature clear..."
+  review: imported
+- addr: 0x570560
+  final: 0x3a59d0
+  kind: function
+  status: PARTLY
+  impl: [cpu/core/fog.ts:unitLook]
+  readings:
+    - "C-129: a unit's look is its stored line-of-sight list — READ (0x58f3f0, the setters 0x56ce90 / 0x5704d0 / 0x570560), both twins"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...look is its stored line-of-sight list — READ (0x58f3f0, the setters 0x56ce90 / 0x5704d0 / 0x570560), both twins"
+    - "...ght (0x56ce90 on +0x1998), of the see-through features (0x5704d0, +0x1470) and terrain (0x570560, +0x14d0). Nothing else calls 0x58f3f0: a feature cleared or grown, a district placed..."
+  review: imported
 - addr: 0x5705f0
   final: 0x3a5a60
   kind: function

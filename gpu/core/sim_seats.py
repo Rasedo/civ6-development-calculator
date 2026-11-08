@@ -13051,6 +13051,8 @@ class SimSeats:
         self.unit_homed[rows, dst] = False
         self.unit_pslot[rows, dst] = -1
         self.unit_list_seat[rows, dst] = -1
+        # its placement looks from the plot (`takeLook`)
+        self._take_look(rows, dst)
         self._occ_set_new(rows, tile, dst)
         cur[rows] += 1
         self._gen_ver += 1
@@ -13887,6 +13889,13 @@ class SimSeats:
                              self._unit_sight(_ut, _up), self._sees_through(_ut, _up))
             self._suzerain_look(rows[mnr], srow[mnr] - 100, dest.take(rows)[mnr],
                                 self._unit_sight(_ut, _up), self._sees_through(_ut, _up))
+        # each member's look taken where it now stands, the old one dropped
+        # (`takeLook`; 0x58f3f0: the new list added, the stored one taken off)
+        _lk = torch.cat([gslot.unsqueeze(1), rider], dim=1).index_select(0, rows)
+        for _c in range(_lk.shape[1]):
+            _ok = _lk[:, _c] >= 0
+            if bool(_ok.count_nonzero()):
+                self._take_look(rows[_ok], _lk[:, _c][_ok])
         # CIV6 (Pilgrim): "Gains 3 extra spreads when moving adjacent to a
         # natural wonder for the first time."
         if self._pk["PILGRIM"] >= 0:

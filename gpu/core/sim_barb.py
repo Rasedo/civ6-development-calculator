@@ -43,7 +43,7 @@ class SimBarb:
         majors and the Free Cities ("fullciv"),
         every living player, the barbarians included ("all", `allSeers`), the
         barbarians alone ("barbarians") or one seat (`who` its absolute seat)
-        see now — each unit's sight across the plots its line reaches, each
+        see now — each unit's look as it last took it (`_unit_look`), each
         city centre two plots round, each owned plot with its ring, and the
         barbarians' camps with theirs (`CAMP_SIGHT`); a seat sees what each
         city-state it is suzerain of sees (the minor's outgoing visibility,
@@ -78,9 +78,7 @@ class SimBarb:
         live = self.unit_alive & seer(self.unit_seat)
         for u in live.any(dim=0).nonzero(as_tuple=True)[0].tolist():
             rows = live[:, u].nonzero(as_tuple=True)[0]
-            ut, pr, st = self.unit_type[rows, u], self.unit_promos[rows, u], self.unit_seat[rows, u]
-            rad = self._unit_sight(ut, pr, st, rows)
-            seen[rows] |= self._los_disk(rows, self.unit_tile[rows, u].clamp(min=0), rad, self._sees_through(ut, pr))
+            seen[rows] |= self._unit_look(rows, torch.full_like(rows, u))
         ctr = self._centre_seat_plane()
         own_c = (ctr >= 0) & seer(ctr)
         if bool(own_c.any()):
@@ -556,8 +554,9 @@ class SimBarb:
 
     def _barb_others_see(self, rows: torch.Tensor, slot: torch.Tensor, plots: torch.Tensor) -> torch.Tensor:
         """[N, T] of `plots` [N, T], those a barbarian unit other than the one
-        at local slot `slot` [N] sees where it stands (in games `rows`) — a
-        civilian of theirs (a capture) none"""
+        at local slot `slot` [N] sees where it stands (in games `rows`), its
+        look as it last took it (`_unit_look`) — a civilian of theirs (a
+        capture) none"""
         out = torch.zeros_like(plots)
         if not bool(plots.any()):
             return out
@@ -565,13 +564,14 @@ class SimBarb:
         live = (self.barb_unit_alive[rows] & (self.barb_unit_seat[rows] == BARB_SEAT) & (self.barb_unit_tile[rows] >= 0)
                 & ~civ)
         live[torch.arange(rows.numel(), device=self.device), slot] = False
+        # a game with no plots to ask of asks no unit's look
+        live &= plots.any(dim=1, keepdim=True)
+        lo = self.POOL_LO["barb"]
         for u in live.any(dim=0).nonzero(as_tuple=True)[0].tolist():
             m = live[:, u]
             ri = m.nonzero(as_tuple=True)[0]
             r = rows[ri]
-            ut, pr = self.barb_unit_type[r, u], self.barb_unit_promos[r, u]
-            rad = self._unit_sight(ut, pr, torch.full_like(ut, BARB_SEAT), r)
-            out[ri] |= self._los_disk(r, self.barb_unit_tile[r, u], rad, self._sees_through(ut, pr)) & plots[ri]
+            out[ri] |= self._unit_look(r, torch.full_like(r, u + lo)) & plots[ri]
         return out
 
     def _barb_battle_boldness(self, live: torch.Tensor, a_kind: str, u: int, a_seat: torch.Tensor,

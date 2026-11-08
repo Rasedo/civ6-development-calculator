@@ -4179,6 +4179,21 @@
             "unit_fionn"
           ],
           "note": "ABILITY_SPEAR_OF_FIONN, granted for good beside the Giant's Causeway: +5 Combat Strength in every fight, through any upgrade."
+        },
+        {
+          "name": "look",
+          "compare": "exact",
+          "covers": [
+            "Unit.look"
+          ],
+          "planes": [
+            "unit_look_at",
+            "unit_look_rad",
+            "unit_look_thru",
+            "unit_look_lo",
+            "unit_look_hi"
+          ],
+          "note": "the plots the unit sees where it stands, its look as it last took it (a step, a placement) however the map changed since, ascending (`unitLookNow` / `_unit_look_now`)."
         }
       ]
     },

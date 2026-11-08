@@ -3065,6 +3065,7 @@ class SimMasks:
         self.barb_unit_free_city[rows, slot] = -1 if home is None else home[rows]
         self.barb_unit_pslot[rows, slot] = -1  # no pool slot until its player's pass (`poolSlots`)
         self.barb_unit_list_seat[rows, slot] = -1
+        self.barb_unit_look_at[rows, slot] = -1  # no look until its first (`unitLook`)
         # no tribe's until the raise that made it says so (`_barb_raise`)
         self.barb_unit_tribe[rows, slot] = -1
         self.barb_unit_scout[rows, slot] = False
@@ -3219,6 +3220,102 @@ class SimMasks:
         disk[kk[vis], tgt[vis]] = True
         disk[torch.arange(K, device=self.device), tiles] = True
         return disk
+
+    def _look_words(self) -> torch.Tensor:
+        """[64] long — the bit of each place in a look's word."""
+        w = getattr(self, "_look_bits", None)
+        if w is None:
+            w = self._look_bits = torch.arange(64, dtype=torch.long, device=self.device)
+        return w
+
+    def _look_pack(self, disk: torch.Tensor, tiles: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
+        """the walk places of the looks `disk` [K, T] from `tiles` [K] as two
+        64-bit words [K] each (`_los_tgt`'s place order)."""
+        tgt = self._los_tgt[tiles.clamp(min=0)]
+        bits = disk.gather(1, tgt.clamp(min=0)) & (tgt >= 0) & (tiles >= 0).unsqueeze(1)
+        w = self._look_words()
+        n = bits.shape[1]
+        lo = (bits[:, :min(n, 64)].long() << w[:min(n, 64)]).sum(dim=1)
+        hi = (bits[:, 64:].long() << w[:max(n - 64, 0)]).sum(dim=1) if n > 64 else torch.zeros_like(lo)
+        return lo, hi
+
+    def _look_unpack(self, tiles: torch.Tensor, lo: torch.Tensor, hi: torch.Tensor) -> torch.Tensor:
+        """[K, T] bool — the plots a stored look from `tiles` [K] holds: its
+        plot and the walk places its words `lo` / `hi` [K] set."""
+        K = tiles.numel()
+        tgt = self._los_tgt[tiles.clamp(min=0)]
+        n = tgt.shape[1]
+        w = self._look_words()
+        bits = ((lo.unsqueeze(1) >> w[:min(n, 64)]) & 1).bool()
+        if n > 64:
+            bits = torch.cat([bits, ((hi.unsqueeze(1) >> w[:n - 64]) & 1).bool()], dim=1)
+        bits = bits & (tgt >= 0) & (tiles >= 0).unsqueeze(1)
+        disk = torch.zeros(K, self.T, dtype=torch.bool, device=self.device)
+        kk = torch.arange(K, device=self.device).unsqueeze(1).expand_as(tgt)
+        disk[kk[bits], tgt[bits]] = True
+        on = (tiles >= 0).nonzero(as_tuple=True)[0]
+        disk[on, tiles[on]] = True
+        return disk
+
+    def _look_key(self, rows: torch.Tensor, slots: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
+        """the sight and see-through [K] the units at merged `slots` [K] of
+        the games `rows` [K] look with now."""
+        ut, pr = self.unit_type[rows, slots], self.unit_promos[rows, slots]
+        return self._unit_sight(ut, pr, self.unit_seat[rows, slots], rows), self._sees_through(ut, pr)
+
+    def _look_held(self, rows: torch.Tensor, slots: torch.Tensor) -> torch.Tensor:
+        """[K] bool — `unitLook`'s stored look still the units' own: taken
+        from the plot they stand on, with the sight and see-through they
+        hold."""
+        rad, thr = self._look_key(rows, slots)
+        return ((self.unit_look_at[rows, slots] == self.unit_tile[rows, slots])
+                & (self.unit_look_rad[rows, slots] == rad) & (self.unit_look_thru[rows, slots] == thr))
+
+    def _fresh_look(self, rows: torch.Tensor, slots: torch.Tensor) -> torch.Tensor:
+        """[K, T] bool — the units' line of sight from where they stand now
+        (none off the map)."""
+        tile = self.unit_tile[rows, slots]
+        rad, thr = self._look_key(rows, slots)
+        return self._los_disk(rows, tile.clamp(min=0), rad, thr) & (tile >= 0).unsqueeze(1)
+
+    def _take_look(self, rows: torch.Tensor, slots: torch.Tensor) -> torch.Tensor:
+        """`takeLook`: the units at merged `slots` [K] of the games `rows` [K]
+        (pairs unique) look from where they stand, their look stored; [K, T]
+        the plots."""
+        if rows.numel() == 0:
+            return torch.zeros(0, self.T, dtype=torch.bool, device=self.device)
+        tile = self.unit_tile[rows, slots]
+        rad, thr = self._look_key(rows, slots)
+        disk = self._fresh_look(rows, slots)
+        lo, hi = self._look_pack(disk, tile)
+        self.unit_look_at[rows, slots] = tile
+        self.unit_look_rad[rows, slots] = rad
+        self.unit_look_thru[rows, slots] = thr
+        self.unit_look_lo[rows, slots] = lo
+        self.unit_look_hi[rows, slots] = hi
+        return disk
+
+    def _unit_look(self, rows: torch.Tensor, slots: torch.Tensor) -> torch.Tensor:
+        """[K, T] bool — `unitLook`: the plots the units at merged `slots` [K]
+        of the games `rows` [K] see where they stand, their look as they last
+        took it — on a step (`_step_verb`) or a placement — however the map
+        changed since; a unit whose stored look is from another plot, sight
+        or see-through looks now (`_take_look`)."""
+        held = self._look_held(rows, slots)
+        out = self._look_unpack(self.unit_look_at[rows, slots], self.unit_look_lo[rows, slots], self.unit_look_hi[rows, slots])
+        if not bool(held.all()):
+            k = (~held).nonzero(as_tuple=True)[0]
+            out[k] = self._take_look(rows[k], slots[k])
+        return out
+
+    def _unit_look_now(self, rows: torch.Tensor, slots: torch.Tensor) -> torch.Tensor:
+        """[K, T] bool — what `_unit_look` answers, nothing stored."""
+        held = self._look_held(rows, slots)
+        out = self._look_unpack(self.unit_look_at[rows, slots], self.unit_look_lo[rows, slots], self.unit_look_hi[rows, slots])
+        if not bool(held.all()):
+            k = (~held).nonzero(as_tuple=True)[0]
+            out[k] = self._fresh_look(rows[k], slots[k])
+        return out
 
     def _city_look(self, rows: torch.Tensor, seat_row, tiles: torch.Tensor) -> None:
         """`cityLook`'s twin, a city founded or changing hands once its plots
@@ -3458,10 +3555,8 @@ class SimMasks:
                 if k.numel() == 0:
                     continue
                 kr = rows[k]
-                utp = self.unit_type[kr, j]
-                upr = self.unit_promos[kr, j]
-                rad = self._unit_sight(utp, upr, self.unit_seat[kr, j], kr)
-                look = self._los_disk(kr, self.unit_tile[kr, j].clamp(min=0), rad, self._sees_through(utp, upr))
+                # its look as it holds it, nothing stored (the ask is no look)
+                look = self._unit_look_now(kr, torch.full_like(kr, j))
                 at_k = at[k].unsqueeze(1)
                 seen[k] = seen[k] | look.gather(1, at_k).squeeze(1)
             if bool(seen.count_nonzero()):
@@ -3533,9 +3628,22 @@ class SimMasks:
             at = frm if j in movers else int(self.major_unit_tile[b, j])
             if at < 0:
                 continue
+            js = torch.tensor([j], dtype=torch.long, device=self.device)
             utp = self.unit_type[bb, j]
             upr = self.unit_promos[bb, j]
             rad = self._unit_sight(utp, upr, self.unit_seat[bb, j], bb)
+            if j not in movers:
+                # its look as it holds it, nothing stored (the ask is no look)
+                if int(self.pair_dist[at, p]) > int(rad[0]):
+                    continue
+                if bool(self._unit_look_now(bb, js)[0, p]):
+                    return True
+                continue
+            # a mover's look is still the one it took on the plot it stepped from
+            if int(self.unit_look_at[b, j]) == at:
+                if bool(self._look_unpack(self.unit_look_at[bb, js], self.unit_look_lo[bb, js], self.unit_look_hi[bb, js])[0, p]):
+                    return True
+                continue
             if int(self.pair_dist[at, p]) > int(rad[0]):
                 continue
             look = self._los_disk(bb, torch.tensor([at], dtype=torch.long, device=self.device), rad,
@@ -3663,10 +3771,8 @@ class SimMasks:
                     if k.numel() == 0:
                         continue
                     kr = rows[k]
-                    utp = self.unit_type[kr, j]
-                    upr = self.unit_promos[kr, j]
-                    rad = self._unit_sight(utp, upr, self.unit_seat[kr, j], kr)
-                    look = self._los_disk(kr, self.unit_tile[kr, j].clamp(min=0), rad, self._sees_through(utp, upr))
+                    # its look as it holds it, nothing stored (the ask is no look)
+                    look = self._unit_look_now(kr, torch.full_like(kr, j))
                     seen[k] = seen[k] | look.gather(1, at[k].unsqueeze(1)).squeeze(1)
             hit = cand & seen
             if not bool(hit.count_nonzero()):
@@ -3852,6 +3958,7 @@ class SimMasks:
         self.major_unit_seat[rows, slot] = seat
         self.major_unit_pslot[rows, slot] = -1  # no pool slot until its player's pass (`poolSlots`)
         self.major_unit_list_seat[rows, slot] = -1  # on no unit list until its owner's end of turn
+        self.major_unit_look_at[rows, slot] = -1  # no look until its first (`unitLook`)
         getattr(self, f"{pre}_unit_type")[rows, slot] = type_idx.take(rows)
         getattr(self, f"{pre}_unit_tile")[rows, slot] = spot.take(rows)
         # a city-state's knowledge base records the unit it made (`spawnUnit`)

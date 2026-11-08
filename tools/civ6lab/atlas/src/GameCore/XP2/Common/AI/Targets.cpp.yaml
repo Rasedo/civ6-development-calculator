@@ -177,9 +177,17 @@
     - "C-96: the knowledge base's army records and the Combat Desire — READ (the records, the update, the desire), PARTLY READ (the signals' looks; the standing-army count in its own section below)"
     - "H-1: the AI memory reader — READ (the hooks, the pointer paths, the contracts, the knowledge base, the operations, the trees), PARTLY READ (the religious AI's holder)"
     - "H-1: the trade record's player — READ (0x5ecb50, 0x787f50, 0x5e9b20's walk), PARTLY READ (the city-states' meetings with each other, the majors' weights)"
+    - "C-129: a unit's look is its stored line-of-sight list — READ (0x58f3f0, the setters 0x56ce90 / 0x5704d0 / 0x570560), both twins"
   context:
     - "H-1: the AI memory reader — READ (the hooks, the pointer paths, the contracts, the knowledge base, the operations, the trees), PARTLY READ (the religious AI's holder)"
     - "...ement (plot +0x44 the barbarians') -> 0x5f0110. Player signal +0xc0 (0x7874a0, bound in 0x7864c0 at 0x786b25) records a unit of the player's own through 0x5f0440 with no sight asked: t..."
+  review: reviewed
+- addr: 0x786d10
+  kind: function
+  semantics: "game signal +0x930's handler (PlayerIntroduced, 0x534ee0): the knowledge base (+0x388) forgets the introduced player's army records (0x5ecc10)."
+  status: PARTLY
+  readings:
+    - "C-129: a unit's look is its stored line-of-sight list — READ (0x58f3f0, the setters 0x56ce90 / 0x5704d0 / 0x570560), both twins"
   review: reviewed
 - addr: 0x786d50
   final: 0x5152e0

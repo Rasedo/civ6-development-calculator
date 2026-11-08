@@ -2834,10 +2834,28 @@
 - addr: 0x58f3f0
   final: 0x3b7100
   kind: function
-  semantics: a unit's sight walk (-> 0x58b1d0) changing the visibility counts.
-  status: PARTLY
-  impl: [cpu/core/fog.ts:Look]
+  name: unitLookUpdate
+  semantics: "a unit's look (unit, plot, add): with add clear the stored list (unit +0x1f40, size +0x1f50) taken off the visibility counts (0x58aa90 flag 0) and emptied; with add the new list walked (0x58b1d0 at the unit's sight +0x1998, see-through features +0x1470 and terrain +0x14d0), added (0x58aa90 flag 1), the stored one taken off, the new one stored. Nothing else walks a standing unit's list: a feature or district change leaves it."
+  status: READ
+  cases:
+    - recording: h1_duelz1128
+      turn: 88
+      value: China's Government Plaza clears the Woods on 11:13; the barbarian Swordsman 4456471 on 12:13 since t84 never records China's Archer 1048580 on 10:13 (age 4 at t88 .. 11 at t105), the engines' fresh sight saw it
+    - recording: h1_duelz1127
+      turn: 108
+      value: the barbarians' captured Settler on 15:12 since t78 does not record China's Builder 1638400 on 13:10 (t108-t129)
+  impl:
+    - cpu/core/fog.ts:Look
+    - cpu/core/fog.ts:unitLook
+    - cpu/core/fog.ts:takeLook
+    - gpu/core/sim_masks.py:_unit_look
+    - gpu/core/sim_masks.py:_take_look
+    - cpu/core/types.ts:UnitLook
+    - cpu/core/units.ts:stepUnit
+    - cpu/core/units.ts:upgradeAnew
+    - gpu/core/sim_seats.py:_step_verb
   readings:
+    - "C-129: a unit's look is its stored line-of-sight list — READ (0x58f3f0, the setters 0x56ce90 / 0x5704d0 / 0x570560), both twins"
     - "H-1: the raids — READ"
     - "H-1: the raids — READ"
     - "C-95: Explore Land and the barbarians' revealed plots — READ, ported (two tests below unread)"

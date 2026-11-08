@@ -344,6 +344,15 @@
     - "## H-1: the trade record's player — READ (0x5ecb50, 0x787f50, 0x5e9b20's walk), PARTLY READ (the city-states' meetings with each other, the majors' weights)"
     - "...f0 vtable @0xd70418): a meeting's two players; where one is the knowledge base's owner, 0x5ecb50 (the knowledge base, the other): \"Invalid player initialized\" guard, m_playerKnowledg..."
   review: reviewed
+- addr: 0x5ecc10
+  final: 0x3f39e0
+  kind: function
+  name: knowledgeForgetPlayer
+  semantics: "(kb, player): the player's army records (kb +0x18 + player x 0x18) resized to the unit types (0x5f0f90) and every type list's size set 0: all its records forgotten. Its one caller is 0x786d10, bound (0x7864c0 at 0x786817) to game signal +0x930, which Rules_Player::PlayerIntroduced (0x534ee0) raises, called by the clans' tribe-to-minor conversion alone."
+  status: PARTLY
+  readings:
+    - "C-129: a unit's look is its stored line-of-sight list — READ (0x58f3f0, the setters 0x56ce90 / 0x5704d0 / 0x570560), both twins"
+  review: reviewed
 - addr: 0x5eceb0
   final: 0x3f3b00
   kind: function

@@ -101,6 +101,7 @@ import { PANTHEONS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, WORSHIP_BELIEFS, ENHANCER
 import { grantedMoves, mapLayer, unitStackSlot } from './units';
 import { GOODY_KINDS } from '../data/goodyHuts';
 import { BARB_TAG_UNITS, BARB_TRIBES, type BarbTag } from '../data/barbarians';
+import { unitLookNow } from './fog';
 
 const MANIFEST_URL = new URL('../../shared/statecompare.manifest.json', import.meta.url);
 // `cpu/core/types.ts` re-exports `world/types.ts` (Tile, GameMap live there),
@@ -1312,6 +1313,7 @@ const UNIT_G: Record<string, Extractor> = {
   noResourceUpkeep: overUnits((u) => (u.noResourceUpkeep ? 1 : 0)),
   alpine: overUnits((u) => (u.alpine ? 1 : 0)),
   fionn: overUnits((u) => (u.fionn ? 1 : 0)),
+  look: (state, rows) => (rows as Unit[]).map((u) => [...unitLookNow(state, u)]),
 };
 
 const TILE: Record<string, Extractor> = {

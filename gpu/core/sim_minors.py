@@ -301,7 +301,7 @@ class SimMinors:
     def _minor_sight(self, s: int) -> torch.Tensor:
         """[B, T] bool — `cityStateSight`: the plots minor `s` sees now — its
         plots and those beside them, the plots within two of its centre, and
-        each of its units' look (`_unit_sight`, cut by `_los_disk`)."""
+        each of its units' look as it last took it (`_unit_look`)."""
         B, T = self.B, self.T
         seat = 100 + s
         if getattr(self, "_ring1", None) is None:
@@ -319,10 +319,7 @@ class SimMinors:
         mine = self.unit_alive & (self.unit_seat == seat)
         for j in mine.any(dim=0).nonzero(as_tuple=True)[0].tolist():
             k = mine[:, j].nonzero(as_tuple=True)[0]
-            utp = self.unit_type[k, j]
-            upr = self.unit_promos[k, j]
-            rad = self._unit_sight(utp, upr, self.unit_seat[k, j], k)
-            seen[k] = seen[k] | self._los_disk(k, self.unit_tile[k, j].clamp(min=0), rad, self._sees_through(utp, upr))
+            seen[k] = seen[k] | self._unit_look(k, torch.full_like(k, j))
         return seen
 
     def _minor_knowledge(self, s: int, age: bool) -> None:

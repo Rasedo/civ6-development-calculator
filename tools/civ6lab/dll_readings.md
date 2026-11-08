@@ -10704,3 +10704,61 @@ GPU `_op_move_exec`'s `pin` and the walk's `cross` (gpu/core/sim_tactics.py),
   in Xi'an beside its standing Apostle 3473421 (Faith 220.67 + 34.5 - 240 =
   15.17 at record t175).
 - OPEN: none of the three.
+
+## C-129: a unit's look is its stored line-of-sight list — READ (0x58f3f0, the setters 0x56ce90 / 0x5704d0 / 0x570560), both twins
+
+`unitLook` / `unitLookNow` / `takeLook` (`cpu/core/fog.ts`, `Unit.look`), read by
+`plotsSeenNow`, `othersSee`, `cityStateSight` and `seatSeesPlot`; the step's
+`takeLook` (`stepUnit`), the upgrade's (`upgradeAnew`); the replay carries it per
+unit (`UNIT_MEMORY`). GPU `_unit_look` / `_unit_look_now` / `_take_look`
+(`gpu/core/sim_masks.py`, planes `unit_look_at` / `_rad` / `_thru` / `_lo` /
+`_hi`), read by `_barb_seen`, `_barb_others_see`, `_minor_sight`,
+`_seat_sees_plot` and the minor and major looks' meetings; `_step_verb`,
+`_upgrade_anew`.
+
+- THE LIST: each unit stores the (plot, ring) list its last look walked
+  (unit +0x1f40, size +0x1f50). 0x58f3f0(unit, plot, add): with add the new
+  list is walked (0x58b1d0 at the unit's sight +0x1998, see-through features
+  +0x1470, terrain +0x14d0), added to the visibility counts (0x58aa90 flag
+  1), then the stored list is taken off (0x58aa90 flag 0) and the new one
+  stored; without add the stored list alone is taken off and emptied.
+- WHO LOOKS AGAIN: the placement and the step (0x586d40), the removal
+  (0x586a90), and the setters of the sight (0x56ce90 on +0x1998), of the
+  see-through features (0x5704d0, +0x1470) and terrain (0x570560, +0x14d0).
+  Nothing else calls 0x58f3f0: a feature cleared or grown, a district placed
+  or a city founded leaves every standing unit's list as it was, and the
+  plots it sees are the counts that list holds.
+- PORTED: the plots a unit sees standing are its stored look while it was
+  taken from the plot it stands on with its sight and see-through; a step
+  takes it anew after the step's reveal (a mover's look from the plot it
+  left is its stored one); an upgrade's new unit takes its own; a unit put
+  on a plot by any other write takes its look at the first ask that stores
+  (the sight walks: `plotsSeenNow`, `othersSee`, `cityStateSight`), the
+  meeting asks (`seatSeesPlot`) store none.
+- CONFIRMED (aimem, one seed each):
+  - runs/h1_duelz1128 t88: China's Government Plaza clears the Woods on
+    11:13; the barbarian Swordsman 4456471 on 12:13 since t84 never records
+    China's Archer 1048580 on 10:13 (its record ages 4 at t88 to 11 at
+    t105). The engines' fresh sight saw it every turn: 15 knowledge.army
+    misses t88-t105, none on the stored look (--from 80 --to 106).
+  - runs/h1_duelz1127 t108: the barbarians' captured Settler on 15:12 since
+    t78 never records China's Builder 1638400 on 13:10 (t108-t129 carried,
+    t108 under aimem); none on the stored look (--from 74 --to 110).
+- THE OLD ID AFTER AN UPGRADE (0xa49cb0, the new unit): every other player's
+  record of the old id stays and ages out; none is re-keyed
+  (runs/h1_duelz1128 t86 city-state 3's 655367 -> 1179650: players 0, 2 and
+  the barbarians keep 655367 on 4:8 / 3:7 / 3:4 ageing; city-state 2
+  records 1179650 at its t87 look). The owner records the new unit at its
+  turn's end look (t86 endlook, age 0); whether the create raises the
+  owner's +0xc0 signal is not told apart by the records.
+- A PLAYER'S RECORDS FORGOTTEN: 0x5ecc10(kb, player) empties every type
+  list of the player's records; its one caller 0x786d10 is bound
+  (0x7864c0 at 0x786817) to game signal +0x930, which Rules_Player::
+  PlayerIntroduced (0x534ee0) raises, called by the clans' tribe conversion
+  alone.
+- OPEN: a destroyed player's records go from every knowledge base at its
+  destruction (runs/h1_duelz1127 t213: city-state 4 destroyed in player 1's
+  turn, PlayerDestroyed; player 1's end look, city-state 3's t213 tactical
+  site and player 0's t214 records hold none of its Bombard 1703944, age 8
+  where seen), the path that empties them unread (not 0x5ecc10's signal);
+  a capture's new unit (the engines' captive keeps its look).

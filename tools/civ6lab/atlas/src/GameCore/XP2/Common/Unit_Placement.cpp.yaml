@@ -395,7 +395,9 @@
   final: 0x3b0fd0
   kind: function
   status: PARTLY
-  readings: ["C-98: a unit off the map counts on its owner's list until its end of turn"]
+  readings:
+    - "C-98: a unit off the map counts on its owner's list until its end of turn"
+    - "C-129: a unit's look is its stored line-of-sight list — READ (0x58f3f0, the setters 0x56ce90 / 0x5704d0 / 0x570560), both twins"
   context:
     - ...70, the watched field +0x718, the serialized m_bDelayedDeath) and takes it off the map (0x586a90); the unit stays on its player's list (+0xd8). THE DESTROY 0x4ef100 also erases it fr...
   review: imported
@@ -404,7 +406,12 @@
   kind: function
   semantics: "places a unit at a plot (unit, plot, flags, ...): flags 1 run the location test 0x586360 with no flag bit set; a refused plot goes to FindAlternateLocation 0x585940 (range 10). Each player whose visibility count of the plot is above 0 meets the unit's owner (0x5246f0)."
   status: PARTLY
-  impl: [cpu/core/fog.ts:majorLookMeets, cpu/core/units.ts:spawnUnit, cpu/core/phase.ts:jumpMadeAnew]
+  impl:
+    - cpu/core/fog.ts:majorLookMeets
+    - cpu/core/units.ts:spawnUnit
+    - cpu/core/phase.ts:jumpMadeAnew
+    - cpu/core/fog.ts:unitLook
+    - cpu/core/units.ts:upgradeAnew
   readings:
     - "H-1: the raids — READ"
     - "C-97: the majors' meeting — READ (the triggers, the effects), PARTLY READ (the shared sight)"
@@ -417,6 +424,7 @@
     - "C-129: a unit made anew that no plot takes is destroyed, its own plot refused by a hostile defender alone; a bankruptcy's disband before the look — READ, both twins"
     - "C-119: the rivers' names on the visibility count — READ (0x58aa90 -> 0x534950, 0x508d50, 0x508330), ported both twins"
     - "C-124: an attack order to a plot out of sight loses its attack flag — READ (0x962310), both twins"
+    - "C-129: a unit's look is its stored line-of-sight list — READ (0x58f3f0, the setters 0x56ce90 / 0x5704d0 / 0x570560), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...om 0 to more — newly visible to the barbarian player, not to the scout alone. A move (0x586d40 → 0x58f3f0 with add) adds the new sight before it drops the old, so a plot both sights..."

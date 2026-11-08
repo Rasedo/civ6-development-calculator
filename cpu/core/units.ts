@@ -67,7 +67,7 @@ import {
 import { TECHS } from '../data/techs';
 import { boostOnEvent, boostPool, drawBoosts, earliestBoostEra } from './boosts';
 import { tradeCapacity } from './trade';
-import { revealAround, unitSight, unitSeesThrough } from './fog';
+import { revealAround, takeLook, unitSight, unitSeesThrough } from './fog';
 import { drawGoodyReward } from './goodyHuts';
 import { goodyAmount } from '../data/goodyHuts';
 import { chopGrant, harvestGrant, applyLumpYield } from './economy';
@@ -1267,6 +1267,9 @@ export function stepUnit(state: GameState, unit: Unit, to: Tile, formed?: readon
     claimGoodyHut(state, unit);
     claimMeteorSite(state, unit);
   }
+  // each member's look taken where it now stands, the old one dropped
+  // (0x58f3f0: the new list added, the stored one taken off, the new stored)
+  for (const m of [unit, ...riders]) takeLook(state, m);
   clearCampFor(state, unit, to.index);
   // a barbarian's step updates its player's sight: a scout looks at the plots
   // it newly sees, in the order the moves are made
@@ -1502,7 +1505,8 @@ export function canUpgradeUnit(state: GameState, unit: Unit, seat: number): bool
  *  Defense: Heavy Chariot 720899 upgraded to the Knight 1114117, the team
  *  "UNIT_HEAVY_CHARIOT; UNIT_TREBUCHET" at 63; runs/h1_duely1128 t86
  *  city-state 3's Warrior 655367 in slot 7 -> Man-at-Arms 1179650 in slot
- *  2). Every other record of the old id names a unit gone. */
+ *  2). Every other record of the old id names a unit gone. Its placement
+ *  takes its own look (`takeLook`). */
 export function upgradeAnew(state: GameState, unit: Unit, next: string): void {
   (state.unitsDying ??= []).push({ ...unit });
   state.units = state.units.filter((u) => u !== unit);
@@ -1513,6 +1517,8 @@ export function upgradeAnew(state: GameState, unit: Unit, next: string): void {
   if (unit.fortifyTurns !== undefined) unit.fortifyTurns = 0;
   unit.type = next;
   unit.movesLeft = 0;
+  // its placement looks from the plot (0x586d40 -> 0x58f3f0)
+  takeLook(state, unit);
   state.units.push(unit);
 }
 

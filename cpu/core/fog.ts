@@ -176,6 +176,51 @@ export function canSee(map: GameMap, from: Tile, to: Tile, seeThrough: boolean):
   return losDisk(map, from, hexDistance(map, from.col, from.row, to.col, to.row), seeThrough).has(to.index);
 }
 
+/**
+ * A UNIT'S LOOK: the plots it sees where it stands. The game keeps each
+ * unit's line-of-sight list (Unit +0x1f40) from its last look and changes
+ * the visibility counts by it alone: a step or a placement (0x586d40 ->
+ * 0x58f3f0) walks the new list (0x58b1d0), adds it, takes the stored one
+ * off and stores the new; a change of its sight or see-through (the setters
+ * 0x56ce90 / 0x5704d0 / 0x570560) looks again; nothing else does — a feature
+ * cleared or grown, a district placed, leaves every standing unit's list as
+ * it was (runs/h1_duelz1128 t88: China's Government Plaza clears the Woods
+ * on 11:13, and the barbarian Swordsman standing on 12:13 since t84 never
+ * sees China's Archer on 10:13 through t105; runs/h1_duelz1127 t108: their
+ * captured Settler on 15:12 since t78 never sees China's Builder on 13:10).
+ * A unit steps through `takeLook`;
+ * one placed by any other write looks at the first ask, its stored look's
+ * plot, sight or see-through no longer its own.
+ */
+export function unitLook(state: GameState, u: Unit): readonly number[] {
+  return heldLook(state, u) ?? takeLook(state, u);
+}
+
+/** what `unitLook` answers, nothing stored */
+export function unitLookNow(state: GameState, u: Unit): readonly number[] {
+  return heldLook(state, u) ?? freshLook(state, u);
+}
+
+/** the unit's stored look where it is still its own (taken from the plot it
+ *  stands on, with the sight and see-through it holds), else null */
+function heldLook(state: GameState, u: Unit): readonly number[] | null {
+  const l = u.look;
+  return l && l.at === u.tileIndex && l.sight === unitSight(u, state) && l.through === unitSeesThrough(u) ? l.plots : null;
+}
+
+/** the unit's line of sight from where it stands now (none off the map) */
+function freshLook(state: GameState, u: Unit): number[] {
+  if (u.tileIndex < 0) return [];
+  return [...losDisk(state.map, state.map.tiles[u.tileIndex], unitSight(u, state), unitSeesThrough(u))].sort((a, b) => a - b);
+}
+
+/** the unit looks from where it stands now (`unitLook`): its look stored */
+export function takeLook(state: GameState, u: Unit): readonly number[] {
+  const plots = freshLook(state, u);
+  u.look = { at: u.tileIndex, sight: unitSight(u, state), through: unitSeesThrough(u), plots };
+  return plots;
+}
+
 /** CIV6 (Sentry, the install's SENTRY_SEE_THROUGH_FEATURES row, CanSee): this unit's look
  *  counts no feature's height. */
 export function unitSeesThrough(u: { type: string; promos?: number }): boolean {
@@ -299,10 +344,10 @@ function majorLookMeets(state: GameState, seat: number, tileIndex: number, radiu
 }
 
 /** Does a major see the plot now (`plotsSeenNow` for one seat, at one plot):
- *  a unit of its whose sight reaches it, a city centre of its within two, a
- *  plot of its beside it or the plot itself — and what each city-state it
- *  is suzerain of sees so (`majorLook`). A `mover`'s units look from the
- *  plot they stepped from (none where placed anew). */
+ *  a unit of its whose look holds it (`unitLook`), a city centre of its
+ *  within two, a plot of its beside it or the plot itself — and what each
+ *  city-state it is suzerain of sees so (`majorLook`). A `mover`'s units
+ *  look from the plot they stepped from (none where placed anew). */
 export function seatSeesPlot(state: GameState, seat: number, t: Tile, mover?: LookMover): boolean {
   const { map } = state;
   const eyes = [seat, ...state.cityStates.filter((cs) => suzerainOf(cs) === seat).map((cs) => cs.seat)];
@@ -316,9 +361,21 @@ export function seatSeesPlot(state: GameState, seat: number, t: Tile, mover?: Lo
   }
   for (const u of state.units) {
     if (!eyes.includes(u.seat)) continue;
-    const moving = mover?.units.includes(u);
-    if (moving && mover!.from < 0) continue;
-    const from = map.tiles[moving ? mover!.from : u.tileIndex];
+    if (!mover?.units.includes(u)) {
+      // its look as it holds it, nothing stored (the ask is no look)
+      const at = map.tiles[u.tileIndex];
+      if (!at || hexDistance(map, at.col, at.row, t.col, t.row) > unitSight(u, state)) continue;
+      if (unitLookNow(state, u).includes(t.index)) return true;
+      continue;
+    }
+    // a mover's look is still the one it took on the plot it stepped from
+    if (mover.from < 0) continue;
+    const l = u.look;
+    if (l && l.at === mover.from) {
+      if (l.plots.includes(t.index)) return true;
+      continue;
+    }
+    const from = map.tiles[mover.from];
     if (hexDistance(map, from.col, from.row, t.col, t.row) <= unitSight(u, state) && canSee(map, from, t, unitSeesThrough(u))) return true;
   }
   return false;
@@ -328,7 +385,7 @@ export function seatSeesPlot(state: GameState, seat: number, t: Tile, mover?: Lo
  *  plots the knowledge base's update walks, 0x7877e0 over player +0x290):
  *  `seatSeesPlot`'s eyes for the minor alone — its plots and those beside
  *  them, the plots within two of its centre, and each of its units' look
- *  (`unitSight`, cut by `losDisk`; `units` false: its ground's eyes alone). */
+ *  (`unitLook`; `units` false: its ground's eyes alone). */
 export function cityStateSight(state: GameState, seat: number, units = true): Uint8Array {
   const { map } = state;
   const out = new Uint8Array(map.tiles.length);
@@ -345,8 +402,7 @@ export function cityStateSight(state: GameState, seat: number, units = true): Ui
   if (!units) return out;
   for (const u of state.units) {
     if (u.seat !== seat) continue;
-    const from = map.tiles[u.tileIndex];
-    for (const n of losDisk(map, from, unitSight(u, state), unitSeesThrough(u))) out[n] = 1;
+    for (const n of unitLook(state, u)) out[n] = 1;
   }
   return out;
 }
