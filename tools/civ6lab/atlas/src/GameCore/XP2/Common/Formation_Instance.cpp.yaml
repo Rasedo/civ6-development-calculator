@@ -307,17 +307,23 @@
   semantics: the formation's class flags re-read over its members (+0x338 may embark, the tracked bool +0x2e0, the OR of the members' 0x56c480 at 0x2677e0..0x2677f7, the embark cost rules' gate); its Movement +0x218 to the least of the members' GetMovementMovesRemaining (0x56e2b0; +0x1938 members the most), each member told (event 0xc50d66d6); reached from a member's 0x56d6f0 through 0x267b00; the formation's domain +0x278 (the sync value of +0x220) the least of its members' +0x650, 0 for an embarked member (0x26791f..0x26794c)
   status: READ
   cases:
+    - recording: h1_duelr1121
+      turn: 83
+      value: "the Galley 524295's formation holds a fighter (+0x398 from 0x2677fa), its walk priced by 0x270be0: Attack Units' Galley 524295 steps 30:20 -> 31:18 beside player 0's Quadrireme 2687008 on 31:17 and strikes the Warrior on 30:17 (CombatLog t83): a fighter's walk keeps its Movement into the zone"
     - recording: h1_duely1121
       turn: 168
       value: "the Settler 4587543 holds once the escort Line Infantry 4456462's plunder ended its moves (AI_Operation: Operation Move 6:10, 4:18, 6:10)"
   impl:
+    - cpu/core/tactical.ts:walk
     - cpu/core/tactical.ts:passMoveExec
     - gpu/core/sim_tactics.py:_op_move_exec
     - cpu/core/tactical.ts:live
     - cpu/core/tactical.ts:formationEmbarks
     - gpu/core/sim_tactics.py:_tac_search
     - gpu/core/sim_tactics.py:_tac_move_to
+    - cpu/core/tactical.ts:fighter
   readings:
+    - "C-95 / C-123: a move order's step costs by the formation's fighter flag; an operation that ends in its tick lets its units go — READ (0x26fe20 at 0x27021b, 0x270980, 0x270be0, 0x267650 at 0x2677fa), FIT (the release), both twins"
     - "C-99: a move order carried on as the turn ends, the zone-of-control wait, the embark rule's TO plot — READ (0x962380, 0x52f50, 0x26fe20, 0x2675e0, 0x2673f0, 0x530420, 0x267650), both twins"
     - "C-123: a formation's Movement and its path's stacking — READ (0x2673f0, 0x267650, 0x262cd0, 0x585eb0 in the path validity), both twins"
     - "C-95: a formation stands where each member may, a path's destination placed, CanEmbark by the type's technology — READ (0x586900, 0x586360 at 0x58640c..0x586494, 0x267650 at 0x2677e0..0x2677f7, 0x2714b0, 0x272880, 0x4ee3f0 at 0x4ee4e1..0x4ee548), both twins"

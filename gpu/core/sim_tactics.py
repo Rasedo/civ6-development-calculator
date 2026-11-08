@@ -1763,6 +1763,17 @@ class SimTactics:
         foe_n = self._tac_hostile_on(seat, False)[rows]
         if bool(rel_u.count_nonzero()):
             foe_n = torch.where(rel_u, self._tac_hostile_on(seat, True)[rows], foe_n)
+        # the step's cost by the formation's +0x398 (`walk`): one holding a
+        # fighter prices no zone of control (0x270be0); one holding none
+        # (0x270980) spends the Movement a step into a zone starts with
+        def fights_t(t: torch.Tensor) -> torch.Tensor:
+            return ((self._type_combat.take(t) > 0) | (self._type_ranged_strength.take(t) > 0)
+                    | (self._type_bombard.take(t) > 0) | (self._rel_strength.take(t) > 0))
+        fighter = fights_t(ut)
+        if bool(m_on.count_nonzero()):
+            fighter = fighter | (m_on & fights_t(ut_pool[rows, mr.clamp(min=0)].clamp(min=0, max=self.NU - 1)))
+        spend_at = torch.full((R,), -1, dtype=torch.long, device=dev)
+        spent = torch.zeros_like(spend_at)
         for i in range(L):
             p = path[:, i]
             on = on & (i < plen)
@@ -1785,6 +1796,10 @@ class SimTactics:
             mp = torch.where(on, (mp - c).clamp(min=0), mp)
             stop = torch.where(on, torch.full_like(stop, i + 1), stop)
             frm = torch.where(on, pc, frm)
+            zs = on & halts[ar, pc] & ~fighter & (mp > 0)
+            spend_at = torch.where(zs, torch.full_like(spend_at, i + 1), spend_at)
+            spent = torch.where(zs, mp, spent)
+            mp = torch.where(zs, torch.zeros_like(mp), mp)
             on = on & (mp > 0) & ~halts[ar, pc]
         for _ in range(L):
             back_off = (stop > 0) & no_end[ar, path.gather(1, (stop - 1).clamp(min=0).unsqueeze(1)).squeeze(1).clamp(min=0)]
@@ -1834,6 +1849,17 @@ class SimTactics:
             under = torch.where(moved, torch.where(occ >= 0, occ, torch.full_like(occ, -1)), under)
             under_emb = torch.where(moved, emb_to, under_emb)
             going = moved & (mp_p[rows, sr] > 0)
+        # the zone's spend, where the walk took its step
+        zhit = (spend_at > 0) & (stop == spend_at) & ~refused
+        if bool(zhit.count_nonzero()):
+            at_z = path.gather(1, (spend_at - 1).clamp(min=0).unsqueeze(1)).squeeze(1)
+            zhit = zhit & (tile_p[rows, sr] == at_z)
+            mp_p[rows, sr] = torch.where(zhit, (mp_p[rows, sr] - spent).clamp(min=0), mp_p[rows, sr])
+            zm_m = zhit & (mr >= 0)
+            if bool(zm_m.count_nonzero()):
+                mcz = mr.clamp(min=0)
+                zm_m = zm_m & (tile_p[rows, mcz] == at_z)
+                mp_p[rows, mcz] = torch.where(zm_m, (mp_p[rows, mcz] - spent).clamp(min=0), mp_p[rows, mcz])
         # the formation's last step in a zone of control or not (`zocMoved`):
         # the zone test on the plot it stands on, no destination waived
         now = tile_p[rows, sr]
@@ -3914,7 +3940,10 @@ class SimTactics:
         # the trees first (the tree manager's tick, list C); then an
         # operation's units are the operation's
         self._barb_trees(done, ai, order, rowof, res, tg, danger)
-        done |= (self.barb_unit_op | self._bcap_members()) & acting
+        # an operation its tick ended holds its units no more (`barbarianTrees`)
+        utr = self.barb_unit_tribe.clamp(min=0, max=max(self.tribe_op_done.shape[1] - 1, 0))
+        op_ended = self.tribe_op_done.gather(1, utr) & (self.barb_unit_tribe >= 0)
+        done |= ((self.barb_unit_op & ~op_ended) | self._bcap_members()) & acting
         # the tactical list (`tacticalUnit`); the homeland takes the rest
         tac = self._tac_tactical(ai, utribe)
         live_all = live

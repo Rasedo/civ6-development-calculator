@@ -11098,3 +11098,59 @@ take the city's Production through `aiCityStats` (`CityState.aiYields`); GPU
   40:12: contract 887 "Build City District" DISTRICT_NEIGHBORHOOD on 40:12,
   VALUE 0.0, as AI_CityBuild.csv and the aimem log.
 - Open: none.
+
+## C-95 / C-123: a move order's step costs by the formation's fighter flag; an operation that ends in its tick lets its units go — READ (0x26fe20 at 0x27021b, 0x270980, 0x270be0, 0x267650 at 0x2677fa), FIT (the release), both twins
+
+`walk`'s `fighter` / `spendAt` (cpu/core/tactical.ts); `_tac_move_to`'s
+`fighter` / `spend_at` (gpu/core/sim_tactics.py). `barbarianTrees`'s held
+set (cpu/core/barbarianOps.ts); the trees' `done` in the barbarians' pass
+(gpu/core/sim_tactics.py).
+
+- THE STEP'S COST (the walk 0x26fe20 at 0x27021b): the formation's byte
+  +0x398 picks the callback. Set, the step is priced by 0x270be0 (the
+  movement rules 0x531660 .. 0x530240, no zone call); clear, by 0x270980,
+  which under no flag 0x800 asks the zone test 0x26f980 (formation, plot,
+  to, the order's destination [rsp+0x58]) and, zoned, sets the step's
+  minimum cost to the formation's Movement +0x218 (its eighth argument;
+  with none left, GetMaxMoves << 8), so the step spends everything.
+- THE FLAG (+0x398, the value of the tracked byte at +0x340): the
+  formation's refresh 0x267650 clears it (0x2676a9) and ORs over the
+  members (0x2677fa..0x26784a) a Combat (0x56dc90), Ranged (0x56e3e0) or
+  Bombard (0x56daa0) strength or a religious strength (+0x1ce0) above 0,
+  unit +0x18ba clear: a formation holding a fighter. So a fighter's walk
+  keeps its Movement into a zone (the zone stops it, the path's cost and
+  the +0x518 wait unchanged); a formation of civilians or support units
+  spends it there.
+- Confirmed (the fighter's branch, the engines' walk): runs/h1_duelr1121
+  t83 Attack Units' Galley 524295 steps 30:20 -> 31:18 beside player 0's
+  Quadrireme 2687008 on 31:17 and strikes the Warrior on 30:17 (CombatLog
+  t83); t109 the Man-At-Arms 3080206 steps 16:14 -> 15:13 beside the
+  Courser 1835015 on 14:13 and strikes it. The civilians' spend has no
+  recorded case that tells it apart (one-seed traces of the five duels'
+  early windows unchanged).
+- THE RELEASE (FIT, AI_Operation.csv / AI_Tactical.csv): an operation
+  whose tick ends it ("Operation complete") holds its units no more; the
+  pass takes those whose turn its moves left open (the moves' own end
+  holds the rest). runs/h1_duelr1121 t70: Builder Capture's team the
+  Settler 2686993 alone ("Not Ready"), the operation completes, and the
+  homeland's Move To Safety takes the Settler to 6:16 as logged (the
+  engines held it on 6:14). The GPU's capture already let its members go
+  (`_bcap_members` on a live capture); a tribe's ended raid or assault
+  (`tribe_op_done`) now does too.
+- Open (C-95): the rampaging Galley 1048590 (runs/h1_duelr1127 t109 on
+  29:17 beside city-state 3's Galley on 29:16, t199 on 29:14) holds in the
+  game while its walk as read keeps its Movement and its next run's first
+  node is the attack: the hold is not the walk's cost.
+- Open (C-123): HL Explore's stop with Movement left (runs/h1_duelr1117
+  t33 Galley 720906 on 27:14, 1 left, for 21:17): the kept path is never
+  taken (0x272aa0), each run searches afresh from the plot it stands on,
+  and the engines' search from 27:14 on its 1 Movement turns back to
+  28:14 where a start of 2 or more makes the next node 26:15 (its own
+  Quadrireme's plot) and the unit holds. The start is the pool finder's
+  +0x1bc. One-seed traces of the five duels' early windows with every
+  step searched afresh: on the unit's Movement, on the last planned
+  barbarian unit's GetMaxMoves, on the danger map's last unit's and on the
+  unit's own GetMaxMoves each misses more barb.move.plot rows than the one
+  search per walk (1117 t18 Galley 720906 25:6 -> 25:3 needs a start of 3
+  where the last planned unit is a Warrior); the per-step search also
+  reads each step's newly revealed plots.

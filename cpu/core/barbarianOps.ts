@@ -404,8 +404,8 @@ export function barbarianCaptures(state: GameState, ticked: ReadonlySet<number> 
  * "Escort Worker To Camp" (priority 3) ticks in the walk after it —
  * Started, Operation Move, Change Target INVALID, complete. The trees that
  * ended free their slots after the walks. The operations' units' turns are
- * their operations'; a scout its tree moved has its turn ended. The ids of
- * the units the trees held.
+ * their operations' (one that ended in its tick holds none); a scout its
+ * tree moved has its turn ended. The ids of the units the trees held.
  */
 export function barbarianTrees(state: GameState, pass: Pass): Set<number> {
   const held = new Set<number>();
@@ -419,9 +419,16 @@ export function barbarianTrees(state: GameState, pass: Pass): Set<number> {
       if (!op && !tr) break;
       if (op && (!tr || treeSlot(op.id) < treeSlot(tr.homing!.id))) {
         last = treeSlot(op.id);
-        for (const id of opUnits(op)) held.add(id);
+        const before = opUnits(op);
         tickOperation(ai, barbEnv(state, pass), op);
-        for (const id of opUnits(op)) held.add(id);
+        // an operation its tick ended holds its units no more: the pass
+        // takes those whose turn its moves left open (runs/h1_duelr1121
+        // t70: Builder Capture's Settler 2686993, its escort gone, "Not
+        // Ready" then "Operation complete", goes to safety on 6:16)
+        if (opsOf(ai).includes(op)) {
+          for (const id of before) held.add(id);
+          for (const id of opUnits(op)) held.add(id);
+        }
       } else {
         last = treeSlot(tr!.homing!.id);
         tickScout(state, pass, tr!);

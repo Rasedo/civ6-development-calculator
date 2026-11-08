@@ -123,6 +123,7 @@
     - gpu/core/sim_tactics.py:_tac_zoc_moved_of
     - cpu/core/tactical.ts:withShortOrders
     - cpu/core/tactical.ts:embarks
+    - cpu/core/tactical.ts:spent
   readings:
     - "C-95: a strike's step from beside its plot, a formation's planning plot at a radius, the ring walk's own location test — READ (0x962380 at 0x96267e..0x9626d2, 0x26ef40 at 0x26f0a4, 0x78fa10 at 0x78fab4..0x78facf, 0x815d50 -> 0x586360), both twins"
     - "C-99: a move order carried on as the turn ends, the zone-of-control wait, the embark rule's TO plot — READ (0x962380, 0x52f50, 0x26fe20, 0x2675e0, 0x2673f0, 0x530420, 0x267650), both twins"

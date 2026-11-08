@@ -1167,6 +1167,16 @@ function walk(state: GameState, unit: Unit, path: number[], dest: number, mates:
   // step (the pathfinder's `carry`)
   let carry = 0;
   const embarks = formationEmbarks(state, unit, mates);
+  // the step's cost by the formation's +0x398 (0x26fe20 at 0x27021b): one
+  // holding a fighter (a member with a Combat, Ranged, Bombard or religious
+  // strength, the refresh 0x267650 at 0x2677fa) prices its steps through
+  // 0x270be0, no zone of control in it; one holding none through 0x270980,
+  // where a step into a zone (0x26f980 on the order's destination) costs at
+  // least the Movement it starts with
+  const fighter = [unit, ...mates].some((m) => fights(m.type) || unitReligious(m.type));
+  // the step that spends the rest so, and the Movement it takes past its cost
+  let spendAt = -1;
+  let spent = 0;
   for (const p of path) {
     // a plot a unit at war with it holds, passed out of its sight, ends the
     // walk short of it: the order moves one node at a time on a path found
@@ -1184,7 +1194,13 @@ function walk(state: GameState, unit: Unit, path: number[], dest: number, mates:
     mp = Math.max(0, mp - cost);
     stop += 1;
     from = p;
-    if (mp <= 0 || inEnemyZoc(state, p, unit, dest, stackedWith(state, unit, mates, p) || peaceAt(state, unit, p))) break;
+    const zoned = inEnemyZoc(state, p, unit, dest, stackedWith(state, unit, mates, p) || peaceAt(state, unit, p));
+    if (zoned && !fighter && mp > 0) {
+      spendAt = stop;
+      spent = mp;
+      mp = 0;
+    }
+    if (mp <= 0 || zoned) break;
   }
   while (stop > 0 && (stackedWith(state, unit, mates, path[stop - 1]) || peaceAt(state, unit, path[stop - 1]))) stop -= 1;
   // the formation the walk sets out with (unit +0x1fb8): the riders on a
@@ -1196,6 +1212,9 @@ function walk(state: GameState, unit: Unit, path: number[], dest: number, mates:
     const r = stepUnit(state, unit, tiles[path[i]], formed);
     if (r === 'halted') return false;
     if (r !== 'moved') return true;
+  }
+  if (stop === spendAt) {
+    for (const m of [unit, ...formed]) if (m.tileIndex === unit.tileIndex) m.movesLeft = Math.max(0, m.movesLeft - spent);
   }
   return false;
 }
