@@ -102,11 +102,16 @@ export interface ResearchEntry {
 
 /** 0x4ca000 / 0x8c4540: the turns a row needs at `rate` (raw Science a turn) —
  *  ceil of what is left over the rate, 1 where nothing is left, -1 where the
- *  seat makes no Science */
+ *  seat makes no Science. Every row reads the bank (Player_Techs +0x1e8): the
+ *  overflow a completion set aside, and with nothing in hand the pool itself
+ *  (the turn's Science 0x4c9640 banks there with an empty queue; runs/
+ *  h1_duely1127 city-state 3 t92: Apprenticeship completed with no choice
+ *  taken, Stirrups 1 turn and Castles 10 on its 72.4) */
 export function researchTurnsLeft(state: GameState, seat: number, r: ResearchState, id: string, rate: number): number {
   const cost = researchCost(state, id, false, seat);
   const kept = id === r.tech ? r.techProgress : r.techRetained[id] ?? 0;
-  return turnsAt(cost * FX - fxOf(kept + Math.max(0, r.techOverflow ?? 0)), rate);
+  const bank = (r.techOverflow ?? 0) + (r.tech ? 0 : r.techProgress);
+  return turnsAt(cost * FX - fxOf(kept + Math.max(0, bank)), rate);
 }
 
 /** 0x4ca120, the turns left on the research in hand (the research AI's

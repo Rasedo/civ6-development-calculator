@@ -50,7 +50,7 @@ import { randRange } from './rand';
 import { srcConst, xml } from '../data/provenance';
 import { rowIsFor } from '../data/civilizations';
 import type { CivId, LeaderId } from '../../world/roster';
-import { BARB_SEAT, allCities, grantFoundingPressure, majorityReligionOf, prophetsOf, citiesOf, civOf, emptySeat, isBarbSeat, isCityStateSeat, markCityCentre, seatOf, setTileOwner, tileClaimed, tileSeat, unitSeat, visibilityCS, allianceTheoCS, alliedAtLevel, civVariantOf , leaderOf, onHomeContinent, civLevelOf } from './seats';
+import { BARB_SEAT, allCities, grantFoundingPressure, majorityReligionOf, prophetsOf, citiesOf, civOf, emptySeat, isBarbSeat, isCityStateSeat, isCiv, markCityCentre, seatOf, setTileOwner, tileClaimed, tileSeat, unitSeat, visibilityCS, allianceTheoCS, alliedAtLevel, civVariantOf , leaderOf, onHomeContinent, civLevelOf } from './seats';
 import { irradiated } from './nuclear';
 import { formationBanned } from './units';
 import { giveEraQuests } from './quests';
@@ -702,9 +702,14 @@ export function mercenaryCost(cost: number, m: number): number {
  *  Mercenary Companies on Production through `mercenaryCost`
  *  (runs/h1_duelw1106 t62-81, outcome B: the Swordsman 45 -> 23 and the
  *  Battering Ram 32 -> 16, the Builder, Settler and Trader unmoved). The
- *  production step pays it as a slower fill. */
+ *  production step pays it as a slower fill. The resolution's modifier
+ *  (MODIFIER_PLAYERS_ADJUST_UNIT_BUFF_PRODUCTION_YIELD) collects
+ *  COLLECTION_MAJOR_PLAYERS: a city-state's and the Free Cities' costs stay
+ *  whole (runs/h1_duely1121 city-state 3 t62-68 under outcome B on
+ *  Production: its Galley at 32 in Mathematics' sea movement term, 336.8
+ *  as logged). */
 export function unitProdCost(state: GameState, seat: number, unitType: string, cost: number): number {
-  const merc = mercenaryUnit(unitType) ? congressUnitCostMult(state, CONGRESS_CUR_PRODUCTION) : 1;
+  const merc = isCiv(seat) && mercenaryUnit(unitType) ? congressUnitCostMult(state, CONGRESS_CUR_PRODUCTION) : 1;
   return mercenaryCost(cost * landUnitPriceMult(state, seat, unitType), merc);
 }
 

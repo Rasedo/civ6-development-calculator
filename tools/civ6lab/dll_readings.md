@@ -8945,3 +8945,34 @@ returns (cpu/core/aiEconomic.ts) through `minorMilitaryTurn`, called after
   Cavalry 7012372 on 42:21 (33 hit points, Movement left: it walks on to
   41:21 under Operation Move); ours claims its own plot at turn 1 for it
   (the city's blow back 22 under the survival filter's 33) and strikes.
+
+## C-98: the research bank with nothing in hand; a city-state's unit cost under Mercenary Companies
+
+- THE BANK (Player_Techs +0x1e8): the turn's research 0x4c9640 takes the
+  Science plus the bank, sets the bank 0 and gives the total to the queue
+  head's progress (0x4c8ea0), or, with the queue empty (+0x188 0) or its head
+  -1, sets the bank to the total (0x1e60f0 on the watched field +0x190). The
+  progress change 0x4c8ea0 sets the bank to what passes the cost (new - cost,
+  through 0x731d10) and the progress to new; a delta to no tech, or to one held
+  and not Repeatable (+0x70 bit 3), goes to the bank. Every analysed row's
+  turns read the bank (0x4ca000). So a completion that takes no choice leaves
+  its whole excess banked: the engine's pool with nothing in hand
+  (`ResearchState.techProgress` at `tech` null) is the bank beside the
+  overflow a choice set aside (`researchTurnsLeft`; `_rai_analysis`).
+  runs/h1_duely1127 city-state 3 t92: Apprenticeship completed with no
+  choice, 72.4 banked: Stirrups 1 turn (77 of 156 kept), Castles 10, Military
+  Tactics 6 as logged; its t93 Stirrups pick follows.
+- MERCENARY COMPANIES (install): WC_RES_UNIT_PRODUCTION_YIELD_BUFF / _DEBUFF
+  are MODIFIER_PLAYERS_ADJUST_UNIT_BUFF_PRODUCTION_YIELD /
+  _BAN_PRODUCTION_YIELD, both COLLECTION_MAJOR_PLAYERS
+  (Expansion2_Modifiers.xml): a city-state's and the Free Cities' unit costs
+  stay whole, which the current cost 0x4f2b20 the AI's terms read holds
+  (`unitProdCost`; the GPU's minor views read `_type_cost`).
+  runs/h1_duely1121 t61 outcome B on Production: city-state 3's Galley at 32
+  in Mathematics' EFFECT_ADJUST_UNIT_SEA_MOVEMENT term, 336.8 t62-68 as logged.
+- Open: a unit off the map still counts for its owner (0x4f2c90 walks the
+  player's unit list +0xd8) through the owner's next AI turn — a levied unit
+  in the levy's turn (runs/h1_duely1124 city-state 3 t68, 4 t69; 1127 4 t54;
+  1117 4 t62, 3 t74), the barbarians' two kills of t132 at t133 (1128
+  city-state 3, Gunpowder 281.1 for 241.1): the delayed death's erase site
+  unread.

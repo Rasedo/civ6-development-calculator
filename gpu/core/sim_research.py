@@ -345,7 +345,9 @@ class SimResearch:
         cost = self._research_cost(False)
         col = torch.arange(NT, device=self.device).unsqueeze(0)
         kept = torch.where(col == cur.unsqueeze(1), self.citystate_tech_prog[:, s].unsqueeze(1), self.citystate_tech_retain[:, s])
-        prog = torch.floor((kept + self.citystate_tech_ovf[:, s].clamp(min=0).unsqueeze(1)) * _FX + 0.5).long()
+        # the bank: the overflow set aside, and with nothing in hand the pool
+        bank = self.citystate_tech_ovf[:, s] + torch.where(cur < 0, self.citystate_tech_prog[:, s], torch.zeros_like(self.citystate_tech_prog[:, s]))
+        prog = torch.floor((kept + bank.clamp(min=0).unsqueeze(1)) * _FX + 0.5).long()
         rate = torch.floor(sci * _FX + 0.5).long().unsqueeze(1)
         tl = _turns_at(cost * _FX - prog, rate)
         tl = torch.where(tl < 0, cost, tl)

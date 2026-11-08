@@ -160,6 +160,7 @@
     - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
     - "C-96: the improvement value — READ (0x7a58f0, 0x7b1320's yields, tourism and modifiers, the feature removal 0x7a3010, the harvest 0x7a37d0, the build unit 0x7a2e20, EFFECT_ADJUST_CITY_FREE_POWER), PARTLY READ (the hazards' turns, 0x7b1320's defence, claimed plots and neighbours terms)"
     - "C-98: a unit's value adds its abilities' modifiers; EFFECT_ADJUST_UNIT_MOVEMENT and REQUIREMENT_PLOT_ADJACENT_TO_OWNER; a second completion adds again — READ (0x7b62c0 at 0x7b7658..0x7b76d8, 0x6e11c7 / 0xc85140, 0x6bd520, 0x6d3200, 0x762d60's rows), both twins"
+    - "C-98: the research bank with nothing in hand; a city-state's unit cost under Mercenary Companies"
   context:
     - "...at the game's speed (0x525400); net = (the new chassis' production cost − the old one's, 0x4f2b20) x UPGRADE_NET_PRODUCTION_PERCENT_COST (+0x74c, 100) / 100, never below 0; cost = base +..."
     - "...90 fills per unit row: c = the owner's unit manager (+0x12e8) current cost array (+0x3c0, 0x4f2b20, `m_aCurrentUnitCost`, an int); where c > 0, the row's +0x20 class does not read 2 throug..."
@@ -194,6 +195,7 @@
     - "C-99: the upgrade trees — READ (the trigger, Find Available Unit's upgradeable offer, Find Unit Targets' job, Upgrade Units, the economic AI's upgrade, Move Unit with no Location), ported; the deletion of an excess obsolete unit unported"
     - "C-96: the upgrade trees' deletion — READ (0x7ef850's branches, 0x591000), both twins"
     - "C-96: the upgrade trees' deletion"
+    - "C-98: the research bank with nothing in hand; a city-state's unit cost under Mercenary Companies"
   context:
     - ...Tech +0x240, ObsoleteCivic +0x248 / Tech +0x250 held) only while the player holds one (0x4f2c90), a unit not yet trainable only where the player signal +0x168 (0x79ba50) answers; per...
   review: reviewed
