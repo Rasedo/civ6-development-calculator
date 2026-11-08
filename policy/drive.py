@@ -593,6 +593,10 @@ def _seat_unit_orders(st, seat: int, nobs: list):
     A_CN = st.col("CONDEMN")
     if _live(A_CN):
         orders0 = torch.where(present & um[:, :, A_CN], torch.full_like(orders0, A_CN), orders0)
+    A_PL = st.col("PLUNDER")
+    if _live(A_PL):
+        # a military unit on an enemy Trader's tile plunders it
+        orders0 = torch.where(present & um[:, :, A_PL], torch.full_like(orders0, A_PL), orders0)
     A_PM = st.col("PROMOTE_0")
     if _live(A_PM, st.promo_cols):
         pm = um[:, :, A_PM:A_PM + st.promo_cols]

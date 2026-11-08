@@ -9361,3 +9361,52 @@ GPU `_plunder_ok` / `_plunder_trader` / `_trader_immune`
   eligibility's "for good" byte (+0x1), so what CANCELS runs/h1_duely1124
   Granada's Barracks contract 693 at t167 (its Encampment pillaged again
   after t166) is unread.
+
+## C-123: the PLUNDER seat action and Lisbon's sea immunity — READ (0x89dae0, 0x58fc20), both twins and the replay
+
+`PLUNDER` (cpu/core/unitActions.ts), its mask column (`unitMask`, the trade
+layer `MaskCtx.trader`, cpu/core/unitMask.ts), its order
+(`applySeatUnitOrders`, cpu/core/phase.ts); `traderImmune`'s
+`seaTraderImmune` and Lisbon's row (cpu/core/trade.ts, cpu/data/cityStates.ts);
+the replay's `plunder` decision (cpu/harness/replayActions.ts, its applier
+in cpu/harness/replay.ts). GPU `_A_PLUNDER` (gpu/core/sim_init.py), the
+mask's `_plu` (gpu/core/sim_masks.py), the order's `_rk_plunder`
+(gpu/core/sim_orders.py), `_trader_immune` over (rows, owner, tile) and the
+route walk through it (gpu/core/sim_seats.py); the driver's `A_PL`
+(policy/drive.py).
+
+- THE SEAT ACTION: one own-tile column, no direction, offered where
+  PLUNDER_TRADE_ROUTE's CanStart (0x89dae0) would take the unit's tile — a
+  combat, ranged or bombard strength, no aircraft, not embarked, the trade
+  layer's Trader of a seat at war with it, not immune; the order runs the
+  command (`plunderTrader`: the payout, the delayed kill, the Movement
+  spent). The replay reads a recorded `UnitCommandStarted` of
+  UNITCOMMAND_PLUNDER_TRADE_ROUTE (hash 0x5ea751e8, the command info
+  0x955950 looks up) as a `plunder` on the plot the log's steps had the
+  unit on: a major's through its seat's order, another's through
+  `plunderTrader`. No recording of runs/ holds one (none of the 676
+  carries the hash), so the reader is unconfirmed on a log.
+- LISBON (Leaders.xml MINOR_CIV_LISBON_UNIQUE_INFLUENCE_BONUS,
+  MODIFIER_ALL_PLAYERS_ATTACH_MODIFIER under PLAYER_IS_SUZERAIN, attaching
+  MINOR_CIV_LISBON_SEA_TRADE_ROUTE_PLUNDER_IMMUNITY_BONUS:
+  MODIFIER_PLAYER_UNITS_GRANT_ABILITY ABILITY_TRADE_ROUTE_PLUNDER_IMMUNITY_SEA
+  on UNIT_IS_TRADER; its TRADE_ROUTE_PLUNDER_IMMUNITY_SEA
+  MODIFIER_PLAYER_UNIT_ADJUST_TRADE_ROUTE_PLUNDER_IMMUNITY DomainType
+  DOMAIN_SEA): the suzerain's Traders carry the water count 0x58fc20 reads,
+  so on a water plot neither the command nor the route walk plunders them
+  ("Your Trader units are immune to being plundered on water tiles",
+  LOC_LEADER_TRAIT_LISBON_DESCRIPTION). An economic ally at level 3 shares
+  it, as every suzerain bonus (`suzerainEffect`).
+- runs/plunder_sweep_a3 t104: both refusals on the Trader's plot (54:22,
+  Ottawa -> Lisbon at step 11 of 20, 8 of its plots water; 54:23, Toronto ->
+  Ngaruawahia at step 2 of 21, 19 water) leave the reasons list empty,
+  where a war or immunity refusal would name LOC_UNITCOMMAND_PLUNDER_TRADE_
+  ROUTE_REQUIRES_WAR_DECLARATION / _BLOCKED_BY_IMMUNITY: the unit failed an
+  earlier test. The unit 2424839 plundered on land with 2 Movement in
+  plunder_sweep_a0 and holds 4 on 54:22, an embarked land unit's: the
+  refusal fits the embarked test, not Lisbon (whose refusal would name
+  _BLOCKED_BY_IMMUNITY).
+- Open: the 54:23 refusal (2 Movement) is unread — the lab record holds no
+  terrain to tell an embarked unit from a land one there; the sweep's
+  empty reasons on every refusal leave unread whether the lab passed the
+  reasons list at all.

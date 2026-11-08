@@ -4864,6 +4864,26 @@ class SimMasks:
                          & self._guru_heal_reach(row).gather(1, tc))
             _gh = [_ghok.unsqueeze(2)]
 
+        # PLUNDER (`plunderTargets`): a unit with a combat, ranged or bombard
+        # strength, no aircraft, not embarked, on the tile of a Trader (the
+        # trade layer, `trader_at`) of a seat this one is at WAR with, not
+        # immune there (`_trader_immune`)
+        _plu: list[torch.Tensor] = []
+        if self._A_PLUNDER >= 0:
+            _tr = self.trader_at.gather(1, tc)
+            _ts = torch.where(_tr >= 0, self.unit_seat.gather(1, _tr.clamp(min=0)), torch.full_like(tc, -1))
+            _tw = self.war[:, row].gather(
+                1, self._seat_row.take(_ts.clamp(min=0))) & (_ts >= 0) & (_ts != row)
+            _u0 = utype.clamp(min=0)
+            _pf = (((self._type_combat.take(_u0) > 0) | (self._type_ranged_strength.take(_u0) > 0)
+                    | (self._type_bombard.take(_u0) > 0)) & (self._type_air.take(_u0) == 0) & ~u_emb.bool())
+            _pok = present & _pf & _tw
+            if bool(_pok.count_nonzero()):
+                _rows = torch.arange(B, device=dev).unsqueeze(1).expand_as(tc)
+                _imm = self._trader_immune(_rows.reshape(-1), _ts.reshape(-1), tc.reshape(-1)).reshape(B, N)
+                _pok = _pok & ~_imm
+            _plu = [_pok.unsqueeze(2)]
+
         _li: list[torch.Tensor] = []
         if self._A_INQUISITION >= 0:
             _ok = torch.zeros(B, N, dtype=torch.bool, device=dev)
@@ -5073,7 +5093,7 @@ class SimMasks:
             + _res_cols + [pillage] + _sn + _sp + _fd + _ex + _pk + _pr + _rh + _li + _hc
             + _ug + _as + _rb + _st + _sm + _rd + _fi + _gp + _sn3 + _pc + _bp + _fu
             + _ec + _ue + _ap + _rr + _cf + _nk + _ri + _hv + _wc + _pt + _dp + _rtb + _prt + _evg
-            + _cd + _gh,
+            + _cd + _gh + _plu,
             dim=2,
         )
         if N < _NFULL:

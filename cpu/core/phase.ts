@@ -28,7 +28,7 @@ import { researchCost, selectResearch, pillagePlunder } from './economy';
 import { IMPROVEMENTS } from '../data/improvements';
 import { isSpaceProject } from '../data/projects';
 import { containmentBonus, sameReligionToken, getModifiers, makeYieldCtx, prodBoostPct, seatYieldMultPerSuzerain, unitUpkeep } from './effects';
-import { allRoadsLeadToRome, addTradeRoute, addCsTradeRoute, addIntlTradeRoute, cancelRoutesBetween, congressCancelBannedIntl, tradeRouteExpiry, tradeRouteWalk } from './trade';
+import { allRoadsLeadToRome, addTradeRoute, addCsTradeRoute, addIntlTradeRoute, cancelRoutesBetween, congressCancelBannedIntl, plunderTrader, tradeRouteExpiry, tradeRouteWalk } from './trade';
 import { addEnvoys, allianceSuzInfluence, cityStateById, declareWarOnCityState, envoysOf, hasMet, isSuzerain, minorCity, resolveSuzerains, sueForPeaceWithCityState, suzerainBuildingLoyalty, suzerainProjectMult, suzerainWonderPct, suzerainGpCultureMult, meetCityState } from './cityStates';
 import { LEVY_TURNS, govInfluence } from '../data/cityStates';
 import { freeCityBuild, freeCombatDesire, freeKnowledge, minorBestOfClass, minorCompleteNow, minorOrdersHeld, minorResearch, trainableIn } from './minorBuild';
@@ -96,6 +96,7 @@ const A_BREAK_ESCORT = unitActionIndex(IMPROVEMENT_IDS).BREAK_ESCORT;
 const A_PROMOTE = unitActionIndex(IMPROVEMENT_IDS).PROMOTE_0;
 const A_CONDEMN = unitActionIndex(IMPROVEMENT_IDS).CONDEMN;
 const A_HEAL_RELIGIOUS = unitActionIndex(IMPROVEMENT_IDS).HEAL_RELIGIOUS;
+const A_PLUNDER = unitActionIndex(IMPROVEMENT_IDS).PLUNDER;
 const A_REMOVE_HERESY = unitActionIndex(IMPROVEMENT_IDS).REMOVE_HERESY;
 const A_LAUNCH_INQUISITION = unitActionIndex(IMPROVEMENT_IDS).LAUNCH_INQUISITION;
 const A_EVANGELIZE = unitActionIndex(IMPROVEMENT_IDS).EVANGELIZE_BELIEF;
@@ -2208,6 +2209,10 @@ export function applySeatUnitOrders(state: GameState, actor: Seat, steps: number
       }
       if (a === A_REMOVE_HERESY) {
         removeHeresy(state, unit);
+        return;
+      }
+      if (a === A_PLUNDER) {
+        plunderTrader(state, unit);
         return;
       }
       if (a === A_HEAL_RELIGIOUS) {

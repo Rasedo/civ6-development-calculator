@@ -99,6 +99,7 @@ class SimOrders:
         _cn = self._A_CONDEMN
         _hx = self._A_HERESY
         _ghc = self._A_HEAL_RELIGIOUS
+        _plc = self._A_PLUNDER
         _lq = self._A_INQUISITION
         _evc = self._A_EVANGELIZE
         _hn = self._A_HEATHEN
@@ -190,11 +191,12 @@ class SimOrders:
                 (((c >= _prc) & (c < _prc + _asw)) if _prc >= 0 else _no),  # priority target
                 ((c == _evc) if _evc >= 0 else _no),                     # evangelize a belief
                 ((c == _ghc) if _ghc >= 0 else _no),                     # a Guru heals
+                ((c == _plc) if _plc >= 0 else _no),                     # plunder a Trader
             ]
         _arm_key = (_fc, _sn, _sn3, self._A_CHOP, tuple(_ic), bool(self._act_names), self._A_PILLAGE,
                     _sp, _xc, _pk, _pm, _pcol, _cn, _hx, _lq, _hn, _ug, _ar, _asw, _rbc, _rbw,
                     _stc, _stw, _smc, _smw, _rdc, _fnc, _gpc, _pfc, _bpc, _fuc, _ecc, _uec,
-                    _apc, _rrc, _cfc, _nkc, _nkw, _hvc, _wcc, _dpc, _dpw, _rtc, _prc, _evc, _ghc)
+                    _apc, _rrc, _cfc, _nkc, _nkw, _hvc, _wcc, _dpc, _dpw, _rtc, _prc, _evc, _ghc, _plc)
         _amat = self._unit_arm_matrix(_ab, _arm_key, _arms)              # [codes, arms]
         _pres = torch.zeros(_amat.shape[0], _n, dtype=torch.float64, device=dev)
         _pres.scatter_(0, _ab.long() + 1, 1.0)                            # row r: code r - 1
@@ -208,7 +210,7 @@ class SimOrders:
          _rk_road, _rk_finish, _rk_gp, _rk_perform, _rk_boost, _rk_form,
          _rk_escort, _rk_unescort, _rk_airpil, _rk_rail, _rk_clean, _rk_nuke,
          _rk_harvest, _rk_wcharge, _rk_deploy, _rk_return, _rk_priority, _rk_evangel,
-         _rk_guru) = _tab
+         _rk_guru, _rk_plunder) = _tab
         for n in range(_n):
             if not _rank_held[n]:
                 break
@@ -372,6 +374,15 @@ class SimOrders:
                     okc, ctc, rel = self._condemn_ok(row, cdm, sc)
                     if bool(okc.count_nonzero()):
                         self._condemn_heretic(row, okc, ctc, rel, sc)
+
+            if _rk_plunder[n] and _plc >= 0:
+                # PLUNDER TRADE ROUTE, on the plunderer's OWN tile
+                # (`plunderTrader`: its CanStart, then its Start)
+                plm = act & (a == _plc)
+                if bool(plm.count_nonzero()):
+                    okp, ptc, ptr = self._plunder_ok(plm, sc)
+                    if bool(okp.count_nonzero()):
+                        self._plunder_trader(okp, ptc, ptr, sc)
 
             if _rk_heresy[n] and _hx >= 0 and self._inquisitor_idx >= 0:
                 _cslot = self.centre_slot_at.gather(1, hc.unsqueeze(1)).squeeze(1)

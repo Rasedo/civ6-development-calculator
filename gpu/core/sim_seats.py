@@ -5025,22 +5025,28 @@ class SimSeats:
         self.unit_mp[cr, sc[cr]] = 0
         self._gen_ver += 1
 
-    def _trader_immune(self, owner: torch.Tensor, tile: torch.Tensor) -> torch.Tensor:
-        """`traderImmune` [B]: is `owner`'s Trader on `tile` immune to plunder?
-        CIV6 (Reform the Coinage, Golden face): "your Traders cannot be
-        plundered" — a major's alone. CIV6 (ABILITY_MANDEKALU /
+    def _trader_immune(self, rows: torch.Tensor, owner: torch.Tensor, tile: torch.Tensor) -> torch.Tensor:
+        """`traderImmune` [n]: is `owner`'s Trader on `tile` immune to plunder,
+        in the games `rows` (all three [n])? CIV6 (Reform the Coinage, Golden
+        face): "your Traders cannot be plundered" — a major's alone. CIV6
+        (Lisbon, ABILITY_TRADE_ROUTE_PLUNDER_IMMUNITY_SEA): its suzerain's
+        Traders on water (`_suz_effect_rows`). CIV6 (ABILITY_MANDEKALU /
         ABILITY_BIREME_PROTECT_TRADER): an escort of the owner's within
         `_trader_guard_radius` of the plot, on the plot's ground (1 land, 2
         water)."""
         maj = (owner >= 0) & (owner < self.n_majors)
-        out = maj & self._golden_ded(owner.clamp(min=0, max=self.n_majors - 1), self._ded_coinage)
+        oc = owner.clamp(min=0, max=self.n_majors - 1)
+        wet = self.water[rows, tile]
+        out = maj & self._golden_ded_table(self._ded_coinage)[rows, oc]
+        if self._suz_c_sea_trader >= 0:
+            out = out | (maj & wet & self._suz_effect_rows(self._suz_c_sea_trader)[rows, oc])
         if bool((self._type_guards_traders > 0).count_nonzero()):
-            mt = self.major_unit_tile.clamp(min=0)
+            mt = self.major_unit_tile[rows].clamp(min=0)
             near = self.pair_dist[tile.unsqueeze(1), mt] <= self._trader_guard_radius
-            want = torch.where(self.water.gather(1, tile.unsqueeze(1)), 2, 1)
-            guard = (self.major_unit_alive & near & (self.major_unit_hp > 0)
-                     & (self.major_unit_seat == owner.unsqueeze(1))
-                     & (self._type_guards_traders.take(self.major_unit_type.clamp(min=0, max=self.NU - 1)) == want)
+            want = torch.where(wet, 2, 1).unsqueeze(1)
+            guard = (self.major_unit_alive[rows] & near & (self.major_unit_hp[rows] > 0)
+                     & (self.major_unit_seat[rows] == owner.unsqueeze(1))
+                     & (self._type_guards_traders.take(self.major_unit_type[rows].clamp(min=0, max=self.NU - 1)) == want)
                      ).any(dim=1)
             out = out | guard
         return out
@@ -5068,7 +5074,7 @@ class SimSeats:
               & ~self.unit_emb.gather(1, s1).squeeze(1).bool() & (tr >= 0) & (ts >= 0) & (ts != seat)
               & self._seats_hostile(seat, ts.unsqueeze(1)).squeeze(1))
         if bool(ok.count_nonzero()):
-            ok = ok & ~self._trader_immune(ts, tc)
+            ok = ok & ~self._trader_immune(torch.arange(self.B, device=self.device), ts, tc)
         return ok, tc, tr
 
     def _plunder_trader(self, ok: torch.Tensor, tile: torch.Tensor, tr: torch.Tensor, sc: torch.Tensor) -> None:
@@ -16599,9 +16605,8 @@ class SimSeats:
         MAJOR raider (the lowest hostile seat id on a shared tile — the
         cross-engine tie-break) banks the gold (`routePlunderGold`), the
         admirals' percentage only where its hull stands on the tile. An
-        escort of the owner's within `_trader_guard_radius` on the walker's
-        ground guards it. CIV6 (Reform the Coinage, Golden face): "your
-        Traders cannot be plundered"."""
+        immune walker (`_trader_immune`) is never plundered.
+        """
         act = self.seat_routes[:, row, :, 0] >= 0  # [B, K]
         leg = self.seat_route_leg[:, row]
         walking = act & (leg >= 0) & active.unsqueeze(1)
@@ -16646,8 +16651,6 @@ class SimSeats:
             return
         wt = self.seat_route_walk[:, row]
         chk = act & (wt >= 0) & active.unsqueeze(1)
-        if row < self.n_majors:
-            chk = chk & ~self._golden_ded(row, self._ded_coinage).unsqueeze(1)
         if not bool(chk.count_nonzero()):
             return
         bb, kk = chk.nonzero(as_tuple=True)
@@ -16678,24 +16681,11 @@ class SimSeats:
         big = torch.full_like(s_m, 1 << 30)
         raider = torch.minimum(torch.where(h_m, s_m, big), torch.where(h_c, s_c, big))
         raider = torch.minimum(raider, torch.where(h_s, s_s, big))
-        # CIV6 (ABILITY_MANDEKALU / ABILITY_BIREME_PROTECT_TRADER): the escort
-        # grants its OWN seat's Traders within `_trader_guard_radius` of it
-        # immunity, on the escort's ground alone — a guard in reach takes the
-        # raider off the Trader.
-        if bool((self._type_guards_traders > 0).count_nonzero()) and row < self.n_majors:
-            _gt = self._type_guards_traders
-            # `pair_dist` is the unbatched [T, T] table, so the Trader's tile
-            # and the unit's tile index it directly — no gather, and nothing
-            # that could pair a selection row with the wrong game.
-            _mt = self.major_unit_tile[bb].clamp(min=0)                 # [n, U]
-            _near = self.pair_dist[tiles.unsqueeze(1), _mt] <= self._trader_guard_radius
-            # 1 guards LAND ground, 2 guards WATER — the Trader's own tile decides
-            _want = torch.where(self.water[bb, tiles], 2, 1).unsqueeze(1)
-            _guard = (self.major_unit_alive[bb] & _near & (self.major_unit_hp[bb] > 0)
-                      & (self.major_unit_seat[bb] == row)
-                      & (_gt.take(self.major_unit_type[bb].clamp(min=0, max=self.NU - 1)) == _want)
-                      ).any(dim=1)
-            raider = torch.where(_guard, big, raider)
+        # an immune walker (`traderImmune`: Reform the Coinage's golden face,
+        # Lisbon's suzerain on water, an escort of its owner's in reach) takes
+        # the raider off the Trader
+        _own = torch.full_like(tiles, int(self._ROW_SEAT[row]))
+        raider = torch.where(self._trader_immune(bb, _own, tiles), big, raider)
         hit = raider < (1 << 30)
         if not bool(hit.count_nonzero()):
             return

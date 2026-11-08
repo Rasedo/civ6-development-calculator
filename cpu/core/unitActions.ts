@@ -173,6 +173,10 @@ export function unitActionNames(improvementIds: readonly string[]): string[] {
   // around it (`guruHeal`). One column, no target. Appended last, like every
   // verb since FOUND_CITY.
   names.push('HEAL_RELIGIOUS');
+  // PLUNDER TRADE ROUTE (UNITCOMMAND_PLUNDER_TRADE_ROUTE): a military unit's
+  // verb against the Trader on its OWN tile — one column, no direction.
+  // Appended last, like every verb since FOUND_CITY.
+  names.push('PLUNDER');
   return names;
 }
 

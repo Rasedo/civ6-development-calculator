@@ -82,7 +82,8 @@ export type SuzEffect =
   | 'wonderProduction'   // Brussels
   | 'freshWaterHousing' // Mohenjo-Daro
   | 'gpActivatedPressure' // Vatican City
-  | 'freeStrategic';   // Hattusa
+  | 'freeStrategic'   // Hattusa
+  | 'seaTraderImmune'; // Lisbon
 
 /** The WIRE order the exported `suzCode` indexes — append only. */
 export const SUZ_EFFECTS: SuzEffect[] = [
@@ -97,7 +98,7 @@ export const SUZ_EFFECTS: SuzEffect[] = [
   'spiceLuxuries', 'routeLengthGold', 'projectProduction', 'landPurchaseDiscount',
   'bonusAmenities', 'shallowWaterProd', 'resourceTypeProduction', 'hubAmenities', 'relicFaith',
   'partnerProduction', 'wonderProduction', 'freshWaterHousing', 'gpActivatedPressure', 'freeStrategic',
-  'gpCulturePct',
+  'gpCulturePct', 'seaTraderImmune',
 ];
 
 /** Cardiff: "Cities receive +2 Power for every Harbor building." Renewable,
@@ -367,6 +368,11 @@ const RAW_CITY_STATE_SUZERAIN_BONUS: Record<string, SuzerainBonusDef> = {
   'Vatican City': { name: 'Vatican City', type: 'religious', bonus: 'When you activate a Great Person they spread 400 Religious pressure of your founded (or majority) religion to cities within 10 tiles.', suz: 'gpActivatedPressure' },
   Antananarivo: { name: 'Antananarivo', type: 'cultural', bonus: '+2% Culture for each Great Person your civilization has earned.', suz: 'gpCulturePct' },
   Hattusa: { name: 'Hattusa', type: 'scientific', bonus: 'Receive 2 of each Strategic resource you have revealed but do not have an improved source of.', suz: 'freeStrategic' },
+  // CIV6 (Leaders.xml, MINOR_CIV_LISBON_UNIQUE_INFLUENCE_BONUS attaching
+  // MINOR_CIV_LISBON_SEA_TRADE_ROUTE_PLUNDER_IMMUNITY_BONUS to the suzerain:
+  // MODIFIER_PLAYER_UNITS_GRANT_ABILITY ABILITY_TRADE_ROUTE_PLUNDER_IMMUNITY_SEA
+  // on its Traders, TRADE_ROUTE_PLUNDER_IMMUNITY_SEA DomainType DOMAIN_SEA)
+  Lisbon: { name: 'Lisbon', type: 'trade', bonus: 'Your Trader units are immune to being plundered on water tiles.', suz: 'seaTraderImmune' },
 };
 
 export const CITY_STATE_SUZERAIN_BONUS: Record<string, SuzerainBonusDef> = Object.fromEntries(

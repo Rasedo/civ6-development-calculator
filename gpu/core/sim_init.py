@@ -679,6 +679,8 @@ class SimInit:
         # Hattusa: a standing amount of each strategic the suzerain sees and
         # improves nowhere (`accrueStockpiles`)
         self._suz_c_free_strat = _sfx.index("freeStrategic") if "freeStrategic" in _sfx else -1
+        # Lisbon: its suzerain's Traders immune to plunder on water (`traderImmune`)
+        self._suz_c_sea_trader = _sfx.index("seaTraderImmune") if "seaTraderImmune" in _sfx else -1
         self._suz_free_strat = int(_suz["freeStrategic"])
         # Brussels: percent toward wonders (`suzerainWonderPct`)
         self._suz_c_wonder_prod = _sfx.index("wonderProduction") if "wonderProduction" in _sfx else -1
@@ -2397,6 +2399,7 @@ class SimInit:
         self._A_CONDEMN = self._act["CONDEMN"]  # vs the religious unit on the own tile
         self._A_HERESY = self._act["REMOVE_HERESY"]
         self._A_HEAL_RELIGIOUS = self._act["HEAL_RELIGIOUS"]   # the Guru heals the religious units around it
+        self._A_PLUNDER = self._act["PLUNDER"]  # vs the Trader on the own tile
         self._A_INQUISITION = self._act["LAUNCH_INQUISITION"]
         self._A_EVANGELIZE = self._act["EVANGELIZE_BELIEF"]   # the Apostle earns its religion a belief
         self._A_HEATHEN = self._act["CONVERT_HEATHEN"]
@@ -2477,7 +2480,8 @@ class SimInit:
             + (1 if self._A_UNESCORT >= 0 else 0) \
             + self._air_strike_cols + _apc + self._air_rebase_cols + _stc + _smc + _nkc \
             + self._air_deploy_cols + (1 if self._A_RETURN >= 0 else 0) + _ptc \
-            + (1 if self._A_EVANGELIZE >= 0 else 0) + (1 if self._A_HEAL_RELIGIOUS >= 0 else 0)
+            + (1 if self._A_EVANGELIZE >= 0 else 0) + (1 if self._A_HEAL_RELIGIOUS >= 0 else 0) \
+            + (1 if self._A_PLUNDER >= 0 else 0)
         assert len(self._act_names) == _want, f"unit action enum is {len(self._act_names)} wide, expected {_want} for {len(ids)} improvements"
         self._A_CHOP = self._act["CHOP"]
         self._A_REPAIR = self._act["REPAIR"]

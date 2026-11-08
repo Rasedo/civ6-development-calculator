@@ -107,6 +107,9 @@ export type Decision = Base & (
   /** a unit's pillage of the plot it stands on (`UnitOperationStarted`,
    *  UNITOPERATION_PILLAGE), where the log's steps had it */
   | { kind: 'pillage'; player: number; unit: string; plot: number }
+  /** a unit's plunder of the Trader on its plot (`UnitCommandStarted`,
+   *  UNITCOMMAND_PLUNDER_TRADE_ROUTE), where the log's steps had it */
+  | { kind: 'plunder'; player: number; unit: string; plot: number }
   /** a hostile civilian stepped on (`UnitCaptured`): the mover the log steps
    *  onto its plot (`unit`, from the plot it left), the civilian, and the
    *  unit the game re-added under the mover's player where it took one */
@@ -532,6 +535,7 @@ const ACTIVITY_OPERATION = gameHash('ACTIVITY_OPERATION');
 const OP_REMOVE_FEATURE = gameHash('UNITOPERATION_REMOVE_FEATURE');
 const OP_HARVEST = gameHash('UNITOPERATION_HARVEST_RESOURCE');
 const OP_PILLAGE = gameHash('UNITOPERATION_PILLAGE');
+const CMD_PLUNDER = gameHash('UNITCOMMAND_PLUNDER_TRADE_ROUTE');
 const OP_FOUND_RELIGION = gameHash('UNITOPERATION_FOUND_RELIGION');
 const PURCHASE_BUILDING = gameHash('BUILDING');
 const PURCHASE_PLOT = gameHash('PLOT');
@@ -641,6 +645,11 @@ export class RecordedActions implements ActionSource {
         const k = `${n(r, 0)}:${n(r, 1)}`;
         const at = stand.get(k);
         if (at !== undefined) out0.push({ kind: 'pillage', phase: phaseOf(n(r, 0)), player: n(r, 0), unit: k, plot: at });
+      }
+      if (name === 'UnitCommandStarted' && n(r, 2) === CMD_PLUNDER) {
+        const k = `${n(r, 0)}:${n(r, 1)}`;
+        const at = stand.get(k);
+        if (at !== undefined) out0.push({ kind: 'plunder', phase: phaseOf(n(r, 0)), player: n(r, 0), unit: k, plot: at });
       }
       if (name === 'UnitOperationStarted' && (n(r, 2) === OP_REMOVE_FEATURE || n(r, 2) === OP_HARVEST)) {
         const k = `${n(r, 0)}:${n(r, 1)}`;

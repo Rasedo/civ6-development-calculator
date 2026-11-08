@@ -28,6 +28,7 @@ import {
   encampmentBlocks, gdrJump, mapLayer, navalMelee, ownerHasTech, parkCluster, parkClusterLegal, unitDomain,
   unitsHostile, unitVisibleTo, waterEnterable, waterWalks,
 } from './units';
+import { traderImmune } from './trade';
 import {
   BARB_SEAT, atWarWithAny, cityAtTile, cityHolders, civOf, civsAtWar, campTiles, hiddenResourcesFor, leaderOf,
   seatOf, tileBelongsTo, tileSeat, unitsOf,
@@ -72,6 +73,7 @@ const A_PARK = col('PARK');
 const A_PROMOTE = col('PROMOTE_0');
 const A_CONDEMN = col('CONDEMN');
 const A_HEAL_RELIGIOUS = col('HEAL_RELIGIOUS');
+const A_PLUNDER = col('PLUNDER');
 const A_REMOVE_HERESY = col('REMOVE_HERESY');
 const A_LAUNCH_INQUISITION = col('LAUNCH_INQUISITION');
 const A_EVANGELIZE = col('EVANGELIZE_BELIEF');
@@ -125,6 +127,8 @@ export interface MaskCtx {
   seat: number;
   /** the occupancy planes: tile -> the unit holding that class there */
   occ: Record<Plane, Map<number, Unit>>;
+  /** the trade layer: tile -> the first Trader standing there */
+  trader: Map<number, Unit>;
   /** a major's or the Free Cities' centre -> its holder seat */
   centre: Map<number, number>;
   anyWar: boolean;
@@ -137,14 +141,16 @@ export function maskCtx(state: GameState, seat: number): MaskCtx {
   const occ: Record<Plane, Map<number, Unit>> = {
     military: new Map(), civilian: new Map(), support: new Map(), embarked: new Map(),
   };
+  const trader = new Map<number, Unit>();
   for (const u of state.units) {
     const p = planeOf(u);
     if (p && !occ[p].has(u.tileIndex)) occ[p].set(u.tileIndex, u);
+    if (mapLayer(u.type) === 'trade' && !trader.has(u.tileIndex)) trader.set(u.tileIndex, u);
   }
   const centre = new Map<number, number>();
   for (const h of cityHolders(state)) for (const c of h.cities) centre.set(c.centerIndex, h.seat);
   return {
-    state, seat, occ, centre, anyWar: atWarWithAny(state, seat), owns: (t: Tile) => tileSeat(t) === seat,
+    state, seat, occ, trader, centre, anyWar: atWarWithAny(state, seat), owns: (t: Tile) => tileSeat(t) === seat,
   };
 }
 
@@ -422,6 +428,14 @@ export function unitMask(ctx: MaskCtx, u: Unit): number[] {
   if ((fights || (def?.ranged?.strength ?? 0) > 0 || (def?.bombard ?? 0) > 0) && !u.embarked) {
     const r = religiousAt(ctx, here.index);
     if (r && r.seat !== seat && civsAtWar(state, seat, r.seat)) out.add(A_CONDEMN);
+  }
+  // PLUNDER (`plunderTargets`, PLUNDER_TRADE_ROUTE's CanStart): a unit with a
+  // combat, ranged or bombard strength, no aircraft, not embarked, on the
+  // tile of a Trader (the trade layer's first) of a seat this one is at WAR
+  // with, not immune there (`traderImmune`).
+  if ((fights || (def?.ranged?.strength ?? 0) > 0 || (def?.bombard ?? 0) > 0) && !u.embarked && unitDomain(u.type) !== 'air') {
+    const t = ctx.trader.get(here.index);
+    if (t && t.seat !== seat && civsAtWar(state, seat, t.seat) && !traderImmune(state, t.seat, here.index)) out.add(A_PLUNDER);
   }
   // REMOVE_HERESY: an Inquisitor with a charge on an own city centre.
   if (u.type === 'INQUISITOR' && charges > 0 && ctx.centre.has(here.index) && tileSeat(here) === seat) {

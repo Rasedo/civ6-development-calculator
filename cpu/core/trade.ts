@@ -377,13 +377,16 @@ function canPlunder(u: Unit): boolean {
  * ABILITY_BIREME_PROTECT_TRADER, MODIFIER_PLAYER_UNITS_GRANT_ABILITY): the
  * escort grants its OWN seat's Traders within TRADER_GUARD_RADIUS immunity,
  * on the escort's ground alone (DomainType DOMAIN_LAND for the Mandekalu,
- * DOMAIN_SEA for the Bireme).
+ * DOMAIN_SEA for the Bireme). CIV6 (Lisbon, ABILITY_TRADE_ROUTE_PLUNDER_IMMUNITY_SEA
+ * DomainType DOMAIN_SEA): "Your Trader units are immune to being plundered on
+ * water tiles" — its suzerain's (`suzerainEffect`, an economic ally's too).
  */
-function traderImmune(state: GameState, seat: number, tileIndex: number): boolean {
+export function traderImmune(state: GameState, seat: number, tileIndex: number): boolean {
   if (goldenDedication(state, seat, DED_COINAGE)) return true;
   const here = state.map.tiles[tileIndex];
   if (!here) return false;
   const ground = isWater(here) ? 'water' : 'land';
+  if (ground === 'water' && suzerainEffect(state, seat, 'seaTraderImmune')) return true;
   return state.units.some((g) => {
     if (g.seat !== seat || g.hp <= 0 || UNITS[g.type]?.guardsTraders !== ground) return false;
     const gt = state.map.tiles[g.tileIndex];

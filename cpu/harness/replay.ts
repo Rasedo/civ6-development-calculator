@@ -68,7 +68,7 @@ import { barbarianTactics, barbMovesNow, dangerPlane, refreshBarbarians, tactics
 import { barbBattleDeath, barbBattlesFromRecord, barbSlots, barbSlotsDying, barbarianRules, barbarianTechs, barbScoutLook, foundTribe, plotsSeenNow, tribeDies, tribeKindAt } from '../core/barbarians';
 import { DIFFICULTIES } from '../data/barbarians';
 import { MINOR_UPGRADE_GOLD, LEVY_TURNS } from '../data/cityStates';
-import { addCsTradeRoute, addIntlTradeRoute, addTradeRoute, minorRouteTo, routeDestCenter, routeOriginCenter } from '../core/trade';
+import { addCsTradeRoute, addIntlTradeRoute, addTradeRoute, minorRouteTo, plunderTrader, routeDestCenter, routeOriginCenter } from '../core/trade';
 import { minorRouteCandidate } from '../core/aiTrade';
 import { questCampCleared, questRouteStarted, questUnitAdded } from '../core/quests';
 import { commitDedications, goodyMoment, pantheonMoment, religionMoment, unitKillEvent } from '../core/eras';
@@ -2961,6 +2961,7 @@ function applyBuyUnit(ctx: Ctx, d: Extract<Decision, { kind: 'buyUnit' }>, rec: 
 
 /** the seat order's pillage column */
 const A_PILLAGE = unitActionIndex(IMPROVEMENT_IDS).PILLAGE;
+const A_PLUNDER = unitActionIndex(IMPROVEMENT_IDS).PLUNDER;
 
 /** the decisions of one phase, in a fixed order: cities first (a founding
  *  gives the queue its city), then the seats, the cities' orders, the plots,
@@ -2970,7 +2971,7 @@ const A_PILLAGE = unitActionIndex(IMPROVEMENT_IDS).PILLAGE;
  *  boosts may complete what was in hand (runs/h1_duelw1117 t23: China's
  *  Slinger kill completed Archery, then Horseback Riding was picked) */
 const ORDER: Decision['kind'][] = ['found', 'capture', 'policies', 'pantheon', 'religion', 'governors', 'war',
-  'envoy', 'levy', 'levyEnd', 'routes', 'congress', 'buyPlot', 'buyBuilding', 'wonderCharge', 'queue', 'worked', 'improve', 'clear', 'buyUnit', 'move', 'village', 'gpActivate', 'unitNew', 'pillage', 'battle', 'seize', 'unitGone', 'combat', 'hit', 'kill', 'promote', 'upgrade', 'camp', 'research', 'civic'];
+  'envoy', 'levy', 'levyEnd', 'routes', 'congress', 'buyPlot', 'buyBuilding', 'wonderCharge', 'queue', 'worked', 'improve', 'clear', 'buyUnit', 'move', 'village', 'gpActivate', 'unitNew', 'pillage', 'plunder', 'battle', 'seize', 'unitGone', 'combat', 'hit', 'kill', 'promote', 'upgrade', 'camp', 'research', 'civic'];
 
 function applyPhase(ctx: Ctx, ds: Decision[], phase: Decision['phase'], b: TurnRecord, wit: TurnRecord,
   players?: ReadonlySet<number>): void {
@@ -3670,6 +3671,23 @@ const res = buyTile(state, city.id, d.plot, seat);        if (!res.ok) setTileOw
         const done = (!!t.pillaged && !was[0]) || (!!t.districtPillaged && !was[1]);
         if (done && isBarbSeat(u.seat)) ctx.barbPillaged.push({ plot: d.plot, was: [was[0], was[1]] });
         count(ctx, 'pillage', done ? 'applied' : 'refused', d.player, done ? undefined : 'the engine wrecked nothing');
+        break;
+      }
+      case 'plunder': {
+        // the command is the player's, through the engine's verb from the
+        // plot the log's steps had the unit on: a major's its seat's own
+        // order (PLUNDER), any other's `plunderTrader`
+        const u = unitOf(ctx, d.unit);
+        if (!u) { count(ctx, 'plunder', 'refused', d.player, 'a unit the replay does not hold'); break; }
+        u.tileIndex = d.plot;
+        const before = state.units.length;
+        const actor = u.seat < state.seats.length ? seatOf(state, u.seat) as Seat | undefined : undefined;
+        if (actor) {
+          u.movesLeft = Math.max(u.movesLeft, grantedMoves(state, u));
+          applySeatUnitOrders(state, actor, [unitsOf(state, u.seat).map((x) => (x === u ? A_PLUNDER : -1))]);
+        } else plunderTrader(state, u);
+        const done = state.units.length < before;
+        count(ctx, 'plunder', done ? 'applied' : 'refused', d.player, done ? undefined : 'the engine plundered no Trader');
         break;
       }
       case 'seize': {
