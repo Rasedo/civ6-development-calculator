@@ -3412,7 +3412,12 @@ class SimTactics:
         ai, utribe = self._tac_ai()
 
         def live() -> torch.Tensor:
-            return acting & ~done & self.barb_unit_alive & (self.barb_unit_seat == BARB_SEAT)
+            # a captor its capture in the pass took out of it (`live`'s
+            # `capsFrom`: the trees' captures start at once, the queue empty)
+            by = self.barb_capq[:, :, 1]
+            slots = torch.arange(acting.shape[1], device=acting.device)
+            caught = (by.unsqueeze(2) == slots.view(1, 1, -1)).any(dim=1)
+            return acting & ~done & self.barb_unit_alive & (self.barb_unit_seat == BARB_SEAT) & ~caught
 
         # the knowledge base ages and looks, then the tactical target list
         # (0x785f30), and its set of the regions the barbarians revealed
@@ -3564,7 +3569,7 @@ class SimTactics:
         # WANDER NEAR CAMP: by slot, each unit above EXPLORE whose camp stands
         for j in range(int(npass.max()) if B else 0):
             u_b = order[:, j]
-            ok = (j < npass) & live()[bidx, u_b] & (ai[bidx, u_b] > _AI_EXPLORE)
+            ok = (j < npass) & live()[bidx, u_b] & (ai[bidx, u_b] > _AI_EXPLORE) & (self.barb_unit_mp[bidx, u_b] > 0)
             tr = utribe[bidx, u_b]
             ok &= (tr >= 0) & self.tribe_alive[bidx, tr.clamp(min=0)]
             if not bool(ok.count_nonzero()):
@@ -4778,8 +4783,8 @@ class SimTactics:
         for j in range(int(npass.max()) if B else 0):
             u_b = order[:, j]
             home = homes[bidx, u_b]
-            # Wander Near Camp: AI type above EXPLORE (`wanderNearCamp`)
-            ok = (j < npass) & live()[bidx, u_b] & (home >= 0) & (ai[bidx, u_b] > _AI_EXPLORE)
+            # Wander Near Camp: AI type above EXPLORE, Movement left (`wanderNearCamp`)
+            ok = (j < npass) & live()[bidx, u_b] & (home >= 0) & (ai[bidx, u_b] > _AI_EXPLORE) & (self.barb_unit_mp[bidx, u_b] > 0)
             if not bool(ok.count_nonzero()):
                 continue
             camp = home.clamp(min=0)

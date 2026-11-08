@@ -739,9 +739,12 @@
 - addr: 0x77b9a0
   final: 0x50d830
   kind: function
-  semantics: "the Free Cities' / barbarians' Wander Near Camp: a unit with a group (+0x11d0 >= 0) whose camp the player's signals answer (0x771250). Its Wander moves with flags 0 (0x77bce4), its move to the camp with 0x1000 (0x77be0b, Wander Back to Camp at 0x77bec7); after its move order its moves end (0x56d6f0 at 0x77bedd: its formation moves no more) and its turn (0x570b40)."
+  semantics: "the Free Cities' / barbarians' Wander Near Camp: a unit above EXPLORE (+0x1c0) with a group (+0x11d0 >= 0) and Movement left (+0xdb0 at 0x77baa1) whose camp the player's signals answer (0x771250). Its Wander moves with flags 0 (0x77bce4), its move to the camp with 0x1000 (0x77be0b, Wander Back to Camp at 0x77bec7); after its move order its moves end (0x56d6f0 at 0x77bedd: its formation moves no more) and its turn (0x570b40)."
   status: READ
   cases:
+    - recording: h1_duely1124
+      turn: 86
+      value: "the Archer 3997716, its Attack Civilian walk to 8:6 spent, logs HL: End Turn"
     - recording: h1_duelw1114
       turn: 124
       value: "Their logs hold 11 \"Wander\" rows (runs/h1_duelw1114 t124-127, 1130   t152-154), each after the recording's last snapshot (t123, t151): no   record pins them;"
@@ -755,6 +758,7 @@
     - gpu/core/sim_tactics.py:_AI_DEFENDER
     - cpu/core/tactical.ts:keptOut
   readings:
+    - "C-93: Operation Pillage takes a member on its target alone; a capture is its step's; Wander asks Movement; a captor leaves the pass — READ (0x811390 at 0x811786..0x811838, 0x26fe20, 0x77b9a0 at 0x77baa1, 0x212500), both twins"
     - "C-99 / C-128: a shore crossing's cliff onto a revealed plot alone, Wander Back to Camp's path flag 0x1000, the path's destination count — READ (0x52fb90, 0x2720a0 at 0x272230..0x27229e / 0x272380, 0x270dd0 at 0x270f24, 0x271be0 at 0x271d03..0x271d18, 0x77b9a0 at 0x77be0b), both twins"
     - "C-95: the tactical pass — READ (the barbarians' moves; the minors share it)"
     - "C-96: the city-states' tactical pass — READ (Wander Near City, Heal, the non-barbarian priorities, FindAlternateLocation), the families it needs PARTLY READ"

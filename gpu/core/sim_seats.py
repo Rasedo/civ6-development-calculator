@@ -12566,20 +12566,22 @@ class SimSeats:
         for _ui in sorted({int(x) for x in self._b_grant_new_city.tolist() if x >= 0}):
             self._spawn_unit(row, made & (_gu == _ui), tile, _ui)
 
-    def _melee_coloc(self, ok: torch.Tensor, tgt: torch.Tensor, atk_kind: str, u: int, seat: int) -> None:
+    def _melee_coloc(self, ok: torch.Tensor, tgt: torch.Tensor, atk_kind: str, u: int, seat: int,
+                     dry: bool = False) -> torch.Tensor:
         """`meleeAttackInner`'s MOVE arm: a melee order onto a tile whose only
         hostile occupant is a RELIGIOUS unit ashore is a step onto it — the
         attacker shares the tile and nothing happens to the religious unit
         (the lab's fired orders). It pays the step as `stepUnit` does (`_step_verb`), spends
         no attack and reveals nothing. `seat` is the mover's seat (an int);
-        the barbarians clear no camp."""
+        the barbarians clear no camp. `dry`: the step's verdict alone
+        (`stepRefusal`), nothing moved. Returns [B] where it stepped (may)."""
         if not bool(ok.count_nonzero()):
-            return
+            return ok
         here = getattr(self, f"{atk_kind}_unit_tile")[:, u]
         gslot = torch.full_like(here, u + self.POOL_LO[atk_kind])
         dirs = (self.neigh[here.clamp(min=0)] == tgt.unsqueeze(1)).long().argmax(dim=1)
-        self._step_verb(ok, gslot, here, tgt, dirs, seat, torch.zeros_like(ok),
-                        clear_camp=POOL_CLASS[atk_kind] == "major")
+        return self._step_verb(ok, gslot, here, tgt, dirs, seat, torch.zeros_like(ok),
+                               clear_camp=POOL_CLASS[atk_kind] == "major", dry=dry)
 
     def _melee_unit_strengths(self, major: bool, a_slot: torch.Tensor, tgt: torch.Tensor,
                               d_slot: torch.Tensor, d_seat: torch.Tensor):
@@ -12822,8 +12824,14 @@ class SimSeats:
             # (`meleeAttackInner`'s seizure arm). A plot the mover could not
             # stand on once emptied is no move; else every hostile civilian
             # on it is seized (`_seize_civilians`) and the mover steps in,
-            # paying the step and no attack.
+            # paying the step and no attack — a step its Movement affords
+            # (`stepRefusal`: the capture is the step's)
             civ_att = self._seize_open(civ_att, ttc, a_type[:, u], a_seat[:, u])
+            can = torch.zeros_like(civ_att)
+            for s in torch.unique(a_seat[civ_att.nonzero(as_tuple=True)[0], u]).tolist():
+                m = civ_att & (a_seat[:, u] == s)
+                can |= self._melee_coloc(m, ttc, atk_kind, u, int(s), dry=True)
+            civ_att = civ_att & can
             rows = civ_att.nonzero(as_tuple=True)[0]
             if rows.numel():
                 self._seize_civilians(civ_att, ttc, a_seat[:, u], atk_kind, u)
@@ -13527,6 +13535,7 @@ class SimSeats:
         seat,
         is_civ: torch.Tensor,
         clear_camp: bool = True,
+        dry: bool = False,
     ) -> torch.Tensor:
         """The `stepUnit` twin for the ACTION appliers — [B] masks in, the
         mask of units that actually stepped out.
@@ -13573,7 +13582,7 @@ class SimSeats:
                 lead = (flag & (mil >= 0) & (mil != gslot)
                         & (self.unit_seat.gather(1, mc).squeeze(1) == self.unit_seat.gather(1, gc).squeeze(1)))
                 stray = flag & ~lead
-                if bool(stray.count_nonzero()):
+                if not dry and bool(stray.count_nonzero()):
                     sr_ = stray.nonzero(as_tuple=True)[0]
                     self.unit_escorted[sr_, gslot[sr_]] = False
                 gslot = torch.where(lead, mil, gslot)
@@ -13643,6 +13652,8 @@ class SimSeats:
         rider, rider_free, rider_ok = self._escort_rider(
             gslot, here, dest, u_type, u_promos, cost)
         moved = ok & ((mp >= cost) | (mp >= full)) & rider_ok
+        if dry:
+            return moved
         if not bool(moved.count_nonzero()):
             return moved
         rows = moved.nonzero(as_tuple=True)[0]

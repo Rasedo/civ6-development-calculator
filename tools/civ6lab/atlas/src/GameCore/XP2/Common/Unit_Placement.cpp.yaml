@@ -343,6 +343,7 @@
     - "C-124: the formation's kept path, and a path's other players' units — READ (0x272aa0, 0x26e3a0, 0x782d0, 0x586360 at 0x586542..0x5865a1), unported"
     - "C-124: the kept path is never taken; a move order's path passes other players' units out of sight — READ (0x272aa0, 0x2714b0, 0x586360 at 0x586542..0x5865a1, 0x26fe20), both twins"
     - "C-99 / C-128: a shore crossing's cliff onto a revealed plot alone, Wander Back to Camp's path flag 0x1000, the path's destination count — READ (0x52fb90, 0x2720a0 at 0x272230..0x27229e / 0x272380, 0x270dd0 at 0x270f24, 0x271be0 at 0x271d03..0x271d18, 0x77b9a0 at 0x77be0b), both twins"
+    - "C-93: Operation Pillage takes a member on its target alone; a capture is its step's; Wander asks Movement; a captor leaves the pass — READ (0x811390 at 0x811786..0x811838, 0x26fe20, 0x77b9a0 at 0x77baa1, 0x212500), both twins"
   notes:
     - ".claude/scratchpad/mu1/readings_c96.md: ...it. - THE PLANNING'S GROUND, beside the barbarians': the list (0x26d890) keeps a   plot only where 0x586900 lets the unit end — another player's unit at   peace it passes and never ends on (runs/h1_duelw1117..."
   context:

@@ -655,11 +655,14 @@ function pillageHere(ctx: OpsContext, id: number): void {
  *  target's owner:
  *  of the teams' members on land or at sea off it, with no bombard
  *  strength, in no formation, with Movement left, that may pillage (a goody
- *  hut any): one on it pillages there ("Operation Pillage City", its plot
- *  the three; runs/h1_duelw11xx: every such line of the barbarians'); else of those within twice their
- *  Movement of it (any for a goody hut) whose planning reaches it within two
- *  turns with Movement left there (0x791300 at range 0), the nearest goes
- *  ("Operation Pillage City, From, Goal, Move") and pillages on arrival */
+ *  hut any), standing on it (one off it is passed by, 0x811786..0x811838:
+ *  its pillage order tested only where it stands; runs/ every "Operation
+ *  Pillage City" line stands on its target, runs/h1_duely1128 t17-t19 the
+ *  raid's Warrior 1114128 on 15:14 stays beside Xi'an's Farm 16:12), within
+ *  twice its Movement of it and its planning holding the plot within two
+ *  turns with Movement left (0x791300 at range 0), the first in member
+ *  order: its turn done (0x570b40), it pillages there ("Operation Pillage
+ *  City", its plot the three), the pillage spending its turn */
 function pillageExecute(node: Parameters<BtHandler<OpsContext>['update']>[0], _run: unknown, ctx: OpsContext): void {
   const { op } = ctx;
   const improvements = flag(node, 'Pillage Improvements', true);
@@ -674,35 +677,19 @@ function pillageExecute(node: Parameters<BtHandler<OpsContext>['update']>[0], _r
     if (!((improvements && g.type === 'IMPROVEMENT') || (districts && g.type === 'PASSIVE_DISTRICT') || (goodies && goody))) continue;
     if (owner >= 0 && P[g.plot].owner !== owner) continue;
     let best: AiUnitView | null = null;
-    let bestD = 0;
-    let spot = NO_PLOT;
     for (const t of op.teams) {
       for (const id of t.members) {
         const u = now(id);
-        if (!u || (u.domain === 'sea' && P[g.plot].water) || u.bombard > 0 || u.mates.length > 0 || u.movesLeft <= 0) continue;
-        if (!goody && u.combat <= 0) continue;
-        if (u.plot === g.plot) {
-          pillageHere(ctx, id);
-          ctx.log(`${op.def}, Operation Pillage City, ${u.type}, From ${xy(v0, u.plot)}, Goal: ${xy(v0, g.plot)}, Move ${xy(v0, u.plot)}`);
-          continue;
-        }
-        const v = ctx.view();
-        if (!goody && v.plotDistance(u.plot, g.plot) >= 2 * (u.movesLeft >> 8)) continue;
-        const s = v.planSpot(id, g.plot, 2, true, 0);
-        if (s < 0) continue;
-        const d = v.plotDistance(u.plot, s);
-        if (best && d >= bestD) continue;
+        if (best || !u || (u.domain === 'sea' && P[g.plot].water) || u.bombard > 0 || u.mates.length > 0 || u.movesLeft <= 0) continue;
+        if ((!goody && u.combat <= 0) || u.plot !== g.plot || (u.movesLeft >> 8) < 1) continue;
+        if (ctx.view().planSpot(id, g.plot, 2, true, 0) < 0) continue;
         best = u;
-        bestD = d;
-        spot = s;
       }
     }
     if (!best) continue;
-    const from = best.plot;
-    moveTo(ctx, best, spot);
-    const after = now(best.id)?.plot ?? from;
-    if (after === g.plot) pillageHere(ctx, best.id);
-    if (after !== from) ctx.log(`${op.def}, Operation Pillage City, ${best.type}, From ${xy(v0, from)}, Goal: ${xy(v0, g.plot)}, Move ${xy(v0, after)}`);
+    ctx.endTurn?.(best.id);
+    pillageHere(ctx, best.id);
+    ctx.log(`${op.def}, Operation Pillage City, ${best.type}, From ${xy(v0, best.plot)}, Goal: ${xy(v0, g.plot)}, Move ${xy(v0, best.plot)}`);
   }
 }
 

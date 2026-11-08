@@ -1114,6 +1114,34 @@ export function setBarbStepLook(fn: ((state: GameState, unit: Unit) => void) | n
   barbStepLook = fn;
 }
 
+/** why the unit (its formation's lead) may not step onto the adjacent plot
+ *  now — a cliff, its Movement short of the step's cost (or a rider's), a
+ *  rider that may not stand there — null where it may */
+export function stepRefusal(state: GameState, unit: Unit, to: Tile): 'blocked' | 'cantAfford' | null {
+  const from = state.map.tiles[unit.tileIndex];
+  // CIV6 (Movement): the one-step allowance reads "full Movement" as "has
+  // spent nothing this turn" — measured against the GRANTED pool, exactly as
+  // the heal gate's `grantedMoves`. A live recompute drifts the moment a tech
+  // or aura lands mid-turn, and the GPU afford reads its stored pool.
+  const full = unit.movesFull ?? unitFullMoves(state, unit);
+  if (cliffBlocksStep(state, from, to, unit)) return 'blocked';
+  const cost = stepCost(state, unit, from, to);
+  if (unit.movesLeft < cost && unit.movesLeft < full) return 'cantAfford';
+  // THE FORMATION MOVES AS ONE — and no further than its slowest member,
+  // unless the escort carries Escort Mobility.
+  const riders = escortRiders(state, unit);
+  // CIV6 (Keshig): "Can escort moving civilian and support units at their
+  // higher Movement speed" — Escort Mobility's clause, on the chassis.
+  const riderFree = riders.length > 0
+    && (promoFlag(unit, 'ESCORT_SPEED') || !!UNITS[unit.type]?.escortSpeed);
+  for (const rider of riders) {
+    if (!tileFreeForUnit(state, to.index, unit.seat, rider, true)) return 'blocked';
+    const rFull = rider.movesFull ?? unitFullMoves(state, rider);
+    if (!riderFree && rider.movesLeft < cost && rider.movesLeft < rFull) return 'cantAfford';
+  }
+  return null;
+}
+
 export function stepUnit(state: GameState, unit: Unit, to: Tile): StepOutcome {
   const seat = unit.seat;
   // a formed civilian's step is its formation's: the escort steps and carries
@@ -1126,29 +1154,15 @@ export function stepUnit(state: GameState, unit: Unit, to: Tile): StepOutcome {
   // leaves it (runs/h1_duely1128 t51: the Settler 3014684, its Warrior
   // killed, walks to 17:13 past the Warrior on 16:13 alone)
   if (unit.escorted) unit.escorted = false;
+  const refused = stepRefusal(state, unit, to);
+  if (refused) return refused;
   const from = state.map.tiles[unit.tileIndex];
   const naval = !!UNITS[unit.type]?.naval;
-  // CIV6 (Movement): the one-step allowance reads "full Movement" as "has
-  // spent nothing this turn" — measured against the GRANTED pool, exactly as
-  // the heal gate's `grantedMoves`. A live recompute drifts the moment a tech
-  // or aura lands mid-turn, and the GPU afford reads its stored pool.
-  const full = unit.movesFull ?? unitFullMoves(state, unit);
   const transition = !naval && !waterWalks(unit.type) && isWater(from) !== isWater(to);
-  if (cliffBlocksStep(state, from, to, unit)) return 'blocked';
   const cost = stepCost(state, unit, from, to);
-  if (unit.movesLeft < cost && unit.movesLeft < full) return 'cantAfford';
-  // THE FORMATION MOVES AS ONE — and no further than its slowest member,
-  // unless the escort carries Escort Mobility.
   const riders = escortRiders(state, unit);
-  // CIV6 (Keshig): "Can escort moving civilian and support units at their
-  // higher Movement speed" — Escort Mobility's clause, on the chassis.
   const riderFree = riders.length > 0
     && (promoFlag(unit, 'ESCORT_SPEED') || !!UNITS[unit.type]?.escortSpeed);
-  for (const rider of riders) {
-    if (!tileFreeForUnit(state, to.index, seat, rider, true)) return 'blocked';
-    const rFull = rider.movesFull ?? unitFullMoves(state, rider);
-    if (!riderFree && rider.movesLeft < cost && rider.movesLeft < rFull) return 'cantAfford';
-  }
   if (transition) unit.embarked = isWater(to);
   unit.tileIndex = to.index;
   carryAirWith(state, unit, from.index);

@@ -1804,6 +1804,9 @@ export interface Pass {
   /** the regions of every plot the player revealed as the pass began — the
    *  target list's set (0x783980), its tertiary region list (0x6fad50) */
   regions: Set<number>;
+  /** the barbarians' captures the pass's own moves took start at their index
+   *  of `GameState.barbCaptures` (undefined outside their pass) */
+  capsFrom?: number;
 }
 
 /** the move that took the unit, as the game's tactical log names it, the
@@ -1851,7 +1854,12 @@ export function passPillage(state: GameState, pass: Pass, u: Unit): void {
   finish(pass, u, 'Operation', u.tileIndex);
 }
 
-const live = (state: GameState, pass: Pass, u: Unit) => !pass.done.has(u.id) && state.units.includes(u) && u.seat === pass.seat;
+/** a unit of the pass yet to move; a captor its capture in the pass took
+ *  out of it (AI_EVENT_UNIT_CAPTURED joins it to its Builder Capture's
+ *  team at once: runs/h1_duely1124 t87 the Archer 3997716 takes the Builder
+ *  on 8:7 in Attack Civilian and logs no homeland move) */
+const live = (state: GameState, pass: Pass, u: Unit) => !pass.done.has(u.id) && state.units.includes(u) && u.seat === pass.seat
+  && !(pass.capsFrom !== undefined && (state.barbCaptures ?? []).slice(pass.capsFrom).some((c) => c.captor === u.id));
 
 /**
  * DEFEND CAMPS (0x779010): each camp in plot order, the first DEFENDER in
@@ -2559,7 +2567,9 @@ function chaseTarget(state: GameState, pass: Pass): void {
 }
 
 /**
- * WANDER NEAR CAMP (0x77b9a0): each unit of AI type above EXPLORE whose
+ * WANDER NEAR CAMP (0x77b9a0): each unit of AI type above EXPLORE with
+ * Movement left (+0xdb0 at 0x77baa1; runs/h1_duely1124 t86 the Archer
+ * 3997716, its Attack Civilian walk to 8:6 spent, logs HL: End Turn) whose
  * camp stands — the plot the player's signals answer for its group
  * (0x771250, `homeOf`: a barbarian tribe's camp): of its planning reach, the
  * plots of this turn with no unit at war with it (0x5862e0), none that keeps
@@ -2575,7 +2585,7 @@ function wanderNearCamp(state: GameState, pass: Pass, homeOf: (u: Unit) => numbe
   for (const u of pass.units) {
     if (!live(state, pass, u) || (pass.ai.get(u.id) ?? -1) <= AI_EXPLORE) continue;
     const home = homeOf(u);
-    if (home < 0) continue;
+    if (home < 0 || u.movesLeft <= 0 || pass.ended.has(u.id)) continue;
     const camp = state.map.tiles[home];
     const campCity = tileSeat(camp) === NO_SEAT ? -1 : tileCity(camp);
     const cands = (pass.reach.get(u.id) ?? []).filter((e) => {
@@ -3613,6 +3623,7 @@ function tacticalPass(state: GameState, acting: ReadonlySet<number>): void {
   // then an operation's units are the operation's
   const opUnits = barbarianTrees(state, pass);
   pass.units = all.filter((u) => !opUnits.has(u.id) && tacticalUnit(state, u, ai.get(u.id)!));
+  pass.capsFrom = state.barbCaptures?.length ?? 0;
   rampage(state, pass);
   attackUnits(state, pass, 'HIGH');
   defendCamps(state, pass);

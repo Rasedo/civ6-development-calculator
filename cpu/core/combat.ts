@@ -29,7 +29,7 @@ import { grievanceCityStateTaken } from './grievance';
 import { goldenDedication, worldEraIndex } from './eras';
 import { drawAndPayGoody, raiseBestTrained, recordAttacker, unitReligious, unitStackSlot } from './units';
 import { randRange } from './rand';
-import { formationCS, escortRiders, unitsAt, unitDomain, tileFreeForUnit, disbandUnit, unitsHostile, fortifyBonus, reseatUnit, cityAtIndex, encampmentBlocks, encampmentIntact, crossesRiver, cliffBlocks, stepUnit, unitVisibleTo, unitExertsZoc, formationTierFor } from './units';
+import { formationCS, escortRiders, unitsAt, unitDomain, tileFreeForUnit, disbandUnit, unitsHostile, fortifyBonus, reseatUnit, cityAtIndex, encampmentBlocks, encampmentIntact, crossesRiver, cliffBlocks, stepUnit, stepRefusal, unitVisibleTo, unitExertsZoc, formationTierFor } from './units';
 import { isAirUnit, airRange, airCoverAgainst, airPillageFit, airPillageOffers, airStrikeReaches, airStrikeOffers, airDefenseOf, antiAirAt, displaceAirFrom, interceptorAgainst, priorityDefender, PRIORITY_TARGET_DAMAGE } from './air';
 import { outerPool, wallsMax, wallsTier, encampOuterPool } from './rules';
 import { fuelShortCS } from './stockpile';
@@ -2079,9 +2079,12 @@ function meleeAttackInner(state: GameState, attackerId: number, targetIndex: num
 
   if ((defDef?.combat ?? 0) <= 0) {
     // no fighter stands there: the order is a MOVE onto the plot, which takes
-    // every hostile civilian on it (`seizable`), and the mover then steps in
+    // every hostile civilian on it (`seizable`) as the mover steps in — a
+    // step its Movement affords (0x26fe20: the capture is the step's;
+    // runs/h1_duely1124 t86 the barbarian Swordsman 3866642 on 7:6, one
+    // Movement left, takes no Builder on the hill 7:7)
     const taken = seizable(state, attacker, targetIndex);
-    if (!taken) return no('Cannot move there.');
+    if (!taken || stepRefusal(state, attacker, target)) return no('Cannot move there.');
     for (const u of taken) seizeCivilian(state, u, attacker);
     stepUnit(state, attacker, target);
     return MOVED_ONTO;

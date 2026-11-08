@@ -1164,11 +1164,10 @@ class SimBarbOps:
         kind unless the node's flag says false) in its order on the ground of
         the target's owner, of the living members with Movement left, in no
         formation and with no bombard strength (a ship's not for a water plot; a goody hut any,
-        else one that fights): each on it pillages there; else the nearest
-        whose planning reaches it within two turns with Movement left there
-        (none of its domain and kind on it) and within twice its Movement (a
-        goody hut at any distance), the first of equals in that order, goes
-        and pillages on arrival"""
+        else one that fights), standing on it (one off it is passed by),
+        with a whole Movement and its planning holding the plot within two
+        turns with Movement left: the first in that order, its turn done,
+        pillages there"""
         if not bool(on.count_nonzero()):
             return
         B = self.B
@@ -1184,7 +1183,6 @@ class SimBarbOps:
         goody = (tg["ok"] == 5) & ground if goodies else nil
         ut = self.barb_unit_type.clamp(min=0, max=self.NU - 1)
         mp_whole = torch.div(self.barb_unit_mp, self._mp_scale, rounding_mode="floor")
-        P = self.barb_unit_op.shape[1]
         naval = self.unit_naval.take(ut)
         water = self.water
         formed = self._tac_formed("barb")
@@ -1197,38 +1195,25 @@ class SimBarbOps:
                       & (self._type_bombard.take(ut) <= 0) & g.unsqueeze(1) & ~(naval & water[:, p].unsqueeze(1)) & ~formed)
                 if not is_goody:
                     el &= self._type_combat.take(ut) > 0
-                here = el & (self.barb_unit_tile == p)
-                for j in here.any(dim=0).nonzero(as_tuple=True)[0].tolist():
-                    hj = here[:, j]
-                    us = torch.full((B,), j, dtype=torch.long, device=dev)
-                    self._barb_pillage_here(hj, us)
-                    done[bidx[hj], j] = True
-                cand = el & ~here
-                if not is_goody:
-                    cand &= self.pair_dist[self.barb_unit_tile.clamp(min=0), torch.full_like(self.barb_unit_tile, p)].to(torch.long) \
-                        < 2 * mp_whole
+                cand = el & (self.barb_unit_tile == p) & (mp_whole >= 1)
                 if not bool(cand.any()):
                     continue
-                # the planning's spot on the plot within two turns with
-                # Movement left, none of its domain and kind there
+                # the planning holds its own plot within two turns with
+                # Movement left (none other of its domain and kind there)
                 spot_ok = torch.zeros_like(cand)
                 cb, cs = cand.nonzero(as_tuple=True)
                 pp = torch.full_like(cb, p)
                 sp = self._op_reach_at(cb, cs, pp, 2, True, torch.zeros_like(cb), rowof, res, "barb", seat)
                 blocked = self._bop_spot_held(cb, cs, pp)
                 spot_ok[cb, cs] = (sp >= 0) & ~blocked
-                d = self.pair_dist[self.barb_unit_tile.clamp(min=0), torch.full_like(self.barb_unit_tile, p)].to(torch.long)
-                key = torch.where(spot_ok, d * (P + 1) + join.clamp(min=0), torch.full_like(d, 1 << 40))
+                key = torch.where(spot_ok, join.clamp(min=0), torch.full_like(join, 1 << 40))
                 best = key.min(dim=1)
                 go = best.values < (1 << 40)
                 if not bool(go.any()):
                     continue
                 us = best.indices
-                dest = torch.full((B,), p, dtype=torch.long, device=dev)
-                self._tac_move_to(go, us, dest, "barb", seat, strike=False)
-                there = go & self.barb_unit_alive[bidx, us] & (self.barb_unit_tile[bidx, us] == p)
-                self._barb_pillage_here(there, us)
-                done[bidx[there], us[there]] = True
+                done[bidx[go], us[go]] = True
+                self._barb_pillage_here(go, us)
 
     def _bop_spot_held(self, rows: torch.Tensor, us: torch.Tensor, plot: torch.Tensor) -> torch.Tensor:
         """[N] another unit of the barbarian's domain and kind (one that fights,

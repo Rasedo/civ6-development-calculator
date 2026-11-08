@@ -8307,3 +8307,49 @@ GPU `_tac_search`'s `haz_n`, `_tac_attack_planes` (gpu/core/sim_tactics.py).
   1124 2, 1128 3 more equal, none fewer.
 - OPEN: a feature with the XP2 list (Features +0x180, its first entry's
   +0x28 flags) unported.
+
+## C-93: Operation Pillage takes a member on its target alone; a capture is its step's; Wander asks Movement; a captor leaves the pass — READ (0x811390 at 0x811786..0x811838, 0x26fe20, 0x77b9a0 at 0x77baa1, 0x212500), both twins
+
+`pillageExecute` (cpu/core/operations/assault.ts), `_op_pillage`
+(gpu/core/sim_barbops.py); `stepRefusal`, `stepUnit` (cpu/core/units.ts) and
+the civilian arm of `meleeAttack` (cpu/core/combat.ts), `_step_verb`'s `dry`,
+`_melee_coloc` (gpu/core/sim_seats.py); `wanderNearCamp`, `live`'s
+`Pass.capsFrom` (cpu/core/tactical.ts), the barbarians' and the Free Cities'
+Wander and the barbarian pass's `live` (gpu/core/sim_tactics.py).
+
+- OPERATION PILLAGE (0x811390): per target, of the team members alive, with
+  Movement, in no formation, without bombard (a land unit for land), able to
+  pillage, it builds the pillage order (0x963190) and asks the manager's
+  CanDo (vt +0x48) only for a member standing on the target
+  (0x811786..0x8117e8); a member off it, or one whose order fails, is passed
+  by (0x811835 -> 0x811a57). The rest (twice the formation's Movement above
+  the distance, the planning holding the plot within two turns with
+  Movement, 0x586900) then picks the first such member. It takes its turn
+  done (0x570b40), the pillage order, the line "Operation Pillage City, From,
+  Goal, Move" (its plot three times) and its moves ended (0x56d6f0). No
+  member walks to pillage.
+- CONFIRMED: every one of the 31 "Operation Pillage City" lines across runs/
+  stands on its target. runs/h1_duely1128 t17-t19: the raid on 15:10's
+  Warrior 1114128 holds on 15:14 beside Xi'an's Farm 16:12 (one-seed aimem,
+  t16-t19 plot equal; misses to t22 15 -> 11).
+- A CAPTURE IS THE STEP'S (0x26fe20): the destination's civilians are taken
+  as the mover completes its step, so a move its Movement does not afford
+  takes none. runs/h1_duely1124 t86: the Swordsman 3866642, on 7:6 with one
+  Movement, takes no Builder on the hill 7:7. The engines had seized the
+  Builder and left the Swordsman beside it.
+- WANDER NEAR CAMP (0x77b9a0): the unit needs Movement left (+0xdb0 at
+  0x77baa1). runs/h1_duely1124 t86: the Archer 3997716 walks to 8:6 in Attack
+  Civilian and logs HL: End Turn.
+- A CAPTOR LEAVES THE PASS: the capture's event (0x212500,
+  AI_EVENT_UNIT_CAPTURED) joins the captor to its Builder Capture at once.
+  runs/h1_duely1124 t87: the Archer 3997716 takes the Builder on 8:7 in
+  Attack Civilian, Builder Capture logs Started, and the Archer logs no
+  homeland row.
+- OPEN: runs/h1_duely1124 t88-t108 (carried run only): Builder Capture's
+  pair walks 8:7 -> 9:7 east over plots the carried barbarians revealed (no
+  explore, flags 0x1001), while the game holds as the `--from` run does: the
+  barbarians' revealed plots drift (C-95). The planning plans no spot on a
+  RELIGIOUS target (STRUCK), while the game assigns LOW Attack Units to
+  Apostles and Missionaries (32 rows in the duely logs, "Move 7 13 Attack
+  -9999" beside its plot, "Move 4 18 Attack 4 18" onto it): runs/
+  h1_duely1121 t92 Man-At-Arms 3014664 (C-95).
