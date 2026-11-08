@@ -35,7 +35,7 @@ import { getModifiers, prodBoostPct, seatGovernment } from './effects';
 import { citiesOf, isCityStateSeat, isFreeSeat, seatOf } from './seats';
 import { minorCity } from './cityStates';
 import { cityLowlands, coastalLowlandCounts } from './climate';
-import { stockFree } from './stockpile';
+import { stockFree, strategicSurplus } from './stockpile';
 import { buildingPillaged } from './yields';
 import { buildingCostIn, worshipOffered } from './rules';
 import { builderCost, cityNavalCapable, traderCost } from './units';
@@ -214,6 +214,7 @@ function majorBuildFacts(state: GameState, city: City, known: (unit: string) => 
       obsolete: (u) => AI_UNITS[AI_UNIT_INDEX.get(u)!].obsolete.some(holds),
       owned: (u) => own_units.get(u) ?? 0,
       known,
+      surplus: strategicSurplus(state, seat),
     }),
     trainsDomain: (d) => d !== 'DOMAIN_SEA' || cityNavalCapable(state, city),
     cities: own.length,

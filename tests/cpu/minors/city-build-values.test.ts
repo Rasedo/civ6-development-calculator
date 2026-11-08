@@ -30,6 +30,7 @@ describe('the city build AI\'s unit value', () => {
   // T 13 (3 and 3 turns to train, +10 for the Monument in hand)
   const table = unitProductionTable({
     isVersion: () => true, obsolete: () => false, owned: () => 0, known: (u) => (u === 'UNIT_WARRIOR' ? 2 : 0),
+    surplus: () => 0,
   });
   const cardiff = { ...facts, unitProduction: table };
   it('values each unit against the known ones: N over the efficiencies\' sum', () => {
@@ -78,6 +79,7 @@ describe('the city build AI\'s building value', () => {
 describe('the values the GPU twin pins', () => {
   const table = unitProductionTable({
     isVersion: () => true, obsolete: () => false, owned: () => 0, known: (u) => (u === 'UNIT_WARRIOR' ? 2 : 0),
+    surplus: () => 0,
   });
   const f = { ...facts, unitProduction: table, amenity: { balance: 0, yields: { YIELD_FOOD: 3, YIELD_GOLD: 4, YIELD_SCIENCE: 2.5 } } };
   const b = (x: string, t: number, ff: CityBuildFacts = f) => buildingValue(ff, AI_BUILDINGS[AI_BUILDING_INDEX.get(x)!], t);

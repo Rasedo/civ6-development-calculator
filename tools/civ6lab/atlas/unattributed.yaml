@@ -7485,6 +7485,7 @@
   impl: [tools/install/ai_tables.py:tourismBombPossible]
   readings:
     - "C-98: a religious unit's value at the city-states — READ (0x7b62c0's religious branch, CanTrain's religion and inquisition refusals), both twins"
+    - "C-130: the unit production table's maintenance resource by the Units index and its shortfall divide — READ (0x7989e0 at 0x798ac3..0x798df2 via 0x28a940, 0x799f04..0x79a0e9, 0x4ab270, 0x3640e0), both twins"
   review: reviewed
 - addr: 0xad6850
   final: 0x7d1ce0

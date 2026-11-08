@@ -641,6 +641,11 @@ export interface AiUnitRow {
   maintenanceResource: string | null;
   maintenanceResourceAmount: number;
   resourceCost: number;
+  /** the maintenance resource and amount the military AI's unit production
+   *  table reads (0x7989e0 via 0x28a940): Units_XP2's row at the unit's
+   *  Units index, none past its count */
+  tableMaintenanceResource: string | null;
+  tableMaintenanceAmount: number;
 }
 
 export const AI_UNIT_INDEX: ReadonlyMap<string, number> = new Map(AI_UNITS.map((u, i) => [u.type, i]));

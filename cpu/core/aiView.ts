@@ -44,7 +44,7 @@ import { unitProductionTable } from './aiUnitProduction';
 import { opsOf } from './operations/manager';
 import { opJobUnits } from './operations/operation';
 import { resourceValue } from './aiResource';
-import { stockFree } from './stockpile';
+import { stockFree, strategicSurplus } from './stockpile';
 import { minorItemTurns, minorKnownUnits, minorUpgradeVisible, minorResourceFacts, minorUnitExpected, minorUnitProduction, minorUnitVersion } from './minorBuild';
 import { majorItemTurns, majorTraits, majorUnitExpected, majorUnitVersion, seatResearchTurns } from './freeCityBuild';
 import { cityStateAt as cityStateAtPlot, envoysHere, envoysOf, minorCity, suzerainOf, suzerainProjectMult } from './cityStates';
@@ -431,6 +431,7 @@ export function aiView(state: GameState, opts: { forecastNow?: boolean } = {}): 
             obsolete: (u) => AI_UNITS[AI_UNIT_INDEX.get(u)!].obsolete.some(holds),
             owned: (u) => own.get(u) ?? 0,
             known,
+            surplus: strategicSurplus(state, i),
           });
         }
         unitTables.set(i, table);

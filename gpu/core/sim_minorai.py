@@ -113,12 +113,17 @@ class SimMinorAi:
                                          self._minor_gp_class())
         self.citystate_savings[:, s] = torch.where(alive.unsqueeze(1), sav, self.citystate_savings[:, s])
         self.citystate_balance[:, s] = torch.where(alive, bal, self.citystate_balance[:, s])
-        # its Gold boost on the net income its gold step banked, which its
-        # Gold weight reads until its next turn (`economicGoldBoost`)
-        boost = _gold_boost_of(self.citystate_net_income[:, s])
-        self.citystate_gold_boost[:, s] = torch.where(alive, boost, self.citystate_gold_boost[:, s])
         self._mops_evaluate(s)
         return delta
+
+    def _minor_gold_boost(self, s: int) -> None:
+        """the Economic AI's Gold boost on the net income its gold step banked
+        (`economicGoldBoost`), written after the city update (`minorPhase`):
+        the update's analysis reads the turn before's, the government values
+        and the next turn's research and civics AIs this one"""
+        alive = self.citystate_alive[:, s] & (self.citystate_center[:, s] >= 0)
+        boost = _gold_boost_of(self.citystate_net_income[:, s])
+        self.citystate_gold_boost[:, s] = torch.where(alive, boost, self.citystate_gold_boost[:, s])
 
     def _minor_economic_disband(self, s: int, delta: torch.Tensor) -> None:
         """`minorEconomicDisband` (0x6877d0, the savings turn's last step):

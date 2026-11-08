@@ -803,12 +803,39 @@ class SimCityValue:
 
     # -- the military AI's unit production table (aiUnitProduction.ts) ------
 
+    def _cv_unit_surplus(self, row: int) -> torch.Tensor:
+        """[B, NU] per AI unit row: seat row `row`'s turn income less its
+        units' fuel bill (`strategicSurplus`) of the row's table maintenance
+        resource (`tableMaintenanceResource`, Units_XP2's row at the unit's
+        Units index), 0 for none"""
+        slots = getattr(self, "_cv_surplus_slots", None)
+        if slots is None:
+            T = self._cv_tables()
+            E = T["engine"]
+            slots = []
+            for r in T["unit_rows"]:
+                res = r["tableMaintenanceResource"]
+                rid = E["resource"].get(res, -1) if res else -1
+                slots.append(int(self._strat_slot_of[rid]) if rid >= 0 else -1)
+            self._cv_surplus_slots = slots
+        out = torch.zeros(self.B, len(slots), dtype=torch.long, device=self.device)
+        if all(k < 0 for k in slots):
+            return out
+        net = self._seat_stock_income(row).long() - self._unit_upkeep_bill(row).long()
+        for i, k in enumerate(slots):
+            if k >= 0:
+                out[:, i] = net[:, k]
+        return out
+
     def _cv_unit_production(self, version: torch.Tensor, obsolete: torch.Tensor, owned: torch.Tensor,
-                            known: torch.Tensor):
+                            known: torch.Tensor, surplus: torch.Tensor):
         """0x7989e0, `unitProductionTable` ([..., NU] each, AI_UNITS' order):
         per unit its value and whether it is an entry; an entry's value N
         over the sum of its efficiencies against the known combat units
-        (1.0 with none known), x1.25 a civilization's unique unit"""
+        (1.0 with none known), x1.25 a civilization's unique unit; where the
+        surplus (`_cv_unit_surplus`) of its table maintenance resource falls
+        below the amount, divided by the amount less the surplus when that is
+        above 1"""
         T = self._cv_tables()
         rows = T["unit_rows"]
         dev = known.device
@@ -822,6 +849,11 @@ class SimCityValue:
         v = torch.where(total == 0, torch.full_like(v, _FX), v)
         unique = torch.tensor([bool(r["trait"]) for r in rows], dtype=torch.bool, device=dev)
         v = torch.where(unique, _fmul(v, torch.full_like(v, _fx_const(1.25))), v)
+        has = torch.tensor([bool(r["tableMaintenanceResource"]) for r in rows], dtype=torch.bool, device=dev)
+        amt = torch.tensor([int(r["tableMaintenanceAmount"]) for r in rows], dtype=torch.long, device=dev)
+        d = (amt - surplus) * _FX
+        cut = has & (surplus < amt) & (d > _FX)
+        v = torch.where(cut, torch.div(v * _FX, d.clamp(min=1), rounding_mode="trunc"), v)
         return torch.where(entry, v, torch.zeros_like(v)), entry
 
     # -- the unit value (aiCityBuild.ts) -----------------------------------
@@ -2055,7 +2087,7 @@ class _MinorFacts:
             known = sim._cv_known(s)
             if self.no_known is not None:
                 known = torch.where(self.no_known.unsqueeze(1), torch.zeros_like(known), known)
-            return sim._cv_unit_production(version.unsqueeze(0).expand(sim.B, -1), obs, owned, known)
+            return sim._cv_unit_production(version.unsqueeze(0).expand(sim.B, -1), obs, owned, known, sim._cv_unit_surplus(self.row))
         return self._get("uprod", build)
 
     def _obsolete(self):
@@ -2781,7 +2813,7 @@ class _FreeFacts(_MinorFacts):
                 if ei >= 0:
                     owned[:, k] = (mine & (sim.barb_unit_type == ei)).sum(dim=1)
             known = torch.zeros(sim.B, nu, dtype=torch.long, device=dev)
-            return sim._cv_unit_production(version.unsqueeze(0).expand(sim.B, -1), obs, owned, known)
+            return sim._cv_unit_production(version.unsqueeze(0).expand(sim.B, -1), obs, owned, known, sim._cv_unit_surplus(self.row))
         return self._get("uprod", build)
 
     def trains_domain(self, d):

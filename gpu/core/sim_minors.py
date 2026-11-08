@@ -87,6 +87,8 @@ class SimMinors:
             # takes none the turn the city is founded)
             ran = self.citystate_ai_on[:, s].clone()
             self._minor_ai_turn(s, units)
+            # its Economic AI's Gold boost, after its city update
+            self._minor_gold_boost(s)
             # the civics AI's government values on the city its update left
             # (the Food focus it set re-placed its citizens: `minorPhase`)
             government()

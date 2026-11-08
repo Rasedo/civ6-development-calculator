@@ -17,7 +17,7 @@ import { UNITS } from '../../data/units';
 import { engineId } from '../../data/aliases';
 import { researchable } from '../aiResearch';
 import type { GameState } from '../types';
-import { stockFree, stockpileIncome, strategicSlot, unitUpkeepBill } from '../stockpile';
+import { stockFree, strategicSurplus } from '../stockpile';
 
 /** a city-state's version of a unit (player +0x12e8 +0x1c0): a unit it may
  *  train of no trait that a major alone may not train */
@@ -112,8 +112,6 @@ export function seatUnitRows(state: GameState, seat: number, knownBy: (unit: str
     const t = installType('unit', u.type, 'UNIT_');
     own.set(t, (own.get(t) ?? 0) + 1);
   }
-  const income = stockpileIncome(state, seat);
-  const bill = unitUpkeepBill(state, seat);
   return unitProductionEntries({
     isVersion: (u) => version(u) === u,
     obsolete: (u) => AI_UNITS[AI_UNIT_INDEX.get(u)!].obsolete.some(holds),
@@ -123,10 +121,6 @@ export function seatUnitRows(state: GameState, seat: number, knownBy: (unit: str
     players,
     atWar,
     buildable: (u) => unitBuildable(state, seat, holds, u),
-    maintained: (res) => {
-      const id = engineId('resource', res, 'RESOURCE_', RESOURCES);
-      const k = id ? strategicSlot(id) : -1;
-      return k < 0 || income[k] > bill[k];
-    },
+    surplus: strategicSurplus(state, seat),
   });
 }

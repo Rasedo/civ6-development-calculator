@@ -289,7 +289,7 @@
       value: 1107 Kandy's 8 against 4.
     - recording: h1_duelw1117
       value: "runs/h1_duelw1117 and 1118:   21 of 21 foundings past a capital draw over 55, each followed by one   picker draw (unread)."
-  impl: [cpu/data/constants.ts:CITY_NAME_CHOICES]
+  impl: [cpu/data/constants.ts:CITY_NAME_CHOICES, cpu/core/aiCityBuild.ts:AiUnitRow]
   readings:
     - "B-24r: the governor operations"
     - "C-94: the religious spread — READ"
@@ -298,6 +298,7 @@
     - "C-60: the Free City's grant — READ (0x274010, 0x273c50), ported (the allowed list's upgrade lines and the repairs below)"
     - "C-96: the improvement value's resource copies, a minor's strategic copies, the district count — READ (0x7a58f0's count, 0x4a93c0, 0x1ae8a0, 0x1ae8f0), a LAB (a city-state's Great General weight)"
     - "C-96: the improvement value's resource copies, a minor's strategic copies, the district count"
+    - "C-130: the unit production table's maintenance resource by the Units index and its shortfall divide — READ (0x7989e0 at 0x798ac3..0x798df2 via 0x28a940, 0x799f04..0x79a0e9, 0x4ab270, 0x3640e0), both twins"
   context:
     - "...CanAppoint 0x430fa0 -> Appoint 0x430590): the PARAM_GOVERNOR_TYPE value is looked up by 0x28a940, which takes an INDEX when it is below the table's size and a HASH otherwise — and the..."
     - "...item whose Projects row (0xad5f10, +0x1c its index) has a Projects_XP2 row (0xad5fb0 / 0x28a940) — its +0x24, ReligiousPressureModifier (Holy Site Prayers 100, every other row 0). Rec..."

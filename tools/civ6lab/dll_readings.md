@@ -9062,3 +9062,59 @@ Units" trees, and the pool from the controls the look lists.
   look as City Defense is gone; the engines' 41:4 takes and moves it
   (Upgrade Units). The Free Cities' cities' standing trees are not in
   their pool (no Free Cities aimem in the duels to read them on).
+
+## C-130: the unit production table's maintenance resource by the Units index and its shortfall divide — READ (0x7989e0 at 0x798ac3..0x798df2 via 0x28a940, 0x799f04..0x79a0e9, 0x4ab270, 0x3640e0), both twins
+
+- THE ROW: the table takes each entry's maintenance resource and amount
+  (+0x24 / +0x28) from Units_XP2 (0xad67b0) through 0x28a940 with the
+  unit's Units index (Units +0x14): the lookup returns the row at that
+  position while the index is below the table's count (86 rows against
+  Units' 144 in the game's database order), so an entry reads the
+  maintenance of whatever Units_XP2 row stands at its own Units index, and
+  none past the count. The Field Cannon (Units 58) carries the Rocket
+  Artillery's Oil 1, the Crossbowman (47) the Infantry's Oil 1, the Bombard
+  (54) the Bomber's Aluminum 1; the Infantry (69), the Ironclad, the
+  Artillery and the Battleship none. `tableMaintenanceResource` /
+  `tableMaintenanceAmount` (`tools/install/ai_tables.py`, the rowid order of
+  DebugGameplay.sqlite).
+- THE DIVIDE: past the value (N over the sum, x1.25 for a unique unit),
+  with a maintenance resource, the surplus = the player's turn income of it
+  (Player_Resources +0x350) less its units' fuel bill (0x4ab270, << 8);
+  below the amount << 8, d = (amount << 8) - surplus, and d above 1.0
+  divides the value (0x3640e0): `strategicSurplus`,
+  `unitProductionEntries`; GPU `_cv_unit_surplus`, `_cv_unit_production`.
+  The unit choice's maintenance test reads the same entry field
+  (`maintained`: the surplus above 0).
+- Confirmed (one-seed aimem traces): runs/h1_duely1127 city-state 2's
+  Logistics (EFFECT_ADJUST_UNIT_FRIENDLY_TERRITORY_START_MOVEMENT on the
+  table value) t203-t248 every row as logged: from t206, its Line Infantry
+  an Infantry (its Oil bill 1, no income), the Field Cannon's 0.94 halved
+  (14 for our 17 at t206-t208, 12 for 13 at t209); the operations' unit
+  choice no longer takes the misread-Oil units: runs/h1_duely1124 t111
+  city-state 2's Simple Operation Attack contract the Trebuchet over the
+  Crossbowman, t205 city-state 3's the Ranger over the AT Crew,
+  runs/h1_duely1128 t197 Bologna's the Ranger over the Field Cannon, as
+  recorded. Over the five duels no minor's operation contracts a
+  Crossbowman, Musketman, Pikeman, Field Cannon or AT Crew; the majors'
+  contract Ironclads, Artillery, Battleships, Bombers and Infantry.
+- Open: the divide also scales +0x30 and +0x2c (0x79a0c7..0x79a0e9), which
+  the unit choice sorts on; ours carries those sums raw in the other
+  orientation, so the choice's order under a shortfall is not ported.
+
+## C-96: the city update's analysis reads the Economic AI's Gold boost of the turn before
+
+- A city-state's city update (`minorAiTurn`: its analysis tables, events
+  and Default Specialization) reads the Gold boost (0x687bf0 at 0x6880a1:
+  fx(-0.2) x the treasury's cached net income +0x1b8 while negative) as the
+  Economic AI's turn before wrote it; the boost of the turn is written after
+  the update (`minorPhase`; GPU `_minor_gold_boost` after `_minor_ai_turn`),
+  so the government values and the next turn's research and civics AIs read
+  it. The pass order this implies against the Control Manager's (the
+  Economic AI's pass 3 before the cities' pass 2) is not read.
+- Confirmed (one-seed aimem traces, the turn after a unit loss turns the
+  net income): runs/h1_duely1117 Valletta t105 (net -5.6 -> +0.4 after its
+  two Crossbowmen's t104 disband) its Build City Building contract the
+  Warrior over the Crossbowman; Antananarivo t162 / t165 the Warrior
+  contract and the Scout over the Field Cannon; runs/h1_duely1128 Hong Kong
+  t79 (net -1 -> +1) the Warrior over the Archer, whose Maintenance 1 at the
+  t78 boost 0.2 takes its 8.04 below the Warrior's 7.78.

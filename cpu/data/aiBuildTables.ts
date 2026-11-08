@@ -10205,7 +10205,9 @@ export const AI_UNITS: readonly AiUnitRow[] = [
   "majorOnly": false,
   "maintenanceResource": null,
   "maintenanceResourceAmount": 0,
-  "resourceCost": 0
+  "resourceCost": 0,
+  "tableMaintenanceResource": null,
+  "tableMaintenanceAmount": 0
  },
  {
   "type": "UNIT_BUILDER",
@@ -10255,7 +10257,9 @@ export const AI_UNITS: readonly AiUnitRow[] = [
   "majorOnly": false,
   "maintenanceResource": null,
   "maintenanceResourceAmount": 0,
-  "resourceCost": 0
+  "resourceCost": 0,
+  "tableMaintenanceResource": null,
+  "tableMaintenanceAmount": 0
  },
  {
   "type": "UNIT_TRADER",
@@ -10305,7 +10309,9 @@ export const AI_UNITS: readonly AiUnitRow[] = [
   "majorOnly": false,
   "maintenanceResource": null,
   "maintenanceResourceAmount": 0,
-  "resourceCost": 0
+  "resourceCost": 0,
+  "tableMaintenanceResource": null,
+  "tableMaintenanceAmount": 0
  },
  {
   "type": "UNIT_MISSIONARY",
@@ -10377,7 +10383,9 @@ export const AI_UNITS: readonly AiUnitRow[] = [
   "majorOnly": false,
   "maintenanceResource": null,
   "maintenanceResourceAmount": 0,
-  "resourceCost": 0
+  "resourceCost": 0,
+  "tableMaintenanceResource": null,
+  "tableMaintenanceAmount": 0
  },
  {
   "type": "UNIT_APOSTLE",
@@ -10442,7 +10450,9 @@ export const AI_UNITS: readonly AiUnitRow[] = [
   "majorOnly": false,
   "maintenanceResource": null,
   "maintenanceResourceAmount": 0,
-  "resourceCost": 0
+  "resourceCost": 0,
+  "tableMaintenanceResource": null,
+  "tableMaintenanceAmount": 0
  },
  {
   "type": "UNIT_INQUISITOR",
@@ -10515,7 +10525,9 @@ export const AI_UNITS: readonly AiUnitRow[] = [
   "majorOnly": false,
   "maintenanceResource": null,
   "maintenanceResourceAmount": 0,
-  "resourceCost": 0
+  "resourceCost": 0,
+  "tableMaintenanceResource": null,
+  "tableMaintenanceAmount": 0
  },
  {
   "type": "UNIT_GURU",
@@ -10589,7 +10601,9 @@ export const AI_UNITS: readonly AiUnitRow[] = [
   "majorOnly": false,
   "maintenanceResource": null,
   "maintenanceResourceAmount": 0,
-  "resourceCost": 0
+  "resourceCost": 0,
+  "tableMaintenanceResource": null,
+  "tableMaintenanceAmount": 0
  },
  {
   "type": "UNIT_WARRIOR_MONK",
@@ -10642,7 +10656,9 @@ export const AI_UNITS: readonly AiUnitRow[] = [
   "majorOnly": false,
   "maintenanceResource": null,
   "maintenanceResourceAmount": 0,
-  "resourceCost": 0
+  "resourceCost": 0,
+  "tableMaintenanceResource": null,
+  "tableMaintenanceAmount": 0
  },
  {
   "type": "UNIT_ARCHAEOLOGIST",
@@ -10694,7 +10710,9 @@ export const AI_UNITS: readonly AiUnitRow[] = [
   "majorOnly": false,
   "maintenanceResource": null,
   "maintenanceResourceAmount": 0,
-  "resourceCost": 0
+  "resourceCost": 0,
+  "tableMaintenanceResource": null,
+  "tableMaintenanceAmount": 0
  },
  {
   "type": "UNIT_GREAT_GENERAL",
@@ -10743,7 +10761,9 @@ export const AI_UNITS: readonly AiUnitRow[] = [
   "majorOnly": false,
   "maintenanceResource": null,
   "maintenanceResourceAmount": 0,
-  "resourceCost": 0
+  "resourceCost": 0,
+  "tableMaintenanceResource": null,
+  "tableMaintenanceAmount": 0
  },
  {
   "type": "UNIT_GREAT_ADMIRAL",
@@ -10790,7 +10810,9 @@ export const AI_UNITS: readonly AiUnitRow[] = [
   "majorOnly": false,
   "maintenanceResource": null,
   "maintenanceResourceAmount": 0,
-  "resourceCost": 0
+  "resourceCost": 0,
+  "tableMaintenanceResource": null,
+  "tableMaintenanceAmount": 0
  },
  {
   "type": "UNIT_GREAT_ENGINEER",
@@ -10837,7 +10859,9 @@ export const AI_UNITS: readonly AiUnitRow[] = [
   "majorOnly": false,
   "maintenanceResource": null,
   "maintenanceResourceAmount": 0,
-  "resourceCost": 0
+  "resourceCost": 0,
+  "tableMaintenanceResource": null,
+  "tableMaintenanceAmount": 0
  },
  {
   "type": "UNIT_GREAT_MERCHANT",
@@ -10886,7 +10910,9 @@ export const AI_UNITS: readonly AiUnitRow[] = [
   "majorOnly": false,
   "maintenanceResource": null,
   "maintenanceResourceAmount": 0,
-  "resourceCost": 0
+  "resourceCost": 0,
+  "tableMaintenanceResource": null,
+  "tableMaintenanceAmount": 0
  },
  {
   "type": "UNIT_GREAT_PROPHET",
@@ -10933,7 +10959,9 @@ export const AI_UNITS: readonly AiUnitRow[] = [
   "majorOnly": false,
   "maintenanceResource": null,
   "maintenanceResourceAmount": 0,
-  "resourceCost": 0
+  "resourceCost": 0,
+  "tableMaintenanceResource": null,
+  "tableMaintenanceAmount": 0
  },
  {
   "type": "UNIT_GREAT_SCIENTIST",
@@ -10982,7 +11010,9 @@ export const AI_UNITS: readonly AiUnitRow[] = [
   "majorOnly": false,
   "maintenanceResource": null,
   "maintenanceResourceAmount": 0,
-  "resourceCost": 0
+  "resourceCost": 0,
+  "tableMaintenanceResource": null,
+  "tableMaintenanceAmount": 0
  },
  {
   "type": "UNIT_GREAT_WRITER",
@@ -11031,7 +11061,9 @@ export const AI_UNITS: readonly AiUnitRow[] = [
   "majorOnly": false,
   "maintenanceResource": null,
   "maintenanceResourceAmount": 0,
-  "resourceCost": 0
+  "resourceCost": 0,
+  "tableMaintenanceResource": null,
+  "tableMaintenanceAmount": 0
  },
  {
   "type": "UNIT_GREAT_ARTIST",
@@ -11080,7 +11112,9 @@ export const AI_UNITS: readonly AiUnitRow[] = [
   "majorOnly": false,
   "maintenanceResource": null,
   "maintenanceResourceAmount": 0,
-  "resourceCost": 0
+  "resourceCost": 0,
+  "tableMaintenanceResource": null,
+  "tableMaintenanceAmount": 0
  },
  {
   "type": "UNIT_GREAT_MUSICIAN",
@@ -11129,7 +11163,9 @@ export const AI_UNITS: readonly AiUnitRow[] = [
   "majorOnly": false,
   "maintenanceResource": null,
   "maintenanceResourceAmount": 0,
-  "resourceCost": 0
+  "resourceCost": 0,
+  "tableMaintenanceResource": null,
+  "tableMaintenanceAmount": 0
  },
  {
   "type": "UNIT_SPY",
@@ -11178,7 +11214,9 @@ export const AI_UNITS: readonly AiUnitRow[] = [
   "majorOnly": false,
   "maintenanceResource": null,
   "maintenanceResourceAmount": 0,
-  "resourceCost": 0
+  "resourceCost": 0,
+  "tableMaintenanceResource": null,
+  "tableMaintenanceAmount": 0
  },
  {
   "type": "UNIT_NATURALIST",
@@ -11227,7 +11265,9 @@ export const AI_UNITS: readonly AiUnitRow[] = [
   "majorOnly": false,
   "maintenanceResource": null,
   "maintenanceResourceAmount": 0,
-  "resourceCost": 0
+  "resourceCost": 0,
+  "tableMaintenanceResource": null,
+  "tableMaintenanceAmount": 0
  },
  {
   "type": "UNIT_SCOUT",
@@ -11286,7 +11326,9 @@ export const AI_UNITS: readonly AiUnitRow[] = [
   "majorOnly": false,
   "maintenanceResource": null,
   "maintenanceResourceAmount": 0,
-  "resourceCost": 0
+  "resourceCost": 0,
+  "tableMaintenanceResource": null,
+  "tableMaintenanceAmount": 0
  },
  {
   "type": "UNIT_WARRIOR",
@@ -11379,7 +11421,9 @@ export const AI_UNITS: readonly AiUnitRow[] = [
   "majorOnly": false,
   "maintenanceResource": null,
   "maintenanceResourceAmount": 0,
-  "resourceCost": 0
+  "resourceCost": 0,
+  "tableMaintenanceResource": null,
+  "tableMaintenanceAmount": 0
  },
  {
   "type": "UNIT_SLINGER",
@@ -11430,7 +11474,9 @@ export const AI_UNITS: readonly AiUnitRow[] = [
   "majorOnly": false,
   "maintenanceResource": null,
   "maintenanceResourceAmount": 0,
-  "resourceCost": 0
+  "resourceCost": 0,
+  "tableMaintenanceResource": null,
+  "tableMaintenanceAmount": 0
  },
  {
   "type": "UNIT_BARBARIAN_HORSEMAN",
@@ -11488,7 +11534,9 @@ export const AI_UNITS: readonly AiUnitRow[] = [
   "majorOnly": false,
   "maintenanceResource": null,
   "maintenanceResourceAmount": 0,
-  "resourceCost": 0
+  "resourceCost": 0,
+  "tableMaintenanceResource": null,
+  "tableMaintenanceAmount": 0
  },
  {
   "type": "UNIT_BARBARIAN_HORSE_ARCHER",
@@ -11547,7 +11595,9 @@ export const AI_UNITS: readonly AiUnitRow[] = [
   "majorOnly": false,
   "maintenanceResource": null,
   "maintenanceResourceAmount": 0,
-  "resourceCost": 0
+  "resourceCost": 0,
+  "tableMaintenanceResource": null,
+  "tableMaintenanceAmount": 0
  },
  {
   "type": "UNIT_SUMERIAN_WAR_CART",
@@ -11616,7 +11666,9 @@ export const AI_UNITS: readonly AiUnitRow[] = [
   "majorOnly": false,
   "maintenanceResource": null,
   "maintenanceResourceAmount": 0,
-  "resourceCost": 0
+  "resourceCost": 0,
+  "tableMaintenanceResource": null,
+  "tableMaintenanceAmount": 0
  },
  {
   "type": "UNIT_GALLEY",
@@ -11667,7 +11719,9 @@ export const AI_UNITS: readonly AiUnitRow[] = [
   "majorOnly": false,
   "maintenanceResource": null,
   "maintenanceResourceAmount": 0,
-  "resourceCost": 0
+  "resourceCost": 0,
+  "tableMaintenanceResource": null,
+  "tableMaintenanceAmount": 0
  },
  {
   "type": "UNIT_NORWEGIAN_LONGSHIP",
@@ -11748,7 +11802,9 @@ export const AI_UNITS: readonly AiUnitRow[] = [
   "majorOnly": false,
   "maintenanceResource": null,
   "maintenanceResourceAmount": 0,
-  "resourceCost": 0
+  "resourceCost": 0,
+  "tableMaintenanceResource": null,
+  "tableMaintenanceAmount": 0
  },
  {
   "type": "UNIT_ARCHER",
@@ -11799,7 +11855,9 @@ export const AI_UNITS: readonly AiUnitRow[] = [
   "majorOnly": false,
   "maintenanceResource": null,
   "maintenanceResourceAmount": 0,
-  "resourceCost": 0
+  "resourceCost": 0,
+  "tableMaintenanceResource": null,
+  "tableMaintenanceAmount": 0
  },
  {
   "type": "UNIT_SPEARMAN",
@@ -11920,7 +11978,9 @@ export const AI_UNITS: readonly AiUnitRow[] = [
   "majorOnly": false,
   "maintenanceResource": null,
   "maintenanceResourceAmount": 0,
-  "resourceCost": 0
+  "resourceCost": 0,
+  "tableMaintenanceResource": null,
+  "tableMaintenanceAmount": 0
  },
  {
   "type": "UNIT_HEAVY_CHARIOT",
@@ -11989,7 +12049,9 @@ export const AI_UNITS: readonly AiUnitRow[] = [
   "majorOnly": false,
   "maintenanceResource": null,
   "maintenanceResourceAmount": 0,
-  "resourceCost": 0
+  "resourceCost": 0,
+  "tableMaintenanceResource": null,
+  "tableMaintenanceAmount": 0
  },
  {
   "type": "UNIT_BATTERING_RAM",
@@ -12058,7 +12120,9 @@ export const AI_UNITS: readonly AiUnitRow[] = [
   "majorOnly": false,
   "maintenanceResource": null,
   "maintenanceResourceAmount": 0,
-  "resourceCost": 0
+  "resourceCost": 0,
+  "tableMaintenanceResource": null,
+  "tableMaintenanceAmount": 0
  },
  {
   "type": "UNIT_GREEK_HOPLITE",
@@ -12236,7 +12300,9 @@ export const AI_UNITS: readonly AiUnitRow[] = [
   "majorOnly": false,
   "maintenanceResource": null,
   "maintenanceResourceAmount": 0,
-  "resourceCost": 0
+  "resourceCost": 0,
+  "tableMaintenanceResource": null,
+  "tableMaintenanceAmount": 0
  },
  {
   "type": "UNIT_SWORDSMAN",
@@ -12329,7 +12395,9 @@ export const AI_UNITS: readonly AiUnitRow[] = [
   "majorOnly": false,
   "maintenanceResource": null,
   "maintenanceResourceAmount": 0,
-  "resourceCost": 20
+  "resourceCost": 20,
+  "tableMaintenanceResource": null,
+  "tableMaintenanceAmount": 0
  },
  {
   "type": "UNIT_HORSEMAN",
@@ -12389,7 +12457,9 @@ export const AI_UNITS: readonly AiUnitRow[] = [
   "majorOnly": false,
   "maintenanceResource": null,
   "maintenanceResourceAmount": 0,
-  "resourceCost": 20
+  "resourceCost": 20,
+  "tableMaintenanceResource": null,
+  "tableMaintenanceAmount": 0
  },
  {
   "type": "UNIT_SCYTHIAN_HORSE_ARCHER",
@@ -12450,7 +12520,9 @@ export const AI_UNITS: readonly AiUnitRow[] = [
   "majorOnly": false,
   "maintenanceResource": null,
   "maintenanceResourceAmount": 0,
-  "resourceCost": 0
+  "resourceCost": 0,
+  "tableMaintenanceResource": null,
+  "tableMaintenanceAmount": 0
  },
  {
   "type": "UNIT_ROMAN_LEGION",
@@ -12544,7 +12616,9 @@ export const AI_UNITS: readonly AiUnitRow[] = [
   "majorOnly": false,
   "maintenanceResource": null,
   "maintenanceResourceAmount": 0,
-  "resourceCost": 10
+  "resourceCost": 10,
+  "tableMaintenanceResource": null,
+  "tableMaintenanceAmount": 0
  },
  {
   "type": "UNIT_KONGO_SHIELD_BEARER",
@@ -12705,7 +12779,9 @@ export const AI_UNITS: readonly AiUnitRow[] = [
   "majorOnly": false,
   "maintenanceResource": null,
   "maintenanceResourceAmount": 0,
-  "resourceCost": 5
+  "resourceCost": 5,
+  "tableMaintenanceResource": null,
+  "tableMaintenanceAmount": 0
  },
  {
   "type": "UNIT_CATAPULT",
@@ -12787,7 +12863,9 @@ export const AI_UNITS: readonly AiUnitRow[] = [
   "majorOnly": false,
   "maintenanceResource": null,
   "maintenanceResourceAmount": 0,
-  "resourceCost": 20
+  "resourceCost": 20,
+  "tableMaintenanceResource": null,
+  "tableMaintenanceAmount": 0
  },
  {
   "type": "UNIT_SIEGE_TOWER",
@@ -12856,7 +12934,9 @@ export const AI_UNITS: readonly AiUnitRow[] = [
   "majorOnly": false,
   "maintenanceResource": null,
   "maintenanceResourceAmount": 0,
-  "resourceCost": 0
+  "resourceCost": 0,
+  "tableMaintenanceResource": null,
+  "tableMaintenanceAmount": 0
  },
  {
   "type": "UNIT_QUADRIREME",
@@ -12907,7 +12987,9 @@ export const AI_UNITS: readonly AiUnitRow[] = [
   "majorOnly": false,
   "maintenanceResource": null,
   "maintenanceResourceAmount": 0,
-  "resourceCost": 0
+  "resourceCost": 0,
+  "tableMaintenanceResource": null,
+  "tableMaintenanceAmount": 0
  },
  {
   "type": "UNIT_EGYPTIAN_CHARIOT_ARCHER",
@@ -12976,7 +13058,9 @@ export const AI_UNITS: readonly AiUnitRow[] = [
   "majorOnly": false,
   "maintenanceResource": null,
   "maintenanceResourceAmount": 0,
-  "resourceCost": 0
+  "resourceCost": 0,
+  "tableMaintenanceResource": null,
+  "tableMaintenanceAmount": 0
  },
  {
   "type": "UNIT_JAPANESE_SAMURAI",
@@ -13078,7 +13162,9 @@ export const AI_UNITS: readonly AiUnitRow[] = [
   "majorOnly": false,
   "maintenanceResource": null,
   "maintenanceResourceAmount": 0,
-  "resourceCost": 10
+  "resourceCost": 10,
+  "tableMaintenanceResource": null,
+  "tableMaintenanceAmount": 0
  },
  {
   "type": "UNIT_NORWEGIAN_BERSERKER",
@@ -13276,7 +13362,9 @@ export const AI_UNITS: readonly AiUnitRow[] = [
   "majorOnly": false,
   "maintenanceResource": null,
   "maintenanceResourceAmount": 0,
-  "resourceCost": 10
+  "resourceCost": 10,
+  "tableMaintenanceResource": null,
+  "tableMaintenanceAmount": 0
  },
  {
   "type": "UNIT_KNIGHT",
@@ -13336,7 +13424,9 @@ export const AI_UNITS: readonly AiUnitRow[] = [
   "majorOnly": false,
   "maintenanceResource": null,
   "maintenanceResourceAmount": 0,
-  "resourceCost": 20
+  "resourceCost": 20,
+  "tableMaintenanceResource": null,
+  "tableMaintenanceAmount": 0
  },
  {
   "type": "UNIT_INDIAN_VARU",
@@ -13456,7 +13546,9 @@ export const AI_UNITS: readonly AiUnitRow[] = [
   "majorOnly": false,
   "maintenanceResource": null,
   "maintenanceResourceAmount": 0,
-  "resourceCost": 0
+  "resourceCost": 0,
+  "tableMaintenanceResource": "RESOURCE_COAL",
+  "tableMaintenanceAmount": 1
  },
  {
   "type": "UNIT_ARABIAN_MAMLUK",
@@ -13523,7 +13615,9 @@ export const AI_UNITS: readonly AiUnitRow[] = [
   "majorOnly": false,
   "maintenanceResource": null,
   "maintenanceResourceAmount": 0,
-  "resourceCost": 10
+  "resourceCost": 10,
+  "tableMaintenanceResource": "RESOURCE_COAL",
+  "tableMaintenanceAmount": 1
  },
  {
   "type": "UNIT_CROSSBOWMAN",
@@ -13574,7 +13668,9 @@ export const AI_UNITS: readonly AiUnitRow[] = [
   "majorOnly": false,
   "maintenanceResource": null,
   "maintenanceResourceAmount": 0,
-  "resourceCost": 0
+  "resourceCost": 0,
+  "tableMaintenanceResource": "RESOURCE_OIL",
+  "tableMaintenanceAmount": 1
  },
  {
   "type": "UNIT_CHINESE_CROUCHING_TIGER",
@@ -13625,7 +13721,9 @@ export const AI_UNITS: readonly AiUnitRow[] = [
   "majorOnly": false,
   "maintenanceResource": null,
   "maintenanceResourceAmount": 0,
-  "resourceCost": 0
+  "resourceCost": 0,
+  "tableMaintenanceResource": "RESOURCE_OIL",
+  "tableMaintenanceAmount": 1
  },
  {
   "type": "UNIT_MILITARY_ENGINEER",
@@ -13676,7 +13774,9 @@ export const AI_UNITS: readonly AiUnitRow[] = [
   "majorOnly": false,
   "maintenanceResource": null,
   "maintenanceResourceAmount": 0,
-  "resourceCost": 0
+  "resourceCost": 0,
+  "tableMaintenanceResource": "RESOURCE_OIL",
+  "tableMaintenanceAmount": 1
  },
  {
   "type": "UNIT_PIKEMAN",
@@ -13797,7 +13897,9 @@ export const AI_UNITS: readonly AiUnitRow[] = [
   "majorOnly": false,
   "maintenanceResource": null,
   "maintenanceResourceAmount": 0,
-  "resourceCost": 0
+  "resourceCost": 0,
+  "tableMaintenanceResource": "RESOURCE_OIL",
+  "tableMaintenanceAmount": 1
  },
  {
   "type": "UNIT_MUSKETMAN",
@@ -13890,7 +13992,9 @@ export const AI_UNITS: readonly AiUnitRow[] = [
   "majorOnly": false,
   "maintenanceResource": null,
   "maintenanceResourceAmount": 0,
-  "resourceCost": 20
+  "resourceCost": 20,
+  "tableMaintenanceResource": "RESOURCE_OIL",
+  "tableMaintenanceAmount": 1
  },
  {
   "type": "UNIT_SPANISH_CONQUISTADOR",
@@ -14034,7 +14138,9 @@ export const AI_UNITS: readonly AiUnitRow[] = [
   "majorOnly": false,
   "maintenanceResource": null,
   "maintenanceResourceAmount": 0,
-  "resourceCost": 10
+  "resourceCost": 10,
+  "tableMaintenanceResource": "RESOURCE_OIL",
+  "tableMaintenanceAmount": 1
  },
  {
   "type": "UNIT_CARAVEL",
@@ -14085,7 +14191,9 @@ export const AI_UNITS: readonly AiUnitRow[] = [
   "majorOnly": false,
   "maintenanceResource": null,
   "maintenanceResourceAmount": 0,
-  "resourceCost": 0
+  "resourceCost": 0,
+  "tableMaintenanceResource": "RESOURCE_ALUMINUM",
+  "tableMaintenanceAmount": 1
  },
  {
   "type": "UNIT_BOMBARD",
@@ -14167,7 +14275,9 @@ export const AI_UNITS: readonly AiUnitRow[] = [
   "majorOnly": false,
   "maintenanceResource": null,
   "maintenanceResourceAmount": 0,
-  "resourceCost": 20
+  "resourceCost": 20,
+  "tableMaintenanceResource": "RESOURCE_ALUMINUM",
+  "tableMaintenanceAmount": 1
  },
  {
   "type": "UNIT_FRIGATE",
@@ -14218,7 +14328,9 @@ export const AI_UNITS: readonly AiUnitRow[] = [
   "majorOnly": false,
   "maintenanceResource": null,
   "maintenanceResourceAmount": 0,
-  "resourceCost": 20
+  "resourceCost": 20,
+  "tableMaintenanceResource": "RESOURCE_ALUMINUM",
+  "tableMaintenanceAmount": 1
  },
  {
   "type": "UNIT_PRIVATEER",
@@ -14305,7 +14417,9 @@ export const AI_UNITS: readonly AiUnitRow[] = [
   "majorOnly": false,
   "maintenanceResource": null,
   "maintenanceResourceAmount": 0,
-  "resourceCost": 0
+  "resourceCost": 0,
+  "tableMaintenanceResource": "RESOURCE_OIL",
+  "tableMaintenanceAmount": 1
  },
  {
   "type": "UNIT_ENGLISH_SEADOG",
@@ -14401,7 +14515,9 @@ export const AI_UNITS: readonly AiUnitRow[] = [
   "majorOnly": false,
   "maintenanceResource": null,
   "maintenanceResourceAmount": 0,
-  "resourceCost": 0
+  "resourceCost": 0,
+  "tableMaintenanceResource": "RESOURCE_OIL",
+  "tableMaintenanceAmount": 1
  },
  {
   "type": "UNIT_FIELD_CANNON",
@@ -14452,7 +14568,9 @@ export const AI_UNITS: readonly AiUnitRow[] = [
   "majorOnly": false,
   "maintenanceResource": null,
   "maintenanceResourceAmount": 0,
-  "resourceCost": 0
+  "resourceCost": 0,
+  "tableMaintenanceResource": "RESOURCE_OIL",
+  "tableMaintenanceAmount": 1
  },
  {
   "type": "UNIT_CAVALRY",
@@ -14510,7 +14628,9 @@ export const AI_UNITS: readonly AiUnitRow[] = [
   "majorOnly": false,
   "maintenanceResource": null,
   "maintenanceResourceAmount": 0,
-  "resourceCost": 20
+  "resourceCost": 20,
+  "tableMaintenanceResource": "RESOURCE_ALUMINUM",
+  "tableMaintenanceAmount": 1
  },
  {
   "type": "UNIT_RUSSIAN_COSSACK",
@@ -14624,7 +14744,9 @@ export const AI_UNITS: readonly AiUnitRow[] = [
   "majorOnly": false,
   "maintenanceResource": null,
   "maintenanceResourceAmount": 0,
-  "resourceCost": 10
+  "resourceCost": 10,
+  "tableMaintenanceResource": "RESOURCE_ALUMINUM",
+  "tableMaintenanceAmount": 1
  },
  {
   "type": "UNIT_ENGLISH_REDCOAT",
@@ -14760,7 +14882,9 @@ export const AI_UNITS: readonly AiUnitRow[] = [
   "majorOnly": false,
   "maintenanceResource": null,
   "maintenanceResourceAmount": 0,
-  "resourceCost": 10
+  "resourceCost": 10,
+  "tableMaintenanceResource": "RESOURCE_OIL",
+  "tableMaintenanceAmount": 1
  },
  {
   "type": "UNIT_FRENCH_GARDE_IMPERIALE",
@@ -14897,7 +15021,9 @@ export const AI_UNITS: readonly AiUnitRow[] = [
   "majorOnly": false,
   "maintenanceResource": null,
   "maintenanceResourceAmount": 0,
-  "resourceCost": 10
+  "resourceCost": 10,
+  "tableMaintenanceResource": "RESOURCE_URANIUM",
+  "tableMaintenanceAmount": 3
  },
  {
   "type": "UNIT_MEDIC",
@@ -14969,7 +15095,9 @@ export const AI_UNITS: readonly AiUnitRow[] = [
   "majorOnly": false,
   "maintenanceResource": null,
   "maintenanceResourceAmount": 0,
-  "resourceCost": 0
+  "resourceCost": 0,
+  "tableMaintenanceResource": null,
+  "tableMaintenanceAmount": 0
  },
  {
   "type": "UNIT_IRONCLAD",
@@ -15018,7 +15146,9 @@ export const AI_UNITS: readonly AiUnitRow[] = [
   "majorOnly": false,
   "maintenanceResource": "RESOURCE_COAL",
   "maintenanceResourceAmount": 1,
-  "resourceCost": 1
+  "resourceCost": 1,
+  "tableMaintenanceResource": null,
+  "tableMaintenanceAmount": 0
  },
  {
   "type": "UNIT_AMERICAN_ROUGH_RIDER",
@@ -15195,7 +15325,9 @@ export const AI_UNITS: readonly AiUnitRow[] = [
   "majorOnly": false,
   "maintenanceResource": null,
   "maintenanceResourceAmount": 0,
-  "resourceCost": 0
+  "resourceCost": 0,
+  "tableMaintenanceResource": null,
+  "tableMaintenanceAmount": 0
  },
  {
   "type": "UNIT_RANGER",
@@ -15246,7 +15378,9 @@ export const AI_UNITS: readonly AiUnitRow[] = [
   "majorOnly": false,
   "maintenanceResource": null,
   "maintenanceResourceAmount": 0,
-  "resourceCost": 0
+  "resourceCost": 0,
+  "tableMaintenanceResource": null,
+  "tableMaintenanceAmount": 0
  },
  {
   "type": "UNIT_OBSERVATION_BALLOON",
@@ -15313,7 +15447,9 @@ export const AI_UNITS: readonly AiUnitRow[] = [
   "majorOnly": false,
   "maintenanceResource": null,
   "maintenanceResourceAmount": 0,
-  "resourceCost": 0
+  "resourceCost": 0,
+  "tableMaintenanceResource": null,
+  "tableMaintenanceAmount": 0
  },
  {
   "type": "UNIT_BIPLANE",
@@ -15388,7 +15524,9 @@ export const AI_UNITS: readonly AiUnitRow[] = [
   "majorOnly": false,
   "maintenanceResource": "RESOURCE_OIL",
   "maintenanceResourceAmount": 1,
-  "resourceCost": 1
+  "resourceCost": 1,
+  "tableMaintenanceResource": null,
+  "tableMaintenanceAmount": 0
  },
  {
   "type": "UNIT_INFANTRY",
@@ -15479,7 +15617,9 @@ export const AI_UNITS: readonly AiUnitRow[] = [
   "majorOnly": false,
   "maintenanceResource": "RESOURCE_OIL",
   "maintenanceResourceAmount": 1,
-  "resourceCost": 1
+  "resourceCost": 1,
+  "tableMaintenanceResource": null,
+  "tableMaintenanceAmount": 0
  },
  {
   "type": "UNIT_ARTILLERY",
@@ -15601,7 +15741,9 @@ export const AI_UNITS: readonly AiUnitRow[] = [
   "majorOnly": false,
   "maintenanceResource": "RESOURCE_OIL",
   "maintenanceResourceAmount": 1,
-  "resourceCost": 1
+  "resourceCost": 1,
+  "tableMaintenanceResource": null,
+  "tableMaintenanceAmount": 0
  },
  {
   "type": "UNIT_BATTLESHIP",
@@ -15651,7 +15793,9 @@ export const AI_UNITS: readonly AiUnitRow[] = [
   "majorOnly": false,
   "maintenanceResource": "RESOURCE_COAL",
   "maintenanceResourceAmount": 1,
-  "resourceCost": 1
+  "resourceCost": 1,
+  "tableMaintenanceResource": null,
+  "tableMaintenanceAmount": 0
  },
  {
   "type": "UNIT_BRAZILIAN_MINAS_GERAES",
@@ -15701,7 +15845,9 @@ export const AI_UNITS: readonly AiUnitRow[] = [
   "majorOnly": false,
   "maintenanceResource": "RESOURCE_COAL",
   "maintenanceResourceAmount": 1,
-  "resourceCost": 1
+  "resourceCost": 1,
+  "tableMaintenanceResource": null,
+  "tableMaintenanceAmount": 0
  },
  {
   "type": "UNIT_SUBMARINE",
@@ -15786,7 +15932,9 @@ export const AI_UNITS: readonly AiUnitRow[] = [
   "majorOnly": false,
   "maintenanceResource": "RESOURCE_OIL",
   "maintenanceResourceAmount": 1,
-  "resourceCost": 1
+  "resourceCost": 1,
+  "tableMaintenanceResource": null,
+  "tableMaintenanceAmount": 0
  },
  {
   "type": "UNIT_GERMAN_UBOAT",
@@ -15913,7 +16061,9 @@ export const AI_UNITS: readonly AiUnitRow[] = [
   "majorOnly": false,
   "maintenanceResource": null,
   "maintenanceResourceAmount": 0,
-  "resourceCost": 0
+  "resourceCost": 0,
+  "tableMaintenanceResource": "RESOURCE_COAL",
+  "tableMaintenanceAmount": 1
  },
  {
   "type": "UNIT_AT_CREW",
@@ -16032,7 +16182,9 @@ export const AI_UNITS: readonly AiUnitRow[] = [
   "majorOnly": false,
   "maintenanceResource": null,
   "maintenanceResourceAmount": 0,
-  "resourceCost": 0
+  "resourceCost": 0,
+  "tableMaintenanceResource": "RESOURCE_ALUMINUM",
+  "tableMaintenanceAmount": 1
  },
  {
   "type": "UNIT_TANK",
@@ -16099,7 +16251,9 @@ export const AI_UNITS: readonly AiUnitRow[] = [
   "majorOnly": false,
   "maintenanceResource": "RESOURCE_OIL",
   "maintenanceResourceAmount": 1,
-  "resourceCost": 1
+  "resourceCost": 1,
+  "tableMaintenanceResource": null,
+  "tableMaintenanceAmount": 0
  },
  {
   "type": "UNIT_FIGHTER",
@@ -16174,7 +16328,9 @@ export const AI_UNITS: readonly AiUnitRow[] = [
   "majorOnly": false,
   "maintenanceResource": "RESOURCE_ALUMINUM",
   "maintenanceResourceAmount": 1,
-  "resourceCost": 1
+  "resourceCost": 1,
+  "tableMaintenanceResource": null,
+  "tableMaintenanceAmount": 0
  },
  {
   "type": "UNIT_AMERICAN_P51",
@@ -16299,7 +16455,9 @@ export const AI_UNITS: readonly AiUnitRow[] = [
   "majorOnly": false,
   "maintenanceResource": "RESOURCE_ALUMINUM",
   "maintenanceResourceAmount": 1,
-  "resourceCost": 1
+  "resourceCost": 1,
+  "tableMaintenanceResource": null,
+  "tableMaintenanceAmount": 0
  },
  {
   "type": "UNIT_BOMBER",
@@ -16374,7 +16532,9 @@ export const AI_UNITS: readonly AiUnitRow[] = [
   "majorOnly": false,
   "maintenanceResource": "RESOURCE_ALUMINUM",
   "maintenanceResourceAmount": 1,
-  "resourceCost": 1
+  "resourceCost": 1,
+  "tableMaintenanceResource": null,
+  "tableMaintenanceAmount": 0
  },
  {
   "type": "UNIT_ANTIAIR_GUN",
@@ -16424,7 +16584,9 @@ export const AI_UNITS: readonly AiUnitRow[] = [
   "majorOnly": false,
   "maintenanceResource": null,
   "maintenanceResourceAmount": 0,
-  "resourceCost": 0
+  "resourceCost": 0,
+  "tableMaintenanceResource": null,
+  "tableMaintenanceAmount": 0
  },
  {
   "type": "UNIT_MACHINE_GUN",
@@ -16473,7 +16635,9 @@ export const AI_UNITS: readonly AiUnitRow[] = [
   "majorOnly": false,
   "maintenanceResource": null,
   "maintenanceResourceAmount": 0,
-  "resourceCost": 0
+  "resourceCost": 0,
+  "tableMaintenanceResource": null,
+  "tableMaintenanceAmount": 0
  },
  {
   "type": "UNIT_AIRCRAFT_CARRIER",
@@ -16522,7 +16686,9 @@ export const AI_UNITS: readonly AiUnitRow[] = [
   "majorOnly": false,
   "maintenanceResource": null,
   "maintenanceResourceAmount": 0,
-  "resourceCost": 0
+  "resourceCost": 0,
+  "tableMaintenanceResource": null,
+  "tableMaintenanceAmount": 0
  },
  {
   "type": "UNIT_DESTROYER",
@@ -16582,7 +16748,9 @@ export const AI_UNITS: readonly AiUnitRow[] = [
   "majorOnly": false,
   "maintenanceResource": "RESOURCE_OIL",
   "maintenanceResourceAmount": 1,
-  "resourceCost": 1
+  "resourceCost": 1,
+  "tableMaintenanceResource": null,
+  "tableMaintenanceAmount": 0
  },
  {
   "type": "UNIT_HELICOPTER",
@@ -16658,7 +16826,9 @@ export const AI_UNITS: readonly AiUnitRow[] = [
   "majorOnly": false,
   "maintenanceResource": "RESOURCE_ALUMINUM",
   "maintenanceResourceAmount": 1,
-  "resourceCost": 1
+  "resourceCost": 1,
+  "tableMaintenanceResource": null,
+  "tableMaintenanceAmount": 0
  },
  {
   "type": "UNIT_NUCLEAR_SUBMARINE",
@@ -16743,7 +16913,9 @@ export const AI_UNITS: readonly AiUnitRow[] = [
   "majorOnly": false,
   "maintenanceResource": null,
   "maintenanceResourceAmount": 0,
-  "resourceCost": 0
+  "resourceCost": 0,
+  "tableMaintenanceResource": null,
+  "tableMaintenanceAmount": 0
  },
  {
   "type": "UNIT_MECHANIZED_INFANTRY",
@@ -16834,7 +17006,9 @@ export const AI_UNITS: readonly AiUnitRow[] = [
   "majorOnly": false,
   "maintenanceResource": "RESOURCE_OIL",
   "maintenanceResourceAmount": 1,
-  "resourceCost": 1
+  "resourceCost": 1,
+  "tableMaintenanceResource": null,
+  "tableMaintenanceAmount": 0
  },
  {
   "type": "UNIT_ROCKET_ARTILLERY",
@@ -16956,7 +17130,9 @@ export const AI_UNITS: readonly AiUnitRow[] = [
   "majorOnly": false,
   "maintenanceResource": "RESOURCE_OIL",
   "maintenanceResourceAmount": 1,
-  "resourceCost": 1
+  "resourceCost": 1,
+  "tableMaintenanceResource": null,
+  "tableMaintenanceAmount": 0
  },
  {
   "type": "UNIT_MOBILE_SAM",
@@ -17006,7 +17182,9 @@ export const AI_UNITS: readonly AiUnitRow[] = [
   "majorOnly": false,
   "maintenanceResource": null,
   "maintenanceResourceAmount": 0,
-  "resourceCost": 0
+  "resourceCost": 0,
+  "tableMaintenanceResource": null,
+  "tableMaintenanceAmount": 0
  },
  {
   "type": "UNIT_JET_FIGHTER",
@@ -17081,7 +17259,9 @@ export const AI_UNITS: readonly AiUnitRow[] = [
   "majorOnly": false,
   "maintenanceResource": "RESOURCE_ALUMINUM",
   "maintenanceResourceAmount": 1,
-  "resourceCost": 1
+  "resourceCost": 1,
+  "tableMaintenanceResource": null,
+  "tableMaintenanceAmount": 0
  },
  {
   "type": "UNIT_JET_BOMBER",
@@ -17156,7 +17336,9 @@ export const AI_UNITS: readonly AiUnitRow[] = [
   "majorOnly": false,
   "maintenanceResource": "RESOURCE_ALUMINUM",
   "maintenanceResourceAmount": 1,
-  "resourceCost": 1
+  "resourceCost": 1,
+  "tableMaintenanceResource": null,
+  "tableMaintenanceAmount": 0
  },
  {
   "type": "UNIT_MISSILE_CRUISER",
@@ -17206,7 +17388,9 @@ export const AI_UNITS: readonly AiUnitRow[] = [
   "majorOnly": false,
   "maintenanceResource": "RESOURCE_OIL",
   "maintenanceResourceAmount": 1,
-  "resourceCost": 1
+  "resourceCost": 1,
+  "tableMaintenanceResource": null,
+  "tableMaintenanceAmount": 0
  },
  {
   "type": "UNIT_MODERN_AT",
@@ -17325,7 +17509,9 @@ export const AI_UNITS: readonly AiUnitRow[] = [
   "majorOnly": false,
   "maintenanceResource": null,
   "maintenanceResourceAmount": 0,
-  "resourceCost": 0
+  "resourceCost": 0,
+  "tableMaintenanceResource": null,
+  "tableMaintenanceAmount": 0
  },
  {
   "type": "UNIT_MODERN_ARMOR",
@@ -17392,7 +17578,9 @@ export const AI_UNITS: readonly AiUnitRow[] = [
   "majorOnly": false,
   "maintenanceResource": "RESOURCE_OIL",
   "maintenanceResourceAmount": 1,
-  "resourceCost": 1
+  "resourceCost": 1,
+  "tableMaintenanceResource": null,
+  "tableMaintenanceAmount": 0
  },
  {
   "type": "UNIT_MAN_AT_ARMS",
@@ -17485,7 +17673,9 @@ export const AI_UNITS: readonly AiUnitRow[] = [
   "majorOnly": false,
   "maintenanceResource": null,
   "maintenanceResourceAmount": 0,
-  "resourceCost": 20
+  "resourceCost": 20,
+  "tableMaintenanceResource": null,
+  "tableMaintenanceAmount": 0
  },
  {
   "type": "UNIT_LINE_INFANTRY",
@@ -17578,7 +17768,9 @@ export const AI_UNITS: readonly AiUnitRow[] = [
   "majorOnly": false,
   "maintenanceResource": null,
   "maintenanceResourceAmount": 0,
-  "resourceCost": 20
+  "resourceCost": 20,
+  "tableMaintenanceResource": null,
+  "tableMaintenanceAmount": 0
  },
  {
   "type": "UNIT_TREBUCHET",
@@ -17660,7 +17852,9 @@ export const AI_UNITS: readonly AiUnitRow[] = [
   "majorOnly": false,
   "maintenanceResource": null,
   "maintenanceResourceAmount": 0,
-  "resourceCost": 0
+  "resourceCost": 0,
+  "tableMaintenanceResource": null,
+  "tableMaintenanceAmount": 0
  },
  {
   "type": "UNIT_AZTEC_EAGLE_WARRIOR",
@@ -17763,7 +17957,9 @@ export const AI_UNITS: readonly AiUnitRow[] = [
   "majorOnly": false,
   "maintenanceResource": null,
   "maintenanceResourceAmount": 0,
-  "resourceCost": 0
+  "resourceCost": 0,
+  "tableMaintenanceResource": null,
+  "tableMaintenanceAmount": 0
  },
  {
   "type": "UNIT_INDONESIAN_JONG",
@@ -17861,7 +18057,9 @@ export const AI_UNITS: readonly AiUnitRow[] = [
   "majorOnly": false,
   "maintenanceResource": null,
   "maintenanceResourceAmount": 0,
-  "resourceCost": 0
+  "resourceCost": 0,
+  "tableMaintenanceResource": null,
+  "tableMaintenanceAmount": 0
  },
  {
   "type": "UNIT_KHMER_DOMREY",
@@ -17934,7 +18132,9 @@ export const AI_UNITS: readonly AiUnitRow[] = [
   "majorOnly": false,
   "maintenanceResource": null,
   "maintenanceResourceAmount": 0,
-  "resourceCost": 0
+  "resourceCost": 0,
+  "tableMaintenanceResource": null,
+  "tableMaintenanceAmount": 0
  },
  {
   "type": "UNIT_POLISH_HUSSAR",
@@ -18003,7 +18203,9 @@ export const AI_UNITS: readonly AiUnitRow[] = [
   "majorOnly": false,
   "maintenanceResource": null,
   "maintenanceResourceAmount": 0,
-  "resourceCost": 10
+  "resourceCost": 10,
+  "tableMaintenanceResource": null,
+  "tableMaintenanceAmount": 0
  },
  {
   "type": "UNIT_NUBIAN_PITATI",
@@ -18054,7 +18256,9 @@ export const AI_UNITS: readonly AiUnitRow[] = [
   "majorOnly": false,
   "maintenanceResource": null,
   "maintenanceResourceAmount": 0,
-  "resourceCost": 0
+  "resourceCost": 0,
+  "tableMaintenanceResource": null,
+  "tableMaintenanceAmount": 0
  },
  {
   "type": "UNIT_MACEDONIAN_HYPASPIST",
@@ -18192,7 +18396,9 @@ export const AI_UNITS: readonly AiUnitRow[] = [
   "majorOnly": false,
   "maintenanceResource": null,
   "maintenanceResourceAmount": 0,
-  "resourceCost": 5
+  "resourceCost": 5,
+  "tableMaintenanceResource": null,
+  "tableMaintenanceAmount": 0
  },
  {
   "type": "UNIT_MACEDONIAN_HETAIROI",
@@ -18313,7 +18519,9 @@ export const AI_UNITS: readonly AiUnitRow[] = [
   "majorOnly": false,
   "maintenanceResource": null,
   "maintenanceResourceAmount": 0,
-  "resourceCost": 10
+  "resourceCost": 10,
+  "tableMaintenanceResource": null,
+  "tableMaintenanceAmount": 0
  },
  {
   "type": "UNIT_PERSIAN_IMMORTAL",
@@ -18407,7 +18615,9 @@ export const AI_UNITS: readonly AiUnitRow[] = [
   "majorOnly": false,
   "maintenanceResource": null,
   "maintenanceResourceAmount": 0,
-  "resourceCost": 10
+  "resourceCost": 10,
+  "tableMaintenanceResource": null,
+  "tableMaintenanceAmount": 0
  },
  {
   "type": "UNIT_DIGGER",
@@ -18575,7 +18785,9 @@ export const AI_UNITS: readonly AiUnitRow[] = [
   "majorOnly": false,
   "maintenanceResource": null,
   "maintenanceResourceAmount": 0,
-  "resourceCost": 0
+  "resourceCost": 0,
+  "tableMaintenanceResource": null,
+  "tableMaintenanceAmount": 0
  },
  {
   "type": "UNIT_ZULU_IMPI",
@@ -18713,7 +18925,9 @@ export const AI_UNITS: readonly AiUnitRow[] = [
   "majorOnly": false,
   "maintenanceResource": null,
   "maintenanceResourceAmount": 0,
-  "resourceCost": 0
+  "resourceCost": 0,
+  "tableMaintenanceResource": null,
+  "tableMaintenanceAmount": 0
  },
  {
   "type": "UNIT_KOREAN_HWACHA",
@@ -18774,7 +18988,9 @@ export const AI_UNITS: readonly AiUnitRow[] = [
   "majorOnly": false,
   "maintenanceResource": null,
   "maintenanceResourceAmount": 0,
-  "resourceCost": 0
+  "resourceCost": 0,
+  "tableMaintenanceResource": null,
+  "tableMaintenanceAmount": 0
  },
  {
   "type": "UNIT_SCOTTISH_HIGHLANDER",
@@ -18876,7 +19092,9 @@ export const AI_UNITS: readonly AiUnitRow[] = [
   "majorOnly": false,
   "maintenanceResource": null,
   "maintenanceResourceAmount": 0,
-  "resourceCost": 0
+  "resourceCost": 0,
+  "tableMaintenanceResource": null,
+  "tableMaintenanceAmount": 0
  },
  {
   "type": "UNIT_DE_ZEVEN_PROVINCIEN",
@@ -18966,7 +19184,9 @@ export const AI_UNITS: readonly AiUnitRow[] = [
   "majorOnly": false,
   "maintenanceResource": null,
   "maintenanceResourceAmount": 0,
-  "resourceCost": 10
+  "resourceCost": 10,
+  "tableMaintenanceResource": null,
+  "tableMaintenanceAmount": 0
  },
  {
   "type": "UNIT_MONGOLIAN_KESHIG",
@@ -19035,7 +19255,9 @@ export const AI_UNITS: readonly AiUnitRow[] = [
   "majorOnly": false,
   "maintenanceResource": null,
   "maintenanceResourceAmount": 0,
-  "resourceCost": 10
+  "resourceCost": 10,
+  "tableMaintenanceResource": null,
+  "tableMaintenanceAmount": 0
  },
  {
   "type": "UNIT_GEORGIAN_KHEVSURETI",
@@ -19174,7 +19396,9 @@ export const AI_UNITS: readonly AiUnitRow[] = [
   "majorOnly": false,
   "maintenanceResource": null,
   "maintenanceResourceAmount": 0,
-  "resourceCost": 10
+  "resourceCost": 10,
+  "tableMaintenanceResource": null,
+  "tableMaintenanceAmount": 0
  },
  {
   "type": "UNIT_MAPUCHE_MALON_RAIDER",
@@ -19284,7 +19508,9 @@ export const AI_UNITS: readonly AiUnitRow[] = [
   "majorOnly": false,
   "maintenanceResource": null,
   "maintenanceResourceAmount": 0,
-  "resourceCost": 0
+  "resourceCost": 0,
+  "tableMaintenanceResource": null,
+  "tableMaintenanceAmount": 0
  },
  {
   "type": "UNIT_CREE_OKIHTCITAW",
@@ -19343,7 +19569,9 @@ export const AI_UNITS: readonly AiUnitRow[] = [
   "majorOnly": false,
   "maintenanceResource": null,
   "maintenanceResourceAmount": 0,
-  "resourceCost": 0
+  "resourceCost": 0,
+  "tableMaintenanceResource": null,
+  "tableMaintenanceAmount": 0
  },
  {
   "type": "UNIT_SPEC_OPS",
@@ -19411,7 +19639,9 @@ export const AI_UNITS: readonly AiUnitRow[] = [
   "majorOnly": false,
   "maintenanceResource": null,
   "maintenanceResourceAmount": 0,
-  "resourceCost": 0
+  "resourceCost": 0,
+  "tableMaintenanceResource": null,
+  "tableMaintenanceAmount": 0
  },
  {
   "type": "UNIT_DRONE",
@@ -19479,7 +19709,9 @@ export const AI_UNITS: readonly AiUnitRow[] = [
   "majorOnly": false,
   "maintenanceResource": null,
   "maintenanceResourceAmount": 0,
-  "resourceCost": 0
+  "resourceCost": 0,
+  "tableMaintenanceResource": null,
+  "tableMaintenanceAmount": 0
  },
  {
   "type": "UNIT_PIKE_AND_SHOT",
@@ -19600,7 +19832,9 @@ export const AI_UNITS: readonly AiUnitRow[] = [
   "majorOnly": false,
   "maintenanceResource": null,
   "maintenanceResourceAmount": 0,
-  "resourceCost": 0
+  "resourceCost": 0,
+  "tableMaintenanceResource": null,
+  "tableMaintenanceAmount": 0
  },
  {
   "type": "UNIT_SUPPLY_CONVOY",
@@ -19700,7 +19934,9 @@ export const AI_UNITS: readonly AiUnitRow[] = [
   "majorOnly": false,
   "maintenanceResource": null,
   "maintenanceResourceAmount": 0,
-  "resourceCost": 0
+  "resourceCost": 0,
+  "tableMaintenanceResource": null,
+  "tableMaintenanceAmount": 0
  },
  {
   "type": "UNIT_SKIRMISHER",
@@ -19750,7 +19986,9 @@ export const AI_UNITS: readonly AiUnitRow[] = [
   "majorOnly": false,
   "maintenanceResource": null,
   "maintenanceResourceAmount": 0,
-  "resourceCost": 0
+  "resourceCost": 0,
+  "tableMaintenanceResource": null,
+  "tableMaintenanceAmount": 0
  },
  {
   "type": "UNIT_COURSER",
@@ -19810,7 +20048,9 @@ export const AI_UNITS: readonly AiUnitRow[] = [
   "majorOnly": false,
   "maintenanceResource": null,
   "maintenanceResourceAmount": 0,
-  "resourceCost": 20
+  "resourceCost": 20,
+  "tableMaintenanceResource": null,
+  "tableMaintenanceAmount": 0
  },
  {
   "type": "UNIT_CUIRASSIER",
@@ -19870,7 +20110,9 @@ export const AI_UNITS: readonly AiUnitRow[] = [
   "majorOnly": false,
   "maintenanceResource": null,
   "maintenanceResourceAmount": 0,
-  "resourceCost": 20
+  "resourceCost": 20,
+  "tableMaintenanceResource": null,
+  "tableMaintenanceAmount": 0
  },
  {
   "type": "UNIT_GIANT_DEATH_ROBOT",
@@ -19945,7 +20187,9 @@ export const AI_UNITS: readonly AiUnitRow[] = [
   "majorOnly": true,
   "maintenanceResource": "RESOURCE_URANIUM",
   "maintenanceResourceAmount": 3,
-  "resourceCost": 1
+  "resourceCost": 1,
+  "tableMaintenanceResource": null,
+  "tableMaintenanceAmount": 0
  },
  {
   "type": "UNIT_ROCK_BAND",
@@ -20004,7 +20248,9 @@ export const AI_UNITS: readonly AiUnitRow[] = [
   "majorOnly": false,
   "maintenanceResource": null,
   "maintenanceResourceAmount": 0,
-  "resourceCost": 0
+  "resourceCost": 0,
+  "tableMaintenanceResource": null,
+  "tableMaintenanceAmount": 0
  },
  {
   "type": "UNIT_CANADA_MOUNTIE",
@@ -20152,7 +20398,9 @@ export const AI_UNITS: readonly AiUnitRow[] = [
   "majorOnly": false,
   "maintenanceResource": null,
   "maintenanceResourceAmount": 0,
-  "resourceCost": 0
+  "resourceCost": 0,
+  "tableMaintenanceResource": null,
+  "tableMaintenanceAmount": 0
  },
  {
   "type": "UNIT_HUNGARY_BLACK_ARMY",
@@ -20230,7 +20478,9 @@ export const AI_UNITS: readonly AiUnitRow[] = [
   "majorOnly": false,
   "maintenanceResource": null,
   "maintenanceResourceAmount": 0,
-  "resourceCost": 10
+  "resourceCost": 10,
+  "tableMaintenanceResource": null,
+  "tableMaintenanceAmount": 0
  },
  {
   "type": "UNIT_HUNGARY_HUSZAR",
@@ -20306,7 +20556,9 @@ export const AI_UNITS: readonly AiUnitRow[] = [
   "majorOnly": false,
   "maintenanceResource": null,
   "maintenanceResourceAmount": 0,
-  "resourceCost": 10
+  "resourceCost": 10,
+  "tableMaintenanceResource": null,
+  "tableMaintenanceAmount": 0
  },
  {
   "type": "UNIT_INCA_WARAKAQ",
@@ -20366,7 +20618,9 @@ export const AI_UNITS: readonly AiUnitRow[] = [
   "majorOnly": false,
   "maintenanceResource": null,
   "maintenanceResourceAmount": 0,
-  "resourceCost": 0
+  "resourceCost": 0,
+  "tableMaintenanceResource": null,
+  "tableMaintenanceAmount": 0
  },
  {
   "type": "UNIT_MALI_MANDEKALU_CAVALRY",
@@ -20468,7 +20722,9 @@ export const AI_UNITS: readonly AiUnitRow[] = [
   "majorOnly": false,
   "maintenanceResource": null,
   "maintenanceResourceAmount": 0,
-  "resourceCost": 10
+  "resourceCost": 10,
+  "tableMaintenanceResource": null,
+  "tableMaintenanceAmount": 0
  },
  {
   "type": "UNIT_MAORI_TOA",
@@ -20620,7 +20876,9 @@ export const AI_UNITS: readonly AiUnitRow[] = [
   "majorOnly": false,
   "maintenanceResource": null,
   "maintenanceResourceAmount": 0,
-  "resourceCost": 5
+  "resourceCost": 5,
+  "tableMaintenanceResource": null,
+  "tableMaintenanceAmount": 0
  },
  {
   "type": "UNIT_OTTOMAN_BARBARY_CORSAIR",
@@ -20716,7 +20974,9 @@ export const AI_UNITS: readonly AiUnitRow[] = [
   "majorOnly": false,
   "maintenanceResource": null,
   "maintenanceResourceAmount": 0,
-  "resourceCost": 0
+  "resourceCost": 0,
+  "tableMaintenanceResource": null,
+  "tableMaintenanceAmount": 0
  },
  {
   "type": "UNIT_PHOENICIA_BIREME",
@@ -20801,7 +21061,9 @@ export const AI_UNITS: readonly AiUnitRow[] = [
   "majorOnly": false,
   "maintenanceResource": null,
   "maintenanceResourceAmount": 0,
-  "resourceCost": 0
+  "resourceCost": 0,
+  "tableMaintenanceResource": null,
+  "tableMaintenanceAmount": 0
  },
  {
   "type": "UNIT_SULEIMAN_JANISSARY",
@@ -20903,7 +21165,9 @@ export const AI_UNITS: readonly AiUnitRow[] = [
   "majorOnly": false,
   "maintenanceResource": null,
   "maintenanceResourceAmount": 0,
-  "resourceCost": 10
+  "resourceCost": 10,
+  "tableMaintenanceResource": null,
+  "tableMaintenanceAmount": 0
  },
  {
   "type": "UNIT_SWEDEN_CAROLEAN",
@@ -21041,7 +21305,9 @@ export const AI_UNITS: readonly AiUnitRow[] = [
   "majorOnly": false,
   "maintenanceResource": null,
   "maintenanceResourceAmount": 0,
-  "resourceCost": 0
+  "resourceCost": 0,
+  "tableMaintenanceResource": null,
+  "tableMaintenanceAmount": 0
  },
  {
   "type": "UNIT_MAYAN_HULCHE",
@@ -21131,7 +21397,9 @@ export const AI_UNITS: readonly AiUnitRow[] = [
   "majorOnly": false,
   "maintenanceResource": null,
   "maintenanceResourceAmount": 0,
-  "resourceCost": 0
+  "resourceCost": 0,
+  "tableMaintenanceResource": null,
+  "tableMaintenanceAmount": 0
  },
  {
   "type": "UNIT_LAHORE_NIHANG",
@@ -21224,7 +21492,9 @@ export const AI_UNITS: readonly AiUnitRow[] = [
   "majorOnly": false,
   "maintenanceResource": null,
   "maintenanceResourceAmount": 0,
-  "resourceCost": 0
+  "resourceCost": 0,
+  "tableMaintenanceResource": null,
+  "tableMaintenanceAmount": 0
  },
  {
   "type": "UNIT_COMANDANTE_GENERAL",
@@ -21274,7 +21544,9 @@ export const AI_UNITS: readonly AiUnitRow[] = [
   "majorOnly": false,
   "maintenanceResource": null,
   "maintenanceResourceAmount": 0,
-  "resourceCost": 0
+  "resourceCost": 0,
+  "tableMaintenanceResource": null,
+  "tableMaintenanceAmount": 0
  },
  {
   "type": "UNIT_COLOMBIAN_LLANERO",
@@ -21376,7 +21648,9 @@ export const AI_UNITS: readonly AiUnitRow[] = [
   "majorOnly": false,
   "maintenanceResource": null,
   "maintenanceResourceAmount": 0,
-  "resourceCost": 20
+  "resourceCost": 20,
+  "tableMaintenanceResource": null,
+  "tableMaintenanceAmount": 0
  },
  {
   "type": "UNIT_BYZANTINE_DROMON",
@@ -21466,7 +21740,9 @@ export const AI_UNITS: readonly AiUnitRow[] = [
   "majorOnly": false,
   "maintenanceResource": null,
   "maintenanceResourceAmount": 0,
-  "resourceCost": 0
+  "resourceCost": 0,
+  "tableMaintenanceResource": null,
+  "tableMaintenanceAmount": 0
  },
  {
   "type": "UNIT_BYZANTINE_TAGMA",
@@ -21621,7 +21897,9 @@ export const AI_UNITS: readonly AiUnitRow[] = [
   "majorOnly": false,
   "maintenanceResource": null,
   "maintenanceResourceAmount": 0,
-  "resourceCost": 10
+  "resourceCost": 10,
+  "tableMaintenanceResource": null,
+  "tableMaintenanceAmount": 0
  },
  {
   "type": "UNIT_GAUL_GAESATAE",
@@ -21787,7 +22065,9 @@ export const AI_UNITS: readonly AiUnitRow[] = [
   "majorOnly": false,
   "maintenanceResource": null,
   "maintenanceResourceAmount": 0,
-  "resourceCost": 0
+  "resourceCost": 0,
+  "tableMaintenanceResource": null,
+  "tableMaintenanceAmount": 0
  },
  {
   "type": "UNIT_VIETNAMESE_VOI_CHIEN",
@@ -21848,7 +22128,9 @@ export const AI_UNITS: readonly AiUnitRow[] = [
   "majorOnly": false,
   "maintenanceResource": null,
   "maintenanceResourceAmount": 0,
-  "resourceCost": 0
+  "resourceCost": 0,
+  "tableMaintenanceResource": null,
+  "tableMaintenanceAmount": 0
  },
  {
   "type": "UNIT_ETHIOPIAN_OROMO_CAVALRY",
@@ -21918,7 +22200,9 @@ export const AI_UNITS: readonly AiUnitRow[] = [
   "majorOnly": false,
   "maintenanceResource": null,
   "maintenanceResourceAmount": 0,
-  "resourceCost": 10
+  "resourceCost": 10,
+  "tableMaintenanceResource": null,
+  "tableMaintenanceAmount": 0
  },
  {
   "type": "UNIT_BABYLONIAN_SABUM_KIBITTUM",
@@ -22066,7 +22350,9 @@ export const AI_UNITS: readonly AiUnitRow[] = [
   "majorOnly": false,
   "maintenanceResource": null,
   "maintenanceResourceAmount": 0,
-  "resourceCost": 0
+  "resourceCost": 0,
+  "tableMaintenanceResource": null,
+  "tableMaintenanceAmount": 0
  },
  {
   "type": "UNIT_PORTUGUESE_NAU",
@@ -22127,7 +22413,9 @@ export const AI_UNITS: readonly AiUnitRow[] = [
   "majorOnly": false,
   "maintenanceResource": null,
   "maintenanceResourceAmount": 0,
-  "resourceCost": 0
+  "resourceCost": 0,
+  "tableMaintenanceResource": null,
+  "tableMaintenanceAmount": 0
  }
 ];
 

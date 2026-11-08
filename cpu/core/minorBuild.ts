@@ -71,7 +71,8 @@ import { unitProductionTable } from './aiUnitProduction';
 import { AI_BUILDING_INDEX, AI_UNIT_INDEX, amenityCityOf, amenityPerTurn, buildingTable, buildingValue, constructibleNow, defaultSpecialization, growthForecast, specializationBests, unitTable, worldArtifacts, type AiUnitRow, type CityBuildFacts, type CityGrowth, type CityBuildTables, type PickFacts } from './aiCityBuild';
 import { defensiveCancel } from './aiCityTrees';
 import { projectTable, type ProjectTableFacts } from './aiProjectValue';
-import { accrueStockpiles, canPayStockpile, capStockpiles, chargeUnitUpkeep, spendStockpile, stockFree, stockOf, stockpileCap, stockpileIncome, strategicSlot, unitResourceCost, unitUpkeepBill, upgradeGoldCost, upgradeType } from './stockpile';
+import { economicGoldBoost } from './aiWeights';
+import { accrueStockpiles, canPayStockpile, capStockpiles, chargeUnitUpkeep, spendStockpile, stockFree, stockOf, stockpileCap, stockpileIncome, strategicSlot, strategicSurplus, unitResourceCost, unitUpkeepBill, upgradeGoldCost, upgradeType } from './stockpile';
 import { FX, FX_MIN, fmul, fxConst, fxOf, pseudoYieldValue, turnsAt, valueBetween, yieldValue } from './aiValue';
 import { cityGrowth, aiView, storeUnitStrength } from './aiView';
 import { congressUdtProdDistrict } from './congress';
@@ -180,6 +181,17 @@ export function minorPhase(state: GameState): void {
     // (runs/h1_duely1124 t84 city-state 4, runs/h1_duely1128 t139 Bologna)
     upgradeTreesStart(cityState, techs);
     minorAiTurn(state, cityState, fresh, units);
+    // its Economic AI's Gold boost on the net income its gold step banked
+    // (0x687bf0 at 0x6880a1: fx(-0.2) x the treasury's +0x1b8 while
+    // negative): its city update's analysis reads the boost of the turn
+    // before, its government values and the turn after's research and
+    // civics AIs this one (runs/h1_duely1117 Valletta t105 after its two
+    // Crossbowmen's disband, net -5.6 -> +0.4: the Warrior's contract over
+    // the Crossbowman's at the t104 boost; Antananarivo t162 / t165 the
+    // Warrior and the Scout over the Field Cannon; runs/h1_duely1128 Hong
+    // Kong t79 net -1 -> +1: the Archer's Maintenance at the t78 boost 0.2
+    // takes it below the Warrior's 7.78)
+    if (cityState.economy && cityState.centerIndex >= 0) cityState.economy.goldBoost = economicGoldBoost(cityState.netIncome ?? 0);
     // the civics AI's government values on the city its update left: the
     // Food focus it set re-placed its citizens (runs/h1_duely1128 city-state
     // 3 t16-t30: the focus toggling a turn apart, its Production 4 / 3
@@ -1369,6 +1381,7 @@ export function minorUnitProduction(state: GameState, cityState: CityState, know
     obsolete: (u) => unitObsoleteIn(r, u),
     owned: (u) => own.get(u) ?? 0,
     known,
+    surplus: strategicSurplus(state, cityState.seat),
   });
 }
 

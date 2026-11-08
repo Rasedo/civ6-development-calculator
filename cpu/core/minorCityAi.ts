@@ -51,7 +51,7 @@ import { projectTable } from './aiProjectValue';
 import { improvementValue, type PlotValueFacts } from './aiPlotValue';
 import { districtValue, type DistrictValueFacts } from './aiDistrictValue';
 import { resourceValue } from './aiResource';
-import { accumulationPct } from './stockpile';
+import { accumulationPct, strategicSurplus } from './stockpile';
 import { AI_RATE, FX, FX_MIN, fmul, pseudoYieldValue, yieldValue } from './aiValue';
 import { modifiersValue } from './aiModifiers';
 import {
@@ -63,7 +63,6 @@ import { newEconomicMemory, purchaseContracts, purchaseTurn, purchasePick, savin
 import { unitProductionEntries } from './aiUnitProduction';
 import { cityThreat, type CityThreat } from './operations/cityThreat';
 import { aiView } from './aiView';
-import { economicGoldBoost } from './aiWeights';
 import { AI_GREAT_PERSON_CLASSES } from '../data/aiTables';
 import { minorJobUnits, minorOpContracts, minorOpLive, minorOpNear, minorOpsEvaluate, minorOpsStart } from './minorOps';
 import { newTreeId } from './treePool';
@@ -729,6 +728,7 @@ function purchaseEntries(state: GameState, cs: CityState): PurchaseEntry[] {
     players,
     atWar: (p) => p === BARB_SEAT || wars.includes(p),
     buildable: (u) => unitBuildable(state, cs.seat, holds, u),
+    surplus: strategicSurplus(state, cs.seat),
   });
   const order = rows.map((x, i) => [x, i] as const).sort(([a, i], [b, j]) =>
     (Number(b.buildable) - Number(a.buildable)) || (b.atWar - a.atWar) || (b.all - a.all) || (b.strength - a.strength) || (i - j));
@@ -888,8 +888,6 @@ export function minorMilitaryTurn(state: GameState, cs: CityState): number {
   // folded slot's savings passing from t16; 1127 p4's Builder at t46, p2's
   // at t210, as logged)
   const delta = savingsTurn(eco, Math.trunc(cs.treasury * FX), minorGreatPersonClass(state));
-  // its Gold boost, which its Gold weight reads until its next turn
-  eco.goldBoost = economicGoldBoost(cs.netIncome ?? 0);
   minorOpsEvaluate(state, cs);
   return delta;
 }

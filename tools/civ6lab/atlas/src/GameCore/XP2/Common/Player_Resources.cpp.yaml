@@ -447,9 +447,12 @@
     - cpu/core/aiUnitProduction.ts:UnitProductionRow
     - cpu/core/operations/unitChoice.ts:fits
     - gpu/core/sim_minorops.py:_mops_unit_rows
+    - cpu/core/aiUnitProduction.ts:UnitProductionFacts
+    - cpu/core/stockpile.ts:strategicSurplus
   readings:
     - "C-96: the resource value and the research value's resources — READ (bonus, luxury, the call), PARTLY READ (the strategic stockpile terms)"
     - "C-96 / C-97: the team's unit to build, the recruit's contract and the knowledge base's camps — the team update's requirements and readiness, the unit choice, Recruit Units' result and contract, the camps READ; the maintenance resource test, the recruit's stealing and levy unread"
+    - "C-130: the unit production table's maintenance resource by the Units index and its shortfall divide — READ (0x7989e0 at 0x798ac3..0x798df2 via 0x28a940, 0x799f04..0x79a0e9, 0x4ab270, 0x3640e0), both twins"
   context:
     - "...PARTLY READ: the strategic stockpile terms — Player_Resources +0x350 (0x4aa700) against 0x4ab270 (the player's +0x12e8 +0x1168) where their difference is negative, the cap 0x4aabe0 les..."
   review: reviewed

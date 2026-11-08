@@ -14,7 +14,14 @@
  *  - per entry the sum of each such count times the efficiency of the entry
  *    against that type (`unitEfficiency`, row the opposing type);
  *  - the entry's value N over that sum (1.0 for every entry where N is 0),
- *    x1.25 for a civilization's unique unit (TraitType).
+ *    x1.25 for a civilization's unique unit (TraitType);
+ *  - the entry's maintenance resource and amount are Units_XP2's row at the
+ *    unit's Units index (0x28a940 on the Units index; none past the table's
+ *    count: `tableMaintenanceResource`), so the Field Cannon carries the
+ *    Rocket Artillery's Oil 1 and the Infantry none. Where the player's turn
+ *    income of that resource less its units' fuel bill of it falls below
+ *    the amount, the value is divided by the amount less that surplus when
+ *    the divisor is above 1.
  *
  * The city build AI's unit value reads it (0x79ca90: 0 for a unit the table
  * lacks) and 0x79d2d0 (the entry's obsolete flag); the operations' unit
@@ -48,8 +55,9 @@ export interface UnitProductionFacts {
   /** the unit's PrereqTech and PrereqCivic held and its StrategicResource
    *  stocked (0x4aa790) */
   buildable?(unit: string): boolean;
-  /** the maintenance resource's income above its fuel bill (absent: yes) */
-  maintained?(resource: string): boolean;
+  /** the player's turn income of an install strategic resource (Player_Resources
+   *  +0x350) less its units' fuel bill of it (0x4ab270, `strategicSurplus`) */
+  surplus(resource: string): number;
 }
 
 export interface UnitProductionEntry {
@@ -68,7 +76,7 @@ export interface UnitProductionRow extends UnitProductionEntry {
   perPlayer: ReadonlyMap<number, number>;
   /** max(Combat, RangedCombat) (+0x18) */
   strength: number;
-  /** its Units_XP2 maintenance resource (+0x24), null for none */
+  /** its maintenance resource (+0x24: Units_XP2's row at its Units index), null for none */
   maintenance: string | null;
   /** the player's turn income of that resource (Player_Resources +0x350)
    *  above its units' fuel bill of it (+0x12e8 +0x1168, 0x4ab270): the unit
@@ -127,11 +135,17 @@ export function unitProductionEntries(f: UnitProductionFacts): UnitProductionRow
     const u = AI_UNITS[k];
     let v = total === 0 ? FX : sums.get(k)! > 0 ? fdiv(total * FX, sums.get(k)!) : 0;
     if (u.trait) v = fmul(v, UNIQUE);
+    const res = u.tableMaintenanceResource;
+    const surplus = res ? f.surplus(res) : 0;
+    if (res && surplus < u.tableMaintenanceAmount) {
+      const d = (u.tableMaintenanceAmount - surplus) * FX;
+      if (d > FX) v = fdiv(v, d);
+    }
     return {
       unit: u.type, value: v, obsolete: f.obsolete(u.type), buildable: f.buildable?.(u.type) ?? false,
       atWar: atWar.get(k)!, all: all.get(k)!, perPlayer: perPlayer.get(k)!, strength: Math.max(u.combat, u.rangedCombat),
-      maintenance: u.maintenanceResource,
-      maintained: !u.maintenanceResource || (f.maintained?.(u.maintenanceResource) ?? true),
+      maintenance: res,
+      maintained: !res || surplus > 0,
     };
   });
 }

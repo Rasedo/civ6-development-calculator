@@ -488,8 +488,7 @@ class SimMinorOps:
                                                           "PSEUDOYIELD_UNIT_AIR_COMBAT")) for r in rows],
                                   dtype=torch.bool, device=dev)
             strength = torch.tensor([max(int(r["combat"]), int(r["rangedCombat"])) for r in rows], dtype=torch.long, device=dev)
-            mres = torch.tensor([E["resource"].get(r["maintenanceResource"], -2) if r["maintenanceResource"] else -1
-                                 for r in rows], dtype=torch.long, device=dev)
+            mres = torch.tensor([bool(r["tableMaintenanceResource"]) for r in rows], dtype=torch.bool, device=dev)
             cache = self._mops_rows_static = {"version": version, "combat": combat, "strength": strength,
                                               "mres": mres}
         techs, civics = self.citystate_techs[:, s], self.citystate_civics[:, s]
@@ -513,17 +512,9 @@ class SimMinorOps:
                     buildable[:, k] &= holds(nm)
         buildable &= self._mops_stock_buildable(s)
         srow = self._CITY_MINOR0 + s
-        # the maintenance resource's turn income above its units' fuel bill
-        # (0x79c277: Player_Resources +0x350 against 0x4ab270)
-        mres = cache["mres"]
-        maintained = torch.ones(B, nu, dtype=torch.bool, device=dev)
-        if bool((mres >= 0).any()):
-            income = self._seat_stock_income(srow)
-            bill = self._unit_upkeep_bill(srow)
-            for k in (mres >= 0).nonzero(as_tuple=True)[0].tolist():
-                slot = int(self._strat_slot_of[int(mres[k])])
-                if slot >= 0:
-                    maintained[:, k] &= income[:, slot] > bill[:, slot]
+        # the table maintenance resource's turn income above its units' fuel
+        # bill (0x79c277: Player_Resources +0x350 against 0x4ab270)
+        maintained = ~cache["mres"].unsqueeze(0) | (self._cv_unit_surplus(srow) > 0)
         # the minor's own units by row
         own = torch.zeros(B, nu + 1, dtype=torch.long, device=dev)
         own.scatter_add_(1, torch.where(u["own"] & (u["row"] >= 0), u["row"], torch.full_like(u["row"], nu)), u["own"].long())

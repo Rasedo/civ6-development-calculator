@@ -15,7 +15,8 @@ import { DED_AUTOMATON, DED_SKY, SKY_ALUMINUM_PER_TURN, AUTOMATON_URANIUM_PER_TU
 import { BUILDINGS, POWER_PLANT_IDS, buildingVariantFor } from '../data/buildings';
 import { GP_CITY_FREE_EXTRACTION, GP_FREE_EXTRACTION, gpCityPermOf, gpPermOf } from '../data/greatPeople';
 import { governorSum, governorTileSum } from './governors';
-import { extractsResource, resourceImprovement } from '../../world/resources';
+import { RESOURCES, extractsResource, resourceImprovement } from '../../world/resources';
+import { engineId } from '../data/aliases';
 import { citiesOf, civOf, isCityStateSeat, leaderOf, seatOf, tileOwnedByCiv, tileSeat, hiddenResourcesFor } from './seats';
 import { minorCity, regionalReach, suzerainEffectCount, suzerainMinorSeats, suzerainOf } from './cityStates';
 import { HATTUSA_FREE_STRATEGIC } from '../data/cityStates';
@@ -270,6 +271,19 @@ export function unitUpkeepBill(state: GameState, seat: number): number[] {
     if (k >= 0 && def?.resourceUpkeep) bill[k] += def.resourceUpkeep;
   }
   return bill;
+}
+
+/** the seat's turn income of an install strategic resource (Player_Resources
+ *  +0x350) less its units' fuel bill of it (0x4ab270); 0 for another
+ *  resource */
+export function strategicSurplus(state: GameState, seat: number): (resource: string) => number {
+  const income = stockpileIncome(state, seat);
+  const bill = unitUpkeepBill(state, seat);
+  return (resource) => {
+    const id = engineId('resource', resource, 'RESOURCE_', RESOURCES);
+    const k = id ? strategicSlot(id) : -1;
+    return k < 0 ? 0 : income[k] - bill[k];
+  };
 }
 
 /** Put `n` of a strategic resource straight into the bank, under the same

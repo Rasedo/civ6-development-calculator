@@ -572,9 +572,14 @@ def build_city(rows, modifier) -> str:
         return out
     unit_bld = multi("Unit_BuildingPrereqs", "Unit")
     uxp2 = keyed(rows("Units_XP2"), "UnitType")
+    # the military AI's unit production table (0x7989e0) reads each entry's
+    # maintenance resource from Units_XP2 by the unit's Units index (0x28a940:
+    # the row at that position while below the table's count, else none)
+    uxp2_rows = [x for _, x in in_game_order("Units_XP2", "UnitType", uxp2)]
     units = []
-    for u, c in in_game_order("Units", "UnitType", keyed(rows("Units"), "UnitType")):
+    for idx, (u, c) in enumerate(in_game_order("Units", "UnitType", keyed(rows("Units"), "UnitType"))):
         x = uxp2.get(u, {})
+        tx = uxp2_rows[idx] if idx < len(uxp2_rows) else {}
         units.append({
             "type": u, "foundCity": c.get("FoundCity", "").lower() == "true", "buildCharges": num(c, "BuildCharges"),
             "mustPurchase": c.get("MustPurchase", "").lower() == "true", "goldPurchase": c.get("PurchaseYield") == "YIELD_GOLD",
@@ -606,6 +611,8 @@ def build_city(rows, modifier) -> str:
             "majorOnly": str(x.get("MajorCivOnly", "")).lower() in ("true", "1"),
             "maintenanceResource": x.get("ResourceMaintenanceType"),
             "maintenanceResourceAmount": num(x, "ResourceMaintenanceAmount"), "resourceCost": num(x, "ResourceCost"),
+            "tableMaintenanceResource": tx.get("ResourceMaintenanceType"),
+            "tableMaintenanceAmount": num(tx, "ResourceMaintenanceAmount"),
         })
     # the military AI's promotion class lists (AiLists System UnitPromotionClasses
     # by leader trait, their AiFavoredItems values)

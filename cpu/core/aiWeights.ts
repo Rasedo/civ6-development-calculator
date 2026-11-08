@@ -166,9 +166,8 @@ export function yieldWeights(state: GameState, seat: number): Record<string, num
   const s = seatOf(state, seat);
   const w: Record<string, number> = Object.fromEntries(AI_YIELDS.map((y) => [y, 0]));
   if (!s) return w;
-  // the Economic AI's gold boost (0x687bf0): a city-state's as its
-  // Economic AI's last turn stored it — list B runs the research and civics
-  // AIs before the Economic AI, list A the cities after it — any other
+  // the Economic AI's gold boost (0x687bf0): a city-state's as its turn
+  // stored it, written after its city update (`minorPhase`), any other
   // seat's on its gold per turn now
   const cs = state.cityStates.find((x) => x.seat === seat);
   w.YIELD_GOLD += cs ? cs.economy?.goldBoost ?? 0 : economicGoldBoost(goldPerTurn(state, seat));

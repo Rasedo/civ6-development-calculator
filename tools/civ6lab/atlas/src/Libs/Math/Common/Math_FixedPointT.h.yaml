@@ -184,7 +184,9 @@
   kind: function
   semantics: fixed-point divide by TilesRequired (the adjacency row's).
   status: PARTLY
-  readings: ["H-1: the district adjacency — READ"]
+  readings:
+    - "H-1: the district adjacency — READ"
+    - "C-130: the unit production table's maintenance resource by the Units index and its shortfall divide — READ (0x7989e0 at 0x798ac3..0x798df2 via 0x28a940, 0x799f04..0x79a0e9, 0x4ab270, 0x3640e0), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...aged (0x811f0), WHOEVER OWNS IT. After the six: divided by TilesRequired when over 1 (0x3640e0, fixed point) and `sar 8` — floor(n · YieldChange / TilesRequired) per row."
