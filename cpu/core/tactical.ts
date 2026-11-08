@@ -183,6 +183,11 @@ interface Ground {
    *  of its own that stacks with it, or on a plot the player sees now
    *  another player's unit but a Trader or a Spy */
   crowded: (i: number) => boolean;
+  /** 0x585eb0's count on the plot at the stacking limit whatever the player
+   *  sees: one of its own that stacks with it, or another player's unit at
+   *  peace of the mover's map layer but a Trader (the path cost 0x270dd0 at
+   *  0x27102e..0x2710a0) */
+  stacked: (i: number) => boolean;
   /** the plot lies in a zone of control the player sees: a hostile unit of
    *  the mover's domain that exerts one beside it, or a district at war that
    *  exerts one (`districtZones`), on a plot the player sees now; a unit across
@@ -286,6 +291,8 @@ function groundOf(state: GameState, unit: Unit, revealedOnly = true, planning = 
   const passes = new Map<number, boolean>();
   let foesSeen: Set<number> | undefined;
   const crowded = (i: number) => own.has(i) || (held.has(i) && peaceHeld(i));
+  const stacked = (i: number) => own.has(i) || (held.has(i) && state.units.some((x) => x.tileIndex === i && x.seat !== unit.seat
+    && onLayer(x) && !UNITS[x.type]?.trader && !unitsHostile(state, unit, x)));
   return {
     known,
     revealed,
@@ -305,6 +312,7 @@ function groundOf(state: GameState, unit: Unit, revealedOnly = true, planning = 
     },
     full: (i) => own.has(i),
     crowded,
+    stacked,
     foughtOn: (i) => {
       if (!fighters.has(i)) return false;
       seenNow ??= plotsSeenNow(state, new Set([unit.seat]));
@@ -554,10 +562,25 @@ function search(state: GameState, unit: Unit, maxTurns: number, zoc: boolean, on
       // 4's embarked Man-At-Arms on 38:18 plans 40:17 / 40:16 (2/0) past
       // 39:17's cliffs, both never revealed, AI_Planning.csv)
       const blind = blindStep(best, to);
-      if (ground.revealed(to.index) && cliffBlocksStep(state, from, to, unit)) continue;
       // a move order's path passes a unit at war with it out of its sight
       // (`pass`)
       const attack = ground.revealed(to.index) && !(zoc ? ground.pass(to) : ground.enter(to));
+      // the destination at its stacking limit (`crowded`), linked at any
+      // turn without flag 0x1000 or within the first under it, ends the
+      // search with no path: the validity 0x2720a0 tests the child on the
+      // destination first of its turn ends (0x272230..0x27229e) and sets the
+      // search's stop +0xe9 there (0x272364), which 0x77a50 / GeneratePath
+      // read (runs/h1_duely1127 t41: city-state 2's Warrior 327683 on 42:17
+      // holds for its Warrior's 42:15, the turn-2 path through 42:16 never
+      // reached; h1_duely1124 t182-t196: the rampaging Galleys 1966102 /
+      // 1179665 hold for China's Water Park 19:8; 1121 t154 the rampaging
+      // Crossbowman 3801114 holds for 17:15)
+      if (zoc && to.index === dest && dest !== unit.tileIndex && !attack && ground.crowded(dest)
+        && (!laterTurns || price(best, to, di, attack, blind).turns <= 1)) {
+        open.length = 0;
+        break;
+      }
+      if (ground.revealed(to.index) && cliffBlocksStep(state, from, to, unit)) continue;
       if (attack && !ground.attack(to)) continue;
       if (zoned && !attack) continue;
       // the step's validity (0x2720a0 at 0x272372..0x27242e): onto a revealed
@@ -712,8 +735,15 @@ function search(state: GameState, unit: Unit, maxTurns: number, zoc: boolean, on
     // human (0x2712be: the formation's land domain +0x1f2; runs/h1_duely1117
     // t69: Valletta's Archer on 13:8 closes the Harbor's 14:7 (1/0) after
     // 12:8 and 12:9 and its water to the north after the land, AI_Planning.csv)
+    // A move order's path (0x270dd0 at 0x27102e..0x2710a0, not under flag 4)
+    // prices a step that ends the turn on a revealed plot at its stacking
+    // limit (`stacked`, against +0x58c) +1e6 more, so its node sorts last
+    // (runs/h1_duely1127 t17: the barbarian Slinger 1114127 on 14:2 for 14:5,
+    // its camp's Spearman on 13:1: 15:4 lands from the head before 14:4 and
+    // the path takes 14:3 / 15:4)
     const seen = ground.known(to.index);
-    const ends = moves <= 0 ? 4 + (seen && tileSeat(to) !== unit.seat ? 3 : 0) : 0;
+    const stack = zoc && moves <= 0 && seen && ground.stacked(to.index) ? 1e6 : 0;
+    const ends = moves <= 0 ? 4 + stack + (seen && tileSeat(to) !== unit.seat ? 3 : 0) : 0;
     const sea = seen && !naval && isWater(to) ? 1000 : 0;
     return { g: p.g + cost * 1000 + (ends + (seen ? 2 : 3) + sea) * FIX, moves, turns, carry, wet };
   }
@@ -755,7 +785,8 @@ export function reachPlots(state: GameState, unit: Unit, maxTurns: number): Reac
  *  under flag 0x1000: the path's search, its zone of control spending the
  *  Movement — the planning's breadth-first refusal 0x26e570 is not its
  *  validity —, a turn after the first free to end where its own stacking
- *  unit stands; stopped once `dest` closes); 0 where it cannot. With no
+ *  unit stands; stopped once `dest` closes, or with none where `dest` at
+ *  its stacking limit is linked within the first turn); 0 where it cannot. With no
  *  `laterTurns` (the path's flags 0) no turn of it ends where its own
  *  stacking unit stands, `dest` the last turn's end. */
 export function turnsToPlot(state: GameState, unit: Unit, dest: number, laterTurns = true): number {
@@ -781,24 +812,13 @@ export function pathTo(state: GameState, unit: Unit, dest: number, laterTurns = 
   // it (0x586360's best defender 0x208b80 under 0x108)
   if (dest !== unit.tileIndex && foreignAt(state, unit, dest)
     && plotsSeenNow(state, new Set([unit.seat]))[dest] !== 1) return [];
+  // the destination at its stacking limit is no path (`search`'s stop)
   let found = null as PNode | null;
-  let crowded = false;
-  search(state, unit, Infinity, true, (n, ground) => {
+  search(state, unit, Infinity, true, (n) => {
     if (n.tile !== dest) return false;
     found = n;
-    crowded = ground.crowded(dest);
     return true;
   }, undefined, false, laterTurns, false, explore, danger, mates, dest);
-  // the destination's count against the stacking limit (the validity
-  // 0x2720a0 tests the destination node itself, 0x272230..0x27229e): its own
-  // stacking unit there, or another player's unit at peace on it in its
-  // sight, is no path, at any turn without flag 0x1000 and within the first
-  // under it; a unit at war counts none (runs/h1_duely1124 t182-t196: the
-  // rampaging Galleys 1966102 / 1179665 hold for China's Water Park 19:8 and
-  // the Ironclad 5701639 on 19:3 likewise, the Galley 720906 on it; 1121 t154
-  // the rampaging Crossbowman 3801114 holds for 17:15)
-  if (found && dest !== unit.tileIndex && !(found as PNode).attack && crowded
-    && (!laterTurns || (found as PNode).turns <= 1)) return [];
   const out: number[] = [];
   for (let n: PNode | null = found; n && n.parent; n = n.parent) out.push(n.tile);
   return out.reverse();

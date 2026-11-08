@@ -763,9 +763,14 @@ class SimTactics:
         # end (`groundOf`'s crowded): its own stacking unit, or on a plot the
         # player sees now another player's unit at peace but a Trader
         crowd_n = None
+        stack_n = None
         if zoc:
             sn_c = self._barb_seen("barbarians" if seat == BARB_SEAT else seat)[rows]
-            crowd_n = full_n | (by_layer(lambda r: self._tac_peaceful(seat, r)) & sn_c)
+            peace_n = by_layer(lambda r: self._tac_peaceful(seat, r))
+            crowd_n = full_n | (peace_n & sn_c)
+            # the count at the stacking limit whatever the player sees
+            # (`groundOf`'s stacked): the path cost's +1e6 on a turn's end
+            stack_n = full_n | peace_n
         # a zone of control's step on the path's destination (`groundOf`'s zoc)
         zp = self._tac_zoc_path(rows, seat, naval, self._tac_zoc_ignored(utype), dest, crowd_n) if zoc else None
         tseat = self.tile_seat
@@ -928,6 +933,11 @@ class SimTactics:
             # unrevealed one; +1000 a land unit's revealed water (0x2712be)
             seen6 = kn_n.gather(1, nbc)
             ends = torch.where(moves <= 0, ((tseat[rows.unsqueeze(1), nbc] != seat) & seen6).long() * 3 + 4, 0)
+            # a move order's path: +1e6 more where the step ends the turn on
+            # a revealed plot at its stacking limit (0x270dd0 at
+            # 0x27102e..0x2710a0, `search`'s price)
+            if stack_n is not None:
+                ends = ends + (stack_n.gather(1, nbc) & seen6 & (moves <= 0)).long() * 1_000_000
             wet = (seen6 & water_n.gather(1, nbc) & ~naval.unsqueeze(1)).long() * 1000
             gn = bg + cst * 1000 + (ends + 3 - seen6.long() + wet) * _FIX
             return nb, nbc, a6, turns, moves, gn, cliff6, bt, carry6, wet6, unrev6
@@ -1012,6 +1022,17 @@ class SimTactics:
             if not bool(act.count_nonzero()):
                 continue
             nb, nbc, a6, turns, moves, gn, cliff6, bt, carry6, wet6, unrev6 = price6(bn)
+            if zoc and dest is not None:
+                # the destination at its stacking limit, linked at any turn
+                # without flag 0x1000 or within the first under it, ends the
+                # search with no path (`search`'s stop: 0x2720a0 sets +0xe9)
+                halt = (act.unsqueeze(1) & (nb >= 0) & (nb == dest.unsqueeze(1)) & (dest != start).unsqueeze(1)
+                        & ~a6 & crowd_n.gather(1, nbc))
+                if later_turns:
+                    halt = halt & (turns <= 1)
+                halt = halt.any(dim=1)
+                run = run & ~halt
+                act = act & ~halt
             ok = act.unsqueeze(1) & (nb >= 0) & (ent_n.gather(1, nbc) | a6 | unrev6) & (turns <= max_turns)
             if zoc:
                 stacked = crowd_n.gather(1, b1) & (turns > bt)
@@ -1235,7 +1256,7 @@ class SimTactics:
         rank = torch.where(stand, rank, torch.full_like(rank, -1))
         rturn = torch.where(stand, rturn, torch.full_like(rturn, -1))
         out = {"rank": rank, "turns": rturn, "parent": par, "found": found, "start": start, "attack": atk_n,
-               "moves": mv[:, :T], "closed": closed, "fits": fits, "crowd": crowd_n}
+               "moves": mv[:, :T], "closed": closed, "fits": fits}
         if plan is not None:
             out.update(plan["spots"])
         return out
@@ -1575,14 +1596,6 @@ class SimTactics:
             if not bool(back_off.count_nonzero()):
                 break
             stop = stop - back_off.long()
-        # the destination's count against the stacking limit (`pathTo`): its
-        # own stacking unit, or another player's unit at peace in sight, there
-        # is no path, at any turn without flag 0x1000, within the first under it
-        crowd_d = res["crowd"][ar, dr] & ~res["attack"][ar, dr] & (dr != start)
-        if later_turns:
-            crowd_d = crowd_d & (res["closed"][ar, dr] <= 1)
-        first = res["found"] & crowd_d
-        stop = torch.where(first, torch.zeros_like(stop), stop)
         gslot = torch.zeros(B, dtype=torch.long, device=dev)
         gslot[rows] = sr + self.POOL_LO[pre]
         going = stop > 0
@@ -1662,7 +1675,7 @@ class SimTactics:
         if pend is not None:
             now = tile_p[rows, sr]
             off = torch.where(into, self.pair_dist[now.clamp(min=0), dr].to(torch.long) != 1, now != dr)
-            short = (getattr(self, f"{pre}_unit_alive")[rows, sr] & has_path & ~first & ~refused & ~waitz & off
+            short = (getattr(self, f"{pre}_unit_alive")[rows, sr] & has_path & ~refused & ~waitz & off
                      & (mp_p[rows, sr] > 0) & (now != dr))
             if bool(short.count_nonzero()):
                 sm = torch.zeros(B, dtype=torch.bool, device=dev)

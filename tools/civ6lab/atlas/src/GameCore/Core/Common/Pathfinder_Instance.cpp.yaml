@@ -6,9 +6,16 @@
 - addr: 0x77a50
   final: 0x57d30
   kind: function
-  semantics: "makes a node's children: the six neighbours from the axial tables, then the callback's extra neighbours (a portal)."
-  status: PARTLY
-  readings: ["H-1: the trade path's search, its score and the Canal — READ"]
+  semantics: "makes a node's children: the six neighbours from the axial tables in DirectionTypes order (0xeff730 / 0xeff748), each the validity (+0x58) admits linked (LinkChild 0x78750); the loop leaves where the search's stop +0xe9 is set (0x77bbe, by the validity 0x2720a0 on a crowded destination); then the callback's extra neighbours (+0x88 count, +0x98 each: a portal's)."
+  status: READ
+  cases:
+    - recording: h1_duely1127
+      turn: 41
+      value: "city-state 2's Warrior 327683 on 42:17 holds for 42:15, its Warrior there: the search stops at the first link onto 42:15"
+  impl: [cpu/core/tactical.ts:search, gpu/core/sim_tactics.py:_tac_search, cpu/core/tactical.ts:from]
+  readings:
+    - "H-1: the trade path's search, its score and the Canal — READ"
+    - "C-124: a move order's path prices a turn's end at the stacking limit +1e6, and its destination there stops the search — READ (0x270dd0 at 0x27101e..0x2710a0, 0x2720a0 at 0x272230..0x272364, 0x77a50, 0x26dcd0's callbacks), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...SearchStep 0x793f0 — GetBest 0x781e0 pops the open list's head, the children are made (0x77a50: the six neighbours from the axial tables, then the callback's extra neighbours, a port..."

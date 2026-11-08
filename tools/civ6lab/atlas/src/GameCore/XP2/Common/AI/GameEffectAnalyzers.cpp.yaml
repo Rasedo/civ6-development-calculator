@@ -302,7 +302,9 @@
     - cpu/core/behaviorTree.ts:h
     - gpu/core/sim_citytrees.py:tick_tree
     - gpu/core/sim_minorops.py:_mops_tick
-  readings: ["C-97: the behaviour trees — READ (the interpreter), the nodes PARTLY READ"]
+  readings:
+    - "C-97: the behaviour trees — READ (the interpreter), the nodes PARTLY READ"
+    - "C-124: a move order's path prices a turn's end at the stacking limit +1e6, and its destination there stops the search — READ (0x270dd0 at 0x27101e..0x2710a0, 0x2720a0 at 0x272230..0x272364, 0x77a50, 0x26dcd0's callbacks), both twins"
   context:
     - "...e 0x7eb210 clears failures and the last good child), Not 0x7f15f0 (its decorator update 0x6a7bd0 returns 0: its child runs; the handler tables at 0x7cbca0 store it at Not's index @f2ee..."
   review: reviewed

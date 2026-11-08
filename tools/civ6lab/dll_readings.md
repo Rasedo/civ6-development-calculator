@@ -8168,3 +8168,61 @@ effects (sim_policy.py), `_route_dest_plots` (sim_seats.py).
   member within twice its formation's Movement whose planning reaches the
   target; runs/h1_duely1128 t17-t19 the raid on 15:10's Warrior 1114128 on
   15:14 stays beside Xi'an's Farm 16:12 (planning 16:12(2/1)) (C-123).
+
+## C-124: a move order's path prices a turn's end at the stacking limit +1e6, and its destination there stops the search — READ (0x270dd0 at 0x27101e..0x2710a0, 0x2720a0 at 0x272230..0x272364, 0x77a50, 0x26dcd0's callbacks), both twins
+
+`search`'s `stack` and its stop, `Ground.stacked` (cpu/core/tactical.ts);
+GPU `_tac_search`'s `stack_n` in `price6` and its `halt`
+(gpu/core/sim_tactics.py).
+
+- THE COST 0x270dd0: on a step that leaves no Movement (+0x1d4 at most 0)
+  onto a revealed child (+0x51 bit 0), after the embark / disembark
+  penalties and before the mountain / canyon ones: where the stacking limit
+  ([0xf28c80] +0x58c) is above 0 and the search's flags (+0xe0) hold no 4,
+  0x585eb0 over the formation and the child's unit list on its layer
+  (0x75c50 with +0x1a4, third argument 0) at the limit or above adds +1e6
+  (0xf424000), at any turn. No visibility gate: another player's unit at
+  peace counts where the player does not see it (`stacked`, `crowded`
+  without `peaceHeld`'s sight). The move order's pool and the planning
+  share the cost: the planning's 0x26dcd0 re-lays only the destination test
+  (+0x18 0x6a7bd0, never), the validity (+0x58 0x26e570), the open
+  notification (+0x78 0x26d890) and the node notify (+0x68 0x26d6f0), and
+  carries flag 4 (0x115), so the planning pays none.
+- THE STOP: 0x2720a0 walks the child and its parents from 0x272230; the
+  child is tested there only on the destination (+0xd8 / +0xdc): seen now
+  (+0x50 bit 1) at the limit (+0x54 against +0x1b0) at any turn without
+  flag 0x1000, at turn 1 with it, the child is refused and +0xe9 set
+  (0x272364); 0x77a50 leaves the neighbour loop on +0xe9 and GeneratePath
+  ends with no path. So the first link onto a crowded destination within
+  the first turn ends the search, a cheaper later turn never reached. This
+  replaces the destination's test on the closed node in `pathTo` and
+  `_tac_move_to` (deleted) and holds for `turnsToPlot` too. The child on
+  the unit's own plot is refused before (0x27215a..0x272166).
+- CONFIRMED (one-seed aimem traces, against the head at c7f6251c, no other
+  kind moved): runs/h1_duely1127 t17 the barbarian Slinger 1114127 on 14:2
+  for 14:5, its camp's Spearman on 13:1: 13:1 (1/0) sorts last, so when
+  14:3 links 15:4 the tail is far and 15:4 lands from the head before 14:4,
+  the path 14:3 / 15:4 as logged; t41 city-state 2's Warrior 327683 on 42:17
+  holds for 42:15 (its Warrior there) as logged, where the +1e6 alone found
+  the turn-2 path through 42:16. To t58 on 1127 ten barbarian plot misses
+  go (t17, t34 x3, t36 x2, t38, t39 x2, t40), none comes; 1117 to t43 the
+  Galley 720906 (t26 / t27 / t32 / t34); 1128 to t78 eleven go (t20 / t21 /
+  t25 / t28 / t31 / t66 / t68 / t71, city-state 3's Warriors t64-66).
+- OPEN: the breadth-first searches of 0x26df90 (the danger map's 0x311,
+  Naval Patrol's flags 0) carry no flag 4 and so pay the +1e6 too; the
+  engines' searches with `zoc` false pay none (the danger map's reach is a
+  set, unmoved by it; Naval Patrol's closing order is). runs/h1_duely1128
+  t41 city-state 4's Horseman 589827 on 30:7: the planning (the third
+  search of the turn, after the strike on the barbarian Swordsman of 30:6)
+  matches AI_Planning.csv through 30:6 (1/0, an attack, 1026304); then the
+  game closes 33:10 before 32:11, both (1/0) at 1027072 in the engines,
+  where 0x775a0 over the engines' open list (head 30:6, tail 28:5 at
+  1282816, 34:6 / 34:7 / 34:8 / 33:9 at 1027840) lands 32:11 from the head;
+  the game's order needs a head key below 1026304 or a list the engines do
+  not hold. 30:6's (1/3) at 256512 is the danger map's search
+  (`standToAttack`), which pays an attack's spend on a district alone.
+- OPEN: runs/h1_duely1121 from t148 (memory not clean): t155 the Settler
+  4390925 and its Musketman 3670041 end on 16:16, the game on 17:16 (the
+  engines too without the +1e6): their 13-turn path to 4:19 turns off 16:18 / 15:19,
+  where the rampaging Crossbowmen 94 / 99 stand in the engines' state; the
+  game's units there at that moment are unread.

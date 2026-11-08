@@ -156,6 +156,7 @@
     - "C-125: the safe plot's stacking test holds other players' units — READ (0x716b90 at 0x716d77 -> 0x585eb0 / 0x585d90), both twins"
     - "C-99 / C-128: a shore crossing's cliff onto a revealed plot alone, Wander Back to Camp's path flag 0x1000, the path's destination count — READ (0x52fb90, 0x2720a0 at 0x272230..0x27229e / 0x272380, 0x270dd0 at 0x270f24, 0x271be0 at 0x271d03..0x271d18, 0x77b9a0 at 0x77be0b), both twins"
     - "C-125 / C-99: the swap's partner pays its step, the stacking count's classes, the walk's end among other players' units, a siege unit's RangedCombat — READ (0x972a50, 0x585d90, 0x26fe20 via 0x585eb0, 0x56e3e0), both twins"
+    - "C-124: a move order's path prices a turn's end at the stacking limit +1e6, and its destination there stops the search — READ (0x270dd0 at 0x27101e..0x2710a0, 0x2720a0 at 0x272230..0x272364, 0x77a50, 0x26dcd0's callbacks), both twins"
   notes:
     - ".claude/scratchpad/mu1/readings_c96.md: ...hin 5 of the city (0x1deb0), no unit at war with it   (0x5862e0), none of its own stacking with it (0x585eb0); the weighted   vector's weights (influence 0x716a60, the plot's owner +0x60, revealed   0x2d2220)..."
   context:
@@ -329,6 +330,7 @@
     - cpu/core/tactical.ts:groundOf
     - cpu/core/tactical.ts:foesSeen
     - cpu/core/tactical.ts:crowded
+    - cpu/core/tactical.ts:stacked
   readings:
     - "C-96: the city-states' tactical pass — READ (Wander Near City, Heal, the non-barbarian priorities, FindAlternateLocation), the families it needs PARTLY READ"
     - "C-95: the scout's tree \"Barbarian Found City\" — READ, ported"
