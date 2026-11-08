@@ -10239,3 +10239,60 @@ a unit the pair's engine made that no record unit stands for
   +0x7d0 after the kill unread) joining the walk below the quota; the gone
   members' Combat as the unit stood (promotions, damage) and their place in
   the pool order.
+
+## Units made, kept progress and the culture banks from the game's memory — READ (0x4c1a30, 0x4bed20, 0x4f2fc0, 0x3939b0, 0x3a1fb0), both twins; the importer reads them
+
+`tallyUnitMade` / `spawnUnit` (cpu/core/units.ts), GPU `_spawn_unit`
+(gpu/core/sim_masks.py); the importer's `unitsConstructed`,
+`importResearchHeld`, `buildRows` / `buildProgress` and `foldCultureTourism`
+(cpu/harness/import.ts); the replay's `minorKeptCarried` and the
+`seat.unitsMade`, `minor.unitsMade`, `seat.researchKept`,
+`minor.researchKept`, `minor.prodKept` tallies (`compareState`,
+cpu/harness/replay.ts).
+
+- THE COUNT 0x4c1a30, as a unit is made (the city's create 0x1e6570, 0xb02c60,
+  0xb67b30, 0xbd8be0, a hero 0x8ffac0), after the best strengths, adds one to
+  PlayerStats m_aiNumUnitsConstructed[unit type] (the archive +0xb40, its
+  vector +0xb98). 0x4bed20 reads it; the unit cost 0x4f2fc0 escalates the Cost
+  by Param1 per unit made for CostProgressionModel 0 and 2 (0x5267a0), by the
+  game's progress for model 1, through 0x4bee80 for model 6. Every Builder,
+  Settler, Missionary, Apostle, Inquisitor, Guru, Spy, Naturalist and Rock
+  Band quote of every record of the five runs/h1_duelz is floor((Cost +
+  n x Param1) / 2) at the record's count n. A starting unit is no unit made
+  (every count empty at t2); the barbarians' and the Free Cities' counts stay
+  empty (players 63 and 62 through t250).
+- THE PORT: every unit born through `spawnUnit` / `_spawn_unit` counts for a
+  major or a city-state — trained, bought with Gold or Faith, a wonder's
+  grant (runs/h1_duelz1121 t48: Pyramids' Builder, China 3 -> 4, its quote
+  31 -> 33), a village's, a pantheon's; the world file's starting units do
+  not (`made` false). Builder, Settler and the progressive chassis only
+  (`buildersTrained`, `settlersTrained`, `unitsAcquired`).
+- CONFIRMED (aimem one-seed windows, `seat.unitsMade` / `minor.unitsMade`
+  every pair): runs/h1_duelz1121 t2-30, 37-41, 46-50, 78-82, 104-108,
+  132-136, 175-180; runs/h1_duelz1128 t1-30, 32-36, 98-102, 144-148,
+  171-175, 227-231; runs/h1_duelz1117 t5-10 (the village Builder of t8). A
+  purchase the replay imposes on the record's unit counts it too.
+- THE IMPORTER'S MEMORY READS (each an import error where the record lacks
+  it): the counts above; each seat's research on every item neither held
+  nor in hand (PlayerTechs m_axResearchProgress, PlayerCulture
+  m_axCulturalProgress) and the overflows (m_xResearchOverflow,
+  m_xCulturalOverflow; a major with no civic chosen banks its Culture in
+  m_xCulturalOverflow: runs/h1_duelz1121 Rome t4-t22, 0.89 to 86.66); each
+  city's progress on every building and unit (City m_kBuildQueue +0x218,
+  +0x230; its floor is the record's queueProgress of the item in hand on
+  every record but two stale ones of player 0, runs/h1_duelz1117 t142 and
+  1121 t127, where the record's research and Food lag too); each major's
+  lifetime culture (PlayerCulture m_xLifetimeCulture, the archive at +0xff8
+  the civic progress setter 0x3a1fb0 adds into) and its tourism banked on
+  each other major (m_axTourismOn, +0xc68, banked by 0x3939b0:
+  runs/h1_duelz1128 t138 China on Rome 672 where the record's tourism
+  folded to 668).
+- OPEN: a city-state's catch-up lands at the major's acquisition in the
+  game (runs/h1_duelz1121 t10: Mining 11 of 12 for city-states 2, 3 and 4 as
+  Rome's turn start completes it, before record t10), at the minor's next
+  turn in the engine; a city-state's emptied queue keeps its item's
+  progress (runs/h1_duelz1121 t3 Hunza's Monument 3, no item in hand) where
+  the engine keeps the item in hand. m_kGrowth word 33 (+0x84) is the
+  growth accumulator 0x1b6180 (Migration Treaty: 51 attached, 50 after a
+  detach's residue), word 32 (+0x80) the Food box (the record's Food
+  exact); `City.growthDrift` still folds the detaches.

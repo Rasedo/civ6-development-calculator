@@ -1970,7 +1970,7 @@
 - addr: 0x4c1a30
   final: 0x330320
   kind: function
-  semantics: "The best melee (PlayerStats +0xf0, saved as m_iMaxMeleeStrengthTrained) is raised to 0x56dc90(unit, 0) — the unit's strength as it stands, its formation's in it — where 0x4bffa0 passes the unit row; an embarked unit stands at its embarked strength. Called as a unit is made (0x1e6570, 0xb02c60, 0xb67b30, 0xbd8be0, a hero 0x8ffac0). Raises the player's best strengths at a unit's training: the best melee, the best ranged (the unit's ranged strength 0x56e3e0, RangedCombat row +0x6c, a Bombard none, with its formation's) and +0x1b0 the best Bombard (0x56daa0)."
+  semantics: "The best melee (PlayerStats +0xf0, saved as m_iMaxMeleeStrengthTrained) is raised to 0x56dc90(unit, 0) — the unit's strength as it stands, its formation's in it — where 0x4bffa0 passes the unit row; an embarked unit stands at its embarked strength. Called as a unit is made (0x1e6570, 0xb02c60, 0xb67b30, 0xbd8be0, a hero 0x8ffac0). Raises the player's best strengths at a unit's training: the best melee, the best ranged (the unit's ranged strength 0x56e3e0, RangedCombat row +0x6c, a Bombard none, with its formation's) and +0x1b0 the best Bombard (0x56daa0). Then adds one to m_aiNumUnitsConstructed[unit type] (the archive +0xb40, its vector +0xb98, 0x1800176b0 then inc dword) — the count the cost progression reads (0x4f2fc0 through 0x4bed20)."
   status: READ
   cases:
     - recording: h1_duelw1112
@@ -1988,11 +1988,20 @@
     - recording: 1120
       turn: 50
       value: "Records:   1120 China's cities strike at 25 from t50 (an Archer made), 40, 60, 70 as   Crossbowmen, Field Cannons and Battleships come;"
-  impl: [cpu/core/units.ts:raiseBestTrained, gpu/core/sim_masks.py:_raise_best_trained]
+    - recording: h1_duelz1121
+      turn: 48
+      value: Pyramids' Builder raises China's m_aiNumUnitsConstructed Builder count 3 -> 4, its Builder quote 31 -> 33
+  impl:
+    - cpu/core/units.ts:raiseBestTrained
+    - gpu/core/sim_masks.py:_raise_best_trained
+    - cpu/core/units.ts:tallyUnitMade
+    - gpu/core/sim_masks.py:_spawn_unit
   readings:
+    - Units made, kept progress and the culture banks from the game's memory
     - "H-1: the best melee, the drought's turns, the Trader's sea, the harvest's lump, the district discount — READ"
     - "H-1: the best melee from the log — READ (as above)"
     - "H-1: the melee result, a ranged blow's domain, a city's shot — READ"
+    - "Units made, kept progress and the culture banks from the game's memory — READ (0x4c1a30, 0x4bed20, 0x4f2fc0, 0x3939b0, 0x3a1fb0), both twins; the importer reads them"
   context:
     - "- The city base's best melee (PlayerStats +0xf0, saved as m_iMaxMeleeStrengthTrained): 0x4c1a30, called as a unit is made (the city's 0x1e6570, 0xb02c60, 0xb67b30, 0xbd8be0, a hero 0x..."
     - "- 0x4c1a30 raises the base as a unit is made, an upgrade included; a unit made and removed before..."
@@ -7721,6 +7730,7 @@
       value: "it also   clears 1106 t243's Giant Death Robot, 80 checks, which was trained on land   and raised nothing — 0x4bffa0's row test, unnamed, a LAB line)."
   readings:
     - "H-1: the best melee, the drought's turns, the Trader's sea, the harvest's lump, the district discount — READ"
+    - "Units made, kept progress and the culture banks from the game's memory — READ (0x4c1a30, 0x4bed20, 0x4f2fc0, 0x3939b0, 0x3a1fb0), both twins; the importer reads them"
   context:
     - "...m_iMaxMeleeStrengthTrained): 0x4c1a30, called as a unit is made (the city's 0x1e6570, 0xb02c60, 0xb67b30, 0xbd8be0, a hero 0x8ffac0) and the era's starting units (0x4580b0 through 0x..."
   review: reviewed
@@ -7857,6 +7867,7 @@
       value: "it also   clears 1106 t243's Giant Death Robot, 80 checks, which was trained on land   and raised nothing — 0x4bffa0's row test, unnamed, a LAB line)."
   readings:
     - "H-1: the best melee, the drought's turns, the Trader's sea, the harvest's lump, the district discount — READ"
+    - "Units made, kept progress and the culture banks from the game's memory — READ (0x4c1a30, 0x4bed20, 0x4f2fc0, 0x3939b0, 0x3a1fb0), both twins; the importer reads them"
   context:
     - "...leeStrengthTrained): 0x4c1a30, called as a unit is made (the city's 0x1e6570, 0xb02c60, 0xb67b30, 0xbd8be0, a hero 0x8ffac0) and the era's starting units (0x4580b0 through 0x4c1c10), r..."
   review: reviewed
@@ -8035,6 +8046,7 @@
       value: "it also   clears 1106 t243's Giant Death Robot, 80 checks, which was trained on land   and raised nothing — 0x4bffa0's row test, unnamed, a LAB line)."
   readings:
     - "H-1: the best melee, the drought's turns, the Trader's sea, the harvest's lump, the district discount — READ"
+    - "Units made, kept progress and the culture banks from the game's memory — READ (0x4c1a30, 0x4bed20, 0x4f2fc0, 0x3939b0, 0x3a1fb0), both twins; the importer reads them"
   context:
     - "...hTrained): 0x4c1a30, called as a unit is made (the city's 0x1e6570, 0xb02c60, 0xb67b30, 0xbd8be0, a hero 0x8ffac0) and the era's starting units (0x4580b0 through 0x4c1c10), raises it t..."
   review: reviewed

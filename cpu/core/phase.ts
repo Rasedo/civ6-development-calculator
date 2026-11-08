@@ -155,15 +155,12 @@ export function warTargets(state: GameState, seat: number): number[] {
 /** CIV6 (MODIFIER_PLAYER_GRANT_UNIT_IN_CAPITAL, RunOnce: Religious
  *  Settlements' Settler, Fertility Rites' Builder): the unit a pantheon
  *  grants in the seat's capital as it is chosen — a previous copy to the
- *  unit's price (runs/h1_duelw1116 China: the Settler at t14, the next one
+ *  unit's price (`tallyUnitMade`; runs/h1_duelw1116 China: the Settler at t14, the next one
  *  priced 55 from t16). `_grant_pantheon_unit` is the twin. */
 export function grantPantheonUnit(state: GameState, seat: number, pantheon: string): void {
   const unit = PANTHEONS[pantheon]?.effects.capitalUnit;
   const cap = unit ? capitalCityOf(state, seat) : undefined;
-  const s = seatOf(state, seat) as Seat | undefined;
-  if (!unit || !cap || !s || !spawnUnit(state, unit, cap.centerIndex, seat)) return;
-  if (unit === 'SETTLER') s.settlersTrained = (s.settlersTrained ?? 0) + 1;
-  if (unit === 'BUILDER') s.buildersTrained += 1;
+  if (unit && cap) spawnUnit(state, unit, cap.centerIndex, seat);
 }
 
 /**

@@ -1628,8 +1628,7 @@ class SimPhase:
             if row < self.n_majors:
                 self._place_citizens(row, col, made_s & ~_free, None, full=True)
             if self._settler_idx >= 0:
-                landed = self._spawn_unit(row, made_s, ctr, self._settler_idx, stack=True)
-                self.civ_settlers_trained[:, row] = self.civ_settlers_trained[:, row] + landed.long()
+                self._spawn_unit(row, made_s, ctr, self._settler_idx, stack=True)
 
         made_u = done & (cur >= self.UNIT_BASE) & (cur < self.UNIT_BASE + self.NU)
         if bool(made_u.count_nonzero()):
@@ -1696,9 +1695,6 @@ class SimPhase:
                         row, self._spawn_unit(row, twin, ctr, ui, init_xp=xp, free_promo=fp, formation=form_t,
                                               stack=True), ui,
                         formation=form_t)
-            if self._builder_idx >= 0:
-                made_b = made_u & (ui == self._builder_idx)
-                self.civ_builders_trained[:, row] = self.civ_builders_trained[:, row] + made_b.long()
 
         made_d = done & (cur >= self.DISTRICT_BASE) & (cur < self.WONDER_BASE)
         if bool(made_d.count_nonzero()):
@@ -3056,12 +3052,8 @@ class SimPhase:
         col = torch.where(on_cap.any(dim=1), on_cap.long().argmax(dim=1), alive.long().argmax(dim=1))
         at = ctr.gather(1, col.unsqueeze(1)).squeeze(1)
         for u_i in sorted(set(int(x) for x in cu[want].tolist())):
-            landed = self._spawn_unit(row, want & (cu == u_i), at, u_i)
+            self._spawn_unit(row, want & (cu == u_i), at, u_i)
             self._gen_ver += 1
-            if u_i == self._settler_idx:
-                self.civ_settlers_trained[:, row] = self.civ_settlers_trained[:, row] + landed.long()
-            if u_i == self._builder_idx:
-                self.civ_builders_trained[:, row] = self.civ_builders_trained[:, row] + landed.long()
 
     def _can_found(self, row: int) -> torch.Tensor:
         """[B] `canFoundReligion`: no seat ban, no religion yet, a pantheon, a

@@ -197,6 +197,30 @@
   context:
     - "...gth (+0x78) x 0.01, SpreadCharges (+0x7c) or ReligiousHealCharges (+0x74) by the counts 0x4be880, 0 with no majority religion (0x4681c0 +0x1c0) — and PSEUDOYIELD_TOURISM terms (ParkCha..."
   review: reviewed
+- addr: 0x4bed20
+  kind: function
+  name: PlayerStats::GetNumUnitsConstructed
+  semantics: "the units of a type the player has made: m_aiNumUnitsConstructed (the vector at +0xb98 of the archive at +0xb40)[eUnit], 0 for an index out of range (asserts)."
+  status: READ
+  cases:
+    - recording: h1_duelz1121
+      turn: 48
+      value: China's Builder count 4 = (its Builder quote 33 - 25) / 2; every Builder, Settler and progressive quote of the five runs/h1_duelz is the Cost and Param1 at this count
+  impl: [cpu/harness/import.ts:unitsConstructed, cpu/core/units.ts:tallyUnitMade]
+  readings:
+    - Units made, kept progress and the culture banks from the game's memory
+    - "Units made, kept progress and the culture banks from the game's memory — READ (0x4c1a30, 0x4bed20, 0x4f2fc0, 0x3939b0, 0x3a1fb0), both twins; the importer reads them"
+  review: reviewed
+- addr: 0x4bee80
+  final: 0x32d650
+  kind: function
+  status: PARTLY
+  readings:
+    - "Units made, kept progress and the culture banks from the game's memory — READ (0x4c1a30, 0x4bed20, 0x4f2fc0, 0x3939b0, 0x3a1fb0), both twins; the importer reads them"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - ...or CostProgressionModel 0 and 2 (0x5267a0), by the game's progress for model 1, through 0x4bee80 for model 6. Every Builder, Settler, Missionary, Apostle, Inquisitor, Guru, Spy, Natura...
+  review: imported
 - addr: 0x4bf200
   final: 0x5147d0
   kind: function

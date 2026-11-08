@@ -83,10 +83,17 @@
   review: reviewed
 - addr: 0x3939b0
   kind: function
-  semantics: banks a player's tourism toward another (+0xc68).
-  status: PARTLY
-  readings: ["C-94: trade posts and cultural dominance — READ"]
-  notes: ["imported: READ in its section, no confirming case found beside it"]
+  semantics: banks a player's tourism toward another (+0xc68, saved as m_axTourismOn, by player id, in 256ths).
+  status: READ
+  cases:
+    - recording: h1_duelz1128
+      turn: 138
+      value: China's tourism banked on Rome 672 (m_axTourismOn 172032), where the importer's fold of the record's tourism read 668
+  impl: [cpu/harness/import.ts:foldCultureTourism]
+  readings:
+    - "C-94: trade posts and cultural dominance — READ"
+    - Units made, kept progress and the culture banks from the game's memory
+    - "Units made, kept progress and the culture banks from the game's memory — READ (0x4c1a30, 0x4bed20, 0x4f2fc0, 0x3939b0, 0x3a1fb0), both twins; the importer reads them"
   context:
     - ...then per other player it has met (0x3daaf0) the tourism toward it is banked (0x394830 / 0x3939b0, +0xc68) and its tourists refreshed (0x39f610), then 0x393af0 the dominance, then the v...
   review: reviewed
@@ -708,11 +715,13 @@
     - cpu/core/phase.ts:completeResearchNow
     - cpu/core/seatTurn.ts:seatCitizens
     - cpu/harness/import.ts:History
+    - cpu/harness/import.ts:foldCultureTourism
   readings:
     - "C-94: trade posts and cultural dominance — READ"
     - "H-1: a boost lands as progress — READ"
     - "H-1: a minor's research catch-up — READ"
     - DLL rules the engines contradict
+    - "Units made, kept progress and the culture banks from the game's memory — READ (0x4c1a30, 0x4bed20, 0x4f2fc0, 0x3939b0, 0x3a1fb0), both twins; the importer reads them"
   context:
     - "...e culture lands (lifetime culture +0x1050, 24.8, grows by every gain of civic progress, 0x3a1fb0 — a boost's share included; culture with no civic chosen is held at +0xb40 until one..."
     - "...0). Domestic tourists (+0x10b0, \"staycationers\"): citizens less what the others draw (0x3a2250 with 0x399c80; 0x39f610 moves it by each refresh's delta). Visiting (0x39bee0): the sum..."

@@ -19,7 +19,7 @@ describe('settlers', () => {
     const state = makeState(makeMap(20, 20));
     state.unitsMode = true;
     const aTile = tileAtCoords(state.map, 6, 9);
-    spawnUnit(state, 'SETTLER', aTile.index, 0);
+    spawnUnit(state, 'SETTLER', aTile.index, 0, 'near', false);
     const a = foundCity(state, aTile.index, 0).city!; // consumes the starting settler
     expect(settlerCount(state, 0)).toBe(0);
     expect(BASE).toBe(scaleByGameSpeed(80));
@@ -54,18 +54,18 @@ describe('settlers', () => {
     expect(settlerCost(state, 0)).toBe(BASE + STEP);
   });
 
-  it('counts the settlers trained or bought, never one granted or lost (runs/h1_duelw1105, China t28-58)', () => {
+  it('counts every settler made, a lost one included, never a starting one (runs/h1_duelz1121)', () => {
     const state = makeState(makeMap(20, 20));
     state.unitsMode = true;
     const aTile = tileAtCoords(state.map, 6, 9);
-    spawnUnit(state, 'SETTLER', aTile.index, 0);
+    spawnUnit(state, 'SETTLER', aTile.index, 0, 'near', false);
     foundCity(state, aTile.index, 0);
-    // a granted settler (a Tribal Village's, a capture) is no trained copy
-    spawnUnit(state, 'SETTLER', tileAtCoords(state.map, 9, 9).index, 0);
     expect(settlerCost(state, 0)).toBe(BASE);
-    // two trained, one of them lost: both still price the next
-    seatOf(state, 0)!.settlersTrained = 2;
+    // a settler made (a Tribal Village's, a grant) is a copy
+    spawnUnit(state, 'SETTLER', tileAtCoords(state.map, 9, 9).index, 0);
+    expect(settlerCost(state, 0)).toBe(BASE + STEP);
+    // lost, it still prices the next
     state.units = state.units.filter((u) => u.type !== 'SETTLER');
-    expect(settlerCost(state, 0)).toBe(BASE + 2 * STEP);
+    expect(settlerCost(state, 0)).toBe(BASE + STEP);
   });
 });

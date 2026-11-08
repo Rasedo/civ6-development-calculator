@@ -47,25 +47,22 @@ import { goldShortfall } from '../data/seats';
 import { governorsOf } from '../core/governors';
 import { envoysWith, minorCity, mostEnvoysReceived } from '../core/cityStates';
 import { GOVERNOR_DEFAULT_PROMOTION, GOVERNOR_INDEX, GOVERNOR_PROMOTION_INDEX, GOVERNOR_PROMOTIONS, promotionBit, promotionBitValue } from '../data/governors';
-import { CIV_LEADERS, COMPETITIONS, COMPETITION_TURNS, DEAL_ITEMS, DEAL_LUXURY, DEAL_TURNS, DEDICATION_COMMEMORATIONS, GOV_INTOLERANCE, TOURISM_GOV_MULT, TOURISM_ROUTE_PCT } from '../data/seats';
-import { BOOSTS } from '../data/boosts';
-import { boostAmount, boostPoints } from '../core/boosts';
+import { CIV_LEADERS, COMPETITIONS, COMPETITION_TURNS, DEAL_ITEMS, DEAL_LUXURY, DEAL_TURNS, DEDICATION_COMMEMORATIONS } from '../data/seats';
 import { updateCulturalDominance } from '../core/seatTurn';
 import { addCityPerm, addSeatPerm } from '../core/gpAbility';
 import { BUILDINGS, POWER_PLANT_IDS } from '../data/buildings';
 import { BUILT_WONDERS } from '../data/builtWonders';
 import { CIVICS } from '../data/civics';
 import { TECHS } from '../data/techs';
-import { UNITS, CITY_MAX_HP, UNIT_HP, BUILDER_COST_STEP, SETTLER_COST_STEP } from '../data/units';
-import { MP_SCALE, emptyStockpile, scaleByGameSpeed } from '../data/constants';
+import { UNITS, CITY_MAX_HP, UNIT_HP } from '../data/units';
+import { MP_SCALE, emptyStockpile } from '../data/constants';
 import { accrueStockpiles, chargeUnitResource, chargeUnitUpkeep, resolveSeatPower, stockpileCap, strategicSlot, unitResourceCost } from '../core/stockpile';
 import { DISTRICTS, PLACEABLE_DISTRICTS } from '../data/districts';
 import { IMPROVEMENTS } from '../data/improvements';
 import { GOVERNMENTS, POLICIES, type SlotKind } from '../data/policies';
 import { ENHANCER_BELIEFS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, PANTHEONS, WORSHIP_BELIEFS } from '../data/religion';
 import { AGE_GOLDEN } from '../data/seats';
-import { CITY_STATE_SUZERAIN_BONUS, CITY_STATE_TYPES, LEVY_TURNS, MINOR_CATCHUP_PCT } from '../data/cityStates';
-import { researchCost } from '../core/economy';
+import { CITY_STATE_SUZERAIN_BONUS, CITY_STATE_TYPES, LEVY_TURNS } from '../data/cityStates';
 import { ALPINE_FEATURE, FIONN_FEATURE, PROMO_CLASSES } from '../data/promotions';
 import { unitPromoRows } from '../core/promotions';
 import { FEATURES, clearableFeatures, isFloodplains } from '../../world/features';
@@ -85,7 +82,7 @@ import { GOVERNMENT_LIST, POLICY_LIST } from '../data/policies';
 import { LUXURY_IDS } from '../../world/resources';
 import { SPY_MISSIONS, SPY_OFFENSIVE_MISSIONS } from '../data/espionage';
 import type { QueueItem } from '../core/types';
-import { projectCost, settlerCost, unitStepCost } from '../core/game';
+import { projectCost, settlerCost } from '../core/game';
 import { alpineChassis, builderCost, fionnChassis, rangedCombatOf, traderCost, unitDomain } from '../core/units';
 import { carryLayout, computeUnlocks, governmentSlots } from '../core/effects';
 import { ERA_BEGINS, bestRoadTier, eraCountdownStep } from '../core/eras';
@@ -512,8 +509,6 @@ export interface History {
    *  its PlayerStats held them, [melee, ranged] (`TurnRecord.mem`): a record
    *  whose read of them failed carries the last */
   trained: Map<number, [number, number]>;
-  /** Builders each player has gained: a Builder id new at t+1 */
-  builders: Map<number, number>;
   /** Great People each player has spent, by class: a Great Person unit of
    *  the player's at t gone at t+1 */
   gpSpent: Map<number, Map<GreatPersonClass, number>>;
@@ -619,25 +614,11 @@ export interface History {
    *  0 gold and the top tier / 1 the top tier alone / 2 the gold alone] */
   podium: Map<number, [number, number][]>;
   /** each major's lifetime culture as the game counts it (`Seat.cultureTotal`):
-   *  every gain of civic progress — a turn's culture while a civic is
-   *  chosen, the culture held while none is once one is, a boost's share of
-   *  a civic not yet held (PlayerCulture 0x3a1fb0) — and the culture held */
+   *  the last record's PlayerCulture m_xLifetimeCulture (`foldCultureTourism`) */
   culture: Map<number, number>;
-  cultureHeld: Map<number, number>;
-  /** the boost each seat parked on an item neither held nor current, by
-   *  `seat:item`: the boost's share of the item's price at the first record
-   *  that showed it boosted (the price of that record's game era) */
-  boostParked: Map<string, number>;
-  /** the research each player parked on an item it left unfinished, by
-   *  `player:t<index>` (a technology) or `player:c<index>` (a civic): the
-   *  record's progress on the item in hand plus the yield its turn banked
-   *  into it, where the next record shows another item in hand and the
-   *  item unheld (`foldResearchParked`); `boosted` where its boost was in
-   *  that progress */
-  researchParked: Map<string, { amount: number; boosted: boolean }>;
-  /** each major's tourism banked toward each major it has met, by `p:o`
-   *  (`Seat.tourismTo`): the record's tourism through the pair's route and
-   *  government terms of `tourismIntlPct` */
+  /** each major's tourism banked toward each other major, by `p:o`
+   *  (`Seat.tourismTo`): the last record's PlayerCulture m_axTourismOn
+   *  (`foldCultureTourism`) */
   tourismTo: Map<string, number>;
   /** the majors each major is culturally dominant over (`updateCulturalDominance`) */
   dominant: Map<number, Set<number>>;
@@ -865,10 +846,10 @@ export function eraBegan(a: TurnRecord, b: TurnRecord): boolean {
 }
 
 export function newHistory(): History {
-  return { firstTurn: -1, last: null, before: null, beforeThat: null, trained: new Map(), levied: new Map(), alpine: new Set(), fionn: new Set(), govSeated: new Map(), growthDrift: new Map(), lastHit: new Map(), builders: new Map(), gpSpent: new Map(), revealed: new Map(),
+  return { firstTurn: -1, last: null, before: null, beforeThat: null, trained: new Map(), levied: new Map(), alpine: new Set(), fionn: new Set(), govSeated: new Map(), growthDrift: new Map(), lastHit: new Map(), gpSpent: new Map(), revealed: new Map(),
     unknownSince: new Set(), cityFirstSeen: new Map(), nextPlotUnheld: new Set(), fireFood: new Map(), fireProd: new Map(), eventYields: new Map(), eventCounts: new Map(), openEvents: [], eventRead: new Map(), eventDraws: new Map(), droughts: [], bare: new Map(), discountDistricts: new Map(), discountPlaced: new Map(), ages: new Map(), moments: new Map(), momentsWorld: [],
     eraTurns: [], gameEra: 0, eraStartTurn: 1, eraCountdown: -1, routeSeen: new Map(), routeCourse: new Map(), trail: new Map(), legs: new Map(), posts: new Map(), policySlots: new Map(),
-    competitionSeen: new Map(), competitionScore: new Map(), podium: new Map(), culture: new Map(), cultureHeld: new Map(), boostParked: new Map(), researchParked: new Map(), tourismTo: new Map(),
+    competitionSeen: new Map(), competitionScore: new Map(), podium: new Map(), culture: new Map(), tourismTo: new Map(),
     dominant: new Map(), districtQuoted: new Set(), districtPriced: new Map(), districtLocked: new Map(), floods: null, startTies: new Map(), startPicks: new Map(), seaLevel: 0, people: null, stockpile: new Map(), reservations: new Map() };
 }
 
@@ -1281,70 +1262,42 @@ function foldDominance(h: History, rec: TurnRecord): void {
   });
 }
 
-/** Fold one record's culture and tourism into the history's lifetime banks:
- *  `prev`'s yields land by `rec`, a boost `rec` shows first lands at once. */
-function foldCultureTourism(h: History, prev: TurnRecord, rec: TurnRecord, cat: Catalog): void {
-  const majors = prev.players.filter((p) => bool(p.major));
-  const routed = new Set(recordRoutes(prev).map((r) => `${r.OriginCityPlayer}:${r.DestinationCityPlayer}`));
-  const govOf = (p: DumpPlayer) => strip(cat.governments[num(p.government)] ?? '', 'GOVERNMENT_');
+/** One record's culture and tourism banks into the history: each major's
+ *  lifetime culture (PlayerCulture m_xLifetimeCulture: the civic progress
+ *  setter 0x3a1fb0 adds every gain into it) and its tourism banked toward
+ *  each major (m_axTourismOn, by player id: 0x3939b0 banks into it), in
+ *  256ths, as `rec`'s memory holds them. A record without them is an import
+ *  error. */
+function foldCultureTourism(h: History, rec: TurnRecord): void {
+  const majors = rec.players.filter((p) => bool(p.major));
   for (const p of majors) {
-    const q = rec.players.find((x) => x.id === p.id);
-    // the civic in progress in both records: its progress moved by exactly
-    // what landed, a boost toward it included (runs/h1_duelw1130: Rome founds
-    // after record 1, which reads Culture 0, and gains 3.296875 by record 2)
-    const civic = num(p.civic);
-    const same = civic >= 0 && q !== undefined && num(q.civic) === civic
-      && Number.isFinite(num(p.civicProgress)) && Number.isFinite(num(q.civicProgress));
-    const cy = num(p.cultureYield);
-    if (same) {
-      h.culture.set(p.id, (h.culture.get(p.id) ?? 0) + (h.cultureHeld.get(p.id) ?? 0) + num(q!.civicProgress) - num(p.civicProgress));
-      h.cultureHeld.set(p.id, 0);
-    } else if (civic >= 0) {
-      h.culture.set(p.id, (h.culture.get(p.id) ?? 0) + (h.cultureHeld.get(p.id) ?? 0) + cy);
-      h.cultureHeld.set(p.id, 0);
-    } else {
-      h.cultureHeld.set(p.id, (h.cultureHeld.get(p.id) ?? 0) + cy);
+    const life = memField(rec, p.id, 'PlayerCulture', 'm_xLifetimeCulture');
+    const tour = memField(rec, p.id, 'PlayerCulture', 'm_axTourismOn');
+    if (typeof life !== 'number' || tour === undefined || typeof tour === 'number') {
+      throw new Error(`record t${rec.turn}: player ${p.id} has no PlayerCulture lifetime culture or tourism`);
     }
-    const was = p.civicBoosts ?? '';
-    const now = q?.civicBoosts ?? '';
-    for (let k = 0; k < now.length; k++) {
-      if (now[k] !== '1' || was[k] === '1' || (q?.civics ?? '')[k] === '1' || (same && k === civic)) continue;
-      const cost = CIVICS[strip(cat.civics[k] ?? '', 'CIVIC_')]?.cost ?? 0;
-      h.culture.set(p.id, (h.culture.get(p.id) ?? 0) + boostAmount(cost, BOOSTS[strip(cat.civics[k] ?? '', 'CIVIC_')]?.pct ?? 0, 0));
-    }
-    const met = new Set((p.met ?? []).map(num));
-    for (const o of majors) {
-      if (o.id === p.id || !met.has(o.id)) continue;
-      let pct = routed.has(`${p.id}:${o.id}`) ? TOURISM_ROUTE_PCT : 0;
-      const ga = govOf(p);
-      const gb = govOf(o);
-      if (ga !== gb) pct -= ((GOV_INTOLERANCE[ga] ?? 0) + (GOV_INTOLERANCE[gb] ?? 0)) * TOURISM_GOV_MULT;
-      const k = `${p.id}:${o.id}`;
-      h.tourismTo.set(k, (h.tourismTo.get(k) ?? 0) + Math.floor(num(p.tourism) * Math.max(0, 100 + pct) / 100));
-    }
+    h.culture.set(p.id, life / 256);
+    const on = tour as Record<string, number>;
+    for (const o of majors) if (o.id !== p.id) h.tourismTo.set(`${p.id}:${o.id}`, (on[o.id] ?? 0) / 256);
   }
 }
 
-/** The copies of a progressive chassis a player's price quotes stand at: the
- *  fewest `n` whose `price(n)` is the highest quote among its cities (a
- *  city's queued copy holds the lower price it locked), or undefined where no
- *  city quotes the row or no count reaches the quote. */
-function copiesQuoted(rec: TurnRecord, cat: Catalog, pid: number, unitName: string,
-  price: (n: number) => number): number | undefined {
-  const idx = cat.units.indexOf(unitName);
-  if (idx < 0) return undefined;
-  let top = -1;
-  for (const c of rec.cities) {
-    if (c.owner !== pid) continue;
-    for (const b of c.buy) if (b[0] === 'U' && b[1] === idx && num(b[2]) > top) top = num(b[2]);
+/** The units a player has made, by engine unit id: its PlayerStats
+ *  m_aiNumUnitsConstructed, indexed by the catalog's unit row (a missing
+ *  row is 0). A record without it is an import error. */
+function unitsConstructed(rec: TurnRecord, cat: Catalog, pid: number): Map<string, number> {
+  const v = memField(rec, pid, 'PlayerStats', 'm_aiNumUnitsConstructed.v');
+  const rows = v !== undefined && typeof v === 'object' && !Array.isArray(v) ? (v as Record<string, unknown>)['0'] : undefined;
+  if (rows === undefined || rows === null || typeof rows !== 'object' || Array.isArray(rows)) {
+    throw new Error(`record t${rec.turn}: player ${pid} has no PlayerStats m_aiNumUnitsConstructed`);
   }
-  if (top < 0) return undefined;
-  for (let n = 0; n < 200; n++) {
-    const v = price(n);
-    if (v === top) return n;
-    if (v > top) return undefined;
+  const out = new Map<string, number>();
+  for (const [k, n] of Object.entries(rows as Record<string, number>)) {
+    if (k === 'n') continue;
+    const id = engineRowOf(cat, 'unit', Number(k));
+    if (id) out.set(id, (out.get(id) ?? 0) + n);
   }
-  return undefined;
+  return out;
 }
 
 /** Fold one record into the history, in turn order. */
@@ -1445,7 +1398,6 @@ export function advanceHistory(h: History, rec: TurnRecord, cat: Catalog): void 
     if (rec.turn > 1) for (const c of rec.cities) h.unknownSince.add(c.y * W + c.x);
   } else {
     const seen = new Set(h.last.units.map((u) => `${u.owner}:${u.id}`));
-    const builder = cat.units.indexOf('UNIT_BUILDER');
     // a unit another player lost this turn: a new one of its type close by is
     // that unit changing hands (a levy, a capture), which raises nothing
     const live = new Set(rec.units.map((u) => `${u.owner}:${u.id}`));
@@ -1463,7 +1415,6 @@ export function advanceHistory(h: History, rec: TurnRecord, cat: Catalog): void 
         && UNITS[engineRowOf(cat, 'unit', g.type) ?? '']?.upgradesTo === engineRowOf(cat, 'unit', u.type)
         && num(g.damage) === num(u.damage) && hexDistance(shape, g.x, g.y, u.x, u.y) <= 3);
       if (was) h.levied.set(`${u.owner}:${u.id}`, h.levied.get(`${was.owner}:${was.id}`)!);
-      if (u.type === builder) h.builders.set(u.owner, (h.builders.get(u.owner) ?? 0) + 1);
     }
     const now = new Set(rec.units.map((u) => `${u.owner}:${u.id}`));
     for (const u of h.last.units) {
@@ -1892,9 +1843,8 @@ export function advanceHistory(h: History, rec: TurnRecord, cat: Catalog): void 
   for (const k of [...h.routeSeen.keys()]) if (!live.has(k)) h.routeSeen.delete(k);
   for (const k of [...h.trail.keys()]) if (!live.has(k)) h.trail.delete(k);
   for (const k of [...h.routeCourse.keys()]) if (!live.has(k)) h.routeCourse.delete(k);
-  if (h.last) foldCultureTourism(h, h.last, rec, cat);
+  foldCultureTourism(h, rec);
   if (h.last) foldGrowthDrift(h, h.last, rec, cat);
-  if (h.last) foldResearchParked(h, h.last, rec);
   foldDominance(h, rec);
   foldBeside(h.alpine, h.last, rec, cat, ALPINE_FEATURE);
   foldBeside(h.fionn, h.last, rec, cat, FIONN_FEATURE);
@@ -2277,26 +2227,18 @@ export function importTurn(rec: TurnRecord, cat: Catalog, history?: History): Im
     }
     s.bestMeleeCS = barb ? 0 : Math.max(startMeleeCS(seat), held?.[0] ?? 0);
     s.bestRangedCS = barb ? 0 : held?.[1] ?? 0;
-    // the copies a price progression counts are the game's own, read off its
-    // quote where one stands: a Builder taken back in the field moves no
-    // price (runs/h1_duelw1105, China's t46 and t52 three-charge Builders
-    // away from its cities left it at 31), a village's does (1117 China t8)
-    const builders = copiesQuoted(rec, ctx.cat, p.id, 'UNIT_BUILDER',
-      (n) => UNITS.BUILDER.cost + scaleByGameSpeed(BUILDER_COST_STEP) * n);
-    s.buildersTrained = builders ?? history?.builders.get(p.id) ?? 0;
-    // a lost Settler stays counted and a captured one never was (China's t28
-    // capture left 70 standing): with no quote, the cities past the first and
-    // the Settlers in the field
-    const settlers = copiesQuoted(rec, ctx.cat, p.id, 'UNIT_SETTLER',
-      (n) => UNITS.SETTLER.cost + scaleByGameSpeed(SETTLER_COST_STEP) * n);
+    // the copies a price progression counts are the game's own count of the
+    // units the player made (PlayerStats m_aiNumUnitsConstructed): every
+    // record's Builder, Settler and progressive quote is its Cost and
+    // Param1 at that count (the five runs/h1_duelz)
+    const made = unitsConstructed(rec, ctx.cat, p.id);
+    s.buildersTrained = made.get('BUILDER') ?? 0;
+    s.settlersTrained = made.get('SETTLER') ?? 0;
     const counts = history?.discountDistricts.get(p.id);
     s.discountDistricts = PLACEABLE_DISTRICTS.map((t) => counts?.get(t) ?? completedSpecialty(rec, ctx.cat, p.id));
-    s.settlersTrained = settlers ?? Math.max(0, rec.cities.filter((c) => c.owner === p.id).length - 1
-      + rec.units.filter((u) => u.owner === p.id && ctx.cat.units[u.type] === 'UNIT_SETTLER').length);
     for (const [id, def] of Object.entries(UNITS)) {
-      if (def.costStep === undefined) continue;
-      const n = copiesQuoted(rec, ctx.cat, p.id, `UNIT_${id}`, (k) => unitStepCost(id, k));
-      if (n === undefined) continue;
+      const n = made.get(id) ?? 0;
+      if (def.costStep === undefined || n === 0) continue;
       s.unitsAcquired ??= {};
       s.unitsAcquired[id] = n;
     }
@@ -2469,15 +2411,21 @@ export function importTurn(rec: TurnRecord, cat: Catalog, history?: History): Im
         ? engineId('project', cat.projects[head.ProjectType] ?? '', 'PROJECT_', PROJECTS) : null;
       if (project) minor.buildProject = project;
       else delete minor.buildProject;
-      // the item in hand and its progress, as the record's queue holds them
-      // (the overflow store and the progress kept on other items are not
-      // recorded)
+      // the item in hand, as the record's queue holds it, and the progress
+      // the city holds on each building and unit, the item in hand's
+      // included, as its memory does (`buildProgress`); a district's or a
+      // project's in hand is the record's floored one (the overflow store is
+      // not recorded)
       const item = minorHead(cat, c, W);
       const key = item ? minorItemKey(item) : '';
+      const held = buildProgress(rec, cat, c);
       if (key) {
         minor.prodItem = key;
-        minor.prodProgress = num(c.queueProgress?.[0]) || 0;
+        minor.prodProgress = held.get(key) ?? (num(c.queueProgress?.[0]) || 0);
+        held.delete(key);
       }
+      if (held.size) minor.prodRetained = Object.fromEntries(held);
+      else delete minor.prodRetained;
       // a district in hand stands at the record's queued Location
       if (item && 'district' in item) minor.prodSite = item.site;
       else delete minor.prodSite;
@@ -2751,7 +2699,7 @@ export function importTurn(rec: TurnRecord, cat: Catalog, history?: History): Im
   // check reads comes from the queue)
   let queueProgressRead = false;
   for (const city of cityByKey.values()) {
-    if (importQueue(ctx, state, dumpOfCity.get(city)!, city)) queueProgressRead = true;
+    if (importQueue(ctx, rec, state, dumpOfCity.get(city)!, city)) queueProgressRead = true;
   }
   // the record before is the last step's input where it is the turn before
   // and the owner's turn start ran once between each pair (`notStarted`)
@@ -2783,49 +2731,15 @@ export function importTurn(rec: TurnRecord, cat: Catalog, history?: History): Im
   // next record (the era checks' t+1 read) locks nothing
   if (history && history.last === rec) lockDistrictPrices(rec, cat, state, cityByKey, history);
   const stockOverCap = history ? importPower(ctx, rec, state, seatOfGame, history) : new Set<number>();
-  // a boosted item neither held nor current holds its boost as parked
-  // progress (`markBoost`); the record shows no item's progress but the
-  // current one's, so any research parked on it before is unread — a
-  // major's, a city-state's and the Free Cities' alike (runs/h1_duelw1121
-  // Ayutthaya t2: Sailing boosted, its 9 parked, 7 turns as logged). The
-  // share is of the price the item had where the boost landed — the game
-  // era of the turn before the first record that shows it boosted —, kept
-  // as the era moves on (runs/h1_duely1124 Colonialism, boosted at t101 /
-  // t115 / t116 an era ahead at 480, its 191 parked: 30 / 26 / 38 turns at
-  // t124 as logged, where the price of the era it reached, 400, leaves
-  // 34 / 30 / 44; runs/h1_duely1128 Bologna's Stirrups, boosted the turn
-  // the Medieval era began at t91, at the Classical price)
-  const boostEra = history && history.eraStartTurn === rec.turn ? Math.max(0, history.gameEra - 1) : state.gameEra;
-  // The research each player parked on an item it left (`foldResearchParked`)
-  // stands on it, its boost beside it where the boost landed after
+  // the research each seat holds on an item neither held nor in hand is the
+  // game's own per-item progress (PlayerTechs m_axResearchProgress,
+  // PlayerCulture m_axCulturalProgress, in 256ths): what it parked on an item
+  // it left, a boost's share, a city-state's catch-up alike; and the
+  // overflow a completion left for the next turn (m_xResearchOverflow,
+  // m_xCulturalOverflow)
   for (const s of [...state.seats, ...state.cityStates, ...(state.freeSeat ? [state.freeSeat] : [])]) {
-    const r = s.research;
     const pid = playerOfSeat.get(s.seat);
-    const researched = new Map<string, { amount: number; boosted: boolean }>();
-    for (const [key, v] of pid === undefined ? [] : history?.researchParked ?? []) {
-      const [owner, item] = key.split(':');
-      if (Number(owner) !== pid) continue;
-      const civic = item[0] === 'c';
-      const name = (civic ? cat.civics : cat.techs)[Number(item.slice(1))];
-      const id = civic ? engineId('civic', name, 'CIVIC_', CIVICS) : engineId('tech', name, 'TECH_', TECHS);
-      if (!id || r.techs.includes(id) || r.civics.includes(id) || r.tech === id || r.civic === id) continue;
-      researched.set(id, v);
-      (civic ? r.civicRetained : r.techRetained)[id] = v.amount;
-    }
-    for (const id of r.boosted) {
-      if (r.techs.includes(id) || r.civics.includes(id) || r.tech === id || r.civic === id || !BOOSTS[id]) continue;
-      const civic = !TECHS[id];
-      const key = `${s.seat}:${id}`;
-      let parked = history?.boostParked.get(key);
-      if (parked === undefined) {
-        const cost = researchCost(state, id, civic, s.seat, boostEra);
-        parked = Math.min(cost, boostAmount(cost, BOOSTS[id].pct, boostPoints(state, s.seat, civic)));
-        if (history && history.last === rec) history.boostParked.set(key, parked);
-      }
-      const before = researched.get(id);
-      if (before?.boosted) continue;
-      (civic ? r.civicRetained : r.techRetained)[id] = before ? Math.min(researchCost(state, id, civic, s.seat), parked + before.amount) : parked;
-    }
+    if (pid !== undefined) importResearchHeld(rec, cat, pid, s.research);
   }
   // the rivers named so far: the history's, then those the record's events
   // name over the record before's sight (`recordRiverNames`), the first
@@ -2846,27 +2760,18 @@ export function importTurn(rec: TurnRecord, cat: Catalog, history?: History): Im
   for (const [minor, item] of repairsInHand) {
     if (item && !('none' in item)) minor.prodProgress = Math.max(0, (minor.prodProgress ?? 0) - minorRepairResumed(state, minor, item));
   }
-  // A MINOR'S CATCH-UP as the record leaves it: the record shows no item's
-  // progress but the one in hand, so every row the minor lacks that its
-  // catch-up has set (at least `need` of the record's majors hold it) stands
-  // at its cost less one where nothing else is shown (runs/h1_duelv1121
-  // Hunza t118: Civil Engineering and Nationalism 1 turn each, its
-  // Urbanization 117 = 115 + 1 + 1 as AI_GovtPolicies.csv logs), and the
-  // counts its catch-up has seen are the record's majors'
+  // A MINOR'S CATCH-UP as the record leaves it: the counts its catch-up has
+  // seen are the record's majors'
   const catchUpMajors = majorsAlive(state).map((s) => state.seats[s].research);
-  const catchUpNeed = Math.max(1, Math.floor((MINOR_CATCHUP_PCT * catchUpMajors.length + 50) / 100));
   for (const m of [...state.cityStates, ...(state.freeSeat ? [state.freeSeat] : [])]) {
     const r = m.research;
     const seen = (civic: boolean) => {
       const have = civic ? r.civics : r.techs;
-      const kept = civic ? r.civicRetained : r.techRetained;
       const out: Record<string, number> = {};
       for (const id of Object.keys(civic ? CIVICS : TECHS)) {
         if (have.includes(id)) continue;
         const n = catchUpMajors.filter((x) => (civic ? x.civics : x.techs).includes(id)).length;
-        if (!n) continue;
-        out[id] = n;
-        if (n >= catchUpNeed && (civic ? r.civic : r.tech) !== id) kept[id] = Math.max(kept[id] ?? 0, researchCost(state, id, civic, m.seat) - 1);
+        if (n) out[id] = n;
       }
       return Object.keys(out).length ? out : undefined;
     };
@@ -3852,28 +3757,99 @@ export function aliasOrPrefixed(individual: string): string | null {
   return bare in PEOPLE ? bare : null;
 }
 
+/** A seat's research on the items it neither holds nor has in hand, and its
+ *  overflows, as the record's memory holds them (PlayerTechs
+ *  m_axResearchProgress / m_xResearchOverflow, PlayerCulture
+ *  m_axCulturalProgress / m_xCulturalOverflow, in 256ths, indexed by the
+ *  catalog's row). A record without them is an import error. */
+function importResearchHeld(rec: TurnRecord, cat: Catalog, pid: number, r: GameState['seats'][number]['research']): void {
+  for (const civic of [false, true]) {
+    const comp = civic ? 'PlayerCulture' : 'PlayerTechs';
+    const items = memField(rec, pid, comp, civic ? 'm_axCulturalProgress' : 'm_axResearchProgress');
+    const over = memField(rec, pid, comp, civic ? 'm_xCulturalOverflow' : 'm_xResearchOverflow');
+    if (items === undefined || typeof items === 'number' || typeof over !== 'number') {
+      throw new Error(`record t${rec.turn}: player ${pid} has no ${comp} progress`);
+    }
+    const kept: Record<string, number> = {};
+    const words = Array.isArray(items) ? Object.entries(items) : Object.entries(items).filter(([k]) => k !== 'n');
+    for (const [k, n] of words) {
+      if (!n) continue;
+      const name = (civic ? cat.civics : cat.techs)[Number(k)] ?? '';
+      const id = civic ? engineId('civic', name, 'CIVIC_', CIVICS) : engineId('tech', name, 'TECH_', TECHS);
+      if (!id || (civic ? r.civics : r.techs).includes(id) || (civic ? r.civic : r.tech) === id) continue;
+      kept[id] = n / 256;
+    }
+    if (civic) {
+      r.civicRetained = kept;
+      if (over) r.civicOverflow = over / 256;
+      else delete r.civicOverflow;
+    } else {
+      r.techRetained = kept;
+      if (over) r.techOverflow = over / 256;
+      else delete r.techOverflow;
+    }
+  }
+}
+
+/** The production a city holds on each building and each unit: its build
+ *  queue's per-item progress in its memory (City m_kBuildQueue +0x218 the
+ *  buildings', +0x230 the units'), in production points, by the catalog's
+ *  row; its floor is the record's `queueProgress` of the item in hand on
+ *  every record of the five runs/h1_duelz. A record without it is an import
+ *  error. */
+function buildRows(rec: TurnRecord, c: DumpCity): { building: Map<number, number>; unit: Map<number, number> } {
+  const v = memCity(rec, c.owner, c.id)?.['m_kBuildQueue.v'] as unknown as Record<string, unknown> | undefined;
+  const read = (rows: unknown) => {
+    if (!rows || typeof rows !== 'object' || Array.isArray(rows)) {
+      throw new Error(`record t${rec.turn}: city ${c.owner}:${c.id} has no m_kBuildQueue progress`);
+    }
+    const out = new Map<number, number>();
+    for (const [k, n] of Object.entries(rows as Record<string, number>)) if (k !== 'n' && n) out.set(Number(k), n / 256);
+    return out;
+  };
+  return { building: read(v?.['134']), unit: read(v?.['140']) };
+}
+
+/** `buildRows` by the minors' item key (`building:<id>`, `unit:<id>`) */
+function buildProgress(rec: TurnRecord, cat: Catalog, c: DumpCity): Map<string, number> {
+  const rows = buildRows(rec, c);
+  const out = new Map<string, number>();
+  for (const kind of ['building', 'unit'] as const) {
+    for (const [k, n] of rows[kind]) {
+      const id = engineRowOf(cat, kind, k);
+      if (id) out.set(`${kind}:${id}`, n);
+    }
+  }
+  return out;
+}
+
 /**
  * A city's build queue in order. What each entry builds is its row (the
  * entry's one type key, a civilization's unique row read as the row it
- * replaces), a district or wonder on the entry's plot; its progress is the
- * record's `queueProgress` where the record carries it and 0 where it does
- * not (`Imported.queueProgressRead`). A district's locked price is the one
+ * replaces), a district or wonder on the entry's plot; a building's, a
+ * wonder's and a unit's progress is the city's memory's (`buildRows`), a
+ * district's and a project's the record's `queueProgress` where the record
+ * carries it and 0 where it does not (`Imported.queueProgressRead`). A
+ * district's locked price is the one
  * the record quotes for it; the other prices the engine locks at queueing (a
  * project's, a Settler's, a Builder's or a Trader's) are the engine's own for
  * the imported state.
  */
-function importQueue(ctx: Ctx, state: GameState, c: DumpCity, city: City): boolean {
+function importQueue(ctx: Ctx, rec: TurnRecord, state: GameState, c: DumpCity, city: City): boolean {
   const s = seatOf(state, city.seat);
   if (!s) return false;
   const W = state.map.width;
   let read = false;
   let unlocks: ReturnType<typeof computeUnlocks> | null = null;
   const queue: QueueItem[] = [];
+  const rows = buildRows(rec, c);
   c.queue.forEach((e, i) => {
     if (typeof e !== 'object' || e === null) return;
     const pr = num(c.queueProgress?.[i]);
     if (Number.isFinite(pr) && pr >= 0) read = true;
-    const progress = Number.isFinite(pr) && pr >= 0 ? pr : 0;
+    const progress = e.UnitType !== undefined ? rows.unit.get(e.UnitType) ?? 0
+      : e.BuildingType !== undefined ? rows.building.get(e.BuildingType) ?? 0
+        : Number.isFinite(pr) && pr >= 0 ? pr : 0;
     const at = e.Location && e.Location.x >= 0 ? e.Location.y * W + e.Location.x : -1;
     if (e.UnitType !== undefined) {
       const id = engineRowOf(ctx.cat, 'unit', e.UnitType);
@@ -4266,37 +4242,6 @@ function importResearchTree(rec: TurnRecord, history?: History): ResearchTree {
   }
   if (history) history.researchTree = tree;
   return tree;
-}
-
-/**
- * THE RESEARCH A PLAYER PARKED (`History.researchParked`): a record shows the
- * progress of the item in hand alone. Where the next record holds another
- * item in hand and the first unheld, the player's step of the turn between
- * banked the turn's yield into it before its choice moved on (the minors'
- * bank before their research AI's turn, `minorResearchBank`), so the item
- * keeps the record's progress plus the record's yield (`selectResearch`
- * parks it): runs/h1_duely1117 city-state 3's Sanitation, in hand t149-t154,
- * 50 turns at t156 beside Economics' 58 at the same cost. An item back in
- * hand shows its progress again, and one held is spent.
- */
-function foldResearchParked(h: History, prev: TurnRecord, rec: TurnRecord): void {
-  const was = new Map(prev.players.map((p) => [p.id, p]));
-  for (const p of rec.players) {
-    const q = was.get(p.id);
-    if (!q) continue;
-    for (const civic of [false, true]) {
-      const before = num(civic ? q.civic : q.researching);
-      const now = num(civic ? p.civic : p.researching);
-      const held = (civic ? p.civics : p.techs) ?? '';
-      const key = (i: number) => `${p.id}:${civic ? 'c' : 't'}${i}`;
-      for (let i = 0; i < held.length; i++) if (held[i] === '1') h.researchParked.delete(key(i));
-      if (before >= 0 && before !== now && held[before] !== '1') {
-        const amount = num(civic ? q.civicProgress : q.researchProgress) + num(civic ? q.cultureYield : q.scienceYield);
-        h.researchParked.set(key(before), { amount, boosted: ((civic ? q.civicBoosts : q.techBoosts) ?? '')[before] === '1' });
-      }
-      if (now >= 0) h.researchParked.delete(key(now));
-    }
-  }
 }
 
 /**

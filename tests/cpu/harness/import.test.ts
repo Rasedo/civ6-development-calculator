@@ -122,7 +122,29 @@ function record(turn: number, over: Partial<TurnRecord> = {}): TurnRecord {
     units: [unit(0, 1, 0, 2, 1), unit(0, 2, 2, 3, 1), unit(1, 3, 0, 5, 3)],
     errors: [],
     ...over,
+    mem: memOf(over.players ?? [0, 1, 2].map((id) => ({ id })), over.cities ?? [{ owner: 0 }, { owner: 2 }], over.mem),
   };
+}
+
+/** the game's memory every record carries: each player's units made, research
+ *  and culture banks, each city's build progress, all empty, under `extra`'s
+ *  components and cities */
+function memOf(players: readonly { id: number }[], cities: readonly { owner: number }[], extra: TurnRecord['mem'] = {}): TurnRecord['mem'] {
+  const out: NonNullable<TurnRecord['mem']> = {};
+  for (const p of players) {
+    const x = (extra?.[String(p.id)] ?? {}) as Record<string, unknown>;
+    const mine = cities.filter((c) => c.owner === p.id);
+    const given = (x.cities ?? []) as Record<string, unknown>[];
+    out[String(p.id)] = {
+      ...x,
+      PlayerStats: { 'm_aiNumUnitsConstructed.v': { 0: { n: CAT.units.length } }, ...(x.PlayerStats as object) },
+      PlayerTechs: { m_axResearchProgress: { n: CAT.techs.length }, m_xResearchOverflow: 0, ...(x.PlayerTechs as object) },
+      PlayerCulture: { m_axCulturalProgress: { n: CAT.civics.length }, m_xCulturalOverflow: 0, m_xLifetimeCulture: 0,
+        m_axTourismOn: { n: 64 }, ...(x.PlayerCulture as object) },
+      cities: mine.map((_c, i) => ({ 'm_kBuildQueue.v': { 134: { n: CAT.buildings.length }, 140: { n: CAT.units.length } }, ...given[i] })),
+    } as never;
+  }
+  return out;
 }
 
 describe('importTurn', () => {
@@ -374,11 +396,14 @@ describe('the build queue', () => {
   const queue = [{ UnitType: 3 }, { BuildingType: 2 }, { DistrictType: 1, Location: { x: 4, y: 2 } },
     { BuildingType: 4, Location: { x: 1, y: 2 } }, { ProjectType: 0 }];
 
-  it('carries each entry as the engine item, its progress where the record has it', () => {
-    const rec = record(10, { cities: [city({ queue, queueProgress: [5, 7, 'err:no reader', 0, 2] }), record(10).cities[1]] });
+  it('carries each entry as the engine item, a unit\'s and a building\'s progress the city memory\'s, the rest where the record has it', () => {
+    const rec = record(10, {
+      cities: [city({ queue, queueProgress: [5, 7, 'err:no reader', 0, 2] }), record(10).cities[1]],
+      mem: { 0: { cities: [{ 'm_kBuildQueue.v': { 134: { n: 8, 2: 7 * 256 }, 140: { n: 4, 3: 5 * 256 + 128 } } }] } } as never,
+    });
     const imp = importTurn(rec, CAT);
     const q = imp.state.seats[0].cities[0].queue;
-    expect(q.map((x) => [x.kind, x.progress])).toEqual([['settler', 5], ['building', 7], ['district', 0], ['wonder', 0], ['project', 2]]);
+    expect(q.map((x) => [x.kind, x.progress])).toEqual([['settler', 5.5], ['building', 7], ['district', 0], ['wonder', 0], ['project', 2]]);
     // the price the engine would lock queueing it into an empty queue
     expect(q[0]).toMatchObject({ cost: settlerCost(importTurn(record(10), CAT).state, 0) });
     expect(q[1]).toMatchObject({ building: 'LIBRARY' });

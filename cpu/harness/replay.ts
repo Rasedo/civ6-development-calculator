@@ -47,7 +47,7 @@ import { applySeatUnitOrders, buySeatBuilding, declareWar, districtSiteCost, dis
 import { addEnvoys, cityStateAt, declareWarOnCityState, minorCity, minorReplaceCitizens, placeCityStateAt, sueForPeaceWithCityState } from '../core/cityStates';
 import { CP_ACCEPTED, CP_CANCELLED, CP_IN_PROGRESS, contractById } from '../core/aiContracts';
 import { availableBuildings, canPlaceWonder, validImprovements, wallsMax } from '../core/rules';
-import { builderHarvest, builderRemoveFeature, spawnUnit, trainableUnits, builderCost, traderCost, disbandUnit, drawAndPayGoody, grantedMoves, unitFullMoves, restUnit, upgradeUnit, unitsAt, unitDomain, fortifyBonus, crossesRiver, waterWalks, cityAtIndex, raiseBestTrained, recordAttacker, unitMadeAnew, FORTIFY_MAX_TURNS, ANTIQUITY_CIVIC, SHIPWRECK_CIVIC } from '../core/units';
+import { builderHarvest, builderRemoveFeature, spawnUnit, tallyUnitMade, trainableUnits, builderCost, traderCost, disbandUnit, drawAndPayGoody, grantedMoves, unitFullMoves, restUnit, upgradeUnit, unitsAt, unitDomain, fortifyBonus, crossesRiver, waterWalks, cityAtIndex, raiseBestTrained, recordAttacker, unitMadeAnew, FORTIFY_MAX_TURNS, ANTIQUITY_CIVIC, SHIPWRECK_CIVIC } from '../core/units';
 import { availableCivicsIn, availableTechsIn, computeUnlocks, goldPrice, governmentSlots, policyWireOf, seatGovernment, darkAgeEra,
   unlockedPolicyIds } from '../core/effects';
 import { selectResearch, chopGrant, harvestGrant, applyLumpYield, holdResearchEra, researchCost } from '../core/economy';
@@ -1873,7 +1873,7 @@ function minorBuysAfter(ctx: Ctx, copy: GameState, buys: readonly CopyBuy[], twi
     }
     const [{ d, rec }] = open.splice(k, 1);
     cs.treasury -= price;
-    if (u.type === 'BUILDER') cs.buildersTrained += 1;
+    tallyUnitMade(cs, u.type);
     // a record unit the turn's new units already stand for (`matchNewUnits`)
     const real = unitOf(ctx, d.unit) ?? spawnRecorded(ctx, rec, d.unit);
     if (real) {
@@ -3073,8 +3073,14 @@ function applyBuyUnit(ctx: Ctx, d: Extract<Decision, { kind: 'buyUnit' }>, rec: 
     return;
   }
   const kind = `buyUnit:${d.currency}`;
+  // a purchase the engine refused stands as the record's unit, a unit its
+  // player made (`tallyUnitMade`)
+  const imposed = () => {
+    const u = spawnRecorded(ctx, rec, d.unit);
+    if (u && actor) tallyUnitMade(actor, u.type);
+  };
   if (!actor || !city || !id || city.seat !== seat) {
-    spawnRecorded(ctx, rec, d.unit);
+    imposed();
     return void count(ctx, kind, 'fallback', d.player);
   }
   const before = new Set(state.units);
@@ -3100,7 +3106,8 @@ function applyBuyUnit(ctx: Ctx, d: Extract<Decision, { kind: 'buyUnit' }>, rec: 
   } else ok = purchaseUnitWithFaith(state, city.id, id, seat).ok;
   const made = state.units.find((u) => !before.has(u) && u.seat === seat && u.type === id);
   if (ok && made) ctx.units.set(d.unit, made);
-  else spawnRecorded(ctx, rec, d.unit);
+  else if (ok) spawnRecorded(ctx, rec, d.unit);
+  else imposed();
   count(ctx, kind, ok && made ? 'applied' : 'fallback', d.player,
     d.currency === 'gold' && id !== 'SETTLER' ? `${id} price ${unitGoldPrice(state, id, seat, city)} treasury ${Math.round(actor.treasury ?? 0)}` : id);
 }
@@ -3695,8 +3702,7 @@ const res = buyTile(state, city.id, d.plot, seat);        if (!res.ok) setTileOw
         for (const x of ds) {
           if (x.kind !== 'unitNew' || x.why !== 'other' || x.player !== d.player) continue;
           const type = engineRowOf(ctx.cat, 'unit', x.type);
-          if (type === 'BUILDER') s.buildersTrained += 1;
-          else if (type === 'SETTLER') s.settlersTrained = (s.settlersTrained ?? 0) + 1;
+          if (type) tallyUnitMade(s, type);
         }
         const grew = d.popCity >= 0 ? cityAt(state, d.popCity) : undefined;
         if (grew && grew.seat === s.seat) {
@@ -4605,6 +4611,33 @@ const near = (a: number, b: number) => Math.abs(a - b) <= EXACT;
 const r3 = (v: number) => Math.round(v * 1000) / 1000;
 const setOf = (xs: readonly (string | null)[]) => xs.filter((x) => x !== null).sort().join(',');
 
+/** the copies a seat's price progressions count: its Builders, its Settlers
+ *  and each progressive chassis */
+const unitsMade = (s: Seat) => [`BUILDER ${s.buildersTrained}`, `SETTLER ${s.settlersTrained ?? 0}`,
+  ...Object.entries(s.unitsAcquired ?? {}).filter(([, n]) => n > 0).sort().map(([id, n]) => `${id} ${n}`)].join(', ');
+
+/** a kept-progress table's nonzero rows, rounded to the game's 256ths */
+const keptOf = (kept: Readonly<Record<string, number>> | undefined): Record<string, number> =>
+  Object.fromEntries(Object.entries(kept ?? {}).filter(([, v]) => v > EXACT).sort().map(([k, v]) => [k, r3(v)]));
+/** the research a seat holds on items neither held nor in hand, and what it
+ *  holds toward none: its overflows, with the progress banked while nothing
+ *  is in hand */
+const researchKept = (s: Seat): Record<string, number> => {
+  const r = s.research;
+  const tech = (r.techOverflow ?? 0) + (r.tech ? 0 : r.techProgress);
+  const civic = (r.civicOverflow ?? 0) + (r.civic ? 0 : r.civicProgress);
+  return {
+    ...Object.fromEntries(Object.entries(keptOf(r.techRetained)).map(([k, v]) => [`t:${k}`, v])),
+    ...Object.fromEntries(Object.entries(keptOf(r.civicRetained)).map(([k, v]) => [`c:${k}`, v])),
+    ...(tech > EXACT ? { techOverflow: r3(tech) } : {}),
+    ...(civic > EXACT ? { civicOverflow: r3(civic) } : {}),
+  };
+};
+const sameKept = (a: Record<string, number>, b: Record<string, number>) => {
+  const ks = new Set([...Object.keys(a), ...Object.keys(b)]);
+  return [...ks].every((k) => Math.abs((a[k] ?? 0) - (b[k] ?? 0)) <= 0.002);
+};
+
 /** the engine's state against the importer's reading of record t+1 */
 export function compareState(state: GameState, read: Imported): Tallies {
   const t: Tallies = {};
@@ -4631,10 +4664,13 @@ export function compareState(state: GameState, read: Imported): Tallies {
     const rh = rc.queue[0];
     if (rh || eh) {
       const same = !!eh && !!rh && itemKey(eh) === itemKey(rh);
-      // the record's progress is the game's 24.8 value truncated to whole
-      // points (every recorded `queueProgress` is whole; runs/h1_duelw1117
-      // Xi'an t19 a Settler at 0.80078125 overflow + 10.80078125 reads 11)
-      const ok = same && (!read.queueProgressRead || Math.floor(eh.progress + 1e-9) === rh.progress);
+      // a building's, a wonder's and a unit's progress is the city's memory's
+      // (`buildRows`); a district's or a project's the record's, the game's
+      // 24.8 value truncated to whole points (every recorded `queueProgress`
+      // is whole)
+      const exact = eh && (eh.kind === 'building' || eh.kind === 'wonder' || eh.kind === 'unit' || eh.kind === 'settler');
+      const ok = same && (!read.queueProgressRead
+        || (exact ? near(eh.progress, rh.progress) : Math.floor(eh.progress + 1e-9) === rh.progress));
       note(t, 'city.production', ok, name, rh ? `${itemKey(rh)} ${r3(rh.progress)}` : null, eh ? `${itemKey(eh)} ${r3(eh.progress)}` : null,
         same ? Math.abs(eh.progress - rh.progress) : 1000);
     }
@@ -4653,10 +4689,21 @@ export function compareState(state: GameState, read: Imported): Tallies {
       Math.abs((ecs.foodBox ?? 0) - (rcs.foodBox ?? 0)));
     note(t, 'minor.culture', near(ecs.cultureBox ?? 0, rcs.cultureBox ?? 0), name, r3(rcs.cultureBox ?? 0), r3(ecs.cultureBox ?? 0),
       Math.abs((ecs.cultureBox ?? 0) - (rcs.cultureBox ?? 0)));
+    note(t, 'minor.unitsMade', unitsMade(ecs) === unitsMade(rcs), name, unitsMade(rcs), unitsMade(ecs));
+    const ek = keptOf(ecs.prodRetained);
+    const rk = keptOf(rcs.prodRetained);
+    note(t, 'minor.prodKept', sameKept(ek, rk), name, rk, ek);
+    const er = researchKept(ecs);
+    const rr = researchKept(rcs);
+    note(t, 'minor.researchKept', sameKept(er, rr), name, rr, er);
   }
   rs.seats.forEach((rsx, seat) => {
     const es = state.seats[seat];
     const name = `seat ${read.playerOfSeat.get(seat)} ${rsx.name}`;
+    note(t, 'seat.unitsMade', unitsMade(es) === unitsMade(rsx), name, unitsMade(rsx), unitsMade(es));
+    const er = researchKept(es);
+    const rr = researchKept(rsx);
+    note(t, 'seat.researchKept', sameKept(er, rr), name, rr, er);
     note(t, 'seat.gold', near(es.treasury ?? 0, rsx.treasury ?? 0), name, r3(rsx.treasury ?? 0), r3(es.treasury ?? 0),
       Math.abs((es.treasury ?? 0) - (rsx.treasury ?? 0)));
     note(t, 'seat.faith', near(es.faith ?? 0, rsx.faith ?? 0), name, r3(rsx.faith ?? 0), r3(es.faith ?? 0), Math.abs((es.faith ?? 0) - (rsx.faith ?? 0)));
@@ -5043,13 +5090,11 @@ const MINOR_MEMORY = ['prodSetValue', 'favoredFood', 'tradeCities', 'tradeReject
 const CITY_MEMORY = ['aiThreat', 'aiThreatNear', 'freeRaid', 'tradeCities', 'tradeRejected'] as const;
 const UNIT_MEMORY = ['slot', 'aiDefender', 'aiHomed', 'escorted', 'originalOwner'] as const;
 const GAME_MEMORY = ['barbTribes', 'barbPool', 'barbCampsBegun', 'barbSpotNext'] as const;
-/** THE RULES' STORES NO RECORD SHOWS, carried the same way: the research
- *  and culture overflow a completion left for the next turn's yield
- *  (runs/h1_duelw1121 Hunza t7: Pottery's 1.5 over, Astrology 7 turns as
- *  logged), the barbarian kills a boost counts, the wars' clocks; a
- *  city-state's production overflow, the progress its items switched from
- *  keep (runs/h1_duely1117 Caguana t117: its Art Museum's 46.3 of 145, valued
- *  110.7 as its tree's contract 381 at 110.0), its powered project and repair
+/** THE RULES' STORES NO RECORD SHOWS, carried the same way: the barbarian
+ *  kills a boost counts, the wars' clocks; a city-state's production
+ *  overflow, the progress its districts, projects and repairs switched from
+ *  keep (`minorKeptCarried`; a building's and a unit's are the record's),
+ *  its powered project and repair
  *  waits, the turn its city was last hit (the walls' repair waits three quiet
  *  turns: runs/h1_duely1124 Cardiff t86-88 NO BUILDS AT ALL, the repair
  *  from t89),
@@ -5060,8 +5105,19 @@ const GAME_MEMORY = ['barbTribes', 'barbPool', 'barbCampsBegun', 'barbSpotNext']
  *  its Faith a turn) */
 const GAME_STORES = ['warTurns'] as const;
 const SEAT_STORES = ['barbKills'] as const;
-const RESEARCH_STORES = ['techOverflow', 'civicOverflow'] as const;
-const MINOR_STORES = ['prodOverflow', 'prodRetained', 'repairWait', 'lastHitTurn', 'fuelShort', 'tradeRoutes', 'foundedTurn', 'stockpile', 'prodReserved', 'gpPoints'] as const;
+const MINOR_STORES = ['prodOverflow', 'repairWait', 'lastHitTurn', 'fuelShort', 'tradeRoutes', 'foundedTurn', 'stockpile', 'prodReserved', 'gpPoints'] as const;
+
+/** the progress a city-state's districts, projects and repairs it switched
+ *  from keep, the engine's own, beside the record's kept on its buildings and
+ *  units (`buildRows`) */
+function minorKeptCarried(from: CityState, to: CityState): void {
+  const kept = { ...to.prodRetained };
+  for (const [k, v] of Object.entries(from.prodRetained ?? {})) {
+    if (!k.startsWith('building:') && !k.startsWith('unit:') && k !== to.prodItem) kept[k] = v;
+  }
+  if (Object.keys(kept).length) to.prodRetained = kept;
+  else delete to.prodRetained;
+}
 
 /** the named fields of `from` onto `to`, a field `from` lacks dropped */
 function carryFields(from: object, to: object, keys: readonly string[]): void {
@@ -5124,7 +5180,7 @@ function bindQueuedContracts(ctx: Ctx, cs: CityState, imp: Imported, turn: numbe
  * the engine's own last turn. A unit the record and the engine both hold
  * keeps the engine's id (the memory names units by id) and its memory; the
  * others take fresh ids. The rules' stores no record shows (`SEAT_STORES`,
- * `RESEARCH_STORES`, `MINOR_STORES`) come over too. A Free City both hold keeps the engine's city id,
+ * `MINOR_STORES`) come over too. A Free City both hold keeps the engine's city id,
  * its plots and its grants with it. The replay's own carry-overs of the
  * world (the production banked on items switched away from) start empty.
  */
@@ -5255,16 +5311,18 @@ function perTurnWorld(ctx: Ctx, a: TurnRecord, imp: Imported, history: History, 
   world.nextUnitId = nextId;
   const seatPair = (from: Seat, to: Seat, minor: boolean) => {
     carryFields(from, to, [...SEAT_MEMORY, ...SEAT_STORES]);
-    carryFields(from.research, to.research, [...RESEARCH_MEMORY, ...RESEARCH_STORES]);
+    carryFields(from.research, to.research, RESEARCH_MEMORY);
     if (minor) {
       carryFields(from, to, [...MINOR_MEMORY, ...MINOR_STORES]);
-      // the record floors the item's progress (queueProgress): the engine's
-      // own fraction stands where it floors to the record's on the same item
-      // (runs/h1_duely1127 Hattusa's Trader at 2.4 a turn, 23.6 + 2.4
-      // completing at t40, 23 + 2.4 short of 26)
+      minorKeptCarried(from as CityState, to as CityState);
+      // the record floors a district's or a project's progress
+      // (queueProgress; a building's and a unit's are the city's memory's):
+      // the engine's own fraction stands where it floors to the record's on
+      // the same item
       const f = from as CityState;
       const t = to as CityState;
-      if (f.prodItem !== undefined && f.prodItem === t.prodItem && Math.floor(f.prodProgress ?? 0) === (t.prodProgress ?? 0)) t.prodProgress = f.prodProgress;
+      if (f.prodItem !== undefined && f.prodItem === t.prodItem && !/^(building|unit):/.test(f.prodItem)
+        && Math.floor(f.prodProgress ?? 0) === (t.prodProgress ?? 0)) t.prodProgress = f.prodProgress;
       // a district project's conversion the record cannot give (its step
       // paid in an overflow no record holds) is the engine's own step's
       // (runs/h1_duely1124 city-state 4 t36: Campus Research Grants begun

@@ -3803,14 +3803,22 @@ class SimMasks:
         if len(_hold) > 0:
             self._occ_set_new(_hold, spot.take(_hold), nxt.take(_hold) + off)
         nxt[rows] += 1
-        # no chassis a minor or the Free Cities trains climbs in price, so the
-        # tally below has no column for them
+        # `tallyUnitMade`: the copies a price progression counts rise here, at
+        # the one place a unit is born (PlayerStats m_aiNumUnitsConstructed,
+        # 0x4c1a30) — trained, bought, granted, a village's alike; a starting
+        # unit never comes through here. Gated on `can` like TS: a no-spot
+        # spawn lands nothing. The barbarians and the Free Cities count none;
+        # a city-state's one progressive chassis is the Builder.
+        if self._builder_idx >= 0:
+            made_b = (can & (ti_n == self._builder_idx)).long()
+            if row < self.n_majors:
+                self.civ_builders_trained[:, row] += made_b
+            elif self._CITY_MINOR0 <= row < self._CITY_MINOR0 + self.S:
+                self.citystate_builders_trained[:, row - self._CITY_MINOR0] += made_b
         if minor:
             return can
-        # CIV6 (Units.xml, COST_PROGRESSION_PREVIOUS_COPIES): a chassis whose
-        # price climbs is priced off every copy the seat has ever acquired, so
-        # the tally is taken here — a purchase, a grant or a Great Person's free
-        # one alike. Gated on `can` like TS: a no-spot spawn lands nothing.
+        if self._settler_idx >= 0:
+            self.civ_settlers_trained[:, row] += (can & (ti_n == self._settler_idx)).long()
         self.civ_unit_acq[:, row].scatter_add_(
             1, ti_n.unsqueeze(1),
             (can & (self._type_cost_step.take(ti_n) > 0)).long().unsqueeze(1))

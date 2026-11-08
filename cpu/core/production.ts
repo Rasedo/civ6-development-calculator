@@ -414,7 +414,7 @@ export function completeQueueItem(
       // the city — a unit like any other, moved and founded by orders.
       // CIV6 (Provision): "Settlers trained in the city do not consume a
       // Population."
-      if (spawnUnit(state, 'SETTLER', city.centerIndex, city.seat, 'stack')) owner.settlersTrained = (owner.settlersTrained ?? 0) + 1;
+      spawnUnit(state, 'SETTLER', city.centerIndex, city.seat, 'stack');
       if (!governorFlag(state, city, (e) => e.settlerFreePop)) {
         city.population = Math.max(1, city.population - 1);
         // CIV6 (the citizen manager, 0x194fb0 with a negative count): a
@@ -441,7 +441,6 @@ export function completeQueueItem(
         applyTrainingGrants(state, city, trained);
         grantFreePromotion(trained, freePromo);
       }
-      if (item.unit === 'BUILDER') owner.buildersTrained += 1;
       // CIV6 (Venetian Arsenal): a TRAINED naval unit arrives twice. Purchases
       // are excluded in the real game and take a different path here.
       // CIV6 (People of the Steppe): "Receive a second light cavalry unit

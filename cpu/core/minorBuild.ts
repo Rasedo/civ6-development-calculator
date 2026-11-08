@@ -860,7 +860,6 @@ export function minorBuyUnit(state: GameState, cityState: CityState, id: string,
   }
   applyTrainingGrants(state, minorCity(cityState), u);
   cityState.treasury -= price;
-  if (id === 'BUILDER') cityState.buildersTrained += 1;
   purchaseTracer?.(cityState, u, price);
   return u;
 }
@@ -2200,7 +2199,6 @@ function minorFinish(state: GameState, cityState: CityState, item: Exclude<Minor
     if (!unit) return false;
     built = unit.id;
     applyTrainingGrants(state, minorCity(cityState), unit);
-    if (item.unit === 'BUILDER') cityState.buildersTrained += 1;
     // its reservation released and its strategic cost charged together
     // (0x1856b3 / 0x185a2a)
     const cost = unitResourceCost(item.unit);

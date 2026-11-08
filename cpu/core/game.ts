@@ -801,7 +801,6 @@ export function purchaseSettler(state: GameState, cityId: number, seat: number):
     if (!state.sandbox) buyer.treasury += cost; // refund: nowhere to stand
     return { ok: false, reason: 'No free tile near the city center.' };
   }
-  buyer.settlersTrained = (buyer.settlersTrained ?? 0) + 1;
   // Purchased settlers cost the pop too (real Civ 6).
   city.population = Math.max(1, city.population - 1);
   logPopWrite(state, city, 'sb');
@@ -1304,14 +1303,11 @@ export function purchaseCivilianWithFaith(
   const u = spawnUnit(state, unitType, city.centerIndex, seat);
   if (!u) return { ok: false, reason: 'No free tile near the city center.' };
   buyer.faith = (buyer.faith ?? 0) - cost;
-  // Purchased settlers cost the pop too (real Civ 6); a purchased builder
-  // escalates builderCost like a trained one.
+  // Purchased settlers cost the pop too (real Civ 6).
   if (unitType === 'SETTLER') {
     city.population = Math.max(1, city.population - 1);
     logPopWrite(state, city, 'sf');
-    buyer.settlersTrained = (buyer.settlersTrained ?? 0) + 1;
   }
-  else buyer.buildersTrained += 1;
   return { ok: true };
 }
 

@@ -2095,8 +2095,6 @@ class SimMinors:
             xp = self._train_xp_pct(bl, u0, row, col0)
         landed = self._spawn_unit(row, mask, self.citystate_center[:, s].clamp(min=0), u0, init_xp=xp, stack=stack)
         self._raise_best_trained(row, landed, u0)
-        if self._builder_idx >= 0:
-            self.citystate_builders_trained[:, s] += (landed & (u0 == self._builder_idx)).long()
         self._gen_ver += 1
         return landed
 

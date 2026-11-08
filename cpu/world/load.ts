@@ -101,7 +101,7 @@ export function loadWorld(world: WorldFile): GameState {
     }
     for (const u of civ.units) {
       if (!UNITS[u.type]) throw new Error(`world file names unit type '${u.type}' the engine does not know`);
-      const spawned = spawnUnit(state, u.type, u.tile, i);
+      const spawned = spawnUnit(state, u.type, u.tile, i, 'near', false);
       if (!spawned || spawned.tileIndex !== u.tile) {
         throw new Error(`seed ${world.gen.seed}: ${u.type} for civ ${i} could not spawn exactly on tile ${u.tile}`);
       }
@@ -114,7 +114,7 @@ export function loadWorld(world: WorldFile): GameState {
   // holds them in and the order the GPU seeds its pool.
   for (const cityState of state.cityStates) {
     for (let k = 0; k < MINOR_STARTING_UNITS; k++) {
-      spawnUnit(state, MINOR_STARTING_UNIT, cityState.centerIndex, cityState.seat);
+      spawnUnit(state, MINOR_STARTING_UNIT, cityState.centerIndex, cityState.seat, 'near', false);
     }
   }
 

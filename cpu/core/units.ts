@@ -1947,13 +1947,16 @@ export function unitMadeAnew(state: GameState, u: Unit): void {
  *    centre), else as 'near';
  *  - 'far': a GRANT, which the game places on the nearest plot that takes
  *    the unit however far that is — past the anchor and its ring, the whole
- *    map by distance, the lower tile index on a tie. */
+ *    map by distance, the lower tile index on a tie.
+ *  `made`: the unit counts among the units its seat made (`tallyUnitMade`);
+ *  a starting unit does not. */
 export function spawnUnit(
   state: GameState,
   unitType: string,
   nearIndex: number,
   seat: number,
   place: 'near' | 'stack' | 'far' = 'near',
+  made = true,
 ): Unit | null {
   const def = UNITS[unitType];
   if (!def) return null;
@@ -2050,18 +2053,29 @@ export function spawnUnit(
   }
   questUnitAdded(state, seat, unitType);
   revealAround(state, seat, unit.tileIndex, unitSight(unit, state), { seeThrough: unitSeesThrough(unit), mover: { units: [unit], from: -1 } });
-  // CIV6 (Units.xml, COST_PROGRESSION_PREVIOUS_COPIES): a chassis whose price
-  // climbs is priced off every copy the seat has ever acquired, so the tally is
-  // taken at the one place a unit is born — a purchase, a grant or a Great
-  // Person's free one alike.
-  if (def.costStep !== undefined) {
+  // the barbarians' and the Free Cities' records count nothing (players 63
+  // and 62 of the five runs/h1_duelz through t250)
+  if (made && (isCiv(seat) || isCityStateSeat(seat))) {
     const owner = seatOf(state, seat);
-    if (owner) {
-      owner.unitsAcquired ??= {};
-      owner.unitsAcquired[unitType] = (owner.unitsAcquired[unitType] ?? 0) + 1;
-    }
+    if (owner) tallyUnitMade(owner, unitType);
   }
   return unit;
+}
+
+/** CIV6 (PlayerStats m_aiNumUnitsConstructed, GameCore_XP2_Release.dll
+ *  0x4c1a30 +1 as a unit is made, read by the cost progression 0x4f2fc0
+ *  through 0x4bed20): the copies a price progression counts — the Builder's,
+ *  the Settler's and each COST_PROGRESSION_PREVIOUS_COPIES chassis' — rise at
+ *  the one place a unit is born: trained, bought with Gold or Faith, granted
+ *  by a wonder (runs/h1_duelz1121 t48: Pyramids' Builder, China's quote 31 to
+ *  33), a village's. A starting unit and a captured one count nothing. */
+export function tallyUnitMade(owner: Seat, unitType: string): void {
+  if (unitType === 'BUILDER') owner.buildersTrained += 1;
+  else if (unitType === 'SETTLER') owner.settlersTrained = (owner.settlersTrained ?? 0) + 1;
+  else if (UNITS[unitType]?.costStep !== undefined) {
+    owner.unitsAcquired ??= {};
+    owner.unitsAcquired[unitType] = (owner.unitsAcquired[unitType] ?? 0) + 1;
+  }
 }
 
 export function cityAtIndex(
@@ -2554,13 +2568,11 @@ export function drawAndPayGoody(state: GameState, unit: Unit, tile: Tile): void 
     }
     case 'unitInCity': {
       // a village's Builder or Settler is a copy the chassis' price climbs on
-      // (COST_PROGRESSION_PREVIOUS_COPIES): every logged village Builder moved
+      // (`tallyUnitMade`): every logged village Builder moved
       // its player's quote one step (runs/h1_duelw1117 China t8 25 -> 27, 1118
       // Rome t14, 1120 t25 and t170, 1121 t80, 1124 t149)
       const city = nearestCityTo(state, owner, tile);
-      if (!city || !spawnUnit(state, p.unit, city.centerIndex, unit.seat)) break;
-      if (p.unit === 'BUILDER') owner.buildersTrained += 1;
-      else if (p.unit === 'SETTLER') owner.settlersTrained = (owner.settlersTrained ?? 0) + 1;
+      if (city) spawnUnit(state, p.unit, city.centerIndex, unit.seat);
       break;
     }
     case 'experience':

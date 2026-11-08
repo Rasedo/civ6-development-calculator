@@ -2848,7 +2848,6 @@ class SimSeats:
             if bool(want_s.count_nonzero()):
                 landed_s = self._spawn_unit(row, want_s, ctr_s, self._settler_idx)
                 self.civ_treasury[:, row] = torch.where(landed_s, self.civ_treasury[:, row] - sett_price, self.civ_treasury[:, row])
-                self.civ_settlers_trained[:, row] = self.civ_settlers_trained[:, row] + landed_s.long()
                 # purchased settlers cost the spawn city a pop (real Civ 6)
                 _pop_col = self.city_pop[bidx, row, spawn_slot]
                 self.city_pop[bidx, row, spawn_slot] = torch.where(landed_s, (_pop_col - 1).clamp(min=1), _pop_col)
@@ -3000,8 +2999,6 @@ class SimSeats:
                 if bool(buy_bl.count_nonzero()):
                     landed_bl = self._spawn_unit(row, buy_bl, at_m, self._builder_idx)
                     self.civ_faith[:, row] = torch.where(landed_bl, self.civ_faith[:, row] - bl_price, self.civ_faith[:, row])
-                    # a purchased builder escalates builderCost like a trained one
-                    self.civ_builders_trained[:, row] = self.civ_builders_trained[:, row] + landed_bl.long()
             if self._settler_idx >= 0:
                 s_price = self._faith_price(row, self._seat_settler_cost(row) * self.rules.faith_purchase_mult * 0.7)
                 pop_m = self.city_pop[bidx, row, jm]
@@ -3009,7 +3006,6 @@ class SimSeats:
                 if bool(buy_sl.count_nonzero()):
                     landed_sl = self._spawn_unit(row, buy_sl, at_m, self._settler_idx)
                     self.civ_faith[:, row] = torch.where(landed_sl, self.civ_faith[:, row] - s_price, self.civ_faith[:, row])
-                    self.civ_settlers_trained[:, row] = self.civ_settlers_trained[:, row] + landed_sl.long()
                     _pop_m = self.city_pop[bidx, row, jm]
                     self.city_pop[bidx, row, jm] = torch.where(landed_sl, (_pop_m - 1).clamp(min=1), _pop_m)
         n_kind, n_j = self._driven_buy_nat.pop(row) if row in self._driven_buy_nat else (None, None)
@@ -7441,14 +7437,7 @@ class SimSeats:
         elif pay == ch["unitInCity"]:
             if near >= 0 and unit_i >= 0:
                 at = torch.full_like(tile, int(self.city_center[b, srow, near]))
-                landed = self._spawn_unit(srow, one, at,
-                                          torch.full_like(tile, unit_i))
-                # a village's Builder or Settler is a copy its price climbs on
-                # (TS `drawAndPayGoody`)
-                if unit_i == self._builder_idx:
-                    self.civ_builders_trained[:, srow] += landed.long()
-                elif unit_i == self._settler_idx:
-                    self.civ_settlers_trained[:, srow] += landed.long()
+                self._spawn_unit(srow, one, at, torch.full_like(tile, unit_i))
         elif pay == ch["experience"]:
             gs = self._goody_unit_slot(b, t, slot)
             if gs >= 0:

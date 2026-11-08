@@ -191,6 +191,7 @@
   readings:
     - "C-94: the growth modifier — READ (the accumulator's writer unread)"
     - "H-1: the AI memory reader — READ (the hooks, the pointer paths, the contracts, the knowledge base, the operations, the trees), PARTLY READ (the religious AI's holder)"
+    - "Units made, kept progress and the culture banks from the game's memory — READ (0x4c1a30, 0x4bed20, 0x4f2fc0, 0x3939b0, 0x3a1fb0), both twins; the importer reads them"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...tyGrowth 0x1b62d0, beside housing 0x1b5f70 (Lua +0x14), happiness 0x1b5800 (+0x18), other 0x1b6180 (+0x1c) and occupation 0x1b6120 (+0x20). 0x1b62d0:"
