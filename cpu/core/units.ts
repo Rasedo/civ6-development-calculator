@@ -689,7 +689,7 @@ export function districtZones(state: GameState, tile: Tile, mover: { seat: numbe
 export function inEnemyZoc(
   state: GameState,
   tileIndex: number,
-  mover: { seat: number; type?: string },
+  mover: { seat: number; type?: string; embarked?: boolean },
   dest = -1,
   crowded = false,
 ): boolean {
@@ -702,9 +702,13 @@ export function inEnemyZoc(
   // military one walks through a religious zone. Only a matching pair halts.
   const relMover = mover.type !== undefined && unitReligious(mover.type);
   // an exerter of the mover's domain alone (Rules_Movement 0x530f50: the
-  // exerter's +0x650 against the mover's formation domain): a land unit
-  // zones no ship, a ship no land unit, embarked or not
-  const navalMover = mover.type !== undefined && !!UNITS[mover.type]?.naval;
+  // exerter's +0x650 against the mover's formation domain +0x278, sea for an
+  // embarked member, 0x267650): a land unit zones no ship and no embarked
+  // land unit, on water or ashore; a ship zones neither a land unit ashore
+  // (runs/h1_duelq1124 t182: city-state 3's embarked Bombard on 39:17 plans
+  // 39:20 / 37:18 (2/0) on from 39:19 / 38:18 beside the barbarian Line
+  // Infantry on 38:19, AI_Planning.csv)
+  const navalMover = mover.type !== undefined && (!!UNITS[mover.type]?.naval || !!mover.embarked);
   let zoned = false;
   for (const n of neighbors(state.map, tile)) {
     // the district before the river (0x24c2f0 at 0x531168)

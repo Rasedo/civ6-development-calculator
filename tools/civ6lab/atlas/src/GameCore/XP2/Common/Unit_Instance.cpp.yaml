@@ -31,6 +31,7 @@
     - gpu/core/sim_tactics.py:_tac_embarks
     - cpu/core/tactical.ts:embarks
     - gpu/core/sim_tactics.py:_tac_search
+    - cpu/core/tactical.ts:seaFormation
   readings:
     - "C-95: the planning's valid wrapper on a district at war, and a land unit's embarking by its original owner — READ (0x26e570 at 0x26e5e2..0x26e7f1, 0x56c480), the first both twins"
     - "C-95: Explore Land and the barbarians' revealed plots — READ, ported (two tests below unread)"

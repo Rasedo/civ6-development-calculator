@@ -14251,3 +14251,53 @@ no clamp; its +0xc4 is the raw damage.
   Default Specialization queues in its t89 update where the engine's
   production step has it in hand before the city AI's events. 1127 Muscat
   t99 (Machinery FAILED t98, researching at 1 turn) starts a Warrior tree.
+
+## C-95: the reach searches open turn-end nodes, and the zone of control's domain is the formation's — READ (0x271920 from 0x26dab0, 0x26f980 -> 0x530f50, 0x267650), both twins
+
+`search`'s turn-end node under `paysStack`, its `onClose` skip, `groundOf`'s
+`seaFormation`, `inEnemyZoc`'s `navalMover` (cpu/core/tactical.ts,
+cpu/core/units.ts); `_tac_search`'s second layer under `pays_stack`, its
+`zsea`, `_tac_move_to`'s zone domain (gpu/core/sim_tactics.py).
+
+- THE OPEN LIST (0x775a0, re-read): sorted by (f +0x18, g +0x1c); a node
+  strictly below the head's (f, g) goes first, strictly above the tail's
+  last; else |f - tail.f| and |f - head.f| (24.8 to float), the walk from
+  the head where the head's is as near or nearer (before its first equal
+  (f, g)), from the tail else (after its last). UpdateOpenNode 0x79560 walks
+  a re-keyed node headward past strictly greater f alone. The step 0x793f0
+  pops the head (0x781e0) and links the six neighbours (0x77a50, the
+  table 0xeff730) as the validity (+0x58) admits. As ported.
+- THE TURN-END NODE IN EVERY SEARCH BUT THE PLANNING'S: 0x271920's callers
+  are the planning's list 0x26d890, the reach search's list 0x26dab0 and the
+  move order's pool 0x26f330; it opens the node's second-layer twin
+  (Movement 0, key f the node's, g + 1000 x the Movement) unless the
+  search's flags hold 4 (the planning's 0x115, where only a mountain or a
+  canyon opens one). So the danger map's (0x311), Explore Land's (0x40 /
+  0x42) and Naval Patrol's (0) one-turn searches open them: no plot more is
+  reached, but every later insertion weighs head against tail with them in
+  the list. A twin lists nothing (0x26dab0 lists a plot once, 0x791270).
+  Confirmed: runs/h1_duelq1121 t8 the barbarian Galley 524295 on 6:8 (HL
+  Explore) closes 4:9 before 7:9, both 543744 (7:9 lands from the tail after
+  4:9 once 5:9 / 5:7 / 6:7 / 6:9's twins at 274432 hold the head), and goes
+  for 4:9 as logged; 1128 t24 the same Galley's fallback 2:3; 1121 t45 /
+  t72 Galley 1572882 and t73 / t81 Scout 2752534; 1124 t43 Galley 262147;
+  Naval Patrol 1121 t82 / t87 city-state 3's Galley 524294 (38:17 for
+  36:23), 1127 t62 / t63 city-state 3's Galley 393216.
+- THE ZONE'S DOMAIN: 0x26f980 passes the formation's +0x278 (at 0x26f9c0)
+  as 0x530f50's third argument, which each exerter's Unit +0x650 must equal
+  (0x53125a); +0x278 is the least of the members' domains, sea for an
+  embarked member (0x267650). An embarked land unit is zoned by hostile
+  ships alone, on water or on the land it steps onto, never by a land unit.
+  Confirmed: runs/h1_duelq1124 t182 city-state 3's embarked Bombard 1638401
+  on 39:17 plans 39:20 / 37:18 (2/0) on from the land 39:19 / 38:18 beside
+  the barbarian Line Infantry on 38:19 (AI_Planning.csv), the reach's order
+  of equal keys after it as the game's (43:20 first of the turn-1 plots with
+  no Movement left after 40:12 / 41:12 / 42:12); 1128 t41 city-state 4's
+  Horseman 589827's Operation step.
+- OPEN: the walk's zone test takes the formation's domain as it sets out
+  (`walk`'s precomputed stops), whether 0x26fe20 re-reads +0x278 after an
+  embarking step unread; 1128 t50 the barbarian Archer 2752535 (Attack
+  Units, Move 17:10) is the move's destination (ours the spot 17:12, the
+  game 17:10's path ending on 17:11), no open-list tie; Operation Move's
+  first steps 1121 t11 / t96 / t112 untraced (t96 / t112 Builder Capture's
+  Settler and escort: the formation's join, not the order of equals).

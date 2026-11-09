@@ -21,6 +21,7 @@
     - "H-1: the trade path's search, its score and the Canal — READ"
     - "C-124: a move order's path prices a turn's end at the stacking limit +1e6, and its destination there stops the search — READ (0x270dd0 at 0x27101e..0x2710a0, 0x2720a0 at 0x272230..0x272364, 0x77a50, 0x26dcd0's callbacks), both twins"
     - "C-108: the trade path's portals, its open list and CanStartRoute's gates — READ, both twins"
+    - "C-95: the reach searches open turn-end nodes, and the zone of control's domain is the formation's — READ (0x271920 from 0x26dab0, 0x26f980 -> 0x530f50, 0x267650), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...SearchStep 0x793f0 — GetBest 0x781e0 pops the open list's head, the children are made (0x77a50: the six neighbours from the axial tables, then the callback's extra neighbours, a port..."
@@ -62,6 +63,7 @@
     - "C-95: the unit pathfinder and the planning's reach — READ, confirmed on the Wander draws"
     - "C-99: Naval Patrol's explore target — the list and the tests READ, two cases unexplained"
     - "C-108: the trade path's portals, its open list and CanStartRoute's gates — READ, both twins"
+    - "C-95: the reach searches open turn-end nodes, and the zone of control's domain is the formation's — READ (0x271920 from 0x26dab0, 0x26f980 -> 0x530f50, 0x267650), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...0xd02108): GeneratePath 0x77d10 seeds the origin and loops SearchStep 0x793f0 — GetBest 0x781e0 pops the open list's head, the children are made (0x77a50: the six neighbours from the..."
@@ -110,6 +112,7 @@
   readings:
     - "H-1: the trade path's search, its score and the Canal — READ"
     - "C-95: the unit pathfinder and the planning's reach — READ, confirmed on the Wander draws"
+    - "C-95: the reach searches open turn-end nodes, and the zone of control's domain is the formation's — READ (0x271920 from 0x26dab0, 0x26f980 -> 0x530f50, 0x267650), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...the base vtable 0xd02108): GeneratePath 0x77d10 seeds the origin and loops SearchStep 0x793f0 — GetBest 0x781e0 pops the open list's head, the children are made (0x77a50: the six ne..."
@@ -132,6 +135,7 @@
     - "C-95: the unit pathfinder and the planning's reach — READ, confirmed on the Wander draws"
     - "C-96: the city-states' tactical pass — READ (Wander Near City, Heal, the non-barbarian priorities, FindAlternateLocation), the families it needs PARTLY READ"
     - "C-108: the trade path's portals, its open list and CanStartRoute's gates — READ, both twins"
+    - "C-95: the reach searches open turn-end nodes, and the zone of control's domain is the formation's — READ (0x271920 from 0x26dab0, 0x26f980 -> 0x530f50, 0x267650), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ...allback passed; an open child is re-parented on a STRICTLY cheaper cost (UpdateOpenNode 0x79560), a closed one likewise with UpdateParents 0x79660, a new one opened. The trade path's...

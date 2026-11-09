@@ -295,6 +295,10 @@ function groundOf(state: GameState, unit: Unit, revealedOnly = true, planning = 
   const str = aiStrengths(state, fighter);
   const shoots = str.ranged > str.melee || str.bombard > str.melee;
   const naval = !!def?.naval;
+  // the formation's domain (+0x278: the least of its members', sea for an
+  // embarked member, 0x267650; its members share the unit's plot), which the
+  // zone of control's exerters share
+  const seaFormation = naval || !!unit.embarked;
   // a unit that may embark (`canEmbark`, 0x56c480: the barbarians' land units
   // plan no water, none of 6,269 of their planning rows on runs/h1_duelw1117,
   // 1121 and 1124 holds a water plot, their captives by their first owners)
@@ -402,7 +406,7 @@ function groundOf(state: GameState, unit: Unit, revealedOnly = true, planning = 
           const river = crossesRiver(state.map, t, n);
           if (river && n.district !== 'CITY_CENTER') continue;
           if (state.units.some((x) => x.tileIndex === n.index && onMap(x) && !unitReligious(x.type) && unitExertsZoc(x)
-            && !!UNITS[x.type]?.naval === naval && unitsHostile(state, x, unit))) { v = true; break; }
+            && !!UNITS[x.type]?.naval === seaFormation && unitsHostile(state, x, unit))) { v = true; break; }
         }
       }
       seenZocs.set(i, v);
@@ -495,8 +499,9 @@ function domainPool(state: GameState, unit: Unit, sea: boolean): number {
 /**
  * THE PATHFINDER (Pathfinder_Instance 0x77d10, its step 0x793f0): Dijkstra
  * from the unit's plot — no heuristic (the pool's default, 0x26f330) — over
- * the open nodes by (key, cost, tie) — a move order's path opens a turn-end
- * node beside each node with Movement left — : a node inserted where its key lies nearer
+ * the open nodes by (key, cost, tie) — every search but the planning's
+ * opens a turn-end node beside each node with Movement left — : a node
+ * inserted where its key lies nearer
  * the cheapest open node goes before its equals, else after them (0x775a0),
  * a node made cheaper goes after its new equals (0x79560), a closed one made
  * cheaper re-prices its children from it (UpdateParents 0x79660); each closed
@@ -647,7 +652,9 @@ function search(state: GameState, unit: Unit, maxTurns: number, zoc: boolean, on
       for (const o of open) if (before(hi, o)) hi = o;
     }
     best.closed = true;
-    if (onClose(best, ground)) break;
+    // a turn-end node lists nothing (the reach lists take a plot once,
+    // 0x791270) and is no path's destination
+    if (best.f === undefined && onClose(best, ground)) break;
     // an attack's plot is the end of the breadth-first searches' paths
     // (0x26e570): no step leaves one a seen unit at war that fights holds
     // (0x26e570 at 0x26e5cd: the parent's +0x51 bit 0x40, 0x271be0 at
@@ -794,10 +801,16 @@ function search(state: GameState, unit: Unit, maxTurns: number, zoc: boolean, on
         // turn may set out from that plot at full Movement (runs/h1_duely1117
         // t32: the barbarian Slinger 1769487 on 30:17 for 30:15 ends its turn
         // on 29:16, its second waiting on 29:15; runs/h1_duely1127 t36: the Warrior
-        // 2031626 for 12:7 waits on 13:8); the planning's search (flag 4)
-        // opens one on a mountain or a canyon alone, none the unit enters, and
-        // the danger map's one-turn search reaches no plot more by one
-        if (zoc && n.moves > 0 && n.tile !== dest) {
+        // 2031626 for 12:7 waits on 13:8); every search but the planning's
+        // opens them, the reach searches 0x26df90 (the danger map's, Explore
+        // Land's, Naval Patrol's) too, whose one turn reaches no plot more by
+        // one but whose open list's order among equal keys they move: a node
+        // inserted after them weighs its side against them (runs/h1_duelq1121
+        // t8: the barbarian Galley 524295 on 6:8 closes 4:9 before 7:9, both
+        // at 543744, and explores for 4:9 as logged); the planning's search
+        // (flag 4) opens one on a mountain or a canyon alone, none the unit
+        // enters
+        if (paysStack && n.moves > 0 && n.tile !== dest) {
           addOpen({ tile: n.tile, g: n.g + n.moves * 1000, f: n.g, tie: 0, moves: 0, turns: n.turns, carry: n.carry, closed: false, parent: best, wet: n.wet });
         }
         continue;

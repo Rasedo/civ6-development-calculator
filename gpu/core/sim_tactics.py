@@ -639,8 +639,9 @@ class SimTactics:
                     strike: bool = False) -> dict:
         """THE PATHFINDER (`search`) for the units at local `slots` of pool
         `pre` in the games `rows` [N]: Dijkstra from each unit's plot over
-        the open nodes by (key, cost, tie) — a move order's path opens a
-        turn-end node beside each new node with Movement left (`search`); a
+        the open nodes by (key, cost, tie) — every search but the planning's
+        opens a turn-end node beside each new node with Movement left
+        (`search`); a
         node inserted where its key lies
         nearer the cheapest open node goes before its equals, else after them;
         a node made cheaper goes after its new equals, a closed one re-prices
@@ -650,8 +651,8 @@ class SimTactics:
         domain its plot holds it in. Returns the closing rank and turns of each
         plot it may end on ([N, T], -1 never closed or only passed: another
         player's unit holds it — in the planning's, one not at war with it,
-        no Trader, on a plot it sees now) and each node's parent (a move order's path [N, 2T]: its turn-end
-        nodes at T + plot); with `dest` [N] each
+        no Trader, on a plot it sees now) and each node's parent ([N, 2T] but
+        in the planning's: its turn-end nodes at T + plot); with `dest` [N] each
         row stops once its plot closes. With `plan` (`_tac_plan`'s targets)
         each link the search prices — the start first, linked from itself —
         lays the targets' spots (`planUnit`'s `onLink`): "spot" [N, E, 6]
@@ -698,6 +699,9 @@ class SimTactics:
         if mate is None:
             mate = self._tac_mate(rows, slots, pre)
         naval = self.unit_naval.take(utype)
+        # the zone of control's exerters share the formation's domain (+0x278:
+        # sea for an embarked unit, `groundOf`'s seaFormation)
+        zsea = naval | getattr(self, f"{pre}_unit_emb")[rows, slots]
         start = getattr(self, f"{pre}_unit_tile")[rows, slots].clamp(min=0)
         mp = (self._tac_full_now(pre) if full else getattr(self, f"{pre}_unit_mp"))[rows, slots]
         granted = getattr(self, f"{pre}_unit_mp_full")[rows, slots]
@@ -865,7 +869,7 @@ class SimTactics:
             # a city or Encampment or onto a civilian goes on
             fought_n = fought[rows]
         if not zoc and not stand:
-            zs = torch.where(naval.unsqueeze(1), self._tac_zoc(seat, sn, True)[rows], self._tac_zoc(seat, sn, False)[rows])
+            zs = torch.where(zsea.unsqueeze(1), self._tac_zoc(seat, sn, True)[rows], self._tac_zoc(seat, sn, False)[rows])
             zs = zs & ~self._tac_zoc_ignored(utype).unsqueeze(1)
         # a path's turn may not end on a plot its own stacking unit holds (the
         # path validity 0x2720a0; `groundOf`'s full; under flag 0x1000 its
@@ -906,12 +910,12 @@ class SimTactics:
         if bool(haz[rows].any()):
             haz_n = haz[rows] & self._barb_seen("barbarians" if seat == BARB_SEAT else seat)[rows]
         # a zone of control's step on the path's destination (`groundOf`'s zoc)
-        zp = self._tac_zoc_path(rows, seat, naval, self._tac_zoc_ignored(utype), dest, crowd_n) if zoc else None
+        zp = self._tac_zoc_path(rows, seat, zsea, self._tac_zoc_ignored(utype), dest, crowd_n) if zoc else None
         tseat = self.tile_seat
-        # the nodes: one per plot, and in a move order's path (`zoc`) a
+        # the nodes: one per plot, and in every search but the planning's a
         # second layer of turn-end nodes at T + plot (`search`'s turn-end
         # node: the two-layer pathfinder's 0x271920 -> 0x7a880)
-        TN = 2 * T if zoc else T
+        TN = 2 * T if pays_stack else T
         g = torch.full((N, TN), NONE, dtype=torch.long, device=dev)
         tie = torch.zeros(N, TN, dtype=torch.long, device=dev)
         mv = torch.zeros(N, TN, dtype=torch.long, device=dev)
@@ -923,7 +927,7 @@ class SimTactics:
         # each node's water as the search takes it (`PNode.wet`, +0x50 bit
         # 0x20): its own, but a plot stepped onto from an unrevealed one with
         # neither revealed its parent's
-        wt = torch.cat((water_n, water_n), dim=1) if zoc else water_n.clone()
+        wt = torch.cat((water_n, water_n), dim=1) if pays_stack else water_n.clone()
         ww_n = self.unit_water_walk.take(utype)
         st = torch.zeros(N, TN, dtype=torch.long, device=dev)
         par = torch.full((N, TN), -1, dtype=torch.long, device=dev)
@@ -1263,12 +1267,12 @@ class SimTactics:
                 continue
             ins6 = new6 | upo6
             cl6 = upd6 & (s0 == 2)
-            if zoc or bool(cl6.count_nonzero()):
+            if pays_stack or bool(cl6.count_nonzero()):
                 # a closed child made cheaper takes its children along at once
-                # (UpdateParents 0x79660, `search`), and a move order's path
-                # opens a turn-end node beside each new node with Movement
-                # left: the links land one by one, each closed one re-parented
-                # then walked
+                # (UpdateParents 0x79660, `search`), and every search but the
+                # planning's opens a turn-end node beside each new node with
+                # Movement left: the links land one by one, each closed one
+                # re-parented then walked
                 sub = _KEY_SHIFT // _SUB_SHIFT
 
                 def place(fm: torch.Tensor, f: torch.Tensor, m: torch.Tensor) -> torch.Tensor:
@@ -1309,7 +1313,7 @@ class SimTactics:
                     tie[ar, k] = torch.where(ins, tj, tie[ar, k])
                     st[ar, k] = torch.where(new, 1, st[ar, k])
                     key[ar, k] = torch.where(ins, nk, key[ar, k])
-                    if zoc:
+                    if pays_stack:
                         # the turn-end node (`search`): Movement 0, the cost
                         # plus 1000 x the Movement left, the node's key cost
                         # and parent; none on the destination (0x271490)
@@ -1772,8 +1776,10 @@ class SimTactics:
         rel_u = (self._rel_strength.take(ut) > 0).unsqueeze(1)
         no_end = own_same | torch.where(rel_u, self._tac_peaceful(seat, True)[rows], self._tac_peaceful(seat, False)[rows])
         # a zone of control ends the walk (`walk`'s inEnemyZoc on the order's
-        # destination, a plot it may not end on at the limit)
-        halts = self._tac_zoc_path(rows, seat, naval, self._tac_zoc_ignored(ut), dr, no_end)
+        # destination, a plot it may not end on at the limit), of the
+        # formation's domain as it sets out (sea for an embarked unit)
+        halts = self._tac_zoc_path(rows, seat, naval | getattr(self, f"{pre}_unit_emb")[rows, sr], self._tac_zoc_ignored(ut),
+                                   dr, no_end)
         # how far its Movement carries it: a formation's, the least its
         # members hold (0x262cd0), a member whose moves an order ended none
         mp = mp_p[rows, sr].clone()
@@ -1900,7 +1906,9 @@ class SimTactics:
         if zm is not None:
             stepped = now != start
             if bool(stepped.count_nonzero()):
-                zoned = self._tac_zoc_path(rows, seat, naval, self._tac_zoc_ignored(ut), None, no_end)[ar, now.clamp(min=0)]
+                zoned = self._tac_zoc_path(rows, seat, naval | getattr(self, f"{pre}_unit_emb")[rows, sr],
+                                           self._tac_zoc_ignored(ut), None,
+                                           no_end)[ar, now.clamp(min=0)]
                 rs, ss = rows[stepped], sr[stepped]
                 zm[rs, ss] = zoned[stepped]
                 if mr is not None:
@@ -3573,7 +3581,7 @@ class SimTactics:
         # the step's zone test on the plot it stands on (0x26fe20 at 0x270800)
         if zm is not None:
             ut = getattr(self, f"{pre}_unit_type")[rows, sr].clamp(min=0, max=self.NU - 1)
-            naval = self.unit_naval.take(ut)
+            naval = self.unit_naval.take(ut) | getattr(self, f"{pre}_unit_emb")[rows, sr]
             no_end = torch.zeros(R, T, dtype=torch.bool, device=dev)
             now = tile_p[rows, sr]
             moved = step & (now != dest[rows])

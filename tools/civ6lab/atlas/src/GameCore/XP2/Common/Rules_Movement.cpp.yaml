@@ -163,6 +163,9 @@
     - recording: h1_duely1124
       turn: 9
       value: "the move's path: over the six plots beside the plot entered (ebx from 0), Bologna's centre 32:8 zones 31:8 for the barbarian Scout 524295 on 30:8, its Explore move to 33:11 ending on 30:9 as logged; an exerter on the path's destination answers no zone unless the plot entered is at its stacking limit (0x53118a, 0x53129f -> 0x531302)"
+    - recording: h1_duelq1124
+      turn: 182
+      value: "the mover's domain (the third argument, [rsp+0x120]) is the formation's +0x278 (0x26f980 at 0x26f9c0), sea for an embarked member (0x267650), against each exerter's Unit +0x650 (0x53125a): city-state 3's embarked Bombard 1638401 on 39:17 plans 39:20 / 37:18 (2/0) on from the land 39:19 / 38:18 beside the barbarian Line Infantry on 38:19, AI_Planning.csv"
   impl:
     - cpu/core/tactical.ts:Ground
     - cpu/core/units.ts:inEnemyZoc
@@ -178,6 +181,7 @@
     - cpu/core/tactical.ts:v
     - cpu/core/tactical.ts:t
   readings:
+    - "C-95: the reach searches open turn-end nodes, and the zone of control's domain is the formation's — READ (0x271920 from 0x26dab0, 0x26f980 -> 0x530f50, 0x267650), both twins"
     - "C-125: a district's zone of control in a move's path, waived on the path's destination; a city-state's strikes after its units' planning — READ (0x530f50 at 0x531127..0x531302, 0x26f980, 0x26f870), FIT (the strikes' place), both twins"
     - "C-125: a civilian at war in the planning's search, a zone of control across a river, the attack's move onto a city — READ (0x26e570, 0x530f50 at 0x5310c8..0x5311c9, 0x771f80 at 0x772121), both twins"
     - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
