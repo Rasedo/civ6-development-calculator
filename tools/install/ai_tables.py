@@ -695,7 +695,7 @@ def build_city(rows, modifier) -> str:
                      "features": [f["FeatureType"] for f in imp_features[i]],
                      "buildUnits": [[u["UnitType"], u.get("ConsumesCharge") != "false"] for u in imp_units[i]],
                      "adjacency": [adj_yield[a["YieldChangeId"]] for a in imp_adj[i] if adj_yield.get(a["YieldChangeId"])],
-                     "tourism": [[r["TourismSource"], num(r, "ScalingFactor", 100)] for r in imp_tourism[i]],
+                     "tourism": [[r["TourismSource"], num(r, "ScalingFactor", 100), r.get("PrereqTech")] for r in imp_tourism[i]],
                      "modifiers": [modifier(r["ModifierId"]) for r in imp_mods[i]]}
                     for i, c in in_game_order("Improvements", "ImprovementType", keyed(rows("Improvements"), "ImprovementType"))]
     # the districts (the district choice's and the trees' rows: PrereqTech /

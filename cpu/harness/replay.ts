@@ -121,7 +121,7 @@ import { seedMoments, stateChecks, transitionChecks, type CheckResult } from './
 import { engineId, gameHash, gameTypeOf } from '../data/aliases';
 import { OperationsProbe, operationsMarkdown, type OperationsTally } from './operationsScore';
 import { GP_CLASSES, GREAT_PEOPLE, gpChargesOf, gpCost, gpEffectOf, personWorkObjects } from '../data/greatPeople';
-import { loadGpTimeline, type GpTimeline } from './gpTimeline';
+import { loadGpTimeline, standGreatPeople, type GpTimeline } from './gpTimeline';
 import { gpClaimLeft, patronageCost, patronizeGreatPerson, recruit } from '../core/greatPeople';
 import { InferredActions, RecordedActions, activePlayer, type ActionSource, type Decision, type LogTally, type QueueSpec } from './replayActions';
 import { newScores, scoreDecision, scoreTable, memoryTable, type DecisionScores } from './aiScore';
@@ -5680,32 +5680,11 @@ function importedWorld(state: GameState, imp: Imported, rec: TurnRecord, history
     if (seat !== undefined && state.seats[seat]) state.seats[seat].handicap = LAB_HANDICAP;
   }
   seedMoments(state, imp, history);
-  standGreatPeople(state, rec.turn);
+  standGreatPeople(state, gpTimeline, rec.turn);
 }
 
 /** the game's Great People timeline beside the dump (`loadGpTimeline`) */
 let gpTimeline: GpTimeline | null = null;
-
-/** each class's standing person and its frozen price as record `turn`
- *  holds them, off the game's timeline log; a class the log names no one for
- *  (exhausted) offers none (-2), one it never logged waits for the engine's
- *  draw */
-function standGreatPeople(state: GameState, turn: number): void {
-  const at = gpTimeline?.at(turn);
-  if (!at) return;
-  state.gpOffer = GP_CLASSES.map(() => -1);
-  state.gpPrice = GP_CLASSES.map(() => 0);
-  GP_CLASSES.forEach((cls, i) => {
-    const s = at.get(cls);
-    if (s === undefined) return;
-    if (s === null) return void (state.gpOffer![i] = -2);
-    const id = aliasOrPrefixed(s.individual);
-    const k = GREAT_PEOPLE[cls].findIndex((p) => p.id === id);
-    if (k < 0) return;
-    state.gpOffer![i] = k;
-    state.gpPrice![i] = s.cost;
-  });
-}
 
 /** a contract the game's city queued in the turn `turn` the record's item
  *  stands for (AI_CityBuild.csv's queue line: its item and tree): the

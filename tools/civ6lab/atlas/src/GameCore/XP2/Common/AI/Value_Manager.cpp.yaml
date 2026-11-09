@@ -70,6 +70,7 @@
     - "C-130: Online Communities' route tourism, the tourism toward a player — READ (0x6a1380, 0x6a1240, 0x394830's modifiers, 0x552fb0), both twins"
     - "C-100: the plot values' golden-age, claims and tourism-percent terms, the required features, the power value's negative Amount — READ"
     - "C-130: the damage modifier's analyzer, a unit's tag requirement, the player's units walked by pool slot, a minor's one-time projects — READ (0x6bba30, 0x6d2610, 0x69ec70), both twins"
+    - "C-100 / C-118 / C-98: the plot values' yield-source tourism, the exhausted Great Person class, a technology's improvement tourism — READ, both twins"
   context:
     - "...7, k = rate/100, a perpetuity a/k past nk >= 10; the horizon itself one discounted turn 0x7a1240, (1-k)^n with -0.16667). Then: per unlocked unit the player's version, 10 x the cities'..."
     - ...yer AI, as PSEUDOYIELD_INFLUENCE @0xf2e240 with the player, discounted from the start 0x7a1240); EFFECT_ADJUST_PLAYER_GOVERNOR_POINTS 0x6c2720 PARTLY (Amount x the governor AI's poin...
@@ -841,13 +842,16 @@
   final: 0x530690
   kind: function
   name: the improvement yields value
-  semantics: "the improvement yields value (impr, T, H, plot, ...): T >= H FX(-9999); a drought hitting it 0; the river manager (0xa2cbf0 / 0xa2af70) and the feature manager (0xa1cc70: a volcano beside) cut H to their turns, H <= T 0. A turn: PSEUDOYIELD_IMPROVEMENT 1.0, Improvement_YieldChanges and its adjacency (each Improvement_Adjacencies row +0x110..+0x118 handed to 0x365ae0 on its own, the rows summed), YieldFromAppeal at the plot's Appeal x the percent, each at the player's value (0x7a6690, 0x7a60d0); the tourism 0x7b19a0; min(max(n, 1), DefenseModifier) + min(n, GrantFortification), n = 0x3dfae0; the Barbarian Clans traps' properties; x3 where a build unit spends no charge. PV(H) - PV(T); the Housing over TilesRequired at 0x7a3d70; where the civics' list +0x1380 holds the improvement (0x39de20) the claimed plots 0x7a10c0; its ImprovementModifiers (0x7a4b20 at 0x7b23d8) in a context of the player (+0x80), the plot's city (+0x70), T (+0x64), H (+0x68), the rate (+0x6c); at the top level (the context's plot list +0x10 empty) its ring's neighbours revalued (0x6b1b0, functor @0xd71be8 -> 0x79ed40). At 0x7b19a0: the improvement's tourism: per Improvement_Tourism row (+0x168) of source 6 (TOURISMSOURCE_APPEAL) the plot's Appeal x ScalingFactor / 100 (0x1aba40), x (1 + the city's +0x1b20 percent); a turn's PSEUDOYIELD_TOURISM of it x fx(1 - max(5 - era, 0) x 0.1f) (@0xd2f320, @0xcfc9f8 1.0; 0x467eb0). The adjacency term counts Farms_MedievalAdjacency / Farms_MechanizedAdjacency like any Improvement_Adjacencies row (0x365ae0): the Farm's Food per group of live Farms beside the plot itself (improvementAdjacency)."
+  semantics: "the improvement yields value (impr, T, H, plot, ...): T >= H FX(-9999); a drought hitting it 0; the river manager (0xa2cbf0 / 0xa2af70) and the feature manager (0xa1cc70: a volcano beside) cut H to their turns, H <= T 0. A turn: PSEUDOYIELD_IMPROVEMENT 1.0, Improvement_YieldChanges and its adjacency (each Improvement_Adjacencies row +0x110..+0x118 handed to 0x365ae0 on its own, the rows summed), YieldFromAppeal at the plot's Appeal x the percent, each at the player's value (0x7a6690, 0x7a60d0); the tourism 0x7b19a0; min(max(n, 1), DefenseModifier) + min(n, GrantFortification), n = 0x3dfae0; the Barbarian Clans traps' properties; x3 where a build unit spends no charge. PV(H) - PV(T); the Housing over TilesRequired at 0x7a3d70; where the civics' list +0x1380 holds the improvement (0x39de20) the claimed plots 0x7a10c0; its ImprovementModifiers (0x7a4b20 at 0x7b23d8) in a context of the player (+0x80), the plot's city (+0x70), T (+0x64), H (+0x68), the rate (+0x6c); at the top level (the context's plot list +0x10 empty) its ring's neighbours revalued (0x6b1b0, functor @0xd71be8 -> 0x79ed40). At 0x7b19a0: the improvement's tourism: per Improvement_Tourism row (+0x168, every row, no PrereqTech test) 0x1aba40 on the plot valued — source 6 (TOURISMSOURCE_APPEAL) the plot's Appeal, a yield source the plot's STANDING improvement's yield of it (not the improvement valued) — x ScalingFactor / 100, x (1 + the city's +0x1b20 percent); a turn's PSEUDOYIELD_TOURISM of it x fx(1 - max(5 - era, 0) x 0.1f) (@0xd2f320, @0xcfc9f8 1.0; 0x467eb0). The adjacency term counts Farms_MedievalAdjacency / Farms_MechanizedAdjacency like any Improvement_Adjacencies row (0x365ae0): the Farm's Food per group of live Farms beside the plot itself (improvementAdjacency)."
   status: PARTLY
   cases:
     - recording: h1_duelv1127
       value: the Forts over a Farm exact 3,952 -> 4,969 with the Farm adjacency counted
     - recording: h1_duelv1124
       value: Ski Resort rows exact 153 of 315
+    - recording: h1_duelq1124
+      turn: 24
+      value: the rows replacing Granada's Alcazar on 42:12 (Farm -79.39 at t24, -93.37 from t31) exact with the standing Alcazar's 2 Culture as tourism
     - recording: h1_duelv1124
       turn: 2
       value: Granada's Alcazar 104.61 at its t2 plot
@@ -875,6 +879,7 @@
     - "C-100: the plot's own subject, PLOT_IS_HILLS and the plot analysis' replaced camp — READ (0x69ed60 / 0x69ec20, 0x6d0970, 0x5cf160..0x5cf1ab), both twins"
     - "C-100: an idle city-state's store takes its Builder's lump; the plot-value lab's turn (the engines unchanged)"
     - "C-118: a district's flat tourism on a pillaged district, Mary Leakey's Artifact percent in the summed scalings — READ (0x1ab780, 0x2486e0), both twins"
+    - "C-100 / C-118 / C-98: the plot values' yield-source tourism, the exhausted Great Person class, a technology's improvement tourism — READ, both twins"
   notes:
     - ".claude/scratchpad/cb/notes.txt: ...litary AI (0x79ca90), yield-weight parts (0x702ad0), modifier evaluator (0x79f7c0/0x7a67f0/0x7a3d70/0x7b1320), horizons (saved state, dynamic)...."
   context:
@@ -960,7 +965,7 @@
 - addr: 0x7b3e50
   final: 0x531f20
   kind: function
-  semantics: "the research value's TechnologyModifiers term: the row's modifiers analysed from landing (-> 0x7a4b20). The resources (0x7b556f..0x7b5758): per improvement of the technology's list (row +0xd0..+0xd8) the player may build (0x35f100), per resource of its valid list (+0x1e8): the copies its cities count (0x5d45c0, summed); where above 0, the resource value (0x7a21e0, count 1, turns, H) added. The value so far x1.5 where the row is the Fav Tech (+0xd88) and 0x3dcf50 holds (at 0x7b5b22); the military turn runs after the research AI's, so the analysis reads the Fav Tech of the turn before."
+  semantics: "the research value's TechnologyModifiers term: the row's modifiers analysed from landing (-> 0x7a4b20). The improvement tourism (0x7b4971..0x7b4b5b): per row of the technology's Improvement_Tourism list (+0xe8, the rows whose PrereqTech it is: source +0x1c via 0xadd870, improvement +0x58 -> +0x14, ScalingFactor +0x20), over the player's plots (+0x1380 +0xf0, count +0x100) it owns holding the improvement, 0x1aba40 summed; that sum at PSEUDOYIELD_TOURISM, PV(H) - PV(T) (0x7a1240 at T = H), added to the value. The resources (0x7b556f..0x7b5758): per improvement of the technology's list (row +0xd0..+0xd8) the player may build (0x35f100), per resource of its valid list (+0x1e8): the copies its cities count (0x5d45c0, summed); where above 0, the resource value (0x7a21e0, count 1, turns, H) added. The value so far x1.5 where the row is the Fav Tech (+0xd88) and 0x3dcf50 holds (at 0x7b5b22); the military turn runs after the research AI's, so the analysis reads the Fav Tech of the turn before."
   status: PARTLY
   cases:
     - recording: h1_duelq1124
@@ -972,8 +977,13 @@
     - recording: h1_duely1124
       turn: 189
       value: Rocketry's own value 10.0 a turn; Satellites 679.2 at 4 turns
+    - recording: h1_duelq1124
+      turn: 144
+      value: Granada's Flight 291.62 as logged 291.6 (its Alcazar's 2 Culture), Hunza's and Cardiff's 251.4; every 1124 Flight / Advanced Flight row within 0.06
   impl:
     - cpu/core/aiResearch.ts:techValue
+    - cpu/core/aiResearch.ts:techTourism
+    - gpu/core/sim_research.py:_rai_imp_tourism
     - cpu/data/aiResearch.ts:RESEARCH_AI_EMBARK_ALL
     - cpu/data/aiValue.ts:AI_UNLOCK_SHARE
     - cpu/core/aiResource.ts:TECH_IMPROVEMENT_RESOURCES
@@ -990,6 +1000,7 @@
     - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
     - "H-1: the military AI's favoured technology — READ (the pick, its use), PARTLY READ (the Free Cities' counts)"
     - "C-96 / C-130: a building's district copy, the player's Gold as its cities stand, a minor's power after its production; a technology's improvement tourism — READ (0x18e570, 0x7a7dc3, 0x4e0bf0, 0x7b4971..0x7b4b5b), both twins but the tourism"
+    - "C-100 / C-118 / C-98: the plot values' yield-source tourism, the exhausted Great Person class, a technology's improvement tourism — READ, both twins"
   context:
     - "...ntouched: 0 for every row the walk never reached). Else turns = max(0, sum) and value = 0x7b3e50(row, turns, H, discount); score = value."
     - "- THE VALUE, 0x7b3e50 (args: row, &discount, turns, H, player, the row's record +0x530): past H, -9999 (0xf04..."

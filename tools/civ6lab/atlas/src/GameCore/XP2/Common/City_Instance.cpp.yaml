@@ -155,6 +155,17 @@
   context:
     - ...3c, its flag +0x38; the loader 0xac62c0) plus the city's own per-level rows (+0x11d8, 0x1cb0f0), at the player's weight, the total at least n; then, n > 0 and the balance below 0, PS...
   review: imported
+- addr: 0x1cb1e0
+  kind: function
+  status: READ
+  cases:
+    - recording: 1124
+      value: 1124   IMPROVEMENTS far rows 1,283 -> 284, DISTRICTS 260 -> 183 (the district   value takes the standing improvement off through the same value).
+  readings:
+    - "C-100 / C-118 / C-98: the plot values' yield-source tourism, the exhausted Great Person class, a technology's improvement tourism — READ, both twins"
+  context:
+    - ...820; the city's yield per flood; per neighbour holding an improvement of the same owner 0x1cb1e0 where 0x1cc2e0 holds; the city's improvement rows 0x1cc2b0 x 0x4bd8c0). The amount is t...
+  review: imported
 - addr: 0x1cb470
   final: 0x132cb0
   kind: function
@@ -238,6 +249,30 @@
   context:
     - "- A citizen's yield share (0x1cbd10): population << 8 times SCIENCE / CULTURE_PERCENTAGE_YIELD_PER_POP << 8, then the fixed..."
   review: reviewed
+- addr: 0x1cc2b0
+  final: 0x133920
+  kind: function
+  status: READ
+  cases:
+    - recording: 1124
+      value: 1124   IMPROVEMENTS far rows 1,283 -> 284, DISTRICTS 260 -> 183 (the district   value takes the standing improvement off through the same value).
+  readings:
+    - "C-100 / C-118 / C-98: the plot values' yield-source tourism, the exhausted Great Person class, a technology's improvement tourism — READ, both twins"
+  context:
+    - "...rovement of the same owner 0x1cb1e0 where 0x1cc2e0 holds; the city's improvement rows 0x1cc2b0 x 0x4bd8c0). The amount is the STANDING improvement's, not the one valued: a new Alcaza..."
+  review: imported
+- addr: 0x1cc2e0
+  final: 0x133950
+  kind: function
+  status: READ
+  cases:
+    - recording: 1124
+      value: 1124   IMPROVEMENTS far rows 1,283 -> 284, DISTRICTS 260 -> 183 (the district   value takes the standing improvement off through the same value).
+  readings:
+    - "C-100 / C-118 / C-98: the plot values' yield-source tourism, the exhausted Great Person class, a technology's improvement tourism — READ, both twins"
+  context:
+    - ...yield per flood; per neighbour holding an improvement of the same owner 0x1cb1e0 where 0x1cc2e0 holds; the city's improvement rows 0x1cc2b0 x 0x4bd8c0). The amount is the STANDING imp...
+  review: imported
 - addr: 0x1cd040
   final: 0x1346f0
   kind: function

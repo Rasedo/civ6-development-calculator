@@ -295,13 +295,21 @@
 - addr: 0x1aba40
   final: 0x11cc40
   kind: function
-  semantics: "the improvement tourism of a plot (source, plot, ScalingFactor): source 6 (TOURISMSOURCE_APPEAL) the plot's Appeal (vcall +0x28), any other the plot's yield of that type for its owner 0x82280 with the last flag false less with it true; x ScalingFactor / 100 (unless 100); x (100 + the plot's city's +0x1b20) / 100 where that is above 0"
-  status: PARTLY
+  semantics: "the improvement tourism of a plot (source, plot, ScalingFactor): source 6 (TOURISMSOURCE_APPEAL) the plot's Appeal (vcall +0x28), any other (the source index taken as the YieldType) the plot's yield of that type for its owner 0x82280 with the last flag false less with it true — 0x538a60's fifth argument, which skips the plot's district yields (0x538b69), its unpillaged improvement's (0x538fae), the per-yield district rows (0x5392c7) and the tail 0x53943c..0x53983c (the player's resource yield rows +0x1360, the city's yield per flood, the neighbours' improvement rows 0x1cb1e0, the city's improvement rows 0x1cc2b0 x 0x4bd8c0): the plot's standing improvement-and-district part; x ScalingFactor / 100 (unless 100); x (100 + the plot's city's +0x1b20) / 100 where that is above 0"
+  status: READ
   cases:
-    - recording: 1117
-      turn: 222
-      value: "The flag   is 0x538a60's fifth argument, unread: which yields it leaves out is the   open question behind 1117 t222 (docs/AUDIT.md C-94)."
-  impl: [cpu/core/aiPlotValue.ts:improvementYieldsValue]
+    - recording: h1_duelq1124
+      turn: 24
+      value: "Granada's Alcazar on 42:12 (2 Culture): every replacement row over it 20.11 lower at t24-30, 24.03 from t31 (the old Alcazar's tourism at the era weight); 116 of the 118 rows over the standing Alcazar exact"
+    - recording: h1_duelq1124
+      turn: 144
+      value: Granada's Flight 291.6 as logged (its Alcazar's 2 Culture through 0x7b3e50's tourism term), Hunza's / Cardiff's 251.4
+  impl:
+    - cpu/core/aiPlotValue.ts:improvementYieldsValue
+    - cpu/core/aiPlotValue.ts:standingYield
+    - gpu/core/sim_cityvalue.py:_cv_standing_yield
+    - cpu/core/aiResearch.ts:techTourism
+    - gpu/core/sim_research.py:_rai_imp_tourism
   readings:
     - "H-1: a wonder's and an improvement's tourism — PARTLY READ"
     - "H-1: the research AI — READ (the choice), PARTLY READ (the value)"
@@ -310,6 +318,7 @@
     - "H-1: the district discount at a city's placement, the appeal tourism of a pillaged plot, a city-state's kill on its centre — READ"
     - "C-118: a district's flat tourism on a pillaged district, Mary Leakey's Artifact percent in the summed scalings — READ (0x1ab780, 0x2486e0), both twins"
     - "C-96 / C-130: a building's district copy, the player's Gold as its cities stand, a minor's power after its production; a technology's improvement tourism — READ (0x18e570, 0x7a7dc3, 0x4e0bf0, 0x7b4971..0x7b4b5b), both twins but the tourism"
+    - "C-100 / C-118 / C-98: the plot values' yield-source tourism, the exhausted Great Person class, a technology's improvement tourism — READ, both twins"
   context:
     - "- An improvement (the lens 0x399e10 at 0x39a73c, the city 0x1aba40): its Improvement_Tourism row pays only with its PrereqTech (+0x60, the player's tech..."
   review: reviewed

@@ -73,8 +73,8 @@ export interface AiImprovementRow {
   buildUnits: readonly (readonly [string, boolean])[];
   /** each Improvement_Adjacencies row's YieldType */
   adjacency: readonly string[];
-  /** Improvement_Tourism: [TourismSource, ScalingFactor] */
-  tourism: readonly (readonly [string, number])[];
+  /** Improvement_Tourism: [TourismSource, ScalingFactor, PrereqTech] */
+  tourism: readonly (readonly [string, number, string | null])[];
   /** ImprovementModifiers' modifiers */
   modifiers: readonly AiModifier[];
 }

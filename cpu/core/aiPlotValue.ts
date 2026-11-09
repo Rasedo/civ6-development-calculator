@@ -176,15 +176,17 @@ export function improvementYieldsValue(f: PlotValueFacts, imp: AiImprovementRow,
   for (const [y, a] of imp.yields) v += yieldValue(f.view, f.seat, a * FX, y);
   for (const y of new Set(imp.adjacency)) v += yieldValue(f.view, f.seat, f.adjacency(imp.type, y) * FX, y);
   if (imp.appealYield) v += yieldValue(f.view, f.seat, fmul(f.appeal * FX, fxConst(imp.appealPct * 0.01)), imp.appealYield);
-  // its tourism (Improvement_Tourism, 0x7b19a0): a TOURISMSOURCE_APPEAL row's
-  // the plot's Appeal x ScalingFactor / 100 (0x1aba40) at PSEUDOYIELD_TOURISM,
-  // x (1 - 0.1 for each era the player stands before the sixth) a turn; the
+  // its tourism (Improvement_Tourism, 0x7b19a0, every row, no PrereqTech
+  // test): the row's source on the plot (0x1aba40) x ScalingFactor / 100 at
+  // PSEUDOYIELD_TOURISM, x (1 - 0.1 for each era the player stands before the
+  // sixth) a turn — TOURISMSOURCE_APPEAL the plot's Appeal, a yield source
+  // the plot's standing improvement's yield of it (0x82280 with the flag
+  // false less true: the improvement standing, not the one valued); the
   // city's percent on it (+0x1b20, EFFECT_ADJUST_CITY_IMPROVEMENT_TOURISM:
-  // the Golden Gate Bridge's) is none in a city-state's city; the yield
-  // sources' rows are not valued
+  // the Golden Gate Bridge's) is none in a city-state's city
   for (const [source, scale] of imp.tourism) {
-    if (source !== 'TOURISMSOURCE_APPEAL') continue;
-    const amount = scale === 100 ? f.appeal : Math.trunc((f.appeal * scale) / 100);
+    const base = source === 'TOURISMSOURCE_APPEAL' ? f.appeal : standingYield(f, source.replace(/^TOURISMSOURCE_/, 'YIELD_'));
+    const amount = scale === 100 ? base : Math.trunc((base * scale) / 100);
     const eraWeight = fxOfFloat(Math.fround(1 - Math.fround(Math.max(5 - f.era, 0) * Math.fround(0.1))));
     v += Math.floor((pseudoYieldValue(f.view, f.seat, amount * FX, 'PSEUDOYIELD_TOURISM') * eraWeight) / FX);
   }
@@ -208,6 +210,20 @@ export function improvementYieldsValue(f: PlotValueFacts, imp: AiImprovementRow,
   // (runs/h1_duelv1117 Caguana's Farms, 18.00 at t6, 88.00 at t45)
   if (imp.modifiers.length) value += f.modifiers(imp.modifiers, t, h);
   return value;
+}
+
+/** the plot's standing improvement's part of its yield of a YieldType
+ *  (0x82280 -> 0x538a60 with its fifth argument false less with it true:
+ *  the unpillaged improvement's Improvement_YieldChanges and its adjacency,
+ *  0x538fae); none on a plot with no improvement or a pillaged one */
+function standingYield(f: PlotValueFacts, y: string): number {
+  if (!f.improvement || f.pillaged) return 0;
+  const row = IMPROVEMENT.get(f.improvement);
+  if (!row) return 0;
+  let n = 0;
+  for (const [yy, a] of row.yields) if (yy === y) n += a;
+  if (row.adjacency.includes(y)) n += f.adjacency(row.type, y);
+  return n;
 }
 
 /** 0x7a58f0: the improvement on the plot landing in `t` turns, to the

@@ -13626,3 +13626,59 @@ contract the city's hand alone holds; `minorAiTurn`'s `goalsReached` call
   Warrior 131073's on its own plot 37:8 (taken 32 + 26 under dealt 28 + 34)
   and 196610's on 37:9 (taken 28 + 28 under 32 + 32), city-state 4's army
   record holding the barbarian Scout 3145752 on 37:9 two turns stale.
+
+## C-100 / C-118 / C-98: the plot values' yield-source tourism, the exhausted Great Person class, a technology's improvement tourism — READ, both twins
+
+- THE YIELD-SOURCE TOURISM (0x7b1320 at 0x7b19a0 -> 0x1aba40): every
+  Improvement_Tourism row of the improvement valued (+0x168), with no
+  PrereqTech test, reads its source ON THE PLOT: TOURISMSOURCE_APPEAL the
+  plot's Appeal, any other source (its index taken as the YieldType) the
+  plot's yield of it for its owner, 0x82280 with the fifth argument false
+  less with it true. 0x538a60's fifth argument ([rbp + 0x7f]) set skips the
+  plot's district yields (0x538b69), its unpillaged improvement's
+  (0x538fae), the per-yield district rows (0x5392c7) and the tail
+  0x53943c..0x53983c (the player's resource yield rows, player +0x1360 via
+  0x43a820; the city's yield per flood; per neighbour holding an improvement
+  of the same owner 0x1cb1e0 where 0x1cc2e0 holds; the city's improvement
+  rows 0x1cc2b0 x 0x4bd8c0). The amount is the STANDING improvement's, not
+  the one valued: a new Alcazar on an empty plot reads 0, the old Alcazar a
+  replacement takes off reads its 2 Culture. Then x ScalingFactor / 100,
+  PSEUDOYIELD_TOURISM x the era weight, as the Appeal row. Ported:
+  `improvementYieldsValue` / `standingYield` (cpu/core/aiPlotValue.ts),
+  `_cv_improvement_yields` / `_cv_standing_yield` (gpu/core/sim_cityvalue.py)
+  — the standing part as the unpillaged improvement's Improvement_YieldChanges
+  and its adjacency. Confirmed: runs/h1_duelq1124 Granada's Alcazar on
+  42:12, the Farm over it -79.39 at t24, -93.37 from t31 (ours 20.11 / 24.03
+  above before); 116 of 118 rows over the standing Alcazar exact; 1124
+  IMPROVEMENTS far rows 1,283 -> 284, DISTRICTS 260 -> 183 (the district
+  value takes the standing improvement off through the same value).
+- THE EXHAUSTED GREAT PERSON CLASS (GrandStrategic 0x6fafc0 at
+  0x6fc880..0x6fd02c): per GreatPersonClasses row (its PseudoYieldType +0x90
+  -> +0x14) the +0x768 list's entry is set 0; where IsClassAvailable
+  (0x2f7eb0) refuses the class, or the class has MaxPlayerInstances (+0x20 /
+  +0x24) and the player has earned that many (0x2f30c0), it is set to -1.0
+  less the +0x748 entry (0x6fcf37), so 0x700810's weight stands at its floor
+  -1.0 and the class's points value nothing. Ported in `pseudoYieldWeights`
+  (a class whose offer is exhausted, `gpOffer` -2, or `gpCapped`) and
+  `_MinorFacts.pseudo_w` (the offer exhausted; a minor earns none).
+  Confirmed: runs/h1_duelq1124 the Scientists' last, Abdus Salam, granted
+  t235 after the city-states' turns: from t236 every Solar, Wind and
+  Offshore Wind Farm row 40.00 lower (EFFECT_ADJUST_CITY_FREE_POWER's
+  GPP_SCIENTIST term 0), 238 Offshore Wind rows exact.
+- A TECHNOLOGY'S IMPROVEMENT TOURISM (0x7b3e50 at 0x7b4971..0x7b4b5b): per
+  row of the technology's Improvement_Tourism list (+0xe8: the rows whose
+  PrereqTech it is; source +0x1c via 0xadd870, improvement +0x58 -> +0x14,
+  ScalingFactor +0x20), over the player's plots (+0x1380 +0xf0, count +0x100)
+  it owns holding the improvement, 0x1aba40 summed; the sum at
+  PSEUDOYIELD_TOURISM, PV(H) - PV(T) (0x7a1240 at T = H), into the value.
+  Ported: `techTourism` in `techValueParts` (cpu/core/aiResearch.ts, rows
+  `TECH_IMPROVEMENT_TOURISM` off AI_IMPROVEMENTS' tourism PrereqTech),
+  `_rai_imp_tourism` (gpu/core/sim_research.py, `t_ai_imp_tourism`).
+  Confirmed: runs/h1_duelq1124 t144 Granada's Flight 291.62 (logged 291.6;
+  Hunza's and Cardiff's 251.4); every 1124 Flight and Advanced Flight row
+  within 0.06.
+- Open: the tail's city terms (the flood yield, the neighbours' and the
+  city's improvement rows) and the district part are not in the standing
+  amount; the city's +0x1b20 percent (none in a city-state) is not read in
+  the research term; 0x6fafc0's share where the +0x748 / +0x620 entry is
+  above 0 (0x6fcab4..0x6fce7c) unread.

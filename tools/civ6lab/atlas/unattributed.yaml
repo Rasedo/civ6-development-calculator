@@ -8526,6 +8526,18 @@
   context:
     - "...`m_aCurrentUnitCost`, an int); where c > 0, the row's +0x20 class does not read 2 through 0xadd5e0 (unread) and the player's +0x1048 equals the global at 0xf2f978 (the currency the resolut..."
   review: reviewed
+- addr: 0xadd870
+  final: 0x7d8d00
+  kind: function
+  status: READ
+  cases:
+    - recording: 1124
+      value: every 1124 Flight and Advanced Flight row   within 0.06.
+  readings:
+    - "C-100 / C-118 / C-98: the plot values' yield-source tourism, the exhausted Great Person class, a technology's improvement tourism — READ, both twins"
+  context:
+    - "...gy's Improvement_Tourism list (+0xe8: the rows whose PrereqTech it is; source +0x1c via 0xadd870, improvement +0x58 -> +0x14, ScalingFactor +0x20), over the player's plots (+0x1380 +0x..."
+  review: imported
 - addr: 0xb015b0
   kind: function
   status: PARTLY

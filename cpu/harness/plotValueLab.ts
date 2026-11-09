@@ -30,7 +30,9 @@
  * --rows prints the store and the item in hand; its grid met (`minorPower`), the
  * Economic AI's Gold boost on the net income the record's treasury cached;
  * the research AI's turns from AI_Research.csv, the civics AI's as its turn
- * would write them. A plot's improvement: its own, a barbarian camp, a
+ * would write them; the Great People's timeline as the record holds it
+ * (`standGreatPeople`: a class granted out in the turn closes after the
+ * city-states' turns). A plot's improvement: its own, a barbarian camp, a
  * tribal village or a meteor site (`plotImprovementType`); a plot holding
  * the city or a district is not compared in the IMPROVEMENTS mode (the
  * analysis skips it, its row an earlier analysis's). A district's facts: the engine's adjacency
@@ -78,6 +80,7 @@ import { eruptionHazardTurns, floodHazardTurns } from '../core/disasters';
 import { loadCityBuildCentre, loadCityBuildPlots } from './cityBuildLog';
 import { replayEvents } from './eventReplay';
 import { loadRandLog, randLogPath } from './randLog';
+import { loadGpTimeline, standGreatPeople } from './gpTimeline';
 import { AI_BUILDINGS } from '../data/aiBuildTables';
 
 const args = process.argv.slice(2).filter((a) => a !== '--');
@@ -91,6 +94,7 @@ const show = args.includes('--show') ? Number(args[args.indexOf('--show') + 1]) 
 const allRows = args.includes('--all');
 
 const cat = loadCatalog(dump);
+const gpTimeline = loadGpTimeline(dump);
 const read: TurnRecord[] = readFileSync(dump, 'utf8').split('\n').filter((l) => l.trim()).map((l) => JSON.parse(l) as TurnRecord);
 const recs = read.filter((r) => !r.moved).sort((a, b) => a.turn - b.turn);
 const plots = loadCityBuildPlots(dump);
@@ -194,6 +198,9 @@ for (const rec of recs) {
   // record's positions, the majors' actions of the turn done (the engine's
   // turn reads them so)
   state.riverNamed = after.state.riverNamed;
+  // the Great People's timeline as the record holds it (a class granted
+  // out in the turn closes after the city-states' turns)
+  standGreatPeople(state, gpTimeline, cur.turn);
   // the map as the majors' turns left it: every plot no city-state holds in
   // either record as the record after holds it (its owner, improvement,
   // feature, district, road), an owning city the record lacks kept out

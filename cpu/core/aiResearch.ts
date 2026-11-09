@@ -36,8 +36,12 @@
  * Arithmetic is the DLL's 24.8 fixed point throughout (`aiValue.ts`).
  */
 import { ERAS, TECHS, TECH_TABLE_ORDER } from '../data/techs';
-import { gameTypeOf } from '../data/aliases';
-import { AI_BUILDINGS, AI_PROJECTS } from '../data/aiBuildTables';
+import { engineId, gameTypeOf } from '../data/aliases';
+import { AI_BUILDINGS, AI_IMPROVEMENTS, AI_PROJECTS } from '../data/aiBuildTables';
+import { IMPROVEMENTS } from '../data/improvements';
+import { improvementAdjacency } from './yields';
+import { makeYieldCtx } from './effects';
+import { tileSeat } from './seats';
 import {
   AI_PROJECT_SHARE, AI_SPACE_RACE_SHARE, AI_UNLOCK_SHARE, AI_VALUE_HORIZON, PSEUDOYIELD_DISTRICT, PSEUDOYIELD_NUCLEAR_WEAPON, PSEUDOYIELD_TECHNOLOGY, PSEUDOYIELD_WONDER,
 } from '../data/aiValue';
@@ -52,7 +56,7 @@ import { projectChain } from './aiProjectValue';
 import { modifiersValue } from './aiModifiers';
 import { aiView } from './aiView';
 import { pseudoYieldWeights } from './aiWeights';
-import type { GameState, ResearchState } from './types';
+import type { GameState, ImprovementId, ResearchState } from './types';
 
 
 /** Has the seat the row (a repeatable row is never spent) */
@@ -167,7 +171,9 @@ function walk(state: GameState, seat: number, r: ResearchState, id: string, rate
  * project `AI_PROJECT_SHARE` and a weapon project PSEUDOYIELD_NUCLEAR_WEAPON
  * of 1.0 more, a space race project in the share's place `AI_SPACE_RACE_SHARE`
  * of PSEUDOYIELD_SPACE_RACE of its chain's length squared (`projectChain`,
- * 0x7b8a30) — each a yield a turn from landing to the horizon, each
+ * 0x7b8a30), the improvement tourism its Improvement_Tourism rows pay on the
+ * player's plots (`techTourism`) at PSEUDOYIELD_TOURISM — each a yield a
+ * turn from landing to the horizon, each
  * pseudo-yield at the seat's weight `pw` (`aiWeights.ts`). Then the row's modifiers
  * (TechnologyModifiers) analysed from landing to the horizon (0x7a4b20) on
  * `view` (the state's `aiView` where none is given). Past the horizon
@@ -201,9 +207,56 @@ function techValueParts(state: GameState, seat: number, id: string, turns: numbe
       + n.districts * fromLanding(pseudoYield(PSEUDOYIELD_DISTRICT, share, w('PSEUDOYIELD_DISTRICT')), turns)
       + n.projects * fromLanding(fxConst(AI_PROJECT_SHARE), turns)
       + n.weapons * fromLanding(pseudoYield(PSEUDOYIELD_NUCLEAR_WEAPON, FX, w('PSEUDOYIELD_NUCLEAR_WEAPON')), turns)
-      + n.space.reduce((v, k) => v + fromLanding(fmul(pseudoYield(SPACE_RACE, k * k * FX, w('PSEUDOYIELD_SPACE_RACE')), SPACE_SHARE), turns), 0),
+      + n.space.reduce((v, k) => v + fromLanding(fmul(pseudoYield(SPACE_RACE, k * k * FX, w('PSEUDOYIELD_SPACE_RACE')), SPACE_SHARE), turns), 0)
+      + fromLanding(pseudoYield(AI_PSEUDOYIELD_DEFAULT.PSEUDOYIELD_TOURISM ?? 1, techTourism(state, seat, gameTypeOf('tech', id, 'TECH_')) * FX,
+        w('PSEUDOYIELD_TOURISM')), turns),
     mods: mods.length ? modifiersValue({ view: view ?? aiView(state), seat, start: turns, horizon: AI_VALUE_HORIZON, rate: AI_RATE }, mods) : 0,
   };
+}
+
+/** per technology its Improvement_Tourism rows (the technology's list,
+ *  +0xe8): [improvement, TourismSource, ScalingFactor] */
+export const TECH_IMPROVEMENT_TOURISM = new Map<string, [string, string, number][]>();
+for (const r of AI_IMPROVEMENTS) {
+  for (const [source, scale, tech] of r.tourism) {
+    if (!tech) continue;
+    let rows = TECH_IMPROVEMENT_TOURISM.get(tech);
+    if (!rows) TECH_IMPROVEMENT_TOURISM.set(tech, (rows = []));
+    rows.push([r.type, source, scale]);
+  }
+}
+const YIELD_KEY: Record<string, string> = {
+  YIELD_FOOD: 'food', YIELD_PRODUCTION: 'production', YIELD_GOLD: 'gold', YIELD_SCIENCE: 'science', YIELD_CULTURE: 'culture', YIELD_FAITH: 'faith',
+};
+
+/** 0x7b3e50 at 0x7b4971..0x7b4b5b: the technology's improvement tourism —
+ *  per Improvement_Tourism row whose PrereqTech it is, over the player's
+ *  plots (+0x1380 +0xf0) it owns holding the row's improvement, the row's
+ *  source there (0x1aba40: the unpillaged improvement's yield of it, its
+ *  Improvement_YieldChanges and adjacency) x ScalingFactor / 100, summed;
+ *  the city's percent (+0x1b20, the Golden Gate Bridge's) not read */
+function techTourism(state: GameState, seat: number, tech: string): number {
+  const rows = TECH_IMPROVEMENT_TOURISM.get(tech);
+  if (!rows) return 0;
+  let ctx: ReturnType<typeof makeYieldCtx> | null = null;
+  let sum = 0;
+  for (const [type, source, scale] of rows) {
+    const id = engineId('improvement', type, 'IMPROVEMENT_', IMPROVEMENTS) as ImprovementId | null;
+    const row = AI_IMPROVEMENTS.find((r) => r.type === type);
+    if (!id || !row) continue;
+    const y = source.replace(/^TOURISMSOURCE_/, 'YIELD_');
+    const base = row.yields.filter(([yy]) => yy === y).reduce((n, [, a]) => n + a, 0);
+    for (const tile of state.map.tiles) {
+      if (tile.improvement !== id || tile.pillaged || tileSeat(tile) !== seat) continue;
+      let n = base;
+      if (row.adjacency.includes(y)) {
+        ctx ??= makeYieldCtx(state, seat);
+        n += (improvementAdjacency(ctx, tile, id) as unknown as Record<string, number>)[YIELD_KEY[y]] ?? 0;
+      }
+      sum += scale === 100 ? n : Math.trunc((n * scale) / 100);
+    }
+  }
+  return sum;
 }
 
 /** 0x3dcf50: the seat at war with a player of the game but the barbarians —

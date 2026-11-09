@@ -547,6 +547,7 @@ class Rules:
     t_embark_all: torch.Tensor  # bool [NT] — CIV6 `EmbarkAll`
     t_embark_unit: torch.Tensor  # long [NT] — the unit type its EmbarkUnitType names (`TechDef.embarkUnit`), -1 none
     t_ai_res: list  # per tech the resources its improvement walk reaches, with repeats (`TECH_IMPROVEMENT_RESOURCES`)
+    t_ai_imp_tourism: list  # per tech its Improvement_Tourism rows, [improvement, TourismSource, ScalingFactor] (`techTourism`)
     res_ai: list  # per resource {cls, happy, units: [{need, ver, obsT, obsC, eng}]} (`AI_RESOURCE_EXPORT`)
     c_ai_unlocks: torch.Tensor  # long [NC, 3] — what the civics AI's value counts: buildings, districts, wonders (`civicUnlocks`)
     c_ai_mods: torch.Tensor  # long [NC, 6] — the civics AI value's modifiers and formations: envoys, spies, combat adjacency, land formations, trade capacity, tourism
@@ -820,6 +821,7 @@ def load_rules(path: Path = FIXTURES / "rules.json") -> Rules:
         t_embark_all=torch.tensor([bool(t["embarkAll"]) for t in r["techs"]], dtype=torch.bool),
         t_embark_unit=torch.tensor([int(t["embarkUnit"]) for t in r["techs"]], dtype=torch.long),
         t_ai_res=[list(t["aiResources"]) for t in r["techs"]],
+        t_ai_imp_tourism=[[tuple(x) for x in t["aiImpTourism"]] for t in r["techs"]],
         res_ai=list(r["resources"]["ai"]),
         c_ai_unlocks=torch.tensor([[int(c["aiBuildings"]), int(c["aiDistricts"]), int(c["aiWonders"])] for c in r["civics"]], dtype=torch.long),
         c_ai_mods=torch.tensor([[int(c["aiTokens"]), int(c["aiSpies"]), int(c["aiAdjacency"]), int(c["aiFormations"]), int(c["aiTradeCapacity"]), int(c["aiTourism"])] for c in r["civics"]],

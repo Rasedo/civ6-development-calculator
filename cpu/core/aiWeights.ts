@@ -30,8 +30,11 @@
  * (player +0x1358 +0xf8, Eras +0x1c).
  */
 import { AI_AGENDA_TRAITS, AI_CIVILIZATION_TRAITS, AI_DIFFICULTIES, AI_ERA_STRATEGY_LISTS, AI_LEADER_TRAITS, AI_LIST_ITEMS,
-  AI_STRATEGY_LISTS, AI_TRAIT_LISTS } from '../data/aiTables';
+  AI_GP_CLASS_PSEUDOYIELD, AI_STRATEGY_LISTS, AI_TRAIT_LISTS } from '../data/aiTables';
 import { ERAS } from '../data/techs';
+import { GP_CLASSES } from '../data/greatPeople';
+import { gpCapped, gpOffer } from './greatPeople';
+import type { GreatPersonClass } from './types';
 import { CIV_LEADERS } from '../data/seats';
 import { FX, fmul, fxConst, type AiListItem, type AiListRef } from './aiValue';
 import { civEraIndex, computeCityStats, standingLuxuries } from './city';
@@ -217,6 +220,15 @@ export function pseudoYieldWeights(state: GameState, seat: number): Map<string, 
   if (!s) return out;
   const chronology = civEraIndex(s.research.techs, s.research.civics) + 1;
   out.set('PSEUDOYIELD_DISTRICT', (out.get('PSEUDOYIELD_DISTRICT') ?? 0) + fxConst(0.5 * chronology));
+  // the grand strategy's turn (0x6fafc0 at 0x6fc880..0x6fd02c), per Great
+  // Person class: a class the timeline holds no one of (IsClassAvailable
+  // 0x2f7eb0: its offer exhausted), or one the player has earned its
+  // MaxPlayerInstances of (0x2f30c0, the Prophet's 1), sets its pseudo-yield
+  // to the floor (-1.0: its points valued at nothing)
+  for (const [cls, pseudo] of Object.entries(AI_GP_CLASS_PSEUDOYIELD)) {
+    const c = cls.replace(/^GREAT_PERSON_CLASS_/, '') as GreatPersonClass;
+    if (GP_CLASSES.includes(c) && (gpOffer(state, c) === -2 || gpCapped(s, c))) out.set(pseudo, -FX);
+  }
   // a city-state's military AI writes its Combat Desire over its
   // PSEUDOYIELD_UNIT_COMBAT weight, and its explorers' and naval scouts'
   // desire less what it holds, less 1.0, into PSEUDOYIELD_UNIT_EXPLORER and

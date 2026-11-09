@@ -6,6 +6,8 @@ from .simbase import *  # noqa: F401,F403 — torch, constants, helpers: the sha
 # tools/civ6lab/dll_readings.md "H-1: the research AI") — the city-states'
 # research inside the engine's turn. 24.8 fixed point throughout, in int64.
 _FX = 256
+# the yields of a plot plane's last axis, in order
+_IMP_YIELDS = ["YIELD_FOOD", "YIELD_PRODUCTION", "YIELD_GOLD", "YIELD_SCIENCE", "YIELD_CULTURE", "YIELD_FAITH"]
 
 
 def _fx_const(c: float) -> int:
@@ -687,9 +689,47 @@ class SimResearch:
                 continue
             a = _fmul(_imul(n * n * _FX, T["py_space"]), torch.full_like(n, T["space_share"])).expand(B, NT)
             val = val + (n > 0).long() * self._rai_from_landing(a, nn)
+        val = val + self._rai_imp_tourism(s, nn)
         if mods:
             val = val + self._rai_mods(s, nn)
         return torch.where(turns > T["horizon"], torch.full_like(val, _fx_const(-9999)), val)
+
+    def _rai_imp_tourism(self, s: int, nn: torch.Tensor) -> torch.Tensor:
+        """`techTourism` [B, NT] for minor `s` (the Free Cities at `FR`),
+        landing in `nn` turns: per Improvement_Tourism row whose PrereqTech is
+        the row, over the plots the player owns holding its improvement
+        unpillaged, the improvement's yield of the source (its
+        Improvement_YieldChanges and adjacency) x ScalingFactor / 100, summed,
+        as PSEUDOYIELD_TOURISM from landing to the horizon"""
+        out = torch.zeros_like(nn)
+        cols = [c for c, xs in enumerate(self.rules.t_ai_imp_tourism) if xs]
+        if not cols:
+            return out
+        CV = self._cv_tables()
+        names = [r["type"] for r in self.rules.ai_city_build["improvements"]]
+        seat = FREE_SEAT if s == self.FR else 100 + s
+        row = self.FREE_ROW if s == self.FR else self._CITY_MINOR0 + s
+        mine = (self.tile_seat == seat) & ~self.pillaged
+        for c in cols:
+            tot = torch.zeros(self.B, dtype=torch.long, device=self.device)
+            for imp, source, scale in self.rules.t_ai_imp_tourism[c]:
+                r = CV["imp"].get(imp)
+                k = int(CV["engine"]["improvement"][names.index(imp)]) if imp in names else -1
+                if r is None or k < 0:
+                    continue
+                on = mine & (self.improvement == k)
+                if not bool(on.any()):
+                    continue
+                y = source.replace("TOURISMSOURCE_", "YIELD_", 1)
+                n = torch.full_like(self.improvement, sum(a for yy, a in r["yields"] if yy == y)).long()
+                if y in r["adjacency"]:
+                    n = n + self._imp_adj_at(row, k)[:, :, _IMP_YIELDS.index(y)].long()
+                if scale != 100:
+                    n = torch.div(n * scale, 100, rounding_mode="trunc")
+                tot = tot + (n * on.long()).sum(dim=1)
+            a = self._cv_pseudo((tot * _FX).unsqueeze(1).expand(-1, nn.shape[1]), "PSEUDOYIELD_TOURISM")
+            out[:, c] = self._rai_from_landing(a, nn)[:, c]
+        return out
 
     def _rai_mods(self, s: int, nn: torch.Tensor) -> torch.Tensor:
         """the rows' TechnologyModifiers (`techValue`'s modifiers term) [B, NT]

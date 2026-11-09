@@ -13,6 +13,18 @@
   context:
     - ...0x168) holds a fixed-point value per Great Person class. The turn 0x43c190 rewrites it (0x439b30 per class, then 0x43b1c0 adds it to the total) only where CanEarnGreatPeople (0x43a980)...
   review: imported
+- addr: 0x43a820
+  final: 0x2e2cb0
+  kind: function
+  status: READ
+  cases:
+    - recording: 1124
+      value: 1124   IMPROVEMENTS far rows 1,283 -> 284, DISTRICTS 260 -> 183 (the district   value takes the standing improvement off through the same value).
+  readings:
+    - "C-100 / C-118 / C-98: the plot values' yield-source tourism, the exhausted Great Person class, a technology's improvement tourism — READ, both twins"
+  context:
+    - ...and the tail 0x53943c..0x53983c (the player's resource yield rows, player +0x1360 via 0x43a820; the city's yield per flood; per neighbour holding an improvement of the same owner 0x1...
+  review: imported
 - addr: 0x43a980
   final: 0x2e2dc0
   kind: function

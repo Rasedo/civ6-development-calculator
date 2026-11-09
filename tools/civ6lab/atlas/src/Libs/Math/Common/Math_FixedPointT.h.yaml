@@ -401,16 +401,21 @@
 - addr: 0x6fafc0
   kind: function
   name: GrandStrategic
-  semantics: "GrandStrategic's turn; m_yieldSensitivityBoost (0x6fbdf1..0x6fc771): for a yield whose sensitivity s = +0x788[y] (the YieldSensitivities system, GlobalAI +0x2508) is > 0, over the player and every major it has met (0x483b50's list, 0x3daaf0) with x their yield per turn (0x4bf7c0 on player +0x1330): n, max, mean; n > 1, sd = sqrt(sum (x - mean)^2 / (n - 1)) > 0 and the player's x < max -> s x (max - x) / sd, else 0. Settle City Evaluation: one job per map region of the regions list, run and waited; each scores every plot of its region in plot order (0x6fd510) and sorts them best first (0x6f5fb0); a region holds a site where one scores above 0. The island (after the apply; AI_ISLAND_COAST_PERCENTAGE 20): while +0x440 (a city's landmass more than half revealed) is clear or +0x4a0 (island) set: per entry of the player +0x12f0 list, the share of its landmass the knowledge base counts (0x786080) above 0.5 (0xd20458) sets +0x440 and decides: coastal plots >= trunc(total x 20 / 100) sets the island, else clears it and ends the walk."
+  semantics: "GrandStrategic's turn; m_yieldSensitivityBoost (0x6fbdf1..0x6fc771): for a yield whose sensitivity s = +0x788[y] (the YieldSensitivities system, GlobalAI +0x2508) is > 0, over the player and every major it has met (0x483b50's list, 0x3daaf0) with x their yield per turn (0x4bf7c0 on player +0x1330): n, max, mean; n > 1, sd = sqrt(sum (x - mean)^2 / (n - 1)) > 0 and the player's x < max -> s x (max - x) / sd, else 0. Settle City Evaluation: one job per map region of the regions list, run and waited; each scores every plot of its region in plot order (0x6fd510) and sorts them best first (0x6f5fb0); a region holds a site where one scores above 0. The Great Person classes' pseudo-yields (0x6fc880..0x6fd02c, per GreatPersonClasses row in database order, its PseudoYieldType +0x90 -> +0x14): the +0x768 list's entry set 0; a class IsClassAvailable (0x2f7eb0) refuses, or one with MaxPlayerInstances (+0x20 / +0x24) the player has earned that many of (0x2f30c0), sets it to -1.0 less the +0x748 list's entry (0x6fcf37: the weight at its floor -1.0, its points valued at nothing, 0x700810); otherwise where the +0x748 or +0x620 entry is above 0 a share by the players past the era (0x6fcab4..0x6fce7c, unread). The island (after the apply; AI_ISLAND_COAST_PERCENTAGE 20): while +0x440 (a city's landmass more than half revealed) is clear or +0x4a0 (island) set: per entry of the player +0x12f0 list, the share of its landmass the knowledge base counts (0x786080) above 0.5 (0xd20458) sets +0x440 and decides: coastal plots >= trunc(total x 20 / 100) sets the island, else clears it and ends the walk."
   status: READ
   cases:
     - recording: h1_duelv1124
       turn: 71
       value: "the game turns later (runs/h1_duelv1124: Qin's Naval at t71, the port's   at t48), so the +0x12f0 list and the visibility word are unread."
+    - recording: h1_duelq1124
+      turn: 236
+      value: "the Scientists' last, Abdus Salam, granted at t235 after the city-states' turns: their Solar, Wind and Offshore Wind Farm rows 40.00 lower from t236 (EFFECT_ADJUST_CITY_FREE_POWER's GPP_SCIENTIST term 0), 238 Offshore Wind rows exact"
+  impl: [cpu/core/aiWeights.ts:pseudoYieldWeights, gpu/core/sim_cityvalue.py:pseudo_w]
   readings:
     - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
     - "C-97: the settle site evaluation — READ (the score, the choices), PARTLY READ (the danger, the plot yield)"
     - "C-97: the victory manager's strategies — READ (the evaluation, the apply, the conditions below), PARTLY READ (three conditions, the island's count)"
+    - "C-100 / C-118 / C-98: the plot values' yield-source tourism, the exhausted Great Person class, a technology's improvement tourism — READ, both twins"
   notes:
     - ".claude/scratchpad/st1/reading.md: ...ess the danger << 8. AI_SiteEval.csv logs no score below 0:   the port clamps there. - The regions (0x6fafc0, the \"Settle City Evaluation\" jobs, one per map   region of the regions list, run and waited): each..."
   context:
@@ -443,6 +448,7 @@
     - "C-97: the government and policy choice — the choice READ, the values PARTLY READ"
     - "C-96: the improvement value's resource copies, a minor's strategic copies, the district count — READ (0x7a58f0's count, 0x4a93c0, 0x1ae8a0, 0x1ae8f0), a LAB (a city-state's Great General weight)"
     - "C-96: the improvement value's resource copies, a minor's strategic copies, the district count"
+    - "C-100 / C-118 / C-98: the plot values' yield-source tourism, the exhausted Great Person class, a technology's improvement tourism — READ, both twins"
   notes:
     - "imported: READ in its section, no confirming case found beside it"
     - ".claude/scratchpad/cb4/NOTES.md: ...f2e270 SPY,   f2e274 DISTRICT, f2e2a0 NUCLEAR, f2e2b4 STANDING_ARMY, f2e2bc TOURISM. (pyglob.py) - 0x700810 pseudo weight: max(-1, mil[+0x7e8]+ai[+0x620]+list768+list748); GP pseudos +GA pts 0x2c4230. - Mili..."

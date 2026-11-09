@@ -16,7 +16,7 @@
 - addr: 0x538a60
   final: 0x37ec60
   kind: function
-  semantics: "The per-flood term (0x539645): when the owning city's m_aYieldPerFlood (City +0x2728) is above 0 for the yield, the plot's home river (0xa2b810) and its floods (0xa2b4f0, 0xa2b410(record, -1)): amount x count. The plot's own rows, then on a plot holding a city (0x81120) Food raised to YIELD_FOOD_CITY_TERRAIN_REPLACE 2 and Production to YIELD_PRODUCTION_CITY_TERRAIN_REPLACE 1 (GlobalParameters +0x7d4 / +0x7dc), and only then the game effects' rows and the neighbours' (the walk from 0x5391c0) — Feature_AdjacentYields among them. The plot yield: adds the game effects' per-plot rows (0xc7e9b0) AFTER the city's floors (the cmovl at 0x53916e)."
+  semantics: "The fifth argument ([rbp + 0x7f]) set skips the plot's district yields (0x538b69), its unpillaged improvement's (0x538fae), the per-yield district rows (0x5392c7) and the tail 0x53943c..0x53983c (the player's resource yield rows, player +0x1360 via 0x43a820; the per-flood term; per neighbour holding an improvement of the same owner 0x1cb1e0 where 0x1cc2e0 holds for the plot's terrain; the city's improvement rows 0x1cc2b0 x 0x4bd8c0 of player +0x1330). The per-flood term (0x539645): when the owning city's m_aYieldPerFlood (City +0x2728) is above 0 for the yield, the plot's home river (0xa2b810) and its floods (0xa2b4f0, 0xa2b410(record, -1)): amount x count. The plot's own rows, then on a plot holding a city (0x81120) Food raised to YIELD_FOOD_CITY_TERRAIN_REPLACE 2 and Production to YIELD_PRODUCTION_CITY_TERRAIN_REPLACE 1 (GlobalParameters +0x7d4 / +0x7dc), and only then the game effects' rows and the neighbours' (the walk from 0x5391c0) — Feature_AdjacentYields among them. The plot yield: adds the game effects' per-plot rows (0xc7e9b0) AFTER the city's floors (the cmovl at 0x53916e)."
   status: READ
   cases:
     - recording: h1_duelw1124
@@ -28,9 +28,9 @@
     - recording: h1_duelw1131
       turn: 96
       value: Beijing 534 (rivers 0 and 1) reads 1 Faith after floods of both, 2 at t122 after river 0's next
-    - recording: 1117
-      turn: 222
-      value: "The flag   is 0x538a60's fifth argument, unread: which yields it leaves out is the   open question behind 1117 t222 (docs/AUDIT.md C-94)."
+    - recording: h1_duelq1124
+      turn: 24
+      value: "the fifth argument: 0x1aba40's standing Alcazar's Culture 2 (its Improvement_YieldChanges), Granada's replacement rows over 42:12 exact"
     - recording: h1_duelw1124
       turn: 162
       value: "The drought's −1 Food is read there: the records put it after   the floors — runs/h1_duelw1124 Shenyang, a Grassland centre in the   footprint t162–163, t194–195, t234–235, reads Food 1 and the city's"
@@ -40,7 +40,10 @@
     - recording: h1_duelw1131
       turn: 96
       value: "Confirmed on the two recorded plots that lie in two lists: runs/h1_duelw1131 Beijing 534 (rivers 0 and 1) reads 1 Faith at t96 after floods of both (the first river's alone: 1;"
-  impl: [cpu/core/city.ts:tileYieldsForCenter, cpu/core/disasters.ts:homeCache]
+  impl:
+    - cpu/core/city.ts:tileYieldsForCenter
+    - cpu/core/disasters.ts:homeCache
+    - cpu/core/aiPlotValue.ts:standingYield
   readings:
     - "H-1: a wonder's and an improvement's tourism — PARTLY READ"
     - "H-1: a city centre's floors — READ"
@@ -49,6 +52,7 @@
     - "C-97: the settle site evaluation — READ (the score, the choices), PARTLY READ (the danger, the plot yield)"
     - "C-100: the plot values' golden-age, claims and tourism-percent terms, the required features, the power value's negative Amount — READ"
     - "C-96 / C-130: a building's district copy, the player's Gold as its cities stand, a minor's power after its production; a technology's improvement tourism — READ (0x18e570, 0x7a7dc3, 0x4e0bf0, 0x7b4971..0x7b4b5b), both twins but the tourism"
+    - "C-100 / C-118 / C-98: the plot values' yield-source tourism, the exhausted Great Person class, a technology's improvement tourism — READ, both twins"
   notes:
     - ".claude/scratchpad/st1/reading.md: ...always 0); at distance 1..CITY_MIN_RANGE every yield (the plot's   yield for the player, 0x82280 -> 0x538a60) into the total, at 1 into the   inner ring; a feature within 2 counted; a resource the player sees..."
     - ".claude/scratchpad/st1/reading.md: ...a fit), the units' strengths (the install's base, the   routines' modifiers unread), the plot yield 0x538a60 (the engine's   `tileYields` for the seat), ownership type 0 (taken as the improved plots   of the..."

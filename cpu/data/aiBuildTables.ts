@@ -24526,7 +24526,8 @@ export const AI_IMPROVEMENTS: readonly AiImprovementRow[] = [
   "tourism": [
    [
     "TOURISMSOURCE_CULTURE",
-    0
+    0,
+    "TECH_FLIGHT"
    ]
   ],
   "modifiers": []
@@ -24670,7 +24671,8 @@ export const AI_IMPROVEMENTS: readonly AiImprovementRow[] = [
   "tourism": [
    [
     "TOURISMSOURCE_CULTURE",
-    100
+    100,
+    "TECH_FLIGHT"
    ]
   ],
   "modifiers": [
@@ -24770,7 +24772,8 @@ export const AI_IMPROVEMENTS: readonly AiImprovementRow[] = [
   "tourism": [
    [
     "TOURISMSOURCE_CULTURE",
-    100
+    100,
+    "TECH_FLIGHT"
    ]
   ],
   "modifiers": [
@@ -25128,7 +25131,8 @@ export const AI_IMPROVEMENTS: readonly AiImprovementRow[] = [
   "tourism": [
    [
     "TOURISMSOURCE_APPEAL",
-    100
+    100,
+    null
    ]
   ],
   "modifiers": []
@@ -25204,7 +25208,8 @@ export const AI_IMPROVEMENTS: readonly AiImprovementRow[] = [
   "tourism": [
    [
     "TOURISMSOURCE_CULTURE",
-    100
+    100,
+    "TECH_FLIGHT"
    ]
   ],
   "modifiers": []
@@ -25251,7 +25256,8 @@ export const AI_IMPROVEMENTS: readonly AiImprovementRow[] = [
   "tourism": [
    [
     "TOURISMSOURCE_FAITH",
-    100
+    100,
+    "TECH_FLIGHT"
    ]
   ],
   "modifiers": []
@@ -25296,7 +25302,8 @@ export const AI_IMPROVEMENTS: readonly AiImprovementRow[] = [
   "tourism": [
    [
     "TOURISMSOURCE_CULTURE",
-    100
+    100,
+    "TECH_FLIGHT"
    ]
   ],
   "modifiers": []
@@ -25339,7 +25346,8 @@ export const AI_IMPROVEMENTS: readonly AiImprovementRow[] = [
   "tourism": [
    [
     "TOURISMSOURCE_FAITH",
-    100
+    100,
+    "TECH_FLIGHT"
    ]
   ],
   "modifiers": []
@@ -25515,7 +25523,8 @@ export const AI_IMPROVEMENTS: readonly AiImprovementRow[] = [
   "tourism": [
    [
     "TOURISMSOURCE_CULTURE",
-    100
+    100,
+    "TECH_FLIGHT"
    ]
   ],
   "modifiers": [
@@ -25698,7 +25707,8 @@ export const AI_IMPROVEMENTS: readonly AiImprovementRow[] = [
   "tourism": [
    [
     "TOURISMSOURCE_CULTURE",
-    100
+    100,
+    "TECH_FLIGHT"
    ]
   ],
   "modifiers": [
@@ -25760,7 +25770,8 @@ export const AI_IMPROVEMENTS: readonly AiImprovementRow[] = [
   "tourism": [
    [
     "TOURISMSOURCE_FOOD",
-    100
+    100,
+    "TECH_FLIGHT"
    ]
   ],
   "modifiers": [
@@ -25817,7 +25828,8 @@ export const AI_IMPROVEMENTS: readonly AiImprovementRow[] = [
   "tourism": [
    [
     "TOURISMSOURCE_CULTURE",
-    100
+    100,
+    "TECH_FLIGHT"
    ]
   ],
   "modifiers": []
@@ -25977,7 +25989,8 @@ export const AI_IMPROVEMENTS: readonly AiImprovementRow[] = [
   "tourism": [
    [
     "TOURISMSOURCE_CULTURE",
-    100
+    100,
+    "TECH_FLIGHT"
    ]
   ],
   "modifiers": []
@@ -26052,7 +26065,8 @@ export const AI_IMPROVEMENTS: readonly AiImprovementRow[] = [
   "tourism": [
    [
     "TOURISMSOURCE_CULTURE",
-    100
+    100,
+    "TECH_FLIGHT"
    ]
   ],
   "modifiers": []
@@ -26095,7 +26109,8 @@ export const AI_IMPROVEMENTS: readonly AiImprovementRow[] = [
   "tourism": [
    [
     "TOURISMSOURCE_CULTURE",
-    100
+    100,
+    "TECH_FLIGHT"
    ]
   ],
   "modifiers": [
@@ -26355,7 +26370,8 @@ export const AI_IMPROVEMENTS: readonly AiImprovementRow[] = [
   "tourism": [
    [
     "TOURISMSOURCE_CULTURE",
-    100
+    100,
+    "TECH_FLIGHT"
    ]
   ],
   "modifiers": [
@@ -26718,7 +26734,8 @@ export const AI_IMPROVEMENTS: readonly AiImprovementRow[] = [
   "tourism": [
    [
     "TOURISMSOURCE_CULTURE",
-    100
+    100,
+    null
    ]
   ],
   "modifiers": []
@@ -26759,7 +26776,8 @@ export const AI_IMPROVEMENTS: readonly AiImprovementRow[] = [
   "tourism": [
    [
     "TOURISMSOURCE_CULTURE",
-    100
+    100,
+    "TECH_FLIGHT"
    ]
   ],
   "modifiers": [
@@ -27113,7 +27131,8 @@ export const AI_IMPROVEMENTS: readonly AiImprovementRow[] = [
   "tourism": [
    [
     "TOURISMSOURCE_APPEAL",
-    100
+    100,
+    null
    ]
   ],
   "modifiers": [
@@ -27186,7 +27205,8 @@ export const AI_IMPROVEMENTS: readonly AiImprovementRow[] = [
   "tourism": [
    [
     "TOURISMSOURCE_CULTURE",
-    100
+    100,
+    null
    ]
   ],
   "modifiers": [
@@ -27254,7 +27274,8 @@ export const AI_IMPROVEMENTS: readonly AiImprovementRow[] = [
   "tourism": [
    [
     "TOURISMSOURCE_CULTURE",
-    100
+    100,
+    "TECH_FLIGHT"
    ]
   ],
   "modifiers": [
@@ -27458,7 +27479,8 @@ export const AI_IMPROVEMENTS: readonly AiImprovementRow[] = [
   "tourism": [
    [
     "TOURISMSOURCE_CULTURE",
-    100
+    100,
+    "TECH_FLIGHT"
    ]
   ],
   "modifiers": []
@@ -27576,7 +27598,8 @@ export const AI_IMPROVEMENTS: readonly AiImprovementRow[] = [
   "tourism": [
    [
     "TOURISMSOURCE_FAITH",
-    100
+    100,
+    "TECH_FLIGHT"
    ]
   ],
   "modifiers": []

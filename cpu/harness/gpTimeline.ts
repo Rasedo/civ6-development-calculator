@@ -6,8 +6,9 @@
  * as a record's turn opens.
  */
 import { readFileSync } from 'node:fs';
-import type { GreatPersonClass } from '../core/types';
-import { GP_CLASSES } from '../data/greatPeople';
+import type { GameState, GreatPersonClass } from '../core/types';
+import { GP_CLASSES, GREAT_PEOPLE } from '../data/greatPeople';
+import { aliasOrPrefixed } from './import';
 
 export interface GpStanding {
   /** the individual's GreatPersonIndividualType */
@@ -54,4 +55,25 @@ export function loadGpTimeline(dumpPath: string): GpTimeline | null {
       return out;
     },
   };
+}
+
+/** each class's standing person and its frozen price as record `turn`
+ *  holds them, off the game's timeline log; a class the log names no one for
+ *  (exhausted) offers none (-2), one it never logged waits for the engine's
+ *  draw */
+export function standGreatPeople(state: GameState, timeline: GpTimeline | null, turn: number): void {
+  const at = timeline?.at(turn);
+  if (!at) return;
+  state.gpOffer = GP_CLASSES.map(() => -1);
+  state.gpPrice = GP_CLASSES.map(() => 0);
+  GP_CLASSES.forEach((cls, i) => {
+    const s = at.get(cls);
+    if (s === undefined) return;
+    if (s === null) return void (state.gpOffer![i] = -2);
+    const id = aliasOrPrefixed(s.individual);
+    const k = GREAT_PEOPLE[cls].findIndex((p) => p.id === id);
+    if (k < 0) return;
+    state.gpOffer![i] = k;
+    state.gpPrice![i] = s.cost;
+  });
 }

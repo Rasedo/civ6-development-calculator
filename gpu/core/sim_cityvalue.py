@@ -388,6 +388,19 @@ class SimCityValue:
             return torch.zeros_like(f.like(), dtype=torch.bool)
         return _t(f.in_drought(), f.like()).bool()
 
+    def _cv_standing_yield(self, f, y: str, like: torch.Tensor) -> torch.Tensor:
+        """`standingYield`: the plot's standing improvement's part of its
+        yield `y` — the unpillaged improvement's Improvement_YieldChanges and
+        its adjacency; none with no improvement or a pillaged one"""
+        cur = f.plot_improvement()
+        row = self._cv_tables()["imp"].get(cur) if cur else None
+        if row is None:
+            return torch.zeros_like(like)
+        out = torch.full_like(like, sum(a for yy, a in row["yields"] if yy == y))
+        if y in row["adjacency"]:
+            out = out + _t(f.adjacency(cur, y), like)
+        return torch.where(_t(f.plot_pillaged(), like).bool(), torch.zeros_like(out), out)
+
     def _cv_improvement_yields(self, f, imp: str, t: torch.Tensor, h: torch.Tensor) -> torch.Tensor:
         """0x7b1320, `improvementYieldsValue`: 0 where a live drought on the
         plot lists the improvement"""
@@ -405,14 +418,16 @@ class SimCityValue:
         if row["appealYield"]:
             amt = _fmul(_t(f.appeal(), like) * _FX, torch.full_like(like, _fx_const(row["appealPct"] * 0.01)))
             v = v + self._cv_yield(amt, row["appealYield"], f.yield_w(row["appealYield"]))
-        # its tourism: a TOURISMSOURCE_APPEAL row's Appeal x ScalingFactor /
-        # 100 at PSEUDOYIELD_TOURISM x the era weight, the city's percent
+        # its tourism, every row: the source on the plot (the Appeal, or the
+        # plot's standing improvement's yield of it) x ScalingFactor / 100
+        # at PSEUDOYIELD_TOURISM x the era weight, the city's percent
         # (+0x1b20, the Golden Gate Bridge's) none in a city-state's city
         # (`improvementYieldsValue`)
-        for source, scale in row["tourism"]:
-            if source != "TOURISMSOURCE_APPEAL":
-                continue
-            ap = _t(f.appeal(), like)
+        for source, scale, _tech in row["tourism"]:
+            if source == "TOURISMSOURCE_APPEAL":
+                ap = _t(f.appeal(), like)
+            else:
+                ap = self._cv_standing_yield(f, source.replace("TOURISMSOURCE_", "YIELD_", 1), like)
             amt = ap if scale == 100 else torch.div(ap * scale, 100, rounding_mode="trunc")
             weights = torch.tensor([_fx_float(_f32(1 - _f32(max(5 - e, 0) * _f32(0.1)))) for e in range(16)],
                                    dtype=torch.long, device=like.device)
@@ -1925,6 +1940,17 @@ class _MinorFacts:
         # floor (`pseudoYieldWeights`)
         if p == "PSEUDOYIELD_GPP_GENERAL" and self.s < self.sim.S:
             return -_FX
+        # a Great Person class the timeline holds no one of (its offer
+        # exhausted) sets its pseudo-yield to the floor; a minor earns no
+        # Great Person, so no class's MaxPlayerInstances caps it
+        # (`pseudoYieldWeights`)
+        rules = self.sim.rules
+        for c, cls in enumerate(rules.civic_ai["gpClassTypes"]):
+            if rules.civic_ai["gpClassPseudo"].get(cls) != p:
+                continue
+            g = int(rules.ai_city_build["gpClasses"][c])
+            if g >= 0:
+                return torch.where(self.sim.gp_offer[:, g] == -2, -_FX, 0).long()
         return 0
 
     def _stats(self):

@@ -138,6 +138,18 @@
   context:
     - "...0 flags): bit 3 RequiresUnit — no unit (a culture claim), not eligible; bit 1 MinOneCity (0x4bd370 ≥ 1); bit 2 Relic — 0x497030 finds a slot for a GREATWORKOBJECT_RELIC in the claimer's ci..."
   review: reviewed
+- addr: 0x4bd8c0
+  final: 0x32c2d0
+  kind: function
+  status: READ
+  cases:
+    - recording: 1124
+      value: 1124   IMPROVEMENTS far rows 1,283 -> 284, DISTRICTS 260 -> 183 (the district   value takes the standing improvement off through the same value).
+  readings:
+    - "C-100 / C-118 / C-98: the plot values' yield-source tourism, the exhausted Great Person class, a technology's improvement tourism — READ, both twins"
+  context:
+    - "...of the same owner 0x1cb1e0 where 0x1cc2e0 holds; the city's improvement rows 0x1cc2b0 x 0x4bd8c0). The amount is the STANDING improvement's, not the one valued: a new Alcazar on an emp..."
+  review: imported
 - addr: 0x4bdd70
   final: 0x32c710
   kind: function

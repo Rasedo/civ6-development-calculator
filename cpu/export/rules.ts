@@ -39,7 +39,7 @@ import {
 import { RESEARCH_AI_EMBARK_ALL, RESEARCH_AI_TASK_BIAS } from '../data/aiResearch';
 import { AI_GOVERNMENTS, AI_GREAT_PERSON_CLASSES, AI_POLICIES, AI_SLOT_TYPES, AI_SPACE_RACE_PROJECTS } from '../data/aiTables';
 import { CIVIC_AI_FORMATION_UNITS, CIVIC_AI_POLICY_FLOOR } from '../data/aiCivics';
-import { techUnlocks } from '../core/aiResearch';
+import { TECH_IMPROVEMENT_TOURISM, techUnlocks } from '../core/aiResearch';
 import { civicUnlocks } from '../core/aiCivics';
 import { GW_HOLDERS, GW_LAYOUT, GW_LAYOUT_W, GWS_ACCEPTS, RELIC_COUNT, GWO_COUNT, GWO_NAMES, GWO_CULTURE, GWO_FAITH, GWO_TOURISM, gwKindOf, EXTRA_SLOT_ROWS, GW_GP_EXTRA_SLOTS, AUTO_THEME_ROWS, THEMING_MULT } from '../data/greatWorks';
 import { TRADE_ROUTE_DURATION, TRADE_ROUTE_ERA_TERM, PLUNDER_ROUTE_GOLD, PLUNDER_ROUTE_TURNS, GOLD_EQUIVALENT_OTHER_YIELDS, TRADER_GUARD_RADIUS, TRADE_WALK_EXPIRY_RAIL, ROUTE_PATH_WATER, ROUTE_PATH_RAIL, ROUTE_PATH_MULTI_DOMAIN, ROUTE_PATH_PORTAL, ROUTE_PATH_MAX_RATIO, ROUTE_PATH_DENOM } from '../core/trade';
@@ -3168,6 +3168,8 @@ export function buildRules() {
       aiProjects: techUnlocks(t.id).projects,
       aiWeapons: techUnlocks(t.id).weapons,
       aiSpace: techUnlocks(t.id).space,
+      // its Improvement_Tourism rows (`techTourism`): [improvement, TourismSource, ScalingFactor]
+      aiImpTourism: TECH_IMPROVEMENT_TOURISM.get(gameTypeOf('tech', t.id, 'TECH_')) ?? [],
       ...techAiModifiers(t.id),
       embarkAll: t.embarkAll ? 1 : 0,
       embarkUnit: t.embarkUnit ? Object.values(UNITS).findIndex((u) => u.id === t.embarkUnit) : -1,
