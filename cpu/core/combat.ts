@@ -2652,7 +2652,12 @@ function rangedCtx(state: GameState, attacker: Unit, defender: Unit, targetIndex
 }
 
 export function hostileRangedStrike(state: GameState, attacker: Unit, targetIndex: number): void {
-  if (striking(attacker.id, targetIndex, () => hostileRangedStrikeInner(state, attacker, targetIndex))) markStealthAttack(state, attacker);
+  if (!striking(attacker.id, targetIndex, () => hostileRangedStrikeInner(state, attacker, targetIndex))) return;
+  markStealthAttack(state, attacker);
+  // the strike leaves the unit's activity HOLD (runs/h1_duelq1117-1128: the
+  // barbarians' 369 ranged strikes of Attack Units each end OPERATION,
+  // AWAKE, HOLD in UnitActivityChanged, their melee blows AWAKE)
+  attacker.activity = 'HOLD';
 }
 
 /** the blow being resolved — its attacker's id and the plot it strikes —,

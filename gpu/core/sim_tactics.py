@@ -1667,6 +1667,11 @@ class SimTactics:
             mask = mask & ~self._tac_moves_ended[bix, us.clamp(min=0) + self.POOL_LO[pre]]
         if not bool(mask.count_nonzero()):
             return
+        # the move order's start (0x55280) with Movement left: OPERATION
+        bix = torch.arange(self.B, device=self.device)
+        uc = us.clamp(min=0)
+        self._operation_start(mask & getattr(self, f"{pre}_unit_alive")[bix, uc]
+                              & (getattr(self, f"{pre}_unit_mp")[bix, uc] > 0), us, pre)
         # a destination another player's unit holds out of the player's sight
         # is no path, an attack order's too (`pathTo`): the order's request
         # (0x962310) drops the attack flag where the owner's visibility count
@@ -2930,20 +2935,46 @@ class SimTactics:
         """THE FORTIFY ORDER (`fortifyOrder`) on pool `pre`'s units of `m`
         [B, P]: a unit of a chassis that may fortify (0x56ef30: a combat,
         ranged or bombard strength, neither naval nor of the air), not
-        embarked, its Movement whole and its moves not ended in the pass
-        (`passFortify`), takes `ticks` turns of fortification, up to 2"""
+        embarked, of no activity CanStart refuses (0x8be70, `unit_activity`),
+        its moves not ended in the pass (`passFortify`), starts it: the
+        activity HOLD with no Movement left (0x55280), else none, and with its
+        Movement whole takes `ticks` turns of fortification, up to 2, the
+        activity SENTRY at 2"""
         if not bool(m.count_nonzero()):
             return
         ut = getattr(self, f"{pre}_unit_type").clamp(min=0, max=self.NU - 1)
         can = (((self._type_combat.take(ut) > 0) | (self._type_ranged_strength.take(ut) > 0)
                 | (self._type_bombard.take(ut) > 0)) & ~self.unit_naval.take(ut) & (self._type_air.take(ut) == 0))
-        go = m & getattr(self, f"{pre}_unit_alive") & can & ~getattr(self, f"{pre}_unit_emb") & ~self._spent_mp(pre)
+        act = getattr(self, f"{pre}_unit_activity")
+        start = m & getattr(self, f"{pre}_unit_alive") & can & ~getattr(self, f"{pre}_unit_emb") & (act == 0)
         ended = self._tac_moves_ended
         if ended is not None:
             lo = self.POOL_LO[pre]
-            go = go & ~ended[:, lo:lo + m.shape[1]]
+            start = start & ~ended[:, lo:lo + m.shape[1]]
+        hold = start & (getattr(self, f"{pre}_unit_mp") <= 0)
+        go = start & ~hold & ~self._spent_mp(pre)
         f = getattr(self, f"{pre}_unit_fortify")
         f.copy_(torch.where(go, (f + ticks).clamp(max=2), f))
+        act.copy_(torch.where(hold, torch.full_like(act, ACT_HOLD),
+                              torch.where(go & (f >= 2), torch.full_like(act, ACT_SENTRY), act)))
+
+    def _skip_turn(self, m: torch.Tensor, pre: str) -> None:
+        """THE SKIP TURN operation (`skipTurn`, 0x9687a0) on pool `pre`'s
+        units of `m` [B, P]: the activity HOLD"""
+        act = getattr(self, f"{pre}_unit_activity")
+        act.copy_(torch.where(m, torch.full_like(act, ACT_HOLD), act))
+
+    def _operation_start(self, mask: torch.Tensor, us: torch.Tensor, pre: str) -> None:
+        """AN OPERATION'S START (`operationStart`, 0x55280) on the unit at
+        local slot `us` [B] of pool `pre` in the games of `mask` [B]: its
+        activity none (OPERATION) with Movement left, else HOLD"""
+        rows = mask.nonzero(as_tuple=True)[0]
+        if rows.numel() == 0:
+            return
+        s = us[rows].clamp(min=0)
+        act = getattr(self, f"{pre}_unit_activity")
+        mp = getattr(self, f"{pre}_unit_mp")[rows, s]
+        act[rows, s] = torch.where(mp > 0, torch.zeros_like(mp), torch.full_like(mp, ACT_HOLD))
 
     def _fortify_slot(self, m: torch.Tensor, u_b: torch.Tensor, pre: str, ticks: int) -> None:
         """`_fortify_order` on the unit at local slot `u_b` [B] of the games
@@ -4125,7 +4156,10 @@ class SimTactics:
                     away = has & ~at_t[bidx, u_b]
                     self._tac_move_to(away, u_b, t)
                     there = has & (self.barb_unit_tile[bidx, u_b] == t)
-                    self._barb_pillage_here(there, u_b)
+                    hit = self._barb_pillage_here(there, u_b)
+                    # the pillager's turn is left to the homeland's End
+                    # Turn, which skips it (`skipTurn`: HOLD)
+                    self.barb_unit_activity[bidx[hit], u_b[hit]] = ACT_HOLD
                     done[bidx[has], u_b[has]] = True
                     active = has & ~there
 
@@ -4171,7 +4205,11 @@ class SimTactics:
         # Plunder Trader, Move To Safety, Explore Land; the rest end their turn
         self._tac_homeland_plunder(live_all, done, order, npass, tg)
         self._tac_move_to_safety(live_all, done, order, npass, rowof, res, danger, "barb", BARB_SEAT, True)
-        self._tac_explore(live_all, done, order, npass, ai, danger, treg, "barb", BARB_SEAT)
+        rest = live_all()
+        explored = self._tac_explore(live_all, done, order, npass, ai, danger, treg, "barb", BARB_SEAT) >= 0
+        # End Turn: the rest stand, each explorer and each unit left skipped
+        # (`endTurn`, `skipTurn`: the activity HOLD)
+        self._skip_turn(rest & self.barb_unit_alive & (explored | ~done), "barb")
 
     # ------------------------------------------------------- Explore Land
 
@@ -5522,7 +5560,9 @@ class SimTactics:
             self._tac_moves_ended[bidx[ok], u_b[ok] + self.POOL_LO[pre]] = True
             done[bidx[ok], u_b[ok]] = True
         # THE HOMELAND: Move to Safety over every unit; the rest end their turn
+        # (`endTurn`, `skipTurn`: the activity HOLD)
         self._tac_move_to_safety(live_all, done, order, npass, op["rowof"], op["res"], danger, pre, seat, True)
+        self._skip_turn(live_all(), pre)
 
     def _minor_ai(self, units: torch.Tensor, pre: str) -> torch.Tensor:
         """[B, P] long — `militaryAiTypeOf` over pool `pre`'s `units`:
@@ -5627,6 +5667,9 @@ class SimTactics:
             # its moves end (0x56d6f0, `wanderNearCamp`)
             self._tac_moves_ended[bidx[ok], u_b[ok] + self.POOL_LO[pre]] = True
             done[bidx[ok], u_b[ok]] = True
+        # the homeland's End Turn over every unit left (`endTurn`, `skipTurn`:
+        # the activity HOLD)
+        self._skip_turn(units & ~done & self.barb_unit_alive & (self.barb_unit_seat == seat), pre)
 
     def _free_homes(self) -> torch.Tensor:
         """[B, U] long — `freeHome` of each hostile-pool unit: the centre of

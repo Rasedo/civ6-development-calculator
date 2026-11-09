@@ -12491,9 +12491,6 @@ third: slot 2 CanStart, slot 4 the tick, slot 5 the update).
   Warrior; 1124 t68 Rome's Warrior 1245192 0 -> 2, the Archer's shot +3 at
   66 HP (+6 less the wound's 3). Trace 1117 t1-30: cityState.fortify 30 of
   30, barb.fortify 134 of 135.
-- Open: the engines carry no activity, so 0x8be70's refusal is not taken:
-  1117 t10 the barbarian Scout 262147, in ACTIVITY_HOLD from its t9 Skip
-  Turn, logs "Fortify in place" with no operation (ours 2, the game's 0).
 - THE HEAL'S PLOT GATE (0x538040): the unit's +0x1590, not dead, on a plot,
   its strategic resource held; then the plot's relation to the owner
   (0x530880: 1 its own, its suzerain's city-state's or an ally's, 2 no
@@ -13191,3 +13188,56 @@ project (cpu/core/minorBuild.ts); GPU `_pol_unit_damage`,
   Manhattan Project closed.
 - Open: none of these; the import reads no one-time project of a
   city-state (the replay carries the engine's, `MINOR_STORES`).
+
+## C-110 / C-99: the unit's activity and the Fortify order's refusal — READ
+
+The unit's activity (+0x5f0, a type hash; the records' `UnitActivityChanged`
+rows name each change) gates the Fortify order: its CanStart (0x95e970)
+refuses HOLD, SLEEP, HEAL, SENTRY and INTERCEPT (0x8be70). Ported as
+`Unit.activity` (none for AWAKE and OPERATION; `unit_activity`, ACT_HOLD /
+ACT_SENTRY), statecompare `activity`.
+
+- AN OPERATION'S START (0x55280, the operations manager): OPERATION
+  (0x490cc8e1) where the unit has Movement left (0x56c690), else HOLD
+  (0x47c048b). The run (0x52f50 at 0x5337a) sets AWAKE once the queue is
+  empty. Ported: `operationStart` from the move order (`orderOnce`,
+  `_tac_move_to`) and the Fortify order's own start (`fortifyOrder`,
+  `_fortify_order`: HOLD with no Movement, SENTRY at the max, 0x95ea70).
+- THE SKIP TURN operation: its execution 0x9687a0 sets HOLD; its CanStart
+  0x9685d0 (an AI's unit: not INTERCEPT, +0x1b28 -1). The homeland's End
+  Turn (0x70cba0, from the homeland's moves 0x709d80) builds it (0x9686d0)
+  for each unit of its list whose turn is not done (+0x530) nor dead
+  (+0x770). Ported: `skipTurn` / `endTurn` (cpu/core/units.ts,
+  tactical.ts), `_skip_turn` (sim_tactics); the barbarians' explorers and
+  pillagers, whose turns the engines' passes close, take it too
+  (runs/h1_duelq1117-1128: 1,031 HL: Explore rows beside an HL: End Turn,
+  176 Pillage Improvement turns OPERATION, AWAKE, HOLD, Skip Turn).
+- A RANGED STRIKE leaves its unit HOLD (`hostileRangedStrike`,
+  `_hostile_ranged_strike`): the duels' 369 barbarian ranged strikes of
+  Attack Units each end OPERATION, AWAKE, HOLD; their melee blows AWAKE.
+  The operation whose start sets it is unread.
+- THE PLAYER'S END OF TURN (Player_Units' end of turn 0x4ef6d0 at
+  0x4f02ce): a unit on HOLD is AWAKE (0x53e20 -> vt +0xc0) where its owner
+  is human or its fortification (+0xd50) is 0; on HEAL, where it is an AI's,
+  or a human's whose +0x590 is not -1 or that holds no damage; a barbarian's units
+  (0x469ce0 at 0x4ef82e) are left as they are. Ported in `refreshUnits`
+  and sim_step's rest (HOLD alone: the engines produce no HEAL).
+- An upgrade's new unit carries the old one's activity (runs/h1_duelq1127
+  t114: city-state 2's Musketman 1572870 made SENTRY, its t115 Heal
+  refused, 0 at t116; 1128 t206 Bologna's Infantry 3342340 the same).
+- The replay takes each unit's activity from the records' action log
+  (`History.activities`, `foldActivities`), as it takes its fortification.
+- A formation's host keeps its own fortification (`mergeFormation`,
+  `_form_up`): runs/h1_duelq1121 t126 city-state 2's Musketman 1900545,
+  two turns dug in on 9:5, forms a Corps and reads 2 at t127; 1117 t159
+  China's Army 3145732 the same; no recorded formation resets it.
+- Confirmed (duelq, the AI score on the game's memory): runs/h1_duelq1117
+  t10 the barbarian Scout 262147, HOLD from its t9 Skip Turn, Fortify in
+  place refused (0, as recorded); 1121 t34 the Archer 1835022 after its t33
+  pillage; 1124 t125-132 the Crossbowman 5177363 after its ranged strikes;
+  1128 t167 the Man-At-Arms 5177366 after two End Turns; 1121 t163-164
+  city-state 4's Skirmisher 1638401, SENTRY at t162 then teleported to 0,
+  its Heal refused.
+- Open: a blow on a unit sets it AWAKE (UnitDamageChanged then AWAKE:
+  runs/h1_duelq1124 t16-17 the barbarian Spearman 327684, SENTRY, struck,
+  AWAKE), unported; HEAL, SLEEP and INTERCEPT never set by the engines.

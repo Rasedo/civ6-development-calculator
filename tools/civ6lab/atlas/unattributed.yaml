@@ -208,6 +208,24 @@
   context:
     - "...NOR 0xa68659ab) or promoted (PROMOTE_GOVERNOR 0x7d3da99d), executed at once (0x48a330 / 0x49a50). One action a turn: a player with two titles spends the second the turn after."
   review: reviewed
+- addr: 0x55280
+  kind: function
+  name: an operation's start
+  semantics: "the operations manager's start of a unit's operation (asserting !IsBusy, an owner, pending operations): the unit's activity (vt +0xc0 on the manager) OPERATION (0x490cc8e1) where it has Movement left (0x56c690), else HOLD (0x47c048b); then the front operation's start (its player's +0x40)."
+  status: READ
+  cases:
+    - recording: h1_duelq1121
+      turn: 32
+      value: "the barbarian Archer 1835022 after its move to 5:14, its Movement spent: AWAKE, HOLD, then UnitOperationStarted SKIP_TURN"
+  impl:
+    - cpu/core/units.ts:operationStart
+    - gpu/core/sim_tactics.py:_operation_start
+    - cpu/core/units.ts:fortifyOrder
+    - cpu/core/tactical.ts:orderOnce
+    - gpu/core/sim_tactics.py:_tac_move_to
+    - gpu/core/sim_tactics.py:_fortify_order
+  readings: ["C-110 / C-99: the unit's activity and the Fortify order's refusal — READ"]
+  review: reviewed
 - addr: 0x5cbc0
   final: 0x447d0
   kind: function
@@ -744,10 +762,21 @@
     - recording: h1_duelp1117
       turn: 10
       value: "barbarian Scout 262147, ACTIVITY_HOLD from its t9 Skip Turn, logs HL: Move To Safety Fortify in place with no operation; record t11 fortify 0"
-  readings: ["C-110: the Fortify order and its ticks; the heal's plot gate — READ"]
+    - recording: h1_duelq1124
+      turn: 125
+      value: the barbarian Crossbowman 5177363, HOLD after its t123-124 ranged strikes, its Chase Target Fortify refused t125-132 (record 0)
+  impl:
+    - cpu/core/units.ts:fortifyOrder
+    - gpu/core/sim_tactics.py:_fortify_order
+    - cpu/core/types.ts:UnitActivity
+    - cpu/core/types.ts:Unit
+    - cpu/harness/import.ts:ACTIVITY_HASH
+    - gpu/core/simbase.py:BARB_SEAT
+  readings:
+    - "C-110: the Fortify order and its ticks; the heal's plot gate — READ"
+    - "C-110 / C-99: the unit's activity and the Fortify order's refusal — READ"
   context:
     - "...unit) 0x56ef30 — a combat, ranged or bombard strength and domain 2 or 3 (land) — not 0x8be70 (the unit's activity +0x5f0 HOLD, SLEEP, HEAL, SENTRY or INTERCEPT), not embarked. The..."
-    - "- Open: the engines carry no activity, so 0x8be70's refusal is not taken: 1117 t10 the barbarian Scout 262147, in ACTIVITY_HOLD from its..."
   review: reviewed
 - addr: 0x901e0
   final: 0x67990
@@ -4634,6 +4663,18 @@
   context:
     - "- The score (0x702380): per entry with a threshold or a value, the evaluator the table at 0xf2e740 holds for..."
   review: reviewed
+- addr: 0x70cba0
+  kind: function
+  name: the homeland's End Turn
+  semantics: "HL End Turn (from the homeland's moves 0x709d80): over the homeland's unit list (+0x208, count +0x218) each unit (0x4f2310) whose turn is not done (+0x530) and not dead (+0x770) is given a Skip Turn request (0x9686d0) queued on the homeland's command list (+0x220) and logs \"HL: End Turn\" where the logger takes it; the list then carried out (0x70a440)."
+  status: READ
+  cases:
+    - recording: h1_duelq1117
+      turn: 9
+      value: "the barbarian Scout 262147's HL: End Turn row, its Skip Turn and HOLD (UnitActivityChanged)"
+  impl: [cpu/core/tactical.ts:endTurn, gpu/core/sim_tactics.py:_skip_turn, cpu/core/units.ts:skipTurn]
+  readings: ["C-110 / C-99: the unit's activity and the Fortify order's refusal — READ"]
+  review: reviewed
 - addr: 0x715f40
   final: 0x4c4f30
   kind: function
@@ -7417,7 +7458,9 @@
       turn: 16
       value: "Rome's Warrior 327683 orders Fortify unmoved: Started, one segment row, SENTRY before Rome's turn closes; record t17 fortify 2, struck at +6 by the barbarian Warrior"
   impl: [cpu/core/units.ts:fortifyOrder, gpu/core/sim_tactics.py:_fortify_order]
-  readings: ["C-110: the Fortify order and its ticks; the heal's plot gate — READ"]
+  readings:
+    - "C-110: the Fortify order and its ticks; the heal's plot gate — READ"
+    - "C-110 / C-99: the unit's activity and the Fortify order's refusal — READ"
   context:
     - "- UNITOPERATION_FORTIFY (0x95eae0 builds the request by its hash 0xd3a6f7e8). CanStart 0x95e970: a formation, then (an AI's unit) 0x56ef30 — a combat, ranged or bombard strength and d..."
   review: reviewed
@@ -7432,7 +7475,9 @@
       turn: 2
       value: "barbarian Spearman 65536 Barb. Camp Defense at its camp: Started, two segment rows, 0 -> 1; t3 orders again 1 -> 2, SENTRY (cityState / barb.fortify trace t1-30: 164 of 165)"
   impl: [cpu/core/units.ts:fortifyOrder, gpu/core/sim_tactics.py:_fortify_order]
-  readings: ["C-110: the Fortify order and its ticks; the heal's plot gate — READ"]
+  readings:
+    - "C-110: the Fortify order and its ticks; the heal's plot gate — READ"
+    - "C-110 / C-99: the unit's activity and the Fortify order's refusal — READ"
   context:
     - "...d at 0) where the unit has not moved (0x56e760: Movement left below full); the update 0x95ea70: at FORTIFY_TURN_MAX (GlobalParameters +0x374) the count set to it, the operation done,..."
   review: reviewed
@@ -7531,6 +7576,17 @@
   context:
     - "...urce Harvesting\" (tag Harvest) set, the harvest (0x95fb20); else the feature's removal (0x965fd0). With \"Release on Complete\" (every city tree's 1) the unit leaves the tree (+0x778 = -..."
   review: reviewed
+- addr: 0x9685d0
+  kind: function
+  name: Skip Turn's CanStart
+  semantics: "UNITOPERATION_SKIP_TURN's CanStart: a human's unit with no fortification (+0xd50), its activity neither HOLD nor SLEEP, its plot's stacking under the limit (0x585eb0 against [0xf28c80] +0x58c); then (any unit) not INTERCEPT (0x5ff1bbdf) and +0x1b28 -1."
+  status: READ
+  cases:
+    - recording: h1_duelq1117
+      turn: 9
+      value: "the barbarian Scout 262147 on 29:20, its only row HL: End Turn: OPERATION, UnitOperationStarted SKIP_TURN, HOLD"
+  readings: ["C-110 / C-99: the unit's activity and the Fortify order's refusal — READ"]
+  review: reviewed
 - addr: 0x9686d0
   final: 0x672d40
   kind: function
@@ -7541,10 +7597,23 @@
     - "C-96: the city-states' tactical pass — READ (Wander Near City, Heal, the non-barbarian priorities, FindAlternateLocation), the families it needs PARTLY READ"
     - "C-99: the pathfinder's later-turn pool, Heal's hull, the tactical list's explorers, Move Unit's planning — READ, both twins"
     - "C-99: the pathfinder's later-turn pool, Heal's hull, the tactical list's explorers, Move Unit's planning"
+    - "C-110 / C-99: the unit's activity and the Fortify order's refusal — READ"
   notes:
     - ".claude/scratchpad/mu1/readings_c96.md: ...SIP_LAND/NAVAL_UNIT_LEVEL) holds its plot — fortify   (0x95eae0) where 0x56ef30 allows, else sleep (0x9686d0); a hull outside   its own territory heads for its player's nearest city (first of equals) —   wher..."
   context:
     - "...AVAL_UNIT_LEVEL) holds its plot — fortify (0x95eae0) where 0x56ef30 allows, else sleep (0x9686d0); a hull outside its own territory heads for its player's nearest city (first of equals..."
+  review: reviewed
+- addr: 0x9687a0
+  kind: function
+  name: Skip Turn's execution
+  semantics: "UNITOPERATION_SKIP_TURN's execution: the skip's game event (0x8b8590, 0x3d4006f2 with the unit's owner and id), the unit's activity HOLD (0x53e20 -> vt +0xc0, 0x47c048b), the operation done."
+  status: READ
+  cases:
+    - recording: h1_duelq1128
+      turn: 166
+      value: "the barbarian Man-At-Arms 5177366, HL: End Turn at t165 and t166, HOLD across them; its t167 Chase Target Fortify refused (record 0)"
+  impl: [cpu/core/units.ts:skipTurn, gpu/core/sim_tactics.py:_skip_turn]
+  readings: ["C-110 / C-99: the unit's activity and the Fortify order's refusal — READ"]
   review: reviewed
 - addr: 0x9724c0
   final: 0x67c2d0

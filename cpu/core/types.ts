@@ -783,6 +783,12 @@ export interface UnitLook {
   plots: number[];
 }
 
+/** a unit's activity the Fortify order's CanStart refuses (0x8be70) */
+export type UnitActivity = 'HOLD' | 'SLEEP' | 'HEAL' | 'SENTRY' | 'INTERCEPT';
+
+/** each activity's code in the GPU twin's `unit_activity` (0 none) */
+export const ACTIVITY_CODE: Record<UnitActivity, number> = { HOLD: 1, SLEEP: 2, HEAL: 3, SENTRY: 4, INTERCEPT: 5 };
+
 export interface Unit {
   id: number;
   type: string;
@@ -855,6 +861,10 @@ export interface Unit {
   bandLevel?: number;
   bandAlbum?: number;
   fortifyTurns?: number;
+  /** its activity (unit +0x5f0) where it is one the Fortify order's CanStart
+   *  refuses (0x8be70: HOLD, SLEEP, HEAL, SENTRY, INTERCEPT); none for
+   *  AWAKE and OPERATION */
+  activity?: UnitActivity;
   /** how many attacks this unit has left this turn. CIV6: a unit attacks
    *  ONCE per turn; Sweeping Wind is the only row that buys a second. Reset
    *  at the refresh; undefined before the first one, where readers fall back

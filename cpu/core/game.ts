@@ -964,8 +964,10 @@ export function formationCivicIn(state: GameState, seat: number, naval: boolean,
 }
 
 /** `host` takes `absorbed` into a formation of `tier`: the veteran's
- *  experience, promotions and hit points, its moves ended; `absorbed` leaves
- *  the map */
+ *  experience, promotions and hit points, its moves ended, its own
+ *  fortification kept (runs/h1_duelq1121 t126: city-state 2's Musketman
+ *  1900545, two turns dug in on 9:5, forms a Corps and reads 2 at t127;
+ *  1117 t159 China's Army 3145732 the same); `absorbed` leaves the map */
 export function mergeFormation(state: GameState, host: Unit, absorbed: Unit, tier: number): void {
   const vet = veteranOf(host, absorbed);
   host.formation = tier;
@@ -978,7 +980,6 @@ export function mergeFormation(state: GameState, host: Unit, absorbed: Unit, tie
   host.promoUsed = vet.promoUsed;
   host.hp = vet.hp;
   host.movesLeft = 0;
-  host.fortifyTurns = 0;
   disbandUnit(state, absorbed.id);
 }
 

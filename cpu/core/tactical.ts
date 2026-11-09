@@ -21,7 +21,7 @@ import { AI_UNIT_AI } from '../data/aiOperations';
 import { engineId, gameTypeOf, installFeature } from '../data/aliases';
 import {
   arrive, canEmbark, cityAtIndex, crossesRiver, embarkTechMoves, escortUnit, inEscort, cliffBlocksStep, shoreCrossing, districtZones, encampmentBlocks, inEnemyZoc, rosterEmbarkMoves, stepCost, stepUnit, terrainMp, unitDomain, unitExertsZoc, unitFullMoves, unitIsNoncombat, mapLayer, unitReligious,
-  setBarbStepLook, unitsHostile, unitVisibleTo, fortifyOrder,
+  setBarbStepLook, unitsHostile, unitVisibleTo, fortifyOrder, operationStart, skipTurn,
   waterEnterable, waterWalks, formationBanned, formationCS, setRecordFormation, formationMates, dropLoneRiders, escortOf, escortRiders, disbandUnit,
 } from './units';
 import { BARB_SEAT, FREE_SEAT, NO_SEAT, campTiles, cityHolders, civsAtWar, isBarbSeat, isCityStateSeat, isCiv, isTerritorial, seatOf, tileCity, tileSeat } from './seats';
@@ -1128,7 +1128,11 @@ function withShortOrders(fn: () => void): void {
  *  Movement (0x265d70, +0x218 the least its members hold) */
 function orderOnce(state: GameState, unit: Unit, dest: number, strike: boolean,
   laterTurns: boolean, explore: boolean, danger: PathDanger | undefined, mates: readonly Unit[], scout: boolean): boolean {
-  if (!state.units.includes(unit) || unit.movesLeft <= 0 || movesEnded?.has(unit.id) || unit.tileIndex === dest) return false;
+  if (!state.units.includes(unit) || unit.movesLeft <= 0 || movesEnded?.has(unit.id)) return false;
+  // the move order's start (0x55280) with Movement left: OPERATION, AWAKE
+  // once its queue empties (0x52f50)
+  operationStart(unit);
+  if (unit.tileIndex === dest) return false;
   const nodes = pathNodes(state, unit, dest, laterTurns, explore, danger, mates, scout, strike);
   let path = nodes.map((n) => n.tile);
   if (!path.length) return false;
@@ -2222,6 +2226,13 @@ function finish(pass: Pass, u: Unit, move: string, plot = -1, attack = -1): void
   tacticsTrace?.(u, move, plot, attack);
 }
 
+/** THE HOMELAND'S END TURN (0x70cba0) on a unit whose turn is not done: its
+ *  Skip Turn (`skipTurn`, the activity HOLD) */
+function endTurn(pass: Pass, u: Unit): void {
+  skipTurn(u);
+  finish(pass, u, 'HL: End Turn');
+}
+
 /** the unit's turn in the pass done by a move outside the pass's own (an
  *  operation's), the plot it went for */
 export function passFinish(pass: Pass, u: Unit, move: string, plot: number): void {
@@ -2324,7 +2335,13 @@ function pillage(state: GameState, pass: Pass, districts: boolean): void {
         moveTo(state, u, t.index);
       }
       const there = u.tileIndex === t.index;
-      if (there && hostilePillage(state, u)) dropHeldCosts();
+      if (there && hostilePillage(state, u)) {
+        dropHeldCosts();
+        // the pillage leaves the unit's turn to the homeland, whose End Turn
+        // skips it (runs/h1_duelq1121 t33: the Archer 1835022 pillages 5:14,
+        // AWAKE, HOLD, its Skip Turn, and its t34 Fortify is refused)
+        skipTurn(u);
+      }
       finish(pass, u, 'Pillage Improvement', t.index);
       if (there) break;
     }
@@ -3504,7 +3521,13 @@ function exploreLand(state: GameState, pass: Pass): void {
     }
     if (!moves.length) break;
   }
-  for (const [u, m] of firstMove) finish(pass, u, m.move, m.plot);
+  // each explorer's turn is left to the homeland's End Turn, which skips it
+  // (runs/h1_duelq1117-1128: 1,031 barbarian HL: Explore rows, each beside
+  // an HL: End Turn and its Skip Turn, the unit HOLD)
+  for (const [u, m] of firstMove) {
+    skipTurn(u);
+    finish(pass, u, m.move, m.plot);
+  }
 }
 
 /** NAVAL PATROL's move for one of its operation's units (0x803060): HL
@@ -3850,7 +3873,7 @@ export function cityStateTactics(state: GameState, cityState: CityState, operati
       wanderNearCity(state, pass, cityState.centerIndex);
       pass.units = all;
       homelandSafety(state, pass);
-      for (const u of pass.units) if (live(state, pass, u)) finish(pass, u, 'HL: End Turn');
+      for (const u of pass.units) if (live(state, pass, u)) endTurn(pass, u);
     });
   } finally {
     costsHeld = null;
@@ -3888,7 +3911,7 @@ export function freeCityTactics(state: GameState, operations: (pass: Pass) => vo
       moveToSafety(state, pass);
       attackUnits(state, pass, 'LOW');
       wanderNearCamp(state, pass, (u) => freeHome(state, u));
-      for (const u of all) if (live(state, pass, u)) finish(pass, u, 'HL: End Turn');
+      for (const u of all) if (live(state, pass, u)) endTurn(pass, u);
     });
   } finally {
     costsHeld = null;
@@ -4311,7 +4334,7 @@ function tacticalPass(state: GameState, acting: ReadonlySet<number>): void {
   homelandSafety(state, pass);
   exploreLand(state, pass);
   // End Turn: the rest stand
-  for (const u of pass.units) if (live(state, pass, u)) finish(pass, u, 'HL: End Turn');
+  for (const u of pass.units) if (live(state, pass, u)) endTurn(pass, u);
 }
 
 /** each barbarian's Movement as its turn opens, by unit id: its full

@@ -994,6 +994,11 @@ WW_BATTLE_KEYS = frozenset({
 })
 
 BARB_SEAT = 200  # the barbarians — cpu/core/seats.ts BARB_SEAT
+# a unit's activity the Fortify order's CanStart refuses (0x8be70), as
+# `unit_activity` holds it — cpu/core/types.ts ACTIVITY_CODE; 0 AWAKE or
+# OPERATION
+ACT_HOLD = 1
+ACT_SENTRY = 4
 # CIV6's FREE CITIES player (CIVILIZATION_FREE_CITIES) — cpu/core/seats.ts
 # FREE_SEAT. One seat holding every city loyalty took from its owner; its
 # row in the city planes is `FREE_ROW`, its tiles carry this id.
@@ -1309,7 +1314,7 @@ _MUTABLE = [
     # RANGE VIEWS into them — snapshot/restore round-trips one tensor per plane
     # instead of three, and a view can never be half-restored.
     "unit_alive", "unit_dying", "unit_type", "unit_tile", "unit_hp", "unit_fortify", "unit_xp", "unit_level", "unit_promos", "unit_promo_offer", "unit_promo_used", "unit_promo_bonus", "unit_xp_pct", "unit_mp_bonus", "unit_charges", "unit_aura_mp", "unit_mp", "unit_mp_full", "unit_attacks", "unit_emb", "unit_seat", "unit_spy_mission", "unit_spy_turns", "unit_spy_target", "unit_spy_level", "unit_band_level", "unit_band_album", "unit_gp_at", "unit_revealed_turn", "unit_formation", "unit_levied", "unit_levy_src", "unit_patrol", "unit_free_city", "unit_no_res_upkeep", "unit_alpine", "unit_fionn", "unit_arrival", "unit_arrival_tile", "unit_pslot", "unit_look_at", "unit_look_rad", "unit_look_thru", "unit_look_lo", "unit_look_hi",
-    "unit_escorted", "unit_defender", "unit_homed", "unit_orig_owner", "military_at", "civilian_at", "support_at", "embarked_at", "trader_at", "war", "ww",
+    "unit_escorted", "unit_activity", "unit_defender", "unit_homed", "unit_orig_owner", "military_at", "civilian_at", "support_at", "embarked_at", "trader_at", "war", "ww",
     "civ_best_melee", "civ_best_ranged", "civ_builders_trained", "civ_settlers_trained", "civ_discount_districts", "civ_relic_reserve", "civ_civic_prog", "civ_cur_civic", "civ_cur_tech", "civ_diplo_favor", "civ_diplo_points", "civ_envoys_avail", "civ_granted_titles", "civ_research_project_pct", "civ_influence", "civ_tech_prog", "civ_tech_ovf", "civ_civic_ovf", "civ_road_tier", "civ_treasury", "civ_techs", "civ_civics", "civ_tech_boosted", "civ_civic_boosted", "civ_tech_retain", "civ_civic_retain",
     "civ_enhancer", "civ_beliefs_earned", "civ_follower", "civ_founder", "civ_worship", "civ_next_city_id",
     "civ_pantheon", "civ_pantheon_done", "civ_prophets", "civ_religion_done", "civ_religion_type", "civ_inquisition", "civ_first_imp_tech",

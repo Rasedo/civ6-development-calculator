@@ -4242,6 +4242,17 @@
           "note": "0 a lone unit, 1 a Corps or Fleet, 2 an Army or Armada."
         },
         {
+          "name": "activity",
+          "compare": "exact",
+          "covers": [
+            "Unit.activity"
+          ],
+          "planes": [
+            "unit_activity"
+          ],
+          "note": "0 AWAKE or OPERATION, 1 HOLD, 2 SLEEP, 3 HEAL, 4 SENTRY, 5 INTERCEPT: the activities the Fortify order's CanStart refuses."
+        },
+        {
           "name": "escorted",
           "compare": "exact",
           "covers": [

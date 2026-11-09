@@ -46,6 +46,7 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
 import type { City, CityState, DealItem, DistrictId, GameState, ProjectYield, ResearchState, Seat, Tile, Unit, UnitPool } from './types';
+import { ACTIVITY_CODE } from './types';
 import { YIELD_KEYS } from '../../world/types';
 import { DEAL_ITEMS, PRODUCTION_QUEUE_MAX } from '../data/seats';
 import { dealOfferOf, dealTermOf, spyHeldWith, spyLevelsHeld } from './deals';
@@ -1356,6 +1357,7 @@ const UNIT_G: Record<string, Extractor> = {
   levied: overUnits((u) => u.leviedFrom ?? -1),
   routed: overUnits((u) => (u.routed ? 1 : 0)),
   formation: overUnits((u) => u.formation ?? 0),
+  activity: overUnits((u) => (u.activity ? ACTIVITY_CODE[u.activity] : 0)),
   escorted: overUnits((u) => (u.escorted ? 1 : 0)),
   originalOwner: overUnits((u) => u.originalOwner ?? -1),
   aiDefender: overUnits((u) => (u.aiDefender ? 1 : 0)),

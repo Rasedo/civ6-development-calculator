@@ -1560,6 +1560,10 @@ class SimInit:
             # IN AN ESCORT FORMATION with the military unit on its own tile —
             # the CIVILIAN half carries it, and the tile names the escort.
             ("escorted", torch.bool),
+            # its activity the Fortify order refuses (`Unit.activity`,
+            # unit +0x5f0): ACT_HOLD, 2 SLEEP, 3 HEAL, ACT_SENTRY, 5
+            # INTERCEPT; 0 AWAKE or OPERATION
+            ("activity", torch.long),
             # of AI type DEFENDER: its city's standing army's or City
             # Defense's garrison (`Unit.aiDefender`, `_minor_standing_army`,
             # `_x_garrison`)

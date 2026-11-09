@@ -1562,6 +1562,7 @@ UNIT = {
     "levied": _unit("unit_levy_src"),
     "routed": _unit_routed,
     "formation": _unit("unit_formation"),
+        "activity": _unit("unit_activity"),
         "escorted": _unit("unit_escorted"),
         "originalOwner": _unit("unit_orig_owner"),
         "aiDefender": _unit("unit_defender"),

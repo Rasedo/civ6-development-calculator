@@ -1982,6 +1982,14 @@ function gameJob(ctx: Ctx, turn: number, player: number, id: number): string {
   if (upgrading('endlook')) return UPGRADE_MOVE;
   if (inOp('tactical')) return 'Operation';
   if (upgrading('log')) return UPGRADE_MOVE;
+  // an "Upgrade Units" tree the log's look holds that the end look no longer
+  // does started and ended in the turn, its units held between the looks
+  // (runs/h1_duelq1128 t154: Bologna's tree 6356998, its four units' swaps
+  // round the centre 4:9 with no tactical row; 1117 t227 city-state 3's Pike
+  // and Shot 1900546 under tree 10223623, its order OPERATION, AWAKE)
+  const log = mem.at('log', turn, player)?.trees ?? {};
+  const end = mem.at('endlook', turn, player)?.trees ?? {};
+  if (Object.entries(log).some(([id, t]) => t.name === UPGRADE_MOVE && !(id in end))) return UPGRADE_MOVE;
   return '(no row)';
 }
 
@@ -6919,6 +6927,12 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
     for (const [k, f] of ctx.fortified) {
       const u = unitOf(ctx, k);
       if (u && f.turns !== null && state.units.includes(u) && f.turns > (u.fortifyTurns ?? 0)) u.fortifyTurns = f.turns;
+    }
+    // ...and each unit's activity as the pair's log left it (`History.activities`)
+    for (const [k, u] of ctx.units) {
+      const act = history.activities.get(k);
+      if (act) u.activity = act;
+      else delete u.activity;
     }
     const campsHeld = syncDraws(ctx, b, tribesBefore);
     syncPillage(ctx);

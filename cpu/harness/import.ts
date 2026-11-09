@@ -27,7 +27,7 @@
  * plot purchases) comes from a `History` folded over the earlier records.
  */
 import { existsSync, readFileSync } from 'node:fs';
-import type { City, CityState, CityStateType, DistrictId, FeatureId, GameMap, GameState, GreatPersonClass, ImprovementId, Seat, TerrainId, Tile, TradeRoute, Unit, Yields } from '../core/types';
+import type { City, CityState, CityStateType, DistrictId, FeatureId, GameMap, GameState, GreatPersonClass, ImprovementId, Seat, TerrainId, Tile, TradeRoute, Unit, UnitActivity, Yields } from '../core/types';
 import { DISASTER_IMPROVEMENT_KEY, HIGH_ADJACENCY_KEY, LARGEST_KEY, MITIGATED_FLOOD_KEY } from '../core/moments';
 import { NO_SEAT } from '../core/types';
 import { minorItemKey, minorRepairResumed, type MinorItem } from '../core/minorBuild';
@@ -498,6 +498,9 @@ export interface History {
   /** captured units, by the captor's `owner:id`, with the player id they
    *  were taken from (`UnitCaptured` in the records' action log) */
   captives: Map<string, number>;
+  /** each unit's activity the Fortify order refuses, by `owner:id`: its last
+   *  `UnitActivityChanged` in the records' action log (`foldActivities`) */
+  activities: Map<string, UnitActivity>;
   /** the units in a formation, by `owner:id` (`UnitEnterFormation` /
    *  `UnitExitFormation` in the records' action log) */
   formed: Set<string>;
@@ -910,8 +913,26 @@ export function eraBegan(a: TurnRecord, b: TurnRecord): boolean {
   return false;
 }
 
+/** the activities by their type hash the Fortify order's CanStart refuses
+ *  (0x8be70); AWAKE, OPERATION and the rest are none */
+const ACTIVITY_HASH = new Map<number, UnitActivity>([[0x047c048b, 'HOLD'], [0x024a74eb, 'SLEEP'], [0xb29e7722, 'HEAL'],
+  [0xd0aed661, 'SENTRY'], [0x5ff1bbdf, 'INTERCEPT']]);
+
+/** a record's `UnitActivityChanged` rows ([row, turn, kind, player, id,
+ *  activity hash]) in order onto each unit's activity: one the Fortify
+ *  order refuses set, any other cleared */
+function foldActivities(acts: Map<string, UnitActivity>, rows: readonly unknown[][]): void {
+  for (const r of rows) {
+    if (!Array.isArray(r) || r[2] !== 'UnitActivityChanged' || typeof r[5] !== 'number') continue;
+    const key = `${r[3]}:${r[4]}`;
+    const act = ACTIVITY_HASH.get(r[5] >>> 0);
+    if (act) acts.set(key, act);
+    else acts.delete(key);
+  }
+}
+
 export function newHistory(): History {
-  return { firstTurn: -1, last: null, before: null, beforeThat: null, trained: new Map(), levied: new Map(), captives: new Map(), formed: new Set(), arrivals: new Map(), alpine: new Set(), fionn: new Set(), govSeated: new Map(), growthDrift: new Map(), lastHit: new Map(), gpSpent: new Map(), revealed: new Map(),
+  return { firstTurn: -1, last: null, before: null, beforeThat: null, trained: new Map(), levied: new Map(), captives: new Map(), activities: new Map(), formed: new Set(), arrivals: new Map(), alpine: new Set(), fionn: new Set(), govSeated: new Map(), growthDrift: new Map(), lastHit: new Map(), gpSpent: new Map(), revealed: new Map(),
     unknownSince: new Set(), cityFirstSeen: new Map(), nextPlotUnheld: new Set(), fireFood: new Map(), fireProd: new Map(), eventYields: new Map(), eventCounts: new Map(), openEvents: [], eventRead: new Map(), eventDraws: new Map(), droughts: [], bare: new Map(), discountDistricts: new Map(), discountPlaced: new Map(), ages: new Map(), moments: new Map(), momentsWorld: [],
     eraTurns: [], gameEra: 0, eraStartTurn: 1, eraCountdown: -1, routeSeen: new Map(), routeCourse: new Map(), trail: new Map(), legs: new Map(), posts: new Map(), policySlots: new Map(),
     competitionSeen: new Map(), competitionScore: new Map(), podium: new Map(), culture: new Map(), tourismTo: new Map(),
@@ -1465,6 +1486,8 @@ export function advanceHistory(h: History, rec: TurnRecord, cat: Catalog): void 
   });
   const held = new Set(rec.units.map((u) => `${u.owner}:${u.id}`));
   for (const k of [...h.captives.keys()]) if (!held.has(k)) h.captives.delete(k);
+  foldActivities(h.activities, rows);
+  for (const k of [...h.activities.keys()]) if (!held.has(k)) h.activities.delete(k);
   formationRows(h.formed, rows);
   // each unit's last placement in the action log (UnitAddedToMap, UnitMoved,
   // UnitTeleported: [row, turn, kind, player, id, x, y]): the row's number and
@@ -2819,6 +2842,8 @@ export function importTurn(rec: TurnRecord, cat: Catalog, history?: History): Im
       const k = rows.findIndex((r) => r.id === cat.unitPromotions?.[p]?.replace(/^PROMOTION_/, ''));
       if (k >= 0) unit.promos = (unit.promos ?? 0) | (1 << k);
     }
+    const act = history?.activities.get(`${u.owner}:${u.id}`);
+    if (act) unit.activity = act;
     if (history?.alpine.has(`${u.owner}:${u.id}`) && alpineChassis(unit.type)) unit.alpine = true;
     if (history?.fionn.has(`${u.owner}:${u.id}`) && fionnChassis(unit.type)) unit.fionn = true;
     const levy = history?.levied.get(`${u.owner}:${u.id}`);

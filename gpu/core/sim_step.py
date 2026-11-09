@@ -80,6 +80,11 @@ class SimStep:
                     _gf = self._imp_fortify.take(_iv.clamp(min=0)) * (_iv >= 0).long()
                     _dug = torch.where(_alive & _mil, torch.maximum(_dug, _gf.clamp(max=2)), _dug)
                 _fort.copy_(_dug)
+                # its player's end of turn: a unit on HOLD with no
+                # fortification AWAKE, the barbarians' left as they are
+                _act = getattr(self, f"{_pre}_unit_activity")
+                _act.copy_(torch.where((_act == ACT_HOLD) & (getattr(self, f"{_pre}_unit_seat") != BARB_SEAT)
+                                       & (_fort == 0), torch.zeros_like(_act), _act))
             self._refresh_aura_mp()
             # The movesLeft/movesFull reset itself, for BOTH windows —
             # refreshUnits loops every unit regardless of seat. The major

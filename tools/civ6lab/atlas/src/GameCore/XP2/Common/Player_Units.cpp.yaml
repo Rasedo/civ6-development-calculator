@@ -131,7 +131,7 @@
 - addr: 0x4ef6d0
   kind: function
   name: Player_Units' end of turn
-  semantics: "from Player::Processor::EndTurn (0x7ecc0 -> 0x4e44e0, before the cities' 0x36ec30): with units (+0xc0), walks the list (+0xd8), each unit flagged dead (+0x770) gathered, the others' end-of-turn work; then each gathered unit destroyed (0x4ef100)."
+  semantics: "from Player::Processor::EndTurn (0x7ecc0 -> 0x4e44e0, before the cities' 0x36ec30): with units (+0xc0), walks the list (+0xd8), each unit flagged dead (+0x770) gathered, the others' end-of-turn work; then each gathered unit destroyed (0x4ef100). A barbarian's units (0x469ce0 at 0x4ef82e) skip the work; at 0x4f02ce a unit on HOLD is set AWAKE (0x53e20 -> vt +0xc0) where its owner is human or its fortification (+0xd50) is 0, one on HEAL where it is an AI's, or a human's with +0x590 not -1 or no damage (+0xcf0)."
   status: PARTLY
   cases:
     - recording: h1_duely1124
@@ -145,10 +145,13 @@
     - gpu/core/sim_step.py:step
     - cpu/core/types.ts:GameState
     - cpu/core/units.ts:upgradeAnew
+    - cpu/core/units.ts:refreshUnits
+    - cpu/core/units.ts:yctx
   readings:
     - "C-98: a unit off the map counts on its owner's list until its end of turn"
     - "C-98 / C-96: a city-state's unit count and standing army read its list with the delayed kill's dead — READ (0x7b62c0 at 0x7b63aa, 0x5ca7e0 at 0x5ca978 / 0x5caa88, 0x4ef6d0), both twins"
     - "C-129: the upgrade is a new unit, its old self dying in its pool slot to the turn's end — READ (0xa49cb0, 0x9402a0, 0x4ef040, 0x4ef6d0), both twins"
+    - "C-110 / C-99: the unit's activity and the Fortify order's refusal — READ"
   review: reviewed
 - addr: 0x4f2310
   final: 0x2c4360

@@ -749,11 +749,36 @@ export function canFortify(unit: Unit): boolean {
  * one segment row, then SENTRY; 123 Barb. Camp Defense / Chase Target
  * orders 0 -> 1, two segment
  * rows; every unit at 1 ordering again 1 -> 2). A unit that has moved
- * ticks neither time.
+ * ticks neither time. CanStart refuses a unit whose activity is HOLD, SLEEP,
+ * HEAL, SENTRY or INTERCEPT (0x8be70, `activity`): the order never starts,
+ * the activity stays (runs/h1_duelq1117 t10: the barbarian Scout 262147,
+ * HOLD from its t9 Skip Turn, logs Fortify in place and stays at 0). The
+ * order's start (0x55280) sets the activity OPERATION with Movement left,
+ * else HOLD; the operation's end at the max SENTRY.
  */
 export function fortifyOrder(state: GameState, unit: Unit, ticks: 1 | 2): void {
-  if (!canFortify(unit) || unit.embarked || unit.movesLeft < grantedMoves(state, unit)) return;
+  if (!canFortify(unit) || unit.embarked || unit.activity) return;
+  if (unit.movesLeft <= 0) {
+    unit.activity = 'HOLD';
+    return;
+  }
+  if (unit.movesLeft < grantedMoves(state, unit)) return;
   unit.fortifyTurns = Math.min(FORTIFY_MAX_TURNS, (unit.fortifyTurns ?? 0) + ticks);
+  if (unit.fortifyTurns >= FORTIFY_MAX_TURNS) unit.activity = 'SENTRY';
+}
+
+/** AN OPERATION'S START (0x55280) on a unit outside the Fortify order: its
+ *  activity OPERATION with Movement left (`activity` none), else HOLD */
+export function operationStart(unit: Unit): void {
+  if (unit.movesLeft > 0) delete unit.activity;
+  else unit.activity = 'HOLD';
+}
+
+/** THE SKIP TURN operation (its execution 0x9687a0, the homeland's End Turn
+ *  0x70cba0 over each unit whose turn is not done): the unit's activity
+ *  HOLD */
+export function skipTurn(unit: Unit): void {
+  unit.activity = 'HOLD';
 }
 
 /** FORTIFY: the defender-strength bonus a unit's fortifyTurns grants
@@ -2393,6 +2418,12 @@ export function refreshUnits(state: GameState): void {
     // the granted pool vary per turn. A unit that has never been refreshed
     // measures against its live full pool (`grantedMoves`).
     restUnit(state, unit, unit.movesLeft >= grantedMoves(state, unit), yctx);
+    // its player's end of turn (0x4ef6d0 at 0x4f02ce): a unit on HOLD with
+    // no fortification is AWAKE, the barbarians' left as they are
+    // (runs/h1_duelq1117 t9-10: the barbarian Scout 262147 HOLD across the
+    // turn; city-state units' Skip Turn HOLD then AWAKE as each turn closes,
+    // 777 of the duels' End Turn rows)
+    if (unit.activity === 'HOLD' && !isBarbSeat(unit.seat) && !(unit.fortifyTurns ?? 0)) delete unit.activity;
     // The Great General/Admiral aura grants +1 MP alongside its
     // +5 CS (real Civ 6). Record what was granted so NEXT turn's gates above
     // can tell "spent no MP" from "was simply given less".

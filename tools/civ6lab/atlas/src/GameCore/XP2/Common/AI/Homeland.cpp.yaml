@@ -28,6 +28,7 @@
   impl: [cpu/core/tactical.ts:exploreLand, gpu/core/sim_tactics.py:_tac_explore]
   readings:
     - "C-95: HL Explore's plot test refuses every other player's ground, Explore Land's flags 0x40 — READ (0x70bd40 at 0x70bd87..0x70beee, 0x709d80 at 0x709da0..0x709dc2, 0x70ce90 at 0x70ced5), FIT (the knowledge base's +0x128 at or below the turn), both twins"
+    - "C-110 / C-99: the unit's activity and the Fortify order's refusal — READ"
   review: reviewed
 - addr: 0x70a250
   final: 0x4bafa0

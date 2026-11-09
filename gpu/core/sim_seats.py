@@ -5005,7 +5005,8 @@ class SimSeats:
         experience unit is preserved". XP banks toward the NEXT level rather
         than accumulating, so the LEVEL leads and the banked remainder breaks
         the tie; the HOST keeps a dead heat, which is the side TS keeps too.
-        The ACTOR is the one spent, and the survivor holds the target's tile.
+        The ACTOR is the one spent, and the survivor holds the target's tile,
+        its moves ended, its fortification kept.
         """
         fr = live.nonzero(as_tuple=True)[0]
         if fr.numel() == 0:
@@ -5019,7 +5020,6 @@ class SimSeats:
             _p[fr, h] = torch.where(take, _p[fr, a], _p[fr, h])
         self.unit_formation[fr, h] = tier[fr]
         self.unit_mp[fr, h] = 0
-        self.unit_fortify[fr, h] = 0
         self.unit_alive[fr, a] = False
         self._occ_clear(fr, self.unit_tile[fr, a], a)
         self._gen_ver += 1
@@ -16091,6 +16091,9 @@ class SimSeats:
         _mp[:, u] = torch.where(city_att | cs_att, torch.zeros_like(_mp[:, u]), _mp[:, u])
         self._spend_one_attack(atk_kind, u, city_att | cs_att)
         self._spend_attack(atk_kind, u, unit_att)
+        # the strike leaves the unit's activity HOLD (`hostileRangedStrike`)
+        _act = getattr(self, f"{atk_kind}_unit_activity")
+        _act[:, u] = torch.where(city_att | enc_att | cs_att | unit_att, torch.full_like(_act[:, u], ACT_HOLD), _act[:, u])
         return city_att | cs_att | unit_att
 
     def _ranged_attack(self, att: torch.Tensor, tgt: torch.Tensor, atk_kind: str,
