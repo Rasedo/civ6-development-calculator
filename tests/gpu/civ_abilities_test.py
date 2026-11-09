@@ -293,7 +293,7 @@ def test_iteru_production(rules, path) -> None:
     campus2, t2 = _river_district(sim2, egypt)
     assert (campus2, t2) == (campus, t)
     p_other = _produce(sim2, egypt, t, campus)
-    assert p_other > 0 and abs(p_egypt - p_other * sim._iteru_mult) < 1e-9, (p_egypt, p_other)
+    assert p_other > 0 and p_egypt == float(sim._step_amount(torch.tensor(p_other), sim._fx_factor(sim._iteru_mult))), (p_egypt, p_other)
     # off the river, the same hammers
     sim3 = fresh(rules, path)
     dry = (~sim3.water[B0] & sim3.passable[B0] & (sim3.tile_seat[B0] == egypt)
@@ -314,7 +314,7 @@ def test_iteru_production(rules, path) -> None:
     sim4._seat_city_produce(egypt, torch.tensor([0]), torch.tensor([True]),
                             torch.tensor([20.0], dtype=torch.float64))
     p_w = float(sim4.city_progress[B0, egypt, 0, 0])
-    assert abs(p_w - p_other * sim._iteru_mult) < 1e-9, (p_w, p_other)
+    assert p_w == float(sim._step_amount(torch.tensor(p_other), sim._fx_factor(sim._iteru_mult))), (p_w, p_other)
     print("  5 Iteru production OK — x1.15 on a river plot (district or wonder), x1 off it")
 
 

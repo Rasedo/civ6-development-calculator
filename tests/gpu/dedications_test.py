@@ -211,14 +211,14 @@ def main() -> None:
         return float(sim.city_progress[0, 0, col, 0])
 
     got = run_prod(sim.UNIT_BASE + warr, sim._ded_to_arms)
-    assert abs(got - 10.0 * sim._to_arms_prod) < 1e-9, got
+    assert got == float(sim._step_amount(torch.tensor(10.0), sim._fx_factor(sim._to_arms_prod))), got
     got = run_prod(sim.UNIT_BASE + warr, sim._ded_exodus)
     assert abs(got - 10.0) < 1e-9, got
     # an Industrial+ wonder under Steam
     widx = int((sim._wonder_era >= sim._industrial_era).long().argmax())
     if bool(sim._wonder_era[widx] >= sim._industrial_era):
         got = run_prod(sim.WONDER_BASE + widx, sim._ded_steam)
-        assert abs(got - 10.0 * sim._steam_wonder_prod) < 1e-9, got
+        assert got == float(sim._step_amount(torch.tensor(10.0), sim._fx_factor(sim._steam_wonder_prod))), got
         got = run_prod(sim.WONDER_BASE + widx, sim._ded_to_arms)
         assert abs(got - 10.0) < 1e-9, got
         print("to-arms + steam production ok")

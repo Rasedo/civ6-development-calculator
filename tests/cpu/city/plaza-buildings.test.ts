@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import { fxFactor, stepAmount } from '../../../cpu/core/production';
 import { makeState, settleFirstCity } from '../helpers';
 import { boostProject, endTurn, settlerCost, foundCityAt, projectBoostCity } from '../../../cpu/core/game';
 import { commitProduction } from '../../../cpu/core/seatTurn';
@@ -114,7 +115,7 @@ describe("the Warlord's Throne — the conquest window", () => {
     };
     const shut = run(false);
     expect(shut).toBeGreaterThan(0);
-    expect(run(true)).toBeCloseTo(shut * 1.2, 9);
+    expect(run(true)).toBe(stepAmount(shut, fxFactor(1.2)));
 
     // and the clock runs down one turn per turn
     const state = makeState();

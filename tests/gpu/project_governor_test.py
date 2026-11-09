@@ -87,7 +87,9 @@ def main() -> int:
             seat_gov(base, P, 0)
             got = [fill(base, c, pi) for c in (0, 1)]
             k = 1.3 if pi in want else 1.0
-            assert abs(got[0] - plain[0] * k) < 1e-9, (
+            # the step's 24.8: the governed amount is the plain one times 1.3 in fixed point
+            wanted = float(base._step_amount(torch.tensor(plain[0]), base._fx_factor(k)))
+            assert got[0] == wanted, (
                 f"{pid} x{got[0] / plain[0]} on project {pi} in its city, wanted x{k}")
             assert got[1] == plain[1], f"{pid} reached project {pi} in the OTHER city"
         print(f"  {n} {pid} OK — x1.3 on {sorted(want)} in its city only, x1 elsewhere")

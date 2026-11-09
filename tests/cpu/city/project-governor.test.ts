@@ -5,6 +5,7 @@ import { governorsOf } from '../../../cpu/core/governors';
 import { seatPhase } from '../../../cpu/core/phase';
 import { GOVERNOR_INDEX, GOVERNOR_PROMOTION_INDEX, promotionBitValue, type GovernorId } from '../../../cpu/data/governors';
 import { PROJECTS } from '../../../cpu/data/projects';
+import { fxFactor, stepAmount } from '../../../cpu/core/production';
 
 // THE GOVERNOR'S PROJECT PERCENT. CIV6 (Arms Race Proponent): one
 // MODIFIER_SINGLE_CITY_ADJUST_PROJECT_PRODUCTION row, Amount 30, on each of
@@ -44,7 +45,7 @@ describe.each([
     const plain = fill(project);
     const got = fill(project, { gov, id });
     expect(plain[0]).toBeGreaterThan(0);
-    expect(got[0]).toBeCloseTo(plain[0] * (set.includes(project) ? 1.3 : 1), 9);
+    expect(got[0]).toBe(set.includes(project) ? stepAmount(plain[0], fxFactor(1.3)) : plain[0]);
     // the seat's other city is never reached
     expect(got[1]).toBe(plain[1]);
   });

@@ -6,7 +6,7 @@ import { endTurn } from '../../../cpu/core/game';
 import { archaeologistExcavate, spawnUnit, unitIsMilitary } from '../../../cpu/core/units';
 import { meleeAttack } from '../../../cpu/core/combat';
 import { revealAround } from '../../../cpu/core/fog';
-import { completeQueueItem } from '../../../cpu/core/production';
+import { completeQueueItem, fxFactor, stepAmount } from '../../../cpu/core/production';
 import { routePlunderer, cityTradeYields, tradeRouteMinDuration } from '../../../cpu/core/trade';
 import { computeCityStats, seatTourism } from '../../../cpu/core/city';
 import { effectiveAdjacency } from '../../../cpu/core/yields';
@@ -213,7 +213,7 @@ describe('the four new dedications', () => {
     const normal = run(false);
     const golden = run(true);
     expect(normal).toBeGreaterThan(0);
-    expect(golden).toBeCloseTo(normal * 1.15, 9);
+    expect(golden).toBe(stepAmount(normal, fxFactor(1.15)));
   });
 
   it('To Arms! pays no Spy — the chassis is a civilian', () => {

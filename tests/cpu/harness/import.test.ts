@@ -404,7 +404,9 @@ describe('the build queue', () => {
 
   it('carries each entry as the engine item, its progress and the overflow store the city memory\'s', () => {
     const rec = record(10, {
-      cities: [city({ queue, queueProgress: [5, 7, 'err:no reader', 0, 2] }), record(10).cities[1]],
+      // the Pyramids not standing in the city, so its queue entry's Location places it
+      cities: [city({ queue, queueProgress: [5, 7, 'err:no reader', 0, 2], buildings: [[0, 0], [1, 0], [3, 0], [5, 0]] }),
+        record(10).cities[1]],
       mem: { 0: { cities: [{ m_kBuildQueue: { n: 200, 125: 3 * 256 },
         'm_kBuildQueue.v': { 134: { n: 8, 2: 7 * 256 }, 140: { n: 4, 3: 5 * 256 + 128 }, 146: { n: 4, 1: 9 * 256 + 64 },
           152: { n: 4, 0: 2 * 256 + 32 } } }] } } as never,

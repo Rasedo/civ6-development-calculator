@@ -106,7 +106,7 @@ def test_production(rules, path) -> None:
         return produce(sim, 0, code)
 
     base_ws = run("AMERICA", ws)  # America holds no production row
-    assert base_ws > 0 and abs(run("ENGLAND", ws) - base_ws * 1.2) < 1e-9, "Workshop of the World"
+    assert base_ws > 0 and run("ENGLAND", ws) == float(BatchSim._step_amount(torch.tensor(base_ws), BatchSim._fx_factor(1.2))), "Workshop of the World"
     assert abs(run("OTTOMAN", ws) - base_ws) < 1e-9, "the Ottomans paid a Workshop"
     base_w = run("AMERICA", walls)
     assert abs(run("GEORGIA", walls) - base_w * 1.5) < 1e-9, "Strength in Unity"

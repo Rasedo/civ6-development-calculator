@@ -32,7 +32,7 @@ from pathlib import Path
 import torch
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "gpu"))
-from core import load_rules, fixture_paths, FIXTURES
+from core import BatchSim, load_rules, fixture_paths, FIXTURES
 from warmup import warm_base, opened
 
 ROW = 1  # a civ row: every body below is seat-generic
@@ -207,7 +207,7 @@ def poke_conquest_prod(rules, path):
 
     shut = run(False)
     assert shut > 0, "the control city produced nothing"
-    assert abs(run(True) - shut * 1.2) < 1e-9, "the window did not pay +20%"
+    assert run(True) == float(BatchSim._step_amount(torch.tensor(shut), BatchSim._fx_factor(1.2))), "the window did not pay +20%"
     print("  5 Warlord's Throne production OK — x1.2 in the window, x1 outside it")
 
 
