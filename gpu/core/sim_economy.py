@@ -6977,7 +6977,8 @@ class SimEconomy:
         `col_mask` [B, RC] narrows the sum to some of the row's cities."""
         out = torch.zeros(self.B, dtype=torch.long, device=self.device)
         if (not self._b_tour_any and not self._b_civic_tour_any
-                and not self._bvar_tour_feat and not self._bvar_tour_with_feat):
+                and not self._bvar_tour_feat and not self._bvar_tour_with_feat
+                and not self._bvar_golden_civic_tour):
             return out
         cols = self.RC
         dreg = self.city_dist_tile[:, row, :cols]
@@ -7011,6 +7012,13 @@ class SimEconomy:
             if not bool(w.count_nonzero()):
                 continue
             out = out + (held[:, :, bi] & w.unsqueeze(1) & self._city_has_feature(row, feat)).long().sum(dim=1) * amt
+        # CIV6 (Tsikhe, CONSERVATION_TSIKHE_TOURISM_GOLDEN_AGE): Tourism once
+        # the civic is held, while the seat stands in a Golden Age
+        for (bi, c), (cv, amt) in (self._bvar_golden_civic_tour.items() if row < self.n_majors else ()):
+            w = self._row_plays_idx(row, c) & self._seat_civics(row)[:, cv] & (self.civ_age[:, row] == AGE_GOLDEN)
+            if not bool(w.count_nonzero()):
+                continue
+            out = out + (held[:, :, bi] & w.unsqueeze(1)).long().sum(dim=1) * amt
         return out
 
     def _suzerain_tourism(self, row: int, own: torch.Tensor) -> torch.Tensor:

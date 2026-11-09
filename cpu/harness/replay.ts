@@ -44,7 +44,7 @@ import { completeQueueItem, keepItem, keptKey, resumeItem, takeKept } from '../c
 import { applySeatUnitOrders, buySeatBuilding, declareWar, districtSiteCost, districtSiteLegal, foundPantheon, grantPantheonUnit, jumpMadeAnew, levyGoldCost, levyUnits, paveGround,
   placeSeatDistrict, putOffer, answerOffer, sueForPeace, transferCity, cityStrikeAt, holdCityStrikes, envoysAtStart, applySeatEnvoys,
   seatPhase, worldCongress, holdBankruptDisband, completeResearchNow } from '../core/phase';
-import { addEnvoys, cityStateAt, declareWarOnCityState, minorCity, minorReplaceCitizens, placeCityStateAt, sueForPeaceWithCityState } from '../core/cityStates';
+import { addEnvoys, buildingCreatedCulture, cityStateAt, declareWarOnCityState, minorCity, minorReplaceCitizens, placeCityStateAt, sueForPeaceWithCityState } from '../core/cityStates';
 import { CP_ACCEPTED, CP_CANCELLED, CP_IN_PROGRESS, contractById } from '../core/aiContracts';
 import { availableBuildings, canPlaceWonder, validImprovements, wallsMax } from '../core/rules';
 import { arrive, arriveAll, builderHarvest, builderRemoveFeature, spawnUnit, tallyUnitMade, trainableUnits, builderCost, traderCost, disbandUnit, escortable, drawAndPayGoody, grantedMoves, unitFullMoves, restUnit, canFortify, upgradeUnit, naturalistPark, upgradeAnew, unitsAt, unitDomain, fortifyBonus, crossesRiver, waterWalks, cityAtIndex, raiseBestTrained, recordAttacker, unitMadeAnew, FORTIFY_MAX_TURNS, ANTIQUITY_CIVIC, SHIPWRECK_CIVIC } from '../core/units';
@@ -1931,8 +1931,7 @@ function minorAi(ctx: Ctx, b: TurnRecord, turn: number, made: ReadonlySet<Unit>,
   // their research AI's turn, whose research in hand the AI turn noted (one
   // with none noted the research as the units' turn left it)
   for (const cs of ctx.state.cityStates) if (!ctx.researchAtTurn.has(cs.seat)) ctx.researchAtTurn.set(cs.seat, cs.research.tech);
-  for (const cs of ctx.state.cityStates) detectBoosts(ctx.state, cs.seat);
-  const ended = new Map<Unit, number>();
+  for (const cs of ctx.state.cityStates) detectBoosts(ctx.state, cs.seat);  const ended = new Map<Unit, number>();
   for (const [c, u] of twin) if (copy.units.includes(c) && minorAiSeat(c.seat)) ended.set(u, c.tileIndex);
   const opOf = new Map<Unit, string>();
   for (const c of copy.cityStates) {
@@ -3401,6 +3400,7 @@ function applyBuyBuilding(ctx: Ctx, d: Extract<Decision, { kind: 'buyBuilding' }
     if (d.currency === 'gold') actor.treasury -= goldPrice(state, seat, buildingPurchaseCost(state, seat, id));
     else actor.faith -= buildingFaithPrice(state, seat, id) ?? 0;
     city.buildings.push(id);
+    buildingCreatedCulture(state, seat, id);
     city.queue = city.queue.filter((q) => !(q.kind === 'building' && q.building === id));
   }
   count(ctx, `buyBuilding:${d.currency}`, ok ? 'applied' : 'fallback', d.player);

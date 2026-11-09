@@ -83,7 +83,10 @@ export type SuzEffect =
   | 'freshWaterHousing' // Mohenjo-Daro
   | 'gpActivatedPressure' // Vatican City
   | 'freeStrategic'   // Hattusa
-  | 'seaTraderImmune'; // Lisbon
+  | 'seaTraderImmune' // Lisbon
+  | 'buildingCostCulture' // Ayutthaya
+  | 'conversionScience'   // Fez
+  | 'killStrengthGpp';    // Wolin
 
 /** The WIRE order the exported `suzCode` indexes — append only. */
 export const SUZ_EFFECTS: SuzEffect[] = [
@@ -98,7 +101,7 @@ export const SUZ_EFFECTS: SuzEffect[] = [
   'spiceLuxuries', 'routeLengthGold', 'projectProduction', 'landPurchaseDiscount',
   'bonusAmenities', 'shallowWaterProd', 'resourceTypeProduction', 'hubAmenities', 'relicFaith',
   'partnerProduction', 'wonderProduction', 'freshWaterHousing', 'gpActivatedPressure', 'freeStrategic',
-  'gpCulturePct', 'seaTraderImmune',
+  'gpCulturePct', 'seaTraderImmune', 'buildingCostCulture', 'conversionScience', 'killStrengthGpp',
 ];
 
 /** Cardiff: "Cities receive +2 Power for every Harbor building." Renewable,
@@ -303,6 +306,42 @@ export const BUENOS_AIRES_AMENITIES = 1;
  *  and t92). */
 export const HATTUSA_FREE_STRATEGIC = srcConst('cityState.hattusaFreeStrategic', 2,
   xml('ModifierArguments', 'ModifierId=MINOR_CIV_HATTUSA_HORSES_RESOURCE_XP2&Name=Amount', 'Value'));
+
+/** CIV6 (Babylon_Leaders.xml, MINOR_CIV_AYUTTHAYA_UNIQUE_INFLUENCE_BONUS attaching
+ *  MINOR_CIV_AYUTTHAYA_CULTURE_COMPLETE_BUILDING to the suzerain:
+ *  MODIFIER_PLAYER_CITIES_GRANT_YIELD_PER_BUILDING_COST, YIELD_CULTURE,
+ *  BuildingProductionPercent 10, IncludeWonder false) — each city's
+ *  m_aYieldPerBuildingComplete percent, paid on the building's Cost at the
+ *  speed as the building is created (`buildingCreatedCulture`). */
+export const AYUTTHAYA_BUILDING_CULTURE_PCT = srcConst('cityStates.ayutthayaBuildingCulturePct', 10,
+  xml('ModifierArguments', 'ModifierId=MINOR_CIV_AYUTTHAYA_CULTURE_COMPLETE_BUILDING&Name=BuildingProductionPercent', 'Value'));
+
+/** CIV6 (Expansion2_Leaders.xml, MINOR_CIV_FEZ_UNIQUE_INFLUENCE_BONUS attaching
+ *  MINOR_CIV_FEZ_INITIATION_SCIENCE_POPULATION to the suzerain:
+ *  MODIFIER_PLAYER_UNITS_ADJUST_INITIATION_YIELD_POPULATION, YIELD_SCIENCE
+ *  Amount 20) — Science per citizen of the city its religious unit converts
+ *  (`spreadFromUnit`). */
+export const FEZ_CONVERSION_SCIENCE = srcConst('cityStates.fezConversionScience', 20,
+  xml('ModifierArguments', 'ModifierId=MINOR_CIV_FEZ_INITIATION_SCIENCE_POPULATION&Name=Amount', 'Value'));
+
+/** CIV6 (Babylon_Leaders.xml, the two MINOR_CIV_WOLIN_GREAT_*_INFLUENCE_BONUS
+ *  rows granting ABILITY_WOLIN_LAND_UNITS / ABILITY_WOLIN_NAVAL_UNITS to the
+ *  suzerain's units: WOLIN_GREAT_GENERAL_POINTS / WOLIN_GREAT_ADMIRAL_POINTS,
+ *  MODIFIER_PLAYER_ADJUST_UNITS_GREAT_PEOPLE_POINTS_PER_KILL_BY_DEFEATED_STRENGTH
+ *  Amount 25) — the percent of the defeated unit's Combat Strength its killer
+ *  earns as Great General (land) or Great Admiral (naval) points
+ *  (`unitKillEvent`). */
+export const WOLIN_GP_PCT = srcConst('cityStates.wolinGpPct', 25,
+  xml('ModifierArguments', 'ModifierId=WOLIN_GREAT_GENERAL_POINTS&Name=Amount', 'Value'));
+/** the classes each Wolin ability attaches to (its TypeTags), as the
+ *  promotion classes whose chassis carry them: the land ability's CLASS_RECON,
+ *  _MELEE, _RANGED, _SIEGE, _HEAVY_CAVALRY, _LIGHT_CAVALRY, _RANGED_CAVALRY,
+ *  _ANTI_CAVALRY, the chariots and _WARRIOR_MONK; the naval one's
+ *  CLASS_NAVAL_RANGED, _NAVAL_RAIDER and _NAVAL_MELEE */
+export const WOLIN_LAND_CLASSES: readonly PromoClass[] = [
+  'RECON', 'MELEE', 'RANGED', 'SIEGE', 'HEAVY_CAV', 'LIGHT_CAV', 'ANTICAV', 'MONK',
+];
+export const WOLIN_NAVAL_CLASSES: readonly PromoClass[] = ['NAVAL_RANGED', 'NAVAL_RAIDER', 'NAVAL_MELEE'];
 interface SuzerainBonusDef {
   /** PROVENANCE, per column (cpu/data/provenance.ts). */
   src?: SrcMap;
@@ -380,6 +419,9 @@ const RAW_CITY_STATE_SUZERAIN_BONUS: Record<string, SuzerainBonusDef> = {
   // MODIFIER_PLAYER_UNITS_GRANT_ABILITY ABILITY_TRADE_ROUTE_PLUNDER_IMMUNITY_SEA
   // on its Traders, TRADE_ROUTE_PLUNDER_IMMUNITY_SEA DomainType DOMAIN_SEA)
   Lisbon: { name: 'Lisbon', type: 'trade', bonus: 'Your Trader units are immune to being plundered on water tiles.', suz: 'seaTraderImmune' },
+  Ayutthaya: { name: 'Ayutthaya', type: 'cultural', bonus: 'Gain Culture equal to 10% of the construction cost when finishing buildings.', suz: 'buildingCostCulture' },
+  Fez: { name: 'Fez', type: 'scientific', bonus: 'When you use a religious unit to convert a city for the first time earn 20 Science per Population of that city (on Standard Speed).', suz: 'conversionScience' },
+  Wolin: { name: 'Wolin', type: 'militaristic', bonus: "Receive Great General points when a land unit defeats a major or minor civilization's unit and receive Great Admiral points when a naval unit defeats a major or minor civilization's unit equal to 25% of the opposing unit's strength (Standard Speed).", suz: 'killStrengthGpp' },
 };
 
 export const CITY_STATE_SUZERAIN_BONUS: Record<string, SuzerainBonusDef> = Object.fromEntries(

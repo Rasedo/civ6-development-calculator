@@ -1797,7 +1797,12 @@ class SimPhase:
         if bool(made_b2.count_nonzero()):
             br = made_b2.nonzero(as_tuple=True)[0]
             bi = cur.clamp(min=0, max=self.NB - 1)
+            # a building not standing before is created (a held one's column
+            # completing is its repair)
+            fresh_b = torch.zeros_like(made_b2)
+            fresh_b[br] = ~self.city_bldg[br, row, col[br], bi[br]]
             self.city_bldg[br, row, col[br], bi[br]] = True
+            self._building_created_culture(row, bi, made_b2 & fresh_b)
             # a building already held and standing pillaged was REPAIRED
             self.city_bldg_pillaged[br, row, col[br], bi[br]] = False
             self._stamp_bldg_era(br, row, col[br], bi[br])

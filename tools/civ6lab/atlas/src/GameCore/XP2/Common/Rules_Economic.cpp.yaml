@@ -88,6 +88,9 @@
     - cpu/core/trade.ts:TRADE_ROUTE_DURATION
     - cpu/core/trade.ts:TRADE_ROUTE_ERA_TERM
     - cpu/core/stockpile.ts:unitBaseResourceCost
+    - cpu/core/cityStates.ts:buildingCreatedCulture
+    - cpu/core/eras.ts:unitKillEvent
+    - cpu/core/eras.ts:wcls
   readings:
     - "B-31r-S1: the plunder payout — CLOSED"
     - "C-94: the game era, the ages and the founding moments — READ"
@@ -108,6 +111,7 @@
     - "C-108: a trade route's term and its end — READ (the MakeTradeRoute operation's check, the term), both twins"
     - "C-96: a unit's strategic cost through the game speed, the pick's pillaged district and the queue's pillaged project — READ (0x17c2e0, 0x4f2cc0, 0x4f2df0 / 0x4f31f0), a fit for the project, both twins"
     - "H-1: a great person's price and its draw's era — READ (0x2f1c50, 0x2f8f70 -> 0x93e9e0 -> 0x2f94d0), both twins"
+    - "C-117: the suzerain bonuses of Ayutthaya, Fez and Wolin; the Tsikhe's Conservation Tourism — READ (0xb0e380, 0xb0ee40, 0xc70830, 0x17f870; 0x1fce20), PARTLY READ (Fez's list on the unit), both twins"
   context:
     - "...op 0x554860..0x554a4e, route yields 0x559b30 origin / 0x559bc0 destination, speed scaling 0x5254d0). Check: `dll_plunder.py`."
     - "...xTurn 0x2c37c0 = start + scale(GameEraMaximumTurns) (Eras_XP1 row +0x24 / +0x2c), scale 0x5254d0 = x × GameSpeeds. CostMultiplier / 100 truncated: online 20 / 30. The first era's start..."

@@ -53,3 +53,29 @@
   context:
     - "...0): its apply (0xb48710) registers the yield type and Amount on the city's +0x1da8 table (0xc705d0); the count that table is multiplied by is read where the city's yields sum (unread). The..."
   review: reviewed
+- addr: 0xc70830
+  kind: function
+  name: changeYieldPerBuildingComplete
+  semantics: adds to the city's m_aYieldPerBuildingComplete (+0xe38) entry of a yield.
+  status: READ
+  cases:
+    - recording: h1_duelq1121
+      turn: 184
+      value: "China, suzerain of Ayutthaya: Bank and bought University +27 Culture"
+  impl:
+    - cpu/core/cityStates.ts:buildingCreatedCulture
+    - gpu/core/sim_seats.py:_building_created_culture
+  readings:
+    - "C-117: the suzerain bonuses of Ayutthaya, Fez and Wolin; the Tsikhe's Conservation Tourism — READ (0xb0e380, 0xb0ee40, 0xc70830, 0x17f870; 0x1fce20), PARTLY READ (Fez's list on the unit), both twins"
+  context:
+    - "...f Ayutthaya, Fez and Wolin; the Tsikhe's Conservation Tourism — READ (0xb0e380, 0xb0ee40, 0xc70830, 0x17f870; 0x1fce20), PARTLY READ (Fez's list on the unit), both twins"
+    - ...b0ee40 adds the percent to the city's m_aYieldPerBuildingComplete (+0xe38, the setter 0xc70830) and, with IncludeWonder, m_aYieldPerWonderComplete (+0xeb0, 0xc70b50); the remove 0xb0...
+  review: reviewed
+- addr: 0xc70b50
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-117: the suzerain bonuses of Ayutthaya, Fez and Wolin; the Tsikhe's Conservation Tourism — READ (0xb0e380, 0xb0ee40, 0xc70830, 0x17f870; 0x1fce20), PARTLY READ (Fez's list on the unit), both twins"
+  context:
+    - ...e38, the setter 0xc70830) and, with IncludeWonder, m_aYieldPerWonderComplete (+0xeb0, 0xc70b50); the remove 0xb0f8e0 subtracts it. The building's completion 0x17f870 (called from the...
+  review: imported

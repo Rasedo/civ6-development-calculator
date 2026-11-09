@@ -163,9 +163,10 @@
   kind: function
   name: GrantYield
   status: PARTLY
-  impl: [cpu/core/phase.ts:researchLump]
+  impl: [cpu/core/phase.ts:researchLump, cpu/core/cityStates.ts:buildingCreatedCulture]
   readings:
     - "C-98: a lump of Science or Culture completes the item in hand — READ (0x4c8e60, 0x4c8ea0, 0x3938e0, 0x393670), both twins"
+    - "C-117: the suzerain bonuses of Ayutthaya, Fez and Wolin; the Tsikhe's Conservation Tourism — READ (0xb0e380, 0xb0ee40, 0xc70830, 0x17f870; 0x1fce20), PARTLY READ (Fez's list on the unit), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...the city-states' catch-up runs on that gain. Callers of 0x4c8e60 / 0x3938e0: GrantYield 0x468540, the harvest 0x95fbf0, 0x93ec40, 0x536480, 0x1fc390, 0x1fce20."
@@ -365,6 +366,7 @@
     - "C-111: a major's district lets go of the queue under a hostile unit, the queue's progress and overflow read from the city's memory — READ (0x184660 at 0x1847dc, 0x5313f0, 0x17f630), both twins"
     - "C-109: war weariness per combat, the turn's decay and the percent — READ"
     - "C-95: HL Explore's unrevealed count holds nothing on a goody hut's plot — READ (0x70a6c0 at 0x70a746..0x70a76a, 0x82d90), both twins"
+    - "C-117: the suzerain bonuses of Ayutthaya, Fez and Wolin; the Tsikhe's Conservation Tourism — READ (0xb0e380, 0xb0ee40, 0xc70830, 0x17f870; 0x1fce20), PARTLY READ (Fez's list on the unit), both twins"
   notes:
     - ".claude/scratchpad/cb4/NOTES.md: ...ligious; cb3 wrong), +0x1b9 bit 0x40 MakeTradeRoute, bit 2 FoundCity, +0x1ba bit 0x40 WMDCapable. - 0x469db0 FULL_CIV, 0x469ce0 TRIBE, 0x469d40 FREE_CITIES, 0x469de0 CITY_STATE. - pseudo globals: f2e210 GOLDE..."
     - ".claude/scratchpad/mu1/readings_c96.md: ...ss after, wanders none: every minor's t1 rows are End Turn). For a   player of a full civilization (0x469db0, CIVILIZATION_LEVEL_FULL_CIV)   only DEFENDER units, round the unit's city (+0x11d0 through 0x36f66..."
@@ -384,6 +386,7 @@
     - "C-96: the resource value and the research value's resources — READ (bonus, luxury, the call), PARTLY READ (the strategic stockpile terms)"
     - "C-97: the war operations — the war candidates, the city value's frame, the assault nodes and Attack Units READ; the loyalty lead's sources, the team update's danger and the assault's executions PARTLY READ"
     - "H-1: the barbarians' turn (0x1514a0) — READ (the max camps and the sight LAB)"
+    - "C-117: the suzerain bonuses of Ayutthaya, Fez and Wolin; the Tsikhe's Conservation Tourism — READ (0xb0e380, 0xb0ee40, 0xc70830, 0x17f870; 0x1fce20), PARTLY READ (Fez's list on the unit), both twins"
   notes:
     - "imported: READ in its section, no confirming case found beside it"
     - ".claude/scratchpad/cb4/NOTES.md: ...2 FoundCity, +0x1ba bit 0x40 WMDCapable. - 0x469db0 FULL_CIV, 0x469ce0 TRIBE, 0x469d40 FREE_CITIES, 0x469de0 CITY_STATE. - pseudo globals: f2e210 GOLDENAGE_POINT, f2e214 GOVERNOR, f2e218 GPP_GENERAL..f2e238 G..."

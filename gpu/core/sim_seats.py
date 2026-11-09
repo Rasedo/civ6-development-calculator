@@ -1471,6 +1471,24 @@ class SimSeats:
                     self._spawn_unit(row, auto & (cap >= 0), cap.clamp(min=0),
                                      torch.full_like(cap, self._gdr_idx))
 
+    def _building_created_culture(self, row: int, bi: torch.Tensor, made: torch.Tensor) -> None:
+        """`buildingCreatedCulture` — CIV6 (Ayutthaya, EFFECT_GRANT_CITY_YIELD
+        _PERCENT_BUILDING_CREATED_COST): a building row `row` creates where
+        `made` [B] (`bi` [B] its index), built or bought, grants Culture of
+        each suzerainty's percent of the building's Cost at the speed, in the
+        24.8 fixed point truncated, a lump on the civic in hand."""
+        if self._suz_c_bldg_cul < 0 or row >= self.n_majors:
+            return
+        n = self._suz_effect_count(row, self._suz_c_bldg_cul)
+        on = made & (n > 0)
+        if not bool(on.count_nonzero()):
+            return
+        cost = self._b_cols(row)["cost"].gather(1, bi.clamp(min=0, max=self.NB - 1).unsqueeze(1)).squeeze(1)
+        fx = torch.trunc(self._suz_bldg_cul_pct * n.double() * cost.double() * 256 / 100)
+        amt = torch.where(on & (fx > 0), fx / 256, torch.zeros_like(fx))
+        if bool(amt.count_nonzero()):
+            self._research_lump(row, amt.to(self.civ_civic_prog.dtype), True)
+
     def _building_dedications(self, row: int, bi: torch.Tensor, made: torch.Tensor) -> None:
         """`buildingDedications` — every dedication a COMPLETED BUILDING pays.
 
@@ -1659,6 +1677,7 @@ class SimSeats:
         self._stamp_bldg_era(rows6, row, jj6[rows6], bb6[rows6])
         self._bldg_version += 1
         self._building_dedications(row, bb6, can6)  # a purchased building is constructed too
+        self._building_created_culture(row, bb6, can6)
         self._eff_version += 1
         if self._walls_rows:
             wm6 = rows6[(self._b_walls[bb6[rows6]] > 0)]
@@ -1676,6 +1695,7 @@ class SimSeats:
         self._stamp_bldg_era(rows, row, jj[rows], bb[rows])
         self._bldg_version += 1
         self._building_dedications(row, bb, ok)
+        self._building_created_culture(row, bb, ok)
         self._eff_version += 1
         if self._walls_rows:
             wm = rows[(self._b_walls[bb[rows]] > 0)]
@@ -2967,6 +2987,7 @@ class SimSeats:
                     rows_w = buy_w.nonzero(as_tuple=True)[0]
                     col_w = jw[rows_w]
                     self.city_bldg[rows_w, row, col_w, wb[rows_w]] = True
+                    self._building_created_culture(row, wb, buy_w)
                     self._stamp_bldg_era(rows_w, row, col_w, wb[rows_w])
                     self._bldg_version += 1
                     self._eff_version += 1
@@ -4200,7 +4221,7 @@ class SimSeats:
             self._occ_clear(gd, td, ds[dead])
             self._unit_kill_event(a_seat, d_type, d_seat == BARB_SEAT, d_died, at0,
                                   vict_form=self._form_tier(ds0), killer_promos=a_promos,
-                                  killer_tile=a_tile)
+                                  killer_tile=a_tile, vict_seat=d_seat)
             self._gen_ver += 1
         _hp_p[:, u] = self._heal_on_kill(self._row_of(a_seat), d_died & (_hp_p[:, u] > 0), _hp_p[:, u])
         self._air_downed(unit_att, atk_kind, u)
@@ -6382,7 +6403,8 @@ class SimSeats:
                          killed: torch.Tensor, killer_type: torch.Tensor | None = None,
                          vict_form: torch.Tensor | None = None,
                          killer_promos: torch.Tensor | None = None,
-                         killer_tile: torch.Tensor | None = None) -> None:
+                         killer_tile: torch.Tensor | None = None,
+                         vict_seat: torch.Tensor | None = None) -> None:
         """`unitKillEvent`'s twin — CIV6 (Hic Sunt Dracones, dark face): "+1
         Era Score each time you kill a non-Barbarian naval unit in combat";
         (Automaton Warfare): "+1 Era Score each time you kill a non-Barbarian
@@ -6412,6 +6434,26 @@ class SimSeats:
                     if self._general_cls >= 0:
                         self.civ_gpp[:, g, self._general_cls] += (
                             _m.long() * _ggp).to(self.civ_gpp.dtype)
+        # CIV6 (Wolin, EFFECT_ADJUST_GREAT_PEOPLE_POINTS_PER_KILL_BY_DEFEATED
+        # _STRENGTH): a suzerain's land / naval unit killing a major's or a
+        # minor's unit earns Great General / Admiral points of the percent of
+        # the victim's Combat Strength, truncated, at the speed
+        if killer_type is not None and vict_seat is not None and self._suz_c_kill_gp >= 0:
+            _wg = self._type_wolin_gp.take(killer_type.clamp(min=0, max=self.NU - 1))
+            _wv = killed & (killer_type >= 0) & (_wg > 0) & (vict_type >= 0) & (vict_seat >= 0) & (vict_seat < BARB_SEAT)
+            if bool(_wv.count_nonzero()):
+                _wcs = self._type_combat.take(vict_type.clamp(min=0, max=self.NU - 1))
+                _wpts = self.rules.scale_by_game_speed(
+                    torch.div(self._suz_kill_gp_pct * _wcs, 100, rounding_mode="trunc").double()).long()
+                for g in range(self.n_majors):
+                    _m = _wv & ((killer == g) if not isinstance(killer, int)
+                                else torch.full_like(_wv, killer == g)) & self._suz_effect(g, self._suz_c_kill_gp)
+                    if not bool(_m.count_nonzero()):
+                        continue
+                    for _code, _cls in ((1, self._general_cls), (2, self._admiral_cls)):
+                        if _cls < 0:
+                            continue
+                        self.civ_gpp[:, g, _cls] += ((_m & (_wg == _code)).long() * _wpts).to(self.civ_gpp.dtype)
         # CIV6 (Rough Rider): Culture worth 50% of the defeated unit's strength,
         # "when on the capital's continent" — the killer's own tile decides
         if killer_type is not None and killer_tile is not None:
@@ -13251,12 +13293,12 @@ class SimSeats:
                 ranged=False, a_died=atk_dead, d_died=def_dead | captured)
             self._unit_kill_event(a_seat[:, u], d_type, def_is_barb, def_dead, a_type[:, u],
                                   vict_form=self._form_tier(d_slot), killer_promos=a_promos,
-                                  killer_tile=here)
+                                  killer_tile=here, vict_seat=d_seat_m)
             self._disciples_spread(a_seat[:, u], a_type[:, u], a_promos, def_is_barb,
                                    tgt, def_dead)
             self._unit_kill_event(d_seat_m, a_type[:, u], a_seat[:, u] == BARB_SEAT, atk_dead, d_type,
                                   vict_form=getattr(self, f"{atk_kind}_unit_formation")[:, u],
-                                  killer_promos=d_promos, killer_tile=ttc)
+                                  killer_promos=d_promos, killer_tile=ttc, vict_seat=a_seat[:, u])
             self._disciples_spread(d_seat_m, d_type, d_promos,
                                    a_seat[:, u] == BARB_SEAT, tgt, atk_dead)
             self._ww_battle(mil_att, self._row_of(self._atk_seat(atk_kind, u)),
@@ -16075,7 +16117,7 @@ class SimSeats:
                                   _type_p[:, u], _tile_p[:, u], _hp_p[:, u])
                 self._unit_kill_event(self._atk_seat(atk_kind, u), d_type, d_barb,
                                       unit_att & (d_slot >= 0) & ((def_hp0 - d_def) <= 0), ut0,
-                                      vict_form=self._form_tier(d_slot), killer_promos=a_promos)
+                                      vict_form=self._form_tier(d_slot), killer_promos=a_promos, vict_seat=d_seat)
                 self._disciples_spread(
                     self._atk_seat(atk_kind, u), ut0, self._promo_pool(atk_kind)[0][:, u],
                     d_barb, ttc, unit_att & (d_slot >= 0) & ((def_hp0 - d_def) <= 0))
@@ -16303,7 +16345,7 @@ class SimSeats:
                               a_type[:, u], a_tile[:, u], a_hp[:, u])
             self._unit_kill_event(self._atk_seat(atk_kind, u), d_type, d_barb,
                                   unit_att & (d_slot >= 0) & ((def_hp0 - d_def) <= 0), at0,
-                                  vict_form=self._form_tier(d_slot), killer_promos=a_promos)
+                                  vict_form=self._form_tier(d_slot), killer_promos=a_promos, vict_seat=d_seat)
             self._disciples_spread(
                 self._atk_seat(atk_kind, u), at0, self._promo_pool(atk_kind)[0][:, u],
                 d_barb, ttc, unit_att & (d_slot >= 0) & ((def_hp0 - d_def) <= 0))

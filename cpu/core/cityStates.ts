@@ -2,7 +2,7 @@
 import type { City, CityState, CityStateType, GameState, QueueItem, Yields } from './types';
 import { giveQuest } from './quests';
 import { losDisk, suzerainSight, unitSight } from './fog';
-import { NO_SEAT, cityStateOfSeat, isCiv, civsAtWar, emptySeat, isCityStateSeat, markCityCentre, seatOf, seatOfCityState, setTileOwner, setTreatyTurnsWith, setWar, setWarTurnsWith, tileBelongsTo, tileSeat, hiddenResourcesFor, treatyTurnsWith, warTurnsWith, alliedAtLevel, warBanned } from './seats';
+import { NO_SEAT, cityStateOfSeat, isCiv, civsAtWar, emptySeat, isCityStateSeat, markCityCentre, seatOf, seatOfCityState, setTileOwner, setTreatyTurnsWith, setWar, setWarTurnsWith, tileBelongsTo, tileSeat, hiddenResourcesFor, treatyTurnsWith, warTurnsWith, alliedAtLevel, warBanned, civOf } from './seats';
 import { cancelRoutes } from './trade';
 import { ATHEISM_PRESSURE_PER_POP } from '../data/religion';
 import { grievanceCityStateWar } from './grievance';
@@ -20,7 +20,9 @@ import { ALLIANCE_ECONOMIC, PEACE_TREATY_TURNS, WAR_MIN_TURNS } from '../data/se
 import { CIV_LEVELS } from '../data/civLevels';
 import { RESOURCES } from '../../world/resources';
 import { CITY_MAX_HP } from '../data/units';
-import { CITY_STATE_SUZERAIN_BONUS, REGIONAL_REACH_BONUS, type SuzEffect, CITY_STATE_TYPES, CITY_STATE_TYPE_YIELD, CITY_STATE_ENVOY_ROWS, CITY_STATE_ITEM_PROD, GENEVA_SCIENCE_PCT, ANTANANARIVO_GP_CULTURE_PCT, ANTANANARIVO_GP_CULTURE_MAX, HONG_KONG_PROJECT_PCT, JOHANNESBURG_LATE_TECH, KANDY_RELIC_FAITH_PCT, KANDY_WONDER_RELICS, SINGAPORE_PARTNER_PROD, BRUSSELS_WONDER_PCT, MUSCAT_HUB_AMENITIES, MUSCAT_HUB_DISTRICT, JOHANNESBURG_RESOURCE_PROD, JOHANNESBURG_RESOURCE_PROD_LATE, NGAZARGAMU_PURCHASE_PCT, MILITARISTIC_BUILDING_ROWS, PRESLAV_BUILDING_LOYALTY, SUZERAIN_ENVOYS, FIRST_MEET_ENVOYS } from '../data/cityStates';
+import { CITY_STATE_SUZERAIN_BONUS, REGIONAL_REACH_BONUS, type SuzEffect, CITY_STATE_TYPES, CITY_STATE_TYPE_YIELD, CITY_STATE_ENVOY_ROWS, CITY_STATE_ITEM_PROD, GENEVA_SCIENCE_PCT, ANTANANARIVO_GP_CULTURE_PCT, ANTANANARIVO_GP_CULTURE_MAX, HONG_KONG_PROJECT_PCT, JOHANNESBURG_LATE_TECH, KANDY_RELIC_FAITH_PCT, KANDY_WONDER_RELICS, SINGAPORE_PARTNER_PROD, BRUSSELS_WONDER_PCT, MUSCAT_HUB_AMENITIES, MUSCAT_HUB_DISTRICT, JOHANNESBURG_RESOURCE_PROD, JOHANNESBURG_RESOURCE_PROD_LATE, NGAZARGAMU_PURCHASE_PCT, MILITARISTIC_BUILDING_ROWS, PRESLAV_BUILDING_LOYALTY, SUZERAIN_ENVOYS, FIRST_MEET_ENVOYS, AYUTTHAYA_BUILDING_CULTURE_PCT } from '../data/cityStates';
+import { effectiveBuilding } from '../data/buildings';
+import { researchLump } from './phase';
 import { REGIONAL_RANGE } from '../data/constants';
 import { warWearinessPeace } from './weariness';
 
@@ -533,6 +535,22 @@ export function suzerainGpCultureMult(state: GameState, seat: number): number {
   if (!suzerainEffect(state, seat, 'gpCulturePct')) return 1;
   if (state.seats.some((s) => s.seat !== seat && civsAtWar(state, seat, s.seat))) return 1;
   return 1 + Math.min(ANTANANARIVO_GP_CULTURE_PCT * (seatOf(state, seat)?.gpEarned?.length ?? 0), ANTANANARIVO_GP_CULTURE_MAX) / 100;
+}
+
+/** CIV6 (Ayutthaya, EFFECT_GRANT_CITY_YIELD_PERCENT_BUILDING_CREATED_COST):
+ *  a building `seat` creates in a city, built or bought, grants its owner
+ *  Culture of the city's m_aYieldPerBuildingComplete percent — each
+ *  suzerainty's `AYUTTHAYA_BUILDING_CULTURE_PCT` summed — of the building's
+ *  Cost at the speed, in the 24.8 fixed point truncated; a lump on the civic
+ *  in hand (GrantYield, `researchLump`). A wonder is not a building here
+ *  (IncludeWonder false). (The building's completion 0x17f870: the percent
+ *  0x17cc00 x the cost 0x5254d0, / 25600, into GrantYield 0x468540.) */
+export function buildingCreatedCulture(state: GameState, seat: number, buildingId: string): void {
+  const n = suzerainEffectCount(state, seat, 'buildingCostCulture');
+  if (n === 0) return;
+  const cost = effectiveBuilding(civOf(state, seat), buildingId)?.cost ?? 0;
+  const fx = Math.trunc((AYUTTHAYA_BUILDING_CULTURE_PCT * n * cost * 256) / 100);
+  if (fx > 0) researchLump(state, seat, fx / 256, true);
 }
 
 /** CIV6 (Johannesburg): a city's Production per distinct resource its owner

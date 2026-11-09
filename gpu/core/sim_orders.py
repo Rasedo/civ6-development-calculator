@@ -1493,6 +1493,17 @@ class SimOrders:
                                 self.unit_promo_used[pb, sc[pb]] = torch.where(
                                     _gv > 0, _gu, self.unit_promo_used[pb, sc[pb]])
                                 self.civ_treasury[pb, row] += _gv.to(self.civ_treasury.dtype)
+                                # CIV6 (Fez, EFFECT_ADJUST_UNIT_INITIATION_YIELD
+                                # _POPULATION): Science per citizen of the city
+                                # converted, a lump on the technology in hand
+                                if self._suz_c_conv_sci >= 0 and row < self.n_majors:
+                                    _fz = self._suz_effect_count(row, self._suz_c_conv_sci)[pb]
+                                    _fs = _flip & (_fz > 0)
+                                    if bool(_fs.count_nonzero()):
+                                        _amt = torch.zeros(B, dtype=self.civ_tech_prog.dtype, device=self.device)
+                                        _amt[pb[_fs]] = (self._suz_conv_sci * _fz[_fs]
+                                                         * self.city_pop[pb[_fs], pr[_fs], pj[_fs]]).to(_amt.dtype)
+                                        self._research_lump(row, _amt, False)
                         landed = pm.reshape(B, -1).any(dim=1)
                         _mt = torch.zeros(B, dtype=torch.bool, device=self.device)
                         _mt[pb[pr >= self.n_majors]] = True

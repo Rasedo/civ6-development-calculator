@@ -73,9 +73,11 @@
   final: 0x1508e0
   kind: function
   status: PARTLY
+  impl: [cpu/core/eras.ts:unitKillEvent, cpu/core/eras.ts:wcls]
   readings:
     - "C-98: a lump of Science or Culture completes the item in hand — READ (0x4c8e60, 0x4c8ea0, 0x3938e0, 0x393670), both twins"
     - "C-101: the owner's religion percent is Scripture's, a religion swing walks every player's cities — READ, both twins"
+    - "C-117: the suzerain bonuses of Ayutthaya, Fez and Wolin; the Tsikhe's Conservation Tourism — READ (0xb0e380, 0xb0ee40, 0xc70830, 0x17f870; 0x1fce20), PARTLY READ (Fez's list on the unit), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...60 / 0x3938e0: GrantYield 0x468540, the harvest 0x95fbf0, 0x93ec40, 0x536480, 0x1fc390, 0x1fce20."

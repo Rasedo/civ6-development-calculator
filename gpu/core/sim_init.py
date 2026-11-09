@@ -712,6 +712,16 @@ class SimInit:
         # Lisbon: its suzerain's Traders immune to plunder on water (`traderImmune`)
         self._suz_c_sea_trader = _sfx.index("seaTraderImmune") if "seaTraderImmune" in _sfx else -1
         self._suz_free_strat = int(_suz["freeStrategic"])
+        # Ayutthaya: a created building's Cost percent as Culture
+        # (`buildingCreatedCulture`); Fez: Science per citizen of a city its
+        # religious unit converts; Wolin: a defeated unit's strength percent
+        # as kill points (`unitKillEvent`)
+        self._suz_c_bldg_cul = _sfx.index("buildingCostCulture") if "buildingCostCulture" in _sfx else -1
+        self._suz_bldg_cul_pct = int(_suz["buildingCulturePct"])
+        self._suz_c_conv_sci = _sfx.index("conversionScience") if "conversionScience" in _sfx else -1
+        self._suz_conv_sci = int(_suz["conversionScience"])
+        self._suz_c_kill_gp = _sfx.index("killStrengthGpp") if "killStrengthGpp" in _sfx else -1
+        self._suz_kill_gp_pct = int(_suz["killGpPct"])
         # Brussels: percent toward wonders (`suzerainWonderPct`)
         self._suz_c_wonder_prod = _sfx.index("wonderProduction") if "wonderProduction" in _sfx else -1
         self._suz_wonder_pct = float(_suz["wonderPct"])
@@ -4224,6 +4234,9 @@ class SimInit:
         # CIV6 (Thermal Bath): Tourism while the border holds a tile of one feature
         self._bvar_tour_with_feat = {(bi, c): (int(v["tourismWithFeature"][0]), int(v["tourismWithFeature"][1]))
                                      for bi, c, v in self._bvar_cols if int(v["tourismWithFeature"][0]) >= 0}
+        # CIV6 (Tsikhe): Tourism in a Golden Age once a civic is held
+        self._bvar_golden_civic_tour = {(bi, c): (int(v["goldenCivicTour"][0]), int(v["goldenCivicTour"][1]))
+                                        for bi, c, v in self._bvar_cols if int(v["goldenCivicTour"][0]) >= 0}
         # CIV6 (Film Studio): pct more of the city's tourism toward each civilization at or past an era
         self._bvar_late_tour = {(bi, c): (int(v["lateTourism"][0]), int(v["lateTourism"][1]))
                                 for bi, c, v in self._bvar_cols if int(v["lateTourism"][0]) != 0 and int(v["lateTourism"][1]) >= 0}
@@ -4713,6 +4726,9 @@ class SimInit:
             [list(x) + [-1] * (_gfw - len(x)) for x in _gf], dtype=torch.long, device=device)
         self._type_no_hill_cost = _uc("noHillCost", bool, torch.bool)
         self._type_alpine = _uc("alpine", bool, torch.bool)
+        # the Great Person class a Wolin ability earns kill points toward: 1
+        # the General's, 2 the Admiral's, 0 none (`wolinGpClass`)
+        self._type_wolin_gp = _uc("wolinGp")
         self._type_fionn = _uc("fionn", bool, torch.bool)
         self._type_no_woods_cost = _uc("noWoodsCost", bool, torch.bool)
         self._type_ignore_shores = _uc("ignoreShores", bool, torch.bool)

@@ -39,7 +39,7 @@ import { warWearinessLosses } from './weariness';
 import { ANTIQUITY_CIVIC, SHIPWRECK_CIVIC, cityGarrisons } from './units';
 import { floodBarrierScale } from './climate';
 import { droughtShielded } from '../data/disasters';
-import { DED_STEAM, DED_WISH, WISH_PARK_TOURISM_MULT, WISH_WONDER_TOURISM_NUM, WISH_WONDER_TOURISM_DEN } from '../data/seats';
+import { DED_STEAM, DED_WISH, WISH_PARK_TOURISM_MULT, WISH_WONDER_TOURISM_NUM, WISH_WONDER_TOURISM_DEN, AGE_GOLDEN } from '../data/seats';
 
 import { GP_ADJ_TOURISM_PCT, GP_BUILDING_TOURISM, GP_BUILDING_YIELDS, gpCityPermOf, gpPermOf, gpTilePermOf } from '../data/greatPeople';
 export interface CityStats {
@@ -1411,12 +1411,14 @@ export function gpDistrictTourism(state: GameState, seat: number, cities: readon
  *  CIV6 (Marae, MARAE_TOURISM_FEATURES; Thermal Bath, THERMALBATH_ADDTOURISM)
  *  per owned tile carrying a feature (EFFECT_ADJUST_CITY_TOURISM_PER_FEATURE
  *  names no passability) once Flight is held, or flat while the border holds
- *  a Geothermal Fissure. A dark building (its district or itself pillaged)
+ *  a Geothermal Fissure; the Tsikhe's Conservation Tourism in a Golden Age
+ *  (`goldenAgeCivicTourism`). A dark building (its district or itself pillaged)
  *  pays nothing. */
 export function buildingTourism(state: GameState, seat: number, cities: readonly City[]): number {
   const civ = civOf(state, seat);
   const techs = seatOf(state, seat)?.research.techs ?? [];
   const civics = seatOf(state, seat)?.research.civics ?? [];
+  const golden = (seatOf(state, seat)?.age ?? 1) === AGE_GOLDEN;
   let t = 0;
   for (const c of cities) {
     const dark = darkBuildings(state.map, c);
@@ -1427,6 +1429,8 @@ export function buildingTourism(state: GameState, seat: number, cities: readonly
       if (ct && civics.includes(ct.civic)) t += ct.amount;
       const bv = buildingVariantFor(civ, id);
       if (!bv) continue;
+      const gt = bv.goldenAgeCivicTourism;
+      if (gt && golden && civics.includes(gt.civic)) t += gt.amount;
       const pf = bv.tourismPerFeature;
       if (pf && (!pf.tech || techs.includes(pf.tech))) {
         let n = 0;

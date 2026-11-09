@@ -6,6 +6,9 @@ import { allCities } from './seats';
 import { SPREAD_STRENGTH_PCT, followedReligionOf, unconvertedOf } from '../data/religion';
 import { UNITS } from '../data/units';
 import { promoFirstUse, promoValue } from './promotions';
+import { suzerainEffectCount } from './cityStates';
+import { researchLump } from './phase';
+import { FEZ_CONVERSION_SCIENCE } from '../data/cityStates';
 
 export function snipeRing(state: GameState, here: Tile): number[] {
   const nb1 = neighbors(state.map, here).filter((t): t is Tile => !!t);
@@ -65,6 +68,11 @@ export function spreadFromUnit(state: GameState, unit: Unit, actor: Seat, toTile
   if (followedReligionOf(pres, target.population, unconvertedOf(target)) === actor.seat && wasFollowed !== actor.seat) {
     const gold = promoFirstUse(unit, 'INDULGENCE');
     if (gold > 0) actor.treasury = (actor.treasury ?? 0) + gold;
+    // CIV6 (Fez, EFFECT_ADJUST_UNIT_INITIATION_YIELD_POPULATION): the
+    // suzerain's religious unit converting a city earns Science per citizen
+    // of it, a lump on the technology in hand (GrantYield)
+    const fez = suzerainEffectCount(state, actor.seat, 'conversionScience');
+    if (fez > 0) researchLump(state, actor.seat, FEZ_CONVERSION_SCIENCE * fez * target.population, false);
   }
   if (tcs) questReligion(state);
   unit.movesLeft = 0;

@@ -315,6 +315,15 @@
     - "C-60: the Free City's grant"
     - "C-111: a captured city keeps its completed districts' locked prices and no progress by type; a district's repair is its city's queue; a unit's pillage takes the district's dearest building first — READ (0x1e8880, 0x173f70 at 0x17480e, 0x967300 / 0x967740, 0x9633c0 -> 0x24af90 -> 0x193190), both twins"
   review: reviewed
+- addr: 0x174f10
+  final: 0xfae30
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-117: the suzerain bonuses of Ayutthaya, Fez and Wolin; the Tsikhe's Conservation Tourism — READ (0xb0e380, 0xb0ee40, 0xc70830, 0x17f870; 0x1fce20), PARTLY READ (Fez's list on the unit), both twins"
+  context:
+    - "...0f8e0 subtracts it. The building's completion 0x17f870 (called from the construct order 0x174f10, 0x175da0 and 0x180800) walks every yield: a wonder (building info +0x158 bit 0x40) r..."
+  review: imported
 - addr: 0x175140
   final: 0xfafe0
   kind: function
@@ -361,6 +370,7 @@
   readings:
     - "C-127: an idle city's store through the queue step (0x16f050), the build lab on it — READ (the engines unchanged)"
     - "C-111: every item's progress kept by type outside the queue, a pillaged building's or district's repair on the share its pillage left, a district's locked price on the district — READ (0x17f5a0, 0x175730 at 0x175bd3, 0x17d910, 0x175140, 0x1af5b0 -> 0x17e770 -> 0x183a60, 0x193190 -> 0x183950), both twins"
+    - "C-117: the suzerain bonuses of Ayutthaya, Fez and Wolin; the Tsikhe's Conservation Tourism — READ (0xb0e380, 0xb0ee40, 0xc70830, 0x17f870; 0x1fce20), PARTLY READ (Fez's list on the unit), both twins"
   notes:
     - "no recording case read: no city-state building bought or granted with progress kept on it in runs/h1_duelv1128"
   context:
@@ -934,6 +944,19 @@
   context:
     - "...ld value with no player, discounted T, taken off. A feature the district does not keep (0x17cb00) and the Features row does not let it clear: 0; else the feature removal (0x7a3010). A..."
   review: reviewed
+- addr: 0x17cc00
+  kind: function
+  name: getYieldPerBuildingComplete
+  semantics: the city's m_aYieldPerBuildingComplete percent of a yield (data +0xe90, size +0xea0), read by the building's completion 0x17f870.
+  status: READ
+  cases:
+    - recording: h1_duelq1121
+      turn: 184
+      value: "China, suzerain of Ayutthaya: Bank and bought University +27 Culture"
+  impl:
+    - cpu/core/cityStates.ts:buildingCreatedCulture
+    - gpu/core/sim_seats.py:_building_created_culture
+  review: reviewed
 - addr: 0x17d050
   kind: function
   status: PARTLY
@@ -1174,9 +1197,11 @@
     - cpu/harness/checks.ts:wondersInStart
     - cpu/harness/checks.ts:startDraws
     - gpu/core/sim_seats.py:_wonder_free_tiles
+    - cpu/core/cityStates.ts:buildingCreatedCulture
   readings:
     - "H-1: every draw of a player's start (witnesses, RandCalls.csv)"
     - "H-1: a start's own event rows, the wonder's annex, the village a claim takes"
+    - "C-117: the suzerain bonuses of Ayutthaya, Fez and Wolin; the Tsikhe's Conservation Tourism — READ (0xb0e380, 0xb0ee40, 0xc70830, 0x17f870; 0x1fce20), PARTLY READ (Fez's list on the unit), both twins"
   context:
     - ...WONDER its production completes annexes WONDER_FREE_TILES_UPON_COMPLETION (2) plots (0x17f870, building info +0x158 bit 0x40, -> 0x1a8a30), one picker draw each, before the wonder's...
     - "- A wonder's annex (0x17f870 → AnnexPlots 0x1a8a30) fires its CityTileOwnershipChanged rows BEFORE the WonderComplet..."
@@ -1197,6 +1222,15 @@
   context:
     - "...he plot (0x1ae340) and sets it whole (0x1af5b0) without the new district's completion 0x180450 (`completeQueueItem`'s repair branch)."
   review: reviewed
+- addr: 0x180800
+  final: 0x101de0
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-117: the suzerain bonuses of Ayutthaya, Fez and Wolin; the Tsikhe's Conservation Tourism — READ (0xb0e380, 0xb0ee40, 0xc70830, 0x17f870; 0x1fce20), PARTLY READ (Fez's list on the unit), both twins"
+  context:
+    - "...uilding's completion 0x17f870 (called from the construct order 0x174f10, 0x175da0 and 0x180800) walks every yield: a wonder (building info +0x158 bit 0x40) reads the wonder array, an..."
+  review: imported
 - addr: 0x180cb0
   final: 0x1020b0
   kind: function

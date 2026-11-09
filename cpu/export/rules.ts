@@ -12,7 +12,7 @@ import { CONGRESS_CURRENCIES } from '../core/congress';
 import { BIOSPHERE_POWER_MULT, IMPROVEMENTS, SEASIDE_RESORT_MIN_APPEAL, PARK_MIN_APPEAL, PARK_AMENITIES_OWNER,
   PARK_AMENITIES_NEAR, PARK_AMENITY_CITIES } from '../data/improvements';
 import { questTables } from '../core/quests';
-import { ANTIQUITY_CIVIC, SHIPWRECK_CIVIC, RELIGIOUS_HEAL_PER_FAITH, unitIsMilitary, classLine, alpineChassis, fionnChassis } from '../core/units';
+import { ANTIQUITY_CIVIC, SHIPWRECK_CIVIC, RELIGIOUS_HEAL_PER_FAITH, unitIsMilitary, classLine, alpineChassis, fionnChassis, wolinGpClass } from '../core/units';
 import { METEOR_WEIGHT, METEOR_TERRAINS, METEOR_AVOIDS_TERRITORY, METEOR_GRANT_CLASS, FIRE_WEIGHT, FIRE_CIPD, FIRE_START_FEATURE, FIRE_BURNING_FEATURE, FIRE_BURNT_FEATURE, FIRE_BURNT_TURN, FIRE_REGROW_TURN, FIRE_SPREAD_P, FIRE_SPREAD_TURNS, FIRE_DAMAGE_TURNS, FIRE_POP_TURN, FIRE_DMG, FIRE_APPEAL } from '../data/disasters';
 import { NUCLEAR_DEVICES, FALLOUT_DAMAGE, NUKE_ROBOT_DAMAGE, NUKE_COVER_RANGE, FALLOUT_CLEAN_CHARGES, NUKE_CARRIERS, NUKE_AA_SUPPORT, NUKE_AA_WOUND, NUKE_SILO_DEFENSE, NUKE_SUB_DEFENSE, NUKE_INTERCEPT_DAMAGE } from '../data/nuclear';
 import type { PlunderRow, ImprovementId } from '../core/types';
@@ -21,7 +21,7 @@ import { GENERAL_AURA_CS, GENERAL_AURA_RANGE } from '../core/aura';
 import { GENERAL_AURA_MP } from '../core/aura';
 import { CARDIFF_HARBOR_POWER, VALLETTA_WALLS_DISCOUNT_PCT } from '../data/cityStates';
 import { MOUNTIE_PARK_RANGE } from '../core/combat';
-import { SUZ_EFFECTS, KABUL_XP_MULT, PRESLAV_BUILDING_LOYALTY, REGIONAL_REACH_BONUS, ANSHAN_WRITING_SCIENCE, ANSHAN_RELIC_SCIENCE, KUMASI_ROUTE_CULTURE, KUMASI_ROUTE_GOLD, GENEVA_SCIENCE_PCT, ANTANANARIVO_GP_CULTURE_PCT, ANTANANARIVO_GP_CULTURE_MAX, BOLOGNA_DISTRICT_GPP, BOLOGNA_GPP_BUILDING, NAN_MADOL_WATER_CULTURE, AMSTERDAM_DEST_LUXURY_GOLD, ZANZIBAR_LUXURIES, ZANZIBAR_LUXURY_AMENITIES, HUNZA_PATH_TILE_GOLD_FX, HONG_KONG_PROJECT_PCT, NGAZARGAMU_PURCHASE_PCT, MILITARISTIC_BUILDING_ROWS, BUENOS_AIRES_AMENITIES, AUCKLAND_PLOT_ROWS, JOHANNESBURG_RESOURCE_PROD, JOHANNESBURG_RESOURCE_PROD_LATE, JOHANNESBURG_LATE_TECH, MUSCAT_HUB_AMENITIES, MUSCAT_HUB_DISTRICT, KANDY_RELIC_FAITH_PCT, KANDY_WONDER_RELICS, SINGAPORE_PARTNER_PROD, BRUSSELS_WONDER_PCT, HATTUSA_FREE_STRATEGIC } from '../data/cityStates';
+import { SUZ_EFFECTS, KABUL_XP_MULT, PRESLAV_BUILDING_LOYALTY, REGIONAL_REACH_BONUS, ANSHAN_WRITING_SCIENCE, ANSHAN_RELIC_SCIENCE, KUMASI_ROUTE_CULTURE, KUMASI_ROUTE_GOLD, GENEVA_SCIENCE_PCT, ANTANANARIVO_GP_CULTURE_PCT, ANTANANARIVO_GP_CULTURE_MAX, BOLOGNA_DISTRICT_GPP, BOLOGNA_GPP_BUILDING, NAN_MADOL_WATER_CULTURE, AMSTERDAM_DEST_LUXURY_GOLD, ZANZIBAR_LUXURIES, ZANZIBAR_LUXURY_AMENITIES, HUNZA_PATH_TILE_GOLD_FX, HONG_KONG_PROJECT_PCT, NGAZARGAMU_PURCHASE_PCT, MILITARISTIC_BUILDING_ROWS, BUENOS_AIRES_AMENITIES, AUCKLAND_PLOT_ROWS, JOHANNESBURG_RESOURCE_PROD, JOHANNESBURG_RESOURCE_PROD_LATE, JOHANNESBURG_LATE_TECH, MUSCAT_HUB_AMENITIES, MUSCAT_HUB_DISTRICT, KANDY_RELIC_FAITH_PCT, KANDY_WONDER_RELICS, SINGAPORE_PARTNER_PROD, BRUSSELS_WONDER_PCT, HATTUSA_FREE_STRATEGIC, AYUTTHAYA_BUILDING_CULTURE_PCT, FEZ_CONVERSION_SCIENCE, WOLIN_GP_PCT } from '../data/cityStates';
 import { CITY_STATE_TYPES, govInfluence, CITY_STATE_ENVOY_ROWS, CITY_STATE_TYPE_YIELD, CITY_STATE_ROUTE_TO_OTHERS, CITY_STATE_TYPE_DISTRICT, CITY_STATE_ITEM_PROD, LEVY_TURNS, MINOR_REPAIR_RESUME_PCT, MINOR_PRODUCTION_PCT, MINOR_WALLS_PROD_PCT, MINOR_HARBOR_PROD_PCT, MINOR_TYPE_DISTRICT_PROD_PCT, MINOR_BUILDER_PROD_PCT, MINOR_MILITARY_PROD_PCT, MINOR_SMALL_MILITARY, MINOR_EXCLUDED_UNIT_CLASSES, MINOR_UPGRADE_GOLD, FIRST_MEET_ENVOYS, MINOR_CATCHUP_PCT } from '../data/cityStates';
 import { GP_ADJ_TOURISM_PCT, GP_BUILDING_TOURISM, GP_BUILDING_YIELDS, GP_CITY_FREE_EXTRACTION, GP_CITY_PERM, GP_FREE_EXTRACTION, GP_FX, GP_PERM, GP_TILE_PERM, GP_PER_ADJ_SOURCES, GP_RESOURCE_REVEAL, GP_SITES, GP_UNIT_PROD_CLASSES, GP_YIELD_KEYS, GW_WORK_CLASSES, gpChargesOf, gpEffectOf, gpNoMilitaryOf, gpSiteOf, type GreatPersonDef } from '../data/greatPeople';
 import { gpSiteArgOf } from '../core/targetSites';
@@ -1303,6 +1303,13 @@ export function buildRules() {
         wonderPct: BRUSSELS_WONDER_PCT,
         // Hattusa: per turn, of each strategic seen and improved nowhere
         freeStrategic: HATTUSA_FREE_STRATEGIC,
+        // Ayutthaya: percent of a created building's Cost paid as Culture
+        buildingCulturePct: AYUTTHAYA_BUILDING_CULTURE_PCT,
+        // Fez: Science per citizen of a city its religious unit converts
+        conversionScience: FEZ_CONVERSION_SCIENCE,
+        // Wolin: percent of a defeated unit's strength its killer earns as
+        // Great General / Admiral points
+        killGpPct: WOLIN_GP_PCT,
         // Auckland: [yield, amount, terrain, the seat's own era at least (-1
         // none)] on every plot of the suzerain
         shallowWaterRows: AUCKLAND_PLOT_ROWS.map((r) => [
@@ -2385,6 +2392,9 @@ export function buildRules() {
       groundFeat: (u.groundCS?.features ?? []).map((f) => FEAT_IDS.indexOf(f)),
       noHillCost: u.ignoresHillCost ? 1 : 0,
       alpine: alpineChassis(u.id) ? 1 : 0,
+      // the Great Person class a Wolin ability on the chassis earns kill
+      // points toward: 1 the General's, 2 the Admiral's, 0 none
+      wolinGp: wolinGpClass(u.id) === 'GENERAL' ? 1 : wolinGpClass(u.id) === 'ADMIRAL' ? 2 : 0,
       fionn: fionnChassis(u.id) ? 1 : 0,
       noWoodsCost: u.ignoresWoodsCost ? 1 : 0,
       ignoreShores: u.ignoresShores ? 1 : 0,
@@ -3021,6 +3031,8 @@ export function buildRules() {
         noGreatWorks: v.noGreatWorks ? 1 : 0,
         featureTileY: YIELD_KEYS.map((k) => v.featureTileYields?.[k] ?? 0),
         goldenAgeY: YIELD_KEYS.map((k) => v.goldenAgeYields?.[k] ?? 0),
+        goldenCivicTour: v.goldenAgeCivicTourism
+          ? [civicIdx.get(v.goldenAgeCivicTourism.civic) ?? -1, v.goldenAgeCivicTourism.amount] : [-1, 0],
         wallsHpBonus: v.wallsHpBonus ?? 0,
         amenityPerLuxuryType: v.amenityPerLuxuryType ?? 0,
         strategicPerType: v.strategicPerType ?? 0,

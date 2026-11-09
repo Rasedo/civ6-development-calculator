@@ -13241,3 +13241,66 @@ ACT_SENTRY), statecompare `activity`.
 - Open: a blow on a unit sets it AWAKE (UnitDamageChanged then AWAKE:
   runs/h1_duelq1124 t16-17 the barbarian Spearman 327684, SENTRY, struck,
   AWAKE), unported; HEAL, SLEEP and INTERCEPT never set by the engines.
+
+## C-117: the suzerain bonuses of Ayutthaya, Fez and Wolin; the Tsikhe's Conservation Tourism — READ (0xb0e380, 0xb0ee40, 0xc70830, 0x17f870; 0x1fce20), PARTLY READ (Fez's list on the unit), both twins
+
+- AYUTTHAYA (MINOR_CIV_AYUTTHAYA_CULTURE_COMPLETE_BUILDING,
+  EFFECT_GRANT_CITY_YIELD_PERCENT_BUILDING_CREATED_COST): the effect's
+  reader 0xb0e380 keeps YieldType (+0x8), BuildingProductionPercent (+0xc,
+  an integer) and IncludeWonder (+0x10); its apply 0xb0ee40 adds the
+  percent to the city's m_aYieldPerBuildingComplete (+0xe38, the setter
+  0xc70830) and, with IncludeWonder, m_aYieldPerWonderComplete (+0xeb0,
+  0xc70b50); the remove 0xb0f8e0 subtracts it. The building's completion
+  0x17f870 (called from the construct order 0x174f10, 0x175da0 and
+  0x180800) walks every yield: a wonder (building info +0x158 bit 0x40)
+  reads the wonder array, any other building the building array; the
+  amount is (percent << 8) x (0x5254d0(the row's Cost) << 8) / 25600, the
+  24.8 value of percent x Cost / 100 truncated, at the speed (65 -> 32),
+  granted through GrantYield 0x468540 (a lump on the civic in hand, which
+  completes it at its cost). Ported: `buildingCreatedCulture` /
+  `_building_created_culture` on a building newly created by production
+  (not a repair) or bought with Gold or Faith (a worship building
+  included); several suzerainties sum their percents. Confirmed on
+  runs/h1_duelq1121, China suzerain of Ayutthaya from t178: Shanghai's
+  bought Lighthouse +6 (t178), Xi'an's Bank and Taiyuan's bought
+  University +27 (t184: the replay's seat.culture 1047.953 for 1074.953
+  without, 3 of 3 with), Chengdu's Walls +4 (t206), Xi'an's Flood Barrier
+  +4 on its row's Cost 80, not the city's lowland price (t208), Xi'an's
+  Shipyard +14.5 (t212), Chengdu's bought Granary 3.199 (819/256, t213);
+  the Colossus (t182) and Big Ben (t203) pay nothing.
+- FEZ (MINOR_CIV_FEZ_INITIATION_SCIENCE_POPULATION,
+  EFFECT_ADJUST_UNIT_INITIATION_YIELD_POPULATION, Amount 20 Science): the
+  effect's apply 0xb015b0 adds (yield, amount) to a list on the unit's
+  religious component (+0x1c80, 0x5886f0). The spread operation 0x9692a0
+  grants the unit's single initiation yield (+0x1cf4 / +0x1cf8: the
+  Indulgence Vendor's) when the city's religion is the unit's after the
+  spread and was not before (0x1f3d50); the list's reader is unread. Ported
+  at that same moment (`spreadFromUnit` / its GPU twin): Science of 20 per
+  suzerainty x the converted city's population, unscaled, a lump on the
+  technology in hand. No recording seats Fez.
+- WOLIN (ABILITY_WOLIN_LAND_UNITS / _NAVAL_UNITS, WOLIN_GREAT_GENERAL_POINTS
+  / _ADMIRAL_POINTS, EFFECT_ADJUST_GREAT_PEOPLE_POINTS_PER_KILL_BY_DEFEATED
+  _STRENGTH Amount 25): the kill 0x1fce20, for every Great Person class,
+  reads the killer's flat points per kill (0x56db20) and then its percent
+  by defeated strength (0x56dbb0): percent x the victim's GetCombat
+  (0x56dc90) / 100 truncated, through the speed (0x5254d0), granted where
+  positive, the class not disabled (0x2f1ed0) and the victim's player a
+  major (FULL_CIV 0x469db0) or a minor (0x469de0). Ported in
+  `unitKillEvent` / `_unit_kill_event` (`wolinGpClass`, the abilities'
+  TypeTags as promotion classes: the land classes the General's, the
+  naval melee, ranged and raider the Admiral's). No recording seats Wolin.
+- THE TSIKHE (CONSERVATION_TSIKHE_TOURISM_GOLDEN_AGE, Expansion1
+  _Buildings_Major.xml): +3 Tourism on the City Center of a city holding
+  the Tsikhe, the seat in a Golden Age, from Conservation — an install row
+  (`goldenAgeCivicTourism`, `buildingTourism` / `_building_tourism`). No
+  recording plays Georgia.
+- C-38's two LAB cases read as no rule missing: 1121 Hunza's Craftsmanship
+  (NUM_IMPROVED_TILES 3) lands in turn 9 on its third Farm (230), 7 of 20,
+  in the head's replay (the city-states' detection after their layings);
+  1127 Mexico City's t22 Builder was bought at its quoted 105 Gold, its
+  Warrior clearing the camp on 6:8 the same turn (DispersalGold 50 at the
+  speed, +25: 104 + 4.5 - 105 + 25 = 28.5).
+- OPEN: the Nazca Line (IMPROVEMENT_NAZCA_LINE and its five
+  ImprovementModifiers on the owner's adjacent plots) is not ported; a
+  Great Person's or Trajan's granted building is not read as a creation
+  through 0x17f870; Fez's list reader on the unit.

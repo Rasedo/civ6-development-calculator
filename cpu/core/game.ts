@@ -19,7 +19,7 @@ import { barbarianPhase } from './tactical';
 import { cityLook } from './fog';
 import { disasterPhase } from './disasters';
 import { climateTurn, deriveLowlands, standingRemovable } from './climate';
-import { cityStateAt, minorCity, suzerainEffect, suzerainLandPurchaseOffPct } from './cityStates';
+import { buildingCreatedCulture, cityStateAt, minorCity, suzerainEffect, suzerainLandPurchaseOffPct } from './cityStates';
 import { minorPhase } from './minorBuild';
 import { seatPhase, freeCitiesPhase, healCities, worldCongress, emergencySessions, nextCityName } from './phase';
 import { congressCondemnFavor, congressUdtBlockedDistrict, congressUnitCostMult, CONGRESS_CUR_GOLD, CONGRESS_CUR_PRODUCTION } from './congress';
@@ -844,6 +844,7 @@ export function buyWorshipBuilding(state: GameState, cityId: number, seat: numbe
   if (!goldAffordable(buyer.faith ?? 0, cost)) return { ok: false, reason: `Not enough faith (${cost} needed).` };
   buyer.faith = (buyer.faith ?? 0) - cost;
   city.buildings.push(wid);
+  buildingCreatedCulture(state, seat, wid);
   stampBuildingEra(state, city, wid);
   dropQueuedBuilding(city, wid);
   return { ok: true };
@@ -870,6 +871,7 @@ export function purchaseBuildingWithFaith(state: GameState, cityId: number, buil
   if (!goldAffordable(buyer.faith ?? 0, cost)) return { ok: false, reason: `Not enough faith (${cost} needed).` };
   buyer.faith = (buyer.faith ?? 0) - cost;
   city.buildings.push(buildingId);
+  buildingCreatedCulture(state, city.seat, buildingId);
   stampBuildingEra(state, city, buildingId);
   dropQueuedBuilding(city, buildingId);
   buildingDedications(state, city.seat, buildingId);

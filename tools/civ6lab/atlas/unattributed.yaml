@@ -1180,6 +1180,15 @@
   context:
     - "...0x1f0020, +0x08 x (100 + +0xa8)% where +0xa8 > 0) is below its required power (+0x58, 0x1f02f0; the unpowered notification 0x1ee5c0 prints +0x58 against +0x30 plus the free power), h..."
   review: reviewed
+- addr: 0x1f3d50
+  final: 0x14a4b0
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-117: the suzerain bonuses of Ayutthaya, Fez and Wolin; the Tsikhe's Conservation Tourism — READ (0xb0e380, 0xb0ee40, 0xc70830, 0x17f870; 0x1fce20), PARTLY READ (Fez's list on the unit), both twins"
+  context:
+    - "...e Vendor's) when the city's religion is the unit's after the spread and was not before (0x1f3d50); the list's reader is unread. Ported at that same moment (`spreadFromUnit` / its GPU t..."
+  review: imported
 - addr: 0x1f6480
   final: 0x14b7f0
   kind: function
@@ -8468,6 +8477,14 @@
   context:
     - "...`m_aCurrentUnitCost`, an int); where c > 0, the row's +0x20 class does not read 2 through 0xadd5e0 (unread) and the player's +0x1048 equals the global at 0xf2f978 (the currency the resolut..."
   review: reviewed
+- addr: 0xb015b0
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-117: the suzerain bonuses of Ayutthaya, Fez and Wolin; the Tsikhe's Conservation Tourism — READ (0xb0e380, 0xb0ee40, 0xc70830, 0x17f870; 0x1fce20), PARTLY READ (Fez's list on the unit), both twins"
+  context:
+    - "...EFFECT_ADJUST_UNIT_INITIATION_YIELD_POPULATION, Amount 20 Science): the effect's apply 0xb015b0 adds (yield, amount) to a list on the unit's religious component (+0x1c80, 0x5886f0). T..."
+  review: imported
 - addr: 0xb028c0
   kind: function
   semantics: "REQUIREMENT unit in owner territory: returns 1 (unmet) where the unit's plot is null; its Inverse met."
@@ -8500,6 +8517,51 @@
   context:
     - "...m_iMaxMeleeStrengthTrained): 0x4c1a30, called as a unit is made (the city's 0x1e6570, 0xb02c60, 0xb67b30, 0xbd8be0, a hero 0x8ffac0) and the era's starting units (0x4580b0 through 0x..."
   review: reviewed
+- addr: 0xb0e380
+  final: 0x8a14a0
+  kind: function
+  name: ayutthayaEffectRead
+  semantics: "EFFECT_GRANT_CITY_YIELD_PERCENT_BUILDING_CREATED_COST's reader: YieldType +0x8, BuildingProductionPercent +0xc (integer), IncludeWonder +0x10."
+  status: READ
+  cases:
+    - recording: h1_duelq1121
+      turn: 184
+      value: "China, suzerain of Ayutthaya: Bank and bought University +27 Culture"
+  impl:
+    - cpu/data/cityStates.ts:AYUTTHAYA_BUILDING_CULTURE_PCT
+    - gpu/core/sim_init.py:_suz_bldg_cul_pct
+  readings:
+    - "C-117: the suzerain bonuses of Ayutthaya, Fez and Wolin; the Tsikhe's Conservation Tourism — READ (0xb0e380, 0xb0ee40, 0xc70830, 0x17f870; 0x1fce20), PARTLY READ (Fez's list on the unit), both twins"
+  context:
+    - "...e suzerain bonuses of Ayutthaya, Fez and Wolin; the Tsikhe's Conservation Tourism — READ (0xb0e380, 0xb0ee40, 0xc70830, 0x17f870; 0x1fce20), PARTLY READ (Fez's list on the unit), both twin..."
+    - "...BUILDING, EFFECT_GRANT_CITY_YIELD_PERCENT_BUILDING_CREATED_COST): the effect's reader 0xb0e380 keeps YieldType (+0x8), BuildingProductionPercent (+0xc, an integer) and IncludeWonder..."
+  review: reviewed
+- addr: 0xb0ee40
+  kind: function
+  name: ayutthayaEffectApply
+  semantics: "the effect's apply: the city's m_aYieldPerBuildingComplete +0xe38 (0xc70830) += the percent of the yield, and m_aYieldPerWonderComplete +0xeb0 (0xc70b50) with IncludeWonder."
+  status: READ
+  cases:
+    - recording: h1_duelq1121
+      turn: 184
+      value: "China, suzerain of Ayutthaya: Bank and bought University +27 Culture"
+  impl:
+    - cpu/core/cityStates.ts:buildingCreatedCulture
+    - gpu/core/sim_seats.py:_building_created_culture
+  readings:
+    - "C-117: the suzerain bonuses of Ayutthaya, Fez and Wolin; the Tsikhe's Conservation Tourism — READ (0xb0e380, 0xb0ee40, 0xc70830, 0x17f870; 0x1fce20), PARTLY READ (Fez's list on the unit), both twins"
+  context:
+    - "...bonuses of Ayutthaya, Fez and Wolin; the Tsikhe's Conservation Tourism — READ (0xb0e380, 0xb0ee40, 0xc70830, 0x17f870; 0x1fce20), PARTLY READ (Fez's list on the unit), both twins"
+    - ...0x8), BuildingProductionPercent (+0xc, an integer) and IncludeWonder (+0x10); its apply 0xb0ee40 adds the percent to the city's m_aYieldPerBuildingComplete (+0xe38, the setter 0xc708...
+  review: reviewed
+- addr: 0xb0f8e0
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-117: the suzerain bonuses of Ayutthaya, Fez and Wolin; the Tsikhe's Conservation Tourism — READ (0xb0e380, 0xb0ee40, 0xc70830, 0x17f870; 0x1fce20), PARTLY READ (Fez's list on the unit), both twins"
+  context:
+    - ...0830) and, with IncludeWonder, m_aYieldPerWonderComplete (+0xeb0, 0xc70b50); the remove 0xb0f8e0 subtracts it. The building's completion 0x17f870 (called from the construct order 0x174...
+  review: imported
 - addr: 0xb12d50
   kind: function
   semantics: "REQUIREMENT unit on home continent: returns 1 (unmet) where the unit's plot is null; its Inverse met."

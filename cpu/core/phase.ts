@@ -29,7 +29,7 @@ import { IMPROVEMENTS } from '../data/improvements';
 import { isSpaceProject } from '../data/projects';
 import { containmentBonus, sameReligionToken, getModifiers, makeYieldCtx, prodBoostPct, seatYieldMultPerSuzerain, unitUpkeep } from './effects';
 import { allRoadsLeadToRome, addTradeRoute, addCsTradeRoute, addIntlTradeRoute, cancelRoutesBetween, congressCancelBannedIntl, plunderTrader, tradeGraphTurn, tradeRouteExpiry, tradeRouteWalk } from './trade';
-import { addEnvoys, allianceSuzInfluence, cityStateById, declareWarOnCityState, envoysOf, hasMet, isSuzerain, minorCity, resolveSuzerains, sueForPeaceWithCityState, suzerainBuildingLoyalty, suzerainProjectMult, suzerainWonderPct, suzerainGpCultureMult, meetCityState } from './cityStates';
+import { addEnvoys, allianceSuzInfluence, cityStateById, declareWarOnCityState, envoysOf, hasMet, isSuzerain, minorCity, resolveSuzerains, sueForPeaceWithCityState, suzerainBuildingLoyalty, suzerainProjectMult, suzerainWonderPct, suzerainGpCultureMult, meetCityState, buildingCreatedCulture } from './cityStates';
 import { LEVY_TURNS, govInfluence } from '../data/cityStates';
 import { freeCityBuild, freeCombatDesire, freeKnowledge, minorBestOfClass, minorCatchUp, minorCompleteNow, minorOrdersHeld, minorResearch, trainableIn } from './minorBuild';
 import { researchUnitTurns } from './aiResearch';
@@ -1467,6 +1467,7 @@ export function buySeatBuilding(state: GameState, actor: Seat, civCity: City, id
   if (Math.round((actor.treasury ?? 0) * 1000) < Math.round((price + reserve) * 1000)) return false;
   actor.treasury = (actor.treasury ?? 0) - price;
   civCity.buildings.push(def.id);
+  buildingCreatedCulture(state, actor.seat, def.id);
   stampBuildingEra(state, civCity, def.id);
   dropQueuedBuilding(civCity, def.id);
   buildingDedications(state, civCity.seat, def.id);

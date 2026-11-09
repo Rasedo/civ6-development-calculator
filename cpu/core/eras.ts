@@ -8,11 +8,13 @@ import { UNITS } from '../data/units';
 import { DED_AUTOMATON, DED_DRACONES, DED_SKY, DED_STEAM, DED_TO_ARMS, SKY_EUREKAS } from '../data/seats';
 import { ERAS, TECHS } from '../data/techs';
 import { promoValue } from './promotions';
-import { spawnUnit } from './units';
+import { spawnUnit, wolinGpClass } from './units';
+import { suzerainEffect } from './cityStates';
+import { WOLIN_GP_PCT } from '../data/cityStates';
 import { BUILDINGS, BUILDING_ERA_INDEX, buildingVariantFor } from '../data/buildings';
 import { GW_HOLDERS } from '../data/greatWorks';
 import { INDUSTRIAL_ERA_INDEX } from '../data/techs';
-import { ROAD_TIER_ERA } from '../data/constants';
+import { ROAD_TIER_ERA, scaleByGameSpeed } from '../data/constants';
 import { hexDistance, tilesWithin } from '../../world/hex';
 import { naturalWonderAt } from '../../world/query';
 import { isExplored } from './fog';
@@ -400,6 +402,17 @@ export function unitKillEvent(
       }
       if (kd.generalPointsOnKill) {
         ks.gpp.GENERAL = (ks.gpp.GENERAL ?? 0) + kd.generalPointsOnKill;
+      }
+      // CIV6 (Wolin, EFFECT_ADJUST_GREAT_PEOPLE_POINTS_PER_KILL_BY_DEFEATED
+      // _STRENGTH): a suzerain's land / naval unit killing a major's or a
+      // minor's unit earns Great General / Admiral points of `WOLIN_GP_PCT`
+      // of the victim's Combat Strength, truncated, at the speed (the kill
+      // 0x1fce20: 0x56dbb0's percent x GetCombat / 100, through 0x5254d0)
+      const wcls = wolinGpClass(killer.type);
+      if (wcls && (isCiv(victim.seat) || isCityStateSeat(victim.seat))
+          && suzerainEffect(state, killerSeat, 'killStrengthGpp')) {
+        const pts = scaleByGameSpeed(Math.trunc((WOLIN_GP_PCT * (UNITS[victim.type]?.combat ?? 0)) / 100));
+        if (pts > 0) ks.gpp[wcls] = (ks.gpp[wcls] ?? 0) + pts;
       }
       // CIV6 (Rough Rider): Culture worth 50% of the defeated unit's strength,
       // "when on the capital's continent" — the killer's own tile decides.

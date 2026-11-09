@@ -28,6 +28,14 @@
   impl: [cpu/core/units.ts:odds]
   notes: ["imported: cited by the code, in no dll_readings section"]
   review: imported
+- addr: 0x5886f0
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-117: the suzerain bonuses of Ayutthaya, Fez and Wolin; the Tsikhe's Conservation Tourism — READ (0xb0e380, 0xb0ee40, 0xc70830, 0x17f870; 0x1fce20), PARTLY READ (Fez's list on the unit), both twins"
+  context:
+    - ...ply 0xb015b0 adds (yield, amount) to a list on the unit's religious component (+0x1c80, 0x5886f0). The spread operation 0x9692a0 grants the unit's single initiation yield (+0x1cf4 / +0...
+  review: imported
 - addr: 0x63fe30
   final: 0x425f00
   kind: function

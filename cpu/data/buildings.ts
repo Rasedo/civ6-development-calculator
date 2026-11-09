@@ -61,6 +61,11 @@ interface BuildingVariant {
   /** CIV6 (Tsikhe, TSIKHE_FAITH_GOLDEN_AGE): what the row pays ON TOP while
    *  its seat holds a Golden Age. */
   goldenAgeYields?: Partial<Yields>;
+  /** CIV6 (Tsikhe, CONSERVATION_TSIKHE_TOURISM_GOLDEN_AGE,
+   *  MODIFIER_PLAYER_DISTRICTS_ADJUST_TOURISM_CHANGE on the City Center of a
+   *  city holding the row, the seat in a Golden Age): Tourism once the seat
+   *  holds `civic` (`buildingTourism`). */
+  goldenAgeCivicTourism?: { civic: string; amount: number };
   /** CIV6 (Tsikhe, OuterDefenseHitPoints 200 against the Star Fort's 100):
    *  what the row adds to its city's outer-defense pool on top of its tier. */
   wallsHpBonus?: number;
@@ -997,6 +1002,7 @@ const rawList: Omit<BuildingDef, 'buyCost'>[] = [
       civ: 'GEORGIA', name: 'Tsikhe', cost: 260,
       yields: { faith: 4 }, goldenAgeYields: { faith: 4 },
       wallsHpBonus: 100,
+      goldenAgeCivicTourism: { civic: 'CONSERVATION', amount: 3 },
     }],
     civicTourism: { civic: 'CONSERVATION', amount: 3 },
     src: {
@@ -1012,6 +1018,8 @@ const rawList: Omit<BuildingDef, 'buyCost'>[] = [
       'civVariants.0.cost': xml('Buildings', 'BuildingType=BUILDING_TSIKHE', 'Cost', { scale: GAME_SPEED }),
       'civVariants.0.yields.faith': xml('Building_YieldChanges', 'BuildingType=BUILDING_TSIKHE&YieldType=YIELD_FAITH', 'YieldChange'),
       'civVariants.0.goldenAgeYields.faith': xml('ModifierArguments', 'ModifierId=TSIKHE_FAITH_GOLDEN_AGE&Name=Amount', 'Value'),
+      'civVariants.0.goldenAgeCivicTourism.civic': xml('CivicModifiers', 'CivicType=CIVIC_CONSERVATION&ModifierId=CONSERVATION_TSIKHE_TOURISM_GOLDEN_AGE', 'CivicType', { expect: 'CIVIC_CONSERVATION' }),
+      'civVariants.0.goldenAgeCivicTourism.amount': xml('ModifierArguments', 'ModifierId=CONSERVATION_TSIKHE_TOURISM_GOLDEN_AGE&Name=Amount', 'Value'),
       'civVariants.0.wallsHpBonus': { derived: 'the unique row\'s OuterDefenseHitPoints MINUS the row it replaces (200 - 100)', inputs: [xml('Buildings', 'BuildingType=BUILDING_TSIKHE', 'OuterDefenseHitPoints'), xml('Buildings', 'BuildingType=BUILDING_STAR_FORT', 'OuterDefenseHitPoints')] },
     },
   },

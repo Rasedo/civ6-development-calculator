@@ -51,6 +51,7 @@ import {
   ALPINE_CLASSES, ALPINE_FEATURE, FIONN_CLASSES, FIONN_FEATURE, BAND_VENUE_BIT, BAND_VENUE_DISTRICTS, CONCERT_SHARE_RANGE,
   ROCK_BAND_MAX_PROMOTIONS, UNIT_PROMO_CLASS,
 } from '../data/promotions';
+import { WOLIN_LAND_CLASSES, WOLIN_NAVAL_CLASSES } from '../data/cityStates';
 import { generalAuraMP } from './aura'; // the aura's +1 MP half
 import {
   attacksLeftOf, attacksPerTurn, drawPromoOffer, promoCount, promoFirstUse, promoFlag, promoReady,
@@ -1261,6 +1262,17 @@ export function stepCost(state: GameState, unit: { type: string; seat: number; p
 
 /** does ABILITY_ALPINE_TRAINING attach to this chassis (its TypeTags,
  *  `ALPINE_CLASSES`; a land chassis) */
+/** the Great Person class a Wolin ability on this chassis earns kill points
+ *  toward: the land ability's classes (`WOLIN_LAND_CLASSES`) the General's,
+ *  the naval one's (`WOLIN_NAVAL_CLASSES`) the Admiral's; null for neither */
+export function wolinGpClass(type: string): 'GENERAL' | 'ADMIRAL' | null {
+  const cls = UNIT_PROMO_CLASS[type];
+  if (!UNITS[type] || cls === undefined) return null;
+  if (WOLIN_NAVAL_CLASSES.includes(cls)) return 'ADMIRAL';
+  if (WOLIN_LAND_CLASSES.includes(cls)) return 'GENERAL';
+  return null;
+}
+
 export function alpineChassis(type: string): boolean {
   const def = UNITS[type];
   const cls = UNIT_PROMO_CLASS[type];

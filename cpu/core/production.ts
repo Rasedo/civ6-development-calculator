@@ -38,6 +38,7 @@ import { unitPromoRows, xpToNextLevel } from './promotions';
 import { applyLumpYield } from './economy';
 import { minorCatchUp } from './minorBuild';
 import { congressGppFactor } from './congress';
+import { buildingCreatedCulture } from './cityStates';
 import { BUILT_WONDERS, WONDER_ERA_INDEX } from '../data/builtWonders';
 import { randRange } from './rand';
 import { claimTile, drawBorderPlot } from './city';
@@ -575,7 +576,10 @@ export function completeQueueItem(
     case 'building':
       // `city.buildings` is a SET — every reader tests it with `includes`,
       // and the GPU carries it as one bit per building.
-      if (!city.buildings.includes(item.building)) city.buildings.push(item.building);
+      if (!city.buildings.includes(item.building)) {
+        city.buildings.push(item.building);
+        buildingCreatedCulture(state, city.seat, item.building);
+      }
       repairBuilding(city, item.building); // a held building's column completing is its REPAIR
       stampBuildingEra(state, city, item.building);
       buildingDedications(state, city.seat, item.building);
