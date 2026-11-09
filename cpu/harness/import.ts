@@ -3485,13 +3485,39 @@ function importTradeRoutes(rec: TurnRecord, state: GameState, cityByKey: Map<str
     else history?.routeCourse.set(routeKey(r), [...(route.course ?? [])]);
     const trail = history?.trail.get(routeKey(r));
     if (trail) route.course = trailCourse(state, owner.seat, route.course ?? [], trail);
+    // a route the first record carrying it shows began in the turn before
+    // (Game_TradeManager's Route Started: runs/h1_duelq1121 Shanghai -> Xi'an
+    // started t182, first in record 183)
     const seen = history?.routeSeen.get(routeKey(r));
-    if (seen !== undefined) route.createdTurn = seen;
+    if (seen !== undefined) route.createdTurn = seen - 1;
+    routeWalkOfRecord(rec, r, route, trail);
     (owner.tradeRoutes ??= []).push(route);
     setTradeEdge(state, routeOriginCenter(state, owner as Seat, route), routeDestCenter(state, owner as Seat, route), route.course ?? []);
     out.push({ owner: owner.seat, route, game: r });
   }
   return out;
+}
+
+/** A record route's walk: its Trader's plot of the course (`walkTile`) and
+ *  its leg (`walkLeg`), out unless the Trader stands on the destination or
+ *  came to its plot from one further along the course (its `trail`, the
+ *  plots the records found it on). The engine's walk steps it from there
+ *  and its round-trip expiry ends it home (runs/h1_duelq1121 Shanghai ->
+ *  Xi'an's Trader on 11:9 in record 213, home on 12:9 and the route ended
+ *  in t213). A Trader off the course leaves the route unwalked. */
+function routeWalkOfRecord(rec: TurnRecord, r: Record<string, number>, route: TradeRoute, trail: number[] | undefined): void {
+  const course = route.course ?? [];
+  const u = rec.units.find((x) => x.owner === r.TraderUnitPlayer && x.id === r.TraderUnitID);
+  if (!u || course.length < 2) return;
+  const W = rec.map[0]?.length ?? 0;
+  const at = u.y * W + u.x;
+  const i = course.indexOf(at);
+  if (i < 0) return;
+  const seen = (trail ?? []).filter((x, k, xs) => k === 0 || xs[k - 1] !== x);
+  if (seen[seen.length - 1] !== at) seen.push(at);
+  const prev = seen.length > 1 ? course.indexOf(seen[seen.length - 2]) : -1;
+  route.walkTile = at;
+  route.walkLeg = i === course.length - 1 || (i > 0 && prev > i) ? 1 : 0;
 }
 
 /** A first leg as a course: the origin, then the plots its Trader stood on

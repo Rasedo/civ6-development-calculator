@@ -32,7 +32,7 @@ import { isSpaceProject } from '../data/projects';
 import { DED_FREE_INQUIRY } from '../data/seats';
 import { dedicationEvent } from './eras';
 import { randRange } from './rand';
-import { spawnUnit, disbandUnit, bestUnlockedOfClass, unitFullMoves, unitsAt, unitStackSlot } from './units';
+import { spawnUnit, disbandUnit, bestUnlockedOfClass, unitFullMoves, unitsAt, unitStackSlot, raiseBestTrained } from './units';
 import { lookAgain } from './fog';
 import { fitEncampOuter, repairDrip, urbanDefensesFit, wallsMax } from './rules';
 import { BUILDINGS } from '../data/buildings';
@@ -452,6 +452,11 @@ export function activateGreatPerson(state: GameState, unit: Unit): boolean {
   // `far` probe).
   if (fx.unit && UNITS[fx.unit]) {
     const made = spawnUnit(state, grantedChassis(state, unit.seat, fx.unit), unit.tileIndex, unit.seat, 'far');
+    // the grant (EFFECT_GRANT_UNIT_WITH_EXPERIENCE, 0xbd8be0) makes its unit
+    // through 0x4c1a30, raising the seat's best strengths (runs/h1_duelq1121
+    // t140: Yi Sun-sin's Ironclad, China's best melee 50 -> 70, its centres
+    // +20)
+    if (made) raiseBestTrained(state, unit.seat, made.type, made.formation ?? 0);
     if (made && fx.unitPromotions) {
       made.xp = xpToNextLevel(made);
       logXpWrite(state, made, 'gf');

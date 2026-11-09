@@ -13021,3 +13021,48 @@ outside the player's cleanness).
   units the game's does not (embarked land units among them: runs/h1_duelq1121
   t124 / t210, player 0's embarked Warriors' 20 / 15) and districts' strikes
   differ by small amounts (runs/h1_duelq1128 t44-54 player 1's Xi'an).
+
+## C-111 / C-108: a route the records carry walks home and ends there, a Great Person's granted unit raises the best strengths, a major's wonder contract cancelled — READ (0x552bc0, 0xbd8be0 -> 0x4c1a30, 0x5d7e00), both twins
+
+- A ROUTE'S END (0x552bc0, ported as `tradeRouteMinDuration` /
+  `tradeRouteExpiry`): a route ends where its Trader comes home with the
+  turn at its start plus the term the game era gives at the check. Every
+  Route Ended (Expired) row of the five duelq Game_TradeManager logs lands on
+  a turn the records find its Trader on the origin centre, and each earlier
+  home arrival falls short of the term. A route begun in turn S is first
+  carried by record S + 1. The importer (`importTradeRoutes`,
+  `routeWalkOfRecord`) gives a record's route its start S (the first record
+  carrying it less one) and its walk: the Trader's plot of the course and
+  its leg (in from the destination, or from a plot further along the
+  course), so a route imported or taken by the replay from the record walks
+  home and ends in the engines' expiry. The engines' rule is unchanged.
+- Confirmed (one-seed traces): runs/h1_duelq1121 Shanghai -> Xi'an (Trader
+  5767183, begun t182) ends at t213 with the Trader home on 12:9, Shanghai's
+  city.yields 0 misses t212-214 (5 Food / 5 Production / 1 Science over
+  before); Hunza -> Shanghai ends t212 and is re-sent t213 by the minor's
+  pick; runs/h1_duelq1124 from t138: Cardiff -> Shenyang (S114) and Bologna
+  -> Shanghai (S118) end at t143, Granada -> Shanghai (S118) at t141, each
+  re-sent the next turn.
+- A GREAT PERSON'S GRANTED UNIT (EFFECT_GRANT_UNIT_WITH_EXPERIENCE 0xbd8be0
+  -> 0x4c1a30): the unit made raises the player's best melee (and ranged)
+  trained to its Combat as made (`activateGreatPerson` ->
+  `raiseBestTrained`; `_gp_unit_grants` -> `_raise_best_trained`).
+  Confirmed: runs/h1_duelq1121 t140 Yi Sun-sin's Ironclad, China's
+  m_iMaxMeleeStrengthTrained 50 -> 70, Xi'an / Taiyuan / Shanghai defense
+  80 / 72 / 70 (read.city.defense 0 misses t141-143 from t134); 1127 t202 an
+  Ironclad 65 -> 70; 1117 t88 a Galley 25 -> 30; the grants below the best
+  (1124 t179 Battleship, t207 Submarine, t230 Spec Ops; Warrior Monks) move
+  nothing.
+- A MAJOR'S WONDER CONTRACT CANCELLED (the in-hand check 0x5d7e00, from the
+  city update 0x5ce680 in the player's AI turn 0x5c2650): CANCELLED is the
+  contract's eligibility failing (vt +0x98: the city's threat for a
+  non-defensive item, the contract's turn limit, CanConstruct), the
+  production cleared (0x17f830) at the city update ahead of the queue's
+  step. runs/h1_duelq1128 t22 Xi'an's Stonehenge (contract 46) is this, a
+  major's AI decision: the replay imposes China's queue and the engines
+  match the store (city.production 0 misses t20-24); the Great Bath t35
+  under barbarian 2490396 stayed eligible. Nothing ported.
+- Open: which of the eligibility terms failed for Stonehenge (the major's
+  city threat unread in its memory); 0xb67b30 / 0xb02c60 (the other grant
+  effects calling 0x4c1a30: GRANT_UNITS_IN_DISTRICTS, a free unit) unwired
+  for Tupac Amaru's and Hanno's grants, no recorded case.

@@ -2035,7 +2035,9 @@ export function formationTierFor(state: GameState, seat: number, unitType: strin
  *  Corps' or Army's formation strength included — rises to it and never falls
  *  (`Seat.bestMeleeCS`, the base its centres stand on). The live game raised
  *  the base at the purchase in every city at once and kept it after the unit
- *  died; a unit merely created, granted, captured or only buildable moved
+ *  died; a Great Person's granted unit raises it too (`activateGreatPerson`,
+ *  0xbd8be0 -> 0x4c1a30: runs/h1_duelq1121 t140 Yi Sun-sin's Ironclad, 50 ->
+ *  70); a unit merely created, captured or only buildable moved
  *  nothing (runs/b95t_p1_mech_bought_20260927.jsonl,
  *  runs/b95t_p0_mech_buy_del_20260927T003125Z.jsonl,
  *  runs/b95t_p1_mech_create_del_20260927T002833Z.jsonl,

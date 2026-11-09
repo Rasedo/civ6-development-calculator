@@ -861,6 +861,9 @@ class SimGp:
                 if not bool(hit.count_nonzero()) or not (0 <= u < self.NU):
                     continue
                 born = self._spawn_unit(row, hit, hc, u, far=True)
+                # the grant (EFFECT_GRANT_UNIT_WITH_EXPERIENCE, 0xbd8be0) makes
+                # its unit through 0x4c1a30, raising the best strengths
+                self._raise_best_trained(row, born, u)
                 if bool((born & _xp).count_nonzero()):
                     self._gp_fill_xp(row, born & _xp)
         # CIV6 (Hanno the Navigator): the strongest unlocked chassis of the

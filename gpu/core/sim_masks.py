@@ -3855,8 +3855,9 @@ class SimMasks:
         the tier it was made at) rises to it and never falls (`civ_best_melee`,
         a minor's `citystate_best_melee`, the Free Cities' `free_best_melee`),
         read at once by every centre's base but the Free Cities' (their own
-        flat one). A unit created, granted or captured, an aircraft and a merge
-        move nothing (runs/b95t_p1_mech_bought_20260927.jsonl,
+        flat one), a Great Person's granted unit too (0xbd8be0 -> 0x4c1a30,
+        runs/h1_duelq1121 t140). A unit created or captured, an aircraft and a
+        merge move nothing (runs/b95t_p1_mech_bought_20260927.jsonl,
         runs/b95t_p1_mech_create_keep_20260927T002928Z.jsonl,
         runs/h1_duelw1107 t176 and t229); the Free Cities keep no best Ranged
         Strength."""

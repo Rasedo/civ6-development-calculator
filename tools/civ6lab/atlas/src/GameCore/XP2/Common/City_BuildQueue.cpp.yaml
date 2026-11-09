@@ -1137,6 +1137,16 @@
     - "C-111: a major's district lets go of the queue under a hostile unit, the queue's progress and overflow read from the city's memory — READ (0x184660 at 0x1847dc, 0x5313f0, 0x17f630), both twins"
     - "C-111: every item's progress kept by type outside the queue, a pillaged building's or district's repair on the share its pillage left, a district's locked price on the district — READ (0x17f5a0, 0x175730 at 0x175bd3, 0x17d910, 0x175140, 0x1af5b0 -> 0x17e770 -> 0x183a60, 0x193190 -> 0x183950), both twins"
   review: reviewed
+- addr: 0x17f830
+  final: 0x1014c0
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-111 / C-108: a route the records carry walks home and ends there, a Great Person's granted unit raises the best strengths, a major's wonder contract cancelled — READ (0x552bc0, 0xbd8be0 -> 0x4c1a30, 0x5d7e00), both twins"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - ...non-defensive item, the contract's turn limit, CanConstruct), the production cleared (0x17f830) at the city update ahead of the queue's step. runs/h1_duelq1128 t22 Xi'an's Stonehenge...
+  review: imported
 - addr: 0x17f870
   final: 0x101500
   kind: function
