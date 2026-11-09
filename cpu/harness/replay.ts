@@ -90,6 +90,8 @@ import { CITY_MAX_HP, UNITS, UNIT_HP } from '../data/units';
 import { CAMP_DISPERSAL_GOLD, MP_SCALE, scaleByGameSpeed } from '../data/constants';
 import { PROMOTE_HEAL, aiPromotionPick, attacksPerTurn, promoCount, takePromotion, unitPromoRows } from '../core/promotions';
 import { fireFeature } from '../data/disasters';
+import { districtBuildingsAt } from '../core/disasters';
+import { repairBuilding } from '../core/yields';
 import { civicAgendas, setupAgendas } from '../core/agendas';
 import { AI_STRATEGIES } from '../core/aiWeights';
 import { holdMinorOrders, holdMinorRoutePick, holdMinorStart, minorCombatDesire, minorResearch, minorSetItem, minorBuildFacts, minorKnowledge, minorKnownUnits, minorItemCost, minorItemInHand, minorItemKey, minorBuildingPrice, minorRaiseBuilding, minorUnitPrice, minorUpgradeUnit, minorUpgradeVisible, techContractsCompleted, traceMinorLays, traceMinorPolicyScores, traceMinorPurchases } from '../core/minorBuild';
@@ -291,7 +293,7 @@ interface Ctx {
   barbSteps: { u: Unit; plots: number[] }[];
   /** the plots the record's barbarian pillages of the pair wrecked, and what
    *  each held before (improvement, district) */
-  barbPillaged: { plot: number; was: [boolean, boolean] }[];
+  barbPillaged: { plot: number; was: [boolean, boolean]; fell?: string }[];
   /** the other players' envoys this pair staged for the engine's turn (`stageEnvoys`) */
   envoys: EnvoyDecision[];
   /** the record's units (`owner:id`) a battle of this pair the engine fought */
@@ -1146,9 +1148,11 @@ function barbarianAi(ctx: Ctx, b: TurnRecord, closing: number, before: ReadonlyS
   }
   // the plots stand as the barbarians' turn opens: their pillages of the
   // turn, which the record's actions landed, not yet made
-  for (const { plot, was } of ctx.barbPillaged.splice(0)) {
+  for (const { plot, was, fell } of ctx.barbPillaged.splice(0)) {
     copy.map.tiles[plot].pillaged = was[0];
     copy.map.tiles[plot].districtPillaged = was[1];
+    const held = fell !== undefined ? districtBuildingsAt(copy, copy.map.tiles[plot]) : undefined;
+    if (held && fell !== undefined) repairBuilding(held, fell);
   }
   // the turn's captures are the record's, landed on the state with its
   // battles: one whose captor an operation holds starts its operation once
@@ -4106,14 +4110,18 @@ const res = buyTile(state, city.id, d.plot, seat);        if (!res.ok) setTileOw
         const t = state.map.tiles[d.plot];
         if (!u) { count(ctx, 'pillage', 'refused', d.player, 'a unit the replay does not hold'); break; }
         const was = [!!t.pillaged, !!t.districtPillaged];
+        // a district's building the pillage takes first (`pillageTopBuilding`)
+        const held = districtBuildingsAt(state, t);
+        const pb = new Set(held?.pillagedBuildings ?? []);
         u.tileIndex = d.plot;
         const actor = u.seat < state.seats.length ? seatOf(state, u.seat) as Seat | undefined : undefined;
         if (actor) {
           u.movesLeft = Math.max(u.movesLeft, grantedMoves(state, u));
           applySeatUnitOrders(state, actor, [unitsOf(state, u.seat).map((x) => (x === u ? A_PILLAGE : -1))]);
         } else hostilePillage(state, u);
-        const done = (!!t.pillaged && !was[0]) || (!!t.districtPillaged && !was[1]);
-        if (done && isBarbSeat(u.seat)) ctx.barbPillaged.push({ plot: d.plot, was: [was[0], was[1]] });
+        const fell = (held?.pillagedBuildings ?? []).find((b) => !pb.has(b));
+        const done = (!!t.pillaged && !was[0]) || (!!t.districtPillaged && !was[1]) || fell !== undefined;
+        if (done && isBarbSeat(u.seat)) ctx.barbPillaged.push({ plot: d.plot, was: [was[0], was[1]], fell });
         count(ctx, 'pillage', done ? 'applied' : 'refused', d.player, done ? undefined : 'the engine wrecked nothing');
         break;
       }

@@ -4851,14 +4851,14 @@ class SimMasks:
             & ~self.feat_stripped.gather(1, tc)
             & ~self._congress_chop(self.feat_id.gather(1, tc))[0]
         ).unsqueeze(2)
-        # REPAIR (the TS applier's REPAIR arm): a builder on an OWN tile whose improvement
-        # or district is pillaged, and no drought holding its improvement
-        # (`droughtBars`). No charge is spent — the turn is.
+        # REPAIR (the TS applier's REPAIR arm): a builder on an OWN tile whose
+        # improvement is pillaged (Unit_Operations_Repair 0x967300), and no
+        # drought holding it (`droughtBars`). No charge is spent — the turn is.
         repair = (
             present
             & ((utype == self._builder_idx) if self._builder_idx >= 0 else torch.zeros_like(present))
             & own_tile.gather(1, tc)
-            & (self.pillaged.gather(1, tc) | self.district_pillaged.gather(1, tc))
+            & self.pillaged.gather(1, tc)
             & ~self._drought_barred().gather(1, tc)
         ).unsqueeze(2)
         # THE MILITARY ENGINEER'S GROUND (`engineerTileOk`): the WIDEST its

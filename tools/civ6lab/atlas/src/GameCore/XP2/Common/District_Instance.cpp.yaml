@@ -281,8 +281,15 @@
   kind: function
   semantics: "the district's building to pillage: nothing on a pillaged district or an InternalOnly one (Districts +0xe1 bit 4); otherwise over the city's buildings in that district not yet pillaged, the first with a strictly greater Buildings.Cost (+0x24)."
   status: PARTLY
-  impl: [cpu/core/disasters.ts:pillageTileBuildings, gpu/core/sim_economy.py:_pillage_tile_buildings]
-  readings: ["C-74: BUILDING_PILLAGED's building — CLOSED"]
+  impl:
+    - cpu/core/disasters.ts:pillageTileBuildings
+    - gpu/core/sim_economy.py:_pillage_tile_buildings
+    - cpu/core/disasters.ts:topStandingBuilding
+    - cpu/core/disasters.ts:pillageTopBuilding
+    - gpu/core/sim_economy.py:_pillage_held
+  readings:
+    - "C-74: BUILDING_PILLAGED's building — CLOSED"
+    - "C-111: a captured city keeps its completed districts' locked prices and no progress by type; a district's repair is its city's queue; a unit's pillage takes the district's dearest building first — READ (0x1e8880, 0x173f70 at 0x17480e, 0x967300 / 0x967740, 0x9633c0 -> 0x24af90 -> 0x193190), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "The applier 0x33a780 (owned plot, the district's city) asks the district's chooser 0x24af90: nothing on a pillaged district or an InternalOnly one (Districts +0xe1 bit 4: the City C..."
@@ -425,6 +432,16 @@
   context:
     - "...0x28] that dis.sh dropped —, the move 0x80f4a0) logged \"From, Goal:, Move\"; encircled (0x24bf70) the ranged members strike \"Operation Siege City Attack\". PILLAGE (0x811390): Pillage D..."
   review: reviewed
+- addr: 0x24c250
+  final: 0x192800
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-111: a captured city keeps its completed districts' locked prices and no progress by type; a district's repair is its city's queue; a unit's pillage takes the district's dearest building first — READ (0x1e8880, 0x173f70 at 0x17480e, 0x967300 / 0x967740, 0x9633c0 -> 0x24af90 -> 0x193190), both twins"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...8 / +0x260) empty. Each COMPLETED district of the old city (+0xb08 set, not the centre: 0x24c250) is recorded (x, y, type +0x218, complete, pillaged, the two damages, +0xaa8 the locked..."
+  review: imported
 - addr: 0x24c2f0
   final: 0x1928a0
   kind: function
@@ -474,6 +491,7 @@
     - "H-1: a pillaged building's specialist, the centre's defence, three moments — READ"
     - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
     - "C-96: the plot analysis's owner test, Build Unit's pillaged district and a unique's install type — READ (0x5ceba7, 0x7f5112 -> 0x1aec20 / 0x1ad720), both twins"
+    - "C-111: a captured city keeps its completed districts' locked prices and no progress by type; a district's repair is its city's queue; a unit's pillage takes the district's dearest building first — READ (0x1e8880, 0x173f70 at 0x17480e, 0x967300 / 0x967740, 0x9633c0 -> 0x24af90 -> 0x193190), both twins"
   context:
     - "...ct), is complete (District +0xb08, Lua IsComplete 0x9c83d0) and not pillaged (+0xc88, 0x24c3a0); AdjacentTerrain: the plot's terrain (+0x2c) alone; AdjacentFeature (+0x3c); AdjacentI..."
     - "...s id) is complete (district +0xb08, Lua `District:IsComplete` 0x9c83d0) and not pillaged (0x24c3a0, `IsPillaged`), that district's type; 0x4aaa70 then answers the plot's resource (+0x40, c..."

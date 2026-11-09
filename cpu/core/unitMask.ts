@@ -334,9 +334,10 @@ export function unitMask(ctx: MaskCtx, u: Unit): number[] {
   // no Congress ban. `builderRemoveFeature` pays only inside the borders.
   if (builder && charges > 0 && here.feature && FEATURES[here.feature]?.chop
       && canRemoveFeature(state, here, seat).ok) out.add(A_CHOP);
-  // REPAIR asks no charge: a Builder on an own pillaged tile, and no drought
-  // holding its improvement (`droughtBars`).
-  if (builder && owned && (here.pillaged || here.districtPillaged)
+  // REPAIR asks no charge: a Builder on an own pillaged improvement
+  // (Unit_Operations_Repair 0x967300), and no drought holding it
+  // (`droughtBars`).
+  if (builder && owned && here.pillaged
       && !droughtBars(here, here.improvement)) out.add(A_REPAIR);
   // A row a NAMED unit lays (`Improvement_ValidBuildUnits`): the GPU asks no
   // charge of it.

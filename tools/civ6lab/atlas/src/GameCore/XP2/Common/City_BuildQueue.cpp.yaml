@@ -300,22 +300,31 @@
   review: imported
 - addr: 0x173f70
   kind: function
-  semantics: the city may repair the pillaged district (the Free City's grant takes the first).
+  semantics: "the district CanProduce (the Free City's grant takes the first): the type unlocked (0x4090b0), the player's own version (0x406c00); r14 the city's first pillaged district of the type (0x1ae340 with the IsPillaged functor 0x1ae7a0 -> 0x1af9a0), else its district of the type (0x1ae530); a repair (r14 found pillaged) refused on a flooded plot (0xa3a0f0), under fallout (0x1aefa0) or occupied (0x1af120), past the one-per-city (+0xe1 bit 0x10 at 0x1741b8) and the population limit (0x17436a); at a plot given (0x17480e) the repair's own plot is taken (0x174c26) before the placement tests 0x35f2d0, any other plot tested by them."
   status: PARTLY
+  cases:
+    - recording: h1_duelp1121
+      turn: 147
+      value: "Xi'an's Holy Site 7:15, pillaged at t141, repaired from the queue (City_BuildQueue.csv t147 93.8 of 78: 58 kept + 35.8)"
+  impl: [cpu/core/phase.ts:districtRepairSite, gpu/core/sim_seats.py:_district_own_site]
   readings:
     - "C-60: the Free City's grant — READ (0x274010, 0x273c50), ported (the allowed list's upgrade lines and the repairs below)"
     - "C-60: the Free City's grant"
-  notes: ["imported: READ in its section, no confirming case found beside it"]
+    - "C-111: a captured city keeps its completed districts' locked prices and no progress by type; a district's repair is its city's queue; a unit's pillage takes the district's dearest building first — READ (0x1e8880, 0x173f70 at 0x17480e, 0x967300 / 0x967740, 0x9633c0 -> 0x24af90 -> 0x193190), both twins"
   review: reviewed
 - addr: 0x175140
   final: 0xfafe0
   kind: function
   semantics: "ORDER_ZONE's completion in the queue step: the district's progress by type (+0x248) against its cost (0x179510) << 8; covered, a district standing on the plot (0x1ae340) is set whole (0x1af5b0, the repair, no completion grants), else the new district completes (0x180450) with its completion events; the zoning plot cleared (0x183b90 -1) unless Districts +0xe1 bit 0x10; no unit on the plot is asked."
   status: PARTLY
-  impl: [cpu/core/production.ts:completeQueueItem, cpu/core/production.ts:pct]
+  impl:
+    - cpu/core/production.ts:completeQueueItem
+    - cpu/core/production.ts:pct
+    - gpu/core/sim_phase.py:_seat_city_produce
   readings:
     - "C-111: a major's district lets go of the queue under a hostile unit, the queue's progress and overflow read from the city's memory — READ (0x184660 at 0x1847dc, 0x5313f0, 0x17f630), both twins"
     - "C-111: every item's progress kept by type outside the queue, a pillaged building's or district's repair on the share its pillage left, a district's locked price on the district — READ (0x17f5a0, 0x175730 at 0x175bd3, 0x17d910, 0x175140, 0x1af5b0 -> 0x17e770 -> 0x183a60, 0x193190 -> 0x183950), both twins"
+    - "C-111: a captured city keeps its completed districts' locked prices and no progress by type; a district's repair is its city's queue; a unit's pillage takes the district's dearest building first — READ (0x1e8880, 0x173f70 at 0x17480e, 0x967300 / 0x967740, 0x9633c0 -> 0x24af90 -> 0x193190), both twins"
   review: reviewed
 - addr: 0x175730
   final: 0xfb520
@@ -1044,9 +1053,10 @@
     - recording: h1_duelp1121
       turn: 153
       value: Taiyuan's pillaged Harbor queued on 78 of 104
-  impl: [cpu/core/production.ts:resumeItem]
+  impl: [cpu/core/production.ts:resumeItem, cpu/core/phase.ts:newId, gpu/core/sim_seats.py:_q_push]
   readings:
     - "C-111: every item's progress kept by type outside the queue, a pillaged building's or district's repair on the share its pillage left, a district's locked price on the district — READ (0x17f5a0, 0x175730 at 0x175bd3, 0x17d910, 0x175140, 0x1af5b0 -> 0x17e770 -> 0x183a60, 0x193190 -> 0x183950), both twins"
+    - "C-111: a captured city keeps its completed districts' locked prices and no progress by type; a district's repair is its city's queue; a unit's pillage takes the district's dearest building first — READ (0x1e8880, 0x173f70 at 0x17480e, 0x967300 / 0x967740, 0x9633c0 -> 0x24af90 -> 0x193190), both twins"
   context:
     - "...e on the district — READ (0x17f5a0, 0x175730 at 0x175bd3, 0x17d910, 0x175140, 0x1af5b0 -> 0x17e770 -> 0x183a60, 0x193190 -> 0x183950), both twins"
     - "- THE PILLAGE: a district's pillage (0x1af5b0 -> the queue's hook 0x17e770) sets +0x248 to (cost x (100 - PILLAGE_BUILDING_REPAIR_PERCENT)) / 100 truncated, <<..."
@@ -1161,7 +1171,10 @@
   kind: function
   semantics: the new district's completion on its plot (0x175140's arm where no district stands there yet).
   status: PARTLY
-  impl: [cpu/core/production.ts:completeQueueItem, cpu/core/production.ts:pct]
+  impl:
+    - cpu/core/production.ts:completeQueueItem
+    - cpu/core/production.ts:pct
+    - gpu/core/sim_phase.py:_seat_city_produce
   readings:
     - "C-111: every item's progress kept by type outside the queue, a pillaged building's or district's repair on the share its pillage left, a district's locked price on the district — READ (0x17f5a0, 0x175730 at 0x175bd3, 0x17d910, 0x175140, 0x1af5b0 -> 0x17e770 -> 0x183a60, 0x193190 -> 0x183950), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
@@ -1241,7 +1254,7 @@
     - recording: h1_duelp1121
       turn: 153
       value: Taiyuan's Harbor 78 = trunc(104 x 75 / 100), the locked price 104 quoted where the type's other price is 150
-  impl: [cpu/core/production.ts:resumeItem]
+  impl: [cpu/core/production.ts:resumeItem, gpu/core/sim_seats.py:_q_push]
   readings:
     - "C-111: every item's progress kept by type outside the queue, a pillaged building's or district's repair on the share its pillage left, a district's locked price on the district — READ (0x17f5a0, 0x175730 at 0x175bd3, 0x17d910, 0x175140, 0x1af5b0 -> 0x17e770 -> 0x183a60, 0x193190 -> 0x183950), both twins"
   context:

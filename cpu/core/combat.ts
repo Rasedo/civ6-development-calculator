@@ -70,6 +70,7 @@ import { gpPermOf } from '../data/greatPeople';
 import { barbBattleBoldness, barbPillageScore, tribeDies } from './barbarians';
 import { questCampCleared } from './quests';
 import { dropRoutes } from './trade';
+import { pillageTopBuilding } from './disasters';
 const ok: RuleResult = { ok: true };
 const no = (reason: string): RuleResult => ({ ok: false, reason });
 
@@ -3248,9 +3249,14 @@ export function hostilePillage(state: GameState, unit: Unit): boolean {
     !here.districtPillaged &&
     hereOwned
   ) {
-    here.districtPillaged = true;
+    // its dearest standing building first, the district once none stands
+    // (`pillageTopBuilding`); the plunder is the district's either way
+    // (0x1fc390 reads the plot's district)
+    if (!pillageTopBuilding(state, here)) {
+      here.districtPillaged = true;
+      displaceAirFrom(state, here.index);
+    }
     pillagePlunder(state, unit, DISTRICTS[here.district].plunder, true);
-    displaceAirFrom(state, here.index);
     unit.movesLeft = 0;
     barbPillageScore(state, unit);
     return true;

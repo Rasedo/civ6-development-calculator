@@ -42,6 +42,7 @@
     - "C-96: the district value — READ (0x7a51f0, 0x7aaf80's terms below, 0x366df0, the purchase price 0x1b1cb0, 0x1c77c0, 0x1b4450), PARTLY READ (the golden-age term, the claims, modifiers and neighbours terms, the domain's resources path), unwired"
     - "C-100: a district on a feature it may not stand on, and the Mountain Portal's analyzer — READ"
     - "C-96: the plot analysis's owner test, Build Unit's pillaged district and a unique's install type — READ (0x5ceba7, 0x7f5112 -> 0x1aec20 / 0x1ad720), both twins"
+    - "C-111: a captured city keeps its completed districts' locked prices and no progress by type; a district's repair is its city's queue; a unit's pillage takes the district's dearest building first — READ (0x1e8880, 0x173f70 at 0x17480e, 0x967300 / 0x967740, 0x9633c0 -> 0x24af90 -> 0x193190), both twins"
   notes: ["imported: cited by the code, in no dll_readings section"]
   review: reviewed
 - addr: 0x35fd60
@@ -90,6 +91,16 @@
   context:
     - ...4d0) and RING_COST when d > 3; an improvement adds RING_COST if it is the barbarian camp (0x362130), else IMPROVEMENT_COST; a natural wonder (0x82e90) NW_COST; YIELD_POINT_COST per yield p...
   review: reviewed
+- addr: 0x362b30
+  final: 0x25cfa0
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-111: a captured city keeps its completed districts' locked prices and no progress by type; a district's repair is its city's queue; a unit's pillage takes the district's dearest building first — READ (0x1e8880, 0x173f70 at 0x17480e, 0x967300 / 0x967740, 0x9633c0 -> 0x24af90 -> 0x193190), both twins"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...THE PILLAGE (Unit_Operations_Pillage 0x9633c0): an improvement on the plot is pillaged (0x362b30); else the district's chooser 0x24af90 names the first of strictly greater Cost (+0x24)..."
+  review: imported
 - addr: 0x362ec0
   final: 0x25d270
   kind: function

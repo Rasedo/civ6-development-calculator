@@ -30,14 +30,29 @@
     - "C-127 / C-100: the buildings' dependents and the districts' buildings (0x5cadc0) — ported, both twins"
     - "C-96: the plot analysis's owner test, Build Unit's pillaged district and a unique's install type"
   review: reviewed
+- addr: 0x1ad930
+  final: 0x11e140
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-111: a captured city keeps its completed districts' locked prices and no progress by type; a district's repair is its city's queue; a unit's pillage takes the district's dearest building first — READ (0x1e8880, 0x173f70 at 0x17480e, 0x967300 / 0x967740, 0x9633c0 -> 0x24af90 -> 0x193190), both twins"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - ...the two damages, +0xaa8 the locked price, the fallout) and made again in the new city (0x1ad930), its price set through the +0xa50 watch (0x1e60f0), then its pillage (0x1af5b0), whose...
+  review: imported
 - addr: 0x1ae340
   final: 0x11e8c0
   kind: function
   semantics: the city's district standing on a plot (null none).
   status: PARTLY
-  impl: [cpu/core/production.ts:completeQueueItem, cpu/core/production.ts:pct]
+  impl:
+    - cpu/core/production.ts:completeQueueItem
+    - cpu/core/production.ts:pct
+    - cpu/core/phase.ts:districtRepairSite
+    - gpu/core/sim_phase.py:_seat_city_produce
   readings:
     - "C-111: every item's progress kept by type outside the queue, a pillaged building's or district's repair on the share its pillage left, a district's locked price on the district — READ (0x17f5a0, 0x175730 at 0x175bd3, 0x17d910, 0x175140, 0x1af5b0 -> 0x17e770 -> 0x183a60, 0x193190 -> 0x183950), both twins"
+    - "C-111: a captured city keeps its completed districts' locked prices and no progress by type; a district's repair is its city's queue; a unit's pillage takes the district's dearest building first — READ (0x1e8880, 0x173f70 at 0x17480e, 0x967300 / 0x967740, 0x9633c0 -> 0x24af90 -> 0x193190), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "- THE REPAIR'S COMPLETION: 0x175140 finds the district standing on the plot (0x1ae340) and sets it whole (0x1af5b0) without the new district's completion 0x180450 (`complete..."
@@ -74,6 +89,16 @@
   context:
     - "...nt stored as fx(Amount x 0.01f)): a city subject with the district (context +0x78, else 0x1ae530 by DistrictType); per building of the district type (Districts +0x130 list, the first r..."
   review: reviewed
+- addr: 0x1ae7a0
+  final: 0x11eac0
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-111: a captured city keeps its completed districts' locked prices and no progress by type; a district's repair is its city's queue; a unit's pillage takes the district's dearest building first — READ (0x1e8880, 0x173f70 at 0x17480e, 0x967300 / 0x967740, 0x9633c0 -> 0x24af90 -> 0x193190), both twins"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...ty_BuildQueue 0x173f70, the district CanProduce): 0x1ae340 with the IsPillaged functor (0x1ae7a0 -> 0x1af9a0 -> 0x24c3a0) finds the city's pillaged district of the type; at a plot nami..."
+  review: imported
 - addr: 0x1ae8a0
   final: 0x11eae0
   kind: function
@@ -170,6 +195,17 @@
     - "C-99: a unit bought in the turn sits out the operations, a Harbor trains ships"
     - "C-99: a unit bought in the turn sits out the operations, a Harbor trains ships — the recruit's turn-done offer READ (0x60a8c0, 0x60a440), 0x1c77c0's district arm READ, the candidates' own strength a FIT, both twins"
   review: reviewed
+- addr: 0x1aefa0
+  final: 0x11f1e0
+  kind: function
+  status: PARTLY
+  impl: [cpu/core/phase.ts:districtRepairSite]
+  readings:
+    - "C-111: a captured city keeps its completed districts' locked prices and no progress by type; a district's repair is its city's queue; a unit's pillage takes the district's dearest building first — READ (0x1e8880, 0x173f70 at 0x17480e, 0x967300 / 0x967740, 0x9633c0 -> 0x24af90 -> 0x193190), both twins"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - ...a); refused before that where the type is locked (0x4090b0), the plot is under fallout (0x1aefa0), flooded or occupied. The Builder's repair (Unit_Operations_Repair CanStart 0x967300,...
+  review: imported
 - addr: 0x1aeff0
   final: 0x11f230
   kind: function
@@ -215,8 +251,11 @@
     - cpu/core/production.ts:completeQueueItem
     - cpu/core/production.ts:resumeItem
     - cpu/core/production.ts:pct
+    - cpu/core/phase.ts:newId
+    - gpu/core/sim_phase.py:_seat_city_produce
   readings:
     - "C-111: every item's progress kept by type outside the queue, a pillaged building's or district's repair on the share its pillage left, a district's locked price on the district — READ (0x17f5a0, 0x175730 at 0x175bd3, 0x17d910, 0x175140, 0x1af5b0 -> 0x17e770 -> 0x183a60, 0x193190 -> 0x183950), both twins"
+    - "C-111: a captured city keeps its completed districts' locked prices and no progress by type; a district's repair is its city's queue; a unit's pillage takes the district's dearest building first — READ (0x1e8880, 0x173f70 at 0x17480e, 0x967300 / 0x967740, 0x9633c0 -> 0x24af90 -> 0x193190), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...locked price on the district — READ (0x17f5a0, 0x175730 at 0x175bd3, 0x17d910, 0x175140, 0x1af5b0 -> 0x17e770 -> 0x183a60, 0x193190 -> 0x183950), both twins"

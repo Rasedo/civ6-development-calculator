@@ -58,7 +58,7 @@ import type { CityStats } from './city';
 import { cityFlags, placeCitizens, replaceAllCitizens, toggleCitizen } from './citizens';
 import { beliefSeatYields, computeCityStats, cityBuildingSum, standingLuxuries, rebuildLuxuries, extractionChanged, drawBorderPlot, acquireTile, refreshParkAmenities, seatBuildingSum, swapTileOk, wonderRegionalLoyalty } from './city';
 import { accrueStockpiles, canTrainWithStockpile, capStockpiles, chargeUnitResource, chargeUnitUpkeep, layRailroad, resolveSeatPower } from './stockpile';
-import { ageReactors } from './disasters';
+import { ageReactors, pillageTopBuilding } from './disasters';
 import { droughtBars } from '../data/disasters';
 import { congressSession, congressBorderFrozen, congressLoyaltyDelta, congressProjectMult, congressEnergyProdMult, congressUdtProdDistrict, congressSessionDue } from './congress';
 import { buyVotes } from './congress';
@@ -1246,6 +1246,12 @@ export function placeSeatDistrict(
 ): boolean {
   const tile = state.map.tiles[tileIndex];
   if (!tile) return false;
+  // the city's own pillaged district on the plot is queued as its repair,
+  // at its locked price on the share its pillage left (`resumeItem`)
+  if (districtRepairSite(state, civCity, id, unlocks, tileIndex)) {
+    commitProduction(state, civCity.seat, civCity, { kind: 'district', district: id, tileIndex, progress: 0, cost: districtSiteCost(state, actor, id, unlocks) });
+    return true;
+  }
   if (!districtSiteLegal(state, civCity, id, unlocks, tileIndex)) return false;
   // the city's own district standing unfinished on the plot is queued again
   // at its locked price and its kept progress (`resumeItem`)
@@ -1267,6 +1273,23 @@ export function districtSiteLegal(
   if (!tile) return false;
   const owns = (t: Tile) => tileBelongsTo(t, civCity);
   return canPlaceDistrictIn(state, civCity, id, tileIndex, { unlocks, ownsTile: owns }).ok;
+}
+
+/** MAY THE CITY REPAIR its district of this type on the plot? The queue's
+ * district test (City_BuildQueue 0x173f70) takes the city's pillaged
+ * district of the type (0x1ae340) at its own plot (0x17480e) past the
+ * placement tests and the population limit, the type unlocked
+ * (0x4090b0), a plot under fallout refused (0x1aefa0). A Builder repairs
+ * improvements only (Unit_Operations_Repair 0x967300: the plot's pillaged
+ * improvement). */
+export function districtRepairSite(
+  state: GameState, civCity: City, id: DistrictId, unlocks: Unlocks, tileIndex: number,
+): boolean {
+  const tile = state.map.tiles[tileIndex];
+  if (!tile || tile.district !== id || !tile.districtComplete || !tile.districtPillaged) return false;
+  if (!tileBelongsTo(tile, civCity) || !civCity.districts.some((d) => d.tileIndex === tileIndex && d.type === id)) return false;
+  if (!unlocks.districts.has(id)) return false;
+  return !irradiated(tile);
 }
 
 /** WHAT THIS DISTRICT COSTS this seat right now — the research scaling, the
@@ -1700,11 +1723,19 @@ export function transferCity(
   // ownership + district_complete. An INCOMPLETE district stays paved-but-dead,
   // because `availableBuildings` keys on a district merely being present and
   // would otherwise offer a building the GPU can never queue.
+  //
+  // The new city is a fresh city (City_Manager 0x1e8880): its queue keeps no
+  // progress by type, and each completed district comes over with its
+  // locked price (the district record's +0x18, the old District's +0xaa8,
+  // set on the new one through its +0xa50 watch). A pillaged one's repair
+  // starts on the share its pillage leaves at that price (0x1af5b0 ->
+  // 0x17e770 on the new city: `resumeItem`).
   const newId = to.nextCityId;
-  const keptDistricts: { type: DistrictId; tileIndex: number }[] = [];
+  const keptDistricts: { type: DistrictId; tileIndex: number; cost?: number }[] = [];
   for (const t of state.map.tiles) {
     if (tileBelongsTo(t, { seat: to.seat, id: newId }) && t.district !== null && t.districtComplete) {
-      keptDistricts.push({ type: t.district, tileIndex: t.index });
+      const cost = civCity.districts.find((d) => d.tileIndex === t.index && d.type === t.district)?.cost;
+      keptDistricts.push(cost !== undefined ? { type: t.district, tileIndex: t.index, cost } : { type: t.district, tileIndex: t.index });
     }
   }
   // CIV6 (`DISTRICT_CITY_CENTER` carries `CaptureRemovesCityDefenses="true"`):
@@ -2452,10 +2483,15 @@ export function applySeatUnitOrders(state: GameState, actor: Seat, steps: number
           unit.movesLeft = Math.max(
             0, unit.movesLeft - MP_SCALE * (pillageCost > 0 ? pillageCost : 3));
         };
-        const wreckDistrict = (t: Tile): void => {
-          t.districtPillaged = true;
+        // `underfoot`: the unit's own plot's pillage takes the district's
+        // dearest standing building first, the district once none stands
+        // (`pillageTopBuilding`); the plunder is the district's either way
+        const wreckDistrict = (t: Tile, underfoot = false): void => {
+          if (!underfoot || !pillageTopBuilding(state, t)) {
+            t.districtPillaged = true;
+            displaceAirFrom(state, t.index);
+          }
           pillagePlunder(state, unit, DISTRICTS[t.district as keyof typeof DISTRICTS].plunder, true);
-          displaceAirFrom(state, t.index);
           spendPillage();
         };
         const districtWreckable = (t: Tile): boolean =>
@@ -2477,7 +2513,7 @@ export function applySeatUnitOrders(state: GameState, actor: Seat, steps: number
           // it starts the Free City's raid (0x276ff0, 0x276e70)
           freeRaidSignal(state, here.index, unit.seat);
         } else if (hereOwned && districtWreckable(here)) {
-          wreckDistrict(here);
+          wreckDistrict(here, true);
           freeRaidSignal(state, here.index, unit.seat);
         } else if ((UNITS[unit.type]?.raider || (leaderOf(state, unit.seat) === 'HARDRADA' && navalMelee(UNITS[unit.type])))
           // CIV6 (Barbary Corsair): "It costs no Movement to coastal raid" —
@@ -2521,13 +2557,13 @@ export function applySeatUnitOrders(state: GameState, actor: Seat, steps: number
           // CIV6 (LOC_UNITOPERATION_REPAIR_BLOCKED_BY_DROUGHT): a drought's
           // improvement waits for the rain
           if (droughtBars(here, here.improvement)) return;
+          // a Builder repairs the plot's pillaged improvement only
+          // (Unit_Operations_Repair 0x967300 / 0x967740); a district's
+          // repair is its city's queue (`districtRepairSite`)
           if (here.pillaged && tileOwnedByCiv(here, actor.seat)) {
             here.pillaged = false;
             unit.movesLeft = 0;
             extractionChanged(state, here);
-          } else if (here.districtPillaged && tileOwnedByCiv(here, actor.seat)) {
-            here.districtPillaged = false;
-            unit.movesLeft = 0;
           }
         } else {
           const ii = a < 18 ? a - 13 : DEDICATED_IMPROVEMENTS + (a - 18);

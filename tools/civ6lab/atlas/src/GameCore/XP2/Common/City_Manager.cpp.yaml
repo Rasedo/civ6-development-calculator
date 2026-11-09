@@ -38,3 +38,21 @@
   context:
     - "...ings +0x159 bit 16), +0x15 its MaxWorldInstances (+0x40) reached by the world's copies (0x1e7b70); for a district its PrereqTech / PrereqCivic, +0x14 set): with the player and the co..."
   review: reviewed
+- addr: 0x1e8880
+  kind: function
+  name: TransferCity
+  semantics: "the city's transfer (Lua TransferCity / TransferCityToFreeCities, the combat capture 0x1fdea0, ...): a fresh city (pkNewCity) for the new owner, its queue's progress arrays empty. Each completed district of the old city (+0xb08 set, not the centre 0x24c250) is recorded in a 40-byte row (+0 x, +4 y, +8 type +0x218, +0xc complete, +0xd pillaged 0x24c3a0, +0x10 / +0x14 the two damages 0x24ae50, +0x18 the locked price +0xaa8, +0x20 the fallout 0x24ada0) and made again in the new city (0x1ad930), its price through the +0xa50 watch (0x1e60f0 at 0x1e9b8a), its pillage through 0x1af5b0 (the queue hook 0x17e770: a pillaged one's +0x248 at trunc(price x 75 / 100)), its damages (0x24cc50). An unfinished district is not recorded."
+  status: PARTLY
+  cases:
+    - recording: h1_duelp1121
+      turn: 153
+      value: the locked price the transfer keeps is the one the repair reads (Taiyuan's Harbor 104 at t153, 0x183a60's 78 of 104); no capture of a district-holding city in the duelp recordings
+  impl:
+    - cpu/core/phase.ts:transferCity
+    - cpu/core/combat.ts:captureCityState
+    - gpu/core/sim_orders.py:_capture_city_state
+    - gpu/core/sim_seats.py:_transfer_city
+    - cpu/core/phase.ts:newId
+  readings:
+    - "C-111: a captured city keeps its completed districts' locked prices and no progress by type; a district's repair is its city's queue; a unit's pillage takes the district's dearest building first — READ (0x1e8880, 0x173f70 at 0x17480e, 0x967300 / 0x967740, 0x9633c0 -> 0x24af90 -> 0x193190), both twins"
+  review: reviewed

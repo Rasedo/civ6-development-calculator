@@ -3,6 +3,27 @@
 # `review: imported` = bootstrapped from dll_readings.md / code comments / saved
 # labels and not yet reviewed: verify against the disassembly, then edit and
 # set `review: reviewed`.
+- addr: 0x967300
+  final: 0x671c40
+  kind: function
+  name: CanStart
+  semantics: "REPAIR's CanStart: build charges above 0 (+0xed0), Movement left (0x56c690), the plot's improvement (+0x44) set and pillaged (+0x4d bit 0), the improvement's ValidBuildUnits list (+0x1b8..+0x1c0) naming the unit's type where it lists any, the plot unowned, the unit's owner's or a city-state's whose suzerain the owner is (0x44c850). A district is never its target."
+  status: READ
+  cases:
+    - recording: h1_duelp1121
+      turn: 147
+      value: Xi'an's pillaged Holy Site 7:15 repaired through the queue (City_BuildQueue.csv t147 DISTRICT_HOLY_SITE 93.8 of 78, DistrictPillaged 100 / 0), no Builder on the plot
+  impl:
+    - cpu/core/unitMask.ts:unitMask
+    - cpu/core/phase.ts:applySeatUnitOrders
+    - gpu/core/sim_masks.py:_seat_unit_mask
+    - gpu/core/sim_orders.py:_apply_seat_unit_actions
+    - cpu/core/phase.ts:districtRepairSite
+    - cpu/core/phase.ts:impWreckable
+    - gpu/core/sim_orders.py:_arms
+  readings:
+    - "C-111: a captured city keeps its completed districts' locked prices and no progress by type; a district's repair is its city's queue; a unit's pillage takes the district's dearest building first — READ (0x1e8880, 0x173f70 at 0x17480e, 0x967300 / 0x967740, 0x9633c0 -> 0x24af90 -> 0x193190), both twins"
+  review: reviewed
 - addr: 0x967560
   final: 0x671e40
   kind: function
@@ -20,3 +41,21 @@
   context:
     - "...— after Move Unit's (node 27 before 28), which moved it — builds (0x95a010; the repair 0x967560): a Builder lays on the turn it arrives, and on the turn it was trained (runs/h1_duelw1..."
   review: imported
+- addr: 0x967740
+  final: 0x672030
+  kind: function
+  name: Start
+  semantics: "REPAIR's Start: the plot's improvement (+0x44, none: the assert \"Started to repair an improvement but couldn't actually complete it.\") set whole through 0x362b30; the unit's moves ended (0x56d6f0). No charge spent, no district touched."
+  status: READ
+  cases:
+    - recording: h1_duelp1121
+      turn: 147
+      value: Xi'an's pillaged Holy Site 7:15 repaired through the queue, not a Builder
+  impl:
+    - cpu/core/phase.ts:applySeatUnitOrders
+    - gpu/core/sim_orders.py:_apply_seat_unit_actions
+    - cpu/core/phase.ts:impWreckable
+    - gpu/core/sim_orders.py:_arms
+  readings:
+    - "C-111: a captured city keeps its completed districts' locked prices and no progress by type; a district's repair is its city's queue; a unit's pillage takes the district's dearest building first — READ (0x1e8880, 0x173f70 at 0x17480e, 0x967300 / 0x967740, 0x9633c0 -> 0x24af90 -> 0x193190), both twins"
+  review: reviewed

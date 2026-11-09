@@ -21,12 +21,20 @@
 - addr: 0x9633c0
   final: 0x66dee0
   kind: function
-  semantics: "the pillage: raises game signal +0x8d0 (the tribe's raid score)."
+  semantics: "the pillage: the plot's improvement (+0x44) pillaged (0x362b30); else the district there (0x57740): its chooser 0x24af90's building, where one, pillaged (0x193190 with the flag); else the district complete (+0xb08), unpillaged and not InternalOnly (+0xe1 bit 4) pillaged itself (0x1af930). Then game signal +0x8d0 (the tribe's raid score), 0x201d10, the moves less GlobalParameters +0x550 (the unit's +0x18bb set) or +0x558, << 8 (0x56cc70), the plunder off the plot (0x1fc390)."
   status: PARTLY
+  cases:
+    - recording: h1_duelp1121
+      turn: 141
+      value: "the barbarian Line Infantry 4128797 on Xi'an's Holy Site 7:15: the Shrine at t140 (no DistrictPillaged row), the district at t141 (DistrictPillaged 75 / 1), both repaired from the queue at t147 / t148"
+  impl:
+    - cpu/core/disasters.ts:pillageTopBuilding
+    - cpu/core/combat.ts:hostilePillage
+    - gpu/core/sim_economy.py:_pillage_held
   readings:
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
-  notes: ["imported: READ in its section, no confirming case found beside it"]
+    - "C-111: a captured city keeps its completed districts' locked prices and no progress by type; a district's repair is its city's queue; a unit's pillage takes the district's dearest building first — READ (0x1e8880, 0x173f70 at 0x17480e, 0x967300 / 0x967740, 0x9633c0 -> 0x24af90 -> 0x193190), both twins"
   context:
     - "...a game signal for the target. The score: the game signal +0x8d0 — raised by the pillage 0x9633c0, the coastal raids 0x95ba10 / 0xa4fbc0 and a district's pillage in combat 0x20bae0 — ru..."
   review: reviewed

@@ -3120,9 +3120,13 @@ def _plunder(sim, m: torch.Tensor, uc: torch.Tensor, plot: torch.Tensor) -> None
     kind = torch.where(pi, sim._imp_plun_kind[iv], sim._d_plun_kind[dv])
     amt = torch.where(pi, sim._imp_plun_amt[iv], sim._d_plun_amt[dv])
     sim.pillaged[b[pi], plot[pi]] = True
-    sim.district_pillaged[b[pd], plot[pd]] = True
+    # the district's dearest standing building first, the district once none
+    # stands (`pillageTopBuilding`); the plunder the district's
     if bool(pd.any()):
-        sim._air_scatter_from(b[pd], plot[pd])
+        _dr = b[pd]
+        _wr = _dr[~sim._pillage_held(_dr, plot[_dr], True, unit=True)]
+        sim.district_pillaged[_wr, plot[_wr]] = True
+        sim._air_scatter_from(_wr, plot[_wr])
     did = pi | pd
     cap = int(sim.rules.combat["unitHp"])
     heal = did & (kind == 1) & (amt > 0)

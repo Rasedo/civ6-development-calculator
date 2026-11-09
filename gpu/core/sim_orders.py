@@ -1173,14 +1173,15 @@ class SimOrders:
                         _lcc = _lc.clamp(min=0)
                         self._place_citizens(row, _lcc, _lm, None, full=True,
                                              fav_food=self.city_fav_food[self._bidx, row, _lcc])
-                # REPAIR (the TS applier's REPAIR arm): improvement first, else district;
-                # the turn is spent, NO charge.
+                # REPAIR (the TS applier's REPAIR arm): the plot's pillaged
+                # improvement only (Unit_Operations_Repair 0x967300 /
+                # 0x967740; a district's repair is its city's queue); the
+                # turn is spent, NO charge.
                 if self._A_REPAIR in _acmd:
                     _rp = (
                         act & (a == self._A_REPAIR) & (utp == self._builder_idx)
                         & own_tile.gather(1, hc.unsqueeze(1)).squeeze(1)
-                        & (self.pillaged.gather(1, hc.unsqueeze(1)).squeeze(1)
-                           | self.district_pillaged.gather(1, hc.unsqueeze(1)).squeeze(1))
+                        & self.pillaged.gather(1, hc.unsqueeze(1)).squeeze(1)
                         # CIV6 (LOC_UNITOPERATION_REPAIR_BLOCKED_BY_DROUGHT)
                         & ~self._drought_barred().gather(1, hc.unsqueeze(1)).squeeze(1)
                     )
@@ -1194,8 +1195,6 @@ class SimOrders:
                     _fixed = torch.zeros(B, dtype=torch.bool, device=dev)
                     _fixed[_r[_imp]] = True
                     self._extraction_changed(_fixed, hc)
-                    _dis = ~_imp & self.district_pillaged[_r, _tt]
-                    self.district_pillaged[_r[_dis], _tt[_dis]] = False
                     self.unit_mp[_r, sc[_r]] = 0
                     self._eff_version += 1
                 # REMOVE_IMPROVEMENT — CIV6 (Builder / Military Engineer):
@@ -1304,11 +1303,18 @@ class SimOrders:
                     _pi = _hi2[_live]
                     _pd = ~_pi
                     self.pillaged[_r[_pi], _tt[_pi]] = True
-                    self.district_pillaged[_r[_pd], _tt[_pd]] = True
-                    self._air_scatter_from(_r[_pd], _tt[_pd])
+                    _und = ~_rd[_r]
+                    # the unit's own plot's pillage takes the district's
+                    # dearest standing building first, the district once none
+                    # stands (`pillageTopBuilding`); a raid the district
+                    _wd = _pd.clone()
+                    _ud = (_pd & _und).nonzero(as_tuple=True)[0]
+                    if _ud.numel():
+                        _wd[_ud[self._pillage_held(_r[_ud], _tt[_ud], True, unit=True)]] = False
+                    self.district_pillaged[_r[_wd], _tt[_wd]] = True
+                    self._air_scatter_from(_r[_wd], _tt[_wd])
                     # a Free City's improvement or district pillaged by the
                     # unit on it starts the Free City's raid (0x276ff0, 0x276e70)
-                    _und = ~_rd[_r]
                     if bool(_und.count_nonzero()):
                         _fm = torch.zeros(B, dtype=torch.bool, device=dev)
                         _fp = torch.full((B,), -1, dtype=torch.long, device=dev)
@@ -1692,6 +1698,12 @@ class SimOrders:
             for _p in ("city_gw_obj", "city_gw_maker", "city_gw_era", "city_gw_seat"):
                 getattr(self, _p)[b, row, col, :] = -1
             self.city_dist_tile[b, row, col, :] = self.city_dist_tile[b, self._CITY_MINOR0 + s, 0, :]
+            # each district comes over at its locked price (City_Manager
+            # 0x1e8880; TS copies the minor's `districts` with their `cost`)
+            self.city_dist_cost[b, row, col, :] = torch.where(
+                self.city_dist_tile[b, row, col, :] >= 0,
+                self.citystate_dist_cost[b, s].to(self.city_dist_cost.dtype),
+                torch.zeros_like(self.city_dist_cost[b, row, col, :]))
             self.city_spec_pin[b, row, col, :] = -1
             self.city_spec_forced[b, row, col, :] = 0
             self.city_fav_food[b, row, col] = False
@@ -2094,8 +2106,11 @@ class SimOrders:
             # a HEAL-plunder district pays its wrecker like a farm
             _dheal = torch.where(self._d_plun_kind[_dvv] == 1,
                                  self._d_plun_amt[_dvv], torch.zeros_like(_dvv))
-            self.district_pillaged[rows, here[rows]] = True
-            self._air_scatter_from(rows, here[rows])
+            # its dearest standing building first, the district once none
+            # stands (`pillageTopBuilding`); the plunder the district's
+            _wr = rows[~self._pillage_held(rows, here[rows], True, unit=True)]
+            self.district_pillaged[_wr, here[_wr]] = True
+            self._air_scatter_from(_wr, here[_wr])
             self.barb_unit_mp[rows, u[rows]] = 0  # the turn is spent (TS movesLeft = 0)
             hp_cap = self.rules.combat["unitHp"]
             self.barb_unit_hp[rows, u[rows]] = torch.where(

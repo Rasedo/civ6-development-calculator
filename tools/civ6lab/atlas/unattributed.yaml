@@ -999,6 +999,26 @@
   context:
     - "...a8a30 — a wonder's free tiles, a founding, a city-state's envoy annex —, the purchase 0x1a7710, a culture bomb 0x524e30) raises the annexed count (+0xc), clears the stored next plot..."
   review: reviewed
+- addr: 0x1af930
+  final: 0x11f940
+  kind: function
+  status: PARTLY
+  impl: [cpu/core/disasters.ts:pillageTopBuilding]
+  readings:
+    - "C-111: a captured city keeps its completed districts' locked prices and no progress by type; a district's repair is its city's queue; a unit's pillage takes the district's dearest building first — READ (0x1e8880, 0x173f70 at 0x17480e, 0x967300 / 0x967740, 0x9633c0 -> 0x24af90 -> 0x193190), both twins"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - ...er its Buildings_XP2 Pillage; only where none stands is the district itself pillaged (0x1af930). The plunder reads the plot's district either way (0x1fc390 -> 0x51a080).
+  review: imported
+- addr: 0x1af9a0
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-111: a captured city keeps its completed districts' locked prices and no progress by type; a district's repair is its city's queue; a unit's pillage takes the district's dearest building first — READ (0x1e8880, 0x173f70 at 0x17480e, 0x967300 / 0x967740, 0x9633c0 -> 0x24af90 -> 0x193190), both twins"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...e 0x173f70, the district CanProduce): 0x1ae340 with the IsPillaged functor (0x1ae7a0 -> 0x1af9a0 -> 0x24c3a0) finds the city's pillaged district of the type; at a plot naming it (0x174..."
+  review: imported
 - addr: 0x1b18c0
   final: 0x120ed0
   kind: function
@@ -1068,6 +1088,7 @@
     - "C-99: the city-states' Promotion move on the replay's copy, Garrison City's swap"
     - "C-98: the research bank with nothing in hand; a city-state's unit cost under Mercenary Companies"
     - "C-99 / C-128: every technology gained starts an Upgrade Units tree, the civic event never fires; a tree's units after its tick; the Nearest City Search's resource test; the plot's unit list — READ (0x4cd4c0 -> 0x800c60, 0x5bbf80 -> 0x27a180, 0x3a1ac0, 0x7cb3d0 -> 0x7d2190, 0x7eba40 -> 0x510d30, 0x74f40 / 0x763b0), the trigger both twins"
+    - "C-111: a captured city keeps its completed districts' locked prices and no progress by type; a district's repair is its city's queue; a unit's pillage takes the district's dearest building first — READ (0x1e8880, 0x173f70 at 0x17480e, 0x967300 / 0x967740, 0x9633c0 -> 0x24af90 -> 0x193190), both twins"
   context:
     - "...+0x7d0 the operation's id and +0x770 clear) and sets each one's AI type (+0x168, setter 0x1e60f0) to its type's own (0x79b9c0: the highest UnitAiInfos flag of the type up to COMBAT 3,..."
   review: reviewed

@@ -61,8 +61,10 @@
   final: 0x14fca0
   kind: function
   status: PARTLY
+  impl: [cpu/core/combat.ts:hereOwned]
   readings:
     - "C-98: a lump of Science or Culture completes the item in hand — READ (0x4c8e60, 0x4c8ea0, 0x3938e0, 0x393670), both twins"
+    - "C-111: a captured city keeps its completed districts' locked prices and no progress by type; a district's repair is its city's queue; a unit's pillage takes the district's dearest building first — READ (0x1e8880, 0x173f70 at 0x17480e, 0x967300 / 0x967740, 0x9633c0 -> 0x24af90 -> 0x193190), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...of 0x4c8e60 / 0x3938e0: GrantYield 0x468540, the harvest 0x95fbf0, 0x93ec40, 0x536480, 0x1fc390, 0x1fce20."

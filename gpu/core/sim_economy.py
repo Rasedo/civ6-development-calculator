@@ -1053,18 +1053,24 @@ class SimEconomy:
               & ~self.district_pillaged[rows, tiles] & ~self._env_immune()[rows, tiles])
         self._pillage_held(rows[ok], tiles[ok], top_only=True)
 
-    def _pillage_held(self, rows: torch.Tensor, tiles: torch.Tensor, top_only: bool) -> None:
+    def _pillage_held(self, rows: torch.Tensor, tiles: torch.Tensor, top_only: bool,
+                      unit: bool = False) -> torch.Tensor:
         """Pillage the buildings of the district standing on each (rows,
         tiles) plot in the city that holds it — a major's or the Free Cities'
         city owning the plot, a city-state's whose registry holds it: every
         standing one but a Dar-e Mehr, or (`top_only`) the dearest standing
         unpillaged one, ties to the first in the layout, none when it is a
         Dar-e Mehr. CIV6 (Dar-e Mehr): "Cannot be pillaged by natural
-        disasters". A city-state's repair of what falls
-        waits for the item in hand (`citystate_repair_wait`).
-        `districtHolder` / `pillageHeld`'s twin."""
+        disasters". `unit`: a unit's pillage (Unit_Operations_Pillage
+        0x9633c0 -> 0x24af90 -> 0x193190), the dearest standing unpillaged
+        one whatever it is, no disaster's damage. A city-state's repair of
+        what falls waits for the item in hand (`citystate_repair_wait`).
+        Returns [n] the plots a building fell on. `districtHolder` /
+        `pillageHeld` / `pillageTopBuilding`'s twin."""
+        out = torch.zeros(rows.shape[0], dtype=torch.bool, device=self.device)
         if not rows.numel():
-            return
+            return out
+        top_only = top_only or unit
         dd = self.district[rows, tiles]
         NB = int(self._b_req_district.shape[0])
         key = (self.rules_dev.b_cost.to(torch.float64) * float(NB + 1)
@@ -1075,8 +1081,9 @@ class SimEconomy:
                     & (self._b_req_district.unsqueeze(0) == bd.unsqueeze(1)))
             if top_only:
                 top = torch.where(cand, key.unsqueeze(0), torch.full_like(cand, -1.0, dtype=torch.float64)).argmax(dim=1)
-                cand = (torch.nn.functional.one_hot(top, NB).bool() & cand.any(dim=1, keepdim=True)
-                        & ~self._b_disaster_proof[top].unsqueeze(1))
+                cand = torch.nn.functional.one_hot(top, NB).bool() & cand.any(dim=1, keepdim=True)
+                if not unit:
+                    cand = cand & ~self._b_disaster_proof[top].unsqueeze(1)
             else:
                 cand = cand & ~self._b_disaster_proof.unsqueeze(0)
             if bool(cand.count_nonzero()):
@@ -1084,17 +1091,19 @@ class SimEconomy:
                 self._eff_version += 1
             return cand.any(dim=1)
 
+        idx = torch.arange(rows.shape[0], device=self.device)
         seat_at = self.tile_seat[rows, tiles]
         for r in (*range(self.n_majors), self.FREE_ROW):
             sel = seat_at == int(self._ROW_SEAT[r])
             if not bool(sel.count_nonzero()):
                 continue
-            br, bt, bd = rows[sel], tiles[sel], dd[sel]
+            br, bt, bd, bi = rows[sel], tiles[sel], dd[sel], idx[sel]
             col = self._city_col_at(r, br, bt)
             good = col >= 0
             if bool(good.count_nonzero()):
                 fell = take(br[good], r, col[good], bd[good])
-                if top_only:
+                out[bi[good][fell]] = True
+                if top_only and not unit:
                     # BUILDING_PILLAGED: half a point of the event's damage
                     self._aid_damage(br[good][fell], torch.full_like(br[good][fell], int(self._ROW_SEAT[r])), 1)
         for s in range(self.S):
@@ -1103,9 +1112,11 @@ class SimEconomy:
             sel = (dd >= 0) & (reg == tiles) & self.citystate_alive[rows, s]
             if not bool(sel.count_nonzero()):
                 continue
-            br, bd = rows[sel], dd[sel]
+            br, bd, bi = rows[sel], dd[sel], idx[sel]
             fell = take(br, r, torch.zeros_like(br), bd)
+            out[bi[fell]] = True
             self.citystate_repair_wait[br[fell], s] = True
+        return out
 
     def _pick_live(self, mask_hit: torch.Tensor, cand: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
         """ONE uniform draw (`_rand_range`) over a live candidate mask [B, N]

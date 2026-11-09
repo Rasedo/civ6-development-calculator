@@ -1780,6 +1780,18 @@ class SimPhase:
 
         made_d = done & (cur >= self.DISTRICT_BASE) & (cur < self.WONDER_BASE)
         if bool(made_d.count_nonzero()):
+            # a district standing complete on the plot is a pillaged one's
+            # repair: it is set whole and pays no completion (0x175140:
+            # 0x1ae340 finds it, 0x1af5b0, where a new one takes 0x180450;
+            # `completeQueueItem`'s repair branch)
+            _qd = qt0.clamp(min=0, max=self.T - 1)
+            rep_d = made_d & (qt0 >= 0) & self.district_complete.gather(1, _qd.unsqueeze(1)).squeeze(1)
+            if bool(rep_d.count_nonzero()):
+                _rr = rep_d.nonzero(as_tuple=True)[0]
+                self.district_pillaged[_rr, _qd[_rr]] = False
+                self._eff_version += 1
+                made_d = made_d & ~rep_d
+        if bool(made_d.count_nonzero()):
             self._district_completed(row, col, qt0, made_d)
 
         made_b2 = done & (cur >= 0) & (cur < self.NB)

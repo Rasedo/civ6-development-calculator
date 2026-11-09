@@ -103,6 +103,17 @@ function pillageTileBuildings(state: GameState, tile: Tile): void {
       || tile.districtPillaged || envImmune(state, tile)) return;
   const h = districtHolder(state, tile);
   if (!h) return;
+  const top = topStandingBuilding(h, tile);
+  if (top && !BUILDINGS[top].disasterProof) {
+    aidDamage(tileSeat(tile), 1);
+    pillageHeld(h, top);
+  }
+}
+
+/** the dearest building the holder keeps standing unpillaged in the
+ *  district on the tile, ties to the first in the production layout (the
+ *  district's chooser 0x24af90 keeps the first strictly greater Cost) */
+function topStandingBuilding(h: NonNullable<ReturnType<typeof districtHolder>>, tile: Tile): string | undefined {
   let top: string | undefined;
   for (const id of centerBuildingIds()) {
     const def = BUILDINGS[id];
@@ -110,10 +121,28 @@ function pillageTileBuildings(state: GameState, tile: Tile): void {
       || buildingPillaged(h.city, id)) continue;
     if (top === undefined || def.cost > BUILDINGS[top].cost) top = id;
   }
-  if (top && !BUILDINGS[top].disasterProof) {
-    aidDamage(tileSeat(tile), 1);
-    pillageHeld(h, top);
-  }
+  return top;
+}
+
+/** A UNIT'S PILLAGE of a district plot takes the district's dearest standing
+ *  building first, one a pillage (Unit_Operations_Pillage 0x9633c0: the
+ *  chooser 0x24af90, then the building's pillage 0x193190), whatever it is;
+ *  only a district left with none standing is pillaged itself (0x1af930).
+ *  The building that fell, undefined where none did. */
+export function pillageTopBuilding(state: GameState, tile: Tile): string | undefined {
+  if (!tile.district || tile.district === 'CITY_CENTER' || !tile.districtComplete || tile.districtPillaged) return undefined;
+  const h = districtHolder(state, tile);
+  if (!h) return undefined;
+  const top = topStandingBuilding(h, tile);
+  if (!top) return undefined;
+  pillageHeld(h, top);
+  return top;
+}
+
+/** the buildings of the city — a major's, the Free Cities', a city-state's —
+ *  whose registry holds the district on the tile */
+export function districtBuildingsAt(state: GameState, tile: Tile): { buildings?: string[]; pillagedBuildings?: string[] } | undefined {
+  return districtHolder(state, tile)?.city;
 }
 
 /** The city — a major's, the Free Cities', a city-state's — whose registry

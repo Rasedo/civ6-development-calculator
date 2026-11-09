@@ -15,7 +15,7 @@ import { availableProjects } from './game';
 import { citySpecialistSlots, resourcePriority, swapTileOk, workableTiles } from './city';
 import { buildingVariantAdjacency, districtAdjacency } from './yields';
 import { prodLayout } from './prodLayout';
-import { districtSiteLegal, formationOrderOk, wonderSite } from './phase';
+import { districtRepairSite, districtSiteLegal, formationOrderOk, wonderSite } from './phase';
 import { builderHasJob, engineerHasJob } from './targetSites';
 
 /**
@@ -73,14 +73,15 @@ export function unitGates(state: GameState, seat: number): Map<string, () => boo
   return out;
 }
 
-/** The plots district `id` may take in this city now, ascending — the
- *  record's district arm re-validates exactly these (`districtSiteLegal`). */
+/** The plots district `id` may take in this city now, its own pillaged
+ *  one's among them (its repair), ascending — the record's district arm
+ *  re-validates exactly these (`districtRepairSite`, `districtSiteLegal`). */
 export function districtPlots(state: GameState, city: City, id: DistrictId): number[] {
   const unlocks = computeUnlocks(state, city.seat);
   const ctr = state.map.tiles[city.centerIndex];
   return tilesWithin(state.map, ctr.col, ctr.row, CITY_WORK_RADIUS)
     .map((t) => t.index)
-    .filter((i) => districtSiteLegal(state, city, id, unlocks, i))
+    .filter((i) => districtRepairSite(state, city, id, unlocks, i) || districtSiteLegal(state, city, id, unlocks, i))
     .sort((a, b) => a - b);
 }
 

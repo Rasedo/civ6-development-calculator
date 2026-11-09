@@ -65,7 +65,7 @@ describe('district pillage', () => {
     expect(cityMaintenance(state, city)).toBe(maintClean - DISTRICTS.CAMPUS.maintenance);
   });
 
-  it('a hostile unit standing on a completed enemy district pillages it; a builder repairs it', () => {
+  it('a hostile unit standing on a completed enemy district pillages it; a builder does not repair it', () => {
     const { state, city, campus } = cityWithCampus(11);
     state.unitsMode = true;
     expect(tileCity(campus)).toBe(city.id); // the district tile is owned
@@ -73,15 +73,20 @@ describe('district pillage', () => {
     barb.tileIndex = campus.index;
     barb.movesLeft = 2 * MP_SCALE;
     expect(campus.districtPillaged).toBeFalsy();
+    // the Library standing there falls first, the district on the next pillage
+    expect(hostilePillage(state, barb)).toBe(true);
+    expect(city.pillagedBuildings).toEqual(['LIBRARY']);
+    expect(campus.districtPillaged).toBeFalsy();
+    expect(barb.movesLeft).toBe(0); // pillage ends the turn, no heal
+    barb.movesLeft = 2 * MP_SCALE;
     expect(hostilePillage(state, barb)).toBe(true);
     expect(campus.districtPillaged).toBe(true);
-    expect(barb.movesLeft).toBe(0); // pillage ends the turn, no heal
 
-    // A builder on the tile repairs the district (the REPAIR order).
+    // A builder repairs improvements only: the district's repair is its
+    // city's queue (`districtRepairSite`).
     const builder = spawnUnit(state, 'BUILDER', campus.index, 0)!;
     builder.tileIndex = campus.index;
     orderUnit(state, builder, 'REPAIR');
-    expect(campus.districtPillaged).toBe(false);
-    expect(builder.movesLeft).toBe(0);
+    expect(campus.districtPillaged).toBe(true);
   });
 });

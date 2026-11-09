@@ -12823,3 +12823,56 @@ Reason). Ported in `weariness.ts` (`warWearinessBattle`, `wwEraBase`,
 - OPEN: the Domestic multiplier's one row (Defense of the Motherland, a card
   the catalog lacks); m_iMaxWarmongerPercent's one writer
   (EFFECT_ADJUST_PLAYER_MAX_WARMONGER_PERCENT, Cyrus, not in the roster).
+
+## C-111: a captured city keeps its completed districts' locked prices and no progress by type; a district's repair is its city's queue; a unit's pillage takes the district's dearest building first — READ (0x1e8880, 0x173f70 at 0x17480e, 0x967300 / 0x967740, 0x9633c0 -> 0x24af90 -> 0x193190), both twins
+
+`transferCity`'s `keptDistricts` (cpu/core/phase.ts), `captureCityState` /
+`captureCityStateFor` (cpu/core/combat.ts, the minor's `districts` with their
+`cost`); `districtRepairSite`, `placeSeatDistrict`, `districtPlots`
+(cpu/core/decideObsCities.ts), the Builder's REPAIR arm and `unitMask`;
+`pillageTopBuilding` (cpu/core/disasters.ts) from `hostilePillage` and the
+seat PILLAGE's `wreckDistrict` underfoot; the replay's pillage case. GPU
+`_transfer_city`'s `old_dcost`, the minor capture's `city_dist_cost` from
+`citystate_dist_cost` (gpu/core/sim_orders.py), `_district_own_site` (the
+district mask and the build arm, gpu/core/sim_seats.py), `_q_push`'s district
+share, `_seat_city_produce`'s repair branch (gpu/core/sim_phase.py), the
+REPAIR arm and mask, `_pillage_held(unit=True)` (gpu/core/sim_economy.py)
+from the seat PILLAGE, `_barb_pillage_here` and the minors' `_plunder`.
+
+- THE CAPTURE (City_Manager 0x1e8880, every transfer: conquest, loyalty,
+  trade, the Lua TransferCity): the new city is a fresh city, its queue's
+  arrays (+0x218 / +0x230 / +0x248 / +0x260) empty. Each COMPLETED district of
+  the old city (+0xb08 set, not the centre: 0x24c250) is recorded (x, y,
+  type +0x218, complete, pillaged, the two damages, +0xaa8 the locked price,
+  the fallout) and made again in the new city (0x1ad930), its price set
+  through the +0xa50 watch (0x1e60f0), then its pillage (0x1af5b0), whose
+  hook 0x17e770 sets the new city's +0x248 to trunc(price x 75 / 100) where
+  pillaged: the engines' lazy share at the repair's queueing (`resumeItem`)
+  on the kept price. An unfinished district is not made again.
+- THE REPAIR (City_BuildQueue 0x173f70, the district CanProduce): 0x1ae340
+  with the IsPillaged functor (0x1ae7a0 -> 0x1af9a0 -> 0x24c3a0) finds the
+  city's pillaged district of the type; at a plot naming it (0x17480e) the
+  item is taken past the placement tests (0x35f2d0), the one-per-city and
+  the population limit (0x17436a); refused before that where the type is
+  locked (0x4090b0), the plot is under fallout (0x1aefa0), flooded or
+  occupied. The Builder's repair (Unit_Operations_Repair CanStart 0x967300,
+  Start 0x967740) takes the plot's pillaged improvement (+0x44, +0x4d bit 0)
+  only, so a district is repaired through the queue alone; its completion
+  0x175140 sets it whole without the new district's grants.
+- THE PILLAGE (Unit_Operations_Pillage 0x9633c0): an improvement on the plot
+  is pillaged (0x362b30); else the district's chooser 0x24af90 names the
+  first of strictly greater Cost (+0x24) among the city's unpillaged
+  buildings there (nothing on an InternalOnly district, +0xe1 bit 4, or one
+  with hit points, +0x58 / +0x5c), pillaged through 0x193190 whatever its
+  Buildings_XP2 Pillage; only where none stands is the district itself
+  pillaged (0x1af930). The plunder reads the plot's district either way
+  (0x1fc390 -> 0x51a080).
+- Confirmed (one-seed traces): runs/h1_duelp1121 t140-141 the barbarian
+  Line Infantry 4128797 on Xi'an's Holy Site 7:15 takes the Shrine at t140
+  and the district at t141 (DistrictPillaged t141), the Shrine queued on 26
+  at t148; the replay's Pillage Improvement 8 / 8 on t134-149 (7 / 8 before),
+  read.seat.maintDistricts 15 / 15.
+- Open: the coastal raid's target (0x95ba10, unread: the engines pillage the
+  district); an unfinished district's plot after a capture (the engines leave
+  it paved; the DLL makes none again); a captured minor's unfinished
+  districts (the engines carry them in the registry).

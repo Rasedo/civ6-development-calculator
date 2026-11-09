@@ -112,8 +112,19 @@ class SimSeats:
         if cost is not None:
             # a pillaged building's repair with no progress kept starts at
             # the share its pillage left, (cost x (100 - 25)) / 100 truncated
-            # (0x193190 -> 0x183950)
+            # (0x193190 -> 0x183950); a pillaged district's repair the same
+            # at its plot (0x17e770 -> 0x183a60)
             pil = (code >= 0) & (code < self.NB) & self.city_bldg_pillaged[bidx, row, col, code.clamp(min=0, max=self.NB - 1)]
+            nsc = len(self._scaffold)
+            if nsc and qtile is not None:
+                _si = code - self.DISTRICT_BASE
+                _dq = (_si >= 0) & (_si < nsc) & (qtile >= 0)
+                if bool(_dq.count_nonzero()):
+                    _qt = qtile.clamp(min=0, max=self.T - 1).unsqueeze(1)
+                    _di = self._scaffold_di.take(_si.clamp(min=0, max=nsc - 1))
+                    pil = pil | (_dq & (self.district.gather(1, _qt).squeeze(1) == _di)
+                                 & self.district_complete.gather(1, _qt).squeeze(1)
+                                 & self.district_pillaged.gather(1, _qt).squeeze(1))
             share = torch.floor(cost.double() * (100.0 - self.rules.pillage_building_repair_pct) / 100.0)
             progress = torch.where(pil & (kept <= 0), share.to(kept.dtype), kept)
         for plane, val in zip(self._q_planes(),
@@ -380,15 +391,28 @@ class SimSeats:
                     # `_district_elig` — the most expensive body in the sweep.
                     if not _d_live[si]:
                         continue
+                    # the city's own district held unfinished or standing
+                    # pillaged on its plot: the arm queues it again there
+                    # (`_district_own_site`), past the one-per-city and the
+                    # population limit
+                    own_t, own_ok = self._district_own_site(row, j, di)
+                    own_ok = own_ok & d_tech[si]
                     gate_d = d_tech[si] & self._district_slot_free(row, j, di)
                     if bool(self._is_specialty[di]):
                         gate_d = gate_d & (spec_cnt < cap_max)
-                    if not bool(gate_d.count_nonzero()):
+                    if not bool((gate_d | own_ok).count_nonzero()):
                         continue
-                    elig_d = self._district_elig(row, j, di, plc, base=site)
-                    ok_d[:, si] = gate_d & elig_d.any(dim=1)
+                    if bool(gate_d.count_nonzero()):
+                        elig_d = self._district_elig(row, j, di, plc, base=site) & gate_d.unsqueeze(1)
+                    else:
+                        elig_d = torch.zeros(B, self.T, dtype=torch.bool, device=dev)
+                    if bool(own_ok.count_nonzero()):
+                        _orows = own_ok.nonzero(as_tuple=True)[0]
+                        elig_d = elig_d.clone()
+                        elig_d[_orows, own_t[_orows]] = True
+                    ok_d[:, si] = elig_d.any(dim=1)
                     if sites is not None:
-                        sites[(j, si)] = elig_d & (gate_d & room[:, j]).unsqueeze(1)
+                        sites[(j, si)] = elig_d & room[:, j].unsqueeze(1)
             base_j = torch.cat([ok_b, ok_s, ones_b.unsqueeze(1), ok_u, ok_d], dim=1)
             ok_w = torch.zeros(B, max(nW_m, 0), dtype=torch.bool, device=dev)
             if nW_m > 0:
@@ -3330,18 +3354,13 @@ class SimSeats:
                     if not bool(want_d.count_nonzero()):
                         continue
                     has_tech = self._district_unlocked(row, si)
-                    # the city's own district standing unfinished on the plot
-                    # is queued again at its locked price and its kept progress
-                    # (`placeSeatDistrict`'s held plot, `resumeItem`)
+                    # the city's own district standing unfinished on the plot,
+                    # or standing pillaged (its repair), is queued again at its
+                    # locked price on its kept progress, or on the share its
+                    # pillage left (`placeSeatDistrict`, `resumeItem`)
                     _dt = dtile[:, j, si]
-                    _dtc = _dt.clamp(min=0, max=self.T - 1)
-                    resume = (want_d & has_tech & (_dt >= 0) & (_dt < self.T)
-                              & (self.city_dist_tile[:, row, j, di] == _dt)
-                              & (self.district.gather(1, _dtc.unsqueeze(1)).squeeze(1) == di)
-                              & ~self.district_complete.gather(1, _dtc.unsqueeze(1)).squeeze(1)
-                              & (self.tile_seat.gather(1, _dtc.unsqueeze(1)).squeeze(1) == row)
-                              & (self.tile_city.gather(1, _dtc.unsqueeze(1)).squeeze(1) == self.city_id[:, row, j])
-                              & ~(self._fallout() | self._fire_plots()).gather(1, _dtc.unsqueeze(1)).squeeze(1))
+                    _own_t, _own_ok = self._district_own_site(row, j, di)
+                    resume = want_d & has_tech & (_dt >= 0) & (_dt == _own_t) & _own_ok
                     if bool(resume.count_nonzero()):
                         _lk = self.city_dist_cost[:, row, j, di]
                         _kc = torch.where(_lk > 0, _lk.double(), self._district_cost_si(row, si, pct_d).double())
@@ -11189,6 +11208,25 @@ class SimSeats:
             am = am + hpf * float(self._b_pow_am[n])
         return None if y6 is None else (y6, am)
 
+    def _district_own_site(self, row: int, j: int, di: int) -> tuple[torch.Tensor, torch.Tensor]:
+        """The plot city j of `row` queues its own district of type `di` on
+        again, [B] tile and [B] ok: the registry's plot of the type, the
+        city's, holding the district either unfinished (`placeSeatDistrict`'s
+        held plot, no fallout or fire there) or complete and pillaged (its
+        repair, `districtRepairSite`: 0x173f70 takes the city's pillaged
+        district at its own plot past the placement tests and the population
+        limit; no fallout there)."""
+        dt = self.city_dist_tile[:, row, j, di]
+        dtc = dt.clamp(min=0, max=self.T - 1).unsqueeze(1)
+        g = lambda p: p.gather(1, dtc).squeeze(1)
+        mine = ((dt >= 0) & (g(self.district) == di) & (g(self.tile_seat) == row)
+                & (g(self.tile_city) == self.city_id[:, row, j]) & self.city_alive[:, row, j])
+        done = g(self.district_complete)
+        fall = g(self._fallout())
+        held = ~done & ~fall & ~g(self._fire_plots())
+        repair = done & g(self.district_pillaged) & ~fall
+        return dt, mine & (held | repair)
+
     def _district_slot_free(self, row: int, j: int, di: int) -> torch.Tensor:
         """canPlaceDistrictIn's one-per-city arm, [B]. A REPEATABLE type is
         never blocked by an existing one — CIV 6 lets a city hold several
@@ -12078,6 +12116,10 @@ class SimSeats:
         old_full = old_outer >= int(self._walls_max_at(
             torch.full((self.B,), src_row, dtype=torch.long, device=self.device),
             torch.full((self.B,), src_col, dtype=torch.long, device=self.device))[b])
+        # each completed district comes over with its locked price
+        # (City_Manager 0x1e8880: the old District's +0xaa8 set on the new)
+        old_dtile = self.city_dist_tile[b, src_row, src_col, :].clone()
+        old_dcost = self.city_dist_cost[b, src_row, src_col, :].clone()
         self._clear_city_slot(b, src_row, src_col)
         self.centre_slot_at[b, c_t] = -1
         # ...and the loser re-crowns immediately, BEFORE the route prune and
@@ -12249,6 +12291,12 @@ class SimSeats:
             _di = int(self.district[b, _t])
             if int(self.city_dist_tile[b, dst_row, col, _di]) < 0:  # a repeatable type keeps its first
                 self.city_dist_tile[b, dst_row, col, _di] = _t
+        # the new city is a fresh one: no progress kept by type, each
+        # completed district at its locked price where the loser's registry
+        # held it on the same plot (`transferCity`'s keptDistricts)
+        _dt = self.city_dist_tile[b, dst_row, col, :]
+        self.city_dist_cost[b, dst_row, col, :] = torch.where(
+            (_dt >= 0) & (_dt == old_dtile), old_dcost, torch.zeros_like(old_dcost))
         dead_ring = owned & (self.district[b] >= 0) & ~self.district_complete[b]
         self.district_dead[b] = (self.district_dead[b] | dead_ring) & ~live_ring
         # Wonders are keyed by wonder index -> tile and carry no completeness

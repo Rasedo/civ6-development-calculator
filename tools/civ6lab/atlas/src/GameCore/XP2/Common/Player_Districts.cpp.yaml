@@ -88,6 +88,17 @@
   context:
     - "..., the positive summed, added only where its SpaceRace ones value above 0 — shared by (0x408b60 all + 1) while 0x408b60 complete stands within ceil(0.5 x their count) and the plot lac..."
   review: reviewed
+- addr: 0x4090b0
+  final: 0x2c48c0
+  kind: function
+  status: PARTLY
+  impl: [cpu/core/phase.ts:districtRepairSite]
+  readings:
+    - "C-111: a captured city keeps its completed districts' locked prices and no progress by type; a district's repair is its city's queue; a unit's pillage takes the district's dearest building first — READ (0x1e8880, 0x173f70 at 0x17480e, 0x967300 / 0x967740, 0x9633c0 -> 0x24af90 -> 0x193190), both twins"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - ...ty and the population limit (0x17436a); refused before that where the type is locked (0x4090b0), the plot is under fallout (0x1aefa0), flooded or occupied. The Builder's repair (Unit...
+  review: imported
 - addr: 0x409800
   kind: function
   semantics: "every district's cost refreshed: 0x409870 per Districts row. Called by SetTech (0x4cd7f1), SetCivic (0x3a1dbd), 0x4cc740 (0x4cc84a) and the city placement (0x1eb312)."
