@@ -12977,3 +12977,47 @@ player as a 'city' step, every type's count at the completed count standing.
   class at t180 on all five duelp games, +50 at 1124 t160 and 1128 t183)
   and the store a later grant leaves at that amount and the fraction (1128
   t220: 483 − 480 → 150, the record's).
+
+## C-95: the danger map's list and its districts — a ship's city, a peaceful unit's plot, the undamaged strike, an unbuilt Encampment's — READ (0x26dab0, 0x586900, 0x717460, 0x249ee0 / 0x24b960), both twins
+
+`dangerPlane` / `dangerDistricts` (cpu/core/tactical.ts), `_danger_plane` /
+`_danger_districts` (gpu/core/sim_tactics.py). The replay sets each map
+against the game's (the AI memory's `danger` at the tactical step,
+`readDanger` in cpu/harness/aiMemory.ts, kinds `danger` and `danger.major`
+outside the player's cleanness).
+
+- A SHIP'S REACH: the list keeps no land plot a ship attacks into, and keeps
+  a land plot it moves onto — its own city, a Canal. runs/h1_duelq1124 t163:
+  the barbarians' map holds Rome's centre 34:19 at 146, the 86 of its
+  defence and land units and 30 for each of its Galleys 3735561 (34:18) and
+  917504 (32:19); t35-t88 the same plot 30 / 60 / 90 short for one, two,
+  three Galleys. runs/h1_duelq1121 t230 / t233: city-state 2's map holds 30
+  on player 1's Canal 8:8.
+- THE LIST'S STAND TEST (0x26dab0 at 0x26db72..0x26dbe5): a plot the player
+  sees now joins only with the node's +0x50 bit 0x40 (0x586900 under flag
+  1), the planning list's rule: none another player's unit at peace with
+  it holds (`groundOf`'s `stand`; GPU `res["turns"]`, the stand-filtered
+  reach). runs/h1_duelq1127 t216-220: city-state 3's Galley on 30:19 adds
+  nothing to 30:18 / 30:17, player 0's embarked Scouts on them.
+- THE DISTRICTS' STRIKE is 0x249ee0's, which reads no damage
+  (`cityStrikeBase`; GPU `_strike_base` and the Bastions half): no wounded
+  loss on a damaged wall. runs/h1_duelq1128 t45-54: Xi'an's walls 13..31
+  down of 100, player 1's own plots about it taken down by its whole Slinger
+  15 (+ Bastions), the barbarians' plots raised by it.
+- AN ENCAMPMENT'S STRIKE (0x249ee0 with its flag clear -> 0x24b960, its
+  outer damage below its outer maximum): read for every placed Encampment,
+  built or not, pillaged or not; one not yet built stands behind its city's
+  whole walls (its outer damage 0). runs/h1_duelq1128 t96-103: Xi'an's
+  Encampment on 13:13, placed, outer damage 0 of 100, adds its 40 to the
+  barbarians' plots about it (12:11 81, 13:12 82 as the game's);
+  runs/h1_duelq1124 t219-248: Granada's pillaged Encampment 40:10 (outer
+  damage 57 of 400) adds its 70 / 90 to the barbarians' plots about it.
+- Open: player 1's own map lowers 13:12 / 12:13 / 14:13 by that
+  Encampment to 1 where ours leaves 10 (runs/h1_duelq1128 t96-103); a
+  major's map at its DoTurn sees the walls its city completes that
+  DoTurn, which record t lacks (runs/h1_duelq1121 t41 Xi'an, 1127 t36 Xi'an,
+  1128 t44 Xi'an: the own strike's 1s a turn before the record's walls) —
+  the `danger.major` kind builds on record t; the barbarians' map sees
+  units the game's does not (embarked land units among them: runs/h1_duelq1121
+  t124 / t210, player 0's embarked Warriors' 20 / 15) and districts' strikes
+  differ by small amounts (runs/h1_duelq1128 t44-54 player 1's Xi'an).

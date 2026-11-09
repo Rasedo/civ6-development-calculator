@@ -20,16 +20,16 @@ import { AI_FEATURES, AI_UNITS } from '../data/aiBuildTables';
 import { AI_UNIT_AI } from '../data/aiOperations';
 import { engineId, gameTypeOf, installFeature } from '../data/aliases';
 import {
-  arrive, canEmbark, cityAtIndex, crossesRiver, embarkTechMoves, escortUnit, inEscort, cliffBlocksStep, shoreCrossing, districtZones, encampmentBlocks, encampmentIntact, inEnemyZoc, rosterEmbarkMoves, stepCost, stepUnit, terrainMp, unitDomain, unitExertsZoc, unitFullMoves, unitIsNoncombat, mapLayer, unitReligious,
+  arrive, canEmbark, cityAtIndex, crossesRiver, embarkTechMoves, escortUnit, inEscort, cliffBlocksStep, shoreCrossing, districtZones, encampmentBlocks, inEnemyZoc, rosterEmbarkMoves, stepCost, stepUnit, terrainMp, unitDomain, unitExertsZoc, unitFullMoves, unitIsNoncombat, mapLayer, unitReligious,
   setBarbStepLook, unitsHostile, unitVisibleTo, fortifyOrder,
   waterEnterable, waterWalks, formationBanned, formationCS, setRecordFormation, formationMates, dropLoneRiders, escortOf, escortRiders, disbandUnit,
 } from './units';
 import { BARB_SEAT, FREE_SEAT, NO_SEAT, campTiles, cityHolders, civsAtWar, isBarbSeat, isCityStateSeat, isCiv, isTerritorial, seatOf, tileCity, tileSeat } from './seats';
 import { OPEN_BORDERS_CIVIC } from '../data/seats';
 import { randRange } from './rand';
-import { cityDefenseStrength, districtGarrisonedStrength, embarkedDefenseCS, cityStrikeStrength, coastalRaid, damageExpected, hostilePillage, hostileRangedStrike, meleeAttack, meleeUnitStrengths, movesAndShoots, predictCityBlow, predictCityExchange, predictCityShot, rangedUnitStrengths, stackDefender, unitAttackRange } from './combat';
+import { cityDefenseStrength, districtGarrisonedStrength, embarkedDefenseCS, cityStrikeBase, coastalRaid, damageExpected, hostilePillage, hostileRangedStrike, meleeAttack, meleeUnitStrengths, movesAndShoots, predictCityBlow, predictCityExchange, predictCityShot, rangedUnitStrengths, stackDefender, unitAttackRange } from './combat';
 import { CITY_STRIKE_RANGE } from './phase';
-import { encampOuterPool, outerPool } from './rules';
+import { encampOuterPool, outerPool, wallsMax } from './rules';
 import { cityStateAt, minorCity } from './cityStates';
 import { irradiated } from './nuclear';
 import { canSee, losDisk, unitSight } from './fog';
@@ -1956,8 +1956,10 @@ export const aiRanged = (u: Unit): number => (UNITS[u.type]?.bombard ? 0 : aiFor
  * read by 0x716a90): per player at war with `seat`, each unit of it the seat
  * sees now with a combat, ranged or bombard strength adds its danger
  * (`unitDanger`) to every plot its one-turn planning search closes from where
- * it stands on its full Movement (0x7921e0 -> 0x26df90, no zone of control, its melee attacks
- * included but a ship's onto land: runs/h1_duelv1128 t45 / t80 / t109, a
+ * it stands on its full Movement and may stand on, none another player's
+ * unit at peace with it holds in its sight (0x7921e0 -> 0x26df90, no zone of
+ * control, its melee attacks included but a ship's onto land, a city it may
+ * enter a ship's plot: runs/h1_duelv1128 t45 / t80 / t109, a
  * city-state's land unit beside a barbarian Galley and Quadriremes logs the
  * Quadriremes' ranged danger alone; a unit with a range only the plots it
  * reaches with Movement left), and to a second list, each plot once: every other plot within
@@ -1996,14 +1998,22 @@ export function dangerPlane(state: GameState, seat: number): Int16Array {
     const mates = formationMates(state, u);
     const full = { ...u, movesLeft: formationFullMoves(state, u, mates) };
     // a ship's strike onto land is no plot of its reach: the land a ship
-    // threatens is the range of its water plots
+    // threatens is the range of its water plots and the cities it may
+    // enter (runs/h1_duelq1124 t163: the barbarians' map holds Rome's centre
+    // 34:19 at 146, 86 without its two Galleys' 30 each, the Galley 3735561
+    // on 34:18 and 917504 on 32:19)
     const naval = !!UNITS[u.type]?.naval;
     search(state, full, 1, false, (n, ground) => {
-      if (!ground.fits(n.tile)) return false;
+      // the list (0x26dab0) takes a plot the player sees now only where the
+      // unit may stand (+0x50 bit 0x40): none another player's unit at peace
+      // with it holds, as the planning's (runs/h1_duelq1127 t216: city-state
+      // 3's Galley on 30:19 lists neither 30:18 nor 30:17, player 0's
+      // embarked Scouts on them)
+      if (!ground.fits(n.tile) || (n.tile !== u.tileIndex && !n.attack && !ground.stand(n.tile))) return false;
       // a unit with a range lists a plot only with Movement left there to
       // strike from (the list's ranged flag, 0x7921e0 -> 0x791270)
       if (R > 0 && n.moves <= 0) return false;
-      if (!naval || isWater(map.tiles[n.tile])) reach.push(n.tile);
+      if (!naval || !n.attack || isWater(map.tiles[n.tile])) reach.push(n.tile);
       return false;
     }, undefined, 'danger');
     const inReach = new Set(reach);
@@ -2067,24 +2077,32 @@ export function featureDanger(feature: string): number {
  * A CITY'S DISTRICTS AS THE DANGER MAP READS THEM (the player's district
  * list, +0x1308 -> +0xd8): every district placed, built or not, pillaged or
  * not, its wonders' plots among them (DISTRICT_WONDER), each with its
- * defence (0x24ae80) and strike (0x249ee0) in whole numbers (the 24.8 values
- * shifted down). Only a district with hit points (DistrictInfo +0x58 / +0x5c:
+ * defence (0x24ae80) and undamaged strike (0x249ee0, `cityStrikeBase`) in
+ * whole numbers (the 24.8 values shifted down). Only a district with hit points (DistrictInfo +0x58 / +0x5c:
  * the City Center, the Encampment) has a defence, and it strikes only while
  * its own perimeter stands (0x24b960: its outer damage below its maximum):
  * the centre on its city's defence and strike, the Encampment on its city's
  * standing strength with its own plot's garrison (0x24a180 over the best
- * defender there, `districtGarrisonedStrength`) and the city's strike; any
- * other district neither.
+ * defender there, `districtGarrisonedStrength`) and the city's strike, one
+ * not yet built behind its city's whole walls; any other district neither.
  */
 export function dangerDistricts(state: GameState, c: City): { plot: number; def: number; strike: number }[] {
-  const strike = Math.floor(cityStrikeStrength(state, c));
+  // the strike before any damage: 0x249ee0 reads none (runs/h1_duelq1124
+  // t219: Granada's Encampment, its walls 57 down of 400, adds its whole 70
+  // to the barbarians' plots about it)
+  const strike = Math.floor(cityStrikeBase(state, c));
   const out: { plot: number; def: number; strike: number }[] = [];
   for (const d of c.districts) {
     if (d.type === 'CITY_CENTER') {
       out.push({ plot: d.tileIndex, def: Math.floor(cityDefenseStrength(state, c)), strike: outerPool(state, c) > 0 ? strike : 0 });
     } else if (d.type === 'ENCAMPMENT') {
       const t = state.map.tiles[d.tileIndex];
-      out.push({ plot: d.tileIndex, def: Math.floor(districtGarrisonedStrength(state, c, d.tileIndex)), strike: encampmentIntact(t) && encampOuterPool(state, c, t) > 0 ? strike : 0 });
+      // a placed Encampment not yet built stands behind its city's whole
+      // walls (runs/h1_duelq1128 t96-103: Xi'an's Encampment on 13:13,
+      // unbuilt, outer damage 0 of 100, adds its 40 to the barbarians' plots
+      // about it)
+      const pool = t.districtComplete ? encampOuterPool(state, c, t) : wallsMax(state, c);
+      out.push({ plot: d.tileIndex, def: Math.floor(districtGarrisonedStrength(state, c, d.tileIndex)), strike: pool > 0 ? strike : 0 });
     } else {
       out.push({ plot: d.tileIndex, def: 0, strike: 0 });
     }
@@ -2177,6 +2195,19 @@ export interface Pass {
 let tacticsTrace: ((unit: Unit, move: string, plot: number, attack: number) => void) | null = null;
 export function traceTactics(fn: ((unit: Unit, move: string, plot: number, attack: number) => void) | null): void {
   tacticsTrace = fn;
+}
+
+let dangerTrace: ((seat: number, plane: Int16Array) => void) | null = null;
+/** REPLAY: each player's danger map as its tactical pass opens on it */
+export function traceDanger(fn: ((seat: number, plane: Int16Array) => void) | null): void {
+  dangerTrace = fn;
+}
+
+/** a pass's danger map, the replay's trace shown it */
+function passDanger(state: GameState, seat: number): Int16Array {
+  const plane = dangerPlane(state, seat);
+  dangerTrace?.(seat, plane);
+  return plane;
 }
 
 /** the unit whose move takes the draw being taken, for the replay's hold on
@@ -3895,7 +3926,7 @@ export function openPass(state: GameState, seat: number, aiOf: (u: Unit) => numb
   }
   const ended = new Set<number>();
   movesEnded = ended;
-  return { seat, strike: false, units, reach, done: new Set(), ended, ai, targets, plan, danger: dangerPlane(state, seat), regions: seenRegions(state, seat) };
+  return { seat, strike: false, units, reach, done: new Set(), ended, ai, targets, plan, danger: passDanger(state, seat), regions: seenRegions(state, seat) };
 }
 
 /** an operation's member of the player, null for one killed */
@@ -4247,7 +4278,7 @@ function tacticalPass(state: GameState, acting: ReadonlySet<number>): void {
     reach.set(u.id, p.reach);
   }
   const pass: Pass = { seat: BARB_SEAT, strike: true, units: all, reach, done: new Set(), ended: (movesEnded = new Set<number>()), ai, targets, plan,
-    danger: dangerPlane(state, BARB_SEAT), regions: seenRegions(state, BARB_SEAT) };
+    danger: passDanger(state, BARB_SEAT), regions: seenRegions(state, BARB_SEAT) };
   // the operations first (their manager's job opens the player's turn);
   // then an operation's units are the operation's
   const opUnits = barbarianTrees(state, pass);

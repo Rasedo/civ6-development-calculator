@@ -64,7 +64,7 @@ import { BOOSTS } from '../data/boosts';
 import { chargeUnitResource, upgradeGoldCost, upgradeType } from '../core/stockpile';
 import { airStrike, applyTrainingGrants, cityStrikeStrength, clearCampFor, combatBlow, type Blow, flankSupportLive, hostilePillage, meleeAttack, rangedAttack, seizeCivilian, terrainDefense } from '../core/combat';
 import { freeCitiesMilitary, traceFreeOps } from '../core/freeOps';
-import { barbarianTactics, barbMovesNow, dangerPlane, refreshBarbarians, tacticsDrawing, knowledgeLook, traceKnowledge, traceTactics } from '../core/tactical';
+import { barbarianTactics, barbMovesNow, dangerPlane, refreshBarbarians, tacticsDrawing, knowledgeLook, traceDanger, traceKnowledge, traceTactics } from '../core/tactical';
 import { barbBattleDeath, barbBattlesFromRecord, barbSlots, barbSlotsDying, barbarianRules, barbarianTechs, barbScoutLook, foundTribe, plotsSeenNow, tribeDies, tribeKindAt } from '../core/barbarians';
 import { DIFFICULTIES } from '../data/barbarians';
 import { MINOR_UPGRADE_GOLD, LEVY_TURNS } from '../data/cityStates';
@@ -124,7 +124,7 @@ import { loadGpTimeline, type GpTimeline } from './gpTimeline';
 import { patronageCost, patronizeGreatPerson, recruit } from '../core/greatPeople';
 import { InferredActions, RecordedActions, activePlayer, type ActionSource, type Decision, type LogTally, type QueueSpec } from './replayActions';
 import { newScores, scoreDecision, scoreTable, memoryTable, type DecisionScores } from './aiScore';
-import { GameMemory, MemoryLogs, readGameMemory, readMemory, readRevealed, syncContracts, type ArmyLogged } from './aiMemory';
+import { GameMemory, MemoryLogs, readDanger, readGameMemory, readMemory, readRevealed, syncContracts, type ArmyLogged } from './aiMemory';
 import { gameSpawnChanges, importCityAi, importOps, type GameSpawnChange } from './gameAiImport';
 import { NO_SCORE } from '../core/aiPolicyValue';
 
@@ -360,6 +360,9 @@ interface Ctx {
   gameMemory?: GameMemory;
   /** per seat its knowledge base as its last tactical turn logged it */
   armyLogged: Map<number, ArmyLogged>;
+  /** per seat the danger map its last tactical pass opened on, with that
+   *  turn */
+  dangerLogged: Map<number, { turn: number; plane: Int16Array }>;
   /** each unit's type as the city-states' and Free Cities' turns left the
    *  units (the moment of their end looks), by id */
   minorLookTypes: Map<number, string>;
@@ -6054,7 +6057,7 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
     researchAi: report.researchAi, researchScores: report.researchScores, agendaCivics: null, strategyLog: loadStrategyLog(dumpPath), researchBefore: new Map(), researchAtTurn: new Map(), aiResearchLog,
     tactical: loadTactical(dumpPath), barbTally: report.barbTactics, minorTally: report.minorTactics, minorDraws: report.minorDraws,
     civicAi: report.civicAi, civicScores: report.civicScores, civicBefore: new Map(), aiCivicLog: govtLog.civics, aiPolicyLog: govtLog.policies,
-    scores: report.scores, turn: recs[0].turn, memoryLogs: new MemoryLogs(dumpPath), gameMemory: GameMemory.of(dumpPath), armyLogged: new Map(), minorLookTypes: new Map(), minorDying: [],
+    scores: report.scores, turn: recs[0].turn, memoryLogs: new MemoryLogs(dumpPath), gameMemory: GameMemory.of(dumpPath), armyLogged: new Map(), dangerLogged: new Map(), minorLookTypes: new Map(), minorDying: [],
     // a game from its first turn opens on no memory, the game's as well
     memoryClean: new Map([...first.playerOfSeat].filter(([seat]) => minorAiSeat(seat) || isBarbSeat(seat)).map(([, p]) => [p, recs[0].turn <= 1] as const)),
     cityBuildLog: loadCityBuildTables(dumpPath), cityBuild: newCityBuildTally(), cityBuildPer: new Map(),
@@ -6071,6 +6074,8 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
   // each knowledge base as its tactical turn's ageing and look leave it, the
   // moment the game writes its ARMY lines
   traceKnowledge(armyLog(ctx));
+  // each danger map as its tactical pass opens on it, with the pair's turn
+  traceDanger((seat, plane) => ctx.dangerLogged.set(seat, { turn: ctx.turn, plane: plane.slice() }));
   // the operations each AI party started, against the log's
   operations.onStarts = (turn, player, log, ours) => {
     const seat = ctx.seatOfPlayer.get(player) ?? NO_SEAT;
@@ -6143,6 +6148,10 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
       break;
     }
     ctx.turn = a.turn;
+    // a major's danger map on the world record t holds, its turn opening
+    if (opts.aiScore && ctx.gameMemory) {
+      for (const [seat] of ctx.playerOfSeat) if (isCiv(seat)) ctx.dangerLogged.set(seat, { turn: a.turn, plane: dangerPlane(state, seat) });
+    }
     ctx.groundWas = state.map.tiles.map(groundWasOf);
     // the city-states' revealed plots as the turn opens, which their units'
     // planning reads (runs/h1_duely1117 t2: Valletta's Warrior on 13:8
@@ -6946,6 +6955,17 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
         clean.set(pid, reads.every((m) => m.equal));
       }
       ctx.memoryClean = clean;
+      // each danger map against the game's at the player's tactical step,
+      // outside its cleanness: the minors' and the barbarians' as their
+      // passes opened on them, the majors' on the world record t holds
+      for (const [seat, opened] of ctx.dangerLogged) {
+        const pid = ctx.playerOfSeat.get(seat);
+        const m = pid === undefined || opened.turn !== a.turn ? undefined
+          : readDanger(isCiv(seat) ? 'danger.major' : 'danger', opened.plane, ctx.gameMemory?.at('tactical', a.turn, pid), ctx.W);
+        if (!m) continue;
+        scoreDecision(report.memory, m.kind, a.turn, `p${pid}`, m.equal, m.ours, m.game);
+        if (!m.equal && TRACE.has('memory')) console.error(`t${a.turn} memory p${pid} ${m.kind} ours ${m.ours} | log ${m.game}`);
+      }
     }
     // the city-states' research AI: each choice its turn made, against the
     // research record t+1 shows
@@ -7043,6 +7063,7 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
   holdMinorClears(null);
   traceMinorOps(null);
   traceKnowledge(null);
+  traceDanger(null);
   traceFreeOps(null);
   holdResearchEra(null);
   holdMinorOrders(false);

@@ -14,6 +14,10 @@
  *     AI_Operation.csv (running and started, less those complete);
  *   - revealed: the city-states' and the barbarians' revealed plots against
  *     the next record's (`readRevealed`), outside the player's cleanness.
+ *   - danger: the city-states', the Free Cities' and the barbarians' danger
+ *     maps as their tactical passes open on them against the game's at its
+ *     tactical step (`readDanger`), outside the player's cleanness;
+ *     danger.major the majors' maps alike, built on the world record t holds.
  *
  * A recording with the game's own AI memory beside it (`<stem>.aimem.jsonl`,
  * `GameMemory`) is compared against that instead (`readGameMemory`): the
@@ -33,7 +37,7 @@ import { gameTypeOf } from '../data/aliases';
 import { CIVICS } from '../data/civics';
 
 export const MEMORY_KINDS = ['knowledge.army', 'knowledge.camps', 'cityAi.contracts', 'contracts', 'contracts.progress', 'ops',
-  'ops.targets', 'ops.members', 'ops.strength', 'revealed'] as const;
+  'ops.targets', 'ops.members', 'ops.strength', 'revealed', 'danger', 'danger.major'] as const;
 export type MemoryKind = typeof MEMORY_KINDS[number];
 
 const lines = (path: string): string[] => (existsSync(path) ? readFileSync(path, 'utf8').split(/\r?\n/).slice(1) : []);
@@ -211,6 +215,9 @@ export interface GameMemoryRead {
   holders?: { cities: { city: number; hand: number; list: number[] }[]; economic: number[]; research?: number[]; culture?: number[] };
   /** per unit id the control it is assigned to */
   assigned?: Record<string, number>;
+  /** at the tactical step: the danger map, [x, y, danger] per plot of
+   *  non-zero danger */
+  danger?: [number, number, number][];
 }
 
 /** one behaviour tree as the game holds it (aimem.py `trees`) */
@@ -411,6 +418,25 @@ export function readRevealed(ours: readonly number[] | undefined, game: readonly
   const count = (x: readonly number[]) => x.reduce((n, v) => n + (v === 1 ? 1 : 0), 0);
   const show = (n: number, plots: string[]) => `${n}${plots.length ? ` +${plots.length} ${plots.slice(0, 8).join(' ')}` : ''}`;
   return { kind: 'revealed', equal: mine.length + theirs.length === 0, ours: show(count(ours), mine), game: show(count(game), theirs) };
+}
+
+/** a player's danger map as its tactical pass opened on it against the
+ *  game's at its tactical step (`GameMemoryRead.danger`): each side its count
+ *  of plots of danger, then the plots that differ (x:y ours/game, the first
+ *  eight) */
+export function readDanger(kind: 'danger' | 'danger.major', ours: ArrayLike<number> | undefined, game: GameMemoryRead | undefined,
+  W: number): MemoryRead | undefined {
+  if (!ours || !game?.danger) return undefined;
+  const theirs = new Map(game.danger.map(([x, y, v]) => [y * W + x, v] as const));
+  const off: string[] = [];
+  let n = 0;
+  for (let p = 0; p < ours.length; p++) {
+    const g = theirs.get(p) ?? 0;
+    if (ours[p] !== 0) n += 1;
+    if (ours[p] !== g) off.push(`${xy(p, W)} ${ours[p]}/${g}`);
+  }
+  const tail = off.length ? ` ~${off.length} ${off.slice(0, 8).join(' ')}` : '';
+  return { kind, equal: off.length === 0, ours: `${n}${tail}`, game: `${theirs.size}` };
 }
 
 /** one memory kind's comparison of a player at a turn: ours, the log's */

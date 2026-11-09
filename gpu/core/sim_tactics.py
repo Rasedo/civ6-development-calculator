@@ -4805,8 +4805,9 @@ class SimTactics:
         `need` [B, T] (those its pass reads): each unit of a player at war
         with it that it sees, with a combat, ranged or bombard strength, adds
         its danger (`unitDanger`) over the plots its one-turn search closes
-        from where it stands on its full Movement (a ship's strike onto land
-        none; a unit with a range only those it reaches with Movement left),
+        from where it stands on its full Movement and may stand on (none
+        another player's unit at peace holds in its sight; a ship's strike onto land
+        none, a city it may enter one; a unit with a range only those it reaches with Movement left),
         those within its range of
         them and, a raider's, the land beside them — each set once; an
         aircraft over its range. Each district of such a player
@@ -4872,10 +4873,14 @@ class SimTactics:
                     if not mm.numel():
                         continue
                     res = self._tac_search(b_i[mm], u_i[mm] - lo, int(sv), 1, False, pre=pre, full=True, stand=True)
-                    reach = (res["closed"] >= 1) & res["fits"]
-                    # a ship's strike onto land is no plot of its reach
+                    # the plots it may stand on, attacks into and its own
+                    # (the list 0x26dab0: none another player's unit at peace
+                    # holds on a plot the player sees now)
+                    reach = res["turns"] >= 1
+                    # a ship's strike onto land is no plot of its reach (a
+                    # city it may enter is)
                     ship = self.unit_naval[ut[b_i[mm], u_i[mm]]]
-                    reach &= ~(ship.unsqueeze(1) & ~self.water[b_i[mm]])
+                    reach &= ~(ship.unsqueeze(1) & ~self.water[b_i[mm]] & res["attack"])
                     rr = R[b_i[mm], u_i[mm]]
                     # a unit with a range lists a plot only with Movement
                     # left there to strike from (0x7921e0 -> 0x791270)
@@ -4939,8 +4944,8 @@ class SimTactics:
         (placed [B], plot [B], defence [B], strike [B]) in whole numbers — the
         centre on its city's defence and its strike while the walls stand,
         the Encampment on the city's standing strength with its own plot's
-        garrison and its strike while it stands intact behind its own perimeter, any
-        other neither"""
+        garrison and its strike while its own perimeter stands (one not yet
+        built behind its city's walls), any other neither"""
         dev = self.device
         B = self.B
         bidx = self._bidx
@@ -4948,10 +4953,10 @@ class SimTactics:
         rt = torch.full_like(col, row)
         zero = torch.zeros_like(col)
         wmax = self._walls_max_at(rt, col).long()
-        raw = self._strike_strength(row, col)
+        # the strike before any damage (0x249ee0 reads none)
+        raw = self._strike_base(row)
         if row < self.n_majors:
-            raw = raw + self._gov_mods(row)[12]["crng"].to(raw.dtype)
-        raw = torch.floor(raw).long()
+            raw = raw + self._gov_mods(row)[12]["crng"].double().floor().long()
         pool = torch.minimum(self.city_outer_hp[bidx, row, col].long(), wmax)
         ctr = self.city_center[:, row, c].clamp(min=0)
         out = [(live, ctr, torch.floor(self._city_defense_cs(rt, col)[0]).long(), torch.where(pool > 0, raw, zero))]
@@ -4963,14 +4968,14 @@ class SimTactics:
                 continue
             p0 = plot.clamp(min=0)
             if di == self._encamp_didx:
-                intact = (self.district_complete[bidx, p0] & ~self.district_pillaged[bidx, p0]
-                          & (self.encamp_hp[bidx, p0] > 0)
-                          & (torch.minimum(self.encamp_outer_hp[bidx, p0].long(), wmax) > 0))
+                # one placed, not yet built, behind its city's whole walls
+                stands = torch.where(self.district_complete[bidx, p0],
+                                     torch.minimum(self.encamp_outer_hp[bidx, p0].long(), wmax), wmax) > 0
                 # its city's standing strength and its own plot's garrison
                 # (0x24ae80 with the garrison flag 0, 0x24a180)
                 gar = self._garrison_cs(rt, col, self._ROW_SEAT.take(rt), self._holder_strength(rt, col), plot=p0)
                 d = torch.floor(self._centre_strength(rt, col, garrisoned=False) + gar).long()
-                out.append((placed, p0, d, torch.where(intact, raw, zero)))
+                out.append((placed, p0, d, torch.where(stands, raw, zero)))
             else:
                 out.append((placed, p0, zero, zero))
         wreg = self.city_wonder[:, row, c]

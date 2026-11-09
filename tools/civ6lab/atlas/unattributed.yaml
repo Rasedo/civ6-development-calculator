@@ -1361,10 +1361,19 @@
   kind: function
   semantics: "the reach search's list callback (0x26df90 +0x78): on NotifyList 5, or 3 with no parent (GetBest 0x781e0's close), a plot it lists (0x791270, once): one the player sees now (+0x50 & 2) only with +0x50 & 0x40 and neither 0xc, its own stacking count (+0x54) on a plot of the formation's owner; then 0x586900 under the search's flags (4 -> 8, 0x10 -> 1, 0x20 -> 2, 0x2000 -> 0x80)."
   status: PARTLY
+  cases:
+    - recording: h1_duelq1127
+      turn: 216
+      value: "the danger map's list: city-state 3's Galley on 30:19 lists neither 30:18 nor 30:17, player 0's embarked Scouts at peace with it there in its sight (+0x50 bit 0x40 clear); the barbarians' map 0 on both"
+  impl:
+    - cpu/core/tactical.ts:dangerPlane
+    - gpu/core/sim_tactics.py:_danger_plane
+    - cpu/core/tactical.ts:within
   readings:
     - "C-99: Naval Patrol's explore target — the list and the tests READ, two cases unexplained"
     - "C-124: a path enters a plot the player never revealed whatever it is — READ (0x2720a0 at 0x272372..0x27242e, 0x271be0's +0x50 bit 0x20, 0x26e920), both twins"
     - "C-95: a ranged unit's danger reach holds only plots with Movement left — READ (0x7921e0, 0x791270, 0x26dab0), both twins"
+    - "C-95: the danger map's list and its districts — a ship's city, a peaceful unit's plot, the undamaged strike, an unbuilt Encampment's — READ (0x26dab0, 0x586900, 0x717460, 0x249ee0 / 0x24b960), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "- THE CANDIDATE LIST (0x26df90's list callback 0x26dab0): a plot is appended on GetBest's NotifyList 3 (0x781e0, parent argument 0), once (0x79..."

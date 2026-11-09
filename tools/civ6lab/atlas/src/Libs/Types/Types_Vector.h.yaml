@@ -519,6 +519,15 @@
     - recording: h1_duelz1124
       turn: 29
       value: "city-state 3's Build City Improvement keeps its Builder off the Farm plot 41:11 at t29: the danger the barbarian Warrior on 41:10 adds at the DoTurn's build, though its Warriors kill it later in the turn; laid t30"
+    - recording: h1_duelq1124
+      turn: 163
+      value: "the barbarians' map (aimem danger) holds Rome's centre 34:19 at 146: its two Galleys reach their own city, 30 each (the ship's reach keeps a city it may enter)"
+    - recording: h1_duelq1128
+      turn: 96
+      value: "Xi'an's Encampment on 13:13, placed and unbuilt, outer damage 0 of 100, strikes: player 1's own plots beside it 50 -> 1, the barbarians' +40"
+    - recording: h1_duelq1127
+      turn: 216
+      value: city-state 3's Galley on 30:19 adds nothing to 30:18 / 30:17, player 0's embarked Scouts at peace with it on them in its sight
   impl:
     - cpu/core/minorBuild.ts:minorPhase
     - gpu/core/sim_minors.py:_city_state_phase
@@ -535,6 +544,7 @@
     - "C-95: the danger map and Move to Safety — READ, ported"
     - "C-99: Move Unit's path flags 0x2 / 0x8 — READ (0x2720a0, 0x716080), both twins"
     - "C-99: when the pool finder's +0x1bc is written — the danger map at DoTurn, the planning at the AI turn's start, nothing inside a pass — READ (0x46cdd0, 0x717460, 0x6096c0, 0x792c90, 0x7921a0, 0x790890, 0x47ffb0), unported"
+    - "C-95: the danger map's list and its districts — a ship's city, a peaceful unit's plot, the undamaged strike, an unbuilt Encampment's — READ (0x26dab0, 0x586900, 0x717460, 0x249ee0 / 0x24b960), both twins"
   notes:
     - "imported: READ in its section, no confirming case found beside it"
     - ".claude/scratchpad/st1/reading.md: ...tance, x5 unowned; later ones 100 /   turns where it may found). - The danger map (InfluenceMap.cpp 0x717460, m_influence): per player at   war with the player (0x469cd0), each unit it sees now (0x5033a0) wit..."
