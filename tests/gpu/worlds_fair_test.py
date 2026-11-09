@@ -57,10 +57,6 @@ def main() -> int:
     assert int(row["silverBoosts"]) == 2 and int(row["bronzeBoosts"]) == 1, "the boosts are 2 / 1"
     assert int(row["boostLo"]) >= 0 and int(row["boostHi"]) > int(row["boostLo"]), (
         "the boost era window is empty")
-    # the Prophet is not one of the eight classes it scores
-    assert sim._prophet_cls not in sim._fair_gp_classes, "the Prophet is scored"
-    assert len(sim._fair_gp_classes) == 8, (
-        f"the Fair scores {len(sim._fair_gp_classes)} classes, wanted 8")
     print(f"  1 catalog OK — 8 classes, gold 1 DV + {int(row['goldGpp'])} GPP, tiers 50/0, boosts 2/1")
 
     # 2 — the SCORE is the points EARNED this turn, and the stash clears
@@ -69,25 +65,30 @@ def main() -> int:
     sim.comp_left[B0] = 5
     sim.comp_score[B0] = 0
     sim.comp_member[B0, :nrow] = True
-    sci = sim._fair_gp_classes[0]
+    sci = int(_sc[0][2])
     sim.civ_gpp_turn[B0, 0, sci] = 7.0
     sim.civ_gpp_turn[B0, 1, sci] = 3.0
     sim.civ_gpp_turn[B0, 0, sim._prophet_cls] = 99.0  # never scored
-    sim._competition_score()
+    sim._competition_score(torch.ones(sim.B, dtype=torch.bool))
     assert float(sim.comp_score[B0, 0]) == 7.0, (
         f"row 0 scored {float(sim.comp_score[B0, 0])}, wanted the 7 it earned")
     assert float(sim.comp_score[B0, 1]) == 3.0, "row 1 scored the wrong points"
     print("  2 score OK — the points earned this turn, and the Prophet's are not among them")
 
-    # 3 — the PODIUM pays the winner its victory point and its Great Person points
+    # 3 — the PODIUM pays the winner its victory point and free Great Person
+    # points of every class, the Prophet's too
     sim.comp_left[B0] = 0
     dv = int(sim.civ_diplo_points[B0, 0])
     gp0 = float(sim.civ_gpp[B0, 0, sci])
+    pr0 = float(sim.civ_gpp[B0, 0, sim._prophet_cls])
     sim._competition_podium(torch.tensor([True]))
     assert int(sim.civ_diplo_points[B0, 0]) == dv + int(row["gold"]), (
         "the winner took no victory point")
     assert float(sim.civ_gpp[B0, 0, sci]) == gp0 + int(row["goldGpp"]), (
         "the winner took no Great Person points")
+    assert float(sim.civ_gpp[B0, 0, sim._prophet_cls]) == pr0 + int(row["goldGpp"]), (
+        "the winner took no Prophet points")
+    assert float(sim.civ_gpp_free[B0, 0, sci]) == int(row["goldGpp"]), "the points are not free"
     print(f"  3 podium OK — +{int(row['gold'])} DV point and +{int(row['goldGpp'])} GPP to the winner")
 
     print("WORLDS FAIR OK")

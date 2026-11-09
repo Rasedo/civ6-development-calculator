@@ -1259,6 +1259,7 @@ def main() -> None:
     # a session turn but nobody is Medieval -> still nothing
     s6.turn = s6._congress_interval + 1
     s6.civ_techs[:, 0].zero_(); s6.civ_techs[:, 1:].zero_(); s6.civ_civics[:, 0].zero_(); s6.civ_civics[:, 1:].zero_()
+    s6.game_era[:] = 0  # the session reads the GAME era
     s6._world_congress()
     assert int(s6.congress_sessions[0]) == 0, "pre-Medieval sessions must not convene"
     assert int(s6.civ_diplo_favor[0, 0]) == 50, "... and must not spend favor"
@@ -1271,6 +1272,7 @@ def main() -> None:
             _era_ok = _t
             break
     assert _era_ok is not None, "no tech reaches the Medieval era — check the era table"
+    s6.game_era[:] = s6._congress_min_era
     if s6.n_majors > 1:
         s6.civ_diplo_favor[:, 1] = 90
     s6._world_congress()
@@ -1285,7 +1287,7 @@ def main() -> None:
         return torch.full((s6.B,), v, dtype=torch.long)
 
     s6._congress_votes(torch.ones(s6.B, dtype=torch.bool), _full(_udt), _full(_pat), torch.zeros(s6.B, dtype=torch.bool),
-                       _full(-1), torch.full((s6.B, s6.n_majors, 3, 4), -1, dtype=torch.long))
+                       _full(-1), torch.full((s6.B, s6.n_majors, 4, 4), -1, dtype=torch.long))
     # pre-Modern there is no DV resolution, so the favor curve never walks
     assert int(s6.civ_diplo_favor[0, 0]) == 50 and int(s6.civ_diplo_favor[0, 1]) == 90, "favor spends on the DV resolution only"
     assert s6.congress_active[0, :, 0].tolist() == [_udt, _pat], "the slate stands as voted"
@@ -1304,6 +1306,7 @@ def main() -> None:
             break
     assert _era_mod is not None, "no tech reaches the Modern era"
     assert s8.n_majors >= 3, "the DV poke wants three voters"
+    s8.game_era[:] = s8._congress_dv_min
     s8.turn = s8._congress_interval + 1
     s8.civ_diplo_points[:, 1] = 5      # seat 1 leads
     s8.civ_diplo_favor[:, 0] = 65      # buys 5 extra votes (4+8+12+16+20 = 60), 4 short of the 6th
@@ -1327,6 +1330,7 @@ def main() -> None:
     try:
         s8b._congress_dv_min = 99
         s8b.civ_techs[:, 0].zero_(); s8b.civ_techs[:, 0, _era_mod] = True
+        s8b.game_era[:] = s8b._congress_dv_min
         s8b.turn = s8b._congress_interval + 1
         s8b.civ_diplo_points[:, 1] = 5
         s8b.civ_diplo_favor[:, 0] = 65

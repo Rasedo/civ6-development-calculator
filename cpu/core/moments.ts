@@ -64,8 +64,8 @@ export const CIVIC_ERA_KEY = ERAS.map((e, i) => (i === 0 ? -1 : add(`CIVIC_ERA:$
 export const CITY_SIZE_KEY = MOMENT_CITY_SIZES.map((s, i) => add(`CITY_SIZE:${i}`, s.pay));
 /** a government of a tier, by tier (-1 for the Chiefdom's 0) */
 export const GOV_TIER_KEY = [-1, ...MOMENT_GOV_TIERS.map((p, i) => add(`GOV_TIER:${i + 1}`, p))];
-const UNIT_SEA_KEY = add('UNIT_SEA', MOMENT_UNIT_SEA);
-const UNIT_AIR_KEY = add('UNIT_AIR', MOMENT_UNIT_AIR);
+export const UNIT_SEA_KEY = add('UNIT_SEA', MOMENT_UNIT_SEA);
+export const UNIT_AIR_KEY = add('UNIT_AIR', MOMENT_UNIT_AIR);
 const STRATEGIC_KEY = new Map(STRATEGIC_IDS.map((r) => [r, add(`STRATEGIC:${r}`, MOMENT_UNIT_STRATEGIC)] as const));
 /** the keys a living unit of each type holds: a seafaring one, a flying one,
  *  the strategic resource it uses, a unique one */

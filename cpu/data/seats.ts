@@ -646,9 +646,9 @@ interface CongressResolutionDef {
   /** PROVENANCE, per column (cpu/data/provenance.ts). */
   src?: SrcMap;
   name: string;
-  /** civEraIndex floor for the slate (0 = from the congress's own gate). */
+  /** the game-era floor for the slate (0 = from the congress's own gate). */
   minEra: number;
-  /** civEraIndex ceiling, inclusive (99 = none). */
+  /** the game-era ceiling, inclusive (99 = none). */
   maxEra: number;
   target: CongressTargetKind;
 }
@@ -1319,15 +1319,21 @@ export const AGREEMENT_TURNS = srcConst('seats.agreementTurns', speedTurns(30),
 // CIV6 (World Congress): they are "chances for civilizations to win esteem
 // through events and projects that benefit the world".
 //
-// CIV6 (Competition): each runs for exactly 30 turns, "after which it ends and
-// winners are chosen". "The civilization with the highest score wins the Gold
-// Tier rewards. Additionally, all civs whose scores fall within the top 25%
-// (including the Gold Tier winner) win the Silver Tier rewards, and all civs
-// whose scores fall within the next highest quarter (i.e. the top 26-50%) win
-// the Bronze Tier rewards."
+// CIV6 (Competition): each runs for its EmergencyAlliances Duration, "after
+// which it ends and winners are chosen". "The civilization with the highest
+// score wins the Gold Tier rewards. Additionally, all civs whose scores fall
+// within the top 25% (including the Gold Tier winner) win the Silver Tier
+// rewards, and all civs whose scores fall within the next highest quarter
+// (i.e. the top 26-50%) win the Bronze Tier rewards."
 // ---------------------------------------------------------------------------
-export const COMPETITION_TURNS = srcConst('eras.competitionTurns', AGREEMENT_TURNS,
-  { derived: 'the same clock AGREEMENT_TURNS holds, 30 turns at Standard speed through GameSpeed_Durations ONLINE_HALF (speedTurns) — CIV6 (Competition): each runs for exactly 30 turns', inputs: [gp('DIPLOMACY_ALLIANCE_TIME_LIMIT')] });
+/** A competition's run in turns: its EmergencyAlliances Duration through
+ *  GameSpeed_Durations ONLINE_HALF (the World's Fair started by the t161
+ *  session and paid at the head of t181: runs/h1_duelq1117..1128
+ *  Game_Emergencies.csv STARTED 162, SCORED ENDED 181). */
+const competitionTurns = (type: string, standard: number) =>
+  srcConst(`eras.competitionTurns.${type}`, speedTurns(standard),
+    { derived: `the Standard Duration ${standard} through GameSpeed_Durations ONLINE_HALF (speedTurns)`,
+      inputs: [xml('EmergencyAlliances', `EmergencyType=${type}`, 'Duration', { expect: standard })] });
 /** The score fractions the two lower podiums cut at, as published. */
 export const COMPETITION_SILVER_PCT = srcConst('eras.competitionSilverPct', 25,
   { pedia: 'CIV6 (Competition): "all civs whose scores fall within the top 25%% ... win the Silver Tier rewards" — no install row' });
@@ -1365,6 +1371,10 @@ export interface ScoreRow {
 interface CompetitionDef {
   id: string;
   name: string;
+  /** its EmergencyAlliances row (`EMERGENCY_TYPES`) */
+  type: string;
+  /** the turns it scores, its Duration online (`competitionTurns`) */
+  turns: number;
   /** WHAT the competition counts, one install `<EmergencyScoreSources>` row
    *  apiece. Read in order; a competition scoring nothing this turn adds
    *  nothing. */
@@ -1375,8 +1385,11 @@ interface CompetitionDef {
   silverFavor: number;
   /** ...and to the quarter below it. */
   bronzeFavor: number;
-  /** CIV6 (WORLD_FAIR_FIRST_PLACE_GREAT_PERSON_POINTS): Great Person points
-   *  to the single highest score, on top of its victory point. */
+  /** CIV6 (WORLD_FAIR_FIRST_PLACE_GREAT_PERSON_POINTS,
+   *  MODIFIER_EMERGENCY_PLAYERS_ADJUST_GREAT_PERSON_POINTS with no class):
+   *  Great Person points of EVERY class to the single highest score, on top
+   *  of its victory point (runs/h1_duelq1117 t181: China +100 in all ten
+   *  classes, the Prophet and the Comandante General among them). */
   goldGpp?: number;
   /** CIV6 (WORLD_FAIR_{TOP,BOTTOM}_TIER_CULTURE,
    *  MODIFIER_EMERGENCY_PLAYERS_GRANT_RANDOM_CIVIC_BOOST_BY_ERA): random
@@ -1413,7 +1426,8 @@ export const COMPETITIONS: readonly CompetitionDef[] = [
   // decommission projects (CLIMATE_ACCORDS_SCORE_DECOMMISSION_*). Gold "2
   // Diplomatic Victory points", Silver "100 Diplomatic Favor", Bronze "50".
   {
-    id: 'CLIMATE_ACCORDS', name: 'Climate Accords',
+    id: 'CLIMATE_ACCORDS', name: 'Climate Accords', type: 'EMERGENCY_CLIMATE_ACCORDS',
+    turns: competitionTurns('EMERGENCY_CLIMATE_ACCORDS', 29),
     scored: [
       { source: 'co2', amount: 1 },
       { source: 'project', amount: 100, of: 'DECOMMISSION_COAL_POWER_PLANT' },
@@ -1424,11 +1438,13 @@ export const COMPETITIONS: readonly CompetitionDef[] = [
   },
   // CIV6 (Expansion2_Emergencies.xml, EMERGENCY_WORLDS_FAIR): Duration 29,
   // LockoutTime 60; scored 1 point per Great Person POINT of every class
-  // earned during the window. FIRST PLACE +1 Diplomatic Victory point and
-  // +100 Great Person points; TOP TIER +50 Favor and 2 random civic boosts of
-  // the Industrial..Information eras; BOTTOM TIER 1 such boost.
+  // but the Prophet earned during the window. FIRST PLACE +1 Diplomatic
+  // Victory point and +100 Great Person points of every class; TOP TIER +50
+  // Favor and 2 random civic boosts of the Industrial..Information eras;
+  // BOTTOM TIER 1 such boost.
   {
-    id: 'WORLDS_FAIR', name: "World's Fair", scored: FAIR_GPP,
+    id: 'WORLDS_FAIR', name: "World's Fair", type: 'EMERGENCY_WORLDS_FAIR',
+    turns: competitionTurns('EMERGENCY_WORLDS_FAIR', 29), scored: FAIR_GPP,
     goldPoints: 1, silverFavor: 50, bronzeFavor: 0,
     goldGpp: 100, silverBoosts: 2, bronzeBoosts: 1,
     boostEras: ['Industrial', 'Information'],
@@ -1438,7 +1454,8 @@ export const COMPETITIONS: readonly CompetitionDef[] = [
   // "Maintaining Aquatic Centers". FIRST PLACE +1 Diplomatic Victory point;
   // TOP TIER +50 Favor.
   {
-    id: 'WORLD_GAMES', name: 'World Games',
+    id: 'WORLD_GAMES', name: 'World Games', type: 'EMERGENCY_WORLD_GAMES',
+    turns: competitionTurns('EMERGENCY_WORLD_GAMES', 29),
     scored: [
       { source: 'project', amount: 50, of: 'TRAIN_ATHLETES' },
       { source: 'building', amount: 1, of: 'STADIUM' },
@@ -1456,7 +1473,8 @@ export const COMPETITIONS: readonly CompetitionDef[] = [
   // Districts" and 1 for "Maintaining Campus Districts". FIRST PLACE +1
   // Diplomatic Victory point; TOP TIER +50 Favor.
   {
-    id: 'SPACE_STATION', name: 'Space Station',
+    id: 'SPACE_STATION', name: 'Space Station', type: 'EMERGENCY_SPACE_STATION',
+    turns: competitionTurns('EMERGENCY_SPACE_STATION', 29),
     scored: [
       { source: 'project', amount: 30, of: 'TRAIN_ASTRONAUTS' },
       { source: 'district', amount: 5, of: 'SPACEPORT' },
@@ -1481,7 +1499,8 @@ export const COMPETITIONS: readonly CompetitionDef[] = [
   // runs — both engines carry ONE slot), the victim is
   // its target and every other living civilization its field.
   {
-    id: 'AID_REQUEST', name: 'Aid Request',
+    id: 'AID_REQUEST', name: 'Aid Request', type: 'EMERGENCY_SEND_AID',
+    turns: competitionTurns('EMERGENCY_SEND_AID', 30),
     scored: [
       { source: 'gold', amount: 1 },
       { source: 'project', amount: 200, of: 'SEND_AID' },
@@ -1498,6 +1517,18 @@ export const COMPETITION_WORLDS_FAIR = 1;
 export const COMPETITION_WORLD_GAMES = 2;
 export const COMPETITION_SPACE_STATION = 3;
 export const COMPETITION_AID_REQUEST = 4;
+
+/** THE EMERGENCY TYPES in the game's table order — Expansion1_Emergencies.xml's
+ *  seven, then Expansion2_Emergencies.xml's nine (modinfo load order): the
+ *  index an `EmergencyStarted` event names (runs/h1_duelq1117 t162 11 the
+ *  World's Fair, t182 14 the World Games, beside Game_Emergencies.csv). */
+export const EMERGENCY_TYPES: readonly string[] = [
+  'EMERGENCY_MILITARY', 'EMERGENCY_SETTLED_CITY', 'EMERGENCY_CAPTURE_CITY_STATE', 'EMERGENCY_RELIGIOUS',
+  'EMERGENCY_SPYING', 'EMERGENCY_NUCLEAR', 'EMERGENCY_BACKSTAB',
+  'EMERGENCY_NOBEL_PRIZE_LITERATURE', 'EMERGENCY_NOBEL_PRIZE_PEACE', 'EMERGENCY_NOBEL_PRIZE_PHYSICS',
+  'EMERGENCY_SEND_AID', 'EMERGENCY_WORLDS_FAIR', 'EMERGENCY_SPACE_STATION', 'EMERGENCY_CLIMATE_ACCORDS',
+  'EMERGENCY_WORLD_GAMES', 'EMERGENCY_SEND_MILITARY_AID',
+];
 
 /** THE COMPETITIONS A REGULAR SESSION STARTS: the EmergencyAlliances rows
  *  with Trigger EMERGENCY_TRIGGER_WORLD_CONGRESS (Expansion2_Emergencies.xml)

@@ -2019,6 +2019,17 @@
           "note": "the Great Person points this seat EARNED this turn, per class. Stashed at the Great Person phase and read once by a scored competition (the World's Fair scores eight of the nine classes), then cleared with co2Turn — the same shape, for the same reason: the value must be comparable at one point in the turn."
         },
         {
+          "name": "gppFree",
+          "compare": "milli",
+          "covers": [
+            "Seat.gppFree"
+          ],
+          "planes": [
+            "civ_gpp_free"
+          ],
+          "note": "the free Great Person points per class (Alfred Nobel's, the World's Fair's first place): held in the points, never spent by a claim, the floor a claim leaves the class at."
+        },
+        {
           "name": "gpUsed",
           "compare": "exact",
           "covers": [

@@ -35,7 +35,7 @@ import { foundingMoments, religionMoment, gameEraTurn, upgradeAllRoads, building
 import { UNITS, CITY_MAX_HP, UNIT_HP, REPAIR_QUIET_TURNS, REPAIR_HP_PER_COST, FORMATION_CIVIC, FORMATION_MAX, SETTLER_COST_STEP, formationCost } from '../data/units';
 import { buildingCostIn, outerPool, wallsMax, fitEncampOuter, encampOuterMissing } from './rules';
 import { darkBuildings, laserSpeed, stampBuildingEra } from './yields';
-import { competitionOf } from './competition';
+import { competitionOf, payCompetition } from './competition';
 import { canRunProject, chargeUnitResource } from './stockpile';
 import { FEATURES } from '../../world/features';
 import { isWater, deriveAreas, deriveContinents, deriveMountainRanges, deriveRegions } from '../../world/query';
@@ -1662,12 +1662,14 @@ export function endTurn(state: GameState): void {
 
 /** THE TURN'S CHANGE: the random-event step (`disasterPhase`), the climate
  *  step, then the game era and Ages of the turn the starts open and its
- *  opening (`gameEraTurn`, `eraOpening`) */
+ *  opening (`gameEraTurn`, `eraOpening`), then the podium of a competition
+ *  whose turns ran out (`payCompetition`) */
 export function turnChange(state: GameState): void {
   upgradeAllRoads(state);
   if (state.disasters) disasterPhase(state);
   climateTurn(state);
   if (gameEraTurn(state, state.turn + 1)) eraOpening(state);
+  payCompetition(state);
 }
 
 /** THE CITY-STATES' TURNS, then the Free Cities' */

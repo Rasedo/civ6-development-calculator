@@ -37,8 +37,9 @@ function twoCivs() {
   state.fogOfWar = false;
   settleFirstCity(state, 1);
   state.autoResearch = false;
-  // Medieval, so the Congress sits at all
+  // the Medieval game era, so the Congress sits at all
   for (const sx of state.seats) sx.research.techs.push('APPRENTICESHIP');
+  state.gameEra = 2;
   return state;
 }
 
@@ -115,6 +116,7 @@ describe('emergencies: the trigger and the call', () => {
   it('a pre-Medieval world records the condition and calls nothing', () => {
     const state = twoCivs();
     for (const sx of state.seats) sx.research.techs = [];
+    state.gameEra = 1;
     conquer(state);
     (state.seats[1] as Seat).diplomaticFavor = 200;
     state.turn = 7;

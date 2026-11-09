@@ -74,8 +74,9 @@ export interface CongressVoterCtx {
 }
 
 /** One seat's Regular Session ballot: [outcome, target, extra votes, cast
- *  order] for slate slot 0, 1 and the Diplomatic Victory resolution (2), or
- *  null for a slot it leaves to the AI line. */
+ *  order] for slate slot 0, 1, the Diplomatic Victory resolution (2) and the
+ *  competition's discussion (3: its extra votes alone, bought up the same
+ *  price), or null for a slot it leaves to the AI line. */
 export type CongressBallot = ([number, number, number, number] | null)[];
 
 /** What a session sits on: the slate's two resolutions (-1 none), whether the
@@ -86,6 +87,20 @@ export interface CongressSlate { slate: readonly number[]; dv: boolean; competit
 /** The DIPLOMATIC VICTORY resolution's slot in the vote head — the always-3rd
  * resolution, which stands outside the two-slot rotating slate. */
 const CONGRESS_DV_SLOT = 2;
+/** The competition's DISCUSSION slot: a session drawing a competition
+ *  discusses it, and its votes cost Favor up the vote price with nothing
+ *  to win (runs/h1_duelq1117 t161: China's 5 Diplomatic Victory votes, 4
+ *  World Ideology, 1 Public Relations and 3 on the World's Fair's
+ *  discussion, 20 + 12 + 0 + 6 times the price 2 = 76 Favor, 92 -> 16). */
+const CONGRESS_DISCUSSION_SLOT = 3;
+
+/** the session's ballots a caller holds (the action replay's recorded
+ *  votes), asked once the slate is drawn; none votes every seat on the AI
+ *  line */
+let heldBallots: ((state: GameState, at: CongressSlate) => (CongressBallot | null)[]) | null = null;
+export function holdCongressBallots(fn: typeof heldBallots): void {
+  heldBallots = fn;
+}
 
 /** every device a seat holds, across the catalog — what Arms Control compares
  *  when it names a target. */
@@ -372,15 +387,15 @@ function runResolution(state: GameState, res: number, slot: number,
 }
 
 /** A Regular Session sits at `turn`: every CONGRESS_INTERVAL turn once the
- *  world era (`worldEraIndex`) has reached CONGRESS_MIN_ERA. */
-export function congressSessionDue(turn: number, worldEra: number): boolean {
-  return turn % CONGRESS_INTERVAL === 0 && worldEra >= CONGRESS_MIN_ERA;
+ *  game era (`GameState.gameEra`) has reached CONGRESS_MIN_ERA. */
+export function congressSessionDue(turn: number, era: number): boolean {
+  return turn % CONGRESS_INTERVAL === 0 && era >= CONGRESS_MIN_ERA;
 }
 
 /** A Special Session sits at `turn`: a called emergency whose hiatus has run
- *  out (`act` reached), with the Congress open (world era at CONGRESS_MIN_ERA). */
-export function specialSessionDue(state: GameState, turn: number, worldEra: number): boolean {
-  if (worldEra < CONGRESS_MIN_ERA) return false;
+ *  out (`act` reached), with the Congress open (the game era at CONGRESS_MIN_ERA). */
+export function specialSessionDue(state: GameState, turn: number, era: number): boolean {
+  if (era < CONGRESS_MIN_ERA) return false;
   return (state.emergencies ?? []).some((e) => e.phase === EMG_CALLED && turn >= e.act);
 }
 
@@ -482,17 +497,17 @@ function congressUsable(state: GameState, res: number): boolean {
  * their era (`CONGRESS_COMPETITIONS`) not running, the pick the competition
  * the session starts. `_congress_draw_slate` is the twin.
  */
-export function drawCongressSlate(state: GameState, worldEra: number): CongressSlate {
+export function drawCongressSlate(state: GameState, era: number): CongressSlate {
   const pool: number[] = [];
   for (let i = 0; i < CONGRESS_RESOLUTIONS.length; i++) {
     const r = CONGRESS_RESOLUTIONS[i];
-    if (worldEra >= r.minEra && worldEra <= r.maxEra && congressUsable(state, i)) pool.push(i);
+    if (era >= r.minEra && era <= r.maxEra && congressUsable(state, i)) pool.push(i);
   }
   const drawn: number[] = [];
   for (let k = Math.min(3, pool.length); k > 0; k--) drawn.push(pool.splice(randRange(state, pool.length, 'World Congress Resolutions'), 1)[0]);
-  const dv = worldEra >= CONGRESS_DV_MIN_ERA;
+  const dv = era >= CONGRESS_DV_MIN_ERA;
   if (dv) randRange(state, 1, 'World Congress Resolutions');
-  const comps = CONGRESS_COMPETITIONS.filter((c) => worldEra >= c.minEra && worldEra <= c.maxEra && state.competition?.kind !== c.kind);
+  const comps = CONGRESS_COMPETITIONS.filter((c) => era >= c.minEra && era <= c.maxEra && state.competition?.kind !== c.kind);
   const competition = comps.length ? comps[randRange(state, comps.length, 'World Congress Resolutions')].kind : -1;
   return { slate: [drawn[0] ?? -1, drawn[1] ?? -1], dv, competition };
 }
@@ -500,14 +515,16 @@ export function drawCongressSlate(state: GameState, worldEra: number): CongressS
 /** One Regular Session, after the barbarians' turn closes the turn every
  * player acted in (the game's draw log: the session's draws the last of the
  * turn, before the next turn's random-event step; runs/h1_duelv1127 t61):
- * the slate drawn (`drawCongressSlate`), then `congressVotes`, every seat
- * on the AI line. */
+ * the slate drawn (`drawCongressSlate`), then `congressVotes` on the ballots
+ * held (`holdCongressBallots`), else every seat on the AI line. */
 export function congressSession(state: GameState, worldEra: number): void {
-  congressVotes(state, drawCongressSlate(state, worldEra), []);
+  const at = drawCongressSlate(state, worldEra);
+  congressVotes(state, at, heldBallots?.(state, at) ?? []);
 }
 
 /** The votes on a drawn slate: the ballots' target draws (`drawTargets`),
- * the two resolutions, the Diplomatic Victory one where it sits, then the
+ * the two resolutions, the Diplomatic Victory one where it sits, the
+ * competition's discussion votes bought, then the
  * competition drawn starts with every living major in its field (one runs
  * at a time). The standing effects REPLACE the previous session's and hold
  * until the next one. */
@@ -525,6 +542,12 @@ export function congressVotes(state: GameState, at: CongressSlate, recorded: rea
   state.congress = [];
   at.slate.filter((r) => r >= 0).forEach((res, slot) => runResolution(state, res, slot, ballots, voters));
   if (at.dv) runDvResolution(state, ballots);
+  if (at.competition >= 0) {
+    for (let c = 0; c < state.seats.length; c++) {
+      const v = ballots[c]?.[CONGRESS_DISCUSSION_SLOT];
+      if (v && state.seats[c].cities.length > 0) buyVotes(state.seats[c], Math.max(0, Math.trunc(v[2])));
+    }
+  }
   if (at.competition >= 0 && !state.competition) {
     startCompetition(state, at.competition, state.seats.filter((sx) => isCiv(sx.seat) && sx.cities.length > 0).map((sx) => sx.seat));
   }

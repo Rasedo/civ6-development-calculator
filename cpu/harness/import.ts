@@ -28,7 +28,7 @@
  */
 import { existsSync, readFileSync } from 'node:fs';
 import type { City, CityState, CityStateType, DistrictId, FeatureId, GameMap, GameState, GreatPersonClass, ImprovementId, Seat, TerrainId, Tile, TradeRoute, Unit, UnitActivity, Yields } from '../core/types';
-import { DISASTER_IMPROVEMENT_KEY, HIGH_ADJACENCY_KEY, LARGEST_KEY, MITIGATED_FLOOD_KEY } from '../core/moments';
+import { DISASTER_IMPROVEMENT_KEY, HIGH_ADJACENCY_KEY, LARGEST_KEY, MITIGATED_FLOOD_KEY, UNIT_AIR_KEY, UNIT_SEA_KEY } from '../core/moments';
 import { NO_SEAT } from '../core/types';
 import { minorItemKey, minorRepairResumed, type MinorItem } from '../core/minorBuild';
 import { keptKey } from '../core/production';
@@ -51,7 +51,7 @@ import { goldShortfall } from '../data/seats';
 import { governorsOf } from '../core/governors';
 import { envoysWith, minorCity, mostEnvoysReceived } from '../core/cityStates';
 import { GOVERNOR_DEFAULT_PROMOTION, GOVERNOR_INDEX, GOVERNOR_PROMOTION_INDEX, GOVERNOR_PROMOTIONS, promotionBit, promotionBitValue } from '../data/governors';
-import { CIV_LEADERS, COMPETITIONS, COMPETITION_TURNS, DEAL_ITEMS, DEAL_LUXURY, DEAL_TURNS, DEDICATION_COMMEMORATIONS, HEROIC_DEDICATIONS } from '../data/seats';
+import { CIV_LEADERS, COMPETITIONS, EMERGENCY_TYPES, DEAL_ITEMS, DEAL_LUXURY, DEAL_TURNS, DEDICATION_COMMEMORATIONS, HEROIC_DEDICATIONS } from '../data/seats';
 import { updateCulturalDominance } from '../core/seatTurn';
 import { addCityPerm, addSeatPerm } from '../core/gpAbility';
 import { BUILDINGS, POWER_PLANT_IDS } from '../data/buildings';
@@ -478,6 +478,15 @@ function leaderRow(leader: string): number {
  * record's hold (`TurnRecord.mem`: the best strengths trained, the plots
  * taken with culture, a levy's clock) is read there.
  */
+/** a scored competition as the records see it run (`History.competition`) */
+export interface RunningCompetition {
+  kind: number;
+  session: number;
+  target: number;
+  field: number[];
+  score: Map<number, number>;
+}
+
 export interface History {
   firstTurn: number;
   /** the flood rivers the records' events have named so far
@@ -620,12 +629,11 @@ export interface History {
    *  turn: the government, the slot kinds, the card in each slot and the
    *  cards slotted without their modifiers (`importLapsed`) */
   policySlots: Map<number, Map<number, PolicySlots>>;
-  /** the last record a project only one scored competition counts stood in
-   *  a queue, by `COMPETITIONS` place */
-  competitionSeen: Map<number, number>;
-  /** each running competition's project score per player, by `COMPETITIONS`
-   *  place, off the record's event log */
-  competitionScore: Map<number, Map<number, number>>;
+  /** the scored competition a session started (`EmergencyStarted`), until
+   *  the record its podium paid in: its `COMPETITIONS` place, the session's
+   *  turn, its target player (-1 none), its field and each player's score so
+   *  far (`foldCompetition`) */
+  competition: RunningCompetition | null;
   /** the competitions each player took the podium's top of, [competition,
    *  0 gold and the top tier / 1 the top tier alone / 2 the gold alone] */
   podium: Map<number, [number, number][]>;
@@ -935,7 +943,7 @@ export function newHistory(): History {
   return { firstTurn: -1, last: null, before: null, beforeThat: null, trained: new Map(), levied: new Map(), captives: new Map(), activities: new Map(), formed: new Set(), arrivals: new Map(), alpine: new Set(), fionn: new Set(), govSeated: new Map(), growthDrift: new Map(), lastHit: new Map(), gpSpent: new Map(), revealed: new Map(),
     unknownSince: new Set(), cityFirstSeen: new Map(), nextPlotUnheld: new Set(), fireFood: new Map(), fireProd: new Map(), eventYields: new Map(), eventCounts: new Map(), openEvents: [], eventRead: new Map(), eventDraws: new Map(), droughts: [], bare: new Map(), discountDistricts: new Map(), discountPlaced: new Map(), ages: new Map(), moments: new Map(), momentsWorld: [],
     eraTurns: [], gameEra: 0, eraStartTurn: 1, eraCountdown: -1, routeSeen: new Map(), routeCourse: new Map(), trail: new Map(), legs: new Map(), posts: new Map(), policySlots: new Map(),
-    competitionSeen: new Map(), competitionScore: new Map(), podium: new Map(), culture: new Map(), tourismTo: new Map(),
+    competition: null, podium: new Map(), culture: new Map(), tourismTo: new Map(),
     dominant: new Map(), districtQuoted: new Set(), districtPriced: new Map(), districtLocked: new Map(), floods: null, startTies: new Map(), startPicks: new Map(), seaLevel: 0, people: null, stockpile: new Map(), reservations: new Map() };
 }
 
@@ -1410,8 +1418,12 @@ const PLACEMENT_ROWS = new Set(['UnitAddedToMap', 'UnitMoved', 'UnitTeleported']
  *  mitigated flood, a district's high adjacency, the largest civilization
  *  (runs/h1_duelp1117 China: its t38 disaster improvement, t72 mitigated
  *  flood, t107 largest civilization and t111 Campus none paid again at
- *  t104 / t107 / t146 / t149) */
+ *  t104 / t107 / t146 / t149), and a seat's first seafaring or flying unit,
+ *  which may be gone since (runs/h1_duelq1117 China: its t87 Great Admiral,
+ *  spent, the sea moment not paid again for Himerios at t141) */
 function eventMomentKey(type: string): number | undefined {
+  if (/^MOMENT_UNIT_CREATED_FIRST_DOMAIN_SEA(_IN_WORLD)?$/.test(type)) return UNIT_SEA_KEY;
+  if (/^MOMENT_UNIT_CREATED_FIRST_DOMAIN_AIR(_IN_WORLD)?$/.test(type)) return UNIT_AIR_KEY;
   if (type === 'MOMENT_IMPROVEMENT_CONSTRUCTED_ON_DISASTER_YIELD_TILE_FIRST') return DISASTER_IMPROVEMENT_KEY;
   if (type === 'MOMENT_MITIGATED_RIVER_FLOOD') return MITIGATED_FLOOD_KEY;
   if (type === 'MOMENT_CITY_BUILT_BECAME_LARGEST_CIV_BY_MARGIN') return LARGEST_KEY;
@@ -1935,66 +1947,47 @@ export function advanceHistory(h: History, rec: TurnRecord, cat: Catalog): void 
       }
       h.posts.set(r.TraderUnitPlayer, posts);
     }
-    // a scored competition's podium: the record names none, but the seat
-    // the top quarter's Favor reached (its Favor up by its rate plus the
-    // competition's `silverFavor`) while a project only one competition
-    // scores was queued within its run took that competition's top tier,
-    // and, alone there, its gold (1108 Rome t201: 35 → 86 at 1 a turn, the
-    // World Games' Training Athletes queued t196–199)
-    const running = COMPETITIONS.flatMap((_def, k) => {
-      const seen = h.competitionSeen.get(k);
-      return seen !== undefined && rec.turn - seen <= COMPETITION_TURNS ? [k] : [];
-    });
-    // each running competition's projects completed, scored per player off
-    // the record's event log (`CityProjectCompleted`: owner, city, project)
-    for (const r of Array.isArray(rows) ? rows : []) {
-      if (!Array.isArray(r) || r[2] !== 'CityProjectCompleted') continue;
-      const name = cat.projects[r[5] as number];
-      for (const k of running) {
-        for (const s of COMPETITIONS[k]!.scored) {
-          if (s.source !== 'project' || `PROJECT_${s.of}` !== name) continue;
-          const sc = h.competitionScore.get(k) ?? new Map<number, number>();
-          h.competitionScore.set(k, sc.set(r[3] as number, (sc.get(r[3] as number) ?? 0) + s.amount));
-        }
-      }
-    }
-    if (running.length === 1) {
-      const def = COMPETITIONS[running[0]]!;
-      const top = rec.players.filter((p) => {
-        const was = h.last!.players.find((q) => q.id === p.id);
-        return bool(p.major) && was && num(p.favor) - num(was.favor) - num(was.favorPerTurn) === def.silverFavor;
-      });
-      // the gold: where the log scored the run, every player on the best
-      // score (runs/h1_duelw1118 t201: China's Training Athletes t191 and
-      // Rome's t193 tied, China took the Campus Tourism, Rome alone the
-      // Favor); else the top tier's seat when it stands alone there
-      const sc = h.competitionScore.get(running[0]);
-      const best = sc ? Math.max(0, ...sc.values()) : 0;
-      const golds = new Set(best > 0 ? [...sc!].filter(([, n]) => n === best).map(([pid]) => pid)
-        : top.length === 1 ? [top[0].id] : []);
-      if (top.length) {
+    // the running competition's score of the pair (`foldCompetition`), and
+    // its podium on the record its turns ran out before
+    const run = h.competition;
+    if (run) {
+      const def = COMPETITIONS[run.kind]!;
+      if (rec.turn <= run.session + def.turns) foldCompetition(run, h.last!, rec, cat, (Array.isArray(logged) ? logged : []) as unknown[][]);
+      else {
+        // the podium: the record names none, but the seat the top
+        // quarter's Favor reached (its Favor up by its rate plus the
+        // competition's `silverFavor`) took that competition's top tier (1108
+        // Rome t201: 35 → 86 at 1 a turn); the gold every player on the best
+        // score (runs/h1_duelw1118 t201: China's Training Athletes t191 and
+        // Rome's t193 tied, China took the Campus Tourism, Rome alone the
+        // Favor), else the top tier's seat when it stands alone there
+        const top = rec.players.filter((p) => {
+          const was = h.last!.players.find((q) => q.id === p.id);
+          return bool(p.major) && was && num(p.favor) - num(was.favor) - num(was.favorPerTurn) === def.silverFavor;
+        });
+        const best = Math.max(0, ...run.score.values());
+        const golds = new Set(best > 0 ? [...run.score].filter(([, n]) => n === best).map(([pid]) => pid)
+          : top.length === 1 ? [top[0].id] : []);
         for (const pid of new Set([...top.map((p) => p.id), ...golds])) {
           const won = h.podium.get(pid) ?? [];
           const silver = top.some((p) => p.id === pid);
-          won.push([running[0], golds.has(pid) ? (silver ? 0 : 2) : 1]);
+          won.push([run.kind, golds.has(pid) ? (silver ? 0 : 2) : 1]);
           h.podium.set(pid, won);
         }
-        h.competitionSeen.delete(running[0]);
-        h.competitionScore.delete(running[0]);
+        h.competition = null;
       }
     }
   }
-  // the competitions a queued project tells running: the projects only one
-  // competition's score counts
-  for (const c of rec.cities) {
-    for (const q of c.queue ?? []) {
-      const pi = typeof q === 'object' ? num(q.ProjectType) : -1;
-      const name = pi >= 0 ? cat.projects[pi] : undefined;
-      if (!name) continue;
-      const kinds = COMPETITIONS.flatMap((def, k) =>
-        def.scored.some((r) => r.source === 'project' && `PROJECT_${r.of}` === name) ? [k] : []);
-      if (kinds.length === 1) h.competitionSeen.set(kinds[0]!, rec.turn);
-    }
+  // a competition a session started: the record's `EmergencyStarted` event
+  // (target, the EMERGENCY_TYPES row, the session's turn), every major
+  // holding a city its field (runs/h1_duelq1117 t162: 11, the World's Fair
+  // of the t161 session)
+  for (const r of rows) {
+    if (!Array.isArray(r) || r[2] !== 'EmergencyStarted') continue;
+    const kind = COMPETITIONS.findIndex((c) => c.type === EMERGENCY_TYPES[r[4] as number]);
+    if (kind < 0) continue;
+    const field = rec.players.filter((p) => bool(p.major) && rec.cities.some((c) => c.owner === p.id)).map((p) => p.id);
+    h.competition = { kind, session: num(r[5] as number), target: num(r[3] as number), field, score: new Map(field.map((pid) => [pid, 0])) };
   }
   const live = new Set<string>();
   for (const r of recordRoutes(rec)) {
@@ -2303,6 +2296,8 @@ export function importTurn(rec: TurnRecord, cat: Catalog, history?: History): Im
     for (const [k, tier] of history?.podium.get(p.id) ?? []) {
       const def = COMPETITIONS[k]!;
       if (tier !== 1 && def.goldPerm) addSeatPerm(seat, def.goldPerm);
+      // the gold's free Great Person points, already in the record's
+      if (tier !== 1 && def.goldGpp) for (const c of GP_CLASSES) (seat.gppFree ??= {})[c] = (seat.gppFree?.[c] ?? 0) + def.goldGpp;
       if (tier !== 2 && def.silverPerm) addSeatPerm(seat, def.silverPerm);
     }
     // the plots it has revealed, where the record carries them; else none is
@@ -2321,6 +2316,24 @@ export function importTurn(rec: TurnRecord, cat: Catalog, history?: History): Im
       seat.tourismTo = majors.map((o) => history.tourismTo.get(`${p.id}:${o.id}`) ?? 0);
       seat.culturallyDominant = majors.map((o) => history.dominant.get(p.id)?.has(o.id) ?? false);
     });
+  }
+  // the scored competition running (`History.competition`): the turns it has
+  // left after the pairs past its session's scored (the session's own pair
+  // scores none), its field and score so far
+  const run = history?.competition;
+  if (run) {
+    const n = state.seats.length;
+    const seatOfPid = (pid: number) => majors.findIndex((p) => p.id === pid);
+    const member = Array.from({ length: n }, () => 0);
+    const score = Array.from({ length: n }, () => 0);
+    for (const pid of run.field) {
+      const s = seatOfPid(pid);
+      if (s < 0) continue;
+      member[s] = 1;
+      score[s] = run.score.get(pid) ?? 0;
+    }
+    const left = COMPETITIONS[run.kind]!.turns - (rec.turn - run.session - 1);
+    if (left >= 0) state.competition = { kind: run.kind, left, score, member, target: run.target < 0 ? -1 : seatOfPid(run.target) };
   }
   const minorOfPlayer = new Map<number, CityState>();
   minors.forEach((p, k) => {
@@ -4430,6 +4443,8 @@ function importPeople(ctx: Ctx, rec: TurnRecord, state: GameState, people: Map<n
       addSeatPerm(s, fx.perm ?? {});
       (s.gpActivated ??= []).push(person.id);
       if (fx.luxuryCopies) (s.gpLuxuries ??= []).push(fx.luxuryAmenities ?? 1);
+      // its free Great Person points, already in the record's (`addFreeGpp`)
+      if (fx.gppAll && 'gpp' in s) for (const c of GP_CLASSES) (s.gppFree ??= {})[c] = (s.gppFree?.[c] ?? 0) + fx.gppAll;
       // a RunOnce row: the cities the player held when it spent the charge
       if (fx.cityPermAll && 'cities' in s) {
         for (const c of s.cities) {
@@ -4578,6 +4593,51 @@ function importResearchTree(rec: TurnRecord, history?: History): ResearchTree {
  * t190, 344 -> 292 as Magnus moves to Yiyang; 1109 Shenyang t193, 1117
  * Xiurong t197, 1124 Shenyang t189).
  */
+/**
+ * One pair of the running competition's score, per player of its field, off
+ * what the records show of each `<EmergencyScoreSources>` row
+ * (`scoreTurn`): a class's Great Person points earned (the store's rise; a
+ * store that fell paid a recruit, its earnings at least the store left), a
+ * scored project completed (`CityProjectCompleted`: owner, city, project), a
+ * scored building held, a scored district standing. The CO2, war and gold
+ * rows have no record reading and add nothing.
+ */
+function foldCompetition(run: RunningCompetition, prev: TurnRecord, rec: TurnRecord, cat: Catalog,
+  rows: readonly unknown[][]): void {
+  const def = COMPETITIONS[run.kind]!;
+  for (const pid of run.field) {
+    const a = prev.players.find((p) => p.id === pid);
+    const b = rec.players.find((p) => p.id === pid);
+    if (!a || !b) continue;
+    let gain = 0;
+    for (const s of def.scored) {
+      if (s.source === 'gpp') {
+        const k = cat.greatPersonClasses?.indexOf(`GREAT_PERSON_CLASS_${s.of}`) ?? -1;
+        const was = num(a.gpp?.[k]);
+        const now = num(b.gpp?.[k]);
+        if (k >= 0) gain += s.amount * (now >= was ? now - was : now);
+      } else if (s.source === 'project') {
+        for (const r of rows) {
+          if (Array.isArray(r) && r[2] === 'CityProjectCompleted' && r[3] === pid
+            && cat.projects[r[5] as number] === `PROJECT_${s.of}`) gain += s.amount;
+        }
+      } else if (s.source === 'building') {
+        const bi = cat.buildings.indexOf(`BUILDING_${s.of}`);
+        for (const c of rec.cities) {
+          if (c.owner === pid && bi >= 0 && (c.buildings ?? []).some(([x]) => x === bi)) gain += s.amount;
+        }
+      } else if (s.source === 'district') {
+        const di = cat.districts.indexOf(`DISTRICT_${s.of}`);
+        for (const c of rec.cities) {
+          if (c.owner !== pid || di < 0) continue;
+          for (const d of c.districts ?? []) if (num(d[0] as number) === di && bool(d[3] as boolean)) gain += s.amount;
+        }
+      }
+    }
+    run.score.set(pid, (run.score.get(pid) ?? 0) + gain);
+  }
+}
+
 function foldGrowthDrift(h: History, prev: TurnRecord, rec: TurnRecord, cat: Catalog): void {
   const add = (k: string, residue: number) => {
     if (residue !== 0) h.growthDrift.set(k, (h.growthDrift.get(k) ?? 0) + residue);
@@ -4624,6 +4684,58 @@ const PROMO_CLASS_ABBREV: Record<string, string> = {
 
 /** a resolution's target in the engine's target space for its kind, read off
  *  the localisation key the game names it by; -1 where the engine has none */
+/** the install tables a World_Congress.csv OPTIONS target indexes where the
+ *  catalog holds none: UnitPromotionClasses' first seven (Base
+ *  UnitPromotions.xml, the Military Advisory's offer in WorldCongress.lua),
+ *  the MINORCIVBONUS types (Expansion2_Leaders.xml), YieldTypes, and the
+ *  offensive spy rows of UnitOperations in modinfo load order (Base, then
+ *  Expansion1_ / Expansion2_UnitOperations.xml); runs/h1_duelq1117..1128:
+ *  every RESOLUTION DECIDED row names the record's ChosenThing through them */
+const LOG_PROMOTION_CLASSES = ['RECON', 'MELEE', 'RANGED', 'SIEGE', 'ANTI_CAVALRY', 'LIGHT_CAVALRY', 'HEAVY_CAVALRY'];
+const LOG_MINOR_BONUSES = ['SCIENTIFIC', 'RELIGIOUS', 'TRADE', 'CULTURAL', 'MILITARISTIC', 'INDUSTRIAL'];
+const LOG_YIELDS = ['FOOD', 'PRODUCTION', 'GOLD', 'SCIENCE', 'CULTURE', 'FAITH'];
+const LOG_SPY_OPERATIONS: Record<number, string> = {
+  39: 'COUNTERSPY', 40: 'DISRUPT_ROCKETRY', 41: 'GAIN_SOURCES', 42: 'GREAT_WORK_HEIST', 43: 'LISTENING_POST',
+  44: 'RECRUIT_PARTISANS', 45: 'SABOTAGE_PRODUCTION', 46: 'SIPHON_FUNDS', 47: 'STEAL_TECH_BOOST',
+  48: 'TRAVEL_NEW_CITY', 57: 'FABRICATE_SCANDAL', 58: 'FOMENT_UNREST', 59: 'NEUTRALIZE_GOVERNOR', 62: 'BREACH_DAM',
+};
+
+/** A World_Congress.csv resolution type as a `CONGRESS_RESOLUTIONS` place,
+ *  `'dv'` for the Diplomatic Victory resolution, -1 for one outside it */
+export function resolutionOfLog(type: string): number | 'dv' {
+  if (type === 'WC_RES_DIPLOVICTORY') return 'dv';
+  return resolutionByHash().get(gameHash(type)) ?? -1;
+}
+
+/** A World_Congress.csv OPTIONS target — the row of the resolution's target
+ *  table, a player id for a player — as the engine's target of `res`; -1
+ *  where it names none the engine holds */
+export function loggedCongressTarget(res: number | 'dv', target: number, rec: TurnRecord, cat: Catalog, imp: Imported): number {
+  const kind = res === 'dv' ? 'seat' : CONGRESS_RESOLUTIONS[res].target;
+  const named = (list: readonly string[] | undefined) => (list?.[target] ? `LOC_${list[target]}_NAME` : '');
+  const thing = (() => {
+    switch (kind) {
+      case 'seat': return String(target);
+      case 'government': return named(cat.governments);
+      case 'gpClass': return named(cat.greatPersonClasses);
+      case 'luxury': return named(cat.resources);
+      case 'project': return named(cat.projects);
+      case 'district': return named(cat.districts);
+      case 'building': return named(cat.buildings);
+      case 'feature': return named(cat.features);
+      case 'religion': return cat.religions[target] ? `LOC_${cat.religions[target]}` : '';
+      case 'gwObject': return GWO_NAMES[target] ? `LOC_GREAT_WORK_OBJECT_${GWO_NAMES[target]}_NAME` : '';
+      case 'promoClass': return LOG_PROMOTION_CLASSES[target] ? `LOC_PROMOTION_CLASS_${LOG_PROMOTION_CLASSES[target]}_NAME` : '';
+      case 'csType': return LOG_MINOR_BONUSES[target] ? `LOC_MINOR_CIV_${LOG_MINOR_BONUSES[target]}_TRAIT_NAME` : '';
+      case 'currency': return LOG_YIELDS[target] ? `LOC_YIELD_${LOG_YIELDS[target]}_NAME` : '';
+      case 'spyMission': return LOG_SPY_OPERATIONS[target] ? `LOC_UNITOPERATION_SPY_${LOG_SPY_OPERATIONS[target]}_DESCRIPTION` : '';
+      default: return '';
+    }
+  })();
+  if (!thing) return -1;
+  return congressTarget(kind, thing, rec, cat, imp.religionSeat, (pid) => imp.seatOfPlayer.get(pid) ?? NO_SEAT, imp.state.seats.length);
+}
+
 function congressTarget(kind: string, thing: string, rec: TurnRecord, cat: Catalog,
   religionSeat: Map<number, number>, seatOfGame: (pid: number) => number, majors: number): number {
   const core = strip(thing, 'LOC_').replace(/_NAME$/, '');

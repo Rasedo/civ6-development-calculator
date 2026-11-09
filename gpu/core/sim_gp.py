@@ -485,7 +485,7 @@ class SimGp:
                 self._minor_envoy_tiles(_ok)
         _gpp = col("gppAll")
         if bool(_gpp.count_nonzero()):
-            self.civ_gpp[:, row] = self.civ_gpp[:, row] + _gpp.unsqueeze(1)
+            self._add_free_gpp(row, _gpp)
 
         # ---- the unit on the tile
         self._gp_unit_grants(row, m, cls, at, hc, ccol)

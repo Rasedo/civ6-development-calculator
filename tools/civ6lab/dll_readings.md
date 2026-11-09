@@ -13304,3 +13304,4 @@ ACT_SENTRY), statecompare `activity`.
   ImprovementModifiers on the owner's adjacent plots) is not ported; a
   Great Person's or Trajan's granted building is not read as a creation
   through 0x17f870; Fez's list reader on the unit.
+

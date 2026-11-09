@@ -299,13 +299,13 @@ class BatchEnv:
         iv = max(1, int(s._congress_interval))
         cols.append(torch.full((s.B,), float((iv - int(s.turn) % iv) % iv) / iv,
                                dtype=d, device=s.device))
-        era = s._world_era()
+        era = s.game_era
         cols.append(((era >= s._congress_min_era) & (era >= s._congress_dv_min)).to(d))
         mine = s.comp_member[:, row]
         top = torch.where(s.comp_member, s.comp_score,
                           torch.zeros_like(s.comp_score)).max(dim=1).values
         cols += [(s.comp_kind + 1).clamp(min=0).to(d),
-                 s.comp_left.to(d) / float(s._comp_turns),
+                 s.comp_left.to(d) / s._comp_turns.take(s.comp_kind.clamp(min=0)).to(d),
                  mine.to(d),
                  torch.where(mine, s.comp_score[:, row].to(d) / top.clamp(min=1).to(d),
                              torch.zeros(s.B, dtype=d, device=s.device))]

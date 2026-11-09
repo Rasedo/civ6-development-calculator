@@ -122,7 +122,7 @@ def main() -> int:
     sim._raise_aid_request(hit)
     assert int(sim.comp_kind[B0]) == k and int(sim.comp_target[B0]) == 1
     assert sim.comp_member[B0, :3].tolist() == [True, False, True], "the target is out of the field"
-    assert int(sim.comp_left[B0]) == sim._comp_turns
+    assert int(sim.comp_left[B0]) == int(sim._comp_turns[k])
     hit2 = torch.zeros_like(hit)
     hit2[B0, 2] = True
     sim._raise_aid_request(hit2)            # one slot: nothing changes
@@ -137,10 +137,10 @@ def main() -> int:
     sim.war[B0, 1, 2] = True
     sim.civ_co2_turn[B0] = 0
     sim.civ_co2_turn[B0, 2] = 7             # seat 2: the world's top polluter, at war with the target
-    sim._competition_score()
+    sim._competition_score(torch.ones(sim.B, dtype=torch.bool))
     assert sim.comp_score[B0, :3].tolist() == [40.0, 0.0, -430.0], sim.comp_score[B0, :3].tolist()
     sim.civ_co2_turn[B0] = 0                # nobody emits: nobody is bad
-    sim._competition_score()
+    sim._competition_score(torch.ones(sim.B, dtype=torch.bool))
     assert sim.comp_score[B0, :3].tolist() == [40.0, 0.0, -460.0], sim.comp_score[B0, :3].tolist()
     sim.war[B0, 2, 1] = False
     sim.war[B0, 1, 2] = False
@@ -157,6 +157,7 @@ def main() -> int:
     # every plane, the target included (the TS drops the record whole; 9248 t72)
     sim.comp_left[B0] = 1
     sim._resolve_competition()
+    sim._pay_competition()
     assert int(sim.comp_kind[B0]) == -1 and int(sim.comp_target[B0]) == -1 and int(sim.comp_left[B0]) == 0
     assert not bool(sim.comp_member[B0].any()) and float(sim.comp_score[B0].abs().sum()) == 0.0
     print("  3 Aid Request OK — triggered against the lowest victim, gold / project / war / pollution scored, 2 DVP + 100 Favor to the winner")

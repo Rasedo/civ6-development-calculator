@@ -834,6 +834,8 @@ SEAT = {
     "co2Turn": _civ_scalar("civ_co2_turn"),
     "gppTurn": lambda sim, b, rows: [
         [float(x) for x in sim.civ_gpp_turn[b, c].tolist()] for c in rows],
+    "gppFree": lambda sim, b, rows: [
+        [float(x) for x in sim.civ_gpp_free[b, c].tolist()] for c in rows],
     "cultureTotal": _civ_scalar("civ_culture"),
     "faith": _civ_scalar("civ_faith"),
     "tourism": _civ_scalar("civ_tourism"),

@@ -13,10 +13,9 @@
 import type { City, CityState, CityStateQuest, GameState, QueueItem } from './types';
 import { allyTurnsWith, atWarWithAny, borderTurnsFrom, citiesOf, civsAtWar, denounceLeft, diploVisibility, friendTurnsWith, isBarbSeat, seatOf, tileCity, tileSeat, warTurnsWith } from './seats';
 import { seatStrength, seatProximity } from './phase';
-import { AGREEMENT_TURNS, COMPETITION_TURNS, CONGRESS_DV_MIN_ERA, CONGRESS_INTERVAL, CONGRESS_MIN_ERA, DIPLO_VICTORY_POINTS, GRIEVANCE_GANG, VISIBILITY_MAX } from '../data/seats';
+import { AGREEMENT_TURNS, COMPETITIONS, CONGRESS_DV_MIN_ERA, CONGRESS_INTERVAL, CONGRESS_MIN_ERA, DIPLO_VICTORY_POINTS, GRIEVANCE_GANG, VISIBILITY_MAX } from '../data/seats';
 import { grievancesAgainst } from './grievance';
 import { envoysOf, hasMet } from './cityStates';
-import { worldEraIndex } from './eras';
 import { itemCost, districtCostIn, settlerCost, DISTRICT_SPECIALTY_COST } from './game';
 import { builderCost, settlerCount } from './units';
 import { growthFoodNeeded, borderGrowthCost } from '../data/constants';
@@ -189,8 +188,8 @@ export function observeSeat(state: GameState, seat: number, cityMax: number, hor
     live && live.members.includes(seat) ? 1 : 0,
   );
   // THE SESSION ABOUT TO SIT: the turns until it, and whether the Diplomatic
-  // Victory resolution sits in it.
-  const wera = worldEraIndex(state);
+  // Victory resolution sits in it, on the game era.
+  const wera = state.gameEra ?? 0;
   congress.push(
     ((CONGRESS_INTERVAL - state.turn % CONGRESS_INTERVAL) % CONGRESS_INTERVAL) / CONGRESS_INTERVAL,
     wera >= CONGRESS_MIN_ERA && wera >= CONGRESS_DV_MIN_ERA ? 1 : 0,
@@ -203,7 +202,7 @@ export function observeSeat(state: GameState, seat: number, cityMax: number, hor
   const compMine = comp?.member[seat] ? 1 : 0;
   congress.push(
     comp ? comp.kind + 1 : 0,
-    (comp?.left ?? 0) / COMPETITION_TURNS,
+    comp ? comp.left / COMPETITIONS[comp.kind].turns : 0,
     compMine,
     compMine ? (comp?.score[seat] ?? 0) / Math.max(1, compTop) : 0,
   );

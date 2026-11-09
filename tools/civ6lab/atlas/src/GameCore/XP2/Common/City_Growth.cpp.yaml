@@ -192,7 +192,10 @@
   kind: function
   semantics: "the city's growth percent: adds its game-config growth term to CityGrowth +0x84 (m_iOtherGrowthModifier)."
   status: PARTLY
-  impl: [cpu/core/city.ts:m256, cpu/harness/import.ts:foldGrowthDrift]
+  impl:
+    - cpu/core/city.ts:m256
+    - cpu/harness/import.ts:foldGrowthDrift
+    - cpu/harness/import.ts:foldCompetition
   readings:
     - "C-94: the growth modifier — READ (the accumulator's writer unread)"
     - "H-1: the AI memory reader — READ (the hooks, the pointer paths, the contracts, the knowledge base, the operations, the trees), PARTLY READ (the religious AI's holder)"
@@ -217,6 +220,7 @@
     - cpu/core/aiCityBuild.ts:CityGrowth
     - cpu/core/city.ts:growth256
     - cpu/harness/import.ts:foldGrowthDrift
+    - cpu/harness/import.ts:foldCompetition
   readings:
     - "C-94: the growth modifier — READ (the accumulator's writer unread)"
     - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"

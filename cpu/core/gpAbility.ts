@@ -34,6 +34,7 @@ import { dedicationEvent } from './eras';
 import { randRange } from './rand';
 import { spawnUnit, disbandUnit, bestUnlockedOfClass, unitFullMoves, unitsAt, unitStackSlot, raiseBestTrained } from './units';
 import { lookAgain } from './fog';
+import { addFreeGpp } from './greatPeople';
 import { fitEncampOuter, repairDrip, urbanDefensesFit, wallsMax } from './rules';
 import { BUILDINGS } from '../data/buildings';
 import { itemCost } from './game';
@@ -443,7 +444,7 @@ export function activateGreatPerson(state: GameState, unit: Unit): boolean {
       receiveEnvoyTiles(state);
     }
   }
-  if (fx.gppAll) for (const c of GP_CLASSES) owner.gpp[c] = (owner.gpp[c] ?? 0) + fx.gppAll;
+  if (fx.gppAll) addFreeGpp(owner, fx.gppAll);
 
   // THE UNIT ON THE TILE — a granted chassis, or a promotion for whoever is
   // already standing here.

@@ -121,7 +121,7 @@ import { resolveCompetition } from './competition';
 import { acceptDeal, capitalCityOf, dealPhase, setDealOffer } from './deals';
 import { hiddenResourcesFor } from './seats';
 import { grievanceCityTaken, grievanceDenounce, grievanceLastCity, grievanceWarDeclared, settlePromises } from './grievance';
-import { levyMoment, pantheonMoment, transferMoments, agePressure, worldEraIndex } from './eras';
+import { levyMoment, pantheonMoment, transferMoments, agePressure } from './eras';
 import { improvementMoment } from './moments';
 import { cityAppealResolver, cityGovernorEstablished, establishedGovernorCityIds, governorFlag, governorLoyaltyAura, governorMult, governorPhase, governedCityIds, governorSum, cityGovernorPromos } from './governors';
 import { NO_SEAT, civOf, alliancePtsWith, allianceTypeWith, alliedAtLevel, allyTurnsWith, atWarWithAny, borderTurnsFrom, campTiles, citiesOf, civsAtWar, cityStateOfSeat, clearDelegations, denounceActive, friendTurnsWith, isCiv, isCityStateSeat, isTerritorial, seatOf, seatOfCityState, seatsAllied, seatsFriends, setAlliancePtsWith, setAllyTurnsWith, setBorderTurnsFrom, setFriendTurnsWith, setTileOwner, setWar, setWarKind, clearWarKind, setTreatyTurnsWith, setWarTurnsWith, tileBelongsTo, tileCity, tileOwnedByCiv, tileSeat, unitsOf, treatyTurnsWith, warClockKey, warTurnsWith, warsOf, hasRouteToSeat, leaderOf, warBanned, cityAtTile, onHomeContinent, BARB_SEAT, FREE_SEAT, isFreeSeat, freeSeatOf, cityHolders, civLevelOf, tileClaimed, majorsMet, setPeaceTurnWith } from './seats';
@@ -1615,11 +1615,15 @@ function payEmergency(state: GameState, e: Emergency, membersWon: boolean): void
 }
 
 /**
- * The WORLD CONGRESS trigger: at every CONGRESS_INTERVAL turn, once ANY civ
- * has reached CONGRESS_MIN_ERA (Medieval), one Regular Session runs — the
- * mechanics and their sources live at `congressSession` and the catalog
- * (CONGRESS_RESOLUTIONS). The slate keys on the MAX era across civs, the
- * wiki's "topics relevant for the current world". The session closes the
+ * The WORLD CONGRESS trigger: at every CONGRESS_INTERVAL turn, once the GAME
+ * era (`GameState.gameEra`) has reached CONGRESS_MIN_ERA (Medieval), one
+ * Regular Session runs — the mechanics and their sources live at
+ * `congressSession` and the catalog (CONGRESS_RESOLUTIONS). The slate and
+ * its competition key on the game era too (0x598270, 0x596b40;
+ * runs/h1_duelq1117 / 1124 / 1127 / 1128 t61: a session with every major
+ * Classical in the game's Medieval era; 1127 t181: the Espionage Pact and
+ * the World Games drawn in the Atomic game era, the majors' furthest era
+ * Modern). The session closes the
  * turn the players acted in, after the barbarians' turn and before the next
  * turn's random-event step (the game's draw log puts its draws there:
  * runs/h1_duelv1127 t61), so endTurn calls it right after `barbarianPhase`
@@ -1628,9 +1632,9 @@ function payEmergency(state: GameState, e: Emergency, membersWon: boolean): void
  */
 export function worldCongress(state: GameState): void {
   const turn = state.turn - 1;
-  const worldEra = worldEraIndex(state);
-  if (!congressSessionDue(turn, worldEra)) return;
-  congressSession(state, worldEra);
+  const era = state.gameEra ?? 0;
+  if (!congressSessionDue(turn, era)) return;
+  congressSession(state, era);
   state.lastSessionTurn = turn;
   congressCancelBannedIntl(state);
 }
@@ -1645,7 +1649,7 @@ export function worldCongress(state: GameState): void {
 export function emergencySessions(state: GameState): void {
   const recorded = state.seats.map((sx) => sx.congressVote ?? null);
   for (const sx of state.seats) sx.congressVote = undefined;  // an intent is for ONE turn
-  if (worldEraIndex(state) >= CONGRESS_MIN_ERA) specialSessions(state, recorded);
+  if ((state.gameEra ?? 0) >= CONGRESS_MIN_ERA) specialSessions(state, recorded);
   resolveEmergencies(state);
   resolveCompetition(state);
 }

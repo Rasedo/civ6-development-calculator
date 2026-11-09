@@ -49,8 +49,8 @@ def build():
 
 
 def blank(sim) -> torch.Tensor:
-    """[B, n, 3, 4] — no ballot anywhere: every major votes the AI line."""
-    return torch.full((sim.B, sim.n_majors, 3, 4), -1, dtype=torch.long)
+    """[B, n, 4, 4] — no ballot anywhere: every major votes the AI line."""
+    return torch.full((sim.B, sim.n_majors, 4, 4), -1, dtype=torch.long)
 
 
 def session(sim, bal: torch.Tensor, slate: tuple[int, int] = (0, 1), comp: int = -1) -> None:
@@ -58,7 +58,7 @@ def session(sim, bal: torch.Tensor, slate: tuple[int, int] = (0, 1), comp: int =
     ballots — what `_world_congress` runs once it has drawn the slate."""
     B = sim.B
     fires = torch.ones(B, dtype=torch.bool)
-    dv = sim._world_era() >= sim._congress_dv_min
+    dv = sim.game_era >= sim._congress_dv_min
 
     def full(v: int) -> torch.Tensor:
         return torch.full((B,), v, dtype=torch.long)
@@ -79,7 +79,7 @@ def main() -> None:
     quiet, _ = sim._congress_due(iv + 1)
     assert not bool(quiet[0]), "no session on an off-interval turn"
     res0, res1, comp = sim._congress_draw_slate(fires)
-    era = int(sim._world_era()[0])
+    era = int(sim.game_era[0])
     for r in (int(res0[0]), int(res1[0])):
         assert r >= 0 and sim._congress_res[r]["min"] <= era <= sim._congress_res[r]["max"], "the slate left its era"
     assert int(res0[0]) != int(res1[0]), "a pick is removed before the next draw"
@@ -96,12 +96,14 @@ def main() -> None:
         return draw0(mask, mx)
 
     sim._rand_range = spy0
-    sim._world_era = lambda: torch.full((sim.B,), 5, dtype=torch.long)
+    # the slate reads the GAME era
+    game_era = sim.game_era
+    sim.game_era = torch.full((sim.B,), 5, dtype=torch.long)
     try:
         *_, comp = sim._congress_draw_slate(fires)
     finally:
         del sim._rand_range
-        del sim._world_era
+        sim.game_era = game_era
     E = ranges[0]
     assert ranges == [E, E - 1, E - 2, 1, 1], f"the Modern session drew {ranges}"
     assert int(comp[0]) == sim._comp_fair, "the World's Fair is the Modern competition"
@@ -518,7 +520,7 @@ def main() -> None:
     print("  a tied vote goes to the side that COMMITTED the favor, outcome and target alike")
 
     # --- THE SCORED COMPETITION: the window, the score and the podium -------
-    # CIV6 (Competition): one runs for exactly 30 turns; "the civilization with
+    # CIV6 (Competition): one runs for its Duration; "the civilization with
     # the highest score wins the Gold Tier rewards", every civ in the top 25%
     # takes Silver and the next quarter Bronze. CIV6 (Climate Accords): "1
     # point per turn for each CO2 emission less than the highest polluter".
@@ -531,7 +533,7 @@ def main() -> None:
     # the session starts the competition it drew, every living major in its field
     session(simC, blank(simC), slate=(-1, -1), comp=simC._comp_climate)
     assert int(simC.comp_kind[0]) == simC._comp_climate, "the drawn competition did not start"
-    assert int(simC.comp_left[0]) == simC._comp_turns, "the window is not its turns"
+    assert int(simC.comp_left[0]) == int(simC._comp_turns[simC._comp_climate]), "the window is not its turns"
     assert bool(simC.comp_member[0, :nrow].all()), "the field is every living major"
     # a running one is never started over
     session(simC, blank(simC), slate=(-1, -1), comp=simC._comp_fair)
@@ -545,7 +547,7 @@ def main() -> None:
     assert float(simC.comp_score[0, 0]) == 0.0, "the highest polluter scored"
     assert float(simC.comp_score[0, 1]) == 6.0, "the gap to the top polluter is the score"
     assert float(simC.civ_co2_turn[0, 0]) == 0.0, "the turn's emission carried into the next"
-    assert int(simC.comp_left[0]) == simC._comp_turns - 1, "the clock did not run"
+    assert int(simC.comp_left[0]) == int(simC._comp_turns[simC._comp_climate]) - 1, "the clock did not run"
     simC.comp_kind[:] = -1
 
     # the podium at the window's end: gold to the best, then the two quarters
@@ -561,11 +563,13 @@ def main() -> None:
         for row in range(nrow):
             simC.civ_diplo_points[:, row] = 0
             simC.civ_diplo_favor[:, row] = 0
-        for _ in range(simC._comp_turns):
+        for _ in range(int(simC._comp_turns[simC._comp_climate])):
             simC.civ_co2_turn[:] = 0
             for row in range(nrow):
                 simC.civ_co2_turn[0, row] = emit(row)
             simC._resolve_competition()
+        # the podium at the next turn's head
+        simC._pay_competition()
         assert int(simC.comp_kind[0]) == -1, "the window did not close on time"
 
     run_window(lambda row: 2.0 * (nrow - 1 - row))     # row 0 dirtiest, last cleanest
@@ -624,16 +628,16 @@ def main() -> None:
             _s.city_dist_tile[0, 0, _j, _of] = _t
             _s.district_complete[0, _t] = False
         _b0 = float(_s.comp_score[0, 0])
-        _s._competition_score()
+        _s._competition_score(torch.ones(_s.B, dtype=torch.bool))
         if _kindf == simbase.SCORE_DISTRICT:
             assert float(_s.comp_score[0, 0]) == _b0, (
                 f"{_name} scored a district that had not finished")
             _s.district_complete[0, _t] = True
-            _s._competition_score()
+            _s._competition_score(torch.ones(_s.B, dtype=torch.bool))
         assert float(_s.comp_score[0, 0]) == _b0 + _amt, (
             f"{_name} scored {float(_s.comp_score[0, 0]) - _b0} for one holding, wanted {_amt}")
         # ...and again next turn, because it is MAINTAINED
-        _s._competition_score()
+        _s._competition_score(torch.ones(_s.B, dtype=torch.bool))
         assert float(_s.comp_score[0, 0]) == _b0 + 2 * _amt, (
             f"{_name} did not pay its holding a second turn")
         # a seat outside the field scores nothing at all

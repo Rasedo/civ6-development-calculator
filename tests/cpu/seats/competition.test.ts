@@ -20,11 +20,11 @@
 import { describe, it, expect } from 'vitest';
 import { makeMap, makeState, tileAtCoords } from '../helpers';
 import { emptySeat, setTileOwner } from '../../../cpu/core/seats';
-import { resolveCompetition, startCompetition, competitionOf, scoreProject, raiseAidRequest, scoreGoldGift } from '../../../cpu/core/competition';
+import { payCompetition, resolveCompetition, startCompetition, competitionOf, scoreProject, raiseAidRequest, scoreGoldGift } from '../../../cpu/core/competition';
 import { PROJECTS } from '../../../cpu/data/projects';
 import { emitCarbon } from '../../../cpu/core/climate';
 import {
-  COMPETITIONS, COMPETITION_CLIMATE, COMPETITION_TURNS, COMPETITION_WORLDS_FAIR,
+  COMPETITIONS, COMPETITION_CLIMATE, COMPETITION_WORLDS_FAIR,
   COMPETITION_WORLD_GAMES, COMPETITION_SPACE_STATION, COMPETITION_AID_REQUEST,
 } from '../../../cpu/data/seats';
 import { tilesWithin } from '../../../world/hex';
@@ -119,11 +119,15 @@ describe("the World's Fair", () => {
     c.left = 1;
     const dv = state.seats[0].diplomaticPoints ?? 0;
     resolveCompetition(state);
+    // the last turn scored, the podium waits for the turn's head
+    expect(competitionOf(state)).toBeDefined();
+    payCompetition(state);
     expect(competitionOf(state)).toBeUndefined();
     expect(state.seats[0].diplomaticPoints).toBe(dv + FAIR.goldPoints);
     expect(state.seats[0].gpp.SCIENTIST).toBe(FAIR.goldGpp);
-    // ...and the Prophet is not one of the classes it scores
-    expect(state.seats[0].gpp.PROPHET ?? 0).toBe(0);
+    // ...free points of every class, the Prophet's too (runs/h1_duelq1117 t181)
+    expect(state.seats[0].gpp.PROPHET).toBe(FAIR.goldGpp);
+    expect(state.seats[0].gppFree?.PROPHET).toBe(FAIR.goldGpp);
   });
 });
 
@@ -152,10 +156,11 @@ describe('a scored competition', () => {
     expect(c.score[1]).toBe(6);
   });
 
-  it('pays the podium when the 30 turns run out, and then ends', () => {
+  it('pays the podium at the head of the turn after its turns run out, and then ends', () => {
     const state = table();
     startCompetition(state, COMPETITION_CLIMATE, [0, 1, 2]);
-    for (let i = 0; i < COMPETITION_TURNS; i++) burn(state, [10, 4, 0]);
+    for (let i = 0; i < CLIMATE.turns; i++) burn(state, [10, 4, 0]);
+    payCompetition(state);
     expect(competitionOf(state)).toBeUndefined();
     // three in the field: silver is the top quarter rounded up (1 seat), and
     // bronze the quarter below it (the second).
@@ -170,7 +175,8 @@ describe('a scored competition', () => {
     const state = table();
     startCompetition(state, COMPETITION_CLIMATE, [0, 1, 2]);
     // seats 1 and 2 emit nothing, so both trail seat 0 by the same gap
-    for (let i = 0; i < COMPETITION_TURNS; i++) burn(state, [10, 0, 0]);
+    for (let i = 0; i < CLIMATE.turns; i++) burn(state, [10, 0, 0]);
+    payCompetition(state);
     expect(state.seats[1].diplomaticPoints).toBe(CLIMATE.goldPoints);
     expect(state.seats[2].diplomaticPoints).toBe(CLIMATE.goldPoints);
     expect(state.seats[0].diplomaticPoints ?? 0).toBe(0);
@@ -275,6 +281,7 @@ describe("the podium's permanent rewards", () => {
     c.score[2] = 1;
     c.left = 1;
     resolveCompetition(state);
+    payCompetition(state);
     expect(competitionOf(state)).toBeUndefined();
     return state;
   }
@@ -342,7 +349,7 @@ describe('the Aid Request', () => {
     expect(c.kind).toBe(COMPETITION_AID_REQUEST);
     expect(c.target).toBe(1);
     expect(c.member).toEqual([1, 0, 1]);
-    expect(c.left).toBe(COMPETITION_TURNS);
+    expect(c.left).toBe(COMPETITIONS[COMPETITION_AID_REQUEST].turns);
     raiseAidRequest(state, 2); // one slot: nothing changes
     expect(competitionOf(state)!.target).toBe(1);
   });
@@ -373,6 +380,7 @@ describe('the Aid Request', () => {
     c.score[2] = 1;
     c.left = 1;
     resolveCompetition(state);
+    payCompetition(state);
     expect(competitionOf(state)).toBeUndefined();
     expect(state.seats[0]!.diplomaticPoints ?? 0).toBe(2);
     expect(state.seats[0]!.diplomaticFavor ?? 0).toBe(100);

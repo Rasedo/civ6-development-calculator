@@ -935,7 +935,8 @@ export interface GpEffect {
   plotLuxury?: number;
   /** a Great Work of this kind, made on the spot. */
   greatWorkKind?: number;
-  /** Great Person points toward EVERY class at once. */
+  /** FREE Great Person points toward EVERY class at once
+   *  (MODIFIER_PLAYER_ADJUST_FREE_GREAT_PERSON_POINTS, `Seat.gppFree`). */
   gppAll?: number;
   /** CIV6 (Mary Leakey): science "for every Artifact in this city", instant. */
   artifactScience?: number;

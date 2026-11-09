@@ -23,7 +23,7 @@ import { PROMO_CLASSES } from '../../../cpu/data/promotions';
 import { CONGRESS_ESPIONAGE, CONGRESS_PACT_LEVELS, CONGRESS_ARMS_CONTROL } from '../../../cpu/data/seats';
 import { congressPactBanned, congressPactLevels, congressVotes, drawCongressSlate, targetSpaceSize, type CongressBallot } from '../../../cpu/core/congress';
 import { competitionOf } from '../../../cpu/core/competition';
-import { COMPETITION_WORLDS_FAIR, COMPETITION_TURNS, CONGRESS_LUXURY_POLICY } from '../../../cpu/data/seats';
+import { COMPETITIONS, COMPETITION_WORLDS_FAIR, CONGRESS_LUXURY_POLICY } from '../../../cpu/data/seats';
 import { SPY_OFFENSIVE_MISSIONS, SPY_UNIT, SPY_M_SIPHON_FUNDS, SPY_M_FOMENT_UNREST, SPY_M_GAIN_SOURCES } from '../../../cpu/data/espionage';
 import { addGrievance, grievanceWith, decayGrievances } from '../../../cpu/core/grievance';
 import { congressUnitCS, defenderCS, theoStrength } from '../../../cpu/core/combat';
@@ -62,6 +62,8 @@ function vote(state: ReturnType<typeof newGame>, slate: readonly number[], ballo
 function medieval(state: ReturnType<typeof newGame>) {
   seatOf(state, 0)!.research.techs.push('APPRENTICESHIP'); // Medieval
   for (const civSeat of state.seats.slice(1)) civSeat.research.techs.push('APPRENTICESHIP');
+  // the Congress reads the GAME era
+  state.gameEra = 2;
 }
 
 describe('world congress', () => {
@@ -191,9 +193,11 @@ describe('world congress', () => {
     expect(BUILT_WONDERS.FORBIDDEN_CITY.effects?.extraSlots?.wildcard).toBe(1);
   });
 
-  it('the Medieval gate reads ANY civ, not just seat 0', () => {
+  it('the Medieval gate reads the GAME era, not the majors\' research', () => {
+    // runs/h1_duelq1117 t61: a session with every major Classical in the
+    // game's Medieval era
     const state = newGame(1);
-    (state.seats[(0) + 1] as Seat).research.techs.push('APPRENTICESHIP'); // only the civ
+    state.gameEra = 2;
     state.turn = CONGRESS_INTERVAL + 1;
     seatOf(state, 0)!.diplomaticFavor = 5;
     worldCongress(state);
@@ -418,7 +422,7 @@ describe('world congress: the wider slate', () => {
     vote(state, [CONGRESS_UDT, CONGRESS_PATRONAGE], [], false, COMPETITION_WORLDS_FAIR);
     const c = competitionOf(state)!;
     expect(c.kind).toBe(COMPETITION_WORLDS_FAIR);
-    expect(c.left).toBe(COMPETITION_TURNS);
+    expect(c.left).toBe(COMPETITIONS[COMPETITION_WORLDS_FAIR].turns);
     expect(c.member).toEqual([1, 1, 0]);
   });
 

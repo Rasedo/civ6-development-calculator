@@ -30,6 +30,8 @@ class SimStep:
         self._climate_turn()
         # the game era and Ages of the turn the starts open (`gameEraTurn`)
         self._game_era_turn(int(self.turn) + 1)
+        # the podium of a competition whose turns ran out (`payCompetition`)
+        self._pay_competition()
         self._seat_phase()
         self._city_state_phase()
         self._free_cities_phase()

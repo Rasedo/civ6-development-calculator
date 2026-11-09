@@ -57,7 +57,7 @@ import { getModifiers } from '../core/effects';
 import { researchUnitTurns, type ResearchEntry } from '../core/aiResearch';
 import type { CivicEntry } from '../core/aiCivics';
 import { detectBoosts, grantBoost, markBoost } from '../core/boosts';
-import { recordMoments } from '../core/moments';
+import { improvementMoment, recordMoments } from '../core/moments';
 import { applyGovernorActions, governorsOf } from '../core/governors';
 import { GOVERNOR_PROMOTIONS, GOV_APPOINT, GOV_ASSIGN_CITY, GOV_ASSIGN_MINOR, GOV_PROMOTE, promotionBit } from '../data/governors';
 import { BOOSTS } from '../data/boosts';
@@ -106,7 +106,8 @@ import { opUnits } from '../core/operations/operation';
 import { newCityAi } from '../core/aiCityTrees';
 import { newEconomicMemory, purchaseSpend, savingsTurn, upgradePurchase, type EconomicMemory } from '../core/aiEconomic';
 import { FX } from '../core/aiValue';
-import { advanceHistory, aliasOrPrefixed, engineRowOf, formationRows, importTurn, minorHead, loadWarKinds, loadWeariness, newHistory, warKindAt, wearyAt, recordRoutes, type History, type Imported, type WarKindRow } from './import';
+import { advanceHistory, aliasOrPrefixed, engineRowOf, formationRows, importTurn, loggedCongressTarget, minorHead, loadWarKinds, loadWeariness, newHistory, resolutionOfLog, warKindAt, wearyAt, recordRoutes, type History, type Imported, type WarKindRow } from './import';
+import { holdCongressBallots, type CongressBallot, type CongressSlate } from '../core/congress';
 import { TribeFold } from './windowFold';
 import { AI_UNITS } from '../data/aiBuildTables';
 import { loadCityBuildCentre, loadCityBuildTables, newCityBuildTally, tallyBuildings, type CityBuildTally } from './cityBuildLog';
@@ -121,7 +122,7 @@ import { engineId, gameHash, gameTypeOf } from '../data/aliases';
 import { OperationsProbe, operationsMarkdown, type OperationsTally } from './operationsScore';
 import { GP_CLASSES, GREAT_PEOPLE, gpChargesOf, gpCost, gpEffectOf, personWorkObjects } from '../data/greatPeople';
 import { loadGpTimeline, type GpTimeline } from './gpTimeline';
-import { patronageCost, patronizeGreatPerson, recruit } from '../core/greatPeople';
+import { gpClaimLeft, patronageCost, patronizeGreatPerson, recruit } from '../core/greatPeople';
 import { InferredActions, RecordedActions, activePlayer, type ActionSource, type Decision, type LogTally, type QueueSpec } from './replayActions';
 import { newScores, scoreDecision, scoreTable, memoryTable, type DecisionScores } from './aiScore';
 import { GameMemory, MemoryLogs, readDanger, readGameMemory, readMemory, readRevealed, syncContracts, type ArmyLogged } from './aiMemory';
@@ -442,6 +443,67 @@ function stageStrategies(ctx: Ctx, turn: number): void {
     if (on.size) s.strategies = AI_STRATEGIES.filter((st) => on.has(st));
     else delete s.strategies;
   }
+}
+
+/** the game's World Congress log beside the dump (`<dump>.logs/
+ *  World_Congress.csv`): per session turn, its VOTES, OPTIONS and
+ *  DISCUSSION VOTES rows in the log's order; an empty map without it */
+function loadCongressLog(dumpPath: string): Map<number, string[][]> {
+  const out = new Map<number, string[][]>();
+  let text = '';
+  try {
+    text = readFileSync(dumpPath.replace(/\.jsonl$/, '.logs/World_Congress.csv'), 'utf8');
+  } catch {
+    return out;
+  }
+  for (const line of text.split('\n').slice(1)) {
+    const p = line.split(',').map((x) => x.trim());
+    if (p[1] !== 'VOTES' && p[1] !== 'OPTIONS' && p[1] !== 'DISCUSSION VOTES') continue;
+    const t = Number(p[0]);
+    out.set(t, [...out.get(t) ?? [], p]);
+  }
+  return out;
+}
+
+/** THE SESSION'S BALLOTS AS THE LOG CASTS THEM (`holdCongressBallots`): per
+ *  major, each slate resolution's and the Diplomatic Victory resolution's
+ *  VOTES n and OPTIONS [option 1 A / 2 B, target] as [outcome, target, n - 1,
+ *  cast order], the discussion's DISCUSSION VOTES n as its slot's n - 1
+ *  (runs/h1_duelq1117 t161: China's 5 / 4 / 1 / 3 votes, 76 Favor). A target
+ *  the engine holds no row for leaves the ballot to the AI line. */
+function loggedBallots(rows: readonly string[][], at: CongressSlate, ctx: Ctx, rec: TurnRecord): (CongressBallot | null)[] {
+  const out: (CongressBallot | null)[] = ctx.state.seats.map(() => null);
+  const ballot = (pid: number) => {
+    const seat = ctx.next.seatOfPlayer.get(pid);
+    if (seat === undefined || seat < 0 || seat >= out.length) return null;
+    return (out[seat] ??= [null, null, null, null]);
+  };
+  rows.forEach((p, order) => {
+    const pid = Number(p[3]);
+    const b = ballot(pid);
+    if (!b) return;
+    if (p[1] === 'DISCUSSION VOTES') {
+      b[3] = [0, -1, Math.max(0, Number(p[4]) - 1), order];
+      return;
+    }
+    const res = resolutionOfLog(p[2]);
+    const slot = res === 'dv' ? (at.dv ? 2 : -1) : at.slate.indexOf(res);
+    if (slot < 0) return;
+    const v = b[slot] ?? [0, -1, 0, order];
+    if (p[1] === 'VOTES') v[2] = Math.max(0, Number(p[4]) - 1);
+    else {
+      const target = loggedCongressTarget(res, Number(p[5]), rec, ctx.cat, ctx.next);
+      if (target < 0) {
+        count(ctx, 'congress:ballot', 'fallback', pid, `${p[2]} target ${p[5]}`);
+        b[slot] = null;
+        return;
+      }
+      v[0] = Number(p[4]) === 2 ? 1 : 0;
+      v[1] = target;
+    }
+    b[slot] = v;
+  });
+  return out;
 }
 
 /** the game's AI research log beside the dump, or an empty map */
@@ -3329,7 +3391,7 @@ function completeRecruit(ctx: Ctx, b: TurnRecord, d: Extract<Decision, { kind: '
   const purse = (['faith', 'gold'] as const).find((c) => spent(c) >= patronageCost(state, seat, cls, c === 'gold') - 1);
   if (purse && patronizeGreatPerson(state, seat, i, purse).ok) why = `patronized with ${purse}`;
   else {
-    s.gpp[cls] = Math.max(0, (s.gpp[cls] ?? 0) - (state.gpPrice[i] ?? 0));
+    s.gpp[cls] = gpClaimLeft(s as Seat, cls, Math.max(0, (s.gpp[cls] ?? 0) - (state.gpPrice[i] ?? 0)));
     s.gpp[cls] = (s.gpp[cls] ?? 0) + recruit(state, seat, cls);
   }
   matchNewUnits(ctx, b);
@@ -3612,6 +3674,10 @@ const res = buyTile(state, city.id, d.plot, seat);        if (!res.ok) setTileOw
           if (t.improvement === want) { count(ctx, 'improve', 'applied'); break; }
         }
         const ok = valid.includes(want as never);
+        // the major's improvement on a plot a disaster enriched records its
+        // moment where the engine's verb did not lay it (runs/h1_duelq1121
+        // t147: China's on 576, IMPROVEMENT_CONSTRUCTED_ON_DISASTER_YIELD_TILE_FIRST)
+        if (isCiv(seat) && t.improvement !== want) improvementMoment(state, seat, t);
         t.improvement = want;
         t.pillaged = false;
         count(ctx, 'improve', 'fallback', d.player, ok ? (builder ? 'the builder\'s order refused' : d.unit ? 'a builder the replay does not hold' : 'no builder the log names')
@@ -6068,6 +6134,7 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
   // (`researchUnitTurns`), which their next unit production table reads:
   // the turns above 0 AI_Research.csv logs that turn
   const aiResearchLog = loadAiResearchLog(dumpPath);
+  const congressLog = loadCongressLog(dumpPath);
   for (const [seat, player] of first.playerOfSeat) {
     if (!isCityStateSeat(seat) && seat !== FREE_SEAT) continue;
     const s = seatOf(state, seat);
@@ -6399,8 +6466,8 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
     const hpPre = new Map(state.units.map((u) => [u, u.hp]));
     // THE ENGINE'S TURN in the order the pair holds it: the other majors'
     // starts and actions of turn t, the city-states' and Free Cities' turns,
-    // the barbarians' (sat out), the World Congress, the turn's close and
-    // heal; the counter's change (the random events, the climate, the era);
+    // the barbarians' (sat out), the turn's close and heal, the World
+    // Congress; the counter's change (the random events, the climate, the era);
     // the active player's start of t+1
     try {
       ctx.streams = new Map();
@@ -6708,10 +6775,20 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
       ctx.minorLookTypes = new Map([...state.unitsDying ?? [], ...state.units].map((u) => [u.id, gameTypeOf('unit', u.type, 'UNIT_')]));
       ctx.minorDying = state.unitsDying ?? [];
       takeBarbs();
-      worldCongress(state);
       ctx.barbCentres = new Map([...state.seats.flatMap((s) => s.cities), ...state.freeSeat?.cities ?? [], ...state.cityStates]
         .map((c) => [c.centerIndex, { hp: c.hp ?? CITY_MAX_HP, outerHp: c.outerHp }] as const));
       turnClose(state);
+      // the Regular Session after the turn's close, as `endTurn` runs it: a
+      // competition it starts scores from the next turn (runs/h1_duelq1117:
+      // the World's Fair of the t161 session STARTED 162, its podium t181),
+      // the majors voting the ballots the game's log casts (`loggedBallots`)
+      const session = congressLog.get(a.turn);
+      holdCongressBallots(session ? (_st, at) => loggedBallots(session, at, ctx, b) : null);
+      try {
+        worldCongress(state);
+      } finally {
+        holdCongressBallots(null);
+      }
       const changing = barbs.filter((u) => barbAt.has(u));
       barbs.splice(0, barbs.length, ...barbs.filter((u) => !barbAt.has(u)));
       const barbFrom = new Map(changing.map((u) => [u, u.tileIndex] as const));

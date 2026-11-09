@@ -1120,7 +1120,8 @@ class SimInit:
         self._deal_k_mission = self._deal_kinds.index("MISSION")
         self._deal_k_friend = self._deal_kinds.index("FRIENDSHIP")
         self._deal_k_alliance = self._deal_kinds.index("ALLIANCE")
-        self._comp_turns = int(_er2["competitionTurns"])
+        # each competition's turns, its Duration online (`CompetitionDef.turns`)
+        self._comp_turns = torch.tensor([int(c["turns"]) for c in _er2["competitions"]], dtype=torch.long, device=device)
         self._comp_silver_pct = int(_er2["competitionSilverPct"])
         self._comp_bronze_pct = int(_er2["competitionBronzePct"])
         self._comps = list(_er2["competitions"])
@@ -2248,11 +2249,6 @@ class SimInit:
         self._gp_class_unit = torch.tensor(
             rr["gpClassUnitIdx"], dtype=torch.long, device=device)
         self._prophet_cls = int(rr["prophetCls"])  # PROPHET's class index
-        # CIV6 (Expansion2_Emergencies.xml): the World's Fair scores eight
-        # `WORLDS_FAIR_SCORE_GPP_*` rows — every Great Person class but the
-        # Prophet.
-        _ngp = len(rr["gpClassDistrict"])
-        self._fair_gp_classes = [i for i in range(_ngp) if i != self._prophet_cls]
         self._writer_cls = int(rr["writerCls"])  # WRITER's class index
         self._gp_engineer_cls = int(rr["engineerCls"])  # the Great ENGINEER's
         self._promo_max_level = int(rr["promoMaxLevel"])
@@ -5584,6 +5580,9 @@ class SimInit:
         ("tourism", torch.long, None),
         ("tourism_rel", torch.long, None),
         ("gpp", None, "_gp_nc"),
+        # the free Great Person points per class, which no claim spends
+        # (`Seat.gppFree`)
+        ("gpp_free", None, "_gp_nc"),
     )
 
     def _alloc_civ_pairs(self, B: int, n_majors: int, dtype, device) -> None:

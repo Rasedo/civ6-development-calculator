@@ -6,8 +6,9 @@
  * draws one to start (`drawCongressSlate`), every living major in its field
  * (runs/h1_duelw1117 Game_Emergencies.csv: SCORING lists both players).
  *
- * CIV6 (Competition): one runs for exactly 30 turns, "after which it ends and
- * winners are chosen". "The civilization with the highest score wins the Gold
+ * CIV6 (Competition): one scores for its Duration (`CompetitionDef.turns`),
+ * "after which it ends and winners are chosen", the podium paid at the next
+ * turn's head (`payCompetition`). "The civilization with the highest score wins the Gold
  * Tier rewards. Additionally, all civs whose scores fall within the top 25%
  * (including the Gold Tier winner) win the Silver Tier rewards, and all civs
  * whose scores fall within the next highest quarter (i.e. the top 26-50%) win
@@ -19,9 +20,8 @@ import type { Competition, GameState, GreatPersonClass } from './types';
 import { addSeatPerm, boostRandom } from './gpAbility';
 import { ERAS } from '../data/techs';
 import type { Era } from '../data/techs';
-import {
-  COMPETITIONS, COMPETITION_BRONZE_PCT, COMPETITION_SILVER_PCT, COMPETITION_TURNS,
-} from '../data/seats';
+import { addFreeGpp } from './greatPeople';
+import { COMPETITIONS, COMPETITION_BRONZE_PCT, COMPETITION_SILVER_PCT } from '../data/seats';
 import { civsAtWar, isCiv, seatOf } from './seats';
 import { getModifiers } from './effects';
 
@@ -45,7 +45,7 @@ export function startCompetition(state: GameState, kind: number, field: readonly
     const sx = seatOf(state, s);
     if (sx && isCiv(s) && sx.cities.length > 0) member[s] = 1;
   }
-  state.competition = { kind, left: COMPETITION_TURNS, score: Array.from({ length: n }, () => 0), member, target };
+  state.competition = { kind, left: COMPETITIONS[kind].turns, score: Array.from({ length: n }, () => 0), member, target };
 }
 
 /** CIV6 (EMERGENCY_SEND_AID, Trigger PLAYER_LOSES_POP_TO_RANDOM_EVENT): a
@@ -143,13 +143,6 @@ export function scoreProject(state: GameState, seat: number, project: string): v
   }
 }
 
-/** CIV6 (Expansion2_Emergencies.xml): the eight classes the World's Fair
- *  scores — every Great Person class but the Prophet. Its GOLD reward spreads
- *  over the same eight. */
-const FAIR_CLASSES: readonly GreatPersonClass[] = [
-  'GENERAL', 'ADMIRAL', 'ENGINEER', 'MERCHANT', 'SCIENTIST', 'WRITER', 'ARTIST', 'MUSICIAN',
-];
-
 /** The podium. The two lower tiers go by RANK, the published quarters of the
  *  field, ties broken on the lower seat id (one total order both engines
  *  share); the gold goes to the best and to every member that scored as much
@@ -171,9 +164,9 @@ function payPodium(state: GameState, c: Competition): void {
     if (!sx) continue;
     if (gold(r)) sx.diplomaticPoints = (sx.diplomaticPoints ?? 0) + def.goldPoints;
     // CIV6 (WORLD_FAIR_FIRST_PLACE_GREAT_PERSON_POINTS): the winner also
-    // takes Great Person points, spread over the classes it scored.
+    // takes free Great Person points of every class (`addFreeGpp`)
     if (gold(r) && def.goldGpp) {
-      for (const cls of FAIR_CLASSES) sx.gpp[cls] = (sx.gpp[cls] ?? 0) + def.goldGpp;
+      addFreeGpp(sx, def.goldGpp);
     }
     // CIV6 (Faces of Peace): "+100% Diplomatic Favor from successfully
     // completing an ... Scored Competition" (`EMERGENCY_FAVOR_ROWS`)
@@ -200,19 +193,15 @@ function payPodium(state: GameState, c: Competition): void {
 }
 
 /**
- * The turn's competition: score the field, run the clock down, pay the podium
- * when it reaches zero. Runs beside the emergencies, after every seat has had
- * its turn — which is what makes this turn's emissions comparable.
+ * The turn's competition: score the field and run the clock down while it has
+ * turns left. Runs beside the emergencies, after every seat has had its turn —
+ * which is what makes this turn's emissions comparable.
  */
 export function resolveCompetition(state: GameState): void {
   const c = state.competition;
-  if (c) {
+  if (c && c.left > 0) {
     scoreTurn(state, c);
     c.left -= 1;
-    if (c.left <= 0) {
-      payPodium(state, c);
-      state.competition = undefined;
-    }
   }
   // The per-turn emission is read HERE and nowhere else, so it is cleared here
   // too: every seat has emitted by now, and the next turn starts from zero.
@@ -220,4 +209,16 @@ export function resolveCompetition(state: GameState): void {
     if (s.co2Turn) s.co2Turn = 0;
     if (s.gppTurn) delete s.gppTurn;
   }
+}
+
+/** A competition whose turns have run out pays its podium at the turn's head,
+ *  after the random-event step and the era's opening and before the first
+ *  start (runs/h1_duelq1117 t181: the Volcano and Random Event rolls, the
+ *  era's quest, then China's two "Choosing random civic boost to grant based
+ *  on era" draws, then its start), and the slot empties. */
+export function payCompetition(state: GameState): void {
+  const c = state.competition;
+  if (!c || c.left > 0) return;
+  payPodium(state, c);
+  state.competition = undefined;
 }

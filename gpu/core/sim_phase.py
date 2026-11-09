@@ -2908,7 +2908,8 @@ class SimPhase:
                     & (self.civ_gpp[:, row, cls] >= gcost) & ~_ban & ~self._gp_capped(row, cls)
                 if not bool(hit.count_nonzero()):
                     break
-                self.civ_gpp[:, row, cls] = torch.where(hit, self.civ_gpp[:, row, cls] - gcost, self.civ_gpp[:, row, cls])
+                self.civ_gpp[:, row, cls] = torch.where(
+                    hit, self._gp_claim_left(row, cls, self.civ_gpp[:, row, cls] - gcost), self.civ_gpp[:, row, cls])
                 self._gp_claim(row, hit, cls)
             # CIV6: "GPPs that can no longer be used are converted to Faith,
             # in a 1:1 ratio" — the exhausted class's stock and flow alike.
@@ -2983,6 +2984,19 @@ class SimPhase:
         if cls != self._prophet_cls:
             return torch.zeros(self.B, dtype=torch.bool, device=self.device)
         return self.civ_gp_earned[:, row, cls] >= self._prophet_max
+
+    def _gp_claim_left(self, row: int, cls: int, left: torch.Tensor) -> torch.Tensor:
+        """[B] — a class's points after a claim spent them down to `left`:
+        never below the row's free points of the class, which no claim spends.
+        `gpClaimLeft`'s twin."""
+        return torch.maximum(left, self.civ_gpp_free[:, row, cls].to(left.dtype))
+
+    def _add_free_gpp(self, row: int, n: torch.Tensor) -> None:
+        """`addFreeGpp`'s twin — `n` [B] free Great Person points to every
+        class of row `row`: into the points and the free points both."""
+        add = n.to(self.civ_gpp.dtype).unsqueeze(1)
+        self.civ_gpp[:, row] = self.civ_gpp[:, row] + add
+        self.civ_gpp_free[:, row] = self.civ_gpp_free[:, row] + add
 
     def _grant_free_prophet(self, row: int, sto: torch.Tensor, centre: torch.Tensor) -> None:
         """CIV6 (Stonehenge): "Grants a free Great Prophet (or a free Apostle

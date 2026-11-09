@@ -1147,6 +1147,12 @@ export interface Seat {
    *  `co2Turn` shape, read once by a scored competition and cleared with it.
    *  CIV6 (World's Fair): "1 point per Great Person POINT of every class". */
   gppTurn?: Partial<Record<GreatPersonClass, number>>;
+  /** the FREE Great Person points per class — a lump that is never spent
+   *  (MODIFIER_PLAYER_ADJUST_FREE_GREAT_PERSON_POINTS, the World's Fair's
+   *  first place): held in `gpp`, it counts toward a claim, and a claim
+   *  leaves the class's points no lower than it (`gpClaimLeft`), a patronage
+   *  keeps it beside the fraction. */
+  gppFree?: Partial<Record<GreatPersonClass, number>>;
   buildersTrained: number;
   /** the Settlers this seat has TRAINED or BOUGHT — what `settlerCost`'s
    *  progression counts (a starting, captured or granted one moves nothing). */

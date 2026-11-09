@@ -165,8 +165,12 @@ export function patronizeGreatPerson(state: GameState, seat: number, clsIdx: num
   const over = 2 * (price - pts) > price;
   // the claim spends the whole points, the fraction kept (runs/h1_duelp1121
   // t102: Kamal-ud-Din Behzad patronized on 116.25 Artist points, 0.25 left;
-  // 1117 t141 Emilie du Chatelet on 66.758, 0.758), and the refund too
-  owner.gpp[cls] = pts - Math.floor(pts) + recruit(state, seat, cls, over ? currency : null);
+  // 1117 t141 Emilie du Chatelet on 66.758, 0.758), the free points beside
+  // it (`Seat.gppFree`: runs/h1_duelq1128 t218 Rabindranath Tagore
+  // patronized with Faith on 475.453 Writer points, 150.453 left), and the
+  // refund too
+  const free = owner.gppFree?.[cls] ?? 0;
+  owner.gpp[cls] = free + (pts - free) - Math.floor(pts - free) + recruit(state, seat, cls, over ? currency : null);
   return { ok: true };
 }
 
@@ -370,6 +374,28 @@ export function passGreatPerson(state: GameState, seat: number, clsIdx: number):
   return { ok: true };
 }
 
+/** A class's points after a claim spent them down to `left`: never below
+ *  the seat's free points of the class (`Seat.gppFree`), which no claim
+ *  spends (runs/h1_duelq1117 t181: Giovanni de' Medici claimed for 120 on
+ *  202 Merchant points, the World's Fair's 100 left, and Trung Trac for 30 on
+ *  the Fair's 100 General points, 100 left; 1128 t220 Erwin Schrödinger for
+ *  480 on 483, the Fair's 100 and Alfred Nobel's 50 left). `_gp_claim_left`
+ *  is the twin. */
+export function gpClaimLeft(owner: Seat, cls: GreatPersonClass, left: number): number {
+  return Math.max(left, owner.gppFree?.[cls] ?? 0);
+}
+
+/** `n` free Great Person points to every class: into the points and the
+ *  free points both (`gpClaimLeft`; runs/h1_duelq1124 t160 Alfred Nobel's 50,
+ *  1117 t181 the World's Fair's 100). `_add_free_gpp` is the twin. */
+export function addFreeGpp(owner: Seat, n: number): void {
+  const free = (owner.gppFree ??= {});
+  for (const c of GP_CLASSES) {
+    owner.gpp[c] = (owner.gpp[c] ?? 0) + n;
+    free[c] = (free[c] ?? 0) + n;
+  }
+}
+
 export function advanceGreatPeople(state: GameState, seat: number): void {
   const owner = seatOf(state, seat);
   if (!owner) return;
@@ -400,7 +426,7 @@ export function advanceGreatPeople(state: GameState, seat: number): void {
         if (gpCapped(owner, cls)) break;
         const cost = gpOfferCost(state, cls); // Infinity while no offer stands
         if (!Number.isFinite(cost) || pts < cost) break;
-        pts -= cost;
+        pts = gpClaimLeft(owner, cls, pts - cost);
         pts += recruit(state, seat, cls); // the refund joins the LIVE local
       }
     }

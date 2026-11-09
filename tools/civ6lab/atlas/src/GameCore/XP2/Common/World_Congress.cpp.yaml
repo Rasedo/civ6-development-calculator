@@ -12,7 +12,15 @@
     - recording: h1_duelv1127
       turn: 161
       value: "a draw over 1 after the Diplomatic Victory row's: the World's Fair, STARTED t162 (1117)"
-  impl: [cpu/core/congress.ts:drawCongressSlate, gpu/core/sim_seats.py:_congress_draw_slate]
+    - recording: h1_duelq1117
+      turn: 161
+      value: "the World's Fair STARTED 162, SCORED ENDED 181 (Duration 29, 19 online): China FIRST PLACE 607, +100 free Great Person points in all ten classes and Nuclear Program + Suffrage in record t181"
+  impl:
+    - cpu/core/congress.ts:drawCongressSlate
+    - gpu/core/sim_seats.py:_congress_draw_slate
+    - cpu/core/competition.ts:payCompetition
+    - gpu/core/sim_seats.py:_pay_competition
+    - cpu/core/phase.ts:worldCongress
   readings: ["H-1: the World Congress slate (0x598270) — READ"]
   review: reviewed
 - addr: 0x598270
@@ -27,7 +35,14 @@
     - recording: h1_duelv1127
       turn: 121
       value: 12, 11, 10 -> Military Advisory, Mercenary Companies (the slate at t101 held Mercenary Companies too)
+    - recording: h1_duelq1127
+      turn: 181
+      value: "the game era Atomic, the majors' furthest Modern: World Ideology and the Espionage Pact voted, the World Games drawn (the engine on the majors' era drew the World's Fair)"
+    - recording: h1_duelq1117
+      turn: 61
+      value: a session (14 draws over the pool) with every major Classical in the Medieval game era
   impl:
+    - cpu/core/phase.ts:worldCongress
     - cpu/core/congress.ts:drawCongressSlate
     - gpu/core/sim_seats.py:_congress_draw_slate
     - cpu/data/seats.ts:RAW_CONGRESS_RESOLUTIONS

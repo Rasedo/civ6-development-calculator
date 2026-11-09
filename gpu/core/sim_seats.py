@@ -2738,10 +2738,11 @@ class SimSeats:
             # the price records the patronage moment
             _pr = self.gp_price[:, c].double()
             over = 2 * (_pr - self.civ_gpp[:, row, c].double()) > _pr
-            # the claim spends the whole points, the fraction kept
-            # (`patronizeGreatPerson`)
+            # the claim spends the whole points, the fraction kept, the free
+            # points beside it (`patronizeGreatPerson`)
             _g = self.civ_gpp[:, row, c]
-            self.civ_gpp[:, row, c] = torch.where(ok, _g - torch.floor(_g), _g)
+            _f = self.civ_gpp_free[:, row, c].to(_g.dtype)
+            self.civ_gpp[:, row, c] = torch.where(ok, _f + (_g - _f) - torch.floor(_g - _f), _g)
             self._gp_claim(row, ok, c, over, gold)
             done = done | ok
         return done
@@ -6641,14 +6642,14 @@ class SimSeats:
 
     def _congress_due(self, turn: int) -> tuple[torch.Tensor, torch.Tensor]:
         """(fires, dv) [B] — a Regular Session sits at `turn`: every
-        congressInterval turn once the world era has reached congressMinEra;
+        congressInterval turn once the GAME era has reached congressMinEra;
         the Diplomatic Victory resolution sits in it from congressDvMinEra."""
         zero = torch.zeros(self.B, dtype=torch.bool, device=self.device)
         if self._congress_interval <= 0 or (turn % self._congress_interval) != 0:
             return zero, zero
-        world_era = self._world_era()
-        fires = world_era >= self._congress_min_era
-        return fires, fires & (world_era >= self._congress_dv_min)
+        era = self.game_era
+        fires = era >= self._congress_min_era
+        return fires, fires & (era >= self._congress_dv_min)
 
     def _congress_draw_slate(self, fires: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         """(res0, res1, competition) [B] — `drawCongressSlate`'s twin, the
@@ -6663,7 +6664,7 @@ class SimSeats:
         session starts (-1 none)."""
         B, dev = self.B, self.device
         neg = torch.full((B,), -1, dtype=torch.long, device=dev)
-        world_era = self._world_era()
+        world_era = self.game_era
         drawn = torch.full((B, 3), -1, dtype=torch.long, device=dev)
         NR = len(self._congress_res)
         if NR and bool(fires.count_nonzero()):
@@ -6787,7 +6788,7 @@ class SimSeats:
     def _world_congress(self) -> None:
         """The `worldCongress`/`congressSession` mirror, after the barbarians'
         turn on the turn they close (`turn - 1`): one Regular Session at every
-        congressInterval turn once ANY major is Medieval — the slate drawn
+        congressInterval turn once the GAME era is Medieval — the slate drawn
         (`_congress_draw_slate`), then the votes on it (`_congress_votes`),
         every major on the AI line."""
         turn = int(self.turn) - 1
@@ -6795,7 +6796,7 @@ class SimSeats:
         if not bool(fires.count_nonzero()):
             return
         res0, res1, comp = self._congress_draw_slate(fires)
-        ballots = torch.full((self.B, self.n_majors, 3, 4), -1, dtype=torch.long, device=self.device)
+        ballots = torch.full((self.B, self.n_majors, 4, 4), -1, dtype=torch.long, device=self.device)
         self._congress_votes(fires, res0, res1, dv, comp, ballots)
         self.last_session_turn.copy_(torch.where(
             fires, torch.full_like(self.last_session_turn, turn), self.last_session_turn))
@@ -6809,8 +6810,9 @@ class SimSeats:
         runs at a time). Mechanics sourced at the catalog
         (CONGRESS_RESOLUTIONS): the free vote and the price s n (n - 1),
         outcome before target, +1 DVP to every winning-combo voter, refund
-        tiers. `ballots` [B, n, 3, 4] per major and slot [outcome, target,
-        extra votes, cast order]; -1 in the outcome votes the AI line."""
+        tiers. `ballots` [B, n, 4, 4] per major and slot [outcome, target,
+        extra votes, cast order] — slot 3 the competition's discussion, its
+        extra votes alone bought; -1 in the outcome votes the AI line."""
         votes = self._congress_target_draws(ballots, (res0, res1), dv, fires)
         self.congress_sessions.add_(fires.long())
         # the standing Migration Treaty detaches from its target's cities,
@@ -6840,6 +6842,14 @@ class SimSeats:
                     self._congress_regular(r, m, slot, votes)
         if bool((fires & dv).count_nonzero()):
             self._congress_dv(fires & dv, votes)
+        # the competition's discussion votes, bought up the vote price
+        disc = fires & (comp >= 0)
+        if bool(disc.count_nonzero()):
+            for row in range(self.n_majors):
+                v = votes[:, row, 3]
+                voter = disc & (v[:, 0] >= 0) & self.city_alive[:, row].any(dim=1)
+                if bool(voter.count_nonzero()):
+                    self._congress_buy(row, voter, v[:, 2].clamp(min=0))
         start = fires & (comp >= 0) & (self.comp_kind < 0)
         if bool(start.count_nonzero()):
             self._start_competition(start, comp, torch.ones(self.B, self.n_majors, dtype=torch.bool, device=self.device))
@@ -6863,10 +6873,10 @@ class SimSeats:
     # the session sits on `emg_act`; 2 it runs, and `emg_act` is its deadline.
 
     def _congress_open(self) -> torch.Tensor:
-        """[B] — the Congress sits at all: the MAX era across majors has
+        """[B] — the Congress sits at all: the GAME era has
         reached congressMinEra. Independent of the 30-turn interval, because a
         SPECIAL session may sit on any turn."""
-        return self._world_era() >= self._congress_min_era
+        return self.game_era >= self._congress_min_era
 
     def _emg_clear(self, k: int, m: torch.Tensor) -> None:
         """Empty one slot where `m` holds — the `filter(e => e.phase >= 0)` twin."""
@@ -8156,7 +8166,7 @@ class SimSeats:
             return
         live = torch.stack([self.city_alive[:, r].any(dim=1) for r in range(self.n_majors)], dim=1)
         self.comp_kind[fire] = kind[fire]
-        self.comp_left[fire] = self._comp_turns
+        self.comp_left[fire] = self._comp_turns.take(kind.clamp(min=0))[fire]
         self.comp_score[fire] = 0
         self.comp_member[fire] = (field & live)[fire]
         self.comp_target[fire] = target[fire] if target is not None else -1
@@ -8193,9 +8203,9 @@ class SimSeats:
                 self.comp_score[:, giver] += torch.where(
                     pay, paid.to(self.comp_score.dtype) * amt, torch.zeros_like(self.comp_score[:, giver]))
 
-    def _competition_score(self) -> None:
-        """THE TURN'S SCORE, one <EmergencyScoreSources> row at a time —
-        `scoreTurn`'s twin.
+    def _competition_score(self, live: torch.Tensor) -> None:
+        """THE TURN'S SCORE where `live` [B] runs a competition with turns
+        left, one <EmergencyScoreSources> row at a time — `scoreTurn`'s twin.
 
         Every PER-TURN kind is here; `FromProject` is an EVENT and is paid at
         the completion instead, so a competition whose rows are all projects
@@ -8205,7 +8215,7 @@ class SimSeats:
         emit = self.civ_co2_turn[:, : self.n_majors]
         top = emit.max(dim=1, keepdim=True).values
         for k, rows in enumerate(self._comp_scored):
-            run = (self.comp_kind >= 0) & (self.comp_kind == k)
+            run = live & (self.comp_kind == k)
             if not bool(run.count_nonzero()):
                 continue
             add = run.unsqueeze(1) & self.comp_member
@@ -8293,12 +8303,12 @@ class SimSeats:
                 if rank in golds:
                     self.civ_diplo_points[b, r] += int(row["gold"])
                     # CIV6 (WORLD_FAIR_FIRST_PLACE_GREAT_PERSON_POINTS): the
-                    # winner also takes Great Person points, spread over the
-                    # classes it scored.
+                    # winner also takes free Great Person points of every
+                    # class (`_add_free_gpp`)
                     _gg = int(row["goldGpp"])
                     if _gg:
-                        for _c in self._fair_gp_classes:
-                            self.civ_gpp[b, r, _c] += _gg
+                        self.civ_gpp[b, r, :] += _gg
+                        self.civ_gpp_free[b, r, :] += _gg
                 # CIV6 (Faces of Peace): "+100% Diplomatic Favor from
                 # successfully completing a ... Scored Competition"
                 _pct = 0
@@ -8332,26 +8342,33 @@ class SimSeats:
                         self._eff_version += 1
 
     def _resolve_competition(self) -> None:
-        """The turn's competition: score the field, run the clock down, pay the
-        podium at zero. `resolveCompetition`'s twin — and the per-turn emission
-        is read HERE and nowhere else, so it is cleared here too."""
-        run = self.comp_kind >= 0
+        """The turn's competition: score the field and run the clock down
+        while it has turns left. `resolveCompetition`'s twin — and the
+        per-turn emission is read HERE and nowhere else, so it is cleared here
+        too."""
+        run = (self.comp_kind >= 0) & (self.comp_left > 0)
         if bool(run.count_nonzero()):
-            self._competition_score()
+            self._competition_score(run)
             self.comp_left[run] -= 1
-            done = run & (self.comp_left <= 0)
-            if bool(done.count_nonzero()):
-                self._competition_podium(done)
-                # the TS drops the RECORD (`state.competition = undefined`),
-                # so every plane of the slot reads as no competition —
-                # the target too (9248 t72: an ended Aid Request left it)
-                self.comp_kind[done] = -1
-                self.comp_left[done] = 0
-                self.comp_member[done] = False
-                self.comp_score[done] = 0
-                self.comp_target[done] = -1
         self.civ_co2_turn[:] = 0
         self.civ_gpp_turn[:] = 0
+
+    def _pay_competition(self) -> None:
+        """`payCompetition`'s twin: a competition whose turns ran out pays its
+        podium at the turn's head, after the random-event step and the era's
+        opening and before the first start, and the slot empties."""
+        done = (self.comp_kind >= 0) & (self.comp_left <= 0)
+        if not bool(done.count_nonzero()):
+            return
+        self._competition_podium(done)
+        # the TS drops the RECORD (`state.competition = undefined`), so every
+        # plane of the slot reads as no competition — the target too (9248
+        # t72: an ended Aid Request left it)
+        self.comp_kind[done] = -1
+        self.comp_left[done] = 0
+        self.comp_member[done] = False
+        self.comp_score[done] = 0
+        self.comp_target[done] = -1
 
     def _congress_leader(self, m: torch.Tensor) -> torch.Tensor:
         """[B] the DVP leader among alive majors, ties to the LOWER row; -1

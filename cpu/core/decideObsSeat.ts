@@ -4,7 +4,6 @@ import { seatOf } from './seats';
 import { cityStateById, envoysOf, hasMet } from './cityStates';
 import { gpOffer } from './greatPeople';
 import { GP_CLASSES } from '../data/greatPeople';
-import { worldEraIndex } from './eras';
 import { specialSessionDue } from './congress';
 import { NUCLEAR_DEVICES } from '../data/nuclear';
 import { siloTargets } from './combat';
@@ -49,7 +48,7 @@ function envoyGroup(state: GameState, seat: number): { avail: number; held: numb
 /** The `congress` group: whether a Special Session sits at the close of the
  *  current turn (its ballot rides the record's `vote`). */
 function congressGroup(state: GameState): Record<string, unknown> {
-  return { special: specialSessionDue(state, state.turn, worldEraIndex(state)) };
+  return { special: specialSessionDue(state, state.turn, state.gameEra ?? 0) };
 }
 
 /** The `gp` group, per Great Person class: the standing offer (`gpOffer`),

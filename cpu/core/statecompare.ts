@@ -847,6 +847,7 @@ const SEAT: Record<string, Extractor> = {
   // the Great Person points EARNED this turn, per class — a scored
   // competition reads it once and clears it, the `co2Turn` shape.
   gppTurn: overSeats((s) => GP_CLASSES.map((c) => s.gppTurn?.[c] ?? 0)),
+  gppFree: overSeats((s) => GP_CLASSES.map((c) => s.gppFree?.[c] ?? 0)),
   unitsAcquired: overSeats((s) => {
     const out: number[] = [];
     for (const [id, n] of Object.entries(s.unitsAcquired ?? {})
