@@ -23,7 +23,7 @@ import { CARBON_RECAPTURE_FAVOR, CARBON_RECAPTURE_UNITS } from '../data/climate'
 import { emitCarbon, repairBehindBarrier } from './climate';
 import { PROJECTS, PROJECT_LIST, gpClassesOf, gppFractionOf, isSpaceProject } from '../data/projects';
 import { NUCLEAR_DEVICES } from '../data/nuclear';
-import { ALLIANCE_M2_MIL_PROD_PCT, ALLIANCE_MILITARY, CONGRESS_PROD_MULT, CULTURE_BOMB_RANGE, DED_FREE_INQUIRY, DED_MONUMENTALITY, DED_STEAM, DED_TO_ARMS, STEAM_WONDER_PROD_MULT, TO_ARMS_MIL_PROD_MULT } from '../data/seats';
+import { ALLIANCE_M2_MIL_PROD_PCT, ALLIANCE_MILITARY, CONGRESS_PROD_MULT, CULTURE_BOMB_RANGE, DED_FREE_INQUIRY, DED_MONUMENTALITY, DED_STEAM, DED_TO_ARMS, STEAM_WONDER_PROD_MULT, TO_ARMS_MIL_PROD_MULT, LOYALTY_MAX } from '../data/seats';
 import { ERAS, INDUSTRIAL_ERA_INDEX, TECHS, TECH_TABLE_RANK } from '../data/techs';
 import { CIVIC_TABLE_RANK } from '../data/civics';
 import { buildingDedications, canalMoment, dedicationEvent, goldenDedication, wonderMoment } from './eras';
@@ -178,6 +178,13 @@ export function completeProject(state: GameState, city: City, projectId: string,
       state.eventLog.push('The Exoplanet Expedition has launched.');
     }
     return;
+  }
+  // CIV6 (Bread and Circuses' PROJECT_COMPLETION_LOYALTY,
+  // MODIFIER_SINGLE_CITY_GRANT_LOYALTY): the city's Loyalty rises by the
+  // grant, never past its maximum
+  if (def.completionLoyalty) {
+    city.loyalty = Math.min(LOYALTY_MAX, (city.loyalty ?? LOYALTY_MAX) + def.completionLoyalty);
+    state.eventLog.push(`${city.name} completed ${def.name}.`);
   }
   // a district project's yield is converted turn by turn as the Production
   // goes in (`City.projectYield`); its completion pays the points

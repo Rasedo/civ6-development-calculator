@@ -44,6 +44,13 @@ export interface ProjectDef {
    *  religious pressure on its neighbours gains while this project heads its
    *  queue (`pressureFromCity`). */
   pressurePct?: number;
+  /** CIV6 (Projects_XP1.IdentityPerCitizenChange): the loyalty pressure each
+   *  of the city's citizens adds while this project heads its queue
+   *  (`citizenPressure`). */
+  identityPerCitizen?: number;
+  /** CIV6 (PROJECT_COMPLETION_LOYALTY, MODIFIER_SINGLE_CITY_GRANT_LOYALTY):
+   *  the Loyalty its completion grants the city. */
+  completionLoyalty?: number;
   /** Great-person class receiving points on completion. Kept as the PRIMARY
    *  class (and the GPU export's single `g` column) for index stability; read
    *  `gpClassesOf(p)` for the full list. */
@@ -520,6 +527,51 @@ export const PROJECTS: Record<string, ProjectDef> = Object.fromEntries(
         costProgressGame: xml('Projects', 'ProjectType=PROJECT_ENHANCE_DISTRICT_INDUSTRIAL_ZONE', 'CostProgressionParam1'),
         district: xml('Projects', 'ProjectType=PROJECT_ENHANCE_DISTRICT_INDUSTRIAL_ZONE', 'PrereqDistrict', { expect: 'DISTRICT_INDUSTRIAL_ZONE' }),
         gpClass: xml('Project_GreatPersonPoints', 'ProjectType=PROJECT_ENHANCE_DISTRICT_INDUSTRIAL_ZONE', 'GreatPersonClassType', { expect: 'GREAT_PERSON_CLASS_ENGINEER' }),
+      },
+    }),
+    // CIV6 (Expansion1_Projects.xml, PROJECT_BREAD_AND_CIRCUSES and
+    // PROJECT_WATER_BREAD_AND_CIRCUSES): the Entertainment Complex's and the
+    // Water Park's project — Cost 25 on the GAME_PROGRESS curve, no yield, no
+    // Great Person points; each citizen of the city presses 1 more while it
+    // heads the queue (Projects_XP1.IdentityPerCitizenChange, 0x1a1370), and
+    // its completion grants the city 20 Loyalty (PROJECT_COMPLETION_LOYALTY).
+    // APPENDED LAST, because a project's catalog index IS its action code.
+    P({
+      id: 'BREAD_AND_CIRCUSES',
+      name: 'Bread and Circuses',
+      district: 'ENTERTAINMENT_COMPLEX',
+      yield: null,
+      gpClass: null,
+      identityPerCitizen: 1,
+      completionLoyalty: 20,
+      description: '+1 Loyalty pressure a citizen while active; +20 Loyalty in this city once finished.',
+      cost: 25,
+      costProgressGame: 1500,
+      src: {
+        district: xml('Projects', 'ProjectType=PROJECT_BREAD_AND_CIRCUSES', 'PrereqDistrict', { expect: 'DISTRICT_ENTERTAINMENT_COMPLEX' }),
+        cost: xml('Projects', 'ProjectType=PROJECT_BREAD_AND_CIRCUSES', 'Cost', { scale: GAME_SPEED }),
+        costProgressGame: xml('Projects', 'ProjectType=PROJECT_BREAD_AND_CIRCUSES', 'CostProgressionParam1'),
+        identityPerCitizen: xml('Projects_XP1', 'ProjectType=PROJECT_BREAD_AND_CIRCUSES', 'IdentityPerCitizenChange'),
+        completionLoyalty: xml('ModifierArguments', 'ModifierId=PROJECT_COMPLETION_LOYALTY&Name=Amount', 'Value'),
+      },
+    }),
+    P({
+      id: 'WATER_BREAD_AND_CIRCUSES',
+      name: 'Bread and Circuses',
+      district: 'WATER_PARK',
+      yield: null,
+      gpClass: null,
+      identityPerCitizen: 1,
+      completionLoyalty: 20,
+      description: '+1 Loyalty pressure a citizen while active; +20 Loyalty in this city once finished.',
+      cost: 25,
+      costProgressGame: 1500,
+      src: {
+        district: xml('Projects', 'ProjectType=PROJECT_WATER_BREAD_AND_CIRCUSES', 'PrereqDistrict', { expect: 'DISTRICT_WATER_ENTERTAINMENT_COMPLEX' }),
+        cost: xml('Projects', 'ProjectType=PROJECT_WATER_BREAD_AND_CIRCUSES', 'Cost', { scale: GAME_SPEED }),
+        costProgressGame: xml('Projects', 'ProjectType=PROJECT_WATER_BREAD_AND_CIRCUSES', 'CostProgressionParam1'),
+        identityPerCitizen: xml('Projects_XP1', 'ProjectType=PROJECT_WATER_BREAD_AND_CIRCUSES', 'IdentityPerCitizenChange'),
+        completionLoyalty: xml('ModifierArguments', 'ModifierId=PROJECT_COMPLETION_LOYALTY&Name=Amount', 'Value'),
       },
     }),
   ].map((p) => [p.id, p.cost !== undefined

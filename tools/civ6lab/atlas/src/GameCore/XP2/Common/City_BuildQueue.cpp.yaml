@@ -542,7 +542,11 @@
       value: "Recorded: runs/h1_duelw1118   Armagh, a city-state with a Holy Site, reads GetPressureFromCity 8 on every   record whose queue Prayers heads (t68–85, t116–130, t139–156, t212 on) and   4 on the rest ("
     - recording: 1107
       value: 1107 Kandy's 8 against 4.
-  impl: [cpu/core/aiCityBuild.ts:PickFacts, cpu/core/aiProjectValue.ts:ProjectTableFacts]
+  impl:
+    - cpu/core/aiCityBuild.ts:PickFacts
+    - cpu/core/aiProjectValue.ts:ProjectTableFacts
+    - cpu/core/phase.ts:citizenPressure
+    - cpu/core/phase.ts:headIdentityPerCitizen
   readings:
     - "C-94: the religious spread — READ"
     - "C-96: the project value — READ (0x7b28c0, the PROJECTS table 0x5ce970), PARTLY READ (the space-race standing 0x7b8a30, the diplomatic-victory rows, the repair count), unwired"

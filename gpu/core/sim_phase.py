@@ -615,7 +615,8 @@ class SimPhase:
         dom = torch.where(self.civ_dominant[:, :, row], 1.0 + self._citizen_press_dom / 100, 1.0)  # [B, n_majors]
         each = (self._citizen_press_base
                 + self._citizen_press_cap * self.city_is_cap[:, :nrow].double()
-                + pre["age_p"].unsqueeze(2)) * dom.unsqueeze(2)
+                + pre["age_p"].unsqueeze(2)
+                + self._head_identity(0, nrow)) * dom.unsqueeze(2)
         cits = (self.city_pop[:, :nrow].double() - pre["cut"].unsqueeze(2)).clamp(min=0)
         sub = self._pressure_fixed(d, cits, each, self.city_alive[:, :nrow], rng).sum(dim=2)
         own = sub[:, row]
@@ -665,10 +666,24 @@ class SimPhase:
         ctr = self.city_center[:, row].clamp(min=0)  # [B, RC]
         d = self.pair_dist[here.unsqueeze(1), ctr].long()
         pop = (self.city_pop[:, row].double() - self._emergency_pressure_cut(row).unsqueeze(1)).clamp(min=0)
-        each = self._citizen_press_base + self._citizen_press_cap * self.city_is_cap[:, row].double()
+        each = (self._citizen_press_base + self._citizen_press_cap * self.city_is_cap[:, row].double()
+                + self._head_identity(row, row + 1)[:, 0])
         if row < self.n_majors:
             each = each + self._age_pressure.take(self.civ_age[:, row]).unsqueeze(1)
         return self._pressure_fixed(d, pop, each, self.city_alive[:, row], rng).sum(dim=1)
+
+    def _head_identity(self, r0: int, r1: int) -> torch.Tensor:
+        """[B, r1 - r0, RC] f64 — the loyalty pressure a citizen of each city
+        of rows r0..r1 adds for the project heading its build queue
+        (`headIdentityPerCitizen`: Projects_XP1.IdentityPerCitizenChange, read
+        by 0x1a1370 off the queue's head), read live."""
+        if not self._proj_ipc_any:
+            return torch.zeros(self.B, r1 - r0, self.RC, dtype=torch.float64, device=self.device)
+        head = self.city_current[:, r0:r1, :self.RC, 0] - self.PROJECT_BASE
+        n = self._proj_ipc_t.numel()
+        okh = (head >= 0) & (head < n)
+        return torch.where(okh, self._proj_ipc_t.take(head.clamp(min=0, max=n - 1)),
+                           torch.zeros((), dtype=torch.float64, device=self.device))
 
     def _pressure_fixed(self, d: torch.Tensor, cits: torch.Tensor, each: torch.Tensor,
                         alive: torch.Tensor, rng: int) -> torch.Tensor:
@@ -2035,6 +2050,15 @@ class SimPhase:
                     # "Completing the X project" whatever the project then
                     # goes on to do, so the score lands FIRST, as TS's does.
                     self._score_project(row, hit, pidx)
+                    _cl = float(prow["cl"])
+                    if _cl:
+                        # CIV6 (Bread and Circuses' PROJECT_COMPLETION_LOYALTY,
+                        # MODIFIER_SINGLE_CITY_GRANT_LOYALTY): the city's
+                        # Loyalty rises by the grant, never past its maximum
+                        _lr = hit.nonzero(as_tuple=True)[0]
+                        if len(_lr) > 0:
+                            _lv = self.city_loyalty[_lr, row, col[_lr]].double() + _cl
+                            self.city_loyalty[_lr, row, col[_lr]] = _lv.clamp(max=self._loyalty_max).to(self.city_loyalty.dtype)
                     # a district project's yield is converted step by step as
                     # the Production goes in (`city_proj_conv`); its
                     # completion pays the points

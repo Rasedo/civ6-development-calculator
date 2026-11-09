@@ -28,7 +28,7 @@ import { addCivicProgress, researchCost, selectResearch, pillagePlunder } from '
 import { IMPROVEMENTS } from '../data/improvements';
 import { containmentBonus, sameReligionToken, getModifiers, makeYieldCtx, seatYieldMultPerSuzerain, unitUpkeep } from './effects';
 import { allRoadsLeadToRome, addTradeRoute, addCsTradeRoute, addIntlTradeRoute, cancelRoutesBetween, congressCancelBannedIntl, plunderTrader, tradeGraphTurn, tradeRouteExpiry, tradeRouteWalk } from './trade';
-import { addEnvoys, allianceSuzInfluence, cityStateById, declareWarOnCityState, envoysOf, hasMet, isSuzerain, minorCity, resolveSuzerains, sueForPeaceWithCityState, suzerainBuildingLoyalty, suzerainGpCultureMult, meetCityState, buildingCreatedCulture } from './cityStates';
+import { addEnvoys, allianceSuzInfluence, cityStateById, declareWarOnCityState, envoysOf, hasMet, isSuzerain, minorCity, resolveSuzerains, sueForPeaceWithCityState, suzerainBuildingLoyalty, suzerainGpCultureMult, meetCityState, buildingCreatedCulture, cityStateAt } from './cityStates';
 import { LEVY_TURNS, govInfluence } from '../data/cityStates';
 import { freeCityBuild, freeCombatDesire, freeKnowledge, minorBestOfClass, minorCatchUp, minorCompleteNow, minorOrdersHeld, minorResearch, trainableIn } from './minorBuild';
 import { researchUnitTurns } from './aiResearch';
@@ -519,8 +519,11 @@ export function levyUnits(state: GameState, cityStateId: number, seat: number): 
  *  −1.953125, −2.34375). A major culturally dominant over the
  *  pressed city's owner presses CITIZEN_PRESSURE_DOMINANCE_PCT harder per
  *  citizen (`pct`; 0x1a1640: runs/h1_duelw1130 Rome t95 reads 18.671875 and
- *  t100 18.4375 with China's Taiyuan and Handan at 1.875 a citizen). The sum
- *  is in pressure units. */
+ *  t100 18.4375 with China's Taiyuan and Handan at 1.875 a citizen). The
+ *  project heading the city's build queue adds its IdentityPerCitizenChange
+ *  to each citizen's term before the dominance raise (0x1a1370 on 0x179650:
+ *  Bread and Circuses' 1, `headIdentityPerCitizen`). The sum is in pressure
+ *  units. */
 function citizenPressure(state: GameState, here: Tile, cities: City[], pct = 0): number {
   const cutoff = LOYALTY_RANGE + 1;
   let raw = 0;
@@ -528,13 +531,24 @@ function citizenPressure(state: GameState, here: Tile, cities: City[], pct = 0):
     const t = state.map.tiles[c.centerIndex];
     const d = hexDistance(state.map, here.col, here.row, t.col, t.row);
     if (d <= LOYALTY_RANGE) {
-      const each = (CITIZEN_PRESSURE_BASE + (c.isCapital ? CITIZEN_PRESSURE_CAPITAL : 0) + agePressure(state, c.seat)) * (100 + pct) / 100;
+      const each = (CITIZEN_PRESSURE_BASE + (c.isCapital ? CITIZEN_PRESSURE_CAPITAL : 0) + agePressure(state, c.seat)
+        + headIdentityPerCitizen(state, c)) * (100 + pct) / 100;
       const w = Math.floor((FIXED_ONE * (cutoff - d)) / cutoff);
       const cits = Math.max(0, c.population - emergencyPressureCut(state, c.seat));
       raw += Math.floor((cits * Math.round(each * FIXED_ONE) * w) / FIXED_ONE);
     }
   }
   return raw / FIXED_ONE;
+}
+
+/** The loyalty pressure a citizen of `city` adds for the project heading its
+ *  build queue (Projects_XP1.IdentityPerCitizenChange, read by 0x1a1370 off
+ *  the queue's head 0x179650): a major's or a Free City's queue, a
+ *  city-state's standing build. */
+function headIdentityPerCitizen(state: GameState, city: City): number {
+  const head = city.queue[0];
+  const project = head?.kind === 'project' ? head.project : cityStateAt(state, city.centerIndex)?.buildProject;
+  return project ? PROJECTS[project]?.identityPerCitizen ?? 0 : 0;
 }
 
 /** The DLL's fixed point: 24.8, one unit 256 raw. */

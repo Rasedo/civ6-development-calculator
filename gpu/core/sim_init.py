@@ -1928,6 +1928,11 @@ class SimInit:
         self._proj_rp_t = torch.tensor([float(p["relp"]) for p in self._proj_rows] or [0.0],
                                        dtype=torch.float64, device=device)
         self._proj_rp_any = bool(self._proj_rp_t.count_nonzero())
+        # each row's loyalty pressure a citizen while it heads its city's
+        # queue (`ProjectDef.identityPerCitizen`)
+        self._proj_ipc_t = torch.tensor([float(p["ipc"]) for p in self._proj_rows] or [0.0],
+                                        dtype=torch.float64, device=device)
+        self._proj_ipc_any = bool(self._proj_ipc_t.count_nonzero())
         self._proj_gf = float(_pj["gppFraction"])
         # The space-race chain. Space rows carry sp/vic flags (+ rt tech gate,
         # rp previous-step link) and sit LAST in the projects table, in chain

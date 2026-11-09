@@ -1850,6 +1850,11 @@ export function buildRules() {
         // the percent the city's religious pressure gains while the row heads
         // its queue (`ReligiousPressureModifier`)
         relp: p.pressurePct ?? 0,
+        // the loyalty pressure a citizen adds while the row heads its queue
+        // (`identityPerCitizen`) and the Loyalty its completion grants the
+        // city (`completionLoyalty`)
+        ipc: p.identityPerCitizen ?? 0,
+        cl: p.completionLoyalty ?? 0,
         g: p.gpClass ? GP_CLASSES.indexOf(p.gpClass) : -1,
         // the FULL class list + this project's own per-class rate. `g` stays
         // for index stability; the GPU reads `gs`/`gf` and falls back to `g`.
