@@ -1322,6 +1322,25 @@ def _decide_gp_pass(nobs: list, row: int, seeds, turn, device) -> torch.Tensor |
     return torch.where(hit, pick, torch.full_like(pick, -1))
 
 
+def _decide_gp_recruit(nobs: list, row: int, gp_pass: torch.Tensor | None, device) -> torch.Tensor | None:
+    """RECRUIT the lowest class's standing Great Person the seat's points
+    reach, one a turn (the engine claims on its own only where a class's
+    points moved), never the class it passes on this turn. The offers are
+    the observation's `gp` group."""
+    if not nobs[0]["gp"]["offer"]:
+        return None
+    offer = _obs_dense(nobs, "gp", "offer", device)
+    elig = ((offer >= 0) & (_obs_dense(nobs, "gp", "passed_by", device) != row)
+            & (_obs_dense(nobs, "gp", "points", device) >= _obs_dense(nobs, "gp", "price", device)))
+    if gp_pass is not None:
+        cls = torch.arange(elig.shape[1], device=device).unsqueeze(0)
+        elig = elig & (cls != gp_pass.unsqueeze(1))
+    if not bool(elig.count_nonzero()):
+        return None
+    pick = elig.long().argmax(dim=1)
+    return torch.where(elig.any(dim=1), pick, torch.full_like(pick, -1))
+
+
 #: a religion's belief classes, in the observation's (`BELIEF_CLASSES`) order
 _BELIEF_CLASSES = ("follower", "worship", "founder", "enhancer")
 
@@ -1449,7 +1468,7 @@ def tables(st) -> tuple:
 DECIDE_FIELDS = (
     "prod", "dtile", "tech", "civic", "war", "war_kind", "env_seq", "seq",
     "buy", "worship", "relig", "levy", "monu", "nat", "cls", "ucls", "pat",
-    "band", "dist", "route", "nuke", "spec", "lock", "swap", "vote", "gp_pass",
+    "band", "dist", "route", "nuke", "spec", "lock", "swap", "vote", "gp_pass", "gp_recruit",
     "policies", "beliefs", "government", "pantheon", "religion", "gov",
 )
 
@@ -1539,6 +1558,7 @@ def decide_seat(st, row: int, nobs: list, roster: dict, classes: dict, seeds=Non
     swap = _decide_swap(nobs, dev)
     vote = _decide_vote(nobs, dev)
     gp_pass = _decide_gp_pass(nobs, row, seeds, t, dev)
+    gp_recruit = _decide_gp_recruit(nobs, row, gp_pass, dev)
     beliefs = _decide_beliefs(nobs, row, seeds, t, dev)
     religion = _decide_religion(nobs, beliefs, row, seeds, t, dev)
     pantheon = _decide_pantheon(nobs, row, seeds, t, dev)
@@ -1548,7 +1568,7 @@ def decide_seat(st, row: int, nobs: list, roster: dict, classes: dict, seeds=Non
             "war_kind": war_kind, "env_seq": env_seq, "buy": buy, "worship": worship,
             "relig": relig, "levy": levy, "monu": monu, "nat": nat, "cls": cls, "ucls": ucls,
             "pat": pat, "band": band, "dist": dist, "route": route, "nuke": nuke, "spec": spec,
-            "lock": lock, "swap": swap, "vote": vote, "gp_pass": gp_pass, "policies": policies,
+            "lock": lock, "swap": swap, "vote": vote, "gp_pass": gp_pass, "gp_recruit": gp_recruit, "policies": policies,
             "beliefs": beliefs, "government": government, "pantheon": pantheon, "religion": religion,
             "gov": gov}
 

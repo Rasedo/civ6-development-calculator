@@ -1,7 +1,7 @@
 
 import type { City, CityState, CongressVote, DistrictId, Emergency, GameState, ImprovementId, SeatActionRecord, Seat, Tile, Unit, YieldKey } from './types';
 import { logPopWrite } from './difflog';
-import { advanceGreatPeople, passGreatPerson, patronizeGreatPerson } from './greatPeople';
+import { advanceGreatPeople, passGreatPerson, patronizeGreatPerson, recruitClaimable } from './greatPeople';
 import { activateGreatPerson } from './gpAbility';
 import { GW_KINDS } from '../data/greatWorks';
 import { drainRelicReserve, gwCountKind, gwHasRoom, gwLastOfKind, moveGreatWork } from './greatWorks';
@@ -3762,6 +3762,9 @@ export function seatPhase(state: GameState, only?: { seats: ReadonlySet<number>;
     // player's turn (tools/civ6lab/turn_order_civ6.md, A11): its diplomacy,
     // its purchases, its silo, its levy, its routes, then its units.
     seatDiplomacy(state, actor, rec);
+    // THE RECRUIT of a standing Great Person the seat's points reach, before
+    // its purchases (the AI's recruit leads its Gold patronage, 0x6898b0)
+    if (rec?.gpRecruit !== undefined && rec.gpRecruit >= 0) recruitClaimable(state, actor.seat, rec.gpRecruit);
     // GOLD PURCHASE — ONE per seat per turn, and the WIRE names it. The
     // record's `buy` column carries [kind, centreTile, index]: kind 0 a
     // building, 1 a settler, 2 a military unit. Nothing here picks; each arm

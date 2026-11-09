@@ -3982,13 +3982,34 @@ function unrecordedLuxuryGaps(ctx: Ctx, rec: TurnRecord, state: GameState, seats
  * civilization is the city's seat and its era -1; a full holder of Artifacts,
  * whose theming reads both, is the city's `great-work-origin` gap.
  */
+/** the great-work holder (`GW_HOLDERS` index) a catalog building row stands
+ *  for, a wonder's or a building's; -1 none */
+export function gwHolderOfRow(cat: Catalog, bi: number): number {
+  const name = cat.buildings[bi];
+  const id = (cat.wonders ?? []).includes(name) ? engineId('wonder', name, 'BUILDING_', BUILT_WONDERS)
+    : engineRowOf(cat, 'building', bi);
+  return GW_HOLDERS.findIndex((x) => x.id === id);
+}
+
+/** a GreatWorks catalog row's object type and its maker (the person's place
+ *  in its class roster, -1 for a Relic or a find, or a person the roster
+ *  does not name: `unnamed`); null for a row or object type the engine has
+ *  none of */
+export function gwWorkOfRow(cat: Catalog, row: number): { obj: number; maker: number; unnamed?: string } | null {
+  const gw = cat.greatWorks?.[row];
+  const obj = gw ? GWO_BY_NAME[gw[1]] : undefined;
+  if (!gw || obj === undefined) return null;
+  if (!gw[2]) return { obj, maker: -1 };
+  const pid = aliasOrPrefixed(gw[2]);
+  const person = pid ? PEOPLE[pid] : undefined;
+  return person ? { obj, maker: GREAT_PEOPLE[person.class].indexOf(person) } : { obj, maker: -1, unnamed: gw[2] };
+}
+
 function importGreatWorks(ctx: Ctx, c: DumpCity, city: City): void {
   const works: GreatWork[] = [];
   for (const [bi, s, , row] of c.greatWorks ?? []) {
     const name = ctx.cat.buildings[bi];
-    const id = ctx.wonders.has(name) ? engineId('wonder', name, 'BUILDING_', BUILT_WONDERS)
-      : engineRowOf(ctx.cat, 'building', bi);
-    const h = GW_HOLDERS.findIndex((x) => x.id === id);
+    const h = gwHolderOfRow(ctx.cat, bi);
     if (h < 0) {
       gap(ctx, 'great-work-holder', name);
       continue;
@@ -3999,18 +4020,13 @@ function importGreatWorks(ctx: Ctx, c: DumpCity, city: City): void {
       gap(ctx, 'great-work', gw ? `${name} slot ${s}` : 'no GreatWorks catalog');
       continue;
     }
-    const obj = GWO_BY_NAME[gw[1]];
-    if (obj === undefined) {
+    const work = gwWorkOfRow(ctx.cat, num(row));
+    if (!work) {
       gap(ctx, 'great-work-object', gw[1]);
       continue;
     }
-    let maker = -1;
-    if (gw[2]) {
-      const pid = aliasOrPrefixed(gw[2]);
-      const person = pid ? PEOPLE[pid] : undefined;
-      if (person) maker = GREAT_PEOPLE[person.class].indexOf(person);
-      else gap(ctx, 'great-work-maker', gw[2]);
-    }
+    const { obj, maker } = work;
+    if (work.unnamed) gap(ctx, 'great-work-maker', work.unnamed);
     if (GW_HOLDERS[h].id === 'BANK') {
       const perm = GP_CITY_PERM.indexOf('bankGwSlots');
       const amount = GW_GP_EXTRA_SLOTS.find((r) => r.holder === 'BANK')!.amount;

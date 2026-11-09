@@ -169,9 +169,11 @@
     - recording: h1_duelv1127
       turn: 171
       value: Gold patronage of Zhang Qian (the record's purse)
+  impl: [cpu/core/phase.ts:seatPhase]
   readings:
     - "C-97: the great people's patronage — the Gold and Faith patronage READ, the usable plots and the points a turn PARTLY READ"
     - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
+    - "C-114: the great person claim on a points change and the recruit — READ"
   review: reviewed
 - addr: 0x68a100
   final: 0x458530

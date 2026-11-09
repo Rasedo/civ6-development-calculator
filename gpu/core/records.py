@@ -134,7 +134,8 @@ def apply_decisions(sim, row: int, dec: dict) -> None:
                            nat=by_slot.get("nat"), cls=by_slot.get("cls"), ucls=by_slot.get("ucls"),
                            pat=dec["pat"], band=by_slot.get("band"), dist=dec["dist"], route=dec["route"], nuke=dec["nuke"],
                            spec=spec, lock=dec["lock"], swap=dec["swap"], vote=dec["vote"],
-                           gp_pass=dec["gp_pass"], beliefs=dec["beliefs"], government=dec["government"],
+                           gp_pass=dec["gp_pass"], gp_recruit=dec["gp_recruit"], beliefs=dec["beliefs"],
+                           government=dec["government"],
                            pantheon=dec["pantheon"], religion=dec["religion"], gov=dec["gov"])
 
 
@@ -215,7 +216,7 @@ def extract_geo(geo, row: int, b: int) -> dict:
     return out
 
 
-def extract_record(sim, row: int, prod, dtile, tech, civic, war, war_kind, env_seq, seq, buy, worship, relig, levy, monu, nat, cls, ucls, pat, band, dist, route, nuke, spec, lock, swap, vote, gp_pass, policies, beliefs, government, pantheon, religion, gov, b: int) -> dict:
+def extract_record(sim, row: int, prod, dtile, tech, civic, war, war_kind, env_seq, seq, buy, worship, relig, levy, monu, nat, cls, ucls, pat, band, dist, route, nuke, spec, lock, swap, vote, gp_pass, gp_recruit, policies, beliefs, government, pantheon, religion, gov, b: int) -> dict:
     nS = 0 if dtile is None else int(dtile.shape[2])
     prod_pairs = []
     for k, (centre, col) in enumerate(zip(prod[0][b].tolist(), prod[1][b].tolist())):
@@ -261,6 +262,8 @@ def extract_record(sim, row: int, prod, dtile, tech, civic, war, war_kind, env_s
         rec["vote"] = [int(vote[b, 0]), int(vote[b, 1])]
     if gp_pass is not None and int(gp_pass[b]) >= 0:
         rec["gpPass"] = int(gp_pass[b])
+    if gp_recruit is not None and int(gp_recruit[b]) >= 0:
+        rec["gpRecruit"] = int(gp_recruit[b])
     if beliefs is not None:
         picks = [[int(c), int(i)] for c, i in beliefs[b].tolist() if c >= 0 or i >= 0]
         if picks:
@@ -457,6 +460,9 @@ def replay_seat(sim, row: int, rec: dict) -> None:
     _gpv = rec.get("gpPass")
     gp_pass = (torch.full((sim.B,), int(_gpv), dtype=torch.long, device=dev)
                if _gpv is not None and int(_gpv) >= 0 else None)
+    _grv = rec.get("gpRecruit")
+    gp_recruit = (torch.full((sim.B,), int(_grv), dtype=torch.long, device=dev)
+                  if _grv is not None and int(_grv) >= 0 else None)
     _blv = rec.get("beliefs") or []
     beliefs = (torch.tensor(_blv, dtype=torch.long, device=dev).reshape(1, -1, 2).expand(sim.B, -1, -1)
                if _blv else None)
@@ -474,7 +480,7 @@ def replay_seat(sim, row: int, rec: dict) -> None:
         "war": war, "war_kind": war_kind, "env_seq": env_seq, "buy": buy, "worship": worship,
         "relig": relig, "levy": levy, "monu": monu, "nat": nat, "cls": cls, "ucls": ucls,
         "pat": pat, "band": band, "dist": dist, "route": route, "nuke": nuke, "spec": spec,
-        "lock": lock, "swap": swap, "vote": vote, "gp_pass": gp_pass, "beliefs": beliefs,
+        "lock": lock, "swap": swap, "vote": vote, "gp_pass": gp_pass, "gp_recruit": gp_recruit, "beliefs": beliefs,
         "government": government, "pantheon": pantheon, "religion": religion, "gov": gov})
 
     def _geo_mask(seats) -> torch.Tensor:

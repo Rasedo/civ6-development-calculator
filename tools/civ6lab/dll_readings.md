@@ -13736,3 +13736,37 @@ contract the city's hand alone holds; `minorAiTurn`'s `goalsReached` call
   planning's per-spot blow back 0x791470 at 0x7918b0 is simulated for every
   spot at its plot, no later-turn rule): the inputs of the per-spot blow
   back (ours 31-65 for a 23-health Archer) unread.
+
+## C-114: the great person claim on a points change and the recruit — READ
+
+- THE TRIGGER: a class's stored points change only through SetPoints 0x43e050
+  (ChangePoints 0x43b1c0 adds a delta, the total clamped at 0); a new value
+  signals the game (signal +0x798, its handler 0x2f8100, connected by
+  0x2f9750). The free points (+0x2c8, `Seat.gppFree`) are their own store and
+  signal nothing: the World's Fair's 100 claim nobody until a class's points
+  move.
+- THE CLAIM 0x2f8100 (player, class): of every player who may claim the
+  class's standing person (0x2f1e70: on the timeline, CanRecruitPerson
+  0x2f28a0 = earnable and floor(points 0x43ce10, the free ones included) >=
+  the price 0x2f72f0, nobody marked at entry +0x10), the one holding the most
+  points (strictly more, the first on a tie); the claim 0x2f2e90 only when it
+  is the player whose points moved. 0x2f2e90 marks the entry, notifies, and
+  for an AI player recruits at once (RecruitPerson 0x2f8890: the grant
+  0x2f74b0 with its replacement's draw, then ChangePoints by minus the price
+  plus the refund 0x43ce00's percent, one change). That change signals the
+  claim again only where it moved the stored points (`advanceGreatPeople`,
+  `gpClaimable`, `gpClaimant`, `_advance_great_people`, `_gp_claimable`,
+  `_gp_claimant`, `_gp_spend`).
+- THE RECRUIT: a person whose class's points did not move is claimed by the
+  player's own RECRUIT_GREAT_PERSON (the AI's leads its Gold patronage,
+  0x6898b0): a seat verb, `SeatActionRecord.gpRecruit` (`recruitClaimable`,
+  `_gp_recruit`); the action replay imposes the recorded grant
+  (`completeRecruit`).
+- Confirmed: runs/h1_duelq1128 t181 the World's Fair's 100 free points:
+  James of St. George (Engineer, 14 own) and Dimitrie Cantemir (Musician,
+  163 own) claimed at the turn's points; Gaius Duilius and Colaeus (30 each,
+  neither class earning) by the AI's recruit, Duilius at t181 and Colaeus at
+  t182 (duelw1128 both at t181); 1117 t181 Trung Trac, 1121 t181 Imhotep,
+  1127 t181 Hanno the same way.
+- Open: who the human player's pending claim (+0x10 marked, no recruit) waits
+  on; the refund term 0x43ce00's rows past Magnanimous.

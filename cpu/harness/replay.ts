@@ -106,7 +106,7 @@ import { opUnits } from '../core/operations/operation';
 import { newCityAi } from '../core/aiCityTrees';
 import { newEconomicMemory, purchaseSpend, savingsTurn, upgradePurchase, type EconomicMemory } from '../core/aiEconomic';
 import { FX } from '../core/aiValue';
-import { advanceHistory, aliasOrPrefixed, engineRowOf, formationRows, importTurn, loggedCongressTarget, minorHead, loadWarKinds, loadWeariness, newHistory, resolutionOfLog, warKindAt, wearyAt, recordRoutes, type History, type Imported, type WarKindRow } from './import';
+import { advanceHistory, aliasOrPrefixed, engineRowOf, formationRows, gwHolderOfRow, gwWorkOfRow, importTurn, loggedCongressTarget, minorHead, loadWarKinds, loadWeariness, newHistory, resolutionOfLog, warKindAt, wearyAt, recordRoutes, type History, type Imported, type WarKindRow } from './import';
 import { holdCongressBallots, type CongressBallot, type CongressSlate } from '../core/congress';
 import { TribeFold } from './windowFold';
 import { AI_UNITS } from '../data/aiBuildTables';
@@ -114,7 +114,8 @@ import { loadCityBuildCentre, loadCityBuildTables, newCityBuildTally, tallyBuild
 import { buildingTable } from '../core/aiCityBuild';
 import { replayEvents } from './eventReplay';
 import { cityFlags, placeCitizens, replaceAllCitizens } from '../core/citizens';
-import { loadCombatLog, loadRandLog, randLogPath, type RandLog } from './randLog';
+import { loadClimateLog, loadCombatLog, loadRandLog, randLogPath, type ClimateLog, type RandLog } from './randLog';
+import { seedEventMemory } from './eventPick';
 import { streamHold, type StreamHold } from './streamHold';
 import { holdRng, rngHold } from '../core/rand';
 import { seedMoments, stateChecks, transitionChecks, type CheckResult } from './checks';
@@ -122,7 +123,9 @@ import { engineId, gameHash, gameTypeOf } from '../data/aliases';
 import { OperationsProbe, operationsMarkdown, type OperationsTally } from './operationsScore';
 import { GP_CLASSES, GREAT_PEOPLE, gpChargesOf, gpCost, gpEffectOf, personWorkObjects } from '../data/greatPeople';
 import { loadGpTimeline, standGreatPeople, type GpTimeline } from './gpTimeline';
-import { gpClaimLeft, patronageCost, patronizeGreatPerson, recruit } from '../core/greatPeople';
+import { gpClaimLeft, patronageCost, patronizeGreatPerson, recruit, recruitClaimable } from '../core/greatPeople';
+import { GW_LAYOUT, holderSlots, slotAccepts } from '../data/greatWorks';
+import { gwWorks, removeGreatWork } from '../core/greatWorks';
 import { InferredActions, RecordedActions, activePlayer, type ActionSource, type Decision, type LogTally, type QueueSpec } from './replayActions';
 import { newScores, scoreDecision, scoreTable, memoryTable, type DecisionScores } from './aiScore';
 import { GameMemory, MemoryLogs, readDanger, readGameMemory, readMemory, readRevealed, syncContracts, type ArmyLogged } from './aiMemory';
@@ -3370,10 +3373,38 @@ function wonderUnderPerson(ctx: Ctx, u: Unit): void {
   count(ctx, 'gpActivate:wonderHead', 'fallback', ctx.playerOfSeat.get(u.seat), `${t.builtWonder} at ${t.index} back at the head at ${r3(q.progress)}`);
 }
 
+/** A GREAT WORK A MAJOR MOVED (`GreatWorkMoved`): its work of the record's
+ *  row (object and maker) leaves the giving city for the first empty slot of
+ *  the named building in the receiving one that takes its object, as the
+ *  record shows it land; no engine verb names the building, so the move is
+ *  counted a fallback (runs/h1_duelq1127 t171-182: player 1 shuffles Homer's
+ *  two and Sun Tzu's writings between Xi'an's Great Library and Changsha's
+ *  Amphitheater every turn, the cities' Culture with them) */
+function applyGwMove(ctx: Ctx, d: Extract<Decision, { kind: 'gwMove' }>): void {
+  const { state } = ctx;
+  const from = cityAt(state, d.from);
+  const to = cityAt(state, d.to);
+  const work = gwWorkOfRow(ctx.cat, d.row);
+  const h = gwHolderOfRow(ctx.cat, d.building);
+  const held = from && work ? gwWorks(from).filter((w) => w.obj === work.obj) : [];
+  const w = held.find((x) => x.maker === work?.maker) ?? held[0];
+  const taken = new Set(to ? gwWorks(to).map((x) => x.slot) : []);
+  const slot = w && h >= 0 ? holderSlots(h).find((s) => !taken.has(s) && slotAccepts(GW_LAYOUT[s].type, w.obj)) : undefined;
+  if (!from || !to || !w || slot === undefined) {
+    count(ctx, 'gwMove', 'refused', d.player, !w ? 'no such work in the giving city' : 'no empty slot in the named building');
+    return;
+  }
+  const moved = removeGreatWork(from, w.slot)!;
+  (to.greatWorks ??= []).push({ ...moved, slot });
+  to.greatWorks.sort((a, b) => a.slot - b.slot);
+  count(ctx, 'gwMove', 'fallback', d.player, 'no engine verb names the building');
+}
+
 /** A GREAT PERSON A MAJOR WAS GRANTED that the engine's points did not
  *  recruit: the person record t+1 names granted it in the pair's turn
  *  (`TurnRecord.greatPeople`) stands on its class's timeline, and the claim
- *  is the engine's own — the player's patronage through `patronizeGreatPerson`
+ *  is the engine's own — the seat's recruit where its points reach the price
+ *  (`recruitClaimable`), else the player's patronage through `patronizeGreatPerson`
  *  where a purse fell across the pair beyond its income by the price, else
  *  the claim on its points (`recruit`, its price off the points): the
  *  moment, the boosts, the quest, the replacement's draw; its unit the
@@ -3406,8 +3437,11 @@ function completeRecruit(ctx: Ctx, b: TurnRecord, d: Extract<Decision, { kind: '
   const p1 = b.players.find((q) => q.id === d.player);
   const spent = (field: 'gold' | 'faith') => (p0 && p1
     ? num(p0[field]) + num(p0[field === 'gold' ? 'goldYield' : 'faithYield']) - num(p1[field]) : 0);
+  // points that reach the price recruit (`recruitClaimable`); a purse only
+  // patronizes the points missing
   const purse = (['faith', 'gold'] as const).find((c) => spent(c) >= patronageCost(state, seat, cls, c === 'gold') - 1);
-  if (purse && patronizeGreatPerson(state, seat, i, purse).ok) why = `patronized with ${purse}`;
+  if (recruitClaimable(state, seat, i).ok) why = 'recruited on its points';
+  else if (purse && patronizeGreatPerson(state, seat, i, purse).ok) why = `patronized with ${purse}`;
   else {
     s.gpp[cls] = gpClaimLeft(s as Seat, cls, Math.max(0, (s.gpp[cls] ?? 0) - (state.gpPrice[i] ?? 0)));
     s.gpp[cls] = (s.gpp[cls] ?? 0) + recruit(state, seat, cls);
@@ -3761,6 +3795,7 @@ const res = buyTile(state, city.id, d.plot, seat);        if (!res.ok) setTileOw
         count(ctx, 'park', same ? 'applied' : 'fallback', d.player, res.reason);
         break;
       }
+      case 'gwMove': applyGwMove(ctx, d); break;
       case 'gpActivate': {
         // the order is the player's, through the engine's verb from the plot
         // the log's steps had the person on: the effects, the charge
@@ -5686,10 +5721,15 @@ function importedWorld(state: GameState, imp: Imported, rec: TurnRecord, history
   }
   seedMoments(state, imp, history);
   standGreatPeople(state, gpTimeline, rec.turn);
+  if (eventSeed) seedEventMemory(state, eventSeed.recs, rec, eventSeed.cat, eventSeed.climate);
 }
 
 /** the game's Great People timeline beside the dump (`loadGpTimeline`) */
 let gpTimeline: GpTimeline | null = null;
+
+/** the records and the game's climate log an imported world's event memory
+ *  and carbon are read from (`seedEventMemory`) */
+let eventSeed: { recs: TurnRecord[]; cat: Catalog; climate: ClimateLog | undefined } | null = null;
 
 /** a contract the game's city queued in the turn `turn` the record's item
  *  stands for (AI_CityBuild.csv's queue line: its item and tree): the
@@ -6043,6 +6083,8 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
   const source = opts.source ?? (recs.some((r) => Array.isArray((r as { actions?: unknown }).actions)) ? new RecordedActions() : new InferredActions());
   const history: History = newHistory();
   gpTimeline = loadGpTimeline(dumpPath);
+  const seeds = all.flatMap((r) => (r.witness ?? []).flatMap((w) => (typeof w.seed === 'number' ? [w.seed] : [])));
+  eventSeed = { recs: all, cat, climate: all[0] ? loadClimateLog(dumpPath, seeds, all[0].head.W) : undefined };
   // the game's own draw log, where the recording kept it
   const logPath = randLogPath(dumpPath);
   if (logPath) {

@@ -381,7 +381,59 @@ export function passGreatPerson(state: GameState, seat: number, clsIdx: number):
   return { ok: true };
 }
 
-/** A class's points after a claim spent them down to `left`: never below
+/** The seat may claim the class's standing person on `pts` points, the free
+ *  ones included (CanRecruitPerson 0x2f28a0: the points 0x43ce10 at the
+ *  frozen price 0x2f72f0): a standing offer, the passer locked out, the
+ *  Prophet cap. */
+export function gpClaimable(state: GameState, owner: Seat, cls: GreatPersonClass, pts: number): boolean {
+  if ((state.gpPassedBy?.[GP_CLASSES.indexOf(cls)] ?? -1) === owner.seat) return false;
+  if (gpCapped(owner, cls)) return false;
+  const cost = gpOfferCost(state, cls); // Infinity while no offer stands
+  return Number.isFinite(cost) && pts >= cost;
+}
+
+/** Who a points change claims the class's standing person for (0x2f8100):
+ *  of the seats that may claim it, the one holding the most points, the
+ *  first in seat order on a tie; -1 none. `seat`'s points are `pts`, the
+ *  local its turn holds. `_gp_claimant` is the twin. */
+function gpClaimant(state: GameState, cls: GreatPersonClass, seat: number, pts: number): number {
+  let best = -1;
+  let most = -Infinity;
+  for (const o of state.seats) {
+    const p = o.seat === seat ? pts : (o.gpp[cls] ?? 0);
+    if (p > most && gpClaimable(state, o, cls, p)) {
+      most = p;
+      best = o.seat;
+    }
+  }
+  return best;
+}
+
+/** THE RECRUIT verb (RECRUIT_GREAT_PERSON -> RecruitPerson 0x2f8890): the
+ *  seat claims the class's standing person its points reach, the price off
+ *  the points with the refund (`gpClaimLeft`). A class whose points did not
+ *  move this turn is claimed only so (runs/h1_duelq1128 t181: the World's
+ *  Fair's 100 free points on Gaius Duilius and Colaeus, 30 each, neither
+ *  class earning; the AI recruits Duilius at t181, Colaeus at t182).
+ *  `_gp_recruit` is the twin. */
+export function recruitClaimable(state: GameState, seat: number, clsIdx: number): { ok: boolean } {
+  const cls = GP_CLASSES[clsIdx];
+  const owner = cls ? seatOf(state, seat) : undefined;
+  if (!cls || !owner) return { ok: false };
+  const mods = getModifiers(state, seat);
+  if ((cls === 'WRITER' && mods.seatBans.has('greatWriter'))
+    || (cls === 'PROPHET' && mods.seatBans.has('greatProphet'))) return { ok: false };
+  const pts = owner.gpp[cls] ?? 0;
+  if (!gpClaimable(state, owner, cls, pts)) return { ok: false };
+  const cost = gpOfferCost(state, cls);
+  const refund = recruit(state, seat, cls);
+  owner.gpp[cls] = gpClaimLeft(owner, cls, pts - cost + refund);
+  return { ok: true };
+}
+
+/** A class's points after a claim spent them down to `left` (the price
+ *  less the refund in one change, 0x2f8890 -> 0x43b1c0, the stored points
+ *  clamped at 0 by 0x43e050): never below
  *  the seat's free points of the class (`Seat.gppFree`), which no claim
  *  spends (runs/h1_duelq1117 t181: Giovanni de' Medici claimed for 120 on
  *  202 Merchant points, the World's Fair's 100 left, and Trung Trac for 30 on
@@ -425,17 +477,19 @@ export function advanceGreatPeople(state: GameState, seat: number): void {
     // once and clear — the `co2Turn` shape.
     (owner.gppTurn ??= {})[cls] = ((owner.gppTurn ?? {})[cls] ?? 0) + perTurn[cls];
     let pts = (owner.gpp[cls] ?? 0) + perTurn[cls];
-    if (pts !== 0) {
-      for (;;) {
-        // the PASSER is locked out of this individual — the points wait
-        if ((state.gpPassedBy?.[GP_CLASSES.indexOf(cls)] ?? -1) === seat) break;
-        // a seat that has earned its Great Prophet takes no other — the points wait
-        if (gpCapped(owner, cls)) break;
-        const cost = gpOfferCost(state, cls); // Infinity while no offer stands
-        if (!Number.isFinite(cost) || pts < cost) break;
-        pts = gpClaimLeft(owner, cls, pts - cost);
-        pts += recruit(state, seat, cls); // the refund joins the LIVE local
-      }
+    // the claim rides the class's points CHANGING (0x43e050 signals 0x2f8100):
+    // a class this turn earned nothing for claims nothing here, its standing
+    // person left to the seat's recruit (`recruitClaimable`), and a claim
+    // that leaves the points as they stood claims no further
+    let changed = perTurn[cls] > 0;
+    while (changed) {
+      changed = false;
+      if (!gpClaimable(state, owner, cls, pts) || gpClaimant(state, cls, seat, pts) !== seat) break;
+      const cost = gpOfferCost(state, cls);
+      const refund = recruit(state, seat, cls);
+      const next = gpClaimLeft(owner, cls, pts - cost + refund);
+      changed = next !== pts;
+      pts = next;
     }
     // CIV6: "GPPs that can no longer be used are converted to Faith, in a
     // 1:1 ratio" — the exhausted class's stock and flow alike, checked

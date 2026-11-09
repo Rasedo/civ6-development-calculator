@@ -75,6 +75,11 @@ export type Decision = Base & (
    *  the log's steps had it on, the catalog's individual it names; a
    *  Prophet's founding is `religion`'s */
   | { kind: 'gpActivate'; player: number; unit: string; plot: number; individual: number }
+  /** a great work the player moved (`GreatWorkMoved`: its city's centre, the
+   *  receiving player and city centre, the receiving building's catalog row, the
+   *  game's work id), its GreatWorks catalog row the records' great works
+   *  name for that id (-1 none) */
+  | { kind: 'gwMove'; player: number; from: number; toPlayer: number; to: number; building: number; row: number }
   | { kind: 'worked'; player: number; city: number; plots: number[] }
   | { kind: 'envoy'; player: number; minor: number; n: number }
   | { kind: 'pantheon'; player: number; belief: number }
@@ -662,6 +667,12 @@ export class RecordedActions implements ActionSource {
         if (at !== undefined && lastOp.get(k) !== OP_FOUND_RELIGION) {
           out0.push({ kind: 'gpActivate', phase: phaseOf(n(r, 0)), player: n(r, 0), unit: k, plot: at, individual: n(r, 3) });
         }
+      }
+      if (name === 'GreatWorkMoved') {
+        const work = n(r, 5);
+        const held = [...a.cities, ...b.cities].flatMap((c) => c.greatWorks ?? []).find((g) => g[2] === work);
+        out0.push({ kind: 'gwMove', phase: phaseOf(n(r, 0)), player: n(r, 0), from: cityPlot(n(r, 0), n(r, 1)), toPlayer: n(r, 2), to: cityPlot(n(r, 2), n(r, 3)),
+          building: n(r, 4), row: held ? num(held[3]) : -1 });
       }
       if (name === 'UnitOperationStarted') lastOp.set(`${n(r, 0)}:${n(r, 1)}`, n(r, 2));
       if (name === 'UnitOperationStarted' && n(r, 2) === OP_PILLAGE) {

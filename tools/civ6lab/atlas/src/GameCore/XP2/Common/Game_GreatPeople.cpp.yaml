@@ -30,6 +30,18 @@
   readings:
     - "H-1: a great person's price and its draw's era — READ (0x2f1c50, 0x2f8f70 -> 0x93e9e0 -> 0x2f94d0), both twins"
   review: reviewed
+- addr: 0x2f1e70
+  final: 0x209220
+  kind: function
+  semantics: "the player may claim the standing person: on the timeline, CanRecruitPerson 0x2f28a0, the entry unmarked (+0x10 -1)."
+  status: READ
+  cases:
+    - recording: h1_duelq1128
+      turn: 181
+      value: "runs/h1_duelq1128 t181: James of St. George and Dimitrie Cantemir claimed at the turn's points on the World's Fair's 100; Gaius Duilius and Colaeus (neither class earning) left to the AI's recruit, t181 / t182"
+  impl: [cpu/core/greatPeople.ts:gpClaimable, gpu/core/sim_phase.py:_gp_claimable]
+  readings: ["C-114: the great person claim on a points change and the recruit — READ"]
+  review: reviewed
 - addr: 0x2f1ed0
   kind: function
   semantics: "the player can earn a great person class: its civilization level's CanEarnGreatPeople (0x43a980; a city-state's and the Free Cities' lack it), no trait barring the class, a person left."
@@ -73,8 +85,10 @@
   kind: function
   semantics: the player may claim the great person.
   status: PARTLY
+  impl: [cpu/core/greatPeople.ts:gpClaimable]
   readings:
     - "C-97: the great people's patronage — the Gold and Faith patronage READ, the usable plots and the points a turn PARTLY READ"
+    - "C-114: the great person claim on a points change and the recruit — READ"
   context:
     - "...(0xad58b0) and each class's standing person (0x2f64a0): a person the player may claim (0x2f28a0) whose RECRUIT_GREAT_PERSON operation (0xe8e854ba, the individual 0x385fc342) can start..."
   review: reviewed
@@ -90,12 +104,16 @@
 - addr: 0x2f2e90
   final: 0x20a040
   kind: function
-  semantics: claims a great person for the player with the most points who can.
-  status: PARTLY
+  semantics: "the claim: marks the entry +0x10 with the player, notifies, and for an AI player recruits at once (0x2f8890)."
+  status: READ
+  cases:
+    - recording: h1_duelq1128
+      turn: 181
+      value: "runs/h1_duelq1128 t181: James of St. George and Dimitrie Cantemir claimed at the turn's points on the World's Fair's 100; Gaius Duilius and Colaeus (neither class earning) left to the AI's recruit, t181 / t182"
+  impl: [cpu/core/greatPeople.ts:advanceGreatPeople, gpu/core/sim_phase.py:_advance_great_people]
   readings:
+    - "C-114: the great person claim on a points change and the recruit — READ"
     - "C-97: the great people's patronage — the Gold and Faith patronage READ, the usable plots and the points a turn PARTLY READ"
-  context:
-    - "...its one caller is the player operation handler 0x48b9d0: the AI never passes. After it, 0x2f2e90 claims for the player with the most points who can (0x2f8100 the same on a points chang..."
   review: reviewed
 - addr: 0x2f30c0
   final: 0x20a1e0
@@ -174,6 +192,15 @@
   context:
     - ...ited and ends the call. Else, where it may patronize with Gold (0x2f26c0), the price (0x2f70e0, whole) a candidate where it is cheaper than the best so far, the SLUSH_FUND and GREAT_...
   review: reviewed
+- addr: 0x2f72f0
+  kind: function
+  status: PARTLY
+  impl: [cpu/core/greatPeople.ts:gpClaimable]
+  readings: ["C-114: the great person claim on a points change and the recruit — READ"]
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - ...n 0x2f28a0 = earnable and floor(points 0x43ce10, the free ones included) >= the price 0x2f72f0, nobody marked at entry +0x10), the one holding the most points (strictly more, the fir...
+  review: imported
 - addr: 0x2f74b0
   kind: function
   semantics: "a great person's grant: the spawn plot from 0x2f6500."
@@ -193,6 +220,7 @@
     - "C-93: the great person draw"
     - "H-1: the great person's spawn — READ"
     - "H-1: a great person's price and its draw's era — READ (0x2f1c50, 0x2f8f70 -> 0x93e9e0 -> 0x2f94d0), both twins"
+    - "C-114: the great person claim on a points change and the recruit — READ"
   context:
     - ...line's setup 0x2f7c10; the replacement after a person leaves the timeline 0x2f8f70 (grant 0x2f74b0 via recruit 0x2f8890, patronize 0x2f83e0, reject 0x2f8c00); and a deferred grant queue 0x...
     - "The grant 0x2f74b0 asks 0x2f6500 for the spawn plot: the class row (+0x70 its district, +0x98 its unit) and..."
@@ -229,12 +257,19 @@
 - addr: 0x2f8100
   final: 0x20d530
   kind: function
-  semantics: claims a great person for the player with the most points who can (on a points change).
-  status: PARTLY
+  semantics: "the points-changed handler (player, class): of the players who may claim (0x2f1e70) the one with the most points (0x43ce10, strictly more, the first on a tie); the claim 0x2f2e90 only when it is the player whose points moved."
+  status: READ
+  cases:
+    - recording: h1_duelq1128
+      turn: 181
+      value: "runs/h1_duelq1128 t181: James of St. George and Dimitrie Cantemir claimed at the turn's points on the World's Fair's 100; Gaius Duilius and Colaeus (neither class earning) left to the AI's recruit, t181 / t182"
+  impl:
+    - cpu/core/greatPeople.ts:gpClaimant
+    - gpu/core/sim_phase.py:_gp_claimant
+    - cpu/core/greatPeople.ts:pts
   readings:
+    - "C-114: the great person claim on a points change and the recruit — READ"
     - "C-97: the great people's patronage — the Gold and Faith patronage READ, the usable plots and the points a turn PARTLY READ"
-  context:
-    - "...AI never passes. After it, 0x2f2e90 claims for the player with the most points who can (0x2f8100 the same on a points change) — the engines' claim at the points."
   review: reviewed
 - addr: 0x2f83e0
   final: 0x20d6a0
@@ -250,7 +285,10 @@
   kind: function
   semantics: recruits a great person (-> the grant 0x2f74b0).
   status: PARTLY
-  readings: ["C-93: the great person draw"]
+  impl: [cpu/core/greatPeople.ts:recruitClaimable, cpu/core/greatPeople.ts:gpClaimLeft]
+  readings:
+    - "C-93: the great person draw"
+    - "C-114: the great person claim on a points change and the recruit — READ"
   context:
     - ...; the replacement after a person leaves the timeline 0x2f8f70 (grant 0x2f74b0 via recruit 0x2f8890, patronize 0x2f83e0, reject 0x2f8c00); and a deferred grant queue 0x2f2a60 (reached throu...
   review: reviewed
@@ -301,4 +339,14 @@
     - "H-1: a great person's price and its draw's era — READ (0x2f1c50, 0x2f8f70 -> 0x93e9e0 -> 0x2f94d0), both twins"
   context:
     - "`Game_GreatPeople` 0x2f94d0 draws ONE uniform pick (\"Generating a random new Great Person\") among the class's candida..."
+  review: reviewed
+- addr: 0x2f9750
+  kind: function
+  semantics: "connects the great people signals: the points change (+0x798) to 0x2f8100, the era changes to 0x2f8090 / 0x2f8330."
+  status: READ
+  cases:
+    - recording: h1_duelq1128
+      turn: 181
+      value: "runs/h1_duelq1128 t181: James of St. George and Dimitrie Cantemir claimed at the turn's points on the World's Fair's 100; Gaius Duilius and Colaeus (neither class earning) left to the AI's recruit, t181 / t182"
+  readings: ["C-114: the great person claim on a points change and the recruit — READ"]
   review: reviewed

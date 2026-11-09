@@ -401,6 +401,39 @@ function bandOf(t: EventTable, i: number): [number, number] {
   return [lo, lo + t.pairs[i].reduce((a, b) => a + b, 0)];
 }
 
+/** A state imported at record `rec` holds what the records do not carry of
+ *  the random-event step, as the game held it: each site's event memory (the
+ *  first-occurrence boost) off every event `recs` showed begun by `rec`'s
+ *  turn, on its row and site, and the world's carbon of the climate log's
+ *  row for that turn on the first seat (its deforestation factor laid back
+ *  off). runs/h1_duelq1127 t237: Хуанхэ's FLOOD_MAJOR at 4:13 on the roll
+ *  141 of 2500 with the memory and the warming, the Amur's FLOOD_MODERATE
+ *  at 7:16 without. */
+export function seedEventMemory(state: GameState, recs: readonly TurnRecord[], rec: TurnRecord, cat: Catalog,
+  climate: ClimateLog | undefined): void {
+  const names = cat.randomEvents ?? [];
+  const seen = new Map<string, { name: string; plot: number }>();
+  for (const r of recs) {
+    for (const e of r.events ?? []) {
+      if (num(e[0]) > rec.turn) continue;
+      const key = `${e[0]}:${e[1]}`;
+      if (!seen.has(key)) seen.set(key, { name: names[num(e[1])] ?? '', plot: num(e[3]) });
+    }
+  }
+  const t0 = eventTable(state);
+  for (const e of seen.values()) {
+    if (e.plot < 0) continue;
+    const i = t0.rows.findIndex((_r, j) => rowName(t0, j) === e.name);
+    if (i < 0 || !t0.keys[i]) continue;
+    const k = t0.keys[i]!.findIndex((_key, kk) => sitePlots(t0, i, kk)!.some((p) => p.index === e.plot));
+    if (k >= 0) t0.keys[i]![k].eventFired = (t0.keys[i]![k].eventFired ?? 0) | (1 << i);
+  }
+  const carbon = climate?.carbon.get(rec.turn);
+  if (carbon !== undefined) {
+    state.seats.forEach((s, i) => { s.co2 = i === 0 ? carbon / (1 + deforestationModifier(deforestationLevel(state))) : 0; });
+  }
+}
+
 /** each river's plot list in the river vector's order: the map's own
  *  (`GameMap.rivers`), else laid back from its edges (`laidRivers`) */
 function riverLists(map: GameMap): number[][] {

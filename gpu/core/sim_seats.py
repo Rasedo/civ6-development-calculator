@@ -501,6 +501,7 @@ class SimSeats:
         swap: torch.Tensor | None = None,  # [B, K, 2] TILE SWAPS: (claiming city's centre, tile); -1 = padding
         vote: torch.Tensor | None = None,  # [B, 4, 4] the congress ballot: [outcome, target, extra votes, cast order] per slot
         gp_pass: torch.Tensor | None = None,  # [B] the GP class this seat PASSES on (-1 = none)
+        gp_recruit: torch.Tensor | None = None,  # [B] the GP class this seat RECRUITS on its points (-1 = none)
         nuke: tuple | None = None,  # the MISSILE SILO's launch: (device [B], tile [B]); -1 = none
         beliefs: torch.Tensor | None = None,  # [B, K, 2] (class, index) beliefs the religion adopts; -1 = padding
         government: torch.Tensor | None = None,  # [B] the government roster position to adopt; -1/None = no decision
@@ -545,6 +546,8 @@ class SimSeats:
             self._driven_vote[row] = vote
         if gp_pass is not None:
             self._driven_gp_pass[row] = gp_pass
+        if gp_recruit is not None:
+            self._driven_gp_recruit[row] = gp_recruit
         if beliefs is not None:
             self._driven_beliefs[row] = beliefs
         if religion is not None:
@@ -2886,6 +2889,12 @@ class SimSeats:
         ext = self.seat_ext[:, row]
         alive_row = self.city_alive[:, row]
         n_cities = alive_row.sum(dim=1)
+        # THE RECRUIT of a standing Great Person the seat's points reach,
+        # before its purchases (`recruitClaimable`)
+        gp_recruit = self._driven_gp_recruit.pop(row, None)
+        if gp_recruit is not None and self._gp_nc > 0:
+            self._gp_recruit(row, torch.where(active & ext, gp_recruit.to(torch.long),
+                                              torch.full_like(gp_recruit.to(torch.long), -1)))
         bought = torch.zeros(B, dtype=torch.bool, device=dev)
         kind = jjw = bbw = None
         if row in self._driven_buy:

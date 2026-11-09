@@ -2897,21 +2897,23 @@ class SimPhase:
                 active & (pts > 0), self.civ_gpp[:, row, cls] + pts, self.civ_gpp[:, row, cls]
             )
             maxN = self._gp_effects.shape[1]
+            # the claim rides the class's points CHANGING: a class this turn
+            # earned nothing for claims nothing here (its person left to the
+            # seat's recruit, `_gp_recruit`), and a claim that leaves the
+            # points as they stood claims no further (`advanceGreatPeople`)
+            changed = active & (pts > 0)
             # maxN + 1: a turn claiming the WHOLE roster still reaches the
             # exhaustion draw, so both engines convert the same turn.
             for _ in range(maxN + 1):
                 self._gp_ensure_offer(active, cls)
-                has_person = self.gp_offer[:, cls] >= 0
-                gcost = self.gp_price[:, cls]
-                # the PASSER is locked out of this individual, and a seat that
-                # has earned its Great Prophet takes no other — points wait
-                hit = active & has_person & (self.gp_passed_by[:, cls] != row) \
-                    & (self.civ_gpp[:, row, cls] >= gcost) & ~_ban & ~self._gp_capped(row, cls)
+                hit = changed & self._gp_claimable(row, cls, self.civ_gpp[:, row, cls]) & ~_ban
+                if bool(hit.count_nonzero()):
+                    hit = hit & (self._gp_claimant(cls) == row)
                 if not bool(hit.count_nonzero()):
                     break
-                self.civ_gpp[:, row, cls] = torch.where(
-                    hit, self._gp_claim_left(row, cls, self.civ_gpp[:, row, cls] - gcost), self.civ_gpp[:, row, cls])
-                self._gp_claim(row, hit, cls)
+                was = self.civ_gpp[:, row, cls].clone()
+                self._gp_spend(row, hit, cls)
+                changed = hit & (self.civ_gpp[:, row, cls] != was)
             # CIV6: "GPPs that can no longer be used are converted to Faith,
             # in a 1:1 ratio" — the exhausted class's stock and flow alike.
             exh = active & (self.gp_offer[:, cls] == -2) & (self.civ_gpp[:, row, cls] > 0)
@@ -2991,6 +2993,51 @@ class SimPhase:
         never below the row's free points of the class, which no claim spends.
         `gpClaimLeft`'s twin."""
         return torch.maximum(left, self.civ_gpp_free[:, row, cls].to(left.dtype))
+
+    def _gp_claimable(self, row: int, cls: int, pts: torch.Tensor) -> torch.Tensor:
+        """[B] bool — row `row` may claim the class's standing person on `pts`
+        points, the free ones included: a standing offer, the passer locked
+        out, the Prophet cap, the frozen price reached. `gpClaimable`'s twin."""
+        return ((self.gp_offer[:, cls] >= 0) & (self.gp_passed_by[:, cls] != row)
+                & ~self._gp_capped(row, cls) & (pts >= self.gp_price[:, cls].to(pts.dtype)))
+
+    def _gp_claimant(self, cls: int) -> torch.Tensor:
+        """[B] long — who a points change claims the class's standing person
+        for: of the rows that may claim it, the one holding the most points,
+        the first row on a tie; -1 none. `gpClaimant`'s twin."""
+        best = torch.full((self.B,), -1, dtype=torch.long, device=self.device)
+        most = torch.full((self.B,), float("-inf"), dtype=torch.float64, device=self.device)
+        for r in range(self.n_majors):
+            p = self.civ_gpp[:, r, cls].double()
+            take = (p > most) & self._gp_claimable(r, cls, p)
+            best = torch.where(take, torch.full_like(best, r), best)
+            most = torch.where(take, p, most)
+        return best
+
+    def _gp_spend(self, row: int, hit: torch.Tensor, cls: int) -> None:
+        """The claim on the points where `hit`: the price off, the claim
+        (`_gp_claim`, its refund in), then the free-points floor
+        (`_gp_claim_left`) — the price less the refund in one change."""
+        self.civ_gpp[:, row, cls] = torch.where(
+            hit, self.civ_gpp[:, row, cls] - self.gp_price[:, cls].to(self.civ_gpp.dtype), self.civ_gpp[:, row, cls])
+        self._gp_claim(row, hit, cls)
+        self.civ_gpp[:, row, cls] = torch.where(
+            hit, self._gp_claim_left(row, cls, self.civ_gpp[:, row, cls]), self.civ_gpp[:, row, cls])
+
+    def _gp_recruit(self, row: int, gi: torch.Tensor) -> None:
+        """THE RECRUIT verb — `recruitClaimable`'s twin: where `gi` [B] names a
+        class (-1 none), row `row` claims its standing person on its points."""
+        for cls in range(self._gp_nc):
+            want = gi == cls
+            if not bool(want.count_nonzero()):
+                continue
+            ban = torch.zeros(self.B, dtype=torch.bool, device=self.device)
+            if cls == self._writer_cls:
+                ban = ban | self._row_banned(row, self.BAN_GREAT_WRITER)
+            if cls == self._prophet_cls:
+                ban = ban | self._row_banned(row, self.BAN_GREAT_PROPHET)
+            hit = want & ~ban & self._gp_claimable(row, cls, self.civ_gpp[:, row, cls])
+            self._gp_spend(row, hit, cls)
 
     def _add_free_gpp(self, row: int, n: torch.Tensor) -> None:
         """`addFreeGpp`'s twin — `n` [B] free Great Person points to every

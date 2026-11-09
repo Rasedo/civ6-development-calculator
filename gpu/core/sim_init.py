@@ -5286,6 +5286,7 @@ class SimInit:
         self._driven_citizens: dict = {}
         self._driven_vote: dict = {}
         self._driven_gp_pass: dict = {}
+        self._driven_gp_recruit: dict = {}
         self._driven_beliefs: dict = {}
         self._driven_gov: dict = {}
         self._driven_religion: dict = {}

@@ -41,13 +41,17 @@
 - addr: 0x43b1c0
   final: 0x2e3250
   kind: function
-  status: PARTLY
+  semantics: "ChangePoints (class, delta): the total plus the delta through SetPoints 0x43e050; a player who cannot earn takes no positive delta."
+  status: READ
+  cases:
+    - recording: h1_duelq1128
+      turn: 181
+      value: "runs/h1_duelq1128 t181: James of St. George and Dimitrie Cantemir claimed at the turn's points on the World's Fair's 100; Gaius Duilius and Colaeus (neither class earning) left to the AI's recruit, t181 / t182"
+  impl: [cpu/core/greatPeople.ts:gpClaimLeft, gpu/core/sim_phase.py:_gp_spend]
   readings:
     - "C-130: a city-state's Great Person points store, its Faith and its flat bonus; Bastions' strike on standing walls — READ, both twins"
-  notes: ["imported: READ in its section, no confirming case found beside it"]
-  context:
-    - ...t value per Great Person class. The turn 0x43c190 rewrites it (0x439b30 per class, then 0x43b1c0 adds it to the total) only where CanEarnGreatPeople (0x43a980) holds; a city-state ne...
-  review: imported
+    - "C-114: the great person claim on a points change and the recruit — READ"
+  review: reviewed
 - addr: 0x43c190
   kind: function
   semantics: "The player's Great Person turn: only where CanEarnGreatPeople (0x43a980) holds, per class the store +0x110 (data +0x168) is set to the class's points a turn (0x439b30) and those added to the total (0x43b1c0). A city-state never runs it, so its store keeps every grant."
@@ -95,6 +99,26 @@
   readings:
     - "C-130: a city-state's Great Person points store, its Faith and its flat bonus; Bastions' strike on standing walls — READ, both twins"
   review: reviewed
+- addr: 0x43ce00
+  kind: function
+  status: PARTLY
+  readings: ["C-114: the great person claim on a points change and the recruit — READ"]
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - ...f74b0 with its replacement's draw, then ChangePoints by minus the price plus the refund 0x43ce00's percent, one change). That change signals the claim again only where it moved the sto...
+    - ...o the human player's pending claim (+0x10 marked, no recruit) waits on; the refund term 0x43ce00's rows past Magnanimous.
+  review: imported
+- addr: 0x43ce10
+  kind: function
+  semantics: "the class points a claim reads: the stored total plus the free points (+0x2c8) in 24.8."
+  status: READ
+  cases:
+    - recording: h1_duelq1128
+      turn: 181
+      value: "runs/h1_duelq1128 t181: James of St. George and Dimitrie Cantemir claimed at the turn's points on the World's Fair's 100; Gaius Duilius and Colaeus (neither class earning) left to the AI's recruit, t181 / t182"
+  impl: [cpu/core/greatPeople.ts:gpClaimable, gpu/core/sim_phase.py:_gp_claimable]
+  readings: ["C-114: the great person claim on a points change and the recruit — READ"]
+  review: reviewed
 - addr: 0x43d1e0
   kind: function
   semantics: the yield's patronage is barred.
@@ -123,4 +147,20 @@
     - cpu/core/types.ts:CityState
   readings:
     - "C-130: a city-state's Great Person points store, its Faith and its flat bonus; Bastions' strike on standing walls — READ, both twins"
+  review: reviewed
+- addr: 0x43e050
+  final: 0x2e46a0
+  kind: function
+  semantics: "SetPoints (class, value): a negative value clamped to 0; a changed value stored and signalled (game signal +0x798 -> 0x2f8100)."
+  status: READ
+  cases:
+    - recording: h1_duelq1128
+      turn: 181
+      value: "runs/h1_duelq1128 t181: James of St. George and Dimitrie Cantemir claimed at the turn's points on the World's Fair's 100; Gaius Duilius and Colaeus (neither class earning) left to the AI's recruit, t181 / t182"
+  impl:
+    - cpu/core/greatPeople.ts:advanceGreatPeople
+    - gpu/core/sim_phase.py:_advance_great_people
+    - cpu/core/greatPeople.ts:gpClaimLeft
+    - cpu/core/greatPeople.ts:pts
+  readings: ["C-114: the great person claim on a points change and the recruit — READ"]
   review: reviewed

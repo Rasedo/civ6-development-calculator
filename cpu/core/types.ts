@@ -422,6 +422,9 @@ export interface SeatActionRecord {
   vote?: CongressVote;
   /** the Great Person class this seat PASSES on this turn (-1/absent none) */
   gpPass?: number;
+  /** the Great Person class whose standing person this seat RECRUITS on its
+   *  points this turn (-1/absent none; `recruitClaimable`) */
+  gpRecruit?: number;
   /** THE GOVERNOR VERBS, applied in order after the seat's governor clocks:
    *  [verb, governor roster index, argument] each — `GOV_APPOINT` (argument
    *  0), `GOV_PROMOTE` (a GOVERNOR_PROMOTIONS index), `GOV_ASSIGN_CITY` (the
