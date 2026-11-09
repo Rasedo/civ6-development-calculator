@@ -74,7 +74,7 @@ import { minorCity, minorFoodFocus } from './cityStates';
 import { BARB_SEAT, FREE_SEAT, campTiles, civOf, freeSeatOf, hiddenResourcesFor, isCiv, seatOf, tileSeat } from './seats';
 import { cityAppealResolver } from './governors';
 import { adjacentPlotTargetOk, canPlaceDistrictIn, canRemoveFeature, suzerainNames, validImprovementsIn } from './rules';
-import { borderCandidates, computeCityStats } from './city';
+import { borderCandidates, computeCityStats, extractionChanged } from './city';
 import { goldAffordable, tilePurchaseCost } from './game';
 import { computeUnlocksIn, makeYieldCtx } from './effects';
 import { eruptionHazardTurns, floodHazardTurns } from './disasters';
@@ -690,6 +690,7 @@ function minorTreeWorld(state: GameState, cs: CityState, ai: CityAi, city: CityT
         if (tile.improvement === id && tile.pillaged) {
           tile.pillaged = false;
           unit.movesLeft = 0;
+          extractionChanged(state, tile);
           return;
         }
         if ((unit.charges ?? 0) <= 1) spent.add(u);
@@ -707,6 +708,7 @@ function minorTreeWorld(state: GameState, cs: CityState, ai: CityAi, city: CityT
         tile.improvement = null;
         tile.pillaged = false;
         unit.movesLeft = 0;
+        extractionChanged(state, tile);
         return;
       }
       const clears = kind === 'harvest' ? (tile.resource ? 'resource' : null)

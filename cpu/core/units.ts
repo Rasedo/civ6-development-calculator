@@ -4,6 +4,7 @@
  * actions. Combat lives in combat.ts.
  */
 
+import { rebuildLuxuries } from './city';
 import { ENHANCER_BELIEFS, gainPopulationPressure, unconvertedOf } from '../data/religion';
 import type { ArmyRecord, GameMap, GameState, City, Seat, Tile, Unit } from './types';
 import { seatWonderSum } from './wonders';
@@ -1658,7 +1659,12 @@ export function upgradeUnit(state: GameState, unit: Unit, seat: number): RuleRes
   const s = seatOf(state, seat)!;
   s.treasury -= upgradeGoldCost(state, seat, unit.type, next, unit.leviedFrom !== undefined, unit.formation ?? 0);
   const c = upgradeResourceCost(state, seat, unit.type, next);
-  if (c) spendStockpile(state, seat, c.id, c.n, 'ug');
+  if (c) {
+    spendStockpile(state, seat, c.id, c.n, 'ug');
+    // the upgrade's cost is a ChangeResourceAmount (0x4a7560): the luxury
+    // allocation rebuilt
+    rebuildLuxuries(state, seat);
+  }
   upgradeAnew(state, unit, next);
   unit.movesFull = unitFullMoves(state, unit);
   raiseBestTrained(state, seat, next, unit.formation ?? 0);

@@ -12,7 +12,7 @@ import { tilesWithin } from '../../world/hex';
 import { FEATURES } from '../../world/features';
 // the border-growth pick and its claim: a minor's envoy plots are taken by
 // the city rule's OWN next-tile choice, never a second one
-import { drawBorderPlot, acquireTile } from './city';
+import { drawBorderPlot, acquireTile, rebuildLuxuries } from './city';
 import { cityFlags, placeCitizens, replaceAllCitizens } from './citizens';
 import { darkBuildings } from './yields';
 import type { RuleResult } from './rules';
@@ -356,6 +356,13 @@ export function resolveSuzerain(state: GameState, cityState: CityState): void {
   // revealed in the record it is first suzerain in — 1121 China of Hunza,
   // t42, 34 of the 35 plots it reveals the minor's revealed ones)
   if (cityState.suzerain !== was && isCiv(cityState.suzerain)) suzerainSight(state, cityState.seat, cityState.suzerain);
+  // a suzerain CHANGE takes the city-state's resources off the old and gives
+  // them to the new (0x451b20: 0x4a91a0, 0x4a6d90 -> 0x4a7560), a rebuild of
+  // each one's luxury allocation
+  if (cityState.suzerain !== was) {
+    if (isCiv(was)) rebuildLuxuries(state, was);
+    if (isCiv(cityState.suzerain)) rebuildLuxuries(state, cityState.suzerain);
+  }
 }
 
 /**
@@ -731,6 +738,7 @@ export function minorCity(cityState: CityState): City {
     projectYield: cityState.projectYield,
     lastHitTurn: cityState.lastHitTurn,
     powered: cityState.powered,
+    luxuryAmenities: cityState.luxuryAmenities,
     religionPressure: cityState.religionPressure,
     unconvertedPressure: cityState.unconvertedPressure,
     specialistPref: cityState.specialistPref,

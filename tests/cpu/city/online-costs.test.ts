@@ -12,7 +12,7 @@ import { FEATURES, isFloodplains } from '../../../world/features';
 import { featureDefense } from '../../../cpu/core/combat';
 import { validImprovementsIn } from '../../../cpu/core/rules';
 import { pressureTerm } from '../../../cpu/core/phase';
-import { luxuryAmenities, cityMaintenance } from '../../../cpu/core/city';
+import { rankLuxuries, cityMaintenance } from '../../../cpu/core/city';
 import { centreStrength, wallsStrength } from '../../../cpu/core/combat';
 import { spawnUnit, traderCost } from '../../../cpu/core/units';
 import { tilePurchaseCost, projectCost } from '../../../cpu/core/game';
@@ -93,9 +93,9 @@ describe('the second wave of the harness findings', () => {
     const t = tileAtCoords(state.map, 10, 9);
     t.resource = 'WINE';
     t.improvement = 'PLANTATION';
-    expect(luxuryAmenities(state, 0).get(city.id)).toBe(1);
+    expect(rankLuxuries(state, 0).get(city.id)).toBe(1);
     t.pillaged = true;
-    expect(luxuryAmenities(state, 0).get(city.id)).toBe(0);
+    expect(rankLuxuries(state, 0).get(city.id)).toBe(0);
   });
 
   it('the Dam pays Entertainment 1; a pillaged district no upkeep', () => {

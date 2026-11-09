@@ -96,6 +96,11 @@ export interface City {
    *  (`refreshParkAmenities`): a park designated since pays from the owner's
    *  next processing; absent before the city's first. */
   parkAmenities?: number;
+  /** the luxury amenities its owner's last allocation rebuild gave it
+   *  (`rebuildLuxuries`): the resources step of the owner's processing and
+   *  every change of the resources it holds re-rank them; absent (none) on a
+   *  city founded since. */
+  luxuryAmenities?: number;
   cultureBox: number;
   tilesAcquired: number;
   /** CIV6 (City_Culture): the plot this city's culture claims next — drawn
@@ -1365,6 +1370,9 @@ export interface CityState extends Seat {
    *  project waits on (`City.lastHitTurn`) */
   lastHitTurn?: number;
   /** its city's power this turn (`City.powered`), set by `minorPower` */
+  /** its city's luxury amenities as its last allocation rebuild left them
+   *  (`City.luxuryAmenities`, through `minorCity`) */
+  luxuryAmenities?: number;
   powered?: boolean;
   /** the district project its last turn's Production went toward and did
    *  not finish (`minorBuild`) — the queue head the religious step reads

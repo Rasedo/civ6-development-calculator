@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { makeMap, makeState, tileAtCoords, settleAt, grantCivics } from '../helpers';
 import { emptySeat, setTileOwner } from '../../../cpu/core/seats';
-import { computeCityStats } from '../../../cpu/core/city';
+import { computeCityStats, rebuildLuxuries } from '../../../cpu/core/city';
 import { getModifiers, wonderExtraSlots } from '../../../cpu/core/effects';
 import { greatPersonPointsPerTurn } from '../../../cpu/core/greatPeople';
 import { unitKillEvent } from '../../../cpu/core/eras';
@@ -47,6 +47,8 @@ function giveLuxuries(state: GameState, city: City, n: number): void {
     t.improvement = RESOURCES[LUXURIES[i]].improvement;
     t.feature = null;
   }
+  // the cities read the allocation as a rebuild stores it
+  rebuildLuxuries(state, 0);
 }
 
 describe('the Scottish Enlightenment', () => {

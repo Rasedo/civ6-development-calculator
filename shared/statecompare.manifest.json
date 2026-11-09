@@ -2674,6 +2674,17 @@
           "note": "the minor city's food box — the install has ONE city rule, so it grows exactly as a major's does"
         },
         {
+          "name": "minorLuxuryAmenities",
+          "compare": "exact",
+          "covers": [
+            "CityState.luxuryAmenities"
+          ],
+          "planes": [
+            "city_lux_amen"
+          ],
+          "note": "the minor city's luxury amenities as its last allocation rebuild stored them"
+        },
+        {
           "name": "minorCultureBox",
           "compare": "milli",
           "covers": [
@@ -3480,6 +3491,17 @@
             "city_park_amen"
           ],
           "note": "the National Park amenities the owner's last turn processing stored (refreshParkAmenities): a city's amenities read this, never the live sum."
+        },
+        {
+          "name": "luxuryAmenities",
+          "compare": "exact",
+          "covers": [
+            "City.luxuryAmenities"
+          ],
+          "planes": [
+            "city_lux_amen"
+          ],
+          "note": "the luxury amenities the owner's last allocation rebuild stored (rebuildLuxuries): its processing's resources step and every change of its resources; a city's amenities read this, never a live ranking."
         },
         {
           "name": "foodBox",

@@ -653,7 +653,7 @@ export function luxuryHoldings(state: GameState, seat: number): { held: Map<stri
 
 /**
  * Every amenity `city` has but its luxuries', net of war weariness and
- * bankruptcy — the sum `luxuryAmenities` ranks cities on, and the one the
+ * bankruptcy — the sum `rankLuxuries` ranks cities on, and the one the
  * tier balance adds the luxuries to. `m` is the city's own modifiers (its
  * governor and follower beliefs folded in), `regionalAmenities` what the
  * regional buildings reaching it pay. `ww` is the war-weariness part, for
@@ -716,7 +716,7 @@ function nonLuxuryAmenities(
  *   non-luxury amenities (`nonLuxuryAmenities`) and the luxury amenities
  *   granted so far — and a pass serves its first cities in that order.
  */
-export function luxuryAmenities(state: GameState, seat: number): Map<number, number> {
+export function rankLuxuries(state: GameState, seat: number): Map<number, number> {
   // a city-state's one city is its `minorCity` view (its Seat's `cities` is
   // empty): an improved luxury on its ground serves it like any city's
   const minor = isCityStateSeat(seat) ? (seatOf(state, seat) as CityState | undefined) : undefined;
@@ -803,6 +803,53 @@ export function luxuryAmenities(state: GameState, seat: number): Map<number, num
     }
   }
   return result;
+}
+
+/**
+ * THE LUXURY ALLOCATION'S REBUILD (Player_Resources 0x4a6110): the seat's
+ * cities ranked now (`rankLuxuries`) and stored on each (`luxuryAmenities`).
+ * Its callers are the resources step of the seat's processing (0x4a8ed0) and
+ * every change of the resources it holds (ChangeResourceAmount 0x4a7560): a
+ * strategic cost paid, an improvement on a resource, a suzerain's change, the
+ * turn end's cap. A growth, a founding or a card re-slotted between them
+ * re-ranks nothing (dll_readings "H-1: the luxury allocation's rebuilds").
+ */
+export function rebuildLuxuries(state: GameState, seat: number): void {
+  const ranked = rankLuxuries(state, seat);
+  if (isCityStateSeat(seat)) {
+    const minor = seatOf(state, seat) as CityState | undefined;
+    if (minor) minor.luxuryAmenities = ranked.get(-1) ?? 0;
+    return;
+  }
+  for (const c of citiesOf(state, seat)) c.luxuryAmenities = ranked.get(c.id) ?? 0;
+}
+
+/** An improvement on `tile` built, removed or repaired changes the
+ *  resource its owner extracts (0x4ab4d0 -> 0x4a7560): a luxury's or a bonus
+ *  resource's rebuilds the owner's allocation, an accumulated strategic's
+ *  does not; a city-state's change reaches its suzerain's copies (0x44eff0),
+ *  a rebuild there too. */
+export function extractionChanged(state: GameState, tile: Tile): void {
+  const owner = tileSeat(tile);
+  if (owner < 0 || !tile.resource || RESOURCES[tile.resource]?.category === 'strategic') return;
+  rebuildLuxuries(state, owner);
+  if (!isCityStateSeat(owner)) return;
+  const suz = (seatOf(state, owner) as CityState | undefined)?.suzerain ?? -1;
+  if (suz >= 0) rebuildLuxuries(state, suz);
+}
+
+/** The seat's luxury allocation as its last rebuild stored it, by city id
+ *  (a city-state's one city at -1): what every reader of a city's amenities
+ *  takes between rebuilds. */
+export function standingLuxuries(state: GameState, seat: number): Map<number, number> {
+  const out = new Map<number, number>();
+  if (isCityStateSeat(seat)) {
+    const minor = seatOf(state, seat) as CityState | undefined;
+    if (minor) out.set(-1, minor.luxuryAmenities ?? 0);
+    return out;
+  }
+  for (const c of citiesOf(state, seat)) out.set(c.id, c.luxuryAmenities ?? 0);
+  return out;
 }
 
 export function borderCandidates(state: GameState, city: City): number[] {
@@ -1796,18 +1843,19 @@ export function computeCityStats(
 
   const hParts = housingParts(state, city, m);
   const housing = hParts.reduce((a, b) => a + b, 0);
-  // THE RANKING BASE — everything `luxuryAmenities` ranks cities on, and the
+  // THE RANKING BASE — everything `rankLuxuries` ranks cities on, and the
   // one split point both engines share. Named so the amenity log can print
   // it: a disagreement here is a different sum, a disagreement in `lux`
   // alone is a different allocation of the same one.
   const { have: amenBase, ww: wwLoss } = nonLuxuryAmenities(state, city, m, regional.amenities);
-  const have = amenBase + ((luxMap ?? luxuryAmenities(state, city.seat)).get(city.id) ?? 0);
+  const lux = (luxMap ?? standingLuxuries(state, city.seat)).get(city.id) ?? 0;
+  const have = amenBase + lux;
   const needed = amenitiesNeeded(city.population);
   const balance = have - needed;
   const tier = amenityTier(balance);
   const dl = (globalThis as { __diffLog?: string[] }).__diffLog;
   if (dl && record) {
-    dl.push(`c:${city.seat}:${city.id} base${amenBase} lux${(luxMap ?? luxuryAmenities(state, city.seat)).get(city.id) ?? 0}`
+    dl.push(`c:${city.seat}:${city.id} base${amenBase} lux${lux}`
       + ` ww${wwLoss} have${have} need${needed} bal${balance}`
       + ` tier${amenityTierIndex(tier.name)}`
       // the COMPLETE specialty count this city carries: a governor's

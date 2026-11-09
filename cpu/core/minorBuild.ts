@@ -40,7 +40,7 @@ import { bankruptcy, cityBorderGrowth, cultureAfterGrowth, jumpMadeAnew, paveGro
 import { applyTrainingGrants } from './combat';
 import { keepItem, resumeItem } from './production';
 import { districtScaledBase, goldAffordable, projectCost, repairAvailable, repairWanted } from './game';
-import { civEraIndex, computeCityStats, withPercent256 } from './city';
+import { civEraIndex, computeCityStats, extractionChanged, rebuildLuxuries, withPercent256 } from './city';
 import { upgradeRoads } from './eras';
 import { researchCost, selectResearch } from './economy';
 import { CP_ACCEPTED, CP_CANCELLED, CP_COMPLETED, CP_FAILED, CP_IN_PROGRESS, contractById, newContractBook } from './aiContracts';
@@ -149,6 +149,8 @@ export function minorPhase(state: GameState): void {
     // revealed this turn included (runs/h1_duely1128 Nazca's Horses t15-t31
     // as logged; runs/h1_duelw1121 Hunza's one Horses Pasture from t20)
     accrueStockpiles(state, cityState.seat);
+    // the same resources step's luxury allocation (0x4a8ed0 -> 0x4a6110)
+    rebuildLuxuries(state, cityState.seat);
     // its units' fuel, out of the same bank (a major's order: `chargeUnitUpkeep`)
     chargeUnitUpkeep(state, cityState.seat);
     // its city AI's forecast, between the production and the growth: of the
@@ -864,6 +866,7 @@ export function minorUpgradeUnit(state: GameState, cityState: CityState, u: Unit
   const res = unitResourceCost(next);
   if (res && res.id !== UNITS[u.type].requiresResource && canPayStockpile(state, cityState.seat, res.id, res.n)) {
     spendStockpile(state, cityState.seat, res.id, res.n, 'ug');
+    rebuildLuxuries(state, cityState.seat);
   }
   // the upgrade a new unit (`upgradeAnew`): of its type's own AI type and
   // homed nowhere, out of the standing army (runs/h1_duely1127 city-state 2
@@ -979,6 +982,7 @@ export function minorBuilderLays(state: GameState, u: Unit, plot: number, imp: s
   const tile = state.map.tiles[plot];
   tile.improvement = imp;
   tile.pillaged = false;
+  extractionChanged(state, tile);
   u.charges = (u.charges ?? 0) - 1;
   u.movesLeft = 0;
   if (u.charges <= 0) disbandUnit(state, u.id);
@@ -2289,7 +2293,10 @@ function minorFinish(state: GameState, cityState: CityState, item: Exclude<Minor
     // its reservation released and its strategic cost charged together
     // (0x1856b3 / 0x185a2a)
     const cost = unitResourceCost(item.unit);
-    if (cost && cityState.prodReserved !== undefined) spendStockpile(state, cityState.seat, cost.id, cityState.prodReserved, 'mu');
+    if (cost && cityState.prodReserved !== undefined) {
+      spendStockpile(state, cityState.seat, cost.id, cityState.prodReserved, 'mu');
+      rebuildLuxuries(state, cityState.seat);
+    }
     delete cityState.prodReserved;
   } else if ('building' in item) {
     minorRaiseBuilding(state, cityState, item.building);

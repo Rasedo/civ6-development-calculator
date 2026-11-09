@@ -11,7 +11,7 @@
 import { describe, it, expect } from 'vitest';
 import { makeMap, makeState, tileAtCoords } from '../helpers';
 import { emptySeat, setTileOwner } from '../../../cpu/core/seats';
-import { luxuryAmenities } from '../../../cpu/core/city';
+import { rankLuxuries } from '../../../cpu/core/city';
 import { CONGRESS_LUXURY_POLICY } from '../../../cpu/data/seats';
 import { LUXURY_IDS, resourceImprovement } from '../../../world/resources';
 import { tilesWithin } from '../../../world/hex';
@@ -56,11 +56,11 @@ describe('the luxury allocation', () => {
     // first held twice under Luxury Policy A
     const state = scene([1, 3, 4, 7, 2], [2, 1, 1, 1]);
     state.congress = [{ res: CONGRESS_LUXURY_POLICY, outcome: 0, target: 0 }];
-    expect([...luxuryAmenities(state, 0).values()]).toEqual([3, 5, 4, 5, 3]);
+    expect([...rankLuxuries(state, 0).values()]).toEqual([3, 5, 4, 5, 3]);
   });
 
   it('with no policy each luxury is one pass of four', () => {
     const state = scene([1, 3, 4, 7, 2], [2, 1, 1, 1]);
-    expect([...luxuryAmenities(state, 0).values()]).toEqual([2, 4, 4, 4, 2]);
+    expect([...rankLuxuries(state, 0).values()]).toEqual([2, 4, 4, 4, 2]);
   });
 });

@@ -12721,3 +12721,47 @@ same calls.
   Catapult 1048580 (on 32:5 from t85) has left for 32:6 under Operation
   Move before Garrison City's execution, so the branch finds only the
   Catapult 1114113 made there that turn; which runs first is unread.
+
+## H-1: the luxury allocation stored, its rebuild's triggers — READ (the triggers ported), LAB (the pillage)
+
+- THE STORE: m_aLuxuryAllocations (Player_Resources +0x460) holds each
+  city's luxury amenities between rebuilds; 0x4a6110's only callers are
+  0x4a7560 (0x4a77d4) and 0x4a8ed0. Both twins store it on the city
+  (`City.luxuryAmenities` / `CityState.luxuryAmenities`, `city_lux_amen`)
+  and every reader takes the stored value (`standingLuxuries`; GPU
+  `_seat_amenity` reads `city_lux_amen`); the ranking itself is
+  `rankLuxuries` / `_luxury_amenities`. A city founded or taken holds none
+  until its owner's next rebuild.
+- THE REBUILDS (`rebuildLuxuries`, `_rebuild_luxuries`):
+  - the resources step of each processing (0x4a8ed0): after the accrual,
+    the fuel bill and the power, before the parks (0x32deb0) — a major's
+    (phase.ts, sim_phase), the Free Cities' and a city-state's (after its
+    accrual);
+  - 0x4a7560 on a strategic cost paid, an amount of 0 too: a unit
+    (`chargeUnitResource`, 0x1856b3 / 0x185a2a; a city-state's 'mu'), a
+    project (`chargeProjectResource`, 0x184d95), an upgrade (a major's and
+    a city-state's), the turn end's cap when a bank is over (0x4a8f10);
+  - an extracted resource changing (0x4ab4d0, `extractionChanged`,
+    `_extraction_changed`): an improvement built, removed or repaired on a
+    luxury or bonus resource (an accumulated strategic skips), the owner's
+    and, for a city-state, its suzerain's (0x44eff0);
+  - a suzerain change (0x451b20 -> 0x4a91a0 / 0x4a6d90 -> 0x4a7560): the
+    old and the new suzerain (`resolveSuzerain`, `_cs_resolve_suzerain`).
+- THE CHECKS' READING (`luxAtRebuild`): a citizen a city loses after its
+  owner's turn closed re-ranks nothing — the allocation stands on its size
+  before (runs/h1_duelp1124 t166: Shanghai ranked at 7 keeps four luxuries
+  when the turn's end leaves it at 6, Wuhan one, as recorded at t167). A
+  growth in the walk stands in the ranking the record reads.
+- THE SLOT REBUILD'S CLEAR RUN counts the catalogue's cards, an
+  uncatalogued one included (`slottedAfterRebuild`): runs/h1_duelp1128
+  t221's clear signals Martial Law among its eight, and Liberalism and
+  Civil Prestige laid back pay nothing to t242 (civics amenities 0, policy
+  housing 0, as recorded).
+- CONFIRMED: runs/h1_duelp1128 t222-242 Xi'an, Taiyuan, Shanghai, Wuhan,
+  Jiaodong read the recorded amenities and tier (Displeased); runs/h1_duelp1124
+  t167, t183, t200 and runs/h1_duelp1117 t210, t220 the recorded per-city
+  luxuries.
+- OPEN: a pillaged improvement on a luxury (0x4ab4d0 from the plot
+  handlers) — no rebuild in either twin; the power ledger's own call
+  (0x4a7cc0) mid-processing; runs/h1_duelp1121 t230 Chengdu / Shenyang and
+  t247 Chengdu / Jiaodong / Shanghai / Wuhan, runs/h1_duelp1117 t235 Handan.

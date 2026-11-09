@@ -4276,6 +4276,7 @@ class SimSeats:
             pay = (ok & want).long() * cost
             self.civ_stockpile[:, row].scatter_add_(1, slot.clamp(min=0).unsqueeze(1), -pay.unsqueeze(1))
             self._log_stock((ok & want).nonzero(as_tuple=True)[0], row, slot[ok & want], "ug")
+            self._rebuild_luxuries(row, ok & want)
         # the upgrade a new unit (`upgradeAnew`)
         rr = ok.nonzero(as_tuple=True)[0]
         self._upgrade_anew(rr, sc[rr], nc[rr])
@@ -4358,6 +4359,8 @@ class SimSeats:
         col = self.civ_stockpile[:, row, slot]
         col.copy_(torch.where(hit, (col - pay.to(col.dtype)).clamp(min=0), col))
         self._log_stock(hit.nonzero(as_tuple=True)[0], row, slot, "uc")
+        # the charge is a ChangeResourceAmount (0x4a7560): the allocation rebuilt
+        self._rebuild_luxuries(row, hit)
 
     def _charge_project_resource(self, row: int, hit: torch.Tensor, pi: int) -> None:
         """`chargeProjectResource` — the Lagrange station's one-time Aluminum."""
@@ -4368,6 +4371,7 @@ class SimSeats:
         col = self.civ_stockpile[:, row, rs]
         col.copy_(torch.where(hit, (col - rc).clamp(min=0), col))
         self._log_stock(hit.nonzero(as_tuple=True)[0], row, rs, "pc")
+        self._rebuild_luxuries(row, hit)
 
     def _once_step_ok(self, row: int, pi: int) -> torch.Tensor:
         """[B] — may this seat START space-race step `pi` right now?
@@ -5779,6 +5783,14 @@ class SimSeats:
         ok = (best >= suz_min) & ~tied
         was = self.citystate_suzerain[:, : self.S].clone()
         self.citystate_suzerain[:, : self.S] = torch.where(ok, arg, torch.full_like(arg, -1))
+        # a suzerain CHANGE takes the city-state's resources off the old and
+        # gives them to the new (0x451b20 -> 0x4a7560): each one's luxury
+        # allocation rebuilt (`resolveSuzerain`)
+        _now = self.citystate_suzerain[:, : self.S]
+        _moved = _now != was
+        if bool(_moved.count_nonzero()):
+            for m in range(self.n_majors):
+                self._rebuild_luxuries(m, (_moved & ((was == m) | (_now == m))).any(dim=1))
         # a new suzerain sees what the minor has revealed and sees
         # (`suzerainSight`)
         if self.fog_of_war:
@@ -10979,6 +10991,8 @@ class SimSeats:
                 _rows = over[:, _k].nonzero().reshape(-1)
                 if _rows.numel():
                     self._log_stock(_rows, row, _k, "cp")
+        # the hand-back is a ChangeResourceAmount: the allocation rebuilt
+        self._rebuild_luxuries(row, over.any(dim=1))
         return over.any(dim=1)
 
     def _city_has_feature(self, row: int, feat: int) -> torch.Tensor:
@@ -11376,7 +11390,45 @@ class SimSeats:
             housing = housing + self._governor_house_amen(row)[0][:, :cols]
         return maint, torch.where(alive, housing, torch.zeros_like(housing))
 
-    def _seat_amenity(self, row: int, lux: torch.Tensor | None = None) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
+    def _extraction_changed(self, mask: torch.Tensor, tile: torch.Tensor) -> None:
+        """`extractionChanged`'s twin: an improvement built, removed or
+        repaired on `tile` [B] for the games in `mask` [B] changes what its
+        owner extracts (0x4ab4d0 -> 0x4a7560) — a luxury's or a bonus
+        resource's rebuilds the owner's allocation, a strategic's does not; a
+        city-state's change rebuilds its suzerain's too (0x44eff0)."""
+        if not bool(mask.count_nonzero()):
+            return
+        tc = tile.clamp(min=0).unsqueeze(1)
+        rid = self.res_id.gather(1, tc).squeeze(1)
+        gone = self.res_stripped.gather(1, tc).squeeze(1)
+        pri = self.res_priority.gather(1, tc).squeeze(1)
+        seat = self.tile_seat.gather(1, tc).squeeze(1).long()
+        hit = mask & (tile >= 0) & (rid >= 0) & ~gone & (pri != 2) & (seat >= 0)
+        if not bool(hit.count_nonzero()):
+            return
+        row = torch.where(hit, self._seat_row.take(seat.clamp(min=0)), torch.full_like(seat, -1))
+        for r in sorted(set(row[hit].tolist())):
+            if r < 0:
+                continue
+            here = hit & (row == r)
+            self._rebuild_luxuries(r, here)
+            if self._CITY_MINOR0 <= r < self.FREE_ROW and r - self._CITY_MINOR0 < self.S:
+                suz = self.citystate_suzerain[:, r - self._CITY_MINOR0]
+                for g in range(self.n_majors):
+                    self._rebuild_luxuries(g, here & (suz == g))
+
+    def _rebuild_luxuries(self, row: int, active: torch.Tensor) -> None:
+        """THE LUXURY ALLOCATION'S REBUILD for the games in `active` [B] —
+        `rebuildLuxuries`' twin: seat row `row`'s cities ranked now
+        (`_luxury_amenities` on the amenity base) and stored on each
+        (`city_lux_amen`), which every later read of a city's amenities takes
+        until the next rebuild."""
+        if not bool(active.count_nonzero()):
+            return
+        self._seat_amenity(row, rebuild=active)
+
+    def _seat_amenity(self, row: int, lux: torch.Tensor | None = None,
+                      rebuild: torch.Tensor | None = None) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
         """THE amenity body, for every seat row — computeCityStats' amenity
         half, in f64.
 
@@ -11390,9 +11442,11 @@ class SimSeats:
         Returns (tier_idx, growth_f, yield_f, lux_add), each [B, cols]; the
         factors are f64 and a caller running self.dtype casts them. The seat
         block calls this ONCE per row, at its loop top (_seat_city_stats), so
-        the luxury ranking freezes there for the whole walk; `lux` hands in
-        a standing allocation in place of a new ranking (the culture after a
-        growth, `_culture_after_growth`)."""
+        the cities read the luxury allocation their owner's last rebuild
+        stored (`city_lux_amen`); `lux` hands in an allocation in its place
+        (the culture after a growth, `_culture_after_growth`). `rebuild` [B]
+        ranks the allocation anew on this base, stores it for those games and
+        returns at once (`_rebuild_luxuries`)."""
         cols = self.RC
         alive = self.city_alive[:, row, :cols]
         is_cap = self.city_is_cap[:, row, :cols]
@@ -11539,10 +11593,15 @@ class SimSeats:
         # whose treasury has fallen to the line loses amenities to bankruptcy
         have = have - self._bankrupt_amenities(row).unsqueeze(1)
         # THE RANKING BASE — every non-luxury amenity, net of war weariness and
-        # bankruptcy: what `luxuryAmenities` ranks on, and the one split point
+        # bankruptcy: what `rankLuxuries` ranks on, and the one split point
         # both engines share. Kept for the amenity log.
         _amen_base = have
-        lux_add = self._luxury_amenities(row, have, need) if lux is None else lux
+        if rebuild is not None:
+            ranked = self._luxury_amenities(row, have, need).round().to(self.city_lux_amen.dtype)
+            self.city_lux_amen[:, row, :cols] = torch.where(
+                rebuild.unsqueeze(1) & alive, ranked, self.city_lux_amen[:, row, :cols])
+            return None  # type: ignore[return-value]
+        lux_add = (self.city_lux_amen[:, row, :cols].to(have.dtype) * alive.to(have.dtype)) if lux is None else lux
         balance = have + lux_add - need
         # the balance as computed, for the AI values that read it (`AmenityCity.balance`)
         self._amen_balance_of[row] = balance
@@ -11660,6 +11719,8 @@ class SimSeats:
         self.city_worked[b, row, col, :] = -1
         self.city_amen_tier[b, row, col] = -1
         self.city_park_amen[b, row, col] = 0
+        # a city founded holds no luxury until its owner's next rebuild
+        self.city_lux_amen[b, row, col] = 0
 
     def _city_col_at(self, row: int, rows: torch.Tensor, tiles: torch.Tensor) -> torch.Tensor:
         """`cityAtTile` in COLUMN space — the column of seat row `row`'s
@@ -12064,6 +12125,7 @@ class SimSeats:
         self.city_worked[b, dst_row, col, :] = -1
         self.city_amen_tier[b, dst_row, col] = -1
         self.city_park_amen[b, dst_row, col] = 0
+        self.city_lux_amen[b, dst_row, col] = 0
         # CIV6 (Military Emergency): "The Target has conquered the city of
         # another nation; it must be Liberated!" The seat that LOST it is the
         # affected one.

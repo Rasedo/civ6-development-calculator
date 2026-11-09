@@ -10,7 +10,7 @@ import { makeMap, makeState, settleAt, tileAtCoords } from '../helpers';
 import { emptySeat, seatOf, seatOfCityState, setTileOwner } from '../../../cpu/core/seats';
 import { getModifiers, goldPrice } from '../../../cpu/core/effects';
 import { cityDistrictYields, onOrNextToShallowWater } from '../../../cpu/core/yields';
-import { luxuryAmenities } from '../../../cpu/core/city';
+import { rankLuxuries } from '../../../cpu/core/city';
 import { greatPersonPointsPerTurn } from '../../../cpu/core/greatPeople';
 import { gpActivatedPressure, unitGoldPrice, unitPurchaseCost } from '../../../cpu/core/game';
 import { suzerainProjectMult, suzerainLandPurchaseOffPct } from '../../../cpu/core/cityStates';
@@ -176,7 +176,7 @@ describe("Zanzibar's spices and Buenos Aires' bonuses", () => {
     for (const [c, r] of [[5, 15], [11, 15], [17, 15], [5, 21], [11, 21]] as const) {
       settleAt(state, tileAtCoords(state.map, c, r).index, 0);
     }
-    const sum = (): number => [...luxuryAmenities(state, 0).values()].reduce((a, b) => a + b, 0);
+    const sum = (): number => [...rankLuxuries(state, 0).values()].reduce((a, b) => a + b, 0);
     const before = sum();
     suzerainOf(state, 'spiceLuxuries');
     const cities = seatOf(state, 0)!.cities.length;
@@ -188,7 +188,7 @@ describe("Zanzibar's spices and Buenos Aires' bonuses", () => {
     const owned = state.map.tiles.filter((t) => t.ownerCity === city.id && t.ownerSeat === 0);
     owned[0].resource = 'WHEAT';
     owned[1].resource = 'WHEAT'; // a second copy is not a second head
-    const sum = (): number => [...luxuryAmenities(state, 0).values()].reduce((a, b) => a + b, 0);
+    const sum = (): number => [...rankLuxuries(state, 0).values()].reduce((a, b) => a + b, 0);
     const before = sum();
     suzerainOf(state, 'bonusAmenities');
     expect(sum() - before).toBe(BUENOS_AIRES_AMENITIES);

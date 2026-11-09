@@ -159,7 +159,7 @@ export function runReport(dumpPath: string, from = -Infinity, to = Infinity) {
     const imp = importTurn(rec, cat, history);
     if (t >= from) for (const [g, n] of imp.gaps) gaps.set(g, Math.max(gaps.get(g) ?? 0, n));
     for (const r of picks.check(rec, byTurn.get(t + 1), imp)) add(r);
-    for (const r of stateChecks(rec, cat, imp, starts, byTurn.get(t + 1))) add(r);
+    for (const r of stateChecks(rec, cat, imp, starts, byTurn.get(t + 1), byTurn.get(t - 1))) add(r);
     const next = byTurn.get(t + 1);
     if (next) for (const r of transitionChecks(rec, next, cat, history, byTurn.get(t - 1))) add(r);
   }

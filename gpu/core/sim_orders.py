@@ -1088,6 +1088,7 @@ class SimOrders:
                         laid_at[_r] = hc[_r]
                         if row < self.n_majors:
                             self._moment_disaster_improvement(row, _r, hc[_r])
+                        self._extraction_changed(_ok, hc)
                 # CIV6 (Mountain Tunnel, Qhapaq Ñan, Ski Resort): "Can only be built on an
                 # adjacent Mountain tile" — the rows whose target is not the
                 # builder's own tile, so each gets its own write. The pick is
@@ -1190,6 +1191,9 @@ class SimOrders:
                     _tt = hc[_r]
                     _imp = self.pillaged[_r, _tt]
                     self.pillaged[_r[_imp], _tt[_imp]] = False
+                    _fixed = torch.zeros(B, dtype=torch.bool, device=dev)
+                    _fixed[_r[_imp]] = True
+                    self._extraction_changed(_fixed, hc)
                     _dis = ~_imp & self.district_pillaged[_r, _tt]
                     self.district_pillaged[_r[_dis], _tt[_dis]] = False
                     self.unit_mp[_r, sc[_r]] = 0
@@ -1217,6 +1221,7 @@ class SimOrders:
                     self.unit_mp[_r, sc[_r]] = 0
                     self._eff_version += 1
                     self._air_scatter_from(_r, _tt)
+                    self._extraction_changed(_rmv, hc)
 
             if _rk_pillage[n]:
                 _ts = self.tile_seat.gather(1, hc.unsqueeze(1)).squeeze(1)

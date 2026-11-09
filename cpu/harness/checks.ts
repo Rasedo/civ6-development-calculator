@@ -29,7 +29,7 @@ import type { City, CityState, GameState, Tile, Unit } from '../core/types';
 import { NO_SEAT } from '../core/types';
 import { congressBorderFrozen } from '../core/congress';
 import { spreadFromUnit } from '../core/unitOrders';
-import { borderBestPlots, cityCentreYields, cityPlotBonus, cityTourism, cityYieldCtx, computeCityStats, buildingMaintenance, districtMaintenance, luxuryAmenities, refreshParkAmenities, seatTourism, seatTourismReligious } from '../core/city';
+import { borderBestPlots, cityCentreYields, cityPlotBonus, cityTourism, cityYieldCtx, computeCityStats, buildingMaintenance, districtMaintenance, rankLuxuries, refreshParkAmenities, seatTourism, seatTourismReligious } from '../core/city';
 import { tileYields } from '../core/yields';
 import { baseYieldCtx, computeUnlocks, getModifiers, goldPrice, makeYieldCtx, unitUpkeep } from '../core/effects';
 import { centreStrength, cityDefenseStrength } from '../core/combat';
@@ -1016,7 +1016,7 @@ function subjectOf(c: DumpCity): string {
 }
 
 export function stateChecks(rec: TurnRecord, cat: Catalog, imp: Imported = importTurn(rec, cat), sink?: StartReplay[],
-  next?: TurnRecord): CheckResult[] {
+  next?: TurnRecord, prev?: TurnRecord): CheckResult[] {
   const out: CheckResult[] = [];
   const state = imp.state;
   const starts = startDraws(rec, state, imp, cat);
@@ -1148,11 +1148,30 @@ export function stateChecks(rec: TurnRecord, cat: Catalog, imp: Imported = impor
     const s = seatOf(state, seat);
     const all = s?.cities ?? [];
     if (s && unallocated.size) s.cities = all.filter((c) => !unallocated.has(c.id));
+    // a city's size changed after the seat's turn closed (a citizen the
+    // turn's end takes) re-ranks nothing: the allocation stands on its size
+    // before (runs/h1_duelp1124 t166: Shanghai ranked at 7 keeps four
+    // luxuries when the turn's end leaves it at 6)
+    const sized: [City, number][] = [];
+    const processing = closed;
+    for (const [key, c] of imp.cityByKey) {
+      if (c.seat !== seat) continue;
+      const [pid, id] = key.split(':').map(Number);
+      const rows = log.map((r, i) => [r, i] as const).filter(([r]) => r[2] === 'CityPopulationChanged' && r[3] === pid && r[4] === id);
+      const first = closed < 0 ? undefined : rows.find(([, i]) => i > processing);
+      if (!first) continue;
+      const before = rows.filter(([, i]) => i <= processing).pop()?.[0][5]
+        ?? prev?.cities.find((q) => num(q.owner) === pid && num(q.id) === id)?.pop;
+      if (typeof before !== 'number' && typeof before !== 'string') continue;
+      sized.push([c, c.population]);
+      c.population = num(before as number);
+    }
     let out: Map<number, number>;
     try {
-      out = withCards(state, seat, imp.luxCardsOf(seat), () => luxuryAmenities(state, seat));
+      out = withCards(state, seat, imp.luxCardsOf(seat), () => rankLuxuries(state, seat));
     } finally {
       if (s) s.cities = all;
+      for (const [c, n] of sized) c.population = n;
     }
     for (const id of unallocated) out.set(id, 0);
     for (const t of pillaged) t.districtPillaged = true;
@@ -2365,7 +2384,7 @@ export function transitionChecks(a: TurnRecord, b: TurnRecord, cat: Catalog, his
     // (`refreshParkAmenities`, after the allocation 0x4a6110 in 0x4a8ed0:
     // 1121 t243, Chengdu's park pays its 3 at its growth beside the 4
     // luxuries ranked on the 1 it paid before, Happy)
-    const standing = luxuryAmenities(state, seat);
+    const standing = rankLuxuries(state, seat);
     // each city's yield flags: the record's, else those its standing
     // citizens were placed under (`standingFlags`), read on the record's
     // own city before the turn moves it
@@ -2376,7 +2395,7 @@ export function transitionChecks(a: TurnRecord, b: TurnRecord, cat: Catalog, his
       const now = list.map(({ city }) => city.parkAmenities);
       list.forEach(({ city }, j) => { city.parkAmenities = parksBefore[j]; });
       try {
-        return luxuryAmenities(state, seat);
+        return rankLuxuries(state, seat);
       } finally {
         list.forEach(({ city }, j) => { city.parkAmenities = now[j]; });
       }

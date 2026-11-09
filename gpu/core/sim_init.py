@@ -156,7 +156,7 @@ class SimInit:
         self.shallow_water = torch.tensor([[t["shw"] for t in f["tiles"]] for f in fixtures], dtype=torch.bool, device=device)
 
         self.work_ok = torch.tensor([[t.get("work", t["pass"]) for t in f["tiles"]] for f in fixtures], dtype=torch.bool, device=device)
-        # Luxury amenity source (mirrors luxuryAmenities): per tile, the
+        # Luxury amenity source (mirrors rankLuxuries): per tile, the
         # luxury's catalog index (-1 none) and the improvement index that
         # activates it (-9 = outside the GPU roster, never matches).
         self.lux_id = torch.tensor([[t.get("lux", -1) for t in f["tiles"]] for f in fixtures], dtype=torch.long, device=device)
@@ -2380,6 +2380,11 @@ class SimInit:
         # (`refreshParkAmenities`, `_refresh_park_amenities`), 0 before its
         # first. A registered CITY plane, so it rides the compaction.
         self.city_park_amen = torch.zeros(
+            (B, self.CITY_ROWS, self.RC), dtype=torch.long, device=device)
+        # THE LUXURY AMENITIES each city's owner's last allocation rebuild
+        # stored (`rebuildLuxuries`, `_rebuild_luxuries`), 0 before its first.
+        # A registered CITY plane, so it rides the compaction.
+        self.city_lux_amen = torch.zeros(
             (B, self.CITY_ROWS, self.RC), dtype=torch.long, device=device)
         self._off5 = tiles_within_offsets(5).to(device)
         self._off7 = tiles_within_offsets(7).to(device)

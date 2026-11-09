@@ -5,7 +5,7 @@ import { hexRingWalk, neighbors, tilesWithin } from '../../../world/hex';
 import { flipCity, freeCityAllowed, freeCityChassis, freeCitiesPhase, freeCityLoyaltyDelta, loyaltyDelta, applyLoyalty, declareWar, transferCity } from '../../../cpu/core/phase';
 import { meleeAttack, attackTargets, cityDefenseStrength } from '../../../cpu/core/combat';
 import { disbandUnit, spawnUnit, unitsHostile } from '../../../cpu/core/units';
-import { computeCityStats, luxuryAmenities } from '../../../cpu/core/city';
+import { computeCityStats, rankLuxuries } from '../../../cpu/core/city';
 import { getModifiers, unitUpkeep } from '../../../cpu/core/effects';
 import { worldEraIndex } from '../../../cpu/core/eras';
 import { researchCost } from '../../../cpu/core/economy';
@@ -378,7 +378,7 @@ describe('the Free City step', () => {
     const spot = tileAtCoords(state.map, 20, 2).index;
     spawnUnit(state, 'HORSEMAN', spot, FREE_SEAT);
     free.treasury = 50;
-    const lux = luxuryAmenities(state, FREE_SEAT);
+    const lux = rankLuxuries(state, FREE_SEAT);
     const gold = free.cities.reduce((s, c) => s + computeCityStats(state, c, lux, mods).total.gold, 0);
     const upkeep = state.units.reduce((s, u) => s + (u.seat === FREE_SEAT ? unitUpkeep(mods, u) : 0), 0);
     expect(upkeep).toBeGreaterThan(0);

@@ -13,7 +13,7 @@ import { makeMap, makeState, tileAtCoords } from '../helpers';
 import { seatPhase } from '../../../cpu/core/phase';
 import { emptySeat, setTileOwner } from '../../../cpu/core/seats';
 import { dealItemPayable, dealTermOf } from '../../../cpu/core/deals';
-import { luxuryAmenities, luxuryHoldings } from '../../../cpu/core/city';
+import { rankLuxuries, luxuryHoldings } from '../../../cpu/core/city';
 import { DEAL_LUXURY, DEAL_TURNS } from '../../../cpu/data/seats';
 import { LUXURY_IDS, resourceImprovement } from '../../../world/resources';
 import { tilesWithin } from '../../../world/hex';
@@ -67,7 +67,7 @@ function play(state: GameState, recs: Record<number, Partial<SeatActionRecord>>)
 }
 
 const amen = (state: GameState, seat: number): number =>
-  [...luxuryAmenities(state, seat).values()].reduce((a, b) => a + b, 0);
+  [...rankLuxuries(state, seat).values()].reduce((a, b) => a + b, 0);
 
 describe('a luxury copy on a deal', () => {
   it('is held by the receiver for the term, and goes home when it ends', () => {

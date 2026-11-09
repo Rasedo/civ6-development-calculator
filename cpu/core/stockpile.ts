@@ -27,6 +27,7 @@ import { goldAffordable } from './game';
 import { GOLD_EQUIVALENT_OTHER_YIELDS } from './trade';
 import { cityHasLiveDistrict, cityImprovedResourceKinds, cityPower, darkBuildings } from './yields';
 import { CARBON_PER_RESOURCE, emitCarbon, plantCarbon, powerCells, unitCarbon } from './climate';
+import { rebuildLuxuries } from './city';
 import { ageReactors } from './disasters';
 import type { City, CityState, GameState, Seat, Tile, Unit } from './types';
 
@@ -240,6 +241,7 @@ export function capStockpiles(state: GameState, seat: number): boolean {
     over = true;
     logStockWrite(state.turn, seat, k, 'cp', bk[k]);
   }
+  if (over) rebuildLuxuries(state, seat);
   return over;
 }
 
@@ -481,6 +483,9 @@ export function chargeUnitResource(state: GameState, seat: number, unitType: str
   // CIV6 (Black Marketeer): "Strategic resources for units are discounted 80%."
   const off = city ? governorSum(state, city, (e) => e.resourceDiscountPct) : 0;
   spendStockpile(state, seat, def.requiresResource, formationResourceCost(unitBaseResourceCost(def), formation, off), 'uc');
+  // the charge is a ChangeResourceAmount (0x1856b3 / 0x185a2a -> 0x4a7560),
+  // which rebuilds the luxury allocation, a cost discounted to 0 too
+  rebuildLuxuries(state, seat);
 }
 
 /** The same charge for a PROJECT — the Lagrange station's one-time Aluminum. */
@@ -491,7 +496,10 @@ export function canRunProject(state: GameState, seat: number, projectId: string)
 
 export function chargeProjectResource(state: GameState, seat: number, projectId: string): void {
   const p = PROJECTS[projectId];
-  if (p?.resource) spendStockpile(state, seat, p.resource, p.resourceCost ?? 0, 'pc');
+  if (!p?.resource) return;
+  spendStockpile(state, seat, p.resource, p.resourceCost ?? 0, 'pc');
+  // a ChangeResourceAmount (0x184d95 -> 0x4a7560): the allocation rebuilt
+  rebuildLuxuries(state, seat);
 }
 
 /**

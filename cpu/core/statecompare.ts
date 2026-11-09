@@ -1139,6 +1139,7 @@ const CITY_STATE_G: Record<string, Extractor> = {
   minorShortfall: overCityStates((cityState) => cityState.goldShortfall),
   minorPop: overCityStates((cityState) => cityState.population),
   minorFoodBox: overCityStates((cityState) => cityState.foodBox ?? 0),
+  minorLuxuryAmenities: overCityStates((cityState) => cityState.luxuryAmenities ?? 0),
   minorCultureBox: overCityStates((cityState) => cityState.cultureBox ?? 0),
   minorNextPlot: overCityStates((cityState) => cityState.nextPlot ?? -1),
   minorTilesAcquired: overCityStates((cityState) => cityState.tilesAcquired ?? 0),
@@ -1239,6 +1240,8 @@ const CITY: Record<string, Extractor> = {
   amenityTier: overCities((r) => r.city.amenityTier ?? -1),
   // the park amenities the owner's last processing stored
   parkAmenities: overCities((r) => r.city.parkAmenities ?? 0),
+  // the luxury amenities the owner's last allocation rebuild stored
+  luxuryAmenities: overCities((r) => r.city.luxuryAmenities ?? 0),
   foodBox: overCities((r) => r.city.foodBox),
   cultureBox: overCities((r) => r.city.cultureBox),
   nextPlot: overCities((r) => r.city.nextPlot ?? -1),

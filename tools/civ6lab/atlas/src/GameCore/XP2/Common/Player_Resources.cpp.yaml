@@ -25,13 +25,20 @@
       turn: 186
       value: runs/h1_duelw1121 t186 (Jiaodong 6 -> 7 on its 3, Displeased), t220   Shenyang, t238 Taiyuan.
   impl:
-    - cpu/core/city.ts:luxuryAmenities
+    - cpu/core/city.ts:rankLuxuries
+    - cpu/core/city.ts:rebuildLuxuries
+    - cpu/core/city.ts:standingLuxuries
+    - gpu/core/sim_seats.py:_rebuild_luxuries
     - cpu/core/city.ts:passes
     - cpu/harness/checks.ts:foundedUnallocated
     - cpu/harness/checks.ts:standing
     - cpu/harness/import.ts:moved
     - gpu/core/sim_economy.py:_luxury_amenities
+    - cpu/core/minorBuild.ts:prev
+    - cpu/core/phase.ts:seatPhase
+    - gpu/core/sim_minors.py:_city_state_phase
   readings:
+    - "H-1: the luxury allocation stored, its rebuild's triggers — READ (the triggers ported), LAB (the pillage)"
     - "H-1: the luxury allocation — READ"
     - "H-1: the luxury allocation's rebuilds — PARTLY READ"
     - "H-1: a National Park's amenities, stored at the owner's turn — READ"
@@ -47,7 +54,10 @@
   kind: function
   semantics: hands a city-state's owned resources to its new suzerain (-> 0x4a7560).
   status: PARTLY
-  readings: ["H-1: the luxury allocation's rebuilds — PARTLY READ"]
+  impl: [cpu/core/cityStates.ts:resolveSuzerain]
+  readings:
+    - "H-1: the luxury allocation's rebuilds — PARTLY READ"
+    - "H-1: the luxury allocation stored, its rebuild's triggers — READ (the triggers ported), LAB (the pillage)"
   context:
     - "...city-state's owned resources off the old suzerain (0x4a91a0) and hands them to the new (0x4a6d90 -> 0x4a7560): a rebuild for the new one. A city-state's own resource change re-hands it..."
   review: reviewed
@@ -120,7 +130,19 @@
     - cpu/harness/checks.ts:foundedUnallocated
     - cpu/harness/checks.ts:unit
     - cpu/harness/import.ts:moved
+    - cpu/core/stockpile.ts:chargeUnitResource
+    - cpu/core/stockpile.ts:chargeProjectResource
+    - cpu/core/stockpile.ts:capStockpiles
+    - gpu/core/sim_seats.py:_seat_cap_stockpile
+    - cpu/core/city.ts:rebuildLuxuries
+    - cpu/core/city.ts:extractionChanged
+    - cpu/core/cityStates.ts:resolveSuzerain
+    - cpu/core/units.ts:c
+    - gpu/core/sim_seats.py:_charge_unit_resource
+    - gpu/core/sim_seats.py:_cs_resolve_suzerain
+    - gpu/core/sim_seats.py:_extraction_changed
   readings:
+    - "H-1: the luxury allocation stored, its rebuild's triggers — READ (the triggers ported), LAB (the pillage)"
     - "H-1: the luxury allocation — READ"
     - "H-1: the luxury allocation's rebuilds — PARTLY READ"
     - "H-1: the cards the luxury allocation ranks on — READ (the order), the triggers partly"
@@ -155,6 +177,7 @@
   readings:
     - "H-1: the luxury allocation's rebuilds — PARTLY READ"
     - "C-96 / C-97: the team's unit to build, the recruit's contract and the knowledge base's camps — the team update's requirements and readiness, the unit choice, Recruit Units' result and contract, the camps READ; the maintenance resource test, the recruit's stealing and levy unread"
+    - "H-1: the luxury allocation stored, its rebuild's triggers — READ (the triggers ported), LAB (the pillage)"
   context:
     - ...resource skips it), the copies 0x44eff0 hands a resource's recipients, the power ledger 0x4a7cc0.
   review: reviewed
@@ -181,9 +204,18 @@
       value: runs/h1_duelw1121 t186 (Jiaodong 6 -> 7 on its 3, Displeased), t220   Shenyang, t238 Taiyuan.
   impl:
     - cpu/core/city.ts:refreshParkAmenities
+    - cpu/core/city.ts:rebuildLuxuries
+    - gpu/core/sim_seats.py:_rebuild_luxuries
     - cpu/harness/checks.ts:standing
     - cpu/harness/import.ts:luxuryCards
+    - cpu/core/minorBuild.ts:prev
+    - cpu/core/phase.ts:freeCitiesPhase
+    - cpu/core/phase.ts:seatPhase
+    - gpu/core/sim_minors.py:_city_state_phase
+    - gpu/core/sim_phase.py:_seat_turn
+    - gpu/core/sim_phase.py:_free_cities_phase
   readings:
+    - "H-1: the luxury allocation stored, its rebuild's triggers — READ (the triggers ported), LAB (the pillage)"
     - "H-1: the luxury allocation — READ"
     - "H-1: the luxury allocation's rebuilds — PARTLY READ"
     - "H-1: a National Park's amenities, stored at the owner's turn — READ"
@@ -206,7 +238,9 @@
     - cpu/core/minorBuild.ts:minorPhase
     - gpu/core/sim_seats.py:_seat_cap_stockpile
     - cpu/core/minorBuild.ts:prev
-  readings: ["H-1: the luxury allocation's rebuilds — PARTLY READ"]
+  readings:
+    - "H-1: the luxury allocation's rebuilds — PARTLY READ"
+    - "H-1: the luxury allocation stored, its rebuild's triggers — READ (the triggers ported), LAB (the pillage)"
   context:
     - "...::Processor::DoTurnDeactivate 0x7eb60 -> 0x4e4ad0, which tail-jumps to Player_Resources 0x4a8f10): for each accumulated resource, the stockpile less the player's reserved amount (0x4..."
   review: reviewed
@@ -215,7 +249,10 @@
   kind: function
   semantics: takes a city-state's owned resources off its old suzerain.
   status: PARTLY
-  readings: ["H-1: the luxury allocation's rebuilds — PARTLY READ"]
+  impl: [cpu/core/cityStates.ts:resolveSuzerain]
+  readings:
+    - "H-1: the luxury allocation's rebuilds — PARTLY READ"
+    - "H-1: the luxury allocation stored, its rebuild's triggers — READ (the triggers ported), LAB (the pillage)"
   context:
     - "...old != new or it returns) takes the city-state's owned resources off the old suzerain (0x4a91a0) and hands them to the new (0x4a6d90 -> 0x4a7560): a rebuild for the new one. A city-..."
   review: reviewed
@@ -499,8 +536,12 @@
     - recording: 1121
       turn: 196
       value: "1121 t196, Big Ben re-slots Xi'an's cards mid-walk and the Line Infantry   (StrategicResource Niter) it buys after re-ranks them on the new cards —   the unit's strategic cost (0x1856b3 / 0x185a2a) ca"
-  impl: [cpu/harness/checks.ts:foundedUnallocated]
+  impl:
+    - cpu/harness/checks.ts:foundedUnallocated
+    - cpu/core/city.ts:extractionChanged
+    - gpu/core/sim_seats.py:_extraction_changed
   readings:
+    - "H-1: the luxury allocation stored, its rebuild's triggers — READ (the triggers ported), LAB (the pillage)"
     - "H-1: the luxury allocation's rebuilds — PARTLY READ"
     - "H-1: the cards the luxury allocation ranks on — READ (the order), the triggers partly"
   context:

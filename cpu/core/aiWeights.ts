@@ -34,7 +34,7 @@ import { AI_AGENDA_TRAITS, AI_CIVILIZATION_TRAITS, AI_DIFFICULTIES, AI_ERA_STRAT
 import { ERAS } from '../data/techs';
 import { CIV_LEADERS } from '../data/seats';
 import { FX, fmul, fxConst, type AiListItem, type AiListRef } from './aiValue';
-import { civEraIndex, computeCityStats, luxuryAmenities } from './city';
+import { civEraIndex, computeCityStats, standingLuxuries } from './city';
 import { getModifiers, unitUpkeep } from './effects';
 import { wmdUpkeep } from './nuclear';
 import { FREE_SEAT, isCiv, majorsMet, seatOf } from './seats';
@@ -148,7 +148,7 @@ export function eraYieldBias(era: number): number[] {
 export function goldPerTurn(state: GameState, seat: number): number {
   const s = seatOf(state, seat);
   if (!s) return 0;
-  const lux = luxuryAmenities(state, seat);
+  const lux = standingLuxuries(state, seat);
   const mods = getModifiers(state, seat);
   let g = 0;
   for (const c of s.cities) g += computeCityStats(state, c, lux, mods).total.gold;

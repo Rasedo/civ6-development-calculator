@@ -56,7 +56,7 @@ import { CITY_WORK_RADIUS, scaleByGameSpeed, GOLD_PURCHASE_MULT, MP_SCALE, RAILR
 import { cityDistrictSum, darkBuildings, stampBuildingEra } from './yields';
 import type { CityStats } from './city';
 import { cityFlags, placeCitizens, replaceAllCitizens, toggleCitizen } from './citizens';
-import { beliefSeatYields, computeCityStats, cityBuildingSum, luxuryAmenities, drawBorderPlot, acquireTile, refreshParkAmenities, seatBuildingSum, swapTileOk, wonderRegionalLoyalty } from './city';
+import { beliefSeatYields, computeCityStats, cityBuildingSum, standingLuxuries, rebuildLuxuries, extractionChanged, drawBorderPlot, acquireTile, refreshParkAmenities, seatBuildingSum, swapTileOk, wonderRegionalLoyalty } from './city';
 import { accrueStockpiles, canTrainWithStockpile, capStockpiles, chargeUnitResource, chargeUnitUpkeep, layRailroad, resolveSeatPower } from './stockpile';
 import { ageReactors } from './disasters';
 import { droughtBars } from '../data/disasters';
@@ -1125,8 +1125,10 @@ export function freeCitiesPhase(state: GameState): void {
   // a Free City's reactor keeps its clock: the seat resolves no power, so the
   // age is kept here
   ageReactors(free.cities);
+  // the resources step: the luxury allocation, then the parks (0x4a8ed0)
+  rebuildLuxuries(state, FREE_SEAT);
   refreshParkAmenities(state, FREE_SEAT);
-  let luxMap = luxuryAmenities(state, FREE_SEAT);
+  let luxMap = standingLuxuries(state, FREE_SEAT);
   let mods = getModifiers(state, FREE_SEAT);
   const stats = free.cities.map((city) => computeCityStats(state, city, luxMap, mods));
   free.cities.forEach((city, i) => { city.amenityTier = amenityTierIndex(stats[i].amenities.tier.name); });
@@ -1140,7 +1142,7 @@ export function freeCitiesPhase(state: GameState): void {
   freeDesire(state);
   research.government();
   if (research.gained > 0) {
-    luxMap = luxuryAmenities(state, FREE_SEAT);
+    luxMap = standingLuxuries(state, FREE_SEAT);
     mods = getModifiers(state, FREE_SEAT);
     free.cities.forEach((city, i) => { stats[i] = computeCityStats(state, city, luxMap, mods); });
   }
@@ -1158,7 +1160,7 @@ export function freeCitiesPhase(state: GameState): void {
   // the cities' Production is read again where the shortfall moved what they
   // make
   if ((free.goldShortfall ?? 0) !== short0) {
-    const lux2 = luxuryAmenities(state, FREE_SEAT);
+    const lux2 = standingLuxuries(state, FREE_SEAT);
     const mods2 = getModifiers(state, FREE_SEAT);
     free.cities.forEach((city, i) => { stats[i] = computeCityStats(state, city, lux2, mods2); });
   }
@@ -2522,6 +2524,7 @@ export function applySeatUnitOrders(state: GameState, actor: Seat, steps: number
           if (here.pillaged && tileOwnedByCiv(here, actor.seat)) {
             here.pillaged = false;
             unit.movesLeft = 0;
+            extractionChanged(state, here);
           } else if (here.districtPillaged && tileOwnedByCiv(here, actor.seat)) {
             here.districtPillaged = false;
             unit.movesLeft = 0;
@@ -2562,6 +2565,7 @@ export function applySeatUnitOrders(state: GameState, actor: Seat, steps: number
               && validImprovementsIn(here, { unlocks: un, builder: unit.type, map: state.map, camps: campTiles(state), gpAppeal: cityAppealResolver(state), ownsTile: (t: Tile) => tileOwnedByCiv(t, actor.seat), suzerain: suzerainNames(state, actor.seat), civ: civOf(state, actor.seat), farmTerrain: getModifiers(state, actor.seat).farmTerrain, civics: actor.research.civics, hidden: hiddenResourcesFor(state, actor.seat), oneHeld, govPromos: hereCity ? cityGovernorPromos(state, hereCity) : undefined }).includes(imp)) {
             here.improvement = imp;
             improvementMoment(state, actor.seat, here);
+            extractionChanged(state, here);
             // CIV6 (Mana): "Culture Bomb adjacent tiles" on the named
             // improvement — the same claim a district's bomb makes
             // (`CULTURE_BOMB_ROWS`)
@@ -2603,6 +2607,7 @@ export function applySeatUnitOrders(state: GameState, actor: Seat, steps: number
           here.pillaged = false;
           displaceAirFrom(state, here.index);
           unit.movesLeft = 0;
+          extractionChanged(state, here);
         }
       } else if (a === A_HARVEST) {
         // CIV6 (Builder): the resource goes, and its own lump is paid — the
@@ -3041,6 +3046,9 @@ export function seatPhase(state: GameState, only?: { seats: ReadonlySet<number>;
     accrueStockpiles(state, actor.seat);
     chargeUnitUpkeep(state, actor.seat);
     resolveSeatPower(state, actor.seat);
+    // the holdings' luxury allocation, then the parks (0x4a8ed0: 0x4a6110,
+    // then 0x32deb0): every read of the processing takes this ranking
+    rebuildLuxuries(state, actor.seat);
     refreshParkAmenities(state, actor.seat);
     // ESPIONAGE: this seat's own spies move a turn closer to arriving or to
     // resolving, and the clocks their missions left behind tick down.
@@ -3126,7 +3134,7 @@ export function seatPhase(state: GameState, only?: { seats: ReadonlySet<number>;
     // turn holds the city from the next) and before any loyalty moves.
     const rGovIds = governedCityIds(actor);
     const readYields = (): CityStats['total'][] => {
-      const lux = luxuryAmenities(state, actor.seat);
+      const lux = standingLuxuries(state, actor.seat);
       const mods = getModifiers(state, actor.seat);
       return actor.cities.map((c) => computeCityStats(state, c, lux, mods).total);
     };
@@ -3395,7 +3403,7 @@ export function seatPhase(state: GameState, only?: { seats: ReadonlySet<number>;
     const madeOf = new Map<number, number>();
     const plainOf = new Map<number, number>();
     {
-      const luxMap = luxuryAmenities(state, actor.seat);
+      const luxMap = standingLuxuries(state, actor.seat);
       for (const civCity of walkCities) {
         const st = computeCityStats(state, civCity, luxMap, seatMods);
         madeOf.set(civCity.id, st.total.production);
@@ -3585,8 +3593,9 @@ export function seatPhase(state: GameState, only?: { seats: ReadonlySet<number>;
       }
     }
     const grown = new Map<number, CityStats>();
-    // the luxury allocation the walk reads, ranked once before it
-    const luxMap = luxuryAmenities(state, actor.seat);
+    // the luxury allocation the walk reads, as the resources step or the
+    // last change of the seat's resources left it
+    const luxMap = standingLuxuries(state, actor.seat);
     {
       const mods = getModifiers(state, actor.seat);
       for (const civCity of walkCities) grown.set(civCity.id, computeCityStats(state, civCity, luxMap, mods, true));

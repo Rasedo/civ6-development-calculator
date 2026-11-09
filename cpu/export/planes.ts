@@ -113,7 +113,7 @@ export function buildFixture(state: GameState, world: WorldFile): object {
       // read alike wherever a rule says "coast" (Nan Madol's suzerain).
       shw: t.terrain === 'COAST' || t.terrain === 'LAKE' ? 1 : 0,
       work: isImpassable(t) ? 0 : 1, // citizen-workable (water IS workable; ice/mountains are not)
-      // Luxury amenity source (mirrors luxuryAmenities): the luxury's catalog
+      // Luxury amenity source (mirrors rankLuxuries): the luxury's catalog
       // index + the improvement index that activates it. -9 = its improvement
       // is outside the GPU roster (PEARLS/WHALES -> FISHING_BOATS), so it can
       // never activate in the GPU — currently true in TS too (no scripted

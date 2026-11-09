@@ -172,7 +172,7 @@ class SimEconomy:
                     f" lux{int((counts > 0).long().sum(dim=1)[_rb])}"
                     f" dup{int(dup[_rb])}"
                     f" reach[{','.join(str(x) for x in _rr)}]")
-        # ONE persistent list (`luxuryAmenities`): `pos` is each slot's place
+        # ONE persistent list (`rankLuxuries`): `pos` is each slot's place
         # in it — city-id order at first, dead slots last — and every pass
         # re-sorts it by need with the old place breaking ties. A slot is a
         # storage address the compaction reorders; the id is fixed for the
@@ -7311,11 +7311,12 @@ class SimEconomy:
         The walk runs in f64 on every row; row 0's f32 lane casts on return.
 
         j: one column.
-        amen_yf: [B, n] the tier's yieldFactor. The caller ranks amenities,
-           because seatPhase ranks luxuryAmenities once per read and feeds that
-           same map to every city the read covers.
-        amen_tier: [B, RC] that same ranking's tier, full width, when the
-           caller holds it; otherwise the walk ranks again for the tier rows.
+        amen_yf: [B, n] the tier's yieldFactor. The caller reads the
+           amenities, because seatPhase reads the standing luxury allocation
+           (`standingLuxuries`) once per read and feeds that same map to every
+           city the read covers.
+        amen_tier: [B, RC] that same read's tier, full width, when the
+           caller holds it; otherwise the walk reads it again for the tier rows.
         pick: when given, the worked-tile pick of the columns walked is
            appended to it, [B, n, M] tile ids, -1 unused.
         item_flat: False reads the city's PLAIN Production — the city-states'
@@ -8177,12 +8178,12 @@ class SimEconomy:
 
     def _seat_city_stats(self, row: int, record: bool = True) -> tuple[torch.Tensor, ...]:
         """The city-stats read for seat row `row` as the state stands now: the
-        twin of `computeCityStats(state, c, luxuryAmenities(...),
+        twin of `computeCityStats(state, c, standingLuxuries(...),
         getModifiers(...))` over every city of the row at once, one luxury
-        ranking for the whole read. Returns the CityStats fields the seat
+        allocation for the whole read. Returns the CityStats fields the seat
         block consumes — (total [B, RC, 6], eff_surplus [B, RC], need [B, RC],
-        tier_idx [B, RC]), all f64 — and that ranking's luxury amenities
-        [B, RC] (`luxuryAmenities`' map, which the walk's culture after a
+        tier_idx [B, RC]), all f64 — and that allocation's luxury amenities
+        [B, RC] (`standingLuxuries`' map, which the walk's culture after a
         growth reads, `_culture_after_growth`).
 
         The seat block takes it three times: before the economy (the yields it

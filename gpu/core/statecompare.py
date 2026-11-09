@@ -1083,6 +1083,7 @@ CITY_STATE = {
     # three boxes are read straight off it — no second name for one fact
     "minorPop": lambda sim, b, rows: [int(sim.citystate_pop[b, s]) for s in rows],
     "minorFoodBox": lambda sim, b, rows: [float(sim.city_growth[b, sim._CITY_MINOR0 + s, 0]) for s in rows],
+    "minorLuxuryAmenities": lambda sim, b, rows: [int(sim.city_lux_amen[b, sim._CITY_MINOR0 + s, 0]) for s in rows],
     "minorCultureBox": lambda sim, b, rows: [float(sim.city_cbox[b, sim._CITY_MINOR0 + s, 0]) for s in rows],
     "minorNextPlot": lambda sim, b, rows: [int(sim.city_next_plot[b, sim._CITY_MINOR0 + s, 0]) for s in rows],
     "minorTilesAcquired": lambda sim, b, rows: [int(sim.city_acquired[b, sim._CITY_MINOR0 + s, 0]) for s in rows],
@@ -1421,6 +1422,7 @@ CITY = {
     # surfaces as a fraction of a food box.
     "amenityTier": _cty("city_amen_tier"),
     "parkAmenities": _cty("city_park_amen"),
+    "luxuryAmenities": _cty("city_lux_amen"),
     "foodBox": _cty("city_growth"),
     "cultureBox": _cty("city_cbox"),
     "nextPlot": _cty("city_next_plot"),

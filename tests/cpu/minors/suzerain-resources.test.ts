@@ -11,7 +11,7 @@
 import { describe, it, expect } from 'vitest';
 import { makeMap, makeState, settleAt, tileAtCoords } from '../helpers';
 import { emptySeat, seatOf, seatOfCityState, setTileOwner } from '../../../cpu/core/seats';
-import { luxuryAmenities, luxuryHoldings } from '../../../cpu/core/city';
+import { rankLuxuries, luxuryHoldings } from '../../../cpu/core/city';
 import { accrueStockpiles } from '../../../cpu/core/stockpile';
 import { STRATEGIC_IDS, STRATEGIC_PER_TURN } from '../../../cpu/data/constants';
 import { HATTUSA_FREE_STRATEGIC, SUZERAIN_ENVOYS } from '../../../cpu/data/cityStates';
@@ -39,7 +39,7 @@ function scene(resource: string, envoys: number): { state: GameState; plot: Tile
 }
 
 const sum = (state: GameState, seat: number): number =>
-  [...luxuryAmenities(state, seat).values()].reduce((a, b) => a + b, 0);
+  [...rankLuxuries(state, seat).values()].reduce((a, b) => a + b, 0);
 
 describe("a suzerained city-state's luxury", () => {
   it('is a copy the suzerain holds once the city-state improves it', () => {

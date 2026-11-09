@@ -52,6 +52,8 @@ class SimMinors:
             # its strategic resources after its city's turn (`minorPhase`), then
             # its units' fuel out of the same bank
             self._seat_accrue_stockpile(self._CITY_MINOR0 + s)
+            # the same resources step's luxury allocation (0x4a8ed0 -> 0x4a6110)
+            self._rebuild_luxuries(self._CITY_MINOR0 + s, alive)
             self._seat_charge_upkeep(self._CITY_MINOR0 + s)
             # its city AI's update reads, between the production and the
             # growth, the growth its last turn read (its own the first turn)
@@ -2446,6 +2448,7 @@ class SimMinors:
                     take = torch.minimum(held, have).clamp(min=0)
                     bank.scatter_add_(1, slot.clamp(min=0).unsqueeze(1), -(pay.long() * take).unsqueeze(1))
                     self._log_stock(pay.nonzero(as_tuple=True)[0], row, slot[pay], "mu")
+                    self._rebuild_luxuries(row, pay)
                 self.citystate_prod_reserved[:, s] = torch.where(landed, torch.full_like(held, -1), held)
         m = done & is_b
         if bool(m.any()):
@@ -2585,6 +2588,9 @@ class SimMinors:
             if bool(pay.count_nonzero()):
                 bank.scatter_add_(1, k.clamp(min=0).unsqueeze(1), -(pay.long() * n_res).unsqueeze(1))
                 self.citystate_stockpile[rr, s] = bank
+                paid = torch.zeros(self.B, dtype=torch.bool, device=self.device)
+                paid[rr] = pay
+                self._rebuild_luxuries(self._CITY_MINOR0 + s, paid)
         # the upgrade a new unit (`upgradeAnew`), in no job of an operation:
         # the old unit's team lists it until its next update, released
         # (`minorUpgradeUnit`)

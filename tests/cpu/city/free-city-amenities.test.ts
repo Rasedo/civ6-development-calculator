@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { makeState, makeMap, tileAtCoords } from '../helpers';
 import { foundCity } from '../../../cpu/core/game';
-import { computeCityStats } from '../../../cpu/core/city';
+import { computeCityStats, rebuildLuxuries } from '../../../cpu/core/city';
 import { flipCity, freeCitiesPhase } from '../../../cpu/core/phase';
 import { emptySeat, setTileOwner, tileSeat, FREE_SEAT } from '../../../cpu/core/seats';
 import { amenitiesNeeded, amenityTierIndex } from '../../../cpu/data/constants';
@@ -45,6 +45,8 @@ function scene() {
   const wine = tileAtCoords(state.map, 11, 7);
   wine.resource = 'WINE';
   wine.improvement = 'PLANTATION';
+  // the cities read the allocation as a rebuild stores it
+  rebuildLuxuries(state, 0);
   return { state, border, wine };
 }
 

@@ -186,7 +186,7 @@ def test_happy_rows(rules, path) -> None:
 
     def give_luxuries(sim, n: int) -> None:
         """N distinct improved luxuries on this row's own ground (no luxury
-        anywhere else) — the amenity source `luxuryAmenities` ranks, so the
+        anywhere else) — the amenity source `rankLuxuries` ranks, so the
         tier follows the count."""
         for t in range(sim.T):
             sim.lux_id[B0, t] = -1

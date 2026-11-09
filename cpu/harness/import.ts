@@ -34,7 +34,7 @@ import { createGameFromMap } from '../core/game';
 import { BARB_SEAT, FREE_SEAT, civOf, emptySeat, isBarbSeat, isCityStateSeat, startMeleeCS, freeSeatOf, grantKey, isCiv, markCityCentre, seatOf, tileBelongsTo, seatOfCityState, setTileOwner, setWar, majorsMet, setMetTurnWith } from '../core/seats';
 import { routeDestCenter, routeOriginCenter, stampTradingPost } from '../core/trade';
 import { setTradeEdge, tradeCourse, tradeReach } from '../core/tradePath';
-import { civEraIndex, cityCentreYields, cityPlotBonus, cityYieldCtx, growthDetachResidue, luxuryAmenities, luxuryHoldings, parkAmenities } from '../core/city';
+import { civEraIndex, cityCentreYields, cityPlotBonus, cityYieldCtx, growthDetachResidue, rankLuxuries, rebuildLuxuries, luxuryHoldings, parkAmenities } from '../core/city';
 import { tileYields } from '../core/yields';
 import type { EventReplay } from './eventReplay';
 import { floodplainList } from './eventDraws';
@@ -705,6 +705,9 @@ interface RecruitedPerson {
 interface PolicySlots {
   gov: number;
   kinds: SlotKind[];
+  /** the record's slot list as catalogue indices: an uncatalogued card
+   *  still stands in the rebuild's runs */
+  raw: number[];
   cards: (string | null)[];
   lapsed: Set<string>;
 }
@@ -2796,6 +2799,14 @@ export function importTurn(rec: TurnRecord, cat: Catalog, history?: History): Im
   const late = new Set([...(b1 ? notStarted(b1, rec) : []), ...(b1 && b2 ? notStarted(b2, b1) : [])]);
   const prevCities = new Map((b1?.cities ?? []).map((c) => [`${c.owner}:${c.id}`, c]));
   importParkAmenities(state, b1, active?.id, playerOfSeat);
+  // every seat's stored luxury allocation, ranked on the record under the
+  // congress it read (the checks rank the record's standing one themselves,
+  // `luxAtRebuild`)
+  for (const seat of [...state.seats.map((x) => x.seat), ...(state.freeSeat ? [FREE_SEAT] : []), ...state.cityStates.map((x) => x.seat)]) {
+    state.congress = congressOf(seat);
+    rebuildLuxuries(state, seat);
+  }
+  state.congress = now.list;
   const projectYieldUnread = new Map<string, number>();
   for (const [key, city] of cityByKey) {
     const c = dumpOfCity.get(city)!;
@@ -3076,30 +3087,33 @@ function lockDistrictPrices(rec: TurnRecord, cat: Catalog, state: GameState, cit
  * where the record carries no log or no rebuild shows in it (1118 China
  * t202: the action phase clears its seven cards and slots Expropriation
  * alone, Liberalism laid back paying nothing to t208; 1117 China t162: six
- * cleared, four slotted).
+ * cleared, four slotted). The cards are the catalogue's indices, so a card
+ * the engine does not catalogue still stands in a run (1128 China t222:
+ * Martial Law among the eight the clear signals, Liberalism laid back
+ * paying nothing).
  */
-function slottedAfterRebuild(rec: TurnRecord, cat: Catalog, pid: number, before: (string | null)[], n: number): Set<string> | null {
+function slottedAfterRebuild(rec: TurnRecord, pid: number, before: readonly number[], n: number): Set<number> | null {
   const rows = (rec as TurnRecord & { actions?: unknown }).actions;
   if (!Array.isArray(rows)) return null;
   // the player's signals, a null between two runs where another of its
   // events stands
-  const events: (string | null)[] = [];
+  const events: (number | null)[] = [];
   let govAt = -1;
   for (const r of rows as unknown[][]) {
     if (r[3] !== pid || typeof r[2] !== 'string' || r[2].startsWith('Unit') || r[2].startsWith('City')) continue;
     if (r[2] === 'GovernmentPolicyChanged') {
       const i = r[4] as number;
-      events.push(i >= 0 ? engineId('policy', cat.policies[i] ?? '', 'POLICY_', POLICIES) : null);
+      events.push(i >= 0 ? i : null);
       continue;
     }
     if (r[2] === 'GovernmentChanged') govAt = events.length;
     events.push(null);
   }
-  const held = new Set(before.filter((c): c is string => c !== null));
+  const held = new Set(before.filter((c) => c >= 0));
   let from = govAt;
   for (let i = 0; i < events.length && govAt < 0;) {
     let j = i;
-    const run = new Set<string>();
+    const run = new Set<number>();
     while (j < events.length && run.size < before.length && events[j] !== null && held.has(events[j]!)
       && !run.has(events[j]!)) run.add(events[j++]!);
     if (run.size >= Math.max(1, n) && (i === 0 || events[i - 1] === null)) {
@@ -3111,7 +3125,7 @@ function slottedAfterRebuild(rec: TurnRecord, cat: Catalog, pid: number, before:
     i += 1;
   }
   if (from < 0) return null;
-  return new Set(events.slice(from).filter((c): c is string => c !== null));
+  return new Set(events.slice(from).filter((c): c is number => c !== null));
 }
 
 /**
@@ -3150,25 +3164,23 @@ export function lapsedCards(rec: TurnRecord, cat: Catalog, state: GameState, sea
   history.policySlots.set(p.id, byTurn);
   let now = byTurn.get(rec.turn);
   if (!now) {
-    const cards = (p.policies ?? []).map((pi) => {
-      const i = num(pi);
-      return i >= 0 ? engineId('policy', cat.policies[i], 'POLICY_', POLICIES) : null;
-    });
+    const raw = (p.policies ?? []).map(num);
+    const cards = raw.map((i) => (i >= 0 ? engineId('policy', cat.policies[i], 'POLICY_', POLICIES) : null));
     const kinds = governmentSlots(state, seat);
     const gov = num(p.government);
     const before = Math.max(-1, ...[...byTurn.keys()].filter((t) => t < rec.turn));
     const prev = byTurn.get(before);
     const lapsed = new Set<string>();
     const slotted = prev && (prev.gov !== gov || prev.cards.length !== cards.length)
-      ? slottedAfterRebuild(rec, cat, p.id, prev.cards, Math.min(cards.filter((c) => c).length, prev.cards.filter((c) => c).length)) : null;
-    if (slotted) cards.forEach((c) => { if (c && !slotted.has(c)) lapsed.add(c); });
+      ? slottedAfterRebuild(rec, p.id, prev.raw, Math.min(raw.filter((c) => c >= 0).length, prev.raw.filter((c) => c >= 0).length)) : null;
+    if (slotted) cards.forEach((c, i) => { if (c && !slotted.has(raw[i])) lapsed.add(c); });
     else if (prev && (prev.gov !== gov || prev.cards.length !== cards.length)) {
       const laid = carryLayout(prev.kinds.map((k, i) => [k, prev!.cards[i] ?? null] as const), kinds, () => true);
       cards.forEach((c, i) => { if (c && laid[i] === c) lapsed.add(c); });
     } else if (prev) {
       cards.forEach((c, i) => { if (c && prev!.cards[i] === c && prev!.lapsed.has(c)) lapsed.add(c); });
     }
-    now = { gov, kinds, cards, lapsed };
+    now = { gov, kinds, raw, cards, lapsed };
     if (keep) byTurn.set(rec.turn, now);
   }
   return now.lapsed;
@@ -3745,7 +3757,7 @@ function importLuxuryDeals(ctx: Ctx, state: GameState, players: DumpPlayer[], ca
  * all the importer can place, so the evidence of a deal or a grant it cannot
  * name is the cities' own luxury amenities (`GetAmenitiesFromLuxuries`,
  * amenityParts[0]). Where the seat's sum differs from the engine's
- * (`luxuryAmenities`, under the congress the seat reads) the seat takes the
+ * (`rankLuxuries`, under the congress the seat reads) the seat takes the
  * `luxuries:not recorded` gap.
  */
 function unrecordedLuxuryGaps(ctx: Ctx, rec: TurnRecord, state: GameState, seats: number[],
@@ -3755,7 +3767,7 @@ function unrecordedLuxuryGaps(ctx: Ctx, rec: TurnRecord, state: GameState, seats
   for (const seat of seats) {
     state.congress = congressOf(seat);
     let ours = 0;
-    for (const n of luxuryAmenities(state, seat).values()) ours += n;
+    for (const n of rankLuxuries(state, seat).values()) ours += n;
     let game = 0;
     for (const c of rec.cities) if (seatOfGame(c.owner) === seat) game += num(c.amenityParts?.[0] ?? 0);
     if (ours === game) continue;

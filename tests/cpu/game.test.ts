@@ -7,7 +7,7 @@ import { foundCity, endTurn, itemCost } from '../../cpu/core/game';
 import { availableBuildings, canFoundCity } from '../../cpu/core/rules';
 import { placeSeatDistrict } from '../../cpu/core/phase';
 import { computeUnlocksIn } from '../../cpu/core/effects';
-import { computeCityStats, assignWorkedTiles, luxuryAmenities } from '../../cpu/core/city';
+import { computeCityStats, assignWorkedTiles, rankLuxuries } from '../../cpu/core/city';
 import { replaceAllCitizens } from '../../cpu/core/citizens';
 
 describe('rule formulas', () => {
@@ -272,8 +272,8 @@ describe('amenities', () => {
     const city = foundCity(state, tileAtCoords(state.map, 8, 8).index, 0).city!;
     const lux = tileAtCoords(state.map, 9, 8);
     lux.resource = 'WINE';
-    expect(luxuryAmenities(state, 0).get(city.id)).toBe(0); // not improved yet
+    expect(rankLuxuries(state, 0).get(city.id)).toBe(0); // not improved yet
     lux.improvement = 'PLANTATION';
-    expect(luxuryAmenities(state, 0).get(city.id)).toBe(1);
+    expect(rankLuxuries(state, 0).get(city.id)).toBe(1);
   });
 });

@@ -218,6 +218,8 @@ class SimPhase:
         self._seat_accrue_stockpile(row)
         self._seat_charge_upkeep(row)
         self._resolve_seat_power(row)
+        # the holdings' luxury allocation, then the parks (0x4a8ed0)
+        self._rebuild_luxuries(row, active)
         self._refresh_park_amenities(row, active)
         # ESPIONAGE: this seat's own spies move a turn closer to arriving or to
         # resolving, and the clocks their missions left behind tick down.
@@ -879,6 +881,8 @@ class SimPhase:
         # a Free City's reactor keeps its clock: the seat resolves no power,
         # so the age is kept here (`ageReactors`)
         self._age_reactors(row)
+        # the resources step: the luxury allocation, then the parks (0x4a8ed0)
+        self._rebuild_luxuries(row, alive.any(dim=1))
         self._refresh_park_amenities(row, alive.any(dim=1))
         _tier, _gf, _yf, _lux = self._seat_amenity(row)
         self.city_amen_tier[:, row, : self.RC] = torch.where(

@@ -54,7 +54,7 @@ def post(sim, row: int, g: int, s: int, promos: int = 0) -> None:
 
 
 def poke_tie_is_the_id(rules, path) -> None:
-    """CIV6 (`luxuryAmenities`): each luxury's reach goes to the NEEDIEST
+    """CIV6 (`rankLuxuries`): each luxury's reach goes to the NEEDIEST
     cities of one list that starts in CITY ID order, so the first copy breaks
     a tie by the id.
 
@@ -96,7 +96,7 @@ def poke_tie_is_the_id(rules, path) -> None:
 
 
 def poke_list_persists(rules, path) -> None:
-    """CIV6 (`luxuryAmenities`, fitted on runs/h1_duelw1103 t110 seat 1): the
+    """CIV6 (`rankLuxuries`, fitted on runs/h1_duelw1103 t110 seat 1): the
     cities stand in ONE list, re-sorted stably before every copy, so a tie
     keeps the order the previous copy left. Needs 4,4,4,2,1 under four
     four-city copies end 4,4,4,2,2 — a fresh id order per copy would end

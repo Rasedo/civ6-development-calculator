@@ -5,7 +5,7 @@ import { tilesWithin } from '../../../world/hex';
 import { governorPhase, governorsOf, minorGovernorEffects, neutralizeGovernor, governorClocks } from '../../../cpu/core/governors';
 import { GOVERNORS, GOVERNOR_INDEX, GOVERNOR_PROMOTION_INDEX, GOV_ASSIGN_MINOR, promotionBitValue } from '../../../cpu/data/governors';
 import { envoysHere, envoysOf, isSuzerain, minorLuxuries, resolveSuzerain, suzerainOf } from '../../../cpu/core/cityStates';
-import { luxuryAmenities } from '../../../cpu/core/city';
+import { rankLuxuries } from '../../../cpu/core/city';
 import { SUZERAIN_ENVOYS } from '../../../cpu/data/cityStates';
 import type { CityState, GameState } from '../../../cpu/core/types';
 
@@ -129,15 +129,15 @@ describe('the governor at a city-state', () => {
     lux.resource = 'WINE';
     setTileOwner(lux, seatOfCityState(cs.id));
     expect(minorLuxuries(state, cs)).toEqual(['WINE']);
-    const before = luxuryAmenities(state, 0).get(seatOf(state, 0)!.cities[0].id) ?? 0;
+    const before = rankLuxuries(state, 0).get(seatOf(state, 0)!.cities[0].id) ?? 0;
     const g = post(state, cs);
-    expect(luxuryAmenities(state, 0).get(seatOf(state, 0)!.cities[0].id) ?? 0).toBe(before);
+    expect(rankLuxuries(state, 0).get(seatOf(state, 0)!.cities[0].id) ?? 0).toBe(before);
     g.promotions = promotionBitValue(P_AFFLUENCE);
-    expect(luxuryAmenities(state, 0).get(seatOf(state, 0)!.cities[0].id) ?? 0).toBe(before + 1);
+    expect(rankLuxuries(state, 0).get(seatOf(state, 0)!.cities[0].id) ?? 0).toBe(before + 1);
     // a neutralized governor leaves, and takes the copy with her
     neutralizeGovernor(state, 0, AMANI, 6);
     expect(g.minorId).toBe(-1);
-    expect(luxuryAmenities(state, 0).get(seatOf(state, 0)!.cities[0].id) ?? 0).toBe(before);
+    expect(rankLuxuries(state, 0).get(seatOf(state, 0)!.cities[0].id) ?? 0).toBe(before);
   });
 
   it('a conquered minor sends her home', () => {

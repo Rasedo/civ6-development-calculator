@@ -809,7 +809,7 @@ const RAW_CONGRESS_RESOLUTIONS: readonly CongressResolutionDef[] = [
   // resource grants no Amenities." (Renaissance through Industrial per the
   // published table.) Outcome A's REACH — which cities a duplicate's +1
   // serves — is unpublished; each duplicate is one more LUXURY_AMENITY_CITIES
-  // copy, served first (`luxuryAmenities`, fitted on the H-1 records).
+  // copy, served first (`rankLuxuries`, fitted on the H-1 records).
   // CIV6 (Expansion2_Congress.xml): the row carries NO era columns.
   { id: 'LUXURY_POLICY', name: 'Luxury Policy', minEra: 0, maxEra: 99, target: 'luxury' },
   // CIV6: "A: Each Trade Route sent to target player provides +4 Gold to the

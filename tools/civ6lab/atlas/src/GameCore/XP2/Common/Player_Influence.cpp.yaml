@@ -234,10 +234,14 @@
       value: "0x44eff0 (Player_Influence, a signal on 0x4a7560) passes a city-state's   owned-resource change to its suzerain — an accumulated resource as owned   (+n to the suzerain, -n to the city-state), any oth"
     - recording: 1117
       value: 1117's eight (Antananarivo's Sugar, Caguana) and 1127's   Hattusa show no such amount in the records.
-  impl: [cpu/harness/checks.ts:foundedUnallocated]
+  impl:
+    - cpu/harness/checks.ts:foundedUnallocated
+    - cpu/core/city.ts:extractionChanged
+    - gpu/core/sim_seats.py:_extraction_changed
   readings:
     - "H-1: the luxury allocation's rebuilds — PARTLY READ"
     - "H-1: the cards the luxury allocation ranks on — READ (the order), the triggers partly"
+    - "H-1: the luxury allocation stored, its rebuild's triggers — READ (the triggers ported), LAB (the pillage)"
   context:
     - ...ict and plot handlers 0x4ac2e0..0x4ad0d0; an accumulated resource skips it), the copies 0x44eff0 hands a resource's recipients, the power ledger 0x4a7cc0.
     - "...y-state's own resource change re-hands its copies to its recipients (the signal handler 0x44eff0, Player_Influence.cpp: the luxury and strategic recipient counts +0x8a0 / +0x918 per pl..."
@@ -303,8 +307,12 @@
   name: Player_Influence
   semantics: "the suzerain's update (\"Attempting to update the suzerain\"): a major sees what each city-state it is suzerain of sees (0x508330). A suzerain CHANGE (old != new or it returns) takes the city-state's owned resources off the old suzerain (0x4a91a0) and hands them to the new (0x4a6d90 -> 0x4a7560): a rebuild for the new one."
   status: PARTLY
-  impl: [cpu/core/barbarians.ts:plotsSeenNow]
+  impl:
+    - cpu/core/barbarians.ts:plotsSeenNow
+    - cpu/core/cityStates.ts:resolveSuzerain
+    - gpu/core/sim_seats.py:_cs_resolve_suzerain
   readings:
+    - "H-1: the luxury allocation stored, its rebuild's triggers — READ (the triggers ported), LAB (the pillage)"
     - "H-1: the luxury allocation's rebuilds — PARTLY READ"
     - "H-1: the barbarians' turn (0x1514a0) — READ (the max camps and the sight LAB)"
   context:

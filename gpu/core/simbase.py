@@ -1262,6 +1262,7 @@ _MUTABLE = [
     "city_worked",  # the worked-tile pick — a city plane, so it rides the compaction
     "city_amen_tier",  # the amenity tier the walk ran on — a city plane, same reason
     "city_park_amen",  # the park amenities the owner's last processing stored
+    "city_lux_amen",  # the luxury amenities the owner's last allocation rebuild stored
     "city_spy_sources",  # the per-seat Gain Sources clock a spy mission leaves behind
     "city_free_press", "free_next_city_id", "free_best_melee",  # a FREE CITY's race per major, the Free Cities seat's city-id counter and its best trained melee strength
     "city_founded_turn",  # the turn its owner founded or took the city
