@@ -1130,6 +1130,13 @@ class SimCityValue:
             city = torch.tensor([_fx_float(_f32(int(p) * _f32(0.01) + 1)) for p in pct.reshape(-1).tolist()],
                                 dtype=torch.long, device=like.device).reshape(pct.shape)
             v = v + self._cv_yield(_fmul(torch.full_like(like, amt * _FX), city), y, f.yield_w(y))
+        # the second yields pass (0x18e570): the last district copy row, its
+        # PrereqDistrict's yield of the old yield, whole, above 0 at the new
+        # yield's value (`buildingPerTurn`)
+        if b["copies"] and b["district"]:
+            old, new = b["copies"][-1]
+            amt = torch.floor(f.district_yield(b["district"], old)).long()
+            v = v + torch.where(amt > 0, self._cv_yield(amt.clamp(min=0) * _FX, new, f.yield_w(new)), torch.zeros_like(v))
         v = v + torch.where(self._cv_reasons_clear_now(f, b), _t(f.era(), like) * _FX, torch.zeros_like(v))
         for pseudo, pts in b["gpp"]:
             if pseudo:
@@ -2593,6 +2600,24 @@ class _MinorFacts:
 
     def city_yield(self, y):
         return self._total(_YIELDS.index(y))
+
+    def district_yield(self, district, y):
+        """the city's district of the type, its yield `y` (0x24b5a0,
+        `_pol_district_yield`) [B] f64, 0 with none (`districtYield`)"""
+        sim = self.sim
+        dv = sim._pol_district_index(district)
+        zero = torch.zeros(sim.B, dtype=torch.float64, device=sim.device)
+        if dv is None:
+            return zero
+        tl = sim.city_dist_tile[:, self.row, self._slot, dv]
+        out = sim._pol_district_yield({"row": self.row, "B": sim.B, "dev": sim.device},
+                                      {"j": self._slot, "dv": dv, "tile": tl}, y)
+        return torch.where(tl >= 0, out, zero)
+
+    def city_yield_now(self, y):
+        """the city's yield as its citizens and routes stand, outside the
+        AI reads' cache (the player's Gold, `grossGoldYield`)"""
+        return self._stats()[0][:, self._slot, _YIELDS.index(y)]
 
     def power_short(self):
         """a city-state's city never short (`cityPowerShort`)"""

@@ -43,8 +43,10 @@
   kind: function
   name: GetGoldYield
   status: PARTLY
+  impl: [cpu/core/aiView.ts:centres]
   readings:
     - "C-130: the Economic AI's Gold boost on the treasury's banked net income — READ (0x4e08f0, PlayerTreasury +0x1b8), both twins"
+    - "C-96 / C-130: a building's district copy, the player's Gold as its cities stand, a minor's power after its production; a technology's improvement tourism — READ (0x18e570, 0x7a7dc3, 0x4e0bf0, 0x7b4971..0x7b4b5b), both twins but the tourism"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...e45ee), before the culture, the resources and the cities' turns: +0x1b8 = GetGoldYield (0x4ddc70 -> GameAttribute::Value) less 0x4dd3b0's sum less the total Maintenance (0x4df2d0); the..."

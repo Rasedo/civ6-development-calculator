@@ -13471,3 +13471,59 @@ ACT_SENTRY), statecompare `activity`.
 - Open: the improvement's creation under a standing unit (0xa4cee0 /
   0xa4e7a0) is held by the rest's floor, not ported at the creation; the
   operation queued after a ranged strike (above).
+
+## C-96 / C-130: a building's district copy, the player's Gold as its cities stand, a minor's power after its production; a technology's improvement tourism — READ (0x18e570, 0x7a7dc3, 0x4e0bf0, 0x7b4971..0x7b4b5b), both twins but the tourism
+
+`buildingPerTurn` (cpu/core/aiCityBuild.ts) / `_cv_building_per_turn` and
+`_MinorFacts.district_yield` (gpu/core/sim_cityvalue.py); `grossGoldYield`
+(cpu/core/aiView.ts) / `_MinorFacts.city_yield_now` read by
+`_pol_plot_purchase` and GOLD_PURCHASES (gpu/core/sim_policy.py);
+`minorPhase`'s second `minorPower` (cpu/core/minorBuild.ts) /
+`_minor_power` after `_minor_build` (gpu/core/sim_minors.py).
+
+- THE SECOND YIELDS PASS (0x7a7590 at 0x7a7d6a..0x7a7e60, after the
+  building's Yield rows, before CanConstruct's era term): per DB.Yields row
+  Y, a = 0x18e570(city +0x1c78, the building, Y); a > 0 adds
+  yieldValue(a << 8, Y) (0x7a6690, the player's weight), the prerequisite
+  depth multiplier and the Maintenance after it. 0x18e570 (City_Buildings):
+  the building's Building_YieldDistrictCopies rows (+0x2f8..+0x300), the
+  last row's OldYieldType (+0x40 +0x14) and NewYieldType (+0x38 +0x14);
+  where the new one is Y, its PrereqDistrict (+0x218) as the owner's
+  version (player +0x1308, 0x408860), the city's district of it (0x1ae530
+  on +0x1a48), its yield of the old one (0x24b5a0); plus, with the
+  building's +0x158 bit 0x40, its entry in the list +0xb0 (count +0xc0)
+  keyed by Y; plus its (building, Y) entry in the 12-byte table +0x80
+  (count +0x90), the modifier-made building yields. The engines port the
+  district copy; the two lists hold nothing a city-state's buildings carry
+  on the recorded rows.
+- THE PLAYER'S GOLD (0x4e0bf0 -> 0x4ddc70, GetGoldYield) sums its cities'
+  Gold as they stand: a city-state's free Trader's route begun at the
+  dispatch is in it, though the city AI's cached reads (`aiCityStats`) keep
+  the city before the dispatch (0x4ddc70 reads each city's Gold outside
+  the AI reads' cache: the confirming rows below, a route begun again after
+  its expiry each time).
+- A MINOR'S POWER: a building its city's production completes is powered
+  in the same turn's later reads (its government values), not from its next
+  turn's start.
+- A TECHNOLOGY'S IMPROVEMENT TOURISM (0x7b3e50 at 0x7b4971..0x7b4b5b): the
+  technology row's +0xe8 list, its Improvement_Tourism rows whose PrereqTech
+  it is; per row, over the player's plot list (player +0x1380 +0xf0, count
+  +0x100) each plot the player owns (+0x1c) holding the row's improvement
+  (+0x44), 0x1aba40(the row's TourismSource, the plot, its ScalingFactor
+  +0x20) summed whole; the sum << 8 as PSEUDOYIELD_TOURISM at the player's
+  weight (0x7a60d0), PV(H) - PV(turns) (0x7a16e0; discounted where turns is
+  H), added to the value before the Fav Tech's 1.5 and the modifiers. Not
+  ported (C-98).
+- Confirmed (one-seed aimem traces): runs/h1_duelq1117 Valletta t222-224
+  Shipyard 26.31 / 20.52 / 31.34 at T 45 / 44 / 43 (25 a turn and its
+  Harbor's 2 Gold as Production at the depth's 3x: 31), picked at t222 as
+  logged over Shipping's 24.0; Suffrage at 1117 t227 / t239 (Caguana, its
+  Traders to Longxi and Handan begun again at t226 / t238) and t241
+  (Antananarivo to Xi'an at t240: 18.25 Gold, GOLD_PURCHASES 48 for 27,
+  619.5), 1124 t205 (Cardiff to Longxi, 475.9) and t244 / t246-248
+  (Bologna), 1121 t236 (Antioch's Stock Exchange completed at t235, powered
+  in its government values: 36 Gold, 725.8) as logged. The tourism term on
+  runs/h1_duelq1124 t144: Granada's Flight 291.6 = 251.4 + its Alcazar's 2
+  Culture as Tourism at T 1 (40.2), Cardiff's and Bologna's 251.4.
+- Open: 0x1aba40's yield source past the improvement's own part (the tail
+  0x53943c..0x53983c, C-100); the two lists of 0x18e570 on a major's city.

@@ -439,8 +439,14 @@ export function aiView(state: GameState, opts: { updated?: boolean } = {}): AiVi
       const cs = isCityStateSeat(i) ? (seatOf(state, i) as CityState | undefined) : undefined;
       return !!cs?.prodItem?.startsWith('unit:');
     },
+    // the player's Gold (0x4e0bf0 -> 0x4ddc70) its cities' as they stand, a
+    // city-state's free Trader's route begun at the dispatch in it, outside
+    // the city reads' cache (`aiCityStats`): runs/h1_duelq1117 Antananarivo
+    // t240, its expired route to Xi'an begun again, Democracy's
+    // GOLD_PURCHASES on its 18.25 Gold, Suffrage 619.5 at t241 as logged;
+    // runs/h1_duelq1124 Cardiff t204 to Longxi, 475.9 at t205
     grossGoldYield: (i) => seatCities(i).reduce((a, c) => {
-      const st = statsOf(i, c);
+      const st = computeCityStats(state, c);
       return a + st.total.gold + st.maintenance;
     }, 0),
     // a major's and the Free Cities' city build AI hold none here

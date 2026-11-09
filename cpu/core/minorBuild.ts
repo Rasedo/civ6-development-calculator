@@ -139,6 +139,10 @@ export function minorPhase(state: GameState): void {
     // player's DoTurn 0x4e4560 -> 0x4d8a40)
     tradeGraphTurn(state, cityState.seat);
     minorBuild(state, cityState, computeCityStats(state, minorCity(cityState)).total.production);
+    // a building its city's turn completed is powered at once (runs/h1_duelq1121
+    // Antioch t235: its Stock Exchange, the city's 36 Gold in its government
+    // values, Democracy's GOLD_PURCHASES, Suffrage 725.8 at t236 as logged)
+    minorPower(state, cityState);
     // the boosts its city's turn earned land at once (runs/h1_duely1128
     // Nazca's Holy Site completed t15: State Workforce boosted that turn,
     // its civics AI's t15 analysis at 6 turns as logged)
@@ -216,9 +220,8 @@ export function minorPhase(state: GameState): void {
     // city's yields keep those before the route, the Food apart and the
     // totals' Production (City::GetYield 0x1cb8b0, each cached from its
     // first read while the game state is locked, a re-placement in its
-    // update notwithstanding: `aiCityStats`):
-    // runs/h1_duelz1117 t44 city-state 4's route Gold out of Democracy's
-    // GOLD_PURCHASES, Political Philosophy 150.3 at t45; t46 city-state 3's
+    // update notwithstanding: `aiCityStats`; the player's Gold, 0x4e0bf0,
+    // reads the city as it stands): runs/h1_duelz1117 t46 city-state 3's
     // route Gold and Science out of Classical Republic's and Digital
     // Democracy's amenity terms, 314.5 at t47)
     const seen = computeCityStats(state, minorCity(cityState));

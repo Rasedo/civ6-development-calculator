@@ -96,6 +96,7 @@
     - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
     - "C-96: the Trader's value — READ (0x7a7110, its call from 0x7b62c0)"
     - "C-100: the plot values' golden-age, claims and tourism-percent terms, the required features, the power value's negative Amount — READ"
+    - "C-96 / C-130: a building's district copy, the player's Gold as its cities stand, a minor's power after its production; a technology's improvement tourism — READ (0x18e570, 0x7a7dc3, 0x4e0bf0, 0x7b4971..0x7b4b5b), both twins but the tourism"
   notes:
     - "imported: READ in its section, no confirming case found beside it"
     - ".claude/scratchpad/cb/notes.txt: ...30(player+0x1290) -> discount rate (GlobalParameters AI_DISCOUNT_RATE=2.0 -> r=0.02 via /25600). PV 0x7a16e0(out,&v,&rate,n): n==0 ->v; n<0 ->0; rate==0 -> v*n; if rate>=50.0 or ((rate*n>>8)*2>>8)>=fx(10): v/..."
@@ -520,6 +521,7 @@
     - "C-130: Online Communities' route tourism, the tourism toward a player — READ (0x6a1380, 0x6a1240, 0x394830's modifiers, 0x552fb0), both twins"
     - "C-98: a unit's value adds its abilities' modifiers; EFFECT_ADJUST_UNIT_MOVEMENT and REQUIREMENT_PLOT_ADJACENT_TO_OWNER; a second completion adds again — READ (0x7b62c0 at 0x7b7658..0x7b76d8, 0x6e11c7 / 0xc85140, 0x6bd520, 0x6d3200, 0x762d60's rows), both twins"
     - "C-130: the damage modifier's analyzer, a unit's tag requirement, the player's units walked by pool slot, a minor's one-time projects — READ (0x6bba30, 0x6d2610, 0x69ec70), both twins"
+    - "C-96 / C-130: a building's district copy, the player's Gold as its cities stand, a minor's power after its production; a technology's improvement tourism — READ (0x18e570, 0x7a7dc3, 0x4e0bf0, 0x7b4971..0x7b4b5b), both twins but the tourism"
   notes: ["label: pseudoYieldValue(out,&amt,pseudo,playerAI,..)"]
   context:
     - ...ds' +0x638, +0x7a8, the +0x6b0 list or +0x6c8); per row also pseudo-yield terms through 0x7a60d0 (PSEUDOYIELD_GOLDENAGE_POINT from 0x2c40b0, 0x2c4350 for Science, 0x2c3ed0, 0x2c4290 fo...
@@ -559,6 +561,7 @@
     - "C-96: the unit value's Maintenance at the player's Gold weight — READ (0x7b62c0 at 0x7b729e..0x7b72de), both twins"
     - "C-130: Market Economy's per-destination-resource route analyzers — READ (0x6b2aa0, 0x6b44d0, 0x6c89b0, 0x6c87a0, 0x1f71b0's viewer), both twins"
     - "C-100: the plot values' golden-age, claims and tourism-percent terms, the required features, the power value's negative Amount — READ"
+    - "C-96 / C-130: a building's district copy, the player's Gold as its cities stand, a minor's power after its production; a technology's improvement tourism — READ (0x18e570, 0x7a7dc3, 0x4e0bf0, 0x7b4971..0x7b4b5b), both twins but the tourism"
   notes:
     - "imported: READ in its section, no confirming case found beside it"
     - "label: yieldValue(out,&amt,yield,playerAI): amt*Yields.col1c*(1+min(w[yield],9))"
@@ -680,6 +683,7 @@
     - cpu/core/aiCityBuild.ts:v
     - cpu/core/aiCityBuild.ts:buildingTable
     - cpu/core/aiCityBuild.ts:analysisBuildings
+    - cpu/core/aiCityBuild.ts:copy
   readings:
     - "C-127 / C-96: a minor's unit versions, the unit table's religion gate and the building value's era reasons — READ, both twins"
     - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
@@ -689,6 +693,7 @@
     - "C-96: the district value's remaining terms — READ (the envoys' term, the golden-age term's reader, the modifiers' list, the neighbours' functor), a LAB (the district's buildings), and the Farm's adjacency in the plot values"
     - "C-127 / C-100: a building's value carries its dependents' (0x5cadc0) — READ, live-confirmed"
     - "C-100: the plot values' golden-age, claims and tourism-percent terms, the required features, the power value's negative Amount — READ"
+    - "C-96 / C-130: a building's district copy, the player's Gold as its cities stand, a minor's power after its production; a technology's improvement tourism — READ (0x18e570, 0x7a7dc3, 0x4e0bf0, 0x7b4971..0x7b4b5b), both twins but the tourism"
   notes:
     - "label: valueConstructible(modifiers+yields)"
     - ".claude/scratchpad/cb/notes.txt: ...]; g=s+256; if g<256 ->0 else den=max(trunc(rate*g/25600),2); out=((s*v>>8)<<8)/den. BUILDING value 0x7a7590 (generic constructible): per Building_YieldChanges entry: amt<<8 * (fx(1+cityPct[y]*.01)*fx(1+bldPc..."
@@ -958,6 +963,9 @@
   semantics: "the research value's TechnologyModifiers term: the row's modifiers analysed from landing (-> 0x7a4b20). The resources (0x7b556f..0x7b5758): per improvement of the technology's list (row +0xd0..+0xd8) the player may build (0x35f100), per resource of its valid list (+0x1e8): the copies its cities count (0x5d45c0, summed); where above 0, the resource value (0x7a21e0, count 1, turns, H) added. The value so far x1.5 where the row is the Fav Tech (+0xd88) and 0x3dcf50 holds (at 0x7b5b22); the military turn runs after the research AI's, so the analysis reads the Fav Tech of the turn before."
   status: PARTLY
   cases:
+    - recording: h1_duelq1124
+      turn: 144
+      value: "the improvement tourism term (0x7b4971..0x7b4b5b, unported): Granada's Flight 291.6 = 251.4 + its Alcazar's 2 Culture as Tourism at T 1"
     - recording: h1_duely1127
       turn: 34
       value: "the Free Cities: Fav Tech Archery at t33, Archery 83.7 -> 125.6 at t34"
@@ -981,6 +989,7 @@
     - "C-96: the resource value and the research value's resources — READ (bonus, luxury, the call), PARTLY READ (the strategic stockpile terms)"
     - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
     - "H-1: the military AI's favoured technology — READ (the pick, its use), PARTLY READ (the Free Cities' counts)"
+    - "C-96 / C-130: a building's district copy, the player's Gold as its cities stand, a minor's power after its production; a technology's improvement tourism — READ (0x18e570, 0x7a7dc3, 0x4e0bf0, 0x7b4971..0x7b4b5b), both twins but the tourism"
   context:
     - "...ntouched: 0 for every row the walk never reached). Else turns = max(0, sum) and value = 0x7b3e50(row, turns, H, discount); score = value."
     - "- THE VALUE, 0x7b3e50 (args: row, &discount, turns, H, player, the row's record +0x530): past H, -9999 (0xf04..."

@@ -2278,14 +2278,28 @@
 - addr: 0x4e0bf0
   final: 0x3439b0
   kind: function
-  semantics: the player's gross Gold yield (its cities' before their buildings' Maintenance, tributaries, deals, interest ...).
-  status: PARTLY
-  impl: [cpu/core/aiModifiers.ts:ANALYZERS, cpu/core/aiValue.ts:AiValueView]
+  semantics: "the player's gross Gold yield (0x4ddc70, GetGoldYield: its cities' Gold as they stand, before their buildings' Maintenance, tributaries, deals, interest ...), outside the city reads' cache: a city-state's free Trader's route begun at the dispatch is in it."
+  status: READ
+  cases:
+    - recording: h1_duelq1117
+      turn: 240
+      value: "Antananarivo's route to Xi'an begun again: 18.25 Gold in Democracy's GOLD_PURCHASES, Suffrage 619.5 at t241 as logged"
+    - recording: h1_duelq1124
+      turn: 204
+      value: "Cardiff's route to Longxi begun again: Suffrage 475.9 at t205 as logged"
+  impl:
+    - cpu/core/aiModifiers.ts:ANALYZERS
+    - cpu/core/aiView.ts:aiView
+    - gpu/core/sim_policy.py:_pol_plot_purchase
+    - gpu/core/sim_cityvalue.py:city_yield_now
+    - cpu/core/aiValue.ts:AiValueView
+    - cpu/core/aiView.ts:centres
+    - cpu/core/minorBuild.ts:seen
   readings:
     - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
     - "C-130: a city's undamaged strike in Bastions' analyzer; a city-state's danger map at its DoTurn; the plot purchase analyzer — READ / PARTLY READ"
     - "C-130 / C-98: the civic queue, the best plot to buy and the plot purchase analyzer — READ, both twins"
-  notes: ["imported: READ in its section, no confirming case found beside it"]
+    - "C-96 / C-130: a building's district copy, the player's Gold as its cities stand, a minor's power after its production; a technology's improvement tourism — READ (0x18e570, 0x7a7dc3, 0x4e0bf0, 0x7b4971..0x7b4b5b), both twins but the tourism"
   context:
     - "...8) x the Amount as Gold weighted, discounted from the start, plus 0.5 x the Gold yield (0x4e0bf0, the player's gross: cities, tributaries, deals, interest ...) x the Amount, between —..."
   review: reviewed

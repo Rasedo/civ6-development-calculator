@@ -395,7 +395,7 @@ class SimPolicy:
         cost = self._seat_tile_price(row, c0, p0).long()
         price = torch.where(owner >= 0, zero, torch.where(beside, cost, torch.full_like(cost, -1)))
         maint = self._seat_housing(row)[0][:, 0].double()
-        gross = torch.as_tensor(ctx["f0"].city_yield("YIELD_GOLD"), dtype=torch.float64, device=dev) + maint
+        gross = torch.as_tensor(ctx["f0"].city_yield_now("YIELD_GOLD"), dtype=torch.float64, device=dev) + maint
         gold = torch.floor(gross * _FX + 0.5).long() >> 8
         ok = has & (gold > 0)
         turns = torch.div(price, gold.clamp(min=1), rounding_mode="trunc")
@@ -747,7 +747,7 @@ class SimPolicy:
                     alive = self.citystate_alive[:, s]
                     banked = _fmul(_fmul(fx(self.citystate_treasury[:, s]), half), full(pct))
                     maint = self._seat_housing(ctx["row"])[0][:, 0].double()
-                    gross = torch.where(alive, torch.as_tensor(f0.city_yield("YIELD_GOLD"), dtype=torch.float64, device=dev) + maint,
+                    gross = torch.where(alive, torch.as_tensor(f0.city_yield_now("YIELD_GOLD"), dtype=torch.float64, device=dev) + maint,
                                         torch.zeros(B, dtype=torch.float64, device=dev))
                     income = _fmul(_fmul(fx(gross), half), full(pct))
                     w = f0.yield_w("YIELD_GOLD")

@@ -459,6 +459,18 @@ export function buildingPerTurn(f: CityBuildFacts, b: AiBuildingRow): number {
     const city = fxConst(Math.fround(f.yieldPct(y) * Math.fround(0.01) + 1));
     v += yieldValue(f.view, f.seat, fmul(amt * FX, city), y);
   }
+  // the second yields pass (0x18e570 per Yields row): the building's
+  // district copy — its last Building_YieldDistrictCopies row, on the row's
+  // new yield: its PrereqDistrict's yield of the old one in the city
+  // (0x24b5a0), whole, above 0 at the new yield's value (runs/h1_duelq1117
+  // Valletta t222-224: the Shipyard's Production off its Harbor's Gold,
+  // 26.31 / 20.52 / 31.34 at T 45 / 44 / 43 as logged); the pass's
+  // modifier-made building yields (City_Buildings +0x80) are not read
+  const copy = b.copies[b.copies.length - 1];
+  if (copy && b.district) {
+    const amt = Math.floor(f.view.districtYield(f.seat, f.cityId, b.district, copy[0]));
+    if (amt > 0) v += yieldValue(f.view, f.seat, amt * FX, copy[1]);
+  }
   if (reasonsClearNow(f, b)) v += f.era * FX;
   for (const [pseudo, pts] of b.gpp) if (pseudo) v += pseudoYieldValue(f.view, f.seat, pts * FX, pseudo);
   if (b.outerDefenseHitPoints) {

@@ -53,14 +53,21 @@
 - addr: 0x18e570
   final: 0x10c0e0
   kind: function
-  status: PARTLY
-  impl: [cpu/core/aiCityBuild.ts:city]
-  readings: ["C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"]
-  notes:
-    - ".claude/scratchpad/cb/notes.txt: ...arts (player arrays).  + per entry extras: GA points (PSEUDOYIELD_GOLDENAGE_POINT) etc; second loop 0x18e570 yields; housing(+0x44)<<8 added raw; maintenance(+0x38) gold subtracted;  then value = PV(v, rate,..."
-  context:
-    - ...e, 0x2c3ed0, 0x2c4290 for a prerequisite of era 5 or later); then a second yields pass (0x18e570), a whole number (player +0x1358 +0xf8) when CanConstruct's three reason fields are all...
-  review: imported
+  name: buildingExtraYield
+  semantics: "a building's extra yield Y in its city (City_Buildings this, the building, Y), whole: its last Building_YieldDistrictCopies row (+0x2f8..+0x300; OldYieldType +0x40 +0x14, NewYieldType +0x38 +0x14) where the new yield is Y: its PrereqDistrict (+0x218) as the owner's version (player +0x1308, 0x408860), the city's district of it (0x1ae530 on +0x1a48), that district's yield of the old one (0x24b5a0); plus, the building's +0x158 bit 0x40 set, its entry keyed by Y in the list +0xb0 (count +0xc0); plus its (building, Y) entry of the 12-byte table +0x80 (count +0x90; 0x18c2a0), the modifier-made building yields."
+  status: READ
+  cases:
+    - recording: h1_duelq1117
+      turn: 222
+      value: "Valletta's Shipyard: its Harbor's 2 Gold as Production, 31 a turn at the depth's 3x, 26.31 / 20.52 / 31.34 at T 45 / 44 / 43 (t222-224) as logged"
+  impl:
+    - cpu/core/aiCityBuild.ts:buildingPerTurn
+    - gpu/core/sim_cityvalue.py:_cv_building_per_turn
+    - cpu/core/aiCityBuild.ts:city
+  readings:
+    - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
+    - "C-96 / C-130: a building's district copy, the player's Gold as its cities stand, a minor's power after its production; a technology's improvement tourism — READ (0x18e570, 0x7a7dc3, 0x4e0bf0, 0x7b4971..0x7b4b5b), both twins but the tourism"
+  review: reviewed
 - addr: 0x18e890
   final: 0x10c350
   kind: function

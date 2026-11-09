@@ -47,6 +47,8 @@ class SimMinors:
             # the trade graph's turn before its city's (`tradeGraphTurn`)
             self._trade_graph_turn(self._CITY_MINOR0 + s, alive)
             self._minor_build(s, self._minor_production(s))
+            # a building its city's turn completed is powered at once (`minorPhase`)
+            self._minor_power(s)
             # the boosts its city's turn earned land at once (`minorPhase`)
             self._detect_minor_boosts(s, alive)
             # its strategic resources after its city's turn (`minorPhase`), then
