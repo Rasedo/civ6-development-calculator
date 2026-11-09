@@ -1858,6 +1858,23 @@ export function carryPolicies(state: GameState, seat: number, before: readonly S
   s.government.lapsed = laid.filter((c): c is string => !!c);
 }
 
+/** A SLOT-COUNT CHANGE (CIV6, PlayerCulture 0x3a2e30, dll_readings "C-116:
+ *  the lay-back leaves one slot empty"): where seat `seat`'s slots now hold
+ *  another count of any kind than `before` (a wonder's slot, Adam Smith's,
+ *  World Ideology's wildcard coming or going), a major's slot rebuild runs
+ *  as on a government change (`carryPolicies`: every card laid back is
+ *  LAPSED), and
+ *  SetCivicCompletedThisTurn (0x3a1f20) opens game turn `turn`'s free policy
+ *  change (`government.civicTurn`). `_slot_count_rebuild` is the twin. */
+export function slotCountRebuild(state: GameState, seat: number, before: readonly SlotKind[], turn: number): void {
+  const s = seatOf(state, seat);
+  if (!s || isCityStateSeat(seat) || !seatGovernment(state, seat)) return;
+  const now = governmentSlots(state, seat);
+  if (SLOT_KINDS.every((k) => now.filter((x) => x === k).length === before.filter((x) => x === k).length)) return;
+  carryPolicies(state, seat, before);
+  s.government.civicTurn = Math.max(s.government.civicTurn, turn);
+}
+
 /** The Cost of the civic that unlocks card `id`, -1 for a card no civic
  *  unlocks (a Dark Age or legacy card) — the slot rebuild's sort key. */
 const CARD_CIVIC_COST: ReadonlyMap<string, number> = (() => {

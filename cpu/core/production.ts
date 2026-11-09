@@ -10,7 +10,7 @@ import { NO_SEAT } from '../../world/types';
 import type { Tile } from '../../world/types';
 import { congressCultureBombSeat } from './congress';
 import { hexDistance, neighbors } from '../../world/hex';
-import { availableCivicsIn, availableTechsIn, getModifiers } from './effects';
+import { availableCivicsIn, availableTechsIn, getModifiers, governmentSlots, slotCountRebuild } from './effects';
 import { completedWonders, seatWonderFlag } from './wonders';
 import { grantEraBoosts, itemCost, offerApostlePromotions, refreshDistrictDiscount } from './game';
 import { UNITS, UNIT_TYPE_IDX, ENCAMPMENT_HP, URBAN_DEFENSES_TECH, isLightCavalry } from '../data/units';
@@ -411,7 +411,10 @@ export function completeQueueItem(
       break;
     }
     case 'wonder': {
+      const slotsBefore = governmentSlots(state, owner.seat);
       state.map.tiles[item.tileIndex].builtWonderComplete = true;
+      // a wonder's policy slot rebuilds the slots (`slotCountRebuild`)
+      slotCountRebuild(state, owner.seat, slotsBefore, state.turn);
       // CIV6 (WONDER_FREE_TILES_UPON_COMPLETION, the DLL's completion
       // 0x17f870 -> 0x1a8a30): the city annexes that many plots before the
       // wonder's grants, each one border pick (`drawBorderPlot`, no draw with

@@ -43,6 +43,7 @@ import { xpToNextLevel } from './promotions';
 import { logXpWrite } from './difflog';
 import { treePrereqs } from './researchTree';
 import { minorCatchUp } from './minorBuild';
+import { governmentSlots, slotCountRebuild } from './effects';
 
 /** the CLASS a Great Person chassis carries — the unit id IS the class name. */
 export function gpClassOfUnit(unit: { type: string }): GreatPersonClass | undefined {
@@ -520,8 +521,11 @@ export function activateGreatPerson(state: GameState, unit: Unit): boolean {
     for (const t of districtTilesOfOwner(state, tile)) spawnUnit(state, chassis, t, unit.seat);
   }
 
-  // PERMANENT CHANNELS.
+  // PERMANENT CHANNELS. A channel that adds a policy slot (Adam Smith)
+  // rebuilds the slots (`slotCountRebuild`).
+  const slotsBefore = governmentSlots(state, unit.seat);
   for (const [k, n] of Object.entries(fx.perm ?? {})) permAdd(owner, GP_PERM.length, k, GP_PERM, n);
+  slotCountRebuild(state, unit.seat, slotsBefore, state.turn);
   // CIV6 (Leif Erikson): "+1 sight range for all naval units" — each of the
   // owner's naval units looks again with it (`lookAgain`)
   if (fx.perm?.navalSight) for (const u of state.units) if (u.seat === unit.seat && UNITS[u.type]?.naval) lookAgain(state, u);

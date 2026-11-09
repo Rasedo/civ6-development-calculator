@@ -1837,7 +1837,11 @@ class SimPhase:
                 wr = made_w.nonzero(as_tuple=True)[0]
                 wi = (cur - self.WONDER_BASE).clamp(min=0)
                 wt = self.city_wonder[bidx, row, col, :][wr, wi[wr]]
+                _slots_before = self._seat_policy_slots(row) if row < self.n_majors else None
                 self.built_wonder_complete[wr, wt.clamp(min=0)] = True
+                # a wonder's policy slot rebuilds the slots (`_slot_count_rebuild`)
+                if _slots_before is not None:
+                    self._slot_count_rebuild(row, _slots_before, int(self.turn), made_w)
                 # the plots the completion annexes, before the grants
                 self._wonder_free_tiles(row, col, made_w)
                 # `wonderMoment`: GAME_ERA when the wonder's era is the game

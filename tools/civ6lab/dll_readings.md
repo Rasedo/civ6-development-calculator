@@ -13805,3 +13805,38 @@ contract the city's hand alone holds; `minorAiTurn`'s `goalsReached` call
   growth step on the record places the t44 citizen at surplus 5 and grows
   the city at t52, its t45 and t53 Farm rows −34.34 / +45.09 off the log:
   the lab's staging, not the forecast.
+
+## C-116: the slot-count rebuild in the engines — READ, both twins
+
+`slotCountRebuild` (cpu/core/effects.ts), `_slot_count_rebuild`
+(gpu/core/sim_economy.py), on top of `carryPolicies` / `_carry_policies`
+(dll_readings "C-94: the slot rebuild", "C-116: the lay-back leaves one slot
+empty").
+
+- A major whose slots change count in any kind (the slot-count changes
+  0x3a2e30 / 0x39fc00 / 0x3a2bf0, reached from a slot modifier attaching:
+  a wonder's EFFECT_ADJUST_PLAYER_GOVERNMENT_SLOT_TYPE, Adam Smith's, World
+  Ideology's GOVT_ADD_WILDCARD_SLOT / GOVT_LOSE_WILDCARD_SLOT) runs the
+  rebuild the government change runs: every card off, the saved cards laid
+  back by the civic-Cost sort until one slot stands empty, each laid card
+  slotted with no ADDED signal (lapsed); then SetCivicCompletedThisTurn
+  (0x3a1f20) opens the turn's free change (`government.civicTurn` /
+  `civ_civic_turn` raised to the turn). A card the AI then slots, or moves
+  to another slot, pays; one left where the rebuild laid it stays lapsed.
+- Where: the Regular Session after the barbarians' turn (`worldCongress` /
+  `_world_congress`, on the turn the session closes), a wonder's completion
+  before its grants (`completeQueueItem` / `_seat_city_produce`), a Great
+  Person's permanent channels (`activateGreatPerson` / the GP pass).
+- Confirmed: runs/h1_duelq1127 record t182: China's Classical Republic
+  takes World Ideology's wildcard at t181's session (four slots to five);
+  the log's run CIVIL_PRESTIGE, LIBERALISM, MERCHANT_CONFEDERATION, LIMES is
+  the clear, MILITARY_RESEARCH signalled after into the fifth. Laid back:
+  Liberalism, Civil Prestige (slots 0 / 1), Merchant Confederation, Limes,
+  all lapsed: Xi'an, Changsha, Shanghai housingParts[4] 3 -> 1,
+  amenityParts[2] 3 -> 1. The replay (`--from 176 --to 192`) reads
+  city.housing, city.amenities, city.food, city.pop, city.production and
+  loyaltyPerTurn 16 / 16 (Shanghai's food 3.05 at t183 for the engines' 20.2
+  before).
+- Open: a city's transfer (conquest, loyalty) carrying a slot wonder to
+  another major runs no rebuild on either side; Founding Fathers' conversion
+  (a kind's slots moved, the count kept) rebuilds only with the government.

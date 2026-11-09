@@ -3728,6 +3728,28 @@ class SimEconomy:
         self.civ_policy_lapsed[:, row] = torch.where(chg.unsqueeze(1), kept, self.civ_policy_lapsed[:, row])
         self._eff_version += 1
 
+    def _slot_count_rebuild(self, row: int, before: torch.Tensor, turn: int,
+                            where: torch.Tensor | None = None) -> None:
+        """A SLOT-COUNT CHANGE (CIV6, PlayerCulture 0x3a2e30, dll_readings
+        "C-116: the lay-back leaves one slot empty"), where `where`: a major
+        whose slots (`_seat_policy_slots`) now hold another count of any kind
+        than `before` [B, 4] (a wonder's slot, Adam Smith's, World Ideology's
+        wildcard coming or going) runs the slot rebuild as on a government
+        change (`_carry_policies`: every card laid back is LAPSED), and
+        SetCivicCompletedThisTurn (0x3a1f20) opens game turn `turn`'s free
+        policy change (`civ_civic_turn`). `slotCountRebuild`'s twin."""
+        if row >= self.n_majors:
+            return
+        _, has = self._adopted_gov(row)
+        chg = has & (self._seat_policy_slots(row) != before).any(dim=1)
+        if where is not None:
+            chg = chg & where
+        if not bool(chg.count_nonzero()):
+            return
+        self._carry_policies(row, chg, before)
+        ct = self.civ_civic_turn[:, row]
+        self.civ_civic_turn[:, row] = torch.where(chg, ct.clamp(min=int(turn)), ct)
+
     def _policy_unlocked(self, civics2: torch.Tensor, dark: torch.Tensor | None,
                          era: torch.Tensor | None, held: torch.Tensor | None,
                          adopted: torch.Tensor) -> torch.Tensor:

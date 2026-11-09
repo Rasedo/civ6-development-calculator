@@ -742,7 +742,9 @@
   kind: function
   semantics: a slot-count change (the slot rebuild as SetGovernment's).
   status: PARTLY
-  readings: ["C-94: the slot rebuild — READ"]
+  readings:
+    - "C-94: the slot rebuild — READ"
+    - "C-116: the slot-count rebuild in the engines — READ, both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "- The rebuild (SetGovernment 0x3a25f0; the slot-count changes 0x39fc00, 0x3a2bf0, 0x3a2e30): save the slots (0x3a3b00 into +0x448, std::sort 0x386350 / 0x38..."
@@ -771,8 +773,10 @@
   name: SetCivicCompletedThisTurn
   semantics: sets the player's civic-completed-this-turn flag (+0xba8, through 0x42eb20) and signals it (0x8b9070 on the player); the flag opens the turn's free policy change.
   status: PARTLY
+  impl: [cpu/core/effects.ts:slotCountRebuild, gpu/core/sim_economy.py:_slot_count_rebuild]
   readings:
     - "C-116: the lay-back leaves one slot empty, and a slot-count rebuild grants the free change — READ"
+    - "C-116: the slot-count rebuild in the engines — READ, both twins"
   review: reviewed
 - addr: 0x3a1fb0
   final: 0x2844e0
@@ -838,7 +842,9 @@
   kind: function
   semantics: a slot-count change (the slot rebuild as SetGovernment's).
   status: PARTLY
-  readings: ["C-94: the slot rebuild — READ"]
+  readings:
+    - "C-94: the slot rebuild — READ"
+    - "C-116: the slot-count rebuild in the engines — READ, both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "- The rebuild (SetGovernment 0x3a25f0; the slot-count changes 0x39fc00, 0x3a2bf0, 0x3a2e30): save the slots (0x3a3b00 into +0x448, std::sort 0x386350 / 0x385b50 by the..."
@@ -852,10 +858,17 @@
     - recording: h1_duelp1121
       turn: 204
       value: "China at t203: Triangular Trade replaces Liberalism, Big Ben's rebuild clears the seven (seven REMOVED signals), lays them back into seven of the eight slots, and Liberalism, signalled after into the eighth, pays (Xi'an / Shanghai civics amenity 2 -> 1, Civil Prestige lapsed)"
-  impl: [cpu/harness/import.ts:slottedAfterRebuild]
+    - recording: h1_duelq1127
+      turn: 182
+      value: "China at t181: the session's World Ideology wildcard (GOVT_ADD_WILDCARD_SLOT) takes Classical Republic from four slots to five after the barbarians' turn; the four cards signalled as the clear, laid back lapsed (Liberalism and Civil Prestige in slots 0 / 1), Military Research signalled into the fifth: Xi'an, Changsha, Shanghai housingParts[4] 3 -> 1, amenityParts[2] 3 -> 1; the engines' replay t176-192 city.housing, amenities, food, pop, production 16 / 16"
+  impl:
+    - cpu/harness/import.ts:slottedAfterRebuild
+    - cpu/core/effects.ts:slotCountRebuild
+    - gpu/core/sim_economy.py:_slot_count_rebuild
   readings:
     - "C-94: the slot rebuild — READ"
     - "C-116: the lay-back leaves one slot empty, and a slot-count rebuild grants the free change — READ"
+    - "C-116: the slot-count rebuild in the engines — READ, both twins"
   context:
     - "- The rebuild (SetGovernment 0x3a25f0; the slot-count changes 0x39fc00, 0x3a2bf0, 0x3a2e30): save the slots (0x3a3b00 into +0x448, std::sort 0x386350 / 0x385b50 by the card's pol..."
   review: reviewed

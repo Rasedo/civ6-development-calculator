@@ -41,7 +41,7 @@ import { plotDistance, seatPoolSlots, tacticalTargets } from './tactical';
 import { freeCitiesMilitary, freeRaidCheck, freeRaidSignal } from './freeOps';
 import { plotsSeenNow, ringPlots } from './barbarians';
 import { PROJECTS, PROJECT_LIST, projectConversionRate } from '../data/projects';
-import { adoptGovernment, carryPolicies, seatGovernment, governmentBit, darkAgeEra, unlockedPolicyIds, governmentSlots, governmentChanges, policyLayoutChanges, policyLayoutOf, policyUnlockCost } from './effects';
+import { adoptGovernment, carryPolicies, slotCountRebuild, seatGovernment, governmentBit, darkAgeEra, unlockedPolicyIds, governmentSlots, governmentChanges, policyLayoutChanges, policyLayoutOf, policyUnlockCost } from './effects';
 import type { RuleResult } from './rules';
 import { TECHS, type ResearchEffect } from '../data/techs';
 import { BUILDINGS, SCRIPTED_HELD_BUILDINGS } from '../data/buildings';
@@ -1634,7 +1634,11 @@ export function worldCongress(state: GameState): void {
   const turn = state.turn - 1;
   const era = state.gameEra ?? 0;
   if (!congressSessionDue(turn, era)) return;
+  // a resolution that moves a seat's slots (World Ideology) rebuilds them
+  // as the session lands (`slotCountRebuild`)
+  const slotsBefore = state.seats.map((sx) => governmentSlots(state, sx.seat));
   congressSession(state, era);
+  state.seats.forEach((sx, i) => slotCountRebuild(state, sx.seat, slotsBefore[i], turn));
   state.lastSessionTurn = turn;
   congressCancelBannedIntl(state);
 }

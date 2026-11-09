@@ -503,7 +503,11 @@ class SimGp:
         _rowfx = self._gp_row(cls, at)
         _np = len(self._gp_perm_names)
         if _np:
+            # a channel that adds a policy slot (Adam Smith) rebuilds the
+            # slots (`_slot_count_rebuild`)
+            _slots_before = self._seat_policy_slots(row)
             self.civ_gp_perm[:, row] = self.civ_gp_perm[:, row] + _rowfx[:, self._GP_PERM0:self._GP_PERM0 + _np] * m.to(self.civ_gp_perm.dtype).unsqueeze(1)
+            self._slot_count_rebuild(row, _slots_before, int(self.turn), m)
             # CIV6 (Leif Erikson): "+1 sight range for all naval units" — each
             # of the owner's naval units looks again with it (`lookAgain`)
             if "navalSight" in self._gp_perm_names:

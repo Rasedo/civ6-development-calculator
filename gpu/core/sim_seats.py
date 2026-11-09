@@ -6839,7 +6839,12 @@ class SimSeats:
             return
         res0, res1, comp = self._congress_draw_slate(fires)
         ballots = torch.full((self.B, self.n_majors, 4, 4), -1, dtype=torch.long, device=self.device)
+        # a resolution that moves a seat's slots (World Ideology) rebuilds
+        # them as the session lands (`_slot_count_rebuild`)
+        slots_before = [self._seat_policy_slots(r) for r in range(self.n_majors)]
         self._congress_votes(fires, res0, res1, dv, comp, ballots)
+        for r in range(self.n_majors):
+            self._slot_count_rebuild(r, slots_before[r], turn, fires)
         self.last_session_turn.copy_(torch.where(
             fires, torch.full_like(self.last_session_turn, turn), self.last_session_turn))
         self._congress_cancel_banned_intl()
