@@ -238,7 +238,7 @@ def main() -> None:
         assert float(bt[oli, ui[uid]]) == o_want, f"OLIGARCHY {uid}: want {o_want}"
         assert float(bt[fas, ui[uid]]) == f_want, f"FASCISM {uid}: want {f_want}"
     assert not bool((sim._type_melee & sim._type_anticav).any()), "no unit type is melee AND antiCavalry"
-    assert float(sim._gov_wwcut[fas]) == 20.0, "FASCISM war weariness -20% (FASCISM_WAR_WEARINESS Amount 20)"
+    assert float(sim._gov_wwpct[fas]) == 20.0, "FASCISM war weariness +20% (FASCISM_WAR_WEARINESS Amount 20)"
     cr = gov_idx["CLASSICAL_REPUBLIC"]
     assert int(sim._gov_hid_min[cr]) == 1 and float(sim._gov_hid_house[cr]) == 1.0, "CLASSICAL_REPUBLIC +1 housing at 1 specialty district"
     assert int(sim._gov_ais_min[cr]) == 1 and float(sim._gov_ais_amen[cr]) == 1.0, "CLASSICAL_REPUBLIC +1 amenity at 1 specialty district"
@@ -255,7 +255,7 @@ def main() -> None:
     adoptedF, hasF = sim._newest_gov(cF)
     assert int(adoptedF[0]) == fas and bool(hasF[0]), "TOTALITARIANISM alone at tier 3 => FASCISM"
     fxF = sim._gov_policy_mods(cF)[12]
-    assert float(fxF["wwcut"][0]) == 20.0 and float(fxF["xppct"][0]) == 0.0, "FASCISM fx: -20% weariness, no xp term"
+    assert float(fxF["wwpct"][0]) == 20.0 and float(fxF["xppct"][0]) == 0.0, "FASCISM fx: +20% weariness, no xp term"
     assert float(fxF["gppmult"][0]) == 1.0, "FASCISM fx: no GPP factor"
     _prows = [(int(w), int(cm), int(e), float(p)) for _a, w, cm, e, p, _mn in fxF["prod"] if bool(_a[0])]
     assert (2, 0, -1, 0.5) in _prows, "FASCISM fx: its flat bonus, +50% toward every unit"

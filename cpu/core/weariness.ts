@@ -1,41 +1,18 @@
 import type { City, GameState, Seat } from './types';
-import { WW_ERA_BASE_FORMAL, WW_ERA_BASE_SURPRISE, WW_ABROAD_MULT, WW_DEATH_MULT, WW_DECAY_AT_WAR, WW_DECAY_AT_PEACE, WW_PEACE_TREATY, WW_WMD_LAUNCHED, WW_LOSS_AT_WAR_CITY, WW_LOSS_NONFOUNDED_CITY, WW_LOSS_FOUNDED_CITY, warWearinessPenalty } from '../data/seats';
+import { WW_BASE, ERA_WARMONGER_POINTS, WW_HOME_MULT, WW_ABROAD_MULT, WW_DEATH_MULT, WW_DECAY_AT_WAR, WW_DECAY_AT_PEACE, WW_PEACE_TREATY, WW_WMD_LAUNCHED, WW_LOSS_AT_WAR_CITY, WW_LOSS_NONFOUNDED_CITY, WW_LOSS_FOUNDED_CITY, warWearinessPenalty } from '../data/seats';
+import { WAR_KINDS } from '../data/warKinds';
 import { amenitiesNeeded } from '../data/constants';
-import { atWarWithAny, cityAtTile, citiesOf, civsAtWar, isBarbSeat, isCiv, seatOf, seatsAllied, tileSeat, warIsFormal } from './seats';
-import { civEraIndex } from './city';
+import { cityAtTile, citiesOf, civsAtWar, isCiv, seatOf, seatsAllied, tileSeat, warKindWith } from './seats';
+import { gameEraIndex } from './yields';
 
 import { gpPermOf } from '../data/greatPeople';
 import { getModifiers } from './effects';
 /**
- * WAR WEARINESS, one seat-generic model.
- *
- * Civ 6 scores weariness PER BATTLE:
- *
- *     WWP = (EraBase * Location) + Death
- *
- * with `Location` 1 inside your own borders and 2 anywhere else, `Death` a
- * further 3 * EraBase to whichever side lost a unit, and any battle involving
- * a CITY scored at the abroad column. Both the attacker and the defender score
- * it, "without any discrimination" — the aggressor gets no discount.
- *
- * There is no per-turn accrual: in Civ 6 a war in which nobody fights SHEDS
- * 50 a turn. A phoney war is free and a bloody one is ruinous, and the
- * old model had exactly no way to tell them apart.
- *
- * Everything here takes a SEAT: one set of three entry points, called from
- * every seat's block.
+ * WAR WEARINESS, Player_Diplomacy's ledger (GameCore_XP2 0x1fb680 per
+ * combat, 0x3d7270 per turn; the rule in `data/seats.ts`). Only two majors
+ * score it against each other (0x1fb680's two FULL_CIV tests): a war with a
+ * city-state, a Free City or the barbarians wears no one down.
  */
-
-/** Barbarians neither accrue weariness nor inflict it.
- *
- *  Not an omission: the model's own decay rules make it necessary. Every seat
- *  is permanently hostile to barbarians, so if that counted as war then "at
- *  peace with everyone" (-200/turn) would be unreachable for the entire game
- *  and no accumulator could ever drain. Civ 6 has no barbarian war weariness
- *  for the same reason — there is no barbarian *war* to be weary of. */
-const scores = (seat: number): boolean => !isBarbSeat(seat) && seat >= 0;
-
-const holdsWeariness = (seat: number): boolean => isCiv(seat);
 
 export function wwGet(seat: Seat, other: number): number {
   return seat.ww?.[other] ?? 0;
@@ -93,15 +70,18 @@ export function wwSum(seat: Seat | undefined): number {
   return n;
 }
 
-export function wwEraBase(state: GameState, seat: number, other: number): number {
-  const s = seatOf(state, seat);
-  // A seat with no research record has completed nothing, so it fights at
-  // Ancient — the same answer `civEraIndex` gives for two empty lists. Spelled
-  // as a default rather than a crash because the barbarian seat and the
-  // hand-built test fixtures both legitimately carry no research.
-  const era = civEraIndex(s?.research?.techs ?? [], s?.research?.civics ?? []);
-  const row = warIsFormal(state, seat, other) ? WW_ERA_BASE_FORMAL : WW_ERA_BASE_SURPRISE;
-  return row[Math.min(Math.max(era, 0), row.length - 1)];
+/** The war's DiplomaticActions WarmongerPercent (0x3d1450): its kind's
+ *  `WAR_KINDS` percent, 0 for a war with no kind. */
+export function wwWarPercent(state: GameState, a: number, b: number): number {
+  const kind = warKindWith(state, a, b);
+  return kind < 0 ? 0 : WAR_KINDS[kind].pct[0];
+}
+
+/** The attacker's base: WAR_WEARINESS_WARMONGER_BASE + the game era's
+ *  WarmongerPoints x the war's percent / 100. */
+export function wwEraBase(state: GameState, a: number, b: number): number {
+  const era = Math.min(Math.max(gameEraIndex(state), 0), ERA_WARMONGER_POINTS.length - 1);
+  return WW_BASE + Math.trunc((ERA_WARMONGER_POINTS[era] * wwWarPercent(state, a, b)) / 100);
 }
 
 function friendlyLand(state: GameState, seat: number, tileOwner: number): boolean {
@@ -111,44 +91,47 @@ function friendlyLand(state: GameState, seat: number, tileOwner: number): boolea
   return seatsAllied(state, seat, tileOwner);
 }
 
+/** One side's score: trunc(amount x (100 + pct) / 100), pct its Overall
+ *  modifiers (the government's, the cards', the Great People's) + the
+ *  opponent's Enemy ones; nothing at pct -100 or below, nothing unless the
+ *  result is above 0 (0x1fb680 at 0x1fb93d..0x1fb990). */
 function addWw(state: GameState, seat: number, other: number, amount: number): void {
   const s = seatOf(state, seat);
   if (!s) return;
+  const pct = gpPermOf(s, 'wwPct') + getModifiers(state, seat).wwPct + getModifiers(state, other).enemyWarWearinessPct;
+  if (pct <= -100) return;
+  const gained = Math.trunc((amount * (100 + pct)) / 100);
+  if (gained <= 0) return;
   (s.ww ??= {});
-  (s.wwTurn ??= {});
-  // CIV6 (Trung Trac, Joaquim Marques Lisboa): a permanent percentage off
-  // everything this seat accrues from here on. CIV6 (Fascism,
-  // FASCISM_WAR_WEARINESS Amount 20): war weariness cut by 20% — the
-  // government's cut joins additively.
-  const cut = Math.min(100, gpPermOf(s, 'warWearyPct')
-    + (isCiv(seat) ? getModifiers(state, seat).wwCutPct : 0));
-  // CIV6 (Satyagraha): "Opposing civilizations receive double the war
-  // weariness for fighting against Gandhi" — the OTHER seat's row raises what
-  // this one accrues against it (`WAR_WEARINESS_ROWS`)
-  const foePct = isCiv(other) ? getModifiers(state, other).enemyWarWearinessPct : 0;
-  const gained = Math.floor((amount * (100 + foePct)) / 100);
-  s.ww[other] = Math.max(0, (s.ww[other] ?? 0) + Math.floor((gained * (100 - cut)) / 100));
-  s.wwTurn[other] = state.turn;
+  s.ww[other] = (s.ww[other] ?? 0) + gained;
 }
 
+/**
+ * A combat between `aSeat` and `dSeat` at `tileIndex`. Each side's loc reads
+ * the combat's plot: WW_HOME_MULT where it is the side's own or an ally's and
+ * the side fights with a unit, else WW_ABROAD_MULT (a city or district side,
+ * `aCity` / `dCity`, has no unit); + WW_DEATH_MULT where its unit died. The
+ * attacker scores loc x `wwEraBase`, the defender loc x (WW_BASE - the war's
+ * percent).
+ */
 export function warWearinessBattle(
   state: GameState,
   aSeat: number,
   dSeat: number,
   tileIndex: number,
-  opts: { aDied?: boolean; dDied?: boolean; city?: boolean } = {},
+  opts: { aDied?: boolean; dDied?: boolean; aCity?: boolean; dCity?: boolean } = {},
 ): void {
-  if (!scores(aSeat) || !scores(dSeat) || aSeat === dSeat) return;
-  const tile = state.map.tiles[tileIndex];
-  const owner = tile ? tileSeat(tile) : -1;
-  const score = (self: number, foe: number, died: boolean): void => {
-    if (!holdsWeariness(self)) return;
-    const base = wwEraBase(state, self, foe);
-    const loc = opts.city || !friendlyLand(state, self, owner) ? WW_ABROAD_MULT : 1;
-    addWw(state, self, foe, base * loc + (died ? WW_DEATH_MULT * base : 0));
-  };
-  score(aSeat, dSeat, opts.aDied ?? false);
-  score(dSeat, aSeat, opts.dDied ?? false);
+  if (aSeat !== dSeat && isCiv(aSeat) && isCiv(dSeat)) {
+    const tile = state.map.tiles[tileIndex];
+    const owner = tile ? tileSeat(tile) : -1;
+    const side = (self: number, foe: number, base: number, city: boolean, died: boolean): void => {
+      const loc = (!city && friendlyLand(state, self, owner) ? WW_HOME_MULT : WW_ABROAD_MULT)
+        + (!city && died ? WW_DEATH_MULT : 0);
+      addWw(state, self, foe, loc * base);
+    };
+    side(aSeat, dSeat, wwEraBase(state, aSeat, dSeat), opts.aCity ?? false, opts.aDied ?? false);
+    side(dSeat, aSeat, WW_BASE - wwWarPercent(state, dSeat, aSeat), opts.dCity ?? false, opts.dDied ?? false);
+  }
   // Every combat path on both engines reaches this ONE hook, so a rule that
   // fires "when a battle resolves" rides it rather than the ten call sites.
   postCombatLoyalty(state, aSeat, dSeat, tileIndex, opts);
@@ -183,33 +166,25 @@ function postCombatLoyalty(
   hit(dSeat, aSeat, opts.aDied ?? false);
 }
 
-/**
- * CIV6 (War weariness): "every time you drop a nuke, the war weariness it will
- * incur is equal to 12 times the Era Base value. There is no difference
- * between dropping a Nuclear Device or a Thermonuclear Device" — the launch's
- * own `WW_WMD_LAUNCHED` plus the abroad multiplier, a blast never landing on
- * the launcher's own ground. The bill is the LAUNCHER's alone.
- */
+
+/** A WMD's launch: the launcher's loc is WW_WMD_LAUNCHED + WW_ABROAD_MULT
+ *  (a blast never lands on its own ground), times `wwEraBase`. */
 export function warWearinessLaunch(state: GameState, seat: number, other: number): void {
-  if (!scores(seat) || !scores(other) || seat === other) return;
-  if (!holdsWeariness(seat)) return;
+  if (seat === other || !isCiv(seat) || !isCiv(other)) return;
   addWw(state, seat, other, (WW_WMD_LAUNCHED + WW_ABROAD_MULT) * wwEraBase(state, seat, other));
 }
 
+/** The turn's decay (0x3d7270): from each opponent `seat` holds weariness
+ *  against, WW_DECAY_AT_WAR while at war with that opponent, else
+ *  WW_DECAY_AT_PEACE, floored at 0. */
 export function warWearinessTurn(state: GameState, seat: number): void {
   const s = seatOf(state, seat);
   if (!s?.ww) return;
-  const atWarSomewhere = anyWar(state, seat);
   for (const k in s.ww) {
     const other = Number(k);
-    if (s.wwTurn?.[other] === state.turn) continue; // blood was spilled
-    const shed = atWarSomewhere ? WW_DECAY_AT_WAR : WW_DECAY_AT_PEACE;
-    s.ww[other] = Math.max(0, s.ww[other] - shed);
+    if (s.ww[other] <= 0) continue;
+    s.ww[other] = Math.max(0, s.ww[other] - (civsAtWar(state, seat, other) ? WW_DECAY_AT_WAR : WW_DECAY_AT_PEACE));
   }
-}
-
-export function anyWar(state: GameState, seat: number): boolean {
-  return atWarWithAny(state, seat);
 }
 
 export function warWearinessPeace(state: GameState, a: number, b: number): void {

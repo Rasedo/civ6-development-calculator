@@ -1323,16 +1323,6 @@
           "note": "per-opponent, as (opponent seat, points) pairs sorted by opponent — the sum and the max both cancel a pair of opposite errors."
         },
         {
-          "name": "warWearinessTurn",
-          "compare": "exact",
-          "covers": [
-            "Seat.wwTurn"
-          ],
-          "planes": [
-            "ww_turn"
-          ]
-        },
-        {
           "name": "eraScore",
           "compare": "exact",
           "covers": [

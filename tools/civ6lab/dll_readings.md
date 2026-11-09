@@ -12765,3 +12765,61 @@ same calls.
   handlers) — no rebuild in either twin; the power ledger's own call
   (0x4a7cc0) mid-processing; runs/h1_duelp1121 t230 Chengdu / Shenyang and
   t247 Chengdu / Jiaodong / Shanghai / Wuhan, runs/h1_duelp1117 t235 Handan.
+
+## C-109: war weariness per combat, the turn's decay and the percent — READ
+
+Player_Diplomacy's ledger: 0x1fb680 per combat (from the combat log
+0x20d280), 0x3d7270 per turn, 0x3d04a0 the writer (adds the delta, floors the
+total at 0, logs Player_WarWeariness.csv: Player, FromPlayer, Delta, New Total,
+Reason). Ported in `weariness.ts` (`warWearinessBattle`, `wwEraBase`,
+`wwWarPercent`, `addWw`, `warWearinessTurn`) and `_ww_battle`, `_ww_era_base`,
+`_ww_war_pct`, `_ww_add`, `_ww_decay`; the wiki's era tables deleted.
+
+- WHO: both players FULL_CIV (0x469db0 at 0x1fb801 / 0x1fb823), so a combat
+  with a city-state, a Free City or the barbarians scores no one.
+- SIDES by the combat type ([+0x50]) and its subtype (0x213cd0): a unit's
+  side is its owner, a district's (0x213c80) the district's owner, a plot
+  target's the plot's owner; a district side has no unit ([+0] / [+8] null).
+- LOC, per side, on the combat's plot ([+0x48], [+0x4c]): 0x20a220 is true
+  where the plot's owner is the unit's owner or one it HasAllied (0x3da560);
+  WAR_WEARINESS_PER_COMBAT_IN_ALLIED_LANDS 1 (gp +0x76c) then, else (and
+  for a side with no unit) _IN_FOREIGN_LANDS 2 (+0x770); + _PER_UNIT_KILLED 3
+  (+0x774) where its unit's damage reached its max HP (0x56e0d0); the
+  attacker + _PER_WMD_LAUNCHED 10 (+0x778) for a WMD ([+0x5c] != -1).
+- BASE: X = 0x3d1450(player, foe, the pair's war state 0x2a8460): the war
+  state's DiplomaticActions row's WarmongerPercent (+0x34), 0 for EMERGENCY_WAR,
+  SUZERAIN_WAR, DEFENSIVE_PACT and a pair at peace, capped by
+  m_iMaxWarmongerPercent (+0x1a48). The attacker's base is
+  WAR_WEARINESS_WARMONGER_BASE 16 (+0x780) + trunc(Eras[the GAME era
+  (0x2c3660 +0x108)].WarmongerPoints (+0x30) x X / 100); the defender's
+  16 - X (0x1fba5f..0x1fba6b), so in a war of 16% or more the defender
+  scores nothing (the duelw ledgers' one "Getting Attacked" row each: 32,
+  loc 2 x 16, a war of percent 0).
+- PERCENT: pct = the side's m_iOverallWarWearinessMultiplier (+0x18c8) +
+  the foe's m_iEnemyWarWearinessMultiplier (+0x1808) [+ its own
+  m_iDomesticWarWearinessMultiplier (+0x1868) where loc read allied];
+  nothing at pct <= -100; amount = trunc(loc x base x (100 + pct) / 100),
+  logged only above 0. EFFECT_ADJUST_WAR_WEARINESS (0xbe2d40 reads Amount,
+  Enemy / Domestic / Overall; 0xbe35b0 applies) ADDS the signed Amount to
+  the chosen multiplier: Fascism's Overall +20 raises it, Propaganda's,
+  Martial Law's, Trung Trac's and Joaquim Marques Lisboa's -25 cut it
+  (`wwPct`: the government's and the cards' `PolicyEffects.wwPct`, the
+  Great People's `gpPerm` channel).
+- DECAY (0x3d7270, from 0x3d7020 at the player's DoTurn): from every opponent
+  o the pair relation 0x2a8610 holds for, with W[o] > 0, the player sheds
+  WAR_WEARINESS_DECAY_TURN_AT_WAR 50 (+0x75c, "At War Decay") while o's
+  flag +0x728 is set and o is at war with it (0x2a92d0), else _AT_PEACE 200
+  (+0x758, "At Peace Decay"); a turn of combat does not hold it back. A
+  peace (0x3dbcb0) sheds 2000 on both sides ("We / They Made Peace").
+- The war's kind for an import or a recorded declaration: DiplomacySummary.csv's
+  "At War" row, its name 0x2a8480's (`loadWarKinds`, `WAR_NAMES`).
+- Confirmed: runs/h1_duelp1128 (Rome / China, China's Surprise war of t203,
+  the game era Industrial: base 52): the 33 Attacking rows (Rome's city
+  104, Galley on its own plot 52, China's units abroad 104, from t223 under
+  Fascism 124 / 62) and every At War Decay; `seat.warWeariness` in the
+  replay 34 / 34 pairs equal over t205-240 (0 / 12 before over t205-216).
+  The duelw ledgers factor the same way (1118 China t240-247 78 / 39 =
+  104 / 52 x 75%, China holding Trung Trac and no war-weariness card).
+- OPEN: the Domestic multiplier's one row (Defense of the Motherland, a card
+  the catalog lacks); m_iMaxWarmongerPercent's one writer
+  (EFFECT_ADJUST_PLAYER_MAX_WARMONGER_PERCENT, Cyrus, not in the roster).

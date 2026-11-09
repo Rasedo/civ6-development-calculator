@@ -2719,7 +2719,7 @@ export function cityStrikeAt(state: GameState, city: City, key: 'cstk' | 'estk',
   const atkCS = strikeCS + emergencyStrikeCS(state, city.seat, defender.seat);
   defender.hp -= damageRoll(state, atkCS - defCSa, key, targetIndex, { a: atkCS, d: defCSa });
   awardDefenseXp(state, defender); // +2 to a surviving military defender (attacker is the city)
-  warWearinessBattle(state, city.seat, defender.seat, targetIndex, { dDied: defender.hp <= 0, city: true });
+  warWearinessBattle(state, city.seat, defender.seat, targetIndex, { dDied: defender.hp <= 0, aCity: true });
   // The STRIKER is the city, so the dig's era gate is its owner's — the GPU
   // passes `striker_row` at the same site.
   if (defender.hp <= 0) {

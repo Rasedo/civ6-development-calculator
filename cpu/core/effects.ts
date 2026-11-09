@@ -433,7 +433,7 @@ export interface Modifiers {
   yieldPctPerSuzerain: Partial<Yields>;
   unitCombatCS: { classMask: number; all: boolean; cs: number }[];
   xpPct: number;
-  wwCutPct: number;
+  wwPct: number;
   gppMult: number;
   housingPerWallLevel: number;
   theologyCS: number;
@@ -697,7 +697,7 @@ export function defaultModifiers(): Modifiers {
     yieldPctPerSuzerain: {},
     unitCombatCS: [],
     xpPct: 0,
-    wwCutPct: 0,
+    wwPct: 0,
     gppMult: 1,
     housingPerWallLevel: 0,
     theologyCS: 0,
@@ -816,7 +816,7 @@ export function applyPolicyEffects(mods: Modifiers, fx: PolicyEffects): void {
     mods.unitCombatCS.push({ classMask: mask, all: !!fx.unitCombatCS.all, cs: fx.unitCombatCS.cs });
   }
   if (fx.xpPct) mods.xpPct += fx.xpPct;
-  if (fx.wwCutPct) mods.wwCutPct += fx.wwCutPct;
+  if (fx.wwPct) mods.wwPct += fx.wwPct;
   if (fx.gppMult) mods.gppMult *= fx.gppMult;
   if (fx.housingPerWallLevel) mods.housingPerWallLevel += fx.housingPerWallLevel;
   if (fx.theologyCS) mods.theologyCS += fx.theologyCS;

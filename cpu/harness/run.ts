@@ -26,9 +26,9 @@
  * (`<stem>.aimem.jsonl`). A recording with the game's AI memory beside it is
  * compared against that (`readGameMemory`), else against its logs.
  */
-import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
 import { loadCatalog, type TurnRecord } from './record';
-import { advanceHistory, importTurn, newHistory, readWeariness, routeLegs } from './import';
+import { advanceHistory, importTurn, loadWarKinds, loadWeariness, newHistory, routeLegs } from './import';
 import { replayEvents } from './eventReplay';
 import { stateChecks, transitionChecks, type CheckResult, type StartReplay } from './checks';
 import { loadClimateLog, loadRandLog, randLogPath } from './randLog';
@@ -120,10 +120,8 @@ export function runReport(dumpPath: string, from = -Infinity, to = Infinity) {
   for (const r of all) for (const w of r.witness ?? []) if (typeof w.seed === 'number') seeds.push(w.seed);
   if (logPath) history.randLog = loadRandLog(logPath, seeds);
   // the war-weariness ledger, where the recording kept its logs
-  const logs = dumpPath.replace(/\.jsonl$/, '.logs/');
-  if (existsSync(`${logs}Player_WarWeariness.csv`) && existsSync(`${logs}CombatLog.csv`)) {
-    history.weary = readWeariness(readFileSync(`${logs}Player_WarWeariness.csv`, 'utf8'), readFileSync(`${logs}CombatLog.csv`, 'utf8'));
-  }
+  history.weary = loadWeariness(dumpPath);
+  history.warKinds = loadWarKinds(dumpPath);
   history.replay = replayEvents(all, cat, history.randLog, moved);
   history.legs = routeLegs(all);
   all.length = 0;

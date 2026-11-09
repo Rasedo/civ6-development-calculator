@@ -26,12 +26,14 @@
  * (the best melee a seat has trained, a city's culture expansions, a seat's
  * plot purchases) comes from a `History` folded over the earlier records.
  */
+import { existsSync, readFileSync } from 'node:fs';
 import type { City, CityState, CityStateType, DistrictId, FeatureId, GameMap, GameState, GreatPersonClass, ImprovementId, Seat, TerrainId, Tile, TradeRoute, Unit, Yields } from '../core/types';
 import { NO_SEAT } from '../core/types';
 import { minorItemKey, minorRepairResumed, type MinorItem } from '../core/minorBuild';
 import { keptKey } from '../core/production';
 import { createGameFromMap } from '../core/game';
-import { BARB_SEAT, FREE_SEAT, civOf, emptySeat, isBarbSeat, isCityStateSeat, startMeleeCS, freeSeatOf, grantKey, isCiv, markCityCentre, seatOf, tileBelongsTo, seatOfCityState, setTileOwner, setWar, majorsMet, setMetTurnWith } from '../core/seats';
+import { BARB_SEAT, FREE_SEAT, civOf, emptySeat, isBarbSeat, isCityStateSeat, startMeleeCS, freeSeatOf, grantKey, isCiv, markCityCentre, seatOf, tileBelongsTo, seatOfCityState, setTileOwner, setWar, setWarKind, majorsMet, setMetTurnWith } from '../core/seats';
+import { WAR_KINDS, type WarKindId } from '../data/warKinds';
 import { routeDestCenter, routeOriginCenter, stampTradingPost } from '../core/trade';
 import { setTradeEdge, tradeCourse, tradeReach } from '../core/tradePath';
 import { civEraIndex, cityCentreYields, cityPlotBonus, cityYieldCtx, growthDetachResidue, rankLuxuries, rebuildLuxuries, luxuryHoldings, parkAmenities } from '../core/city';
@@ -656,6 +658,8 @@ export interface History {
   /** the war-weariness ledger on the timeline (`readWeariness`), where the
    *  recording kept its logs */
   weary?: WearyRow[];
+  /** the wars the logs declared (`loadWarKinds`), where the recording kept them */
+  warKinds?: WarKindRow[];
   /** the removable features of the turn-1 record (`GameState.removableAtStart`) */
   removableAtStart?: number;
   /** by `${turn}:${owner}:${city id}`, a city's closing-pick ties as the
@@ -766,6 +770,53 @@ export function readWeariness(ledger: string, combats: string): WearyRow[] | und
     } else return undefined;
   }
   return out;
+}
+
+/** The war-weariness ledger of the recording at `dumpPath`, placed on the
+ *  timeline (`readWeariness`), where the recorder kept its logs. */
+export function loadWeariness(dumpPath: string): WearyRow[] | undefined {
+  const logs = dumpPath.replace(/\.jsonl$/, '.logs/');
+  if (!existsSync(`${logs}Player_WarWeariness.csv`) || !existsSync(`${logs}CombatLog.csv`)) return undefined;
+  return readWeariness(readFileSync(`${logs}Player_WarWeariness.csv`, 'utf8'), readFileSync(`${logs}CombatLog.csv`, 'utf8'));
+}
+
+/** A war the logs declared: DiplomacySummary.csv's "At War" row, its kind a
+ *  `WAR_KINDS` code, -1 for a war of no kind. */
+export interface WarKindRow { turn: number; from: number; to: number; kind: number }
+
+/** DiplomacySummary.csv's war names (0x2a8480, the war state's name) as
+ *  `WAR_KINDS` ids; null for the wars with no DiplomaticActions row
+ *  (0x3d1450 reads their percent 0). */
+const WAR_NAMES: Record<string, WarKindId | null> = {
+  Surprise: 'surprise', Formal: 'formal', Holy: 'holy', Liberation: 'liberation', Reconquest: 'reconquest',
+  Protectorate: 'protectorate', Colonial: 'colonial', Territorial: 'territorial', 'Golden Age War': 'golden',
+  'War of Retribution': 'retribution', 'Ideological War': 'ideological', 'Joint War': 'joint',
+  'Suzerain War': null, 'Emergency War': null, 'Defensive Pact': null,
+};
+
+/** The wars the recording's logs declared, in the log's order. */
+export function loadWarKinds(dumpPath: string): WarKindRow[] | undefined {
+  const path = dumpPath.replace(/\.jsonl$/, '.logs/DiplomacySummary.csv');
+  if (!existsSync(path)) return undefined;
+  const out: WarKindRow[] = [];
+  for (const line of readFileSync(path, 'utf8').split('\n').slice(1)) {
+    const c = line.split(',').map((s) => s.trim());
+    if (c[3] !== 'At War' || !(c[4] in WAR_NAMES)) continue;
+    const id = WAR_NAMES[c[4]];
+    out.push({ turn: Number(c[0]), from: Number(c[1]), to: Number(c[2]), kind: id === null ? -1 : WAR_KINDS.findIndex((k) => k.id === id) });
+  }
+  return out;
+}
+
+/** The kind of the latest war `a` and `b` entered by `turn` (either side
+ *  declaring), undefined where the logs declared none. */
+export function warKindAt(rows: readonly WarKindRow[], a: number, b: number, turn: number): WarKindRow | undefined {
+  let last: WarKindRow | undefined;
+  for (const r of rows) {
+    if (r.turn > turn) break;
+    if ((r.from === a && r.to === b) || (r.from === b && r.to === a)) last = r;
+  }
+  return last;
 }
 
 /** Each player's war weariness against each other at a point of the turn
@@ -2318,6 +2369,11 @@ export function importTurn(rec: TurnRecord, cat: Catalog, history?: History): Im
     for (const q of p.wars ?? []) {
       const b = seatOfGame(q);
       if (a !== NO_SEAT && b !== NO_SEAT && a !== BARB_SEAT && b !== BARB_SEAT) setWar(state, a, b, true);
+      // a war between two majors takes the kind the logs declared it under
+      if (!isCiv(a) || !isCiv(b) || p.id > q) continue;
+      const w = history?.warKinds && warKindAt(history.warKinds, p.id, q, rec.turn);
+      if (!w) gap(ctx, 'war-kind', 'not logged');
+      else if (w.kind >= 0) setWarKind(state, seatOfGame(w.from), seatOfGame(w.to), w.kind);
     }
     // the majors it has met: the record names no meeting turn, so the
     // record's own

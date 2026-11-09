@@ -897,7 +897,6 @@ SEAT = {
     "peaceTurns": lambda sim, b, rows: [int(sim.peace_turns[b, _seat_row(sim, c)]) for c in rows],
     "conquestProdTurns": lambda sim, b, rows: [int(sim.conquest_turns[b, _seat_row(sim, c)]) for c in rows],
     "warWeariness": _ww_pairs("ww", lambda v: v != 0),
-    "warWearinessTurn": _ww_pairs("ww_turn", lambda v: v >= 0),
     "eraScore": _civ_scalar("era_score"),
     "darkBar": _civ_scalar("dark_bar"),
     "goldenBar": _civ_scalar("golden_bar"),

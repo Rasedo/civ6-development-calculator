@@ -405,6 +405,7 @@
     - "C-95: the scout's tree \"Barbarian Found City\" — READ, ported"
     - "C-95: Attack Units — READ, ported"
     - "H-1: the barbarians' turn (0x1514a0) — READ (the max camps and the sight LAB)"
+    - "C-109: war weariness per combat, the turn's decay and the percent — READ"
   context:
     - "...s the node's units whose damage (unit +0xcf0) is at least that share of their health (0x56e0d0) AND whose plot reads above 0 on the AI's influence map (player +0x12d8, 0x716a90 — its..."
     - "...bFightWhileEmbarked). Both sides' totals are then summed against COMBAT_MAX_HIT_POINTS (0x56e0d0): where both would fall, the side whose total overshoots further falls and the other is..."

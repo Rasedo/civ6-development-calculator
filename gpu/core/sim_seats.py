@@ -14385,7 +14385,7 @@ class SimSeats:
         self._encamp_take_hit(att, tc, at0, a_seat[:, u], atk_e - def_cs, True, key)
         self._ww_battle(att, self._row_of(a_seat[:, u]),
                         self._row_of(self.tile_seat.gather(1, tc.unsqueeze(1)).squeeze(1)),
-                        tc, city=True)
+                        tc, d_city=True)
         _fell = self.encamp_hp.gather(1, tc.unsqueeze(1)).squeeze(1) <= 0
         self._award_city_xp(att, atk_kind, u, a_type[:, u], a_seat[:, u],
                             torch.where(_fell, torch.full_like(tc, XP_CITY_FELLED),
@@ -14450,7 +14450,7 @@ class SimSeats:
         # `attackEncampment` hook's twin.
         self._ww_battle(att, self._row_of(self._atk_seat(atk_kind, u)),
                         self._row_of(self.tile_seat.gather(1, tc.unsqueeze(1)).squeeze(1)),
-                        tc, a_died=_ww_ad, city=True)
+                        tc, a_died=_ww_ad, d_city=True)
         if bool(died.count_nonzero()):
             dr = died.nonzero(as_tuple=True)[0]
             _as = self._atk_seat(atk_kind, u)[dr]
@@ -15369,7 +15369,7 @@ class SimSeats:
         self._free_raid_signal(att, hrow, slot, a_seat[:, u])
         a_hp[:, u] = torch.where(att, a_hp[:, u] - d_atk, a_hp[:, u])
         died = att & (a_hp[:, u] <= 0)
-        self._ww_battle(att, self._row_of(a_seat[:, u]), hrow, tgt, a_died=died, city=True)
+        self._ww_battle(att, self._row_of(a_seat[:, u]), hrow, tgt, a_died=died, d_city=True)
         self._unit_kill_event(hrow, a_type[:, u], a_seat[:, u] == BARB_SEAT, died,
                               vict_form=getattr(self, f"{atk_kind}_unit_formation")[:, u])
         if bool(died.count_nonzero()):
@@ -15561,7 +15561,7 @@ class SimSeats:
             self._dig_at(ar, here[ar], a_seat[ar, u], torch.full_like(ar, u + self.POOL_LO[atk_kind]))
             self._occ_clear(ar, here[ar], torch.full_like(ar, u + self.POOL_LO[atk_kind]))
         self._ww_battle(att, self._row_of(a_seat[:, u]), self._row_of(100 + citystate_sc), tgt,
-                        a_died=atk_dead, city=True)
+                        a_died=atk_dead, d_city=True)
         cap = att & (self.citystate_hp.gather(1, citystate_sc.unsqueeze(1)).squeeze(1) <= 0)
         return rows, atk_dead, cap
 
@@ -15573,7 +15573,7 @@ class SimSeats:
                              striker_row, key: str) -> None:
         d = self._damage_roll(strike, atk_cs - def_e, k=key, tile=tt, parts=(atk_cs, def_e))
         self._ww_battle(strike, striker_row, self._row_of(d_seat), tt,
-                        d_died=strike & (d_slot >= 0) & ((def_hp - d) <= 0), city=True)
+                        d_died=strike & (d_slot >= 0) & ((def_hp - d) <= 0), a_city=True)
         self._unit_kill_event(
             striker_row,
             self.unit_type.gather(1, d_slot.clamp(min=0).unsqueeze(1)).squeeze(1),
@@ -15853,7 +15853,7 @@ class SimSeats:
             _wmax = self._walls_tier_hp.take(_wtier)
             wall, centre = self._district_hit(city_att, atk_e - def_cs, outer_all, _wmax, self._city_max_hp,
                                               _klass, None, "vrngc", tgt)
-            self._ww_battle(city_att, self._row_of(self._atk_seat(atk_kind, u)), hrow, tgt, city=True)
+            self._ww_battle(city_att, self._row_of(self._atk_seat(atk_kind, u)), hrow, tgt, d_city=True)
             rows = city_att.nonzero(as_tuple=True)[0]
             hr_, hc_ = hrow.take(rows), hcol.take(rows)
             outer = self.city_outer_hp[rows, hr_, hc_]
@@ -15904,7 +15904,7 @@ class SimSeats:
             cs_wall, cs_centre = self._district_hit(cs_att, atk_cs - def_cs, cs_outer, self._walls_tier_hp[cs_tier],
                                                     self._city_max_hp, _klass, None, "vrngcs", tgt)
             self._ww_battle(cs_att, self._row_of(self._atk_seat(atk_kind, u)),
-                            self._row_of(100 + csx), tgt, city=True)
+                            self._row_of(100 + csx), tgt, d_city=True)
             rr = cs_att.nonzero(as_tuple=True)[0]
             self.city_outer_hp[rr, cs_mrow[rr], 0] = cs_outer[rr] - cs_wall[rr]
             self.city_last_hit[rr, cs_mrow[rr], 0] = self.turn
@@ -16056,7 +16056,7 @@ class SimSeats:
                                                                 getattr(self, f"{atk_kind}_unit_levied")[:, u]).to(atk_base.dtype)
                                               - def_cs,
                                               outer_all, _wmax, self._city_max_hp, _klass, None, "rngrc", tgt)
-            self._ww_battle(city_att, self._row_of(aseat), hrow, tgt, city=True)
+            self._ww_battle(city_att, self._row_of(aseat), hrow, tgt, d_city=True)
             rr = city_att.nonzero(as_tuple=True)[0]
             hr, sl = hrow[rr], slot[rr]
             outer = self.city_outer_hp[rr, hr, sl]
@@ -16087,7 +16087,7 @@ class SimSeats:
                                                                       getattr(self, f"{atk_kind}_unit_levied")[:, u]).to(atk_base.dtype)
                                                     - def_cs,
                                                     cs_outer, self._walls_tier_hp[cs_tier], self._city_max_hp, _klass, None, "rngcs", tgt)
-            self._ww_battle(cs_att, self._row_of(aseat), self._row_of(100 + csx), tgt, city=True)
+            self._ww_battle(cs_att, self._row_of(aseat), self._row_of(100 + csx), tgt, d_city=True)
             rr = cs_att.nonzero(as_tuple=True)[0]
             self.city_outer_hp[rr, cs_mrow[rr], 0] = cs_outer[rr] - cs_wall[rr]
             self.city_last_hit[rr, cs_mrow[rr], 0] = self.turn

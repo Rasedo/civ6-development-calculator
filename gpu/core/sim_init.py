@@ -3157,7 +3157,7 @@ class SimInit:
             self._gov_ucs_allc = torch.tensor([bool(x[1]) for x in _gucs], dtype=torch.bool, device=device)
             self._gov_ucs_cs = torch.tensor([float(x[2]) for x in _gucs], dtype=torch.float64, device=device)
             self._gov_xppct = torch.tensor([float(r["xpPct"]) for r in _govs], dtype=dtype, device=device)
-            self._gov_wwcut = torch.tensor([float(r["wwCutPct"]) for r in _govs], dtype=dtype, device=device)
+            self._gov_wwpct = torch.tensor([float(r["wwPct"]) for r in _govs], dtype=dtype, device=device)
             self._gov_gppmult = torch.tensor([float(r["gppMult"]) for r in _govs], dtype=torch.float64, device=device)
             self._gov_wallhouse = torch.tensor([float(r["housingPerWallLevel"]) for r in _govs], dtype=dtype, device=device)
             self._gov_theocs = torch.tensor([float(r["theologyCS"]) for r in _govs], dtype=dtype, device=device)
@@ -3193,7 +3193,7 @@ class SimInit:
                 + self._gov_gpp.abs().sum()
                 + (self._gov_ucs_cs.abs() * ((self._gov_ucs_mask != 0) | self._gov_ucs_allc).double()).sum()
                 + self._gov_xppct.abs().sum()
-                + self._gov_wwcut.abs().sum() + (self._gov_gppmult - 1).abs().sum()
+                + self._gov_wwpct.abs().sum() + (self._gov_gppmult - 1).abs().sum()
                 + self._gov_wallhouse.abs().sum() + self._gov_theocs.abs().sum()
                 + self._gov_govbldy.abs().sum()
                 + (self._gov_distprod - 1).abs().sum() + (self._gov_inflmult - 1).abs().sum()
@@ -3347,7 +3347,7 @@ class SimInit:
             self._pol_ucs_allc = torch.tensor([bool(x[1]) for x in _pucs], dtype=torch.bool, device=device)
             self._pol_ucs_cs = torch.tensor([float(x[2]) for x in _pucs], dtype=torch.float64, device=device)
             self._pol_xppct = torch.tensor([float(r["xpPct"]) for r in _pols], dtype=dtype, device=device)
-            self._pol_wwcut = torch.tensor([float(r["wwCutPct"]) for r in _pols], dtype=dtype, device=device)
+            self._pol_wwpct = torch.tensor([float(r["wwPct"]) for r in _pols], dtype=dtype, device=device)
             self._pol_gppmult = torch.tensor([float(r["gppMult"]) for r in _pols], dtype=torch.float64, device=device)
             self._pol_wallhouse = torch.tensor([float(r["housingPerWallLevel"]) for r in _pols], dtype=dtype, device=device)
             self._pol_theocs = torch.tensor([float(r["theologyCS"]) for r in _pols], dtype=dtype, device=device)
@@ -3380,7 +3380,7 @@ class SimInit:
                 + self._pol_gpp.abs().sum()
                 + (self._pol_ucs_cs.abs() * ((self._pol_ucs_mask != 0) | self._pol_ucs_allc).double()).sum()
                 + self._pol_xppct.abs().sum()
-                + self._pol_wwcut.abs().sum() + (self._pol_gppmult - 1).abs().sum()
+                + self._pol_wwpct.abs().sum() + (self._pol_gppmult - 1).abs().sum()
                 + self._pol_wallhouse.abs().sum() + self._pol_theocs.abs().sum()
                 + self._pol_govbldy.abs().sum()
                 + (self._pol_distprod - 1).abs().sum() + (self._pol_inflmult - 1).abs().sum()
@@ -5594,7 +5594,6 @@ class SimInit:
         self.ww = torch.zeros(B, self.NS, self.NS, dtype=torch.long, device=device)
         self._ww_opened = torch.zeros(B, dtype=torch.long, device=device)
         self._ww_hooked = torch.zeros(B, dtype=torch.long, device=device)
-        self.ww_turn = torch.full((B, self.NS, self.NS), -1, dtype=torch.long, device=device)
 
     def sync_war(self) -> None:
         w = self.war

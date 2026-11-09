@@ -87,8 +87,9 @@
       value: "The ledger   (Logs/Player_WarWeariness.csv) carries no turn: each \"Attacking\" row is the   attacker's k-th combat against that player in Logs/CombatLog.csv (China's   18, Rome's 9 on 1128), each \"At W"
   impl:
     - cpu/core/weariness.ts:warWearinessLosses
-    - cpu/data/seats.ts:WW_ERA_BASE_FORMAL
+    - gpu/core/sim_economy.py:_ww_losses
     - cpu/data/seats.ts:WW_LOSS_AT_WAR_CITY
+    - cpu/data/seats.ts:WW_BASE
   readings:
     - "B-D-S1: the war-weariness split — CLOSED (structure)"
     - "H-1: a growth re-ranks no luxury; war weariness's amenities at the processing — READ"
@@ -109,14 +110,37 @@
   readings:
     - "C-97: the World Congress AI — the evaluation, the outcome, the votes, the hints, the option values and the targets READ"
   review: reviewed
+- addr: 0x3d04a0
+  final: 0x2a0f80
+  kind: function
+  semantics: "the war-weariness ledger's writer (player diplomacy, opponent, delta, reason): W[opponent] (+0x1310 via +0x12b8) += delta, floored at 0, then the Player_WarWeariness.csv row (Player, FromPlayer, Delta, New Total Weariness, Reason)."
+  status: READ
+  cases:
+    - recording: h1_duelp1128
+      turn: 205
+      value: "the ledger's rows: China 104, 104 at t204, -50 'At War Decay' at t205 (208 -> 158)"
+  impl:
+    - cpu/core/weariness.ts:warWearinessBattle
+    - gpu/core/sim_economy.py:_ww_add
+    - cpu/data/seats.ts:WW_BASE
+  readings: ["C-109: war weariness per combat, the turn's decay and the percent — READ"]
+  review: reviewed
 - addr: 0x3d1450
   final: 0x2a1bd0
   kind: function
-  semantics: "a war's warmonger percent: min(the DiplomaticActions WarmongerPercent, the player's cap +0x1a48)."
-  status: PARTLY
-  readings: ["H-1: war weariness per combat — PARTLY READ"]
-  context:
-    - .../ 100, X = min(the war's DiplomaticActions WarmongerPercent, the player's cap +0x1a48) (0x3d1450); amount = loc x base x (100 + the player's +0x18c8 + the foe's +0x1808 [+ +0x1868 in...
+  semantics: "a war's warmonger percent: the war state (0x2a8460) mapped to its DiplomaticActions row (SURPRISE_WAR -> DIPLOACTION_DECLARE_SURPRISE_WAR, FORMAL_WAR, HOLY_WAR, LIBERATION_WAR, RECONQUEST_WAR, PROTECTORATE_WAR, COLONIAL_WAR, TERRITORIAL_WAR, GOLDEN_AGE_WAR, WAR_OF_RETRIBUTION, IDEOLOGICAL_WAR, JOINT_WAR), its WarmongerPercent (+0x34); 0 for EMERGENCY_WAR, SUZERAIN_WAR, DEFENSIVE_PACT and no war; then min(that, m_iMaxWarmongerPercent +0x1a48) x 100 / 100."
+  status: READ
+  cases:
+    - recording: h1_duelp1128
+      turn: 205
+      value: "China's Surprise war: 150, Rome's and China's base 16 + 24 x 150 / 100 = 52"
+  impl:
+    - cpu/core/weariness.ts:wwWarPercent
+    - gpu/core/sim_economy.py:_ww_war_pct
+    - cpu/harness/import.ts:WAR_NAMES
+  readings:
+    - "H-1: war weariness per combat — PARTLY READ"
+    - "C-109: war weariness per combat, the turn's decay and the percent — READ"
   review: reviewed
 - addr: 0x3d7020
   final: 0x2a4440
@@ -135,13 +159,14 @@
   readings:
     - "B-D-S1: the war-weariness split — CLOSED (structure)"
     - "H-1: a growth re-ranks no luxury; war weariness's amenities at the processing — READ"
+    - "C-109: war weariness per combat, the turn's decay and the percent — READ"
   context:
     - "`Player_Diplomacy` allocation 0x3cda00 (from 0x3d7020); requirement 0x5275a0; city sorts 0x3bdd20 / 0x3bdbc0 / 0x3bdc70 / 0x3bdb10 (population..."
     - "- War weariness's amenity losses (0x3cda00, `warWearinessLosses`) are laid by 0x3d7020, whose one caller is Player DoTurn (0x4e4656, before the resources step 0x4e46c0 and th..."
   review: reviewed
 - addr: 0x3d7270
   kind: function
-  semantics: war weariness's turn decay.
+  semantics: "war weariness's turn decay: from each opponent o the pair relation 0x2a8610 holds for, with W[o] (+0x1310) > 0, WAR_WEARINESS_DECAY_TURN_AT_WAR 50 (GP +0x75c, 'At War Decay') while o's +0x728 flag is set and the two are at war (0x2a92d0), else _AT_PEACE 200 (+0x758, 'At Peace Decay'), through 0x3d04a0; no combat holds it back."
   status: READ
   cases:
     - recording: h1_duelw1128
@@ -149,7 +174,14 @@
       value: "Recorded:   runs/h1_duelw1128 Xi'an, China's weariness 474 after its t199 attacks and   no amenity lost at record 200, 424 after its t200 decay and one lost at   record 201 (the growth at t200 on the "
     - recording: 1128
       value: "The ledger   (Logs/Player_WarWeariness.csv) carries no turn: each \"Attacking\" row is the   attacker's k-th combat against that player in Logs/CombatLog.csv (China's   18, Rome's 9 on 1128), each \"At W"
-  readings: ["H-1: a growth re-ranks no luxury; war weariness's amenities at the processing — READ"]
+  impl:
+    - cpu/core/weariness.ts:warWearinessTurn
+    - gpu/core/sim_economy.py:_ww_decay
+    - cpu/core/weariness.ts:wwGet
+    - cpu/data/seats.ts:WW_BASE
+  readings:
+    - "H-1: a growth re-ranks no luxury; war weariness's amenities at the processing — READ"
+    - "C-109: war weariness per combat, the turn's decay and the percent — READ"
   context:
     - "...(0x4e4656, before the resources step 0x4e46c0 and the cities), after the turn's decay (0x3d7270): a city's loss stands as its owner's last processing laid it. Recorded: runs/h1_duel..."
   review: reviewed
@@ -236,6 +268,7 @@
     - "C-97: the war operations — the war candidates, the city value's frame, the assault nodes and Attack Units READ; the loyalty lead's sources, the team update's danger and the assault's executions PARTLY READ"
     - "C-97: the war desires, the war operation's readiness and the assault's executions — the war value, the not-ready hook, the readiness and the executions READ; the leader's war factor, the WMD flags, the deal items and the war record's writer unread"
     - "C-95: HL Explore's plot test refuses every other player's ground, Explore Land's flags 0x40 — READ (0x70bd40 at 0x70bd87..0x70beee, 0x709d80 at 0x709da0..0x709dc2, 0x70ce90 at 0x70ced5), FIT (the knowledge base's +0x128 at or below the turn), both twins"
+    - "C-109: war weariness per combat, the turn's decay and the percent — READ"
   notes:
     - "imported: READ in its section, no confirming case found beside it"
     - ".claude/scratchpad/mu1/readings_c96.md: ...r plot owner (0x783980   0x783ec5..0x7856a5): the player's own district FRIENDLY_CITY, an ally's   (0x3da560) ALLY_SUPPORT, a player at war COMBAT/PASSIVE_DISTRICT, else   NEUTRAL_CITY — each where the player..."
@@ -335,6 +368,14 @@
   context:
     - "...sign rebuilt), the first plot P may enter — its own, no one's, open borders / alliance (0x3dab70), or an owner not enforcing its borders (diplomacy +0x6c0) — the rally where the walk..."
   review: reviewed
+- addr: 0x3dbcb0
+  kind: function
+  status: PARTLY
+  readings: ["C-109: war weariness per combat, the turn's decay and the percent — READ"]
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...EACE 200 (+0x758, \"At Peace Decay\"); a turn of combat does not hold it back. A peace (0x3dbcb0) sheds 2000 on both sides (\"We / They Made Peace\")."
+  review: imported
 - addr: 0x3dcec0
   final: 0x2a86c0
   kind: function

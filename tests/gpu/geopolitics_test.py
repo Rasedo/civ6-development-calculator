@@ -656,16 +656,18 @@ def poke_ww_differential(rules, path):
         f"a war nobody fought must shed {at_war} (got {int(sim.ww[0, 1, 2])})"
     )
 
-    # FORMAL vs SURPRISE picks the era COLUMN, not a multiplier; at Ancient the
-    # two columns are equal (16 = 16).
+    # the war's kind picks its percent: the attacker's base is 16 + the game
+    # era's WarmongerPoints x the percent / 100 (a Formal war's 100, a war of
+    # no kind 0)
     sim.restore(snap)
     sim.seat_warkind[0, 1, 2] = 2  # FORMAL, declared by 1
     sim.seat_warkind[0, 2, 1] = -2
     formal = int(sim._ww_era_base(torch.tensor([1]), torch.tensor([2]))[0])
     sim.restore(snap)
-    surprise = int(sim._ww_era_base(torch.tensor([1]), torch.tensor([2]))[0])
-    assert formal == int(rww["eraFormal"][0]) and surprise == int(rww["eraSurprise"][0]), (
-        f"the casus belli must pick the COLUMN (formal {formal} / surprise {surprise})"
+    plain = int(sim._ww_era_base(torch.tensor([1]), torch.tensor([2]))[0])
+    pts = int(rww["eraPoints"][min(int(sim.game_era[0]), len(rww["eraPoints"]) - 1)])
+    assert formal == int(rww["base"]) + pts and plain == int(rww["base"]), (
+        f"the war's percent must scale the era's points (formal {formal} / no kind {plain})"
     )
 
     # full peace drains four times faster than a phoney war

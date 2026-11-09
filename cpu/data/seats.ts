@@ -237,42 +237,27 @@ export const LOYALTY_AMENITY: Record<string, number> = {
 };
 
 // --- war weariness ------------------------------------------------------
-// WAR WEARINESS IS SCORED PER BATTLE, NOT PER TURN.
+// WAR WEARINESS (Player_Diplomacy, GameCore_XP2 0x1fb680 per combat, 0x3d7270
+// per turn, 0x3d04a0 the ledger's writer, Logs/Player_WarWeariness.csv).
 //
-// The previous model added +1 per turn at war and shed 4 per turn at peace,
-// into an accumulator capped at 32 that converted at 8 per amenity. Those are
-// the real Civ 6 numbers divided by 50 — and with the SIGN of the war term
-// flipped, which is the actual fidelity gap: in Civ 6 a war in which nobody
-// fights DECAYS. A phoney war costs nothing; a bloody one is ruinous.
+// A combat between two majors scores each side
 //
-//     WWP  = (EraBase * Location) + Death
-//     Location = 1 fighting inside your own borders, 2 anywhere else
-//     Death    = 3 * EraBase, to the side whose unit died
-//     any battle with a CITY on either side scores at the abroad column
+//     trunc(loc x base x (100 + pct) / 100), kept only when above 0
 //
-// PRIMARY SOURCE. Every magnitude below is a GlobalParameters
-// row of the shipped game — not a wiki, not a forum:
+// loc: WAR_WEARINESS_PER_COMBAT_IN_ALLIED_LANDS 1 where the combat's plot is
+// the side's own or an ally's and the side fights with a unit, else
+// ..._IN_FOREIGN_LANDS 2; + WAR_WEARINESS_PER_UNIT_KILLED 3 when its unit
+// died; + WAR_WEARINESS_PER_WMD_LAUNCHED 10 for the launcher of a WMD.
+// base, the attacker's: WAR_WEARINESS_WARMONGER_BASE 16 + the GAME era's
+// Eras.WarmongerPoints x X / 100; the defender's: 16 - X; X the war's
+// DiplomaticActions WarmongerPercent (0 for a war with no kind). So in a
+// war whose percent is 16 or more the defender scores nothing.
+// pct: the side's Overall war-weariness modifiers + the opponent's Enemy ones.
 //
-//   WAR_WEARINESS_PER_COMBAT_IN_FOREIGN_LANDS  2     -> WW_ABROAD_MULT
-//   WAR_WEARINESS_PER_COMBAT_IN_ALLIED_LANDS   1     -> the at-home column
-//   WAR_WEARINESS_PER_UNIT_KILLED              3     -> WW_DEATH_MULT
-//   WAR_WEARINESS_DECAY_TURN_AT_WAR            50    -> WW_DECAY_AT_WAR
-//   WAR_WEARINESS_DECAY_TURN_AT_PEACE          200   -> WW_DECAY_AT_PEACE
-//   WAR_WEARINESS_DECAY_PEACE_DECLARED         2000  -> WW_PEACE_TREATY
-//   WAR_WEARINESS_POINTS_FOR_AMENITY_LOSS      400   -> WAR_WEARINESS_PER_AMENITY
-//   WAR_WEARINESS_WARMONGER_BASE               16    -> the era tables' row 0
-//
-// The ERA SCALING is the one part that is NOT in the data: GlobalParameters
-// carries a single base of 16 and no era table at all, so the scaling lives
-// in the C++ DLL, where
-// `EFFECT_ADJUST_WAR_WEARINESS` takes only {Amount, Overall|Domestic|Enemy}
-// with no era and no casus-belli argument. So the era rows come from
-// https://civilization.fandom.com/wiki/War_weariness_(Civ6) and its reference,
-// CivFanatics thread 623207: the two agree everywhere
-// except Ancient SURPRISE, where the formula's `3 * min(max(era-1,1),4)` yields
-// 19 and the table says 16 — the TABLE is taken, and the data's base of 16
-// independently backs it. `WAR_WEARINESS_PER_WMD_LAUNCHED = 10` likewise backs
-// the thread's "+10 * base" nuke reading (12x total with the abroad multiplier).
+// Each turn the player sheds, from each opponent it holds weariness
+// against, WAR_WEARINESS_DECAY_TURN_AT_WAR 50 while at war with THAT
+// opponent, else ..._AT_PEACE 200; a peace sheds
+// WAR_WEARINESS_DECAY_PEACE_DECLARED 2000 on both sides.
 //
 // THE AMENITY LOSS is split over the cities (`warWearinessLosses`,
 // GameCore_XP2 0x3cda00): each opponent's WWP // 400 goes to the cities it
@@ -280,20 +265,16 @@ export const LOYALTY_AMENITY: Record<string, number> = {
 // own, each city capped at its need plus
 // WAR_WEARINESS_LOSS_OVER_REQ_AMENITIES_{AT_WAR_CITY 3, NONFOUNDED_CITY 1,
 // FOUNDED_CITY 0}.
-//
-// UNITS ARE NOW REAL WWP. The accumulator stays an INTEGER, so the derived
-// amenity penalty is integer too and there is no float-association risk.
 
-export const WW_ERA_BASE_FORMAL = srcConst('warWeariness.eraFormal',
-  [16, 22, 28, 34, 40] as const, {
-    pedia: 'the era table of civilization.fandom.com "War weariness (Civ6)" and its reference, CivFanatics thread 623207 — GlobalParameters carries only WAR_WEARINESS_WARMONGER_BASE 16 (row 0) and no era table at all, the scaling living in the DLL',
-  });
-/** The same table for a SURPRISE war (no casus belli). The premium runs 1.00
- *  at Ancient to 1.30 at Industrial+, never a flat 2. */
-export const WW_ERA_BASE_SURPRISE = srcConst('warWeariness.eraSurprise',
-  [16, 25, 34, 43, 52] as const, {
-    pedia: 'the same wiki era table\'s SURPRISE column (CivFanatics thread 623207); at Ancient the table\'s 16 is taken over the formula\'s 19, backed by WAR_WEARINESS_WARMONGER_BASE 16',
-  });
+export const WW_BASE = srcConst('warWeariness.base', 16, gp('WAR_WEARINESS_WARMONGER_BASE'));
+/** Eras.WarmongerPoints by era (ERAS order), the attacker's per-era term */
+export const ERA_WARMONGER_POINTS = srcConst('warWeariness.eraPoints', [0, 6, 12, 18, 24, 24, 24, 24, 24] as const, {
+  derived: 'Eras.WarmongerPoints in ChronologyIndex order',
+  inputs: ['ANCIENT', 'CLASSICAL', 'MEDIEVAL', 'RENAISSANCE', 'INDUSTRIAL', 'MODERN', 'ATOMIC', 'INFORMATION', 'FUTURE']
+    .map((e) => xml('Eras', `EraType=ERA_${e}`, 'WarmongerPoints')),
+});
+export const WW_HOME_MULT = srcConst('warWeariness.home', 1,
+  gp('WAR_WEARINESS_PER_COMBAT_IN_ALLIED_LANDS'));
 export const WW_ABROAD_MULT = srcConst('warWeariness.abroad', 2,
   gp('WAR_WEARINESS_PER_COMBAT_IN_FOREIGN_LANDS'));
 export const WW_DEATH_MULT = srcConst('warWeariness.death', 3,
@@ -316,39 +297,9 @@ export const WW_LOSS_NONFOUNDED_CITY = srcConst('warWeariness.lossNonfoundedCity
   gp('WAR_WEARINESS_LOSS_OVER_REQ_AMENITIES_NONFOUNDED_CITY'));
 export const WW_LOSS_FOUNDED_CITY = srcConst('warWeariness.lossFoundedCity', 0,
   gp('WAR_WEARINESS_LOSS_OVER_REQ_AMENITIES_FOUNDED_CITY'));
-/** CIV6 (War weariness): "every time you drop a nuke, the war weariness it
- *  will incur is equal to 12 times the Era Base value. There is no difference
- *  between dropping a Nuclear Device or a Thermonuclear Device" — 624 WWP in
- *  a surprise war, 480 in a formal one, both of which the Industrial+ rows
- *  above reproduce exactly. GlobalParameters carries the launch's own half as
- *  WAR_WEARINESS_PER_WMD_LAUNCHED 10; the abroad multiplier is the other 2. */
+/** the WMD launcher's own loc term (0x1fb680 at 0x1fb8bc) */
 export const WW_WMD_LAUNCHED = srcConst('nuclear.wwLaunched', 10,
   gp('WAR_WEARINESS_PER_WMD_LAUNCHED'));
-/* THERE IS NO SURPRISE-VS-FORMAL WEARINESS MULTIPLIER, and weariness is not
- * seat-dependent.
- *
- * THE MAGNITUDE. Nothing in any Civ 6 ruleset carries a x2 war-weariness term.
- * The only surprise-vs-formal number in shipped data is
- * `DiplomaticActions.WarmongerPercent` 150 (SURPRISE) vs 100 (FORMAL) = 1.5 —
- * a WARMONGER/GRIEVANCE column, not a weariness one, and its own description
- * string reads "Normal warmonger penalties increased by 50%".
- *
- * THE SPLIT. Nothing in Civ 6 makes weariness depend on WHICH seats are
- * fighting. An engine limitation is not a game rule.
- *
- * WHAT IS STILL TRUE, AND DELIBERATELY UNDER-MODELLED. The GS Civilopedia says
- * weariness is "increased depending on the era and if you declared war without
- * using a Casus Belli", so the DIRECTION is real. The MAGNITUDE is unobtainable:
- * `EFFECT_ADJUST_WAR_WEARINESS` takes only {Amount, Overall|Domestic|Enemy} —
- * no era argument and no casus-belli argument on any of its seven consumers —
- * so the scaling lives in the C++ DLL and no datamining will ever produce it.
- * Under-modelling a sourced direction is an honest recorded residual;
- * over-modelling a magnitude by 33-100% with a borrowed constant is not.
- *
- * PROVENANCE. The numbers here are sourced to the wiki table and its
- * CivFanatics thread, with the caveat above. The GlobalParameters rows have
- * NOT been read directly — a claim about shipped game data must name a source
- * that was actually fetched. */
 /**
  * THE MOMENTS the engines pay, each its Moments row's EraScore; which one
  * fires is the DLL's (GameCore_XP2 Game_History_MomentHandlers, read in

@@ -1044,7 +1044,6 @@ export interface Seat {
   cities: City[];
   nextCityId: number;
   ww: Record<number, number>;
-  wwTurn: Record<number, number>;
   /** LIFETIME raw carbon this seat has discharged. May go negative: CIV6
    *  (Carbon Recapture) "allows the lifetime carbon emissions of a
    *  civilization to go below 0". */

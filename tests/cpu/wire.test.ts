@@ -31,7 +31,7 @@ function addCiv(state: GameState, col: number, row: number): Seat {
   const civ: Seat = {
     ...emptySeat(state.seats.length),
     name: 'Rome', color: '#8e3db8', seat: 1,
-    ww: {}, wwTurn: {}, diplomaticFavor: 0, diplomaticPoints: 0, influencePoints: 0,
+    ww: {}, diplomaticFavor: 0, diplomaticPoints: 0, influencePoints: 0,
     envoysAvailable: 0, treasury: 0, scienceTotal: 0, cultureTotal: 0, faith: 0,
     tourism: 0, government: { chosen: null, policies: [], held: 0, civicTurn: 0, anarchyEnd: 0, lapsed: [] }, cities: [], nextCityId: 0,
     peaceTurns: 0,

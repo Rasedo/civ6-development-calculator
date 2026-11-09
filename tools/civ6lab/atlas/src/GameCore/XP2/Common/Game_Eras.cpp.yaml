@@ -61,6 +61,7 @@
     - "C-108: a trade route's term and its end — READ (the MakeTradeRoute operation's check, the term), both twins"
     - "C-108: a trade route's term and its end"
     - "C-100: the plot values' golden-age, claims and tourism-percent terms, the required features, the power value's negative Amount — READ"
+    - "C-109: war weariness per combat, the turn's decay and the percent — READ"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ...d (pseudo index in [@0xf2e218, @0xf2e238]) adds 0x2c4230(player) [the record +0x6c of the 0x2c3660 manager's per-player vector] valued as PSEUDOYIELD_GOLDENAGE_POINT through 0x7a60d0, and...

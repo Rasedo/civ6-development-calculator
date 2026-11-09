@@ -253,85 +253,82 @@ class SimEconomy:
                 | ((self.support_at.gather(1, t).squeeze(1) >= 0).long() << 3))
 
     def _ww_holds(self, row: int) -> bool:
-        """Only MAJOR civs keep an accumulator: rows 0..n_majors-1. A city-state is a
-        real OPPONENT - warring one wears you down normally - but has no
-        amenities to lose and no research to date its era from. The barbarian
-        row is never a war at all."""
+        """Only MAJOR civs keep an accumulator: rows 0..n_majors-1."""
         return 0 <= row < self.n_majors
 
-    def _ww_era_base(self, row: torch.Tensor, foe_row: torch.Tensor) -> torch.Tensor:
-        """[B] long - each game's per-battle base for the seat in `row` fighting
-        the seat in `foe_row`: that seat's OWN era's entry in the formal or
-        surprise column, clamped at Industrial and beyond.
-
-        Rows are TENSORS because a GPU battle site resolves many games at once
-        and the defender is a different civ in each of them.
-
-        The casus belli picks the column. Only the civ-civ axis can ever
-        answer FORMAL, because denouncing is the only casus-belli verb either
-        engine has and only civs hold it - a missing VERB, not a seat rule
-        (`warIsFormal` says the same thing in the same words). SURPRISE is the
-        harsher column, so the default costs the defaulting seat.
-        """
-        rww = self.rules.war_weariness
-        formal = torch.tensor(rww["eraFormal"], dtype=torch.long, device=self.device)
-        surprise = torch.tensor(rww["eraSurprise"], dtype=torch.long, device=self.device)
-        civ = row.clamp(0, self.n_majors - 1)
-        T, C = self.civ_techs.shape[2], self.civ_civics.shape[2]
-        techs = self.civ_techs.gather(1, civ.view(-1, 1, 1).expand(-1, 1, T)).squeeze(1)
-        civics = self.civ_civics.gather(1, civ.view(-1, 1, 1).expand(-1, 1, C)).squeeze(1)
-        era = self._civ_era(techs, civics).clamp(0, formal.numel() - 1)
-        rr = (row >= 0) & (row < self.n_majors) & (foe_row >= 0) & (foe_row < self.n_majors)
+    def _ww_war_pct(self, row: torch.Tensor, foe_row: torch.Tensor) -> torch.Tensor:
+        """[B] long - the war's DiplomaticActions WarmongerPercent (0x3d1450),
+        its kind's percent, 0 for a war with no kind (`wwWarPercent`'s twin)."""
         n = self.seat_warkind.shape[1]
         flat = row.clamp(0, n - 1) * n + foe_row.clamp(0, n - 1)
-        # every kind but the Surprise war (code 0) reads the FORMAL column
-        kind = (self.seat_warkind.reshape(self.B, -1).gather(1, flat.unsqueeze(1)).squeeze(1).abs() >= 2) & rr
-        return torch.where(kind, formal.take(era), surprise.take(era))
+        code = self.seat_warkind.reshape(self.B, -1).gather(1, flat.unsqueeze(1)).squeeze(1).abs().long() - 1
+        pct = torch.tensor([p[0] for p in self._war_griev_pct], dtype=torch.long, device=self.device)
+        ok = (code >= 0) & (row >= 0) & (row < n) & (foe_row >= 0) & (foe_row < n)
+        return torch.where(ok, pct.take(code.clamp(min=0, max=pct.numel() - 1)), torch.zeros_like(code))
+
+    def _ww_era_base(self, row: torch.Tensor, foe_row: torch.Tensor) -> torch.Tensor:
+        """[B] long - the attacker's base: WAR_WEARINESS_WARMONGER_BASE + the
+        GAME era's WarmongerPoints x the war's percent / 100 (`wwEraBase`)."""
+        rww = self.rules.war_weariness
+        pts = torch.tensor(rww["eraPoints"], dtype=torch.long, device=self.device)
+        era = self.game_era.long().clamp(0, pts.numel() - 1)
+        return int(rww["base"]) + torch.div(pts.take(era) * self._ww_war_pct(row, foe_row), 100,
+                                            rounding_mode="trunc")
+
+    def _ww_add(self, score: torch.Tensor, self_row: torch.Tensor, foe_row: torch.Tensor,
+                amount: torch.Tensor) -> None:
+        """One side's score (`addWw`'s twin): trunc(amount x (100 + pct) / 100),
+        pct its Overall percent (the Great People's, the government's and the
+        cards') + the opponent's Enemy rows; nothing at pct -100 or below,
+        nothing unless the result is above 0."""
+        NS = self.NS
+        pct = (self._gp_perm_at(self_row, "wwPct").long()
+               + self._fx_at_seat("wwpct", self_row).long()
+               + self._ww_enemy_pct(foe_row))
+        gain = torch.div(amount * (100 + pct), 100, rounding_mode="trunc")
+        keep = score & (pct > -100) & (gain > 0)
+        idx = (self_row.clamp(min=0) * NS + foe_row.clamp(min=0)).unsqueeze(1)
+        self.ww.view(self.B, NS * NS).scatter_add_(
+            1, idx, torch.where(keep, gain, torch.zeros_like(gain)).unsqueeze(1))
 
     def _ww_battle(self, hit: torch.Tensor, a_row, d_row, tile: torch.Tensor,
-                   a_died=None, d_died=None, city: bool = False) -> None:
-        """One BATTLE, scored for both sides - the `warWearinessBattle` twin.
+                   a_died=None, d_died=None, a_city: bool = False, d_city: bool = False) -> None:
+        """One combat (`warWearinessBattle`'s twin), scored only between two
+        majors.
 
         `hit` [B] masks the games in which the battle happened; `a_row`/`d_row`
         are seat ROWS, an int (the same seat in every game) or a [B] tensor.
-        `tile` [B] is the TARGET's tile ("the target location is always the
-        location, including for ranged units"), whose OWNER decides each side's
-        location multiplier: 1 in your own borders, 2 anywhere else. `city`
-        forces the abroad column for both sides, which is what a city giving or
-        receiving an attack does regardless of whose land it stands on.
+        `tile` [B] is the combat's plot, whose OWNER decides each side's loc:
+        home where it is the side's own or an ally's and the side fights with
+        a unit, else abroad; `a_city` / `d_city` mark a city or district side,
+        which has no unit. A death adds three to the loc of the side that lost
+        it. The attacker scores loc x `_ww_era_base`, the defender loc x
+        (base - the war's percent).
 
         Call it after the rolls and after the deaths are known but BEFORE any
-        capture - the multiplier is the one that applied while the battle was
-        fought, not the one that applies once the tile changes hands.
+        capture - the loc is the one that applied while the battle was fought.
         """
         self._ww_hooked += hit.long()
         rww = self.rules.war_weariness
-        abroad = int(rww["abroad"])
-        death = int(rww["death"])
+        home_m, abroad, death = int(rww["home"]), int(rww["abroad"]), int(rww["death"])
         zeros = torch.zeros(self.B, dtype=torch.long, device=self.device)
         a_row = zeros + a_row if isinstance(a_row, int) else a_row.long()
         d_row = zeros + d_row if isinstance(d_row, int) else d_row.long()
-        owner = self.tile_seat.gather(1, tile.clamp(min=0).unsqueeze(1)).squeeze(1)
-        turn = zeros + int(self.turn)
-        # Barbarians neither accrue weariness nor inflict it: every seat is
-        # permanently hostile to them, so counting it would make "at peace with
-        # everyone" unreachable and no accumulator could ever drain.
         live = hit & (a_row >= 0) & (d_row >= 0) & (a_row != d_row) \
             & (a_row != self.BARB_ROW) & (d_row != self.BARB_ROW)
         # Every combat path on both engines reaches this ONE hook, so a rule
         # that fires "when a battle resolves" rides it rather than the
         # thirteen call sites (`warWearinessBattle`'s twin).
         self._post_combat_loyalty(live, a_row, d_row, tile, a_died, d_died)
-        if not bool(live.count_nonzero()):
+        majors = live & (a_row < self.n_majors) & (d_row < self.n_majors)
+        if not bool(majors.count_nonzero()):
             return
-        NS = self.NS
-        flat_ww = self.ww.view(self.B, NS * NS)
-        flat_turn = self.ww_turn.view(self.B, NS * NS)
-        for self_row, foe_row, died in ((a_row, d_row, a_died), (d_row, a_row, d_died)):
-            score = live & (self_row >= 0) & (self_row < self.n_majors)
-            if not bool(score.count_nonzero()):
-                continue
-            base = self._ww_era_base(self_row, foe_row)
+        owner = self.tile_seat.gather(1, tile.clamp(min=0).unsqueeze(1)).squeeze(1)
+        pct = self._ww_war_pct(a_row, d_row)
+        a_base = self._ww_era_base(a_row, d_row)
+        d_base = int(rww["base"]) - pct
+        for self_row, foe_row, base, died, city in ((a_row, d_row, a_base, a_died, a_city),
+                                                    (d_row, a_row, d_base, d_died, d_city)):
             # GlobalParameters carries exactly two location rows -
             # WAR_WEARINESS_PER_COMBAT_IN_ALLIED_LANDS 1 and
             # ..._IN_FOREIGN_LANDS 2 - so an ALLY's territory is home ground
@@ -342,29 +339,16 @@ class SimEconomy:
             _fl = self_row.clamp(0, _n - 1) * _n + owner.clamp(0, _n - 1)
             _ally = (self.seat_ally_turns.reshape(self.B, -1).gather(1, _fl.unsqueeze(1)).squeeze(1) > 0) & _rr
             at_home = (_own | _ally) & (not city)
-            gain = base * torch.where(at_home, 1, abroad)
-            if died is not None:
-                gain = gain + torch.where(died, base * death, zeros)
-            # CIV6 (Trung Trac, Joaquim Marques Lisboa): a permanent percentage
-            # off everything this seat accrues from here on. Integer both
-            # sides — `ww` is a long plane and the TS twin floors to match.
-            # CIV6 (Fascism): "War Weariness reduced by 15%" — the adopted
-            # government's cut joins additively, capped together.
-            _cut = (self._gp_perm_at(self_row, "warWearyPct").long()
-                    + self._fx_at_seat("wwcut", self_row).long()).clamp(min=0, max=100)
-            gain = torch.div(gain * self._ww_enemy_mult(foe_row), 100, rounding_mode="floor")
-            gain = torch.div(gain * (100 - _cut), 100, rounding_mode="floor")
-            idx = (self_row.clamp(min=0) * NS + foe_row.clamp(min=0)).unsqueeze(1)
-            flat_ww.scatter_add_(1, idx, torch.where(score, gain, zeros).unsqueeze(1))
-            flat_turn.scatter_(1, idx, torch.where(
-                score, turn, flat_turn.gather(1, idx).squeeze(1)).unsqueeze(1))
+            loc = torch.where(at_home, home_m, abroad) + zeros
+            if died is not None and not city:
+                loc = loc + torch.where(died, death, 0)
+            self._ww_add(majors, self_row, foe_row, loc * base)
 
-    def _ww_enemy_mult(self, foe_row: torch.Tensor) -> torch.Tensor:
-        """long, `foe_row`'s shape — CIV6 (Satyagraha): "Opposing civilizations
-        receive double the war weariness for fighting against Gandhi". The
-        OPPONENT's row decides, so both accrual sites ask this one body
-        (`WAR_WEARINESS_ROWS`)."""
-        out = torch.full_like(foe_row, 100)
+    def _ww_enemy_pct(self, foe_row: torch.Tensor) -> torch.Tensor:
+        """long, `foe_row`'s shape — the OPPONENT's Enemy war-weariness rows
+        (Satyagraha: Amount 100, Enemy), added to the percent of whoever
+        fights it (`WAR_WEARINESS_ROWS`)."""
+        out = torch.zeros_like(foe_row)
         for _wc, _wl, _wp in self._war_weariness_rows:
             out = out + self._seat_is(foe_row.clamp(min=0), _wc, _wl).long() * _wp
         return out
@@ -405,52 +389,35 @@ class SimEconomy:
                         self.city_loyalty[b, lr, j] + float(drop[b]), min=0.0)
 
     def _ww_launch(self, hit: torch.Tensor, row: int, foe_row) -> None:
-        """`warWearinessLaunch`'s twin. CIV6 (War weariness): "every time you
-        drop a nuke, the war weariness it will incur is equal to 12 times the
-        Era Base value" — the launch's own count plus the abroad multiplier,
-        billed to the LAUNCHER alone."""
+        """`warWearinessLaunch`'s twin: the launcher's loc is the WMD's own
+        term + the abroad one, times `_ww_era_base`; between two majors only."""
         zeros = torch.zeros(self.B, dtype=torch.long, device=self.device)
         foe = zeros + foe_row if isinstance(foe_row, int) else foe_row.long()
         self_row = zeros + row
-        if row < 0 or row >= self.n_majors or row == self.BARB_ROW:
+        if row < 0 or row >= self.n_majors:
             return
-        live = hit & (foe >= 0) & (foe != self_row) & (foe != self.BARB_ROW)
+        live = hit & (foe >= 0) & (foe < self.n_majors) & (foe != self_row)
         if not bool(live.count_nonzero()):
             return
-        NS = self.NS
-        flat_ww = self.ww.view(self.B, NS * NS)
-        flat_turn = self.ww_turn.view(self.B, NS * NS)
         mult = int(self._ww_wmd_launched) + int(self.rules.war_weariness["abroad"])
-        gain = self._ww_era_base(self_row, foe) * mult
-        _cut = (self._gp_perm_at(self_row, "warWearyPct").long()
-                + self._fx_at_seat("wwcut", self_row).long()).clamp(min=0, max=100)
-        gain = torch.div(gain * self._ww_enemy_mult(foe), 100, rounding_mode="floor")
-        gain = torch.div(gain * (100 - _cut), 100, rounding_mode="floor")
-        idx = (self_row * NS + foe.clamp(min=0)).unsqueeze(1)
-        flat_ww.scatter_add_(1, idx, torch.where(live, gain, zeros).unsqueeze(1))
-        flat_turn.scatter_(1, idx, torch.where(
-            live, zeros + int(self.turn), flat_turn.gather(1, idx).squeeze(1)).unsqueeze(1))
+        self._ww_add(live, self_row, foe, self._ww_era_base(self_row, foe) * mult)
 
     def _ww_decay(self, row: int, mask: torch.Tensor | None = None) -> None:
-        """The end-of-turn decay for ONE seat - the `warWearinessTurn` twin,
-        called from that seat's own block top.
-
-          * a war in which a battle was fought THIS turn does not decay
-          * any other war sheds 50 while this seat is at war with somebody
-          * a seat at war with nobody sheds 200 from every war it remembers
-        """
+        """The turn's decay for ONE seat (0x3d7270, the `warWearinessTurn`
+        twin), called from that seat's own block top: from each opponent it
+        holds weariness against, 50 while at war with THAT opponent, else 200,
+        floored at 0."""
         if not self._ww_holds(row):
             return
         rww = self.rules.war_weariness
-        at_war = self.war[:, row, :].any(dim=1, keepdim=True)
-        shed = torch.where(at_war,
+        shed = torch.where(self.war[:, row, :],
                            torch.tensor(int(rww["decayAtWar"]), dtype=torch.long, device=self.device),
                            torch.tensor(int(rww["decayAtPeace"]), dtype=torch.long, device=self.device))
-        fought = self.ww_turn[:, row, :] == int(self.turn)
+        cur = self.ww[:, row, :]
+        new = (cur - shed).clamp(min=0)
         if mask is not None:
-            fought = fought | ~mask.unsqueeze(1)
-        self.ww[:, row, :] = torch.where(fought, self.ww[:, row, :],
-                                         (self.ww[:, row, :] - shed).clamp(min=0))
+            new = torch.where(mask.unsqueeze(1), new, cur)
+        self.ww[:, row, :] = new
 
     def _ww_peace(self, mask: torch.Tensor, a_row: int, b_row: int) -> None:
         """A peace treaty sheds 2000 from THAT war on both sides - deliberately
@@ -3933,7 +3900,7 @@ class SimEconomy:
             # amenities and loyalty in a city with a garrisoned unit
             "garamen": _z64.clone(), "garloy": _z64.clone(),
             "ucst": torch.zeros(B, self.NU, dtype=torch.float64, device=dev),
-            "xppct": _z.clone(), "wwcut": _z.clone(), "wmdup": _z.clone(),
+            "xppct": _z.clone(), "wwpct": _z.clone(), "wmdup": _z.clone(),
             "gppmult": torch.ones(B, dtype=torch.float64, device=dev),
             # CIV6 (Thermopylae): how many MILITARY policies stand slotted
             "milpol": torch.zeros(B, dtype=torch.long, device=dev),
@@ -4005,7 +3972,7 @@ class SimEconomy:
                            ("crng", self._gov_crng),
                            ("infl", self._gov_infl),
                            ("xppct", self._gov_xppct),
-                           ("wwcut", self._gov_wwcut), ("wmdup", self._gov_wmdup),
+                           ("wwpct", self._gov_wwpct), ("wmdup", self._gov_wmdup),
                            ("wallhouse", self._gov_wallhouse),
                            ("theocs", self._gov_theocs), ("govbldy", self._gov_govbldy)):
                 fx[_k] = fx[_k] + _t.take(adopted) * _gf
@@ -4112,7 +4079,7 @@ class SimEconomy:
                                ("crng", self._pol_crng),
                                ("infl", self._pol_infl),
                                ("xppct", self._pol_xppct),
-                               ("wwcut", self._pol_wwcut), ("wmdup", self._pol_wmdup),
+                               ("wwpct", self._pol_wwpct), ("wmdup", self._pol_wmdup),
                                ("wallhouse", self._pol_wallhouse),
                                ("theocs", self._pol_theocs), ("govbldy", self._pol_govbldy)):
                     fx[_k] = fx[_k] + sd @ _t

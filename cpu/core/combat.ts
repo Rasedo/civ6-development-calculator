@@ -1693,7 +1693,7 @@ function cityAssault(
   attacker.hp -= dmgToAttacker;
   spendAttack(attacker, true);
   warWearinessBattle(state, attacker.seat, city.seat, city.centerIndex,
-    { aDied: attacker.hp <= 0, city: true });
+    { aDied: attacker.hp <= 0, dCity: true });
   if (attacker.hp <= 0) {
     unitKillEvent(state, city.seat, undefined, attacker);
     killUnit(state, attacker);
@@ -1769,7 +1769,7 @@ function rangedStrikeEncampment(state: GameState, attacker: Unit, tileIndex: num
     + congressUnitCS(state, attacker) + governmentUnitCS(state, attacker)
     + rosterCS(state, attacker, tileSeat(tile), null, true)) - defCS);
   tile.encampHp = Math.max(0, (tile.encampHp ?? ENCAMPMENT_HP) - encampSplit(state, tile, attacker, diff, true, key));
-  warWearinessBattle(state, attacker.seat, tileSeat(tile), tileIndex, { city: true });
+  warWearinessBattle(state, attacker.seat, tileSeat(tile), tileIndex, { dCity: true });
   spendAttack(attacker, true);
   awardCityXp(state, attacker, (tile.encampHp ?? 0) <= 0 ? XP_CITY_FELLED : XP_CITY_ATTACK);
 }
@@ -1817,7 +1817,7 @@ function attackEncampment(
   attacker.hp -= dmgToAttacker;
   spendAttack(attacker, true);
   warWearinessBattle(state, attacker.seat, tileSeat(tile), tileIndex,
-    { aDied: attacker.hp <= 0, city: true });
+    { aDied: attacker.hp <= 0, dCity: true });
   if (attacker.hp <= 0) killUnit(state, attacker);
 }
 
@@ -2569,7 +2569,7 @@ function rangedAttackInner(state: GameState, attackerId: number, targetIndex: nu
     civCity.city.hp = Math.max(1, civCity.city.hp - split.centre);
     civCity.city.lastHitTurn = state.turn;
     if (civCity.city.seat === FREE_SEAT) freeRaidSignal(state, civCity.city.centerIndex, attacker.seat);
-    warWearinessBattle(state, attacker.seat, civCity.city.seat, targetIndex, { city: true });
+    warWearinessBattle(state, attacker.seat, civCity.city.seat, targetIndex, { dCity: true });
     spendAttack(attacker, true);
     awardCityXp(state, attacker, civCity.city.hp <= 1 ? XP_CITY_FELLED : XP_CITY_ATTACK);
     return ok;
@@ -2596,7 +2596,7 @@ function rangedAttackInner(state: GameState, attackerId: number, targetIndex: nu
     if (csSplit.wall > 0) cityState.outerHp = csOuter - csSplit.wall;
     cityState.hp = Math.max(1, (cityState.hp ?? CITY_MAX_HP) - csSplit.centre);
     cityState.lastHitTurn = state.turn;
-    warWearinessBattle(state, attacker.seat, seatOfCityState(cityState.id), targetIndex, { city: true });
+    warWearinessBattle(state, attacker.seat, seatOfCityState(cityState.id), targetIndex, { dCity: true });
     spendAttack(attacker, true);
     awardCityXp(state, attacker, cityState.hp <= 1 ? XP_CITY_FELLED : XP_CITY_ATTACK);
     return ok;
@@ -2695,7 +2695,7 @@ function hostileRangedStrikeInner(state: GameState, attacker: Unit, targetIndex:
     enemyCity.hp = Math.max(1, enemyCity.hp - split.centre);
     enemyCity.lastHitTurn = state.turn;
     if (enemyCity.seat === FREE_SEAT) freeRaidSignal(state, enemyCity.centerIndex, attacker.seat);
-    warWearinessBattle(state, attacker.seat, enemyCity.seat, targetIndex, { city: true });
+    warWearinessBattle(state, attacker.seat, enemyCity.seat, targetIndex, { dCity: true });
     spendAttack(attacker, true);
     awardCityXp(state, attacker, enemyCity.hp <= 1 ? XP_CITY_FELLED : XP_CITY_ATTACK);
     return true;
@@ -2720,7 +2720,7 @@ function hostileRangedStrikeInner(state: GameState, attacker: Unit, targetIndex:
     if (split.wall > 0) csHere.outerHp = csOuter - split.wall;
     csHere.hp = Math.max(1, (csHere.hp ?? CITY_MAX_HP) - split.centre);
     csHere.lastHitTurn = state.turn;
-    warWearinessBattle(state, attacker.seat, seatOfCityState(csHere.id), targetIndex, { city: true });
+    warWearinessBattle(state, attacker.seat, seatOfCityState(csHere.id), targetIndex, { dCity: true });
     spendAttack(attacker, true);
     awardCityXp(state, attacker, csHere.hp <= 1 ? XP_CITY_FELLED : XP_CITY_ATTACK);
     return true;
@@ -3066,7 +3066,7 @@ function attackCityState(state: GameState, attacker: Unit, cityState: CityState)
   if (capsOf(attacker.seat).alwaysHostile) cityState.hp = Math.max(1, cityState.hp);
   attacker.hp -= dmgToAttacker;
   warWearinessBattle(state, attacker.seat, seatOfCityState(cityState.id), cityState.centerIndex,
-    { aDied: attacker.hp <= 0, city: true });
+    { aDied: attacker.hp <= 0, dCity: true });
   spendAttack(attacker, true);
   awardCityXp(state, attacker, (cityState.hp ?? 0) <= 0 ? XP_CITY_FELLED : XP_CITY_ATTACK);
   if (attacker.hp <= 0) killUnit(state, attacker);

@@ -33,7 +33,7 @@ function addCiv(
     ...emptySeat(state.seats.length),
     name: 'Rome',
     color: '#8e3db8',
-    ww: {}, wwTurn: {},
+    ww: {},
     diplomaticFavor: 0,
     diplomaticPoints: 0,
     influencePoints: 0,

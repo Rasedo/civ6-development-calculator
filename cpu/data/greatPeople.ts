@@ -627,7 +627,7 @@ export type GpSite =
  *  the wire index, so a new channel appends. */
 export const GP_PERM = [
   'spaceProdPct',        // Space Race project production, percent
-  'warWearyPct',         // war weariness accrued, percent off
+  'wwPct',               // the Overall war-weariness percent (EFFECT_ADJUST_WAR_WEARINESS Amount, signed)
   'flankPctLand',        // flanking bonus for LAND units, percent
   'flankPctNaval',       // flanking bonus for NAVAL units, percent
   'militaryProdPct',     // military unit production, percent (`unitIsMilitary`)
@@ -1185,14 +1185,14 @@ export const GP_ABILITY: Record<string, GpAbility> = {
   GP_JAMSETJI_TATA: { siteDistrict: 'CAMPUS', perm: { campusTourism: 10 } },
   GP_MASARU_IBUKA: { siteDistrict: 'INDUSTRIAL_ZONE', perm: { izTourism: 10 } },
 
-  // ---- GENERAL: promotions, free units, and the war-weariness cut ----
+  // ---- GENERAL: promotions, free units, and the war-weariness percent ----
   GP_BOUDICA: { site: 'adjacentBarbarian', convertBarbarians: true },
   GP_HANNIBAL_BARCA: { promotionLevels: 1 },
   // CIV6 (Sun Tzu, ActionCharges 0): no retire action; his one charge is the
   // Work of Writing (GREATWORK_SUN_TZU), made as a Writer makes his — in a
   // city of the seat with an open slot for it, the one he stands in.
   GP_SUN_TZU: { site: 'gwSlot', greatWorkKind: 0 },
-  GP_TRUNG_TRAC: { siteDistrict: 'ENCAMPMENT', perm: { warWearyPct: 25 } },
+  GP_TRUNG_TRAC: { siteDistrict: 'ENCAMPMENT', perm: { wwPct: -25 } },
   GP_THELFLD: { siteDistrict: 'CITY_CENTER', cityPerm: { loyalty: GP_AETHELFLAED_LOYALTY } },
   GP_EL_CID: { formation: 1 },
   GP_TIMUR: { promotionLevels: 1, xpPct: 25 },
@@ -1251,7 +1251,7 @@ export const GP_ABILITY: Record<string, GpAbility> = {
   GP_LASKARINA_BOUBOULINA: { promotionLevels: 1, xpPct: 50 },
   GP_MATTHEW_PERRY: { site: 'cityState', suzerainSeize: true },
   GP_FRANZ_VON_HIPPER: { unit: 'BATTLESHIP', unitPromotions: 1, perm: { coalPerTurn: GP_COAL_PER_TURN } },
-  GP_JOAQUIM_MARQUES_LISBOA: { perm: { warWearyPct: 25 } },
+  GP_JOAQUIM_MARQUES_LISBOA: { perm: { wwPct: -25 } },
   GP_TOGO_HEIHACHIRO: { siteDistrict: 'HARBOR', cityPerm: { loyalty: GP_TOGO_LOYALTY } },
   GP_CHESTER_NIMITZ: {
     unit: 'SUBMARINE', unitPromotions: 1,

@@ -75,7 +75,7 @@ import { commitDedications, goodyMoment, pantheonMoment, religionMoment, unitKil
 import { cityStateSight, initFog, revealAround, unitSeesThrough, unitSight } from '../core/fog';
 import { holdFavor, seatFavor } from '../core/seatTurn';
 import { displaceAirFrom, isAirUnit } from '../core/air';
-import { BARB_SEAT, cityStateOfSeat, civsAtWar, delegationWith, FREE_SEAT, isBarbSeat, isCityStateSeat, isCiv, MISSION_DELEGATION, MISSION_EMBASSY, prophetsOf, seatOf, setPeaceTurnWith, setTileOwner, setWar, tileSeat, unitsOf } from '../core/seats';
+import { BARB_SEAT, cityStateOfSeat, civsAtWar, clearWarKind, delegationWith, FREE_SEAT, isBarbSeat, isCityStateSeat, isCiv, MISSION_DELEGATION, MISSION_EMBASSY, prophetsOf, seatOf, setPeaceTurnWith, setTileOwner, setWar, tileSeat, unitsOf } from '../core/seats';
 import { activateGreatPerson, gpActivateOk, gpClassOfUnit, gpPersonOf } from '../core/gpAbility';
 import { BUILDINGS } from '../data/buildings';
 import { BUILT_WONDERS } from '../data/builtWonders';
@@ -104,7 +104,7 @@ import { opUnits } from '../core/operations/operation';
 import { newCityAi } from '../core/aiCityTrees';
 import { newEconomicMemory, purchaseSpend, savingsTurn, upgradePurchase, type EconomicMemory } from '../core/aiEconomic';
 import { FX } from '../core/aiValue';
-import { advanceHistory, aliasOrPrefixed, engineRowOf, formationRows, importTurn, minorHead, newHistory, recordRoutes, type History, type Imported } from './import';
+import { advanceHistory, aliasOrPrefixed, engineRowOf, formationRows, importTurn, minorHead, loadWarKinds, loadWeariness, newHistory, warKindAt, wearyAt, recordRoutes, type History, type Imported, type WarKindRow } from './import';
 import { TribeFold } from './windowFold';
 import { AI_UNITS } from '../data/aiBuildTables';
 import { loadCityBuildCentre, loadCityBuildTables, newCityBuildTally, tallyBuildings, type CityBuildTally } from './cityBuildLog';
@@ -312,6 +312,8 @@ interface Ctx {
   lateEnvoys: EnvoyDecision[];
   /** the game's draw log, where the recording kept it */
   log?: RandLog;
+  /** the wars the logs declared, with their kinds (`loadWarKinds`) */
+  warKinds?: WarKindRow[];
   /** the hold on the game's stream (`streamHold`) */
   stream: StreamHold;
   /** the research AI's choices against the record's and the game's AI log
@@ -3843,8 +3845,14 @@ const res = buyTile(state, city.id, d.plot, seat);        if (!res.ok) setTileOw
           if (d.war) declareWarOnCityState(state, cityStateOfSeat(o), a);
           else sueForPeaceWithCityState(state, cityStateOfSeat(o), a);
         } else if (a < state.seats.length && o < state.seats.length) {
-          if (d.war) declareWar(state, a, o);
-          else sueForPeace(state, a, o);
+          // the kind the logs declared the war under (`loadWarKinds`)
+          const w0 = d.war && ctx.warKinds ? warKindAt(ctx.warKinds, d.player, d.other, ctx.turn) : undefined;
+          const w = w0 && w0.turn === ctx.turn && w0.from === d.player ? w0 : undefined;
+          if (d.war) {
+            declareWar(state, a, o, w ? w.kind : -1);
+            // a war of no kind (a Suzerain War) carries none
+            if (w && w.kind < 0) clearWarKind(state, a, o);
+          } else sueForPeace(state, a, o);
         }
         const ok = civsAtWar(state, a, o) === d.war;
         if (!ok) {
@@ -4923,7 +4931,9 @@ const sameKept = (a: Record<string, number>, b: Record<string, number>) => {
 };
 
 /** the engine's state against the importer's reading of record t+1 */
-export function compareState(state: GameState, read: Imported): Tallies {
+/** `weary`: each seat's war weariness in the game's ledger as the record
+ *  stands (`loadWeariness`, `wearyAt`), where the recording kept it */
+export function compareState(state: GameState, read: Imported, weary?: Map<number, Record<number, number>>): Tallies {
   const t: Tallies = {};
   const rs = read.state;
   const plotsOf = (st: GameState, c: City) => st.map.tiles.filter((x) => x.ownerSeat === c.seat && x.ownerCity === c.id).map((x) => x.index);
@@ -5008,6 +5018,16 @@ export function compareState(state: GameState, read: Imported): Tallies {
       Math.abs((es.eraScore ?? 0) - (rsx.eraScore ?? 0)));
     note(t, 'seat.favor', near(es.diplomaticFavor ?? 0, rsx.diplomaticFavor ?? 0), name, rsx.diplomaticFavor ?? 0, r3(es.diplomaticFavor ?? 0),
       Math.abs((es.diplomaticFavor ?? 0) - (rsx.diplomaticFavor ?? 0)));
+    // its war weariness against each opponent, beside the game's ledger
+    if (weary) {
+      const gw = weary.get(seat) ?? {};
+      const foes = [...new Set([...Object.keys(es.ww ?? {}), ...Object.keys(gw)])].map(Number).sort((x, y) => x - y);
+      for (const o of foes) {
+        const [ours, game] = [es.ww?.[o] ?? 0, gw[o] ?? 0];
+        if (ours === 0 && game === 0) continue;
+        note(t, 'seat.warWeariness', ours === game, `${name} vs ${read.playerOfSeat.get(o) ?? o}`, game, ours, Math.abs(ours - game));
+      }
+    }
     note(t, 'seat.government', es.government.chosen === rsx.government.chosen
       && setOf(es.government.policies) === setOf(rsx.government.policies), name,
     [rsx.government.chosen, ...rsx.government.policies], [es.government.chosen, ...es.government.policies]);
@@ -5795,6 +5815,8 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
   if (logPath) {
     history.randLog = loadRandLog(logPath, all.flatMap((r) => (r.witness ?? []).flatMap((w) => (typeof w.seed === 'number' ? [w.seed] : []))));
   }
+  history.weary = loadWeariness(dumpPath);
+  history.warKinds = loadWarKinds(dumpPath);
   history.replay = replayEvents(all, cat, history.randLog);
   // a window started past the first record takes the history every record
   // before it leaves (the game era and its countdown, the eras' ages, the
@@ -5904,7 +5926,7 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
   const ctx: Ctx = {
     state, cat, W: recs[0].head.W, seatOfPlayer: first.seatOfPlayer, playerOfSeat: first.playerOfSeat,
     units: new Map(), pendingMinors: new Map(), next: first, tally: new Map(), fellBack: new Map(), imposed: new Map(), reasons: new Map(),
-    engineKilled: new Set(), paths: new Map(), walked: new Set(), steps: new Map(), barbBlows: new Map(), barbCentres: new Map(), gone: new Map(), barbSeized: [], minorBlows: new Map(), minorShots: [], minorPromoted: new Map(), minorBuys: [], minorImproves: [], minorClears: [], minorCleared: new Set(), minorClearItems: new Map(), minorClearUnits: [], barbBattles: [], barbFought: new Set(), barbDraws: [], promoteHp: new Map(), minorUnits: [], minorGround: [], buyTrace, lateBlows: [], upgradeInto: new Set(), upgradedFrom: new Map(), levyFrom: new Map(), barbSteps: [], barbPillaged: [], envoys: [], battled: new Set(), fortified: new Map(), undug: new Map(), streams: new Map(), applied: new Set(), barbNew: [], lateEnvoys: [], log: history.randLog, stream, prev: recs[0],
+    engineKilled: new Set(), paths: new Map(), walked: new Set(), steps: new Map(), barbBlows: new Map(), barbCentres: new Map(), gone: new Map(), barbSeized: [], minorBlows: new Map(), minorShots: [], minorPromoted: new Map(), minorBuys: [], minorImproves: [], minorClears: [], minorCleared: new Set(), minorClearItems: new Map(), minorClearUnits: [], barbBattles: [], barbFought: new Set(), barbDraws: [], promoteHp: new Map(), minorUnits: [], minorGround: [], buyTrace, lateBlows: [], upgradeInto: new Set(), upgradedFrom: new Map(), levyFrom: new Map(), barbSteps: [], barbPillaged: [], envoys: [], battled: new Set(), fortified: new Map(), undug: new Map(), streams: new Map(), applied: new Set(), barbNew: [], lateEnvoys: [], log: history.randLog, warKinds: history.warKinds, stream, prev: recs[0],
     researchAi: report.researchAi, researchScores: report.researchScores, agendaCivics: null, strategyLog: loadStrategyLog(dumpPath), researchBefore: new Map(), researchAtTurn: new Map(), aiResearchLog,
     tactical: loadTactical(dumpPath), barbTally: report.barbTactics, minorTally: report.minorTactics, minorDraws: report.minorDraws,
     civicAi: report.civicAi, civicScores: report.civicScores, civicBefore: new Map(), aiCivicLog: govtLog.civics, aiPolicyLog: govtLog.policies,
@@ -6834,7 +6856,9 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
       if (ours === ctx.civicBefore.get(s.seat) && rec === recCivic(a, pid)) continue;
       tallyCivicAi(ctx, party, a.turn, pid, ours, rec);
     }
-    const t = compareState(state, read);
+    // the game's ledger as the record stands: before the active player's actions
+    const t = compareState(state, read, history.weary && wearyAt(history.weary, read.seatOfPlayer, b.turn,
+      b.players.find((p) => bool(p.turnActive))?.id ?? num(b.head.localPlayer), 1));
     compareUnits(ctx, b, t);
     note(t, 'barb.camps', campsHeld, 'camps', ctx.next.state.barbSeat.camps.length, state.barbSeat.camps.length);
     const base = stateChecks(b, cat, read);

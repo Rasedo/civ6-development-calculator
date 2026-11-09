@@ -926,7 +926,6 @@ const SEAT: Record<string, Extractor> = {
   treatyTurns: overSeats((s, state) => treatyClockLine(state, s.seat)),
   peaceTurns: overSeats((s) => s.peaceTurns),
   warWeariness: overSeats((s) => wwPairs(s.ww, (v) => v !== 0)),
-  warWearinessTurn: overSeats((s) => wwPairs(s.wwTurn, (v) => v >= 0)),
   eraScore: overSeats((s) => s.eraScore ?? 0),
   darkBar: overSeats((s) => s.darkBar ?? 0),
   goldenBar: overSeats((s) => s.goldenBar ?? 0),

@@ -6,19 +6,29 @@
 - addr: 0x1fb680
   final: 0x14efa0
   kind: function
-  semantics: "war weariness per side of a combat, the attacker logged \"Attacking\": loc = 1 in lands allied to the unit (GP +0x76c), else 2 (+0x770), +3 killed (+0x774), +10 a WMD (+0x778); base = WAR_WEARINESS_WARMONGER_BASE 16 (+0x780) + Eras.WarmongerPoints of the era row (+0x30) x X / 100, X = min(the war's DiplomaticActions WarmongerPercent, the player's cap +0x1a48) (0x3d1450); amount = loc x base x (100 + the player's +0x18c8 + the foe's +0x1808 [+ +0x1868 in allied land]) / 100. It reads only the struct's [+0] and [+8] and the combat's location: the interceptor and the anti-air unit never enter it."
-  status: PARTLY
+  semantics: "war weariness per side of a combat between two FULL_CIV players (0x469db0 on both): the attacker logged \"Attacking\", the defender \"Getting Attacked\". loc, on the combat's plot ([+0x48], [+0x4c]): 1 (GP +0x76c) where 0x20a220 finds the plot the side's unit's owner's or an ally's, else (and for a side with no unit) 2 (+0x770); +3 (+0x774) where its unit's damage reached its max HP; the attacker +10 (+0x778) for a WMD ([+0x5c] != -1). X = 0x3d1450(player, foe, the pair's war state 0x2a8460). The attacker's base: WAR_WEARINESS_WARMONGER_BASE 16 (+0x780) + trunc(Eras[the game era 0x2c3660 +0x108].WarmongerPoints (+0x30) x X / 100); the defender's 16 - X. pct = the side's Overall multiplier (+0x18c8) + the foe's Enemy one (+0x1808) [+ its Domestic one (+0x1868) where loc read allied]; nothing at pct <= -100; amount = trunc(loc x base x (100 + pct) / 100), written (0x3d04a0) only above 0. It reads only the struct's [+0] and [+8] and the combat's location: the interceptor and the anti-air unit never enter it."
+  status: READ
   cases:
+    - recording: h1_duelp1128
+      turn: 205
+      value: "the Surprise war of t203 at the Industrial game era: Rome's city 104 (2 x 52), its Galley on its own plot 52, China's units abroad 104, from t223 under Fascism 124 / 62 (x 120%); no row for the defenders; seat.warWeariness 34 / 34 pairs over t205-240"
     - recording: h1_duelw1119
       turn: 216
       value: "Rome 104 / 260 / 52 / 208 = (2 / 5 / 1 / 4) x 52, 52 = 16 + 24 x 150%"
-  impl: [cpu/core/combat.ts:interceptFight]
+  impl:
+    - cpu/core/weariness.ts:warWearinessBattle
+    - cpu/core/weariness.ts:wwEraBase
+    - gpu/core/sim_economy.py:_ww_battle
+    - gpu/core/sim_economy.py:_ww_era_base
+    - cpu/core/combat.ts:interceptFight
+    - cpu/core/weariness.ts:wwGet
+    - cpu/core/weariness.ts:addWw
+    - cpu/data/seats.ts:WW_BASE
+    - cpu/data/seats.ts:WW_LOSS_FOUNDED_CITY
   readings:
     - "C-34: the interception's damage, XP, weariness and the answers"
     - "H-1: war weariness per combat — PARTLY READ"
-  context:
-    - "- War weariness (0x1fb680, from the combat log 0x20d280): it reads only the struct's [+0] and [+8] and the combat..."
-    - "- 0x1fb680, per side, the attacker logged \"Attacking\": loc = 1 in lands allied to the unit (GP +0x..."
+    - "C-109: war weariness per combat, the turn's decay and the percent — READ"
   review: reviewed
 - addr: 0x1fbae0
   final: 0x14f400
@@ -443,6 +453,18 @@
     - "C-123: Operation Move's danger flags, the MoveTo execution and m_blockedTurns — READ (0x816cb0 at 0x816e70 / 0x817839, 0x962380, 0x73e610), both twins"
     - "C-124: the kept path is never taken; a move order's path passes other players' units out of sight — READ (0x272aa0, 0x2714b0, 0x586360 at 0x586542..0x5865a1, 0x26fe20), both twins"
   review: reviewed
+- addr: 0x20a220
+  final: 0x15a700
+  kind: function
+  semantics: "war weariness's allied-land test (from 0x1fb680): true where the combat plot's owner is the unit's owner, or a player its owner HasAllied (0x3da560); false for no unit and an unowned plot."
+  status: READ
+  cases:
+    - recording: h1_duelp1128
+      turn: 205
+      value: "Rome's Galley 917507 striking China's Bombard on Rome's plot: 52 (loc 1); Rome's city centre: 104 (no unit, loc 2)"
+  impl: [cpu/core/weariness.ts:warWearinessBattle, gpu/core/sim_economy.py:_ww_battle]
+  readings: ["C-109: war weariness per combat, the turn's decay and the percent — READ"]
+  review: reviewed
 - addr: 0x20a2a0
   final: 0x15a780
   kind: function
@@ -497,6 +519,7 @@
     - "C-34: the interception's damage, XP, weariness and the answers"
     - "C-96: the knowledge base's army records and the Combat Desire — READ (the records, the update, the desire), PARTLY READ (the signals' looks; the standing-army count in its own section below)"
     - "C-129: a killed player's records forgotten; a capture's new unit; an air strike's record — READ (0x534c50, 0x787fc0 -> 0x5ee370, 0x212500's create), both twins; the replay's later-player timings"
+    - "C-109: war weariness per combat, the turn's decay and the percent — READ"
   context:
     - "- War weariness (0x1fb680, from the combat log 0x20d280): it reads only the struct's [+0] and [+8] and the combat's location — the interceptor..."
   review: reviewed

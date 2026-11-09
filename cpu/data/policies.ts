@@ -189,8 +189,8 @@ export interface PolicyEffects {
   unitCombatCS?: { classes?: PromoClass[]; all?: boolean; cs: number };
   /** percentage POINTS joining every experience award's building percentage */
   xpPct?: number;
-  /** percentage taken off every war-weariness accrual this seat scores */
-  wwCutPct?: number;
+  /** the Overall war-weariness percent (EFFECT_ADJUST_WAR_WEARINESS Amount, signed) joining every accrual this seat scores */
+  wwPct?: number;
   /** multiplies every per-turn Great Person point source */
   gppMult?: number;
   gppFlat?: Partial<Record<GreatPersonClass, number>>;
@@ -800,7 +800,7 @@ const POLICY_SRC: Record<string, SrcMap> = {
   },
   PROPAGANDA: {
     kind: xml('Policies', 'PolicyType=POLICY_PROPAGANDA', 'GovernmentSlotType', { expect: 'SLOT_MILITARY' }),
-    'effects.wwCutPct': { derived: '-Amount - the install writes the cut negative (Overall), this catalog positive', inputs: [xml('ModifierArguments', 'ModifierId=PROPAGANDA_OVERALLWARWEARINESS&Name=Amount', 'Value')] },
+    'effects.wwPct': xml('ModifierArguments', 'ModifierId=PROPAGANDA_OVERALLWARWEARINESS&Name=Amount', 'Value'),
   },
   RETAINERS: {
     kind: xml('Policies', 'PolicyType=POLICY_RETAINERS', 'GovernmentSlotType', { expect: 'SLOT_MILITARY' }),
@@ -1274,7 +1274,7 @@ export const POLICIES: Record<string, PolicyDef> = Object.fromEntries(
       yieldPctPerSuzerain: { science: 0.05 },
     }),
     P('PROPAGANDA', 'Propaganda', 'military', 'War Weariness reduced by 25%.', undefined, {
-      wwCutPct: 25,
+      wwPct: -25,
     }),
     P('RETAINERS', 'Retainers', 'military', '+1 Amenity in cities with a garrisoned unit.', 'MASS_MEDIA', {
       amenitiesWithGarrison: 1,
@@ -1563,7 +1563,7 @@ const GOVERNMENT_SRC: Record<string, SrcMap> = {
     'bonus.prodBoost.eraMax': { derived: '-1: every era - the flat bonus names no era', inputs: [xml('ModifierArguments', 'ModifierId=FASCISM_UNIT_PRODUCTION&Name=BonusType', 'Value')] },
     'bonus.prodBoost.pct': { derived: 'Amount/100 - the install writes the percentage, this catalog the fraction', inputs: [xml('ModifierArguments', 'ModifierId=FASCISM_UNIT_PRODUCTION&Name=Amount', 'Value')] },
     'effects.unitCombatCS.cs': xml('ModifierArguments', 'ModifierId=FASCISM_ATTACK_BUFF&Name=Amount', 'Value'),
-    'effects.wwCutPct': xml('ModifierArguments', 'ModifierId=FASCISM_WAR_WEARINESS&Name=Amount', 'Value'),
+    'effects.wwPct': xml('ModifierArguments', 'ModifierId=FASCISM_WAR_WEARINESS&Name=Amount', 'Value'),
   },
   DIGITAL_DEMOCRACY: {
     tier: xml('Governments', 'GovernmentType=GOVERNMENT_DIGITAL_DEMOCRACY', 'Tier', { expect: 'Tier4' }),
@@ -1629,7 +1629,7 @@ const LEGACY_SRC: Record<string, SrcMap> = {
   FASCISM: {
     legacyOf: xml('Governments', 'GovernmentType=GOVERNMENT_FASCISM', 'PolicyToUnlock', { expect: 'POLICY_GOV_FASCISM' }),
     'effects.unitCombatCS.cs': xml('ModifierArguments', 'ModifierId=FASCISM_LEGACY_ATTACK_BUFF&Name=Amount', 'Value'),
-    'effects.wwCutPct': xml('ModifierArguments', 'ModifierId=FASCISM_WAR_WEARINESS&Name=Amount', 'Value'),
+    'effects.wwPct': xml('ModifierArguments', 'ModifierId=FASCISM_WAR_WEARINESS&Name=Amount', 'Value'),
   },
 };
 
@@ -1683,11 +1683,12 @@ export const GOVERNMENTS: Record<string, GovernmentDef> = Object.fromEntries(
     // Governors."
     G('COMMUNISM', 'Communism', 3, [M, M, M, E, E, E, D, W], { governorPerCitizen: { production: 0.6 } },
       '+0.6 production per citizen in cities with governors.'),
-    // CIV6 (GS) INHERENT: "All units gain +5 Combat Strength. War
-    // Weariness reduced by 20%" — ModifierArguments[FASCISM_WAR_WEARINESS].Amount 20.
+    // CIV6 (GS) INHERENT: "All units gain +5 Combat Strength." FASCISM_WAR_WEARINESS
+    // Overall Amount 20 adds 20 to the war-weariness percent (0xbe35b0), whatever
+    // its text ("War Weariness reduced by 15%") says.
     G('FASCISM', 'Fascism', 3, [M, M, M, M, E, D, W, W],
-      { unitCombatCS: { all: true, cs: 5 }, wwCutPct: 20 },
-      '+5 combat strength for all units; -20% war weariness.'),
+      { unitCombatCS: { all: true, cs: 5 }, wwPct: 20 },
+      '+5 combat strength for all units; +20% war weariness.'),
     // CIV6 (GS) INHERENT: "+2 Amenities in all cities, and +2 Culture per
     // Specialty District." Its flat bonus (`GOV_BONUS`) is the -3 Combat
     // Strength. A tier-4 government names no PolicyToUnlock, so it leaves

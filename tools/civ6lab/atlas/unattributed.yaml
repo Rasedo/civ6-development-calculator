@@ -1168,10 +1168,20 @@
   status: PARTLY
   readings:
     - "C-123 / C-95: a Trader stands on the trade layer; a city's shot is a COMBAT_DISTRICT spot's blow back — READ (0x901e0, 0x586360 -> 0x208b80, 0x585eb0 -> 0x585d90, 0x791470 at 0x7917f7..0x7918f7 -> 0x249ee0 / 0x205720, 0x776140 at 0x776780..0x7767fa), both twins"
+    - "C-109: war weariness per combat, the turn's decay and the percent — READ"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...gates a second simulation (0x205720) with the sides swapped (the district the attacker, 0x213c80 / 0x213d30, the unit the defender, 0x213e00), its location each spot (+0x1c + 8 i): t..."
   review: reviewed
+- addr: 0x213cd0
+  final: 0x163610
+  kind: function
+  status: PARTLY
+  readings: ["C-109: war weariness per combat, the turn's decay and the percent — READ"]
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "- SIDES by the combat type ([+0x50]) and its subtype (0x213cd0): a unit's side is its owner, a district's (0x213c80) the district's owner, a plot ta..."
+  review: imported
 - addr: 0x213d30
   final: 0x163670
   kind: function
@@ -1641,10 +1651,30 @@
       value: the barbarian Man-At-Arms 3014664 on 8:14 plans 7:13 (turn 2, dealt 150) beside the Apostle 2097152 on 6:13 and takes it in Attack Units, as logged
   readings:
     - "C-95: the planning strikes a religious unit and a Trader on their plot, its foreign test reads the mover's map layer, the blow on them 1.5 x their health — READ (0x790c60 at 0x790f22, 0x790fc9..0x791016, 0x7910b3..0x791162; 0x791470 at 0x791703..0x79174a, 0x7917b1..0x7917f7; 0x793400), both twins"
+    - "C-109: war weariness per combat, the turn's decay and the percent — READ"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ...strength (+0x29) whose owner's diplomatic relationship with the target's (0x2a7750 -> 0x2a8460 -> 0x29fb10) is not -1 (-1 only for one player with itself); every other target a mover...
   review: reviewed
+- addr: 0x2a8480
+  kind: function
+  semantics: "a war state's name as DiplomacySummary.csv writes it: Surprise, Formal, Holy, Liberation, Reconquest, Protectorate, Colonial, Territorial, Golden Age War, War of Retribution, Ideological War, Joint War, Suzerain War, Emergency War, Defensive Pact."
+  status: READ
+  cases:
+    - recording: h1_duelp1128
+      turn: 205
+      value: DiplomacySummary t203 China -> Rome 'At War, Surprise'
+  impl: [cpu/harness/import.ts:loadWarKinds, cpu/harness/import.ts:WAR_NAMES]
+  readings: ["C-109: war weariness per combat, the turn's decay and the percent — READ"]
+  review: reviewed
+- addr: 0x2a8610
+  kind: function
+  status: PARTLY
+  readings: ["C-109: war weariness per combat, the turn's decay and the percent — READ"]
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...x3d7270, from 0x3d7020 at the player's DoTurn): from every opponent o the pair relation 0x2a8610 holds for, with W[o] > 0, the player sheds WAR_WEARINESS_DECAY_TURN_AT_WAR 50 (+0x75c,..."
+  review: imported
 - addr: 0x2a92d0
   kind: function
   semantics: the two players are at war.
@@ -1660,6 +1690,7 @@
       value: runs/h1_duelv1128 Hong Kong's   Forts one 1.0 a turn (20.11 at T 0) higher from its t196 war with China,   1128's Fort rows 2,602 -> 2,795 exact;
   readings:
     - "C-96: the improvement value — READ (0x7a58f0, 0x7b1320's yields, tourism and modifiers, the feature removal 0x7a3010, the harvest 0x7a37d0, the build unit 0x7a2e20, EFFECT_ADJUST_CITY_FREE_POWER), PARTLY READ (the hazards' turns, 0x7b1320's defence, claimed plots and neighbours terms)"
+    - "C-109: war weariness per combat, the turn's decay and the percent — READ"
   context:
     - "...player below 0x41 with a slot (+0x2b48) and its +0x728 flag set, at war with this one (0x2a92d0) — the barbarians not counted: every row before a war fits n 0, runs/h1_duelv1124 Grana..."
   review: reviewed
@@ -8651,6 +8682,31 @@
     - "Units made, kept progress and the culture banks from the game's memory — READ (0x4c1a30, 0x4bed20, 0x4f2fc0, 0x3939b0, 0x3a1fb0), both twins; the importer reads them"
   context:
     - "...hTrained): 0x4c1a30, called as a unit is made (the city's 0x1e6570, 0xb02c60, 0xb67b30, 0xbd8be0, a hero 0x8ffac0) and the era's starting units (0x4580b0 through 0x4c1c10), raises it t..."
+  review: reviewed
+- addr: 0xbe2d40
+  kind: function
+  semantics: "EFFECT_ADJUST_WAR_WEARINESS's arguments: Enemy (+8), Domestic (+9), Overall (+0xa) and Amount (+0xc, signed), exactly one type set."
+  status: READ
+  cases:
+    - recording: h1_duelp1128
+      turn: 205
+      value: "FASCISM_WAR_WEARINESS Overall Amount 20: China's 104 -> 124 under Fascism from t223"
+  impl: [cpu/data/policies.ts:GOVERNMENTS]
+  readings: ["C-109: war weariness per combat, the turn's decay and the percent — READ"]
+  review: reviewed
+- addr: 0xbe35b0
+  kind: function
+  semantics: "EFFECT_ADJUST_WAR_WEARINESS applied: adds the signed Amount to the player diplomacy's Enemy (+0x17b0 +0x58 = +0x1808), Domestic (+0x1868) or Overall (+0x18c8) war-weariness multiplier."
+  status: READ
+  cases:
+    - recording: h1_duelp1128
+      turn: 205
+      value: "Fascism's +20 Overall: China's 104 -> 124, 52 -> 62 from t223"
+  impl:
+    - cpu/core/weariness.ts:warWearinessBattle
+    - gpu/core/sim_economy.py:_ww_add
+    - cpu/data/policies.ts:GOVERNMENTS
+  readings: ["C-109: war weariness per combat, the turn's decay and the percent — READ"]
   review: reviewed
 - addr: 0xbe3670
   final: 0x8a1af0

@@ -1,19 +1,14 @@
-"""War weariness is scored PER BATTLE — the
+"""War weariness per combat (Player_Diplomacy 0x1fb680) — the
 tests/cpu/seats/war-weariness.test.ts twin.
 
     python tests/gpu/war_weariness_test.py
 
-The scripted parity gate proves the two engines AGREE, never that either agrees
-with Civ 6, and it reaches only the wars its seeds happen to fight — Ancient and
-Classical bases, no city-state combat, no simultaneous wars. Every rule below is
-poked directly instead, through the same seat-generic entry points both engines
-call.
-
-    WWP = (EraBase * Location) + Death
-
-Location 1 at home / 2 abroad; Death = 3 * EraBase to the side that lost a unit;
-any battle with a CITY at the abroad column; both sides score, "without any
-discrimination".
+Every rule below is poked directly, through the same seat-generic entry points
+both engines call: each side of a combat between two majors scores
+trunc(loc x base x (100 + pct) / 100), the attacker's base 16 + the game era's
+WarmongerPoints x the war's percent / 100, the defender's 16 - the war's
+percent; loc 1 on its own or an ally's plot with a unit, else 2, + 3 where its
+unit died.
 """
 
 from __future__ import annotations
@@ -39,11 +34,9 @@ def build():
     sim.war[:, 0, 1:sim.n_majors] = sim.war[:, 1:sim.n_majors, 0] = False
     sim.war[:, 1:sim.n_majors, 1:sim.n_majors] = False
     sim.sync_war()  # close the pokes under transpose
+    sim.seat_warkind[:] = 0
     sim.ww[:] = 0
-    sim.ww_turn[:] = -1
     return sim
-
-
 def one(sim) -> torch.Tensor:
     return torch.ones(sim.B, dtype=torch.bool)
 
@@ -65,62 +58,60 @@ def neutral_tile(sim) -> torch.Tensor:
 def main() -> None:
     sim = build()
     rww = sim.rules.war_weariness
-    abroad, death = int(rww["abroad"]), int(rww["death"])
+    home_m, abroad, death = int(rww["home"]), int(rww["abroad"]), int(rww["death"])
     per = int(rww["perAmenity"])
-    # Ancient SURPRISE — the one row of the sourced table where a casus belli
-    # buys nothing (formal == surprise); the premium opens at Classical.
-    b = int(rww["eraSurprise"][0])
-    assert int(rww["eraFormal"][0]) == b, "Ancient formal and surprise are equal"
-    assert int(rww["eraSurprise"][1]) > int(rww["eraFormal"][1]), "the premium opens at Classical"
+    # a war of no kind: the war's percent 0, both bases WAR_WEARINESS_WARMONGER_BASE
+    b = int(rww["base"])
 
     away, home = neutral_tile(sim), owned_tile(sim, 0)
 
-    # --- both sides score, and the aggressor gets no discount --------------
+    # --- a war of no kind scores both sides at the base -------------------
     sim.ww[:] = 0
     sim._ww_battle(one(sim), 0, 1, away)
     assert int(sim.ww[0, 0, 1]) == b * abroad, int(sim.ww[0, 0, 1])
     assert int(sim.ww[0, 1, 0]) == b * abroad, int(sim.ww[0, 1, 0])
     print(f"  both sides score {b * abroad} on neutral ground")
 
-    # --- HOME is half of ABROAD, per side, on the SAME battle --------------
+    # --- a unit on its own plot scores the home loc -----------------------
     sim.ww[:] = 0
-    sim._ww_battle(one(sim), 0, 1, home)
-    assert int(sim.ww[0, 0, 1]) == b, "the defender at home pays a single base"
-    assert int(sim.ww[0, 1, 0]) == b * abroad, "the invader pays double"
-    print(f"  one battle, two multipliers: home {b} vs abroad {b * abroad}")
+    sim._ww_battle(one(sim), 1, 0, home)
+    assert int(sim.ww[0, 0, 1]) == b * home_m, "the defender at home pays the home loc"
+    assert int(sim.ww[0, 1, 0]) == b * abroad, "the invader pays the abroad loc"
+    print(f"  one battle, two locs: home {b * home_m} vs abroad {b * abroad}")
 
-    # --- a CITY forces the abroad column for BOTH --------------------------
+    # --- a city side has no unit: the abroad loc --------------------------
     sim.ww[:] = 0
-    sim._ww_battle(one(sim), 0, 1, home, city=True)
-    assert int(sim.ww[0, 0, 1]) == b * abroad, "a city drags its own defender abroad"
-    print("  a city giving or receiving the attack scores at the abroad column")
+    sim._ww_battle(one(sim), 1, 0, home, d_city=True)
+    assert int(sim.ww[0, 0, 1]) == b * abroad, "a city side scores abroad"
+    print("  a city side scores at the abroad loc")
 
-    # --- a death costs the side that LOST the unit, and only that side -----
+    # --- a death adds three to the loc of the side that lost the unit -----
     sim.ww[:] = 0
     sim._ww_battle(one(sim), 0, 1, away, d_died=one(sim))
     assert int(sim.ww[0, 0, 1]) == b * abroad, "the survivor pays no death term"
-    assert int(sim.ww[0, 1, 0]) == b * abroad + death * b, int(sim.ww[0, 1, 0])
-    print(f"  the loser pays {death} more bases: {int(sim.ww[0, 1, 0])} vs {int(sim.ww[0, 0, 1])}")
+    assert int(sim.ww[0, 1, 0]) == b * (abroad + death), int(sim.ww[0, 1, 0])
+    print(f"  the loser pays {death} more: {int(sim.ww[0, 1, 0])} vs {int(sim.ww[0, 0, 1])}")
 
-    # --- BARBARIANS neither accrue it nor inflict it -----------------------
+    # --- a Surprise war: the attacker 16 + the game era's points x 150%, the defender nothing
+    sim.ww[:] = 0
+    sim.game_era[:] = 4
+    sim.seat_warkind[:, 0, 1] = 1
+    sim.seat_warkind[:, 1, 0] = -1
+    sim._ww_battle(one(sim), 0, 1, away, d_died=one(sim))
+    assert int(sim.ww[0, 0, 1]) == 52 * abroad, int(sim.ww[0, 0, 1])
+    assert int(sim.ww[0, 1, 0]) == 0, int(sim.ww[0, 1, 0])
+    sim.seat_warkind[:] = 0
+    sim.game_era[:] = 0
+    print("  a Surprise war: the attacker's base 52 at Industrial, the defender none")
+
+    # --- BARBARIANS and CITY-STATES neither accrue it nor inflict it ------
     sim.ww[:] = 0
     barb = int(sim.BARB_ROW)
     sim._ww_battle(one(sim), 0, barb, away, d_died=one(sim))
     sim._ww_battle(one(sim), barb, 0, away, d_died=one(sim))
-    assert int(sim.ww.sum()) == 0, (
-        "a barbarian fight scored war weariness. Every seat is permanently "
-        "hostile to barbarians, so counting it makes 'at peace with everyone' "
-        "unreachable for the whole game and no accumulator can ever drain"
-    )
-    print("  barbarians score nothing, in either direction")
-
-    # --- a CITY-STATE is a real opponent but holds no accumulator ---------
-    sim.ww[:] = 0
-    citystate_row = sim.n_majors
-    sim._ww_battle(one(sim), 0, citystate_row, away, city=True)
-    assert int(sim.ww[0, 0, citystate_row]) > 0, "warring a minor wears you down normally"
-    assert int(sim.ww[0, citystate_row, :].sum()) == 0, "a minor keeps no accumulator"
-    print("  a city-state is a valid opponent and holds nothing itself")
+    sim._ww_battle(one(sim), 0, sim.n_majors, away, d_city=True)
+    assert int(sim.ww.sum()) == 0, "a fight with a barbarian or a city-state scored war weariness"
+    print("  barbarians and city-states score nothing, in either direction")
 
     # --- wars score SEPARATELY --------------------------------------------
     sim.ww[:] = 0
@@ -132,23 +123,18 @@ def main() -> None:
     assert int(sim._ww_sum(0)[0]) == step * 3, int(sim._ww_sum(0)[0])
     print(f"  each war its own accumulator ({step * 2}, {step})")
 
-    # --- decay: fought this turn / phoney / at peace with everyone --------
+    # --- decay: 50 from an opponent at war, 200 from one at peace ---------
     sim.ww[:] = 0
-    sim.ww_turn[:] = -1
     sim.ww[:, 0, 1] = 1000
     sim.ww[:, 0, 2] = 1000
-    sim.ww_turn[:, 0, 1] = int(sim.turn)  # blood was spilled against civ 0
     sim.war[:, 0, 1 + 0] = sim.war[:, 1 + 0, 0] = True
     sim.sync_war()
     sim._ww_decay(0)
-    assert int(sim.ww[0, 0, 1]) == 1000, "a war fought THIS turn does not decay"
-    assert int(sim.ww[0, 0, 2]) == 1000 - int(rww["decayAtWar"]), int(sim.ww[0, 0, 2])
-    sim.turn += 1
+    assert int(sim.ww[0, 0, 1]) == 1000 - int(rww["decayAtWar"]), int(sim.ww[0, 0, 1])
+    assert int(sim.ww[0, 0, 2]) == 1000 - int(rww["decayAtPeace"]), int(sim.ww[0, 0, 2])
     sim.war[:, 0, 1 + 0] = sim.war[:, 1 + 0, 0] = False
     sim.sync_war()
-    sim._ww_decay(0)
-    assert int(sim.ww[0, 0, 1]) == 1000 - int(rww["decayAtPeace"]), int(sim.ww[0, 0, 1])
-    print(f"  decay: 0 fought, {int(rww['decayAtWar'])} phoney, {int(rww['decayAtPeace'])} at peace")
+    print(f"  decay: {int(rww['decayAtWar'])} at war with the opponent, {int(rww['decayAtPeace'])} at peace")
 
     # --- a peace treaty settles THAT war and no other ---------------------
     sim.ww[:] = 0
@@ -194,14 +180,10 @@ def main() -> None:
     # --- the accumulator round-trips snapshot/restore ---------------------
     sim.ww[:] = 0
     sim.ww[:, 0, 1] = 4321
-    sim.ww_turn[:, 0, 1] = 7
     snap = sim.snapshot()
     sim.ww[:, 0, 1] = 0
-    sim.ww_turn[:, 0, 1] = -1
     sim.restore(snap)
     assert int(sim.ww[0, 0, 1]) == 4321, "ww lost in snapshot/restore"
-    assert int(sim.ww_turn[0, 0, 1]) == 7, "ww_turn lost in snapshot/restore"
-    print("  ww and ww_turn round-trip snapshot/restore")
 
     # --- a war DECLARED but never fought costs nothing -------------------
     sim = build()
@@ -216,7 +198,7 @@ def main() -> None:
     )
     print("  30 turns of a declared, unfought war cost nothing")
 
-    print("WAR WEARINESS OK — per-battle accrual, per-war accumulators, no ceiling")
+    print("WAR WEARINESS OK — per-combat accrual, per-war accumulators, no ceiling")
 
 
 if __name__ == "__main__":
