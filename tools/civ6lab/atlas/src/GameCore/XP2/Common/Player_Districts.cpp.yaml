@@ -107,9 +107,17 @@
     - recording: h1_duelp1128
       turn: 161
       value: Bologna's district quotes 138 -> 143 with Military Science, 146 with Metal Casting at t162
-  impl: [cpu/core/game.ts:districtScaledBase]
+  impl:
+    - cpu/core/game.ts:districtScaledBase
+    - cpu/core/combat.ts:captureCityState
+    - cpu/core/game.ts:foundCityAt
+    - gpu/core/sim_orders.py:_capture_city_state
+    - gpu/core/sim_seats.py:_transfer_city
+    - gpu/core/sim_seats.py:_found_city_at
+    - cpu/core/game.ts:refreshDistrictDiscount
   readings:
     - "C-100: the build turns' store — a completion's overflow, an idle city's Production — and a Builder's charge at the count before the turn's contract purchases"
+    - "C-105: the district discount's refresh at a district's placement and at a city's placement — READ (0x181700 at 0x181a97 / 0x181ac2, 0x36dc00 at 0x36dcc2 -> 0x1eae70 at 0x1eb312 -> 0x409800), both twins"
   review: reviewed
 - addr: 0x409870
   final: 0x2c4f10
@@ -122,10 +130,14 @@
       value: "What the city's quoted price caches is unread: the records fit every   type's price retaking the completed count at a technology or civic and a   type's own again when a district of it completes (1112"
     - recording: 1110
       value: "the ten duels' buy.districtCost +161, 1110 −6 where the record   caught China mid-turn) — `refreshDistrictDiscount`, a LAB line."
-  impl: [cpu/core/game.ts:districtDiscounted]
+  impl:
+    - cpu/core/game.ts:districtDiscounted
+    - cpu/core/phase.ts:paveDistrictTile
+    - gpu/core/sim_economy.py:_place_district
   readings:
     - "H-1: the best melee, the drought's turns, the Trader's sea, the harvest's lump, the district discount — READ"
     - "C-100: the build turns' store — a completion's overflow, an idle city's Production — and a Builder's charge at the count before the turn's contract purchases"
+    - "C-105: the district discount's refresh at a district's placement and at a city's placement — READ (0x181700 at 0x181a97 / 0x181ac2, 0x36dc00 at 0x36dcc2 -> 0x1eae70 at 0x1eb312 -> 0x409800), both twins"
   context:
     - "- The district discount (0x409870's under-average models): the type's count 0x4bdd70 (placed districts included) against..."
   review: reviewed

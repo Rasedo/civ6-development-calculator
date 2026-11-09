@@ -12171,6 +12171,10 @@ class SimSeats:
         self.tile_seat[b] = torch.where(owned, torch.full_like(self.tile_seat[b], dst_seat), self.tile_seat[b])
         self.tile_city[b] = torch.where(owned, torch.full_like(self.tile_city[b], new_id), self.tile_city[b])
         self._tile_owner_ver += 1  # seat + which city: the two halves TS calls ownerSeat/ownerCity
+        # the city's placement takes every district type's price to the
+        # completed count before its own districts join (0x1eae70 -> 0x409800)
+        if dst_major:
+            self.civ_discount_districts[b, dst_row] = self._completed_specialty(dst_row)[b]
         col = self._seat_city_append(b, dst_row)
         self.city_alive[b, dst_row, col] = True
         # the Free Cities seat scores no era and explores nothing
@@ -12887,8 +12891,11 @@ class SimSeats:
             _col_b = _slot_b.clamp(min=0)
             self._place_citizens(row, _col_b, found, None, full=True,
                                  fav_food=self.city_fav_food[self._bidx, row, _col_b])
-            # a major's city AI's analysis at the placement keeps its trade
-            # list (`majorCityTradeList`)
+            # the city's placement takes every district type's price to the
+            # completed count (0x1eae70 -> 0x409800), then its city AI's
+            # analysis keeps its trade list (`majorCityTradeList`)
+            self.civ_discount_districts[:, row] = torch.where(
+                found.unsqueeze(1), self._completed_specialty(row).unsqueeze(1), self.civ_discount_districts[:, row])
             self._major_trade_lists(row, found, _slot_b)
         self._settle_incursion(row, found, tile)
         self._eff_version += 1

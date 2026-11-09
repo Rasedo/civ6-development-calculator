@@ -1336,13 +1336,16 @@ export function paveGround(tile: Tile, keep: readonly FeatureId[] = []): void {
  * city is going to build it over ten turns or bought it outright. The
  * district set on its plot re-places the city's citizens (City_BuildQueue
  * 0x181700 -> the full reassign 0x196320 at 0x181bb8); its price locks
- * there (`City.districts`' `cost`). */
+ * there (`City.districts`' `cost`), and the type's later prices take the
+ * completed count afresh (0x181700 refreshes the type through 0x409870
+ * after the lock 0x179960). */
 function paveDistrictTile(state: GameState, civCity: City, id: DistrictId, tileIndex: number, cost: number): void {
   const tile = state.map.tiles[tileIndex];
   tile.district = id;
   tile.districtComplete = false;
   paveGround(tile);
   civCity.districts.push({ type: id, tileIndex, cost });
+  if (isCiv(civCity.seat)) refreshDistrictDiscount(state, civCity.seat, id);
   replaceAllCitizens(state, civCity, cityFlags(civCity));
 }
 
@@ -1823,6 +1826,10 @@ export function transferCity(
   // breaches nothing and carries the pool it had.
   if (why === 'conquered') flipped.outerHp = 0;
   else flipped.outerHp = civCity.outerHp;
+  // the city's placement takes every district type's price to the
+  // completed count before its own districts join (0x1eae70 -> 0x409800;
+  // the log adds them after CityInitialized)
+  if (isCiv(to.seat)) refreshDistrictDiscount(state, to.seat);
   to.cities.push(flipped);
   logPopWrite(state, flipped, 'tr');
   // CIV6 (Military Emergency): "The Target has conquered the city of another

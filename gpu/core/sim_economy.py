@@ -5201,6 +5201,10 @@ class SimEconomy:
             else:
                 self.city_dist_tile[rows, row, j, di] = bt
                 self.city_dist_cost[rows, row, j, di] = _cst
+            # the type's later prices take the completed count afresh
+            # (0x181700 refreshes the type through 0x409870 after the lock)
+            if row < self.n_majors:
+                self.civ_discount_districts[rows, row, di] = self._completed_specialty(row)[rows]
             self._eff_version += 1
             # the district set on its plot re-places the city's citizens
             # (City_BuildQueue 0x181700 -> the full reassign 0x196320)

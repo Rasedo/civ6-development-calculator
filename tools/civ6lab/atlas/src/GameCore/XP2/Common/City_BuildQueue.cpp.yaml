@@ -556,9 +556,11 @@
     - cpu/core/minorBuild.ts:minorItemCost
     - cpu/core/production.ts:resumeItem
     - cpu/core/types.ts:City
+    - cpu/core/phase.ts:paveDistrictTile
   readings:
     - "C-100: the build turns' store — a completion's overflow, an idle city's Production — and a Builder's charge at the count before the turn's contract purchases"
     - "C-111: every item's progress kept by type outside the queue, a pillaged building's or district's repair on the share its pillage left, a district's locked price on the district — READ (0x17f5a0, 0x175730 at 0x175bd3, 0x17d910, 0x175140, 0x1af5b0 -> 0x17e770 -> 0x183a60, 0x193190 -> 0x183950), both twins"
+    - "C-105: the district discount's refresh at a district's placement and at a city's placement — READ (0x181700 at 0x181a97 / 0x181ac2, 0x36dc00 at 0x36dcc2 -> 0x1eae70 at 0x1eb312 -> 0x409800), both twins"
   review: reviewed
 - addr: 0x179dd0
   kind: function
@@ -1177,6 +1179,7 @@
     - gpu/core/sim_phase.py:_seat_city_produce
   readings:
     - "C-111: every item's progress kept by type outside the queue, a pillaged building's or district's repair on the share its pillage left, a district's locked price on the district — READ (0x17f5a0, 0x175730 at 0x175bd3, 0x17d910, 0x175140, 0x1af5b0 -> 0x17e770 -> 0x183a60, 0x193190 -> 0x183950), both twins"
+    - "C-105: the district discount's refresh at a district's placement and at a city's placement — READ (0x181700 at 0x181a97 / 0x181ac2, 0x36dc00 at 0x36dcc2 -> 0x1eae70 at 0x1eb312 -> 0x409800), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...he plot (0x1ae340) and sets it whole (0x1af5b0) without the new district's completion 0x180450 (`completeQueueItem`'s repair branch)."
@@ -1203,18 +1206,20 @@
 - addr: 0x181700
   final: 0x1029c0
   kind: function
-  semantics: "a district set on its zoning plot (from 0x176210, m_aiZoningPlot): ends in the full citizen reassign 0x196320 (0x181bb8)."
+  semantics: "a district set on its zoning plot (from 0x176210, m_aiZoningPlot): its price locked through 0x179960 (0x181a97, stored at +0x48), then the player's price of its type refreshed through 0x409870 (0x181ac2); ends in the full citizen reassign 0x196320 (0x181bb8)."
   status: PARTLY
   impl:
     - cpu/core/phase.ts:paveDistrictTile
     - cpu/harness/replay.ts:placeHead
     - gpu/core/sim_economy.py:_place_district
     - cpu/harness/replay.ts:seat
+    - cpu/core/game.ts:refreshDistrictDiscount
   readings:
     - "C-112: the majors' citizens on a placement, the Free Cities' city turn — READ (0x180cb0, 0x181700, 0x1fa1d0), both twins"
     - "C-112: the majors' citizens by the citizen manager — READ (0x1fa1d0 at 0x1fa22d, 0x196320's callers), both twins"
     - "C-100 / C-112: a city-state's power and its regional buildings, the citizen reassign's callers — a fit and a reading"
     - "C-100 / C-112: a city-state's power and its regional buildings, the citizen reassign's callers"
+    - "C-105: the district discount's refresh at a district's placement and at a city's placement — READ (0x181700 at 0x181a97 / 0x181ac2, 0x36dc00 at 0x36dcc2 -> 0x1eae70 at 0x1eb312 -> 0x409800), both twins"
   context:
     - "...REASSIGN 0x196320's callers (the DLL's call sites): the building completions (0x180cb0, 0x181700), the favored / disfavored yield setters (0x196f90, 0x1970e0), AnnexPlot (0x1a8b70), th..."
   review: reviewed

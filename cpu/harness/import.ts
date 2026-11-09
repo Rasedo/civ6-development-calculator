@@ -574,7 +574,7 @@ export interface History {
   /** each player's district-discount counts (`Seat.discountDistricts`), by
    *  player and type: every type's the specialty districts it had completed
    *  at the record before its research last moved (the technology or civic
-   *  completed ahead of that turn's productions); a type's own again where a
+   *  completed ahead of that turn's productions) or a city joined it; a type's own again where a
    *  district of it completed since the record before, the count after
    *  that turn's productions */
   discountDistricts: Map<number, Map<DistrictId, number>>;
@@ -1839,20 +1839,22 @@ export function advanceHistory(h: History, rec: TurnRecord, cat: Catalog): void 
       // Campus complete before a technology completed in the turn, the
       // Harbor quoted 112 at t191). Without the log, or where it misses a
       // completion, the research takes the count of the record before and a
-      // completed type the count of this record.
+      // completed type the count of this record. A city added to the player
+      // takes every type's count as the research does (1117 t186: Shanghai
+      // founded after Chengdu's Campus, the Holy Site 98 from t187).
       const steps = loggedDiscountSteps(rec, cat, p.id);
       const before = completedSpecialty(h.last, cat, p.id);
       const after = completedSpecialty(rec, cat, p.id);
       const researched = done(rec, p.id) !== done(h.last, p.id);
-      const districts = steps.filter((x) => x !== 'research').length;
+      const districts = steps.filter((x) => x !== 'research' && x !== 'city').length;
       if (before + districts === after && (!researched || steps.includes('research'))) {
         let cur = before;
         for (const x of steps) {
-          if (x === 'research') for (const t of PLACEABLE_DISTRICTS) counts.set(t, cur);
+          if (x === 'research' || x === 'city') for (const t of PLACEABLE_DISTRICTS) counts.set(t, cur);
           else counts.set(x, (cur += 1));
         }
       } else {
-        if (researched) for (const t of PLACEABLE_DISTRICTS) counts.set(t, before);
+        if (researched || steps.includes('city')) for (const t of PLACEABLE_DISTRICTS) counts.set(t, before);
         for (const t of completedSince(h.last, rec, cat, p.id)) counts.set(t, after);
       }
       // a district placed: its own price took the count standing, the type's
@@ -2106,17 +2108,22 @@ function completedSince(a: TurnRecord, b: TurnRecord, cat: Catalog, pid: number,
 }
 
 /** The steps of a player's turn that move its district-price counts, in
- *  the log's order: 'research' for a technology or civic completed, a type
- *  for a specialty district (`countsTowardLimit`) completed, each city's
- *  district once. */
-function loggedDiscountSteps(rec: TurnRecord, cat: Catalog, pid: number): ('research' | DistrictId)[] {
+ *  the log's order: 'research' for a technology or civic completed, 'city'
+ *  for a city added to the player (founded or transferred), a type for a
+ *  specialty district (`countsTowardLimit`) completed, each city's district
+ *  once. */
+function loggedDiscountSteps(rec: TurnRecord, cat: Catalog, pid: number): ('research' | 'city' | DistrictId)[] {
   const logged = (rec as TurnRecord & { actions?: unknown }).actions;
   const seen = new Set<string>();
-  const out: ('research' | DistrictId)[] = [];
+  const out: ('research' | 'city' | DistrictId)[] = [];
   for (const r of Array.isArray(logged) ? logged as unknown[][] : []) {
     if (r[3] !== pid) continue;
     if (r[2] === 'ResearchCompleted' || r[2] === 'CivicCompleted') {
       out.push('research');
+      continue;
+    }
+    if (r[2] === 'CityAddedToMap') {
+      out.push('city');
       continue;
     }
     if (r[2] !== 'CityProductionCompleted' || r[5] !== 2) continue;

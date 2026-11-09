@@ -36,7 +36,7 @@ import type { ArmyRecord, BarbTribe, City, CityState, DistrictId, GameState, Que
 import { hexDistance, neighbors } from '../../world/hex';
 import { isWater } from '../../world/query';
 import { NO_SEAT } from '../core/types';
-import { advanceTurn, minorTurns, turnChange, turnClose, foundCity, foundCityAt, buyTile, settlerCost, projectCost, unitStepCost, unitsAcquired, buildingPurchaseCost,
+import { advanceTurn, refreshDistrictDiscount, minorTurns, turnChange, turnClose, foundCity, foundCityAt, buyTile, settlerCost, projectCost, unitStepCost, unitsAcquired, buildingPurchaseCost,
   buyWorshipBuilding, purchaseBuildingWithFaith, purchaseCivilianWithFaith, purchaseNaturalist, purchaseReligiousUnit, purchaseRockBand, purchaseUnitWithFaith,
   purchaseSettler, unitGoldPrice, availableProjects, goldAffordable, buildingFaithPrice, wonderChargeBoost, adoptBeliefs,
   serialize, deserialize, itemCost } from '../core/game';
@@ -2565,7 +2565,10 @@ function placeHead(ctx: Ctx, actor: Seat, city: City, q: QueueItem): boolean {
       t.district = q.district;
       t.districtComplete = false;
       paveGround(t);
-      if (!city.districts.some((d) => d.tileIndex === q.tileIndex)) city.districts.push({ type: q.district, tileIndex: q.tileIndex, cost: q.cost });
+      if (!city.districts.some((d) => d.tileIndex === q.tileIndex)) {
+        city.districts.push({ type: q.district, tileIndex: q.tileIndex, cost: q.cost });
+        refreshDistrictDiscount(state, seat, q.district);
+      }
       // set on its plot, the city's citizens re-placed (0x181700)
       replaceAllCitizens(state, city, cityFlags(city));
       return false;

@@ -133,8 +133,10 @@ export function districtDiscounted(
 
 /** Take the specialty districts completed into the seat's prices
  *  (`Seat.discountDistricts`): every type's when a technology or civic
- *  completes, before the cities produce; `type`'s alone when a district of
- *  it completes. Between those a price stands on the count it took: a
+ *  completes, before the cities produce, and when a city joins the seat
+ *  (founded or received, before its own districts: 0x36dc00 -> 0x1eae70 ->
+ *  0x409800); `type`'s alone when a district of it is placed (after its
+ *  price locks: 0x181700) or completes. Between those a price stands on the count it took: a
  *  district finished elsewhere moves no other type's price
  *  (runs/h1_duelw110{3..8}: China's fourth Campus, done t123, discounted
  *  nothing until a technology landed at t125; runs/h1_duelw1112: China's
@@ -390,8 +392,10 @@ export function foundCityAt(state: GameState, seat: number, tile: Tile, owner: S
     const id = g.unit ?? (g.promoClass ? bestTrainableOfClass(state, seat, g.promoClass) : null);
     if (id) spawnUnit(state, id, tile.index, seat);
   }
-  // a major's city AI's analysis at the placement keeps its trade list
-  // (`majorCityTradeList`)
+  // the city's placement takes every district type's price to the completed
+  // count (0x1eae70 -> 0x409800), then its city AI's analysis keeps its
+  // trade list (`majorCityTradeList`)
+  if (seat < state.seats.length) refreshDistrictDiscount(state, seat);
   if (owner && isCiv(seat)) majorCityTradeList(state, owner, city);
   settleIncursion(state, seat, tile);
   return city;

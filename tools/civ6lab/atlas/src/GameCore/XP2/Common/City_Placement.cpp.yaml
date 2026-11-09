@@ -6,7 +6,7 @@
 - addr: 0x1eae70
   kind: function
   name: cityPlacement
-  semantics: "The city's placement (City_Placement.cpp): for a player 0x5bcdc0 admits whose city holds a CityBuildAI (+0x31d0), the city AI's analysis 0x5cdd70 (0x1eb335), whose City Analysis 0x5ce3f0 (0x5ce191) keeps the new city's trade list (0x78f210) at once."
+  semantics: "The city's placement (City_Placement.cpp): the owner's every district type's price refreshed (0x409800 at 0x1eb312), then for a player 0x5bcdc0 admits whose city holds a CityBuildAI (+0x31d0), the city AI's analysis 0x5cdd70 (0x1eb335), whose City Analysis 0x5ce3f0 (0x5ce191) keeps the new city's trade list (0x78f210) at once."
   status: PARTLY
   cases:
     - recording: h1_duelz1124
@@ -19,8 +19,13 @@
     - cpu/core/aiTrade.ts:majorCityTradeList
     - cpu/core/game.ts:foundCityAt
     - gpu/core/sim_seats.py:_found_city_at
+    - cpu/core/combat.ts:captureCityState
+    - gpu/core/sim_orders.py:_capture_city_state
+    - gpu/core/sim_seats.py:_transfer_city
+    - cpu/core/game.ts:refreshDistrictDiscount
   readings:
     - "C-130: a minor's levy home after its bank; its free Trader's route before its city update, the AI's yields cached before it; a deleted unit off its list at once; a major's founded city keeps its trade list at once — READ (0x4e4560 at 0x4e45ee / 0x4e4638, 0x6096c0's passes, 0x688eaa, 0x1cb8b0, 0x948500 at 0x9485e5, 0x1eae70 at 0x1eb335 -> 0x5cdd70 at 0x5ce191), the cache's span a fit, both twins"
     - "C-100: the build turns' store — a completion's overflow, an idle city's Production — and a Builder's charge at the count before the turn's contract purchases"
+    - "C-105: the district discount's refresh at a district's placement and at a city's placement — READ (0x181700 at 0x181a97 / 0x181ac2, 0x36dc00 at 0x36dcc2 -> 0x1eae70 at 0x1eb312 -> 0x409800), both twins"
   notes: [0x5bcdc0's test unread]
   review: reviewed

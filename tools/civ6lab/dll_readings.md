@@ -12876,3 +12876,39 @@ from the seat PILLAGE, `_barb_pillage_here` and the minors' `_plunder`.
   district); an unfinished district's plot after a capture (the engines leave
   it paved; the DLL makes none again); a captured minor's unfinished
   districts (the engines carry them in the registry).
+
+## C-105: the district discount's refresh at a district's placement and at a city's placement — READ (0x181700 at 0x181a97 / 0x181ac2, 0x36dc00 at 0x36dcc2 -> 0x1eae70 at 0x1eb312 -> 0x409800), both twins
+
+The player's district prices are a cache (Player_Districts +0x1a8, one entry
+per Districts row) that 0x409870 writes for one type and 0x409800 for every
+type. Its writers:
+
+- every type: SetTech (0x4cd7f1), SetCivic (0x3a1dbd), the game's start
+  (0x4cc740) and a city's placement 0x1eae70 (0x1eb312), which Player_Cities'
+  city add 0x36dc00 runs for every city a player receives: founded (0x36de50
+  from Create), transferred (City_Manager 0x1e8880: a capture, a cession, a
+  flip to the Free Cities), converted from a tribe (0x8e0c10). The engines:
+  `foundCityAt` / `_found_city_at`, `transferCity` / `_transfer_city`,
+  `captureCityState`, `captureCityStateFor` / `_capture_city_state`, each
+  `refreshDistrictDiscount(state, seat)` over the receiver's completed
+  specialty districts before the received city's own join (the log adds a
+  transferred city's districts after its CityInitialized: runs/h1_duelq1127
+  t213, Rome's city 589832 to China).
+- the type: a district completed (0x180450 at 0x1806c6, `completeQueueItem`)
+  and a district set on its zoning plot (0x181700: its price 0x179960 locked
+  at 0x181a97, then 0x409870 for its type at 0x181ac2): `paveDistrictTile` /
+  `_place_district`, the replay's imposed placement (`placeHead`).
+
+The importer (`loggedDiscountSteps`) takes a logged CityAddedToMap of the
+player as a 'city' step, every type's count at the completed count standing.
+
+- Confirmed: runs/h1_duelq1117 t186: Chengdu's Campus completes, then
+  Shanghai is founded; from record t187 China's Holy Site, Encampment,
+  Harbor, Industrial Zone and Entertainment Complex quote 98 (the discounted
+  32 x 6.125 / 2) in all eight cities, 165 before: buy.districtCost 186
+  misses -> 0 over the five duelq games (70,993 quotes). The placement's
+  type refresh: runs/h1_duelq1121 t179, China's Aerodrome placed at 95 (its
+  lock, the count before), the other cities' quotes 160 from record t180
+  (the importer's `discountPlaced`).
+- Open: the count a transferred city's own completed districts join at
+  (runs/h1_duelq1127 t213 moved no quote).

@@ -12,6 +12,7 @@ import { NUCLEAR_DEVICES, NUKE_ROBOT_DAMAGE, NUKE_SILO_DEFENSE, NUKE_SUB_DEFENSE
 import { AGE_GOLDEN, EMERGENCY_NUCLEAR } from '../data/seats';
 import { addWmd, nukeBlast, nukeCarrier, nukeInterceptStrength, nukeOffers, nukeVictims, wmdHeld } from './nuclear';
 import { declareWar } from './phase';
+import { refreshDistrictDiscount } from './game';
 import { declareWarOnCityState } from './cityStates';
 import { warBuffCS } from './casusBelli';
 import { envoysOf, hasMet, minorCity, mostEnvoysReceived } from './cityStates';
@@ -3132,6 +3133,9 @@ export function captureCityState(state: GameState, cityState: CityState, seat: n
   // count it free. Real Civ 6: a conquered city-state IS a city with a centre.
   markCityCentre(center);
   setTileOwner(center, seat, id);
+  // the city's placement takes every district type's price to the
+  // completed count before its own districts join (0x1eae70 -> 0x409800)
+  if (isCiv(seat)) refreshDistrictDiscount(state, seat);
   seatOf(state, seat)!.cities.push({
     id,
     seat: seat, // a conquered city-state joins its CONQUEROR's roster
@@ -3188,6 +3192,7 @@ export function captureCityStateFor(state: GameState, actor: Seat, cityState: Ci
   }
   cityLook(state, actor.seat, cityState.centerIndex);
   markCityCentre(center); // the captureCityState twin — see the note there
+  if (isCiv(actor.seat)) refreshDistrictDiscount(state, actor.seat);
   actor.cities.push({
     id,
     name: cityState.name,

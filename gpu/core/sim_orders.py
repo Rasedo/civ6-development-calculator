@@ -1638,6 +1638,10 @@ class SimOrders:
             self._tile_owner_ver += 1
             if int(self.city_alive[b, row].sum()) >= max_cities:
                 continue  # razed at the seat city cap — the TS early return, before nextCityId++
+            # the city's placement takes every district type's price to the
+            # completed count before its own districts join (0x1eae70 -> 0x409800)
+            if row < self.n_majors:
+                self.civ_discount_districts[b, row] = self._completed_specialty(row)[b]
             col = self._seat_city_append(b, row)
             new_id = int(self.civ_next_city_id[b, row])
             self.civ_next_city_id[b, row] += 1

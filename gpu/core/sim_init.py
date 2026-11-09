@@ -2838,8 +2838,9 @@ class SimInit:
         nD = len(self.districts_cat)
         # the COMPLETED specialty districts each district type's price reads
         # for the under-represented discount (`Seat.discountDistricts`): every
-        # type's taken when a technology or civic completes, a type's own
-        # again when a district of it completes (`refreshDistrictDiscount`)
+        # type's taken when a technology or civic completes or a city joins
+        # the seat, a type's own again when a district of it is placed or
+        # completes (`refreshDistrictDiscount`)
         self.civ_discount_districts = torch.zeros(B, self.n_majors, nD, dtype=torch.long, device=device)
         self.d_static_adj = torch.tensor(
             [[t.get("dadj", [0.0] * nD) for t in f["tiles"]] for f in fixtures],

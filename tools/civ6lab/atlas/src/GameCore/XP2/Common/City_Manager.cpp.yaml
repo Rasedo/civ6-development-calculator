@@ -55,4 +55,5 @@
     - cpu/core/phase.ts:newId
   readings:
     - "C-111: a captured city keeps its completed districts' locked prices and no progress by type; a district's repair is its city's queue; a unit's pillage takes the district's dearest building first — READ (0x1e8880, 0x173f70 at 0x17480e, 0x967300 / 0x967740, 0x9633c0 -> 0x24af90 -> 0x193190), both twins"
+    - "C-105: the district discount's refresh at a district's placement and at a city's placement — READ (0x181700 at 0x181a97 / 0x181ac2, 0x36dc00 at 0x36dcc2 -> 0x1eae70 at 0x1eb312 -> 0x409800), both twins"
   review: reviewed

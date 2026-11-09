@@ -3,6 +3,39 @@
 # `review: imported` = bootstrapped from dll_readings.md / code comments / saved
 # labels and not yet reviewed: verify against the disassembly, then edit and
 # set `review: reviewed`.
+- addr: 0x36dc00
+  final: 0x2649f0
+  kind: function
+  name: Player_Cities add city
+  semantics: "a city added to the player: the city allocated (0x36db10), named (0x327c30 / 0x328d10), placed by 0x1eae70 (0x36dcc2: the plot, every district type's price through 0x409800 at 0x1eb312, the city AI's analysis); on a placement's failure the city is removed (0x36dfe0). Called for a founded city (0x36de50 from Create), a transferred one (City_Manager 0x1e8880), a world-builder load (0x8aea40, 0x8c8130) and a tribe made a city-state (0x8e0c10)."
+  status: READ
+  cases:
+    - recording: h1_duelq1117
+      turn: 186
+      value: "Shanghai founded after Chengdu's Campus: China's Holy Site, Encampment, Harbor, Industrial Zone and Entertainment Complex 165 -> 98 in all eight cities from record t187"
+  impl:
+    - cpu/core/game.ts:foundCityAt
+    - cpu/core/phase.ts:transferCity
+    - cpu/core/combat.ts:captureCityState
+    - cpu/core/combat.ts:captureCityStateFor
+    - cpu/harness/import.ts:loggedDiscountSteps
+    - gpu/core/sim_seats.py:_found_city_at
+    - gpu/core/sim_seats.py:_transfer_city
+    - gpu/core/sim_orders.py:_capture_city_state
+    - cpu/core/game.ts:refreshDistrictDiscount
+  readings:
+    - "C-105: the district discount's refresh at a district's placement and at a city's placement — READ (0x181700 at 0x181a97 / 0x181ac2, 0x36dc00 at 0x36dcc2 -> 0x1eae70 at 0x1eb312 -> 0x409800), both twins"
+  review: reviewed
+- addr: 0x36de50
+  final: 0x264c40
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-105: the district discount's refresh at a district's placement and at a city's placement — READ (0x181700 at 0x181a97 / 0x181ac2, 0x36dc00 at 0x36dcc2 -> 0x1eae70 at 0x1eb312 -> 0x409800), both twins"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...which Player_Cities' city add 0x36dc00 runs for every city a player receives: founded (0x36de50 from Create), transferred (City_Manager 0x1e8880: a capture, a cession, a flip to the..."
+  review: imported
 - addr: 0x36f420
   final: 0x265410
   kind: function

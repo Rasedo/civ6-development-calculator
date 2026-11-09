@@ -1144,7 +1144,8 @@ export interface Seat {
   /** the COMPLETED specialty districts each district type's price reads for
    *  the under-represented discount, dense over `PLACEABLE_DISTRICTS`
    *  (`districtDiscounted`): every type's taken when a technology or civic
-   *  completes, a type's own again when a district of it completes
+   *  completes or a city joins the seat, a type's own again when a district
+   *  of it is placed or completes
    *  (`refreshDistrictDiscount`). */
   discountDistricts?: number[];
   /** CIV6: a Relic with no open slot is held until one opens, not lost. */
