@@ -2402,7 +2402,13 @@ class _MinorFacts:
             dcp = sim.rules.district_cost
             base = int(dcp["perDistrict"][dv]) if dv < len(dcp["perDistrict"]) else int(dcp["base"])
             k = int(dcp["perK"][dv]) if dv < len(dcp["perK"]) else int(dcp["k"])
-            return sim._progress_cost(base, k, pct).double()
+            # the type placed on any plot, complete or not: the price the
+            # city locked at its placement (`minorDistrictFull`)
+            full = sim._progress_cost(base, k, pct).double()
+            if dv < 0:
+                return full
+            lk = sim.citystate_dist_cost[:, s, dv]
+            return torch.where(lk > 0, lk.double(), full)
         pi = self._pidx(item)
         if pi == sim._repair_proj_idx:
             return sim._minor_repair(s)[1]
@@ -2434,14 +2440,16 @@ class _MinorFacts:
             return torch.where(sim._citystate_didx[:, s] == dv, type_pct[sim.citystate_type[:, s].clamp(min=0)], zero)
         return zero
 
-    def build_turns(self, item):
+    def build_turns(self, item, repair: bool = False):
         """the turns the item takes at the city's Production under its
         percent, from the progress it keeps and the overflow store; 500 for
         an item the minor has no row for (once per item while the item in
-        hand stands)"""
-        return self._get(("bt", item, getattr(self.sim, "_mi_ver", 0)), lambda: self._build_turns(item))
+        hand stands); `repair`, a district's on the plot of the city's own
+        pillaged one, the rest of its price past the resumed share
+        (`minorRepairResumed`)"""
+        return self._get(("bt", item, repair, getattr(self.sim, "_mi_ver", 0)), lambda: self._build_turns(item, repair))
 
-    def _build_turns(self, item):
+    def _build_turns(self, item, repair: bool = False):
         sim, s = self.sim, self.s
         k = self._item_key(item)
         if k < 0:
@@ -2449,6 +2457,8 @@ class _MinorFacts:
         cur = sim.citystate_item[:, s]
         progress = torch.where(cur == k, sim.citystate_prod[:, s], sim.citystate_kept[:, s, k]) + sim.citystate_ovf[:, s]
         cost = self._item_cost(item)
+        if repair:
+            cost = cost - torch.floor(cost * float(sim.rules.citystate["repairResumePct"]) / 100)
         pct = self._item_pct(item)
         if self.no_known is not None and item.startswith("UNIT_") and self._uidx(item) != sim._builder_idx:
             # a founding turn's first look: no PLAYER_CITIES modifier on the

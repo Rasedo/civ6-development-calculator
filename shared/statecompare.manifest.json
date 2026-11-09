@@ -5070,7 +5070,7 @@
       },
       {
         "path": "Seat.aiYields",
-        "why": "a city-state's city yields as its AI read them before its free Trader's dispatch: written by minorPhase before minorTradePick, dropped by a citizen re-placement and deleted after its military AI's upgrade, so it is never live at a turn boundary; the GPU twin holds it at the same points (`_cv_yields_seen`, transient)."
+        "why": "a city-state's city yields and growth as its AI read them before its free Trader's dispatch: written by minorPhase before minorTradePick and deleted after its military AI's upgrade, so it is never live at a turn boundary; the GPU twin holds them at the same points (`_cv_yields_seen`, `_cv_growth_seen`, transient)."
       },
       {
         "path": "Seat.dangerOpen",

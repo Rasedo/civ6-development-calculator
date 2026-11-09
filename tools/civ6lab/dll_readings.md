@@ -14099,3 +14099,46 @@ no clamp; its +0xc4 is the raw damage.
   0x39fd80 once each, where the engines clear and lay back once; whether
   0x391650 converts an extra Diplomatic slot (Potala Palace) under
   Founding Fathers (the engines convert it).
+
+## C-100: the City Analysis reads the city before the free Trader's route, the Neighbourhood's install Housing beside a feature, a pillaged district's repair turns — READ (0x5c24e0 on +0x258 before the dispatch 0x78e0a0 and the update 0x5ce680; 0x79e140 on Districts +0x40), both twins
+
+`minorPlotEvals` (cpu/core/minorCityAi.ts: `CityState.aiYields`' growth,
+`DISTRICT_HOUSING`, the repair's `buildTurns(type, plot)`), `minorPhase`
+(cpu/core/minorBuild.ts); `_PlotFacts.housing_value` / `beside_housing` and
+`_minor_plot_evals`' repairs (gpu/core/sim_minorai.py), `_cv_growth_seen`
+(gpu/core/sim_minors.py), `_MinorFacts.build_turns(item, repair)`
+(gpu/core/sim_cityvalue.py).
+
+- THE GROWTH THE PLOT VALUES READ: the City Analysis 0x5c24e0 runs on player
+  signal +0x258, before the +0x370 list and the job pass whose Economic AI
+  turn ends on the free Trader's route (0x78e0a0 at 0x688eaa); the city
+  update 0x5ce680 writes the growth forecast 0x5cb570 after that dispatch.
+  So a city-state's improvement Housing (0x7a3d70 from 0x7b1320 and from
+  EFFECT_ADJUST_IMPROVEMENT_HOUSING 0x6ad2b0) reads the city's surplus and
+  Housing before the route begun in the turn, over the forecast the last
+  update wrote after the route. The engines keep the growth at the
+  dispatch beside the yields (`aiYields.growth`, `_cv_growth_seen`) and
+  read it for the plot values; the forecast stays `aiGrowthSeen`.
+- Confirmed: runs/h1_duelq1117 Caguana's route ran out in its t135 / t165
+  / t195 / t225 turns and began again in t136 / t166 / t196 / t226: the
+  Farm rows (the Mayab housing modifier) of those turns at the city without
+  the route's 1 Food, the next turns' at a forecast with it (surplus 6 / 8 /
+  9 / 16, not 5 / 7 / 8 / 15): 4 x 4-5 rows a seed's 30 turns +45.
+- THE HOUSING DISTRICT BESIDE A FEATURE (0x7a3010's Appeal term through
+  0x79e140): the neighbour's district row's Districts +0x40 Housing, the
+  install column (the Neighbourhood's 4; its city housing is its plot's
+  Appeal band, read elsewhere). The engines read the AI district rows'
+  `housing` (`DISTRICT_HOUSING`, `beside_housing`). Confirmed:
+  runs/h1_duelq1121 Hunza t228-t249: the Neighbourhood placed on 10:3 in its
+  t227 turn, its Forest on 11:3's Fort and Airstrip rows (the Forest
+  cleared) 10.05 lower (the Forest's Appeal 1 x 0.5 Food from T to H).
+- THE REPAIR'S TURNS: the plot holding the city's own pillaged district
+  values that district alone at the repair's turns, the rest of the price
+  past `MINOR_REPAIR_RESUME_PCT` (`minorRepairResumed` at that plot), the
+  progress the type keeps and the store. Confirmed: runs/h1_duelq1124
+  Granada's Encampment on 40:10 pillaged t121-t249: T 0-2 as logged (the
+  full price's T 4-7 before).
+- Open: the City Analysis' other reads of the city (its Production and the
+  totals) against the dispatch are those `aiCityStats` holds; a formation's
+  boost (Mobilization's corps) completes after the analysis (the lab holds
+  the civic in hand), its place in the engines' turn unread.

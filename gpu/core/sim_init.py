@@ -474,6 +474,9 @@ class SimInit:
         # them before it: the totals' reads but the Food and the Production,
         # the bases' but the Food take them (`CityState.aiYields`)
         self._cv_yields_seen: dict[int, tuple[torch.Tensor, torch.Tensor]] = {}
+        # and its growth as its City Analysis read it before the dispatch
+        # (`CityState.aiYields`' growth, `_MinorFacts.growth`'s keys)
+        self._cv_growth_seen: dict[int, dict[str, torch.Tensor]] = {}
         # per minor in its turn, its danger map ([B, T]) as its DoTurn built
         # it, after its growth (`Seat.dangerOpen`): its city trees read it
         self._minor_danger_open: dict[int, torch.Tensor] = {}

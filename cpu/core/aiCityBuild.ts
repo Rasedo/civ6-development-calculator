@@ -241,8 +241,9 @@ export interface CityBuildFacts {
    *  cities within a regional building's range */
   amenity: AmenityCity;
   regionalAmenities(range: number): readonly AmenityCity[];
-  /** turns to build an item at the city's Production toward it */
-  buildTurns(item: string): number;
+  /** turns to build an item at the city's Production toward it; a
+   *  district's at `site`, the repair of the city's own pillaged one there */
+  buildTurns(item: string, site?: number): number;
   /** the city's growth as its forecast reads it */
   growth: CityGrowth;
   /** the growth forecast (`growthForecast`, CityBuildAI +0x6c8) its city's

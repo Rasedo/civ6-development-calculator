@@ -120,6 +120,10 @@ const YIELD_KEY: Record<string, string> = {
 };
 /** per AI district row its engine district, null none */
 const DISTRICT_ENGINE = new Map(AI_DISTRICTS.map((r) => [r.type, engineId('district', r.type, 'DISTRICT_', DISTRICTS) as DistrictId | null]));
+/** per engine district the install's Districts.Housing (+0x40), its
+ *  traitless AI row's: the Neighbourhood's 4, whose city housing its
+ *  plot's Appeal pays */
+const DISTRICT_HOUSING = new Map(AI_DISTRICTS.filter((r) => r.trait === null).map((r) => [DISTRICT_ENGINE.get(r.type), r.housing] as const));
 /** per AI improvement row its engine improvement, null none */
 const IMPROVEMENT_ENGINE = new Map(AI_IMPROVEMENTS.map((r) => [r.type, engineId('improvement', r.type, 'IMPROVEMENT_', IMPROVEMENTS)]));
 /** the engine improvements whose install row is Buildable */
@@ -328,6 +332,12 @@ export function minorPlotEvals(state: GameState, cs: CityState, facts: CityBuild
   const yctx = makeYieldCtx(state, cs.seat);
   const resFacts = minorResourceFacts(state, cs);
   const forecast = facts.forecast;
+  // the city's growth as the analysis reads it, before its free Trader's
+  // dispatch (`CityState.aiYields`), its improvements' Housing and their
+  // modifiers' on it
+  const growth = cs.aiYields?.growth ?? facts.growth;
+  const view: typeof facts.view = { ...facts.view, cityHousingValue: (i, id, housing, t, h) =>
+    (i === cs.seat && id === facts.cityId ? housingValue(growth, forecast, housing, t, h) : facts.view.cityHousingValue(i, id, housing, t, h)) };
   const centre = map.tiles[cs.centerIndex];
   const candidates = new Set(borderCandidates(state, city));
   const specialty = (cs.districts ?? []).filter((x) => DISTRICTS[x.type]?.countsTowardLimit).length;
@@ -370,7 +380,7 @@ export function minorPlotEvals(state: GameState, cs: CityState, facts: CityBuild
       eruptionTurns: eruptionHazardTurns(state, plot),
       drought: tile.droughtTurns > 0,
       appeal: tileAppeal(map, tile, camps, gp),
-      besideHousingDistrict: neighbors(map, tile).some((n) => n.district !== null && (DISTRICTS[n.district]?.housing ?? 0) > 0),
+      besideHousingDistrict: neighbors(map, tile).some((n) => n.district !== null && (DISTRICT_HOUSING.get(n.district) ?? 0) > 0),
       unitCost: (u) => (u === 'UNIT_BUILDER' ? UNITS.BUILDER.cost + scaleByGameSpeed(BUILDER_COST_STEP) * (cs.aiBuilders ?? cs.buildersTrained)
         : UNITS[engineId('unit', u, 'UNIT_', UNITS) ?? '']?.cost ?? 0),
       buildsUnit: (u) => minorUnitVersion(u) === u,
@@ -383,14 +393,14 @@ export function minorPlotEvals(state: GameState, cs: CityState, facts: CityBuild
         if (!id) return 0;
         return (improvementAdjacency(yctx, tile, id, sees) as unknown as Record<string, number>)[YIELD_KEY[y]] ?? 0;
       },
-      housingValue: (housing, t, h) => housingValue(facts.growth, forecast, housing, t, h),
+      housingValue: (housing, t, h) => housingValue(growth, forecast, housing, t, h),
       resourceValue: (res, count, t, h) => {
         const row = RES.get(res);
         return row ? resourceValue(resFacts, row, count, t, h) : 0;
       },
       accumulationPct: accumulationPct(state, cs.seat, tile.terrain),
       era: facts.era,
-      modifiers: (mods, t, h) => modifiersValue({ view: facts.view, seat: cs.seat, start: t, horizon: h, rate: AI_RATE,
+      modifiers: (mods, t, h) => modifiersValue({ view, seat: cs.seat, start: t, horizon: h, rate: AI_RATE,
         owner: { cityId: facts.cityId, capital: facts.capital }, plot }, mods),
     };
     // the plot test asks no drought; the value of an improvement a drought
@@ -470,8 +480,12 @@ export function minorPlotEvals(state: GameState, cs: CityState, facts: CityBuild
       if (minorDistrictVerdict(cs.type, row.type) < 0) return FX_MIN;
       passed = true;
       // the update's pass then adds the district's buildings term into a
-      // positive slot (0x5cb36b..0x5cb44e)
-      const v = districtValue(df, row.type, distT[i], AI_VALUE_HORIZON);
+      // positive slot (0x5cb36b..0x5cb44e); a repair lands at the repair's
+      // turns, the rest of its price past the resumed share
+      // (`minorRepairResumed`: runs/h1_duelq1124 Granada's pillaged
+      // Encampment on 40:10, t121-t249 at T 0 - 2)
+      const t = repair ? facts.buildTurns(row.type, plot) + Math.max(facts.techTurns(row.tech), facts.civicTurns(row.civic)) : distT[i];
+      const v = districtValue(df, row.type, t, AI_VALUE_HORIZON);
       return v > 0 ? v + districtBuildings[i] : v;
     });
     out.push({

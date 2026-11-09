@@ -1001,8 +1001,9 @@ export interface Seat {
    *  notwithstanding: the totals but the Food and the Production, the
    *  bases but the Food (the city's cached yields, City::GetYield 0x1cb8b0,
    *  each kept from its first read while the game state is locked:
-   *  `aiCityStats`); absent outside that turn */
-  aiYields?: { total: Yields; base: Yields };
+   *  `aiCityStats`); and its growth as its City Analysis read it, before
+   *  the dispatch (`minorPlotEvals`); absent outside that turn */
+  aiYields?: { total: Yields; base: Yields; growth: CityGrowth };
   /** a city-state's danger map (`dangerPlane`) per plot as its DoTurn
    *  builds it (0x4e4560 -> 0x46cdd0 -> 0x717460, after its city's turn),
    *  the one its city trees read all turn, the replay's copy's included;

@@ -224,8 +224,13 @@ export function minorPhase(state: GameState): void {
     // reads the city as it stands): runs/h1_duelz1117 t46 city-state 3's
     // route Gold and Science out of Classical Republic's and Digital
     // Democracy's amenity terms, 314.5 at t47)
+    // Its City Analysis' plot values read the city's growth before the
+    // route, its update's forecast after it (runs/h1_duelq1117 Caguana t136
+    // / t166 / t196 / t226: the route run out the turn before and begun
+    // again, none of its Food in that turn's Farm rows, all of it in the
+    // forecast the next turn's rows read)
     const seen = computeCityStats(state, minorCity(cityState));
-    cityState.aiYields = { total: { ...seen.total }, base: { ...seen.baseYields } };
+    cityState.aiYields = { total: { ...seen.total }, base: { ...seen.baseYields }, growth: minorCityGrowth(state, cityState) };
     // the route's values at the Gold boost the Economic AI's turn wrote
     // before it (0x6880a1), its city update's at the turn before's
     // (runs/h1_duelz1121 Hunza t87: its Trader to Taiyuan, as recorded, on
@@ -1987,10 +1992,12 @@ export function minorBuildFacts(state: GameState, cityState: CityState, known: (
     current,
     techTurns: turns,
     civicTurns: turns,
-    buildTurns: (type) => {
-      // a building the city holds pillaged: its repair's turns
-      const item = minorItemFor(cityState, type);
-      if (!item) return 500;
+    buildTurns: (type, site) => {
+      // a building the city holds pillaged, or its own pillaged district at
+      // `site`: its repair's turns
+      const found = minorItemFor(cityState, type);
+      if (!found) return 500;
+      const item = site !== undefined && 'district' in found ? { ...found, site } : found;
       const k = minorItemKey(item);
       // the progress kept on the item, and the store an idle step or a
       // completion left, which the next item takes (runs/h1_duelv1124: idle

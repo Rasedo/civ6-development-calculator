@@ -106,6 +106,9 @@ class SimMinors:
             _row = self._CITY_MINOR0 + s
             self._cv_yields_seen[s] = (self._seat_city_stats(_row, record=False)[0][:, 0].clone(),
                                        self._seat_city_base(_row)[:, 0].clone())
+            # its City Analysis' plot values read the city's growth before
+            # the route, its update's forecast after it
+            self._cv_growth_seen[s] = {k: v.clone() for k, v in self._cv_minor_facts(s).growth().items()}
             # the route's values at the Gold boost the Economic AI's turn
             # writes before it, its city update's at the turn before's
             _boost_was = self.citystate_gold_boost[:, s].clone()
@@ -125,6 +128,7 @@ class SimMinors:
             self._mops_military_upgrade(s, alive)
             del self._cv_counted[s]
             del self._cv_yields_seen[s]
+            del self._cv_growth_seen[s]
             # the boosts its routes and the actions before them earned land
             # before its army's walk and its second hook's tree tick
             self._detect_minor_boosts(s, alive)

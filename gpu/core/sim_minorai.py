@@ -1349,7 +1349,11 @@ class SimMinorAi:
                                 [(name, torch.zeros_like(bb, dtype=torch.bool)) for (_i, name, _dv, _pl, _ok) in cand_rows])
                 pf.repair_of = dname
                 passed[bb, pp] = passed[bb, pp] | ok_t[bb]
-                ti = distT[i][bb]
+                # a repair lands at the repair's turns, the rest of its price
+                # past the resumed share (`minorPlotEvals`)
+                r = dist_rows[i]
+                ti = (_t(f.build_turns(dname, repair=True), f.like()) + torch.maximum(_t(f.tech_turns(r["tech"]), f.like()),
+                                                                                     _t(f.civic_turns(r["civic"]), f.like())))[bb]
                 if bool((ti > hz).all()):
                     continue
                 v = self._cv_district(pf, dname, ti, torch.full_like(bb, hz))
@@ -1990,10 +1994,13 @@ class _PlotCtx:
 
     def beside_housing(self) -> torch.Tensor:
         """[B, T] a plot beside a district (complete or not; a city centre)
-        whose row gives Housing"""
+        whose install row gives Housing (Districts +0x40, its AI row's: the
+        Neighbourhood's 4)"""
         def build():
             sim = self.sim
-            dh = torch.tensor([int(d["housing"]) > 0 for d in sim.districts_cat] or [False], dtype=torch.bool, device=sim.device)
+            rows = sim._cv_tables()["district_row"].tolist()
+            cbd = sim.rules.ai_city_build["districts"]
+            dh = torch.tensor([r >= 0 and int(cbd[r]["housing"]) > 0 for r in rows] or [False], dtype=torch.bool, device=sim.device)
             has = (sim.district >= 0) & dh.take(sim.district.clamp(min=0))
             if int(sim.rules.ai_city_build["centreHousing"]) > 0:
                 has = has | sim._centre_plane()
@@ -2201,9 +2208,12 @@ class _PlotFacts:
         return out
 
     def housing_value(self, housing, t, h):
+        """the plots' city's Housing more (`minorPlotEvals`): on its growth as
+        the analysis read it, before its free Trader's dispatch
+        (`_cv_growth_seen`), and its turn's forecast"""
         sim = self.sim
-        g = self.mf.growth()
-        fc = self.mf._get("fc", lambda: sim._cv_forecast(g))
+        g = sim._cv_growth_seen.get(self.s) or self.mf.growth()
+        fc = self.mf._get("fc", lambda: sim._cv_forecast(self.mf.forecast_growth()))
         gn = {k: v.take(self.bb) for k, v in g.items()}
         fcn = tuple(x[self.bb] for x in fc)
         return sim._cv_housing_value(gn, fcn, housing, t, h)

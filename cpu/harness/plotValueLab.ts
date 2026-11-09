@@ -14,7 +14,10 @@
  * parts, the landing turn that gives the log's value and its value
  * two turns either side. The world: the record of the turn, every plot no
  * city-state holds as the record after holds it (the majors' turns before
- * the city-states'), and the minor as its city AI's turn finds it after its
+ * the city-states'), but a pillage with no major's military unit on its plot
+ * and a fire's feature, as the record holds them (the barbarians', the
+ * city-states' units' and the random-event step's, after its turn), and the
+ * minor as its city AI's turn finds it after its
  * economy's accrual and its city's production and growth steps (`minorPhase`,
  * `minorGrowth`: its citizens re-placed), its growth forecast on the growth
  * its last analysis read (`CityState.aiGrowthSeen`): the technologies, the civics and the
@@ -24,7 +27,11 @@
  * it completed, its overflow and no item in hand, the building or district
  * standing, an idle city's store with the Production the step made (the
  * city as the record after holds it) and its Builder's lumps of a turn its
- * analysis chose nothing (AI_CityBuild.csv); the gold shortfall its turn's
+ * analysis chose nothing (AI_CityBuild.csv); a technology or civic a
+ * formation's boost completed in the turn (Game_Boosts.csv) still in hand;
+ * the forecast its update writes for the next turn on its routes with the one
+ * its free Trader began in the turn (its own analysis reads the city before
+ * that dispatch); the gold shortfall its turn's
  * start banked; its wars as the record after holds them; the plots the
  * majors' envoys of the turn annexed (`envoyTiles`, its citizens
  * re-placed); its strategic stockpile carried from its last turn, less the
@@ -44,7 +51,8 @@
  * tribal village or a meteor site (`plotImprovementType`); a plot holding
  * the city or a district is not compared in the IMPROVEMENTS mode (the
  * analysis skips it, its row an earlier analysis's). A district's facts: the engine's adjacency
- * (`baseAdjacency`) for both the whole and the rows, the plot's price where
+ * (`baseAdjacency`) for both the whole and the rows, its own pillaged
+ * district's plot at the repair's turns, the plot's price where
  * the city may buy it (`borderCandidates`), one city (no regional reach, no
  * Dam, Canal or projects); LAB: an inland city-state on a river trains ships
  * (0x1c77c0's sea test unread).
@@ -62,12 +70,12 @@ import { districtValue, type DistrictValueFacts } from '../core/aiDistrictValue'
 import { baseAdjacency } from '../core/yields';
 import { tilePurchaseCost } from '../core/game';
 import { canPlaceDistrictIn } from '../core/rules';
-import { minorBuildFacts, minorGrowth, minorItemInHand, minorPower, minorRaiseBuilding, minorResourceFacts } from '../core/minorBuild';
+import { minorBuildFacts, minorCityGrowth, minorGrowth, minorRepairsDistrictAt, minorItemInHand, minorPower, minorRaiseBuilding, minorResourceFacts } from '../core/minorBuild';
 import { economicGoldBoost } from '../core/aiWeights';
 import { newEconomicMemory } from '../core/aiEconomic';
 import { minorCity, minorReplaceCitizens } from '../core/cityStates';
 import { plotImprovementType } from '../core/minorCityAi';
-import { campTiles, hiddenResourcesFor } from '../core/seats';
+import { campTiles, hiddenResourcesFor, seatOf } from '../core/seats';
 import { civicAnalysis } from '../core/aiCivics';
 import { acquireTile, borderCandidates, computeCityStats } from '../core/city';
 import { chopGrant, harvestGrant } from '../core/economy';
@@ -80,12 +88,16 @@ import { engineId, gameTypeOf, installFeature } from '../data/aliases';
 import { IMPROVEMENTS } from '../data/improvements';
 import { DISTRICTS } from '../data/districts';
 import { TECHS } from '../data/techs';
+import { CIVICS } from '../data/civics';
+import { BOOSTS } from '../data/boosts';
 import { BUILDER_COST_STEP, UNITS } from '../data/units';
 import { GAME_COST_ESCALATION, gameProgressPct, scaleByGameSpeed } from '../data/constants';
 import { neighbors } from '../../world/hex';
+import { unitDomain } from '../core/units';
 import { tileAppeal } from '../core/appeal';
 import { cityAppealResolver } from '../core/governors';
 import { eruptionHazardTurns, floodHazardTurns } from '../core/disasters';
+import { FIRE_BURNING_FEATURE, FIRE_BURNT_FEATURE } from '../data/disasters';
 import { loadCityBuildCentre, loadCityBuildPlots } from './cityBuildLog';
 import { replayEvents } from './eventReplay';
 import { loadRandLog, randLogPath } from './randLog';
@@ -135,6 +147,20 @@ const unitTurns = new Map<string, Record<string, number>>();
     }
   }
 }
+/** Game_Boosts.csv's rows a boost completed: `${turn}:${player}` -> the
+ *  install technologies and civics */
+const boostDone = new Map<string, string[]>();
+{
+  const path = dump.replace(/\.jsonl$/, '.logs/Game_Boosts.csv');
+  if (existsSync(path)) {
+    for (const line of readFileSync(path, 'utf8').split('\n')) {
+      const p = line.split(',').map((x) => x.trim());
+      if (p[3] !== 'Completed') continue;
+      const k = `${p[0]}:${p[1]}`;
+      boostDone.set(k, [...(boostDone.get(k) ?? []), p[2]]);
+    }
+  }
+}
 /** AI_Knowledge.csv's TRADE rows: `${turn}:${player}` -> the route value K
  *  (an analysis reads its city-state's K of the turn before) */
 const tradeVal = new Map<string, number>();
@@ -173,7 +199,12 @@ const noBuild = new Set<string>();
   }
 }
 const W = recs[0].head.W;
+/** the features a fire lays (burning, burnt) */
+const FIRE_FEATURES = new Set<string>([...FIRE_BURNING_FEATURE, ...FIRE_BURNT_FEATURE]);
 const RES = new Map(AI_RESOURCES.map((r) => [r.type, r] as const));
+/** per engine district the install's Districts.Housing (`minorPlotEvals`) */
+const RES_DISTRICT_HOUSING = new Map(AI_DISTRICTS.filter((r) => r.trait === null)
+  .map((r) => [engineId('district', r.type, 'DISTRICT_', DISTRICTS), r.housing] as const));
 /** an engine district's install type: the traitless AI row whose engine id it is */
 const typeOfDistrict = (id: string): string => AI_DISTRICTS.find((r) => r.trait === null && engineId('district', r.type, 'DISTRICT_', DISTRICTS) === id)?.type ?? `DISTRICT_${id}`;
 const YIELD_KEY: Record<string, string> = {
@@ -228,6 +259,13 @@ for (const rec of recs) {
   // feature, district, road), an owning city the record lacks kept out
   const minorSeats = new Set([...state.cityStates, ...after.state.cityStates].map((c) => c.seat));
   const cityIds = new Set([...state.seats, ...(state.freeSeat ? [state.freeSeat] : [])].flatMap((s) => s.cities.map((c) => c.id)));
+  // the plots a major's military unit stands on in the record after: a pillage
+  // elsewhere came after the city-states' turns (the barbarians' turn, the
+  // random-event step into the next turn: runs/h1_duelq1127 t134, the Farm
+  // player 1 built on 6:12 that turn flooded at t135's step, Hattusa and
+  // Mexico City growing on its adjacency)
+  const majorSeats = new Set(after.state.seats.map((s) => s.seat).filter((s) => !minorSeats.has(s) && s !== after.state.freeSeat?.seat));
+  const majorAt = new Set(after.state.units.filter((u) => majorSeats.has(u.seat) && unitDomain(u.type) === 'military').map((u) => u.tileIndex));
   for (const tile of state.map.tiles) {
     const next = after.state.map.tiles[tile.index];
     if (minorSeats.has(tile.ownerSeat) || minorSeats.has(next.ownerSeat)) continue;
@@ -235,13 +273,16 @@ for (const rec of recs) {
       tile.ownerSeat = next.ownerSeat;
       tile.ownerCity = next.ownerCity;
     }
+    const pillagedBy = majorAt.has(tile.index);
+    const district = tile.district;
+    tile.pillaged = next.pillaged && (pillagedBy || (tile.pillaged && tile.improvement === next.improvement));
     tile.improvement = next.improvement;
-    tile.pillaged = next.pillaged;
-    tile.feature = next.feature;
+    // a fire's feature (burning, burnt, regrown) is the event step's
+    if (!FIRE_FEATURES.has(next.feature ?? '') && !FIRE_FEATURES.has(tile.feature ?? '')) tile.feature = next.feature;
     tile.resource = next.resource;
     tile.district = next.district;
     tile.districtComplete = next.districtComplete;
-    tile.districtPillaged = next.districtPillaged;
+    tile.districtPillaged = next.districtPillaged && (pillagedBy || (tile.districtPillaged && district === next.district));
     tile.builtWonder = next.builtWonder;
     tile.builtWonderComplete = next.builtWonderComplete;
     tile.road = next.road;
@@ -324,6 +365,7 @@ for (const rec of recs) {
     }
     if (nextCs) {
       const n = nextCs.research;
+      const was = { civic: cs.research.civic, civicProgress: cs.research.civicProgress, tech: cs.research.tech, techProgress: cs.research.techProgress };
       cs.research.civics = [...n.civics];
       cs.research.civic = n.civic;
       cs.research.civicProgress = n.civicProgress;
@@ -335,6 +377,29 @@ for (const rec of recs) {
       cs.research.techProgress = n.techProgress;
       cs.research.techRetained = { ...n.techRetained };
       cs.research.researchTurns = { ...(unitTurns.get(`${turn - 1}:${player}`) ?? {}) };
+      // a row a formation's boost completed in the turn (Game_Boosts.csv's
+      // Completed: its corps or armies, its military AI's after its city's
+      // analysis) is still in hand as the record held it (runs/h1_duelq1117
+      // Antananarivo t161 and runs/h1_duelq1121 t149: Mobilization's three
+      // corps, their district rows on the civics before it)
+      for (const id of boostDone.get(`${turn}:${player}`) ?? []) {
+        const civic = id.startsWith('CIVIC_');
+        const e = civic ? engineId('civic', id, 'CIVIC_', CIVICS) : engineId('tech', id, 'TECH_', TECHS);
+        if (!e || !['HAVE_X_CORPS', 'HAVE_X_ARMIES'].includes(BOOSTS[e]?.cls ?? '')) continue;
+        if (civic && cs.research.civics.includes(e)) {
+          cs.research.civics = cs.research.civics.filter((x) => x !== e);
+          if (was.civic === e) {
+            cs.research.civic = e;
+            cs.research.civicProgress = was.civicProgress;
+          }
+        } else if (!civic && cs.research.techs.includes(e)) {
+          cs.research.techs = cs.research.techs.filter((x) => x !== e);
+          if (was.tech === e) {
+            cs.research.tech = e;
+            cs.research.techProgress = was.techProgress;
+          }
+        }
+      }
     }
     // the plots the majors' envoys of the turn annexed (`envoyTiles`, in
     // the majors' turns before its own): each plot it holds in the record
@@ -375,7 +440,21 @@ for (const rec of recs) {
     // the forecast on the growth its city AI's last turn read
     // (`CityState.aiGrowthSeen`), its own the first turn
     const forecast = growthForecast(growthSeen.get(player) ?? facts.growth);
-    growthSeen.set(player, { ...facts.growth });
+    // the forecast its update writes, after its Economic AI's free Trader's
+    // dispatch (`minorPhase`): a route of the record after begun this turn
+    // joins the record's (a route its Trader ends later in the turn still
+    // runs); its City Analysis, before the dispatch, reads the city without
+    // it (runs/h1_duelq1117 Caguana t136 / t166 / t196 / t226: a route run
+    // out in the turn before and begun again, its Food in the forecast its
+    // t137 / t167 / t197 / t227 Farm rows read, none in its own rows)
+    {
+      const own = seatOf(state, cs.seat);
+      const begun = (seatOf(after.state, cs.seat)?.tradeRoutes ?? []).filter((x) => x.createdTurn === turn);
+      const kept = own?.tradeRoutes;
+      if (own && begun.length) own.tradeRoutes = [...(kept ?? []), ...begun.map((x) => ({ ...x }))];
+      growthSeen.set(player, minorCityGrowth(state, cs));
+      if (own) own.tradeRoutes = kept;
+    }
     // the modifiers' housing on the same growth (`cityHousingValue`)
     const k = tradeVal.get(`${turn - 1}:${player}`);
     const modView = { ...facts.view, cityHousingValue: (i: number, id: number, housing: number, t: number, h: number) =>
@@ -446,7 +525,7 @@ for (const rec of recs) {
         eruptionTurns: eruptionHazardTurns(state, tile.index),
         drought: tile.droughtTurns > 0,
         appeal: tileAppeal(state.map, tile, camps, gp),
-        besideHousingDistrict: neighbors(state.map, tile).some((n) => n.district !== null && (DISTRICTS[n.district]?.housing ?? 0) > 0),
+        besideHousingDistrict: neighbors(state.map, tile).some((n) => n.district !== null && (RES_DISTRICT_HOUSING.get(n.district) ?? 0) > 0),
         unitCost: (u) => (u === 'UNIT_BUILDER' ? UNITS.BUILDER.cost + scaleByGameSpeed(BUILDER_COST_STEP) * builders
           : UNITS[engineId('unit', u, 'UNIT_', UNITS) ?? '']?.cost ?? 0),
         // a city-state's own version of every unit (no unique one)
@@ -526,8 +605,10 @@ for (const rec of recs) {
           const row = AI_DISTRICTS[i];
           if (onlyImp && row.type !== onlyImp) return;
           const inHand = 0;
-          const t = facts.buildTurns(row.type) + inHand + Math.max(techTurns(row.tech), facts.civicTurns(row.civic));
-          const tparts = `${facts.buildTurns(row.type)}+${inHand}+${techTurns(row.tech)}/${facts.civicTurns(row.civic)}`;
+          // the city's own pillaged district: its repair's turns (`minorPlotEvals`)
+          const bt = minorRepairsDistrictAt(state, cs, plot) ? facts.buildTurns(row.type, plot) : facts.buildTurns(row.type);
+          const t = bt + inHand + Math.max(techTurns(row.tech), facts.civicTurns(row.civic));
+          const tparts = `${bt}+${inHand}+${techTurns(row.tech)}/${facts.civicTurns(row.civic)}`;
           const ours = slot(i, t) / FX;
           const d = Math.abs(ours - lv);
           let rowFit = -1;
