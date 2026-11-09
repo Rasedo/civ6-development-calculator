@@ -131,9 +131,11 @@ export interface BuiltWonderDef {
     /** CIV6 (Great Library): "Receive a random tech boost after another
      *  player recruits a Great Scientist." */
     rivalScientistBoost?: boolean;
-    /** CIV6 (Oracle): "Districts in this city provide +2 Great Person points
-     *  of their type." */
-    districtGpPoints?: number;
+    /** CIV6 (Oracle, MODIFIER_SINGLE_CITY_DISTRICTS_ADJUST_GREAT_PERSON_POINTS):
+     *  what each district of the holding city adds to the classes its rows
+     *  name — the Theater Square's Writer alone, no Artist or Musician
+     *  (runs/h1_duelp1128 China t214: Taiyuan's Theater Square +2 Writer). */
+    districtGpPoints?: Partial<Record<GreatPersonClass, number>>;
     /** CIV6 (Oracle): "diminishes all Patronage Faith costs by 25%" —
      *  Faith only, never the Gold price. */
     patronageFaithPct?: number;
@@ -323,7 +325,7 @@ export const BUILT_WONDERS: Record<string, BuiltWonderDef> = Object.fromEntries(
       requiresCivic: 'MYSTICISM',
       placement: { hillsOnly: true },
       cityYields: { culture: 1, faith: 1 },
-      effects: { districtGpPoints: 2, patronageFaithPct: 25 },
+      effects: { districtGpPoints: { GENERAL: 2, ADMIRAL: 2, ENGINEER: 2, MERCHANT: 2, PROPHET: 2, SCIENTIST: 2, WRITER: 2 }, patronageFaithPct: 25 },
       description: '+1 culture, +1 faith, districts in this city give +2 Great Person points of their type, Patronage faith costs -25%. Hills.',
       src: {
         code: { stylized: 'a display code, not a game constant' },
@@ -332,7 +334,8 @@ export const BUILT_WONDERS: Record<string, BuiltWonderDef> = Object.fromEntries(
         'cityYields.culture': xml('Building_YieldChanges', 'BuildingType=BUILDING_ORACLE&YieldType=YIELD_CULTURE', 'YieldChange'),
         'cityYields.faith': xml('Building_YieldChanges', 'BuildingType=BUILDING_ORACLE&YieldType=YIELD_FAITH', 'YieldChange'),
         'placement.hillsOnly': { derived: 'true where every Building_ValidTerrains row of the wonder is a HILLS terrain', inputs: [xml('Building_ValidTerrains', 'BuildingType=BUILDING_ORACLE', 'TerrainType')] },
-        'effects.districtGpPoints': xml('ModifierArguments', 'ModifierId=ORACLE_GREATSCIENTISTPOINTS&Name=Amount', 'Value'),
+        ...Object.fromEntries((['GENERAL', 'ADMIRAL', 'ENGINEER', 'MERCHANT', 'PROPHET', 'SCIENTIST', 'WRITER'] as const).map((c) => [
+          `effects.districtGpPoints.${c}`, xml('ModifierArguments', `ModifierId=ORACLE_GREAT${c}POINTS&Name=Amount`, 'Value')])),
         'effects.patronageFaithPct': xml('ModifierArguments', 'ModifierId=ORACLE_PATRONAGE_FAITH_DISCOUNT&Name=Amount', 'Value'),
       },
     }),

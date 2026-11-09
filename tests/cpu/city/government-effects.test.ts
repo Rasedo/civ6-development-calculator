@@ -207,7 +207,8 @@ describe('CLASSICAL REPUBLIC — the specialty-district gate and the GPP factor'
     borrowingRow({ gppMult: 1.15 }, () => {
       const boosted = greatPersonPointsPerTurn(state, 0);
       for (const cls of GP_CLASSES) {
-        expect(boosted[cls]).toBeCloseTo(bare[cls] * 1.15, 12);
+        // the factor in the game's 24.8 fixed point
+        expect(boosted[cls]).toBeCloseTo(bare[cls] * (Math.floor(1.15 * 256) / 256), 12);
       }
     });
   });

@@ -32,7 +32,7 @@
  * from the game's draw log where the recording kept it.
  */
 import { existsSync, readFileSync } from 'node:fs';
-import type { ArmyRecord, BarbTribe, City, CityState, DistrictId, GameState, QueueItem, Seat, SeatActionRecord, Tile, TradeRoute, Unit } from '../core/types';
+import type { ArmyRecord, BarbTribe, City, CityState, DistrictId, GameState, GreatPersonClass, QueueItem, Seat, SeatActionRecord, Tile, TradeRoute, Unit } from '../core/types';
 import { hexDistance, neighbors } from '../../world/hex';
 import { isWater } from '../../world/query';
 import { NO_SEAT } from '../core/types';
@@ -119,7 +119,9 @@ import { holdRng, rngHold } from '../core/rand';
 import { seedMoments, stateChecks, transitionChecks, type CheckResult } from './checks';
 import { engineId, gameHash, gameTypeOf } from '../data/aliases';
 import { OperationsProbe, operationsMarkdown, type OperationsTally } from './operationsScore';
-import { GP_CLASSES, GREAT_PEOPLE, gpChargesOf, gpEffectOf, personWorkObjects } from '../data/greatPeople';
+import { GP_CLASSES, GREAT_PEOPLE, gpChargesOf, gpCost, gpEffectOf, personWorkObjects } from '../data/greatPeople';
+import { loadGpTimeline, type GpTimeline } from './gpTimeline';
+import { patronageCost, patronizeGreatPerson, recruit } from '../core/greatPeople';
 import { InferredActions, RecordedActions, activePlayer, type ActionSource, type Decision, type LogTally, type QueueSpec } from './replayActions';
 import { newScores, scoreDecision, scoreTable, memoryTable, type DecisionScores } from './aiScore';
 import { GameMemory, MemoryLogs, readGameMemory, readMemory, readRevealed, syncContracts, type ArmyLogged } from './aiMemory';
@@ -3251,6 +3253,77 @@ function applyClear(ctx: Ctx, d: Extract<Decision, { kind: 'clear' }>, copyClear
   if (!why) count(ctx, `clear:${d.what}`, 'applied');
 }
 
+/** THE WONDER A PERSON'S PRODUCTION IS SPENT ON stands at its city's queue
+ *  head as the player spent it there: the queue record t+1 shows has it
+ *  complete and gone, which the pair's queue order takes off before the
+ *  activation (runs/h1_duelp1117 t145: Imhotep on Xi'an's Great Lighthouse,
+ *  t147 on Longxi's Casa de Contratación). The item comes back at the head
+ *  with the progress the queue order kept of it. Counted as `gpActivate:wonderHead`. */
+function wonderUnderPerson(ctx: Ctx, u: Unit): void {
+  const { state } = ctx;
+  const person = gpPersonOf(u);
+  const fx = person ? gpEffectOf(person) : undefined;
+  if (!fx || !(fx.wonderProduction || fx.wonderBuyout)) return;
+  const t = state.map.tiles[u.tileIndex];
+  if (!t?.builtWonder || t.builtWonderComplete || t.ownerSeat !== u.seat) return;
+  const city = seatOf(state, u.seat)?.cities.find((c) => c.id === t.ownerCity);
+  if (!city) return;
+  const head = city.queue[0];
+  if (head?.kind === 'wonder' && head.tileIndex === t.index) return;
+  const q: QueueItem = { kind: 'wonder', wonder: t.builtWonder, tileIndex: t.index, progress: 0 };
+  resumeItem(state, city, q);
+  city.queue.unshift(q);
+  count(ctx, 'gpActivate:wonderHead', 'fallback', ctx.playerOfSeat.get(u.seat), `${t.builtWonder} at ${t.index} back at the head at ${r3(q.progress)}`);
+}
+
+/** A GREAT PERSON A MAJOR WAS GRANTED that the engine's points did not
+ *  recruit: the person record t+1 names granted it in the pair's turn
+ *  (`TurnRecord.greatPeople`) stands on its class's timeline, and the claim
+ *  is the engine's own — the player's patronage through `patronizeGreatPerson`
+ *  where a purse fell across the pair beyond its income by the price, else
+ *  the claim on its points (`recruit`, its price off the points): the
+ *  moment, the boosts, the quest, the replacement's draw; its unit the
+ *  record's (`matchNewUnits`). runs/h1_duelp1117 t101: China patronizes
+ *  Marcus Licinius Crassus with Faith, GREAT_PERSON_CREATED_PATRONAGE_FAITH_OVER_HALF
+ *  and the Mercantilism inspiration. Counted as `unitNew:greatPerson`; false
+ *  for no such person. */
+function completeRecruit(ctx: Ctx, b: TurnRecord, d: Extract<Decision, { kind: 'unitNew' }>): boolean {
+  const { state } = ctx;
+  const cls = /^UNIT_GREAT_(.+)$/.exec(ctx.cat.units[d.type] ?? '')?.[1] as GreatPersonClass | undefined;
+  const i = cls ? GP_CLASSES.indexOf(cls) : -1;
+  const seat = seatOfP(ctx, d.player);
+  const s = seatOf(state, seat);
+  if (!cls || i < 0 || !s || !isCiv(seat)) return false;
+  const person = (Array.isArray(b.greatPeople) ? b.greatPeople : [])
+    .filter(([, player, c, , turn]) => player === d.player && turn === ctx.turn
+      && ctx.cat.greatPersonClasses?.[c] === `GREAT_PERSON_CLASS_${cls}`)
+    .map(([ind]) => GREAT_PEOPLE[cls].findIndex((p) => p.id === aliasOrPrefixed(ctx.cat.greatPeople?.[ind] ?? '')))
+    .find((k) => k >= 0 && !state.claimedGreatPeople.includes(GREAT_PEOPLE[cls][k].id));
+  if (person === undefined) return false;
+  state.gpOffer ??= GP_CLASSES.map(() => -1);
+  state.gpPrice ??= GP_CLASSES.map(() => 0);
+  let why = 'on its points';
+  if (state.gpOffer[i] !== person) {
+    why = `the engine's timeline stood ${GREAT_PEOPLE[cls][state.gpOffer[i]]?.id ?? state.gpOffer[i]}`;
+    state.gpOffer[i] = person;
+    state.gpPrice[i] = gpCost(GREAT_PEOPLE[cls][person].era, state.gameEra ?? 0);
+  }
+  const p0 = ctx.prev?.players.find((q) => q.id === d.player);
+  const p1 = b.players.find((q) => q.id === d.player);
+  const spent = (field: 'gold' | 'faith') => (p0 && p1
+    ? num(p0[field]) + num(p0[field === 'gold' ? 'goldYield' : 'faithYield']) - num(p1[field]) : 0);
+  const purse = (['faith', 'gold'] as const).find((c) => spent(c) >= patronageCost(state, seat, cls, c === 'gold') - 1);
+  if (purse && patronizeGreatPerson(state, seat, i, purse).ok) why = `patronized with ${purse}`;
+  else {
+    s.gpp[cls] = Math.max(0, (s.gpp[cls] ?? 0) - (state.gpPrice[i] ?? 0));
+    s.gpp[cls] = (s.gpp[cls] ?? 0) + recruit(state, seat, cls);
+  }
+  matchNewUnits(ctx, b);
+  if (!unitOf(ctx, d.unit)) spawnRecorded(ctx, b, d.unit);
+  count(ctx, 'unitNew:greatPerson', 'fallback', d.player, `${d.unit} ${GREAT_PEOPLE[cls][person].id}: ${why}`);
+  return true;
+}
+
 /** A NEW UNIT OF THE RECORD, a major's, a city-state's or a Free City's.
  *  `mayWait`: a city-state's the engine has not made waits for its
  *  clearings' lumps (`minorClearsAfter`) */
@@ -3276,6 +3349,7 @@ function applyUnitNew(ctx: Ctx, b: TurnRecord, d: Extract<Decision, { kind: 'uni
   }
   // a captive is the seizure's (`seize`)
   if (ds.some((x) => x.kind === 'seize' && x.into === d.unit)) return;
+  if (major && completeRecruit(ctx, b, d)) return;
   spawnRecorded(ctx, b, d.unit);
   count(ctx, major ? 'unitNew:other' : 'minorAi:unitNew', 'fallback', d.player, `${d.unit} ${ctx.cat.units[d.type]} ${d.why}: the engine made none`);
 }
@@ -3609,6 +3683,7 @@ const res = buyTile(state, city.id, d.plot, seat);        if (!res.ok) setTileOw
         }
         const person = gpPersonOf(u);
         if (person && gpEffectOf(person).perm?.navalSight) stepsBeforeSight(ctx, b, d.unit, u.seat);
+        wonderUnderPerson(ctx, u);
         if (!activateGreatPerson(state, u)) {
           if (TRACE.has('gpActivate')) console.error(`   ${d.unit} ${u.type} gpAt${u.gpAt} charges${u.charges} at ${u.tileIndex}`);
           count(ctx, 'gpActivate', 'refused', d.player, 'the engine refused the activation');
@@ -5033,6 +5108,12 @@ export function compareState(state: GameState, read: Imported, weary?: Map<numbe
     }
     note(t, 'seat.eraScore', (es.eraScore ?? 0) === (rsx.eraScore ?? 0), name, rsx.eraScore ?? 0, es.eraScore ?? 0,
       Math.abs((es.eraScore ?? 0) - (rsx.eraScore ?? 0)));
+    // the Great Person points by class, where the record carries them
+    if (Object.keys(rsx.gpp).length) {
+      const off = GP_CLASSES.filter((c) => !near(es.gpp[c] ?? 0, rsx.gpp[c] ?? 0));
+      note(t, 'seat.gpp', off.length === 0, name, off.map((c) => `${c} ${r3(rsx.gpp[c] ?? 0)}`), off.map((c) => `${c} ${r3(es.gpp[c] ?? 0)}`),
+        Math.max(0, ...off.map((c) => Math.abs((es.gpp[c] ?? 0) - (rsx.gpp[c] ?? 0)))));
+    }
     note(t, 'seat.favor', near(es.diplomaticFavor ?? 0, rsx.diplomaticFavor ?? 0), name, rsx.diplomaticFavor ?? 0, r3(es.diplomaticFavor ?? 0),
       Math.abs((es.diplomaticFavor ?? 0) - (rsx.diplomaticFavor ?? 0)));
     // its war weariness against each opponent, beside the game's ledger
@@ -5474,6 +5555,31 @@ function importedWorld(state: GameState, imp: Imported, rec: TurnRecord, history
     if (seat !== undefined && state.seats[seat]) state.seats[seat].handicap = LAB_HANDICAP;
   }
   seedMoments(state, imp, history);
+  standGreatPeople(state, rec.turn);
+}
+
+/** the game's Great People timeline beside the dump (`loadGpTimeline`) */
+let gpTimeline: GpTimeline | null = null;
+
+/** each class's standing person and its frozen price as record `turn`
+ *  holds them, off the game's timeline log; a class the log names no one for
+ *  (exhausted) offers none (-2), one it never logged waits for the engine's
+ *  draw */
+function standGreatPeople(state: GameState, turn: number): void {
+  const at = gpTimeline?.at(turn);
+  if (!at) return;
+  state.gpOffer = GP_CLASSES.map(() => -1);
+  state.gpPrice = GP_CLASSES.map(() => 0);
+  GP_CLASSES.forEach((cls, i) => {
+    const s = at.get(cls);
+    if (s === undefined) return;
+    if (s === null) return void (state.gpOffer![i] = -2);
+    const id = aliasOrPrefixed(s.individual);
+    const k = GREAT_PEOPLE[cls].findIndex((p) => p.id === id);
+    if (k < 0) return;
+    state.gpOffer![i] = k;
+    state.gpPrice![i] = s.cost;
+  });
 }
 
 /** a contract the game's city queued in the turn `turn` the record's item
@@ -5827,6 +5933,7 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
   const skipped = start < 0 ? all : all.slice(0, start);
   const source = opts.source ?? (recs.some((r) => Array.isArray((r as { actions?: unknown }).actions)) ? new RecordedActions() : new InferredActions());
   const history: History = newHistory();
+  gpTimeline = loadGpTimeline(dumpPath);
   // the game's own draw log, where the recording kept it
   const logPath = randLogPath(dumpPath);
   if (logPath) {

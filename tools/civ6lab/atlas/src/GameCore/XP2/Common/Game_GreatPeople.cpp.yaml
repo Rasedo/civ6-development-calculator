@@ -3,6 +3,33 @@
 # `review: imported` = bootstrapped from dll_readings.md / code comments / saved
 # labels and not yet reviewed: verify against the disassembly, then edit and
 # set `review: reviewed`.
+- addr: 0x2f1ba0
+  kind: function
+  semantics: the game era for a great person (Game_Eras +0x108; asserts NO_ERA).
+  status: READ
+  cases:
+    - recording: h1_duelp1128
+      turn: 93
+      value: Thomas Aquinas (Renaissance) replaces in the Renaissance game era with both majors Medieval.
+  impl: [cpu/core/greatPeople.ts:ensureGpOffer]
+  readings:
+    - "H-1: a great person's price and its draw's era — READ (0x2f1c50, 0x2f8f70 -> 0x93e9e0 -> 0x2f94d0), both twins"
+  review: reviewed
+- addr: 0x2f1c50
+  kind: function
+  semantics: "a timeline entry's price: the person era's Eras.GreatPersonBaseCost (+0x2c); where the game era (Game_Eras +0x108) is not the start era (GetStartEra 0x215b20), not the last (0x93e8a0), and before the person's (0x93e9e0), d = the eras between, and d times price += floor(d x price x 30 / 100); then the speed (0x5254d0) and down to a multiple of PURCHASE_DIVISOR (gp +0x5b0). The class argument is not read."
+  status: READ
+  cases:
+    - recording: h1_duelp1124
+      turn: 145
+      value: "Game_GreatPeople.csv: Alfred Nobel (Modern) added in the Industrial game era at 425 = floor((660 + 198) x 0.5) down to 5; Mary Leakey (Atomic, t173) 620."
+  impl:
+    - cpu/data/greatPeople.ts:gpCost
+    - gpu/core/sim_phase.py:_gp_cost
+    - cpu/data/greatPeople.ts:GP_ERA_STEP_PCT
+  readings:
+    - "H-1: a great person's price and its draw's era — READ (0x2f1c50, 0x2f8f70 -> 0x93e9e0 -> 0x2f94d0), both twins"
+  review: reviewed
 - addr: 0x2f1ed0
   kind: function
   semantics: "the player can earn a great person class: its civilization level's CanEarnGreatPeople (0x43a980; a city-state's and the Free Cities' lack it), no trait barring the class, a person left."
@@ -88,6 +115,16 @@
   context:
     - ...f83e0, reject 0x2f8c00); and a deferred grant queue 0x2f2a60 (reached through the virtual 0x2f46a0) that grants a random person of a class from the first chronological era. The 9 turn-open...
   review: reviewed
+- addr: 0x2f4990
+  final: 0x20a9e0
+  kind: function
+  status: PARTLY
+  readings:
+    - "H-1: a great person's price and its draw's era — READ (0x2f1c50, 0x2f8f70 -> 0x93e9e0 -> 0x2f94d0), both twins"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...08) and the leaving entry's era (+8), walking forward to the first era with candidates (0x2f4990, 0x93eaa0); the entry it writes {individual, class, era, price}. `ensureGpOffer(from)`,..."
+  review: imported
 - addr: 0x2f64a0
   kind: function
   semantics: a class's standing great person.
@@ -149,7 +186,10 @@
       turn: 112
       value: "The importer (`spentAtSpawn`) takes a person spent before any record showed its unit to its site in that city: 1116 Ibn Khaldun t112 on Xian's Campus (the city's Districts housing part 3 -> 5 in the n"
   impl: [cpu/core/greatPeople.ts:recruit]
-  readings: ["C-93: the great person draw", "H-1: the great person's spawn — READ"]
+  readings:
+    - "C-93: the great person draw"
+    - "H-1: the great person's spawn — READ"
+    - "H-1: a great person's price and its draw's era — READ (0x2f1c50, 0x2f8f70 -> 0x93e9e0 -> 0x2f94d0), both twins"
   context:
     - ...line's setup 0x2f7c10; the replacement after a person leaves the timeline 0x2f8f70 (grant 0x2f74b0 via recruit 0x2f8890, patronize 0x2f83e0, reject 0x2f8c00); and a deferred grant queue 0x...
     - "The grant 0x2f74b0 asks 0x2f6500 for the spawn plot: the class row (+0x70 its district, +0x98 its unit) and..."
@@ -158,7 +198,9 @@
   kind: function
   semantics: the great person timeline's setup (-> 0x2f94d0).
   status: PARTLY
-  readings: ["C-93: the great person draw"]
+  readings:
+    - "C-93: the great person draw"
+    - "H-1: a great person's price and its draw's era — READ (0x2f1c50, 0x2f8f70 -> 0x93e9e0 -> 0x2f94d0), both twins"
   context:
     - "...tes of the earliest era that has any, walking eras forward. Callers: the timeline's setup 0x2f7c10; the replacement after a person leaves the timeline 0x2f8f70 (grant 0x2f74b0 via recruit..."
   review: reviewed
@@ -223,10 +265,20 @@
   review: reviewed
 - addr: 0x2f8f70
   kind: function
-  semantics: the replacement after a person leaves the timeline (grant 0x2f74b0 via recruit 0x2f8890, patronize 0x2f83e0, reject 0x2f8c00) (-> 0x2f94d0).
-  status: PARTLY
-  impl: [cpu/core/greatPeople.ts:recruit]
-  readings: ["C-93: the great person draw"]
+  semantics: "the replacement after a person leaves the timeline (grant 0x2f74b0 via recruit 0x2f8890, patronize 0x2f83e0, reject 0x2f8c00): the draw 0x2f94d0 from the later (0x93e9e0) of the game era (0x2f1ba0) and the leaving entry's era (+8)."
+  status: READ
+  cases:
+    - recording: h1_duelp1124
+      turn: 145
+      value: "Game_GreatPeople.csv: 130 of 137 replacements at the later of the game era and the leaving era, 2 past it with that era spent (Nobel after Darwin), 5 on an era's turnover turn."
+  impl:
+    - cpu/core/greatPeople.ts:recruit
+    - cpu/core/greatPeople.ts:ensureGpOffer
+    - gpu/core/sim_phase.py:_gp_claim
+    - gpu/core/sim_phase.py:_gp_ensure_offer
+  readings:
+    - "C-93: the great person draw"
+    - "H-1: a great person's price and its draw's era — READ (0x2f1c50, 0x2f8f70 -> 0x93e9e0 -> 0x2f94d0), both twins"
   context:
     - "...allers: the timeline's setup 0x2f7c10; the replacement after a person leaves the timeline 0x2f8f70 (grant 0x2f74b0 via recruit 0x2f8890, patronize 0x2f83e0, reject 0x2f8c00); and a deferre..."
   review: reviewed
@@ -235,8 +287,13 @@
   name: Game_GreatPeople
   semantics: "Game_GreatPeople: ONE uniform pick (\"Generating a random new Great Person\") among the class's candidates of the earliest era that has any, walking eras forward. Callers: the timeline's setup 0x2f7c10; the replacement after a person leaves the timeline 0x2f8f70; the deferred grant queue 0x2f2a60."
   status: PARTLY
-  impl: [cpu/harness/drawSites.ts:DRAW_SITES, gpu/core/sim_phase.py:_gp_ensure_offer]
-  readings: ["C-93: the great person draw"]
+  impl:
+    - cpu/harness/drawSites.ts:DRAW_SITES
+    - gpu/core/sim_phase.py:_gp_ensure_offer
+    - cpu/core/greatPeople.ts:ensureGpOffer
+  readings:
+    - "C-93: the great person draw"
+    - "H-1: a great person's price and its draw's era — READ (0x2f1c50, 0x2f8f70 -> 0x93e9e0 -> 0x2f94d0), both twins"
   context:
     - "`Game_GreatPeople` 0x2f94d0 draws ONE uniform pick (\"Generating a random new Great Person\") among the class's candida..."
   review: reviewed

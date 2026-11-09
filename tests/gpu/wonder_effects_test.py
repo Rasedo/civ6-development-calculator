@@ -81,7 +81,7 @@ def main() -> None:
     oxford = _find(rows, lambda r: r["freeTechs"] > 0, "wonder granting free technologies")
     ruhr = _find(rows, lambda r: r["impY"], "wonder paying yields per improvement")
     library = _find(rows, lambda r: r["boostTechEra"] >= 0, "wonder boosting an era of technologies")
-    oracle = _find(rows, lambda r: r["distGpp"] > 0, "wonder paying its districts GP points")
+    oracle = _find(rows, lambda r: max(r["distGpp"]) > 0, "wonder paying its districts GP points")
     bolshoi = _find(rows, lambda r: r["freeCivics"] > 0, "wonder granting free civics")
     assert rows[montsm]["apostleMartyr"] == 1, "the +6 defence wonder is Mont St. Michel — it grants MARTYR"
     assert rows[artemis]["amenImpRange"] == 4, "Temple of Artemis reaches 4 tiles"
@@ -109,7 +109,7 @@ def main() -> None:
     assert rows[ruhr]["impYYields"][1] == 1 and len(rows[ruhr]["impY"]) == 2, \
         "Ruhr Valley pays +1 PRODUCTION for each of two improvements"
     assert rows[library]["boostTechEra"] == 1, "the Great Library reaches the CLASSICAL era"
-    assert rows[oracle]["distGpp"] == 2, "the Oracle pays its districts +2"
+    assert rows[oracle]["distGpp"] == [2, 2, 2, 2, 0, 2, 2, 2, 0], "the Oracle pays its districts +2, never to the Artist or the Musician"
     print(f"  catalog OK — {len(rows)} rows, {len(gpp_rows)} pay GP points, {len(tiley_rows)} key on terrain")
 
     sim = build(rules, paths[0])

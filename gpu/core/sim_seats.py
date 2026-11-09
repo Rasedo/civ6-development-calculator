@@ -2718,7 +2718,10 @@ class SimSeats:
             # the price records the patronage moment
             _pr = self.gp_price[:, c].double()
             over = 2 * (_pr - self.civ_gpp[:, row, c].double()) > _pr
-            self.civ_gpp[:, row, c] = torch.where(ok, torch.zeros_like(self.civ_gpp[:, row, c]), self.civ_gpp[:, row, c])
+            # the claim spends the whole points, the fraction kept
+            # (`patronizeGreatPerson`)
+            _g = self.civ_gpp[:, row, c]
+            self.civ_gpp[:, row, c] = torch.where(ok, _g - torch.floor(_g), _g)
             self._gp_claim(row, ok, c, over, gold)
             done = done | ok
         return done

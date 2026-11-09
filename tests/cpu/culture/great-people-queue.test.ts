@@ -1,8 +1,8 @@
 /**
  * The Great Person DRAW. Every class offers ONE person at a time, drawn
- * randomly from the unclaimed members of the first era at or past the
- * world's; the price freezes with the draw and outlives an era step. A class
- * with nobody left at or past the world era is exhausted for good, and its
+ * randomly from the unclaimed members of the first era at or past the game
+ * era; the price freezes with the draw and outlives an era step. A class
+ * with nobody left at or past the game era is exhausted for good, and its
  * points convert to faith 1:1.
  * The GPU twin is religion_gp_test's cost/era-gate block.
  */
@@ -10,13 +10,9 @@ import { describe, it, expect } from 'vitest';
 import { makeMap, makeState, tileAtCoords } from '../helpers';
 import { foundCity } from '../../../cpu/core/game';
 import { advanceGreatPeople, ensureGpOffer, gpOffer, gpOfferCost, greatPeopleEarned } from '../../../cpu/core/greatPeople';
-import { GP_CLASSES, GP_ERA_GPP, GP_FLAT_COST_CLASSES, GREAT_PEOPLE, gpCost } from '../../../cpu/data/greatPeople';
-import { worldEraIndex } from '../../../cpu/core/eras';
+import { GP_CLASSES, GP_ERA_GPP, GREAT_PEOPLE, gpCost } from '../../../cpu/data/greatPeople';
 import { seatOf } from '../../../cpu/core/seats';
 import type { GameState } from '../../../cpu/core/types';
-
-const ERA_TECH = ['POTTERY', 'CELESTIAL_NAVIGATION', 'APPRENTICESHIP', 'BANKING',
-  'INDUSTRIALIZATION', 'ELECTRICITY', 'PLASTICS', 'COMPOSITES', 'OFFWORLD_MISSION'];
 
 function scene(): GameState {
   const state = makeState(makeMap(16, 16));
@@ -25,9 +21,8 @@ function scene(): GameState {
   return state;
 }
 
-function setWorldEra(state: GameState, era: number): void {
-  seatOf(state, 0)!.research.techs = ERA_TECH.slice(0, era + 1);
-  expect(worldEraIndex(state)).toBe(era);
+function setGameEra(state: GameState, era: number): void {
+  state.gameEra = era;
 }
 
 describe('the roster', () => {
@@ -50,20 +45,15 @@ describe('the roster', () => {
 });
 
 describe('the price', () => {
-  it('scales with the eras the world is behind the person', () => {
-    // the page's own worked examples
-    expect(gpCost('SCIENTIST', 4, 2)).toBe(1075); // 420 * 1.6^2
-    expect(gpCost('SCIENTIST', 1, 0)).toBe(78); // 60 * 1.3
-    expect(gpCost('SCIENTIST', 1, 1)).toBe(60); // caught up
-    expect(gpCost('SCIENTIST', 1, 5)).toBe(60); // never negative
-  });
-
-  it('leaves the art classes and the Prophet at their era base', () => {
-    expect([...GP_FLAT_COST_CLASSES].sort()).toEqual(['ARTIST', 'MUSICIAN', 'PROPHET', 'WRITER']);
-    for (const cls of GP_FLAT_COST_CLASSES) {
-      expect(gpCost(cls, 4, 0)).toBe(GP_ERA_GPP[4]);
-      expect(gpCost(cls, 4, 4)).toBe(GP_ERA_GPP[4]);
-    }
+  it('scales with the eras the person stands past the game era, at the game speed', () => {
+    // runs/h1_duelp1124's timeline: Alfred Nobel (Modern) in the Industrial
+    // game era, Mary Leakey (Atomic) in the Modern
+    expect(gpCost(5, 4)).toBe(425);
+    expect(gpCost(6, 5)).toBe(620);
+    expect(gpCost(1, 1)).toBe(GP_ERA_GPP[1] / 2); // caught up
+    expect(gpCost(1, 5)).toBe(GP_ERA_GPP[1] / 2); // never below the base
+    // the start era scales nobody: Imhotep (Medieval) drawn at the setup
+    expect(gpCost(2, 0)).toBe(60);
   });
 });
 
@@ -76,15 +66,15 @@ describe('the offer', () => {
     expect(at).toBeGreaterThanOrEqual(0);
     // an Ancient world: the pool is the Classical members, nobody earlier exists
     expect(GREAT_PEOPLE.SCIENTIST[at].era).toBe(1);
-    expect(gpOfferCost(state, 'SCIENTIST')).toBe(gpCost('SCIENTIST', 1, 0));
+    expect(gpOfferCost(state, 'SCIENTIST')).toBe(gpCost(1, 0));
   });
 
   it('never draws from the eras the world has passed', () => {
     const state = scene();
-    setWorldEra(state, 3);
+    setGameEra(state, 3);
     ensureGpOffer(state, 'SCIENTIST');
     expect(GREAT_PEOPLE.SCIENTIST[gpOffer(state, 'SCIENTIST')].era).toBe(3);
-    expect(gpOfferCost(state, 'SCIENTIST')).toBe(gpCost('SCIENTIST', 3, 3));
+    expect(gpOfferCost(state, 'SCIENTIST')).toBe(gpCost(3, 3));
   });
 
   it('freezes the price at the draw, across an era step', () => {
@@ -92,14 +82,14 @@ describe('the offer', () => {
     ensureGpOffer(state, 'SCIENTIST');
     const at = gpOffer(state, 'SCIENTIST');
     const cost = gpOfferCost(state, 'SCIENTIST');
-    setWorldEra(state, 3);
+    setGameEra(state, 3);
     expect(gpOffer(state, 'SCIENTIST')).toBe(at);
     expect(gpOfferCost(state, 'SCIENTIST')).toBe(cost);
   });
 
   it('exhausts for good, and the dead bank converts to faith 1:1', () => {
     const state = scene();
-    setWorldEra(state, 4); // Industrial — every Prophet is behind the world
+    setGameEra(state, 4); // Industrial — every Prophet is behind the world
     ensureGpOffer(state, 'PROPHET');
     expect(gpOffer(state, 'PROPHET')).toBe(-2);
     expect(gpOfferCost(state, 'PROPHET')).toBe(Infinity);

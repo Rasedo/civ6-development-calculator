@@ -30,15 +30,13 @@ def main() -> None:
     bl = rules.beliefs
 
     # --- the ERA-KEYED price table -----------------------------------------
-    # [person era][eras the world is behind them]; column 0 is the era base
-    # (Classical 60, Medieval 120, Renaissance 240, Industrial 420, Modern 660,
-    # Atomic 960, Information 1320) and Ancient/Future mirror their neighbour.
+    # [person era][game era] (`gpCost`); column 0, the start era, is the era
+    # base at the online speed (Classical 30 ... Information 660), and
+    # Ancient/Future mirror their neighbour.
     ct = rr["gpCostTable"]
     assert len(ct) == 9 and all(len(row) == 9 for row in ct), f"cost table shape: {len(ct)}"
-    assert [row[0] for row in ct] == [60, 60, 120, 240, 420, 660, 960, 1320, 1320],         f"era base costs: {[row[0] for row in ct]}"
-    assert ct[4][2] == 1075, f"the page's own worked example (420 x 1.6^2): {ct[4][2]}"
-    # the art classes and the Prophet do not scale
-    assert rr["gpFlatCost"] == [0, 0, 0, 1, 1, 0, 0, 1, 1], f"flat-cost classes: {rr['gpFlatCost']}"
+    assert [row[0] for row in ct] == [30, 30, 60, 120, 210, 330, 480, 660, 660],         f"era base costs: {[row[0] for row in ct]}"
+    assert ct[5][4] == 425 and ct[6][5] == 620, f"runs/h1_duelp1124 Nobel / Leakey: {ct[5][4]}, {ct[6][5]}"
 
     # --- Writer/Musician classes -> n_gp = 9 -------------------------------
     cd = rr["gpClassDistrict"]
@@ -160,18 +158,13 @@ def main() -> None:
         sim.city_pressure[:, 1:sim.n_majors].zero_()
         sim.city_followed[:, 1:sim.n_majors].fill_(-1)
 
-    # --- the price a class pays depends on how far the WORLD is behind it ---
-    # A SCIENTIST (class 0, which scales) at queue position 0 is Classical: at
-    # an Ancient world era the difference is 1 and the price is 78, and once the
-    # world reaches Classical it drops to the 60 base. A flat class ignores it.
-    _we = sim._world_era()
-    assert bool((_we == 0).all()), f"a fresh fixture must be Ancient: {_we.tolist()}"
+    # --- the price reads the GAME era: the start era scales nobody ----------
+    assert bool((sim.game_era == 0).all()), f"a fresh fixture must be Ancient: {sim.game_era.tolist()}"
     _at0 = torch.zeros(sim.B, dtype=torch.long, device=sim.device)
-    assert bool((sim._gp_cost(0, _at0, _we) == 78.0).all()), "Classical Scientist, Ancient world"
-    assert bool((sim._gp_cost(0, _at0, _we + 1) == 60.0).all()), "the world catches up"
-    assert bool((sim._gp_cost(3, _at0, _we) == 60.0).all()), "the Prophet never scales"
+    assert bool((sim._gp_cost(0, _at0) == 30.0).all()), "Classical Scientist, the start era"
+    assert bool((sim._gp_cost(3, _at0) == 30.0).all()), "Classical Prophet, the start era"
 
-    # --- the ERA GATE: a class whose roster the world has passed offers nobody
+    # --- the ERA GATE: a class whose roster the game era has passed offers nobody
     _pc = int(rr["prophetCls"])
     assert int(sim._gp_era[_pc, : int(sim._gp_roster[_pc])].max()) < 4,         "Industrial: no more Great Prophets"
     sim.gp_offer[:, _pc] = -1
@@ -180,15 +173,12 @@ def main() -> None:
     _pro0 = sim.civ_prophets[:, 0].clone()
     _fa0 = sim.civ_faith[:, 0].clone()
     sim.civ_gpp[:, 0, _pc] = 100_000.0
-    for _r in range(sim.n_majors):
-        sim.civ_techs[:, _r, :] = True  # push the world era past the roster
-        sim.civ_civics[:, _r, :] = True
+    _ge0 = sim.game_era.clone()
+    sim.game_era[:] = 8  # push the game era past the roster
     sim._advance_great_people(0, torch.ones(sim.B, dtype=torch.bool, device=sim.device))
     assert int(sim.gp_earned[0, _pc]) == 0 and int(sim.gp_offer[0, _pc]) == -2,         "an exhausted class must claim nobody, however fat the bank"
     assert float(sim.civ_faith[0, 0] - _fa0[0]) == 100_000.0,         "the dead bank must convert to faith 1:1"
-    for _r in range(sim.n_majors):
-        sim.civ_techs[:, _r, :] = False
-        sim.civ_civics[:, _r, :] = False
+    sim.game_era[:] = _ge0
     sim.civ_prophets[:, 0] = _pro0
     sim.civ_faith[:, 0] = _fa0
     sim.civ_gpp[:, 0, _pc] = 0.0

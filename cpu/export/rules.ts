@@ -28,7 +28,7 @@ import { gpSiteArgOf } from '../core/targetSites';
 import { strategicSlot, unitBaseResourceCost } from '../core/stockpile';
 import { MAX_LEVEL, XP_PER_LEVEL } from '../core/promotions';
 import { ALPINE_FEATURE, ALPINE_HILLS_CS, FIONN_CS, FIONN_FEATURE, KILL_SPREAD_RANGE } from '../data/promotions';
-import { GP_CLASSES, GP_WORK_CULTURE, GP_WORK_TOURISM, GREAT_PEOPLE, GP_ERA_GPP, GP_FLAT_COST_CLASSES, GP_CLASS_DISTRICT, GW_WORKS_PER_PERSON, GW_PRINTING_TECH, GW_PRINTING_WRITING_MULT, ARTIST_WORKS, SPECIALIST_YIELDS, SPECIALIST_TIERS } from '../data/greatPeople';
+import { GP_BUILDING_POINTS, GP_CLASSES, GP_WORK_CULTURE, GP_WORK_TOURISM, GREAT_PEOPLE, GP_ERA_GPP, gpCost, GP_CLASS_DISTRICT, GW_WORKS_PER_PERSON, GW_PRINTING_TECH, GW_PRINTING_WRITING_MULT, ARTIST_WORKS, SPECIALIST_YIELDS, SPECIALIST_TIERS } from '../data/greatPeople';
 import { PANTHEONS, RELIGION_TYPES, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, WORSHIP_BELIEFS, ENHANCER_BELIEFS, PANTHEON_FAITH_COST, RELIGION_PRESSURE_RANGE, RELIGION_PRESSURE_PER_TURN, HOLY_CITY_PRESSURE_MULT, HOLY_SITE_PRESSURE_MULT, ATHEISM_PRESSURE_PER_POP, COLONIZE_PRESSURE_EXTRA, HOLY_CITY_FOUNDING_PRESSURE_PER_POP, ROUTE_PRESSURE_DESTINATION, ROUTE_PRESSURE_ORIGIN, JUST_WAR_RANGE, SPREAD_STRENGTH_PCT, MISSIONARY_CAP, APOSTLE_CAP, THEO_PRESSURE_SWING, THEO_PRESSURE_RANGE, INQUISITOR_CAP, GURU_CAP, GURU_HEAL, INQUISITOR_HOME_STRENGTH, REMOVE_HERESY_PCT, LAUNCH_INQUISITION_CHARGES, RELIGION_INITIAL_BELIEFS, PROPHET_MAX_PLAYER_INSTANCES, CONDEMN_PRESSURE_RANGE, CONDEMN_PRESSURE_SWING, type BeliefEffects } from '../data/religion';
 import { PROJECTS, isSpaceProject, PROJECT_GPP_FRACTION, SPACE_FLIGHT_LY, LASER_POWER_LOAD, gpClassesOf, gppFractionOf } from '../data/projects';
 import { BUILT_WONDERS } from '../data/builtWonders';
@@ -1464,12 +1464,13 @@ export function buildRules() {
       goldDisbandLine: GOLD_DISBAND_LINE,
       goldDisbandsPerTurn: GOLD_DISBANDS_PER_TURN,
       loyaltyAmenity: AMENITY_TIERS.map((t) => LOYALTY_AMENITY[t.name]),
-      // the ERA space the queue and its price both live in. The cost table is
-      // computed HERE so both engines read the same floored doubles:
-      // [person era][eras the world is behind them].
-      gpCostTable: GP_ERA_GPP.map((base) => GP_ERA_GPP.map((_, d) => Math.floor(base * (1 + 0.3 * d) ** d))),
+      // the ERA space the queue and its price both live in. The price table
+      // is computed HERE so both engines read the same integers:
+      // [person era][game era] (`gpCost`).
+      gpCostTable: GP_ERA_GPP.map((_, pe) => GP_ERA_GPP.map((__, ge) => gpCost(pe, ge))),
       gpEra: GP_CLASSES.map((c) => GREAT_PEOPLE[c].map((p) => p.era)),
-      gpFlatCost: GP_CLASSES.map((c) => (GP_FLAT_COST_CLASSES.has(c) ? 1 : 0)),
+      // [class, building, points] per Building_GreatPersonPoints row (`GP_BUILDING_POINTS`)
+      gpBuildingPoints: GP_BUILDING_POINTS.map((r) => [GP_CLASSES.indexOf(r.cls), buildingIdx.get(r.building) ?? -1, r.points]),
       gpRoster: GP_CLASSES.map((c) => GREAT_PEOPLE[c].length),
       gpClassDistrict: GP_CLASSES.map((c) => PLACEABLE_DISTRICTS.indexOf(GP_CLASS_DISTRICT[c])),
       // THE PERSON'S OWN ROW, one dense record per queue position. `gpFx`
@@ -1633,7 +1634,7 @@ export function buildRules() {
         impY: (w.effects?.cityYieldPerImprovement?.improvements ?? []).map((i) => IMPROVEMENT_IDS.indexOf(i)),
         impYYields: YIELD_KEYS.map((k) => w.effects?.cityYieldPerImprovement?.yields[k] ?? 0),
         boostTechEra: w.effects?.boostTechsThroughEra ?? -1,
-        distGpp: w.effects?.districtGpPoints ?? 0,
+        distGpp: GP_CLASSES.map((c) => w.effects?.districtGpPoints?.[c] ?? 0),
         patronPct: w.effects?.patronageFaithPct ?? 0,
         mult: YIELD_KEYS.map((k) => w.effects?.cityYieldMult?.[k] ?? 1),
         // adjacency requirement: -1 none, -2 CITY_CENTER, -3 required but

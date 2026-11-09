@@ -1197,27 +1197,38 @@ export const DED_EVENT_SCORE = srcConst('eras.dedEventScore',
   [1, 1, 1, 2, 1, 1, 1, 2, 1, 1, 1, 1] as const, {
     pedia: 'the Gathering Storm Civilopedia "Dedications" concept — the per-event Era Score of each dedication\'s DARK/NORMAL face, in catalog order; no install table publishes them',
   });
-/**
- * WHICH DEDICATIONS A WORLD ERA OFFERS, indexed by `ERAS`. Real Civ 6 draws
- * each era's choice from a window — "the particular set of Dedications
- * available changes according to the era the world enters into", and there are
- * "always four different Dedications to choose from". Ancient offers none: a
- * civ has earned no era score yet when the game opens.
- *
- * Every window below is exactly the column the source's table ticks for that
- * era. Information ticks five rather than four; the table is the source.
- */
-export const DEDICATION_ERAS: readonly (readonly number[])[] = [
-  [],                                                                  // Ancient
-  [DED_MONUMENTALITY, DED_FREE_INQUIRY, DED_PEN_BRUSH_AND_VOICE, DED_EXODUS], // Classical
-  [DED_MONUMENTALITY, DED_FREE_INQUIRY, DED_PEN_BRUSH_AND_VOICE, DED_EXODUS], // Medieval
-  [DED_MONUMENTALITY, DED_EXODUS, DED_DRACONES, DED_COINAGE],          // Renaissance
-  [DED_DRACONES, DED_COINAGE, DED_STEAM, DED_TO_ARMS],                 // Industrial
-  [DED_DRACONES, DED_COINAGE, DED_STEAM, DED_TO_ARMS],                 // Modern
-  [DED_TO_ARMS, DED_WISH, DED_SKY, DED_BODYGUARD],                     // Atomic
-  [DED_TO_ARMS, DED_WISH, DED_SKY, DED_BODYGUARD, DED_AUTOMATON],      // Information
-  [DED_WISH, DED_SKY, DED_BODYGUARD, DED_AUTOMATON],                   // Future
+/** a CommemorationTypes row's game-era bound, as an ERAS index (none: the
+ *  last era) */
+const dedicationEra = (c: string, col: 'MinimumGameEra' | 'MaximumGameEra', era: string | null, v: number) =>
+  srcConst(`eras.dedication.${c}.${col}`, v, era === null
+    ? { derived: `${v} where the install writes no ${col} (the last era)`,
+      inputs: [xml('CommemorationTypes', `CommemorationType=COMMEMORATION_${c}`, col)] }
+    : xml('CommemorationTypes', `CommemorationType=COMMEMORATION_${c}`, col, { expect: era }));
+/** each `DEDICATIONS` entry's [MinimumGameEra, MaximumGameEra] (Expansion1_Moments.xml,
+ *  Expansion2_Moments.xml's CommemorationTypes) */
+const DEDICATION_ERA_RANGE: readonly (readonly [number, number])[] = [
+  [dedicationEra('INFRASTRUCTURE', 'MinimumGameEra', 'ERA_CLASSICAL', 1), dedicationEra('INFRASTRUCTURE', 'MaximumGameEra', 'ERA_RENAISSANCE', 3)],
+  [dedicationEra('SCIENTIFIC', 'MinimumGameEra', 'ERA_CLASSICAL', 1), dedicationEra('SCIENTIFIC', 'MaximumGameEra', 'ERA_MEDIEVAL', 2)],
+  [dedicationEra('CULTURAL', 'MinimumGameEra', 'ERA_CLASSICAL', 1), dedicationEra('CULTURAL', 'MaximumGameEra', 'ERA_MEDIEVAL', 2)],
+  [dedicationEra('RELIGIOUS', 'MinimumGameEra', 'ERA_CLASSICAL', 1), dedicationEra('RELIGIOUS', 'MaximumGameEra', 'ERA_RENAISSANCE', 3)],
+  [dedicationEra('MILITARY', 'MinimumGameEra', 'ERA_INDUSTRIAL', 4), dedicationEra('MILITARY', 'MaximumGameEra', 'ERA_ATOMIC', 6)],
+  [dedicationEra('EXPLORATION', 'MinimumGameEra', 'ERA_RENAISSANCE', 3), dedicationEra('EXPLORATION', 'MaximumGameEra', 'ERA_MODERN', 5)],
+  [dedicationEra('ECONOMIC', 'MinimumGameEra', 'ERA_RENAISSANCE', 3), dedicationEra('ECONOMIC', 'MaximumGameEra', 'ERA_MODERN', 5)],
+  [dedicationEra('INDUSTRIAL', 'MinimumGameEra', 'ERA_INDUSTRIAL', 4), dedicationEra('INDUSTRIAL', 'MaximumGameEra', 'ERA_ATOMIC', 6)],
+  [dedicationEra('TOURISM', 'MinimumGameEra', 'ERA_ATOMIC', 6), dedicationEra('TOURISM', 'MaximumGameEra', null, 8)],
+  [dedicationEra('AERONAUTICAL', 'MinimumGameEra', 'ERA_INFORMATION', 7), dedicationEra('AERONAUTICAL', 'MaximumGameEra', null, 8)],
+  [dedicationEra('ESPIONAGE', 'MinimumGameEra', 'ERA_ATOMIC', 6), dedicationEra('ESPIONAGE', 'MaximumGameEra', null, 8)],
+  [dedicationEra('AUTOMATON', 'MinimumGameEra', 'ERA_INFORMATION', 7), dedicationEra('AUTOMATON', 'MaximumGameEra', null, 8)],
 ];
+/**
+ * WHICH DEDICATIONS A GAME ERA OFFERS, indexed by `ERAS`: each one whose
+ * CommemorationTypes row's MinimumGameEra..MaximumGameEra holds the era, in
+ * `DEDICATIONS` order (runs/h1_duelp1128 t181: China's Heroic Age takes
+ * Heartbeat of Steam beside Wish You Were Here and Bodyguard of Lies in the
+ * Atomic era). Ancient offers none.
+ */
+export const DEDICATION_ERAS: readonly (readonly number[])[] = Array.from({ length: 9 }, (_, era) =>
+  DEDICATION_ERA_RANGE.flatMap(([lo, hi], d) => (era >= lo && era <= hi ? [d] : [])));
 /** CIV6 (Wish You Were Here, Golden face): "+100% Tourism to all National
  *  Parks." */
 export const WISH_PARK_TOURISM_MULT = srcConst('eras.wishParkTourism', 2,

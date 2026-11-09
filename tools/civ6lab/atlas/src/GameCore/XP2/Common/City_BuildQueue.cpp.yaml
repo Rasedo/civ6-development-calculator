@@ -170,7 +170,10 @@
     - recording: h1_duely1117
       turn: 121
       value: "China's harvest at Longxi (Builder 2752523's UnitOperationStarted, then CityProductionCompleted 131073 district 7 twice): the Entertainment Complex completes inside China's actions, Caguana's t121 civics and Civil Prestige read its route's Food from it"
-  impl: [cpu/core/economy.ts:applyLumpYield, gpu/core/sim_phase.py:_lump_step]
+  impl:
+    - cpu/core/economy.ts:applyLumpYield
+    - gpu/core/sim_phase.py:_lump_step
+    - cpu/core/gpAbility.ts:activateGreatPerson
   readings:
     - "C-130: a lump's queue step completes the head; a major's trade list tries what its last turn revealed; a city-state's researched technology lands its boosts before the Culture — READ, both twins"
     - "C-111: a major's district lets go of the queue under a hostile unit, the queue's progress and overflow read from the city's memory — READ (0x184660 at 0x1847dc, 0x5313f0, 0x17f630), both twins"

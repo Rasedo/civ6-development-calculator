@@ -1,7 +1,7 @@
 
 import type { DistrictId, GreatPersonClass, YieldKey } from '../core/types';
 import { srcConst, xml, type SrcMap } from './provenance';
-import { GAME_SPEED, scaleByGameSpeed } from './constants';
+import { COST_MULTIPLIER_PCT, GAME_SPEED, PURCHASE_DIVISOR, scaleByGameSpeed } from './constants';
 import { GW_GP_EXTRA_SLOTS, GW_KIND_MUSIC, GW_KIND_WRITING, GWO_LANDSCAPE, GWO_MUSIC, GWO_PORTRAIT, GWO_RELIGIOUS, GWO_SCULPTURE, GWO_WRITING } from './greatWorks';
 import { PLACEABLE_DISTRICTS } from './districts';
 
@@ -42,25 +42,76 @@ export const GP_ERA_GPP: readonly number[] = srcConst('greatPeople.GP_ERA_GPP',
     ],
   });
 
+/** a Building_GreatPersonPoints row (Buildings.xml, Expansion2_Buildings.xml):
+ *  the engine's building, the class, its PointsPerTurn */
+const gpBuildingRow = (building: string, install: string, cls: GreatPersonClass, v: number) => ({
+  building, cls,
+  points: srcConst(`greatPeople.buildingPoints.${building}.${cls}`, v, xml('Building_GreatPersonPoints',
+    `BuildingType=BUILDING_${install}&GreatPersonClassType=GREAT_PERSON_CLASS_${cls}`, 'PointsPerTurn')),
+});
 /**
- * CIV6: "most Great People classes' GPP cost (all but art-related People and
- * the Great Prophet) will scale up from the general era base cost".
+ * WHAT A DISTRICT'S BUILDINGS EARN each turn (Building_GreatPersonPoints, a
+ * civilization's own building standing in for its base): each row's class
+ * and points, never a point for every class the district serves
+ * (runs/h1_duelp1128 China t214: Xi'an's Art Museum 2 Artist and 1 Writer,
+ * each Amphitheater 1 Writer, its Shrines and Temples 1 Prophet — Artist 8,
+ * Musician 6, Writer 13, Prophet 4 a turn as recorded). The world wonders'
+ * rows are their own (`gpPoints`).
  */
-export const GP_FLAT_COST_CLASSES: ReadonlySet<GreatPersonClass> = new Set<GreatPersonClass>([
-  'WRITER', 'ARTIST', 'MUSICIAN', 'PROPHET',
-]);
+export const GP_BUILDING_POINTS: readonly { building: string; cls: GreatPersonClass; points: number }[] = [
+  gpBuildingRow('LIGHTHOUSE', 'LIGHTHOUSE', 'ADMIRAL', 1),
+  gpBuildingRow('SHIPYARD', 'SHIPYARD', 'ADMIRAL', 1),
+  gpBuildingRow('SEAPORT', 'SEAPORT', 'ADMIRAL', 1),
+  gpBuildingRow('AMPHITHEATER', 'AMPHITHEATER', 'WRITER', 1),
+  gpBuildingRow('MUSEUM', 'MUSEUM_ART', 'WRITER', 1),
+  gpBuildingRow('MUSEUM', 'MUSEUM_ART', 'ARTIST', 2),
+  gpBuildingRow('ARCHAEOLOGICAL_MUSEUM', 'MUSEUM_ARTIFACT', 'WRITER', 1),
+  gpBuildingRow('ARCHAEOLOGICAL_MUSEUM', 'MUSEUM_ARTIFACT', 'ARTIST', 2),
+  gpBuildingRow('BROADCAST_CENTER', 'BROADCAST_CENTER', 'ARTIST', 1),
+  gpBuildingRow('BROADCAST_CENTER', 'BROADCAST_CENTER', 'MUSICIAN', 2),
+  gpBuildingRow('WORKSHOP', 'WORKSHOP', 'ENGINEER', 1),
+  gpBuildingRow('FACTORY', 'FACTORY', 'ENGINEER', 1),
+  gpBuildingRow('COAL_POWER_PLANT', 'COAL_POWER_PLANT', 'ENGINEER', 1),
+  gpBuildingRow('OIL_POWER_PLANT', 'FOSSIL_FUEL_POWER_PLANT', 'ENGINEER', 1),
+  gpBuildingRow('SHRINE', 'SHRINE', 'PROPHET', 1),
+  gpBuildingRow('TEMPLE', 'TEMPLE', 'PROPHET', 1),
+  gpBuildingRow('BARRACKS', 'BARRACKS', 'GENERAL', 1),
+  gpBuildingRow('STABLE', 'STABLE', 'GENERAL', 1),
+  gpBuildingRow('ARMORY', 'ARMORY', 'GENERAL', 1),
+  gpBuildingRow('MILITARY_ACADEMY', 'MILITARY_ACADEMY', 'GENERAL', 1),
+  gpBuildingRow('MARKET', 'MARKET', 'MERCHANT', 1),
+  gpBuildingRow('BANK', 'BANK', 'MERCHANT', 1),
+  gpBuildingRow('STOCK_EXCHANGE', 'STOCK_EXCHANGE', 'MERCHANT', 1),
+  gpBuildingRow('LIBRARY', 'LIBRARY', 'SCIENTIST', 1),
+  gpBuildingRow('UNIVERSITY', 'UNIVERSITY', 'SCIENTIST', 1),
+  gpBuildingRow('RESEARCH_LAB', 'RESEARCH_LAB', 'SCIENTIST', 1),
+];
+
+/** the percent each era the person stands past the game era adds, per step
+ *  (Game_GreatPeople 0x2f1c50: imul 0x1e, / 100) */
+const GP_ERA_STEP_PCT = srcConst('greatPeople.eraStepPct', 30, { lab: 'tools/civ6lab/dll_readings.md H-1: a great person\'s price and its draw\'s era (0x2f1c50 at 0x2f1e10..0x2f1e22)' });
 
 /**
- * CIV6: "GPP cost = base cost * (1 + 0.3 * difference in era) ^ difference in
- * era", where the difference is the eras between the person and the WORLD era,
- * never negative. The page's own worked examples floor it (420 * 1.6^2 = 1075.2
- * is quoted as 1075).
+ * A PERSON'S PRICE, frozen at the draw (Game_GreatPeople 0x2f1c50): the
+ * person's era's GreatPersonBaseCost; where the person's era is past the game
+ * era (and the game era is neither the game's start era, the Ancient every
+ * engine game starts in, nor the last), d = the eras between them and the
+ * price grows d times by floor(d × price × 30 / 100); then the game speed
+ * (CostMultiplier / 100), rounded down to a multiple of PURCHASE_DIVISOR.
+ * Every class alike. runs/h1_duelp1124: Alfred Nobel (Modern) drawn in the
+ * Industrial game era at t145 costs (660 + 198) × 0.5 = 429 -> 425, Mary
+ * Leakey (Atomic) in the Modern at t173 (960 + 288) × 0.5 = 624 -> 620; Imhotep
+ * (Medieval) drawn in the Ancient start era 60.
  */
-export function gpCost(cls: GreatPersonClass, personEra: number, worldEra: number): number {
-  const base = GP_ERA_GPP[Math.min(Math.max(personEra, 0), GP_ERA_GPP.length - 1)];
-  if (GP_FLAT_COST_CLASSES.has(cls)) return base;
-  const d = Math.max(0, personEra - worldEra);
-  return Math.floor(base * (1 + 0.3 * d) ** d);
+export function gpCost(personEra: number, gameEra: number): number {
+  let cost = GP_ERA_GPP[Math.min(Math.max(personEra, 0), GP_ERA_GPP.length - 1)];
+  const last = GP_ERA_GPP.length - 1;
+  if (gameEra > 0 && gameEra < last && personEra > gameEra) {
+    const d = personEra - gameEra;
+    for (let k = 0; k < d; k++) cost += Math.floor((d * cost * GP_ERA_STEP_PCT) / 100);
+  }
+  const c = Math.floor((cost * COST_MULTIPLIER_PCT) / 100);
+  return c - (c % PURCHASE_DIVISOR);
 }
 
 /**

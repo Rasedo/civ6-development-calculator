@@ -6,7 +6,7 @@
  */
 
 import type { City, CityState, DistrictId, GameState, GreatPersonClass, QueueItem, Unit } from './types';
-import { dropQueuedBuilding } from './production';
+import { completeQueueItem, dropQueuedBuilding } from './production';
 import type { Tile } from '../../world/types';
 import { neighbors } from '../../world/hex';
 import { naturalWonderAt } from '../../world/query';
@@ -373,6 +373,17 @@ export function activateGreatPerson(state: GameState, unit: Unit): boolean {
     if (prod > 0) {
       q.progress += prod;
       owner.treasury -= 2 * prod;
+    }
+  }
+  // a grant that fills the wonder completes it at once, as a lump into the
+  // queue does (City_BuildQueue AddProgress 0x16f6e0; runs/h1_duelp1117
+  // t145 / t147: Imhotep's charges on Xi'an's Great Lighthouse and Longxi's
+  // Casa de Contratación, each WonderCompleted logged beside the activation)
+  if (raised) {
+    const cost = itemCost(raised.q, state, raised.city);
+    if (raised.q.progress >= cost) {
+      raised.city.queue.shift();
+      completeQueueItem(state, raised.city, raised.q, cost);
     }
   }
   if (fx.spaceProduction && city) {

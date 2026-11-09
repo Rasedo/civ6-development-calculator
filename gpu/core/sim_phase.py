@@ -2751,16 +2751,11 @@ class SimPhase:
         self._seat_pantheon_pick(row, active)
         return sci_turn
 
-    def _gp_cost(self, cls: int, at: torch.Tensor, world_era: torch.Tensor) -> torch.Tensor:
-        """[B] float64 — what the person at queue position `at` costs. CIV6:
-        "GPP cost = base cost * (1 + 0.3 * difference in era) ^ difference in
-        era", the difference measured from the WORLD era and never negative;
-        art-related People and the Great Prophet stay at the base."""
+    def _gp_cost(self, cls: int, at: torch.Tensor) -> torch.Tensor:
+        """[B] float64 — what the person at queue position `at` costs: the
+        exporter's [person era, game era] table (`gpCost`, 0x2f1c50)."""
         p_era = self._gp_era[cls, at].clamp(min=0, max=8)
-        d = (p_era - world_era).clamp(min=0, max=8)
-        if bool(self._gp_flat_cost[cls]):
-            d = torch.zeros_like(d)
-        return self._gp_cost_table[p_era, d]
+        return self._gp_cost_table[p_era, self.game_era.clamp(min=0, max=8)]
 
     def _advance_great_people(self, row: int, active: torch.Tensor) -> None:
         if self._gp_nc == 0:
@@ -2770,10 +2765,9 @@ class SimPhase:
         # turn, ahead of the race, exactly as `advanceGreatPeople` does
         self._grant_guaranteed_great_people(row, active)
         # CIV6 (Oracle): "Districts in this city provide +2 Great Person points
-        # of their type" — the HOLDING city's own districts only.
-        dgpp = (self._city_wonder_flat(row, self._wond_distgpp)
-                if self._wond_n and float(self._wond_distgpp.sum()) != 0.0
-                else torch.zeros(B, 1, dtype=torch.float64, device=dev))
+        # of their type" — the HOLDING city's own districts only, each class
+        # its rows name
+        _dg_on = bool(self._wond_n) and float(self._wond_distgpp.sum()) != 0.0
         # CIV6 (Cultural alliance 2): +1 Great Person point per class-matched
         # district in origin cities holding a Trade Route to the ally.
         c2 = torch.zeros(B, self.RC, dtype=torch.float64, device=dev)
@@ -2801,8 +2795,13 @@ class SimPhase:
             if d_cls >= 0:
                 reg_c = self.city_dist_tile[:, row, :, d_cls]  # [B, cols]
                 comp_c = (reg_c >= 0) & self.district_complete.gather(1, reg_c.clamp(min=0)) & ~self.district_pillaged.gather(1, reg_c.clamp(min=0))  # a pillaged district earns no GPP
-                bmask_c = (self.rules_dev.b_req_district == d_cls).reshape(1, 1, -1)
-                nb_of = (self.city_bldg[:, row] & bmask_c).sum(dim=2)  # [B, cols]
+                # the district's buildings' own rows (`GP_BUILDING_POINTS`)
+                # a pillaged building earns none
+                nb_of = ((self.city_bldg[:, row] & ~self.city_bldg_pillaged[:, row]).double()
+                         * self._gp_bld_pts[cls].reshape(1, 1, -1)).sum(dim=2)  # [B, cols]
+                dgpp = (self._city_wonder_flat(row, self._wond_distgpp[:, cls].contiguous())
+                        if _dg_on and cls < self._wond_distgpp.shape[1]
+                        else torch.zeros(B, 1, dtype=torch.float64, device=dev))
                 # Divine Spark: the belief's flat GPP joins the per-city
                 # term (1 + gppFlat + buildings), the
                 # greatPersonPointsPerTurn form.
@@ -2852,8 +2851,9 @@ class SimPhase:
             # source, the golden prophet term included.
             pts = pts * self._congress_gpp_factor(cls)
             # CIV6 (Classical Republic): "+15% Great Person points" — the
-            # government's factor covers every per-turn source the same way.
-            pts = pts * self._gov_mods(row)[12]["gppmult"]
+            # government's factor covers every per-turn source the same way,
+            # the factor in the game's 24.8 fixed point (`greatPersonPointsPerTurn`)
+            pts = pts * (torch.floor(self._gov_mods(row)[12]["gppmult"] * 256.0) / 256.0)
             # CIV6 (EFFECT_ADJUST_GREAT_PERSON_POINTS_PERCENT): the roster's
             # per-class factor, over every source like the government's
             if self._gpp_class_rows:
@@ -2917,25 +2917,25 @@ class SimPhase:
                 self.civ_gpp[:, row, cls] = torch.where(
                     exh, torch.zeros_like(self.civ_gpp[:, row, cls]), self.civ_gpp[:, row, cls])
 
-    def _gp_ensure_offer(self, active: torch.Tensor, cls: int) -> None:
-        """The DRAW, where pending. CIV6: "the replacement is chosen randomly
-        from those available in the current era, or the next if all those
-        from the current era have been claimed" — the pool is the FIRST era
-        at or past the world's with an unclaimed member; the price freezes
-        with the pick; no pool anywhere ahead = -2 for good, and that
-        verdict draws no random (`ensureGpOffer`)."""
+    def _gp_ensure_offer(self, active: torch.Tensor, cls: int, from_era: torch.Tensor | None = None) -> None:
+        """The DRAW, where pending (0x2f94d0): the pool is the FIRST era at or
+        past the start with an unclaimed member — the start the game era, or
+        for a replacement the later of the game era and the era of the person
+        who left (`from_era`, 0x2f8f70 -> 0x93e9e0); the price freezes with
+        the pick; no pool anywhere ahead = -2 for good, and that verdict draws
+        no random (`ensureGpOffer`)."""
         nR = int(self._gp_roster[cls]) if cls < int(self._gp_roster.numel()) else 0
         need = active & (self.gp_offer[:, cls] == -1)
         if not bool(need.count_nonzero()) or nR <= 0:
             return
         dev = self.device
-        world_era = self._world_era()
+        start = self.game_era if from_era is None else torch.maximum(self.game_era, from_era)
         uncl = ~self.gp_claimed[:, cls, :nR]
         p_eras = self._gp_era[cls, :nR].clamp(min=0, max=8)
         e9 = torch.arange(9, device=dev)
         era_open = (uncl.unsqueeze(2)
                     & (p_eras.reshape(1, -1, 1) == e9.reshape(1, 1, 9))).sum(dim=1)
-        e_ok = (e9.reshape(1, 9) >= world_era.unsqueeze(1)) & (era_open > 0)
+        e_ok = (e9.reshape(1, 9) >= start.unsqueeze(1)) & (era_open > 0)
         has_pool = e_ok.any(dim=1)
         e_pick = e_ok.long().argmax(dim=1)
         pool = uncl & (p_eras.reshape(1, -1) == e_pick.unsqueeze(1))
@@ -2945,7 +2945,7 @@ class SimPhase:
         dr = (need & has_pool).nonzero(as_tuple=True)[0]
         self.gp_offer[dr, cls] = pid[dr]
         self.gp_price[:, cls] = torch.where(
-            need & has_pool, self._gp_cost(cls, pid, world_era), self.gp_price[:, cls])
+            need & has_pool, self._gp_cost(cls, pid), self.gp_price[:, cls])
         xr = (need & ~has_pool).nonzero(as_tuple=True)[0]
         self.gp_offer[xr, cls] = -2
 
@@ -3022,6 +3022,9 @@ class SimPhase:
             return
         maxN = self._gp_effects.shape[1]
         at_c = self.gp_offer[:, cls].clamp(min=0)
+        # the era of the person leaving the timeline, where its replacement's
+        # draw starts at the latest
+        left_era = self._gp_era[cls, at_c].clamp(min=0, max=8)
         # CIV6 (Magnanimous): "After recruiting or patronizing a Great Person,
         # 20% of its Great Person point cost is refunded" — read the price
         # BEFORE the offer is retired below (`GP_REFUND_ROWS`)
@@ -3081,7 +3084,7 @@ class SimPhase:
                     self._land_boosts(o, want, False)
         # the person leaves the timeline and the class draws its replacement
         # at once (`recruit`)
-        self._gp_ensure_offer(hit, cls)
+        self._gp_ensure_offer(hit, cls, left_era)
         guidx = int(self._gp_class_unit[cls]) if cls < int(self._gp_class_unit.numel()) else -1
         if guidx < 0:
             return

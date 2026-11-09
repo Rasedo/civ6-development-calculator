@@ -62,6 +62,7 @@
     - "C-108: a trade route's term and its end"
     - "C-100: the plot values' golden-age, claims and tourism-percent terms, the required features, the power value's negative Amount — READ"
     - "C-109: war weariness per combat, the turn's decay and the percent — READ"
+    - "H-1: a great person's price and its draw's era — READ (0x2f1c50, 0x2f8f70 -> 0x93e9e0 -> 0x2f94d0), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ...d (pseudo index in [@0xf2e218, @0xf2e238]) adds 0x2c4230(player) [the record +0x6c of the 0x2c3660 manager's per-player vector] valued as PSEUDOYIELD_GOLDENAGE_POINT through 0x7a60d0, and...

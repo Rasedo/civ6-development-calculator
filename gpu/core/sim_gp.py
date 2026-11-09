@@ -767,6 +767,13 @@ class SimGp:
             prod = torch.minimum(need, self.civ_treasury[rb, row].double() / 2).clamp(min=0)
             self.city_progress[rb, row, cb, 0] += prod.to(self.city_progress.dtype)
             self.civ_treasury[rb, row] = (self.civ_treasury[rb, row].double() - 2 * prod).to(self.civ_treasury.dtype)
+        # a grant that fills the wonder completes it at once, as a lump into
+        # the queue does (`activateGreatPerson`)
+        rw = (hit | buy).nonzero(as_tuple=True)[0]
+        cw = cc[rw]
+        done = self.city_progress[rw, row, cw, 0].double() >= self.city_cost[rw, row, cw, 0].double()
+        if bool(done.count_nonzero()):
+            self._complete_head_now(row, rw[done], cw[done])
 
     def _gp_per_adjacent(self, row: int, m: torch.Tensor, cls: torch.Tensor,
                          at: torch.Tensor, hc: torch.Tensor) -> None:

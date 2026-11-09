@@ -2040,8 +2040,9 @@ class SimInit:
                 for wi, w in enumerate(self._wond_rows) if w["impY"]]
             # Great Library: boost every technology up to this era, -1 = none.
             self._wond_boost_era = torch.tensor([int(w["boostTechEra"]) for w in self._wond_rows], dtype=torch.long, device=device)
-            # Oracle: what each of the holding city's districts adds to its own class.
-            self._wond_distgpp = torch.tensor([float(w["distGpp"]) for w in self._wond_rows], dtype=torch.float64, device=device)
+            # Oracle: [wonder, class] — what each of the holding city's
+            # districts adds to the classes its rows name.
+            self._wond_distgpp = torch.tensor([list(w["distGpp"]) for w in self._wond_rows], dtype=torch.float64, device=device)
             self._wond_patron = torch.tensor([float(w["patronPct"]) for w in self._wond_rows], dtype=torch.float64, device=device)
             self._wond_envoy = torch.tensor([int(w["envoysPerWonder"]) for w in self._wond_rows], dtype=torch.long, device=device)
             self._wond_spread = torch.tensor([int(w["spreadCharges"]) for w in self._wond_rows], dtype=torch.long, device=device)
@@ -2141,17 +2142,21 @@ class SimInit:
                     self.city_id[b, row, j] = rc["id"]
                     self.centre_slot_at[b, rc["center"]] = j
                 self.civ_next_city_id[b, row] = len(cv.get("cities", []))
-        # [person era, eras the world is BEHIND that person] -> GPP price,
-        # floored by the exporter so both engines read the same doubles.
+        # [person era, game era] -> GPP price, computed by the exporter so
+        # both engines read the same integers (`gpCost`)
         self._gp_cost_table = torch.tensor(
             rr["gpCostTable"], dtype=torch.float64, device=device)
+        # [class, building] -> the building's own points per turn
+        # (`GP_BUILDING_POINTS`)
+        self._gp_bld_pts = torch.zeros(n_gp, int(rules.b_req_district.numel()), dtype=torch.float64, device=device)
+        for _c, _b, _p in rr["gpBuildingPoints"]:
+            if 0 <= _c < n_gp and _b >= 0:
+                self._gp_bld_pts[_c, _b] = float(_p)
         self._gp_roster = torch.tensor(rr["gpRoster"], dtype=torch.long, device=device)
         # who is CLAIMED, per (class, roster position) — the draw pool's
         # complement (`GameState.claimedGreatPeople`)
         self.gp_claimed = torch.zeros(B, n_gp, int(self._gp_roster.max()) if self._gp_roster.numel() else 1,
                                       dtype=torch.bool, device=device)
-        self._gp_flat_cost = torch.tensor(
-            rr["gpFlatCost"], dtype=torch.bool, device=device)
         gp_cd = rr["gpClassDistrict"]
         self._gp_class_district = torch.tensor(gp_cd if gp_cd else [-1] * n_gp, dtype=torch.long, device=device)
         # THE PERSON'S OWN ROW. `gpFx` names the dense columns and the two

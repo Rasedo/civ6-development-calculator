@@ -2,15 +2,14 @@
 import { markBoost } from './boosts';
 import type { GameState, GreatPersonClass, Seat } from './types';
 import { alliedAtLevel, citiesOf, seatOf, unitSeat } from './seats';
-import { GP_CLASSES, GP_CLASS_DISTRICT, GREAT_PEOPLE, gpChargesOf, gpCost } from '../data/greatPeople';
+import { GP_BUILDING_POINTS, GP_CLASSES, GP_CLASS_DISTRICT, GREAT_PEOPLE, gpChargesOf, gpCost } from '../data/greatPeople';
 import { randRange } from './rand';
 import { congressGppFactor } from './congress';
-import { BUILDINGS } from '../data/buildings';
 import { BUILT_WONDERS } from '../data/builtWonders';
 import { TECHS } from '../data/techs';
 import { ALLIANCE_C2_GPP, ALLIANCE_CULTURAL, DED_SKY } from '../data/seats';
 import { completedWonders, seatWonders } from './wonders';
-import { dedicationEvent, goldenProphetPoints, greatPersonMoment, worldEraIndex } from './eras';
+import { dedicationEvent, goldenProphetPoints, greatPersonMoment } from './eras';
 import { governorMult } from './governors';
 import { getModifiers } from './effects';
 import { computeCityStats } from './city';
@@ -20,6 +19,7 @@ import { suzerainEffect } from './cityStates';
 import { BOLOGNA_GPP_BUILDING, BOLOGNA_DISTRICT_GPP } from '../data/cityStates';
 import { PROPHET_MAX_PLAYER_INSTANCES } from '../data/religion';
 import { questRecruited } from './quests';
+import { buildingPillaged } from './yields';
 
 export function greatPeopleEarned(state: GameState, cls: GreatPersonClass): number {
   return state.claimedGreatPeople.filter((id) => GREAT_PEOPLE[cls].some((p) => p.id === id)).length;
@@ -39,24 +39,29 @@ export function gpOffer(state: GameState, cls: GreatPersonClass): number {
 }
 
 /**
- * The DRAW. CIV6: "the replacement is chosen randomly from those available
- * in the current era, or the next if all those from the current era have
- * been claimed" — the pool is the FIRST era at or past the world's with an
- * unclaimed member, and the price freezes with the pick. No pool anywhere
- * ahead = the class is exhausted for good (-2), and that verdict draws no
- * random. The seat-phase loop and every claim (`recruit`) call it — a draw consumes the
- * shared RNG stream, and the GPU twin sits at the same positions.
+ * The DRAW (Game_GreatPeople 0x2f94d0): ONE uniform pick among the class's
+ * unclaimed people of the FIRST era at or past the start holding any — the
+ * start the game era, or for a replacement the later of the game era and the
+ * era of the person who left (`from`; 0x2f8f70 -> 0x93e9e0) — its price
+ * frozen with the pick (`gpCost`). runs/h1_duelp1128 t93: Thomas Aquinas
+ * (Renaissance) in the Renaissance game era, both majors Medieval; 1124 t145:
+ * Alfred Nobel (Modern) after Charles Darwin, the Industrial people spent. No
+ * pool anywhere ahead = the class is exhausted for good (-2), and that
+ * verdict draws no random. The seat-phase loop and every claim (`recruit`)
+ * call it — a draw consumes the shared RNG stream, and the GPU twin sits at
+ * the same positions.
  */
-export function ensureGpOffer(state: GameState, cls: GreatPersonClass): void {
+export function ensureGpOffer(state: GameState, cls: GreatPersonClass, from = 0): void {
   const i = GP_CLASSES.indexOf(cls);
   state.gpOffer ??= GP_CLASSES.map(() => -1);
   state.gpPrice ??= GP_CLASSES.map(() => 0);
   if (state.gpOffer[i] !== -1) return;
   const roster = GREAT_PEOPLE[cls];
-  const we = Math.max(0, Math.min(worldEraIndex(state), 8));
+  const game = state.gameEra ?? 0;
+  const start = Math.max(0, Math.min(Math.max(game, from), 8));
   const claimed = new Set(state.claimedGreatPeople);
   let pool: number[] = [];
-  for (let e = we; e <= 8 && pool.length === 0; e++) {
+  for (let e = start; e <= 8 && pool.length === 0; e++) {
     pool = roster.flatMap((p, at) => (p.era === e && !claimed.has(p.id) ? [at] : []));
   }
   if (pool.length === 0) {
@@ -65,7 +70,7 @@ export function ensureGpOffer(state: GameState, cls: GreatPersonClass): void {
   }
   const at = pool[randRange(state, pool.length, 'Generating a random new Great Person')];
   state.gpOffer[i] = at;
-  state.gpPrice[i] = gpCost(cls, roster[at].era, worldEraIndex(state));
+  state.gpPrice[i] = gpCost(roster[at].era, game);
 }
 
 /** CIV6 (The Last Prophet): "Automatically receive the final Great Prophet
@@ -156,8 +161,12 @@ export function patronizeGreatPerson(state: GameState, seat: number, clsIdx: num
   // the purse paid for the points the seat lacked: more than half the price
   // records the patronage moment
   const price = state.gpPrice?.[clsIdx] ?? 0;
-  const over = 2 * (price - (owner.gpp[cls] ?? 0)) > price;
-  owner.gpp[cls] = recruit(state, seat, cls, over ? currency : null); // patronage keeps the refund too
+  const pts = owner.gpp[cls] ?? 0;
+  const over = 2 * (price - pts) > price;
+  // the claim spends the whole points, the fraction kept (runs/h1_duelp1121
+  // t102: Kamal-ud-Din Behzad patronized on 116.25 Artist points, 0.25 left;
+  // 1117 t141 Emilie du Chatelet on 66.758, 0.758), and the refund too
+  owner.gpp[cls] = pts - Math.floor(pts) + recruit(state, seat, cls, over ? currency : null);
   return { ok: true };
 }
 
@@ -174,9 +183,8 @@ export function greatPersonPointsPerTurn(
     // city" — a PER-CITY factor over everything this city generates.
     const cityMult = governorMult(state, city, (e) => e.gppMult);
     // CIV6 (Oracle): "Districts in this city provide +2 Great Person points
-    // of their type" — the HOLDING city's districts only.
-    const distGpp = completedWonders(state, city)
-      .reduce((n, w) => n + (w.def.effects?.districtGpPoints ?? 0), 0);
+    // of their type" — the HOLDING city's districts only, each class its rows name
+    const wonders = completedWonders(state, city);
     // CIV6 (Cultural alliance 2): +1 Great Person point per class-matched
     // district in origin cities holding a Trade Route to the ally.
     const c2Routed = (seatOf(state, seat)?.tradeRoutes ?? []).some((r) =>
@@ -200,8 +208,13 @@ export function greatPersonPointsPerTurn(
       // holding a building — the TIER-1 building of this class's own district.
       const bologna = bolognaGpp && BOLOGNA_GPP_BUILDING[cls]?.some((b) => city.buildings.includes(b))
         ? BOLOGNA_DISTRICT_GPP : 0;
-      out[cls] += (1 + (gppFlat[cls] ?? 0) + distGpp + c2Routed + bologna
-        + city.buildings.filter((b) => BUILDINGS[b]?.district === district).length) * cityMult;
+      // the district's buildings' own rows (`GP_BUILDING_POINTS`), a pillaged
+      // building none (runs/h1_duelp1117 China t144: Xi'an's pillaged Library,
+      // 5 Scientist points a turn as recorded)
+      const built = GP_BUILDING_POINTS.reduce((n, r) => (r.cls === cls && city.buildings.includes(r.building)
+        && !buildingPillaged(city, r.building) ? n + r.points : n), 0);
+      const distGpp = wonders.reduce((n, w) => n + (w.def.effects?.districtGpPoints?.[cls] ?? 0), 0);
+      out[cls] += (1 + (gppFlat[cls] ?? 0) + distGpp + c2Routed + bologna + built) * cityMult;
     }
     // CIV6: a wonder's per-turn Great Person points are the owner's, paid
     // whether or not the holding city has the class's district — and
@@ -216,8 +229,10 @@ export function greatPersonPointsPerTurn(
   // prophet term included — so it applies after all of them.
   for (const cls of GP_CLASSES) out[cls] *= congressGppFactor(state, cls);
   // CIV6 (Classical Republic): "+15% Great Person points" — the government's
-  // factor covers every per-turn source the same way.
-  const gppMult = getModifiers(state, seat).gppMult;
+  // factor covers every per-turn source the same way, the factor in the
+  // game's 24.8 fixed point (runs/h1_duelp1121 China t101-110: six Writer
+  // points a turn under Classical Republic bank 6.890625, 6 × 294/256)
+  const gppMult = Math.floor(getModifiers(state, seat).gppMult * 256) / 256;
   for (const cls of GP_CLASSES) out[cls] *= gppMult;
   // CIV6 (EFFECT_ADJUST_GREAT_PERSON_POINTS_PERCENT): the roster's per-class
   // factor (`GPP_CLASS_ROWS`), over every source like the government's
@@ -266,7 +281,7 @@ function gpSpawnTile(state: GameState, seat: number, cls: GreatPersonClass): num
  *  banks: `advanceGreatPeople` holds the class's points in a local it
  *  writes back at the end of the turn, so a store written here would be
  *  overwritten and the refund lost (`GP_REFUND_ROWS`). */
-function recruit(state: GameState, seat: number, cls: GreatPersonClass,
+export function recruit(state: GameState, seat: number, cls: GreatPersonClass,
   patron: 'faith' | 'gold' | null = null): number {
   const owner = seatOf(state, seat);
   const at = gpOffer(state, cls);
@@ -326,7 +341,7 @@ function recruit(state: GameState, seat: number, cls: GreatPersonClass,
   // the person leaves the timeline and the class draws its replacement at
   // once (0x2f74b0 -> 0x2f8f70; runs/h1_duelw1117 t26: Stonehenge's Prophet,
   // "Generating a random new Great Person" before Dynastic Cycle's boosts)
-  ensureGpOffer(state, cls);
+  ensureGpOffer(state, cls, person.era);
   return refund;
 }
 

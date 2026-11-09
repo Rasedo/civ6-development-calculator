@@ -12944,3 +12944,36 @@ player as a 'city' step, every type's count at the completed count standing.
   Working boost at t22 (Game_Boosts.csv), 15 kept at t23.
 - Open: the capture path's placement (whether an acquired city runs
   0x1eae70); the Free Cities' placement (the engines refresh a major's).
+
+## H-1: a great person's price and its draw's era — READ (0x2f1c50, 0x2f8f70 -> 0x93e9e0 -> 0x2f94d0), both twins
+
+- THE PRICE 0x2f1c50 (game, class, person era r8): the person era's
+  Eras.GreatPersonBaseCost (row +0x2c); where the game era (0x2c3660 →
+  Game_Eras +0x108) is neither the game's start era (GetStartEra 0x215b20,
+  row +0x14) nor the person's, the person's is the later (0x93e9e0), and the
+  game era is not the last (0x93e8a0): d = the eras walked from the game era
+  to the person's (0x93eaa0), and d times price += floor(d × price × 0x1e /
+  100) (0x2f1e10..0x2f1e22); then the speed (0x5254d0, CostMultiplier / 100)
+  and down to a multiple of gp +0x5b0 (PURCHASE_DIVISOR). The class argument
+  is never read: every class scales. `gpCost` (rules `gpCostTable`
+  [person era][game era], `_gp_cost`).
+- THE REPLACEMENT 0x2f8f70 (after a grant 0x2f74b0): the draw 0x2f94d0
+  starts at the later (0x93e9e0) of the game era (0x2f1ba0 → Game_Eras
+  +0x108) and the leaving entry's era (+8), walking forward to the first era
+  with candidates (0x2f4990, 0x93eaa0); the entry it writes {individual,
+  class, era, price}. `ensureGpOffer(from)`, `_gp_ensure_offer(from_era)`.
+- Confirmed: runs/h1_duelp1117-1128 Game_GreatPeople.csv, 137
+  replacements: 130 at the later of the game era and the leaving era, 2
+  past it with that era spent (1124 t145 Alfred Nobel, Modern, after Charles
+  Darwin with the Industrial scientists spent), 5 on an era's turnover
+  turn drawn before it; 1128 t93 Thomas Aquinas Renaissance in the
+  Renaissance game era, both majors Medieval. Every price: 1124 Nobel 425
+  (drawn in the Industrial game era, (660 + 198) × 0.5 = 429 → 425), Mary
+  Leakey 620 (t173, (960 + 288) × 0.5 = 624 → 620), every other one its era's
+  online base (Imhotep 60 at the setup, the Ancient start era). runs/h1_duelp1128
+  t220: China's 483 points recruit Erwin Schrödinger at 480.
+- OPEN: the setup's draws 0x2f7c10 (the start era); the per-class points
+  every major's store gains with no source the engines hold (China +100 a
+  class at t180 on all five duelp games, +50 at 1124 t160 and 1128 t183)
+  and the store a later grant leaves at that amount and the fraction (1128
+  t220: 483 − 480 → 150, the record's).

@@ -28,6 +28,7 @@
  */
 import { existsSync, readFileSync } from 'node:fs';
 import type { City, CityState, CityStateType, DistrictId, FeatureId, GameMap, GameState, GreatPersonClass, ImprovementId, Seat, TerrainId, Tile, TradeRoute, Unit, Yields } from '../core/types';
+import { DISASTER_IMPROVEMENT_KEY, HIGH_ADJACENCY_KEY, LARGEST_KEY, MITIGATED_FLOOD_KEY } from '../core/moments';
 import { NO_SEAT } from '../core/types';
 import { minorItemKey, minorRepairResumed, type MinorItem } from '../core/minorBuild';
 import { keptKey } from '../core/production';
@@ -50,7 +51,7 @@ import { goldShortfall } from '../data/seats';
 import { governorsOf } from '../core/governors';
 import { envoysWith, minorCity, mostEnvoysReceived } from '../core/cityStates';
 import { GOVERNOR_DEFAULT_PROMOTION, GOVERNOR_INDEX, GOVERNOR_PROMOTION_INDEX, GOVERNOR_PROMOTIONS, promotionBit, promotionBitValue } from '../data/governors';
-import { CIV_LEADERS, COMPETITIONS, COMPETITION_TURNS, DEAL_ITEMS, DEAL_LUXURY, DEAL_TURNS, DEDICATION_COMMEMORATIONS } from '../data/seats';
+import { CIV_LEADERS, COMPETITIONS, COMPETITION_TURNS, DEAL_ITEMS, DEAL_LUXURY, DEAL_TURNS, DEDICATION_COMMEMORATIONS, HEROIC_DEDICATIONS } from '../data/seats';
 import { updateCulturalDominance } from '../core/seatTurn';
 import { addCityPerm, addSeatPerm } from '../core/gpAbility';
 import { BUILDINGS, POWER_PLANT_IDS } from '../data/buildings';
@@ -1383,6 +1384,20 @@ export function formationRows(formed: Set<string>, rows: readonly unknown[][]): 
 /** the action log's rows that place a unit on a plot */
 const PLACEMENT_ROWS = new Set(['UnitAddedToMap', 'UnitMoved', 'UnitTeleported']);
 
+/** the once key of a Moments row the engines record at its event, which no
+ *  held state shows afterwards: the improvement on a disaster's plot, the
+ *  mitigated flood, a district's high adjacency, the largest civilization
+ *  (runs/h1_duelp1117 China: its t38 disaster improvement, t72 mitigated
+ *  flood, t107 largest civilization and t111 Campus none paid again at
+ *  t104 / t107 / t146 / t149) */
+function eventMomentKey(type: string): number | undefined {
+  if (type === 'MOMENT_IMPROVEMENT_CONSTRUCTED_ON_DISASTER_YIELD_TILE_FIRST') return DISASTER_IMPROVEMENT_KEY;
+  if (type === 'MOMENT_MITIGATED_RIVER_FLOOD') return MITIGATED_FLOOD_KEY;
+  if (type === 'MOMENT_CITY_BUILT_BECAME_LARGEST_CIV_BY_MARGIN') return LARGEST_KEY;
+  const d = /^MOMENT_DISTRICT_CONSTRUCTED_HIGH_ADJACENCY_(.+)$/.exec(type)?.[1];
+  return d ? HIGH_ADJACENCY_KEY[d as DistrictId] : undefined;
+}
+
 /** Fold one record into the history, in turn order. */
 export function advanceHistory(h: History, rec: TurnRecord, cat: Catalog): void {
   const W = rec.head.W;
@@ -1415,6 +1430,18 @@ export function advanceHistory(h: History, rec: TurnRecord, cat: Catalog): void 
       if (!type || !def || !(def.combat > 0) || unitDomain(type) !== 'military') continue;
       was[0] = Math.max(was[0], def.combat);
       was[1] = Math.max(was[1], rangedCombatOf(type));
+    }
+  }
+  // the once keys a major's moments of the record name that no held state
+  // shows afterwards (`eventMomentKey`)
+  for (const p of rec.players) {
+    if (!bool(p.major) || !Array.isArray(p.moments)) continue;
+    for (const m of p.moments) {
+      const k = eventMomentKey(m[1]);
+      if (k === undefined) continue;
+      const ks = h.moments.get(p.id) ?? [];
+      if (!ks.includes(k)) h.moments.set(p.id, [...ks, k].sort((x, y) => x - y));
+      if (!h.momentsWorld.includes(k)) h.momentsWorld = [...h.momentsWorld, k].sort((x, y) => x - y);
     }
   }
   // a governor seated in a city: [.., turn, kind, city owner, city id,
@@ -2753,6 +2780,7 @@ export function importTurn(rec: TurnRecord, cat: Catalog, history?: History): Im
   const luxUnrecorded = importLuxuryDeals(ctx, state, players, cat, seatOfGame, history);
   if (history?.people) importPeople(ctx, rec, state, history.people, seatOfGame, cityByKey, history.cityFirstSeen);
   else spentPersonGaps(ctx, rec, cityByKey, history);
+  importRecruited(ctx, rec, state, seatOfGame);
   const routes = importTradeRoutes(rec, state, cityByKey, minorOfPlayer, seatOfGame, history);
 
   // the units
@@ -3653,6 +3681,17 @@ function importPlayer(ctx: Ctx, p: DumpPlayer, s: GameState['seats'][number]): v
   }
   s.treasury = num(p.gold);
   s.faith = num(p.faith);
+  // a major's Great Person points by class (the record's GreatPersonClasses
+  // order); a class the engine has no roster of carries points as the
+  // `gp-class` gap
+  if (bool(p.major) && Array.isArray(p.gpp)) {
+    s.gpp = {};
+    p.gpp.forEach((v, k) => {
+      const cls = strip(cat.greatPersonClasses?.[k] ?? '', 'GREAT_PERSON_CLASS_') as GreatPersonClass;
+      if (GP_CLASSES.includes(cls)) s.gpp[cls] = num(v);
+      else if (num(v)) gap(ctx, 'gp-class', cls);
+    });
+  }
   s.diplomaticFavor = num(p.favor) || 0;
   s.envoysAvailable = num(p.tokens) || 0;
   // the Influence banked toward the next envoy (GetInfluence():GetPointsEarned):
@@ -3686,7 +3725,10 @@ function importAges(ctx: Ctx, s: GameState['seats'][number], p: DumpPlayer, hist
     if (d >= 0) s.dedicationPicks.push(d);
     else gap(ctx, 'commemoration', name);
   }
-  s.dedications = s.dedicationPicks.length;
+  // what the age allows, whether or not its picks are made yet: a Heroic
+  // age three, any other one (runs/h1_duelp1117 t181: the Atomic era's first
+  // record holds none, China takes one in its turn)
+  s.dedications = ageOf(p) === AGE_HEROIC ? HEROIC_DEDICATIONS : 1;
   const ages = history?.ages.get(p.id) ?? [];
   s.darkAges = ages.filter((a) => a === AGE_DARK).length;
   s.goldenAges = ages.filter((a) => a >= AGE_GOLDEN_ONLY).length;
@@ -4278,6 +4320,26 @@ function importCongress(table: unknown, rec: TurnRecord, cat: Catalog, state: Ga
     out.push({ res, outcome, target });
   }
   return { list: out, gaps };
+}
+
+/** THE GREAT PEOPLE RECRUITED SO FAR (`TurnRecord.greatPeople`): gone from
+ *  the world's pool (`GameState.claimedGreatPeople`, the draw's) and each its
+ *  claimant's (`Seat.gpEarned`, the Great People boosts' and the Prophet's
+ *  cap); one outside the roster is the `gp-person` gap */
+function importRecruited(ctx: Ctx, rec: TurnRecord, state: GameState, seatOfGame: (pid: number) => number): void {
+  if (!Array.isArray(rec.greatPeople)) return;
+  state.claimedGreatPeople = [];
+  for (const s of state.seats) s.gpEarned = [];
+  for (const [ind, player] of rec.greatPeople) {
+    const person = personOf(ctx.cat, ind);
+    if (!person) {
+      gap(ctx, 'gp-person', ctx.cat.greatPeople?.[ind] ?? String(ind));
+      continue;
+    }
+    state.claimedGreatPeople.push(person.id);
+    const seat = seatOfGame(player);
+    if (seat >= 0 && seat < state.seats.length) state.seats[seat].gpEarned.push(person.id);
+  }
 }
 
 /**
