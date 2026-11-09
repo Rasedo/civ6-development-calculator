@@ -13,7 +13,7 @@ import { selectResearch } from './economy';
 import { GOVERNMENTS } from '../data/policies';
 import { growthFoodNeeded } from '../data/constants';
 import { ALLIANCE_C3_TOUR_PCT, ALLIANCE_CULTURAL, DIPLO_FAVOR_PER_SUZERAIN, FAVOR_OCCUPIED_CAPITAL, FAVOR_PER_ALLIANCE, ENLIGHTENMENT_CIVIC, TOURISM_RELIGIOUS_PENALTY_PCT, TOURISM_PER_VISITOR_PER_CIV, CULTURE_PER_DOMESTIC_TOURIST } from '../data/seats';
-import { seatWonderFlag } from './wonders';
+import { seatWonderFlag, seatWonderSum } from './wonders';
 import { emergencyEnvoyGold } from './emergency';
 import { pollutionFavorPenalty } from './climate';
 import { tourismFavorOf, slotFavorOf } from './effects';
@@ -25,9 +25,11 @@ export function suzerainCount(state: GameState, seat: number): number {
 
 export function diplomaticFavorPerTurn(gov: string | null, suzerains: number,
                                        occupiedCapitals = 0, alliances = 0,
-                                       buildings = 0, pollution = 0, grievances = 0): number {
+                                       buildings = 0, pollution = 0, grievances = 0, suzerainPct = 0): number {
   const tier = gov ? GOVERNMENTS[gov]?.tier ?? 0 : 0;
-  return tier + DIPLO_FAVOR_PER_SUZERAIN * suzerains
+  // CIV6 (Orszaghaz, MODIFIER_PLAYER_ADJUST_SUZERAIN_FAVOR_MULTIPLIER): the
+  // suzerainties' Favor raised by the seat's percent
+  return tier + Math.trunc((DIPLO_FAVOR_PER_SUZERAIN * suzerains * (100 + suzerainPct)) / 100)
     + FAVOR_PER_ALLIANCE * alliances + buildings
     - FAVOR_OCCUPIED_CAPITAL * occupiedCapitals - pollution - grievances;
 }
@@ -117,7 +119,8 @@ export function seatFavor(state: GameState, seat: number): void {
                              allianceLevels(state, seat),
                              seatBuildingSum(state, seat, 'favorPerTurn') + cardFavorPerBuilding(state, seat),
                              pollutionFavorPenalty(state, seat),
-                             grievanceFavorPenalty(state, seat)));
+                             grievanceFavorPenalty(state, seat),
+                             seatWonderSum(state, seat, 'suzerainFavorPct')));
   // CIV6 (Faces of Peace): "For every 100 Tourism per turn earn 1 Diplomatic
   // Favor per turn" — this turn's OWN rate, the number stored just above
   // (`TOURISM_FAVOR_ROWS`)

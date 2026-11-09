@@ -8,6 +8,7 @@ import type { GpAppeal } from './appeal';
 import { seatBuildingSum, cityHasPark, growthDetachResidue } from './city';
 import { cityDistrictSum, darkBuildings } from './yields';
 import { getModifiers } from './effects';
+import { seatWonderSum } from './wonders';
 import { addEnvoys, resolveSuzerains } from './cityStates';
 import {
   GOVERNORS, GOVERNOR_PROMOTIONS, GOVERNOR_DEFAULT_PROMOTION, GOVERNOR_TITLE_CIVICS,
@@ -448,6 +449,16 @@ export function cityAppealResolver(state: GameState): GpAppeal {
     if (!add) continue;
     for (const c of s2.cities) {
       if (!cityHasPark(state, c)) continue;
+      const key = c.seat * APPEAL_SEAT_STRIDE + c.id;
+      flat.set(key, (flat.get(key) ?? 0) + add);
+    }
+  }
+  // CIV6 (Eiffel Tower, MODIFIER_PLAYER_CITIES_ADJUST_CITY_APPEAL Amount 2):
+  // the same per-CITY flat add, to every city of the seat holding it
+  for (const s5 of state.seats) {
+    const add = seatWonderSum(state, s5.seat, 'cityAppeal');
+    if (!add) continue;
+    for (const c of s5.cities) {
       const key = c.seat * APPEAL_SEAT_STRIDE + c.id;
       flat.set(key, (flat.get(key) ?? 0) + add);
     }

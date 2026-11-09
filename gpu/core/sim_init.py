@@ -1950,6 +1950,15 @@ class SimInit:
         self.wok = torch.tensor([[t.get("wok", 0) for t in f["tiles"]] for f in fixtures], dtype=torch.long, device=device)
         # a lowland plot's `wok` once the sea makes it a Coast (`_submerge`)
         self._wok_sea = torch.tensor([[t.get("wks", 0) for t in f["tiles"]] for f in fixtures], dtype=torch.long, device=device)
+        self._wond_free_res: list[tuple[int, int, int]] = []
+        self._wond_cls_prod: list[tuple[int, int, float]] = []
+        self._wond_mv_on = False
+        # the Orszaghaz: the percent more Favor from suzerainties; the Eiffel
+        # Tower: Appeal on every plot of the owner's cities
+        self._wond_suz_favor = torch.tensor([float(w["suzFavorPct"]) for w in self._wond_rows],
+                                            dtype=torch.float64, device=device)
+        self._wond_city_appeal = torch.tensor([int(w["cityAppeal"]) for w in self._wond_rows],
+                                              dtype=torch.long, device=device)
         if self._wond_n:
             # the install's RegionalRange per wonder, 0 for none: a regional
             # wonder's `cy` and amenities reach every same-seat city centre
@@ -2055,6 +2064,26 @@ class SimInit:
             self._wond_guru_off = torch.tensor([float(w["guruBuyOff"]) for w in self._wond_rows], dtype=torch.float64, device=device)
             self._wond_treasury = torch.tensor([float(w["treasuryMult"]) for w in self._wond_rows], dtype=torch.float64, device=device)
             self._wond_erascore = torch.tensor([int(w["eraScorePerMoment"]) for w in self._wond_rows], dtype=torch.long, device=device)
+            # the Great Lighthouse: Movement to the owner's naval units and to
+            # its embarked units (`seaMoveBonus` / `embarkTechMoves`)
+            self._wond_naval_mv = torch.tensor([int(w["navalMoves"]) for w in self._wond_rows], dtype=torch.long, device=device)
+            self._wond_embark_mv = torch.tensor([int(w["embarkedMoves"]) for w in self._wond_rows], dtype=torch.long, device=device)
+            # [nW] bool: the wonders that carry either, so a world where none
+            # stands complete skips the walk
+            self._wond_mv_any = (self._wond_naval_mv != 0) | (self._wond_embark_mv != 0)
+            self._wond_mv_on = bool(self._wond_mv_any.count_nonzero())
+            # Kilwa Kisiwani: per wonder, (city-state type, yield index,
+            # percent, ownAt, allAt) per row (`suzerainTypeYieldPct`)
+            self._wond_suz_type = [[(int(r[0]), int(r[1]), float(r[2]), int(r[3]), int(r[4])) for r in w["suzTypeYield"]]
+                                   for w in self._wond_rows]
+            # Jebel Barkal: (wonder, resource index, amount) banked each turn
+            self._wond_free_res = [(wi, int(w["freeRes"][0]), int(w["freeRes"][1]))
+                                   for wi, w in enumerate(self._wond_rows) if w["freeRes"]]
+            # the Statue of Zeus: (wonder, promotion class index, percent) of
+            # Production toward the class's units in every city
+            _wpcl = list(rules.promo_classes)
+            self._wond_cls_prod = [(wi, _wpcl.index(w["clsProd"][0]) if w["clsProd"][0] in _wpcl else -1, float(w["clsProd"][1]))
+                                   for wi, w in enumerate(self._wond_rows) if w["clsProd"]]
         self.feat_id = torch.tensor([[t.get("fid", -1) for t in f["tiles"]] for f in fixtures], dtype=torch.long, device=device)
         self.feat_removable = torch.tensor([[bool(t.get("frm", 0)) for t in f["tiles"]] for f in fixtures], dtype=torch.bool, device=device)
         # ONE roster: a natural wonder is a FEATURE row, and this plane is a

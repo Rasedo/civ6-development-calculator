@@ -29,6 +29,7 @@ import { cityHasLiveDistrict, cityImprovedResourceKinds, cityPower, darkBuilding
 import { CARBON_PER_RESOURCE, emitCarbon, plantCarbon, powerCells, unitCarbon } from './climate';
 import { rebuildLuxuries } from './city';
 import { ageReactors } from './disasters';
+import { seatWonders } from './wonders';
 import type { City, CityState, GameState, Seat, Tile, Unit } from './types';
 
 /** the cities whose buildings raise a seat's cap: a city-state's own one */
@@ -201,6 +202,13 @@ export function stockpileIncome(state: GameState, seat: number): number[] {
     const k = strategicSlot(r.resource);
     if (k < 0) continue;
     for (const city of citiesOf(state, seat)) if (cityHasLiveDistrict(state, city, r.district)) bk[k] += r.perTurn;
+  }
+  // CIV6 (Jebel Barkal, MODIFIER_SINGLE_CITY_ADJUST_FREE_RESOURCE_EXTRACTION):
+  // each complete wonder's standing grant
+  for (const w of seatWonders(state, seat)) {
+    const fr = w.def.effects?.freeResource;
+    const k = strategicSlot(fr?.resource);
+    if (fr && k >= 0) bk[k] += fr.amount;
   }
   // CIV6 (Hattusa, MODIFIER_PLAYER_ADJUST_FREE_RESOURCE_IMPORT_EXTRACTION under
   // PLAYER_HAS_NO_IMPROVED_<R>): each strategic resource the suzerain sees and

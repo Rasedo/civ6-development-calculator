@@ -1467,6 +1467,18 @@ class SimPhase:
                     _off_home = ~self._on_home_continent(row, self.city_center[bidx, row, col])
                 _cls_i = _cls_i & _off_home
             _emall = torch.where(_cls_i & _who, _emall * (1.0 + _pct / 100.0), _emall)
+        # CIV6 (Statue of Zeus, MODIFIER_PLAYER_CITIES_ADJUST_UNIT_TAG_ERA_PRODUCTION
+        # NO_ERA): the seat's wonders' unit-class rows, in catalog order, read
+        # live (a wonder an earlier city completed this step counts)
+        if self._wond_cls_prod:
+            _cw = self._completed_wonders(row)
+            if _cw is not None:
+                _wh = _cw.any(dim=1)  # [B, nW]
+                for _wi, _wpc, _wpct in self._wond_cls_prod:
+                    if _wpc < 0:
+                        continue
+                    _cls_i = _is_unit & (self.rules_dev.u_promo_class[_ut] == _wpc) & _wh[:, _wi]
+                    _emall = torch.where(_cls_i, _emall * (1.0 + _wpct / 100.0), _emall)
         # CIV6 (Iteru): "+15% Production towards Districts and Wonders built
         # next to a River."
         _egypt = pre["egypt"]
@@ -2652,7 +2664,10 @@ class SimPhase:
         # bank floors at zero.
         bank(self.civ_diplo_favor,
              self._adopted_gov_tier(row)
-             + self._favor_per_suz * self._suzerains_held(row)
+             # CIV6 (Orszaghaz, MODIFIER_PLAYER_ADJUST_SUZERAIN_FAVOR_MULTIPLIER):
+             # the suzerainties' Favor raised by the seat's percent
+             + torch.trunc(self._favor_per_suz * self._suzerains_held(row)
+                           * (100.0 + self._seat_wonder_sum(row, self._wond_suz_favor)) / 100.0)
              + self._favor_per_alliance * self._alliance_levels_of(row).sum(dim=1)
              # CIV6 (Foreign Ministry, GS): "+3 Diplomatic Favor per turn."
              + self._seat_building_sum(row, self._b_favor)

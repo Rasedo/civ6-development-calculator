@@ -1716,6 +1716,18 @@ export function buildRules() {
         guruBuyOff: w.effects?.guruBuyOffPct ?? 0,
         treasuryMult: w.effects?.treasuryMult ?? 1,
         eraScorePerMoment: w.effects?.eraScorePerMoment ?? 0,
+        // Movement to the owner's naval units, and to its embarked units
+        navalMoves: w.effects?.navalMoves ?? 0,
+        embarkedMoves: w.effects?.embarkedMoves ?? 0,
+        // [resource index, amount] banked by the owner each turn, [] none
+        freeRes: w.effects?.freeResource ? [RESOURCE_IDS.indexOf(w.effects.freeResource.resource as never), w.effects.freeResource.amount] : [],
+        // [promotion class, percent] of Production toward its units in every city, [] none
+        clsProd: w.effects?.unitClassProdPct ? [w.effects.unitClassProdPct.promoClass, w.effects.unitClassProdPct.pct] : [],
+        // Appeal on every plot of the owner's cities; percent more Favor from suzerainties
+        cityAppeal: w.effects?.cityAppeal ?? 0,
+        suzFavorPct: w.effects?.suzerainFavorPct ?? 0,
+        // [city-state type index (CITY_STATE_TYPES), yield index, percent, ownAt, allAt] per row
+        suzTypeYield: (w.effects?.suzerainTypeYieldPct ?? []).map((r) => [CITY_STATE_TYPES.indexOf(r.type), YIELD_KEYS.indexOf(r.yield), r.pct, r.ownAt, r.allAt]),
       })),
       // per feature: one of the floodplains (`isFloodplains`), which a
       // district or a wonder leaves standing under it

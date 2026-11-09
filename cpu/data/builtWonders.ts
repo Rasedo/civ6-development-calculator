@@ -12,7 +12,7 @@
  * PAYS here; docs/AUDIT.md carries the effects still missing.
  */
 
-import type { DistrictId, FeatureId, GreatPersonClass, ImprovementId, TerrainId, Yields } from '../core/types';
+import type { CityStateType, DistrictId, FeatureId, GreatPersonClass, ImprovementId, TerrainId, YieldKey, Yields } from '../core/types';
 import type { SlotKind } from './policies';
 import { GAME_SPEED, scaleByGameSpeed } from './constants';
 import { xml, type SrcMap } from './provenance';
@@ -219,6 +219,33 @@ export interface BuiltWonderDef {
     treasuryMult?: number;
     /** Era score paid per era-score event worth `ERA_SCORE_MOMENT_MIN` or more. */
     eraScorePerMoment?: number;
+    /** CIV6 (Great Lighthouse, ABILITY_GREAT_LIGHTHOUSE_MOVEMENT's
+     *  MODIFIER_PLAYER_UNIT_ADJUST_SEA_MOVEMENT): Movement every naval unit
+     *  of the owner gains — the ability's four CLASS_NAVAL_* tags, which
+     *  every DOMAIN_SEA combat chassis carries (`UnitDef.naval`). */
+    navalMoves?: number;
+    /** CIV6 (MODIFIER_PLAYER_ADJUST_EMBARKED_MOVEMENT): Movement the owner's
+     *  embarked units gain, beside the technologies' rungs. */
+    embarkedMoves?: number;
+    /** CIV6 (MODIFIER_SINGLE_CITY_ADJUST_FREE_RESOURCE_EXTRACTION): a
+     *  strategic resource the owner banks each turn. */
+    freeResource?: { resource: string; amount: number };
+    /** CIV6 (MODIFIER_PLAYER_CITIES_ADJUST_UNIT_TAG_ERA_PRODUCTION, EraType
+     *  NO_ERA): the percent more Production every city of the owner puts
+     *  toward a unit of this promotion class. */
+    unitClassProdPct?: { promoClass: string; pct: number };
+    /** CIV6 (MODIFIER_PLAYER_CITIES_ADJUST_CITY_APPEAL): Appeal on every plot
+     *  of every city of the owner (the city appeal resolver's flat add). */
+    cityAppeal?: number;
+    /** CIV6 (MODIFIER_PLAYER_ADJUST_SUZERAIN_FAVOR_MULTIPLIER): the percent
+     *  more Diplomatic Favor the owner earns from its suzerainties. */
+    suzerainFavorPct?: number;
+    /** CIV6 (Kilwa Kisiwani, EFFECT_ADJUST_CITY_YIELD_MODIFIER under
+     *  REQUIREMENT_PLAYER_IS_SUZERAIN_X_TYPE): the percent of a yield the
+     *  wonder's own city gains while the owner is suzerain of `ownAt`
+     *  city-states of the type, and every city of the owner while it is
+     *  suzerain of `allAt` — the wonder's city takes both. */
+    suzerainTypeYieldPct?: { type: CityStateType; yield: YieldKey; pct: number; ownAt: number; allAt: number }[];
   };
   description: string;
 }
@@ -831,10 +858,12 @@ export const BUILT_WONDERS: Record<string, BuiltWonderDef> = Object.fromEntries(
       id: 'GREAT_LIGHTHOUSE', name: 'Great Lighthouse', code: 'GH', cost: 290,
       requiresTech: 'CELESTIAL_NAVIGATION', placement: { onCoastalWater: true, adjacentDistrict: 'HARBOR' },
       cityYields: { gold: 3 },
-      effects: { gpPoints: { ADMIRAL: 1 } },
-      description: '+3 gold and +1 Admiral point per turn. Coastal water adjacent to a Harbor.',
+      effects: { gpPoints: { ADMIRAL: 1 }, navalMoves: 1, embarkedMoves: 1 },
+      description: '+3 gold and +1 Admiral point per turn; +1 Movement to the owner\'s naval units and to its embarked units. Coastal water adjacent to a Harbor.',
       src: {
         code: { stylized: 'a display code, not a game constant' },
+        'effects.navalMoves': xml('ModifierArguments', 'ModifierId=GREAT_LIGHTHOUSE_SEA_MOVEMENT&Name=Amount', 'Value'),
+        'effects.embarkedMoves': xml('ModifierArguments', 'ModifierId=GREATLIGHTHOUSE_ADJUST_EMBARKED_MOVEMENT&Name=Amount', 'Value'),
         cost: xml('Buildings', 'BuildingType=BUILDING_GREAT_LIGHTHOUSE', 'Cost', { scale: GAME_SPEED }),
         requiresTech: xml('Buildings', 'BuildingType=BUILDING_GREAT_LIGHTHOUSE', 'PrereqTech', { expect: 'TECH_CELESTIAL_NAVIGATION' }),
         'cityYields.gold': xml('Building_YieldChanges', 'BuildingType=BUILDING_GREAT_LIGHTHOUSE&YieldType=YIELD_GOLD', 'YieldChange'),
@@ -847,10 +876,12 @@ export const BUILT_WONDERS: Record<string, BuiltWonderDef> = Object.fromEntries(
       id: 'JEBEL_BARKAL', name: 'Jebel Barkal', code: 'JB', cost: 400,
       requiresTech: 'IRON_WORKING', placement: { terrains: ['DESERT'], hillsOnly: true },
       cityYields: { faith: 4 },
-      effects: { regionalRange: 6 },
-      description: '+4 faith to each of your cities within 6 tiles. Desert Hills.',
+      effects: { regionalRange: 6, freeResource: { resource: 'IRON', amount: 6 } },
+      description: '+4 faith to each of your cities within 6 tiles; 6 Iron a turn to the owner. Desert Hills.',
       src: {
         code: { stylized: 'a display code, not a game constant' },
+        'effects.freeResource.resource': xml('ModifierArguments', 'ModifierId=JEBELBARKAL_GRANT_FOUR_IRON_PER_TURN&Name=ResourceType', 'Value', { expect: 'RESOURCE_IRON' }),
+        'effects.freeResource.amount': xml('ModifierArguments', 'ModifierId=JEBELBARKAL_GRANT_FOUR_IRON_PER_TURN&Name=Amount', 'Value'),
         cost: xml('Buildings', 'BuildingType=BUILDING_JEBEL_BARKAL', 'Cost', { scale: GAME_SPEED }),
         requiresTech: xml('Buildings', 'BuildingType=BUILDING_JEBEL_BARKAL', 'PrereqTech', { expect: 'TECH_IRON_WORKING' }),
         'cityYields.faith': xml('Building_YieldChanges', 'BuildingType=BUILDING_JEBEL_BARKAL&YieldType=YIELD_FAITH', 'YieldChange'),
@@ -865,10 +896,13 @@ export const BUILT_WONDERS: Record<string, BuiltWonderDef> = Object.fromEntries(
       cityYields: { gold: 3 },
       effects: {
         grantUnits: [{ unit: 'SPEARMAN', count: 3 }, { unit: 'ARCHER', count: 3 }, { unit: 'BATTERING_RAM', count: 1 }],
+        unitClassProdPct: { promoClass: 'ANTICAV', pct: 50 },
       },
-      description: '+3 gold; 3 free Spearmen, 3 free Archers and a free Battering Ram. Flat land adjacent to an Encampment.',
+      description: '+3 gold; 3 free Spearmen, 3 free Archers and a free Battering Ram; +50% Production toward anti-cavalry units in every city. Flat land adjacent to an Encampment.',
       src: {
         code: { stylized: 'a display code, not a game constant' },
+        'effects.unitClassProdPct.promoClass': xml('ModifierArguments', 'ModifierId=STAUEZEUS_ANTI_CAVALRY_PRODUCTION&Name=UnitPromotionClass', 'Value', { expect: 'PROMOTION_CLASS_ANTI_CAVALRY' }),
+        'effects.unitClassProdPct.pct': xml('ModifierArguments', 'ModifierId=STAUEZEUS_ANTI_CAVALRY_PRODUCTION&Name=Amount', 'Value'),
         cost: xml('Buildings', 'BuildingType=BUILDING_STATUE_OF_ZEUS', 'Cost', { scale: GAME_SPEED }),
         requiresCivic: xml('Buildings', 'BuildingType=BUILDING_STATUE_OF_ZEUS', 'PrereqCivic', { expect: 'CIVIC_MILITARY_TRAINING' }),
         'cityYields.gold': xml('Building_YieldChanges', 'BuildingType=BUILDING_STATUE_OF_ZEUS&YieldType=YIELD_GOLD', 'YieldChange'),
@@ -968,10 +1002,38 @@ export const BUILT_WONDERS: Record<string, BuiltWonderDef> = Object.fromEntries(
     W({
       id: 'KILWA_KISIWANI', name: 'Kilwa Kisiwani', code: 'KK', cost: 710,
       requiresTech: 'MACHINERY', placement: { flatOnly: true, coastalLand: true },
-      effects: { grantEnvoys: 3 },
-      description: '3 envoys at completion. Flat land on the coast.',
+      effects: {
+        grantEnvoys: 3,
+        suzerainTypeYieldPct: [
+          { type: 'scientific', yield: 'science', pct: 15, ownAt: 1, allAt: 2 },
+          { type: 'religious', yield: 'faith', pct: 15, ownAt: 1, allAt: 2 },
+          { type: 'trade', yield: 'gold', pct: 15, ownAt: 1, allAt: 2 },
+          { type: 'cultural', yield: 'culture', pct: 15, ownAt: 1, allAt: 2 },
+        ],
+      },
+      description: '3 envoys at completion; +15% of a yield in this city while suzerain of one city-state of its type, and +15% in every city while suzerain of two (Science, Faith, Gold, Culture). Flat land on the coast.',
       src: {
         code: { stylized: 'a display code, not a game constant' },
+        'effects.suzerainTypeYieldPct.0.type': xml('RequirementArguments', 'RequirementId=REQUIRES_SUZERAIN_SCIENTIFIC_1_LEADER&Name=LeaderType', 'Value', { expect: 'LEADER_MINOR_CIV_SCIENTIFIC' }),
+        'effects.suzerainTypeYieldPct.0.yield': xml('ModifierArguments', 'ModifierId=KILWA_SINGLE_ADDSCIENCEYIELD&Name=YieldType', 'Value', { expect: 'YIELD_SCIENCE' }),
+        'effects.suzerainTypeYieldPct.0.pct': xml('ModifierArguments', 'ModifierId=KILWA_SINGLE_ADDSCIENCEYIELD&Name=Amount', 'Value'),
+        'effects.suzerainTypeYieldPct.0.ownAt': xml('RequirementArguments', 'RequirementId=REQUIRES_SUZERAIN_SCIENTIFIC_1_LEADER&Name=Amount', 'Value'),
+        'effects.suzerainTypeYieldPct.0.allAt': xml('RequirementArguments', 'RequirementId=REQUIRES_SUZERAIN_SCIENTIFIC_2_LEADERS&Name=Amount', 'Value'),
+        'effects.suzerainTypeYieldPct.1.type': xml('RequirementArguments', 'RequirementId=REQUIRES_SUZERAIN_RELIGIOUS_1_LEADER&Name=LeaderType', 'Value', { expect: 'LEADER_MINOR_CIV_RELIGIOUS' }),
+        'effects.suzerainTypeYieldPct.1.yield': xml('ModifierArguments', 'ModifierId=KILWA_SINGLE_ADDFAITHYIELD&Name=YieldType', 'Value', { expect: 'YIELD_FAITH' }),
+        'effects.suzerainTypeYieldPct.1.pct': xml('ModifierArguments', 'ModifierId=KILWA_SINGLE_ADDFAITHYIELD&Name=Amount', 'Value'),
+        'effects.suzerainTypeYieldPct.1.ownAt': xml('RequirementArguments', 'RequirementId=REQUIRES_SUZERAIN_RELIGIOUS_1_LEADER&Name=Amount', 'Value'),
+        'effects.suzerainTypeYieldPct.1.allAt': xml('RequirementArguments', 'RequirementId=REQUIRES_SUZERAIN_RELIGIOUS_2_LEADERS&Name=Amount', 'Value'),
+        'effects.suzerainTypeYieldPct.2.type': xml('RequirementArguments', 'RequirementId=REQUIRES_SUZERAIN_TRADE_1_LEADER&Name=LeaderType', 'Value', { expect: 'LEADER_MINOR_CIV_TRADE' }),
+        'effects.suzerainTypeYieldPct.2.yield': xml('ModifierArguments', 'ModifierId=KILWA_SINGLE_ADDGOLDYIELD&Name=YieldType', 'Value', { expect: 'YIELD_GOLD' }),
+        'effects.suzerainTypeYieldPct.2.pct': xml('ModifierArguments', 'ModifierId=KILWA_SINGLE_ADDGOLDYIELD&Name=Amount', 'Value'),
+        'effects.suzerainTypeYieldPct.2.ownAt': xml('RequirementArguments', 'RequirementId=REQUIRES_SUZERAIN_TRADE_1_LEADER&Name=Amount', 'Value'),
+        'effects.suzerainTypeYieldPct.2.allAt': xml('RequirementArguments', 'RequirementId=REQUIRES_SUZERAIN_TRADE_2_LEADERS&Name=Amount', 'Value'),
+        'effects.suzerainTypeYieldPct.3.type': xml('RequirementArguments', 'RequirementId=REQUIRES_SUZERAIN_CULTURAL_1_LEADER&Name=LeaderType', 'Value', { expect: 'LEADER_MINOR_CIV_CULTURAL' }),
+        'effects.suzerainTypeYieldPct.3.yield': xml('ModifierArguments', 'ModifierId=KILWA_SINGLE_ADDCULTUREYIELD&Name=YieldType', 'Value', { expect: 'YIELD_CULTURE' }),
+        'effects.suzerainTypeYieldPct.3.pct': xml('ModifierArguments', 'ModifierId=KILWA_SINGLE_ADDCULTUREYIELD&Name=Amount', 'Value'),
+        'effects.suzerainTypeYieldPct.3.ownAt': xml('RequirementArguments', 'RequirementId=REQUIRES_SUZERAIN_CULTURAL_1_LEADER&Name=Amount', 'Value'),
+        'effects.suzerainTypeYieldPct.3.allAt': xml('RequirementArguments', 'RequirementId=REQUIRES_SUZERAIN_CULTURAL_2_LEADERS&Name=Amount', 'Value'),
         cost: xml('Buildings', 'BuildingType=BUILDING_KILWA_KISIWANI', 'Cost', { scale: GAME_SPEED }),
         requiresTech: xml('Buildings', 'BuildingType=BUILDING_KILWA_KISIWANI', 'PrereqTech', { expect: 'TECH_MACHINERY' }),
         'placement.flatOnly': { derived: 'true where every Building_ValidTerrains row of the wonder is a FLAT terrain', inputs: [xml('Building_ValidTerrains', 'BuildingType=BUILDING_KILWA_KISIWANI', 'TerrainType')] },
@@ -1078,9 +1140,11 @@ export const BUILT_WONDERS: Record<string, BuiltWonderDef> = Object.fromEntries(
       id: 'ORSZAGHAZ', name: 'Országház', code: 'OH', cost: 920,
       requiresTech: 'SANITATION', placement: { requiresRiver: true },
       cityYields: { culture: 4 },
-      description: '+4 culture. On a river.',
+      effects: { suzerainFavorPct: 100 },
+      description: '+4 culture; the Diplomatic Favor the owner earns from its suzerainties doubled. On a river.',
       src: {
         code: { stylized: 'a display code, not a game constant' },
+        'effects.suzerainFavorPct': xml('ModifierArguments', 'ModifierId=ORSZAGHAZ_DOUBLE_FAVOR_SUZERAIN&Name=Amount', 'Value'),
         cost: xml('Buildings', 'BuildingType=BUILDING_ORSZAGHAZ', 'Cost', { scale: GAME_SPEED }),
         requiresTech: xml('Buildings', 'BuildingType=BUILDING_ORSZAGHAZ', 'PrereqTech', { expect: 'TECH_SANITATION' }),
         'cityYields.culture': xml('Building_YieldChanges', 'BuildingType=BUILDING_ORSZAGHAZ&YieldType=YIELD_CULTURE', 'YieldChange'),
@@ -1103,9 +1167,11 @@ export const BUILT_WONDERS: Record<string, BuiltWonderDef> = Object.fromEntries(
     W({
       id: 'EIFFEL_TOWER', name: 'Eiffel Tower', code: 'EF', cost: 1620,
       requiresTech: 'STEEL', placement: { flatOnly: true, adjacentDistrict: 'CITY_CENTER' },
-      description: 'No modeled payout. Flat land adjacent to the City Center.',
+      effects: { cityAppeal: 2 },
+      description: '+2 Appeal on every plot of every city of the owner. Flat land adjacent to the City Center.',
       src: {
         code: { stylized: 'a display code, not a game constant' },
+        'effects.cityAppeal': xml('ModifierArguments', 'ModifierId=EIFFEL_TOWER_ADDAPPEAL&Name=Amount', 'Value'),
         cost: xml('Buildings', 'BuildingType=BUILDING_EIFFEL_TOWER', 'Cost', { scale: GAME_SPEED }),
         requiresTech: xml('Buildings', 'BuildingType=BUILDING_EIFFEL_TOWER', 'PrereqTech', { expect: 'TECH_STEEL' }),
         'placement.flatOnly': { derived: 'true where every Building_ValidTerrains row of the wonder is a FLAT terrain', inputs: [xml('Building_ValidTerrains', 'BuildingType=BUILDING_EIFFEL_TOWER', 'TerrainType')] },

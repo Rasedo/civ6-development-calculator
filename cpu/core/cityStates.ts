@@ -206,6 +206,14 @@ export function suzerainMinorSeats(state: GameState, seat: number): Set<number> 
   return out;
 }
 
+/** CIV6 (REQUIREMENT_PLAYER_IS_SUZERAIN_X_TYPE): the city-states of one type
+ *  `seat` is suzerain of, counted as `suzerainCount` counts them */
+export function suzerainTypeCount(state: GameState, seat: number, type: CityStateType): number {
+  let n = 0;
+  for (const cityState of state.cityStates ?? []) if (cityState.type === type && isSuzerain(state, cityState, seat)) n += 1;
+  return n;
+}
+
 export function hasMet(cityState: CityState, seat: number): boolean {
   return cityState.met.includes(seat);
 }

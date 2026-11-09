@@ -3465,6 +3465,17 @@ export function seatPhase(state: GameState, only?: { seats: ReadonlySet<number>;
         if (q.kind === 'unit' && leaderOf(state, civCity.seat) === 'HARDRADA' && navalMelee(UNITS[q.unit])) _em *= HARDRADA_NAVAL_MELEE_PROD_MULT;
         // CIV6 (EFFECT_ADJUST_UNIT_TAG_ERA_PRODUCTION): the roster's unit-class rows
         if (q.kind === 'unit') _em *= prodMultFor(seatMods.prodMults, { kind: 'unit', promoClass: promoClassOf(q.unit), unit: q.unit }, _offHome);
+        // CIV6 (Statue of Zeus, MODIFIER_PLAYER_CITIES_ADJUST_UNIT_TAG_ERA_PRODUCTION
+        // NO_ERA): the seat's wonders' unit-class rows, in catalog order
+        // (runs/h1_duelp1124 Wuhan's AT Crew 20 -> 51 -> 82 on 20.703 the
+        // turns after Shanghai's t213 Statue)
+        if (q.kind === 'unit') {
+          const _pc = promoClassOf(q.unit);
+          for (const w of seatWonders(state, civCity.seat)) {
+            const wp = w.def.effects?.unitClassProdPct;
+            if (wp && wp.promoClass === _pc) _em *= 1 + wp.pct / 100;
+          }
+        }
         if (q.kind === 'district') _em *= governorMult(state, civCity, (e) => e.districtProdMult);
         // CIV6 (Merchant Republic, GOVERNMENTBONUS_DISTRICT_PRODUCTION):
         // "+15% Production toward Districts."

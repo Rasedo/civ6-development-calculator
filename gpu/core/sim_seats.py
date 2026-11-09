@@ -5894,6 +5894,15 @@ class SimSeats:
             return torch.zeros(self.B, dtype=torch.float64, device=self.device)
         return self._suzerain_mask(row)[:, : self.S].double().sum(dim=1)
 
+    def _suzerain_type_count(self, row: int) -> torch.Tensor:
+        """[B, T] f64 — the minors of each type this row is suzerain of
+        (`suzerainTypeCount`, counted as `_suzerains_held` counts them)."""
+        if row >= self.n_majors or self.S == 0:
+            return torch.zeros(self.B, len(self.rules.citystate["typeItemKinds"]),
+                               dtype=torch.float64, device=self.device)
+        return torch.einsum("bs,bst->bt", self._suzerain_mask(row)[:, : self.S].double(),
+                            self._cs_type_onehot[:, : self.S])
+
     def _seat_ymult_per_suz(self, row: int, k: int) -> torch.Tensor:
         """[B] f64 — `seatYieldMultPerSuzerain`: the PLAYER's multiplier on
         yield column `k`, a percent per city-state it is suzerain of
@@ -10906,6 +10915,15 @@ class SimSeats:
             if _es < bank.shape[1]:
                 _has = (self._dist_counts(row)[:, : self.RC, _ed] > 0) & self.city_alive[:, row, : self.RC]
                 bank[:, _es] += (_has & _eon.unsqueeze(1)).long().sum(dim=1) * _en
+        # CIV6 (Jebel Barkal, MODIFIER_SINGLE_CITY_ADJUST_FREE_RESOURCE_EXTRACTION):
+        # each complete wonder's standing grant
+        if self._wond_free_res and row < self.CITY_ROWS:
+            _cw = self._completed_wonders(row)
+            if _cw is not None:
+                _held = _cw.any(dim=1)  # [B, nW]
+                for _wi, _wr, _wa in self._wond_free_res:
+                    if _wr in self._strat_rid:
+                        bank[:, self._strat_rid.index(_wr)] += _held[:, _wi].long() * _wa
         # CIV6 (Hattusa, MODIFIER_PLAYER_ADJUST_FREE_RESOURCE_IMPORT_EXTRACTION
         # under PLAYER_HAS_NO_IMPROVED_<R>): each strategic the suzerain sees
         # and improves on none of its own plots pays it a standing amount

@@ -345,6 +345,9 @@ class SimMinorOps:
             for t, v in self._embark_move_techs:
                 if t >= 0:
                     extra = extra + techs[:, t].long() * v
+            # ...and the seat's wonders' embarked Movement (`embarkTechMoves`)
+            if self._wond_mv_on:
+                extra = extra + self._seat_wonder_sum(self._CITY_MINOR0 + s, self._wond_embark_mv)
             base = torch.where(emb, self._embark_moves + extra.unsqueeze(1), base)
         mp = pu("mp")
         # its chassis obsolete to the holder (0x538460, `AiUnitView.obsolete`)

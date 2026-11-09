@@ -27,7 +27,7 @@ import { SPECIALIST_YIELDS, SPECIALIST_TIERS, GW_PRINTING_TECH } from '../data/g
 import { greatWorkTourism, greatWorkYields, gwCountsByObj, relicTourism } from './greatWorks';
 import { GWO_ARTIFACT, GWO_RELIC, GWO_WRITING } from '../data/greatWorks';
 import { congressBannedLuxury, congressDuplicateLuxury, congressGrowthMult, congressGwMult } from './congress';
-import { cityStateItemProduction, suzerainEffect, suzerainHubAmenities, suzerainPartnerProduction, suzerainResourceTypeProduction, minorCity, minorLuxuries, suzerainMinorSeats } from './cityStates';
+import { cityStateItemProduction, suzerainEffect, suzerainHubAmenities, suzerainPartnerProduction, suzerainResourceTypeProduction, minorCity, minorLuxuries, suzerainMinorSeats, suzerainTypeCount } from './cityStates';
 import { ANSHAN_WRITING_SCIENCE, ANSHAN_RELIC_SCIENCE, ZANZIBAR_LUXURIES, ZANZIBAR_LUXURY_AMENITIES, BUENOS_AIRES_AMENITIES, MINOR_PRODUCTION_PCT } from '../data/cityStates';
 import { bankruptAmenities, DEAL_LUXURY, DED_FREE_INQUIRY, HOLY_CITY_TOURISM, TOURISM_PCT_ROWS, LOYALTY_MAX, GOV_INTOLERANCE, TOURISM_GOV_MULT, TOURISM_OPEN_BORDERS_PCT, TOURISM_ROUTE_PCT } from '../data/seats';
 import { LUXURY_IDS, RESOURCES, resourceImprovement } from '../../world/resources';
@@ -1941,6 +1941,13 @@ export function computeCityStats(
     const fg = w.def.effects?.foreignGovernorYieldPct;
     if (fg && cityGovernorEffects(state, city).length > 0 && !onHomeContinent(state, city.seat, city.centerIndex)) {
       for (const k of Object.keys(fg) as YieldKey[]) pct[k] += (fg[k] ?? 0) / 100;
+    }
+    // CIV6 (Kilwa Kisiwani): the wonder's city while the owner is suzerain
+    // of `ownAt` city-states of the row's type, every city at `allAt`
+    for (const r of w.def.effects?.suzerainTypeYieldPct ?? []) {
+      const n = suzerainTypeCount(state, city.seat, r.type);
+      const times = (mine && n >= r.ownAt ? 1 : 0) + (n >= r.allAt ? 1 : 0);
+      pct[r.yield] += times * (r.pct / 100);
     }
   }
   // CIV6 (MINOR_CIV_PRODUCTION_PENALTY, MODIFIER_PLAYER_CITIES_ADJUST_CITY_

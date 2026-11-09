@@ -1127,16 +1127,21 @@ export function unitFullMoves(state: GameState, unit: { type: string; seat: numb
 /** the Mathematics rung (MODIFIER_PLAYER_UNITS_ADJUST_SEA_MOVEMENT): a hull's
  *  alone — an embarked unit keeps its embarked pool (runs/h1_duelw1117 t78:
  *  city-state 2's embarked Swordsman plans on 2 Movement with Mathematics,
- *  AI_Planning.csv) */
+ *  AI_Planning.csv), then the seat's wonders' (the Great Lighthouse's
+ *  ABILITY_GREAT_LIGHTHOUSE_MOVEMENT: runs/h1_duelp1124 t61, China's Galley
+ *  3 -> 4 the turn it stands) */
 export function seaMoveBonus(state: GameState, seat: number): number {
-  return seatOf(state, seat)?.research.techs.includes(SEA_MOVE_TECH) ? SEA_MOVE_TECH_BONUS : 0;
+  return (seatOf(state, seat)?.research.techs.includes(SEA_MOVE_TECH) ? SEA_MOVE_TECH_BONUS : 0)
+    + seatWonderSum(state, seat, 'navalMoves');
 }
 
-/** the three rungs that raise the EMBARKED pool itself. */
+/** the three rungs that raise the EMBARKED pool itself, then the seat's
+ *  wonders' MODIFIER_PLAYER_ADJUST_EMBARKED_MOVEMENT (the Great Lighthouse:
+ *  runs/h1_duelp1124 t61, China's embarked Builder 2 -> 3) */
 export function embarkTechMoves(state: GameState, seat: number): number {
   const techs = seatOf(state, seat)?.research.techs;
   if (!techs) return 0;
-  let n = 0;
+  let n = seatWonderSum(state, seat, 'embarkedMoves');
   for (const [id, v] of EMBARK_MOVE_TECHS) if (techs.includes(id)) n += v;
   return n;
 }

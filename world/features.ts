@@ -263,8 +263,8 @@ Object.assign(FEATURES, {
 // in `AdjacencySource`); a city holding it earns 1 Amenity (PAMUKKALE_AMENITY,
 // Expansion2_Features.xml: runs/h1_duelw1106 Taiyuan and Jerusalem, 1117
 // Taiyuan with one plot or both read GetAmenitiesFromNaturalWonders 1).
-// Giant's Causeway's ABILITY_SPEAR_OF_FIONN and Pamukkale's second Amenity
-// beside an Entertainment Complex are not modelled.
+// Pamukkale's second Amenity (PAMUKKALE_AMENITY_ENTERTAINMENT_COMPLEX)
+// beside an Entertainment Complex is not modelled.
 Object.assign(FEATURES, {
   PIOPIOTAHI: { id: 'PIOPIOTAHI', name: 'Piopiotahi', yields: {}, impassable: true, adjacentYields: { gold: 1, culture: 1 }, ...NW },
   TSINGY: { id: 'TSINGY', name: 'Tsingy de Bemaraha', yields: {}, impassable: true, adjacentYields: { culture: 1, science: 1 }, ...NW },

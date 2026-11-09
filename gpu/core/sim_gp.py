@@ -153,6 +153,14 @@ class SimGp:
                 _has = self._city_has_park(r)                      # [B, RC]
                 _hit = (_slot >= 0) & _has.gather(1, _slot.clamp(min=0)) & _pw.unsqueeze(1)
                 out = out + _hit.to(out.dtype) * _pa
+        # CIV6 (Eiffel Tower, MODIFIER_PLAYER_CITIES_ADJUST_CITY_APPEAL): the
+        # same per-CITY flat add, to every city of the seat holding it
+        if bool(self._wond_city_appeal.count_nonzero()):
+            for r in range(self.n_majors):
+                _wa = self._seat_wonder_sum(r, self._wond_city_appeal)    # [B]
+                if not bool(_wa.count_nonzero()):
+                    continue
+                out = out + (self.city_slot_at(r) >= 0).to(out.dtype) * _wa.unsqueeze(1).to(out.dtype)
         return out
 
     def _city_has_park(self, row: int) -> torch.Tensor:

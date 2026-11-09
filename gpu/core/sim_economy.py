@@ -6443,6 +6443,15 @@ class SimEconomy:
             out = out + (has_tech(self._sea_move_tech) & naval).long() * self._sea_move_bonus
         for ti, v in self._embark_move_techs:
             out = out + (has_tech(ti) & emb & ~naval).long() * v
+        # the seat's wonders' Movement (the Great Lighthouse): a hull's, and
+        # an embarked passenger's, summed over its COMPLETE wonders
+        if self._wond_mv_on and bool((self.built_wonder_complete
+                                      & self._wond_mv_any.take(self.built_wonder.clamp(min=0))).count_nonzero()):
+            wr = (row >= 0) & (row < self.CITY_ROWS)
+            rr = row.clamp(min=0, max=self.CITY_ROWS - 1)
+            nav = torch.stack([self._seat_wonder_sum(r, self._wond_naval_mv) for r in range(self.CITY_ROWS)], dim=1)
+            emv = torch.stack([self._seat_wonder_sum(r, self._wond_embark_mv) for r in range(self.CITY_ROWS)], dim=1)
+            out = out + (nav.gather(1, rr) * (naval & wr).long()) + (emv.gather(1, rr) * (emb & ~naval & wr).long())
         return out
 
     def _full_mp(self, pre: str, emb: torch.Tensor | None = None) -> torch.Tensor:
@@ -8113,6 +8122,16 @@ class SimEconomy:
                             row, self.city_center[:, row, sl])
                     pct = pct + torch.where((_held[:, wi].unsqueeze(1) & _fgov).unsqueeze(2),
                                             self._wond_foreign_gov[wi].reshape(1, 1, 6) / 100.0, zeros6)
+                # CIV6 (Kilwa Kisiwani): the wonder's city while the owner is
+                # suzerain of `own` city-states of the row's type, every city
+                # at `all` (`suzerainTypeCount`)
+                for _kt, _ky, _kp, _ko, _ka in self._wond_suz_type[wi]:
+                    _n = self._suzerain_type_count(row)[:, _kt]                       # [B]
+                    _mine = (compw[:, :, wi] if compw is not None
+                             else torch.zeros(B, pct.shape[1], dtype=torch.bool, device=dev))
+                    _times = ((_mine & (_n >= _ko).unsqueeze(1)).long()
+                              + (_n >= _ka).long().unsqueeze(1)) * _held[:, wi].long().unsqueeze(1)
+                    pct[:, :, _ky] = pct[:, :, _ky] + _times.double() * (_kp / 100.0)
         # CIV6 (MINOR_CIV_PRODUCTION_PENALTY, a city yield percent): a
         # city-state's city takes the minor's -50% in the same sum
         if self._CITY_MINOR0 <= row < self.FREE_ROW:
