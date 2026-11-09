@@ -6828,7 +6828,15 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
         best: new Map(state.seats.map((s) => [s.seat, [s.bestMeleeCS, s.bestRangedCS]] as const)),
         types: new Map(state.units.map((u) => [u, u.type] as const)),
       };
+      // ...without its units the pair lost, gone by then to the later
+      // players' blows the turn's last decisions land: they pay no upkeep
+      // there (runs/h1_duelq1117 t49: Rome's 983048 killed in the
+      // barbarians' turn, its t50 start +4.5 on 1 unit less; 1124 t62, 1128 t74)
+      const lostUnits = new Set(ds.flatMap((d) => (d.kind === 'unitGone' && d.why === 'lost' && d.player === activeP ? [unitOf(ctx, d.unit)] : [])));
+      const setAside = state.units.flatMap((u, i) => (lostUnits.has(u) ? [[u, i] as const] : []));
+      state.units = state.units.filter((u) => !lostUnits.has(u));
       seatPhase(state, { seats: new Set([active.seat]), deals: false });
+      for (const [u, i] of setAside) state.units.splice(Math.min(i, state.units.length), 0, u);
       advanceTurn(state);
     } catch (e) {
       report.stopped = `the engine's turn threw at turn ${a.turn}: ${(e as Error).message}`;

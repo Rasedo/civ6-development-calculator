@@ -526,11 +526,13 @@ const OP_FOUND_RELIGION = gameHash('UNITOPERATION_FOUND_RELIGION');
 const OP_SPREAD = gameHash('UNITOPERATION_SPREAD_RELIGION');
 const PURCHASE_BUILDING = gameHash('BUILDING');
 const PURCHASE_PLOT = gameHash('PLOT');
+/** CityProductionQueueChanged's change type when the queue is emptied */
+const QUEUE_CLEAR = gameHash('VALUE_CLEAR');
 /** the game's `CityProductionChanged` / `CityProductionCompleted` kinds */
 const PRODUCTION_KIND = ['unit', 'building', 'district', 'project'] as const;
 /** the events a reader takes */
-const READ_EVENTS = new Set(['CityAddedToMap', 'CityProductionCompleted', 'CityMadePurchase', 'ImprovementAddedToMap', 'PantheonFounded',
-  'ResearchChanged', 'CivicChanged', 'CityProductionChanged', 'UnitAddedToMap', 'UnitKilledInCombat', 'UnitMoved', 'UnitPromoted', 'UnitFormCorps', 'UnitFormArmy', 'UnitRemovedFromMap', 'UnitUpgraded', 'UnitChargesChanged', 'GoodyHutReward', 'UnitCaptured']);
+const READ_EVENTS = new Set(['CityAddedToMap', 'CityProductionCompleted', 'CityMadePurchase', 'ImprovementAddedToMap', 'ImprovementRemovedFromMap', 'PantheonFounded',
+  'ResearchChanged', 'CivicChanged', 'CityProductionChanged', 'CityProductionQueueChanged', 'UnitAddedToMap', 'UnitKilledInCombat', 'UnitMoved', 'UnitPromoted', 'UnitFormCorps', 'UnitFormArmy', 'UnitRemovedFromMap', 'UnitUpgraded', 'UnitChargesChanged', 'GoodyHutReward', 'UnitCaptured']);
 
 /** the decisions of the kinds the log settles, keyed for the comparison */
 type Keyed = Map<string, Decision>;
@@ -546,12 +548,19 @@ type Keyed = Map<string, Decision>;
  *   - `buyBuilding` and `buyPlot`: `CityMadePurchase` of a building or a plot;
  *   - `improve`: `ImprovementAddedToMap` (x, y, type, owner);
  *   - `pantheon`: `PantheonFounded` (player, belief);
+ *   - `camp` where no unit of record t+1 stands on it: `ImprovementRemovedFromMap`
+ *     of a camp after the `UnitMoved` onto its plot (that unit's owner);
  *   - `kill`: `UnitKilledInCombat` (victim player, victim id, killer player,
  *     killer id), the types off the records' units;
  *   - the active player's `research` and `civic` where the record holds no pick:
- *     its last `ResearchChanged` / `CivicChanged` of the turn; its queues' head: its last
- *     `CityProductionChanged` of the turn per city (a pick its start of turn
- *     then completed leaves no trace in the record).
+ *     its last `ResearchChanged` / `CivicChanged` of the turn;
+ *   - every major's queues' head: its last `CityProductionChanged` of the
+ *     turn per city, none after a `CityProductionQueueChanged` VALUE_CLEAR
+ *     (a pick a start then completed leaves no trace in the record: the
+ *     active player's at its next start; another major's start pick its
+ *     actions complete, runs/h1_duelq1121 t79: Xi'an's Shrine repair, picked
+ *     after the Holy Site's, completed by its Builder's chop of 9:12, record
+ *     t80's queue empty).
  * The currency of a purchase is not in the event: it is the purse that paid
  * the record's price. Events no reader takes are counted in `unread`, and per
  * kind `settled` compares the log's decisions with the inference's.
@@ -637,6 +646,10 @@ export class RecordedActions implements ActionSource {
     // Battlecry, Commando and Zweihander; t126 its Musketman 1966080 at 3
     // experience, Battlecry after UnitFormCorps)
     let formed: string | null = null;
+    const majorIds = new Set(b.players.filter((p) => bool(p.major)).map((p) => p.id));
+    const minorIds = new Set(b.players.filter((p) => bool(p.minor)).map((p) => p.id));
+    const campRow = cat.improvements.indexOf('IMPROVEMENT_BARBARIAN_CAMP');
+    const campsCleared = new Map<number, Extract<Decision, { kind: 'camp' }>>();
     for (const r of ev) {
       const name = r[2];
       if (name === 'UnitFormCorps' || name === 'UnitFormArmy') formed = `${n(r, 0)}:${n(r, 1)}`;
@@ -772,6 +785,17 @@ export class RecordedActions implements ActionSource {
         // after the engine's turn, which may have fought the same battle
         out0.push({ kind: 'kill', phase: 'after', player: n(r, 2), killerType: typeOf(n(r, 2), n(r, 3)), killerUnit: `${n(r, 2)}:${n(r, 3)}`,
           victim: n(r, 0), victimType: typeOf(n(r, 0), n(r, 1)), victimUnit: `${n(r, 0)}:${n(r, 1)}` });
+      } else if (name === 'ImprovementRemovedFromMap' && r[1] === a.turn && campRow >= 0 && plotAt(a, n(r, 1) * W + n(r, 0))[P.improvement] === campRow) {
+        // a camp cleared by the unit the log steps onto it just before,
+        // which may fall later in the turn (runs/h1_duelq1127 t50: Rome's
+        // Warrior 589831 onto the camp at 33:22, killed by the barbarians'
+        // 1769491; Rome's purse +27)
+        const at = ev.indexOf(r);
+        const step = ev.slice(Math.max(0, at - 3), at).reverse().find((x) => x[2] === 'UnitMoved' && n(x, 2) === n(r, 0) && n(x, 3) === n(r, 1));
+        if (step && (majorIds.has(n(step, 0)) || minorIds.has(n(step, 0)))) {
+          const plot = n(r, 1) * W + n(r, 0);
+          campsCleared.set(plot, { kind: 'camp', phase: phaseOf(n(step, 0)), player: n(step, 0), plot, unit: `${n(step, 0)}:${n(step, 1)}` });
+        }
       } else if (name === 'PantheonFounded') {
         put('pantheon', `${n(r, 0)}:${n(r, 1)}`, { kind: 'pantheon', phase: phaseOf(n(r, 0)), player: n(r, 0), belief: n(r, 1) });
       } else if ((name === 'ResearchChanged' || name === 'CivicChanged') && n(r, 0) === act && n(r, 1) >= 0 && r[1] === a.turn) {
@@ -783,11 +807,14 @@ export class RecordedActions implements ActionSource {
         map.clear();
         log.set(kind, map);
         put(kind, `${act}:${n(r, 1)}`, kind === 'research' ? { kind, phase: 'before', player: act, tech: n(r, 1) } : { kind, phase: 'before', player: act, civic: n(r, 1) });
-      } else if (name === 'CityProductionChanged' && n(r, 0) === act && r[1] === a.turn) {
+      } else if (name === 'CityProductionChanged' && majorIds.has(n(r, 0)) && r[1] === a.turn) {
         const pk = PRODUCTION_KIND[n(r, 2)];
-        const centre = cityPlot(act, n(r, 1));
+        const centre = cityPlot(n(r, 0), n(r, 1));
         if (!pk || centre < 0) continue;
-        put('queueHead', `${centre}`, { kind: 'queue', phase: 'before', player: act, city: centre, items: [{ kind: pk, row: n(r, 3), plot: -1 }] });
+        put('queueHead', `${centre}`, { kind: 'queue', phase: phaseOf(n(r, 0)), player: n(r, 0), city: centre, items: [{ kind: pk, row: n(r, 3), plot: -1 }] });
+      } else if (name === 'CityProductionQueueChanged' && n(r, 2) === QUEUE_CLEAR && majorIds.has(n(r, 0)) && r[1] === a.turn) {
+        // the queue emptied: no pick before it stands
+        log.get('queueHead')?.delete(`${cityPlot(n(r, 0), n(r, 1))}`);
       }
     }
     // a levy: a city-state's unit removed and a major's added in the next
@@ -795,7 +822,6 @@ export class RecordedActions implements ActionSource {
     // of it (runs/h1_duelw1117 t74: city-state 3's Heavy Chariot in its
     // centre at (42,13), China's at (41,13))
     const minors = new Set(b.players.filter((p) => bool(p.minor)).map((p) => p.id));
-    const majorIds = new Set(b.players.filter((p) => bool(p.major)).map((p) => p.id));
     const levies = new Map<string, Extract<Decision, { kind: 'levy' }>>();
     ev.forEach((r, i) => {
       const nx = ev[i + 1];
@@ -1148,7 +1174,7 @@ export class RecordedActions implements ActionSource {
         case 'research': return d.player === act ? ['research', `${d.player}:${d.tech}`] : null;
         case 'civic': return d.player === act ? ['civic', `${d.player}:${d.civic}`] : null;
         case 'buyUnit': case 'unitNew': return ['unitOrigin', d.unit];
-        case 'queue': return d.player === act && log.get('queueHead')?.has(`${d.city}`) ? ['queueHead', `${d.city}`] : null;
+        case 'queue': return log.get('queueHead')?.has(`${d.city}`) ? ['queueHead', `${d.city}`] : null;
         default: return null;
       }
     };
@@ -1161,6 +1187,9 @@ export class RecordedActions implements ActionSource {
     const inferredAll = inferred;
     inferred = inferredAll.filter((d) => !((d.kind === 'unitGone' || d.kind === 'unitNew') && upgraded.has(d.unit)));
     const out: Decision[] = [...out0];
+    // the camps the log clears that no unit of record t+1 stands on
+    for (const d of inferred) if (d.kind === 'camp') campsCleared.delete(d.plot);
+    out.push(...campsCleared.values());
     // the steps each moved unit took, on the inference's move
     for (const d of inferred) {
       if (d.kind !== 'move' || !paths.has(d.unit)) continue;
