@@ -386,7 +386,7 @@ describe('the channel clauses', () => {
     expect(tourismIntlPct(state, 0, 1)).toBe(before - 25);
   });
 
-  it('Tata and Ibuka: +10 Tourism per complete Campus / Industrial Zone, dark when pillaged', () => {
+  it('Tata and Ibuka: +10 Tourism per complete Campus / Industrial Zone, kept when pillaged', () => {
     const state = newGame();
     const cities = state.seats[0].cities;
     const campus = district(state, 'CAMPUS');
@@ -398,8 +398,9 @@ describe('the channel clauses', () => {
     const ibuka = found('GP_MASARU_IBUKA');
     expect(activateGreatPerson(state, stand(state, ibuka.cls, ibuka.at, iz))).toBe(true);
     expect(gpDistrictTourism(state, 0, cities)).toBe(20);
+    // the city's district walk reads no pillage (0x1ab780)
     state.map.tiles[campus].districtPillaged = true;
-    expect(gpDistrictTourism(state, 0, cities)).toBe(10);
+    expect(gpDistrictTourism(state, 0, cities)).toBe(20);
   });
 
   it('Kenzo Tange: the city counts its district adjacency as Tourism, whole or half by yield', () => {
