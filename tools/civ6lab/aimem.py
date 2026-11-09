@@ -34,7 +34,9 @@ Each record: `seq`, `site`, `turn`, `player`, `rng` [state, count], `at`
 stood for the read), and by site:
   start     the player's turn start (PlayerTurnStarted's raise)
   tactical  the tactical turn's knowledge step (player signal +0x1f8),
-            before the ageing: `army`, `ops`
+            before the ageing: `army`, `ops`, `danger` (the player's danger
+            map as its DoTurn built it: [x, y, danger] per plot of non-zero
+            danger)
   log       AI_Knowledge.csv's moment (after the ageing and the look, before
             the cities' contract submissions): `army`, `camps`,
             `contracts`, `holders`, `trees`, `ops`, `stats`
@@ -392,6 +394,22 @@ class Reader:
             node = self.pm.u64(node + 0x10)
         return out
 
+    def danger(self, pl: int) -> list:
+        """the player's danger map (the influence map, player +0x6b8; its
+        per-plot int16 vector: +0xb8 the items, +0xc8 the count, a plot's
+        index x + y x the map's width, [game +0x248] +0x28; the read
+        FinalRelease 0x4c5920): [x, y, danger] for each plot of non-zero
+        danger, in plot order"""
+        im = ptr(self.pm.u64(pl + 0x6B8))
+        if not im:
+            return []
+        items, n = self.pm.u64(im + 0xB8), self.pm.u32(im + 0xC8)
+        w = self.pm.i32(self.pm.u64(self.game() + 0x248) + 0x28)
+        if not ptr(items) or not 0 < n <= 1 << 16 or w <= 0:
+            return []
+        vals = struct.unpack(f"<{n}h", self.pm.read(items, 2 * n))
+        return [[i % w, i // w, v] for i, v in enumerate(vals) if v]
+
     def stats(self, pl: int) -> dict:
         return {"maxMelee": self.pm.i32(self.pm.u64(pl + 0x710) + 0xA0),
                 "citiesEc": self.pm.i32(self.pm.u64(pl + 0x6D0) + 0xEC)}
@@ -526,6 +544,10 @@ def hit_record(r: Reader, mb: bytes) -> dict | None:
         rec.update(r.common())
         rec["army"] = r.army(rcx + 0x270)
         rec["ops"] = r.ops(pl)
+        try:
+            rec["danger"] = r.danger(pl)
+        except MemError as e:
+            rec.setdefault("errors", []).append(f"danger: {e}")
     elif site == 2:
         pid = pm.i32(rcx + 0x6E8)
         rec.update(site="log", player=pid)
