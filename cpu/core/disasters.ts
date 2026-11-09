@@ -35,6 +35,8 @@ import { STORM_EVENTS, STORM_ROWS, WIND_ROWS, STORM_UNIT_ROWS, stormFamilyAt, ga
 import { floodFertilityHalted, removeFertility, seaRise, stormFertilityHalted, warmingDegrees } from './climate';
 import { governorTileFlag } from './governors';
 import { mitigatedFloodMoment } from './moments';
+import { cityFlags, replaceAllCitizens } from './citizens';
+import { minorReplaceCitizens } from './cityStates';
 
 function log(state: GameState, text: string): void {
   state.eventLog.push(text);
@@ -199,18 +201,26 @@ function losePopulation(state: GameState, tile: Tile): void {
 
 /** One citizen an event takes from `seat`'s city `cityId` (a city-state's
  *  one city: -1), a full point of the event's damage to the owner
- *  (`aidDamage`) */
+ *  (`aidDamage`); the city's population change re-places every citizen
+ *  (City::ChangePopulation 0x1c79b0 -> ChangeNumUnassigned 0x194fb0, a
+ *  negative count the full reassign 0x196320: runs/h1_duelq1127 t33, Mexico
+ *  City 6 -> 5 at the turn's end, its citizen off 491 and on 535 kept,
+ *  its t34 surplus 7) */
 function loseCitizen(state: GameState, seat: number, cityId: number): void {
   aidDamage(seat, 2);
   if (isCityStateSeat(seat)) {
     const cs = state.cityStates.find((c) => c.seat === seat);
-    if (cs && cs.population > 1) cs.population -= 1;
+    if (cs && cs.population > 1) {
+      cs.population -= 1;
+      minorReplaceCitizens(state, cs);
+    }
     return;
   }
   const home = seatOf(state, seat)?.cities.find((c) => c.id === cityId);
   if (home && home.population > 1) {
     home.population -= 1;
     logPopWrite(state, home, 'ds');
+    replaceAllCitizens(state, home, cityFlags(home));
   }
 }
 

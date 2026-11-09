@@ -39,7 +39,11 @@
   kind: function
   name: ChangeNumUnassigned
   semantics: "ChangeNumUnassigned (called with the population change by City::ChangePopulation 0x1c79b0): adds to m_iNumUnassignedCitizens (+0x68); a negative count runs the full reassign 0x196320, else 0x197230 places the unassigned ones beside the citizens already working."
-  status: PARTLY
+  status: READ
+  cases:
+    - recording: h1_duelq1127
+      turn: 33
+      value: "a random event takes Mexico City's citizen at the turn's end (6 -> 5): the full reassign keeps 535 and drops 491, the t34 surplus 7 the record's"
   impl:
     - cpu/harness/citizens.ts:replaceAllCitizens
     - cpu/core/citizens.ts:replaceAllCitizens
@@ -51,10 +55,12 @@
     - gpu/core/sim_phase.py:_seat_turn
     - cpu/core/units.ts:city
     - gpu/core/sim_seats.py:_draw_and_pay_goody
+    - cpu/core/disasters.ts:loseCitizen
+    - gpu/core/sim_economy.py:_lose_citizen
   readings:
     - "H-1: the citizen manager's placement and the yield flags — READ"
     - "C-112: the majors' citizens by the citizen manager — READ (0x1fa1d0 at 0x1fa22d, 0x196320's callers), both twins"
-  notes: ["imported: READ in its section, no confirming case found beside it"]
+    - "C-112: a citizen an event takes re-places the city's citizens — READ (0x1c79b0 -> 0x194fb0 -> 0x196320), both twins"
   context:
     - "City_Citizens.cpp. `ChangeNumUnassigned` (0x194fb0, called with the population change by City::ChangePopulation 0x1c79b0) adds to m_iNumUnas..."
   review: reviewed
@@ -171,6 +177,8 @@
     - gpu/core/sim_minors.py:_queue_wonder_at
     - gpu/core/sim_phase.py:_free_cities_phase
     - cpu/core/phase.ts:forcedIn
+    - cpu/core/disasters.ts:loseCitizen
+    - gpu/core/sim_economy.py:_lose_citizen
   readings:
     - "C-112: the majors' citizens by the citizen manager — READ (0x1fa1d0 at 0x1fa22d, 0x196320's callers), both twins"
     - "H-1: the citizen manager's placement and the yield flags — READ"
@@ -182,6 +190,7 @@
     - "H-1: the envoy annex counts the most envoys one player holds — READ (0x1abf40 -> 0x44c4b0), both twins"
     - "C-112: the majors' citizens on a placement, the Free Cities' city turn — READ (0x180cb0, 0x181700, 0x1fa1d0), both twins"
     - "C-112: the full re-place keeps the forced citizens — READ (0x196440, 0x1956b0, 0x197230), both twins"
+    - "C-112: a citizen an event takes re-places the city's citizens — READ (0x1c79b0 -> 0x194fb0 -> 0x196320), both twins"
   context:
     - "...1c79b0) adds to m_iNumUnassignedCitizens (+0x68): a negative count runs the full reassign 0x196320 (save the forced counts +0x08, unassign all 0x196440, assign 0x197230, lay the forced cou..."
     - "...nd writes the disfavored byte (+0x50); 0x1970e0 the converse; each runs the full reassign 0x196320 whatever the value was and fires the event (hash 0xe808a01e) — the city command 0x975920..."
@@ -282,6 +291,7 @@
     - "C-112: the citizen manager has no turn of its own — READ (the event's raisers), the records' counts"
     - "C-112: the citizen manager has no turn of its own"
     - "C-112: the full re-place keeps the forced citizens — READ (0x196440, 0x1956b0, 0x197230), both twins"
+    - "C-112: a citizen an event takes re-places the city's citizens — READ (0x1c79b0 -> 0x194fb0 -> 0x196320), both twins"
   context:
     - ...s the full reassign 0x196320 (save the forced counts +0x08, unassign all 0x196440, assign 0x197230, lay the forced counts back 0x196e30), else 0x197230 places the unassigned ones beside th...
     - "0x197230: need = max(0, -floor((food256 - consumption(pop) << 8) / 256)), food the city's cached f..."

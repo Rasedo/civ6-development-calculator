@@ -86,7 +86,7 @@ import { GOVERNMENTS, GOVERNMENT_LIST, POLICIES } from '../data/policies';
 import { BELIEF_CATALOGS, BELIEF_CLASS_FOLLOWER, BELIEF_SLOTS, PANTHEONS, PANTHEON_IDS, RELIGION_TYPES, gainPopulationPressure } from '../data/religion';
 import { establishMission, missionOf, missionPayable } from '../core/deals';
 import { DEAL_MISSION } from '../data/seats';
-import { CITY_MAX_HP, UNITS, UNIT_HP } from '../data/units';
+import { CITY_HEAL_PER_TURN, CITY_MAX_HP, UNITS, UNIT_HP } from '../data/units';
 import { CAMP_DISPERSAL_GOLD, MP_SCALE, scaleByGameSpeed } from '../data/constants';
 import { PROMOTE_HEAL, aiPromotionPick, attacksPerTurn, promoCount, takePromotion, unitPromoRows } from '../core/promotions';
 import { fireFeature } from '../data/disasters';
@@ -3126,6 +3126,9 @@ function startSeeds(b: TurnRecord, player: number): { pre?: number; post?: numbe
   return out;
 }
 
+/** the rows a city's turn in its owner's start publishes */
+const CITY_TURN_ROWS = new Set(['CityPopulationChanged', 'CityProductionCompleted', 'CityTileOwnershipChanged', 'CityReligionChanged']);
+
 /** does the giver send its envoys in its start: its start draws more border
  *  picks than its cities (one each) — the minors' annexes — by the game's
  *  log; with no log, the start (the DLL's reading) */
@@ -3135,10 +3138,20 @@ function envoysInStart(log: RandLog | undefined, a: TurnRecord, b: TurnRecord, p
   // Hunza, its Mysticism token, the minor annexing no plot for it)
   const rows = ((b as { actions?: unknown }).actions ?? []) as unknown[][];
   const on = rows.findIndex((r) => r[2] === 'PlayerTurnActivated' && r[3] === player && r[1] === a.turn);
+  // ...and one after its cities' rows is sent once its cities' turns are
+  // done: it lands after the start (`settleEnvoys`), the minor's annex
+  // drawing after the cities' border picks (runs/h1_duelq1127 t47: Xi'an's
+  // pick 318, then China's envoy to Mexico City annexing 360 on the start's
+  // second draw)
   if (on > 0) {
     let k = on - 1;
     while (k >= 0 && rows[k][2] !== 'PlayerTurnDeactivated') k--;
-    if (rows.slice(k + 1, on).some((r) => r[2] === 'InfluenceGiven')) return true;
+    const block = rows.slice(k + 1, on);
+    const given = block.findIndex((r) => r[2] === 'InfluenceGiven');
+    if (given >= 0) {
+      const city = block.findIndex((r) => CITY_TURN_ROWS.has(r[2] as string) && r[3] === player);
+      return city < 0 || given < city;
+    }
   }
   const { pre, post } = startSeeds(b, player);
   const draws = log && pre !== undefined && post !== undefined ? log.between(pre, post) : undefined;
@@ -3533,12 +3546,14 @@ const A_SPREAD = unitActionIndex(IMPROVEMENT_IDS).SPREAD_HERE;
 /** the decisions of one phase, in a fixed order: cities first (a founding
  *  gives the queue its city), then the seats, the cities' orders, the plots,
  *  the units, a Trader's route once its unit stands (runs/h1_duelw1117 t44:
- *  Antananarivo's Trader trained and sent in one turn); the research and
- *  civic picks last, after the blows whose
+ *  Antananarivo's Trader trained and sent in one turn); the citizens record
+ *  t+1 works after the units, whose villages place theirs (runs/h1_duelq1117
+ *  t16: China's Scout's village citizen on Xi'an's 649, inside the five
+ *  record t17 shows); the research and civic picks last, after the blows whose
  *  boosts may complete what was in hand (runs/h1_duelw1117 t23: China's
  *  Slinger kill completed Archery, then Horseback Riding was picked) */
 const ORDER: Decision['kind'][] = ['found', 'capture', 'policies', 'pantheon', 'religion', 'governors', 'war',
-  'envoy', 'levy', 'levyEnd', 'routes', 'congress', 'buyPlot', 'buyBuilding', 'wonderCharge', 'queue', 'worked', 'improve', 'clear', 'buyUnit', 'move', 'village', 'gpActivate', 'park', 'unitNew', 'pillage', 'plunder', 'spread', 'battle', 'seize', 'unitGone', 'combat', 'hit', 'kill', 'promote', 'upgrade', 'camp', 'research', 'civic'];
+  'envoy', 'levy', 'levyEnd', 'routes', 'congress', 'buyPlot', 'buyBuilding', 'wonderCharge', 'queue', 'improve', 'clear', 'buyUnit', 'move', 'village', 'gpActivate', 'park', 'unitNew', 'pillage', 'plunder', 'spread', 'battle', 'seize', 'unitGone', 'combat', 'hit', 'kill', 'promote', 'upgrade', 'camp', 'worked', 'research', 'civic'];
 
 function applyPhase(ctx: Ctx, ds: Decision[], phase: Decision['phase'], b: TurnRecord, wit: TurnRecord,
   players?: ReadonlySet<number>): void {
@@ -6464,6 +6479,8 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
     // each unit's health before the engine's turn heals it, beside the plot
     // the heal reads (`healedOn`)
     const hpPre = new Map(state.units.map((u) => [u, u.hp]));
+    // each city centre's hit points before the turn's close and after its heal
+    const centreHeal = new Map<{ hp?: number }, { was: number; healed: number }>();
     // THE ENGINE'S TURN in the order the pair holds it: the other majors'
     // starts and actions of turn t, the city-states' and Free Cities' turns,
     // the barbarians' (sat out), the turn's close and heal, the World
@@ -6775,9 +6792,10 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
       ctx.minorLookTypes = new Map([...state.unitsDying ?? [], ...state.units].map((u) => [u.id, gameTypeOf('unit', u.type, 'UNIT_')]));
       ctx.minorDying = state.unitsDying ?? [];
       takeBarbs();
-      ctx.barbCentres = new Map([...state.seats.flatMap((s) => s.cities), ...state.freeSeat?.cities ?? [], ...state.cityStates]
-        .map((c) => [c.centerIndex, { hp: c.hp ?? CITY_MAX_HP, outerHp: c.outerHp }] as const));
+      const centres = [...state.seats.flatMap((s) => s.cities), ...state.freeSeat?.cities ?? [], ...state.cityStates];
+      ctx.barbCentres = new Map(centres.map((c) => [c.centerIndex, { hp: c.hp ?? CITY_MAX_HP, outerHp: c.outerHp }] as const));
       turnClose(state);
+      for (const c of centres) centreHeal.set(c, { was: ctx.barbCentres.get(c.centerIndex)!.hp, healed: c.hp ?? CITY_MAX_HP });
       // the Regular Session after the turn's close, as `endTurn` runs it: a
       // competition it starts scores from the next turn (runs/h1_duelq1117:
       // the World's Fair of the t161 session STARTED 162, its podium t181),
@@ -6930,6 +6948,16 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
     // their rules, `barbarianTurn`)
     const keyOfId = new Map([...ctx.units].map(([k, u]) => [u.id, k] as const));
     applyPhase(ctx, ds, 'after', b, b);
+    // ...whose blows on a city centre came before the game's heal at the
+    // turn's end: a centre they struck heals on the hit points they left, its
+    // close's gate as it stood (runs/h1_duelq1127 t22: the barbarians' Scout
+    // strikes Mexico City for 10, whole again at its t23 city update, no
+    // defensive cancel of its Granary)
+    for (const [c, { was, healed }] of centreHeal) {
+      const hp = c.hp ?? CITY_MAX_HP;
+      if (hp >= healed || (was < CITY_MAX_HP && healed === was)) continue;
+      c.hp = Math.min(CITY_MAX_HP, hp - (healed - was) + CITY_HEAL_PER_TURN);
+    }
     unlistTurnLosses(b, a.turn, keyOfId, state.cityStates, new Set(state.units.map((u) => u.id)));
     for (const u of struckHp.keys()) {
       if (!state.units.includes(u) || u.hp >= UNIT_HP) continue;

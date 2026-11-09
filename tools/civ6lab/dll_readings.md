@@ -13305,3 +13305,28 @@ ACT_SENTRY), statecompare `activity`.
   Great Person's or Trajan's granted building is not read as a creation
   through 0x17f870; Fez's list reader on the unit.
 
+## C-112: a citizen an event takes re-places the city's citizens — READ (0x1c79b0 -> 0x194fb0 -> 0x196320), both twins
+
+- THE RULE: a random event's POPULATION_LOSS changes the city's population
+  through City::ChangePopulation (0x1c79b0), which hands the change to
+  ChangeNumUnassigned (0x194fb0): a negative count runs the full reassign
+  0x196320 at once, the forced citizens kept, every other placed again
+  (0x197230). `loseCitizen` (cpu/core/disasters.ts) re-places a city-state's
+  city (`minorReplaceCitizens`) and a holder's (`replaceAllCitizens` on its
+  yield flags); GPU `_lose_citizen` (gpu/core/sim_economy.py) through
+  `_minor_replace_citizens` and `_place_citizens(full=True)`.
+- CONFIRMED: runs/h1_duelq1127 t33, Mexico City 6 -> 5 at the turn's end
+  (CityPopulationChanged after the heals), the record's t34 citizens on 535
+  with 491 dropped and its surplus 7; the engines kept the last-placed plot
+  off and grew on 5 until the city's own re-place a turn later.
+- THE REPLAY'S ORDER (cpu/harness/replay.ts, no DLL reading): a centre the
+  pair's landed battles struck heals at the turn's end on the hit points they
+  left (the game's heal follows the barbarians' blows: 1127 t22 Mexico City
+  struck for 10, whole at its t23 city update, no defensive cancel of its
+  Granary); a major's start envoy whose InfluenceGiven row follows its own
+  cities' rows lands after the start (1127 t47: Xi'an's pick, then China's
+  envoy to Mexico City annexing 360 on the second picker draw); a major's
+  citizens as record t+1 shows them land after its units, whose villages
+  place theirs (1117 t16: China's village citizen on Xi'an's 649).
+- Open: whether the AI's start sends a token envoy before its cities or
+  after them is read from the log, not from the DLL's player turn.

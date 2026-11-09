@@ -2503,7 +2503,9 @@ class SimEconomy:
         """`losePopulation` — POPULATION_LOSS in the games `pr`: one citizen
         of the city owning `tile` [B] (its seat `seat_at` [B]), never its last
         — every holder's, the Free Cities' and a city-state's one city (its
-        row's column 0) included."""
+        row's column 0) included; the population change re-places every
+        citizen of the city (ChangePopulation 0x1c79b0 -> 0x194fb0, a
+        negative count the full reassign 0x196320)."""
         if not pr.numel():
             return
         tc = tile.unsqueeze(1)
@@ -2513,6 +2515,11 @@ class SimEconomy:
             _mpop = self.city_pop[_ms, _mrow, 0]
             _mok = self.city_alive[_ms, _mrow, 0] & (_mpop > 1)
             self.city_pop[_ms, _mrow, 0] = torch.where(_mok, _mpop - 1, _mpop)
+            for _s in range(self.S):
+                _lost = torch.zeros(self.B, dtype=torch.bool, device=self.device)
+                _lost[_ms[_mok & (seat_at[_ms] == 100 + _s)]] = True
+                if bool(_lost.any()):
+                    self._minor_replace_citizens(_s, _lost)
         # `tile_seat` is an ABSOLUTE seat, so the row and the seat are carried
         # as a pair: a major's row IS its seat, the free row's is FREE_SEAT
         for _r, _seat in [(_m, _m) for _m in range(self.n_majors)] + [(self.FREE_ROW, FREE_SEAT)]:
@@ -2529,6 +2536,12 @@ class SimEconomy:
             pop = self.city_pop[sel, _r, sl]
             self.city_pop[sel, _r, sl] = torch.where(pop > 1, pop - 1, pop)
             self._log_pop(sel, _r, sl, "ds")
+            _col = torch.zeros(self.B, dtype=torch.long, device=self.device)
+            _col[sel] = sl
+            _lost = torch.zeros(self.B, dtype=torch.bool, device=self.device)
+            _lost[sel[pop > 1]] = True
+            self._place_citizens(_r, _col, _lost, None, full=True,
+                                 fav_food=self.city_fav_food[self._bidx, _r, _col])
             # a citizen lost: a full point of the event's damage to the owner
             self._aid_damage(sel[pop > 1], torch.full_like(sel[pop > 1], _seat), 2)
 

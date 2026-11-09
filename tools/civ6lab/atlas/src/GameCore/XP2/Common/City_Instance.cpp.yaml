@@ -110,11 +110,16 @@
     - recording: h1_duelw1121
       turn: 186
       value: runs/h1_duelw1121 t186 (Jiaodong 6 -> 7 on its 3, Displeased), t220   Shenyang, t238 Taiyuan.
-  impl: [cpu/core/units.ts:city, gpu/core/sim_seats.py:_draw_and_pay_goody]
+  impl:
+    - cpu/core/units.ts:city
+    - gpu/core/sim_seats.py:_draw_and_pay_goody
+    - cpu/core/disasters.ts:loseCitizen
+    - gpu/core/sim_economy.py:_lose_citizen
   readings:
     - "C-94: the religious spread — READ"
     - "H-1: the citizen manager's placement and the yield flags — READ"
     - "H-1: a growth re-ranks no luxury; war weariness's amenities at the processing — READ"
+    - "C-112: a citizen an event takes re-places the city's citizens — READ (0x1c79b0 -> 0x194fb0 -> 0x196320), both twins"
   context:
     - "- The population change 0x1f3050 (called from City ChangePopulation 0x1c79b0): a gain of n adds ATHEISM_PRESSURE_PER_POP (gp +0x5d8) x n, `<< 8`, to the entry of th..."
     - "...angeNumUnassigned` (0x194fb0, called with the population change by City::ChangePopulation 0x1c79b0) adds to m_iNumUnassignedCitizens (+0x68): a negative count runs the full reassign 0x1963..."
