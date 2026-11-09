@@ -397,6 +397,10 @@ export function grantFoundingPressure(state: GameState, seat: number): void {
   const pres = (holy.religionPressure ??= []);
   while (pres.length < state.seats.length) pres.push(0);
   pres[seat] += HOLY_CITY_FOUNDING_PRESSURE_PER_POP * holy.population;
+  // ...and follows its majority at once, pressing from the founder's next
+  // spread
+  const best = followedReligionOf(pres, holy.population, unconvertedOf(holy));
+  holy.followedReligion = best >= 0 ? best : null;
 }
 
 export function unitsOf(state: GameState, seat: number): Unit[] {

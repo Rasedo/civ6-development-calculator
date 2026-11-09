@@ -33,7 +33,7 @@
  */
 import { existsSync, readFileSync } from 'node:fs';
 import type { ArmyRecord, BarbTribe, City, CityState, DistrictId, GameState, GreatPersonClass, QueueItem, Seat, SeatActionRecord, Tile, TradeRoute, Unit } from '../core/types';
-import { hexDistance, neighbors } from '../../world/hex';
+import { hexDistance, neighborTile, neighbors } from '../../world/hex';
 import { isWater } from '../../world/query';
 import { NO_SEAT } from '../core/types';
 import { advanceTurn, refreshDistrictDiscount, minorTurns, turnChange, turnClose, foundCity, foundCityAt, buyTile, settlerCost, projectCost, unitStepCost, unitsAcquired, buildingPurchaseCost,
@@ -3453,6 +3453,8 @@ function applyBuyUnit(ctx: Ctx, d: Extract<Decision, { kind: 'buyUnit' }>, rec: 
 /** the seat order's pillage column */
 const A_PILLAGE = unitActionIndex(IMPROVEMENT_IDS).PILLAGE;
 const A_PLUNDER = unitActionIndex(IMPROVEMENT_IDS).PLUNDER;
+/** the seat order's spread columns: the unit's own plot, then each neighbour */
+const A_SPREAD = unitActionIndex(IMPROVEMENT_IDS).SPREAD_HERE;
 
 /** the decisions of one phase, in a fixed order: cities first (a founding
  *  gives the queue its city), then the seats, the cities' orders, the plots,
@@ -3462,7 +3464,7 @@ const A_PLUNDER = unitActionIndex(IMPROVEMENT_IDS).PLUNDER;
  *  boosts may complete what was in hand (runs/h1_duelw1117 t23: China's
  *  Slinger kill completed Archery, then Horseback Riding was picked) */
 const ORDER: Decision['kind'][] = ['found', 'capture', 'policies', 'pantheon', 'religion', 'governors', 'war',
-  'envoy', 'levy', 'levyEnd', 'routes', 'congress', 'buyPlot', 'buyBuilding', 'wonderCharge', 'queue', 'worked', 'improve', 'clear', 'buyUnit', 'move', 'village', 'gpActivate', 'park', 'unitNew', 'pillage', 'plunder', 'battle', 'seize', 'unitGone', 'combat', 'hit', 'kill', 'promote', 'upgrade', 'camp', 'research', 'civic'];
+  'envoy', 'levy', 'levyEnd', 'routes', 'congress', 'buyPlot', 'buyBuilding', 'wonderCharge', 'queue', 'worked', 'improve', 'clear', 'buyUnit', 'move', 'village', 'gpActivate', 'park', 'unitNew', 'pillage', 'plunder', 'spread', 'battle', 'seize', 'unitGone', 'combat', 'hit', 'kill', 'promote', 'upgrade', 'camp', 'research', 'civic'];
 
 function applyPhase(ctx: Ctx, ds: Decision[], phase: Decision['phase'], b: TurnRecord, wit: TurnRecord,
   players?: ReadonlySet<number>): void {
@@ -4227,6 +4229,28 @@ const res = buyTile(state, city.id, d.plot, seat);        if (!res.ok) setTileOw
         } else plunderTrader(state, u);
         const done = state.units.length < before;
         count(ctx, 'plunder', done ? 'applied' : 'refused', d.player, done ? undefined : 'the engine plundered no Trader');
+        break;
+      }
+      case 'spread': {
+        // the operation is the player's, through its seat's own order from
+        // the plot the log's steps had the unit on, into the one city centre
+        // on or beside it (every spread of the five duelq recordings has one)
+        const u = unitOf(ctx, d.unit);
+        if (!u) { count(ctx, 'spread', 'refused', d.player, 'a unit the replay does not hold'); break; }
+        const actor = u.seat < state.seats.length ? seatOf(state, u.seat) as Seat | undefined : undefined;
+        const here = state.map.tiles[d.plot];
+        const centres = new Set([...state.seats.flatMap((s) => s.cities), ...state.cityStates].map((c) => c.centerIndex));
+        const dirs = [-1, 0, 1, 2, 3, 4, 5].filter((k) => centres.has((k < 0 ? here : neighborTile(state.map, here, k))?.index ?? -1));
+        if (!actor || dirs.length !== 1) { count(ctx, 'spread', 'refused', d.player, actor ? `${dirs.length} centres in reach` : 'not a major'); break; }
+        const was = u.tileIndex;
+        const charges = u.charges ?? 0;
+        u.tileIndex = d.plot;
+        u.movesLeft = Math.max(u.movesLeft, grantedMoves(state, u));
+        applySeatUnitOrders(state, actor, [unitsOf(state, u.seat).map((x) => (x === u ? A_SPREAD + 1 + dirs[0] : -1))]);
+        const gone = !state.units.includes(u);
+        if (!gone) u.tileIndex = was;
+        const done = gone || (u.charges ?? 0) < charges;
+        count(ctx, 'spread', done ? 'applied' : 'refused', d.player, done ? undefined : 'the engine spread nothing');
         break;
       }
       case 'seize': {

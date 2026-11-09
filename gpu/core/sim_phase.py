@@ -3311,6 +3311,13 @@ class SimPhase:
         if bool(_gr.count_nonzero()):
             gb = _gr.nonzero(as_tuple=True)[0]
             self.city_pressure[gb, row, _h_slot[gb], row] += self._holy_founding_per_pop * self.city_pop[gb, row, _h_slot[gb]].long()
+            # ...and follows its majority at once, pressing from the
+            # founder's next spread
+            _hs = _h_slot[gb]
+            self.city_followed[gb, row, _hs] = self._followed_religion(
+                self.city_pressure[gb, row, _hs], self.city_pop[gb, row, _hs],
+                self.city_unconverted[gb, row, _hs]).to(self.city_followed.dtype)
+            self._eff_version += 1
 
     #: Reset on an ownership change: a captured unit never carries its old
     #: fortification, its old owner's aura, or movement — movesLeft = 0

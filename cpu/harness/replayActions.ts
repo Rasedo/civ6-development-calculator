@@ -111,6 +111,10 @@ export type Decision = Base & (
   /** a unit's plunder of the Trader on its plot (`UnitCommandStarted`,
    *  UNITCOMMAND_PLUNDER_TRADE_ROUTE), where the log's steps had it */
   | { kind: 'plunder'; player: number; unit: string; plot: number }
+  /** a religious unit's spread (`UnitOperationStarted`,
+   *  UNITOPERATION_SPREAD_RELIGION, its charge spent after it) from the plot
+   *  the log's steps had it on */
+  | { kind: 'spread'; player: number; unit: string; plot: number }
   /** a hostile civilian stepped on (`UnitCaptured`): the mover the log steps
    *  onto its plot (`unit`, from the plot it left), the civilian, and the
    *  unit the game re-added under the mover's player where it took one */
@@ -519,6 +523,7 @@ const OP_HARVEST = gameHash('UNITOPERATION_HARVEST_RESOURCE');
 const OP_PILLAGE = gameHash('UNITOPERATION_PILLAGE');
 const CMD_PLUNDER = gameHash('UNITCOMMAND_PLUNDER_TRADE_ROUTE');
 const OP_FOUND_RELIGION = gameHash('UNITOPERATION_FOUND_RELIGION');
+const OP_SPREAD = gameHash('UNITOPERATION_SPREAD_RELIGION');
 const PURCHASE_BUILDING = gameHash('BUILDING');
 const PURCHASE_PLOT = gameHash('PLOT');
 /** the game's `CityProductionChanged` / `CityProductionCompleted` kinds */
@@ -655,6 +660,17 @@ export class RecordedActions implements ActionSource {
         const k = `${n(r, 0)}:${n(r, 1)}`;
         const at = stand.get(k);
         if (at !== undefined) out0.push({ kind: 'plunder', phase: phaseOf(n(r, 0)), player: n(r, 0), unit: k, plot: at });
+      }
+      // a spread is its operation and the charge the unit spends after it,
+      // before its next operation (runs/h1_duelq1127 t54: China's Missionary
+      // 1048582 on 14:9 into Changsha, 2 -> 1, 32 -> 240)
+      if (name === 'UnitOperationStarted' && n(r, 2) === OP_SPREAD) {
+        const k = `${n(r, 0)}:${n(r, 1)}`;
+        const at = stand.get(k);
+        const mine = ev.slice(ev.indexOf(r) + 1).filter((x) => `${n(x, 0)}:${n(x, 1)}` === k);
+        const until = mine.findIndex((x) => x[2] === 'UnitOperationStarted' || x[2] === 'UnitRemovedFromMap');
+        const charged = (until < 0 ? mine : mine.slice(0, until)).some((x) => x[2] === 'UnitChargesChanged' && n(x, 2) < n(x, 3));
+        if (at !== undefined && charged) out0.push({ kind: 'spread', phase: phaseOf(n(r, 0)), player: n(r, 0), unit: k, plot: at });
       }
       if (name === 'UnitOperationStarted' && (n(r, 2) === OP_REMOVE_FEATURE || n(r, 2) === OP_HARVEST)) {
         const k = `${n(r, 0)}:${n(r, 1)}`;
