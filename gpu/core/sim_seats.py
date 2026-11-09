@@ -4195,6 +4195,7 @@ class SimSeats:
         g = unit_att.nonzero(as_tuple=True)[0]
         ds = d_slot[g]
         self.unit_hp[g, ds] -= d_dmg[g]
+        self._wake_struck(g, ds)
         _mp = getattr(self, f"{atk_kind}_unit_mp")
         _mp[:, u] = torch.where(unit_att, torch.zeros_like(_mp[:, u]), _mp[:, u])
         self._spend_one_attack(atk_kind, u, unit_att)
@@ -5526,6 +5527,31 @@ class SimSeats:
         self.unit_arrival[r, g] = self.arrival_next[r] + before + 1
         self.unit_arrival_tile[r, g] = t
         self.arrival_next.index_add_(0, r, torch.ones(n, dtype=torch.long, device=self.device))
+        # the placement sets the fortification to 0, then to the plot's grant
+        # (0x586d40 at 0x587789 / 0x5877f7 / 0x5878cf, `arrive`)
+        ty = self.unit_type[r, g].clamp(min=0, max=self.NU - 1)
+        mil = (self._type_combat.take(ty) > 0) & ~self.unit_naval.take(ty) & (self._type_air.take(ty) == 0)
+        self.unit_fortify[r, g] = torch.where(mil, self._plot_fortify(r, t), torch.zeros_like(t))
+
+    def _wake_struck(self, rows: torch.Tensor, slots: torch.Tensor) -> None:
+        """`wakeInBattle` on the units at global `slots` [N] of the games
+        `rows` [N], each struck (0x20d280 at 0x20d5ce): one on SENTRY AWAKE"""
+        a = self.unit_activity[rows, slots]
+        self.unit_activity[rows, slots] = torch.where(a == ACT_SENTRY, torch.zeros_like(a), a)
+
+    def _plot_fortify(self, rows: torch.Tensor, tiles: torch.Tensor) -> torch.Tensor:
+        """[N] long — `plotFortification` on `tiles` [N] of the games `rows`
+        [N]: a complete wonder's occupation (Alhambra, Mont St. Michel) 2, an
+        improvement's GrantFortification, the larger, at most 2"""
+        out = torch.zeros_like(tiles)
+        occ = self._occupy_def()
+        if occ is not None:
+            out = torch.where(occ[rows, tiles] > 0, torch.full_like(out, 2), out)
+        if self._imp_fortify_any:
+            iv = self.improvement[rows, tiles].long()
+            gf = self._imp_fortify.take(iv.clamp(min=0)) * (iv >= 0).long()
+            out = torch.maximum(out, gf.clamp(max=2))
+        return out
 
     def _arrival_key(self) -> torch.Tensor:
         """[B, U] long — each unit's place in its plot's list (`arrivalOrder`):
@@ -13364,6 +13390,8 @@ class SimSeats:
             rows, def_dead, atk_dead, captured = self._melee_exchange(
                 mil_att, tgt, ttc, d_slot, a_hp, u, atk_e, def_e,
                 self._row_of(a_seat[:, u]), a_type[:, u], d_emb)
+            _mr = mil_att.nonzero(as_tuple=True)[0]
+            self._wake_struck(_mr, ds0[_mr])
             self._award_pair_xp(
                 mil_att, a_kind=atk_kind, u=u, a_type=a_type[:, u], a_seat=a_seat[:, u],
                 d_slot=d_slot, d_type=d_type, d_is_barb=def_is_barb,
@@ -15819,6 +15847,7 @@ class SimSeats:
         if len(g) > 0:
             ds = d_slot.take(g)
             self.unit_hp[g, ds] -= d.take(g)
+            self._wake_struck(g, ds)
             dead = self.unit_hp[g, ds] <= 0
             gd, td = g[dead], tt.take(g[dead])
             self._occ_clear(gd, td, ds[dead])
@@ -16180,6 +16209,7 @@ class SimSeats:
                 g = unit_att.nonzero(as_tuple=True)[0]
                 ds = d_slot[g]  # paired rows — gather(1, …) would read rows 0..|g|
                 self.unit_hp[g, ds] -= d_def[g]
+                self._wake_struck(g, ds)
                 dead = self.unit_hp[g, ds] <= 0
                 gd, td = g[dead], ttc[g[dead]]
                 self.unit_alive[gd, ds[dead]] = False
@@ -16408,6 +16438,7 @@ class SimSeats:
             g = unit_att.nonzero(as_tuple=True)[0]
             ds = d_slot[g]  # paired rows — gather(1, …) would read rows 0..|g|
             self.unit_hp[g, ds] -= d_def[g]
+            self._wake_struck(g, ds)
             dead = self.unit_hp[g, ds] <= 0
             gd, td = g[dead], ttc[g[dead]]
             self.unit_alive[gd, ds[dead]] = False

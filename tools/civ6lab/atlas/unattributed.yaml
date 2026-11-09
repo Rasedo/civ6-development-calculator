@@ -224,7 +224,9 @@
     - cpu/core/tactical.ts:orderOnce
     - gpu/core/sim_tactics.py:_tac_move_to
     - gpu/core/sim_tactics.py:_fortify_order
-  readings: ["C-110 / C-99: the unit's activity and the Fortify order's refusal — READ"]
+  readings:
+    - "C-110 / C-99: the unit's activity and the Fortify order's refusal — READ"
+    - "C-110 / C-99: a placement resets the fortification, a struck SENTRY wakes, a siege striker asks no Movement — READ (0x586d40 at 0x587789, 0x20d280 at 0x20d5ce, 0x775340 at 0x7754c7), both twins"
   review: reviewed
 - addr: 0x5cbc0
   final: 0x447d0
@@ -3096,12 +3098,22 @@
 - addr: 0x5707b0
   final: 0x3a5c20
   kind: function
-  semantics: sets a unit's fortify turns.
-  status: PARTLY
+  name: SetFortifyTurns
+  semantics: "sets a unit's fortify turns (+0xd50 through the tracked int +0xcf8, a negative 0). Its writers: the battle (0x1fbae0, 0x20a820, 0x20ad00: the attacker 0), the placement (0x586d40: 0, then the plot's grant), an improvement's creation (0xa4cee0, 0xa4e7a0: every unit on the plot its GrantFortification), the Fortify operation's ticks (0x95ebb0, 0x960800, 0x959830, 0x95ea70), Lua, 0x561c50; no end of turn writes it."
+  status: READ
+  cases:
+    - recording: h1_duelq1124
+      turn: 17
+      value: "the barbarian Spearman 327684, two turns dug in on its camp 41:7, swapped onto 40:7 and walked back: 0 at t18"
+  impl:
+    - cpu/core/units.ts:arrive
+    - gpu/core/sim_seats.py:_arrive
+    - cpu/core/units.ts:restUnit
+    - gpu/core/sim_step.py:step
   readings:
     - "H-1: the melee result, a ranged blow's domain, a city's shot — READ"
     - "C-110: the Fortify order and its ticks; the heal's plot gate — READ"
-  notes: ["imported: READ in its section, no confirming case found beside it"]
+    - "C-110 / C-99: a placement resets the fortification, a struck SENTRY wakes, a siege striker asks no Movement — READ (0x586d40 at 0x587789, 0x20d280 at 0x20d5ce, 0x775340 at 0x7754c7), both twins"
   context:
     - "- An attack ends the attacker's fortification: 0x1fbae0 sets its fortify turns to 0 (0x5707b0(attacker, 0)) once the result is made (0x205da0). Fortification grows only in the Forti..."
   review: reviewed
@@ -7627,7 +7639,9 @@
       turn: 166
       value: "the barbarian Man-At-Arms 5177366, HL: End Turn at t165 and t166, HOLD across them; its t167 Chase Target Fortify refused (record 0)"
   impl: [cpu/core/units.ts:skipTurn, gpu/core/sim_tactics.py:_skip_turn]
-  readings: ["C-110 / C-99: the unit's activity and the Fortify order's refusal — READ"]
+  readings:
+    - "C-110 / C-99: the unit's activity and the Fortify order's refusal — READ"
+    - "C-110 / C-99: a placement resets the fortification, a struck SENTRY wakes, a siege striker asks no Movement — READ (0x586d40 at 0x587789, 0x20d280 at 0x20d5ce, 0x775340 at 0x7754c7), both twins"
   review: reviewed
 - addr: 0x9724c0
   final: 0x67c2d0

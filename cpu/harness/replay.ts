@@ -47,7 +47,7 @@ import { applySeatUnitOrders, buySeatBuilding, declareWar, districtSiteCost, dis
 import { addEnvoys, buildingCreatedCulture, cityStateAt, declareWarOnCityState, minorCity, minorReplaceCitizens, placeCityStateAt, sueForPeaceWithCityState } from '../core/cityStates';
 import { CP_ACCEPTED, CP_CANCELLED, CP_IN_PROGRESS, contractById } from '../core/aiContracts';
 import { availableBuildings, canPlaceWonder, validImprovements, wallsMax } from '../core/rules';
-import { arrive, arriveAll, builderHarvest, builderRemoveFeature, spawnUnit, tallyUnitMade, trainableUnits, builderCost, traderCost, disbandUnit, escortable, drawAndPayGoody, grantedMoves, unitFullMoves, restUnit, canFortify, upgradeUnit, naturalistPark, upgradeAnew, unitsAt, unitDomain, fortifyBonus, crossesRiver, waterWalks, cityAtIndex, raiseBestTrained, recordAttacker, unitMadeAnew, FORTIFY_MAX_TURNS, ANTIQUITY_CIVIC, SHIPWRECK_CIVIC } from '../core/units';
+import { arrive, arriveAll, plotFortification, builderHarvest, builderRemoveFeature, spawnUnit, tallyUnitMade, trainableUnits, builderCost, traderCost, disbandUnit, escortable, drawAndPayGoody, grantedMoves, unitFullMoves, restUnit, canFortify, upgradeUnit, naturalistPark, upgradeAnew, unitsAt, unitDomain, fortifyBonus, crossesRiver, waterWalks, cityAtIndex, raiseBestTrained, recordAttacker, unitMadeAnew, FORTIFY_MAX_TURNS, ANTIQUITY_CIVIC, SHIPWRECK_CIVIC } from '../core/units';
 import { availableCivicsIn, availableTechsIn, computeUnlocks, goldPrice, governmentSlots, policyWireOf, seatGovernment, darkAgeEra,
   unlockedPolicyIds } from '../core/effects';
 import { selectResearch, chopGrant, harvestGrant, applyLumpYield, holdResearchEra, researchCost } from '../core/economy';
@@ -6843,9 +6843,15 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
     // a recorded promotion's heal stands (runs/h1_duely1124 t34: China's Scout
     // 524294 promoted at 77 HP, UnitDamageChanged 23 -> 0, takes the
     // barbarian Slinger's 30 whole)
+    // A unit whose moves the record spent walked or struck: the game's
+    // placement and battle took its fortification (`arrive`, `spendAttack`),
+    // the plot's grant left
     for (const [u, was] of spent) {
       const cap = Math.max(was.hp, ctx.promoteHp.get(u) ?? 0);
       if (u.hp > cap) u.hp = cap;
+      if (!movesKept.get(u) && !isBarbSeat(u.seat) && unitDomain(u.type) === 'military' && !UNITS[u.type]?.naval) {
+        u.fortifyTurns = plotFortification(state, u.tileIndex);
+      }
       if ((u.fortifyTurns ?? 0) > was.fortify) u.fortifyTurns = was.fortify;
     }
     // a rested unit struck in a later player's turn heals at its own next
@@ -7022,7 +7028,9 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
     // (runs/h1_duelw1117 t4: the camp's Spearman, struck at t4, still two
     // turns dug in at t5, took 21 from a city-state's Warrior at -4)
     for (const [u, stood] of barbRest) {
-      if (state.units.includes(u)) restUnit(state, u, stood);
+      if (!state.units.includes(u)) continue;
+      if (!stood && u.fortifyTurns) u.fortifyTurns = 0;
+      restUnit(state, u, stood);
     }
     // the record's Fortify orders (every player's units move as the record
     // has them; the minors' and the barbarians' AI runs on a copy): the unit

@@ -13418,3 +13418,56 @@ ACT_SENTRY), statecompare `activity`.
 - OPEN: 1121 t151 / t161 / t164-167 / t197-198 the Crossbowmen, Scout and
   Bombard of the t148 rampage family; 1124 t20 Scout 1638420; 1127 t170
   Galley 262147.
+
+## C-110 / C-99: a placement resets the fortification, a struck SENTRY wakes, a siege striker asks no Movement — READ (0x586d40 at 0x587789, 0x20d280 at 0x20d5ce, 0x775340 at 0x7754c7), both twins
+
+- THE PLACEMENT (0x586d40) sets the unit's fortification (+0xd50,
+  SetFortifyTurns 0x5707b0) to 0 once its look is taken (0x587789), then to
+  the plot's grant: the unpillaged improvement's GrantFortification
+  (0x5877f7), else each building of the plot with one (0x5878cf: the
+  Alhambra, Mont St. Michel). Every step, swap, advance, jump and new unit
+  takes it. No end of turn writes +0xd50 (0x4ef6d0 reads it): the rest takes
+  no fortification away. Ported in `arrive` / `plotFortification`
+  (cpu/core/units.ts) and `_arrive` / `_plot_fortify` (sim_seats); the rest
+  (`restUnit`, sim_step) keeps the plot's grant as a floor (an improvement
+  made under a unit, 0xa4cee0 / 0xa4e7a0, sets it there). The replay, whose
+  recorded moves place no unit, takes the fortification of a unit whose
+  moves the record spent (a major's: the plot's grant; a barbarian's that
+  did not stand: none) as the rest did.
+- Confirmed: runs/h1_duelq1124 t17 the barbarian Spearman 327684, two turns
+  dug in on its camp 41:7, swapped onto 40:7 by the Warrior 1441805 and
+  walked back by Barb. Camp Defense: 0 (barb.fortify 2 / 0 before); 1128
+  t150 Bologna's Warrior 2162692 off 4:9 and back: 0 (cityState.fortify).
+- THE COMBAT LOG'S WAKE (0x20d280 at 0x20d5ce): the combat's defender (+0x8)
+  on SENTRY has its operations cleared (the manager's vt +0x68) and is AWAKE
+  (vt +0xc0, 0x6b25012e); HOLD and the rest stay. Ported as `wakeInBattle`
+  (cpu/core/combat.ts: the melee, ranged, hostile ranged and air blows on a
+  unit, the city's strike in phase.ts `cityStrikeAt`) and `_wake_struck`
+  (sim_seats, the same five sites). Confirmed: runs/h1_duelq1124 t16-17 the
+  barbarian Spearman 327684, SENTRY on its camp, struck by city-state 3's
+  Warrior 131073, UnitDamageChanged then ACTIVITY_AWAKE; 1121 t18 the camp
+  Spearman 196610 the same; 1117 t10 the barbarian Scout 262147, HOLD from
+  its t9 Skip Turn, struck by China's Warrior 131073: no activity row, its
+  Fortify in place refused at t11 (barb.fortify 0 / 0).
+- A RANGED STRIKER'S HOLD: HOLD (0x47c048b) is written by an operation's
+  start with no Movement left (0x55280), the Skip Turn execution (0x9687a0)
+  and nothing else (the end of turn 0x4ef6d0 only clears it). The duels'
+  barbarian strikes log OPERATION, the blow, AWAKE (the queue emptied,
+  0x52f50), HOLD with no UnitOperationStarted row: an operation started
+  after the blow with the Movement spent, of a kind that logs no start row
+  (the move family; the Skip Turn logs SKIP_TURN). Which operation the
+  tactical queues after the strike is unread; `hostileRangedStrike` sets
+  HOLD.
+- ATTACK UNITS' STRIKERS (0x775340 at 0x7754c7..0x7754e0): the planning test
+  (0x791300) takes the unit's range (GetRange) and asks Movement left at the
+  plot only where its GetRangedCombat is above 0: a siege unit (Bombard, no
+  RangedCombat in Units.xml) takes a plot at its range it reaches with none,
+  its blow a turn later. Ported in `strikers` (`aiRanged`) and
+  `_tac_attack_units` (`shoots`). Confirmed: runs/h1_duelq1124 t85-86
+  city-state 4's Catapult 786437 (31:8 -> 31:9, Attack Units on the
+  barbarian Scout 524295, Move 31 9 Attack -9999), t117 Trebuchet 1376263;
+  1117 t98 Catapult 917509 and Trebuchet 1310727, t102 Trebuchet 1179651
+  (cityState.move.family 6 misses gone).
+- Open: the improvement's creation under a standing unit (0xa4cee0 /
+  0xa4e7a0) is held by the rest's floor, not ported at the creation; the
+  operation queued after a ranged strike (above).

@@ -2164,6 +2164,7 @@ function meleeAttackInner(state: GameState, attackerId: number, targetIndex: num
   } else {
     const { atk: atkCSf, def: defCSf } = meleeUnitStrengths(state, attacker, targetIndex, defender);
     defender.hp -= damageRoll(state, atkCSf - defCSf, 'mel', targetIndex, { a: atkCSf, d: defCSf });
+    wakeInBattle(defender);
     // CIV6 (GameCore_XP2_Release.dll 0x206960, the melee result): an
     // EMBARKED defender strikes no blow back — the counter is never drawn
     if (!defender.embarked) attacker.hp -= damageRoll(state, defCSf - atkCSf, 'melc', targetIndex);
@@ -2486,6 +2487,7 @@ export function airStrike(
     // mirrored difference (runs/c34w_strike_b89b_aa_20260927T191029Z.jsonl)
     if (duel) attacker.hp -= damageRoll(state, defE - atkE, 'airb', targetIndex);
   }
+  wakeInBattle(defender);
   spendAttack(attacker, true);
   // the duel pays neither side experience
   if (!duel) {
@@ -2609,6 +2611,7 @@ function rangedAttackInner(state: GameState, attackerId: number, targetIndex: nu
   defender.hp -= damageRoll(state, atkCS - defCS, 'rng', targetIndex, {
     a: atkCS, d: defCS, at: UNIT_TYPE_IDX.indexOf(attacker.type), as: attacker.seat, dt: UNIT_TYPE_IDX.indexOf(defender.type), ds: defender.seat,
   });
+  wakeInBattle(defender);
   awardBattleXp(state, attacker, defender, { ranged: true, aDied: false, dDied: defender.hp <= 0 });
   warWearinessBattle(state, attacker.seat, defender.seat, targetIndex, { dDied: defender.hp <= 0 });
   recordAttacker(state, attacker, defender.seat);
@@ -2637,6 +2640,17 @@ function spendAttack(unit: Unit, endsTurn = false): void {
   // written on the chassis.
   const keeps = promoFlag(unit, 'MOVE_AFTER_ATTACK') || !!UNITS[unit.type]?.moveAfterAttack;
   if (endsTurn || !keeps) unit.movesLeft = 0;
+}
+
+/** THE COMBAT LOG'S WAKE (0x20d280 at 0x20d5ce, the combat's defender
+ *  +0x8): a unit struck on SENTRY has its operations cleared (the manager's
+ *  vt +0x68) and is AWAKE, its fortification kept; another activity stays
+ *  (runs/h1_duelq1124 t16-17: the barbarian Spearman 327684, SENTRY on its
+ *  camp, struck by city-state 3's Warrior 131073: UnitDamageChanged, then
+ *  ACTIVITY_AWAKE; 1117 t10: the barbarian Scout 262147, HOLD from its t9
+ *  Skip Turn, struck by China's Warrior 131073 and still HOLD) */
+export function wakeInBattle(unit: Unit): void {
+  if (unit.activity === 'SENTRY') delete unit.activity;
 }
 
 /** the promotion context of a RANGED shot at a unit — one body, because both
@@ -2745,6 +2759,7 @@ function hostileRangedStrikeInner(state: GameState, attacker: Unit, targetIndex:
   const defender = stackDefender(state, enemies, true);
   const { atk, def: defCS } = rangedUnitStrengths(state, attacker, targetIndex, defender, false);
   defender.hp -= damageRoll(state, atk - defCS, 'vrng', targetIndex);
+  wakeInBattle(defender);
   warWearinessBattle(state, attacker.seat, defender.seat, targetIndex, { dDied: defender.hp <= 0 });
   recordAttacker(state, attacker, defender.seat);
   awardBattleXp(state, attacker, defender, { ranged: true, aDied: false, dDied: defender.hp <= 0 });

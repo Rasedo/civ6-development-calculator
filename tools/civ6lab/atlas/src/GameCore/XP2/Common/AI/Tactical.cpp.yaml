@@ -500,7 +500,7 @@
   final: 0x507370
   kind: function
   name: attackStrikers
-  semantics: "the units whose planning holds the target within two turns (a ranged one at exactly its range, Movement left); a DEFENDER on its own plot. With its fifth argument (Attack Units for a target not HIGH) a unit with no range and no bombard strength on a district that defends (DistrictInfo +0x58 / +0x5c: a city's centre, an Encampment) is left out (0x77541f..0x7754ab); the list sorted by 0x76f210 on +8, -1 for every entry."
+  semantics: "the units whose planning holds the target within two turns (one with a range at exactly its range, Movement left asked where GetRangedCombat is above 0, 0x7754c7..0x7754e0: none of a siege unit, its Bombard alone); a DEFENDER on its own plot. With its fifth argument (Attack Units for a target not HIGH) a unit with no range and no bombard strength on a district that defends (DistrictInfo +0x58 / +0x5c: a city's centre, an Encampment) is left out (0x77541f..0x7754ab); the list sorted by 0x76f210 on +8, -1 for every entry."
   status: READ
   cases:
     - recording: h1_duelp1121
@@ -509,6 +509,9 @@
     - recording: h1_duelw1124
       turn: 1-249
       value: "the action replay: 206 of 330 Attack Units rows take the logged move and attack; 5 seeds 70 of 126 end plots"
+    - recording: h1_duelq1124
+      turn: 85
+      value: "city-state 4's Catapult 786437 on 31:8, its reach's 31:9 at range 2 of the barbarian Scout 524295 with no Movement left: Attack Units, Move 31 9, no attack"
   impl:
     - cpu/core/tactical.ts:strikers
     - cpu/core/tactical.ts:pillage
@@ -516,7 +519,10 @@
     - cpu/core/tactical.ts:onList
     - gpu/core/sim_tactics.py:_tac_on_list
     - gpu/core/sim_tactics.py:_tac_attack_units
+    - cpu/core/tactical.ts:R
+    - cpu/core/tactical.ts:moves
   readings:
+    - "C-110 / C-99: a placement resets the fortification, a struck SENTRY wakes, a siege striker asks no Movement — READ (0x586d40 at 0x587789, 0x20d280 at 0x20d5ce, 0x775340 at 0x7754c7), both twins"
     - "C-95: the tactical pass — READ (the barbarians' moves; the minors share it)"
     - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
     - "C-95: Attack Units — READ, ported"

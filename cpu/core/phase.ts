@@ -70,7 +70,7 @@ import { canBuildRoad, canBuildRailroad, canPlaceDistrictIn, canPlaceWonder, suz
 import { BUILT_WONDERS, type BuiltWonderDef } from '../data/builtWonders';
 import { seatWonders } from './wonders';
 import { cleanFallout, escortUnit, breakEscort, disbandUnit, builderCost, traderCost, builderRemoveFeature, trainableUnits, goldBuyableUnits, purchaseSpotBlocked, unitMadeAnew, archaeologistExcavate, naturalistPark, performConcert, upgradeUnit, unitDomain, formationBanned, cityGarrisons, promotionsHeld } from './units';
-import { killUnit } from './combat';
+import { killUnit, wakeInBattle } from './combat';
 import { adoptBeliefs, itemCost, unitProdCost, availableProjects, buyTile, buyWorshipBuilding, purchaseBuildingWithFaith, purchaseUnitWithFaith, wallsGoldBlocked, boostProject, wonderChargeBoost, condemnHeretic, formUp, convertHeathens, districtScaledBase, districtDiscounted, refreshDistrictDiscount, engineerFinish, foundCity, goldAffordable, isEncampHarborItem, launchInquisition, evangelizeBelief, purchaseCivilianWithFaith, purchaseNaturalist, purchaseReligiousUnit, purchaseRockBand, purchaseSettler, queueProject, removeHeresy, guruHeal, settlerCost, unitGoldPrice, unitStepCost, unitsAcquired, districtVariantCost, buildingPurchaseCost, spreadReligiousPressure } from './game';
 import { DISTRICTS, PLACEABLE_DISTRICTS, SCAFFOLD_DISTRICTS } from '../data/districts';
 import { IMPROVEMENT_IDS, DEDICATED_IMPROVEMENTS, unitActionIndex, AIR_STRIKE_COLS, AIR_REBASE_COLS, AIR_DEPLOY_COLS, NUKE_COLS, SPY_TRAVEL_COLS, SPY_MISSIONS } from './unitActions';
@@ -2766,6 +2766,7 @@ export function cityStrikeAt(state: GameState, city: City, key: 'cstk' | 'estk',
   // shot pays it too.
   const atkCS = strikeCS + emergencyStrikeCS(state, city.seat, defender.seat);
   defender.hp -= damageRoll(state, atkCS - defCSa, key, targetIndex, { a: atkCS, d: defCSa });
+  wakeInBattle(defender);
   awardDefenseXp(state, defender); // +2 to a surviving military defender (attacker is the city)
   warWearinessBattle(state, city.seat, defender.seat, targetIndex, { dDied: defender.hp <= 0, aCity: true });
   // The STRIKER is the city, so the dig's era gate is its owner's — the GPU

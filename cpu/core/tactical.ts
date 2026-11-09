@@ -2692,7 +2692,8 @@ const ATTACK_BARB = Math.fround(0.8);
  * THE UNITS THAT CAN STRIKE A PLOT (0x775340 as Attack Units asks it, 2
  * turns): each unit left, in pool order, with a strength to fight with,
  * whose planning reach holds — in melee the plot within two turns, at range
- * a plot exactly its range from it within two turns with Movement left and
+ * a plot exactly its range from it within two turns, with Movement left
+ * where it has a ranged strength (a siege unit's Bombard asks none), and
  * none of its own units stacking there unless it is its own (0x78fa10); a
  * camp's DEFENDER goes in only before another unit. With `garrisons` (a
  * target not HIGH, 0x7784b0 at 0x7785ad) a melee unit with no bombard
@@ -2708,11 +2709,16 @@ function strikers(state: GameState, pass: Pass, plot: number, garrisons: boolean
     if (garrisons && rangeOf(u) === 0 && UNITS[u.type]?.bombard === undefined
       && garrisonDistrict(state, state.map.tiles[u.tileIndex])) continue;
     const reach = pass.reach.get(u.id) ?? [];
-    const ranged = rangedStrength(u) > 0;
-    const R = ranged ? rangeOf(u) : 0;
+    const R = rangeOf(u);
+    // Movement left asked of a unit with a ranged strength (0x7754c7..
+    // 0x7754e0: GetRangedCombat); a siege unit, its Bombard alone, takes a
+    // plot at its range with none (runs/h1_duelq1124 t85-86 city-state 4's
+    // Catapult 786437 on 31:8, Attack Units on the barbarian Scout 524295 on
+    // 30:11: Move 31 9, its Movement spent on the step, no attack)
+    const moves = aiRanged(u) > 0;
     const ok = R === 0
-      ? reach.some((e) => e.tile === plot && e.turns <= PLAN_TURNS && (!ranged || e.moves > 0))
-      : reach.some((e) => plotDistance(state, e.tile, plot) === R && e.turns <= PLAN_TURNS && e.moves > 0
+      ? reach.some((e) => e.tile === plot && e.turns <= PLAN_TURNS)
+      : reach.some((e) => plotDistance(state, e.tile, plot) === R && e.turns <= PLAN_TURNS && (!moves || e.moves > 0)
         && (!stackedAt(state, u, e.tile) || e.tile === u.tileIndex));
     if (!ok) continue;
     if (pass.ai.get(u.id) === AI_DEFENDER && !out.length) {

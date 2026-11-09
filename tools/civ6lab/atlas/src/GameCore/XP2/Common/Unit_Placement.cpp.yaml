@@ -428,8 +428,12 @@
 - addr: 0x586d40
   final: 0x3b11b0
   kind: function
-  semantics: "places a unit at a plot (unit, plot, flags, ...): flags 1 run the location test 0x586360 with no flag bit set; a refused plot goes to FindAlternateLocation 0x585940 (range 10). Each player whose visibility count of the plot is above 0 meets the unit's owner (0x5246f0)."
+  semantics: "places a unit at a plot (unit, plot, flags, ...): flags 1 run the location test 0x586360 with no flag bit set; a refused plot goes to FindAlternateLocation 0x585940 (range 10). Each player whose visibility count of the plot is above 0 meets the unit's owner (0x5246f0). Its look taken (0x58f3f0), the unit's fortification is set 0 (0x587789), then the plot's unpillaged improvement's GrantFortification (+0x3c, 0x5877f7), else each building of the plot's city with a GrantFortification (Buildings +0x30, 0x5878cf)."
   status: PARTLY
+  cases:
+    - recording: h1_duelq1128
+      turn: 150
+      value: "Bologna's Warrior 2162692, two turns dug in on 4:9, swapped off and back: 0 in the record, as the engine's placement gives"
   impl:
     - cpu/core/fog.ts:majorLookMeets
     - cpu/core/units.ts:spawnUnit
@@ -439,7 +443,11 @@
     - cpu/core/units.ts:captureAnew
     - gpu/core/sim_seats.py:_capture_anew
     - cpu/core/units.ts:arrive
+    - cpu/core/units.ts:plotFortification
+    - gpu/core/sim_seats.py:_arrive
+    - gpu/core/sim_seats.py:_plot_fortify
   readings:
+    - "C-110 / C-99: a placement resets the fortification, a struck SENTRY wakes, a siege striker asks no Movement — READ (0x586d40 at 0x587789, 0x20d280 at 0x20d5ce, 0x775340 at 0x7754c7), both twins"
     - "H-1: the raids — READ"
     - "C-97: the majors' meeting — READ (the triggers, the effects), PARTLY READ (the shared sight)"
     - "H-1: the raids — READ"

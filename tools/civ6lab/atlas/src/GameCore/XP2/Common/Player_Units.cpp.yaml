@@ -147,11 +147,13 @@
     - cpu/core/units.ts:upgradeAnew
     - cpu/core/units.ts:refreshUnits
     - cpu/core/units.ts:yctx
+    - cpu/core/units.ts:restUnit
   readings:
     - "C-98: a unit off the map counts on its owner's list until its end of turn"
     - "C-98 / C-96: a city-state's unit count and standing army read its list with the delayed kill's dead — READ (0x7b62c0 at 0x7b63aa, 0x5ca7e0 at 0x5ca978 / 0x5caa88, 0x4ef6d0), both twins"
     - "C-129: the upgrade is a new unit, its old self dying in its pool slot to the turn's end — READ (0xa49cb0, 0x9402a0, 0x4ef040, 0x4ef6d0), both twins"
     - "C-110 / C-99: the unit's activity and the Fortify order's refusal — READ"
+    - "C-110 / C-99: a placement resets the fortification, a struck SENTRY wakes, a siege striker asks no Movement — READ (0x586d40 at 0x587789, 0x20d280 at 0x20d5ce, 0x775340 at 0x7754c7), both twins"
   review: reviewed
 - addr: 0x4f2310
   final: 0x2c4360

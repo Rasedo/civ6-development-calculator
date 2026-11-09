@@ -57,16 +57,15 @@ class SimStep:
             for _pre in ("barb", "major"):
                 _alive = getattr(self, f"{_pre}_unit_alive")
                 _typ = getattr(self, f"{_pre}_unit_type")
-                _spent = self._spent_mp(_pre)
                 _fort = getattr(self, f"{_pre}_unit_fortify")
                 # CIV6: a plane is based inside a city centre, an Aerodrome or a
                 # carrier and a Spy carries no Combat Strength — neither digs in.
                 _mil = ((self._type_combat.take(_typ) > 0) & ~self.unit_naval.take(_typ)
                         & (self._type_air.take(_typ) == 0))
                 # standing digs no unit in (the Fortify order alone does,
-                # `_fortify_order`): a unit that spent no MP keeps what it
-                # holds, one that spent any loses it
-                _dug = torch.where(_alive & _mil & _spent, torch.zeros_like(_fort), _fort)
+                # `_fortify_order`), and the rest takes none away: a placement
+                # (`_arrive`) and a blow (`_spend_one_attack`) do
+                _dug = _fort.clone()
                 # CIV6 (Alhambra, Mont St. Michel): a unit occupying the wonder
                 # "automatically gains 2 turns of fortification" — a floor.
                 _occ = self._occupy_def()

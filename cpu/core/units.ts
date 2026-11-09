@@ -378,19 +378,33 @@ export function unitsAt(state: GameState, tileIndex: number): Unit[] {
  * order (0x763b0 -> 0x76a10), a layer change removes then appends (0x75280).
  * The engine holds the order as a stamp: `arrive` gives the unit the next one
  * where it stands on a plot it took none on, and always where `fresh` (a new
- * unit: a spawn, a capture's, an upgrade's). The GPU twin is `_arrive`.
+ * unit: a spawn, a capture's, an upgrade's). The placement sets the unit's
+ * fortification (+0xd50, 0x5707b0 at 0x587789) to 0, then to the plot's
+ * grant (`plotFortification`, 0x5877f7 / 0x5878cf): a step off a plot and
+ * back leaves none (runs/h1_duelq1124 t17: the barbarian Spearman 327684,
+ * two turns dug in on its camp 41:7, swapped onto 40:7 by the Warrior
+ * 1441805 and walked back, 0 at t18; 1128 t150 Bologna's Warrior 2162692
+ * off 4:9 and back). The GPU twin is `_arrive`.
  */
 export function arrive(state: GameState, u: Unit, fresh = false): void {
-  if (u.tileIndex < 0 || (!fresh && u.arrivalTile === u.tileIndex)) return;
+  if (!stamp(state, u, fresh)) return;
+  if (unitDomain(u.type) === 'military' && !UNITS[u.type]?.naval) u.fortifyTurns = plotFortification(state, u.tileIndex);
+  else if (u.fortifyTurns) u.fortifyTurns = 0;
+}
+
+function stamp(state: GameState, u: Unit, fresh: boolean): boolean {
+  if (u.tileIndex < 0 || (!fresh && u.arrivalTile === u.tileIndex)) return false;
   state.arrivals = (state.arrivals ?? 0) + 1;
   u.arrival = state.arrivals;
   u.arrivalTile = u.tileIndex;
+  return true;
 }
 
-/** `arrive` over every unit in the units' order: the units a recorded action
- *  placed, stamped as the action lands */
+/** each unit's stamp (`arrive`'s list order) in the units' order: the units
+ *  a recorded action placed take their places as the action lands, their
+ *  fortification the records' */
 export function arriveAll(state: GameState): void {
-  for (const u of state.units) arrive(state, u);
+  for (const u of state.units) stamp(state, u, false);
 }
 
 /** the units in their plot's arrival order (0x75c50): a unit holding no
@@ -1679,7 +1693,6 @@ export function upgradeAnew(state: GameState, unit: Unit, next: string): void {
   delete unit.slot;
   delete unit.aiDefender;
   delete unit.aiHomed;
-  if (unit.fortifyTurns !== undefined) unit.fortifyTurns = 0;
   unit.type = next;
   unit.movesLeft = 0;
   // its placement looks from the plot (0x586d40 -> 0x58f3f0)
@@ -2538,20 +2551,24 @@ export function restUnit(state: GameState, unit: Unit, still: boolean,
   // FORTIFY: standing digs no unit in — fortification grows under the
   // Fortify order alone (`fortifyOrder`; runs/h1_duelw1117: 41 barbarian
   // Scouts and 6 city-state Warriors stood a turn unspent and stayed at 0).
-  // A military unit that spent no MP since the last refresh keeps what it
-  // holds; any move/attack resets it. NAVAL units never fortify.
+  // The rest takes none away (0x4ef6d0 reads +0xd50 only): a placement
+  // (`arrive`) and a blow (`spendAttack`) do. The plot's grant is a floor.
+  // NAVAL units never fortify.
   if (unitDomain(unit.type) === 'military' && !naval) {
-    const dug = still ? (unit.fortifyTurns ?? 0) : 0;
-    // CIV6 (Alhambra, Mont St. Michel): a unit occupying the wonder
-    // "automatically gains 2 turns of fortification" — a floor, not a step.
-    // CIV6 (`Improvements.GrantFortification`): the Fort, the Great Wall and
-    // the Pa say the same thing on their own rows, so the floor is the
-    // larger of the two.
-    const floor = Math.max(
-      wonderOccupyDefense(state, unit.tileIndex) > 0 ? FORTIFY_MAX_TURNS : 0,
-      IMPROVEMENTS[tile.improvement as ImprovementId]?.grantsFortification ?? 0);
-    unit.fortifyTurns = Math.max(dug, Math.min(FORTIFY_MAX_TURNS, floor));
+    unit.fortifyTurns = Math.max(unit.fortifyTurns ?? 0, plotFortification(state, unit.tileIndex));
   }
+}
+
+/** THE PLOT'S FORTIFICATION GRANT (the placement 0x586d40 at 0x5877f7 /
+ *  0x5878cf): CIV6 (`Improvements.GrantFortification`) the Fort, the Great
+ *  Wall, the Pa, the Alcazar; (Alhambra, Mont St. Michel) a unit occupying
+ *  the wonder "automatically gains 2 turns of fortification" */
+export function plotFortification(state: GameState, tileIndex: number): number {
+  const tile = state.map.tiles[tileIndex];
+  if (!tile) return 0;
+  return Math.min(FORTIFY_MAX_TURNS, Math.max(
+    wonderOccupyDefense(state, tileIndex) > 0 ? FORTIFY_MAX_TURNS : 0,
+    IMPROVEMENTS[tile.improvement as ImprovementId]?.grantsFortification ?? 0));
 }
 
 function builderOn(state: GameState, unitId: number): { unit?: Unit; err?: RuleResult } {

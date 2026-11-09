@@ -529,10 +529,21 @@
   review: reviewed
 - addr: 0x20d280
   kind: function
-  semantics: "the combat log: after its CombatLog.csv line raises game signal +0x4c8 and player signal +0x78 of the defender's owner (0x20d7e5: the unit's +0x2e0) with the attacking unit (0x20d7f8). Calls war weariness (0x1fb680)."
+  semantics: "the combat log: after its CombatLog.csv line raises game signal +0x4c8 and player signal +0x78 of the defender's owner (0x20d7e5: the unit's +0x2e0) with the attacking unit (0x20d7f8). Calls war weariness (0x1fb680). The combat's defender (+0x8) on SENTRY (+0x5f0 0xd0aed661) has its operations cleared (the manager's vt +0x68) and is AWAKE (vt +0xc0, 0x6b25012e) at 0x20d5ce; another activity is left."
   status: PARTLY
-  impl: [cpu/core/units.ts:recordAttacker]
+  cases:
+    - recording: h1_duelq1124
+      turn: 17
+      value: "the barbarian Spearman 327684, SENTRY on its camp, struck by city-state 3's Warrior 131073: UnitDamageChanged, then ACTIVITY_AWAKE"
+    - recording: h1_duelq1117
+      turn: 10
+      value: "the barbarian Scout 262147, HOLD from its t9 Skip Turn, struck by China's Warrior 131073: no activity row, its Fortify in place refused at t11"
+  impl:
+    - cpu/core/units.ts:recordAttacker
+    - cpu/core/combat.ts:wakeInBattle
+    - gpu/core/sim_seats.py:_wake_struck
   readings:
+    - "C-110 / C-99: a placement resets the fortification, a struck SENTRY wakes, a siege striker asks no Movement — READ (0x586d40 at 0x587789, 0x20d280 at 0x20d5ce, 0x775340 at 0x7754c7), both twins"
     - "C-34: the interception's damage, XP, weariness and the answers"
     - "C-96: the knowledge base's army records and the Combat Desire — READ (the records, the update, the desire), PARTLY READ (the signals' looks; the standing-army count in its own section below)"
     - "C-129: a killed player's records forgotten; a capture's new unit; an air strike's record — READ (0x534c50, 0x787fc0 -> 0x5ee370, 0x212500's create), both twins; the replay's later-player timings"

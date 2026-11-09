@@ -3112,6 +3112,9 @@ class SimTactics:
         on_list = self._tac_on_list(live, done, pre)
         ut = getattr(self, f"{pre}_unit_type").clamp(min=0, max=self.NU - 1)
         ranged = self._type_ranged_strength.take(ut) > 0
+        # Movement left asked of a unit with a ranged strength, none of a
+        # siege unit's Bombard (0x7754c7..0x7754e0, `strikers`)
+        shoots = ranged & (self._type_bombard.take(ut) <= 0)
         sl = torch.arange(P, device=dev).unsqueeze(0).expand(B, P)
         urng = torch.where(ranged, self._tac_range(bidx.unsqueeze(1).expand(B, P), sl, pre), torch.zeros_like(sl))
         rsafe = rowof.clamp(min=0)
@@ -3138,8 +3141,9 @@ class SimTactics:
             mil = self.military_at
             own_stk = (mil >= 0) & (self.unit_seat.gather(1, mil.clamp(min=0)) == seat)
             # `strikers`: in melee the plot within two turns, at range a plot
-            # exactly the range from it within two turns with Movement left and
-            # none of its own stacking there but its own plot
+            # exactly the range from it within two turns, with Movement left
+            # where it shoots, and none of its own stacking there but its own
+            # plot
             rt_t = rturn[rsafe, t.unsqueeze(1).expand(B, P)]
             melee_ok = (urng == 0) & (rt_t >= 1) & (rt_t <= _PLAN_TURNS)
             rng_ok = torch.zeros(B, P, dtype=torch.bool, device=dev)
@@ -3151,7 +3155,8 @@ class SimTactics:
                 dq = self.pair_dist[t[b_i]].to(torch.long)                       # [K, T]
                 here = getattr(self, f"{pre}_unit_tile")[b_i, s_i]
                 okq = ((dq == urng[b_i, s_i].unsqueeze(1)) & (rturn[n_i] >= 1) & (rturn[n_i] <= _PLAN_TURNS)
-                       & (rmoves[n_i] > 0) & (~own_stk[b_i] | (self._arange_bt[b_i] == here.unsqueeze(1))))
+                       & ((rmoves[n_i] > 0) | ~shoots[b_i, s_i].unsqueeze(1))
+                       & (~own_stk[b_i] | (self._arange_bt[b_i] == here.unsqueeze(1))))
                 rng_ok[b_i, s_i] = okq.any(dim=1)
             cand = self._tac_reachers(cand0 & (melee_ok | rng_ok), ai, order)
             if not bool(cand.count_nonzero()):
