@@ -2324,6 +2324,11 @@ function minorFinish(state: GameState, cityState: CityState, item: Exclude<Minor
       cityState.outerHp = wallsMax(state, city);
       fitEncampOuter(state, city);
     }
+    // a one-time project (MaxPlayerInstances 1) joins the minor's
+    // completions, which its projects table's gates read (0x5ce970:
+    // runs/h1_duelq1124 Bologna t242, its Manhattan Project complete, the
+    // Operation Ivy at 2217.2 as logged)
+    if (PROJECTS[item.project].once && !cityState.projectsDone.includes(item.project)) cityState.projectsDone.push(item.project);
     const r = cityState.research;
     for (const g of projectGreatPersonPoints(installType('project', item.project, 'PROJECT_'), gameProgressPct(r.techs.length, r.civics.length))) {
       (cityState.gpPoints ??= {})[g.cls] = (cityState.gpPoints[g.cls] ?? 0) + g.points;

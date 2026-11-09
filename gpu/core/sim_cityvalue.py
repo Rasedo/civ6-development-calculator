@@ -1456,6 +1456,9 @@ class SimCityValue:
         col = m.get("collection")
         if col not in reads["collections"]:
             return
+        # an effect with no analyzer is worth 0 whatever its set reads
+        if m.get("effect") not in reads["analyzers"]:
+            return
         if col == "COLLECTION_PLAYER_UNITS":
             self._cv_check_units(m, reads, depth)
             return
@@ -2480,9 +2483,13 @@ class _MinorFacts:
         open_ = like + _expected_of_priority(most)
         return torch.where(kept > 0, like + _FX, torch.where(can, open_, like))
 
-    # the projects table's facts: a minor completes no once-only project
+    # the projects table's facts: the minor's one-time projects completed
+    # (`CityState.projectsDone`)
     def advanced(self, p):
-        return 0
+        k = self.sim._once_step.get(self._pidx(p))
+        if k is None or self.s >= self.sim.S:
+            return 0
+        return self.sim.citystate_project_done[:, self.s, k].long()
 
     def progress_pct(self):
         sim, s = self.sim, self.s

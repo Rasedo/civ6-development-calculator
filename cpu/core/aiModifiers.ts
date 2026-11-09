@@ -302,6 +302,13 @@ const EVALUATORS: Readonly<Record<string, Evaluator>> = {
   // operation (Unit +0x7d0 -1); met otherwise, and with no unit
   REQUIREMENT_PLOT_ADJACENT_TO_OWNER: (t, _args, s) => !((s.kind === 'unit' || t.unit) && t.valued
     && t.view.playerUnits(t.seat).some((u) => u.type === t.valued && !u.inOperation)),
+  // 0x6d2610 (its parser 0x6d24e0: the Tag string +8): with the context's
+  // unit (+0x90), its Units row (+0x160) carries the Tag in TypeTags
+  // (0x8c2880); with none, unmet
+  REQUIREMENT_UNIT_TAG_MATCHES: (t, args, s) => {
+    const u = s.kind === 'unit' ? s : t.unit;
+    return !!u && !!AI_UNITS[AI_UNIT_INDEX.get(u.type) ?? -1]?.tags.includes(args.Tag ?? '');
+  },
   REQUIREMENT_UNIT_PROMOTION_CLASS_MATCHES: (t, args, s) => s.kind === 'unit'
     ? AI_UNITS[AI_UNIT_INDEX.get(s.type) ?? -1]?.promotionClass === args.UnitPromotionClass
     : s.kind === 'city' || (s.kind !== 'nocity' && !!t.owner),
@@ -1162,6 +1169,20 @@ const ANALYZERS: Readonly<Record<string, Analyzer>> = {
     let x = Math.fround(Math.fround(Math.fround(amount * Math.fround(COMBAT_POWER_SCALING)) + t.unit.combat) - ck);
     if (x < 0) x = 0;
     return Math.min(STRENGTH_MODIFIER_CAP, Math.trunc(Math.fround(s.count * x)));
+  },
+  // 0x6bba30 (Amount +8, whole, as its parser 0x6bb8f0 stores it): with the
+  // context's unit (+0x90), Amount x (its combat strength, 0x56dc90 with 0,
+  // over the strongest melee strength its owner has trained, PlayerStats
+  // +0xf0 0x4d9320, x 0.5f) x 0.01f, float, as PSEUDOYIELD_UNIT_COMBAT at
+  // the owner's weight, discounted to the start (0x7a1240), whole; nothing
+  // where the owner has trained none
+  EFFECT_ADJUST_UNIT_STRENGTH_REDUCTION_FOR_DAMAGE_MODIFIER: (t, args) => {
+    const u = t.unit;
+    const best = t.view.bestCombatStrength(t.seat);
+    if (!u || best <= 0) return 0;
+    const r = Math.fround(Math.fround(Math.fround(u.combat) / Math.fround(best)) * Math.fround(0.5));
+    const x = Math.fround(Math.fround(Math.fround(Number(args.Amount ?? 0) | 0) * r) * Math.fround(0.01));
+    return whole(discounted(pseudoYieldValue(t.view, t.seat, fxConst(x), 'PSEUDOYIELD_UNIT_COMBAT'), t.rate, t.start));
   },
   // 0x6b2350 (UnitType +8, Amount +0x10 as its parser 0x6b1d00 stores it,
   // fx(Amount x 0.01f)): per city of the player (the context's city alone

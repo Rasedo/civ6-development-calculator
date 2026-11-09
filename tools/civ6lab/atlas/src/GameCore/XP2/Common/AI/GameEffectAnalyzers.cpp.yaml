@@ -1224,6 +1224,45 @@
   context:
     - "...(0x4f2b20) and its value 0x7b62c0, x Amount, added whole. EFFECT_ADD_RELIGIOUS_BUILDING 0x6bb1f0: the greatest over the player's cities of the building's value 0x7a7590 from the start..."
   review: reviewed
+- addr: 0x6bb8f0
+  final: 0x46cdc0
+  kind: function
+  name: EFFECT_ADJUST_UNIT_STRENGTH_REDUCTION_FOR_DAMAGE_MODIFIER parser
+  semantics: "the damage modifier's parser: Amount (whole, the argument's >> 8) at +8 of a 0x10 block, vtable @d63a90; none where Amount is 0"
+  status: READ
+  cases:
+    - recording: h1_duelq1127
+      turn: 205
+      value: city-state 3's National Identity 1 as logged
+  impl: [cpu/core/aiModifiers.ts:ANALYZERS]
+  readings:
+    - "C-130: the damage modifier's analyzer, a unit's tag requirement, the player's units walked by pool slot, a minor's one-time projects — READ (0x6bba30, 0x6d2610, 0x69ec70), both twins"
+  context:
+    - "...onal Identity; registry 0x6c9640 at 0x6cb21f, object @f04108, vtable 0xd635b0; parser 0x6bb8f0: Amount whole at +8; analyzer 0x6bba30, slot 2 the no-op 0xbe4aa0): with the context's..."
+  review: reviewed
+- addr: 0x6bba30
+  final: 0x46cf00
+  kind: function
+  name: EFFECT_ADJUST_UNIT_STRENGTH_REDUCTION_FOR_DAMAGE_MODIFIER
+  semantics: "EFFECT_ADJUST_UNIT_STRENGTH_REDUCTION_FOR_DAMAGE_MODIFIER (National Identity; registry 0x6c9640 at 0x6cb21f, object @f04108, vtable 0xd635b0, slot 2 0xbe4aa0): with the context's unit (+0x90), x = float(Amount +8) x (float(GetCombat(unit, 0) 0x56dc90) / float(the owner's PlayerStats +0xf0, 0x4d9320) x 0.5f @d20458) x 0.01f @d136f0, to fixed point (floor, fraction x 256 @d06118), through PSEUDOYIELD_UNIT_COMBAT at the owner's weight (0x7a60d0), discounted to the start +0xb4 at the rate +0xbc (0x7a1240), whole, added to +0xc0"
+  status: READ
+  cases:
+    - recording: h1_duelq1127
+      turn: 205
+      value: city-state 3's National Identity 1 as logged
+    - recording: h1_duelq1117
+      turn: 240
+      value: city-state 3's National Identity 1 as logged
+  impl:
+    - cpu/core/aiModifiers.ts:ANALYZERS
+    - gpu/core/sim_policy.py:_pol_unit_damage
+    - gpu/core/sim_policy.py:_STRENGTH_UNIT_REQS
+  readings:
+    - "C-130: the damage modifier's analyzer, a unit's tag requirement, the player's units walked by pool slot, a minor's one-time projects — READ (0x6bba30, 0x6d2610, 0x69ec70), both twins"
+  context:
+    - "...requirement, the player's units walked by pool slot, a minor's one-time projects — READ (0x6bba30, 0x6d2610, 0x69ec70), both twins"
+    - "...x6cb21f, object @f04108, vtable 0xd635b0; parser 0x6bb8f0: Amount whole at +8; analyzer 0x6bba30, slot 2 the no-op 0xbe4aa0): with the context's unit (+0x90), x = float(Amount) x (fl..."
+  review: reviewed
 - addr: 0x6bc050
   kind: function
   name: EFFECT_ADJUST_PLAYER_BAN_RESOURCE

@@ -221,6 +221,39 @@
   context:
     - "...ntext's n reach MinimumTokens (parser 0x6d4490, stoi); REQUIREMENT_PLAYER_IS_AT_PEACE 0x6d2470: a context player (+0x40) the player is not at war with. The suzerain requirements are..."
   review: reviewed
+- addr: 0x6d24e0
+  final: 0x48f990
+  kind: function
+  name: REQUIREMENT_UNIT_TAG_MATCHES parser
+  semantics: "REQUIREMENT_UNIT_TAG_MATCHES' parser: the Tag argument's string kept at +8 of a 0x10 block, vtable @d678b0"
+  status: READ
+  cases:
+    - recording: h1_duelq1128
+      turn: 221
+      value: city-state 3's Wars of Religion unlogged, its Trader the walk's last unit
+  impl: [cpu/core/aiModifiers.ts:EVALUATORS]
+  readings:
+    - "C-130: the damage modifier's analyzer, a unit's tag requirement, the player's units walked by pool slot, a minor's one-time projects — READ (0x6bba30, 0x6d2610, 0x69ec70), both twins"
+  context:
+    - "...IREMENT_UNIT_TAG_MATCHES (registry at 0x6cccd2, object @f04550, vtable 0xd676b8; parser 0x6d24e0: the Tag string +8; evaluator 0x6d2610): with the context's unit (+0x90), its Units row..."
+  review: reviewed
+- addr: 0x6d2610
+  final: 0x48fac0
+  kind: function
+  name: REQUIREMENT_UNIT_TAG_MATCHES
+  semantics: "REQUIREMENT_UNIT_TAG_MATCHES (registry at 0x6cccd2, object @f04550, vtable 0xd676b8): with the context's unit (+0x90) and the requirement, its Units row (+0x160, DB.Units 0xad6670) carries the Tag (+8) in TypeTags (0x5d440 -> 0x8c2880); no unit or no row, unmet"
+  status: READ
+  cases:
+    - recording: h1_duelq1128
+      turn: 225
+      value: city-state 3's Wars of Religion 10 as logged (CLASS_RELIGIOUS inverse on its units), unlogged t221-224
+  impl: [cpu/core/aiModifiers.ts:EVALUATORS, gpu/core/sim_policy.py:_strength_unit_admits]
+  readings:
+    - "C-130: the damage modifier's analyzer, a unit's tag requirement, the player's units walked by pool slot, a minor's one-time projects — READ (0x6bba30, 0x6d2610, 0x69ec70), both twins"
+  context:
+    - "...nt, the player's units walked by pool slot, a minor's one-time projects — READ (0x6bba30, 0x6d2610, 0x69ec70), both twins"
+    - "...x6cccd2, object @f04550, vtable 0xd676b8; parser 0x6d24e0: the Tag string +8; evaluator 0x6d2610): with the context's unit (+0x90), its Units row (+0x160) carries the Tag in TypeTags..."
+  review: reviewed
 - addr: 0x6d2760
   final: 0x48fbc0
   kind: function

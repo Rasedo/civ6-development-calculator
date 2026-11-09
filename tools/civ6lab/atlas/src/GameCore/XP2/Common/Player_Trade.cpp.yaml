@@ -46,6 +46,7 @@
     - cpu/core/aiCityBuild.ts:unitValue
     - cpu/core/aiValue.ts:AiValueView
     - cpu/core/trade.ts:tradeCapacity
+    - cpu/core/aiModifiers.ts:ANALYZERS
   readings:
     - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
     - "C-96 / C-97: the unit value — READ (the combat, trade, explorer branches, the tail, the military AI's unit production), PARTLY READ (its inputs)"
@@ -57,6 +58,7 @@
     - "C-96: the Trader's value — READ (0x7a7110, its call from 0x7b62c0)"
     - "H-1: the AI memory reader — READ (the hooks, the pointer paths, the contracts, the knowledge base, the operations, the trees), PARTLY READ (the religious AI's holder)"
     - "C-108: the trade path's portals, its open list and CanStartRoute's gates — READ, both twins"
+    - "C-130: the damage modifier's analyzer, a unit's tag requirement, the player's units walked by pool slot, a minor's one-time projects — READ (0x6bba30, 0x6d2610, 0x69ec70), both twins"
   context:
     - "...derValue`): 0 once the player's MakeTradeRoute units (+0x1b9 bit 64) fill its capacity (0x4d9320, + the extra the caller adds); else the trade AI's route value K (its knowledge base +0..."
     - "...08, 0x79d2d0) is set, + fx(0.5 x (player +0x12f0 +0xc0)) where Combat (+0x48) exceeds 0x4d9320 (PlayerTrade +0xf0) — a city-state's logs read no such term (its count read 0); AIR + 3..."

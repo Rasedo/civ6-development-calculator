@@ -69,6 +69,7 @@
     - "H-1: the civics AI — READ (the choice, the walk, the propagation), PARTLY READ (the value)"
     - "C-130: Online Communities' route tourism, the tourism toward a player — READ (0x6a1380, 0x6a1240, 0x394830's modifiers, 0x552fb0), both twins"
     - "C-100: the plot values' golden-age, claims and tourism-percent terms, the required features, the power value's negative Amount — READ"
+    - "C-130: the damage modifier's analyzer, a unit's tag requirement, the player's units walked by pool slot, a minor's one-time projects — READ (0x6bba30, 0x6d2610, 0x69ec70), both twins"
   context:
     - "...7, k = rate/100, a perpetuity a/k past nk >= 10; the horizon itself one discounted turn 0x7a1240, (1-k)^n with -0.16667). Then: per unlocked unit the player's version, 10 x the cities'..."
     - ...yer AI, as PSEUDOYIELD_INFLUENCE @0xf2e240 with the player, discounted from the start 0x7a1240); EFFECT_ADJUST_PLAYER_GOVERNOR_POINTS 0x6c2720 PARTLY (Amount x the governor AI's poin...
@@ -518,6 +519,7 @@
     - "C-98 / C-130: the player tourism analyzer, the city subject's context, the dark trade buildings — READ (0x6b0700, 0x6b0430, 0x69ea00's +0x70), a FIT (the capacity), both twins"
     - "C-130: Online Communities' route tourism, the tourism toward a player — READ (0x6a1380, 0x6a1240, 0x394830's modifiers, 0x552fb0), both twins"
     - "C-98: a unit's value adds its abilities' modifiers; EFFECT_ADJUST_UNIT_MOVEMENT and REQUIREMENT_PLOT_ADJACENT_TO_OWNER; a second completion adds again — READ (0x7b62c0 at 0x7b7658..0x7b76d8, 0x6e11c7 / 0xc85140, 0x6bd520, 0x6d3200, 0x762d60's rows), both twins"
+    - "C-130: the damage modifier's analyzer, a unit's tag requirement, the player's units walked by pool slot, a minor's one-time projects — READ (0x6bba30, 0x6d2610, 0x69ec70), both twins"
   notes: ["label: pseudoYieldValue(out,&amt,pseudo,playerAI,..)"]
   context:
     - ...ds' +0x638, +0x7a8, the +0x6b0 list or +0x6c8); per row also pseudo-yield terms through 0x7a60d0 (PSEUDOYIELD_GOLDENAGE_POINT from 0x2c40b0, 0x2c4350 for Science, 0x2c3ed0, 0x2c4290 fo...

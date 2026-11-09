@@ -360,6 +360,7 @@
     - "C-130: the Economic AI's disband of a falling treasury — READ (0x6877d0 from the savings turn 0x688b45..0x688e71, the delete command's can-start 0x948370), both twins"
     - "C-95 / C-123 / C-125: the stand-to-attack site, a district closed to a ranged unit, City Attack's members and log, the siege gain's lift, a city's blow back, the units of no zone of control — READ (0x2720a0 at 0x272255..0x272330, 0x271be0 at 0x271e69 / 0x271f2e, 0x586360 at 0x5866c9..0x58671f, 0x8109e0, 0x80ceb0 at 0x80d6f9, 0x771f80, 0x80f6b0 at 0x80f75f / 0x80f824 / 0x80f95a, 0x791470, 0x56d6c0), both twins"
     - "C-95 / C-123: a move order's step costs by the formation's fighter flag; an operation that ends in its tick lets its units go — READ (0x26fe20 at 0x27021b, 0x270980, 0x270be0, 0x267650 at 0x2677fa), FIT (the release), both twins"
+    - "C-130: the damage modifier's analyzer, a unit's tag requirement, the player's units walked by pool slot, a minor's one-time projects — READ (0x6bba30, 0x6d2610, 0x69ec70), both twins"
   notes:
     - ".claude/scratchpad/st1/reading.md: ...he player (0x469cd0), each unit it sees now (0x5033a0) with a   combat, ranged or bombard strength (0x56dc90, 0x56e3e0, 0x56daa0): its   strength (0x716400: bombard > 0 — the combat strength where it tops the..."
   context:

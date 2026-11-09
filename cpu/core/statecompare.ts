@@ -1144,6 +1144,7 @@ const CITY_STATE_G: Record<string, Extractor> = {
   minorTilesAcquired: overCityStates((cityState) => cityState.tilesAcquired ?? 0),
   minorFaith: overCityStates((cityState) => cityState.faith),
   minorGpPoints: overCityStates((cityState) => AI_GREAT_PERSON_CLASSES.map((c) => cityState.gpPoints?.[c] ?? 0)),
+  minorProjectsDone: overCityStates((cityState) => cityState.projectsDone.length),
   minorBuildingsPillaged: overCityStates((cityState) => (cityState.pillagedBuildings ?? []).map((x) => idx(BUILDING_IDX, x)).sort((a, b) => a - b)),
   minorBuildings: overCityStates((cityState) => (cityState.buildings ?? []).map((x) => idx(BUILDING_IDX, x)).sort((a, b) => a - b)),
   minorDistricts: overCityStates((cityState) => PLACEABLE_DISTRICTS.map((d) => cityState.districts?.find((x) => x.type === d)?.tileIndex ?? -1)),

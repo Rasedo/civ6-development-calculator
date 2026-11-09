@@ -2491,10 +2491,14 @@ class SimMinors:
                 full = self._walls_tier_hp[self._minor_walls_tier(s)]
                 self.city_outer_hp[rr, row, 0] = full[rr]
                 self._fit_encamp_outer(rr, row, torch.zeros_like(rr), full[rr])
+            pi = item - self._mk_p0
+            # a one-time project joins the minor's completions
+            # (`CityState.projectsDone`)
+            for p_once, k_once in self._once_step.items():
+                self.citystate_project_done[:, s, k_once] |= m & (pi == p_once)
             # a district project's Great Person points into the minor's store
             # (`projectGreatPersonPoints`, 0x43d510): each row's Points
             # escalated on the game's progress
-            pi = item - self._mk_p0
             pct = None
             for k, prow in enumerate(self._proj_rows):
                 mk = m & (pi == k)

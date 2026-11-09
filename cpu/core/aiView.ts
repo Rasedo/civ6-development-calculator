@@ -490,7 +490,12 @@ export function aiView(state: GameState, opts: { updated?: boolean } = {}): AiVi
     playerUnits: (i) => {
       const ops = seatOf(state, i)?.ops;
       const held = new Set(ops ? opsOf(ops).flatMap(opJobUnits) : []);
-      return unitsOf(state, i).map((u) => ({ plot: u.tileIndex, type: gameTypeOf('unit', u.type, 'UNIT_'), moves: Math.floor(unitFullMoves(state, u) / MP_SCALE),
+      // the player's list walked by pool slot (`poolSlots`), a unit with
+      // none after: runs/h1_duelq1128 t221-224 city-state 3's Infantry
+      // (slot 4) before its Trader (slot 5), made the other way round, the
+      // Trader the walk's last unit (Wars of Religion 0 as logged)
+      const slotOf = (u: { slot?: number }) => u.slot ?? 1e9;
+      return [...unitsOf(state, i)].sort((a, b) => slotOf(a) - slotOf(b)).map((u) => ({ plot: u.tileIndex, type: gameTypeOf('unit', u.type, 'UNIT_'), moves: Math.floor(unitFullMoves(state, u) / MP_SCALE),
         level: u.level ?? 1, combat: aiStrengths(state, u).melee, inOperation: held.has(u.id) }));
     },
     enemyUnitCounts: (i) => new Map(Object.entries(seatOf(state, i)?.enemyCounts ?? {}).map(([t, n]) => [gameTypeOf('unit', t, 'UNIT_'), n])),

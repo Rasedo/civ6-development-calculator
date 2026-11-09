@@ -2729,6 +2729,17 @@
           "note": "the Great Person points a turn its district projects stored, per AI_GREAT_PERSON_CLASSES class — its Faith a turn and its flat bonus read them"
         },
         {
+          "name": "minorProjectsDone",
+          "compare": "exact",
+          "covers": [
+            "CityState.projectsDone"
+          ],
+          "planes": [
+            "citystate_project_done"
+          ],
+          "note": "its one-time projects completed — its projects table's MaxPlayerInstances and prerequisite gates read them"
+        },
+        {
           "name": "minorBuildingsPillaged",
           "compare": "exact",
           "covers": [

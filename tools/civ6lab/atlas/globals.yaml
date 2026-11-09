@@ -254,6 +254,15 @@
   context:
     - "...in runs/h1_duelw1117 / 1121 / 1124 / 1127 / 1128). COLLECTION_PLAYER_CITIES' walk (vtable 0xd624b8, the registry's object @f03bb8: begin 0x69e9e0 clears +0x70 and the counters +0xd0 / +0xd..."
   review: reviewed
+- addr: 0xd624e8
+  kind: global
+  status: PARTLY
+  readings:
+    - "C-130: the damage modifier's analyzer, a unit's tag requirement, the player's units walked by pool slot, a minor's one-time projects — READ (0x6bba30, 0x6d2610, 0x69ec70), both twins"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "- COLLECTION_PLAYER_UNITS (registry at 0x6cc096, object @f03bd0, vtable 0xd624e8; the walk's step 0x69ec70): the context's +0xd0 counts up the player's unit pool (Playe..."
+  review: imported
 - addr: 0xd62500
   kind: global
   name: COLLECTION_PLAYER_PLOT_YIELDS.vtable
@@ -435,6 +444,15 @@
   context:
     - ...6cf3c0's evaluation of it unread). The other analyzers (EFFECT_ADJUST_CITY_YIELD_MODIFIER 0xd63490 ...) are unread.
   review: imported
+- addr: 0xd635b0
+  kind: global
+  status: PARTLY
+  readings:
+    - "C-130: the damage modifier's analyzer, a unit's tag requirement, the player's units walked by pool slot, a minor's one-time projects — READ (0x6bba30, 0x6d2610, 0x69ec70), both twins"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...MAGE_MODIFIER (National Identity; registry 0x6c9640 at 0x6cb21f, object @f04108, vtable 0xd635b0; parser 0x6bb8f0: Amount whole at +8; analyzer 0x6bba30, slot 2 the no-op 0xbe4aa0):..."
+  review: imported
 - addr: 0xd63688
   kind: global
   status: PARTLY
@@ -524,6 +542,15 @@
   context:
     - "- REQUIREMENT_PLOT_IS_HILLS (registry at 0x6ccb37, @f04508, vtable 0xd674c0, evaluate 0x6d0970): the context plot (+0x88) is hills (IsHills 0x82e30, the Terrains r..."
   review: reviewed
+- addr: 0xd676b8
+  kind: global
+  status: PARTLY
+  readings:
+    - "C-130: the damage modifier's analyzer, a unit's tag requirement, the player's units walked by pool slot, a minor's one-time projects — READ (0x6bba30, 0x6d2610, 0x69ec70), both twins"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "- REQUIREMENT_UNIT_TAG_MATCHES (registry at 0x6cccd2, object @f04550, vtable 0xd676b8; parser 0x6d24e0: the Tag string +8; evaluator 0x6d2610): with the context's unit (+0x9..."
+  review: imported
 - addr: 0xd67790
   kind: global
   status: PARTLY

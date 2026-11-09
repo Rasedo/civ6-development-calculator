@@ -1719,7 +1719,9 @@ function minorAi(ctx: Ctx, b: TurnRecord, turn: number, made: ReadonlySet<Unit>,
   // activation, is a boost its units' turn lands, none of its start's
   // (runs/h1_duely1121 t149: city-state 4's third Corps, 1638401's, lands
   // Mobilization's boost; its Line Infantry Corps 2031622 forms no Army
-  // that turn)
+  // that turn), and so is a technology but a route's, which lands before the
+  // hook (runs/h1_duelq1124 t49: Cardiff's Masonry on its Builder's Quarry,
+  // no pick on its empty queue that turn, the Walls at t50)
   const midTurn = new Map<number, Set<string>>();
   {
     const active = new Set<number>();
@@ -1727,9 +1729,11 @@ function minorAi(ctx: Ctx, b: TurnRecord, turn: number, made: ReadonlySet<Unit>,
       if (!Array.isArray(a) || a[1] !== turn) continue;
       const p = Number(a[3]);
       if (a[2] === 'PlayerTurnActivated') active.add(p);
-      if (a[2] !== 'CivicCompleted' || !active.has(p)) continue;
+      if ((a[2] !== 'CivicCompleted' && a[2] !== 'ResearchCompleted') || !active.has(p)) continue;
       const seat = ctx.seatOfPlayer.get(p);
-      const id = engineId('civic', ctx.cat.civics[Number(a[4])], 'CIVIC_', CIVICS);
+      const id = a[2] === 'CivicCompleted' ? engineId('civic', ctx.cat.civics[Number(a[4])], 'CIVIC_', CIVICS)
+        : engineId('tech', ctx.cat.techs[Number(a[4])], 'TECH_', TECHS);
+      if (id && BOOSTS[id]?.cls === 'MAINTAIN_X_TRADE_ROUTES') continue;
       if (seat === undefined || !isCityStateSeat(seat) || !id) continue;
       if (!midTurn.has(seat)) midTurn.set(seat, new Set());
       midTurn.get(seat)!.add(id);
@@ -1738,7 +1742,7 @@ function minorAi(ctx: Ctx, b: TurnRecord, turn: number, made: ReadonlySet<Unit>,
   for (const s of [...copy.cityStates, ...copy.seats]) {
     const r = seatOf(ctx.next.state, s.seat)?.research;
     const late = midTurn.get(s.seat);
-    if (r) s.research = { ...s.research, techs: [...r.techs], civics: r.civics.filter((x) => !late?.has(x)) };
+    if (r) s.research = { ...s.research, techs: r.techs.filter((x) => !late?.has(x)), civics: r.civics.filter((x) => !late?.has(x)) };
   }
   // each unit's Movement whole (an upgraded one's none), its pool composed
   // on that research where the
@@ -5544,11 +5548,12 @@ const GAME_MEMORY = ['barbTribes', 'barbPool', 'barbCampsBegun', 'barbSpotNext']
  *  reservation on it (the importer reads a minor's none), the trade routes the record's routes laid (the
  *  importer reads a city-state's none), the turn its city was founded, its
  *  district projects' Great Person points (the record shows their sum alone,
- *  its Faith a turn); the trade graph's paths (runs/h1_duelz1124 Shenyang ->
+ *  its Faith a turn), its one-time projects completed (the importer reads
+ *  none); the trade graph's paths (runs/h1_duelz1124 Shenyang ->
  *  Bologna t180 on the path laid at t147) */
 const GAME_STORES = ['warTurns', 'tradeEdges'] as const;
 const SEAT_STORES = ['barbKills', 'netIncome'] as const;
-const MINOR_STORES = ['prodOverflow', 'repairWait', 'lastHitTurn', 'fuelShort', 'tradeRoutes', 'foundedTurn', 'stockpile', 'prodReserved', 'gpPoints'] as const;
+const MINOR_STORES = ['prodOverflow', 'repairWait', 'lastHitTurn', 'fuelShort', 'tradeRoutes', 'foundedTurn', 'stockpile', 'prodReserved', 'gpPoints', 'projectsDone'] as const;
 
 /** the progress a city-state's districts, projects and repairs it switched
  *  from keep, the engine's own, beside the record's kept on its buildings and

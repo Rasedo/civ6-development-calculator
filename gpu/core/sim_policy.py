@@ -64,6 +64,11 @@ _PLAYER_CITIES_WALK = 5
 # context has not: no subject (`subjects`' empty walks)
 _POL_NO_SUBJECTS = {"COLLECTION_CITY_DISTRICTS", "COLLECTION_CITY_TRAINED_UNITS", "COLLECTION_CITY_PLOT_YIELDS", "COLLECTION_ALL_CITIES",
                     "COLLECTION_PLAYER_PLOT_YIELDS"}
+# the requirements a strength wrapper's own units are tested on here
+# (`_strength_unit_admits`)
+_STRENGTH_UNIT_REQS = ("REQUIREMENT_PLAYER_IS_ATTACKING", "REQUIREMENT_UNIT_TAG_MATCHES")
+# the damage modifier's analyzer (0x6bba30, `_pol_unit_damage`)
+_DAMAGE_REDUCTION = "EFFECT_ADJUST_UNIT_STRENGTH_REDUCTION_FOR_DAMAGE_MODIFIER"
 _POL_EVALUATORS = {"REQUIREMENT_DISTRICT_TYPE_MATCHES", "REQUIREMENT_CITY_HAS_BUILDING", "REQUIREMENT_PLOT_IS_APPEAL_BETWEEN",
                    "REQUIREMENT_CITY_HAS_GARRISON_UNIT", "REQUIREMENT_CITY_HAS_X_SPECIALTY_DISTRICTS",
                    "REQUIREMENT_CITY_IS_OWNER_CAPITAL_CONTINENT", "REQUIREMENT_PLAYER_IS_MINOR",
@@ -161,6 +166,11 @@ class SimPolicy:
             return
         if eff == "EFFECT_ADJUST_UNIT_MOVEMENT" and m.get("collection") == "COLLECTION_PLAYER_UNITS":
             self._unit_movement_check(m, reads, owner)
+            return
+        if eff == _DAMAGE_REDUCTION and m.get("collection") == "COLLECTION_PLAYER_UNITS":
+            for r in (m.get("subjectReqs") or {}).get("reqs", []):
+                if r["type"] in reads["evaluators"]:
+                    raise NotImplementedError(f"{owner} {m.get('id')}: requirement {r['type']} on a damage modifier's units")
             return
         if eff in reads["sets"] or eff in reads["none"]:
             raise NotImplementedError(f"{owner} {m.get('id')}: {eff}'s setting / slot-2 analysis not on the GPU")
@@ -953,11 +963,37 @@ class SimPolicy:
         if not inner or not all(x.get("effect") == "EFFECT_ADJUST_PLAYER_STRENGTH_MODIFIER"
                                 and x.get("collection") == "COLLECTION_UNIT_COMBAT" for x in inner):
             return False
-        for rs in [m.get("subjectReqs")] + [x.get("subjectReqs") for x in inner]:
+        for k, rs in enumerate([m.get("subjectReqs")] + [x.get("subjectReqs") for x in inner]):
+            ok = _STRENGTH_UNIT_REQS if k == 0 else ("REQUIREMENT_PLAYER_IS_ATTACKING",)
             for r in (rs or {}).get("reqs", []):
-                if r["type"] in reads["evaluators"] and r["type"] != "REQUIREMENT_PLAYER_IS_ATTACKING":
+                if r["type"] in reads["evaluators"] and r["type"] not in ok:
                     raise NotImplementedError(f"modifier {m.get('id')}: requirement {r['type']} on a strength modifier's units")
         return True
+
+    def _strength_unit_admits(self, rs, row: torch.Tensor) -> torch.Tensor:
+        """[B, P] the wrapper's own set over each unit (0x6cf3c0):
+        REQUIREMENT_PLAYER_IS_ATTACKING met, REQUIREMENT_UNIT_TAG_MATCHES
+        (0x6d2610) the unit's Units row carrying the Tag; `row` its AI_UNITS
+        row, len(rows) for none"""
+        reads = self._cv_tables()["reads"]
+        rows = self._cv_tables()["unit_rows"]
+        dev = row.device
+        if not rs:
+            return torch.ones_like(row, dtype=torch.bool)
+        met = []
+        for q in rs["reqs"]:
+            if q["type"] not in reads["requirements"]:
+                continue
+            if q["type"] == "REQUIREMENT_UNIT_TAG_MATCHES":
+                tag = q["args"].get("Tag", "")
+                hit = torch.tensor([tag in r.get("tags", []) for r in rows] + [False], dtype=torch.bool, device=dev).take(row)
+            else:
+                hit = torch.ones_like(row, dtype=torch.bool)
+            met.append(hit != bool(q.get("inverse")))
+        if not met:
+            return torch.ones_like(row, dtype=torch.bool) if rs["test"] != "ANY" else torch.zeros_like(row, dtype=torch.bool)
+        st = torch.stack(met, 0)
+        return st.any(0) if rs["test"] == "ANY" else ~st.any(0) if rs["test"] == "NONE" else st.all(0)
 
     def _strength_mod_value(self, s: int, m: dict) -> torch.Tensor:
         """[B] the whole value of a strength wrapper (`_strength_wrapper`) of
@@ -975,7 +1011,8 @@ class SimPolicy:
         if self._pol_refused(m.get("subjectReqs"), reads):
             return zero
         inner = list(m.get("ability") or []) if m.get("effect") == "EFFECT_GRANT_ABILITY" else [m["attach"]]
-        on, _row, _moves, rank = self._pol_units(s)
+        on, row, _moves, rank = self._pol_units(s)
+        on = on & self._strength_unit_admits(m.get("subjectReqs"), row)
         pre = "barb" if s == self.FR else "major"
         cu = self._ai_combat(pre).to(torch.float32)
         kb = self.FK if s == self.FR else s
@@ -998,6 +1035,32 @@ class SimPolicy:
             return per.sum(dim=1)
         last = torch.where(on, rank, torch.full_like(rank, -1)).argmax(dim=1, keepdim=True)
         return torch.where(on.any(dim=1), per.gather(1, last).squeeze(1), zero)
+
+    def _pol_unit_damage(self, ctx: dict, a: dict) -> torch.Tensor:
+        """EFFECT_ADJUST_UNIT_STRENGTH_REDUCTION_FOR_DAMAGE_MODIFIER (0x6bba30)
+        over the minor's first 51 units in pool order: per unit, Amount x
+        (its combat strength (`_ai_combat`) over the strongest melee strength
+        the minor has trained x 0.5f) x 0.01f, float32, as
+        PSEUDOYIELD_UNIT_COMBAT at the minor's weight, discounted to the
+        start (0), each whole; nothing where it has trained none"""
+        B, dev = ctx["B"], ctx["dev"]
+        f0 = ctx["f0"]
+        on, _row, _moves, _rk = self._pol_units(ctx["s"])
+        pre = "barb" if ctx["s"] == self.FR else "major"
+        cu = self._ai_combat(pre).to(torch.float32)
+        best = torch.as_tensor(f0.best_combat_strength(), device=dev).long().expand(B)
+        half = torch.tensor(_f32(0.5), dtype=torch.float32, device=dev)
+        cent = torch.tensor(_f32(0.01), dtype=torch.float32, device=dev)
+        amount = torch.tensor(float(int(float(a.get("Amount", 0) or 0))), dtype=torch.float32, device=dev)
+        r = (cu / best.clamp(min=1).to(torch.float32).unsqueeze(1)) * half
+        x = _fx_const_t((amount * r) * cent)
+        p = "PSEUDOYIELD_UNIT_COMBAT"
+        w = _t(f0.pseudo_w(p), x[:, 0]).unsqueeze(1).expand_as(x)
+        v = self._cv_pseudo(x, p, w)
+        t0 = torch.zeros_like(v)
+        v = _discounted(v, self._cv_tables()["rate"], t0) >> 8
+        ok = on & (best > 0).unsqueeze(1)
+        return torch.where(ok, v, torch.zeros_like(v)).sum(dim=1)
 
     def _pol_unit_moves(self, ctx: dict, amount: int, h: int) -> torch.Tensor:
         """EFFECT_ADJUST_UNIT_FRIENDLY_TERRITORY_START_MOVEMENT (0x6ac440) over
@@ -1148,6 +1211,8 @@ class SimPolicy:
             return self._pol_unit_experience(ctx, m.get("args") or {}, m.get("subjectReqs"), h)
         if m.get("collection") == "COLLECTION_PLAYER_UNITS" and eff == "EFFECT_ADJUST_UNIT_MOVEMENT":
             return self._unit_movement_value(ctx["s"], m)
+        if m.get("collection") == "COLLECTION_PLAYER_UNITS" and eff == _DAMAGE_REDUCTION:
+            return self._pol_unit_damage(ctx, m.get("args") or {})
         acc = zero
         for sub in self._pol_subjects(ctx, m["collection"])[:51]:
             ok = self._pol_admits(m.get("subjectReqs"), sub) & sub["mask"]

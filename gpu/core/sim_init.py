@@ -1919,6 +1919,8 @@ class SimInit:
         self._once_proj_idx = [i for i, row in enumerate(self._proj_rows) if int(row["one"])]
         self._n_once = len(self._once_proj_idx)
         self._once_step = {pi: k for k, pi in enumerate(self._once_proj_idx)}
+        # each city-state's one-time projects completed (`CityState.projectsDone`)
+        self.citystate_project_done = torch.zeros(B, max(self.S, 1), max(self._n_once, 1), dtype=torch.bool, device=device)
         self._once_victory_idx = {i for i in self._once_proj_idx if int(self._proj_rows[i]["vic"])}
         # the SPACE-RACE subset, which is what a Great Engineer's space
         # production acts on — a one-time project elsewhere is not one.

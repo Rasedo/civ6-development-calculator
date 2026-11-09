@@ -13143,3 +13143,51 @@ PlayerCulture m_xLifetimeCulture.
   t18 / t22 / t23 Scouts
   131073 and 1703949, 1127 t12 / t35-t40 Scouts 393221, 1441809 and 2359316
   end on the game's plots.
+
+## C-130: the damage modifier's analyzer, a unit's tag requirement, the player's units walked by pool slot, a minor's one-time projects — READ (0x6bba30, 0x6d2610, 0x69ec70), both twins
+
+`ANALYZERS.EFFECT_ADJUST_UNIT_STRENGTH_REDUCTION_FOR_DAMAGE_MODIFIER`,
+`EVALUATORS.REQUIREMENT_UNIT_TAG_MATCHES` (cpu/core/aiModifiers.ts), the AI
+view's `playerUnits` (cpu/core/aiView.ts), `minorFinish`'s one-time
+project (cpu/core/minorBuild.ts); GPU `_pol_unit_damage`,
+`_strength_unit_admits` (gpu/core/sim_policy.py), `_MinorFacts.advanced`
+(gpu/core/sim_cityvalue.py) on `citystate_project_done`, set in
+`_minor_finish` (gpu/core/sim_minors.py).
+
+- EFFECT_ADJUST_UNIT_STRENGTH_REDUCTION_FOR_DAMAGE_MODIFIER (National
+  Identity; registry 0x6c9640 at 0x6cb21f, object @f04108, vtable 0xd635b0;
+  parser 0x6bb8f0: Amount whole at +8; analyzer 0x6bba30, slot 2 the no-op
+  0xbe4aa0): with the context's unit (+0x90), x = float(Amount) x
+  (float(GetCombat(unit, 0) 0x56dc90) / float(the owner's strongest melee
+  trained, PlayerStats +0xf0 0x4d9320) x 0.5f @d20458) x 0.01f @d136f0, to
+  fixed point (floor, the fraction x 256 @d06118), through
+  PSEUDOYIELD_UNIT_COMBAT at the owner's weight (0x7a60d0: the Combat Desire
+  for a city-state), discounted to the start (0x7a1240), whole, added
+  (+0xc0) per unit.
+- REQUIREMENT_UNIT_TAG_MATCHES (registry at 0x6cccd2, object @f04550,
+  vtable 0xd676b8; parser 0x6d24e0: the Tag string +8; evaluator 0x6d2610):
+  with the context's unit (+0x90), its Units row (+0x160) carries the Tag in
+  TypeTags (0x5d440 -> 0x8c2880); no unit, unmet. Wars of Religion's
+  CLASS_RELIGIOUS inverse set on its units; REQUIREMENT_OPPONENT_IS_OTHER_
+  RELIGION is not registered (its string's only references 0xb6d103,
+  0xb6f082), so its attached strength modifier's set is empty.
+- COLLECTION_PLAYER_UNITS (registry at 0x6cc096, object @f03bd0, vtable
+  0xd624e8; the walk's step 0x69ec70): the context's +0xd0 counts up the
+  player's unit pool (Player +0x12e8: pages of 8 at +0xa0, 0x18-byte slots,
+  bound +0xc4), a null slot or a dead unit (+0x770) skipped, each the
+  context's unit (+0x90): the units in pool slot order, not the order they
+  were made. EFFECT_ATTACH_MODIFIER takes the last unit's total.
+- A MINOR'S ONE-TIME PROJECTS: the projects table's gates (0x5ce970:
+  MaxPlayerInstances, the prerequisite projects) count the player's
+  completions; a city-state's completed Manhattan Project closes it and
+  opens Operation Ivy.
+- Confirmed (one-seed aimem traces): runs/h1_duelq1127 t205 and 1117 t240
+  city-state 3's National Identity 1 as logged, unlogged on the turns
+  around; runs/h1_duelq1128 city-state 3's Wars of Religion unlogged t221-224
+  (its Infantry in slot 4, its Trader in slot 5 the walk's last, made in
+  the other order: serials 51 and 14), 10 at t225-226 with its AT Crew past
+  them; runs/h1_duelq1124 Bologna t242: the Manhattan Project complete,
+  Operation Ivy picked at 2217.2 as logged, t243 at 2418.8 with the
+  Manhattan Project closed.
+- Open: none of these; the import reads no one-time project of a
+  city-state (the replay carries the engine's, `MINOR_STORES`).
