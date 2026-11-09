@@ -127,6 +127,8 @@ describe('seat scalar groups', () => {
   it('congress: a Special Session sits once a called emergency is due', () => {
     const state = scene();
     state.seats[0].research.techs.push(LAST_TECH);
+    // the Congress reads the game era
+    state.gameEra = CONGRESS_MIN_ERA;
     // the session sits at the close of the turn it is due in, before the
     // counter moves: due at 12, the coming step from turn 12 holds it
     state.turn = 11;
