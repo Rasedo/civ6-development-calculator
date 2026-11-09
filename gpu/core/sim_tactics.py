@@ -2434,7 +2434,9 @@ class SimTactics:
         `_ranged_unit_strengths`, the attacker's pool's terms) and the damage
         law's expectation (`_damage_expected`); a ranged blow and one on an
         embarked defender take none, a melee blow on a civilian neither deals
-        nor takes any. The jobs of one game run one call each,
+        nor takes any; where both blows would kill, the side the blow
+        overshoots further falls and the other is left at 1 hit point, the
+        attacker on a tie. The jobs of one game run one call each,
         the games side by side, the two pools apart."""
         dev = self.device
         J = rows.numel()
@@ -2448,6 +2450,14 @@ class SimTactics:
             if js.numel():
                 dl, tk = self._tac_predict_pool(rows[js], a_slot[js], d_slot[js], tiles[js], not pool_h)
                 dealt[js], taken[js] = dl, tk
+        hp_d = self.unit_hp[rows, d_slot].long()
+        hp_a = self.unit_hp[rows, a_slot].long()
+        d_over = dealt - hp_d
+        a_over = taken - hp_a
+        both = (d_over >= 0) & (a_over >= 0)
+        a_falls = both & (a_over > d_over)
+        dealt = torch.where(a_falls, hp_d - 1, dealt)
+        taken = torch.where(both & ~a_falls, hp_a - 1, taken)
         return dealt, taken
 
     def _tac_predict_pool(self, rows: torch.Tensor, a_slot: torch.Tensor, d_slot: torch.Tensor,

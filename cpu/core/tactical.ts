@@ -1763,7 +1763,13 @@ function targetUnit(state: GameState, e: Target): Unit | null {
  *  (none at range, none from an embarked defender; in melee none either way
  *  on a defender of FORMATION_CLASS_CIVILIAN, 0x206960 at 0x206a1f:
  *  runs/h1_duely1128 t37 the City Assault's Warrior 1114128 at 17 hit points
- *  takes player 1's Settler on 16:13, as logged) */
+ *  takes player 1's Settler on 16:13, as logged); in melee where both blows
+ *  would kill, the side the blow overshoots further falls and the other is
+ *  left at 1 hit point, the attacker on a tie (0x206960 at 0x206c34..0x206d62,
+ *  as `resolveMutualKill`): runs/h1_duelq1128 t50 the barbarian Archer
+ *  2752535 at 23 takes 22 on 17:10 from player 1's Warrior 589828 at 14, the
+ *  Warrior 29 (15 over to the Archer's 8), the spot kept by the survival
+ *  filter */
 export function predictBlow(state: GameState, attacker: Unit, defender: Unit, at: number): { dealt: number; taken: number } {
   if (rangedStrength(attacker) > 0) {
     const s = rangedUnitStrengths(state, attacker, at, defender);
@@ -1771,7 +1777,12 @@ export function predictBlow(state: GameState, attacker: Unit, defender: Unit, at
   }
   if (unitDomain(defender.type) === 'civilian') return { dealt: 0, taken: 0 };
   const s = meleeUnitStrengths(state, attacker, at, defender);
-  return { dealt: damageExpected(s.atk - s.def), taken: defender.embarked ? 0 : damageExpected(s.def - s.atk) };
+  const dealt = damageExpected(s.atk - s.def);
+  const taken = defender.embarked ? 0 : damageExpected(s.def - s.atk);
+  const dOver = dealt - healthOf(defender);
+  const aOver = taken - healthOf(attacker);
+  if (dOver < 0 || aOver < 0) return { dealt, taken };
+  return aOver > dOver ? { dealt: healthOf(defender) - 1, taken } : { dealt, taken: healthOf(attacker) - 1 };
 }
 
 /**

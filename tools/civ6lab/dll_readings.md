@@ -13878,3 +13878,39 @@ empty").
   ChangeFreePower 0x1ed860) unread, the grid's supply read for it; the
   strategic branch's income (`ResourceFacts.income`) still the banked one,
   none under a suzerain.
+
+## C-125: the planning's blow back where both blows would kill — READ, ported
+
+The planning's combat simulation (0x791470) runs the game's own combat
+result on the units as they stand: the forward blow at the target's plot and,
+per spot, the blow back with the sides swapped (0x213e00 side 0 the target,
+side 1 the unit) and the combat's location the spot (+0x48, 0x7918b0). A
+melee blow resolves through 0x205720 -> 0x205f70 -> 0x206960, whose result
+already holds the mutual-kill rule (0x206c34..0x206d62): where the
+defender's total (its damage + the blow) and the attacker's (its damage + the
+counter) both reach COMBAT_MAX_HIT_POINTS, the side whose total overshoots
+further falls and the other is left at max - 1 damage, the attacker on a tie
+(`jle` at 0x206d04). The result words the planning reads are the clamped
+ones: +0xc4 (the defender's damage, the spot's +0x94 blow back taken) and
++0x7c (the attacker's, +0xac). A ranged result (0x207a80) has no counter and
+no clamp; its +0xc4 is the raw damage.
+
+- Ported: `predictBlow` (cpu/core/tactical.ts) and `_tac_predict`
+  (gpu/core/sim_tactics.py) clamp a melee prediction where both blows would
+  kill: dealt = the defender's health - 1 where the attacker overshoots
+  further, else taken = the attacker's health - 1. The forward blow and the
+  blow back share it, so a clamped forward blow is no kill (+0xc4 >= health
+  false).
+- Confirmed: runs/h1_duelq1128 t50, the barbarian Archer 2752535 (77 damage)
+  on 17:13 with player 1's Warrior 589828 (86 damage) on 15:11 among Attack
+  Units' targets: the Warrior's blow back on 17:10 is 31 against the Archer's
+  23 health, its counter 29; both would fall, the Warrior 15 over to the
+  Archer's 8, so the Archer is left at 1 (22 taken) and the spot passes the
+  survival filter (0x7767cb); the GAP gives the Archer 17:10 at turn 3 (Move
+  17 10 Attack -9999), as logged; barb.move.family t50 equal.
+- Open: the same Archer's walk to 17:10 ends on 17:12, the game's on 17:11
+  (the move order's path); 1128 t30 Warrior 2031630's Move-only claim on
+  14:13 for player 1's Warrior 524291 (68 health, Discipline): the forward 28
+  / 32 and the blow back 32 / 28 put the spot under the exchange filter
+  (64 > 56), the real t31 blow there 22 against 18 (CombatLog +2 / -2): no
+  mutual kill, the input that keeps the spot unread.

@@ -141,6 +141,9 @@
   semantics: "the planning's combat simulation: the blow from where the attacker stands at the expected roll (COMBAT_MAX_EXTRA_DAMAGE/2); dealt +0x64, taken +0x7c, per spot the target's blow back +0x94 / +0xac; a kill sets +0x60 At 0x79174a: per spot dealt = the larger of the simulation's two results ([rbp-0xc], [rbp-8]; 150 a civilian or a Trader; a RELIGIOUS or TRADER target in a combat other than COMBAT_RELIGIOUS 0x5e2f7468 trunc(health x 1.5), 0x791703..0x79174a), the kill byte (+0xc4) dealt >= the target's health, `wins` (+0x60) dealt > it; the blow back per spot re-simulated (0x205720 with the sides swapped through 0x213e00, the location the spot) into +0x94 / +0xac, for a LOW..HIGH target or a RELIGIOUS one struck by a religious mover alone (0x7917b1..0x7917f7). The roll at COMBAT_MAX_EXTRA_DAMAGE / 2 (damageExpected); the strengths the blow resolves on from the plot the attacker stands on (meleeUnitStrengths, rangedUnitStrengths); a ranged blow and one on an embarked defender take none. Ported: predictBlow, _tac_predict."
   status: READ
   cases:
+    - recording: h1_duelq1128
+      turn: 50
+      value: "the barbarian Archer 2752535 (23 health) on 17:13, player 1's Warrior 589828 (14) on 15:11: the blow back on 17:10 31 / 29, both would fall, the Warrior 15 over to the Archer's 8: the Archer left at 1 (22), the spot kept by the survival filter, Move 17 10 Attack -9999 as logged"
     - recording: h1_duely1128
       turn: 239
       value: "the barbarian Cavalry 7012372 / 7077911, more than half their health lost, beside player 0's 42:20 at 52 hit points, their predicted blows 59 / 55: the district branch (0x791677) sets wins, they hold and wander as logged"
@@ -175,6 +178,7 @@
     - cpu/core/combat.ts:districtDamageLoss
     - gpu/core/sim_tactics.py:_UNSTACK_RANGE
   readings:
+    - "C-125: the planning's blow back where both blows would kill — READ, ported"
     - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
     - "C-95: the planning's spots and the combat prediction — READ, ported"
     - "C-97: the war operations — the war candidates, the city value's frame, the assault nodes and Attack Units READ; the loyalty lead's sources, the team update's danger and the assault's executions PARTLY READ"

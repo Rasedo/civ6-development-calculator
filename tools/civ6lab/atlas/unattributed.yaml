@@ -1317,6 +1317,7 @@
     - "C-97: City Defense and the assault target's validity — the city's threat, the defence event, Is City Threatened, Garrison City and the district target's validity READ; the threat's level terms, the garrison's swap and the team's unit to build unread"
     - "C-95: Attack Units — READ, ported"
     - "C-123 / C-95: a Trader stands on the trade layer; a city's shot is a COMBAT_DISTRICT spot's blow back — READ (0x901e0, 0x586360 -> 0x208b80, 0x585eb0 -> 0x585d90, 0x791470 at 0x7917f7..0x7918f7 -> 0x249ee0 / 0x205720, 0x776140 at 0x776780..0x7767fa), both twins"
+    - "C-125: the planning's blow back where both blows would kill — READ, ported"
   context:
     - "...player +0x12f0 +0xf4 above 0; unread, taken clear); else the combat simulation's blow (0x213e00 .. 0x205720, dealt +0x24, taken +0x28 — the blow back none in the port) against COMBA..."
   review: reviewed
