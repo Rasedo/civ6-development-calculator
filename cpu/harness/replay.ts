@@ -6398,6 +6398,12 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
     // the plots whose improvement the turn's change (its random events, its
     // climate) took or laid: no Builder's
     const eventPlots = new Set<number>();
+    // what the turn's change moved: each plot's feature (a fire lit, burnt,
+    // grown back) and each unit's health, before it and after, and the units
+    // it killed but the barbarians' with their places in the unit list
+    const eventFeatures = new Map<number, { was: Tile['feature']; now: Tile['feature'] }>();
+    const eventHp = new Map<Unit, { was: number; now: number }>();
+    const eventKilled: { u: Unit; at: number }[] = [];
     const charges = new Map(state.units.filter((u) => minorAiSeat(u.seat) && (u.charges ?? 0) > 0).map((u) => [u, u.charges ?? 0]));
     // what each unit did in its player's actions of the turn, which the
     // turn's heal and fortification read: one that stood on its plot and
@@ -6871,8 +6877,17 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
       for (const u of changing) u.tileIndex = barbAt.get(u)!;
       state.units.push(...changing);
       const preChange = state.map.tiles.map((x) => x.improvement ?? null);
+      const featurePre = state.map.tiles.map((x) => x.feature);
+      const unitsPre = [...state.units];
+      const hpBefore = unitsPre.map((u) => u.hp);
       turnChange(state);
       for (const t of state.map.tiles) if ((t.improvement ?? null) !== preChange[t.index]) eventPlots.add(t.index);
+      for (const t of state.map.tiles) if (t.feature !== featurePre[t.index]) eventFeatures.set(t.index, { was: featurePre[t.index], now: t.feature });
+      const standingAfter = new Set(state.units);
+      unitsPre.forEach((u, i) => {
+        if (u.hp !== hpBefore[i]) eventHp.set(u, { was: hpBefore[i], now: u.hp });
+        if (!standingAfter.has(u) && !isBarbSeat(u.seat)) eventKilled.push({ u, at: i });
+      });
       // back where the replay's own steps take them from (`syncUnits`)
       for (const [u, at] of barbFrom) u.tileIndex = at;
       takeBarbs();
@@ -7068,17 +7083,43 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
     // there, its Quadrireme bought) — a purchase the record shows that the
     // engine's turn did not make is the units' turn's
     const bought = new Set(ds.flatMap((d) => (d.kind === 'buyUnit' ? [d.unit] : [])));
-    minorAi(ctx, b, a.turn, new Set([...ctx.units].filter(([k, u]) => minorAiSeat(u.seat) && !standing.has(u)
-      && (!bought.has(k) || minorBought.has(u))).map(([, u]) => u)), new Set(minorBought.keys()), revealedWas);
-    // the items the city-states' second hooks set, against record t+1's
-    minorBuilds(ctx, b, report.minorBuilds);
-    // a later player's blow on a city-state's or the Free Cities' unit came
-    // after the defender's end look: its record of the attacker is the blow's
-    // (runs/h1_dueld1121 t22: Hunza's end look sees the barbarians'
-    // Quadrireme on 8:3, which then strikes its Warrior from 9:1; Hunza's
-    // t23 record of it 9:1)
-    for (const { seat, attacker } of ctx.lateBlows) recordAttacker(state, attacker, seat);
-    barbarianTurn(ctx, b, a.turn);
+    // the minors' and the barbarians' units' turns close turn t before its
+    // change: they read each plot's feature, each unit's health and the
+    // units it killed as they stood before the change's random events, the
+    // blows' snapshots of the units too (runs/h1_duelq1127 t47: the forest
+    // fire of the t48 step on 36:11 no plot of the barbarians' danger map;
+    // h1_duelq1124 t82: the t83 Rubicon flood's 63 damage on player 0's
+    // Warrior on 37:18 none of the barbarians' Barbarian Attack's enemy
+    // strength on Rome, 98; h1_duelq1128 t125: city-state 3's Man-at-Arms
+    // on 4:1 and Warrior on 3:3, which the change's event kills, stand in
+    // its tactical pass, its danger map 30 plots)
+    const tiles = state.map.tiles;
+    for (const [p, f] of eventFeatures) if (tiles[p].feature === f.now) tiles[p].feature = f.was;
+    for (const [u, h] of eventHp) if (u.hp === h.now) u.hp = h.was;
+    for (const [u, snap] of [...ctx.barbBlows, ...[...ctx.minorBlows].map(([v, x]) => [v, x.snap] as const)]) {
+      const h = eventHp.get(u);
+      if (h && snap.hp === h.now) snap.hp = h.was;
+    }
+    const revived = eventKilled.filter(({ u }) => !state.units.some((x) => x.id === u.id && x.seat === u.seat));
+    for (const { u, at } of revived) state.units.splice(Math.min(at, state.units.length), 0, u);
+    try {
+      minorAi(ctx, b, a.turn, new Set([...ctx.units].filter(([k, u]) => minorAiSeat(u.seat) && !standing.has(u)
+        && (!bought.has(k) || minorBought.has(u))).map(([, u]) => u)), new Set(minorBought.keys()), revealedWas);
+      // the items the city-states' second hooks set, against record t+1's
+      minorBuilds(ctx, b, report.minorBuilds);
+      // a later player's blow on a city-state's or the Free Cities' unit came
+      // after the defender's end look: its record of the attacker is the blow's
+      // (runs/h1_dueld1121 t22: Hunza's end look sees the barbarians'
+      // Quadrireme on 8:3, which then strikes its Warrior from 9:1; Hunza's
+      // t23 record of it 9:1)
+      for (const { seat, attacker } of ctx.lateBlows) recordAttacker(state, attacker, seat);
+      barbarianTurn(ctx, b, a.turn);
+    } finally {
+      for (const [p, f] of eventFeatures) if (tiles[p].feature === f.was) tiles[p].feature = f.now;
+      for (const [u, h] of eventHp) if (u.hp === h.was) u.hp = h.now;
+      const dead = new Set(revived.map(({ u }) => u));
+      state.units = state.units.filter((u) => !dead.has(u));
+    }
     // the units the barbarians raised stand where the record holds them
     inTurn(state, a.turn, () => syncUnits(ctx, b));
     // the barbarians' knowledge base looks at their turn's end from there,
