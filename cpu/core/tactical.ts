@@ -2192,6 +2192,10 @@ export interface Pass {
    *  dispatcher 0x770ce0 takes those off the unit list +0x240 once the move
    *  ends) */
   listedFrom?: Set<number>;
+  /** the job (unit +0x7d0) of a unit a running "Upgrade Units" tree holds,
+   *  or let go to the pass (0x7d2190) keeping it: the move an operation's
+   *  order on it as no member logs */
+  jobs?: Map<number, string>;
 }
 
 /** the move that took the unit, as the game's tactical log names it, the

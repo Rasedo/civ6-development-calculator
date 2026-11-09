@@ -176,8 +176,15 @@
     - recording: h1_duelp1128
       turn: 174
       value: "the same tree: its Warrior 2293764 on the centre, swapped off by the Warrior 2490370 reached before it, off its target as it is reached (turn done): held, no row; over the five duelp duels no on-target unit of a running tree is held but one moved off its target before it was reached (every held one ends the turn short of its Movement or off its plot)"
-  impl: [cpu/core/minorOps.ts:upgradeTreesTick, gpu/core/sim_minorops.py:_mops_upgrade_tree]
+    - recording: h1_duelq1128
+      turn: 144
+      value: "Hong Kong's tree 5308422: its Warrior 2293764 on the centre 9:7, garrisoned by City Defense's Garrison City as no member (turn done, no tactical row), the tree's (+0x7d0) at the end look t144 / t145: the release clears +0x778 alone, the job kept until another takes it"
+  impl:
+    - cpu/core/minorOps.ts:upgradeTreesTick
+    - gpu/core/sim_minorops.py:_mops_upgrade_tree
+    - cpu/core/tactical.ts:Pass
   readings:
+    - "C-99: a unit an Upgrade Units tree lets go keeps the tree's job — READ (0x7d2190 -> 0x1e60f0 on +0x778, 0x810d30 at 0x81100a -> 0x81116f, 0x570b40), the tally's label (CPU)"
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
     - "C-99: the upgrade trees — READ (the trigger, Find Available Unit's upgradeable offer, Find Unit Targets' job, Upgrade Units, the economic AI's upgrade, Move Unit with no Location), ported; the deletion of an excess obsolete unit unported"
     - "C-99 / C-128: every technology gained starts an Upgrade Units tree, the civic event never fires; a tree's units after its tick; the Nearest City Search's resource test; the plot's unit list — READ (0x4cd4c0 -> 0x800c60, 0x5bbf80 -> 0x27a180, 0x3a1ac0, 0x7cb3d0 -> 0x7d2190, 0x7eba40 -> 0x510d30, 0x74f40 / 0x763b0), the trigger both twins"

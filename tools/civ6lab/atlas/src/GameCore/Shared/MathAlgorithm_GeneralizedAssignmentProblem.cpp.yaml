@@ -19,6 +19,7 @@
     - "C-95: Attack Units — READ, ported"
     - "C-97: the governor AI — the analysis, the choice and the seats READ, the analyzers PARTLY READ"
     - "C-97: the war desires, the war operation's readiness and the assault's executions — the war value, the not-ready hook, the readiness and the executions READ; the leader's war factor, the WMD flags, the deal items and the war record's writer unread"
+    - "C-99: the attack assignment's ties go to the earlier striker — READ (0x776140 -> 0x8b5bf0 -> 0x629480 -> 0x616570 -> 0x61ddb0 at 0x61de20..0x61de39, 0x775340 -> 0x76f210 -> 0x76f5c0 -> 0x76efc0 at 0x76f000..0x76f00f), no port"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...e dealt, or whose received would kill the unit, is dropped. The Generalized Assignment (0x8b5bf0, MathAlgorithm_GeneralizedAssignmentProblem.cpp) runs ONE pass over the spots: per sp..."

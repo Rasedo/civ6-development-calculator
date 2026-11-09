@@ -100,8 +100,9 @@ export interface OpsContext {
   defend?: DefendOrders;
   /** the unit's turn done (0x570b40): the tactical pass moves it no more,
    *  Operation Move still takes it with Movement left; none outside the
-   *  seat's units' turn */
-  endTurn?: (id: number) => void;
+   *  seat's units' turn; a unit the operation does not hold (`member`
+   *  false) keeps its job, none or a running tree's (`Pass.jobs`) */
+  endTurn?: (id: number, member?: boolean) => void;
   /** UNITOPERATION_SWAP_UNITS (0x972880, `swapUnits`): the unit changes
    *  places with its own unit on `plot` beside it, both with Movement left;
    *  none outside the seat's units' turn */

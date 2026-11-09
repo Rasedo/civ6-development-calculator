@@ -230,8 +230,10 @@ const garrisonCity: BtHandler<OpsContext> = {
  *  takes the Fortify order, its moves ended (0x95eae0 at 0x81116f on its
  *  operation queue, `fortifyOrder`'s one tick; 0x56d6f0; where every team's
  *  +0x98 less +0x94 is at most 10, those sums unported and the test taken
- *  as held). Each unit the execution takes has its turn done (0x570b40)
- *  and keeps its Movement otherwise: Operation Move moves a ranged
+ *  as held). Each unit the execution takes has its turn done (0x570b40),
+ *  a garrison not the operation's in its own job still (runs/h1_duelq1128
+ *  t144 Hong Kong's Warrior 2293764, its "Upgrade Units" tree's at the end
+ *  look), and keeps its Movement otherwise: Operation Move moves a ranged
  *  garrison on (runs/h1_duely1117 Antananarivo t85 / t89, its Catapult
  *  32:5 -> 32:6 before the city's purchase; city-state 3's Crossbowman
  *  42:13 -> 41:13 t112-t121), a melee one stays (runs/h1_dueldA1117
@@ -299,7 +301,7 @@ function garrisonExecute(_node: Parameters<BtHandler<OpsContext>['update']>[0], 
     if (after && after.plot === city && after.ranged === 0) ctx.endMoves?.(p.id);
     return;
   }
-  ctx.endTurn?.(garrison.id);
+  ctx.endTurn?.(garrison.id, held.has(garrison.id));
   const stronger = gRanged < bestRanged || (gRanged <= 0 && gCombat < bestCombat);
   if (stronger && pick) {
     // the candidate's turn done, its move beside the city, then its swap

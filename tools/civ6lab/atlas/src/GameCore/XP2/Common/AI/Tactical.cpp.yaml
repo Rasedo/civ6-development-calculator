@@ -530,6 +530,7 @@
     - "C-95: the danger map and Move to Safety — READ, ported"
     - "C-95: the full search sets out on the formation's least Movement, a major's formations from the log, a tactical move walks its own done units — READ (0x26eea0, 0x266660, 0x262cd0, 0x770ce0 at 0x770d30..0x771097, 0x77d180, 0x775340, 0x771f80 at 0x7723cb / 0x772663, 0x77a810, 0x774380), both twins"
     - "C-125 / C-99: the attack assignment's stacking block is by formation class; a garrison on a defending district is no striker against a target not HIGH — READ (0x776140 at 0x776890..0x776909, 0x8bcd0, 0x775340 at 0x77541f..0x7754ab, 0x7784b0 at 0x7785ad, 0x61ddb0 at 0x61de20..0x61de2f), both twins"
+    - "C-99: the attack assignment's ties go to the earlier striker — READ (0x776140 -> 0x8b5bf0 -> 0x629480 -> 0x616570 -> 0x61ddb0 at 0x61de20..0x61de39, 0x775340 -> 0x76f210 -> 0x76f5c0 -> 0x76efc0 at 0x76f000..0x76f00f), no port"
   context:
     - "...rovement — the units of AI type EXPLORE or above whose planning reaches it this turn (0x775340, 1 turn) in pool order, none standing on a plot of the kind itself (0x774380), go to it..."
     - "...79240): each CIVILIAN target, the units whose planning holds its plot within two turns (0x775340: pool order, a strength to fight with, a DEFENDER held until another unit goes in; the..."
@@ -652,6 +653,7 @@
     - "C-95: the full search sets out on the formation's least Movement, a major's formations from the log, a tactical move walks its own done units — READ (0x26eea0, 0x266660, 0x262cd0, 0x770ce0 at 0x770d30..0x771097, 0x77d180, 0x775340, 0x771f80 at 0x7723cb / 0x772663, 0x77a810, 0x774380), both twins"
     - "C-99: Operation Move's and Operation Attack's planning plot keeps out another player's unit at peace, not one at war; Operation Attack's march carries the attack flag; a refresh reads the knowledge base's target entries — READ (0x78fa10 -> 0x585eb0 -> 0x585d90, 0x791300's callers 0x80c397 / 0x810e98 / 0x811213, 0x80c180 at 0x80c3c4 / 0x80c4be / 0x80c7ee), both twins"
     - "C-125 / C-99: the attack assignment's stacking block is by formation class; a garrison on a defending district is no striker against a target not HIGH — READ (0x776140 at 0x776890..0x776909, 0x8bcd0, 0x775340 at 0x77541f..0x7754ab, 0x7784b0 at 0x7785ad, 0x61ddb0 at 0x61de20..0x61de2f), both twins"
+    - "C-99: the attack assignment's ties go to the earlier striker — READ (0x776140 -> 0x8b5bf0 -> 0x629480 -> 0x616570 -> 0x61ddb0 at 0x61de20..0x61de39, 0x775340 -> 0x76f210 -> 0x76f5c0 -> 0x76efc0 at 0x76f000..0x76f00f), no port"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "- THE ASSIGNMENT (0x776140): a target's health floor(100 x 281 / 256) less its damage (1.1 in 24.8); for MEDIUM /..."

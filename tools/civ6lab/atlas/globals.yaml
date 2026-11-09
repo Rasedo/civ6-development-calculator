@@ -586,6 +586,15 @@
   context:
     - "...ic unheld, 0x4cb590 / 0x39d490; the one listener the research AI's 0x75d3d0, functor vt 0xd6f258 bound in 0x761d30: its m_turnsToResearchUnit (+0x388, data +0x3e0) at the unit is not 0..."
   review: imported
+- addr: 0xd6fe18
+  kind: global
+  status: PARTLY
+  readings:
+    - "C-99: the attack assignment's ties go to the earlier striker — READ (0x776140 -> 0x8b5bf0 -> 0x629480 -> 0x616570 -> 0x61ddb0 at 0x61de20..0x61de39, 0x775340 -> 0x76f210 -> 0x76f5c0 -> 0x76efc0 at 0x76f000..0x76f00f), no port"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...0x776140's fifth to eighth arguments) and calls its ninth, the knapsack lambda (vtable 0xd6fe18 +0x10 = 0x629480 -> 0x616570 -> 0x61ddb0): a max_element over the values in agent order..."
+  review: imported
 - addr: 0xd703e8
   kind: global
   status: PARTLY

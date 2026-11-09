@@ -1147,6 +1147,7 @@
     - "C-98: the research bank with nothing in hand; a city-state's unit cost under Mercenary Companies"
     - "C-99 / C-128: every technology gained starts an Upgrade Units tree, the civic event never fires; a tree's units after its tick; the Nearest City Search's resource test; the plot's unit list — READ (0x4cd4c0 -> 0x800c60, 0x5bbf80 -> 0x27a180, 0x3a1ac0, 0x7cb3d0 -> 0x7d2190, 0x7eba40 -> 0x510d30, 0x74f40 / 0x763b0), the trigger both twins"
     - "C-111: a captured city keeps its completed districts' locked prices and no progress by type; a district's repair is its city's queue; a unit's pillage takes the district's dearest building first — READ (0x1e8880, 0x173f70 at 0x17480e, 0x967300 / 0x967740, 0x9633c0 -> 0x24af90 -> 0x193190), both twins"
+    - "C-99: a unit an Upgrade Units tree lets go keeps the tree's job — READ (0x7d2190 -> 0x1e60f0 on +0x778, 0x810d30 at 0x81100a -> 0x81116f, 0x570b40), the tally's label (CPU)"
   context:
     - "...+0x7d0 the operation's id and +0x770 clear) and sets each one's AI type (+0x168, setter 0x1e60f0) to its type's own (0x79b9c0: the highest UnitAiInfos flag of the type up to COMBAT 3,..."
   review: reviewed
@@ -3178,6 +3179,7 @@
     - "C-99: Wander Near City ends its unit's moves; a unit whose moves an order ended runs its order no more — READ (0x77bf50 at 0x77c62a, 0x56d6f0, 0x52f50 at 0x530fd..0x53113), both twins"
     - "C-128 / C-99: an Upgrade Units tree lets go to the tactical pass each unit whose turn is not done — READ (0x7cb3d0 -> 0x7d2190, 0x7eeba0 at 0x7eef4c), both twins"
     - "C-95: the rampage strikes with the move's whole list; its defender is one the barbarians see — READ (0x778b40, 0x771670, 0x208b80, 0x20a2a0), both twins"
+    - "C-99: a unit an Upgrade Units tree lets go keeps the tree's job — READ (0x7d2190 -> 0x1e60f0 on +0x778, 0x810d30 at 0x81100a -> 0x81116f, 0x570b40), the tally's label (CPU)"
   notes:
     - ".claude/scratchpad/mu1/readings_c96.md: ...000, else the skip 0x95eae0 (\"Wander Back to City\", \"Move To\" the   city). The turn ends (0x56d6f0, 0x570b40). Confirmed: the turn's \"Random   Direction\" draws pair one to one with the AI_Tactical.csv rows \"W..."
   context:
@@ -3753,7 +3755,7 @@
   review: reviewed
 - addr: 0x616570
   kind: function
-  semantics: the knapsack (-> 0x61ddb0; at capacity 1 the first largest gain above 0).
+  semantics: "the knapsack: copies the weights (its fourth argument) and the values (its fifth) and calls 0x61ddb0 (weights in r8, values in r9, the capacity) — at capacity 1 the first largest value above 0, the weights unread."
   status: PARTLY
   cases:
     - recording: h1_duelw1117
@@ -3761,6 +3763,7 @@
       value: "Every governor left on a slot is assigned there   (ASSIGN_GOVERNOR 0xf97c278b: owner, governor, city), the operation   changing nothing where it already sits (runs/h1_duelw1117 t205: Merchant   Handan"
   readings:
     - "C-97: the governor AI — the analysis, the choice and the seats READ, the analyzers PARTLY READ"
+    - "C-99: the attack assignment's ties go to the earlier striker — READ (0x776140 -> 0x8b5bf0 -> 0x629480 -> 0x616570 -> 0x61ddb0 at 0x61de20..0x61de39, 0x775340 -> 0x76f210 -> 0x76f5c0 -> 0x76efc0 at 0x76f000..0x76f00f), no port"
   context:
     - "...ty 1, λ 0x6ed060 (the move: the slot's occupant replaced and returned) and the knapsack 0x616570 -> 0x61ddb0 (at capacity 1 the first largest gain above 0). Per slot in order, per gove..."
   review: reviewed
@@ -3789,13 +3792,15 @@
 - addr: 0x61ddb0
   kind: function
   name: knapsack at capacity 1
+  semantics: "max_element over the values (0x61de20..0x61de2f: cmp best, cur; cmovl — strictly larger replaces, the first of equals kept), taken where above 0 (0x61de36), the weights not read."
   status: READ
   cases:
     - recording: h1_duelw1117
       turn: 205
       value: the first largest gain above 0 takes the slot
-  impl: [cpu/core/aiAssignment.ts:generalizedAssignment]
+  impl: [cpu/core/aiAssignment.ts:generalizedAssignment, cpu/core/tactical.ts:assignTo]
   readings:
+    - "C-99: the attack assignment's ties go to the earlier striker — READ (0x776140 -> 0x8b5bf0 -> 0x629480 -> 0x616570 -> 0x61ddb0 at 0x61de20..0x61de39, 0x775340 -> 0x76f210 -> 0x76f5c0 -> 0x76efc0 at 0x76f000..0x76f00f), no port"
     - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
     - "C-95: Attack Units — READ, ported"
     - "C-97: the governor AI — the analysis, the choice and the seats READ, the analyzers PARTLY READ"
@@ -3813,6 +3818,13 @@
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...The trade path's callbacks (0x557e40): the destination test 0x271490, destination-valid 0x629460 (1), no heuristic (both slots null: the total is the known cost), cost 0x558970, valid..."
+  review: reviewed
+- addr: 0x629480
+  kind: function
+  semantics: "the assignment's knapsack lambda (std::function vtable 0xd6fe18 slot +0x10, 0x776140's ninth argument to 0x8b5bf0, called at 0x8b631d with the slot's weights, values and capacity): forwards to 0x616570 with its +8 state."
+  status: PARTLY
+  readings:
+    - "C-99: the attack assignment's ties go to the earlier striker — READ (0x776140 -> 0x8b5bf0 -> 0x629480 -> 0x616570 -> 0x61ddb0 at 0x61de20..0x61de39, 0x775340 -> 0x76f210 -> 0x76f5c0 -> 0x76efc0 at 0x76f000..0x76f00f), no port"
   review: reviewed
 - addr: 0x655840
   final: 0x435ba0

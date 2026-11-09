@@ -303,9 +303,9 @@ export function passOrders(state: GameState, seat: number, pass: Pass, changed: 
       return out.map((x) => ({ type: gameTypeOf('unit', x.unit.type, 'UNIT_'), from: x.from, dest: x.dest, after: x.unit.tileIndex }));
     },
     defend: passDefend(state, seat, pass, changed),
-    endTurn: (id) => {
+    endTurn: (id, member = true) => {
       const u = unitOf(id);
-      if (u) passFinish(pass, u, 'Operation', u.tileIndex);
+      if (u) passFinish(pass, u, member ? 'Operation' : pass.jobs?.get(id) ?? '(no row)', u.tileIndex);
     },
     swap: (id, plot) => {
       const u = unitOf(id);

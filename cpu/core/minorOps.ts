@@ -417,9 +417,15 @@ export function upgradeTreesTick(state: GameState, cs: CityState, pass: Pass, tr
   // after the tick (0x7cb3d0 -> 0x7d2190): a tree running on, marked
   // (m_allowRecruiting) with no operation, releases its units whose turn is
   // not done to the tactical pass; one that ends releases them all, those
-  // whose turn is not done to the tactical pass alike
-  if (arrived) end();
-  else tree.units = order(held).filter((u) => done.has(u.id)).map((u) => u.id);
+  // whose turn is not done to the tactical pass alike; those a running tree
+  // lets go keep its job (`Pass.jobs`), an ended tree's none
+  if (arrived) {
+    for (const u of order(held)) pass.jobs?.delete(u.id);
+    end();
+  } else {
+    tree.units = order(held).filter((u) => done.has(u.id)).map((u) => u.id);
+    for (const u of order(held)) (pass.jobs ??= new Map()).set(u.id, UPGRADE_MOVE);
+  }
 }
 
 /** MOVE UNIT'S UPDATE with no Location (0x7f0020 at 0x7f067c): SUCCESS where
@@ -562,6 +568,8 @@ export function cityStateMilitary(state: GameState, cs: CityState): void {
   cityStateTactics(state, cs, (pass) => {
     const ops = opsOfMinor(cs);
     const env = minorEnv(state, cs, pass);
+    // the units its "Upgrade Units" trees hold in their job as the walk opens
+    for (const id of upgradeHeld(cs)) (pass.jobs ??= new Map()).set(id, UPGRADE_MOVE);
     // its "Upgrade Units" trees each a tree of the walk, by its pool slot
     const trees = (cs.upgradeTrees ?? []).map((t) => ({ priority: UPGRADE_TREE_PRIORITY, slot: treeSlot(t.id), tick: () => upgradeTreesTick(state, cs, pass, t) }));
     operationsRun(ops, { ...env, trees,

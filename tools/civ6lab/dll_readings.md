@@ -13577,3 +13577,52 @@ contract the city's hand alone holds; `minorAiTurn`'s `goalsReached` call
   makes a Tech Contract and runs on (0x7e7d20's kept contracts +0x94 / +0x9c
   read: SUBMITTED / FAILED / COMPLETED released, IN PROGRESS RUNNING; none
   ends a tree).
+
+## C-99: a unit an Upgrade Units tree lets go keeps the tree's job — READ (0x7d2190 -> 0x1e60f0 on +0x778, 0x810d30 at 0x81100a -> 0x81116f, 0x570b40), the tally's label (CPU)
+
+`upgradeTreesTick`, `cityStateMilitary` (cpu/core/minorOps.ts), `Pass.jobs`
+(cpu/core/tactical.ts), `passOrders`' `endTurn` (cpu/core/opsOrders.ts),
+`garrisonExecute` (cpu/core/operations/assault.ts).
+
+- THE RELEASE (0x7d2190) of a running tree's units whose turn is not done
+  clears +0x778 through 0x1e60f0 and leaves the job (+0x7d0, the AI memory's
+  `assigned`) the tree's until another job takes it: a tactical move takes
+  it (runs/h1_duelp1128 t175, Attack Units, out of the tree at the end
+  look); Garrison City's turn done on a garrison not the operation's
+  (0x81100a -> 0x81116f, 0x570b40) does not.
+- PORTED as the move label alone (no state): `Pass.jobs` holds the job of
+  each unit a minor's running tree holds as its walk opens or lets go after
+  its tick (an ended tree's none), and the operations' `endTurn` on a
+  non-member logs that job ("(no row)" for none) where a member logs
+  Operation. The GPU twin carries no move labels.
+- Confirmed: runs/h1_duelq1128 t144-145 Hong Kong's Warrior 2293764 on its
+  centre 9:7 under tree 5308422, garrisoned by City Defense (Upgrade Units /
+  Upgrade Units), t151-153 Bologna's Warrior 2162692 the same
+  (cityState.move.family t139-155 208 / 208 under --memory aimem).
+
+## C-99: the attack assignment's ties go to the earlier striker — READ (0x776140 -> 0x8b5bf0 -> 0x629480 -> 0x616570 -> 0x61ddb0 at 0x61de20..0x61de39, 0x775340 -> 0x76f210 -> 0x76f5c0 -> 0x76efc0 at 0x76f000..0x76f00f), no port
+
+`assignTo`, `strikers`, `mergeSort` (cpu/core/tactical.ts);
+`generalizedAssignment` (cpu/core/aiAssignment.ts).
+
+- THE SLOT'S PICK: 0x8b5bf0 builds per slot the agents' value and weight
+  vectors (the gain std::function, 0x776140's fifth to eighth arguments) and
+  calls its ninth, the knapsack lambda (vtable 0xd6fe18 +0x10 = 0x629480 ->
+  0x616570 -> 0x61ddb0): a max_element over the values in agent order,
+  strictly larger replacing (cmp best, cur; cmovl), taken where above 0;
+  the weights are not read. Equal gains go to the earlier agent.
+- THE AGENTS' ORDER: 0x775340 appends the strikers in the tactical unit
+  list's order (+0x240, pool slot order), each entry's key +8 -1, and sorts
+  them by 0x76f210 -> 0x76f5c0 (EASTL merge sort with a buffer, halves n /
+  2) whose merge 0x76efc0 takes the second run's head only where its key is
+  strictly below: stable, the list order kept. As the engines run it.
+- OPEN: runs/h1_duelq1128 t22 (city-state 2's Warriors 196610 and 327683,
+  one claim each on 11:6 against the barbarian Scout 262147, gain 14 each
+  in the engines) and t35 (Swordsmen 589827 and 655364 on 10:7, 19 each) the
+  game takes the later unit, so its gains there differ from the engines' or
+  the earlier unit's claim is gone (the planning's reach rows hold both
+  units reaching the spot at 1/0); runs/h1_duelq1124 t50 city-state 4 keeps
+  only the Warrior 327683's claim (37:7) where the engines keep the hurt
+  Warrior 131073's on its own plot 37:8 (taken 32 + 26 under dealt 28 + 34)
+  and 196610's on 37:9 (taken 28 + 28 under 32 + 32), city-state 4's army
+  record holding the barbarian Scout 3145752 on 37:9 two turns stale.
