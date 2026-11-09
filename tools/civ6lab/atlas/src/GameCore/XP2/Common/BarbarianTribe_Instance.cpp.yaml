@@ -171,6 +171,7 @@
   impl: [cpu/core/tactical.ts:CHASE_RANGE, gpu/core/sim_tactics.py:_BARB_DEFENSE_RANGED]
   readings:
     - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
+    - "C-95: the rampage strikes with the move's whole list; its defender is one the barbarians see — READ (0x778b40, 0x771670, 0x208b80, 0x20a2a0), both twins"
   context:
     - "...stacking; else MOVE_TO the target's plot with the attack flag 0x10). With no target (0x1479e0): of the cities its raid (+0x48) then its assault (+0x60) wait for that the player hold..."
   review: reviewed

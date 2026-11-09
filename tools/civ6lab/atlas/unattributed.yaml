@@ -3124,6 +3124,8 @@
     - cpu/core/operations/assault.ts:pillageExecute
     - cpu/core/tactical.ts:makeMilitaryFormation
     - cpu/core/units.ts:canUpgradeUnit
+    - cpu/core/tactical.ts:strike
+    - gpu/core/sim_tactics.py:first_in_reach
   readings:
     - "C-95: the tactical pass — READ (the barbarians' moves; the minors share it)"
     - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
@@ -3149,6 +3151,7 @@
     - "C-99 / C-128: every technology gained starts an Upgrade Units tree, the civic event never fires; a tree's units after its tick; the Nearest City Search's resource test; the plot's unit list — READ (0x4cd4c0 -> 0x800c60, 0x5bbf80 -> 0x27a180, 0x3a1ac0, 0x7cb3d0 -> 0x7d2190, 0x7eba40 -> 0x510d30, 0x74f40 / 0x763b0), the trigger both twins"
     - "C-99: Wander Near City ends its unit's moves; a unit whose moves an order ended runs its order no more — READ (0x77bf50 at 0x77c62a, 0x56d6f0, 0x52f50 at 0x530fd..0x53113), both twins"
     - "C-128 / C-99: an Upgrade Units tree lets go to the tactical pass each unit whose turn is not done — READ (0x7cb3d0 -> 0x7d2190, 0x7eeba0 at 0x7eef4c), both twins"
+    - "C-95: the rampage strikes with the move's whole list; its defender is one the barbarians see — READ (0x778b40, 0x771670, 0x208b80, 0x20a2a0), both twins"
   notes:
     - ".claude/scratchpad/mu1/readings_c96.md: ...000, else the skip 0x95eae0 (\"Wander Back to City\", \"Move To\" the   city). The turn ends (0x56d6f0, 0x570b40). Confirmed: the turn's \"Random   Direction\" draws pair one to one with the AI_Tactical.csv rows \"W..."
   context:
@@ -5253,11 +5256,13 @@
     - cpu/core/tactical.ts:makeMilitaryFormation
     - cpu/core/tactical.ts:Pass
     - gpu/core/sim_tactics.py:_tac_on_list
+    - cpu/core/tactical.ts:strike
   readings:
     - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
     - "C-96: the city-states' tactical pass — READ (Wander Near City, Heal, the non-barbarian priorities, FindAlternateLocation), the families it needs PARTLY READ"
     - "C-128: a city-state's Make Military Formation — READ (0x77a190, 0x770670, 0x536da0, 0x773e20, 0x94a870, 0x949930), both twins"
     - "C-95: the full search sets out on the formation's least Movement, a major's formations from the log, a tactical move walks its own done units — READ (0x26eea0, 0x266660, 0x262cd0, 0x770ce0 at 0x770d30..0x771097, 0x77d180, 0x775340, 0x771f80 at 0x7723cb / 0x772663, 0x77a810, 0x774380), both twins"
+    - "C-95: the rampage strikes with the move's whole list; its defender is one the barbarians see — READ (0x778b40, 0x771670, 0x208b80, 0x20a2a0), both twins"
   context:
     - ...flag 0x10), a unit with no ranged or bombard strength then done (0x56d6f0, 0x570b40, 0x77d180); the civilian taken ends the target; then each ranged one within range strikes it (0x9...
   review: reviewed

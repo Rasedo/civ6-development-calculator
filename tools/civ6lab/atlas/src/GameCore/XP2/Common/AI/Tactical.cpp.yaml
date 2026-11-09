@@ -91,10 +91,11 @@
     - recording: h1_duelp1121
       turn: 183
       value: "the Line Infantry 4653085's attack on 3:16 keeps it on Attack High's list: the Spearman 1376265 strikes 3:18"
-  impl: [cpu/core/tactical.ts:Pass, gpu/core/sim_tactics.py:_tac_on_list]
+  impl: [cpu/core/tactical.ts:Pass, gpu/core/sim_tactics.py:_tac_on_list, cpu/core/tactical.ts:rampage]
   readings:
     - "C-95: the tactical pass — READ (the barbarians' moves; the minors share it)"
     - "C-95: the full search sets out on the formation's least Movement, a major's formations from the log, a tactical move walks its own done units — READ (0x26eea0, 0x266660, 0x262cd0, 0x770ce0 at 0x770d30..0x771097, 0x77d180, 0x775340, 0x771f80 at 0x7723cb / 0x772663, 0x77a810, 0x774380), both twins"
+    - "C-95: the rampage strikes with the move's whole list; its defender is one the barbarians see — READ (0x778b40, 0x771670, 0x208b80, 0x20a2a0), both twins"
   context:
     - "...x240, 0x77d100 from the player's unit evaluator 0x60a8c0 / 0x6092c0), then the moves (0x770ce0) in the order of the player's AiFavoredItems tactical list (Tactics.xml \"Default Barbar..."
   review: reviewed
@@ -185,7 +186,7 @@
 - addr: 0x771670
   final: 0x503660
   kind: function
-  semantics: "the rampage strike: a civilian, Trader or religious unit it moves onto; a ranged unit at a fighter or COMBAT_DISTRICT strikes, first moving to the first plot of its reach this turn with Movement left within range and none of its own stacking, with none toward the first plot of the target's ring at max(range, 1) (0x6b1b0 -> 0x691f0) the functor 0x76ecf0 finds a path to (0x272a60 under flags 0), a unit with no planning (+0x1fc0) moving none; else MOVE_TO the target's plot with the attack flag 0x10. Its arguments the tactical object (its unit list +0x270, 0x30 a unit: +0x24 dealt, +0x28 taken), the target, its plot, two flags ([rbp+0x108] the exchange filter: taken above dealt skipped; [rbp+0x110] the survival filter: damage + taken — twice taken in the ranged loop — at the unit's health skipped). A fighter or COMBAT_DISTRICT target (0x208b80, the type test at 0x7716f4) takes the ranged loop (Ranged or Bombard above 0) then the melee loop, which skips a ranged unit and gives each other one MOVE_TO (0x962030) on the target with flag 0x10 (0x771e44). A melee unit's MOVE_TO with the attack flag on a target its player does not see now goes nowhere — a FIT (the pathfinder's own test unread); ported as the attack plots taken only on a plot the player sees now (groundOf's attack, _tac_attack_planes)."
+  semantics: "the rampage strike, by every unit of the tactical object's list (+0x270, 0x30 each) with Movement left (0x56c690) in its order; whether a fighter holds the target read once at its head (0x208b80 with flags 0 and the attacker's player: a unit that player sees on the plot, 0x20a2a0). Per unit: a civilian, Trader or religious unit it moves onto; a ranged unit at a fighter or COMBAT_DISTRICT strikes, first moving to the first plot of its reach this turn with Movement left within range and none of its own stacking, with none toward the first plot of the target's ring at max(range, 1) (0x6b1b0 -> 0x691f0) the functor 0x76ecf0 finds a path to (0x272a60 under flags 0), a unit with no planning (+0x1fc0) moving none; its turn ended after the move (0x570b40 at 0x771c23), its strike (0x964a40) ending its moves (0x56d6f0) and listing it done (0x77d180); else MOVE_TO the target's plot with the attack flag 0x10, its moves ended (0x56d6f0 at 0x771e67) and its id added to the done list +0x258 (0x771e76..0x771ef5). A ranged unit that neither moved nor struck is not listed done. Its arguments the tactical object (its unit list +0x270, 0x30 a unit: +0x24 dealt, +0x28 taken), the target, its plot, two flags ([rbp+0x108] the exchange filter: taken above dealt skipped; [rbp+0x110] the survival filter: damage + taken — twice taken in the ranged loop — at the unit's health skipped). A fighter or COMBAT_DISTRICT target (0x208b80, the type test at 0x7716f4) takes the ranged loop (Ranged or Bombard above 0) then the melee loop, which skips a ranged unit and gives each other one MOVE_TO (0x962030) on the target with flag 0x10 (0x771e44). A melee unit's MOVE_TO with the attack flag on a target its player does not see now goes nowhere — a FIT (the pathfinder's own test unread); ported as the attack plots taken only on a plot the player sees now (groundOf's attack, _tac_attack_planes)."
   status: READ
   cases:
     - recording: h1_duely1117
@@ -198,11 +199,19 @@
     - recording: h1_duely1121
       turn: 30
       value: the rampaging Quadrireme 786443 on 9:1 for the Warrior on 8:6, no spot this turn, sails to 8:4 (the ring's first plot with a path)
+    - recording: h1_duelq1128
+      turn: 124
+      value: "the Quadriremes 1769482 on 0:3 and 851980 on 1:3, no spot nor ring plot for the Warrior on 3:3, strike again with the list at 1310739's Man-At-Arms on 4:1: to 2:1 (1 Movement left) and 4:0, as recorded"
+    - recording: h1_duelq1121
+      turn: 54
+      value: "the Quadrireme 786443 on 7:7, no spot nor ring plot for 10:4, not listed done: Attack Units takes it to 6:9 as logged; t61 / t140 its target 11:4's Horseman / Musketman unseen, MOVE_TO and done, no HL: End Turn row"
   impl:
     - cpu/core/tactical.ts:strike
     - cpu/core/tactical.ts:groundOf
     - gpu/core/sim_tactics.py:_tac_rampage
+    - gpu/core/sim_tactics.py:first_in_reach
   readings:
+    - "C-95: the rampage strikes with the move's whole list; its defender is one the barbarians see — READ (0x778b40, 0x771670, 0x208b80, 0x20a2a0), both twins"
     - "C-95: the danger map's search pays no zone of control, a ranged unit strikes from its range; the rampage strike's ring — READ (0x26df90, 0x26e920, 0x771670, 0x691f0, 0x76ecf0), FIT (the ranged unit's strike), both twins"
     - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
     - "C-95: a strike's move order onto a plot out of sight — READ (the strike), FIT (the path's sight test)"
@@ -677,15 +686,19 @@
 - addr: 0x778b40
   final: 0x50aa90
   kind: function
-  semantics: "BARBARIAN RAMPAGE: the tribes whose camp a unit took (0x152df0); each of their units, in pool order, takes of the planning's targets of that player the nearest with a spot, else the nearest (strictly nearer replaces) and strikes it (0x771670). With no target 0x1479e0. At 0x778f57: Barbarian Rampage passes both filters 0 and its one unit with r13 = 0 at +0x24 / +0x28: no filter."
+  semantics: "BARBARIAN RAMPAGE: the tribes whose camp a unit took (0x152df0); each of their units, in pool order, takes of the planning's targets of that player the nearest with a spot, else the nearest (strictly nearer replaces) and strikes it (0x771670) with the move's list: each unit given a target appended to the tactical object's +0x270 (0x778dd0..0x778e63), which only the dispatcher 0x770ce0 empties (+0x280 = 0 at 0x770d30) as a move opens, so the units before it with Movement left strike its target too; a unit with no target joins nothing (0x1479e0, the chase). With no target 0x1479e0. At 0x778f57: Barbarian Rampage passes both filters 0 and its one unit with r13 = 0 at +0x24 / +0x28: no filter."
   status: READ
   cases:
     - recording: h1_duelw1124
       value: the logged target in the list on 423 of 446 rows, the pick on 415
     - recording: 1124
       value: "Shadow check over   1124: of 446 rows the logged target is in the list for 423 (the rest the   knowledge base's), the pick matches 415 of them;"
-  impl: [cpu/core/tactical.ts:rampage]
+  impl:
+    - cpu/core/tactical.ts:rampage
+    - gpu/core/sim_tactics.py:_tac_rampage
+    - gpu/core/sim_tactics.py:first_in_reach
   readings:
+    - "C-95: the rampage strikes with the move's whole list; its defender is one the barbarians see — READ (0x778b40, 0x771670, 0x208b80, 0x20a2a0), both twins"
     - "C-95: the tactical pass — READ (the barbarians' moves; the minors share it)"
     - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
     - "C-95: a strike's move order onto a plot out of sight — READ (the strike), FIT (the path's sight test)"

@@ -2357,46 +2357,77 @@ export function districtHealth(state: GameState, tile: number): { max: number; h
   return cs && cs.centerIndex === tile ? { max: CITY_MAX_HP, hp: cs.hp ?? CITY_MAX_HP } : null;
 }
 
-/** a unit of a player at war with the unit holds the plot to fight it (0x208b80) */
+/** a unit of a player at war with the unit holds the plot to fight it, one
+ *  the unit's player sees there now (the best defender 0x208b80 under flags
+ *  0 with the attacker's player: 0x20a2a0, the player's visibility count of
+ *  the plot and the unit's stealth) (runs/h1_duelq1121 t61 / t140: the
+ *  rampaging Quadrireme 786443 on 8:5 for the district 11:4 goes for its
+ *  plot, city-state 2's Horseman / player 1's Musketman there out of the
+ *  barbarians' sight, its turn done) */
 function defenderAt(state: GameState, unit: Unit, p: number): boolean {
-  return state.units.some((x) => x.tileIndex === p && onMap(x) && unitDomain(x.type) === 'military' && unitsHostile(state, unit, x));
+  const seen = plotsSeenNow(state, new Set([unit.seat]));
+  return seen[p] === 1 && state.units.some((x) => x.tileIndex === p && onMap(x) && unitDomain(x.type) === 'military'
+    && unitsHostile(state, unit, x) && unitVisibleTo(state, x, unit.seat));
 }
 
 /**
- * AN ATTACK ON A TARGET (0x771670) by one unit: a civilian, a Trader or a
- * religious unit it moves onto; a target a fighter holds, or a City Center or
- * Encampment, a ranged unit strikes from where it stands, else from the first
- * plot of its planning reach of this turn with Movement left within its range
- * and none of its own stacking there (0x585eb0) it moves to first, with none
- * toward the first plot of the target's ring at its range it has a path to
- * (one with no planning stays); else it goes for the target's plot with the
- * attack flag (`moveTo`).
+ * AN ATTACK ON A TARGET (0x771670) by the units of the move's list (the
+ * tactical object's +0x270, in the order listed), each with Movement left
+ * (0x56c690) as its turn comes: whether a fighter holds the target (0x208b80)
+ * is read once, as the attack begins. A civilian, a Trader or a religious
+ * unit they move onto. At a target a fighter holds, or a City Center or
+ * Encampment, each ranged unit strikes from where it stands, else from the
+ * first plot of its planning reach of this turn with Movement left within
+ * its range and none of its own stacking there (0x585eb0) it moves to first,
+ * with none toward the first plot of the target's ring at its range it has a
+ * path to (one with no planning stays), its turn done (0x570b40 at
+ * 0x771c23); its strike ends its moves (0x56d6f0) and lists it done
+ * (0x77d180), a unit that moved and could not strike keeps the Movement it
+ * has left. Then each other unit goes for the target's plot with the attack
+ * flag (`moveTo`, 0x962030 flag 0x10), its moves ended after (0x56d6f0 at
+ * 0x771e67) and listed done (+0x258). A unit none of this took stays on the
+ * pass's list for the moves after (runs/h1_duelq1121 t54: the rampaging
+ * Quadrireme 786443 on 7:7, with no plot to strike 10:4 from nor a path to
+ * its ring, goes on to Attack Units' Archer 655367 and 6:9).
  */
-function strike(state: GameState, pass: Pass, u: Unit, e: Target): void {
+function strike(state: GameState, pass: Pass, listed: readonly Unit[], e: Target): void {
   const T = e.tile;
-  const range = rangeOf(u);
-  const fight = e.type === 'COMBAT_DISTRICT' || defenderAt(state, u, T);
-  if (fight && range > 0) {
-    if (plotDistance(state, u.tileIndex, T) > range && pass.plan.has(u.id)) {
-      const spot = (pass.reach.get(u.id) ?? []).find((r) => r.turns === 1 && r.moves > 0 && !r.attack
-        && plotDistance(state, r.tile, T) <= range && !stackedOther(state, u, r.tile));
-      // with none, the first plot of the target's ring at its range (1 at
-      // least; 0x6b1b0 -> 0x691f0) it has a path to (0x272a60 under flags 0
-      // from the functor 0x76ecf0), its move order walking toward it
-      // (runs/h1_duely1121 t30: the rampaging Quadrireme on 9:1 for the
-      // Warrior on 8:6 sails to 8:4; h1_duely1127 t52: the Quadrireme on
-      // 32:21 for 35:22 stays, the ring's one plot it reaches, 35:23, its
-      // Galley's)
-      const to = spot ? spot.tile : ringPlots(state, T, Math.max(1, range))
-        .find((p) => plotDistance(state, T, p) === Math.max(1, range) && turnsToPlot(state, u, p, false) > 0);
-      if (to !== undefined) moveTo(state, u, to);
+  const moves = (x: Unit) => state.units.includes(x) && x.movesLeft > 0 && !pass.ended.has(x.id);
+  const fight = e.type === 'COMBAT_DISTRICT' || defenderAt(state, listed[listed.length - 1], T);
+  if (fight) {
+    for (const u of listed) {
+      const range = rangeOf(u);
+      if (range <= 0 || !moves(u)) continue;
+      if (plotDistance(state, u.tileIndex, T) > range && pass.plan.has(u.id)) {
+        const spot = (pass.reach.get(u.id) ?? []).find((r) => r.turns === 1 && r.moves > 0 && !r.attack
+          && plotDistance(state, r.tile, T) <= range && !stackedOther(state, u, r.tile));
+        // with none, the first plot of the target's ring at its range (1 at
+        // least; 0x6b1b0 -> 0x691f0) it has a path to (0x272a60 under flags 0
+        // from the functor 0x76ecf0), its move order walking toward it
+        // (runs/h1_duely1121 t30: the rampaging Quadrireme on 9:1 for the
+        // Warrior on 8:6 sails to 8:4; h1_duely1127 t52: the Quadrireme on
+        // 32:21 for 35:22 stays, the ring's one plot it reaches, 35:23, its
+        // Galley's)
+        const to = spot ? spot.tile : ringPlots(state, T, Math.max(1, range))
+          .find((p) => plotDistance(state, T, p) === Math.max(1, range) && turnsToPlot(state, u, p, false) > 0);
+        if (to !== undefined) {
+          moveTo(state, u, to);
+          pass.done.add(u.id);
+        }
+      }
+      if (state.units.includes(u) && plotDistance(state, u.tileIndex, T) <= range && u.movesLeft > 0 && attacksLeftOf(u) > 0) {
+        hostileRangedStrike(state, u, T);
+        pass.ended.add(u.id);
+        pass.done.add(u.id);
+      }
     }
-    if (state.units.includes(u) && plotDistance(state, u.tileIndex, T) <= range && u.movesLeft > 0 && attacksLeftOf(u) > 0) {
-      hostileRangedStrike(state, u, T);
-    }
-    return;
   }
-  moveTo(state, u, T);
+  for (const u of listed) {
+    if (!moves(u) || (fight && rangeOf(u) > 0)) continue;
+    moveTo(state, u, T);
+    pass.ended.add(u.id);
+    pass.done.add(u.id);
+  }
 }
 
 /** a unit of the unit's player on the plot that stacks with it, the unit
@@ -2436,13 +2467,20 @@ function cityCentresOf(state: GameState, P: number): number[] {
  * BARBARIAN RAMPAGE (0x778b40): each unit, in pool order, of a tribe whose
  * camp a player's unit took (0x152df0) goes after that player's targets among
  * its planning's: a target it has a spot to strike from before any it has
- * none for, then the nearest it (the list's first of equals), struck
- * (`strike`); with none, it heads for the city of that player its tribe goes
- * after (`chaseCity`): to the first plot of its reach of this turn within
- * its range (1 at least) of the city with none of its own stacking there
- * (0x775c60), its turn done; with no such plot it stays for the moves after.
+ * none for, then the nearest it (the list's first of equals). The unit joins
+ * the move's list (0x778e28: the tactical object's +0x270, emptied only as
+ * the dispatcher 0x770ce0 opens a move), and the target is struck by the
+ * whole list as it stands (`strike`): the units before it with Movement
+ * left go for it too (runs/h1_duelq1128 t124: the Quadriremes 1769482 on 0:3
+ * and 851980 on 1:3, no plot to strike the Warrior on 3:3 from, sail on
+ * for 1310739's Man-At-Arms on 4:1, to 2:1 and 4:0). With none, it heads
+ * for the city of that player its tribe goes after (`chaseCity`): to the
+ * first plot of its reach of this turn within its range (1 at least) of the
+ * city with none of its own stacking there (0x775c60), its turn done; with
+ * no such plot it stays for the moves after.
  */
 function rampage(state: GameState, pass: Pass): void {
+  const listed: Unit[] = [];
   for (const u of pass.units) {
     if (!live(state, pass, u)) continue;
     const tr = tribeOf(state, u.id);
@@ -2464,8 +2502,9 @@ function rampage(state: GameState, pass: Pass): void {
       best = e; bestD = d;
     }
     if (best) {
-      strike(state, pass, u, best);
-      finish(pass, u, 'Barbarian Rampage', best.tile);
+      tacticsTrace?.(u, 'Barbarian Rampage', best.tile, -1);
+      listed.push(u);
+      strike(state, pass, listed, best);
       continue;
     }
     const city = chaseCity(state, tr, P);

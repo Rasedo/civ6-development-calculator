@@ -13374,3 +13374,47 @@ ACT_SENTRY), statecompare `activity`.
   REQUIREMENT_PLOT_HAS_ANY_RESOURCE sees a resource the owner has not
   revealed (the engines count any); the AI value's yield-source tourism rows
   (0x7b19a0 -> 0x1aba40's 0x82280 difference) stay unvalued.
+
+## C-95: the rampage strikes with the move's whole list; its defender is one the barbarians see — READ (0x778b40, 0x771670, 0x208b80, 0x20a2a0), both twins
+
+`rampage`, `strike`, `defenderAt` (cpu/core/tactical.ts); `_tac_rampage`
+(gpu/core/sim_tactics.py).
+
+- THE LIST: Barbarian Rampage (0x778b40) appends each unit it gives a
+  target to the tactical object's unit list +0x270 (0x778dd0..0x778e63,
+  0x30 each) and calls the strike 0x771670 on that target; the list is
+  emptied only by the dispatcher 0x770ce0 (+0x280 = 0 at 0x770d30) as each
+  move opens. The strike walks the whole list in its order, each unit with
+  Movement left (0x56c690, +0xdb0 > 0): the units given a target before it
+  go for the new target too. A unit with no target (the chase, 0x1479e0)
+  joins nothing.
+- THE STRIKE 0x771670: whether a fighter holds the target is read once at
+  its head (0x208b80, then the COMBAT_DISTRICT type test at 0x7716f4).
+  Ranged loop (a fighter or district): a unit out of range with a planning
+  (+0x1fc0) moves to its spot or toward the ring's first plot with a path,
+  its turn ended (0x570b40 at 0x771c23), its Movement kept; one in range
+  strikes (0x964a40), its moves ended (0x56d6f0) and listed done (0x77d180).
+  Melee loop: every other unit with Movement (each ranged one too where no
+  fighter holds the target) MOVE_TO the plot with flag 0x10, its moves
+  ended (0x56d6f0 at 0x771e67) and its id added to the done list +0x258
+  (0x771e76..0x771ef5). A ranged unit that neither moved nor struck stays
+  on the pass's list (+0x240) for the moves after.
+- THE DEFENDER 0x208b80 (plot, defending player or -1, attacking player,
+  mover, flags): over the plot's units of the mover's layer (the default
+  layer with none), alive (+0x770), not the attacking player's, fighting
+  (0x209dd0) unless flag 8, and counting for the attacking player's look at
+  the plot (0x20a2a0 at 0x208cc0: its visibility count +0x290 and the
+  unit's stealth; flag 0x100 skips it). The strike passes flags 0, no
+  mover and the barbarians: a unit they do not see there is no defender.
+- Confirmed: runs/h1_duelq1128 t124 the Quadriremes 1769482 on 0:3 and
+  851980 on 1:3, no spot nor ring plot for the Warrior on 3:3, sail on with
+  the list for 1310739's Man-At-Arms on 4:1 to 2:1 (1 Movement left) and
+  4:0, as recorded; runs/h1_duelq1121 t54 the Quadrireme 786443 on 7:7,
+  unlisted, goes on to Attack Units' 6:9 as logged; t61 / t140 its target
+  the district 11:4, city-state 2's Horseman / player 1's Musketman there
+  unseen: MOVE_TO and done, no HL: End Turn row (its LOW and city targets
+  out of reach t26-48 / t66-68 log HL: End Turn); 1128 t131 / t149 the
+  Quadriremes 5701637 on 3:1 and 1769482 on 2:1 hold for the unseen 3:4.
+- OPEN: 1121 t151 / t161 / t164-167 / t197-198 the Crossbowmen, Scout and
+  Bombard of the t148 rampage family; 1124 t20 Scout 1638420; 1127 t170
+  Galley 262147.

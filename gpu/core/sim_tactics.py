@@ -2532,11 +2532,16 @@ class SimTactics:
         """BARBARIAN RAMPAGE (`rampage`): each unit, in pool order, of a tribe
         whose camp a player's unit took goes after that player's targets among
         its planning's — one it has a spot to strike from first, then the
-        nearest, the list's first of equals — struck (`strike`); with none it
-        heads for the city of that player its tribe goes after (`chaseCity`),
-        to the first plot of its reach of this turn within its range (1 at
-        least) of the city with none of its own stacking there, else it stays.
-        The picks read the target list and the reach as the pass began."""
+        nearest, the list's first of equals — the unit joining the move's
+        list, the target struck by the whole list in its order (`strike`:
+        whether a fighter the barbarians see holds it read once; each ranged
+        unit with Movement from its spot or toward the ring, then each other
+        one onto the plot, its moves ended; a unit none of this took not
+        done); with none it heads for the city of that player its tribe goes
+        after (`chaseCity`), to the first plot of its reach of this turn
+        within its range (1 at least) of the city with none of its own
+        stacking there, else it stays. The picks read the target list and the
+        reach as the pass began."""
         dev = self.device
         B, T = self.B, self.T
         P = simbase.BARB_POOL_MAX
@@ -2605,7 +2610,17 @@ class SimTactics:
         if npos:
             held = cand.gather(1, order[:, :npos]) & (torch.arange(npos, device=dev).unsqueeze(0) < npass.unsqueeze(1))
             js = held.any(dim=0).nonzero(as_tuple=True)[0].tolist()
-        for j in js:
+        # the move's list (0x778e28: the tactical object's +0x270), each unit
+        # given a target joining it in turn: every target is struck by the
+        # whole list as it stands, in its order (`strike`)
+        listed = torch.zeros(B, P, dtype=torch.bool, device=dev)
+        # the moves an order of the pass ended (0x56d6f0), of the barbarians'
+        # pool (a view: a write lands in the pass's plane)
+        ended = (self._tac_moves_ended[:, self.POOL_LO["barb"]:self.POOL_HI["barb"]]
+                 if self._tac_moves_ended is not None else torch.zeros(B, P, dtype=torch.bool, device=dev))
+        vis_m = self._visible_military_at(BARB_SEAT)
+        vis_e = self._visible_embarked_at(BARB_SEAT)
+        for ji, j in enumerate(js):
             u_b = order[:, j]
             onj = (j < npass) & live()[bidx, u_b] & cand[bidx, u_b]
             if not bool(onj.count_nonzero()):
@@ -2616,25 +2631,38 @@ class SimTactics:
             tc = tgt.clamp(min=0)
             urng = self._tac_range(bidx, u_b)
             if bool(st.count_nonzero()):
-                mil = self.military_at.gather(1, tc.unsqueeze(1)).squeeze(1)
+                listed[bidx[st], u_b[st]] = True
+                # a fighter on the target's plot the barbarians see there now
+                # (0x208b80 under flags 0: 0x20a2a0), read once as the attack
+                # begins
+                mil = vis_m.gather(1, tc.unsqueeze(1)).squeeze(1)
                 ms = torch.where(mil >= 0, self.unit_seat.gather(1, mil.clamp(min=0).unsqueeze(1)).squeeze(1),
                                  torch.full_like(mil, -1))
-                emb = self.embarked_at.gather(1, tc.unsqueeze(1)).squeeze(1)
+                emb = vis_e.gather(1, tc.unsqueeze(1)).squeeze(1)
                 es = torch.where(emb >= 0, self.unit_seat.gather(1, emb.clamp(min=0).unsqueeze(1)).squeeze(1),
                                  torch.full_like(emb, -1))
                 et = self.unit_type.gather(1, emb.clamp(min=0).unsqueeze(1)).squeeze(1).clamp(min=0, max=self.NU - 1)
-                foe = ((mil >= 0) & (ms != BARB_SEAT)) | ((emb >= 0) & (es != BARB_SEAT) & self._type_dom_mil.take(et))
-                fight = pick_cd[bidx, u_b] | foe
-                shoot = st & fight & (urng > 0)
-                if bool(shoot.count_nonzero()):
-                    at = self.barb_unit_tile[bidx, u_b].clamp(min=0)
-                    far = shoot & (self.pair_dist[at, tc].to(torch.long) > urng)
+                foe = (((mil >= 0) & (ms != BARB_SEAT))
+                       | ((emb >= 0) & (es != BARB_SEAT) & self._type_dom_mil.take(et)))
+                seen = self._barb_seen("barbarians")
+                fight = st & (pick_cd[bidx, u_b] | (foe & seen[bidx, tc]))
+                # the ranged loop over the list
+                for k in js[:ji + 1]:
+                    v_b = order[:, k]
+                    vrng = self._tac_range(bidx, v_b)
+                    shoot = (fight & listed[bidx, v_b] & self.barb_unit_alive[bidx, v_b]
+                             & (self.barb_unit_mp[bidx, v_b] > 0) & ~ended[bidx, v_b] & (vrng > 0))
+                    if not bool(shoot.count_nonzero()):
+                        continue
+                    vrow = rowof[bidx, v_b]
+                    at = self.barb_unit_tile[bidx, v_b].clamp(min=0)
+                    far = shoot & (self.pair_dist[at, tc].to(torch.long) > vrng) & (vrow >= 0)
                     if bool(far.count_nonzero()):
-                        rr = row.clamp(min=0)
+                        rr = vrow.clamp(min=0)
                         dtp = self.pair_dist[tc].to(torch.long)  # [B, T]
-                        ok = ((turns[rr] == 1) & (moves[rr] > 0) & ~res["attack"][rr] & (dtp <= urng.unsqueeze(1))
-                              & ~self._tac_stacked_other(u_b) & far.unsqueeze(1))
-                        spot = first_in_reach(row, ok)
+                        ok = ((turns[rr] == 1) & (moves[rr] > 0) & ~res["attack"][rr] & (dtp <= vrng.unsqueeze(1))
+                              & ~self._tac_stacked_other(v_b) & far.unsqueeze(1))
+                        spot = first_in_reach(vrow, ok)
                         # with none, the first plot of the target's ring at
                         # its range (1 at least; 0x6b1b0 -> 0x691f0) with a
                         # path under flags 0 (0x272a60 from 0x76ecf0: the
@@ -2642,7 +2670,7 @@ class SimTactics:
                         # limit) (`strike`)
                         fb = far & (spot < 0)
                         if bool(fb.count_nonzero()):
-                            R = urng.clamp(min=1, max=3)
+                            R = vrng.clamp(min=1, max=3)
                             ring = self._barb_ring[tc]  # [B, 37]
                             jr = torch.arange(ring.shape[1], device=dev).unsqueeze(0)
                             inr = ((jr >= (1 + 3 * R * (R - 1)).unsqueeze(1)) & (jr < (1 + 3 * R * (R + 1)).unsqueeze(1))
@@ -2654,19 +2682,34 @@ class SimTactics:
                                     continue
                                 r_i = bidx[need]
                                 p_i = ring[need, jj]
-                                res2 = self._tac_search(r_i, u_b[need], BARB_SEAT, 1 << 30, True, dest=p_i, pre="barb",
+                                res2 = self._tac_search(r_i, v_b[need], BARB_SEAT, 1 << 30, True, dest=p_i, pre="barb",
                                                         later_turns=False)
                                 ok2 = res2["turns"][torch.arange(r_i.shape[0], device=dev), p_i] > 0
                                 ring_p[r_i[ok2]] = p_i[ok2]
                             spot = torch.where(fb, ring_p, spot)
-                        self._tac_move_to(far & (spot >= 0), u_b, spot)
-                    at = self.barb_unit_tile[bidx, u_b].clamp(min=0)
-                    fire = (shoot & self.barb_unit_alive[bidx, u_b] & (self.pair_dist[at, tc].to(torch.long) <= urng)
-                            & (self.barb_unit_mp[bidx, u_b] > 0) & (self.barb_unit_attacks[bidx, u_b] > 0))
-                    for u in torch.unique(u_b[fire]).tolist():
-                        self._hostile_ranged_strike(fire & (u_b == u), tc, "barb", u)
-                self._tac_move_to(st & ~shoot, u_b, tc)
-                done[bidx[st], u_b[st]] = True
+                        go = far & (spot >= 0)
+                        self._tac_move_to(go, v_b, spot)
+                        # its turn done (0x570b40 at 0x771c23)
+                        done[bidx[go], v_b[go]] = True
+                    at = self.barb_unit_tile[bidx, v_b].clamp(min=0)
+                    fire = (shoot & self.barb_unit_alive[bidx, v_b] & (self.pair_dist[at, tc].to(torch.long) <= vrng)
+                            & (self.barb_unit_mp[bidx, v_b] > 0) & (self.barb_unit_attacks[bidx, v_b] > 0))
+                    for u in torch.unique(v_b[fire]).tolist():
+                        self._hostile_ranged_strike(fire & (v_b == u), tc, "barb", u)
+                    ended[bidx[fire], v_b[fire]] = True
+                    done[bidx[fire], v_b[fire]] = True
+                # ...then each other unit of the list goes for the plot, its
+                # moves ended (0x56d6f0 at 0x771e67)
+                for k in js[:ji + 1]:
+                    v_b = order[:, k]
+                    vrng = self._tac_range(bidx, v_b)
+                    mel = (st & listed[bidx, v_b] & self.barb_unit_alive[bidx, v_b] & (self.barb_unit_mp[bidx, v_b] > 0)
+                           & ~ended[bidx, v_b] & ~(fight & (vrng > 0)))
+                    if not bool(mel.count_nonzero()):
+                        continue
+                    self._tac_move_to(mel, v_b, tc)
+                    ended[bidx[mel], v_b[mel]] = True
+                    done[bidx[mel], v_b[mel]] = True
             ch = onj & (tgt < 0)
             if not bool(ch.count_nonzero()):
                 continue
