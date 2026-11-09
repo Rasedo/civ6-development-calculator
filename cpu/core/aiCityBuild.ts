@@ -783,9 +783,11 @@ export function unitValue(f: CityBuildFacts, u: AiUnitRow, t: number, h = AI_VAL
  *  Units row in database order; null where the value is not read */
 export function unitTable(f: CityBuildFacts): (number | null)[] {
   return AI_UNITS.map((u) => {
-    // CanTrain (0x172820, its prerequisites skipped) refuses an
+    // CanTrain (0x172820, its prerequisites skipped) refuses a MajorCivOnly
+    // unit to a player that is not a full civilization (0x172941), and an
     // EnabledByReligion unit no belief of the city's majority religion
     // enables (runs/h1_duelv1128: every minor's Warrior Monk FX(-9999))
+    if (u.majorOnly && !f.fullCiv) return FX_MIN;
     if (u.religion && !f.beliefEnables(u.type)) return FX_MIN;
     // and, past its prerequisites, a unit of ReligiousStrength in a city
     // following no religion (0x172d88..0x172d9d: runs/h1_duelv1127 a

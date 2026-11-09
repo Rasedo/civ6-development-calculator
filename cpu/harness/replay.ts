@@ -61,7 +61,7 @@ import { improvementMoment, recordMoments, upgradeMoments } from '../core/moment
 import { applyGovernorActions, governorsOf } from '../core/governors';
 import { GOVERNOR_PROMOTIONS, GOV_APPOINT, GOV_ASSIGN_CITY, GOV_ASSIGN_MINOR, GOV_PROMOTE, promotionBit } from '../data/governors';
 import { BOOSTS } from '../data/boosts';
-import { chargeUnitResource, upgradeGoldCost, upgradeType } from '../core/stockpile';
+import { chargeUnitResource, strategicSlot, unitResourceCost, upgradeGoldCost, upgradeType } from '../core/stockpile';
 import { airStrike, applyTrainingGrants, cityStrikeStrength, clearCampFor, combatBlow, type Blow, flankSupportLive, hostilePillage, meleeAttack, rangedAttack, seizeCivilian, terrainDefense } from '../core/combat';
 import { freeCitiesMilitary, traceFreeOps } from '../core/freeOps';
 import { barbarianTactics, barbMovesNow, dangerPlane, refreshBarbarians, tacticsDrawing, knowledgeLook, traceDanger, traceKnowledge, traceTactics } from '../core/tactical';
@@ -2127,9 +2127,10 @@ function scoreFortify(ctx: Ctx, b: TurnRecord, turn: number, copy: GameState, tw
 /** THE CITY-STATES' PURCHASES after their units' turn on the copy, each
  *  against the record's of the pair (`ctx.minorBuys`) by its city-state and
  *  unit: one the record holds stands as the record's unit, paid from the
- *  treasury, the copy's unit its twin; one it does not leaves the copy (the
- *  savings it spent kept, its Gold not); a record's purchase the copy made
- *  none of is imposed at its price, paid from what the treasury holds — the
+ *  treasury and its strategic cost from the stock (`chargeUnitResource`),
+ *  the copy's unit its twin; one it does not leaves the copy (the savings it
+ *  spent kept, its Gold not); a record's purchase the copy made none of is
+ *  imposed at its price and strategic cost, paid from what the treasury holds — the
  *  game buys only what it can pay for, so where the engine holds less the
  *  shortfall is the engine's own drift, never a debt */
 function minorBuysAfter(ctx: Ctx, copy: GameState, buys: readonly CopyBuy[], twin: Map<Unit, Unit>, keyOf: Map<Unit, string>): void {
@@ -2160,6 +2161,7 @@ function minorBuysAfter(ctx: Ctx, copy: GameState, buys: readonly CopyBuy[], twi
     }
     const [{ d, rec }] = open.splice(k, 1);
     cs.treasury -= price;
+    chargeUnitResource(state, cs.seat, u.type);
     tallyUnitMade(cs, u.type);
     // a record unit the turn's new units already stand for (`matchNewUnits`)
     const real = unitOf(ctx, d.unit) ?? spawnRecorded(ctx, rec, d.unit);
@@ -2189,6 +2191,7 @@ function minorBuysAfter(ctx: Ctx, copy: GameState, buys: readonly CopyBuy[], twi
       const eco = copy.cityStates.find((x) => x.id === minor.id)?.economy;
       if (eco) purchaseSpend(eco, price * FX, (minor.threat ?? -1) > -1);
     } else minor.faith -= Math.min(price, Math.max(0, minor.faith));
+    if (id) chargeUnitResource(state, seat, id);
     const real = spawnRecorded(ctx, rec, d.unit);
     // the record's unit stands in the copy for the end look
     if (real) {
@@ -6144,10 +6147,11 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
   holdBankruptDisband((s) => isCiv(s.seat));
   // the city-states' own purchases of the pair, each with its price
   // each purchase with the economic AI's savings as it bought (its spend
-  // follows the purchase, on the city's threat)
-  const minorBought = new Map<Unit, { cityState: CityState; price: number; savings?: number[]; threatened: boolean }>();
-  const buyTrace: Ctx['buyTrace'] = (cityState, u, price) => minorBought.set(u, {
-    cityState, price, savings: cityState.economy ? [...cityState.economy.savings] : undefined, threatened: (cityState.threat ?? -1) > -1,
+  // follows the purchase, on the city's threat) and the strategic stock it
+  // spent
+  const minorBought = new Map<Unit, { cityState: CityState; price: number; spent: number; savings?: number[]; threatened: boolean }>();
+  const buyTrace: Ctx['buyTrace'] = (cityState, u, price, spent) => minorBought.set(u, {
+    cityState, price, spent, savings: cityState.economy ? [...cityState.economy.savings] : undefined, threatened: (cityState.threat ?? -1) > -1,
   });
   traceMinorPurchases(buyTrace);
   const state = first.state;
@@ -6941,6 +6945,8 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
       if (paid || gone === 0) forget(u);
       if (paid) {
         paid.cityState.treasury += paid.price;
+        const res = unitResourceCost(u.type);
+        if (res && paid.spent > 0) paid.cityState.stockpile![strategicSlot(res.id)] += paid.spent;
         if (u.type === 'BUILDER') paid.cityState.buildersTrained -= 1;
         // ...and its savings back: the spend the purchase took from each
         // slot and from the balance returned, so the turns after share the

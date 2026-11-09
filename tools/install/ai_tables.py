@@ -672,9 +672,15 @@ def build_city(rows, modifier) -> str:
     res_yields = multi("Resource_YieldChanges", "ResourceType")
     # (the power value 0x7a67f0's fuel: Resource_Consumption PowerProvided)
     consumption = keyed(rows("Resource_Consumption"), "ResourceType")
+    # (the projects whose PrereqResource it is: the row's +0xd0 list)
+    res_projects = collections.defaultdict(list)
+    for c in rows("Projects"):
+        if c.get("PrereqResource"):
+            res_projects[c["PrereqResource"]].append(c["ProjectType"])
     resources = [{"type": r, "class": c.get("ResourceClassType"), "happiness": num(c, "Happiness"),
                   "peakEra": c.get("PeakEra") if c.get("PeakEra") not in (None, "", "NO_ERA") else None,
                   "units": strat_units[r],
+                  "projects": res_projects[r],
                   "harvests": [[h["YieldType"], num(h, "Amount")] for h in harvests[r]],
                   "harvestTechs": [h.get("PrereqTech") or None for h in harvests[r]],
                   "yields": [[y["YieldType"], num(y, "YieldChange")] for y in res_yields[r]],

@@ -1815,11 +1815,12 @@ export function buildRules() {
       }),
       yields: RESOURCE_IDS.map((id) => YIELD_KEYS.map((k) => RESOURCES[id]?.yields?.[k] ?? 0)),
       // the resource value's rows (`resourceValue`): class (0 none, 1 luxury, 2
-      // strategic), Happiness, and the units asking it (`AI_RESOURCE_EXPORT`)
+      // strategic), Happiness, a project asking it and the units asking it
+      // (`AI_RESOURCE_EXPORT`)
       ai: RESOURCE_IDS.map((id) => {
         const e = AI_RESOURCE_EXPORT(id);
-        return { cls: e.cls, happy: e.happy, units: e.units.map((u) => ({
-          need: u.need, ver: u.ver, obsT: u.obsTechs.map((t) => techIdx.get(t) ?? -1), obsC: u.obsCivics.map((c) => civicIdx.get(c) ?? -1),
+        return { cls: e.cls, happy: e.happy, proj: e.proj, units: e.units.map((u) => ({
+          need: u.need, ver: u.ver, row: u.row, obsT: u.obsTechs.map((t) => techIdx.get(t) ?? -1), obsC: u.obsCivics.map((c) => civicIdx.get(c) ?? -1),
           eng: u.engine.map((x) => Object.keys(UNITS).indexOf(x)),
         })) };
       }),

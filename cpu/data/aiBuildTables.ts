@@ -23563,6 +23563,7 @@ export const AI_RESOURCES: readonly AiResourceRow[] = [
   "happiness": 0,
   "peakEra": null,
   "units": [],
+  "projects": [],
   "harvests": [
    [
     "YIELD_FOOD",
@@ -23586,6 +23587,7 @@ export const AI_RESOURCES: readonly AiResourceRow[] = [
   "happiness": 0,
   "peakEra": null,
   "units": [],
+  "projects": [],
   "harvests": [
    [
     "YIELD_FOOD",
@@ -23609,6 +23611,7 @@ export const AI_RESOURCES: readonly AiResourceRow[] = [
   "happiness": 0,
   "peakEra": null,
   "units": [],
+  "projects": [],
   "harvests": [
    [
     "YIELD_GOLD",
@@ -23632,6 +23635,7 @@ export const AI_RESOURCES: readonly AiResourceRow[] = [
   "happiness": 0,
   "peakEra": null,
   "units": [],
+  "projects": [],
   "harvests": [
    [
     "YIELD_GOLD",
@@ -23655,6 +23659,7 @@ export const AI_RESOURCES: readonly AiResourceRow[] = [
   "happiness": 0,
   "peakEra": null,
   "units": [],
+  "projects": [],
   "harvests": [
    [
     "YIELD_PRODUCTION",
@@ -23678,6 +23683,7 @@ export const AI_RESOURCES: readonly AiResourceRow[] = [
   "happiness": 0,
   "peakEra": null,
   "units": [],
+  "projects": [],
   "harvests": [
    [
     "YIELD_FOOD",
@@ -23701,6 +23707,7 @@ export const AI_RESOURCES: readonly AiResourceRow[] = [
   "happiness": 0,
   "peakEra": null,
   "units": [],
+  "projects": [],
   "harvests": [
    [
     "YIELD_FOOD",
@@ -23724,6 +23731,7 @@ export const AI_RESOURCES: readonly AiResourceRow[] = [
   "happiness": 0,
   "peakEra": null,
   "units": [],
+  "projects": [],
   "harvests": [
    [
     "YIELD_FOOD",
@@ -23747,6 +23755,7 @@ export const AI_RESOURCES: readonly AiResourceRow[] = [
   "happiness": 0,
   "peakEra": null,
   "units": [],
+  "projects": [],
   "harvests": [
    [
     "YIELD_PRODUCTION",
@@ -23770,6 +23779,7 @@ export const AI_RESOURCES: readonly AiResourceRow[] = [
   "happiness": 0,
   "peakEra": null,
   "units": [],
+  "projects": [],
   "harvests": [
    [
     "YIELD_FOOD",
@@ -23793,6 +23803,7 @@ export const AI_RESOURCES: readonly AiResourceRow[] = [
   "happiness": 4,
   "peakEra": null,
   "units": [],
+  "projects": [],
   "harvests": [],
   "harvestTechs": [],
   "yields": [
@@ -23809,6 +23820,7 @@ export const AI_RESOURCES: readonly AiResourceRow[] = [
   "happiness": 4,
   "peakEra": null,
   "units": [],
+  "projects": [],
   "harvests": [],
   "harvestTechs": [],
   "yields": [
@@ -23825,6 +23837,7 @@ export const AI_RESOURCES: readonly AiResourceRow[] = [
   "happiness": 4,
   "peakEra": null,
   "units": [],
+  "projects": [],
   "harvests": [],
   "harvestTechs": [],
   "yields": [
@@ -23841,6 +23854,7 @@ export const AI_RESOURCES: readonly AiResourceRow[] = [
   "happiness": 4,
   "peakEra": null,
   "units": [],
+  "projects": [],
   "harvests": [],
   "harvestTechs": [],
   "yields": [
@@ -23857,6 +23871,7 @@ export const AI_RESOURCES: readonly AiResourceRow[] = [
   "happiness": 4,
   "peakEra": null,
   "units": [],
+  "projects": [],
   "harvests": [],
   "harvestTechs": [],
   "yields": [
@@ -23873,6 +23888,7 @@ export const AI_RESOURCES: readonly AiResourceRow[] = [
   "happiness": 4,
   "peakEra": null,
   "units": [],
+  "projects": [],
   "harvests": [],
   "harvestTechs": [],
   "yields": [
@@ -23889,6 +23905,7 @@ export const AI_RESOURCES: readonly AiResourceRow[] = [
   "happiness": 4,
   "peakEra": null,
   "units": [],
+  "projects": [],
   "harvests": [],
   "harvestTechs": [],
   "yields": [
@@ -23909,6 +23926,7 @@ export const AI_RESOURCES: readonly AiResourceRow[] = [
   "happiness": 4,
   "peakEra": null,
   "units": [],
+  "projects": [],
   "harvests": [],
   "harvestTechs": [],
   "yields": [
@@ -23929,6 +23947,7 @@ export const AI_RESOURCES: readonly AiResourceRow[] = [
   "happiness": 4,
   "peakEra": null,
   "units": [],
+  "projects": [],
   "harvests": [],
   "harvestTechs": [],
   "yields": [
@@ -23945,6 +23964,7 @@ export const AI_RESOURCES: readonly AiResourceRow[] = [
   "happiness": 4,
   "peakEra": null,
   "units": [],
+  "projects": [],
   "harvests": [],
   "harvestTechs": [],
   "yields": [
@@ -23965,6 +23985,7 @@ export const AI_RESOURCES: readonly AiResourceRow[] = [
   "happiness": 4,
   "peakEra": null,
   "units": [],
+  "projects": [],
   "harvests": [],
   "harvestTechs": [],
   "yields": [
@@ -23981,6 +24002,7 @@ export const AI_RESOURCES: readonly AiResourceRow[] = [
   "happiness": 4,
   "peakEra": null,
   "units": [],
+  "projects": [],
   "harvests": [],
   "harvestTechs": [],
   "yields": [
@@ -23997,6 +24019,7 @@ export const AI_RESOURCES: readonly AiResourceRow[] = [
   "happiness": 4,
   "peakEra": null,
   "units": [],
+  "projects": [],
   "harvests": [],
   "harvestTechs": [],
   "yields": [
@@ -24013,6 +24036,7 @@ export const AI_RESOURCES: readonly AiResourceRow[] = [
   "happiness": 4,
   "peakEra": null,
   "units": [],
+  "projects": [],
   "harvests": [],
   "harvestTechs": [],
   "yields": [
@@ -24029,6 +24053,7 @@ export const AI_RESOURCES: readonly AiResourceRow[] = [
   "happiness": 4,
   "peakEra": null,
   "units": [],
+  "projects": [],
   "harvests": [],
   "harvestTechs": [],
   "yields": [
@@ -24049,6 +24074,7 @@ export const AI_RESOURCES: readonly AiResourceRow[] = [
   "happiness": 4,
   "peakEra": null,
   "units": [],
+  "projects": [],
   "harvests": [],
   "harvestTechs": [],
   "yields": [
@@ -24065,6 +24091,7 @@ export const AI_RESOURCES: readonly AiResourceRow[] = [
   "happiness": 4,
   "peakEra": null,
   "units": [],
+  "projects": [],
   "harvests": [],
   "harvestTechs": [],
   "yields": [
@@ -24081,6 +24108,7 @@ export const AI_RESOURCES: readonly AiResourceRow[] = [
   "happiness": 4,
   "peakEra": null,
   "units": [],
+  "projects": [],
   "harvests": [],
   "harvestTechs": [],
   "yields": [
@@ -24097,6 +24125,7 @@ export const AI_RESOURCES: readonly AiResourceRow[] = [
   "happiness": 4,
   "peakEra": null,
   "units": [],
+  "projects": [],
   "harvests": [],
   "harvestTechs": [],
   "yields": [
@@ -24113,6 +24142,7 @@ export const AI_RESOURCES: readonly AiResourceRow[] = [
   "happiness": 4,
   "peakEra": null,
   "units": [],
+  "projects": [],
   "harvests": [],
   "harvestTechs": [],
   "yields": [
@@ -24129,6 +24159,7 @@ export const AI_RESOURCES: readonly AiResourceRow[] = [
   "happiness": 4,
   "peakEra": null,
   "units": [],
+  "projects": [],
   "harvests": [],
   "harvestTechs": [],
   "yields": [
@@ -24145,6 +24176,7 @@ export const AI_RESOURCES: readonly AiResourceRow[] = [
   "happiness": 4,
   "peakEra": null,
   "units": [],
+  "projects": [],
   "harvests": [],
   "harvestTechs": [],
   "yields": [
@@ -24161,6 +24193,7 @@ export const AI_RESOURCES: readonly AiResourceRow[] = [
   "happiness": 4,
   "peakEra": null,
   "units": [],
+  "projects": [],
   "harvests": [],
   "harvestTechs": [],
   "yields": [
@@ -24181,6 +24214,7 @@ export const AI_RESOURCES: readonly AiResourceRow[] = [
   "happiness": 4,
   "peakEra": null,
   "units": [],
+  "projects": [],
   "harvests": [],
   "harvestTechs": [],
   "yields": [
@@ -24201,6 +24235,7 @@ export const AI_RESOURCES: readonly AiResourceRow[] = [
   "happiness": 4,
   "peakEra": null,
   "units": [],
+  "projects": [],
   "harvests": [],
   "harvestTechs": [],
   "yields": [],
@@ -24212,6 +24247,7 @@ export const AI_RESOURCES: readonly AiResourceRow[] = [
   "happiness": 6,
   "peakEra": null,
   "units": [],
+  "projects": [],
   "harvests": [],
   "harvestTechs": [],
   "yields": [],
@@ -24223,6 +24259,7 @@ export const AI_RESOURCES: readonly AiResourceRow[] = [
   "happiness": 4,
   "peakEra": null,
   "units": [],
+  "projects": [],
   "harvests": [],
   "harvestTechs": [],
   "yields": [],
@@ -24234,6 +24271,7 @@ export const AI_RESOURCES: readonly AiResourceRow[] = [
   "happiness": 4,
   "peakEra": null,
   "units": [],
+  "projects": [],
   "harvests": [],
   "harvestTechs": [],
   "yields": [],
@@ -24245,6 +24283,7 @@ export const AI_RESOURCES: readonly AiResourceRow[] = [
   "happiness": 6,
   "peakEra": null,
   "units": [],
+  "projects": [],
   "harvests": [],
   "harvestTechs": [],
   "yields": [],
@@ -24256,6 +24295,7 @@ export const AI_RESOURCES: readonly AiResourceRow[] = [
   "happiness": 6,
   "peakEra": null,
   "units": [],
+  "projects": [],
   "harvests": [],
   "harvestTechs": [],
   "yields": [],
@@ -24274,6 +24314,7 @@ export const AI_RESOURCES: readonly AiResourceRow[] = [
    "UNIT_JET_FIGHTER",
    "UNIT_JET_BOMBER"
   ],
+  "projects": [],
   "harvests": [],
   "harvestTechs": [],
   "yields": [
@@ -24294,6 +24335,7 @@ export const AI_RESOURCES: readonly AiResourceRow[] = [
    "UNIT_BATTLESHIP",
    "UNIT_BRAZILIAN_MINAS_GERAES"
   ],
+  "projects": [],
   "harvests": [],
   "harvestTechs": [],
   "yields": [
@@ -24321,6 +24363,7 @@ export const AI_RESOURCES: readonly AiResourceRow[] = [
    "UNIT_COLOMBIAN_LLANERO",
    "UNIT_ETHIOPIAN_OROMO_CAVALRY"
   ],
+  "projects": [],
   "harvests": [],
   "harvestTechs": [],
   "yields": [
@@ -24357,6 +24400,7 @@ export const AI_RESOURCES: readonly AiResourceRow[] = [
    "UNIT_MALI_MANDEKALU_CAVALRY",
    "UNIT_BYZANTINE_TAGMA"
   ],
+  "projects": [],
   "harvests": [],
   "harvestTechs": [],
   "yields": [
@@ -24383,6 +24427,7 @@ export const AI_RESOURCES: readonly AiResourceRow[] = [
    "UNIT_DE_ZEVEN_PROVINCIEN",
    "UNIT_SULEIMAN_JANISSARY"
   ],
+  "projects": [],
   "harvests": [],
   "harvestTechs": [],
   "yields": [
@@ -24414,6 +24459,7 @@ export const AI_RESOURCES: readonly AiResourceRow[] = [
    "UNIT_MISSILE_CRUISER",
    "UNIT_MODERN_ARMOR"
   ],
+  "projects": [],
   "harvests": [],
   "harvestTechs": [],
   "yields": [
@@ -24432,6 +24478,10 @@ export const AI_RESOURCES: readonly AiResourceRow[] = [
   "units": [
    "UNIT_GIANT_DEATH_ROBOT"
   ],
+  "projects": [
+   "PROJECT_BUILD_NUCLEAR_DEVICE",
+   "PROJECT_BUILD_THERMONUCLEAR_DEVICE"
+  ],
   "harvests": [],
   "harvestTechs": [],
   "yields": [
@@ -24448,6 +24498,7 @@ export const AI_RESOURCES: readonly AiResourceRow[] = [
   "happiness": 0,
   "peakEra": null,
   "units": [],
+  "projects": [],
   "harvests": [],
   "harvestTechs": [],
   "yields": [],
@@ -24459,6 +24510,7 @@ export const AI_RESOURCES: readonly AiResourceRow[] = [
   "happiness": 0,
   "peakEra": null,
   "units": [],
+  "projects": [],
   "harvests": [],
   "harvestTechs": [],
   "yields": [],
@@ -24470,6 +24522,7 @@ export const AI_RESOURCES: readonly AiResourceRow[] = [
   "happiness": 4,
   "peakEra": null,
   "units": [],
+  "projects": [],
   "harvests": [],
   "harvestTechs": [],
   "yields": [
@@ -24486,6 +24539,7 @@ export const AI_RESOURCES: readonly AiResourceRow[] = [
   "happiness": 4,
   "peakEra": null,
   "units": [],
+  "projects": [],
   "harvests": [],
   "harvestTechs": [],
   "yields": [
@@ -24506,6 +24560,7 @@ export const AI_RESOURCES: readonly AiResourceRow[] = [
   "happiness": 4,
   "peakEra": null,
   "units": [],
+  "projects": [],
   "harvests": [],
   "harvestTechs": [],
   "yields": [
@@ -24522,6 +24577,7 @@ export const AI_RESOURCES: readonly AiResourceRow[] = [
   "happiness": 0,
   "peakEra": null,
   "units": [],
+  "projects": [],
   "harvests": [
    [
     "YIELD_GOLD",
@@ -24545,6 +24601,7 @@ export const AI_RESOURCES: readonly AiResourceRow[] = [
   "happiness": 4,
   "peakEra": null,
   "units": [],
+  "projects": [],
   "harvests": [],
   "harvestTechs": [],
   "yields": [

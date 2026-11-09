@@ -73,7 +73,7 @@ import { AI_BUILDING_INDEX, AI_UNIT_INDEX, amenityCityOf, amenityPerTurn, buildi
 import { defensiveCancel } from './aiCityTrees';
 import { projectTable, type ProjectTableFacts } from './aiProjectValue';
 import { economicGoldBoost } from './aiWeights';
-import { accrueStockpiles, canPayStockpile, capStockpiles, chargeUnitUpkeep, spendStockpile, stockFree, stockOf, stockpileCap, stockpileIncome, strategicSlot, strategicSurplus, unitResourceCost, unitUpkeepBill, upgradeGoldCost, upgradeType } from './stockpile';
+import { accrueStockpiles, canPayStockpile, capStockpiles, chargeUnitResource, chargeUnitUpkeep, spendStockpile, stockFree, stockOf, stockpileCap, stockpileIncome, strategicSlot, strategicSurplus, unitResourceCost, unitUpkeepBill, upgradeGoldCost, upgradeType } from './stockpile';
 import { FX, FX_MIN, fmul, fxConst, fxOf, pseudoYieldValue, turnsAt, valueBetween, yieldValue } from './aiValue';
 import { aiCityStats, cityGrowth, aiView, storeUnitStrength } from './aiView';
 import { congressBannedLuxury, congressQueueMult } from './congress';
@@ -920,8 +920,11 @@ export function minorUnitPrice(state: GameState, cityState: CityState, id: strin
 
 /** THE MINOR BUYS A UNIT in its city: the purse covers the price, the unit
  *  stands on or beside the centre (none bought with no free tile) and carries
- *  the city's training grants; a Faith purchase raises the seat's bests.
- *  Returns the unit. */
+ *  the city's training grants and its strategic cost (the purchase 0xa540c0:
+ *  the queue's charge 0x17c2e0 through ChangeResourceAmount, the stock held
+ *  at 0; runs/h1_duelq1121 Hunza's Horseman bought at t42, its Horses 25 ->
+ *  15, the Pasture row on 230 at t225 377.79 on 15); a Faith purchase raises
+ *  the seat's bests. Returns the unit. */
 export function minorBuyUnit(state: GameState, cityState: CityState, id: string, currency: 'gold' | 'faith'): Unit | undefined {
   const price = minorUnitPrice(state, cityState, id, currency);
   if (!goldAffordable(currency === 'gold' ? cityState.treasury : cityState.faith, price)) return undefined;
@@ -931,6 +934,10 @@ export function minorBuyUnit(state: GameState, cityState: CityState, id: string,
   // Muscat's Builder bought onto its centre 42:15 lays 43:15's Farm at t31;
   // every unit the five duely duels' city-states bought sat its turn idle)
   u.movesLeft = 0;
+  const res = unitResourceCost(id);
+  const was = res ? stockOf(state, cityState.seat, res.id) : 0;
+  if (res) chargeUnitResource(state, cityState.seat, id);
+  const spent = res ? was - stockOf(state, cityState.seat, res.id) : 0;
   if (currency === 'faith') {
     cityState.faith -= price;
     raiseBestTrained(state, cityState.seat, id);
@@ -938,16 +945,16 @@ export function minorBuyUnit(state: GameState, cityState: CityState, id: string,
   }
   applyTrainingGrants(state, minorCity(cityState), u);
   cityState.treasury -= price;
-  purchaseTracer?.(cityState, u, price);
+  purchaseTracer?.(cityState, u, price, spent);
   return u;
 }
 
-let purchaseTracer: ((cityState: CityState, u: Unit, price: number) => void) | null = null;
+let purchaseTracer: ((cityState: CityState, u: Unit, price: number, spent: number) => void) | null = null;
 
-/** The action replay's view of a minor's own Gold purchases (the unit and
- *  its price), so that it can undo one the record's player did not make
- *  whole. Null outside a replay. */
-export function traceMinorPurchases(fn: ((cityState: CityState, u: Unit, price: number) => void) | null): void {
+/** The action replay's view of a minor's own Gold purchases (the unit, its
+ *  price and the strategic stock it spent), so that it can undo one the
+ *  record's player did not make whole. Null outside a replay. */
+export function traceMinorPurchases(fn: ((cityState: CityState, u: Unit, price: number, spent: number) => void) | null): void {
   purchaseTracer = fn;
 }
 
@@ -1359,15 +1366,17 @@ export function minorQueueOk(state: GameState, cityState: CityState, item: Exclu
  *  (0x538460 — runs/h1_duelu1117 Valletta t195-t220: its Warrior contract 680
  *  ACCEPTED beside Gunpowder, the Gold over a Warrior's price, never bought,
  *  the record's purchase list without the Warrior), no civilization's unique
- *  unit, none faith-bought, spawned or a spy, a naval unit at a coastal
- *  centre, an air unit beside a complete Aerodrome, a Trader below the trade
- *  capacity, the Archaeologist with an Archaeological Museum; a city-state
- *  ignores the strategic resources. `id` the engine's unit */
+ *  unit, none MajorCivOnly (`majorCivOnly`), faith-bought, spawned or a spy,
+ *  a naval unit at a coastal centre, an air unit beside a complete
+ *  Aerodrome, a Trader below the trade capacity, the Archaeologist with an
+ *  Archaeological Museum; a city-state ignores the strategic resources.
+ *  `id` the engine's unit */
 export function minorCanTrain(state: GameState, cityState: CityState, id: string): boolean {
   const r = cityState.research;
   const held = cityState.buildings ?? [];
   const d = UNITS[id];
   if (!d || d.uniqueTo || d.faithOnly || d.spawnOnly || d.spy) return false;
+  if (majorCivOnly(installType('unit', id, 'UNIT_'))) return false;
   if (d.requiresTech && !r.techs.includes(d.requiresTech)) return false;
   if (d.requiresCivic && !r.civics.includes(d.requiresCivic)) return false;
   if (unitObsoleteIn(r, installType('unit', id, 'UNIT_'))) return false;
@@ -1508,13 +1517,22 @@ export function analysedTurns(entries: readonly { id: string; next: string; turn
 
 /** A minor's version of a unit (player +0x12e8 +0x1c0, written by
  *  0x4f4a50): none for a civilization's unique unit (TraitType +0x2d0), a
- *  MajorCivOnly one, a unit that founds a city, one the database bars from
- *  training (CanTrain +0x1b8 bit 0x20); EnabledByReligion (bit 0x40) is not
- *  asked (runs/h1_duelv1128 Nazca t44-57: the Temple's Warrior Monk valued
- *  through 0x7b62c0, the Temple valid) */
+ *  unit that founds a city, one the database bars from training (CanTrain
+ *  +0x1b8 bit 0x20); neither EnabledByReligion (bit 0x40) nor MajorCivOnly
+ *  is asked (runs/h1_duelv1128 Nazca t44-57: the Temple's Warrior Monk
+ *  valued through 0x7b62c0, the Temple valid; runs/h1_duelq1127 Hattusa
+ *  t249: the Giant Death Robot in its unit production table, its Uranium's
+ *  need 31) — CanTrain refuses a MajorCivOnly unit (`minorCanTrain`) */
 export function minorUnitVersion(u: string): string | null {
   const row = AI_UNITS[AI_UNIT_INDEX.get(u) ?? -1];
-  return row && !row.trait && !row.majorOnly && !row.foundCity && row.canTrain ? u : null;
+  return row && !row.trait && !row.foundCity && row.canTrain ? u : null;
+}
+
+/** Units_XP2 MajorCivOnly (+0x48 bit 0x10): CanTrain (0x172820, before the
+ *  prerequisites it may skip) refuses the unit to a player that is not a
+ *  full civilization */
+export function majorCivOnly(u: string): boolean {
+  return !!AI_UNITS[AI_UNIT_INDEX.get(u) ?? -1]?.majorOnly;
 }
 
 /** The promotion class weight (0x723bb0) of a player whose lists are

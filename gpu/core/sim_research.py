@@ -516,6 +516,8 @@ class SimResearch:
             "e_res": torch.tensor([r for r, _u in ents] or [0], dtype=torch.long, device=dev),
             "e_need": torch.tensor([int(u["need"]) for _r, u in ents] or [0], dtype=torch.long, device=dev),
             "e_ver": torch.tensor([bool(u["ver"]) for _r, u in ents] or [False], dtype=torch.bool, device=dev),
+            "e_row": torch.tensor([int(u["row"]) for _r, u in ents] or [0], dtype=torch.long, device=dev),
+            "proj": torch.tensor([int(a["proj"]) for a in rules.res_ai], dtype=torch.long, device=dev),
             "e_obs_t": e_obs_t, "e_obs_c": e_obs_c, "e_eng": e_eng, "n_ent": ne, "nr": nr,
             "py_happy": _fx_const(float(rules.ai_value["pyHappiness"])),
             "py_lux": _fx_const(float(rules.ai_value["pyLuxury"])),
@@ -625,7 +627,10 @@ class SimResearch:
             own_t = torch.zeros(B, self.NU, dtype=torch.long, device=dev)
             own_t.scatter_add_(1, ut, mineu.long())
             owned = (own_t.unsqueeze(1) * R["e_eng"].unsqueeze(0).long()).sum(dim=2)    # [B, E]
-            intab = R["e_ver"].unsqueeze(0) & (~obs | (owned > 0))
+            # the unit production table's entries (`unitProductionTable`):
+            # the minor's version, not obsolete unless held, listed
+            listed = self._unit_listed(s).gather(1, R["e_row"].unsqueeze(0).expand(B, -1))
+            intab = R["e_ver"].unsqueeze(0) & (~obs | (owned > 0)) & listed
             need = torch.zeros(B, nr, dtype=torch.long, device=dev)
             need.scatter_reduce_(1, R["e_res"].unsqueeze(0).expand(B, -1), torch.where(intab, R["e_need"].unsqueeze(0), torch.zeros_like(owned)), "amax")
             used = torch.zeros(B, nr, dtype=torch.long, device=dev)
@@ -652,6 +657,7 @@ class SimResearch:
             w = chrono.unsqueeze(1) * _fx_const(25.0)
             w = torch.where(nd > 0, torch.div(w * _FX, (nd * _FX).clamp(min=1), rounding_mode="trunc"), w)
             w = torch.where(hv == 0, _fmul(w, torch.full_like(w, 2 * _FX)), w)
+            w = w + (R["proj"][rc] > 0).long().unsqueeze(0) * _fx_const(50.0)
             st = _fmul(_discounted(w, T["rate"], nn), n * _FX)
             st = torch.where(used.gather(1, rc.unsqueeze(0).expand(B, -1)) > 0, st, torch.zeros_like(st))
             v = torch.where(cls == 1, lux, torch.where(cls == 2, st, torch.zeros_like(lux))).clamp(max=800 * _FX)

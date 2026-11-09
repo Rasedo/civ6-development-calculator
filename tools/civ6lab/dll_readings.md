@@ -13914,3 +13914,55 @@ no clamp; its +0xc4 is the raw damage.
   / 32 and the blow back 32 / 28 put the spot under the exchange filter
   (64 > 56), the real t31 blow there 22 against 18 (CombatLog +2 / -2): no
   mutual kill, the input that keeps the spot unread.
+
+## C-127 / C-98: a minor's purchase charges its strategic cost; the resource value's project term; a minor's MajorCivOnly units in its unit production table — READ (0xa540c0, 0x7a21e0 at 0x7a2b71, 0xa9cfb0, 0x4f4a50, 0x172941), both twins
+
+- THE PURCHASE (0xa540c0, the city purchase's execution behind its test
+  0xa53980, which holds the World Congress's Gold / Faith bans and
+  LOC_UNIT_TRAIN_REQUIRES_RESOURCE_AMOUNT): a unit with a StrategicResource
+  (Units +0x2c8) is charged the queue's charge (0x17c2e0) through
+  ChangeResourceAmount (0x4a7560, ownership 0, the amount negated) for every
+  player, with no FULL_CIV test; an accumulated resource's stock is held at 0
+  (0x4a77ae); a suzerained city-state's negative change passes nothing to
+  its suzerain (0x44eff0 hands on a positive accumulated change only), so
+  its stock falls. `minorBuyUnit` (`chargeUnitResource`) / `_minor_buy_unit`;
+  the replay charges the real state's minor for each copy purchase it keeps
+  or imposes (`minorBuysAfter`) and gives the stock back with a purchase it
+  undoes.
+- Confirmed: runs/h1_duelq1121 Hunza (suzerained at t42, its Horses 25)
+  buys a Horseman at t42 (CityMadePurchase; the scaled ResourceCost 10):
+  Horses 15. Its Pasture row on 230 at t225 is 377.79: need 20 (the
+  Horseman), have 15, 25 copies (40 less 15) at 8 x 25.0 / 20 = 10.0. The
+  Equestrian Orders values t42-t225 (37 ... 150) read min(c, 40 - c) = 15
+  copies, which 15 and 25 both give.
+- THE PROJECT TERM (0x7a2b71..0x7a2b9b): Resources +0xd0..+0xd8 is the
+  list of the Projects whose PrereqResource is the resource (the loader
+  0xa9cfb0, between the Technologies list +0xc8 and StartBiasResources
+  +0xe8; Units +0x100). Where it is not empty a copy's worth gains 50.0,
+  after the x2 and the cap clamp, before the x1.5 test. Only Uranium has
+  one (PROJECT_BUILD_NUCLEAR_DEVICE, PROJECT_BUILD_THERMONUCLEAR_DEVICE).
+  `AiResourceRow.projects` (tools/install/ai_tables.py), `resourceValue`;
+  GPU `_cv_resource_value`, `_rai_resources` (the export's `proj`).
+- A MINOR'S MajorCivOnly UNITS: the unit versions (0x4f4a50) read no
+  MajorCivOnly; CanTrain (0x172820) refuses such a unit (Units_XP2 +0x48 bit
+  0x10, 0x17293b) to a player that is not FULL_CIV (0x172941), before the
+  prerequisites it may skip. So a city-state's unit production table
+  (0x7989e0) lists the Giant Death Robot once its research AI answers for
+  it (`researchListed`), and the Uranium's need is 31 (ResourceCost 1 + 10
+  x 3). `minorUnitVersion` / `unit_version` (and the GPU's operations
+  table) no longer drop it; `minorCanTrain` / `_minor_can_train` and the
+  UNITS table (`unitTable` / `_cv_unit_table`) refuse it (`majorCivOnly`).
+  The GPU's resource value reads the table's listing (`_unit_listed` on the
+  export's AI unit `row`).
+- Confirmed: runs/h1_duelq1127 Hattusa (Combined Arms at t248, Robotics
+  first in its AI_Research.csv at t248, 195 turns): its Mine on Uranium
+  3:11 over its Farm 404.05 at t249 = -458.84 + 800.0 (60 copies at
+  (8 x 25.0 / 31) x 2 + 50.0 = 62.89, held to 800.0) + 62.89 (the Farm's
+  -1 copy), -458.84 at t242-248 with no unit asking it; the Builder
+  contract it makes at t249 (contract 1170, VALUE 404.0) as recorded.
+  plotValueLab.ts seeds the research AI's turns of the turn before.
+- Open (C-127): the production completion's strategic charge and its
+  reservation's release run under FULL_CIV alone (0x1853d0 at 0x18562c /
+  0x185988) where the engines charge a city-state's completed unit
+  (`minorFinish` / `_minor_finish`); runs/h1_duelq1128 Nazca's Horsemen
+  (t33, t37) the case to read.

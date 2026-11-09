@@ -411,13 +411,17 @@
 - addr: 0x4f4a50
   kind: function
   name: the unit versions
-  semantics: "per Units row the player's version (player +0x12e8 +0x1c0): itself, -1 for a row not CanTrain (+0x1b8 bit 0x20), a FoundCity row (+0x1b9 bit 2) the player's level forbids, a TraitType row (+0x2d0) its traits do not name, the level-hashed rows (0x8e7bf0); a trait's unit replaces its base (\"Two or more traits trying to replace the unit %s\"); EnabledByReligion (+0x1b8 bit 0x40) is not read"
+  semantics: "per Units row the player's version (player +0x12e8 +0x1c0): itself, -1 for a row not CanTrain (+0x1b8 bit 0x20), a FoundCity row (+0x1b9 bit 2) the player's level forbids, a TraitType row (+0x2d0) its traits do not name, the level-hashed rows (0x8e7bf0); a trait's unit replaces its base (\"Two or more traits trying to replace the unit %s\"); EnabledByReligion (+0x1b8 bit 0x40) and Units_XP2 MajorCivOnly are not read (CanTrain 0x172941 refuses MajorCivOnly)"
   status: READ
   cases:
     - recording: h1_duelv1128
       turn: 56
       value: Nazca's Temple 43.25 as logged, its Warrior Monk (EnabledByReligion) valued through 0x7b62c0 where the version passes; the UNITS table's Warrior Monk FX(-9999) by CanTrain
+    - recording: h1_duelq1127
+      turn: 249
+      value: "Hattusa's Giant Death Robot (MajorCivOnly) in its unit production table once Robotics is listed: the Uranium's need 31, its Mine on Uranium 3:11 404.05"
   impl: [cpu/core/minorBuild.ts:minorUnitVersion, gpu/core/sim_cityvalue.py:unit_version]
   readings:
     - "C-127 / C-96: a minor's unit versions, the unit table's religion gate and the building value's era reasons — READ, both twins"
+    - "C-127 / C-98: a minor's purchase charges its strategic cost; the resource value's project term; a minor's MajorCivOnly units in its unit production table — READ (0xa540c0, 0x7a21e0 at 0x7a2b71, 0xa9cfb0, 0x4f4a50, 0x172941), both twins"
   review: reviewed

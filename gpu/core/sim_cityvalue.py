@@ -1049,7 +1049,9 @@ class SimCityValue:
         for u in self._cv_tables()["unit_rows"]:
             # a unit not the player's own version, or landing past the
             # horizon, values FX(-9999) whatever the rest reads
-            if f.unit_version(u["type"]) != u["type"]:
+            # (and CanTrain, its prerequisites skipped, refuses a MajorCivOnly
+            # unit to a player that is not a full civilization)
+            if f.unit_version(u["type"]) != u["type"] or (u["majorOnly"] and not f.full_civ()):
                 out.append((torch.full_like(like, _FX_MIN), torch.ones_like(like, dtype=torch.bool)))
                 continue
             t = self._cv_unit_turns(f, u["type"])
@@ -2017,7 +2019,8 @@ class _MinorFacts:
 
     def unit_version(self, u):
         r = self.T["unit"].get(u)
-        ok = r is not None and not r["trait"] and not r["majorOnly"] and not r["foundCity"] and r["canTrain"]
+        # neither EnabledByReligion nor MajorCivOnly asked (`minorUnitVersion`)
+        ok = r is not None and not r["trait"] and not r["foundCity"] and r["canTrain"]
         return u if ok else None
 
     def _followed(self):

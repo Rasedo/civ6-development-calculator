@@ -146,11 +146,19 @@
   final: 0x528700
   kind: function
   name: resourceValue
-  semantics: "(out, player, resource, count, &rate, T, H): no resource 0. BONUS 0. LUXURY: v = PSEUDOYIELD_RESOURCE_LUXURY of 1.0 from T to H (0x7a2140); where the player holds it (0x4abfe0) and count > 0, 0; else for a full civilization or a city-state the amenities a copy gives (0x527a50), the player's cities with their amenities less those required (0x5275a0) sorted (0x79ea80), the first min(cities, amenities) each one Amenity more from T to H (0x79f7c0), at least v; at most 200.0. STRATEGIC: the need, the most of ResourceCost + 10 x ResourceMaintenanceAmount over the resource's units in the military AI's production table (0x79d340); have = 0x4a93c0(r, 1); where have is below twice the need, T = H (or H = 0) and count not positive, FX(-9999); a positive count held to twice the need less have; with a unit asking it each copy worth the era's chronology x 25.0 over the need (x2 with none had), discounted to T, times the copies; at most 800.0. The stockpile terms (0x7a2850..0x7a2d61): where Player_Resources +0x350 (0x4aa700) less +0x12e8 +0x1168 (0x4ab270) is below 0 and 0.5 x the need is above have, the need at least the shortfall's whole part; at T = H a positive count held to the cap (0x4aabe0) less the stock less its reservations; a resource with a +0xd0 list adds 50.0. ARTIFACT and LEY_LINE 0. Have is 0x4a93c0(r, 1) (0x7a228f / 0x7a28e7); the strategic flag [rsp+0x40] (set where T != H and H != 0) skips both the FX(-9999) exit and the cap clamp (0x4aabe0 less 0x4aa790), so the count is held to 2 x need - have alone. A city-state's have is its stockpile (minorResourceFacts, _rai_resources; CityState.stockpile / citystate_stockpile)."
-  status: PARTLY
+  semantics: "(out, player, resource, count, &rate, T, H): no resource 0. BONUS 0. LUXURY: v = PSEUDOYIELD_RESOURCE_LUXURY of 1.0 from T to H (0x7a2140); where the player holds it (0x4abfe0) and count > 0, 0; else for a full civilization or a city-state the amenities a copy gives (0x527a50), the player's cities with their amenities less those required (0x5275a0) sorted (0x79ea80), the first min(cities, amenities) each one Amenity more from T to H (0x79f7c0), at least v; at most 200.0. STRATEGIC: the need, the most of ResourceCost + 10 x ResourceMaintenanceAmount over the resource's units in the military AI's production table (0x79d340); have = 0x4a93c0(r, 1); where have is below twice the need, T = H (or H = 0) and count not positive, FX(-9999); a positive count held to twice the need less have; with a unit asking it each copy worth the era's chronology x 25.0 over the need (x2 with none had), discounted to T, times the copies; at most 800.0. The stockpile terms (0x7a2850..0x7a2d61): where Player_Resources +0x350 (0x4aa700) less +0x12e8 +0x1168 (0x4ab270) is below 0 and 0.5 x the need is above have, the need at least the shortfall's whole part; at T = H a positive count held to the cap (0x4aabe0) less the stock less its reservations; then a resource whose +0xd0 list (the Projects of that PrereqResource, loaded by 0xa9cfb0: the nuclear devices' Uranium) is not empty adds 50.0 to a copy's worth (0x7a2b71..0x7a2b9b), before the x1.5 test. ARTIFACT and LEY_LINE 0. Have is 0x4a93c0(r, 1) (0x7a228f / 0x7a28e7); the strategic flag [rsp+0x40] (set where T != H and H != 0) skips both the FX(-9999) exit and the cap clamp (0x4aabe0 less 0x4aa790), so the count is held to 2 x need - have alone. A city-state's have is its stockpile (minorResourceFacts, _rai_resources; CityState.stockpile / citystate_stockpile)."
+  status: READ
+  cases:
+    - recording: h1_duelq1127
+      turn: 249
+      value: "Hattusa's Mine on Uranium 3:11 over its Farm 404.05 (-458.84 to t248): the Giant Death Robot's need 31 in its table the turn after its research AI listed Robotics, a copy (8 x 25.0 / 31) x 2 + 50.0 = 62.89, 60 copies held to 800.0, the Farm's -1 copy 62.89 back"
+    - recording: h1_duelq1121
+      turn: 225
+      value: "Hunza's Pasture on Horses 230 377.79: need 20, have 15 (25 less its t42 Horseman purchase's 10), 25 copies at 10.0"
   impl:
     - cpu/core/aiResearch.ts:researchAnalysis
     - cpu/core/aiResource.ts:resourceValue
+    - gpu/core/sim_research.py:_rai_resources
     - cpu/core/aiPlotValue.ts:PlotValueFacts
     - gpu/core/sim_minorai.py:_cv_resource_value
     - cpu/core/aiPlotValue.ts:resourceCopies
@@ -168,8 +176,8 @@
     - "C-96: the improvement value — READ (0x7a58f0, 0x7b1320's yields, tourism and modifiers, the feature removal 0x7a3010, the harvest 0x7a37d0, the build unit 0x7a2e20, EFFECT_ADJUST_CITY_FREE_POWER), PARTLY READ (the hazards' turns, 0x7b1320's defence, claimed plots and neighbours terms)"
     - "C-96: the improvement value's resource copies, a minor's strategic copies, the district count"
     - "C-100: the luxury's ban, the power value's RequiredPower term and the plot adjacency's sight — READ"
+    - "C-127 / C-98: a minor's purchase charges its strategic cost; the resource value's project term; a minor's MajorCivOnly units in its unit production table — READ (0xa540c0, 0x7a21e0 at 0x7a2b71, 0xa9cfb0, 0x4f4a50, 0x172941), both twins"
   notes:
-    - "imported: READ in its section, no confirming case found beside it"
     - ".claude/scratchpad/cb3/NOTES.md: ...odifiers (Lighthouse/Shipyard), units (0x78e0a0 military table),  projects 0x7b28c0, resource value 0x7a21e0, districts/improvements, scorer/DS pick/events/contracts, swap. CHECKS: tsc OK, vitest green (after..."
     - ".claude/scratchpad/cb4/NOTES.md: ...aintenance < handicap 3, PV...  NEXT: unit value / military table; DS pick 0x5d4d70; resource value 0x7a21e0; docs (dll_readings, AUDIT); checks; sweep; replays...."
     - ".claude/scratchpad/cb5/NOTES.md: ...rt units (Ram/Siege Tower), project value 0x7b28c0 (district projects,   Manhattan), resource value 0x7a21e0, GPU twin, swap...."

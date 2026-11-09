@@ -2015,13 +2015,24 @@ class SimMinors:
         """[B] — `minorCanTrain` of chassis `ui` ([B], -1 none), its
         prerequisites asked (0x172820, sixth argument clear): the minor's
         research unlocks it and has not made it obsolete (0x538460), no
-        civilization's unique, none faith-bought, spawned or a spy, a naval
-        unit at a coastal centre, an air unit beside a complete Aerodrome, a
-        Trader below the trade capacity, the Archaeologist with an
-        Archaeological Museum; a city-state ignores the strategic resources"""
+        civilization's unique, none MajorCivOnly, faith-bought, spawned or a
+        spy, a naval unit at a coastal centre, an air unit beside a complete
+        Aerodrome, a Trader below the trade capacity, the Archaeologist with
+        an Archaeological Museum; a city-state ignores the strategic
+        resources"""
         row = self._CITY_MINOR0 + s
         u0 = ui.clamp(min=0, max=self.NU - 1)
+        major_only = getattr(self, "_type_major_only", None)
+        if major_only is None:
+            T = self._cv_tables()
+            major_only = torch.zeros(self.NU, dtype=torch.bool, device=self.device)
+            for k, r in enumerate(T["unit_rows"]):
+                ei = T["engine"]["unit"][k]
+                if r["majorOnly"] and 0 <= ei < self.NU:
+                    major_only[ei] = True
+            self._type_major_only = major_only
         ok = (ui >= 0) & (self._type_uniq.take(u0) < 0) & ~self._type_faith_only.take(u0) & ~self._type_spawn_only.take(u0)
+        ok = ok & ~major_only.take(u0)
         if self._spy_idx >= 0:
             ok = ok & (u0 != self._spy_idx)
         if not self._minor_any_res:

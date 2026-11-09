@@ -50,6 +50,7 @@
     - "C-98: a unit off the map counts on its owner's list until its end of turn"
     - "C-98: a city-state's City Analysis counts its knowledge base as its last turn left it — READ (0x608580 at 0x6085c9, 0x5c24e0 / 0x6fae70 on player signal +0x258, 0x785f30 in 0x6096c0's +0x370 list), both twins"
     - "C-98 / C-130: the unit production table's research listing and its no-opposition sums; the favoured technology over the stored table — READ (0x7989e0 at 0x798c26..0x798c4c and 0x7997bd..0x799924, 0x79ba50, 0x75d3d0, 0x761090, 0x763b00, 0x761b70, 0x71fb80 at 0x721b12), both twins"
+    - "C-127 / C-98: a minor's purchase charges its strategic cost; the resource value's project term; a minor's MajorCivOnly units in its unit production table — READ (0xa540c0, 0x7a21e0 at 0x7a2b71, 0xa9cfb0, 0x4f4a50, 0x172941), both twins"
   notes:
     - ".claude/scratchpad/cb5/NOTES.md: ...scratchpad/final.patch.  DONE: the UNIT value (0x7b62c0) + the military AI's unit production table (0x7989e0, cpu/core/aiUnitProduction.ts),   unit T (+5 on PrereqTech/Civic turns), maintenance as plain Gold..."
   context:

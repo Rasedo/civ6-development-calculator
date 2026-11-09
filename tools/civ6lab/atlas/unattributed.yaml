@@ -8170,6 +8170,37 @@
     - "- a flood (0xa2f200) skips its yield pass 0xa2ed80 — no \"Boosted Yield Chance\" draw at all (runs/h1_duelw11..."
     - "- MITIGATED_RIVER_FLOOD: the flood (0xa2f200) runs the damage pass 0xa2a4d0, whose out parameter is the MITIGATING player — the owne..."
   review: reviewed
+- addr: 0xa53980
+  final: 0x74ef40
+  kind: function
+  name: the city purchase's test
+  semantics: "the city purchase's CanStart: the World Congress's Gold / Faith unit bans (LOC_WORLD_CONGRESS_UNIT_ACCESS_BAN_GOLD / _FAITH), the stack test, the strategic amount (LOC_UNIT_TRAIN_REQUIRES_RESOURCE_AMOUNT / _PARTIAL, through 0x17c2e0); only its strings read"
+  status: PARTLY
+  readings:
+    - "C-127 / C-98: a minor's purchase charges its strategic cost; the resource value's project term; a minor's MajorCivOnly units in its unit production table — READ (0xa540c0, 0x7a21e0 at 0x7a2b71, 0xa9cfb0, 0x4f4a50, 0x172941), both twins"
+  context:
+    - "- THE PURCHASE (0xa540c0, the city purchase's execution behind its test 0xa53980, which holds the World Congress's Gold / Faith bans and LOC_UNIT_TRAIN_REQUIRES_RESOURC..."
+  review: reviewed
+- addr: 0xa540c0
+  final: 0x74f680
+  kind: function
+  name: the city purchase
+  semantics: "the city purchase's execution (no direct caller: a command's vtable). A unit (+0x18 0): its StrategicResource (Units +0x2c8) charged the queue's charge 0x17c2e0 through ChangeResourceAmount (0x4a7560, ownership 0, negated) for any player, no FULL_CIV test, a climate observation (0x288740), its population cost (0x17a2d0 -> ChangePopulation 0x1c79b0); a building's resource through 0x5254d0 (0xa542d7..0xa542ed); a district's placement (0xa54385..)"
+  status: READ
+  cases:
+    - recording: h1_duelq1121
+      turn: 42
+      value: "Hunza (suzerained) buys a Horseman (CityMadePurchase): Horses 25 -> 15, its Pasture row on 230 at t225 377.79 on have 15"
+  impl:
+    - cpu/core/minorBuild.ts:minorBuyUnit
+    - gpu/core/sim_minorai.py:_minor_buy_unit
+    - cpu/harness/replay.ts:minorBuysAfter
+  readings:
+    - "C-127 / C-98: a minor's purchase charges its strategic cost; the resource value's project term; a minor's MajorCivOnly units in its unit production table — READ (0xa540c0, 0x7a21e0 at 0x7a2b71, 0xa9cfb0, 0x4f4a50, 0x172941), both twins"
+  context:
+    - "...e value's project term; a minor's MajorCivOnly units in its unit production table — READ (0xa540c0, 0x7a21e0 at 0x7a2b71, 0xa9cfb0, 0x4f4a50, 0x172941), both twins"
+    - "- THE PURCHASE (0xa540c0, the city purchase's execution behind its test 0xa53980, which holds the World Congress..."
+  review: reviewed
 - addr: 0xa55190
   final: 0x7507f0
   kind: function
@@ -8258,6 +8289,23 @@
     - "...0), at least 200.0, summed; a weapon one (+0x148, its PrereqResource reference, which 0xa99160 writes: the Nuclear and Thermonuclear Devices, not the WMD column's Manhattan Project o..."
     - "...n test, CanConstruct's district gates and Nazca's early turns — READ (0x7b2aee -> +0x148, 0xa99160; 0x170450's exit 0x17143f, 0x406c00 / +0xb08), a fit for the rest, both twins"
     - "...is set — a qword, the PrereqResource reference the Projects loader's relation getter 0xa99160 writes (\"SELECT T1.rowid from Resources ... T2.PrereqResource\"), not the WMD column: th..."
+  review: reviewed
+- addr: 0xa9cfb0
+  final: 0x798440
+  kind: function
+  name: DB.Resources projects list
+  semantics: "a Resources row's +0xd0 vector (0xa9d137): SELECT T1.rowid from Projects inner join Resources on T2.ResourceType = T1.PrereqResource, Projects' rowid order; called from the database load 0xad68e0 between the Technologies (+0xc8, 0xa9d260) and StartBiasResources (+0xe8, 0xa9cc10) lists"
+  status: READ
+  cases:
+    - recording: h1_duelq1127
+      turn: 249
+      value: "Uranium's list (the nuclear devices) adds 50.0 a copy: Hattusa's Mine on Uranium 3:11 404.05"
+  impl: [tools/install/ai_tables.py:res_projects, cpu/core/aiResource.ts:AiResourceRow]
+  readings:
+    - "C-127 / C-98: a minor's purchase charges its strategic cost; the resource value's project term; a minor's MajorCivOnly units in its unit production table — READ (0xa540c0, 0x7a21e0 at 0x7a2b71, 0xa9cfb0, 0x4f4a50, 0x172941), both twins"
+  context:
+    - "...s MajorCivOnly units in its unit production table — READ (0xa540c0, 0x7a21e0 at 0x7a2b71, 0xa9cfb0, 0x4f4a50, 0x172941), both twins"
+    - ...0..+0xd8 is the list of the Projects whose PrereqResource is the resource (the loader 0xa9cfb0, between the Technologies list +0xc8 and StartBiasResources +0xe8; Units +0x100). Where...
   review: reviewed
 - addr: 0xabaaf0
   final: 0x7b5eb0

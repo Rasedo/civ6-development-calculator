@@ -1371,8 +1371,9 @@ class SimMinorAi:
         bans it and `count` is positive, else one Amenity more in its one city (a
         resource that gives one) at least PSEUDOYIELD_RESOURCE_LUXURY, at most
         200.0; a strategic the copies worth taking up to twice the need of the
-        minor's unit table, each 25.0 per era chronology step over the need
-        (x2 where it has none), discounted to `t` — FX(-9999) where it has
+        minor's unit production table, each 25.0 per era chronology step over
+        the need (x2 where it has none) and 50.0 more where a project asks it,
+        discounted to `t` — FX(-9999) where it has
         less than twice the need and none comes, the horizon not cut; at
         most 800.0"""
         T = self._cv_tables()
@@ -1423,7 +1424,10 @@ class SimMinorAi:
             own_t = torch.zeros(B, self.NU, dtype=torch.long, device=dev)
             own_t.scatter_add_(1, ut, mineu.long())
             owned = (own_t.unsqueeze(1) * R["e_eng"].unsqueeze(0).long()).sum(dim=2)
-            intab = R["e_ver"].unsqueeze(0) & (~obs | (owned > 0)) & (R["e_res"] == ri).unsqueeze(0)
+            # the unit production table's entries (`unitProductionTable`):
+            # the minor's version, not obsolete unless held, listed
+            listed = self._unit_listed(s).gather(1, R["e_row"].unsqueeze(0).expand(B, -1))
+            intab = R["e_ver"].unsqueeze(0) & (~obs | (owned > 0)) & listed & (R["e_res"] == ri).unsqueeze(0)
             need = torch.where(intab, R["e_need"].unsqueeze(0), torch.zeros_like(owned)).max(dim=1).values
             used = intab.any(dim=1)
         # a turn's income (Player_Resources +0x350) short of the units' fuel
@@ -1449,6 +1453,9 @@ class SimMinorAi:
         if k_s >= 0:
             room = (self._stockpile_cap(row_s) - (self.citystate_stockpile[:, s, k_s] - self._stock_reserved(row_s)[:, k_s])).take(bb)
             n = torch.where(~late & (n > 0), torch.minimum(n, room), n)
+        # a resource some project asks (Resources +0xd0) 50.0 more a copy
+        if row.get("projects"):
+            w = w + _fx_const(50.0)
         w = torch.where((have > nd) & (n + have < nd), _fmul(w, torch.full_like(w, _fx_const(1.5))), w)
         v = _fmul(_discounted(w, rate, t), n * _FX)
         v = torch.where(us & ~short, v, torch.where(short, torch.full_like(v, _FX_MIN), zero))
@@ -1590,8 +1597,9 @@ class SimMinorAi:
     def _minor_buy_unit(self, s: int, mask: torch.Tensor, ui: torch.Tensor, price: torch.Tensor) -> torch.Tensor:
         """`minorBuyUnit` in Gold where `mask`: the treasury covers the price,
         the unit stands on or beside the centre with the city's training
-        grants at Movement 0 (none bought with no free tile), the treasury
-        pays; [B] the games where it landed"""
+        grants at Movement 0 (none bought with no free tile), its strategic
+        cost charged (the purchase 0xa540c0 through 0x17c2e0, the stock held
+        at 0), the treasury pays; [B] the games where it landed"""
         go = mask & self._afford(self.citystate_treasury[:, s], price)
         if not bool(go.count_nonzero()):
             return go
@@ -1599,6 +1607,18 @@ class SimMinorAi:
         landed = self._minor_spawn(s, go, ui)
         rows = landed.nonzero(as_tuple=True)[0]
         self.major_unit_mp[rows, slot[rows]] = 0
+        if self._n_strategic:
+            u0 = ui.clamp(min=0, max=self.NU - 1)
+            rs = self._type_res_slot.take(u0)
+            pay = landed & (ui >= 0) & (rs >= 0)
+            if bool(pay.count_nonzero()):
+                bank = self.citystate_stockpile[:, s]
+                have = bank.gather(1, rs.clamp(min=0).unsqueeze(1)).squeeze(1)
+                take = torch.minimum(self._type_res_cost.take(u0).to(have.dtype), have).clamp(min=0)
+                bank.scatter_add_(1, rs.clamp(min=0).unsqueeze(1), -(pay.to(have.dtype) * take).unsqueeze(1))
+                row = self._CITY_MINOR0 + s
+                self._log_stock(pay.nonzero(as_tuple=True)[0], row, rs[pay], "uc")
+                self._rebuild_luxuries(row, pay)
         self.citystate_treasury[:, s] -= torch.where(landed, price, torch.zeros_like(price))
         return landed
 

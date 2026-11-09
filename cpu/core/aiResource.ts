@@ -19,10 +19,14 @@
  *    ResourceMaintenanceAmount); with no unit asking it 0; else the copies
  *    worth taking, `count` up to twice the need less what the player has
  *    (0x4a93c0), each worth 25.0 per era chronology step over the need (x2
- *    where it has none), discounted to `t`; a turn's income short of the
- *    units' fuel bill with half the need above what it has raises the need
- *    to the shortfall; at `t` = `h` the copies are held to the room the
- *    cap leaves.
+ *    where it has none) and 50.0 more where a project asks it (Resources
+ *    +0xd0, the projects of that PrereqResource), discounted to `t`; a
+ *    turn's income short of the units' fuel bill with half the need above
+ *    what it has raises the need to the shortfall; at `t` = `h` the copies
+ *    are held to the room the cap leaves (runs/h1_duelq1127 Hattusa t249:
+ *    its Mine on Uranium 3:11 over its Farm 404.05, the Giant Death Robot's
+ *    need 31 in its table the turn after its research AI first listed
+ *    Robotics, 62.89 a copy, 800.0 held, the Farm's -1 copy 62.89 back).
  *  - At most 800.0.
  */
 import { FX, FX_MIN, discounted, fdiv, fmul, fxConst, AI_RATE } from './aiValue';
@@ -41,6 +45,8 @@ export interface AiResourceRow {
   peakEra: string | null;
   /** the units whose StrategicResource it is, in the Units' order */
   units: readonly string[];
+  /** the projects whose PrereqResource it is (Resources +0xd0) */
+  projects: readonly string[];
   /** Resource_Harvests and Resource_YieldChanges: [YieldType, amount] */
   harvests: readonly (readonly [string, number])[];
   /** each Resource_Harvests row's PrereqTech, null none */
@@ -176,6 +182,9 @@ export function resourceValue(f: ResourceFacts, r: AiResourceRow, count: number,
       // at T = H (or H 0), the copies held to the room its cap leaves (the
       // cap 0x4aabe0 less its stock less its reservations, 0x4aa790)
       if (!late && n > 0) n = Math.min(n, f.room(r.type));
+      // a resource some project asks (Resources +0xd0: the nuclear devices'
+      // Uranium) 50.0 more a copy
+      if (r.projects.length) w += fxConst(50);
       if (have > need && n + have < need) w = fmul(w, fxConst(1.5));
       v = fmul(discounted(w, rate, t), n * FX);
     }
@@ -206,26 +215,29 @@ export function aiTechResources(tech: string): string[] {
 }
 
 /** a resource's row as the GPU reads it: its class (0 none or bonus, 1
- *  luxury, 2 strategic), Happiness, and per unit asking it the need it
- *  sets, whether it is a city-state's version (no trait, not MajorCivOnly,
- *  no FoundCity, CanTrain), its obsolete technologies and civics and the
- *  engine units of it (engine ids) */
-export function AI_RESOURCE_EXPORT(engineRes: string): { cls: number; happy: number; units: { need: number; ver: number; obsTechs: string[]; obsCivics: string[]; engine: string[] }[] } {
+ *  luxury, 2 strategic), Happiness, whether a project asks it (Resources
+ *  +0xd0), and per unit asking it the need it sets, whether it is a
+ *  city-state's version (no trait, no FoundCity, CanTrain:
+ *  `minorUnitVersion`), its AI unit row, its obsolete technologies and
+ *  civics and the engine units of it (engine ids) */
+export function AI_RESOURCE_EXPORT(engineRes: string): { cls: number; happy: number; proj: number; units: { need: number; ver: number; row: number; obsTechs: string[]; obsCivics: string[]; engine: string[] }[] } {
   const type = engineGameType('resource', engineRes, 'RESOURCE_', RESOURCES);
   const r = AI_RESOURCES.find((x) => x.type === type);
-  if (!r) return { cls: 0, happy: 0, units: [] };
+  if (!r) return { cls: 0, happy: 0, proj: 0, units: [] };
   const cls = r.class === 'RESOURCECLASS_LUXURY' ? 1 : r.class === 'RESOURCECLASS_STRATEGIC' ? 2 : 0;
   const units = r.units.map((u) => {
-    const row = AI_UNITS.find((x) => x.type === u)!;
+    const k = AI_UNITS.findIndex((x) => x.type === u);
+    const row = AI_UNITS[k];
     return {
       need: row.resourceCost + 10 * row.maintenanceResourceAmount,
-      ver: !row.trait && !row.majorOnly && !row.foundCity && row.canTrain ? 1 : 0,
+      ver: !row.trait && !row.foundCity && row.canTrain ? 1 : 0,
+      row: k,
       obsTechs: row.obsolete.map((o) => engineId('tech', o, 'TECH_', TECHS)).filter((x): x is string => !!x),
       obsCivics: row.obsolete.map((o) => engineId('civic', o, 'CIVIC_', CIVICS)).filter((x): x is string => !!x),
       engine: Object.keys(UNITS).filter((id) => engineGameType('unit', id, 'UNIT_', UNITS) === u),
     };
   });
-  return { cls, happy: r.happiness, units };
+  return { cls, happy: r.happiness, proj: r.projects.length ? 1 : 0, units };
 }
 
 /** the game type of an engine row: its own where that names it, else the
