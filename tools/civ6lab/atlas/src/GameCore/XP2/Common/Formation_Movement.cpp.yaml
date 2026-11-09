@@ -170,6 +170,7 @@
     - "C-95: a move order's path steps on from an attack's plot, its attack child by the order's flags, a non-attack order's destination, a melee blow on a civilian — READ (0x2720a0 at 0x272434..0x272544, 0x2715a0 at 0x2717cd / 0x271870..0x2718d7, 0x1385c0, 0x889e0, 0x2714b0, 0x206960 at 0x206a1f), both twins"
     - "C-95: a strike's step from beside its plot, a formation's planning plot at a radius, the ring walk's own location test — READ (0x962380 at 0x96267e..0x9626d2, 0x26ef40 at 0x26f0a4, 0x78fa10 at 0x78fab4..0x78facf, 0x815d50 -> 0x586360), both twins"
     - "C-95: the danger map's search goes on past a civilian, the target list's own civilian, a district the player never revealed, a strike a later turn's — READ (0x26e570 at 0x26e5cd, 0x271be0 at 0x271f0c..0x271f2e, 0x5861f0, 0x523520, 0x783980 at 0x784c4b..0x784c5f, 0x26e570 at 0x26e5e2..0x26e6c4), FIT (0x962380's strike on the walked path), both twins"
+    - "C-99: the safe plot's fort is any district of the player's own territory — READ (0x716b90 at 0x716de5..0x716e19, 0xabfc20 at 0xabfff5..0xac001b), both twins"
   context:
     - "...or 2 turns, flags 0x115 | 0x800 | 0x100 where the unit has not moved; the valid wrapper 0x26e570 refuses a node past the turn limit): the list at planning +0x30 (16-byte entries x, y,..."
     - "...centre, an Encampment) as a node whose step spends the Movement left (the valid wrapper 0x26e570: the attack's cost adds the Movement left, 0x1d0 += 0x1d4) and links nothing from it (a..."

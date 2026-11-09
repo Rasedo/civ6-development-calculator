@@ -50,7 +50,7 @@
   final: 0x4c59b0
   kind: function
   name: safePlot
-  semantics: "the safe plot over the planning reach of this turn (args: this, unit, a formation pointer, the taken list r9, the caller's [rsp+0x20] byte skipping the stacking test 0x585eb0, [rsp+0x28] a goal plot pointer valid by 0x497d20, [rsp+0x30] a whole Movement floor: node +0xc below it << 8 skipped at 0x716ca5): no fallout (0x2d2100); a fort (own plot, district with HitPoints, DistrictInfo +0x58) first, safe over dangerous, own territory, less Movement left; off it, with a goal, nearer the goal than the best taken by a unit that fights (0x56dc90 with 0), by one that does not off the goal itself (0x716f9a..0x717007), then lower danger, farther"
+  semantics: "the safe plot over the planning reach of this turn (args: this, unit, a formation pointer, the taken list r9, the caller's [rsp+0x20] byte skipping the stacking test 0x585eb0, [rsp+0x28] a goal plot pointer valid by 0x497d20, [rsp+0x30] a whole Movement floor: node +0xc below it << 8 skipped at 0x716ca5): no fallout (0x2d2100); a fort (own plot holding any district: DistrictInfo +0x58 alone, set on every row by 0xabfc20) first, safe over dangerous, own territory, less Movement left; off it, with a goal, nearer the goal than the best taken by a unit that fights (0x56dc90 with 0), by one that does not off the goal itself (0x716f9a..0x717007), then lower danger, farther"
   status: READ
   cases:
     - recording: h1_duelw1117-1128
@@ -62,8 +62,12 @@
     - recording: h1_duely1127
       turn: 88
       value: city-state 3's Galley 393216 on 30:19 takes 28:17 as logged, player 0's embarked Warrior on 29:15 keeping it out of 29:15 (0x585eb0 counts another player's units at peace)
+    - recording: h1_duelq1124
+      turn: 181
+      value: "city-state 3's embarked Cuirassier 1835008 on 39:17 takes 36:14 as logged: Granada's Harbor 40:13 (a fort, 4 off) taken first, the centre 41:12 a fort of equal danger, 36:14 of no danger 5 off the farther; t151 / t157 the Harbor over 41:13, t154 / t182 42:19 / 43:20 the same way"
   impl:
     - cpu/core/tactical.ts:safePlot
+    - cpu/core/tactical.ts:districtPlot
     - gpu/core/sim_tactics.py:_tac_safe_plot
     - cpu/core/barbarianOps.ts:SCOUT_NODES
     - cpu/core/tactical.ts:passSafePlot
@@ -79,6 +83,7 @@
     - "C-95: a ranged unit's danger reach holds only plots with Movement left — READ (0x7921e0, 0x791270, 0x26dab0), both twins"
     - "C-125: Protect Units' safe plot toward the operation's target — READ (0x716b90 at 0x716ca5 / 0x716f9a..0x717007, 0x80d790 at 0x80db1a / 0x80e44a / 0x80e8ab, 0x497d20), both twins"
     - "C-125: the safe plot's stacking test holds other players' units — READ (0x716b90 at 0x716d77 -> 0x585eb0 / 0x585d90), both twins"
+    - "C-99: the safe plot's fort is any district of the player's own territory — READ (0x716b90 at 0x716de5..0x716e19, 0xabfc20 at 0xabfff5..0xac001b), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "- THE SAFE PLOT (0x716b90): over the planning reach's plots of this turn (+0x8 <= 1), none taken already, none (0..."

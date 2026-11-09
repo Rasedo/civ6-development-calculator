@@ -1695,10 +1695,16 @@
   offset: 0x58
   name: HitPoints
   type: int
-  semantics: "set: the district defends (+0x5c the amount)."
-  status: PARTLY
+  semantics: "set on every Districts row whose HitPoints is not NULL — every row, the column's default 0 among them (0xabfc20); +0x5c the amount. The defence readers test +0x5c beside it; the safe plot's fort test (0x716e13) reads it alone."
+  status: READ
+  cases:
+    - recording: h1_duelq1124
+      turn: 151
+      value: city-state 3's Cuirassier 1835008 takes Granada's Harbor 40:13 as a fort (the safe plot, +0x58 alone), over 41:13, as logged
   writers: [0xabfc20]
-  readings: ["C-95: the danger map and Move to Safety — READ, ported"]
+  readings:
+    - "C-95: the danger map and Move to Safety — READ, ported"
+    - "C-99: the safe plot's fort is any district of the player's own territory — READ (0x716b90 at 0x716de5..0x716e19, 0xabfc20 at 0xabfff5..0xac001b), both twins"
   review: reviewed
 - kind: field
   owner: Districts

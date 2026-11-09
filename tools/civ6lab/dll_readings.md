@@ -14016,3 +14016,44 @@ no clamp; its +0xc4 is the raw damage.
   24.8 raw, 1.1 as 281/256, each through fx_mul_assign 0x16eb20) and a
   Builder's wonder charge through it (runs/h1_duelq1121 t38: Xi'an's
   Pyramids 18.66 + 16.5 x 281/256 = 36.7695 of 110, the engines 35.2).
+
+## C-99: the safe plot's fort is any district of the player's own territory — READ (0x716b90 at 0x716de5..0x716e19, 0xabfc20 at 0xabfff5..0xac001b), both twins
+
+`safePlot`'s fort test, `districtPlot` (cpu/core/tactical.ts); `_tac_safe_plot`'s
+`held` plane (gpu/core/sim_tactics.py).
+
+- THE TEST (0x716de5..0x716e19): a plot of the player's own territory
+  (+0x1c against the unit's +0x2e0) whose district (GetDistrictType
+  0x810d0: the plot's district object, the centre, any district placed, a
+  wonder's DISTRICT_WONDER) has DistrictInfo +0x58 set is a fort. The
+  test reads +0x58 alone; the defence readers (the district's defence
+  0x24a000, the planning's valid wrapper 0x26e570) read +0x5c, the
+  amount, beside it.
+- THE FLAG (the Districts loader 0xabfc20): +0x58 is set where the row's
+  HitPoints column (0x16) is not NULL (the column type, vt +0xd0, against
+  5), +0x5c its value. The column defaults to 0 (01_GameplaySchema.sql), so
+  every row sets it: a Harbor, a Holy Site, a Campus and a wonder's plot are
+  forts as the centre and the Encampment are.
+- THE ORDER IT MOVES: a fort taken, a later plot of no danger off the
+  player's territory replaces it only farther from the unit (the danger
+  branch), its own plots and forts of equal danger never; so a district
+  nearer the unit than the centre lets a farther plot of no danger win.
+- CONFIRMED (one-seed aimem traces, runs/h1_duelq1124 --from 148 / 178 /
+  189): city-state 3's embarked Cuirassier 1835008 t151 / t157 on 40:18
+  takes Granada's Harbor 40:13 over 41:13, both own water of no danger at
+  (1/0); t181 on 39:17 the Harbor (1/1, 4 off) is taken first, the centre
+  41:12 under the Battleship 1900550 a fort of equal danger, 36:14 (5 off,
+  unowned, no danger) the farther; t154 the Frigate 1572866 on 38:17 takes
+  42:19 past the Harbor (4 off) the same way; Attack Barb Camp's Protect
+  Units for the Cuirassier (target 40:21) t185 / t192 / t194 / t200 as
+  logged (42:15 / 43:21 / 39:15 / 0:20); runs/h1_duelq1128 t41 city-state
+  4's Horseman 589827 on 30:7 (Protect Units' danger move) takes Nazca's
+  Holy Site 33:10 over its walled centre 32:11 as logged. On the game's own
+  inputs (AI_Planning's order, the dumped danger, the records' plots) the
+  rule gives 42 of the 43 city-state Move to Safety rows of the five
+  duelq recordings, the centre and Encampment alone 37.
+- OPEN: runs/h1_duelq1124 t182 the Bombard 1638401 on 39:17 takes 43:20 as
+  the game's reach closes it first among the turn-1 plots of no Movement
+  left after the disembarking 40:12 / 41:12 / 42:12; the engines' reach
+  closes 36:14 / 35:15 / 36:13 / 39:12 .. 37:12 before it (the open list's
+  order of equal keys), so the engines take 36:13.

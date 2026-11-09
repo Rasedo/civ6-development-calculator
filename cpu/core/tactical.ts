@@ -3306,6 +3306,15 @@ function garrisonDistrict(state: GameState, t: Tile): boolean {
   return t.district === 'ENCAMPMENT' || cityCentre(state, t);
 }
 
+/** a plot holding a district (GetDistrictType 0x810d0: the city centre, any
+ *  other district placed, a wonder's DISTRICT_WONDER) — the safe plot's fort
+ *  test (0x716e13) reads DistrictInfo +0x58, which the Districts loader
+ *  (0xabfc20 at 0xabfff5..0xac001b) sets on every row whose HitPoints is not
+ *  NULL, the column's default 0 among them */
+function districtPlot(state: GameState, t: Tile): boolean {
+  return cityCentre(state, t) || !!t.district || !!t.builtWonder;
+}
+
 /** a city's centre (IsCity 0x81120) */
 function cityCentre(state: GameState, t: Tile): boolean {
   if (t.district === 'CITY_CENTER') return true;
@@ -3321,8 +3330,10 @@ function cityCentre(state: GameState, t: Tile): boolean {
  * h1_duely1127 t88: player 0's Warrior on 29:15 keeps city-state 3's Galley
  * 393216 to 28:17) and no unit at war with it
  * (0x5861f0), none in fallout (0x2d2100). A FORT is a plot of the player's
- * own territory whose district has HitPoints (DistrictInfo +0x58: the city
- * centre and the Encampment, `garrisonDistrict`). Against the best so far,
+ * own territory holding any district or wonder (`districtPlot`: runs/
+ * h1_duelq1124 t151 city-state 3's Cuirassier 1835008 takes Granada's
+ * Harbor 40:13 over 41:13; t181 a Harbor fort 4 plots off lets the farther
+ * 36:14 of equal danger take its place). Against the best so far,
  * the first taken: a fort over any plot but a fort, of two forts the lower
  * danger; a plot of no danger over one of danger, a fort aside; of two of no
  * danger the player's own territory, else the one with less Movement left;
@@ -3360,7 +3371,7 @@ function safePlot(state: GameState, pass: Pass, u: Unit, taken: ReadonlySet<numb
     const d = pass.danger[r.tile];
     const safe = d <= 0;
     const own = tileSeat(t) === u.seat;
-    const fort = own && garrisonDistrict(state, t);
+    const fort = own && districtPlot(state, t);
     const water = isWater(t);
     const dist = plotDistance(state, u.tileIndex, r.tile);
     const toGoal = goal >= 0 ? plotDistance(state, r.tile, goal) : -1;

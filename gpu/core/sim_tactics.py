@@ -5201,7 +5201,7 @@ class SimTactics:
         `taken`, none with a unit that keeps it out (`keptOut`: its own
         stacking with it, itself counted, or another player's at peace but a
         Trader), one at war with it or fallout, the first best — a fort (its
-        own territory under a city centre or an Encampment) over any plot
+        own territory under any district or wonder) over any plot
         but a fort, of two forts the lower danger; a plot of no danger over
         one of danger, a fort aside; of two of no danger its own territory,
         else less Movement left; of two of danger on its own territory its
@@ -5221,9 +5221,8 @@ class SimTactics:
                 & ~self._tac_hostile(seat) & (self.tile_fallout <= 0))
         if min_mv is not None:
             cand = cand & (mv >= (min_mv * _FIX).unsqueeze(1))
-        garrison = self._centre_plane()
-        if self._encamp_didx >= 0:
-            garrison = garrison | (self.district == self._encamp_didx)
+        # a fort's district: any (DistrictInfo +0x58 set on every row)
+        held = self._centre_plane() | (self.district >= 0) | (self.built_wonder >= 0)
         n = cand.sum(dim=1)
         best = torch.full((B,), -1, dtype=torch.long, device=dev)
         K = int(n.max()) if B else 0
@@ -5248,7 +5247,7 @@ class SimTactics:
             d = danger[bidx, p]
             safe = d <= 0
             own = self.tile_seat[bidx, p] == seat
-            fort = own & garrison[bidx, p]
+            fort = own & held[bidx, p]
             water = self.water[bidx, p]
             m = mv[bidx, p]
             dist = self.pair_dist[here, p].to(torch.long)
