@@ -101,9 +101,11 @@
   kind: function
   semantics: reserves a strategic resource amount.
   status: PARTLY
+  impl: [cpu/core/stockpile.ts:reserveStockpile, gpu/core/sim_minors.py:_minor_reserve]
   readings:
     - "H-1: the luxury allocation's rebuilds — PARTLY READ"
     - "C-96: the resource value and the research value's resources — READ (bonus, luxury, the call), PARTLY READ (the strategic stockpile terms)"
+    - "C-127: a city-state's completed unit keeps its strategic cost in the stock, reserved; a resource value's copies the stock less the reservations — READ (0x1853d0 at 0x18562c / 0x185988, 0x182b80 at 0x182bae, 0x17f3a0, 0x4a93c0), both twins; Add Goal Tech's kept contracts and execution — READ (0x7e7d20 at 0x7e7ea7..0x7e7fb2, 0x7e7200), unported"
   context:
     - ...t the queue's front with a strategic cost and no progress (0x17d1a0) reserves its cost (0x4a7400) where the player's amount less its reservations covers it (0x4aa790), else leaves the...
   review: reviewed
@@ -150,6 +152,7 @@
     - "H-1: the cards the luxury allocation ranks on — READ (the order), the triggers partly"
     - "H-1: a growth re-ranks no luxury; war weariness's amenities at the processing — READ"
     - "C-127 / C-98: a minor's purchase charges its strategic cost; the resource value's project term; a minor's MajorCivOnly units in its unit production table — READ (0xa540c0, 0x7a21e0 at 0x7a2b71, 0xa9cfb0, 0x4f4a50, 0x172941), both twins"
+    - "C-127: a city-state's completed unit keeps its strategic cost in the stock, reserved; a resource value's copies the stock less the reservations — READ (0x1853d0 at 0x18562c / 0x185988, 0x182b80 at 0x182bae, 0x17f3a0, 0x4a93c0), both twins; Add Goal Tech's kept contracts and execution — READ (0x7e7d20 at 0x7e7ea7..0x7e7fb2, 0x7e7200), unported"
   context:
     - "Player_Resources.cpp 0x4a6110 (callers 0x4a7560, the import/export setter, and 0x4a8ed0) rebuilds `m_aLuxuryAllocations` (Player_Resource..."
     - "- ChangeResourceAmount 0x4a7560 (resource, ownership, amount) rebuilds the allocation at once (0x4a77d4, unless the gam..."
@@ -272,6 +275,9 @@
   semantics: "the copies of a resource the player holds. (r, 1): Player_Resources +0x2e0[r][0] less the reserved (0x4aa530, with the flag) plus +0x2e0[r][1] — a strategic one's stockpile."
   status: READ
   cases:
+    - recording: h1_duelq1128
+      turn: 37
+      value: "Nazca's Horses 20 less its reservations 20: none, its Pasture row on 34:10 at 280.96 (the x2 of none)"
     - recording: h1_duelv1121
       turn: 20
       value: "Hunza's Horses 2 (its stockpile): its Pasture at (12,5) 118.95 = 38 copies x 1.25 + 71.45"
@@ -281,7 +287,9 @@
     - cpu/core/minorBuild.ts:minorResourceFacts
     - gpu/core/sim_minorai.py:_cv_resource_value
     - gpu/core/sim_research.py:_rai_resources
+    - cpu/core/minorBuild.ts:id
   readings:
+    - "C-127: a city-state's completed unit keeps its strategic cost in the stock, reserved; a resource value's copies the stock less the reservations — READ (0x1853d0 at 0x18562c / 0x185988, 0x182b80 at 0x182bae, 0x17f3a0, 0x4a93c0), both twins; Add Goal Tech's kept contracts and execution — READ (0x7e7d20 at 0x7e7ea7..0x7e7fb2, 0x7e7200), unported"
     - "H-1: the luxury allocation — READ"
     - "C-96: the resource value and the research value's resources — READ (bonus, luxury, the call), PARTLY READ (the strategic stockpile terms)"
     - "C-96: the improvement value's resource copies, a minor's strategic copies, the district count — READ (0x7a58f0's count, 0x4a93c0, 0x1ae8a0, 0x1ae8f0), a LAB (a city-state's Great General weight)"

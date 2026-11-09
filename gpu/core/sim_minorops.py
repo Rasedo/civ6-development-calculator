@@ -501,7 +501,10 @@ class SimMinorOps:
         nu = len(rows)
         cache = getattr(self, "_mops_rows_static", None)
         if cache is None:
-            version = torch.tensor([bool(r["canTrain"]) and not r["trait"] for r in rows], dtype=torch.bool, device=dev)
+            # the minor's version (`minorUnitVersion`): no trait unit, no unit
+            # that founds a city, one the database lets train
+            version = torch.tensor([bool(r["canTrain"]) and not r["trait"] and not r["foundCity"] for r in rows],
+                                   dtype=torch.bool, device=dev)
             combat = torch.tensor([r["combat"] != 0 and (not r["pseudo"] or r["pseudo"] in
                                                          ("PSEUDOYIELD_UNIT_COMBAT", "PSEUDOYIELD_UNIT_NAVAL_COMBAT",
                                                           "PSEUDOYIELD_UNIT_AIR_COMBAT")) for r in rows],

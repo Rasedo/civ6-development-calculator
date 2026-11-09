@@ -5709,7 +5709,7 @@ const GAME_MEMORY = ['barbTribes', 'barbPool', 'barbCampsBegun', 'barbSpotNext']
  *  waits, the turn its city was last hit (the walls' repair waits three quiet
  *  turns: runs/h1_duely1124 Cardiff t86-88 NO BUILDS AT ALL, the repair
  *  from t89),
- *  its fuel shortfall, its strategic stockpile and the queue front's
+ *  its fuel shortfall, its strategic stockpile, its reservations and the queue front's
  *  reservation on it (the importer reads a minor's none), the trade routes the record's routes laid (the
  *  importer reads a city-state's none), the turn its city was founded, its
  *  district projects' Great Person points (the record shows their sum alone,
@@ -5718,7 +5718,7 @@ const GAME_MEMORY = ['barbTribes', 'barbPool', 'barbCampsBegun', 'barbSpotNext']
  *  Bologna t180 on the path laid at t147) */
 const GAME_STORES = ['warTurns', 'tradeEdges'] as const;
 const SEAT_STORES = ['barbKills', 'netIncome'] as const;
-const MINOR_STORES = ['prodOverflow', 'repairWait', 'lastHitTurn', 'fuelShort', 'tradeRoutes', 'foundedTurn', 'stockpile', 'prodReserved', 'gpPoints', 'projectsDone'] as const;
+const MINOR_STORES = ['prodOverflow', 'repairWait', 'lastHitTurn', 'fuelShort', 'tradeRoutes', 'foundedTurn', 'stockpile', 'prodReserved', 'reserved', 'gpPoints', 'projectsDone'] as const;
 
 /** the progress a city-state's districts, projects and repairs it switched
  *  from keep, the engine's own, beside the record's kept on its buildings and

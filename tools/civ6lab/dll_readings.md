@@ -14193,3 +14193,61 @@ no clamp; its +0xc4 is the raw damage.
   and culture t90), where the engines drop it at once. A Production lump
   (AddProgress 0x16f6e0 -> 0x16f050) takes the same step; the engines add it
   without the multiplier, no case read.
+
+## C-127: a city-state's completed unit keeps its strategic cost in the stock, reserved; a resource value's copies the stock less the reservations — READ (0x1853d0 at 0x18562c / 0x185988, 0x182b80 at 0x182bae, 0x17f3a0, 0x4a93c0), both twins; Add Goal Tech's kept contracts and execution — READ (0x7e7d20 at 0x7e7ea7..0x7e7fb2, 0x7e7200), unported
+
+`CityState.reserved` / `citystate_reserved`, `reserveStockpile` / `_minor_reserve`
+(cpu/core/stockpile.ts, gpu/core/sim_minors.py), `stockReserved` / `_stock_reserved`,
+`minorFinish` / `_minor_finish`, `minorResourceFacts.have` / `_cv_resource_value`,
+`_rai_resources`; plotValueLab.ts's `recordReservations`.
+
+- THE COMPLETION (0x1853d0): the unit's strategic charge and the release of
+  its reservation (0x17c2e0 -> 0x4a7400 negative at 0x18569b / 0x185a14,
+  ChangeResourceAmount 0x4a7560 at 0x1856b3 / 0x185a2a) both sit behind
+  FULL_CIV (0x469db0 at 0x18562c / 0x185988); a queue front leaving with no
+  progress releases its reservation behind FULL_CIV too (0x182b80 at
+  0x182bae). The front check (0x17f3a0 at 0x17f4ce..0x17f4f3) has no such
+  test. So a city-state's reservations (Player_Resources +0x528) only grow:
+  every unit its queue front reserved keeps its cost in the stock, reserved,
+  for good. The cap test (stock less reservations) and the front check (the
+  same) read the stock as before; the resource value's copies (0x4a93c0
+  (r, 1): +0x2e0[r][0] less the reservations where they are above 0, plus
+  +0x2e0[r][1]) are the stock less the reservations, which may be negative.
+- Confirmed: runs/h1_duelq1128 Nazca (player 4): its memory's
+  m_aiReservedResources reads Horses 10 at t33 (its Horseman taken on the
+  idle store, standing at t34) and 20 from t37 (the second, standing at t38)
+  to t43 and on, never back; the engine's Horses stock 20 from t23 (2 a turn from t14), its
+  reservations 10 / 20 the same turns. Its Pasture row on 34:10 from t37 on
+  (280.96 .. 288.53) reads 0 copies (20 less 20, the x2 of none), as logged;
+  plotValueLab on the record's reservations: 1128 IMPROVEMENTS far rows 81 ->
+  58 (PASTURE 24 -> 1: the lab's resources' turn now after its research, so
+  Animal Husbandry's Horses accrue at t14), 1117 / 1121 / 1124 unchanged, 1127
+  206 -> 205.
+- ADD GOAL TECH'S UPDATE (0x7e7d20) first reads its kept contracts (+0x94
+  the tech's, +0x9c the civic's, through 0x7cb8b0): a status in {0, 2
+  SUBMITTED, 4 FAILED, 7 COMPLETED} (mask 0x95) is released (0x7d22f0) and
+  the handle cleared; 5 IN PROGRESS returns RUNNING at once; 1, 3 ACCEPTED
+  and 6 fall through to the lists. Its execution (0x7e7200) posts a Tech
+  Contract (0x604a70 kind 1, 0x5f4530, the tree's +0x548 priority) where
+  the goal (+0x98) is set and no kept contract holds that goal, adds it to
+  the tree (0x7d1570), submits it (0x60bb50) and keeps it (+0x94) and in
+  the Contract ID tag. The research AI's listener (0x7635c0) takes any
+  contract its check (vt +0x70, 0x5f5940) passes: a tech other than none
+  always passes, the tech in research setting IN PROGRESS before the
+  submission's ACCEPTED. Under the Contract Manager Decorator's block a
+  kept contract that is ACCEPTED or IN PROGRESS keeps the child from
+  ticking, so the release part runs only past the decorator's own FAILED
+  / SUCCESS paths; the engines need none of it yet.
+- Open (C-127): runs/h1_duelq1124 Cardiff t89: the game consumes no
+  contract id in Cardiff's t89 turn (ids 254-260 player 1's t89, 261 player
+  1's t90, 263 Cardiff's t90 Castle; 262 the only gap), so the tree it
+  starts and ends that turn (tree id 0x2e0001, between Upgrade Units 0x2d
+  at the t89 log look and 0x2f at t90's) never runs Add Goal Tech's
+  execution. Its building slot was emptied by the t88 Turn Limit FAILED of
+  contract 233. Of the five duelq seeds' FAILED Tech Contracts of a Build
+  City Building tree, four see no new Build City Building tree the turn
+  after: 1124 Cardiff t67 / t101 and 1128 Bologna t89 under NO BUILDS AT ALL,
+  Cardiff t89 the only one with a build — the repair, which the game's
+  Default Specialization queues in its t89 update where the engine's
+  production step has it in hand before the city AI's events. 1127 Muscat
+  t99 (Machinery FAILED t98, researching at 1 turn) starts a Warrior tree.

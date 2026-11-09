@@ -34,8 +34,8 @@
  * that dispatch); the gold shortfall its turn's
  * start banked; its wars as the record after holds them; the plots the
  * majors' envoys of the turn annexed (`envoyTiles`, its citizens
- * re-placed); its strategic stockpile carried from its last turn, less the
- * unit its step completed, with the turn's accrual and fuel
+ * re-placed); its strategic stockpile carried from its last turn (a completed unit's
+ * cost kept, reserved), the record's reservations, the turn's accrual and fuel
  * (`accrueStockpiles`, `chargeUnitUpkeep`); its research AI's turns per
  * technology for the unit production table from AI_Research.csv's turn
  * before (`researchUnitTurns`); the resources it sees on the record after's
@@ -81,7 +81,7 @@ import { acquireTile, borderCandidates, computeCityStats } from '../core/city';
 import { chopGrant, harvestGrant } from '../core/economy';
 import { resourceValue } from '../core/aiResource';
 import { AI_BUILDING_INDEX, BUILDING_DEPENDENTS, buildingsPass, growthForecast, housingValue, type CityGrowth } from '../core/aiCityBuild';
-import { accrueStockpiles, accumulationPct, capStockpiles, chargeUnitResource, chargeUnitUpkeep } from '../core/stockpile';
+import { accrueStockpiles, accumulationPct, capStockpiles, chargeUnitUpkeep, strategicSlot } from '../core/stockpile';
 import { makeYieldCtx } from '../core/effects';
 import { improvementAdjacency } from '../core/yields';
 import { engineId, gameTypeOf, installFeature } from '../data/aliases';
@@ -91,7 +91,8 @@ import { TECHS } from '../data/techs';
 import { CIVICS } from '../data/civics';
 import { BOOSTS } from '../data/boosts';
 import { BUILDER_COST_STEP, UNITS } from '../data/units';
-import { GAME_COST_ESCALATION, gameProgressPct, scaleByGameSpeed } from '../data/constants';
+import { RESOURCES } from '../../world/resources';
+import { GAME_COST_ESCALATION, emptyStockpile, gameProgressPct, scaleByGameSpeed } from '../data/constants';
 import { neighbors } from '../../world/hex';
 import { unitDomain } from '../core/units';
 import { tileAppeal } from '../core/appeal';
@@ -233,6 +234,21 @@ const idleStore = new Map<number, number>();
 const growthSeen = new Map<number, CityGrowth>();
 /** per player the strategic stockpile its last turn's end left (capped) */
 const banks = new Map<number, number[]>();
+/** the player's reservations by strategic slot as the record's memory holds
+ *  them (PlayerResources m_aiReservedResources, by the game's resource
+ *  index) */
+function recordReservations(rec: TurnRecord, player: number): number[] {
+  const out = emptyStockpile();
+  const held = memField(rec, player, 'PlayerResources', 'm_aiReservedResources');
+  if (!held || typeof held !== 'object' || Array.isArray(held)) return out;
+  for (const [i, n] of Object.entries(held as Record<string, unknown>)) {
+    if (i === 'n' || typeof n !== 'number') continue;
+    const id = engineId('resource', cat.resources[Number(i)] ?? '', 'RESOURCE_', RESOURCES);
+    const k = strategicSlot(id ?? undefined);
+    if (k >= 0) out[k] += n;
+  }
+  return out;
+}
 type Held = { imp: ReturnType<typeof importTurn>; turn: number; rec: TurnRecord };
 let held: Held | null = null;
 /** the record before the one analysed, as its own analysis left it */
@@ -347,22 +363,12 @@ for (const rec of recs) {
     if (nextCs) cs.wars = [...(nextCs.wars ?? [])];
     // its grid as its turn meets it (`minorPower`)
     minorPower(state, cs);
-    // its strategic resources' turn after its city's (`accrueStockpiles`)
-    // and its units' fuel out of the same bank (`chargeUnitUpkeep`), as
-    // `minorPhase` runs them before its growth (runs/h1_duelq1121 Hunza t20:
-    // its first Pasture's 2 Horses in its t20 analysis, 38 copies at 1.25)
-    // on the bank its last turn left (the records hold no minor's
-    // stockpile), less the cost of a unit its production step completed
-    const bank = banks.get(player);
-    if (bank) cs.stockpile = [...bank];
-    const madeUnit = completed && step[3].startsWith('UNIT_') ? engineId('unit', step[3], 'UNIT_', UNITS) : null;
-    if (madeUnit) chargeUnitResource(state, cs.seat, madeUnit);
-    accrueStockpiles(state, cs.seat);
-    chargeUnitUpkeep(state, cs.seat);
     if (nextCs && nextCs.prodItem === cs.prodItem) {
       cs.prodProgress = nextCs.prodProgress;
       cs.prodRetained = nextCs.prodRetained ? { ...nextCs.prodRetained } : undefined;
     }
+    // its research and civics as its economy's banking left them, before
+    // its resources' turn
     if (nextCs) {
       const n = nextCs.research;
       const was = { civic: cs.research.civic, civicProgress: cs.research.civicProgress, tech: cs.research.tech, techProgress: cs.research.techProgress };
@@ -401,6 +407,22 @@ for (const rec of recs) {
         }
       }
     }
+    // its strategic resources' turn after its city's (`accrueStockpiles`)
+    // and its units' fuel out of the same bank (`chargeUnitUpkeep`), as
+    // `minorPhase` runs them after its banking and before its growth: a
+    // resource its research reveals that turn accrues (runs/h1_duelq1128
+    // Nazca t14, Animal Husbandry's Horses 2 in its analysis; runs/h1_duelq1121
+    // Hunza t20: its first Pasture's 2 Horses in its t20 analysis, 38 copies
+    // at 1.25) on the bank its last turn left (the records hold no minor's
+    // stockpile; a completed unit's cost stays in it, reserved), with the
+    // reservations the record's memory holds (Player_Resources
+    // m_aiReservedResources: runs/h1_duelq1128 Nazca 10 from t33, 20 from
+    // t37)
+    const bank = banks.get(player);
+    if (bank) cs.stockpile = [...bank];
+    cs.reserved = recordReservations(cur.rec, player);
+    accrueStockpiles(state, cs.seat);
+    chargeUnitUpkeep(state, cs.seat);
     // the plots the majors' envoys of the turn annexed (`envoyTiles`, in
     // the majors' turns before its own): each plot it holds in the record
     // after and not in this one, no district of its placing on it, and its

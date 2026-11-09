@@ -599,11 +599,13 @@ class SimResearch:
             return torch.zeros(B, NT, dtype=torch.long, device=dev)
         ext = torch.zeros(B, nr, dtype=torch.long, device=dev)
         ext.scatter_add_(1, rid, (mine & live & self._res_extracting()).long())
-        # a strategic one's copies its stockpile (0x4a93c0)
+        # a strategic one's copies its stockpile less its reservations
+        # (0x4a93c0 (r, 1))
         copies = ext.clone()
+        free = self.citystate_stockpile[:, s] - self.citystate_reserved[:, s]
         for k, ri in enumerate(self._strat_rid):
             if 0 <= ri < nr:
-                copies[:, ri] = self.citystate_stockpile[:, s, k]
+                copies[:, ri] = free[:, k]
         nn = turns.clamp(min=0)
         h = T["horizon"]
         # the luxury: one copy's amenities over the one city, at least the

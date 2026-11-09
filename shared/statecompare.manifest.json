@@ -2954,6 +2954,17 @@
           "note": "the strategic resource its unit in hand reserved at the queue's front check, -1 none"
         },
         {
+          "name": "minorReserved",
+          "compare": "exact",
+          "covers": [
+            "CityState.reserved"
+          ],
+          "planes": [
+            "citystate_reserved"
+          ],
+          "note": "the minor's reservations by strategic slot, every front check's reservation held"
+        },
+        {
           "name": "minorStockpile",
           "compare": "exact",
           "covers": [

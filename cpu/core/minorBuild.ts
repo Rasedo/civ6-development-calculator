@@ -73,7 +73,7 @@ import { AI_BUILDING_INDEX, AI_UNIT_INDEX, amenityCityOf, amenityPerTurn, buildi
 import { defensiveCancel } from './aiCityTrees';
 import { projectTable, type ProjectTableFacts } from './aiProjectValue';
 import { economicGoldBoost } from './aiWeights';
-import { accrueStockpiles, canPayStockpile, capStockpiles, chargeUnitResource, chargeUnitUpkeep, spendStockpile, stockFree, stockOf, stockpileCap, stockpileIncome, strategicSlot, strategicSurplus, unitResourceCost, unitUpkeepBill, upgradeGoldCost, upgradeType } from './stockpile';
+import { accrueStockpiles, canPayStockpile, capStockpiles, chargeUnitResource, chargeUnitUpkeep, reserveStockpile, spendStockpile, stockFree, stockOf, stockpileCap, stockpileIncome, strategicSlot, strategicSurplus, unitResourceCost, unitUpkeepBill, upgradeGoldCost, upgradeType } from './stockpile';
 import { FX, FX_MIN, fmul, fxConst, fxOf, pseudoYieldValue, turnsAt, valueBetween, yieldValue } from './aiValue';
 import { aiCityStats, cityGrowth, aiView, storeUnitStrength } from './aiView';
 import { congressBannedLuxury, congressQueueMult } from './congress';
@@ -1227,7 +1227,7 @@ export function minorBuild(state: GameState, cityState: CityState, production: n
         cityState.prodOverflow = (cityState.prodOverflow ?? 0) + made;
         return;
       }
-      cityState.prodReserved = res.n;
+      reserveStockpile(cityState, res.id, res.n);
     }
   }
   const pct = minorItemPct(state, cityState, item);
@@ -1301,7 +1301,7 @@ export function minorSetItem(state: GameState, cityState: CityState, item: Exclu
   if (item && 'unit' in item && !(cityState.prodProgress ?? 0)) {
     const res = unitResourceCost(item.unit);
     if (res && stockFree(state, cityState.seat, res.id) < res.n) minorSetItem(state, cityState, null);
-    else if (res) cityState.prodReserved = res.n;
+    else if (res) reserveStockpile(cityState, res.id, res.n);
   }
 }
 
@@ -1757,7 +1757,8 @@ export function minorResourceFacts(state: GameState, cityState: CityState): Reso
     banned: (res) => engineId('resource', res, 'RESOURCE_', RESOURCES) === congressBannedLuxury(state),
     have: (res) => {
       const id = engineId('resource', res, 'RESOURCE_', RESOURCES);
-      return id && strategicSlot(id) >= 0 ? stockOf(state, cityState.seat, id) : extracted.get(res) ?? 0;
+      // a strategic one's stock less its reservations (0x4a93c0 (r, 1))
+      return id && strategicSlot(id) >= 0 ? stockFree(state, cityState.seat, id) : extracted.get(res) ?? 0;
     },
     income: (res) => slotOf(res, income),
     upkeep: (res) => slotOf(res, bill),
@@ -2325,13 +2326,9 @@ function minorFinish(state: GameState, cityState: CityState, item: Exclude<Minor
     if (!unit) return false;
     built = unit.id;
     applyTrainingGrants(state, minorCity(cityState), unit);
-    // its reservation released and its strategic cost charged together
-    // (0x1856b3 / 0x185a2a)
-    const cost = unitResourceCost(item.unit);
-    if (cost && cityState.prodReserved !== undefined) {
-      spendStockpile(state, cityState.seat, cost.id, cityState.prodReserved, 'mu');
-      rebuildLuxuries(state, cityState.seat);
-    }
+    // no charge and no release: 0x1853d0 charges the stock and releases the
+    // reservation (0x1856b3 / 0x185a2a) under FULL_CIV alone (0x18562c /
+    // 0x185988), so the cost stays in the stock, reserved
     delete cityState.prodReserved;
   } else if ('building' in item) {
     minorRaiseBuilding(state, cityState, item.building);

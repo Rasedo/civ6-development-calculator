@@ -4335,6 +4335,10 @@ class SimInit:
         self.citystate_fuel_short = torch.zeros(B, self.citystate_alive.shape[1], max(self._n_strategic, 1), dtype=torch.bool,
                                                 device=device)
         self.citystate_prod_reserved = torch.full((B, self.citystate_alive.shape[1]), -1, dtype=torch.long, device=device)
+        # its reservations by slot (`CityState.reserved`): every front
+        # check's, none ever released
+        self.citystate_reserved = torch.zeros(B, self.citystate_alive.shape[1], max(self._n_strategic, 1), dtype=torch.long,
+                                              device=device)
         self.city_powered = torch.zeros(B, self.CITY_ROWS, self.RC, dtype=torch.bool, device=device)
         self.camp_tile = torch.full((B, max(self.K, 1)), -1, dtype=torch.long, device=device)
         self.n_camps = torch.zeros(B, dtype=torch.long, device=device)

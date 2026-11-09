@@ -11162,19 +11162,11 @@ class SimSeats:
 
     def _stock_reserved(self, row: int) -> torch.Tensor:
         """[B, K] `stockReserved` — seat row `row`'s reservations by slot: a
-        city-state's unit in hand's reserved cost on its resource's slot; a
-        major's none here"""
-        out = torch.zeros_like(self._stock_bank(row))
-        if row < self.n_majors or row >= self._CITY_MINOR0 + self.citystate_prod_reserved.shape[1]:
-            return out
-        s = row - self._CITY_MINOR0
-        item = self.citystate_item[:, s]
-        res = self.citystate_prod_reserved[:, s]
-        is_u = (item >= 0) & (item < self._mk_b0)
-        slot = self._type_res_slot.take(item.clamp(min=0, max=self.NU - 1))
-        on = is_u & (res >= 0) & (slot >= 0)
-        out.scatter_add_(1, slot.clamp(min=0).unsqueeze(1), torch.where(on, res, torch.zeros_like(res)).unsqueeze(1))
-        return out
+        city-state's, every cost its queue's front checks reserved
+        (`citystate_reserved`); a major's none here"""
+        if row < self._CITY_MINOR0 or row >= self._CITY_MINOR0 + self.citystate_reserved.shape[1]:
+            return torch.zeros_like(self._stock_bank(row))
+        return self.citystate_reserved[:, row - self._CITY_MINOR0]
 
     def _unit_upkeep_bill(self, row: int) -> torch.Tensor:
         """[B, K] `unitUpkeepBill` — seat row `row`'s units' fuel bill a

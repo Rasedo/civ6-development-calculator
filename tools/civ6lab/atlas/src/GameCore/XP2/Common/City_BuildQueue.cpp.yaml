@@ -903,6 +903,7 @@
     - "C-96: the queue's strategic charge, a placed district's resource, the minors' resource turn — READ (0x17c2e0, 0x186460's names), a fit for the district, both twins"
     - "C-96: a unit's strategic cost through the game speed, the pick's pillaged district and the queue's pillaged project"
     - "C-127 / C-98: a minor's purchase charges its strategic cost; the resource value's project term; a minor's MajorCivOnly units in its unit production table — READ (0xa540c0, 0x7a21e0 at 0x7a2b71, 0xa9cfb0, 0x4f4a50, 0x172941), both twins"
+    - "C-127: a city-state's completed unit keeps its strategic cost in the stock, reserved; a resource value's copies the stock less the reservations — READ (0x1853d0 at 0x18562c / 0x185988, 0x182b80 at 0x182bae, 0x17f3a0, 0x4a93c0), both twins; Add Goal Tech's kept contracts and execution — READ (0x7e7d20 at 0x7e7ea7..0x7e7fb2, 0x7e7200), unported"
   context:
     - ...8 / +0x1a0), no progress (0x17d1a0) and a StrategicResource (+0x2c8) reserves its cost (0x17c2e0, its formation's) where the stock less the reservations (0x4aa790) covers it (0x4a7400)...
   review: reviewed
@@ -1139,8 +1140,12 @@
   final: 0x101170
   kind: function
   name: City_BuildQueue
-  semantics: "the strategic reservation (from the front check 0x17f070): a unit at the queue's front with a strategic cost and no progress (0x17d1a0) reserves its cost (0x4a7400) where the player's amount less its reservations covers it (0x4aa790), else leaves the front; the completion (0x1856b3 / 0x185a2a) releases the reservation and charges the stockpile together."
-  status: PARTLY
+  semantics: "the strategic reservation (from the front check 0x17f070): a unit at the queue's front with a strategic cost and no progress (0x17d1a0) reserves its cost (0x4a7400) where the player's amount less its reservations covers it (0x4aa790), else leaves the front — for every player (no FULL_CIV test); the completion (0x1856b3 / 0x185a2a) releases the reservation and charges the stockpile together for a full civilization alone (0x1853d0 at 0x18562c / 0x185988), so a city-state's reservations only grow."
+  status: READ
+  cases:
+    - recording: h1_duelq1128
+      turn: 37
+      value: Nazca's m_aiReservedResources Horses 10 at t33 (its first Horseman taken), 20 from t37 (the second) to t43 and on, never released at their completions
   impl:
     - cpu/harness/import.ts:reserved
     - cpu/core/minorBuild.ts:cost
@@ -1149,9 +1154,12 @@
     - cpu/core/types.ts:CityState
     - gpu/core/sim_minors.py:_minor_build
     - cpu/core/minorBuild.ts:minorSetItem
+    - cpu/core/stockpile.ts:reserveStockpile
+    - gpu/core/sim_minors.py:_minor_reserve
   readings:
     - "H-1: the luxury allocation's rebuilds — PARTLY READ"
     - "C-96: the resource value and the research value's resources — READ (bonus, luxury, the call), PARTLY READ (the strategic stockpile terms)"
+    - "C-127: a city-state's completed unit keeps its strategic cost in the stock, reserved; a resource value's copies the stock less the reservations — READ (0x1853d0 at 0x18562c / 0x185988, 0x182b80 at 0x182bae, 0x17f3a0, 0x4a93c0), both twins; Add Goal Tech's kept contracts and execution — READ (0x7e7d20 at 0x7e7ea7..0x7e7fb2, 0x7e7200), unported"
   context:
     - "- The reservation (City_BuildQueue 0x17f3a0 from the front check 0x17f070): a unit at the queue's front with a strategic cost and n..."
   review: reviewed
@@ -1310,7 +1318,16 @@
   kind: function
   semantics: "a front leaving with no progress held (from 0x17f5a0), a major's only (0x469db0): the unit's strategic reservation (0x17c2e0) and the building's and project's resource reservations released (0x4a7400 negative)."
   status: PARTLY
+  cases:
+    - recording: h1_duelq1128
+      turn: 37
+      value: Nazca's reservations 10 / 20 held to the game's end (m_aiReservedResources)
+  impl:
+    - gpu/core/sim_seats.py:_stock_reserved
+    - cpu/core/stockpile.ts:stockReserved
+    - cpu/core/types.ts:CityState
   readings:
+    - "C-127: a city-state's completed unit keeps its strategic cost in the stock, reserved; a resource value's copies the stock less the reservations — READ (0x1853d0 at 0x18562c / 0x185988, 0x182b80 at 0x182bae, 0x17f3a0, 0x4a93c0), both twins; Add Goal Tech's kept contracts and execution — READ (0x7e7d20 at 0x7e7ea7..0x7e7fb2, 0x7e7200), unported"
     - "C-111: every item's progress kept by type outside the queue, a pillaged building's or district's repair on the share its pillage left, a district's locked price on the district — READ (0x17f5a0, 0x175730 at 0x175bd3, 0x17d910, 0x175140, 0x1af5b0 -> 0x17e770 -> 0x183a60, 0x193190 -> 0x183950), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
@@ -1440,9 +1457,12 @@
 - addr: 0x1853d0
   final: 0x105850
   kind: function
-  semantics: "an item's progress takes (A + the stored overflow) x the item's percent multiplier — 0x1856ed multiplies the SUM; on completion the stored overflow is min(A, B) - what the item lacked, A the turn's Production unmultiplied (0x16f3cb), B the plain Production."
+  semantics: "an item's progress takes (A + the stored overflow) x the item's percent multiplier — 0x1856ed multiplies the SUM; on completion the stored overflow is min(A, B) - what the item lacked, A the turn's Production unmultiplied (0x16f3cb), B the plain Production. A unit's strategic charge and its reservation's release (0x18569b / 0x1856b3, 0x185a14 / 0x185a2a) run for a FULL_CIV alone (0x18562c / 0x185988): a city-state's completed unit keeps its cost in the stock, reserved."
   status: READ
   cases:
+    - recording: h1_duelq1128
+      turn: 37
+      value: "Nazca's Horsemen completed t34 / t38: its reservations 10 / 20 never released, its Pasture row on 34:10 from t37 reading 0 copies (20 less 20) at 280.96"
     - recording: 1121
       turn: 222
       value: "a slot rebuild during the   city walk (a completion opening a slot: Big Ben, the Alhambra, a Shipyard's   slot) or a card signalled in the actions does not, until the next   ChangeResourceAmount: 1121"
@@ -1460,6 +1480,8 @@
     - cpu/core/stockpile.ts:chargeUnitResource
     - cpu/core/production.ts:stepMultiplier
     - gpu/core/sim_phase.py:_step_mult
+    - cpu/core/minorBuild.ts:built
+    - cpu/core/types.ts:CityState
   readings:
     - "H-1: the luxury allocation's rebuilds — PARTLY READ"
     - "H-1: a completion's overflow and the item multiplier — READ"
@@ -1467,6 +1489,7 @@
     - "C-127: an idle city's store through the queue step (0x16f050), the build lab on it — READ (the engines unchanged)"
     - "H-1: the luxury allocation stored, its rebuild's triggers — READ (the triggers ported), LAB (the pillage)"
     - "C-127 / C-98: a minor's purchase charges its strategic cost; the resource value's project term; a minor's MajorCivOnly units in its unit production table — READ (0xa540c0, 0x7a21e0 at 0x7a2b71, 0xa9cfb0, 0x4f4a50, 0x172941), both twins"
+    - "C-127: a city-state's completed unit keeps its strategic cost in the stock, reserved; a resource value's copies the stock less the reservations — READ (0x1853d0 at 0x18562c / 0x185988, 0x182b80 at 0x182bae, 0x17f3a0, 0x4a93c0), both twins; Add Goal Tech's kept contracts and execution — READ (0x7e7d20 at 0x7e7ea7..0x7e7fb2, 0x7e7200), unported"
   context:
     - "...lers: a production completion's strategic costs (0x18433d building, 0x184d95 project, 0x1856b3 / 0x185a2a unit), a plot's extracted resource changing (0x4ab4d0 from the city, distric..."
     - ...nt less its reservations covers it (0x4aa790), else leaves the front; the completion (0x1856b3 / 0x185a2a) releases the reservation and charges the stockpile together.

@@ -62,6 +62,7 @@
   impl: [cpu/core/aiCityTrees.ts:treeContract, cpu/core/aiContracts.ts:treeContractOf]
   readings:
     - "C-96 / C-127: a plot purchase contract lives to its Turn Limit, the pick's best project asks no CanProduce, Build Unit's tree takes only an ACCEPTED contract — READ (0x7f7bf0, 0x5d1f10, 0x7f4240 at 0x7f4270 / 0x7f48db), both twins"
+    - "C-127: a city-state's completed unit keeps its strategic cost in the stock, reserved; a resource value's copies the stock less the reservations — READ (0x1853d0 at 0x18562c / 0x185988, 0x182b80 at 0x182bae, 0x17f3a0, 0x4a93c0), both twins; Add Goal Tech's kept contracts and execution — READ (0x7e7d20 at 0x7e7ea7..0x7e7fb2, 0x7e7200), unported"
   notes: ["imported: cited by the code, in no dll_readings section"]
   review: imported
 - addr: 0x7cb930
@@ -115,6 +116,7 @@
   impl: [cpu/core/aiContracts.ts:execute]
   readings:
     - "C-96 / C-127: a plot purchase contract lives to its Turn Limit, the pick's best project asks no CanProduce, Build Unit's tree takes only an ACCEPTED contract — READ (0x7f7bf0, 0x5d1f10, 0x7f4240 at 0x7f4270 / 0x7f48db), both twins"
+    - "C-127: a city-state's completed unit keeps its strategic cost in the stock, reserved; a resource value's copies the stock less the reservations — READ (0x1853d0 at 0x18562c / 0x185988, 0x182b80 at 0x182bae, 0x17f3a0, 0x4a93c0), both twins; Add Goal Tech's kept contracts and execution — READ (0x7e7d20 at 0x7e7ea7..0x7e7fb2, 0x7e7200), unported"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ...b50) +0x90 takes the contract's id, and only an ACCEPTED one (0x7f48db) joins the tree (0x7d1570) and the Contract ID tag. One no taker accepted is held by none and goes; the next ti...
@@ -200,6 +202,7 @@
   readings:
     - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
     - "C-127: a contract its tree leaves is CANCELLED in the city's hand too; a Tech Contract's research test before the research AI's choice — LAB (the aimem contracts), READ (0x760980 -> 0x5f5940), both twins"
+    - "C-127: a city-state's completed unit keeps its strategic cost in the stock, reserved; a resource value's copies the stock less the reservations — READ (0x1853d0 at 0x18562c / 0x185988, 0x182b80 at 0x182bae, 0x17f3a0, 0x4a93c0), both twins; Add Goal Tech's kept contracts and execution — READ (0x7e7d20 at 0x7e7ea7..0x7e7fb2, 0x7e7200), unported"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ...ILED past the turn limit through the holder +0xa8 (0x731d10), removes it from the tree (0x7d22f0) and releases it (0x600b00); a city's list +0x3a8 holds weak handles, and 0x5d4d70's he...

@@ -14,6 +14,22 @@
     - ...GlobalParameters.xml Replace 4). Below it nothing is raised; at or above it the trigger 0x260760 queues the emergency.
     - "...tim raises the request as before (`raiseAidRequest` / `_raise_aid_request`). Unread: what 0x260760's queue (+0x68) does with a raised aid request before it runs (the World Congress's WC_EM..."
   review: reviewed
+- addr: 0x2dfe20
+  final: 0x1f8c60
+  kind: function
+  status: READ
+  cases:
+    - recording: 1124
+      turn: 67
+      value: "Of the five duelq seeds' FAILED Tech Contracts of a Build   City Building tree, four see no new Build City Building tree the turn   after: 1124 Cardiff t67 / t101 and 1128 Bologna t89 under NO BUILDS "
+    - recording: 1127
+      turn: 99
+      value: 1127 Muscat   t99 (Machinery FAILED t98, researching at 1 turn) starts a Warrior tree.
+  readings:
+    - "C-127: a city-state's completed unit keeps its strategic cost in the stock, reserved; a resource value's copies the stock less the reservations — READ (0x1853d0 at 0x18562c / 0x185988, 0x182b80 at 0x182bae, 0x17f3a0, 0x4a93c0), both twins; Add Goal Tech's kept contracts and execution — READ (0x7e7d20 at 0x7e7ea7..0x7e7fb2, 0x7e7200), unported"
+  context:
+    - ...diff's t90 Castle; 262 the only gap), so the tree it starts and ends that turn (tree id 0x2e0001, between Upgrade Units 0x2d at the t89 log look and 0x2f at t90's) never runs Add Goal...
+  review: imported
 - addr: 0x76f0f0
   final: 0x501700
   kind: function

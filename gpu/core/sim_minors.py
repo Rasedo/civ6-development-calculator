@@ -1953,9 +1953,18 @@ class SimMinors:
                 free = (self.citystate_stockpile[:, s] - self._stock_reserved(self._CITY_MINOR0 + s)).gather(
                     1, slot.clamp(min=0).unsqueeze(1)).squeeze(1)
                 drop = fresh & (free < need)
-                self.citystate_prod_reserved[:, s] = torch.where(fresh & ~drop, need, self.citystate_prod_reserved[:, s])
+                self._minor_reserve(s, fresh & ~drop, slot, need)
                 if bool(drop.count_nonzero()):
                     self._minor_set_item(s, drop, -1)
+
+    def _minor_reserve(self, s: int, mask: torch.Tensor, slot: torch.Tensor, need: torch.Tensor) -> None:
+        """`reserveStockpile` where `mask`: the queue front reserves the unit
+        in hand's strategic cost `need` on its `slot` (0x17f3a0 -> 0x4a7400),
+        held from then on (`citystate_reserved`), the item marked
+        (`citystate_prod_reserved`)"""
+        self.citystate_prod_reserved[:, s] = torch.where(mask, need, self.citystate_prod_reserved[:, s])
+        add = torch.where(mask, need, torch.zeros_like(need))
+        self.citystate_reserved[:, s].scatter_add_(1, slot.clamp(min=0).unsqueeze(1), add.unsqueeze(1))
 
     def _minor_place_district(self, s: int, mask: torch.Tensor, key: torch.Tensor, site: torch.Tensor) -> None:
         """`minorPlaceDistrict` where `mask` (`key` the item, `site` its plot):
@@ -2352,7 +2361,7 @@ class SimMinors:
             if bool(fresh.count_nonzero()):
                 free = (self.citystate_stockpile[:, s] - self._stock_reserved(row)).gather(1, slot.clamp(min=0).unsqueeze(1)).squeeze(1)
                 drop = fresh & (free < need)
-                self.citystate_prod_reserved[:, s] = torch.where(fresh & ~drop, need, self.citystate_prod_reserved[:, s])
+                self._minor_reserve(s, fresh & ~drop, slot, need)
                 if bool(drop.count_nonzero()):
                     self._minor_set_item(s, drop, -1)
                     item = torch.where(drop, torch.full_like(item, -1), item)
@@ -2458,20 +2467,12 @@ class SimMinors:
             uid = torch.where(landed, self.POOL_LO["major"] + slot0, uid)
             u_row = torch.where(landed, T["engine_row"].to(dev).take(ui), u_row)
             fin = fin | landed
-            # its reservation released and its strategic cost charged
-            # together (0x1856b3 / 0x185a2a)
-            if self._n_strategic:
-                slot = self._type_res_slot.take(ui)
-                held = self.citystate_prod_reserved[:, s]
-                bank = self.citystate_stockpile[:, s]
-                pay = landed & (slot >= 0) & (held >= 0)
-                if bool(pay.count_nonzero()):
-                    have = bank.gather(1, slot.clamp(min=0).unsqueeze(1)).squeeze(1)
-                    take = torch.minimum(held, have).clamp(min=0)
-                    bank.scatter_add_(1, slot.clamp(min=0).unsqueeze(1), -(pay.long() * take).unsqueeze(1))
-                    self._log_stock(pay.nonzero(as_tuple=True)[0], row, slot[pay], "mu")
-                    self._rebuild_luxuries(row, pay)
-                self.citystate_prod_reserved[:, s] = torch.where(landed, torch.full_like(held, -1), held)
+            # no charge and no release: 0x1853d0 charges the stock and
+            # releases the reservation (0x1856b3 / 0x185a2a) under FULL_CIV
+            # alone (0x18562c / 0x185988), so the cost stays in the stock,
+            # reserved
+            held = self.citystate_prod_reserved[:, s]
+            self.citystate_prod_reserved[:, s] = torch.where(landed, torch.full_like(held, -1), held)
         m = done & is_b
         if bool(m.any()):
             bi = (item - self._mk_b0).clamp(min=0, max=int(rd.b_cost.shape[0]) - 1)

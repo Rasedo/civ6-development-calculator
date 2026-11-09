@@ -263,13 +263,24 @@ export function capStockpiles(state: GameState, seat: number): boolean {
 }
 
 /** the seat's reservations of a strategic slot (Player_Resources +0x528,
- *  0x4aa530): a city-state's, the cost its unit in hand reserved at the
- *  queue's front check (`CityState.prodReserved`); a major's none here */
+ *  0x4aa530): a city-state's, every cost its queue's front checks reserved
+ *  (`CityState.reserved`); a major's none here */
 export function stockReserved(state: GameState, seat: number, k: number): number {
   if (!isCityStateSeat(seat)) return 0;
-  const cs = state.cityStates.find((c) => c.seat === seat);
-  if (!cs?.prodReserved || !cs.prodItem?.startsWith('unit:')) return 0;
-  return strategicSlot(UNITS[cs.prodItem.slice(5)]?.requiresResource) === k ? cs.prodReserved : 0;
+  return state.cityStates.find((c) => c.seat === seat)?.reserved?.[k] ?? 0;
+}
+
+/** THE MINOR'S QUEUE FRONT RESERVES its unit in hand's strategic cost
+ *  (0x17f3a0 -> 0x4a7400): the slot's reservations rise by it, held from
+ *  then on (`CityState.reserved`), the item marked as reserved
+ *  (`CityState.prodReserved`) */
+export function reserveStockpile(cityState: CityState, resourceId: string, n: number): void {
+  const k = strategicSlot(resourceId);
+  if (k < 0) return;
+  const held = [...(cityState.reserved ?? emptyStockpile())];
+  held[k] += n;
+  cityState.reserved = held;
+  cityState.prodReserved = n;
 }
 
 /** the seat's stock of a resource less its reservations (0x4aa790,

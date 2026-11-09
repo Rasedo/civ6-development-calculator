@@ -368,6 +368,7 @@
     - "C-109: war weariness per combat, the turn's decay and the percent — READ"
     - "C-95: HL Explore's unrevealed count holds nothing on a goody hut's plot — READ (0x70a6c0 at 0x70a746..0x70a76a, 0x82d90), both twins"
     - "C-117: the suzerain bonuses of Ayutthaya, Fez and Wolin; the Tsikhe's Conservation Tourism — READ (0xb0e380, 0xb0ee40, 0xc70830, 0x17f870; 0x1fce20), PARTLY READ (Fez's list on the unit), both twins"
+    - "C-127: a city-state's completed unit keeps its strategic cost in the stock, reserved; a resource value's copies the stock less the reservations — READ (0x1853d0 at 0x18562c / 0x185988, 0x182b80 at 0x182bae, 0x17f3a0, 0x4a93c0), both twins; Add Goal Tech's kept contracts and execution — READ (0x7e7d20 at 0x7e7ea7..0x7e7fb2, 0x7e7200), unported"
   notes:
     - ".claude/scratchpad/cb4/NOTES.md: ...ligious; cb3 wrong), +0x1b9 bit 0x40 MakeTradeRoute, bit 2 FoundCity, +0x1ba bit 0x40 WMDCapable. - 0x469db0 FULL_CIV, 0x469ce0 TRIBE, 0x469d40 FREE_CITIES, 0x469de0 CITY_STATE. - pseudo globals: f2e210 GOLDE..."
     - ".claude/scratchpad/mu1/readings_c96.md: ...ss after, wanders none: every minor's t1 rows are End Turn). For a   player of a full civilization (0x469db0, CIVILIZATION_LEVEL_FULL_CIV)   only DEFENDER units, round the unit's city (+0x11d0 through 0x36f66..."

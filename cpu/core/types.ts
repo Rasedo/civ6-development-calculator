@@ -1432,11 +1432,19 @@ export interface CityState extends Seat {
   prodRetained?: Record<string, number>;
   prodOverflow?: number;
   prodSite?: number;
-  /** the strategic resource its unit in hand reserved at the queue's front
+  /** the strategic cost its unit in hand reserved at the queue's front
    *  check (0x17f3a0: the unit's cost, reserved where its stock less its
-   *  reservations covers it), released and charged at the completion;
+   *  reservations covers it), so the check reserves once per item taken;
    *  absent none */
   prodReserved?: number;
+  /** its reservations by strategic slot (Player_Resources +0x528,
+   *  m_aiReservedResources): each front check's reservation adds to it and
+   *  nothing takes it back — the completion's charge and release (0x1853d0
+   *  at 0x18562c / 0x185988) and a queue removal's release (0x182b80) run
+   *  for a full civilization alone, so the completed unit's cost stays in
+   *  the stock, reserved (runs/h1_duelq1128 Nazca: its Horsemen taken at
+   *  t33 / t37, the reservation 10 then 20 to the game's end); absent none */
+  reserved?: number[];
   prodSetValue?: number;
   /** its city's Food favored by its city AI (`minorFoodFocus`, 0x5cdae0):
    *  the citizen manager's yield flag */

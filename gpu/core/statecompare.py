@@ -1119,6 +1119,7 @@ CITY_STATE = {
         sum(1 << k for k, x in enumerate(sim.citystate_fuel_short[b, s].tolist()) if x) for s in rows
     ],
     "minorProdReserved": lambda sim, b, rows: [int(sim.citystate_prod_reserved[b, s]) for s in rows],
+    "minorReserved": lambda sim, b, rows: [[int(x) for x in sim.citystate_reserved[b, s].tolist()] for s in rows],
     "minorCitizens": lambda sim, b, rows: [[int(sim.citystate_fav_food[b, s]), int(sim.city_idle[b, sim._CITY_MINOR0 + s, 0])]
                                            + [int(x) for x in sim.city_spec_pin[b, sim._CITY_MINOR0 + s, 0].clamp(min=0).tolist()] for s in rows],
     "minorThreat": lambda sim, b, rows: [int(sim.citystate_threat[b, s]) for s in rows],

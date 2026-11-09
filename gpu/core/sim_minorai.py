@@ -1391,9 +1391,11 @@ class SimMinorAi:
         seat = 100 + s
         mine_t = (self.tile_seat == seat) & self._res_extracting() & (self.res_id == ri)
         have = mine_t.sum(dim=1).take(bb)
-        # a strategic one's copies its stockpile (0x4a93c0)
+        # a strategic one's copies its stockpile less its reservations
+        # (0x4a93c0 (r, 1))
         if ri in self._strat_rid:
-            have = self.citystate_stockpile[:, s, self._strat_rid.index(ri)].take(bb)
+            k = self._strat_rid.index(ri)
+            have = (self.citystate_stockpile[:, s, k] - self.citystate_reserved[:, s, k]).take(bb)
         n = count.long() if torch.is_tensor(count) else torch.full_like(t, count)
         cls = row["class"]
         if cls == "RESOURCECLASS_LUXURY":
@@ -1441,7 +1443,8 @@ class SimMinorAi:
         row_s = self._CITY_MINOR0 + s
         if k_s >= 0:
             gap = (self._unit_upkeep_bill(row_s)[:, k_s] - self._seat_stock_income(row_s)[:, k_s])
-            raise_ = (gap > 0) & ((need.double() * 0.5) > self.citystate_stockpile[:, s, k_s].double())
+            free = self.citystate_stockpile[:, s, k_s] - self.citystate_reserved[:, s, k_s]
+            raise_ = (gap > 0) & ((need.double() * 0.5) > free.double())
             used = used | raise_
             need = torch.where(raise_, torch.maximum(need, gap), need)
         nd, us = need.take(bb), used.take(bb)
