@@ -40,7 +40,8 @@ import { UNITS } from '../../../cpu/data/units';
 import { RESOURCES } from '../../../world/resources';
 import { emptyStockpile } from '../../../cpu/data/constants';
 import { accrueStockpiles, strategicSlot } from '../../../cpu/core/stockpile';
-import { advanceGreatPeople, ensureGpOffer, gpOfferCost } from '../../../cpu/core/greatPeople';
+import { ensureGpOffer, gpOfferCost, recruitClaimable } from '../../../cpu/core/greatPeople';
+import { GP_CLASSES } from '../../../cpu/data/greatPeople';
 import { INDUSTRIAL_ERA_INDEX } from '../../../cpu/data/techs';
 import type { GameState } from '../../../cpu/core/types';
 
@@ -331,7 +332,7 @@ describe('the three late-era dedications', () => {
     commit(state, 0, DED_SKY);
     ensureGpOffer(state, 'SCIENTIST'); // the offer is drawn state, not a formula
     seatOf(state, 0)!.gpp.SCIENTIST = gpOfferCost(state, 'SCIENTIST');
-    advanceGreatPeople(state, 0);
+    expect(recruitClaimable(state, 0, GP_CLASSES.indexOf('SCIENTIST')).ok).toBe(true);
     expect(seatOf(state, 0)!.gpEarned.length).toBe(1);
     expect(seatOf(state, 0)!.eraScore).toBe(MOMENT_GP_GAME_ERA + DED_EVENT_SCORE[DED_SKY]);
   });

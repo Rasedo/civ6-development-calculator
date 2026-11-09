@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { canPlaceDistrict, makeMap, makeState, tileAtCoords, settleAt } from '../helpers';
+import { canPlaceDistrict, grantTechs, makeMap, makeState, standDistrict, tileAtCoords, settleAt } from '../helpers';
 import { emptySeat, setTileOwner } from '../../../cpu/core/seats';
 import { computeCityStats } from '../../../cpu/core/city';
 import { buildingFaithCost, canFoundReligion } from '../../../cpu/core/game';
@@ -106,7 +106,10 @@ describe('the Nobel Prize', () => {
   it('hands 50 Diplomatic Favor with every person earned', () => {
     const favor = (row: number): { favor: number; earned: number } => {
       const state = sceneAs(row);
-      settleAt(state, tileAtCoords(state.map, 7, 7).index, 0);
+      const city = settleAt(state, tileAtCoords(state.map, 7, 7).index, 0);
+      // a Campus earns the class its turn's point, so the claim runs
+      grantTechs(state, 'WRITING');
+      standDistrict(state, city, 'CAMPUS', tileAtCoords(state.map, 8, 7).index);
       state.seats[0].gpp = { SCIENTIST: 5000 };
       advanceGreatPeople(state, 0);
       return { favor: state.seats[0].diplomaticFavor, earned: state.seats[0].gpEarned.length };

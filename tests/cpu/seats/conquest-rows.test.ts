@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { canPlaceDistrict, makeMap, makeState, tileAtCoords, settleAt } from '../helpers';
+import { canPlaceDistrict, grantTechs, makeMap, makeState, standDistrict, tileAtCoords, settleAt } from '../helpers';
 import { emptySeat, setWar, tileCity } from '../../../cpu/core/seats';
 import { computeCityStats } from '../../../cpu/core/city';
 import { advanceGreatPeople } from '../../../cpu/core/greatPeople';
@@ -172,7 +172,10 @@ describe('Magnanimous', () => {
     // the only path a game actually takes (seed 9274, turn 61)
     const earned = (row: number): { gpp: number; n: number } => {
       const state = sceneAs(row);
-      settleAt(state, tileAtCoords(state.map, 8, 8).index, 0);
+      const city = settleAt(state, tileAtCoords(state.map, 8, 8).index, 0);
+      // a Campus earns the class its turn's point, so the claim runs
+      grantTechs(state, 'WRITING');
+      standDistrict(state, city, 'CAMPUS', tileAtCoords(state.map, 9, 8).index);
       state.seats[0].gpp = { SCIENTIST: 5000 };
       advanceGreatPeople(state, 0);
       return { gpp: state.seats[0].gpp.SCIENTIST ?? 0, n: state.seats[0].gpEarned.length };

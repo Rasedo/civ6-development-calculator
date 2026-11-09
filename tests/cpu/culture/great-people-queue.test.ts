@@ -7,9 +7,9 @@
  * The GPU twin is religion_gp_test's cost/era-gate block.
  */
 import { describe, it, expect } from 'vitest';
-import { makeMap, makeState, tileAtCoords } from '../helpers';
+import { makeMap, makeState, standDistrict, tileAtCoords } from '../helpers';
 import { foundCity } from '../../../cpu/core/game';
-import { advanceGreatPeople, ensureGpOffer, gpOffer, gpOfferCost, greatPeopleEarned } from '../../../cpu/core/greatPeople';
+import { advanceGreatPeople, ensureGpOffer, gpOffer, gpOfferCost, greatPeopleEarned, recruitClaimable } from '../../../cpu/core/greatPeople';
 import { GP_CLASSES, GP_ERA_GPP, GREAT_PEOPLE, gpCost } from '../../../cpu/data/greatPeople';
 import { seatOf } from '../../../cpu/core/seats';
 import type { GameState } from '../../../cpu/core/types';
@@ -110,7 +110,7 @@ describe('the recruit', () => {
     const at = gpOffer(state, 'SCIENTIST');
     const cost = gpOfferCost(state, 'SCIENTIST');
     seatOf(state, 0)!.gpp.SCIENTIST = cost;
-    advanceGreatPeople(state, 0);
+    expect(recruitClaimable(state, 0, GP_CLASSES.indexOf('SCIENTIST')).ok).toBe(true);
     expect(state.claimedGreatPeople).toContain(GREAT_PEOPLE.SCIENTIST[at].id);
     expect(greatPeopleEarned(state, 'SCIENTIST')).toBe(1);
     expect(seatOf(state, 0)!.gpp.SCIENTIST).toBe(0);
@@ -122,6 +122,9 @@ describe('the recruit', () => {
 
   it('claims several in one turn while the bank holds out', () => {
     const state = scene();
+    // the class earns this turn (a Commercial Hub's point), so its points
+    // change and the claim runs, each claim's spend changing them again
+    standDistrict(state, seatOf(state, 0)!.cities[0], 'COMMERCIAL_HUB', tileAtCoords(state.map, 9, 8).index);
     ensureGpOffer(state, 'MERCHANT');
     const a = gpOfferCost(state, 'MERCHANT');
     seatOf(state, 0)!.gpp.MERCHANT = a * 4;

@@ -11,7 +11,7 @@ WRITER inside 250t is uncommon; a MUSEUM even rarer):
     instant culture lump;
   * the per-work culture is LIVE and version-invalidated (linear per work,
     no gold), music paying double writing;
-  * a WRITER earned through _advance_great_people slots nothing at the claim
+  * a WRITER recruited through _gp_recruit slots nothing at the claim
     and everything at the spend;
   * _reclaim_cities carries a city's works with it through slot compaction;
   * a COMPLETE wonder holds works in a city with no matching building;
@@ -179,7 +179,8 @@ def main() -> None:
     earned0 = sim.gp_earned[:, wc].clone()
     live0 = sim.major_unit_alive[0].sum().item()
     sim.civ_gpp[:, 0, wc] = 100.0  # >= gpCost(0) = 60
-    sim._advance_great_people(0, one)
+    sim._gp_ensure_offer(one, wc)
+    sim._gp_recruit(0, torch.full((B,), wc, dtype=torch.long))
     assert bool((sim.gp_earned[:, wc] == earned0 + 1).all()), "Writer not earned"
     assert sim.major_unit_alive[0].sum().item() == live0 + 1, "the claim did not spawn the Writer as a unit"
     assert works_of(sim, 0, 0, 0, [WRITING]) == 0, "the CLAIM slotted works; the SPEND does that now"

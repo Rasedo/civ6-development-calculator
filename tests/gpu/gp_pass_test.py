@@ -111,13 +111,13 @@ def test_the_lockout_and_the_rivals_claim(rules, path) -> None:
     sim._advance_great_people(ROW, ones)
     assert int(sim.gp_offer[B0, 0]) == 0, "the passer claimed the individual they passed on"
     assert float(sim.civ_gpp[B0, ROW, 0]) >= pts0, "the locked-out passer lost points"
-    # the rival's race: claims at the DISCOUNTED price, and the claim lifts
-    # the lockout for the next person
+    # the rival's recruit: claims at the DISCOUNTED price, and the claim
+    # lifts the lockout for the next person
     sim.civ_gpp[B0, 1, 0] = 50.0   # short of 60, past 48
-    sim._advance_great_people(1, ones)
+    sim._gp_recruit(1, torch.zeros(sim.B, dtype=torch.long))
     assert int(sim.gp_offer[B0, 0]) != 0, "the rival could not claim at the discounted price"
     assert int(sim.gp_passed_by[B0, 0]) == -1, "the claim did not lift the lockout"
-    print("  3 lockout OK — the passer waits, the rival claims at 80%, the stamp clears")
+    print("  3 lockout OK — the passer waits, the rival recruits at 80%, the stamp clears")
 
 
 def test_patronage_refuses_the_passer(rules, path) -> None:

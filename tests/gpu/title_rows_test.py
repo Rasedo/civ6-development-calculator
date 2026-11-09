@@ -162,6 +162,16 @@ def test_nobel_favor(rules, path) -> None:
         s2 = fresh(rules, path)
         play(s2, 0, name)
         cls = 0
+        # the class's district in city slot 0 earns its turn's point, so the
+        # claim runs on the points changing
+        di = int(s2._gp_class_district[cls])
+        ctr = int(s2.city_center[B0, 0, 0])
+        at = next(int(x) for x in s2.neigh[ctr].tolist() if x >= 0)
+        s2.district[B0, at] = di
+        s2.district_complete[B0, at] = True
+        s2.district_pillaged[B0, at] = False
+        s2.city_dist_tile[B0, 0, 0, di] = at
+        s2._eff_version += 1
         s2.civ_gpp[B0, 0, cls] = 5000.0
         before = float(s2.civ_diplo_favor[B0, 0])
         n0 = int(s2.gp_earned[B0, cls])

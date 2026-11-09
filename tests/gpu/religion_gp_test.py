@@ -188,7 +188,7 @@ def main() -> None:
     sim.gp_price[:, :] = 0.0
     sim.gp_claimed[:, :, :] = False
 
-    # --- a Writer (class 7) is earnable through the seat-0 advance loop,
+    # --- a Writer (class 7) is earnable through the seat-0 recruit,
     # proving the widened tensors flow end to end. The CLAIM only stands the
     # person up as a unit: nothing is paid and no slot is taken until a charge
     # is spent. Fresh turn 1 with no AMPHITHEATER, so the spend overflows both
@@ -202,7 +202,8 @@ def main() -> None:
     gw0 = int((sim.city_gw_obj[:, 0] >= 0).sum())
     live0 = sim.major_unit_alive[0].sum().item()
     sim.civ_gpp[:, 0, 7] = 100.0  # >= the Writer's flat Classical 60
-    sim._advance_great_people(0, torch.ones(sim.B, dtype=torch.bool, device=sim.device))
+    sim._gp_ensure_offer(torch.ones(sim.B, dtype=torch.bool, device=sim.device), 7)
+    sim._gp_recruit(0, torch.full((sim.B,), 7, dtype=torch.long, device=sim.device))
     assert bool((sim.gp_earned[:, 7] == earned0 + 1).all()), "Writer not earned"
     assert sim.major_unit_alive[0].sum().item() == live0 + 1, "the claim did not spawn the Writer as a unit"
     assert bool((sim.civ_civic_prog[:, 0] == civic0).all()), "the claim paid a lump it no longer owes"
@@ -235,8 +236,9 @@ def main() -> None:
     _cls_same = sim._gp_era[pc, :_nr_p] == sim._gp_era[pc, 0]
     _cls_same[0] = False
     sim.gp_claimed[:, pc, :_nr_p] |= _cls_same.reshape(1, -1)
-    sim.civ_gpp[:, 0, pc] = 100.0  # >= the flat Classical 60, earns one Prophet
-    sim._advance_great_people(0, torch.ones(sim.B, dtype=torch.bool, device=sim.device))
+    sim.civ_gpp[:, 0, pc] = 100.0  # >= the flat Classical 60, recruits one Prophet
+    sim._gp_ensure_offer(torch.ones(sim.B, dtype=torch.bool, device=sim.device), pc)
+    sim._gp_recruit(0, torch.full((sim.B,), pc, dtype=torch.long, device=sim.device))
     assert bool((sim.gp_earned[:, pc] == pe0 + 1).all()), "Prophet not earned"
     assert bool((sim.civ_faith[:, 0] == faith0).all()), "the claim banked faith it no longer owes"
     puidx = int(sim._gp_class_unit[pc])

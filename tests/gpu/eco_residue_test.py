@@ -12,7 +12,7 @@ The TS twin is tests/cpu/city/eco-residue.test.ts.
      a government change outside the window
      pays it once, and one the purse cannot meet is refused.
   3. a city-state's city holds the Palace (`_palace_at`): +5 Gold.
-  4. the Great Prophet, one per player (`_gp_capped`): the race, the patronage
+  4. the Great Prophet, one per player (`_gp_capped`): the race, the recruit, the patronage
      and the pass refuse a seat that has earned one.
   5. a Holy Site's healing faith counts the Dar-e Mehr's era Faith and none of
      a pillaged building's.
@@ -170,10 +170,12 @@ def test_prophet_cap(sim) -> None:
     sim._advance_great_people(ROW, active)
     assert int(sim.civ_gp_earned[0, ROW, p]) == 1 and int(sim.gp_earned[0, p]) == earned
     assert float(sim.civ_gpp[0, ROW, p]) >= 1.0e6, "the points should wait"
-    done = sim._patronize(ROW, active, torch.full((sim.B,), p, dtype=torch.long), gold=False)
+    sim._gp_recruit(ROW, torch.full((sim.B,), p, dtype=torch.long))
+    assert int(sim.civ_gp_earned[0, ROW, p]) == 1, "a capped seat recruited a Great Prophet"
+    done =sim._patronize(ROW, active, torch.full((sim.B,), p, dtype=torch.long), gold=False)
     assert not bool(done[0]), "a capped seat patronized a Great Prophet"
     sim.restore(snap)
-    print("  4 the Great Prophet, one per player: the race and patronage refuse OK")
+    print("  4 the Great Prophet, one per player: the race, the recruit and patronage refuse OK")
 
 
 def test_holy_site_faith(rules, rj, path) -> None:

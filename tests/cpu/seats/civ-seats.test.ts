@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { MP_SCALE } from '../../../cpu/data/constants';
 import { MAX_CITIES_PER_SEAT } from '../../../cpu/data/seats';
 import { PANTHEON_IDS } from '../../../cpu/data/religion';
+import { GP_CLASSES } from '../../../cpu/data/greatPeople';
 import { IMPROVEMENT_IDS, unitActionIndex } from '../../../cpu/core/unitActions';
 
 const A_PILLAGE = unitActionIndex(IMPROVEMENT_IDS).PILLAGE;
@@ -186,6 +187,9 @@ describe('races', () => {
     ensureGpOffer(state, 'SCIENTIST'); // the offer is drawn state, not a formula
     civ.gpp.SCIENTIST = gpOfferCost(state, 'SCIENTIST'); // about to claim
     const before = greatPeopleEarned(state, 'SCIENTIST');
+    // the class earns nothing this turn: the seat's own RECRUIT claims it
+    state.seatActions = { [state.turn - 1]: { [civ.seat]: {
+      production: [], tech: null, civic: null, units: [], gpRecruit: GP_CLASSES.indexOf('SCIENTIST') } } };
     seatPhase(state);
     expect(greatPeopleEarned(state, 'SCIENTIST')).toBe(before + 1);
     expect(state.eventLog.some((e) => e.includes('claimed'))).toBe(true);

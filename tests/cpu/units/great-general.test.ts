@@ -1,6 +1,5 @@
 import { describe, it, expect } from 'vitest';
 import { isCiv, seatOf, setWar, tileSeat } from '../../../cpu/core/seats';
-import { endTurn } from '../../../cpu/core/game';
 import { seededGame } from '../helpers';
 import { spawnUnit, unitDomain, trainableUnits } from '../../../cpu/core/units';
 import { isImpassable, isWater } from '../../../world/query';
@@ -8,7 +7,8 @@ import { generalAuraCS, meleeAttack } from '../../../cpu/core/combat';
 import { GENERAL_AURA_CS } from '../../../cpu/core/aura';
 import { neighbors, hexDistance } from '../../../world/hex';
 import { UNITS } from '../../../cpu/data/units';
-import { ensureGpOffer, gpOfferCost } from '../../../cpu/core/greatPeople';
+import { ensureGpOffer, gpOfferCost, recruitClaimable } from '../../../cpu/core/greatPeople';
+import { GP_CLASSES } from '../../../cpu/data/greatPeople';
 import type { GameState, Unit, Seat } from '../../../cpu/core/types';
 
 // — Great General & Great Admiral (the TS twin of the GPU
@@ -141,11 +141,11 @@ describe('aura', () => {
 describe('spawn-at-claim & capture', () => {
   it('a seat-0 GENERAL claim spawns a general civilian at the capital', () => {
     const state = newGame();
-    // fund exactly one GENERAL; advanceGreatPeople (in endTurn) claims + spawns.
+    // fund exactly one GENERAL; the seat's recruit claims it and spawns it
     ensureGpOffer(state, 'GENERAL'); // the offer is drawn state, not a formula
     seatOf(state, 0)!.gpp.GENERAL = gpOfferCost(state, 'GENERAL');
     const before = state.units.filter((u) => (u.seat) === 0 && u.type === 'GENERAL').length;
-    endTurn(state);
+    expect(recruitClaimable(state, 0, GP_CLASSES.indexOf('GENERAL')).ok).toBe(true);
     const after = state.units.filter((u) => (u.seat) === 0 && u.type === 'GENERAL');
     expect(after.length).toBe(before + 1);
     // spawned at/adjacent to the capital, a civilian with 1 charge
