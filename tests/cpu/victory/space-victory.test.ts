@@ -216,7 +216,9 @@ describe('science victory', () => {
     endTurn(base.state);
     endTurn(twin.state);
     const sciPerTurn = seatOf(base.state, 0)!.scienceTotal - sciBefore;
-    const lump = seatOf(twin.state, 0)!.cultureTotal - seatOf(base.state, 0)!.cultureTotal;
+    // the lump lands in the civic pool (`addCivicProgress`); lifetime culture
+    // counts it only into a civic in hand
+    const lump = seatOf(twin.state, 0)!.research.civicProgress - seatOf(base.state, 0)!.research.civicProgress;
     expect(lump).toBe(Math.round(10 * sciPerTurn));
     expect(lump).toBeGreaterThan(0);
 

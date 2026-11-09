@@ -413,16 +413,17 @@ describe('religious pressure spread', () => {
 
     endTurn(state);
     expect(cap.followedReligion).toBe(0);
-    expect(near.followedReligion ?? null).toBeNull(); // nothing pressed it yet: the Holy City presses from the turn AFTER it follows
     expect(far.followedReligion ?? null).toBeNull(); // out of range — no pressure
 
-    // The Holy City presses x4 a turn, never itself; the near city converts
-    // once that holds more than half of its total against its atheism
-    // baseline (50 per citizen), and the far city never hears of it.
+    // The holy city follows at the founding, so it presses x4 from the first
+    // turn, never itself; the near city converts once that holds more than
+    // half of its total against its atheism baseline (50 per citizen), and
+    // the far city never hears of it.
+    expect(near.religionPressure![0]).toBe(HOLY_CITY_PRESSURE_MULT * RELIGION_PRESSURE_PER_TURN);
     const p = cap.religionPressure![0];
     endTurn(state);
     expect(cap.religionPressure![0]).toBe(p);
-    expect(near.religionPressure![0]).toBe(HOLY_CITY_PRESSURE_MULT * RELIGION_PRESSURE_PER_TURN);
+    expect(near.religionPressure![0]).toBe(2 * HOLY_CITY_PRESSURE_MULT * RELIGION_PRESSURE_PER_TURN);
     // the city grows meanwhile, so its baseline is read each turn
     let guard = 0;
     while ((near.followedReligion ?? null) === null && guard++ < 30) {
