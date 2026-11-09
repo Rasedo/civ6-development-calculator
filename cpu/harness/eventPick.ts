@@ -35,14 +35,14 @@ import type { CheckResult } from './checks';
 import { P, type Catalog, type TurnRecord } from './record';
 import { engineRowOf, type Imported } from './import';
 import type { ClimateLog, LoggedEvent, RandLog } from './randLog';
-import { droughtStarts, eventAt, fireCandidate, eventTable, floodRivers, floodplainRun, laidRivers, riverPlotList, sitePairWeight, stormStarts, volcanoOrder, type EventTable } from '../core/disasters';
+import { droughtStarts, eventAt, fireCandidate, eventTable, floodRivers, floodplainRun, laidRivers, riverPlotList, sitePairWeight, stormFootprint, stormStarts, volcanoOrder, type EventTable } from '../core/disasters';
 import type { GameMap } from '../../world/types';
 import { warmingDegrees } from '../core/climate';
 import { TURN_LIMIT } from '../core/game';
 import { EVENT_OCC_SCALE, FIRST_TIME_OCCURRENCE_BOOST } from '../data/disasters';
 import { ERUPTION_ROWS, STORM_EVENTS, stormFamilyAt } from '../data/disasters';
 import { initFog, losDisk, unitSeesThrough, unitSight, type Look } from '../core/fog';
-import { tilesWithin } from '../../world/hex';
+import { hexDistance, tilesWithin } from '../../world/hex';
 import { isCiv } from '../core/seats';
 import { deforestationLevel } from '../core/climate';
 import { deforestationModifier } from '../data/climate';
@@ -406,11 +406,12 @@ function bandOf(t: EventTable, i: number): [number, number] {
  *  first-occurrence boost) off every event `recs` showed begun by `rec`'s
  *  turn, on its row and site, and the world's carbon of the climate log's
  *  row for that turn on the first seat (its deforestation factor laid back
- *  off). runs/h1_duelq1127 t237: Хуанхэ's FLOOD_MAJOR at 4:13 on the roll
+ *  off), and each volcano's activity off the game's draw log
+ *  (`seedVolcanoes`). runs/h1_duelq1127 t237: Хуанхэ's FLOOD_MAJOR at 4:13 on the roll
  *  141 of 2500 with the memory and the warming, the Amur's FLOOD_MODERATE
  *  at 7:16 without. */
 export function seedEventMemory(state: GameState, recs: readonly TurnRecord[], rec: TurnRecord, cat: Catalog,
-  climate: ClimateLog | undefined): void {
+  climate: ClimateLog | undefined, log: RandLog | undefined): void {
   const names = cat.randomEvents ?? [];
   const seen = new Map<string, { name: string; plot: number }>();
   for (const r of recs) {
@@ -420,7 +421,13 @@ export function seedEventMemory(state: GameState, recs: readonly TurnRecord[], r
       if (!seen.has(key)) seen.set(key, { name: names[num(e[1])] ?? '', plot: num(e[3]) });
     }
   }
+  // every volcano a site of the table the memory is laid on, asleep or not:
+  // a volcano keeps its memory through its sleep
+  const volcanoes = volcanoOrder(state.map);
+  const wasActive = volcanoes.map((t) => t.volcanoActive);
+  for (const t of volcanoes) t.volcanoActive = true;
   const t0 = eventTable(state);
+  volcanoes.forEach((t, i) => { t.volcanoActive = wasActive[i]; });
   for (const e of seen.values()) {
     if (e.plot < 0) continue;
     const i = t0.rows.findIndex((_r, j) => rowName(t0, j) === e.name);
@@ -432,6 +439,89 @@ export function seedEventMemory(state: GameState, recs: readonly TurnRecord[], r
   if (carbon !== undefined) {
     state.seats.forEach((s, i) => { s.co2 = i === 0 ? carbon / (1 + deforestationModifier(deforestationLevel(state))) : 0; });
   }
+  if (log) seedVolcanoes(state, recs, rec, log);
+  if (climate) seedStormScars(state, [...seen.entries()], rec, climate);
+}
+
+/**
+ * Each plot a storm's walk struck by record `rec` (`Tile.stormStruck`, which
+ * bars a drought's start for good: `droughtCandidate`), which no record
+ * carries: the footprint (`stormFootprint`) round every centre of every walk
+ * the climate log's STORM MOVEMENT rows hold up to rec's turn, each the walk
+ * of the storm born on the records (`seen`: its row, its start plot) whose
+ * centre lies on or beside the walk's first step. A birth's own strike
+ * marks none (`stormBirth`). runs/h1_duelq1124 t112 / t115: the drought
+ * finds no start, 233 / 234 / 277 / 278 struck by the t49 storm's t50 walk;
+ * 1117 t152 / t155 none and t187 / t208 / t240 the one start 736, 569 / 570
+ * struck by the t50 storm's t52 walk.
+ */
+function seedStormScars(state: GameState, seen: [string, { name: string; plot: number }][], rec: TurnRecord, climate: ClimateLog): void {
+  const map = state.map;
+  const births = new Map<number, { hexes: number; at: number; born: number }[]>();
+  for (const [key, e] of seen) {
+    const ev = STORM_EVENTS.find((s) => `RANDOM_EVENT_${s.id}` === e.name);
+    const turn = Number(key.split(':')[0]);
+    if (!ev || e.plot < 0) continue;
+    births.set(turn, [...births.get(turn) ?? [], { hexes: ev.hexes, at: e.plot, born: turn }]);
+  }
+  let live: { hexes: number; at: number; born: number }[] = [];
+  const turns = [...new Set([...climate.starts.keys(), ...births.keys()])].filter((t) => t <= rec.turn).sort((a, b) => a - b);
+  for (const turn of turns) {
+    // a storm walks on the two turns after its birth
+    live = live.filter((x) => turn - x.born <= 2);
+    for (const row of climate.starts.get(turn) ?? []) {
+      const path = row.path;
+      if (row.kind !== 'STORM MOVEMENT' || !path?.length) continue;
+      const first = map.tiles[path[0]];
+      const s = first && live.find((x) => {
+        const c = map.tiles[x.at];
+        return hexDistance(map, c.col, c.row, first.col, first.row) <= 1;
+      });
+      if (!s) continue;
+      for (const at of path) {
+        const c = map.tiles[at];
+        if (c) for (const t of stormFootprint(map, c, s.hexes)) t.stormStruck = true;
+      }
+      s.at = path[path.length - 1];
+    }
+    live.push(...(births.get(turn) ?? []).map((b) => ({ ...b })));
+  }
+}
+
+/**
+ * Each volcano's activity at record `rec`, which no record carries: the
+ * game's volcano roll's choices up to the step of rec's turn (`volcanoRoll`),
+ * each the logged index into its candidates in the volcano vector's order
+ * (`volcanoOrder`) — a wake ("Choose Active Volcano Roll") over the sleeping
+ * NAMED volcanoes, those the latest record by its turn names
+ * (`TurnRecord.volcanoes`), a sleep ("Choose Inactive Volcano Roll") over the
+ * active ones. runs/h1_duelq1128 t126: Paektusan 633 woken t11 and 136 t97,
+ * the roll 231 of 2500 on VOLCANO_GENTLE at 633 (Game_RandomEvents.csv's two
+ * active volcanoes), a storm with none.
+ */
+function seedVolcanoes(state: GameState, recs: readonly TurnRecord[], rec: TurnRecord, log: RandLog): void {
+  const order = volcanoOrder(state.map);
+  if (!order.length) return;
+  const named = (turn: number): Set<number> | null => {
+    let list: unknown = null;
+    for (const r of recs) if (r.turn <= turn && Array.isArray(r.volcanoes?.list)) list = r.volcanoes!.list;
+    return Array.isArray(list) ? new Set(list.map((e: [number, number]) => e[0])) : null;
+  };
+  const active = new Set<number>();
+  for (const d of log.draws) {
+    if (d.turn > rec.turn) break;
+    const k = siteLabel(d.label);
+    if (k !== 'Choose Active Volcano Roll' && k !== 'Choose Inactive Volcano Roll') continue;
+    const wake = k === 'Choose Active Volcano Roll';
+    const names = wake ? named(d.turn) : null;
+    if (wake && !names) return;
+    const from = order.filter((t) => (wake ? !active.has(t.index) && names!.has(t.index) : active.has(t.index)));
+    const v = from[d.value];
+    if (!v) continue;
+    if (wake) active.add(v.index);
+    else active.delete(v.index);
+  }
+  for (const t of order) t.volcanoActive = active.has(t.index);
 }
 
 /** each river's plot list in the river vector's order: the map's own

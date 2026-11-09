@@ -129,8 +129,9 @@ function gameOfLog(path: string, seeds: Iterable<number>): { log: RandLog; k: nu
 
 /** an event row of the climate log at a turn: its kind (ERUPTION, FLOOD,
  *  FLOOD MITIGATED, DROUGHT, STORM, ONEOFF; STORM MOVEMENT with no severity
- *  or plot), severity and start plot */
-export interface LoggedEvent { kind: string; severity: number; plot: number }
+ *  or plot, the centre of each step of the storm's walk in `path`),
+ *  severity and start plot */
+export interface LoggedEvent { kind: string; severity: number; plot: number; path?: number[] }
 
 /** one game of the climate log: the world's carbon by turn (the turns its
  *  step ran) and its event rows by turn */
@@ -253,14 +254,14 @@ function climateGames(text: string, W: number): ClimateLog[] {
       continue;
     }
     // an event row: the turn, the kind, its severity and its start plot; a
-    // storm's movement row (no severity, no plot) follows the row of a storm
-    // that began before the turn
+    // storm's movement row (no severity, no plot: the centre of each step of
+    // its walk) follows the row of a storm that began before the turn
     if (!/^\d+$/.test(f[0] ?? '')) continue;
     const turn = Number(f[0]);
     const list = cur.starts.get(turn) ?? [];
     const sev = /^Severity\s*=\s*(\d+)$/.exec(f[2] ?? '');
     const at = /\((\d+) - (\d+)\)/.exec(f[4] ?? '');
-    if (f[1] === 'STORM MOVEMENT') list.push({ kind: f[1], severity: -1, plot: -1 });
+    if (f[1] === 'STORM MOVEMENT') list.push({ kind: f[1], severity: -1, plot: -1, path: f.slice(2).filter((x) => /^\d+$/.test(x)).map(Number) });
     else if (sev && at) list.push({ kind: f[1], severity: Number(sev[1]), plot: Number(at[2]) * W + Number(at[1]) });
     else continue;
     cur.starts.set(turn, list);

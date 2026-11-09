@@ -5756,15 +5756,15 @@ function importedWorld(state: GameState, imp: Imported, rec: TurnRecord, history
   }
   seedMoments(state, imp, history);
   standGreatPeople(state, gpTimeline, rec.turn);
-  if (eventSeed) seedEventMemory(state, eventSeed.recs, rec, eventSeed.cat, eventSeed.climate);
+  if (eventSeed) seedEventMemory(state, eventSeed.recs, rec, eventSeed.cat, eventSeed.climate, eventSeed.log);
 }
 
 /** the game's Great People timeline beside the dump (`loadGpTimeline`) */
 let gpTimeline: GpTimeline | null = null;
 
-/** the records and the game's climate log an imported world's event memory
- *  and carbon are read from (`seedEventMemory`) */
-let eventSeed: { recs: TurnRecord[]; cat: Catalog; climate: ClimateLog | undefined } | null = null;
+/** the records, the game's climate log and its draw log an imported world's event memory,
+ *  carbon, volcanoes and storm scars are read from (`seedEventMemory`) */
+let eventSeed: { recs: TurnRecord[]; cat: Catalog; climate: ClimateLog | undefined; log?: RandLog } | null = null;
 
 /** a contract the game's city queued in the turn `turn` the record's item
  *  stands for (AI_CityBuild.csv's queue line: its item and tree): the
@@ -6124,6 +6124,7 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
   const logPath = randLogPath(dumpPath);
   if (logPath) {
     history.randLog = loadRandLog(logPath, all.flatMap((r) => (r.witness ?? []).flatMap((w) => (typeof w.seed === 'number' ? [w.seed] : []))));
+    eventSeed.log = history.randLog;
   }
   history.weary = loadWeariness(dumpPath);
   history.warKinds = loadWarKinds(dumpPath);
