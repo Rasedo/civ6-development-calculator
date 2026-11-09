@@ -13,6 +13,21 @@
   context:
     - Improvement_Yields.cpp. Lua Plot:GetAdjacencyYield (binding 0x25600 -> 0x81b90 -> 0x5389b0) and District::GetYield (0x249850) both reach the sum 0x365720 (via 0x366df0,...
   review: reviewed
+- addr: 0x81e70
+  final: 0x5f2d0
+  kind: function
+  name: plotIndex
+  semantics: "the plot's index: its y (+0x2a) x the map's width (map +0x28) + its x (+0x28)."
+  status: READ
+  cases:
+    - recording: h1_duelq1128
+      turn: 9
+      value: the revealed test of the Tribal Village 20:3 (index 152 on the 44-wide map) in HL Explore's count
+  readings:
+    - "C-95: HL Explore's unrevealed count holds nothing on a goody hut's plot — READ (0x70a6c0 at 0x70a746..0x70a76a, 0x82d90), both twins"
+  context:
+    - "...the Goody bit (0x82d90: plot +0x44, row +0x109 & 4) and the player revealed the plot (0x81e70 -> 0x154c0 over the visibility 0x5d3f0), it sets the first flag and returns 0 before th..."
+  review: reviewed
 - addr: 0x82280
   final: 0x5f6d0
   kind: function
@@ -79,12 +94,20 @@
 - addr: 0x82d90
   final: 0x60180
   kind: function
-  semantics: the plot holds a goody hut (taken at once by a full civilization; no barbarian).
+  semantics: the plot holds a goody hut (its improvement's row +0x109 bit 4, Improvements.Goody); HL Explore's count 0x70a6c0 holds nothing on such a plot.
   status: READ
   cases:
+    - recording: h1_duelq1128
+      turn: 9
+      value: "the Tribal Village on 20:3 counts nothing for the barbarian Scout 262147: it takes 20:1 (6) as logged"
     - recording: h1_duelv1124
       value: "- PARTLY READ: the region lists' writer (the engines carry none: 36 of the   barbarians' 223 Explore rows of runs/h1_duelv1124 are \"tertiary regions\");"
+  impl:
+    - cpu/core/tactical.ts:exploreTarget
+    - gpu/core/sim_tactics.py:_tac_explore_counts
+    - cpu/core/tactical.ts:hut
   readings:
+    - "C-95: HL Explore's unrevealed count holds nothing on a goody hut's plot — READ (0x70a6c0 at 0x70a746..0x70a76a, 0x82d90), both twins"
     - "C-95: Explore Land and the barbarians' revealed plots — READ, ported (two tests below unread)"
   context:
     - "...d's +0x128; taken as passing); a goody hut's plot taken at once by a full civilization (0x82d90: no barbarian)."

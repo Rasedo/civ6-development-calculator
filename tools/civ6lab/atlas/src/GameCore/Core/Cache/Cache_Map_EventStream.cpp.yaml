@@ -13,6 +13,7 @@
     - "C-95: the unit pathfinder and the planning's reach — READ, confirmed on the Wander draws"
     - "C-95: Explore Land and the barbarians' revealed plots — READ, ported (two tests below unread)"
     - "C-96: the city-states' tactical pass — READ (Wander Near City, Heal, the non-barbarian priorities, FindAlternateLocation), the families it needs PARTLY READ"
+    - "C-95: HL Explore's unrevealed count holds nothing on a goody hut's plot — READ (0x70a6c0 at 0x70a746..0x70a76a, 0x82d90), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...— save under flag 0x800. Between two plots the player never revealed (node +0x51 bit 0, 0x154c0) the step costs the parent's or 1 and no rule runs."

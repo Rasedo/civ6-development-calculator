@@ -4285,7 +4285,7 @@ class SimTactics:
         Patrol's "patrol") for the units at local `slots` of games `rows` ([n]): the search of this turn on their Movement left (`res`)
         and per plot closed this turn with no danger and no other player's
         unit its two sight counts — the plots its player never revealed
-        (`v1`), those it does not see now (`v2`) — and whether its look
+        (`v1`, none on a goody hut), those it does not see now (`v2`) — and whether its look
         holds a revealed route (`rt`, plot +0x47); [n, T] each, NEG off the
         candidates"""
         T, dev = self.T, self.device
@@ -4301,10 +4301,13 @@ class SimTactics:
             ut_n = getattr(self, f"{pre}_unit_type")[rows[n_i], slots[n_i]]
             sight = self._unit_sight(ut_n, getattr(self, f"{pre}_unit_promos")[rows[n_i], slots[n_i]])
             disk = self._los_disk(rows[n_i], t_i, sight, torch.zeros_like(n_i, dtype=torch.bool))
-            v1[n_i, t_i] = (disk & ~revealed[rows[n_i]]).sum(dim=1)
+            # a goody hut on the plot counts nothing and flags no route
+            # (0x70a6c0 at 0x70a746: 0x82d90)
+            hut = self.tile_goody[rows[n_i], t_i]
+            v1[n_i, t_i] = torch.where(hut, 0, (disk & ~revealed[rows[n_i]]).sum(dim=1))
             v2[n_i, t_i] = (disk & ~seen_now[rows[n_i]]).sum(dim=1)
             route = self.road | self.railroad
-            rt[n_i, t_i] = (disk & revealed[rows[n_i]] & route[rows[n_i]]).any(dim=1)
+            rt[n_i, t_i] = (disk & revealed[rows[n_i]] & route[rows[n_i]]).any(dim=1) & ~hut
         return res, v1, v2, rt
 
     def _tac_explore_pick(self, go: torch.Tensor, u_b: torch.Tensor, r: torch.Tensor, res: dict, v1: torch.Tensor,

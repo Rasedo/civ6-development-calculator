@@ -82,9 +82,12 @@
   final: 0x4bb410
   kind: function
   name: exploreUnrevealedCount
-  semantics: the plots within the unit's sight from a plot the player never revealed; a revealed plot's +0x47 flag unread Over the look, a plot not revealed counts; a revealed one whose route byte (+0x47) is not -1 sets the second flag; a goody hut on the revealed plot itself sets the first and counts nothing (the first wins at once for a full civilization alone, 0x82d90).
+  semantics: the plots within the unit's sight from a plot the player never revealed; a revealed one whose route byte (+0x47) is not -1 sets the second flag; a goody hut (0x82d90) on the plot, revealed, sets the first flag and returns 0 before the sight walk, the route flag clear (0x70a746..0x70a76a); HL Explore takes such a plot at once for a FULL_CIV alone, any other player's count there 0.
   status: READ
   cases:
+    - recording: h1_duelq1128
+      turn: 9
+      value: the barbarian Scout 262147 on 19:2 takes 20:1 (6 unrevealed) over the Tribal Village 20:3 (7 in its look); t10 on 20:1 takes 'cur region' 15:2, 20:3 the only plot of its reach with a count
     - recording: h1_duelw1117
       value: "the HL: Explore rows of the 5-seed replay end on the game's plot 419 -> 490 of 1,056 with the tertiary list"
     - recording: h1_duelv1124
@@ -93,7 +96,10 @@
     - cpu/core/tactical.ts:exploreTarget
     - cpu/core/tactical.ts:v2Best
     - gpu/core/sim_tactics.py:_tac_explore
+    - cpu/core/tactical.ts:hut
+    - gpu/core/sim_tactics.py:_tac_explore_counts
   readings:
+    - "C-95: HL Explore's unrevealed count holds nothing on a goody hut's plot — READ (0x70a6c0 at 0x70a746..0x70a76a, 0x82d90), both twins"
     - "C-95: Explore Land and the barbarians' revealed plots — READ, ported (two tests below unread)"
     - "H-1: the sight rule — READ (the walk 0x58b1d0, emulated); a city's look — READ"
   context:
@@ -114,6 +120,7 @@
   readings:
     - "C-95: Explore Land and the barbarians' revealed plots — READ, ported (two tests below unread)"
     - "H-1: the sight rule — READ (the walk 0x58b1d0, emulated); a city's look — READ"
+    - "C-95: HL Explore's unrevealed count holds nothing on a goody hut's plot — READ (0x70a6c0 at 0x70a746..0x70a76a, 0x82d90), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...n from the plot): those the player never revealed (0x70a6c0) and those not visible now (0x70a8b0, [player +0x290] <= 0). The first plot of the largest first count above 0 wins (\"HL: Ex..."
@@ -130,6 +137,7 @@
     - "C-99: Naval Patrol's explore target — the list and the tests READ, two cases unexplained"
     - "C-124 / C-95: every search but the planning's pays the stacking +1e6, the cost reads the child's revealed bit, Explore's flag 0x40 prices the unrevealed — READ (0x270dd0 at 0x270e55 / 0x270e86 / 0x270ff2 / 0x2711c3..0x271268 / 0x2713d3, 0x502aa0, 0x26df90's callers 0x716739 / 0x70aadd, 0x70ce90 at 0x70ced5, 0x803060 at 0x80316f), both twins"
     - "C-99: a move order's search sets out on the pool finder's +0x1bc, the last full-Movement search's GetMaxMoves — READ (0x26f330, 0x77d10, 0x270d70, 0x26e920, 0x26eea0, 0x26dcd0, 0x26df90, 0x26e2c0, 0x26fe20 at 0x270309), unported"
+    - "C-95: HL Explore's unrevealed count holds nothing on a goody hut's plot — READ (0x70a6c0 at 0x70a746..0x70a76a, 0x82d90), both twins"
   context:
     - "...d Units 0x80d790 (\"Operation Protect Units\"), Naval Patrol 0x803060 (the explore move 0x70aa40), Naval Pillage 0x803250, Naval Escort 0x817f60; Operation Move's unit tactical block (..."
   review: reviewed

@@ -91,6 +91,7 @@
     - "H-1: the sight rule — READ (the walk 0x58b1d0, emulated); a city's look — READ"
     - "H-1: the barbarians' turn (0x1514a0) — READ (the max camps and the sight LAB)"
     - "C-129: a unit's look is its stored line-of-sight list — READ (0x58f3f0, the setters 0x56ce90 / 0x5704d0 / 0x570560), both twins"
+    - "C-95: HL Explore's unrevealed count holds nothing on a goody hut's plot — READ (0x70a6c0 at 0x70a746..0x70a76a, 0x82d90), both twins"
   review: reviewed
 - addr: 0x58d1c0
   final: 0x3b5c00

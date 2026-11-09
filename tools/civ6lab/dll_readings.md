@@ -13120,3 +13120,26 @@ PlayerCulture m_xLifetimeCulture.
   quest the engines' Rome completes at Antioch, its envoy annexing 914
   (the record's envoys stay 1); the remaining step.border misses are the
   Culture the box banks (`cultureAfterGrowth`), the plots right.
+
+## C-95: HL Explore's unrevealed count holds nothing on a goody hut's plot — READ (0x70a6c0 at 0x70a746..0x70a76a, 0x82d90), both twins
+
+`exploreTarget` (cpu/core/tactical.ts); `_tac_explore_counts` (gpu/core/sim_tactics.py).
+
+- THE COUNT 0x70a6c0 (plot, player, sight, out first, out route): where the
+  plot holds an improvement whose Improvements row carries the Goody bit
+  (0x82d90: plot +0x44, row +0x109 & 4) and the player revealed the plot
+  (0x81e70 -> 0x154c0 over the visibility 0x5d3f0), it sets the first flag
+  and returns 0 before the sight walk 0x58b1d0: no unrevealed plot counts and
+  the route flag stays clear. In HL Explore (0x70abe6) the first flag takes
+  the plot at once only for a FULL_CIV (0x469db0); for a barbarian or a
+  city-state the plot's count is 0, so it never wins the first count nor
+  leads by the route. The unseen count 0x70a8b0 reads no hut: the fallback
+  still weighs the plot.
+- Confirmed: runs/h1_duelq1128 the barbarian Scout 262147 — t9 on 19:2
+  takes 20:1 (6 unrevealed) over the Tribal Village 20:3 (7 in its look:
+  21:3, 22:3, 21:4, 22:4, 21:5, 21:1, 22:2), t10 on 20:1 takes "cur region"
+  15:2 with 20:3 the only plot of its reach holding a count (3: 22:3, 22:4,
+  21:5), as AI_Tactical.csv logs; t11 / t13 end on the game's plots; 1128
+  t18 / t22 / t23 Scouts
+  131073 and 1703949, 1127 t12 / t35-t40 Scouts 393221, 1441809 and 2359316
+  end on the game's plots.

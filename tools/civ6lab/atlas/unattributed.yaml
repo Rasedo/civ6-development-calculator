@@ -274,6 +274,7 @@
   status: PARTLY
   readings:
     - "C-124: an attack order to a plot out of sight loses its attack flag — READ (0x962310), both twins"
+    - "C-95: HL Explore's unrevealed count holds nothing on a goody hut's plot — READ (0x70a6c0 at 0x70a746..0x70a76a, 0x82d90), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ...get plot (the operation's vt +0x68) and, where the unit owner's visibility count of it (0x5d3f0 +0x290) is 0, clears the attack flag 0x10 in the order's flags (parameters +8 -> +8). T...

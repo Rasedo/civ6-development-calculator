@@ -3393,7 +3393,8 @@ function nearestUnrevealed(state: GameState, u: Unit, revealed: (i: number) => b
  * Land's 0x40 / 0x42, Naval Patrol's 0) with no danger, none chosen
  * this move and one it may go to (`exploreOk`), the one whose sight (the
  * plots within its sight it sees from there, `losDisk`) holds the most plots
- * its player never revealed (0x70a6c0, the first of equals, above 0); else,
+ * its player never revealed (0x70a6c0, the first of equals, above 0; a
+ * goody hut's plot holds none); else,
  * on the move's first round, the nearest unrevealed plot of its region
  * where the player has not revealed all of it ("cur region", a path to it
  * existing — 0x272a60, `turnsToPlot`; a unit off any region the nearest of
@@ -3426,9 +3427,12 @@ function exploreTarget(state: GameState, pass: Pass, u: Unit, chosen: Set<number
     const p = n.tile;
     if (!ground.stand(p) || pass.danger[p] > 0 || chosen.has(p) || !exploreOk(state, u, p, revealed)) return false;
     const seen = look(p);
-    const v1 = seen.filter((q) => !revealed(q)).length;
+    // a goody hut on the plot (revealed, `exploreOk`) counts nothing and
+    // flags no route (0x70a6c0 at 0x70a746: 0x82d90)
+    const hut = !!map.tiles[p].goodyHut;
+    const v1 = hut ? 0 : seen.filter((q) => !revealed(q)).length;
     const v2 = seen.filter((q) => !seenNow[q]).length;
-    const route = seen.some((q) => revealed(q) && (!!map.tiles[q].road || !!map.tiles[q].railroad));
+    const route = !hut && seen.some((q) => revealed(q) && (!!map.tiles[q].road || !!map.tiles[q].railroad));
     if (!routeLed && route && v1 > 0) {
       routeLed = true;
       best1 = p;
