@@ -180,9 +180,10 @@ describe('Magnanimous', () => {
     const pedro = earned(leaderRow('PEDRO'));
     const plain = earned(PLAIN);
     expect(pedro.n).toBeGreaterThan(0);
-    expect(pedro.n).toBe(plain.n);
-    // every claim refunds a fifth of its price, so Pedro ends the turn ahead
-    expect(pedro.gpp).toBeGreaterThan(plain.gpp);
+    // every claim refunds a fifth of its price, so Pedro ends the turn ahead:
+    // another claim, or the same claims with more points kept
+    expect(pedro.n).toBeGreaterThanOrEqual(plain.n);
+    if (pedro.n === plain.n) expect(pedro.gpp).toBeGreaterThan(plain.gpp);
   });
 });
 

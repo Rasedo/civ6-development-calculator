@@ -3,7 +3,7 @@ import { GAME_SPEED, MP_SCALE, scaleByGameSpeed } from '../../../cpu/data/consta
 import { projectCost, TURN_LIMIT } from '../../../cpu/core/game';
 import { UNITS } from '../../../cpu/data/units';
 import { PROJECTS } from '../../../cpu/data/projects';
-import { WONDER_ERA_INDEX } from '../../../cpu/data/builtWonders';
+import { BUILT_WONDERS, WONDER_ERA_INDEX } from '../../../cpu/data/builtWonders';
 import { GREAT_PEOPLE, GP_CLASSES, GP_ABILITY, gpChargesOf } from '../../../cpu/data/greatPeople';
 import { activateGreatPerson } from '../../../cpu/core/gpAbility';
 import { spawnUnit } from '../../../cpu/core/units';
@@ -97,8 +97,15 @@ describe('a Great Person grant the install types ScaleByGameSpeed', () => {
       const state = newGame();
       const { city, u } = engineerOnWonder(state, 'GP_IMHOTEP', wonder);
       expect(WONDER_ERA_INDEX[wonder] <= 1).toBe(standard === 350);
+      const t = state.map.tiles[u.tileIndex];
       expect(activateGreatPerson(state, u)).toBe(true);
-      expect(city.queue[0].progress).toBe(scaleByGameSpeed(standard));
+      // a grant that fills the wonder completes it at once
+      if (scaleByGameSpeed(standard) >= BUILT_WONDERS[wonder].cost) {
+        expect(t.builtWonderComplete).toBe(true);
+        expect(city.queue.some((q) => q.kind === 'wonder')).toBe(false);
+      } else {
+        expect(city.queue[0].progress).toBe(scaleByGameSpeed(standard));
+      }
     }
   });
 });
