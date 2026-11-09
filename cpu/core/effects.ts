@@ -359,7 +359,10 @@ export interface Modifiers {
   borderExpansionPct: number;
   /** 1 + the summed growth percents (`computeCityStats`) */
   growthMult: number;
+  /** the beliefs' points a turn per city holding the class's district */
   gppFlat: Partial<Record<GreatPersonClass, number>>;
+  /** the cards' points a turn paid once to the player (MODIFIER_PLAYER_ADJUST_GREAT_PERSON_POINTS) */
+  gppSeat: Partial<Record<GreatPersonClass, number>>;
   workEthic: boolean;
   buildingYieldAdd: Partial<Record<string, Partial<Yields>>>;
   buildingHousingAdd: Partial<Record<string, number>>;
@@ -650,6 +653,7 @@ export function defaultModifiers(): Modifiers {
     borderExpansionPct: 0,
     growthMult: 1,
     gppFlat: {},
+    gppSeat: {},
     workEthic: false,
     buildingYieldAdd: {},
     buildingHousingAdd: {},
@@ -861,7 +865,7 @@ export function applyPolicyEffects(mods: Modifiers, fx: PolicyEffects): void {
   if (fx.militaryMaintenanceAdd) mods.militaryMaintenanceAdd += fx.militaryMaintenanceAdd;
   for (const [cls, n] of Object.entries(fx.gppFlat ?? {})) {
     const key = cls as GreatPersonClass;
-    mods.gppFlat[key] = (mods.gppFlat[key] ?? 0) + (n ?? 0);
+    mods.gppSeat[key] = (mods.gppSeat[key] ?? 0) + (n ?? 0);
   }
 }
 

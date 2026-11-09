@@ -57,7 +57,7 @@ import { getModifiers } from '../core/effects';
 import { researchUnitTurns, type ResearchEntry } from '../core/aiResearch';
 import type { CivicEntry } from '../core/aiCivics';
 import { detectBoosts, grantBoost, markBoost } from '../core/boosts';
-import { improvementMoment, recordMoments } from '../core/moments';
+import { improvementMoment, recordMoments, upgradeMoments } from '../core/moments';
 import { applyGovernorActions, governorsOf } from '../core/governors';
 import { GOVERNOR_PROMOTIONS, GOV_APPOINT, GOV_ASSIGN_CITY, GOV_ASSIGN_MINOR, GOV_PROMOTE, promotionBit } from '../data/governors';
 import { BOOSTS } from '../data/boosts';
@@ -4240,6 +4240,7 @@ const res = buyTile(state, city.id, d.plot, seat);        if (!res.ok) setTileOw
           // its Train Unit quests as the verb's does
           if (t) raiseBestTrained(state, u.seat, t, u.formation ?? 0);
           if (t) questUnitAdded(state, u.seat, t);
+          if (t) upgradeMoments(state, u.seat, t);
         }
         count(ctx, 'upgrade', res.ok ? 'applied' : 'fallback', d.player, res.reason);
         break;

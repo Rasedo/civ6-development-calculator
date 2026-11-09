@@ -2812,11 +2812,6 @@ class SimPhase:
                     gflat = self._bel_add("gpp", row)[:, cls].double().unsqueeze(1)
                 else:
                     gflat = torch.zeros(B, 1, dtype=torch.float64, device=dev)
-                # a policy card's flat points join the SAME per-city term:
-                # `mods.gppFlat` is one map over beliefs and cards alike.
-                _pg = self._gov_mods(row)[12]["gpp"]
-                if cls < _pg.shape[1]:
-                    gflat = gflat + _pg[:, cls].unsqueeze(1)
                 # CIV6 (Nobel Prize, EFFECT_ADJUST_GREAT_PERSON_POINTS): the
                 # roster's own per-BUILDING points, in the same per-city term
                 nb_r = torch.zeros(B, self.RC, dtype=torch.float64, device=dev)
@@ -2843,6 +2838,12 @@ class SimPhase:
                 pts = (comp_c.double() * (1.0 + gflat + dgpp + nb_of.double() + nb_r + c2 + bol) * gm).sum(dim=1)
             else:
                 pts = torch.zeros(B, dtype=torch.float64, device=dev)
+            # CIV6 (MODIFIER_PLAYER_ADJUST_GREAT_PERSON_POINTS, the cards): the
+            # class's points paid once to the player, no district needed
+            # (`mods.gppSeat`)
+            _pg = self._gov_mods(row)[12]["gpp"]
+            if cls < _pg.shape[1]:
+                pts = pts + _pg[:, cls].double()
             if cls == self._prophet_cls:
                 pts = pts + self._golden_ded(row, self._ded_exodus).double() * 4.0
             # CIV6: a wonder's per-turn points are the OWNER's, paid whether or

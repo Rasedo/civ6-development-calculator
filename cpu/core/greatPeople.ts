@@ -229,6 +229,13 @@ export function greatPersonPointsPerTurn(
       }
     }
   }
+  // CIV6 (MODIFIER_PLAYER_ADJUST_GREAT_PERSON_POINTS, the cards): the class's
+  // points paid once to the player, no district needed (runs/h1_duelq1117
+  // China t54-58: Literary Tradition +2 Writer points a turn with no Theater
+  // Square; 1121 t178-185: Frescoes with three Theater Squares and three Art
+  // Museums +8 Artist points a turn, 2 + 3 x 2)
+  const gppSeat = getModifiers(state, seat).gppSeat;
+  for (const cls of GP_CLASSES) out[cls] += gppSeat[cls] ?? 0;
   // CIV6 (Patronage resolution): the factor covers every source, the golden
   // prophet term included — so it applies after all of them.
   for (const cls of GP_CLASSES) out[cls] *= congressGppFactor(state, cls);

@@ -66,7 +66,7 @@ export const CITY_SIZE_KEY = MOMENT_CITY_SIZES.map((s, i) => add(`CITY_SIZE:${i}
 export const GOV_TIER_KEY = [-1, ...MOMENT_GOV_TIERS.map((p, i) => add(`GOV_TIER:${i + 1}`, p))];
 export const UNIT_SEA_KEY = add('UNIT_SEA', MOMENT_UNIT_SEA);
 export const UNIT_AIR_KEY = add('UNIT_AIR', MOMENT_UNIT_AIR);
-const STRATEGIC_KEY = new Map(STRATEGIC_IDS.map((r) => [r, add(`STRATEGIC:${r}`, MOMENT_UNIT_STRATEGIC)] as const));
+export const STRATEGIC_KEY = new Map(STRATEGIC_IDS.map((r) => [r, add(`STRATEGIC:${r}`, MOMENT_UNIT_STRATEGIC)] as const));
 /** the keys a living unit of each type holds: a seafaring one, a flying one,
  *  the strategic resource it uses, a unique one */
 export const UNIT_KEYS: Record<string, number[]> = Object.fromEntries(Object.entries(UNITS).map(([id, u]) => {
@@ -163,6 +163,16 @@ export function recordMoment(state: GameState, seat: number, k: number): void {
   if (pay > 0) addEraScore(state, seat, pay);
   insertSorted(seen, k);
   insertSorted(world, k);
+}
+
+/** CIV6 (UNIT_CREATED_FIRST_*): an upgrade is a unit `seat` creates — the
+ *  new type's keys are recorded at the event, a levied unit's too, which the
+ *  sweep leaves to the city-state (runs/h1_duelq1121 t148: China's levied
+ *  Musketman corps 3670030 upgraded into Line Infantry 4194310 pays
+ *  UNIT_CREATED_FIRST_REQUIRING_STRATEGIC_IN_WORLD, Niter). `_upgrade_units`
+ *  on the GPU is the twin. */
+export function upgradeMoments(state: GameState, seat: number, type: string): void {
+  for (const k of UNIT_KEYS[type] ?? []) recordMoment(state, seat, k);
 }
 
 /** CIV6 (IMPROVEMENT_CONSTRUCTED_ON_DISASTER_YIELD_TILE_FIRST): major `seat`

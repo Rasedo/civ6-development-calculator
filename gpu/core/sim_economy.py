@@ -4017,6 +4017,8 @@ class SimEconomy:
         for _gi in range(self._ngov):
             if _gi in _gov_on and float(self._gov_byb[_gi, 0]) >= 0:
                 byb.append((has_gov & (adopted == _gi), self._gov_byb[_gi]))
+            if _gi in _gov_on and self._gov_favor_b[_gi] >= 0:
+                fx["favorb"].append((has_gov & (adopted == _gi), self._gov_favor_b[_gi], self._gov_favor_n[_gi]))
         if self._gov_fx_mag > 0:
             _gf = has_gov.to(dt)
             for _k, _t in (("bcharge", self._gov_bcharge), ("mcut", self._gov_mcut),

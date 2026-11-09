@@ -4327,6 +4327,13 @@ class SimSeats:
         self._upgrade_anew(rr, sc[rr], nc[rr])
         self._raise_best_trained(row, ok, nc, formation=self.unit_formation.gather(1, sc.unsqueeze(1)).squeeze(1))
         self._quest_unit_added(row, ok, nc)
+        # CIV6 (UNIT_CREATED_FIRST_*): the upgrade is a unit the seat creates,
+        # its keys recorded at the event, a levied unit's too (`upgradeMoments`)
+        if row < self.n_majors and self._mk_n:
+            uk = self._mk_unit[nc]
+            keys = torch.zeros(self.B, self._mk_n, dtype=torch.bool, device=self.device)
+            self._moment_scatter(keys, torch.where(ok.unsqueeze(1), uk, torch.full_like(uk, -1)))
+            self._moment_record(row, keys)
 
     def _seat_charge_upkeep(self, row: int) -> None:
         """`chargeUnitUpkeep` — CIV6 (Resource, GS): "each turn, the unit will

@@ -278,7 +278,7 @@ describe('the empire-wide channels', () => {
     const m = defaultModifiers();
     applyPolicyEffects(m, POLICIES.INVENTION.effects);
     applyPolicyEffects(m, POLICIES.NOBEL_PRIZE.effects);
-    expect(m.gppFlat).toEqual({ ENGINEER: 4 });
+    expect(m.gppSeat).toEqual({ ENGINEER: 4 });
     expect(m.gppBuildings).toContainEqual({ building: 'WORKSHOP', cls: 'ENGINEER', amount: 2 });
     expect(m.gppBuildings).toContainEqual({ building: 'NUCLEAR_POWER_PLANT', cls: 'ENGINEER', amount: 4 });
     expect(m.gppBuildings.filter((r) => r.cls === 'SCIENTIST').map((r) => r.building)).toEqual(['UNIVERSITY', 'RESEARCH_LAB']);

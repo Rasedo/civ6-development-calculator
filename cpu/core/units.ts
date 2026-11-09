@@ -59,6 +59,7 @@ import {
 } from './promotions';
 import { logXpWrite, logPopWrite, logStockWrite } from './difflog';
 import { dedicationEvent, goldenMoveBonus, goodyMoment } from './eras';
+import { upgradeMoments } from './moments';
 import { warBuffMoves } from './casusBelli'; // MONUMENTALITY / EXODUS +2 MP
 import { DED_WISH, LOYALTY_MAX, OPEN_BORDERS_CIVIC } from '../data/seats';
 import { KNARR_NAVAL_MELEE_NEUTRAL_HEAL } from '../data/civilizations';
@@ -1725,6 +1726,7 @@ export function upgradeUnit(state: GameState, unit: Unit, seat: number): RuleRes
   unit.movesFull = unitFullMoves(state, unit);
   raiseBestTrained(state, seat, next, unit.formation ?? 0);
   questUnitAdded(state, seat, next);
+  upgradeMoments(state, seat, next);
   return { ok: true };
 }
 

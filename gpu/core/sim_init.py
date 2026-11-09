@@ -3215,6 +3215,9 @@ class SimInit:
             self._gov_wwpct = torch.tensor([float(r["wwPct"]) for r in _govs], dtype=dtype, device=device)
             self._gov_gppmult = torch.tensor([float(r["gppMult"]) for r in _govs], dtype=torch.float64, device=device)
             self._gov_wallhouse = torch.tensor([float(r["housingPerWallLevel"]) for r in _govs], dtype=dtype, device=device)
+            # favorPerBuilding [building, Favor] — Monarchy's per Renaissance Walls
+            self._gov_favor_b = [int(r["favorPerBuilding"][0]) for r in _govs]
+            self._gov_favor_n = [float(r["favorPerBuilding"][1]) for r in _govs]
             self._gov_theocs = torch.tensor([float(r["theologyCS"]) for r in _govs], dtype=dtype, device=device)
             self._gov_govbldy = torch.tensor([float(r["yieldsPerGovBuilding"]) for r in _govs], dtype=dtype, device=device)
             # the Gathering Storm FLAT bonus's channels (the government row

@@ -193,6 +193,8 @@ export interface PolicyEffects {
   wwPct?: number;
   /** multiplies every per-turn Great Person point source */
   gppMult?: number;
+  /** MODIFIER_PLAYER_ADJUST_GREAT_PERSON_POINTS: the class's points a turn,
+   *  paid once to the PLAYER, no district or city needed */
   gppFlat?: Partial<Record<GreatPersonClass, number>>;
   /** CIV6 (Monarchy): housing per LEVEL of the city's walls. */
   housingPerWallLevel?: number;
@@ -1528,6 +1530,8 @@ const GOVERNMENT_SRC: Record<string, SrcMap> = {
     slots: { derived: 'the Government_SlotCounts rows of this government, one entry per slot', inputs: [xml('Government_SlotCounts', 'GovernmentType=GOVERNMENT_MONARCHY&GovernmentSlotType=SLOT_MILITARY', 'NumSlots')] },
     'bonus.influenceMult': { derived: '1 + Amount/100 - the install writes the percentage, this catalog the multiplier', inputs: [xml('ModifierArguments', 'ModifierId=MONARCHY_ENVOYS&Name=Amount', 'Value')] },
     'effects.housingPerWallLevel': xml('ModifierArguments', 'ModifierId=MONARCHY_WALLS_HOUSING&Name=Amount', 'Value'),
+    'effects.favorPerBuilding.building': xml('RequirementArguments', 'RequirementId=REQUIRES_CITY_HAS_RENAISSANCE_WALLS&Name=BuildingType', 'Value', { expect: 'BUILDING_STAR_FORT' }),
+    'effects.favorPerBuilding.favor': xml('ModifierArguments', 'ModifierId=MONARCHY_STARFORT_FAVOR&Name=Amount', 'Value'),
   },
   MERCHANT_REPUBLIC: {
     tier: xml('Governments', 'GovernmentType=GOVERNMENT_MERCHANT_REPUBLIC', 'Tier', { expect: 'Tier2' }),
@@ -1606,6 +1610,8 @@ const LEGACY_SRC: Record<string, SrcMap> = {
   MONARCHY: {
     legacyOf: xml('Governments', 'GovernmentType=GOVERNMENT_MONARCHY', 'PolicyToUnlock', { expect: 'POLICY_GOV_MONARCHY' }),
     'effects.housingPerWallLevel': xml('ModifierArguments', 'ModifierId=MONARCHY_WALLS_HOUSING&Name=Amount', 'Value'),
+    'effects.favorPerBuilding.building': xml('RequirementArguments', 'RequirementId=REQUIRES_CITY_HAS_RENAISSANCE_WALLS&Name=BuildingType', 'Value', { expect: 'BUILDING_STAR_FORT' }),
+    'effects.favorPerBuilding.favor': xml('ModifierArguments', 'ModifierId=MONARCHY_STARFORT_FAVOR&Name=Amount', 'Value'),
   },
   MERCHANT_REPUBLIC: {
     legacyOf: xml('Governments', 'GovernmentType=GOVERNMENT_MERCHANT_REPUBLIC', 'PolicyToUnlock', { expect: 'POLICY_GOV_MERCHANT_REPUBLIC' }),
@@ -1656,9 +1662,13 @@ export const GOVERNMENTS: Record<string, GovernmentDef> = Object.fromEntries(
       '+1 housing and +1 amenity in every city with a specialty district.'),
     // CIV6 (GS) INHERENT: "+1 Housing per level of Walls." `wallsLevel`
     // answers it — the level BUILT, where `wallsTier` is the DEFENCE tier
-    // Urban Defenses raises with no wall standing.
-    G('MONARCHY', 'Monarchy', 2, [M, M, E, D, W, W], { housingPerWallLevel: 1 },
-      '+1 housing per level of walls.'),
+    // Urban Defenses raises with no wall standing. MONARCHY_STARFORT_FAVOR
+    // (Expansion2_Governments.xml, on the government and its legacy card):
+    // +2 Diplomatic Favor a turn for each city with Renaissance Walls
+    // (CITY_HAS_RENAISSANCE_WALLS, BUILDING_STAR_FORT).
+    G('MONARCHY', 'Monarchy', 2, [M, M, E, D, W, W],
+      { housingPerWallLevel: 1, favorPerBuilding: { building: 'RENAISSANCE_WALLS', favor: 2 } },
+      '+1 housing per level of walls; +2 Diplomatic Favor per city with Renaissance Walls.'),
     // CIV6 (GS) INHERENT: "+10% Gold in all cities with an established
     // Governor."
     G('MERCHANT_REPUBLIC', 'Merchant Republic', 2, [M, E, E, D, D, W], { governorYieldMult: { gold: 1.1 } },

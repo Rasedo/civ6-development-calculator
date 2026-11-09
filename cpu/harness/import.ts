@@ -28,7 +28,7 @@
  */
 import { existsSync, readFileSync } from 'node:fs';
 import type { City, CityState, CityStateType, DistrictId, FeatureId, GameMap, GameState, GreatPersonClass, ImprovementId, Seat, TerrainId, Tile, TradeRoute, Unit, UnitActivity, Yields } from '../core/types';
-import { DISASTER_IMPROVEMENT_KEY, HIGH_ADJACENCY_KEY, LARGEST_KEY, MITIGATED_FLOOD_KEY, UNIT_AIR_KEY, UNIT_SEA_KEY } from '../core/moments';
+import { DISASTER_IMPROVEMENT_KEY, HIGH_ADJACENCY_KEY, LARGEST_KEY, MITIGATED_FLOOD_KEY, STRATEGIC_KEY, UNIT_AIR_KEY, UNIT_SEA_KEY } from '../core/moments';
 import { NO_SEAT } from '../core/types';
 import { minorItemKey, minorRepairResumed, type MinorItem } from '../core/minorBuild';
 import { keptKey } from '../core/production';
@@ -1431,6 +1431,26 @@ function eventMomentKey(type: string): number | undefined {
   return d ? HIGH_ADJACENCY_KEY[d as DistrictId] : undefined;
 }
 
+/** the strategic key a MOMENT_UNIT_CREATED_FIRST_REQUIRING_STRATEGIC row of
+ *  player `pid` names: the resource of a unit new to the player in `rec`
+ *  that the history has not keyed (runs/h1_duelq1127 China: its t104
+ *  Man-at-Arms keys Iron, the moment not paid again for the Cuirassier at
+ *  t181) */
+function strategicMomentKey(h: History, rec: TurnRecord, cat: Catalog, pid: number, type: string): number | undefined {
+  if (!/^MOMENT_UNIT_CREATED_FIRST_REQUIRING_STRATEGIC(_IN_WORLD)?$/.test(type) || !h.last) return undefined;
+  const had = h.moments.get(pid) ?? [];
+  const seen = new Set(h.last.units.map((u) => `${u.owner}:${u.id}`));
+  const levies = leviesAcross(h.last, rec);
+  for (const u of rec.units) {
+    if (u.owner !== pid || seen.has(`${u.owner}:${u.id}`) || levies.has(`${u.owner}:${u.id}`)) continue;
+    const t = engineRowOf(cat, 'unit', u.type);
+    const r = t ? UNITS[t]?.requiresResource : undefined;
+    const k = r ? STRATEGIC_KEY.get(r) : undefined;
+    if (k !== undefined && !had.includes(k)) return k;
+  }
+  return undefined;
+}
+
 /** Fold one record into the history, in turn order. */
 export function advanceHistory(h: History, rec: TurnRecord, cat: Catalog): void {
   const W = rec.head.W;
@@ -1470,7 +1490,7 @@ export function advanceHistory(h: History, rec: TurnRecord, cat: Catalog): void 
   for (const p of rec.players) {
     if (!bool(p.major) || !Array.isArray(p.moments)) continue;
     for (const m of p.moments) {
-      const k = eventMomentKey(m[1]);
+      const k = eventMomentKey(m[1]) ?? strategicMomentKey(h, rec, cat, p.id, m[1]);
       if (k === undefined) continue;
       const ks = h.moments.get(p.id) ?? [];
       if (!ks.includes(k)) h.moments.set(p.id, [...ks, k].sort((x, y) => x - y));
