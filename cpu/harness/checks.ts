@@ -332,6 +332,11 @@ function wondersInStart(win: ActionRow[], p: number, W: number, barbs: ReadonlyS
       const q = win[j];
       if (q[2] === 'ImprovementRemovedFromMap' && barbs.has(q[5] as number)) camps++;
       if ((q[2] === 'BuildingChanged' && q[7] === city) || ANNEX_SIDE_ROWS.has(q[2] as string)) continue;
+      // the activity a unit pushed off takes after its teleport (runs/h1_duelp1124
+      // t166: Casa de Contratación at Shanghai annexes 436, puts city-state 3's
+      // unit 1835008 out of 393 and annexes it)
+      const pushed = win[j - 1];
+      if (q[2] === 'UnitActivityChanged' && pushed?.[2] === 'UnitTeleported' && pushed[3] === q[3] && pushed[4] === q[4]) continue;
       if (q[2] !== 'CityTileOwnershipChanged' || q[3] !== p || q[4] !== city) break;
       annexed.push((q[6] as number) * W + (q[5] as number));
     }
@@ -2715,6 +2720,17 @@ export function transitionChecks(a: TurnRecord, b: TurnRecord, cat: Catalog, his
       // the city.nextPlotDraw check replays: the claim stands on the game's plot where
       // it is one of the engine's ties
       const claim = gainedGame.filter((q) => !annexed.includes(q) && !boughtPlots.includes(q));
+      // the plots a city-state's envoy annex took in the owner's start
+      // before this city's claim stand taken at it (runs/h1_duelp1121 t237:
+      // city-state 2 takes 233 and 189 as China's start sends its envoy,
+      // Shanghai's stored 233 gone, 323 drawn)
+      const ownRow = startWin?.findIndex((x) => x[2] === 'CityTileOwnershipChanged' && x[3] === c.owner && x[4] === c.id) ?? -1;
+      for (const x of ownRow > 0 ? startWin!.slice(0, ownRow) : []) {
+        const other = imp.seatOfPlayer.get(x[3] as number);
+        if (x[2] !== 'CityTileOwnershipChanged' || other === undefined || !isCityStateSeat(other)) continue;
+        const q = (x[6] as number) * a.head.W + (x[5] as number);
+        if (!tileClaimed(state.map.tiles[q])) setTileOwner(state.map.tiles[q], other);
+      }
       const stored = city.nextPlot ?? -1;
       if (claim.length === 1 && (stored < 0 || tileClaimed(state.map.tiles[stored]))
         && borderBestPlots(state, city).includes(claim[0])) city.nextPlot = claim[0];

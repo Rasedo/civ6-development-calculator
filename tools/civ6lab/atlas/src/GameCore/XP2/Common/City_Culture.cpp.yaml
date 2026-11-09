@@ -46,6 +46,7 @@
     - "H-1: a start's own event rows, the wonder's annex, the village a claim takes"
     - "H-1: an annex re-places the citizens, the garrison's unit, a religious unit killed on a move — READ"
     - "H-1: the envoy annex counts the most envoys one player holds — READ (0x1abf40 -> 0x44c4b0), both twins"
+    - "C-107: the founding's annex, lifetime culture and the border reads of the duelp records — READ (0x1a9f10, 0x1a8a30, 0x1a7710, 0x3a1fb0), both twins"
   context:
     - "...rs: the culture turn (0x1a9bc0, which then draws and stores a fresh plot), AnnexPlots(n) (0x1a8a30: n picker draws, each annexed), the plot swap (0x1ac910), the culture bombs (0x524e30), t..."
     - ...ONDER_FREE_TILES_UPON_COMPLETION (2) plots (0x17f870, building info +0x158 bit 0x40, -> 0x1a8a30), one picker draw each, before the wonder's own grants (China's Dynastic Cycle boost, O...
@@ -88,6 +89,7 @@
     - "C-100 / C-112: a city-state's power and its regional buildings, the citizen reassign's callers — a fit and a reading"
     - "H-1: the envoy annex counts the most envoys one player holds — READ (0x1abf40 -> 0x44c4b0), both twins"
     - "C-112: the full re-place keeps the forced citizens — READ (0x196440, 0x1956b0, 0x197230), both twins"
+    - "C-107: the founding's annex, lifetime culture and the border reads of the duelp records — READ (0x1a9f10, 0x1a8a30, 0x1a7710, 0x3a1fb0), both twins"
   context:
     - "0x1a8b70 annexes one plot to a city (City_Culture.cpp): it writes the city culture's stored next p..."
     - "...(China's Dynastic Cycle boost, Oxford's techs: runs/h1_duelw1117 t44, t226); the annex 0x1a8b70 clears the city's stored next plot (+0x1c = -1) and counts no culture claim (+0x10 is t..."
@@ -130,14 +132,20 @@
 - addr: 0x1a9f10
   final: 0x11be40
   kind: function
-  semantics: a founding's annex (-> 0x1a8a30).
-  status: PARTLY
+  semantics: "A founding's annex (from cityPlacement 0x1eae70 at 0x1eb2a9): AnnexPlots 0x1a8a30 with the count max(0, StartingTilesForCity 0x1ab460) and the ring flag (r8b = 1) — the ring functor 0x1a7710 first, then a GetNextBuyablePlot picker per plot the count has left; then for each player holding envoys there (GetTokensReceived 0x44c860 > 0) the envoy annex 0x1abf40."
+  status: READ
   cases:
+    - recording: h1_duelp1117
+      turn: 194
+      value: "Shenyang: five ring plots from Xi'an, 826 by the picker (range 1) after Choosing a City Name"
     - recording: 1115
       value: "Replayed (`startDraws`, `resolveStart`, the harness's `start.draws`): of the witnessed starts, the count lands exactly with no AI choice in it on 1115 81.1%, 1116 81.5%, 1117 80.4%, 1118 82.2% (of the"
     - recording: 1117
       value: On 1117 / 1118 the resolved choices are the game's logged ones on 630 of 631 starts.
-  readings: ["H-1: every draw of a player's start (witnesses, RandCalls.csv)"]
+  impl: [cpu/core/game.ts:foundCityAt, gpu/core/sim_seats.py:_found_city_at]
+  readings:
+    - "H-1: every draw of a player's start (witnesses, RandCalls.csv)"
+    - "C-107: the founding's annex, lifetime culture and the border reads of the duelp records — READ (0x1a9f10, 0x1a8a30, 0x1a7710, 0x3a1fb0), both twins"
   context:
     - ...ff). Its three callers are the border turn's two and 0x1a8a30 (the wonder, the founding 0x1a9f10, the minors' envoy annex 0x1abf40, a unit signal 0x1abe90); no jump or pointer reaches...
   review: reviewed
@@ -205,6 +213,7 @@
     - "Border plot: GetNextBuyablePlot — READ"
     - "H-1: the start of a player's turn — the border pick (witnesses)"
     - "H-1: every draw of a player's start (witnesses, RandCalls.csv)"
+    - "C-107: the founding's annex, lifetime culture and the border reads of the duelp records — READ (0x1a9f10, 0x1a8a30, 0x1a7710, 0x3a1fb0), both twins"
   context:
     - "...e more if such a wonder lies within 3 of the centre. The lowest cost collects a tie list; 0x1ab1c0 draws one (\"GetNextBuyablePlot picker\") whenever the list is non-empty. BASE_MULTIPLIER a..."
     - "...e draws once per city whose next-plot tie list is not empty (\"GetNextBuyablePlot picker\", 0x1ab1c0 from the border turn 0x1a9bc0; turn_order_civ6.md A8): on runs/h1_duelw1116 player 0's st..."
@@ -236,6 +245,7 @@
   readings:
     - "H-1: the envoy annex — READ (settles the extra border picks)"
     - "H-1: the envoy annex counts the most envoys one player holds — READ (0x1abf40 -> 0x44c4b0), both twins"
+    - "C-107: the founding's annex, lifetime culture and the border reads of the duelp records — READ (0x1a9f10, 0x1a8a30, 0x1a7710, 0x3a1fb0), both twins"
   context:
     - "...holds (0x44c4b0, every giver) and A its annexed count past its starting tiles (+0xc less 0x1ab460, StartingTilesForCity's), E > A annexes E − A plots (AnnexPlots 0x1a8a30, one \"GetNextBuy..."
   review: reviewed
@@ -353,6 +363,7 @@
     - "H-1: every draw of a player's start (witnesses, RandCalls.csv)"
     - "H-1: the envoy annex — READ (settles the extra border picks)"
     - "H-1: the envoy annex counts the most envoys one player holds — READ (0x1abf40 -> 0x44c4b0), both twins"
+    - "C-107: the founding's annex, lifetime culture and the border reads of the duelp records — READ (0x1a9f10, 0x1a8a30, 0x1a7710, 0x3a1fb0), both twins"
   context:
     - "...r turn's two and 0x1a8a30 (the wonder, the founding 0x1a9f10, the minors' envoy annex 0x1abf40, a unit signal 0x1abe90); no jump or pointer reaches any of them. Replayed (`startDraws`,..."
     - "0x1abf40, a city-state's culture reacting to influence received: where its civilization level CanA..."

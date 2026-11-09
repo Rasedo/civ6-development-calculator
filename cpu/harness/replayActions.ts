@@ -671,7 +671,10 @@ export class RecordedActions implements ActionSource {
         for (const [k, ck] of clearing) if (k.startsWith(`${n(r, 0)}:`)) completing.add(ck);
       }
       if (name === 'UnitChargesChanged') clearing.delete(`${n(r, 0)}:${n(r, 1)}`);
-      if (name === 'CityAddedToMap') {
+      // a city taken is removed and added again for its new owner: no
+      // founding (runs/h1_duelp1127 t213: Raffles absorbs Mexico City,
+      // CityRemovedFromMap then CityAddedToMap of China's on its centre)
+      if (name === 'CityAddedToMap' && !inferred.some((d) => d.kind === 'capture' && d.city === n(r, 3) * W + n(r, 2))) {
         const plot = n(r, 3) * W + n(r, 2);
         const inf = inferred.find((d) => d.kind === 'found' && d.plot === plot) as Extract<Decision, { kind: 'found' }> | undefined;
         put('found', `${n(r, 0)}:${plot}`, { kind: 'found', phase: phaseOf(n(r, 0)), player: n(r, 0), plot, ...(inf?.unit ? { unit: inf.unit } : {}) });

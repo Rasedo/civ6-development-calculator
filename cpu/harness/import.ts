@@ -1568,7 +1568,11 @@ export function advanceHistory(h: History, rec: TurnRecord, cat: Catalog): void 
     // Shanghai t162: two free tiles with its wonder, 756 held at t163).
     // `clearedSince`: where the record logs its events, does city
     // `pid:cityId` hold none — its last gain (a plot it holds at the record:
-    // a plot lost logs a row under the city too) or founding with no start
+    // a plot lost logs a row under the city too; a plot it bought, held at
+    // the record or not: the purchase's annex clears the stored plot, and
+    // losing the plot draws none — runs/h1_duelp1121 t225 Shenyang's 587,
+    // bought in China's start, taken by the city China founds on 16:12,
+    // -1 held) or founding with no start
     // of the owner's after a turn closed since; null where the log names no
     // gain. A city new since a record before this one with no row in this
     // log was founded before it, so the log's top counts (runs/h1_duelw1119
@@ -1581,9 +1585,10 @@ export function advanceHistory(h: History, rec: TurnRecord, cat: Catalog): void 
         if (r[2] === 'PlayerTurnActivated') activeNow = r[3] as number;
         else if (r[2] === 'PlayerTurnDeactivated') activeNow = -1;
         else if (r[3] === pid && r[4] === cityId && (r[2] === 'CityAddedToMap'
-          || (r[2] === 'CityTileOwnershipChanged' && plots.includes((r[6] as number) * W + (r[5] as number)) && (activeNow === pid || (rows as unknown[][]).slice(i + 1, i + 4)
-            .some((x) => x[2] === 'CityMadePurchase' && x[7] === PURCHASE_PLOT_HASH && x[3] === pid && x[4] === cityId
-              && x[5] === r[5] && x[6] === r[6]))))) last = i;
+          || (r[2] === 'CityTileOwnershipChanged' && ((plots.includes((r[6] as number) * W + (r[5] as number)) && activeNow === pid)
+            || (rows as unknown[][]).slice(i + 1, i + 4)
+              .some((x) => x[2] === 'CityMadePurchase' && x[7] === PURCHASE_PLOT_HASH && x[3] === pid && x[4] === cityId
+                && x[5] === r[5] && x[6] === r[6]))))) last = i;
       });
       if (last < 0 && !founded) return null;
       // a start of the owner's after a turn closed since the gain draws again

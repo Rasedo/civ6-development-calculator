@@ -5606,11 +5606,11 @@ class SimInit:
         _row_level[self.FREE_ROW] = "FREE_CITIES"
         _row_level[self.BARB_ROW] = "TRIBE"
         self._row_level = _row_level
-        # CIV6 (StartingTilesForCity, FULL_CIV 6): `_found_city_at`'s direction
-        # walk claims the whole first ring, which is six tiles — the column is
-        # an invariant here, not a count to stop at; a minor's ring arrives on the
-        # wire's `ownerSeatInit` (TS `placeCityStateAt` claims them).
-        assert int(_lvl["FULL_CIV"]["startingTilesForCity"]) == 6, "the founding claim is the first ring"
+        # CIV6 (StartingTilesForCity): the count a founding's annex takes off,
+        # its ring first, the rest by the border pick (`_found_city_at`); a
+        # minor's ring arrives on the wire's `ownerSeatInit` (TS
+        # `placeCityStateAt` claims them).
+        self._row_starting_tiles = [int(_lvl[x]["startingTilesForCity"]) for x in _row_level]
         # the one column that forks a live rule: a full civ's culture box buys
         # ground and nobody else's does.
         self._row_annex_culture = torch.tensor(

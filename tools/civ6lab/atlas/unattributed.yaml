@@ -428,6 +428,7 @@
   readings:
     - "C-95: the danger map's search pays no zone of control, a ranged unit strikes from its range; the rampage strike's ring — READ (0x26df90, 0x26e920, 0x771670, 0x691f0, 0x76ecf0), FIT (the ranged unit's strike), both twins"
     - "C-128: a city-state's Make Military Formation — READ (0x77a190, 0x770670, 0x536da0, 0x773e20, 0x94a870, 0x949930), both twins"
+    - "C-107: the founding's annex, lifetime culture and the border reads of the duelp records — READ (0x1a9f10, 0x1a8a30, 0x1a7710, 0x3a1fb0), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "....0x771b17); with none, the ring of the target at max(range, 1) (0x6b1b0 -> GetRingPlots 0x6b130 -> 0x691f0: the ring at that radius, its six corners (0,1), (-1,0), (1,-1), (0,-1), (..."
@@ -536,6 +537,7 @@
     - "C-95: the planning's valid wrapper on a district at war, and a land unit's embarking by its original owner — READ (0x26e570 at 0x26e5e2..0x26e7f1, 0x56c480), the first both twins"
     - "C-95: the danger map's search goes on past a civilian, the target list's own civilian, a district the player never revealed, a strike a later turn's — READ (0x26e570 at 0x26e5cd, 0x271be0 at 0x271f0c..0x271f2e, 0x5861f0, 0x523520, 0x783980 at 0x784c4b..0x784c5f, 0x26e570 at 0x26e5e2..0x26e6c4), FIT (0x962380's strike on the walked path), both twins"
     - "C-100: the plot's own subject, PLOT_IS_HILLS and the plot analysis' replaced camp — READ (0x69ed60 / 0x69ec20, 0x6d0970, 0x5cf160..0x5cf1ab), both twins"
+    - "C-107: the founding's annex, lifetime culture and the border reads of the duelp records — READ (0x1a9f10, 0x1a8a30, 0x1a7710, 0x3a1fb0), both twins"
   context:
     - "...330); OtherDistrictAdjacent: the neighbour's owner (+0x1c) is the player, its district (0x810d0) is not InternalOnly (Districts +0xe1 bit 4 — the Wonder district), is complete (Dist..."
     - "...rovement (+0x44, read as none while pillaged, +0x4d bit 0) and, when the plot's district (0x810d0, the district at the plot's id) is complete (district +0xb08, Lua `District:IsComplete` 0..."
@@ -988,17 +990,30 @@
 - addr: 0x1a7710
   final: 0x11a290
   kind: function
-  semantics: a plot purchase (-> AnnexPlot 0x1a8b70).
+  semantics: "The founding's ring functor (AnnexPlots 0x1a8a30 with its ring flag, through the functor vtable 0xd15268 slot 2 0x1aca80; GetRingPlots 0x6b130 radius 1 from 0x6b1b0): a ring plot unowned (+0x1c == -1), or owned by the city's player with no district (GetDistrictType 0x810d0 == -1), is annexed (AnnexPlot 0x1a8b70) and the count decremented, with no floor at 0."
   status: READ
   cases:
-    - recording: 1121
-      turn: 41
-      value: "Recorded: a city-state's envoy annex re-places before its growth (1121   Hunza t41: 229 annexed, the growth on surplus 3 where the record's set   read 4;"
+    - recording: h1_duelp1117
+      turn: 194
+      value: Shenyang founded on Xi'an's ground takes Xi'an's five ring plots (CityTileOwnershipChanged 589832 then 65536 for each), and 826 by one GetNextBuyablePlot picker over range 1 after its name
+    - recording: h1_duelw1103
+      value: "48 of 48 city-states founded at t2 hold all six ring plots on CITY_STATE StartingTilesForCity 5 (5 - 6: no picker draw)"
+  impl: [cpu/core/game.ts:foundCityAt, gpu/core/sim_seats.py:_found_city_at]
   readings:
     - "H-1: an annex re-places the citizens, the garrison's unit, a religious unit killed on a move — READ"
+    - "C-107: the founding's annex, lifetime culture and the border reads of the duelp records — READ (0x1a9f10, 0x1a8a30, 0x1a7710, 0x3a1fb0), both twins"
   context:
     - "...a8a30 — a wonder's free tiles, a founding, a city-state's envoy annex —, the purchase 0x1a7710, a culture bomb 0x524e30) raises the annexed count (+0xc), clears the stored next plot..."
   review: reviewed
+- addr: 0x1aca80
+  final: 0x11d670
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-107: the founding's annex, lifetime culture and the border reads of the duelp records — READ (0x1a9f10, 0x1a8a30, 0x1a7710, 0x3a1fb0), both twins"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...et: GetRingPlots 0x6b130 (radius 1) walks the ring through the functor 0xd15268 (slot 2 0x1aca80 -> 0x1a7710), which annexes (AnnexPlot 0x1a8b70) a plot unowned, or owned by the city's..."
 - addr: 0x1af930
   final: 0x11f940
   kind: function

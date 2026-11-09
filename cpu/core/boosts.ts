@@ -15,7 +15,7 @@ import { BUILDINGS } from '../data/buildings';
 import { WONDER_ERA_INDEX } from '../data/builtWonders';
 import { randRange } from './rand';
 import { completeResearchNow } from './phase';
-import { researchCost } from './economy';
+import { countLifetimeCulture, researchCost } from './economy';
 import { GREAT_PEOPLE } from '../data/greatPeople';
 import { isCoastalLand, isMountain, naturalWonderAt } from '../../world/query';
 import { RESOURCES } from '../../world/resources';
@@ -89,6 +89,9 @@ export function markBoost(state: GameState, seat: number, id: string): boolean {
   else if (rsr.civic === id) rsr.civicProgress += add;
   else if (civic) rsr.civicRetained[id] = have + add;
   else rsr.techRetained[id] = have + add;
+  // a civic's boost share is lifetime culture, the civic in hand or not
+  // (runs/h1_duelp1121 Rome t30: 10 -> 90 with no civic in hand)
+  if (civic) countLifetimeCulture(s, have, add, cost);
   // the progress setter completes the item the moment it reaches the cost
   if (have + add >= cost) completeResearchNow(state, seat, id);
   return true;

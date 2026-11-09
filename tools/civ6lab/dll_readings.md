@@ -13066,3 +13066,57 @@ outside the player's cleanness).
   city threat unread in its memory); 0xb67b30 / 0xb02c60 (the other grant
   effects calling 0x4c1a30: GRANT_UNITS_IN_DISTRICTS, a free unit) unwired
   for Tupac Amaru's and Hanno's grants, no recorded case.
+
+## C-107: the founding's annex, lifetime culture and the border reads of the duelp records — READ (0x1a9f10, 0x1a8a30, 0x1a7710, 0x3a1fb0), both twins
+
+`foundCityAt` (cpu/core/game.ts), GPU `_found_city_at` (gpu/core/sim_seats.py,
+`_row_starting_tiles` in sim_init.py); `countLifetimeCulture` /
+`addCivicProgress` (cpu/core/economy.ts) at the turn's Culture, a boost
+(`markBoost`), a lump (`researchLump`, `applyLumpYield`) and Kupe's
+pre-settle Culture, GPU `_count_lifetime_culture` / `_add_civic_progress`
+(gpu/core/sim_economy.py); the replay's `seat.lifetimeCulture` against
+PlayerCulture m_xLifetimeCulture.
+
+- THE FOUNDING'S ANNEX: cityPlacement 0x1eae70 calls 0x1a9f10 (0x1eb2a9),
+  which runs AnnexPlots 0x1a8a30 with the count max(0, StartingTilesForCity
+  0x1ab460) and its ring flag set: GetRingPlots 0x6b130 (radius 1) walks the
+  ring through the functor 0xd15268 (slot 2 0x1aca80 -> 0x1a7710), which
+  annexes (AnnexPlot 0x1a8b70) a plot unowned, or owned by the city's player
+  with no district on it (GetDistrictType 0x810d0 == -1), decrementing the
+  count with no floor; then one GetNextBuyablePlot picker (0x1ab1c0) per
+  plot the count has left, each annexed; then the envoy annex 0x1abf40 for
+  each player holding envoys there. An annex is no culture claim.
+- A CITY-STATE (CITY_STATE StartingTilesForCity 5): its six unowned ring
+  plots take the count to -1, no picker draw (48 of 48 at t2 on
+  runs/h1_duelw1103-1118); the envoy annex's A (+0xc less 0x1ab460) is 1
+  from the founding, so its E envoys annex E - 1 (`envoyTiles`' `- 1`).
+- CONFIRMED: runs/h1_duelp1117 t194 Shenyang, founded on Xi'an's ground,
+  takes Xi'an's five ring plots (a CityTileOwnershipChanged row of each
+  city) and 826 by one picker over range 1 after "Choosing a City Name";
+  the replay's founding pairs now hold every plot of 1117 t195, 1121 t247
+  (Wuhan), 1124 t223 (Quxian), 1127 t213 (Wuhan), where the engines took
+  only the unowned ring.
+- LIFETIME CULTURE: the civic progress setter 0x3a1fb0 sets the progress no
+  higher than the civic's cost (0x3a20d6..0x3a2108) and adds the new less
+  the old (+0x988[civic]) to +0x1050 where positive (0x3a21ac..0x3a21c1):
+  every gain counts, a boost's share on a civic not in hand included, the
+  part of a turn's Culture past the cost only once the bank lands on the
+  next civic, Culture held with no civic chosen not until one is.
+  runs/h1_duelp1121: Rome with no civic t4-t29 holds 10 while its overflow
+  climbs to 120.9, t30 +80 a boost's share; China t7 Code of Laws at 10 of
+  10, the 2.79 past it counted at t8. The replay's per-pair check holds 1121
+  t2-60 but t38 (China's culture yield 0.027 over).
+- THE PICKS' READS (the harness): a plot bought clears the stored next plot
+  though the city loses it after (runs/h1_duelp1121 t225 Shenyang's 587,
+  taken by the city founded on 16:12: -1 held); a wonder's annex reads past
+  the unit it puts out of a plot, its teleport and its activity (1124 t166
+  Casa de Contratación at Shanghai: 436 and 393, one picker each, Longxi's
+  t167 draw then lands); a city-state's envoy annex in a major's start comes
+  before that major's cities' claims (1121 t237: 233 and 189, Shanghai's
+  stored 233 gone, 323 drawn); a first meeting's free envoy is the record's
+  envoy (1124 t10 Granada, 1128 t24, 1127 t44: no annex).
+- OPEN: 1127 t47-48 Mexico City's envoy annex draws 537 where the game
+  drew 360 (both in its ties, the stored 360 of record t47); 1121 t143 a
+  quest the engines' Rome completes at Antioch, its envoy annexing 914
+  (the record's envoys stay 1); the remaining step.border misses are the
+  Culture the box banks (`cultureAfterGrowth`), the plots right.

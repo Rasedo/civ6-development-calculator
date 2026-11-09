@@ -196,9 +196,8 @@ class SimPhase:
             if bool(_nc.count_nonzero()):
                 _ncf = _nc.to(self.civ_tech_prog.dtype)
                 self.civ_tech_prog[:, row] += _ncf * _cy[3]
-                self.civ_civic_prog[:, row] += _ncf * _cy[4]
                 self.seat_science_total[:, row] += _ncf * _cy[3]
-                self.civ_culture[:, row] += _ncf * _cy[4]
+                self._add_civic_progress(row, _ncf * _cy[4])
         if not bool(active.count_nonzero()):
             # TS's eliminated-actor `continue` — but the stashed intents are for
             # THIS turn and must not survive into the next one. Every drain pops
@@ -2040,10 +2039,8 @@ class SimPhase:
                             self.seat_explored[hit, row] = True
                         if pidx == self._proj_moon_idx and sci_turn is not None:
                             # CIV6: one-time Culture of 10x science/turn, the
-                            # applyLumpYield culture arm (pool + lifetime bank).
-                            amt_c = js_round(10.0 * sci_turn)
-                            self.civ_civic_prog[:, row] = torch.where(hit, self.civ_civic_prog[:, row] + amt_c, self.civ_civic_prog[:, row])
-                            self.civ_culture[:, row] = torch.where(hit, self.civ_culture[:, row] + amt_c, self.civ_culture[:, row])
+                            # applyLumpYield culture arm (`_add_civic_progress`).
+                            self._add_civic_progress(row, js_round(10.0 * sci_turn), hit)
                         if pidx in self._once_victory_idx:
                             # CIV6: completing the Exoplanet Expedition LAUNCHES
                             # the craft; the win fires on ARRIVAL, in step().
@@ -2621,9 +2618,10 @@ class SimPhase:
         bank(self.civ_tourism_rel, _rel_t)
         self._bank_tourism_per_rival(row, active, _nat_gen, _rel_t, _late)
         self._update_cultural_dominance(row, active)
-        bank(self.civ_civic_prog, cul_sum + self.civ_civic_ovf[:, row])
+        # the turn's Culture and the bank on the civic in hand, lifetime
+        # culture counting what that civic gains (`_add_civic_progress`)
+        self._add_civic_progress(row, cul_sum + self.civ_civic_ovf[:, row], active)
         self.civ_civic_ovf[:, row] = torch.where(active, torch.zeros_like(cul_sum), self.civ_civic_ovf[:, row])
-        bank(self.civ_culture, cul_sum)
         _gov_before = self._adopted_gov(row)[0] if self._ngov else None
         _slots_before = self._seat_policy_slots(row) if self._ngov else None
         civic_done = torch.zeros(B, dtype=torch.bool, device=dev)

@@ -62,11 +62,13 @@ export function placeCityStateAt(
     revealed: new Array<number>(state.map.tiles.length).fill(0),
   };
   for (const p of losDisk(state.map, tile, unitSight({ type: 'SETTLER' }), false)) cityState.revealed![p] = 1;
-  // CIV6: a city-state's founding is a major's — a city of one citizen on
-  // its centre and the whole first ring (runs/h1_duelw1103–1118: 48 of 48
-  // city-states founded at t2 hold size 1 and all six ring plots; the
-  // install's CITY_STATE StartingTilesForCity 5 is not what they show), the
-  // centre's improvement and removable feature cleared
+  // CIV6: a city-state's founding is a major's (`foundCityAt`) — a city of
+  // one citizen on its centre and the whole first ring: the founding's ring
+  // functor (0x1a7710) annexes every unowned ring plot off CITY_STATE's
+  // StartingTilesForCity 5 with no floor, so 5 - 6 leaves no border pick
+  // (runs/h1_duelw1103–1118: 48 of 48 city-states founded at t2 hold size 1
+  // and all six ring plots), the centre's improvement and removable feature
+  // cleared
   markCityCentre(tile);
   tile.improvement = null;
   if (tile.feature && FEATURES[tile.feature].removable) tile.feature = null;

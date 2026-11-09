@@ -778,9 +778,12 @@
   final: 0x2844e0
   kind: function
   name: PlayerCulture
-  semantics: "PlayerCulture: sets the player's progress on a civic. The civic in progress (+0xad0[0]) completed (0x3a24c4..0x3a2534): the civic queue +0xa58 pops its front (0x39efa0), then pops each front row the player holds (+0x900, the front 0x4c9c80) and stops at the first it does not. Lifetime culture grows by every gain of civic progress, a boost's share included, and not by culture held with no civic chosen; the engines' cultureTotal / civ_culture sum the culture yield (AUDIT C-94)."
+  semantics: "PlayerCulture: sets the player's progress on a civic. The civic in progress (+0xad0[0]) completed (0x3a24c4..0x3a2534): the civic queue +0xa58 pops its front (0x39efa0), then pops each front row the player holds (+0x900, the front 0x4c9c80) and stops at the first it does not. Lifetime culture (+0x1050) grows by each gain of a civic's progress, the new progress set no higher than the civic's cost (0x3a20d6..0x3a2108) and the gain the new less the old (+0x988) where positive (0x3a21ac..0x3a21c1): a boost's share on any civic, the turn's Culture and its bank on the civic in hand; culture held with no civic chosen counts once it lands on one."
   status: READ
   cases:
+    - recording: h1_duelp1121
+      turn: 30
+      value: Rome with no civic chosen t4-t29 holds lifetime 10 while its overflow climbs to 120.9; t30 +80, a boost's share; China t7 Code of Laws at 10 of 10, its 2.79 past the cost counted at t8
     - recording: h1_duelw1121
       turn: 4
       value: "Records: runs/h1_duelw1121 Rome's Code of Laws at its start of t4 puts every minor's and the Free Cities' at 9 of 10 (the log's CivicChanged for players 2, 3, 4 and 62 just before Rome's CivicComplete"
@@ -798,7 +801,12 @@
     - cpu/core/minorBuild.ts:civicQueueNext
     - gpu/core/sim_civics.py:_cai_queue_next
     - cpu/core/types.ts:ResearchState
+    - cpu/core/economy.ts:countLifetimeCulture
+    - cpu/core/economy.ts:addCivicProgress
+    - gpu/core/sim_economy.py:_count_lifetime_culture
+    - gpu/core/sim_economy.py:_add_civic_progress
   readings:
+    - "C-107: the founding's annex, lifetime culture and the border reads of the duelp records — READ (0x1a9f10, 0x1a8a30, 0x1a7710, 0x3a1fb0), both twins"
     - "C-130 / C-98: the civic queue, the best plot to buy and the plot purchase analyzer — READ, both twins"
     - "C-94: trade posts and cultural dominance — READ"
     - "H-1: a boost lands as progress — READ"

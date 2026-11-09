@@ -12843,6 +12843,10 @@ class SimSeats:
         # see it.
         contrib = self._feat_adj[rows, s_idx] * fresh_f.unsqueeze(1).to(self._feat_adj.dtype)  # [n, nD]
         nb = self.neigh[s_idx]
+        # the founding's annex (`foundCityAt`): every first-ring plot, water
+        # included, unowned or the founder's own with no district, each off
+        # StartingTilesForCity; the count left the border pick annexes
+        left = torch.full_like(s_idx, self._row_starting_tiles[row])
         for d in range(6):
             n_d = nb[:, d]
             ndc = n_d.clamp(min=0)
@@ -12850,16 +12854,37 @@ class SimSeats:
             if bool(on_map.count_nonzero()):
                 om = on_map.nonzero(as_tuple=True)[0]
                 self.d_static_adj[rows[om], n_d[om], :] -= contrib[om]
-            free = (
-                # the full first ring, water included, mirroring foundCity — a
-                # coastal city must own its harbor water or the Harbor line is
-                # unreachable
-                on_map
-                & (self.tile_seat[rows, ndc] < 0)
-            )
+            _ts = self.tile_seat[rows, ndc]
+            free = on_map & ((_ts < 0) | ((_ts == seat) & (self.district[rows, ndc] < 0)
+                                         & (self.built_wonder[rows, ndc] < 0)))
             self.tile_seat[rows[free], n_d[free]] = seat
             self.tile_city[rows[free], n_d[free]] = _new_cid[free]
+            self.tile_forced[rows[free], n_d[free]] = False
+            left = left - free.long()
             self._tile_owner_ver += 1
+        _ctr = torch.zeros(self.B, dtype=torch.long, device=self.device)
+        _ctr[rows] = s_idx
+        _cid = torch.full((self.B,), -1, dtype=torch.long, device=self.device)
+        _cid[rows] = _new_cid
+        _left = torch.zeros(self.B, dtype=torch.long, device=self.device)
+        _left[rows] = left
+        for _ in range(max(0, self._row_starting_tiles[row])):
+            go = _left > 0
+            if not bool(go.count_nonzero()):
+                break
+            spot = self._seat_border_draw(row, _ctr, _cid, go)
+            got = go & (spot >= 0)
+            _left = _left - go.long()
+            if bool(got.count_nonzero()):
+                _r = got.nonzero(as_tuple=True)[0]
+                _sp = spot.take(_r)
+                self.tile_seat[_r, _sp] = seat
+                self.tile_city[_r, _sp] = _cid.take(_r)
+                self.tile_forced[_r, _sp] = False
+                self._tile_owner_ver += 1
+                if row < self.n_majors:
+                    self._reveal_around(_r, row, _sp, 1)
+                self._claim_version += 1
         # CIV6 (Mother Russia): "Extra territory upon founding cities" — the
         # SECOND ring, `amount` of it, in ascending TILE INDEX so both engines
         # claim the same ground (`CITY_TILES_ROWS`)

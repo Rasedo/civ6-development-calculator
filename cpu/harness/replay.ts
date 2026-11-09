@@ -5109,6 +5109,9 @@ export function compareState(state: GameState, read: Imported, weary?: Map<numbe
         `${rsx.research.civic} ${r3(rsx.research.civicProgress)}`, `${es.research.civic} ${r3(es.research.civicProgress)}`,
         same ? Math.abs(es.research.civicProgress - rsx.research.civicProgress) : 1000);
     }
+    // lifetime culture against the game's PlayerCulture m_xLifetimeCulture
+    note(t, 'seat.lifetimeCulture', near(es.cultureTotal ?? 0, rsx.cultureTotal ?? 0), name, r3(rsx.cultureTotal ?? 0), r3(es.cultureTotal ?? 0),
+      Math.abs((es.cultureTotal ?? 0) - (rsx.cultureTotal ?? 0)));
     note(t, 'seat.eraScore', (es.eraScore ?? 0) === (rsx.eraScore ?? 0), name, rsx.eraScore ?? 0, es.eraScore ?? 0,
       Math.abs((es.eraScore ?? 0) - (rsx.eraScore ?? 0)));
     // the Great Person points by class, where the record carries them

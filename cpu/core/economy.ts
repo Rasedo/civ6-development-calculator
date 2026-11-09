@@ -82,6 +82,31 @@ export function selectResearch(rsr: ResearchState, id: string | null, isCivic = 
 }
 
 /**
+ * CIV6 (PlayerCulture 0x3a1fb0, the civic progress setter): LIFETIME CULTURE
+ * (m_xLifetimeCulture) grows by each gain of a civic's progress, the progress
+ * set no higher than the civic's cost: `have` the civic's progress before,
+ * `add` what lands on it. Culture banked with no civic in hand counts only
+ * once it lands on one (runs/h1_duelp1121 Rome t4-t29: no civic, lifetime 10
+ * while its overflow climbs to 120.9; China t7 Code of Laws at 10 of 10, the
+ * 2.79 past it counted at t8).
+ */
+export function countLifetimeCulture(s: Seat, have: number, add: number, cost: number): void {
+  const gain = Math.min(have + add, cost) - have;
+  if (gain > 0) s.cultureTotal += gain;
+}
+
+/** Culture into the civic pool (a lump, a yield grant): the civic in hand
+ *  takes it, lifetime culture counting what it gains (`countLifetimeCulture`);
+ *  with none in hand the pool holds it uncounted. */
+export function addCivicProgress(state: GameState, seat: number, amount: number): void {
+  const s = seatOf(state, seat);
+  if (!s) return;
+  const r = s.research;
+  if (r.civic) countLifetimeCulture(s, r.civicProgress, amount, researchCost(state, r.civic, true, seat));
+  r.civicProgress += amount;
+}
+
+/**
  * CIV6 (plunder progression): a pillage lump scales with the LARGER of tech
  * progress (of the 67-tech tree) and civic progress (of the 50-civic tree),
  * x10 at 100%.
@@ -232,8 +257,7 @@ export function applyLumpYield(
   }
   // (selectResearch, below, is the only other writer of the progress pool.)
   if (key === 'culture') {
-    s.research.civicProgress += amount;
-    s.cultureTotal += amount;
+    addCivicProgress(state, seat, amount);
     return;
   }
   // a city-state's city takes its lump as its own step would (`minorLump`)

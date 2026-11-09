@@ -712,11 +712,36 @@ class SimEconomy:
         add = torch.where(go, add, torch.zeros_like(add))
         prog[:, row] += (add * is_cur.to(add.dtype)).sum(dim=1)
         retain[:, row, :n] += torch.where(is_cur, torch.zeros_like(add), add)
+        # a civic's boost share is lifetime culture, the civic in hand or not
+        # (`add` already stops at each civic's cost)
+        if is_civic:
+            self.civ_culture[:, row] = self.civ_culture[:, row] + add.sum(dim=1).to(self.civ_culture.dtype)
         full = torch.zeros_like(held)
         full[:, :n] = go & (have + add >= cost_n.to(have.dtype))
         if bool(full.count_nonzero()):
             self._complete_research_now(row, full, is_civic)
         return newly
+
+    def _count_lifetime_culture(self, row: int, have: torch.Tensor, add: torch.Tensor, cost: torch.Tensor) -> None:
+        """`countLifetimeCulture`'s twin: lifetime culture (`civ_culture`)
+        grows by each gain of a civic's progress, the progress set no higher
+        than the civic's cost (PlayerCulture 0x3a1fb0); [B] each."""
+        gain = (torch.minimum(have + add, cost) - have).clamp(min=0)
+        self.civ_culture[:, row] = self.civ_culture[:, row] + gain.to(self.civ_culture.dtype)
+
+    def _add_civic_progress(self, row: int, amount, where: torch.Tensor | None = None) -> None:
+        """`addCivicProgress`'s twin: Culture `amount` (a scalar or [B]) into
+        the civic pool of the games of `where` (every game without it), the
+        civic in hand taking it and lifetime culture counting what it gains;
+        with none in hand the pool holds it uncounted."""
+        prog = self.civ_civic_prog
+        amt = torch.zeros(self.B, dtype=prog.dtype, device=self.device) + amount
+        if where is not None:
+            amt = torch.where(where, amt, torch.zeros_like(amt))
+        cur = self.civ_cur_civic[:, row]
+        cost = self._research_cost(True).gather(1, cur.clamp(min=0).unsqueeze(1)).squeeze(1).to(prog.dtype)
+        self._count_lifetime_culture(row, prog[:, row], torch.where(cur >= 0, amt, torch.zeros_like(amt)), cost)
+        prog[:, row] = prog[:, row] + amt
 
     def _research_lump(self, row: int, amount: torch.Tensor, is_civic: bool) -> None:
         """`researchLump`'s twin: a lump of Science / Culture `amount` [B] on
@@ -726,7 +751,10 @@ class SimEconomy:
         prog = self.civ_civic_prog if is_civic else self.civ_tech_prog
         ovf = self.civ_civic_ovf if is_civic else self.civ_tech_ovf
         cur = (self.civ_cur_civic if is_civic else self.civ_cur_tech)[:, row]
-        prog[:, row] = prog[:, row] + amount.to(prog.dtype)
+        if is_civic:
+            self._add_civic_progress(row, amount)
+        else:
+            prog[:, row] = prog[:, row] + amount.to(prog.dtype)
         cost = self._research_cost(is_civic).gather(1, cur.clamp(min=0).unsqueeze(1)).squeeze(1).to(prog.dtype)
         fin = (cur >= 0) & (amount != 0) & (prog[:, row] >= cost)
         if not bool(fin.count_nonzero()):

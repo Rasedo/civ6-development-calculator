@@ -5,7 +5,7 @@ import { GP_CLASSES } from '../data/greatPeople';
 import { createRelic } from './greatWorks';
 import { VALLETTA_FAITH_DISTRICTS, VALLETTA_WALLS_DISCOUNT_PCT, VATICAN_GP_PRESSURE } from '../data/cityStates';
 import { tilesWithin, hexDistance, neighbors } from '../../world/hex';
-import { claimTile, borderCandidates, newCityGrantUnit, seatBuildingSum } from './city';
+import { claimTile, borderCandidates, drawBorderPlot, newCityGrantUnit, seatBuildingSum } from './city';
 import { cityFlags, replaceAllCitizens } from './citizens';
 import { canFoundCity, availableBuildings, buildingCompletable, purchasableBuildings, worshipOffered, type RuleResult } from './rules';
 import { computeUnlocks, getModifiers, isCivicComplete, goldPrice, faithPrice } from './effects';
@@ -314,20 +314,24 @@ export function foundCityAt(state: GameState, seat: number, tile: Tile, owner: S
   markCityCentre(tile);
   tile.improvement = null;
   if (tile.feature && FEATURES[tile.feature].removable) tile.feature = null;
-  // CIV6 (CivilizationLevels.StartingTilesForCity, FULL_CIV 6): a new city
-  // starts with its centre plus the first ring — the class's count of it,
-  // in ascending tile index (the GPU's direction walk claims the same six).
+  // CIV6 (the founding's annex 0x1a9f10 -> AnnexPlots 0x1a8a30, its ring
+  // functor 0x1a7710): the city takes its centre and every plot of the first
+  // ring that is unowned or its founder's own with no district on it, each
+  // one off the class's StartingTilesForCity (CivilizationLevels: FULL_CIV
+  // 6); the count left after the ring the city annexes by its border pick,
+  // one "GetNextBuyablePlot picker" draw each (runs/h1_duelp1117 t194:
+  // Shenyang, founded on Xi'an's ground, takes Xi'an's five ring plots, and
+  // 826 drawn over range 1 after its name). An annex is no culture claim.
   setTileOwner(tile, seat, id);
-  let want = civLevelOf(seat).startingTilesForCity;
-  const ring = tilesWithin(state.map, tile.col, tile.row, 1)
-    .filter((t) => t.index !== tile.index)
-    .sort((a, b) => a.index - b.index);
-  for (const t of ring) {
-    if (want <= 0) break;
-    if (!tileClaimed(t)) {
-      setTileOwner(t, seat, id);
-      want -= 1;
-    }
+  let left = civLevelOf(seat).startingTilesForCity;
+  for (const t of neighbors(state.map, tile)) {
+    if (tileClaimed(t) && (tileSeat(t) !== seat || t.district || t.builtWonder)) continue;
+    setTileOwner(t, seat, id);
+    left -= 1;
+  }
+  for (; left > 0; left--) {
+    const q = drawBorderPlot(state, city);
+    if (q !== null) claimTile(state, city, q);
   }
   // CIV6 (Mother Russia): "Extra territory upon founding cities" — the
   // SECOND ring, `amount` of it, in ascending TILE INDEX so both engines

@@ -24,7 +24,7 @@ import { PROMO_COLS, type PromoClass } from '../data/promotions';
 import { availableTechsIn, availableCivicsIn, computeUnlocks, isCivicComplete, type Unlocks , prodMultFor, notFoundedSum, peacefulFounderFaith, foreignFollowerCount, greatWorkLoyalty, goldPrice, faithPrice } from './effects';
 import { boostOnWarDeclared, detectBoosts, markBoost } from './boosts';
 import { BOOSTS } from '../data/boosts';
-import { researchCost, selectResearch, pillagePlunder } from './economy';
+import { addCivicProgress, researchCost, selectResearch, pillagePlunder } from './economy';
 import { IMPROVEMENTS } from '../data/improvements';
 import { isSpaceProject } from '../data/projects';
 import { containmentBonus, sameReligionToken, getModifiers, makeYieldCtx, prodBoostPct, seatYieldMultPerSuzerain, unitUpkeep } from './effects';
@@ -3005,7 +3005,7 @@ export function researchLump(state: GameState, seat: number, amount: number, civ
   const s = seatOf(state, seat);
   if (!s || amount === 0) return;
   const r = s.research;
-  if (civic) r.civicProgress += amount;
+  if (civic) addCivicProgress(state, seat, amount);
   else r.techProgress += amount;
   const id = civic ? r.civic : r.tech;
   if (!id) return;
@@ -3070,9 +3070,8 @@ export function seatPhase(state: GameState, only?: { seats: ReadonlySet<number>;
         const s0 = r.presettleYields?.science ?? 0;
         const c0 = r.presettleYields?.culture ?? 0;
         actor.research.techProgress += s0;
-        actor.research.civicProgress += c0;
         actor.scienceTotal = (actor.scienceTotal ?? 0) + s0;
-        actor.cultureTotal = (actor.cultureTotal ?? 0) + c0;
+        addCivicProgress(state, actor.seat, c0);
       }
       if (recU) applySeatUnitOrders(state, actor, recU.units);
       capStockpiles(state, actor.seat);
@@ -3355,13 +3354,10 @@ export function seatPhase(state: GameState, only?: { seats: ReadonlySet<number>;
     // the tourism term reads the seat's ERA off its completed research: after
     // this turn's techs, before any civic completes
     seatAccumulators(state, actor.seat, establishedGovernorCityIds(actor));
-    rsr.civicProgress += culSum + (rsr.civicOverflow ?? 0);
+    // the turn's Culture and the bank on the civic in hand, lifetime culture
+    // counting what that civic gains (`addCivicProgress`)
+    addCivicProgress(state, actor.seat, culSum + (rsr.civicOverflow ?? 0));
     rsr.civicOverflow = 0;
-    // LIFETIME culture — the same per-turn sum, banked separately
-    // because civicProgress is SPENT by every completed civic. Real Civ 6
-    // scores DOMESTIC TOURISTS off lifetime culture, so this is the substrate
-    // the Culture victory reads. Zero-draw; the GPU mirrors at this position.
-    actor.cultureTotal = (actor.cultureTotal ?? 0) + culSum;
     const _govBefore = seatGovernment(state, actor.seat);
     const _slotsBefore = governmentSlots(state, actor.seat);
     let civicDone = false;
