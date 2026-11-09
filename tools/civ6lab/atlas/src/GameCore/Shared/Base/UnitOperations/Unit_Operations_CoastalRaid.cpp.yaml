@@ -6,13 +6,16 @@
 - addr: 0x95b7c0
   final: 0x666ce0
   kind: function
-  semantics: "the coastal raid: wrecks the plot's improvement, else its district, 3 Movement spent (none for a raider that raids free)."
-  status: PARTLY
+  semantics: "the coastal raid's order: the operation 0xcfb9b561 (the manager's vt +0x88) on the target's coordinates, pushed on the unit (vt +0x80); its execution is 0xa4fbc0."
+  status: READ
+  cases:
+    - recording: h1_duelq1124
+      turn: 186
+      value: the Nuclear Submarine 6160412 on 31:6 raids 31:7 (ImprovementChanged pillaged) and holds
   impl: [cpu/core/combat.ts:coastalRaid, cpu/core/tactical.ts:coastalRaids]
-  readings: ["C-95: Coastal Raid — READ, ported", "C-95: Coastal Raid"]
-  notes: ["imported: READ in its section, no confirming case found beside it"]
-  context:
-    - ...oves to its plot (0x962190, flag 0x10) and raids the target where it may (0x95b100 -> 0x95b7c0). The raid wrecks the plot's improvement, else its district, 3 Movement spent (none for...
+  readings:
+    - "C-95: Coastal Raid — READ, ported"
+    - "C-123 / C-125: Coastal Raid's queue walks on, a raid ends the raider's moves; Attack Units' targets keep one the pass killed — READ (0x7735d0, 0x95b100, 0x95b7c0, 0xa4fbc0 at 0xa501e2..0xa502e6, 0x5218f0, 0x76eb50, 0x776140 at 0x776333 -> 0x7765e4), both twins"
   review: reviewed
 - addr: 0x95ba10
   kind: function

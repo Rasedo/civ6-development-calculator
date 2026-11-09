@@ -2659,9 +2659,15 @@ function homelandPlunder(state: GameState, pass: Pass): void {
  * the list in its order on coastal land, each unit left that may raid
  * (+0x18bd, a raider) whose planning of two turns holds a plot beside it
  * (0x791300 at range 1) is queued with that plot ("Coastal Raid"); the queue
- * carried out (0x7735d0): each queued unit that can still act goes to its
- * plot with the attack flag, then raids the target where it may (0x95b100,
- * 0x95b7c0), its turn done.
+ * carried out (0x7735d0), each entry in its order: a queued unit with
+ * Movement left (0x56c690) goes to its plot with the attack flag, as far as
+ * its Movement carries it, then raids the target where it may (0x95b100,
+ * 0x95b7c0). The carry-out ends no turn and lists no unit done: a unit whose
+ * raid failed walks on to its next entry's plot, and the later moves of the
+ * pass may still take it; a move its walk leaves short of its plot with
+ * Movement left stays on the unit, every later order behind it. A
+ * raid ends the raider's moves (0xa4fbc0 at 0xa502b2 -> 0x56d6f0) unless it
+ * pillages at the advanced cost (+0x1884).
  */
 function coastalRaids(state: GameState, pass: Pass): void {
   const queue: { u: Unit; spot: number; plot: number }[] = [];
@@ -2676,9 +2682,21 @@ function coastalRaids(state: GameState, pass: Pass): void {
   }
   for (const q of queue) {
     if (!canAct(state, pass, q.u)) continue;
+    tacticsTrace?.(q.u, 'Coastal Raid', q.spot, -1);
     if (q.u.tileIndex !== q.spot) moveTo(state, q.u, q.spot);
-    if (state.units.includes(q.u) && coastalRaid(state, q.u, q.plot)) dropHeldCosts();
-    finish(pass, q.u, 'Coastal Raid', q.spot);
+    if (!state.units.includes(q.u)) continue;
+    // a move its walk left short of its plot with Movement left: the order
+    // stays on the unit (`moveTo`), every order after it queued behind
+    if (q.u.tileIndex !== q.spot && q.u.movesLeft > 0) {
+      pass.done.add(q.u.id);
+      continue;
+    }
+    if (!coastalRaid(state, q.u, q.plot)) continue;
+    dropHeldCosts();
+    if (!(UNITS[q.u.type]?.pillageCost ?? 0)) {
+      q.u.movesLeft = 0;
+      pass.ended.add(q.u.id);
+    }
   }
 }
 
@@ -2771,6 +2789,11 @@ export interface Assigned { unit: Unit; move: number; attack: number; from: numb
  *  - each target's health (1.1 x its whole, less its damage): a unit's, a
  *    district's (a City Center's hit points; its blow the predicted one,
  *    `predictCityBlow`, the damage it takes the planning's, `predictCityExchange`);
+ *    a unit target whose unit the pass has killed keeps its entry at health
+ *    0 and no plot (0x776333 -> 0x7765e4: the record's health and plot as
+ *    initialised), its claims the planning's (runs/h1_duelq1128 t64: the
+ *    Swordsman 3211281 kills player 0's Warrior on 41:20 and advances, the
+ *    Archer 3407902 then takes 40:19 at turn 2 against it, no attack);
  *  - per target, each unit with Movement left: its planning's spots (in
  *    order), save — but against a HIGH target — one where the damage it
  *    takes in the blow and the blow back passes the damage it deals in both,
@@ -2802,6 +2825,10 @@ export function assignTo(state: GameState, pass: Pass, units: Unit[], targets: T
         damage: 0, units: [], barb: isBarbSeat(v.seat) });
       continue;
     }
+    if (t.unit) {
+      tg.push({ target: t, unit: null, health: 0, damage: 0, units: [], barb: isBarbSeat(t.seat) });
+      continue;
+    }
     const d = districtHealth(state, t.tile);
     if (!d) continue;
     tg.push({ target: t, unit: null, health: Math.floor(d.max * ATTACK_HEALTH_256 / 256) - (d.max - d.hp),
@@ -2822,7 +2849,7 @@ export function assignTo(state: GameState, pass: Pass, units: Unit[], targets: T
       const job = jobOf(state, pass, u);
       const E = p.entries.find((e) => e.target === T.target);
       if (!E) return;
-      const dealt = T.unit ? E.dealt : predictCityBlow(state, u, T.target.tile);
+      const dealt = T.target.unit ? E.dealt : predictCityBlow(state, u, T.target.tile);
       for (const s of E.spots) {
         const takes = E.taken + s.backTaken;
         if (T.target.type !== 'HIGH' && ((exchange && takes > dealt + s.backDealt) || (survive && takes > healthOf(u)))) continue;
@@ -2911,7 +2938,7 @@ export function assignTo(state: GameState, pass: Pass, units: Unit[], targets: T
     const c = S.claims.find((x) => x.unit === i && tg[x.target].units.includes(i));
     if (!c) return null;
     const T = tg[c.target];
-    return { unit: u, move: S.tile, attack: c.turns === 1 ? (T.unit ? T.unit.tileIndex : T.target.tile) : -1, from: u.tileIndex,
+    return { unit: u, move: S.tile, attack: c.turns === 1 && !(T.target.unit && !T.unit) ? (T.unit ? T.unit.tileIndex : T.target.tile) : -1, from: u.tileIndex,
       damage: UNIT_HP - healthOf(u), civilian: T.target.type === 'CIVILIAN' || T.target.type === 'TRADER',
       religious: T.target.type === 'RELIGIOUS', trader: T.target.type === 'TRADER' };
   });
@@ -3051,7 +3078,8 @@ export function passAttack(state: GameState, pass: Pass, ids: readonly number[],
  * takes the RELIGIOUS targets too): each target of the type in the list's
  * order, its unit still on the map, the units that can strike its plot
  * (`strikers`) assigned (`assignTo`) over the targets of its type
- * within 5 of it, and the assignment carried out (`carryOut`).
+ * within 5 of it (0x76eb50: by the list's plot, a target the pass has killed
+ * among them), and the assignment carried out (`carryOut`).
  */
 function attackUnits(state: GameState, pass: Pass, type: TargetType): void {
   pass.listedFrom = new Set(pass.done);
@@ -3061,8 +3089,7 @@ function attackUnits(state: GameState, pass: Pass, type: TargetType): void {
     if (!v) continue;
     const units = strikers(state, pass, v.tileIndex, type !== 'HIGH');
     if (!units.length) continue;
-    const near = pass.targets.filter((t) => t.type === e.type && targetUnit(state, t)
-      && plotDistance(state, t.unit!.tileIndex, v.tileIndex) <= ATTACK_TARGETS_RANGE);
+    const near = pass.targets.filter((t) => t.type === e.type && plotDistance(state, t.tile, v.tileIndex) <= ATTACK_TARGETS_RANGE);
     carryOut(state, pass, assignTo(state, pass, units, near, type !== 'HIGH', type !== 'HIGH'));
   }
   delete pass.listedFrom;

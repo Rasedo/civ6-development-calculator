@@ -239,3 +239,16 @@
   context:
     - "- Flanking (0x521530) and Support (0x521ed0, 0x5228c0) are gated on the player's m_bMilitaryCombatAdjacency..."
   review: reviewed
+- addr: 0x5218f0
+  final: 0x36c650
+  kind: function
+  semantics: "a pillage's Movement cost: the least of the globals +0x558, +0x550 where +0x18bb (UseAdvancedCoastalRaid), +0x168 where +0x1884 (advanced pillage) is above 0; INT_MAX left reads GetMaxMoves."
+  status: READ
+  cases:
+    - recording: h1_duelq1124
+      turn: 186
+      value: "the Nuclear Submarine 6160412 (5 Movement) raids 31:7 with 5 left: 3 spent (PILLAGE_MOVEMENT_COST), its moves then ended"
+  impl: [cpu/core/combat.ts:coastalRaid, gpu/core/sim_orders.py:_barb_coastal_raid]
+  readings:
+    - "C-123 / C-125: Coastal Raid's queue walks on, a raid ends the raider's moves; Attack Units' targets keep one the pass killed — READ (0x7735d0, 0x95b100, 0x95b7c0, 0xa4fbc0 at 0xa501e2..0xa502e6, 0x5218f0, 0x76eb50, 0x776140 at 0x776333 -> 0x7765e4), both twins"
+  review: reviewed

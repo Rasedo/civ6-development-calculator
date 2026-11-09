@@ -5,12 +5,18 @@
 # set `review: reviewed`.
 - addr: 0xa4fbc0
   kind: function
-  semantics: "a coastal raid (XP2): raises game signal +0x8d0."
-  status: PARTLY
+  semantics: "the coastal raid's execution (XP2): the plot's improvement or district wrecked, ChangeMoves by minus the cost 0x5218f0 (0xa501ed..0xa50207), the game signal +0x8d0; with +0x1884 (advanced pillage) at 0 or below the moves end (0x56d6f0 at 0xa502e6)."
+  status: READ
+  cases:
+    - recording: h1_duelq1124
+      turn: 181
+      value: the Nuclear Submarine 6160412 raids 16:7 from 17:6 with 4 Movement and holds there, as recorded
+  impl:
+    - cpu/core/combat.ts:coastalRaid
+    - cpu/core/tactical.ts:coastalRaids
+    - gpu/core/sim_tactics.py:_tac_coastal_raid
   readings:
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
+    - "C-123 / C-125: Coastal Raid's queue walks on, a raid ends the raider's moves; Attack Units' targets keep one the pass killed — READ (0x7735d0, 0x95b100, 0x95b7c0, 0xa4fbc0 at 0xa501e2..0xa502e6, 0x5218f0, 0x76eb50, 0x776140 at 0x776333 -> 0x7765e4), both twins"
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
-  notes: ["imported: READ in its section, no confirming case found beside it"]
-  context:
-    - "...: the game signal +0x8d0 — raised by the pillage 0x9633c0, the coastal raids 0x95ba10 / 0xa4fbc0 and a district's pillage in combat 0x20bae0 — runs 0x154b80: a barbarian unit of a tr..."
   review: reviewed

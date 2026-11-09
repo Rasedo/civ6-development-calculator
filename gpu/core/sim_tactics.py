@@ -3119,7 +3119,6 @@ class SimTactics:
         urng = torch.where(ranged, self._tac_range(bidx.unsqueeze(1).expand(B, P), sl, pre), torch.zeros_like(sl))
         rsafe = rowof.clamp(min=0)
         rturn, rmoves = res["turns"], res["moves"]
-        all_e = torch.arange(U, device=dev).unsqueeze(0).expand(B, U)
         # against a target not HIGH a melee unit with no bombard strength on a
         # district that defends (a city's centre, an Encampment) is none of
         # the strikers (0x775340 at 0x77541f..0x7754ab)
@@ -3161,9 +3160,10 @@ class SimTactics:
             cand = self._tac_reachers(cand0 & (melee_ok | rng_ok), ai, order)
             if not bool(cand.count_nonzero()):
                 continue
-            # the targets of the target's own kind within 5 of it
+            # the targets of the target's own kind within 5 of it by the
+            # list's plot (0x76eb50), one the pass has killed among them
             ek = tg["uk"].gather(1, ents[:, j:j + 1].clamp(max=U - 1))
-            near = (tg["uk"] == ek) & standing(all_e) & (self.pair_dist[t].to(torch.long) <= _ATTACK_TARGETS_RANGE).repeat(1, L)
+            near = (tg["uk"] == ek) & (unit_pl >= 0) & (self.pair_dist[t].to(torch.long) <= _ATTACK_TARGETS_RANGE).repeat(1, L)
             near &= on.unsqueeze(1)
             plain = torch.full((B,), kind != 3, dtype=torch.bool, device=dev)
             out = self._tac_assign(cand, order, ai, near, res, rowof, unit_pl, plain, kind != 3, tg["uk"], tg["uo"], peers, pre, seat)
@@ -3224,10 +3224,15 @@ class SimTactics:
             health = dmax * _ATTACK_HEALTH_256 // 256 - (dmax - dhp)         # [B, K]
             tbarb = dseat == BARB_SEAT
             tgt_ok = tv & (dmax > 0)
+            gone = torch.zeros_like(tv)
         else:
             tslot = unit_pl.gather(1, tk)                                    # the targets' units
             thp = self.unit_hp.gather(1, tslot.clamp(min=0))
             health = full_hp * _ATTACK_HEALTH_256 // 256 - (full_hp - thp)   # [B, K]
+            # a target whose unit the pass has killed: health 0, no plot to
+            # strike (0x776333 -> 0x7765e4)
+            gone = (tslot >= 0) & ~self.unit_alive.gather(1, tslot.clamp(min=0))
+            health = torch.where(gone, torch.zeros_like(health), health)
             tbarb = self.unit_seat.gather(1, tslot.clamp(min=0)) == BARB_SEAT
             tgt_ok = tv & (tslot >= 0)
         # each unit's planning entry for each target
@@ -3413,7 +3418,8 @@ class SimTactics:
         got = uv & (at >= 0) & (c4 < C)
         c4c = c4.clamp(max=C - 1)
         move = torch.where(got, cplot.gather(1, c4c), torch.full_like(c4, -1))
-        att = torch.where(got & (cturn.gather(1, c4c) == 1), tplot.gather(1, ck.gather(1, c4c)), torch.full_like(c4, -1))
+        ck4 = ck.gather(1, c4c)
+        att = torch.where(got & (cturn.gather(1, c4c) == 1) & ~gone.gather(1, ck4), tplot.gather(1, ck4), torch.full_like(c4, -1))
         frm = here
         dmg = int(self.rules.combat["unitHp"]) - uhp
         slot = torch.where(got, us, torch.full_like(us, -1))
@@ -4007,9 +4013,12 @@ class SimTactics:
         """COASTAL RAID (`coastalRaids`): each IMPROVEMENT or PASSIVE_DISTRICT
         target on coastal land in plot order, each raider left in slot order
         whose planning of two turns holds a plot beside it queued with that
-        plot; the queue carried out: each queued raider that can still act
-        goes to its plot (striking what holds it) and raids the target, its
-        turn done."""
+        plot; the queue carried out in its order: each queued raider with
+        Movement left goes to its plot (striking what holds it) and raids the
+        target where it may, its turn not done (a failed raid walks on to the
+        next entry's plot; a move left short of its plot with Movement left
+        stays on it, every later order behind); a raid ends its moves unless its type
+        pillages at the advanced cost."""
         B = self.B
         dev = self.device
         bidx = torch.arange(B, device=dev)
@@ -4041,9 +4050,17 @@ class SimTactics:
                 continue
             away = act & (self.barb_unit_tile[bidx, us] != spot)
             self._tac_move_to(away, us, spot)
-            there = act & self.barb_unit_alive[bidx, us]
-            self._barb_coastal_raid(there, us, torch.full((B,), t, dtype=torch.long, device=dev))
-            done[bidx[act], us[act]] = True
+            # a move its walk left short of its plot with Movement left: the
+            # order stays on the unit, every order after it queued behind
+            short = (act & self.barb_unit_alive[bidx, us] & (self.barb_unit_tile[bidx, us] != spot)
+                     & (self.barb_unit_mp[bidx, us] > 0))
+            done[bidx[short], us[short]] = True
+            there = act & self.barb_unit_alive[bidx, us] & ~short
+            did = self._barb_coastal_raid(there, us, torch.full((B,), t, dtype=torch.long, device=dev))
+            end = did & (self._type_pillage_cost[ut[bidx, us]] <= 0)
+            if bool(end.count_nonzero()):
+                self.barb_unit_mp[bidx[end], us[end]] = 0
+                self._tac_moves_ended[bidx[end], us[end] + self.POOL_LO["barb"]] = True
 
     def _tac_pass(self, acting: torch.Tensor) -> None:
         """`_barbarian_tactics`' moves"""

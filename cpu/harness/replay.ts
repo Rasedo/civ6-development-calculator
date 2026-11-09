@@ -1122,26 +1122,30 @@ function landMajorDistricts(ctx: Ctx, b: TurnRecord, turn: number, copy: GameSta
   }
 }
 
-/** the improvements a major's Builder repaired in its turn stand repaired
- *  for the players after it: the log's ImprovementChanged (x, y, type,
- *  owner, resource, pillaged) clearing the pillage between the major's
+/** the improvements a Builder repaired in its player's turn stand repaired
+ *  for the players after it (`takes`): the log's ImprovementChanged (x, y, type,
+ *  owner, resource, pillaged) clearing the pillage between the player's
  *  PlayerTurnActivated and Deactivated, which record t+1 alone holds
  *  otherwise (runs/h1_duelp1127 t135: player 1's Farm on 6:12, pillaged by
  *  the turn 134 close, repaired in its turn before Hattusa's; the Farm on
- *  5:13 beside it 5 Food in Hattusa's growth and its policy values) */
-function landMajorRepairs(ctx: Ctx, b: TurnRecord, turn: number, players: ReadonlySet<number>): void {
+ *  5:13 beside it 5 Food in Hattusa's growth and its policy values). A
+ *  city-state's Builder's repair stands so on the barbarians' copy (`onto`):
+ *  their units' turn follows theirs (runs/h1_duelq1124 t203: city-state 4's
+ *  Builder 1769480 repairs the improvement on 31:8, the barbarian Nuclear
+ *  Submarine 6160412 queues its Coastal Raid on it) */
+function landRepairs(ctx: Ctx, b: TurnRecord, turn: number, takes: (player: number, seat: number) => boolean, onto = ctx.state): void {
   let acting = -1;
   for (const x of (b as { actions?: unknown[][] }).actions ?? []) {
     if (x[1] !== turn) continue;
     if (x[2] === 'PlayerTurnActivated') acting = x[3] as number;
     else if (x[2] === 'PlayerTurnDeactivated') acting = -1;
-    else if (x[2] === 'ImprovementChanged' && x[8] === 0 && players.has(acting)) {
+    else if (x[2] === 'ImprovementChanged' && x[8] === 0 && acting >= 0) {
       const seat = ctx.seatOfPlayer.get(acting);
-      if (seat === undefined || !isCiv(seat)) continue;
-      const t = ctx.state.map.tiles[(x[4] as number) * ctx.W + (x[3] as number)];
+      if (seat === undefined || !takes(acting, seat)) continue;
+      const t = onto.map.tiles[(x[4] as number) * ctx.W + (x[3] as number)];
       if (!t.improvement || !t.pillaged) continue;
       t.pillaged = false;
-      count(ctx, 'repair', 'applied', acting);
+      if (onto === ctx.state) count(ctx, 'repair', 'applied', acting);
     }
   }
 }
@@ -1155,6 +1159,7 @@ function barbarianAi(ctx: Ctx, b: TurnRecord, closing: number, before: ReadonlyS
   const { state } = ctx;
   const copy = deserialize(serialize(state));
   landMajorDistricts(ctx, b, closing, copy);
+  landRepairs(ctx, b, closing, (_p, s) => minorAiSeat(s), copy);
   const twin = new Map<Unit, Unit>();
   state.units.forEach((u, i) => twin.set(copy.units[i], u));
   // their turn closes turn t: no unit the next turn's start made stands in
@@ -6305,7 +6310,7 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
     stream.actions(a.turn);
     syncDedications(ctx, new Set([seatOfP(ctx, activePlayer(a))]));
     applyPhase(ctx, ds, 'before', b, a);
-    landMajorRepairs(ctx, b, a.turn, new Set([activePlayer(a)]));
+    landRepairs(ctx, b, a.turn, (p, s) => p === activePlayer(a) && isCiv(s));
     // the active player's units stand where its actions left them before its
     // next start (the engine's turn below): its moves reveal, and meet, there
     syncUnits(ctx, b, activePlayer(a));
@@ -6439,7 +6444,7 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
       // their missions of the turn, the record's
       applyMissions(ctx, missions.get(a.turn) ?? []);
       applyPhase(ctx, ds, 'after', b, b, otherMajors);
-      landMajorRepairs(ctx, b, a.turn, otherMajors);
+      landRepairs(ctx, b, a.turn, (p, s) => otherMajors.has(p) && isCiv(s));
       // their units stand where their actions left them: their looks reveal
       // and meet in their turn (runs/h1_duelv1127: China meets Rome at t61,
       // DiplomacySummary.csv, the record of t62 the first to show it; 1117

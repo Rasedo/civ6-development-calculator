@@ -780,6 +780,16 @@
   context:
     - "...unit) 0x56ef30 — a combat, ranged or bombard strength and domain 2 or 3 (land) — not 0x8be70 (the unit's activity +0x5f0 HOLD, SLEEP, HEAL, SENTRY or INTERCEPT), not embarked. The..."
   review: reviewed
+- addr: 0x8e9d0
+  final: 0x66b80
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-123 / C-125: Coastal Raid's queue walks on, a raid ends the raider's moves; Attack Units' targets keep one the pass killed — READ (0x7735d0, 0x95b100, 0x95b7c0, 0xa4fbc0 at 0xa501e2..0xa502e6, 0x5218f0, 0x76eb50, 0x776140 at 0x776333 -> 0x7765e4), both twins"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - ...the pass has killed stays. The assignment (0x776140) looks each unit target's unit up (0x8e9d0 at 0x776333); with none it keeps the record as initialised (health +0x10 0, plot +0x8 -...
+  review: imported
 - addr: 0x901e0
   final: 0x67990
   kind: function
@@ -5224,15 +5234,21 @@
 - addr: 0x76eb50
   final: 0x501180
   kind: function
-  semantics: the targets of a type within 5 of a plot (the strikers' list).
-  status: PARTLY
-  impl: [cpu/core/tactical.ts:ATTACK_TARGETS_RANGE, gpu/core/sim_tactics.py:_CIVILIAN_TAKEN]
+  semantics: "Attack Units' targets: the list's entries (0x28 each) of the type whose stored plot (+0x4 / +0x8) is within 5 (GetPlotDistance) of the plot; no test of the entry's unit, one the pass killed stays."
+  status: READ
+  cases:
+    - recording: h1_duelq1128
+      turn: 64
+      value: "player 0's Warrior 1114120, killed on 41:20, stays among the Galley 917507's targets: the Archer 3407902's Move 40 19 Attack -9999"
+  impl:
+    - cpu/core/tactical.ts:attackUnits
+    - gpu/core/sim_tactics.py:_tac_attack_units
+    - cpu/core/tactical.ts:ATTACK_TARGETS_RANGE
+    - gpu/core/sim_tactics.py:_CIVILIAN_TAKEN
+    - gpu/core/sim_tactics.py:standing
   readings:
-    - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
     - "C-95: Attack Units — READ, ported"
-  notes: ["imported: READ in its section, no confirming case found beside it"]
-  context:
-    - ...actly its range with Movement left, 0x78fa10), the targets of that type within 5 of it (0x76eb50), each unit's spots per target from its planning (turns, the planning's combat simulati...
+    - "C-123 / C-125: Coastal Raid's queue walks on, a raid ends the raider's moves; Attack Units' targets keep one the pass killed — READ (0x7735d0, 0x95b100, 0x95b7c0, 0xa4fbc0 at 0xa501e2..0xa502e6, 0x5218f0, 0x76eb50, 0x776140 at 0x776333 -> 0x7765e4), both twins"
   review: reviewed
 - addr: 0x76ecf0
   final: 0x5013c0
@@ -7485,13 +7501,19 @@
 - addr: 0x95b100
   final: 0x666620
   kind: function
-  semantics: the coastal raid operation's start (-> 0x95b7c0).
-  status: PARTLY
-  impl: [cpu/core/combat.ts:coastalRaid, cpu/core/tactical.ts:coastalRaids]
-  readings: ["C-95: Coastal Raid — READ, ported", "C-95: Coastal Raid"]
-  notes: ["imported: READ in its section, no confirming case found beside it"]
-  context:
-    - ...that can act moves to its plot (0x962190, flag 0x10) and raids the target where it may (0x95b100 -> 0x95b7c0). The raid wrecks the plot's improvement, else its district, 3 Movement s...
+  semantics: "the coastal raid's plot test: a land plot not impassable (+0x3a bit 3), the unit on water beside land, then the plot's units, an unpillaged improvement of a player at war with it (the improvement's owner +0x46 not the unit's), else a complete district its owner at war, Districts +0xe1 & 4 clear; no Movement and no distance test."
+  status: READ
+  cases:
+    - recording: h1_duelq1124
+      turn: 182
+      value: 19:9's improvement passes from 20:8; the raid operation refuses it with 1 Movement left
+  impl:
+    - cpu/core/combat.ts:coastalRaid
+    - cpu/core/tactical.ts:coastalRaids
+    - gpu/core/sim_orders.py:_barb_coastal_raid
+  readings:
+    - "C-95: Coastal Raid — READ, ported"
+    - "C-123 / C-125: Coastal Raid's queue walks on, a raid ends the raider's moves; Attack Units' targets keep one the pass killed — READ (0x7735d0, 0x95b100, 0x95b7c0, 0xa4fbc0 at 0xa501e2..0xa502e6, 0x5218f0, 0x76eb50, 0x776140 at 0x776333 -> 0x7765e4), both twins"
   review: reviewed
 - addr: 0x95d8d0
   final: 0x668be0

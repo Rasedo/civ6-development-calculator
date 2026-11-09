@@ -13682,3 +13682,57 @@ contract the city's hand alone holds; `minorAiTurn`'s `goalsReached` call
   amount; the city's +0x1b20 percent (none in a city-state) is not read in
   the research term; 0x6fafc0's share where the +0x748 / +0x620 entry is
   above 0 (0x6fcab4..0x6fce7c) unread.
+
+## C-123 / C-125: Coastal Raid's queue walks on, a raid ends the raider's moves; Attack Units' targets keep one the pass killed — READ (0x7735d0, 0x95b100, 0x95b7c0, 0xa4fbc0 at 0xa501e2..0xa502e6, 0x5218f0, 0x76eb50, 0x776140 at 0x776333 -> 0x7765e4), both twins
+
+`coastalRaids` (cpu/core/tactical.ts), `coastalRaid` (cpu/core/combat.ts);
+`_tac_coastal_raid` (gpu/core/sim_tactics.py). `attackUnits` / `assignTo`
+(cpu/core/tactical.ts); `_tac_attack_units` / `_tac_assign`.
+
+- THE RAID QUEUE CARRIED OUT (0x7735d0): each 0x30 entry in its order (unit
+  +0x0, spot +0xc / +0x10, target +0x18); a unit with Movement left
+  (0x56c690) is given the move to its spot (0x962190, flag 0x10, pushed on
+  the unit's operations by the manager's vt +0x60), then, where 0x95b100
+  passes, the raid (0x95b7c0: the operation 0xcfb9b561 on the target's
+  coordinates, pushed the same way). No turn ends and no unit is listed
+  done: a unit whose raid failed walks on to its next entry's spot, and the
+  later moves of the pass still take it (runs/h1_duelq1124 t189 / t200 /
+  t203 Coastal Raid then Wander Back to Camp, t204 then Move to safety).
+- 0x95b100 is the plot test alone: a land plot not impassable (+0x3a bit 3),
+  the unit on water beside land, then the plot's units, an unpillaged
+  improvement of a player at war with it, else a complete pillageable
+  district (Districts +0xe1 & 4 clear); no Movement and no distance test.
+- THE RAID (XP2_Unit_Operations_CoastalRaid, 0xa4fbc0): the wreck, then
+  ChangeMoves by minus the cost 0x5218f0 (the least of the globals +0x558,
+  +0x550 where +0x18bb UseAdvancedCoastalRaid, +0x168 where +0x1884 is above
+  0: PILLAGE_MOVEMENT_COST 3 for the duels' raiders), the pillage signal
+  +0x8d0, and with +0x1884 at 0 or below
+  the moves ended (0x56d6f0 at 0xa502e6). The engines' raider holds no
+  advanced pillage: `UNITS.pillageCost` / `_type_pillage_cost` stand for
+  +0x1884.
+- The engines' walk on: a move its walk leaves short of its spot with
+  Movement left stays on the unit (`moveTo`'s carried order), every later
+  order of the queue behind it: the unit leaves the queue.
+- Confirmed (runs/h1_duelq1124, aimem, the Nuclear Submarine 6160412): t182
+  / t194 17:6 -> 20:8 for 19:9 (1 Movement left, the raid refused), on to
+  20:9 for 18:10's spot; t192 20:8 -> 17:6 for 16:7, on to 18:6; t181 /
+  t186 / t193 / t199 the raid ends its moves on its first spot; t247
+  Nuclear Submarine 6488092's walk short at 6:17 with Movement left holds
+  its later entries (the carried order ends it on 5:16); barb.move t178-249
+  no Coastal Raid row missed.
+- ATTACK UNITS' TARGETS (0x76eb50): the list's entries of the type whose
+  stored plot (+0x4 / +0x8) is within 5 of the target, no test of the
+  entry's unit: one the pass has killed stays. The assignment (0x776140)
+  looks each unit target's unit up (0x8e9d0 at 0x776333); with none it
+  keeps the record as initialised (health +0x10 0, plot +0x8 -9999) and
+  takes the claims (0x7765e4): the planning's spots, dealt and filters; its
+  claims strike no plot. Confirmed: runs/h1_duelq1128 t64, the Swordsman
+  3211281 kills player 0's Warrior 1114120 on 41:20 and advances; the
+  Archer 3407902 (41:16) then takes 40:19 against it at turn 2, "Move 40 19
+  Attack -9999", and stops on 41:17 (barb.move.family / plot 2 misses gone).
+- Open: 1128 t30 (Warrior 2031630 for 14:13) and t50 (Archer 2752535, 77
+  damage, for 17:10): the game's Move-only claims, ours dropped by the
+  exchange / survival filters (0x776780..0x7767fa, no turn test; the
+  planning's per-spot blow back 0x791470 at 0x7918b0 is simulated for every
+  spot at its plot, no later-turn rule): the inputs of the per-spot blow
+  back (ours 31-65 for a 23-health Archer) unread.
