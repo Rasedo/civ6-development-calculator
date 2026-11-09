@@ -1211,6 +1211,21 @@ class SimCityValue:
             v = v + torch.where(pb != -100, add, torch.zeros_like(add))
         return torch.where(same, one, v.clamp(min=n * _FX))
 
+    def _cv_power_need(self, f, need: int, t: torch.Tensor, h: torch.Tensor) -> torch.Tensor:
+        """`powerNeedValue` (0x7a67f0 at a negative Amount): 0 where the city's
+        free power reaches its required power and `need`, or its row's fuel a
+        turn reaches `need`; else minus half the city's Production at its
+        value from `t` to `h`"""
+        r = self._cv_tables()["rate"]
+        like = f.like()
+        free, required, fuel = f.power()
+        met = _t((free >= required + need) | (fuel >= need), like).bool()
+        prod = torch.floor(torch.as_tensor(f.city_yield("YIELD_PRODUCTION"), dtype=torch.float64) * _FX + 0.5).long()
+        half = _fmul(_t(prod, like).expand_as(like), torch.full_like(like, _fx_const(0.5)))
+        a = self._cv_yield(half, "YIELD_PRODUCTION", f.yield_w("YIELD_PRODUCTION"))
+        v = torch.where(t == h, _discounted(a, r, t), _present_value(a, r, h) - _present_value(a, r, t))
+        return torch.where(met, torch.zeros_like(v), -v)
+
     def _cv_building(self, f, building: str, t: torch.Tensor, h: torch.Tensor) -> torch.Tensor:
         """0x7a7590, `buildingValue`"""
         T = self._cv_tables()
@@ -1232,6 +1247,8 @@ class SimCityValue:
         elif b["regionalRange"] > 1 and b["convertsToPower"]:
             # a regional power plant whose fuel the player holds none of
             value = torch.where(_t(f.stocked(b["convertsToPower"]), like).bool(), value, torch.zeros_like(value))
+        if int(b.get("requiredPower", 0)) > 0:
+            value = value + self._cv_power_need(f, int(b["requiredPower"]), t, h)
         if b["blocksCoastalFlooding"]:
             # 100.0 a coastal lowland plot, 1,500.0 one holding a district;
             # the whole value 0 with none (0x7a92b6)
@@ -2648,6 +2665,23 @@ class _MinorFacts:
     def power_short(self):
         """a city-state's city never short (`cityPowerShort`)"""
         return self._bools(False)
+
+    def power(self):
+        """`cityPowerFacts`: the city's free power and required power (its
+        grid's supply and load, `_city_power_need`) and its row's fuel a turn
+        (each accumulating resource's income, `_seat_accumulated`, above 0
+        times its PowerProvided), [B] each"""
+        sim = self.sim
+        demand, supply, _near, _ppr = sim._city_power_need(self.row)
+        acc = sim._seat_accumulated(self.row)
+        fuel = torch.zeros(sim.B, dtype=torch.long, device=sim.device)
+        for r in sim._cv_tables()["res"].values():
+            pp = int(r.get("powerProvided", 0))
+            ri = self.E["resource"].get(r["type"], -1)
+            k = int(sim._strat_slot_of[ri]) if pp > 0 and ri >= 0 else -1
+            if k >= 0:
+                fuel = fuel + acc[:, k].long().clamp(min=0) * pp
+        return supply[:, self._slot].long(), demand[:, self._slot].long(), fuel
 
     def city_strikes(self):
         """the outer defences' pool above 0"""

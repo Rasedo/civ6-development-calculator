@@ -17,7 +17,7 @@ import { GOVERNMENTS } from '../data/policies';
 import { CIV_LEADERS } from '../data/seats';
 import { congressQueueMult } from './congress';
 import { AI_CIVILIZATION_TRAITS, AI_LEADER_TRAITS } from '../data/aiTables';
-import { AI_BUILDINGS, AI_UNITS } from '../data/aiBuildTables';
+import { AI_BUILDINGS, AI_RESOURCES, AI_UNITS } from '../data/aiBuildTables';
 import { engineId } from '../data/aliases';
 import { RESOURCES } from '../../world/resources';
 import { hasRiver } from '../../world/query';
@@ -35,8 +35,8 @@ import { getModifiers, prodBoostPct, seatGovernment } from './effects';
 import { citiesOf, isCityStateSeat, isFreeSeat, seatOf } from './seats';
 import { minorCity } from './cityStates';
 import { cityLowlands, coastalLowlandCounts } from './climate';
-import { stockFree, strategicSurplus } from './stockpile';
-import { buildingPillaged } from './yields';
+import { accumulatedPerTurn, stockFree, strategicSlot, strategicSurplus } from './stockpile';
+import { buildingPillaged, cityPower } from './yields';
 import { buildingCostIn, worshipOffered } from './rules';
 import { builderCost, cityNavalCapable, traderCost } from './units';
 import { districtCost, projectCost, settlerCost, unitStepCost, unitsAcquired } from './game';
@@ -117,6 +117,23 @@ export function majorUnitVersion(traits: readonly string[], u: string): string |
   const unique = AI_UNITS.find((x) => x.trait && traits.includes(x.trait)
     && engineId('unit', x.type, 'UNIT_', UNITS) !== null && UNITS[engineId('unit', x.type, 'UNIT_', UNITS)!]?.replaces === engineId('unit', u, 'UNIT_', UNITS));
   return unique ? unique.type : u;
+}
+
+/** a city's power as the power value reads it (`CityBuildFacts.power`): its
+ *  grid's supply and load (`cityPower`) and its player's turn's fuel — each
+ *  resource's income a turn (`accumulatedPerTurn`) above 0 times its
+ *  Resource_Consumption PowerProvided */
+export function cityPowerFacts(state: GameState, city: City): CityBuildFacts['power'] {
+  const p = cityPower(state, city);
+  const income = accumulatedPerTurn(state, city.seat);
+  let fuel = 0;
+  for (const r of AI_RESOURCES) {
+    if (r.powerProvided <= 0) continue;
+    const id = engineId('resource', r.type, 'RESOURCE_', RESOURCES);
+    const k = id ? strategicSlot(id) : -1;
+    if (k >= 0 && income[k] > 0) fuel += income[k] * r.powerProvided;
+  }
+  return { free: p.supply, required: p.demand, fuel };
 }
 
 /** THE CITY BUILD AI'S VIEW OF A MAJOR'S CITY, its knowledge base's unit
@@ -203,6 +220,8 @@ function majorBuildFacts(state: GameState, city: City, known: (unit: string) => 
       const id = engineId('resource', res, 'RESOURCE_', RESOURCES);
       return !!id && stockFree(state, seat, id) > 0;
     },
+    power: cityPowerFacts(state, city),
+    production: stats.total.production,
     amenity,
     regionalAmenities: (range) => own.filter((c) => hexDistance(state.map, state.map.tiles[c.centerIndex].col, state.map.tiles[c.centerIndex].row,
       centre.col, centre.row) <= range).map(amenityOf),

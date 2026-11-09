@@ -333,6 +333,11 @@ export function minorPlotEvals(state: GameState, cs: CityState, facts: CityBuild
   const specialty = (cs.districts ?? []).filter((x) => DISTRICTS[x.type]?.countsTowardLimit).length;
   const unseen = hiddenResourcesFor(state, cs.seat);
   const hidden = (res: string): boolean => unseen.has(res);
+  // a neighbour's resource as the minor sees it (0x50a690 with its team): a
+  // plot it has revealed, the resource one it sees (runs/h1_duelq1117 Caguana
+  // t44-t69: the Batey on 41:16 beside the Wheat on 40:15 and the unrevealed
+  // 40:17 at the one bonus resource's Culture)
+  const sees = (nb: Tile): boolean => cs.revealed?.[nb.index] === 1 && !!nb.resource && !unseen.has(nb.resource);
   const impT = AI_IMPROVEMENTS.map((row) => Math.max(facts.techTurns(row.tech), facts.civicTurns(row.civic)));
   const distT = AI_DISTRICTS.map((row) => facts.buildTurns(row.type) + Math.max(facts.techTurns(row.tech), facts.civicTurns(row.civic)));
   const trainsSea = facts.trainsDomain('DOMAIN_SEA') || (centre.riverMask ?? 0) !== 0;
@@ -376,7 +381,7 @@ export function minorPlotEvals(state: GameState, cs: CityState, facts: CityBuild
       adjacency: (impType, y) => {
         const id = engineId('improvement', impType, 'IMPROVEMENT_', IMPROVEMENTS) as Parameters<typeof improvementAdjacency>[2] | null;
         if (!id) return 0;
-        return (improvementAdjacency(yctx, tile, id) as unknown as Record<string, number>)[YIELD_KEY[y]] ?? 0;
+        return (improvementAdjacency(yctx, tile, id, sees) as unknown as Record<string, number>)[YIELD_KEY[y]] ?? 0;
       },
       housingValue: (housing, t, h) => housingValue(facts.growth, forecast, housing, t, h),
       resourceValue: (res, count, t, h) => {

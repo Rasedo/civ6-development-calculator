@@ -6,8 +6,8 @@
  * improvement works that the player's cities hold unimproved (0x5d45c0).
  *
  *  - A BONUS resource: 0.
- *  - A LUXURY: 0 where the player holds it already (0x4abfe0) and `count` is
- *    positive; else, for a full civilization or a city-state, the amenities
+ *  - A LUXURY: 0 where the player has banned it (0x4abfe0, IsResourceBanned)
+ *    and `count` is positive; else, for a full civilization or a city-state, the amenities
  *    one copy gives (0x527a50: Happiness, less LUXURY_HAPPINESS_LOSS_PER_ERA
  *    a chronology step from its PeakEra, at least LUXURY_HAPPINESS_MINIMUM —
  *    the greater at the player's era and the next) spread over its cities in
@@ -46,6 +46,8 @@ export interface AiResourceRow {
   /** each Resource_Harvests row's PrereqTech, null none */
   harvestTechs: readonly (string | null)[];
   yields: readonly (readonly [string, number])[];
+  /** Resource_Consumption PowerProvided: the Power a copy gives (0 none) */
+  powerProvided: number;
 }
 
 export interface AiImprovementRow {
@@ -89,8 +91,9 @@ export interface ResourceFacts {
   nextEraChronology: number;
   /** an era's chronology index by type */
   chronologyOf(era: string): number | null;
-  /** 0x4abfe0: the player holds the resource */
-  held(res: string): boolean;
+  /** 0x4abfe0 (IsResourceBanned): the player's ban on the resource
+   *  (Player_Resources m_aiBannedResources +0x598[r] above 0) */
+  banned(res: string): boolean;
   /** 0x4a93c0(res, 1): the copies the player has */
   have(res: string): number;
   /** a turn's income of an accumulating resource (Player_Resources +0x350) */
@@ -130,7 +133,7 @@ export function resourceValue(f: ResourceFacts, r: AiResourceRow, count: number,
   if (r.class === 'RESOURCECLASS_BONUS') v = 0;
   else if (r.class === 'RESOURCECLASS_LUXURY') {
     const floor = f.luxuryPseudo(t, h);
-    if (f.held(r.type) && count > 0) v = 0;
+    if (f.banned(r.type) && count > 0) v = 0;
     else {
       let e = 0;
       if (f.amenityParty) {

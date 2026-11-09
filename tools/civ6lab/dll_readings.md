@@ -13840,3 +13840,41 @@ empty").
 - Open: a city's transfer (conquest, loyalty) carrying a slot wonder to
   another major runs no rebuild on either side; Founding Fathers' conversion
   (a kind's slots moved, the count kept) rebuilds only with the government.
+
+## C-100: the luxury's ban, the power value's RequiredPower term and the plot adjacency's sight — READ
+
+- THE LUXURY'S BAN (0x7a21e0 -> 0x4abfe0): the luxury branch's zero test is
+  IsResourceBanned (Player_Resources m_aiBannedResources +0x598[r] above 0;
+  its assert names the array, its caller 0x120120 is IsResourceBanned), not a
+  copy held: a luxury the player already extracts is valued again (the
+  amenity walk, at least PSEUDOYIELD_RESOURCE_LUXURY). The engines read the
+  World Congress's Luxury Policy B target as the ban (`minorResourceFacts`,
+  `_cv_resource_value`). Confirmed: runs/h1_duelq1128 Nazca t99-t189, its
+  Marble Quarry on 4:7 standing, the Quarry rows on 7:8's Marble 30.16 at
+  the floor and up to 203.55 at the amenity walk as logged.
+- THE REQUIREDPOWER TERM (valueConstructible 0x7a9209 -> 0x7a67f0 at minus
+  Buildings_XP2 RequiredPower): ported as `powerNeedValue` / `_cv_power_need`
+  after the Entertainment and regional terms, before BlocksCoastalFlooding.
+  The city's free and required power are its grid's supply and load
+  (`cityPowerFacts`: `cityPower`, `_city_power_need`); the fuel is the
+  player's +0x1320 +0x350 accumulated resources a turn
+  (m_aAccumulatedResourcePerTurn: `accumulatedPerTurn`, `_seat_accumulated`),
+  which a suzerained city-state still counts (runs/h1_duelq1124 Bologna
+  t170-t230, suzerain player 1: Coal 3.0 a turn in its record), times
+  Resource_Consumption PowerProvided (Coal 4, Oil 4, Uranium 16; the AI
+  resource rows' `powerProvided`). Confirmed (cityBuildLab --logtech): 1121
+  the Stock Exchange rows 0 -> 43 exact of 77, 1124 the Factory 0 -> 13 of 38,
+  Bologna's Research Lab 23 of 61 kept (its Coal's fuel 12 over the need 3).
+- THE ADJACENCY'S SIGHT (0x365ae0's AdjacentResource / AdjacentResourceClass /
+  AdjacentSeaResource clauses through 0x50a690 with the player's team): the
+  plot values' improvement adjacency counts a neighbour's resource only on a
+  plot the minor has revealed and a resource it sees (`improvementAdjacency`'s
+  `sees`, `_imp_adj_at`'s `sees`; the real yields still read every
+  neighbour). Confirmed: runs/h1_duelq1117 Caguana t44-t69, the Batey row on
+  41:16 beside the Wheat on 40:15 and on the unrevealed 40:17 at one bonus
+  resource's Culture (20.12 under the two), t2-t3 41:10 beside the
+  unrevealed 40:9.
+- Open: a city-state's free power past its grid (City_Power +0x08's sources,
+  ChangeFreePower 0x1ed860) unread, the grid's supply read for it; the
+  strategic branch's income (`ResourceFacts.income`) still the banked one,
+  none under a suzerain.

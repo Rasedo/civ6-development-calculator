@@ -33,9 +33,11 @@ function terrainYields(tile: Tile): Yields {
  * neighbours matching any of its sources, divides by `per`, and pays its
  * yields once per whole group (a `once` rule: once if any match); a civic in
  * `ctx.mods.impUpgrades` swaps in the improved rate and payout
- * (`_imp_adjacency`).
+ * (`_imp_adjacency`). `sees`: a neighbour whose resource the valuing player
+ * sees (0x365ae0's resource clauses read it through 0x50a690 with the
+ * player's team); the AI's plot values pass the minor's sight.
  */
-export function improvementAdjacency(ctx: YieldCtx, tile: Tile, imp: ImprovementId): Yields {
+export function improvementAdjacency(ctx: YieldCtx, tile: Tile, imp: ImprovementId, sees: (nb: Tile) => boolean = () => true): Yields {
   const rules = IMPROVEMENTS[imp].adjacency;
   const out = emptyYields();
   // CIV6 (Farms_MedievalAdjacency TilesRequired 2, Farms_MechanizedAdjacency
@@ -63,7 +65,7 @@ export function improvementAdjacency(ctx: YieldCtx, tile: Tile, imp: Improvement
       // the plot owner's own, a named district whoever owns it (DLL 0x365ae0)
       const liveDistrict = nb.district !== null && nb.districtComplete && !nb.districtPillaged;
       const hit =
-        (r.bonusResource && nb.resource !== null && RESOURCES[nb.resource].category === 'bonus') ||
+        (r.bonusResource && nb.resource !== null && sees(nb) && RESOURCES[nb.resource].category === 'bonus') ||
         (r.anyDistrict && liveDistrict && nb.ownerSeat === tile.ownerSeat) ||
         (!!r.district && nb.district === r.district && liveDistrict) ||
         (!!r.builtWonder && nb.builtWonder !== null && nb.builtWonderComplete) ||
@@ -72,12 +74,12 @@ export function improvementAdjacency(ctx: YieldCtx, tile: Tile, imp: Improvement
         // a row that names SOMEBODY ELSE's improvement (the Kurgan's Pasture,
         // the Great Wall's own segments)
         (!!r.improvement && nb.improvement === r.improvement && !nb.pillaged) ||
-        (!!r.luxuryResource && nb.resource !== null && RESOURCES[nb.resource].category === 'luxury') ||
+        (!!r.luxuryResource && nb.resource !== null && sees(nb) && RESOURCES[nb.resource].category === 'luxury') ||
         (!!r.terrains && r.terrains.includes(nb.terrain)) ||
         (!!r.features && nb.feature !== null && r.features.includes(nb.feature)) ||
         // CIV6 (Fishery_SeaResourceAdjacency, AdjacentSeaResource): a
         // neighbour that is WATER and carries a resource.
-        (!!r.seaResource && nb.resource !== null && isWater(nb));
+        (!!r.seaResource && nb.resource !== null && sees(nb) && isWater(nb));
       if (hit) n += 1;
     }
     // a yes/no requirement set pays once, however many neighbours match

@@ -80,6 +80,8 @@ export interface AiBuildingRow {
   copies: readonly (readonly [string, string])[];
   units: readonly string[];
   entertainmentWithPower: number;
+  /** Buildings_XP2 RequiredPower (+0x28) */
+  requiredPower: number;
   /** Buildings_XP2 BlocksCoastalFlooding (+0x48 bit 1) */
   blocksCoastalFlooding: boolean;
   /** Buildings_XP2 ResourceTypeConvertedToPower (+0x58), null none */
@@ -220,6 +222,14 @@ export interface CityBuildFacts {
   /** the player's stock of the strategic resource less its reservations
    *  is above 0 (0x4ab6c0 -> 0x4aa790, ownership 0) */
   stocked(resource: string): boolean;
+  /** the city's power (City_Power +0x30d0): its free power (0x1f0020), its
+   *  required power (+0x58, 0x1f02f0), and the fuel the player's turn brings
+   *  in (0x7a67f0's walk over 0xad6290: each accumulating resource's income
+   *  a turn, Player_Resources +0x1320 +0x350, where above 0, times its
+   *  Resource_Consumption PowerProvided) */
+  power: { free: number; required: number; fuel: number };
+  /** the city's Production (City::GetYield) */
+  production: number;
   /** the city's current production, an item type, or null with nothing in
    *  hand (city +0x2350) */
   current: string | null;
@@ -549,6 +559,16 @@ export function amenityPerTurn(f: { view: CityBuildFacts['view'] | null; seat: n
   return Math.max(v, n * FX);
 }
 
+/** 0x7a67f0 at a negative Amount, `need` Power more: 0 where the city's free
+ *  power reaches its required power and the need, or the fuel its player's
+ *  turn brings in reaches the need; else minus half the city's Production
+ *  at its value from `t` to `h` */
+export function powerNeedValue(f: CityBuildFacts, need: number, t: number, h: number): number {
+  if (f.power.free >= f.power.required + need || f.power.fuel >= need) return 0;
+  const half = fmul(fxOf(f.production), fxConst(0.5));
+  return -valueBetween(yieldValue(f.view, f.seat, half, 'YIELD_PRODUCTION'), t, h);
+}
+
 /** 0x7a7590: a building's value landing in `t` turns, to horizon `h` */
 export function buildingValue(f: CityBuildFacts, b: AiBuildingRow, t: number, h = AI_VALUE_HORIZON): number {
   if (t >= h) return FX_MIN;
@@ -568,6 +588,9 @@ export function buildingValue(f: CityBuildFacts, b: AiBuildingRow, t: number, h 
     // Power Plant row of the city-states 0.00)
     value = 0;
   }
+  // a building that needs Power (Buildings_XP2 RequiredPower, 0x7a9209 ->
+  // 0x7a67f0 at minus it)
+  if (b.requiredPower > 0) value += powerNeedValue(f, b.requiredPower, t, h);
   // a building that blocks coastal flooding (0x7a92b6): 100.0 a coastal
   // lowland plot of the city's the sea has not taken, 1,500.0 a such plot
   // holding a district, after the PV; the whole value 0 with no such plot

@@ -1367,8 +1367,8 @@ class SimMinorAi:
                            bb: torch.Tensor) -> torch.Tensor:
         """`resourceValue` (0x7a21e0) of `count` more of resource `res` to
         minor `s` landing in `t` turns to the horizon `h`, per element of the
-        games `bb`: a bonus resource 0; a luxury 0 where the minor holds one
-        and `count` is positive, else one Amenity more in its one city (a
+        games `bb`: a bonus resource 0; a luxury 0 where the World Congress
+        bans it and `count` is positive, else one Amenity more in its one city (a
         resource that gives one) at least PSEUDOYIELD_RESOURCE_LUXURY, at most
         200.0; a strategic the copies worth taking up to twice the need of the
         minor's unit table, each 25.0 per era chronology step over the need
@@ -1400,7 +1400,13 @@ class SimMinorAi:
                 a = self._cv_amenity_per_turn(f, _t(bal, f.like()), ys)
                 e = _between(a.take(bb), t, h, rate)
             v = torch.maximum(e, floor)
-            v = torch.where((have > 0) & (n > 0), zero, v)
+            # the World Congress's banned luxury (Luxury Policy B: IsResourceBanned
+            # 0x4abfe0) at 0 where `count` is positive
+            lp_out, lp_tgt = self._congress_by_id("LUXURY_POLICY")
+            on = self.res_id == ri
+            li = int(self.lux_id[on][0]) if bool(on.any()) else -1
+            banned = ((lp_out == 1) & (lp_tgt == li)).take(bb) if li >= 0 else torch.zeros_like(t, dtype=torch.bool)
+            v = torch.where(banned & (n > 0), zero, v)
             return v.clamp(max=200 * _FX)
         if cls != "RESOURCECLASS_STRATEGIC":
             return zero
@@ -2155,7 +2161,10 @@ class _PlotFacts:
         k = int(T["engine"]["improvement"][names.index(imp)])
         if k < 0:
             return 0
-        plane = self.ctx.get(("adj", k), lambda: sim._imp_adj_at(self.ctx.row, k))
+        # a neighbour's resource as the minor sees it (0x50a690 with its
+        # team): a plot it has revealed, the resource one it sees
+        sees = lambda: sim.mops_revealed[:, self.ctx.s] & ~sim._res_hidden(self.ctx.row)
+        plane = self.ctx.get(("adj", k), lambda: sim._imp_adj_at(self.ctx.row, k, sees()))
         out = plane[self.bb, self.tiles, _YIELDS.index(y)].long()
         # a Farm's Food per whole group of live Farms beside the plot, at the
         # research's adjacency row (`improvementAdjacency`)

@@ -15,7 +15,7 @@ const view = { yieldWeight: () => 0, pseudoYieldWeight: () => 0, tradeRouteCapac
 const facts: CityBuildFacts = {
   view, seat: 100, cityId: -1, population: 1, capital: true, districtCount: 1, hasWonder: false, atWar: false, era: 0,
   yieldPct: (y) => (y === 'YIELD_PRODUCTION' ? -50 : 0), version: (b) => b, hasBuilding: () => false,
-  hasDistrict: () => true, districtPillaged: () => false, governmentTier: 0, worship: null, riverside: false, groundRefuses: () => false, buildingPillaged: () => false, coastalLowlands: () => ({ plots: 0, districts: 0 }), stocked: () => false,
+  hasDistrict: () => true, districtPillaged: () => false, governmentTier: 0, worship: null, riverside: false, groundRefuses: () => false, buildingPillaged: () => false, coastalLowlands: () => ({ plots: 0, districts: 0 }), stocked: () => false, power: { free: 0, required: 0, fuel: 0 }, production: 0,
   current: null, techTurns: () => 0, civicTurns: () => 0, buildTurns: () => 1,
   amenity: { balance: 0, yields: {} }, regionalAmenities: () => [], unitVersion: (u) => u, beliefEnables: () => false, followsReligion: false, fullCiv: false, tribe: false, unitCount: 1, artifacts: 0,
   growth: { surplus: 2 * 256, housing: 5, population: 1, stored: 0, multiplier: 256 },

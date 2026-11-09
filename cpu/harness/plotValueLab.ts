@@ -25,8 +25,16 @@
  * standing, an idle city's store with the Production the step made (the
  * city as the record after holds it) and its Builder's lumps of a turn its
  * analysis chose nothing (AI_CityBuild.csv); the gold shortfall its turn's
- * start banked; the plots' event yields as the run's replay lays them
- * (`replayEvents`);
+ * start banked; its wars as the record after holds them; the plots the
+ * majors' envoys of the turn annexed (`envoyTiles`, its citizens
+ * re-placed); its strategic stockpile carried from its last turn, less the
+ * unit its step completed, with the turn's accrual and fuel
+ * (`accrueStockpiles`, `chargeUnitUpkeep`); its research AI's turns per
+ * technology for the unit production table from AI_Research.csv's turn
+ * before (`researchUnitTurns`); the resources it sees on the record after's
+ * research and suzerain (`hiddenResourcesFor`), and a neighbour's resource
+ * in the adjacency only on a plot it has revealed; the plots' event yields
+ * as the run's replay lays them (`replayEvents`);
  * --rows prints the store and the item in hand; its grid met (`minorPower`), the
  * Economic AI's Gold boost on the net income the record's treasury cached;
  * the research AI's turns from AI_Research.csv, the civics AI's as its turn
@@ -43,6 +51,7 @@
  */
 import { existsSync, readFileSync } from 'node:fs';
 import { loadCatalog, memField, type TurnRecord } from './record';
+import type { Tile } from '../core/types';
 import { advanceHistory, importTurn, newHistory } from './import';
 import { AI_DISTRICTS, AI_IMPROVEMENTS, AI_RESOURCES } from '../data/aiBuildTables';
 import { AI_RATE, FX, FX_MIN } from '../core/aiValue';
@@ -56,24 +65,24 @@ import { canPlaceDistrictIn } from '../core/rules';
 import { minorBuildFacts, minorGrowth, minorItemInHand, minorPower, minorRaiseBuilding, minorResourceFacts } from '../core/minorBuild';
 import { economicGoldBoost } from '../core/aiWeights';
 import { newEconomicMemory } from '../core/aiEconomic';
-import { minorCity } from '../core/cityStates';
+import { minorCity, minorReplaceCitizens } from '../core/cityStates';
 import { plotImprovementType } from '../core/minorCityAi';
-import { campTiles } from '../core/seats';
+import { campTiles, hiddenResourcesFor } from '../core/seats';
 import { civicAnalysis } from '../core/aiCivics';
-import { borderCandidates, computeCityStats } from '../core/city';
+import { acquireTile, borderCandidates, computeCityStats } from '../core/city';
 import { chopGrant, harvestGrant } from '../core/economy';
 import { resourceValue } from '../core/aiResource';
 import { AI_BUILDING_INDEX, BUILDING_DEPENDENTS, buildingsPass, growthForecast, housingValue, type CityGrowth } from '../core/aiCityBuild';
-import { accumulationPct } from '../core/stockpile';
+import { accrueStockpiles, accumulationPct, capStockpiles, chargeUnitResource, chargeUnitUpkeep } from '../core/stockpile';
 import { makeYieldCtx } from '../core/effects';
 import { improvementAdjacency } from '../core/yields';
 import { engineId, gameTypeOf, installFeature } from '../data/aliases';
 import { IMPROVEMENTS } from '../data/improvements';
 import { DISTRICTS } from '../data/districts';
+import { TECHS } from '../data/techs';
 import { BUILDER_COST_STEP, UNITS } from '../data/units';
 import { GAME_COST_ESCALATION, gameProgressPct, scaleByGameSpeed } from '../data/constants';
 import { neighbors } from '../../world/hex';
-import { RESOURCES } from '../../world/resources';
 import { tileAppeal } from '../core/appeal';
 import { cityAppealResolver } from '../core/governors';
 import { eruptionHazardTurns, floodHazardTurns } from '../core/disasters';
@@ -104,6 +113,10 @@ const centreRows = loadCityBuildCentre(dump);
  *  tech each player researches each turn with its turns */
 const research = new Map<string, [number, string]>();
 const researching = new Map<string, [string, number]>();
+/** the research AI's turns per technology its turn's end kept for the unit
+ *  production table (`researchUnitTurns`): `${turn}:${player}` -> engine
+ *  technology -> the turns of its last analysis's row, above 0 */
+const unitTurns = new Map<string, Record<string, number>>();
 {
   const path = dump.replace(/\.jsonl$/, '.logs/AI_Research.csv');
   if (existsSync(path)) {
@@ -112,6 +125,13 @@ const researching = new Map<string, [string, number]>();
       if (p[2] !== 'Tech') continue;
       research.set(`${p[0]}:${p[1]}:${p[3]}`, [Number(p[6]), p[5]]);
       if (p[5] === 'RESEARCHING') researching.set(`${p[0]}:${p[1]}`, [p[3], Number(p[6])]);
+      const k = `${p[0]}:${p[1]}`;
+      const row = unitTurns.get(k) ?? (unitTurns.set(k, {}), unitTurns.get(k)!);
+      const id = engineId('tech', p[3], 'TECH_', TECHS);
+      if (id) {
+        if (Number(p[6]) > 0) row[id] = Number(p[6]);
+        else delete row[id];
+      }
     }
   }
 }
@@ -180,6 +200,8 @@ const hadCity = new Set<number>();
 const idleStore = new Map<number, number>();
 /** per player the growth its city AI's last analysis read */
 const growthSeen = new Map<number, CityGrowth>();
+/** per player the strategic stockpile its last turn's end left (capped) */
+const banks = new Map<number, number[]>();
 type Held = { imp: ReturnType<typeof importTurn>; turn: number; rec: TurnRecord };
 let held: Held | null = null;
 /** the record before the one analysed, as its own analysis left it */
@@ -278,8 +300,24 @@ for (const rec of recs) {
     // the gold shortfall its turn's start banked (its bankruptcy amenities):
     // the one the record after reads off this record's treasury
     if (nextCs) cs.goldShortfall = nextCs.goldShortfall;
+    // its wars as the majors' turns left them (a declaration or a peace of
+    // theirs comes before its turn): the record after's (runs/h1_duelq1128
+    // t203: every Fort row 20.11 up with the war its three city-states met)
+    if (nextCs) cs.wars = [...(nextCs.wars ?? [])];
     // its grid as its turn meets it (`minorPower`)
     minorPower(state, cs);
+    // its strategic resources' turn after its city's (`accrueStockpiles`)
+    // and its units' fuel out of the same bank (`chargeUnitUpkeep`), as
+    // `minorPhase` runs them before its growth (runs/h1_duelq1121 Hunza t20:
+    // its first Pasture's 2 Horses in its t20 analysis, 38 copies at 1.25)
+    // on the bank its last turn left (the records hold no minor's
+    // stockpile), less the cost of a unit its production step completed
+    const bank = banks.get(player);
+    if (bank) cs.stockpile = [...bank];
+    const madeUnit = completed && step[3].startsWith('UNIT_') ? engineId('unit', step[3], 'UNIT_', UNITS) : null;
+    if (madeUnit) chargeUnitResource(state, cs.seat, madeUnit);
+    accrueStockpiles(state, cs.seat);
+    chargeUnitUpkeep(state, cs.seat);
     if (nextCs && nextCs.prodItem === cs.prodItem) {
       cs.prodProgress = nextCs.prodProgress;
       cs.prodRetained = nextCs.prodRetained ? { ...nextCs.prodRetained } : undefined;
@@ -296,6 +334,24 @@ for (const rec of recs) {
       cs.research.tech = n.tech;
       cs.research.techProgress = n.techProgress;
       cs.research.techRetained = { ...n.techRetained };
+      cs.research.researchTurns = { ...(unitTurns.get(`${turn - 1}:${player}`) ?? {}) };
+    }
+    // the plots the majors' envoys of the turn annexed (`envoyTiles`, in
+    // the majors' turns before its own): each plot it holds in the record
+    // after and not in this one, no district of its placing on it, and its
+    // citizens re-placed (runs/h1_duelq1127 t27: player 1's token to Mexico
+    // City, 7:12 annexed and worked in its analysis)
+    if (nextCs) {
+      const city = minorCity(cs);
+      let took = false;
+      for (const tile of state.map.tiles) {
+        const next = after.state.map.tiles[tile.index];
+        if (next.ownerSeat !== cs.seat || tile.ownerSeat === cs.seat || next.district) continue;
+        acquireTile(state, city, tile.index);
+        took = true;
+      }
+      cs.tilesAcquired = city.tilesAcquired;
+      if (took) minorReplaceCitizens(state, cs);
     }
     // its city's growth step (`minorGrowth`): the citizen it grows placed,
     // every citizen re-placed, on the map the turns before its own left
@@ -308,6 +364,14 @@ for (const rec of recs) {
     if (typeof net === 'number') cs.economy = { ...(cs.economy ?? newEconomicMemory()), goldBoost: economicGoldBoost(net / 256) };
     const facts = minorBuildFacts(state, cs, () => 0);
     const resFacts = minorResourceFacts(state, cs);
+    // its turn's end holds each stockpile to its cap (`capStockpiles`): the
+    // bank its next turn starts on
+    {
+      const keep = [...(cs.stockpile ?? [])];
+      capStockpiles(state, cs.seat);
+      banks.set(player, [...(cs.stockpile ?? [])]);
+      cs.stockpile = keep;
+    }
     // the forecast on the growth its city AI's last turn read
     // (`CityState.aiGrowthSeen`), its own the first turn
     const forecast = growthForecast(growthSeen.get(player) ?? facts.growth);
@@ -352,6 +416,9 @@ for (const rec of recs) {
       }
     }
     const passDistricts = buildingsPass(facts, own).districts;
+    const hidden = hiddenResourcesFor(after.state, cs.seat);
+    // a neighbour's resource as the minor sees it (`minorPlotEvals`)
+    const sees = (nb: Tile): boolean => cs.revealed?.[nb.index] === 1 && !!nb.resource && !hidden.has(nb.resource);
     const camps = campTiles(state);
     const gp = cityAppealResolver(state);
     for (const lp of logged) {
@@ -368,8 +435,11 @@ for (const rec of recs) {
         view: facts.view, seat: cs.seat,
         improvement: plotImprovementType(tile, camps),
         pillaged: !!tile.pillaged,
-        // the resource the player sees: its RevealedByTech held
-        resource: tile.resource && (!RESOURCES[tile.resource]?.revealTech || r.techs.includes(RESOURCES[tile.resource].revealTech!))
+        // the resource the player sees (`hiddenResourcesFor`: its
+        // RevealedByTech held, or its suzerain's sight), the research and the
+        // suzerain as the city-states' turn finds them (runs/h1_duelq1117
+        // city-state 4 t85: Niter on 32:8 in its plot analysis)
+        resource: tile.resource && !hidden.has(tile.resource)
           ? gameTypeOf('resource', tile.resource, 'RESOURCE_') : null,
         feature: tile.feature ? installFeature(tile.feature) : null,
         floodTurns: floodHazardTurns(state, tile.index),
@@ -388,7 +458,7 @@ for (const rec of recs) {
         adjacency: (impType, y) => {
           const id = engineId('improvement', impType, 'IMPROVEMENT_', IMPROVEMENTS) as Parameters<typeof improvementAdjacency>[2] | null;
           if (!id) return 0;
-          return (improvementAdjacency(yctx, tile, id) as unknown as Record<string, number>)[YIELD_KEY[y]] ?? 0;
+          return (improvementAdjacency(yctx, tile, id, sees) as unknown as Record<string, number>)[YIELD_KEY[y]] ?? 0;
         },
         housingValue: (housing, t, h) => housingValue(facts.growth, forecast, housing, t, h),
         resourceValue: (res, count, t, h) => {

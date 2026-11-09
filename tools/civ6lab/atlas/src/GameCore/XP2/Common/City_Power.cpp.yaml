@@ -1,0 +1,15 @@
+# The DLL atlas, curated layer (tools/civ6lab/atlas.py documents the record).
+# Records keyed by GameCore_XP2_Release.dll RVA; `final` the FinalRelease RVA.
+# `review: imported` = bootstrapped from dll_readings.md / code comments / saved
+# labels and not yet reviewed: verify against the disassembly, then edit and
+# set `review: reviewed`.
+- addr: 0x1ed860
+  final: 0x146f30
+  kind: function
+  name: ChangeFreePower
+  status: UNREAD
+  readings:
+    - "C-100: the luxury's ban, the power value's RequiredPower term and the plot adjacency's sight — READ"
+  context:
+    - "...n: a city-state's free power past its grid (City_Power +0x08's sources, ChangeFreePower 0x1ed860) unread, the grid's supply read for it; the strategic branch's income (`ResourceFacts.i..."
+  review: imported

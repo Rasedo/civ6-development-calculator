@@ -47,6 +47,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 0,
+  "requiredPower": 0,
   "blocksCoastalFlooding": false,
   "convertsToPower": null,
   "modifiers": [
@@ -142,6 +143,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 0,
+  "requiredPower": 0,
   "blocksCoastalFlooding": false,
   "convertsToPower": null,
   "modifiers": [
@@ -200,6 +202,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 0,
+  "requiredPower": 0,
   "blocksCoastalFlooding": false,
   "convertsToPower": null,
   "modifiers": [
@@ -287,6 +290,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 0,
+  "requiredPower": 0,
   "blocksCoastalFlooding": false,
   "convertsToPower": null,
   "modifiers": []
@@ -334,6 +338,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 0,
+  "requiredPower": 0,
   "blocksCoastalFlooding": false,
   "convertsToPower": null,
   "modifiers": []
@@ -383,6 +388,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
    "UNIT_MISSIONARY"
   ],
   "entertainmentWithPower": 0,
+  "requiredPower": 0,
   "blocksCoastalFlooding": false,
   "convertsToPower": null,
   "modifiers": []
@@ -420,6 +426,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 0,
+  "requiredPower": 0,
   "blocksCoastalFlooding": false,
   "convertsToPower": null,
   "modifiers": []
@@ -466,6 +473,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 0,
+  "requiredPower": 0,
   "blocksCoastalFlooding": false,
   "convertsToPower": null,
   "modifiers": [
@@ -572,6 +580,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 0,
+  "requiredPower": 0,
   "blocksCoastalFlooding": false,
   "convertsToPower": null,
   "modifiers": []
@@ -614,6 +623,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 0,
+  "requiredPower": 0,
   "blocksCoastalFlooding": false,
   "convertsToPower": null,
   "modifiers": [
@@ -740,6 +750,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 0,
+  "requiredPower": 0,
   "blocksCoastalFlooding": false,
   "convertsToPower": null,
   "modifiers": [
@@ -798,6 +809,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 0,
+  "requiredPower": 0,
   "blocksCoastalFlooding": false,
   "convertsToPower": null,
   "modifiers": [
@@ -886,6 +898,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
    "UNIT_GURU"
   ],
   "entertainmentWithPower": 0,
+  "requiredPower": 0,
   "blocksCoastalFlooding": false,
   "convertsToPower": null,
   "modifiers": []
@@ -947,6 +960,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
    "UNIT_GURU"
   ],
   "entertainmentWithPower": 0,
+  "requiredPower": 0,
   "blocksCoastalFlooding": false,
   "convertsToPower": null,
   "modifiers": [
@@ -1060,6 +1074,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 0,
+  "requiredPower": 0,
   "blocksCoastalFlooding": false,
   "convertsToPower": null,
   "modifiers": []
@@ -1099,6 +1114,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 0,
+  "requiredPower": 0,
   "blocksCoastalFlooding": false,
   "convertsToPower": null,
   "modifiers": [
@@ -1155,6 +1171,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 0,
+  "requiredPower": 0,
   "blocksCoastalFlooding": false,
   "convertsToPower": null,
   "modifiers": []
@@ -1209,6 +1226,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   ],
   "units": [],
   "entertainmentWithPower": 0,
+  "requiredPower": 0,
   "blocksCoastalFlooding": false,
   "convertsToPower": null,
   "modifiers": []
@@ -1256,6 +1274,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 0,
+  "requiredPower": 0,
   "blocksCoastalFlooding": false,
   "convertsToPower": null,
   "modifiers": []
@@ -1308,6 +1327,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
    "UNIT_MILITARY_ENGINEER"
   ],
   "entertainmentWithPower": 0,
+  "requiredPower": 0,
   "blocksCoastalFlooding": false,
   "convertsToPower": null,
   "modifiers": [
@@ -1407,6 +1427,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   ],
   "units": [],
   "entertainmentWithPower": 0,
+  "requiredPower": 0,
   "blocksCoastalFlooding": false,
   "convertsToPower": null,
   "modifiers": [
@@ -1501,6 +1522,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 0,
+  "requiredPower": 0,
   "blocksCoastalFlooding": false,
   "convertsToPower": null,
   "modifiers": []
@@ -1540,6 +1562,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 0,
+  "requiredPower": 0,
   "blocksCoastalFlooding": false,
   "convertsToPower": null,
   "modifiers": [
@@ -1618,6 +1641,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 0,
+  "requiredPower": 0,
   "blocksCoastalFlooding": false,
   "convertsToPower": null,
   "modifiers": []
@@ -1682,6 +1706,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
    "UNIT_ARCHAEOLOGIST"
   ],
   "entertainmentWithPower": 0,
+  "requiredPower": 0,
   "blocksCoastalFlooding": false,
   "convertsToPower": null,
   "modifiers": []
@@ -1731,6 +1756,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 0,
+  "requiredPower": 2,
   "blocksCoastalFlooding": false,
   "convertsToPower": null,
   "modifiers": []
@@ -1780,6 +1806,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 0,
+  "requiredPower": 2,
   "blocksCoastalFlooding": false,
   "convertsToPower": null,
   "modifiers": [
@@ -1852,6 +1879,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 0,
+  "requiredPower": 3,
   "blocksCoastalFlooding": false,
   "convertsToPower": null,
   "modifiers": []
@@ -1901,6 +1929,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 0,
+  "requiredPower": 0,
   "blocksCoastalFlooding": false,
   "convertsToPower": null,
   "modifiers": [
@@ -1992,6 +2021,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 0,
+  "requiredPower": 0,
   "blocksCoastalFlooding": false,
   "convertsToPower": null,
   "modifiers": []
@@ -2031,6 +2061,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 0,
+  "requiredPower": 0,
   "blocksCoastalFlooding": false,
   "convertsToPower": null,
   "modifiers": [
@@ -2116,6 +2147,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 0,
+  "requiredPower": 0,
   "blocksCoastalFlooding": false,
   "convertsToPower": null,
   "modifiers": [
@@ -2196,6 +2228,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 0,
+  "requiredPower": 0,
   "blocksCoastalFlooding": false,
   "convertsToPower": null,
   "modifiers": [
@@ -2301,6 +2334,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 0,
+  "requiredPower": 0,
   "blocksCoastalFlooding": false,
   "convertsToPower": "RESOURCE_URANIUM",
   "modifiers": []
@@ -2362,6 +2396,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 0,
+  "requiredPower": 3,
   "blocksCoastalFlooding": false,
   "convertsToPower": null,
   "modifiers": []
@@ -2423,6 +2458,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 0,
+  "requiredPower": 3,
   "blocksCoastalFlooding": false,
   "convertsToPower": null,
   "modifiers": [
@@ -2482,6 +2518,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 0,
+  "requiredPower": 3,
   "blocksCoastalFlooding": false,
   "convertsToPower": null,
   "modifiers": []
@@ -2526,6 +2563,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 0,
+  "requiredPower": 1,
   "blocksCoastalFlooding": false,
   "convertsToPower": null,
   "modifiers": [
@@ -2592,6 +2630,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 2,
+  "requiredPower": 2,
   "blocksCoastalFlooding": false,
   "convertsToPower": null,
   "modifiers": [
@@ -2684,6 +2723,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 0,
+  "requiredPower": 0,
   "blocksCoastalFlooding": false,
   "convertsToPower": null,
   "modifiers": []
@@ -2732,6 +2772,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 0,
+  "requiredPower": 0,
   "blocksCoastalFlooding": false,
   "convertsToPower": null,
   "modifiers": []
@@ -2780,6 +2821,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 0,
+  "requiredPower": 0,
   "blocksCoastalFlooding": false,
   "convertsToPower": null,
   "modifiers": []
@@ -2824,6 +2866,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 0,
+  "requiredPower": 0,
   "blocksCoastalFlooding": false,
   "convertsToPower": null,
   "modifiers": [
@@ -2889,6 +2932,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 0,
+  "requiredPower": 0,
   "blocksCoastalFlooding": false,
   "convertsToPower": null,
   "modifiers": [
@@ -2942,6 +2986,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 0,
+  "requiredPower": 0,
   "blocksCoastalFlooding": false,
   "convertsToPower": null,
   "modifiers": []
@@ -2990,6 +3035,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 0,
+  "requiredPower": 0,
   "blocksCoastalFlooding": false,
   "convertsToPower": null,
   "modifiers": []
@@ -3034,6 +3080,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 0,
+  "requiredPower": 0,
   "blocksCoastalFlooding": false,
   "convertsToPower": null,
   "modifiers": []
@@ -3078,6 +3125,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 0,
+  "requiredPower": 0,
   "blocksCoastalFlooding": false,
   "convertsToPower": null,
   "modifiers": []
@@ -3120,6 +3168,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 0,
+  "requiredPower": 0,
   "blocksCoastalFlooding": false,
   "convertsToPower": null,
   "modifiers": [
@@ -3200,6 +3249,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 0,
+  "requiredPower": 0,
   "blocksCoastalFlooding": false,
   "convertsToPower": null,
   "modifiers": [
@@ -3251,6 +3301,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 0,
+  "requiredPower": 0,
   "blocksCoastalFlooding": false,
   "convertsToPower": null,
   "modifiers": [
@@ -3327,6 +3378,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 0,
+  "requiredPower": 0,
   "blocksCoastalFlooding": false,
   "convertsToPower": null,
   "modifiers": [
@@ -3533,6 +3585,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 0,
+  "requiredPower": 0,
   "blocksCoastalFlooding": false,
   "convertsToPower": null,
   "modifiers": [
@@ -3616,6 +3669,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 0,
+  "requiredPower": 0,
   "blocksCoastalFlooding": false,
   "convertsToPower": null,
   "modifiers": [
@@ -3671,6 +3725,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 0,
+  "requiredPower": 0,
   "blocksCoastalFlooding": false,
   "convertsToPower": null,
   "modifiers": [
@@ -3744,6 +3799,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 0,
+  "requiredPower": 0,
   "blocksCoastalFlooding": false,
   "convertsToPower": null,
   "modifiers": [
@@ -3827,6 +3883,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 0,
+  "requiredPower": 0,
   "blocksCoastalFlooding": false,
   "convertsToPower": null,
   "modifiers": [
@@ -3891,6 +3948,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 0,
+  "requiredPower": 0,
   "blocksCoastalFlooding": false,
   "convertsToPower": null,
   "modifiers": [
@@ -3955,6 +4013,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 0,
+  "requiredPower": 0,
   "blocksCoastalFlooding": false,
   "convertsToPower": null,
   "modifiers": [
@@ -4024,6 +4083,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 0,
+  "requiredPower": 0,
   "blocksCoastalFlooding": false,
   "convertsToPower": null,
   "modifiers": [
@@ -4075,6 +4135,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 0,
+  "requiredPower": 0,
   "blocksCoastalFlooding": false,
   "convertsToPower": null,
   "modifiers": [
@@ -4121,6 +4182,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 0,
+  "requiredPower": 0,
   "blocksCoastalFlooding": false,
   "convertsToPower": null,
   "modifiers": [
@@ -4253,6 +4315,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 0,
+  "requiredPower": 0,
   "blocksCoastalFlooding": false,
   "convertsToPower": null,
   "modifiers": [
@@ -4304,6 +4367,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 0,
+  "requiredPower": 0,
   "blocksCoastalFlooding": false,
   "convertsToPower": null,
   "modifiers": [
@@ -4381,6 +4445,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 0,
+  "requiredPower": 0,
   "blocksCoastalFlooding": false,
   "convertsToPower": null,
   "modifiers": [
@@ -4450,6 +4515,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 0,
+  "requiredPower": 0,
   "blocksCoastalFlooding": false,
   "convertsToPower": null,
   "modifiers": [
@@ -4505,6 +4571,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 0,
+  "requiredPower": 0,
   "blocksCoastalFlooding": false,
   "convertsToPower": null,
   "modifiers": [
@@ -4562,6 +4629,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 0,
+  "requiredPower": 0,
   "blocksCoastalFlooding": false,
   "convertsToPower": null,
   "modifiers": [
@@ -4659,6 +4727,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 0,
+  "requiredPower": 0,
   "blocksCoastalFlooding": false,
   "convertsToPower": null,
   "modifiers": [
@@ -4719,6 +4788,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 0,
+  "requiredPower": 0,
   "blocksCoastalFlooding": false,
   "convertsToPower": null,
   "modifiers": [
@@ -4786,6 +4856,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 0,
+  "requiredPower": 0,
   "blocksCoastalFlooding": false,
   "convertsToPower": null,
   "modifiers": [
@@ -4855,6 +4926,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 0,
+  "requiredPower": 0,
   "blocksCoastalFlooding": false,
   "convertsToPower": null,
   "modifiers": []
@@ -4892,6 +4964,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 0,
+  "requiredPower": 0,
   "blocksCoastalFlooding": false,
   "convertsToPower": null,
   "modifiers": [
@@ -4960,6 +5033,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 0,
+  "requiredPower": 0,
   "blocksCoastalFlooding": false,
   "convertsToPower": null,
   "modifiers": [
@@ -5022,6 +5096,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 0,
+  "requiredPower": 0,
   "blocksCoastalFlooding": false,
   "convertsToPower": null,
   "modifiers": [
@@ -5084,6 +5159,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 0,
+  "requiredPower": 0,
   "blocksCoastalFlooding": false,
   "convertsToPower": null,
   "modifiers": []
@@ -5138,6 +5214,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 0,
+  "requiredPower": 0,
   "blocksCoastalFlooding": false,
   "convertsToPower": null,
   "modifiers": []
@@ -5178,6 +5255,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 0,
+  "requiredPower": 0,
   "blocksCoastalFlooding": false,
   "convertsToPower": null,
   "modifiers": []
@@ -5218,6 +5296,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 0,
+  "requiredPower": 0,
   "blocksCoastalFlooding": false,
   "convertsToPower": null,
   "modifiers": []
@@ -5258,6 +5337,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 0,
+  "requiredPower": 0,
   "blocksCoastalFlooding": false,
   "convertsToPower": null,
   "modifiers": []
@@ -5309,6 +5389,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 0,
+  "requiredPower": 0,
   "blocksCoastalFlooding": false,
   "convertsToPower": null,
   "modifiers": []
@@ -5346,6 +5427,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 0,
+  "requiredPower": 0,
   "blocksCoastalFlooding": false,
   "convertsToPower": null,
   "modifiers": [
@@ -5490,6 +5572,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
    "UNIT_GURU"
   ],
   "entertainmentWithPower": 0,
+  "requiredPower": 0,
   "blocksCoastalFlooding": false,
   "convertsToPower": null,
   "modifiers": [
@@ -5551,6 +5634,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 0,
+  "requiredPower": 0,
   "blocksCoastalFlooding": false,
   "convertsToPower": null,
   "modifiers": [
@@ -5615,6 +5699,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 0,
+  "requiredPower": 0,
   "blocksCoastalFlooding": false,
   "convertsToPower": null,
   "modifiers": [
@@ -5692,6 +5777,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 0,
+  "requiredPower": 0,
   "blocksCoastalFlooding": false,
   "convertsToPower": null,
   "modifiers": [
@@ -5751,6 +5837,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 0,
+  "requiredPower": 0,
   "blocksCoastalFlooding": false,
   "convertsToPower": null,
   "modifiers": [
@@ -5837,6 +5924,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 0,
+  "requiredPower": 0,
   "blocksCoastalFlooding": false,
   "convertsToPower": null,
   "modifiers": [
@@ -5903,6 +5991,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 0,
+  "requiredPower": 0,
   "blocksCoastalFlooding": false,
   "convertsToPower": null,
   "modifiers": [
@@ -5999,6 +6088,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 0,
+  "requiredPower": 0,
   "blocksCoastalFlooding": false,
   "convertsToPower": null,
   "modifiers": [
@@ -6088,6 +6178,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 0,
+  "requiredPower": 0,
   "blocksCoastalFlooding": false,
   "convertsToPower": null,
   "modifiers": [
@@ -6163,6 +6254,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 0,
+  "requiredPower": 0,
   "blocksCoastalFlooding": false,
   "convertsToPower": null,
   "modifiers": []
@@ -6200,6 +6292,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 0,
+  "requiredPower": 0,
   "blocksCoastalFlooding": false,
   "convertsToPower": null,
   "modifiers": [
@@ -6550,6 +6643,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 0,
+  "requiredPower": 0,
   "blocksCoastalFlooding": false,
   "convertsToPower": null,
   "modifiers": [
@@ -6611,6 +6705,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 0,
+  "requiredPower": 0,
   "blocksCoastalFlooding": false,
   "convertsToPower": null,
   "modifiers": [
@@ -6736,6 +6831,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 0,
+  "requiredPower": 0,
   "blocksCoastalFlooding": false,
   "convertsToPower": null,
   "modifiers": [
@@ -6927,6 +7023,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 0,
+  "requiredPower": 0,
   "blocksCoastalFlooding": false,
   "convertsToPower": null,
   "modifiers": [
@@ -6974,6 +7071,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 0,
+  "requiredPower": 0,
   "blocksCoastalFlooding": false,
   "convertsToPower": null,
   "modifiers": [
@@ -7050,6 +7148,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 0,
+  "requiredPower": 0,
   "blocksCoastalFlooding": false,
   "convertsToPower": null,
   "modifiers": [
@@ -7157,6 +7256,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 0,
+  "requiredPower": 0,
   "blocksCoastalFlooding": false,
   "convertsToPower": null,
   "modifiers": [
@@ -7205,6 +7305,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 0,
+  "requiredPower": 0,
   "blocksCoastalFlooding": false,
   "convertsToPower": null,
   "modifiers": [
@@ -7292,6 +7393,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 2,
+  "requiredPower": 2,
   "blocksCoastalFlooding": false,
   "convertsToPower": null,
   "modifiers": [
@@ -7360,6 +7462,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 0,
+  "requiredPower": 0,
   "blocksCoastalFlooding": false,
   "convertsToPower": null,
   "modifiers": [
@@ -7455,6 +7558,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 0,
+  "requiredPower": 0,
   "blocksCoastalFlooding": false,
   "convertsToPower": null,
   "modifiers": [
@@ -7514,6 +7618,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 0,
+  "requiredPower": 0,
   "blocksCoastalFlooding": false,
   "convertsToPower": null,
   "modifiers": [
@@ -7572,6 +7677,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 0,
+  "requiredPower": 0,
   "blocksCoastalFlooding": false,
   "convertsToPower": null,
   "modifiers": [
@@ -7676,6 +7782,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 0,
+  "requiredPower": 0,
   "blocksCoastalFlooding": false,
   "convertsToPower": null,
   "modifiers": [
@@ -7752,6 +7859,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 0,
+  "requiredPower": 0,
   "blocksCoastalFlooding": false,
   "convertsToPower": null,
   "modifiers": [
@@ -7894,6 +8002,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 0,
+  "requiredPower": 0,
   "blocksCoastalFlooding": false,
   "convertsToPower": null,
   "modifiers": [
@@ -7961,6 +8070,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 0,
+  "requiredPower": 0,
   "blocksCoastalFlooding": false,
   "convertsToPower": null,
   "modifiers": []
@@ -8006,6 +8116,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 0,
+  "requiredPower": 0,
   "blocksCoastalFlooding": false,
   "convertsToPower": null,
   "modifiers": [
@@ -8059,6 +8170,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 0,
+  "requiredPower": 1,
   "blocksCoastalFlooding": false,
   "convertsToPower": null,
   "modifiers": []
@@ -8103,6 +8215,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 1,
+  "requiredPower": 1,
   "blocksCoastalFlooding": false,
   "convertsToPower": null,
   "modifiers": [
@@ -8149,6 +8262,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 0,
+  "requiredPower": 0,
   "blocksCoastalFlooding": true,
   "convertsToPower": null,
   "modifiers": []
@@ -8186,6 +8300,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 0,
+  "requiredPower": 0,
   "blocksCoastalFlooding": false,
   "convertsToPower": null,
   "modifiers": [
@@ -8270,6 +8385,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   ],
   "units": [],
   "entertainmentWithPower": 0,
+  "requiredPower": 0,
   "blocksCoastalFlooding": false,
   "convertsToPower": "RESOURCE_COAL",
   "modifiers": []
@@ -8322,6 +8438,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 0,
+  "requiredPower": 0,
   "blocksCoastalFlooding": false,
   "convertsToPower": "RESOURCE_OIL",
   "modifiers": []
@@ -8371,6 +8488,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 0,
+  "requiredPower": 0,
   "blocksCoastalFlooding": false,
   "convertsToPower": null,
   "modifiers": [
@@ -8425,6 +8543,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 0,
+  "requiredPower": 0,
   "blocksCoastalFlooding": false,
   "convertsToPower": null,
   "modifiers": [
@@ -8574,6 +8693,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 0,
+  "requiredPower": 0,
   "blocksCoastalFlooding": false,
   "convertsToPower": null,
   "modifiers": []
@@ -8618,6 +8738,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 0,
+  "requiredPower": 0,
   "blocksCoastalFlooding": false,
   "convertsToPower": null,
   "modifiers": [
@@ -8698,6 +8819,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 0,
+  "requiredPower": 0,
   "blocksCoastalFlooding": false,
   "convertsToPower": null,
   "modifiers": [
@@ -8750,6 +8872,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 0,
+  "requiredPower": 0,
   "blocksCoastalFlooding": false,
   "convertsToPower": null,
   "modifiers": [
@@ -8973,6 +9096,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 0,
+  "requiredPower": 0,
   "blocksCoastalFlooding": false,
   "convertsToPower": null,
   "modifiers": [
@@ -9149,6 +9273,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 0,
+  "requiredPower": 0,
   "blocksCoastalFlooding": false,
   "convertsToPower": null,
   "modifiers": [
@@ -9240,6 +9365,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 0,
+  "requiredPower": 0,
   "blocksCoastalFlooding": false,
   "convertsToPower": null,
   "modifiers": [
@@ -9291,6 +9417,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 0,
+  "requiredPower": 0,
   "blocksCoastalFlooding": false,
   "convertsToPower": null,
   "modifiers": []
@@ -9328,6 +9455,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 0,
+  "requiredPower": 0,
   "blocksCoastalFlooding": false,
   "convertsToPower": null,
   "modifiers": [
@@ -9414,6 +9542,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 0,
+  "requiredPower": 0,
   "blocksCoastalFlooding": false,
   "convertsToPower": null,
   "modifiers": [
@@ -9489,6 +9618,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 0,
+  "requiredPower": 0,
   "blocksCoastalFlooding": false,
   "convertsToPower": null,
   "modifiers": [
@@ -9561,6 +9691,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 0,
+  "requiredPower": 0,
   "blocksCoastalFlooding": false,
   "convertsToPower": null,
   "modifiers": []
@@ -9598,6 +9729,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 0,
+  "requiredPower": 0,
   "blocksCoastalFlooding": false,
   "convertsToPower": null,
   "modifiers": []
@@ -9635,6 +9767,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 0,
+  "requiredPower": 0,
   "blocksCoastalFlooding": false,
   "convertsToPower": null,
   "modifiers": [
@@ -9710,6 +9843,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 0,
+  "requiredPower": 0,
   "blocksCoastalFlooding": false,
   "convertsToPower": null,
   "modifiers": [
@@ -9771,6 +9905,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 0,
+  "requiredPower": 0,
   "blocksCoastalFlooding": false,
   "convertsToPower": null,
   "modifiers": [
@@ -9844,6 +9979,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 0,
+  "requiredPower": 0,
   "blocksCoastalFlooding": false,
   "convertsToPower": null,
   "modifiers": [
@@ -9906,6 +10042,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 0,
+  "requiredPower": 0,
   "blocksCoastalFlooding": false,
   "convertsToPower": null,
   "modifiers": [
@@ -10122,6 +10259,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 0,
+  "requiredPower": 0,
   "blocksCoastalFlooding": false,
   "convertsToPower": null,
   "modifiers": [
@@ -23439,7 +23577,8 @@ export const AI_RESOURCES: readonly AiResourceRow[] = [
     "YIELD_FOOD",
     1
    ]
-  ]
+  ],
+  "powerProvided": 0
  },
  {
   "type": "RESOURCE_CATTLE",
@@ -23461,7 +23600,8 @@ export const AI_RESOURCES: readonly AiResourceRow[] = [
     "YIELD_FOOD",
     1
    ]
-  ]
+  ],
+  "powerProvided": 0
  },
  {
   "type": "RESOURCE_COPPER",
@@ -23483,7 +23623,8 @@ export const AI_RESOURCES: readonly AiResourceRow[] = [
     "YIELD_GOLD",
     2
    ]
-  ]
+  ],
+  "powerProvided": 0
  },
  {
   "type": "RESOURCE_CRABS",
@@ -23505,7 +23646,8 @@ export const AI_RESOURCES: readonly AiResourceRow[] = [
     "YIELD_GOLD",
     2
    ]
-  ]
+  ],
+  "powerProvided": 0
  },
  {
   "type": "RESOURCE_DEER",
@@ -23527,7 +23669,8 @@ export const AI_RESOURCES: readonly AiResourceRow[] = [
     "YIELD_PRODUCTION",
     1
    ]
-  ]
+  ],
+  "powerProvided": 0
  },
  {
   "type": "RESOURCE_FISH",
@@ -23549,7 +23692,8 @@ export const AI_RESOURCES: readonly AiResourceRow[] = [
     "YIELD_FOOD",
     1
    ]
-  ]
+  ],
+  "powerProvided": 0
  },
  {
   "type": "RESOURCE_RICE",
@@ -23571,7 +23715,8 @@ export const AI_RESOURCES: readonly AiResourceRow[] = [
     "YIELD_FOOD",
     1
    ]
-  ]
+  ],
+  "powerProvided": 0
  },
  {
   "type": "RESOURCE_SHEEP",
@@ -23593,7 +23738,8 @@ export const AI_RESOURCES: readonly AiResourceRow[] = [
     "YIELD_FOOD",
     1
    ]
-  ]
+  ],
+  "powerProvided": 0
  },
  {
   "type": "RESOURCE_STONE",
@@ -23615,7 +23761,8 @@ export const AI_RESOURCES: readonly AiResourceRow[] = [
     "YIELD_PRODUCTION",
     1
    ]
-  ]
+  ],
+  "powerProvided": 0
  },
  {
   "type": "RESOURCE_WHEAT",
@@ -23637,7 +23784,8 @@ export const AI_RESOURCES: readonly AiResourceRow[] = [
     "YIELD_FOOD",
     1
    ]
-  ]
+  ],
+  "powerProvided": 0
  },
  {
   "type": "RESOURCE_CITRUS",
@@ -23652,7 +23800,8 @@ export const AI_RESOURCES: readonly AiResourceRow[] = [
     "YIELD_FOOD",
     2
    ]
-  ]
+  ],
+  "powerProvided": 0
  },
  {
   "type": "RESOURCE_COCOA",
@@ -23667,7 +23816,8 @@ export const AI_RESOURCES: readonly AiResourceRow[] = [
     "YIELD_GOLD",
     3
    ]
-  ]
+  ],
+  "powerProvided": 0
  },
  {
   "type": "RESOURCE_COFFEE",
@@ -23682,7 +23832,8 @@ export const AI_RESOURCES: readonly AiResourceRow[] = [
     "YIELD_CULTURE",
     1
    ]
-  ]
+  ],
+  "powerProvided": 0
  },
  {
   "type": "RESOURCE_COTTON",
@@ -23697,7 +23848,8 @@ export const AI_RESOURCES: readonly AiResourceRow[] = [
     "YIELD_GOLD",
     3
    ]
-  ]
+  ],
+  "powerProvided": 0
  },
  {
   "type": "RESOURCE_DIAMONDS",
@@ -23712,7 +23864,8 @@ export const AI_RESOURCES: readonly AiResourceRow[] = [
     "YIELD_GOLD",
     3
    ]
-  ]
+  ],
+  "powerProvided": 0
  },
  {
   "type": "RESOURCE_DYES",
@@ -23727,7 +23880,8 @@ export const AI_RESOURCES: readonly AiResourceRow[] = [
     "YIELD_FAITH",
     1
    ]
-  ]
+  ],
+  "powerProvided": 0
  },
  {
   "type": "RESOURCE_FURS",
@@ -23746,7 +23900,8 @@ export const AI_RESOURCES: readonly AiResourceRow[] = [
     "YIELD_GOLD",
     1
    ]
-  ]
+  ],
+  "powerProvided": 0
  },
  {
   "type": "RESOURCE_GYPSUM",
@@ -23765,7 +23920,8 @@ export const AI_RESOURCES: readonly AiResourceRow[] = [
     "YIELD_PRODUCTION",
     1
    ]
-  ]
+  ],
+  "powerProvided": 0
  },
  {
   "type": "RESOURCE_INCENSE",
@@ -23780,7 +23936,8 @@ export const AI_RESOURCES: readonly AiResourceRow[] = [
     "YIELD_FAITH",
     1
    ]
-  ]
+  ],
+  "powerProvided": 0
  },
  {
   "type": "RESOURCE_IVORY",
@@ -23799,7 +23956,8 @@ export const AI_RESOURCES: readonly AiResourceRow[] = [
     "YIELD_PRODUCTION",
     1
    ]
-  ]
+  ],
+  "powerProvided": 0
  },
  {
   "type": "RESOURCE_JADE",
@@ -23814,7 +23972,8 @@ export const AI_RESOURCES: readonly AiResourceRow[] = [
     "YIELD_CULTURE",
     1
    ]
-  ]
+  ],
+  "powerProvided": 0
  },
  {
   "type": "RESOURCE_MARBLE",
@@ -23829,7 +23988,8 @@ export const AI_RESOURCES: readonly AiResourceRow[] = [
     "YIELD_CULTURE",
     1
    ]
-  ]
+  ],
+  "powerProvided": 0
  },
  {
   "type": "RESOURCE_MERCURY",
@@ -23844,7 +24004,8 @@ export const AI_RESOURCES: readonly AiResourceRow[] = [
     "YIELD_SCIENCE",
     1
    ]
-  ]
+  ],
+  "powerProvided": 0
  },
  {
   "type": "RESOURCE_PEARLS",
@@ -23859,7 +24020,8 @@ export const AI_RESOURCES: readonly AiResourceRow[] = [
     "YIELD_FAITH",
     1
    ]
-  ]
+  ],
+  "powerProvided": 0
  },
  {
   "type": "RESOURCE_SALT",
@@ -23878,7 +24040,8 @@ export const AI_RESOURCES: readonly AiResourceRow[] = [
     "YIELD_GOLD",
     1
    ]
-  ]
+  ],
+  "powerProvided": 0
  },
  {
   "type": "RESOURCE_SILK",
@@ -23893,7 +24056,8 @@ export const AI_RESOURCES: readonly AiResourceRow[] = [
     "YIELD_CULTURE",
     1
    ]
-  ]
+  ],
+  "powerProvided": 0
  },
  {
   "type": "RESOURCE_SILVER",
@@ -23908,7 +24072,8 @@ export const AI_RESOURCES: readonly AiResourceRow[] = [
     "YIELD_GOLD",
     3
    ]
-  ]
+  ],
+  "powerProvided": 0
  },
  {
   "type": "RESOURCE_SPICES",
@@ -23923,7 +24088,8 @@ export const AI_RESOURCES: readonly AiResourceRow[] = [
     "YIELD_FOOD",
     2
    ]
-  ]
+  ],
+  "powerProvided": 0
  },
  {
   "type": "RESOURCE_SUGAR",
@@ -23938,7 +24104,8 @@ export const AI_RESOURCES: readonly AiResourceRow[] = [
     "YIELD_FOOD",
     2
    ]
-  ]
+  ],
+  "powerProvided": 0
  },
  {
   "type": "RESOURCE_TEA",
@@ -23953,7 +24120,8 @@ export const AI_RESOURCES: readonly AiResourceRow[] = [
     "YIELD_SCIENCE",
     1
    ]
-  ]
+  ],
+  "powerProvided": 0
  },
  {
   "type": "RESOURCE_TOBACCO",
@@ -23968,7 +24136,8 @@ export const AI_RESOURCES: readonly AiResourceRow[] = [
     "YIELD_FAITH",
     1
    ]
-  ]
+  ],
+  "powerProvided": 0
  },
  {
   "type": "RESOURCE_TRUFFLES",
@@ -23983,7 +24152,8 @@ export const AI_RESOURCES: readonly AiResourceRow[] = [
     "YIELD_GOLD",
     3
    ]
-  ]
+  ],
+  "powerProvided": 0
  },
  {
   "type": "RESOURCE_WHALES",
@@ -24002,7 +24172,8 @@ export const AI_RESOURCES: readonly AiResourceRow[] = [
     "YIELD_GOLD",
     1
    ]
-  ]
+  ],
+  "powerProvided": 0
  },
  {
   "type": "RESOURCE_WINE",
@@ -24021,7 +24192,8 @@ export const AI_RESOURCES: readonly AiResourceRow[] = [
     "YIELD_GOLD",
     1
    ]
-  ]
+  ],
+  "powerProvided": 0
  },
  {
   "type": "RESOURCE_JEANS",
@@ -24031,7 +24203,8 @@ export const AI_RESOURCES: readonly AiResourceRow[] = [
   "units": [],
   "harvests": [],
   "harvestTechs": [],
-  "yields": []
+  "yields": [],
+  "powerProvided": 0
  },
  {
   "type": "RESOURCE_PERFUME",
@@ -24041,7 +24214,8 @@ export const AI_RESOURCES: readonly AiResourceRow[] = [
   "units": [],
   "harvests": [],
   "harvestTechs": [],
-  "yields": []
+  "yields": [],
+  "powerProvided": 0
  },
  {
   "type": "RESOURCE_COSMETICS",
@@ -24051,7 +24225,8 @@ export const AI_RESOURCES: readonly AiResourceRow[] = [
   "units": [],
   "harvests": [],
   "harvestTechs": [],
-  "yields": []
+  "yields": [],
+  "powerProvided": 0
  },
  {
   "type": "RESOURCE_TOYS",
@@ -24061,7 +24236,8 @@ export const AI_RESOURCES: readonly AiResourceRow[] = [
   "units": [],
   "harvests": [],
   "harvestTechs": [],
-  "yields": []
+  "yields": [],
+  "powerProvided": 0
  },
  {
   "type": "RESOURCE_CINNAMON",
@@ -24071,7 +24247,8 @@ export const AI_RESOURCES: readonly AiResourceRow[] = [
   "units": [],
   "harvests": [],
   "harvestTechs": [],
-  "yields": []
+  "yields": [],
+  "powerProvided": 0
  },
  {
   "type": "RESOURCE_CLOVES",
@@ -24081,7 +24258,8 @@ export const AI_RESOURCES: readonly AiResourceRow[] = [
   "units": [],
   "harvests": [],
   "harvestTechs": [],
-  "yields": []
+  "yields": [],
+  "powerProvided": 0
  },
  {
   "type": "RESOURCE_ALUMINUM",
@@ -24103,7 +24281,8 @@ export const AI_RESOURCES: readonly AiResourceRow[] = [
     "YIELD_SCIENCE",
     1
    ]
-  ]
+  ],
+  "powerProvided": 0
  },
  {
   "type": "RESOURCE_COAL",
@@ -24122,7 +24301,8 @@ export const AI_RESOURCES: readonly AiResourceRow[] = [
     "YIELD_PRODUCTION",
     2
    ]
-  ]
+  ],
+  "powerProvided": 4
  },
  {
   "type": "RESOURCE_HORSES",
@@ -24152,7 +24332,8 @@ export const AI_RESOURCES: readonly AiResourceRow[] = [
     "YIELD_PRODUCTION",
     1
    ]
-  ]
+  ],
+  "powerProvided": 0
  },
  {
   "type": "RESOURCE_IRON",
@@ -24183,7 +24364,8 @@ export const AI_RESOURCES: readonly AiResourceRow[] = [
     "YIELD_SCIENCE",
     1
    ]
-  ]
+  ],
+  "powerProvided": 0
  },
  {
   "type": "RESOURCE_NITER",
@@ -24212,7 +24394,8 @@ export const AI_RESOURCES: readonly AiResourceRow[] = [
     "YIELD_PRODUCTION",
     1
    ]
-  ]
+  ],
+  "powerProvided": 0
  },
  {
   "type": "RESOURCE_OIL",
@@ -24238,7 +24421,8 @@ export const AI_RESOURCES: readonly AiResourceRow[] = [
     "YIELD_PRODUCTION",
     3
    ]
-  ]
+  ],
+  "powerProvided": 4
  },
  {
   "type": "RESOURCE_URANIUM",
@@ -24255,7 +24439,8 @@ export const AI_RESOURCES: readonly AiResourceRow[] = [
     "YIELD_PRODUCTION",
     2
    ]
-  ]
+  ],
+  "powerProvided": 16
  },
  {
   "type": "RESOURCE_ANTIQUITY_SITE",
@@ -24265,7 +24450,8 @@ export const AI_RESOURCES: readonly AiResourceRow[] = [
   "units": [],
   "harvests": [],
   "harvestTechs": [],
-  "yields": []
+  "yields": [],
+  "powerProvided": 0
  },
  {
   "type": "RESOURCE_SHIPWRECK",
@@ -24275,7 +24461,8 @@ export const AI_RESOURCES: readonly AiResourceRow[] = [
   "units": [],
   "harvests": [],
   "harvestTechs": [],
-  "yields": []
+  "yields": [],
+  "powerProvided": 0
  },
  {
   "type": "RESOURCE_AMBER",
@@ -24290,7 +24477,8 @@ export const AI_RESOURCES: readonly AiResourceRow[] = [
     "YIELD_CULTURE",
     1
    ]
-  ]
+  ],
+  "powerProvided": 0
  },
  {
   "type": "RESOURCE_OLIVES",
@@ -24309,7 +24497,8 @@ export const AI_RESOURCES: readonly AiResourceRow[] = [
     "YIELD_PRODUCTION",
     1
    ]
-  ]
+  ],
+  "powerProvided": 0
  },
  {
   "type": "RESOURCE_TURTLES",
@@ -24324,7 +24513,8 @@ export const AI_RESOURCES: readonly AiResourceRow[] = [
     "YIELD_SCIENCE",
     1
    ]
-  ]
+  ],
+  "powerProvided": 0
  },
  {
   "type": "RESOURCE_MAIZE",
@@ -24346,7 +24536,8 @@ export const AI_RESOURCES: readonly AiResourceRow[] = [
     "YIELD_GOLD",
     2
    ]
-  ]
+  ],
+  "powerProvided": 0
  },
  {
   "type": "RESOURCE_HONEY",
@@ -24361,7 +24552,8 @@ export const AI_RESOURCES: readonly AiResourceRow[] = [
     "YIELD_FOOD",
     2
    ]
-  ]
+  ],
+  "powerProvided": 0
  }
 ];
 

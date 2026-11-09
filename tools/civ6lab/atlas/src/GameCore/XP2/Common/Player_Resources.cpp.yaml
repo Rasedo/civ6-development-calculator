@@ -323,7 +323,7 @@
   kind: function
   semantics: "Player_Resources +0x350 (fx): read as the turn's strategic income."
   status: PARTLY
-  impl: [cpu/core/stockpile.ts:stockpileIncome]
+  impl: [cpu/core/stockpile.ts:stockpileIncome, cpu/core/stockpile.ts:accumulatedPerTurn]
   readings:
     - "C-96: the resource value and the research value's resources — READ (bonus, luxury, the call), PARTLY READ (the strategic stockpile terms)"
   context:
@@ -590,11 +590,19 @@
   review: reviewed
 - addr: 0x4abfe0
   kind: function
-  name: resourceHeld
-  semantics: the player holds the resource (Player_Resources +0x598[r] > 0).
-  status: PARTLY
-  impl: [cpu/core/aiResource.ts:ResourceFacts]
+  name: IsResourceBanned
+  semantics: "the player's ban on the resource: Player_Resources m_aiBannedResources +0x598[r] > 0 (its assert names m_aiBannedResources; caller 0x120120 IsResourceBanned). The resource value 0x7a21e0 zeroes a luxury the player has banned, count > 0, not one it holds."
+  status: READ
+  cases:
+    - recording: h1_duelq1128
+      turn: 99
+      value: "runs/h1_duelq1128 Nazca t99-t189: its Marble Quarry on 4:7 standing, the Quarry rows on 7:8's Marble 30.16 .. 203.55 above the bare Quarry as logged (Quarry far rows 98 -> 1)"
+  impl:
+    - cpu/core/aiResource.ts:ResourceFacts
+    - cpu/core/minorBuild.ts:minorResourceFacts
+    - gpu/core/sim_minorai.py:_cv_resource_value
   readings:
+    - "C-100: the luxury's ban, the power value's RequiredPower term and the plot adjacency's sight — READ"
     - "C-96: the resource value and the research value's resources — READ (bonus, luxury, the call), PARTLY READ (the strategic stockpile terms)"
   context:
     - "...= PSEUDOYIELD_RESOURCE_LUXURY of 1.0 from T to H (0x7a2140); where the player holds it (0x4abfe0: Player_Resources +0x598[r] > 0) and count > 0, 0; else for a full civilization (0x469d..."

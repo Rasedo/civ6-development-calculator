@@ -34,7 +34,7 @@ import { CITY_MIN_STRIKE_CS, FAITH_PURCHASE_MULT, GOLD_PURCHASE_MULT, amenityTie
 import { boostOnResearch, detectBoosts } from './boosts';
 import { canPlaceDistrictIn, fitEncampOuter, outerDamage, outerPool, urbanDefensesFit, urbanFit, wallsMax } from './rules';
 import { lumpFood, seatGrowth } from './seatTurn';
-import { freeCityBuildFacts, majorQueueItem, seatResearchTurns } from './freeCityBuild';
+import { cityPowerFacts, freeCityBuildFacts, majorQueueItem, seatResearchTurns } from './freeCityBuild';
 import { freeCityThreat, minorAiTurn, minorContractPurchases, minorEconomicDisband, minorItemBuilt, minorMilitaryTurn } from './minorCityAi';
 import { bankruptcy, cityBorderGrowth, cultureAfterGrowth, jumpMadeAnew, paveGround } from './phase';
 import { applyTrainingGrants } from './combat';
@@ -76,7 +76,7 @@ import { economicGoldBoost } from './aiWeights';
 import { accrueStockpiles, canPayStockpile, capStockpiles, chargeUnitUpkeep, spendStockpile, stockFree, stockOf, stockpileCap, stockpileIncome, strategicSlot, strategicSurplus, unitResourceCost, unitUpkeepBill, upgradeGoldCost, upgradeType } from './stockpile';
 import { FX, FX_MIN, fmul, fxConst, fxOf, pseudoYieldValue, turnsAt, valueBetween, yieldValue } from './aiValue';
 import { aiCityStats, cityGrowth, aiView, storeUnitStrength } from './aiView';
-import { congressQueueMult } from './congress';
+import { congressBannedLuxury, congressQueueMult } from './congress';
 import { civicPolicyBest, governmentValues, policyScores, slotTypeBest } from './aiPolicyValue';
 import { cityStateSight } from './fog';
 import { combatDesire, type CombatDesire } from './aiMilitary';
@@ -1693,9 +1693,11 @@ export function minorResourceCounts(state: GameState, cityState: CityState): Map
 }
 
 /** THE RESOURCE VALUE'S VIEW OF A MINOR (`resourceValue`): a city-state; its
- *  era (`civEraIndex`) and the next as chronology; a resource held where a
- *  plot it owns hands it over (`extractsResource`); its copies the same
- *  plots' count, a strategic one's its stockpile (0x4a93c0: Player_Resources
+ *  era (`civEraIndex`) and the next as chronology; a resource banned where
+ *  the World Congress's Luxury Policy bans it (runs/h1_duelq1128 Nazca
+ *  t99-t189: its Marble Quarry on 4:7 standing, the Quarry row on 7:8's
+ *  Marble valued 30.16 .. 203.55 above the bare Quarry); its copies the
+ *  plots it owns that hand it over (`extractsResource`), a strategic one's its stockpile (0x4a93c0: Player_Resources
  *  +0x2e0[r] less the reserved; runs/h1_duelv1121 Hunza's Pasture on Horses
  *  2.5 less a turn from t20 as its Horses grow 2 a turn); its one city's
  *  amenity balance; its unit production table */
@@ -1728,7 +1730,8 @@ export function minorResourceFacts(state: GameState, cityState: CityState): Reso
       const i = ERAS.indexOf(e.replace(/^ERA_/, '') as Era);
       return i < 0 ? null : i + 1;
     },
-    held: (res) => (extracted.get(res) ?? 0) > 0,
+    // the World Congress's banned luxury (Luxury Policy B)
+    banned: (res) => engineId('resource', res, 'RESOURCE_', RESOURCES) === congressBannedLuxury(state),
     have: (res) => {
       const id = engineId('resource', res, 'RESOURCE_', RESOURCES);
       return id && strategicSlot(id) >= 0 ? stockOf(state, cityState.seat, id) : extracted.get(res) ?? 0;
@@ -1928,6 +1931,8 @@ export function minorBuildFacts(state: GameState, cityState: CityState, known: (
       const id = engineId('resource', res, 'RESOURCE_', RESOURCES);
       return !!id && stockFree(state, cityState.seat, id) > 0;
     },
+    power: cityPowerFacts(state, city),
+    production: stats.total.production,
     amenity,
     // a city-state holds one city
     regionalAmenities: () => [amenity],

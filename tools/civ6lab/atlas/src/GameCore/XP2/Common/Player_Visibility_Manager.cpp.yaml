@@ -83,8 +83,15 @@
   kind: function
   semantics: the plot's resource as a team sees it (artifacts excluded).
   status: PARTLY
-  impl: [cpu/core/aiValue.ts:AiPlotView, cpu/core/yields.ts:feature]
-  readings: ["H-1: the district adjacency — READ"]
+  impl:
+    - cpu/core/aiValue.ts:AiPlotView
+    - cpu/core/yields.ts:feature
+    - cpu/core/minorCityAi.ts:hidden
+    - cpu/core/yields.ts:improvementAdjacency
+    - gpu/core/sim_minorai.py:adjacency
+  readings:
+    - "H-1: the district adjacency — READ"
+    - "C-100: the luxury's ban, the power value's RequiredPower term and the plot adjacency's sight — READ"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...er clause it answers: a natural wonder (0x82e90); the resource AS THE PLAYER SEES IT (0x50a690 with the player's team; artifacts excluded) for AdjacentResource, on water for Adjacent..."

@@ -115,15 +115,24 @@ export function accrueStockpiles(state: GameState, seat: number): void {
   }
 }
 
-/** One turn's strategic income of a seat by slot (Player_Resources +0x350,
- *  0x4aa700): every source `accrueStockpiles` pays. A city-state under a
- *  suzerain banks none: its suzerain holds its resources (runs/h1_duelw1121
- *  Hunza, suzerained in t41, its Horses read at the cap of 25 every turn
- *  after through two Pastures, Equestrian Orders 37 / 56 / 75 as logged) */
+/** One turn's strategic income of a seat by slot, the one `accrueStockpiles`
+ *  pays: a city-state under a suzerain banks none, its suzerain holding its
+ *  resources (runs/h1_duelw1121 Hunza, suzerained in t41, its Horses read at
+ *  the cap of 25 every turn after through two Pastures, Equestrian Orders
+ *  37 / 56 / 75 as logged) */
 export function stockpileIncome(state: GameState, seat: number): number[] {
   const s = seatOf(state, seat)!;
+  if (isCityStateSeat(seat) && suzerainOf(s as CityState) >= 0) return emptyStockpile();
+  return accumulatedPerTurn(state, seat);
+}
+
+/** A seat's accumulated resources a turn by slot (Player_Resources +0x350,
+ *  m_aAccumulatedResourcePerTurn, 0x4aa700): every source of its own, a
+ *  suzerained city-state's too (runs/h1_duelq1124 Bologna t170-t230, its
+ *  suzerain player 1: Coal 3.0 a turn in its record) */
+export function accumulatedPerTurn(state: GameState, seat: number): number[] {
+  const s = seatOf(state, seat)!;
   const bk = emptyStockpile();
-  if (isCityStateSeat(seat) && suzerainOf(s as CityState) >= 0) return bk;
   const rate = getModifiers(state, seat).stockpileRate;
   const perSource = getModifiers(state, seat).stockpilePerSource;
   // CIV6 (Resources.PrereqTech): a strategic resource the seat cannot see

@@ -9136,13 +9136,15 @@ class SimSeats:
             out = add if out is None else out + add
         return out
 
-    def _imp_adj_at(self, row: int, k: int) -> torch.Tensor:
+    def _imp_adj_at(self, row: int, k: int, sees: torch.Tensor | None = None) -> torch.Tensor:
         """[B, T, 6] — `improvementAdjacency` of improvement `k` on every plot,
         as seat row `row`'s research reads its rules: each catalog rule counts
         the neighbours matching any of its sources, divides by `per`, and pays
         once per whole group (a `once` rule: once if any match); the row's
         civics and techs swap in the improved rate and payout, and a rule
-        waiting on a civic or tech of its own pays nothing before it."""
+        waiting on a civic or tech of its own pays nothing before it; `sees` [B, T]: a
+        neighbour whose resource the valuing player sees, the resource rules
+        counting no other (the AI's plot values)."""
         out = torch.zeros(self.B, self.T, 6, dtype=self.dtype, device=self.device)
         rules = self._imp_adj[k]
         if not rules:
@@ -9152,6 +9154,7 @@ class SimSeats:
         nb = self.neigh
         nbc = nb.clamp(min=0)
         on = (nb >= 0).unsqueeze(0)
+        seen = sees[:, nbc] if sees is not None else torch.ones(self.B, self.T, 6, dtype=torch.bool, device=self.device)
         for r in rules:
             # a rule may WAIT on a civic of its own (Terrace_MedievalAdjacency)
             rc = int(r["rc"])
@@ -9168,7 +9171,7 @@ class SimSeats:
                 up = up | tv[:, ut]
             hit = torch.zeros(self.B, self.T, 6, dtype=torch.bool, device=self.device)
             if int(r["bres"]):
-                hit |= (self.res_priority[:, nbc] == 1) & ~self.res_stripped[:, nbc]
+                hit |= (self.res_priority[:, nbc] == 1) & ~self.res_stripped[:, nbc] & seen
             di = int(r["dist"])
             if int(r["bw"]):
                 hit |= (self.built_wonder[:, nbc] >= 0) & self.built_wonder_complete[:, nbc]
@@ -9195,12 +9198,12 @@ class SimSeats:
             if _ri >= 0:
                 hit |= (self.improvement[:, nbc] == _ri) & ~self.pillaged[:, nbc]
             if int(r["lux"]):
-                hit |= (self.res_priority[:, nbc] == 3) & ~self.res_stripped[:, nbc]
+                hit |= (self.res_priority[:, nbc] == 3) & ~self.res_stripped[:, nbc] & seen
             # CIV6 (AdjacentSeaResource, Fishery_SeaResourceAdjacency): a
             # neighbour that is WATER and carries a resource of any kind.
             if int(r["sres"]):
                 hit |= ((self.res_priority[:, nbc] > 0) & ~self.res_stripped[:, nbc]
-                        & self.water[:, nbc])
+                        & self.water[:, nbc] & seen)
             for _rt in r["terr"]:
                 hit |= self.terrain[:, nbc] == int(_rt)
             n = (hit & on).sum(dim=2)                    # [B, T]
@@ -11004,8 +11007,18 @@ class SimSeats:
 
     def _seat_stock_income(self, row: int) -> torch.Tensor:
         """[B, K] one turn's strategic income of seat row `row` by slot
-        (`stockpileIncome`, Player_Resources +0x350): every source
-        `_seat_accrue_stockpile` pays"""
+        (`stockpileIncome`): every source `_seat_accrue_stockpile` pays, none
+        of a city-state under a suzerain, which holds its resources"""
+        bank = self._seat_accumulated(row)
+        if self._CITY_MINOR0 <= row < self.FREE_ROW:
+            held = self.citystate_suzerain[:, row - self._CITY_MINOR0] >= 0
+            bank = torch.where(held.unsqueeze(1), torch.zeros_like(bank), bank)
+        return bank
+
+    def _seat_accumulated(self, row: int) -> torch.Tensor:
+        """[B, K] seat row `row`'s accumulated resources a turn by slot
+        (`accumulatedPerTurn`, Player_Resources +0x350): every source of its
+        own, a suzerained city-state's too"""
         # CIV6 (Resources.PrereqTech): a strategic the seat cannot see yet
         # accrues nothing, whatever stands on its tile
         owned = ((self.tile_seat == int(self._ROW_SEAT[row])) & self._res_extracting()
@@ -11136,11 +11149,6 @@ class SimSeats:
                         seen = seen | (self._gp_perm(row, self._gp_perm_names[_pk]) > 0)
                 improved = (owned & (self.res_id == rid)).any(dim=1)
                 bank[:, k] += (seen & ~improved).long() * _hat * self._suz_free_strat
-        # a city-state under a suzerain banks none: its suzerain holds its
-        # resources
-        if self._CITY_MINOR0 <= row < self.FREE_ROW:
-            held = self.citystate_suzerain[:, row - self._CITY_MINOR0] >= 0
-            bank = torch.where(held.unsqueeze(1), torch.zeros_like(bank), bank)
         return bank
 
     def _fuel_short_bank(self, row: int) -> torch.Tensor:
