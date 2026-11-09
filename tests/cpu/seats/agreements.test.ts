@@ -532,8 +532,8 @@ describe('the alliance levels pay their dividends', () => {
     };
     const base = run('WARRIOR', ALLIANCE_L2_QP, null);
     expect(base).toBeGreaterThan(0);
-    expect(run('WARRIOR', ALLIANCE_L2_QP, 2)).toBeCloseTo(base * 1.15, 9);   // the ally's war
-    expect(run('WARRIOR', ALLIANCE_L2_QP, 1)).toBeCloseTo(base * 1.15, 9);   // the seat's own war
+    expect(run('WARRIOR', ALLIANCE_L2_QP, 2)).toBeCloseTo(base * 1.15, 1);   // the step in 24.8: the ally's war
+    expect(run('WARRIOR', ALLIANCE_L2_QP, 1)).toBeCloseTo(base * 1.15, 1);   // the seat's own war
     expect(run('WARRIOR', 0, 2)).toBeCloseTo(base, 9);                       // level 1 pays nothing
     const settler = run('SETTLER', ALLIANCE_L2_QP, null);
     expect(run('SETTLER', ALLIANCE_L2_QP, 2)).toBeCloseTo(settler, 9);        // a civilian head

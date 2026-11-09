@@ -238,6 +238,7 @@
     - cpu/harness/checks.ts:foundedUnallocated
     - cpu/core/city.ts:extractionChanged
     - gpu/core/sim_seats.py:_extraction_changed
+    - gpu/core/sim_seats.py:_extraction_rebuild
   readings:
     - "H-1: the luxury allocation's rebuilds — PARTLY READ"
     - "H-1: the cards the luxury allocation ranks on — READ (the order), the triggers partly"

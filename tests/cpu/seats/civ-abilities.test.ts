@@ -105,7 +105,7 @@ describe('Iteru', () => {
     };
     const rome = run('ROME');
     expect(rome).toBeGreaterThan(0);
-    expect(run('EGYPT')).toBe(rome * ITERU_RIVER_PROD_MULT);
+    expect(run('EGYPT')).toBeCloseTo(rome * ITERU_RIVER_PROD_MULT, 1); // the step in 24.8
     // off the river, nothing
     const dry = (id: string): number => {
       const state = makeState(makeMap(12, 12, 'GRASSLAND'));

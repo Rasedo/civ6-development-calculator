@@ -1315,7 +1315,7 @@ function minorPlaceDistrict(state: GameState, cityState: CityState, district: Di
   if (t.district === district) return;
   t.district = district;
   t.districtComplete = false;
-  paveGround(t);
+  paveGround(state, t);
   // its price locks at the placement, a second of the type at the first's
   // (`minorDistrictFull`; runs/h1_duelv1124 Granada's Harbor
   // at 53 from t42 to its completion at t44, Production Needed in

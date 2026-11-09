@@ -511,13 +511,13 @@ export function plotYieldRowsFor(state: GameState, seat: number, civ: string | n
 }
 
 /**
- * The roster's production multipliers for one queue item. `offHome` is
- * REQUIRED — a row may be keyed on the city sitting off the seat's home
- * continent (Treasure Fleet), and a defaulted flag would pay it in every
- * city or none.
+ * The roster's production factors for one queue item, one per row that names
+ * it, in the table's order. `offHome` is REQUIRED — a row may be keyed on
+ * the city sitting off the seat's home continent (Treasure Fleet), and a
+ * defaulted flag would pay it in every city or none.
  */
-export function prodMultFor(rows: readonly ProdMultRow[], item: { kind?: 'building' | 'unit' | 'district'; building?: string; district?: string; promoClass?: string; unit?: string; districtItem?: string }, offHome: boolean): number {
-  let m = 1;
+export function prodMultFactors(rows: readonly ProdMultRow[], item: { kind?: 'building' | 'unit' | 'district'; building?: string; district?: string; promoClass?: string; unit?: string; districtItem?: string }, offHome: boolean): number[] {
+  const out: number[] = [];
   for (const r of rows) {
     const hit = r.building !== undefined ? r.building === item.building
       : r.district !== undefined ? r.district === item.district
@@ -525,9 +525,9 @@ export function prodMultFor(rows: readonly ProdMultRow[], item: { kind?: 'buildi
       : r.unit !== undefined ? r.unit === item.unit
       : r.districtItem !== undefined ? r.districtItem === item.districtItem
       : r.every !== undefined ? r.every === item.kind : false;
-    if (hit && (!r.offHomeContinent || offHome)) m *= 1 + r.pct / 100;
+    if (hit && (!r.offHomeContinent || offHome)) out.push(1 + r.pct / 100);
   }
-  return m;
+  return out;
 }
 
 export function defaultModifiers(): Modifiers {

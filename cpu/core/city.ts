@@ -824,14 +824,16 @@ export function rebuildLuxuries(state: GameState, seat: number): void {
   for (const c of citiesOf(state, seat)) c.luxuryAmenities = ranked.get(c.id) ?? 0;
 }
 
-/** An improvement on `tile` built, removed, repaired or pillaged changes the
- *  resource its owner extracts (0x4ab4d0 -> 0x4a7560): a luxury's or a bonus
+/** An improvement on `tile` built, removed, repaired or pillaged, by a unit
+ *  or an event, and a district placed on its resource change the resource
+ *  its owner extracts (0x4ab4d0 -> 0x4a7560): a luxury's or a bonus
  *  resource's rebuilds the owner's allocation, an accumulated strategic's
  *  does not; a city-state's change reaches its suzerain's copies (0x44eff0),
- *  a rebuild there too. */
-export function extractionChanged(state: GameState, tile: Tile): void {
+ *  a rebuild there too. `resource` is the plot's, or the one the change
+ *  took off it. */
+export function extractionChanged(state: GameState, tile: Tile, resource = tile.resource): void {
   const owner = tileSeat(tile);
-  if (owner < 0 || !tile.resource || RESOURCES[tile.resource]?.category === 'strategic') return;
+  if (owner < 0 || !resource || RESOURCES[resource]?.category === 'strategic') return;
   rebuildLuxuries(state, owner);
   if (!isCityStateSeat(owner)) return;
   const suz = (seatOf(state, owner) as CityState | undefined)?.suzerain ?? -1;

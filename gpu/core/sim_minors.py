@@ -1386,9 +1386,14 @@ class SimMinors:
         # the bonus resource goes as a harvest takes it: every baked plane to
         # its resource-free value, so a plot whose district is later gone
         # reads bare ground (TS deleted `tile.resource`)
+        valued = self._valued_at(rows, tiles)
         fresh_rs = (self.res_priority[rows, tiles] == 1) & ~self.res_stripped[rows, tiles]
         if bool(fresh_rs.count_nonzero()):
             self._drop_resource(rows[fresh_rs], tiles[fresh_rs])
+        # the district set on a bonus or luxury resource changes what its
+        # owner extracts (the district handler's 0x4ab4d0), its allocation
+        # ranked anew
+        self._extraction_changed_pairs(rows, tiles, valued)
 
     def _minor_military_count(self, s: int) -> torch.Tensor:
         """[B] long — minor `s`'s military units."""

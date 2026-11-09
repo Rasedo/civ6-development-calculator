@@ -1,11 +1,13 @@
 import { describe, it, expect } from 'vitest';
 import { makeMap, makeState, tileAtCoords, settleAt } from '../helpers';
 import { emptySeat, seatOf, onHomeContinent } from '../../../cpu/core/seats';
-import { getModifiers, prodMultFor } from '../../../cpu/core/effects';
+import { getModifiers, prodMultFactors } from '../../../cpu/core/effects';
 import { rosterRouteCapacity } from '../../../cpu/core/trade';
 import { PROD_MULT_ROWS, ROUTE_CAPACITY_ROWS } from '../../../cpu/data/civilizations';
 import { CIV_LEADERS } from '../../../cpu/data/seats';
 import type { GameState } from '../../../cpu/core/types';
+
+const product = (fs: number[]) => fs.reduce((a, b) => a * b, 1);
 
 /**
  * The three clauses that read a city's landmass against its seat's HOME one
@@ -42,17 +44,17 @@ describe("Spain's cities off the capital's continent", () => {
     settleAt(state, tileAtCoords(state.map, 4, 5).index, 0);
     const rows = getModifiers(state, 0).prodMults;
     const item = { kind: 'district' as const, districtItem: 'CAMPUS' };
-    expect(prodMultFor(rows, item, true)).toBeCloseTo(1.25);
-    expect(prodMultFor(rows, item, false)).toBe(1);
+    expect(product(prodMultFactors(rows, item, true))).toBeCloseTo(1.25);
+    expect(product(prodMultFactors(rows, item, false))).toBe(1);
     // ...and it is a DISTRICT clause, not a blanket one
-    expect(prodMultFor(rows, { kind: 'building', building: 'MONUMENT' }, true)).toBe(1);
+    expect(product(prodMultFactors(rows, { kind: 'building', building: 'MONUMENT' }, true))).toBe(1);
   });
 
   it('pays a seat the roster does not name nothing either way', () => {
     const state = scene(-1);
     settleAt(state, tileAtCoords(state.map, 4, 5).index, 0);
     const rows = getModifiers(state, 0).prodMults;
-    expect(prodMultFor(rows, { kind: 'district', districtItem: 'CAMPUS' }, true)).toBe(1);
+    expect(product(prodMultFactors(rows, { kind: 'district', districtItem: 'CAMPUS' }, true))).toBe(1);
   });
 });
 

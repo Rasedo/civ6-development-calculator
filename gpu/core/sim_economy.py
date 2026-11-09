@@ -1054,7 +1054,10 @@ class SimEconomy:
         pillaged already or not (0x33aba0 returns 1 on any it reaches)."""
         ok = (self.improvement[rows, tiles] >= 0) & ~self._env_immune()[rows, tiles]
         self._aid_damage(rows[ok], self.tile_seat[rows[ok], tiles[ok]], 1)
+        fresh = ok & ~self.pillaged[rows, tiles]
         self.pillaged[rows[ok], tiles[ok]] = True
+        # an improvement newly pillaged changes what its owner extracts
+        self._extraction_changed_pairs(rows[fresh], tiles[fresh])
 
     def _pillage_district(self, rows: torch.Tensor, tiles: torch.Tensor) -> None:
         """CIV6 (Gathering Storm): a disaster damages the DISTRICT on the tile,
@@ -1394,6 +1397,9 @@ class SimEconomy:
             r, s = d.nonzero(as_tuple=True)
             getattr(self, f"{pool}_unit_alive")[r, s] = False
             self._vacate(pool, r, s)
+        # the improved bonus or luxury resource the sea takes
+        _ext = (take & (self.improvement >= 0) & ~self.pillaged & (self.res_id >= 0)
+                & ~self.res_stripped & (self.res_priority != 2))
         # the district leaves its city's registry with the ground
         _dt = self.city_dist_tile
         _gone = take.gather(1, _dt.reshape(self.B, -1).clamp(min=0)).reshape(_dt.shape) & (_dt >= 0)
@@ -1461,6 +1467,10 @@ class SimEconomy:
         self._air_orphans_die()   # an airstrip under water bases nothing
         self._eff_version += 1
         self._gen_ver += 1
+        # the improved resource drowned changes what its owner extracts
+        if bool(_ext.count_nonzero()):
+            _er, _et = _ext.nonzero(as_tuple=True)
+            self._extraction_changed_pairs(_er, _et, torch.ones_like(_er, dtype=torch.bool))
 
     def _melt_ice(self, at: torch.Tensor, fraction: float) -> None:
         """CIV6: "the polar ice starts to melt (i.e., Ice tiles will disappear
@@ -1519,8 +1529,13 @@ class SimEconomy:
             if fb > 0:
                 wet = ((self.tile_lowland == fb) & ~barrier & at.unsqueeze(1)
                        & ~self.tile_flooded)
+                fresh = wet & (self.improvement >= 0) & ~self.pillaged
                 self.tile_flooded |= wet
                 self.pillaged |= wet
+                # an improvement newly pillaged changes what its owner extracts
+                if bool(fresh.count_nonzero()):
+                    _fr, _ft = fresh.nonzero(as_tuple=True)
+                    self._extraction_changed_pairs(_fr, _ft)
                 self.district_pillaged |= wet & (self.district >= 0)
             sb = int(self._cl_submerge[p])
             if sb > 0:
@@ -2297,8 +2312,10 @@ class SimEconomy:
         if gr.numel():
             gt = tile[gr]
             gone = listed_at(gr, gt)
+            fresh = gone & ~self.pillaged[gr, gt]
             self.improvement[gr[gone], gt[gone]] = -1
             self.pillaged[gr[gone], gt[gone]] = False
+            self._extraction_changed_pairs(gr[fresh], gt[fresh])
         self._rand_range(on, 100)
         rows = on.nonzero(as_tuple=True)[0]
         if not rows.numel():
@@ -2307,7 +2324,9 @@ class SimEconomy:
         self.drought[rows, tt] = torch.maximum(self.drought[rows, tt], turns[rows])
         struck = listed_at(rows, tt)
         self._aid_damage(rows[struck], self.tile_seat[rows[struck], tt[struck]], 2)
+        fresh = struck & ~self.pillaged[rows, tt]
         self.pillaged[rows[struck], tt[struck]] = True
+        self._extraction_changed_pairs(rows[fresh], tt[fresh])
         self._remove_fertility(on, tile)
 
     def _destroy_improvement(self, rows: torch.Tensor, tiles: torch.Tensor) -> None:
@@ -2317,8 +2336,10 @@ class SimEconomy:
             return
         ok = (self.improvement[rows, tiles] >= 0) & ~self._env_immune()[rows, tiles]
         self._aid_damage(rows[ok], self.tile_seat[rows[ok], tiles[ok]], 1)
+        fresh = ok & ~self.pillaged[rows, tiles]
         self.improvement[rows[ok], tiles[ok]] = -1
         self.pillaged[rows[ok], tiles[ok]] = False
+        self._extraction_changed_pairs(rows[fresh], tiles[fresh])
 
     def _flood_severity_draw(self, hit: torch.Tensor) -> torch.Tensor:
         """[B] `floodSeverity` — a flood no draw chose (the spy's breached

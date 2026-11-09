@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { makeMap, makeState, tileAtCoords, settleAt, grantTechs, grantCivics, holdWorks } from '../helpers';
 import { emptySeat, setTileOwner } from '../../../cpu/core/seats';
 import { computeCityStats } from '../../../cpu/core/city';
-import { getModifiers, prodMultFor } from '../../../cpu/core/effects';
+import { getModifiers, prodMultFactors } from '../../../cpu/core/effects';
 import { greatPersonPointsPerTurn } from '../../../cpu/core/greatPeople';
 import { poweredExtra } from '../../../cpu/core/yields';
 import { accrueStockpiles, stockpileCap } from '../../../cpu/core/stockpile';
@@ -19,6 +19,8 @@ import { STRATEGIC_IDS, STOCKPILE_CAP_BASE } from '../../../cpu/data/constants';
 import { TECHS } from '../../../cpu/data/techs';
 import type { GameState } from '../../../cpu/core/types';
 import { GWO_ARTIFACT, GWO_RELIC } from '../../../cpu/data/greatWorks';
+
+const product = (fs: number[]) => fs.reduce((a, b) => a * b, 1);
 
 /**
  * THE CITY'S ROSTER ROWS (CIV6, the install's TraitModifiers): the centre's
@@ -45,17 +47,17 @@ describe('the production rows widen', () => {
     expect(PROD_MULT_ROWS.filter((r) => r.districtItem !== undefined).length).toBeGreaterThan(0);
     expect(PROD_MULT_ROWS.filter((r) => r.every !== undefined).length).toBeGreaterThan(0);
     const hojo = PROD_MULT_ROWS.filter((r) => r.leader === 'HOJO');
-    expect(prodMultFor(hojo, { kind: 'district', districtItem: 'ENCAMPMENT' }, false)).toBe(2);
-    expect(prodMultFor(hojo, { kind: 'district', districtItem: 'CAMPUS' }, false)).toBe(1);
+    expect(product(prodMultFactors(hojo, { kind: 'district', districtItem: 'ENCAMPMENT' }, false))).toBe(2);
+    expect(product(prodMultFactors(hojo, { kind: 'district', districtItem: 'CAMPUS' }, false))).toBe(1);
     const dutch = PROD_MULT_ROWS.filter((r) => r.civ === 'NETHERLANDS');
-    expect(prodMultFor(dutch, { kind: 'district', districtItem: 'DAM' }, false)).toBe(1.5);
+    expect(product(prodMultFactors(dutch, { kind: 'district', districtItem: 'DAM' }, false))).toBe(1.5);
     const mali = PROD_MULT_ROWS.filter((r) => r.civ === 'MALI');
-    expect(prodMultFor(mali, { kind: 'building', building: 'MONUMENT' }, false)).toBe(0.7);
-    expect(prodMultFor(mali, { kind: 'unit', unit: 'WARRIOR', promoClass: 'MELEE' }, false)).toBe(0.7);
-    expect(prodMultFor(mali, { kind: 'district', districtItem: 'CAMPUS' }, false)).toBe(1);
+    expect(product(prodMultFactors(mali, { kind: 'building', building: 'MONUMENT' }, false))).toBe(0.7);
+    expect(product(prodMultFactors(mali, { kind: 'unit', unit: 'WARRIOR', promoClass: 'MELEE' }, false))).toBe(0.7);
+    expect(product(prodMultFactors(mali, { kind: 'district', districtItem: 'CAMPUS' }, false))).toBe(1);
     const eng = PROD_MULT_ROWS.filter((r) => r.civ === 'ENGLAND');
-    expect(prodMultFor(eng, { kind: 'unit', unit: 'MILITARY_ENGINEER', promoClass: 'SUPPORT' }, false)).toBe(2 * 1);
-    expect(prodMultFor(eng, { kind: 'unit', unit: 'WARRIOR', promoClass: 'MELEE' }, false)).toBe(1);
+    expect(product(prodMultFactors(eng, { kind: 'unit', unit: 'MILITARY_ENGINEER', promoClass: 'SUPPORT' }, false))).toBe(2 * 1);
+    expect(product(prodMultFactors(eng, { kind: 'unit', unit: 'WARRIOR', promoClass: 'MELEE' }, false))).toBe(1);
   });
 
   it("Grote Rivieren: the Netherlands' three districts read the river as a major adjacency", () => {

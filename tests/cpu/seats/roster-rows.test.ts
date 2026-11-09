@@ -3,12 +3,14 @@ import { makeMap, makeState, tileAtCoords, settleAt, grantTechs } from '../helpe
 import { emptySeat } from '../../../cpu/core/seats';
 import { seatPhase } from '../../../cpu/core/phase';
 import { computeCityStats } from '../../../cpu/core/city';
-import { prodMultFor, getModifiers } from '../../../cpu/core/effects';
+import { prodMultFactors, getModifiers } from '../../../cpu/core/effects';
 import { routeYieldsInternational, tradeCapacity, rosterRouteCapacity } from '../../../cpu/core/trade';
 import { neighbors } from '../../../world/hex';
 import { CIV_LEADERS } from '../../../cpu/data/seats';
 import { PROD_MULT_ROWS, DISTRICT_ADJ_ROWS, INTL_ROUTE_YIELD_ROWS, ROUTE_CAPACITY_ROWS } from '../../../cpu/data/civilizations';
 import type { City, Tile } from '../../../cpu/core/types';
+
+const product = (fs: number[]) => fs.reduce((a, b) => a * b, 1);
 
 /**
  * THE ROSTER'S DATA ROWS (CIV6, the install's TraitModifiers): production
@@ -25,12 +27,12 @@ function placeDistrict(city: City, type: 'HOLY_SITE' | 'CAMPUS' | 'GOVERNMENT_PL
 }
 
 describe('the production rows', () => {
-  it('prodMultFor multiplies the rows that name the item', () => {
-    expect(prodMultFor(PROD_MULT_ROWS.filter((r) => r.civ === 'ENGLAND'), { building: 'WORKSHOP', district: 'INDUSTRIAL_ZONE' }, false)).toBe(1.2);
-    expect(prodMultFor(PROD_MULT_ROWS.filter((r) => r.civ === 'ENGLAND'), { building: 'MONUMENT', district: 'CITY_CENTER' }, false)).toBe(1);
-    expect(prodMultFor(PROD_MULT_ROWS.filter((r) => r.civ === 'GEORGIA'), { building: 'ANCIENT_WALLS', district: 'CITY_CENTER' }, false)).toBe(1.5);
-    expect(prodMultFor(PROD_MULT_ROWS.filter((r) => r.civ === 'OTTOMAN'), { promoClass: 'SIEGE' }, false)).toBe(1.5);
-    expect(prodMultFor(PROD_MULT_ROWS.filter((r) => r.civ === 'OTTOMAN'), { promoClass: 'MELEE' }, false)).toBe(1);
+  it('prodMultFactors gives one factor per row that names the item', () => {
+    expect(product(prodMultFactors(PROD_MULT_ROWS.filter((r) => r.civ === 'ENGLAND'), { building: 'WORKSHOP', district: 'INDUSTRIAL_ZONE' }, false))).toBe(1.2);
+    expect(product(prodMultFactors(PROD_MULT_ROWS.filter((r) => r.civ === 'ENGLAND'), { building: 'MONUMENT', district: 'CITY_CENTER' }, false))).toBe(1);
+    expect(product(prodMultFactors(PROD_MULT_ROWS.filter((r) => r.civ === 'GEORGIA'), { building: 'ANCIENT_WALLS', district: 'CITY_CENTER' }, false))).toBe(1.5);
+    expect(product(prodMultFactors(PROD_MULT_ROWS.filter((r) => r.civ === 'OTTOMAN'), { promoClass: 'SIEGE' }, false))).toBe(1.5);
+    expect(product(prodMultFactors(PROD_MULT_ROWS.filter((r) => r.civ === 'OTTOMAN'), { promoClass: 'MELEE' }, false))).toBe(1);
   });
 
   it('pay on the queue: England +20% on a Workshop, Georgia +50% on walls, the Ottomans +50% on a Catapult', () => {
@@ -43,9 +45,9 @@ describe('the production rows', () => {
       return city.queue[0].progress;
     };
     const ws = { kind: 'building', building: 'WORKSHOP', progress: 0 } as City['queue'][number];
-    expect(run('ENGLAND', ws)).toBe(run('AMERICA', ws) * 1.2); // America holds no production row
+    expect(run('ENGLAND', ws)).toBeCloseTo(run('AMERICA', ws) * 1.2, 1); // the step in 24.8 // America holds no production row
     const walls = { kind: 'building', building: 'ANCIENT_WALLS', progress: 0 } as City['queue'][number];
-    expect(run('GEORGIA', walls)).toBe(run('AMERICA', walls) * 1.5);
+    expect(run('GEORGIA', walls)).toBeCloseTo(run('AMERICA', walls) * 1.5, 1);
     const cat = { kind: 'unit', unit: 'CATAPULT', progress: 0 } as City['queue'][number];
     expect(run('OTTOMAN', cat)).toBe(run('AMERICA', cat) * 1.5);
     expect(run('OTTOMAN', ws)).toBe(run('AMERICA', ws));

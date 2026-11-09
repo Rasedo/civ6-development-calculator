@@ -66,7 +66,7 @@ describe('the Gathering Storm floodplains', () => {
       t.terrain = f === 'FLOODPLAINS' ? 'DESERT' : f === 'FLOODPLAINS_GRASSLAND' ? 'GRASSLAND' : 'PLAINS';
       t.feature = f as typeof t.feature;
       expect(validImprovementsIn(t, { unlocks: null, ownsTile: () => true, map })).toContain('FARM');
-      paveGround(t);
+      paveGround(null as never, t);
       expect(t.feature).toBe(f); // a district leaves the floodplains under it
     }
     expect(isFloodplains('MARSH')).toBe(false);

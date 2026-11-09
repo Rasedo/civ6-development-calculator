@@ -37,6 +37,7 @@ import { governorTileFlag } from './governors';
 import { mitigatedFloodMoment } from './moments';
 import { cityFlags, replaceAllCitizens } from './citizens';
 import { minorReplaceCitizens } from './cityStates';
+import { extractionChanged } from './city';
 
 function log(state: GameState, text: string): void {
   state.eventLog.push(text);
@@ -63,7 +64,10 @@ function envImmune(state: GameState, tile: Tile): boolean {
 function scorch(state: GameState, tile: Tile): void {
   if (!tile.improvement || envImmune(state, tile)) return;
   aidDamage(tileSeat(tile), 1);
+  const was = tile.pillaged;
   tile.pillaged = true;
+  // an improvement newly pillaged changes what its owner extracts
+  if (!was) extractionChanged(state, tile);
 }
 
 /** CIV6 (Gathering Storm): a disaster damages the DISTRICT on the tile, not
@@ -179,8 +183,10 @@ function cityHoldingDistrict(state: GameState, tile: Tile): City | undefined {
 function destroyImprovement(state: GameState, tile: Tile): void {
   if (tile.improvement && !envImmune(state, tile)) {
     aidDamage(tileSeat(tile), 1);
+    const was = tile.pillaged;
     tile.improvement = null;
     tile.pillaged = false;
+    if (!was) extractionChanged(state, tile);
   }
 }
 
@@ -1423,13 +1429,17 @@ function droughtTile(state: GameState, t: Tile, sev: number, turns: number): voi
   // damage, the specific one pillaged a full point (0x3388e0 sums its field
   // twice)
   if (DROUGHT_DESTROY_P[sev] > 0 && randRange(state, 100, 'Pillage Improvement Chance') < Math.round(DROUGHT_DESTROY_P[sev] * 100) && listed()) {
+    const was = t.pillaged;
     t.improvement = null;
     t.pillaged = false;
+    if (!was) extractionChanged(state, t);
   }
   randRange(state, 100, 'Pillage Improvement Chance');
   if (listed()) {
     aidDamage(tileSeat(t), 2);
+    const was = t.pillaged;
     t.pillaged = true;
+    if (!was) extractionChanged(state, t);
   }
   t.droughtTurns = Math.max(t.droughtTurns, turns);
   removeFertility(state, t);

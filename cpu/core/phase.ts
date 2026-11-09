@@ -5,31 +5,30 @@ import { advanceGreatPeople, passGreatPerson, patronizeGreatPerson, recruitClaim
 import { activateGreatPerson } from './gpAbility';
 import { GW_KINDS } from '../data/greatWorks';
 import { drainRelicReserve, gwCountKind, gwHasRoom, gwLastOfKind, moveGreatWork } from './greatWorks';
-import { completeQueueItem, dropQueuedBuilding, cultureBomb, grantFreeResearch, districtPlotHostile, keepItem, wonderLetGo } from './production';
+import { completeQueueItem, dropQueuedBuilding, cultureBomb, grantFreeResearch, districtPlotHostile, keepItem, stepAmount, stepMultiplier, wonderLetGo } from './production';
 import { cityLook, fogActive, isExplored, meetMajors, revealAround, unitSight, unitSeesThrough } from './fog';
 import { tilesWithin, hexDistance, hexRingWalk, neighbors, neighborTile } from '../../world/hex';
-import { isWater, hasRiver, isCoastalLand } from '../../world/query';
+import { isWater, isCoastalLand } from '../../world/query';
 import { isFloodplains } from '../../world/features';
 import type { FeatureId } from '../../world/types';
-import { ITERU_RIVER_PROD_MULT, EPIC_QUEST_LEVY_DISCOUNT_PCT, CLEOPATRA_TRADE_QP_MULT, HARDRADA_NAVAL_MELEE_PROD_MULT, ENKIDU_COMMON_FOE_QP, SKIP_FREE_CITY_ROWS, rowIsFor } from '../data/civilizations';
+import { EPIC_QUEST_LEVY_DISCOUNT_PCT, CLEOPATRA_TRADE_QP_MULT, ENKIDU_COMMON_FOE_QP, SKIP_FREE_CITY_ROWS, rowIsFor } from '../data/civilizations';
 import { atRngPoint, randRange } from './rand';
 import { emergencyEnvoyIncome, seatAccumulators, seatTallies, seatGrowth, commitProduction } from './seatTurn';
-import { arrive, cityAtIndex, spawnUnit, unitsAt, unitsHostile, unitIsMilitary, encampmentIntact, stepUnit, unitFullMoves, ownerHasTech, tileFreeForUnit, visibleHostilesAt , navalMelee, crossesRiver, builderHarvest, unitIsNoncombat } from './units';
+import { arrive, cityAtIndex, spawnUnit, unitsAt, unitsHostile, unitIsMilitary, encampmentIntact, stepUnit, unitFullMoves, ownerHasTech, tileFreeForUnit, visibleHostilesAt, navalMelee, builderHarvest, unitIsNoncombat } from './units';
 import { cityStrikeStrength, cityStrikeDefenderCS, airPillage, airStrike, detonate, nukeTargets, siloReaches, shootable } from './combat';
 import { nukeOffers } from './nuclear';
 import { NUCLEAR_DEVICES } from '../data/nuclear';
 import { applyTrainingGrants, meleeAttack, rangedAttack, hostileRangedStrike, damageRoll, awardDefenseXp, encircled, stackDefender, unitAttackRange } from './combat';
-import { promoClassOf, promoValue, takePromotion } from './promotions';
+import { promoValue, takePromotion } from './promotions';
 import { PROMO_COLS, type PromoClass } from '../data/promotions';
-import { availableTechsIn, availableCivicsIn, computeUnlocks, isCivicComplete, type Unlocks , prodMultFor, notFoundedSum, peacefulFounderFaith, foreignFollowerCount, greatWorkLoyalty, goldPrice, faithPrice } from './effects';
+import { availableTechsIn, availableCivicsIn, computeUnlocks, isCivicComplete, type Unlocks, notFoundedSum, peacefulFounderFaith, foreignFollowerCount, greatWorkLoyalty, goldPrice, faithPrice } from './effects';
 import { boostOnWarDeclared, detectBoosts, markBoost } from './boosts';
 import { BOOSTS } from '../data/boosts';
 import { addCivicProgress, researchCost, selectResearch, pillagePlunder } from './economy';
 import { IMPROVEMENTS } from '../data/improvements';
-import { isSpaceProject } from '../data/projects';
-import { containmentBonus, sameReligionToken, getModifiers, makeYieldCtx, prodBoostPct, seatYieldMultPerSuzerain, unitUpkeep } from './effects';
+import { containmentBonus, sameReligionToken, getModifiers, makeYieldCtx, seatYieldMultPerSuzerain, unitUpkeep } from './effects';
 import { allRoadsLeadToRome, addTradeRoute, addCsTradeRoute, addIntlTradeRoute, cancelRoutesBetween, congressCancelBannedIntl, plunderTrader, tradeGraphTurn, tradeRouteExpiry, tradeRouteWalk } from './trade';
-import { addEnvoys, allianceSuzInfluence, cityStateById, declareWarOnCityState, envoysOf, hasMet, isSuzerain, minorCity, resolveSuzerains, sueForPeaceWithCityState, suzerainBuildingLoyalty, suzerainProjectMult, suzerainWonderPct, suzerainGpCultureMult, meetCityState, buildingCreatedCulture } from './cityStates';
+import { addEnvoys, allianceSuzInfluence, cityStateById, declareWarOnCityState, envoysOf, hasMet, isSuzerain, minorCity, resolveSuzerains, sueForPeaceWithCityState, suzerainBuildingLoyalty, suzerainGpCultureMult, meetCityState, buildingCreatedCulture } from './cityStates';
 import { LEVY_TURNS, govInfluence } from '../data/cityStates';
 import { freeCityBuild, freeCombatDesire, freeKnowledge, minorBestOfClass, minorCatchUp, minorCompleteNow, minorOrdersHeld, minorResearch, trainableIn } from './minorBuild';
 import { researchUnitTurns } from './aiResearch';
@@ -40,7 +39,7 @@ import { FREE_CITY_PAIR_CLASS, LOYALTY_RELIGION_MATCHING, LOYALTY_RELIGION_MISMA
 import { plotDistance, seatPoolSlots, tacticalTargets } from './tactical';
 import { freeCitiesMilitary, freeRaidCheck, freeRaidSignal } from './freeOps';
 import { plotsSeenNow, ringPlots } from './barbarians';
-import { PROJECTS, PROJECT_LIST, projectConversionRate } from '../data/projects';
+import { PROJECTS, projectConversionRate } from '../data/projects';
 import { adoptGovernment, carryPolicies, slotCountRebuild, slotLossRebuild, seatGovernment, governmentBit, darkAgeEra, unlockedPolicyIds, governmentSlots, governmentChanges, policyLayoutChanges, policyLayoutOf, policyUnlockCost } from './effects';
 import type { RuleResult } from './rules';
 import { TECHS, type ResearchEffect } from '../data/techs';
@@ -56,11 +55,11 @@ import { CITY_WORK_RADIUS, scaleByGameSpeed, GOLD_PURCHASE_MULT, MP_SCALE, RAILR
 import { cityDistrictSum, darkBuildings, stampBuildingEra } from './yields';
 import type { CityStats } from './city';
 import { cityFlags, placeCitizens, replaceAllCitizens, toggleCitizen } from './citizens';
-import { beliefSeatYields, computeCityStats, cityBuildingSum, standingLuxuries, rebuildLuxuries, extractionChanged, drawBorderPlot, acquireTile, refreshParkAmenities, seatBuildingSum, swapTileOk, wonderRegionalLoyalty } from './city';
+import { beliefSeatYields, computeCityStats, standingLuxuries, rebuildLuxuries, extractionChanged, drawBorderPlot, acquireTile, refreshParkAmenities, seatBuildingSum, swapTileOk, wonderRegionalLoyalty } from './city';
 import { accrueStockpiles, canTrainWithStockpile, capStockpiles, chargeUnitResource, chargeUnitUpkeep, layRailroad, resolveSeatPower } from './stockpile';
 import { ageReactors, pillageTopBuilding } from './disasters';
 import { droughtBars } from '../data/disasters';
-import { congressSession, congressBorderFrozen, congressLoyaltyDelta, congressProjectMult, congressEnergyProdMult, congressUdtProdDistrict, congressSessionDue } from './congress';
+import { congressSession, congressBorderFrozen, congressLoyaltyDelta, congressSessionDue } from './congress';
 import { buyVotes } from './congress';
 import { EMG_CALLED, EMG_PENDING, EMG_RUNNING, EMERGENCY_CITY_STATE, EMERGENCY_MILITARY, EMERGENCY_NUCLEAR, emergencies, emergencyLoyalty, emergencyName, emergencyPressureCut, emergencyStrikeCS, raiseEmergency } from './emergency';
 import { irradiated, wmdUpkeep } from './nuclear';
@@ -71,7 +70,7 @@ import { BUILT_WONDERS, type BuiltWonderDef } from '../data/builtWonders';
 import { seatWonders } from './wonders';
 import { cleanFallout, escortUnit, breakEscort, disbandUnit, builderCost, traderCost, builderRemoveFeature, trainableUnits, goldBuyableUnits, purchaseSpotBlocked, unitMadeAnew, archaeologistExcavate, naturalistPark, performConcert, upgradeUnit, unitDomain, formationBanned, cityGarrisons, promotionsHeld } from './units';
 import { killUnit, wakeInBattle } from './combat';
-import { adoptBeliefs, itemCost, unitProdCost, availableProjects, buyTile, buyWorshipBuilding, purchaseBuildingWithFaith, purchaseUnitWithFaith, wallsGoldBlocked, boostProject, wonderChargeBoost, condemnHeretic, formUp, convertHeathens, districtScaledBase, districtDiscounted, refreshDistrictDiscount, engineerFinish, foundCity, goldAffordable, isEncampHarborItem, launchInquisition, evangelizeBelief, purchaseCivilianWithFaith, purchaseNaturalist, purchaseReligiousUnit, purchaseRockBand, purchaseSettler, queueProject, removeHeresy, guruHeal, settlerCost, unitGoldPrice, unitStepCost, unitsAcquired, districtVariantCost, buildingPurchaseCost, spreadReligiousPressure } from './game';
+import { adoptBeliefs, itemCost, availableProjects, buyTile, buyWorshipBuilding, purchaseBuildingWithFaith, purchaseUnitWithFaith, wallsGoldBlocked, boostProject, wonderChargeBoost, condemnHeretic, formUp, convertHeathens, districtScaledBase, districtDiscounted, refreshDistrictDiscount, engineerFinish, foundCity, goldAffordable, launchInquisition, evangelizeBelief, purchaseCivilianWithFaith, purchaseNaturalist, purchaseReligiousUnit, purchaseRockBand, purchaseSettler, queueProject, removeHeresy, guruHeal, settlerCost, unitGoldPrice, unitStepCost, unitsAcquired, districtVariantCost, buildingPurchaseCost, spreadReligiousPressure } from './game';
 import { DISTRICTS, PLACEABLE_DISTRICTS, SCAFFOLD_DISTRICTS } from '../data/districts';
 import { IMPROVEMENT_IDS, DEDICATED_IMPROVEMENTS, unitActionIndex, AIR_STRIKE_COLS, AIR_REBASE_COLS, AIR_DEPLOY_COLS, NUKE_COLS, SPY_TRAVEL_COLS, SPY_MISSIONS } from './unitActions';
 import { airPillageTargets, airStrikeTargets, rebaseTargets, rebaseAir, displaceAirFrom, deployAir, deployTargets, priorityTargets, returnToBase } from './air';
@@ -116,23 +115,20 @@ const A_HARVEST = unitActionIndex(IMPROVEMENT_IDS).HARVEST;
 const A_WONDER_CHARGE = unitActionIndex(IMPROVEMENT_IDS).WONDER_CHARGE;
 const A_PORTAL = unitActionIndex(IMPROVEMENT_IDS).PORTAL;
 const A_ACTIVATE_GP = unitActionIndex(IMPROVEMENT_IDS).ACTIVATE_GP;
-import { ALLIANCE_CULTURAL, ALLIANCE_E2_INFLUENCE, ALLIANCE_MILITARY, ALLIANCE_M2_MIL_PROD_PCT, ALLIANCE_QP_ROUTE, ALLIANCE_QP_TURN, ALLIANCE_R2_BOOST_TURNS, ALLIANCE_R3_SCI_PCT, ALLIANCE_C3_CUL_PCT, ALLIANCE_RESEARCH, ALLIANCE_REL3_FAITH_PER_POP, ALLIANCE_RELIGIOUS, ALLIANCE_ROUTE_FROM, ALLIANCE_ROUTE_YKEY, DEAL_ITEMS, DEAL_OFFER_TURNS, CIV_LEADERS, MAX_CITIES_PER_SEAT, WAR_MIN_TURNS, PEACE_TREATY_TURNS, PEACE_GOLD_COST, LOYALTY_MAX, LOYALTY_RANGE, LOYALTY_PRESS_MAX_LOYALTY, LOYALTY_PRESS_MAX_RATIO, LOYALTY_PRESS_NEUTRAL_LOYALTY, LOYALTY_PRESS_NEUTRAL_RATIO, CITIZEN_PRESSURE_BASE, CITIZEN_PRESSURE_CAPITAL, CITIZEN_PRESSURE_DOMINANCE_PCT, LOYALTY_AMENITY, FREE_CITY_LOYALTY_PER_TURN, LOYALTY_AFTER_CULTURAL_TRANSFER, FREE_CITY_PAIR_COUNT, FREE_CITY_GRANT_PERIOD, FREE_CITY_GRANT_CLASSES, FREE_CITY_GRANT_CAP, FREE_CITY_BUILDER, FREE_CITY_BUILDER_THREAT, bankruptDisbands, goldShortfall, GOVERNOR_LOYALTY, CONGRESS_MIN_ERA, CONGRESS_PROD_MULT } from '../data/seats';
+import { ALLIANCE_CULTURAL, ALLIANCE_E2_INFLUENCE, ALLIANCE_MILITARY, ALLIANCE_QP_ROUTE, ALLIANCE_QP_TURN, ALLIANCE_R2_BOOST_TURNS, ALLIANCE_R3_SCI_PCT, ALLIANCE_C3_CUL_PCT, ALLIANCE_RESEARCH, ALLIANCE_REL3_FAITH_PER_POP, ALLIANCE_RELIGIOUS, ALLIANCE_ROUTE_FROM, ALLIANCE_ROUTE_YKEY, DEAL_ITEMS, DEAL_OFFER_TURNS, CIV_LEADERS, MAX_CITIES_PER_SEAT, WAR_MIN_TURNS, PEACE_TREATY_TURNS, PEACE_GOLD_COST, LOYALTY_MAX, LOYALTY_RANGE, LOYALTY_PRESS_MAX_LOYALTY, LOYALTY_PRESS_MAX_RATIO, LOYALTY_PRESS_NEUTRAL_LOYALTY, LOYALTY_PRESS_NEUTRAL_RATIO, CITIZEN_PRESSURE_BASE, CITIZEN_PRESSURE_CAPITAL, CITIZEN_PRESSURE_DOMINANCE_PCT, LOYALTY_AMENITY, FREE_CITY_LOYALTY_PER_TURN, LOYALTY_AFTER_CULTURAL_TRANSFER, FREE_CITY_PAIR_COUNT, FREE_CITY_GRANT_PERIOD, FREE_CITY_GRANT_CLASSES, FREE_CITY_GRANT_CAP, FREE_CITY_BUILDER, FREE_CITY_BUILDER_THREAT, bankruptDisbands, goldShortfall, GOVERNOR_LOYALTY, CONGRESS_MIN_ERA } from '../data/seats';
 import { resolveCompetition } from './competition';
 import { acceptDeal, capitalCityOf, dealPhase, setDealOffer } from './deals';
 import { hiddenResourcesFor } from './seats';
 import { grievanceCityTaken, grievanceDenounce, grievanceLastCity, grievanceWarDeclared, settlePromises } from './grievance';
 import { levyMoment, pantheonMoment, transferMoments, agePressure } from './eras';
 import { improvementMoment } from './moments';
-import { cityAppealResolver, cityGovernorEstablished, establishedGovernorCityIds, governorFlag, governorLoyaltyAura, governorMult, governorPhase, governedCityIds, governorSum, cityGovernorPromos } from './governors';
+import { cityAppealResolver, cityGovernorEstablished, establishedGovernorCityIds, governorFlag, governorLoyaltyAura, governorPhase, governedCityIds, governorSum, cityGovernorPromos } from './governors';
 import { NO_SEAT, civOf, alliancePtsWith, allianceTypeWith, alliedAtLevel, allyTurnsWith, atWarWithAny, borderTurnsFrom, campTiles, citiesOf, civsAtWar, cityStateOfSeat, clearDelegations, denounceActive, friendTurnsWith, isCiv, isCityStateSeat, isTerritorial, seatOf, seatOfCityState, seatsAllied, seatsFriends, setAlliancePtsWith, setAllyTurnsWith, setBorderTurnsFrom, setFriendTurnsWith, setTileOwner, setWar, setWarKind, clearWarKind, setTreatyTurnsWith, setWarTurnsWith, tileBelongsTo, tileCity, tileOwnedByCiv, tileSeat, unitsOf, treatyTurnsWith, warClockKey, warTurnsWith, warsOf, hasRouteToSeat, leaderOf, warBanned, cityAtTile, onHomeContinent, BARB_SEAT, FREE_SEAT, isFreeSeat, freeSeatOf, cityHolders, civLevelOf, tileClaimed, majorsMet, setPeaceTurnWith } from './seats';
 import { warWearinessBattle, warWearinessPeace, warWearinessTurn } from './weariness';
 import { snipeRing, snipeRing3, spreadFromUnit } from './unitOrders';
-import { unitKillEvent, buildingDedications, goldenDedication, layRoad } from './eras';
-import { defaultWarKind, warBuffProdPct, warKindAllowed } from './casusBelli';
+import { unitKillEvent, buildingDedications, layRoad } from './eras';
+import { defaultWarKind, warKindAllowed } from './casusBelli';
 import { WAR_KINDS, WAR_KIND_FORMAL, WAR_KIND_SURPRISE } from '../data/warKinds';
-import { DED_TO_ARMS, DED_STEAM, TO_ARMS_MIL_PROD_MULT, STEAM_WONDER_PROD_MULT } from '../data/seats';
-import { WONDER_ERA_INDEX } from '../data/builtWonders';
-import { INDUSTRIAL_ERA_INDEX, ERAS } from '../data/techs';
 
 import { gpCityPermOf } from '../data/greatPeople';
 import { questReligion } from './quests';
@@ -1322,14 +1318,19 @@ export function districtSiteCost(
  * its placement's `onFeature`) — runs/h1_duelw1117 t84: Chichen Itza placed
  * at (35,12) stands on its Rainforest in every record after, where the Oracle
  * (t61) and the Hanging Gardens (t75) took theirs off. */
-export function paveGround(tile: Tile, keep: readonly FeatureId[] = []): void {
+export function paveGround(state: GameState, tile: Tile, keep: readonly FeatureId[] = []): void {
   // the improvement goes, pillaged or not, and with it its pillage
   // (runs/h1_duelw1128 t34: China's wonder placed on the pillaged Farm at
   // (16,12), the plot unpillaged in record t35)
   tile.improvement = null;
   tile.pillaged = false;
   tile.feature = isFloodplains(tile.feature) || (tile.feature !== null && keep.includes(tile.feature)) ? tile.feature : null;
-  if (tile.resource && RESOURCES[tile.resource].category === 'bonus') tile.resource = null;
+  const resource = tile.resource;
+  if (resource && RESOURCES[resource].category === 'bonus') tile.resource = null;
+  // the district set on a bonus or luxury resource changes what its owner
+  // extracts (the district handler's 0x4ab4d0, as a centre's), its
+  // allocation ranked anew
+  extractionChanged(state, tile, resource);
 }
 
 /** The GROUND a district takes when it is placed — the same writes whether the
@@ -1343,7 +1344,7 @@ function paveDistrictTile(state: GameState, civCity: City, id: DistrictId, tileI
   const tile = state.map.tiles[tileIndex];
   tile.district = id;
   tile.districtComplete = false;
-  paveGround(tile);
+  paveGround(state, tile);
   civCity.districts.push({ type: id, tileIndex, cost });
   if (isCiv(civCity.seat)) refreshDistrictDiscount(state, civCity.seat, id);
   replaceAllCitizens(state, civCity, cityFlags(civCity));
@@ -1437,7 +1438,7 @@ export function placeSeatWonder(state: GameState, actor: Seat, civCity: City, de
   if (!tile) return false;
   tile.builtWonder = def.id;
   tile.builtWonderComplete = false;
-  paveGround(tile, def.placement.onFeature);
+  paveGround(state, tile, def.placement.onFeature);
   civCity.wonders.push({ id: def.id, tileIndex: tile.index });
   commitProduction(state, civCity.seat, civCity, { kind: 'wonder', wonder: def.id, tileIndex: tile.index, progress: 0 });
   // a wonder set on its plot re-places the city's citizens (0x180cb0 under
@@ -3110,15 +3111,11 @@ export function seatPhase(state: GameState, only?: { seats: ReadonlySet<number>;
     accrueStockpiles(state, actor.seat);
     chargeUnitUpkeep(state, actor.seat);
     resolveSeatPower(state, actor.seat);
-    // the holdings' luxury allocation, then the parks (0x4a8ed0: 0x4a6110,
-    // then 0x32deb0): every read of the processing takes this ranking but
-    // the economy's yields, which DoTurn banks before the resources step
-    // (0x4e4560: the science 0x4c9640, the gold 0x4e08f0, the culture
-    // 0x396860 and the faith 0x4967f0 ahead of 0x4a8ed0 at 0x4e46c0) on the
-    // allocation standing before it (`econLux`)
+    // the economy's yields read the luxury allocation standing as the turn
+    // opens (`econLux`): DoTurn banks the science, gold, culture and faith
+    // before its resources step rebuilds it (0x4e4560: 0x4c9640, 0x4e08f0,
+    // 0x396860, 0x4967f0 ahead of 0x4a8ed0 at 0x4e46c0)
     const econLux = standingLuxuries(state, actor.seat);
-    rebuildLuxuries(state, actor.seat);
-    refreshParkAmenities(state, actor.seat);
     // ESPIONAGE: this seat's own spies move a turn closer to arriving or to
     // resolving, and the clocks their missions left behind tick down.
     tickSpies(state, actor.seat);
@@ -3452,6 +3449,13 @@ export function seatPhase(state: GameState, only?: { seats: ReadonlySet<number>;
     spreadReligiousPressure(state, actor.seat);
     questReligion(state);
 
+    // THE RESOURCES STEP's luxury allocation, then the parks (0x4a8ed0:
+    // 0x4a6110, then 0x32deb0), after the economy: the ranking reads the
+    // amenities its government, cards and civics left (runs/h1_duelq1124
+    // t91: China's government and cards, Oligarchy's, re-rank Xi'an 1 -> 3)
+    rebuildLuxuries(state, actor.seat);
+    refreshParkAmenities(state, actor.seat);
+
     // THE CITIES, after the economy. CIV6: each city runs its production (the
     // completion, a Settler's citizen), then grows or starves on the city as
     // it stands after that completion, then claims its border tile, then
@@ -3478,12 +3482,6 @@ export function seatPhase(state: GameState, only?: { seats: ReadonlySet<number>;
         plainOf.set(civCity.id, st.plainProduction);
       }
     }
-    // CIV6 (Military alliance 2): "+15% Production toward military units
-    // when you or your ally are at war."
-    const warBuffPct = warBuffProdPct(state, actor.seat) / 100;
-    const milAllyWarPct = state.seats.some((x) => x.seat !== actor.seat
-      && alliedAtLevel(state, actor.seat, x.seat, ALLIANCE_MILITARY, 2)
-      && (atWarWithAny(state, actor.seat) || atWarWithAny(state, x.seat))) ? ALLIANCE_M2_MIL_PROD_PCT / 100 : 0;
     for (const civCity of walkCities) {
       const production = madeOf.get(civCity.id)!;
       const q = civCity.queue[0];
@@ -3491,128 +3489,6 @@ export function seatPhase(state: GameState, only?: { seats: ReadonlySet<number>;
       // one converted before it puts this turn's Production in
       delete civCity.projectYield;
       if (q && (q.kind === 'settler' || q.kind === 'unit' || q.kind === 'district' || q.kind === 'building' || q.kind === 'project' || q.kind === 'wonder')) {
-        // The seat's GOVERNMENT/POLICY encampHarborProdMult: a seat that
-        // adopts the government owns its effects; the multiplier keys on
-        // the ITEM, not on the seat.
-        let _em = isEncampHarborItem(q) ? seatMods.encampHarborProdMult : 1;
-        // CIV6 (To Arms!, Golden face): "+15% Production towards military
-        // units." (Heartbeat of Steam, Golden face): "+10% Production toward
-        // Industrial era and later wonders." The three item classes are
-        // disjoint, so the multiplier order is association-free.
-        if (q.kind === 'unit' && unitIsMilitary(q.unit) && goldenDedication(state, civCity.seat, DED_TO_ARMS)) _em *= TO_ARMS_MIL_PROD_MULT;
-        if (q.kind === 'wonder' && (WONDER_ERA_INDEX[q.wonder] ?? 0) >= INDUSTRIAL_ERA_INDEX && goldenDedication(state, civCity.seat, DED_STEAM)) _em *= STEAM_WONDER_PROD_MULT;
-        // CIV6 (Urban Development Treaty, outcome A): "+100% Production
-        // towards buildings in this district."
-        const _udtD = congressUdtProdDistrict(state);
-        if (q.kind === 'building' && _udtD !== null && BUILDINGS[q.building]?.district === _udtD) _em *= CONGRESS_PROD_MULT;
-        // CIV6 (Global Energy Treaty, outcome B): +100% Production toward the
-        // named power plant.
-        if (q.kind === 'building') _em *= congressEnergyProdMult(state, q.building);
-        // CIV6 (EFFECT_ADJUST_BUILDING_PRODUCTION): the roster's building rows
-        // CIV6 (Treasure Fleet): a row may be keyed on the city sitting OFF
-        // the seat's home continent — its original capital's continent
-        const _offHome = !onHomeContinent(state, civCity.seat, civCity.centerIndex);
-        if (q.kind === 'building') _em *= prodMultFor(seatMods.prodMults, { kind: 'building', building: q.building, district: BUILDINGS[q.building]?.district }, _offHome);
-        // CIV6 (Public Works Program): "+100% / -50% Production towards this
-        // Project."
-        if (q.kind === 'project') _em *= congressProjectMult(state, PROJECT_LIST.findIndex((pr) => pr.id === q.project));
-        // CIV6 (Zoning Commissioner): "+20% Production towards constructing
-        // Districts in the city".
-        // CIV6 (Letters of Marque): "Naval Raiders: +100% Production";
-        // (Flower Power, Mercenary Companies on Production): a unit cost
-        // multiplier, which this model pays as a slower fill rather than a
-        // moved queue cost.
-        if (q.kind === 'unit' && UNITS[q.unit]?.raider) _em *= seatMods.navalRaiderProdMult;
-        if (q.kind === 'unit') {
-          const _uc = itemCost(q);
-          const _ucm = unitProdCost(state, civCity.seat, q.unit, _uc);
-          if (_ucm > 0 && _ucm !== _uc) _em *= _uc / _ucm;
-        }
-        // CIV6 (Thunderbolt of the North): "+50% Production toward all naval
-        // melee units."
-        if (q.kind === 'unit' && leaderOf(state, civCity.seat) === 'HARDRADA' && navalMelee(UNITS[q.unit])) _em *= HARDRADA_NAVAL_MELEE_PROD_MULT;
-        // CIV6 (EFFECT_ADJUST_UNIT_TAG_ERA_PRODUCTION): the roster's unit-class rows
-        if (q.kind === 'unit') _em *= prodMultFor(seatMods.prodMults, { kind: 'unit', promoClass: promoClassOf(q.unit), unit: q.unit }, _offHome);
-        // CIV6 (Statue of Zeus, MODIFIER_PLAYER_CITIES_ADJUST_UNIT_TAG_ERA_PRODUCTION
-        // NO_ERA): the seat's wonders' unit-class rows, in catalog order
-        // (runs/h1_duelp1124 Wuhan's AT Crew 20 -> 51 -> 82 on 20.703 the
-        // turns after Shanghai's t213 Statue)
-        if (q.kind === 'unit') {
-          const _pc = promoClassOf(q.unit);
-          for (const w of seatWonders(state, civCity.seat)) {
-            const wp = w.def.effects?.unitClassProdPct;
-            if (wp && wp.promoClass === _pc) _em *= 1 + wp.pct / 100;
-          }
-        }
-        if (q.kind === 'district') _em *= governorMult(state, civCity, (e) => e.districtProdMult);
-        // CIV6 (Merchant Republic, GOVERNMENTBONUS_DISTRICT_PRODUCTION):
-        // "+15% Production toward Districts."
-        if (q.kind === 'district') _em *= seatMods.districtProdMult;
-        // CIV6 (Founder of Carthage): "+50% Production toward districts in the
-        // city with the Government Plaza" (`PLAZA_DISTRICT_PROD_ROWS`)
-        if (q.kind === 'district' && seatMods.plazaDistrictProd
-          && civCity.districts.some((d) => d.type === 'GOVERNMENT_PLAZA'
-            && state.map.tiles[d.tileIndex].districtComplete)) {
-          _em *= 1 + seatMods.plazaDistrictProd / 100;
-        }
-        // CIV6 (EFFECT_ADJUST_DISTRICT_PRODUCTION): the roster's district rows
-        if (q.kind === 'district') _em *= prodMultFor(seatMods.prodMults, { kind: 'district', districtItem: q.district }, _offHome);
-        // CIV6 (Space Initiative, Arms Race Proponent): +30% toward the named
-        // projects in the governor's city; (Hong Kong): "+20% Production
-        // towards city projects"
-        // (Future Tech): "+5% Production towards city projects each time it
-        // is completed" — the percent the seat has banked
-        if (q.kind === 'project') _em *= (1 + governorSum(state, civCity, (e) => e.projectProdPct?.[q.project]) / 100) * seatMods.projectProdMult * suzerainProjectMult(state, civCity.seat) * (1 + (seatOf(state, civCity.seat)?.researchProjectPct ?? 0) / 100);
-        // CIV6 (France, EFFECT_ADJUST_WONDER_ERA_PRODUCTION): "+20% Production
-        // toward Medieval, Renaissance, and Industrial era wonders" — an ERA
-        // BAND, inclusive at both ends (`WONDER_ERA_PROD_ROWS`)
-        if (q.kind === 'wonder' && seatMods.wonderEraProd.length) {
-          const we = WONDER_ERA_INDEX[q.wonder] ?? 0;
-          for (const r of seatMods.wonderEraProd) {
-            if (we >= ERAS.indexOf(r.startEra) && we <= ERAS.indexOf(r.endEra)) _em *= 1 + r.pct / 100;
-          }
-        }
-        // CIV6 (Pearl of the Danube): "+50% Production to Districts and
-        // Buildings constructed ACROSS A RIVER from a City Center." A building
-        // is built in its district, so its tile is that district's; a City
-        // Center building never crosses a river from the centre it stands on.
-        if (seatMods.riverCrossProd.length && (q.kind === 'district' || q.kind === 'building')) {
-          const at = q.kind === 'district'
-            ? q.tileIndex
-            : civCity.districts.find((d) => d.type === BUILDINGS[q.building]?.district)?.tileIndex;
-          if (at !== undefined && crossesRiver(state.map, state.map.tiles[civCity.centerIndex], state.map.tiles[at])) {
-            for (const r of seatMods.riverCrossProd) if (r.kind === q.kind) _em *= 1 + r.pct / 100;
-          }
-        }
-        // CIV6 (Iteru): "+15% Production towards Districts and Wonders built
-        // next to a River."
-        if ((q.kind === 'district' || q.kind === 'wonder') && seatMods.civ === 'EGYPT' && hasRiver(state.map.tiles[q.tileIndex])) {
-          _em *= ITERU_RIVER_PROD_MULT;
-        }
-        // CIV6 (Ancestral Hall): "50% increased Production toward Settlers in
-        // this city"; (Warlord's Throne): "Capturing an enemy City grants 20%
-        // bonus Production in all Cities for 5 turns". Both are percentages, so
-        // they join the cards' additive stack rather than compounding on it.
-        let _bpct = q.kind === 'settler' ? cityBuildingSum(state, civCity, 'settlerProdPct') / 100 : 0;
-        if ((actor.conquestProdTurns ?? 0) > 0) {
-          _bpct += seatBuildingSum(state, actor.seat, 'conquestProdPct') / 100;
-        }
-        if (q.kind === 'unit' && unitIsMilitary(q.unit)) _bpct += milAllyWarPct;
-        // CIV6 (Integrated Space Cell, EFFECT_ADJUST_SPACE_RACE_PROJECTS_PRODUCTION):
-        // "+15% Production toward Space Race projects if a city has either a
-        // Military Academy or a Seaport" — a building standing, not dark
-        if (q.kind === 'project' && isSpaceProject(q.project) && seatMods.spaceProjectProd.length) {
-          const dark = darkBuildings(state.map, civCity);
-          for (const r of seatMods.spaceProjectProd) {
-            if (r.buildings.some((b) => civCity.buildings.includes(b) && !dark.has(b))) _bpct += r.pct / 100;
-          }
-        }
-        // CIV6 (TRAIT_LIBERATION_WAR_PRODUCTION, YIELD_PRODUCTION Amount 100):
-        // a percent on every item for the turns after the declaration
-        _bpct += warBuffPct;
-        // CIV6 (Brussels, EFFECT_ADJUST_WONDER_PRODUCTION): percent toward wonders
-        if (q.kind === 'wonder') _bpct += suzerainWonderPct(state, actor.seat) / 100;
-        _em *= 1 + prodBoostPct(seatMods, q, actor.gpPerm) + _bpct;
         const progressBefore = q.progress;
         const banked = civCity.productionBank ?? 0;
         // CIV6 (City_BuildQueue 0x184660 at 0x1847dc): a district whose plot
@@ -3626,10 +3502,10 @@ export function seatPhase(state: GameState, only?: { seats: ReadonlySet<number>;
         // CIV6 (City_BuildQueue 0x16f050 → the order's step, 0x1853d0 for a
         // unit): the turn's Production toward the item (with its envoys'
         // flat, `computeCityStats`) plus the overflow store, the SUM under
-        // the item's percents (0x1856ed multiplies it by the item's
-        // multiplier before 0x0ac650 adds it to the item's progress;
+        // the item's multiplier, in 24.8 (`stepMultiplier`: 0x1856ed
+        // multiplies it before 0x0ac650 adds it to the item's progress;
         // runs/h1_duelw1118 Rome t16, a Warrior on Agoge)
-        q.progress += (production + banked) * _em;
+        q.progress += stepAmount(production + banked, stepMultiplier(state, civCity, q));
         civCity.productionBank = 0;
         repairDrip(state, civCity, progressBefore);
         const cost = itemCost(q, state, civCity);

@@ -45,6 +45,7 @@
     - "H-1: the cards the luxury allocation ranks on — READ (the order), the triggers partly"
     - "H-1: a growth re-ranks no luxury; war weariness's amenities at the processing — READ"
     - "H-4: a wonder under a hostile unit, the economy before the luxury rebuild, the extraction a pillage and a centre change — READ, both twins"
+    - "H-4: the step's item multiplier in 24.8 and a Builder's wonder charge through it; the resources step after the economy; an event's pillage and a district's resource re-rank the luxuries — READ, both twins"
   context:
     - "Player_Resources.cpp 0x4a6110 (callers 0x4a7560, the import/export setter, and 0x4a8ed0) rebuilds `m_aLuxuryAllocations..."
     - "...at the list's end — a wrapping (no-cap, copies > 1) one runs on from the list's start (0x4a6b74)."
@@ -225,6 +226,7 @@
     - "H-1: the cards the luxury allocation ranks on — READ (the order), the triggers partly"
     - "H-1: a growth re-ranks no luxury; war weariness's amenities at the processing — READ"
     - "H-4: a wonder under a hostile unit, the economy before the luxury rebuild, the extraction a pillage and a centre change — READ, both twins"
+    - "H-4: the step's item multiplier in 24.8 and a Builder's wonder charge through it; the resources step after the economy; an event's pillage and a district's resource re-rank the luxuries — READ, both twins"
   context:
     - "Player_Resources.cpp 0x4a6110 (callers 0x4a7560, the import/export setter, and 0x4a8ed0) rebuilds `m_aLuxuryAllocations` (Player_Resources +0x460, serialized at 0x4a3d46):"
     - "...in order: the culture (+0x1310, 0x396860: the civic progress), the resources (+0x1320, 0x4a8ed0 at 0x4e46c0: the holdings recomputed by 0x4ab6e0, then 0x4a6110 rebuilds the allocation..."
@@ -553,11 +555,14 @@
     - cpu/core/combat.ts:hostilePillage
     - cpu/core/game.ts:foundCityAt
     - gpu/core/sim_seats.py:_extraction_changed_at
+    - cpu/core/phase.ts:paveGround
+    - gpu/core/sim_minors.py:_pave_plot
   readings:
     - "H-1: the luxury allocation stored, its rebuild's triggers — READ (the triggers ported), LAB (the pillage)"
     - "H-1: the luxury allocation's rebuilds — PARTLY READ"
     - "H-1: the cards the luxury allocation ranks on — READ (the order), the triggers partly"
     - "H-4: a wonder under a hostile unit, the economy before the luxury rebuild, the extraction a pillage and a centre change — READ, both twins"
+    - "H-4: the step's item multiplier in 24.8 and a Builder's wonder charge through it; the resources step after the economy; an event's pillage and a district's resource re-rank the luxuries — READ, both twins"
   context:
     - ...g, 0x184d95 project, 0x1856b3 / 0x185a2a unit), a plot's extracted resource changing (0x4ab4d0 from the city, district and plot handlers 0x4ac2e0..0x4ad0d0; an accumulated resource s...
     - ...56b3 / 0x185a2a) calls 0x4a7560. A Builder's improvement on a resource rebuilds through 0x4ab4d0 (non-accumulated resources only). The harness ranks each major's record allocation on t...

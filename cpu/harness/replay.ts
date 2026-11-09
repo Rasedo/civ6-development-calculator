@@ -2665,7 +2665,7 @@ function placeHead(ctx: Ctx, actor: Seat, city: City, q: QueueItem): boolean {
       }
       t.district = q.district;
       t.districtComplete = false;
-      paveGround(t);
+      paveGround(state, t);
       if (!city.districts.some((d) => d.tileIndex === q.tileIndex)) {
         city.districts.push({ type: q.district, tileIndex: q.tileIndex, cost: q.cost });
         refreshDistrictDiscount(state, seat, q.district);
@@ -2680,7 +2680,7 @@ function placeHead(ctx: Ctx, actor: Seat, city: City, q: QueueItem): boolean {
       const ok = canPlaceWonder(state, city, q.wonder, q.tileIndex, seat).ok;
       t.builtWonder = q.wonder;
       t.builtWonderComplete = false;
-      paveGround(t, BUILT_WONDERS[q.wonder]?.placement.onFeature);
+      paveGround(state, t, BUILT_WONDERS[q.wonder]?.placement.onFeature);
       if (!city.wonders.some((w) => w.id === q.wonder)) city.wonders.push({ id: q.wonder, tileIndex: q.tileIndex });
       // set on its plot, the city's citizens re-placed (0x180cb0)
       replaceAllCitizens(state, city, cityFlags(city));

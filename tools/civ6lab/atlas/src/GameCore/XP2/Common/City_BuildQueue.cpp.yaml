@@ -87,7 +87,12 @@
     - recording: h1_duelw1124
       turn: 3
       value: "BOTH WALKS TAKE THE   PLOT'S OFFSET (x, y) AS AXIAL, standing on the plot at column x + y/2 of   the row (runs/h1_duelw1124 t3, China's capital at (3,10): no Desert within   3 of it, four within 3 of "
-  impl: [cpu/core/aiModifiers.ts:ANALYZERS]
+  impl:
+    - cpu/core/aiModifiers.ts:ANALYZERS
+    - cpu/core/production.ts:fxBy
+    - cpu/core/production.ts:stepMultiplier
+    - gpu/core/sim_phase.py:_fx_by
+    - gpu/core/sim_phase.py:_step_mult
   readings:
     - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
     - "C-97: the religion AI — the belief scores READ (the job, the value, the analysis's attach), the picks READ, the analyzers PARTLY READ"
@@ -95,6 +100,7 @@
     - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
     - "C-102: the citizen pressure's falloff and the per-citizen term — READ; Stamford Raffles' city"
     - "H-4: a wonder under a hostile unit, the economy before the luxury rebuild, the extraction a pillage and a centre change — READ, both twins"
+    - "H-4: the step's item multiplier in 24.8 and a Builder's wonder charge through it; the resources step after the economy; an event's pillage and a district's resource re-rank the luxuries — READ, both twins"
   notes:
     - "label: fx_mul_assign(a*=b)"
     - ".claude/scratchpad/cb/notes.txt: ...| trunc((f-floor)*256)&0xff ; fx(0.01)=2 (!), fx(0.5)=128, fx(1/6 const 0.16667)=42. fx_mul a*b>>8 (0x16eb20 assign, 0x16e7d0 new), fx_div (a<<8)/b trunc (0x16e940), add 0xac650, sub 0x16ec10. FX_MIN=-9999.0..."
@@ -145,7 +151,7 @@
     - cpu/core/phase.ts:banked
     - cpu/core/phase.ts:conv
     - cpu/core/phase.ts:lacked
-    - cpu/core/phase.ts:milAllyWarPct
+    - cpu/core/production.ts:stepMultiplier
     - gpu/core/sim_phase.py:_seat_city_produce
     - gpu/core/sim_minors.py:_minor_build
     - cpu/harness/cityBuildLab.ts:done
@@ -154,6 +160,9 @@
     - cpu/core/phase.ts:headCost
     - cpu/core/production.ts:wonderLetGo
     - gpu/core/sim_phase.py:_wonder_let_go
+    - cpu/core/phase.ts:plainOf
+    - cpu/core/production.ts:stepMultiplier
+    - gpu/core/sim_phase.py:_step_mult
   readings:
     - "H-1: a district project's yield conversion — READ"
     - "H-1: the build queue's overflow, the yields' fixed point, the dispersal Gold, the pantheon's price — READ"
@@ -162,6 +171,7 @@
     - "C-130: a lump's queue step completes the head; a major's trade list tries what its last turn revealed; a city-state's researched technology lands its boosts before the Culture — READ, both twins"
     - "C-111: a major's district lets go of the queue under a hostile unit, the queue's progress and overflow read from the city's memory — READ (0x184660 at 0x1847dc, 0x5313f0, 0x17f630), both twins"
     - "H-4: a wonder under a hostile unit, the economy before the luxury rebuild, the extraction a pillage and a centre change — READ, both twins"
+    - "H-4: the step's item multiplier in 24.8 and a Builder's wonder charge through it; the resources step after the economy; an event's pillage and a district's resource re-rank the luxuries — READ, both twins"
   context:
     - ...e city's yield component) and its project id (+0x1360 = -1), then applies the Production (0x16f050), whose ORDER_ADVANCE arm 0x184ae0 walks the project's Project_YieldConversions rows (Pro...
     - "- The queue's step (City_BuildQueue 0x177d10 → 0x16f050) reads the city's Production twice through 0x1c5350: A with the head's id (the Producti..."
@@ -184,6 +194,7 @@
   readings:
     - "C-130: a lump's queue step completes the head; a major's trade list tries what its last turn revealed; a city-state's researched technology lands its boosts before the Culture — READ, both twins"
     - "C-111: a major's district lets go of the queue under a hostile unit, the queue's progress and overflow read from the city's memory — READ (0x184660 at 0x1847dc, 0x5313f0, 0x17f630), both twins"
+    - "H-4: the step's item multiplier in 24.8 and a Builder's wonder charge through it; the resources step after the economy; an event's pillage and a district's resource re-rank the luxuries — READ, both twins"
   review: reviewed
 - addr: 0x16f7b0
   kind: function
@@ -1354,14 +1365,28 @@
 - addr: 0x183db0
   final: 0x1049b0
   kind: function
-  status: PARTLY
+  semantics: "ORDER_CONSTRUCT's step (a building or a wonder): the step's argument (the amount +0, the multiplier +8, raw 24.8) takes each factor turned into 24.8 on its own (a float32 percent x 0.01 + 1.0, floor << 8 | trunc(frac x 256): 1.1 is 281) through fx_mul_assign 0x16eb20 — a wonder (Buildings +0x158 & 0x40) the queue's +0x308, +0x30c under 0x17d460, 0x17d520's above 1; a building 0x178610's above 1 and +0x318; then (1 + the player's percents) x the per-building +0x2a8 word, and 0x17ae50's — then the amount x the multiplier (0x16eb20 at 0x18439d) is added to the item's progress (0xac650)."
+  status: READ
+  cases:
+    - recording: h1_duelq1121
+      turn: 38
+      value: Xi'an's Pyramids 18.66 + a Builder's 16.5 x 281/256 = 36.77 of 110 (record t39)
+  impl:
+    - cpu/core/production.ts:stepMultiplier
+    - cpu/core/production.ts:stepAmount
+    - cpu/core/production.ts:fxFactor
+    - gpu/core/sim_phase.py:_step_mult
+    - gpu/core/sim_phase.py:_step_amount
+    - gpu/core/sim_phase.py:_fx_factor
+    - cpu/core/game.ts:wonderChargeBoost
   readings:
     - "H-1: the luxury allocation's rebuilds — PARTLY READ"
     - "C-112: the majors' citizens by the citizen manager — READ (0x1fa1d0 at 0x1fa22d, 0x196320's callers), both twins"
     - "H-4: a wonder under a hostile unit, the economy before the luxury rebuild, the extraction a pillage and a centre change — READ, both twins"
+    - "H-4: the step's item multiplier in 24.8 and a Builder's wonder charge through it; the resources step after the economy; an event's pillage and a district's resource re-rank the luxuries — READ, both twins"
   context:
     - "...on-accumulated import / export. Its callers: a production completion's strategic costs (0x18433d building, 0x184d95 project, 0x1856b3 / 0x185a2a unit), a plot's extracted resource chan..."
-  review: imported
+  review: reviewed
 - addr: 0x184660
   final: 0x104f40
   kind: function
@@ -1378,6 +1403,8 @@
     - gpu/core/sim_phase.py:_seat_city_produce
     - gpu/core/sim_phase.py:_lump_step
     - cpu/core/phase.ts:banked
+    - cpu/core/production.ts:stepMultiplier
+    - gpu/core/sim_phase.py:_step_mult
   readings:
     - "C-111: a major's district lets go of the queue under a hostile unit, the queue's progress and overflow read from the city's memory — READ (0x184660 at 0x1847dc, 0x5313f0, 0x17f630), both twins"
   review: reviewed
@@ -1400,6 +1427,8 @@
     - cpu/data/projects.ts:projectConversionRate
     - gpu/core/sim_phase.py:_seat_city_produce
     - cpu/core/stockpile.ts:chargeProjectResource
+    - cpu/core/production.ts:stepMultiplier
+    - gpu/core/sim_phase.py:_step_mult
   readings:
     - "H-1: a district project's yield conversion — READ"
     - "H-1: the luxury allocation's rebuilds — PARTLY READ"
@@ -1429,6 +1458,8 @@
     - gpu/core/sim_minors.py:_minor_finish
     - cpu/core/phase.ts:letGo
     - cpu/core/stockpile.ts:chargeUnitResource
+    - cpu/core/production.ts:stepMultiplier
+    - gpu/core/sim_phase.py:_step_mult
   readings:
     - "H-1: the luxury allocation's rebuilds — PARTLY READ"
     - "H-1: a completion's overflow and the item multiplier — READ"

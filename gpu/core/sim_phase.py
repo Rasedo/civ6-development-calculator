@@ -217,14 +217,12 @@ class SimPhase:
         self._seat_accrue_stockpile(row)
         self._seat_charge_upkeep(row)
         self._resolve_seat_power(row)
-        # the holdings' luxury allocation, then the parks (0x4a8ed0); the
-        # economy's yields read the allocation standing before it (DoTurn
-        # 0x4e4560 banks the science, gold, culture and faith ahead of the
-        # resources step, `econLux`), a city founded since holding none
+        # the economy's yields read the luxury allocation standing as the
+        # turn opens (`econLux`): DoTurn banks the science, gold, culture and
+        # faith before its resources step rebuilds it (0x4e4560), a city
+        # founded since holding none
         econ_lux = torch.where(self.city_alive[:, row, :self.RC], self.city_lux_amen[:, row, :self.RC],
                                torch.zeros_like(self.city_lux_amen[:, row, :self.RC]))
-        self._rebuild_luxuries(row, active)
-        self._refresh_park_amenities(row, active)
         # ESPIONAGE: this seat's own spies move a turn closer to arriving or to
         # resolving, and the clocks their missions left behind tick down.
         self._tick_spies(row)
@@ -254,6 +252,11 @@ class SimPhase:
         # cities (`spreadReligiousPressure`'s place in `seatPhase`)
         self._spread_religious_pressure(row, active)
         self._quest_religion(active)
+        # THE RESOURCES STEP's luxury allocation, then the parks (0x4a8ed0),
+        # after the economy: the ranking reads the amenities its government,
+        # cards and civics left (`seatPhase`)
+        self._rebuild_luxuries(row, active)
+        self._refresh_park_amenities(row, active)
 
         # THE CITIES, after the economy (`seatPhase`'s walk). CIV6: each city
         # runs its production, then grows or starves on the city as it stands
@@ -1271,55 +1274,39 @@ class SimPhase:
               & self._seats_hostile(row, self.unit_seat))
         return (plot >= 0) & on.any(dim=1)
 
-    def _seat_city_produce(self, row: int, col: torch.Tensor, act: torch.Tensor,
-                           prod: torch.Tensor, sci_turn: torch.Tensor | None = None,
-                           pre: dict | None = None, plain: torch.Tensor | None = None,
-                           let_go: bool = True) -> None:
-        """The queue head's turn — the production add, the banked chop, the
-        completion and every completion's payout. ONE body, every seat row, at
-        the per-city seatPhase position (the city's first step, before its
-        growth).
+    @staticmethod
+    def _fx_factor(f) -> torch.Tensor:
+        """A step factor as the DLL turns it into 24.8 (TS `fxFactor`; 0x183db0:
+        the float32 factor's floor as the whole part, its fraction's 256ths
+        truncated: 1.1 is 281 / 256), raw, float64."""
+        g = torch.as_tensor(f, dtype=torch.float64).to(torch.float32)
+        fl = torch.floor(g)
+        return fl.double() * 256 + torch.trunc((g - fl) * 256).double()
 
-        Only the HEAD accrues — a deeper entry keeps whatever hammers it
-        already holds and waits — and a completion SHIFTS the queue. The
-        city's overflow store (`city_prod_bank`) takes a completion's overflow
-        and an empty queue's Production, and the next step pays it into the
-        head.
+    @classmethod
+    def _fx_by(cls, m: torch.Tensor, f) -> torch.Tensor:
+        """`m` (raw 24.8) times the factor `f` (fx_mul_assign 0x16eb20: (a b) >> 8)."""
+        return torch.floor(m * cls._fx_factor(f).to(m.device) / 256)
 
-        `pre` is `_produce_pre(row)`, the seat half of the multiplier chain;
-        a caller with one city (every direct test) may leave it out. `plain`
-        is the city's Production with no city-state flat toward the head
-        (`plainProduction`); left out, it is `prod`. `let_go` False is a
-        completion outside the step (`_complete_head_now`), which no hostile
-        unit stops."""
+    @staticmethod
+    def _step_amount(amount: torch.Tensor, mult: torch.Tensor) -> torch.Tensor:
+        """`amount` put into an item under the step's multiplier `mult` (raw
+        24.8; TS `stepAmount`): the amount in 24.8 times it, float64."""
+        return torch.floor(torch.floor(amount.double() * 256 + 0.5) * mult / 256) / 256
+
+    def _step_mult(self, row: int, col: torch.Tensor, cur: torch.Tensor, qt0: torch.Tensor,
+                   pre: dict) -> torch.Tensor:
+        """[B] THE QUEUE STEP'S ITEM MULTIPLIER of city `col` of seat row `row`
+        (TS `stepMultiplier`; City_BuildQueue 0x16f050 -> 0x183db0 / 0x1853d0 /
+        0x184660 / 0x184ae0), raw 24.8: each factor turned into 24.8 on its
+        own and multiplied in through fx_mul_assign (0x16eb20), the item's
+        additive percents one factor (1 + their sum). `cur` is the head's
+        item (a formation's its unit), `qt0` its plot, `pre` `_produce_pre(row)`.
+        The item classes the factors key on are disjoint, so a factor's place
+        among another class's moves nothing; within a class they run in TS's
+        order."""
         bidx = self._bidx
-        if pre is None:
-            pre = self._produce_pre(row)
-        # CIV6 (City_BuildQueue 0x177d10): the step clears the yield the last
-        # one converted before it puts this turn's Production in
-        self.city_proj_conv[bidx, row, col] = torch.where(
-            act, torch.zeros_like(self.city_proj_conv[bidx, row, col]), self.city_proj_conv[bidx, row, col])
-        self.city_proj_yield[bidx, row, col] = torch.where(
-            act, torch.full_like(self.city_proj_yield[bidx, row, col], -1), self.city_proj_yield[bidx, row, col])
-        cur = self.city_current[bidx, row, col, 0].clone()
-        # A FORMATION head is the unit's own column to every multiplier and to
-        # the completion below — TS's `kind === 'unit'` tests cannot tell them
-        # apart — and only the spawn asks the tier.
-        form_t = self._q_form_tier(cur)
-        cur = self._q_unit_of(cur)
-        # the head's PLOT, read before the shift takes it away
-        qt0 = self.city_qtile[bidx, row, col, 0].clone()
-        has_q = act & (cur >= 0)
-        # CIV6 (City_BuildQueue 0x16f050): a city with nothing queued adds the
-        # turn's Production to its overflow store
-        _bk0 = self.city_prod_bank[bidx, row, col]
-        self.city_prod_bank[bidx, row, col] = torch.where(act & (cur < 0), _bk0 + prod.to(_bk0.dtype), _bk0)
-        if not bool(has_q.count_nonzero()):
-            return
-        # ONE multiplier, assembled in phase.ts's own order and applied once:
-        # a military unit under To Arms AND a production card takes
-        # `production * (a * b)`, never `(production * a) * b`.
-        _emall = torch.ones_like(prod)
+        _emall = torch.full((self.B,), 256.0, dtype=torch.float64, device=self.device)
         em = pre["em"]
         if em is not None:
             _bd = self._b_req_district.take(cur.clamp(min=0, max=self.NB - 1))
@@ -1328,7 +1315,7 @@ class SimPhase:
                 enc_i = enc_i | (cur == self.DISTRICT_BASE + self._encamp_si)
             if self._harbor_si >= 0:
                 enc_i = enc_i | (cur == self.DISTRICT_BASE + self._harbor_si)
-            _emall = torch.where(enc_i, em.to(_emall.dtype), _emall)
+            _emall = torch.where(enc_i, self._fx_by(_emall, em), _emall)
         # CIV6 (To Arms!, Golden face): "+15% Production towards military
         # units." (Heartbeat of Steam, Golden face): "+10% Production toward
         # Industrial era and later wonders." Item classes are disjoint, so the
@@ -1337,25 +1324,25 @@ class SimPhase:
         if pre["ta_on"]:
             mil_i = (cur >= self.UNIT_BASE) & (cur < self.UNIT_BASE + self.NU) \
                 & self._type_military[(cur - self.UNIT_BASE).clamp(min=0, max=self.NU - 1)]
-            _emall = torch.where(ta & mil_i, _emall * self._to_arms_prod, _emall)
+            _emall = torch.where(ta & mil_i, self._fx_by(_emall, self._to_arms_prod), _emall)
         stm = pre["stm"]
         if pre["stm_on"]:
             nw = self._wonder_era.shape[0]
             wid = (cur - self.WONDER_BASE).clamp(min=0, max=nw - 1)
             won_i = (cur >= self.WONDER_BASE) & (cur < self.WONDER_BASE + nw) \
                 & (self._wonder_era[wid] >= self._industrial_era)
-            _emall = torch.where(stm & won_i, _emall * self._steam_wonder_prod, _emall)
+            _emall = torch.where(stm & won_i, self._fx_by(_emall, self._steam_wonder_prod), _emall)
         # CIV6 (Urban Development Treaty, outcome A): "+100% Production
         # towards buildings in this district." The x2 is exact in f64, so the
         # multiplier order against VETERANCY cannot re-associate anything.
         _cp = pre["cp"]
         _bldg_i = (cur >= 0) & (cur < self.NB) & (_cp != self.UDT_NONE) \
             & (self._b_req_district.take(cur.clamp(min=0, max=self.NB - 1)) == _cp)
-        _emall = torch.where(_bldg_i, _emall * self._c_prod_mult, _emall)
+        _emall = torch.where(_bldg_i, self._fx_by(_emall, self._c_prod_mult), _emall)
         # CIV6 (Global Energy Treaty, outcome B): +100% Production toward the
         # named power plant.
         _eg = pre["eg"]
-        _emall = torch.where((_eg >= 0) & (cur == _eg), _emall * self._c_energy_prod_mult, _emall)
+        _emall = torch.where((_eg >= 0) & (cur == _eg), self._fx_by(_emall, self._c_energy_prod_mult), _emall)
         # CIV6 (EFFECT_ADJUST_BUILDING_PRODUCTION): the roster's building rows —
         # a named building or every building of a district
         # a named building, every building of a district, EVERY building, or a
@@ -1389,7 +1376,7 @@ class SimPhase:
                 if _off_home is None:
                     _off_home = ~self._on_home_continent(row, self.city_center[bidx, row, col])
                 _hit = _hit & _off_home
-            _emall = torch.where(_hit & _who, _emall * (1.0 + _pct / 100.0), _emall)
+            _emall = torch.where(_hit & _who, self._fx_by(_emall, (1.0 + _pct / 100.0)), _emall)
         # CIV6 (Public Works Program): "+100% / -50% Production towards this
         # Project." The queue head is ONE item per game, so the projects the
         # batch is actually building are read off it in one sync instead of
@@ -1402,7 +1389,7 @@ class SimPhase:
             if bool(_pon.count_nonzero()):
                 for _p in sorted({int(x) for x in pidx[_pon].tolist()}):
                     on = (pidx == _p)
-                    _emall = torch.where(on, _emall * self._congress_project_mult(_p), _emall)
+                    _emall = torch.where(on, self._fx_by(_emall, self._congress_project_mult(_p)), _emall)
         _is_unit = (cur >= self.UNIT_BASE) & (cur < self.UNIT_BASE + self.NU)
         _ut = (cur - self.UNIT_BASE).clamp(min=0, max=self.NU - 1)
         _fx = pre["fx"]
@@ -1412,7 +1399,7 @@ class SimPhase:
         if _fx["raiderprod"] is not None:
             _rp = _fx["raiderprod"].to(_emall.dtype)
             _emall = torch.where(_is_unit & self._type_raider[_ut],
-                                 _emall * _rp, _emall)
+                                 self._fx_by(_emall, _rp), _emall)
         # (Flower Power, Mercenary Companies on Production): the unit's
         # production cost moves (`unitProdCost`) — land units other than Rock
         # Bands at double, then every unit of a military formation, the
@@ -1429,26 +1416,26 @@ class SimPhase:
         _merc_u = _is_unit & ((self._type_combat[_ut] > 0) | self._type_support[_ut])
         _ucm = torch.where(_merc_u & (_mc != 1), mercenary_cost(_ucm, _mc), _ucm)
         _ucf = _uc / torch.where(_ucm > 0, _ucm, torch.ones_like(_ucm))
-        _emall = torch.where(_is_unit & (_ucm > 0) & (_ucm != _uc), _emall * _ucf.to(_emall.dtype), _emall)
+        _emall = torch.where(_is_unit & (_ucm > 0) & (_ucm != _uc), self._fx_by(_emall, _ucf.to(_emall.dtype)), _emall)
         # CIV6 (Automated Workforce): "+20% Production towards city
         # projects."
         if _fx["projprod"] is not None and self._proj_rows:
             _pp = _fx["projprod"].to(_emall.dtype)
             _proj_i = (cur >= self.PROJECT_BASE) & (cur < self.PROJECT_BASE + len(self._proj_rows))
-            _emall = torch.where(_proj_i, _emall * _pp, _emall)
+            _emall = torch.where(_proj_i, self._fx_by(_emall, _pp), _emall)
         # CIV6 (Zoning Commissioner): "+20% Production towards constructing
         # Districts in the city" — per CITY, not per seat.
         if self.n_governors and row < self.n_majors:
             _dm = self._gov_chan(row, "mult", "districtProdMult")[bidx, col].to(_emall.dtype)
             if bool((_dm != 1).count_nonzero()):
                 _dist_i = (cur >= self.DISTRICT_BASE) & (cur < self.DISTRICT_BASE + len(self.districts_cat))
-                _emall = torch.where(_dist_i, _emall * _dm, _emall)
+                _emall = torch.where(_dist_i, self._fx_by(_emall, _dm), _emall)
         # CIV6 (Merchant Republic, GOVERNMENTBONUS_DISTRICT_PRODUCTION): "+15%
         # Production toward Districts" — the seat's, right after the governor's
         if pre["fx"]["distprod"] is not None:
             _dp = pre["fx"]["distprod"].to(_emall.dtype)
             _dist_i = (cur >= self.DISTRICT_BASE) & (cur < self.DISTRICT_BASE + len(self.districts_cat))
-            _emall = torch.where(_dist_i, _emall * _dp, _emall)
+            _emall = torch.where(_dist_i, self._fx_by(_emall, _dp), _emall)
         # CIV6 (Space Initiative, Arms Race Proponent): +30% toward the named
         # projects in the governor's city — a percent per (promotion, project)
         if self.n_governors and row < self.n_majors and self._proj_rows:
@@ -1458,21 +1445,21 @@ class SimPhase:
             if bool(_gon.count_nonzero()):
                 _gpct = self._governor_vec(row, "projectProdPct")[bidx, col]      # [B, nP]
                 _gpct = _gpct.gather(1, _gpi.clamp(min=0, max=_nP - 1).unsqueeze(1)).squeeze(1)
-                _emall = torch.where(_gon, _emall * (1.0 + _gpct / 100.0).to(_emall.dtype), _emall)
+                _emall = torch.where(_gon, self._fx_by(_emall, (1.0 + _gpct / 100.0).to(_emall.dtype)), _emall)
         # CIV6 (Hong Kong): "+20% Production towards city projects" — third of
         # the four project factors, the order TS composes them in.
         _hk = pre["hk"]
         if _hk is not None:
             _proj_i = (cur >= self.PROJECT_BASE) & (cur < self.PROJECT_BASE + len(self._proj_rows))
             _emall = torch.where(_proj_i & _hk,
-                                 _emall * (1.0 + self._suz_proj_pct / 100.0), _emall)
+                                 self._fx_by(_emall, (1.0 + self._suz_proj_pct / 100.0)), _emall)
         # CIV6 (Future Tech): "+5% Production towards city projects each time
         # it is completed" — the percent the seat has banked
         if self._proj_rows and row < self.n_majors:
             _rp = self.civ_research_project_pct[bidx, row]
             if bool(_rp.count_nonzero()):
                 _proj_i = (cur >= self.PROJECT_BASE) & (cur < self.PROJECT_BASE + len(self._proj_rows))
-                _emall = torch.where(_proj_i, _emall * (1.0 + _rp.to(_emall.dtype) / 100.0), _emall)
+                _emall = torch.where(_proj_i, self._fx_by(_emall, (1.0 + _rp.to(_emall.dtype) / 100.0)), _emall)
         # CIV6 (Founder of Carthage): "+50% Production toward districts in the
         # city with the Government Plaza" (`PLAZA_DISTRICT_PROD_ROWS`)
         if pre["plaza"]:
@@ -1480,12 +1467,12 @@ class SimPhase:
             _pz = self.city_dist_tile[bidx, row, col, self._govplaza_didx]
             _pz_ok = (_pz >= 0) & self.district_complete[bidx, _pz.clamp(min=0)]
             for _zp, _zw in pre["plaza"]:
-                _emall = torch.where(_pd_i & _pz_ok & _zw, _emall * (1.0 + _zp / 100.0), _emall)
+                _emall = torch.where(_pd_i & _pz_ok & _zw, self._fx_by(_emall, (1.0 + _zp / 100.0)), _emall)
         # CIV6 (Thunderbolt of the North): "+50% Production toward all naval
         # melee units."
         _hard = pre["hard"]
         if _hard is not None:
-            _emall = torch.where(_is_unit & self._type_naval_melee[_ut] & _hard, _emall * self._hard_naval_prod, _emall)
+            _emall = torch.where(_is_unit & self._type_naval_melee[_ut] & _hard, self._fx_by(_emall, self._hard_naval_prod), _emall)
         # CIV6 (EFFECT_ADJUST_UNIT_TAG_ERA_PRODUCTION): the roster's unit-class rows
         # a promotion class, ONE unit type (EFFECT_ADJUST_UNIT_PRODUCTION), or every unit
         for (_rc, _rl, _rb, _rd, _rp, _pct, _rdi, _rev, _ru, _rho), _who in pre["urows"]:
@@ -1499,7 +1486,7 @@ class SimPhase:
                 if _off_home is None:
                     _off_home = ~self._on_home_continent(row, self.city_center[bidx, row, col])
                 _cls_i = _cls_i & _off_home
-            _emall = torch.where(_cls_i & _who, _emall * (1.0 + _pct / 100.0), _emall)
+            _emall = torch.where(_cls_i & _who, self._fx_by(_emall, (1.0 + _pct / 100.0)), _emall)
         # CIV6 (Statue of Zeus, MODIFIER_PLAYER_CITIES_ADJUST_UNIT_TAG_ERA_PRODUCTION
         # NO_ERA): the seat's wonders' unit-class rows, in catalog order, read
         # live (a wonder an earlier city completed this step counts)
@@ -1511,7 +1498,7 @@ class SimPhase:
                     if _wpc < 0:
                         continue
                     _cls_i = _is_unit & (self.rules_dev.u_promo_class[_ut] == _wpc) & _wh[:, _wi]
-                    _emall = torch.where(_cls_i, _emall * (1.0 + _wpct / 100.0), _emall)
+                    _emall = torch.where(_cls_i, self._fx_by(_emall, (1.0 + _wpct / 100.0)), _emall)
         # CIV6 (Iteru): "+15% Production towards Districts and Wonders built
         # next to a River."
         _egypt = pre["egypt"]
@@ -1524,7 +1511,7 @@ class SimPhase:
             _wplot = self.city_wonder[bidx, row, col, (cur - self.WONDER_BASE).clamp(min=0, max=_nw - 1)]
             _plot = torch.where(_w_i, _wplot, qt0)
             _riv = (_plot >= 0) & self.tile_river[bidx, _plot.clamp(min=0)]
-            _emall = torch.where((_d_i | _w_i) & _riv & _egypt, _emall * self._iteru_mult, _emall)
+            _emall = torch.where((_d_i | _w_i) & _riv & _egypt, self._fx_by(_emall, self._iteru_mult), _emall)
         # CIV6 (France, EFFECT_ADJUST_WONDER_ERA_PRODUCTION): "+20% Production
         # toward Medieval, Renaissance, and Industrial era wonders" — an ERA
         # BAND, inclusive at both ends (`WONDER_ERA_PROD_ROWS`)
@@ -1533,7 +1520,7 @@ class SimPhase:
             _wid = (cur - self.WONDER_BASE).clamp(min=0, max=max(_nw - 1, 0))
             _isw = (cur >= self.WONDER_BASE) & (cur < self.WONDER_BASE + _nw)
             _band = _isw & (self._wonder_era.take(_wid) >= _fs) & (self._wonder_era.take(_wid) <= _fe)
-            _emall = torch.where(_band & _fw, _emall * (1.0 + _fp / 100.0), _emall)
+            _emall = torch.where(_band & _fw, self._fx_by(_emall, (1.0 + _fp / 100.0)), _emall)
         # CIV6 (Pearl of the Danube): "+50% Production to Districts and
         # Buildings constructed ACROSS A RIVER from a City Center." A building
         # is built in its district, so its tile is that district's; a City
@@ -1553,11 +1540,11 @@ class SimPhase:
                        & (self._river_cross(_hctr.clamp(min=0), _hat.clamp(min=0)) != 0))
             for _rk, _rp, _rw in pre["river"]:
                 _kind = _hd if _rk == 1 else (_hb & (_hbd >= 0))
-                _emall = torch.where(_hcross & _kind & _rw, _emall * (1.0 + _rp / 100.0), _emall)
+                _emall = torch.where(_hcross & _kind & _rw, self._fx_by(_emall, (1.0 + _rp / 100.0)), _emall)
         # The slotted production cards: CIV6 stacks production modifiers
         # ADDITIVELY, so two cards that both name the item pay their
         # percentages summed rather than compounded.
-        _add = torch.zeros_like(prod)
+        _add = torch.zeros(self.B, dtype=torch.float64, device=self.device)
         _pb = pre["pb"]
         if _pb:
             for _pact, _isw, _cmask, _eramax, _pct, _eramin in _pb:
@@ -1644,15 +1631,62 @@ class SimPhase:
                     _seen[_key] = (_spc, _seen[_key][1] | _hit) if _key in _seen else (_spc, _hit)
                 for _spc, _hit in _seen.values():
                     _add = _add + (_isp & _hit).to(_add.dtype) * (_spc / 100)
-        _emall = _emall * (1 + _add)
+        return self._fx_by(_emall, 1 + _add)
+
+    def _seat_city_produce(self, row: int, col: torch.Tensor, act: torch.Tensor,
+                           prod: torch.Tensor, sci_turn: torch.Tensor | None = None,
+                           pre: dict | None = None, plain: torch.Tensor | None = None,
+                           let_go: bool = True) -> None:
+        """The queue head's turn — the production add, the banked chop, the
+        completion and every completion's payout. ONE body, every seat row, at
+        the per-city seatPhase position (the city's first step, before its
+        growth).
+
+        Only the HEAD accrues — a deeper entry keeps whatever hammers it
+        already holds and waits — and a completion SHIFTS the queue. The
+        city's overflow store (`city_prod_bank`) takes a completion's overflow
+        and an empty queue's Production, and the next step pays it into the
+        head.
+
+        `pre` is `_produce_pre(row)`, the seat half of the multiplier chain;
+        a caller with one city (every direct test) may leave it out. `plain`
+        is the city's Production with no city-state flat toward the head
+        (`plainProduction`); left out, it is `prod`. `let_go` False is a
+        completion outside the step (`_complete_head_now`), which no hostile
+        unit stops."""
+        bidx = self._bidx
+        if pre is None:
+            pre = self._produce_pre(row)
+        # CIV6 (City_BuildQueue 0x177d10): the step clears the yield the last
+        # one converted before it puts this turn's Production in
+        self.city_proj_conv[bidx, row, col] = torch.where(
+            act, torch.zeros_like(self.city_proj_conv[bidx, row, col]), self.city_proj_conv[bidx, row, col])
+        self.city_proj_yield[bidx, row, col] = torch.where(
+            act, torch.full_like(self.city_proj_yield[bidx, row, col], -1), self.city_proj_yield[bidx, row, col])
+        cur = self.city_current[bidx, row, col, 0].clone()
+        # A FORMATION head is the unit's own column to every multiplier and to
+        # the completion below — TS's `kind === 'unit'` tests cannot tell them
+        # apart — and only the spawn asks the tier.
+        form_t = self._q_form_tier(cur)
+        cur = self._q_unit_of(cur)
+        # the head's PLOT, read before the shift takes it away
+        qt0 = self.city_qtile[bidx, row, col, 0].clone()
+        has_q = act & (cur >= 0)
+        # CIV6 (City_BuildQueue 0x16f050): a city with nothing queued adds the
+        # turn's Production to its overflow store
+        _bk0 = self.city_prod_bank[bidx, row, col]
+        self.city_prod_bank[bidx, row, col] = torch.where(act & (cur < 0), _bk0 + prod.to(_bk0.dtype), _bk0)
+        if not bool(has_q.count_nonzero()):
+            return
+        _emall = self._step_mult(row, col, cur, qt0, pre)
         raw = prod
         prog = self.city_progress[bidx, row, col, 0]
         bank = self.city_prod_bank[bidx, row, col]
         # CIV6 (City_BuildQueue 0x16f050 → the order's step): the city's
         # Production toward the item (its envoys' flat, the walk's bonuses,
         # `computeCityStats`) plus the overflow store, the SUM under the
-        # item's percents (0x1856ed)
-        prod = (prod + bank.to(prod.dtype)) * _emall
+        # item's multiplier in 24.8 (`_step_mult`, 0x1856ed)
+        prod = self._step_amount(prod + bank.to(prod.dtype), _emall).to(prod.dtype)
         _drip0 = self.city_progress[:, row, :, 0].clone()
         # f64 intermediates, stored at the PLANE's dtype (see _seat_city_loyalty)
         self.city_progress[bidx, row, col, 0] = torch.where(has_q, prog + prod, prog).to(prog.dtype)

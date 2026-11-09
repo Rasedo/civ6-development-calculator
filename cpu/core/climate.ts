@@ -8,6 +8,7 @@
 
 import type { CityState, GameState, City } from './types';
 import type { GameMap, Tile } from '../../world/types';
+import { extractionChanged } from './city';
 import { clearableFeatures } from '../../world/features';
 import { isWater } from '../../world/query';
 import { neighbors } from '../../world/hex';
@@ -188,10 +189,13 @@ function barrierAt(state: GameState, tile: Tile): boolean {
   return !!city?.buildings.includes('FLOOD_BARRIER');
 }
 
-function floodLowland(tile: Tile): void {
+function floodLowland(state: GameState, tile: Tile): void {
   if (tile.flooded) return;
   tile.flooded = true;
+  const was = tile.pillaged;
   tile.pillaged = true;
+  // an improvement newly pillaged changes what its owner extracts
+  if (tile.improvement && !was) extractionChanged(state, tile);
   if (tile.district) tile.districtPillaged = true;
 }
 
@@ -219,6 +223,7 @@ export function submergeTile(state: GameState, tile: Tile): void {
     const city = citiesOf(state, tile.ownerSeat).find((c) => c.id === tile.ownerCity);
     if (city) city.districts = city.districts.filter((d) => d.tileIndex !== tile.index);
   }
+  const extracted = tile.improvement && !tile.pillaged ? tile.resource : null;
   tile.submerged = true;
   tile.terrain = 'COAST';
   tile.elevation = 'FLAT';
@@ -251,6 +256,8 @@ export function submergeTile(state: GameState, tile: Tile): void {
   tile.fertilitySci = undefined;
   tile.fertilityCul = undefined;
   tile.droughtTurns = 0;
+  // the improved resource drowned changes what its owner extracts
+  if (extracted) extractionChanged(state, tile, extracted);
 }
 
 /** CIV6: a Flood Barrier built late "can be repaired in full and used again,
@@ -315,7 +322,7 @@ function raiseSea(state: GameState, from: number): void {
     meltIce(state, ph.iceMelt);
     if (ph.flood > 0) {
       for (const t of state.map.tiles) {
-        if (t.lowland === ph.flood && !barrierAt(state, t)) floodLowland(t);
+        if (t.lowland === ph.flood && !barrierAt(state, t)) floodLowland(state, t);
       }
     }
     if (ph.submerge > 0) {

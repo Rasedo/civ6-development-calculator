@@ -81,6 +81,7 @@
     - "C-130: the minor's treasury turn between its technologies and its civics; a pillaged building's Maintenance — READ (0x4e4560's order, 0x18c590), both twins"
     - "C-98: the research bank with nothing in hand; a city-state's unit cost under Mercenary Companies"
     - "H-4: a wonder under a hostile unit, the economy before the luxury rebuild, the extraction a pillage and a centre change — READ, both twins"
+    - "H-4: the step's item multiplier in 24.8 and a Builder's wonder charge through it; the resources step after the economy; an event's pillage and a district's resource re-rank the luxuries — READ, both twins"
   context:
     - "- THE ORDER (DoTurn 0x4e4560): Player_Techs' turn 0x4c9640 (0x4e45df), then the treasury's 0x4e08f0 (0x4e45ee), then the deals, the culture 0x3968..."
   review: reviewed

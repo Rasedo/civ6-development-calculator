@@ -1546,7 +1546,11 @@ function sackCity(state: GameState, city: City | City, seat: number): void {
   }
   const center = state.map.tiles[city.centerIndex];
   for (const t of neighbors(state.map, center)) {
-    if (t.improvement && !t.pillaged) t.pillaged = true;
+    // an improvement newly pillaged changes what its owner extracts
+    if (t.improvement && !t.pillaged) {
+      t.pillaged = true;
+      extractionChanged(state, t);
+    }
   }
   city.hp = Math.round(CITY_MAX_HP / 2);
 }
@@ -2968,6 +2972,7 @@ export function detonate(state: GameState, seat: number, k: number, targetIndex:
     if (minor) declareWarOnCityState(state, minor.id, seat);
   }
   const hit = new Set(tiles.map((x) => x.index));
+  const wrecked: Tile[] = [];
   for (const tile of tiles) {
     for (const u of unitsAt(state, tile.index)) {
       if (UNITS[u.type]?.gdr) {
@@ -2977,7 +2982,10 @@ export function detonate(state: GameState, seat: number, k: number, targetIndex:
       unitKillEvent(state, seat, undefined, u);
       killUnit(state, u);
     }
-    if (tile.improvement) tile.pillaged = true;
+    if (tile.improvement && !tile.pillaged) {
+      tile.pillaged = true;
+      wrecked.push(tile);
+    }
     // an unfinished district is REMOVED (its hammers bank); a complete one is
     // pillaged like everything else the ground carries
     if (tile.district && !tile.districtComplete) wipeConstruction(state, tile);
@@ -2988,6 +2996,8 @@ export function detonate(state: GameState, seat: number, k: number, targetIndex:
       tile.encampOuterHp = 0;
     }
   }
+  // each improvement the blast pillaged changes what its owner extracts
+  for (const t of wrecked) extractionChanged(state, t);
   // the population loss — the pick is the walk's recorded read both engines
   // record (`workedTiles` / `city_worked`), walked per city over the blast;
   // city-states record no pick and lose nobody on either engine

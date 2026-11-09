@@ -597,11 +597,17 @@ class SimOrders:
                         _wq = self._q_head(row)[_r, _c] - self.WONDER_BASE
                         _cst = self._wond_cost[
                             _wq.clamp(min=0, max=max(self._wond_n - 1, 0))]
-                        # the share unrounded, paid with the city's overflow
-                        # store (TS `wonderChargeBoost`)
-                        self.city_progress[_r, row, _c, 0] += (
+                        # the share, paid with the city's overflow store
+                        # through the step's item multiplier (TS
+                        # `wonderChargeBoost`)
+                        _scol = torch.zeros(self.B, dtype=torch.long, device=self.device)
+                        _scol[_r] = _c
+                        _scur = self._q_unit_of(self.city_current[self._bidx, row, _scol, 0].clone())
+                        _sm = self._step_mult(row, _scol, _scur, self.city_qtile[self._bidx, row, _scol, 0],
+                                              self._produce_pre(row))[_r]
+                        self.city_progress[_r, row, _c, 0] += self._step_amount(
                             _cst.double() * _pct / 100.0
-                            + self.city_prod_bank[_r, row, _c].double()).to(self.city_progress.dtype)
+                            + self.city_prod_bank[_r, row, _c].double(), _sm).to(self.city_progress.dtype)
                         self.city_prod_bank[_r, row, _c] = 0
                         # a charge that covers the cost completes the wonder
                         # at once, the excess banked nowhere (TS

@@ -14142,3 +14142,54 @@ no clamp; its +0xc4 is the raw damage.
   totals) against the dispatch are those `aiCityStats` holds; a formation's
   boost (Mobilization's corps) completes after the analysis (the lab holds
   the civic in hand), its place in the engines' turn unread.
+
+## H-4: the step's item multiplier in 24.8 and a Builder's wonder charge through it; the resources step after the economy; an event's pillage and a district's resource re-rank the luxuries — READ, both twins
+
+- THE ITEM MULTIPLIER (City_BuildQueue 0x16f050 -> the order's step;
+  0x183db0 for a building or a wonder): the step's argument holds the amount
+  (+0) and the multiplier (+8), both raw 24.8. Each factor is turned into
+  24.8 on its own — a float32 percent x 0.01 + 1.0, floor << 8 | trunc(frac
+  x 256), so 1.1 is 281 / 256 — and multiplied in through fx_mul_assign
+  (0x16eb20, (a b) >> 8); the player's additive percents are one factor; the
+  amount is multiplied by the result (0x16eb20 at 0x18439d) and added to the
+  item's progress (0xac650). Ported: `stepMultiplier` / `stepAmount` /
+  `fxFactor` (cpu/core/production.ts), `_step_mult` / `_step_amount` /
+  `_fx_factor` (gpu/core/sim_phase.py), the seat walk's step and
+  `_seat_city_produce` reading them; the engines' factors run in one order,
+  the item classes they key on disjoint.
+- A BUILDER'S WONDER CHARGE (The First Emperor) is a step through the same
+  multiplier: the charge (15% of the wonder's cost) plus the overflow store
+  times the item multiplier (`wonderChargeBoost`; the GPU's charge arm in
+  sim_orders.py). Confirmed: runs/h1_duelq1121 t38, Xi'an's Pyramids at
+  18.66 takes 16.5 x 281/256 = 18.109 (36.77 of 110, record t39).
+- THE RESOURCES STEP AFTER THE ECONOMY (DoTurn 0x4e4560: 0x4c9640, 0x4e08f0,
+  0x396860, 0x4967f0 ahead of 0x4a8ed0 at 0x4e46c0): the luxury rebuild
+  (0x4a6110) and the parks (0x32deb0) run after the science, gold, culture
+  (its civics, government and cards) and faith (its spread), so the ranking
+  reads the amenities the economy left. Ported: `rebuildLuxuries` /
+  `refreshParkAmenities` after `questReligion` in `seatPhase`;
+  `_rebuild_luxuries` / `_refresh_park_amenities` after `_quest_religion` in
+  the GPU seat turn. Confirmed: runs/h1_duelq1124 t91, China's change to
+  Oligarchy (GovernmentChanged 23843, cards 11 / 36 / 24) takes Xi'an's
+  civics amenities 2 -> 0 and the rank Xi'an 1 -> 3, Beijing and Chengdu
+  3 -> 2 (record t92's luxAlloc); seat gold, culture and science t93-98, the
+  culture's plot (6,10) at t92.
+- AN EVENT'S PILLAGE AND A DISTRICT'S RESOURCE: an improvement newly
+  pillaged or destroyed by an event (`scorch`, `destroyImprovement`, the
+  drought's `droughtTile`, the coastal flood's `floodLowland`,
+  `submergeTile`, a detonation, a sack) and a district or wonder placed on a
+  bonus or luxury resource (`paveGround`, the district handler's 0x4ab4d0 as
+  a centre's) change the owner's extraction (0x4ab4d0), its allocation (and a
+  city-state's suzerain's) ranked anew (`extractionChanged`;
+  `_extraction_changed_pairs` in `_scorch`, `_destroy_improvement`,
+  `_drought_tile`, the sea rise, `_submerge`, the sack, `_detonate`,
+  `_pave_plot`).
+- OPEN: a city's amenities as the game caches them between refreshes:
+  runs/h1_duelq1117 t88 China's unit 2293771 garrisoned in Xi'an leaves the
+  map at city-state 3's turn (UnitRemovedFromMap 23301, the city-state's
+  1179650 added at 30:15 after it); Retainers' garrison +1 stands in
+  Xi'an's civics amenities through turn 89's economy and city walk (record
+  t89 2, t90 1; seat gold / culture / science and Xi'an's food, production
+  and culture t90), where the engines drop it at once. A Production lump
+  (AddProgress 0x16f6e0 -> 0x16f050) takes the same step; the engines add it
+  without the multiplier, no case read.

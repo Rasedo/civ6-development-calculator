@@ -11664,12 +11664,46 @@ class SimSeats:
         for r in sorted(set(row[hit].tolist())):
             if r < 0:
                 continue
-            here = hit & (row == r)
-            self._rebuild_luxuries(r, here)
-            if self._CITY_MINOR0 <= r < self.FREE_ROW and r - self._CITY_MINOR0 < self.S:
-                suz = self.citystate_suzerain[:, r - self._CITY_MINOR0]
-                for g in range(self.n_majors):
-                    self._rebuild_luxuries(g, here & (suz == g))
+            self._extraction_rebuild(r, hit & (row == r))
+
+    def _extraction_rebuild(self, r: int, here: torch.Tensor) -> None:
+        """seat row `r`'s allocation rebuilt in the games `here` [B] for an
+        extraction change on its ground, a city-state's suzerain's with it
+        (0x44eff0)"""
+        self._rebuild_luxuries(r, here)
+        if self._CITY_MINOR0 <= r < self.FREE_ROW and r - self._CITY_MINOR0 < self.S:
+            suz = self.citystate_suzerain[:, r - self._CITY_MINOR0]
+            for g in range(self.n_majors):
+                self._rebuild_luxuries(g, here & (suz == g))
+
+    def _valued_at(self, rows: torch.Tensor, tiles: torch.Tensor) -> torch.Tensor:
+        """[n] the (game, plot) pairs holding a bonus or luxury resource"""
+        return ((self.res_id[rows, tiles] >= 0) & ~self.res_stripped[rows, tiles]
+                & (self.res_priority[rows, tiles] != 2))
+
+    def _extraction_changed_pairs(self, rows: torch.Tensor, tiles: torch.Tensor,
+                                  valued: torch.Tensor | None = None) -> None:
+        """`extractionChanged` on each (game, plot) pair of `rows` / `tiles`
+        [n], several to a game: the owners' allocations rebuilt where the plot
+        holds a bonus or luxury resource — `valued` [n] as the change found
+        it, left out as the plot stands. A rebuild reads its own seat alone,
+        so one per (game, owner) gives what one per plot gives."""
+        if not rows.numel():
+            return
+        if valued is None:
+            valued = self._valued_at(rows, tiles)
+        seat = self.tile_seat[rows, tiles].long()
+        ok = valued & (seat >= 0)
+        if not bool(ok.count_nonzero()):
+            return
+        rr = rows[ok]
+        srow = self._seat_row.take(seat[ok])
+        for r in sorted(set(srow.tolist())):
+            if r < 0:
+                continue
+            here = torch.zeros(self.B, dtype=torch.bool, device=self.device)
+            here[rr[srow == r]] = True
+            self._extraction_rebuild(r, here)
 
     def _rebuild_luxuries(self, row: int, active: torch.Tensor) -> None:
         """THE LUXURY ALLOCATION'S REBUILD for the games in `active` [B] —
@@ -14919,6 +14953,7 @@ class SimSeats:
         # CIV6: "all tile improvements are pillaged ... and any Districts and
         # buildings in the affected tiles are also pillaged", and "all tiles
         # affected are contaminated with radioactive fallout".
+        wrecked = blast & (self.improvement >= 0) & ~self.pillaged
         self.pillaged |= blast & (self.improvement >= 0)
         # an unfinished district is REMOVED (its hammers bank — the
         # `wipeConstruction` twin); a complete one is pillaged with the rest
@@ -14927,6 +14962,10 @@ class SimSeats:
             di = dig.nonzero(as_tuple=False)
             self._wipe_construction(di[:, 0], di[:, 1])
         self.district_pillaged |= blast & (self.district >= 0)
+        # each improvement the blast pillaged changes what its owner extracts
+        if bool(wrecked.count_nonzero()):
+            _wr, _wt = wrecked.nonzero(as_tuple=True)
+            self._extraction_changed_pairs(_wr, _wt)
         # exactly the blast rings, and never SHORTER than what already burns
         self.tile_fallout[:] = torch.where(
             blast, torch.maximum(self.tile_fallout,
@@ -15816,6 +15855,8 @@ class SimSeats:
             r2, t2 = fell[on], n_d[on]
             hit = (self.improvement[r2, t2] >= 0) & ~self.pillaged[r2, t2]
             self.pillaged[r2[hit], t2[hit]] = True
+            # an improvement newly pillaged changes what its owner extracts
+            self._extraction_changed_pairs(r2[hit], t2[hit])
         self._eff_version += 1
 
     def _assault_city_state(self, att: torch.Tensor, citystate_sc: torch.Tensor,
