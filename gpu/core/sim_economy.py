@@ -5717,9 +5717,6 @@ class SimEconomy:
             pm = torch.where(printing, torch.full((self.B,), self._gw_printing_mult, dtype=torch.long, device=self.device),
                              torch.ones(self.B, dtype=torch.long, device=self.device))
             scl = torch.where(obj == 5, scl * pm.reshape(-1, 1, 1), scl)
-        _am = 100 + self._gp_perm(row, "artifactTourismPct").long()               # [B]
-        if bool((_am != 100).count_nonzero()):
-            base = torch.where(obj == 4, base * _am.reshape(-1, 1, 1) // 100, base)  # 4 = GWO_ARTIFACT
         if row < self.n_majors:
             _gs = self._gov_mods(row)[12]["gwscale"]
             if bool((_gs != 1).count_nonzero()):
@@ -5733,6 +5730,10 @@ class SimEconomy:
             _k = km.gather(1, oc.reshape(self.B, -1)).reshape_as(oc)  # by object type
             base = base * (_k > 0).long()
             scl = scl + (_k - 1).clamp(min=0) * 100
+        # Mary Leakey's Artifact percent is one more in that sum
+        _am = self._gp_perm(row, "artifactTourismPct").long()                     # [B]
+        if bool(_am.count_nonzero()):
+            scl = torch.where(obj == 4, scl + _am.reshape(-1, 1, 1), scl)          # 4 = GWO_ARTIFACT
         return (base * (scl + (self._gw_slot_mult(row) - 1) * 100) // 100).sum(dim=2)
 
     def _gw_tourism_relic(self, row: int) -> torch.Tensor:

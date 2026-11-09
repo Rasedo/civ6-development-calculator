@@ -63,7 +63,7 @@ export type SuzEffect =
   | 'faithBuildings'     // Valletta
   | 'wallsFullDamage'    // Akkad
   | 'routePostGold'      // Jakarta
-  | 'suzImprovement'     // Caguana / La Venta / Armagh / Nalanda / Granada
+  | 'suzImprovement'     // Caguana / La Venta / Armagh / Nalanda / Granada / Nazca
   | 'sciencePeace'       // Geneva
   | 'gpCulturePct'       // Antananarivo
   | 'districtGpp'        // Bologna
@@ -93,7 +93,7 @@ export const SUZ_EFFECTS: SuzEffect[] = [
   'xpDouble', 'militaryBuildingLoyalty', 'regionalReach', 'worksScience', 'csRouteYields', 'holySitePressure',
   'apostlePromoChoice', 'eraInspiration', 'harborPower', 'faithBuildings',
   'wallsFullDamage',
-  // the five whose perk is "your Builders can build X improvements",
+  // the six whose perk is "your Builders can build X improvements",
   // which `validImprovementsIn`'s suzerain block answers off `suzerainOf`.
   'suzImprovement',
   'routePostGold',
@@ -405,6 +405,9 @@ const RAW_CITY_STATE_SUZERAIN_BONUS: Record<string, SuzerainBonusDef> = {
   'La Venta': { name: 'La Venta', type: 'religious', bonus: 'Your Builders can build Colossal Heads improvements.', suz: 'suzImprovement' },
   Yerevan: { name: 'Yerevan', type: 'religious', bonus: 'Your Apostle units can choose from any possible promotion instead of receiving a random promotion.', suz: 'apostlePromoChoice' },
   Armagh: { name: 'Armagh', type: 'religious', bonus: 'Your Builders can build Monastery improvements.', suz: 'suzImprovement' },
+  // CIV6 (Expansion2_Leaders.xml, MINOR_CIV_NAZCA_UNIQUE_INFLUENCE_BONUS
+  // attaching MINOR_CIV_NAZCA_CAN_NAZCA_LINE to the suzerain)
+  Nazca: { name: 'Nazca', type: 'religious', bonus: 'Your Builders can now make Nazca Line improvements.', suz: 'suzImprovement' },
   // CIV6 (Leaders.xml, MINOR_CIV_MOHENJO_DARO_CITIES_FRESHWATER_HOUSING_BONUS:
   // MODIFIER_PLAYER_GRANT_CITIES_FRESHWATER_HOUSING_BONUS, HasBonus true)
   'Mohenjo-Daro': { name: 'Mohenjo-Daro', type: 'cultural', bonus: 'Your cities have full Housing from water, as if they were adjacent to a River.', suz: 'freshWaterHousing' },

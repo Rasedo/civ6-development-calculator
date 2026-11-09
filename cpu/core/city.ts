@@ -1375,9 +1375,13 @@ function parkTourism(state: GameState, owns: (t: Tile) => boolean): number {
 }
 
 /** The Great Person DISTRICT tourism: CIV6 (Jamsetji Tata / Masaru Ibuka)
- *  +10 per complete Campus / Industrial Zone the seat holds, and (Kenzo
- *  Tange) a city's district adjacency bonuses as Tourism. A pillaged
- *  district is dark, as it is for every district yield. */
+ *  +10 per complete Campus / Industrial Zone the seat holds, pillaged or
+ *  not: the city's district walk (0x1ab780) sums each district's flat
+ *  Tourism (+0x608, EFFECT_ADJUST_DISTRICT_TOURISM_CHANGE's) with no
+ *  pillage test (runs/h1_duelq1124 Chengdu t229-250, its pillaged Campus's
+ *  World Games 2 in its 40 and 51). The Stadium's and Aquatics Center's
+ *  and (Kenzo Tange) a city's district adjacency bonuses as Tourism are
+ *  dark on a pillaged district. */
 export function gpDistrictTourism(state: GameState, seat: number, cities: readonly City[]): number {
   const s = seatOf(state, seat);
   const campus = gpPermOf(s, 'campusTourism');
@@ -1388,9 +1392,10 @@ export function gpDistrictTourism(state: GameState, seat: number, cities: readon
     const adjPct = gpCityPermOf(c, 'adjTourism');
     for (const d of c.districts) {
       const tile = state.map.tiles[d.tileIndex];
-      if (!tile.districtComplete || tile.districtPillaged) continue;
+      if (!tile.districtComplete) continue;
       if (d.type === 'CAMPUS') t += campus;
       else if (d.type === 'INDUSTRIAL_ZONE') t += iz;
+      if (tile.districtPillaged) continue;
       // CIV6 (World Games): per Stadium / Aquatics Center standing on its district
       for (const b of GP_BUILDING_TOURISM) {
         if (d.type === b.district && c.buildings.includes(b.building) && !buildingPillaged(c, b.building)) t += gpPermOf(s, b.perm);

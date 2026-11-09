@@ -132,7 +132,8 @@ export type ImprovementId =
   | 'SEASTEAD'
   | 'OFFSHORE_OIL_RIG'
   | 'MAHAVIHARA'
-  | 'ALCAZAR';
+  | 'ALCAZAR'
+  | 'NAZCA_LINE';
 
 export type DistrictId =
   | 'CITY_CENTER'

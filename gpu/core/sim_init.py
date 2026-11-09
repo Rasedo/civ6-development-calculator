@@ -2724,7 +2724,14 @@ class SimInit:
         # [(yield idx, percent)] — the Chemamull's Culture off the tile's Appeal
         self._imp_appeal_y = [(int(r["appealY"][0]), float(r["appealY"][1])) for r in _R]
         self._imp_appeal_y_any = any(y >= 0 for y, _ in self._imp_appeal_y)
-        self._imp_def_cs = torch.tensor([int(r["defCs"]) for r in _R], dtype=torch.long, device=device)
+        # per row, what the owner's plots beside an unpillaged one take (the
+        # Nazca Line's `ownerAdjacentYields`): (yields, resource, terrain,
+        # elevation, not hills, civic, tech)
+        self._imp_own_adj = [
+            [(tuple(float(v) for v in q["y"]), bool(q["res"]), int(q["terr"]), int(q["elev"]),
+              bool(q["nh"]), int(q["c"]), int(q["t"])) for q in r["ownAdj"]] for r in _R]
+        self._imp_own_adj_any = any(self._imp_own_adj)
+        self._imp_def_cs =torch.tensor([int(r["defCs"]) for r in _R], dtype=torch.long, device=device)
         self._imp_fortify = torch.tensor([int(r["fortify"]) for r in _R], dtype=torch.long, device=device)
         self._imp_fortify_any = bool((self._imp_fortify > 0).count_nonzero())
         self._imp_frontier = [bool(r["frontier"]) for r in _R]

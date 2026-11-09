@@ -69,11 +69,13 @@ class SimGp:
 
     def _gp_district_tourism(self, row: int, col_mask: torch.Tensor | None = None) -> torch.Tensor:
         """[B] long — `gpDistrictTourism`: CIV6 (Jamsetji Tata / Masaru Ibuka)
-        +10 Tourism per complete Campus / Industrial Zone the seat holds, and
-        (Kenzo Tange) a city's district ADJACENCY bonuses as Tourism at the
-        wire's percent per yield. A pillaged district is dark, as it is for
-        every district yield. `col_mask` [B, RC] narrows the sum to some
-        of the row's cities (a city's own tourism)."""
+        +10 Tourism per complete Campus / Industrial Zone the seat holds,
+        pillaged or not (the district walk 0x1ab780 reads each district's
+        flat +0x608 with no pillage test); the Stadium's and Aquatics
+        Center's and (Kenzo Tange) a city's district ADJACENCY bonuses as
+        Tourism at the wire's percent per yield are dark on a pillaged
+        district. `col_mask` [B, RC] narrows the sum to some of the row's
+        cities (a city's own tourism)."""
         out = torch.zeros(self.B, dtype=torch.long, device=self.device)
         if row >= self.n_majors:
             return out
@@ -82,16 +84,18 @@ class SimGp:
             alive = alive & col_mask
         dt_all = self.city_dist_tile[:, row]                # [B, RC, nD]
 
-        def live(di: int) -> torch.Tensor:
+        def built(di: int) -> torch.Tensor:
             t = dt_all[:, :, di]
-            tc = t.clamp(min=0)
-            return alive & (t >= 0) & self.district_complete.gather(1, tc) & ~self.district_pillaged.gather(1, tc)
+            return alive & (t >= 0) & self.district_complete.gather(1, t.clamp(min=0))
+
+        def live(di: int) -> torch.Tensor:
+            return built(di) & ~self.district_pillaged.gather(1, dt_all[:, :, di].clamp(min=0))
 
         for di, key in ((self._campus_idx, "campusTourism"), (self._iz_idx, "izTourism")):
             per = self._gp_perm(row, key).long()
             if di < 0 or not bool(per.count_nonzero()):
                 continue
-            out = out + live(di).sum(dim=1) * per
+            out = out + built(di).sum(dim=1) * per
         # CIV6 (WORLD_GAMES_*_TIER_*_TOURISM): per Stadium / Aquatics Center
         # standing on its complete, unpillaged district
         for pk, bi, di in self._gp_building_tourism:

@@ -13330,3 +13330,47 @@ ACT_SENTRY), statecompare `activity`.
   place theirs (1117 t16: China's village citizen on Xi'an's 649).
 - Open: whether the AI's start sends a token envoy before its cities or
   after them is read from the log, not from the DLL's player turn.
+
+## C-118: a district's flat tourism on a pillaged district, Mary Leakey's Artifact percent in the summed scalings — READ (0x1ab780, 0x2486e0), both twins
+
+- THE DISTRICT WALK (0x1ab780, a term of the city's tourism 0x1ab2a0):
+  over the city's districts (ids at City +0x1a50, count +0x1a60, each
+  0x1ae510 on +0x1a48) it sums each district's flat Tourism (+0x608, what
+  EFFECT_ADJUST_DISTRICT_TOURISM_CHANGE writes: Jamsetji Tata's and Masaru
+  Ibuka's +10, the World Games' Campus 2) and, per yield, 0x2486e0: 0 where
+  the district's percent for the yield (+0x800) is not above 0, else
+  District::GetYield(yield, true) x the percent / 100, truncated (Kenzo
+  Tange). The walk tests no pillage: a pillaged Campus keeps its flat
+  Tourism. Ported in `gpDistrictTourism` / `_gp_district_tourism` (the
+  Campus and Industrial Zone rows on a complete district, pillaged or not;
+  the Stadium's, the Aquatics Center's and the adjacency share stay dark on
+  a pillaged one). Confirmed: runs/h1_duelq1124 Chengdu t229-250, its
+  Campus pillaged from t229: 40 = (24 + 6 + 2) x 125% at t229, 51 at
+  t243-250 (ours 37 and 48 before).
+- MARY LEAKEY (GREATPERSON_ARTIFACT_TOURISM_MODIFIER,
+  MODIFIER_PLAYER_CITIES_ADJUST_TOURISM, ScalingFactor 300 on
+  GREATWORKOBJECT_ARTIFACT): the same effect as Heritage Tourism's, so her
+  +200% joins the object type's percents summed on the work's base
+  (`greatWorkTourism`, `_gw_tourism`'s `scl`). Confirmed: runs/h1_duelq1124
+  t230, Heritage Tourism slotted: Chengdu's two Artifacts 3 each x 4 (43 at
+  115%), Shenyang's three alike (120), where the product x 6 read 55 and 141.
+- Improvement_Tourism: the Pasture's and the Plantation's
+  TOURISMSOURCE_CULTURE rows behind Flight are catalog rows
+  (`tourismFrom` / `tourismTech`, the city walk 0x1abb40).
+- THE NAZCA LINE (Expansion2_Improvements.xml): flat Desert alone
+  (Improvement_ValidTerrains TERRAIN_DESERT), Workable false, Appeal 1,
+  PLUNDER_FAITH 25, MINOR_CIV_NAZCA_TRAIT (the city-state's own Builders and
+  its suzerain's, MINOR_CIV_NAZCA_CAN_NAZCA_LINE). Its five ImprovementModifiers
+  (MODIFIER_PLAYER_ADJUST_PLOT_YIELD, each behind ADJACENT_TO_OWNER) pay the
+  owner's plots beside an unpillaged one: +1 Faith; +1 Faith on a plot with
+  a resource (REQUIREMENT_PLOT_HAS_ANY_RESOURCE); +1 Food on TERRAIN_DESERT_HILLS
+  (REQUIRES_PLOT_DESERT) and +1 Food on TERRAIN_DESERT (REQUIRES_PLOT_HAS_DESERT),
+  both with CIVIC_CIVIL_SERVICE; +1 Production off the hills (REQUIRES_PLOT_IS_FLAT,
+  REQUIREMENT_PLOT_IS_HILLS inverse) with TECH_MASS_PRODUCTION. Ported as
+  `ownerAdjacentYields` (`addOwnerAdjacentYields` / `_owner_adjacent_plane`,
+  a mountain included, each neighbouring Line once). No recording builds one.
+- OPEN: whether a pillaged Nazca Line keeps its modifiers (the engines stop
+  them, as every ImprovementModifiers row they port); whether
+  REQUIREMENT_PLOT_HAS_ANY_RESOURCE sees a resource the owner has not
+  revealed (the engines count any); the AI value's yield-source tourism rows
+  (0x7b19a0 -> 0x1aba40's 0x82280 difference) stay unvalued.

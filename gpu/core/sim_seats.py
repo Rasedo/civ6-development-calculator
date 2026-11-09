@@ -9193,9 +9193,11 @@ class SimSeats:
         # (`_res_hidden`); the plane's version counter is the stamp
         # ...and the districts a suzerain improvement counts: their pillage
         # and their owners (`_imp_adjacency`)
+        # ...and a city-state's own research (`_seat_techs` / `_seat_civics`)
         key = (row, self._eff_version, self._bel_stamp(), simbase.write_stamp(self.civ_techs),
                simbase.write_stamp(self.civ_civics), simbase.write_stamp(self.district_pillaged),
-               self._tile_owner_ver)
+               self._tile_owner_ver, simbase.write_stamp(self.citystate_techs),
+               simbase.write_stamp(self.citystate_civics))
         if self._belief_feat_cache is not None and self._belief_feat_cache[0] == key:
             return self._belief_feat_cache[1]
         suz = self._imp_adjacency(row)
@@ -9228,6 +9230,9 @@ class SimSeats:
             mty = self._mountain_yield_plane(row)
             if mty is not None:
                 plane = plane + mty * (~self.nwonder).unsqueeze(2).to(self.dtype)
+            own = self._owner_adjacent_plane(row)
+            if own is not None:
+                plane = plane + own * self._owner_adjacent_live()
             pres = self._preserve_plane(row)
             if pres is not None:
                 plane = plane + pres * self._preserve_live()
@@ -9268,6 +9273,9 @@ class SimSeats:
         mty = self._mountain_yield_plane(row)
         if mty is not None:
             plane = plane + mty * (~self.nwonder).unsqueeze(2).to(self.dtype)
+        own = self._owner_adjacent_plane(row)
+        if own is not None:
+            plane = plane + own * self._owner_adjacent_live()
         pres = self._preserve_plane(row)
         if pres is not None:
             plane = plane + pres * self._preserve_live()
@@ -9536,6 +9544,58 @@ class SimSeats:
                 _yt = torch.tensor(y, dtype=self.dtype, device=dev)
                 out = out + (here.to(self.dtype) * n.unsqueeze(1)).unsqueeze(2) * _yt.view(1, 1, 6)
         return out
+
+    def _owner_adjacent_plane(self, row: int) -> torch.Tensor | None:
+        """[B, T, 6] — `addOwnerAdjacentYields` (the Nazca Line's
+        ImprovementModifiers, MODIFIER_PLAYER_ADJUST_PLOT_YIELD behind
+        ADJACENT_TO_OWNER): a plot of this row's seat takes each
+        `ownerAdjacentYields` row of every unpillaged improvement of the
+        seat's beside it whose clauses it meets — any resource on it, its
+        terrain and elevation, not hills, the seat's civic or tech. None
+        where no such improvement stands the seat's."""
+        if not self._imp_own_adj_any:
+            return None
+        mine = self.tile_seat == int(self._ROW_SEAT[row])                # [B, T]
+        nb = self.neigh
+        nbc = nb.clamp(min=0)
+        live_nb = (nb >= 0).unsqueeze(0) & ~self.pillaged[:, nbc] & mine[:, nbc]   # [B, T, 6]
+        imp_nb = self.improvement[:, nbc]
+        B, T, dev = self.B, self.T, self.device
+        out = None
+        tv, cv = self._seat_techs(row), self._seat_civics(row)
+        hills = self.hills.bool()
+        for k, rows_k in enumerate(self._imp_own_adj):
+            if not rows_k:
+                continue
+            n = ((imp_nb == k) & live_nb).sum(dim=2) * mine.long()       # [B, T]
+            if not bool(n.count_nonzero()):
+                continue
+            for y, res, terr, elev, nh, c, t in rows_k:
+                m = n
+                if res:
+                    m = m * self._res_live().long()
+                if terr >= 0:
+                    el = (hills if elev == 1 else self.tile_mountain if elev == 2
+                          else ~hills & ~self.tile_mountain)
+                    m = m * ((self.terrain == terr) & el).long()
+                if nh:
+                    m = m * (~hills).long()
+                if c >= 0:
+                    m = m * cv[:, c].long().unsqueeze(1)
+                if t >= 0:
+                    m = m * tv[:, t].long().unsqueeze(1)
+                if out is None:
+                    out = torch.zeros(B, T, 6, dtype=self.dtype, device=dev)
+                _yt = torch.tensor(y, dtype=self.dtype, device=dev)
+                out = out + m.unsqueeze(2).to(self.dtype) * _yt.view(1, 1, 6)
+        return out
+
+    def _owner_adjacent_live(self) -> torch.Tensor:
+        """[B, T, 1] where `addOwnerAdjacentYields` lands: a mountain off a
+        natural wonder (`tileYields`' mountain arm), else where a generic
+        tile add does."""
+        mtn = (self.tile_mountain & ~self.nwonder).unsqueeze(2).to(self.dtype)
+        return torch.where(self.tile_mountain.unsqueeze(2), mtn, self._tile_add_live())
 
     def _founded_terrains(self, row: int) -> torch.Tensor:
         """[B, nTerrain] bool — the TERRAIN KINDS this seat has founded a city

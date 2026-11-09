@@ -2205,6 +2205,10 @@ export function preserveTileYields(
 export interface YieldCtx {
   map: GameState['map'];
   mods: Modifiers;
+  /** the seat whose yields these are: its own plots beside its own Nazca
+   *  Lines take their `ownerAdjacentYields`. Absent (the seatless base
+   *  context) pays none. */
+  seat?: number;
   /** barbarian outpost tiles — the Seaside Resort's gold reads tile appeal */
   camps?: ReadonlySet<number>;
   /** what this seat's Groves and Sanctuaries pay the tiles around their
@@ -2254,6 +2258,7 @@ export function makeYieldCtx(state: GameState, seat: number, mods?: Modifiers): 
   return {
     map: state.map,
     mods: mods ?? getModifiers(state, seat),
+    seat,
     camps,
     preserve: preserveTileYields(state, seat, camps),
     gpAppeal: cityAppealResolver(state),

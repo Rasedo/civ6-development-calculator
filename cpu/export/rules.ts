@@ -2796,6 +2796,18 @@ export function buildRules() {
           tourAppeal: def.tourismFromAppeal ? 1 : 0,
           // `Workable` false: no citizen works the plot
           unwork: def.unworkable ? 1 : 0,
+          // what the owner's plots beside an unpillaged one take (the Nazca
+          // Line's): yields, any resource, terrain + elevation (0 flat, 1
+          // hills, 2 mountain), not hills, the owner's civic / tech
+          ownAdj: (def.ownerAdjacentYields ?? []).map((r) => ({
+            y: YIELD_KEYS.map((k) => r.yields[k] ?? 0),
+            res: r.resource ? 1 : 0,
+            terr: r.terrain ? TERRAIN_IDS.indexOf(r.terrain.terrain) : -1,
+            elev: r.terrain ? ['FLAT', 'HILLS', 'MOUNTAIN'].indexOf(r.terrain.elevation) : -1,
+            nh: r.notHills ? 1 : 0,
+            c: r.civic ? civicIdx.get(r.civic) ?? -3 : -1,
+            t: r.tech ? techIdx.get(r.tech) ?? -3 : -1,
+          })),
           // [promotion, Power] the row supplies its city on top while the
           // owning city's governor holds the promotion; [-1, 0] for none
           govPow: def.governorPower

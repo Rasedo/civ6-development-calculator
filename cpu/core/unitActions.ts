@@ -22,7 +22,9 @@ export const IMPROVEMENT_IDS: readonly string[] = ['FARM', 'MINE', 'LUMBER_MILL'
   // ...and Nalanda's Mahavihara after that
   'MAHAVIHARA',
   // ...and Granada's Alcázar after that
-  'ALCAZAR'];
+  'ALCAZAR',
+  // ...and Nazca's Nazca Line after that
+  'NAZCA_LINE'];
 
 export const DEDICATED_IMPROVEMENTS = 3;
 

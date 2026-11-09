@@ -148,6 +148,7 @@ export function tileYields(ctx: YieldCtx, tile: Tile): Yields {
       for (const nb of neighbors(ctx.map, tile)) if (nb.improvement === r.improvement && !nb.pillaged) n += 1;
       out[r.yield] += r.amount * n;
     }
+    addOwnerAdjacentYields(ctx, tile, out);
     return out;
   }
   if (tile.district || tile.builtWonder) return out; // paved tiles don't produce tile yields
@@ -242,6 +243,8 @@ export function tileYields(ctx: YieldCtx, tile: Tile): Yields {
     }
   }
 
+  addOwnerAdjacentYields(ctx, tile, out);
+
   // CIV6 (Feature_AdjacentYields): what the natural wonders beside it pay.
   // CIV6 (Torres del Paine): the terrain yields double ONCE, however many of
   // the wonder's plots the tile touches (runs/h1_duelw1116 Beijing, plots 721
@@ -264,6 +267,29 @@ export function tileYields(ctx: YieldCtx, tile: Tile): Yields {
   const near = ctx.preserve?.get(tile.index);
   if (near) addYields(out, near);
   return out;
+}
+
+/** CIV6 (the Nazca Line's ImprovementModifiers, MODIFIER_PLAYER_ADJUST_PLOT_YIELD
+ *  behind ADJACENT_TO_OWNER): a plot of the context's seat takes each
+ *  `ownerAdjacentYields` row of every unpillaged improvement of the seat's
+ *  beside it whose clauses it meets — any resource on it, its terrain and
+ *  elevation, not hills, the seat's civic or tech. `_owner_adjacent_plane`
+ *  is the twin. */
+function addOwnerAdjacentYields(ctx: YieldCtx, tile: Tile, out: Yields): void {
+  if (ctx.seat === undefined || tileSeat(tile) !== ctx.seat) return;
+  for (const nb of neighbors(ctx.map, tile)) {
+    if (!nb.improvement || nb.pillaged || tileSeat(nb) !== ctx.seat) continue;
+    const rows = IMPROVEMENTS[nb.improvement as ImprovementId]?.ownerAdjacentYields;
+    if (!rows) continue;
+    for (const r of rows) {
+      if (r.resource && tile.resource === null) continue;
+      if (r.terrain && (tile.terrain !== r.terrain.terrain || tile.elevation !== r.terrain.elevation)) continue;
+      if (r.notHills && tile.elevation === 'HILLS') continue;
+      if (r.civic && !ctx.mods.impUpgrades.has(r.civic)) continue;
+      if (r.tech && !ctx.mods.impUpgradeTechs.has(r.tech)) continue;
+      addYields(out, r.yields);
+    }
+  }
 }
 
 /** a district on `n` that a neighbour's adjacency row may count: complete

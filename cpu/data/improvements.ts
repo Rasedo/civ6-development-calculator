@@ -63,6 +63,21 @@ interface ImpAdjacency {
   once?: boolean;
 }
 
+/** One `ownerAdjacentYields` row: its requirement set's clauses, each absent
+ *  one met. */
+export interface OwnerAdjacentYieldRow {
+  yields: Partial<Yields>;
+  /** REQUIREMENT_PLOT_HAS_ANY_RESOURCE */
+  resource?: boolean;
+  /** REQUIREMENT_PLOT_TERRAIN_TYPE_MATCHES: the plot's terrain at this elevation */
+  terrain?: { terrain: TerrainId; elevation: Elevation };
+  /** REQUIREMENT_PLOT_IS_HILLS, Inverse */
+  notHills?: boolean;
+  /** REQUIREMENT_PLAYER_HAS_CIVIC / _TECHNOLOGY */
+  civic?: string;
+  tech?: string;
+}
+
 export interface ImprovementDef {
   id: ImprovementId;
   /** PROVENANCE, per column (cpu/data/provenance.ts): the install row and column
@@ -249,6 +264,12 @@ export interface ImprovementDef {
   /** CIV6 (`Improvements.Workable` = false): no citizen works its plot, a
    *  mountain Mit'a opens included (`workableTiles`). */
   unworkable?: boolean;
+  /** CIV6 (ImprovementModifiers MODIFIER_PLAYER_ADJUST_PLOT_YIELD behind
+   *  ADJACENT_TO_OWNER): what the improvement's owner's plots ADJACENT to an
+   *  unpillaged one pay, each row once per such neighbour, where the plot
+   *  matches the row's clauses: a resource on it, its terrain at its
+   *  elevation, not hills, the owner's civic or tech (the Nazca Line's). */
+  ownerAdjacentYields?: readonly OwnerAdjacentYieldRow[];
   /** CIV6 (MODIFIER_PLAYER_GRANT_RANDOM_TECHNOLOGY, Permanent, behind a
    *  REQUIREMENT_PLAYER_HAS_IMPROVEMENT set): the random technologies a seat
    *  is granted the first time it lays this row — once per seat, ever
@@ -396,6 +417,10 @@ export const IMPROVEMENTS: Record<ImprovementId, ImprovementDef> = {
     yields: { production: 1 },
     housing: 0.5,
     resourceOnly: true,
+    // Improvement_Tourism: TOURISMSOURCE_CULTURE, PrereqTech TECH_FLIGHT,
+    // ScalingFactor 100
+    tourismFrom: 'culture',
+    tourismTech: 'FLIGHT',
     description: 'Cattle, sheep or horses.',
     src: {
       'plunder.kind': xml('Improvements', 'ImprovementType=IMPROVEMENT_PASTURE', 'PlunderType', { expect: 'PLUNDER_FAITH' }),
@@ -403,6 +428,8 @@ export const IMPROVEMENTS: Record<ImprovementId, ImprovementDef> = {
       'yields.production': xml('Improvement_YieldChanges', 'ImprovementType=IMPROVEMENT_PASTURE&YieldType=YIELD_PRODUCTION', 'YieldChange'),
       housing: { derived: 'Housing / TilesRequired — the install writes the CLUSTER total', inputs: [xml('Improvements', 'ImprovementType=IMPROVEMENT_PASTURE', 'Housing'), xml('Improvements', 'ImprovementType=IMPROVEMENT_PASTURE', 'TilesRequired')] },
       resourceOnly: { derived: 'true where the install writes Improvement_ValidResources rows for the row', inputs: [xml('Improvement_ValidResources', 'ImprovementType=IMPROVEMENT_PASTURE', 'ResourceType')] },
+      tourismFrom: xml('Improvement_Tourism', 'ImprovementType=IMPROVEMENT_PASTURE', 'TourismSource', { expect: 'TOURISMSOURCE_CULTURE' }),
+      tourismTech: xml('Improvement_Tourism', 'ImprovementType=IMPROVEMENT_PASTURE', 'PrereqTech', { expect: 'TECH_FLIGHT' }),
     },
   },
   CAMP: {
@@ -430,6 +457,10 @@ export const IMPROVEMENTS: Record<ImprovementId, ImprovementDef> = {
     yields: { gold: 2 },
     housing: 0.5,
     resourceOnly: true,
+    // Improvement_Tourism: TOURISMSOURCE_CULTURE, PrereqTech TECH_FLIGHT,
+    // ScalingFactor 100
+    tourismFrom: 'culture',
+    tourismTech: 'FLIGHT',
     description: 'Plantation luxuries (wine, silk, spices, ...).',
     src: {
       'plunder.kind': xml('Improvements', 'ImprovementType=IMPROVEMENT_PLANTATION', 'PlunderType', { expect: 'PLUNDER_FAITH' }),
@@ -437,6 +468,8 @@ export const IMPROVEMENTS: Record<ImprovementId, ImprovementDef> = {
       'yields.gold': xml('Improvement_YieldChanges', 'ImprovementType=IMPROVEMENT_PLANTATION&YieldType=YIELD_GOLD', 'YieldChange'),
       housing: { derived: 'Housing / TilesRequired — the install writes the CLUSTER total', inputs: [xml('Improvements', 'ImprovementType=IMPROVEMENT_PLANTATION', 'Housing'), xml('Improvements', 'ImprovementType=IMPROVEMENT_PLANTATION', 'TilesRequired')] },
       resourceOnly: { derived: 'true where the install writes Improvement_ValidResources rows for the row', inputs: [xml('Improvement_ValidResources', 'ImprovementType=IMPROVEMENT_PLANTATION', 'ResourceType')] },
+      tourismFrom: xml('Improvement_Tourism', 'ImprovementType=IMPROVEMENT_PLANTATION', 'TourismSource', { expect: 'TOURISMSOURCE_CULTURE' }),
+      tourismTech: xml('Improvement_Tourism', 'ImprovementType=IMPROVEMENT_PLANTATION', 'PrereqTech', { expect: 'TECH_FLIGHT' }),
     },
   },
   FISHING_BOATS: {
@@ -895,6 +928,55 @@ export const IMPROVEMENTS: Record<ImprovementId, ImprovementDef> = {
       'appealYield.pct': xml('Improvements', 'ImprovementType=IMPROVEMENT_ALCAZAR', 'YieldFromAppealPercent'),
       tourismFrom: xml('Improvement_Tourism', 'ImprovementType=IMPROVEMENT_ALCAZAR', 'TourismSource', { expect: 'TOURISMSOURCE_CULTURE' }),
       tourismTech: xml('Improvement_Tourism', 'ImprovementType=IMPROVEMENT_ALCAZAR', 'PrereqTech', { expect: 'TECH_FLIGHT' }),
+    },
+  },
+  // CIV6 (Expansion2_Improvements.xml, IMPROVEMENT_NAZCA_LINE): Nazca's
+  // suzerain improvement — flat Desert alone, Appeal +1 to its neighbours,
+  // not workable, no yield of its own; its five ImprovementModifiers pay
+  // the owner's plots beside it.
+  NAZCA_LINE: {
+    id: 'NAZCA_LINE',
+    name: 'Nazca Line',
+    code: 'Nz',
+    plunder: { kind: 'faith', amount: 25 },
+    yields: {},
+    housing: 0,
+    resourceOnly: false,
+    suzerainOf: 'Nazca',
+    terrains: ['DESERT'],
+    elevations: ['FLAT'],
+    unworkable: true,
+    appealAdjacent: 1,
+    ownerAdjacentYields: [
+      { yields: { faith: 1 } },
+      { yields: { faith: 1 }, resource: true },
+      { yields: { food: 1 }, terrain: { terrain: 'DESERT', elevation: 'HILLS' }, civic: 'CIVIL_SERVICE' },
+      { yields: { food: 1 }, terrain: { terrain: 'DESERT', elevation: 'FLAT' }, civic: 'CIVIL_SERVICE' },
+      { yields: { production: 1 }, notHills: true, tech: 'MASS_PRODUCTION' },
+    ],
+    description: 'Flat Desert only, not workable, +1 Appeal to its neighbours. The owner\'s adjacent plots: +1 Faith, +1 more on a resource, +1 Food on Desert and Desert Hills from Civil Service, +1 Production off the hills from Mass Production.',
+    src: {
+      'plunder.kind': xml('Improvements', 'ImprovementType=IMPROVEMENT_NAZCA_LINE', 'PlunderType', { expect: 'PLUNDER_FAITH' }),
+      'plunder.amount': xml('Improvements', 'ImprovementType=IMPROVEMENT_NAZCA_LINE', 'PlunderAmount'),
+      housing: xml('Improvements', 'ImprovementType=IMPROVEMENT_NAZCA_LINE', 'Housing'),
+      resourceOnly: { derived: 'true where the install writes Improvement_ValidResources rows for the row', inputs: [xml('Improvement_ValidResources', 'ImprovementType=IMPROVEMENT_NAZCA_LINE', 'ResourceType')] },
+      suzerainOf: xml('Improvements', 'ImprovementType=IMPROVEMENT_NAZCA_LINE', 'TraitType', { expect: 'MINOR_CIV_NAZCA_TRAIT' }),
+      terrains: { derived: 'the Improvement_ValidTerrains rows of IMPROVEMENT_NAZCA_LINE, as engine terrain ids', inputs: [xml('Improvement_ValidTerrains', 'ImprovementType=IMPROVEMENT_NAZCA_LINE', 'TerrainType')] },
+      elevations: { derived: 'the HILLS / MOUNTAIN half of the Improvement_ValidTerrains rows of IMPROVEMENT_NAZCA_LINE', inputs: [xml('Improvement_ValidTerrains', 'ImprovementType=IMPROVEMENT_NAZCA_LINE', 'TerrainType')] },
+      unworkable: xml('Improvements', 'ImprovementType=IMPROVEMENT_NAZCA_LINE', 'Workable', { expect: false }),
+      appealAdjacent: xml('Improvements', 'ImprovementType=IMPROVEMENT_NAZCA_LINE', 'Appeal'),
+      'ownerAdjacentYields.0.yields.faith': xml('ModifierArguments', 'ModifierId=NAZCA_LINE_ADJACENCY_FAITH&Name=Amount', 'Value'),
+      'ownerAdjacentYields.1.yields.faith': xml('ModifierArguments', 'ModifierId=NAZCA_LINE_ADJACENCY_FAITH_RESOURCE&Name=Amount', 'Value'),
+      'ownerAdjacentYields.1.resource': { derived: 'the set\'s PLOT_HAS_RESOURCE_REQUIREMENTS row (REQUIREMENT_PLOT_HAS_ANY_RESOURCE)', inputs: [xml('RequirementSetRequirements', 'RequirementSetId=NAZCA_LINE_ADJACENCY_FAITH_RESOURCE_REQUIREMENTS&RequirementId=PLOT_HAS_RESOURCE_REQUIREMENTS', 'RequirementId')] },
+      'ownerAdjacentYields.2.yields.food': xml('ModifierArguments', 'ModifierId=NAZCA_LINE_ADJACENCY_FOOD_DESERT_CIVIL_SERVICE&Name=Amount', 'Value'),
+      'ownerAdjacentYields.2.terrain': { derived: 'REQUIRES_PLOT_DESERT\'s TerrainType, TERRAIN_DESERT_HILLS', inputs: [xml('RequirementArguments', 'RequirementId=REQUIRES_PLOT_DESERT&Name=TerrainType', 'Value', { expect: 'TERRAIN_DESERT_HILLS' })] },
+      'ownerAdjacentYields.2.civic': xml('RequirementArguments', 'RequirementId=REQUIRES_PLAYER_HAS_CIVIL_SERVICE_XP2&Name=CivicType', 'Value', { expect: 'CIVIC_CIVIL_SERVICE' }),
+      'ownerAdjacentYields.3.yields.food': xml('ModifierArguments', 'ModifierId=NAZCA_LINE_ADJACENCY_FOOD_DESERT_HILLS_CIVIL_SERVICE&Name=Amount', 'Value'),
+      'ownerAdjacentYields.3.terrain': { derived: 'REQUIRES_PLOT_HAS_DESERT\'s TerrainType, TERRAIN_DESERT', inputs: [xml('RequirementArguments', 'RequirementId=REQUIRES_PLOT_HAS_DESERT&Name=TerrainType', 'Value', { expect: 'TERRAIN_DESERT' })] },
+      'ownerAdjacentYields.3.civic': xml('RequirementArguments', 'RequirementId=REQUIRES_PLAYER_HAS_CIVIL_SERVICE_XP2&Name=CivicType', 'Value', { expect: 'CIVIC_CIVIL_SERVICE' }),
+      'ownerAdjacentYields.4.yields.production': xml('ModifierArguments', 'ModifierId=NAZCA_LINE_ADJACENCY_PRODUCTION_FLAT_MASS_PRODUCTION&Name=Amount', 'Value'),
+      'ownerAdjacentYields.4.notHills': xml('Requirements', 'RequirementId=REQUIRES_PLOT_IS_FLAT', 'Inverse', { expect: true }),
+      'ownerAdjacentYields.4.tech': xml('RequirementArguments', 'RequirementId=REQUIRES_PLAYER_HAS_MASS_PRODUCTION_XP2&Name=TechnologyType', 'Value', { expect: 'TECH_MASS_PRODUCTION' }),
     },
   },
   // CIV6 (Offshore Wind Farm): "+2 Production", "Provides 2 Power per turn",

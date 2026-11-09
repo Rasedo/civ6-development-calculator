@@ -372,7 +372,8 @@ def main() -> int:
     assert _iids.index("OFFSHORE_OIL_RIG") == 41, "the Offshore Oil Rig build column moved"
     assert _iids.index("MAHAVIHARA") == 42, "the Mahavihara build column moved"
     assert _iids.index("ALCAZAR") == 43, "the Alcázar build column moved"
-    assert len(_iids) == 44, "a build column was added without a pin"
+    assert _iids.index("NAZCA_LINE") == 44, "the Nazca Line build column moved"
+    assert len(_iids) == 45, "a build column was added without a pin"
     _byid = {r["id"]: r for r in _irows}
     for _n in _WANT_I:
         assert int(_byid[_n]["uniq"]) >= 0, f"{_n} names no civilization"

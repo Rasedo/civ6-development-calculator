@@ -289,7 +289,9 @@ export function greatWorkTourism(state: GameState, city: WorkCity, printing: boo
   const works = gwWorks(city);
   if (works.length === 0) return 0;
   const mult = gwSlotMults(state, city);
-  const artifact = (100 + gpPermOf(seatOf(state, city.seat), 'artifactTourismPct')) / 100;
+  // CIV6 (Mary Leakey, MODIFIER_PLAYER_CITIES_ADJUST_TOURISM ScalingFactor
+  // 300 on GREATWORKOBJECT_ARTIFACT): the Artifacts' added percent
+  const artifact = gpPermOf(seatOf(state, city.seat), 'artifactTourismPct') / 100;
   // CIV6 (Heritage Tourism, Satellite Broadcasts): the seat's cards scale one
   // object type's tourism (EFFECT_ADJUST_CITY_TOURISM's ScalingFactor)
   const scale = getModifiers(state, city.seat).gwTourismScale;
@@ -307,11 +309,14 @@ export function greatWorkTourism(state: GameState, city: WorkCity, printing: boo
     // over the product from the card's adoption at t216)
     // The Heritage Organization's +100% is one more percent in that sum
     // (runs/h1_duelw1117 t222, Writing: each work 4 -> 6 under Printing,
-    // never 8); its outcome B silences the type.
+    // never 8); its outcome B silences the type. Mary Leakey's Artifact
+    // percent is one more (runs/h1_duelq1124 t230: Chengdu's two Artifacts
+    // 3 each x 4 under her +200% and Heritage Tourism's +100%, never x 6;
+    // Shenyang's three alike).
     const scaled = (w.obj === GWO_WRITING && printing ? GW_PRINTING_WRITING_MULT : 1) * scale[w.obj]!;
     const k = omult?.[w.obj] ?? 1;
     if (k === 0) continue;
-    t += own * (w.obj === GWO_ARTIFACT ? artifact : 1) * (scaled + k - 1 + mult[w.slot]! - 1);
+    t += own * (scaled + k - 1 + mult[w.slot]! - 1 + (w.obj === GWO_ARTIFACT ? artifact : 0));
   }
   return t;
 }

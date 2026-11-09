@@ -77,7 +77,9 @@ describe('the unique improvement catalog', () => {
     expect(IMPROVEMENT_IDS.indexOf('MAHAVIHARA')).toBe(42);
     // ...and Granada's Alcázar after that
     expect(IMPROVEMENT_IDS.indexOf('ALCAZAR')).toBe(43);
-    expect(IMPROVEMENT_IDS.length).toBe(44);
+    // ...and Nazca's Nazca Line after that
+    expect(IMPROVEMENT_IDS.indexOf('NAZCA_LINE')).toBe(44);
+    expect(IMPROVEMENT_IDS.length).toBe(45);
   });
 
   it('gives one civilization at most one unique improvement', () => {

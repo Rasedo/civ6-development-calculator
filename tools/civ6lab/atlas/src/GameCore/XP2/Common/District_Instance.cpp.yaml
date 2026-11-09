@@ -3,6 +3,19 @@
 # `review: imported` = bootstrapped from dll_readings.md / code comments / saved
 # labels and not yet reviewed: verify against the disassembly, then edit and
 # set `review: reviewed`.
+- addr: 0x2486e0
+  final: 0x1902d0
+  kind: function
+  semantics: "a district's yield as Tourism (yield): 0 outside the yield range or where the district's percent for the yield (+0x800, 0x1c2c10) is not above 0, else District::GetYield(yield, true) x that percent / 100, truncated."
+  status: READ
+  cases:
+    - recording: h1_duelq1124
+      turn: 229
+      value: "no Kenzo Tange percent in China's cities: Chengdu's district walk 0x1ab780 pays its pillaged Campus's flat 2 alone (40 at 125%)"
+  impl: [cpu/core/city.ts:gpDistrictTourism, gpu/core/sim_gp.py:_gp_district_tourism]
+  readings:
+    - "C-118: a district's flat tourism on a pillaged district, Mary Leakey's Artifact percent in the summed scalings — READ (0x1ab780, 0x2486e0), both twins"
+  review: reviewed
 - addr: 0x249850
   final: 0x1905f0
   kind: function
