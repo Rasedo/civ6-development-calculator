@@ -283,8 +283,22 @@
     - "H-1: the research AI — READ (the choice), PARTLY READ (the value)"
     - "C-96: the improvement value — READ (0x7a58f0, 0x7b1320's yields, tourism and modifiers, the feature removal 0x7a3010, the harvest 0x7a37d0, the build unit 0x7a2e20, EFFECT_ADJUST_CITY_FREE_POWER), PARTLY READ (the hazards' turns, 0x7b1320's defence, claimed plots and neighbours terms)"
     - "C-100: the plot values' golden-age, claims and tourism-percent terms, the required features, the power value's negative Amount — READ"
+    - "H-1: the district discount at a city's placement, the appeal tourism of a pillaged plot, a city-state's kill on its centre — READ"
   context:
     - "- An improvement (the lens 0x399e10 at 0x39a73c, the city 0x1aba40): its Improvement_Tourism row pays only with its PrereqTech (+0x60, the player's tech..."
+  review: reviewed
+- addr: 0x1abb40
+  final: 0x11cd40
+  kind: function
+  semantics: "a city's improvement tourism: over the city's plots (0x5d1e0 by index, count +0x12 over 0x5cbc0(2)) owned by its owner (+0x1c) and of this city (+0xc), an improvement (+0x44) whose Improvement_Tourism row (0x28a940) has its PrereqCivic (+0x60, HasCivic 0x39d1f0) and PrereqTech (+0x68, HasTech 0x4cb2f0) held, 0x1aba40 at a scaling of 100 plus, per city row (+0x30..+0x38, 20 bytes) naming the improvement, its +0xc less 100, summed; the plot's pillage flag is not read."
+  status: READ
+  cases:
+    - recording: h1_duelp1124
+      turn: 199
+      value: "Wuhan 20 = (Stonehenge 9 + the Alcazar's 2 + its pillaged Seaside Resort's Appeal 5) x 125%, t199-226 (ours 13 without the resort)"
+  impl: [cpu/core/city.ts:resortTourism, gpu/core/sim_economy.py:_tourism_of]
+  readings:
+    - "H-1: the district discount at a city's placement, the appeal tourism of a pillaged plot, a city-state's kill on its centre — READ"
   review: reviewed
 - addr: 0x1abe50
   final: 0x11cf80

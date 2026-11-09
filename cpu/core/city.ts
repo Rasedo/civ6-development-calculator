@@ -1275,14 +1275,17 @@ function suzerainTourism(state: GameState, seat: number, owns: (t: Tile) => bool
 
 /** CIV6 (`Improvement_Tourism` TOURISMSOURCE_APPEAL): Tourism equal to the
  *  plot's Appeal, floored at 0, from every row that names it (the Seaside
- *  and Ski Resorts). CIV6 (CRISTOREDENTOR_BEACHTOURISM, ImprovementType
+ *  and Ski Resorts), a pillaged one's too: the city's plot walk (0x1abb40)
+ *  reads the improvement and its row, never the pillage (runs/h1_duelp1124
+ *  Wuhan t199-226, its pillaged Seaside Resort's Appeal 5 in its 20).
+ *  CIV6 (CRISTOREDENTOR_BEACHTOURISM, ImprovementType
  *  IMPROVEMENT_BEACH_RESORT): the beach multiplier scales the Seaside Resort's alone. */
 function resortTourism(state: GameState, owns: (t: Tile) => boolean, beachMult: number): number {
   let t = 0;
   const camps = campTiles(state);
   const gpa = cityAppealResolver(state);
   for (const tile of state.map.tiles) {
-    if (!tile.improvement || tile.pillaged || !owns(tile)) continue;
+    if (!tile.improvement || !owns(tile)) continue;
     if (!IMPROVEMENTS[tile.improvement as ImprovementId]?.tourismFromAppeal) continue;
     t += Math.max(0, tileAppeal(state.map, tile, camps, gpa)) * (tile.improvement === 'SEASIDE_RESORT' ? beachMult : 1);
   }

@@ -110,6 +110,7 @@
     - recording: h1_duelw1121
       turn: 186
       value: runs/h1_duelw1121 t186 (Jiaodong 6 -> 7 on its 3, Displeased), t220   Shenyang, t238 Taiyuan.
+  impl: [cpu/core/units.ts:city, gpu/core/sim_seats.py:_draw_and_pay_goody]
   readings:
     - "C-94: the religious spread — READ"
     - "H-1: the citizen manager's placement and the yield flags — READ"

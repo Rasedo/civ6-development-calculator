@@ -3071,7 +3071,13 @@ function attackCityState(state: GameState, attacker: Unit, cityState: CityState)
     { aDied: attacker.hp <= 0, dCity: true });
   spendAttack(attacker, true);
   awardCityXp(state, attacker, (cityState.hp ?? 0) <= 0 ? XP_CITY_FELLED : XP_CITY_ATTACK);
-  if (attacker.hp <= 0) killUnit(state, attacker);
+  // an attacker the city fells is the city-state's kill, as a major city's
+  // (runs/h1_duelp1117: Valletta's centre fells the barbarian Warrior
+  // 589832 at t13, its third barbarian at t22 boosting Bronze Working)
+  if (attacker.hp <= 0) {
+    unitKillEvent(state, seatOfCityState(cityState.id), undefined, attacker);
+    killUnit(state, attacker);
+  }
   if ((cityState.hp ?? 0) <= 0) {
     if (isCiv(attacker.seat)) {
       const civSeat = seatOf(state, attacker.seat);

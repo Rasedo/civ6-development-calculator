@@ -49,6 +49,8 @@
     - gpu/core/sim_phase.py:_seat_city_produce
     - cpu/core/phase.ts:civCityDefectors
     - gpu/core/sim_phase.py:_seat_turn
+    - cpu/core/units.ts:city
+    - gpu/core/sim_seats.py:_draw_and_pay_goody
   readings:
     - "H-1: the citizen manager's placement and the yield flags — READ"
     - "C-112: the majors' citizens by the citizen manager — READ (0x1fa1d0 at 0x1fa22d, 0x196320's callers), both twins"

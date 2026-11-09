@@ -107,6 +107,9 @@
     - recording: h1_duelp1128
       turn: 161
       value: Bologna's district quotes 138 -> 143 with Military Science, 146 with Metal Casting at t162
+    - recording: h1_duelp1117
+      turn: 187
+      value: "the city placement's call (0x1eb312, unconditional): Shanghai founded after Chengdu's Campus completes, every Chinese Holy Site quoting 98 (14 completed over 13 types) from t187, 165 before"
   impl:
     - cpu/core/game.ts:districtScaledBase
     - cpu/core/combat.ts:captureCityState
@@ -118,6 +121,7 @@
   readings:
     - "C-100: the build turns' store — a completion's overflow, an idle city's Production — and a Builder's charge at the count before the turn's contract purchases"
     - "C-105: the district discount's refresh at a district's placement and at a city's placement — READ (0x181700 at 0x181a97 / 0x181ac2, 0x36dc00 at 0x36dcc2 -> 0x1eae70 at 0x1eb312 -> 0x409800), both twins"
+    - "H-1: the district discount at a city's placement, the appeal tourism of a pillaged plot, a city-state's kill on its centre — READ"
   review: reviewed
 - addr: 0x409870
   final: 0x2c4f10
@@ -138,6 +142,7 @@
     - "H-1: the best melee, the drought's turns, the Trader's sea, the harvest's lump, the district discount — READ"
     - "C-100: the build turns' store — a completion's overflow, an idle city's Production — and a Builder's charge at the count before the turn's contract purchases"
     - "C-105: the district discount's refresh at a district's placement and at a city's placement — READ (0x181700 at 0x181a97 / 0x181ac2, 0x36dc00 at 0x36dcc2 -> 0x1eae70 at 0x1eb312 -> 0x409800), both twins"
+    - "H-1: the district discount at a city's placement, the appeal tourism of a pillaged plot, a city-state's kill on its centre — READ"
   context:
     - "- The district discount (0x409870's under-average models): the type's count 0x4bdd70 (placed districts included) against..."
   review: reviewed

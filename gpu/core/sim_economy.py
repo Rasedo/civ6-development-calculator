@@ -6755,10 +6755,12 @@ class SimEconomy:
             t = t + (wt * w_live.long()).sum(dim=1)
         # CIV6 (`Improvement_Tourism` TOURISMSOURCE_APPEAL): Tourism equal to
         # the plot's Appeal, floored at 0, from every row that names it — the
-        # `resortTourism` twin. CIV6 (CRISTOREDENTOR_BEACHTOURISM): the
-        # SEAT's multiplier scales the Seaside Resort's alone.
+        # `resortTourism` twin, a pillaged improvement's too (the city's
+        # plot walk 0x1abb40 reads no pillage). CIV6
+        # (CRISTOREDENTOR_BEACHTOURISM): the SEAT's multiplier scales the
+        # Seaside Resort's alone.
         for _k in self._imp_tour_appeal:
-            live = (self.improvement == _k) & ~self.pillaged & own
+            live = (self.improvement == _k) & own
             if not bool(live.count_nonzero()):
                 continue
             ta = (self._tile_appeal().clamp(min=0) * live.long()).sum(dim=1)

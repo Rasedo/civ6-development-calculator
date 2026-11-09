@@ -739,17 +739,19 @@ function minorUrbanFit(state: GameState, cityState: CityState): void {
  * t10: Rome's Mining at its start puts city-states 2, 3 and 4 at 11 of 12
  * before the record; runs/h1_duelv1128 Bologna's Iron Working 59 of 60 from
  * Rome's at t32, 47 of 48 from China's at t63). A major's progress is not
- * touched.
+ * touched. The cost is the one of the gainer's moment, the game era its turn
+ * stands in (runs/h1_duelp1117 t31: Rome's Wheel in its start of the
+ * Classical era puts every city-state's at 31 of 32).
  */
 export function minorCatchUp(state: GameState, gainer: number, id: string, civic: boolean): void {
   if (!isCiv(gainer)) return;
   const majors = majorsAlive(state).map((s) => state.seats[s].research);
   const need = Math.max(1, Math.floor((MINOR_CATCHUP_PCT * majors.length + 50) / 100));
   if (majors.filter((m) => (civic ? m.civics : m.techs).includes(id)).length < need) return;
+  const floor = researchCost(state, id, civic, gainer) - 1;
   for (const m of [...state.cityStates, freeSeatOf(state)]) {
     const r = m.research;
     if ((civic ? r.civics : r.techs).includes(id)) continue;
-    const floor = researchCost(state, id, civic, m.seat) - 1;
     if ((civic ? r.civic : r.tech) === id) {
       if (civic) r.civicProgress = floor;
       else r.techProgress = floor;

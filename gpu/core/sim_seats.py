@@ -7658,6 +7658,13 @@ class SimSeats:
                                                torch.tensor([int(amt)], device=self.device))
                 self.city_pop[b, srow, near] += amt
                 self._log_pop(torch.tensor([b]), srow, torch.tensor([near]), "gh")
+                # the population change places its citizens at once
+                # (ChangePopulation 0x1c79b0 -> 0x194fb0, `placeCitizens`)
+                _pc = torch.full((self.B,), int(near), dtype=torch.long, device=self.device)
+                _pm = torch.zeros(self.B, dtype=torch.bool, device=self.device)
+                _pm[b] = True
+                self._place_citizens(srow, _pc, _pm, torch.full((self.B,), int(amt), dtype=torch.long, device=self.device),
+                                     fav_food=self.city_fav_food[self._bidx, srow, _pc])
         elif pay == ch["governorTitle"]:
             self.civ_granted_titles[b, srow] += amt
         elif pay == ch["envoy"]:
@@ -15628,6 +15635,9 @@ class SimSeats:
                             torch.where(_cshp <= 0,
                                         torch.full_like(_cshp, XP_CITY_FELLED),
                                         torch.full_like(_cshp, XP_CITY_ATTACK)))
+        # an attacker the city fells is the city-state's kill (`attackCityState`)
+        self._unit_kill_event(100 + citystate_sc, at0, a_seat[:, u] == BARB_SEAT, atk_dead,
+                              vict_form=getattr(self, f"{atk_kind}_unit_formation")[:, u])
         if bool(atk_dead.count_nonzero()):
             ar = atk_dead.nonzero(as_tuple=True)[0]
             a_alive[:, u] = a_alive[:, u] & ~atk_dead

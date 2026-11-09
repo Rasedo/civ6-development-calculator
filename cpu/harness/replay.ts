@@ -112,7 +112,7 @@ import { AI_UNITS } from '../data/aiBuildTables';
 import { loadCityBuildCentre, loadCityBuildTables, newCityBuildTally, tallyBuildings, type CityBuildTally } from './cityBuildLog';
 import { buildingTable } from '../core/aiCityBuild';
 import { replayEvents } from './eventReplay';
-import { cityFlags, replaceAllCitizens } from '../core/citizens';
+import { cityFlags, placeCitizens, replaceAllCitizens } from '../core/citizens';
 import { loadCombatLog, loadRandLog, randLogPath, type RandLog } from './randLog';
 import { streamHold, type StreamHold } from './streamHold';
 import { holdRng, rngHold } from '../core/rand';
@@ -2482,8 +2482,12 @@ function unstack(ctx: Ctx, b: TurnRecord, u: Unit): void {
  * envoy (`meetCityState`). Each minor's count from the player is brought to
  * record t+1's — through the engine's own verb, its purse's tokens, where
  * the engine's meeting has not; what the purse cannot send is the record's.
+ * A minor the engine's seat has not met yet waits for the pair's close,
+ * where the meeting a later sync makes sends the free envoy first
+ * (runs/h1_duelp1124 t10: China meets Granada in the barbarians' sync, its
+ * one envoy the meeting's).
  */
-function settleEnvoys(ctx: Ctx, b: TurnRecord): void {
+function settleEnvoys(ctx: Ctx, b: TurnRecord, close: boolean): void {
   const { state } = ctx;
   const due = ctx.lateEnvoys;
   ctx.lateEnvoys = [];
@@ -2493,6 +2497,7 @@ function settleEnvoys(ctx: Ctx, b: TurnRecord): void {
     const ms = seatOfP(ctx, d.minor);
     const cs = isCityStateSeat(ms) ? state.cityStates.find((c) => c.id === cityStateOfSeat(ms)) : undefined;
     if (!s || !cs || seat >= state.seats.length) { count(ctx, 'envoy', 'refused', d.player); continue; }
+    if (!close && !cs.met.includes(seat)) { ctx.lateEnvoys.push(d); continue; }
     const want = (b.players.find((p) => p.id === d.minor)?.envoysReceived ?? []).find(([g]) => g === d.player)?.[1] ?? 0;
     const short = want - (cs.envoys[seat] ?? 0);
     if (short <= 0) { count(ctx, 'envoy', 'applied'); continue; }
@@ -3993,6 +3998,7 @@ const res = buyTile(state, city.id, d.plot, seat);        if (!res.ok) setTileOw
         if (grew && grew.seat === s.seat) {
           gainPopulationPressure(grew, 1);
           grew.population += 1;
+          placeCitizens(state, grew, 1, cityFlags(grew));
         }
         for (const [rows, names, prefix, known] of [[d.techBoosts, ctx.cat.techs, 'TECH_', TECHS], [d.civicBoosts, ctx.cat.civics, 'CIVIC_', CIVICS]] as const) {
           for (const k of rows) {
@@ -6230,7 +6236,7 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
       // turns, which bank on the ground they annex (runs/h1_duely1127 t60:
       // China's envoy to Hattusa in its actions annexes 573, Hattusa's
       // Builder on it the next turn)
-      settleEnvoys(ctx, b);
+      settleEnvoys(ctx, b, false);
     };
     // each unit's health before the engine's turn heals it, beside the plot
     // the heal reads (`healedOn`)
@@ -6748,7 +6754,7 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
     knowledgeLook(state, state.barbSeat, BARB_SEAT, plotsSeenNow(state, new Set([BARB_SEAT])), false);
     state.units = all;
     // ...and the active player's, sent in its start of the next turn
-    settleEnvoys(ctx, b);
+    settleEnvoys(ctx, b, true);
     // the barbarians' units sat the engine's turn out, so their rest — the
     // fortification a unit that stood keeps — is the engine's own step, run
     // here where their turn closes the log's. Being attacked spends nothing

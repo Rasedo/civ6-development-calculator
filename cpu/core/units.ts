@@ -5,6 +5,7 @@
  */
 
 import { rebuildLuxuries } from './city';
+import { cityFlags, placeCitizens } from './citizens';
 import { ENHANCER_BELIEFS, gainPopulationPressure, unconvertedOf } from '../data/religion';
 import type { ArmyRecord, GameMap, GameState, City, Seat, Tile, Unit } from './types';
 import { seatWonderSum } from './wonders';
@@ -2777,6 +2778,10 @@ export function drawAndPayGoody(state: GameState, unit: Unit, tile: Tile): void 
         gainPopulationPressure(city, amount);
         city.population += amount;
         logPopWrite(state, city, 'gh');
+        // the population change places its citizens at once (ChangePopulation
+        // 0x1c79b0 -> 0x194fb0; runs/h1_duelp1121 t30: Rome's village citizen
+        // on 695 in Rome's actions, its start of t31 banking on it)
+        placeCitizens(state, city, amount, cityFlags(city));
       }
       break;
     }

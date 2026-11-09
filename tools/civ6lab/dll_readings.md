@@ -12912,3 +12912,35 @@ player as a 'city' step, every type's count at the completed count standing.
   (the importer's `discountPlaced`).
 - Open: the count a transferred city's own completed districts join at
   (runs/h1_duelq1127 t213 moved no quote).
+
+## H-1: the district discount at a city's placement, the appeal tourism of a pillaged plot, a city-state's kill on its centre — READ
+
+- THE DISTRICT DISCOUNT AT A PLACEMENT: the city placement 0x1eae70 calls
+  0x409800 (every Districts row's price, 0x409870) at 0x1eb312, with no
+  condition, before the city AI's analysis (0x1eb335). A major's founded
+  city retakes every type's count of completed specialty districts
+  (`foundCityAt` -> `refreshDistrictDiscount`, `_found_city_at`); the
+  importer reads a city of the player placed (`CityInitialized`) as a
+  step taking every type's count, in the log's order with the research and
+  the completions (`loggedDiscountSteps`). Confirmed: runs/h1_duelp1117
+  t187: Chengdu's Campus completes, then Shanghai is founded, every Chinese
+  Holy Site quoting 98 (14 completed over 13 types) to t191, 165 before
+  (buy.districtCost 186 -> 0).
+- THE APPEAL TOURISM OF A PILLAGED PLOT: the city's improvement tourism
+  walk 0x1abb40 reads the plot's improvement (+0x44) and its
+  Improvement_Tourism row's PrereqCivic / PrereqTech, never its pillage;
+  0x1aba40 pays a TOURISMSOURCE_APPEAL row the plot's Appeal
+  (`resortTourism`, `_tourism_of`). A yield source pays the improvement's
+  own yield, which a pillage zeroes. Confirmed: runs/h1_duelp1124 Wuhan
+  t199-226: 20 = (Stonehenge 9 + the Alcazar's 2 + its pillaged Seaside
+  Resort's Appeal 5) x 125% (city.tourism 72 -> 29, seat.tourism 43 -> 19
+  failures).
+- A CITY-STATE'S KILL ON ITS CENTRE: an attacker its centre fells is the
+  city-state's kill, as a major city's (`attackCityState` ->
+  `unitKillEvent`, `_assault_city_state`'s `_unit_kill_event`), its
+  barbarian kills counting toward BOOST_TRIGGER_NUM_BARBS_KILLED.
+  Confirmed: runs/h1_duelp1117 Valletta: the Spearman at t8, the barbarian
+  Warrior 589832 felled on its centre at t13, the Scout at t22 — its Bronze
+  Working boost at t22 (Game_Boosts.csv), 15 kept at t23.
+- Open: the capture path's placement (whether an acquired city runs
+  0x1eae70); the Free Cities' placement (the engines refresh a major's).
