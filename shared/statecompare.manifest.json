@@ -2731,13 +2731,11 @@
         {
           "name": "minorProjectsDone",
           "compare": "exact",
-          "covers": [
-            "CityState.projectsDone"
-          ],
+          "covers": [],
           "planes": [
             "citystate_project_done"
           ],
-          "note": "its one-time projects completed — its projects table's MaxPlayerInstances and prerequisite gates read them"
+          "note": "a minor's Seat.projectsDone (CityState extends Seat, covered there by projectsDone): its one-time projects completed — its projects table's MaxPlayerInstances and prerequisite gates read them"
         },
         {
           "name": "minorBuildingsPillaged",
