@@ -47,7 +47,7 @@ describe('the sourced government rows', () => {
       { unitCombatCS: { classes: ['MELEE', 'ANTICAV', 'NAVAL_MELEE'], cs: 4 } });
     expect(GOVERNMENTS.CLASSICAL_REPUBLIC.effects).toEqual(
       { housingIfDistricts: { min: 1, housing: 1 }, amenitiesIfSpecialty: { min: 1, amenities: 1 } });
-    expect(GOVERNMENTS.MONARCHY.effects).toEqual({ housingPerWallLevel: 1 });
+    expect(GOVERNMENTS.MONARCHY.effects).toEqual({ housingPerWallLevel: 1, favorPerBuilding: { building: 'RENAISSANCE_WALLS', favor: 2 } });
     expect(GOVERNMENTS.MERCHANT_REPUBLIC.effects).toEqual({ governorYieldMult: { gold: 1.1 } });
     expect(GOVERNMENTS.THEOCRACY.effects).toEqual(
       { theologyCS: 5, governorPerCitizen: { faith: 0.5 } });
