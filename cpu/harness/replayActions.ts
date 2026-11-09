@@ -24,7 +24,7 @@
 import { hexDistance } from '../../world/hex';
 import { UNITS } from '../data/units';
 import { engineId, gameHash } from '../data/aliases';
-import { bool, num, plotAt, P, type Catalog, type DumpCity, type DumpPlayer, type DumpQueueEntry, type TurnRecord } from './record';
+import { bool, memCity, num, plotAt, P, type Catalog, type DumpCity, type DumpPlayer, type DumpQueueEntry, type TurnRecord } from './record';
 import type { CombatRow } from './randLog';
 
 export type Phase = 'before' | 'after';
@@ -43,6 +43,10 @@ interface Base { phase: Phase }
 
 export type Decision = Base & (
   | { kind: 'queue'; player: number; city: number; items: QueueSpec[] }
+  /** a wonder heading a major's queue that its city's AI took off before
+   *  the pair's step: its progress by type unchanged across the pair, the
+   *  step's Production banked (`queueSpec`'s building row) */
+  | { kind: 'queueDrop'; player: number; city: number; row: number }
   | { kind: 'research'; player: number; tech: number }
   | { kind: 'civic'; player: number; civic: number }
   | { kind: 'policies'; player: number; government: number; policies: number[] /* per slot, the game's order; -1 empty */ }
@@ -349,6 +353,23 @@ export class InferredActions implements ActionSource {
       const active = c1.owner === act;
       const isMajor = b.players.find((p) => p.id === c1.owner)?.major === true;
       const queue = stepQueue(a, b, c0, c1, active);
+      if (isMajor && c0) {
+        // a wonder contract the city's AI cancels at its start goes before
+        // the city's step, which then banks its Production: the wonder's
+        // progress by type unchanged across the pair (runs/h1_duelq1128
+        // Xi'an t22: Stonehenge's contract cancelled, its 14 kept, the
+        // Builder queued after on 0 and 18 the turn after; 1117 Xi'an t96
+        // Chichen Itza)
+        const h0 = queueSpec(c0.queue[0], W);
+        const rows0 = memCity(a, c0.owner, c0.id)?.['m_kBuildQueue.v'] as unknown as Record<string, Record<string, number>> | undefined;
+        const rows1 = memCity(b, c1.owner, c1.id)?.['m_kBuildQueue.v'] as unknown as Record<string, Record<string, number>> | undefined;
+        const h1 = queueSpec(c1.queue[0], W);
+        if (h0 && h0.kind === 'building' && cat.wonders.includes(cat.buildings[h0.row]) && rows0 && rows1
+          && num(c0.productionYield) > 0 && !headCompleted(a, b, c0, c1) && !(h1 && specKey(h1) === specKey(h0))
+          && (rows0['134']?.[h0.row] ?? 0) === (rows1['134']?.[h0.row] ?? 0)) {
+          out.push({ kind: 'queueDrop', phase: 'before', player: c1.owner, city: at, row: h0.row });
+        }
+      }
       if (isMajor) out.push({ kind: 'queue', phase: ph, player: c1.owner, city: at, items: queue });
       // the citizens: the turn's own are the engine's citizen manager's (the
       // growth's, the city's turn end's), from the plots record t works;

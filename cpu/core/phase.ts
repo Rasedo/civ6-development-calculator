@@ -41,7 +41,7 @@ import { plotDistance, seatPoolSlots, tacticalTargets } from './tactical';
 import { freeCitiesMilitary, freeRaidCheck, freeRaidSignal } from './freeOps';
 import { plotsSeenNow, ringPlots } from './barbarians';
 import { PROJECTS, PROJECT_LIST, projectConversionRate } from '../data/projects';
-import { adoptGovernment, carryPolicies, slotCountRebuild, seatGovernment, governmentBit, darkAgeEra, unlockedPolicyIds, governmentSlots, governmentChanges, policyLayoutChanges, policyLayoutOf, policyUnlockCost } from './effects';
+import { adoptGovernment, carryPolicies, slotCountRebuild, slotLossRebuild, seatGovernment, governmentBit, darkAgeEra, unlockedPolicyIds, governmentSlots, governmentChanges, policyLayoutChanges, policyLayoutOf, policyUnlockCost } from './effects';
 import type { RuleResult } from './rules';
 import { TECHS, type ResearchEffect } from '../data/techs';
 import { BUILDINGS, SCRIPTED_HELD_BUILDINGS } from '../data/buildings';
@@ -1670,6 +1670,11 @@ export function transferCity(
   const loser = seatOf(state, fromSeat);
   // the losing seat held no other city: its last (the moments read it)
   const wasLast = (loser?.cities.length ?? 0) <= 1;
+  // a slot wonder the city carries detaches from the loser (`slotLossRebuild`)
+  // and attaches to the receiver (`slotCountRebuild`), each seat's slots
+  // rebuilt where their count moved
+  const slotsFrom = governmentSlots(state, fromSeat);
+  const slotsTo = governmentSlots(state, to.seat);
   // A Free City's own grants (`Unit.freeCity`) go when it leaves the Free
   // Cities, joined or captured, in `state.units` order, never to the taker
   // (lab 5d, runs/c60f_capture_t250a_20260928T025820Z.jsonl and the other c60f_capture records: 3 of 3).
@@ -1719,6 +1724,7 @@ export function transferCity(
     centre.district = null;
     centre.districtComplete = false;
     state.eventLog.push(`${civCity.name} razed — ${to.name} cannot govern more cities.`);
+    slotLossRebuild(state, fromSeat, slotsFrom);
     return false;
   }
   for (const t of state.map.tiles) {
@@ -1841,6 +1847,8 @@ export function transferCity(
   if (isCiv(to.seat)) refreshDistrictDiscount(state, to.seat);
   to.cities.push(flipped);
   logPopWrite(state, flipped, 'tr');
+  slotLossRebuild(state, fromSeat, slotsFrom);
+  slotCountRebuild(state, to.seat, slotsTo, state.turn);
   // CIV6 (Military Emergency): "The Target has conquered the city of another
   // nation; it must be Liberated!" The seat that LOST it is the affected one.
   if (why === 'conquered' && isCiv(fromSeat) && isCiv(to.seat)) {

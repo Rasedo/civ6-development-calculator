@@ -1875,6 +1875,27 @@ export function slotCountRebuild(state: GameState, seat: number, before: readonl
   s.government.civicTurn = Math.max(s.government.civicTurn, turn);
 }
 
+/** A SLOT LOST (CIV6, PlayerCulture 0x39fd80, a slot modifier's detach:
+ *  a city carrying a slot wonder leaves the seat): where seat `seat`'s slots
+ *  now hold fewer of a kind than `before`, every card in a slot of that kind
+ *  is cleared (0x3942d0 by slot type: dropped, never laid back), then
+ *  SetGovernment's rebuild runs on the government the seat is in (0x3a25f0:
+ *  the rest laid back by `carryLayout`, each LAPSED). No free change opens.
+ *  `_slot_loss_rebuild` is the twin. */
+export function slotLossRebuild(state: GameState, seat: number, before: readonly SlotKind[]): void {
+  const s = seatOf(state, seat);
+  const gov = s && !isCityStateSeat(seat) ? seatGovernment(state, seat) : null;
+  if (!s || !gov) return;
+  const now = governmentSlots(state, seat);
+  const lost = SLOT_KINDS.filter((k) => now.filter((x) => x === k).length < before.filter((x) => x === k).length);
+  if (!lost.length) return;
+  const open = unlockedPolicyIds(s.research, darkAgeEra(state, seat), s.government.held, gov);
+  const old = s.government.policies;
+  const laid = carryLayout(before.map((k, i) => [k, lost.includes(k) ? null : old[i] ?? null] as const), now, (c) => open.has(c));
+  s.government.policies = laid;
+  s.government.lapsed = laid.filter((c): c is string => !!c);
+}
+
 /** The Cost of the civic that unlocks card `id`, -1 for a card no civic
  *  unlocks (a Dark Age or legacy card) — the slot rebuild's sort key. */
 const CARD_CIVIC_COST: ReadonlyMap<string, number> = (() => {

@@ -4184,8 +4184,12 @@ function importQueue(ctx: Ctx, rec: TurnRecord, state: GameState, c: DumpCity, c
       const name = ctx.cat.buildings[e.BuildingType];
       if (ctx.wonders.has(name)) {
         const id = engineId('wonder', name, 'BUILDING_', BUILT_WONDERS);
-        if (!id || at < 0) return gap(ctx, 'queue-wonder', name);
-        queue.push({ kind: 'wonder', wonder: id, tileIndex: at, progress });
+        // a wonder the city has set on a plot is built there, whatever
+        // Location its queue entry carries (runs/h1_duelq1127 Jiaodong t174:
+        // the Oracle standing on 13:11 re-queued at 11:13)
+        const placed = city.wonders.find((w) => w.id === id)?.tileIndex ?? at;
+        if (!id || placed < 0) return gap(ctx, 'queue-wonder', name);
+        queue.push({ kind: 'wonder', wonder: id, tileIndex: placed, progress });
       } else {
         const id = engineRowOf(ctx.cat, 'building', e.BuildingType);
         if (!id) return gap(ctx, 'queue-building', name);

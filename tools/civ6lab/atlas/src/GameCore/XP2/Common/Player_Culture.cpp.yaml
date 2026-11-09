@@ -16,6 +16,7 @@
   readings:
     - "C-94: the slot rebuild — READ"
     - "C-116: the lay-back leaves one slot empty, and a slot-count rebuild grants the free change — READ"
+    - "C-116: a slot wonder's transfer and the slot conversion — PARTLY, both twins"
   context:
     - "...r every slot (0x3942d0 with -1: unflag and REMOVED for each card), build the new slots (0x391650: the government's rows, the player's extra slots, the removals, the per- government e..."
   review: reviewed
@@ -153,11 +154,13 @@
 - addr: 0x3942d0
   final: 0x27c7f0
   kind: function
-  semantics: "clears a slot (-1: every slot): unflag and REMOVED for each card."
+  semantics: "clears the slots of one slot TYPE (the slots whose +0x430 entry's type equals the argument; -1: every slot): unflag and REMOVED for each card."
   status: PARTLY
+  impl: [cpu/core/effects.ts:slotLossRebuild, gpu/core/sim_economy.py:_slot_loss_rebuild]
   readings:
     - "C-94: the slot rebuild — READ"
     - "C-116: the lay-back leaves one slot empty, and a slot-count rebuild grants the free change — READ"
+    - "C-116: a slot wonder's transfer and the slot conversion — PARTLY, both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...after, an empty slot last; insertion sort, so ties keep slot order), clear every slot (0x3942d0 with -1: unflag and REMOVED for each card), build the new slots (0x391650: the govern..."
@@ -744,15 +747,32 @@
 - addr: 0x39fc00
   final: 0x282f30
   kind: function
-  semantics: a slot-count change (the slot rebuild as SetGovernment's).
+  semantics: "a per-government slot count's detach (culture, government, slot type, sign): the government's entry in +0x608 ({government, slot type, count}, an existing one only) moved by -1 where the sign is set, +1 otherwise; where the government is the one the player is in (+0x158): save, clear every slot, build and lay back (0x3a3b00 / 0x3942d0 / 0x391650), +0x16b8 written, +0xba8 set (SetCivicCompletedThisTurn's flag, inline) and signalled. Reached from 0xb8fb50, the functor's vtable +0x28 (@0xe07088)."
   status: PARTLY
+  impl: [cpu/core/effects.ts:slotCountRebuild, gpu/core/sim_economy.py:_slot_count_rebuild]
   readings:
     - "C-94: the slot rebuild — READ"
     - "C-116: the slot-count rebuild in the engines — READ, both twins"
+    - "C-116: a slot wonder's transfer and the slot conversion — PARTLY, both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "- The rebuild (SetGovernment 0x3a25f0; the slot-count changes 0x39fc00, 0x3a2bf0, 0x3a2e30): save the slots (0x3a3b00 into +0x448, std::sort 0x386350 / 0x38..."
   review: reviewed
+- addr: 0x39fd80
+  final: 0x283060
+  kind: function
+  semantics: "a slot type's detach (culture, slot type, flag), the inverse of 0x3a2e30: the slot type's entry erased from the player's extra slots (+0x4b8 with the flag set, else +0x528; 0x3b48b0), every slot of that type cleared (0x3942d0 with the type: its cards dropped, REMOVED each), then SetGovernment (0x3a25f0) on the government the player is in: the rest saved, cleared, laid back lapsed. No +0xba8 write: no free change. Reached from 0xbb9e70, the functor's vtable +0x28 (@0xe02c38; 0xbb93d0 at +0x20 the attach, 0x3a2e30)."
+  status: PARTLY
+  impl: [cpu/core/effects.ts:slotLossRebuild, gpu/core/sim_economy.py:_slot_loss_rebuild]
+  readings: ["C-116: a slot wonder's transfer and the slot conversion — PARTLY, both twins"]
+  review: reviewed
+- addr: 0x39fe90
+  kind: function
+  status: PARTLY
+  readings: ["C-116: a slot wonder's transfer and the slot conversion — PARTLY, both twins"]
+  context:
+    - ...ls SetGovernment only where the player is in one (+0x158 != -1); the detach 0xbf3d00 -> 0x39fe90 the same in reverse. The trait attaches at the game's start, under no government, so no...
+  review: imported
 - addr: 0x3a1ac0
   final: 0x2841a0
   kind: function
@@ -836,7 +856,10 @@
     - recording: h1_duelw1121
       turn: 31
       value: "China: Autocracy's rebuild lays Survey and Urban Planning back lapsed; Urban Planning slotted in the Wildcard pays its +1"
-  readings: ["C-94: the slot rebuild — READ"]
+  impl: [cpu/core/effects.ts:slotLossRebuild, gpu/core/sim_economy.py:_slot_loss_rebuild]
+  readings:
+    - "C-94: the slot rebuild — READ"
+    - "C-116: a slot wonder's transfer and the slot conversion — PARTLY, both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "- The rebuild (SetGovernment 0x3a25f0; the slot-count changes 0x39fc00, 0x3a2bf0, 0x3a2e30): save the slots (0x3a3b00 into +0..."
@@ -844,11 +867,13 @@
 - addr: 0x3a2bf0
   final: 0x284e90
   kind: function
-  semantics: a slot-count change (the slot rebuild as SetGovernment's).
+  semantics: "a per-government slot count's attach (culture, government, slot type, sign): the government's entry in +0x608 moved by +1 where the sign is set, -1 otherwise, appended where none stands; where the government is the one the player is in (+0x158): save, clear every slot, build and lay back, +0x16b8 written, +0xba8 set (the turn's free change) and signalled. Reached from 0xb8eb50, the functor's vtable +0x20 (@0xe07088)."
   status: PARTLY
+  impl: [cpu/core/effects.ts:slotCountRebuild, gpu/core/sim_economy.py:_slot_count_rebuild]
   readings:
     - "C-94: the slot rebuild — READ"
     - "C-116: the slot-count rebuild in the engines — READ, both twins"
+    - "C-116: a slot wonder's transfer and the slot conversion — PARTLY, both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "- The rebuild (SetGovernment 0x3a25f0; the slot-count changes 0x39fc00, 0x3a2bf0, 0x3a2e30): save the slots (0x3a3b00 into +0x448, std::sort 0x386350 / 0x385b50 by the..."
@@ -873,8 +898,16 @@
     - "C-94: the slot rebuild — READ"
     - "C-116: the lay-back leaves one slot empty, and a slot-count rebuild grants the free change — READ"
     - "C-116: the slot-count rebuild in the engines — READ, both twins"
+    - "C-116: a slot wonder's transfer and the slot conversion — PARTLY, both twins"
   context:
     - "- The rebuild (SetGovernment 0x3a25f0; the slot-count changes 0x39fc00, 0x3a2bf0, 0x3a2e30): save the slots (0x3a3b00 into +0x448, std::sort 0x386350 / 0x385b50 by the card's pol..."
+  review: reviewed
+- addr: 0x3a3850
+  kind: function
+  semantics: "a slot replacement's attach (culture, replaced slot type, added slot type, replaces-all), EFFECT_REPLACE_PLAYER_GOVERNMENT_SLOT_TYPE (Founding Fathers' TRAIT_ALL_DIPLO_POLICY_ARE_WILDCARDS): the triple appended to +0x598, every slot cleared (0x3942d0 with -1: every card dropped, REMOVED each), then SetGovernment (0x3a25f0) on the government the player is in where one stands (+0x158 != -1): nothing saved to lay back. No free change. Reached from 0xbf3490 (the effect @0xe0eb20, its arguments read by 0xbf2b60); 0x39fe90 (from 0xbf3d00) the detach."
+  status: PARTLY
+  impl: [cpu/core/effects.ts:wonderExtraSlots, gpu/core/sim_seats.py:_wonder_extra_slots]
+  readings: ["C-116: a slot wonder's transfer and the slot conversion — PARTLY, both twins"]
   review: reviewed
 - addr: 0x3a3990
   final: 0x2859c0

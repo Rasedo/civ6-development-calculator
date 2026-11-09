@@ -3750,6 +3750,32 @@ class SimEconomy:
         ct = self.civ_civic_turn[:, row]
         self.civ_civic_turn[:, row] = torch.where(chg, ct.clamp(min=int(turn)), ct)
 
+    def _slot_loss_rebuild(self, row: int, before: torch.Tensor,
+                           where: torch.Tensor | None = None) -> None:
+        """A SLOT LOST (CIV6, PlayerCulture 0x39fd80, a slot modifier's
+        detach: a city carrying a slot wonder leaves the seat), where `where`:
+        a major whose slots (`_seat_policy_slots`) now hold fewer of a kind
+        than `before` [B, 4] has every card in a slot of that kind cleared
+        (0x3942d0 by slot type: dropped, never laid back), then
+        SetGovernment's rebuild on the government it is in (0x3a25f0,
+        `_carry_policies`: the rest laid back LAPSED). No free change opens.
+        `slotLossRebuild`'s twin."""
+        if row >= self.n_majors:
+            return
+        _, has = self._adopted_gov(row)
+        lost = has.unsqueeze(1) & (self._seat_policy_slots(row) < before)
+        chg = lost.any(dim=1)
+        if where is not None:
+            chg = chg & where
+        if not bool(chg.count_nonzero()):
+            return
+        S = simbase.POLICY_KIND_STRIDE
+        at = self.civ_policy_slot[:, row]
+        kind = torch.div(at, S, rounding_mode="floor").clamp(min=0)
+        drop = (self.civ_policies[:, row] & (at >= 0) & lost.gather(1, kind) & chg.unsqueeze(1))
+        self.civ_policies[:, row] = self.civ_policies[:, row] & ~drop
+        self._carry_policies(row, chg, before)
+
     def _policy_unlocked(self, civics2: torch.Tensor, dark: torch.Tensor | None,
                          era: torch.Tensor | None, held: torch.Tensor | None,
                          adopted: torch.Tensor) -> torch.Tensor:

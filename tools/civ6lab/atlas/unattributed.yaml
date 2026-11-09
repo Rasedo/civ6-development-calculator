@@ -9016,6 +9016,20 @@
   context:
     - "- TRADE_RELATIONS (0xbb1a20, arguments 0xbb40f0): TradeBonus (2) for a route either way, BonusPerRoute and OnlyInboundTrade off, NoTrad..."
   review: reviewed
+- addr: 0xbb93d0
+  kind: function
+  status: PARTLY
+  readings: ["C-116: a slot wonder's transfer and the slot conversion — PARTLY, both twins"]
+  context:
+    - "...slot type on the player (a wonder's EFFECT_ADJUST_PLAYER_GOVERNMENT_SLOT_TYPE): +0x20 0xbb93d0 the attach, 0x3a2e30 (slot appended, save, clear all, build, lay back, SetCivicComplete..."
+  review: imported
+- addr: 0xbb9e70
+  kind: function
+  status: PARTLY
+  readings: ["C-116: a slot wonder's transfer and the slot conversion — PARTLY, both twins"]
+  context:
+    - "...save, clear all, build, lay back, SetCivicCompletedThisTurn: the free change); +0x28 0xbb9e70 the detach, 0x39fd80: the slot type erased from +0x4b8 / +0x528, every slot of that typ..."
+  review: imported
 - addr: 0xbbb1a0
   kind: function
   semantics: "REQUIREMENT_CITY_HAS_GARRISON_UNIT: walks the city's districts (+0x1a48); for each that seats a garrison (0x24b820) 0x24b170 decides."
@@ -9143,6 +9157,28 @@
   context:
     - ...adds each ability modifier's analysis. Where no subject passes, the analyzer's slot 2 (0xbe4aa0, nothing, but for EFFECT_ADJUST_DISTRICT_GREAT_PERSON_POINTS 0x6a4750).
   review: reviewed
+- addr: 0xbf2b60
+  final: 0x820fe0
+  kind: function
+  status: PARTLY
+  readings: ["C-116: a slot wonder's transfer and the slot conversion — PARTLY, both twins"]
+  context:
+    - "...PLO_POLICY_ARE_WILDCARDS, EFFECT_REPLACE_PLAYER_GOVERNMENT_SLOT_TYPE; arguments read by 0xbf2b60, the effect @0xe0eb20): the attach 0xbf3490 -> 0x3a3850 appends {replaced, added, rep..."
+  review: imported
+- addr: 0xbf3490
+  kind: function
+  status: PARTLY
+  readings: ["C-116: a slot wonder's transfer and the slot conversion — PARTLY, both twins"]
+  context:
+    - "...YER_GOVERNMENT_SLOT_TYPE; arguments read by 0xbf2b60, the effect @0xe0eb20): the attach 0xbf3490 -> 0x3a3850 appends {replaced, added, replaces-all} to +0x598, clears every slot (0x394..."
+  review: imported
+- addr: 0xbf3d00
+  kind: function
+  status: PARTLY
+  readings: ["C-116: a slot wonder's transfer and the slot conversion — PARTLY, both twins"]
+  context:
+    - ...ped) and calls SetGovernment only where the player is in one (+0x158 != -1); the detach 0xbf3d00 -> 0x39fe90 the same in reverse. The trait attaches at the game's start, under no gover...
+  review: imported
 - addr: 0xc03070
   final: 0x8a3d80
   kind: function

@@ -12245,6 +12245,14 @@ class SimSeats:
         cid = int(self.city_id[b, src_row, src_col])
         # the losing row held no other city: its last (the moments read it)
         was_last = int(self.city_alive[b, src_row].sum()) <= 1
+        # a slot wonder the city carries detaches from the loser
+        # (`_slot_loss_rebuild`) and attaches to the receiver
+        # (`_slot_count_rebuild`), each major's slots rebuilt where their
+        # count moved
+        _at_b = torch.zeros(self.B, dtype=torch.bool, device=dev)
+        _at_b[b] = True
+        slots_src = self._seat_policy_slots(src_row) if src_row < self.n_majors else None
+        slots_dst = self._seat_policy_slots(dst_row) if dst_row < self.n_majors else None
         # CONQUERING a city earns GRIEVANCES — accrued at the TOP like TS's, so
         # a raze at the cap earns them too, and the loser's LAST city pays the
         # whole world. A LOYALTY FLIP earns none: nobody declared anything.
@@ -12361,6 +12369,8 @@ class SimSeats:
             self.tile_city[b] = torch.where(owned, torch.full_like(self.tile_city[b], -1), self.tile_city[b])
             self._tile_owner_ver += 1
             self._eff_version += 1
+            if slots_src is not None:
+                self._slot_loss_rebuild(src_row, slots_src, _at_b)
             return False
         # the receiver's next persistent city id — a major's from its civ
         # block, the Free Cities seat's from its own counter
@@ -12524,6 +12534,10 @@ class SimSeats:
             self.war[b, src_row, dst_row] = False
             self.war[b, dst_row, src_row] = False
         self._eff_version += 1
+        if slots_src is not None:
+            self._slot_loss_rebuild(src_row, slots_src, _at_b)
+        if slots_dst is not None:
+            self._slot_count_rebuild(dst_row, slots_dst, int(self.turn), _at_b)
         return True
 
     def _wipe_construction(self, rows: torch.Tensor, tiles: torch.Tensor) -> None:

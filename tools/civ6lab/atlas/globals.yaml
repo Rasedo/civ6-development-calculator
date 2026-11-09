@@ -850,6 +850,27 @@
   context:
     - "...tality's COMMEMORATION_INFRASTRUCTURE_QUEST): the factory 0xc25910, the effect vtable 0xdf85f8, its player apply 0xb83b00 → 0x2bf3e0 adds the Amount to the era manager's player entry..."
   review: reviewed
+- addr: 0xe02c38
+  kind: global
+  status: PARTLY
+  readings: ["C-116: a slot wonder's transfer and the slot conversion — PARTLY, both twins"]
+  context:
+    - "- A slot modifier's functors (Player_Culture): @0xe02c38 for one slot type on the player (a wonder's EFFECT_ADJUST_PLAYER_GOVERNMENT_SLOT_TYPE):..."
+  review: imported
+- addr: 0xe07088
+  kind: global
+  status: PARTLY
+  readings: ["C-116: a slot wonder's transfer and the slot conversion — PARTLY, both twins"]
+  context:
+    - "...er is in (the rest saved, cleared, laid back lapsed); no +0xba8 write, no free change. @0xe07088 for a per-government table (+0x608 {government, slot type, count}; World Ideology's wil..."
+  review: imported
+- addr: 0xe0eb20
+  kind: global
+  status: PARTLY
+  readings: ["C-116: a slot wonder's transfer and the slot conversion — PARTLY, both twins"]
+  context:
+    - "..., EFFECT_REPLACE_PLAYER_GOVERNMENT_SLOT_TYPE; arguments read by 0xbf2b60, the effect @0xe0eb20): the attach 0xbf3490 -> 0x3a3850 appends {replaced, added, replaces-all} to +0x598, cl..."
+  review: imported
 - addr: 0xe261e0
   kind: string
   status: PARTLY

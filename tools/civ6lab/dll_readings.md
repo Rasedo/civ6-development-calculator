@@ -14057,3 +14057,45 @@ no clamp; its +0xc4 is the raw damage.
   left after the disembarking 40:12 / 41:12 / 42:12; the engines' reach
   closes 36:14 / 35:15 / 36:13 / 39:12 .. 37:12 before it (the open list's
   order of equal keys), so the engines take 36:13.
+
+## C-116: a slot wonder's transfer and the slot conversion — PARTLY, both twins
+
+`slotLossRebuild` (cpu/core/effects.ts), `_slot_loss_rebuild`
+(gpu/core/sim_economy.py), called from `transferCity` /
+`_transfer_city` beside `slotCountRebuild` / `_slot_count_rebuild`
+(dll_readings "C-116: the slot-count rebuild in the engines").
+
+- A slot modifier's functors (Player_Culture): @0xe02c38 for one slot type
+  on the player (a wonder's EFFECT_ADJUST_PLAYER_GOVERNMENT_SLOT_TYPE):
+  +0x20 0xbb93d0 the attach, 0x3a2e30 (slot appended, save, clear all,
+  build, lay back, SetCivicCompletedThisTurn: the free change); +0x28
+  0xbb9e70 the detach, 0x39fd80: the slot type erased from +0x4b8 / +0x528,
+  every slot of that type cleared (0x3942d0 with the type: those cards
+  dropped, never saved), then SetGovernment 0x3a25f0 on the government the
+  player is in (the rest saved, cleared, laid back lapsed); no +0xba8
+  write, no free change. @0xe07088 for a per-government table (+0x608
+  {government, slot type, count}; World Ideology's wildcard): +0x20
+  0xb8eb50 -> 0x3a2bf0, +0x28 0xb8fb50 -> 0x39fc00, each |count| times,
+  the rebuild and +0xba8 only where the government is the current one.
+- A city changing hands carries its wonders' modifiers with it: the loser's
+  slot detaches (0x39fd80) and the receiver's attaches (0x3a2e30). The
+  engines take each seat's slots before the transfer and after: the loser,
+  fewer of a kind, clears that kind's cards and lays the rest back lapsed
+  with no free change; the receiver runs the slot-count rebuild. A
+  conquest razed at the cap is the loser's alone.
+- Founding Fathers (TRAIT_ALL_DIPLO_POLICY_ARE_WILDCARDS,
+  EFFECT_REPLACE_PLAYER_GOVERNMENT_SLOT_TYPE; arguments read by 0xbf2b60,
+  the effect @0xe0eb20): the attach 0xbf3490 -> 0x3a3850 appends {replaced,
+  added, replaces-all} to +0x598, clears every slot (0x3942d0 with -1: the
+  cards dropped) and calls SetGovernment only where the player is in one
+  (+0x158 != -1); the detach 0xbf3d00 -> 0x39fe90 the same in reverse. The
+  trait attaches at the game's start, under no government, so nothing
+  rebuilds then; every government after is built with the replacement
+  (SetGovernment's build 0x391650). The engines' conversion in
+  `wonderExtraSlots` / `_wonder_extra_slots` and the rebuild on the
+  government change alone match it.
+- Open: no recording transfers a city holding a slot wonder (82 duels
+  scanned) and none seats America; two slot modifiers detaching at once run
+  0x39fd80 once each, where the engines clear and lay back once; whether
+  0x391650 converts an extra Diplomatic slot (Potala Palace) under
+  Founding Fathers (the engines convert it).

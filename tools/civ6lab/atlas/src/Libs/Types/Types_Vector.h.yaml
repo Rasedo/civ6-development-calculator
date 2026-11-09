@@ -961,6 +961,20 @@
   context:
     - "...is one weighted pick over the offered routes (weights as read in C-16); \"Spy EscapeRoute\" 0x81d360 is the AI's route choice, which the driver makes."
   review: reviewed
+- addr: 0xb8eb50
+  kind: function
+  status: PARTLY
+  readings: ["C-116: a slot wonder's transfer and the slot conversion — PARTLY, both twins"]
+  context:
+    - "...nment table (+0x608 {government, slot type, count}; World Ideology's wildcard): +0x20 0xb8eb50 -> 0x3a2bf0, +0x28 0xb8fb50 -> 0x39fc00, each |count| times, the rebuild and +0xba8 onl..."
+  review: imported
+- addr: 0xb8fb50
+  kind: function
+  status: PARTLY
+  readings: ["C-116: a slot wonder's transfer and the slot conversion — PARTLY, both twins"]
+  context:
+    - "...nment, slot type, count}; World Ideology's wildcard): +0x20 0xb8eb50 -> 0x3a2bf0, +0x28 0xb8fb50 -> 0x39fc00, each |count| times, the rebuild and +0xba8 only where the government is th..."
+  review: imported
 - addr: 0xc6f950
   kind: function
   semantics: adds to the city's per-unit production modifier (city +0x2c0[unit]).

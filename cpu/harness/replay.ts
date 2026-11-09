@@ -2620,7 +2620,10 @@ function queueItem(ctx: Ctx, seat: number, city: City, s: QueueSpec): QueueItem 
     const name = cat.buildings[s.row];
     if (cat.wonders.includes(name)) {
       const id = engineId('wonder', name, 'BUILDING_', BUILT_WONDERS);
-      return id && s.plot >= 0 ? { kind: 'wonder', wonder: id, tileIndex: s.plot, progress: 0 } : null;
+      // a wonder the city has set on a plot is built there, whatever
+      // Location the queue entry carries
+      const at = city.wonders.find((w) => w.id === id)?.tileIndex ?? s.plot;
+      return id && at >= 0 ? { kind: 'wonder', wonder: id, tileIndex: at, progress: 0 } : null;
     }
     const id = engineRowOf(cat, 'building', s.row);
     return id ? { kind: 'building', building: id, progress: 0 } : null;
@@ -3599,7 +3602,7 @@ const A_SPREAD = unitActionIndex(IMPROVEMENT_IDS).SPREAD_HERE;
  *  boosts may complete what was in hand (runs/h1_duelw1117 t23: China's
  *  Slinger kill completed Archery, then Horseback Riding was picked) */
 const ORDER: Decision['kind'][] = ['found', 'capture', 'policies', 'pantheon', 'religion', 'governors', 'war',
-  'envoy', 'levy', 'levyEnd', 'routes', 'congress', 'buyPlot', 'buyBuilding', 'wonderCharge', 'queue', 'improve', 'clear', 'buyUnit', 'move', 'village', 'gpActivate', 'park', 'unitNew', 'pillage', 'plunder', 'spread', 'battle', 'seize', 'unitGone', 'combat', 'hit', 'kill', 'promote', 'upgrade', 'camp', 'worked', 'research', 'civic'];
+  'envoy', 'levy', 'levyEnd', 'routes', 'congress', 'buyPlot', 'buyBuilding', 'wonderCharge', 'queueDrop', 'queue', 'improve', 'clear', 'buyUnit', 'move', 'village', 'gpActivate', 'park', 'unitNew', 'pillage', 'plunder', 'spread', 'battle', 'seize', 'unitGone', 'combat', 'hit', 'kill', 'promote', 'upgrade', 'camp', 'worked', 'research', 'civic'];
 
 function applyPhase(ctx: Ctx, ds: Decision[], phase: Decision['phase'], b: TurnRecord, wit: TurnRecord,
   players?: ReadonlySet<number>): void {
@@ -3665,6 +3668,18 @@ function applyPhase(ctx: Ctx, ds: Decision[], phase: Decision['phase'], b: TurnR
     }
     switch (d.kind) {
       case 'queue': applyQueue(ctx, d); break;
+      case 'queueDrop': {
+        // the wonder off the head before the city's step, its progress kept
+        // on its type
+        const city = cityAt(state, d.city);
+        const q = city?.queue[0];
+        const id = engineId('wonder', ctx.cat.buildings[d.row], 'BUILDING_', BUILT_WONDERS);
+        if (!city || city.seat !== seatOfP(ctx, d.player) || !q || q.kind !== 'wonder' || q.wonder !== id) { count(ctx, 'queueDrop', 'refused', d.player); break; }
+        city.queue.shift();
+        keepItem(city, q);
+        count(ctx, 'queueDrop', 'applied');
+        break;
+      }
       case 'research': applyResearch(ctx, d.player, d.tech, false); break;
       case 'civic': applyResearch(ctx, d.player, d.civic, true); break;
       case 'policies': break;
