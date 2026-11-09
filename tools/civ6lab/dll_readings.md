@@ -13527,3 +13527,53 @@ ACT_SENTRY), statecompare `activity`.
   Culture as Tourism at T 1 (40.2), Cardiff's and Bologna's 251.4.
 - Open: 0x1aba40's yield source past the improvement's own part (the tail
   0x53943c..0x53983c, C-100); the two lists of 0x18e570 on a major's city.
+
+## C-127: a contract its tree leaves is CANCELLED in the city's hand too; a Tech Contract's research test before the research AI's choice — LAB (the aimem contracts), READ (0x760980 -> 0x5f5940), both twins
+
+`reapContracts` (cpu/core/aiContracts.ts), GPU `reap_contracts`
+(gpu/core/sim_citytrees.py); the aimem import (`gameAiImport.ts`) keeps a
+contract the city's hand alone holds; `minorAiTurn`'s `goalsReached` call
+(cpu/core/minorCityAi.ts), GPU `_MinorTreeWorld.researching_tech`
+(gpu/core/sim_minorai.py) on `citystate_ai_tech_seen`.
+
+- A RELEASED CONTRACT (read off the aimem records, the release's writer
+  unread): a contract whose tree is gone (a city tree's end, an operation's
+  "Operation complete") and that a city still holds, in its list or in its
+  hand (CityBuildAI +0x398), reads CANCELLED at the end look, whatever its
+  status but FAILED. Over the five duelq recordings no contract whose owner
+  tree is gone reads CLAIMED, SUBMITTED, ACCEPTED, IN PROGRESS or COMPLETED
+  at an end look (1117-1128: FAILED 238 / 191 / 489 / 344 / 363, CANCELLED 53 /
+  50 / 123 / 77 / 16 player-turns); an IN PROGRESS one with no city holder
+  is gone at once (1124 3:221 t84). The engines release a contract the hand
+  keeps as one the list keeps: CANCELLED but a FAILED one, off the purchase
+  list, its completion signal cut, its line never printed. The next city
+  update's in-hand check (0x5d7e00) then clears the city's production
+  (the contract producing and CANCELLED).
+- Confirmed (one-seed aimem traces): runs/h1_duelq1124 t112 Cardiff's
+  Trebuchet contract 355, queued that turn for Attack Barb Camp, whose camp
+  target goes INVALID (no backup: "Operation complete") in the same tick:
+  CANCELLED at the end look (contracts / contracts.progress 0 misses t1-114,
+  was 1); runs/h1_duelq1128 t201 Bologna's Ranger contract 693 IN PROGRESS
+  since t198, its Attack Barb Camp complete at t201: CANCELLED (0 misses
+  t196-203, was 1), the game's production cleared at t203 (Bologna's Scout
+  after the Ranger's 131.8, the carried p56 miss t202 RANGER // SCOUT);
+  runs/h1_duelq1127 Hattusa t91 the Water Mill contract 277 its chop
+  completed inside the tick, in hand as its Build City Building tree ends:
+  CANCELLED as the end look reads it. The Contract Manager's FAILED ones
+  stay FAILED on the list (1124 t36 contract 70).
+- A TECH CONTRACT'S RESEARCH TEST: the research AI's turn (0x760980) walks
+  its contracts (vt +0x70, 0x5f5940: the tech the research -> IN PROGRESS)
+  before its choice, so a contract whose tech the turn's choice takes stays
+  ACCEPTED to the next turn's walk. The engines test the research in hand as
+  the research AI's turn found it (`ResearchState.aiTechSeen`). Confirmed:
+  runs/h1_duelq1127 p3 contract 315 on Castles, Stirrups completed at t93's
+  end, Castles chosen at t94: ACCEPTED at the t94 end look, IN PROGRESS from
+  t95 (0 contracts.progress misses t86-96, was 1).
+- Open: the release's writer (the tree's end 0x7cbb40 / the operation's
+  end, and 0x7d22f0's caller); the civics AI's walk order for a Civic
+  Contract (kept on the civic in hand); 1124 p2 t89's Castle tree, which the
+  game starts in slot 1 (tree 3014657) and ends in the same tick with no
+  contract, Castles researching at 1 turn, where the engines' Add Goal Tech
+  makes a Tech Contract and runs on (0x7e7d20's kept contracts +0x94 / +0x9c
+  read: SUBMITTED / FAILED / COMPLETED released, IN PROGRESS RUNNING; none
+  ends a tree).

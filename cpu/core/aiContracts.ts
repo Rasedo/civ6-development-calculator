@@ -351,29 +351,36 @@ export function contractBuilt(book: ContractBook, cityId: number, item: Contract
 }
 
 /** the contracts no holder keeps: a contract lives while a tree holds it, a
- *  city has it in hand or a city lists it. One only a city's list keeps is
- *  released: an open one CANCELLED (runs/h1_duely1117 Valletta's Builder
- *  contract 47, bought at t22, its Build City Improvement tree gone that
- *  turn: CANCELLED, refs 1, on the city's list to its t32 pick), off the
- *  purchase list, its expected unit still counted (0x5d4750 walks the list),
- *  and its line never printed (0x5f4cd0 prints none for a contract whose
- *  owner control is gone, 0x609060 at 0x5f4d59) */
+ *  city has it in hand or a city lists it. One only a city's hand or list
+ *  keeps is released: CANCELLED but a FAILED one, off the purchase list, its
+ *  expected unit still counted (0x5d4750 walks the list), and its line never
+ *  printed (0x5f4cd0 prints none for a contract whose owner control is gone,
+ *  0x609060 at 0x5f4d59). runs/h1_duely1117 Valletta's Builder contract 47,
+ *  bought at t22, its Build City Improvement tree gone that turn: CANCELLED,
+ *  refs 1, on the city's list to its t32 pick; runs/h1_duelq1124 t112
+ *  Cardiff's Trebuchet contract 355 and runs/h1_duelq1128 t201 Bologna's
+ *  Ranger contract 693, each IN PROGRESS in hand when its Attack Barb Camp
+ *  completes: CANCELLED at the end look, the city's production cleared at
+ *  its next update (Cardiff's Workshop t113, Bologna's Scout t203);
+ *  runs/h1_duelq1127 Hattusa t91, the Water Mill contract 277 its chop
+ *  completed inside the tick, still in hand as its Build City Building tree
+ *  ends: CANCELLED; the Contract Manager's FAILED ones stay FAILED on the
+ *  list (1124 t36 contract 70). No contract whose tree is gone reads open
+ *  or COMPLETED at an end look (duelq 1117-1128) */
 export function reapContracts(book: ContractBook, held: ReadonlySet<number>): number[] {
-  const keep = new Set(held);
-  for (const id of Object.values(book.inHand)) keep.add(id);
+  const hand = new Set(Object.values(book.inHand));
   const listed = new Set(Object.values(book.city).flat());
   for (const c of book.contracts) {
-    if (keep.has(c.id) || !listed.has(c.id) || c.released) continue;
+    if (held.has(c.id) || !(listed.has(c.id) || hand.has(c.id)) || c.released) continue;
     c.released = true;
     delete c.queued;
-    if (c.progress === CP_CLAIMED || c.progress === CP_SUBMITTED || c.progress === CP_ACCEPTED || c.progress === CP_IN_PROGRESS) {
-      c.progress = CP_CANCELLED;
-    }
+    if (c.progress !== CP_FAILED) c.progress = CP_CANCELLED;
   }
-  const gone = book.contracts.filter((c) => !keep.has(c.id) && !listed.has(c.id)).map((c) => c.id);
-  book.contracts = book.contracts.filter((c) => keep.has(c.id) || listed.has(c.id));
+  const kept = (id: number): boolean => held.has(id) || hand.has(id) || listed.has(id);
+  const gone = book.contracts.filter((c) => !kept(c.id)).map((c) => c.id);
+  book.contracts = book.contracts.filter((c) => kept(c.id));
   // the purchase list's handles empty with them
-  book.purchase = book.purchase.filter((id) => keep.has(id));
+  book.purchase = book.purchase.filter((id) => held.has(id));
   return gone;
 }
 

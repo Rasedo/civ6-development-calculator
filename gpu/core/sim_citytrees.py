@@ -591,21 +591,22 @@ def reap_contracts(ai: CityAi, s: int, w) -> None:
     """`reapContracts`: a contract lives while its tree — a city tree's, an
     operation's (`w.operation_live`) — runs and holds it, or the city has it
     in hand, or the research or culture AI holds it (`c_goal_held`), or the
-    city lists it; one the list alone keeps is released (`c_released`: an
-    open one CANCELLED, off the purchase list, its line never printed)"""
+    city lists it; one the hand or the list alone keeps is released
+    (`c_released`: CANCELLED but a FAILED one, off the purchase list, its
+    line never printed)"""
     in_tree = ai.c_in_tree[:, s] & (tree_live(ai, s, ai.c_tree[:, s]) | _b(w.operation_live(ai.c_tree[:, s]), ai.c_in_tree[:, s]))
-    keep = in_tree | ai.c_goal_held[:, s] | (ai.c_id[:, s] == ai.in_hand[:, s].unsqueeze(1))
+    owned = in_tree | ai.c_goal_held[:, s]
+    city = ai.c_listed[:, s] | (ai.c_id[:, s] == ai.in_hand[:, s].unsqueeze(1))
     live = ai.c_id[:, s] >= 0
-    rel = live & ~keep & ai.c_listed[:, s] & ~ai.c_released[:, s]
+    rel = live & ~owned & city & ~ai.c_released[:, s]
     prog = ai.c_progress[:, s]
-    open_ = (prog == CP_CLAIMED) | (prog == CP_SUBMITTED) | (prog == CP_ACCEPTED) | (prog == CP_IN_PROGRESS)
-    ai.c_progress[:, s] = torch.where(rel & open_, torch.full_like(prog, CP_CANCELLED), prog)
+    ai.c_progress[:, s] = torch.where(rel & (prog != CP_FAILED), torch.full_like(prog, CP_CANCELLED), prog)
     ai.c_released[:, s] |= rel
-    held = live & ~keep & ai.c_listed[:, s]
+    held = live & ~owned & city
     ai.c_purchase[:, s] &= ~held
     ai.c_in_tree[:, s] &= ~held
     ai.c_queued[:, s] &= ~held
-    gone = live & ~keep & ~ai.c_listed[:, s]
+    gone = live & ~owned & ~city
     ai.c_id[:, s] = torch.where(gone, torch.full_like(ai.c_id[:, s], -1), ai.c_id[:, s])
     ai.c_listed[:, s] &= ~gone
     ai.c_purchase[:, s] &= ~gone

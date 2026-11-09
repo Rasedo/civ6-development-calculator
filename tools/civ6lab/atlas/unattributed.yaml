@@ -3440,8 +3440,12 @@
     - recording: h1_duelq1128
       turn: 22
       value: Xi'an's (a major's) Stonehenge contract 46 CANCELLED with no Canceling current build line, the queue cleared at China's city update before its production step (CityProductionChanged before PlayerTurnActivated)
+    - recording: h1_duelq1128
+      turn: 203
+      value: Bologna's Ranger contract 693, released CANCELLED in hand at t201 with its Attack Barb Camp, producing; the production cleared, the Scout picked after the Ranger's 131.8
   impl: [cpu/core/aiContracts.ts:inHandCheck]
   readings:
+    - "C-127: a contract its tree leaves is CANCELLED in the city's hand too; a Tech Contract's research test before the research AI's choice — LAB (the aimem contracts), READ (0x760980 -> 0x5f5940), both twins"
     - "C-111 / C-108: a route the records carry walks home and ends there, a Great Person's granted unit raises the best strengths, a major's wonder contract cancelled — READ (0x552bc0, 0xbd8be0 -> 0x4c1a30, 0x5d7e00), both twins"
     - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
     - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"

@@ -2523,7 +2523,9 @@ class _MinorWorld:
         return v.reshape(code.shape)
 
     def researching_tech(self, code):
-        cur = self.sim.citystate_cur_tech[:, self.s]
+        # the research in hand as the research AI's turn found it, before
+        # its choice (`goalsReached`'s research test)
+        cur = self.sim.citystate_ai_tech_seen[:, self.s]
         flat = code.reshape(self.sim.B, -1)
         return ((flat == cur.unsqueeze(1)) & (flat >= 0)).reshape(code.shape)
 

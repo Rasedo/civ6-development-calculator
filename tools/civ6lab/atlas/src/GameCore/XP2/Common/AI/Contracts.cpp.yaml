@@ -105,12 +105,19 @@
     - recording: h1_duely1124
       turn: 49
       value: "city-state 2 (Cardiff): Masonry boosted complete by the Quarry its Improvement tree laid, Tech Contract 108 ACCEPTED at the log look, COMPLETED at the end look"
+    - recording: h1_duelq1127
+      turn: 94
+      value: "p3 contract 315 on Castles, chosen at t94 after the walk: ACCEPTED at the t94 end look, IN PROGRESS from t95 (the research test on the research in hand as the turn found it)"
   impl:
     - cpu/core/aiCityTrees.ts:goalsReached
+    - cpu/core/minorCityAi.ts:minorAiTurn
+    - gpu/core/sim_minorai.py:researching_tech
     - cpu/core/minorBuild.ts:techContractsCompleted
     - gpu/core/sim_minors.py:_tech_contracts_completed
+    - cpu/core/minorCityAi.ts:r
   readings:
     - "C-96: a completion's contract walk COMPLETES its Tech Contracts mid-turn; a city-state's route boosts land before its army's walk — READ (0x762d60 at 0x762ed0..0x762f8a, 0x5f5940), both twins"
+    - "C-127: a contract its tree leaves is CANCELLED in the city's hand too; a Tech Contract's research test before the research AI's choice — LAB (the aimem contracts), READ (0x760980 -> 0x5f5940), both twins"
     - "H-1: the research AI — READ (the choice), PARTLY READ (the value)"
     - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
   context:

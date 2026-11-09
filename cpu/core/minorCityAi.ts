@@ -1162,9 +1162,15 @@ export function minorAiTurn(state: GameState, cs: CityState, fresh: boolean,
   if (!fresh) cs.bestPlotToBuy = minorBestPlotToBuy(state, cs, evals);
   const city = minorTreeCity(state, cs, facts, tables, pf, evals, threat);
   const w = minorTreeWorld(state, cs, ai, city);
+  // a Tech Contract's research test reads the research in hand as the
+  // research AI's turn found it: its contract walk (0x760980 -> vt +0x70
+  // 0x5f5940) runs before its choice (runs/h1_duelq1127 p3 contract 315 on
+  // Castles, chosen at t94 after Stirrups completed at t93's end: ACCEPTED
+  // at the t94 end look, IN PROGRESS from t95)
   const r = cs.research;
+  const techSeen = r.aiTechSeen ?? null;
   goalsReached(ai, (g) => w.techHeld(g) || w.civicHeld(g),
-    (g) => (r.tech !== null && g === installType('tech', r.tech, 'TECH_')) || (r.civic !== null && g === installType('civic', r.civic, 'CIVIC_')));
+    (g) => (techSeen !== null && g === installType('tech', techSeen, 'TECH_')) || (r.civic !== null && g === installType('civic', r.civic, 'CIVIC_')));
   freeSlots(ai, w, city.id);
   inHandCheck(ai, city, () => minorSetItem(state, cs, null));
   city.current = currentItem(cs);
