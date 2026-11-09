@@ -13966,3 +13966,53 @@ no clamp; its +0xc4 is the raw damage.
   0x185988) where the engines charge a city-state's completed unit
   (`minorFinish` / `_minor_finish`); runs/h1_duelq1128 Nazca's Horsemen
   (t33, t37) the case to read.
+
+## H-4: a wonder under a hostile unit, the economy before the luxury rebuild, the extraction a pillage and a centre change — READ, both twins
+
+- THE QUEUE STEP'S PRELUDE (City_BuildQueue 0x16f050 at 0x16f09a..0x16f180):
+  a head ORDER_CONSTRUCT on a plot (+0x30 = 1, +0x14 not -1: a wonder) is
+  asked CanConstruct (0x170450). For a building with progress
+  (HasBuildingProductionProgress 0x17d050) on its construction plot
+  (0x179280), 0x170450 refuses at 0x170db8 where 0x5313f0 (the owner, the
+  plot, flag 1) finds a hostile unit on the plot (+0x29). Refused, the front
+  leaves (0x17f5a0, 0x17f630), its progress kept by type; the step then works
+  the next item, or with the queue empty adds the Production to the overflow
+  store (0x16f62d). Ported: `wonderLetGo` (cpu/core/production.ts; the
+  seat walk before its stats, the lump step in economy.ts) and
+  `_wonder_let_go` (gpu/core/sim_phase.py, the seat turn and `_lump_step`).
+  Confirmed: runs/h1_duelq1128 Xi'an t22, Stonehenge at 14 on 15:11 under
+  the barbarian Warrior: no step logged at t22, the Builder picked at 0 takes
+  9 + 9 at t23 (City_BuildQueue.csv 18.0), kept at 18 to t54, the Builder at
+  18 in record t55 and complete at t55 (38.0 of 31).
+- THE ECONOMY BEFORE THE RESOURCES STEP (Player DoTurn 0x4e4560): the
+  science (0x4c9640 at 0x4e45df), the gold (0x4e08f0), the culture
+  (0x396860 at 0x4e460b) and the faith (0x4967f0) are banked before the
+  resources step (0x4a8ed0 at 0x4e46c0, the luxury rebuild 0x4a6110): the
+  yields read the allocation standing before it. Ported: `econLux`
+  (cpu/core/phase.ts, `readYields`), `econ_lux` (gpu/core/sim_phase.py,
+  `_seat_economy`'s reads); a city founded since holds none. Confirmed:
+  runs/h1_duelq1121 t37, Taiyuan founded at t36 banks 0.26953125 Culture and
+  0.453125 Science at its -10% (record t37), allocated at the rebuild after
+  (record t38 0.296875 / 0.5): civic progress 36.84375, tech overflow 3.449.
+- THE EXTRACTION'S CHANGE (0x4ab4d0) on a unit's pillage of an improvement
+  on a luxury or bonus resource, and on a city centre placed on one: the
+  owner's (and a city-state's suzerain's) allocation ranked anew. Ported in
+  `hostilePillage`, `coastalRaid`, `airPillage`, the seat's pillage order
+  (`applySeatUnitOrders`) and `foundCityAt` (`extractionChanged`);
+  `_barb_pillage_here`, `_barb_coastal_raid`, `_plunder`,
+  `_apply_seat_unit_actions`, `_air_pillage` and `_found_city_at`
+  (`_extraction_changed_at`). Confirmed: runs/h1_duelq1127 t62, the
+  barbarians' pillage of 13:5's Truffles Camp (ImprovementChanged ... 31, 1) leaves
+  record t63 with one luxury per city; 1127 t63 Jiaodong on 12:10's luxury,
+  LuxAllocArrived after its DistrictAddedToMap, record t64 two per city.
+- THE TURN'S END (DoTurnDeactivate -> 0x4a8f10) holds each stockpile to its
+  cap after the player's actions, a bank over it re-ranking the luxuries: the
+  replay lands it after the actions it applies (`seatPhase` with `only`
+  leaves it). Confirmed: runs/h1_duelq1128 t106, Taiyuan founded in China's
+  actions, LuxAllocArrived after its PlayerTurnDeactivated.
+- Open: a pillage by an event (`scorch`, the drought, the flood, a
+  detonation, a sack) and a district placed on a resource do not re-rank;
+  the step's item multiplier as the game forms it (0x183db0: per factor a
+  24.8 raw, 1.1 as 281/256, each through fx_mul_assign 0x16eb20) and a
+  Builder's wonder charge through it (runs/h1_duelq1121 t38: Xi'an's
+  Pyramids 18.66 + 16.5 x 281/256 = 36.7695 of 110, the engines 35.2).

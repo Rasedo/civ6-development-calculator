@@ -4069,6 +4069,7 @@ class SimSeats:
             _pi = (self.improvement[_r, _tt] >= 0) & ~self.pillaged[_r, _tt]
             _pd = ~_pi
             self.pillaged[_r[_pi], _tt[_pi]] = True
+            self._extraction_changed_at(_r[_pi], _tt[_pi])
             self.district_pillaged[_r[_pd], _tt[_pd]] = True
             self._air_scatter_from(_r[_pd], _tt[_pd])
             self._eff_version += 1
@@ -11632,9 +11633,20 @@ class SimSeats:
             housing = housing + self._governor_house_amen(row)[0][:, :cols]
         return maint, torch.where(alive, housing, torch.zeros_like(housing))
 
+    def _extraction_changed_at(self, rows: torch.Tensor, tiles: torch.Tensor) -> None:
+        """`_extraction_changed` for the games `rows` [n] (one plot each) on
+        `tiles` [n]"""
+        if not rows.numel():
+            return
+        m = torch.zeros(self.B, dtype=torch.bool, device=self.device)
+        m[rows] = True
+        t = torch.full((self.B,), -1, dtype=torch.long, device=self.device)
+        t[rows] = tiles
+        self._extraction_changed(m, t)
+
     def _extraction_changed(self, mask: torch.Tensor, tile: torch.Tensor) -> None:
-        """`extractionChanged`'s twin: an improvement built, removed or
-        repaired on `tile` [B] for the games in `mask` [B] changes what its
+        """`extractionChanged`'s twin: an improvement built, removed,
+        repaired or pillaged on `tile` [B] for the games in `mask` [B] changes what its
         owner extracts (0x4ab4d0 -> 0x4a7560) — a luxury's or a bonus
         resource's rebuilds the owner's allocation, a strategic's does not; a
         city-state's change rebuilds its suzerain's too (0x44eff0)."""
@@ -13079,6 +13091,9 @@ class SimSeats:
             self.tile_seat[rows[_r], _t] = seat
             self.tile_city[rows[_r], _t] = _new_cid[_r]
             self._tile_owner_ver += 1
+        # the centre placed on a luxury or bonus resource extracts it at once,
+        # the owner's allocation ranked anew (`foundCityAt`'s extractionChanged)
+        self._extraction_changed_at(rows, s_idx)
         # foundCityAt's cityLook over the plots just claimed, then its moments
         self._city_look(rows, seat, s_idx)
         self._founding_moments(row, rows, slot, s_idx)

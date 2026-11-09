@@ -19,7 +19,7 @@ import { RESOURCES } from '../../world/resources';
 import { minorLump } from './minorBuild';
 import { lumpFood } from './seatTurn';
 import { itemCost } from './game';
-import { completeQueueItem, districtPlotHostile, keepItem } from './production';
+import { completeQueueItem, districtPlotHostile, keepItem, wonderLetGo } from './production';
 
 /**
  * SELECT a tech or civic, keeping the progress on the one being left.
@@ -278,7 +278,9 @@ export function applyLumpYield(
   // completes the head it fills at once, AddProgress's flag (r9b 1) storing
   // the lump less what the head lacked before it as the overflow (0x16f3bf;
   // runs/h1_duely1117 t121: China's harvest at Longxi completes its
-  // Entertainment Complex inside its actions)
+  // Entertainment Complex inside its actions); a wonder under a hostile unit
+  // leaves the head first (`wonderLetGo`)
+  wonderLetGo(state, city);
   if (city.queue.length > 0) {
     const q = city.queue[0];
     const before = q.progress;

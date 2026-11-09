@@ -5,7 +5,7 @@ import { GP_CLASSES } from '../data/greatPeople';
 import { createRelic } from './greatWorks';
 import { VALLETTA_FAITH_DISTRICTS, VALLETTA_WALLS_DISCOUNT_PCT, VATICAN_GP_PRESSURE } from '../data/cityStates';
 import { tilesWithin, hexDistance, neighbors } from '../../world/hex';
-import { claimTile, borderCandidates, drawBorderPlot, newCityGrantUnit, seatBuildingSum } from './city';
+import { claimTile, borderCandidates, drawBorderPlot, extractionChanged, newCityGrantUnit, seatBuildingSum } from './city';
 import { cityFlags, replaceAllCitizens } from './citizens';
 import { canFoundCity, availableBuildings, buildingCompletable, purchasableBuildings, worshipOffered, type RuleResult } from './rules';
 import { computeUnlocks, getModifiers, isCivicComplete, goldPrice, faithPrice } from './effects';
@@ -364,6 +364,11 @@ export function foundCityAt(state: GameState, seat: number, tile: Tile, owner: S
     const owner = seatOf(state, seat);
     if (owner) owner.capitalTile = tile.index;  // static once founded
   }
+  // the centre placed on a luxury or bonus resource extracts it at once,
+  // the owner's allocation ranked anew (`extractionChanged`; runs/
+  // h1_duelq1127 t63: Jiaodong on 12:10's luxury, LuxAllocArrived after its
+  // DistrictAddedToMap, record t64 Xi'an and Changsha on two luxuries)
+  extractionChanged(state, tile);
   trajansColumn(state, seat, city);
   cityLook(state, seat, tile.index);
   foundingMoments(state, seat, tile.index);

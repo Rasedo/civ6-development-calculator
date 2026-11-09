@@ -26,7 +26,7 @@
     - recording: 1121
       turn: 243
       value: "Player_Resources' DoTurn step 0x4a8ed0 runs the holdings 0x4ab6e0, the   allocation, then the parks 0x32deb0 — so a park stored at a processing   pays beside the luxuries ranked on the park amenities "
-  impl: [cpu/core/city.ts:refreshParkAmenities, cpu/core/phase.ts:seatPhase]
+  impl: [cpu/core/city.ts:refreshParkAmenities, cpu/core/phase.ts:seatPhase, cpu/core/phase.ts:econLux]
   readings:
     - "H-1: a National Park's amenities, stored at the owner's turn — READ"
     - "H-1: the cards the luxury allocation ranks on — READ (the order), the triggers partly"

@@ -217,7 +217,12 @@ class SimPhase:
         self._seat_accrue_stockpile(row)
         self._seat_charge_upkeep(row)
         self._resolve_seat_power(row)
-        # the holdings' luxury allocation, then the parks (0x4a8ed0)
+        # the holdings' luxury allocation, then the parks (0x4a8ed0); the
+        # economy's yields read the allocation standing before it (DoTurn
+        # 0x4e4560 banks the science, gold, culture and faith ahead of the
+        # resources step, `econLux`), a city founded since holding none
+        econ_lux = torch.where(self.city_alive[:, row, :self.RC], self.city_lux_amen[:, row, :self.RC],
+                               torch.zeros_like(self.city_lux_amen[:, row, :self.RC]))
         self._rebuild_luxuries(row, active)
         self._refresh_park_amenities(row, active)
         # ESPIONAGE: this seat's own spies move a turn closer to arriving or to
@@ -244,7 +249,7 @@ class SimPhase:
         cact_any_l = cact_all.any(dim=0).tolist()
 
         gov = self._seat_governor_seats(row)
-        sci_turn = self._seat_economy(row, active, cact_all, cact_any_l)
+        sci_turn = self._seat_economy(row, active, cact_all, cact_any_l, econ_lux)
         # its religion, if it founded one, spreads with its faith, before its
         # cities (`spreadReligiousPressure`'s place in `seatPhase`)
         self._spread_religious_pressure(row, active)
@@ -261,6 +266,11 @@ class SimPhase:
         # The SEAT halves of the per-city bodies are derived once above their
         # loop and handed to every column: nothing in either reads a plane a
         # column writes (see `_produce_pre` / `_loyalty_pre`).
+        # a wonder under a hostile unit leaves the head before the step reads
+        # its Production (`wonderLetGo`)
+        for j in range(self.RC):
+            if cact_any_l[j]:
+                self._wonder_let_go(row, j, cact_all[:, j])
         made = self._seat_city_stats(row, record=False)[0][:, :, 1]
         # the cities' PLAIN Production, which a completion's overflow is capped
         # at (`plainProduction`): the same read without the city-states' flat
@@ -1193,6 +1203,10 @@ class SimPhase:
         it fills completes at once, the overflow store taking the lump less
         what the head lacked before it (0x16f3bf, the flag set). With nothing
         queued the lump goes to the overflow store."""
+        # a wonder under a hostile unit leaves the head first (`wonderLetGo`)
+        _wg = torch.zeros(self.B, dtype=torch.bool, device=self.device)
+        _wg[b] = True
+        self._wonder_let_go(row, j, _wg)
         if int(self.city_current[b, row, j, 0]) < 0:
             self.city_prod_bank[b, row, j] += amount
             return
@@ -1225,6 +1239,26 @@ class SimPhase:
         lacked = max(0.0, cost - before)
         if amount > lacked:
             self.city_prod_bank[b, row, j] += amount - lacked
+
+    def _wonder_let_go(self, row: int, j: int, act: torch.Tensor) -> None:
+        """`wonderLetGo` for city `j` of major row `row` in the games of
+        `act` [B] (City_BuildQueue 0x16f050 at 0x16f09a..0x16f180): a wonder
+        at the head with progress on a plot a hostile unit holds
+        (CanConstruct 0x170450 at 0x170db8, `_district_plot_hostile`) leaves
+        the queue, its progress kept by type."""
+        nw = self._wond_n
+        if row >= self.n_majors or not nw:
+            return
+        cur = self.city_current[:, row, j, 0]
+        won = act & (cur >= self.WONDER_BASE) & (cur < self.WONDER_BASE + nw) & (self.city_progress[:, row, j, 0] > 0)
+        if not bool(won.count_nonzero()):
+            return
+        plot = self.city_wonder[self._bidx, row, j, (cur - self.WONDER_BASE).clamp(min=0, max=nw - 1)]
+        hit = won & self._district_plot_hostile(row, torch.where(won, plot, torch.full_like(plot, -1)))
+        if not bool(hit.count_nonzero()):
+            return
+        self._q_keep_head(hit.nonzero(as_tuple=True)[0], row, j)
+        self._q_pop(row, torch.full((self.B,), j, dtype=torch.long, device=self.device), hit)
 
     def _district_plot_hostile(self, row: int, plot: torch.Tensor) -> torch.Tensor:
         """[B] `districtPlotHostile` for major row `row` (0x5313f0 with its
@@ -2403,7 +2437,7 @@ class SimPhase:
             plane[:, row] += torch.where(fin, amt.gather(0, at), torch.zeros_like(cur)).to(plane.dtype)
 
     def _seat_economy(self, row: int, active: torch.Tensor, cact_all: torch.Tensor,
-                      cact_any_l: list) -> torch.Tensor:
+                      cact_any_l: list, econ_lux: torch.Tensor) -> torch.Tensor:
         """The seat's ECONOMY, for seat row `row` — ONE body every seat runs,
         ahead of its city walk; the `seatPhase` twin.
 
@@ -2424,6 +2458,9 @@ class SimPhase:
         term reads the seat's ERA off completed research, so tourism must sit
         AFTER this turn's tech completions and BEFORE any civic completes.
 
+        Every read takes the luxury allocation `econ_lux` [B, RC], the one
+        standing before the turn's resources step (`econLux`).
+
         Returns [B] the cities' own science as the turn opened, which the
         Moon Landing lump reads."""
         B, dev = self.B, self.device
@@ -2433,11 +2470,19 @@ class SimPhase:
         def bank(plane: torch.Tensor, add: torch.Tensor) -> None:
             plane[:, row] = plane[:, row] + torch.where(active, add, torch.zeros_like(add))
 
+        def stats() -> torch.Tensor:
+            """the cities' yields on `econ_lux`, the stored allocation kept"""
+            held = self.city_lux_amen[:, row, :self.RC].clone()
+            self.city_lux_amen[:, row, :self.RC] = econ_lux
+            out = self._seat_city_stats(row, record=False)[0]
+            self.city_lux_amen[:, row, :self.RC] = held
+            return out
+
         def read(where: torch.Tensor, total: torch.Tensor) -> torch.Tensor:
             """the cities' yields read again in the games of `where`"""
             if not bool(where.count_nonzero()):
                 return total
-            fresh = self._seat_city_stats(row, record=False)[0]
+            fresh = stats()
             return torch.where(where.view(-1, 1, 1), fresh, total)
 
         def city_sum(total: torch.Tensor, k: int) -> torch.Tensor:
@@ -2506,7 +2551,7 @@ class SimPhase:
                 m = m + (self._suz_gp_culture_mult(row) - 1.0)
             return torch.where(m == 1.0, s, torch.floor(s * m * 256.0 + 1e-6) / 256.0)
 
-        total = self._seat_city_stats(row, record=False)[0]
+        total = stats()
 
         # SCIENCE, and the technologies it completes.
         sci_sum = city_sum(total, 3)

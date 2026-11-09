@@ -824,7 +824,7 @@ export function rebuildLuxuries(state: GameState, seat: number): void {
   for (const c of citiesOf(state, seat)) c.luxuryAmenities = ranked.get(c.id) ?? 0;
 }
 
-/** An improvement on `tile` built, removed or repaired changes the
+/** An improvement on `tile` built, removed, repaired or pillaged changes the
  *  resource its owner extracts (0x4ab4d0 -> 0x4a7560): a luxury's or a bonus
  *  resource's rebuilds the owner's allocation, an accumulated strategic's
  *  does not; a city-state's change reaches its suzerain's copies (0x44eff0),

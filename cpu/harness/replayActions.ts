@@ -1151,6 +1151,9 @@ export class RecordedActions implements ActionSource {
       if (v) v.unit = `${n(r, 0)}:${n(r, 1)}`;
     }
     const upgradedInto = new Set(out0.flatMap((d) => (d.kind === 'upgrade' ? [d.into] : [])));
+    // the active player's actions close at its PlayerTurnDeactivated: a unit
+    // added before it came in those actions
+    const actEnd = ev.findIndex((r) => r[2] === 'PlayerTurnDeactivated' && n(r, 0) === act);
     ev.forEach((r, i) => {
       if (r[2] !== 'UnitAddedToMap') return;
       const k = `${n(r, 0)}:${n(r, 1)}`;
@@ -1168,8 +1171,11 @@ export class RecordedActions implements ActionSource {
       if (at !== undefined && at >= 0) {
         put('unitOrigin', k, { kind: 'buyUnit', phase: phaseOf(u.owner), player: u.owner, city: at, type: u.type, unit: k, currency: currencyOf(u.owner, at, 'U', u.type) });
       } else {
-        put('unitOrigin', k, { kind: 'unitNew', phase: 'after', player: u.owner, unit: k, type: u.type, plot,
-          why: completed.has(`${u.owner}:${u.type}`) ? 'trained' : 'other' });
+        // one its player's actions added lands with them (runs/h1_duelq1128
+        // t93: Rome's Heavy Chariot 1966081 from a village before its
+        // PlayerTurnDeactivated, in its t94 start's upkeep)
+        put('unitOrigin', k, { kind: 'unitNew', phase: u.owner === act && i < actEnd ? 'before' : 'after', player: u.owner, unit: k,
+          type: u.type, plot, why: completed.has(`${u.owner}:${u.type}`) ? 'trained' : 'other' });
       }
     });
     for (const r of ev) if (!READ_EVENTS.has(r[2])) this.unread.set(r[2], (this.unread.get(r[2]) ?? 0) + 1);

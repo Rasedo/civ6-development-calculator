@@ -5,7 +5,7 @@ import { advanceGreatPeople, passGreatPerson, patronizeGreatPerson, recruitClaim
 import { activateGreatPerson } from './gpAbility';
 import { GW_KINDS } from '../data/greatWorks';
 import { drainRelicReserve, gwCountKind, gwHasRoom, gwLastOfKind, moveGreatWork } from './greatWorks';
-import { completeQueueItem, dropQueuedBuilding, cultureBomb, grantFreeResearch, districtPlotHostile, keepItem } from './production';
+import { completeQueueItem, dropQueuedBuilding, cultureBomb, grantFreeResearch, districtPlotHostile, keepItem, wonderLetGo } from './production';
 import { cityLook, fogActive, isExplored, meetMajors, revealAround, unitSight, unitSeesThrough } from './fog';
 import { tilesWithin, hexDistance, hexRingWalk, neighbors, neighborTile } from '../../world/hex';
 import { isWater, hasRiver, isCoastalLand } from '../../world/query';
@@ -2523,6 +2523,7 @@ export function applySeatUnitOrders(state: GameState, actor: Seat, steps: number
           && !IMPROVEMENTS[t.improvement as keyof typeof IMPROVEMENTS]?.noPillage;
         if (impWreckable(here) && hereOwned) {
           here.pillaged = true;
+          extractionChanged(state, here);
           pillagePlunder(state, unit, IMPROVEMENTS[here.improvement as keyof typeof IMPROVEMENTS]?.plunder, false, here.improvement ?? undefined, tileSeat(here));
           spendPillage();
           // a Free City's improvement or district pillaged by the unit on
@@ -2550,6 +2551,7 @@ export function applySeatUnitOrders(state: GameState, actor: Seat, steps: number
           const impT = cand.find(impWreckable);
           if (impT) {
             impT.pillaged = true;
+            extractionChanged(state, impT);
             pillagePlunder(state, unit, IMPROVEMENTS[impT.improvement as keyof typeof IMPROVEMENTS]?.plunder, false, impT.improvement ?? undefined, tileSeat(impT));
             spendPillage(true);
             raidGold();
@@ -3033,7 +3035,9 @@ export function researchLump(state: GameState, seat: number, amount: number, civ
  * THE MAJORS' STARTS AND ACTIONS, each seat in ascending order. `only` runs
  * the seats it names alone (the action replay runs each player's start in
  * the place its record's pair holds it), the standing deals' turn with them
- * where `deals` says so; every seat, the deals first, without it.
+ * where `deals` says so, and leaves each seat's turn end (the stockpiles'
+ * cap, `capStockpiles`) to the replay, which lands it after the actions it
+ * applies; every seat, the deals first, without it.
  */
 export function seatPhase(state: GameState, only?: { seats: ReadonlySet<number>; deals: boolean }): void {
 
@@ -3099,7 +3103,12 @@ export function seatPhase(state: GameState, only?: { seats: ReadonlySet<number>;
     chargeUnitUpkeep(state, actor.seat);
     resolveSeatPower(state, actor.seat);
     // the holdings' luxury allocation, then the parks (0x4a8ed0: 0x4a6110,
-    // then 0x32deb0): every read of the processing takes this ranking
+    // then 0x32deb0): every read of the processing takes this ranking but
+    // the economy's yields, which DoTurn banks before the resources step
+    // (0x4e4560: the science 0x4c9640, the gold 0x4e08f0, the culture
+    // 0x396860 and the faith 0x4967f0 ahead of 0x4a8ed0 at 0x4e46c0) on the
+    // allocation standing before it (`econLux`)
+    const econLux = standingLuxuries(state, actor.seat);
     rebuildLuxuries(state, actor.seat);
     refreshParkAmenities(state, actor.seat);
     // ESPIONAGE: this seat's own spies move a turn closer to arriving or to
@@ -3186,9 +3195,8 @@ export function seatPhase(state: GameState, only?: { seats: ReadonlySet<number>;
     // turn holds the city from the next) and before any loyalty moves.
     const rGovIds = governedCityIds(actor);
     const readYields = (): CityStats['total'][] => {
-      const lux = standingLuxuries(state, actor.seat);
       const mods = getModifiers(state, actor.seat);
-      return actor.cities.map((c) => computeCityStats(state, c, lux, mods).total);
+      return actor.cities.map((c) => computeCityStats(state, c, econLux, mods).total);
     };
     // `total.gold` is already NET of district+building upkeep —
     // computeCityStats subtracts it — so it is not charged a second time.
@@ -3454,6 +3462,9 @@ export function seatPhase(state: GameState, only?: { seats: ReadonlySet<number>;
     {
       const luxMap = standingLuxuries(state, actor.seat);
       for (const civCity of walkCities) {
+        // a wonder under a hostile unit leaves the head before the step
+        // reads its Production (`wonderLetGo`)
+        wonderLetGo(state, civCity);
         const st = computeCityStats(state, civCity, luxMap, seatMods);
         madeOf.set(civCity.id, st.total.production);
         plainOf.set(civCity.id, st.plainProduction);
@@ -3972,7 +3983,7 @@ export function seatPhase(state: GameState, only?: { seats: ReadonlySet<number>;
     }
     if (recU) applySeatUnitOrders(state, actor, recU.units);
     // the turn's end holds each strategic stockpile to its cap
-    capStockpiles(state, actor.seat);
+    if (!only) capStockpiles(state, actor.seat);
     // the eurekas and inspirations the seat's processing and actions earned
     // land within its turn, as the game's events land them (a city founded on
     // the coast shows Sailing's boost in the record of the turn it was

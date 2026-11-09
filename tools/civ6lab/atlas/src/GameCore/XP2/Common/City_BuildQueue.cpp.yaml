@@ -94,6 +94,7 @@
     - "C-97: the governor AI — the analysis, the choice and the seats READ, the analyzers PARTLY READ"
     - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
     - "C-102: the citizen pressure's falloff and the per-citizen term — READ; Stamford Raffles' city"
+    - "H-4: a wonder under a hostile unit, the economy before the luxury rebuild, the extraction a pillage and a centre change — READ, both twins"
   notes:
     - "label: fx_mul_assign(a*=b)"
     - ".claude/scratchpad/cb/notes.txt: ...| trunc((f-floor)*256)&0xff ; fx(0.01)=2 (!), fx(0.5)=128, fx(1/6 const 0.16667)=42. fx_mul a*b>>8 (0x16eb20 assign, 0x16e7d0 new), fx_div (a<<8)/b trunc (0x16e940), add 0xac650, sub 0x16ec10. FX_MIN=-9999.0..."
@@ -118,7 +119,7 @@
   final: 0xf5080
   kind: function
   name: City_BuildQueue
-  semantics: "reads the city's Production twice through 0x1c5350: A with the head's id (toward the item), B with none (the plain Production). With an item at the head it adds A plus the stored overflow (m_xProductionOverflow +0x1f4, 0x16f1db) and clears the overflow (0x16f31b); on a completion the overflow becomes min(A, B) - (cost - progress before the step) (0x16f3bf: B under the remainder -> 0, else the smaller less the remainder), the carried overflow not counted. With nothing queued the step adds B to the overflow (0x16f62d -> 0xac650)."
+  semantics: "reads the city's Production twice through 0x1c5350: A with the head's id (toward the item), B with none (the plain Production). With an item at the head it adds A plus the stored overflow (m_xProductionOverflow +0x1f4, 0x16f1db) and clears the overflow (0x16f31b); on a completion the overflow becomes min(A, B) - (cost - progress before the step) (0x16f3bf: B under the remainder -> 0, else the smaller less the remainder), the carried overflow not counted. With nothing queued the step adds B to the overflow (0x16f62d -> 0xac650). Before the step (0x16f09a..0x16f180) a head ORDER_CONSTRUCT on a plot (a wonder) is asked CanConstruct (0x170450); refused, the front leaves (0x17f5a0, 0x17f630, +0x3ac set) and the step works the next item, or with none adds the Production to the overflow."
   status: READ
   cases:
     - recording: h1_duelw1117
@@ -136,6 +137,9 @@
     - recording: 1117
       turn: 15
       value: "B, read with no   item, holds none of the city-states' Production toward the head (the   Industrial / Militaristic envoy rows are toward-item terms): 1117 Rome t15,   a Warrior at 12 + 9 of 20 with on"
+    - recording: h1_duelq1128
+      turn: 22
+      value: "Xi'an's Stonehenge at 14 under the barbarian Warrior on 15:11: no step logged at t22, the Builder picked at 0 takes 9 + 9 at t23, kept at 18 to its t54 pick"
   impl:
     - cpu/core/minorBuild.ts:minorBuild
     - cpu/core/phase.ts:banked
@@ -148,6 +152,8 @@
     - gpu/core/sim_phase.py:_lump_step
     - cpu/core/phase.ts:letGo
     - cpu/core/phase.ts:headCost
+    - cpu/core/production.ts:wonderLetGo
+    - gpu/core/sim_phase.py:_wonder_let_go
   readings:
     - "H-1: a district project's yield conversion — READ"
     - "H-1: the build queue's overflow, the yields' fixed point, the dispersal Gold, the pantheon's price — READ"
@@ -155,6 +161,7 @@
     - "C-127: an idle city's store through the queue step (0x16f050), the build lab on it — READ (the engines unchanged)"
     - "C-130: a lump's queue step completes the head; a major's trade list tries what its last turn revealed; a city-state's researched technology lands its boosts before the Culture — READ, both twins"
     - "C-111: a major's district lets go of the queue under a hostile unit, the queue's progress and overflow read from the city's memory — READ (0x184660 at 0x1847dc, 0x5313f0, 0x17f630), both twins"
+    - "H-4: a wonder under a hostile unit, the economy before the luxury rebuild, the extraction a pillage and a centre change — READ, both twins"
   context:
     - ...e city's yield component) and its project id (+0x1360 = -1), then applies the Production (0x16f050), whose ORDER_ADVANCE arm 0x184ae0 walks the project's Project_YieldConversions rows (Pro...
     - "- The queue's step (City_BuildQueue 0x177d10 → 0x16f050) reads the city's Production twice through 0x1c5350: A with the head's id (the Producti..."
@@ -192,7 +199,7 @@
   final: 0xf61c0
   kind: function
   name: CanConstruct
-  semantics: "CanConstruct (the pick's): true with its reason fields +0x54 / +0x68 clear; its result's second byte says refused for good. Refuses a held building (not a pillaged one: its repair stands), one MutuallyExclusiveBuildings names, a Capital row off the capital, a government building above the tier, a worship building the city's religion does not offer, RequiresAdjacentRiver off a river, a Flood Barrier with no coastal lowland; not a district no plot can hold yet. Its result (exit 0x17143f): the result byte [rsi] (set 1 at 0x1705c2, cleared by each refusal) and the reason +0x18 clear; +0x1 set refuses too. The prerequisite-district test at 0x17071d runs where the city holds the district complete (+0xb08) and 0x406c00 holds (the player's own version of the district type, its table +0x430); then 0x1ad720 (pillaged) refuses with +0x2a. At 0x17071d: the pick's prerequisite-district test: the building's PrereqDistrict (+0x160) or its replacement (0x408860) looked up in the city's districts (+0x1a48, 0x1ae530); held, +0xb08 set and 0x406c00 true, the reason +0x1c cleared, then 0x1ad720 (a district of the type in the city pillaged) sets +0x2a and fails, 0x1aeff0 (fallout) +0x2b, 0x1af120 +0x29; a held building pillaged (0x18e9f0, then 0x18fe60 true at 0x17082b) reads its district again through +0x218 and 0x1af250 (IsPillaged). Ported: pickDistrictPillaged (cpu/core/minorBuild.ts) / _pick_district_pillaged (gpu/core/sim_cityvalue.py); a building the city holds pillaged is let through. At 0x1707f1: the contract eligibility's CanConstruct (to 0x170832): a held building refused unless pillaged."
+  semantics: "CanConstruct (the pick's): true with its reason fields +0x54 / +0x68 clear; its result's second byte says refused for good. Refuses a held building (not a pillaged one: its repair stands), one MutuallyExclusiveBuildings names, a Capital row off the capital, a government building above the tier, a worship building the city's religion does not offer, RequiresAdjacentRiver off a river, a Flood Barrier with no coastal lowland; not a district no plot can hold yet. Its result (exit 0x17143f): the result byte [rsi] (set 1 at 0x1705c2, cleared by each refusal) and the reason +0x18 clear; +0x1 set refuses too. The prerequisite-district test at 0x17071d runs where the city holds the district complete (+0xb08) and 0x406c00 holds (the player's own version of the district type, its table +0x430); then 0x1ad720 (pillaged) refuses with +0x2a. At 0x17071d: the pick's prerequisite-district test: the building's PrereqDistrict (+0x160) or its replacement (0x408860) looked up in the city's districts (+0x1a48, 0x1ae530); held, +0xb08 set and 0x406c00 true, the reason +0x1c cleared, then 0x1ad720 (a district of the type in the city pillaged) sets +0x2a and fails, 0x1aeff0 (fallout) +0x2b, 0x1af120 +0x29; a held building pillaged (0x18e9f0, then 0x18fe60 true at 0x17082b) reads its district again through +0x218 and 0x1af250 (IsPillaged). Ported: pickDistrictPillaged (cpu/core/minorBuild.ts) / _pick_district_pillaged (gpu/core/sim_cityvalue.py); a building the city holds pillaged is let through. At 0x1707f1: the contract eligibility's CanConstruct (to 0x170832): a held building refused unless pillaged. At 0x170c87..0x170dd2: a building with progress (0x17d050) on its construction plot (0x179280) is refused where 0x5313f0 (the owner, the plot, flag 1) finds a hostile unit there (+0x29), else accepted at once."
   status: PARTLY
   cases:
     - recording: h1_duely1117
@@ -204,6 +211,9 @@
     - recording: h1_duelv1124
       turn: 155
       value: "of the   log's own-table misses 78 are the log's NO BUILDS where we pick (a valued   building the queue refuses — runs/h1_duelv1124 Cardiff t155..t157 holds an   unfilled Factory contract of t125 —, o"
+    - recording: h1_duelq1128
+      turn: 22
+      value: "Stonehenge (14 of 90) on 15:11 under the barbarian Warrior refused at the queue step: off the queue, its 9 to the overflow"
   impl:
     - cpu/core/aiCityBuild.ts:PickFacts
     - cpu/core/aiContracts.ts:ContractCity
@@ -213,6 +223,8 @@
     - cpu/core/minorBuild.ts:pickDistrictPillaged
     - gpu/core/sim_cityvalue.py:_pick_district_pillaged
     - cpu/core/aiCityBuild.ts:reasonsClearNow
+    - cpu/core/production.ts:wonderLetGo
+    - gpu/core/sim_phase.py:_wonder_let_go
   readings:
     - "C-127 / C-96: a minor's unit versions, the unit table's religion gate and the building value's era reasons — READ, both twins"
     - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
@@ -221,6 +233,7 @@
     - "C-96: a unit's strategic cost through the game speed, the pick's pillaged district and the queue's pillaged project — READ (0x17c2e0, 0x4f2cc0, 0x4f2df0 / 0x4f31f0), a fit for the project, both twins"
     - "C-96: the project value's weapon test, CanConstruct's district gates and Nazca's early turns"
     - "C-96: a city-state's City Center projects, Build Unit's pillaged building, the pick's pillaged district and the war footing's writer"
+    - "H-4: a wonder under a hostile unit, the economy before the luxury rebuild, the extraction a pillage and a centre change — READ, both twins"
   notes: ["label: CanConstruct(city.buildQueue,...)"]
   context:
     - "...lain pick (flags 1, 0): the building not queued or held (0x17e690 > 0), CanConstruct (0x170450) true with its reason fields +0x54 / +0x68 clear, not MustPurchase (Buildings +0x159 bi..."
@@ -479,6 +492,7 @@
   status: PARTLY
   readings:
     - "C-130: the analyzers a minor's policy jobs never reach, the treaties on a minor's queue, a major's cached net income — READ, both twins"
+    - "H-4: a wonder under a hostile unit, the economy before the luxury rebuild, the extraction a pillage and a centre change — READ, both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...building multiplier): the queue's +0x324 above 1.0 where the building's district plot (0x179280 -> vt +0x60) is adjacent (0x823c0) to the city's plot with the river bit of their direc..."
@@ -968,6 +982,7 @@
   readings:
     - "C-112: the majors' citizens on a placement, the Free Cities' city turn — READ (0x180cb0, 0x181700, 0x1fa1d0), both twins"
     - "C-111: every item's progress kept by type outside the queue, a pillaged building's or district's repair on the share its pillage left, a district's locked price on the district — READ (0x17f5a0, 0x175730 at 0x175bd3, 0x17d910, 0x175140, 0x1af5b0 -> 0x17e770 -> 0x183a60, 0x193190 -> 0x183950), both twins"
+    - "H-4: a wonder under a hostile unit, the economy before the luxury rebuild, the extraction a pillage and a centre change — READ, both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ...on its plot (0x5d3c0, the plot's vcall +0x50; one already holding production progress, 0x17d050 at 0x180d33, goes straight on) and the path ends in the full reassign 0x196320 at 0x181...
@@ -1143,9 +1158,11 @@
     - cpu/core/production.ts:resumeItem
     - gpu/core/sim_seats.py:_q_keep_head
     - gpu/core/sim_seats.py:_q_push
+    - cpu/core/production.ts:wonderLetGo
   readings:
     - "C-111: a major's district lets go of the queue under a hostile unit, the queue's progress and overflow read from the city's memory — READ (0x184660 at 0x1847dc, 0x5313f0, 0x17f630), both twins"
     - "C-111: every item's progress kept by type outside the queue, a pillaged building's or district's repair on the share its pillage left, a district's locked price on the district — READ (0x17f5a0, 0x175730 at 0x175bd3, 0x17d910, 0x175140, 0x1af5b0 -> 0x17e770 -> 0x183a60, 0x193190 -> 0x183950), both twins"
+    - "H-4: a wonder under a hostile unit, the economy before the luxury rebuild, the extraction a pillage and a centre change — READ, both twins"
   review: reviewed
 - addr: 0x17f630
   final: 0x101400
@@ -1161,9 +1178,11 @@
     - gpu/core/sim_seats.py:_q_pop
     - gpu/core/sim_phase.py:_seat_city_produce
     - cpu/core/production.ts:keepItem
+    - cpu/core/production.ts:wonderLetGo
   readings:
     - "C-111: a major's district lets go of the queue under a hostile unit, the queue's progress and overflow read from the city's memory — READ (0x184660 at 0x1847dc, 0x5313f0, 0x17f630), both twins"
     - "C-111: every item's progress kept by type outside the queue, a pillaged building's or district's repair on the share its pillage left, a district's locked price on the district — READ (0x17f5a0, 0x175730 at 0x175bd3, 0x17d910, 0x175140, 0x1af5b0 -> 0x17e770 -> 0x183a60, 0x193190 -> 0x183950), both twins"
+    - "H-4: a wonder under a hostile unit, the economy before the luxury rebuild, the extraction a pillage and a centre change — READ, both twins"
   review: reviewed
 - addr: 0x17f830
   final: 0x1014c0
@@ -1339,6 +1358,7 @@
   readings:
     - "H-1: the luxury allocation's rebuilds — PARTLY READ"
     - "C-112: the majors' citizens by the citizen manager — READ (0x1fa1d0 at 0x1fa22d, 0x196320's callers), both twins"
+    - "H-4: a wonder under a hostile unit, the economy before the luxury rebuild, the extraction a pillage and a centre change — READ, both twins"
   context:
     - "...on-accumulated import / export. Its callers: a production completion's strategic costs (0x18433d building, 0x184d95 project, 0x1856b3 / 0x185a2a unit), a plot's extracted resource chan..."
   review: imported

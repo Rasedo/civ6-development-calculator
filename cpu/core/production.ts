@@ -261,6 +261,25 @@ export function districtPlotHostile(state: GameState, city: City, tileIndex: num
   });
 }
 
+/**
+ * CIV6 (City_BuildQueue 0x16f050 at 0x16f09a..0x16f180): before the step a
+ * wonder at the head (ORDER_CONSTRUCT on a plot) is asked CanConstruct
+ * (0x170450); a wonder with progress on its plot is refused where a hostile
+ * unit holds the plot (0x170db8, `districtPlotHostile`), and leaves the
+ * queue, its progress kept by type (0x17f5a0, 0x17f630). The step then
+ * works the next item, or puts the turn's Production in the overflow store
+ * (runs/h1_duelq1128 Xi'an t22: Stonehenge at 14 under the barbarian
+ * Warrior on 15:11, no step logged, the Builder picked at 0 taking 9 + 9 at
+ * t23). True when the head left.
+ */
+export function wonderLetGo(state: GameState, city: City): boolean {
+  const q = city.queue[0];
+  if (q?.kind !== 'wonder' || q.progress <= 0 || !districtPlotHostile(state, city, q.tileIndex)) return false;
+  city.queue.shift();
+  keepItem(city, q);
+  return true;
+}
+
 /** The type a city keeps an item's progress under (City_BuildQueue's
  *  per-type arrays: +0x218 the buildings', a wonder among them, +0x230 the
  *  units', +0x248 the districts', +0x260 the projects'); a formation's is its

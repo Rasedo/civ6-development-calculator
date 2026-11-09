@@ -4,7 +4,7 @@ import { darkBuildings } from './yields';
 import { ENKIDU_SHARE_RANGE } from '../data/civilizations';
 import { neighbors, hexDistance, tilesWithin } from '../../world/hex';
 import { isWater, isImpassable,  isCoastalLand } from '../../world/query';
-import { civEraIndex, seatBuildingSum } from './city';
+import { civEraIndex, extractionChanged, seatBuildingSum } from './city';
 import { logUnitOrder } from './seatTurn';
 import { MODERN_ERA_INDEX } from '../data/techs';
 import { emergencyAttackCS, emergencyStrikeCS, raiseEmergency, EMERGENCY_CITY_STATE } from './emergency';
@@ -2381,8 +2381,10 @@ export function airPillage(state: GameState, attackerId: number, targetIndex: nu
   spendAttack(attacker, true);
   if (airPillageFit(attacker)) {
     const t = state.map.tiles[targetIndex]!;
-    if (t.improvement && !t.pillaged) t.pillaged = true;
-    else {
+    if (t.improvement && !t.pillaged) {
+      t.pillaged = true;
+      extractionChanged(state, t);
+    } else {
       t.districtPillaged = true;
       displaceAirFrom(state, targetIndex);
     }
@@ -3265,6 +3267,7 @@ export function hostilePillage(state: GameState, unit: Unit): boolean {
     && unitsHostile(state, unit, { seat: tileSeat(here) });
   if (here.improvement && !here.pillaged && hereOwned) {
     here.pillaged = true;
+    extractionChanged(state, here);
     pillagePlunder(state, unit, IMPROVEMENTS[here.improvement as ImprovementId]?.plunder, false, here.improvement ?? undefined, tileSeat(here));
     unit.movesLeft = 0;
     barbPillageScore(state, unit);
@@ -3326,6 +3329,7 @@ export function coastalRaid(state: GameState, unit: Unit, plot: number): boolean
   };
   if (t.improvement && !t.pillaged && !IMPROVEMENTS[t.improvement as ImprovementId]?.noPillage) {
     t.pillaged = true;
+    extractionChanged(state, t);
     pillagePlunder(state, unit, IMPROVEMENTS[t.improvement as ImprovementId]?.plunder, false, t.improvement ?? undefined, tileSeat(t));
     spend();
     barbPillageScore(state, unit);

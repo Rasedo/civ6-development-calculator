@@ -1303,6 +1303,7 @@ class SimOrders:
                     _pi = _hi2[_live]
                     _pd = ~_pi
                     self.pillaged[_r[_pi], _tt[_pi]] = True
+                    self._extraction_changed_at(_r[_pi], _tt[_pi])
                     _und = ~_rd[_r]
                     # the unit's own plot's pillage takes the district's
                     # dearest standing building first, the district once none
@@ -2100,6 +2101,7 @@ class SimOrders:
             heal_amt = torch.where(self._imp_plun_kind[_impv] == 1,
                                    self._imp_plun_amt[_impv], torch.zeros_like(_impv))
             self.pillaged[rows, here[rows]] = True
+            self._extraction_changed_at(rows, here[rows])
             self.barb_unit_mp[rows, u[rows]] = 0  # the turn is spent (TS movesLeft = 0)
             self._eff_version += 1  # a farm's yield just dropped
             hp_cap = self.rules.combat["unitHp"]
@@ -2171,6 +2173,7 @@ class SimOrders:
             iv = imp[ri].clamp(min=0)
             heal = torch.where(self._imp_plun_kind[iv] == 1, self._imp_plun_amt[iv], torch.zeros_like(iv))
             self.pillaged[ri, pc[ri]] = True
+            self._extraction_changed_at(ri, pc[ri])
             self.barb_unit_hp[ri, us[ri]] = (self.barb_unit_hp[ri, us[ri]] + heal).clamp(max=hp_cap)
         rd = do_d.nonzero(as_tuple=True)[0]
         if rd.numel():

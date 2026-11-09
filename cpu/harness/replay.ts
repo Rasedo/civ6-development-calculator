@@ -52,7 +52,7 @@ import { availableCivicsIn, availableTechsIn, computeUnlocks, goldPrice, governm
   unlockedPolicyIds } from '../core/effects';
 import { selectResearch, chopGrant, harvestGrant, applyLumpYield, holdResearchEra, researchCost } from '../core/economy';
 import { treePrereqs } from '../core/researchTree';
-import { computeCityStats } from '../core/city';
+import { computeCityStats, extractionChanged } from '../core/city';
 import { getModifiers } from '../core/effects';
 import { researchUnitTurns, type ResearchEntry } from '../core/aiResearch';
 import type { CivicEntry } from '../core/aiCivics';
@@ -61,7 +61,7 @@ import { improvementMoment, recordMoments, upgradeMoments } from '../core/moment
 import { applyGovernorActions, governorsOf } from '../core/governors';
 import { GOVERNOR_PROMOTIONS, GOV_APPOINT, GOV_ASSIGN_CITY, GOV_ASSIGN_MINOR, GOV_PROMOTE, promotionBit } from '../data/governors';
 import { BOOSTS } from '../data/boosts';
-import { chargeUnitResource, strategicSlot, unitResourceCost, upgradeGoldCost, upgradeType } from '../core/stockpile';
+import { chargeUnitResource, strategicSlot, unitResourceCost, upgradeGoldCost, upgradeType, capStockpiles } from '../core/stockpile';
 import { airStrike, applyTrainingGrants, cityStrikeStrength, clearCampFor, combatBlow, type Blow, flankSupportLive, hostilePillage, meleeAttack, rangedAttack, seizeCivilian, terrainDefense } from '../core/combat';
 import { freeCitiesMilitary, traceFreeOps } from '../core/freeOps';
 import { barbarianTactics, barbMovesNow, dangerPlane, refreshBarbarians, tacticsDrawing, knowledgeLook, traceDanger, traceKnowledge, traceTactics } from '../core/tactical';
@@ -2223,8 +2223,10 @@ const groundOf = (t: Tile): GroundOf => ({ ownerSeat: t.ownerSeat, ownerCity: t.
 /** THE CITY-STATES' LAYINGS after their units' turn on the copy, each
  *  against the record's improvements of the pair (`ctx.minorImproves`) by
  *  its plot: one the record holds stands; one it does not leaves the plot as
- *  it was; a record's improvement no laying made is imposed. The Builders'
- *  charges are record t+1's already (`syncUnits`). */
+ *  it was; a record's improvement no laying made is imposed. Each laid on
+ *  the replayed state changes its plot's extraction (`extractionChanged`:
+ *  the minor's and its suzerain's luxuries ranked anew, as the laying's own
+ *  verb does). The Builders' charges are record t+1's already (`syncUnits`). */
 function minorLaysAfter(ctx: Ctx, lays: readonly { u: Unit; plot: number; imp: string }[]): void {
   const { state, next } = ctx;
   const open = [...ctx.minorImproves];
@@ -2240,6 +2242,7 @@ function minorLaysAfter(ctx: Ctx, lays: readonly { u: Unit; plot: number; imp: s
     if (t.improvement !== imp) {
       t.improvement = imp;
       t.pillaged = false;
+      extractionChanged(state, t);
       replaceOwnerCitizens(state, t);
     }
     count(ctx, 'minorAi:improve', 'applied', d.player);
@@ -2250,6 +2253,7 @@ function minorLaysAfter(ctx: Ctx, lays: readonly { u: Unit; plot: number; imp: s
     if (t.improvement === want) { count(ctx, 'minorAi:improve', 'applied', d.player); continue; }
     t.improvement = want;
     t.pillaged = false;
+    extractionChanged(state, t);
     replaceOwnerCitizens(state, t);
     count(ctx, 'minorAi:improve', 'fallback', d.player, `plot ${d.plot}: the engine laid none of ${want}`);
   }
@@ -4262,6 +4266,17 @@ const res = buyTile(state, city.id, d.plot, seat);        if (!res.ok) setTileOw
         // spend (the order needs them); the record's steps before it are the
         // replay's, outside the engine's turn
         if (r) u.tileIndex = r.y * ctx.W + r.x;
+        // a city-state's unit the engine still holds under a major (a levied
+        // army's return the engine did not make) is the city-state's again,
+        // as its upgrade shows it (runs/h1_duelq1124 t93: city-state 4's
+        // 1245189, added on 32:8 and upgraded in its turn, China's levied
+        // Warrior in the engine)
+        const upSeat = seatOfP(ctx, d.player);
+        if (isCityStateSeat(upSeat) && u.seat !== upSeat) {
+          count(ctx, 'levyEnd', 'fallback', d.player, `${d.unit} ${u.type} held by seat ${u.seat}`);
+          u.seat = upSeat;
+          delete u.leviedFrom;
+        }
         if (u.movesLeft <= 0) u.movesLeft = grantedMoves(state, u);
         // a city-state's upgrade is its AI's, through the minor's own verb
         const minor = isCityStateSeat(u.seat) ? state.cityStates.find((c) => c.seat === u.seat) : undefined;
@@ -5118,13 +5133,15 @@ function layDigSites(ctx: Ctx, before: Imported, seats: readonly number[]): void
 /** THE PILLAGES AND REPAIRS: a pillage is a unit's action (the barbarians'
  *  and the players' alike), which the record's units carry, and so is a
  *  Builder's repair: each improvement standing on both sides takes record
- *  t+1's pillaged state */
+ *  t+1's pillaged state, its plot's extraction changed with it
+ *  (`extractionChanged`) */
 function syncPillage(ctx: Ctx): void {
   const { state, next } = ctx;
   for (const t of state.map.tiles) {
     const r = next.state.map.tiles[t.index];
     if (!t.improvement || t.improvement !== r.improvement || !!t.pillaged === !!r.pillaged) continue;
     t.pillaged = !!r.pillaged;
+    extractionChanged(state, t);
     count(ctx, r.pillaged ? 'pillage' : 'repair', 'fallback', ctx.playerOfSeat.get(t.ownerSeat));
   }
 }
@@ -6364,6 +6381,10 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
     // trade lists try (`Seat.tradeSeen`)
     const actor0 = state.seats[seatOfP(ctx, activePlayer(a))];
     if (actor0) actor0.tradeSeen = [...actor0.explored];
+    // ...and its turn's end holds each strategic stockpile to its cap after
+    // those actions (DoTurnDeactivate -> 0x4a8f10; `seatPhase` leaves it
+    // here), a bank over it re-ranking the luxuries
+    if (actor0) capStockpiles(state, actor0.seat);
     activeBoosts(ctx, b, activePlayer(a));
     stageEnvoys(ctx, ds, a, b, history.randLog);
     stageAgendas(ctx, a.turn, history.randLog);
@@ -6497,6 +6518,12 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
       // t20: China's Scout gone from 41:12 by city-state 3's look)
       for (const p of otherMajors) syncUnits(ctx, b, p);
       for (const seat of others) state.seats[seat].tradeSeen = [...state.seats[seat].explored];
+      // ...and their turns' end, after those actions: each strategic
+      // stockpile held to its cap, a bank over it re-ranking the luxuries
+      // (DoTurnDeactivate -> 0x4a8f10; runs/h1_duelq1128 t106: China's
+      // Taiyuan, founded in its actions, allocated at the LuxAllocArrived
+      // after its PlayerTurnDeactivated)
+      for (const seat of others) capStockpiles(state, seat);
       // ...taking into the turn's heal the moves their actions spent
       for (const [u, kept] of movesKept) if (others.includes(u.seat)) u.movesLeft = kept ? grantedMoves(state, u) : 0;
       for (const seat of others) detectBoosts(state, seat);

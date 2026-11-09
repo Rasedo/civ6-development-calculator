@@ -3120,6 +3120,7 @@ def _plunder(sim, m: torch.Tensor, uc: torch.Tensor, plot: torch.Tensor) -> None
     kind = torch.where(pi, sim._imp_plun_kind[iv], sim._d_plun_kind[dv])
     amt = torch.where(pi, sim._imp_plun_amt[iv], sim._d_plun_amt[dv])
     sim.pillaged[b[pi], plot[pi]] = True
+    sim._extraction_changed_at(b[pi], plot[pi])
     # the district's dearest standing building first, the district once none
     # stands (`pillageTopBuilding`); the plunder the district's
     if bool(pd.any()):
