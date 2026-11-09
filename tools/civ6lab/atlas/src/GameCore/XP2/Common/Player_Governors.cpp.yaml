@@ -80,7 +80,7 @@
     - recording: 1122
       turn: 200
       value: "both give the   same answer on the recorded cases: 1122 t200, Reyna established in   Changsha (Civil Prestige's amenity) leaves the ranking standing to t201   (the rebuild precedes her clock), and the"
-  impl: [cpu/core/governors.ts:governorClocks]
+  impl: [cpu/core/governors.ts:governorClocks, cpu/harness/replay.ts:city]
   readings: ["H-1: the luxury allocation's rebuilds — PARTLY READ", "H-1: the governors' clocks — READ"]
   context:
     - ...recomputed by 0x4ab6e0, then 0x4a6110 rebuilds the allocation), the governors' clocks (0x432980 at 0x4e46df), and only then each city's turn (0x1fa1d0 at 0x4e4813, in the loop over Pl...

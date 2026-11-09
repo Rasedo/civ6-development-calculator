@@ -38,6 +38,7 @@
     - cpu/core/phase.ts:econLux
     - gpu/core/sim_phase.py:econ_lux
     - gpu/core/sim_phase.py:_seat_turn
+    - cpu/harness/replay.ts:gov
   readings:
     - "H-1: every draw of a player's start (witnesses, RandCalls.csv)"
     - "H-1: the luxury allocation's rebuilds — PARTLY READ"

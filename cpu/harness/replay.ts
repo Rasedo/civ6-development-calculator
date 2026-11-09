@@ -3168,7 +3168,16 @@ function envoysInStart(log: RandLog | undefined, a: TurnRecord, b: TurnRecord, p
     const given = block.findIndex((r) => r[2] === 'InfluenceGiven');
     if (given >= 0) {
       const city = block.findIndex((r) => CITY_TURN_ROWS.has(r[2] as string) && r[3] === player);
-      return city < 0 || given < city;
+      // the governors' clocks (0x432980, a GovernorChanged row for each
+      // governor) run after the Influence turn and before the cities
+      // (Player DoTurn 0x4e46df, 0x4e4813), and no step between them sends
+      // a token: a row after the clocks' last is sent after the cities
+      // (runs/h1_duelq1128 t97: China's envoy to Bologna after its
+      // governors' rows, its Dyes after Xi'an's turn); one between them is
+      // a posted Ambassador's, sent in its clock
+      let gov = -1;
+      block.forEach((r, j) => { if (r[2] === 'GovernorChanged' && r[3] === player) gov = j; });
+      return (city < 0 || given < city) && (gov < 0 || given < gov);
     }
   }
   const { pre, post } = startSeeds(b, player);
