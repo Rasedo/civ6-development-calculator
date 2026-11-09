@@ -396,7 +396,7 @@ class SimMinors:
             return
         sight = self._minor_sight(s)
         self._knowledge_look(s, 100 + s, sight, alive, age)
-        self._mops_camps_look(s, sight, alive)
+        self._mops_camps_look(s, sight, alive, age)
         self._minor_cities_look(s, alive)
 
     def _knowledge_look(self, r: int, seat: int, sight: torch.Tensor, alive: torch.Tensor, age: bool) -> None:

@@ -1592,7 +1592,7 @@ export function minorUnitProduction(state: GameState, cityState: CityState, know
  *  (`minorCampsLook`, `minorCitiesLook`) over the plots it has revealed. */
 export function minorKnowledge(state: GameState, cityState: CityState, age: boolean): void {
   knowledgeLook(state, cityState, cityState.seat, cityStateSight(state, cityState.seat), age);
-  minorCampsLook(state, cityState);
+  minorCampsLook(state, cityState, age);
   minorCitiesLook(state, cityState);
 }
 /** A CITY'S PRIMARY REGIONS (0x700630, from the city analysis 0x5cdd70, into

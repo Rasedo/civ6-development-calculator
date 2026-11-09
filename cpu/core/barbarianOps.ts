@@ -24,7 +24,7 @@ import { passOrders, passView } from './opsOrders';
 import { recentOf } from './minorOps';
 import { allowedOps, newOpsAi, operationsRefresh, opsOf, startOperationAt, tickOperation, type OpsAi, type OpsEnv } from './operations/manager';
 import { evaluate, type Candidate, type EvalInputs } from './operations/evaluate';
-import { NO_PLOT, addMember, opDef, opUnits, type Operation } from './operations/operation';
+import { NO_PLOT, addMember, opDef, opJobUnits, opUnits, type Operation } from './operations/operation';
 import type { BarbarianHooks } from './operations/barbarian';
 import { BT_FAILURE, BT_FRESH, BT_RUNNING, BT_SUCCESS, compileTree, dataBool, dataFloat, dataInt, dataTag, tick, type BtHandler, type BtNode, type BtRun } from './behaviorTree';
 import { AI_OP_DEFS, AI_TREES } from '../data/aiOperations';
@@ -273,13 +273,14 @@ function treeMarks(def: string): { seq: number; recruit: number; raid: number } 
  *  raid, 2 an assault), the target's owner and plot, the rally, the player
  *  it is against, its tree's id, the child its trigger's Sequence resumes
  *  at, the first turns of its recruit's and its raid's Turn Limiters, its
- *  members living and killed */
+ *  members living and killed (those assigned to it: a released one the
+ *  next team update drops is not) */
 export function barbOpRecord(state: GameState, tribe: BarbTribe): number[] {
   const op = tribe.op ? barbOp(state, tribe.op.id) : null;
   if (!tribe.op || !op) return [0, -1, -1, -1, -1, -1, -1, -1, -1, 0, 0];
   const m = treeMarks(op.def);
   const at = (i: number, k: string): number => (i >= 0 && typeof op.mem[i][k] === 'number' ? (op.mem[i][k] as number) : -1);
-  const members = opUnits(op);
+  const members = opJobUnits(op);
   const living = members.filter((id) => unitOf(state, id)).length;
   return [tribe.op.assault ? 2 : 1, tribe.op.target.seat, op.target, op.rally, op.enemy, op.id,
     at(m.seq, 'resume'), at(m.recruit, 'start'), at(m.raid, 'start'), living, (op.killed ?? 0) + members.length - living];
@@ -341,12 +342,13 @@ export function barbarianOpsEvaluate(state: GameState): void {
 export function barbarianOpsTurn(state: GameState): void {
   const ai = state.barbSeat.ops;
   if (!ai || !opsOf(ai).length) return;
-  // the members killed leave their teams, counted to their operation
+  // the members killed leave their teams, counted to their operation (a
+  // released one to the operation it was assigned to)
   for (const op of opsOf(ai)) {
     for (const t of op.teams) {
       const living = t.members.filter((id) => unitOf(state, id));
-      const gone = t.members.length - living.length;
-      if (!gone) continue;
+      if (living.length === t.members.length) continue;
+      const gone = t.members.filter((id) => !unitOf(state, id) && !op.released?.includes(id)).length;
       t.members = living;
       op.killed = (op.killed ?? 0) + gone;
     }
@@ -361,8 +363,12 @@ export function barbarianOpsTurn(state: GameState): void {
  * definition's candidate valid or not) on the captive's plot, its rally the
  * candidate's (`captureRally`, none where it was not valid: runs/h1_duely1124
  * t87 8:7's capture rallies at the camp 18:7), the event's units — the
- * captive, then its captor — joining its team (0x737e80), the captor leaving
- * the operation it held. A capture inside the trees' walks starts at once
+ * captive, then its captor — joining its team (0x737e80), the captor's
+ * assignment (unit +0x7d0) the new operation's: the operation it held keeps
+ * it listed, released (`Operation.released`), until its next team update
+ * drops it (runs/h1_duelq1128 t25: the Slinger 1441812 in Barbarian Attack's
+ * team and Builder Capture's at the end look, Attack's alone dropping it by
+ * the t26 end look). A capture inside the trees' walks starts at once
  * and its tree ticks in its priority's walk where that is yet to come
  * (`barbarianTrees`); one of the tactical pass after them first ticks in the
  * next turn's walk.
@@ -381,7 +387,11 @@ export function barbarianCaptures(state: GameState, ticked: ReadonlySet<number> 
     const cu = unitOf(state, captive);
     if (!cu) continue;
     const units = [cu, unitOf(state, captor)].filter((u): u is Unit => !!u);
-    for (const o of opsOf(ai)) for (const t of o.teams) t.members = t.members.filter((id) => !units.some((u) => u.id === id));
+    for (const o of opsOf(ai)) {
+      for (const u of units) {
+        if (o.teams.some((t) => t.members.includes(u.id)) && !o.released?.includes(u.id)) (o.released ??= []).push(u.id);
+      }
+    }
     const op = startOperationAt(ai, barbEnv(state, null), BARB_CAPTURE_DEF, -1, cu.tileIndex, state.barbSeat.captureRally ?? NO_PLOT);
     op.triggerUnits = units.map((u) => u.id);    for (const u of units) addMember(op.teams[0], { id: u.id, type: gameTypeOf('unit', u.type, 'UNIT_') });
   }

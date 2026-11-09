@@ -397,19 +397,22 @@ class SimMinorOps:
 
     # -- the knowledge base --------------------------------------------------
 
-    def _mops_camps_look(self, s: int, sight: torch.Tensor, alive: torch.Tensor) -> None:
+    def _mops_camps_look(self, s: int, sight: torch.Tensor, alive: torch.Tensor, aged: bool) -> None:
         """`minorCampsLook` on minor `s`'s camps where `alive`: the plots it
-        sees join its revealed ones (`mops_revealed`); a camp whose plot it
-        has revealed with none there dropped, each camp on a plot it has
-        revealed added in plot order (`lookCamps`)"""
+        sees join its revealed ones (`mops_revealed`); at its ageing
+        (`aged`) a camp whose plot it has revealed with none there dropped,
+        each camp on a plot it has revealed added in plot order
+        (`lookCamps`)"""
         self.mops_revealed[:, s] |= sight & alive.unsqueeze(1)
-        self.mops_camps[:, s] = torch.where(alive.unsqueeze(1), self._kb_camps(self.mops_camps[:, s], self.mops_revealed[:, s]),
+        self.mops_camps[:, s] = torch.where(alive.unsqueeze(1),
+                                            self._kb_camps(self.mops_camps[:, s], self.mops_revealed[:, s], aged),
                                             self.mops_camps[:, s])
 
-    def _kb_camps(self, known: torch.Tensor, sight: torch.Tensor) -> torch.Tensor:
+    def _kb_camps(self, known: torch.Tensor, sight: torch.Tensor, aged: bool) -> torch.Tensor:
         """`lookCamps`: the knowledge base's camps `known` [B, N_CAMPS] in its
-        order, a camp whose plot `sight` [B, T] holds with none there
-        dropped, each camp on a plot it holds added in plot order"""
+        order, at its ageing (`aged`) a camp whose plot `sight` [B, T] holds
+        with none there dropped, each camp on a plot it holds added in plot
+        order"""
         T = self.T
         dev = self.device
         now = torch.zeros(self.B, T + 1, dtype=torch.bool, device=dev)
@@ -417,7 +420,7 @@ class SimMinorOps:
         now.scatter_(1, torch.where(cp >= 0, cp, T), True)
         now = now[:, :T]
         kc = known.clamp(min=0)
-        keep = (known >= 0) & (~sight.gather(1, kc) | now.gather(1, kc))
+        keep = (known >= 0) & (~sight.gather(1, kc) | now.gather(1, kc)) if aged else known >= 0
         held = torch.zeros(self.B, T + 1, dtype=torch.bool, device=dev)
         held.scatter_(1, torch.where(keep, known, T), True)
         add = sight & now & ~held[:, :T]
@@ -433,13 +436,13 @@ class SimMinorOps:
         new = vals.gather(1, o[:, :N_CAMPS])
         return torch.where(ar < n.unsqueeze(1), new, torch.full_like(new, -1))
 
-    def _barb_kb_camps(self, seen: torch.Tensor) -> None:
-        """the barbarians' knowledge base's camps (`barbCampsLook`): over the
-        plots they see or have revealed (`barb_explored`; every plot where
-        they revealed none)"""
+    def _barb_kb_camps(self, seen: torch.Tensor, aged: bool) -> None:
+        """the barbarians' knowledge base's camps (`barbCampsLook`, its
+        ageing where `aged`): over the plots they see or have revealed
+        (`barb_explored`; every plot where they revealed none)"""
         ex = self.barb_explored
         rev = seen | ex | ~ex.any(dim=1, keepdim=True)
-        self.barb_camps_known = self._kb_camps(self.barb_camps_known, rev)
+        self.barb_camps_known = self._kb_camps(self.barb_camps_known, rev, aged)
 
     def _mops_records(self, s: int) -> dict:
         """the knowledge base's army records of row `s` (a minor, the barbarians'

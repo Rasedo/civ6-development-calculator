@@ -96,15 +96,16 @@ export function recentOf(holder: { armyKnown?: ArmyRecord[]; armyAged?: number }
   return knownOf(aged === undefined ? holder.armyKnown : holder.armyKnown?.filter((r) => aged - r.seen <= ARMY_READ_AGE), player);
 }
 
-/** the knowledge base's camps (its look, `lookCamps`) on the plots the
- *  minor has revealed: the plots it sees join its revealed ones first */
-export function minorCampsLook(state: GameState, cs: CityState): void {
+/** the knowledge base's camps (its ageing where `aged` and its look,
+ *  `lookCamps`) on the plots the minor has revealed: the plots it sees
+ *  join its revealed ones first */
+export function minorCampsLook(state: GameState, cs: CityState, aged: boolean): void {
   const sight = cityStateSight(state, cs.seat);
   const revealed = (cs.revealed ??= new Array<number>(state.map.tiles.length).fill(0));
   sight.forEach((v, p) => {
     if (v) revealed[p] = 1;
   });
-  const camps = lookCamps(cs.campsKnown ?? [], (p) => revealed[p] === 1, campTiles(state));
+  const camps = lookCamps(cs.campsKnown ?? [], (p) => revealed[p] === 1, campTiles(state), aged);
   if (camps.length) cs.campsKnown = camps;
   else delete cs.campsKnown;
 }

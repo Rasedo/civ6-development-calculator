@@ -1551,12 +1551,12 @@ export function traceKnowledge(fn: ((seat: number, turn: number, records: readon
   knowledgeTrace = fn;
 }
 
-/** the barbarians' knowledge base's camps (its look 0x7877e0 -> 0x5f0110,
- *  `lookCamps`) over the plots they see or have revealed (every plot where
- *  they revealed none) */
-function barbCampsLook(state: GameState, seen: ArrayLike<number>): void {
+/** the barbarians' knowledge base's camps (its ageing where `aged`, its look
+ *  0x7877e0 -> 0x5f0110, `lookCamps`) over the plots they see or have
+ *  revealed (every plot where they revealed none) */
+function barbCampsLook(state: GameState, seen: ArrayLike<number>, aged: boolean): void {
   const ex = state.barbSeat.explored ?? [];
-  const camps = lookCamps(state.barbSeat.campsKnown ?? [], (p) => seen[p] === 1 || ex.length === 0 || ex[p] === 1, campTiles(state));
+  const camps = lookCamps(state.barbSeat.campsKnown ?? [], (p) => seen[p] === 1 || ex.length === 0 || ex[p] === 1, campTiles(state), aged);
   if (camps.length) state.barbSeat.campsKnown = camps;
   else delete state.barbSeat.campsKnown;
 }
@@ -4382,7 +4382,7 @@ export function barbarianTactics(state: GameState, acting: ReadonlySet<number>):
   barbarianCaptures(state);
   const seen = plotsSeenNow(state, new Set([BARB_SEAT]));
   knowledgeLook(state, state.barbSeat, BARB_SEAT, seen, false);
-  barbCampsLook(state, seen);
+  barbCampsLook(state, seen, false);
 }
 
 function tacticalPass(state: GameState, acting: ReadonlySet<number>): void {
@@ -4396,7 +4396,7 @@ function tacticalPass(state: GameState, acting: ReadonlySet<number>): void {
   barbarianOpsEvaluate(state);
   // the knowledge base ages and looks, then the target list (0x785f30)
   knowledgeLook(state, state.barbSeat, BARB_SEAT, seen, true);
-  barbCampsLook(state, seen);
+  barbCampsLook(state, seen, true);
   // the military AI's part of the turn after the look: their operations
   // logged and refreshed on the knowledge base it left (the AI memory
   // reader: runs/h1_duelt1121 t16 the raid's 46 against 54 at the end look,

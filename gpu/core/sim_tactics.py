@@ -2521,7 +2521,7 @@ class SimTactics:
         ones = torch.ones(self.B, dtype=torch.bool, device=self.device)
         seen = self._barb_seen("barbarians")
         self._knowledge_look(self.BK, BARB_SEAT, seen, ones, False)
-        self._barb_kb_camps(seen)
+        self._barb_kb_camps(seen, False)
 
     def _tac_range(self, b: torch.Tensor, s: torch.Tensor, pre: str = "barb") -> torch.Tensor:
         """`rangeOf` for the units at local slots `s` of pool `pre` in the
@@ -4105,7 +4105,7 @@ class SimTactics:
         # left (`barbarianOpsEvaluate`)
         self._barb_ops_evaluate()
         self._knowledge_look(self.BK, BARB_SEAT, seen0, torch.ones(B, dtype=torch.bool, device=dev), True)
-        self._barb_kb_camps(seen0)
+        self._barb_kb_camps(seen0, True)
         # the military AI's part of the turn after the look: the operations
         # refreshed on the knowledge base it left (`barbarianOpsTurn`)
         self._barb_ops_refresh()

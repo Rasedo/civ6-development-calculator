@@ -7228,11 +7228,14 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
         const logged = ctx.armyLogged.get(s.seat);
         const playerOf = (seat: number) => ctx.playerOfSeat.get(seat) ?? seat;
         // a minor's members as its end look saw them, before the barbarians'
-        // turn; the barbarians' as their own turn left them
+        // turn; the barbarians' as their own turn left them, a member that
+        // fell in it read as it stood before (the game's unit object lives
+        // to the turn's end: runs/h1_duelq1117 t22 the Warrior 917504 killed
+        // attacking, its Barbarian Attack's UNIT_WARRIOR at the end look)
         const unitType = (id: number) => {
           if (!isBarbSeat(s.seat)) return ctx.minorLookTypes.get(id);
           const u = state.units.find((x) => x.id === id);
-          return u ? gameTypeOf('unit', u.type, 'UNIT_') : undefined;
+          return u ? gameTypeOf('unit', u.type, 'UNIT_') : ctx.minorLookTypes.get(id);
         };
         const reads = ctx.gameMemory
           ? readGameMemory(ctx.gameMemory, cat, s, pid, a.turn, ctx.W, playerOf, logged, unitType)
