@@ -246,6 +246,7 @@
     - "C-130 / C-98: the civic queue, the best plot to buy and the plot purchase analyzer — READ, both twins"
     - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
     - "C-96: the resource value and the research value's resources — READ (bonus, luxury, the call), PARTLY READ (the strategic stockpile terms)"
+    - "C-127: the growth forecast the city AI reads is the one its last full update wrote — READ (0x5ce680 at 0x5ce831 / 0x5ce841, 0x5c27e0's +0x258), both twins"
   context:
     - ...adv[YIELD_PRODUCTION] from 0x5d83c0, the YIELD_* list is CityBuildAI +0x908), 0x5c9a00, 0x5c9700, 0x5cb570, 0x5ca7e0, the military AI's city hook 0x79a320, and the City Analysis job (0...
   review: reviewed

@@ -121,6 +121,7 @@
     - "H-1: the citizen manager's placement and the yield flags — READ"
     - "C-127: the improvement loop's housing — EFFECT_ADJUST_IMPROVEMENT_HOUSING READ (0x6ad2b0), the growth forecast as the last analysis read it (a LAB fit), the water arm's resource rows, the Mountain Tunnel's analysis rows"
     - "C-127: the improvement loop's housing"
+    - "C-127: the growth forecast the city AI reads is the one its last full update wrote — READ (0x5ce680 at 0x5ce831 / 0x5ce841, 0x5c27e0's +0x258), both twins"
   context:
     - "...+0x1788, the rate, population, Housing, T, H): S = the Food surplus less the citizens' (0x1b5620: City::GetYield FOOD - 0x5276c0(pop)), housing 0x1b5840 (whole); the factor 0x527ca0(le..."
     - "...span. EFFECT_ADJUST_CITY_GROWTH 0x6beb00 (+0x64 cleared): the growth object's surplus (0x1b5620), 2.0 with no city, x fx(Amount x 0.01), bare Food, between. EFFECT_ADJUST_CITY_ALL_MIL..."
@@ -148,6 +149,7 @@
     - "H-1: the citizen manager's placement and the yield flags — READ"
     - "C-127: the improvement loop's housing — EFFECT_ADJUST_IMPROVEMENT_HOUSING READ (0x6ad2b0), the growth forecast as the last analysis read it (a LAB fit), the water arm's resource rows, the Mountain Tunnel's analysis rows"
     - "C-127: the improvement loop's housing"
+    - "C-127: the growth forecast the city AI reads is the one its last full update wrote — READ (0x5ce680 at 0x5ce831 / 0x5ce841, 0x5c27e0's +0x258), both twins"
   context:
     - "...d surplus less the citizens' (0x1b5620: City::GetYield FOOD - 0x5276c0(pop)), housing 0x1b5840 (whole); the factor 0x527ca0(left) = 0 below CITY_HOUSING_LEFT_ZERO_GROWTH (-4), 0.25 t..."
   review: reviewed

@@ -13770,3 +13770,38 @@ contract the city's hand alone holds; `minorAiTurn`'s `goalsReached` call
   1127 t181 Hanno the same way.
 - Open: who the human player's pending claim (+0x10 marked, no recruit) waits
   on; the refund term 0x43ce00's rows past Magnanimous.
+
+## C-127: the growth forecast the city AI reads is the one its last full update wrote — READ (0x5ce680 at 0x5ce831 / 0x5ce841, 0x5c27e0's +0x258), both twins
+
+`minorAiTurn` (cpu/core/minorCityAi.ts, `CityState.aiGrowthSeen`), `minorPhase`
+(cpu/core/minorBuild.ts, `CityState.aiGrowth`); `_minor_ai_turn`
+(gpu/core/sim_minorai.py: `citystate_ai_seen` / `citystate_ai_growth`).
+
+- THE WRITER: the forecast's one caller is the city update 0x5ce680 (the
+  player's AI turn 0x5c2650 over its cities). On a full update (r8b set) it
+  runs the in-hand check 0x5d7e00, the dependents' pass 0x5cadc0, the threat
+  0x5cbd10, the improvement pick 0x5c9a00 (0x5ce831), the resource counts
+  0x5c9700 (0x5ce839), then the forecast 0x5cb570 (0x5ce841), which writes
+  CityBuildAI +0x6c8 / +0x738 / +0x7a8 from the city's surplus (0x1b5620),
+  Housing (0x1b5840), population and store as they stand then; the standing
+  army 0x5ca7e0 and the events follow. None of the calls before it changes
+  the city's citizens or store. A Free Cities player (0x469d40) takes the
+  threat alone and returns before it.
+- THE READERS: the City Analysis 0x5c24e0 runs on player signal +0x258
+  (bound by 0x5c27e0) before the cities' update, and the update's own
+  improvement pick runs before its forecast call: every plot and housing
+  value of a turn (0x7a3d70 on +0x6c8 / +0x738 / +0x7a8) reads the forecast
+  the previous turn's update wrote, of the city after that turn's production
+  and growth and before its Builders acted. The engines write it at the
+  update (`aiGrowthSeen`, after `minorGrowth`) and read it the next turn
+  (`aiGrowth`); the city's first turn reads its own.
+- Confirmed (one-seed aimem trace, runs/h1_duelq1117): Caguana t45, the
+  forecast on population 6, store 1.82, surplus 6 as the t44 update read it
+  (the t44 growth's citizen on a 6-surplus plot), and t53 on population 6,
+  store 32.98, surplus 4 (no growth at t52, the surplus 4 at its update)
+  — the engine's forecast inputs are those the
+  game's Farm rows imply (every Farm row of Caguana's t45 and t53 at the
+  forecast of the city before the turn's growth). plotValueLab.ts's own
+  growth step on the record places the t44 citizen at surplus 5 and grows
+  the city at t52, its t45 and t53 Farm rows −34.34 / +45.09 off the log:
+  the lab's staging, not the forecast.
