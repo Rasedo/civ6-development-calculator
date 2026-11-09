@@ -6146,14 +6146,16 @@ class SimSeats:
     def _suz_gp_culture_mult(self, row: int) -> torch.Tensor:
         """`suzerainGpCultureMult`'s twin, [B] f64. CIV6 (Antananarivo): the
         suzerain's whole Culture income, `_suz_gp_cul_pct` percent per Great
-        Person it has earned, while at war with no civilization."""
+        Person it has earned up to `_suz_gp_cul_max` percent, while at war
+        with no civilization."""
         out = torch.ones(self.B, dtype=torch.float64, device=self.device)
         if self._suz_c_gp_cul < 0 or row >= self.n_majors:
             return out
         peace = ~self.war[:, row, : self.n_majors].any(dim=1)
         on = self._suz_effect(row, self._suz_c_gp_cul) & peace
         n = self.civ_gp_earned[:, row].sum(dim=1).double()
-        return torch.where(on, 1.0 + self._suz_gp_cul_pct * n / 100.0, out)
+        pct = torch.clamp(self._suz_gp_cul_pct * n, max=self._suz_gp_cul_max)
+        return torch.where(on, 1.0 + pct / 100.0, out)
 
     def _suz_land_buy_off(self, row: int, cols: slice | None = None) -> torch.Tensor:
         """`suzerainLandPurchaseOffPct`'s twin, [B, RC] f64. CIV6 (Ngazargamu):

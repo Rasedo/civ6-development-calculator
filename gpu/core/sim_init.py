@@ -669,6 +669,7 @@ class SimInit:
         # Ngazargamu / Buenos Aires — nine rows, each its own rule.
         self._suz_sci_pct = float(_suz["sciencePct"])
         self._suz_gp_cul_pct = float(_suz["gpCulturePct"])
+        self._suz_gp_cul_max = float(_suz["gpCultureMax"])
         self._suz_dist_gpp = float(_suz["districtGpp"])
         _gb = _suz["gppBuildingIdx"]
         _gbw = max(max((len(x) for x in _gb), default=1), 1)

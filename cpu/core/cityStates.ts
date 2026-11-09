@@ -20,7 +20,7 @@ import { ALLIANCE_ECONOMIC, PEACE_TREATY_TURNS, WAR_MIN_TURNS } from '../data/se
 import { CIV_LEVELS } from '../data/civLevels';
 import { RESOURCES } from '../../world/resources';
 import { CITY_MAX_HP } from '../data/units';
-import { CITY_STATE_SUZERAIN_BONUS, REGIONAL_REACH_BONUS, type SuzEffect, CITY_STATE_TYPES, CITY_STATE_TYPE_YIELD, CITY_STATE_ENVOY_ROWS, CITY_STATE_ITEM_PROD, GENEVA_SCIENCE_PCT, ANTANANARIVO_GP_CULTURE_PCT, HONG_KONG_PROJECT_PCT, JOHANNESBURG_LATE_TECH, KANDY_RELIC_FAITH_PCT, KANDY_WONDER_RELICS, SINGAPORE_PARTNER_PROD, BRUSSELS_WONDER_PCT, MUSCAT_HUB_AMENITIES, MUSCAT_HUB_DISTRICT, JOHANNESBURG_RESOURCE_PROD, JOHANNESBURG_RESOURCE_PROD_LATE, NGAZARGAMU_PURCHASE_PCT, MILITARISTIC_BUILDING_ROWS, PRESLAV_BUILDING_LOYALTY, SUZERAIN_ENVOYS, FIRST_MEET_ENVOYS } from '../data/cityStates';
+import { CITY_STATE_SUZERAIN_BONUS, REGIONAL_REACH_BONUS, type SuzEffect, CITY_STATE_TYPES, CITY_STATE_TYPE_YIELD, CITY_STATE_ENVOY_ROWS, CITY_STATE_ITEM_PROD, GENEVA_SCIENCE_PCT, ANTANANARIVO_GP_CULTURE_PCT, ANTANANARIVO_GP_CULTURE_MAX, HONG_KONG_PROJECT_PCT, JOHANNESBURG_LATE_TECH, KANDY_RELIC_FAITH_PCT, KANDY_WONDER_RELICS, SINGAPORE_PARTNER_PROD, BRUSSELS_WONDER_PCT, MUSCAT_HUB_AMENITIES, MUSCAT_HUB_DISTRICT, JOHANNESBURG_RESOURCE_PROD, JOHANNESBURG_RESOURCE_PROD_LATE, NGAZARGAMU_PURCHASE_PCT, MILITARISTIC_BUILDING_ROWS, PRESLAV_BUILDING_LOYALTY, SUZERAIN_ENVOYS, FIRST_MEET_ENVOYS } from '../data/cityStates';
 import { REGIONAL_RANGE } from '../data/constants';
 import { warWearinessPeace } from './weariness';
 
@@ -526,12 +526,13 @@ export function suzerainSciencePct(state: GameState, seat: number): number {
 
 /** CIV6 (Antananarivo): the suzerain's multiplier on its whole Culture
  *  income, `ANTANANARIVO_GP_CULTURE_PCT` percent per Great Person it has
- *  earned, while it is at war with no civilization (REQUIREMENT_PLAYER_IS_AT
- *  _PEACE) — the player's, on no city's own yield. */
+ *  earned up to `ANTANANARIVO_GP_CULTURE_MAX` percent, while it is at war with
+ *  no civilization (REQUIREMENT_PLAYER_IS_AT_PEACE) — the player's, on no
+ *  city's own yield. */
 export function suzerainGpCultureMult(state: GameState, seat: number): number {
   if (!suzerainEffect(state, seat, 'gpCulturePct')) return 1;
   if (state.seats.some((s) => s.seat !== seat && civsAtWar(state, seat, s.seat))) return 1;
-  return 1 + (ANTANANARIVO_GP_CULTURE_PCT * (seatOf(state, seat)?.gpEarned?.length ?? 0)) / 100;
+  return 1 + Math.min(ANTANANARIVO_GP_CULTURE_PCT * (seatOf(state, seat)?.gpEarned?.length ?? 0), ANTANANARIVO_GP_CULTURE_MAX) / 100;
 }
 
 /** CIV6 (Johannesburg): a city's Production per distinct resource its owner

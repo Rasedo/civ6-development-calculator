@@ -154,6 +154,13 @@ export const GENEVA_SCIENCE_PCT = 15;
 export const ANTANANARIVO_GP_CULTURE_PCT = srcConst('cityStates.antananarivoGpCulturePct', 2,
   xml('ModifierArguments', 'ModifierId=MINOR_CIV_ANTANANARIVO_CULTURE_FROM_EARNED_GREAT_PEOPLE_BONUS&Name=Amount', 'Value'));
 
+/** CIV6 (GlobalParameters.xml YIELD_MODIFIER_PER_EARNED_GREAT_PERSON_MAXIMUM):
+ *  the percent EFFECT_ADJUST_PLAYER_YIELD_MODIFIER_PER_EARNED_GREAT_PERSON
+ *  reaches at most (runs/h1_duelq1117 t205-219: China, suzerain with 20 Great
+ *  People earned, reads its Culture income x1.30, not x1.40). */
+export const ANTANANARIVO_GP_CULTURE_MAX = srcConst('cityStates.antananarivoGpCultureMax', 30,
+  xml('GlobalParameters', 'Name=YIELD_MODIFIER_PER_EARNED_GREAT_PERSON_MAXIMUM', 'Value'));
+
 /** CIV6 (Expansion2_Leaders.xml, the nine MINOR_CIV_BOLOGNA_GREAT_*_POINTS
  *  _BONUS rows): `MODIFIER_PLAYER_CITIES_ADJUST_GREAT_PERSON_POINT` Amount 1
  *  each, under a BUILDING requirement — the TIER-1 building of the class's own
