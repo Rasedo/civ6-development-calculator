@@ -56,16 +56,25 @@ by one scripted decision server (`policy/`), verified against each other by
   second. Launch in the background and end the turn; never poll, never sleep.
 - Green = the pass row at the head sha in `stats/battery.jsonl`, never an
   exit code.
-- AI-port agents (owner 2026-10-18, 2026-10-24): no slice is tested or
-  measured. Agents develop and hand back; the lead merges without a bar and
-  hands out the next task at once. The lead runs the CPU bar and the
-  measures whenever it chooses, at a fixed head in the bar worktree
-  (`.claude/scratchpad/w_full.sh <tag> <sha>`), beside development: the
-  bar never holds up a merge or a task. Bugs it finds go to fresh fixing
+- AI-port agents (owner 2026-10-18, 2026-10-24, 2026-11-15): agents develop
+  and hand back a patch plus their AUDIT edits as data (`audit_ops.json`).
+  They run no tests, and measure only the one bounded before / after run a
+  task names. The lead merges with `.claude/scratchpad/merge_handback.sh`
+  and commits with `lead_commit.sh`, which runs the whole CPU suite and the
+  install checks: a red test stops that commit, not a later bar. The AI
+  score runs every four code commits at a fixed head in the bar worktree
+  (`.claude/scratchpad/bar_ai.sh <tag> <sha>`), beside development: it
+  never holds up a merge or a task. Bugs it finds go to fresh fixing
   agents, never back to the developing agent: an agent either strictly
   develops or strictly fixes. GPU tests are banned: nothing under
   `tests/gpu` runs; the GPU twin is still written and checked by
-  `seat_symmetry_check.py` in the bar.
+  `seat_symmetry_check.py` at the commit.
+- A brief states observations (recording, turn, ours against the game's);
+  a cause is named only as a guess. Every agent reads
+  `.claude/scratchpad/inflight.md` (what the others hold, what merged) before
+  it starts and before it hands back.
+- Whether the gap list shrinks is read from `stats/audit_cases.jsonl` (the
+  clauses each merge closed and opened), not from AUDIT's entry count.
 
 ## Housekeeping
 
@@ -78,3 +87,29 @@ by one scripted decision server (`policy/`), verified against each other by
 - The lead orchestrates: at most six subagents at a time, plus one
   battery agent pinned to a fixed head (owner 2026-10-24); none spawns its
   own, and agents never commit (the lead commits named paths).
+- The lead reports to the owner once per bar: what merged, the score's
+  change, what is red. Between bars it speaks only for a decision that is
+  the owner's.
+
+## Compact instructions
+
+When this conversation is compacted, the summary keeps, in this order:
+
+1. Every owner message since the last summary, verbatim, and any ruling in
+   it (what is allowed, forbidden or deferred), dated.
+2. The lead's state as entry points, not narrative: main's head sha; each
+   running agent (name, worktree, base sha, AUDIT ids, one line of task);
+   each background job (task id, what it measures, at which sha); any
+   hand-back received and not yet merged, with its patch path; any merge
+   half applied (what is staged, the next command).
+3. The last bar: its tag and sha, green or red, the score rows that moved,
+   and any regression not yet given to a fixer.
+4. Facts the files do not hold: a cause found and not yet written to
+   AUDIT, a brief's premise an agent proved wrong, a decision between two
+   overlapping patches and why.
+
+It drops: tool output, file contents, the text of hand-back reports already
+merged, per-merge detail the commit messages carry, and the procedure itself
+(`.claude/HANDOFF.md`, `.claude/scratchpad/brief_aiport.md` and the scripts
+hold it). It restates no rule this file states. After a compaction, read
+`.claude/HANDOFF.md` and `.claude/scratchpad/inflight.md` before acting.
