@@ -31,7 +31,7 @@
  */
 import type { GameState } from '../core/types';
 import type { DrawLabel, RngHooks, RngPoint } from '../core/rand';
-import type { TurnRecord } from './record';
+import type { RecordLight } from './recordStore';
 import type { History } from './import';
 import { DRAW_SITES, loggedStep, siteLabel } from './drawSites';
 import { lcgStep } from './civ6Random';
@@ -102,7 +102,7 @@ export interface StreamHold extends RngHooks {
  * border picks of its start of t + 1); the random-event step takes the state
  * its first draw was taken from.
  */
-export function streamHold(game: GameState, recs: readonly TurnRecord[], playerOfSeat: Map<number, number>, history: History): StreamHold {
+export function streamHold(game: GameState, recs: readonly RecordLight[], playerOfSeat: Map<number, number>, history: History): StreamHold {
   last = makeHold(game, recs, playerOfSeat, history);
   return last;
 }
@@ -115,7 +115,7 @@ export function lastStreamLedger(): StreamLedger | undefined {
   return last?.ledger();
 }
 
-function makeHold(game: GameState, recs: readonly TurnRecord[], playerOfSeat: Map<number, number>, history: History): StreamHold {
+function makeHold(game: GameState, recs: readonly RecordLight[], playerOfSeat: Map<number, number>, history: History): StreamHold {
   // per engine turn and player: the start the pair holds, its game turn and
   // the generator's state as it began
   const pre = new Map<string, { turn: number; seed: number }>();

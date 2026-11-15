@@ -130,6 +130,7 @@ import { InferredActions, RecordedActions, activePlayer, type ActionSource, type
 import { newScores, scoreDecision, scoreTable, memoryTable, type DecisionScores } from './aiScore';
 import { GameMemory, MemoryLogs, readDanger, readGameMemory, readMemory, readRevealed, syncContracts, type ArmyLogged } from './aiMemory';
 import { GameUnits, readPass, readUnitTable, type StateRead } from './aiUnits';
+import { RecordStore, type RecordLight } from './recordStore';
 import { gameSpawnChanges, importCityAi, importOps, type GameSpawnChange } from './gameAiImport';
 import { NO_SCORE } from '../core/aiPolicyValue';
 
@@ -6030,18 +6031,6 @@ const STEP_OF: Record<string, string> = {
   'city.loyalty': 'step.loyalty', 'city.pressure': 'step.pressure', 'seat.eraScore': 'step.eraScore',
 };
 
-function loadRecords(dumpPath: string, from: number, to: number): { cat: Catalog; recs: TurnRecord[] } {
-  const cat = loadCatalog(dumpPath);
-  const byTurn = new Map<number, TurnRecord>();
-  for (const line of readFileSync(dumpPath, 'utf8').split('\n')) {
-    if (!line.trim()) continue;
-    const rec = JSON.parse(line) as TurnRecord;
-    if (rec.moved || rec.turn < from || rec.turn > to) continue;
-    byTurn.set(rec.turn, rec);
-  }
-  return { cat, recs: [...byTurn.keys()].sort((a, b) => a - b).map((t) => byTurn.get(t)!) };
-}
-
 /** the seed the record's witness holds for the first major's start of turn */
 function turnSeed(rec: TurnRecord): number | undefined {
   const first = Math.min(...rec.players.filter((p) => bool(p.major)).map((p) => p.id));
@@ -6138,7 +6127,7 @@ let gpTimeline: GpTimeline | null = null;
 
 /** the records, the game's climate log and its draw log an imported world's event memory,
  *  carbon, volcanoes and storm scars are read from (`seedEventMemory`) */
-let eventSeed: { recs: TurnRecord[]; cat: Catalog; climate: ClimateLog | undefined; log?: RandLog } | null = null;
+let eventSeed: { recs: readonly RecordLight[]; cat: Catalog; climate: ClimateLog | undefined; log?: RandLog } | null = null;
 
 /** a contract the game's city queued in the turn `turn` the record's item
  *  stands for (AI_CityBuild.csv's queue line: its item and tree): the
@@ -6491,27 +6480,32 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
   memoryFromAimem?: boolean;
   /** called after each pair is compared, with the engine state and record t+1 */
   onPair?: (state: GameState, b: TurnRecord, decisions: Decision[]) => void } = {}): ReplayReport {
-  const { cat, recs: all } = loadRecords(dumpPath, -Infinity, opts.to ?? Infinity);
+  // the records, each parsed when the replay reaches it (`RecordStore`)
+  const cat = loadCatalog(dumpPath);
+  const store = new RecordStore(dumpPath, opts.from ?? -Infinity, opts.to ?? Infinity);
+  const record = (t: number) => store.get(t)!;
   // the window: the records from `from` on; those before it are folded into
   // the history alone (`skipped`)
+  const all = store.light;
   const start = all.findIndex((r) => r.turn >= (opts.from ?? -Infinity));
   const recs = start < 0 ? [] : all.slice(start);
   const skipped = start < 0 ? all : all.slice(0, start);
-  const source = opts.source ?? (recs.some((r) => Array.isArray((r as { actions?: unknown }).actions)) ? new RecordedActions() : new InferredActions());
+  const source = opts.source ?? (store.logged ? new RecordedActions() : new InferredActions());
   const history: History = newHistory();
   gpTimeline = loadGpTimeline(dumpPath);
   const seeds = all.flatMap((r) => (r.witness ?? []).flatMap((w) => (typeof w.seed === 'number' ? [w.seed] : [])));
-  eventSeed = { recs: all, cat, climate: all[0] ? loadClimateLog(dumpPath, seeds, all[0].head.W) : undefined };
+  const W0 = all[0] ? record(all[0].turn).head.W : 0;
+  eventSeed = { recs: all, cat, climate: all[0] ? loadClimateLog(dumpPath, seeds, W0) : undefined };
   // the game's own draw log, where the recording kept it
   const logPath = randLogPath(dumpPath);
   if (logPath) {
-    history.randLog = loadRandLog(logPath, all.flatMap((r) => (r.witness ?? []).flatMap((w) => (typeof w.seed === 'number' ? [w.seed] : []))));
+    history.randLog = loadRandLog(logPath, seeds);
     eventSeed.log = history.randLog;
   }
   history.weary = loadWeariness(dumpPath);
   history.warKinds = loadWarKinds(dumpPath);
   history.borderGrants = loadBorderGrants(dumpPath);
-  history.replay = replayEvents(all, cat, history.randLog);
+  history.replay = replayEvents(all, cat, history.randLog, [], (t) => store.get(t));
   // a window started past the first record takes the history every record
   // before it leaves (the game era and its countdown, the eras' ages, the
   // boosts parked, the districts' prices, the levies, the trained bests...),
@@ -6520,12 +6514,13 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
   const savings = new Map<number, EconomicMemory>();
   const folding = opts.source ?? (source instanceof RecordedActions ? new RecordedActions() : new InferredActions());
   // ...and the barbarians' tribes (`TribeFold`)
-  const W0 = all[0]?.head.W ?? 0;
   const tribeFold = skipped.length ? new TribeFold(dumpPath, W0) : undefined;
-  skipped.forEach((r, i) => {
+  skipped.forEach((l, i) => {
+    const r = record(l.turn);
     advanceHistory(history, r, cat);
     const imp = importTurn(r, cat, history);
-    const next = skipped[i + 1] ?? recs[0];
+    const at = skipped[i + 1] ?? recs[0];
+    const next = at && record(at.turn);
     const ds = next ? folding.decisions(r, next, cat) : [];
     if (next) foldSavings(savings, imp, ds, cat);
     tribeFold?.observe(r, imp, cat, ds);
@@ -6533,7 +6528,13 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
   // the game's combat log, where the recording kept it: each record carries
   // the battles of the turns its event log covers (`RecordedActions`)
   const combat = loadCombatLog(dumpPath, recs.flatMap((r) => (r.witness ?? []).flatMap((w) => (typeof w.seed === 'number' ? [w.seed] : []))));
-  if (combat) for (const r of recs) r.combatLog = combat.filter((x) => x.turn === r.turn - 1 || x.turn === r.turn);
+  if (combat && recs.length) {
+    const from = recs[0].turn;
+    store.decorate = (r) => {
+      if (r.turn >= from) r.combatLog = combat.filter((x) => x.turn === r.turn - 1 || x.turn === r.turn);
+    };
+    for (const r of store.live()) store.decorate(r);
+  }
   const report: ReplayReport = { dump: dumpPath, source: source.constructor.name, turns: [], subsystems: {}, cleanEvery: 0, decisions: {}, unread: {}, settled: {}, perTurn: [], refusals: {},
     researchAi: { minor: newResearchTally(), free: newResearchTally() },
     researchScores: { minor: { rows: 0, turns: 0, score: 0 }, free: { rows: 0, turns: 0, score: 0 } },
@@ -6542,8 +6543,9 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
     minorTactics: {}, minorDraws: { turns: 0, paired: 0, draws: 0, sameRange: 0 }, minorBuilds: { turns: 0, same: 0, byKind: {}, samples: [] }, minorResearch: { rows: [], majors: [], food: [] },
     scores: newScores(), memory: newScores(), ...(opts.aiScore ? { perTurnWorld: true } : {}) };
   if (recs.length < 2) return report;
-  advanceHistory(history, recs[0], cat);
-  const first = importTurn(recs[0], cat, history);
+  const rec0 = record(recs[0].turn);
+  advanceHistory(history, rec0, cat);
+  const first = importTurn(rec0, cat, history);
   const stream = streamHold(first.state, recs, first.playerOfSeat, history);
   holdRng(stream);
   if (TRACE.has('minorAi')) traceMinorAi((l) => console.error(l));
@@ -6571,8 +6573,8 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
   });
   traceMinorPurchases(buyTrace);
   const state = first.state;
-  importedWorld(state, first, recs[0], history);
-  tribeFold?.observe(recs[0], first, cat, []);
+  importedWorld(state, first, rec0, history);
+  tribeFold?.observe(rec0, first, cat, []);
   // the city-states' city AI ran on the game's turns before the import's:
   // its first look ran no events (none contracted); its savings those turns'
   // (`foldSavings`), else, with no record before, the treasury taken whole;
@@ -6606,7 +6608,7 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
   }
   // the majors: every major seat the record's first turn names
   const majorSeats = new Map<number, number>();
-  for (const p of recs[0].players) {
+  for (const p of rec0.players) {
     const seat = first.seatOfPlayer.get(p.id);
     if (seat === undefined || seat >= state.seats.length) continue;
     majorSeats.set(p.id, seat);
@@ -6620,16 +6622,16 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
   const operations = new OperationsProbe(dumpPath, opsSeats, first.seatOfPlayer);
   const govtLog = loadAiCivicLog(dumpPath);
   const ctx: Ctx = {
-    state, cat, W: recs[0].head.W, seatOfPlayer: first.seatOfPlayer, playerOfSeat: first.playerOfSeat,
+    state, cat, W: rec0.head.W, seatOfPlayer: first.seatOfPlayer, playerOfSeat: first.playerOfSeat,
     units: new Map(), pendingMinors: new Map(), next: first, tally: new Map(), fellBack: new Map(), imposed: new Map(), reasons: new Map(),
-    engineKilled: new Set(), paths: new Map(), walked: new Set(), steps: new Map(), barbBlows: new Map(), barbCentres: new Map(), gone: new Map(), barbSeized: [], minorBlows: new Map(), minorShots: [], minorPromoted: new Map(), minorBuys: [], minorImproves: [], minorClears: [], minorCleared: new Set(), minorClearItems: new Map(), minorClearUnits: [], barbBattles: [], barbFought: new Set(), barbDraws: [], promoteHp: new Map(), minorUnits: [], minorGround: [], minorLux: new Map(), buyTrace, lateBlows: [], upgradeInto: new Set(), upgradedFrom: new Map(), levyFrom: new Map(), barbSteps: [], barbPillaged: [], envoys: [], battled: new Set(), fortified: new Map(), undug: new Map(), streams: new Map(), applied: new Set(), barbNew: [], lateEnvoys: [], log: history.randLog, warKinds: history.warKinds, stream, prev: recs[0],
+    engineKilled: new Set(), paths: new Map(), walked: new Set(), steps: new Map(), barbBlows: new Map(), barbCentres: new Map(), gone: new Map(), barbSeized: [], minorBlows: new Map(), minorShots: [], minorPromoted: new Map(), minorBuys: [], minorImproves: [], minorClears: [], minorCleared: new Set(), minorClearItems: new Map(), minorClearUnits: [], barbBattles: [], barbFought: new Set(), barbDraws: [], promoteHp: new Map(), minorUnits: [], minorGround: [], minorLux: new Map(), buyTrace, lateBlows: [], upgradeInto: new Set(), upgradedFrom: new Map(), levyFrom: new Map(), barbSteps: [], barbPillaged: [], envoys: [], battled: new Set(), fortified: new Map(), undug: new Map(), streams: new Map(), applied: new Set(), barbNew: [], lateEnvoys: [], log: history.randLog, warKinds: history.warKinds, stream, prev: rec0,
     researchAi: report.researchAi, researchScores: report.researchScores, agendaCivics: null, strategyLog: loadStrategyLog(dumpPath), researchBefore: new Map(), researchAtTurn: new Map(), aiResearchLog,
     tactical: loadTactical(dumpPath), barbTally: report.barbTactics, minorTally: report.minorTactics, minorDraws: report.minorDraws,
     civicAi: report.civicAi, civicScores: report.civicScores, civicBefore: new Map(), aiCivicLog: govtLog.civics, aiPolicyLog: govtLog.policies,
-    scores: report.scores, turn: recs[0].turn, memoryLogs: new MemoryLogs(dumpPath), gameMemory: GameMemory.of(dumpPath), armyLogged: new Map(), dangerLogged: new Map(), minorLookTypes: new Map(), minorDying: [],
+    scores: report.scores, turn: rec0.turn, memoryLogs: new MemoryLogs(dumpPath), gameMemory: GameMemory.of(dumpPath), armyLogged: new Map(), dangerLogged: new Map(), minorLookTypes: new Map(), minorDying: [],
     gameUnits: opts.aiScore ? GameUnits.of(dumpPath) : undefined, stateScores: newScores(), stateLeftOut: {},
     // a game from its first turn opens on no memory, the game's as well
-    memoryClean: new Map([...first.playerOfSeat].filter(([seat]) => minorAiSeat(seat) || isBarbSeat(seat)).map(([, p]) => [p, recs[0].turn <= 1] as const)),
+    memoryClean: new Map([...first.playerOfSeat].filter(([seat]) => minorAiSeat(seat) || isBarbSeat(seat)).map(([, p]) => [p, rec0.turn <= 1] as const)),
     cityBuildLog: loadCityBuildTables(dumpPath), cityBuild: newCityBuildTally(), cityBuildPer: new Map(),
     operations, minorOps: new Map(),
   };
@@ -6687,14 +6689,14 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
   });
   // the record's units in the importer's order
   let k = 0;
-  for (const u of recs[0].units) {
+  for (const u of rec0.units) {
     if (!first.seatOfPlayer.has(u.owner) || !engineRowOf(cat, 'unit', u.type)) continue;
     ctx.units.set(`${u.owner}:${u.id}`, state.units[k++]);
   }
   if (tribeFold?.logged) tribeFold.seed(state, (key) => ctx.units.get(key)?.id);
   // a window started past the first turn opens on the game's memory of the
   // turn before, as every later pair does (`perTurnWorld`)
-  if (opts.aiScore && recs[0].turn > 1) takeGameMemory(ctx, state, first, recs[0].turn - 1, opts.memoryFromLog ?? false, opts.memoryFromAimem ?? false);
+  if (opts.aiScore && rec0.turn > 1) takeGameMemory(ctx, state, first, rec0.turn - 1, opts.memoryFromLog ?? false, opts.memoryFromAimem ?? false);
   for (const [pid, cs] of first.minorOfPlayer) {
     if (cs.centerIndex >= 0) continue;
     ctx.pendingMinors.set(pid, cs);
@@ -6706,8 +6708,8 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
   const baseFails = new Map<string, Set<string>>();
   let prev: TurnRecord | undefined;
   for (let i = 0; i + 1 < recs.length; i++) {
-    const a = recs[i];
-    const b = recs[i + 1];
+    const a = record(recs[i].turn);
+    const b = record(recs[i + 1].turn);
     if (b.turn !== a.turn + 1) {
       report.stopped = `no record of turn ${a.turn + 1}`;
       break;
@@ -7822,6 +7824,8 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
   traceMinorPurchases(null);
   traceMinorPolicyScores(null);
   if (operations.active) report.operations = operations.tally;
+  store.close();
+  ctx.gameMemory?.close();
   if (ctx.gameUnits) {
     ctx.gameUnits.close();
     report.state = ctx.stateScores;

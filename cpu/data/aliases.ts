@@ -148,5 +148,12 @@ export function installTerrain(terrain: TerrainId, elevation: Elevation): string
   return `TERRAIN_${base}${elevation === 'HILLS' ? '_HILLS' : elevation === 'MOUNTAIN' ? '_MOUNTAIN' : ''}`;
 }
 export function installFeature(feature: string): string {
-  return Object.entries(FEATURE_ID).find(([, f]) => f === feature)?.[0] ?? `FEATURE_${feature}`;
+  if (!FEATURE_TYPE) {
+    FEATURE_TYPE = new Map();
+    for (const [type, f] of Object.entries(FEATURE_ID)) if (!FEATURE_TYPE.has(f)) FEATURE_TYPE.set(f, type);
+  }
+  return FEATURE_TYPE.get(feature) ?? `FEATURE_${feature}`;
 }
+
+/** the first install type of each engine feature (`FEATURE_ID` reversed) */
+let FEATURE_TYPE: Map<string, string> | null = null;

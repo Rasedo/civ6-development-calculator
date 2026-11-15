@@ -28,7 +28,7 @@
  * A player's memory is CLEAN at a turn when every kind compared agrees; the
  * next turn's decisions read it (`replay.ts`).
  */
-import { existsSync, readFileSync } from 'node:fs';
+import { closeSync, existsSync, openSync, readSync } from 'node:fs';
 import { CP_ACCEPTED, CP_CANCELLED, CP_CLAIMED, CP_IN_PROGRESS, CP_NAMES, CP_SUBMITTED, type AiContract } from '../core/aiContracts';
 import type { CityAi } from '../core/aiCityTrees';
 import { opsOf } from '../core/operations/manager';
@@ -36,12 +36,36 @@ import { teamList } from '../core/operations/operation';
 import type { ArmyRecord, Seat } from '../core/types';
 import { gameTypeOf } from '../data/aliases';
 import { CIVICS } from '../data/civics';
+import { forEachLine } from './recordStore';
 
 export const MEMORY_KINDS = ['knowledge.army', 'knowledge.camps', 'cityAi.contracts', 'contracts', 'contracts.progress', 'ops',
   'ops.targets', 'ops.members', 'ops.strength', 'revealed', 'danger', 'danger.major'] as const;
 export type MemoryKind = typeof MEMORY_KINDS[number];
 
-const lines = (path: string): string[] => (existsSync(path) ? readFileSync(path, 'utf8').split(/\r?\n/).slice(1) : []);
+/** a log's lines after its header, each its own string; `keep` the lines
+ *  wanted (all by default), tested on the bytes; `count` the lines after the
+ *  header `split(/\r?\n/)` cuts (0 with no file) */
+function logLines(path: string, keep?: (buf: Buffer, from: number, len: number) => boolean): { lines: string[]; count: number } {
+  if (!existsSync(path)) return { lines: [], count: 0 };
+  const out: string[] = [];
+  let first = true;
+  const fd = openSync(path, 'r');
+  const count = forEachLine(fd, (_at, len, buf, from) => {
+    if (first) {
+      first = false;
+      return;
+    }
+    if (!keep || keep(buf, from, len)) out.push(buf.toString('utf8', from, from + len));
+  });
+  closeSync(fd);
+  return { lines: out, count };
+}
+
+const lines = (path: string): string[] => logLines(path).lines;
+
+/** a line holding a contract (AI_CityBuild.csv's state and queue lines) */
+const CONTRACT = Buffer.from('CONTRACT ');
+const hasContract = (buf: Buffer, from: number, len: number) => buf.subarray(from, from + len).indexOf(CONTRACT) >= 0;
 
 /** AI_Knowledge.csv's ARMY lines by `${turn}:${player}`: per line (the
  *  players in the game's list, the line's index the player) and type
@@ -97,16 +121,17 @@ export class MemoryLogs {
   constructor(dumpPath: string) {
     const logs = dumpPath.replace(/\.jsonl$/, '.logs/');
     this.army = loadArmyLog(dumpPath);
-    const knowledge = lines(`${logs}AI_Knowledge.csv`);
-    for (const line of knowledge) {
+    const knowledge = logLines(`${logs}AI_Knowledge.csv`);
+    for (const line of knowledge.lines) {
       const c = line.split(',').map((x) => x.trim());
       if (c[2] !== 'CAMP') continue;
       const k = `${c[0]}:${c[1]}`;
       (this.camps.get(k) ?? (this.camps.set(k, []), this.camps.get(k)!)).push(c[3]);
     }
     const open = new Map<number, Map<string, string>>();
-    const build = lines(`${logs}AI_CityBuild.csv`);
-    for (const line of build) {
+    // the lines that name no contract are none of these
+    const build = logLines(`${logs}AI_CityBuild.csv`, hasContract);
+    for (const line of build.lines) {
       const c = line.split(',').map((x) => x.trim());
       // the queue line: "turn, player, city, , , item, tree, CONTRACT id"
       if (c[4] === '' && c[7]?.startsWith('CONTRACT ')) {
@@ -126,8 +151,8 @@ export class MemoryLogs {
       else hist.push([turn, snap]);
     }
     const alive = new Map<string, Map<string, number>>();
-    const opLines = lines(`${logs}AI_Operation.csv`);
-    for (const line of opLines) {
+    const opLines = logLines(`${logs}AI_Operation.csv`);
+    for (const line of opLines.lines) {
       const m = /^(\d+), (\d+), (.*)$/.exec(line);
       if (!m) continue;
       const k = `${m[1]}:${m[2]}`;
@@ -140,8 +165,8 @@ export class MemoryLogs {
       a.set(name, (a.get(name) ?? 0) + step);
     }
     for (const [k, a] of alive) this.ops.set(k, [...a].flatMap(([n, c]) => Array<string>(Math.max(0, c)).fill(n)).sort());
-    this.logged = { 'knowledge.army': this.army.size > 0, 'knowledge.camps': knowledge.length > 0, 'cityAi.contracts': build.length > 0,
-      'ops': opLines.length > 0 };
+    this.logged = { 'knowledge.army': this.army.size > 0, 'knowledge.camps': knowledge.count > 0, 'cityAi.contracts': build.count > 0,
+      'ops': opLines.count > 0 };
   }
 
   /** the open contracts the log shows for the player at the turn's end */
@@ -242,14 +267,29 @@ export interface GameTree {
  * replaces the first).
  */
 export class GameMemory {
-  private readonly reads = new Map<string, GameMemoryRead>();
+  /** each read's line by `${site}:${turn}:${player}`, its bytes in the file */
+  private readonly index = new Map<string, [number, number]>();
+  /** the reads parsed, each held while its turn is within `KEPT` turns of
+   *  the latest asked for: a read asked for again is the same object */
+  private readonly parsed = new Map<string, { turn: number; read: GameMemoryRead }>();
+  private latest = -Infinity;
+  private readonly fd: number;
 
   constructor(path: string) {
-    for (const line of readFileSync(path, 'utf8').split(/\r?\n/)) {
-      if (!line) continue;
-      const r = JSON.parse(line) as GameMemoryRead;
-      if (r.turn !== undefined) this.reads.set(`${r.site}:${r.turn}:${r.player}`, r);
-    }
+    this.fd = openSync(path, 'r');
+    // a line opens with its site, player and turn; one that does not is
+    // parsed whole for them
+    const head = /^\{"site":\s*"(\w+)",\s*"player":\s*(-?\d+),\s*"turn":\s*(-?\d+)[,}]/;
+    forEachLine(this.fd, (at, len, buf, from) => {
+      if (!len) return;
+      const m = head.exec(buf.toString('latin1', from, from + Math.min(len, 96)));
+      if (m) {
+        this.index.set(`${m[1]}:${m[3]}:${m[2]}`, [at, len]);
+        return;
+      }
+      const r = JSON.parse(buf.toString('utf8', from, from + len)) as GameMemoryRead;
+      if (r.turn !== undefined) this.index.set(`${r.site}:${r.turn}:${r.player}`, [at, len]);
+    });
   }
 
   static of(dumpPath: string): GameMemory | undefined {
@@ -258,9 +298,29 @@ export class GameMemory {
   }
 
   at(site: GameMemoryRead['site'], turn: number, player: number): GameMemoryRead | undefined {
-    return this.reads.get(`${site}:${turn}:${player}`);
+    const key = `${site}:${turn}:${player}`;
+    if (turn > this.latest) {
+      this.latest = turn;
+      for (const [k, p] of this.parsed) if (p.turn < turn - KEPT) this.parsed.delete(k);
+    }
+    const held = this.parsed.get(key);
+    if (held) return held.read;
+    const e = this.index.get(key);
+    if (!e) return undefined;
+    const buf = Buffer.allocUnsafe(e[1]);
+    readSync(this.fd, buf, 0, e[1], e[0]);
+    const read = JSON.parse(buf.toString('utf8')) as GameMemoryRead;
+    this.parsed.set(key, { turn, read });
+    return read;
+  }
+
+  close(): void {
+    closeSync(this.fd);
   }
 }
+
+/** the turns behind the latest a parsed read of the game's memory is held */
+const KEPT = 3;
 
 /** the catalog's names a read's indices take */
 export interface MemoryNames {

@@ -347,12 +347,28 @@ export function minorHead(cat: Catalog, c: DumpCity, W: number): MinorItem | und
 }
 
 export function engineRowOf(cat: Catalog, kind: 'building' | 'district' | 'unit', idx: number): string | null {
-  const ctx: Ctx = {
-    cat, gaps: new Map(), bReplace: new Map(cat.buildingReplaces), dReplace: new Map(cat.districtReplaces),
-    uReplace: new Map(cat.unitReplaces), wonders: new Set(cat.wonders),
-  };
-  return kind === 'building' ? buildingId(ctx, idx) : kind === 'district' ? districtId(ctx, idx) : unitId(ctx, idx);
+  let rows = ROWS_OF.get(cat);
+  if (!rows) {
+    rows = {
+      ctx: { cat, gaps: new Map(), bReplace: new Map(cat.buildingReplaces), dReplace: new Map(cat.districtReplaces),
+        uReplace: new Map(cat.unitReplaces), wonders: new Set(cat.wonders) },
+      building: new Map(), district: new Map(), unit: new Map(),
+    };
+    ROWS_OF.set(cat, rows);
+  }
+  const seen = rows[kind];
+  const had = seen.get(idx);
+  if (had !== undefined) return had;
+  const { ctx } = rows;
+  const id = kind === 'building' ? buildingId(ctx, idx) : kind === 'district' ? districtId(ctx, idx) : unitId(ctx, idx);
+  seen.set(idx, id);
+  return id;
 }
+
+/** each catalog's rows as `engineRowOf` maps them, by kind and index (its
+ *  gaps counted on a context of its own, read by no one) */
+const ROWS_OF = new WeakMap<Catalog, { ctx: Ctx; building: Map<number, string | null>; district: Map<number, string | null>;
+  unit: Map<number, string | null> }>();
 
 const ALL_BELIEFS = { ...FOLLOWER_BELIEFS, ...FOUNDER_BELIEFS, ...WORSHIP_BELIEFS, ...ENHANCER_BELIEFS };
 

@@ -33,6 +33,7 @@
 import type { GameState, Tile } from '../core/types';
 import type { CheckResult } from './checks';
 import { P, type Catalog, type TurnRecord } from './record';
+import type { RecordLight } from './recordStore';
 import { engineRowOf, type Imported } from './import';
 import type { ClimateLog, LoggedEvent, RandLog } from './randLog';
 import { droughtStarts, eventAt, fireCandidate, eventTable, floodRivers, floodplainRun, laidRivers, riverPlotList, sitePairWeight, stormFootprint, stormStarts, volcanoOrder, type EventTable } from '../core/disasters';
@@ -410,7 +411,7 @@ function bandOf(t: EventTable, i: number): [number, number] {
  *  (`seedVolcanoes`). runs/h1_duelq1127 t237: Хуанхэ's FLOOD_MAJOR at 4:13 on the roll
  *  141 of 2500 with the memory and the warming, the Amur's FLOOD_MODERATE
  *  at 7:16 without. */
-export function seedEventMemory(state: GameState, recs: readonly TurnRecord[], rec: TurnRecord, cat: Catalog,
+export function seedEventMemory(state: GameState, recs: readonly RecordLight[], rec: TurnRecord, cat: Catalog,
   climate: ClimateLog | undefined, log: RandLog | undefined): void {
   const names = cat.randomEvents ?? [];
   const seen = new Map<string, { name: string; plot: number }>();
@@ -499,7 +500,7 @@ function seedStormScars(state: GameState, seen: [string, { name: string; plot: n
  * the roll 231 of 2500 on VOLCANO_GENTLE at 633 (Game_RandomEvents.csv's two
  * active volcanoes), a storm with none.
  */
-function seedVolcanoes(state: GameState, recs: readonly TurnRecord[], rec: TurnRecord, log: RandLog): void {
+function seedVolcanoes(state: GameState, recs: readonly RecordLight[], rec: TurnRecord, log: RandLog): void {
   const order = volcanoOrder(state.map);
   if (!order.length) return;
   const named = (turn: number): Set<number> | null => {

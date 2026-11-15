@@ -26,6 +26,7 @@ import { plotAt, P, num, type Catalog, type TurnRecord } from './record';
 import { engineRowOf, recordMap } from './import';
 import { drawsBetween, type Civ6Random } from './civ6Random';
 import type { RandLog } from './randLog';
+import type { RecordLight } from './recordStore';
 import { loggedStep, sameDraw } from './drawSites';
 import {
   droughtDraws, eruptionDraws, floodDraws, floodplainList, newClimate, newOutcome, replayAtEnd, stormBirth, stormStartPlots, stormWalk, unitRolls,
@@ -217,12 +218,17 @@ function unownedAtStep(after: TurnRecord, T: number): Set<number> {
  * of its turn is replayed on the read record before it, and what it laid
  * lands at the next read record (runs/h1_duelw1131: record 5 unread, record
  * 6 missing; the t3 dust storm's last walk at t5 lays 229 and 272 +1
- * Production, first read at record 7).
+ * Production, first read at record 7). `record` gives each read record
+ * whole by its turn (by default `recs`' own: a caller holding them light,
+ * `RecordStore`, reads them there).
  */
-export function replayEvents(recs: readonly TurnRecord[], cat: Catalog, log?: RandLog, unread: readonly TurnRecord[] = []): EventReplay {
+export function replayEvents(recs: readonly RecordLight[], cat: Catalog, log?: RandLog, unread: readonly TurnRecord[] = [],
+  record?: (turn: number) => TurnRecord | undefined): EventReplay {
   const result: EventReplay = { events: new Map(), placedTurns: new Map(), gains: new Map(), turns: new Map(), unsure: new Map(), steps: new Map(), gaps: new Map() };
   const names = cat.randomEvents ?? [];
   const byTurn = new Map(recs.map((r) => [r.turn, r]));
+  const whole = record ?? ((t: number) => byTurn.get(t) as TurnRecord | undefined);
+  const read = (t: number) => (byTurn.has(t) ? whole(t) : undefined);
   const unreadAt = new Map(unread.filter((r) => !byTurn.has(r.turn)).map((r) => [r.turn, r]));
   const readTurns = [...byTurn.keys()].sort((a, b) => a - b);
   // the read record a step's fertility first shows in
@@ -247,8 +253,8 @@ export function replayEvents(recs: readonly TurnRecord[], cat: Catalog, log?: Ra
     if (!placed.has(key)) placed.set(key, { family, turns: new Map() });
     placed.get(key)!.turns.set(turn, g);
   };
-  const resolved = resolveRivers(first, byTurn, names, cat);
-  const bands = rollBands(first, names, recs[0], cat);
+  const resolved = resolveRivers(first, read, names, cat);
+  const bands = rollBands(first, names, whole(recs[0].turn)!, cat);
   // the list each river was found to hold
   const riverHolds = new Map<number, string>();
   let live: { storm: StormState; key: string }[] = [];
@@ -268,8 +274,8 @@ export function replayEvents(recs: readonly TurnRecord[], cat: Catalog, log?: Ra
     // the map the step struck: the read record before, or the latest earlier
     // one where that record was not read (runs/h1_duelw1119: record 3
     // missing, record 4 unread; the step of t5 runs on record 2)
-    const before = byTurn.get(T - 1) ?? byTurn.get(readTurns.filter((t) => t < T).pop() ?? -1);
-    const after = byTurn.get(T) ?? unreadAt.get(T)!;
+    const before = read(T - 1) ?? read(readTurns.filter((t) => t < T).pop() ?? -1);
+    const after = read(T) ?? unreadAt.get(T)!;
     const news = [...first.values()].filter((e) => e[0] === T);
     live = live.filter((s) => T - s.storm.start <= STORM_WALKS);
     const fail = (why: string) => {
@@ -599,13 +605,13 @@ export function replayEvents(recs: readonly TurnRecord[], cat: Catalog, log?: Ra
  * river walked upstream against its flow and goes; a river left with one
  * list holds it. Repeated until nothing moves. By event key.
  */
-function resolveRivers(first: Map<string, EventRow>, byTurn: Map<number, TurnRecord>, names: readonly string[],
+function resolveRivers(first: Map<string, EventRow>, read: (turn: number) => TurnRecord | undefined, names: readonly string[],
   cat: Catalog): Map<string, Tile[][]> {
   const out = new Map<string, Tile[][]>();
   const byRiver = new Map<number, string[]>();
   for (const [key, e] of first) {
     if (!FLOODS.includes(names[e[1]] ?? '')) continue;
-    const before = byTurn.get(e[0] - 1);
+    const before = read(e[0] - 1);
     if (!before) continue;
     const map = recordMap(before, cat);
     const start = map.tiles[num(e[3])];

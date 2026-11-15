@@ -53,7 +53,7 @@
  * `targets`, not of the planning); the AI type of a unit whose game row
  * changes it between its tactical step and its pass (ours is read between).
  */
-import { closeSync, existsSync, fstatSync, openSync, readSync } from 'node:fs';
+import { closeSync, existsSync, openSync, readSync } from 'node:fs';
 import { neighbors } from '../../world/hex';
 import { isWater } from '../../world/query';
 import { aiView } from '../core/aiView';
@@ -65,6 +65,7 @@ import { unitDomain, unitExertsZoc, unitsHostile } from '../core/units';
 import { gameTypeOf } from '../data/aliases';
 import { MP_SCALE } from '../data/constants';
 import { UNIT_HP, UNITS } from '../data/units';
+import { forEachLine } from './recordStore';
 
 /** one comparison: ours, the game's */
 export interface StateRead {
@@ -110,32 +111,15 @@ export class GameUnits {
 
   constructor(path: string) {
     this.fd = openSync(path, 'r');
-    const size = fstatSync(this.fd).size;
-    const chunk = Buffer.allocUnsafe(1 << 22);
-    const lines: [number, number][] = [];
-    let start = 0;
-    for (let pos = 0; pos < size;) {
-      const n = readSync(this.fd, chunk, 0, chunk.length, pos);
-      if (n <= 0) break;
-      for (let from = 0; ;) {
-        const nl = chunk.indexOf(10, from);
-        if (nl < 0 || nl >= n) break;
-        lines.push([start, pos + nl - start]);
-        start = pos + nl + 1;
-        from = nl + 1;
-      }
-      pos += n;
-    }
-    if (start < size) lines.push([start, size - start]);
-    const head = Buffer.allocUnsafe(96);
-    lines.forEach(([at, len], k) => {
-      if (k === 0) {
-        const cols = (this.read(at, len) as { cols?: { unit?: string[] } }).cols;
+    let first = true;
+    forEachLine(this.fd, (at, len, buf, from) => {
+      if (first) {
+        first = false;
+        const cols = (JSON.parse(buf.toString('utf8', from, from + len)) as { cols?: { unit?: string[] } }).cols;
         (cols?.unit ?? []).forEach((name, i) => { this.unitCol[name] = i; });
         return;
       }
-      const n = readSync(this.fd, head, 0, Math.min(head.length, len), at);
-      const m = /^\{"site":\s*"(\w+)",\s*"player":\s*(\d+),\s*"turn":\s*(\d+)/.exec(head.toString('latin1', 0, n));
+      const m = /^\{"site":\s*"(\w+)",\s*"player":\s*(\d+),\s*"turn":\s*(\d+)/.exec(buf.toString('latin1', from, from + Math.min(96, len)));
       if (m) this.index.set(`${m[1]}:${m[3]}:${m[2]}`, [at, len]);
     });
   }
