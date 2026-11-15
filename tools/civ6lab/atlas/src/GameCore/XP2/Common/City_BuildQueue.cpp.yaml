@@ -211,7 +211,9 @@
   kind: function
   semantics: one of the player's cities may advance the project.
   status: PARTLY
+  impl: [cpu/core/game.ts:repairAvailable]
   readings:
+    - "C-127 / C-96: the improvement pick's unit test, a Fort's tree, Find Available Unit's types, a held district not OnePerCity, the walls' repair cooldown — READ (0x5c9a00 at 0x5c9c85..0x5c9ca4, 0x35ede0 at 0x35f058..0x35f05f, 0x5ccc10, 0x7f6ea0 at 0x7f7028..0x7f72b7, 0x7ec7b0 at 0x7ec90f..0x7eca80, 0x16f7b0 at 0x16fd9f..0x16fe10, 0x198180, 0x248800 at 0x2488d6..0x2488f9), both twins"
     - "C-97: the World Congress AI — the evaluation, the outcome, the votes, the hints, the option values and the targets READ"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
@@ -338,6 +340,7 @@
     - "C-96: CanTrain's obsolescence and the contract purchase's refusal"
     - "C-98: a religious unit's value at the city-states — READ (0x7b62c0's religious branch, CanTrain's religion and inquisition refusals), both twins"
     - "C-127 / C-98: a minor's purchase charges its strategic cost; the resource value's project term; a minor's MajorCivOnly units in its unit production table — READ (0xa540c0, 0x7a21e0 at 0x7a2b71, 0xa9cfb0, 0x4f4a50, 0x172941), both twins"
+    - "C-127 / C-96: the improvement pick's unit test, a Fort's tree, Find Available Unit's types, a held district not OnePerCity, the walls' repair cooldown — READ (0x5c9a00 at 0x5c9c85..0x5c9ca4, 0x35ede0 at 0x35f058..0x35f05f, 0x5ccc10, 0x7f6ea0 at 0x7f7028..0x7f72b7, 0x7ec7b0 at 0x7ec90f..0x7eca80, 0x16f7b0 at 0x16fd9f..0x16fe10, 0x198180, 0x248800 at 0x2488d6..0x2488f9), both twins"
   notes: ["label: CanTrain(unit)"]
   context:
     - ...x5 first); the unit without FoundCity (+0x1b9 bit 2) or BuildCharges (+0x44), CanTrain (0x172820), not MustPurchase (+0x1b9 bit 128). Defensive pick (flags 1, 1; the military AI's +0x4...

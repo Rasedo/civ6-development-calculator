@@ -228,10 +228,6 @@ class World:
     def builder_type(self, imp):
         return torch.full_like(imp, self.T.unit_row["UNIT_BUILDER"])
 
-    def builder_lays(self, imp):
-        # every row the scenarios pick is a Builder's
-        return imp >= 0
-
     def district_tie(self, mask):
         out = []
         for b in range(self.B):

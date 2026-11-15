@@ -285,17 +285,17 @@ describe('Repair Outer Defenses', () => {
     expect(p?.district).toBe('CITY_CENTER');
   });
 
-  it('CIV6: it needs Walls, damage, and three turns without an attack after the strike\'s own', () => {
+  it('CIV6: it needs Walls, damage, and COMBAT_HEAL_OUTER_DEFENSES_COOLDOWN turns since the strike\'s', () => {
     const { state, city } = damaged();
     const offered = () => availableProjects(state, city).some((p) => p.id === 'REPAIR_DEFENSES');
     state.turn = 10;
     city.lastHitTurn = 10;
     expect(offered()).toBe(false);
-    for (let d = 1; d <= REPAIR_QUIET_TURNS; d++) {
+    for (let d = 1; d < REPAIR_QUIET_TURNS; d++) {
       city.lastHitTurn = 10 - d;
       expect(offered()).toBe(false);
     }
-    city.lastHitTurn = 10 - REPAIR_QUIET_TURNS - 1;
+    city.lastHitTurn = 10 - REPAIR_QUIET_TURNS;
     expect(offered()).toBe(true);
     city.outerHp = WALLS_TIER_HP[1]; // undamaged
     expect(offered()).toBe(false);

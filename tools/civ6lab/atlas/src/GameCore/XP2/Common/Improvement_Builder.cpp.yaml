@@ -6,10 +6,15 @@
 - addr: 0x35ede0
   final: 0x259ff0
   kind: function
-  semantics: the unit type can build the improvement (UNIT_BUILDER).
-  status: PARTLY
-  impl: [cpu/core/aiViewTypes.ts:AiView]
+  semantics: "(the improvement, the player, a unit type, test the unit): the player may build the improvement — no TraitType (+0x180), or 0x468220 / one of its cities' 0x1ca610 grants it, or its civilization's or leader's trait lists hold it; with the last argument 0 that is the answer (0x35f058..0x35f05f), else the unit type must also be one of the improvement's build units (+0x1b8..+0x1c0, 0x35f064 on). The improvement pick passes UNIT_BUILDER with 0: no unit test."
+  status: READ
+  cases:
+    - recording: h1_duels1142
+      turn: 188
+      value: city-state 2's pick the Fort (m_bestImprovementToMake 12, no Builder builds it) on 36:4 at 52.45; its tree a new id in slot 3 each turn to t188
+  impl: [cpu/core/aiViewTypes.ts:AiView, cpu/core/aiCityTrees.ts:pickImprovement]
   readings:
+    - "C-127 / C-96: the improvement pick's unit test, a Fort's tree, Find Available Unit's types, a held district not OnePerCity, the walls' repair cooldown — READ (0x5c9a00 at 0x5c9c85..0x5c9ca4, 0x35ede0 at 0x35f058..0x35f05f, 0x5ccc10, 0x7f6ea0 at 0x7f7028..0x7f72b7, 0x7ec7b0 at 0x7ec90f..0x7eca80, 0x16f7b0 at 0x16fd9f..0x16fe10, 0x198180, 0x248800 at 0x2488d6..0x2488f9), both twins"
     - "C-96: the improvement value — READ (0x7a58f0, 0x7b1320's yields, the feature removal 0x7a3010, the harvest 0x7a37d0, the build unit 0x7a2e20), PARTLY READ (the hazards' turns, 0x7b1320's tourism, defence, claimed plots, modifiers and neighbours terms), unwired"
     - "C-97: the war operations — the war candidates, the city value's frame, the assault nodes and Attack Units READ; the loyalty lead's sources, the team update's danger and the assault's executions PARTLY READ"
     - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"

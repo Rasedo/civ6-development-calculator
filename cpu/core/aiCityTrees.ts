@@ -424,16 +424,15 @@ export function bestPlotFor(ai: CityAi, city: CityTreeCity, improvement: number)
 
 /** 0x5ccc10, THE IMPROVEMENT EVENT: with its slot free, the improvement the
  *  city's turn picked, at its best plot, valued above 0 there, starts
- *  "Build City Improvement" — one no Builder lays (the Military Engineer's
- *  Mountain Tunnel the pick takes) starts none (runs/h1_duely1124 Cardiff
- *  t214-t250, runs/h1_duely1127 Hattusa t220-t250 and Muscat t221-t250:
- *  m_bestImprovementToMake the Tunnel, no "Build City Improvement" tree
- *  held, no Builder bought for it) */
+ *  "Build City Improvement" — whatever unit lays it: a Fort's tree whose
+ *  city may train no Military Engineer (no Armory) ends at its Check Plot the turn it
+ *  starts, slot 3 holding a new tree each turn (runs/h1_duels1138 Nalanda
+ *  t175-t177, runs/h1_duels1142 city-state 2 to t188; from t189 its tree
+ *  holds a Military Engineer contract) */
 export function improvementEvent(ai: CityAi, w: CityTreeWorld, city: CityTreeCity, tree: string): void {
   if (!slotFree(ai, city.id, SLOT_IMPROVEMENT)) return;
   const imp = city.bestImprovement;
   if (imp === -1) return;
-  if (!AI_IMPROVEMENTS[imp].buildUnits.some(([u]) => u === 'UNIT_BUILDER')) return;
   const e = bestPlotFor(ai, city, imp);
   if (!e || e.improvements[imp] <= 0) return;
   startTree(ai, w, city, SLOT_IMPROVEMENT, tree, {
@@ -482,7 +481,9 @@ export function districtEvent(ai: CityAi, w: CityTreeWorld, city: CityTreeCity, 
  *  owned plots, each plot's best valued at 0 or more, that the city picks —
  *  the first plot's, then a later plot's higher one; while none picked is
  *  researched any plot's replaces it, after one is researched only a higher
- *  researched one — of an improvement a Builder can make; -1 none */
+ *  researched one — whatever unit makes it (0x35ede0 asked with no unit
+ *  test: the player's own test, which the analysis's FX(-9999) already
+ *  holds); -1 none */
 export function pickImprovement(ai: CityAi, w: CityTreeWorld, evals: readonly PlotEval[]): number {
   let best = FX_MIN;
   let pick = -1;
@@ -510,7 +511,6 @@ export function pickImprovement(ai: CityAi, w: CityTreeWorld, evals: readonly Pl
     const p = prereqsOf({ improvement: type });
     const held = (!p.tech || w.techHeld(p.tech)) && (!p.civic || w.civicHeld(p.civic));
     if (researched && !held) continue;
-    if (!w.builderType(type)) continue;
     researched = held;
     pick = bi;
     best = bv;
@@ -760,15 +760,26 @@ const checkPlot: BtHandler<Ctx> = {
   },
 };
 
-// FIND AVAILABLE UNIT (0x7ec7b0): a unit of a desired type the tree holds;
-// else the player's free units of the type (in no tree) join the tree, the
-// nearest the desired location first; its id in Found Unit
+// FIND AVAILABLE UNIT (0x7ec7b0): the desired types its Desired Units list
+// holds, its Unit Type only where that list is empty (0x7ec92c..0x7ec97c);
+// no list and no Unit Type an ERROR, an empty list and none SUCCESS with
+// Found Unit cleared (0x7eca16..0x7eca80: a Fort's tree whose Check Plot
+// found no unit to build it; runs/h1_duels1142 city-state 2 t190, the Fort
+// tree's Builder Type the Military Engineer, its free Builder not taken).
+// A unit of a desired type the tree holds; else the player's free units of
+// the type (in no tree) join the tree, the nearest the desired location
+// first; its id in Found Unit
 const findAvailableUnit: BtHandler<Ctx> = {
   update(node, run, ctx) {
-    const types = new Set(list(tagOf(run, node, 'Desired Units')).map(String));
+    const listTag = dataTag(node, 'Desired Units');
     const one = run.nodes[node.index].data['Unit Type']?.value;
-    if (one) types.add(one);
-    if (!types.size) return BT_ERROR;
+    if (!listTag && !one) return BT_ERROR;
+    const desired = list(listTag ? run.blackboard.get(listTag) : undefined).map(String);
+    const types = new Set(desired.length ? desired : one ? [one] : []);
+    if (!types.size) {
+      setTag(run, node, 'Found Unit', []);
+      return BT_SUCCESS;
+    }
     const { w, ai, tree } = ctx;
     let found = w.units.find((u) => tree.units.includes(u.id) && types.has(u.type));
     if (!found) {

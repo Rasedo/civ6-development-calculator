@@ -929,6 +929,7 @@
     - gpu/core/sim_citytrees.py:_u_find_unit
     - cpu/core/minorOps.ts:upgradeTreesTick
   readings:
+    - "C-127 / C-96: the improvement pick's unit test, a Fort's tree, Find Available Unit's types, a held district not OnePerCity, the walls' repair cooldown — READ (0x5c9a00 at 0x5c9c85..0x5c9ca4, 0x35ede0 at 0x35f058..0x35f05f, 0x5ccc10, 0x7f6ea0 at 0x7f7028..0x7f72b7, 0x7ec7b0 at 0x7ec90f..0x7eca80, 0x16f7b0 at 0x16fd9f..0x16fe10, 0x198180, 0x248800 at 0x2488d6..0x2488f9), both twins"
     - "C-97: the behaviour trees — READ (the interpreter), the nodes PARTLY READ"
     - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
     - "C-99: the upgrade trees — READ (the trigger, Find Available Unit's upgradeable offer, Find Unit Targets' job, Upgrade Units, the economic AI's upgrade, Move Unit with no Location), ported; the deletion of an excess obsolete unit unported"

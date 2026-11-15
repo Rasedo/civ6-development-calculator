@@ -991,6 +991,38 @@ function foldEvents(h: History, rec: TurnRecord, cat: Catalog): void {
   }
 }
 
+/** The game turn a centre's damage first shown in `rec` dates from, as
+ *  District::ChangeDamage (0x248800) stamps m_iLastTurnDamaged with the
+ *  game's turn: a flood or an eruption of the record's own turn, run before
+ *  the first player's start, whose river or rings reach the plot, dates it
+ *  at the record's turn (runs/h1_duels1124 Cardiff's FLOOD_MAJOR of t86
+ *  beside it, its centre struck before record 86, the repair t89;
+ *  runs/h1_duels1144 Kabul beside the VOLCANO_MEGACOLOSSAL of t169 on 35:12,
+ *  the repair t172); a strike in a player's turn at the turn the record
+ *  before closed (runs/h1_duels1144 Nalanda, the barbarians' Galley of t51,
+ *  the repair t54) */
+function struckTurn(rec: TurnRecord, cat: Catalog, plot: number): number {
+  for (const [turn, type, cur, start] of rec.events ?? []) {
+    if (turn !== rec.turn) continue;
+    const ev = strip(cat.randomEvents?.[num(type)] ?? '', 'RANDOM_EVENT_');
+    const eruption = (ERUPTION_ROWS as readonly string[]).indexOf(ev);
+    if (!ev.startsWith('FLOOD_') && eruption < 0) continue;
+    const map = recordMap(rec, cat);
+    let reach: Tile[];
+    if (eruption < 0) {
+      const s = map.tiles[num(start)];
+      reach = s ? riverReach(map, s) : [];
+    } else {
+      const wonder = ERUPTION_WONDER[eruption];
+      const at = map.tiles[num(cur)];
+      const plots = wonder ? map.tiles.filter((t) => t.feature === wonder) : at ? [at] : [];
+      reach = [...plots, ...eruptionRings(map, plots).flat()];
+    }
+    if (reach.some((t) => t.index === plot)) return rec.turn;
+  }
+  return rec.turn - 1;
+}
+
 /** A fertility channel a random event's yield row adds to (`silt`), with
  *  its yield column in the record's YIELD_KEYS order. */
 type EventChannel = 'fertility' | 'fertilityProd' | 'fertilitySci' | 'fertilityCul';
@@ -2076,7 +2108,7 @@ export function advanceHistory(h: History, rec: TurnRecord, cat: Catalog): void 
   foldBeside(h.fionn, h.last, rec, cat, FIONN_FEATURE);
   h.beforeThat = h.before;
   // a centre struck: its damage or its outer defences' grown since the
-  // record before, in the turn that record closed
+  // record before, dated as the game stamps it (`struckTurn`)
   if (h.last) {
     const centre = (c: TurnRecord['cities'][number]) => c.districts.find((x) => x[1] === c.x && x[2] === c.y);
     const was = new Map(h.last.cities.map((c) => [`${c.owner}:${c.id}`, centre(c)] as const));
@@ -2084,7 +2116,7 @@ export function advanceHistory(h: History, rec: TurnRecord, cat: Catalog): void 
       const now = centre(c);
       const old = was.get(`${c.owner}:${c.id}`);
       if (now && old && (num(now[6] as number) > num(old[6] as number) || num(now[8] as number) > num(old[8] as number))) {
-        h.lastHit.set(`${c.owner}:${c.id}`, rec.turn - 1);
+        h.lastHit.set(`${c.owner}:${c.id}`, struckTurn(rec, cat, c.y * rec.head.W + c.x));
       }
     }
   }

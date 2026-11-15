@@ -737,7 +737,7 @@ class SimMasks:
         _ctr = self.city_center[:, row, j]
         clean = (_ctr >= 0) & ~self._fallout().gather(1, _ctr.clamp(min=0).unsqueeze(1)).squeeze(1)
         return ((mx > 0) & breached & clean
-                & ((self.turn - self.city_last_hit[:, row, j]) > self._repair_quiet))
+                & ((self.turn - self.city_last_hit[:, row, j]) >= self._repair_quiet))
 
     def _repair_price(self, down: torch.Tensor) -> torch.Tensor:
         """`projectCost`'s repair: the outer defences' hit points down over

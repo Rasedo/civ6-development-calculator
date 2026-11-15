@@ -1440,6 +1440,10 @@ export function minorCanTrain(state: GameState, cityState: CityState, id: string
   if (d.requiresCivic && !r.civics.includes(d.requiresCivic)) return false;
   if (unitObsoleteIn(r, installType('unit', id, 'UNIT_'))) return false;
   if (d.requiresResource && !minorAnyResource()) return false;
+  // Unit_BuildingPrereqs: the Military Engineer's Armory (runs/h1_duels1142
+  // city-state 2: its Fort's tree finds no Military Engineer while the
+  // Armory is building, t187-t188, and holds its contract from t189)
+  if (d.requiresBuilding && !held.includes(d.requiresBuilding)) return false;
   if (d.naval && !cityNavalCapable(state, minorCity(cityState))) return false;
   if (d.air && !(cityState.districts ?? []).some((x) => x.type === 'AERODROME' && state.map.tiles[x.tileIndex].districtComplete)) return false;
   if (d.trader && minorTraders(state, cityState) >= tradeCapacity(state, cityState.seat)) return false;

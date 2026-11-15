@@ -17388,3 +17388,64 @@ log's `History.captives` alone).
   landing marked (`seatPair`): runs/h1_duels1156 city-state 4's Rifling,
   boosted at its Niter Mine (Game_Boosts.csv t95, logged twice), 255 of 642
   in record t96, not landed again on the record's unboosted list.
+
+## C-127 / C-96: the improvement pick's unit test, a Fort's tree, Find Available Unit's types, a held district not OnePerCity, the walls' repair cooldown — READ (0x5c9a00 at 0x5c9c85..0x5c9ca4, 0x35ede0 at 0x35f058..0x35f05f, 0x5ccc10, 0x7f6ea0 at 0x7f7028..0x7f72b7, 0x7ec7b0 at 0x7ec90f..0x7eca80, 0x16f7b0 at 0x16fd9f..0x16fe10, 0x198180, 0x248800 at 0x2488d6..0x2488f9), both twins
+
+- THE PICK'S UNIT TEST: the improvement pick (0x5c9a00) asks 0x35ede0
+  (the improvement, the player, UNIT_BUILDER, 0): with its last argument 0
+  it answers the player's own test alone (a unique improvement's trait,
+  0x468220 / the cities' 0x1ca610, the civilization's and the leader's trait
+  lists) and returns true before the unit list (0x35f058..0x35f05f). The pick
+  so takes an improvement whatever unit builds it — the Fort, the Mountain
+  Tunnel (`pickImprovement`, `pick_improvement`). The improvement event
+  (0x5ccc10) asks no unit either: it starts "Build City Improvement" for
+  any pick valued above 0 at its best plot (`improvementEvent`,
+  `improvement_event`).
+- CHECK PLOT'S BUILDER TYPE (0x7f6ea0 at 0x7f7028..0x7f72b7, its node data
+  +0x70): with an improvement named, the cheapest of the improvement's build
+  units (Improvement +0x1b8..+0x1c0) some city of the player may train
+  (CanTrain 0x172820), none FAILURE; with none named, the cheapest unit with
+  build charges a city may train (`builderType`, `builder_type`: the first
+  trainable of the improvement's units — every install list holds one; the
+  Builder with none). A Fort's tree whose city trains no Military Engineer
+  ends at its Check Plot the turn it starts: slot 3 holds a new tree id each
+  turn (duels1138 Nalanda t172-t177, duels1142 city-state 2 to t188, 1124 and
+  1127 the Tunnel's t225 / t226); duels1142 city-state 2 t189, Military
+  Engineering held, its Armory (Unit_BuildingPrereqs) complete from t189:
+  the Fort's tree submits Military Engineer contract 565 (value 52.0) and
+  holds it (`minorCanTrain`, `_minor_can_train`: a unit's prerequisite
+  building).
+- FIND AVAILABLE UNIT'S TYPES (0x7ec7b0 at 0x7ec90f..0x7eca80): the
+  Desired Units list's types, the node's Unit Type appended only to an empty
+  list; no list tag and no Unit Type ERROR; an empty list and no Unit Type
+  SUCCESS with Found Unit cleared (`findAvailableUnit`, `_u_find_unit`;
+  duels1142 city-state 2 t190-t199: the Fort tree's node 21, Unit Type
+  UNIT_BUILDER beside its Builder Type the Military Engineer, takes none of
+  the free Builders, its contract 565 held).
+- A HELD DISTRICT NOT OnePerCity: the analysis values a district the city
+  holds where its Districts row is not OnePerCity (the Neighborhood, the Dam,
+  the Canal), one under construction too (duels1136 Buenos Aires: its
+  Neighborhood placed on 28:13 from t176, complete t190, the Neighborhood
+  rows of t179 / t189 / t191 logged; its next Build City District tree on
+  28:15 starts t191, its Purchase Plot contract 837 that turn, again t203 /
+  t215 / t227); the other districts a district's value is weighed against
+  stay those the city does not hold (`minorPlotEvals`, `_minor_plot_evals`).
+- THE WALLS' REPAIR COOLDOWN: Repair Outer Defenses' CanProduce (0x16f7b0
+  at 0x16fd9f..0x16fe10, a project with OuterDefenseRepair) asks the game's
+  turn at least the latest m_iLastTurnDamaged (+0x938) of the city's
+  complete districts (0x198180, -100 none) plus
+  COMBAT_HEAL_OUTER_DEFENSES_COOLDOWN (GlobalParameters +0x1d8, 3);
+  District::ChangeDamage (0x248800 at 0x2488d6..0x2488f9) stamps the game's
+  turn on any damage above 0 (`repairAvailable`, `_repair_available`). A
+  player's strike dates from its turn (duels1144 Nalanda's walls struck by
+  the barbarians' Galley 1900550 in t51 and 1048589 in t56, the repair t54 /
+  t59; duels1145 Anshan t70 -> t73); a flood or an eruption, run before the first player's
+  start, from the turn it opens (duels1124 Cardiff's FLOOD_MAJOR of t86 and
+  FLOOD_1000_YEAR of t104, the repair t89 / t107; Granada t124 -> t127,
+  t160 -> t163, t167 -> t170; duels1144 Kabul beside the VOLCANO_MEGACOLOSSAL
+  of t169, the repair t172). The per-turn world dates a centre's damage by
+  the record (`struckTurn`): its own turn where a flood of that turn's river
+  or an eruption's rings of that turn reach the plot, else the turn before.
+- OPEN: the engines' floods and eruptions strike no city-state's centre and stamp no
+  turn on a major's; an Encampment's own stamp (the max over the districts)
+  is not kept apart from the centre's.

@@ -285,7 +285,7 @@
   final: 0x3e1150
   kind: function
   name: the improvement event
-  semantics: "the improvement event (slot 3): with its slot free (+0xb88's element 3 -1) and the city's event handle 3 (+0xb18 +0x18) live (its first byte not the none byte @0xe36190), the pick +0x648 (-1 none), its best plot 0x5d1cb0(city, pick, -1, 0) and the pick's value there 0x5d4ae0 above 0: the tree (\"City %s\" named, made 0x7ff9a0, seeded 0x7cb230, not ticked), its trigger the pick and the plot, its id in slot 3 (+0xb30). It starts no tree for a pick no Builder lays (the Mountain Tunnel's adjacent-plot row on a bare mountain): where in it or the tree's seed the Tunnel stops is unread (a LAB; improvementEvent)."
+  semantics: "the improvement event (slot 3): with its slot free (+0xb88's element 3 -1) and the city's event handle 3 (+0xb18 +0x18) live (its first byte not the none byte @0xe36190), the pick +0x648 (-1 none), its best plot 0x5d1cb0(city, pick, -1, 0) and the pick's value there 0x5d4ae0 above 0: the tree (\"City %s\" named, made 0x7ff9a0, seeded 0x7cb230, not ticked), its trigger the pick and the plot, its id in slot 3 (+0xb30). It asks no unit: a Fort's or a Tunnel's tree whose city trains no Military Engineer ends at its Check Plot the turn it starts (improvementEvent)."
   status: READ
   cases:
     - recording: h1_duely1127
@@ -299,6 +299,7 @@
       value: Hunza's Builder contract 72.0 SUBMITTED by Build City Improvement, queued t3, COMPLETED t5
   impl: [cpu/core/aiCityTrees.ts:improvementEvent]
   readings:
+    - "C-127 / C-96: the improvement pick's unit test, a Fort's tree, Find Available Unit's types, a held district not OnePerCity, the walls' repair cooldown — READ (0x5c9a00 at 0x5c9c85..0x5c9ca4, 0x35ede0 at 0x35f058..0x35f05f, 0x5ccc10, 0x7f6ea0 at 0x7f7028..0x7f72b7, 0x7ec7b0 at 0x7ec90f..0x7eca80, 0x16f7b0 at 0x16fd9f..0x16fe10, 0x198180, 0x248800 at 0x2488d6..0x2488f9), both twins"
     - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
     - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
     - "C-96 / C-97: the team's unit to build, the recruit's contract and the knowledge base's camps — the team update's requirements and readiness, the unit choice, Recruit Units' result and contract, the camps READ; the maintenance resource test, the recruit's stealing and levy unread"

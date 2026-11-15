@@ -1465,7 +1465,7 @@ class SimMinors:
         ctr = self.citystate_center[:, s]
         clean = (ctr >= 0) & ~self._fallout().gather(1, ctr.clamp(min=0).unsqueeze(1)).squeeze(1)
         wanted = (mx > 0) & breached & clean
-        ok = wanted & ((int(self.turn) - self.city_last_hit[:, row, 0]) > self._repair_quiet)
+        ok = wanted & ((int(self.turn) - self.city_last_hit[:, row, 0]) >= self._repair_quiet)
         cost = self._repair_price((mx - outer) + enc_missing)
         return ok, cost, wanted
 
@@ -2152,7 +2152,8 @@ class SimMinors:
         civilization's unique, none MajorCivOnly, faith-bought, spawned or a
         spy, a naval unit at a coastal centre, an air unit beside a complete
         Aerodrome, a Trader below the trade capacity, the Archaeologist with
-        an Archaeological Museum; a city-state ignores the strategic
+        an Archaeological Museum, a unit with its prerequisite building (the
+        Military Engineer's Armory); a city-state ignores the strategic
         resources"""
         row = self._CITY_MINOR0 + s
         u0 = ui.clamp(min=0, max=self.NU - 1)
@@ -2171,6 +2172,10 @@ class SimMinors:
             ok = ok & (u0 != self._spy_idx)
         if not self._minor_any_res:
             ok = ok & (self._type_resource.take(u0) < 0)
+        # Unit_BuildingPrereqs (the Military Engineer's Armory)
+        rb = self._type_req_bldg.take(u0)
+        if bool((ok & (rb >= 0)).any()):
+            ok = ok & ((rb < 0) | self.city_bldg[:, row, 0].gather(1, rb.clamp(min=0).unsqueeze(1)).squeeze(1))
         tt, tc = self._type_tech.take(u0), self._type_civic.take(u0)
         ok = ok & ((tt < 0) | self.citystate_techs[:, s].gather(1, tt.clamp(min=0).unsqueeze(1)).squeeze(1))
         ok = ok & ((tc < 0) | self.citystate_civics[:, s].gather(1, tc.clamp(min=0).unsqueeze(1)).squeeze(1))
@@ -2820,7 +2825,7 @@ class SimMinors:
         breached = (outer < mx) | (enc_missing > 0)
         ctr = self.city_center[:, row, j]
         clean = (ctr >= 0) & ~self._fallout().gather(1, ctr.clamp(min=0).unsqueeze(1)).squeeze(1)
-        ok = (mx > 0) & breached & clean & ((int(self.turn) - self.city_last_hit[:, row, j]) > self._repair_quiet)
+        ok = (mx > 0) & breached & clean & ((int(self.turn) - self.city_last_hit[:, row, j]) >= self._repair_quiet)
         cost = self._repair_price((mx - outer) + enc_missing)
         return ok, cost
 

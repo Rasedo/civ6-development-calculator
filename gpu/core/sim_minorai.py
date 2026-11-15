@@ -1268,20 +1268,23 @@ class SimMinorAi:
                                                                        _t(f.civic_turns(r["civic"]), f.like()))
                  for r in dist_rows]
         # the districts the analysis values: no civilization's, no centre or
-        # wonder, an engine row the city does not hold, the plot taking it
-        # (research waived, any owner)
+        # wonder, an engine row the city does not hold or one not OnePerCity,
+        # the plot taking it (research waived, any owner); the other
+        # districts a value weighs against are those the city does not hold
         cand_rows = []
         for i, r in enumerate(dist_rows):
             dv = int(E["district"][i])
             if r["trait"] or r["type"] in ("DISTRICT_CITY_CENTER", "DISTRICT_WONDER") or dv < 0:
                 continue
             # the plot test (0x35f2d0) asks no population limit
-            pl = self._minor_district_plane(s, dv, False, False, limit=False).gather(1, p0) & ev & (held[:, dv] < 0).unsqueeze(1)
+            pb = self._minor_district_plane(s, dv, False, False, limit=False).gather(1, p0) & ev
+            other = pb & (held[:, dv] < 0).unsqueeze(1)
+            pl = other | (pb if bool(self._is_repeatable[dv]) else torch.zeros_like(pb))
             if bool(pl.count_nonzero()):
                 # the minor's type's verdict: a district it disfavours is
                 # valued at none of its plots (it stays among the others)
                 ok_t = T["minor_dverdict"].to(dev)[self.citystate_type[:, s].clamp(min=0), i] >= 0
-                cand_rows.append((i, r["type"], dv, pl, ok_t))
+                cand_rows.append((i, r["type"], dv, pl, ok_t, other))
         # each plot's facts, the plots grouped by their improvement,
         # resource and feature
         PN = T["plot_names"]
@@ -1315,7 +1318,7 @@ class SimMinorAi:
                             imp_names[ii] if ii >= 0 else None,
                             PN["resourceType"][ri] if ri >= 0 else None,
                             PN["feature"][fi] if fi >= 0 else None,
-                            [(name, pl[bb, pp]) for (_i, name, _dv, pl, _ok) in cand_rows])
+                            [(name, other[bb, pp]) for (_i, name, _dv, _pl, _ok, other) in cand_rows])
             for i, r in enumerate(imp_rows):
                 ke = int(imp_eng[i])
                 if ke < 0:
@@ -1327,7 +1330,7 @@ class SimMinorAi:
                     continue
                 v = self._cv_improvement(pf, r["type"], ti, torch.full_like(bb, hz))
                 imps[bb, pp, i] = torch.where(gi, v, torch.full_like(v, _FX_MIN))
-            for (i, name, _dv, pl, ok_t) in cand_rows:
+            for (i, name, _dv, pl, ok_t, _other) in cand_rows:
                 ci = pl[bb, pp] & ok_t[bb]
                 passed[bb, pp] = passed[bb, pp] | ci
                 ti = distT[i][bb]
@@ -1349,7 +1352,7 @@ class SimMinorAi:
                                 imp_names[ii] if ii >= 0 else None,
                                 PN["resourceType"][ri] if ri >= 0 else None,
                                 PN["feature"][fi] if fi >= 0 else None,
-                                [(name, torch.zeros_like(bb, dtype=torch.bool)) for (_i, name, _dv, _pl, _ok) in cand_rows])
+                                [(name, torch.zeros_like(bb, dtype=torch.bool)) for (_i, name, _dv, _pl, _ok, _other) in cand_rows])
                 pf.repair_of = dname
                 passed[bb, pp] = passed[bb, pp] | ok_t[bb]
                 # a repair lands at the repair's turns, the rest of its price
@@ -2599,21 +2602,24 @@ class _MinorWorld:
         T = self.sim._mops_tables()
         return self.sim._mops_start(self.s, T.names.index(name), plot, plot, mask, recruit=self._threat.reshape(-1))
 
-    def builder_lays(self, imp):
-        """[B] the improvement row (AI_IMPROVEMENTS' order, -1 none) is one
-        a Builder lays (its buildUnits name UNIT_BUILDER)"""
-        rows = self.sim.rules.ai_city_build["improvements"]
-        lays = torch.tensor([any(u == "UNIT_BUILDER" for u, _c in r["buildUnits"]) for r in rows] + [False],
-                            dtype=torch.bool, device=self.sim.device)
-        return lays[torch.where(imp >= 0, imp, torch.full_like(imp, len(rows)))]
-
     def builder_type(self, imp):
-        """`builderType`: the Builder's AI row whatever the improvement
-        (none named: -1), -1 where the minor trains none"""
+        """`builderType`: [B] an improvement's (AI_IMPROVEMENTS' row) first
+        build unit the city may train, its AI unit row; with none named
+        (-1) the Builder's; -1 none"""
         T = self.T
         bu = T["unit_index"].get("UNIT_BUILDER", -1)
         ok = self.f.unit_version("UNIT_BUILDER") == "UNIT_BUILDER" and bu >= 0
-        return torch.full_like(imp, bu if ok else -1)
+        out = torch.full_like(imp, bu if ok else -1)
+        rows = self.sim.rules.ai_city_build["improvements"]
+        for k in torch.unique(imp[imp >= 0]).tolist():
+            pick = torch.full_like(imp, -1)
+            for u, _c in reversed(rows[k]["buildUnits"]):
+                ui = T["unit_index"].get(u, -1)
+                if ui < 0:
+                    continue
+                pick = torch.where(self.can_train(torch.full_like(imp, ui)), ui, pick)
+            out = torch.where(imp == k, pick, out)
+        return out
 
     def district_tie(self, mask):
         # the game's draw 'City Build District Choice' (0x5d0c20)

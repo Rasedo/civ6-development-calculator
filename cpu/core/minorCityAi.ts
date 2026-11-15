@@ -472,10 +472,14 @@ export function minorPlotEvals(state: GameState, cs: CityState, facts: CityBuild
     const districts = AI_DISTRICTS.map((row, i) => {
       if (row.trait !== null || row.type === 'DISTRICT_CITY_CENTER' || row.type === 'DISTRICT_WONDER') return FX_MIN;
       const id = DISTRICT_ENGINE.get(row.type) ?? null;
+      // the pillaged district's plot values its own row alone; elsewhere a
+      // district the city holds is valued only where it is not OnePerCity
+      // (runs/h1_duels1136 Buenos Aires t191: its Neighborhood completed at
+      // t190, the Neighborhood rows of t191 at 611.9-700.1, its next Build
+      // City District tree on 28:15 that turn)
       if (repair) {
-        // the pillaged district's plot values its own row alone
         if (!id || id !== tile.district) return FX_MIN;
-      } else if (!id || (cs.districts ?? []).some((c) => c.type === id) || !placeable(id)) return FX_MIN;
+      } else if (!id || (!DISTRICTS[id].allowMultiple && (cs.districts ?? []).some((c) => c.type === id)) || !placeable(id)) return FX_MIN;
       if (minorDistrictVerdict(cs.type, row.type) < 0) return FX_MIN;
       passed = true;
       // the update's pass then adds the district's buildings term into a
@@ -656,7 +660,11 @@ function minorTreeWorld(state: GameState, cs: CityState, ai: CityAi, city: CityT
       if (tile.improvement && !(tile.pillaged && tile.improvement === id)) return false;
       return !!id && owned(plot) && standingImprovements(state, cs, tile).includes(id);
     },
-    builderType: () => (minorUnitVersion('UNIT_BUILDER') === 'UNIT_BUILDER' ? 'UNIT_BUILDER' : null),
+    // an improvement's: the first of its build units the city may train
+    // (runs/h1_duels1142 city-state 2 t189: the Fort's tree, its Military
+    // Engineer contract 565); with none named, the Builder
+    builderType: (imp) => (imp === null ? (minorUnitVersion('UNIT_BUILDER') === 'UNIT_BUILDER' ? 'UNIT_BUILDER' : null)
+      : AI_IMPROVEMENTS.find((r) => r.type === imp)?.buildUnits.map(([u]) => u).find((u) => city.canTrain(u)) ?? null),
     plotCity: (plot) => (owned(plot) ? city.id : -2),
     reachThisTurn: (u, plot, moves) => {
       const unit = unitOf(u.id);

@@ -33,3 +33,20 @@
   context:
     - "...defences: +1 for a city of two districts or more (city +0x1a60, the districts' count, 0x197ff0's array), +2 for a capital (city +0x5e8 m_bCapital), +1 with a wonder (0x18e930), popul..."
   review: reviewed
+- addr: 0x198180
+  final: 0x111890
+  kind: function
+  name: the city's last damaged turn
+  semantics: over the city's districts (+0x1a50, count +0x1a60, 0x1ae510) complete (+0xb08) the latest m_iLastTurnDamaged (+0x938, the turn District::ChangeDamage 0x248800 stamps), -100 none. Repair Outer Defenses' CanProduce (0x16f7b0 at 0x16fdef) asks the game's turn at least it plus COMBAT_HEAL_OUTER_DEFENSES_COOLDOWN (GlobalParameters +0x1d8, 3).
+  status: READ
+  cases:
+    - recording: h1_duels1144
+      turn: 54
+      value: "Nalanda's walls struck by the barbarians' Galley 1900550 in t51: NO BUILDS t53, Repair Outer Defenses t54 (232.5); struck t56, the repair t59"
+    - recording: h1_duels1124
+      turn: 89
+      value: "Cardiff's centre struck by the FLOOD_MAJOR of t86 (before player 0's start): NO BUILDS t86-t88, the repair t89"
+  impl: [cpu/core/game.ts:repairAvailable, gpu/core/sim_masks.py:_repair_available]
+  readings:
+    - "C-127 / C-96: the improvement pick's unit test, a Fort's tree, Find Available Unit's types, a held district not OnePerCity, the walls' repair cooldown — READ (0x5c9a00 at 0x5c9c85..0x5c9ca4, 0x35ede0 at 0x35f058..0x35f05f, 0x5ccc10, 0x7f6ea0 at 0x7f7028..0x7f72b7, 0x7ec7b0 at 0x7ec90f..0x7eca80, 0x16f7b0 at 0x16fd9f..0x16fe10, 0x198180, 0x248800 at 0x2488d6..0x2488f9), both twins"
+  review: reviewed

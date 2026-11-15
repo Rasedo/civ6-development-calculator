@@ -345,12 +345,12 @@ def test_repair_project(rules, path) -> None:
     assert not bool(sim._repair_available(0, 0)[0]), "an intact perimeter needs no repair"
     sim.city_outer_hp[0, 0, 0] = 40
     sim.city_last_hit[0, 0, 0] = sim.turn
-    assert not bool(sim._repair_available(0, 0)[0]), "hit THIS turn — the three quiet turns have not passed"
-    for d in range(1, sim._repair_quiet + 1):
+    assert not bool(sim._repair_available(0, 0)[0]), "hit THIS turn — the cooldown has not passed"
+    for d in range(1, sim._repair_quiet):
         sim.city_last_hit[0, 0, 0] = sim.turn - d
-        assert not bool(sim._repair_available(0, 0)[0]), f"only {d} quiet turns"
-    sim.city_last_hit[0, 0, 0] = sim.turn - sim._repair_quiet - 1
-    assert bool(sim._repair_available(0, 0)[0]), "three quiet turns past the strike's and a breach: the project must offer"
+        assert not bool(sim._repair_available(0, 0)[0]), f"only {d} turns since the strike's"
+    sim.city_last_hit[0, 0, 0] = sim.turn - sim._repair_quiet
+    assert bool(sim._repair_available(0, 0)[0]), "the cooldown's turns since the strike's and a breach: the project must offer"
     want = max(1, int(((sim._walls_hp - 40) // sim._repair_hp_per_cost) * sim.rules.game_speed))
     assert int(sim._repair_cost(0, 0)[0]) == want, int(sim._repair_cost(0, 0)[0])
     # the MASK offers it, and only in the column that qualifies

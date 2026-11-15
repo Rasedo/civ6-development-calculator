@@ -485,10 +485,14 @@ export function projectCost(state: GameState, seat: number, projectId: string, c
 
 /** CIV6: the repair "becomes available after building Walls. A city can
  *  undertake this project if it and/or its Encampment district have damaged
- *  Walls and have not been attacked in the last three turns." One perimeter
- *  serves the centre and its Encampment here, so one pool answers both. */
+ *  Walls and have not been attacked in the last three turns": the project's
+ *  CanProduce (0x16f7b0 at 0x16fdef..0x16fe10) asks the game's turn at
+ *  least the city's districts' last damaged turn (0x198180, the latest
+ *  m_iLastTurnDamaged District::ChangeDamage 0x248800 stamps) plus
+ *  COMBAT_HEAL_OUTER_DEFENSES_COOLDOWN. One perimeter serves the centre and
+ *  its Encampment here, so one pool answers both. */
 export function repairAvailable(state: GameState, city: City): boolean {
-  return repairWanted(state, city) && state.turn - (city.lastHitTurn ?? 0) > REPAIR_QUIET_TURNS;
+  return repairWanted(state, city) && state.turn - (city.lastHitTurn ?? 0) >= REPAIR_QUIET_TURNS;
 }
 
 /** the repair but its three quiet turns: walls standing and damaged, the

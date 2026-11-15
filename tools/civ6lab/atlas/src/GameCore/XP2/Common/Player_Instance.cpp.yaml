@@ -137,6 +137,16 @@
     - ...es (+0x7c), ReligiousHealCharges (+0x74), nothing where the player's majority religion (0x4681c0 +0x1c0) is -1, then PSEUDOYIELD_TOURISM terms (ParkCharges +0x64, Units_XP2 tourism)...
     - "...or ReligiousHealCharges (+0x74) by the counts 0x4be880, 0 with no majority religion (0x4681c0 +0x1c0) — and PSEUDOYIELD_TOURISM terms (ParkCharges +0x64, Units_XP2 TourismBomb). ARC..."
   review: imported
+- addr: 0x468220
+  final: 0x2f8130
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-127 / C-96: the improvement pick's unit test, a Fort's tree, Find Available Unit's types, a held district not OnePerCity, the walls' repair cooldown — READ (0x5c9a00 at 0x5c9c85..0x5c9ca4, 0x35ede0 at 0x35f058..0x35f05f, 0x5ccc10, 0x7f6ea0 at 0x7f7028..0x7f72b7, 0x7ec7b0 at 0x7ec90f..0x7eca80, 0x16f7b0 at 0x16fd9f..0x16fe10, 0x198180, 0x248800 at 0x2488d6..0x2488f9), both twins"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - ...last argument 0 it answers the player's own test alone (a unique improvement's trait, 0x468220 / the cities' 0x1ca610, the civilization's and the leader's trait lists) and returns tr...
+  review: imported
 - addr: 0x468260
   final: 0x2f8170
   kind: function

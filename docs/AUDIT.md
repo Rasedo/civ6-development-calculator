@@ -363,7 +363,7 @@ A question the SOURCE under-determines; neither engine ships a branch until the 
   - LAB (buildings and districts): the walls' value on runs/h1_duelw1105 t63-69 (181 vs 468.4 before the walls' threat terms were ported; the city build lab finds no PLOT ANALYSIS LOG rows for that recording to recheck it)
   - LAB (buildings and districts): CanProduce's district test
   - LAB (buildings and districts): the Free Cities' pick still asks the repair's quiet turns (their queue's refusal unported)
-  - LAB (buildings and districts): the walls' repair the game picks where ours picks none or another item: duels1144 Nalanda t54 / t59 / t87, 1145 Anshan t73 / t100, 1139 Wolin t148, 1137 Cardiff t229 (untraced)
+  - LAB (buildings and districts): the walls' repair the game picks where ours picks another item or none: duels1145 Anshan t100 (ours Research Grants), 1139 Wolin t148, 1137 Cardiff t229 (untraced)
   - LAB (picks): a 0.0 pick tie (1117 t168-214)
   - LAB (picks): 1127 Mexico City t22's cancel
   - LAB (picks): the forecast's place (1121 t18)
@@ -393,9 +393,7 @@ A question the SOURCE under-determines; neither engine ships a branch until the 
 - **C-127. CITY-STATES' BUILDERS, TRADE AND CONTRACTS.** Weight 3.
   - LAB (improvements): 1121 p2 188: the Farm re-laid t223 / t238 on the plot the t222 Resort tree cleared, ours the Seaside Resort (168.02 over 154.61)
   - LAB (improvements): 1128 p2 229 Pasture t194-195 re-laid
-  - LAB (improvements): where 0x5ccc10 / the tree's seed stops a Tunnel pick
   - LAB (improvements): 1128 t48 272 Camp
-  - LAB (improvements): a pick no Builder lays (the Fort, the Tunnel) starts a tree that ends that turn (slot 3 a new id each turn: 1124 city-state 2 t214-218), the engines' event none
   - LAB (improvements): 1124 p3's t149 / t159 Builder tree a turn late (untraced)
   - BUILD (improvements): the GPU has no city-state builder lay (`minorBuilderLays`)
   - LAB (improvements): the district tree's Find Available Unit (node 16) finds a free Builder and its tree holds no unit at the end look (95 of 95 looks with the node SUCCESS on duels1146 / 1139 / 1124; 1146 Kandy t138 Builder 1310723 found by Build City District 83:7, assigned to Build City Improvement 84:8): how it lets the unit go unread, the engines' Check Plot handing the district's tree no Builder type
@@ -411,7 +409,6 @@ A question the SOURCE under-determines; neither engine ships a branch until the 
   - LAB (route value K): the route value K x1.2 over a major's lists closed by its strategies (C-130)
   - LAB (quests): the quests' select ranges (18 draws)
   - LAB (contracts): t178 p2 a Stock Exchange contract the game has none of (seed not named)
-  - LAB (contracts): after a failed plot contract the game re-picks the same unowned district plot the next turn, ours a turn later (1124 Granada t69, Cardiff t95; duels1140 Muscat's Neighborhood on 42:18 t188 and every twelfth turn to t248, 1134 city-state 4 9:5 t190-t238, 1136 city-state 2 28:15 t191-t227, 1143 city-state 4 6:18 t206-t230, 1145 city-state 2 17:14 t208 / t242: no district tree started that turn, untraced)
   - LAB (contracts): 1121 p2 t231 / t238 / t245 the game's Market contract a turn early
   - LAB (contracts): the civics AI's walk order for a Civic Contract (kept on the civic in hand)
   - LAB (contracts): a mid-turn reveal other than the ground's sight (unread)
@@ -466,6 +463,7 @@ A question the SOURCE under-determines; neither engine ships a branch until the 
   - LAB (cadence and trees): duels1132 t172-175 / t179 / t188 city-state 2 holds no Naval Superiority where the game's stands on 22:20 with its Caravel (t202 the Caravel 1441798 in the game's Upgrade Units, ours no row)
   - LAB (cadence and trees): duels1135 city-state 3: t141 the game holds City Defense beside Attack Barb Camp, ours Attack Barb Camp alone; t148 ours' Attack Barb Camp is gone, the game's stands; t167 ours' stands, the game's none
   - LAB (cadence and trees): duels1146 city-state 2 t25-t26: the tree pool frees each priority's ended trees in its own pass (0x7ffdd0 / 0x7cb2e0: City Defense's slot 7 before Build City District's 4 and Build City Improvement's 8), ours every ended slot in one pass in slot order: t26's Build City District takes slot 7 for the game's 4 and ticks after the Improvement tree on the same plot 40:12, whose Irrigation contract stands at the end look where the game's tree is gone
+  - LAB (cadence and trees): duels1136 Singapore t244: the game's Wind Farm tree takes pool slot 2 and its Neighborhood tree (which ends that turn, the Neighborhood held) slot 3 (10878978 / 10813443), ours slots 5 / 3: our district tree ticks first, its reservation of 5:15 refuses the Wind Farm's, the game's Builder contract missed
   - BUILD (garrison city): Garrison City's swap 0x972880
   - BUILD (garrison city): the garrison's and candidate's AI types post-swap (0x1e60f0 on +0x168)
   - LAB (nodes): Protect Units' plunder test (0x51a160 +0x48, partly)
@@ -834,6 +832,7 @@ A question the SOURCE under-determines; neither engine ships a branch until the 
   - LAB (importer's draws): records only: an eruption's soil under an improvement it took (1109 plot 536 t55)
   - LAB (droughts): a drought's Duration at the game speed (0x2922ff, `DROUGHT_TURNS` 2 and 5 online)
   - BUILD (turn change): the engine's turn change takes Farms the game keeps (duelu1124 t82: Cardiff's 539, 582, 627)
+  - BUILD (turn change): the engines' floods and eruptions strike no city-state's centre (`hitCityHp` / `hitCityWalls` over `cityAtIndex`), and stamp no damaged turn on a major's for the walls' repair cooldown (duels1124 Cardiff's centre struck by the FLOOD_MAJOR of t86, Granada's by the floods of t124 / t160 / t167, duels1144 Kabul's by the eruption of t169)
 - **C-114. ERAS, GOVERNORS, GREAT PEOPLE AND THE CONGRESS.** Weight 2.
   - LAB (governors): Civil Prestige counts the default title (1105 Shenyang's Magnus with two paid t150–155)
   - LAB (governors): fit, unread (action replay): the governor's turn (`governorPhase`; clocks 0x432980: establishment 0x35df30, neutralize 0x35e1f0) after the seat's Culture tally and before its cities, a governor seated in a processing paying from the next
@@ -914,6 +913,7 @@ A question the SOURCE under-determines; neither engine ships a branch until the 
   - LAB (ayutthaya): a Great Person's or Trajan's granted building as a creation for Ayutthaya's Culture (0x17f870's callers 0x175da0 / 0x180800 unread)
   - LAB (fez and wolin): Fez's initiation list reader on the unit (+0x1c80)
   - LAB (fez and wolin): Fez and Wolin seated in no recording
+  - BUILD (unique improvements): the engines hold no IMPROVEMENT_MOUND, IMPROVEMENT_TRADING_DOME or IMPROVEMENT_MOAI: a recorded one imports as a bare plot and the city-state's Builder lays over it every turn (duels1181 city-state 3 the Mound on 16:17 from t7, the game's Farm row -19.05, ours lays a Farm t7-t9; duels1176 city-state 3 the Trading Dome on 42:20 from t10, the game's Mine row -34.51, ours lays a Mine t13-t14 and t69-t76; duels1162 city-state 4 the Mound on 6:10 from t8)
 - **C-118. TOURISM AND GREAT WORKS.** Weight 2.
   - LAB (great works): 1124 Xi'an's Science moving with the Great Works it shuffles (t137–150)
   - LAB (great works): fit, unread: a great work's ScalingFactor (Heritage Tourism, Satellite Broadcasts, Printing) and a themed holder's ThemingTourismMultiplier summing as percents on the base (1112 Beijing and Guangzhou, three themed Religious works each, +9 over the product from t216; Mary Leakey's Artifact ScalingFactor 300 one more percent in that sum: duelq1124 t230 Chengdu 43, Shenyang 120)

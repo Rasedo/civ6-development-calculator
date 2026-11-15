@@ -770,11 +770,10 @@ def best_plot_for(ai: CityAi, s: int, w, imp: torch.Tensor) -> torch.Tensor:
 def improvement_event(ai: CityAi, s: int, w, best_improvement: torch.Tensor, mask: torch.Tensor) -> None:
     """`improvementEvent` where `mask`: with its slot free, the improvement
     the city picked, at its best plot, valued above 0 there, starts the
-    slot's tree"""
+    slot's tree, whatever unit lays it"""
     if SLOT_IMPROVEMENT not in ai.slot_trees:
         return
-    # one no Builder lays (the Mountain Tunnel) starts none
-    go = mask & slot_free(ai, s, SLOT_IMPROVEMENT) & (best_improvement != -1) & w.builder_lays(best_improvement)
+    go = mask & slot_free(ai, s, SLOT_IMPROVEMENT) & (best_improvement != -1)
     if not bool(go.any()):
         return
     ev = w.evals()
@@ -837,8 +836,8 @@ def pick_improvement(ai: CityAi, s: int, w, mask: torch.Tensor) -> torch.Tensor:
     """`pickImprovement` where `mask`: over the owned plots in order, each
     plot's best improvement valued 0 or more — the first plot's, then a later
     plot's higher one; while none picked is researched any plot's replaces
-    it, after one is researched only a higher researched one — of an
-    improvement a Builder can make. [B] its row, -1 none"""
+    it, after one is researched only a higher researched one — whatever
+    unit makes it. [B] its row, -1 none"""
     ev = w.evals()
     imps = ev["imps"]
     B, P, _ = imps.shape
@@ -861,7 +860,7 @@ def pick_improvement(ai: CityAi, s: int, w, mask: torch.Tensor) -> torch.Tensor:
         if not bool(on.any()):
             continue
         held = _held_pair(w, t_all[:, p], c_all[:, p])
-        on = on & ~(researched & ~held) & (_l(w.builder_type(bi), bi) >= 0)
+        on = on & ~(researched & ~held)
         researched = torch.where(on, held, researched)
         pick = torch.where(on, bi, pick)
         best = torch.where(on, bv, best)
@@ -1124,18 +1123,21 @@ def _u_check_plot(c: _Ctx, i: int, at: torch.Tensor) -> torch.Tensor:
 
 
 def _u_find_unit(c: _Ctx, i: int, at: torch.Tensor) -> torch.Tensor:
-    """FIND AVAILABLE UNIT (0x7ec7b0)"""
+    """FIND AVAILABLE UNIT (0x7ec7b0): the Desired Units list's type, the
+    Unit Type only where the list is empty; no list and no Unit Type an
+    ERROR, an empty list and none SUCCESS with Found Unit cleared"""
     ai, s, w = c.ai, c.s, c.w
-    want = c.tag(i, "Desired Units")
     one = c.tree.value(i, "Unit Type")
     one_r = ai.T.unit_row.get(one, -9) if one else -9
-    if (want == NONE).all() and one_r == -9:
+    if c.tree.tag(i, "Desired Units") is None and one_r == -9:
         return torch.full_like(c.ref, BT_ERROR)
+    want = c.tag(i, "Desired Units")
+    if one_r != -9:
+        want = torch.where(want == NONE, torch.full_like(want, one_r), want)
+    empty = want == NONE
     u = c.units()
     typ = u["type"]
-    match = (typ == want.unsqueeze(1)) & (want != NONE).unsqueeze(1)
-    if one_r != -9:
-        match = match | (typ == one_r)
+    match = (typ == want.unsqueeze(1)) & (~empty).unsqueeze(1)
     match = match & u["valid"]
     mine = c.tree_units() & match
     found = _first(mine)
@@ -1159,10 +1161,8 @@ def _u_find_unit(c: _Ctx, i: int, at: torch.Tensor) -> torch.Tensor:
         _tree_take_unit(ai, s, torch.full_like(c.ref, c.k), _pick(u["id"], jf), take)
     found = torch.where(found >= 0, found, jf)
     c.set_tag(i, "Found Unit", _pick(u["id"], found), at & (found >= 0))
-    st = torch.where(found >= 0, BT_SUCCESS, BT_FAILURE)
-    if one_r == -9:
-        st = torch.where(want == NONE, BT_ERROR, st)
-    return st
+    c.set_tag(i, "Found Unit", NONE, at & empty)
+    return torch.where((found >= 0) | empty, BT_SUCCESS, BT_FAILURE)
 
 
 def _u_cancel(c: _Ctx, i: int, at: torch.Tensor) -> torch.Tensor:
