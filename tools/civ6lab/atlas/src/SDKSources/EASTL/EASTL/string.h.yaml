@@ -174,11 +174,15 @@
   name: AI::CityBuild constructor
   semantics: "AI::CityBuild's constructor (FinalRelease 0x3db2f0): names its watched fields; FinalRelease value offsets +0xa8 m_cityId, +0xc0 m_playerOwner, +0xd8 m_cityThreat, +0x140 m_managedWorkingContract (the handle in hand at +0x150, its id +0x15c), +0x160 m_managedContracts (a container: +0x10 a vector of 16-byte handles, +0x18 its capacity, +0x20 the count; stale copies stand past the count)."
   status: PARTLY
-  impl: [cpu/core/operations/manager.ts:CITY_AI_PASS, gpu/core/sim_minorops.py:_CITY_AI_PASS]
+  impl:
+    - cpu/core/operations/manager.ts:CITY_AI_PASS
+    - gpu/core/sim_minorops.py:_CITY_AI_PASS
+    - cpu/core/aiCityTrees.ts:CITY_TREE_PRIORITY
   readings:
     - "H-1: the AI memory reader — READ (the hooks, the pointer paths, the contracts, the knowledge base, the operations, the trees), PARTLY READ (the religious AI's holder)"
     - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
     - "C-130 / C-98: the civic queue, the best plot to buy and the plot purchase analyzer — READ, both twins"
+    - "C-96 / C-130 / C-127 / C-100: a building's modifier-made yields, the walls' threat terms and CanConstruct's walls prerequisite, a regional building's cities, the game state's lock and the yields the AI's jobs read, a city tree's priority — READ (0x18e570's tables, 0x7a7590 at 0x7a826c..0x7a87f3 and 0x7a9044..0x7a91ee, 0x170450 at 0x170644..0x170716, 0x7a4d40 at 0x7a5182..0x7a51d9, 0x608870 at 0x60889e..0x6089e6, 0x1cb8b0, 0x7cb230), both twins"
   context:
     - "- THE HOLDERS: a CityBuild (constructor 0x5c4f40 (FinalRelease 0x3db2f0)): +0xa8 m_cityId, +0xc0 m_playerOwner, +0xd8 m_cityThreat, +0x1..."
   review: reviewed
@@ -337,3 +341,12 @@
   context:
     - ...(0x4ba1f0), +0x680 the military AI (0x4c88d0), +0x688 Research, +0x690 the tactical AI (0x501e80), +0x698 Targets.
   review: reviewed
+- addr: 0x7c8960
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-96 / C-130 / C-127 / C-100: a building's modifier-made yields, the walls' threat terms and CanConstruct's walls prerequisite, a regional building's cities, the game state's lock and the yields the AI's jobs read, a city tree's priority — READ (0x18e570's tables, 0x7a7590 at 0x7a826c..0x7a87f3 and 0x7a9044..0x7a91ee, 0x170450 at 0x170644..0x170716, 0x7a4d40 at 0x7a5182..0x7a51d9, 0x608870 at 0x60889e..0x6089e6, 0x1cb8b0, 0x7cb230), both twins"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - ...tree's watched priority (+0x4f0, its value +0x548) through 0x1e60f0; the tree's reset 0x7c8960 writes -1 (0x7c9b78). The district event 0x5cc910 (0x5ccb75), the improvement event 0x5...
+  review: imported

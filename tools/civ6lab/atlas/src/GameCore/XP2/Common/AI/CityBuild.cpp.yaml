@@ -132,7 +132,7 @@
   kind: function
   name: growthForecast
   semantics: "the growth forecast (CityBuildAI +0x6c8 turns, +0x738 withheld Food, +0x7a8 population; each turn's full update): the current factor g (0x1b5f70); where g < 1 a step (0, S(1 - g), pop); the turns to the next citizen 0x1b6390; then per next citizen while the turn is below 100 (+0x6c0): its factor, a step where it changes, the whole turns its threshold takes at g x S, S less 2.0 (at least 0). A city-state's forecast is of its citizens and store before the turn's growth. Its one caller is the city update 0x5ce680 at 0x5ce841, after the improvement pick (0x5ce831) and the resource counts; the City Analysis (signal +0x258) and the pick read the forecast the previous turn's update wrote (CityState.aiGrowthSeen, read as CityState.aiGrowth)."
-  status: PARTLY
+  status: READ
   cases:
     - recording: h1_duely1117
       turn: 136
@@ -158,6 +158,7 @@
     - "C-130 / C-129: the recruit's obsolete cut under the team's player; the government values' housing on the forecast of the city as its update read it — READ (0x7383d0 at 0x7384c0..0x7384ed, 0x732db0, 0x7325a0, 0x538460, 0x73a5e0 at 0x73a7d9), a fit (the forecast), both twins"
     - "C-130: a minor's levy home after its bank; its free Trader's route before its city update, the AI's yields cached before it; a deleted unit off its list at once; a major's founded city keeps its trade list at once — READ (0x4e4560 at 0x4e45ee / 0x4e4638, 0x6096c0's passes, 0x688eaa, 0x1cb8b0, 0x948500 at 0x9485e5, 0x1eae70 at 0x1eb335 -> 0x5cdd70 at 0x5ce191), the cache's span a fit, both twins"
     - "C-100: the City Analysis reads the city before the free Trader's route, the Neighbourhood's install Housing beside a feature, a pillaged district's repair turns — READ (0x5c24e0 on +0x258 before the dispatch 0x78e0a0 and the update 0x5ce680; 0x79e140 on Districts +0x40), both twins"
+    - "C-96 / C-130 / C-127 / C-100: a building's modifier-made yields, the walls' threat terms and CanConstruct's walls prerequisite, a regional building's cities, the game state's lock and the yields the AI's jobs read, a city tree's priority — READ (0x18e570's tables, 0x7a7590 at 0x7a826c..0x7a87f3 and 0x7a9044..0x7a91ee, 0x170450 at 0x170644..0x170716, 0x7a4d40 at 0x7a5182..0x7a51d9, 0x608870 at 0x60889e..0x6089e6, 0x1cb8b0, 0x7cb230), both twins"
   notes:
     - ".claude/scratchpad/cb4/NOTES.md: ...8709, anyT +4503 (13212), onlyOurs 1318.  DONE (code): - aiCityBuild.ts: CityGrowth/growthForecast (0x5cb570)/housingValue (0x7a3d70)/turnsToGrow (0x1b6390); unitValueExit   (0x7b62c0 exits: T>=H, version, no..."
   context:
@@ -235,11 +236,16 @@
     - recording: 1124
       turn: 61
       value: 1124 Bologna t61 60 against 50;
-  impl: [cpu/core/aiCityBuild.ts:amenityCityOf, gpu/core/sim_economy.py:_seat_city_base]
+  impl:
+    - cpu/core/aiCityBuild.ts:amenityCityOf
+    - gpu/core/sim_economy.py:_seat_city_base
+    - cpu/core/aiView.ts:aiCityStats
+    - cpu/core/minorBuild.ts:seen
   readings:
     - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
     - "C-97: the government and policy choice — the choice READ, the values PARTLY READ"
     - "H-1: the City Analysis runs on player signal +0x258 and reads each plot's owner live — READ (0x5c27e0, 0x5c24e0, 0x5ce970), the 1117 t44 Mine unexplained"
+    - "C-96 / C-130 / C-127 / C-100: a building's modifier-made yields, the walls' threat terms and CanConstruct's walls prerequisite, a regional building's cities, the game state's lock and the yields the AI's jobs read, a city tree's priority — READ (0x18e570's tables, 0x7a7590 at 0x7a826c..0x7a87f3 and 0x7a9044..0x7a91ee, 0x170450 at 0x170644..0x170716, 0x7a4d40 at 0x7a5182..0x7a51d9, 0x608870 at 0x60889e..0x6089e6, 0x1cb8b0, 0x7cb230), both twins"
   context:
     - ...but Food (@f2f974), CityBuildAI's yield (+0x1028's vector +0x1080, filled per yield by 0x5cc510 from 0x1c64d0's attribute) x (after + 100) / (before + 100) - 1, the level's percent be...
   review: reviewed
@@ -270,6 +276,7 @@
     - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
     - "C-96 / C-97: the team's unit to build, the recruit's contract and the knowledge base's camps — the team update's requirements and readiness, the unit choice, Recruit Units' result and contract, the camps READ; the maintenance resource test, the recruit's stealing and levy unread"
     - "C-99: a non-major player's tree pool — every city-state tree, its operations' and its \"Upgrade Units\" trees in one pool, ticked in slot order — READ (0x7ff9a0 / 0x7ff7b0 / 0x800c60 -> 0x7fef20, 0x7ffdd0 -> 0x7cb2e0), both twins"
+    - "C-96 / C-130 / C-127 / C-100: a building's modifier-made yields, the walls' threat terms and CanConstruct's walls prerequisite, a regional building's cities, the game state's lock and the yields the AI's jobs read, a city tree's priority — READ (0x18e570's tables, 0x7a7590 at 0x7a826c..0x7a87f3 and 0x7a9044..0x7a91ee, 0x170450 at 0x170644..0x170716, 0x7a4d40 at 0x7a5182..0x7a51d9, 0x608870 at 0x60889e..0x6089e6, 0x1cb8b0, 0x7cb230), both twins"
   context:
     - "...0, the unit-or-building event 0x5cd150 (tree \"Build City Building\"), the district event 0x5cc910 (its \"City Build District Choice\" draw in 0x5d0c20), the improvement event 0x5ccc10 (\"B..."
     - "...nits needing them) with CityBuildAI +0x978's counts (0x5d45c0), the events (0x5cd150, 0x5cc910, 0x5ccc10, 0x5cced0, 0x5cd4e0) and their trees' nodes, the contracts (Contracts.cpp: th..."
@@ -299,6 +306,7 @@
     - "C-99: an upgraded unit out of the tactical pass — READ (records), both twins"
     - "C-99: an upgraded unit out of the tactical pass"
     - "C-99: a non-major player's tree pool — every city-state tree, its operations' and its \"Upgrade Units\" trees in one pool, ticked in slot order — READ (0x7ff9a0 / 0x7ff7b0 / 0x800c60 -> 0x7fef20, 0x7ffdd0 -> 0x7cb2e0), both twins"
+    - "C-96 / C-130 / C-127 / C-100: a building's modifier-made yields, the walls' threat terms and CanConstruct's walls prerequisite, a regional building's cities, the game state's lock and the yields the AI's jobs read, a city tree's priority — READ (0x18e570's tables, 0x7a7590 at 0x7a826c..0x7a87f3 and 0x7a9044..0x7a91ee, 0x170450 at 0x170644..0x170716, 0x7a4d40 at 0x7a5182..0x7a51d9, 0x608870 at 0x60889e..0x6089e6, 0x1cb8b0, 0x7cb230), both twins"
   context:
     - "...ent 0x5cc910 (its \"City Build District Choice\" draw in 0x5d0c20), the improvement event 0x5ccc10 (\"Build City Improvement\"), 0x5cd4e0; last, with the build queue empty (city +0x2350 0..."
     - "...ng them) with CityBuildAI +0x978's counts (0x5d45c0), the events (0x5cd150, 0x5cc910, 0x5ccc10, 0x5cced0, 0x5cd4e0) and their trees' nodes, the contracts (Contracts.cpp: the contract..."
@@ -358,6 +366,7 @@
     - "C-96 / C-97: the team's unit to build, the recruit's contract and the knowledge base's camps — the team update's requirements and readiness, the unit choice, Recruit Units' result and contract, the camps READ; the maintenance resource test, the recruit's stealing and levy unread"
     - "C-99: a non-major player's tree pool — every city-state tree, its operations' and its \"Upgrade Units\" trees in one pool, ticked in slot order — READ (0x7ff9a0 / 0x7ff7b0 / 0x800c60 -> 0x7fef20, 0x7ffdd0 -> 0x7cb2e0), both twins"
     - "C-98 / C-130 / C-96: a levied unit home with no plot dies on its minor's list; the unit term's upgrade Gold is the minor's; the pick refuses a held building under its pillaged district — READ (0x93fa10 at 0x93ff0b, 0x7cb8b0, 0x4cb350, 0x7f2970 at 0x7f3bd1), LAB (the placement's embark state, the unit term's Gold on the records), both twins"
+    - "C-96 / C-130 / C-127 / C-100: a building's modifier-made yields, the walls' threat terms and CanConstruct's walls prerequisite, a regional building's cities, the game state's lock and the yields the AI's jobs read, a city tree's priority — READ (0x18e570's tables, 0x7a7590 at 0x7a826c..0x7a87f3 and 0x7a9044..0x7a91ee, 0x170450 at 0x170644..0x170716, 0x7a4d40 at 0x7a5182..0x7a51d9, 0x608870 at 0x60889e..0x6089e6, 0x1cb8b0, 0x7cb230), both twins"
   context:
     - "...er the AI drives: 0x5cdae0, the City Defense event 0x5cced0, the unit-or-building event 0x5cd150 (tree \"Build City Building\"), the district event 0x5cc910 (its \"City Build District Cho..."
     - ...s over the units needing them) with CityBuildAI +0x978's counts (0x5d45c0), the events (0x5cd150, 0x5cc910, 0x5ccc10, 0x5cced0, 0x5cd4e0) and their trees' nodes, the contracts (Contr...
@@ -369,6 +378,7 @@
   readings:
     - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
     - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
+    - "C-96 / C-130 / C-127 / C-100: a building's modifier-made yields, the walls' threat terms and CanConstruct's walls prerequisite, a regional building's cities, the game state's lock and the yields the AI's jobs read, a city tree's priority — READ (0x18e570's tables, 0x7a7590 at 0x7a826c..0x7a87f3 and 0x7a9044..0x7a91ee, 0x170450 at 0x170644..0x170716, 0x7a4d40 at 0x7a5182..0x7a51d9, 0x608870 at 0x60889e..0x6089e6, 0x1cb8b0, 0x7cb230), both twins"
   context:
     - "...Choice\" draw in 0x5d0c20), the improvement event 0x5ccc10 (\"Build City Improvement\"), 0x5cd4e0; last, with the build queue empty (city +0x2350 0 or +0x2340 null), the Default Special..."
     - "...BuildAI +0x978's counts (0x5d45c0), the events (0x5cd150, 0x5cc910, 0x5ccc10, 0x5cced0, 0x5cd4e0) and their trees' nodes, the contracts (Contracts.cpp: the contract line 0x5f4cd0, the..."
@@ -394,6 +404,7 @@
     - "C-112: the citizen manager has no turn of its own — READ (the event's raisers), the records' counts"
     - "C-112: the citizen manager has no turn of its own"
     - "C-130: a city-state's government values on the city its update left; the boosts its city's turn earns land at once — READ, both twins"
+    - "C-96 / C-130 / C-127 / C-100: a building's modifier-made yields, the walls' threat terms and CanConstruct's walls prerequisite, a regional building's cities, the game state's lock and the yields the AI's jobs read, a city tree's priority — READ (0x18e570's tables, 0x7a7590 at 0x7a826c..0x7a87f3 and 0x7a9044..0x7a91ee, 0x170450 at 0x170644..0x170716, 0x7a4d40 at 0x7a5182..0x7a51d9, 0x608870 at 0x60889e..0x6089e6, 0x1cb8b0, 0x7cb230), both twins"
   context:
     - "...ned with no wait, \"H-1: why a seed does not replay\"). Then, for a player the AI drives: 0x5cdae0, the City Defense event 0x5cced0, the unit-or-building event 0x5cd150 (tree \"Build City..."
   review: reviewed
@@ -455,6 +466,7 @@
     - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
     - "C-95: Explore Land and the barbarians' revealed plots — READ, ported (two tests below unread)"
     - "C-130: a minor's levy home after its bank; its free Trader's route before its city update, the AI's yields cached before it; a deleted unit off its list at once; a major's founded city keeps its trade list at once — READ (0x4e4560 at 0x4e45ee / 0x4e4638, 0x6096c0's passes, 0x688eaa, 0x1cb8b0, 0x948500 at 0x9485e5, 0x1eae70 at 0x1eb335 -> 0x5cdd70 at 0x5ce191), the cache's span a fit, both twins"
+    - "C-96 / C-130 / C-127 / C-100: a building's modifier-made yields, the walls' threat terms and CanConstruct's walls prerequisite, a regional building's cities, the game state's lock and the yields the AI's jobs read, a city tree's priority — READ (0x18e570's tables, 0x7a7590 at 0x7a826c..0x7a87f3 and 0x7a9044..0x7a91ee, 0x170450 at 0x170644..0x170716, 0x7a4d40 at 0x7a5182..0x7a51d9, 0x608870 at 0x60889e..0x6089e6, 0x1cb8b0, 0x7cb230), both twins"
   notes:
     - ".claude/scratchpad/cb/notes.txt: ...d.csv lines: DS '%d, %d, %s, , , %s, %s, , , Value %3.1f' at 0x5d4d70 (DS chooser).  advantage line 0x5cdd70: Food Adv = adv[YIELD_FOOD], Prod Adv = adv[YIELD_PRODUCTION] (0x5d83c0 per yield), weights printed..."
   context:
@@ -539,6 +551,7 @@
     - "C-111 / C-108: a route the records carry walks home and ends there, a Great Person's granted unit raises the best strengths, a major's wonder contract cancelled — READ (0x552bc0, 0xbd8be0 -> 0x4c1a30, 0x5d7e00), both twins"
     - "C-127: the growth forecast the city AI reads is the one its last full update wrote — READ (0x5ce680 at 0x5ce831 / 0x5ce841, 0x5c27e0's +0x258), both twins"
     - "C-100: the City Analysis reads the city before the free Trader's route, the Neighbourhood's install Housing beside a feature, a pillaged district's repair turns — READ (0x5c24e0 on +0x258 before the dispatch 0x78e0a0 and the update 0x5ce680; 0x79e140 on Districts +0x40), both twins"
+    - "C-96 / C-130 / C-127 / C-100: a building's modifier-made yields, the walls' threat terms and CanConstruct's walls prerequisite, a regional building's cities, the game state's lock and the yields the AI's jobs read, a city tree's priority — READ (0x18e570's tables, 0x7a7590 at 0x7a826c..0x7a87f3 and 0x7a9044..0x7a91ee, 0x170450 at 0x170644..0x170716, 0x7a4d40 at 0x7a5182..0x7a51d9, 0x608870 at 0x60889e..0x6089e6, 0x1cb8b0, 0x7cb230), both twins"
   context:
     - "- The city's turn (0x5ce680, from the player's AI turn 0x5c2650 over its cities). On a full update: 0x5d7e00, 0x5ca..."
     - "...cancellation 0x5d7640 (\"Canceling current build\"). About 224 KB of code reaches from 0x5ce680 and 0x5ce970."
@@ -636,6 +649,7 @@
     - "C-100: the plot's own subject, PLOT_IS_HILLS and the plot analysis' replaced camp — READ (0x69ed60 / 0x69ec20, 0x6d0970, 0x5cf160..0x5cf1ab), both twins"
     - "C-100: the build turns' store — a completion's overflow, an idle city's Production — and a Builder's charge at the count before the turn's contract purchases"
     - "C-130: the damage modifier's analyzer, a unit's tag requirement, the player's units walked by pool slot, a minor's one-time projects — READ (0x6bba30, 0x6d2610, 0x69ec70), both twins"
+    - "C-96 / C-130 / C-127 / C-100: a building's modifier-made yields, the walls' threat terms and CanConstruct's walls prerequisite, a regional building's cities, the game state's lock and the yields the AI's jobs read, a city tree's priority — READ (0x18e570's tables, 0x7a7590 at 0x7a826c..0x7a87f3 and 0x7a9044..0x7a91ee, 0x170450 at 0x170644..0x170716, 0x7a4d40 at 0x7a5182..0x7a51d9, 0x608870 at 0x60889e..0x6089e6, 0x1cb8b0, 0x7cb230), both twins"
   notes:
     - ".claude/scratchpad/cb/notes.txt: ...== f2f988?) & cond -> +5.0. Initial best FX(-9999). CITY ANALYSIS job vtable d59af0 -> 0x5ce910 -> 0x5ce970 (per PLOT eval): +0x20 districts, +0x28 buildings, +0x30 improvements, +0x38 projects, +0x40 units...."
   context:
@@ -675,6 +689,7 @@
     - "C-96: the promotion class weight's vectors and the event building's pillaged prerequisite"
     - "C-96: the project value's weapon test, CanConstruct's district gates and Nazca's early turns"
     - "C-98 / C-130 / C-96: a levied unit home with no plot dies on its minor's list; the unit term's upgrade Gold is the minor's; the pick refuses a held building under its pillaged district — READ (0x93fa10 at 0x93ff0b, 0x7cb8b0, 0x4cb350, 0x7f2970 at 0x7f3bd1), LAB (the placement's embark state, the unit term's Gold on the records), both twins"
+    - "C-96 / C-130 / C-127 / C-100: a building's modifier-made yields, the walls' threat terms and CanConstruct's walls prerequisite, a regional building's cities, the game state's lock and the yields the AI's jobs read, a city tree's priority — READ (0x18e570's tables, 0x7a7590 at 0x7a826c..0x7a87f3 and 0x7a9044..0x7a91ee, 0x170450 at 0x170644..0x170716, 0x7a4d40 at 0x7a5182..0x7a51d9, 0x608870 at 0x60889e..0x6089e6, 0x1cb8b0, 0x7cb230), both twins"
   notes:
     - ".claude/scratchpad/cb/notes.txt: ...in gnames.json (value = string BEFORE the previous lea; fixed).  DS CHOOSER 0x5d4d70: bestBuilding=0x5d0860, bestProject=0x5d1f10, bestUnit=0x5d2600 (each returns idx, value fx).  pick building if bv>=uv &&..."
   context:

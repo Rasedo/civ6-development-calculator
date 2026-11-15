@@ -469,12 +469,12 @@ class SimInit:
         # per minor in its city AI's turn, its records by AI_UNITS row as its
         # military AI's turn counted them (`CityState.armyCounted`)
         self._cv_counted: dict[int, torch.Tensor] = {}
-        # per minor in its AI turn from its free Trader's dispatch, its city's
-        # yields (the total [B, 6], the attribute base [B, 6]) as its AI read
-        # them before it: the totals' reads but the Food and the Production,
-        # the bases' but the Food take them (`CityState.aiYields`)
+        # per minor in its AI turn, its city's yields (the total [B, 6], the
+        # attribute base [B, 6]) as its City Analysis read them as the turn
+        # opened: its analysis' reads take both, its government values the
+        # bases (`CityState.aiYields`)
         self._cv_yields_seen: dict[int, tuple[torch.Tensor, torch.Tensor]] = {}
-        # and its growth as its City Analysis read it before the dispatch
+        # and its growth as its City Analysis read it then
         # (`CityState.aiYields`' growth, `_MinorFacts.growth`'s keys)
         self._cv_growth_seen: dict[int, dict[str, torch.Tensor]] = {}
         # per minor in its turn, its danger map ([B, T]) as its DoTurn built

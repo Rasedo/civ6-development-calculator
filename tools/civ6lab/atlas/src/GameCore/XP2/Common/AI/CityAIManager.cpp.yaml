@@ -12,7 +12,7 @@
     - recording: h1_duely1128
       turn: 47
       value: "Hong Kong's 272 (8:6), annexed in China's start, takes the Camp tree that turn: its Builder 983040 steps to 8:7 in Hong Kong's t47 actions and lays the Camp at t48"
-  impl: [cpu/core/minorCityAi.ts:minorBuildingPurchaseCity]
+  impl: [cpu/core/minorCityAi.ts:minorBuildingPurchaseCity, cpu/core/minorBuild.ts:seen]
   readings:
     - "H-1: the City Analysis runs on player signal +0x258 and reads each plot's owner live — READ (0x5c27e0, 0x5c24e0, 0x5ce970), the 1117 t44 Mine unexplained"
     - "C-126: the building contract purchase reads the turn's own City Analysis — READ (0x68afe0 -> 0x5d4920 on CityBuildAI +0xcf8, the analysis 0x5c24e0 on player signal +0x258 before the +0x370 list), both twins"
@@ -20,6 +20,7 @@
     - "C-127: the growth forecast the city AI reads is the one its last full update wrote — READ (0x5ce680 at 0x5ce831 / 0x5ce841, 0x5c27e0's +0x258), both twins"
     - "C-100: the City Analysis reads the city before the free Trader's route, the Neighbourhood's install Housing beside a feature, a pillaged district's repair turns — READ (0x5c24e0 on +0x258 before the dispatch 0x78e0a0 and the update 0x5ce680; 0x79e140 on Districts +0x40), both twins"
     - "C-96 / C-98 / C-100 / C-99: the city AI's fitted rules read — the analysis before the job list, the unit term's upgrade price, the city's trained domains, a non-major's required power, the eruption's turns — READ (0x608870 at 0x608976..0x608988, 0x7b3e50 at 0x7b4564..0x7b45c8, 0x5376d0, 0x1c77c0, 0x1aed10, 0x1f0440 at 0x1f04c7..0x1f04dc, 0xa1d480), both twins"
+    - "C-96 / C-130 / C-127 / C-100: a building's modifier-made yields, the walls' threat terms and CanConstruct's walls prerequisite, a regional building's cities, the game state's lock and the yields the AI's jobs read, a city tree's priority — READ (0x18e570's tables, 0x7a7590 at 0x7a826c..0x7a87f3 and 0x7a9044..0x7a91ee, 0x170450 at 0x170644..0x170716, 0x7a4d40 at 0x7a5182..0x7a51d9, 0x608870 at 0x60889e..0x6089e6, 0x1cb8b0, 0x7cb230), both twins"
   review: reviewed
 - addr: 0x5c2610
   final: 0x3d90f0

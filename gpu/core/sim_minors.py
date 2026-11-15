@@ -97,19 +97,19 @@ class SimMinors:
             ran = self.citystate_ai_on[:, s].clone()
             self._minor_trade_list(s, alive & ran & (self.citystate_center[:, s] >= 0))
             self._cv_counted[s] = self._cv_known(s)
+            # its city's yields and growth as its City Analysis reads them as
+            # its AI turn opens, before its Economic AI's purchases and free
+            # Trader's dispatch and its update's Food focus
+            # (`CityState.aiYields`)
+            _row = self._CITY_MINOR0 + s
+            self._cv_yields_seen[s] = (self._seat_city_stats(_row, record=False)[0][:, 0].clone(),
+                                       self._seat_city_base(_row)[:, 0].clone())
+            self._cv_growth_seen[s] = {k: v.clone() for k, v in self._cv_minor_facts(s).growth().items()}
             self._minor_knowledge(s, True)
             self._minor_contract_purchases(s, self.citystate_alive[:, s] & (self.citystate_center[:, s] >= 0), units)
             self._minor_economic_disband(s, fell)
             # its Economic AI's turn ends on its free Trader's route, before
-            # its city update reads the city (`minorTradePick`); its AI's
-            # reads of the city's yields keep those before it, the Food and
-            # the totals' Production apart (`CityState.aiYields`)
-            _row = self._CITY_MINOR0 + s
-            self._cv_yields_seen[s] = (self._seat_city_stats(_row, record=False)[0][:, 0].clone(),
-                                       self._seat_city_base(_row)[:, 0].clone())
-            # its City Analysis' plot values read the city's growth before
-            # the route, its update's forecast after it
-            self._cv_growth_seen[s] = {k: v.clone() for k, v in self._cv_minor_facts(s).growth().items()}
+            # its city update reads the city (`minorTradePick`)
             # the route's values at the Gold boost the Economic AI's turn
             # writes before it, its city update's at the turn before's
             _boost_was = self.citystate_gold_boost[:, s].clone()

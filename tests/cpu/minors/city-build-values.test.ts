@@ -11,13 +11,14 @@ import { unitProductionTable } from '../../../cpu/core/aiUnitProduction';
 import { AI_BUILDING_INDEX, AI_UNIT_INDEX, buildingValue, defaultSpecialization, growthForecast, housingValue, unitValue, type CityBuildFacts, type PickFacts } from '../../../cpu/core/aiCityBuild';
 import type { AiValueView } from '../../../cpu/core/aiValue';
 
-const view = { yieldWeight: () => 0, pseudoYieldWeight: () => 0, tradeRouteCapacity: () => 0, bestCombatStrength: () => 0, enemyUnitCounts: () => new Map(), playerUnits: () => [] } as unknown as AiValueView;
+const view = { yieldWeight: () => 0, pseudoYieldWeight: () => 0, tradeRouteCapacity: () => 0, bestCombatStrength: () => 0, enemyUnitCounts: () => new Map(), playerUnits: () => [], cityBuildingYieldChange: () => 0 } as unknown as AiValueView;
 const facts: CityBuildFacts = {
   view, seat: 100, cityId: -1, population: 1, capital: true, districtCount: 1, hasWonder: false, atWar: false, era: 0,
+  cityThreat: -1, anyCityThreat: false, outerDamage: 0, strongerFoe: false,
   yieldPct: (y) => (y === 'YIELD_PRODUCTION' ? -50 : 0), version: (b) => b, hasBuilding: () => false,
   hasDistrict: () => true, districtPillaged: () => false, governmentTier: 0, worship: null, riverside: false, groundRefuses: () => false, buildingPillaged: () => false, coastalLowlands: () => ({ plots: 0, districts: 0 }), stocked: () => false, power: { free: 0, required: 0, fuel: 0 }, production: 0,
   current: null, techTurns: () => 0, civicTurns: () => 0, buildTurns: () => 1,
-  amenity: { balance: 0, yields: {} }, regionalAmenities: () => [], unitVersion: (u) => u, beliefEnables: () => false, followsReligion: false, fullCiv: false, tribe: false, unitCount: 1, artifacts: 0,
+  amenity: { balance: 0, yields: {} }, regionalAmenities: () => [], regionalBuildingCities: () => 1, unitVersion: (u) => u, beliefEnables: () => false, followsReligion: false, fullCiv: false, tribe: false, unitCount: 1, artifacts: 0,
   growth: { surplus: 2 * 256, housing: 5, population: 1, stored: 0, multiplier: 256 },
   forecast: growthForecast({ surplus: 2 * 256, housing: 5, population: 1, stored: 0, multiplier: 256 }),
   unitProduction: new Map(), trainsDomain: () => true, cities: 0, extraCopies: () => 0, promotionWeight: () => 256,

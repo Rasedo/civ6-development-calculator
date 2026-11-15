@@ -284,8 +284,10 @@
   name: the other player has denounced the owner
   semantics: the other player has denounced the player (Player_Diplomacy +0x9d0, the reverse of 0x3da8e0).
   status: PARTLY
+  impl: [cpu/core/minorBuild.ts:strongerFoe]
   readings:
     - "C-97: City Defense and the assault target's validity — the city's threat, the defence event, Is City Threatened, Garrison City and the district target's validity READ; the threat's level terms, the garrison's swap and the team's unit to build unread"
+    - "C-96 / C-130 / C-127 / C-100: a building's modifier-made yields, the walls' threat terms and CanConstruct's walls prerequisite, a regional building's cities, the game state's lock and the yields the AI's jobs read, a city tree's priority — READ (0x18e570's tables, 0x7a7590 at 0x7a826c..0x7a87f3 and 0x7a9044..0x7a91ee, 0x170450 at 0x170644..0x170716, 0x7a4d40 at 0x7a5182..0x7a51d9, 0x608870 at 0x60889e..0x6089e6, 0x1cb8b0, 0x7cb230), both twins"
   context:
     - "...red friend (0x3da770): a full civ the owner fights (0x469cd0) or that has denounced it (0x3da5e0) or that it denounced (0x3da8e0), and the barbarians, are hostile (margin 5.0); anoth..."
   review: reviewed
@@ -316,11 +318,13 @@
     - cpu/core/aiViewTypes.ts:AiView
     - cpu/core/aiView.ts:denounced
     - cpu/core/aiModifiers.ts:ANALYZERS
+    - cpu/core/minorBuild.ts:strongerFoe
   readings:
     - "C-97: the sender's pick, the savings, the threat and the focus — the savings, the spacing, the trust term and the focus READ, the threat PARTLY READ"
     - "C-97: the war operations — the war candidates, the city value's frame, the assault nodes and Attack Units READ; the loyalty lead's sources, the team update's danger and the assault's executions PARTLY READ"
     - "C-97: the World Congress AI — the evaluation, the outcome, the votes, the hints, the option values and the targets READ"
     - "C-97: City Defense and the assault target's validity — the city's threat, the defence event, Is City Threatened, Garrison City and the district target's validity READ; the threat's level terms, the garrison's swap and the team's unit to build unread"
+    - "C-96 / C-130 / C-127 / C-100: a building's modifier-made yields, the walls' threat terms and CanConstruct's walls prerequisite, a regional building's cities, the game state's lock and the yields the AI's jobs read, a city tree's priority — READ (0x18e570's tables, 0x7a7590 at 0x7a826c..0x7a87f3 and 0x7a9044..0x7a91ee, 0x170450 at 0x170644..0x170716, 0x7a4d40 at 0x7a5182..0x7a51d9, 0x608870 at 0x60889e..0x6089e6, 0x1cb8b0, 0x7cb230), both twins"
   context:
     - ...0x2a81f0 against GlobalParameters +0x268 through the speed; one at war, or turned away (0x3da8e0), is passed over; else p's AI's value of the owner (p's +0x1280 vt+0x18) above the best...
   review: reviewed
@@ -404,6 +408,7 @@
   kind: function
   semantics: the diplomacy's at-war test (0x469cd0 reads it).
   status: PARTLY
+  impl: [cpu/core/minorBuild.ts:strongerFoe]
   readings:
     - "H-1: the city-states' quests — READ"
     - "C-97: the operations — the manager READ (no-enemy candidates), the war candidates unread"
@@ -416,6 +421,7 @@
     - "C-133 / C-95 / C-134: the kept path's searches inside a queue run; the Trader target, the defending district and Pillage's own plot; the safe plot's unit at war that fights — READ (0x272aa0 at 0x272af9..0x272c76, 0x26ef40 at 0x26f123..0x26f162, 0x26e3a0, 0x782d0, 0x783980 at 0x7842df..0x7842eb / 0x784aec..0x784b36, 0x24c2f0, 0x774380 at 0x774481..0x7744a9, 0x716b90 at 0x716d53..0x716da1), both twins"
     - "C-133 / C-95 / C-134: the kept path's searches inside a queue run; the Trader target, the defending district and Pillage's own plot; the safe plot's unit at war that fights — READ (0x272aa0 at 0x272af9..0x272c76, 0x26ef40 at 0x26f123..0x26f162, 0x26e3a0, 0x782d0, 0x783980 at 0x7842df..0x7842eb / 0x784aec..0x784b36, 0x24c2f0, 0x774380 at 0x774481..0x7744a9, 0x716b90 at 0x716d53..0x716da1), FIT (the planning list's seen unit at war), both twins"
     - "C-125 / C-95: the target list's trade layer and its one unit of the units' layer; a siege unit's step onto civilians; the city-states' Attack Civilians; the flankers' test, the support's caller, the camp strike's queue — READ (0x783980 at 0x7849bb..0x784c2b and 0x784c30..0x784f57, 0x26fe20 -> 0x212500, 0x521530, 0x51f070 at 0x51f70e..0x51f737, 0x546f0, 0x52f50), both twins"
+    - "C-96 / C-130 / C-127 / C-100: a building's modifier-made yields, the walls' threat terms and CanConstruct's walls prerequisite, a regional building's cities, the game state's lock and the yields the AI's jobs read, a city tree's priority — READ (0x18e570's tables, 0x7a7590 at 0x7a826c..0x7a87f3 and 0x7a9044..0x7a91ee, 0x170450 at 0x170644..0x170716, 0x7a4d40 at 0x7a5182..0x7a51d9, 0x608870 at 0x60889e..0x6089e6, 0x1cb8b0, 0x7cb230), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...49cc0 / 0x449940), the client has met the actor (0x3daaf0) and is not at war with it (0x3dcec0), then the logic's own test; weight 1 each; one draw \"Selecting a random new quest\" ove..."
@@ -440,6 +446,7 @@
     - "C-96: the unit value's unit count and the founding Production — READ, both twins"
     - "H-1: the military AI's favoured technology — READ (the pick, its use), PARTLY READ (the Free Cities' counts)"
     - "C-96 / C-97: the unit value — READ (the combat, trade, explorer branches, the tail, the military AI's unit production), PARTLY READ (its inputs)"
+    - "C-96 / C-130 / C-127 / C-100: a building's modifier-made yields, the walls' threat terms and CanConstruct's walls prerequisite, a regional building's cities, the game state's lock and the yields the AI's jobs read, a city tree's priority — READ (0x18e570's tables, 0x7a7590 at 0x7a826c..0x7a87f3 and 0x7a9044..0x7a91ee, 0x170450 at 0x170644..0x170716, 0x7a4d40 at 0x7a5182..0x7a51d9, 0x608870 at 0x60889e..0x6089e6, 0x1cb8b0, 0x7cb230), both twins"
   context:
     - ...l (city +0x5e8 m_bCapital), +1 with a wonder (0x18e930), population / 5 + 1, +2 at war (0x3dcf50), the city's CityBuildAI +0x1b8 where above -1, +4 where any city of the player has i...
     - "...VEL_FULL_CIV (0x469db0, hash 0x253718b0) nor _TRIBE (0x469ce0, 0xd959ec24), not at war (0x3dcf50) and holding more than five units (player +0x12e8 +0xc0); a Spy (Units +0x1ba bit 2 — t..."

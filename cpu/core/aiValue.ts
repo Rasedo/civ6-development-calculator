@@ -169,6 +169,10 @@ export interface AiValueView {
   /** a district's yield of a YieldType as the district totals it (0x24b5a0:
    *  its own yields with its modifiers, and its buildings') */
   districtYield(seat: number, cityId: number, district: string, yieldType: string): number;
+  /** a city's modifier-made yield of a building, held or not (City_Buildings
+   *  m_aYieldChanges, 0x18c2a0: EFFECT_ADJUST_BUILDING_YIELD_CHANGE's entry),
+   *  whole: the follower beliefs' of the religions the city follows */
+  cityBuildingYieldChange(seat: number, cityId: number, building: string, yieldType: string): number;
   /** a city has the building (City_Buildings 0x18e9f0) */
   cityHasBuilding(seat: number, cityId: number, building: string): boolean;
   /** a city has a district of the type, built or building (0x1ae530) */

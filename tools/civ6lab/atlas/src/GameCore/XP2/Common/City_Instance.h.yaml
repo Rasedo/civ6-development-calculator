@@ -18,6 +18,25 @@
   context:
     - "...y the score lines they miss, with their analyzers and whether they reach CityBuildAI (0xa5c20): `.claude` analysis `anlist.py` / `ancalls.py`."
   review: reviewed
+- addr: 0xb354a0
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-96 / C-130 / C-127 / C-100: a building's modifier-made yields, the walls' threat terms and CanConstruct's walls prerequisite, a regional building's cities, the game state's lock and the yields the AI's jobs read, a city tree's priority — READ (0x18e570's tables, 0x7a7590 at 0x7a826c..0x7a87f3 and 0x7a9044..0x7a91ee, 0x170450 at 0x170644..0x170716, 0x7a4d40 at 0x7a5182..0x7a51d9, 0x608870 at 0x60889e..0x6089e6, 0x1cb8b0, 0x7cb230), both twins"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...city's own yield (0x1c5120) alone. EFFECT_ADJUST_WONDER_YIELD_CHANGE (vtable 0xde9018: 0xb354a0 / 0xb36150) writes +0xb0: Divine Inspiration's Faith; no centre row is a wonder. In t..."
+  review: imported
+- addr: 0xb36150
+  final: 0x7fd710
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-96 / C-130 / C-127 / C-100: a building's modifier-made yields, the walls' threat terms and CanConstruct's walls prerequisite, a regional building's cities, the game state's lock and the yields the AI's jobs read, a city tree's priority — READ (0x18e570's tables, 0x7a7590 at 0x7a826c..0x7a87f3 and 0x7a9044..0x7a91ee, 0x170450 at 0x170644..0x170716, 0x7a4d40 at 0x7a5182..0x7a51d9, 0x608870 at 0x60889e..0x6089e6, 0x1cb8b0, 0x7cb230), both twins"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...yield (0x1c5120) alone. EFFECT_ADJUST_WONDER_YIELD_CHANGE (vtable 0xde9018: 0xb354a0 / 0xb36150) writes +0xb0: Divine Inspiration's Faith; no centre row is a wonder. In the install..."
+  review: imported
 - addr: 0xb42cb0
   kind: function
   semantics: "EFFECT_ADJUST_CITY_IMPROVEMENT_TOURISM's apply (object vtable 0xdebe68 slot +0x60): adds the Amount (+8) into the city's watched block +0x1a70 (0x9034b0: its data at +0x58) at +0x58, city +0x1b20, the improvement tourism percent 0x1aba40 reads; its one install user GOLDENGATE_IMPROVEMENT_TOURISM"

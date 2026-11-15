@@ -182,6 +182,7 @@
     - "H-4: the step's item multiplier in 24.8 and a Builder's wonder charge through it; the resources step after the economy; an event's pillage and a district's resource re-rank the luxuries — READ, both twins"
     - "C-96 / C-130: the build step asks CanConstruct of every building at the queue's head — READ (0x16f050 at 0x16f09a..0x16f180, 0x17f070, 0x17e8d0, 0x5f6050's building branch), the city-states' step, both twins"
     - "C-96: every player's build step drops a building CanConstruct refuses at the queue's head, the front check asking the next — READ (0x16f050 at 0x16f09a..0x16f180, 0x178250 -> 0x17f070 -> 0x17e8d0, 0x170450 at 0x17071d), both twins"
+    - "C-96 / C-130 / C-127 / C-100: a building's modifier-made yields, the walls' threat terms and CanConstruct's walls prerequisite, a regional building's cities, the game state's lock and the yields the AI's jobs read, a city tree's priority — READ (0x18e570's tables, 0x7a7590 at 0x7a826c..0x7a87f3 and 0x7a9044..0x7a91ee, 0x170450 at 0x170644..0x170716, 0x7a4d40 at 0x7a5182..0x7a51d9, 0x608870 at 0x60889e..0x6089e6, 0x1cb8b0, 0x7cb230), both twins"
   context:
     - ...e city's yield component) and its project id (+0x1360 = -1), then applies the Production (0x16f050), whose ORDER_ADVANCE arm 0x184ae0 walks the project's Project_YieldConversions rows (Pro...
     - "- The queue's step (City_BuildQueue 0x177d10 → 0x16f050) reads the city's Production twice through 0x1c5350: A with the head's id (the Producti..."
@@ -220,7 +221,7 @@
   final: 0xf61c0
   kind: function
   name: CanConstruct
-  semantics: "CanConstruct (the pick's): true with its reason fields +0x54 / +0x68 clear; its result's second byte says refused for good. Refuses a held building (not a pillaged one: its repair stands), one MutuallyExclusiveBuildings names, a Capital row off the capital, a government building above the tier, a worship building the city's religion does not offer, RequiresAdjacentRiver off a river, a Flood Barrier with no coastal lowland; not a district no plot can hold yet. Its result (exit 0x17143f): the result byte [rsi] (set 1 at 0x1705c2, cleared by each refusal) and the reason +0x18 clear; +0x1 set refuses too. The prerequisite-district test at 0x17071d runs where the city holds the district complete (+0xb08) and 0x406c00 holds (the player's own version of the district type, its table +0x430); then 0x1ad720 (pillaged) refuses with +0x2a. At 0x17071d: the pick's prerequisite-district test: the building's PrereqDistrict (+0x160) or its replacement (0x408860) looked up in the city's districts (+0x1a48, 0x1ae530); held, +0xb08 set and 0x406c00 true, the reason +0x1c cleared, then 0x1ad720 (a district of the type in the city pillaged) sets +0x2a and fails, 0x1aeff0 (fallout) +0x2b, 0x1af120 +0x29; a held building pillaged (0x18e9f0, then 0x18fe60 true at 0x17082b) reads its district again through +0x218 and 0x1af250 (IsPillaged). Ported: pickDistrictPillaged (cpu/core/minorBuild.ts) / _pick_district_pillaged (gpu/core/sim_cityvalue.py); a building the city holds pillaged is let through. At 0x1707f1: the contract eligibility's CanConstruct (to 0x170832): a held building refused unless pillaged. At 0x170c87..0x170dd2: a building with progress (0x17d050) on its construction plot (0x179280) is refused where 0x5313f0 (the owner, the plot, flag 1) finds a hostile unit there (+0x29), else accepted at once."
+  semantics: "CanConstruct (the pick's): true with its reason fields +0x54 / +0x68 clear; its result's second byte says refused for good. Refuses a held building (not a pillaged one: its repair stands), one MutuallyExclusiveBuildings names, a Capital row off the capital, a government building above the tier, a worship building the city's religion does not offer, RequiresAdjacentRiver off a river, a Flood Barrier with no coastal lowland; not a district no plot can hold yet. Its result (exit 0x17143f): the result byte [rsi] (set 1 at 0x1705c2, cleared by each refusal) and the reason +0x18 clear; +0x1 set refuses too. The prerequisite-district test at 0x17071d runs where the city holds the district complete (+0xb08) and 0x406c00 holds (the player's own version of the district type, its table +0x430); then 0x1ad720 (pillaged) refuses with +0x2a. At 0x17071d: the pick's prerequisite-district test: the building's PrereqDistrict (+0x160) or its replacement (0x408860) looked up in the city's districts (+0x1a48, 0x1ae530); held, +0xb08 set and 0x406c00 true, the reason +0x1c cleared, then 0x1ad720 (a district of the type in the city pillaged) sets +0x2a and fails, 0x1aeff0 (fallout) +0x2b, 0x1af120 +0x29; a held building pillaged (0x18e9f0, then 0x18fe60 true at 0x17082b) reads its district again through +0x218 and 0x1af250 (IsPillaged). Ported: pickDistrictPillaged (cpu/core/minorBuild.ts) / _pick_district_pillaged (gpu/core/sim_cityvalue.py); a building the city holds pillaged is let through. At 0x1707f1: the contract eligibility's CanConstruct (to 0x170832): a held building refused unless pillaged. At 0x170c87..0x170dd2: a building with progress (0x17d050) on its construction plot (0x179280) is refused where 0x5313f0 (the owner, the plot, flag 1) finds a hostile unit there (+0x29), else accepted at once. At 0x170644..0x170716, its sixth argument clear (every AI caller): per BuildingPrereqs row, as the player's version, with OuterDefenseHitPoints (+0x54 set, +0x58 above 0), the city lacking it sets the second byte (0x1713a4, refused for good); the city holding it under damaged outer defences (0x197ff0 above 0) returns false with the reason +4 naming it (0x170d8b), before the district and held tests: a held Castle or Star Fort is valued while the walls stand damaged."
   status: PARTLY
   cases:
     - recording: h1_duely1117
@@ -235,7 +236,12 @@
     - recording: h1_duelq1128
       turn: 22
       value: "Stonehenge (14 of 90) on 15:11 under the barbarian Warrior refused at the queue step: off the queue, its 9 to the overflow"
+    - recording: h1_duelq1124
+      turn: 104
+      value: Cardiff's held Castle valued 2414.90 under its walls' 54 damage (t104-t107), FX(-9999) at t96-t103 and from t108; Bologna t92-96 the Star Fort FX(-9999) beside its unbuilt Castle
   impl:
+    - cpu/core/aiCityBuild.ts:wallsPrereq
+    - gpu/core/sim_cityvalue.py:_cv_walls_prereq
     - cpu/core/aiCityBuild.ts:PickFacts
     - cpu/core/aiContracts.ts:ContractCity
     - cpu/core/minorBuild.ts:minorPickFacts
@@ -247,6 +253,8 @@
     - cpu/core/production.ts:headLetGo
     - gpu/core/sim_phase.py:_head_let_go
     - cpu/core/production.ts:districtPillagedIn
+    - cpu/core/aiCityBuild.ts:wallsPrereq
+    - gpu/core/sim_cityvalue.py:_cv_walls_prereq
   readings:
     - "C-127 / C-96: a minor's unit versions, the unit table's religion gate and the building value's era reasons — READ, both twins"
     - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
@@ -259,6 +267,7 @@
     - "C-96 / C-130: the build step asks CanConstruct of every building at the queue's head — READ (0x16f050 at 0x16f09a..0x16f180, 0x17f070, 0x17e8d0, 0x5f6050's building branch), the city-states' step, both twins"
     - "C-96: every player's build step drops a building CanConstruct refuses at the queue's head, the front check asking the next — READ (0x16f050 at 0x16f09a..0x16f180, 0x178250 -> 0x17f070 -> 0x17e8d0, 0x170450 at 0x17071d), both twins"
     - "C-98 / C-130 / C-96: a levied unit home with no plot dies on its minor's list; the unit term's upgrade Gold is the minor's; the pick refuses a held building under its pillaged district — READ (0x93fa10 at 0x93ff0b, 0x7cb8b0, 0x4cb350, 0x7f2970 at 0x7f3bd1), LAB (the placement's embark state, the unit term's Gold on the records), both twins"
+    - "C-96 / C-130 / C-127 / C-100: a building's modifier-made yields, the walls' threat terms and CanConstruct's walls prerequisite, a regional building's cities, the game state's lock and the yields the AI's jobs read, a city tree's priority — READ (0x18e570's tables, 0x7a7590 at 0x7a826c..0x7a87f3 and 0x7a9044..0x7a91ee, 0x170450 at 0x170644..0x170716, 0x7a4d40 at 0x7a5182..0x7a51d9, 0x608870 at 0x60889e..0x6089e6, 0x1cb8b0, 0x7cb230), both twins"
   notes: ["label: CanConstruct(city.buildQueue,...)"]
   context:
     - "...lain pick (flags 1, 0): the building not queued or held (0x17e690 > 0), CanConstruct (0x170450) true with its reason fields +0x54 / +0x68 clear, not MustPurchase (Buildings +0x159 bi..."

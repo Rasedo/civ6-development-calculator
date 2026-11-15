@@ -28,7 +28,7 @@ import { seatListed, unitProductionTable } from './aiUnitProduction';
 import { researchAnalysis } from './aiResearch';
 import { civicAnalysis } from './aiCivics';
 import { aiCityStats, cityGrowth, aiView } from './aiView';
-import { analysedTurns, installType, promotionWeight } from './minorBuild';
+import { analysedTurns, installType, promotionWeight, strongerFoe } from './minorBuild';
 import { civEraIndex, computeCityStats } from './city';
 import { researchCost } from './economy';
 import { getModifiers, prodBoostPct, seatGovernment } from './effects';
@@ -37,7 +37,7 @@ import { minorCity } from './cityStates';
 import { cityLowlands, coastalLowlandCounts } from './climate';
 import { accumulatedPerTurn, stockFree, strategicSlot, strategicSurplus } from './stockpile';
 import { buildingPillaged, cityPower } from './yields';
-import { buildingCostIn, worshipOffered } from './rules';
+import { buildingCostIn, outerDamage, worshipOffered } from './rules';
 import { builderCost, cityNavalCapable, traderCost } from './units';
 import { districtCost, projectCost, settlerCost, unitStepCost, unitsAcquired } from './game';
 import { handicapOf } from './barbarians';
@@ -177,6 +177,11 @@ function majorBuildFacts(state: GameState, city: City, known: (unit: string) => 
     districtCount: city.districts.length,
     hasWonder: (city.wonders ?? []).length > 0,
     atWar: s.wars.length > 0,
+    // the threats its cities' last updates left (`City.aiThreat`)
+    cityThreat: city.aiThreat ?? -1,
+    anyCityThreat: own.some((c) => (c.aiThreat ?? -1) > -1),
+    outerDamage: outerDamage(state, city),
+    strongerFoe: strongerFoe(state, seat, city),
     era: civEraIndex(r.techs, r.civics),
     yieldPct: (y) => Math.round(((stats.yieldPct[YIELD_KEY[y]] ?? 0) - (y === 'YIELD_FOOD' ? 0 : stats.amenities.tier.yieldFactor - 1)) * 100),
     version: (b) => {
@@ -228,6 +233,8 @@ function majorBuildFacts(state: GameState, city: City, known: (unit: string) => 
     amenity,
     regionalAmenities: (range) => own.filter((c) => hexDistance(state.map, state.map.tiles[c.centerIndex].col, state.map.tiles[c.centerIndex].row,
       centre.col, centre.row) <= range).map(amenityOf),
+    regionalBuildingCities: (range, converts) => own.filter((c) => hexDistance(state.map, state.map.tiles[c.centerIndex].col, state.map.tiles[c.centerIndex].row,
+      centre.col, centre.row) <= range && (!converts || c === city || view.cityPowerShort(seat, c.id))).length,
     fullCiv: true,
     tribe: false,
     unitCount: state.units.filter((u) => u.seat === seat).length,

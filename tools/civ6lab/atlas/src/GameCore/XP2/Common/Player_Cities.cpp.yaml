@@ -148,6 +148,7 @@
   readings:
     - "C-130: a city-state's government values on the city its update left; the boosts its city's turn earns land at once — READ, both twins"
     - "C-130: the city yields' cache holds through the update's re-placement — READ (0x1cb8b0, 0x91e540), the split a fit, both twins"
+    - "C-96 / C-130 / C-127 / C-100: a building's modifier-made yields, the walls' threat terms and CanConstruct's walls prerequisite, a regional building's cities, the game state's lock and the yields the AI's jobs read, a city tree's priority — READ (0x18e570's tables, 0x7a7590 at 0x7a826c..0x7a87f3 and 0x7a9044..0x7a91ee, 0x170450 at 0x170644..0x170716, 0x7a4d40 at 0x7a5182..0x7a51d9, 0x608870 at 0x60889e..0x6089e6, 0x1cb8b0, 0x7cb230), both twins"
   context:
     - ...t 0x60889e) on its first count fires game signal +0x18f0 with 1; Player_Cities' handler 0x370080 (bound by 0x36fe20) clears every city's cached flags (0x1cd040). So the flat bonus's...
   review: reviewed

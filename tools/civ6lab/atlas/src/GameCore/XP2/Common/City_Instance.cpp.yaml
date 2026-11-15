@@ -13,6 +13,16 @@
   context:
     - ...0xd8a30267, unit 0x15d11e18, district 0x80d3734) into the yield build 0x1c5350, whose 0x1c4460 adds the city's per-kind flat (+0xa40 / +0xaa0 / +0xb00) and percent (+0x248c / +0x2484...
   review: imported
+- addr: 0x1c5120
+  final: 0x12fe20
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-96 / C-130 / C-127 / C-100: a building's modifier-made yields, the walls' threat terms and CanConstruct's walls prerequisite, a regional building's cities, the game state's lock and the yields the AI's jobs read, a city tree's priority — READ (0x18e570's tables, 0x7a7590 at 0x7a826c..0x7a87f3 and 0x7a9044..0x7a91ee, 0x170450 at 0x170644..0x170716, 0x7a4d40 at 0x7a5182..0x7a51d9, 0x608870 at 0x60889e..0x6089e6, 0x1cb8b0, 0x7cb230), both twins"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...+0xb0 entry of the yield; the +0x98 list is read by 0x18e790 from the city's own yield (0x1c5120) alone. EFFECT_ADJUST_WONDER_YIELD_CHANGE (vtable 0xde9018: 0xb354a0 / 0xb36150) writ..."
+  review: imported
 - addr: 0x1c5350
   final: 0x12ff20
   kind: function
@@ -177,21 +187,20 @@
 - addr: 0x1cb8b0
   kind: function
   name: City::GetYield
-  semantics: "City::GetYield: while the game state is locked (game instance +0x458 at 1 or more) the city's cached yield (+0x31d8, the entry's flag +4), computed (0x1c5350) and kept on a miss; unlocked, computed afresh. The lock's first count clears the caches (0x91e540 -> 0x370080 -> 0x1cd040)."
-  status: PARTLY
+  semantics: "City::GetYield: while the game state is locked (game instance +0x458 at 1 or more, 0x1cb8e9) the city's cached yield (+0x31d8, the entry's flag +4), computed (0x1c5350) and kept on a miss; unlocked, computed afresh and nothing kept. The lock is held over player signal +0x258's jobs as the AI turn opens, the influence map and the unit planning only (0x91e540): the pass walk's readers (the Economic AI, the cities' update, the civics job's government values) each compute the city as it stands."
+  status: READ
   cases:
-    - recording: h1_duelz1117
-      turn: 44
-      value: city-state 4's route Gold out of Democracy's GOLD_PURCHASES after its Trader's dispatch; Political Philosophy 150.3 at t45 as logged
-    - recording: h1_duelr1124
-      turn: 218
-      value: "Bologna's government values on the city before its update's Food focus re-placement (Culture 4.5 / 5.5): Digital Democracy 888.5 / 892.5 a turn apart t218-230 as logged"
+    - recording: h1_duelq1124
+      turn: 190
+      value: "Granada: its analysis' Neighbourhood rows on the Food before its t190 re-placement, 0.00 as logged"
+    - recording: h1_duelr1128
+      turn: 17
+      value: Bologna's government values on the Production its Food focus left (Autocracy's wonder term, Political Philosophy 392.1 / 396.1 a turn apart as logged)
   impl:
-    - cpu/core/aiModifiers.ts:ANALYZERS
     - cpu/core/aiView.ts:aiCityStats
-    - gpu/core/sim_cityvalue.py:_MinorFacts
-    - cpu/core/minorBuild.ts:seen
-    - cpu/core/types.ts:Seat
+    - gpu/core/sim_cityvalue.py:_total
+    - cpu/core/types.ts:aiYields
+    - cpu/core/aiModifiers.ts:ANALYZERS
   readings:
     - "C-130: the city yields' cache holds through the update's re-placement — READ (0x1cb8b0, 0x91e540), the split a fit, both twins"
     - "C-130: a minor's levy home after its bank; its free Trader's route before its city update, the AI's yields cached before it; a deleted unit off its list at once; a major's founded city keeps its trade list at once — READ (0x4e4560 at 0x4e45ee / 0x4e4638, 0x6096c0's passes, 0x688eaa, 0x1cb8b0, 0x948500 at 0x9485e5, 0x1eae70 at 0x1eb335 -> 0x5cdd70 at 0x5ce191), the cache's span a fit, both twins"
@@ -202,7 +211,7 @@
     - "C-130: the flat bonus's wonder term runs on into the combat experience term — READ, both twins"
     - "C-130: a city-state's government values on the city its update left; the boosts its city's turn earns land at once — READ, both twins"
     - "A minor's items' turns at the Production its AI read before its free Trader's route — the C-130 cache applied to the build turns, both twins"
-  notes: ["imported: READ in its section, no confirming case found beside it"]
+    - "C-96 / C-130 / C-127 / C-100: a building's modifier-made yields, the walls' threat terms and CanConstruct's walls prerequisite, a regional building's cities, the game state's lock and the yields the AI's jobs read, a city tree's priority — READ (0x18e570's tables, 0x7a7590 at 0x7a826c..0x7a87f3 and 0x7a9044..0x7a91ee, 0x170450 at 0x170644..0x170716, 0x7a4d40 at 0x7a5182..0x7a51d9, 0x608870 at 0x60889e..0x6089e6, 0x1cb8b0, 0x7cb230), both twins"
   context:
     - "...x(0, -floor((food256 - consumption(pop) << 8) / 256)), food the city's cached food yield (0x1cb8b0, `m_bIsCached`), consumption 0x5276c0 of the new population. One entry per free slot of e..."
     - ...- PV(start), 0x7a2140); EFFECT_ADJUST_CITY_YIELD_MODIFIER 0x6b9d90 (min(City::GetYield 0x1cb8b0, 100) x the percent x 0.01f, weighted, the same span); EFFECT_ADJUST_PLAYER_YIELD_CHA...
@@ -283,6 +292,7 @@
   readings:
     - "C-130: a city-state's government values on the city its update left; the boosts its city's turn earns land at once — READ, both twins"
     - "C-130: the city yields' cache holds through the update's re-placement — READ (0x1cb8b0, 0x91e540), the split a fit, both twins"
+    - "C-96 / C-130 / C-127 / C-100: a building's modifier-made yields, the walls' threat terms and CanConstruct's walls prerequisite, a regional building's cities, the game state's lock and the yields the AI's jobs read, a city tree's priority — READ (0x18e570's tables, 0x7a7590 at 0x7a826c..0x7a87f3 and 0x7a9044..0x7a91ee, 0x170450 at 0x170644..0x170716, 0x7a4d40 at 0x7a5182..0x7a51d9, 0x608870 at 0x60889e..0x6089e6, 0x1cb8b0, 0x7cb230), both twins"
   context:
     - ...; Player_Cities' handler 0x370080 (bound by 0x36fe20) clears every city's cached flags (0x1cd040). So the flat bonus's wonder term (0x6c5bcf) reads the city as it stands when the AI...
   review: reviewed

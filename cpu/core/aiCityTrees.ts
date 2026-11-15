@@ -588,8 +588,10 @@ const decodeTrigger: BtHandler<Ctx> = {
   },
 };
 
-/** a city tree's priority (BehaviorTree +0x548): every city tree of the
- *  five runs/h1_duely recordings' AI memory holds 2 (its writer unread) */
+/** a city tree's priority (BehaviorTree +0x548): the city AI's job pass
+ *  (CityBuildAI +0x470, set 2 by its constructor 0x5c4f40), which each city
+ *  event seeds its tree with (0x7cb230); every city tree of the five
+ *  runs/h1_duely recordings' AI memory holds 2 */
 const CITY_TREE_PRIORITY = 2;
 
 /** what the shared contract nodes read of a city tree: the seat's book, the

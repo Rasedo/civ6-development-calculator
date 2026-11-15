@@ -16207,3 +16207,139 @@ cpu/harness/replay.ts). The operation queue's push is read, not ported.
   Civilian as logged.
 - OPEN: what sets +0x18c3 and +0x1937 (their writers unread; no unit of the
   engines' data fights embarked).
+
+## C-96 / C-130 / C-127 / C-100: a building's modifier-made yields, the walls' threat terms and CanConstruct's walls prerequisite, a regional building's cities, the game state's lock and the yields the AI's jobs read, a city tree's priority — READ (0x18e570's tables, 0x7a7590 at 0x7a826c..0x7a87f3 and 0x7a9044..0x7a91ee, 0x170450 at 0x170644..0x170716, 0x7a4d40 at 0x7a5182..0x7a51d9, 0x608870 at 0x60889e..0x6089e6, 0x1cb8b0, 0x7cb230), both twins
+
+`cityBuildingYieldChange` (cpu/core/aiValue.ts, cpu/core/aiView.ts),
+`buildingPerTurn`, `wallsPrereq`, `refused`, `constructibleNow`,
+`analysisBuildings`, `buildingValue`, the facts `cityThreat` /
+`anyCityThreat` / `outerDamage` / `strongerFoe` / `regionalBuildingCities`
+(cpu/core/aiCityBuild.ts), `strongerFoe`, `minorPickFacts`' `reasonsClear`
+(cpu/core/minorBuild.ts), `majorBuildFacts` (cpu/core/freeCityBuild.ts),
+`aiCityStats` and `aiView`'s `updated` (cpu/core/aiView.ts), the capture of
+`CityState.aiYields` in `minorPhase`, `CITY_TREE_PRIORITY`
+(cpu/core/aiCityTrees.ts). GPU `_cv_building_per_turn`, `_cv_walls_prereq`,
+`_cv_refused`, `_cv_constructible`, `_cv_analysis_buildings`, `_cv_building`,
+`_MinorFacts.building_yield_change` / `city_threat` / `any_city_threat` /
+`outer_damage` / `stronger_foe` / `regional_building_cities` / `_total` / `_base`
+(gpu/core/sim_cityvalue.py), `event_building` (gpu/core/sim_minorai.py), the
+capture of `_cv_yields_seen` (gpu/core/sim_minors.py).
+
+- A BUILDING'S MODIFIER-MADE YIELDS. City_Buildings holds three lists
+  beside its yield percents (+0x68, 0x18e890): +0x80 (count +0x90)
+  m_aYieldChanges, 12-byte (building, yield, amount) entries written by
+  0x18ae70; +0x98 (count +0xa8) m_aYieldChangesCityStates, written by
+  0x18afa0 (lookup 0x18c400, removal 0x1909d0); +0xb0 (count +0xc0), 8-byte
+  (yield, amount) entries written by 0x18ade0. EFFECT_ADJUST_BUILDING_YIELD_CHANGE
+  (vtable 0xde6118: apply 0xb275f0, remove 0xb27ae0; its parser 0xb27010
+  reads CityStatesOnly, its name 0xb29b40) maps its BuildingType to the
+  player's version (cities +0x230) and writes +0x80, or +0x98 with
+  CityStatesOnly set (+0x14): the envoy bonuses' rows. 0x18e570, the value's
+  second yields pass, adds the +0x80 entry (0x18c2a0) and, for a wonder row
+  (Buildings +0x158 bit 0x40), the +0xb0 entry of the yield; the +0x98 list
+  is read by 0x18e790 from the city's own yield (0x1c5120) alone.
+  EFFECT_ADJUST_WONDER_YIELD_CHANGE (vtable 0xde9018: 0xb354a0 / 0xb36150)
+  writes +0xb0: Divine Inspiration's Faith; no centre row is a wonder. In
+  the install the rows without CityStatesOnly a city-state's or the Free
+  Cities' city can hold are the follower beliefs' alone, attached to every
+  city following the religion (MODIFIER_ALL_CITIES_ATTACH_MODIFIER under
+  CITY_FOLLOWS_RELIGION_REQUIREMENTS): Choral Music's Shrine 2 / Temple 4
+  Culture, Feed the World's Shrine 3 / Temple 3 Food; the rest are a
+  major's cards, governors, Great People and traits, as are the percents'
+  (EFFECT_ADJUST_BUILDING_YIELD_MODIFIER, _MODIFIERS_FOR_DISTRICT). 0x7a7590
+  at 0x7a7d6a..0x7a7e60: per Yields row the sum of the district copy and
+  these, above 0, at the yield's value, no city percent. Confirmed (the
+  city build lab): runs/h1_duelq1117 Antananarivo t88 under Choral Music,
+  its Shrine -9974.21 and Temple -39772.33 as logged (122 of its 255 Shrine
+  and Temple rows exact, none before); runs/h1_duelq1124 Cardiff t101 under
+  Feed the World, its Shrine a turn 4.7578 (Faith 2, Food 3, the Prophet
+  point, less its Maintenance at the Gold boost 0.484) at the lab's T 27,
+  and t102 / t105 / t108 / t109.
+- THE WALLS' TERMS of a row with OuterDefenseHitPoints (0x7a7590 at
+  0x7a826c..0x7a87f3): d = 1 for a city of two districts or more, 2 for a
+  capital, 1 with a wonder, population / 5 + 1; the city's own threat level
+  where its CityBuildAI +0x1b8 is above -1 (0x7a836b..0x7a83d8); at war
+  with a living major (0x3dcf50) 2.0, and 4.0 more where some city of the
+  player holds a threat (0x7a8427..0x7a86e1); four times where the city
+  holds the row's building (0x18e9f0) under damaged outer defences
+  (0x197ff0 above 0; 0x7a8528..0x7a8569); twice where a major of the
+  players' list +0xb50 the player fights (0x3dcec0), has denounced
+  (0x3da8e0) or is denounced by (0x3da5e0) has a strongest melee strength
+  trained (PlayerStats +0xf0) above the city centre's defence strength
+  (0x24ae80 with its flag set, whole; 0x7a8602..0x7a875c). The analysis
+  reads +0x1b8 as the city's last update left it. Confirmed (the one-seed
+  aimem trace): runs/h1_duelq1124 Granada's Walls on each turn t20-t57 as
+  logged, its own threat level 4 in them at t20-23, t28-39 and t43-44
+  (43.46 / 45.61 / 99.46 / 32.89, 3.68 at t24 without it, 50.17 / 99.66 at
+  t43 / t44, 36.31 at t45).
+- CANCONSTRUCT'S WALLS PREREQUISITE (0x170450 at 0x170644..0x170716, with
+  its sixth argument clear, as the BUILDINGS table 0x5ce970, bestBuilding
+  0x5d0860, the contract eligibility 0x5f6050, the value 0x7a7590 and the
+  queue step 0x16f050 pass it): per BuildingPrereqs row, as the player's
+  version, with OuterDefenseHitPoints (+0x54 set, +0x58 above 0): the city
+  lacking it, the result's second byte is set (0x1713a4: refused for good,
+  the table's FX(-9999)); the city holding it under damaged outer defences
+  (0x197ff0 above 0), the result is false with its prerequisite reason +4
+  naming it (0x170d8b) — returned before the district test 0x17071d and the
+  held test 0x1707f1, so a Castle or Star Fort the city holds is valued
+  while its walls stand damaged. 0x7a4d40 (0x7a5182..0x7a51d9) doubles the
+  value of a building the city holds pillaged, or holds under damaged outer
+  defences where the row has OuterDefenseHitPoints. The event's best
+  building (0x5d0860 unchecked) takes no row whose reasons stand, so not
+  the held Castle; it takes the held Walls' row (FX(-9999) plus its
+  dependents' values) where nothing else is valued, and Build Unit succeeds
+  on it at once. Confirmed: runs/h1_duelq1124 Cardiff, its walls 42 down at
+  t86-t89 and 54 down at t104-t107: the Castle 296.37 / 318.98 / 405.19 /
+  493.96 / 469.41 at t87-t91 and, held, 2414.90 / 2414.90 / 2546.90 at t104
+  / t105 / t107, the Walls' row -7584.10 with it, as logged; at t89 no
+  Castle tree and no Tech Contract (the one-seed aimem trace: contracts and
+  contracts.progress as the game's); Bologna t92-t96 the Star Fort FX(-9999)
+  beside its unbuilt Castle's 365.1 / 255.41 / 257.71 / 361.51; Granada
+  t125 its held Castle 2134.76 under its damaged walls, the Granary's
+  contract posted.
+- A REGIONAL BUILDING'S CITIES (0x7a7590 at 0x7a9044..0x7a91ee, a row with
+  no Entertainment and a RegionalRange above 1): a row converting a
+  resource to power (Buildings_XP2 +0x58) the player holds none of (0x4ab6c0)
+  is worth 0; else the value so far times the player's cities within the
+  range of the city's centre — under a converted resource only those short
+  of power (City_Power 0x1f01f0 above 0) and the city itself. A city-state
+  counts its one city; the Free Cities' Factory counts their cities in
+  reach. No recorded row holds two Free Cities within a Factory's range.
+- THE GAME STATE'S LOCK AND THE YIELDS. City::GetYield 0x1cb8b0 reads its
+  per-yield cache (city +0x31d8) only while the game state is locked
+  (instance +0x458 at 1 or more, 0x1cb8e9); unlocked it computes afresh and
+  keeps nothing. The lock 0x91e540 clears every city's cached flags on its
+  first count (game signal +0x18f0 with 1 -> 0x370080 -> 0x1cd040) and has
+  three callers, each releasing it (0x91c9d0): the AI turn start 0x608870
+  from 0x60889e to 0x6089e6 — over player signal +0x258's handlers and
+  their jobs, before the pass walk; the influence map 0x717460 (to
+  0x717a03); the unit planning 0x792c90 (to 0x792f6f). The recordings run
+  each job at its spawn (the replay patch). So the City AI manager's
+  handler 0x5c24e0 — 0x5cc510 storing each yield's attribute value (+0xfb0)
+  and base (+0x1028 / +0x1080), then the City Analysis — reads the city as
+  the AI turn opens, before the Economic AI's purchases and free Trader's
+  dispatch (pass 3) and the city update's Food focus (pass 2); the civics
+  job's government values (0x620110 at 0x620413, pass 2 after the cities'
+  job) read each total afresh, the city as it then stands, their amenity
+  terms (0x79f7c0) the bases the analysis stored, their housing terms the
+  forecast the turn's update wrote (0x5cb570, called by 0x5ce680 at 0x5ce841
+  alone, before its Food focus 0x5cdae0). Confirmed (one-seed aimem
+  traces): runs/h1_duelq1124 Granada t190, its Neighbourhood rows on the
+  Food before its t190 re-placement, 0.00 on its owned plots, its Build
+  City District contract as the game's (contracts and contracts.progress, two of
+  the seed's 27 missed rows); every other row of the five duelq seeds as it
+  was (1124 Bologna t218-230 and 1128 Bologna t16-30, the cases the split
+  by yield was fitted on, among them).
+- A CITY TREE'S PRIORITY. 0x7cb230(tree, player, priority) sets the tree's
+  watched priority (+0x4f0, its value +0x548) through 0x1e60f0; the tree's
+  reset 0x7c8960 writes -1 (0x7c9b78). The district event 0x5cc910
+  (0x5ccb75), the improvement event 0x5ccc10 (0x5cce2e), the building or
+  unit event 0x5cd150 (0x5cd3c3) and 0x5cd4e0 (0x5cda21) pass CityBuildAI
+  +0x470, the city AI's job pass its constructor 0x5c4f40 sets to 2
+  (0x5c5e41..0x5c5e5b); the founding 0x5cdd70 (0x5ce316) and 0x5beca0
+  (0x5bf31e) pass 2. Confirmed: every city tree of the runs/h1_duely AI
+  memory holds 2; runs/h1_duely1121 Hunza's Ilkum 1.0 at t23 on its Builder
+  contract 57 of priority 2.
+- Open (C-130): runs/h1_duelq1124 Bologna t245 — the game's t244
+  government values read its route's origin Gold as record 245 holds it
+  (11.40625; records 241-244 10.7734375), ours a turn later.

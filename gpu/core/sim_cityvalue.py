@@ -1077,6 +1077,27 @@ class SimCityValue:
 
     # -- the building value (aiCityBuild.ts) -------------------------------
 
+    def _cv_walls_prereq(self, f, b: dict):
+        """`wallsPrereq` (CanConstruct 0x170644..0x170716): the building's
+        first walls prerequisite, as the player's version — lacking, or held
+        under damaged outer defences: ([B] bool, [B] bool)"""
+        T = self._cv_tables()
+        like = f.like()
+        lacking = torch.zeros_like(like, dtype=torch.bool)
+        damaged = torch.zeros_like(like, dtype=torch.bool)
+        undecided = torch.ones_like(like, dtype=torch.bool)
+        for p in b["prereqs"]:
+            v = f.version(p)
+            row = T["bld"].get(v) if v else None
+            if row is None or not row["outerDefenseHitPoints"]:
+                continue
+            has = _t(f.has_building(row["type"]), like).bool()
+            dmg = _t(f.outer_damage(), like) > 0
+            lacking = lacking | (undecided & ~has)
+            damaged = damaged | (undecided & has & dmg)
+            undecided = undecided & has & ~dmg
+        return lacking, damaged
+
     def _cv_refused(self, f, b: dict) -> torch.Tensor:
         """`refused`: what CanConstruct refuses outright"""
         like = f.like()
@@ -1091,7 +1112,11 @@ class SimCityValue:
             no = no | ~_t(f.worship_is(b["type"]), like).bool()
         if b["adjacentRiver"]:
             no = no | ~_t(f.riverside(), like).bool()
-        return no | _t(f.ground_refuses(b["type"]), like).bool()
+        no = no | _t(f.ground_refuses(b["type"]), like).bool()
+        # the walls prerequisite test ends CanConstruct before the rest: for
+        # good where the city lacks it, for now under damaged outer defences
+        lacking, damaged = self._cv_walls_prereq(f, b)
+        return lacking | (no & ~damaged)
 
     def _cv_turns_over(self, f, b: dict) -> torch.Tensor:
         like = f.like()
@@ -1118,7 +1143,8 @@ class SimCityValue:
     def _cv_constructible(self, f, b: dict) -> torch.Tensor:
         """`constructibleNow`"""
         like = f.like()
-        ok = ~self._cv_refused(f, b) & (_t(f.tech_turns(b["tech"]), like) == 0) & (_t(f.civic_turns(b["civic"]), like) == 0)
+        lacking, damaged = self._cv_walls_prereq(f, b)
+        ok = ~lacking & ~damaged & ~self._cv_refused(f, b) & (_t(f.tech_turns(b["tech"]), like) == 0) & (_t(f.civic_turns(b["civic"]), like) == 0)
         if b["district"]:
             ok = ok & _t(f.has_district(b["district"]), like).bool()
         if b["prereqs"]:
@@ -1147,13 +1173,15 @@ class SimCityValue:
             city = torch.tensor([_fx_float(_f32(int(p) * _f32(0.01) + 1)) for p in pct.reshape(-1).tolist()],
                                 dtype=torch.long, device=like.device).reshape(pct.shape)
             v = v + self._cv_yield(_fmul(torch.full_like(like, amt * _FX), city), y, f.yield_w(y))
-        # the second yields pass (0x18e570): the last district copy row, its
-        # PrereqDistrict's yield of the old yield, whole, above 0 at the new
-        # yield's value (`buildingPerTurn`)
-        if b["copies"] and b["district"]:
-            old, new = b["copies"][-1]
-            amt = torch.floor(f.district_yield(b["district"], old)).long()
-            v = v + torch.where(amt > 0, self._cv_yield(amt.clamp(min=0) * _FX, new, f.yield_w(new)), torch.zeros_like(v))
+        # the second yields pass (0x18e570 per Yields row), whole, above 0 at
+        # the yield's value: the last district copy row on its new yield (its
+        # PrereqDistrict's yield of the old one) plus the city's modifier-made
+        # yield of the building (`buildingPerTurn`)
+        for y in _YIELDS:
+            amt = _t(f.building_yield_change(b["type"], y), like)
+            if b["copies"] and b["district"] and b["copies"][-1][1] == y:
+                amt = amt + torch.floor(f.district_yield(b["district"], b["copies"][-1][0])).long()
+            v = v + torch.where(amt > 0, self._cv_yield(amt.clamp(min=0) * _FX, y, f.yield_w(y)), torch.zeros_like(v))
         v = v + torch.where(self._cv_reasons_clear_now(f, b), _t(f.era(), like) * _FX, torch.zeros_like(v))
         for pseudo, pts in b["gpp"]:
             if pseudo:
@@ -1164,7 +1192,17 @@ class SimCityValue:
             d = d + _t(f.capital(), like) * 2 * _FX
             d = d + _t(f.has_wonder(), like) * _FX
             d = d + (torch.div(_t(f.population(), like), 5, rounding_mode="trunc") + 1) * _FX
-            d = d + _t(f.at_war(), like) * 2 * _FX
+            # the city's own threat level; at war 2.0, 4.0 more where some
+            # city of the player is threatened; four times for a held copy
+            # under damaged outer defences; twice against a stronger foe
+            thr = _t(f.city_threat(), like)
+            d = d + torch.where(thr > -1, thr * _FX, torch.zeros_like(d))
+            war = _t(f.at_war(), like).bool()
+            anyt = _t(f.any_city_threat(), like).bool()
+            d = d + torch.where(war, torch.where(anyt, torch.full_like(d, 6 * _FX), torch.full_like(d, 2 * _FX)), torch.zeros_like(d))
+            held = _t(f.has_building(b["type"]), like).bool() & (_t(f.outer_damage(), like) > 0)
+            d = torch.where(held, d * 4, d)
+            d = torch.where(_t(f.stronger_foe(), like).bool(), d * 2, d)
             v = v + d
         v = v + b["outerDefenseStrength"] * _FX
         for g in b["greatWorks"]:
@@ -1246,9 +1284,13 @@ class SimCityValue:
                 add = torch.where(t == h, _discounted(a, r, t), _present_value(a, r, h) - _present_value(a, r, t))
                 e = e + (torch.where(c[2], add, torch.zeros_like(add)) if len(c) > 2 else add)
             value = value + (e if b["regionalRange"] <= 1 else e.clamp(max=50 * _FX))
-        elif b["regionalRange"] > 1 and b["convertsToPower"]:
-            # a regional power plant whose fuel the player holds none of
-            value = torch.where(_t(f.stocked(b["convertsToPower"]), like).bool(), value, torch.zeros_like(value))
+        elif b["regionalRange"] > 1:
+            # any other regional building: its value so far times the
+            # player's cities it reaches; a power plant whose fuel the player
+            # holds none of worth nothing
+            value = value * _t(f.regional_building_cities(b["regionalRange"], bool(b["convertsToPower"])), like)
+            if b["convertsToPower"]:
+                value = torch.where(_t(f.stocked(b["convertsToPower"]), like).bool(), value, torch.zeros_like(value))
         if int(b.get("requiredPower", 0)) > 0:
             value = value + self._cv_power_need(f, int(b["requiredPower"]), t, h)
         if b["blocksCoastalFlooding"]:
@@ -1330,8 +1372,12 @@ class SimCityValue:
                 out.append(torch.full_like(t, _FX_MIN))
                 continue
             v = self._cv_building(f, b["type"], t, torch.full_like(t, hz))
-            # 0x7a4d40: a held pillaged building's value doubled
-            pil = _t(f.has_building(b["type"]), like).bool() & _t(f.building_pillaged(b["type"]), like).bool()
+            # 0x7a4d40: a held building's value doubled where it is pillaged,
+            # or a walls building under damaged outer defences
+            pil = _t(f.building_pillaged(b["type"]), like).bool()
+            if b["outerDefenseHitPoints"]:
+                pil = pil | (_t(f.outer_damage(), like) > 0)
+            pil = pil & _t(f.has_building(b["type"]), like).bool()
             v = torch.where(pil & (t < hz), _fmul(v, torch.full_like(v, 2 * _FX)), v)
             out.append(torch.where(no | (t < 0), torch.full_like(v, _FX_MIN), v))
         return out
@@ -1976,10 +2022,11 @@ class _MinorFacts:
         return self._get("stats", lambda: self.sim._seat_city_stats(self.row, record=False))
 
     def _total(self, k: int) -> torch.Tensor:
-        # a yield but the Food and the Production its AI read before its free
-        # Trader's dispatch (`CityState.aiYields`)
+        # a yield as its City Analysis read it as its AI turn opened
+        # (`CityState.aiYields`, `aiCityStats`); its government values
+        # (`updated`) the city as it stands
         seen = self.sim._cv_yields_seen.get(self.s)
-        if seen is not None and k > 1:
+        if seen is not None and not self.updated:
             return seen[0][:, k]
         return self._stats()[0][:, 0, k]
 
@@ -2004,6 +2051,33 @@ class _MinorFacts:
 
     def at_war(self):
         return self.sim.war[:, self.row].any(dim=1)
+
+    def city_threat(self):
+        """the city's threat as its last update left it (CityBuildAI +0x1b8)"""
+        return self.sim.citystate_threat[:, self.s]
+
+    def any_city_threat(self):
+        return self.sim.citystate_threat[:, self.s] > -1
+
+    def outer_damage(self):
+        """`outerDamage` (0x197ff0) of the city"""
+        return self.defence_repairs()
+
+    def _fights(self, p: int):
+        return self.sim.war[:, self.row, int(self.sim._seat_row[p])]
+
+    def stronger_foe(self):
+        """`strongerFoe`: a major of the game the player fights whose
+        strongest melee strength trained is above the city centre's defence
+        strength (no garrison), whole"""
+        sim = self.sim
+        hrow = torch.full((sim.B,), self.row, dtype=torch.long, device=sim.device)
+        hcol = torch.full((sim.B,), self._slot, dtype=torch.long, device=sim.device)
+        d = torch.floor(sim._city_defense_cs(hrow, hcol, False)[0]).long()
+        out = self._bools(False)
+        for p in range(sim.n_majors):
+            out = out | (sim.civ_alive[:, p] & self._fights(p) & (sim.civ_best_melee[:, p].long() > d))
+        return out
 
     def war_count(self):
         return self.sim.war[:, self.row, : self.sim.n_majors].sum(dim=1)
@@ -2151,16 +2225,16 @@ class _MinorFacts:
         return (sim._stock_bank(self.row) - sim._stock_reserved(self.row))[:, k] > 0
 
     def _base(self):
-        """the city yields' attribute bases (`amenityCityOf`); those but the
-        Food its AI read before its free Trader's dispatch
-        (`CityState.aiYields`, `aiCityStats`)"""
+        """the city yields' attribute bases (`amenityCityOf`): those its City
+        Analysis stored as its AI turn opened (`CityState.aiYields`,
+        `aiCityStats`)"""
         def read():
             base = self.sim._seat_city_base(self.row)
             seen = self.sim._cv_yields_seen.get(self.s)
             if seen is None:
                 return base
             out = base.clone()
-            out[:, 0, 1:] = seen[1][:, 1:]
+            out[:, 0] = seen[1]
             return out
         return self._get("base", read)
 
@@ -2172,6 +2246,11 @@ class _MinorFacts:
 
     def regional_amenities(self, r):
         return [self.amenity()]
+
+    def regional_building_cities(self, r, converts):
+        """`regionalBuildingCities`: the player's cities a regional building reaches,
+        the city among them; a city-state's one"""
+        return 1
 
     def full_civ(self):
         return False
@@ -2670,6 +2749,16 @@ class _MinorFacts:
                                       {"j": self._slot, "dv": dv, "tile": tl}, y)
         return torch.where(tl >= 0, out, zero)
 
+    def building_yield_change(self, b, y):
+        """`cityBuildingYieldChange`: the city's modifier-made yield `y` of
+        the building, held or not (City_Buildings m_aYieldChanges): the
+        follower beliefs' of the religions it follows [B] long"""
+        bi = self._building_index(b)
+        if bi < 0:
+            return self.like()
+        tab = self.sim._fol_tab_for("bldgY", self.row, slice(self._slot, self._slot + 1))
+        return tab[:, 0, bi, _YIELDS.index(y)].long()
+
     def city_yield_now(self, y):
         """the city's yield as its citizens and routes stand, outside the
         AI reads' cache (the player's Gold, `grossGoldYield`)"""
@@ -2850,6 +2939,17 @@ class _FreeFacts(_MinorFacts):
         most = mx - torch.minimum(sim.city_outer_hp[:, self.row, self.j], mx)
         return torch.maximum(most, sim._enc_outer_missing(self.row)[:, self.j]).clamp(min=0)
 
+    def city_threat(self):
+        return self.sim.city_ai_threat[:, self.row, self.j]
+
+    def any_city_threat(self):
+        sim = self.sim
+        return (sim.city_alive[:, self.row, : sim.RC] & (sim.city_ai_threat[:, self.row, : sim.RC] > -1)).any(dim=1)
+
+    def _fights(self, p: int):
+        # the Free Cities fight every major
+        return self._bools(True)
+
     # the defensive pick where the city is under threat (0x5cdc50): its
     # threat above -1 with its centre's hit points damaged or the enemy at
     # its gates (CityBuildAI +0x218)
@@ -2974,6 +3074,18 @@ class _FreeFacts(_MinorFacts):
             bal = sim._amen_balance_of[self.row][:, c]
             out.append((bal.long(), {y: tot[:, c, k] for k, y in enumerate(_YIELDS)}, near))
         return out
+
+    def regional_building_cities(self, r, converts):
+        """the Free Cities' cities within `r` of the centre, the city among
+        them; under a converted resource the city alone (none of theirs is
+        short of power)"""
+        if converts:
+            return 1
+        sim = self.sim
+        ctr = self._centre().clamp(min=0)
+        cc = sim.city_center[:, self.row, : sim.RC]
+        near = sim.city_alive[:, self.row, : sim.RC] & (cc >= 0) & (sim.pair_dist[ctr.unsqueeze(1), cc.clamp(min=0)].long() <= r)
+        return near.sum(dim=1)
 
     def _production_table(self):
         def build():

@@ -856,6 +856,24 @@
   context:
     - "...culture-bomb triggers: EFFECT_ADD_CULTURE_BOMB_TRIGGER (factory 0xc1c890, effect vtable 0xdde870, its object 0xc03070: BuildingType +8, DistrictType +0xc, ImprovementType +0x10, Captur..."
   review: reviewed
+- addr: 0xde6118
+  kind: global
+  status: PARTLY
+  readings:
+    - "C-96 / C-130 / C-127 / C-100: a building's modifier-made yields, the walls' threat terms and CanConstruct's walls prerequisite, a regional building's cities, the game state's lock and the yields the AI's jobs read, a city tree's priority — READ (0x18e570's tables, 0x7a7590 at 0x7a826c..0x7a87f3 and 0x7a9044..0x7a91ee, 0x170450 at 0x170644..0x170716, 0x7a4d40 at 0x7a5182..0x7a51d9, 0x608870 at 0x60889e..0x6089e6, 0x1cb8b0, 0x7cb230), both twins"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...yield, amount) entries written by 0x18ade0. EFFECT_ADJUST_BUILDING_YIELD_CHANGE (vtable 0xde6118: apply 0xb275f0, remove 0xb27ae0; its parser 0xb27010 reads CityStatesOnly, its name 0x..."
+  review: imported
+- addr: 0xde9018
+  kind: global
+  status: PARTLY
+  readings:
+    - "C-96 / C-130 / C-127 / C-100: a building's modifier-made yields, the walls' threat terms and CanConstruct's walls prerequisite, a regional building's cities, the game state's lock and the yields the AI's jobs read, a city tree's priority — READ (0x18e570's tables, 0x7a7590 at 0x7a826c..0x7a87f3 and 0x7a9044..0x7a91ee, 0x170450 at 0x170644..0x170716, 0x7a4d40 at 0x7a5182..0x7a51d9, 0x608870 at 0x60889e..0x6089e6, 0x1cb8b0, 0x7cb230), both twins"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...0 from the city's own yield (0x1c5120) alone. EFFECT_ADJUST_WONDER_YIELD_CHANGE (vtable 0xde9018: 0xb354a0 / 0xb36150) writes +0xb0: Divine Inspiration's Faith; no centre row is a wond..."
+  review: imported
 - addr: 0xdecb08
   kind: global
   semantics: "the city-state bonus type trade modifier's vtable: apply 0xb468d0 / remove 0xb47620."

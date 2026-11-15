@@ -3,17 +3,46 @@
 # `review: imported` = bootstrapped from dll_readings.md / code comments / saved
 # labels and not yet reviewed: verify against the disassembly, then edit and
 # set `review: reviewed`.
+- addr: 0x18ade0
+  final: 0x109d30
+  kind: function
+  name: ChangeWonderYieldChange
+  semantics: "City_Buildings: adds an amount to the yield's entry of the list +0xb0 (count +0xc0, 8-byte (yield, amount) entries), called by EFFECT_ADJUST_WONDER_YIELD_CHANGE's 0xb354a0 / 0xb36150: Divine Inspiration's Faith a wonder. 0x18e570 adds the entry for a wonder row (Buildings +0x158 bit 0x40) alone."
+  status: PARTLY
+  readings:
+    - "C-96 / C-130 / C-127 / C-100: a building's modifier-made yields, the walls' threat terms and CanConstruct's walls prerequisite, a regional building's cities, the game state's lock and the yields the AI's jobs read, a city tree's priority — READ (0x18e570's tables, 0x7a7590 at 0x7a826c..0x7a87f3 and 0x7a9044..0x7a91ee, 0x170450 at 0x170644..0x170716, 0x7a4d40 at 0x7a5182..0x7a51d9, 0x608870 at 0x60889e..0x6089e6, 0x1cb8b0, 0x7cb230), both twins"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...c400, removal 0x1909d0); +0xb0 (count +0xc0), 8-byte (yield, amount) entries written by 0x18ade0. EFFECT_ADJUST_BUILDING_YIELD_CHANGE (vtable 0xde6118: apply 0xb275f0, remove 0xb27ae0;..."
+  review: reviewed
 - addr: 0x18ae70
   final: 0x109dc0
   kind: function
   name: ChangeBuildingYieldChange
-  semantics: "City_Buildings: changes the (building, yield) entry of m_aYieldChanges (+0x80, count +0x90), the modifier-made building yields 0x18e570 adds; lookup 0x18c2a0, removal 0x190880."
-  status: PARTLY
+  semantics: "City_Buildings: changes the (building, yield) entry of m_aYieldChanges (+0x80, count +0x90, 12-byte entries; lookup 0x18c2a0, removal 0x190880), called by EFFECT_ADJUST_BUILDING_YIELD_CHANGE's apply 0xb275f0 / remove 0xb27ae0 without CityStatesOnly. 0x18e570 adds the entry to a building's value. A city-state's or the Free Cities' city holds the follower beliefs' rows alone (Choral Music, Feed the World)."
+  status: READ
+  cases:
+    - recording: h1_duelq1117
+      turn: 88
+      value: "Antananarivo under Choral Music: its Shrine -9974.21 and Temple -39772.33 as logged, the Culture 2 / 4 in their values"
+  impl: [cpu/core/aiView.ts:cityBuildingYieldChange, gpu/core/sim_cityvalue.py:building_yield_change]
   readings:
     - "C-96 / C-98 / C-100 / C-99: the city AI's fitted rules read — the analysis before the job list, the unit term's upgrade price, the city's trained domains, a non-major's required power, the eruption's turns — READ (0x608870 at 0x608976..0x608988, 0x7b3e50 at 0x7b4564..0x7b45c8, 0x5376d0, 0x1c77c0, 0x1aed10, 0x1f0440 at 0x1f04c7..0x1f04dc, 0xa1d480), both twins"
-  notes: ["imported: READ in its section, no confirming case found beside it"]
+    - "C-96 / C-130 / C-127 / C-100: a building's modifier-made yields, the walls' threat terms and CanConstruct's walls prerequisite, a regional building's cities, the game state's lock and the yields the AI's jobs read, a city tree's priority — READ (0x18e570's tables, 0x7a7590 at 0x7a826c..0x7a87f3 and 0x7a9044..0x7a91ee, 0x170450 at 0x170644..0x170716, 0x7a4d40 at 0x7a5182..0x7a51d9, 0x608870 at 0x60889e..0x6089e6, 0x1cb8b0, 0x7cb230), both twins"
   context:
     - ...0x80 (count +0x90) is m_aYieldChanges, the modifier-made building yields 0x18e570 adds (0x18ae70, 0x190880, the lookup 0x18c2a0).
+  review: reviewed
+- addr: 0x18afa0
+  final: 0x109f10
+  kind: function
+  name: ChangeBuildingYieldChangeCityStates
+  semantics: "City_Buildings: changes the (building, yield) entry of m_aYieldChangesCityStates (+0x98, count +0xa8; lookup 0x18c400, removal 0x1909d0), called by EFFECT_ADJUST_BUILDING_YIELD_CHANGE with CityStatesOnly set: the envoy bonuses' building yields. Read by 0x18e790 from the city's yield 0x1c5120 alone, never by the value's 0x18e570."
+  status: PARTLY
+  readings:
+    - "C-96 / C-130 / C-127 / C-100: a building's modifier-made yields, the walls' threat terms and CanConstruct's walls prerequisite, a regional building's cities, the game state's lock and the yields the AI's jobs read, a city tree's priority — READ (0x18e570's tables, 0x7a7590 at 0x7a826c..0x7a87f3 and 0x7a9044..0x7a91ee, 0x170450 at 0x170644..0x170716, 0x7a4d40 at 0x7a5182..0x7a51d9, 0x608870 at 0x60889e..0x6089e6, 0x1cb8b0, 0x7cb230), both twins"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - ...ntries written by 0x18ae70; +0x98 (count +0xa8) m_aYieldChangesCityStates, written by 0x18afa0 (lookup 0x18c400, removal 0x1909d0); +0xb0 (count +0xc0), 8-byte (yield, amount) entrie...
   review: reviewed
 - addr: 0x18b280
   final: 0x10a1d0
@@ -30,14 +59,33 @@
 - addr: 0x18c2a0
   final: 0x10aa90
   kind: function
-  semantics: "City_Buildings: the (building, yield) entry of m_aYieldChanges (+0x80)."
-  status: PARTLY
+  name: buildingYieldChangeLookup
+  semantics: "City_Buildings: the (building, yield) entry of m_aYieldChanges (+0x80, count +0x90), the building as the player's version (cities +0x230); the end of the list where none."
+  status: READ
+  cases:
+    - recording: h1_duelq1124
+      turn: 101
+      value: "Cardiff under Feed the World: its Shrine a turn 4.7578 (Faith 2, Food 3, the Prophet point, less its Maintenance at the Gold boost 0.484) at T 27"
+  impl:
+    - cpu/core/aiCityBuild.ts:buildingPerTurn
+    - gpu/core/sim_cityvalue.py:_cv_building_per_turn
+    - cpu/core/aiValue.ts:AiValueView
   readings:
     - "C-96 / C-98 / C-100 / C-99: the city AI's fitted rules read — the analysis before the job list, the unit term's upgrade price, the city's trained domains, a non-major's required power, the eruption's turns — READ (0x608870 at 0x608976..0x608988, 0x7b3e50 at 0x7b4564..0x7b45c8, 0x5376d0, 0x1c77c0, 0x1aed10, 0x1f0440 at 0x1f04c7..0x1f04dc, 0xa1d480), both twins"
-  notes: ["imported: READ in its section, no confirming case found beside it"]
+    - "C-96 / C-130 / C-127 / C-100: a building's modifier-made yields, the walls' threat terms and CanConstruct's walls prerequisite, a regional building's cities, the game state's lock and the yields the AI's jobs read, a city tree's priority — READ (0x18e570's tables, 0x7a7590 at 0x7a826c..0x7a87f3 and 0x7a9044..0x7a91ee, 0x170450 at 0x170644..0x170716, 0x7a4d40 at 0x7a5182..0x7a51d9, 0x608870 at 0x60889e..0x6089e6, 0x1cb8b0, 0x7cb230), both twins"
   context:
     - ...hanges, the modifier-made building yields 0x18e570 adds (0x18ae70, 0x190880, the lookup 0x18c2a0).
   review: reviewed
+- addr: 0x18c400
+  final: 0x10ab40
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-96 / C-130 / C-127 / C-100: a building's modifier-made yields, the walls' threat terms and CanConstruct's walls prerequisite, a regional building's cities, the game state's lock and the yields the AI's jobs read, a city tree's priority — READ (0x18e570's tables, 0x7a7590 at 0x7a826c..0x7a87f3 and 0x7a9044..0x7a91ee, 0x170450 at 0x170644..0x170716, 0x7a4d40 at 0x7a5182..0x7a51d9, 0x608870 at 0x60889e..0x6089e6, 0x1cb8b0, 0x7cb230), both twins"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - ...0x18ae70; +0x98 (count +0xa8) m_aYieldChangesCityStates, written by 0x18afa0 (lookup 0x18c400, removal 0x1909d0); +0xb0 (count +0xc0), 8-byte (yield, amount) entries written by 0x18...
+  review: imported
 - addr: 0x18c590
   final: 0x10ac10
   kind: function
@@ -103,7 +151,18 @@
     - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
     - "C-96 / C-130: a building's district copy, the player's Gold as its cities stand, a minor's power after its production; a technology's improvement tourism — READ (0x18e570, 0x7a7dc3, 0x4e0bf0, 0x7b4971..0x7b4b5b), both twins but the tourism"
     - "C-96 / C-98 / C-100 / C-99: the city AI's fitted rules read — the analysis before the job list, the unit term's upgrade price, the city's trained domains, a non-major's required power, the eruption's turns — READ (0x608870 at 0x608976..0x608988, 0x7b3e50 at 0x7b4564..0x7b45c8, 0x5376d0, 0x1c77c0, 0x1aed10, 0x1f0440 at 0x1f04c7..0x1f04dc, 0xa1d480), both twins"
+    - "C-96 / C-130 / C-127 / C-100: a building's modifier-made yields, the walls' threat terms and CanConstruct's walls prerequisite, a regional building's cities, the game state's lock and the yields the AI's jobs read, a city tree's priority — READ (0x18e570's tables, 0x7a7590 at 0x7a826c..0x7a87f3 and 0x7a9044..0x7a91ee, 0x170450 at 0x170644..0x170716, 0x7a4d40 at 0x7a5182..0x7a51d9, 0x608870 at 0x60889e..0x6089e6, 0x1cb8b0, 0x7cb230), both twins"
   review: reviewed
+- addr: 0x18e790
+  final: 0x10c250
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-96 / C-130 / C-127 / C-100: a building's modifier-made yields, the walls' threat terms and CanConstruct's walls prerequisite, a regional building's cities, the game state's lock and the yields the AI's jobs read, a city tree's priority — READ (0x18e570's tables, 0x7a7590 at 0x7a826c..0x7a87f3 and 0x7a9044..0x7a91ee, 0x170450 at 0x170644..0x170716, 0x7a4d40 at 0x7a5182..0x7a51d9, 0x608870 at 0x60889e..0x6089e6, 0x1cb8b0, 0x7cb230), both twins"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - ...(Buildings +0x158 bit 0x40), the +0xb0 entry of the yield; the +0x98 list is read by 0x18e790 from the city's own yield (0x1c5120) alone. EFFECT_ADJUST_WONDER_YIELD_CHANGE (vtable 0...
+  review: imported
 - addr: 0x18e890
   final: 0x10c350
   kind: function
@@ -114,6 +173,7 @@
   readings:
     - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
     - "C-96 / C-98 / C-100 / C-99: the city AI's fitted rules read — the analysis before the job list, the unit term's upgrade price, the city's trained domains, a non-major's required power, the eruption's turns — READ (0x608870 at 0x608976..0x608988, 0x7b3e50 at 0x7b4564..0x7b45c8, 0x5376d0, 0x1c77c0, 0x1aed10, 0x1f0440 at 0x1f04c7..0x1f04dc, 0xa1d480), both twins"
+    - "C-96 / C-130 / C-127 / C-100: a building's modifier-made yields, the walls' threat terms and CanConstruct's walls prerequisite, a regional building's cities, the game state's lock and the yields the AI's jobs read, a city tree's priority — READ (0x18e570's tables, 0x7a7590 at 0x7a826c..0x7a87f3 and 0x7a9044..0x7a91ee, 0x170450 at 0x170644..0x170716, 0x7a4d40 at 0x7a5182..0x7a51d9, 0x608870 at 0x60889e..0x6089e6, 0x1cb8b0, 0x7cb230), both twins"
   notes: ["label: buildingYieldLookup(cityBuildings,bld,yield)"]
   context:
     - ...e amount x fx(1 + cityPct[y] 0.01) x fx(1 + bldPct 0.01) (city +0xbc0 through 0x7a2fa0; 0x18e890) through the yield value 0x7a6690 = amount x Yields.DefaultValue (Gold 0.5) x (1 + min(...
@@ -147,6 +207,7 @@
     - "C-127 / C-100: the buildings' dependents and the districts' buildings (0x5cadc0) — ported, both twins"
     - "C-96: a city-state's City Center projects, Build Unit's pillaged building, the pick's pillaged district and the war footing's writer"
     - "C-96 / C-98 / C-100 / C-99: the city AI's fitted rules read — the analysis before the job list, the unit term's upgrade price, the city's trained domains, a non-major's required power, the eruption's turns — READ (0x608870 at 0x608976..0x608988, 0x7b3e50 at 0x7b4564..0x7b45c8, 0x5376d0, 0x1c77c0, 0x1aed10, 0x1f0440 at 0x1f04c7..0x1f04dc, 0xa1d480), both twins"
+    - "C-96 / C-130 / C-127 / C-100: a building's modifier-made yields, the walls' threat terms and CanConstruct's walls prerequisite, a regional building's cities, the game state's lock and the yields the AI's jobs read, a city tree's priority — READ (0x18e570's tables, 0x7a7590 at 0x7a826c..0x7a87f3 and 0x7a9044..0x7a91ee, 0x170450 at 0x170644..0x170716, 0x7a4d40 at 0x7a5182..0x7a51d9, 0x608870 at 0x60889e..0x6089e6, 0x1cb8b0, 0x7cb230), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...Amount +0x10): a city subject; Amount weighted, x0.5 where the city lacks the building (0x18e9f0), span."
@@ -193,6 +254,15 @@
   context:
     - ...t +0x90) is m_aYieldChanges, the modifier-made building yields 0x18e570 adds (0x18ae70, 0x190880, the lookup 0x18c2a0).
   review: reviewed
+- addr: 0x1909d0
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-96 / C-130 / C-127 / C-100: a building's modifier-made yields, the walls' threat terms and CanConstruct's walls prerequisite, a regional building's cities, the game state's lock and the yields the AI's jobs read, a city tree's priority — READ (0x18e570's tables, 0x7a7590 at 0x7a826c..0x7a87f3 and 0x7a9044..0x7a91ee, 0x170450 at 0x170644..0x170716, 0x7a4d40 at 0x7a5182..0x7a51d9, 0x608870 at 0x60889e..0x6089e6, 0x1cb8b0, 0x7cb230), both twins"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - ...(count +0xa8) m_aYieldChangesCityStates, written by 0x18afa0 (lookup 0x18c400, removal 0x1909d0); +0xb0 (count +0xc0), 8-byte (yield, amount) entries written by 0x18ade0. EFFECT_ADJUS...
+  review: imported
 - addr: 0x190b20
   kind: function
   semantics: "City_Buildings: removes an entry of m_aYieldModifiers (+0x68)."

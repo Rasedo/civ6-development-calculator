@@ -432,6 +432,7 @@
   readings:
     - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
     - "C-127 / C-100: a building's value carries its dependents' (0x5cadc0) — READ, live-confirmed"
+    - "C-96 / C-130 / C-127 / C-100: a building's modifier-made yields, the walls' threat terms and CanConstruct's walls prerequisite, a regional building's cities, the game state's lock and the yields the AI's jobs read, a city tree's priority — READ (0x18e570's tables, 0x7a7590 at 0x7a826c..0x7a87f3 and 0x7a9044..0x7a91ee, 0x170450 at 0x170644..0x170716, 0x7a4d40 at 0x7a5182..0x7a51d9, 0x608870 at 0x60889e..0x6089e6, 0x1cb8b0, 0x7cb230), both twins"
   notes:
     - ".claude/scratchpad/cb/notes.txt: ...urrent) + build turns 0x17b1e0 (+10 if [rbp-0x60] && current != bld) + prereq buildings...  value = 0x7a4d40(bld, turns, plot=-9999, horizon=H1=[globalAI+0x2f0][1]) ; units: 0x7b62c0(unit, turns...) horizon H..."
   context:
@@ -710,6 +711,8 @@
     - cpu/core/aiCityBuild.ts:buildingTable
     - cpu/core/aiCityBuild.ts:analysisBuildings
     - cpu/core/aiCityBuild.ts:copy
+    - cpu/core/aiCityBuild.ts:CityBuildFacts
+    - cpu/core/minorBuild.ts:strongerFoe
   readings:
     - "C-127 / C-96: a minor's unit versions, the unit table's religion gate and the building value's era reasons — READ, both twins"
     - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
@@ -721,6 +724,7 @@
     - "C-100: the plot values' golden-age, claims and tourism-percent terms, the required features, the power value's negative Amount — READ"
     - "C-96 / C-130: a building's district copy, the player's Gold as its cities stand, a minor's power after its production; a technology's improvement tourism — READ (0x18e570, 0x7a7dc3, 0x4e0bf0, 0x7b4971..0x7b4b5b), both twins but the tourism"
     - "C-100: the luxury's ban, the power value's RequiredPower term and the plot adjacency's sight — READ"
+    - "C-96 / C-130 / C-127 / C-100: a building's modifier-made yields, the walls' threat terms and CanConstruct's walls prerequisite, a regional building's cities, the game state's lock and the yields the AI's jobs read, a city tree's priority — READ (0x18e570's tables, 0x7a7590 at 0x7a826c..0x7a87f3 and 0x7a9044..0x7a91ee, 0x170450 at 0x170644..0x170716, 0x7a4d40 at 0x7a5182..0x7a51d9, 0x608870 at 0x60889e..0x6089e6, 0x1cb8b0, 0x7cb230), both twins"
   notes:
     - "label: valueConstructible(modifiers+yields)"
     - ".claude/scratchpad/cb/notes.txt: ...]; g=s+256; if g<256 ->0 else den=max(trunc(rate*g/25600),2); out=((s*v>>8)<<8)/den. BUILDING value 0x7a7590 (generic constructible): per Building_YieldChanges entry: amt<<8 * (fx(1+cityPct[y]*.01)*fx(1+bldPc..."

@@ -37,7 +37,7 @@ import { lumpFood, seatGrowth } from './seatTurn';
 import { cityPowerFacts, freeCityBuildFacts, majorQueueItem, seatResearchTurns } from './freeCityBuild';
 import { freeCityThreat, minorAiTurn, minorContractPurchases, minorEconomicDisband, minorItemBuilt, minorMilitaryTurn } from './minorCityAi';
 import { bankruptcy, cityBorderGrowth, cultureAfterGrowth, jumpMadeAnew, paveGround } from './phase';
-import { applyTrainingGrants } from './combat';
+import { applyTrainingGrants, cityDefenseStrength } from './combat';
 import { districtPillagedIn, headLetGo, keepItem, resumeItem } from './production';
 import { districtScaledBase, goldAffordable, projectCost, repairAvailable, repairWanted } from './game';
 import { civEraIndex, computeCityStats, extractionChanged, rebuildLuxuries, withPercent256 } from './city';
@@ -52,7 +52,7 @@ import { buildingPillaged, cityPower, repairBuilding } from './yields';
 import { centerBuildingIds } from './prodLayout';
 import { cityLowlands, coastalLowlandCounts, floodBarrierCost, repairBehindBarrier } from './climate';
 import { minorTrade, minorTradePick, tradeCapacity, tradeGraphTurn } from './trade';
-import { BARB_SEAT, FREE_SEAT, freeSeatOf, hiddenResourcesFor, isCiv, majorityReligionOf, majorsAlive, seatOf, tileSeat } from './seats';
+import { BARB_SEAT, FREE_SEAT, civsAtWar, denounceActive, freeSeatOf, hiddenResourcesFor, isCiv, majorityReligionOf, majorsAlive, seatOf, tileSeat } from './seats';
 import { builderCost, cityNavalCapable, disbandUnit, holdGarrison, raiseBestTrained, spawnUnit, traderCost, unitFullMoves, unitIsMilitary, unitMadeAnew, upgradeAnew } from './units';
 import { irradiated } from './nuclear';
 import { atRngPoint } from './rand';
@@ -69,7 +69,7 @@ import { AI_VALUE_HORIZON } from '../data/aiValue';
 import { TECH_IMPROVEMENT_RESOURCES, resourceValue, type ResourceFacts } from './aiResource';
 import { RESOURCES, extractsResource } from '../../world/resources';
 import { seatListed, unitProductionTable } from './aiUnitProduction';
-import { AI_BUILDING_INDEX, AI_UNIT_INDEX, amenityCityOf, amenityPerTurn, buildingTable, buildingValue, constructibleNow, defaultSpecialization, growthForecast, specializationBests, unitTable, worldArtifacts, type AiUnitRow, type CityBuildFacts, type CityGrowth, type CityBuildTables, type PickFacts } from './aiCityBuild';
+import { AI_BUILDING_INDEX, AI_UNIT_INDEX, amenityCityOf, amenityPerTurn, buildingTable, buildingValue, constructibleNow, defaultSpecialization, growthForecast, specializationBests, unitTable, wallsPrereq, worldArtifacts, type AiUnitRow, type CityBuildFacts, type CityGrowth, type CityBuildTables, type PickFacts } from './aiCityBuild';
 import { defensiveCancel } from './aiCityTrees';
 import { projectTable, type ProjectTableFacts } from './aiProjectValue';
 import { economicGoldBoost } from './aiWeights';
@@ -208,6 +208,13 @@ export function minorPhase(state: GameState): void {
     // city-state 4 after its t40 turn, its free Trader to Rome that turn)
     if (!fresh) minorTradeList(state, cityState);
     cityState.armyCounted = minorArmyCounts(cityState.armyKnown ?? []);
+    // its city's yields and growth as its City Analysis reads them, on
+    // player signal +0x258 before the job passes (0x5c24e0: 0x5cc510 stores
+    // each yield and its attribute base, then the analysis): before its
+    // Economic AI's purchases and free Trader's dispatch and its update's
+    // Food focus (`aiCityStats`)
+    const seen = computeCityStats(state, minorCity(cityState));
+    cityState.aiYields = { total: { ...seen.total }, base: { ...seen.baseYields }, growth: minorCityGrowth(state, cityState) };
     minorKnowledge(state, cityState, true);
     minorContractPurchases(state, cityState, units);
     minorEconomicDisband(state, cityState, fell);
@@ -216,21 +223,13 @@ export function minorPhase(state: GameState): void {
     // growth forecast holds the route (runs/h1_duelz1117 Caguana t136: the
     // route ended in its t135 turn begun again before its update, the
     // forecast's withheld Food 4.5 at a surplus of 6, m_foodLossAmounts
-    // 1152; Civil Prestige 69 at t137 as logged). Its AI's later reads of the
-    // city's yields keep those before the route, the Food apart and the
-    // totals' Production (City::GetYield 0x1cb8b0, each cached from its
-    // first read while the game state is locked, a re-placement in its
-    // update notwithstanding: `aiCityStats`; the player's Gold, 0x4e0bf0,
-    // reads the city as it stands): runs/h1_duelz1117 t46 city-state 3's
-    // route Gold and Science out of Classical Republic's and Digital
-    // Democracy's amenity terms, 314.5 at t47)
-    // Its City Analysis' plot values read the city's growth before the
-    // route, its update's forecast after it (runs/h1_duelq1117 Caguana t136
-    // / t166 / t196 / t226: the route run out the turn before and begun
-    // again, none of its Food in that turn's Farm rows, all of it in the
-    // forecast the next turn's rows read)
-    const seen = computeCityStats(state, minorCity(cityState));
-    cityState.aiYields = { total: { ...seen.total }, base: { ...seen.baseYields }, growth: minorCityGrowth(state, cityState) };
+    // 1152; Civil Prestige 69 at t137 as logged). Its City Analysis read
+    // the city before it (`CityState.aiYields`): runs/h1_duelz1117 t46
+    // city-state 3's route Gold and Science out of Classical Republic's and
+    // Digital Democracy's amenity terms, 314.5 at t47; runs/h1_duelq1117
+    // Caguana t136 / t166 / t196 / t226: the route run out the turn before
+    // and begun again, none of its Food in that turn's Farm rows, all of it
+    // in the forecast the next turn's rows read
     // the route's values at the Gold boost the Economic AI's turn wrote
     // before it (0x6880a1), its city update's at the turn before's
     // (runs/h1_duelz1121 Hunza t87: its Trader to Taiyuan, as recorded, on
@@ -252,15 +251,14 @@ export function minorPhase(state: GameState): void {
     // Kong t79 net -1 -> +1: the Archer's Maintenance at the t78 boost 0.2
     // takes it below the Warrior's 7.78)
     if (cityState.economy && cityState.centerIndex >= 0) cityState.economy.goldBoost = economicGoldBoost(cityState.netIncome ?? 0);
-    // the civics AI's government values on the city its update left, its
-    // yields as its AI read them before the dispatch, the Food and the
-    // totals' Production apart (`aiCityStats`): the Food focus it set
-    // re-placed its citizens
+    // the civics AI's government values on the city its update left (the
+    // Food focus it set re-placed its citizens), the amenity terms' yields
+    // those its City Analysis stored (`aiView`'s `updated`)
     // (runs/h1_duely1128 city-state 3 t16-t30: the focus toggling a turn
     // apart, its Production 4 / 3 between the plots 399 and 445; Autocracy's
     // wonder term and Political Philosophy 392.1 / 396.1 a turn apart as
-    // logged; runs/h1_duelr1124 city-state 4 t218-230: its Culture 4.5 / 5.5
-    // read before the re-placement, Digital Democracy as logged)
+    // logged; runs/h1_duelr1124 city-state 4 t218-230: its Culture base 4.5
+    // / 5.5 read before the re-placement, Digital Democracy as logged)
     government();
     // its military AI's job (0x722690, the military's pass 2 after the
     // cities' in the Control Manager's first list): its operations' refresh
@@ -1461,7 +1459,7 @@ export function minorItemTurns(state: GameState, cityState: CityState, type: str
   const own = 'building' in item ? traitBuildingCost(state, cityState, type, item.building) : null;
   const kept = own !== null ? 0 : cityState.prodItem === k ? cityState.prodProgress ?? 0 : cityState.prodRetained?.[k] ?? 0;
   const progress = kept + (cityState.prodOverflow ?? 0);
-  // the Production its AI read before its free Trader's dispatch (`aiCityStats`)
+  // the Production its City Analysis read as its AI turn opened (`aiCityStats`)
   const stats = aiCityStats(computeCityStats(state, minorCity(cityState)), cityState);
   const pct = own === null ? minorItemPct(state, cityState, item) : 0;
   const base = fxOf(stats.total.production * (1 + pct / 100 + (scale ? 0 : extra / FX)));
@@ -1949,8 +1947,8 @@ export function minorCityGrowth(state: GameState, cityState: CityState): CityGro
 export function minorBuildFacts(state: GameState, cityState: CityState, known: (unit: string) => number, fresh = false,
   unitCount = minorListedCount(state, cityState), founding = false): CityBuildFacts {
   const city = minorCity(cityState);
-  // its yields but the Food as its AI read them before its free Trader's
-  // dispatch (`aiCityStats`): the items' turns at that Production
+  // its yields as its City Analysis read them as its AI turn opened
+  // (`aiCityStats`): the items' turns at that Production
   const stats = aiCityStats(computeCityStats(state, city), cityState);
   const r = cityState.research;
   const view = aiView(state);
@@ -1975,6 +1973,11 @@ export function minorBuildFacts(state: GameState, cityState: CityState, known: (
     // a city-state builds no wonder
     hasWonder: false,
     atWar: (seatOf(state, cityState.seat)?.wars.length ?? 0) > 0,
+    // its one city's threat as its last update left it
+    cityThreat: cityState.threat ?? -1,
+    anyCityThreat: (cityState.threat ?? -1) > -1,
+    outerDamage: outerDamage(state, city),
+    strongerFoe: strongerFoe(state, cityState.seat, city),
     era: civEraIndex(r.techs, r.civics),
     // the city's modifier percent on the yield (city +0xbc0): the happiness
     // level's NonFoodYieldModifier is not among them (runs/h1_duelv1127:
@@ -2013,6 +2016,7 @@ export function minorBuildFacts(state: GameState, cityState: CityState, known: (
     amenity,
     // a city-state holds one city
     regionalAmenities: () => [amenity],
+    regionalBuildingCities: () => 1,
     unitVersion: minorUnitVersion,
     beliefEnables: (u) => {
       const rel = majorityReligionOf(state, cityState.seat);
@@ -2063,6 +2067,19 @@ export function minorBuildFacts(state: GameState, cityState: CityState, known: (
       return turnsAt(cost * FX - fxOf(progress), rate);
     },
   };
+}
+
+/** THE STRONGER FOE of a city's walls value (0x7a7590 at 0x7a8602..0x7a875c):
+ *  a major of the game (the players' list +0xb50) the city's player fights
+ *  (0x3dcec0), has denounced (0x3da8e0) or is denounced by (0x3da5e0) whose
+ *  strongest melee strength trained (PlayerStats +0xf0) is above the city
+ *  centre's defence strength (0x24ae80 with no garrison), whole; the Free
+ *  Cities fight every major */
+export function strongerFoe(state: GameState, seat: number, city: City): boolean {
+  const defense = Math.floor(cityDefenseStrength(state, city, false));
+  return majorsAlive(state).some((p) => p !== seat
+    && (seat === FREE_SEAT || civsAtWar(state, seat, p) || denounceActive(state, seat, p) || denounceActive(state, p, seat))
+    && (seatOf(state, p)?.bestMeleeCS ?? 0) > defense);
 }
 
 /**
@@ -2171,6 +2188,7 @@ export function minorPickFacts(state: GameState, cityState: CityState, facts: Ci
     reasonsClear: (b) => {
       const row = AI_BUILDINGS[AI_BUILDING_INDEX.get(b)!];
       if (row.district && !facts.hasDistrict(row.district)) return false;
+      if (wallsPrereq(facts, row) !== null) return false;
       return !row.prereqs.length || row.prereqs.some((p) => facts.hasBuilding(p) && !facts.buildingPillaged(p));
     },
     canTrain: (u) => {
@@ -2666,6 +2684,7 @@ export function freeCityPickFacts(state: GameState, city: City, facts: CityBuild
     reasonsClear: (b) => {
       const row = AI_BUILDINGS[AI_BUILDING_INDEX.get(b)!];
       if (row.district && !facts.hasDistrict(row.district)) return false;
+      if (wallsPrereq(facts, row) !== null) return false;
       return !row.prereqs.length || row.prereqs.some((p) => facts.hasBuilding(p) && !facts.buildingPillaged(p));
     },
     canTrain: (u) => {

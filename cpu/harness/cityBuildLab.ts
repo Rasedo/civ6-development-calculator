@@ -428,7 +428,11 @@ for (let i = 0; i + 1 < recs.length; i++) {
         const parts = [facts.techTurns(brow.tech), facts.civicTurns(brow.civic), brow.district && !facts.hasDistrict(brow.district) ? facts.buildTurns(brow.district) : -1, facts.buildTurns(brow.type), facts.current];
         const rlog = brow.tech ? research.get(`${turn}:${player}:${brow.tech}`) ?? null : null;
         const cur = researching.get(`${turn}:${player}`) ?? null;
-        rows.push({ nu: facts.unitCount, war: facts.atWar, t: turn, p: player, b: brow.type, log: g, ours: o, T, v, parts, rlog, cur, pop: cs.population, prod: stats.total.production, item: cs.prodItem ?? null, g: brow.housing > 0 ? { ...facts.growth, fc: facts.forecast, hv: housingValue(facts.growth, facts.forecast, brow.housing, T, 50) / 256 } : undefined });
+        // the city's modifier-made yields of the building (Food, Culture, Faith)
+        const yc = ['YIELD_FOOD', 'YIELD_CULTURE', 'YIELD_FAITH'].map((y) => facts.view.cityBuildingYieldChange(facts.seat, facts.cityId, brow.type, y));
+        // under one, the turns at which our value prints the log's
+        const ycT = yc.some((x) => x !== 0) ? [...Array(50).keys()].filter((tt) => Math.abs(buildingValue(facts, brow, tt) / 256 - g) < 0.0051) : undefined;
+        rows.push({ yc: ycT ? yc : undefined, ycT, nu: facts.unitCount, war: facts.atWar, t: turn, p: player, b: brow.type, log: g, ours: o, T, v, parts, rlog, cur, pop: cs.population, prod: stats.total.production, item: cs.prodItem ?? null, g: brow.housing > 0 ? { ...facts.growth, fc: facts.forecast, hv: housingValue(facts.growth, facts.forecast, brow.housing, T, 50) / 256 } : undefined });
       });
     }
   }

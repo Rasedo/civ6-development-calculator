@@ -1000,14 +1000,12 @@ export interface Seat {
    *  them, before the turn's ageing and look: the unit production table its
    *  city AI's turn reads (`minorKnownUnits`); absent outside that turn */
   armyCounted?: Record<string, number>;
-  /** a city-state's city yields (the total and the attribute base) as its
-   *  AI read them before its free Trader's dispatch, which its AI's later
-   *  reads in the turn take, a re-placement of its citizens
-   *  notwithstanding: the totals but the Food and the Production, the
-   *  bases but the Food (the city's cached yields, City::GetYield 0x1cb8b0,
-   *  each kept from its first read while the game state is locked:
-   *  `aiCityStats`); and its growth as its City Analysis read it, before
-   *  the dispatch (`minorPlotEvals`); absent outside that turn */
+  /** a city-state's city yields (the total and the attribute base) and its
+   *  growth as its City Analysis read them as its AI turn opened, before
+   *  its Economic AI's purchases and free Trader's dispatch and its
+   *  update's re-placement of its citizens: the analysis' tables read them
+   *  whole, its government values the bases (`aiCityStats`,
+   *  `minorPlotEvals`); absent outside that turn */
   aiYields?: { total: Yields; base: Yields; growth: CityGrowth };
   /** a city-state's or the barbarians' danger map (`dangerPlane`) per plot
    *  as its DoTurn builds it (0x4e4560 -> 0x46cdd0 -> 0x717460: a

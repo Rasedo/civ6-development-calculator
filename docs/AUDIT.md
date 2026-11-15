@@ -53,14 +53,14 @@ Hand-weighted 1–8 by the size of what is LEFT to build. One row per entry, no 
 | C-133 unit paths and move orders | 3 | MoveTo 0x962380's placement, defender and wait, carried runs, the walk's zone and embark steps, the kept path's re-search, unrevealed plots, portal exits (LAB, BUILD) |
 | C-96 city-states' build values | 4 | the unit value's unported terms and the unit production table, a major's and the Free Cities' step's building check (BUILD); the event unit, building and district terms, pick ties and fits, 1128 Nazca and Hong Kong (LAB) |
 | C-126 city-states' purchases, treasury, upgrades and disbands | 2 | a treasury off the record's on four minors, a Builder purchase, an upgrade past an obsolete rung, the disband count and refusals (LAB) |
-| C-127 city-states' builders, trade and contracts | 3 | improvement re-lays and loops, a late start envoy, the route value K's residues, the quests' ranges, contracts' ends and releases with Cardiff t89 (LAB); the GPU's builder lay (BUILD) |
+| C-127 city-states' builders, trade and contracts | 3 | improvement re-lays and loops, a late start envoy, the route value K's residues, the quests' ranges, contracts' ends and releases (LAB); the GPU's builder lay (BUILD) |
 | C-100 city-states' plot and district values | 4 | the free power's sources, district rows and placements, build turns T off by one, improvement rows, the yields a turn ahead, the Great Person share (LAB) |
 | C-99 city-states' operations | 3 | a team's unit to build and its recruits, Naval Superiority's request, one-turn shifts, the trees' tick order, Garrison City's swap (BUILD, LAB); Protect Units, Naval Pillage, the religious AI's buys (LAB) |
 | C-134 city-states' unit moves | 4 | cityState.move.plot misses: the unit gather and families, claims and strikes, City Defense, Upgrade Units' walks (Galley 393216, Heavy Chariot 983040), Wander and Wander Back to City (LAB); Garrison City's fortify test at the refresh (LAB) |
 | C-128 city-states' units, formations and stacking | 3 | the swap pair, formation size and the Corps rules, the turn-end stacking check, a teleport off a shared plot, the placement's unit-type byte (LAB); a levy home on a suzerain change (BUILD) |
 | C-129 the knowledge bases and operations' strength | 3 | the army memory's misses over full games, the military AI's turn against the job order, district-only city entries, the hidden-unit test (LAB); a Fighter's strike on a ship (BUILD); the teams' battle strengths, the imported operations' strength (LAB) |
 | C-98 city-states' research and civic values | 3 | the Free Cities' terms and a civilization's religious unit value, Add Goal Tech's block (BUILD); goal techs, civics short, resource values, the unit term's misses, late picks (LAB) |
-| C-130 city-states' policy and government analyzers | 4 | card values off by a term (Civil Prestige, Logistics, Totalitarianism, Suffrage), the yields' cache, the Archaeologist's count, unread offsets (LAB) |
+| C-130 city-states' policy and government analyzers | 4 | card values off by a term (Civil Prestige, Logistics, Totalitarianism, Suffrage on a route's Gold a turn late), the Archaeologist's count, unread offsets (LAB) |
 | C-101 religious pressure and spread | 2 | Kandy's 8, a Missionary's 250, a unit's spread, rules read off the records alone (LAB); the condemnation's +0x80 / +0x18c3, the holy city's DED_EXODUS (BUILD) |
 | C-102 loyalty and identity | 2 | the age flags, "Other" terms (Aquileia, Hunza, Wuhan), the dominance count on 1129 / 1130, the falloff, a cached population (LAB) |
 | C-103 wonders' unported effects | 2 | Kilwa, Terracotta Army, Amundsen-Scott, Torre de Belém, the Panama Canal and Golden Gate Bridge, Ik Kil (BUILD); Meenakshi's Gurus, Huey Teocalli, Kilwa's coast, Pamukkale (LAB) |
@@ -328,14 +328,11 @@ A question the SOURCE under-determines; neither engine ships a branch until the 
   - LAB (unit production table): the unit production table's shortfall divide also scaling +0x30 / +0x2c (0x79a0c7..0x79a0e9), which the unit choice sorts on, ours raw
   - LAB (event unit): the event unit's value past the table: the game takes the obsolete Warrior at 0 over the Field Cannon at +0.29 (t150-151) and the Trebuchet at 22, ours 25.20 under the Catapult's 25.81 (1117 Caguana t88, runs/lb1_mil1117)
   - LAB (event unit): 1128 t79 Hong Kong's event unit ours Archer, the game's Warrior (8.0), equal army records
-  - BUILD (buildings and districts): a regional building's value times the player's cities in range (0x7a90d0: with a converted resource those whose +0x30d0 is above 0, and the city itself; a Free Cities seat's Factory and power plants)
   - BUILD (buildings and districts): RequiredPower in 0x7a67f0's negative branch, unconfirmed (h1_duelv1121 Antioch Factory residuals 3.08-12.07)
   - LAB (buildings and districts): the Sewer's housing term alternating 14.07 / 20.75 (duelv1121 p3 t187-193, T 26 / 31)
-  - LAB (buildings and districts): the walls' threat (0x7a84c0..0x7a8758; 1124 Granada's Walls t24-56, 1105 t63-69 181 vs 468.4)
+  - LAB (buildings and districts): the walls' value on runs/h1_duelw1105 t63-69 (181 vs 468.4 before the walls' threat terms were ported; the city build lab finds no PLOT ANALYSIS LOG rows for that recording to recheck it)
   - LAB (buildings and districts): CanProduce's district test
-  - BUILD (buildings and districts): 0x18e570's flag-0x40 list (+0xb0) and m_aYieldChanges (+0x80, written by 0x18ae70: a follower belief's building yields in a city-state's city of that religion), unported (empty on a city-state's recorded rows)
   - LAB (buildings and districts): the Free Cities' pick still asks the repair's quiet turns (their queue's refusal unported)
-  - LAB (buildings and districts): a held walls building under damaged walls is valued in the game's BUILDINGS table: 1124 Cardiff's Castle 2414.90 / 2546.90 at t104-107 (FX(-9999) at t96-103 and from t108), a tree made and ended in its tick each of those turns (tree ids 64-66, 68: Build Unit succeeds on a held building, 0x7f4e00 at 0x7f50e9), ours FX(-9999) and no tree
   - LAB (picks): a 0.0 pick tie (1117 t168-214)
   - LAB (picks): 1127 Mexico City t22's cancel
   - LAB (picks): the forecast's place (1121 t18)
@@ -387,17 +384,11 @@ A question the SOURCE under-determines; neither engine ships a branch until the 
   - LAB (contracts): a mid-turn reveal other than the ground's sight (unread)
   - LAB (contracts): a release's status on a COMPLETED / FAILED contract
   - LAB (contracts): the release's writer (the tree's end 0x7cbb40, an operation's end, 0x7d22f0's caller) unread, the rule read off the aimem contracts (a released contract CANCELLED but a FAILED one, in the city's hand too)
-  - LAB (cardiff t89): 1124 Cardiff t89: the game's Castle tree 48 ends in its tick with no contract where 1117 Caguana t124's of the same shape keeps it (both Castles one short of its cost, taken at the completion): tree 48's trigger, the event's, unseen in the aimem and unread (Cardiff alone held a FAILED Castles contract 233 the turn before; its t61 / t75 / t82 Castle trees each failed at the Turn Limit 5, as ours) (the tree's id index 0x2e on pool slot 1, a slot no tree held before it, its control's index 48)
-  - LAB (cardiff t89): 1124 Cardiff t89, no node of a Castle trigger read to end it: Decode Trigger fails only with nothing decoded and no value (0x7f2970 at 0x7f3bd1), Add Goal Tech lists the Castle's PrereqTech on plain HasTech, looks its kept contracts up in the tree's own list (0x7cb8b0) and posts wherever the goal is set (0x7e7200), Build Unit fails a building whose PrereqTech is not held (0x7f4e00 -> 0x4cb350) and succeeds at once on one the city holds, 0x5f5940 passes a tech in research, 0x7f2220 makes no vt +0x70 call
-  - LAB (cardiff t89): 1124 p2 t89: the game uses no contract id in Cardiff's turn (ids 254-260 player 1's t89, 261 player 1's t90, 263 Cardiff's t90 Castle), so the tree it starts and ends that turn (id 0x2e) never runs Add Goal Tech's execution (0x7e7200), where the engines post a Castles Tech Contract (365.1) and run on
-  - LAB (cardiff t89): the ending rule unread: of the duelq FAILED Build City Building Tech Contracts with no building tree the next turn, 1124 t67 / t101 and 1128 Bologna t89 under NO BUILDS AT ALL, Cardiff t89 the repair turn (the game's Default Specialization queues the repair in its t89 update, the engine's production step holds it in hand before the events), where Add Goal Tech's update (0x7e7d20) reads kept contracts SUBMITTED / FAILED / COMPLETED / 0 released, IN PROGRESS RUNNING, no turn test
-  - LAB (cardiff t89): 1124 Cardiff t89: the game's BUILDINGS table holds the Castle at 405.19 (318.98 at t88, 493.96 at t90) and no unit above FX(-9999), its event's building the Castle, where ours reads 365.1 with the repair in hand from the production step (+10 turns) and the game's analysis ran on the empty queue at its turn-start pick (CityProductionChanged before PlayerTurnActivated)
 - **C-100. CITY-STATES' PLOT AND DISTRICT VALUES.** Weight 4.
   - LAB (power): the free power's sources (ChangeFreePower 0x1ed860 from 0xafe320 / 0xaff790, the percent +0xa8) unread, the city's own renewables read for it
   - LAB (district placement): on the older recordings only (the duelz logs hold no DISTRICTS rows): 1128 Bologna t2 the Campus at 3:8 (355) for the game's 3:7 (311)
   - LAB (district placement): on the older recordings only (the duelz logs hold no DISTRICTS rows): 1128 Bologna t73 1:9 for 3:7
   - LAB (district placement): 1117 p4 Theater from t99
-  - LAB (district placement): 1124 Granada t190: the game's Neighbourhood rows read 0.00 on its five owned plots (24-26 at t189, 65-68 at t191) and FX(-9999) less 0.20 / 1.23 on the unowned 39:10 / 39:11 (27.22 / 25.37 at t189), its event taking 40:12 at 0.0 (contract 887, VALUE 0.0, priority 4) the turn after the Neighbourhood contract 764 FAILED, where ours keeps the district valued and posts the plot contract on 39:10
   - LAB (district placement): a district placed at its production's start (1127 t17)
   - LAB (district rows): 1124 Granada's Alcazar candidate t130 on 39:9 / 40:9 / 39:10 10.05 under the game's (a one-point Appeal gap)
   - LAB (district rows): 1124 Encampment rows p3 t90 +38 (fitT = T+1)
@@ -542,18 +533,15 @@ A question the SOURCE under-determines; neither engine ships a branch until the 
   - LAB (card values): E-Commerce
   - LAB (card values): 1124 p2 t47's Culture
   - LAB (card values): God King a turn apart (1128 t48)
-  - LAB (card values): 1124 Bologna t245, the turn Class Struggle completes at its start (Collectivization first scored, 87.0): Suffrage 651.242 for 654.2 and Digital Democracy 1140.344 for 1141.3, both as logged at t244 and t246, on the city of the yields' cache fit (its Food focus toggling each turn)
+  - LAB (card values): 1124 Bologna t245, the turn Class Struggle completes at its start (Collectivization first scored, 87.0): Suffrage 651.242 for 654.2 and Digital Democracy 1140.344 for 1141.3, both as logged at t244 and t246: the game's t244 government values read its route's origin Gold as record 245 holds it (11.40625; records 241-244 10.7734375: GOLD_PURCHASES 23 for 22, Digital Democracy's amenity term 152 for 151), ours a turn later
   - LAB (card values): Civil Prestige 1127 p3 t159 / t160 (154 / 127 for 150 / 126: the Amenity term 124 for 126 and the Housing 30 for 24 on the city's yields at the job; Limes, Retainers, Liberalism t159 124 for 127 / 126 / 126)
   - LAB (card values): 1127 city-state 3 t62-63 policies, research and civics (Ilkum 0 / 1, Limes 0 / 12, Civil Prestige 76 / 74, Military Tactics +7.4, Civil Service +2) carried from the t61 border draw (C-107)
-  - LAB (yields at the job): fit, unread: the city yields' cache (0x1cb8b0, per yield, cleared at the lock's first count only): the totals but Food and Production, the bases but Food kept from the Trader's dispatch through the update's re-placement, on 1124 Bologna t218-230 / 1128 Bologna t16-30, each yield's first reader unread
   - LAB (yields at the job): a project begun at 0 converting an unrecorded overflow (1121 Hunza t85)
   - LAB (archaeologist): the Archaeologist's artifact count: an excavated site's entry unread
   - LAB (archaeologist): the Archaeologist's artifact count: t179 9.1 at T 49 where the game counts none (1124 city-state 3)
   - LAB (boosts): a major's own RESEARCH_TECH boost lands at its block's detectBoosts, after its Culture (no case)
   - LAB (majors and free cities): a major's victory-manager strategies imported from AI_Victories.csv (Seat.strategies), none in self-play
   - LAB (majors and free cities): a major's and the Free Cities' best plot to buy (none)
-  - LAB (unread): fit, unread: a city tree's priority 2 (+0x548's writer)
-  - LAB (unread): fit, unread: the update's read of the government values, their forecast writer (CityBuildAI +0x6c8, 0x5cb570) unread
   - LAB (unread): 0x4dd3b0's counter +0x1724
   - LAB (unread): +0x390
   - LAB (unread): 0x5d17b0 (valued 0)

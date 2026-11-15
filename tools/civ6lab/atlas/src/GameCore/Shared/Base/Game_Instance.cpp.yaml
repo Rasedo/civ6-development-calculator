@@ -3,20 +3,35 @@
 # `review: imported` = bootstrapped from dll_readings.md / code comments / saved
 # labels and not yet reviewed: verify against the disassembly, then edit and
 # set `review: reviewed`.
+- addr: 0x91c9d0
+  kind: function
+  name: game state unlock
+  semantics: "the game state's lock released: +0x458 counted down; at 0 game signal +0x18f0 fires with 0. Callers: the AI turn start 0x608870 at 0x6089e6 (after player signal +0x258's handlers and their jobs, before the pass walk), the influence map 0x717460 at 0x717a03, the unit planning 0x792c90 at 0x792f6f."
+  status: READ
+  cases:
+    - recording: h1_duelq1124
+      turn: 190
+      value: "Granada's City Analysis on the Food before its t190 Food focus re-placement: its Neighbourhood rows 0.00 on its owned plots, its Build City District contract as the game's"
+  impl: [cpu/core/aiView.ts:aiCityStats]
+  readings:
+    - "C-96 / C-130 / C-127 / C-100: a building's modifier-made yields, the walls' threat terms and CanConstruct's walls prerequisite, a regional building's cities, the game state's lock and the yields the AI's jobs read, a city tree's priority — READ (0x18e570's tables, 0x7a7590 at 0x7a826c..0x7a87f3 and 0x7a9044..0x7a91ee, 0x170450 at 0x170644..0x170716, 0x7a4d40 at 0x7a5182..0x7a51d9, 0x608870 at 0x60889e..0x6089e6, 0x1cb8b0, 0x7cb230), both twins"
+  context:
+    - "...ignal +0x18f0 with 1 -> 0x370080 -> 0x1cd040) and has three callers, each releasing it (0x91c9d0): the AI turn start 0x608870 from 0x60889e to 0x6089e6 — over player signal +0x258's ha..."
+  review: reviewed
 - addr: 0x91e540
   kind: function
-  semantics: "the game state's lock: +0x458 counted up; at the first count game signal +0x18f0 fires with 1 (the cities' yield caches cleared, 0x370080)."
-  status: PARTLY
+  name: game state lock
+  semantics: "the game state's lock: +0x458 counted up; at the first count game signal +0x18f0 fires with 1 (every city's yield cache flags cleared, 0x370080 -> 0x1cd040). Three callers, each paired with the unlock 0x91c9d0: the AI turn start 0x608870 (0x60889e..0x6089e6), the influence map 0x717460, the unit planning 0x792c90."
+  status: READ
   cases:
-    - recording: h1_duely1128
-      turn: 17
-      value: city-state 3's government values on the Production its Food focus left (Political Philosophy 392.1 / 396.1 a turn apart as logged)
-    - recording: h1_duelr1124
-      turn: 218
-      value: the caches held through Bologna's update re-placement, the government values on the city before it as logged t218-230
+    - recording: h1_duelq1124
+      turn: 190
+      value: "Granada's City Analysis under the turn start's lock reads the city before its update's re-placement: the Neighbourhood rows 0.00 as logged"
+  impl: [cpu/core/aiView.ts:aiCityStats, gpu/core/sim_cityvalue.py:_total]
   readings:
     - "C-130: the city yields' cache holds through the update's re-placement — READ (0x1cb8b0, 0x91e540), the split a fit, both twins"
     - "C-130: a city-state's government values on the city its update left; the boosts its city's turn earns land at once — READ, both twins"
+    - "C-96 / C-130 / C-127 / C-100: a building's modifier-made yields, the walls' threat terms and CanConstruct's walls prerequisite, a regional building's cities, the game state's lock and the yields the AI's jobs read, a city tree's priority — READ (0x18e570's tables, 0x7a7590 at 0x7a826c..0x7a87f3 and 0x7a9044..0x7a91ee, 0x170450 at 0x170644..0x170716, 0x7a4d40 at 0x7a5182..0x7a51d9, 0x608870 at 0x60889e..0x6089e6, 0x1cb8b0, 0x7cb230), both twins"
   context:
     - ...locked (game instance +0x458 at 1 or more), else computes afresh (0x1c5350). The lock 0x91e540 (from the AI turn start 0x608870 at 0x60889e) on its first count fires game signal +0x1...
   review: reviewed

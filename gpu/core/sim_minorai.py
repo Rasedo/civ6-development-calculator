@@ -2511,7 +2511,8 @@ class _MinorWorld:
         """0x5d0860 with neither the checks nor the defensive filter: the best
         building not queued (a held one valued at none, a pillaged one as
         unbuilt) whose prerequisite building stands unpillaged and whose
-        district stands, FX(-9999) none"""
+        district stands, none under a walls prerequisite's reason
+        (`wallsPrereq`), FX(-9999) none"""
         f = self.f
         like = f.like()
         idx = torch.full_like(like, -1)
@@ -2521,6 +2522,8 @@ class _MinorWorld:
             if b["district"]:
                 ok = ok & _t(f.has_district(b["district"]), like).bool()
             if b["prereqs"]:
+                lacking, damaged = self.sim._cv_walls_prereq(f, b)
+                ok = ok & ~lacking & ~damaged
                 anyp = torch.zeros_like(ok)
                 for p in b["prereqs"]:
                     anyp = anyp | (_t(f.has_building(p), like).bool() & ~_t(f.building_pillaged(p), like).bool())

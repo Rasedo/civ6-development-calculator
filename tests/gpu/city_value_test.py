@@ -386,6 +386,24 @@ class City:
     def has_building(self, b):
         return 0
 
+    def building_yield_change(self, b, y):
+        return 0
+
+    def city_threat(self):
+        return -1
+
+    def any_city_threat(self):
+        return 0
+
+    def outer_damage(self):
+        return 0
+
+    def stronger_foe(self):
+        return 0
+
+    def regional_building_cities(self, r, converts):
+        return 1
+
     def has_district(self, d):
         return 1
 

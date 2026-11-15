@@ -585,7 +585,9 @@
     - recording: 1124
       value: the Coal / Fossil Fuel Power Plants 0 -> 147   / 102 of 147 / 102 (1124, every row 0.00), 1121 0 -> 4 of 4;
   impl: [cpu/core/aiCityBuild.ts:CityBuildFacts]
-  readings: ["C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"]
+  readings:
+    - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
+    - "C-96 / C-130 / C-127 / C-100: a building's modifier-made yields, the walls' threat terms and CanConstruct's walls prerequisite, a regional building's cities, the game state's lock and the yields the AI's jobs read, a city tree's priority — READ (0x18e570's tables, 0x7a7590 at 0x7a826c..0x7a87f3 and 0x7a9044..0x7a91ee, 0x170450 at 0x170644..0x170716, 0x7a4d40 at 0x7a5182..0x7a51d9, 0x608870 at 0x60889e..0x6089e6, 0x1cb8b0, 0x7cb230), both twins"
   context:
     - ...rtedToPower (+0x58, its resource +0x14) the player's stock of it less its reservations (0x4ab6c0 -> 0x4aa790, ownership 0) none -> the whole value 0 (0x7a9098); else the value x the...
   review: imported

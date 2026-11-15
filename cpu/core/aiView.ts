@@ -30,7 +30,7 @@ import { COST_MULTIPLIER_PCT, EMBARK_MOVES, MP_SCALE } from '../data/constants';
 import { GP_CLASSES } from '../data/greatPeople';
 import { GOVERNMENT_LIST } from '../data/policies';
 import { DIPLO_VICTORY_POINTS } from '../data/seats';
-import { getModifiers, governmentBit, inDarkAge, makeYieldCtx, seatGovernment } from './effects';
+import { followerBeliefForReligion, followerReligionsForCity, getModifiers, governmentBit, inDarkAge, makeYieldCtx, seatGovernment } from './effects';
 import { gpOffer, greatPersonPointsPerTurn } from './greatPeople';
 import type { City, CityState, DistrictId, GameState, GreatPersonClass, Unit, YieldKey } from './types';
 import { BUILDINGS, effectiveBuilding } from '../data/buildings';
@@ -78,29 +78,25 @@ const YIELD_KEY: Readonly<Record<string, YieldKey>> = {
   YIELD_FOOD: 'food', YIELD_PRODUCTION: 'production', YIELD_GOLD: 'gold',
   YIELD_SCIENCE: 'science', YIELD_CULTURE: 'culture', YIELD_FAITH: 'faith',
 };
-const AI_YIELD_KEYS: readonly YieldKey[] = AI_YIELDS.map((y) => YIELD_KEY[y]);
+const aiYieldKeys = (): readonly YieldKey[] => AI_YIELDS.map((y) => YIELD_KEY[y]);
 const govType = (id: string): string => gameTypeOf('government', id, 'GOVERNMENT_');
 const UNIT_ACTION = unitActionIndex(IMPROVEMENT_IDS);
 
-/** a city's stats as the AI reads them (City::GetYield 0x1cb8b0, each yield
- *  cached on its first read while the game state is locked; no re-placement
- *  of its citizens clears it): a city-state's yields as its AI read them
- *  before its free Trader's dispatch (`CityState.aiYields`) — the totals but
- *  the Food and the Production, the attribute bases (the amenity terms'
- *  yields) but the Food — the rest as its citizens stand. runs/h1_duelr1124
- *  city-state 4 t218-230: its Food focus toggling a turn apart (Culture 4.5
- *  / 5.5, Production 13 / 13.5), its government values on the city before
- *  the update's re-placement, Digital Democracy 888.5 / 892.5 a turn apart
- *  as logged; runs/h1_duelr1128 city-state 3 t16-t30: the total Production
- *  4 / 3 after it, Political Philosophy 392.1 / 396.1 as logged */
+/** a city's stats as its player's City Analysis reads them: the job runs on
+ *  player signal +0x258 as the AI turn opens (0x608870, the game state
+ *  locked from 0x60889e to 0x6089e6, City::GetYield 0x1cb8b0 reading its
+ *  per-yield cache only under that lock), before the job passes — the
+ *  Economic AI's free Trader's dispatch, the city update's Food focus. A
+ *  city-state's yields as they stood there (`CityState.aiYields`), the
+ *  totals and the attribute bases (0x5cc510's +0x1080, the amenity terms'
+ *  yields); the rest as the city stands. runs/h1_duelq1124 Granada t190: its
+ *  Neighbourhood rows on the Food before its t190 re-placement, 0.00 on its
+ *  five owned plots as logged; runs/h1_duelq1117 Caguana t196: Cold War's
+ *  turns on the Culture without the route begun again that turn */
 export function aiCityStats(st: CityStats, cs: CityState | undefined): CityStats {
   const seen = cs?.aiYields;
   if (!seen) return st;
-  return {
-    ...st,
-    total: { ...seen.total, food: st.total.food, production: st.total.production },
-    baseYields: { ...seen.base, food: st.baseYields.food },
-  };
+  return { ...st, total: { ...seen.total }, baseYields: { ...seen.base } };
 }
 
 /** a city's growth as the growth forecast reads it (`CityGrowth`) */
@@ -115,10 +111,11 @@ export function cityGrowth(state: GameState, city: City): CityGrowth {
   };
 }
 
-/** `updated`: a city-state's housing value on the forecast of its city as
- *  its city AI's update this turn read it (`CityState.aiGrowthSeen`: the
- *  civics AI's government values) instead of the one its turn's production
- *  set (`CityState.aiGrowth`) */
+/** `updated`, the civics AI's government values' view: a city-state's
+ *  housing value on the forecast of its city as its city AI's update this
+ *  turn read it (`CityState.aiGrowthSeen`) instead of the one its turn's
+ *  production set (`CityState.aiGrowth`), and its city's yield totals as the
+ *  city stands instead of those its City Analysis read (`aiCityStats`) */
 export function aiView(state: GameState, opts: { updated?: boolean } = {}): AiView {
   const seat = (i: number) => {
     const s = seatOf(state, i);
@@ -176,8 +173,20 @@ export function aiView(state: GameState, opts: { updated?: boolean } = {}): AiVi
     return citiesOf(state, i).find((c) => c.id === id);
   };
   // a city's stats as the AI reads them (`aiCityStats`)
-  const statsOf = (i: number, city: City): CityStats =>
-    aiCityStats(computeCityStats(state, city), isCityStateSeat(i) ? (seatOf(state, i) as CityState | undefined) : undefined);
+  // with `updated`, the civics job's read in pass 2, the game state unlocked:
+  // the totals as the city stands (City::GetYield computed afresh, after the
+  // dispatch and the update's re-placement), the attribute bases the
+  // analysis stored (runs/h1_duelr1124 city-state 4 t218-230: its Food focus
+  // toggling a turn apart, Digital Democracy's amenity term on the bases
+  // before the re-placement, 888.5 / 892.5 as logged; runs/h1_duelr1128
+  // city-state 3 t16-t30: Autocracy's wonder term on the Production after
+  // it, Political Philosophy 392.1 / 396.1)
+  const statsOf = (i: number, city: City): CityStats => {
+    const st = computeCityStats(state, city);
+    const cs = isCityStateSeat(i) ? (seatOf(state, i) as CityState | undefined) : undefined;
+    if (opts.updated) return cs?.aiYields ? { ...st, baseYields: { ...cs.aiYields.base } } : st;
+    return aiCityStats(st, cs);
+  };
   // a seat's cities; a city-state's its one city (`minorCity`)
   const seatCities = (i: number): City[] => {
     if (!isCityStateSeat(i)) return citiesOf(state, i);
@@ -295,6 +304,17 @@ export function aiView(state: GameState, opts: { updated?: boolean } = {}): AiVi
       const key = YIELD_KEY[yieldType];
       const d = city?.districts.find((x) => districtType(x.type) === type);
       return city && d && key ? districtYieldOf(state, i, city, d, key) : 0;
+    },
+    cityBuildingYieldChange: (i, id, building, yieldType) => {
+      const city = cityOf(i, id);
+      const key = YIELD_KEY[yieldType];
+      const b = engineId('building', building, 'BUILDING_', BUILDINGS);
+      if (!city || !key || !b) return 0;
+      let n = 0;
+      for (const g of followerReligionsForCity(getModifiers(state, i), city)) {
+        n += followerBeliefForReligion(state, g)?.effects.buildingYields?.[b]?.[key] ?? 0;
+      }
+      return n;
     },
     cityHasBuilding: (i, id, building) => {
       const city = cityOf(i, id);
@@ -833,7 +853,7 @@ function knownCities(state: GameState, seat: number): AiKnownCityView[] {
     }
     out.push({
       plot: c.centerIndex, owner: c.seat, id: c.id, population: c.population, originalCapital, capital: c.isCapital,
-      yields: AI_YIELD_KEYS.map((k) => Math.trunc(t[k])), wonders: c.wonders.length,
+      yields: aiYieldKeys().map((k) => Math.trunc(t[k])), wonders: c.wonders.length,
       districts: [{ plot: c.centerIndex, defense, walls: walled ? defense : 0, strike: walled ? cityStrikeStrength(state, c) : 0 }, ...forts]
     });
   };

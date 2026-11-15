@@ -40,6 +40,7 @@ import type { CityStats } from './city';
 import type { GameState } from './types';
 import { AMENITY_TIERS, amenityTier, growthFoodNeeded, housingGrowthFactor } from '../data/constants';
 import { AI_YIELD_DEFAULT } from '../data/aiTables';
+import { AI_YIELDS } from './aiWeights';
 import { modifiersValue, type AiModifier } from './aiModifiers';
 
 /** One Buildings row as the city build AI reads it (ai_tables.py) */
@@ -185,6 +186,18 @@ export interface CityBuildFacts {
   districtCount: number;
   hasWonder: boolean;
   atWar: boolean;
+  /** the city's threat as its city AI's last update left it (CityBuildAI
+   *  +0x1b8, m_cityThreat: -1 none), and whether some city of the player
+   *  holds one */
+  cityThreat: number;
+  anyCityThreat: boolean;
+  /** the city's outer defences' damage (0x197ff0: the most hit points one of
+   *  its districts with outer defences lacks) */
+  outerDamage: number;
+  /** a major the player fights, has denounced or is denounced by whose
+   *  strongest melee strength trained (PlayerStats +0xf0) is above the city
+   *  centre's defence strength (0x24ae80 with no garrison, whole) */
+  strongerFoe: boolean;
   /** the player's era index (player +0x1358 +0xf8) */
   era: number;
   /** the city's percent on a YieldType (city +0xbc0) */
@@ -241,6 +254,11 @@ export interface CityBuildFacts {
    *  cities within a regional building's range */
   amenity: AmenityCity;
   regionalAmenities(range: number): readonly AmenityCity[];
+  /** the player's cities within `range` of the city's centre, the city
+   *  among them (0x7a90d0..0x7a912e); for a building converting a resource
+   *  to power only those short of power (City_Power 0x1f01f0 above 0) and
+   *  the city itself */
+  regionalBuildingCities(range: number, converts: boolean): number;
   /** turns to build an item at the city's Production toward it; a
    *  district's at `site`, the repair of the city's own pillaged one there */
   buildTurns(item: string, site?: number): number;
@@ -409,14 +427,37 @@ export function housingValue(g: CityGrowth, forecast: readonly GrowthStep[], hou
 
 const turnsOver = (f: CityBuildFacts, b: AiBuildingRow): number => Math.max(f.techTurns(b.tech), f.civicTurns(b.civic));
 
+/** CanConstruct's test of a building's walls prerequisites (0x170644..
+ *  0x170716, before its district and held tests): the first BuildingPrereqs
+ *  row with OuterDefenseHitPoints, as the player's version, that the city
+ *  lacks refuses the building for good; one it holds under damaged outer
+ *  defences (0x197ff0) refuses it for now, whatever else the city holds
+ *  (runs/h1_duelq1124 Bologna t92-96: the Star Fort FX(-9999) beside its
+ *  unbuilt Castle's 365.1; Cardiff t104-107: its held Castle valued under
+ *  its walls' 54 damage). Null where neither applies. */
+export function wallsPrereq(f: CityBuildFacts, b: AiBuildingRow): 'lacking' | 'damaged' | null {
+  for (const p of b.prereqs) {
+    const v = f.version(p);
+    const row = v === null ? undefined : AI_BUILDINGS[AI_BUILDING_INDEX.get(v) ?? -1];
+    if (!row?.outerDefenseHitPoints) continue;
+    if (!f.hasBuilding(row.type)) return 'lacking';
+    if (f.outerDamage > 0) return 'damaged';
+  }
+  return null;
+}
+
 /** what CanConstruct (its test with the research waived) refuses outright:
- *  a building the city holds whole (a pillaged one stands to be repaired:
+ *  a building whose walls prerequisite the city lacks (`wallsPrereq`); a
+ *  building the city holds whole (a pillaged one stands to be repaired:
  *  runs/h1_duelv1124 Granada t73-t78, its pillaged Lighthouse valued) or one
  *  it excludes, a Capital-only row, a
  *  government building above the tier run, a worship building the city's
  *  religion does not offer, a riverside building away from a river, and
- *  what the city's ground refuses */
+ *  what the city's ground refuses — none of them under a walls prerequisite
+ *  whose outer defences are damaged, which ends the test before them */
 export function refused(f: CityBuildFacts, b: AiBuildingRow): boolean {
+  const walls = wallsPrereq(f, b);
+  if (walls !== null) return walls === 'lacking';
   if ((f.hasBuilding(b.type) && !f.buildingPillaged(b.type)) || b.exclusive.some((x) => f.hasBuilding(x))) return true;
   if (b.capital && !f.capital) return true;
   if (b.governmentTier > f.governmentTier) return true;
@@ -445,7 +486,7 @@ export function buildingTurns(f: CityBuildFacts, b: AiBuildingRow): number {
 /** CanConstruct with its reasons all clear: the technology and the civic
  *  held, the district standing in the city, a prerequisite building held */
 export function constructibleNow(f: CityBuildFacts, b: AiBuildingRow): boolean {
-  if (refused(f, b) || f.techTurns(b.tech) !== 0 || f.civicTurns(b.civic) !== 0) return false;
+  if (wallsPrereq(f, b) !== null || refused(f, b) || f.techTurns(b.tech) !== 0 || f.civicTurns(b.civic) !== 0) return false;
   if (b.district && !f.hasDistrict(b.district)) return false;
   return !b.prereqs.length || b.prereqs.some((p) => f.hasBuilding(p));
 }
@@ -470,17 +511,20 @@ export function buildingPerTurn(f: CityBuildFacts, b: AiBuildingRow): number {
     const city = fxConst(Math.fround(f.yieldPct(y) * Math.fround(0.01) + 1));
     v += yieldValue(f.view, f.seat, fmul(amt * FX, city), y);
   }
-  // the second yields pass (0x18e570 per Yields row): the building's
-  // district copy — its last Building_YieldDistrictCopies row, on the row's
-  // new yield: its PrereqDistrict's yield of the old one in the city
-  // (0x24b5a0), whole, above 0 at the new yield's value (runs/h1_duelq1117
-  // Valletta t222-224: the Shipyard's Production off its Harbor's Gold,
-  // 26.31 / 20.52 / 31.34 at T 45 / 44 / 43 as logged); the pass's
-  // modifier-made building yields (City_Buildings +0x80) are not read
+  // the second yields pass (0x18e570 per Yields row), whole, above 0 at the
+  // yield's value: the building's district copy — its last
+  // Building_YieldDistrictCopies row, on the row's new yield: its
+  // PrereqDistrict's yield of the old one in the city (0x24b5a0)
+  // (runs/h1_duelq1117 Valletta t222-224: the Shipyard's Production off its
+  // Harbor's Gold, 26.31 / 20.52 / 31.34 at T 45 / 44 / 43 as logged) — plus
+  // the city's modifier-made yield of the building (City_Buildings
+  // m_aYieldChanges). A wonder's entry of the city's wonder yields (+0xb0,
+  // EFFECT_ADJUST_WONDER_YIELD_CHANGE) is no part of a centre row
   const copy = b.copies[b.copies.length - 1];
-  if (copy && b.district) {
-    const amt = Math.floor(f.view.districtYield(f.seat, f.cityId, b.district, copy[0]));
-    if (amt > 0) v += yieldValue(f.view, f.seat, amt * FX, copy[1]);
+  for (const y of AI_YIELDS) {
+    let amt = f.view.cityBuildingYieldChange(f.seat, f.cityId, b.type, y);
+    if (copy && b.district && copy[1] === y) amt += Math.floor(f.view.districtYield(f.seat, f.cityId, b.district, copy[0]));
+    if (amt > 0) v += yieldValue(f.view, f.seat, amt * FX, y);
   }
   if (reasonsClearNow(f, b)) v += f.era * FX;
   for (const [pseudo, pts] of b.gpp) if (pseudo) v += pseudoYieldValue(f.view, f.seat, pts * FX, pseudo);
@@ -490,10 +534,15 @@ export function buildingPerTurn(f: CityBuildFacts, b: AiBuildingRow): number {
     if (f.capital) d += 2 * FX;
     if (f.hasWonder) d += FX;
     d += (Math.trunc(f.population / 5) + 1) * FX;
-    if (f.atWar) d += 2 * FX;
-    // the threat terms (0x7a84c0..0x7a8758: +4.0 where a city of the player
-    // is threatened, x4 for a damaged own copy, x2 against a stronger foe)
-    // are not read
+    // the city's own threat level where it holds one (0x7a836b..0x7a83d8);
+    // at war 2.0, and 4.0 more where some city of the player is threatened
+    // (0x7a8427..0x7a86e1); four times for a copy the city holds under
+    // damaged outer defences (0x7a8528..0x7a8569); twice against a stronger
+    // foe (0x7a8602..0x7a875c)
+    if (f.cityThreat > -1) d += f.cityThreat * FX;
+    if (f.atWar) d += (f.anyCityThreat ? 6 : 2) * FX;
+    if (f.hasBuilding(b.type) && f.outerDamage > 0) d *= 4;
+    if (f.strongerFoe) d *= 2;
     v += d;
   }
   v += b.outerDefenseStrength * FX;
@@ -583,11 +632,14 @@ export function buildingValue(f: CityBuildFacts, b: AiBuildingRow, t: number, h 
     let e = 0;
     for (const c of cities) e += valueBetween(amenityPerTurn(f, c), t, h);
     value += b.regionalRange <= 1 ? e : Math.min(e, 50 * FX);
-  } else if (b.regionalRange > 1 && b.convertsToPower && !f.stocked(b.convertsToPower)) {
-    // a regional power plant whose fuel the player holds none of is worth
-    // nothing so far (0x7a9089..0x7a909b: runs/h1_duelv1124, every Coal
-    // Power Plant row of the city-states 0.00)
-    value = 0;
+  } else if (b.regionalRange > 1) {
+    // any other regional building (0x7a9044..0x7a91ee): a power plant whose
+    // fuel the player holds none of is worth nothing so far
+    // (0x7a9089..0x7a909b: runs/h1_duelv1124, every Coal Power Plant row of
+    // the city-states 0.00); else its value so far times the player's
+    // cities it reaches (0x7a90d0..0x7a9157)
+    value = b.convertsToPower && !f.stocked(b.convertsToPower) ? 0
+      : value * f.regionalBuildingCities(b.regionalRange, b.convertsToPower !== null);
   }
   // a building that needs Power (Buildings_XP2 RequiredPower, 0x7a9209 ->
   // 0x7a67f0 at minus it)
@@ -818,7 +870,8 @@ export interface PickFacts {
   canConstruct(building: string): boolean;
   /** CanConstruct's reasons clear (its result aside): the building's
    *  district stands in the city and, where it has prerequisites, one of
-   *  them is held unpillaged */
+   *  them is held unpillaged — none a walls building under damaged outer
+   *  defences, which names the prerequisite its reason (`wallsPrereq`) */
   reasonsClear(building: string): boolean;
   /** CanTrain (0x172820) */
   canTrain(unit: string): boolean;
@@ -910,8 +963,9 @@ export function specializationBests(t: CityBuildTables, f: PickFacts): Record<'b
  *  the building value (0x7a7590) doubled where the city holds the building
  *  pillaged (0x18e9f0 and 0x18fe60, 0x7a5182..0x7a51d9 -> 0x7a5136;
  *  runs/h1_duelv1124 Granada t89 its pillaged Lighthouse 227.34 = 2 x
- *  113.67) — the same doubling for a held walls building under damaged
- *  walls never reaches the table, which refuses a held building */
+ *  113.67), or holds it, a walls building, under damaged outer defences
+ *  (0x197ff0 above 0 with the row's OuterDefenseHitPoints: a held Castle
+ *  or Star Fort the walls prerequisite test lets through, `wallsPrereq`) */
 function analysisBuildings(f: CityBuildFacts): number[] {
   return AI_BUILDINGS.map((b) => {
     if (b.wonder || b.placement) return FX_MIN;
@@ -919,7 +973,8 @@ function analysisBuildings(f: CityBuildFacts): number[] {
     const t = buildingTurns(f, b);
     if (t < 0 || t >= AI_VALUE_HORIZON) return FX_MIN;
     const v = buildingValue(f, b, t);
-    return f.hasBuilding(b.type) && f.buildingPillaged(b.type) ? fmul(v, 2 * FX) : v;
+    const twice = f.hasBuilding(b.type) && (f.buildingPillaged(b.type) || (f.outerDamage > 0 && b.outerDefenseHitPoints));
+    return twice ? fmul(v, 2 * FX) : v;
   });
 }
 

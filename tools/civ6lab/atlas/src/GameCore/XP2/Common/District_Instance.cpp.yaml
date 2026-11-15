@@ -307,6 +307,8 @@
     - cpu/core/operations/cityThreat.ts:cityThreat
     - cpu/core/aiViewTypes.ts:cityDefense
     - cpu/core/aiView.ts:knownCities
+    - cpu/core/aiCityBuild.ts:CityBuildFacts
+    - cpu/core/minorBuild.ts:strongerFoe
   readings:
     - "H-1: a pillaged building's specialist, the centre's defence, three moments — READ"
     - "C-97: the settle site evaluation — READ (the score, the choices), PARTLY READ (the danger, the plot yield)"
@@ -315,6 +317,7 @@
     - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
     - "C-99: a unit bought in the turn sits out the operations, a Harbor trains ships — the recruit's turn-done offer READ (0x60a8c0, 0x60a440), 0x1c77c0's district arm READ, the candidates' own strength a FIT, both twins"
     - "C-129 / C-99 / C-134: a known city's Encampment in the enemy strength, the rally's advance, the team's battle strengths and Garrison City's fortify test — READ (0x7877e0 at 0x7878e1..0x78791f / 0x787c64..0x787ca7, 0x5f0280, 0x5efaf0, 0x73f0c0, 0x73f7d0 at 0x73face, 0x738f20 at 0x7391a4..0x7395e1, 0x810d30 at 0x810f80..0x81115e), both twins; the replay's buildings before the next start"
+    - "C-96 / C-130 / C-127 / C-100: a building's modifier-made yields, the walls' threat terms and CanConstruct's walls prerequisite, a regional building's cities, the game state's lock and the yields the AI's jobs read, a city tree's priority — READ (0x18e570's tables, 0x7a7590 at 0x7a826c..0x7a87f3 and 0x7a9044..0x7a91ee, 0x170450 at 0x170644..0x170716, 0x7a4d40 at 0x7a5182..0x7a51d9, 0x608870 at 0x60889e..0x6089e6, 0x1cb8b0, 0x7cb230), both twins"
   notes:
     - ".claude/scratchpad/st1/reading.md: ...in) onto the   plots within its range. Each such city whose centre the player sees: its   strength (0x24ae80) on the centre, its strike (0x249ee0) over its reach   (0x249e40) or, with none, 1 on each plot bes..."
   context:
