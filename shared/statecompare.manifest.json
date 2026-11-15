@@ -4423,6 +4423,17 @@
           "note": "ABILITY_SPEAR_OF_FIONN, granted for good beside the Giant's Causeway: +5 Combat Strength in every fight, through any upgrade."
         },
         {
+          "name": "currents",
+          "compare": "exact",
+          "covers": [
+            "Unit.currents"
+          ],
+          "planes": [
+            "unit_currents"
+          ],
+          "note": "ABILITY_MYSTERIOUS_CURRENTS, granted for good on a plot of the Bermuda Triangle: +1 Movement, through any upgrade."
+        },
+        {
           "name": "arrivalRank",
           "compare": "exact",
           "covers": [

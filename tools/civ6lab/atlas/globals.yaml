@@ -981,6 +981,15 @@
   context:
     - "...s): its leader's InheritFrom chain's and its civilization's trait modifiers (the query @0xe261e0, ORDER BY ModifierId) whose requirements name a type tagged INFLUENCE_REQUIREMENT (Ty..."
   review: imported
+- addr: 0xe2edf8
+  kind: global
+  status: PARTLY
+  readings:
+    - "C-132 / C-95: the planning's attack onto a unit at war for any mover, a Trader's layer, the danger map's war table, the Bermuda Triangle's currents — READ (0x26e570 at 0x26e6c4, 0x586360 at 0x586542..0x5865a1, 0x585d90, 0x530f50, 0x469cd0 -> 0x3dcec0 -> 0x2a92d0, 0xc67f70), both twins"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...mod W, (y + H/2) mod H), rings about it widened until 37 candidate plots (the functor @0xe2edf8) or the modifier's bounds, one drawn (\"Unit Teleport to other side of world roll\"), a T..."
+  review: imported
 - addr: 0xe36190
   kind: global
   semantics: the none byte a city's event handle's first byte is tested against.

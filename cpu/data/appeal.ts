@@ -53,6 +53,8 @@ export const FEATURE_APPEAL: Readonly<Record<string, number>> = Object.fromEntri
   feature('UBSUNUR_HOLLOW', 'UBSUNUR_HOLLOW', 2),
   feature('HA_LONG_BAY', 'HA_LONG_BAY', 2),
   feature('IKKIL', 'IKKIL', 2),
+  feature('CHOCOLATEHILLS', 'CHOCOLATEHILLS', 2),
+  feature('LYSEFJORDEN', 'LYSEFJORDEN', 2),
 ]);
 
 /** `Terrains.Appeal` of a mountain (every TERRAIN_*_MOUNTAIN row) and of the

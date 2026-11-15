@@ -48,7 +48,7 @@ import { clearCampFor, conquerEncampment } from './combat';
 import { emergencyHeal, emergencyMoveBonus } from './emergency';
 import { civUnitAllowed, GDR_UPGRADES, GDR_ENHANCED_MOVES, UNITS, UNIT_HP, UNIT_TYPE_IDX, ENCAMPMENT_HP, ROCK_BAND_VENUES, ROCK_BAND_WONDER_VENUE, ROCK_BAND_TIERS, ROCK_BAND_TIER_ODDS, ROCK_BAND_MAX_LEVEL, type UnitDef } from '../data/units';
 import {
-  ALPINE_CLASSES, ALPINE_FEATURE, FIONN_CLASSES, FIONN_FEATURE, BAND_VENUE_BIT, BAND_VENUE_DISTRICTS, CONCERT_SHARE_RANGE,
+  ALPINE_CLASSES, ALPINE_FEATURE, CURRENTS_CLASSES, CURRENTS_FEATURE, CURRENTS_MOVES, FIONN_CLASSES, FIONN_FEATURE, BAND_VENUE_BIT, BAND_VENUE_DISTRICTS, CONCERT_SHARE_RANGE,
   ROCK_BAND_MAX_PROMOTIONS, UNIT_PROMO_CLASS,
 } from '../data/promotions';
 import { WOLIN_LAND_CLASSES, WOLIN_NAVAL_CLASSES } from '../data/cityStates';
@@ -285,6 +285,8 @@ export function terrainMp(tile: Tile, mover?: { promos?: number; type: string; a
   else if (tile.feature === 'UBSUNUR_HOLLOW') cost += MP_SCALE;
   // CIV6 (Features.xml): FEATURE_PANTANAL MovementChange 1
   else if (tile.feature === 'PANTANAL') cost += MP_SCALE;
+  // CIV6 (Expansion2_Features.xml): FEATURE_CHOCOLATEHILLS MovementChange 1
+  else if (tile.feature === 'CHOCOLATEHILLS') cost += MP_SCALE;
   return cost;
 }
 
@@ -1235,7 +1237,7 @@ export function startTileMoves(state: GameState, unit: { type: string; seat: num
  * composer, so a bonus added here reaches every one of them. The GPU's twin
  * is `_full_mp`.
  */
-export function unitFullMoves(state: GameState, unit: { type: string; seat: number; embarked?: boolean; tileIndex?: number; leviedFrom?: number; mpBonus?: number }): number {
+export function unitFullMoves(state: GameState, unit: { type: string; seat: number; embarked?: boolean; tileIndex?: number; leviedFrom?: number; mpBonus?: number; currents?: boolean }): number {
   const def = UNITS[unit.type];
   // CIV6 (Commando): the +1 Movement "also applies while the unit is
   // embarked", so the promotion adder joins both arms.
@@ -1262,7 +1264,7 @@ export function unitFullMoves(state: GameState, unit: { type: string; seat: numb
     // CIV6 (Ordu, EFFECT_ADJUST_UNIT_MOVEMENT through an ability granted to
     // units TRAINED in its city): a unit's own stat, carried for life, so the
     // embarked pool above overrides it as it does the levy's
-    + (unit.mpBonus ?? 0)
+    + (unit.mpBonus ?? 0) + abilityMoves(unit)
     // CIV6 (Enhanced Mobility): "+3 Moves."
     + (gdrHas(state, unit, 'ENHANCED_MOBILITY') ? GDR_ENHANCED_MOVES : 0)
     // an emergency member marches faster on its target's ground
@@ -1441,19 +1443,36 @@ export function fionnChassis(type: string): boolean {
     && unitDomain(type) === 'military';
 }
 
+/** does ABILITY_MYSTERIOUS_CURRENTS attach to this chassis (its TypeTags,
+ *  `CURRENTS_CLASSES`) */
+export function currentsChassis(type: string): boolean {
+  const cls = UNIT_PROMO_CLASS[type];
+  return !!UNITS[type] && cls !== undefined && CURRENTS_CLASSES.includes(cls);
+}
+
+/** the Movement a unit's abilities add for good: Mysterious Currents' */
+export function abilityMoves(unit: { currents?: boolean }): number {
+  return unit.currents ? CURRENTS_MOVES : 0;
+}
+
 /** the abilities a natural wonder grants for good (Permanent) to a land unit
  *  standing on a plot beside it — stepped onto or born there — whose chassis
  *  takes them: MATTERHORN_ADJACENT_UNITS_GRANT_ABILITY's
  *  ABILITY_ALPINE_TRAINING (runs/h1_duely1124: Cardiff's Warrior 196610 on 8:9
  *  at record 30, hills (1/1) in AI_Planning.csv from t32, (1/0) at t26-27; its
  *  Swordsman, Man-at-Arms and t130 upgrade keep it) and
- *  GIANTS_CAUSEWAY_GRANT_UNIT_ABILITY's ABILITY_SPEAR_OF_FIONN */
+ *  GIANTS_CAUSEWAY_GRANT_UNIT_ABILITY's ABILITY_SPEAR_OF_FIONN; and to a
+ *  ship on a plot of the Bermuda Triangle BERMUDA_TRIANGLE_UNITS_GRANT_ABILITY's
+ *  ABILITY_MYSTERIOUS_CURRENTS (runs/h1_duels1156 t129: the barbarian Galley
+ *  3014665 sails 19:12 -> 23:12, is teleported to 6:22 and holds 5 Movement
+ *  from 4) */
 export function grantFeatureAbilities(state: GameState, unit: Unit): void {
   const at = state.map.tiles[unit.tileIndex];
   if (!at) return;
   const near = neighbors(state.map, at);
   if (!unit.alpine && alpineChassis(unit.type) && near.some((n) => n.feature === ALPINE_FEATURE)) unit.alpine = true;
   if (!unit.fionn && fionnChassis(unit.type) && near.some((n) => n.feature === FIONN_FEATURE)) unit.fionn = true;
+  if (!unit.currents && currentsChassis(unit.type) && at.feature === CURRENTS_FEATURE) unit.currents = true;
 }
 
 /** CITY_MOVEMENT_COST (GlobalParameters), in MP_SCALE units */

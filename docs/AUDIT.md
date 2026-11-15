@@ -31,7 +31,7 @@ Hand-weighted 1–8 by the size of what is LEFT to build. One row per entry, no 
 | B-86 the emergency combat terms' reach | 1 | the lost Nuclear emergency's -1, raising a Military emergency (LAB) |
 | B-89 fire on a religious unit | 1 | a second gun's burst, the Bomber against a ship, the gun's XP against a Fighter (LAB) |
 | B-91 a religion's beliefs | 1 | Cross-Cultural Dialogue read live (LAB) |
-| B-92 the H-1 roster rows' tails | 1 | the Bermuda Triangle's currents and stop (BUILD), its teleport and the Guru heal's turn and offer (LAB) |
+| B-92 the H-1 roster rows' tails | 1 | the Bermuda Triangle's stop (BUILD), its teleport and the Guru heal's turn and offer (LAB) |
 | **B. Fidelity vs real Civ 6** | **7** | |
 | C-2 diplomatic agreements | 1 | the kept promise's end, the broken multiple on Don't Spy (LAB) |
 | C-16 the spy's second half | 1 | the level base, the police's guess, the counterspy's escape term (LAB) |
@@ -112,7 +112,7 @@ A question the SOURCE under-determines; neither engine ships a branch until the 
 - **B-91. A RELIGION'S BELIEFS.** Weight 1.
   - LAB (beliefs): Cross-Cultural Dialogue shares World Church's rows and rule, not read live
 - **B-92. THE H-1 ROSTER ROWS' TAILS.** Weight 1.
-  - BUILD (bermuda triangle): the Bermuda Triangle's ABILITY_MYSTERIOUS_CURRENTS (BERMUDA_TRIANGLE_UNITS_GRANT_ABILITY: a naval melee, ranged, raider or carrier unit entering it gains MYSTERIOUS_CURRENTS_MOVEMENT +1 Movement for good) and `Feature_UnitMovements` AllowPassthrough false (a unit entering it stops), a per-unit ability flag in both engines
+  - BUILD (bermuda triangle): the Bermuda Triangle's `Feature_UnitMovements` AllowPassthrough false (a unit entering it stops)
   - LAB (bermuda triangle): BERMUDA_TRIANGLE_TELEPORT (MODIFIER_UNIT_TELEPORT, Repeatable): where the entering unit lands (no install row names it)
   - LAB (guru): whether the Guru's heal ends its turn (the engines spend it)
   - LAB (guru): whether the game offers the Guru's heal with nothing wounded in reach (the engines do not)
@@ -293,6 +293,7 @@ A question the SOURCE under-determines; neither engine ships a branch until the 
   - LAB (predicted blow): duels1124 t87-121 a centre's blow a point or a few apart on 22 spots: t87 the Slinger 2883596 on player 0's 34:19 dealt 5 for 6; t111 / t113 the Crossbowman 4915219 on city-state 4's 32:8 dealt 4 / 3 for 5 / 4; t121 the Men-At-Arms 4521989 and 4849682 on 34:19 taken 26 / 24 for 22 / 20 and 4784141 on 32:8 taken 70 for 57
   - LAB (predicted blow): duels1124 t118-121 city-state 4's Trebuchets 1245189 / 1441798 and Pikeman 1048582 against the barbarian Man-At-Arms on 30:9 / 31:8, 19 spots: the blow back ours 25 / 35 for the game's 28 / 33 (t118), the dealt 17 for 14 and the blow back 38 / 24 for 31 / 29 (t121); t23 its Warrior 458757 on the barbarian Warrior on 31:11: dealt 21 / taken 43 for 24 / 37
   - LAB (predicted blow): duels1165 t141 the barbarian Line Infantry 3014670 / 3080202's blows on player 1's Bombard 4063258 on 6:16 beside its Classical General 4456476 on 5:15: the game's predicted damage dealt 45 / 52, ours 54 / 64 (about 5 more in the Bombard's defence than ours, which takes no aura from the General: a Renaissance unit, outside AOE_CLASSICAL_REQUIREMENTS)
+  - LAB (predicted blow): duels1169 t72-81 the barbarian Archer's planning on player 1's embarked Scout 196608 (32:18, 31:20 .. 32:20): the blow back on the Archer at its spots ours 66 / 14 .. 83 / 11, the game's 100 / 1 on each (the forward blow 44 / 0 alike)
   - LAB (targets): 1124 t131 Knight 1376260 on 38:16 lists the Man-At-Arms' 39:20 at (2/1), game (2/0), 39:20 unrevealed to city-state 3 in ours
   - LAB (targets): 1124 t87 city-state 2's Men-At-Arms on 9:12 / 9:14 list 11:12 unseen, 11:14 / 9:11 seen
   - LAB (targets): the planning's seen-now plane past our sight (1117 t8 13:13, t61 33:8 / 32:7; 1127 t3's Scout on 5:10)
@@ -307,15 +308,16 @@ A question the SOURCE under-determines; neither engine ships a branch until the 
   - BUILD (targets): the importer drops the city-states' unique improvements IMPROVEMENT_MOUND and IMPROVEMENT_TRADING_DOME (no engine row), so the barbarians' list lacks their IMPROVEMENT entries: duels1181 1,733 entries and duels1162 354 of the Mound, duels1176 142 and duels1159 110 of the Trading Dome (aiscore kind `targets`)
   - LAB (targets): a meteor site stands a turn early in the copies' target lists and a turn past its claim: duels1165 t38 29:19 (record t39 on), t47 43:14 (record t48 on) ours only, t47 29:19 ours only (gone by record t48)
   - LAB (spots): duels1124 39 targets' spots differ (aiscore kind `plan.spots`): a city-state's ship or cavalry holds turn-2 spots the game's lacks on 22 (t117 city-state 3's Quadrireme 1048577 on the Man-At-Arms on 36:17: 35:17 at turn 2; t185 its Battleship 1900550: 42:23; t84 city-state 4's Heavy Chariot 983040 on the Swordsman on 7:6: 8:6); its Bombard 1638401's spots at turn 2 for the game's 3 (t148, t183: 38:18, 38:19); t104-108 the barbarian Archer 3997716's spots a turn early (7:7 and 7:8 at turn 1 for 2)
+  - LAB (planning): a ship's turn-2 step onto a city centre: duels1124 t78-92 city-state 3's Quadrireme 1048577 plans its centre 41:12 at (2/512), the game's (2/0) (plan.reach.moves, 69 rows of the [d] / [dm] shape on 1124, 1143, 1157 and 1181); 0x56d9f0 gives a hull -1 off its own domain, but `domainPool` -1 ashore takes a ship's turn-2 water plots too (the new-turn pool 0x26e920 at 0x26ea6d..0x26eaa2 reads the +0x180 array by an index the engines take as the land one for every ship)
 - **C-132. THE DANGER MAP.** Weight 3. Scored against the aimem `danger` (aiscore kinds `danger` / `danger.major`, one-seed traces).
   - LAB (danger): 1124 t228 / t230 / t238 / t239 player 1's Giant Death Robot: ours 130 on 86 plots past the game's reach at t228 from 39:9, on 96 at t230 from 37:16 embarked (the engines' walks water as ground on its land Movement, `waterWalk`; the record's is embarked there, maxMoves 5)
   - LAB (danger): 1128 t164 the danger map 0 on 33:11 beside the barbarian Man-At-Arms on 35:10
   - LAB (danger): 1121 t236 player 1's Submarine 7733252 on its own water 3:9 lays its 75 a ring short, 32 plots: ours sets out on 4 Movement, the record's maxMoves 5 at t237 (4 on 5:5 at t236; Logistics, slotted in its start of t236, stands on our copy)
   - LAB (danger): 1124 t237 / t246 / t248 16:16 ours 100 / 105
   - LAB (danger): an unbuilt Encampment's defence under a unit at war: 1127 t248 / t249 13:2 ours 79 / 84 (Chengdu's, placed in t248, the barbarian Musketman 4456452 on it; the record's 83)
-  - LAB (danger): duels1156 t179-221 the barbarian Galley 3014665, teleported off the Bermuda Triangle 23:12 to 6:22 in t128 (UnitTeleported), holds maxMoves 5 from record t129 (ABILITY_MYSTERIOUS_CURRENTS, MODIFIER_PLAYER_UNIT_ADJUST_MOVEMENT 1, GranColombia_Maya_Features.xml): both majors' maps lack its 30 on the ring of its reach (ours 0 / 30), the Triangle's grant and teleport (BERMUDA_TRIANGLE_UNITS_GRANT_ABILITY, MODIFIER_UNIT_TELEPORT) unported; duels1152, 1172 and 1183 hold the feature too
   - LAB (danger): duels1180 t151-179 player 0's embarked Scouts 196608 on 41:7 and 3014698 on 0:10 (record maxMoves 2) lay nothing in our barbarians' map, the game's 15 about them (43:7 ours 10 / 25, 41:9 .. 2:12 0 / 15); duels1144 t134-138 player 0's embarked Scouts 1376275 on 8:5 and 1769497 on 7:5, the game's 30 (8:3 .. 7:9 ours 0 / 30)
   - LAB (danger): duels1171 t150 our barbarians' map lays player 0's embarked Warriors' 15 on their 4-Movement reach a turn early (16:4 .. 13:6 ours 15 / 0, 20 plots): Rome's heroic age of t151 with Hic Sunt Dracones (record t152's commemorations) stands in the pair's world as the barbarians' t150 turn runs, the game's map of t150 on 2 Movement
+  - LAB (danger): duels1143 t208-217 the Free Cities' map and player 0's about the Free Cities' Mechanized Infantry 131073 on 7:6 and their centre beside it: player 0's 85 / 88 on 7:6 / 8:6 / 6:7, 0 / 3 on 9:6 / 9:7 / 6:8 (a 3 the game's alone), the Free Cities' 15 / 12 .. 85 / 82 on 7:6 .. 9:7 (ours 3 above)
   - LAB (danger.major): 1121 t235 player 1's 6:4 ours 0 / 30
   - LAB (danger.major): 1128 t227 / t228 player 1's map lacks the barbarians' 62 / 30 on 49 and 38 plots about 40:17 (their Cavalry 7143430 on 40:16, its Observation Balloon 4980748 on 41:15 beside it), t231 62 / 60 on 15 plots about 41:18
   - LAB (danger.major): 1128 t179 player 1's 13:11 / 14:12 ours 0 / 1, 14:13 0 / 25
@@ -675,6 +677,7 @@ A question the SOURCE under-determines; neither engine ships a branch until the 
   - BUILD (unported rows): Torre de Belém's luxury route Gold and cheapest building off the capital's continent
   - BUILD (unported rows): the Panama Canal's and Golden Gate Bridge's placement, the bridge's appeal (GOLDENGATE_CITYAPPEAL 4), roads, tourism and cliffs
   - BUILD (unported rows): Ik Kil's IKKIL_PRODUCTION_WONDER / _DISTRICT (+50% Production toward a wonder or district beside it; `FEATURES.IKKIL` holds the plot only)
+  - BUILD (unported rows): Lysefjorden's LYSEFJORDEN_GRANT_NAVAL_UNIT_EXPERIENCE (MODIFIER_UNITS_ADJUST_GRANT_EXPERIENCE -1, Permanent: a naval unit beside it gains a promotion level; `FEATURES.LYSEFJORDEN` holds the plot only)
   - LAB (meenakshi): a religious unit beside a friendly Guru reads +1 maxMoves live (duelp1121 t141 Missionary 3473414 at 4:12 beside Guru 3342336 reads 5, at 2:12 reads 3; t134 the two free Gurus side by side spawn with 5 / 5), REQUIREMENT_PLOT_ADJACENT_FRIENDLY_UNIT_TAG_MATCHES's reach unread
   - LAB (meenakshi): whether a mid-turn grant of Meenakshi's Guru Movement reaches Movement left
   - LAB (meenakshi): GURU_STRENGTH's +5 unread

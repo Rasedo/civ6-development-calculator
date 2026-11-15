@@ -1580,6 +1580,7 @@ UNIT = {
     "noResourceUpkeep": _unit("unit_no_res_upkeep"),
     "alpine": _unit("unit_alpine"),
     "fionn": _unit("unit_fionn"),
+    "currents": _unit("unit_currents"),
     "arrivalRank": _unit_arrival_rank,
     "look": lambda sim, b, rows: _unit_look_rows(sim, b, rows),
 }

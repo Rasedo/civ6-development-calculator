@@ -2148,6 +2148,9 @@
   semantics: the two players are at war.
   status: PARTLY
   cases:
+    - recording: h1_duels1143
+      turn: 209
+      value: "the diplomatic relationship's war id (+0x398 -> 0x29fb10) above -1: the Free Cities at war with the majors alone"
     - recording: h1_duelv1117
       value: "A turn: PSEUDOYIELD_IMPROVEMENT 1.0, Improvement_YieldChanges   and its adjacency: the loop over Improvement_Adjacencies (+0x110..+0x118)   hands 0x365ae0 each row on its own (r8 = the row, r9d its yi"
     - recording: h1_duelv1124
@@ -2156,8 +2159,9 @@
     - recording: h1_duelv1128
       turn: 0
       value: runs/h1_duelv1128 Hong Kong's   Forts one 1.0 a turn (20.11 at T 0) higher from its t196 war with China,   1128's Fort rows 2,602 -> 2,795 exact;
-  impl: [cpu/core/seats.ts:atWarWithMajor]
+  impl: [cpu/core/seats.ts:atWarWithMajor, cpu/core/seats.ts:atWarWith]
   readings:
+    - "C-132 / C-95: the planning's attack onto a unit at war for any mover, a Trader's layer, the danger map's war table, the Bermuda Triangle's currents — READ (0x26e570 at 0x26e6c4, 0x586360 at 0x586542..0x5865a1, 0x585d90, 0x530f50, 0x469cd0 -> 0x3dcec0 -> 0x2a92d0, 0xc67f70), both twins"
     - "C-96: the improvement value — READ (0x7a58f0, 0x7b1320's yields, tourism and modifiers, the feature removal 0x7a3010, the harvest 0x7a37d0, the build unit 0x7a2e20, EFFECT_ADJUST_CITY_FREE_POWER), PARTLY READ (the hazards' turns, 0x7b1320's defence, claimed plots and neighbours terms)"
     - "C-109: war weariness per combat, the turn's decay and the percent — READ"
     - "H-1 / C-96: at war with a living major, a unit's strategic resource in the City Analysis, a city-state's naval strategy — READ (0x3dcf50, 0x7b62c0 at 0x7b71cd..0x7b725d, 0x6fafc0 at 0x6fc771..0x6fc873, 0x783980 at 0x783ade..0x783d93 and 0x785271..0x7852df, 0x786080, 0x865f20), both twins"

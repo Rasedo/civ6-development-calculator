@@ -241,9 +241,9 @@ Object.assign(FEATURES, {
 // (GranColombia_Maya_Features.xml): FEATURE_BERMUDA_TRIANGLE, three plots of
 // Ocean, no Feature_YieldChanges row, Feature_AdjacentYields Science 5 — its
 // own plots, each beside the other two, read 10 Science (runs/h1_duelw1105).
-// Its MODIFIER_UNIT_TELEPORT and ABILITY_MYSTERIOUS_CURRENTS are not
-// modelled. The engines' map generator lays neither; an imported world
-// carries them.
+// `grantFeatureAbilities` grants its ABILITY_MYSTERIOUS_CURRENTS; the engines
+// run none of its MODIFIER_UNIT_TELEPORT. The engines' map generator
+// lays neither; an imported world carries them.
 Object.assign(FEATURES, {
   GOBUSTAN: { id: 'GOBUSTAN', name: 'Gobustan', yields: { culture: 3, production: 1 }, ...NW },
   BERMUDA_TRIANGLE: { id: 'BERMUDA_TRIANGLE', name: 'Bermuda Triangle', yields: {}, adjacentYields: { science: 5 }, ...NW },
@@ -327,4 +327,22 @@ Object.assign(FEATURES, {
 // a wonder or a district beside it, in every city) are not modelled.
 Object.assign(FEATURES, {
   IKKIL: { id: 'IKKIL', name: 'Ik Kil', yields: {}, impassable: true, ...NW, freshWater: true },
+} satisfies Record<string, FeatureDef>);
+
+// THE CHOCOLATE HILLS and LYSEFJORDEN, appended after Ik Kil; the engines'
+// map generator lays neither, an imported world carries them. CIV6
+// (Expansion2_Features.xml): FEATURE_CHOCOLATEHILLS, four plots of Grassland
+// or Plains, passable, Appeal 2, MovementChange 1 (`terrainMp`),
+// DefenseModifier 3 (`featureDefense`), SightThroughModifier 1;
+// Feature_YieldChanges Food 1 Production 2 Science 1, its plots' whole
+// yields (runs/h1_duels1169 t12: player 0's Scout on 13:13 lays its 10 on
+// 12:12 and none on the hills' 11:12 or 11:11 two steps on in the
+// barbarians' danger map). CIV6 (VikingsLandmarks_Features.xml):
+// FEATURE_LYSEFJORDEN, three plots of Tundra or Plains, Impassable,
+// Appeal 2, SightThroughModifier 1; Feature_AdjacentYields Production 1 to
+// every neighbouring plot (runs/h1_duels1181 t31: the barbarians' danger map
+// holds none of 30:17 / 31:17 / 31:18).
+Object.assign(FEATURES, {
+  CHOCOLATEHILLS: { id: 'CHOCOLATEHILLS', name: 'Chocolate Hills', yields: { food: 1, production: 2, science: 1 }, ...NW },
+  LYSEFJORDEN: { id: 'LYSEFJORDEN', name: 'Lysefjorden', yields: {}, impassable: true, adjacentYields: { production: 1 }, ...NW },
 } satisfies Record<string, FeatureDef>);

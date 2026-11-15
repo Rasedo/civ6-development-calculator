@@ -1329,6 +1329,24 @@ export const FIONN_CLASSES: readonly PromoClass[] = [
 export const FIONN_CS = srcConst('promotions.fionnCs', 5,
   xml('ModifierArguments', 'ModifierId=SPEAR_OF_FIONN_ADJUST_COMBAT_STRENGTH&Name=Amount', 'Value'));
 
+/** CIV6 (DLC/GranColombia_Maya/Data/GranColombia_Maya_Features.xml
+ *  BERMUDA_TRIANGLE_UNITS_GRANT_ABILITY, MODIFIER_ALL_UNITS_GRANT_ABILITY,
+ *  Permanent): every player's unit on a plot of the Bermuda Triangle
+ *  (UNIT_ENTERS_BERMUDA_TRIANGLE: REQUIREMENT_PLOT_FEATURE_TYPE_MATCHES on its
+ *  own plot) gains ABILITY_MYSTERIOUS_CURRENTS for good — the feature the
+ *  requirement names */
+export const CURRENTS_FEATURE = srcConst('promotions.currentsFeature', 'BERMUDA_TRIANGLE',
+  xml('RequirementArguments', 'RequirementId=REQUIRES_UNIT_INSIDE_BERMUDA_TRIANGLE&Name=FeatureType', 'Value',
+    { expect: 'FEATURE_BERMUDA_TRIANGLE' }));
+/** the classes ABILITY_MYSTERIOUS_CURRENTS attaches to (its TypeTags:
+ *  CLASS_NAVAL_MELEE, CLASS_NAVAL_RANGED, CLASS_NAVAL_RAIDER,
+ *  CLASS_NAVAL_CARRIER), as the promotion classes whose chassis carry them */
+export const CURRENTS_CLASSES: readonly PromoClass[] = ['NAVAL_MELEE', 'NAVAL_RANGED', 'NAVAL_RAIDER', 'NAVAL_CARRIER'];
+/** MYSTERIOUS_CURRENTS_MOVEMENT (MODIFIER_PLAYER_UNIT_ADJUST_MOVEMENT): the
+ *  ability's Movement */
+export const CURRENTS_MOVES = srcConst('promotions.currentsMoves', 1,
+  xml('ModifierArguments', 'ModifierId=MYSTERIOUS_CURRENTS_MOVEMENT&Name=Amount', 'Value'));
+
 /** the class BIT a chassis presents to another unit's `CS_VS_*` mask. */
 export function classBitOf(unitType: string): number {
   const c = UNIT_PROMO_CLASS[unitType];

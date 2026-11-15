@@ -481,12 +481,14 @@ class SimTactics:
             land, naval, fight_w = land & sn, naval & sn, fight_w & sn
         return land, naval, fight_w
 
-    def _tac_zoc(self, seat: int, seen: torch.Tensor | None = None, naval: bool | None = None) -> torch.Tensor:
+    def _tac_zoc(self, seat: int, seen: torch.Tensor | None = None, naval: bool | None = None,
+                 units: bool = True) -> torch.Tensor:
         """[B, T] bool — `inEnemyZoc` for a military mover of `seat` at every
         plot, no destination: `_tac_zoc_dirs` over the six plots beside it."""
-        return self._tac_zoc_dirs(seat, seen, naval).any(dim=2)
+        return self._tac_zoc_dirs(seat, seen, naval, units).any(dim=2)
 
-    def _tac_zoc_dirs(self, seat: int, seen: torch.Tensor | None = None, naval: bool | None = None) -> torch.Tensor:
+    def _tac_zoc_dirs(self, seat: int, seen: torch.Tensor | None = None, naval: bool | None = None,
+                      units: bool = True) -> torch.Tensor:
         """[B, T, 6] bool — the plot beside each plot in direction k zones it
         for a military mover of `seat` (Rules_Movement 0x530f50): a district
         of a player at war that exerts one (`districtZones`: a city centre, a
@@ -497,7 +499,9 @@ class SimTactics:
         ship's or a land unit's), none across a river but from a city
         centre's plot (0x5311a0..0x5311c9). With `seen` [B, T] (`groundOf`'s
         seenZoc) only a unit on a plot it sees, a district whatever it sees
-        (0x531168). The mover's own ignoring is the caller's."""
+        (0x531168). With no `units` the districts alone (a Trader's layer
+        holds no exerting unit, `groundOf`'s seenZoc). The mover's own
+        ignoring is the caller's."""
         mil = self.military_at
         here = mil >= 0
         ms = mil.clamp(min=0)
@@ -517,6 +521,8 @@ class SimTactics:
             town = town | self._encamp_block_plane(seat)
         if seen is not None:
             ex = ex & seen
+        if not units:
+            ex = torch.zeros_like(ex)
         nb = self.neigh.clamp(min=0)
         bits = torch.arange(6, device=self.device).view(1, 1, 6)
         riv = (self.river_mask.unsqueeze(2) >> bits) & 1
@@ -828,6 +834,14 @@ class SimTactics:
         board_step = None
         if bool(emb_u.count_nonzero()):
             boarded_n = by_layer(lambda r: self._tac_boarded(seat, r)) & emb_u.unsqueeze(1)
+            # a Trader's layer the trade layer: another player's embarked
+            # Trader there boards it (`groundOf`'s boarded)
+            tr_m = utype == self._trader_idx
+            if bool((tr_m & emb_u).count_nonzero()):
+                tp = self.trader_at
+                tpc = tp.clamp(min=0)
+                tb = (tp >= 0) & (self.unit_seat.gather(1, tpc) != seat) & self.unit_emb.gather(1, tpc)
+                boarded_n = torch.where(tr_m.unsqueeze(1), tb[rows] & emb_u.unsqueeze(1), boarded_n)
             rev_b = self._tac_known(seat)
             board_step = boarded_n & rev_b[rows] if rev_b is not None else boarded_n
         orig_of = getattr(self, f"{pre}_unit_orig_owner")
@@ -905,6 +919,17 @@ class SimTactics:
             pf_b = free_b.unsqueeze(1) & self._tac_peace_fort(seat)[rows]
             land_b, wat_b = self._tac_enter(seat, False, plain_civ=not zoc and not stand, foes_seen=zoc, closed=False, forts=False)
             ent_n = ent_n | (pf_b & torch.where(naval.unsqueeze(1), wat_b[rows], land_b[rows] | (wat_b[rows] & placed.unsqueeze(1))))
+        # a Trader stands on the trade layer: the planning's units at war that
+        # fight are of the mover's layer (`groundOf`'s fighters), so a Trader
+        # steps onto a fighter's plot as any plot
+        trader_u = utype == self._trader_idx
+        if not zoc and bool(trader_u.count_nonzero()):
+            land_t, wat_t = self._tac_enter(seat, False, foes=False, closed=False)
+            ent_t = torch.where(naval.unsqueeze(1), wat_t[rows], land_t[rows] | (wat_t[rows] & placed.unsqueeze(1)))
+            if pf_b is not None:
+                land_tb, wat_tb = self._tac_enter(seat, False, foes=False, closed=False, forts=False)
+                ent_t = ent_t | (pf_b & torch.where(naval.unsqueeze(1), wat_tb[rows], land_tb[rows] | (wat_tb[rows] & placed.unsqueeze(1))))
+            ent_n = torch.where(trader_u.unsqueeze(1), ent_t, ent_n)
         ent_n = ent_n & ~cl_n
         water_n = self.water[rows]
         # the plots each unit attacks into (`groundOf`'s attack): an enemy
@@ -946,9 +971,18 @@ class SimTactics:
                 fort_v = self._centre_plane()
                 if self._encamp_didx >= 0:
                     fort_v = fort_v | (self.district == self._encamp_didx)
+                unseen = ~self._barb_seen("barbarians" if seat == BARB_SEAT else seat)
                 fort_v = (fort_v & (self.tile_seat >= 0) & (self.tile_seat != seat) & self._seats_hostile(seat, self.tile_seat)
-                          & ~self._barb_seen("barbarians" if seat == BARB_SEAT else seat))
+                          & unseen)
                 atk_n = atk_n | (weak.unsqueeze(1) & fort_v[rows] & ~ent_n & ~cl_n)
+                # ...and so onto a plot of a unit at war that fights, of its
+                # map layer (a Trader's none): its ground, water where it
+                # embarks and the player may enter it
+                fu = self._tac_fighters(seat) & unseen
+                cart_v = self._ocean_open(torch.full((self.B,), seat, dtype=torch.long, device=dev))
+                fu_w = fu & self.wpass & ~(self.ocean_tile & ~cart_v.unsqueeze(1))
+                fu_n = torch.where(naval.unsqueeze(1), fu_w[rows], (fu & self.passable)[rows] | (fu_w[rows] & placed.unsqueeze(1)))
+                atk_n = atk_n | ((weak & ~trader_u).unsqueeze(1) & fu_n & ~ent_n & ~cl_n)
         if rv_n is not None:
             # a plot the player never revealed is entered, never attacked into
             # — but in the breadth-first searches (the valid wrapper 0x26e570
@@ -961,6 +995,9 @@ class SimTactics:
                     fort_x = fort_x | (self.district == self._encamp_didx)
                 fort_x = fort_x & (self.tile_seat >= 0) & (self.tile_seat != seat) & self._seats_hostile(seat, self.tile_seat)
                 atk_n = atk_n | (~rv_n & fort_x[rows])
+                # ...and a unit at war that fights there, of the mover's map
+                # layer (a Trader's none) (`search`'s fortBlind, `fighterAt`)
+                atk_n = atk_n | (~rv_n & self._tac_fighters(seat)[rows] & ~trader_u.unsqueeze(1))
         # the danger map's search (flag 0x200) pays the attack's spend on a
         # district alone (`search`'s districtAttack: a city centre or an
         # Encampment of a player at war); a step onto a unit's plot is priced
@@ -1016,6 +1053,10 @@ class SimTactics:
             fought_n = fought[rows]
         if not zoc and not stand:
             zs = torch.where(zsea.unsqueeze(1), self._tac_zoc(seat, sn, True)[rows], self._tac_zoc(seat, sn, False)[rows])
+            if bool(trader_u.count_nonzero()):
+                # a Trader's: the districts' alone (Rules_Movement 0x530f50 on
+                # the formation's layer)
+                zs = torch.where(trader_u.unsqueeze(1), self._tac_zoc(seat, sn, units=False)[rows], zs)
             zs = zs & ~self._tac_zoc_ignored(utype).unsqueeze(1)
         # a path's turn may not end on a plot its own stacking unit holds (the
         # path validity 0x2720a0; `groundOf`'s full; under flag 0x1000 its
@@ -1661,6 +1702,9 @@ class SimTactics:
             # (a fit: a formation with no fighter lists no plot it sees now
             # that a unit at war of its layer holds)
             kept_out = kept_out | (by_layer(lambda r: self._tac_hostile_on(seat, r)) & sn_k & ~fights.unsqueeze(1))
+            # (a Trader's layer holds no unit that keeps it out: another
+            # player's Trader none, 0x585d90)
+            kept_out = kept_out & ~trader_u.unsqueeze(1)
             if boarded_n is not None:
                 kept_out = kept_out | boarded_n
         stand = ~kept_out | atk_n
@@ -5517,7 +5561,7 @@ class SimTactics:
         rng_s = self._ai_ranged()
         tile = self.unit_tile
         tc = tile.clamp(min=0)
-        ok = (self.unit_alive & (tile >= 0) & self._seats_hostile(seat, self.unit_seat) & seen.gather(1, tc)
+        ok = (self.unit_alive & (tile >= 0) & self._seats_at_war(seat, self.unit_seat) & seen.gather(1, tc)
               & ((melee > 0) | (rng_s > 0) | (bomb > 0)) & (self._rel_strength.take(ut) == 0))
         if self._stealth_live:
             me = torch.arange(U, device=dev).unsqueeze(0)
@@ -5608,7 +5652,7 @@ class SimTactics:
         for row in range(self.city_alive.shape[1]):
             hseat = int(self._ROW_SEAT[row])
             minor = self._CITY_MINOR0 <= row < self._CITY_MINOR0 + self.S
-            hostile = self._seats_hostile(seat, torch.full((B,), hseat, dtype=torch.long, device=dev))
+            hostile = self._seats_at_war(seat, torch.full((B,), hseat, dtype=torch.long, device=dev))
             mine = hseat == seat
             if not mine and not bool(hostile.count_nonzero()):
                 continue

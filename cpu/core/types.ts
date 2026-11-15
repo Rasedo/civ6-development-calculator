@@ -856,6 +856,10 @@ export interface Unit {
    *  Giant's Causeway, `grantFeatureAbilities`): +5 Combat Strength in every
    *  fight (SPEAR_OF_FIONN_ADJUST_COMBAT_STRENGTH), through any upgrade. */
   fionn?: boolean;
+  /** CIV6 (ABILITY_MYSTERIOUS_CURRENTS, granted for good on a plot of the
+   *  Bermuda Triangle, `grantFeatureAbilities`): +1 Movement
+   *  (MYSTERIOUS_CURRENTS_MOVEMENT), through any upgrade. */
+  currents?: boolean;
   /** ITS PLACE IN ITS PLOT'S UNIT LIST (0x75c50, the arrival order,
    *  `arrive`): the stamp its last placement took and the plot it took it
    *  on; a unit standing elsewhere has none on its plot */

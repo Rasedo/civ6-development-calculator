@@ -14350,6 +14350,23 @@ class SimSeats:
         self._host_tbl_cache = (w.clone(), tbl, simbase.plane_stamp((w,)))
         return tbl
 
+    def _seats_at_war(self, a_seat, b_plane: torch.Tensor) -> torch.Tensor:
+        """`atWarWith`, the diplomacy's war table: `_seats_hostile` but a Free
+        City at war with the majors alone (the barbarians and the
+        city-states none)"""
+        out = self._seats_hostile(a_seat, b_plane)
+        major_b = (b_plane >= 0) & (b_plane < self.n_majors)
+        free_b = b_plane == FREE_SEAT
+        if not torch.is_tensor(a_seat):
+            ia = int(a_seat)
+            if ia == FREE_SEAT:
+                return out & major_b
+            return out if 0 <= ia < self.n_majors else out & ~free_b
+        a = a_seat.reshape(*a_seat.shape, *([1] * (b_plane.dim() - a_seat.dim())))
+        free_a = a == FREE_SEAT
+        major_a = (a >= 0) & (a < self.n_majors)
+        return out & ~(free_b & ~major_a) & ~(free_a & ~major_b)
+
     def _seats_hostile(self, a_seat, b_plane: torch.Tensor) -> torch.Tensor:
         # A seat is never hostile to ITSELF, stated explicitly in the table:
         # leaving it to the war matrix's unwritten diagonal would make the
@@ -14543,6 +14560,8 @@ class SimSeats:
         # a step beside the Matterhorn or the Giant's Causeway: Alpine Training, the Spear of Fionn, for good (`grantFeatureAbilities`)
         self.unit_alpine[rows, gs] |= self._alpine_grant(rows, dest.take(rows), u_type.take(rows))
         self.unit_fionn[rows, gs] |= self._fionn_grant(rows, dest.take(rows), u_type.take(rows))
+        # ...a step onto the Bermuda Triangle: Mysterious Currents
+        self.unit_currents[rows, gs] |= self._currents_grant(rows, dest.take(rows), u_type.take(rows))
         self._air_carry_with(moved, gslot, here, dest)
         # One read of "is anybody riding along": `_escort_rider` hands back an
         # all -1 column set when no formation stands here, and every rider loop

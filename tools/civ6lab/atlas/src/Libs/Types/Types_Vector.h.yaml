@@ -1039,6 +1039,19 @@
   context:
     - "...nment, slot type, count}; World Ideology's wildcard): +0x20 0xb8eb50 -> 0x3a2bf0, +0x28 0xb8fb50 -> 0x39fc00, each |count| times, the rebuild and +0xba8 only where the government is th..."
   review: imported
+- addr: 0xc67f70
+  final: 0x944a70
+  kind: function
+  name: EFFECT_UNIT_TELEPORT
+  semantics: "the unit teleport effect (GameEffects_Effects_UnitTeleport.cpp): the plot opposite the unit's ((x + W/2) mod W, (y + H/2) mod H, the map's virtual +0x58), rings of plots about it gathered by 0x6b1b0 through the functor @0xe2edf8 from a radius up to max(W/2, H/2) bounded by the modifier's two arguments, widened until 37 candidates; one drawn on the synchronous generator (\"Unit Teleport to other side of world roll\", range the count) and a TeleportTo operation (0x973050) pushed on the unit. The functor's test and the ring order unread; no engine runs it."
+  status: PARTLY
+  cases:
+    - recording: h1_duels1156
+      turn: 129
+      value: the barbarian Galley 3014665 sails 19:12 -> 23:12 (the Bermuda Triangle) in t128, UnitTeleported to 6:22
+  readings:
+    - "C-132 / C-95: the planning's attack onto a unit at war for any mover, a Trader's layer, the danger map's war table, the Bermuda Triangle's currents — READ (0x26e570 at 0x26e6c4, 0x586360 at 0x586542..0x5865a1, 0x585d90, 0x530f50, 0x469cd0 -> 0x3dcec0 -> 0x2a92d0, 0xc67f70), both twins"
+  review: reviewed
 - addr: 0xc6f950
   kind: function
   semantics: adds to the city's per-unit production modifier (city +0x2c0[unit]).

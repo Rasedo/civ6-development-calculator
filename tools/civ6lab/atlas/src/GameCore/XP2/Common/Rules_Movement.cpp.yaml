@@ -175,6 +175,9 @@
   semantics: "Rules_Movement's zone of control test (via 0x26f980 from the path cost 0x26e920, the step cost 0x270980 and the walk 0x26fe20 at 0x270800, the answer stored on the formation +0x518): the plot entered (x, y, the formation's layer 0x2665b0, 3 religious) is in a zone where the functor 0x52f710 over its ring (0x6aef0) finds one, else a neighbour holds a district of a player at war that exerts one (0x24c2f0) or a unit not the mover's player's, of a player at war (religious layer: another religion +0x1ce4), alive, of the mover's domain (0x266720), exerting (0x56d6c0) and seen by the mover's player (0x5033a0). An exerter on the path's destination answers no zone unless the plot's stacking count is at its limit (0x585eb0 against +0x58c). The costs then take max(cost, Movement left) (0x26eb7c, 0x270a2d) unless the path flags hold 0x800."
   status: READ
   cases:
+    - recording: h1_duels1169
+      turn: 60
+      value: "the formation's layer: city-state 2's Trader 458753 on 8:5 plans 9:3 / 10:3 / 11:4 at (2/0) past the barbarian Swordsman on 9:5, no unit zoning the trade layer"
     - recording: h1_duely1127
       turn: 43
       value: "the barbarian Archer on 13:8 plans nothing past 12:7, player 1's centre 12:6 beside it out of its sight: the district zones unseen (0x531168)"
@@ -197,6 +200,8 @@
       turn: 182
       value: "the mover's domain (the third argument, [rsp+0x120]) is the formation's +0x278 (0x26f980 at 0x26f9c0), sea for an embarked member (0x267650), against each exerter's Unit +0x650 (0x53125a): city-state 3's embarked Bombard 1638401 on 39:17 plans 39:20 / 37:18 (2/0) on from the land 39:19 / 38:18 beside the barbarian Line Infantry on 38:19, AI_Planning.csv"
   impl:
+    - cpu/core/tactical.ts:seenZoc
+    - gpu/core/sim_tactics.py:_tac_zoc_dirs
     - cpu/core/tactical.ts:Ground
     - cpu/core/units.ts:inEnemyZoc
     - cpu/core/units.ts:districtZones
@@ -211,7 +216,9 @@
     - cpu/core/tactical.ts:v
     - cpu/core/tactical.ts:t
     - cpu/core/tactical.ts:sea
+    - gpu/core/sim_tactics.py:borderless
   readings:
+    - "C-132 / C-95: the planning's attack onto a unit at war for any mover, a Trader's layer, the danger map's war table, the Bermuda Triangle's currents — READ (0x26e570 at 0x26e6c4, 0x586360 at 0x586542..0x5865a1, 0x585d90, 0x530f50, 0x469cd0 -> 0x3dcec0 -> 0x2a92d0, 0xc67f70), both twins"
     - "C-95: the reach searches open turn-end nodes, and the zone of control's domain is the formation's — READ (0x271920 from 0x26dab0, 0x26f980 -> 0x530f50, 0x267650), both twins"
     - "C-125: a district's zone of control in a move's path, waived on the path's destination; a city-state's strikes after its units' planning — READ (0x530f50 at 0x531127..0x531302, 0x26f980, 0x26f870), FIT (the strikes' place), both twins"
     - "C-125: a civilian at war in the planning's search, a zone of control across a river, the attack's move onto a city — READ (0x26e570, 0x530f50 at 0x5310c8..0x5311c9, 0x771f80 at 0x772121), both twins"

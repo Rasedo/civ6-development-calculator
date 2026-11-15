@@ -68,7 +68,7 @@ import { GOVERNMENTS, POLICIES, type SlotKind } from '../data/policies';
 import { ENHANCER_BELIEFS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, PANTHEONS, WORSHIP_BELIEFS } from '../data/religion';
 import { AGE_GOLDEN } from '../data/seats';
 import { CITY_STATE_SUZERAIN_BONUS, CITY_STATE_TYPES, LEVY_TURNS } from '../data/cityStates';
-import { ALPINE_FEATURE, FIONN_FEATURE, PROMO_CLASSES } from '../data/promotions';
+import { ALPINE_FEATURE, CURRENTS_FEATURE, FIONN_FEATURE, PROMO_CLASSES } from '../data/promotions';
 import { promoFlag, unitPromoRows } from '../core/promotions';
 import { FEATURES, clearableFeatures, isFloodplains } from '../../world/features';
 import { RESOURCES } from '../../world/resources';
@@ -88,7 +88,7 @@ import { LUXURY_IDS } from '../../world/resources';
 import { SPY_MISSIONS, SPY_OFFENSIVE_MISSIONS } from '../data/espionage';
 import type { QueueItem } from '../core/types';
 import { projectCost, settlerCost } from '../core/game';
-import { alpineChassis, builderCost, escortable, fionnChassis, rangedCombatOf, traderCost, unitDomain } from '../core/units';
+import { alpineChassis, builderCost, currentsChassis, escortable, fionnChassis, rangedCombatOf, traderCost, unitDomain } from '../core/units';
 import { carryLayout, computeUnlocks, governmentSlots } from '../core/effects';
 import { ERA_BEGINS, bestRoadTier, eraCountdownStep } from '../core/eras';
 import { standingRemovable } from '../core/climate';
@@ -542,6 +542,10 @@ export interface History {
   alpine: Set<string>;
   /** units holding the Spear of Fionn, by `owner:id` (`foldBeside`) */
   fionn: Set<string>;
+  /** units holding Mysterious Currents, by `owner:id` (`foldBeside` on the
+   *  Bermuda Triangle's own plots: a logged step onto one, the teleport
+   *  after it) */
+  currents: Set<string>;
   /** the turn each player last seated each governor (`GovernorAssigned` in
    *  the records' action log), by `player:governor` catalog index */
   govSeated: Map<string, number>;
@@ -991,7 +995,7 @@ function foldActivities(acts: Map<string, UnitActivity>, rows: readonly unknown[
 }
 
 export function newHistory(): History {
-  return { firstTurn: -1, last: null, before: null, beforeThat: null, trained: new Map(), levied: new Map(), captives: new Map(), struck: new Map(), activities: new Map(), formed: new Set(), arrivals: new Map(), alpine: new Set(), fionn: new Set(), govSeated: new Map(), growthDrift: new Map(), lastHit: new Map(), gpSpent: new Map(), revealed: new Map(),
+  return { firstTurn: -1, last: null, before: null, beforeThat: null, trained: new Map(), levied: new Map(), captives: new Map(), struck: new Map(), activities: new Map(), formed: new Set(), arrivals: new Map(), alpine: new Set(), fionn: new Set(), currents: new Set(), govSeated: new Map(), growthDrift: new Map(), lastHit: new Map(), gpSpent: new Map(), revealed: new Map(),
     unknownSince: new Set(), cityFirstSeen: new Map(), nextPlotUnheld: new Set(), fireFood: new Map(), fireProd: new Map(), eventYields: new Map(), eventCounts: new Map(), openEvents: [], eventRead: new Map(), eventDraws: new Map(), droughts: [], bare: new Map(), discountDistricts: new Map(), discountPlaced: new Map(), ages: new Map(), moments: new Map(), momentsWorld: [], villageKinds: new Map(),
     eraTurns: [], gameEra: 0, eraStartTurn: 1, eraCountdown: -1, routeSeen: new Map(), routeCourse: new Map(), trail: new Map(), legs: new Map(), posts: new Map(), policySlots: new Map(),
     competition: null, podium: new Map(), culture: new Map(), tourismTo: new Map(),
@@ -2134,6 +2138,7 @@ export function advanceHistory(h: History, rec: TurnRecord, cat: Catalog): void 
   foldDominance(h, rec);
   foldBeside(h.alpine, h.last, rec, cat, ALPINE_FEATURE);
   foldBeside(h.fionn, h.last, rec, cat, FIONN_FEATURE);
+  foldBeside(h.currents, h.last, rec, cat, CURRENTS_FEATURE, true);
   h.beforeThat = h.before;
   // a centre struck: its damage or its outer defences' grown since the
   // record before, dated as the game stamps it (`struckTurn`)
@@ -2160,7 +2165,7 @@ export function advanceHistory(h: History, rec: TurnRecord, cat: Catalog): void 
  *  its owner's gone since the record before, close by, of its experience and
  *  level (runs/h1_duely1124 Cardiff's Warrior 196610 -> Swordsman 851973 t48
  *  -> Man-at-Arms 1048577 t77) */
-function foldBeside(held: Set<string>, last: TurnRecord | null, rec: TurnRecord, cat: Catalog, feature: string): void {
+function foldBeside(held: Set<string>, last: TurnRecord | null, rec: TurnRecord, cat: Catalog, feature: string, on = false): void {
   const fi = cat.features.indexOf(`FEATURE_${feature}`);
   if (fi < 0) return;
   const W = rec.head.W;
@@ -2169,6 +2174,11 @@ function foldBeside(held: Set<string>, last: TurnRecord | null, rec: TurnRecord,
   const beside = new Set<number>();
   rec.map.forEach((row, y) => row.forEach((p, x) => {
     if (num(p[P.feature] as number) !== fi) return;
+    // (`on`: the feature's own plots, a step onto one)
+    if (on) {
+      beside.add(y * W + x);
+      return;
+    }
     for (let y2 = Math.max(0, y - 1); y2 <= Math.min(H - 1, y + 1); y2++) {
       for (let dx = -2; dx <= 2; dx++) {
         const x2 = (x + dx + W) % W;
@@ -2998,6 +3008,7 @@ export function importTurn(rec: TurnRecord, cat: Catalog, history?: History): Im
     if (act) unit.activity = act;
     if (history?.alpine.has(`${u.owner}:${u.id}`) && alpineChassis(unit.type)) unit.alpine = true;
     if (history?.fionn.has(`${u.owner}:${u.id}`) && fionnChassis(unit.type)) unit.fionn = true;
+    if (history?.currents.has(`${u.owner}:${u.id}`) && currentsChassis(unit.type)) unit.currents = true;
     const levy = history?.levied.get(`${u.owner}:${u.id}`);
     if (levy !== undefined && seatOfGame(levy) !== NO_SEAT) unit.leviedFrom = seatOfGame(levy);
     // a barbarian stealth unit that has struck stands seen (`unitVisibleTo`:

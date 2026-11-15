@@ -17874,3 +17874,67 @@ Check Plot's `canPlaceDistrict` / `gpu/core/sim_minorai.py`
   no contract) and t90 (population 4: its Commercial Hub contract held).
 - OPEN: the count 0x1ae8f0's flags (placed incomplete districts counted as
   the engines count them) unread.
+
+## C-132 / C-95: the planning's attack onto a unit at war for any mover, a Trader's layer, the danger map's war table, the Bermuda Triangle's currents — READ (0x26e570 at 0x26e6c4, 0x586360 at 0x586542..0x5865a1, 0x585d90, 0x530f50, 0x469cd0 -> 0x3dcec0 -> 0x2a92d0, 0xc67f70), both twins
+
+`groundOf`'s attack, fighters, keeps and seenZoc, `search`'s fortBlind
+(cpu/core/tactical.ts), `atWarWith` (cpu/core/seats.ts) in `dangerPlane`,
+`grantFeatureAbilities` / `currentsChassis` / `abilityMoves`
+(cpu/core/units.ts), `History.currents` (cpu/harness/import.ts); GPU
+`_tac_search`'s weak arm, trader_u, kept_out and zs, `_seats_at_war`
+(gpu/core/sim_seats.py) in `_danger_plane`, `_currents_grant`
+(gpu/core/sim_masks.py), `unit_currents` in `_full_mp`.
+
+- THE PLANNING'S ATTACK (the valid wrapper 0x26e570): a plot holding a unit
+  of a player at war that fights (0x75c50 -> 0x209dd0) is an attack whatever
+  the mover, a formation with no strength at all included, and whatever the
+  player revealed or sees of it; its step spends the Movement it leaves. The
+  path validity 0x2720a0 then refuses a formation with no fighter the link
+  onto such a plot the player sees now (the child's +0x51 & 0x34, set on a
+  seen plot alone), so a Builder or a Trader plans a fighter's plot out of
+  its sight at (n/0), and any mover plans one on a plot it never revealed at
+  (n/0). Confirming: duels1169 t56 city-state 4's Builder 655366 on 35:21
+  plans the barbarian Scout's 37:21 at (2/0), t62 city-state 2's Builder
+  524288 the Archer's 11:4; t11 the barbarian Scout 131073 on 14:11 the
+  unrevealed 14:14 under player 0's Scout at (2/0).
+- A TRADER'S LAYER: the plot unit list the wrapper and the zone test read is
+  the formation's layer (0x2665b0; the trade layer for a Trader), so a
+  Trader steps onto a fighter's plot as any plot (duels1124 t41 city-state
+  3's Trader 851971 on 41:12 plans the barbarian Slinger's 40:11 at
+  (1/256)), and no unit zones it — a district at war still does
+  (Rules_Movement 0x530f50: duels1169 t60 city-state 2's Trader 458753 on
+  8:5 plans 9:3 / 10:3 / 11:4 at (2/0) past the barbarian Swordsman on 9:5).
+  The stacking count 0x585d90 counts no unit with MakeTradeRoute or Spy, so
+  another player's Trader keeps no Trader out (duels1117 t78 city-state 4's
+  Trader 655360 on 32:11 plans 33:12 at (1/256), player 1's Trader and
+  Great Writer on it in its sight).
+- THE DANGER MAP'S WAR TABLE: the map takes the units and districts of each
+  player IsAtWarWith (0x469cd0 -> 0x3dcec0 -> 0x2a92d0: the diplomatic
+  relationship's war id, +0x398), not every player that may strike the
+  seat: the Free Cities are at war with the majors alone, the barbarians with
+  every player but the Free Cities (the records' wars: duels1143 t209 the
+  Free Cities' [0, 1], the barbarians' [0, 1, 2, 3, 4], city-state 4's
+  [63]; 1124 and 1191 the Free Cities' [0, 1] throughout). Confirming:
+  duels1143 t209 city-state 4's map holds none of the Free Cities'
+  Mechanized Infantry 131073 on 7:6 (85), the Free Cities' none of
+  city-state 4's Ironclad 1703945 on 5:5 (70).
+- THE BERMUDA TRIANGLE'S CURRENTS: BERMUDA_TRIANGLE_UNITS_GRANT_ABILITY
+  (GranColombia_Maya_Features.xml, Permanent) grants ABILITY_MYSTERIOUS_CURRENTS
+  (TypeTags CLASS_NAVAL_MELEE / _RANGED / _RAIDER / _CARRIER) to a unit on a
+  plot of the Triangle, MYSTERIOUS_CURRENTS_MOVEMENT +1 Movement for good.
+  The teleport (EFFECT_UNIT_TELEPORT 0xc67f70): the plot opposite the
+  unit's ((x + W/2) mod W, (y + H/2) mod H), rings about it widened until
+  37 candidate plots (the functor @0xe2edf8) or the modifier's bounds, one
+  drawn ("Unit Teleport to other side of world roll"), a TeleportTo
+  operation queued (0x973050). Confirming: duels1156 the barbarian Galley
+  3014665 sails 19:12 -> 23:12 in t128, UnitTeleported to 6:22, maxMoves 4
+  -> 5 from record t129, its 30 over the ring of its 5-Movement reach in
+  player 1's map (t183-215: 5:15, 6:15 and on).
+- THE CHOCOLATE HILLS AND LYSEFJORDEN (install rows, no DLL): a plot of the
+  Chocolate Hills costs 1 more (MovementChange 1; duels1169 t12 player 0's
+  Scout on 13:13 lays nothing on 11:12 / 11:11 two hills steps on in the
+  barbarians' map), Lysefjorden is Impassable (duels1181 t31 none of 30:17 /
+  31:17 / 31:18 in the barbarians' map).
+- OPEN: the teleport's candidate functor and ring order, and its draw's
+  place among the turn's draws (no engine runs it); Lysefjorden's
+  LYSEFJORDEN_GRANT_NAVAL_UNIT_EXPERIENCE.

@@ -6665,6 +6665,10 @@ class SimEconomy:
         # so the embark pool below overrides it as it does the levy's.
         if self._bvar_train_mp:
             base = base + getattr(self, f"{pre}_unit_mp_bonus")
+        # ...and Mysterious Currents', granted for good on the Bermuda
+        # Triangle (`abilityMoves`)
+        if self._currents_feat >= 0:
+            base = base + getattr(self, f"{pre}_unit_currents").long() * self._currents_mp
         # CIV6 (Letters of Marque): "Naval Raiders: +100% Production, +2
         # Movement."
         _sd = getattr(self, f"{pre}_unit_seat")

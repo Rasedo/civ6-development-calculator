@@ -81,7 +81,9 @@ export type FeatureId =
   | 'WHITE_DESERT'
   | 'MATTERHORN'
   | 'RORAIMA'
-  | 'IKKIL';
+  | 'IKKIL'
+  | 'CHOCOLATEHILLS'
+  | 'LYSEFJORDEN';
 
 export type ResourceCategory = 'bonus' | 'luxury' | 'strategic';
 

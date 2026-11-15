@@ -127,6 +127,9 @@
   semantics: "the planning search's valid wrapper, on every link it prices (the start linked from itself, its null parent skipping the +0x51 & 0x40 refusal). Attack test: the plot's district type (0x810d0) of an owner (+0x1c) at war with the mover's player whose DistrictInfo +0x58 is set and +0x5c above 0 (the city centre, the Encampment: Districts.HitPoints), whatever the mover and the district's pillage or health, else (search flag +0x398 & 0x200 clear) any unit on the plot (0x75c50) of a player at war that fights (0x209dd0), no domain test; the attack's cost adds the Movement left (0x1d0 += 0x1d4, 0x1d4 = 0): a unit standing on such a district sets out with none; nothing is linked from a fighter's attack node (0x26e5cd: a parent with node flag +0x51 & 0x40 refused). At 0x26e83e..0x26e8ae, flag 0x200 clear, a step whose parent is not the unit's own plot and lies in the unit's enemy zone of control (0x26f980 -> 0x530f50) is refused unless it is an attack."
   status: READ
   cases:
+    - recording: h1_duels1169
+      turn: 56
+      value: "any mover: city-state 4's Builder 655366 on 35:21 plans the barbarian Scout's 37:21 at (2/0), out of its sight; t11 the barbarian Scout 131073 on 14:11 the unrevealed 14:14 under player 0's Scout at (2/0)"
     - recording: h1_duely1121
       turn: 97-103
       value: "the raid's Man-At-Arms 2883594 on 6:14 lists China's Great Scientist's 5:12 at (2/1), a plain step from the city 6:12, none from 5:13 in the city's zone; its spot 6:12 as logged (civilian plots in the five duels' planning rows, t1-140: 475 equal / 51 differ as plain steps, 357 / 167 as attacks)"
@@ -152,6 +155,9 @@
       turn: 43
       value: "the district attack whatever the mover, a civilian's too where the validity links it: the captive Builder 1900564 on 10:3 lists player 1's unseen centre 7:5 at (2/0)"
   impl:
+    - cpu/core/tactical.ts:fighterAt
+    - cpu/core/tactical.ts:fortBlind
+    - gpu/core/sim_tactics.py:_tac_search
     - cpu/core/tactical.ts:fortAtWar
     - cpu/core/tactical.ts:garrisonDistrict
     - gpu/core/sim_tactics.py:_tac_search
@@ -180,7 +186,9 @@
     - cpu/core/tactical.ts:fortBlind
     - gpu/core/sim_tactics.py:borderless
     - cpu/core/tactical.ts:attack
+    - cpu/core/tactical.ts:Ground
   readings:
+    - "C-132 / C-95: the planning's attack onto a unit at war for any mover, a Trader's layer, the danger map's war table, the Bermuda Triangle's currents — READ (0x26e570 at 0x26e6c4, 0x586360 at 0x586542..0x5865a1, 0x585d90, 0x530f50, 0x469cd0 -> 0x3dcec0 -> 0x2a92d0, 0xc67f70), both twins"
     - "C-125: a civilian at war in the planning's search, a zone of control across a river, the attack's move onto a city — READ (0x26e570, 0x530f50 at 0x5310c8..0x5311c9, 0x771f80 at 0x772121), both twins"
     - "C-95: the planning's valid wrapper on a district at war, and a land unit's embarking by its original owner — READ (0x26e570 at 0x26e5e2..0x26e7f1, 0x56c480), the first both twins"
     - "C-95: the unit pathfinder and the planning's reach — READ, confirmed on the Wander draws"
@@ -968,6 +976,7 @@
     - "C-134 / C-95: the plots the sea took, a flooded route, a Trader's closed ground, a new turn's domain, the planning list's room — READ"
     - "C-134 / C-95: the plots the sea took, a flooded route, a Trader's closed ground, a new turn's domain, the planning list's room — READ (0x586360 at 0x58645d..0x58648e / 0x5865e7..0x5865fd, 0x2720a0 at 0x272392 / 0x272618..0x272689, 0x52fe90, 0x26e920 at 0x26ea6d..0x26eaa2, 0x7920d0 at 0x792144..0x79216d, 0x790c60 at 0x790c87..0x790c8d, 0x586d40 at 0x587042..0x5870aa, 0x52fa40 at 0x52fa6a..0x52fa8e), LAB (the records' drowned plots), both twins"
     - "C-95 / C-134 / C-125: a raised unit's planning, a Trader's districts at peace, a civilian's district at war, a captive's first owner, the meteor site's goody — READ (0x792c90, 0x586360 at 0x5865e7..0x5865fd / 0x58666a..0x5866c7 / 0x586729..0x586733, 0x26e570 at 0x26e5e2..0x26e6c4, 0x2720a0 at 0x272434..0x272544, 0x82d90, 0x212500 at 0x212825..0x2128f3), LAB (the aiunits plannings), both twins"
+    - "C-132 / C-95: the planning's attack onto a unit at war for any mover, a Trader's layer, the danger map's war table, the Bermuda Triangle's currents — READ (0x26e570 at 0x26e6c4, 0x586360 at 0x586542..0x5865a1, 0x585d90, 0x530f50, 0x469cd0 -> 0x3dcec0 -> 0x2a92d0, 0xc67f70), both twins"
   context:
     - "- THE PATH'S TURN ENDS (0x2720a0, the move order's validity at the end of 0x26e570): each node records (0x271be0) whethe..."
     - "- A plot the player never revealed is the reach's leaf (READ): the validity 0x2720a0 under the search's flag 1 (0x115) refuses a step whose parent is not revealed (node +0x..."

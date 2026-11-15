@@ -420,8 +420,16 @@
   kind: function
   semantics: the diplomacy's at-war test (0x469cd0 reads it).
   status: PARTLY
-  impl: [cpu/core/minorBuild.ts:strongerFoe]
+  cases:
+    - recording: h1_duels1143
+      turn: 209
+      value: "the war table: the Free Cities' wars [0, 1], the barbarians' [0, 1, 2, 3, 4]; city-state 4's danger map holds none of the Free Cities' Mechanized Infantry 131073 on 7:6"
+  impl:
+    - cpu/core/minorBuild.ts:strongerFoe
+    - cpu/core/seats.ts:atWarWith
+    - gpu/core/sim_seats.py:_seats_at_war
   readings:
+    - "C-132 / C-95: the planning's attack onto a unit at war for any mover, a Trader's layer, the danger map's war table, the Bermuda Triangle's currents — READ (0x26e570 at 0x26e6c4, 0x586360 at 0x586542..0x5865a1, 0x585d90, 0x530f50, 0x469cd0 -> 0x3dcec0 -> 0x2a92d0, 0xc67f70), both twins"
     - "H-1: the city-states' quests — READ"
     - "C-97: the operations — the manager READ (no-enemy candidates), the war candidates unread"
     - "C-97: the operations — the manager and its candidates READ, the staging list and City Defense's start unread"

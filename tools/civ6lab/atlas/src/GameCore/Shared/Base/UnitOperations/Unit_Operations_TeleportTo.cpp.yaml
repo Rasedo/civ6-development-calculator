@@ -1,0 +1,15 @@
+# The DLL atlas, curated layer (tools/civ6lab/atlas.py documents the record).
+# Records keyed by GameCore_XP2_Release.dll RVA; `final` the FinalRelease RVA.
+# `review: imported` = bootstrapped from dll_readings.md / code comments / saved
+# labels and not yet reviewed: verify against the disassembly, then edit and
+# set `review: reviewed`.
+- addr: 0x973050
+  final: 0x67ce30
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-132 / C-95: the planning's attack onto a unit at war for any mover, a Trader's layer, the danger map's war table, the Bermuda Triangle's currents — READ (0x26e570 at 0x26e6c4, 0x586360 at 0x586542..0x5865a1, 0x585d90, 0x530f50, 0x469cd0 -> 0x3dcec0 -> 0x2a92d0, 0xc67f70), both twins"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...e drawn (\"Unit Teleport to other side of world roll\"), a TeleportTo operation queued (0x973050). Confirming: duels1156 the barbarian Galley 3014665 sails 19:12 -> 23:12 in t128, Unit..."
+  review: imported

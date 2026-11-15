@@ -1382,6 +1382,7 @@ const UNIT_G: Record<string, Extractor> = {
   noResourceUpkeep: overUnits((u) => (u.noResourceUpkeep ? 1 : 0)),
   alpine: overUnits((u) => (u.alpine ? 1 : 0)),
   fionn: overUnits((u) => (u.fionn ? 1 : 0)),
+  currents: overUnits((u) => (u.currents ? 1 : 0)),
   // its place among its plot's military units in the plot's list order
   // (`plotUnits`, 0x75c50), -1 for a unit of another class
   arrivalRank: ((state, rows) => (rows as Unit[]).map((u) => (unitDomain(u.type) !== 'military' || u.tileIndex < 0 ? -1

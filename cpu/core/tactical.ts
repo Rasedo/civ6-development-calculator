@@ -24,7 +24,7 @@ import {
   setBarbStepLook, unitsHostile, unitVisibleTo, fortifyOrder, operationStart, skipTurn,
   waterEnterable, waterWalks, borderClosedTo, formationBanned, formationCS, setRecordFormation, formationMates, dropLoneRiders, escortOf, escortRiders, disbandUnit,
 } from './units';
-import { BARB_SEAT, FREE_SEAT, NO_SEAT, campTiles, cityHolders, civsAtWar, isBarbSeat, isCityStateSeat, isCiv, isTerritorial, seatOf, tileCity, tileSeat } from './seats';
+import { BARB_SEAT, FREE_SEAT, NO_SEAT, atWarWith, campTiles, cityHolders, civsAtWar, isBarbSeat, isCityStateSeat, isCiv, isTerritorial, seatOf, tileCity, tileSeat } from './seats';
 import { OPEN_BORDERS_CIVIC } from '../data/seats';
 import { randRange } from './rand';
 import { cityDefenseStrength, districtGarrisonedStrength, embarkedDefenseCS, cityStrikeBase, coastalRaid, damageExpected, hostilePillage, hostileRangedStrike, meleeAttack, meleeUnitStrengths, movesAndShoots, predictDistrictExchange, rangedUnitStrengths, stackDefender, unitAttackRange } from './combat';
@@ -256,6 +256,10 @@ interface Ground {
   /** the same ground whatever the unit: no step leaves it under the search's
    *  flag 1 but from the unit's own plot (0x2720a0 at 0x272618..0x272689) */
   shutParent: (i: number) => boolean;
+  /** in the planning's and the breadth-first searches' ground, a unit of a
+   *  player at war that fights holds the plot, of the mover's map layer,
+   *  seen or not (0x26e570's attack test, 0x75c50 -> 0x209dd0) */
+  fighterAt: (i: number) => boolean;
 }
 
 const NO_FOES: ReadonlySet<number> = new Set();
@@ -294,7 +298,11 @@ function groundOf(state: GameState, unit: Unit, revealedOnly = true, planning = 
     const st = aiStrengths(state, u);
     if (st.melee <= 0 && st.ranged <= 0 && st.bombard <= 0) continue;
     fought.add(u.tileIndex);
-    if (planning) fighters.add(u.tileIndex);
+    // ...of the mover's map layer (the plot's unit list 0x75c50 on the
+    // formation's layer): a Trader steps onto a fighter's plot as any plot
+    // (runs/h1_duels1124 t41: city-state 3's Trader 851971 on 41:12 plans the
+    // barbarian Slinger's 40:11 at (1/256))
+    if (planning && mapLayer(u.type) === mapLayer(unit.type)) fighters.add(u.tileIndex);
   }
   // the planning's search (0x26e570): a plot of a unit at war that does not
   // fight (a civilian) is a plain step, neither barred nor attacked into
@@ -364,8 +372,11 @@ function groundOf(state: GameState, unit: Unit, revealedOnly = true, planning = 
   const layer = mapLayer(unit.type);
   const onLayer = (x: Unit) => onMap(x) && mapLayer(x.type) === layer;
   const boards = new Map<number, boolean>();
+  // (a Trader's layer the trade layer: another player's embarked Trader there
+  // boards it; runs/h1_duels1143 t158: city-state 4's embarked Trader
+  // 1245192 on 1:18 plans no 3:18, player 1's embarked Trader on it)
   const boarded = (i: number): boolean => {
-    if (!unit.embarked || !held.has(i)) return false;
+    if (!unit.embarked || (layer !== 'trade' && !held.has(i))) return false;
     let v = boards.get(i);
     if (v === undefined) {
       // the plot list the best defender reads (0x75c50 on the mover's layer)
@@ -376,22 +387,24 @@ function groundOf(state: GameState, unit: Unit, revealedOnly = true, planning = 
   };
   // on a plot the player sees now (node +0x50 & 2, the visibility count
   // +0x290) a unit of another player not at war with it, of the mover's map
-  // layer (0x585d90 counts none with MakeTradeRoute or Spy: the node's +0x54)
+  // layer (0x585d90 counts none with MakeTradeRoute or Spy: the node's +0x54;
+  // runs/h1_duels1117 t78: city-state 4's Trader 655360 on 32:11 plans 33:12
+  // at (1/256), player 1's Trader and Great Writer on it in its sight)
+  const keeps = (x: Unit) => x.seat !== unit.seat && onLayer(x) && !UNITS[x.type]?.trader && stackClass(x.type) !== 'spy'
+    && !unitsHostile(state, unit, x);
   const peaces = new Map<number, boolean>();
   const peaceHeld = (i: number): boolean => {
     let v = peaces.get(i);
     if (v === undefined) {
       seenNow ??= plotsSeenNow(state, new Set([unit.seat]));
-      peaces.set(i, (v = seenNow[i] === 1 && state.units.some((x) => x.tileIndex === i && x.seat !== unit.seat && onLayer(x)
-        && !unitsHostile(state, unit, x))));
+      peaces.set(i, (v = seenNow[i] === 1 && state.units.some((x) => x.tileIndex === i && keeps(x))));
     }
     return v;
   };
   const passes = new Map<number, boolean>();
   let foesSeen: Set<number> | undefined;
   const crowded = (i: number) => own.has(i) || (held.has(i) && peaceHeld(i));
-  const stacked = (i: number) => own.has(i) || (held.has(i) && state.units.some((x) => x.tileIndex === i && x.seat !== unit.seat
-    && onLayer(x) && !unitsHostile(state, unit, x)));
+  const stacked = (i: number) => own.has(i) || (held.has(i) && state.units.some((x) => x.tileIndex === i && keeps(x)));
   const hazard = (i: number): boolean => {
     const f = state.map.tiles[i].feature;
     if (!f || featureDanger(f) <= 0) return false;
@@ -405,6 +418,7 @@ function groundOf(state: GameState, unit: Unit, revealedOnly = true, planning = 
     boarded,
     closed: (i) => shut(state.map.tiles[i]),
     shutParent: (i) => closedTo(state.map.tiles[i]),
+    fighterAt: (i) => fighters.has(i),
     stand: (i) => {
       if (!held.has(i)) return true;
       if (!planning || boarded(i)) return false;
@@ -463,7 +477,12 @@ function groundOf(state: GameState, unit: Unit, revealedOnly = true, planning = 
           if (!sn[n.index]) continue;
           const river = crossesRiver(state.map, t, n);
           if (river && n.district !== 'CITY_CENTER') continue;
-          if (state.units.some((x) => x.tileIndex === n.index && onMap(x) && !unitReligious(x.type) && unitExertsZoc(x)
+          // ...a unit's of the mover's map layer (Rules_Movement 0x530f50 on
+          // the formation's layer 0x2665b0): none for a Trader (runs/
+          // h1_duels1169 t60: city-state 2's Trader 458753 on 8:5 plans
+          // 9:3 / 10:3 / 11:4 at (2/0) past the zone of the barbarian
+          // Swordsman on 9:5)
+          if (layer !== 'trade' && state.units.some((x) => x.tileIndex === n.index && onMap(x) && !unitReligious(x.type) && unitExertsZoc(x)
             && !!UNITS[x.type]?.naval === seaFormation && unitsHostile(state, x, unit))) { v = true; break; }
         }
       }
@@ -525,10 +544,18 @@ function groundOf(state: GameState, unit: Unit, revealedOnly = true, planning = 
       // 1900564 on 10:3 plans player 1's centre 7:5, out of their sight, at
       // (2/0); h1_duels1142 t100 the Builder 3670047 on 34:8 nothing of
       // player 1's centre 32:7 in their sight)
-      if (!melee && !shoots && planning && known(t.index) && garrisonDistrict(state, t) && !shut(t)) {
+      // ...and so a plot of a unit at war that fights (0x26e570 at
+      // 0x26e6c4: any unit of the plot at war that fights, whatever the
+      // mover): the step spends the Movement it leaves and the plot is listed
+      // (runs/h1_duels1169 t56: city-state 4's Builder 655366 on 35:21 plans
+      // the barbarian Scout's 37:21 at (2/0), out of its sight; t62
+      // city-state 2's Builder 524288 the Archer's 11:4)
+      if (!melee && !shoots && planning && known(t.index) && !shut(t) && (garrisonDistrict(state, t) || fighters.has(t.index))) {
         const owner = tileSeat(t);
         seenNow ??= plotsSeenNow(state, new Set([unit.seat]));
-        return seenNow[t.index] !== 1 && owner !== NO_SEAT && owner !== unit.seat && unitsHostile(state, unit, { seat: owner });
+        if (seenNow[t.index] === 1) return false;
+        if (garrisonDistrict(state, t) && owner !== NO_SEAT && owner !== unit.seat && unitsHostile(state, unit, { seat: owner })) return true;
+        return fighters.has(t.index) && (!isWater(t) || waterEnterable(state, t, unit));
       }
       if (!melee || !known(t.index) || isImpassable(t) || peaceFort(state, unit, t)) return false;
       // ground closed to the unit is none it strikes into: no search links
@@ -830,7 +857,12 @@ function search(state: GameState, unit: Unit, maxTurns: number, zoc: boolean, on
       // (runs/h1_duelp1117 t56: the barbarian Warrior 3080209 on 33:8 plans
       // city-state 4's unrevealed centre 32:5 at (2/0) from the zoned 32:6
       // and moves there for the Archer in it, AI_Planning.csv)
-      const fortBlind = !zoc && !ground.revealed(to.index) && districtAttack(to);
+      // ...and so its units: one at war that fights on a plot the player never
+      // revealed is an attack whatever the mover, its Movement spent
+      // (runs/h1_duels1169 t11: the barbarian Scout 131073 on 14:11 plans the
+      // unrevealed 14:14, player 0's Scout on it, at (2/0); t18 from 13:16
+      // the unrevealed 12:19, player 0's Warrior on it)
+      const fortBlind = !zoc && !ground.revealed(to.index) && (districtAttack(to) || ground.fighterAt(to.index));
       const attack = fortBlind || (ground.revealed(to.index) && !(zoc ? ground.pass(to) : ground.enter(to)));
       // the destination at its stacking limit (`crowded`), linked at any
       // turn without flag 0x1000 or within the first under it, ends the
@@ -2404,7 +2436,7 @@ export function dangerPlane(state: GameState, seat: number): Int16Array {
   const seers = [seat, ...state.cityStates.filter((cs) => cs.centerIndex >= 0 && suzerainOf(cs) === seat).map((cs) => cs.seat)];
   for (const u of state.units) {
     if (!onMap(u) && unitDomain(u.type) !== 'air') continue;
-    if (unitReligious(u.type) || !unitsHostile(state, { seat }, u) || !seen[u.tileIndex] || !seers.some((s) => unitVisibleTo(state, u, s))) continue;
+    if (unitReligious(u.type) || !atWarWith(state, seat, u.seat) || !seen[u.tileIndex] || !seers.some((s) => unitVisibleTo(state, u, s))) continue;
     const st = aiStrengths(state, u);
     if (st.melee <= 0 && st.ranged <= 0 && st.bombard <= 0) continue;
     const s = unitDanger(st.melee, st.ranged, st.bombard);
@@ -2475,7 +2507,7 @@ export function dangerPlane(state: GameState, seat: number): Int16Array {
   const citiesHeld = (h: { seat: number; cities: City[] }) => isCityStateSeat(h.seat)
     ? state.cityStates.filter((cs) => cs.seat === h.seat && cs.centerIndex >= 0).map(minorCity) : h.cities;
   for (const h of [...cityHolders(state), ...state.cityStates]) {
-    if (!unitsHostile(state, { seat }, h)) continue;
+    if (!atWarWith(state, seat, h.seat)) continue;
     for (const c of citiesHeld(h)) {
       for (const d of dangerDistricts(state, c)) {
         if (!seen[d.plot]) continue;

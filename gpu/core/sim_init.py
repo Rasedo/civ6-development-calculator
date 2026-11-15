@@ -1629,6 +1629,10 @@ class SimInit:
             # ABILITY_SPEAR_OF_FIONN (`Unit.fionn`), granted for good on a
             # plot beside the Giant's Causeway, through any upgrade
             ("fionn", torch.bool),
+            # ABILITY_MYSTERIOUS_CURRENTS (`Unit.currents`), granted for good on
+            # a plot of the Bermuda Triangle (`_currents_grant`): +1 Movement,
+            # through any upgrade
+            ("currents", torch.bool),
             # its place in its plot's unit list (0x75c50, the arrival order,
             # `_arrive`): the stamp its last placement took and the plot it
             # took it on (-1 none)
@@ -4200,6 +4204,8 @@ class SimInit:
         self._alpine_hills_cs = int(rules.alpine_hills_cs)
         self._fionn_feat = int(rules.fionn_feature)
         self._fionn_cs = int(rules.fionn_cs)
+        self._currents_feat = int(rules.currents_feature)
+        self._currents_mp = int(rules.currents_moves)
         self._b_era = rules.b_era.to(device)  # [NB] long — unlock era (Heartbeat of Steam's gate) — per-building training XP (best tier over present buildings)
         # What `_building_dedications` reads besides the era: Free Inquiry pays
         # for a building that provides SCIENCE, Pen Brush and Voice for one
@@ -4793,6 +4799,7 @@ class SimInit:
         # the General's, 2 the Admiral's, 0 none (`wolinGpClass`)
         self._type_wolin_gp = _uc("wolinGp")
         self._type_fionn = _uc("fionn", bool, torch.bool)
+        self._type_currents = _uc("currents", bool, torch.bool)
         self._type_no_woods_cost = _uc("noWoodsCost", bool, torch.bool)
         self._type_ignore_shores = _uc("ignoreShores", bool, torch.bool)
         self._type_see_through = _uc("seeThrough", bool, torch.bool)

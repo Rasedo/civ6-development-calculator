@@ -2607,6 +2607,14 @@ class SimMasks:
         """ABILITY_SPEAR_OF_FIONN beside the Giant's Causeway (`_type_fionn`)"""
         return self._feature_grant(rows, tiles, types, self._fionn_feat, self._type_fionn)
 
+    def _currents_grant(self, rows: torch.Tensor, tiles: torch.Tensor, types: torch.Tensor) -> torch.Tensor:
+        """ABILITY_MYSTERIOUS_CURRENTS on a plot of the Bermuda Triangle
+        (`grantFeatureAbilities`, `_type_currents`)"""
+        if self._currents_feat < 0:
+            return torch.zeros_like(tiles, dtype=torch.bool)
+        on = self.feat_id[rows, tiles.clamp(min=0)] == self._currents_feat
+        return on & (tiles >= 0) & (types >= 0) & self._type_currents.take(types.clamp(min=0, max=self.NU - 1))
+
     def _road_terms(self, frm: torch.Tensor, dest: torch.Tensor, river_mp: torch.Tensor,
                     utype: torch.Tensor | None = None, promos: torch.Tensor | None = None,
                     useat: torch.Tensor | None = None, alpine: torch.Tensor | None = None):
@@ -3165,6 +3173,7 @@ class SimMasks:
         self.barb_unit_no_res_upkeep[rows, slot] = False
         self.barb_unit_alpine[rows, slot] = self._alpine_grant(rows, spot[rows], self.barb_unit_type[rows, slot])
         self.barb_unit_fionn[rows, slot] = self._fionn_grant(rows, spot[rows], self.barb_unit_type[rows, slot])
+        self.barb_unit_currents[rows, slot] = self._currents_grant(rows, spot[rows], self.barb_unit_type[rows, slot])
         self.barb_unit_gp_at[rows, slot] = -1
         self.barb_unit_formation[rows, slot] = 0
         self.barb_unit_escorted[rows, slot] = False
@@ -4067,6 +4076,7 @@ class SimMasks:
         # born beside the Matterhorn or the Giant's Causeway: Alpine Training, the Spear of Fionn (`grantFeatureAbilities`)
         getattr(self, f"{pre}_unit_alpine")[rows, slot] = self._alpine_grant(rows, spot.take(rows), type_idx.take(rows))
         getattr(self, f"{pre}_unit_fionn")[rows, slot] = self._fionn_grant(rows, spot.take(rows), type_idx.take(rows))
+        getattr(self, f"{pre}_unit_currents")[rows, slot] = self._currents_grant(rows, spot.take(rows), type_idx.take(rows))
         # CIV6 (Embrasure): "Military units trained in this city start with a
         # free promotion" — a unit that owes no XP for its first level, which
         # `takePromotion` then zeroes, so nothing carries into the second.

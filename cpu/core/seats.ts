@@ -428,6 +428,19 @@ export function civsAtWar(state: GameState, a: number, b: number): boolean {
   return seatOf(state, a)?.wars.includes(b) ?? false;
 }
 
+/** the diplomacy's at-war test (IsAtWarWith 0x469cd0 -> 0x3dcec0 ->
+ *  0x2a92d0, the war table): the Free Cities at war with the majors alone,
+ *  the barbarians with every other player but the Free Cities, else the
+ *  seats' wars (runs/h1_duels1143 t209: the Free Cities' wars [0, 1], the
+ *  barbarians' [0, 1, 2, 3, 4], city-state 4's [63]) — where `unitsHostile`
+ *  reads who may strike whom */
+export function atWarWith(state: GameState, a: number, b: number): boolean {
+  if (a === b) return false;
+  if (isFreeSeat(a) || isFreeSeat(b)) return isCiv(a) || isCiv(b);
+  if (isBarbSeat(a) || isBarbSeat(b)) return true;
+  return civsAtWar(state, a, b);
+}
+
 /** 0x3dcf50: the seat at war with a living major of the game (the players'
  *  list +0xb50, alive +0x728, 0x2a92d0) — a war with a city-state, the Free
  *  Cities or the barbarians is none; the Free Cities fight every major */
