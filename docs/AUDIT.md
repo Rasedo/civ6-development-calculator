@@ -201,6 +201,8 @@ A question the SOURCE under-determines; neither engine ships a branch until the 
   - LAB (city walk): fit, unread (action replay): each city's turn reading only its own and earlier cities' completions (1121 t199)
 - **C-95. BARBARIANS' UNIT MOVES.** Weight 5.
   - LAB (planning): the planning reach against AI_Planning (1124: 1230 of 1829 rows)
+  - LAB (planning): duelq1121 t237 the captive Settler 4587543 on 3:10: its safe plot ours 5:13 (player 1's Great Writer's, out of sight: no path, it stands), the game's 6:12, stepping to 3:11
+  - LAB (planning): duelq1121 t208 the captive Settler 4063247 on 17:12, every plot of its first turn at danger 77: its safe plot ours 17:14, the game's 15:13, both two plots off at (1/0), the reach closing 17:14 first
   - LAB (attack units): fit, unread: the strike domain test
   - LAB (attack units): 1128 t197 Ranger 6750212 walks 5:12 -> 5:13 where the game's goes to 5:11 and strikes the Field Cannon 5:10 (the attack assignment; noted too as the Ranger out of the barbarians' pass)
   - LAB (attack units): duelq1128 t197 the Ranger 6750212 is done before Attack Units in ours, so the camp's Pike and Shot 6684692, a lone DEFENDER, is no striker on city-state 3's Man-At-Arms on 4:11 (the game's Move 4 12 Attack 4 11 behind the Ranger's Move 5 11 Attack 5 10)
@@ -209,7 +211,7 @@ A question the SOURCE under-determines; neither engine ships a branch until the 
   - BUILD (attack units): PLUNDER_TRADE_ROUTE after a Trader target's move (0x771f80 +0x34) unported (the step replay, duelw1121)
   - LAB (attack units): duelq1124 t82 Archer 3801089's Attack Units ends on 38:19, the game's 39:19
   - LAB (attack units): duelq1124 t104 Man-At-Arms 4259859 takes Attack Units and ends on 35:21, the game's Move to safety to 37:21
-  - LAB (attack units): duelq1124 t134 Caravel 4587523's Attack Units ends on 28:15, the game's 28:14; t156 the Caravel and the Galley 1966102 Move to safety (25:16, 25:14) where the game's take Attack Units to 26:12 and 26:11, the Galley 1179665 on 26:12 for 25:12; t162 Ironclad 5701639's Attack Units 31:19 for 32:18, t169 its Move to safety to 33:23 for the game's Attack Units to 33:22
+  - LAB (attack units): duelq1124 t134 Caravel 4587523's Attack Units ends on 28:15, the game's 28:14; t156 the Caravel and the Galley 1966102 Move to safety (25:16, 25:14) where the game's take Attack Units to 26:12 and 26:11, the Galley 1179665 on 26:12 for 25:12; t162 Ironclad 5701639's Attack Units 32:19 for 32:18, t169 its Move to safety to 33:23 for the game's Attack Units to 33:22
   - LAB (attack units): duelq1121 t78 Galley 1572882's Attack Units ends on 30:20, the game's 30:21; t173 Quadrireme 2228245 on 29:5 for 28:5
   - LAB (attack units): duelq1128 t103 Man-At-Arms 5111824 takes Attack Units, the game's Pillage Improvement; t215 Cavalry 7012372's Attack Units ends on 40:20 for 42:19, t220 / t221 its Attack Civilian for the game's Attack Units (t220 42:19 for 41:21)
   - LAB (rampage): extras round major cities (1124 t31-52)
@@ -253,7 +255,6 @@ A question the SOURCE under-determines; neither engine ships a branch until the 
   - LAB (builder capture): 1121 t149 Builder Capture's Builder 4259860 / Bombard 3997700 stop the Bombard on 14:19 where the game carries both to 14:18
   - LAB (builder capture): 1121 t160 the capture pair's Musketman 3538967 for 3:19 walks 6:18 -> 6:16, the game's 5:17 (our danger map's 4:16 / 5:16 at 20, the game's none, close 5:17's children to the first-turn danger flag)
   - LAB (builder capture): 1121 t161 the second and third pairs' goals 4:18 for the game's 4:19
-  - LAB (builder capture): 1124 t141 Builder 5111833 387 for 386
   - LAB (pillage): duelq1121 t110 the Skirmisher 3342353, Pillage Improvement's second available unit, walks 7:14 -> 7:15, the game's holds 7:14 with no row
 - **C-123. BARBARIANS' RAIDS AND SCOUT REPORTS.** Weight 2.
   - LAB (raids and assaults): 1110 t42 City Assault (a member lost to combat drift)
@@ -280,6 +281,7 @@ A question the SOURCE under-determines; neither engine ships a branch until the 
   - LAB (predicted blow): 1124 t69 / t70 Slinger 2490393 on China's Spearman 1179657, defender +5 (a river crossing; nine others match without)
   - LAB (predicted blow): t135 Rome's Warrior 2686977's fortification a turn behind (+3 vs +6) (seed not named; listed after a 1124 case)
   - LAB (predicted blow): fit, unread: a ranged no-step strike (1124 t53)
+  - LAB (predicted blow): duelq1117 t90 city-state 3's Heavy Chariot 1179650 (61 damage on 31:16, danger 40) takes Promote where the game's Move to safety goes to 30:17: our planning holds a killing blow for it (the kill byte set)
   - LAB (targets): 1124 t131 Knight 1376260 on 38:16 lists the Man-At-Arms' 39:20 at (2/1), game (2/0), 39:20 unrevealed to city-state 3 in ours
   - LAB (targets): 1124 t87 city-state 2's Men-At-Arms on 9:12 / 9:14 list 11:12 unseen, 11:14 / 9:11 seen
   - LAB (targets): the planning's seen-now plane past our sight (1117 t8 13:13, t61 33:8 / 32:7; 1127 t3's Scout on 5:10)
@@ -317,7 +319,6 @@ A question the SOURCE under-determines; neither engine ships a branch until the 
   - LAB (move order): MoveTo 0x962380's zone-of-control wait (+0x518)
   - LAB (move order): MoveTo of an HL Move To Safety order (1121 Builder 3604504 t124-127: 0x962380, the finder's +0x1f7 / +0x1e0, no direct writer)
   - LAB (move order): Operation Move's alternate order for a solo unit with +0x1939 reaching no plot at the radius in two turns (0x817bea..0x817d9e)
-  - LAB (move order): a path between two ways of equal turns (the open list's order): duelq1121 t172 the Quadrireme 1900549 on 26:3 for 29:5 walks 27:3 / 28:4 / 28:5 into the zone of player 0's Quadrireme on 29:6 out of its sight and stops, the game's reaches 29:5
   - LAB (move order): a path between two ways of equal turns (the open list's order): duelq1117 t38 the Scout 1441799 on 37:20, Explore for 31:7, ends on 38:18, the game's 36:18
   - LAB (carried runs): a carried run's hold: duelp1117 t33 the barbarian Galley 720906 (HL Explore for 21:17) stops on 27:14 through its turn-end node with 1 Movement, the game's queue run (its one segment, before HL End Turn's 745019656) moving nothing, the engines' carried run stepping back to 28:14 (noted twice, once as 1117 t33 Galley 720906's plot)
   - LAB (carried runs): HL End Turn drops only the turn-end run (1117 t33 2097152 / 1769487 second segments), the engines modelling one carried run
@@ -326,7 +327,6 @@ A question the SOURCE under-determines; neither engine ships a branch until the 
   - LAB (walk steps): fit, unread: the Movement cap on a land unit stepping ashore from owned water (1117 t160 / t201): the walk's step 0x26fe20 prices it by the rules chain 0x270be0 from the formation's +0x218 and the destination domain's full (0x266660), how the chain uses them unread
   - LAB (walk steps): 1117 t243 Infantry 1376263's embark from 15:6 onto city-state 2's Harbor 14:7, a waiting step priced cheaper in the game (g <= 2820352, ours 3331072) moving the open list's tie order
   - LAB (walk steps): 1117 t188 Line Infantry 1179654's Wander to 16:4 through 15:6 under player 0's Warrior 458757, ending on 16:6 in two segments, our walk refusing the first step
-  - LAB (kept path): the kept path's mid-run re-search (0x272aa0 at 0x272bd3 on bit 1 of the path's first unseen node, 0x272af9 on a goal come into sight) unported: a cut walk must pass through, not end on, the flagged node's predecessor (duelp1121 t71 city-state 3's Galley 524294 walks 38:22 -> 37:18 in one run)
   - LAB (unrevealed plots): 1124 t119 Man-At-Arms 4849682 lays the water 36:16 its barbarians never revealed and steps from no unrevealed 35:17
   - LAB (unrevealed plots): 1128 t21 the raid's Slinger / Warrior find no path through our revealed plots under flag 1
   - BUILD (portals): the unit pathfinder also takes 0x271b50's portal exits (0x26f330 installs it), where ours steps onto the tunnel and uses `portalExit` (A_PORTAL)
@@ -493,18 +493,13 @@ A question the SOURCE under-determines; neither engine ships a branch until the 
   - LAB (upgrade units): 1121 Upgrade Units' walk 4:589828 t69-72 the 781 / 782 tie
   - LAB (upgrade units): 1121 Upgrade Units' walk 4:720896 t74-78
   - LAB (upgrade units): 1121 t69 Warrior 262146 back from 35:19 to 35:18, ours waiting for 34:19 (Upgrade Units)
-  - LAB (upgrade units): 1124 t94 Heavy Chariot 983040 (Upgrade Units for 32:8): the game walks 16:8 -> 17:8 -> 17:7, stops with one Movement left, the carried order 17:7 -> 18:8, ours 17:8 -> 18:8 then back (no danger: city-state 4 sees neither the Spearman 196610 on 18:7 nor the ships as its turn opens)
   - BUILD (upgrade units): an Upgrade Units tree's Galley holding (1127 Galley 393216 t146-198 round the barbarian Galleys; t129 danger 30, ours 0; ring t103-113)
-  - LAB (upgrade units): Upgrade Units' cityState.move.plot misses: 1127 t145 / t163 / t164 / t227 Galley 393216's walk (damaged on 27:12 for its far-west centre: the game's 3 steps south to 28:15 with 1 Movement kept, ours north-east to 29:8, a naval path under the move's 0x100a flags; our danger round 27:12 empty at t145)
-  - LAB (upgrade units): 1127 t163 the Galley 393216 walks 28:15 -> 29:14 -> 28:13 -> 28:12 and back to 28:13 in one segment, t164 28:13 -> 29:14 -> 29:15 (ours 27:12 / 29:9), its target unread
-  - LAB (upgrade units): 1127 t227 Galley 393216 halts on 31:20 in the barbarian Quadrireme's zone, the game's 30:21 / 31:21
+  - LAB (upgrade units): duelq1127 t145 city-state 3's Galley 393216 (Upgrade Units, on 27:12 for 3:13) steps 27:13, 28:14; the kept path's first-turn end 29:16 holds the barbarian Galley seen from 28:14, no path there, and the order's plot searched from 28:14 on 2 Movement gives ours 27:15 / 28:16 (732) where the game's unit steps 28:15 and holds with 1 Movement (688)
   - LAB (upgrade units): 1128 t117 2031620 Move to safety for the game's Upgrade Units
+  - LAB (upgrade units): duelq1127 t94 city-state 4's Crossbowman 1048577, made on its centre 8:10 under the Heavy Chariot, ends on 7:11 in both with no row of ours where the game's memory holds it in an Upgrade Units tree
   - LAB (wander): Wander Back to City 4:1048577 t81-98 (seed not named; listed after 1121 cases): from 36:19 ours lands on 37:17 at its turn-2 end under player 0's Warrior 1507343, the game sails to 38:18 (0x1000 refuses turn-1 ends alone, 0x27229b)
   - LAB (wander): 589828 t68 ends turn 2 on player 0's Warrior on 33:18 (seed not named; listed after 1121 cases)
-  - LAB (wander): 1124 t85 / t87 city-state 4's Heavy Chariot 983040, home from its levy on 8:9, walks Wander Back to City one plot a turn in the game (8:10, 7:10, 8:11, 8:11), ours on along its path (489 / 579 for 447 / 492)
-  - LAB (wander): duelq1124 t85 / t87 city-state 4's Heavy Chariot 983040, Wander Back to City for 32:8 over plots it never revealed: from 8:10 the game steps to 7:10 and stops with Movement left (ours 5:11), from 8:11 it holds the whole turn (ours 7:13), t84 / t86 / t88-92 equal
   - LAB (wander): duelq1121 t238 city-state 2's Infantry 2818052 Wander for 9:3 from 13:4 ends on 11:4, ours on 11:5
-  - LAB (wander): duelq1128 t165 city-state 4's Crossbowman 851971 Wander for 32:8 from 31:11 ends on 31:9, ours on 32:9
   - LAB (wander): 1117 city-state 3's Wander draws t163 / t186
   - LAB (wander): 1124 t75 the Quadrireme 1048577 to 40:13 (612), ours staying on 569
   - LAB (wander): 1124 t182 / t194 Nuclear Submarine 6160412 Coastal Raid 372 // 416
@@ -957,6 +952,7 @@ A question the SOURCE under-determines; neither engine ships a branch until the 
   - LAB (action replay): the barbarians' end-of-turn knowledge look after the replay's unit sync reads record t+1's health, the game's own event damage included
   - BUILD (action replay): 1127 record t96 read before Rome's t96 start (its CityProductionCompleted in pair 96 -> 97): Rome's Warrior 0 queued in the record, completed in ours
   - BUILD (action replay): (engine) a Production lump (AddProgress 0x16f6e0 -> 0x16f050) takes the step's argument the charge takes, where the engines add it without the item multiplier (no case read)
+  - LAB (action replay): duelq1121 t207 the barbarians' embarked captive Settler 4063247 on 18:11 opens the copy's turn on 2 Movement where the record holds 5 / 5: its Move To Safety for 17:12 stops on 17:11, the game's reaches 17:12
   - LAB (drift): economy drift: an event's civilian kill's unit layers (1127 t160 Muscat's Trader spared)
   - LAB (drift): economy drift: 1127 Muscat's citizens and amenities t84-137
   - LAB (drift): economy drift: 1124 Granada's third envoy a turn late (t52 / t51)

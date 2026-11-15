@@ -94,16 +94,27 @@
   final: 0x1a6cd0
   kind: function
   semantics: "flags a path found: walking from its start, the first node not seen now bit 1, the node before it bit 2; a goal not seen now bit 1"
-  status: PARTLY
+  status: READ
+  cases:
+    - recording: h1_duelq1124
+      turn: 87
+      value: "the Heavy Chariot 983040 on 8:11: its path's second node 7:13 the first out of sight, flagged; standing on 8:12 its search for that node finds none (closed ground, seen) and the order's plot turns it back to 8:11"
+  impl:
+    - cpu/core/tactical.ts:orderRun
+    - cpu/core/tactical.ts:KeptPath
+    - gpu/core/sim_tactics.py:_tac_move_to
+    - cpu/core/tactical.ts:orderOnce
   readings:
     - "C-124: the formation's kept path, and a path's other players' units — READ (0x272aa0, 0x26e3a0, 0x782d0, 0x586360 at 0x586542..0x5865a1), unported"
     - "C-124: the kept path is never taken; a move order's path passes other players' units out of sight — READ (0x272aa0, 0x2714b0, 0x586360 at 0x586542..0x5865a1, 0x26fe20), both twins"
     - "C-99: every pool search sets out on its own formation's value, a queue run walks its first search's path — READ (0x2715a0 at 0x271909..0x271910, 0x77d10 at 0x77d8b..0x77db0 / 0x77f0b / 0x78007 / 0x7805d, 0x52f50 at 0x52f9e / 0x52fce / 0x53394, 0x265fd0, 0x272aa0 at 0x272ad7..0x272c24, 0x26e3a0), the engines' model"
-  notes: ["imported: READ in its section, no confirming case found beside it"]
+    - "C-133 / C-95 / C-134: the kept path's searches inside a queue run; the Trader target, the defending district and Pillage's own plot; the safe plot's unit at war that fights"
+    - "C-133 / C-95 / C-134: the kept path's searches inside a queue run; the Trader target, the defending district and Pillage's own plot; the safe plot's unit at war that fights — READ (0x272aa0 at 0x272af9..0x272c76, 0x26ef40 at 0x26f123..0x26f162, 0x26e3a0, 0x782d0, 0x783980 at 0x7842df..0x7842eb / 0x784aec..0x784b36, 0x24c2f0, 0x774380 at 0x774481..0x7744a9, 0x716b90 at 0x716d53..0x716da1), both twins"
+    - "C-133 / C-95 / C-134: the kept path's searches inside a queue run; the Trader target, the defending district and Pillage's own plot; the safe plot's unit at war that fights — READ (0x272aa0 at 0x272af9..0x272c76, 0x26ef40 at 0x26f123..0x26f162, 0x26e3a0, 0x782d0, 0x783980 at 0x7842df..0x7842eb / 0x784aec..0x784b36, 0x24c2f0, 0x774380 at 0x774481..0x7744a9, 0x716b90 at 0x716d53..0x716da1), FIT (the planning list's seen unit at war), both twins"
   context:
     - "## C-124: the formation's kept path, and a path's other players' units — READ (0x272aa0, 0x26e3a0, 0x782d0, 0x586360 at 0x586542..0x5865a1), unported"
     - "- THE FLAGS (0x26e3a0, on each path found): walking from the start, the first node whose plot the player does..."
-  review: imported
+  review: reviewed
 - addr: 0x26e570
   final: 0x1a6e00
   kind: function
@@ -289,12 +300,16 @@
   name: formation path request
   semantics: "a formation's path (more than one member, not embarked, a member of domain 2 or 4 by 0x2669d0) carries flag 0x2000, which the move 0x26fe20 turns into 0x80 for each member's placement Sets path flag 0x2000 for a formation of more than one member (+0x738), not embarked (+0x278 0), with a member of domain 2 (land) or 4 (0x2669d0 on each member's +0x650); the move 0x26fe20 turns it into 0x80 for each member's placement (0x587ca0 -> 0x586d40 -> 0x586360), read only in the sea-domain branch (a hull's district test): 0x2000 does not by itself bar a land escort's step."
   status: PARTLY
+  impl: [cpu/core/tactical.ts:orderRun]
   readings:
     - "C-95: the barbarians' Builder Capture — READ (the event, the start, the tree's walk), ported"
     - "C-123: Operation Move's danger flags, the MoveTo execution and m_blockedTurns — READ (0x816cb0 at 0x816e70 / 0x817839, 0x962380, 0x73e610), both twins"
     - "C-124: the formation's kept path, and a path's other players' units — READ (0x272aa0, 0x26e3a0, 0x782d0, 0x586360 at 0x586542..0x5865a1), unported"
     - "C-124: the kept path is never taken; a move order's path passes other players' units out of sight — READ (0x272aa0, 0x2714b0, 0x586360 at 0x586542..0x5865a1, 0x26fe20), both twins"
     - "C-95: a strike's step from beside its plot, a formation's planning plot at a radius, the ring walk's own location test — READ (0x962380 at 0x96267e..0x9626d2, 0x26ef40 at 0x26f0a4, 0x78fa10 at 0x78fab4..0x78facf, 0x815d50 -> 0x586360), both twins"
+    - "C-133 / C-95 / C-134: the kept path's searches inside a queue run; the Trader target, the defending district and Pillage's own plot; the safe plot's unit at war that fights"
+    - "C-133 / C-95 / C-134: the kept path's searches inside a queue run; the Trader target, the defending district and Pillage's own plot; the safe plot's unit at war that fights — READ (0x272aa0 at 0x272af9..0x272c76, 0x26ef40 at 0x26f123..0x26f162, 0x26e3a0, 0x782d0, 0x783980 at 0x7842df..0x7842eb / 0x784aec..0x784b36, 0x24c2f0, 0x774380 at 0x774481..0x7744a9, 0x716b90 at 0x716d53..0x716da1), both twins"
+    - "C-133 / C-95 / C-134: the kept path's searches inside a queue run; the Trader target, the defending district and Pillage's own plot; the safe plot's unit at war that fights — READ (0x272aa0 at 0x272af9..0x272c76, 0x26ef40 at 0x26f123..0x26f162, 0x26e3a0, 0x782d0, 0x783980 at 0x7842df..0x7842eb / 0x784aec..0x784b36, 0x24c2f0, 0x774380 at 0x774481..0x7744a9, 0x716b90 at 0x716d53..0x716da1), FIT (the planning list's seen unit at war), both twins"
   review: reviewed
 - addr: 0x26f1d0
   final: 0x1a76a0
@@ -457,6 +472,7 @@
     - cpu/core/tactical.ts:embarks
     - cpu/core/tactical.ts:spent
     - cpu/core/tactical.ts:through
+    - cpu/core/tactical.ts:orderRun
   readings:
     - "C-95 / C-123: a move order's step costs by the formation's fighter flag; an operation that ends in its tick lets its units go — READ (0x26fe20 at 0x27021b, 0x270980, 0x270be0, 0x267650 at 0x2677fa), FIT (the release), both twins"
     - "C-99: a move order carried on as the turn ends, the zone-of-control wait, the embark rule's TO plot — READ (0x962380, 0x52f50, 0x26fe20, 0x2675e0, 0x2673f0, 0x530420, 0x267650), both twins"

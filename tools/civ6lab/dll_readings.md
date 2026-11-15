@@ -14925,3 +14925,88 @@ cpu/harness/replay.ts; `loadBorderGrants`, cpu/harness/import.ts).
   pillaged Harbor) keeps the Theater Square the game queued.
 - Open: a major's and the Free Cities' step (cpu/core/phase.ts,
   `wonderLetGo`) ask only a wonder's hostile plot of their head.
+
+## C-133 / C-95 / C-134: the kept path's searches inside a queue run; the Trader target, the defending district and Pillage's own plot; the safe plot's unit at war that fights — READ (0x272aa0 at 0x272af9..0x272c76, 0x26ef40 at 0x26f123..0x26f162, 0x26e3a0, 0x782d0, 0x783980 at 0x7842df..0x7842eb / 0x784aec..0x784b36, 0x24c2f0, 0x774380 at 0x774481..0x7744a9, 0x716b90 at 0x716d53..0x716da1), FIT (the planning list's seen unit at war), both twins
+
+`orderOnce`, `orderRun`, `walk`'s `kept` (`KeptPath`), `tacticalTargets`,
+`pillage`, `safePlot`'s `fighterOnLayer` (cpu/core/tactical.ts); GPU
+`_tac_move_to`'s `order` / `under0`, `_tac_targets`, `_tac_pass`'s pillage,
+`_tac_safe_plot`, `_tac_search`'s kept-out plots (gpu/core/sim_tactics.py);
+`groundOf`'s `stand` (the fit).
+
+- THE KEPT PATH INSIDE A RUN (0x272aa0, the kept-path flag +0x5d8 set by the
+  queue run 0x52f50): each MoveTo execution asks the formation's path. With
+  fewer than two kept nodes (the unit stands on the kept goal) the requested
+  plot is searched unless it is the kept goal, which is no path. Else a goal
+  node flagged out of sight (node +8 bit 1) whose plot the player sees now
+  (the visibility count +0x290 above 0) is searched afresh
+  (0x272af9..0x272b95); on no path the requested plot is searched unless it
+  was that goal. Else the next node (count - 2) not flagged, the kept path
+  is taken unsearched (0x272bd7). Else — the next node flagged — the kept
+  path's last node of its first turn (0x782d0(path, 1)) is searched for
+  (0x272c24); none such, or no path to it, the requested plot is searched
+  (0x272c60), unless it was that node.
+- EVERY SEARCH KEEPS ITS PATH (0x26ef40): after GeneratePath (0x7a630 at
+  0x26f11e), found or not, the kept goal takes the plot searched (0x7eb220
+  at 0x26f139), the kept path the finder's (0x778f0 at 0x26f157) and its
+  flags are laid (0x26e3a0 at 0x26f162): walking from the start, the first
+  node on a plot the player does not see takes bit 1, a goal not seen bit 1.
+- THE TURN'S LAST NODE (0x782d0(path, T)): from the start toward the goal,
+  the first node of turn T whose next node is of a later turn; the goal
+  where its turn is T.
+- THE ENGINES run the order again for the plot the rule names (`orderRun`'s
+  `search`), a run for another plot than the order's searching the order's
+  once it finds no path or stands on its plot; the walk asks the rule before
+  each step after the search's own.
+- THE TRADER TARGET (0x783980 at 0x784aec..0x784b36): a unit of the trade
+  layer of another player, of formation class 2, with a route (0x58fc40), of
+  a player at war (0x3dcec0), not immune to plunder on the plot's ground
+  (0x58fc20 with 2 on land, 0 on water).
+- THE DEFENDING DISTRICT (0x24c2f0; 0x783980 at 0x7842df..0x7842eb): a
+  district ends its plot's chain (no unit, camp, hut, Trader, civilian or
+  improvement entry) only where it defends — a city centre, or a district
+  whose type has hit points, complete (+0xb08) and not pillaged (+0xc88).
+- PILLAGE'S OWN PLOT (0x774380 at 0x774481..0x7744a9): a unit off the target
+  on a plot whose district type (0x810d0) is not -1 takes no district
+  target; one on a plot with an improvement (+0x44) no improvement target.
+- THE SAFE PLOT'S UNIT AT WAR (0x716b90 at 0x716d53..0x716da1): the plot's
+  units of the mover's layer (0x75c50 of 0x901e0) are tested by 0x5861f0,
+  and the plot is left out only where its out-flag is set: a unit at war
+  with a Combat, Ranged or Bombard strength (0x523520).
+- FIT (the planning's list, 0x26d890): a formation with no fighter lists no
+  plot it sees now that a unit at war of its layer holds, and lists one out
+  of its sight whatever stands on it (the list's location test 0x586900
+  under 9 unread for it).
+- CONFIRMED (one-seed aimem traces from the game's start, the rows the port
+  closed): runs/h1_duelq1124 t85 city-state 4's Heavy Chariot 983040 on 8:10
+  for its centre 32:8 steps 7:10, 6:11, its path's next node 5:11 never
+  seen, a mountain once seen: no path there, the order's plot searched,
+  back to 7:10 (record 86; the record's revealed plots hold 5:12, 5:13 and
+  6:13, seen from 6:11 alone); t87 on 8:11 it steps 8:12, 7:13 closed ground
+  once seen, and steps back; t94 on 16:8 it steps 17:8, then 17:7 on the
+  order's plot searched (18:7's unit seen), its carried order to 18:8.
+  runs/h1_duelq1128 t165 city-state 4's Crossbowman 851971, Wander for 32:8
+  out of its sight on 31:11: from 32:10 the goal is seen, searched afresh,
+  and it ends on 31:9. runs/h1_duelq1127 t227 city-state 3's Galley 393216
+  ends on 31:21; runs/h1_duelq1121 t172 the Quadrireme 1900549 reaches 29:5;
+  runs/h1_duelq1124 t125 the Man-At-Arms 4849682 ends on 36:21.
+  runs/h1_duelq1117 t107-109 the barbarian Man-At-Arms 3932182 beside player
+  1's Trader 1310732 on 33:13 / 34:13 logs Pillage Improvement, then Move to
+  safety, no Plunder Trader. runs/h1_duelq1124 t218 / t236 city-state 4's
+  Trader on city-state 3's pillaged Encampment 40:10 is the captive Builder
+  5111833's Plunder Trader target. runs/h1_duelq1128 t176 the Line Infantry
+  6553608 on player 1's wonder under construction 15:12, three districts in
+  reach, goes for none and moves to safety; runs/h1_duelq1127 t93 the
+  Swordsman 3801105 on 13:11 wanders, t120 the Man-At-Arms 4259842 on it
+  takes the improvement 13:10; runs/h1_duelq1121 t113 the Man-At-Arms
+  3145730 on 6:15 wanders. runs/h1_duelq1121 t234 / t236 the captive Settler
+  4587543 on 3:10 takes player 1's Great Writer's 5:13, three plots off, as
+  its safe plot, its order with no path, and stands; runs/h1_duelq1117 t110
+  the captive Builder 4128787 on 32:9 leaves player 1's Builder's 32:11, in
+  its sight, for 34:10, runs/h1_duelq1121 t197 the Builder 4784145 4:19 for
+  6:18.
+- OPEN: runs/h1_duelq1127 t145 the Galley 393216 on 27:12 steps 27:13,
+  28:14; its first turn's last node 29:16 holds the barbarian Galley seen
+  from 28:14, no path there; the order's plot searched from 28:14 on 2
+  Movement gives ours 27:15 / 28:16, the game's unit steps 28:15 and holds
+  with 1 Movement.

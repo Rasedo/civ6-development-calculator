@@ -1485,6 +1485,9 @@ class SimTactics:
         else:
             sn_k = self._barb_seen("barbarians" if seat == BARB_SEAT else seat)[rows]
             kept_out = by_layer(lambda r: self._tac_peaceful(seat, r)) & sn_k
+            # (a fit: a formation with no fighter lists no plot it sees now
+            # that a unit at war of its layer holds)
+            kept_out = kept_out | (by_layer(lambda r: self._tac_hostile_on(seat, r)) & sn_k & ~fights.unsqueeze(1))
             if boarded_n is not None:
                 kept_out = kept_out | boarded_n
         stand = ~kept_out | atk_n
@@ -1704,7 +1707,8 @@ class SimTactics:
     def _tac_move_to(self, mask: torch.Tensor, us: torch.Tensor, dest: torch.Tensor, pre: str = "barb",
                      seat: int = BARB_SEAT, strike: bool = True,
                      later_turns: bool = False, explore: bool = True, danger: tuple | None = None,
-                     mate: torch.Tensor | None = None, scout: bool = False) -> None:
+                     mate: torch.Tensor | None = None, scout: bool = False,
+                     order: torch.Tensor | None = None, under0: tuple | None = None) -> None:
         """`moveTo` for the unit at local slot `us` [B] of pool `pre` (its
         player `seat`) in the games of `mask`: the pathfinder's path to `dest`
         with zones of control, walked as far as its Movement carries it this
@@ -1728,7 +1732,18 @@ class SimTactics:
         reach). In an AI player's pass a unit whose last step
         of the turn ended in a zone of control does not move, nor one whose
         moves an order of the pass ended (`_tac_moves_ended`, 0x56d6f0: the
-        queue 0x52f50 runs no operation for it) (`orderOnce`)."""
+        queue 0x52f50 runs no operation for it) (`orderOnce`).
+
+        THE KEPT PATH (0x272aa0, `orderOnce` / `orderRun`): the walk steps the
+        path its search kept, flagged as it was found (its first node on a
+        plot the player did not see then, its goal where not seen then).
+        Before a step after the search's own a goal so flagged and seen now
+        is searched afresh, else a next node so flagged has the kept path's
+        last node of its first turn searched for: the call runs again for
+        that plot with `order` the order's own plot (`dest` here), which a
+        run for another plot searches once it finds no path or its unit
+        stands on its plot. `under0` ([B] slot, [B] embarked plane) is the
+        unit the walker stands over as such a run opens."""
         if self._tac_moves_ended is not None:
             bix = torch.arange(self.B, device=self.device)
             mask = mask & ~self._tac_moves_ended[bix, us.clamp(min=0) + self.POOL_LO[pre]]
@@ -1754,6 +1769,18 @@ class SimTactics:
         barred = f_on.gather(1, dc).squeeze(1) & (dest != at_u)
         if strike:
             barred = barred & ~self._barb_seen("barbarians" if seat == BARB_SEAT else seat).gather(1, dc).squeeze(1)
+
+        def on_order(m: torch.Tensor, und: tuple | None = under0) -> None:
+            # a run for a kept path's node that finds no path or stands on
+            # it: the order's plot searched
+            if order is None:
+                return
+            m = m & (dest != order)
+            if bool(m.count_nonzero()):
+                self._tac_move_to(m, us, order, pre, seat, strike, later_turns, explore, danger, mate, scout,
+                                  under0=und)
+
+        on_order(mask & barred)
         mask = mask & ~barred
         if not bool(mask.count_nonzero()):
             return
@@ -1781,6 +1808,7 @@ class SimTactics:
             back.append(torch.where(more, cur % self.T, torch.full_like(cur, -1)))
             cur = torch.where(more, par[ar, cur], cur)
         if not back:
+            on_order(mask)
             return
         L = len(back)
         path = torch.stack(back[::-1], dim=1)  # [R, L], -1 before each row's first plot
@@ -1790,6 +1818,23 @@ class SimTactics:
         path = torch.where(idx < L, path.gather(1, idx.clamp(max=L - 1)), torch.full_like(path, -1))
         plen = L - lead
         has_path = res["found"] & (plen > 0)
+        no_path = torch.zeros(B, dtype=torch.bool, device=dev)
+        no_path[rows] = ~has_path
+        on_order(no_path)
+        # the kept path's flags (0x26e3a0), by what the player sees as it is
+        # found: its first node out of sight (L none), its goal out of sight;
+        # and the last node of its first turn from that node on (0x782d0)
+        cols = torch.arange(L, device=dev).unsqueeze(0)
+        sight = self._barb_seen("barbarians" if seat == BARB_SEAT else seat)
+        on_p = has_path.unsqueeze(1) & (path >= 0)
+        pcl = path.clamp(min=0)
+        flag_i = torch.where(on_p & ~sight[rows.unsqueeze(1), pcl], cols, torch.full_like(path, L)).amin(dim=1)
+        goal_flag = has_path & ~sight[rows, dr]
+        late_n = on_p & (res["closed"][ar.unsqueeze(1), pcl] > 1)
+        turn_end = torch.where((late_n | ~on_p) & (cols > flag_i.unsqueeze(1)), cols, torch.full_like(path, L)).amin(dim=1) - 1
+        turn_end_plot = pcl.gather(1, turn_end.clamp(min=0, max=L - 1).unsqueeze(1)).squeeze(1)
+        again_goal = torch.zeros(R, dtype=torch.bool, device=dev)
+        again_next = torch.zeros(R, dtype=torch.bool, device=dev)
         # a path ending on a plot it attacks into: it walks to its side
         into = res["found"] & res["attack"][ar, dr] & (plen > 0)
         # (`attackPlot`: a unit at war on its map layer, a hostile city centre
@@ -1938,6 +1983,8 @@ class SimTactics:
         # steps on
         under = torch.full((R,), -1, dtype=torch.long, device=dev)
         under_emb = torch.zeros(R, dtype=torch.bool, device=dev)
+        if under0 is not None:
+            under, under_emb = under0[0][rows].clone(), under0[1][rows].clone()
         # a step refused (the placement 0x587ca0): the order done
         refused = torch.zeros(R, dtype=torch.bool, device=dev)
         # the formation the walk sets out with (`walk`'s formed): the riders
@@ -1963,6 +2010,18 @@ class SimTactics:
             go = going & (i < stop)
             if not bool(go.count_nonzero()):
                 break
+            if i > 0:
+                # the kept path's rule before a step after the search's own
+                gf = go & goal_flag
+                if bool(gf.count_nonzero()):
+                    gf = gf & self._barb_seen("barbarians" if seat == BARB_SEAT else seat)[rows, dr]
+                    again_goal = again_goal | gf
+                nf = go & ~gf & (flag_i == i)
+                again_next = again_next | nf
+                going = going & ~gf & ~nf
+                go = go & ~gf & ~nf
+                if not bool(go.count_nonzero()):
+                    break
             here = tile_p[rows, sr].clamp(min=0)
             nxc = path[:, i].clamp(min=0)
             dcol = (self.neigh[here] == nxc.unsqueeze(1)).long().argmax(dim=1)
@@ -2025,6 +2084,8 @@ class SimTactics:
         # its step priced afresh from beside the plot as any step of the
         # walk: one dearer than the Movement left, the unit moved, is a later
         # turn's, the order kept
+        again = (again_goal | again_next) & ~refused & getattr(self, f"{pre}_unit_alive")[rows, sr]
+        into = into & ~again
         if strike and bool(into.count_nonzero()):
             here = tile_p[rows, sr].clamp(min=0)
             beside = into & (self.pair_dist[here, dr].to(torch.long) == 1)
@@ -2062,13 +2123,33 @@ class SimTactics:
         if pend is not None:
             now = tile_p[rows, sr]
             off = torch.where(into, self.pair_dist[now.clamp(min=0), dr].to(torch.long) != 1, now != dr)
-            short = (getattr(self, f"{pre}_unit_alive")[rows, sr] & has_path & ~refused & ~waitz & off
+            short = (getattr(self, f"{pre}_unit_alive")[rows, sr] & has_path & ~refused & ~waitz & off & ~again
                      & (mp_p[rows, sr] > 0) & (now != dr))
             if bool(short.count_nonzero()):
                 sm = torch.zeros(B, dtype=torch.bool, device=dev)
                 sm[rows[short]] = True
-                pend.append((sm, us.clone(), dest.clone(), dict(pre=pre, seat=seat, strike=strike, later_turns=later_turns,
-                                                                explore=explore, danger=danger, mate=mate, scout=scout)))
+                pend.append((sm, us.clone(), (dest if order is None else order).clone(),
+                             dict(pre=pre, seat=seat, strike=strike, later_turns=later_turns,
+                                  explore=explore, danger=danger, mate=mate, scout=scout)))
+        # a unit standing on the plot a run for a kept path's node searched:
+        # the order's plot searched (`orderOnce`'s 'there')
+        ub = torch.full((B,), -1, dtype=torch.long, device=dev)
+        ue = torch.zeros(B, dtype=torch.bool, device=dev)
+        ub[rows], ue[rows] = under, under_emb
+        there = torch.zeros(B, dtype=torch.bool, device=dev)
+        there[rows] = (has_path & ~refused & ~into & ~again & getattr(self, f"{pre}_unit_alive")[rows, sr]
+                       & (tile_p[rows, sr] == dr))
+        on_order(there, (ub, ue))
+        # the kept path's searches: the goal's own afresh, or its first
+        # turn's last node (`orderRun`'s search)
+        if bool(again.count_nonzero()):
+            am = torch.zeros(B, dtype=torch.bool, device=dev)
+            am[rows[again]] = True
+            goal2 = dest.clone()
+            nx = again & again_next
+            goal2[rows[nx]] = turn_end_plot[nx]
+            self._tac_move_to(am, us, goal2, pre, seat, strike, later_turns, explore, danger, mate, scout,
+                              order=dest if order is None else order, under0=(ub, ue))
 
     def _tac_zoc_moved_of(self, pre: str) -> torch.Tensor | None:
         """[B, U] bool of pool `pre` — `zocMoved`: the units whose last step
@@ -2147,7 +2228,9 @@ class SimTactics:
         enc = (self.district == self._encamp_didx) if self._encamp_didx >= 0 else torch.zeros_like(ctr)
         dd = self.district
         spec = self._is_specialty.take(dd.clamp(min=0)) & (dd >= 0)
-        combat = ctr | enc
+        # a district that defends (0x24c2f0): a centre, an Encampment complete
+        # and not pillaged
+        combat = ctr | (enc & self.district_complete & ~self.district_pillaged)
         passive = (dd >= 0) & ~enc & ~ctr & self.district_complete & ~self.district_pillaged & spec
         h_own = hostile(ts)
         dk = torch.zeros_like(ts)
@@ -2177,8 +2260,16 @@ class SimTactics:
         sup = self.support_at
         ss = seat_of(sup)
         trd = self.trader_at
-        trader = trd >= 0
         ts_ = seat_of(trd)
+        # a Trader walking a route (0x58fc40: `seat_route_unit` names its
+        # slot), not immune to plunder on the plot's ground (0x58fc20,
+        # `_trader_immune`)
+        trader = torch.zeros_like(seen)
+        tb, tp = ((trd >= 0) & (ts_ != seat)).nonzero(as_tuple=True)
+        if tb.numel():
+            tsl = trd[tb, tp] - self.POOL_LO["major"]
+            walked = (self.seat_route_unit[tb].reshape(tb.shape[0], -1) == tsl.unsqueeze(1)).any(dim=1)
+            trader[tb, tp] = walked & ~self._trader_immune(tb, ts_[tb, tp], tp)
         relig = (civ >= 0) & (self._rel_strength.take(ct) > 0)
         # the religious unit of the plot: the civilian plane's, or a passenger at sea
         erel = (emb >= 0) & (self._rel_strength.take(et) > 0)
@@ -4445,7 +4536,8 @@ class SimTactics:
                     here = self.barb_unit_tile.clamp(min=0)
                     at_t = self.barb_unit_tile == t.unsqueeze(1)
                     if districts:
-                        stand = (self.district.gather(1, here) >= 0) | self._centre_plane().gather(1, here)
+                        stand = ((self.district.gather(1, here) >= 0) | self._centre_plane().gather(1, here)
+                                 | (self.built_wonder.gather(1, here) >= 0))
                     else:
                         stand = self.improvement.gather(1, here) >= 0
                     cand = (live() & (ai >= _AI_EXPLORE) & (rt == 1) & (slotno > last.unsqueeze(1))
@@ -5449,7 +5541,7 @@ class SimTactics:
         with `min_mv` [B] whole Movement left at least (none: 0), none in
         `taken`, none with a unit that keeps it out (`keptOut`: its own
         stacking with it, itself counted, or another player's at peace but a
-        Trader), one at war with it or fallout, the first best — a fort (its
+        Trader), one at war with it that fights or fallout, the first best — a fort (its
         own territory under any district or wonder) over any plot
         but a fort, of two forts the lower danger; a plot of no danger over
         one of danger, a fort aside; of two of no danger its own territory,
@@ -5466,8 +5558,11 @@ class SimTactics:
         mask = mask & (row >= 0)
         rr = row.clamp(min=0)
         rt, rk, mv = res["turns"][rr], res["rank"][rr], res["moves"][rr]
+        # no unit at war that fights on the mover's map layer (`fighterOnLayer`:
+        # a religious mover's layer holds none)
+        rel_m = self._rel_strength.take(getattr(self, f"{pre}_unit_type")[bidx, u_b].clamp(min=0, max=self.NU - 1)) > 0
         cand = (mask.unsqueeze(1) & (rt == 1) & ~taken & ~self._tac_own_mil(seat, self._tac_hull(u_b, pre)) & ~self._tac_peaceful(seat)
-                & ~self._tac_hostile(seat) & (self.tile_fallout <= 0))
+                & ~(self._tac_fighters(seat) & ~rel_m.unsqueeze(1)) & (self.tile_fallout <= 0))
         if min_mv is not None:
             cand = cand & (mv >= (min_mv * _FIX).unsqueeze(1))
         # a fort's district: any (DistrictInfo +0x58 set on every row)

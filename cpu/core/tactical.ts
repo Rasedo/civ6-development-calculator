@@ -14,7 +14,7 @@ import { COMBAT_BOMBARD_VS_UNIT, EMBARK_MOVES, MP_SCALE } from '../data/constant
 import { CITY_MAX_HP, FORMATION_MAX, UNITS, UNIT_HP } from '../data/units';
 import { DISTRICTS } from '../data/districts';
 import { condemnHeretic, formationCivicIn, mergeFormation } from './game';
-import { plunderTrader } from './trade';
+import { plunderTrader, traderImmune } from './trade';
 import { IMPROVEMENTS } from '../data/improvements';
 import { AI_FEATURES, AI_UNITS } from '../data/aiBuildTables';
 import { AI_UNIT_AI } from '../data/aiOperations';
@@ -382,7 +382,17 @@ function groundOf(state: GameState, unit: Unit, revealedOnly = true, planning = 
       // the barbarian Scout's, out of its sight; h1_duely1127 t10: city-state
       // 4's Warrior leaves 3:12 out, city-state 3's Builder on it in sight;
       // t45: it lists 7:10, city-state 3's Trader on it, AI_Planning.csv)
-      return !peaceHeld(i);
+      if (peaceHeld(i)) return false;
+      // a fit: a formation with no fighter lists no plot it sees now that a
+      // unit at war of its layer holds, and one out of its sight whatever
+      // stands on it (runs/h1_duelq1117 t110: the barbarians' captive Builder
+      // 4128787 on 32:9 leaves player 1's Builder's 32:11 out of its safe
+      // plots, h1_duelq1121 t197 the Builder 4784145 4:19; t234 the captive
+      // Settler 4587543 on 3:10 takes player 1's Great Writer's 5:13, three
+      // plots off)
+      if (melee || !foes.has(i)) return true;
+      seenNow ??= plotsSeenNow(state, new Set([unit.seat]));
+      return seenNow[i] !== 1 || !state.units.some((x) => x.tileIndex === i && x.seat !== unit.seat && onLayer(x) && unitsHostile(state, unit, x));
     },
     strikeSite: (i) => {
       seenNow ??= plotsSeenNow(state, new Set([unit.seat]));
@@ -1189,17 +1199,53 @@ function withShortOrders(fn: () => void): void {
  *  moves an order of the pass ended
  *  (`movesEnded`, 0x56d6f0) runs it no more: the queue 0x52f50 executes an
  *  operation only for a unit with Movement (0x56c690) or a formation with
- *  Movement (0x265d70, +0x218 the least its members hold) */
+ *  Movement (0x265d70, +0x218 the least its members hold).
+ *
+ *  THE KEPT PATH (0x272aa0, inside one queue run): each execution steps one
+ *  node (0x26fe20) of the path the run's last search kept, flagged as it
+ *  was found (0x26e3a0: its first node on a plot the player did not see
+ *  then, and its goal where not seen then). Before a step after the
+ *  search's own: a goal so flagged and seen now is searched afresh
+ *  (0x272af9..0x272b95); else a next node so flagged has the kept path's
+ *  last node of its first turn (0x782d0) searched for (0x272c24); either
+ *  search finding no path, the order's plot is searched, unless it was the
+ *  plot searched; standing on a kept goal short of the order's plot, the
+ *  order's plot is searched (runs/h1_duelq1124 t85: city-state 4's Heavy
+ *  Chariot 983040 on 8:10 for its centre 32:8 steps 7:10, 6:11 on a path
+ *  through 5:11 it never saw, a mountain: no path there, its search from
+ *  6:11 turns it back to 7:10; t87 on 8:11 it steps 8:12, 7:13 closed
+ *  ground once seen, and steps back to 8:11; the record's revealed plots
+ *  hold both looks) */
 function orderOnce(state: GameState, unit: Unit, dest: number, strike: boolean,
   laterTurns: boolean, explore: boolean, danger: PathDanger | undefined, mates: readonly Unit[], scout: boolean): boolean {
+  let goal = dest;
+  for (;;) {
+    const r = orderRun(state, unit, goal, strike, laterTurns, explore, danger, mates, scout);
+    if (typeof r === 'boolean') return r;
+    if (r === 'none' || r === 'there') {
+      if (goal === dest) return false;
+      goal = dest;
+    } else goal = r.search;
+  }
+}
+
+/** the walk of one path of `orderOnce`, searched for `goal`: 'none' where
+ *  the search finds no path, 'there' where the unit stands on `goal`,
+ *  `search` the plot the kept path's rule searches next (`walk`'s
+ *  `kept.again`) */
+function orderRun(state: GameState, unit: Unit, dest: number, strike: boolean,
+  laterTurns: boolean, explore: boolean, danger: PathDanger | undefined, mates: readonly Unit[], scout: boolean): boolean | 'none' | 'there' | { search: number } {
   if (!state.units.includes(unit) || unit.movesLeft <= 0 || movesEnded?.has(unit.id)) return false;
   // the move order's start (0x55280) with Movement left: OPERATION, AWAKE
   // once its queue empties (0x52f50)
   operationStart(unit);
-  if (unit.tileIndex === dest) return false;
+  if (unit.tileIndex === dest) return 'there';
   const nodes = pathNodes(state, unit, dest, laterTurns, explore, danger, mates, scout, strike);
   let path = nodes.map((n) => n.tile);
-  if (!path.length) return false;
+  if (!path.length) return 'none';
+  // the path's flags (0x26e3a0), by what the player sees as it is found
+  const sight = plotsSeenNow(state, new Set([unit.seat]));
+  const kept: KeptPath = { flagged: nodes.findIndex((n) => sight[n.tile] !== 1), goal: sight[dest] !== 1 ? dest : -1, again: -1 };
   // a path ending on a plot it attacks into: it walks to its side, and
   // strikes it where its Movement and attacks last (the order's attack flag)
   const last = path[path.length - 1];
@@ -1211,7 +1257,7 @@ function orderOnce(state: GameState, unit: Unit, dest: number, strike: boolean,
   // passes the plot beside it (`walk`'s `onto`)
   const capture = into && strike && nodes[nodes.length - 1].turns === 1 && attacksLeftOf(unit) > 0 && !unit.embarked
     && (UNITS[unit.type]?.combat ?? 0) > 0 && !((UNITS[unit.type]?.bombard ?? 0) > 0) && civiliansAlone(state, unit, last);
-  const refused = walk(state, unit, path, dest, mates, capture ? last : -1);
+  const refused = walk(state, unit, path, dest, mates, capture ? last : -1, kept);
   if (zocMoved && unit.tileIndex !== from) {
     // the zone test on the plot it stands on, no destination (0x270800:
     // 0x26f980's fourth argument null), so no exerter's plot is waived
@@ -1222,6 +1268,15 @@ function orderOnce(state: GameState, unit: Unit, dest: number, strike: boolean,
     }
   }
   if (refused || !state.units.includes(unit)) return false;
+  if (kept.again >= 0) {
+    // the goal seen now: searched afresh; else the kept path's last node of
+    // its first turn (0x782d0: the first whose next is a later turn's, the
+    // goal where none is)
+    if (kept.again !== kept.flagged) return { search: dest };
+    let j = kept.again;
+    while (j + 1 < nodes.length && nodes[j + 1].turns <= 1) j += 1;
+    return { search: nodes[j].tile };
+  }
   if (into) {
     if (plotDistance(state, unit.tileIndex, last) !== 1) return true;
     if (!strike || nodes[nodes.length - 1].turns > 1) return false;
@@ -1237,8 +1292,15 @@ function orderOnce(state: GameState, unit: Unit, dest: number, strike: boolean,
     if (unit.movesLeft > 0 && attacksLeftOf(unit) > 0) meleeAttack(state, unit.id, last, unit.seat);
     return false;
   }
-  return unit.tileIndex !== dest;
+  return unit.tileIndex === dest ? 'there' : true;
 }
+
+/** a kept path's flags (0x26e3a0) for its walk: `flagged` the index of its
+ *  first node on a plot the player did not see as it was found (-1 none),
+ *  `goal` its goal where not seen then (-1 seen); `again` the index of the
+ *  step the walk stopped before for a search (-1 none; the path's length
+ *  for the goal's) */
+interface KeptPath { flagged: number; goal: number; again: number }
 
 /** a plot the unit would attack into rather than enter: one a unit of a
  *  player at war with it holds on its map layer (a religious unit on its
@@ -1275,8 +1337,9 @@ function civiliansAlone(state: GameState, unit: Unit, p: number): boolean {
  *  city-state 3's Trader, t109 its Crossbowman 1769474 onto 9:8 under
  *  player 1's Missionary); true where a step was
  *  refused (the placement 0x587ca0 refusing: the order done, 0x26fe20 at
- *  0x270933) */
-function walk(state: GameState, unit: Unit, path: number[], dest: number, mates: readonly Unit[], onto = -1): boolean {
+ *  0x270933). Before a step after its first the kept path's rule (`kept`,
+ *  0x272aa0) may ask a search: the walk ends there, `kept.again` set. */
+function walk(state: GameState, unit: Unit, path: number[], dest: number, mates: readonly Unit[], onto: number, kept: KeptPath): boolean {
   const { tiles } = state.map;
   // how far its Movement carries it along the path this turn: a formation's,
   // the least its members hold (0x262cd0)
@@ -1342,6 +1405,16 @@ function walk(state: GameState, unit: Unit, path: number[], dest: number, mates:
   const lead = escortOf(state, unit);
   const formed = escortRiders(state, lead ?? unit);
   for (let i = 0; i < stop; i++) {
+    if (i > 0) {
+      if (kept.goal >= 0 && plotsSeenNow(state, new Set([unit.seat]))[kept.goal] === 1) {
+        kept.again = path.length + 1;
+        return false;
+      }
+      if (i === kept.flagged) {
+        kept.again = i;
+        return false;
+      }
+    }
     const mover = lead && state.units.includes(lead) && lead.tileIndex === unit.tileIndex ? lead : unit;
     const r = stepUnit(state, mover, tiles[path[i]], formed);
     if (r === 'halted') return false;
@@ -1369,6 +1442,18 @@ export function enemyAt(state: GameState, unit: Unit, tile: number): boolean {
 function enemyOnLayer(state: GameState, unit: Unit, tile: number): boolean {
   const layer = mapLayer(unit.type);
   return state.units.some((u) => u.tileIndex === tile && onMap(u) && mapLayer(u.type) === layer && unitsHostile(state, unit, u));
+}
+
+/** a unit at war with the unit that fights (a Combat, Ranged or Bombard
+ *  strength: 0x5861f0's out-flag, 0x523520) holds the plot on the unit's map
+ *  layer (the plot's list 0x75c50 of the layer 0x901e0) */
+function fighterOnLayer(state: GameState, unit: Unit, tile: number): boolean {
+  const layer = mapLayer(unit.type);
+  return state.units.some((u) => {
+    if (u.tileIndex !== tile || !onMap(u) || mapLayer(u.type) !== layer || !unitsHostile(state, unit, u)) return false;
+    const st = aiStrengths(state, u);
+    return st.melee > 0 || st.ranged > 0 || st.bombard > 0;
+  });
 }
 
 /** a unit of another player than the unit's on the plot (an aircraft, a
@@ -1695,7 +1780,12 @@ export function tacticalTargets(state: GameState, seat: number, seen: ArrayLike<
       out.push({ type: 'FRIENDLY_CITY', tile: t.index, seat, unit: null });
     }
     if (t.district !== null) {
-      combat = t.district === 'CITY_CENTER' || t.district === 'ENCAMPMENT';
+      // a district that defends (0x24c2f0: a city centre, or a district of
+      // hit points complete and not pillaged) ends its plot's chain; a
+      // pillaged or unbuilt Encampment's plot goes on to its units
+      // (runs/h1_duelq1124 t218 / t236: city-state 4's Trader on city-state
+      // 3's pillaged Encampment 40:10 is the barbarians' TRADER target)
+      combat = t.district === 'CITY_CENTER' || (t.district === 'ENCAMPMENT' && !!t.districtComplete && !t.districtPillaged);
       if (hostile(owner)) {
         if (combat) out.push({ type: 'COMBAT_DISTRICT', tile: t.index, seat: owner, unit: null });
         else if (t.districtComplete && !t.districtPillaged && DISTRICTS[t.district]?.countsTowardLimit) out.push({ type: 'PASSIVE_DISTRICT', tile: t.index, seat: owner, unit: null });
@@ -1724,7 +1814,12 @@ export function tacticalTargets(state: GameState, seat: number, seen: ArrayLike<
       out.push({ type: 'GOODY', tile: t.index, seat: NO_SEAT, unit: null });
       continue;
     }
-    const traders = here.filter((u) => UNITS[u.type]?.trader && unitsHostile(state, me, u));
+    // a Trader of a player at war walking a route (0x58fc40), not immune to
+    // plunder on the plot's ground (0x58fc20 at 0x784b2f: `traderImmune`;
+    // runs/h1_duelq1117 t107-109: the barbarian Man-At-Arms 3932182 beside
+    // player 1's Trader 1310732 on 33:13 / 34:13 takes no Plunder Trader)
+    const traders = here.filter((u) => UNITS[u.type]?.trader && u.seat !== seat && !!u.routed && unitsHostile(state, me, u)
+      && !traderImmune(state, u.seat, t.index));
     if (traders.length) {
       for (const u of traders) out.push({ type: 'TRADER', tile: t.index, seat: u.seat, unit: u });
       continue;
@@ -2533,7 +2628,12 @@ function campStrike(state: GameState, pass: Pass, u: Unit, camp: number): { unit
  * only ahead of another unit, 0x77551e..0x775534; runs/h1_duelq1128 t38 the
  * camp's Spearman 589832 on 33:10, alone in reach of city-state 4's Farm on
  * 32:10, wanders onto it and leaves it whole) and that do not stand on such a
- * plot themselves (0x774380) go there, each one's turn done, until one stands
+ * plot themselves (0x774380: for an improvement target a plot with an
+ * improvement, for a district target one with any district, GetDistrictType
+ * 0x810d0 — `districtPlot`, a wonder's plot among them: runs/h1_duelq1128
+ * t176 the Line Infantry 6553608 on player 1's wonder under construction
+ * 15:12, three districts in its reach, goes for none and moves to safety)
+ * go there, each one's turn done, until one stands
  * on it and pillages it (`hostilePillage`). Both log "Pillage Improvement"
  * (AI_Tactical.csv: 158 of its rows target a PASSIVE_DISTRICT under that
  * name over the five duely duels, none is named otherwise).
@@ -2568,7 +2668,7 @@ function pillage(state: GameState, pass: Pass, districts: boolean): void {
       if (u.tileIndex !== t.index) {
         const here = map.tiles[u.tileIndex];
         if (!districts && here.improvement !== null) continue;
-        if (districts && here.district !== null) continue;
+        if (districts && districtPlot(state, here)) continue;
         moveTo(state, u, t.index);
       }
       const there = u.tileIndex === t.index;
@@ -3568,8 +3668,11 @@ function cityCentre(state: GameState, t: Tile): boolean {
  * it out (0x585eb0, `keptOut`: one of its own stacking with it, itself
  * counted, or another player's at peace but a Trader or a Spy — runs/
  * h1_duely1127 t88: player 0's Warrior on 29:15 keeps city-state 3's Galley
- * 393216 to 28:17) and no unit at war with it
- * (0x5861f0), none in fallout (0x2d2100). A FORT is a plot of the player's
+ * 393216 to 28:17) and no unit at war with it that fights
+ * (0x5861f0's out-flag at 0x716d9c, `fighterOnLayer`: a civilian at war
+ * keeps no plot out — runs/h1_duelq1121 t234: the barbarians' captive
+ * Settler 4587543 on 3:10 takes player 1's Great Writer's 5:13, its order
+ * with no path there, and stands), none in fallout (0x2d2100). A FORT is a plot of the player's
  * own territory holding any district or wonder (`districtPlot`: runs/
  * h1_duelq1124 t151 city-state 3's Cuirassier 1835008 takes Granada's
  * Harbor 40:13 over 41:13; t181 a Harbor fort 4 plots off lets the farther
@@ -3607,7 +3710,7 @@ function safePlot(state: GameState, pass: Pass, u: Unit, taken: ReadonlySet<numb
     if (r.turns > 1 || taken.has(r.tile) || r.moves < minMoves * FIX) continue;
     const t = state.map.tiles[r.tile];
     if (irradiated(t)) continue;
-    if (keptOut(state, u, r.tile) || enemyAt(state, u, r.tile)) continue;
+    if (keptOut(state, u, r.tile) || fighterOnLayer(state, u, r.tile)) continue;
     const d = pass.danger[r.tile];
     const safe = d <= 0;
     const own = tileSeat(t) === u.seat;

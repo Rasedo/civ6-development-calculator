@@ -73,16 +73,27 @@
   final: 0x58530
   kind: function
   semantics: "the path node ending turn T (edx): walking from the start, the last node of turn T before a node of a later turn"
-  status: PARTLY
+  status: READ
+  cases:
+    - recording: h1_duelq1124
+      turn: 94
+      value: "the Heavy Chariot 983040 on 16:8 for 32:8, path 17:8 / 18:8 / 18:7 in its first turn: from 17:8 the node searched is 18:7, the first turn's last (no path, a unit seen on it), the order's plot then taking it to 17:7 and its carried order to 18:8"
+  impl:
+    - cpu/core/tactical.ts:orderRun
+    - gpu/core/sim_tactics.py:_tac_move_to
+    - cpu/core/tactical.ts:orderOnce
+    - cpu/core/tactical.ts:refused
   readings:
     - "C-124: the formation's kept path, and a path's other players' units — READ (0x272aa0, 0x26e3a0, 0x782d0, 0x586360 at 0x586542..0x5865a1), unported"
     - "C-124: the kept path is never taken; a move order's path passes other players' units out of sight — READ (0x272aa0, 0x2714b0, 0x586360 at 0x586542..0x5865a1, 0x26fe20), both twins"
     - "C-99: every pool search sets out on its own formation's value, a queue run walks its first search's path — READ (0x2715a0 at 0x271909..0x271910, 0x77d10 at 0x77d8b..0x77db0 / 0x77f0b / 0x78007 / 0x7805d, 0x52f50 at 0x52f9e / 0x52fce / 0x53394, 0x265fd0, 0x272aa0 at 0x272ad7..0x272c24, 0x26e3a0), the engines' model"
-  notes: ["imported: READ in its section, no confirming case found beside it"]
+    - "C-133 / C-95 / C-134: the kept path's searches inside a queue run; the Trader target, the defending district and Pillage's own plot; the safe plot's unit at war that fights"
+    - "C-133 / C-95 / C-134: the kept path's searches inside a queue run; the Trader target, the defending district and Pillage's own plot; the safe plot's unit at war that fights — READ (0x272aa0 at 0x272af9..0x272c76, 0x26ef40 at 0x26f123..0x26f162, 0x26e3a0, 0x782d0, 0x783980 at 0x7842df..0x7842eb / 0x784aec..0x784b36, 0x24c2f0, 0x774380 at 0x774481..0x7744a9, 0x716b90 at 0x716d53..0x716da1), both twins"
+    - "C-133 / C-95 / C-134: the kept path's searches inside a queue run; the Trader target, the defending district and Pillage's own plot; the safe plot's unit at war that fights — READ (0x272aa0 at 0x272af9..0x272c76, 0x26ef40 at 0x26f123..0x26f162, 0x26e3a0, 0x782d0, 0x783980 at 0x7842df..0x7842eb / 0x784aec..0x784b36, 0x24c2f0, 0x774380 at 0x774481..0x7744a9, 0x716b90 at 0x716d53..0x716da1), FIT (the planning list's seen unit at war), both twins"
   context:
     - "...the formation's kept path, and a path's other players' units — READ (0x272aa0, 0x26e3a0, 0x782d0, 0x586360 at 0x586542..0x5865a1), unported"
     - "...agged, the kept path is taken unsearched; else the node ending the path's first turn (0x782d0(nodes, 1): the last node of turn 1, walking from the start) is searched for, and on fai..."
-  review: imported
+  review: reviewed
 - addr: 0x78750
   final: 0x588e0
   kind: function

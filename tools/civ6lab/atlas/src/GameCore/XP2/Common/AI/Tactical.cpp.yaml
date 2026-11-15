@@ -466,11 +466,21 @@
   kind: function
   semantics: the unit stands on a plot of the target's kind.
   status: PARTLY
-  impl: [cpu/core/tactical.ts:pillage, cpu/harness/replay.ts:Tactical]
+  cases:
+    - recording: h1_duelq1128
+      turn: 176
+      value: "the Line Infantry 6553608 on player 1's wonder under construction 15:12 (a district type), three PASSIVE_DISTRICT rows naming it available: it goes for none and moves to safety"
+  impl:
+    - cpu/core/tactical.ts:pillage
+    - cpu/harness/replay.ts:Tactical
+    - cpu/core/tactical.ts:districtPlot
+    - gpu/core/sim_tactics.py:_tac_pass
   readings:
     - "C-95: the tactical pass — READ (the barbarians' moves; the minors share it)"
     - "C-95: the full search sets out on the formation's least Movement, a major's formations from the log, a tactical move walks its own done units — READ (0x26eea0, 0x266660, 0x262cd0, 0x770ce0 at 0x770d30..0x771097, 0x77d180, 0x775340, 0x771f80 at 0x7723cb / 0x772663, 0x77a810, 0x774380), both twins"
-  notes: ["imported: READ in its section, no confirming case found beside it"]
+    - "C-133 / C-95 / C-134: the kept path's searches inside a queue run; the Trader target, the defending district and Pillage's own plot; the safe plot's unit at war that fights"
+    - "C-133 / C-95 / C-134: the kept path's searches inside a queue run; the Trader target, the defending district and Pillage's own plot; the safe plot's unit at war that fights — READ (0x272aa0 at 0x272af9..0x272c76, 0x26ef40 at 0x26f123..0x26f162, 0x26e3a0, 0x782d0, 0x783980 at 0x7842df..0x7842eb / 0x784aec..0x784b36, 0x24c2f0, 0x774380 at 0x774481..0x7744a9, 0x716b90 at 0x716d53..0x716da1), both twins"
+    - "C-133 / C-95 / C-134: the kept path's searches inside a queue run; the Trader target, the defending district and Pillage's own plot; the safe plot's unit at war that fights — READ (0x272aa0 at 0x272af9..0x272c76, 0x26ef40 at 0x26f123..0x26f162, 0x26e3a0, 0x782d0, 0x783980 at 0x7842df..0x7842eb / 0x784aec..0x784b36, 0x24c2f0, 0x774380 at 0x774481..0x7744a9, 0x716b90 at 0x716d53..0x716da1), FIT (the planning list's seen unit at war), both twins"
   context:
     - ...is turn (0x775340, 1 turn) in pool order, none standing on a plot of the kind itself (0x774380), go to it until one stands on it and pillages it.
   review: reviewed

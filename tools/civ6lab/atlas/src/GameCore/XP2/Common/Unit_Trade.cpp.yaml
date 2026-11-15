@@ -13,10 +13,18 @@
     - recording: plunder_sweep_a0
       turn: 101
       value: no Trader of the sweep carries an escort or Lisbon's immunity on land, each on-plot request with Movement plunders
-  impl: [cpu/core/trade.ts:traderImmune, gpu/core/sim_seats.py:_trader_immune]
+  impl:
+    - cpu/core/trade.ts:traderImmune
+    - gpu/core/sim_seats.py:_trader_immune
+    - cpu/core/tactical.ts:tacticalTargets
+    - gpu/core/sim_tactics.py:_tac_targets
+    - cpu/core/tactical.ts:traders
   readings:
     - "C-123 / C-95: the Plunder Trade Route command and the AI's plunder after the move — READ (0x89dae0, 0x89dfc0, 0x9555a0, 0x9559a0, 0x5545e0 at 0x554667 / 0x554d4c, 0x58fc20, 0x7746a0, 0x70a440, 0x771f80 at 0x7722b6 / 0x77254e / 0x77277f, 0x776140 at 0x776424..0x776470), both twins"
     - "C-123: the PLUNDER seat action and Lisbon's sea immunity — READ (0x89dae0, 0x58fc20), both twins and the replay"
+    - "C-133 / C-95 / C-134: the kept path's searches inside a queue run; the Trader target, the defending district and Pillage's own plot; the safe plot's unit at war that fights"
+    - "C-133 / C-95 / C-134: the kept path's searches inside a queue run; the Trader target, the defending district and Pillage's own plot; the safe plot's unit at war that fights — READ (0x272aa0 at 0x272af9..0x272c76, 0x26ef40 at 0x26f123..0x26f162, 0x26e3a0, 0x782d0, 0x783980 at 0x7842df..0x7842eb / 0x784aec..0x784b36, 0x24c2f0, 0x774380 at 0x774481..0x7744a9, 0x716b90 at 0x716d53..0x716da1), both twins"
+    - "C-133 / C-95 / C-134: the kept path's searches inside a queue run; the Trader target, the defending district and Pillage's own plot; the safe plot's unit at war that fights — READ (0x272aa0 at 0x272af9..0x272c76, 0x26ef40 at 0x26f123..0x26f162, 0x26e3a0, 0x782d0, 0x783980 at 0x7842df..0x7842eb / 0x784aec..0x784b36, 0x24c2f0, 0x774380 at 0x774481..0x7744a9, 0x716b90 at 0x716d53..0x716da1), FIT (the planning list's seen unit at war), both twins"
   notes:
     - the engines model the escorts' grant (Mandekalu, Bireme), Reform the Coinage's golden face and Lisbon's suzerain's ABILITY_TRADE_ROUTE_PLUNDER_IMMUNITY_SEA (DOMAIN_SEA, the water count)
   review: reviewed
@@ -26,8 +34,15 @@
   name: traderHasRoute
   semantics: "does the Trader's trade object (+0x1eb8) hold a route: the plunder (0x5545e0 at 0x554667) goes to its NO_ROUTE branch (0x554d4c, V 0) where it does not."
   status: PARTLY
-  impl: [cpu/core/trade.ts:routePlunderGold]
+  impl:
+    - cpu/core/trade.ts:routePlunderGold
+    - cpu/core/tactical.ts:tacticalTargets
+    - gpu/core/sim_tactics.py:_tac_targets
+    - cpu/core/tactical.ts:camps
   readings:
     - "C-123 / C-95: the Plunder Trade Route command and the AI's plunder after the move — READ (0x89dae0, 0x89dfc0, 0x9555a0, 0x9559a0, 0x5545e0 at 0x554667 / 0x554d4c, 0x58fc20, 0x7746a0, 0x70a440, 0x771f80 at 0x7722b6 / 0x77254e / 0x77277f, 0x776140 at 0x776424..0x776470), both twins"
+    - "C-133 / C-95 / C-134: the kept path's searches inside a queue run; the Trader target, the defending district and Pillage's own plot; the safe plot's unit at war that fights"
+    - "C-133 / C-95 / C-134: the kept path's searches inside a queue run; the Trader target, the defending district and Pillage's own plot; the safe plot's unit at war that fights — READ (0x272aa0 at 0x272af9..0x272c76, 0x26ef40 at 0x26f123..0x26f162, 0x26e3a0, 0x782d0, 0x783980 at 0x7842df..0x7842eb / 0x784aec..0x784b36, 0x24c2f0, 0x774380 at 0x774481..0x7744a9, 0x716b90 at 0x716d53..0x716da1), both twins"
+    - "C-133 / C-95 / C-134: the kept path's searches inside a queue run; the Trader target, the defending district and Pillage's own plot; the safe plot's unit at war that fights — READ (0x272aa0 at 0x272af9..0x272c76, 0x26ef40 at 0x26f123..0x26f162, 0x26e3a0, 0x782d0, 0x783980 at 0x7842df..0x7842eb / 0x784aec..0x784b36, 0x24c2f0, 0x774380 at 0x774481..0x7744a9, 0x716b90 at 0x716d53..0x716da1), FIT (the planning list's seen unit at war), both twins"
   notes: ["its body unread: read off its use at 0x554667 alone"]
   review: reviewed
