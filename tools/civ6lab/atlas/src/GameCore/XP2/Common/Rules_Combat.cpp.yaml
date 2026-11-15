@@ -167,6 +167,18 @@
     - "- A ranged blow's domain term (0x51c810, the unit-vs-unit attack strength): a bombard attack (combat type 0x4fc9163d) loses C..."
     - ...IER_UNIT_ADJUST_COMBAT_STRENGTH, the barbarian traits, the difficulty rows), no term of 0x51c810 / 0x51f070 read here, and the dumps' promotions are empty.
   review: reviewed
+- addr: 0x51e640
+  final: 0x36a540
+  kind: function
+  name: bonusVsBarbarians
+  semantics: "a term of the strength composers: the unit's +0x1844 (x 256) where the other side's owner is the barbarian player (0x483b50 -> 0x484910), LOC_COMBAT_PREVIEW_BONUS_VS_BARBARIANS in a preview; what sets +0x1844 unread."
+  status: PARTLY
+  impl: [cpu/core/combat.ts:barbarianCombatCS]
+  readings:
+    - "C-110 / C-125: an embarked unit's strengths in a unit's blow, a promotion's side, ground closed to a strike — READ (0x51f070 at 0x51f3ef..0x51f457, 0x206960 at 0x2069b4..0x2069e0 and 0x206a78..0x206b29, 0x520270 at 0x520576..0x5205db, 0x5228c0, 0x77a4b0), FIT (the closed ground), both twins"
+  context:
+    - "...r15`); with none it takes every term a unit ashore takes: the bonus against barbarians 0x51e640 (the unit's +0x1844), the friendly-territory term 0x5230b0 (+0x1848), the terrain term..."
+  review: reviewed
 - addr: 0x51eaf0
   kind: function
   name: districtDamageLoss
@@ -189,9 +201,15 @@
   review: reviewed
 - addr: 0x51f070
   kind: function
-  semantics: "the defender's strength composer: 0x521ed0 for the combat type 0x5e2f7468, 0x5228c0 for every other; its modifier walk reads the unit abilities (ABILITY_SPEAR_OF_FIONN's +5). At 0x51f603..0x51f737 the terrain term 0x522c10, the fortification 0x521830 and the support are added one after the other with no test of the defender's plot: no district is asked before 0x5228c0."
+  semantics: "the defender's strength composer: 0x521ed0 for the combat type 0x5e2f7468, 0x5228c0 for every other; its modifier walk reads the unit abilities (ABILITY_SPEAR_OF_FIONN's +5). At 0x51f603..0x51f737 the terrain term 0x522c10, the fortification 0x521830 and the support are added one after the other with no test of the defender's plot: no district is asked before 0x5228c0. Arguments: rdx the result, r8 the defender, r9 the combat's plot, then the attacker, the combat type, the modifiers' context and the preview list. After the wound (0x522630) and the fuel term an embarked defender that does not fight embarked (0x8be30, +0x18c3 clear) is cut to those alone only where the preview list is given (0x51f3ef..0x51f457: test r15, r15); with none it takes every term a unit ashore takes — the bonus against barbarians 0x51e640, the friendly territory 0x5230b0, the terrain 0x522c10, the fortification 0x521830, the Support, the unused Movement 0x5232d0, the modifiers' sum — on its era's embarked strength (0x56dc90 with dl 0)."
   status: READ
   cases:
+    - recording: h1_duelq1127
+      turn: 170
+      value: the rampaging Galley 262147 on player 0's embarked Warrior 4849729 on the Reef 38:7 deals 55 (CombatLog 15 / -1), the Warrior left at 2 and the Galley on 39:8
+    - recording: h1_duelq1121
+      turn: 78
+      value: the barbarian Galleys 524295 / 1572882 on player 0's embarked Warrior 589826 on the Reef 30:20 deal 45 and 53 (CombatLog DefenderStrMod +3, then -1), the Warrior left at 2
     - recording: h1_duelq1128
       turn: 30
       value: the barbarian Warrior 2031630's blow back about its own plot 14:15 (three of its own beside it) keeps its spot 14:13 under the exchange filter, Move 14 13 as logged
@@ -207,12 +225,17 @@
     - recording: 1124
       turn: 14
       value: "- Not explained by this reading (C-94 ASK): a +5 a barbarian unit carries on   some attacks and not others (1124 t14 a Spearman and a Warrior on Rome's   Scout, t32, t37, t84;"
+  impl:
+    - cpu/core/combat.ts:defenderCS
+    - gpu/core/sim_seats.py:_melee_unit_strengths
+    - gpu/core/sim_seats.py:_ranged_unit_strengths
   readings:
     - "H-1: the melee result, a ranged blow's domain, a city's shot — READ"
     - "C-98: the unit efficiencies — READ (0x79a440, its simulated combats 0x205720 off the map), ported: every entry the logged table's"
     - "C-99 / C-95: a melee blow's river is the defender plot's edge on the attacker's side at any distance; a levied unit home reveals its sight — READ (0x522c10 at 0x522f1d..0x52301b, 0x51f070 at 0x51f603..0x51f639), both twins"
     - "C-125 / C-95: flanking and support count about the defender unit's own plot, no river edge read; MEDIUM by the plot's layer-0 list; a killed target's record; the camp strike's orders — READ (0x521530, 0x51c810 at 0x51cc1c..0x51cc56, 0x5228c0, 0x786d50, 0x776140 at 0x776333, 0x8e9d0, 0x772940 at 0x772d2f..0x772f78), FIT (the camp strike's path), both twins"
     - "C-125 / C-95: the target list's trade layer and its one unit of the units' layer; a siege unit's step onto civilians; the city-states' Attack Civilians; the flankers' test, the support's caller, the camp strike's queue — READ (0x783980 at 0x7849bb..0x784c2b and 0x784c30..0x784f57, 0x26fe20 -> 0x212500, 0x521530, 0x51f070 at 0x51f70e..0x51f737, 0x546f0, 0x52f50), both twins"
+    - "C-110 / C-125: an embarked unit's strengths in a unit's blow, a promotion's side, ground closed to a strike — READ (0x51f070 at 0x51f3ef..0x51f457, 0x206960 at 0x2069b4..0x2069e0 and 0x206a78..0x206b29, 0x520270 at 0x520576..0x5205db, 0x5228c0, 0x77a4b0), FIT (the closed ground), both twins"
   context:
     - "...pportLive` / `_flank_support_live` read each player's civics. The defender's composer 0x51f070 calls 0x521ed0 for the combat type 0x5e2f7468 and 0x5228c0 for every other; 0x5228c0 ad..."
     - ...JUST_COMBAT_STRENGTH, the barbarian traits, the difficulty rows), no term of 0x51c810 / 0x51f070 read here, and the dumps' promotions are empty.
@@ -220,10 +243,12 @@
 - addr: 0x520270
   kind: function
   name: visibilityCS
-  semantics: "the district-defender strength (called by the district attack 0x207080): carries the diplomatic-visibility (ESPIONAGE) bonus (visibilityCS)."
+  semantics: "the district-defender strength (called by the district attack 0x207080): carries the diplomatic-visibility (ESPIONAGE) bonus (visibilityCS). An embarked defender that does not fight embarked is left its wound and fuel terms alone, preview list or none (0x520576..0x5205db: the list only guards the preview's line), where the unit composer 0x51f070 cuts it so under a list alone."
   status: PARTLY
   impl: [cpu/core/combat.ts:cityStrikeDefenderCS]
-  readings: ["C-26: the struck unit's terms (install audit)"]
+  readings:
+    - "C-26: the struck unit's terms (install audit)"
+    - "C-110 / C-125: an embarked unit's strengths in a unit's blow, a promotion's side, ground closed to a strike — READ (0x51f070 at 0x51f3ef..0x51f457, 0x206960 at 0x2069b4..0x2069e0 and 0x206a78..0x206b29, 0x520270 at 0x520576..0x5205db, 0x5228c0, 0x77a4b0), FIT (the closed ground), both twins"
   context:
     - "...erm's modifiers and requirements from the layered install; the district-defender strength 0x520270 (called by the district attack 0x207080) carries the diplomatic-visibility (\"ESPIONAGE\")..."
     - "...TYPE_MATCHES COMBAT_RANGED and NOT attacking: a city's shot is ranged); `visibilityCS` (0x520270)."
@@ -277,13 +302,20 @@
 - addr: 0x521830
   final: 0x36c590
   kind: function
-  status: PARTLY
+  name: fortificationTerm
+  semantics: "the defender's fortification term: the unit's fortification turns (+0xd50), where above 0, x FORTIFY_BONUS_PER_TURN (GlobalParameters +0x370, 3) x 256; no test of the unit's plot or embarkation."
+  status: READ
+  cases:
+    - recording: h1_duelq1124
+      turn: 104
+      value: "player 0's Warrior 2162689 on 35:20, the Fortify order taken in its turn, two turns dug in under the barbarian Man-At-Arms 4259859 (1 health) on 36:21: the blow would fell both, the Man-At-Arms the further over, no winning blow in its planning, and it moves to safety to 37:21 as logged"
+  impl: [cpu/core/units.ts:fortifyBonus]
   readings:
     - "C-125 / C-95: the target list's trade layer and its one unit of the units' layer; a siege unit's step onto civilians; the city-states' Attack Civilians; the flankers' test, the support's caller, the camp strike's queue — READ (0x783980 at 0x7849bb..0x784c2b and 0x784c30..0x784f57, 0x26fe20 -> 0x212500, 0x521530, 0x51f070 at 0x51f70e..0x51f737, 0x546f0, 0x52f50), both twins"
-  notes: ["imported: READ in its section, no confirming case found beside it"]
+    - "C-110 / C-125: an embarked unit's strengths in a unit's blow, a promotion's side, ground closed to a strike — READ (0x51f070 at 0x51f3ef..0x51f457, 0x206960 at 0x2069b4..0x2069e0 and 0x206a78..0x206b29, 0x520270 at 0x520576..0x5205db, 0x5228c0, 0x77a4b0), FIT (the closed ground), both twins"
   context:
     - "...S CALLER (0x51f070 at 0x51f70e..0x51f737): the terrain term 0x522c10, the fortification 0x521830 and the support (0x521ed0 for the combat type 0x5e2f7468, 0x5228c0 for every other) are..."
-  review: imported
+  review: reviewed
 - addr: 0x5218f0
   final: 0x36c650
   kind: function

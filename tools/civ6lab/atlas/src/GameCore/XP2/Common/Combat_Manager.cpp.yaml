@@ -170,7 +170,7 @@
       value: "city-state 2's Warrior 131073 at 60 health, fortified 2 on 14:10: 30 taken + 26 back, the spot kept, the attack fought"
     - recording: AI_UnitEfficiency.csv
       value: "Logged once a game as   AI_UnitEfficiency.csv (\", %3.2f\"), the same in every recording;"
-  impl: [cpu/core/aiViewTypes.ts:AiView]
+  impl: [cpu/core/aiViewTypes.ts:AiView, cpu/core/combat.ts:defenderCS]
   readings:
     - "C-96 / C-97: the unit value — READ (the combat, trade, explorer branches, the tail, the military AI's unit production), PARTLY READ (its inputs)"
     - "C-97: City Defense and the assault target's validity — the city's threat, the defence event, Is City Threatened, Garrison City and the district target's validity READ; the threat's level terms, the garrison's swap and the team's unit to build unread"
@@ -180,6 +180,7 @@
     - "C-123 / C-95: a Trader stands on the trade layer; a city's shot is a COMBAT_DISTRICT spot's blow back — READ (0x901e0, 0x586360 -> 0x208b80, 0x585eb0 -> 0x585d90, 0x791470 at 0x7917f7..0x7918f7 -> 0x249ee0 / 0x205720, 0x776140 at 0x776780..0x7767fa), both twins"
     - "C-95: a move order's path steps on from an attack's plot, its attack child by the order's flags, a non-attack order's destination, a melee blow on a civilian — READ (0x2720a0 at 0x272434..0x272544, 0x2715a0 at 0x2717cd / 0x271870..0x2718d7, 0x1385c0, 0x889e0, 0x2714b0, 0x206960 at 0x206a1f), both twins"
     - "C-125: the planning's blow back where both blows would kill — READ, ported"
+    - "C-110 / C-125: an embarked unit's strengths in a unit's blow, a promotion's side, ground closed to a strike — READ (0x51f070 at 0x51f3ef..0x51f457, 0x206960 at 0x2069b4..0x2069e0 and 0x206a78..0x206b29, 0x520270 at 0x520576..0x5205db, 0x5228c0, 0x77a4b0), FIT (the closed ground), both twins"
   context:
     - "...ombat 0) 1.0; one without against one with 0.01 / 100.0; else two combat simulations (0x205720) of the neutral player's units, each attacking the other: the damage each takes in both..."
   review: reviewed
@@ -234,9 +235,12 @@
 - addr: 0x206960
   final: 0x157510
   kind: function
-  semantics: "the melee result (Combat_Manager): the defender's damage drawn first (0x51a240); the counter (the attacker's damage) is never drawn where the defender is embarked (0x8be30, byte +0x6b0) and does not fight embarked (+0x18c3, m_bFightWhileEmbarked). Both totals are then summed against COMBAT_MAX_HIT_POINTS (0x56e0d0): where both would fall, the side whose total overshoots further falls and the other is left at max - 1 damage (1 HP) — the attacker on a tie (0x206d01: jle). The experience reads the result after it (0x1975e0 at 0x206e98 / 0x206ee2). A defender of formation 2 takes nothing either way (0x206a1f); one of formation 1 (the support class) takes its whole hit points after the law (0x206bf0): the Anti-Air Gun and Mobile SAM at 165 a pair (100 + 65), their attacker 2. GetFormationClass 2 is FORMATION_CLASS_CIVILIAN: a melee blow on a civilian deals and takes nothing, so the planning's prediction (0x791470) of a CIVILIAN, RELIGIOUS or TRADER target struck in melee takes 0 (predictBlow, _tac_predict_pool's d_civ)."
+  semantics: "the melee result (Combat_Manager): the defender's damage drawn first (0x51a240); the counter (the attacker's damage) is never drawn where the defender is embarked (0x8be30, byte +0x6b0) and does not fight embarked (+0x18c3, m_bFightWhileEmbarked). Both totals are then summed against COMBAT_MAX_HIT_POINTS (0x56e0d0): where both would fall, the side whose total overshoots further falls and the other is left at max - 1 damage (1 HP) — the attacker on a tie (0x206d01: jle). The experience reads the result after it (0x1975e0 at 0x206e98 / 0x206ee2). A defender of formation 2 takes nothing either way (0x206a1f); one of formation 1 (the support class) takes its whole hit points after the law (0x206bf0): the Anti-Air Gun and Mobile SAM at 165 a pair (100 + 65), their attacker 2. GetFormationClass 2 is FORMATION_CLASS_CIVILIAN: a melee blow on a civilian deals and takes nothing, so the planning's prediction (0x791470) of a CIVILIAN, RELIGIOUS or TRADER target struck in melee takes 0 (predictBlow, _tac_predict_pool's d_civ). The attacker's own strength (0x2069b4..0x2069e0): GetCombat 0x56dc90's flag is IsCoastalLand 0x82a10(the combat's plot, -1) where the attacker is embarked, else 0 — an embarked attacker onto land that is no coastal land (a lake's shore) fights at its owner's era's embarked strength. The composers' preview list is the results object where the third argument is 0, none otherwise (0x206a78..0x206b29); the planning's simulation passes 1."
   status: READ
   cases:
+    - recording: h1_duelq1124
+      turn: 91
+      value: "city-state 2's Man-At-Arms 1310723 embarked on the lake 9:10: its blow on the barbarian Archer 3997716 on 8:7 is the embarked strength's (22 dealt, 41 taken), no Attack Medium Priority claim, the Builder 4456474 beside the Archer its Attack Civilian target as logged"
     - recording: h1_duelq1128
       turn: 50
       value: "the barbarian Archer 2752535 (23 health) on 17:13, player 1's Warrior 589828 (14) on 15:11: the blow back on 17:10 31 / 29, both would fall, the Warrior 15 over to the Archer's 8: the Archer left at 1 (22), the spot kept by the survival filter, Move 17 10 Attack -9999 as logged"
@@ -263,12 +267,16 @@
     - cpu/core/combat.ts:defDef
     - cpu/core/combat.ts:struck
     - cpu/core/aiUnitEfficiency.ts:blow
+    - cpu/core/combat.ts:defenderCS
+    - cpu/core/combat.ts:meleeUnitStrengths
+    - gpu/core/sim_seats.py:_melee_unit_strengths
   readings:
     - "C-125: the planning's blow back where both blows would kill — READ, ported"
     - "C-95: a move order's path steps on from an attack's plot, its attack child by the order's flags, a non-attack order's destination, a melee blow on a civilian — READ (0x2720a0 at 0x272434..0x272544, 0x2715a0 at 0x2717cd / 0x271870..0x2718d7, 0x1385c0, 0x889e0, 0x2714b0, 0x206960 at 0x206a1f), both twins"
     - "H-1: the melee result, a ranged blow's domain, a city's shot — READ"
     - "C-98: the unit efficiencies — READ (0x79a440, its simulated combats 0x205720 off the map), ported: every entry the logged table's"
     - "C-98: the unit efficiencies"
+    - "C-110 / C-125: an embarked unit's strengths in a unit's blow, a promotion's side, ground closed to a strike — READ (0x51f070 at 0x51f3ef..0x51f457, 0x206960 at 0x2069b4..0x2069e0 and 0x206a78..0x206b29, 0x520270 at 0x520576..0x5205db, 0x5228c0, 0x77a4b0), FIT (the closed ground), both twins"
   context:
     - "- The melee result (0x206960, Combat_Manager): the defender's damage is drawn first (0x51a240); the counter — the at..."
   review: reviewed
@@ -470,6 +478,7 @@
     - "C-95: the rampage strikes with the move's whole list; its defender is one the barbarians see — READ (0x778b40, 0x771670, 0x208b80, 0x20a2a0), both twins"
     - "C-125 / C-95: flanking and support count about the defender unit's own plot, no river edge read; MEDIUM by the plot's layer-0 list; a killed target's record; the camp strike's orders — READ (0x521530, 0x51c810 at 0x51cc1c..0x51cc56, 0x5228c0, 0x786d50, 0x776140 at 0x776333, 0x8e9d0, 0x772940 at 0x772d2f..0x772f78), FIT (the camp strike's path), both twins"
     - "C-125 / C-95: the target list's trade layer and its one unit of the units' layer; a siege unit's step onto civilians; the city-states' Attack Civilians; the flankers' test, the support's caller, the camp strike's queue — READ (0x783980 at 0x7849bb..0x784c2b and 0x784c30..0x784f57, 0x26fe20 -> 0x212500, 0x521530, 0x51f070 at 0x51f70e..0x51f737, 0x546f0, 0x52f50), both twins"
+    - "C-110 / C-125: an embarked unit's strengths in a unit's blow, a promotion's side, ground closed to a strike — READ (0x51f070 at 0x51f3ef..0x51f457, 0x206960 at 0x2069b4..0x2069e0 and 0x206a78..0x206b29, 0x520270 at 0x520576..0x5205db, 0x5228c0, 0x77a4b0), FIT (the closed ground), both twins"
   context:
     - "...Encampment) 0x24b170 takes the plot's best defender (0x208b80) where it is a combat unit (0x209dd0: Combat, Ranged or Bombard above 0) and, with a MilitaryFormation argument (+0x90), compa..."
     - ...'s units from the last to the first; for each one not dead (+0x770), not a combat unit (0x209dd0), whose unit info lacks the +0x1ba bit 2, and whose player the mover's player is at w...

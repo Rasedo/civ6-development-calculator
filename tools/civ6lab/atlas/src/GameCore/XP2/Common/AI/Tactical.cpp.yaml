@@ -926,6 +926,12 @@
   semantics: "Move to Safety: lists units on danger that flee (no strength, embarked, hurt at half health with no kill, a hurt barbarian at sea, a whole non-barbarian topped by 20), then moves each to its safe plot"
   status: READ
   cases:
+    - recording: h1_duelq1124
+      turn: 104
+      value: the barbarian Man-At-Arms 4259859 at 1 health on 36:21, no winning blow in its planning (player 0's Warrior on 35:20 two turns dug in), moves to safety to 37:21 as logged
+    - recording: h1_duelq1117
+      turn: 90
+      value: city-state 3's Heavy Chariot 1179650, 61 damage on 31:16, its planning holding no winning blow (the barbarian Warrior at 15 health beside it stands on player 1's closed 31:15), moves to safety to 30:17 as logged
     - recording: h1_duelw1117-1128
       turn: all
       value: "the barbarians' logged Current Danger 114 of 240 equal; HL: Move To Safety ends 184 of 371"
@@ -937,7 +943,7 @@
     - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
     - "C-95: the danger map and Move to Safety — READ, ported"
     - "C-95: Attack Units — READ, ported"
-  notes: ["imported: READ in its section, no confirming case found beside it"]
+    - "C-110 / C-125: an embarked unit's strengths in a unit's blow, a promotion's side, ground closed to a strike — READ (0x51f070 at 0x51f3ef..0x51f457, 0x206960 at 0x2069b4..0x2069e0 and 0x206a78..0x206b29, 0x520270 at 0x520576..0x5205db, 0x5228c0, 0x77a4b0), FIT (the closed ground), both twins"
   context:
     - "- MOVE TO SAFETY (0x77a4b0) and the influence map (0x717460) — READ, unported: per player at war, each of its figh..."
   review: reviewed

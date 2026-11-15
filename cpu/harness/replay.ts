@@ -1303,6 +1303,12 @@ function barbarianAi(ctx: Ctx, b: TurnRecord, closing: number, before: ReadonlyS
     // ...and a barbarian the pair's own turn undug still dug in (`undug`)
     const dug = isBarbSeat(c.seat) ? ctx.undug.get(key) : undefined;
     if (dug) c.fortifyTurns = dug.turns;
+    // ...and another player's unit that took the Fortify order before their
+    // turn opens dug in as record t+1 holds it (runs/h1_duelq1124 t104:
+    // player 0's Warrior 2162689 on 35:20, ordered in its turn, two turns
+    // dug in under the barbarian Man-At-Arms 4259859's planning)
+    const f = open === undefined || isBarbSeat(c.seat) ? undefined : ctx.fortified.get(key);
+    if (f && f.ord < open! && f.turns !== null && f.turns > (c.fortifyTurns ?? 0)) c.fortifyTurns = f.turns;
   }
   // ...and each major's formations as the log's rows before their turn left
   // them (runs/h1_duelp1121 t83: player 1's Courser 1835015 escorts its Great

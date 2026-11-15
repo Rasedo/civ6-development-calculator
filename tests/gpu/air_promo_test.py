@@ -180,7 +180,7 @@ def main() -> None:
         assert cs(ty, cls, "CS_DEF_VS_AA", attacking=zero, vs_air=one) == 0
         assert cs(ty, cls, "CS_DEF_VS_AA", attacking=one, vs_anti_air=one) == 0
     # and the class terms read the NEW class bits
-    tb = torch.tensor([1 << col_with(rules, "AIR_BOMBER", "CS_VS_CLASS_ANY", v=17)])
+    tb = torch.tensor([1 << col_with(rules, "AIR_BOMBER", "CS_VS_CLASS_ATK", v=17)])
     hit = int(sim._promo_cs(torch.tensor([BOMBER]), tb, attacking=one,
                             foe_type=torch.tensor([RAIDER]))[0])
     assert hit == 17, f"CIV6 counts the raider among 'naval units' — read {hit}"

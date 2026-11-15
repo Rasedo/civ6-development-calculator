@@ -373,6 +373,8 @@
     - cpu/core/tactical.ts:melee
     - cpu/core/tactical.ts:fights
     - cpu/core/opsOrders.ts:targetStrength
+    - cpu/core/combat.ts:defenderCS
+    - gpu/core/sim_seats.py:_melee_unit_strengths
   readings:
     - "C-34: the interception's damage, XP, weariness and the answers"
     - "C-99: an operation's start takes its strengths; a unit's AI strengths with its formation — READ (0x73a120, 0x56dc90, 0x56e3e0, 0x56daa0, 0x1497d0), both twins"
@@ -397,6 +399,7 @@
     - "C-125 / C-95: flanking and support count about the defender unit's own plot, no river edge read; MEDIUM by the plot's layer-0 list; a killed target's record; the camp strike's orders — READ (0x521530, 0x51c810 at 0x51cc1c..0x51cc56, 0x5228c0, 0x786d50, 0x776140 at 0x776333, 0x8e9d0, 0x772940 at 0x772d2f..0x772f78), FIT (the camp strike's path), both twins"
     - "C-132: the danger map's sight, its list's closed ground, the search's whole Movement and its strikes onto water; the embark waiver off a wonder's plot — READ (0x5033a0 -> 0x503320, 0x530420), FIT (the list's closed ground, the start on a district at war, the strikes onto water, the Great General's Movement), both twins"
     - "C-129 / C-99 / C-134: a known city's Encampment in the enemy strength, the rally's advance, the team's battle strengths and Garrison City's fortify test — READ (0x7877e0 at 0x7878e1..0x78791f / 0x787c64..0x787ca7, 0x5f0280, 0x5efaf0, 0x73f0c0, 0x73f7d0 at 0x73face, 0x738f20 at 0x7391a4..0x7395e1, 0x810d30 at 0x810f80..0x81115e), both twins; the replay's buildings before the next start"
+    - "C-110 / C-125: an embarked unit's strengths in a unit's blow, a promotion's side, ground closed to a strike — READ (0x51f070 at 0x51f3ef..0x51f457, 0x206960 at 0x2069b4..0x2069e0 and 0x206a78..0x206b29, 0x520270 at 0x520576..0x5205db, 0x5228c0, 0x77a4b0), FIT (the closed ground), both twins"
   notes:
     - ".claude/scratchpad/st1/reading.md: ...he player (0x469cd0), each unit it sees now (0x5033a0) with a   combat, ranged or bombard strength (0x56dc90, 0x56e3e0, 0x56daa0): its   strength (0x716400: bombard > 0 — the combat strength where it tops the..."
   context:

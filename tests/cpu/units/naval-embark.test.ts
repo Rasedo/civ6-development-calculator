@@ -232,22 +232,27 @@ describe('N2 naval spawn + combat', () => {
     expect(galley.embarked).toBeFalsy(); // naval units are never "embarked"
   });
 
-  it('an embarked defender uses the flat CS — no terrain/fortify/support', () => {
+  it("an embarked defender's own strength is its era's, its plot's terrain on top", () => {
     const state = makeState(makeMap(12, 12, 'COAST'));
     state.unitsMode = true;
     const civ = bareCiv(state);
     const water = tileAtCoords(state.map, 5, 5);
     // construct the embarked unit directly (the map is all water — a land unit
-    // cannot spawnUnit here) with a fortify counter that must be IGNORED.
+    // cannot spawnUnit here)
     const embarked: Unit = {
       id: state.nextUnitId++, type: 'WARRIOR', seat: civ.seat,
       tileIndex: water.index, movesLeft: 2 * MP_SCALE, hp: 100, charges: null,
-      embarked: true, fortifyTurns: 2,
+      embarked: true,
     };
     state.units.push(embarked);
     const flat = embarkedDefenseCS(state, civ.seat);
     expect(flat).toBe(EMBARKED_DEFENSE_CS_BY_ERA[0]);
     expect(defenderCS(state, embarked, water.index)).toBe(flat);
+    // a Reef's +3 is the embarked defender's too (runs/h1_duelq1121 t78:
+    // player 0's Warrior on 30:20, CombatLog DefenderStrMod +3)
+    water.feature = 'REEF';
+    expect(defenderCS(state, embarked, water.index)).toBe(flat + 3);
+    water.feature = null;
     // wounded embarked: flat CS minus the linear wound penalty
     embarked.hp = 50;
     expect(defenderCS(state, embarked, water.index)).toBe(flat - 5);
@@ -267,9 +272,10 @@ describe('N2 naval spawn + combat', () => {
     expect(embarkedDefenseCS(state, minor.seat)).toBe(EMBARKED_DEFENSE_CS_BY_ERA[0]);
     minor.research.civics.push('EXPLORATION');
     expect(embarkedDefenseCS(state, minor.seat)).toBe(EMBARKED_DEFENSE_CS_BY_ERA[3]);
-    // grounded, the override is gone: the unit's own 20 plus the two turns of
-    // fortification the flat CS was ignoring
+    // grounded, the override is gone: the unit's own 20 plus two turns of
+    // fortification
     embarked.embarked = false;
+    embarked.fortifyTurns = 2;
     expect(defenderCS(state, embarked, water.index)).toBe(20 + 6);
   });
 
@@ -471,7 +477,7 @@ describe('the amphibious attack', () => {
     expect(attackTargets(state, att)).not.toContain(land.index);
   });
 
-  it('an embarked defender keeps its escort, except against a ship', () => {
+  it('an embarked defender keeps its escort, against a ship too', () => {
     const state = makeState(makeMap(12, 12, 'COAST'));
     state.unitsMode = true;
     grantTechs(state, 'SAILING');
@@ -498,7 +504,8 @@ describe('the amphibious attack', () => {
     const flat = embarkedDefenseCS(state, civ.seat);
     expect(defenderCS(state, afloat, water.index, { attacker: soldier, melee: true }))
       .toBe(flat + SUPPORT_CS);
-    expect(defenderCS(state, afloat, water.index, { attacker: ship, melee: true })).toBe(flat);
+    // the Support term reads no attacker (0x5228c0)
+    expect(defenderCS(state, afloat, water.index, { attacker: ship, melee: true })).toBe(flat + SUPPORT_CS);
     // a ranged attack ignores Support whoever fires it
     expect(defenderCS(state, afloat, water.index, { attacker: soldier, melee: false })).toBe(flat);
   });

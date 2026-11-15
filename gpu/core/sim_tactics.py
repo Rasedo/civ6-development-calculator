@@ -864,8 +864,10 @@ class SimTactics:
             m_fights = mate_on & (self._type_combat.take(m_type) > 0)
             fslot = torch.where(~fights & m_fights, mc, slots)
             fights = fights | m_fights
+        # ground closed to the unit is none it strikes into (`groundOf`'s
+        # attack)
         atk_n = torch.where(naval.unsqueeze(1), a_nav[rows], a_land[rows] | (a_fw[rows] & placed.unsqueeze(1))) \
-            & fights.unsqueeze(1) & ~ent_n
+            & fights.unsqueeze(1) & ~ent_n & ~self._tac_closed(seat)[rows]
         # a district of hit points at war is no plot for a unit whose ranged
         # or bombard strength tops its combat strength (`groundOf`'s attack:
         # the location test 0x586360 at 0x5866c9..0x58671f)

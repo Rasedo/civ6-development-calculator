@@ -1222,9 +1222,9 @@ class SimMasks:
         put("CS_DEF_TERRAIN", ~atk & cover)
         put("CS_IN_DISTRICT", mine)
         put("CS_ATK_DISTRICT", atk & ~rng & (cty | fid))
-        put("CS_VS_IN_DISTRICT", fid)
+        put("CS_VS_IN_DISTRICT", atk & fid)
         put("CS_VS_DISTRICT_DEF", cty)
-        put("CS_VS_DAMAGED", dmg)
+        put("CS_VS_DAMAGED", atk & dmg)
         put("CS_VS_FORTIFIED", atk & frt)
 
         hit = cond.gather(1, kinds.reshape(B, -1).clamp(min=0, max=NK - 1)).reshape(kinds.shape)

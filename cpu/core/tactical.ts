@@ -498,6 +498,12 @@ function groundOf(state: GameState, unit: Unit, revealedOnly = true, planning = 
     },
     attack: (t) => {
       if (!melee || !known(t.index) || isImpassable(t) || peaceFort(state, unit, t)) return false;
+      // ground closed to the unit is none it strikes into: no search links
+      // it, so the planning lays no spot on a target there and holds no blow
+      // on it (runs/h1_duelq1117 t90: city-state 3's Heavy Chariot 1179650,
+      // 61 damage on 31:16, the barbarian Warrior at 15 health beside it on
+      // player 1's 31:15, moves to safety)
+      if (shut(t)) return false;
       // a move order's path attacks into no plot the player does not see now:
       // a city or a unit it last knew there out of its sight bars the plot
       // (runs/h1_duely1117 t127-134: the rampaging Man-At-Arms at 37:16 holds

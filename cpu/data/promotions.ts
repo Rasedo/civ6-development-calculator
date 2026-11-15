@@ -90,9 +90,9 @@ export const PROMO_KINDS = [
   'CS_DEF_TERRAIN',      // +v defending on woods / rainforest / hills / marsh
   'CS_IN_DISTRICT',      // +v while this unit occupies a district or a Fort
   'CS_ATK_DISTRICT',     // +v on a MELEE attack into a district
-  'CS_VS_IN_DISTRICT',   // +v against a foe standing in a district
+  'CS_VS_IN_DISTRICT',   // +v attacking a foe standing in a district
   'CS_VS_DISTRICT_DEF',  // +v against district DEFENSES (a city or Encampment)
-  'CS_VS_DAMAGED',       // +v against a foe below full HP
+  'CS_VS_DAMAGED',       // +v attacking a foe below full HP
   'CS_VS_FORTIFIED',     // +v against a fortified defender
   'MOVES',               // +v movement
   'SIGHT',               // +v sight range
@@ -1013,7 +1013,7 @@ export const PROMOTIONS: readonly PromoDef[] = [
   P('TORTOISE', 'MELEE', 1, [], cs('CS_DEF_RANGED', 10)),
   P('COMMANDO', 'MELEE', 2, ['BATTLECRY', 'AMPHIBIOUS'], { kind: 'CLIFFS' }, cs('MOVES', 1)),
   P('AMPHIBIOUS', 'MELEE', 2, ['TORTOISE', 'COMMANDO'], { kind: 'AMPHIBIOUS' }),
-  P('ZWEIHANDER', 'MELEE', 3, ['COMMANDO', 'AMPHIBIOUS'], cs('CS_VS_CLASS_ATK', 7, CLASS_BIT.ANTICAV)),
+  P('ZWEIHANDER', 'MELEE', 3, ['COMMANDO', 'AMPHIBIOUS'], cs('CS_VS_CLASS_ANY', 7, CLASS_BIT.ANTICAV)),
   P('URBAN_WARFARE', 'MELEE', 3, ['COMMANDO', 'AMPHIBIOUS'], cs('CS_ATK_DISTRICT', 10)),
   P('ELITE_GUARD', 'MELEE', 4, ['ZWEIHANDER', 'URBAN_WARFARE'],
     { kind: 'MOVE_AFTER_ATTACK' }, cs('EXTRA_ATTACK', 1)),
@@ -1042,7 +1042,7 @@ export const PROMOTIONS: readonly PromoDef[] = [
   P('DEPREDATION', 'LIGHT_CAV', 2, ['CAPARISON'], cs('PILLAGE_CHEAP', 1)),
   P('DOUBLE_ENVELOPMENT', 'LIGHT_CAV', 2, ['COURSERS'], cs('FLANK_MULT', 2)),
   P('SPIKING_THE_GUNS', 'LIGHT_CAV', 3, ['DEPREDATION', 'DOUBLE_ENVELOPMENT'],
-    cs('CS_VS_CLASS_ANY', 7, CLASS_BIT.SIEGE)),
+    cs('CS_VS_CLASS_ATK', 7, CLASS_BIT.SIEGE)),
   P('PURSUIT', 'LIGHT_CAV', 3, ['DEPREDATION', 'DOUBLE_ENVELOPMENT'], cs('MOVES', 1)),
   // CIV6 (Escort Mobility): "Formation units all inherit escort's Movement
   // speed" — the pair stops paying the slower member's way.
@@ -1086,7 +1086,7 @@ export const PROMOTIONS: readonly PromoDef[] = [
     cs('CS_VS_CLASS_ANY', 14, CLASS_BIT.NAVAL_RAIDER)),
 
   // ---- NAVAL RANGED ---------------------------------------------------
-  P('LINE_OF_BATTLE', 'NAVAL_RANGED', 1, [], cs('CS_VS_CLASS_ANY', 7, MASK_NAVAL)),
+  P('LINE_OF_BATTLE', 'NAVAL_RANGED', 1, [], cs('CS_VS_CLASS_ATK', 7, MASK_NAVAL)),
   P('BOMBARDMENT', 'NAVAL_RANGED', 1, [], cs('CS_VS_DISTRICT_DEF', 7)),
   P('PREPARATORY_FIRE', 'NAVAL_RANGED', 2, ['LINE_OF_BATTLE'], cs('CS_VS_CLASS_ATK', 7, MASK_LAND)),
   P('ROLLING_BARRAGE', 'NAVAL_RANGED', 2, ['BOMBARDMENT'], cs('CS_VS_DISTRICT_DEF', 10)),
@@ -1126,14 +1126,14 @@ export const PROMOTIONS: readonly PromoDef[] = [
   P('INTERCEPTOR', 'AIR_FIGHTER', 2, ['DOGFIGHTING'],
     cs('CS_VS_CLASS_ANY', 7, CLASS_BIT.AIR_BOMBER)),
   P('STRAFE', 'AIR_FIGHTER', 2, ['COCKPIT_ARMOR'],
-    cs('CS_VS_CLASS_ANY', 17, MASK_LAND & ~MASK_CAVALRY)),
+    cs('CS_VS_CLASS_ATK', 17, MASK_LAND & ~MASK_CAVALRY)),
   // CIV6 (Ground Crews): "Heal while patrolling or deployed" —
   // GROUND_CREWS_BONUS_HEALTH is MODIFIER_PLAYER_UNIT_GRANT_HEAL_AFTER_ACTION
   // with no argument and no requirement set, so the engine's own heal supplies
   // the number and the modifier lifts the rest gate and the patrol's bar
   // (`refreshUnits`).
   P('GROUND_CREWS', 'AIR_FIGHTER', 3, ['INTERCEPTOR'], { kind: 'HEAL_AFTER_ACTION' }),
-  P('TANK_BUSTER', 'AIR_FIGHTER', 3, ['STRAFE'], cs('CS_VS_CLASS_ANY', 17, MASK_CAVALRY)),
+  P('TANK_BUSTER', 'AIR_FIGHTER', 3, ['STRAFE'], cs('CS_VS_CLASS_ATK', 17, MASK_CAVALRY)),
   P('DROP_TANKS', 'AIR_FIGHTER', 4, ['GROUND_CREWS', 'TANK_BUSTER'], cs('RANGE', 2)),
 
   // ---- AIR BOMBER -----------------------------------------------------
@@ -1143,9 +1143,9 @@ export const PROMOTIONS: readonly PromoDef[] = [
     cs('CS_DEF_VS_CLASS', 7, CLASS_BIT.AIR_FIGHTER)),
   P('EVASIVE_MANEUVERS', 'AIR_BOMBER', 1, [], cs('CS_DEF_VS_AA', 7)),
   P('CLOSE_AIR_SUPPORT', 'AIR_BOMBER', 2, ['BOX_FORMATION', 'EVASIVE_MANEUVERS'],
-    cs('CS_VS_CLASS_ANY', 12, MASK_LAND)),
+    cs('CS_VS_CLASS_ATK', 12, MASK_LAND)),
   P('TORPEDO_BOMBER', 'AIR_BOMBER', 2, ['BOX_FORMATION', 'EVASIVE_MANEUVERS'],
-    cs('CS_VS_CLASS_ANY', 17, MASK_NAVAL)),
+    cs('CS_VS_CLASS_ATK', 17, MASK_NAVAL)),
   P('LONG_RANGE', 'AIR_BOMBER', 3, ['CLOSE_AIR_SUPPORT'], cs('RANGE', 2)),
   P('TACTICAL_MAINTENANCE', 'AIR_BOMBER', 3, ['TORPEDO_BOMBER'],
     { kind: 'HEAL_AFTER_ATTACK' }),

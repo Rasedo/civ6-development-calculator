@@ -369,9 +369,10 @@ export const SEA_MOVE_TECH_BONUS = srcConst('constants.SEA_MOVE_TECH_BONUS', 1, 
  * era (not the World Era), and is updated upon discovery of the first
  * technology or civic of that era". Indexed by `ERAS`. The published list
  * starts at Classical — embarking needs a Classical technology, so the Ancient
- * row repeats the first stated tier rather than inventing one. NO terrain,
- * fortify, support or class terms ride on top: the class is what the
- * normalization removes.
+ * row repeats the first stated tier rather than inventing one. It replaces
+ * the unit's own Combat alone: under a unit's blow the terrain, support and
+ * every other defender term ride on top (`defenderCS`); under a district's
+ * shot none does (`cityStrikeDefenderCS`).
  */
 export const EMBARKED_DEFENSE_CS_BY_ERA: readonly number[] =
   srcConst('combat.embarkedDefenseCsByEra', [15, 15, 15, 30, 35, 50, 55, 55, 55], {

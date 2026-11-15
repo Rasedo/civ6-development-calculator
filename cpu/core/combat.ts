@@ -103,9 +103,9 @@ export function clearCampFor(state: GameState, unit: Unit, tileIndex: number): v
 /** a FEATURE's own DefenseModifier (Features.xml): woods and rainforest
  *  shelter (+3), marsh and floodplains EXPOSE the defender (−2 — marsh stays
  *  SLOW to enter, only its defence value flips), and CIV6 (R&F) "Reefs
- *  provide a +3 Defensive CS bonus for units in the water" — a NAVAL
- *  defender's terrain, since an embarked one defends at the normalized CS
- *  that carries no terrain at all. Exported per feature as `featDef`. */
+ *  provide a +3 Defensive CS bonus for units in the water" — a naval
+ *  defender's terrain and an embarked one's under a unit's blow
+ *  (`defenderCS`). Exported per feature as `featDef`. */
 export function featureDefense(feature: string | null | undefined): number {
   // the pack's burning and burnt Woods and Rainforest carry the same 3
   if (feature === 'WOODS' || feature === 'RAINFOREST' || fireFeature(feature)) return 3;
@@ -833,29 +833,19 @@ export function stackDefender(state: GameState, enemies: Unit[], ranged: boolean
  *  melee-only bonus (counted about `vs.stands`, the plot the defender's unit
  *  stands on, `defTileIndex` where none is given) and the class matchup is
  *  pairwise. Flanking is the attacker's own term and is added at the attack
- *  site. */
+ *  site. An embarked unit's own strength is its owner's era's (GetCombat
+ *  0x56dc90 with dl 0), every other term its too: under a unit's blow the
+ *  composer 0x51f070 cuts an embarked defender to its wound only where it is
+ *  handed a preview list (0x51f3ef..0x51f457), and neither the blow struck
+ *  nor the planning's simulation hands one (0x206960 at 0x206a78..0x206b29
+ *  under its third argument, 0x791470's 0x205720(1, 1)): runs/h1_duelq1121
+ *  t78 player 0's embarked Warrior 589826 on the Reef 30:20 takes 45 and 53
+ *  from the barbarian Galleys at 15 + 3. */
 export function defenderCS(state: GameState, defender: Unit, defTileIndex: number,
                            vs?: { attacker: Unit; melee: boolean; stands?: number }): number {
-  if (defender.embarked) {
-    // The normalized embarked CS replaces the unit's own strength, its terrain
-    // and its fortification. Support survives it: CIV6 (Flanking and Support)
-    // withholds Support from an embarked defender only "against attacks of
-    // enemy naval units".
-    const escort = vs?.melee && !UNITS[vs.attacker.type]?.naval
-      ? SUPPORT_CS * promoStackMult(defender, 'SUPPORT_MULT') * supportCount(state, defTileIndex, defender, vs.stands)
-      : 0;
-    return embarkedDefenseCS(state, defender.seat) + formationCS(defender) + convoyCS(state, defender) - fuelShortCS(state, defender) + chassisDefendCS(defender, vs)
-      - woundPenalty(defender) + escort
-      + generalAuraCS(state, defender, defTileIndex)
-      + congressUnitCS(state, defender) + governmentUnitCS(state, defender)
-      + (vs ? barbarianCombatCS(state, defender.seat, vs.attacker.seat)
-        + visibilityCS(state, defender.seat, vs.attacker.seat)
-        + allianceWarCS(state, defender.seat, vs.attacker.seat)
-        + rosterCS(state, defender, vs.attacker.seat, vs.attacker.hp, false) : 0);
-  }
   const tile = state.map.tiles[defTileIndex];
   return (
-    (UNITS[defender.type]?.combat ?? 0) + formationCS(defender) + convoyCS(state, defender) - fuelShortCS(state, defender) + chassisDefendCS(defender, vs) +
+    (defender.embarked ? embarkedDefenseCS(state, defender.seat) : (UNITS[defender.type]?.combat ?? 0)) + formationCS(defender) + convoyCS(state, defender) - fuelShortCS(state, defender) + chassisDefendCS(defender, vs) +
     // CIV6 (Garrison Commander): "Units defending within the city's territory
     // get +5 Combat Strength" — the GOVERNED city's own tiles, whoever stands
     // on them, so a foreign attacker's target gets it and the attacker does not.
@@ -872,7 +862,7 @@ export function defenderCS(state: GameState, defender: Unit, defTileIndex: numbe
       foeDamaged: vs ? vs.attacker.hp < UNIT_HP : false,
       foeInDistrict: vs ? inDistrictTile(state, vs.attacker.tileIndex) : false,
       tile,
-    }) + // the promotions this unit chose — an embarked defender took the flat override above
+    }) + // the promotions this unit chose
     (vs ? holdTheLineCS(state, defender, defTileIndex, vs.attacker.type) : 0) +
     religionDefenseCS(state, defender, defTileIndex) + // enhancer adders (unit-vs-unit — every defenderCS caller is one; city strikes assemble inline without them)
     chassisAbilityCS(state, defender, defTileIndex,
@@ -1299,7 +1289,10 @@ export function barbarianCombatCS(state: GameState, own: number, foe: number): n
  *
  * A city strike is a RANGED attack, so Support is ignored and the promotions
  * are read with `ranged` and `vsCity`. An EMBARKED target takes the era's
- * flat override instead of everything above it, formation included.
+ * flat override instead of everything above it, formation included: the
+ * district attack's composer 0x520270 leaves an embarked defender its wound
+ * alone, preview list or none (0x520576..0x5205db), where a unit's blow
+ * (`defenderCS`) adds every term.
  *
  * `striker` is the seat that owns the firing city or Encampment: the
  * roster's rows read it as the unit's OPPONENT, a district that is never
@@ -2069,12 +2062,19 @@ function retreatPlot(state: GameState, u: Unit): number {
  *  and Support count the units about `stands`, the plot the defender's unit
  *  stands on (0x51c810 at 0x51cc1c..0x51cc56 hands 0x521530 the defender's
  *  own plot 0x90290; 0x5228c0): the target plot in a blow struck, another in
- *  the planning's blow back on a unit set on a spot. */
+ *  the planning's blow back on a unit set on a spot. An embarked attacker's
+ *  own strength is its Combat only onto coastal land, else its owner's
+ *  era's embarked strength (0x206960 at 0x2069b4..0x2069e0: GetCombat's
+ *  flag IsCoastalLand 0x82a10 of the combat's plot — a lake's shore none:
+ *  runs/h1_duelq1124 t91 city-state 2's Man-At-Arms 1310723 embarked on the
+ *  lake 9:10 takes no Attack Medium Priority claim on the barbarian Archer
+ *  on 8:7, the Builder beside it under Attack Civilian as logged). */
 export function meleeUnitStrengths(state: GameState, attacker: Unit, targetIndex: number, defender: Unit, stands = targetIndex): { atk: number; def: number } {
   const from = state.map.tiles[attacker.tileIndex];
   const target = state.map.tiles[targetIndex];
   const amph = promoFlag(attacker, 'AMPHIBIOUS');
-  const atk = (UNITS[attacker.type]?.combat ?? 0) + formationCS(attacker) + convoyCS(state, attacker) - fuelShortCS(state, attacker) + chassisAttackCS(attacker) - woundPenalty(attacker) - (!amph && meleeCrossesRiver(state.map, target, from) ? RIVER_ATTACK_PENALTY : 0)
+  const own = attacker.embarked && !isCoastalLand(state.map, target) ? embarkedDefenseCS(state, attacker.seat) : (UNITS[attacker.type]?.combat ?? 0);
+  const atk = own + formationCS(attacker) + convoyCS(state, attacker) - fuelShortCS(state, attacker) + chassisAttackCS(attacker) - woundPenalty(attacker) - (!amph && meleeCrossesRiver(state.map, target, from) ? RIVER_ATTACK_PENALTY : 0)
     - (attacker.embarked && !amph ? AMPHIBIOUS_ATTACK_CS : 0)
     + FLANKING_CS * promoStackMult(attacker, 'FLANK_MULT') * chassisFlankMult(attacker) * flankCount(state, stands, attacker)
       * (1 + gpPermOf(seatOf(state, attacker.seat),

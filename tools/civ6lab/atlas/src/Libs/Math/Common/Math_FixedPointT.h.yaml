@@ -288,6 +288,7 @@
     - "C-95: the danger map and Move to Safety — READ, ported"
     - "C-94: the wounded law and the garrison"
     - "C-95: a damaged centre defends at its wounded strength, the planning's city shot needs standing walls, the barbarians plan on the turn's unhealed centres — READ (0x51eaf0, 0x791470 at 0x79181c..0x791827 -> 0x249ee0 / 0x24b960), both twins; the replay's barbarian copy"
+    - "C-110 / C-125: an embarked unit's strengths in a unit's blow, a promotion's side, ground closed to a strike — READ (0x51f070 at 0x51f3ef..0x51f457, 0x206960 at 0x2069b4..0x2069e0 and 0x206a78..0x206b29, 0x520270 at 0x520576..0x5205db, 0x5228c0, 0x77a4b0), FIT (the closed ground), both twins"
   context:
     - "- 0x522630, the Combat a wounded unit loses, 24.8: m = COMBAT_WOUNDED_DAMAGE_ MULTIPLIER (gp +0x23..."
     - "...56dc90 with the formation's) is strictly greater, and only then takes its wounds off (0x522630). Recorded: 1121 Guangzhou t191, a Line Infantry Corps (75, 16 HP) over an Ironclad (70..."
@@ -320,8 +321,31 @@
     - "H-1: the melee result, a ranged blow's domain, a city's shot — READ"
     - "C-125 / C-95: flanking and support count about the defender unit's own plot, no river edge read; MEDIUM by the plot's layer-0 list; a killed target's record; the camp strike's orders — READ (0x521530, 0x51c810 at 0x51cc1c..0x51cc56, 0x5228c0, 0x786d50, 0x776140 at 0x776333, 0x8e9d0, 0x772940 at 0x772d2f..0x772f78), FIT (the camp strike's path), both twins"
     - "C-125 / C-95: the target list's trade layer and its one unit of the units' layer; a siege unit's step onto civilians; the city-states' Attack Civilians; the flankers' test, the support's caller, the camp strike's queue — READ (0x783980 at 0x7849bb..0x784c2b and 0x784c30..0x784f57, 0x26fe20 -> 0x212500, 0x521530, 0x51f070 at 0x51f70e..0x51f737, 0x546f0, 0x52f50), both twins"
+    - "C-110 / C-125: an embarked unit's strengths in a unit's blow, a promotion's side, ground closed to a strike — READ (0x51f070 at 0x51f3ef..0x51f457, 0x206960 at 0x2069b4..0x2069e0 and 0x206a78..0x206b29, 0x520270 at 0x520576..0x5205db, 0x5228c0, 0x77a4b0), FIT (the closed ground), both twins"
   context:
     - "- Flanking (0x521530) and Support (0x521ed0, 0x5228c0) are gated on the player's m_bMilitaryCombatAdjacency (+0x1268), which only EFFECT_GR..."
+  review: reviewed
+- addr: 0x5230b0
+  final: 0x36d950
+  kind: function
+  name: friendlyTerritoryTerm
+  semantics: "a term of the defender's composers: the unit's +0x1848 (x 256) on a plot its own player owns, outside the combat type 0x46a0d8c5; under COMBAT_RELIGIOUS 0x5e2f7468 the plot's city's +0x19e0 where the city's religion (+0x1910) is the unit's (+0x1ce4). What sets +0x1848 unread."
+  status: PARTLY
+  readings:
+    - "C-110 / C-125: an embarked unit's strengths in a unit's blow, a promotion's side, ground closed to a strike — READ (0x51f070 at 0x51f3ef..0x51f457, 0x206960 at 0x2069b4..0x2069e0 and 0x206a78..0x206b29, 0x520270 at 0x520576..0x5205db, 0x5228c0, 0x77a4b0), FIT (the closed ground), both twins"
+  context:
+    - "...the bonus against barbarians 0x51e640 (the unit's +0x1844), the friendly-territory term 0x5230b0 (+0x1848), the terrain term 0x522c10 (the plot's own DefenseModifier: a Reef's 3), the..."
+  review: reviewed
+- addr: 0x5232d0
+  final: 0x36db10
+  kind: function
+  name: unusedMovementTerm
+  semantics: "a term of the defender's composers: the unit's +0x1880, where above 0, times its Movement left (+0xdb0), in 1/256 (LOC_COMBAT_PREVIEW_UNUSED_MOVEMENT_COMBAT_BONUS_DESC); what sets +0x1880 unread."
+  status: PARTLY
+  readings:
+    - "C-110 / C-125: an embarked unit's strengths in a unit's blow, a promotion's side, ground closed to a strike — READ (0x51f070 at 0x51f3ef..0x51f457, 0x206960 at 0x2069b4..0x2069e0 and 0x206a78..0x206b29, 0x520270 at 0x520576..0x5205db, 0x5228c0, 0x77a4b0), FIT (the closed ground), both twins"
+  context:
+    - ...50 x FORTIFY_BONUS_PER_TURN, gp +0x370), the Support 0x5228c0, the unused-Movement term 0x5232d0 (+0x1880 x +0xdb0) and the modifiers' sum. Its own strength is GetCombat 0x56dc90 with...
   review: reviewed
 - addr: 0x55dc00
   final: 0x396d70

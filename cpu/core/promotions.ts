@@ -335,9 +335,9 @@ export function promoCS(unit: { promos?: number; type: string }, ctx: PromoCtx):
       case 'CS_DEF_TERRAIN': if (!ctx.attacking && TERRAIN_COVER(ctx.tile)) n += e.v; break;
       case 'CS_IN_DISTRICT': if (IN_DISTRICT(ctx.tile)) n += e.v; break;
       case 'CS_ATK_DISTRICT': if (ctx.attacking && !ctx.ranged && (ctx.vsCity || ctx.foeInDistrict)) n += e.v; break;
-      case 'CS_VS_IN_DISTRICT': if (ctx.foeInDistrict) n += e.v; break;
+      case 'CS_VS_IN_DISTRICT': if (ctx.attacking && ctx.foeInDistrict) n += e.v; break;
       case 'CS_VS_DISTRICT_DEF': if (ctx.vsCity) n += e.v; break;
-      case 'CS_VS_DAMAGED': if (ctx.foeDamaged) n += e.v; break;
+      case 'CS_VS_DAMAGED': if (ctx.attacking && ctx.foeDamaged) n += e.v; break;
       case 'CS_VS_FORTIFIED': if (ctx.attacking && ctx.foeFortified) n += e.v; break;
       default: break;
     }

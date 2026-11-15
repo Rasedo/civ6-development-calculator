@@ -66,8 +66,13 @@
 - addr: 0x82a10
   final: 0x5fe00
   kind: function
-  semantics: "IsCoastalLand(plot, minWaterSize): false on a water plot (terrain 15 / 16 Coast / Ocean, or a terrain whose row +0x48 bit 4 is set); else true where one of the six neighbours (0xeff670 / 0xeff688) is such water, not impassable (+0x3a bit 3), and its water body (the plot's +0x10 area, size +4) holds at least minWaterSize plots (-1: GlobalParameters +0x528 OCEAN_MIN_WATER_SIZE, 10; 0 or less any): land beside an ocean-sized body, a lake shore not. The unit value's NAVAL exit (a city with no Harbor), the standing army's coastal city, Coastal Raid's coastal land and the settle score's coastal term read it on the plot."
+  semantics: "IsCoastalLand(plot, minWaterSize): false on a water plot (terrain 15 / 16 Coast / Ocean, or a terrain whose row +0x48 bit 4 is set); else true where one of the six neighbours (0xeff670 / 0xeff688) is such water, not impassable (+0x3a bit 3), and its water body (the plot's +0x10 area, size +4) holds at least minWaterSize plots (-1: GlobalParameters +0x528 OCEAN_MIN_WATER_SIZE, 10; 0 or less any): land beside an ocean-sized body, a lake shore not. The unit value's NAVAL exit (a city with no Harbor), the standing army's coastal city, Coastal Raid's coastal land and the settle score's coastal term read it on the plot. The melee result 0x206960 reads it on the combat's plot for an embarked attacker's GetCombat flag."
   status: PARTLY
+  cases:
+    - recording: h1_duelq1124
+      turn: 91
+      value: "8:7 beside the lake 9:7 / 9:8 is no coastal land: city-state 2's embarked Man-At-Arms 1310723 strikes it at the embarked strength (no Attack Medium Priority claim, as logged)"
+  impl: [cpu/core/combat.ts:meleeUnitStrengths]
   readings:
     - "C-74: the event draw, the volcanoes, the drought"
     - "C-96 / C-97: the unit value — READ (the combat, trade, explorer branches, the tail, the military AI's unit production), PARTLY READ (its inputs)"
@@ -76,6 +81,7 @@
     - "C-96: the standing army and the Combat Desire's city terms — READ (0x5ca7e0, the watched setter 0x731d10, 0x79b9c0), the unit table's orientation READ"
     - "C-99: the upgrade trees — READ (the trigger, Find Available Unit's upgradeable offer, Find Unit Targets' job, Upgrade Units, the economic AI's upgrade, Move Unit with no Location), ported; the deletion of an excess obsolete unit unported"
     - "C-132: the danger map's fitted rules in the DLL; a search's shore crossings on the formation's own domain — READ (0x26dab0, 0x586360 at 0x586624..0x586664, 0x2720a0 at 0x272618..0x272689, 0x66a90, 0x52fe90, 0x56e0a0, 0x26e570, 0x530240, 0x530420), FIT (the unmoved flag, the barbarians' raise, the grant's last turn), both twins"
+    - "C-110 / C-125: an embarked unit's strengths in a unit's blow, a promotion's side, ground closed to a strike — READ (0x51f070 at 0x51f3ef..0x51f457, 0x206960 at 0x2069b4..0x2069e0 and 0x206a78..0x206b29, 0x520270 at 0x520576..0x5205db, 0x5228c0, 0x77a4b0), FIT (the closed ground), both twins"
   notes:
     - ".claude/scratchpad/st1/reading.md: ...promise's plot   (PROMISE_DONT_SETTLE_NEAR_ME, 0xfadf5055). Then: the continent (+0x30),   coastal (0x82a10) and fresh water (0x82c20); the nearest own city (a min,   0 with none); the danger (the influence..."
   context:

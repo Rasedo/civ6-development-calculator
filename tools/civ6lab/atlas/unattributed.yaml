@@ -788,6 +788,7 @@
     - "C-126 / C-130: who may plunder a route (0x9555a0) and the treasury turn's city term (0x4dd3b0) — READ, the plunder ported in both twins"
     - "C-99: an embarked unit passes no other player's passenger — the step's flag-1 test READ (0x2720a0 at 0x272372, 0x271be0, 0x586360 at 0x586542, 0x208b80 under 0x108, 0x20a2a0), both twins"
     - "C-125 / C-95: flanking and support count about the defender unit's own plot, no river edge read; MEDIUM by the plot's layer-0 list; a killed target's record; the camp strike's orders — READ (0x521530, 0x51c810 at 0x51cc1c..0x51cc56, 0x5228c0, 0x786d50, 0x776140 at 0x776333, 0x8e9d0, 0x772940 at 0x772d2f..0x772f78), FIT (the camp strike's path), both twins"
+    - "C-110 / C-125: an embarked unit's strengths in a unit's blow, a promotion's side, ground closed to a strike — READ (0x51f070 at 0x51f3ef..0x51f457, 0x206960 at 0x2069b4..0x2069e0 and 0x206a78..0x206b29, 0x520270 at 0x520576..0x5205db, 0x5228c0, 0x77a4b0), FIT (the closed ground), both twins"
   notes:
     - ".claude/scratchpad/mu1/readings_c96.md: ...ts moves 0x7737c0): each unit (+0x770 clear) that has   taken damage (+0xcf0 > 0), in no formation (0x8be30), on a plot of no   danger (the influence map 0x716a90 <= 0) is queued (\"Heal\"); the queue's   move..."
   context:
@@ -2917,6 +2918,7 @@
     - "C-95: a damaged centre defends at its wounded strength, the planning's city shot needs standing walls, the barbarians plan on the turn's unhealed centres — READ (0x51eaf0, 0x791470 at 0x79181c..0x791827 -> 0x249ee0 / 0x24b960), both twins; the replay's barbarian copy"
     - "C-99 / C-95: a melee blow's river is the defender plot's edge on the attacker's side at any distance; a levied unit home reveals its sight — READ (0x522c10 at 0x522f1d..0x52301b, 0x51f070 at 0x51f603..0x51f639), both twins"
     - "C-125 / C-95: the target list's trade layer and its one unit of the units' layer; a siege unit's step onto civilians; the city-states' Attack Civilians; the flankers' test, the support's caller, the camp strike's queue — READ (0x783980 at 0x7849bb..0x784c2b and 0x784c30..0x784f57, 0x26fe20 -> 0x212500, 0x521530, 0x51f070 at 0x51f70e..0x51f737, 0x546f0, 0x52f50), both twins"
+    - "C-110 / C-125: an embarked unit's strengths in a unit's blow, a promotion's side, ground closed to a strike — READ (0x51f070 at 0x51f3ef..0x51f457, 0x206960 at 0x2069b4..0x2069e0 and 0x206a78..0x206b29, 0x520270 at 0x520576..0x5205db, 0x5228c0, 0x77a4b0), FIT (the closed ground), both twins"
   notes:
     - the terrain, improvement and building terms read, unported here (the engines' defenderCS); the attacker's +0x1935 unread (read as Amphibious)
     - "imported: READ in its section, no confirming case found beside it"
@@ -8057,6 +8059,17 @@
   context:
     - ...the end look on player signal +0x228, whose return the stub redirects to a fourth site; 0x84ed50 (FinalRelease 0x5a8250), the raise of the Lua PlayerTurnStarted (rdx the player), a pla...
     - ...ease 0x515d70), the look (from FinalRelease 0x51471a; the end look on signal +0x228); 0x84ed50 (FinalRelease 0x5a8250), PlayerTurnStarted.
+  review: reviewed
+- addr: 0x8536a0
+  final: 0x5ac7a0
+  kind: function
+  name: SimulateAttackVersus
+  semantics: "the Lua CombatManager.SimulateAttackVersus: builds the combat (0x213e00) and simulates it with 0x205720(combat, dl, 0) — the third argument 0, so the strength composers are handed the preview list."
+  status: PARTLY
+  readings:
+    - "C-110 / C-125: an embarked unit's strengths in a unit's blow, a promotion's side, ground closed to a strike — READ (0x51f070 at 0x51f3ef..0x51f457, 0x206960 at 0x2069b4..0x2069e0 and 0x206a78..0x206b29, 0x520270 at 0x520576..0x5205db, 0x5228c0, 0x77a4b0), FIT (the closed ground), both twins"
+  context:
+    - "...lation calls 0x205720(combat, 1, 1) (0x7916ea, 0x7918d5), the Lua SimulateAttackVersus (0x853ae8) with the third 0: the preview shows the wound alone, the blow struck and the AI's pr..."
   review: reviewed
 - addr: 0x8808f0
   final: 0x5ccf90

@@ -15606,3 +15606,83 @@ in `cityAssault`, `districtBothFall` in `cityAssault`, `attackCityState` and
   such a player may raze, and a barbarian's blow leaves a city-state's
   centre at 1 — with no recorded case; a FULL_CIV's ranged blow is floored
   at 1 in the engines where 0x248800 cuts none.
+
+## C-110 / C-125: an embarked unit's strengths in a unit's blow, a promotion's side, ground closed to a strike — READ (0x51f070 at 0x51f3ef..0x51f457, 0x206960 at 0x2069b4..0x2069e0 and 0x206a78..0x206b29, 0x520270 at 0x520576..0x5205db, 0x5228c0, 0x77a4b0), FIT (the closed ground), both twins
+
+- AN EMBARKED DEFENDER UNDER A UNIT'S BLOW (0x51f070, the defender's
+  composer): after the wound (0x522630) and the fuel term, an embarked unit
+  that does not fight embarked (0x8be30, +0x18c3 clear) is cut to those two
+  alone only where the composer is handed a preview list (its seventh
+  argument, 0x51f404: `test r15, r15`); with none it takes every term a unit
+  ashore takes: the bonus against barbarians 0x51e640 (the unit's +0x1844),
+  the friendly-territory term 0x5230b0 (+0x1848), the terrain term 0x522c10
+  (the plot's own DefenseModifier: a Reef's 3), the fortification 0x521830
+  (+0xd50 x FORTIFY_BONUS_PER_TURN, gp +0x370), the Support 0x5228c0, the
+  unused-Movement term 0x5232d0 (+0x1880 x +0xdb0) and the modifiers' sum.
+  Its own strength is GetCombat 0x56dc90 with dl 0: its owner's era's
+  EmbarkedUnitStrength. The melee result 0x206960 hands its results as the
+  list only where its third argument is 0 (0x206a78..0x206acb), none
+  otherwise; the planning's simulation calls 0x205720(combat, 1, 1)
+  (0x7916ea, 0x7918d5), the Lua SimulateAttackVersus (0x853ae8) with the
+  third 0: the preview shows the wound alone, the blow struck and the AI's
+  prediction every term. `defenderCS`; `_melee_unit_strengths`,
+  `_ranged_unit_strengths`, the seats' ranged strike (gpu/core/sim_seats.py).
+- UNDER A DISTRICT'S SHOT (0x520270, the district attack's composer): an
+  embarked defender is left its wound alone, list or none
+  (0x520576..0x5205db: the list only guards the preview's line).
+  `cityStrikeDefenderCS` stands.
+- THE SUPPORT 0x5228c0 reads no attacker: its arguments are the defender
+  and the combat type (COMBAT_MELEE 0x2ca3edd1 alone, under the owner's
+  m_bMilitaryCombatAdjacency). An embarked defender takes it from a ship's
+  blow as from any (`defenderCS`).
+- AN EMBARKED ATTACKER'S OWN STRENGTH (0x206960 at 0x2069b4..0x2069e0):
+  GetCombat's flag is IsCoastalLand 0x82a10(the combat's plot, -1) where the
+  attacker is embarked, else 0; with the flag clear an embarked unit reads
+  its owner's era's embarked strength. Onto land beside no water body of
+  OCEAN_MIN_WATER_SIZE plots — a lake's shore — it strikes at that strength
+  (`meleeUnitStrengths`' own; `_melee_unit_strengths`' a_own, the plane
+  `coastal_land`).
+- MOVE TO SAFETY'S TEST (0x77a4b0 at 0x77a630..0x77a6b1) re-read as ported:
+  a hurt unit of half its health or more lost flees where its planning
+  (+0x1fc0) is none or holds no winning blow (+0x60, set by 0x791470 at
+  0x79175c where the damage dealt tops the target's health).
+- A PROMOTION'S SIDE (the install, UnitPromotions.xml: the modifier's
+  SubjectRequirementSetId): PLAYER_IS_ATTACKER_REQUIREMENTS stands in the
+  sets of Line of Battle, Spiking the Guns, Strafe, Tank Buster, Close Air
+  Support, Torpedo Bomber, Rout and Marauding (`CS_VS_CLASS_ATK`; the kinds
+  `CS_VS_DAMAGED` and `CS_VS_IN_DISTRICT` attacking only); Zweihander's set
+  names the opponent alone (`CS_VS_CLASS_ANY`).
+- FIT, unread: a search links no attack into ground closed to the unit
+  (`groundOf`'s attack, `_tac_search`'s atk_n): the planning then lays no
+  spot on a target there (the valid wrapper 0x26e570 -> 0x209dd0 and the
+  spots' pricing 0x790c60 on such a link unread).
+- THE CHECK: the barbarians' copy holds another player's unit that took
+  the Fortify order before their turn opened dug in as record t+1 holds it.
+- CONFIRMED (one-seed aimem traces from the game's start): runs/
+  h1_duelq1121 t78 the barbarian Galleys 524295 / 1572882 on player 0's
+  embarked Warrior 589826 on the Reef 30:20 deal 45 and 53 (CombatLog
+  DefenderStrMod +3, then -1), the Warrior left at 2 and the Galley on 30:21
+  as recorded; t70 on the Warrior 786437, 50 then the kill; runs/
+  h1_duelq1127 t170 the rampaging Galley 262147 on the Warrior 4849729 on the
+  Reef 38:7 deals 55 (15 / -1), the Warrior left at 2. Line of Battle:
+  runs/h1_duelq1124 t186 the Ironclads 5963781 / 6029330 on player 1's
+  Battleship 6422555 (Line of Battle, 20 damage) deal 45 and 54 (CombatLog
+  60 +1, then -3), 6029330 taking 15:20 as recorded. The embarked attacker:
+  1124 t91 city-state 2's Man-At-Arms 1310723 embarked on the lake 9:10
+  takes no Attack Medium Priority claim on the barbarian Archer 3997716 on
+  8:7, its blow from the lake's shore the embarked strength's; the Builder
+  4456474 beside the Archer is its Attack Civilian target as logged. The
+  closed ground: runs/h1_duelq1117 t90 city-state 3's Heavy Chariot
+  1179650, 61 damage on 31:16, the barbarian Warrior 3670030 at 15 health
+  beside it on player 1's 31:15, moves to safety to 30:17 as logged;
+  runs/h1_duelq1127 t73 City Defense's Heavy Chariot 720899 holds 7:11, no
+  claim on the barbarian Warrior 1835024 on player 1's 10:11. The
+  Fortify order: 1124 t104 player 0's Warrior 2162689 on 35:20, ordered in
+  its turn, stands two turns dug in under the barbarian Man-At-Arms
+  4259859 (1 health) — its blow would fell both, the Man-At-Arms the
+  further over — which moves to safety to 37:21 as logged.
+- OPEN (C-110, C-125, C-95): a +5 player 0's embarked Warrior 3080200
+  defends at against the barbarian Caravel and Galley in 1124 t134 / t155 /
+  t156 (no Reef, no unit beside it, no resolution in force), its Warrior
+  3276804 at +0 in t161; the third argument the blow struck passes
+  0x206960 (read off the CombatLog's +3 alone).
