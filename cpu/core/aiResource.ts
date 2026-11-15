@@ -198,13 +198,16 @@ export function resourceValue(f: ResourceFacts, r: AiResourceRow, count: number,
 /** per technology the resources its improvements work (the research value's
  *  walk, 0x7b3e50: the row's improvements in table order, each its
  *  Improvement_ValidResources), the improvements a minor may build only —
- *  Buildable, no civilization's trait (0x35f100) */
+ *  those of no civilization's trait (0x35f100 reads the trait alone: the Oil
+ *  Well and the Offshore Oil Rig, whose rows state no Buildable, count —
+ *  runs/h1_duels1136 city-state 4 t215-230: Plastics with the Oil of 15:10,
+ *  its Farm gone at t214, 36.36 a copy discounted to its turns) */
 export const TECH_IMPROVEMENT_RESOURCES: ReadonlyMap<string, readonly AiResourceRow[]> = (() => {
   const byType = new Map(AI_RESOURCES.map((r) => [r.type, r]));
   const out = new Map<string, AiResourceRow[]>();
   for (const i of AI_IMPROVEMENTS) {
     const tech = i.tech ? engineId('tech', i.tech, 'TECH_', TECHS) : null;
-    if (!tech || !i.buildable || i.trait) continue;
+    if (!tech || i.trait) continue;
     const list = out.get(tech) ?? (out.set(tech, []), out.get(tech)!);
     for (const res of i.resources) if (byType.has(res)) list.push(byType.get(res)!);
   }

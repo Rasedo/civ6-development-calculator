@@ -92,7 +92,7 @@ import { gpPermOf } from '../data/greatPeople';
 import { irradiated } from './nuclear';
 import { FALLOUT_DAMAGE } from '../data/nuclear';
 import { questUnitAdded } from './quests';
-import { minorCatchUp } from './minorBuild';
+import { grantFreeResearch } from './production';
 const ok: RuleResult = { ok: true };
 const no = (reason: string): RuleResult => ({ ok: false, reason });
 
@@ -2908,15 +2908,12 @@ export function drawAndPayGoody(state: GameState, unit: Unit, tile: Tile): void 
       if (era >= 0) drawBoosts(state, unit.seat, kind, boostPool(owner.research, kind, era, era), amount);
       break;
     }
-    case 'tech': {
-      const pool = Object.keys(TECHS).filter((id) => !owner.research.techs.includes(id));
-      for (let i = 0; i < amount && pool.length; i++) {
-        const id = pool.splice(randRange(state, pool.length, 'Choosing random tech to grant based on era'), 1)[0];
-        owner.research.techs.push(id);
-        minorCatchUp(state, unit.seat, id, false);
-      }
+    case 'tech':
+      // MODIFIER_PLAYER_GRANT_RANDOM_TECHNOLOGY (0x4caeb0): drawn over the
+      // rows researchable now, in table order (runs/h1_duels1146 t129:
+      // player 0's village draws over its five, Mathematics the second)
+      grantFreeResearch(state, owner, 'tech', amount);
       break;
-    }
     case 'unitByClass': {
       const id = bestTrainableOfClass(state, unit.seat, p.promoClass);
       if (id) spawnUnit(state, id, tile.index, unit.seat);

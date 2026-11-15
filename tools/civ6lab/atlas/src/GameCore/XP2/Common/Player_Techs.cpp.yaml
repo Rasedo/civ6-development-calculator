@@ -265,13 +265,21 @@
     - recording: 1117
       turn: 226
       value: "0x4caeb0 (civics 0x39cd90), \"Choosing random tech / civic to grant based on era\" (Oxford, the Bolshoi, a Great Person's free tech): ONE pool of the rows researchable before the grants (0x4c8c40), each"
+    - recording: h1_duels1146
+      turn: 129
+      value: "player 0's village (GOODYHUT_ONE_TECH, MODIFIER_PLAYER_GRANT_RANDOM_TECHNOLOGY): the draw's range 5 — Iron Working, Mathematics, Apprenticeship, Military Engineering, Castles, its rows researchable now in table order — value 1, Mathematics held in record t130"
   impl:
     - cpu/core/production.ts:grantFreeResearch
     - cpu/data/techs.ts:TECH_TABLE_ORDER
     - cpu/harness/checks.ts:goodyRewardDraws
     - cpu/harness/drawSites.ts:DRAW_SITES
     - gpu/core/sim_seats.py:_grant_free_research
-  readings: ["H-1: the random boost and free research pickers — READ"]
+    - cpu/core/units.ts:drawAndPayGoody
+    - gpu/core/sim_seats.py:_draw_and_pay_goody
+    - cpu/core/units.ts:amount
+  readings:
+    - "H-1: the random boost and free research pickers — READ"
+    - "C-98 / C-130: a village's free technology, the resource a plot's record shows a city-state, the research value's improvements by trait alone, the Lighthouse's coast — READ (0x4caeb0, 0x50a690, 0x50b3e0, 0x35ecb0, 0x35f100), FIT (the record's refresh, the drowned plot), both twins"
   context:
     - "...OSTLESS`, `boostPool`, `earliestBoostEra`, `drawBoosts` / `_boost_pool`, `_draw_boosts`). 0x4caeb0 (civics 0x39cd90), \"Choosing random tech / civic to grant based on era\" (Oxford, the Bols..."
   review: reviewed
@@ -396,6 +404,7 @@
     - "C-98: a minor's catch-up lands at the major's gain — READ (0x427bf0, 0x4cb930, 0x39ec60), both twins"
     - "C-60: the Free Cities' research — READ (the catch-up's receivers), ported"
     - "C-60: the Free Cities' research"
+    - "C-98 / C-130: a village's free technology, the resource a plot's record shows a city-state, the research value's improvements by trait alone, the Lighthouse's coast — READ (0x4caeb0, 0x50a690, 0x50b3e0, 0x35ecb0, 0x35f100), FIT (the record's refresh, the drowned plot), both twins"
   context:
     - 0x4cb930 (techs; civics 0x39ec60, the same body), called from the handler 0x427bf0 that every play...
   review: reviewed

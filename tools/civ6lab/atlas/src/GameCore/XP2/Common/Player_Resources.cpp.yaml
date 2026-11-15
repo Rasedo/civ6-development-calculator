@@ -680,12 +680,14 @@
     - cpu/core/goodyHuts.ts:goodyEligible
     - cpu/core/seats.ts:drawCitizenName
     - gpu/core/sim_economy.py:_res_hidden
+    - cpu/core/seats.ts:hiddenResourcesFor
   readings:
     - "H-1: a plot's resource for its owner (strategic access) — READ"
     - "H-1: a city-state sees its suzerain's resources — READ"
     - "H-1: the goody hut's other gates and the Relic — READ"
     - "C-96: the resource value and the research value's resources — READ (bonus, luxury, the call), PARTLY READ (the strategic stockpile terms)"
     - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
+    - "C-98 / C-130: a village's free technology, the resource a plot's record shows a city-state, the research value's improvements by trait alone, the Lighthouse's coast — READ (0x4caeb0, 0x50a690, 0x50b3e0, 0x35ecb0, 0x35f100), FIT (the record's refresh, the drowned plot), both twins"
   context:
     - "...40, count +0x42 > 0) when the plot's owner is the player, the resource's condition holds (0x4ac140, the revealing tech), and EITHER a district stands there — any type, the city centre incl..."
     - "0x4ac140 (a player's resource condition, 0x4ab4b0's): the player's own reveal bit (+0xf0), then —..."

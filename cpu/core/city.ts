@@ -557,8 +557,13 @@ export function housingParts(state: GameState, city: City, mods?: Modifiers): nu
     const def = effectiveBuilding(civOf(state, city.seat), id);
     if (dark.has(id)) continue; // in a pillaged district, or pillaged itself
     if (def?.housing) buildings += def.housing;
-    // CIV6 (LIGHTHOUSE_COASTAL_CITY_HOUSING): more while the centre is coastal
-    if (def?.coastalHousing && isCoastalLand(map, center)) buildings += def.coastalHousing;
+    // CIV6 (LIGHTHOUSE_COASTAL_CITY_HOUSING, PLOT_IS_ADJACENT_TO_COAST): more
+    // while the centre is coastal — beside sea that no rising water made (a
+    // fit: runs/h1_duels1146 Kumasi, 11:12 drowned at t198, its buildings'
+    // Housing 4 through t249)
+    if (def?.coastalHousing && neighbors(map, center).some((n) => (n.terrain === 'COAST' || n.terrain === 'OCEAN') && !n.submerged)) {
+      buildings += def.coastalHousing;
+    }
     // CIV6 (Kupe's Voyage): "The Palace receives +3 Housing"
     if (def?.autoCapital) for (const r of m.capital) buildings += r.palaceHousing ?? 0;
     const beliefHousing = m.buildingHousingAdd[id];

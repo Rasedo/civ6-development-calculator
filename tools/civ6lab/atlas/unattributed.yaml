@@ -2444,6 +2444,17 @@
   context:
     - "...raises the posting's count (+0x28), at EstablishTurns (0x433180) \"Governor Established\" (0x35e5f0); the neutralize clock (0x35e1f0 → 0x35d220(−1)); each logs GovernorChanged (0x8b9120, 0x..."
   review: imported
+- addr: 0x35ecb0
+  final: 0x259f60
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-98 / C-130: a village's free technology, the resource a plot's record shows a city-state, the research value's improvements by trait alone, the Lighthouse's coast — READ (0x4caeb0, 0x50a690, 0x50b3e0, 0x35ecb0, 0x35f100), FIT (the record's refresh, the drowned plot), both twins"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...improvements by trait alone, the Lighthouse's coast — READ (0x4caeb0, 0x50a690, 0x50b3e0, 0x35ecb0, 0x35f100), FIT (the record's refresh, the drowned plot), both twins"
+    - "...the adjacency rows' resource clauses (0x365ae0; the sea resource's neighbour callback 0x35ecb0: a water plot whose record holds a resource that is no artifact) read the visibility ma..."
+  review: imported
 - addr: 0x363a20
   final: 0x25dc10
   kind: function

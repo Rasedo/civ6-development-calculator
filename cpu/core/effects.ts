@@ -2,7 +2,7 @@
 import { ANARCHY_TURNS, PURCHASE_DIVISOR, CIVIC_UNLOCK_MAX_COST, CIVIC_UNLOCK_PER_TURN_DROP, CIVIC_UNLOCK_MIN_COST, GAME_COST_ESCALATION, gameProgressPct } from '../data/constants';
 import type { City, CityState, DistrictId, GameState, GreatPersonClass, ImprovementId, QueueItem, ResearchState, ResourceCategory, Seat, YieldKey, Yields } from './types';
 import type { TerrainId, Tile } from '../../world/types';
-import { hiddenResourcesFor } from './seats';
+import { hiddenResourcesFor, unseenResourcesFor } from './seats';
 import type { CivId, LeaderId } from '../data/seats';
 import { AGE_GOLDEN, ALLIANCE_ECONOMIC } from '../data/seats';
 import { CULTURE_BOMB_ROWS, SLOT_CONVERT_ROWS, SLOT_FAVOR_ROWS, PLAZA_DISTRICT_PROD_ROWS, GREAT_WORK_LOYALTY_ROWS, PARK_APPEAL_ROWS, TRADE_GAIN_TILE_ROWS, GOVERNOR_XP_ROWS, CONQUEST_FORMATION_ROWS, SPY_PROMO_ROWS, WONDER_CHARGE_ROWS, WONDER_ERA_BOOST_ROWS, WONDER_ERA_PROD_ROWS, WONDER_TOURISM_ROWS, RIVER_CROSS_PROD_ROWS, IMMEDIATE_POST_ROWS, DIPLO_VIS_ROWS, WAR_BAN_ROWS, TOURISM_FAVOR_ROWS, EMERGENCY_FAVOR_ROWS, GOLDEN_DEDICATION_ROWS, INTL_ROUTE_TERRAIN_ROWS, GOLDEN_ROUTE_CAPACITY_ROWS, PROGRESS_TRADE_ROWS, RELIGION_AMENITY_ROWS, ALL_FOLLOWER_BELIEFS_ROWS, CAMP_GOODY_ROWS, FEATURE_APPEAL_ROWS, ALLIANCE_SHARED_VIS_ROWS, ROUTE_PRESSURE_ROWS, FOREIGN_FOLLOWER_YIELD_ROWS, GP_GUARANTEE_ROWS, FAITH_PURCHASE_DISTRICT_ROWS, START_BOOST_ROWS, POST_COMBAT_LOYALTY_ROWS, LEVY_ROWS, DOMESTIC_ROUTE_LOYALTY_ROWS, INCOMING_ROUTE_YIELD_ROWS, EXTRA_UNIT_COPY_ROWS, UNIT_POP_COST_ROWS, type UnitPopCostRow, CONQUEST_POP_ROWS, NOT_FOUNDED_ROWS, EXTRA_DISTRICT_ROWS, CITY_TILES_ROWS, BOOST_PCT_ROWS, BUILDING_PREREQ_ROWS, DISTRICT_PREREQ_ROWS, WAR_WEARINESS_ROWS, PEACEFUL_FOUNDER_ROWS, YIELD_PER_SUZERAIN_ROWS, GOVERNOR_TITLE_GRANT_ROWS, GP_REFUND_ROWS, EVICT_PCT_ROWS, OCEAN_ACCESS_ROWS, GOVERNOR_TITLE_YIELD_ROWS, GPP_BUILDING_ROWS, GP_FAVOR_ROWS, SEAT_BAN_ROWS, WORSHIP_ROWS, DISTRICT_UNIT_ROWS, HAPPY_YIELD_ROWS, HAPPY_GPP_ROWS, POLICY_SLOT_ROWS, POST_COMBAT_YIELD_ROWS, WORK_IMPASSABLE_ROWS, TERRAIN_ADJ_YIELD_ROWS, ROUTE_TERRAIN_ROWS, GOVERNOR_YIELD_ROWS, GOVERNOR_LOYALTY_ROWS, GARRISON_LOYALTY_ROWS, FORMATION_ROWS, type HappyYieldRow, type HappyGppRow, type PostCombatYieldRow, type RouteTerrainRow, type TerrainAdjYieldRow, type GovernorYieldRow, type GovernorLoyaltyRow, type GarrisonLoyaltyRow, type FormationRow, type OceanAccessRow, type NotFoundedChannel, type ExtraUnitCopyRow, type NotFoundedRow, type BoostPctRow, type BuildingPrereqRow, type DistrictPrereqRow, type YieldPerSuzerainRow, type GovernorTitleGrantRow, type ReligionAmenityRow, type WonderChargeRow, type WonderEraBoostRow, type WonderEraProdRow, type RiverCrossProdRow, type DiploVisRow, type WarBan, type TourismFavorRow, type IntlRouteTerrainRow, type SlotConvertRow, type SlotFavorRow, type GreatWorkLoyaltyRow, type GovernorXpRow, type CultureBombRow, type FeatureAppealRow, type RoutePressureRow, type ForeignFollowerYieldRow, type PostCombatLoyaltyRow, type LevyRow, type IncomingRouteYieldRow, type GovernorTitleYieldRow, type GppBuildingRow, type SeatBan, type WorshipRow, type DistrictUnitRow } from '../data/civilizations';
@@ -2273,6 +2273,10 @@ export interface YieldCtx {
    *  their tiles pay no resource yield to it (`hiddenResourcesFor`). Absent
    *  (the seatless base context) hides nothing. */
   hiddenResources?: ReadonlySet<string>;
+  /** the resources this seat's plot records do not show
+   *  (`unseenResourcesFor`): a district's adjacency counts none of them.
+   *  Absent hides nothing. */
+  unseenResources?: ReadonlySet<string>;
   /** CIV6 (MODIFIER_PLAYER_CITIES_TERRAIN_ADJACENCY): the adjacency rules
    *  this seat's complete wonders hand its districts, by type
    *  (`wonderAdjacency`). Absent adds none. */
@@ -2307,6 +2311,7 @@ export function makeYieldCtx(state: GameState, seat: number, mods?: Modifiers): 
     offHomeContinent: (t) => !onHomeContinent(state, seat, t.index),
     foundedTerrains: founded,
     hiddenResources: hiddenResourcesFor(state, seat),
+    unseenResources: unseenResourcesFor(state, seat),
     wonderAdjacency: wonderAdjacency(state, seat),
     govPromosAt: cityGovernorPromoResolver(state, seat),
   };

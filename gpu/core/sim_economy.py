@@ -4981,6 +4981,20 @@ class SimEconomy:
                     have = have | (self._res_seen_own(x, rt) & on.unsqueeze(1))
         return gated & ~have
 
+    def _res_unseen(self, row: int) -> torch.Tensor:
+        """[B, T] bool — a LIVE resource this row's plot records do not show
+        (`unseenResourcesFor`): `_res_hidden` for every row but a
+        city-state, whose records show a resource from its own research on,
+        whatever its suzerain sees."""
+        s = row - self._CITY_MINOR0
+        if not 0 <= s < self.S:
+            return self._res_hidden(row)
+        rt = self._res_reveal_tech.take(self.res_id.clamp(min=0))
+        gated = (rt >= 0) & self._res_live()
+        if not bool(gated.count_nonzero()):
+            return gated
+        return gated & ~self._res_seen_own(row, rt)
+
     def _res_seen_own(self, row: int, rt: torch.Tensor) -> torch.Tensor:
         """[B, T] the plots whose resource this row's own research (or its
         Great Person's reveal) shows, `rt` each plot's revealing tech."""
@@ -5115,10 +5129,10 @@ class SimEconomy:
 
     def _adj_hidden_cut(self, row: int, di: int) -> torch.Tensor | float:
         """[B, T] — what the resource rows of district `di` (the seat's own
-        variant's where it plays one) count for the resources this row cannot
-        see (`matchesAdjacency`'s `hidden`): each row whole, times its amount.
-        0 where the row sees every resource."""
-        hid = self._res_hidden(row)
+        variant's where it plays one) count for the resources this row's plot
+        records do not show (`matchesAdjacency`'s `hidden`, `_res_unseen`):
+        each row whole, times its amount. 0 where they show every resource."""
+        hid = self._res_unseen(row)
         if not bool(hid.count_nonzero()):
             return 0.0
         nb = self.neigh

@@ -79,21 +79,6 @@ export function tileClaimed(t: Tile): boolean {
   return tileSeat(t) !== NO_SEAT;
 }
 
-/** CIV6 (Resources.PrereqTech; REQUIREMENT_PLOT_RESOURCE_VISIBLE): the
- *  resources this seat cannot yet SEE — a strategic resource is invisible
- *  until its revealing technology, and until then the tile is plain ground
- *  to this seat: no tile yield from it, no improvement forced or offered by
- *  it, no access, no accrual. Every reader that means "this seat's
- *  resource" asks this set; the GPU twin is `_res_hidden(row)`. A city-state
- *  is a player too and reads its own research; a seat with no research (the
- *  Free Cities) sees none of them; a seat with no record here at all (a
- *  test's phantom owner) hides nothing. A Great Person's reveal
- *  (`GP_RESOURCE_REVEAL`, James Young's Oil) shows one before its technology.
- *  A city-state sees every resource its suzerain sees (0x4ac140 asks the
- *  suzerain's resources before its own research: runs/h1_duelw1117
- *  Antananarivo t85-90 and runs/h1_duelw1118 Armagh t83-95 score the Niter
- *  beside their next plots once their suzerain holds Military Engineering,
- *  before they do). */
 /**
  * "Choosing a Citizen Name" (0x486c20): a name from the seat's civilization's
  * citizen names it has not given — ONE draw over the names left, the name
@@ -111,7 +96,43 @@ export function drawCitizenName(state: GameState, seat: number): void {
   s.citizenNames = (s.citizenNames ?? 0) + 1;
 }
 
+/** CIV6 (Resources.PrereqTech; REQUIREMENT_PLOT_RESOURCE_VISIBLE): the
+ *  resources this seat cannot yet SEE — a strategic resource is invisible
+ *  until its revealing technology, and until then the tile is plain ground
+ *  to this seat: no tile yield from it, no improvement forced or offered by
+ *  it, no access, no accrual. Every reader that means "this seat's
+ *  resource" asks this set; the GPU twin is `_res_hidden(row)`. A city-state
+ *  is a player too and reads its own research; a seat with no research (the
+ *  Free Cities) sees none of them; a seat with no record here at all (a
+ *  test's phantom owner) hides nothing. A Great Person's reveal
+ *  (`GP_RESOURCE_REVEAL`, James Young's Oil) shows one before its technology.
+ *  A city-state sees every resource its suzerain sees (0x4ac140 asks the
+ *  suzerain's resources before its own research: runs/h1_duelw1117
+ *  Antananarivo t85-90 and runs/h1_duelw1118 Armagh t83-95 score the Niter
+ *  beside their next plots once their suzerain holds Military Engineering,
+ *  before they do). */
 export function hiddenResourcesFor(state: GameState, seat: number): ReadonlySet<string> {
+  const out = new Set(unseenResourcesFor(state, seat));
+  const suz = isCityStateSeat(seat) ? (seatOf(state, seat) as CityState | undefined)?.suzerain ?? -1 : -1;
+  if (suz >= 0 && out.size) {
+    const seen = hiddenResourcesFor(state, suz);
+    for (const r of [...out]) if (!seen.has(r)) out.delete(r);
+  }
+  return out;
+}
+
+/** THE RESOURCES A SEAT'S PLOT RECORDS DO NOT SHOW (0x50a690: the visibility
+ *  manager's record of a plot as the player last saw it, +0x360, which the
+ *  record's writer 0x50b3e0 takes as the plot comes into sight): those its
+ *  own research (or its Great Person's reveal) has not revealed. A
+ *  city-state's records of the plots it holds in sight show a resource from
+ *  its own technology on, whatever its suzerain sees — runs/h1_duels1135
+ *  city-state 2's Harbor beside the Oil of 5:17: its suzerain's James Young
+ *  at t135 and Refining at t202 leave the Harbor's Gold at 3 (Naval
+ *  Infrastructure 22.0), its own Refining at t203 makes it 4 (29.0). The
+ *  district adjacency's resource rows read them (0x365ae0); the GPU twin is
+ *  `_res_unseen(row)`. */
+export function unseenResourcesFor(state: GameState, seat: number): ReadonlySet<string> {
   const s = seatOf(state, seat);
   if (!s) return NOTHING_HIDDEN;
   const techs = s.research?.techs ?? [];
@@ -119,11 +140,6 @@ export function hiddenResourcesFor(state: GameState, seat: number): ReadonlySet<
   for (const def of Object.values(RESOURCES)) {
     if (def.revealTech && !techs.includes(def.revealTech)
       && !GP_RESOURCE_REVEAL.some((r) => r.resource === def.id && gpPermOf(s, r.perm) > 0)) out.add(def.id);
-  }
-  const suz = isCityStateSeat(seat) ? (s as CityState).suzerain ?? -1 : -1;
-  if (suz >= 0 && out.size) {
-    const seen = hiddenResourcesFor(state, suz);
-    for (const r of [...out]) if (!seen.has(r)) out.delete(r);
   }
   return out;
 }

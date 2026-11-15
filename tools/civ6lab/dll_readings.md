@@ -16954,3 +16954,67 @@ with the seat as the return player; `h1/dump.py play`).
   (the memory stream: 24 moments a turn against 29, turns 178..238).
 - Engine: none; the recorder (`game.py` LAB_PROFILE turns AutoEndTurn off,
   `h1/dump.py play` refuses to record with it on and ends at a dead seat).
+
+## C-98 / C-130: a village's free technology, the resource a plot's record shows a city-state, the research value's improvements by trait alone, the Lighthouse's coast — READ (0x4caeb0, 0x50a690, 0x50b3e0, 0x35ecb0, 0x35f100), FIT (the record's refresh, the drowned plot), both twins
+
+`drawAndPayGoody` (cpu/core/units.ts) / `_draw_and_pay_goody`
+(gpu/core/sim_seats.py); `unseenResourcesFor` (cpu/core/seats.ts),
+`YieldCtx.unseenResources` (cpu/core/effects.ts), `baseAdjacency`
+(cpu/core/yields.ts) / `_res_unseen`, `_adj_hidden_cut`
+(gpu/core/sim_economy.py); `TECH_IMPROVEMENT_RESOURCES`
+(cpu/core/aiResource.ts, the GPU's `t_ai_res`); `housingParts`
+(cpu/core/city.ts).
+
+- A VILLAGE'S FREE TECHNOLOGY (GOODYHUT_ONE_TECH: GOODY_SCIENCE_GRANT_ONE_TECH,
+  MODIFIER_PLAYER_GRANT_RANDOM_TECHNOLOGY, Amount 1) is Oxford University's
+  grant 0x4caeb0: one draw "Choosing random tech to grant based on era" over
+  the rows researchable now, in table order. Confirmed: runs/h1_duels1146
+  t129, player 0's village: the draw's range 5 (Iron Working, Mathematics,
+  Apprenticeship, Military Engineering, Castles), value 1, Mathematics held
+  in record t130. The grant is a major's gain: the city-states' catch-up
+  (0x4cb930) sets their progress on the row drawn and on no other —
+  city-state 4 holds no progress on Steel after it (its
+  m_axResearchProgress at t144), Steel 54 turns for city-state 2 at t145
+  beside Refining's 54.
+- THE RESOURCE A PLOT'S RECORD SHOWS (0x50a690): the adjacency rows'
+  resource clauses (0x365ae0; the sea resource's neighbour callback
+  0x35ecb0: a water plot whose record holds a resource that is no artifact)
+  read the visibility manager's record of the plot for the player's team
+  (the team's table +0x360, a resource word a plot), not the player's
+  resource condition 0x4ac140. The record is written by 0x50b3e0, whose
+  callers are the visibility count's changes (0x508d50 among them): a plot
+  held in sight keeps the resource its record took. A city-state's record
+  of a plot it holds in sight shows a resource from its own technology on;
+  its suzerain's sight of the resource (0x4ac140's recursion, a Great
+  Person's reveal) does not rewrite it. Confirmed: runs/h1_duels1135
+  city-state 2 (suzerain player 1), its Harbor on 6:16 beside the City
+  Centre, the Industrial Zone and the Oil of 5:17: player 1 activates James
+  Young at t135 and holds Refining at t202, the Harbor's Gold stays 3
+  (Naval Infrastructure 22.0 t130-139 and t147-157, 14.0 at t140-146 with
+  the Industrial Zone pillaged in records t140-147; the city's Gold 7.2 in
+  records t135 and t136);
+  city-state 2 holds Refining at its t203 start: 4 (Economic Union 29.0
+  from t203, the city's Gold 21.5 to 22.3 at Unrest's 0.7).
+- THE RESEARCH VALUE'S IMPROVEMENTS (0x7b3e50's walk): 0x35f100 answers by
+  the improvement's TraitType alone (none: true) — no Buildable test. The
+  Oil Well (Refining) and the Offshore Oil Rig (Plastics), whose
+  Improvements rows state no Buildable, give their technology the Oil the
+  city counts. Confirmed: runs/h1_duels1136 city-state 4 t215-230: the
+  Farm on the Oil of 15:10 gone in record t214, Plastics 9.6 at 36 turns
+  to 19.6 at 19 above the value without it — 36.36 a copy (chronology 8 x
+  25 over the need 11, twice with none in stock) discounted to its turns.
+- THE LIGHTHOUSE'S COASTAL HOUSING (LIGHTHOUSE_COASTAL_CITY_HOUSING,
+  PLOT_IS_ADJACENT_TO_COAST): a plot the rising sea drowned beside the
+  centre does not make the centre coastal — a FIT: runs/h1_duels1146
+  Kumasi (12:12), 11:12 drowned in record t199, its buildings' Housing 4
+  through t250 (6 with the Lighthouse's 2); Civil Prestige's Housing below
+  0 at t202 (the card 1.0 beside Liberalism's 14.0) on Housing 12 of 14
+  citizens. The GPU reads the start's coastal plane (`coastal_land`).
+- OPEN: the record's writer 0x50b3e0 and the events that refresh a record
+  in sight (a player's own technology shows its resource: the caller
+  unread); the engines hold no record a plot — a plot a city-state first
+  sees after its suzerain's reveal would show the resource; a plot's own
+  resource yield and the boosts' improvements still read the condition
+  with the suzerain's sight (`hiddenResourcesFor`);
+  REQUIREMENT_PLOT_ADJACENT_TO_COAST's evaluator is unread (a water body's
+  size, or an answer kept from the attach).

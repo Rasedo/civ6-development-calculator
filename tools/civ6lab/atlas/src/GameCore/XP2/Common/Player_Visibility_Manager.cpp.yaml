@@ -63,6 +63,7 @@
     - "H-1: the barbarians' turn (0x1514a0) — READ (the max camps and the sight LAB)"
     - "C-96: the city-states' tactical pass — READ (Wander Near City, Heal, the non-barbarian priorities, FindAlternateLocation), the families it needs PARTLY READ"
     - "C-119: the revealed plots against the records' planes — an embassy reveals the capital, a new suzerain's reveal meets, a sight raised looks again — READ (0x238330 -> 0x3e6820 -> 0x508bd0 -> 0x507c00 -> 0x508d50, 0x508330 -> 0x50d390, 0x56ce90 -> 0x58f3f0), both twins; the replay's steps and added units"
+    - "C-98 / C-130: a village's free technology, the resource a plot's record shows a city-state, the research value's improvements by trait alone, the Lighthouse's coast — READ (0x4caeb0, 0x50a690, 0x50b3e0, 0x35ecb0, 0x35f100), FIT (the record's refresh, the drowned plot), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...signal at signals +0x10c8, which the unit sight update 0x58aa90 raises per plot when 0x508d50 (Player_Visibility_Manager, the count change) answers 2: the plot's visibility count fo..."
@@ -81,17 +82,24 @@
   review: imported
 - addr: 0x50a690
   kind: function
-  semantics: the plot's resource as a team sees it (artifacts excluded).
-  status: PARTLY
+  semantics: "the plot's resource as a team's record of the plot holds it (this, player or team, plot index): the team's visibility object (+0x30 by the +8 team table; 0x3e8 the +0x50 one, none the +0x48 one), its per-plot table +0x360 (count +0x440), the resource word of the plot's entry (+0x10 array by the index, 0 past +8); -1 with no entry. The record is 0x50b3e0's, written as the plot's visibility count changes: a plot held in sight keeps the resource its record took — a city-state's shows a resource from its own technology on, not from its suzerain's sight (0x4ac140's recursion)."
+  status: READ
+  cases:
+    - recording: h1_duels1135
+      turn: 135
+      value: "city-state 2's Harbor 6:16 beside the Oil of 5:17: its suzerain's James Young at t135 and Refining at t202 leave the Harbor's Gold 3 (Naval Infrastructure 22.0, the city's Gold 7.2 in records t135 and t136), its own Refining at its t203 start 4 (Economic Union 29.0)"
   impl:
     - cpu/core/aiValue.ts:AiPlotView
     - cpu/core/yields.ts:feature
     - cpu/core/minorCityAi.ts:hidden
     - cpu/core/yields.ts:improvementAdjacency
     - gpu/core/sim_minorai.py:adjacency
+    - cpu/core/seats.ts:unseenResourcesFor
+    - gpu/core/sim_economy.py:_res_unseen
   readings:
     - "H-1: the district adjacency — READ"
     - "C-100: the luxury's ban, the power value's RequiredPower term and the plot adjacency's sight — READ"
+    - "C-98 / C-130: a village's free technology, the resource a plot's record shows a city-state, the research value's improvements by trait alone, the Lighthouse's coast — READ (0x4caeb0, 0x50a690, 0x50b3e0, 0x35ecb0, 0x35f100), FIT (the record's refresh, the drowned plot), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...er clause it answers: a natural wonder (0x82e90); the resource AS THE PLAYER SEES IT (0x50a690 with the player's team; artifacts excluded) for AdjacentResource, on water for Adjacent..."
@@ -123,6 +131,16 @@
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "- Camp step 0x14fcc0: target = max camps (+0x110) x the land plots no major sees (0x50b2d0 on hash 0x253718b0) / all land plots, less the standing camps (+0x170); the first step..."
+  review: reviewed
+- addr: 0x50b3e0
+  final: 0x35c020
+  kind: function
+  name: the revealed plot record's writer
+  semantics: writes a team's record of a plot as it stands (terrain, feature, the resource through 0x50a690's table, improvement, district, natural wonder, fallout); its callers are the visibility count's changes (0x508330, 0x508870, 0x508d50, 0x50c7f0, 0x50c870, 0x50ccc0). Which events refresh a record held in sight is unread.
+  status: PARTLY
+  impl: [cpu/core/seats.ts:unseenResourcesFor]
+  readings:
+    - "C-98 / C-130: a village's free technology, the resource a plot's record shows a city-state, the research value's improvements by trait alone, the Lighthouse's coast — READ (0x4caeb0, 0x50a690, 0x50b3e0, 0x35ecb0, 0x35f100), FIT (the record's refresh, the drowned plot), both twins"
   review: reviewed
 - addr: 0x50ccc0
   final: 0x35d8c0

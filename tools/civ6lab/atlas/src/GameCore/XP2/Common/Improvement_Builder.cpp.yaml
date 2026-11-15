@@ -20,11 +20,16 @@
 - addr: 0x35f100
   final: 0x25a230
   kind: function
-  semantics: the player may build the improvement (its trait against the player's civilization and leader).
-  status: PARTLY
+  semantics: "the player may build the improvement (improvement, player): false with no player or no Improvements row; true where the row's TraitType (+0x180) is none; else the trait against the player's civilization's and leader's trait lists. Buildable is not read."
+  status: READ
+  cases:
+    - recording: h1_duels1136
+      turn: 215
+      value: "city-state 4, the Farm on the Oil of 15:10 gone in record t214: Plastics (the Offshore Oil Rig, no Buildable in its row) 856.8 at 36 turns, 9.6 above the value without the Oil's 36.36 a copy discounted to its turns; 19.6 at 19 turns, t230"
   impl: [cpu/core/aiResource.ts:TECH_IMPROVEMENT_RESOURCES]
   readings:
     - "C-96: the resource value and the research value's resources — READ (bonus, luxury, the call), PARTLY READ (the strategic stockpile terms)"
+    - "C-98 / C-130: a village's free technology, the resource a plot's record shows a city-state, the research value's improvements by trait alone, the Lighthouse's coast — READ (0x4caeb0, 0x50a690, 0x50b3e0, 0x35ecb0, 0x35f100), FIT (the record's refresh, the drowned plot), both twins"
   context:
     - "...st (row +0xd0..+0xd8, the improvements it unlocks in table order) the player may build (0x35f100: the improvement's trait against the player's civilization and leader), per resource..."
   review: reviewed

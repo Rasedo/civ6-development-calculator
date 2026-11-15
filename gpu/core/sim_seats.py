@@ -7600,25 +7600,6 @@ class SimSeats:
         self.civ_goody_kinds[b, row, kind] += 1
         return out
 
-    def _goody_pool_draw(self, one: torch.Tensor, b: int, open_: torch.Tensor,
-                         n: int) -> list[int]:
-        """`n` picks WITHOUT replacement from the open columns of `open_`
-        ([nCols] bool for game `b`), each one draw, ascending index.
-
-        TS holds a JS array and splices the pick out; taking the k-th still-open
-        column in ascending order is the same walk over the same order."""
-        got: list[int] = []
-        live = open_.clone()
-        for _ in range(n):
-            cnt = int(live.sum())
-            if cnt <= 0:
-                break
-            k = int(self._rand_range(one, cnt)[b])
-            col = int(live.nonzero().flatten()[k])
-            live[col] = False
-            got.append(col)
-        return got
-
     def _claim_goody_hut(self, mask: torch.Tensor, tile: torch.Tensor,
                          seat: torch.Tensor, slot: torch.Tensor | None = None) -> None:
         """A unit entering a TRIBAL VILLAGE claims it.
@@ -7744,11 +7725,9 @@ class SimSeats:
                     self._draw_boosts(srow, civic, pool, one.long() * amt)
                     break
         elif pay == ch["tech"]:
-            held = self.civ_techs[b, srow]
-            for col in self._goody_pool_draw(one, b, ~held, amt):
-                self.civ_techs[b, srow, col] = True
-                self._minor_catch_up(srow, torch.full((self.B,), int(col), dtype=torch.long, device=self.device), one, False)
-                self._eff_version += 1
+            # MODIFIER_PLAYER_GRANT_RANDOM_TECHNOLOGY: the rows researchable
+            # now, in table order (`grantFreeResearch`)
+            self._grant_free_research(srow, one.long() * amt, torch.zeros_like(one, dtype=torch.long))
         elif pay == ch["unitByClass"]:
             pcl = list(self.rules.promo_classes)
             pi = pcl.index(pcls) if pcls in pcl else -1
