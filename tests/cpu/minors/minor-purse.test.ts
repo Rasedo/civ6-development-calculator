@@ -61,6 +61,7 @@ describe("a city-state's purse", () => {
     cs.treasury = 2000;
     const ring = tilesWithin(state.map, 6, 6, 2).filter((t) => hexDistance(state.map, t.col, t.row, 6, 6) === 2);
     cs.armyKnown = ring.slice(0, 6).map((t, i) => ({ id: 900 + i, owner: BARB_SEAT, type: 'HORSEMAN', seen: 5, plot: t.index, damage: 0 }));
+    cs.armyTabled = cs.armyKnown.map((x) => ({ type: x.type, owner: x.owner }));
     expect(minorThreat(state, cs).level).toBeGreaterThan(-1);
     minorMilitaryTurn(state, cs);
     minorAiTurn(state, cs, true);

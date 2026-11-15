@@ -226,7 +226,7 @@ class World:
         return -1
 
     def builder_type(self, imp):
-        return torch.where(imp >= 0, self.T.unit_row["UNIT_BUILDER"], -1)
+        return torch.full_like(imp, self.T.unit_row["UNIT_BUILDER"])
 
     def builder_lays(self, imp):
         # every row the scenarios pick is a Builder's

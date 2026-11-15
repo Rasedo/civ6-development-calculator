@@ -611,6 +611,9 @@ export function canPlaceDistrictIn(
   if (dist > CITY_WORK_RADIUS) return no('Too far from the city center.');
   if (tile.district && !held) return no('Another district is here.');
   if (irradiated(tile)) return no('Radioactive fallout covers this tile.');
+  // a flooded coastal lowland takes no district (the placement test 0x35f2d0
+  // at 0x35f46b: the plot in the terrain manager's flooded set)
+  if (tile.flooded) return no('The sea floods this lowland.');
   if (tile.builtWonder) return no('A wonder occupies this tile.');
   if (naturalWonderAt(tile)) return no('Cannot build on a natural wonder.');
   if (isImpassable(tile)) return no('Impassable terrain.');

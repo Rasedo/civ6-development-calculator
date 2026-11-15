@@ -896,6 +896,28 @@ class SimCityValue:
         v = torch.where(cut, torch.div(v * _FX, d.clamp(min=1), rounding_mode="trunc"), v)
         return torch.where(entry, v, torch.zeros_like(v)), entry
 
+    def _cv_unit_at_war(self, n_war: torch.Tensor, total: torch.Tensor, surplus: torch.Tensor) -> torch.Tensor:
+        """the table's at-war field ([..., NU], `unitProductionEntries`'
+        `atWar`): the at-war players' counts `n_war` (the opposing combat
+        rows alone) over the sum of each count times that row's efficiency
+        against the entry, the value's way — 0 with none known at war, 1.0
+        with no opposing unit at all (`total` [..., 1] 0) —, x1.25 a
+        civilization's unique unit, and the value's shortfall divide"""
+        T = self._cv_tables()
+        rows = T["unit_rows"]
+        dev = n_war.device
+        w_sum = n_war @ T["eff"].to(dev)
+        w_tot = n_war.sum(-1, keepdim=True)
+        v = torch.where(w_sum > 0, torch.div(w_tot * _FX * _FX, w_sum.clamp(min=1), rounding_mode="trunc"), torch.zeros_like(w_sum))
+        v = torch.where(total == 0, torch.full_like(v, _FX), v)
+        unique = torch.tensor([bool(r["trait"]) for r in rows], dtype=torch.bool, device=dev)
+        v = torch.where(unique, _fmul(v, torch.full_like(v, _fx_const(1.25))), v)
+        has = torch.tensor([bool(r["tableMaintenanceResource"]) for r in rows], dtype=torch.bool, device=dev)
+        amt = torch.tensor([int(r["tableMaintenanceAmount"]) for r in rows], dtype=torch.long, device=dev)
+        d = (amt - surplus) * _FX
+        cut = has & (surplus < amt) & (d > _FX)
+        return torch.where(cut, torch.div(v * _FX, d.clamp(min=1), rounding_mode="trunc"), v)
+
     # -- the unit value (aiCityBuild.ts) -----------------------------------
 
     def _cv_unit_turns(self, f, unit: str) -> torch.Tensor:
@@ -2287,7 +2309,9 @@ class _MinorFacts:
             return self.units_before
         return self.sim._minor_listed_units(self.s).sum(dim=1)
 
-    def _production_table(self):
+    def _production_table(self, tabled=None):
+        """the unit production table on the knowledge base's counts, or on
+        `tabled` ([B, NU_ai], the counts its purchases' table keeps)"""
         def build():
             sim, s = self.sim, self.s
             rows = self.T["unit_rows"]
@@ -2301,11 +2325,11 @@ class _MinorFacts:
             for k, ei in enumerate(eng):
                 if ei >= 0:
                     owned[:, k] = (mine & (sim.major_unit_type == ei)).sum(dim=1)
-            known = sim._cv_known(s)
+            known = sim._cv_known(s) if tabled is None else tabled
             if self.no_known is not None:
                 known = torch.where(self.no_known.unsqueeze(1), torch.zeros_like(known), known)
             return sim._cv_unit_production(version.unsqueeze(0).expand(sim.B, -1), obs, sim._unit_listed(s), owned, known, sim._cv_unit_surplus(self.row))
-        return self._get("uprod", build)
+        return self._get("uprod" if tabled is None else "uprod_tabled", build)
 
     def _obsolete(self):
         """[B, NU_ai] per AI unit row: obsolete to the player (0x538460, its
@@ -2904,15 +2928,15 @@ class _MinorFacts:
         return ok
 
     def can_produce(self, p):
-        """the repair while its walls stand damaged, its quiet turns unasked
-        (`repairWanted`); a district project while its district stands
-        complete and clean"""
+        """the repair always (the queue refuses it with no damaged walls or
+        inside its quiet turns); a district project while its district
+        stands complete and clean"""
         sim = self.sim
         pi = self._pidx(p)
         if pi < 0:
             return self._bools(False)
         if pi == sim._repair_proj_idx:
-            return sim._minor_repair(self.s)[2]
+            return self._bools(True)
         dv = int(sim._proj_rows[pi]["d"])
         if dv < 0:
             return self._bools(False)

@@ -32,3 +32,13 @@
   context:
     - ...slot its free list's head (+0x2c, each entry's +8 the next) names, else a new block's (0x7ff430); the id (+0x28 += 0x10000) | slot; the used list (head +0x38, tail +0x40, each entry's...
   review: reviewed
+- addr: 0x801240
+  final: 0x564c30
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-127 / C-100 / C-96 / C-99: Check Plot's district test and Add Goal Tech's Goal Plot, a flooded lowland's district, the unit production table's at-war field, the pick's repair project — READ (0x7f6ea0 at 0x7f7600..0x7f7662, 0x35f2d0 at 0x35f46b..0x35f48a / 0x35f60f..0x35f81d, 0x7e7d20 at 0x7e888b..0x7e8a9d, 0x173940 at 0x173a05..0x173be1), LAB (the aiunits unit tables, the Default Specialization's project), both twins"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "- THE TREE POOL'S FREE ORDER (0x7ffdd0, 0x7cb2e0, 0x801240): the tick runs once per priority and its destroy loop frees that priority's ended tree..."
+  review: imported

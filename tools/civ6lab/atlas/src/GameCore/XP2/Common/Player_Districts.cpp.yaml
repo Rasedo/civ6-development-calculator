@@ -90,6 +90,30 @@
   context:
     - "..., the positive summed, added only where its SpaceRace ones value above 0 — shared by (0x408b60 all + 1) while 0x408b60 complete stands within ceil(0.5 x their count) and the plot lac..."
   review: reviewed
+- addr: 0x408ce0
+  final: 0x2c4730
+  kind: function
+  semantics: "the player holds a valid-feature count above 0 for any feature (+0x3c0 by Features index): the placement test then asks 0x408f40 alone."
+  status: PARTLY
+  readings:
+    - "C-127 / C-100 / C-96 / C-99: Check Plot's district test and Add Goal Tech's Goal Plot, a flooded lowland's district, the unit production table's at-war field, the pick's repair project — READ (0x7f6ea0 at 0x7f7600..0x7f7662, 0x35f2d0 at 0x35f46b..0x35f48a / 0x35f60f..0x35f81d, 0x7e7d20 at 0x7e888b..0x7e8a9d, 0x173940 at 0x173a05..0x173be1), LAB (the aiunits unit tables, the Default Specialization's project), both twins"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...d0 at 0x35f60f..0x35f81d): a player whose Player_Districts holds a valid-feature count (0x408ce0 over +0x3c0, none for a city-state) asks 0x408f40 alone. Else a feature on the distri..."
+    - ...irst set (0x32f250 / 0x3306f0, the National Parks'); the player's valid-feature counts (0x408ce0 / 0x408f40); Check Plot's SUCCESS on a plot with no coordinates (0x7f793d); the per-pla...
+  review: imported
+- addr: 0x408f40
+  final: 0x2c4780
+  kind: function
+  semantics: the player's valid-feature count of the plot's feature is above 0 for a district counted toward the limit (0x527e30).
+  status: PARTLY
+  readings:
+    - "C-127 / C-100 / C-96 / C-99: Check Plot's district test and Add Goal Tech's Goal Plot, a flooded lowland's district, the unit production table's at-war field, the pick's repair project — READ (0x7f6ea0 at 0x7f7600..0x7f7662, 0x35f2d0 at 0x35f46b..0x35f48a / 0x35f60f..0x35f81d, 0x7e7d20 at 0x7e888b..0x7e8a9d, 0x173940 at 0x173a05..0x173be1), LAB (the aiunits unit tables, the Default Specialization's project), both twins"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - ...istricts holds a valid-feature count (0x408ce0 over +0x3c0, none for a city-state) asks 0x408f40 alone. Else a feature on the district row's +0x218 list passes; with no list (0x35f773)...
+    - ...x32f250 / 0x3306f0, the National Parks'); the player's valid-feature counts (0x408ce0 / 0x408f40); Check Plot's SUCCESS on a plot with no coordinates (0x7f793d); the per-player field...
+  review: imported
 - addr: 0x4090b0
   final: 0x2c48c0
   kind: function

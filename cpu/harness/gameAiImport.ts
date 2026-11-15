@@ -447,15 +447,20 @@ export function importCityAi(cs: CityState, read: GameMemoryRead, w: ImportWorld
   const defense = ops.some((o) => o.id === was) ? was : ops.find((o) => o.def === 'City Defense')?.id ?? -1;
   ai.slots = { [-1]: [-1, -1, -1, -1, -1, defense] };
   for (const t of trees) ai.slots[-1][t.slot] = t.id;
-  // each tree's reservation: its Reserve Plot that succeeded, its plot and
-  // value as its tags hold them
+  // each tree's reservation: its Reserve Plot that succeeded — on this
+  // tick, or on an earlier one where a Sequence about it resumes past it
+  // (its status fresh again: runs/h1_duels1146 Kandy's Build City District
+  // 21:4 of t26, its nodes 1..8 fresh from t27 on, its root resuming at 9,
+  // the reservation of 40:12 at 194.0 held in m_reservations to t36) —, its
+  // plot and value as its tags hold them
   ai.reservations = [];
   for (const [id, g] of Object.entries(read.trees)) {
     const t = trees.find((x) => x.id === idOf.get(Number(id)));
     if (!t) continue;
     const rows = AI_CITY_TREES[t.name];
+    const passed = (k: number) => rows.some((s, i) => s.type === 'Sequence' && i < k && k < s.jumpTo && (g.nodes![i][5]?.[4] ?? 0) > k);
     rows.forEach((row, k) => {
-      if (row.type !== 'Reserve Plot' || g.nodes![k][0] !== BT_SUCCESS) return;
+      if (row.type !== 'Reserve Plot' || (g.nodes![k][0] !== BT_SUCCESS && !passed(k))) return;
       const tagOf = (name: string) => (row.data[name]?.tag ? t.bb[row.data[name].tag!] : undefined);
       const plot = tagOf('Plot to reserve');
       if (typeof plot !== 'number' || plot < 0) return;

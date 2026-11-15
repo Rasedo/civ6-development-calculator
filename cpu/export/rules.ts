@@ -1082,7 +1082,7 @@ export function buildRules() {
       pseudoDefault: AI_PSEUDOYIELD_DEFAULT,
       improvements: AI_IMPROVEMENTS,
       features: AI_FEATURES,
-      resources: AI_RESOURCES.map((r) => ({ type: r.type, class: r.class, harvests: r.harvests, harvestTechs: r.harvestTechs, yields: r.yields })),
+      resources: AI_RESOURCES.map((r) => ({ type: r.type, class: r.class, harvests: r.harvests, harvestTechs: r.harvestTechs, yields: r.yields, workers: r.workers })),
       districts: AI_DISTRICTS,
       projects: AI_PROJECTS,
       savings: AI_DEFAULT_SAVINGS.map((s) => s.weight),

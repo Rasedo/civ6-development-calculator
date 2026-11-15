@@ -39,7 +39,7 @@ import { freeCityThreat, minorAiTurn, minorContractPurchases, minorEconomicDisba
 import { bankruptcy, cityBorderGrowth, cultureAfterGrowth, jumpMadeAnew, paveGround } from './phase';
 import { applyTrainingGrants, cityDefenseStrength } from './combat';
 import { districtPillagedIn, headLetGo, keepItem, resumeItem } from './production';
-import { districtScaledBase, goldAffordable, projectCost, repairAvailable, repairWanted } from './game';
+import { districtScaledBase, goldAffordable, projectCost, repairAvailable } from './game';
 import { civEraIndex, computeCityStats, extractionChanged, rebuildLuxuries, withPercent256 } from './city';
 import { upgradeRoads } from './eras';
 import { researchCost, selectResearch } from './economy';
@@ -212,6 +212,11 @@ export function minorPhase(state: GameState): void {
     // city-state 4 after its t40 turn, its free Trader to Rome that turn)
     if (!fresh) minorTradeList(state, cityState);
     cityState.armyCounted = minorArmyCounts(cityState.armyKnown ?? []);
+    // the table its city's purchases read keeps the same records past the
+    // look (runs/h1_duels1124 Granada t72: a second barbarian record that
+    // turn's look adds; the table's at-war field at the end look still the
+    // Quadrireme 595 over the Catapult 378, the Quadrireme bought)
+    cityState.armyTabled = (cityState.armyKnown ?? []).map((x) => ({ type: x.type, owner: x.owner }));
     // its city's yields and growth as its City Analysis reads them, on
     // player signal +0x258 before the job passes (0x5c24e0: 0x5cc510 stores
     // each yield and its attribute base, then the analysis): before its
@@ -280,7 +285,12 @@ export function minorPhase(state: GameState): void {
     // 76 COMPLETED and its Build City District tree's Commercial Hub
     // contract 123 posted by the t47 end look)
     detectBoosts(state, cityState.seat);
-    if (!ordersHeld) cityStateMilitary(state, cityState);
+    // under the replay's hold its copy runs the army's walk and the second
+    // hook, on the table this turn kept
+    if (!ordersHeld) {
+      cityStateMilitary(state, cityState);
+      delete cityState.armyTabled;
+    }
     // its Traders step on their routes after its units' turn, their route
     // operation after the tactical moves (runs/h1_duelp1117 t225: city-state
     // 4's Trader 655360 onto its centre 32:5 after its Field Cannon's and
@@ -2210,12 +2220,17 @@ export function minorPickFacts(state: GameState, cityState: CityState, facts: Ci
     // from t127; t159-162 / t163, t167-169 / t170; Cardiff t86-88 / t89)
     canProduce: (p) => {
       const id = engineId('project', p, 'PROJECT_', PROJECTS);
-      // the walls' repair while its walls stand damaged, its quiet turns
-      // unasked: the queue's refusal leaves the turn with nothing
+      // the walls' repair whatever its walls: damaged, its quiet turns
+      // unasked, the queue's refusal leaves the turn with nothing
       // (runs/h1_duely1124 Granada t124-126: the repair 21971 over its
       // Encampment contract 3317, NO BUILDS AT ALL; the repair queued at
-      // t127, the Encampment at t128)
-      if (id === 'REPAIR_DEFENSES') return repairWanted(state, minorCity(cityState));
+      // t127, the Encampment at t128); with none to repair it stands in the
+      // table at 0.00, the first of the projects, and where no building,
+      // unit or project tops it the pick takes it and the queue refuses it
+      // (runs/h1_duels1132 Lahore t214 / t219 / t223 / t224: its units all
+      // FX(-9999), PROJECTS 0.00 at Repair Outer Defenses and at Recommission
+      // Reactor, NO BUILDS AT ALL)
+      if (id === 'REPAIR_DEFENSES') return true;
       return !!id && minorProjectOk(state, cityState, id);
     },
     favored: () => 0,

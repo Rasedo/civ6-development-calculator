@@ -255,6 +255,7 @@
     - cpu/core/production.ts:districtPillagedIn
     - cpu/core/aiCityBuild.ts:wallsPrereq
     - gpu/core/sim_cityvalue.py:_cv_walls_prereq
+    - cpu/core/minorCityAi.ts:districtDrowned
   readings:
     - "C-127 / C-96: a minor's unit versions, the unit table's religion gate and the building value's era reasons — READ, both twins"
     - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
@@ -346,8 +347,11 @@
 - addr: 0x173940
   final: 0xf97b0
   kind: function
+  semantics: "CanConstruct of a district at a plot. A one-per-city type the city holds (Districts +0xe1 bit 4; 0x1aec20, 0x1ae530): complete (0x1aef40), a plot other than its own, a flooded plot (0xa3a0f0) or one not pillaged (0x1af250) refuses for good (+0x28 and the result's second byte), an enemy unit on its plot sets +0x29, fallout +0x2b; incomplete, a plot other than its zoning plot (0x17cd50) refuses for good. Else the player's unlock and count tests, then the placement test 0x35f2d0 with the city."
   status: PARTLY
-  impl: [cpu/core/aiContracts.ts:ContractCity]
+  impl: [cpu/core/aiContracts.ts:ContractCity, cpu/core/minorCityAi.ts:districtDrowned]
+  readings:
+    - "C-127 / C-100 / C-96 / C-99: Check Plot's district test and Add Goal Tech's Goal Plot, a flooded lowland's district, the unit production table's at-war field, the pick's repair project — READ (0x7f6ea0 at 0x7f7600..0x7f7662, 0x35f2d0 at 0x35f46b..0x35f48a / 0x35f60f..0x35f81d, 0x7e7d20 at 0x7e888b..0x7e8a9d, 0x173940 at 0x173a05..0x173be1), LAB (the aiunits unit tables, the Default Specialization's project), both twins"
   notes: ["imported: cited by the code, in no dll_readings section"]
   review: imported
 - addr: 0x173f70

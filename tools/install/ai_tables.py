@@ -677,10 +677,17 @@ def build_city(rows, modifier) -> str:
     for c in rows("Projects"):
         if c.get("PrereqResource"):
             res_projects[c["PrereqResource"]].append(c["ProjectType"])
+    # (the improvements working it: its Improvement_ValidResources rows in the
+    # database's order, the row's +0xa8 list, each with its MustRemoveFeature)
+    res_workers = collections.defaultdict(list)
+    for it, rt, must in game_db().execute(
+            "select ImprovementType, ResourceType, MustRemoveFeature from Improvement_ValidResources order by rowid"):
+        res_workers[rt].append([it, bool(must)])
     resources = [{"type": r, "class": c.get("ResourceClassType"), "happiness": num(c, "Happiness"),
                   "peakEra": c.get("PeakEra") if c.get("PeakEra") not in (None, "", "NO_ERA") else None,
                   "units": strat_units[r],
                   "projects": res_projects[r],
+                  "workers": res_workers[r],
                   "harvests": [[h["YieldType"], num(h, "Amount")] for h in harvests[r]],
                   "harvestTechs": [h.get("PrereqTech") or None for h in harvests[r]],
                   "yields": [[y["YieldType"], num(y, "YieldChange")] for y in res_yields[r]],

@@ -178,9 +178,9 @@ export interface CityTreeWorld {
   civicHeld(civic: string): boolean;
   /** the plot can hold the improvement as it stands (0x35fd60) */
   canImprove(plot: number, improvement: string): boolean;
-  /** the cheapest unit type the city may train that builds the improvement
-   *  (Check Plot), null none */
-  builderType(improvement: string): string | null;
+  /** the cheapest unit type a city may train that builds the improvement —
+   *  with none named, that has build charges (Check Plot); null none */
+  builderType(improvement: string | null): string | null;
   /** the city id a plot belongs to, -2 none (a city-state's one city is -1) */
   plotCity(plot: number): number;
   /** the unit's planning reaches the plot this turn (0x791300, one turn,
@@ -188,7 +188,9 @@ export interface CityTreeWorld {
   reachThisTurn(unit: TreeUnit, plot: number, moves: boolean): boolean;
   /** the turns the unit's path takes to the plot (0x272a60), 0 none */
   turnsTo(unit: TreeUnit, plot: number): number;
-  /** the district may stand on the plot as it is (0x35f2d0) */
+  /** the district may stand on the plot as it is (Check Plot's 0x35f2d0
+   *  with neither waiver: a removable feature it would clear and a resource
+   *  the player sees refuse it), or the plot holds a district of the type */
   canPlaceDistrict(plot: number, district: string): boolean;
   /** the plot's owner, -1 none */
   plotOwner(plot: number): number;
@@ -622,7 +624,8 @@ const RESOURCE_ROW = new Map(AI_RESOURCES.map((r) => [r.type, r] as const));
 // own, and on its Goal Plot to work the harvest's of a resource the player
 // sees there that the improvement does not work and the removal's of a
 // feature it neither keeps nor stands on (a feature that may not be removed
-// FAILS); none SUCCEEDS; else RUNNING, its execution claiming a contract on
+// FAILS) — then the Goal Plot's own (a district's plot: the improvements
+// working its resource, its removable feature); none SUCCEEDS; else RUNNING, its execution claiming a contract on
 // the first of them (runs/h1_duelw1124 Granada t2: the Alcazar tree on plot
 // 570's Rainforest, Bronze Working Tech Contract 7 at 104.0)
 const addGoalTech: BtHandler<Ctx> = {
@@ -652,6 +655,22 @@ const addGoalTech: BtHandler<Ctx> = {
         const f = FEATURE_ROW.get(g.feature);
         if (!f?.removable) return BT_FAILURE;
         if (f.removeTech) want({ tech: f.removeTech, civic: null });
+      }
+    }
+    // the Goal Plot alone (0x7e888b..0x7e8a9d), whatever the items: the
+    // technology of each improvement working the resource the player sees
+    // there; and, with no such resource or its last row a MustRemoveFeature
+    // one, a removable feature's RemoveTech
+    if (typeof goal === 'number' && goal >= 0) {
+      const g = w.plotGround(goal);
+      const workers = (g.resource ? RESOURCE_ROW.get(g.resource)?.workers : undefined) ?? [];
+      for (const [imp] of workers) {
+        const tech = IMPROVEMENT_ROW.get(imp)?.tech;
+        if (tech) want({ tech, civic: null });
+      }
+      if (g.feature && (!workers.length || workers[workers.length - 1][1])) {
+        const f = FEATURE_ROW.get(g.feature);
+        if (f?.removable && f.removeTech) want({ tech: f.removeTech, civic: null });
       }
     }
     for (const t of list(tagOf(run, node, 'Desired Techs'))) if (!w.techHeld(String(t)) && !techs.includes(String(t))) techs.push(String(t));
@@ -704,27 +723,32 @@ const reservePlot: BtHandler<Ctx> = {
   },
 };
 
-// CHECK PLOT (0x7f6ea0): the Builder type (the cheapest unit the city may
-// train that builds the improvement) into its tag, FAILURE with none; the
-// plot as it stands can take the improvement: SUCCESS, its Plot To Move the
-// plot the Builder lays from (`builderPlot`), else FAILURE (the tree clears
-// it first) — on a plot holding no improvement and no feature
-// but a resource, its Resource Harvesting set (0x7f7844)
+// CHECK PLOT (0x7f6ea0): the Builder type (the cheapest unit a city may
+// train that builds the improvement, with no improvement the cheapest with
+// build charges), an improvement's into its tag — none FAILS an
+// improvement's check and is an ERROR without one; the plot as it stands can take the district or the
+// improvement: SUCCESS, an improvement's Plot To Move the plot the Builder
+// lays from (`builderPlot`), else FAILURE (the tree clears it first) — on a
+// plot holding no improvement and no feature but a resource, its Resource
+// Harvesting set (0x7f7844)
 const checkPlot: BtHandler<Ctx> = {
   update(node, run, ctx) {
     setTag(run, node, 'Resource Harvesting', false);
     const plot = tagOf(run, node, 'Plot To Check');
     if (typeof plot !== 'number' || plot < 0) return BT_FAILURE;
-    const districts = list(tagOf(run, node, 'Building Districts')).map(String);
-    if (districts.length) return ctx.w.canPlaceDistrict(plot, districts[0]) ? BT_SUCCESS : BT_FAILURE;
-    const imps = list(tagOf(run, node, 'Building Improvements')).map(String);
-    const imp = imps[0];
-    if (!imp) return BT_FAILURE;
-    const builder = ctx.w.builderType(imp);
-    if (!builder) return BT_FAILURE;
-    setTag(run, node, 'Builder List', [builder]);
+    const district = list(tagOf(run, node, 'Building Districts')).map(String)[0];
+    const imp = list(tagOf(run, node, 'Building Improvements')).map(String)[0];
+    if (!district && !imp) return BT_FAILURE;
+    const builder = ctx.w.builderType(imp ?? null);
+    if (!builder) return imp ? BT_FAILURE : BT_ERROR;
+    // a district's check hands its tree no Builder type: the game's Find
+    // Available Unit after it finds a Builder and its tree holds none at any
+    // end look (runs/h1_duels1146 Kandy t138: Builder 1310723 found by Build
+    // City District 83:7, assigned to Build City Improvement 84:8)
+    if (imp) setTag(run, node, 'Builder List', [builder]);
     setTag(run, node, 'Plot To Move', plot);
-    if (ctx.w.canImprove(plot, imp)) {
+    if (district && ctx.w.canPlaceDistrict(plot, district)) return BT_SUCCESS;
+    if (imp && ctx.w.canImprove(plot, imp)) {
       // an impassable plot (a Ski Resort's mountain): the Builder's plot
       // beside it (0x7f77a4..0x7f7821)
       setTag(run, node, 'Plot To Move', ctx.w.builderPlot(plot));

@@ -5214,6 +5214,8 @@ class SimEconomy:
         # contamination" - `canPlaceDistrictIn` refuses an irradiated tile,
         # and a fire's plot (`fireFeature`)
         surface = surface & ~self._fallout() & ~self._fire_plots()
+        # a flooded coastal lowland takes no district
+        surface = surface & ~self.tile_flooded
         elig = (self._district_elig_site(row, j) if base is None else base) & surface
         if placement in (1, 3):  # Aqueduct: adjacent-centre + water source; Encampment/Preserve: NOT adjacent-centre
             cc = self._adj_center_count()  # [B, T] adjacent CITY_CENTERs (any seat)

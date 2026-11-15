@@ -1004,6 +1004,10 @@ export interface Seat {
    *  them, before the turn's ageing and look: the unit production table its
    *  city AI's turn reads (`minorKnownUnits`); absent outside that turn */
   armyCounted?: Record<string, number>;
+  /** a city-state's records (type and owner) at the same moment: the unit
+   *  production table copied to its city, which its purchases read after
+   *  the turn's look (`purchaseEntries`); absent once its army's turn ends */
+  armyTabled?: { type: string; owner: number }[];
   /** a city-state's city yields (the total and the attribute base) and its
    *  growth as its City Analysis read them as its AI turn opened, before
    *  its Economic AI's purchases and free Trader's dispatch and its

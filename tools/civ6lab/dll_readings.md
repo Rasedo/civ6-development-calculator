@@ -16777,3 +16777,134 @@ GPU `_pol_enemy_plunder`, `_pol_admits`, `_free_power_wrapper`,
   player 62 t215-249: Raid 364 / 0 for 141-146, 0 for 289 from t222); the
   GPU analyses the attach wrapper over the player's cities for the bare
   EFFECT_ADJUST_CITY_FREE_POWER alone.
+
+## C-127 / C-100 / C-96 / C-99: Check Plot's district test and Add Goal Tech's Goal Plot, a flooded lowland's district, the unit production table's at-war field, the pick's repair project — READ (0x7f6ea0 at 0x7f7600..0x7f7662, 0x35f2d0 at 0x35f46b..0x35f48a / 0x35f60f..0x35f81d, 0x7e7d20 at 0x7e888b..0x7e8a9d, 0x173940 at 0x173a05..0x173be1), LAB (the aiunits unit tables, the Default Specialization's project), both twins
+
+- CHECK PLOT'S DISTRICT (0x7f6ea0 at 0x7f7600..0x7f7662): the Builder type
+  first (0x7f7028..0x7f72ff; with no improvement list the cheapest unit with
+  BuildCharges a city may train, none an ERROR at 0x7f72b9; an
+  improvement's none FAILS at 0x7f71bd), then 0x35f2d0 with every flag
+  argument 0 and no city — SUCCESS where it passes or where the plot's
+  district is of the type (0x7f7652) — else the plot's improvement, feature
+  or bare resource is the clearing's (0x7f7826..0x7f7890), FAILURE.
+- THE PLACEMENT TEST'S GROUND (0x35f2d0 at 0x35f60f..0x35f81d): a player
+  whose Player_Districts holds a valid-feature count (0x408ce0 over +0x3c0,
+  none for a city-state) asks 0x408f40 alone. Else a feature on the
+  district row's +0x218 list passes; with no list (0x35f773) a feature
+  passes under the eighth argument, or where Removable (+0xc1 bit 7) under
+  the sixth, or where ValidDistrictPlacement (Features_XP2 +0x28 bit 2):
+  Check Plot passes neither argument, so a Forest, a Rainforest or a Marsh
+  refuses the plot whatever the player's research. The resource the player
+  sees (0x5112f0) refuses it without the seventh argument (0x35f7d6), and
+  with it where it has no Resource_Harvests row (+0x78 / +0x80) — a plot
+  holding the district being built there (0x35f4c4) asks neither.
+- ADD GOAL TECH'S GOAL PLOT ALONE (0x7e7d20 at 0x7e888b..0x7e8a9d, after
+  the improvements' loop, with or without one): on the Goal Plot the
+  resource the player sees (0x4ab4b0); each of its Improvement_ValidResources
+  rows (Resources +0xa8, the database's order) whose improvement has a
+  PrereqTech (+0xd8 / +0xe0, the row +0x160) the player lacks adds it; with
+  no such resource, no row, or the last row's MustRemoveFeature (+0x28 bit
+  0) set, a Removable feature's RemoveTech the player lacks. The list's
+  sort (0x7e7080 -> 0x7e6810): the third word descending, then the second
+  ascending, stable; the goal plot's entries carry (-1, 0).
+- So "Build City District" on a plot under a Forest, Rainforest or Marsh
+  fails its Check Plot each tick: its Add Goal Tech (Clear Ground Contract,
+  Turn Limit 10) holds a Tech Contract on the RemoveTech until it is held,
+  then the Priority after it succeeds and Build Unit follows. That
+  Priority's Find Available Unit (node 16) finds a free Builder — SUCCESS,
+  Found Unit set — and its tree holds no unit at the end look on 95 of 95
+  looks with the node SUCCESS (duels1146, 1139, 1124; duels1146 Kandy t138:
+  Builder 1310723 found by Build City District 83:7, assigned to Build City
+  Improvement 84:8; t46 found with no improvement tree, assigned to none):
+  how it lets the unit go is unread, and the engines' check hands the
+  district's tree no Builder type, the node an ERROR, the Priority ending
+  on its Reserve Plot of no plot.
+  Ported: `checkPlot`, `addGoalTech`, `CityTreeWorld.canPlaceDistrict` /
+  `builderType` (minorCityAi.ts), AI_RESOURCES' `workers`; `_u_check_plot`,
+  `_goal_of`, `_MinorWorld.can_place_district` / `builder_type`,
+  `CityTreeTables.r_worker_tech` / `r_clears` / `f_valid_district`.
+- CONFIRMED: runs/h1_duels1146 Kandy's Holy Site on the Marsh 40:12 (the
+  analysis 194.78): Build City District 21:4 of t26 holds Tech Contract 82
+  on Irrigation at 194.0 to its FAILED t37, tree 32:4 Contract 124 from t38,
+  IN PROGRESS t43, COMPLETED t46 with the district's Contract 143 that
+  turn, queued t47 (the engines posted the district's contract at t26).
+  duels1133 player 2 t10 (Mining), t17 (Bronze Working), duels1145 player 4
+  t13 (Mining) alike.
+- A FLOODED LOWLAND (0x35f2d0 at 0x35f46b..0x35f48a): the plot in the
+  terrain manager's flooded set (0xa39c20 +0xb0, 0xa3a0f0; the Lua
+  IsFlooded's) takes no district; CanConstruct of a district the city holds
+  complete (0x173940 at 0x173a05..0x173be1, Districts +0xe1 bit 4: 0x1aec20,
+  0x1ae530, 0x1aef40) refuses for good (+0x28 and the result's second byte)
+  a plot other than its own, one in the flooded set (0x173aa7..0x173acf),
+  and one not pillaged (0x1af250); an enemy unit on its plot (0x469cd0 over
+  the plot's units) sets +0x29 alone; else +0x2b where the district holds
+  fallout (0x1aeff0). The contract eligibility (0x5f6050 at 0x5f641d) reads
+  the second byte and +0x20. Ported: `canPlaceDistrictIn` and
+  `_district_elig` (the flooded plot), `districtBlocked` /
+  `district_blocked` (complete on a flooded plot); `submergeTile` drops a
+  city-state's record of the district the sea takes, as `_submerge` does
+  for every city row.
+- CONFIRMED: runs/h1_duels1146 Kandy's Holy Site on 40:12, flooded at t164
+  and pillaged, submerged at t185: Build City District starts for it every
+  second turn t175-t183 (105:7, 108:7, 111:8, 112:8, 115:8) at 10721.0,
+  its Build Unit RUNNING with no contract at each end look, no SUBMITTED
+  line (the engines held the contract ACCEPTED); 39:10, flooded from t174,
+  unvalued for a district (the engines posted its Purchase Plot at t189 and
+  t193).
+- THE UNIT PRODUCTION TABLE'S FIELDS (LAB, the recordings' aiunits
+  `unitTable`): +0x30 holds the entry's value (+0x160) on each of 69,267
+  entries of runs/h1_duels1143; +0x2c the same quotient over the at-war
+  players' units alone — their count over the sum of each count times that
+  type's efficiency against the entry (M[opposing][entry], truncated) —, 0
+  with none known at war, x1.25 a civilization's unique unit (duels1146
+  player 0 t30-34: the Legion 1128 = 903 x 1.25). duels1146 Kumasi t48,
+  four barbarian Galleys known: the Warrior Monk 564, the Galley 256, the
+  Heavy Chariot 224, the Spearman 177, the Archer 142, the Warrior 116, the
+  Slinger 64, the Scout 54, the Builder 2, the Battering Ram 2, the Knight
+  1213, the Trebuchet 923, the Crossbowman 455 — each as computed; the
+  entry's row against the opposing column gives the Battering Ram 256 (M[j
+  weak][i strong] 1.0 for i < j), the Knight 1212, the Crossbowman 452. Over
+  the end looks' own army records the quotient matches 2,319 of 3,324
+  (duels1146 player 4 t20-120), 937 of 1,085 (player 3) and 1,460 of 1,610
+  (duels1139 player 2) entries, the rest a table built on the look before:
+  the table of a turn's end look is the quotient over the records the turn
+  before left (runs/h1_duels1124 city-state 3 t72: records a Galley and an
+  Archer at its end look, the table still t71's — the Warrior Monk 736, the
+  Quadrireme 595, the Galley 461, the Catapult 378 —, t73's the Monk 639,
+  the Catapult 405, the Quadrireme 364 of t72's records), so the city's
+  purchases after the look read the records as the turn opened.
+  Ported: `unitProductionEntries`' `atWar` / `all`, `_cv_unit_at_war`,
+  `_minor_purchase_rows`, `_mops_unit_rows`; `CityState.armyTabled` /
+  `_cv_tabled` (the purchases' records). The per-player field (+0x38) is
+  unread and stays the entry's row sums; the operations' unit choice reads
+  the records after the look.
+- CONFIRMED: duels1146 Kumasi t48-t55, threat 5: its list's first unit it
+  may train is the Heavy Chariot, which its purse does not meet, and it buys
+  nothing (the engines ranked the Battering Ram at 1024 and bought one each
+  turn). duels1124 Granada t72, threat 1: the Quadrireme bought, the first
+  of t71's table it may train (on t72's records the Catapult leads).
+- THE PICK'S REPAIR PROJECT (LAB): Repair Outer Defenses stands in the
+  PROJECTS table at 0.00 with no walls to repair (duels1146 Kandy t26, no
+  walls; duels1132 Lahore t214), the first row; the Default Specialization's
+  project best takes it where no later project is valued above it, and
+  where no building or unit reaches it the queue's refusal leaves "NO BUILDS
+  AT ALL". No Default Specialization line of the twenty duels recordings
+  carries a value below 0, and none a project at or below 0.05. Ported:
+  `minorPickFacts.canProduce`, `_MinorFacts.can_produce`.
+- CONFIRMED: duels1132 Lahore t214, t219, t223, t224: UNITS all FX(-9999),
+  PROJECTS 0.00 at Repair Outer Defenses and Recommission Reactor, NO
+  BUILDS AT ALL (the engines queued Recommission Reactor).
+- THE TREE POOL'S FREE ORDER (0x7ffdd0, 0x7cb2e0, 0x801240): the tick runs
+  once per priority and its destroy loop frees that priority's ended trees
+  alone (0x7cb2e9), the freed slot the free list's head (+0x2c). duels1146
+  city-state 2 t25: City Defense 18:7 (priority 4), Build City District
+  13:4 and Build City Improvement 14:8 (priority 2) end; t26 takes 8
+  (Upgrade Units 20:8) then 4 (Build City District 21:4), t27 7 (City
+  Defense 23:7) then 8 (Build City Improvement 24:8) — the list 8, 4, 7
+  from the head as t25 ends. The engines free every ended slot in one pass
+  in slot order (8, 7, 4 from the head): unported (C-99).
+- OPEN: a held complete district's enemy unit refusal (+0x29) in the
+  queue; the placement test's first set (0x32f250 / 0x3306f0, the National
+  Parks'); the player's valid-feature counts (0x408ce0 / 0x408f40); Check
+  Plot's SUCCESS on a plot with no coordinates (0x7f793d); the per-player
+  field's formula.

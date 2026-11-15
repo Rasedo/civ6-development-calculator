@@ -133,8 +133,12 @@ export type Decision = Base & (
   | { kind: 'kill'; player: number; killerType: number; killerUnit: string; victim: number; victimType: number; victimUnit: string }
   /** a promotion the player picked (`UnitPromoted`): the unit, the catalog's
    *  `unitPromotions` index, the experience the unit held at record t;
-   *  `formed` one the unit carries over from a formation (logged right after
-   *  its `UnitFormCorps` / `UnitFormArmy`), no pick */
+   *  `formed` one the unit carries over, no pick: from a formation (logged
+   *  right after its `UnitFormCorps` / `UnitFormArmy`), or logged with no
+   *  Promote command before it — a transfer's new unit's, logged with what
+   *  it brings (runs/h1_duels1143 t47: city-state 3's levied Warrior home as
+   *  720900, its Battlecry logged after its UnitTeleported; its Archer home
+   *  as 655363 at 15 experience picks Volley by the command) */
   | { kind: 'promote'; player: number; unit: string; promotion: number; xp: number; formed?: true }
   /** a unit upgraded (`UnitUpgraded`): the game removes the unit and adds its
    *  upgrade under a new id */
@@ -548,6 +552,7 @@ const OP_REMOVE_FEATURE = gameHash('UNITOPERATION_REMOVE_FEATURE');
 const OP_HARVEST = gameHash('UNITOPERATION_HARVEST_RESOURCE');
 const OP_PILLAGE = gameHash('UNITOPERATION_PILLAGE');
 const CMD_PLUNDER = gameHash('UNITCOMMAND_PLUNDER_TRADE_ROUTE');
+const CMD_PROMOTE = gameHash('UNITCOMMAND_PROMOTE');
 const OP_FOUND_RELIGION = gameHash('UNITOPERATION_FOUND_RELIGION');
 const OP_SPREAD = gameHash('UNITOPERATION_SPREAD_RELIGION');
 const PURCHASE_BUILDING = gameHash('BUILDING');
@@ -672,6 +677,10 @@ export class RecordedActions implements ActionSource {
     // Battlecry, Commando and Zweihander; t126 its Musketman 1966080 at 3
     // experience, Battlecry after UnitFormCorps)
     let formed: string | null = null;
+    // the unit whose Promote command the log just started: the promotion it
+    // names next is that unit's pick; one logged with no command is carried
+    // (an upgrade's, a formation's, a transfer's new unit's)
+    let picking: string | null = null;
     const majorIds = new Set(b.players.filter((p) => bool(p.major)).map((p) => p.id));
     const minorIds = new Set(b.players.filter((p) => bool(p.minor)).map((p) => p.id));
     const campRow = cat.improvements.indexOf('IMPROVEMENT_BARBARIAN_CAMP');
@@ -680,6 +689,8 @@ export class RecordedActions implements ActionSource {
       const name = r[2];
       if (name === 'UnitFormCorps' || name === 'UnitFormArmy') formed = `${n(r, 0)}:${n(r, 1)}`;
       else if (name !== 'UnitPromoted' || `${n(r, 0)}:${n(r, 1)}` !== formed) formed = null;
+      if (name === 'UnitCommandStarted' && n(r, 2) === CMD_PROMOTE) picking = `${n(r, 0)}:${n(r, 1)}`;
+      else if (name !== 'UnitPromoted') picking = null;
       if (name === 'UnitActivityChanged') acting.set(n(r, 0), `${n(r, 0)}:${n(r, 1)}`);
       if (name === 'UnitMoved' || name === 'UnitTeleported') stand.set(`${n(r, 0)}:${n(r, 1)}`, n(r, 3) * W + n(r, 2));
       if (name === 'UnitGreatPersonActivated') {
@@ -777,10 +788,12 @@ export class RecordedActions implements ActionSource {
           out0.push({ kind: 'upgrade', phase: phaseOf(n(r, 0)), player: n(r, 0), unit: removed, into });
         }
       } else if (name === 'UnitPromoted') {
-        const u0 = a.units.find((x) => x.owner === n(r, 0) && x.id === n(r, 1));
+        // a unit new in the pair (a levied unit home under its new id) holds
+        // the experience record t+1 reads on it
+        const u0 = a.units.find((x) => x.owner === n(r, 0) && x.id === n(r, 1)) ?? b.units.find((x) => x.owner === n(r, 0) && x.id === n(r, 1));
         const key = `${n(r, 0)}:${n(r, 1)}`;
         out0.push({ kind: 'promote', phase: phaseOf(n(r, 0)), player: n(r, 0), unit: key, promotion: n(r, 2),
-          xp: u0 ? num(u0.xp) : 0, ...(formed === key ? { formed: true as const } : {}) });
+          xp: u0 ? num(u0.xp) : 0, ...(formed === key || picking !== key ? { formed: true as const } : {}) });
       } else if (name === 'UnitChargesChanged' && n(r, 2) < n(r, 3)) {
         // a charge spent where the Builder stands on a wonder under
         // construction is a charge toward the wonder, one placed in the

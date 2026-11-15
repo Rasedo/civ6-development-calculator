@@ -5120,6 +5120,10 @@
         "why": "a city-state's unit production table for its city AI's turn (`minorKnownUnits`): written by minorPhase before minorAiTurn and deleted right after it, so it is never live at a turn boundary; the records it counts are compared as minorArmyKnown."
       },
       {
+        "path": "Seat.armyTabled",
+        "why": "a city-state's records as its last turn left them, for the unit production table its city's purchases read (`purchaseEntries`): written by minorPhase beside armyCounted and deleted after its army's turn, so it is never live at a turn boundary; the records it copies are compared as minorArmyKnown; the GPU twin holds them at the same points (`_cv_tabled`, transient)."
+      },
+      {
         "path": "Seat.aiYields",
         "why": "a city-state's city yields and growth as its AI read them before its free Trader's dispatch: written by minorPhase before minorTradePick and deleted after its military AI's upgrade, so it is never live at a turn boundary; the GPU twin holds them at the same points (`_cv_yields_seen`, `_cv_growth_seen`, transient)."
       },

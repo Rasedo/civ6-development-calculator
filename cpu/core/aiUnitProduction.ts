@@ -31,10 +31,10 @@
  *
  * The city build AI's unit value reads it (0x79ca90: 0 for a unit the table
  * lacks) and 0x79d2d0 (the entry's obsolete flag); the operations' unit
- * choice (0x79bd30) its entries (`unitProductionEntries`): beside the value,
- * the sums of the at-war players' counts (+0x2c) and of each player's (the
- * per-player vector +0x38), the sum over every player (+0x30), the entry
- * buildable (+0x0e: its PrereqTech and PrereqCivic held, its
+ * choice (0x79bd30) its entries (`unitProductionEntries`): beside the value
+ * (+0x160, the same number at +0x30), the value over the at-war players'
+ * units alone (+0x2c) and each player's sums (the per-player vector +0x38),
+ * the entry buildable (+0x0e: its PrereqTech and PrereqCivic held, its
  * StrategicResource owned), its strength (+0x18: max(Combat,
  * RangedCombat)) and its maintenance resource (+0x24).
  */
@@ -80,8 +80,10 @@ export interface UnitProductionEntry {
 export interface UnitProductionRow extends UnitProductionEntry {
   unit: string;
   buildable: boolean;
-  /** the sums over the at-war players (+0x2c) and over every player (+0x30),
-   *  24.8, and per player (+0x38) */
+  /** the entry against the at-war players' units (+0x2c: their count over
+   *  the sum of each count times that type's efficiency against the entry,
+   *  the value's way; 0 with none known at war) and against every player's
+   *  (+0x30: the value), 24.8, and its sums per player (+0x38) */
   atWar: number;
   all: number;
   perPlayer(player: number): number;
@@ -139,12 +141,12 @@ export function unitProductionEntries(f: UnitProductionFacts): UnitProductionRow
     entries.push(k);
   });
   const sums = new Map<number, number>(entries.map((k) => [k, 0]));
-  const all = new Map<number, number>(entries.map((k) => [k, 0]));
-  const atWar = new Map<number, number>(entries.map((k) => [k, 0]));
+  const warSums = new Map<number, number>(entries.map((k) => [k, 0]));
   const perPlayer = new Map<number, Map<number, number>>(entries.map((k) => [k, new Map()]));
   const players = f.players ?? [];
   const eff = unitEfficiency();
   let total = 0;
+  let totalWar = 0;
   AI_UNITS.forEach((u, i) => {
     if (u.combat === 0 || f.obsolete(u.type)) return;
     if (u.pseudo && !COMBAT_PSEUDO.has(u.pseudo)) return;
@@ -153,15 +155,13 @@ export function unitProductionEntries(f: UnitProductionFacts): UnitProductionRow
     total += n;
     let w = 0;
     for (const p of players) if (f.atWar?.(p)) w += f.knownBy?.(u.type, p) ?? 0;
+    totalWar += w;
     for (const k of entries) {
       sums.set(k, sums.get(k)! + eff[i][k] * n);
-      // the choice's sums read the table's other way (the entry's row
-      // against the opposing unit's column): AI_Operation.csv's "Contract
-      // for" names the Warrior Monk against Warriors and Spearmen, the
-      // strongest; the value's way names the Scout
+      warSums.set(k, warSums.get(k)! + eff[i][k] * w);
+      // the per-player sums read the table's other way (the entry's row
+      // against the opposing unit's column)
       const e = eff[k][i];
-      all.set(k, all.get(k)! + e * n);
-      atWar.set(k, atWar.get(k)! + e * w);
       const per = perPlayer.get(k)!;
       for (const p of players) {
         const c = f.knownBy?.(u.type, p) ?? 0;
@@ -169,26 +169,30 @@ export function unitProductionEntries(f: UnitProductionFacts): UnitProductionRow
       }
     }
   });
-  if (total === 0) {
-    for (const k of entries) {
-      all.set(k, FX);
-      atWar.set(k, FX);
-    }
-  }
   return entries.map((k) => {
     const per = perPlayer.get(k)!;
     const u = AI_UNITS[k];
     let v = total === 0 ? FX : sums.get(k)! > 0 ? fdiv(total * FX, sums.get(k)!) : 0;
-    if (u.trait) v = fmul(v, UNIQUE);
+    // the at-war field: the at-war players' count over their sum, as the
+    // value over every player's (none known at war 0), the unique unit's
+    // factor and the shortfall divide on it too
+    let war = total === 0 ? FX : totalWar > 0 && warSums.get(k)! > 0 ? fdiv(totalWar * FX, warSums.get(k)!) : 0;
+    if (u.trait) {
+      v = fmul(v, UNIQUE);
+      war = fmul(war, UNIQUE);
+    }
     const res = u.tableMaintenanceResource;
     const surplus = res ? f.surplus(res) : 0;
     if (res && surplus < u.tableMaintenanceAmount) {
       const d = (u.tableMaintenanceAmount - surplus) * FX;
-      if (d > FX) v = fdiv(v, d);
+      if (d > FX) {
+        v = fdiv(v, d);
+        war = fdiv(war, d);
+      }
     }
     return {
       unit: u.type, value: v, obsolete: f.obsolete(u.type), buildable: f.buildable?.(u.type) ?? false,
-      atWar: atWar.get(k)!, all: all.get(k)!, perPlayer: (p) => (total === 0 ? FX : per.get(p) ?? 0),
+      atWar: war, all: v, perPlayer: (p) => (total === 0 ? FX : per.get(p) ?? 0),
       strength: Math.max(u.combat, u.rangedCombat),
       maintenance: res,
       maintained: !res || surplus > 0,

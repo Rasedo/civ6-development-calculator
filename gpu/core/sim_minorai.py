@@ -38,7 +38,7 @@ from .simbase import *  # noqa: F401,F403 — torch, constants, helpers: the sha
 from .sim_citytrees import (
     building_event, city_contracts, defense_event, district_event, free_slots, goals_reached,
     improvement_event, in_hand_check, pick_improvement, queue_contract, takes_turn, tick_city_trees, _cget, _cset,
-    gold_purchasable, CP_ACCEPTED, CP_COMPLETED,
+    city_tree_tables, gold_purchasable, CP_ACCEPTED, CP_COMPLETED,
 )
 from .sim_cityvalue import _FX_MIN, _SLOT_SLUSH, _SLOT_UNITS, _MinorFacts, _gold_boost_of, _t
 from .sim_research import _FX, _discounted, _fmul, _fx_const, _present_value
@@ -1480,20 +1480,23 @@ class SimMinorAi:
         StrategicResource stocked), then by the at-war players' sums, every
         player's sums and the strength, each the larger first (equal entries
         in database order): [B, R] the AI unit rows, [B, R] the entries, [B, R]
-        the entries ranked at or above 0"""
+        the entries ranked at or above 0. The table is the one its military
+        AI built as the turn opened, on the records its last turn left
+        (`_cv_tabled`)"""
         T = self._cv_tables()
         rows = T["unit_rows"]
         E = T["engine"]
         B, dev = self.B, self.device
         nu = len(rows)
-        _v, entry = f._production_table()
+        tab = self._cv_tabled[s]
+        known = tab["known"]
+        _v, entry = f._production_table(known)
         obs = f._obsolete()
-        known = self._cv_known(s)
         # the known units' counts by owner at war with the minor, the
         # barbarians always so
-        slot = self.citystate_kb_slot[:, s]
-        typ = self.citystate_kb_type[:, s].long()
-        owner = self.citystate_kb_owner[:, s].long()
+        slot = tab["slot"]
+        typ = tab["type"].long()
+        owner = tab["owner"].long()
         er = T["engine_row"].to(dev)
         arow = torch.where(typ >= 0, er.take(typ.clamp(min=0, max=er.numel() - 1)), torch.full_like(typ, -1))
         row = self._CITY_MINOR0 + s
@@ -1510,11 +1513,11 @@ class SimMinorAi:
         opp = combat & ~obs & (known > 0)
         n_all = torch.where(opp, known, torch.zeros_like(known))
         n_war = torch.where(opp, war_n, torch.zeros_like(war_n))
-        # an entry's sums read the table the other way from the value's (the
-        # entry's row against the opposing unit's column)
-        eff_t = T["eff"].to(dev).t()                              # [opposing, entry]
-        all_s = n_all @ eff_t
-        war_s = n_war @ eff_t
+        # every player's field the entry's value, the at-war one the at-war
+        # players' count over their sum the value's way (0 with none at war,
+        # 1.0 with no opposing unit at all)
+        all_s = _v
+        war_s = self._cv_unit_at_war(n_war, n_all.sum(dim=1, keepdim=True), self._cv_unit_surplus(self._CITY_MINOR0 + s))
         have_t, have_c = self.citystate_techs[:, s], self.citystate_civics[:, s]
         buildable = torch.ones(B, nu, dtype=torch.bool, device=dev)
         for k, r in enumerate(rows):
@@ -2441,8 +2444,9 @@ class _MinorWorld:
             dv = int(self.E["district"][r])
             if dv < 0:
                 return torch.ones(sim.B, dtype=torch.bool, device=sim.device)
-            # held complete and unpillaged (a pillaged one's repair it takes)
-            return ((sim.district == dv) & sim.district_complete & ~sim.district_pillaged
+            # held complete and unpillaged (a pillaged one's repair it takes),
+            # or complete on a flooded plot (no repair there)
+            return ((sim.district == dv) & sim.district_complete & (~sim.district_pillaged | sim.tile_flooded)
                     & (sim.tile_seat == self.seat)).any(dim=1)
         return self._rows_apply(row, one) | (row < 0)
 
@@ -2604,10 +2608,12 @@ class _MinorWorld:
         return lays[torch.where(imp >= 0, imp, torch.full_like(imp, len(rows)))]
 
     def builder_type(self, imp):
+        """`builderType`: the Builder's AI row whatever the improvement
+        (none named: -1), -1 where the minor trains none"""
         T = self.T
         bu = T["unit_index"].get("UNIT_BUILDER", -1)
         ok = self.f.unit_version("UNIT_BUILDER") == "UNIT_BUILDER" and bu >= 0
-        return torch.where(imp >= 0, bu if ok else -1, -1)
+        return torch.full_like(imp, bu if ok else -1)
 
     def district_tie(self, mask):
         # the game's draw 'City Build District Choice' (0x5d0c20)
@@ -2625,14 +2631,28 @@ class _MinorWorld:
                 return torch.zeros(sim.B, sim.T, dtype=torch.bool, device=sim.device)
             return sim._minor_district_plane(self.s, dv, True, False)
         out = torch.zeros_like(plot, dtype=torch.bool)
+        # the plot as it stands (Check Plot's 0x35f2d0, neither waiver
+        # passed): a removable feature the district would clear refuses it,
+        # and any resource the minor sees — a plot holding a district of the
+        # type asks neither
+        CT = city_tree_tables(sim.rules)
+        dev = sim.device
+        flat = plot.reshape(sim.B, -1)
+        fl = flat.clamp(min=0)
+        fid = sim.feat_id.gather(1, fl)
+        fr = torch.where((fid >= 0) & ~sim.feat_stripped.gather(1, fl), CT.feat_row.to(dev)[fid.clamp(min=0)], -1)
+        frc = fr.clamp(min=0)
+        clears = (fr >= 0) & CT.f_removable.to(dev)[frc] & ~CT.f_valid_district.to(dev)[frc]
+        seen = sim._res_live().gather(1, fl) & ~sim._res_hidden(sim._CITY_MINOR0 + self.s).gather(1, fl)
+        here = sim.district.gather(1, fl)
         for r in sorted(set(d.reshape(-1).tolist())):
             if r < 0:
                 continue
             pl = one(int(r))
-            flat = plot.reshape(sim.B, -1)
-            v = pl.gather(1, flat.clamp(min=0)).reshape(plot.shape)
-            # the plot of its own pillaged district takes that district's repair
             dv = int(self.E["district"][int(r)]) if int(r) < len(self.E["district"]) else -1
+            bare = (here == dv) | ~(clears | seen)
+            v = (pl.gather(1, fl) & bare).reshape(plot.shape)
+            # the plot of its own pillaged district takes that district's repair
             if dv >= 0 and flat.shape[1] > 0:
                 rep = torch.stack([sim._minor_repairs_district_at(self.s, dv, flat[:, k]) for k in range(flat.shape[1])], dim=1)
                 v = v | rep.reshape(plot.shape)

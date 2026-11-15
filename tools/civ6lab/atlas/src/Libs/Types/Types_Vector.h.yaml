@@ -896,7 +896,11 @@
     - recording: h1_duelw1124
       turn: 2
       value: Granada's Alcazar tree on plot 570's Rainforest posts Bronze Working, contract 7 at 104.0
-  impl: [cpu/core/aiCityTrees.ts:addGoalTech, gpu/core/sim_citytrees.py:_u_add_goal_tech]
+  impl:
+    - cpu/core/aiCityTrees.ts:addGoalTech
+    - gpu/core/sim_citytrees.py:_u_add_goal_tech
+    - cpu/core/aiCityTrees.ts:update
+    - gpu/core/sim_citytrees.py:want_tech
   readings:
     - "C-127: a city-state's completed unit keeps its strategic cost in the stock, reserved; a resource value's copies the stock less the reservations — READ (0x1853d0 at 0x18562c / 0x185988, 0x182b80 at 0x182bae, 0x17f3a0, 0x4a93c0), both twins; Add Goal Tech's kept contracts and execution — READ (0x7e7d20 at 0x7e7ea7..0x7e7fb2, 0x7e7200), unported"
     - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
@@ -905,6 +909,7 @@
     - "C-127: the plot test takes a removable feature for a Buildable row alone; a completion releases the research AI's other Tech Contracts — READ (0x35fd60 at 0x36079e / 0x36085d, 0xac6bb0, 0x762d60 at 0x762f7b), both twins"
     - "C-127: a contract its tree leaves is CANCELLED in the city's hand too; a Tech Contract's research test before the research AI's choice — LAB (the aimem contracts), READ (0x760980 -> 0x5f5940), both twins"
     - "C-98 / C-130 / C-96: a levied unit home with no plot dies on its minor's list; the unit term's upgrade Gold is the minor's; the pick refuses a held building under its pillaged district — READ (0x93fa10 at 0x93ff0b, 0x7cb8b0, 0x4cb350, 0x7f2970 at 0x7f3bd1), LAB (the placement's embark state, the unit term's Gold on the records), both twins"
+    - "C-127 / C-100 / C-96 / C-99: Check Plot's district test and Add Goal Tech's Goal Plot, a flooded lowland's district, the unit production table's at-war field, the pick's repair project — READ (0x7f6ea0 at 0x7f7600..0x7f7662, 0x35f2d0 at 0x35f46b..0x35f48a / 0x35f60f..0x35f81d, 0x7e7d20 at 0x7e888b..0x7e8a9d, 0x173940 at 0x173a05..0x173be1), LAB (the aiunits unit tables, the Default Specialization's project), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...0x50 over the turn limit, reset when every contract it holds is alive); Add Goal Tech 0x7e7d20 / 0x7e7200; Build Unit 0x7f4e00 / 0x7f4240; Reserve Plot 0x7f7da0 (0x5d74c0: another tr..."
@@ -952,6 +957,7 @@
     - cpu/core/minorCityAi.ts:minorTreeCity
     - gpu/core/sim_minorai.py:district_held
     - cpu/core/minorCityAi.ts:districtWhole
+    - cpu/core/minorCityAi.ts:districtDrowned
   readings:
     - "C-96: the plot analysis's owner test, Build Unit's pillaged district and a unique's install type — READ (0x5ceba7, 0x7f5112 -> 0x1aec20 / 0x1ad720), both twins"
     - "C-97: the behaviour trees — READ (the interpreter), the nodes PARTLY READ"

@@ -18,6 +18,7 @@
     - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
     - "C-99: a non-major player's tree pool — every city-state tree, its operations' and its \"Upgrade Units\" trees in one pool, ticked in slot order — READ (0x7ff9a0 / 0x7ff7b0 / 0x800c60 -> 0x7fef20, 0x7ffdd0 -> 0x7cb2e0), both twins"
+    - "C-127 / C-100 / C-96 / C-99: Check Plot's district test and Add Goal Tech's Goal Plot, a flooded lowland's district, the unit production table's at-war field, the pick's repair project — READ (0x7f6ea0 at 0x7f7600..0x7f7662, 0x35f2d0 at 0x35f46b..0x35f48a / 0x35f60f..0x35f81d, 0x7e7d20 at 0x7e888b..0x7e8a9d, 0x173940 at 0x173a05..0x173be1), LAB (the aiunits unit tables, the Default Specialization's project), both twins"
   context:
     - "- The tree manager's tick 0x7ffdd0: each tree 0x7d3a00, then 0x7cb2e0 in a loop destroys a tree whose +0x368 is set or whose +0x308 is set with its root ne..."
   review: reviewed

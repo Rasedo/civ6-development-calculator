@@ -346,15 +346,17 @@ A question the SOURCE under-determines; neither engine ships a branch until the 
   - BUILD (unit values): duels1136 the UNITS table's Trader: player 4 t64 397.54 ours 227.08, player 3 t65 550.14 ours 308.38, player 2 t100-t123 246.72 ours 0.00
   - LAB (unit production table): the military AI's unit production table (0x7989e0's +0x20 counts, the obsolete entry's hold) left on the units standing, no case telling the two apart
   - LAB (unit production table): a gone non-army COMBAT unit joining the standing-army walk below the quota (its +0x7d0 after the kill unread), a gone member's Combat as it stood and its place in the pool order
-  - LAB (unit production table): the unit production table's shortfall divide also scaling +0x30 / +0x2c (0x79a0c7..0x79a0e9), which the unit choice sorts on, ours raw
   - LAB (unit production table): duels1124 t206 city-state 4: five entries at twice the game's value (Crossbowman 21 / 10, Pikeman 23 / 11, Musketman 44 / 22, Privateer 53 / 26, Military Engineer 2 / 1), its other 50 equal; the game's other 743 tables equal (aiscore kind `unit.table`); the units held differ on 15 tables (t18 city-state 4 Warrior 5 / 4, t68 city-state 3 Warrior 0 / 1), ours counted at the upgrade step
+  - LAB (unit production table): the table's per-player field (+0x38) unread, the engines' the entry's row sums against each player's units where +0x2c and +0x30 are the value's quotient (the aiunits `unitTable`); the operations' unit choice reads the table on the records after the turn's look, the game's table built on the records its last turn left (duels1124 city-state 3 t72: the table at its end look still t71's)
   - LAB (event unit): the event unit's value past the table: the game takes the obsolete Warrior at 0 over the Field Cannon at +0.29 (t150-151) and the Trebuchet at 22, ours 25.20 under the Catapult's 25.81 (1117 Caguana t88, runs/lb1_mil1117)
   - LAB (event unit): 1128 t79 Hong Kong's event unit ours Archer, the game's Warrior (8.0), equal army records
+  - LAB (event unit): the event's unit the game's obsolete Warrior where ours holds another: duels1138 city-state 4 t55 (Heavy Chariot) and t135 / t142 / t163 (Field Cannon), 1144 city-state 4 t207 / t214 (Field Cannon) and t245 (Modern AT), 1139 city-state 3 t148 (Cuirassier)
   - BUILD (buildings and districts): RequiredPower in 0x7a67f0's negative branch, unconfirmed (h1_duelv1121 Antioch Factory residuals 3.08-12.07)
   - LAB (buildings and districts): the Sewer's housing term alternating 14.07 / 20.75 (duelv1121 p3 t187-193, T 26 / 31)
   - LAB (buildings and districts): the walls' value on runs/h1_duelw1105 t63-69 (181 vs 468.4 before the walls' threat terms were ported; the city build lab finds no PLOT ANALYSIS LOG rows for that recording to recheck it)
   - LAB (buildings and districts): CanProduce's district test
   - LAB (buildings and districts): the Free Cities' pick still asks the repair's quiet turns (their queue's refusal unported)
+  - LAB (buildings and districts): the walls' repair the game picks where ours picks none or another item: duels1144 Nalanda t54 / t59 / t87, 1145 Anshan t73 / t100, 1139 Wolin t148, 1137 Cardiff t229 (untraced)
   - LAB (picks): a 0.0 pick tie (1117 t168-214)
   - LAB (picks): 1127 Mexico City t22's cancel
   - LAB (picks): the forecast's place (1121 t18)
@@ -376,6 +378,7 @@ A question the SOURCE under-determines; neither engine ships a branch until the 
   - LAB (treasury): a minor's treasury off the record's: 1127 Muscat t163
   - LAB (treasury): a minor's treasury off the record's: 1127 Hattusa t178
   - LAB (purchases): 1128 Nazca t25 a Builder PURCHASE (0x5f3c40) ours trains
+  - LAB (purchases): unit purchases of the game ours does not make: duels1134 city-state 3 t47 a Spearman (threat 1, ours 98.9 Gold), 1146 city-state 2 t43 a Galley (ours 2.0 Gold), 1137 city-state 3 t178 a Caravel, 1146 city-state 3 t208 an AT Crew (untraced)
   - LAB (upgrades): an upgrade past an obsolete rung (1128 t110 Hong Kong's Warrior 1966081: the game's Man-at-Arms 2097159, ours a Swordsman)
   - LAB (disbands): 0x4dd270's disband count floor(S/10) against runs/bankrupt_m35's one a turn
   - LAB (disbands): a city-state's disbands: 1121 t165 / t219 a unit short of the game's
@@ -388,6 +391,7 @@ A question the SOURCE under-determines; neither engine ships a branch until the 
   - LAB (improvements): a pick no Builder lays (the Fort, the Tunnel) starts a tree that ends that turn (slot 3 a new id each turn: 1124 city-state 2 t214-218), the engines' event none
   - LAB (improvements): 1124 p3's t149 / t159 Builder tree a turn late (untraced)
   - BUILD (improvements): the GPU has no city-state builder lay (`minorBuilderLays`)
+  - LAB (improvements): the district tree's Find Available Unit (node 16) finds a free Builder and its tree holds no unit at the end look (95 of 95 looks with the node SUCCESS on duels1146 / 1139 / 1124; 1146 Kandy t138 Builder 1310723 found by Build City District 83:7, assigned to Build City Improvement 84:8): how it lets the unit go unread, the engines' Check Plot handing the district's tree no Builder type
   - LAB (envoys): a start envoy our purse cannot fund lands after the minors' turns (1128 t81 Bologna FARM@444 for PLANTATION@398)
   - LAB (route value K): the route value K, a missed meeting: 1127 t47 China / Hattusa via Hattusa's Trader to Mexico City (our Hattusa queues the Granary at t33 for the game's Trader, Value 61.4, K 2.50)
   - LAB (route value K): the route value K, a missed meeting: 1127 t61 China / Muscat as China meets Rome
@@ -400,12 +404,13 @@ A question the SOURCE under-determines; neither engine ships a branch until the 
   - LAB (route value K): the route value K x1.2 over a major's lists closed by its strategies (C-130)
   - LAB (quests): the quests' select ranges (18 draws)
   - LAB (contracts): t178 p2 a Stock Exchange contract the game has none of (seed not named)
-  - LAB (contracts): after a failed plot contract the game re-picks the same unowned district plot (1124 Granada t69, Cardiff t95)
+  - LAB (contracts): after a failed plot contract the game re-picks the same unowned district plot the next turn, ours a turn later (1124 Granada t69, Cardiff t95; duels1140 Muscat's Neighborhood on 42:18 t188 and every twelfth turn to t248, 1134 city-state 4 9:5 t190-t238, 1136 city-state 2 28:15 t191-t227, 1143 city-state 4 6:18 t206-t230, 1145 city-state 2 17:14 t208 / t242: no district tree started that turn, untraced)
   - LAB (contracts): 1121 p2 t231 / t238 / t245 the game's Market contract a turn early
   - LAB (contracts): the civics AI's walk order for a Civic Contract (kept on the civic in hand)
   - LAB (contracts): a mid-turn reveal other than the ground's sight (unread)
   - LAB (contracts): a release's status on a COMPLETED / FAILED contract
   - LAB (contracts): the release's writer (the tree's end 0x7cbb40, an operation's end, 0x7d22f0's caller) unread, the rule read off the aimem contracts (a released contract CANCELLED but a FAILED one, in the city's hand too)
+  - LAB (contracts): duels1146 Kandy from t185, its Holy Site's plot 40:12 submerged: the game's district tree places a new Holy Site (Contract 1059 t199, 1107 t207), ours holds DISTRICT_HOLY_SITE contracts t185 / t191 / t195 and none t207 / t224; its Neighborhood and Purchase Plot (37:13) contracts t174-t198 the game holds none of (untraced)
 - **C-100. CITY-STATES' PLOT AND DISTRICT VALUES.** Weight 4.
   - LAB (power): the free power's sources (ChangeFreePower 0x1ed860 from 0xafe320 / 0xaff790, the percent +0xa8) unread, the city's own renewables read for it
   - LAB (district placement): on the older recordings only (the duelz logs hold no DISTRICTS rows): 1128 Bologna t2 the Campus at 3:8 (355) for the game's 3:7 (311)
@@ -428,6 +433,8 @@ A question the SOURCE under-determines; neither engine ships a branch until the 
   - LAB (improvement rows): 1124 IMPROVEMENTS Plantation, Farm and Lumber Mill rows (about 19 each)
   - LAB (improvement rows): 1124 t91 p3 Farm rows +10.80 over the game's and t93-94 p2 Farm rows (housing / growth one-turn shifts)
   - LAB (improvement rows): 1117 Farm rows p2 t150 (+44), p4 t185-189 / t213
+  - LAB (improvement rows): duels1138 Nalanda's own pillaged Mahaviharas on 37:9 and 36:10 read FX(-9999) on their own row from t49 (a pillaged Farm's own row valued: city-state 2 t84 182.45), ours their repair: the pick the Mahavihara and a Builder contract t125-t127 / t177-t195 where the game's pick is the Fort at 52.45
+  - LAB (improvement rows): duels1146 Kumasi t176 / t202: the game lays the Mine on the Volcanic Soil 12:13 (53.38 over its Farm's 49.17) and the Farm at t180 after an eruption takes it, ours a Farm tree on 11:12 (untraced; the plot value lab's Farm and Mine rows far on t199-t230)
   - LAB (yields at the analysis): the analysis' yields a turn ahead of the record's: duelp1121 Hunza t164 Production 7 -> 4
   - LAB (yields at the analysis): the analysis' yields a turn ahead of the record's: duelp1121 Hunza t124-129 the surplus the Neighbourhood's housing reads
   - LAB (yields at the analysis): the analysis' yields a turn ahead of the record's: 1121 p3's T alternating 27 / 34
@@ -451,6 +458,7 @@ A question the SOURCE under-determines; neither engine ships a branch until the 
   - LAB (cadence and trees): duels1137 t22 city-state 4's Attack Barb Camp on 14:11 stands in ours with its two Warriors, the game's gone with the camp its knowledge base drops that turn (knowledge.camps 14:11 // none)
   - LAB (cadence and trees): duels1132 t172-175 / t179 / t188 city-state 2 holds no Naval Superiority where the game's stands on 22:20 with its Caravel (t202 the Caravel 1441798 in the game's Upgrade Units, ours no row)
   - LAB (cadence and trees): duels1135 city-state 3: t141 the game holds City Defense beside Attack Barb Camp, ours Attack Barb Camp alone; t148 ours' Attack Barb Camp is gone, the game's stands; t167 ours' stands, the game's none
+  - LAB (cadence and trees): duels1146 city-state 2 t25-t26: the tree pool frees each priority's ended trees in its own pass (0x7ffdd0 / 0x7cb2e0: City Defense's slot 7 before Build City District's 4 and Build City Improvement's 8), ours every ended slot in one pass in slot order: t26's Build City District takes slot 7 for the game's 4 and ticks after the Improvement tree on the same plot 40:12, whose Irrigation contract stands at the end look where the game's tree is gone
   - BUILD (garrison city): Garrison City's swap 0x972880
   - BUILD (garrison city): the garrison's and candidate's AI types post-swap (0x1e60f0 on +0x168)
   - LAB (nodes): Protect Units' plunder test (0x51a160 +0x48, partly)
@@ -926,6 +934,7 @@ A question the SOURCE under-determines; neither engine ships a branch until the 
   - LAB (import): the religious AI's own contract list (the religious manager's) unread
   - LAB (import): the congress table's `Winner` / `Chosen*` meaning
   - LAB (import): the river identity behind a flood's reach (GameCore_XP2 0xa2f200, against 1110 plot 697)
+  - BUILD (import): aimem reads a vector member's count x 4 bytes whatever its element (the city AI's m_reservations: 37 ints of 37 twelve-byte entries): a tree's reservation past the twelfth plot evaluation is not in the recordings, the import takes the Reserve Plot nodes and the Sequences' resumes
   - LAB (records' reads): a city centre's defence read cached against an earlier garrison (1117 Rome t20, t88, t118, t168)
   - LAB (records' reads): records only: the district defense a record reads after its garrison walked off (1127 Rome t96: 26 with no unit on the centre; the record before's garrison breaks 1118–1125 Rome)
   - LAB (records' reads): a spent Great Scientist's building row staying in its city where the building is regional (1109 t183, Watt's Factory)

@@ -475,6 +475,10 @@ class SimInit:
         # per minor in its city AI's turn, its records by AI_UNITS row as its
         # military AI's turn counted them (`CityState.armyCounted`)
         self._cv_counted: dict[int, torch.Tensor] = {}
+        # per minor to the end of its army's turn, the same records for the
+        # table its city's purchases read: the counts and each record's slot,
+        # type and owner (`CityState.armyTabled`)
+        self._cv_tabled: dict[int, dict[str, torch.Tensor]] = {}
         # per minor in its AI turn, its city's yields (the total [B, 6], the
         # attribute base [B, 6]) as its City Analysis read them as the turn
         # opened: its analysis' reads take both, its government values the

@@ -188,6 +188,21 @@ class CityTreeTables:
         k = max([len(x["harvestTechs"]) for x in ress] + [1])
         self.r_harvest_tech = torch.tensor([[self.tech_code.get(t, -2) if t else -1 for t in x["harvestTechs"]]
                                             + [-1] * (k - len(x["harvestTechs"])) for x in ress], dtype=torch.long)
+        # the Goal Plot alone: per feature row whether a district stands on
+        # it unremoved; per resource row the technologies of the
+        # improvements working it (its Improvement_ValidResources rows in
+        # the database's order, -1 none) and whether its feature goes (no
+        # such row, or the last a MustRemoveFeature one)
+        self.f_valid_district = torch.tensor([bool(f["validDistrictPlacement"]) for f in feats], dtype=torch.bool)
+        i_of = {r["type"]: r for r in imps}
+
+        def worker_tech(w):
+            t = i_of.get(w[0], {}).get("tech")
+            return self.tech_code.get(t, -2) if t else -1
+        k = max([len(x["workers"]) for x in ress] + [1])
+        self.r_worker_tech = torch.tensor([[worker_tech(w) for w in x["workers"]] + [-1] * (k - len(x["workers"])) for x in ress],
+                                          dtype=torch.long)
+        self.r_clears = torch.tensor([not x["workers"] or bool(x["workers"][-1][1]) for x in ress], dtype=torch.bool)
         self.event_types = list(cb["cityEventTypes"])
         self.event_lists = cb["cityEventLists"]
         self.trees = {name: _Tree(name, rows) for name, rows in cb["cityTrees"].items()}
@@ -991,6 +1006,24 @@ def _goal_of(c: _Ctx, i: int):
         clear = on & (fi >= 0) & ~keeps & ~T.i_feat_ok.to(dev)[r, fc]
         fail = fail | (clear & ~T.f_removable.to(dev)[fc])
         want_tech(T.f_remove_tech.to(dev)[fc], clear & T.f_removable.to(dev)[fc])
+    # the Goal Plot alone (0x7e888b..0x7e8a9d), whatever the items: the
+    # technology of each improvement working the resource the seat sees
+    # there; and, with no such resource or its last row a MustRemoveFeature
+    # one, a removable feature's RemoveTech
+    gp = c.tag(i, "Goal Plot to work")
+    on = (gp != NONE) & (gp >= 0)
+    if bool(on.any()):
+        dev = gp.device
+        fe, re = w.plot_ground(torch.where(on, gp, 0))
+        fi = torch.where(fe >= 0, T.feat_row.to(dev)[fe.clamp(min=0)], -1)
+        ri = torch.where(re >= 0, T.res_row.to(dev)[re.clamp(min=0)], -1)
+        rc, fc = ri.clamp(min=0), fi.clamp(min=0)
+        has_r = on & (ri >= 0)
+        wt = T.r_worker_tech.to(dev)[rc]
+        for k in range(wt.shape[1]):
+            want_tech(wt[:, k], has_r)
+        goes = on & (fi >= 0) & (~has_r | T.r_clears.to(dev)[rc]) & T.f_removable.to(dev)[fc]
+        want_tech(T.f_remove_tech.to(dev)[fc], goes)
     t = c.tag(i, "Desired Techs")
     t_l = (t != NONE) & ~_b(w.tech_held(torch.where(t == NONE, -1, t)), t)
     tech = torch.where((tech == NONE) & t_l, t, tech)
@@ -1067,22 +1100,26 @@ def _u_check_plot(c: _Ctx, i: int, at: torch.Tensor) -> torch.Tensor:
     p = torch.where(none, 0, plot)
     d = c.tag(i, "Building Districts")
     has_d = d != NONE
-    d_ok = _b(w.can_place_district(p, torch.where(has_d, d, -1)), p)
     imp = c.tag(i, "Building Improvements")
     has_i = imp != NONE
     imp_r = torch.where(has_i, imp, -1)
+    # the Builder type first: none FAILS an improvement's check and is an
+    # ERROR without one
     builder = _l(w.builder_type(imp_r), p)
-    ok_b = has_i & (builder >= 0)
-    go = at & ~none & ~has_d & ok_b
-    c.set_tag(i, "Builder List", builder, go)
+    ok_b = builder >= 0
+    go = at & ~none & (has_d | has_i) & ok_b
+    # a district's check hands its tree no Builder type (`checkPlot`)
+    c.set_tag(i, "Builder List", builder, go & has_i)
     c.set_tag(i, "Plot To Move", p, go)
-    i_ok = _b(w.can_improve(p, imp_r), p)
+    d_ok = has_d & _b(w.can_place_district(p, torch.where(has_d, d, -1)), p)
+    i_ok = has_i & ~d_ok & _b(w.can_improve(p, imp_r), p)
     # an impassable plot taking it: the Builder's plot beside it
     c.set_tag(i, "Plot To Move", _l(w.builder_plot(p), p), go & i_ok)
     imp_on, feat_on, res_on = w.plot_standing(p)
-    c.set_tag(i, "Resource Harvesting", 1, go & ~i_ok & ~imp_on & ~feat_on & res_on)
-    st = torch.where(has_d, torch.where(d_ok, BT_SUCCESS, BT_FAILURE),
-                     torch.where(ok_b & i_ok, BT_SUCCESS, BT_FAILURE))
+    c.set_tag(i, "Resource Harvesting", 1, go & ~d_ok & ~i_ok & ~imp_on & ~feat_on & res_on)
+    st = torch.where(d_ok | i_ok, BT_SUCCESS, BT_FAILURE)
+    st = torch.where(ok_b, st, torch.where(has_i, BT_FAILURE, BT_ERROR))
+    st = torch.where(has_d | has_i, st, BT_FAILURE)
     return torch.where(none, BT_FAILURE, st)
 
 

@@ -536,6 +536,7 @@
     - "H-1: the civics AI — READ (the choice, the walk, the propagation), PARTLY READ (the value)"
     - "C-130: Market Economy's per-destination-resource route analyzers — READ (0x6b2aa0, 0x6b44d0, 0x6c89b0, 0x6c87a0, 0x1f71b0's viewer), both twins"
     - "C-130: the pillage analyzers, the Favor grant's and the extra accumulation's analyzers, CITY_HAS_DISTRICT's evaluator, the Luxury Policy's players — READ (0x6b7ec0, 0x6b92c0, 0x6c2f90, 0x6ae390, 0x6d3d50), both twins"
+    - "C-127 / C-100 / C-96 / C-99: Check Plot's district test and Add Goal Tech's Goal Plot, a flooded lowland's district, the unit production table's at-war field, the pick's repair project — READ (0x7f6ea0 at 0x7f7600..0x7f7662, 0x35f2d0 at 0x35f46b..0x35f48a / 0x35f60f..0x35f81d, 0x7e7d20 at 0x7e888b..0x7e8a9d, 0x173940 at 0x173a05..0x173be1), LAB (the aiunits unit tables, the Default Specialization's project), both twins"
   notes:
     - ".claude/scratchpad/st1/reading.md: ...to the total, at 1 into the   inner ring; a feature within 2 counted; a resource the player sees   (0x4ab4b0) counted by its plot's amount, and at distance 1 one the player   holds none of (0x4aa790, ownershi..."
   context:

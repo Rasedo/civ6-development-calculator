@@ -2239,6 +2239,26 @@
     - "- \"NameManager::GetUnitNamePart\" (0x328760) is called only through 0x327d50 / 0x327de0 from the behaviour tree — \"HL: Rock Band Mo..."
     - "- \"NameManager::GetUnitNamePart\" (0x328760, via 0x327d50 / 0x327de0): the AI's log names (\"HL: Rock Band Move\" 0x710f40, CITY_ASSA..."
   review: reviewed
+- addr: 0x32f250
+  final: 0x2363e0
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-127 / C-100 / C-96 / C-99: Check Plot's district test and Add Goal Tech's Goal Plot, a flooded lowland's district, the unit production table's at-war field, the pick's repair project — READ (0x7f6ea0 at 0x7f7600..0x7f7662, 0x35f2d0 at 0x35f46b..0x35f48a / 0x35f60f..0x35f81d, 0x7e7d20 at 0x7e888b..0x7e8a9d, 0x173940 at 0x173a05..0x173be1), LAB (the aiunits unit tables, the Default Specialization's project), both twins"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - ...ete district's enemy unit refusal (+0x29) in the queue; the placement test's first set (0x32f250 / 0x3306f0, the National Parks'); the player's valid-feature counts (0x408ce0 / 0x408f4...
+  review: imported
+- addr: 0x3306f0
+  final: 0x237830
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-127 / C-100 / C-96 / C-99: Check Plot's district test and Add Goal Tech's Goal Plot, a flooded lowland's district, the unit production table's at-war field, the pick's repair project — READ (0x7f6ea0 at 0x7f7600..0x7f7662, 0x35f2d0 at 0x35f46b..0x35f48a / 0x35f60f..0x35f81d, 0x7e7d20 at 0x7e888b..0x7e8a9d, 0x173940 at 0x173a05..0x173be1), LAB (the aiunits unit tables, the Default Specialization's project), both twins"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - ...t's enemy unit refusal (+0x29) in the queue; the placement test's first set (0x32f250 / 0x3306f0, the National Parks'); the player's valid-feature counts (0x408ce0 / 0x408f40); Check...
+  review: imported
 - addr: 0x3338d0
   final: 0x23a2e0
   kind: function
@@ -2820,7 +2840,9 @@
       turn: 3
       value: "Checked on the recorded ties: 1126 turn 3 (996 and   1041 tie at 52, the log's ranges 2 / 2, the game's pick 996), 1117 turn 8   (687 alone, range 1, where n1 + n2 tied it with 766), 1128 turn 5."
   impl: [cpu/core/barbarians.ts:campGround]
-  readings: ["H-1: the barbarians' turn (0x1514a0) — READ (the max camps and the sight LAB)"]
+  readings:
+    - "H-1: the barbarians' turn (0x1514a0) — READ (the max camps and the sight LAB)"
+    - "C-127 / C-100 / C-96 / C-99: Check Plot's district test and Add Goal Tech's Goal Plot, a flooded lowland's district, the unit production table's at-war field, the pick's repair project — READ (0x7f6ea0 at 0x7f7600..0x7f7662, 0x35f2d0 at 0x35f46b..0x35f48a / 0x35f60f..0x35f81d, 0x7e7d20 at 0x7e888b..0x7e8a9d, 0x173940 at 0x173a05..0x173be1), LAB (the aiunits unit tables, the Default Specialization's project), both twins"
   context:
     - "...), camp terrain and feature, no resource at all (0x35fd60 is asked for player -1, and 0x5112f0 hands player -1 every resource: 1118, 1119, 1123 and 1128 t1 drop exactly their Coal, H..."
     - "...(0x50b180 over +0x4a0), camp terrain / feature, NO resource (0x35fd60 for player −1; 0x5112f0 gives −1 every resource: 1118, 1119, 1123, 1128 t1), no major city within 3, no camp wi..."
@@ -4134,6 +4156,7 @@
     - "C-96: CanTrain's obsolescence and the contract purchase's refusal"
     - "C-96 / C-130: the build step asks CanConstruct of every building at the queue's head — READ (0x16f050 at 0x16f09a..0x16f180, 0x17f070, 0x17e8d0, 0x5f6050's building branch), the city-states' step, both twins"
     - "C-96 / C-130 / C-127 / C-100: a building's modifier-made yields, the walls' threat terms and CanConstruct's walls prerequisite, a regional building's cities, the game state's lock and the yields the AI's jobs read, a city tree's priority — READ (0x18e570's tables, 0x7a7590 at 0x7a826c..0x7a87f3 and 0x7a9044..0x7a91ee, 0x170450 at 0x170644..0x170716, 0x7a4d40 at 0x7a5182..0x7a51d9, 0x608870 at 0x60889e..0x6089e6, 0x1cb8b0, 0x7cb230), both twins"
+    - "C-127 / C-100 / C-96 / C-99: Check Plot's district test and Add Goal Tech's Goal Plot, a flooded lowland's district, the unit production table's at-war field, the pick's repair project — READ (0x7f6ea0 at 0x7f7600..0x7f7662, 0x35f2d0 at 0x35f46b..0x35f48a / 0x35f60f..0x35f81d, 0x7e7d20 at 0x7e888b..0x7e8a9d, 0x173940 at 0x173a05..0x173be1), LAB (the aiunits unit tables, the Default Specialization's project), both twins"
   context:
     - "...0 runs each city's listener 0x5d6050 in city order: a city that may take it (vt +0x98 0x5f6050) lists it (+0x3a8), logs its SUBMITTED line, and clears its production (0x175d10) where..."
   review: reviewed
@@ -7028,6 +7051,17 @@
     - "- THE HANDLERS (dispatcher 0x7cbca0, ids by 0x7db850, @d5b198 unnamed): Operation Move 0x81a130 / 0x816cb0; Attack Units 0x80ecf0 / 0x80ceb0..."
     - ...D MILITARY IMPROVEMENT 0x7e9b10 (+0xed0, +0x160, +0x108 & 0x40, +0x34, 0x35ede0). Names 0x7db850 (@f2eeb0..), handlers 0x7cbca0.
   review: reviewed
+- addr: 0x7e6810
+  final: 0x54ecc0
+  kind: function
+  semantics: "the insertion sort of Add Goal Tech's 12-byte entries: the third word descending, then the second ascending, stable."
+  status: PARTLY
+  readings:
+    - "C-127 / C-100 / C-96 / C-99: Check Plot's district test and Add Goal Tech's Goal Plot, a flooded lowland's district, the unit production table's at-war field, the pick's repair project — READ (0x7f6ea0 at 0x7f7600..0x7f7662, 0x35f2d0 at 0x35f46b..0x35f48a / 0x35f60f..0x35f81d, 0x7e7d20 at 0x7e888b..0x7e8a9d, 0x173940 at 0x173a05..0x173be1), LAB (the aiunits unit tables, the Default Specialization's project), both twins"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...0) set, a Removable feature's RemoveTech the player lacks. The list's sort (0x7e7080 -> 0x7e6810): the third word descending, then the second ascending, stable; the goal plot's entries..."
+  review: imported
 - addr: 0x7e7080
   final: 0x54f530
   kind: function
@@ -7038,6 +7072,7 @@
       value: the lists (desired techs / civics, items' prerequisites, a resource's   harvest tech, a feature's RemoveTech), sorted 0x7e7080, the first posted   (runs/h1_duelw1124 Granada t2 Bronze Working).
   readings:
     - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
+    - "C-127 / C-100 / C-96 / C-99: Check Plot's district test and Add Goal Tech's Goal Plot, a flooded lowland's district, the unit production table's at-war field, the pick's repair project — READ (0x7f6ea0 at 0x7f7600..0x7f7662, 0x35f2d0 at 0x35f46b..0x35f48a / 0x35f60f..0x35f81d, 0x7e7d20 at 0x7e888b..0x7e8a9d, 0x173940 at 0x173a05..0x173be1), LAB (the aiunits unit tables, the Default Specialization's project), both twins"
   context:
     - ...ivics, items' prerequisites, a resource's harvest tech, a feature's RemoveTech), sorted 0x7e7080, the first posted (runs/h1_duelw1124 Granada t2 Bronze Working). A tech contract is pos...
   review: imported
@@ -7503,6 +7538,7 @@
     - "C-99: a non-major player's tree pool — every city-state tree, its operations' and its \"Upgrade Units\" trees in one pool, ticked in slot order — READ (0x7ff9a0 / 0x7ff7b0 / 0x800c60 -> 0x7fef20, 0x7ffdd0 -> 0x7cb2e0), both twins"
     - "C-123 / C-110: the barbarians' rules run as the first job of their AI turn start, after the DoTurn tail; a centre a player that is no major may not raze keeps its last hit point — READ (0x6096c0 at 0x6097af..0x609802, 0x608870, 0x7280a0, 0x1514a0, 0x14d25d; 0x248800, 0x533e50, 0x206080 at 0x206868..0x2068c8, 0x20dd30, 0x1fdea0 at 0x1fe098..0x1fe0ab), both twins"
     - "C-123 / C-110: the barbarians' rules run as the first job of their AI turn start, after the DoTurn tail; a centre a player that is no major may not raze keeps its last hit point; a melee blow on a district that would fell both sides — READ (0x6096c0 at 0x6097af..0x609802, 0x608870, 0x7280a0, 0x1514a0, 0x14d25d; 0x248800, 0x533e50, 0x206080 at 0x206684..0x206715 and 0x206868..0x2068c8, 0x20dd30, 0x1fdea0 at 0x1fe098..0x1fe0ab), both twins"
+    - "C-127 / C-100 / C-96 / C-99: Check Plot's district test and Add Goal Tech's Goal Plot, a flooded lowland's district, the unit production table's at-war field, the pick's repair project — READ (0x7f6ea0 at 0x7f7600..0x7f7662, 0x35f2d0 at 0x35f46b..0x35f48a / 0x35f60f..0x35f81d, 0x7e7d20 at 0x7e888b..0x7e8a9d, 0x173940 at 0x173a05..0x173be1), LAB (the aiunits unit tables, the Default Specialization's project), both twins"
   context:
     - "...is empty, then TryPurchaseUnits 0x68be60 over the city's units; the tree manager's tick 0x7ffdd0; tactical). A city founded during the turn exists for C only: the Default Specializatio..."
     - "- The tree manager's tick 0x7ffdd0: each tree 0x7d3a00, then 0x7cb2e0 in a loop destroys a tree whose +0x368 is set or who..."

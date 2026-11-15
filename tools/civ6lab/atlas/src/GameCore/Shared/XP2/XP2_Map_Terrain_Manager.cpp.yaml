@@ -39,6 +39,28 @@
   context:
     - "...iredPower +0x28 > 0 -> 0x7a67f0 of -RequiredPower; BlocksCoastalFlooding +0x48 bit 1 -> 0xa39110 over the XP2 terrain manager's lowland list (+0xb0; entries of 0x20 bytes: +0 the level..."
   review: reviewed
+- addr: 0xa39c20
+  final: 0x7392a0
+  kind: function
+  semantics: the XP2 terrain manager's instance (its +0xb0 the flooded plots' set).
+  status: PARTLY
+  readings:
+    - "C-127 / C-100 / C-96 / C-99: Check Plot's district test and Add Goal Tech's Goal Plot, a flooded lowland's district, the unit production table's at-war field, the pick's repair project — READ (0x7f6ea0 at 0x7f7600..0x7f7662, 0x35f2d0 at 0x35f46b..0x35f48a / 0x35f60f..0x35f81d, 0x7e7d20 at 0x7e888b..0x7e8a9d, 0x173940 at 0x173a05..0x173be1), LAB (the aiunits unit tables, the Default Specialization's project), both twins"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...OWLAND (0x35f2d0 at 0x35f46b..0x35f48a): the plot in the terrain manager's flooded set (0xa39c20 +0xb0, 0xa3a0f0; the Lua IsFlooded's) takes no district; CanConstruct of a district the..."
+  review: imported
+- addr: 0xa3a0f0
+  final: 0x739290
+  kind: function
+  semantics: "a plot index stands in the set (the flooded lowlands': the placement test 0x35f2d0 and a held district's CanConstruct 0x173940 refuse it; the Lua IsFlooded's)."
+  status: PARTLY
+  readings:
+    - "C-127 / C-100 / C-96 / C-99: Check Plot's district test and Add Goal Tech's Goal Plot, a flooded lowland's district, the unit production table's at-war field, the pick's repair project — READ (0x7f6ea0 at 0x7f7600..0x7f7662, 0x35f2d0 at 0x35f46b..0x35f48a / 0x35f60f..0x35f81d, 0x7e7d20 at 0x7e888b..0x7e8a9d, 0x173940 at 0x173a05..0x173be1), LAB (the aiunits unit tables, the Default Specialization's project), both twins"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...at 0x35f46b..0x35f48a): the plot in the terrain manager's flooded set (0xa39c20 +0xb0, 0xa3a0f0; the Lua IsFlooded's) takes no district; CanConstruct of a district the city holds co..."
+  review: imported
 - addr: 0xa3a210
   final: 0x7393c0
   kind: function

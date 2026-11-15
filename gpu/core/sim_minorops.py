@@ -563,15 +563,14 @@ class SimMinorOps:
         n_war = torch.zeros(B, nu + 1, dtype=torch.long, device=dev)
         n_war.scatter_add_(1, torch.where(war, rec["row"], torch.full_like(rec["row"], nu)), war.long())
         n_war = n_war[:, :nu]
+        # every player's field the entry's value, the at-war one the at-war
+        # players' count over their sum the value's way (0 with none at war)
+        s_all, _e = self._cv_unit_production(cache["version"].unsqueeze(0).expand(B, -1), obsolete, listed, own, n_all,
+                                             self._cv_unit_surplus(srow))
         opp = cache["combat"].unsqueeze(0) & ~obsolete & (n_all > 0)
         n_all = torch.where(opp, n_all, torch.zeros_like(n_all))
         n_war = torch.where(opp, n_war, torch.zeros_like(n_war))
-        eff_t = T["eff"].to(dev).t()                                  # [opposing, entry]
-        s_all, s_war = n_all @ eff_t, n_war @ eff_t
-        # no opposing unit at all: every entry's sums read 1.0 (0x7997bd)
-        none = (n_all.sum(dim=1) == 0).unsqueeze(1)
-        s_all = torch.where(none, torch.full_like(s_all, 256), s_all)
-        s_war = torch.where(none, torch.full_like(s_war, 256), s_war)
+        s_war = self._cv_unit_at_war(n_war, n_all.sum(dim=1, keepdim=True), self._cv_unit_surplus(srow))
         return {"entry": entry, "obsolete": obsolete, "buildable": buildable, "maintained": maintained,
                 "all": s_all, "war": s_war,
                 "strength": cache["strength"].unsqueeze(0).expand(B, -1)}

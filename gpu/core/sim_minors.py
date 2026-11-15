@@ -100,6 +100,11 @@ class SimMinors:
             ran = self.citystate_ai_on[:, s].clone()
             self._minor_trade_list(s, alive & ran & (self.citystate_center[:, s] >= 0))
             self._cv_counted[s] = self._cv_known(s)
+            # the table its city's purchases read keeps the same records past
+            # the look
+            self._cv_tabled[s] = {"known": self._cv_counted[s], "slot": self.citystate_kb_slot[:, s].clone(),
+                                  "type": self.citystate_kb_type[:, s].clone(),
+                                  "owner": self.citystate_kb_owner[:, s].clone()}
             # its city's yields and growth as its City Analysis reads them as
             # its AI turn opens, before its Economic AI's purchases and free
             # Trader's dispatch and its update's Food focus
@@ -137,6 +142,7 @@ class SimMinors:
             # before its army's walk and its second hook's tree tick
             self._detect_minor_boosts(s, alive)
             self._minor_tactics(s)
+            del self._cv_tabled[s]
             # its Traders step on their routes after its units' turn
             # (`minorPhase`)
             self._minor_trade(s)

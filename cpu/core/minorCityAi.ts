@@ -551,6 +551,14 @@ function minorTreeCity(state: GameState, cs: CityState, facts: CityBuildFacts, t
     return !!id && (cs.districts ?? []).some((x) => x.type === id && state.map.tiles[x.tileIndex].districtComplete
       && !state.map.tiles[x.tileIndex].districtPillaged);
   };
+  // the city holds the district complete on a flooded plot: no repair
+  // (CanConstruct 0x173940 at 0x173aa7..0x173ae7: the plot in the terrain
+  // manager's flooded set refuses it for good)
+  const districtDrowned = (d: string): boolean => {
+    const id = engineId('district', d, 'DISTRICT_', DISTRICTS);
+    return !!id && (cs.districts ?? []).some((x) => x.type === id && state.map.tiles[x.tileIndex].districtComplete
+      && !!state.map.tiles[x.tileIndex].flooded);
+  };
   return {
     id: city.id, name: cs.name, underThreat: minorUnderThreat(cs, threat),
     current: currentItem(cs),
@@ -564,7 +572,7 @@ function minorTreeCity(state: GameState, cs: CityState, facts: CityBuildFacts, t
       const id = engineId('building', b, 'BUILDING_', BUILDINGS);
       return !id || ((cs.buildings ?? []).includes(id) && !buildingPillaged(cs, id));
     },
-    districtBlocked: (d) => !engineId('district', d, 'DISTRICT_', DISTRICTS) || districtWhole(d),
+    districtBlocked: (d) => !engineId('district', d, 'DISTRICT_', DISTRICTS) || districtWhole(d) || districtDrowned(d),
     canTrain: (u) => pf.canTrain(u),
     trainsSea: facts.trainsDomain('DOMAIN_SEA'),
     buildTurns: (c) => facts.buildTurns(c.unit ?? c.building ?? c.district ?? ''),
@@ -662,8 +670,18 @@ function minorTreeWorld(state: GameState, cs: CityState, ai: CityAi, city: CityT
     canPlaceDistrict: (plot, d) => {
       const id = engineId('district', d, 'DISTRICT_', DISTRICTS) as DistrictId | null;
       if (!id) return false;
+      const tile = state.map.tiles[plot];
       // the plot of its own pillaged district takes that district's repair
-      if (state.map.tiles[plot].district === id && minorRepairsDistrictAt(state, cs, plot)) return true;
+      if (tile.district === id && minorRepairsDistrictAt(state, cs, plot)) return true;
+      // the plot as it stands (0x35f2d0 from Check Plot, neither waiver
+      // passed): a removable feature the district would clear refuses it
+      // (0x35f773..0x35f7b0), and any resource the minor sees (0x35f7c0..0x35f7de)
+      // — a plot holding the district it placed asks neither
+      if (tile.district !== id) {
+        const g = plotGroundOf(state, cs.seat, plot);
+        const f = g.feature ? FEATURE_ROW.get(g.feature) : undefined;
+        if ((f?.removable && !f.validDistrictPlacement) || g.resource) return false;
+      }
       return canPlaceDistrictIn(state, minorCity(cs), id, plot, { unlocks: null, ownsTile: (t) => tileSeat(t) === cs.seat }).ok;
     },
     plotOwner: (plot) => tileSeat(state.map.tiles[plot]),
@@ -772,15 +790,17 @@ export function minorContractCity(state: GameState, cs: CityState): CityTreeCity
  *  sorted as 0x79d3a0 sorts it — the buildable first (`unitBuildable`: its
  *  prerequisites held, its StrategicResource stocked, so a city-state that
  *  trains a Horseman without Horses still lists it after every unit it
- *  holds the means of), then by the at-war
- *  players' sums (the barbarians at war with it, as for the favoured
- *  technology: runs/h1_duely1124 Granada t72 the Quadrireme over the
- *  Catapult, every player's sums 4457 against 5668, the at-war 854 against
- *  811), every player's sums and the strength, each the larger
- *  first (equal entries in database order) */
+ *  holds the means of), then by its value against the at-war players'
+ *  units (+0x2c; the barbarians at war with it: runs/h1_duels1146 Kumasi
+ *  t48, four barbarian Galleys known: the Warrior Monk 564, the Galley 256,
+ *  the Heavy Chariot 224 ... the Builder and the Battering Ram 2, as its
+ *  table holds them), its value (+0x30) and the strength, each the larger
+ *  first (equal entries in database order). The table is the one its
+ *  military AI built as the turn opened, on the records its last turn left
+ *  (`CityState.armyTabled`) */
 function purchaseEntries(state: GameState, cs: CityState): PurchaseEntry[] {
   const r = cs.research;
-  const records = cs.armyKnown ?? [];
+  const records = cs.armyTabled ?? [];
   const known = new Map<string, number>();
   const by = new Map<string, number>();
   for (const rec of records) {

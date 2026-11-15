@@ -223,6 +223,11 @@ export function submergeTile(state: GameState, tile: Tile): void {
     const city = citiesOf(state, tile.ownerSeat).find((c) => c.id === tile.ownerCity);
     if (city) city.districts = city.districts.filter((d) => d.tileIndex !== tile.index);
   }
+  if (tile.district) {
+    for (const cs of state.cityStates ?? []) {
+      if (cs.districts?.some((d) => d.tileIndex === tile.index)) cs.districts = cs.districts.filter((d) => d.tileIndex !== tile.index);
+    }
+  }
   const extracted = tile.improvement && !tile.pillaged ? tile.resource : null;
   tile.submerged = true;
   tile.terrain = 'COAST';

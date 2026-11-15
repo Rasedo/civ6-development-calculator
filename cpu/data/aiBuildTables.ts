@@ -23564,6 +23564,12 @@ export const AI_RESOURCES: readonly AiResourceRow[] = [
   "peakEra": null,
   "units": [],
   "projects": [],
+  "workers": [
+   [
+    "IMPROVEMENT_PLANTATION",
+    false
+   ]
+  ],
   "harvests": [
    [
     "YIELD_FOOD",
@@ -23588,6 +23594,12 @@ export const AI_RESOURCES: readonly AiResourceRow[] = [
   "peakEra": null,
   "units": [],
   "projects": [],
+  "workers": [
+   [
+    "IMPROVEMENT_PASTURE",
+    false
+   ]
+  ],
   "harvests": [
    [
     "YIELD_FOOD",
@@ -23612,6 +23624,12 @@ export const AI_RESOURCES: readonly AiResourceRow[] = [
   "peakEra": null,
   "units": [],
   "projects": [],
+  "workers": [
+   [
+    "IMPROVEMENT_MINE",
+    true
+   ]
+  ],
   "harvests": [
    [
     "YIELD_GOLD",
@@ -23636,6 +23654,12 @@ export const AI_RESOURCES: readonly AiResourceRow[] = [
   "peakEra": null,
   "units": [],
   "projects": [],
+  "workers": [
+   [
+    "IMPROVEMENT_FISHING_BOATS",
+    true
+   ]
+  ],
   "harvests": [
    [
     "YIELD_GOLD",
@@ -23660,6 +23684,12 @@ export const AI_RESOURCES: readonly AiResourceRow[] = [
   "peakEra": null,
   "units": [],
   "projects": [],
+  "workers": [
+   [
+    "IMPROVEMENT_CAMP",
+    false
+   ]
+  ],
   "harvests": [
    [
     "YIELD_PRODUCTION",
@@ -23684,6 +23714,12 @@ export const AI_RESOURCES: readonly AiResourceRow[] = [
   "peakEra": null,
   "units": [],
   "projects": [],
+  "workers": [
+   [
+    "IMPROVEMENT_FISHING_BOATS",
+    false
+   ]
+  ],
   "harvests": [
    [
     "YIELD_FOOD",
@@ -23708,6 +23744,12 @@ export const AI_RESOURCES: readonly AiResourceRow[] = [
   "peakEra": null,
   "units": [],
   "projects": [],
+  "workers": [
+   [
+    "IMPROVEMENT_FARM",
+    false
+   ]
+  ],
   "harvests": [
    [
     "YIELD_FOOD",
@@ -23732,6 +23774,12 @@ export const AI_RESOURCES: readonly AiResourceRow[] = [
   "peakEra": null,
   "units": [],
   "projects": [],
+  "workers": [
+   [
+    "IMPROVEMENT_PASTURE",
+    false
+   ]
+  ],
   "harvests": [
    [
     "YIELD_FOOD",
@@ -23756,6 +23804,12 @@ export const AI_RESOURCES: readonly AiResourceRow[] = [
   "peakEra": null,
   "units": [],
   "projects": [],
+  "workers": [
+   [
+    "IMPROVEMENT_QUARRY",
+    false
+   ]
+  ],
   "harvests": [
    [
     "YIELD_PRODUCTION",
@@ -23780,6 +23834,12 @@ export const AI_RESOURCES: readonly AiResourceRow[] = [
   "peakEra": null,
   "units": [],
   "projects": [],
+  "workers": [
+   [
+    "IMPROVEMENT_FARM",
+    true
+   ]
+  ],
   "harvests": [
    [
     "YIELD_FOOD",
@@ -23804,6 +23864,12 @@ export const AI_RESOURCES: readonly AiResourceRow[] = [
   "peakEra": null,
   "units": [],
   "projects": [],
+  "workers": [
+   [
+    "IMPROVEMENT_PLANTATION",
+    false
+   ]
+  ],
   "harvests": [],
   "harvestTechs": [],
   "yields": [
@@ -23821,6 +23887,12 @@ export const AI_RESOURCES: readonly AiResourceRow[] = [
   "peakEra": null,
   "units": [],
   "projects": [],
+  "workers": [
+   [
+    "IMPROVEMENT_PLANTATION",
+    false
+   ]
+  ],
   "harvests": [],
   "harvestTechs": [],
   "yields": [
@@ -23838,6 +23910,12 @@ export const AI_RESOURCES: readonly AiResourceRow[] = [
   "peakEra": null,
   "units": [],
   "projects": [],
+  "workers": [
+   [
+    "IMPROVEMENT_PLANTATION",
+    false
+   ]
+  ],
   "harvests": [],
   "harvestTechs": [],
   "yields": [
@@ -23855,6 +23933,12 @@ export const AI_RESOURCES: readonly AiResourceRow[] = [
   "peakEra": null,
   "units": [],
   "projects": [],
+  "workers": [
+   [
+    "IMPROVEMENT_PLANTATION",
+    false
+   ]
+  ],
   "harvests": [],
   "harvestTechs": [],
   "yields": [
@@ -23872,6 +23956,12 @@ export const AI_RESOURCES: readonly AiResourceRow[] = [
   "peakEra": null,
   "units": [],
   "projects": [],
+  "workers": [
+   [
+    "IMPROVEMENT_MINE",
+    false
+   ]
+  ],
   "harvests": [],
   "harvestTechs": [],
   "yields": [
@@ -23889,6 +23979,12 @@ export const AI_RESOURCES: readonly AiResourceRow[] = [
   "peakEra": null,
   "units": [],
   "projects": [],
+  "workers": [
+   [
+    "IMPROVEMENT_PLANTATION",
+    false
+   ]
+  ],
   "harvests": [],
   "harvestTechs": [],
   "yields": [
@@ -23906,6 +24002,12 @@ export const AI_RESOURCES: readonly AiResourceRow[] = [
   "peakEra": null,
   "units": [],
   "projects": [],
+  "workers": [
+   [
+    "IMPROVEMENT_CAMP",
+    false
+   ]
+  ],
   "harvests": [],
   "harvestTechs": [],
   "yields": [
@@ -23927,6 +24029,12 @@ export const AI_RESOURCES: readonly AiResourceRow[] = [
   "peakEra": null,
   "units": [],
   "projects": [],
+  "workers": [
+   [
+    "IMPROVEMENT_QUARRY",
+    false
+   ]
+  ],
   "harvests": [],
   "harvestTechs": [],
   "yields": [
@@ -23948,6 +24056,12 @@ export const AI_RESOURCES: readonly AiResourceRow[] = [
   "peakEra": null,
   "units": [],
   "projects": [],
+  "workers": [
+   [
+    "IMPROVEMENT_PLANTATION",
+    false
+   ]
+  ],
   "harvests": [],
   "harvestTechs": [],
   "yields": [
@@ -23965,6 +24079,12 @@ export const AI_RESOURCES: readonly AiResourceRow[] = [
   "peakEra": null,
   "units": [],
   "projects": [],
+  "workers": [
+   [
+    "IMPROVEMENT_CAMP",
+    false
+   ]
+  ],
   "harvests": [],
   "harvestTechs": [],
   "yields": [
@@ -23986,6 +24106,12 @@ export const AI_RESOURCES: readonly AiResourceRow[] = [
   "peakEra": null,
   "units": [],
   "projects": [],
+  "workers": [
+   [
+    "IMPROVEMENT_MINE",
+    true
+   ]
+  ],
   "harvests": [],
   "harvestTechs": [],
   "yields": [
@@ -24003,6 +24129,12 @@ export const AI_RESOURCES: readonly AiResourceRow[] = [
   "peakEra": null,
   "units": [],
   "projects": [],
+  "workers": [
+   [
+    "IMPROVEMENT_QUARRY",
+    false
+   ]
+  ],
   "harvests": [],
   "harvestTechs": [],
   "yields": [
@@ -24020,6 +24152,12 @@ export const AI_RESOURCES: readonly AiResourceRow[] = [
   "peakEra": null,
   "units": [],
   "projects": [],
+  "workers": [
+   [
+    "IMPROVEMENT_MINE",
+    true
+   ]
+  ],
   "harvests": [],
   "harvestTechs": [],
   "yields": [
@@ -24037,6 +24175,12 @@ export const AI_RESOURCES: readonly AiResourceRow[] = [
   "peakEra": null,
   "units": [],
   "projects": [],
+  "workers": [
+   [
+    "IMPROVEMENT_FISHING_BOATS",
+    true
+   ]
+  ],
   "harvests": [],
   "harvestTechs": [],
   "yields": [
@@ -24054,6 +24198,12 @@ export const AI_RESOURCES: readonly AiResourceRow[] = [
   "peakEra": null,
   "units": [],
   "projects": [],
+  "workers": [
+   [
+    "IMPROVEMENT_MINE",
+    true
+   ]
+  ],
   "harvests": [],
   "harvestTechs": [],
   "yields": [
@@ -24075,6 +24225,12 @@ export const AI_RESOURCES: readonly AiResourceRow[] = [
   "peakEra": null,
   "units": [],
   "projects": [],
+  "workers": [
+   [
+    "IMPROVEMENT_PLANTATION",
+    false
+   ]
+  ],
   "harvests": [],
   "harvestTechs": [],
   "yields": [
@@ -24092,6 +24248,12 @@ export const AI_RESOURCES: readonly AiResourceRow[] = [
   "peakEra": null,
   "units": [],
   "projects": [],
+  "workers": [
+   [
+    "IMPROVEMENT_MINE",
+    true
+   ]
+  ],
   "harvests": [],
   "harvestTechs": [],
   "yields": [
@@ -24109,6 +24271,12 @@ export const AI_RESOURCES: readonly AiResourceRow[] = [
   "peakEra": null,
   "units": [],
   "projects": [],
+  "workers": [
+   [
+    "IMPROVEMENT_PLANTATION",
+    false
+   ]
+  ],
   "harvests": [],
   "harvestTechs": [],
   "yields": [
@@ -24126,6 +24294,12 @@ export const AI_RESOURCES: readonly AiResourceRow[] = [
   "peakEra": null,
   "units": [],
   "projects": [],
+  "workers": [
+   [
+    "IMPROVEMENT_PLANTATION",
+    false
+   ]
+  ],
   "harvests": [],
   "harvestTechs": [],
   "yields": [
@@ -24143,6 +24317,12 @@ export const AI_RESOURCES: readonly AiResourceRow[] = [
   "peakEra": null,
   "units": [],
   "projects": [],
+  "workers": [
+   [
+    "IMPROVEMENT_PLANTATION",
+    false
+   ]
+  ],
   "harvests": [],
   "harvestTechs": [],
   "yields": [
@@ -24160,6 +24340,12 @@ export const AI_RESOURCES: readonly AiResourceRow[] = [
   "peakEra": null,
   "units": [],
   "projects": [],
+  "workers": [
+   [
+    "IMPROVEMENT_PLANTATION",
+    false
+   ]
+  ],
   "harvests": [],
   "harvestTechs": [],
   "yields": [
@@ -24177,6 +24363,12 @@ export const AI_RESOURCES: readonly AiResourceRow[] = [
   "peakEra": null,
   "units": [],
   "projects": [],
+  "workers": [
+   [
+    "IMPROVEMENT_CAMP",
+    false
+   ]
+  ],
   "harvests": [],
   "harvestTechs": [],
   "yields": [
@@ -24194,6 +24386,12 @@ export const AI_RESOURCES: readonly AiResourceRow[] = [
   "peakEra": null,
   "units": [],
   "projects": [],
+  "workers": [
+   [
+    "IMPROVEMENT_FISHING_BOATS",
+    true
+   ]
+  ],
   "harvests": [],
   "harvestTechs": [],
   "yields": [
@@ -24215,6 +24413,12 @@ export const AI_RESOURCES: readonly AiResourceRow[] = [
   "peakEra": null,
   "units": [],
   "projects": [],
+  "workers": [
+   [
+    "IMPROVEMENT_PLANTATION",
+    false
+   ]
+  ],
   "harvests": [],
   "harvestTechs": [],
   "yields": [
@@ -24236,6 +24440,7 @@ export const AI_RESOURCES: readonly AiResourceRow[] = [
   "peakEra": null,
   "units": [],
   "projects": [],
+  "workers": [],
   "harvests": [],
   "harvestTechs": [],
   "yields": [],
@@ -24248,6 +24453,7 @@ export const AI_RESOURCES: readonly AiResourceRow[] = [
   "peakEra": null,
   "units": [],
   "projects": [],
+  "workers": [],
   "harvests": [],
   "harvestTechs": [],
   "yields": [],
@@ -24260,6 +24466,7 @@ export const AI_RESOURCES: readonly AiResourceRow[] = [
   "peakEra": null,
   "units": [],
   "projects": [],
+  "workers": [],
   "harvests": [],
   "harvestTechs": [],
   "yields": [],
@@ -24272,6 +24479,7 @@ export const AI_RESOURCES: readonly AiResourceRow[] = [
   "peakEra": null,
   "units": [],
   "projects": [],
+  "workers": [],
   "harvests": [],
   "harvestTechs": [],
   "yields": [],
@@ -24284,6 +24492,7 @@ export const AI_RESOURCES: readonly AiResourceRow[] = [
   "peakEra": null,
   "units": [],
   "projects": [],
+  "workers": [],
   "harvests": [],
   "harvestTechs": [],
   "yields": [],
@@ -24296,6 +24505,7 @@ export const AI_RESOURCES: readonly AiResourceRow[] = [
   "peakEra": null,
   "units": [],
   "projects": [],
+  "workers": [],
   "harvests": [],
   "harvestTechs": [],
   "yields": [],
@@ -24315,6 +24525,12 @@ export const AI_RESOURCES: readonly AiResourceRow[] = [
    "UNIT_JET_BOMBER"
   ],
   "projects": [],
+  "workers": [
+   [
+    "IMPROVEMENT_MINE",
+    false
+   ]
+  ],
   "harvests": [],
   "harvestTechs": [],
   "yields": [
@@ -24336,6 +24552,12 @@ export const AI_RESOURCES: readonly AiResourceRow[] = [
    "UNIT_BRAZILIAN_MINAS_GERAES"
   ],
   "projects": [],
+  "workers": [
+   [
+    "IMPROVEMENT_MINE",
+    false
+   ]
+  ],
   "harvests": [],
   "harvestTechs": [],
   "yields": [
@@ -24364,6 +24586,12 @@ export const AI_RESOURCES: readonly AiResourceRow[] = [
    "UNIT_ETHIOPIAN_OROMO_CAVALRY"
   ],
   "projects": [],
+  "workers": [
+   [
+    "IMPROVEMENT_PASTURE",
+    false
+   ]
+  ],
   "harvests": [],
   "harvestTechs": [],
   "yields": [
@@ -24401,6 +24629,12 @@ export const AI_RESOURCES: readonly AiResourceRow[] = [
    "UNIT_BYZANTINE_TAGMA"
   ],
   "projects": [],
+  "workers": [
+   [
+    "IMPROVEMENT_MINE",
+    true
+   ]
+  ],
   "harvests": [],
   "harvestTechs": [],
   "yields": [
@@ -24428,6 +24662,12 @@ export const AI_RESOURCES: readonly AiResourceRow[] = [
    "UNIT_SULEIMAN_JANISSARY"
   ],
   "projects": [],
+  "workers": [
+   [
+    "IMPROVEMENT_MINE",
+    false
+   ]
+  ],
   "harvests": [],
   "harvestTechs": [],
   "yields": [
@@ -24460,6 +24700,16 @@ export const AI_RESOURCES: readonly AiResourceRow[] = [
    "UNIT_MODERN_ARMOR"
   ],
   "projects": [],
+  "workers": [
+   [
+    "IMPROVEMENT_OIL_WELL",
+    false
+   ],
+   [
+    "IMPROVEMENT_OFFSHORE_OIL_RIG",
+    false
+   ]
+  ],
   "harvests": [],
   "harvestTechs": [],
   "yields": [
@@ -24482,6 +24732,12 @@ export const AI_RESOURCES: readonly AiResourceRow[] = [
    "PROJECT_BUILD_NUCLEAR_DEVICE",
    "PROJECT_BUILD_THERMONUCLEAR_DEVICE"
   ],
+  "workers": [
+   [
+    "IMPROVEMENT_MINE",
+    false
+   ]
+  ],
   "harvests": [],
   "harvestTechs": [],
   "yields": [
@@ -24499,6 +24755,7 @@ export const AI_RESOURCES: readonly AiResourceRow[] = [
   "peakEra": null,
   "units": [],
   "projects": [],
+  "workers": [],
   "harvests": [],
   "harvestTechs": [],
   "yields": [],
@@ -24511,6 +24768,7 @@ export const AI_RESOURCES: readonly AiResourceRow[] = [
   "peakEra": null,
   "units": [],
   "projects": [],
+  "workers": [],
   "harvests": [],
   "harvestTechs": [],
   "yields": [],
@@ -24523,6 +24781,16 @@ export const AI_RESOURCES: readonly AiResourceRow[] = [
   "peakEra": null,
   "units": [],
   "projects": [],
+  "workers": [
+   [
+    "IMPROVEMENT_FISHING_BOATS",
+    true
+   ],
+   [
+    "IMPROVEMENT_MINE",
+    false
+   ]
+  ],
   "harvests": [],
   "harvestTechs": [],
   "yields": [
@@ -24540,6 +24808,12 @@ export const AI_RESOURCES: readonly AiResourceRow[] = [
   "peakEra": null,
   "units": [],
   "projects": [],
+  "workers": [
+   [
+    "IMPROVEMENT_PLANTATION",
+    false
+   ]
+  ],
   "harvests": [],
   "harvestTechs": [],
   "yields": [
@@ -24561,6 +24835,12 @@ export const AI_RESOURCES: readonly AiResourceRow[] = [
   "peakEra": null,
   "units": [],
   "projects": [],
+  "workers": [
+   [
+    "IMPROVEMENT_FISHING_BOATS",
+    false
+   ]
+  ],
   "harvests": [],
   "harvestTechs": [],
   "yields": [
@@ -24578,6 +24858,12 @@ export const AI_RESOURCES: readonly AiResourceRow[] = [
   "peakEra": null,
   "units": [],
   "projects": [],
+  "workers": [
+   [
+    "IMPROVEMENT_FARM",
+    true
+   ]
+  ],
   "harvests": [
    [
     "YIELD_GOLD",
@@ -24602,6 +24888,12 @@ export const AI_RESOURCES: readonly AiResourceRow[] = [
   "peakEra": null,
   "units": [],
   "projects": [],
+  "workers": [
+   [
+    "IMPROVEMENT_CAMP",
+    false
+   ]
+  ],
   "harvests": [],
   "harvestTechs": [],
   "yields": [

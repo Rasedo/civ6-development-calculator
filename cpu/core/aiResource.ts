@@ -47,6 +47,9 @@ export interface AiResourceRow {
   units: readonly string[];
   /** the projects whose PrereqResource it is (Resources +0xd0) */
   projects: readonly string[];
+  /** its Improvement_ValidResources rows in the database's order (Resources
+   *  +0xa8): [ImprovementType, MustRemoveFeature] */
+  workers: readonly (readonly [string, boolean])[];
   /** Resource_Harvests and Resource_YieldChanges: [YieldType, amount] */
   harvests: readonly (readonly [string, number])[];
   /** each Resource_Harvests row's PrereqTech, null none */
