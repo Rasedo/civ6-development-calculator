@@ -792,6 +792,7 @@
     - cpu/core/minorBuild.ts:minorCompleteNow
     - gpu/core/sim_minors.py:_minor_complete_now
     - cpu/core/minorBuild.ts:cities
+    - cpu/core/minorBuild.ts:completionLeft
   readings:
     - "H-1: every draw of a player's start (witnesses, RandCalls.csv)"
     - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
@@ -799,6 +800,7 @@
     - "H-1: a city-state's boost completion and the research AI — READ"
     - "C-127: a boost completion's turns left; a minor Builder's clearing lump"
     - "C-127: a boost completion's turns left; a minor Builder's clearing lump"
+    - "C-130 / C-98: a completion with no pick leaves the research AI's in-hand turns at 0; a seated specialist keeps a pillaged district's slot — READ (0x762d60 at 0x762d96, 0x763020 at 0x7630e4 / 0x7632ad), FIT (the district slot), both twins"
   context:
     - "...es: a city-state whose research or civic completed picks the next (\"BT Research Choice\" 0x763020: the AI plan's tech, no draw, else ONE uniform draw over every researchable tech; \"Rand..."
     - "...t (+0x4d0, data +0x58) written only by its turn (0x7609d7) and its completion's choice (0x7630ec), each 0x4ca120: the turns left on the research in hand; the analysis reads the value b..."

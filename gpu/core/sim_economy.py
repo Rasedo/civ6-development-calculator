@@ -7300,7 +7300,7 @@ class SimEconomy:
         standing buildings but the pillaged ones, dark while the district is
         incomplete or pillaged and zero for a district type that seats no
         specialist; `seated`: the slots a pinned citizen keeps, a pillaged
-        building's too (`citySpecialistSlots`)."""
+        building's and a pillaged district's too (`citySpecialistSlots`)."""
         if sl is None:
             sl = slice(0, self.RC)
         B = self.B
@@ -7310,7 +7310,9 @@ class SimEconomy:
             bldg = bldg & ~self._building_pillaged(row, sl)
         dreg = self.city_dist_tile[:, row, sl]
         dflat = dreg.clamp(min=0).reshape(B, -1)
-        dlive = (dreg >= 0) & self.district_complete.gather(1, dflat).reshape_as(dreg) & ~self.district_pillaged.gather(1, dflat).reshape_as(dreg)
+        dlive = (dreg >= 0) & self.district_complete.gather(1, dflat).reshape_as(dreg)
+        if not seated:
+            dlive = dlive & ~self.district_pillaged.gather(1, dflat).reshape_as(dreg)
         gate = dlive & self._spec_any.reshape(1, 1, -1) & alive.unsqueeze(2)
         return (bldg.double() @ self._b_dist_oh).long() * gate.long()
 

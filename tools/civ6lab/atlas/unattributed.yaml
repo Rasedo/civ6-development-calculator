@@ -5132,6 +5132,7 @@
     - "C-130 / C-112: the domain strength's treasury carry and the city's turn's citizen re-place — READ, both twins"
     - "C-127: a boost completion's turns left; a minor Builder's clearing lump"
     - "C-98: the research bank with nothing in hand; a city-state's unit cost under Mercenary Companies"
+    - "C-130 / C-98: a completion with no pick leaves the research AI's in-hand turns at 0; a seated specialist keeps a pillaged district's slot — READ (0x762d60 at 0x762d96, 0x763020 at 0x7630e4 / 0x7632ad), FIT (the district slot), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ...ct Manager's check 0x7f2220 sets FAILED past the turn limit through the holder +0xa8 (0x731d10), removes it from the tree (0x7d22f0) and releases it (0x600b00); a city's list +0x3a8...

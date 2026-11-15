@@ -90,6 +90,9 @@
     - recording: h1_duelw1128
       turn: 105
       value: "Xi'an: the Shrine pillaged t104, the district's specialist kept, Faith 5; China's turn re-places it (t106: Faith 3)"
+    - recording: h1_duelq1121
+      turn: 226
+      value: "Hunza: its district on 187 pillaged in t225, record 226 still working it at 20 Gold and banking so (Triangular Trade 87.0 at t227); re-placed off it in its t226 turn (record 227)"
     - recording: 1128
       turn: 105
       value: "Recorded: 1128 Xi'an t105, the barbarians' UNITOPERATION_PILLAGE on the   Holy Site at t104, the Shrine pillaged, the record's worked plots keep the   district's specialist and the city's Faith 5 = 1 "
@@ -102,6 +105,7 @@
     - "H-1: the citizen manager's placement and the yield flags — READ"
     - "H-1: a pillaged building's specialist, the centre's defence, three moments — READ"
     - "C-112: the full re-place keeps the forced citizens — READ (0x196440, 0x1956b0, 0x197230), both twins"
+    - "C-130 / C-98: a completion with no pick leaves the research AI's in-hand turns at 0; a seated specialist keeps a pillaged district's slot — READ (0x762d60 at 0x762d96, 0x763020 at 0x7630e4 / 0x7632ad), FIT (the district slot), both twins"
   context:
     - ...= x - floor(y/2) + dq, y' = y + dr, x' = q + floor(y'/2), x wrapped), the plot's capacity 0x195940 (0 on the centre, 0 where no yield is above 0, a district's specialist slots, else 1) les...
     - "- A plot's capacity (0x195940) counts a district's specialist slots as its row's base (+0x54 behind +0x50) plus each..."

@@ -649,9 +649,9 @@ export function minorResearchBank(state: GameState, r: ResearchState, seat: numb
     delete r.techRetained[cur];
     minorTechGained(state, seat);
     r.tech = null;
-    takeChoice(r, researchCompletionChoice(state, seat, r.aiEntries ?? researchAnalysis(state, seat, science, terms()?.tech, contracts), cur,
+    const took = takeChoice(r, researchCompletionChoice(state, seat, r.aiEntries ?? researchAnalysis(state, seat, science, terms()?.tech, contracts), cur,
       researchDraw(state), contracts));
-    r.aiLeft = researchInHandLeft(state, seat, r, fxOf(science));
+    r.aiLeft = completionLeft(state, seat, r, took, fxOf(science));
     if (cur === URBAN_DEFENSES_TECH) urban();
     // the boosts it triggers land at once, before the Culture banks
     if (seat !== FREE_SEAT) boostOnResearch(state, seat, cur);
@@ -795,10 +795,21 @@ function minorTechGained(state: GameState, seat: number): void {
 }
 
 /** the research AI's choice taken: its research and its goal */
-function takeChoice(r: ResearchState, c: ResearchChoice | null): void {
-  if (!c) return;
+function takeChoice(r: ResearchState, c: ResearchChoice | null): boolean {
+  if (!c) return false;
   selectResearch(r, c.tech);
   r.goal = c.goal;
+  return true;
+}
+
+/** the research AI's turns left on the research in hand after a completion
+ *  (+0x528): the completion zeroes it (0x762d60 at 0x762d96), the choice
+ *  writes the turns left on its pick (0x763020 at 0x7630e4 / 0x7632ad), no
+ *  pick leaves 0 — runs/h1_duelq1127 city-state 3 t92: Apprenticeship
+ *  completed with no pick, Castles read at its analysis' 10 turns, Limes
+ *  27.0 as logged */
+function completionLeft(state: GameState, seat: number, r: ResearchState, took: boolean, rate: number): number {
+  return took ? researchInHandLeft(state, seat, r, rate) : 0;
 }
 
 /** A city-state's or the Free Cities' item COMPLETED outside its research
@@ -841,17 +852,17 @@ export function minorCompleteNow(state: GameState, seat: number, id: string): vo
     r.tech = null;
     r.techProgress = 0;
   }
-  if (r.aiEntries) takeChoice(r, researchCompletionChoice(state, seat, r.aiEntries, id, researchDraw(state),
+  const took = !!r.aiEntries && takeChoice(r, researchCompletionChoice(state, seat, r.aiEntries, id, researchDraw(state),
     cs ? minorTechContracts(cs) : []));
   if (cs) techContractsCompleted(cs, id);
   if (!r.aiEntries) return;
-  // the choice writes the turns left on its pick at the player's Science
-  // (0x763020 at 0x7630e4), which the next city build analysis reads
-  // (runs/h1_duely1124 Cardiff t60: Engineering boosted complete, Horseback
-  // Riding's 1 turn beside Apprenticeship's 41 values the Industrial Zone)
+  // the turns left on its pick at the player's Science, which the next city
+  // build analysis reads (runs/h1_duely1124 Cardiff t60: Engineering boosted
+  // complete, Horseback Riding's 1 turn beside Apprenticeship's 41 values
+  // the Industrial Zone)
   const cities = cs ? [minorCity(cs)] : (seatOf(state, seat) as { cities?: City[] }).cities ?? [];
   const science = cities.reduce((n, c) => n + computeCityStats(state, c).total.science, 0);
-  r.aiLeft = researchInHandLeft(state, seat, r, fxOf(science));
+  r.aiLeft = completionLeft(state, seat, r, took, fxOf(science));
 }
 
 /** the civics AI's choice joins the queue's back (0x626600 on PlayerCulture

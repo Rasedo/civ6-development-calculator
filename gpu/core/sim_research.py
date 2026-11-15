@@ -940,7 +940,14 @@ class SimResearch:
         self.citystate_ai_score[:, s] = torch.where(keep, score, self.citystate_ai_score[:, s])
         pick, goal = self._rai_choice(s, fire, (turns, nxt, base, score, owned), done)
         self._rai_take(s, pick, goal)
-        self.citystate_ai_left[:, s] = torch.where(fire, self._rai_left(s, sci), self.citystate_ai_left[:, s])
+        self._rai_completion_left(s, fire, pick, sci)
+
+    def _rai_completion_left(self, s: int, fire: torch.Tensor, pick: torch.Tensor, sci: torch.Tensor) -> None:
+        """`completionLeft` where `fire` [B]: the completion zeroes the turns
+        left on the research in hand (0x762d60), the choice writes them on
+        its pick (`pick` >= 0), no pick leaves 0"""
+        left = torch.where(pick >= 0, self._rai_left(s, sci), torch.zeros_like(pick))
+        self.citystate_ai_left[:, s] = torch.where(fire, left, self.citystate_ai_left[:, s])
 
     def _rai_turn(self, s: int, alive: torch.Tensor, sci: torch.Tensor) -> None:
         """the turn's analysis (kept) and its choice (`researchTurnChoice`):

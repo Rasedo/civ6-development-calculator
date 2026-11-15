@@ -60,7 +60,7 @@ Hand-weighted 1–8 by the size of what is LEFT to build. One row per entry, no 
 | C-128 city-states' units, formations and stacking | 3 | a re-made levied unit's jump on four seeds, the swap pair, formation size and the Corps rules, the turn-end stacking check, a teleport off a shared plot (LAB) |
 | C-129 the knowledge bases and operations' strength | 3 | the army memory's misses over full games, the military AI's turn against the job order, district-only city entries, the hidden-unit test (LAB); ops.strength's enemy and own-team terms (LAB) |
 | C-98 city-states' research and civic values | 3 | the Free Cities' terms and a civilization's religious unit value, Add Goal Tech's block (BUILD); goal techs, civics short, resource values, the unit term's misses, late picks (LAB) |
-| C-130 city-states' policy and government analyzers | 4 | card values off by a term (Limes, Conscription, Civil Prestige, Logistics, Totalitarianism), the six-unit cut, the yields' cache and Hunza t226, the Archaeologist's count, unread offsets (LAB) |
+| C-130 city-states' policy and government analyzers | 4 | card values off by a term (Limes' Tsikhe turns, Civil Prestige, Logistics, Totalitarianism), the six-unit cut, the yields' cache, the Archaeologist's count, unread offsets (LAB) |
 | C-101 religious pressure and spread | 2 | Kandy's 8, a Missionary's 250, a unit's spread, rules read off the records alone (LAB); the condemnation's +0x80 / +0x18c3, the holy city's DED_EXODUS (BUILD) |
 | C-102 loyalty and identity | 2 | the age flags, "Other" terms (Aquileia, Hunza, Wuhan), the dominance count on 1129 / 1130, the falloff, a cached population (LAB) |
 | C-103 wonders' unported effects | 2 | Kilwa, Terracotta Army, Amundsen-Scott, Torre de Belém, the Panama Canal and Golden Gate Bridge, Ik Kil (BUILD); Meenakshi's Gurus, Huey Teocalli, Kilwa's coast, Pamukkale (LAB) |
@@ -598,13 +598,9 @@ A question the SOURCE under-determines; neither engine ships a branch until the 
   - LAB (card values): 1124 t245 Bologna Suffrage −3
   - LAB (card values): Civil Prestige 1127 p3 t159 / t160 (154 / 127 for 150 / 126: the Amenity term 124 for 126 and the Housing 30 for 24 on the city's yields at the job; Limes, Retainers, Liberalism t159 124 for 127 / 126 / 126)
   - LAB (card values): 1127 city-state 3 t62-63 policies, research and civics (Ilkum 0 / 1, Limes 0 / 12, Civil Prestige 76 / 74, Military Tactics +7.4, Civil Service +2) carried from the t61 border draw (C-107)
-  - LAB (limes): 1127 p3 t92 Limes 31 for 27: Castles' turns read at 10 plus the research in hand's left, nothing in hand at its research AI's turn (Apprenticeship completed at the bank, ours 10 - 1), the game's value fitting 10 (0x7610e0 compares the live GetResearchingTech, Military Engineering chosen that turn, and adds +0x528, the turn start's GetTurnsLeft: the term that gives 10 unread)
-  - LAB (limes): 1124 p3 t167-170 Limes 88 / 85 / 87 / 89 for 85 / 87 / 84 / 87 (the Tsikhe's turns at the city's Production, untraced)
+  - LAB (limes): 1124 p3 t167-170 Limes 88 / 85 / 87 / 89 for 85 / 87 / 84 / 87 on the Tsikhe alone: ours at T0 / T1 30 / 15, 29 / 15, 28 / 14, 25 / 13, the game's values fitting 29 / 15, 28 / 14, 27 / 14, 28 / 14 (Granada's Encampment pillaged t166-167; its Production at the policy job untraced)
   - LAB (six-unit cut): 1121 Hunza t194 six units a turn early
-  - LAB (six-unit cut): the six-unit cut counting a bankrupt disband's units the turn after (1128 Bologna t133)
-  - LAB (six-unit cut): 1128 p3 t133 Conscription 22 for 36, Gunpowder / Metal Casting 40 under, the turn after its t132 bankrupt disband (9 units in ours and record 133, the game's value fitting about 15)
   - LAB (yields at the job): fit, unread: the city yields' cache (0x1cb8b0, per yield, cleared at the lock's first count only): the totals but Food and Production, the bases but Food kept from the Trader's dispatch through the update's re-placement, on 1124 Bologna t218-230 / 1128 Bologna t16-30, each yield's first reader unread
-  - LAB (yields at the job): 1121 Hunza t226 the citizen placement at the bank (the record works 187, 20 Gold; ours 15.2), its Gold boost a turn early: t227 Triangular Trade / E-Commerce / Liberalism / Civil Prestige 121 / 173 / 102 / 300 for 87 / 131 / 96 / 294, Globalization +42 at t228
   - LAB (yields at the job): a project begun at 0 converting an unrecorded overflow (1121 Hunza t85)
   - LAB (archaeologist): the Archaeologist's artifact count read as the map's dig sites: the active player's revealing civic inside its own actions is not laid early (1124 city-state 3 t171 424.3 for 433.8)
   - LAB (archaeologist): the Archaeologist's artifact count: an excavated site's entry unread
@@ -717,6 +713,7 @@ A question the SOURCE under-determines; neither engine ships a branch until the 
   - LAB (amenities): where GameEffects re-tests a requirement (the turn end and the next unit move both fit; 0xc7ede0 / 0xc7f640)
   - LAB (amenities): 1117 t84 Xi'an's amenityParts[2] 1 -> 2 with no garrison on the record's plots
   - BUILD (production): a Builder's wonder charge under a wonder percent: 1121 Xi'an t38 Pyramids +18.0703 (4626/256) under Autocracy's +10% for 0.15 x 110 = 16.5 (duelw1105 Chengdu Pyramids +18.1, Oracle +23.9; 1104 Great Library +32.9), most charges a flat 15% (`wonderChargeBoost`)
+  - LAB (specialists): fit, unread: a citizen already on a district's specialist slot keeps it and is paid when the district is pillaged (`citySpecialistSlots` seated / `_city_spec_slots`; 0x195940 counts slots for a placement alone; the one case duelq1121 Hunza t226 plot 187, 20 Gold), every player's cities
 - **C-107. BORDERS AND CULTURE CLAIMS.** Weight 2.
   - LAB (border count): a captured city's border count counts the plot gained on the capture turn (1110 Rome 5, 10, 17; 1114 the Free City of Rome 10, 17, 26)
   - LAB (border count): the importer counts a claim the turn's culture outran by the next plot joining alone, unbought in the log (1117 Handan t103; city.borderCost 172 → 24 over 1116–1118)

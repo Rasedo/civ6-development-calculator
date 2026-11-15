@@ -14615,3 +14615,36 @@ copy (`barbarianAi`, cpu/harness/replay.ts). GPU `_tac_enter`'s `rel` /
   never revealed: the game steps to 7:10 and stops with Movement left,
   then holds 8:11 a whole turn; ours walks 3 plots on the path found
   once.
+
+## C-130 / C-98: a completion with no pick leaves the research AI's in-hand turns at 0; a seated specialist keeps a pillaged district's slot — READ (0x762d60 at 0x762d96, 0x763020 at 0x7630e4 / 0x7632ad), FIT (the district slot), both twins
+
+- RULE (the research AI's +0x528, the turns 0x7610e0 adds to a row whose
+  walk does not lead through the research in hand): a completion (0x762d60)
+  writes 0 to it first (0x731d10 on +0x4d0 at 0x762d96); its choice
+  (0x763020) writes GetTurnsLeft (0x4ca120) on a pick, at 0x7630e4 for the
+  best row's next step and 0x7632ad for the random pick; no pick (the goal
+  unowned, 0x763143..0x763166) leaves the 0. The turn (0x760980) writes
+  GetTurnsLeft at its start (0x7609cf) and its choice on a pick as above.
+  Engines: `completionLeft` (cpu/core/minorBuild.ts, from
+  `minorResearchBank` and `minorCompleteNow`), `_rai_completion_left`
+  (gpu/core/sim_research.py, from `_rai_completion` and
+  `_minor_completion_choice`).
+- CONFIRMED: runs/h1_duelq1127 city-state 3 t92: Apprenticeship completed at
+  the bank, no pick, Military Engineering taken by the turn; its policy jobs
+  read Castles at the analysis' 10 turns (the research in hand none, +0x528
+  0): Limes 27.0 as logged, 31 on the -1 GetTurnsLeft gives with none in
+  hand. t91 (Apprenticeship picked at the completion, 15 + 1) and t93
+  (Stirrups, 9 + 1) unchanged.
+- RULE (fit, read off the records): a citizen seated on a district's slot
+  keeps it when the district is pillaged, as one on a pillaged building's
+  slot does (0x195940 counts the slots only for a placement): its yields pay
+  until a re-placement moves it. `citySpecialistSlots` seated /
+  `_city_spec_slots(seated=True)` no longer drop a pillaged district.
+- CONFIRMED: runs/h1_duelq1121 Hunza t226: its district on 187 pillaged in
+  t225, record 226 still working it at 20 Gold; banked at 20, its net income
+  positive, no Economic AI Gold boost at t227: Triangular Trade / Liberalism
+  / E-Commerce / Civil Prestige 87 / 96 / 131 / 294 at t227 and
+  Globalization 994.7 at t228 as logged (15.2 banked before: 121 / 102 /
+  173 / 300, 1036.7).
+- OPEN: whether a placement (0x195940) refuses a pillaged district's slots
+  (the engines refuse them; unread).

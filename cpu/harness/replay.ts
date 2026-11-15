@@ -6110,12 +6110,19 @@ function perTurnWorld(ctx: Ctx, a: TurnRecord, imp: Imported, history: History, 
     const o = state.cityStates.find((x) => x.id === cs.id);
     if (o) seatPair(o, cs, true);
   }
-  unlistTurnLosses(a, a.turn - 1, new Map([...was].map(([k, u]) => [u.id, k] as const)), world.cityStates,
+  // the record's units of the last pair: those standing at its end and those
+  // its record took off (`Ctx.gone`)
+  const lastPair = [...was, ...ctx.gone];
+  unlistTurnLosses(a, a.turn - 1, new Map(lastPair.map(([k, u]) => [u.id, k] as const)), world.cityStates,
     new Set(world.units.map((u) => u.id)));
   // a unit the pair's engine made that no record unit stands for was never
   // on the game's list (runs/h1_duely1121 t116: an engine-only Trader of
-  // city-state 4, its t117 City Analysis on the record's five units)
-  const recorded = new Set([...was.values()].map((u) => u.id));
+  // city-state 4, its t117 City Analysis on the record's five units); one
+  // the record took off after every player's turn stays on it
+  // (runs/h1_duelq1128 t132: city-state 3's two Men-at-Arms the Phlegraean
+  // Fields' eruption killed, its Conscription 36.0 and Gunpowder 281.1 at
+  // t133 on them)
+  const recorded = new Set(lastPair.map(([, u]) => u.id));
   for (const cs of world.cityStates) {
     for (const id of Object.keys(cs.unitsListed ?? {}).map(Number)) if (!recorded.has(id)) delete cs.unitsListed![id];
   }

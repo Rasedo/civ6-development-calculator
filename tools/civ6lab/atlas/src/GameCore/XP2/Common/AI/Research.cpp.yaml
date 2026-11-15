@@ -64,6 +64,7 @@
     - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
     - "C-130: the city update's Default Specialization on an empty queue, before the civics AI's turn; the dig sites a major's civic lays before the minors' turns — READ (0x5ce8f0, 0x6096c0's +0x370 list, CultureAI +0x208), both twins"
     - "C-127: a contract its tree leaves is CANCELLED in the city's hand too; a Tech Contract's research test before the research AI's choice — LAB (the aimem contracts), READ (0x760980 -> 0x5f5940), both twins"
+    - "C-130 / C-98: a completion with no pick leaves the research AI's in-hand turns at 0; a seated specialist keeps a pillaged district's slot — READ (0x762d60 at 0x762d96, 0x763020 at 0x7630e4 / 0x7632ad), FIT (the district slot), both twins"
   context:
     - "...h the research in hand — a tracked int (+0x4d0, data +0x58) written only by its turn (0x7609d7) and its completion's choice (0x7630ec), each 0x4ca120: the turns left on the research..."
     - "- THE TURN, 0x760980: contracts (0x761980 adds a contract's value to the score), the propagation, then: with..."
@@ -119,6 +120,7 @@
     - "C-96: the improvement value — READ (0x7a58f0, 0x7b1320's yields, the feature removal 0x7a3010, the harvest 0x7a37d0, the build unit 0x7a2e20), PARTLY READ (the hazards' turns, 0x7b1320's tourism, defence, claimed plots, modifiers and neighbours terms), unwired"
     - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
     - "C-96: the improvement value — READ (0x7a58f0, 0x7b1320's yields, tourism and modifiers, the feature removal 0x7a3010, the harvest 0x7a37d0, the build unit 0x7a2e20, EFFECT_ADJUST_CITY_FREE_POWER), PARTLY READ (the hazards' turns, 0x7b1320's defence, claimed plots and neighbours terms)"
+    - "C-130 / C-98: a completion with no pick leaves the research AI's in-hand turns at 0; a seated specialist keeps a pillaged district's slot — READ (0x762d60 at 0x762d96, 0x763020 at 0x7630e4 / 0x7632ad), FIT (the district slot), both twins"
   notes:
     - ".claude/scratchpad/cb/notes.txt: ...8 projects, +0x40 units.  building (non-wonder) only at city centre plot; turns r12 = max(techTurns 0x7610e0, civicTurns 0x621920) + prereq district turns(+10 if not current) + build turns 0x17b1e0 (+10 if [r..."
   context:
@@ -234,7 +236,12 @@
     - recording: 1124
       turn: 6
       value: "- A COMPLETION, 0x762d60 (the completed row): the propagation once more on   the entries as they stand, then the choice with the row as the key   (1124 t6: minors 2 and 3 pass Writing, Currency and Ir"
+    - recording: h1_duelq1127
+      turn: 92
+      value: "city-state 3: Apprenticeship completed at the bank with no pick (goal Stirrups unowned), +0x528 left 0: Castles read at its analysis' 10 turns, Limes 27.0 as logged"
   impl:
+    - cpu/core/minorBuild.ts:completionLeft
+    - gpu/core/sim_research.py:_rai_completion_left
     - cpu/core/minorBuild.ts:techContractsCompleted
     - gpu/core/sim_minors.py:_tech_contracts_completed
     - cpu/core/aiResearch.ts:researchCompletionChoice
@@ -252,6 +259,7 @@
     - "C-127: a boost completion's turns left; a minor Builder's clearing lump"
     - "C-98: a unit's value adds its abilities' modifiers; EFFECT_ADJUST_UNIT_MOVEMENT and REQUIREMENT_PLOT_ADJACENT_TO_OWNER; a second completion adds again — READ (0x7b62c0 at 0x7b7658..0x7b76d8, 0x6e11c7 / 0xc85140, 0x6bd520, 0x6d3200, 0x762d60's rows), both twins"
     - "C-127: the plot test takes a removable feature for a Buildable row alone; a completion releases the research AI's other Tech Contracts — READ (0x35fd60 at 0x36079e / 0x36085d, 0xac6bb0, 0x762d60 at 0x762f7b), both twins"
+    - "C-130 / C-98: a completion with no pick leaves the research AI's in-hand turns at 0; a seated specialist keeps a pillaged district's slot — READ (0x762d60 at 0x762d96, 0x763020 at 0x7630e4 / 0x7632ad), FIT (the district slot), both twins"
   context:
     - "- A COMPLETION, 0x762d60 (the completed row): the propagation once more on the entries as they stand, then the c..."
   review: reviewed

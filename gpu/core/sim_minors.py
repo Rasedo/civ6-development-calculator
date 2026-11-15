@@ -361,7 +361,7 @@ class SimMinors:
         self.citystate_ai_score[:, s] = torch.where(fire.unsqueeze(1), score, self.citystate_ai_score[:, s])
         pick, goal = self._rai_choice(s, fire, (turns, self.citystate_ai_next[:, s], base, score, self.citystate_ai_owned[:, s]), done)
         self._rai_take(s, pick, goal)
-        self.citystate_ai_left[:, s] = torch.where(fire, self._rai_left(s, sci), self.citystate_ai_left[:, s])
+        self._rai_completion_left(s, fire, pick, sci)
 
     def _minor_sight(self, s: int) -> torch.Tensor:
         """[B, T] bool — `cityStateSight`: the plots minor `s` sees now — its

@@ -197,16 +197,19 @@ export function workableTiles(state: GameState, city: City): Tile[] {
  *  0x195940): each building standing in the district, none in a district
  *  incomplete or pillaged, none of a pillaged building (0x18fe60) — the
  *  slots a placement fills. `seated`: the slots a citizen already pinned
- *  keeps, a pillaged building's too — nothing evicts it at the pillage
- *  (runs/h1_duelw1128 Xi'an t105: barbarians pillage the Shrine, its
- *  specialist stays and pays its 2 Faith until China's turn re-places it).
+ *  keeps, a pillaged building's and a pillaged district's too — nothing
+ *  evicts it at the pillage (runs/h1_duelw1128 Xi'an t105: barbarians
+ *  pillage the Shrine, its specialist stays and pays its 2 Faith until
+ *  China's turn re-places it; runs/h1_duelq1121 Hunza t226: its district on
+ *  187 pillaged in t225, record 226 still working it at 20 Gold, banked so,
+ *  Triangular Trade 87.0 at t227 as logged).
  */
 export function citySpecialistSlots(state: GameState, city: City, seated = false): Map<number, number> {
   const out = new Map<number, number>();
   for (const d of city.districts) {
     if (!SPECIALIST_YIELDS[d.type]) continue;
     const dt = state.map.tiles[d.tileIndex];
-    if (!dt.districtComplete || dt.districtPillaged) continue;
+    if (!dt.districtComplete || (dt.districtPillaged && !seated)) continue;
     const slots = city.buildings.filter((b) => BUILDINGS[b]?.district === d.type && (seated || !buildingPillaged(city, b))).length;
     if (slots > 0) out.set(d.tileIndex, slots);
   }

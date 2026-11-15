@@ -83,7 +83,7 @@ export const NUKE_ROBOT_DAMAGE = srcConst('nuclear.robotDamage', 50, {
  *  adds NUKE_AA_SUPPORT·hp/100; damage = the ordinary combat roll against the
  *  warhead's defence, and the strike is cancelled iff damage > NUKE_INTERCEPT_DAMAGE. */
 export const NUKE_COVER_RANGE = srcConst('nuclear.coverRange', 1, {
-  lab: 'C-34: one interceptor at exactly distance 1, 2 and 3 from the aim plot for all seven '
+  lab: 'one interceptor at exactly distance 1, 2 and 3 from the aim plot for all seven '
     + 'anti-air chassis — d = 1 covers, d = 2 and 3 never (lab 3 part eight, the coverage table)',
 });
 /** CIV6 (COMBAT_ANTI_AIR_SUPPORT_BONUS_MODIFIER): each further adjacent
@@ -104,15 +104,15 @@ export const NUKE_AA_WOUND = srcConst('nuclear.aaWound', 10, {
  *  the aim plot's terrain + feature DefenseModifier. A BOMBER's warhead
  *  defends at the bomber's own Combat and takes no plot term. */
 export const NUKE_SILO_DEFENSE = srcConst('nuclear.siloDefense', 75, {
-  lab: 'C-34: lab 3 part eight, "RESOLVED: both are integers — 75 and 80"',
+  lab: 'lab 3 part eight, "RESOLVED: both are integers — 75 and 80"',
 });
 export const NUKE_SUB_DEFENSE = srcConst('nuclear.subDefense', 80, {
-  lab: 'C-34: lab 3 part eight, "RESOLVED: both are integers — 75 and 80"',
+  lab: 'lab 3 part eight, "RESOLVED: both are integers — 75 and 80"',
 });
 /** the cancellation line: a measured 50 LANDED and 52 cancelled, so the
  *  integer damage is tested strictly above 50. */
 export const NUKE_INTERCEPT_DAMAGE = srcConst('nuclear.interceptDamage', 50, {
-  lab: 'C-34: lab 3 part three ("The threshold is strictly > 50: a row that did exactly 50 damage landed")',
+  lab: 'lab 3 part three ("The threshold is strictly > 50: a row that did exactly 50 damage landed")',
 });
 
 /** CIV6: a finished device "can then be used by any unit or improvement
