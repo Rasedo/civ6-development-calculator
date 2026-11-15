@@ -6733,7 +6733,10 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
     // closes 11:10, which the other Warrior's step to 12:9 reveals later in
     // the turn, as a plot never revealed, AI_Planning.csv)
     const revealedWas = new Map(state.cityStates.map((cs) => [cs.seat, cs.revealed?.slice()] as const));
-    const baseStep = transitionChecks(a, b, cat, history, prev);
+    // the free replay's checks (the per-turn harness's transition and state
+    // checks, the state compare) feed the subsystems alone; the AI score
+    // runs without them
+    const baseStep = opts.aiScore ? [] : transitionChecks(a, b, cat, history, prev);
     advanceHistory(history, b, cat);
     const recordA = ctx.next;
     const read = importTurn(b, cat, history);
@@ -7753,23 +7756,25 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
       tallyCivicAi(ctx, party, a.turn, pid, ours, rec);
     }
     // the game's ledger as the record stands: before the active player's actions
-    const t = compareState(state, read, history.weary && wearyAt(history.weary, read.seatOfPlayer, b.turn,
+    const t: Tallies = opts.aiScore ? {} : compareState(state, read, history.weary && wearyAt(history.weary, read.seatOfPlayer, b.turn,
       b.players.find((p) => bool(p.turnActive))?.id ?? num(b.head.localPlayer), 1));
-    compareUnits(ctx, b, t);
-    note(t, 'barb.camps', campsHeld, 'camps', ctx.next.state.barbSeat.camps.length, state.barbSeat.camps.length);
-    const base = stateChecks(b, cat, read);
-    for (const r of [...baseStep, ...base]) {
-      if (r.ok || r.skip) continue;
-      if (!baseFails.has(r.subject)) baseFails.set(r.subject, new Set());
-      baseFails.get(r.subject)!.add(r.check);
+    if (!opts.aiScore) {
+      compareUnits(ctx, b, t);
+      note(t, 'barb.camps', campsHeld, 'camps', ctx.next.state.barbSeat.camps.length, state.barbSeat.camps.length);
+      const base = stateChecks(b, cat, read);
+      for (const r of [...baseStep, ...base]) {
+        if (r.ok || r.skip) continue;
+        if (!baseFails.has(r.subject)) baseFails.set(r.subject, new Set());
+        baseFails.get(r.subject)!.add(r.check);
+      }
+      let mine: CheckResult[] = [];
+      try {
+        mine = stateChecks(b, cat, engineAsImported(state, read));
+      } catch (e) {
+        note(t, 'read.threw', false, (e as Error).message, null, null);
+      }
+      readerTallies(mine, base, t);
     }
-    let mine: CheckResult[] = [];
-    try {
-      mine = stateChecks(b, cat, engineAsImported(state, read));
-    } catch (e) {
-      note(t, 'read.threw', false, (e as Error).message, null, null);
-    }
-    readerTallies(mine, base, t);
     opts.onPair?.(state, b, ds);
     const fallbacks: Record<string, number> = {};
     for (const xs of ctx.fellBack.values()) for (const x of xs) fallbacks[x] = (fallbacks[x] ?? 0) + 1;
