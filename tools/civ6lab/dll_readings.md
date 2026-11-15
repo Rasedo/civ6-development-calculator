@@ -17136,3 +17136,50 @@ recordings' CombatLog and on the game's own planning memory
   Encampment's standing strength with its own plot's garrison (the known
   cities hold player 1's 16:16 at 94 where the engines hold 89, runs/
   h1_duels1124 t225).
+
+## C-122 / C-111: the kinds a player's villages gave, a village subtype's unit gates — READ (0x42bdd0 at 0x42c875, 0x42c980 at 0x42ca38..0x42cae2 / 0x42cca7..0x42cd50, 0x55d650, 0x536f70), the unit gates unwired
+
+`advanceHistory`, `History.villageKinds`, `importTurn`
+(cpu/harness/import.ts) onto `Seat.goodyKinds`; `goodyEligible`
+(cpu/core/goodyHuts.ts) / `_goody_eligible` (gpu/core/sim_seats.py).
+
+- THE KINDS HAD (0x42bdd0): the kind draw halves a kind's weight once per
+  village of that kind the player has had (the player's +0x100[kind],
+  bumped at 0x42c875 after the pick), a count no record holds. The records'
+  action log names every reward (`GoodyHutReward`: player, unit, the kind's
+  type hash, the sub type's; a village a city's culture claim takes names
+  no player, the `CityTileOwnershipChanged` after it its city's owner), so
+  a world imported from a record takes each player's counts from the rows
+  before it. Confirmed: runs/h1_duels1117 player 1, rewarded Culture at
+  t5, Survivors at t7 and t16: its t204 "Choosing a Goody Hut Type" runs
+  over 4,600 (Culture 400, Survivors 200, the other five 800) and reads
+  2,634, Military, its "Choosing a Sub Type" 5 of 55, Grant Scout; t212
+  over 4,200 (Military 400 now), 1,829, Faith. With no counts the draw runs
+  over 5,600 and the same generator state reads Science, then One Tech of
+  100: a free technology the game did not give, on which the city-states'
+  catch-up (0x4cb930) sets their progress — Combustion one turn away for
+  city-states 2 and 4 where AI_Research.csv holds it at 102 and 81 turns,
+  -9999.
+- A SUBTYPE'S GATES WITH A UNIT (0x42c980, 0x42ca38..0x42cae2): the row's
+  Turn is +0x20, at the game's speed (0x5254d0) against the game turn; its
+  flags +0x50: bit 1 MinOneCity; bit 5 UpgradeUnit, 0x536f70 on the unit;
+  bit 0 Experience, the unit earns experience (0x55d650: its Units_XP2
+  row, where it has one, CanEarnExperience, +0x48 bit 1; its Units row's
+  +0x1b8 bit 2; the experience's own +0xa clear); Heal (+0x1c) above 0:
+  the unit's damage (+0xcf0) at least COMBAT_MAX_HIT_POINTS (gp +0x1e8)
+  over Heal, 25 at Heal 4; bit 2 Relic; bit 4 Trader; then the XP2 row's
+  CityState and StrategicResources. WITH NO UNIT (0x42cca7..0x42cd50, a
+  culture claim's plot): bit 3 RequiresUnit refuses; then Turn,
+  MinOneCity, Relic and Trader alone, the XP2 row unread.
+  Confirmed on the Military kind's "Choosing a Sub Type" ranges of
+  runs/h1_duels (Grant Scout 35, Grant Experience 20, Heal 25, Resources
+  20): an undamaged Warrior or Scout 55 before its player sees a strategic
+  resource and 75 after (1121 t4 / t101, 1134 t7 / t33, 1124 t137); at 20
+  and 23 damage still 55 and 75 (1124 t37, 1138 t43); at 41, 44, 59 and 99
+  damage 100 (1148 t33, 1144 t29, 1145 t38, 1133 t167); 1117 t204 the
+  undamaged Rock Band (Units_XP2 CanEarnExperience false) 55: Grant Scout
+  and Resources.
+- OPEN: the engines' `goodyEligible` / `_goody_eligible` read no unit, so
+  Heal and Grant Experience stand for every claimer (1117 t204 ours over
+  100 for the game's 55); the Units row's +0x1b8 bit 2 and the
+  experience's +0xa are unnamed.

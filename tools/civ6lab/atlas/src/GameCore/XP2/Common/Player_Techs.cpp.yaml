@@ -405,6 +405,7 @@
     - "C-60: the Free Cities' research — READ (the catch-up's receivers), ported"
     - "C-60: the Free Cities' research"
     - "C-98 / C-130: a village's free technology, the resource a plot's record shows a city-state, the research value's improvements by trait alone, the Lighthouse's coast — READ (0x4caeb0, 0x50a690, 0x50b3e0, 0x35ecb0, 0x35f100), FIT (the record's refresh, the drowned plot), both twins"
+    - "C-122 / C-111: the kinds a player's villages gave, a village subtype's unit gates — READ (0x42bdd0 at 0x42c875, 0x42c980 at 0x42ca38..0x42cae2 / 0x42cca7..0x42cd50, 0x55d650, 0x536f70), the unit gates unwired"
   context:
     - 0x4cb930 (techs; civics 0x39ec60, the same body), called from the handler 0x427bf0 that every play...
   review: reviewed

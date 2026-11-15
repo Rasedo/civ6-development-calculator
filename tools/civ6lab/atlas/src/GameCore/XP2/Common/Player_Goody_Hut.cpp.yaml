@@ -20,19 +20,25 @@
     - recording: 1117
       turn: 10
       value: "A subtype's Turn is read at the game's speed (0x42c980 through 0x5254d0: online, Turn 20 is turn 10 — 1117 t13's Gold over 85 holds Medium Gold, t16's seven kinds hold Faith)."
+    - recording: h1_duels1117
+      turn: 204
+      value: "player 1, rewarded Culture at t5 and Survivors at t7 and t16: the kind draw over 4,600 (Culture 400, Survivors 200, the other five 800), 2,634 Military; t212 over 4,200 (Military 400), 1,829 Faith"
   impl:
     - cpu/core/goodyHuts.ts:goodyEligible
     - cpu/data/goodyHuts.ts:GOODY_KIND_ROWS
     - cpu/data/goodyHuts.ts:goodyKindWeight
     - gpu/core/sim_seats.py:_goody_kind_weight
-  readings: ["H-1: the goody hut's kind — READ"]
+    - cpu/harness/import.ts:villageKinds
+  readings:
+    - "H-1: the goody hut's kind — READ"
+    - "C-122 / C-111: the kinds a player's villages gave, a village subtype's unit gates — READ (0x42bdd0 at 0x42c875, 0x42c980 at 0x42ca38..0x42cae2 / 0x42cca7..0x42cd50, 0x55d650, 0x536f70), the unit gates unwired"
   context:
     - "0x42bdd0 (Player_Goody_Hut.cpp): over the GoodyHuts rows whose ImprovementType is the popped one (..."
   review: reviewed
 - addr: 0x42c980
   final: 0x2dad40
   kind: function
-  semantics: "a goody subtype's eligibility: MinOneCity, Turn (at the game speed through 0x5254d0: Turn 20 is turn 10 online), RequiresUnit (a village a culture claim takes has no unit), CityState, StrategicResources... Per subtype row (+0x50 flags): bit 3 RequiresUnit; bit 1 MinOneCity (0x4bd370 >= 1); bit 2 Relic — 0x497030 finds a slot for a GREATWORKOBJECT_RELIC in the claimer's cities; +0x1c the Turn at the speed; then the XP2 row (+0x18): +0x28 bit 0 CityState — a city-state in the minor list the player has met (0x3daaf0); bit 1 StrategicResources — a RESOURCECLASS_STRATEGIC resource whose condition the player meets (0x4ac140) with its stockpile (0x4aa790) below the cap (0x4aabe0)."
+  semantics: "a goody subtype's eligibility: MinOneCity, Turn (at the game speed through 0x5254d0: Turn 20 is turn 10 online), RequiresUnit (a village a culture claim takes has no unit), CityState, StrategicResources... Per subtype row (+0x50 flags): bit 3 RequiresUnit; bit 1 MinOneCity (0x4bd370 >= 1); bit 2 Relic — 0x497030 finds a slot for a GREATWORKOBJECT_RELIC in the claimer's cities; +0x20 the Turn at the speed; then the XP2 row (+0x18): +0x28 bit 0 CityState — a city-state in the minor list the player has met (0x3daaf0); bit 1 StrategicResources — a RESOURCECLASS_STRATEGIC resource whose condition the player meets (0x4ac140) with its stockpile (0x4aa790) below the cap (0x4aabe0). With a unit (r8, 0x42ca38..0x42cae2) also: bit 5 UpgradeUnit — 0x536f70 on the unit; bit 0 Experience — the unit earns experience (0x55d650 on the unit's +0x1bc0); +0x1c Heal above 0 — the unit's damage (+0xcf0) at least COMBAT_MAX_HIT_POINTS (gp +0x1e8) / Heal; bit 4 Trader (0x54fe20). With no unit (0x42cca7..0x42cd50: the plot's owner) bit 3 RequiresUnit refuses, then Turn, MinOneCity, Relic and Trader alone; the XP2 row is not read."
   status: READ
   cases:
     - recording: h1_duelw1118
@@ -50,13 +56,22 @@
     - recording: h1_duelw1119
       turn: 13
       value: "A Relic, however it comes — a martyred Apostle, a village, Jeanne d'Arc — is created by Game_Culture 0x296c00: ONE \"Choosing a Relic\" draw over the 24 GREATWORK_RELIC rows not yet created, none left n"
+    - recording: h1_duels1133
+      turn: 167
+      value: "the Military kind's sub type range by the unit's damage (Heal 25 in from 25 damage): a Warrior at 99 damage 100; h1_duels1124 t37 a Scout at 20 damage 55, h1_duels1138 t43 a Scout at 23 damage 75, h1_duels1148 t33 a Scout at 41 damage 100"
+    - recording: h1_duels1117
+      turn: 204
+      value: "the undamaged Rock Band (Units_XP2 CanEarnExperience false): the Military sub type over 55, Grant Scout 35 and Resources 20, Grant Experience and Heal out"
   impl:
     - cpu/core/goodyHuts.ts:goodyEligible
     - cpu/export/rules.ts:pl
     - cpu/harness/drawSites.ts:DRAW_SITES
     - gpu/core/sim_init.py:__init__
     - gpu/core/sim_seats.py:_goody_eligible
-  readings: ["H-1: the goody hut's kind — READ", "H-1: the goody hut's other gates and the Relic — READ"]
+  readings:
+    - "H-1: the goody hut's kind — READ"
+    - "H-1: the goody hut's other gates and the Relic — READ"
+    - "C-122 / C-111: the kinds a player's villages gave, a village subtype's unit gates — READ (0x42bdd0 at 0x42c875, 0x42c980 at 0x42ca38..0x42cae2 / 0x42cca7..0x42cd50, 0x55d650, 0x536f70), the unit gates unwired"
   context:
     - "..., floored at 1.0 below 2.0, rounded half up; a kind counts only with an eligible subtype (0x42c980: MinOneCity, Turn, RequiresUnit, CityState, StrategicResources...). ONE \"Choosing a Goody..."
     - "0x42c980 per subtype row (+0x50 flags): bit 3 RequiresUnit — no unit (a culture claim), not eligib..."

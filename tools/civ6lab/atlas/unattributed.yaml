@@ -3498,6 +3498,16 @@
     - "...grades as the research's; UNIT_COMBAT 100 where 0x4f2ac0 (+0xaa8 / +0xb08) names it and 0x536da0 fails; buildings, wonders, districts (0x406c00) 0.5; its policies: the best card (0x623..."
     - "## C-128: a city-state's Make Military Formation — READ (0x77a190, 0x770670, 0x536da0, 0x773e20, 0x94a870, 0x949930), both twins"
   review: reviewed
+- addr: 0x536f70
+  final: 0x37d900
+  kind: function
+  semantics: "the unit has an upgrade: 0x537c80's answer for the unit is not -1 (0x537c80's body unread). The village sub type's UpgradeUnit gate (0x42c980, the row's +0x50 bit 5) asks it; the one row carrying the flag, GOODYHUT_GRANT_UPGRADE, weighs 0, so no recorded draw reads it."
+  status: PARTLY
+  readings:
+    - "C-122 / C-111: the kinds a player's villages gave, a village subtype's unit gates — READ (0x42bdd0 at 0x42c875, 0x42c980 at 0x42ca38..0x42cae2 / 0x42cca7..0x42cd50, 0x55d650, 0x536f70), the unit gates unwired"
+  context:
+    - "...(0x5254d0) against the game turn; its flags +0x50: bit 1 MinOneCity; bit 5 UpgradeUnit, 0x536f70 on the unit; bit 0 Experience, the unit earns experience (0x55d650: its Units_XP2 row..."
+  review: reviewed
 - addr: 0x538040
   final: 0x37e2a0
   kind: function

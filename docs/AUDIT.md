@@ -779,8 +779,8 @@ A question the SOURCE under-determines; neither engine ships a branch until the 
   - LAB (captures): a captured city's unfinished district plot (the DLL makes none again, the engines leave it paved)
   - LAB (captures): a captured minor's stay in the registry
   - BUILD (captures): a city felled by a non-major captor: TS transferCity gives it to the Free City or city-state, the GPU sacks it (`_melee_city`) leaving the minor at <= 0 HP, the game's capture destroys the city (0x1fdea0 at 0x1fe098..0x1fe0ab -> 0x1e6f50; no recorded case)
-  - LAB (goody huts): the HEAL goody's damage gate (0x42c980 +0x1c vs unit +0xcf0), read, not wired
-  - LAB (goody huts): the goody's Experience gate (bit 1, 0x55d650), read, not wired
+  - LAB (goody huts): the HEAL goody's damage gate (0x42c980 +0x1c vs unit +0xcf0: the unit's damage at least COMBAT_MAX_HIT_POINTS over Heal, 25), read, not wired: duels1117 t204 player 1's undamaged Rock Band, the Military sub type ours over 100 (Grant Scout, Grant Experience, Heal, Resources), the game's over 55
+  - LAB (goody huts): the goody's Experience gate (the row's +0x50 bit 0, 0x55d650: the unit's Units_XP2 CanEarnExperience), read, not wired: duels1117 t204 the Rock Band's Grant Experience stands in ours, out of the game's 55 (Grant Scout and Resources)
   - LAB (purchases and raids): a held unfinished district's purchase (the DLL test unread; both twins refuse)
   - LAB (purchases and raids): the coastal raid's target (0x95ba10 unread; the engines pillage the district)
   - LAB (plunder): runs/plunder_sweep_a3 t104 54:23 a unit on the Trader's plot with 2 Movement refused, reasons empty (54:22's fits the embarked test), the refusing test unread

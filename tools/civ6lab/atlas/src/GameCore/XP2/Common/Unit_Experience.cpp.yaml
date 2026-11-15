@@ -3,6 +3,20 @@
 # `review: imported` = bootstrapped from dll_readings.md / code comments / saved
 # labels and not yet reviewed: verify against the disassembly, then edit and
 # set `review: reviewed`.
+- addr: 0x55d650
+  final: 0x396930
+  kind: function
+  semantics: "the unit earns experience (the unit's experience component, unit +0x1bc0): false where its type has a Units_XP2 row (0xad67b0 by the Units row's +0x24) whose CanEarnExperience (+0x48 bit 1) is clear; false where its Units row's flags (+0x1b8) bit 2 is clear; else true where the component's byte +0xa is 0. The Units flag and the byte are unnamed."
+  status: READ
+  cases:
+    - recording: h1_duels1117
+      turn: 204
+      value: "player 1's Rock Band (Units_XP2 CanEarnExperience false) enters a village: the Military kind's \"Choosing a Sub Type\" over 55, Grant Scout 35 and Resources 20, Grant Experience (the row's Experience flag, 0x42c980) out; h1_duels1121 t101 an undamaged Warrior 75 with Grant Experience in"
+  readings:
+    - "C-122 / C-111: the kinds a player's villages gave, a village subtype's unit gates — READ (0x42bdd0 at 0x42c875, 0x42c980 at 0x42ca38..0x42cae2 / 0x42cca7..0x42cd50, 0x55d650, 0x536f70), the unit gates unwired"
+  context:
+    - "...; bit 5 UpgradeUnit, 0x536f70 on the unit; bit 0 Experience, the unit earns experience (0x55d650: its Units_XP2 row, where it has one, CanEarnExperience, +0x48 bit 1; its Units row's..."
+  review: reviewed
 - addr: 0x55d750
   final: 0x3969a0
   kind: function

@@ -48,6 +48,7 @@ import { ERUPTION_CUL_P, ERUPTION_PAINT_P, ERUPTION_PROD_P, ERUPTION_ROWS, ERUPT
 import { isWater } from '../../world/query';
 import { FEATURE_ID, TERRAIN_BASE } from '../data/aliases';
 import { goldShortfall } from '../data/seats';
+import { GOODY_KINDS } from '../data/goodyHuts';
 import { governorsOf } from '../core/governors';
 import { envoysWith, minorCity, mostEnvoysReceived } from '../core/cityStates';
 import { GOVERNOR_DEFAULT_PROMOTION, GOVERNOR_INDEX, GOVERNOR_PROMOTION_INDEX, GOVERNOR_PROMOTIONS, promotionBit, promotionBitValue } from '../data/governors';
@@ -610,6 +611,12 @@ export interface History {
    *  across the pairs so far, and the world's (`eraChecks`) */
   moments: Map<number, number[]>;
   momentsWorld: number[];
+  /** the times each kind of Tribal Village has rewarded each player, in
+   *  `GOODY_KINDS`' order (`GoodyHutReward`'s type in the records' action
+   *  log; a village a city's culture claim took names no player and rewards
+   *  the city's owner, the claim's row after it): `Seat.goodyKinds`, which
+   *  the kind draw halves a kind's weight by */
+  villageKinds: Map<number, number[]>;
   /** the first record each live trade route was seen in, by `routeKey` */
   routeSeen: Map<string, number>;
   /** each live route's course as the first record it was seen in laid it,
@@ -964,7 +971,7 @@ function foldActivities(acts: Map<string, UnitActivity>, rows: readonly unknown[
 
 export function newHistory(): History {
   return { firstTurn: -1, last: null, before: null, beforeThat: null, trained: new Map(), levied: new Map(), captives: new Map(), activities: new Map(), formed: new Set(), arrivals: new Map(), alpine: new Set(), fionn: new Set(), govSeated: new Map(), growthDrift: new Map(), lastHit: new Map(), gpSpent: new Map(), revealed: new Map(),
-    unknownSince: new Set(), cityFirstSeen: new Map(), nextPlotUnheld: new Set(), fireFood: new Map(), fireProd: new Map(), eventYields: new Map(), eventCounts: new Map(), openEvents: [], eventRead: new Map(), eventDraws: new Map(), droughts: [], bare: new Map(), discountDistricts: new Map(), discountPlaced: new Map(), ages: new Map(), moments: new Map(), momentsWorld: [],
+    unknownSince: new Set(), cityFirstSeen: new Map(), nextPlotUnheld: new Set(), fireFood: new Map(), fireProd: new Map(), eventYields: new Map(), eventCounts: new Map(), openEvents: [], eventRead: new Map(), eventDraws: new Map(), droughts: [], bare: new Map(), discountDistricts: new Map(), discountPlaced: new Map(), ages: new Map(), moments: new Map(), momentsWorld: [], villageKinds: new Map(),
     eraTurns: [], gameEra: 0, eraStartTurn: 1, eraCountdown: -1, routeSeen: new Map(), routeCourse: new Map(), trail: new Map(), legs: new Map(), posts: new Map(), policySlots: new Map(),
     competition: null, podium: new Map(), culture: new Map(), tourismTo: new Map(),
     dominant: new Map(), districtQuoted: new Set(), districtPriced: new Map(), districtLocked: new Map(), floods: null, startTies: new Map(), startPicks: new Map(), seaLevel: 0, people: null, stockpile: new Map(), reservations: new Map() };
@@ -1538,6 +1545,18 @@ export function advanceHistory(h: History, rec: TurnRecord, cat: Catalog): void 
     if (!Array.isArray(r) || r[2] !== 'UnitCaptured') return;
     const added = rows.slice(Math.max(0, i - 8), i).reverse().find((x) => Array.isArray(x) && x[2] === 'UnitAddedToMap' && x[3] === r[6]);
     if (added) h.captives.set(`${added[3]}:${added[4]}`, r[3] as number);
+  });
+  // a village's reward: [.., turn, kind, player, unit, type, sub type], the
+  // player -1 where a city's culture claim took it (`CityTileOwnershipChanged`
+  // after it: [.., kind, player, city, x, y])
+  rows.forEach((r, i) => {
+    if (!Array.isArray(r) || r[2] !== 'GoodyHutReward') return;
+    const kind = GOODY_KINDS.findIndex((k) => gameHash(`GOODYHUT_${k}`) === r[5]);
+    const pid = r[3] !== -1 ? r[3] : rows.slice(i + 1).find((x) => Array.isArray(x) && x[2] === 'CityTileOwnershipChanged')?.[3];
+    if (kind < 0 || typeof pid !== 'number') return;
+    const had = h.villageKinds.get(pid) ?? GOODY_KINDS.map(() => 0);
+    had[kind] += 1;
+    h.villageKinds.set(pid, had);
   });
   const held = new Set(rec.units.map((u) => `${u.owner}:${u.id}`));
   for (const k of [...h.captives.keys()]) if (!held.has(k)) h.captives.delete(k);
@@ -2343,6 +2362,9 @@ export function importTurn(rec: TurnRecord, cat: Catalog, history?: History): Im
       if (tier !== 1 && def.goldGpp) for (const c of GP_CLASSES) (seat.gppFree ??= {})[c] = (seat.gppFree?.[c] ?? 0) + def.goldGpp;
       if (tier !== 2 && def.silverPerm) addSeatPerm(seat, def.silverPerm);
     }
+    // the village kinds the history saw reward it (`History.villageKinds`)
+    const villages = history?.villageKinds.get(p.id);
+    if (villages) seat.goodyKinds = [...villages];
     // the plots it has revealed, where the record carries them; else none is
     // read and every plot counts as explored (`isExplored`)
     seat.explored = revealedPlots(rec, p.id, W * H) ?? [];
