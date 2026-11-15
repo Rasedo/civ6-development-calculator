@@ -17449,3 +17449,57 @@ log's `History.captives` alone).
 - OPEN: the engines' floods and eruptions strike no city-state's centre and stamp no
   turn on a major's; an Encampment's own stamp (the max over the districts)
   is not kept apart from the centre's.
+
+## C-95: the barbarians' scout is any tribe unit of AI type EXPLORE, a captive's sight counts — READ (0x153ef0 at 0x153f1d / 0x153f86), both twins
+
+`barbScoutLook` / `othersSee` (cpu/core/barbarians.ts, the AI type
+`aiTypeOf` of cpu/core/tactical.ts); `_barb_scout_look` /
+`_barb_others_see` (gpu/core/sim_barb.py, the AI type `_tac_ai`, the
+per-unit sight memory `barb_unit_saw`).
+
+- THE SCOUT: the report (0x153ef0) takes the stepping unit's tribe by its
+  index (unit +0x11d0 at 0x153f1d, any unit a tribe raised) and asks its AI
+  type (unit +0x1c0 == 2, UNITAI_EXPLORE, at 0x153f86), not the tribe's
+  scout list: a Skirmisher a tribe raised as one of its units (its type's
+  own AI type EXPLORE: no UNITAI_COMBAT row) reports and walks home as the
+  scout's tree's unit, beside the tribe's living Scout; each such unit
+  keeps its own sight memory (the unit's stored visibility list, taken off
+  after the new one is added: a plot in both stays counted).
+  Confirmed: duels1175 t139 tribe 6's Skirmisher 5701633 (raised t134, the
+  tribe's Scout 3342351 alive to t143; AI type 2 in the aiunits stream)
+  steps 7:16 -> 8:14, its Barbarian Found City tree holds it (Move Unit's
+  +0x50), the raid on 9:14 starts at t141 (op rows to t150 74 -> 0); the
+  game's other missed raids alike: 1162 t113 / t139, 1181 t128 / t163,
+  1145 t134 (every tree's unit a Skirmisher).
+- THE PLACEMENT: a unit's placement runs the sight update (0x58aa90) as a
+  step does: a scout a tribe's turn raises looks from its plot
+  (`placedLook`). Confirmed: duels1162 t113 tribe 5's Skirmisher 3473426
+  raised on 39:4 starts its tree there (the t113 end look; the farm on
+  38:6 in its sight), the game's raid on 37:7 at t114. The camp's own
+  scouts raised with it (0x147fc0) are not confirmed and look not.
+- ANOTHER UNIT'S SIGHT: the visibility count a captive civilian of theirs
+  adds counts as any unit's (the count's rise from 0 raises the report,
+  0x508d50): duels1152 t94 player 1's Builder taken on 34:17 (its
+  UnitAddedToMap before the captor's step) sees the Government Plaza on
+  34:15 before tribe 2's Scout steps there: no report, the game's tree
+  first at t108.
+- THE EVALUATION'S MustHaveUnits (0x746920 at 0x746991..0x7469ad): above 0,
+  the player's unit count (player +0x12e8 +0xc0, every unit) below it
+  leaves the candidate invalid before the target walk. Confirmed on the war
+  candidates of duels1145 city-state 4 (four units at t36: Wartime Attack
+  Enemy City (3) alone; six at t46 / t56: Attack Enemy City (5), Wartime
+  Attack Enemy City and Wartime Attack Walled City (6), not Attack Walled
+  City (10); four at t66: Wartime Attack Enemy City alone), duels1164
+  city-state 3 (six at t184 / t209, five at t219: Wartime Attack Walled City
+  dropped) and duels1133 t170 (six). Ported in `evaluate` (the CPU's only:
+  no definition the twins run carries MustHaveUnits).
+- OPEN: duels1162 t113 the raised Skirmisher's tree, beside its camp 38:3
+  (the tribe's Spearman on it), RUNNING in the game (Move Unit holding it
+  for 38:3), FAILS in the engines (its path to the crowded camp linked in
+  its first turn: `turnsToPlot` 0), no raid at t114.
+- OPEN: the city-states' WAR definitions (Attack Enemy City, Wartime Attack
+  Enemy City, Attack Walled City, Wartime Attack Walled City) are no
+  candidates the engines weigh (`MINOR_OP_DEFS`); the GPU carries neither
+  their trees' nodes (Is At War, Operation Diplomacy, Lock Units, Turn
+  Limiter, Build Military Improvement) nor the enemy-city target walk and
+  its city value (0x79fef0).

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from .simbase import *  # noqa: F401,F403 — torch, constants, helpers: the shared floor
+from .sim_tactics import _AI_EXPLORE
 
 # a camp's sight (`CAMP_SIGHT`): its owner sees its plot and the six beside it
 _CAMP_SIGHT = 1
@@ -122,13 +123,14 @@ class SimBarb:
         return torch.stack(out, dim=1)
 
     def _barb_raise(self, mask: torch.Tensor, k: torch.Tensor, tag: torch.Tensor, radius: int, n: int,
-                    scout: bool, track: bool = True) -> torch.Tensor:
+                    scout: bool, track: bool = True, look: bool = False) -> torch.Tensor:
         """`raise`: up to `n` units of each game's class `tag` (its best unit
         now) on the first free plots `radius` round its tribe `k`'s camp in
         ring order — no city on the plot, the unit's own domain
         (`tileFreeForUnit`) —, tagged the tribe's units (raised in its turn)
-        or its scouts where `track`; a new scout has seen nothing. [B] long
-        the units raised."""
+        or its scouts where `track`; with `look` (a tribe's turn,
+        `placedLook`) each looks from where it is placed. [B] long the units
+        raised."""
         raised = torch.zeros(self.B, dtype=torch.long, device=self.device)
         if not bool(mask.count_nonzero()):
             return raised
@@ -160,10 +162,14 @@ class SimBarb:
                 rows = landed.nonzero(as_tuple=True)[0]
                 self.barb_unit_tribe[rows, before[rows]] = k[rows]
                 self.barb_unit_scout[rows, before[rows]] = scout
-                if scout:
-                    self.tribe_saw[rows, k[rows]] = False
-                else:
+                if not scout:
                     self.barb_unit_fresh[rows, before[rows]] = True
+                if look:
+                    ai, _ = self._tac_ai()
+                    at = torch.where(landed, before, torch.full_like(before, -1))
+                    for kk in torch.unique(k[rows]).tolist():
+                        if kk >= 0:
+                            self._barb_scout_look(landed & (k == kk), int(kk), at, ai)
         return raised
 
     # ------------------------------------------------------------- the camps
@@ -227,7 +233,6 @@ class SimBarb:
         self.tribe_home_plot[rows, k[rows]] = -1
         self.tribe_raidp[rows, k[rows]] = -1
         self.tribe_ramp[rows, k[rows]] = -1
-        self.tribe_saw[rows, k[rows]] = False
         self.tribe_op[rows, k[rows]] = 0
         self.tribe_op_seat[rows, k[rows]] = -1
         self.tribe_op_id[rows, k[rows]] = -1
@@ -450,7 +455,7 @@ class SimBarb:
         q0 = self.tribe_queue[:, k, 0]
         qhit = hit & (q0 >= 0)
         if bool(qhit.count_nonzero()):
-            self._barb_raise(qhit, kk, q0, 1, 1, scout=False)
+            self._barb_raise(qhit, kk, q0, 1, 1, scout=False, look=True)
             self._barb_pop(self.tribe_queue, qhit.nonzero(as_tuple=True)[0], k)
         room = hit & ~qhit & (self.tribe_unitn[:, k] < bb["maxUnits"])
         pct = self._barb_kind_col(3, kind)
@@ -460,11 +465,11 @@ class SimBarb:
         roll = self._rand_range(room, 100)
         ranged = roll < pct
         tag = torch.where(ranged, self._barb_kind_col(7, kind), self._barb_kind_col(6, kind))
-        self.tribe_unitn[:, k] += self._barb_raise(room, kk, tag, 1, 1, scout=False)
+        self.tribe_unitn[:, k] += self._barb_raise(room, kk, tag, 1, 1, scout=False, look=True)
         wait = on & ~hit & (self.tribe_scoutn[:, k] < bb["maxScouts"])
         self.tribe_scoutc[:, k] += wait.long()
         due = wait & (self.tribe_scoutc[:, k] >= bb["scoutWait"])
-        self.tribe_scoutn[:, k] += self._barb_raise(due, kk, self._barb_kind_col(5, kind), 2, 1, scout=True)
+        self.tribe_scoutn[:, k] += self._barb_raise(due, kk, self._barb_kind_col(5, kind), 2, 1, scout=True, look=True)
         self.tribe_scoutc[:, k] = torch.where(due, torch.zeros_like(self.tribe_scoutc[:, k]), self.tribe_scoutc[:, k])
         self.tribe_bold[:, k] += on.long() * int(bb["boldTurn"])
         # the scout's tree's id forgotten once the tree runs no more
@@ -492,17 +497,17 @@ class SimBarb:
 
     # ------------------------------------------------------- the operations
 
-    def _barb_scout_look(self, on: torch.Tensor, k: int, at: torch.Tensor) -> None:
-        """`barbScoutLook` for tribe `k`'s living scout at local slot `at` [B]
-        in the games `on`, as it steps: the owned plots newly visible to the
+    def _barb_scout_look(self, on: torch.Tensor, k: int, at: torch.Tensor, ai: torch.Tensor) -> None:
+        """`barbScoutLook` for tribe `k`'s living unit at local slot `at` [B]
+        in the games `on`, as it steps, where its AI type (`ai` [B, P],
+        `_tac_ai`) is EXPLORE — a scout: the owned plots newly visible to the
         barbarian player by its sight (in it now, not at its last look, seen
         by no other unit of theirs) holding an improvement or a district (a
         wonder among them), in plot order — per major the first, once its
         throttle allows, sends the scout home where its tribe holds no scout's
         tree's id (`tribe_home_set`) and spares the major further reports."""
         ac = at.clamp(min=0).unsqueeze(1)
-        sc = (self.barb_unit_alive.gather(1, ac) & (self.barb_unit_tribe.gather(1, ac) == k)
-              & self.barb_unit_scout.gather(1, ac)).squeeze(1)
+        sc = (self.barb_unit_alive.gather(1, ac) & (ai.gather(1, ac) == _AI_EXPLORE)).squeeze(1)
         # the tribe by the unit's index, its camp standing or not
         has = on & (at >= 0) & sc
         rows = has.nonzero(as_tuple=True)[0]
@@ -516,8 +521,8 @@ class SimBarb:
         vis = self._los_disk(rows, self.barb_unit_tile[rows, slot].clamp(min=0), rad, self._sees_through(ut, pr))
         ts = self.tile_seat[rows]
         now = vis & (ts >= 0) & ((ts < BARB_SEAT) | (ts == FREE_SEAT))
-        new = now & ~self.tribe_saw[rows, k]
-        self.tribe_saw[rows, k] = now
+        new = now & ~self.barb_unit_saw[rows, slot]
+        self.barb_unit_saw[rows, slot] = now
         new &= ~self._barb_others_see(rows, slot, new)
         T = self.T
         # the wonders' plots, built or placed in a queue (the `city_wonder`
@@ -564,13 +569,11 @@ class SimBarb:
         """[N, T] of `plots` [N, T], those a barbarian unit other than the one
         at local slot `slot` [N] sees where it stands (in games `rows`), its
         look as it last took it (`_unit_look`) — a civilian of theirs (a
-        capture) none"""
+        capture) among them"""
         out = torch.zeros_like(plots)
         if not bool(plots.any()):
             return out
-        civ = self._type_civilian.take(self.barb_unit_type[rows].clamp(min=0, max=self.NU - 1))
-        live = (self.barb_unit_alive[rows] & (self.barb_unit_seat[rows] == BARB_SEAT) & (self.barb_unit_tile[rows] >= 0)
-                & ~civ)
+        live = self.barb_unit_alive[rows] & (self.barb_unit_seat[rows] == BARB_SEAT) & (self.barb_unit_tile[rows] >= 0)
         live[torch.arange(rows.numel(), device=self.device), slot] = False
         # a game with no plots to ask of asks no unit's look
         live &= plots.any(dim=1, keepdim=True)

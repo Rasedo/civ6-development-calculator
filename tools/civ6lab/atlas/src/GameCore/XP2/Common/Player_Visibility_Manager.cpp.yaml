@@ -64,6 +64,7 @@
     - "C-96: the city-states' tactical pass — READ (Wander Near City, Heal, the non-barbarian priorities, FindAlternateLocation), the families it needs PARTLY READ"
     - "C-119: the revealed plots against the records' planes — an embassy reveals the capital, a new suzerain's reveal meets, a sight raised looks again — READ (0x238330 -> 0x3e6820 -> 0x508bd0 -> 0x507c00 -> 0x508d50, 0x508330 -> 0x50d390, 0x56ce90 -> 0x58f3f0), both twins; the replay's steps and added units"
     - "C-98 / C-130: a village's free technology, the resource a plot's record shows a city-state, the research value's improvements by trait alone, the Lighthouse's coast — READ (0x4caeb0, 0x50a690, 0x50b3e0, 0x35ecb0, 0x35f100), FIT (the record's refresh, the drowned plot), both twins"
+    - "C-95: the barbarians' scout is any tribe unit of AI type EXPLORE, a captive's sight counts — READ (0x153ef0 at 0x153f1d / 0x153f86), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...signal at signals +0x10c8, which the unit sight update 0x58aa90 raises per plot when 0x508d50 (Player_Visibility_Manager, the count change) answers 2: the plot's visibility count fo..."

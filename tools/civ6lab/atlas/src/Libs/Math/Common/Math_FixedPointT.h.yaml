@@ -717,6 +717,7 @@
     - "C-97: the war operations — the war candidates, the city value's frame, the assault nodes and Attack Units READ; the loyalty lead's sources, the team update's danger and the assault's executions PARTLY READ"
     - "C-97: the war desires, the war operation's readiness and the assault's executions — the war value, the not-ready hook, the readiness and the executions READ; the leader's war factor, the WMD flags, the deal items and the war record's writer unread"
     - "C-95: an operation's enemy strength — READ (0x73eb60), ported"
+    - "C-95: the barbarians' scout is any tribe unit of AI type EXPLORE, a captive's sight counts — READ (0x153ef0 at 0x153f1d / 0x153f86), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...0), reached from a city of the player (its build AI's +0x870 set), value the city value 0x79fef0 (the \"CITY VALUES\" lines; unread), enemy strength 0x5eadb0 within 3 where the player'..."

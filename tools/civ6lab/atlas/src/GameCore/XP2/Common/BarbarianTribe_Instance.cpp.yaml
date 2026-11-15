@@ -210,6 +210,7 @@
   readings:
     - "H-1: the barbarians' turn (0x1514a0) — READ (the max camps and the sight LAB)"
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
+    - "C-95: the barbarians' scout is any tribe unit of AI type EXPLORE, a captive's sight counts — READ (0x153ef0 at 0x153f1d / 0x153f86), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "- Tribe init 0x147fc0: a CLASS_ANTI_CAVALRY defender on the camp, the scouts within 3; the unit chooser 0x147..."

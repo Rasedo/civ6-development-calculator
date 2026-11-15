@@ -318,22 +318,32 @@
     - recording: h1_duelw1128
       turn: 6
       value: "the scout's tree from its t6 move (the trees at t6 and t8, raids t11): the replay's starts on those turns"
+    - recording: h1_duels1175
+      turn: 139
+      value: "the scout is the unit's AI type (+0x1c0 2 at 0x153f86), its tribe's list not read: tribe 6's Skirmisher 5701633, raised t134 beside the tribe's living Scout 3342351, AI type 2 in the aiunits stream, steps 7:16 -> 8:14 and its Barbarian Found City tree holds it (Move Unit +0x50), the raid on 9:14 Started at t141 (also 1162 t113 / t139, 1181 t128 / t163, 1145 t134: every Skirmisher)"
+    - recording: h1_duels1152
+      turn: 94
+      value: "another unit's sight counts a captive civilian's: player 1's Builder taken on 34:17 (UnitAddedToMap before the captor's step) sees the Government Plaza on 34:15 before tribe 2's Scout steps there, no report; the game's tree first at t108"
   impl:
     - cpu/core/barbarians.ts:barbScoutLook
     - cpu/core/barbarians.ts:othersSee
+    - cpu/core/tactical.ts:aiTypeOf
     - cpu/data/barbarians.ts:BARB_SPOT_THROTTLE
     - gpu/core/sim_barb.py:_barb_scout_look
     - gpu/core/sim_barb.py:_barb_others_see
+    - gpu/core/sim_tactics.py:_tac_ai
     - cpu/core/types.ts:GameState
     - cpu/core/tactical.ts:barbarianPhase
     - cpu/core/units.ts:barbStepLook
     - gpu/core/sim_seats.py:_step_verb
+    - cpu/core/barbarians.ts:tribe
   readings:
     - "H-1: the raids — READ"
     - "C-95: the scout's tree \"Barbarian Found City\" — READ, ported"
     - "C-95: HL Explore's plot test refuses every other player's ground, Explore Land's flags 0x40 — READ (0x70bd40 at 0x70bd87..0x70beee, 0x709d80 at 0x709da0..0x709dc2, 0x70ce90 at 0x70ced5), FIT (the knowledge base's +0x128 at or below the turn), both twins"
     - "C-95 / C-99: a cleared camp's scout still reports; a lake city trains ships; IsCoastalTarget; the recruit's priority; a candidate's own strength — READ (0x153ef0, 0x1485c0, 0x1c77c0 -> 0x82a10, 0x73a440 -> 0x73a880, 0x81c820 at 0x81cacf..0x81cb14, 0x7d1e40 at 0x7d2004..0x7d205f, 0x5cced0 at 0x5cd0c1..0x5cd11e, 0x7f5240), both twins"
     - "C-95 / C-99: a cleared camp's scout still reports; a lake city trains ships; IsCoastalTarget; the recruit's priority; a candidate's own strength — READ (0x153ef0, 0x1485c0, 0x1488a0 at 0x148c38..0x148c64, 0x1c77c0 -> 0x82a10, 0x73a440 -> 0x73a880, 0x81c820 at 0x81cacf..0x81cb14, 0x7d1e40 at 0x7d2004..0x7d205f, 0x5cced0 at 0x5cd0c1..0x5cd11e, 0x7f5240), both twins"
+    - "C-95: the barbarians' scout is any tribe unit of AI type EXPLORE, a captive's sight counts — READ (0x153ef0 at 0x153f1d / 0x153f86), both twins"
   context:
     - "- The report (0x153ef0, a barbarian unit's sight of a plot): a tribe's scout (unit +0x1c0 == 2) seeing an owne..."
     - "- The report's event: 0x153ef0 is bound (0x153b0d) to the game signal at signals +0x10c8, which the unit sight update..."

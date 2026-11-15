@@ -28,6 +28,7 @@ import { BARB_SEAT, FREE_SEAT, NO_SEAT, allCities, campTiles, isBarbSeat, isTerr
 import { suzerainOf } from './cityStates';
 import { losDisk, unitLook, unitSight, unitSeesThrough } from './fog';
 import { spawnUnit, tileFreeForUnit, unitDomain } from './units';
+import { AI_EXPLORE, aiTypeOf } from './tactical';
 import { UNITS } from '../data/units';
 import { TECHS } from '../data/techs';
 import { CIVICS } from '../data/civics';
@@ -400,6 +401,17 @@ export function raidBoldness(tribe: BarbTribe): number {
   return barbNameRaidBoldness(tribe.kind, tribe.name) ?? BARB_RAID_BOLDNESS;
 }
 
+/** a unit's placement updates its player's sight (0x58aa90): a scout among
+ *  the units a tribe's turn raised looks from its plot (runs/h1_duels1162
+ *  t113: tribe 5's Skirmisher 3473426 raised on 39:4 reports 37:7 there,
+ *  its tree that turn, the raid at t114) */
+function placedLook(state: GameState, ids: readonly number[]): void {
+  for (const id of ids) {
+    const u = state.units.find((x) => x.id === id);
+    if (u) barbScoutLook(state, u);
+  }
+}
+
 /**
  * A TRIBE'S TURN (0x1488a0): its spawn clock runs; at its interval — the
  * tribe's TurnsToWarriorSpawn at the speed, or the SpawnRate its operation
@@ -412,7 +424,8 @@ export function raidBoldness(tribe: BarbTribe): number {
  * raised within two plots on the fifth.
  * Then its Boldness grows, its operation is forgotten once gone, and the
  * cities it waits to go after are tried: a city assault at
- * CityAttackBoldness, else a raid at RaidingBoldness.
+ * CityAttackBoldness, else a raid at RaidingBoldness. Each unit it raises
+ * looks from where it is placed (`placedLook`).
  */
 function tribeTurn(state: GameState, tribe: BarbTribe): void {
   const def = BARB_TRIBES.find((d) => d.kind === tribe.kind)!;
@@ -423,12 +436,14 @@ function tribeTurn(state: GameState, tribe: BarbTribe): void {
     if (tribe.queue?.length) {
       const ids = raise(state, tribe, tribe.queue.shift()!, 1, 1);
       tribe.units.push(...ids);
+      placedLook(state, ids);
       tribe.fresh.push(...ids);
     } else if (tribe.unitCount < BARB_MAX_UNITS) {
       const pct = barbNameRangedPct(tribe.kind, tribe.name) ?? def.rangedPct;
       const ranged = randRange(state, 100, 'Barbarian Ranged unit roll') < pct;
       const ids = raise(state, tribe, ranged ? def.rangedTag : def.meleeTag, 1, 1);
       tribe.units.push(...ids);
+      placedLook(state, ids);
       tribe.fresh.push(...ids);
       tribe.unitCount += ids.length;
     }
@@ -437,6 +452,7 @@ function tribeTurn(state: GameState, tribe: BarbTribe): void {
     if (tribe.scoutTurns >= BARB_SCOUT_WAIT) {
       const ids = raise(state, tribe, def.scoutTag, 2, 1);
       tribe.scouts.push(...ids);
+      placedLook(state, ids);
       tribe.scoutCount += ids.length;
       tribe.scoutTurns = 0;
     }
@@ -478,15 +494,17 @@ function cityCentreOf(state: GameState, t: Tile): number {
  * a handicap level turns.
  */
 /** of the plots, those another barbarian unit sees where it stands — a
- *  civilian of theirs (a capture) none (runs/h1_dueld1128 t76: the captured
- *  Settler on 13:14, three plots from the Farm on 15:12, leaves the
- *  Skirmisher's report standing: the scout's tree that day, the raid at t78
- *  as AI_Operation.csv logs it) */
+ *  civilian of theirs (a capture) among them (runs/h1_duels1152 t94: player
+ *  1's Builder taken on 34:17, its sight over the Government Plaza on 34:15
+ *  before the captor, tribe 2's Scout, steps there: no report, the scout's
+ *  tree first at t108; runs/h1_dueld1128 t76: the captured Settler on 13:14,
+ *  three plots from the Farm on 15:12, out of its sight, leaves the
+ *  Skirmisher's report standing) */
 function othersSee(state: GameState, unit: Unit, plots: readonly number[]): Set<number> {
   const out = new Set<number>();
   if (!plots.length) return out;
   for (const o of state.units) {
-    if (o === unit || !isBarbSeat(o.seat) || o.tileIndex < 0 || unitDomain(o.type) === 'civilian') continue;
+    if (o === unit || !isBarbSeat(o.seat) || o.tileIndex < 0) continue;
     const sees = new Set(unitLook(state, o));
     for (const p of plots) if (sees.has(p)) out.add(p);
   }
@@ -498,9 +516,14 @@ export function barbScoutLook(state: GameState, unit: Unit): void {
   // a cleared camp's scout still reports, and its tree walks it to where
   // the camp stood — one tree, the tribe's turn alone forgetting its id
   // (`scoutTreeHeld`; runs/h1_duels1132 t75-77 tribe 1's Scout 262147;
-  // runs/h1_duels1133 t25 tribe 0's Scout 131073, its tree of t7 held, none)
-  const tribe = tribesOf(state).find((tr) => tr.scouts.includes(unit.id));
-  if (!tribe) return;
+  // runs/h1_duels1133 t25 tribe 0's Scout 131073, its tree of t7 held, none);
+  // a scout is any unit of AI type EXPLORE (unit +0x1c0 2, 0x153f86), a tribe's
+  // Skirmisher raised as one of its units among them (runs/h1_duels1175 t139:
+  // tribe 6's Skirmisher 5701633, beside its Scout, walks home from 8:14 and
+  // its raid on 9:14 starts at t141; 1162 t113 / t139, 1181 t128 / t163,
+  // 1145 t134 alike)
+  const tribe = tribeOf(state, unit.id);
+  if (!tribe || aiTypeOf(state, unit) !== AI_EXPLORE) return;
   const { map } = state;
   const from = map.tiles[unit.tileIndex];
   const through = unitSeesThrough(unit);

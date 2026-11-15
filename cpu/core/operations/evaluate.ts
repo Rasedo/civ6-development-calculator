@@ -214,6 +214,12 @@ export function evaluate(view: AiView, seat: number, c: Candidate, rallies: read
   c.value = 0;
   if (def.mustBeAtWar && (c.enemy < 0 || !view.atWar(seat, c.enemy))) return;
   if (def.mustHaveNukes) return;
+  // MustHaveUnits: the seat's units (player +0x12e8 +0xc0, every unit it
+  // holds) at least so many (runs/h1_duels1145 city-state 4: four units at
+  // t36, Wartime Attack Enemy City (3) valid and Attack Enemy City (5) not;
+  // six at t46, both and Wartime Attack Walled City (6), Attack Walled City
+  // (10) not)
+  if (def.mustHaveUnits > 0 && view.units(seat).length < def.mustHaveUnits) return;
   const bestOurs = view.bestCombatStrength(seat);
   const bestTheirs = c.enemy >= 0 ? view.bestCombatStrength(c.enemy) : null;
   for (const t of targetsOf(view, seat, c, inputs)) {

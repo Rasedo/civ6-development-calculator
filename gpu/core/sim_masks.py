@@ -3122,6 +3122,7 @@ class SimMasks:
         # no tribe's until the raise that made it says so (`_barb_raise`)
         self.barb_unit_tribe[rows, slot] = -1
         self.barb_unit_scout[rows, slot] = False
+        self.barb_unit_saw[rows, slot] = False
         # a reclaimed slot is no operation's, raised in no tribe's turn, and
         # the scout a tribe's tree held there is lost (-2: the tree's Protect
         # Unit finds no unit and the tree ends)

@@ -14629,10 +14629,13 @@ class SimSeats:
         _bm = moved & (gslot >= _blo) & (gslot < self.POOL_HI["barb"])
         if bool(_bm.count_nonzero()):
             _bs = torch.where(_bm, gslot - _blo, torch.full_like(gslot, -1))
-            _tr = self.barb_unit_tribe.gather(1, _bs.clamp(min=0).unsqueeze(1)).squeeze(1)
+            # a scout is any unit of its tribe (`tribeOf`, its defender
+            # included) of AI type EXPLORE (`aiTypeOf`)
+            _ai, _utr = self._tac_ai()
+            _tr = _utr.gather(1, _bs.clamp(min=0).unsqueeze(1)).squeeze(1)
             for _k in torch.unique(_tr[_bm]).tolist():
                 if _k >= 0:
-                    self._barb_scout_look(_bm & (_tr == _k), int(_k), _bs)
+                    self._barb_scout_look(_bm & (_tr == _k), int(_k), _bs, _ai)
         return moved
 
     def _encamp_terms(self, tc: torch.Tensor):
@@ -15074,6 +15077,7 @@ class SimSeats:
         if pool == "barb":
             self.barb_unit_tribe[rows, nslot] = -1
             self.barb_unit_scout[rows, nslot] = False
+            self.barb_unit_saw[rows, nslot] = False
             self.barb_unit_op[rows, nslot] = False
             self.barb_unit_fresh[rows, nslot] = False
             # a new unit to the barbarians' pool, its place taken at their

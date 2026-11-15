@@ -104,7 +104,11 @@ function bbValue(w: ImportWorld, type: number, v: unknown, tag: string): unknown
     return x < 0 || y < 0 ? -1 : y * w.W + x;
   }
   if (type === 9) return (v as number) / 256;
-  if (type === 3 && /city/i.test(tag)) return (v as number) >= 0 ? -1 : v;
+  // a contract's id under a tag that names a city stays the id (Early City
+  // Assault's "City Attack Contract": runs/h1_duels1145 city-state 4's
+  // contract 97, which its Contract Manager Decorator fails on the ninth
+  // turn after the operation's start)
+  if (type === 3 && /city/i.test(tag) && !/contract/i.test(tag)) return (v as number) >= 0 ? -1 : v;
   return v;
 }
 

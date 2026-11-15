@@ -18,6 +18,9 @@
     - recording: h1_duely1124
       turn: 3
       value: the barbarians' Barbarian Builder Capture 100.0 on the two camps their look knew at t2, 150.0 / 200.0 / 250.0 at t4-t6 (AI_Operation_Eval.csv); the rally 41:7 of the t46 capture, 18:7 of t87's
+    - recording: h1_duels1145
+      turn: 36-66
+      value: "MustHaveUnits (0x746991..0x7469ad: player +0x12e8 +0xc0, the unit count, below it invalid): city-state 4 at four units logs Wartime Attack Enemy City (3) alone (t36, t66), at six Attack Enemy City (5), Wartime Attack Enemy City and Wartime Attack Walled City (6), not Attack Walled City (10) (t46, t56); duels1164 city-state 3 at five drops Wartime Attack Walled City (t219)"
   impl:
     - cpu/core/operations/evaluate.ts:distLimit
     - cpu/core/operations/evaluate.ts:evaluate
@@ -35,7 +38,7 @@
     - "C-95: the barbarians' candidates before the look, a capture's rally, a formation's embark flag and fighter — READ (0x722d70, 0x746920, 0x747230, 0x7877e0, 0x7265b0, 0x747fa0, 0x73e610, 0x73e870, 0x267650), both twins"
     - "C-95 / C-99: a cleared camp's scout still reports; a lake city trains ships; IsCoastalTarget; the recruit's priority; a candidate's own strength — READ (0x153ef0, 0x1485c0, 0x1c77c0 -> 0x82a10, 0x73a440 -> 0x73a880, 0x81c820 at 0x81cacf..0x81cb14, 0x7d1e40 at 0x7d2004..0x7d205f, 0x5cced0 at 0x5cd0c1..0x5cd11e, 0x7f5240), both twins"
     - "C-95 / C-99: a cleared camp's scout still reports; a lake city trains ships; IsCoastalTarget; the recruit's priority; a candidate's own strength — READ (0x153ef0, 0x1485c0, 0x1488a0 at 0x148c38..0x148c64, 0x1c77c0 -> 0x82a10, 0x73a440 -> 0x73a880, 0x81c820 at 0x81cacf..0x81cb14, 0x7d1e40 at 0x7d2004..0x7d205f, 0x5cced0 at 0x5cd0c1..0x5cd11e, 0x7f5240), both twins"
-  notes: ["imported: READ in its section, no confirming case found beside it"]
+    - "C-95: the barbarians' scout is any tribe unit of AI type EXPLORE, a captive's sight counts — READ (0x153ef0 at 0x153f1d / 0x153f86), both twins"
   context:
     - "- The evaluation (job \"Op Evaluation\", 0x746920): MustBeAtWar, MustHaveNukes, MustHaveUnits (player +0x12e8 +0xc0) first; then each tar..."
   review: reviewed

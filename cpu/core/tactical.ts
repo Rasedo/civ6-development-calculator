@@ -2553,7 +2553,7 @@ const CIVILIAN_TAKEN = 150;
 const RELIGIOUS_TAKEN = 1.5;
 
 /** UnitAiTypes: a unit's AI type (unit +0x1c0) */
-const AI_EXPLORE = 2;
+export const AI_EXPLORE = 2;
 const AI_COMBAT = 3;
 const AI_DEFENDER = 4;
 
@@ -2562,7 +2562,7 @@ const AI_DEFENDER = 4;
  *  COMBAT), its scouts EXPLORE, a civilian none, every other its type's own
  *  (`ownMilitaryAi`: runs/h1_duely1128 t239-240 the Rangers 7274504 and
  *  7340037 a tribe raised as units take HL Explore, as logged) */
-function aiTypeOf(state: GameState, u: Unit): number {
+export function aiTypeOf(state: GameState, u: Unit): number {
   if (unitDomain(u.type) !== 'military') return -1;
   const tr = tribeOf(state, u.id);
   if (tr?.alive && tr.defender === u.id) return AI_DEFENDER;

@@ -4398,7 +4398,7 @@ class SimInit:
         # it asked for (the export's tag order, -1 empty), the owners of the cities its raid and its
         # assault wait for, its scout's tree (its scout's slot, the city's
         # owner, the tree's id, its Sequence's resume, Move Unit's held
-        # scout), the owned plots its scout saw at its last look; its
+        # scout); its
         # operation (0 none, 1 a raid, 2 an assault; `sim_barbops.py`), the
         # owner it goes after, its tree's id, its recruit's Turn Limiter's
         # first turn, its team's readiness of the military AI's turn; per
@@ -4423,7 +4423,9 @@ class SimInit:
         self.tribe_home_id = torch.full((B, self.KT), -1, dtype=torch.long, device=device)
         self.tribe_home_resume = torch.full((B, self.KT), -1, dtype=torch.long, device=device)
         self.tribe_home_mu = torch.zeros(B, self.KT, dtype=torch.bool, device=device)
-        self.tribe_saw = torch.zeros(B, self.KT, self.T, dtype=torch.bool, device=device)
+        # per barbarian unit the owned plots its sight held at its last look
+        # (`BarbTribe.saw`; a scout is any unit of AI type EXPLORE)
+        self.barb_unit_saw = torch.zeros(B, simbase.BARB_POOL_MAX, self.T, dtype=torch.bool, device=device)
         self.tribe_op = torch.zeros(B, self.KT, dtype=torch.long, device=device)
         self.tribe_op_seat = torch.full((B, self.KT), -1, dtype=torch.long, device=device)
         self.tribe_op_id = torch.full((B, self.KT), -1, dtype=torch.long, device=device)
