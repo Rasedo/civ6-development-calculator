@@ -8,7 +8,7 @@
 import { FEATURES } from '../../world/features';
 import { addYields, emptyYields, type City, type CityState, type GameState, type Seat, type TradeRoute, type Unit, type YieldKey, type Yields } from './types';
 import { BUILDINGS } from '../data/buildings';
-import { NO_SEAT, seatOf, citiesOf, isBarbSeat, civsAtWar, majorsMet, allianceTypeWith, isCityStateSeat, seatsAllied, setTileOwner, tileBelongsTo, civOf, tileSeat , leaderOf, routeIntercontinental, onHomeContinent, hiddenResourcesFor } from './seats';
+import { NO_SEAT, seatOf, citiesOf, majorityReligionOf, isBarbSeat, civsAtWar, majorsMet, allianceTypeWith, isCityStateSeat, seatsAllied, setTileOwner, tileBelongsTo, civOf, tileSeat , leaderOf, routeIntercontinental, onHomeContinent, hiddenResourcesFor } from './seats';
 import { ROME_OWN_POST_GOLD, CLEOPATRA_INTL_ROUTE_GOLD, CLEOPATRA_INCOMING_ROUTE_FOOD, CLEOPATRA_INCOMING_ROUTE_GOLD, ROUTE_CAPACITY_ROWS, rowIsFor, type RouteYieldRow } from '../data/civilizations';
 import { ALLIANCE_ROUTE_TO, ALLIANCE_ROUTE_YKEY } from '../data/seats';
 import { hexDistance, tilesWithin } from '../../world/hex';
@@ -24,10 +24,10 @@ import { DISTRICTS, DISTRICT_ROUTE_YIELDS } from '../data/districts';
 import { UNITS } from '../data/units';
 import { cityStateTradeCapacityBonus, hasMet, isSuzerain, minorCity, suzerainEffect, suzerainEffectCount } from './cityStates';
 import { completedDistrictCount, darkBuildings } from './yields';
-import { CITY_STATE_TYPES, CITY_STATE_TYPE_YIELD, CITY_STATE_ROUTE_TO_OTHERS, KUMASI_ROUTE_CULTURE, KUMASI_ROUTE_GOLD, HUNZA_PATH_TILE_GOLD_FX, AMSTERDAM_DEST_LUXURY_GOLD } from '../data/cityStates';
+import { CHINGUETTI_FOLLOWER_FAITH, CITY_STATE_TYPES, CITY_STATE_TYPE_YIELD, CITY_STATE_ROUTE_TO_OTHERS, KUMASI_ROUTE_CULTURE, KUMASI_ROUTE_GOLD, HUNZA_PATH_TILE_GOLD_FX, AMSTERDAM_DEST_LUXURY_GOLD } from '../data/cityStates';
 import { emergencyCsRouteGold } from './emergency';
 import { congressCsRouteFactor, congressIntlBanned, congressRouteCapacity, congressTradeGold } from './congress';
-import { ENHANCER_BELIEFS } from '../data/religion';
+import { ENHANCER_BELIEFS, followersOf, unconvertedOf } from '../data/religion';
 import type { RuleResult } from './rules';
 import { dedicationEvent, goldenDedication, layRoad } from './eras';
 import { DED_COINAGE, COINAGE_INTL_GOLD_PER_SPEC, TRADE_ROUTE_GOLD_CULTURAL_DOMINANCE } from '../data/seats';
@@ -1004,6 +1004,16 @@ export function routeYieldValue(state: GameState, owner: Seat, r: TradeRoute): n
   return v;
 }
 
+/** the followers in `city` of its seat's founded religion, else of the seat's
+ *  majority religion (`majorityReligionOf`); 0 with neither */
+function routeOriginFollowers(state: GameState, city: City): number {
+  const s = seatOf(state, city.seat);
+  const g = s?.religion.founded ? city.seat : majorityReligionOf(state, city.seat);
+  const pres = city.religionPressure;
+  if (g < 0 || !pres || g >= pres.length) return 0;
+  return followersOf(pres, city.population, unconvertedOf(city))[g];
+}
+
 /** What ONE of a major's routes pays its ORIGIN city `city` (the route's
  *  `from`), before the seat's Letters of Marque cut: the seat's cards'
  *  `routeYield` (Caravansaries, Triangular Trade, Ecommerce) and every
@@ -1028,6 +1038,13 @@ export function routeOriginYields(state: GameState, city: City, route: TradeRout
   }
   out.gold += routeChainGold(state, seat, route);
   out.gold += originWonderGold;
+  // CIV6 (Chinguetti's suzerain, EFFECT_ADJUST_PLAYER_TRADE_ROUTE_YIELD_PER_FOLLOWER):
+  // every route out, domestic or foreign, pays Faith per follower in its
+  // origin city of the seat's founded, else majority, religion
+  // (runs/h1_duels1191 China, Chinguetti's suzerain from t63: Yiyang's first
+  // Taoist at t85, its route to Zanzibar +1 Faith in the trade AI's K, 12.91)
+  const chinguetti = suzerainEffectCount(state, seat, 'routeFollowerFaith');
+  if (chinguetti > 0) out.faith += CHINGUETTI_FOLLOWER_FAITH * chinguetti * routeOriginFollowers(state, city);
   if (route.toCs !== undefined) {
     const cityState = state.cityStates.find((c) => c.id === route.toCs);
     if (cityState) {

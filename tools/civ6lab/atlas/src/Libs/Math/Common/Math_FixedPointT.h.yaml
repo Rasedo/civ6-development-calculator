@@ -494,6 +494,7 @@
     - "C-97: the victory manager's strategies — READ (the evaluation, the apply, the conditions below), PARTLY READ (three conditions, the island's count)"
     - "C-100 / C-118 / C-98: the plot values' yield-source tourism, the exhausted Great Person class, a technology's improvement tourism — READ, both twins"
     - "H-1 / C-96: at war with a living major, a unit's strategic resource in the City Analysis, a city-state's naval strategy — READ (0x3dcf50, 0x7b62c0 at 0x7b71cd..0x7b725d, 0x6fafc0 at 0x6fc771..0x6fc873, 0x783980 at 0x783ade..0x783d93 and 0x785271..0x7852df, 0x786080, 0x865f20), both twins"
+    - "C-98 / C-130: a major's yield per turn in the sensitivity, Chinguetti's route Faith per follower — READ (0x4bf7c0, 0x526330's multipliers, PlayerTrade m_axYieldBonusPerFollower), both twins"
   notes:
     - ".claude/scratchpad/st1/reading.md: ...ess the danger << 8. AI_SiteEval.csv logs no score below 0:   the port clamps there. - The regions (0x6fafc0, the \"Settle City Evaluation\" jobs, one per map   region of the regions list, run and waited): each..."
   context:

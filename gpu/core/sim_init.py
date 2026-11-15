@@ -658,6 +658,7 @@ class SimInit:
         self._suz_c_reach = _sfx.index("regionalReach") if "regionalReach" in _sfx else -1
         self._suz_c_works = _sfx.index("worksScience") if "worksScience" in _sfx else -1
         self._suz_c_route = _sfx.index("csRouteYields") if "csRouteYields" in _sfx else -1
+        self._suz_c_route_fol = _sfx.index("routeFollowerFaith") if "routeFollowerFaith" in _sfx else -1
         self._suz_c_holy = _sfx.index("holySitePressure") if "holySitePressure" in _sfx else -1
         self._suz_c_apostle = _sfx.index("apostlePromoChoice") if "apostlePromoChoice" in _sfx else -1
         self._suz_c_era = _sfx.index("eraInspiration") if "eraInspiration" in _sfx else -1
@@ -682,6 +683,7 @@ class SimInit:
         self._suz_relic_sci = float(_suz["relicScience"])
         self._suz_route_cul = float(_suz["routeCulture"])
         self._suz_route_gold = float(_suz["routeGold"])
+        self._suz_route_fol_faith = float(_suz["routeFollowerFaith"])
         # Geneva / Bologna / Nan Madol / Amsterdam / Zanzibar / Hunza / Hong Kong /
         # Ngazargamu / Buenos Aires — nine rows, each its own rule.
         self._suz_sci_pct = float(_suz["sciencePct"])

@@ -407,6 +407,9 @@ A question the SOURCE under-determines; neither engine ships a branch until the 
   - LAB (route value K): the route value K: a major's trade list a turn off (1124 t11, 1117 t36)
   - LAB (route value K): the route value K: 1127 Hattusa's first China route (t95-114: ours 576-577-622-623-667, the game's 576-621-665-666-667)
   - LAB (route value K): the route value K x1.2 over a major's lists closed by its strategies (C-130)
+  - LAB (route value K): the route value K: a major's Religious AI faith boost (0x74f5a0: -0.25 steps on its faith balance against its wanted religious unit's cost, ranked on its cities' City Analysis values) unported: duels1191 t118 China's K 9.40 for ours 14.90 as its faith fell 94 -> 6, then 15.44 / 12.44 turn about t119-128 (Taiyuan's 11 Taoists under Chinguetti); the Free Cities' civics in reach t119-249
+  - LAB (route value K): the route value K a turn late where a major's own turn moves its route yields: duels1180 t28 China slots Caravansaries in its t28 turn, the game's K 3.50 at t28, ours at t29 (the cards land after the Free Cities' turn); duels1139 t153 and duels1170 t242 K one turn late alike, untraced
+  - LAB (route value K): the route value K: duels1153 China's route to city-state 513 (11 Gold) 10.68 to t141, the game's 10.71 at t142, 12.00 at t151, 12.00 / 12.25 turn about t151-160 and 13.45 / 13.70 from t161, no Chinguetti held: untraced
   - LAB (quests): the quests' select ranges (18 draws)
   - LAB (contracts): t178 p2 a Stock Exchange contract the game has none of (seed not named)
   - LAB (contracts): 1121 p2 t231 / t238 / t245 the game's Market contract a turn early

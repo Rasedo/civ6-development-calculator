@@ -29,6 +29,34 @@
     - cpu/core/minorBuild.ts:prev
   readings: ["C-108: the trade graph's paths — READ, both twins"]
   review: reviewed
+- addr: 0x4d8fc0
+  final: 0x33da30
+  kind: function
+  name: internationalRouteYieldModifier
+  semantics: PlayerTrade's per-yield multiplier of an international route (the vector at +0xfa8, r8d the yield; 1.0 = 0x100 past its end), read by 0x526330 on the route's origin yields.
+  status: READ
+  cases:
+    - recording: h1_duels1191
+      turn: 85
+      value: "China's m_axInternationalYieldModifier 1.0 for every yield t84-96: the Free Cities' K 12.91 as the route's own yields x 1.0"
+  impl: [cpu/core/trade.ts:routeOriginYields]
+  readings:
+    - "C-98 / C-130: a major's yield per turn in the sensitivity, Chinguetti's route Faith per follower — READ (0x4bf7c0, 0x526330's multipliers, PlayerTrade m_axYieldBonusPerFollower), both twins"
+  review: reviewed
+- addr: 0x4d9150
+  final: 0x33dbb0
+  kind: function
+  name: routeYieldModifier
+  semantics: PlayerTrade's per-yield multiplier of every route (the vector at +0x1020, r8d the yield; 1.0 = 0x100 past its end), read by 0x526330 and 0x526000 on the route's yields.
+  status: READ
+  cases:
+    - recording: h1_duels1191
+      turn: 85
+      value: "China's m_axOriginYieldModifier 1.0 for every yield t84-96: the Free Cities' K 12.91 as the route's own yields x 1.0"
+  impl: [cpu/core/trade.ts:routeOriginYields]
+  readings:
+    - "C-98 / C-130: a major's yield per turn in the sensitivity, Chinguetti's route Faith per follower — READ (0x4bf7c0, 0x526330's multipliers, PlayerTrade m_axYieldBonusPerFollower), both twins"
+  review: reviewed
 - addr: 0x4d9320
   final: 0x743c0
   kind: function

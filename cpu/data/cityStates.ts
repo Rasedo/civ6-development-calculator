@@ -86,7 +86,8 @@ export type SuzEffect =
   | 'seaTraderImmune' // Lisbon
   | 'buildingCostCulture' // Ayutthaya
   | 'conversionScience'   // Fez
-  | 'killStrengthGpp';    // Wolin
+  | 'killStrengthGpp'     // Wolin
+  | 'routeFollowerFaith'; // Chinguetti
 
 /** The WIRE order the exported `suzCode` indexes — append only. */
 export const SUZ_EFFECTS: SuzEffect[] = [
@@ -102,7 +103,16 @@ export const SUZ_EFFECTS: SuzEffect[] = [
   'bonusAmenities', 'shallowWaterProd', 'resourceTypeProduction', 'hubAmenities', 'relicFaith',
   'partnerProduction', 'wonderProduction', 'freshWaterHousing', 'gpActivatedPressure', 'freeStrategic',
   'gpCulturePct', 'seaTraderImmune', 'buildingCostCulture', 'conversionScience', 'killStrengthGpp',
+  'routeFollowerFaith',
 ];
+
+/** CIV6 (Babylon_Leaders.xml, MINOR_CIV_CHINGUETTI_UNIQUE_INFLUENCE_BONUS
+ *  attaching MINOR_CIV_CHINGUETTI_FAITH_FOLLOWERS to the suzerain:
+ *  MODIFIER_PLAYER_ADJUST_TRADE_ROUTE_YIELD_PER_FOLLOWER, YIELD_FAITH): the
+ *  Faith a route pays per follower in its origin city of the suzerain's
+ *  founded, else majority, religion (PlayerTrade m_axYieldBonusPerFollower) */
+export const CHINGUETTI_FOLLOWER_FAITH = srcConst('cityStates.chinguettiFollowerFaith', 1,
+  xml('ModifierArguments', 'ModifierId=MINOR_CIV_CHINGUETTI_FAITH_FOLLOWERS&Name=Amount', 'Value'));
 
 /** Cardiff: "Cities receive +2 Power for every Harbor building." Renewable,
  *  so it never leaves the city that holds the buildings. */
@@ -424,6 +434,7 @@ const RAW_CITY_STATE_SUZERAIN_BONUS: Record<string, SuzerainBonusDef> = {
   Lisbon: { name: 'Lisbon', type: 'trade', bonus: 'Your Trader units are immune to being plundered on water tiles.', suz: 'seaTraderImmune' },
   Ayutthaya: { name: 'Ayutthaya', type: 'cultural', bonus: 'Gain Culture equal to 10% of the construction cost when finishing buildings.', suz: 'buildingCostCulture' },
   Fez: { name: 'Fez', type: 'scientific', bonus: 'When you use a religious unit to convert a city for the first time earn 20 Science per Population of that city (on Standard Speed).', suz: 'conversionScience' },
+  Chinguetti: { name: 'Chinguetti', type: 'religious', bonus: 'International and domestic Trade Routes receive +1 Faith for every follower in this city, of your founded or majority religion.', suz: 'routeFollowerFaith' },
   Wolin: { name: 'Wolin', type: 'militaristic', bonus: "Receive Great General points when a land unit defeats a major or minor civilization's unit and receive Great Admiral points when a naval unit defeats a major or minor civilization's unit equal to 25% of the opposing unit's strength (Standard Speed).", suz: 'killStrengthGpp' },
 };
 

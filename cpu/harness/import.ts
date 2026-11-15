@@ -3861,6 +3861,15 @@ function importPlayer(ctx: Ctx, p: DumpPlayer, s: GameState['seats'][number]): v
   }
   s.treasury = num(p.gold);
   s.faith = num(p.faith);
+  // a major's Science and Culture a turn as its turn's start accrued them
+  // (the record stands after the first major's start; the AI's yield per
+  // turn, 0x4bf7c0, reads them: runs/h1_duels1183 Rome's 5.0 Science over
+  // China's 4.05, China's Science sensitivity in the Free Cities' K 3.75
+  // t15-27)
+  if (bool(p.major)) {
+    s.sciRate = num(p.scienceYield);
+    s.culRate = num(p.cultureYield);
+  }
   // a major's Great Person points by class (the record's GreatPersonClasses
   // order); a class the engine has no roster of carries points as the
   // `gp-class` gap

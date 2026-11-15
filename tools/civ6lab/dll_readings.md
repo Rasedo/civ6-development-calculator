@@ -17503,3 +17503,50 @@ per-unit sight memory `barb_unit_saw`).
   their trees' nodes (Is At War, Operation Diplomacy, Lock Units, Turn
   Limiter, Build Military Improvement) nor the enemy-city target walk and
   its city value (0x79fef0).
+
+## C-98 / C-130: a major's yield per turn in the sensitivity, Chinguetti's route Faith per follower — READ (0x4bf7c0, 0x526330's multipliers, PlayerTrade m_axYieldBonusPerFollower), both twins
+
+`yieldPerTurn` (cpu/core/aiWeights.ts) on `Seat.sciRate` / `.culRate`, a
+major's set by `importPlayer` (cpu/harness/import.ts) from the record and by
+its own accrual; `routeOriginFollowers` and the Chinguetti term of
+`routeOriginYields` (cpu/core/trade.ts), `CHINGUETTI_FOLLOWER_FAITH` and the
+`routeFollowerFaith` perk (cpu/data/cityStates.ts). GPU `_major_yield_w`
+(gpu/core/sim_minors.py) on `civ_sci_rate` / `civ_cul_rate`;
+`_row_origin_followers` and the Chinguetti term of `_seat_route_income`
+(gpu/core/sim_seats.py), `_suz_c_route_fol` / `_suz_route_fol_faith`
+(gpu/core/sim_init.py).
+
+- THE YIELD PER TURN 0x4bf7c0 (PlayerStats, r8d the YieldType): with r9b
+  set the cached entry +0xd00[yield] (m_axCachedYields; 1.0 past its end),
+  else the player's cities' City::GetYield (0x1cb8b0) summed. The grand
+  strategy's sensitivity (0x6fafc0 at 0x6fbf6d, 0x6fc01c, 0x6fc285) passes
+  r9b 1. The record's mem m_axCachedYields of record T equals the player's
+  scienceYield / cultureYield of record T - 1: the yields as the player's
+  turn opened, before its own founding that turn. The engine reads a
+  major's last accrual's Science and Culture; the replay's world stands
+  after the first major's turn start, so a major's are the record's
+  (`importPlayer`) until its own accrual in the pair writes them.
+- Confirmed: duels1183 Rome's 5.0 Science over China's 4.05: China's
+  ScienceSensitivity (VICTORY_STRATEGY_SCIENCE_VICTORY, 25) x sqrt 2 on its
+  route to Nalanda's 1 Science, the Free Cities' K 3.75 t15-27 as logged
+  (3.39 where Rome's read 0); China's Changsha founded in its t27 turn
+  counts from t28, K 3.39 as logged.
+- 0x526330'S MULTIPLIERS: after the terms (0x54eb90, 0x54c630's reset, the
+  path 0x54e160, 0x54c6c0), per yield an international route takes the
+  origin owner's PlayerTrade +0xfa8[yield] (0x4d8fc0) and +0x1020[yield]
+  (0x4d9150), a domestic one +0x1020 alone, each 1.0 past its end; the
+  recordings' m_axInternationalYieldModifier, m_axOriginYieldModifier and
+  m_axDestinationYieldModifier hold 1.0 throughout (duels1191, 1153).
+- CHINGUETTI (Babylon_Leaders.xml, MINOR_CIV_CHINGUETTI_FAITH_FOLLOWERS:
+  MODIFIER_PLAYER_ADJUST_TRADE_ROUTE_YIELD_PER_FOLLOWER, YIELD_FAITH,
+  Amount 1, attached to the suzerain): PlayerTrade
+  m_axYieldBonusPerFollower[FAITH] 1.0 while the player is suzerain; every
+  route out, domestic or international, pays that much Faith per follower in
+  its origin city of the player's founded religion, else its majority one.
+- Confirmed: duels1191 China, suzerain t36-45 and from t63 (the record's
+  m_axYieldBonusPerFollower {FAITH: 256} on exactly those turns): Yiyang's
+  first Taoist in its t85 turn, its route to Zanzibar 15 Gold and 1 Faith
+  at China's weights, the city-states' and the Free Cities' K 12.91 from t85
+  as logged (12.71 before); the Free Cities' Foreign Trade and the civics
+  past it 602.4 at t86.
+- OPEN: the Free Cities' city terms (C-98).

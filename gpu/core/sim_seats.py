@@ -5808,6 +5808,20 @@ class SimSeats:
                      * self.citystate_alive[:, :S].long()).sum(dim=1)
         return torch.where(g >= 0, n, torch.zeros_like(n))
 
+    def _row_origin_followers(self, row: int) -> torch.Tensor:
+        """[B, RC] long — `routeOriginFollowers`' twin: per city of major row
+        `row`, its followers (`_followers_of`) of the row's founded religion,
+        else of its majority one (`_dominant_religion`); 0 with neither"""
+        B, cols = self.B, self.RC
+        g = torch.where(self.civ_religion_done[:, row], torch.full((B,), row, dtype=torch.long, device=self.device),
+                        self._dominant_religion()[:, row])
+        alive = self.city_alive[:, row, :cols]
+        pop = self.city_pop[:, row, :cols]
+        f, _ = self._followers_of(self.city_pressure[:, row, :cols], torch.where(alive, pop, torch.zeros_like(pop)),
+                                  self.city_unconverted[:, row, :cols])   # [B, RC, n+1]
+        n = f.gather(2, g.clamp(min=0).reshape(B, 1, 1).expand(-1, cols, 1)).squeeze(2)
+        return torch.where((g >= 0).unsqueeze(1) & alive, n, torch.zeros_like(n))
+
     def _cities_following(self, g: torch.Tensor) -> torch.Tensor:
         """[B] long — `citiesFollowing`'s twin: every city in the world whose
         majority follows religion `g` ([B]) — the majors' and the Free
@@ -9871,6 +9885,15 @@ class SimSeats:
             for _kc in range(6):
                 if bool(_rg[:, _kc].count_nonzero()):
                     _rk_add(_kc, _rg[:, _kc].unsqueeze(1) * (act & has_from).double())
+        # CIV6 (Chinguetti's suzerain, EFFECT_ADJUST_PLAYER_TRADE_ROUTE_YIELD_PER_FOLLOWER):
+        # every route out, domestic or foreign, pays Faith per follower in its
+        # origin city of the row's founded, else majority, religion
+        # (`routeOriginFollowers`)
+        if self._suz_c_route_fol >= 0:
+            _chg = self._suz_effect_count(row, self._suz_c_route_fol)
+            if bool(_chg.count_nonzero()):
+                _fol = self._row_origin_followers(row).gather(1, from_j).double()
+                _rk_add(5, self._suz_route_fol_faith * _chg.double().unsqueeze(1) * _fol * (act & has_from).double())
         # domestic legs
         pays_d = act & (rr[:, :, 1] >= 0) & has_from & has_dest
         pd = pays_d.double()
