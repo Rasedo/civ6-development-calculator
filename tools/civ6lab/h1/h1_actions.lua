@@ -12,10 +12,64 @@
 --   arm    install the listeners once per game; print the status line
 --   read   print {k = "actions", list = rows since the last read} and clear
 --   status print the status line only
+-- A UnitAddedToMap row ends with the unit's Units index as the listener
+-- reads it; a UnitRemovedFromMap row with the index its UnitAddedToMap row
+-- read (-1 a unit added before the arm).
+-- Beside the rows, `extra`: the events of EXTRA, logged apart so the rows'
+-- sequence stands as it was — [the rows' seq when it fired, turn, event
+-- name, args...]; a Movement event (UnitMovementPointsChanged / Cleared /
+-- Restored) ends with the unit's Movement left as the listener reads it.
 local mode = "ZMODE"
 if LAB_H1A == nil then LAB_H1A = { armed = false, seq = 0, rows = {}, missing = {}, dropped = 0, luxWatch = {} } end
 local A = LAB_H1A
+if A.extra == nil then A.extra, A.extraArmed, A.extraMissing, A.extraDropped, A.utype = {}, false, {}, 0, {} end
 local CAP = 200000
+
+-- what the rows leave out: when a unit's Movement, abilities and sight
+-- change, a district's damage, the routes laid, the boosts, the banks and
+-- stockpiles, the turn's phases
+local EXTRA = {
+  "UnitMovementPointsChanged", "UnitMovementPointsCleared", "UnitMovementPointsRestored",
+  "UnitAbilityGained", "UnitAbilityLost", "UnitVisibilityChanged", "UnitPromotionAvailable", "UnitAirlifted",
+  "DistrictDamageChanged", "DistrictCombatChanged", "CityDefenseStatusChanged", "CityVisibilityChanged",
+  "RouteChanged", "RouteAddedToMap", "RouteRemovedFromMap",
+  "FeatureAddedToMap", "FeatureRemovedFromMap", "FeatureChanged", "ResourceAddedToMap", "ResourceRemovedFromMap",
+  "ResourceChanged",
+  "TechBoostTriggered", "CivicBoostTriggered", "LevyCounterChanged", "GovernorPointsChanged",
+  "TreasuryChanged", "FaithChanged", "PlayerResourceChanged", "TradeRouteCapacityChanged",
+  "DiplomacyRelationshipChanged", "DiplomacyStatement", "DiplomacyIncomingDeal", "DiplomacySessionClosed",
+  "TurnBegin", "TurnEnd", "PhaseBegin", "PhaseEnd", "LocalPlayerTurnBegin", "LocalPlayerTurnEnd",
+  "RemotePlayerTurnBegin", "RemotePlayerTurnEnd",
+  "WMDDetonated", "NationalParkAdded", "NaturalWonderRevealed", "GreatPeoplePointsChanged", "QuestChanged",
+  "CapitalCityChanged", "CityLoyaltyChanged", "CulturalIdentityConversionOutcomeChanged", "NotificationAdded",
+}
+local MOVEMENT = { UnitMovementPointsChanged = true, UnitMovementPointsCleared = true, UnitMovementPointsRestored = true }
+
+local function armExtra()
+  for _, name in ipairs(EXTRA) do
+    local ok = pcall(function()
+      Events[name].Add(function(...)
+        local a = A
+        if #a.extra >= CAP then a.extraDropped = a.extraDropped + 1 return end
+        local row = { a.seq, Game.GetCurrentGameTurn(), name }
+        local args = { ... }
+        for i = 1, select("#", ...) do
+          local v = args[i]
+          local t = type(v)
+          if t == "number" or t == "boolean" or t == "string" then row[#row + 1] = v
+          elseif v == nil then row[#row + 1] = "nil"
+          else row[#row + 1] = "<" .. t .. ">" end
+        end
+        if MOVEMENT[name] then
+          row[#row + 1] = P(function() return Players[args[1]]:GetUnits():FindID(args[2]):GetMovesRemaining() end)
+        end
+        a.extra[#a.extra + 1] = row
+      end)
+    end)
+    if not ok then A.extraMissing[#A.extraMissing + 1] = name end
+  end
+  A.extraArmed = true
+end
 
 -- the deeds a replay needs: what each player did, where units went, what
 -- cities made and bought, what research / civics / policies / governments /
@@ -75,6 +129,16 @@ local function arm()
             return table.concat(s)
           end)
         end
+        -- a unit's Units index: read at its arrival, kept for its removal
+        if name == "UnitAddedToMap" then
+          local ty = P(function() return Players[args[1]]:GetUnits():FindID(args[2]):GetType() end)
+          a.utype[args[1] .. ":" .. args[2]] = ty
+          row[#row + 1] = ty
+        elseif name == "UnitRemovedFromMap" then
+          local key = args[1] .. ":" .. args[2]
+          row[#row + 1] = a.utype[key] or -1
+          a.utype[key] = nil
+        end
         a.rows[#a.rows + 1] = row
         -- a city founded with no luxury allocated is watched: the first
         -- row after which the allocation names it logs LuxAllocArrived
@@ -107,10 +171,16 @@ local function arm()
 end
 
 if mode == "arm" and not A.armed then arm() end
+if mode == "arm" and not A.extraArmed then armExtra() end
 if mode == "read" then
   local rows = A.rows
   A.rows = {}
   OUT({k = "actions", list = rows, dropped = A.dropped})
   A.dropped = 0
+  local extra = A.extra
+  A.extra = {}
+  OUT({k = "extra", list = extra, dropped = A.extraDropped})
+  A.extraDropped = 0
 end
-OUT({k = "actions_status", armed = A.armed, pending = #A.rows, seq = A.seq, missing = A.missing})
+OUT({k = "actions_status", armed = A.armed, pending = #A.rows, seq = A.seq, missing = A.missing,
+  extraMissing = A.extraMissing})

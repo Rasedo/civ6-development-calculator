@@ -497,6 +497,7 @@
     - "C-130: the minor's treasury turn between its technologies and its civics; a pillaged building's Maintenance — READ (0x4e4560's order, 0x18c590), both twins"
     - "C-95: the full search sets out on the formation's least Movement, a major's formations from the log, a tactical move walks its own done units — READ (0x26eea0, 0x266660, 0x262cd0, 0x770ce0 at 0x770d30..0x771097, 0x77d180, 0x775340, 0x771f80 at 0x7723cb / 0x772663, 0x77a810, 0x774380), both twins"
     - "C-132: the danger map's fitted rules in the DLL; a search's shore crossings on the formation's own domain — READ (0x26dab0, 0x586360 at 0x586624..0x586664, 0x2720a0 at 0x272618..0x272689, 0x66a90, 0x52fe90, 0x56e0a0, 0x26e570, 0x530240, 0x530420), FIT (the unmoved flag, the barbarians' raise, the grant's last turn), both twins"
+    - "H-1: the recorder's unit, planning and city AI reads — READ off the disassembly, not yet read from a running game"
   notes:
     - ".claude/scratchpad/mu1/readings_c96.md: ...bard (0x56daa0) strength   within its range (0x56e3d0), any other nearer than twice its Movement   (0x56e130) — HIGH for a FRIENDLY_CITY, MEDIUM for an ALLY_SUPPORT. The   type ids (0x5bcb80, each global the..."
   context:

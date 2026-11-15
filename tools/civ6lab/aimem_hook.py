@@ -30,6 +30,11 @@ the AI memory reader"):
               mailbox's LOOK slot holds the Targets the look ran on
   5 0x5a8250  a player's turn start, PlayerTurnStarted's raise: rdx the
               player
+  6 0x503520  the tactical pass (the tactical AI's job on its player
+              signal): rcx the tactical AI (+0x98 its player, +0x118 the
+              signal index it runs on), edx the index signalled; it builds
+              the pass's unit list and runs the moves where the two are
+              equal and the player is no human
 """
 from __future__ import annotations
 
@@ -52,6 +57,7 @@ SITES = (
     (2, 0x3F3E90, bytes.fromhex("40565748 83ec78".replace(" ", "")), "kblog"),
     (3, 0x515D70, bytes.fromhex("488bc448894808"), "look"),
     (5, 0x5A8250, bytes.fromhex("48895c2408"), "start"),
+    (6, 0x503520, bytes.fromhex("40534883ec20"), "tacpass"),
 )
 
 
@@ -168,6 +174,9 @@ def build(base: int) -> tuple[bytes, list[tuple[int, bytes]]]:
     # -- site 5: a player's turn start (PlayerTurnStarted's raise; rdx the player)
     a.label("s5").b("41ba05000000").j32("e8", "common")
     a.b("48895c2408").j32("e9", 0x5A8255)
+    # -- site 6: the tactical pass (rcx the tactical AI, edx the signal's index)
+    a.label("s6").b("41ba06000000").j32("e8", "common")
+    a.b("4053 4883ec20").j32("e9", 0x503526)
     code = a.assemble()
     assert CAVE + len(code) <= MAIL, hex(CAVE + len(code))
     jumps = []

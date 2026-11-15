@@ -9,9 +9,20 @@ A record is ONE JSON line per turn: `turn`, `seed` (GameCore's
 counter read before and after the dump; a record whose counter moved under
 it carries `moved: true` and no check reads it), `head`, `map` (one list per
 row y, one plot list per x — the layout `h1_dump_ig.lua` documents),
-`players`, `mem` (per player its components' and cities' named fields
+`players` (each with `openBorders`, the players whose borders are open to
+it, PlayerDiplomacy:HasOpenBordersFrom, and `levy`, [PlayerInfluence's levy
+turn counter, turn limit]), `mem` (per player its components' and cities' named fields
 read from the game's objects while the turn is held, `aimem.Reader.world`;
-`memMs` the read's cost), `religions`, `congress` (the World Congress resolutions table,
+`memMs` the read's cost), `memUnits` (per player id every unit's row as the
+game's Unit object holds it at the hold, `aimem.Reader.all_units`: the
+columns `aimem_fields.rows()`), `deals` (the deals in force between each
+pair of majors, DealManager.GetPlayerDeals: [player, player, items], an
+item [from, to, DealItemTypes, DealItemSubTypes, value type, amount,
+duration, enacted turn, end turn]), `plotUnits` (each plot holding more
+than one unit, its units in the plot's own list order,
+Units.GetUnitsInPlotLayerID over every layer: [plot, [owner, id] ...]),
+`extra` (the events `h1_actions.lua` logs apart from the rows: [the rows'
+seq when it fired, turn, event, args...]), `religions`, `congress` (the World Congress resolutions table,
 raw), `events` (the random events of the turn and the one before),
 `greatPeople` (every recruited person by individual), `parks` (the
 National Parks' plots), `cities` (each with its `plots`: the map plots whose
@@ -146,6 +157,8 @@ def actions(t: Tuner, mode: str, timeout: float = 60.0) -> dict:
             continue
         if o.get("k") == "actions":
             got["list"], got["dropped"] = o["list"], o.get("dropped", 0)
+        elif o.get("k") == "extra":
+            got["extra"], got["extraDropped"] = o["list"], o.get("dropped", 0)
         elif o.get("k") == "actions_status":
             got["status"] = o
     return got
@@ -197,6 +210,10 @@ def snapshot(t: Tuner, cat: bool, timeout: float) -> tuple[dict, dict | None]:
             rec["greatPeople"] = o["past"]
         elif k == "parks":
             rec["parks"] = o["list"]
+        elif k == "deals":
+            rec["deals"] = o["list"]
+        elif k == "plotUnits":
+            rec["plotUnits"] = o["list"]
         elif k == "city":
             rec["cities"].append(o)
         elif k == "unit":
@@ -216,6 +233,11 @@ def snapshot(t: Tuner, cat: bool, timeout: float) -> tuple[dict, dict | None]:
         rec["actions"] = acts["list"]
         if acts.get("dropped"):
             rec["actionsDropped"] = acts["dropped"]
+    # the events logged apart from the rows (`h1_actions.lua`'s EXTRA)
+    if acts.get("extra") is not None:
+        rec["extra"] = acts["extra"]
+        if acts.get("extraDropped"):
+            rec["extraDropped"] = acts["extraDropped"]
     # whose turn start the record holds (`h1_starts.lua`), read before the
     # dump; a start that ran while it read is flagged
     if st.get("armed"):
@@ -236,6 +258,9 @@ def snapshot(t: Tuner, cat: bool, timeout: float) -> tuple[dict, dict | None]:
                 pm = ProcMem.of_host(MEM["host"])
                 MEM["reader"] = aimem.Reader(pm, pm.module(aimem.DLL))
             rec["mem"] = MEM["reader"].world([p["id"] for p in rec["players"] if isinstance(p.get("id"), int)])
+            # every player's units as the game's objects hold them at the
+            # hold: per player id each unit's row (`aimem_fields.rows()`)
+            rec["memUnits"] = MEM["reader"].all_units()
         except Exception as e:  # noqa: BLE001 — the record stands without it
             rec["memError"] = str(e)
             MEM["reader"] = None
@@ -289,7 +314,10 @@ def cmd_play(a, t: Tuner) -> int:
         # the witness listens from here on (once per game; a loaded game arms
         # afresh) — the turn starts before this call ran are not witnessed
         st = starts(t, "arm")
-        actions(t, "arm")
+        armed = actions(t, "arm").get("status") or {}
+        if left == a.turns and (armed.get("missing") or armed.get("extraMissing")):
+            # the events this game's InGame state does not carry
+            log(f"    action log: no event {armed.get('missing')}; no extra event {armed.get('extraMissing')}")
         if now not in done:
             # the seat's own turn start runs before its record is read
             if lp >= 0 and st.get("armed") and start_complete(st, lp) == now - 1:

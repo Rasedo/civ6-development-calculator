@@ -55,11 +55,20 @@ import procmem  # noqa: E402
 
 # the AI's behaviour-tree trace runs to 150 MB a game and carries no rule
 SKIP_LOGS = {"AI_Behavior_Trees.csv"}
+# the game's .log files a recording keeps beside its CSVs: every unit
+# operation added or refused (UnitOperations.log), every unit path search
+# with its goal, flags and checksum (AStar_GC.log) — both with a header
+# line — and, with no header, the game core's own log, the modifiers'
+# (GameEffects.log, written under `game.RECORD_LOGS`), the game core's
+# events and the game's history where the profile turns them on
+LOG_FILES = {"UnitOperations.log": True, "AStar_GC.log": True, "GameCore.log": False, "GameEffects.log": False,
+             "GameCoreEvents.log": False, "GameHistory.log": False, "Game_History.log": False}
 
 
 def log_files(host: str) -> list[pathlib.Path]:
     logs = game.logs_dir(host)
-    return sorted([f for f in logs.glob("*.csv") if f.name not in SKIP_LOGS] + [logs / "CultureBordersLog.txt"])
+    return sorted([f for f in logs.glob("*.csv") if f.name not in SKIP_LOGS] + [logs / "CultureBordersLog.txt"]
+                  + [logs / name for name in LOG_FILES])
 
 
 def log_sizes(host: str) -> dict[str, int]:
@@ -72,15 +81,19 @@ def log_sizes(host: str) -> dict[str, int]:
     return out
 
 
-def save_slice(src: pathlib.Path, start: int, out: pathlib.Path) -> int:
+def save_slice(src: pathlib.Path, start: int, out: pathlib.Path, header: bool = True) -> int:
     """Copy `src`'s bytes past `start` (the game's own) to `out` with the
-    file's header; a file that restarted below `start` is copied whole."""
+    file's header (`header`: its first line is one); a file that restarted
+    below `start` is copied whole."""
     try:
         data = src.read_bytes()
     except OSError:
         return 0
-    head, _, _ = data.partition(b"\n")
     body = data[start:] if len(data) >= start else data
+    if not header:
+        out.write_bytes(body)
+        return body.count(b"\n")
+    head, _, _ = data.partition(b"\n")
     if body.startswith(head):
         body = body[len(head) + 1:]
     out.write_bytes(head + b"\n" + body)
@@ -96,7 +109,7 @@ def save_logs(host: str, starts: dict[str, int], dump: pathlib.Path) -> dict[str
     rows = {}
     for f in log_files(host):
         if f.exists():
-            rows[f.name] = save_slice(f, starts.get(f.name, 0), folder / f.name)
+            rows[f.name] = save_slice(f, starts.get(f.name, 0), folder / f.name, LOG_FILES.get(f.name, True))
     if (folder / "RandCalls.csv").exists():
         dump.with_suffix(".randcalls.csv").write_bytes((folder / "RandCalls.csv").read_bytes())
     logstore.build(str(dump))
@@ -128,12 +141,16 @@ class MemoryWatch:
     stand before the first turn (`wait_armed`); `stop` closes the gate
     through the stop file and returns the reader's last line."""
 
-    def __init__(self, host: str, out: pathlib.Path, log: pathlib.Path):
+    def __init__(self, host: str, out: pathlib.Path, log: pathlib.Path, units: pathlib.Path | None = None,
+                 plan_from: int = 0):
         self.out, self.stopfile = out, out.with_suffix(out.suffix + ".stop")
+        self.units = units
         self.stopfile.unlink(missing_ok=True)
         self.lines: list[str] = []
-        self.proc = subprocess.Popen([PY, str(LAB / "aimem.py"), "--host", host, "watch", "--out", str(out)],
-                                     stdout=subprocess.PIPE, stderr=subprocess.STDOUT, cwd=ROOT, text=True,
+        cmd = [PY, str(LAB / "aimem.py"), "--host", host, "watch", "--out", str(out)]
+        if units is not None:
+            cmd += ["--units", str(units), "--plan-from", str(plan_from)]
+        self.proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, cwd=ROOT, text=True,
                                      encoding="utf-8", errors="replace")
         self.log = log
         threading.Thread(target=self._read, daemon=True).start()
@@ -189,7 +206,8 @@ def play_game(host: str, seed: int, a, stamp: str, lock: threading.Lock) -> dict
         rec.update(end="crash", why=f"no main menu: {tail[-300:]}")
         return rec
     log_start = log_sizes(host)  # the new game's set-up rows are its own
-    mem = MemoryWatch(host, dump.with_suffix(".aimem.jsonl"), log) if a.aimem else None
+    mem = MemoryWatch(host, dump.with_suffix(".aimem.jsonl"), log, dump.with_suffix(".aiunits.jsonl"),
+                      a.majors) if a.aimem else None
     rc, tail = bounded([PY, str(LAB / "game.py"), "--host", host, "new", "--config", a.config,
                         "--map-seed", str(seed), "--game-seed", str(seed + 1000), "--wait", str(a.chunk - 10)],
                        a.chunk + 10, log)
@@ -220,12 +238,15 @@ def play_game(host: str, seed: int, a, stamp: str, lock: threading.Lock) -> dict
             break
     rec["turn"] = last
     if mem:
-        rec["aimem"] = {**rec.get("aimem", {}), "path": str(mem.out), "end": mem.stop()}
+        rec["aimem"] = {**rec.get("aimem", {}), "path": str(mem.out), "units": str(mem.units), "end": mem.stop()}
     bounded([PY, str(LAB / "h4.py"), "--host", host, "--deadline", "30", "lua", "--state", "InGame",
              "Events.ExitToMainMenu()"], 40, log)
     rec["logs"] = save_logs(host, log_start, dump)
     # the game's river and volcano orders beside the dump (`map_orders.py`)
     bounded([PY, str(HERE / "map_orders.py"), str(dump), "--map-seed", str(seed), "--config", a.config], 120, log)
+    if a.no_report:
+        rec["wall_end"] = time.time()
+        return rec
     with lock:  # the report is CPU work; one at a time keeps the box for the games
         rc, tail = bounded(["npx.cmd" if sys.platform == "win32" else "npx", "vite-node", "cpu/harness/run.ts", "--",
                             str(dump)], a.report_timeout, log)
@@ -253,7 +274,7 @@ def seeds_of(spec: str) -> list[int]:
 
 
 def cmd_run(a) -> int:
-    stamp = dt.datetime.now(dt.timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    stamp = a.stamp or dt.datetime.now(dt.timezone.utc).strftime("%Y%m%dT%H%M%SZ")
     manifest = RUNS / f"h1_fleet_{a.tag}_{stamp}.jsonl"
     jobs: "queue.Queue[int]" = queue.Queue()
     for s in seeds_of(a.seeds):
@@ -311,7 +332,12 @@ def main(argv=None) -> int:
     s.add_argument("--report-timeout", type=float, default=1800.0)
     s.add_argument("--keep-open", action="store_true", help="leave each instance running when its queue empties")
     s.add_argument("--aimem", action="store_true",
-                   help="read the AI memory at the logs' moments beside each game (aimem.py, <dump stem>.aimem.jsonl)")
+                   help="read the AI memory at the logs' moments beside each game (aimem.py, <dump stem>.aimem.jsonl"
+                        " and the units' stream <dump stem>.aiunits.jsonl)")
+    s.add_argument("--majors", type=int, default=2,
+                   help="the config's major players (ids 0..n-1): the units' stream leaves their plannings out")
+    s.add_argument("--no-report", action="store_true", help="record only: no engine report over the dump")
+    s.add_argument("--stamp", help="the run's stamp in its file names (default: now, UTC)")
     s.set_defaults(fn=cmd_run)
     s = sub.add_parser("summary")
     s.add_argument("manifest")

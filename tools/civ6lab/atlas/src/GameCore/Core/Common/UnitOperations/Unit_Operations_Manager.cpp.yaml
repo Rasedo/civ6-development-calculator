@@ -131,6 +131,7 @@
       value: "the camp's Spearman 1376265 on 3:18, its move to the spot 3:17 its Line Infantry holds kept, strikes nothing: the strike pushed behind it never starts; h1_duelq1128 t31 the Spearman 589832 walks 30:6 -> 31:7 for 32:8 with no strike"
   readings:
     - "C-125 / C-95: the target list's trade layer and its one unit of the units' layer; a siege unit's step onto civilians; the city-states' Attack Civilians; the flankers' test, the support's caller, the camp strike's queue — READ (0x783980 at 0x7849bb..0x784c2b and 0x784c30..0x784f57, 0x26fe20 -> 0x212500, 0x521530, 0x51f070 at 0x51f70e..0x51f737, 0x546f0, 0x52f50), both twins"
+    - "H-1: the recorder's unit, planning and city AI reads — READ off the disassembly, not yet read from a running game"
   context:
     - ...b and 0x784c30..0x784f57, 0x26fe20 -> 0x212500, 0x521530, 0x51f070 at 0x51f70e..0x51f737, 0x546f0, 0x52f50), both twins
     - "- THE CAMP STRIKE'S QUEUE (0x772940's two pushes through the manager's vt +0x60, 0x546f0): the operation is appended at the back of the unit's queue (+0x2040: the list +0xd0, i..."

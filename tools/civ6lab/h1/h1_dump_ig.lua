@@ -228,6 +228,19 @@ for _, p in ipairs(players) do
     end
   end
   rec.allies, rec.friends = allies, friends
+  -- the players whose borders are open to this one
+  -- (PlayerDiplomacy:HasOpenBordersFrom), and the levy's clock: [turn
+  -- counter (-1 none), turn limit] (PlayerInfluence)
+  local open = {}
+  for _, q in ipairs(players) do
+    if q ~= p then
+      local oko, o = pcall(function() return dip:HasOpenBordersFrom(q) end)
+      if oko and o then open[#open + 1] = q end
+    end
+  end
+  rec.openBorders = open
+  rec.levy = {P(function() return pl:GetInfluence():GetLevyTurnCounter() end),
+    P(function() return pl:GetInfluence():GetLevyTurnLimit() end)}
   -- the dedications this player holds for the current era
   rec.commemorations = P(function() return eras:GetPlayerActiveCommemorations(p) end)
   local tokens = {}
@@ -276,6 +289,33 @@ for _, p in ipairs(players) do
   rec.gpp = gpp
   OUT(rec)
 end
+-- the deals in force between each pair of majors (DealManager.GetPlayerDeals,
+-- the report screen's reader): per deal its items, each [from player, to
+-- player, DealItemTypes, DealItemSubTypes, value type, amount, duration,
+-- enacted turn, end turn]
+OUT({k = "deals", list = P(function()
+  local out = {}
+  for i = 1, #players do
+    for j = i + 1, #players do
+      local a, b = players[i], players[j]
+      if Players[a]:IsMajor() and Players[b]:IsMajor() then
+        local deals = DealManager.GetPlayerDeals(a, b)
+        for _, deal in ipairs(deals or {}) do
+          local items = {}
+          for it in deal:Items() do
+            items[#items + 1] = {P(function() return it:GetFromPlayerID() end), P(function() return it:GetToPlayerID() end),
+              P(function() return it:GetType() end), P(function() return it:GetSubType() end),
+              P(function() return it:GetValueType() end), P(function() return it:GetAmount() end),
+              P(function() return it:GetDuration() end), P(function() return it:GetEnactedTurn() end),
+              P(function() return it:GetEndTurn() end)}
+          end
+          out[#out + 1] = {a, b, items}
+        end
+      end
+    end
+  end
+  return out
+end)})
 OUT({k = "religions", list = P(function() return Game.GetReligion():GetReligions() end)})
 -- the World Congress's resolutions table as the first major reads it (raw)
 local firstMajor = -1
@@ -517,6 +557,21 @@ for _, p in ipairs(players) do
       fortify = P(function() return u:GetFortifyTurns() end)})
   end
 end
+-- the plots holding more than one unit, each with its units in the plot's
+-- own list order (Units.GetUnitsInPlotLayerID over every layer): [plot
+-- index, [owner, unit id] ...]
+OUT({k = "plotUnits", list = P(function()
+  local out = {}
+  for i = 0, W * H - 1 do
+    local list = Units.GetUnitsInPlotLayerID(i % W, math.floor(i / W), MapLayers.ANY)
+    if list ~= nil and #list > 1 then
+      local row = {i}
+      for _, u in ipairs(list) do row[#row + 1] = {u:GetOwner(), u:GetID()} end
+      out[#out + 1] = row
+    end
+  end
+  return out
+end)})
 -- each listed player's revealed plots (PlayersVisibility IsRevealed): the
 -- majors, the city-states, the Free Cities and the barbarians; a hex string
 -- of the plot bits in plot order, four plots a digit (plot 4k the digit's

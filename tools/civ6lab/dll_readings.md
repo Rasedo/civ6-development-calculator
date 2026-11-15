@@ -15686,3 +15686,51 @@ in `cityAssault`, `districtBothFall` in `cityAssault`, `attackCityState` and
   t156 (no Reef, no unit beside it, no resolution in force), its Warrior
   3276804 at +0 in t161; the third argument the blow struck passes
   0x206960 (read off the CombatLog's +3 alone).
+
+## H-1: the recorder's unit, planning and city AI reads — READ off the disassembly, not yet read from a running game
+
+`tools/civ6lab/aimem.py` (`Reader.unit_row`, `formation_row`, `slots`,
+`plan`, `unit_table`, `kb_cities`, `kb_targets`, `city_queues`; the stream
+`Units`, `<stem>.aiunits.jsonl`), `aimem_hook.py` (site 6),
+`aimem_fields.py` (the Unit, Formation, District, Operation, MilitaryAI,
+TacticalAI and PlayerTrade members by name, off their FinalRelease
+constructors). The offsets are the FinalRelease DLL's. None of them has
+been read from a running game: the short test of this recorder did not
+run. Each is to be confirmed on its first recording before anything is
+built on it.
+
+- A UNIT'S MEMBERS: the watched members by name (`aimem_fields.json`
+  "Unit"), a scalar's value at its member +0x10: m_kLocation's x and y
+  (+0xf8 / +0xfc), m_xMovesRemaining (+0x4f0, the value GetMaxMoves
+  FinalRelease 0x3a3a00 is compared with), m_kMovementModifiers (+0x828: the
+  ints +0x838 / +0x83c / +0x840 as FinalRelease 0x3a3a00 adds them: the
+  unit's own, the clear-terrain start's, own ground's).
+- A UNIT'S FORMATION, PLANNING AND QUEUE: the formation's pointer at unit
+  +0xbb8, the planning's at +0xbc0 (the reach's readers, planningReachAt
+  FinalRelease 0x51c340, take it from there); the operation queue is
+  m_kOperations' value (unit +0xbf8 +0x10): +0xd0 its entries, 0x30 bytes
+  each, +0xe0 their count (the push FinalRelease 0x40f50).
+- THE PLANNING: +0x30 the reach list, 16 bytes a plot (x, y, turns,
+  Movement left), +0x40 its count (FinalRelease 0x51c340); +0x48 the
+  targets, 0xd0 bytes each, +0x58 their count (planTargets FinalRelease
+  0x51da80 fills them).
+- THE TACTICAL TARGET LIST: 0x28-byte entries, the plot at +4 / +8, read by
+  planTargets FinalRelease 0x51da80 at its second argument's +0x248 (the
+  entries) and +0x258 (their count); taken as the knowledge base's +0x370 /
+  +0x380, the argument its +0x128. OPEN: that the argument is the knowledge
+  base's +0x128.
+- THE KNOWN CITIES: the knowledge base's +0xe0, its entries 0xe0 bytes each
+  and their count at +0x10 (the look's city arm FinalRelease 0x3f5db0 finds
+  an entry by its owner word +0, its type word +2 and its city id +4).
+- THE UNIT PRODUCTION TABLE: the military AI's +0x188 (the handler
+  FinalRelease 0x4b13f0 passes it to the table's build): +0x10 its entries,
+  0x168 bytes each, +0x20 their count, +0x28 the built flag; an entry's +0
+  the Units index, +0x160 its value (FinalRelease 0x524e30). OPEN: the
+  military AI taken as the player's +0x680.
+- THE TACTICAL PASS'S SITE (hook 6): FinalRelease 0x503520, rcx the tactical
+  AI (+0x98 its player, +0x118 the signal index it runs on), edx the index
+  signalled; its first six bytes (`push rbx`, `sub rsp, 0x20`) are the
+  hook's, checked against the install's file.
+- OPEN: every offset above against a running game; the combat modifiers'
+  member (m_kCombatModifers) and a queue entry's twelve ints are written
+  raw, their fields unread.

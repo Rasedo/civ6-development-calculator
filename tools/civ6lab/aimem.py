@@ -5,6 +5,18 @@ writes its AI logs, one JSON line per moment beside the recording.
     python tools/civ6lab/aimem.py --host 127.0.0.4 watch --out runs/<stem>.aimem.jsonl
     python tools/civ6lab/aimem.py --host 127.0.0.4 snap      # every player's memory now, to stdout
 
+    python tools/civ6lab/aimem.py --host 127.0.0.4 watch --out runs/<stem>.aimem.jsonl \
+        --units runs/<stem>.aiunits.jsonl --plan-from 2
+
+With `--units`, a second stream beside the memory's (`Units`): every
+unit's row with its formation, kept path and operation queue, the player's
+unit container slot by slot, each unit's planning (reach, targets, the
+predicted blows), the tactical target list, the known cities' cached
+strengths, the military AI's unit production table and each city's build
+queue — at the four sites below and at the tactical pass's own
+(`tacpass`, hook site 6, written to the units' stream only). The memory's
+stream holds what it held without it.
+
 `watch` waits for the instance and its game DLL, installs the hooks
 (`aimem_hook.py`: in the process only), prints `armed` and then, at each
 hook hit, reads while the game thread stands at the hook and appends a
@@ -514,6 +526,251 @@ class Reader:
             out[pid] = rec
         return out
 
+    # -- the units, their formations, queues and plannings (`<stem>.aiunits.jsonl`)
+    @staticmethod
+    def ints(raw: bytes) -> list:
+        """a member's bytes as int32s, a pointer's two halves None (an
+        address differs from run to run), the trailing zeros cut"""
+        raw = raw[:len(raw) // 8 * 8]
+        out: list = []
+        for k in range(0, len(raw), 8):
+            lo, hi = struct.unpack_from("<ii", raw, k)
+            out += [None, None] if ptr(struct.unpack_from("<Q", raw, k)[0]) else [lo, hi]
+        while out and not out[-1]:
+            out.pop()
+        return out
+
+    def items(self, at_begin: int, at_count: int, size: int, limit: int) -> bytes:
+        """a {begin, capacity, count} container's items' bytes (the planning's
+        reach and targets, a unit's queue, the knowledge base's lists)"""
+        begin, n = self.pm.u64(at_begin), self.pm.u32(at_count)
+        return self.pm.read(begin, size * n) if ptr(begin) and 0 < n <= limit else b""
+
+    def member_vector(self, b: bytes, off: int) -> list:
+        """a vector member's items as int32s (its header at +0x10, either
+        layout of `vector`); [] where the words are no vector"""
+        try:
+            raw = self.vector(*struct.unpack_from("<QQQ", b, off + 0x10))
+        except MemError:
+            raw = None
+        return list(struct.unpack(f"<{len(raw) // 4}i", raw[:len(raw) // 4 * 4])) if raw else []
+
+    def formation_row(self, f: int) -> list | None:
+        """a formation's row (`aimem_fields.rows()["formation"]`): its scalar
+        members in offset order (m_xMovesRemaining 24.8, m_bHasMoved,
+        m_bHasMovedIntoZOC ...), then its plot's y, its kept path
+        (m_kLastPath's items as int32s) and its members' unit ids"""
+        import aimem_fields  # noqa: PLC0415
+        tab = {n: o for n, o, _ in aimem_fields.load()["Formation"]["fields"]}
+        b = self.pm.read(f, tab["m_kUnitIDList"] + 0x28)
+        row: list = []
+        for name, off in aimem_fields.scalars("Formation"):
+            v = struct.unpack_from("<i", b, off + 0x10)[0]
+            row.append(v & 0xFF if name.startswith("m_b") else v)
+        row.append(struct.unpack_from("<i", b, tab["m_kLocation"] + 0x14)[0])
+        row.append(self.member_vector(b, tab["m_kLastPath"]))
+        row.append(self.member_vector(b, tab["m_kUnitIDList"]))
+        return row
+
+    def unit_row(self, u: int) -> list:
+        """a unit's row (`aimem_fields.rows()["unit"]`): its scalar members in
+        offset order, then its plot's y, its Movement modifiers
+        (m_kMovementModifiers' eight ints: +8 the unit's own, +0xc the
+        clear-terrain start's, +0x10 own ground's, +0x14 foreign ground's, as
+        GetMaxMoves FinalRelease 0x3a3a00 adds them), its experience [points,
+        level, promotion ready], its formation's row (unit +0xbb8),
+        m_aiAbilitiesPossessed's non-zero [index, value] pairs, the combat
+        modifiers' ints (m_kCombatModifers) and its operation queue
+        (m_kOperations' value +0xd0 the entries, 0x30 bytes each, +0xe0
+        their count: each entry's twelve ints)"""
+        import aimem_fields  # noqa: PLC0415
+        tab = {n: o for n, o, _ in aimem_fields.load()["Unit"]["fields"]}
+        ops = tab["m_kOperations"] + 0x10
+        b = self.pm.read(u, ops + 0xE8)
+        row: list = []
+        for name, off in aimem_fields.scalars("Unit"):
+            v = struct.unpack_from("<i", b, off + 0x10)[0]
+            row.append(v & 0xFF if name.startswith("m_b") else v)
+        row.append(struct.unpack_from("<i", b, tab["m_kLocation"] + 0x14)[0])
+        mv = tab["m_kMovementModifiers"]
+        row.append(self.ints(b[mv + 0x10:mv + 0x30]))
+        xp = tab["m_kExperience"] + 0x10
+        row.append([struct.unpack_from("<i", b, xp + 0xC)[0], struct.unpack_from("<i", b, xp + 0x10)[0], b[xp + 8]])
+        f = ptr(struct.unpack_from("<Q", b, 0xBB8)[0])
+        try:
+            row.append(self.formation_row(f) if f else None)
+        except MemError:
+            row.append(None)
+        ab = self.member_vector(b, tab["m_aiAbilitiesPossessed"])
+        row.append([[k, v] for k, v in enumerate(ab) if v])
+        cm = tab["m_kCombatModifers"]
+        row.append(self.ints(b[cm + 0x10:tab["m_kMovementModifiers"]]))
+        q_p, q_n = struct.unpack_from("<Q", b, ops + 0xD0)[0], struct.unpack_from("<I", b, ops + 0xE0)[0]
+        queue = []
+        if ptr(q_p) and 0 < q_n <= 16:
+            try:
+                raw = self.pm.read(q_p, 0x30 * q_n)
+                queue = [self.ints(raw[0x30 * k:0x30 * (k + 1)]) for k in range(q_n)]
+            except MemError:
+                pass
+        row.append(queue)
+        return row
+
+    def unit_pages(self, pl: int) -> list:
+        """Player::Units' paged table (+0x98: 8 entries of 0x18 a page): per
+        slot [slot, the unit or 0, the entry's first word where it is no
+        unit: the free list's link]"""
+        holder = self.pm.u64(pl + 0x6C8) + 0x98
+        pages = self.pm.u64(holder)
+        n = (self.pm.u64(holder + 8) - pages) // 8
+        out = []
+        if not ptr(pages) or not 0 < n <= 8192:
+            return out
+        for k, pg in enumerate(self.pm.qwords(pages, n)):
+            if not ptr(pg):
+                continue
+            ents = self.pm.read(pg, 0x18 * 8)
+            for j in range(8):
+                w = struct.unpack_from("<Q", ents, 0x18 * j)[0]
+                out.append([8 * k + j, ptr(w), 0 if ptr(w) else w & 0xFFFFFFFF])
+        return out
+
+    def units(self, pl: int) -> list:
+        """every unit of the player's pages: its row"""
+        out = []
+        for _, u, _ in self.unit_pages(pl):
+            if u:
+                try:
+                    out.append(self.unit_row(u))
+                except MemError:
+                    pass
+        return out
+
+    def slots(self, pl: int) -> dict:
+        """the player's unit container as the game holds it: `slots` every
+        entry of its pages, a unit's [slot, id, type index, m_bDelayedDeath,
+        m_aiController] (the id's high half the creation serial), a free
+        entry's [slot, -1, its link]; `order` the unit ids along its list
+        (+0xd0: node +0 the unit, +0x10 the next), the order the turn walks;
+        `head` Player::Units' own words +0x90..+0x110 (its counts)"""
+        out: dict = {"slots": [], "order": []}
+        for slot, u, link in self.unit_pages(pl):
+            if u:
+                b = self.pm.read(u + 0xB0, 0x254)
+                out["slots"].append([slot, struct.unpack_from("<i", b, 0)[0], struct.unpack_from("<i", b, 0x18)[0],
+                                     b[0x238], struct.unpack_from("<i", b, 0x250)[0]])
+            else:
+                out["slots"].append([slot, -1, link])
+        units = self.pm.u64(pl + 0x6C8)
+        node, n = self.pm.u64(units + 0xD0), 0
+        while ptr(node) and n < 4096:
+            out["order"].append(self.pm.i32(self.pm.u64(node) + 0xB0))
+            node, n = self.pm.u64(node + 0x10), n + 1
+        out["head"] = self.ints(self.pm.read(units + 0x90, 0x80))
+        return out
+
+    def plan(self, u: int) -> dict | None:
+        """a unit's planning (unit +0xbc0; the reach planningReachAt
+        FinalRelease 0x51c340 reads): `head` its first 0x30 bytes, `reach`
+        the reach list flat, four ints a plot [x, y, turns, Movement left]
+        (+0x30 the items, +0x40 their count), `targets` each target's 0xd0
+        bytes as 52 ints (+0x48 the items, +0x58 their count: the target's
+        plot +8 / +0xc, its spots' count +0x18, per spot the blow dealt
+        +0x64, taken +0x7c, the blow back taken +0x94 and dealt +0xac, the
+        kill byte +0xc4, wins +0x60)"""
+        p = ptr(self.pm.u64(u + 0xBC0))
+        if not p:
+            return None
+        reach = self.items(p + 0x30, p + 0x40, 0x10, 8192)
+        targets = self.items(p + 0x48, p + 0x58, 0xD0, 512)
+        return {"head": self.ints(self.pm.read(p, 0x30)),
+                "reach": list(struct.unpack(f"<{len(reach) // 4}i", reach)),
+                "targets": [list(struct.unpack("<52i", targets[k:k + 0xD0])) for k in range(0, len(targets), 0xD0)]}
+
+    def plans(self, pl: int) -> dict:
+        """per unit id of the player its planning (`plan`)"""
+        out = {}
+        for _, u, _ in self.unit_pages(pl):
+            if not u:
+                continue
+            try:
+                p = self.plan(u)
+                if p is not None:
+                    out[self.pm.i32(u + 0xB0)] = p
+            except MemError:
+                pass
+        return out
+
+    def unit_table(self, pl: int) -> dict:
+        """the military AI's unit production table (the military AI +0x188:
+        +0x10 the entries, 0x168 bytes each, +0x20 their count, +0x28 the
+        built flag; the value's reader FinalRelease 0x524e30): per entry its
+        ints, the trailing zeros cut (+0 the Units index, +8.. its flags,
+        +0x20 the units held, +0x2c the at-war count, +0x30 the opposition,
+        +0x160 the value, 24.8)"""
+        up = self.pm.u64(pl + 0x680) + 0x188
+        raw = self.items(up + 0x10, up + 0x20, 0x168, 1024)
+        return {"built": self.pm.u8(up + 0x28),
+                "entries": [self.ints(raw[k:k + 0x168]) for k in range(0, len(raw), 0x168)]}
+
+    def kb_cities(self, kb: int) -> list:
+        """the knowledge base's known cities (+0xe0: the entries, 0xe0 bytes
+        each, +0x10 their count; the look's city arm FinalRelease 0x3f5db0
+        fills them): per city its first 0x30 bytes as ints (the owner and
+        the entry's type in the first, the city id, +8 / +0xc its plot,
+        +0x1c the population) and its defensible districts, eight ints each
+        (+0x14 the defense strength, +0x18 the same while the outer defense
+        holds, +0x1c the strike)"""
+        raw = self.items(kb + 0xE0, kb + 0xF0, 0xE0, 512)
+        out = []
+        for k in range(0, len(raw), 0xE0):
+            e = raw[k:k + 0xE0]
+            d_p, d_n = struct.unpack_from("<Q", e, 0x48)[0], struct.unpack_from("<I", e, 0x58)[0]
+            d = self.pm.read(d_p, 0x20 * d_n) if ptr(d_p) and 0 < d_n <= 64 else b""
+            out.append([list(struct.unpack("<12i", e[:0x30])), list(struct.unpack(f"<{len(d) // 4}i", d))])
+        return out
+
+    def kb_targets(self, kb: int) -> list:
+        """the tactical target list (the knowledge base +0x370 the entries,
+        0x28 bytes each, +0x380 their count; planTargets FinalRelease
+        0x51da80 walks it): ten ints an entry, flat (+4 / +8 the plot)"""
+        raw = self.items(kb + 0x370, kb + 0x380, 0x28, 8192)
+        return list(struct.unpack(f"<{len(raw) // 4}i", raw))
+
+    def city_queues(self, pl: int) -> list:
+        """per city of the player its id and its m_kBuildQueue, m_kCombat and
+        m_kDistricts members (`fields`: the queue's per-type progress and
+        its overflow under `m_kBuildQueue.v`)"""
+        import aimem_fields  # noqa: PLC0415
+        tab = [f for f in aimem_fields.load()["City"]["fields"] if f[0] in ("m_kBuildQueue", "m_kCombat", "m_kDistricts")]
+        out = []
+        node = self.pm.u64(self.pm.u64(pl + 0x6D0) + 0xD0)
+        while ptr(node) and len(out) < 64:
+            c = self.pm.u64(node)
+            try:
+                out.append({"city": self.pm.i32(c + 0xA8), **self.fields(c, tab)})
+            except MemError:
+                pass
+            node = self.pm.u64(node + 0x10)
+        return out
+
+    def component(self, pl: int, name: str) -> dict:
+        """a player component's named fields (`aimem_fields`)"""
+        import aimem_fields  # noqa: PLC0415
+        t = aimem_fields.load()[name]
+        return self.fields(self.pm.u64(pl + int(t["component"], 16)), t["fields"])
+
+    def all_units(self) -> dict:
+        """per player id every unit's row"""
+        out = {}
+        for pid in PLAYER_IDS:
+            pl = ptr(self.player(pid))
+            if pl:
+                rows = self.units(pl)
+                if rows:
+                    out[pid] = rows
+        return out
+
     def full(self, pid: int, nodes: bool = False) -> dict:
         pl = self.player(pid)
         kb = self.pm.u64(pl + 0x698) + 0x270
@@ -529,16 +786,86 @@ class Reader:
         return out
 
 
-def hit_record(r: Reader, mb: bytes) -> dict | None:
+class Units:
+    """THE UNITS' STREAM (`<stem>.aiunits.jsonl`), a line per hook hit beside
+    the memory's (the same `seq`, `site`, `turn`, `player`), its first line
+    the rows' columns (`aimem_fields.rows()`):
+      start     `units` per player id every unit's row (`Reader.unit_row`),
+                `slots` the player's unit container (`Reader.slots`)
+      tactical  `units` (every player's, as the tactical turn opens),
+                `slots`
+      tacpass   the tactical pass about to run (after the operations'
+                trees): `units` the player's own, `plans` per unit id its
+                planning (`Reader.plan`), `targets` the tactical target
+                list, `kbCities` the known cities with their districts'
+                strengths, `slots`
+      log       `slots`, `targets`, `kbCities`
+      endlook   `units` the player's own, `plans` the plannings that differ
+                from its tacpass's (a unit left out holds the same),
+                `unitTable` the military AI's unit production table,
+                `military` and `tactical` those AIs' named fields, `cities`
+                each city's build queue, combat and districts members,
+                `slots`
+    The plannings are read for the players from `plan_from` up (the majors'
+    AI is not recorded)."""
+
+    def __init__(self, r: Reader, plan_from: int):
+        self.r, self.plan_from = r, plan_from
+        self.seen: dict[int, dict] = {}
+
+    def section(self, out: dict, name: str, fn) -> None:
+        try:
+            out[name] = fn()
+        except Exception as e:  # noqa: BLE001 — a section that fails never costs the memory's record
+            out.setdefault("errors", []).append(f"{name}: {e!r}")
+
+    def safe(self, site: str, pid: int, pl: int) -> dict:
+        try:
+            return self.record(site, pid, pl)
+        except Exception as e:  # noqa: BLE001
+            return {"errors": [f"units: {e!r}"]}
+
+    def record(self, site: str, pid: int, pl: int) -> dict:
+        r = self.r
+        kb = r.pm.u64(pl + 0x698) + 0x270
+        out: dict = {}
+        if site in ("start", "tactical"):
+            self.section(out, "units", r.all_units)
+        else:
+            if site != "log":
+                self.section(out, "units", lambda: r.units(pl))
+            if site != "endlook":
+                self.section(out, "targets", lambda: r.kb_targets(kb))
+                self.section(out, "kbCities", lambda: r.kb_cities(kb))
+        self.section(out, "slots", lambda: r.slots(pl))
+        if site in ("tacpass", "endlook") and pid >= self.plan_from:
+            self.section(out, "plans", lambda: r.plans(pl))
+            plans = out.get("plans") or {}
+            if site == "tacpass":
+                self.seen[pid] = plans
+            else:
+                before = self.seen.pop(pid, {})
+                out["plans"] = {k: v for k, v in plans.items() if before.get(k) != v}
+        if site == "endlook":
+            self.section(out, "unitTable", lambda: r.unit_table(pl))
+            self.section(out, "military", lambda: r.component(pl, "MilitaryAI"))
+            self.section(out, "tactical", lambda: r.component(pl, "TacticalAI"))
+            self.section(out, "cities", lambda: r.city_queues(pl))
+        return out
+
+
+def hit_record(r: Reader, mb: bytes, units: Units | None = None) -> tuple[dict | None, dict | None]:
+    """a hook hit's two records: the memory's (`<stem>.aimem.jsonl`; None for
+    the tactical pass's site) and the units' (`Units`; None without one)"""
     site = struct.unpack_from("<I", mb, H.SITE)[0]
     rcx, rdx, r8, _r9, ret, _rsp, _saved, look = struct.unpack_from("<8Q", mb, H.RCX)
     pm = r.pm
-    rec = {"site": site}
+    rec: dict | None = {"site": site}
     if site == 1:
         # the signal reaches every player's Targets with edx 4..0; it runs
         # where the flag is set and edx is the Targets' own +0x108
         if not (r8 & 0xFF) or (rdx & 0xFFFFFFFF) != pm.u32(rcx + 0x108):
-            return None
+            return None, None
         pl = pm.u64(rcx + 0x98)
         rec.update(site="tactical", player=pm.i32(pl + 0xD8))
         rec.update(r.common())
@@ -550,6 +877,7 @@ def hit_record(r: Reader, mb: bytes) -> dict | None:
             rec.setdefault("errors", []).append(f"danger: {e}")
     elif site == 2:
         pid = pm.i32(rcx + 0x6E8)
+        pl = r.player(pid)
         rec.update(site="log", player=pid)
         rec.update(r.common())
         rec.update(r.full(pid))
@@ -560,11 +888,23 @@ def hit_record(r: Reader, mb: bytes) -> dict | None:
         rec.update(r.common())
         rec.update(r.full(pid, nodes=True))
     elif site == 5:
+        pl = rdx
         rec.update(site="start", player=pm.i32(rdx + 0xD8))
         rec.update(r.common())
+    elif site == 6:
+        # the signal reaches every player's tactical AI; its pass runs where
+        # edx is the tactical AI's own +0x118
+        if units is None or (rdx & 0xFFFFFFFF) != pm.u32(rcx + 0x118):
+            return None, None
+        pl = pm.u64(rcx + 0x98)
+        head = {"site": "tacpass", "player": pm.i32(pl + 0xD8), **r.common()}
+        return None, {**head, **units.safe("tacpass", head["player"], pl)}
     else:
-        return None
-    return rec
+        return None, None
+    if units is None:
+        return rec, None
+    head = {k: rec[k] for k in ("site", "player", "turn", "rng")}
+    return rec, {**head, **units.safe(rec["site"], rec["player"], pl)}
 
 
 def wait_module(host: str, limit: float, pm: ProcMem | None = None) -> tuple[ProcMem, int]:
@@ -604,6 +944,14 @@ def cmd_watch(a) -> int:
     hooked = pm.read(site1, 5)
     n, spent, t0 = 0, 0.0, time.monotonic()
     out = open(a.out, "a", encoding="utf-8", newline="\n")
+    units, uout, un = None, None, 0
+    if a.units is not None:
+        import aimem_fields  # noqa: PLC0415
+        units = Units(r, a.plan_from)
+        uout = open(a.units, "a", encoding="utf-8", newline="\n")
+        if uout.tell() == 0:
+            uout.write(json.dumps({"site": "header", "cols": aimem_fields.rows(), "planFrom": a.plan_from},
+                                  separators=(",", ":")) + "\n")
     try:
         idle = 0
         while True:
@@ -620,6 +968,8 @@ def cmd_watch(a) -> int:
                 except SystemExit:
                     break
                 r = Reader(pm, base)
+                if units is not None:
+                    units = Units(r, a.plan_from)
                 seq = arm(pm, base)
                 M, site1 = base + H.MAIL, base + H.SITES[0][1]
                 hooked = pm.read(site1, 5)
@@ -634,21 +984,27 @@ def cmd_watch(a) -> int:
             idle = 0
             t1 = time.perf_counter()
             mb = b""
+            urec = None
             try:
                 mb = pm.read(M, H.MAIL_SIZE)
-                rec = hit_record(r, mb)
-            except MemError as e:
+                rec, urec = hit_record(r, mb, units)
+            except (MemError, struct.error) as e:
                 rec = {"site": "error", "hook": struct.unpack_from("<I", mb, H.SITE)[0] if mb else None, "error": str(e)}
             finally:
                 pm.write(M + H.ACK, struct.pack("<I", cur))
             held = time.perf_counter() - t1
             spent += held
             seq = cur
+            # the wall second of the read since the watch began, the ms the game stood
+            stamp = {"seq": cur, "at": round(time.monotonic() - t0, 3), "ms": round(1000 * held, 2)}
             if rec is not None:
-                # the wall second of the read since the watch began, the ms the game stood
-                rec.update(seq=cur, at=round(time.monotonic() - t0, 3), ms=round(1000 * held, 2))
+                rec.update(stamp)
                 out.write(json.dumps(rec, separators=(",", ":")) + "\n")
                 n += 1
+            if urec is not None:
+                urec.update(stamp)
+                uout.write(json.dumps(urec, separators=(",", ":")) + "\n")
+                un += 1
     finally:
         try:
             pm.write(M + H.GATE, struct.pack("<I", 0))
@@ -656,7 +1012,9 @@ def cmd_watch(a) -> int:
         except MemError:
             pass
         out.close()
-        print(f"stopped: {n} records, {spent:.1f}s held of {time.monotonic() - t0:.0f}s", flush=True)
+        if uout is not None:
+            uout.close()
+        print(f"stopped: {n} records, {un} unit records, {spent:.1f}s held of {time.monotonic() - t0:.0f}s", flush=True)
     return 0
 
 
@@ -679,6 +1037,9 @@ def main(argv=None) -> int:
     s = sub.add_parser("watch")
     s.add_argument("--out", type=pathlib.Path, required=True)
     s.add_argument("--wait", type=float, default=600.0, help="seconds to wait for the instance's game DLL")
+    s.add_argument("--units", type=pathlib.Path, help="the units' stream (`Units`: <stem>.aiunits.jsonl); none without it")
+    s.add_argument("--plan-from", type=int, default=0,
+                   help="the first player id whose units' plannings are read (the majors' count: theirs are left out)")
     s.set_defaults(fn=cmd_watch)
     s = sub.add_parser("snap")
     s.set_defaults(fn=cmd_snap)

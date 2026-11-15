@@ -282,7 +282,9 @@ def build(stem: str) -> pathlib.Path:
     db.executescript("PRAGMA journal_mode=OFF; PRAGMA synchronous=OFF; PRAGMA page_size=8192;")
     db.execute("CREATE TABLE meta (log TEXT PRIMARY KEY, bytes INTEGER, mtime_ns INTEGER, rows INTEGER)")
     for f in sorted(folder.iterdir()):
-        if f.suffix.lower() not in (".csv", ".txt"):
+        # the two .log files a recording keeps that are CSV in shape (a header
+        # line, then rows): a table each, as the CSVs
+        if f.suffix.lower() not in (".csv", ".txt") and f.name not in ("AStar_GC.log", "UnitOperations.log"):
             continue
         rows = load_csv(db, f)
         st = f.stat()

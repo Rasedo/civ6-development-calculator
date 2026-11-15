@@ -915,6 +915,7 @@ A question the SOURCE under-determines; neither engine ships a branch until the 
   - LAB (recording): the turn-start wait (`h1/h1_starts.lua`, `dump.py` `wait_started`; duel 1113 `starts` exact on all 250 records): its `witness` (GameCore's readers) read by no check, a loaded game's re-arm untested
   - LAB (recording): HIGH_DIFFICULTY_*_SCALING on an AI above the harness's Warlord
   - LAB (recording): re-record the five duels with the reader that follows the vectors' arrays (probez1117), then read City m_kGrowth +0x84 for growthDrift, m_kBuildQueue's per-item progress (+0x218 buildings, +0x230 units) and the builders from `mem`, deleting their reconstructions
+  - LAB (recording): the recorder's units' stream (`aimem.py watch --units`, `<stem>.aiunits.jsonl`), its tactical-pass hook (FinalRelease 0x503520), the dump's `memUnits` / `deals` / `plotUnits` / `extra` and `game.py profile apply --record-logs` have run against no game: the instance spawned for the 30-turn test of seed 1117 exits with code 53 within a second (steam_appid.txt in place, Steam logged in as an account other than the install's last owner), so no test recording exists and the offsets of dll_readings "H-1: the recorder's unit, planning and city AI reads" stand unconfirmed
   - BUILD (congress): the replay's Regular Sessions vote every major on the AI line, not the record's ballots (World_Congress.csv)
   - LAB (placement): whether an acquired city runs the placement 0x1eae70's district refresh
   - LAB (placement): the Free Cities' placement
