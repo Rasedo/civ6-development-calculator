@@ -223,6 +223,18 @@
   context:
     - "- THE HOMELAND'S (0x70f3b0, each unit 0x70bf90): the same test with a quarter of its health (4 x damage) for the hurt, the danger abov..."
   review: reviewed
+- addr: 0x70cba0
+  final: 0x4bd830
+  kind: function
+  status: READ
+  cases:
+    - recording: 1128
+      value: "the barbarians' explorers and   pillagers, whose turns the engines' passes close, take it too   (runs/h1_duelq1117-1128: 1,031 HL: Explore rows beside an HL: End Turn,   176 Pillage Improvement turns "
+  impl: [cpu/core/tactical.ts:endTurn, cpu/core/units.ts:skipTurn]
+  readings: ["C-110 / C-99: the unit's activity and the Fortify order's refusal — READ"]
+  context:
+    - "...CanStart 0x9685d0 (an AI's unit: not INTERCEPT, +0x1b28 -1). The homeland's End Turn (0x70cba0, from the homeland's moves 0x709d80) builds it (0x9686d0) for each unit of its list who..."
+  review: imported
 - addr: 0x70ce90
   final: 0x4bdb20
   kind: function

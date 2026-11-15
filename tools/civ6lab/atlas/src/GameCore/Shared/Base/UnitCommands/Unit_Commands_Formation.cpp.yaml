@@ -23,3 +23,29 @@
   context:
     - ...the plot (the move order 0x962030), on arrival the formation joined (the unit operation 0x94bb50 with the other's id) and the other's turn done (0x570b40); the unit's turn done and it...
   review: reviewed
+- addr: 0x94bbe0
+  final: 0x659e70
+  kind: function
+  name: UNITCOMMAND_ENTER_FORMATION
+  status: PARTLY
+  impl: [cpu/core/operations/nodes.ts:OpsContext, cpu/core/opsOrders.ts:unitOf]
+  readings:
+    - "C-93: Make Formation's formation outlives its operation, a captive embarks by its original owner — READ (0x7ee630, 0x94bbe0, 0x94bc70, 0x212825..0x2128f3, 0x56c480, 0x77b9a0 at 0x77bedd), both twins"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...rmation outlives its operation, a captive embarks by its original owner — READ (0x7ee630, 0x94bbe0, 0x94bc70, 0x212825..0x2128f3, 0x56c480, 0x77b9a0 at 0x77bedd), both twins"
+    - ...scort to the civilian (MoveTo 0x962030), and met there the civilian takes the command 0x94bbe0 builds with its partner's id (hash 0xc9903c80, UNITCOMMAND_ENTER_FORMATION, 0x7eead4..0...
+  review: imported
+- addr: 0x94bc70
+  final: 0x659f00
+  kind: function
+  name: UNITCOMMAND_EXIT_FORMATION
+  status: PARTLY
+  impl: [cpu/core/operations/nodes.ts:OpsContext, cpu/core/opsOrders.ts:unitOf]
+  readings:
+    - "C-93: Make Formation's formation outlives its operation, a captive embarks by its original owner — READ (0x7ee630, 0x94bbe0, 0x94bc70, 0x212825..0x2128f3, 0x56c480, 0x77b9a0 at 0x77bedd), both twins"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...tlives its operation, a captive embarks by its original owner — READ (0x7ee630, 0x94bbe0, 0x94bc70, 0x212825..0x2128f3, 0x56c480, 0x77b9a0 at 0x77bedd), both twins"
+    - "...whose formation (unit +0x1fb8) holds more than one (+0x738 > 1) takes the unit command 0x94bc70 builds (hash 0xfcfe4c4d, UNITCOMMAND_EXIT_FORMATION: CanDo +0x48, Do +0x58; 0x7ee7b0..0..."
+  review: imported

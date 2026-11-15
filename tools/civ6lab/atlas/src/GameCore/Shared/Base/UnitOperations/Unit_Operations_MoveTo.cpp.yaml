@@ -48,6 +48,7 @@
     - "C-99: Wander Near City ends its unit's moves; a unit whose moves an order ended runs its order no more — READ (0x77bf50 at 0x77c62a, 0x56d6f0, 0x52f50 at 0x530fd..0x53113), both twins"
     - "C-99: Operation Move's and Operation Attack's planning plot keeps out another player's unit at peace, not one at war; Operation Attack's march carries the attack flag; a refresh reads the knowledge base's target entries — READ (0x78fa10 -> 0x585eb0 -> 0x585d90, 0x791300's callers 0x80c397 / 0x810e98 / 0x811213, 0x80c180 at 0x80c3c4 / 0x80c4be / 0x80c7ee), both twins"
     - "C-95: Wander Near Camp's orders carry no attack flag — READ (0x77b9a0 at 0x77bce4 / 0x77be0b -> 0x962030, 0x2720a0 at 0x272434..0x272544), both twins; the replay's copies"
+    - "C-125 / C-95: flanking and support count about the defender unit's own plot, no river edge read; MEDIUM by the plot's layer-0 list; a killed target's record; the camp strike's orders — READ (0x521530, 0x51c810 at 0x51cc1c..0x51cc56, 0x5228c0, 0x786d50, 0x776140 at 0x776333, 0x8e9d0, 0x772940 at 0x772d2f..0x772f78), FIT (the camp strike's path), both twins"
   notes:
     - ".claude/scratchpad/mu1/readings_c96.md: ...+0x60, revealed   0x2d2220) are never read: ONE \"Random Direction\" draw over the count, the   move 0x962030 to the plot drawn (\"Wander\", \"Move To\" the plot). With none:   FindAlternateLocation (0x585940) rou..."
   context:
@@ -69,6 +70,7 @@
     - "C-123 / C-95: a Trader stands on the trade layer; a city's shot is a COMBAT_DISTRICT spot's blow back — READ (0x901e0, 0x586360 -> 0x208b80, 0x585eb0 -> 0x585d90, 0x791470 at 0x7917f7..0x7918f7 -> 0x249ee0 / 0x205720, 0x776140 at 0x776780..0x7767fa), both twins"
     - "C-123 / C-125: Coastal Raid's queue walks on, a raid ends the raider's moves; Attack Units' targets keep one the pass killed — READ (0x7735d0, 0x95b100, 0x95b7c0, 0xa4fbc0 at 0xa501e2..0xa502e6, 0x5218f0, 0x76eb50, 0x776140 at 0x776333 -> 0x7765e4), both twins"
     - "C-95: the camp defender's strike, a captured civilian's dead target, a lone DEFENDER out of Pillage — READ (0x772940, 0x779010, 0x774e90, 0x779240 at 0x7792be..0x7792da, 0x775340 at 0x77551e..0x775534, 0x791470 at 0x79174a..0x791756), both twins"
+    - "C-125 / C-95: flanking and support count about the defender unit's own plot, no river edge read; MEDIUM by the plot's layer-0 list; a killed target's record; the camp strike's orders — READ (0x521530, 0x51c810 at 0x51cc1c..0x51cc56, 0x5228c0, 0x786d50, 0x776140 at 0x776333, 0x8e9d0, 0x772940 at 0x772d2f..0x772f78), FIT (the camp strike's path), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...for it in order (0x773270): each that can act (0x56c690) takes the move order onto it (0x962190, flag 0x10), a unit with no ranged or bombard strength then done (0x56d6f0, 0x570b40,..."

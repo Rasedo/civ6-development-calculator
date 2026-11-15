@@ -225,6 +225,16 @@
     - "- The damage law (0x519090; struct 0x519370): damage = trunc((24 + r) x expf(x) + 0.5), clamped [1, 100], x = (k x..."
     - ...0x1c COMBAT_MINIMUM_DAMAGE, +0x20 COMBAT_BASE_DAMAGE, +0x2d the bypass flag). The law 0x519090 takes v = trunc((24 + r) x expf(x) + 0.5) unclamped; on the hit points' hash (0x5e97d62...
   review: reviewed
+- addr: 0x521be0
+  final: 0x36c890
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-125 / C-95: flanking and support count about the defender unit's own plot, no river edge read; MEDIUM by the plot's layer-0 list; a killed target's record; the camp strike's orders — READ (0x521530, 0x51c810 at 0x51cc1c..0x51cc56, 0x5228c0, 0x786d50, 0x776140 at 0x776333, 0x8e9d0, 0x772940 at 0x772d2f..0x772f78), FIT (the camp strike's path), both twins"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...engines' `defensibleDistrict` test unread in its caller 0x51f070; the religious pair 0x521be0 / 0x521ed0 untouched (`theoFlankCount` keeps its river test)."
+  review: imported
 - addr: 0x521ed0
   final: 0x36cb00
   kind: function
@@ -241,7 +251,9 @@
       turn: 16
       value: "So the   gap at runs/h1_duelw1127 t16 — a barbarian Slinger on city-state 3's   Warrior at 51 HP on Floodplains beside a friend, 23 logged and the   engines' 26, the log's DefenderStrMod −4 where the "
   impl: [cpu/core/combat.ts:FLANK_SUPPORT_CIVIC, gpu/core/sim_masks.py:_flank_support_live]
-  readings: ["H-1: the melee result, a ranged blow's domain, a city's shot — READ"]
+  readings:
+    - "H-1: the melee result, a ranged blow's domain, a city's shot — READ"
+    - "C-125 / C-95: flanking and support count about the defender unit's own plot, no river edge read; MEDIUM by the plot's layer-0 list; a killed target's record; the camp strike's orders — READ (0x521530, 0x51c810 at 0x51cc1c..0x51cc56, 0x5228c0, 0x786d50, 0x776140 at 0x776333, 0x8e9d0, 0x772940 at 0x772d2f..0x772f78), FIT (the camp strike's path), both twins"
   context:
     - "- Flanking (0x521530) and Support (0x521ed0, 0x5228c0) are gated on the player's m_bMilitaryCombatAdjacency (+0x1268), which only..."
   review: reviewed
@@ -282,9 +294,12 @@
 - addr: 0x5228c0
   final: 0x36d1d0
   kind: function
-  semantics: "Support for every other combat type: added only when the combat type is 0x2ca3edd1 (COMBAT_MELEE); gated on m_bMilitaryCombatAdjacency (+0x1268)."
+  semantics: "Support under COMBAT_MELEE (0x2ca3edd1), gated on m_bMilitaryCombatAdjacency (+0x1268): the six neighbours of the defender unit's own plot (+0x220 / +0x224, not the combat's location), every layer, each unit with a combat, ranged or bombard strength of the defender's owner other than itself; GlobalParameters +0x234 x the count, scaled by the unit's +0x1850 percent."
   status: READ
   cases:
+    - recording: h1_duelq1128
+      turn: 30
+      value: "the barbarian Warrior 2031630 on 14:15, three of its own beside it, keeps its turn-2 spot 14:13 (one beside it) against player 1's Warrior on 15:12 under the exchange filter: Move 14 13, as logged"
     - recording: 1117
       turn: 23
       value: "- Flanking (0x521530) and Support (0x521ed0, 0x5228c0) are gated on the   player's m_bMilitaryCombatAdjacency (+0x1268), which only   EFFECT_GRANT_COMBAT_ADJACENCY sets (CIVIC_GRANT_COMBAT_ADJACENCY_B"
@@ -294,8 +309,14 @@
     - recording: h1_duelw1127
       turn: 16
       value: "So the   gap at runs/h1_duelw1127 t16 — a barbarian Slinger on city-state 3's   Warrior at 51 HP on Floodplains beside a friend, 23 logged and the   engines' 26, the log's DefenderStrMod −4 where the "
-  impl: [cpu/core/combat.ts:FLANKING_CS]
-  readings: ["H-1: the melee result, a ranged blow's domain, a city's shot — READ"]
+  impl:
+    - cpu/core/combat.ts:FLANKING_CS
+    - cpu/core/combat.ts:supportCount
+    - cpu/core/combat.ts:meleeUnitStrengths
+    - gpu/core/sim_masks.py:_flank_support
+  readings:
+    - "H-1: the melee result, a ranged blow's domain, a city's shot — READ"
+    - "C-125 / C-95: flanking and support count about the defender unit's own plot, no river edge read; MEDIUM by the plot's layer-0 list; a killed target's record; the camp strike's orders — READ (0x521530, 0x51c810 at 0x51cc1c..0x51cc56, 0x5228c0, 0x786d50, 0x776140 at 0x776333, 0x8e9d0, 0x772940 at 0x772d2f..0x772f78), FIT (the camp strike's path), both twins"
   context:
     - "- Flanking (0x521530) and Support (0x521ed0, 0x5228c0) are gated on the player's m_bMilitaryCombatAdjacency (+0x1268), which only EFFECT_GR..."
   review: reviewed
@@ -484,6 +505,26 @@
   context:
     - "...NUCLEAR_WEAPON; x (the city's extra copies + 1, 0x179dd0); x the promotion class weight 0x723bb0 (PromotionClass +0x288: 1.0 with none; 0 where the class's base +0x708 is 0 — a city-st..."
   review: reviewed
+- addr: 0x727db0
+  final: 0x4d2e20
+  kind: function
+  name: minorMilitaryUpgrade
+  status: PARTLY
+  impl:
+    - cpu/core/minorBuild.ts:prev
+    - cpu/core/minorOps.ts:minorOpsRefresh
+    - cpu/core/minorOps.ts:minorMilitaryUpgrade
+    - gpu/core/sim_minorops.py:_mops_military_upgrade
+  readings:
+    - "C-129: the military AI's upgrade — READ (0x727db0, 0x6874d0), both twins"
+    - "C-129: the military AI's upgrade after the look; the Free Cities buy none — READ (0x6096c0's lists, 0x687bf0), both twins"
+    - "C-99 / C-129: the military AI's job refreshes the operations before its upgrade; Recruit Units updates the teams only on a changed count — READ (0x722690, 0x81c820), both twins"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "## C-129: the military AI's upgrade — READ (0x727db0, 0x6874d0), both twins"
+    - "- THE WALK (0x727db0, from the military AI's job 0x722690 after 0x727510): the player's units in pool order..."
+    - ".... The UNITS slot stays 0, the can-afford (0x6874d0, slot 1 at half the cost) fails, and 0x727db0 buys nothing: no Free City upgrade in any recording; neither twin walks it for them."
+  review: imported
 - addr: 0x74cf50
   final: 0x4eb610
   kind: function

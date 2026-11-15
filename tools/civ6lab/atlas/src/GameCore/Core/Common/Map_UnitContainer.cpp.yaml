@@ -126,6 +126,7 @@
     - gpu/core/sim_init.py:ften
     - gpu/core/sim_minorops.py:end_moves
     - gpu/core/sim_seats.py:_arrive
+    - cpu/core/tactical.ts:tacticalTargets
   readings:
     - "C-102 / C-99: the plot's unit list as an arrival stamp, the best defender's tie and Garrison City's standing unit — READ (0x75c50, 0x74f40 / 0x763b0 / 0x75280, 0x208b80 / 0x523d60, 0x810fd7..0x81101b), both twins"
     - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
@@ -146,6 +147,7 @@
     - "C-99: Operation Move's and Operation Attack's planning plot keeps out another player's unit at peace, not one at war; Operation Attack's march carries the attack flag; a refresh reads the knowledge base's target entries — READ (0x78fa10 -> 0x585eb0 -> 0x585d90, 0x791300's callers 0x80c397 / 0x810e98 / 0x811213, 0x80c180 at 0x80c3c4 / 0x80c4be / 0x80c7ee), both twins"
     - "C-111: a major's district lets go of the queue under a hostile unit, the queue's progress and overflow read from the city's memory — READ (0x184660 at 0x1847dc, 0x5313f0, 0x17f630), both twins"
     - "C-125 / C-99: the attack assignment's stacking block is by formation class; a garrison on a defending district is no striker against a target not HIGH — READ (0x776140 at 0x776890..0x776909, 0x8bcd0, 0x775340 at 0x77541f..0x7754ab, 0x7784b0 at 0x7785ad, 0x61ddb0 at 0x61de20..0x61de2f), both twins"
+    - "C-125 / C-95: flanking and support count about the defender unit's own plot, no river edge read; MEDIUM by the plot's layer-0 list; a killed target's record; the camp strike's orders — READ (0x521530, 0x51c810 at 0x51cc1c..0x51cc56, 0x5228c0, 0x786d50, 0x776140 at 0x776333, 0x8e9d0, 0x772940 at 0x772d2f..0x772f78), FIT (the camp strike's path), both twins"
   context:
     - "...x58 / +0x5c) on the plot, else (search flag +0x398 & 0x200 clear) any unit on the plot (0x75c50) of a player at war that fights (0x209dd0: combat, ranged or bombard above 0) — no doma..."
   review: reviewed

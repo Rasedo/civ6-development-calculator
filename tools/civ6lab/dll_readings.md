@@ -14715,3 +14715,84 @@ the Great People's `retreatsWhenCaptured` (cpu/data/units.ts). GPU
   reaches it in the game (by 29:4), ours walks 27:3 / 28:4 / 28:5 into the
   zone of the Quadrireme on 29:6 it does not see: two four-step paths, the
   open list's order between them unread.
+
+## C-125 / C-95: flanking and support count about the defender unit's own plot, no river edge read; MEDIUM by the plot's layer-0 list; a killed target's record; the camp strike's orders — READ (0x521530, 0x51c810 at 0x51cc1c..0x51cc56, 0x5228c0, 0x786d50, 0x776140 at 0x776333, 0x8e9d0, 0x772940 at 0x772d2f..0x772f78), FIT (the camp strike's path), both twins
+
+`flankCount`, `supportCount`, `defenderCS`, `meleeUnitStrengths`
+(cpu/core/combat.ts); `predictBlow`, `planUnit`, `tacticalTargets`,
+`assignTo`, `defendCamps` (cpu/core/tactical.ts); `_flank_support`
+(gpu/core/sim_masks.py), `_melee_unit_strengths` (gpu/core/sim_seats.py),
+`_tac_assign`, the target list's MEDIUM line and the DEFEND CAMPS block of
+`_tac_pass` (gpu/core/sim_tactics.py). The replay: `fortifyOrders`,
+`minorAi`, `barbarianAi` (cpu/harness/replay.ts).
+
+- FLANKING (0x521530, called from the attack strength 0x51c810 at
+  0x51cc1c..0x51cc56 for every combat type but 0x5e2f7468): r8 the attacker,
+  r9 the plot of the DEFENDER UNIT (0x90290 on r14, the unit's own plot, not
+  the combat's location). Under +0x1268 and COMBAT_MELEE (0x2ca3edd1), an
+  attacker whose +0x650 is not 1: over the plot's six neighbours
+  (GetAdjacentPlot 0x1dd00) and every map layer, each unit of the attacker's
+  owner (+0x2e0) other than the attacker (+0x100), passing 0x209dd0, its
+  +0x650 not 1, not embarked (0x8be30), counts one; the term is
+  GlobalParameters +0x1b0 x the count, scaled by the attacker's +0x184c
+  percent. No river edge is read.
+- SUPPORT (0x5228c0, COMBAT_MELEE under +0x1268): the six neighbours of the
+  defender unit's own +0x220 / +0x224, every layer, each unit with a combat,
+  ranged or bombard strength above 0 (0x56dc90 / 0x56e3e0 / 0x56daa0) of the
+  defender's owner other than itself; GlobalParameters +0x234 x the count,
+  scaled by the unit's +0x1850 percent.
+- So the planning's blow back (0x791470, the sides swapped, the location a
+  spot) flanks and supports about the plot the unit stands on as its turn
+  opens, the terrain alone being the spot's.
+- MEDIUM (0x786d50): a TARGET_LOW_PRIORITY_UNIT entry whose plot's layer-0
+  unit list (0x75c50 with r9 0) holds more than one unit, one of them with
+  no combat, ranged or bombard strength, becomes TARGET_MEDIUM_PRIORITY_UNIT:
+  a Trader or a religious unit, each on its own layer, leaves it LOW.
+- A KILLED TARGET (0x776140 at 0x776333): the unit's lookup 0x8e9d0 ->
+  0x4f2310 is by the id's slot, with no test of the unit's death (+0x770;
+  the claim loop's stacking test at 0x7768a0 skips dead units, which the
+  plot lists still hold). The engines give a target the pass killed the
+  health of a unit with every hit point lost (1.1 x 100 - 100 = 9): its
+  claims weigh dealt / turns (0x7702b0's first arm), not the kill's 100.
+  The dead unit's damage and plot as 0x776409..0x77641f read them are a
+  fit: no recorded claim falls on a killed target's turn-1 spot.
+- THE CAMP STRIKE'S ORDERS (0x772940 at 0x772d2f..0x772f78): the move to
+  the spot is 0x773fb0 with its flag set (a MoveTo built by 0x962030 with
+  flags 0x10, pushed by the manager's vt +0x60), then the shot 0x964a40 or
+  the MoveTo 0x962190 with flags 0x10 on the target's plot, pushed the same
+  way. The engines: a unit the first order left short of its spot strikes
+  nothing that turn, and the first order's path runs over later turns
+  (`moveTo`'s `laterTurns`) — a FIT on the two cases below; what the
+  operation queue does with the second order behind a first that waits is
+  unread (0x52f50).
+- Confirmed (aimem, one-seed traces): runs/h1_duelq1128 t33 CombatLog, the
+  barbarian Warrior 2490396 at 80 health strikes player 1's Scout on 15:13
+  from 15:12 at AttackerStrMod 0 with the Warrior 1245202 on 15:14, a river
+  between 15:14 and 15:13; in its planning 1245202 (15:15) ties 2490396 at
+  27 dealt and takes 15:14, as logged. The blow back about the unit's own
+  plot: 1128 t30 Warrior 2031630 (Move 14 13), t50 Archer 2752535 (Move 17
+  10), runs/h1_duelq1121 t66 Warrior 2621454 (6:17), runs/h1_duelq1117 t38
+  Slinger 1769487 (no claim, Wander). MEDIUM: 1117 t39 player 1's Warrior
+  1179652 on 33:13 over its Trader 1310732, TARGET_LOW_PRIORITY_UNIT in the
+  Slinger 1769487's row, Move 33 14. A killed target: runs/h1_duelq1124 t16
+  the Slinger 1310731 keeps 36:17 and its shot on 35:17 over the turn-3
+  spots on player 0's Warrior the Barbarian Attack killed on 36:22; 1128
+  t64 the Archer 3407902 still takes 40:19. The camp strike: 1121 t160 the
+  Spearman 1376265 on 3:18, its spot 3:17 held by its Line Infantry, stays;
+  1128 t31 the Spearman 589832 walks 30:6 -> 31:7 for the spot 32:8 its
+  Warrior holds; t32-34, t207 / t214, 1117 t27, 1121 t28, 1127 t56 as
+  before.
+- THE REPLAY: a unit record t+1 holds undug that took no step in the pair
+  lost its fortification in its own player's turn (`fortifyOrders`: the
+  turn's PlayerTurnActivated row), and a barbarian so undug stands dug in
+  on the minors' and the barbarians' copies: runs/h1_duelq1124 t50 the
+  barbarian Warrior 3080212 (record t50 fortify 1) takes city-state 4's
+  Warrior 327683's blow at the CombatLog's DefenderStrMod 3; with it the
+  Warriors 131073 (Chase Target, the Fortify order) and 196610 (Wander)
+  lose their Attack Units claims to the exchange filter, as logged.
+- OPEN: 0x521530's +0x650 == 1 test (an attacker or a flanker of that
+  domain takes and gives none) and 0x209dd0 against the engines' "military,
+  not embarked"; 0x5228c0 asks no district of the defender's plot, the
+  engines' `defensibleDistrict` test unread in its caller 0x51f070; the
+  religious pair 0x521be0 / 0x521ed0 untouched (`theoFlankCount` keeps its
+  river test).

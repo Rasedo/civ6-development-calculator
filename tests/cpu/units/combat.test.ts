@@ -388,7 +388,7 @@ describe('flanking & support', () => {
     expect(flankCount(state, defTile, atk)).toBe(1);
   });
 
-  it('CIV6: "units across a River from the targeted enemy do not provide Flanking"', () => {
+  it('a unit across a river from the target flanks as any other (0x521530)', () => {
     const { state } = armed();
     const atkTile = tileAtCoords(state.map, 11, 9).index;
     const defTile = tileAtCoords(state.map, 12, 9).index;
@@ -398,7 +398,7 @@ describe('flanking & support', () => {
     spawnUnit(state, 'WARRIOR', fn.index, 0);
     expect(flankCount(state, defTile, atk)).toBe(1);
     state.map.tiles[defTile].riverMask = 0b111111; // a river on every edge
-    expect(flankCount(state, defTile, atk)).toBe(0);
+    expect(flankCount(state, defTile, atk)).toBe(1);
   });
 
   it('a melee defender gains +2 CS per adjacent friendly military (support)', () => {
@@ -465,7 +465,7 @@ describe('flanking & support', () => {
       archer.tileIndex = atkTile;
       const def = spawnUnit(state, 'WARRIOR', defTile, BARB_SEAT)!;
       def.tileIndex = defTile;
-      return { state, archer, atkTile, defTile };
+      return { state, archer, atkTile, defTile, def };
     };
 
     const plain = setup();
@@ -476,7 +476,7 @@ describe('flanking & support', () => {
     const helper = spawnUnit(supported.state, 'WARRIOR', sn.index, BARB_SEAT)!;
     helper.tileIndex = sn.index;
     // the support is REAL — a melee attack would feel it
-    expect(supportCount(supported.state, supported.defTile, helper)).toBe(1);
+    expect(supportCount(supported.state, supported.defTile, supported.def)).toBe(1);
     const d1 = rollDiff('rng', () => rangedAttack(supported.state, supported.archer.id, supported.defTile));
 
     expect(d1).toBe(d0);
@@ -486,10 +486,10 @@ describe('flanking & support', () => {
     const { state, city } = armed();
     const def = spawnUnit(state, 'WARRIOR', city.centerIndex, 0)!;
     const sn = neighbors(state.map, state.map.tiles[city.centerIndex]).find((t) => unitPassable(t))!;
-    spawnUnit(state, 'WARRIOR', sn.index, 0);
+    const beside = spawnUnit(state, 'WARRIOR', sn.index, 0)!;
     expect(supportCount(state, city.centerIndex, def)).toBe(0);
-    // the same pair one tile off the centre does get it
-    expect(supportCount(state, sn.index, def)).toBeGreaterThan(0);
+    // the unit beside the centre does get it, from the one inside
+    expect(supportCount(state, sn.index, beside)).toBeGreaterThan(0);
   });
 });
 

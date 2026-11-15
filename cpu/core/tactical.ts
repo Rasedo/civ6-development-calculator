@@ -1741,10 +1741,14 @@ export function tacticalTargets(state: GameState, seat: number, seen: ArrayLike<
     }
   }
   out.push(...knowledgeEntries(state, seat, seen, known));
-  // a unit stacked with one that cannot fight
+  // a unit stacked with one that cannot fight, of the units' map layer
+  // (0x786d50 walks the plot's layer-0 list 0x75c50: a Trader or a religious
+  // unit on the plot leaves it LOW; runs/h1_duelq1117 t39 player 1's Warrior
+  // 1179652 on 33:13 with its Trader 1310732, TARGET_LOW_PRIORITY_UNIT in
+  // the barbarian Slinger 1769487's Attack Units row)
   for (const e of out) {
     if (e.type !== 'LOW') continue;
-    const here = at.get(e.tile) ?? [];
+    const here = (at.get(e.tile) ?? []).filter((u) => mapLayer(u.type) === 'units');
     if (here.length > 1 && here.some((u) => !((UNITS[u.type]?.combat ?? 0) > 0) && rangedStrength(u) <= 0)) e.type = 'MEDIUM';
   }
   if (isBarbSeat(seat)) {
@@ -1848,14 +1852,20 @@ function targetUnit(state: GameState, e: Target): Unit | null {
  *  as `resolveMutualKill`): runs/h1_duelq1128 t50 the barbarian Archer
  *  2752535 at 23 takes 22 on 17:10 from player 1's Warrior 589828 at 14, the
  *  Warrior 29 (15 over to the Archer's 8), the spot kept by the survival
- *  filter */
-export function predictBlow(state: GameState, attacker: Unit, defender: Unit, at: number): { dealt: number; taken: number } {
+ *  filter. `stands` is the plot the defender's unit stands on, whose
+ *  neighbours flank and support the melee blow (`meleeUnitStrengths`): in
+ *  the blow back on a unit set on a spot, the plot the unit has not left
+ *  (runs/h1_duelq1128 t30 the barbarian Warrior 2031630 on 14:15, three of
+ *  its own beside it and one beside its spot 14:13, keeps that spot against
+ *  player 1's Warrior on 15:12 under the exchange filter, Move 14 13 as
+ *  logged) */
+export function predictBlow(state: GameState, attacker: Unit, defender: Unit, at: number, stands = at): { dealt: number; taken: number } {
   if (rangedStrength(attacker) > 0) {
     const s = rangedUnitStrengths(state, attacker, at, defender);
     return { dealt: damageExpected(s.atk - s.def), taken: 0 };
   }
   if (unitDomain(defender.type) === 'civilian') return { dealt: 0, taken: 0 };
-  const s = meleeUnitStrengths(state, attacker, at, defender);
+  const s = meleeUnitStrengths(state, attacker, at, defender, stands);
   const dealt = damageExpected(s.atk - s.def);
   const taken = defender.embarked ? 0 : damageExpected(s.def - s.atk);
   const dOver = dealt - healthOf(defender);
@@ -1995,7 +2005,7 @@ export function planUnit(state: GameState, unit: Unit, targets: readonly Target[
     const at = unit.tileIndex;
     for (const s of E.spots) {
       unit.tileIndex = s.tile;
-      const back = predictBlow(state, v, unit, s.tile);
+      const back = predictBlow(state, v, unit, s.tile, at);
       unit.tileIndex = at;
       s.backTaken = back.dealt;
       s.backDealt = back.taken;
@@ -2396,12 +2406,15 @@ const onList = (state: GameState, pass: Pass, u: Unit) => !(pass.listedFrom ?? p
  * pool order whose planning reaches it within 3 turns (0x774e90) goes to it
  * ("Barb. Camp Defense"), its turn done — unless its planning holds a
  * strike it takes instead (`campStrike`): then it moves to that spot, its
- * moves kept (0x773fb0, the flag set), and plunders the Trader or condemns
- * the heretics on its plot, shoots the target (0x964a40) or goes for the
- * target's plot with the attack flag (0x962190, flag 0x10)
+ * moves kept (0x773fb0, the flag set), the order's path over the turns it
+ * takes (a spot of the second turn its own unit holds is walked toward, one
+ * beside it that its own unit holds is no step), and plunders the Trader or
+ * condemns the heretics on its plot, and standing on the spot shoots the
+ * target (0x964a40) or goes for the target's plot with the attack flag
+ * (0x962190, flag 0x10)
  * (runs/h1_duelq1128 t31-34: the Spearman 589832 of the camp 30:6 goes out
- * to 31:7, to 33:8 striking player 4's Archer, and on to 34:9 under "Barb.
- * Camp Defense" rows AT 30:6).
+ * to 31:7 for the spot 32:8 its Warrior holds, to 33:8 striking player 4's
+ * Archer, and on to 34:9 under "Barb. Camp Defense" rows AT 30:6).
  */
 function defendCamps(state: GameState, pass: Pass): void {
   for (const camp of [...state.barbSeat.camps].sort((a, b) => a - b)) {
@@ -2411,10 +2424,17 @@ function defendCamps(state: GameState, pass: Pass): void {
     const s = campStrike(state, pass, u, camp);
     if (!s) moveOrFortify(state, pass, u, camp);
     else {
-      if (s.spot !== u.tileIndex) moveTo(state, u, s.spot);
+      if (s.spot !== u.tileIndex) moveTo(state, u, s.spot, true, true);
       if (state.units.includes(u)) {
         if (s.kind === 'TRADER') plunderTrader(state, u);
         else if (s.kind === 'RELIGIOUS') condemnHeretic(state, u);
+        // the strike is pushed on the unit's operations behind the move to
+        // the spot (0x772940 at 0x772ece / 0x772f51, the manager's vt +0x60):
+        // a unit the move left short of its spot strikes nothing this turn
+        // (runs/h1_duelq1121 t160 the Spearman 1376265 on 3:18 for the spot
+        // 3:17 its Line Infantry holds stays there, player 0's Warrior on
+        // 3:16 unstruck)
+        else if (u.tileIndex !== s.spot) { /* the strike waits */ }
         else if (rangeOf(u) > 0) {
           if (state.units.includes(s.unit) && plotDistance(state, u.tileIndex, s.unit.tileIndex) <= unitAttackRange(u)
             && u.movesLeft > 0 && attacksLeftOf(u) > 0) hostileRangedStrike(state, u, s.unit.tileIndex);
@@ -2979,11 +2999,15 @@ export interface Assigned { unit: Unit; move: number; attack: number; from: numb
  *  - each target's health (1.1 x its whole, less its damage): a unit's, a
  *    district's (a City Center's hit points; its blow the predicted one,
  *    `predictCityBlow`, the damage it takes the planning's, `predictCityExchange`);
- *    a unit target whose unit the pass has killed keeps its entry at health
- *    0 and no plot (0x776333 -> 0x7765e4: the record's health and plot as
- *    initialised), its claims the planning's (runs/h1_duelq1128 t64: the
+ *    a unit target whose unit the pass has killed keeps its entry, its
+ *    health that of a unit with every hit point lost (0x776333: the lookup
+ *    0x8e9d0 -> 0x4f2310 reads the unit's slot, no test of its death), its
+ *    claims the planning's and no plot struck (runs/h1_duelq1128 t64: the
  *    Swordsman 3211281 kills player 0's Warrior on 41:20 and advances, the
- *    Archer 3407902 then takes 40:19 at turn 2 against it, no attack);
+ *    Archer 3407902 then takes 40:19 at turn 2 against it, no attack; runs/
+ *    h1_duelq1124 t16: the Slinger 1310731 keeps 36:17 and its shot at
+ *    player 1's Warrior on 35:17, worth 29, over its turn-3 spots 36:21 /
+ *    35:21 on player 0's Warrior the operation killed on 36:22, worth 29 / 3);
  *  - per target, each unit with Movement left: its planning's spots (in
  *    order), save — but against a HIGH target — one where the damage it
  *    takes in the blow and the blow back passes the damage it deals in both,
@@ -3016,7 +3040,8 @@ export function assignTo(state: GameState, pass: Pass, units: Unit[], targets: T
       continue;
     }
     if (t.unit) {
-      tg.push({ target: t, unit: null, health: 0, damage: 0, units: [], barb: isBarbSeat(t.seat) });
+      tg.push({ target: t, unit: null, health: Math.floor(UNIT_HP * ATTACK_HEALTH_256 / 256) - UNIT_HP,
+        damage: 0, units: [], barb: isBarbSeat(t.seat) });
       continue;
     }
     const d = districtHealth(state, t.tile);

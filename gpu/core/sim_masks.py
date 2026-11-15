@@ -2005,17 +2005,19 @@ class SimMasks:
         attacker_slot: torch.Tensor,
         attacker_seat: torch.Tensor,
         defender_slot: torch.Tensor,
+        stands: torch.Tensor | None = None,
     ) -> tuple[torch.Tensor, torch.Tensor]:
         """`flankCount` / `supportCount` for a UNIT defender on def_tile [B]
-        (`defender_slot` its occupancy index: a planning that sets it on a
-        plot it does not stand on, as the AI's combat prediction does, counts
-        none of its support from where it stands).
+        (`defender_slot` its occupancy index), the neighbours counted those
+        of `stands` [B], the plot the defender's unit stands on (def_tile
+        where none is given): the AI's combat prediction sets the unit on a
+        spot it has not left for (0x51c810 at 0x51cc1c, 0x5228c0).
 
         FLANKING counts the military units on the 6 adjacent tiles that the
         ATTACKER owns — "only units that are currently owned by the same player
         can provide Flanking to one another" — never the attacker itself, never
-        an EMBARKED one ("embarked land units do not provide Flanking"), and
-        never one whose tile is across a River from the target. `attacker_slot`
+        an EMBARKED one ("embarked land units do not provide Flanking"), a
+        river between it and the target or not (0x521530). `attacker_slot`
         is the attacker's own occupancy index, -1 when the attacker holds no
         military slot: a RELIGIOUS attacker shares its tile with a military unit
         that flanks like any other, so the exclusion is by unit, not by tile.
@@ -2028,7 +2030,7 @@ class SimMasks:
         unit — each of the 6 neighbours contributes 0 or 1. Returns
         (flank [B] long, support [B] long)."""
         dt = def_tile.clamp(min=0)
-        nb = self.neigh[dt]
+        nb = self.neigh[dt if stands is None else stands.clamp(min=0)]
         nbc = nb.clamp(min=0)
         on = nb >= 0
         mslot = self.military_at.gather(1, nbc)  # [B, 6]
@@ -2036,9 +2038,8 @@ class SimMasks:
         emb = self.unit_emb.gather(1, mslot.clamp(min=0))
         n_seat = torch.where(here, self.unit_seat.gather(1, mslot.clamp(min=0)), torch.full_like(nbc, -1))
 
-        riv = (self.river_mask.gather(1, dt.unsqueeze(1)) >> torch.arange(6, device=self.device)) & 1
         is_atk = (mslot == attacker_slot.unsqueeze(1)) & (attacker_slot.unsqueeze(1) >= 0)
-        mine = here & ~emb & (n_seat == attacker_seat.unsqueeze(1)) & ~is_atk & (riv == 0)
+        mine = here & ~emb & (n_seat == attacker_seat.unsqueeze(1)) & ~is_atk
         flank = mine.long().sum(dim=1) * self._flank_support_live(attacker_seat).long()
 
         # CIV6 (Flanking and Support): "Embarked land units provide Support

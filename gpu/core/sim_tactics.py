@@ -2211,10 +2211,11 @@ class SimTactics:
         def rep(x: torch.Tensor) -> torch.Tensor:
             return x.repeat(1, L)
         # every LOW entry, the walk's and the knowledge base's, read on its
-        # own unit: MEDIUM where a unit that cannot fight shares the plot
+        # own unit: MEDIUM where a unit that cannot fight shares the plot on
+        # the units' map layer (no Trader, no religious unit)
         efight = uk == 1
         eslot = uu.clamp(min=0)
-        nonc = (civ >= 0) | (sup >= 0) | trader
+        nonc = ((civ >= 0) & ~relig) | (sup >= 0)
         lowk = torch.where(efight & rep(nonc), 2, torch.ones_like(uk))
         dt = self.unit_type.gather(1, eslot).clamp(min=0, max=self.NU - 1)
         rs = self._type_ranged_strength.take(dt)
@@ -3407,10 +3408,10 @@ class SimTactics:
             tslot = unit_pl.gather(1, tk)                                    # the targets' units
             thp = self.unit_hp.gather(1, tslot.clamp(min=0))
             health = full_hp * _ATTACK_HEALTH_256 // 256 - (full_hp - thp)   # [B, K]
-            # a target whose unit the pass has killed: health 0, no plot to
-            # strike (0x776333 -> 0x7765e4)
+            # a target whose unit the pass has killed: the health of a unit
+            # with every hit point lost, no plot to strike (0x776333)
             gone = (tslot >= 0) & ~self.unit_alive.gather(1, tslot.clamp(min=0))
-            health = torch.where(gone, torch.zeros_like(health), health)
+            health = torch.where(gone, full_hp * _ATTACK_HEALTH_256 // 256 - full_hp, health)
             tbarb = self.unit_seat.gather(1, tslot.clamp(min=0)) == BARB_SEAT
             tgt_ok = tv & (tslot >= 0)
         # each unit's planning entry for each target
@@ -4345,13 +4346,15 @@ class SimTactics:
             if not bool(has.count_nonzero()):
                 continue
             # unless its planning holds a strike it takes instead
-            # (`campStrike`): to that spot, then the Trader's plunder, the
-            # heretics' condemnation, its shot or the move onto the target
+            # (`campStrike`): to that spot (the order's path over the turns
+            # it takes), then the Trader's plunder, the heretics'
+            # condemnation, and from the spot its shot or the move onto the
+            # target
             pick, pspot, pkind = self._tac_camp_strike(has, u_b, camp, rowof, res, tg)
             st = has & (pick >= 0)
             self._tac_move_or_fortify(has & ~st, u_b, camp)
             if bool(st.count_nonzero()):
-                self._tac_move_to(st & (self.barb_unit_tile[bidx, u_b] != pspot), u_b, pspot)
+                self._tac_move_to(st & (self.barb_unit_tile[bidx, u_b] != pspot), u_b, pspot, later_turns=True)
                 up = st & self.barb_unit_alive[bidx, u_b] & (self.barb_unit_seat[bidx, u_b] == BARB_SEAT)
                 self._tac_plunder_cmd(up & (pkind == 6), u_b)
                 rl = up & (pkind == 8)
@@ -4362,7 +4365,10 @@ class SimTactics:
                         self._condemn_heretic(BARB_SEAT, c_ok, c_tc, c_rl, gs)
                 pc = pick.clamp(min=0)
                 tt = self.unit_tile[bidx, pc]
-                hi = up & (pkind == 3) & self.unit_alive[bidx, pc] & (tt >= 0)
+                # the strike waits behind the move to the spot: none from a
+                # unit the move left short of it
+                hi = (up & (pkind == 3) & self.unit_alive[bidx, pc] & (tt >= 0)
+                      & (self.barb_unit_tile[bidx, u_b] == pspot))
                 rng = self._tac_range(bidx, u_b)
                 at = self.barb_unit_tile[bidx, u_b].clamp(min=0)
                 fire = (hi & (rng > 0) & (self.pair_dist[at, tt.clamp(min=0)].to(torch.long) <= rng)

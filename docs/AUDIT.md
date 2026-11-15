@@ -48,7 +48,7 @@ Hand-weighted 1–8 by the size of what is LEFT to build. One row per entry, no 
 | C-95 barbarians' unit moves | 5 | barb.move.plot misses by family: Attack Units, the rampage, Explore and Wander, Camp Defense, operation members and their goals, Builder Capture pairs (LAB); Defend Units' release, PLUNDER_TRADE_ROUTE (BUILD) |
 | C-123 barbarians' raids and scout reports | 2 | raid and assault starts and teams (1121, 1128), late-era raises, members lost to drift, the scouts' reports and their fits (LAB) |
 | C-124 barbarians' camps and sight | 1 | the alliances' outgoing visibility (BUILD); the unseen land's residue, the Scouts' regions (LAB) |
-| C-125 the tactical planning: targets and the combat prediction | 3 | the exchange filter's cases (1117, 1121, 1128), the +0x1ba waiver, a seat's difficulty, predicted blows off by a term, target lists against sight (LAB) |
+| C-125 the tactical planning: targets and the combat prediction | 3 | the +0x1ba waiver, units fleeing where the game strikes, a seat's difficulty, predicted blows off by a term, target lists against sight (LAB) |
 | C-132 the danger map | 3 | danger / danger.major rows: the Ironclad's Movement, rings ours lacks, the Giant Death Robot, single plots; the search's blocking, endangered sums beside an Encampment, an embarked captive (LAB) |
 | C-133 unit paths and move orders | 3 | MoveTo 0x962380's placement, defender and wait, carried runs, the walk's zone and embark steps, the kept path's re-search, unrevealed plots, portal exits (LAB, BUILD) |
 | C-96 city-states' build values | 4 | the unit value's unported terms and the unit production table (BUILD); the event unit, building and district terms, pick ties and fits, 1128 Nazca and Hong Kong, repairs (LAB) |
@@ -202,13 +202,16 @@ A question the SOURCE under-determines; neither engine ships a branch until the 
 - **C-95. BARBARIANS' UNIT MOVES.** Weight 5.
   - LAB (planning): the planning reach against AI_Planning (1124: 1230 of 1829 rows)
   - LAB (attack units): fit, unread: the strike domain test
-  - LAB (attack units): Attack Units' two claimants on one target (1124 t22 31:11, t37, t118: the first-logged alone strikes; carryOut 0x771f80)
   - LAB (attack units): 1128 t197 Ranger 6750212 walks 5:12 -> 5:13 where the game's goes to 5:11 and strikes the Field Cannon 5:10 (the attack assignment; noted too as the Ranger out of the barbarians' pass)
   - LAB (attack units): duelq1128 t197 the Ranger 6750212 is done before Attack Units in ours, so the camp's Pike and Shot 6684692, a lone DEFENDER, is no striker on city-state 3's Man-At-Arms on 4:11 (the game's Move 4 12 Attack 4 11 behind the Ranger's Move 5 11 Attack 5 10)
-  - LAB (attack units): duelq1128 t50 Archer 2752535 (Attack Units, Move 17:10): ours paths to the spot 17:12, the game's move is to 17:10 and its path ends on 17:11 (the move's destination, not an open-list tie)
   - LAB (attack units): 1128 t114 Attack Civilian's candidates
   - LAB (attack units): 1117 t87 the barbarian Galleys' Attack Civilian on the embarked Great Admiral our copy places on their own Harbor plot 31:12
   - BUILD (attack units): PLUNDER_TRADE_ROUTE after a Trader target's move (0x771f80 +0x34) unported (the step replay, duelw1121)
+  - LAB (attack units): duelq1124 t82 Archer 3801089's Attack Units ends on 38:19, the game's 39:19
+  - LAB (attack units): duelq1124 t104 Man-At-Arms 4259859 takes Attack Units and ends on 35:21, the game's Move to safety to 37:21
+  - LAB (attack units): duelq1124 t134 Caravel 4587523's Attack Units ends on 28:15, the game's 28:14; t156 the Caravel and the Galley 1966102 Move to safety (25:16, 25:14) where the game's take Attack Units to 26:12 and 26:11, the Galley 1179665 on 26:12 for 25:12; t162 Ironclad 5701639's Attack Units 31:19 for 32:18, t169 its Move to safety to 33:23 for the game's Attack Units to 33:22
+  - LAB (attack units): duelq1121 t78 Galley 1572882's Attack Units ends on 30:20, the game's 30:21; t173 Quadrireme 2228245 on 29:5 for 28:5
+  - LAB (attack units): duelq1128 t103 Man-At-Arms 5111824 takes Attack Units, the game's Pillage Improvement; t215 Cavalry 7012372's Attack Units ends on 40:20 for 42:19, t220 / t221 its Attack Civilian for the game's Attack Units (t220 42:19 for 41:21)
   - LAB (rampage): extras round major cities (1124 t31-52)
   - LAB (rampage): t11 a Warrior's turn-3 claim the game refuses (0x790c60) (seed not named; listed after a 1124 case)
   - LAB (rampage): a melee rampager's move-order end (1117 t8 / t10; 1127 Galley 1048590 t109 / t199)
@@ -224,6 +227,7 @@ A question the SOURCE under-determines; neither engine ships a branch until the 
   - LAB (wander): duelq1121 t13 Horseman 655369's Wander draw 5 of 17 lands on 31:6 for the game's 32:6, Operation Move's Horseman 720906 still on 30:6 in ours where the game's stands on 31:9
   - LAB (wander): 1121 t107-109 barbarian Musketman 3473423 carried drift (t107 ours HL: End Turn for Wander; t109 our Skirmisher 3342353 on 3:16, the game's 6:16)
   - LAB (camp defense): duelq1128 t198 the camp 4:12's Pike and Shot 6684692 (52 health) stays under Barb. Camp Defense, ours goes out to 3:11 for the knowledge base's Scout in city-state 3's centre 4:9, a HIGH target with the spot 4:10 at turn 2 in our planning (the camp defender's mover 0x772940; the target list's unseen unit on a district)
+  - LAB (camp defense): fit, unread: the camp strike's shot or attack move pushed behind a move to the spot that waits (0x772940 at 0x772ece / 0x772f51, the queue 0x52f50), the engines striking only from the spot and walking the spot's path over later turns: duelq1121 t160 Spearman 1376265 on 3:18 stays (its spot 3:17 held by its Line Infantry), duelq1128 t31 Spearman 589832 walks 30:6 -> 31:7 for 32:8 its Warrior holds
   - LAB (operation members): 1121 t36 Barbarian Attack's Archer 1835022 on 5:14: ours Operation Protect Units to 4:15 in the tree's second walk of the turn, the game's a second Operation Move holding 5:14 (no endangered member)
   - LAB (operation members): 1121 t27 the Scout 262147 (79 damage) on 37:12 under its tree's Protect Unit goes to 38:12, the game's 37:13 (both off the danger map)
   - LAB (operation members): 1121 t110 the Scout 131073 on 11:18 with 1 Movement carries its tree's order on to 12:18 once the Man-At-Arms 2949124 stands on 11:17, the game's holds 11:18
@@ -269,23 +273,17 @@ A question the SOURCE under-determines; neither engine ships a branch until the 
   - LAB (scouts): 1127 t35 / t37 Scouts' cur region 9:4 / 9:6
 - **C-125. THE TACTICAL PLANNING: TARGETS AND THE COMBAT PREDICTION.** Weight 3.
   - LAB (exchange filter): +0x1ba bit 5 waiving the exchange and survival filters (0x776795)
-  - LAB (exchange filter): duelq1128 t30 Warrior 2031630's Move-only claim on 14:13 for player 1's Warrior 524291 (68 health, Discipline): forward 28/32 and blow back 32/28 put the spot under the exchange filter (64 > 56), the t31 blow there logging +2 / -2, no mutual kill: the input that keeps the spot unread
-  - LAB (exchange filter): duelq1128 t60 Archer 2883598 on 41:16 strikes player 0's Galley 917507 on 43:16 (Move 41 16 Attack 43 16), ours drops the spot under the exchange filter (dealt 13, the Galley's blow back 41 / 22 on a plot two from it) and wanders, the Archer 3407902 beside the Galley on 42:16 wandering in both
-  - LAB (exchange filter): duelq1121 t66 Warrior 2621454's turn-2 claim on 6:17 for player 1's Warrior 131073 (85 health) on 7:17, ours 32 / 28 and back 34 / 26 under the exchange filter (62 > 58)
-  - LAB (exchange filter): duelq1117 t38 Slinger 1769487 on 32:16 wanders where ours claims 33:14 at turn 3 on player 1's Warrior 1179652 (45 health; dealt 25, back 43 / 21), and t39 claims 33:14 from 32:17 where ours holds no LOW target on 33:13 (player 1's unit 1310732 of record 40 on it)
-  - LAB (exchange filter): units fleeing where the game strikes (1124 t119 / t125, 1127 t121, 1128 t159)
+  - LAB (exchange filter): units fleeing where the game strikes (1124 t119 / t125, 1128 t159)
   - LAB (predicted blow): an input lowering the planning's dealt to 27 or less (1117 t10)
   - LAB (predicted blow): no engine seat has a difficulty (Attack City's Immortal bound)
   - LAB (predicted blow): 1127 t76 barbarian Archer 3014676 survives China's centre's 49 (tribe 4's t112 Musketman)
   - LAB (predicted blow): 1124 t69 / t70 Slinger 2490393 on China's Spearman 1179657, defender +5 (a river crossing; nine others match without)
   - LAB (predicted blow): t135 Rome's Warrior 2686977's fortification a turn behind (+3 vs +6) (seed not named; listed after a 1124 case)
-  - LAB (predicted blow): 1128 t33 the barbarian Warrior 1245202 on 15:15 against player 1's Scout on 15:13 reads 15:13's river edge toward it (the melee river term 0x522c10 at any distance), its blow 25 under 2490396's 27 from 15:12: ours 16:14, the game's 15:14 (30 without the river; the attacker's +0x1935 unread)
   - LAB (predicted blow): fit, unread: a ranged no-step strike (1124 t53)
   - LAB (targets): 1124 t131 Knight 1376260 on 38:16 lists the Man-At-Arms' 39:20 at (2/1), game (2/0), 39:20 unrevealed to city-state 3 in ours
   - LAB (targets): 1124 t87 city-state 2's Men-At-Arms on 9:12 / 9:14 list 11:12 unseen, 11:14 / 9:11 seen
   - LAB (targets): the planning's seen-now plane past our sight (1117 t8 13:13, t61 33:8 / 32:7; 1127 t3's Scout on 5:10)
   - LAB (targets): 1124 t119 Man-At-Arms 4521989 for 37:17 on a Missionary
-  - LAB (targets): 1128 t35 two Swordsmen tied on 10:7, game the later (0x775340 / 0x8b5bf0)
 - **C-132. THE DANGER MAP.** Weight 3. Scored against the aimem `danger` (aiscore kinds `danger` / `danger.major`, one-seed traces).
   - LAB (danger): duelq1127 t203-215 the barbarians' map lacks China's Ironclad 4915207's 70 on 16:12 / 16:13 / 17:13 / 18:13 / 16:14 / 17:14 / 18:14 (on 17:6, the records' maxMoves 8; ours sets it out on 8 at t202, the turn it was made, and on 6 from t203)
   - LAB (danger): a ring the game holds and ours lacks for a turn or two: 1124 t72 22 on the 18 plots within 2 of city-state 3's centre 41:12 (40:10 ours 31, the game's 53)
@@ -487,11 +485,12 @@ A question the SOURCE under-determines; neither engine ships a branch until the 
   - LAB (planning): the best defender's strengths (0x523d60) uncompared
   - LAB (planning): 0x70bd40's storm test
   - LAB (claims and strikes): 1124 t32 the Warrior 786433 made that turn on Granada's centre acts as hasMoved (0x56e760) where ours holds full Movement, its turn-1 claim on 41:11 kept (the game's 40:11, no attack)
-  - LAB (claims and strikes): 1124 t50 the game keeps only the Warrior 327683's claim, the engines also 131073's on its own plot 37:8 and 196610's on 37:9 (city-state 4's army record holding the barbarian Scout 3145752 on 37:9 two turns stale)
   - LAB (claims and strikes): 1124 t94 Man-At-Arms 1310728 (Attack Units, Move 32:8) swaps with the Trebuchet 1245189 on 32:8 in ours, the game not
   - LAB (claims and strikes): the strikers' garrison clause (0x775340 at 0x77541f, not HIGH) ported with no confirming case
   - LAB (claims and strikes): 1127 t127 Knight 1114117's Wander onto 6:9 under the barbarian Spearman 3473440, which the game takes only as a strike (the destination test 0x208b80 on the mover's layer: a destination held by a unit at war is an attack, not a move)
   - BUILD (claims and strikes): an operation's unit with no tactical row the engine fortifies (duelq1127 t72 city-state 4's Heavy Chariot 655362 2 / 1, 1128 t130 Hong Kong's Warrior 2293764 1 / 0)
+  - LAB (claims and strikes): duelq1124 t91 city-state 2's embarked Man-At-Arms 1310723 takes Attack Units and ends on 9:8, the game's Attack Civilian to 9:10
+  - LAB (claims and strikes): duelq1128 t132 city-state 3's Trebuchet 1966081 Heals on 3:4, the game's Attack Units to 3:3
   - LAB (city defense): 1117 t84 City Defense Catapult 917509's 2-turn spot on its Man-at-Arms' plot (game 32:5, no row)
   - LAB (city defense): 1117 t89 City Defense Catapult 917509 on 32:7 taking next turn's 32:8
   - LAB (upgrade units): 1121 Upgrade Units' walk 4:589828 t69-72 the 781 / 782 tie

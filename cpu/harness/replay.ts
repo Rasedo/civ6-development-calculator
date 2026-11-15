@@ -1224,6 +1224,9 @@ function barbarianAi(ctx: Ctx, b: TurnRecord, closing: number, before: ReadonlyS
     // China's centre's strike, its Protect Units plunder healing it to 0)
     const hurt = open === undefined ? undefined : damage.get(key) ?? startDamage.get(key);
     if (hurt !== undefined) c.hp = UNIT_HP - hurt;
+    // ...and a barbarian the pair's own turn undug still dug in (`undug`)
+    const dug = isBarbSeat(c.seat) ? ctx.undug.get(key) : undefined;
+    if (dug) c.fortifyTurns = dug.turns;
   }
   // ...and each major's formations as the log's rows before their turn left
   // them (runs/h1_duelp1121 t83: player 1's Courser 1835015 escorts its Great
@@ -1724,6 +1727,10 @@ function minorAi(ctx: Ctx, b: TurnRecord, turn: number, made: ReadonlySet<Unit>,
     }
     if (home && minorAiSeat(c.seat)) levied.push({ c, minor: c.seat, major: seatOfP(ctx, Number(home.split(':')[0])), plot: lastStep.get(home) ?? at ?? c.tileIndex });
     if (at !== undefined) c.tileIndex = at;
+    // a barbarian its own turn of the pair undug is dug in through the
+    // minors' turns before it (`undug`)
+    const dug = key && isBarbSeat(c.seat) ? ctx.undug.get(key) : undefined;
+    if (dug) c.fortifyTurns = dug.turns;
     if (!minorAiSeat(c.seat) || !key) continue;
     // its health the first record's: the game heals its units at the turn's
     // end, after their pass (runs/h1_duelw1117 t10: city-state 3's Warrior
@@ -4852,15 +4859,21 @@ function recordCityName(ctx: Ctx, seat: number, id: number): string {
  *  a blow before that step in the log still finds it dug in (`undug`,
  *  `dugIn`; runs/h1_duelw1117 t76: barbarian Warrior 3211267, two turns dug
  *  in at 38:14, took Xi'an's shot and a Heavy Chariot's blow at +9 and +6
- *  before its own turn's move to 37:14). */
+ *  before its own turn's move to 37:14). One that took no step lost it in
+ *  its own player's turn, by its own order, and is dug in until that turn
+ *  opens (runs/h1_duelq1124 t50: the barbarian Warrior 3080212, one turn dug
+ *  in on 38:8, takes city-state 4's Warrior 327683's blow at the CombatLog's
+ *  DefenderStrMod 3 before it strikes back in its own turn). */
 function fortifyOrders(ctx: Ctx, a: TurnRecord, b: TurnRecord): void {
   const held = new Set(b.units.map((r) => `${r.owner}:${r.id}`));
   const stepped = new Map<string, number>();
+  const opens = new Map<number, number>();
   const rows = (b as { actions?: unknown }).actions;
   if (Array.isArray(rows)) {
     for (const x of rows as unknown[][]) {
       const k = `${x[3]}:${x[4]}`;
       if (x[2] === 'UnitMoved' && !stepped.has(k)) stepped.set(k, x[0] as number);
+      if (x[2] === 'PlayerTurnActivated' && x[1] === a.turn && !opens.has(x[3] as number)) opens.set(x[3] as number, x[0] as number);
     }
   }
   ctx.undug = new Map();
@@ -4868,7 +4881,7 @@ function fortifyOrders(ctx: Ctx, a: TurnRecord, b: TurnRecord): void {
     const key = `${r.owner}:${r.id}`;
     const u = unitOf(ctx, key);
     if (!u || num(r.fortify) > 0 || !(u.fortifyTurns ?? 0)) continue;
-    const ord = stepped.get(key);
+    const ord = stepped.get(key) ?? opens.get(r.owner);
     if (ord !== undefined) ctx.undug.set(key, { ord, turns: u.fortifyTurns ?? 0 });
     u.fortifyTurns = 0;
     count(ctx, 'fortify', 'applied');

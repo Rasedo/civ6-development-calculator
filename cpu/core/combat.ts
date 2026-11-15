@@ -532,15 +532,17 @@ export function flankSupportLive(state: GameState, seat: number): boolean {
  * unit adjacent to the target of the attack" — friendly meaning "units that
  * are currently owned by the same player", never an ally's and never a third
  * party's. "The attacker itself does not count." "Embarked land units do not
- * provide Flanking." "Units across a River from the targeted enemy do not
- * provide Flanking."
+ * provide Flanking." A river between the flanker and the target takes
+ * nothing off (0x521530 walks the target plot's six neighbours and reads no
+ * river edge: runs/h1_duelq1128 t33 the barbarian Warrior 2490396, 80 health,
+ * strikes player 1's Scout on 15:13 from 15:12 at +0 with the Warrior
+ * 1245202 on 15:14 across the river, CombatLog).
  */
 export function flankCount(state: GameState, defTileIndex: number, attacker: Unit): number {
   if (!flankSupportLive(state, attacker.seat)) return 0;
   const dt = state.map.tiles[defTileIndex];
   let n = 0;
   for (const t of neighbors(state.map, dt)) {
-    if (crossesRiver(state.map, dt, t)) continue;
     for (const u of unitsAt(state, t.index)) {
       if (u.id === attacker.id) continue;
       if (unitDomain(u.type) !== 'military') continue;
@@ -568,15 +570,19 @@ function defensibleDistrict(state: GameState, dt: Tile): boolean {
  * like normal" — the one place they differ from flanking. "Units will not gain
  * Support when inside defensible Districts (City Center, Encampment)", though
  * units inside one still provide it. Support is a MELEE-only term, and the
- * callers hold that gate: a ranged attacker never asks for it.
+ * callers hold that gate: a ranged attacker never asks for it. The neighbours
+ * are those of `stands`, the plot the defender's unit stands on (0x5228c0
+ * walks the six plots about the unit's own +0x220 / +0x224), which the AI's
+ * combat prediction holds apart from the plot it defends on.
  */
-export function supportCount(state: GameState, defTileIndex: number, defender: Unit): number {
+export function supportCount(state: GameState, defTileIndex: number, defender: Unit, stands = defTileIndex): number {
   if (!flankSupportLive(state, defender.seat)) return 0;
   const dt = state.map.tiles[defTileIndex];
   if (defensibleDistrict(state, dt)) return 0;
   let n = 0;
-  for (const t of neighbors(state.map, dt)) {
+  for (const t of neighbors(state.map, state.map.tiles[stands])) {
     for (const u of unitsAt(state, t.index)) {
+      if (u.id === defender.id) continue;
       if (unitDomain(u.type) !== 'military') continue;
       if (u.seat === defender.seat) n++;
     }
@@ -642,8 +648,8 @@ export const THEO_HOLY_CITY_STRENGTH = 15;
  * units "move in their own layer", so each layer flanks itself.
  *
  * Everything else is `flankCount`/`supportCount`'s rule unchanged: same owner
- * only, the attacker never counts itself, and flanking does not reach across a
- * river.
+ * only, the attacker never counts itself; this one's flanking does not reach
+ * across a river.
  */
 export function theoFlankCount(state: GameState, defTileIndex: number, attacker: Unit): number {
   if (!flankSupportLive(state, attacker.seat)) return 0;
@@ -824,17 +830,19 @@ export function stackDefender(state: GameState, enemies: Unit[], ranged: boolean
 
 /** The defender's total combat strength for a hit on `defTileIndex`. `vs` names
  *  the attack it is defending against, because two terms need it: SUPPORT is a
- *  melee-only bonus and the class matchup is pairwise. Flanking is the
- *  attacker's own term and is added at the attack site. */
+ *  melee-only bonus (counted about `vs.stands`, the plot the defender's unit
+ *  stands on, `defTileIndex` where none is given) and the class matchup is
+ *  pairwise. Flanking is the attacker's own term and is added at the attack
+ *  site. */
 export function defenderCS(state: GameState, defender: Unit, defTileIndex: number,
-                           vs?: { attacker: Unit; melee: boolean }): number {
+                           vs?: { attacker: Unit; melee: boolean; stands?: number }): number {
   if (defender.embarked) {
     // The normalized embarked CS replaces the unit's own strength, its terrain
     // and its fortification. Support survives it: CIV6 (Flanking and Support)
     // withholds Support from an embarked defender only "against attacks of
     // enemy naval units".
     const escort = vs?.melee && !UNITS[vs.attacker.type]?.naval
-      ? SUPPORT_CS * promoStackMult(defender, 'SUPPORT_MULT') * supportCount(state, defTileIndex, defender)
+      ? SUPPORT_CS * promoStackMult(defender, 'SUPPORT_MULT') * supportCount(state, defTileIndex, defender, vs.stands)
       : 0;
     return embarkedDefenseCS(state, defender.seat) + formationCS(defender) + convoyCS(state, defender) - fuelShortCS(state, defender) + chassisDefendCS(defender, vs)
       - woundPenalty(defender) + escort
@@ -855,7 +863,7 @@ export function defenderCS(state: GameState, defender: Unit, defTileIndex: numbe
     terrainDefense(tile) +
     fortifyBonus(defender) -
     woundPenalty(defender) +
-    (vs?.melee ? SUPPORT_CS * promoStackMult(defender, 'SUPPORT_MULT') * supportCount(state, defTileIndex, defender) : 0) +
+    (vs?.melee ? SUPPORT_CS * promoStackMult(defender, 'SUPPORT_MULT') * supportCount(state, defTileIndex, defender, vs.stands) : 0) +
     (vs ? classMatchupCS(defender.type, vs.attacker.type) : 0) +
     promoCS(defender, {
       attacking: false,
@@ -2021,14 +2029,18 @@ function retreatPlot(state: GameState, u: Unit): number {
 }
 /** THE TWO STRENGTHS of a melee blow on a fighter: the attacker from the
  *  plot it stands on, the defender on `targetIndex` — what the blow resolves
- *  on and what the AI's combat prediction reads (`damageExpected`) */
-export function meleeUnitStrengths(state: GameState, attacker: Unit, targetIndex: number, defender: Unit): { atk: number; def: number } {
+ *  on and what the AI's combat prediction reads (`damageExpected`). Flanking
+ *  and Support count the units about `stands`, the plot the defender's unit
+ *  stands on (0x51c810 at 0x51cc1c..0x51cc56 hands 0x521530 the defender's
+ *  own plot 0x90290; 0x5228c0): the target plot in a blow struck, another in
+ *  the planning's blow back on a unit set on a spot. */
+export function meleeUnitStrengths(state: GameState, attacker: Unit, targetIndex: number, defender: Unit, stands = targetIndex): { atk: number; def: number } {
   const from = state.map.tiles[attacker.tileIndex];
   const target = state.map.tiles[targetIndex];
   const amph = promoFlag(attacker, 'AMPHIBIOUS');
   const atk = (UNITS[attacker.type]?.combat ?? 0) + formationCS(attacker) + convoyCS(state, attacker) - fuelShortCS(state, attacker) + chassisAttackCS(attacker) - woundPenalty(attacker) - (!amph && meleeCrossesRiver(state.map, target, from) ? RIVER_ATTACK_PENALTY : 0)
     - (attacker.embarked && !amph ? AMPHIBIOUS_ATTACK_CS : 0)
-    + FLANKING_CS * promoStackMult(attacker, 'FLANK_MULT') * chassisFlankMult(attacker) * flankCount(state, targetIndex, attacker)
+    + FLANKING_CS * promoStackMult(attacker, 'FLANK_MULT') * chassisFlankMult(attacker) * flankCount(state, stands, attacker)
       * (1 + gpPermOf(seatOf(state, attacker.seat),
         UNITS[attacker.type]?.naval ? 'flankPctNaval' : 'flankPctLand') / 100)
     + promoCS(attacker, {
@@ -2046,7 +2058,7 @@ export function meleeUnitStrengths(state: GameState, attacker: Unit, targetIndex
     + allianceWarCS(state, attacker.seat, defender.seat)
     + rosterCS(state, attacker, defender.seat, defender.hp, false)
     + congressUnitCS(state, attacker) + governmentUnitCS(state, attacker);
-  return { atk, def: defenderCS(state, defender, targetIndex, { attacker, melee: true }) };
+  return { atk, def: defenderCS(state, defender, targetIndex, { attacker, melee: true, stands }) };
 }
 
 /** THE TWO STRENGTHS of a ranged blow on a unit from where the attacker

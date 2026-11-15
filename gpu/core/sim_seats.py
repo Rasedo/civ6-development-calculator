@@ -13312,7 +13312,10 @@ class SimSeats:
         fighter `d_slot` on `tgt` (`d_seat` its seat, -1 none), and whether
         that defender is embarked: what `_hostile_vs_unit` resolves on and
         what the AI's combat prediction reads (`_tac_predict`). `major`: the
-        attacker is of the majors' pool (the terms a barbarian never takes)."""
+        attacker is of the majors' pool (the terms a barbarian never takes).
+        Flanking and Support count the units about the plot the defender's
+        unit stands on (`meleeUnitStrengths`' `stands`): `tgt` in a blow
+        struck, another in the planning's blow back on a unit set on a spot."""
         neg = torch.full_like(d_seat, -1)
         ttc = tgt.clamp(min=0)
         a1 = a_slot.clamp(min=0).unsqueeze(1)
@@ -13357,8 +13360,10 @@ class SimSeats:
         def_e = def_cs - self._wound(def_hp, d_type)
         # flanking helps the hostile attacker (barb/civ at `here`), support
         # helps the defender, whichever seat it belongs to.
+        d_at = self.unit_tile.gather(1, ds0.unsqueeze(1)).squeeze(1)
         _fl, _sp = self._flank_support(
-            tgt, d_seat, a_slot, a_seat, d_slot)
+            tgt, d_seat, a_slot, a_seat, d_slot,
+            stands=torch.where((d_slot >= 0) & (d_at >= 0), d_at, tgt))
         # CIV6 (Impi): "+100% Flanking bonus" — the chassis's own
         # multiplier, beside the promotion's.
         atk_e = atk_e + (FLANKING_CS * self._promo_mult(at, a_promos, "FLANK_MULT")

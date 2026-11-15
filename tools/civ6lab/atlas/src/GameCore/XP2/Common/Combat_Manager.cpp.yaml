@@ -460,6 +460,7 @@
     - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
     - "C-125: a civilian at war in the planning's search, a zone of control across a river, the attack's move onto a city — READ (0x26e570, 0x530f50 at 0x5310c8..0x5311c9, 0x771f80 at 0x772121), both twins"
     - "C-95: the rampage strikes with the move's whole list; its defender is one the barbarians see — READ (0x778b40, 0x771670, 0x208b80, 0x20a2a0), both twins"
+    - "C-125 / C-95: flanking and support count about the defender unit's own plot, no river edge read; MEDIUM by the plot's layer-0 list; a killed target's record; the camp strike's orders — READ (0x521530, 0x51c810 at 0x51cc1c..0x51cc56, 0x5228c0, 0x786d50, 0x776140 at 0x776333, 0x8e9d0, 0x772940 at 0x772d2f..0x772f78), FIT (the camp strike's path), both twins"
   context:
     - "...Encampment) 0x24b170 takes the plot's best defender (0x208b80) where it is a combat unit (0x209dd0: Combat, Ranged or Bombard above 0) and, with a MilitaryFormation argument (+0x90), compa..."
     - ...'s units from the last to the first; for each one not dead (+0x770), not a combat unit (0x209dd0), whose unit info lacks the +0x1ba bit 2, and whose player the mover's player is at w...

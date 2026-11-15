@@ -169,12 +169,14 @@
     - gpu/core/sim_minorops.py:_mops_keep_members
     - cpu/core/operations/nodes.ts:offer
     - gpu/core/sim_minorops.py:_mops_recruit_team
+    - cpu/core/tactical.ts:assignTo
   readings:
     - "C-99 / C-129: a team member gone resolves by its pool slot — READ (0x732cd0 -> 0x4f2310), both twins"
     - "C-95: the target list's knowledge-base entries — READ, ported (two records on one plot below)"
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
     - "H-1: the AI memory reader — READ (the hooks, the pointer paths, the contracts, the knowledge base, the operations, the trees), PARTLY READ (the religious AI's holder)"
     - "C-129: the upgrade is a new unit, its old self dying in its pool slot to the turn's end — READ (0xa49cb0, 0x9402a0, 0x4ef040, 0x4ef6d0), both twins"
+    - "C-125 / C-95: flanking and support count about the defender unit's own plot, no river edge read; MEDIUM by the plot's layer-0 list; a killed target's record; the camp strike's orders — READ (0x521530, 0x51c810 at 0x51cc1c..0x51cc56, 0x5228c0, 0x786d50, 0x776140 at 0x776333, 0x8e9d0, 0x772940 at 0x772d2f..0x772f78), FIT (the camp strike's path), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...1 — seen at the last look, not at this turn's — whose unit (+0, the player's unit list 0x4f2310) still stands (+0x770 clear) within 2 of the plot recorded (+0x10 / +0x14): the unit's..."

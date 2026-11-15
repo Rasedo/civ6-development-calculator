@@ -31,6 +31,7 @@
     - "C-124: the kept path is never taken; a move order's path passes other players' units out of sight — READ (0x272aa0, 0x2714b0, 0x586360 at 0x586542..0x5865a1, 0x26fe20), both twins"
     - "C-110 / C-99: the unit's activity and the Fortify order's refusal — READ"
     - "C-110 / C-99: a placement resets the fortification, a struck SENTRY wakes, a siege striker asks no Movement — READ (0x586d40 at 0x587789, 0x20d280 at 0x20d5ce, 0x775340 at 0x7754c7), both twins"
+    - "C-125 / C-95: flanking and support count about the defender unit's own plot, no river edge read; MEDIUM by the plot's layer-0 list; a killed target's record; the camp strike's orders — READ (0x521530, 0x51c810 at 0x51cc1c..0x51cc56, 0x5228c0, 0x786d50, 0x776140 at 0x776333, 0x8e9d0, 0x772940 at 0x772d2f..0x772f78), FIT (the camp strike's path), both twins"
   review: reviewed
 - addr: 0x53e20
   final: 0x408f0

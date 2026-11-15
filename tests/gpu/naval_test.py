@@ -659,14 +659,14 @@ def poke_flank_support(rules, path, GALLEY):
     assert int(sup1) == int(sup0), "an embarked ally must still support"
     assert int(flank0) - int(flank1) == 1, "an embarked unit must stop flanking"
 
-    # CIV6: "units across a River from the targeted enemy do not provide Flanking"
+    # a river between the flanker and the target takes nothing off (0x521530)
     sim.major_unit_emb[0, mine] = False
     was_river = int(sim.river_mask[0, dt])
     sim.river_mask[0, dt] = 0b111111
     flank2, _ = sim._flank_support(dtile, dseat, noatk, aseat, noatk)
-    assert int(flank2) == 0, "a river on every edge must leave no flanker"
+    assert int(flank2) == int(flank0), "a river on every edge must leave the flankers"
     sim.river_mask[0, dt] = was_river
-    print(f"  9 flank/support OK (flank {int(flank0)}/support {int(sup0)}; embarked -> {int(flank1)}/{int(sup1)}, river -> 0)")
+    print(f"  9 flank/support OK (flank {int(flank0)}/support {int(sup0)}; embarked -> {int(flank1)}/{int(sup1)}, river -> {int(flank2)})")
 
 
 def poke_amphibious(rules, path, WARRIOR, ARCHER):

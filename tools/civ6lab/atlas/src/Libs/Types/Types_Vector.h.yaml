@@ -196,6 +196,18 @@
   context:
     - "...constructor registers), each an int vector of fixed point indexed by promotion class (0x4c1cd0: data +0, size +0x10); the weight max(default + modified, 0.1), 0 where the default is..."
   review: reviewed
+- addr: 0x55e710
+  final: 0x397060
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-129: the bankruptcy's victim and every seat's upgrade to the furthest rung — READ (0x4e05e0, 0x5374c0), both twins"
+    - "C-130: the Economic AI's disband of a falling treasury — READ (0x6877d0 from the savings turn 0x688b45..0x688e71, the delete command's can-start 0x948370), both twins"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - ...y fewer air units (0x929790, none in these engines) or holds strictly fewer promotions (0x55e710 on its experience record +0x1bc0). So the victim is the first candidate, in pool orde...
+    - "...bove the per-unit discount (+0x338, 0 for a minor): the first of the fewest promotions (0x55e710), then one on its own ground, then the least Combat (0x56dc90 with 0, `aiStrengths` /..."
+  review: imported
 - addr: 0x58aa90
   final: 0x3b4040
   kind: function
