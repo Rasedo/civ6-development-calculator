@@ -962,6 +962,7 @@
     - gpu/core/sim_minorai.py:district_held
     - cpu/core/minorCityAi.ts:districtWhole
     - cpu/core/minorCityAi.ts:districtDrowned
+    - cpu/core/minorCityAi.ts:districtOverLimit
   readings:
     - "C-96: the plot analysis's owner test, Build Unit's pillaged district and a unique's install type — READ (0x5ceba7, 0x7f5112 -> 0x1aec20 / 0x1ad720), both twins"
     - "C-97: the behaviour trees — READ (the interpreter), the nodes PARTLY READ"

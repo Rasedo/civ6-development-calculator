@@ -335,6 +335,16 @@ function uniqueGroundOk(
   return true;
 }
 
+/** CIV6 (`SameAdjacentValid` false): the plot test (0x35fd60 at 0x35ffad,
+ *  the walk 0x6b000 over the plots within 1 — the plot itself first,
+ *  0x696c0 — with the lambda 0x363e40 on Plot +0x44) refuses the row where
+ *  the plot or a neighbour holds one, pillaged or not: a pillaged one's own
+ *  row is no repair to the plot analysis (runs/h1_duels1138 Nalanda's
+ *  pillaged Mahavihara on 37:9, its row FX(-9999), the pick the Fort) */
+function sameWithinOne(map: GameMap, tile: Tile, id: ImprovementId): boolean {
+  return tile.improvement === id || neighbors(map, tile).some((n) => n.improvement === id);
+}
+
 export function validImprovementsIn(
   tile: Tile,
   opts: {
@@ -440,8 +450,7 @@ export function validImprovementsIn(
       // a WATER row may be a civilization's own (the Polder)
       if (def.uniqueTo && def.uniqueTo !== opts.civ) continue;
       if (!govOk(def)) continue;
-      if (def.noAdjacentSame && opts.map
-          && neighbors(opts.map, tile).some((n) => n.improvement === def.id)) continue;
+      if (def.noAdjacentSame && opts.map && sameWithinOne(opts.map, tile, def.id)) continue;
       if (def.terrains && !def.terrains.includes(tile.terrain)) continue;
       if (!featureOk(def, tile, unlocks)) continue;
       if (!uniqueGroundOk(def, tile, opts)) continue;
@@ -464,8 +473,7 @@ export function validImprovementsIn(
     if (def.terrains && !def.terrains.includes(tile.terrain)) continue;
     if (def.excludeTerrains?.includes(tile.terrain)) continue;
     if (def.elevations && !def.elevations.includes(tile.elevation)) continue;
-    if (def.noAdjacentSame && opts.map
-        && neighbors(opts.map, tile).some((n) => n.improvement === def.id)) continue;
+    if (def.noAdjacentSame && opts.map && sameWithinOne(opts.map, tile, def.id)) continue;
     if (!uniqueGroundOk(def, tile, opts)) continue;
     if (!govOk(def)) continue;
     out.push(def.id);
@@ -522,8 +530,7 @@ export function validImprovementsIn(
     if (def.terrains && !def.terrains.includes(tile.terrain)) continue;
     if (def.excludeTerrains?.includes(tile.terrain)) continue;
     if (def.elevations && !def.elevations.includes(tile.elevation)) continue;
-    if (def.noAdjacentSame && opts.map
-        && neighbors(opts.map, tile).some((n) => n.improvement === def.id)) continue;
+    if (def.noAdjacentSame && opts.map && sameWithinOne(opts.map, tile, def.id)) continue;
     out.push(def.id);
   }
   // CIV6 (LOC_UNITOPERATION_IMPROVEMENT_BLOCKED_BY_DROUGHT): "This improvement

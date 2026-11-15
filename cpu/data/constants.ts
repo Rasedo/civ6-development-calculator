@@ -629,6 +629,11 @@ export const UNIT_RESOURCE_COST = srcConst('constants.UNIT_RESOURCE_COST', 20,
 export const FUEL_SHORT_CS = srcConst('strategic.fuelShortCs', 20,
   gp('COMBAT_STRENGTH_REDUCTION_INSUFFICIENT_FUEL'));
 
+/** GlobalParameters DISTRICT_POPULATION_REQUIRED_PER (the globals' +0x2ac):
+ *  the citizens each specialty district asks of its city */
+export const DISTRICT_POPULATION_REQUIRED_PER = srcConst('districts.populationPer', 3,
+  gp('DISTRICT_POPULATION_REQUIRED_PER'));
+
 export function maxSpecialtyDistricts(pop: number): number {
   return Math.floor((pop - 1) / 3) + 1;
 }

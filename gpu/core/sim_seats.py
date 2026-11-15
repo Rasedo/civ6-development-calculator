@@ -4614,9 +4614,10 @@ class SimSeats:
             allow |= self.feat_id == f
         ok &= (~live | allow) & ~self.volcano_at
         if self._imp_no_adj_same[k]:
+            # `sameWithinOne`: the plot itself and its neighbours
             nb = self.neigh
             nbc = nb.clamp(min=0)
-            same = ((self.improvement[:, nbc] == k) & (nb >= 0).unsqueeze(0)).any(dim=2)
+            same = ((self.improvement[:, nbc] == k) & (nb >= 0).unsqueeze(0)).any(dim=2) | (self.improvement == k)
             ok &= ~same
         ok &= self._imp_unique_ground_ok(k)
         return ok

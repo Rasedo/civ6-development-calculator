@@ -117,11 +117,12 @@
     - recording: h1_duelv1124
       turn: 2
       value: "Granada population 1: ceil(1 / 3) + 0 = 1 against no district (the half chronology term stands; its Encampment 52.43 at (42,11))"
-  impl: [cpu/core/aiDistrictValue.ts:DistrictValueFacts]
+  impl: [cpu/core/aiDistrictValue.ts:DistrictValueFacts, cpu/core/minorCityAi.ts:districtOverLimit]
   readings:
     - "C-96: the district value — READ (0x7a51f0, 0x7aaf80's terms below, 0x366df0, the purchase price 0x1b1cb0, 0x1c77c0, 0x1b4450), PARTLY READ (the golden-age term, the claims, modifiers and neighbours terms, the domain's resources path), unwired"
     - "C-96: the improvement value's resource copies, a minor's strategic copies, the district count — READ (0x7a58f0's count, 0x4a93c0, 0x1ae8a0, 0x1ae8f0), a LAB (a city-state's Great General weight)"
     - "C-96: the improvement value's resource copies, a minor's strategic copies, the district count"
+    - "C-127 / C-100: the plot test's SameAdjacentValid walk takes the plot itself; a district contract past the population's limit — READ (0x35fd60 at 0x35ffad..0x360008, 0x173940 at 0x173d2e..0x173dad, 0x5f6050 at 0x5f641d..0x5f6436), both twins"
   notes:
     - ceil(population +0x588 / globals +0x2ac) + the districts object's +0x20; 1 where +0x2ac is below 1
   review: reviewed
@@ -148,6 +149,7 @@
     - "C-96: the improvement value's resource copies, a minor's strategic copies, the district count — READ (0x7a58f0's count, 0x4a93c0, 0x1ae8a0, 0x1ae8f0), a LAB (a city-state's Great General weight)"
     - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
     - "C-96: the improvement value's resource copies, a minor's strategic copies, the district count"
+    - "C-127 / C-100: the plot test's SameAdjacentValid walk takes the plot itself; a district contract past the population's limit — READ (0x35fd60 at 0x35ffad..0x360008, 0x173940 at 0x173d2e..0x173dad, 0x5f6050 at 0x5f641d..0x5f6436), both twins"
   context:
     - "...the yield, unweighted, span), EFFECT_ADJUST_CITY_YIELD_PER_DISTRICT 0x6b4e80 (Amount x 0x1ae8f0(1, 1, 1, 0, 0): the city's districts not InternalOnly (+0xe1 bit 2), complete (+0xb08..."
   review: reviewed

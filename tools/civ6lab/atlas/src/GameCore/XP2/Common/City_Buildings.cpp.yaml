@@ -200,6 +200,7 @@
     - cpu/core/aiCityBuild.ts:buildingTable
     - cpu/core/aiCityBuild.ts:analysisBuildings
     - cpu/core/minorCityAi.ts:districtDrowned
+    - cpu/core/minorCityAi.ts:districtOverLimit
   readings:
     - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
     - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
@@ -228,6 +229,7 @@
     - cpu/core/aiCityBuild.ts:buildingTable
     - cpu/core/aiCityBuild.ts:analysisBuildings
     - cpu/core/minorCityAi.ts:districtDrowned
+    - cpu/core/minorCityAi.ts:districtOverLimit
   readings:
     - "H-1: a pillaged building's specialist, the centre's defence, three moments — READ"
     - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"

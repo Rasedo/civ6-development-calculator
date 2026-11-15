@@ -50,20 +50,25 @@
     - gpu/core/sim_minorai.py:_minor_plot_evals
     - cpu/core/minorCityAi.ts:owned
     - gpu/core/sim_minorai.py:can_place_district
+    - gpu/core/sim_minorai.py:one
   readings:
     - "C-96: the district value — READ (0x7a51f0, 0x7aaf80's terms below, 0x366df0, the purchase price 0x1b1cb0, 0x1c77c0, 0x1b4450), PARTLY READ (the golden-age term, the claims, modifiers and neighbours terms, the domain's resources path), unwired"
     - "C-100: a district on a feature it may not stand on, and the Mountain Portal's analyzer — READ"
     - "C-96: the plot analysis's owner test, Build Unit's pillaged district and a unique's install type — READ (0x5ceba7, 0x7f5112 -> 0x1aec20 / 0x1ad720), both twins"
     - "C-111: a captured city keeps its completed districts' locked prices and no progress by type; a district's repair is its city's queue; a unit's pillage takes the district's dearest building first — READ (0x1e8880, 0x173f70 at 0x17480e, 0x967300 / 0x967740, 0x9633c0 -> 0x24af90 -> 0x193190), both twins"
     - "C-127 / C-100 / C-96 / C-99: Check Plot's district test and Add Goal Tech's Goal Plot, a flooded lowland's district, the unit production table's at-war field, the pick's repair project — READ (0x7f6ea0 at 0x7f7600..0x7f7662, 0x35f2d0 at 0x35f46b..0x35f48a / 0x35f60f..0x35f81d, 0x7e7d20 at 0x7e888b..0x7e8a9d, 0x173940 at 0x173a05..0x173be1), LAB (the aiunits unit tables, the Default Specialization's project), both twins"
+    - "C-127 / C-100: the plot test's SameAdjacentValid walk takes the plot itself; a district contract past the population's limit — READ (0x35fd60 at 0x35ffad..0x360008, 0x173940 at 0x173d2e..0x173dad, 0x5f6050 at 0x5f641d..0x5f6436), both twins"
   notes: ["imported: cited by the code, in no dll_readings section"]
   review: reviewed
 - addr: 0x35fd60
   final: 0x25acf0
   kind: function
-  semantics: "the improvement plot test (plot, improvement, ..., fifth argument): a feature the row neither lists nor keeps (0x363a20 false) passes only with the fifth argument 1, the row's Improvements +0x108 & 8 (Buildable) set and the feature's Features +0xc1 at 0x80 or above (Removable), at 0x36079e / 0x36085d / 0x36086c; else the row fails. The first block of the walk (0x36076d, [rax+0x28] & 1) unread."
+  semantics: "the improvement plot test (plot, improvement, ..., fifth argument): a feature the row neither lists nor keeps (0x363a20 false) passes only with the fifth argument 1, the row's Improvements +0x108 & 8 (Buildable) set and the feature's Features +0xc1 at 0x80 or above (Removable), at 0x36079e / 0x36085d / 0x36086c; else the row fails. The first block of the walk (0x36076d, [rax+0x28] & 1) unread. With SameAdjacentValid false (+0x10a & 8, the loader's column 41) the walk 0x6b000 over the plots within 1 (0x6af80 -> 0x69010, the plot itself first at 0x696c0) with the lambda 0x363e40 (Plot +0x44 the row) refuses at 0x35ffad..0x360008: the plot's own improvement, pillaged or not, counts."
   status: READ
   cases:
+    - recording: h1_duels1138
+      turn: 125
+      value: "Nalanda: its pillaged Mahavihara on 37:9 reads FX(-9999) on its own row, the pick the Fort, no Builder contract (t125-t127, t177-t195)"
     - recording: h1_duelz1124
       turn: 230
       value: "Bologna: plot 426 (Forest on Plains Hills, Lumber Mill pillaged) values no Wind Farm (not Buildable), the trees on 382's Wind Farm at 128.56 (the game's tree 11665415, PV 128), the Wind Farm laid on 382 at t230"
@@ -77,6 +82,8 @@
       turn: 3
       value: "Checked on the recorded ties: 1126 turn 3 (996 and   1041 tie at 52, the log's ranges 2 / 2, the game's pick 996), 1117 turn 8   (687 alone, range 1, where n1 + n2 tied it with 766), 1128 turn 5."
   impl:
+    - cpu/core/rules.ts:sameWithinOne
+    - gpu/core/sim_seats.py:_imp_ground_compute
     - cpu/core/barbarians.ts:campGround
     - cpu/core/aiCityTrees.ts:CityTreeWorld
     - cpu/core/minorCityAi.ts:groundImprovements
@@ -85,7 +92,9 @@
     - cpu/core/minorCityAi.ts:BUILDABLE
     - gpu/core/sim_minorai.py:_imp_buildable
     - cpu/core/minorCityAi.ts:out
+    - cpu/core/minorCityAi.ts:tile
   readings:
+    - "C-127 / C-100: the plot test's SameAdjacentValid walk takes the plot itself; a district contract past the population's limit — READ (0x35fd60 at 0x35ffad..0x360008, 0x173940 at 0x173d2e..0x173dad, 0x5f6050 at 0x5f641d..0x5f6436), both twins"
     - "C-127: the plot test takes a removable feature for a Buildable row alone; a completion releases the research AI's other Tech Contracts — READ (0x35fd60 at 0x36079e / 0x36085d, 0xac6bb0, 0x762d60 at 0x762f7b), both twins"
     - "H-1: the barbarians' turn (0x1514a0) — READ (the max camps and the sight LAB)"
     - "C-96: the improvement value — READ (0x7a58f0, 0x7b1320's yields, the feature removal 0x7a3010, the harvest 0x7a37d0, the build unit 0x7a2e20), PARTLY READ (the hazards' turns, 0x7b1320's tourism, defence, claimed plots, modifiers and neighbours terms), unwired"

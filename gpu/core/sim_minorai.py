@@ -2519,8 +2519,20 @@ class _MinorWorld:
                 return torch.ones(sim.B, dtype=torch.bool, device=sim.device)
             # held complete and unpillaged (a pillaged one's repair it takes),
             # or complete on a flooded plot (no repair there)
-            return ((sim.district == dv) & sim.district_complete & (~sim.district_pillaged | sim.tile_flooded)
+            held = ((sim.district == dv) & sim.district_complete & (~sim.district_pillaged | sim.tile_flooded)
                     & (sim.tile_seat == self.seat)).any(dim=1)
+            if not bool(sim._is_specialty[dv]):
+                return held
+            # past the population's district limit (`districtOverLimit`):
+            # none of the type placed, the specialty count at the most the
+            # population allows and the population under the count's next
+            tiles = sim.city_dist_tile[:, self.row, 0]
+            count = ((tiles >= 0) & sim._is_specialty).sum(dim=1)
+            pop = sim.city_pop[:, self.row, 0].long()
+            per = int(sim.rules.district_population_per)
+            allowed = 1 + torch.div(pop - 1, per, rounding_mode="floor")
+            over = (tiles[:, dv] < 0) & (allowed <= count) & (pop < (count + 1) * per)
+            return held | over
         return self._rows_apply(row, one) | (row < 0)
 
     def can_train(self, row):
@@ -2705,7 +2717,8 @@ class _MinorWorld:
             dv = int(self.E["district"][r]) if r < len(self.E["district"]) else -1
             if dv < 0:
                 return torch.zeros(sim.B, sim.T, dtype=torch.bool, device=sim.device)
-            return sim._minor_district_plane(self.s, dv, True, False)
+            # the placement test 0x35f2d0 asks no population limit
+            return sim._minor_district_plane(self.s, dv, True, False, limit=False)
         out = torch.zeros_like(plot, dtype=torch.bool)
         # the plot as it stands (Check Plot's 0x35f2d0, neither waiver
         # passed): a removable feature the district would clear refuses it,
@@ -2750,12 +2763,13 @@ class _MinorWorld:
         flat_p = plot.reshape(sim.B, -1).clamp(min=0)
         flat_k = k.reshape(sim.B, -1).clamp(min=0)
         v = g[torch.arange(sim.B, device=sim.device).unsqueeze(1), flat_p, flat_k].reshape(plot.shape)
-        # a plot holding an improvement takes none but its own pillaged
-        # one's repair
+        # the plot test, else the plot's own pillaged improvement, its
+        # repair: a plot holding another improvement takes none
         cur = sim.improvement.gather(1, flat_p).reshape(plot.shape)
         pil = sim.pillaged.gather(1, flat_p).reshape(plot.shape)
-        free = (cur < 0) | ((cur == k) & pil)
-        return v & free & (imp >= 0) & (k >= 0) & (plot >= 0)
+        own = (sim.tile_seat.gather(1, flat_p) == 100 + self.s).reshape(plot.shape)
+        ok = (v & (cur < 0)) | ((cur == k) & pil & own)
+        return ok & (imp >= 0) & (k >= 0) & (plot >= 0)
 
     def builder_plot(self, plot):
         """`builderPlot` at [B] plots: an impassable plot's ring walked in

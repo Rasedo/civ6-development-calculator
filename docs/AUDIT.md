@@ -360,6 +360,7 @@ A question the SOURCE under-determines; neither engine ships a branch until the 
   - LAB (unit values): PSEUDOYIELD_GPP_GENERAL -1.0 (0x700810's writer)
   - LAB (unit values): locked units by +0x388
   - BUILD (unit values): duels1136 the UNITS table's Trader: player 4 t64 397.54 ours 227.08, player 3 t65 550.14 ours 308.38, player 2 t100-t123 246.72 ours 0.00
+  - BUILD (unit values): the engines hold no UNIT_LAHORE_NIHANG (GranColombia_Maya_Units.xml: Combat 25, MustPurchase, YIELD_FAITH, COST_PROGRESSION_GAME_PROGRESS 400, TraitType MINOR_CIV_LAHORE_NIHANG_TRAIT, its Barracks / Armory / Academy +15 abilities): Lahore's building event takes it where ours takes another (duels1160 t2 the Nihang at 16 for ours' Walls; duels1170 t2 / t23 / t238, 1186 t9; 17 contract rows on 8 seeds), its unit production table holds it (unit.table duels1170 t2-t240), duels1170 t240 the game buys one
   - LAB (unit production table): the military AI's unit production table (0x7989e0's +0x20 counts, the obsolete entry's hold) left on the units standing, no case telling the two apart
   - LAB (unit production table): a gone non-army COMBAT unit joining the standing-army walk below the quota (its +0x7d0 after the kill unread), a gone member's Combat as it stood and its place in the pool order
   - LAB (unit production table): duels1124 t206 city-state 4: five entries at twice the game's value (Crossbowman 21 / 10, Pikeman 23 / 11, Musketman 44 / 22, Privateer 53 / 26, Military Engineer 2 / 1), its other 50 equal; the game's other 743 tables equal (aiscore kind `unit.table`); the units held differ on 15 tables (t18 city-state 4 Warrior 5 / 4, t68 city-state 3 Warrior 0 / 1), ours counted at the upgrade step
@@ -373,6 +374,7 @@ A question the SOURCE under-determines; neither engine ships a branch until the 
   - LAB (buildings and districts): CanProduce's district test
   - LAB (buildings and districts): the Free Cities' pick still asks the repair's quiet turns (their queue's refusal unported)
   - LAB (buildings and districts): the walls' repair the game picks where ours picks another item or none: duels1145 Anshan t100 (ours Research Grants), 1139 Wolin t148, 1137 Cardiff t229 (untraced)
+  - LAB (buildings and districts): the Seaport the game values below the Food Market: duels1143 Bandar Brunei t207 / t214 / t221 / t228 the game's Build City Building event takes the Food Market (contract VALUE 7 / 14), ours the Seaport (350.07 at T 22, 672.67 at T 12; its Harbor, Shipyard and Electricity held, its reasons clear); the game's plain pick t206 the Stock Exchange (521.4) and t215 Shipping (97.5) over ours' Seaport, its Seaport contract first at t235 (VALUE 401); duels1186 Lahore t181-t227 and 1162 / 1181 / 1136 alike (untraced)
   - LAB (picks): a 0.0 pick tie (1117 t168-214)
   - LAB (picks): 1127 Mexico City t22's cancel
   - LAB (picks): the forecast's place (1121 t18)
@@ -419,6 +421,7 @@ A question the SOURCE under-determines; neither engine ships a branch until the 
   - LAB (route value K): the route value K: a major's Religious AI faith boost (0x74f5a0: -0.25 steps on its faith balance against its wanted religious unit's cost, ranked on its cities' City Analysis values) unported: duels1191 t118 China's K 9.40 for ours 14.90 as its faith fell 94 -> 6, then 15.44 / 12.44 turn about t119-128 (Taiyuan's 11 Taoists under Chinguetti); the Free Cities' civics in reach t119-249
   - LAB (route value K): the route value K a turn late where a major's own turn moves its route yields: duels1180 t28 China slots Caravansaries in its t28 turn, the game's K 3.50 at t28, ours at t29 (the cards land after the Free Cities' turn); duels1153 t55 China's Classical Republic and Isolationism (GovernmentChanged in city-state 2's turn), the game's K 8.34 at t55, ours at t56, the engine refusing the government with Political Philosophy not completed (research:completed fallback); duels1139 t153 and duels1170 t242 K one turn late alike, untraced
   - LAB (route value K): the route value K: duels1153 China's route to city-state 513 (11 Gold) 10.68 to t141, the game's 10.71 at t142, 12.00 at t151, 12.00 / 12.25 turn about t151-160 and 13.45 / 13.70 from t161, no Chinguetti held: untraced
+  - LAB (route value K): the route value K a Mountain Tunnel's MOUNTAIN_PORTAL term reads: duels1191 Chinguetti t224 ours' K falls 26.09 -> 14.74, its Tunnel on 16:18 818.34 -> 476.34 under the Farm on 15:20 (521.57), a Builder contract t224-t229; the game's pick the Tunnel t223-t225 (m_bestImprovementToMake 46), its tree ended at its Check Plot each turn
   - LAB (quests): the quests' select ranges (18 draws)
   - LAB (contracts): t178 p2 a Stock Exchange contract the game has none of (seed not named)
   - LAB (contracts): 1121 p2 t231 / t238 / t245 the game's Market contract a turn early
@@ -449,7 +452,6 @@ A question the SOURCE under-determines; neither engine ships a branch until the 
   - LAB (improvement rows): 1124 IMPROVEMENTS Plantation, Farm and Lumber Mill rows (about 19 each)
   - LAB (improvement rows): 1124 t91 p3 Farm rows +10.80 over the game's and t93-94 p2 Farm rows (housing / growth one-turn shifts)
   - LAB (improvement rows): 1117 Farm rows p2 t150 (+44), p4 t185-189 / t213
-  - LAB (improvement rows): duels1138 Nalanda's own pillaged Mahaviharas on 37:9 and 36:10 read FX(-9999) on their own row from t49 (a pillaged Farm's own row valued: city-state 2 t84 182.45), ours their repair: the pick the Mahavihara and a Builder contract t125-t127 / t177-t195 where the game's pick is the Fort at 52.45
   - LAB (improvement rows): duels1146 Kumasi t176 / t202: the game lays the Mine on the Volcanic Soil 12:13 (53.38 over its Farm's 49.17) and the Farm at t180 after an eruption takes it, ours a Farm tree on 11:12 (untraced; the plot value lab's Farm and Mine rows far on t199-t230)
   - LAB (yields at the analysis): the analysis' yields a turn ahead of the record's: duelp1121 Hunza t164 Production 7 -> 4
   - LAB (yields at the analysis): the analysis' yields a turn ahead of the record's: duelp1121 Hunza t124-129 the surplus the Neighbourhood's housing reads

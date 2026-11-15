@@ -433,6 +433,7 @@
     - "C-97: the behaviour trees — READ (the interpreter), the nodes PARTLY READ"
     - "C-126 / C-128: the outer defences' repair, a city-state's centre and a unit made anew — the repair READ (0x17a680, 0x7b28c0's count), the jump a fit, both twins"
     - "C-129 / C-99 / C-134: a known city's Encampment in the enemy strength, the rally's advance, the team's battle strengths and Garrison City's fortify test — READ (0x7877e0 at 0x7878e1..0x78791f / 0x787c64..0x787ca7, 0x5f0280, 0x5efaf0, 0x73f0c0, 0x73f7d0 at 0x73face, 0x738f20 at 0x7391a4..0x7395e1, 0x810d30 at 0x810f80..0x81115e), both twins; the replay's buildings before the next start"
+    - "C-127 / C-100: the plot test's SameAdjacentValid walk takes the plot itself; a district contract past the population's limit — READ (0x35fd60 at 0x35ffad..0x360008, 0x173940 at 0x173d2e..0x173dad, 0x5f6050 at 0x5f641d..0x5f6436), both twins"
   context:
     - ...Combat in the tag that the barbarians' techs and civics allow; placement walks rings 0x69010 (the centre, then each ring from axial corner (0,1),(-1,0),(1,-1),(0,-1),(1,0),(-1,1) a...
     - "...e the node names a Leader Tag and Range above 0. With a radius the ring walk 0x6aef0 (0x69010's order) around the goal with the test 0x815d50: a plot in the goal's region (plot +0x1..."
@@ -473,6 +474,17 @@
     - ...-1 for its own pillaged improvement (+0x4d bit 0), then the ring of radius 1 (0x6b1b0 -> 0x691f0, the centre not in it) through 0x513780, and last +1 when the plot's owner holds the civi...
     - "The spread's neighbour walk 0x6b1b0 -> 0x691f0 is the ring walk: from the plot's cube coordinates, the six steps of the table at 0xf0bf4..."
   review: reviewed
+- addr: 0x696c0
+  final: 0x4e4f0
+  kind: function
+  status: PARTLY
+  impl: [cpu/core/rules.ts:sameWithinOne]
+  readings:
+    - "C-127 / C-100: the plot test's SameAdjacentValid walk takes the plot itself; a district contract past the population's limit — READ (0x35fd60 at 0x35ffad..0x360008, 0x173940 at 0x173d2e..0x173dad, 0x5f6050 at 0x5f641d..0x5f6436), both twins"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...1 of the plot (0x6b000 -> GetNeighborPlots 0x6af80 -> 0x69010, the plot itself first at 0x696c0, then the ring) with the lambda 0x363e40 (`flag |= Plot +0x44 == the row`) and refuses..."
+  review: imported
 - addr: 0x69d80
   final: 0x4e9a0
   kind: function
@@ -522,6 +534,7 @@
   status: PARTLY
   readings:
     - "C-129 / C-99 / C-134: a known city's Encampment in the enemy strength, the rally's advance, the team's battle strengths and Garrison City's fortify test — READ (0x7877e0 at 0x7878e1..0x78791f / 0x787c64..0x787ca7, 0x5f0280, 0x5efaf0, 0x73f0c0, 0x73f7d0 at 0x73face, 0x738f20 at 0x7391a4..0x7395e1, 0x810d30 at 0x810f80..0x81115e), both twins; the replay's buildings before the next start"
+    - "C-127 / C-100: the plot test's SameAdjacentValid walk takes the plot itself; a district contract past the population's limit — READ (0x35fd60 at 0x35ffad..0x360008, 0x173940 at 0x173d2e..0x173dad, 0x5f6050 at 0x5f641d..0x5f6436), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ...member of the sea domain (+0x650 0) and that plot not water, the ring walk 0x6b000 (-> 0x6af80 -> 0x69010) within 3 of the target with the lambda 0x740bd0 takes the first water plot....
@@ -531,10 +544,11 @@
   kind: function
   semantics: a walk of the plots within a radius with a lambda.
   status: PARTLY
-  impl: [cpu/core/operations/assault.ts:advanceRally]
+  impl: [cpu/core/operations/assault.ts:advanceRally, cpu/core/rules.ts:sameWithinOne]
   readings:
     - "C-97: the settle site evaluation — READ (the score, the choices), PARTLY READ (the danger, the plot yield)"
     - "C-129 / C-99 / C-134: a known city's Encampment in the enemy strength, the rally's advance, the team's battle strengths and Garrison City's fortify test — READ (0x7877e0 at 0x7878e1..0x78791f / 0x787c64..0x787ca7, 0x5f0280, 0x5efaf0, 0x73f0c0, 0x73f7d0 at 0x73face, 0x738f20 at 0x7391a4..0x7395e1, 0x810d30 at 0x810f80..0x81115e), both twins; the replay's buildings before the next start"
+    - "C-127 / C-100: the plot test's SameAdjacentValid walk takes the plot itself; a district contract past the population's limit — READ (0x35fd60 at 0x35ffad..0x360008, 0x173940 at 0x173d2e..0x173dad, 0x5f6050 at 0x5f641d..0x5f6436), both twins"
   notes:
     - ".claude/scratchpad/st1/reading.md: ...e as without it). - The evaluation (0x6fd1d0, its ring callback 0x6f93a0 over the plots   within 5, 0x6b000): invalid where the player has not revealed the plot or   may not found there (0x1eaa30: not impass..."
   context:
@@ -2483,6 +2497,17 @@
   context:
     - ...s's improvable test), 0x35fd60 lets a plot's feature the row neither lists nor keeps (0x363a20 false) through only where the row's Improvements +0x108 & 8 is set and the feature's Fe...
   review: imported
+- addr: 0x363e40
+  final: 0x25e090
+  kind: function
+  status: PARTLY
+  impl: [cpu/core/rules.ts:sameWithinOne]
+  readings:
+    - "C-127 / C-100: the plot test's SameAdjacentValid walk takes the plot itself; a district contract past the population's limit — READ (0x35fd60 at 0x35ffad..0x360008, 0x173940 at 0x173d2e..0x173dad, 0x5f6050 at 0x5f641d..0x5f6436), both twins"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...0x6af80 -> 0x69010, the plot itself first at 0x696c0, then the ring) with the lambda 0x363e40 (`flag |= Plot +0x44 == the row`) and refuses where any holds the row, pillaged or not...."
+  review: imported
 - addr: 0x37b760
   final: 0x26c770
   kind: function
@@ -4311,9 +4336,12 @@
   final: 0x3fa8e0
   kind: function
   name: the contract eligibility
-  semantics: "under threat (0x5cdc50) a district only where its Districts row has hit points: +0x58 set and +0x5c non-zero (the City Center, the Encampment and its replacements) At 0x5f62d3: under threat a district passes only where its Districts row has +0x58 set and +0x5c non-zero (0x5f6304): the hit points (districtDefensive / d_defensive). At 0x5f67ec: a unit contract is eligible where COMPLETED, else not MustPurchase and CanTrain (sixth argument clear)."
+  semantics: "under threat (0x5cdc50) a district only where its Districts row has hit points: +0x58 set and +0x5c non-zero (the City Center, the Encampment and its replacements) At 0x5f62d3: under threat a district passes only where its Districts row has +0x58 set and +0x5c non-zero (0x5f6304): the hit points (districtDefensive / d_defensive). At 0x5f67ec: a unit contract is eligible where COMPLETED, else not MustPurchase and CanTrain (sixth argument clear). At 0x5f641d..0x5f6436: a district contract is eligible COMPLETED, else where 0x173940 sets neither its refused-for-good byte nor its population reason +0x20."
   status: READ
   cases:
+    - recording: h1_duels1185
+      turn: 73
+      value: Lisbon's Commercial Hub contract past the population's limit taken by none
     - recording: h1_duelv1124
       turn: 51
       value: Muscat's Walls contract printed ACCEPTED once its Walls stood
@@ -4321,11 +4349,13 @@
       turn: 43
       value: Granada's Harbor contract kept under a threat with its centre whole (0x5cdc50 false), complete t45
   impl:
+    - cpu/core/minorCityAi.ts:districtOverLimit
     - cpu/core/aiContracts.ts:contractEligible
     - cpu/core/minorCityAi.ts:minorTreeCity
     - gpu/core/sim_citytrees.py:contract_eligible
     - cpu/core/minorBuild.ts:minorUnderThreat
   readings:
+    - "C-127 / C-100: the plot test's SameAdjacentValid walk takes the plot itself; a district contract past the population's limit — READ (0x35fd60 at 0x35ffad..0x360008, 0x173940 at 0x173d2e..0x173dad, 0x5f6050 at 0x5f641d..0x5f6436), both twins"
     - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
     - "C-96: the city under threat and a pillaged district's repair — the test READ but +0x218, the repair PARTLY READ"
     - "C-96: the city under threat and a pillaged district's repair — the test READ, the repair PARTLY READ"
@@ -9764,6 +9794,7 @@
     - "C-96: the improvement value — READ (0x7a58f0, 0x7b1320's yields, the feature removal 0x7a3010, the harvest 0x7a37d0, the build unit 0x7a2e20), PARTLY READ (the hazards' turns, 0x7b1320's tourism, defence, claimed plots, modifiers and neighbours terms), unwired"
     - "C-97: the war desires, the war operation's readiness and the assault's executions — the war value, the not-ready hook, the readiness and the executions READ; the leader's war factor, the WMD flags, the deal items and the war record's writer unread"
     - "C-96: the improvement value — READ (0x7a58f0, 0x7b1320's yields, tourism and modifiers, the feature removal 0x7a3010, the harvest 0x7a37d0, the build unit 0x7a2e20, EFFECT_ADJUST_CITY_FREE_POWER), PARTLY READ (the hazards' turns, 0x7b1320's defence, claimed plots and neighbours terms)"
+    - "C-127 / C-100: the plot test's SameAdjacentValid walk takes the plot itself; a district contract past the population's limit — READ (0x35fd60 at 0x35ffad..0x360008, 0x173940 at 0x173d2e..0x173dad, 0x5f6050 at 0x5f641d..0x5f6436), both twins"
   context:
     - "...), the value 0x7a58f0(impr, rate, T, horizon, plot, city). The Improvements row (loader 0xac6bb0, its SELECT alphabetical): AirSlots +0x2c, Appeal +0x30, DefenseModifier +0x34, Dispe..."
     - "...0 or 0x35fd60 refuses; T = max(0x7610e0 to +0x160, 0x621920 to +0x158). The row (loader 0xac6bb0): AirSlots +0x2c .. YieldFromAppealPercent +0x60; Adjacencies +0x110, Tourism +0x168,..."

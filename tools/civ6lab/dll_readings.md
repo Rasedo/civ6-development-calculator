@@ -17837,3 +17837,40 @@ sim_seats.py).
 - OPEN: the GPU's occupancy planes hold one embarked unit a plot, so an
   embarked formation's escort and rider share `embarked_at` (the twin
   finds the escort by a unit scan).
+
+## C-127 / C-100: the plot test's SameAdjacentValid walk takes the plot itself; a district contract past the population's limit — READ (0x35fd60 at 0x35ffad..0x360008, 0x173940 at 0x173d2e..0x173dad, 0x5f6050 at 0x5f641d..0x5f6436), both twins
+
+`cpu/core/rules.ts` `sameWithinOne` / `gpu/core/sim_seats.py`
+`_imp_ground_compute`; `cpu/core/minorCityAi.ts` `districtOverLimit` and
+Check Plot's `canPlaceDistrict` / `gpu/core/sim_minorai.py`
+`district_blocked` and `can_place_district`.
+
+- SAME ADJACENT: the Improvements loader (0xac6bb0) reads column 41
+  (SameAdjacentValid) into +0x10a & 8. The plot test 0x35fd60, the bit
+  clear, walks the plots within 1 of the plot (0x6b000 -> GetNeighborPlots
+  0x6af80 -> 0x69010, the plot itself first at 0x696c0, then the ring) with
+  the lambda 0x363e40 (`flag |= Plot +0x44 == the row`) and refuses where
+  any holds the row, pillaged or not. So a plot holding its own pillaged
+  unique improvement takes no row of it: the analysis values no repair
+  there (FX(-9999)), and the pick goes elsewhere. Check Plot still
+  succeeds on the plot's own pillaged improvement (0x7f6ea0's +0x4d /
+  +0x44 path past the plot test). Confirmed: duels1138 Nalanda's pillaged
+  Mahavihara on 37:9 (t125-t127, t177-t195: no Builder contract, the
+  game's pick the Fort, its tree ended at its Check Plot), duels1176
+  Samarkand's pillaged Trading Dome on 39:21 (t114-t145: m_bestImprovement
+  12, the Fort, no Builder contract), the Mahavihara laid on 521 at t54.
+- THE DISTRICT LIMIT: CanConstruct of a district (0x173940), for a type
+  counting toward the limit (Districts +0xe1 & 0x40) none of which the
+  city has placed (0x17cee0), with the city's count (0x1ae8f0) at least
+  its most allowed (0x1ae8a0) and its population (+0x588) under (count + 1)
+  x DISTRICT_POPULATION_REQUIRED_PER (globals +0x2ac, 3), writes that
+  population to its reason +0x20 and fails. The contract eligibility
+  (0x5f6050) takes a district contract only COMPLETED or with neither the
+  result's refused-for-good byte nor +0x20 set: Build Unit's contract no
+  city takes is held by none, the node RUNNING with no contract, the tree
+  gone the turn after. The placement test 0x35f2d0 Check Plot calls asks no
+  population. Confirmed: duels1185 Lisbon t73-t82 / t100 (population 3, its
+  Harbor: the Commercial Hub tree's Check Plot SUCCESS, Build Unit RUNNING,
+  no contract) and t90 (population 4: its Commercial Hub contract held).
+- OPEN: the count 0x1ae8f0's flags (placed incomplete districts counted as
+  the engines count them) unread.

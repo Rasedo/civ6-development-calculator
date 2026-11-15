@@ -377,6 +377,7 @@ class Rules:
     civic_unlock: tuple  # (CivicUnlockMaxCost, CivicUnlockPerTurnDrop, CivicUnlockMinCost) — `policyUnlockCost`
     cost_escalation: int  # GAME_COST_ESCALATION 1000, the policy unlock's escalation end point — `policyEscalated`
     anarchy_turns: int  # the turns a return to a held government leaves the seat in none (ANARCHY_TURNS)
+    district_population_per: int  # the citizens each specialty district asks of its city (DISTRICT_POPULATION_REQUIRED_PER)
     turn_limit: int  # game over once turn > this
     space_ly_target: int  # the Exoplanet craft's distance (light-years, speed-scaled)
     district_cost: dict  # districtCost params {base, scale} — each seat pays it from ITS OWN research
@@ -654,6 +655,7 @@ def load_rules(path: Path = FIXTURES / "rules.json") -> Rules:
                       int(r["scenario"]["civicUnlockMinCost"])),
         cost_escalation=int(r["scenario"]["gameCostEscalation"]),
         anarchy_turns=int(r["scenario"]["anarchyTurns"]),
+        district_population_per=int(r["scenario"]["districtPopulationPer"]),
         turn_limit=r["scenario"]["turnLimit"],
         space_ly_target=r["scenario"]["spaceLyTarget"],
         district_cost=r["districtCost"],

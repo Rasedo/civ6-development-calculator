@@ -38,7 +38,7 @@ import { TECHS as TECHS_KNOWN } from '../data/techs';
 import { CIVICS as CIVICS_KNOWN } from '../data/civics';
 import { DISTRICTS } from '../data/districts';
 import { IMPROVEMENTS } from '../data/improvements';
-import { GAME_COST_ESCALATION, gameProgressPct, scaleByGameSpeed } from '../data/constants';
+import { DISTRICT_POPULATION_REQUIRED_PER, GAME_COST_ESCALATION, gameProgressPct, maxSpecialtyDistricts, scaleByGameSpeed } from '../data/constants';
 import { AI_BUILDINGS, AI_DISTRICT_LISTS, AI_DISTRICTS, AI_FEATURES, AI_IMPROVEMENTS, AI_PROJECTS, AI_RESOURCES, AI_UNITS } from '../data/aiBuildTables';
 import { AI_CITY_EVENTS, AI_CITY_EVENT_LISTS } from '../data/aiCityTrees';
 import { AI_VALUE_HORIZON } from '../data/aiValue';
@@ -563,6 +563,23 @@ function minorTreeCity(state: GameState, cs: CityState, facts: CityBuildFacts, t
     return !!id && (cs.districts ?? []).some((x) => x.type === id && state.map.tiles[x.tileIndex].districtComplete
       && !!state.map.tiles[x.tileIndex].flooded);
   };
+  // past the population's district limit (CanConstruct 0x173940 at
+  // 0x173d2e..0x173dad, the reason +0x20 the contract eligibility 0x5f6050
+  // reads at 0x5f6431): a district counting toward the limit, none of its
+  // type placed in the city, the city's specialty districts at the most its
+  // population allows (0x1ae8a0) and its population under
+  // DISTRICT_POPULATION_REQUIRED_PER times one more of them
+  // (runs/h1_duels1185 Lisbon t73: population 3 with its Harbor, the
+  // Commercial Hub tree's Build Unit RUNNING with no contract, the
+  // contract submitted at t90 at population 4)
+  const districtOverLimit = (d: string): boolean => {
+    const id = engineId('district', d, 'DISTRICT_', DISTRICTS) as DistrictId | null;
+    if (!id || !DISTRICTS[id].countsTowardLimit) return false;
+    const mine = cs.districts ?? [];
+    if (mine.some((x) => x.type === id)) return false;
+    const count = mine.filter((x) => DISTRICTS[x.type]?.countsTowardLimit).length;
+    return maxSpecialtyDistricts(cs.population) <= count && cs.population < (count + 1) * DISTRICT_POPULATION_REQUIRED_PER;
+  };
   return {
     id: city.id, name: cs.name, underThreat: minorUnderThreat(cs, threat),
     current: currentItem(cs),
@@ -576,7 +593,7 @@ function minorTreeCity(state: GameState, cs: CityState, facts: CityBuildFacts, t
       const id = engineId('building', b, 'BUILDING_', BUILDINGS);
       return !id || ((cs.buildings ?? []).includes(id) && !buildingPillaged(cs, id));
     },
-    districtBlocked: (d) => !engineId('district', d, 'DISTRICT_', DISTRICTS) || districtWhole(d) || districtDrowned(d),
+    districtBlocked: (d) => !engineId('district', d, 'DISTRICT_', DISTRICTS) || districtWhole(d) || districtDrowned(d) || districtOverLimit(d),
     canTrain: (u) => pf.canTrain(u),
     trainsSea: facts.trainsDomain('DOMAIN_SEA'),
     buildTurns: (c) => facts.buildTurns(c.unit ?? c.building ?? c.district ?? ''),
@@ -655,10 +672,12 @@ function minorTreeWorld(state: GameState, cs: CityState, ai: CityAi, city: CityT
     canImprove: (plot, imp) => {
       const id = engineId('improvement', imp, 'IMPROVEMENT_', IMPROVEMENTS);
       const tile = state.map.tiles[plot];
-      // a plot holding an improvement takes none but its own pillaged one's
-      // repair (0x7f6ea0: the plot test, then the repair, else FAILURE)
-      if (tile.improvement && !(tile.pillaged && tile.improvement === id)) return false;
-      return !!id && owned(plot) && standingImprovements(state, cs, tile).includes(id);
+      // the plot test (0x35fd60), else the plot's own pillaged improvement,
+      // its repair (0x7f6ea0 at +0x4d / +0x44): a plot holding another
+      // improvement takes none
+      if (!id || !owned(plot)) return false;
+      if (tile.improvement) return tile.pillaged && tile.improvement === id;
+      return standingImprovements(state, cs, tile).includes(id);
     },
     // an improvement's: the first of its build units the city may train
     // (runs/h1_duels1142 city-state 2 t189: the Fort's tree, its Military
@@ -690,7 +709,10 @@ function minorTreeWorld(state: GameState, cs: CityState, ai: CityAi, city: CityT
         const f = g.feature ? FEATURE_ROW.get(g.feature) : undefined;
         if ((f?.removable && !f.validDistrictPlacement) || g.resource) return false;
       }
-      return canPlaceDistrictIn(state, minorCity(cs), id, plot, { unlocks: null, ownsTile: (t) => tileSeat(t) === cs.seat }).ok;
+      // the placement test asks no population limit (runs/h1_duels1185
+      // Lisbon t73: its Commercial Hub's Check Plot SUCCESS at population 3
+      // beside its Harbor)
+      return canPlaceDistrictIn(state, minorCity(cs), id, plot, { unlocks: null, ownsTile: (t) => tileSeat(t) === cs.seat, anyCount: true }).ok;
     },
     plotOwner: (plot) => tileSeat(state.map.tiles[plot]),
     plotGround: (plot) => plotGroundOf(state, cs.seat, plot),
