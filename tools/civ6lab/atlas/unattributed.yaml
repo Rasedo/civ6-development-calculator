@@ -796,6 +796,7 @@
     - "C-125 / C-95: flanking and support count about the defender unit's own plot, no river edge read; MEDIUM by the plot's layer-0 list; a killed target's record; the camp strike's orders — READ (0x521530, 0x51c810 at 0x51cc1c..0x51cc56, 0x5228c0, 0x786d50, 0x776140 at 0x776333, 0x8e9d0, 0x772940 at 0x772d2f..0x772f78), FIT (the camp strike's path), both twins"
     - "C-110 / C-125: an embarked unit's strengths in a unit's blow, a promotion's side, ground closed to a strike — READ (0x51f070 at 0x51f3ef..0x51f457, 0x206960 at 0x2069b4..0x2069e0 and 0x206a78..0x206b29, 0x520270 at 0x520576..0x5205db, 0x5228c0, 0x77a4b0), FIT (the closed ground), both twins"
     - "C-133 / C-128: flag 2's parent plot, the open list as the list itself, the embarked state's Movement cap, the zone's improvement test — READ (0x2720a0 at 0x27220d / 0x2724c8, 0x775a0, 0x79560, 0x586d40 at 0x587042..0x5870aa / 0x58741c..0x587486, 0x5706e0, 0x531ef0, 0x26fe20 at 0x270444 / 0x270776, 0x270be0, 0x52f970), both twins"
+    - "C-110 / C-125: the amphibious penalty reads the plot the defender stands on — READ (0x51bba0, 0x51c810 at 0x51cb7a..0x51cba1, 0x51d670 at 0x51d92e..0x51d957, 0x205f70, 0x211cc0, 0x209870), both twins"
   notes:
     - ".claude/scratchpad/mu1/readings_c96.md: ...ts moves 0x7737c0): each unit (+0x770 clear) that has   taken damage (+0xcf0 > 0), in no formation (0x8be30), on a plot of no   danger (the influence map 0x716a90 <= 0) is queued (\"Heal\"); the queue's   move..."
   context:
@@ -879,11 +880,12 @@
 - addr: 0x90290
   final: 0x67a40
   kind: function
+  semantics: "the plot a unit stands on: the map's plot (0x6fd10, its vt +0x58) at the unit's x +0x220 / y +0x224."
   status: PARTLY
   cases:
     - recording: h1_duelw1121
       value: "its parser 0x6bedb0 stores fx(expf(Amount x   COMBAT_POWER_SCALING)) at +8, GlobalParameters +0x210, 0.04 under   Expansion1's Replace: Discipline's 5 reads 1.2214, from the start to the   horizon who"
-  impl: [cpu/core/combat.ts:meleeUnitStrengths]
+  impl: [cpu/core/combat.ts:meleeUnitStrengths, cpu/core/combat.ts:amphibiousAttackCS]
   readings:
     - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
     - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
@@ -892,6 +894,7 @@
     - "C-98: a unit's value adds its abilities' modifiers; EFFECT_ADJUST_UNIT_MOVEMENT and REQUIREMENT_PLOT_ADJACENT_TO_OWNER; a second completion adds again — READ (0x7b62c0 at 0x7b7658..0x7b76d8, 0x6e11c7 / 0xc85140, 0x6bd520, 0x6d3200, 0x762d60's rows), both twins"
     - "C-99 / C-95: a melee blow's river is the defender plot's edge on the attacker's side at any distance; a levied unit home reveals its sight — READ (0x522c10 at 0x522f1d..0x52301b, 0x51f070 at 0x51f603..0x51f639), both twins"
     - "C-125 / C-95: flanking and support count about the defender unit's own plot, no river edge read; MEDIUM by the plot's layer-0 list; a killed target's record; the camp strike's orders — READ (0x521530, 0x51c810 at 0x51cc1c..0x51cc56, 0x5228c0, 0x786d50, 0x776140 at 0x776333, 0x8e9d0, 0x772940 at 0x772d2f..0x772f78), FIT (the camp strike's path), both twins"
+    - "C-110 / C-125: the amphibious penalty reads the plot the defender stands on — READ (0x51bba0, 0x51c810 at 0x51cb7a..0x51cba1, 0x51d670 at 0x51d92e..0x51d957, 0x205f70, 0x211cc0, 0x209870), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...vement, kept (+0x40) SUCCESS. Execution 0x7f6630 (@0xf2ef18): on the plot it stands on (0x90290) one request (0x53e20, vt +0x60): the improvement's removal (0x967100), else with Harve..."
@@ -1451,7 +1454,9 @@
   final: 0x163610
   kind: function
   status: PARTLY
-  readings: ["C-109: war weariness per combat, the turn's decay and the percent — READ"]
+  readings:
+    - "C-109: war weariness per combat, the turn's decay and the percent — READ"
+    - "C-110 / C-125: the amphibious penalty reads the plot the defender stands on — READ (0x51bba0, 0x51c810 at 0x51cb7a..0x51cba1, 0x51d670 at 0x51d92e..0x51d957, 0x205f70, 0x211cc0, 0x209870), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "- SIDES by the combat type ([+0x50]) and its subtype (0x213cd0): a unit's side is its owner, a district's (0x213c80) the district's owner, a plot ta..."
@@ -1482,6 +1487,7 @@
     - "C-95: Attack Units — READ, ported"
     - "C-123 / C-95: a Trader stands on the trade layer; a city's shot is a COMBAT_DISTRICT spot's blow back — READ (0x901e0, 0x586360 -> 0x208b80, 0x585eb0 -> 0x585d90, 0x791470 at 0x7917f7..0x7918f7 -> 0x249ee0 / 0x205720, 0x776140 at 0x776780..0x7767fa), both twins"
     - "C-125: the planning's blow back where both blows would kill — READ, ported"
+    - "C-110 / C-125: the amphibious penalty reads the plot the defender stands on — READ (0x51bba0, 0x51c810 at 0x51cb7a..0x51cba1, 0x51d670 at 0x51d92e..0x51d957, 0x205f70, 0x211cc0, 0x209870), both twins"
   context:
     - "...player +0x12f0 +0xf4 above 0; unread, taken clear); else the combat simulation's blow (0x213e00 .. 0x205720, dealt +0x24, taken +0x28 — the blow back none in the port) against COMBA..."
     - "...xc], [rbp−8]), kill byte +0xc4; the blow back re-simulated (0x205720, sides swapped via 0x213e00). The combat object (0x213ab0): each side its unit, owner, id (+0x2e0, +0x100) and plot..."

@@ -13364,16 +13364,19 @@ class SimSeats:
             foe_type=d_type, foe_damaged=self._damaged(def_hp),
             foe_fortified=d_fort_t > 0,
             foe_in_district=self._on_district(ttc), tile=here)
+        # the plot the defender's unit stands on: the from-the-sea penalty,
+        # flanking and Support read it
+        d_at = self.unit_tile.gather(1, ds0.unsqueeze(1)).squeeze(1)
+        stands = torch.where((d_slot >= 0) & (d_at >= 0), d_at, tgt)
         atk_e = (atk_cs_all - self._wound(a_hp, at)
                  + atk_promo.to(atk_cs_all.dtype)
-                 - self._atk_pens(at, a_promos, here, tgt, a_emb))
+                 - self._atk_pens(at, a_promos, here, tgt, a_emb, stands))
         def_e = def_cs - self._wound(def_hp, d_type)
         # flanking helps the hostile attacker (barb/civ at `here`), support
         # helps the defender, whichever seat it belongs to.
-        d_at = self.unit_tile.gather(1, ds0.unsqueeze(1)).squeeze(1)
         _fl, _sp = self._flank_support(
             tgt, d_seat, a_slot, a_seat, d_slot,
-            stands=torch.where((d_slot >= 0) & (d_at >= 0), d_at, tgt))
+            stands=stands)
         # CIV6 (Impi): "+100% Flanking bonus" — the chassis's own
         # multiplier, beside the promotion's.
         atk_e = atk_e + (FLANKING_CS * self._promo_mult(at, a_promos, "FLANK_MULT")

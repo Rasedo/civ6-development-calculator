@@ -16157,3 +16157,53 @@ cpu/harness/replay.ts). The operation queue's push is read, not ported.
   minor's DoTurn; the engines return it at the minor's start alone); the
   location test's owned-water clause for a land unit that may not embark
   (0x58645d..0x58648e) in `placementPlot`.
+
+## C-110 / C-125: the amphibious penalty reads the plot the defender stands on — READ (0x51bba0, 0x51c810 at 0x51cb7a..0x51cba1, 0x51d670 at 0x51d92e..0x51d957, 0x205f70, 0x211cc0, 0x209870), both twins
+
+`amphibiousAttackCS` (cpu/core/combat.ts) in `meleeUnitStrengths` (about its
+`stands`) and `assaultAtkCS` (the district's plot); `_amph_atk_cs` /
+`_atk_pens` (gpu/core/sim_masks.py), `_melee_unit_strengths`
+(gpu/core/sim_seats.py).
+
+- THE AMPHIBIOUS PENALTY 0x51bba0 (rdx the result, r8 the attacker, r9 a
+  plot, its fifth argument the combat type, its sixth the preview list): 0
+  for an attacker of the air domain (+0x650 1); else
+  COMBAT_AMPHIBIOUS_ATTACK_PENALTY (GlobalParameters +0x170, -10) x 256
+  where the attacker is embarked (0x8be30) and does not fight embarked
+  (+0x18c3 clear), the combat type is COMBAT_MELEE (0x2ca3edd1), the
+  attacker's +0x1937 is clear (read as the Amphibious promotion's
+  MODIFIER_PLAYER_UNIT_ADJUST_IGNORE_SHORES, UnitPromotions.xml) and the
+  plot is coastal land (IsCoastalLand 0x82a10(plot, -1)); 0 on any other
+  plot. The preview's LOC_COMBAT_PREVIEW_AMPHIBIOUS_ATTACK_PENALTY line is
+  added only with a list.
+- ITS PLOT: the unit attack composer 0x51c810 hands it the plot the
+  defender's unit stands on (0x90290 on its fifth argument, the defender,
+  0x51cb7a..0x51cba1), not the combat's location; the district attack
+  composer 0x51d670 the district's own plot (0x24b530 on the district,
+  0x51d92e..0x51d957). An embarked attacker's blow on a unit on water, or
+  on land beside no ocean-sized water body, loses none. With the melee
+  result's GetCombat flag (0x206960 at 0x2069b4..0x2069e0: IsCoastalLand of
+  the combat's location) a blow struck onto coastal land is the unit's
+  Combat less 10, any other its owner's era's embarked strength whole.
+- IN THE PLANNING'S BLOW BACK (0x791470 at 0x7917e1..0x7918e1): the sides
+  swapped through 0x213e00, the location the spot, the combat's kind set
+  from its members (0x211cc0 -> 0x209870 -> 0x209550), 0x205720(combat, 1, 1)
+  dispatching a melee on a unit through 0x205f70 (the defender's kind
+  0x213cd0: 0x58e7998b a unit 0x206960, 0xc2f3d823 a district 0x206080).
+  The defender is the planning unit where it stands now: the penalty reads
+  that plot, the GetCombat flag the spot.
+- CONFIRMED (one-seed aimem traces from the game's start): runs/
+  h1_duelq1121 t138 the barbarian Galley 1572882 (15 health, on 24:17) and
+  player 0's embarked Warrior 3866670 on 28:16: the Warrior's blow back at
+  its era's 15 is 23 on the five open spots and 21 on the Reef 28:15 (the
+  Galley's 30 less its wound's 8.48, plus 3), every one above the Galley's
+  health, so the survival filter leaves no spot and the Galley ends its
+  turn on 24:17 as logged; with the penalty taken on water the blow on the
+  Reef is 14 and the Galley claims 28:15. t152 the same, player 0's
+  embarked Warrior on 28:16 again (3407911 in record 153): HL: End Turn as
+  logged. Standing with it: 1121 t70 / t78 the Galleys' Attack
+  Units on the embarked Warriors 786437 / 589826 as logged; runs/
+  h1_duelq1124 t91 city-state 2's embarked Man-At-Arms 1310723's Attack
+  Civilian as logged.
+- OPEN: what sets +0x18c3 and +0x1937 (their writers unread; no unit of the
+  engines' data fights embarked).

@@ -181,6 +181,7 @@
     - "C-95: a move order's path steps on from an attack's plot, its attack child by the order's flags, a non-attack order's destination, a melee blow on a civilian — READ (0x2720a0 at 0x272434..0x272544, 0x2715a0 at 0x2717cd / 0x271870..0x2718d7, 0x1385c0, 0x889e0, 0x2714b0, 0x206960 at 0x206a1f), both twins"
     - "C-125: the planning's blow back where both blows would kill — READ, ported"
     - "C-110 / C-125: an embarked unit's strengths in a unit's blow, a promotion's side, ground closed to a strike — READ (0x51f070 at 0x51f3ef..0x51f457, 0x206960 at 0x2069b4..0x2069e0 and 0x206a78..0x206b29, 0x520270 at 0x520576..0x5205db, 0x5228c0, 0x77a4b0), FIT (the closed ground), both twins"
+    - "C-110 / C-125: the amphibious penalty reads the plot the defender stands on — READ (0x51bba0, 0x51c810 at 0x51cb7a..0x51cba1, 0x51d670 at 0x51d92e..0x51d957, 0x205f70, 0x211cc0, 0x209870), both twins"
   context:
     - "...ombat 0) 1.0; one without against one with 0.01 / 100.0; else two combat simulations (0x205720) of the neutral player's units, each attacking the other: the damage each takes in both..."
   review: reviewed
@@ -196,12 +197,15 @@
 - addr: 0x205f70
   final: 0x156e90
   kind: function
+  semantics: "the melee combat's dispatcher (0x205720's COMBAT_MELEE 0x2ca3edd1 case; rcx the combat, dl and r8b passed on): by the defender's kind (0x213cd0) a unit (0x58e7998b) resolves through 0x206960, a district (0xc2f3d823) through 0x206080; any other asserts \"Invalid Melee vs. type\" and returns 0."
   status: PARTLY
-  readings: ["C-125: the planning's blow back where both blows would kill — READ, ported"]
-  notes: ["imported: READ in its section, no confirming case found beside it"]
+  readings:
+    - "C-125: the planning's blow back where both blows would kill — READ, ported"
+    - "C-110 / C-125: the amphibious penalty reads the plot the defender stands on — READ (0x51bba0, 0x51c810 at 0x51cb7a..0x51cba1, 0x51d670 at 0x51d92e..0x51d957, 0x205f70, 0x211cc0, 0x209870), both twins"
+  notes: [read whole; no recorded case tells it apart]
   context:
     - "...e combat's location the spot (+0x48, 0x7918b0). A melee blow resolves through 0x205720 -> 0x205f70 -> 0x206960, whose result already holds the mutual-kill rule (0x206c34..0x206d62): where..."
-  review: imported
+  review: reviewed
 - addr: 0x206080
   final: 0x156f20
   kind: function
@@ -229,6 +233,7 @@
     - "C-95: a damaged centre defends at its wounded strength, the planning's city shot needs standing walls, the barbarians plan on the turn's unhealed centres — READ (0x51eaf0, 0x791470 at 0x79181c..0x791827 -> 0x249ee0 / 0x24b960), both twins; the replay's barbarian copy"
     - "C-123 / C-110: the barbarians' rules run as the first job of their AI turn start, after the DoTurn tail; a centre a player that is no major may not raze keeps its last hit point — READ (0x6096c0 at 0x6097af..0x609802, 0x608870, 0x7280a0, 0x1514a0, 0x14d25d; 0x248800, 0x533e50, 0x206080 at 0x206868..0x2068c8, 0x20dd30, 0x1fdea0 at 0x1fe098..0x1fe0ab), both twins"
     - "C-123 / C-110: the barbarians' rules run as the first job of their AI turn start, after the DoTurn tail; a centre a player that is no major may not raze keeps its last hit point; a melee blow on a district that would fell both sides — READ (0x6096c0 at 0x6097af..0x609802, 0x608870, 0x7280a0, 0x1514a0, 0x14d25d; 0x248800, 0x533e50, 0x206080 at 0x206684..0x206715 and 0x206868..0x2068c8, 0x20dd30, 0x1fdea0 at 0x1fe098..0x1fe0ab), both twins"
+    - "C-110 / C-125: the amphibious penalty reads the plot the defender stands on — READ (0x51bba0, 0x51c810 at 0x51cb7a..0x51cba1, 0x51d670 at 0x51d92e..0x51d957, 0x205f70, 0x211cc0, 0x209870), both twins"
   context:
     - "- A unit's attack on a city (0x206080, melee) draws three times: 0x519370 the attacker's damage, then 0x519440 the district's..."
   review: reviewed
@@ -277,6 +282,7 @@
     - "C-98: the unit efficiencies — READ (0x79a440, its simulated combats 0x205720 off the map), ported: every entry the logged table's"
     - "C-98: the unit efficiencies"
     - "C-110 / C-125: an embarked unit's strengths in a unit's blow, a promotion's side, ground closed to a strike — READ (0x51f070 at 0x51f3ef..0x51f457, 0x206960 at 0x2069b4..0x2069e0 and 0x206a78..0x206b29, 0x520270 at 0x520576..0x5205db, 0x5228c0, 0x77a4b0), FIT (the closed ground), both twins"
+    - "C-110 / C-125: the amphibious penalty reads the plot the defender stands on — READ (0x51bba0, 0x51c810 at 0x51cb7a..0x51cba1, 0x51d670 at 0x51d92e..0x51d957, 0x205f70, 0x211cc0, 0x209870), both twins"
   context:
     - "- The melee result (0x206960, Combat_Manager): the defender's damage is drawn first (0x51a240); the counter — the at..."
   review: reviewed
@@ -443,8 +449,22 @@
   readings:
     - "C-98: the unit efficiencies — READ (0x79a440, its simulated combats 0x205720 off the map), ported: every entry the logged table's"
     - "C-98: the unit efficiencies"
+    - "C-110 / C-125: the amphibious penalty reads the plot the defender stands on — READ (0x51bba0, 0x51c810 at 0x51cb7a..0x51cba1, 0x51d670 at 0x51d92e..0x51d957, 0x205f70, 0x211cc0, 0x209870), both twins"
   context:
     - "- THE SIMULATION'S COMBAT (0x205720 -> the type of 0x209550): an air attacker's COMBAT_AIR; else RANGED where RangedCombat tops Bombard and Comba..."
+  review: reviewed
+- addr: 0x209870
+  final: 0x159d50
+  kind: function
+  name: GetCombatTypeFromMembers
+  semantics: "the combat's kind from its members (rcx the combat: +0 the attacker unit, +8 the defender unit, +0x5c): an attacker unit of the air domain (+0x650 1) 0x46a0d8c5; +0x5c set 0x61c414a2; else a unit on a unit 0x209550, on no unit the defending district (0x213c80(combat, 1)) through 0x209700; with no attacker unit the attacking district (0x213c80(combat, 0)) on the defender unit through 0x209480; -1 with neither. 0x205720 asserts the combat's +0x50 equals it."
+  status: PARTLY
+  readings:
+    - "C-110 / C-125: the amphibious penalty reads the plot the defender stands on — READ (0x51bba0, 0x51c810 at 0x51cb7a..0x51cba1, 0x51d670 at 0x51d92e..0x51d957, 0x205f70, 0x211cc0, 0x209870), both twins"
+  notes: [0x209700 and 0x209480 unread]
+  context:
+    - ...bba0, 0x51c810 at 0x51cb7a..0x51cba1, 0x51d670 at 0x51d92e..0x51d957, 0x205f70, 0x211cc0, 0x209870), both twins
+    - ...gh 0x213e00, the location the spot, the combat's kind set from its members (0x211cc0 -> 0x209870 -> 0x209550), 0x205720(combat, 1, 1) dispatching a melee on a unit through 0x205f70 (th...
   review: reviewed
 - addr: 0x209dd0
   final: 0x15a2b0
@@ -632,6 +652,18 @@
     - "C-101: the owner's religion percent is Scripture's, a religion swing walks every player's cities — READ, both twins"
   context:
     - "...player's +0x4f0 percent; the condemn command (0x89cc00, 0x947f10) and a combat kill (0x20e720, 0x212c30) pass the same flag. Recorded: 1121 t110, a barbarian on China's Missionary b..."
+  review: reviewed
+- addr: 0x211cc0
+  final: 0x1618e0
+  kind: function
+  semantics: sets the combat's kind (+0x50) from its members (0x209870), asserting it is not NO_COMBAT (-1); the planning's simulation calls it after setting the sides and the location, before 0x205720 (0x7916d6, 0x7918c1).
+  status: PARTLY
+  readings:
+    - "C-110 / C-125: the amphibious penalty reads the plot the defender stands on — READ (0x51bba0, 0x51c810 at 0x51cb7a..0x51cba1, 0x51d670 at 0x51d92e..0x51d957, 0x205f70, 0x211cc0, 0x209870), both twins"
+  notes: [read whole (28 instructions); no recorded case tells it apart]
+  context:
+    - ...READ (0x51bba0, 0x51c810 at 0x51cb7a..0x51cba1, 0x51d670 at 0x51d92e..0x51d957, 0x205f70, 0x211cc0, 0x209870), both twins
+    - ...wapped through 0x213e00, the location the spot, the combat's kind set from its members (0x211cc0 -> 0x209870 -> 0x209550), 0x205720(combat, 1, 1) dispatching a melee on a unit through...
   review: reviewed
 - addr: 0x211f80
   final: 0x161b50

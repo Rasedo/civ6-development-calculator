@@ -117,6 +117,30 @@
   context:
     - "...ge is taken at its percent: melee 15 unless a player flag (0x5212f0) or the ram test (0x51af50, the district's +0x1910 against the support's tier) gives 100; ranged 50 unless the uni..."
   review: reviewed
+- addr: 0x51bba0
+  final: 0x368a70
+  kind: function
+  name: amphibiousPenalty
+  semantics: "the attacker's amphibious term (rdx the result, r8 the attacker, r9 a plot, arg5 the combat type, arg6 the preview list): 0 for an attacker of the air domain (+0x650 1); else COMBAT_AMPHIBIOUS_ATTACK_PENALTY (GlobalParameters +0x170, -10) x 256 where the attacker is embarked (0x8be30), does not fight embarked (+0x18c3 clear), the combat type is COMBAT_MELEE (0x2ca3edd1), its +0x1937 is clear (read as the Amphibious promotion's IGNORE_SHORES) and the plot is coastal land (IsCoastalLand 0x82a10(plot, -1)); 0 on any other plot; LOC_COMBAT_PREVIEW_AMPHIBIOUS_ATTACK_PENALTY only with a list. Its plot: the defender unit's own from 0x51c810 (0x90290 on the defender, 0x51cb7a..0x51cba1), the district's from 0x51d670 (0x24b530, 0x51d92e..0x51d957). The writers of +0x18c3 and +0x1937 unread."
+  status: READ
+  cases:
+    - recording: h1_duelq1121
+      turn: 138
+      value: "player 0's embarked Warrior 3866670 on 28:16 strikes back at the barbarian Galley 1572882 (15 health) at its era's 15 whole: 23 on the open spots, 21 on the Reef 28:15, no spot survives, HL: End Turn on 24:17 as logged; with the penalty on water the Reef's blow is 14 and the Galley claims 28:15"
+    - recording: h1_duelq1121
+      turn: 152
+      value: "the same Galley, player 0's embarked Warrior on 28:16 again (3407911 in record 153): HL: End Turn on 24:17 as logged"
+  impl:
+    - cpu/core/combat.ts:amphibiousAttackCS
+    - gpu/core/sim_masks.py:_amph_atk_cs
+    - gpu/core/sim_masks.py:_atk_pens
+    - gpu/core/sim_seats.py:_melee_unit_strengths
+  readings:
+    - "C-110 / C-125: the amphibious penalty reads the plot the defender stands on — READ (0x51bba0, 0x51c810 at 0x51cb7a..0x51cba1, 0x51d670 at 0x51d92e..0x51d957, 0x205f70, 0x211cc0, 0x209870), both twins"
+  context:
+    - "## C-110 / C-125: the amphibious penalty reads the plot the defender stands on — READ (0x51bba0, 0x51c810 at 0x51cb7a..0x51cba1, 0x51d670 at 0x51d92e..0x51d957, 0x205f70, 0x211cc0, 0x20..."
+    - "- THE AMPHIBIOUS PENALTY 0x51bba0 (rdx the result, r8 the attacker, r9 a plot, its fifth argument the combat type, its si..."
+  review: reviewed
 - addr: 0x51c2d0
   kind: function
   semantics: "the damaged district's strike loss: the wounded law (0x522630) at COMBAT_WOUNDED_DISTRICT_DAMAGE_MULTIPLIER 10 on the percent of the outer defense's damage where the district has an outer defense, else of its hit points'."
@@ -134,7 +158,7 @@
   review: reviewed
 - addr: 0x51c810
   kind: function
-  semantics: "the unit-vs-unit attack strength; its domain term: a bombard attack (combat type 0x4fc9163d) loses COMBAT_BOMBARD_VS_UNIT_STRENGTH_MODIFIER (GlobalParameters +0x188, 17) on a defender of the land domain (+0x650 == 2, LESS_EFFECTIVE_VS_LAND_UNITS); a ranged attack (0x2ec4ce4d) by a land unit loses it on a defender of the sea domain (0, LESS_EFFECTIVE_VS_NAVAL_UNITS). Its modifier walk reads unit abilities (the Spear of Fionn's +5)."
+  semantics: "the unit-vs-unit attack strength; its domain term: a bombard attack (combat type 0x4fc9163d) loses COMBAT_BOMBARD_VS_UNIT_STRENGTH_MODIFIER (GlobalParameters +0x188, 17) on a defender of the land domain (+0x650 == 2, LESS_EFFECTIVE_VS_LAND_UNITS); a ranged attack (0x2ec4ce4d) by a land unit loses it on a defender of the sea domain (0, LESS_EFFECTIVE_VS_NAVAL_UNITS). Its modifier walk reads unit abilities (the Spear of Fionn's +5). Its amphibious term 0x51bba0 is handed the plot the defender's unit stands on (0x90290 on arg5, 0x51cb7a..0x51cba1), as the friendly-territory term and the flanking are."
   status: READ
   cases:
     - recording: h1_duelw1124
@@ -159,13 +183,27 @@
     - cpu/core/aiUnitEfficiency.ts:domainTerm
     - cpu/core/combat.ts:meleeUnitStrengths
     - gpu/core/sim_masks.py:_flank_support
+    - cpu/core/combat.ts:amphibiousAttackCS
   readings:
     - "H-1: the melee result, a ranged blow's domain, a city's shot — READ"
     - "C-98: the unit efficiencies — READ (0x79a440, its simulated combats 0x205720 off the map), ported: every entry the logged table's"
     - "C-125 / C-95: flanking and support count about the defender unit's own plot, no river edge read; MEDIUM by the plot's layer-0 list; a killed target's record; the camp strike's orders — READ (0x521530, 0x51c810 at 0x51cc1c..0x51cc56, 0x5228c0, 0x786d50, 0x776140 at 0x776333, 0x8e9d0, 0x772940 at 0x772d2f..0x772f78), FIT (the camp strike's path), both twins"
+    - "C-110 / C-125: the amphibious penalty reads the plot the defender stands on — READ (0x51bba0, 0x51c810 at 0x51cb7a..0x51cba1, 0x51d670 at 0x51d92e..0x51d957, 0x205f70, 0x211cc0, 0x209870), both twins"
   context:
     - "- A ranged blow's domain term (0x51c810, the unit-vs-unit attack strength): a bombard attack (combat type 0x4fc9163d) loses C..."
     - ...IER_UNIT_ADJUST_COMBAT_STRENGTH, the barbarian traits, the difficulty rows), no term of 0x51c810 / 0x51f070 read here, and the dumps' promotions are empty.
+  review: reviewed
+- addr: 0x51d670
+  kind: function
+  semantics: "the unit-on-district attack strength composer (callers 0x206080 melee, 0x204b10, 0x2074b0, 0x202580): read at 0x51d92e..0x51d957 alone — it hands the amphibious term 0x51bba0 the attacker (r8), the district's own plot (0x24b530 on the district, its arg at [rbp+0x550]) and the combat type; its other terms unread."
+  status: PARTLY
+  impl: [cpu/core/combat.ts:amphibiousAttackCS, cpu/core/combat.ts:assaultAtkCS]
+  readings:
+    - "C-110 / C-125: the amphibious penalty reads the plot the defender stands on — READ (0x51bba0, 0x51c810 at 0x51cb7a..0x51cba1, 0x51d670 at 0x51d92e..0x51d957, 0x205f70, 0x211cc0, 0x209870), both twins"
+  notes: [no recorded case of an embarked unit's blow on a district]
+  context:
+    - "...y reads the plot the defender stands on — READ (0x51bba0, 0x51c810 at 0x51cb7a..0x51cba1, 0x51d670 at 0x51d92e..0x51d957, 0x205f70, 0x211cc0, 0x209870), both twins"
+    - ...efender, 0x51cb7a..0x51cba1), not the combat's location; the district attack composer 0x51d670 the district's own plot (0x24b530 on the district, 0x51d92e..0x51d957). An embarked att...
   review: reviewed
 - addr: 0x51e640
   final: 0x36a540

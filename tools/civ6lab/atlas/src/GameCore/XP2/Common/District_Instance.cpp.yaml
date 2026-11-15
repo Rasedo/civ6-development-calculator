@@ -394,6 +394,17 @@
   context:
     - "...s the damage pass 0xa2a4d0, whose out parameter is the MITIGATING player — the owner (0x24b4b0) of the first complete (+0xb08), unpillaged (0x24c3a0) Dam on the river's plot list, el..."
   review: reviewed
+- addr: 0x24b530
+  final: 0x191b90
+  kind: function
+  semantics: "a district's plot: the map's plot (0x5d3c0, its vt +0x50) at the district's location +0x158."
+  status: PARTLY
+  readings:
+    - "C-110 / C-125: the amphibious penalty reads the plot the defender stands on — READ (0x51bba0, 0x51c810 at 0x51cb7a..0x51cba1, 0x51d670 at 0x51d92e..0x51d957, 0x205f70, 0x211cc0, 0x209870), both twins"
+  notes: [read whole (10 instructions); an accessor, no recorded case tells it apart]
+  context:
+    - ...t the combat's location; the district attack composer 0x51d670 the district's own plot (0x24b530 on the district, 0x51d92e..0x51d957). An embarked attacker's blow on a unit on water, o...
+  review: reviewed
 - addr: 0x24b5a0
   final: 0x191c00
   kind: function

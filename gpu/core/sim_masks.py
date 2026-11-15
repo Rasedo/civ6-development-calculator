@@ -4510,23 +4510,26 @@ class SimMasks:
         out = trans & bit.reshape(B, N, 6) & ~free.reshape(B, N, 6)
         return out & ~waive.unsqueeze(2) if waive is not None else out
 
-    def _amph_atk_cs(self, emb: torch.Tensor) -> torch.Tensor:
-        """[B] the attacker's amphibious penalty. CIV6 (Combat): an attack
-        "made by an embarked unit against a unit or district on land that is
-        unobstructed by Cliffs ... carries a -10 CS penalty". A Cliff refuses
-        the attack outright rather than softening it, so every attack that
-        reaches a resolver at all pays the full penalty."""
-        return emb.long() * self._amphibious_attack_cs
+    def _amph_atk_cs(self, emb: torch.Tensor, plot: torch.Tensor) -> torch.Tensor:
+        """[B] `amphibiousAttackCS` before the promotion's waiver: an embarked
+        melee attacker loses COMBAT_AMPHIBIOUS_ATTACK_PENALTY where `plot` —
+        the plot the defender's unit stands on, a district's own — is coastal
+        land (0x51bba0); a blow on a unit on water or on a lake's shore loses
+        none. A Cliff refuses the attack outright rather than softening it."""
+        shore = self.coastal_land.gather(1, plot.clamp(min=0).unsqueeze(1)).squeeze(1) & (plot >= 0)
+        return (emb & shore).long() * self._amphibious_attack_cs
 
     def _atk_pens(self, utype: torch.Tensor, promos: torch.Tensor, frm: torch.Tensor,
-                  to: torch.Tensor, emb: torch.Tensor) -> torch.Tensor:
-        """[B] the river-crossing and from-the-sea penalties an attacker pays.
-        CIV6 (Amphibious): "No Combat Strength and Movement penalty when
-        attacking from Sea or over a River" waives BOTH."""
+                  to: torch.Tensor, emb: torch.Tensor, stands: torch.Tensor | None = None) -> torch.Tensor:
+        """[B] the river-crossing and from-the-sea penalties an attacker pays
+        on `to`; `stands` is the plot the defender's unit stands on, which the
+        from-the-sea penalty reads (`to` where none is given: a blow struck, a
+        district's plot). CIV6 (Amphibious): "No Combat Strength and Movement
+        penalty when attacking from Sea or over a River" waives BOTH."""
         amph = self._promo_flag(utype, promos, "AMPHIBIOUS")
         z = torch.zeros_like(frm)
         pen = 5 * torch.where(amph, z, self._melee_river(to, frm))
-        return pen + torch.where(amph, z, self._amph_atk_cs(emb))
+        return pen + torch.where(amph, z, self._amph_atk_cs(emb, to if stands is None else stands))
 
     def _assault_promo_cs(self, utype: torch.Tensor, promos: torch.Tensor,
                           frm: torch.Tensor, ranged: bool = False) -> torch.Tensor:

@@ -480,6 +480,20 @@ export const CLASS_ANTICAV_VS_CAV = 10;
  */
 export const AMPHIBIOUS_ATTACK_CS = 10;
 
+/** THE AMPHIBIOUS PENALTY of a melee attacker (0x51bba0): an embarked unit
+ *  without the Amphibious promotion (the unit's +0x1937) loses
+ *  COMBAT_AMPHIBIOUS_ATTACK_PENALTY where `plot` — the plot the defender's
+ *  unit stands on (0x51c810 at 0x51cb7a..0x51cba1 hands it 0x90290 of the
+ *  defender), a district's own (0x51d670 at 0x51d92e..0x51d957) — is coastal
+ *  land (IsCoastalLand 0x82a10); a blow on a unit on water or on a lake's
+ *  shore loses none (runs/h1_duelq1121 t138: player 0's embarked Warrior
+ *  3866670 on 28:16 strikes back at its era's 15 whole, 21 on the Reef 28:15
+ *  to the 15 health of the barbarian Galley 1572882, which takes no Attack
+ *  Units spot and ends its turn on 24:17, as logged). */
+export function amphibiousAttackCS(state: GameState, attacker: Unit, plot: number): number {
+  return attacker.embarked && !promoFlag(attacker, 'AMPHIBIOUS') && isCoastalLand(state.map, state.map.tiles[plot]) ? AMPHIBIOUS_ATTACK_CS : 0;
+}
+
 /** May this unit, standing where it stands, strike that tile at all? CIV6:
  *  "embarked units may not attack any other unit in the water, including other
  *  embarked units", and only a MELEE attack goes ashore. */
@@ -1612,7 +1626,7 @@ export function assaultAtkCS(state: GameState, attacker: Unit, targetIndex: numb
     (!amph && meleeCrossesRiver(state.map, state.map.tiles[targetIndex], state.map.tiles[attacker.tileIndex])
       ? RIVER_ATTACK_PENALTY
       : 0) -
-    (attacker.embarked && !amph ? AMPHIBIOUS_ATTACK_CS : 0) +
+    amphibiousAttackCS(state, attacker, targetIndex) +
     promoCS(attacker, {
       attacking: true, vsCity: true, tile: state.map.tiles[attacker.tileIndex],
     }) +
@@ -2075,7 +2089,7 @@ export function meleeUnitStrengths(state: GameState, attacker: Unit, targetIndex
   const amph = promoFlag(attacker, 'AMPHIBIOUS');
   const own = attacker.embarked && !isCoastalLand(state.map, target) ? embarkedDefenseCS(state, attacker.seat) : (UNITS[attacker.type]?.combat ?? 0);
   const atk = own + formationCS(attacker) + convoyCS(state, attacker) - fuelShortCS(state, attacker) + chassisAttackCS(attacker) - woundPenalty(attacker) - (!amph && meleeCrossesRiver(state.map, target, from) ? RIVER_ATTACK_PENALTY : 0)
-    - (attacker.embarked && !amph ? AMPHIBIOUS_ATTACK_CS : 0)
+    - amphibiousAttackCS(state, attacker, stands)
     + FLANKING_CS * promoStackMult(attacker, 'FLANK_MULT') * chassisFlankMult(attacker) * flankCount(state, stands, attacker)
       * (1 + gpPermOf(seatOf(state, attacker.seat),
         UNITS[attacker.type]?.naval ? 'flankPctNaval' : 'flankPctLand') / 100)
