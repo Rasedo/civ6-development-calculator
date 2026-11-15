@@ -277,8 +277,8 @@ export interface Tile {
    *  creation by `deriveAreas`. */
   area?: number;
   /** CIV6 (Map_Region): the plot's region, -1 off passable land — the map's
-   *  `regions` where it carries them, else its passable land area. Derived at
-   *  creation by `deriveRegions`. */
+   *  `regions` where it carries them, else its passable land area, neither
+   *  crossing the map's x edge. Derived at creation by `deriveRegions`. */
   region?: number;
   /** CIV6 (Mountain Tunnel): "a movement portal on a mountain range" — the
    *  connected component of MOUNTAIN tiles this one belongs to, -1 off a

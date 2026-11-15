@@ -8168,6 +8168,7 @@
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
     - "C-95: Operation Move's ring test takes no path (0x815d50) — READ, both twins"
+    - "C-134 / C-124: the map's regions flood without wrap; City Defense's region test as read — READ (0x887810 at 0x8878d0..0x8878e0 and 0x887a7a, 0x77a50 at 0x77ac6 / 0x77b11, 0x817a0c..0x817a6a, 0x815d50 at 0x815d64..0x815d73)"
   context:
     - "...0. With a radius the ring walk 0x6aef0 (0x69010's order) around the goal with the test 0x815d50: a plot in the goal's region (plot +0x18) before one outside, then the nearest the unit..."
     - "...he radius (0x791300, 0x78fa10) in the goal's region; else the ring walk 0x6aef0 (test 0x815d50: in-region first, nearer, enterable 0x586360; own units only via 0x265ac0 → 0x265af0);..."

@@ -5,8 +5,10 @@ install's DLL (tools/civ6lab/dll_readings.md, "The map's regions").
 
 Region_Builder walks the plots in index order; a passable land plot (not
 impassable, not water) of no region seeds a new one, and a flood from it
-takes every plot its step test (0x887aa0) admits. A step goes onto passable
-land of no region of the flood's own; a step between two plots of which
+takes every plot its step test (0x887aa0) admits. The flood does not wrap:
+Region_Builder clears its path finder's wrap flags for it (+0xe4 / +0xe5,
+0x8878d0..0x8878e0), so a region never crosses the map's x edge. A step
+goes onto passable land of no region of the flood's own; a step between two plots of which
 neither lies on a chokepoint's line is free; otherwise each chokepoint whose
 line holds either plot is tested in order:
 - both plots on its line: a step not meeting the line's segment is free;
@@ -39,7 +41,8 @@ def build_regions(W: int, H: int, water: list[bool], impassable: list[bool],
                   chokes: list[tuple[tuple[int, int], tuple[int, int]]], neighbours) -> dict:
     """Region_Builder (0x887810): per plot its region (-1 for none), per
     region its plot count. `neighbours(i)` lists a plot's
-    neighbours; `chokes` the analysis' (end, end) pairs in its order."""
+    neighbours, of which the flood takes those it reaches without crossing
+    the map's x edge; `chokes` the analysis' (end, end) pairs in its order."""
     N = W * H
     cps = [Chokepoint(a, b) for a, b in chokes]
     on_line = set().union(*(c.plots for c in cps)) if cps else set()
@@ -97,7 +100,7 @@ def build_regions(W: int, H: int, water: list[bool], impassable: list[bool],
             region[p] = cur
             sizes[cur] += 1
             for n in neighbours(p):
-                if n in seen:
+                if n in seen or abs(n % W - p % W) > 1:
                     continue
                 if step(cur, p, n):
                     seen.add(n)

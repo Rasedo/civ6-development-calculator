@@ -5,8 +5,9 @@ import { FEATURES } from './features';
 import type { GameMap, Tile } from './types';
 
 /** the connected components of the tiles `cls` gives a class (-1 none),
- *  numbered from 0 in the order of their lowest tile; -1 off every class */
-function components(map: GameMap, cls: (t: Tile) => number): Int32Array {
+ *  numbered from 0 in the order of their lowest tile; -1 off every class.
+ *  Without `wrap` a component does not cross the map's x edge. */
+function components(map: GameMap, cls: (t: Tile) => number, wrap = true): Int32Array {
   const out = new Int32Array(map.tiles.length).fill(-1);
   let next = 0;
   for (const seed of map.tiles) {
@@ -18,7 +19,7 @@ function components(map: GameMap, cls: (t: Tile) => number): Int32Array {
     while (stack.length) {
       const t = stack.pop()!;
       for (const n of neighbors(map, t)) {
-        if (out[n.index] >= 0 || cls(n) !== k) continue;
+        if (out[n.index] >= 0 || cls(n) !== k || (!wrap && Math.abs(n.col - t.col) > 1)) continue;
         out[n.index] = id;
         stack.push(n);
       }
@@ -59,16 +60,18 @@ export function deriveAreas(map: GameMap): void {
  * CIV6 (Map_Region): each plot's REGION — the map's `regions` (Region_Builder's
  * flood between the map script's chokepoints, tools/civ6map regions.py),
  * numbered in the order of their first plot, -1 off passable land. A map whose
- * generator kept none takes each passable land area as a region. The
- * barbarians' camp step reads them. Static at creation like `area`, which it
- * follows.
+ * generator kept none takes each passable land area as a region. Neither
+ * crosses the map's x edge: Region_Builder floods with its path finder's wrap
+ * cleared (0x8878d0..0x8878e0). The barbarians' camp step, Operation Move's
+ * planning plot and ring walk and HL Explore read them. Static at creation
+ * like `area`, which it follows.
  */
 export function deriveRegions(map: GameMap): void {
   if (map.regions) {
     for (const t of map.tiles) t.region = map.regions[t.index];
     return;
   }
-  const reg = components(map, (t) => (isWater(t) || isImpassable(t) ? -1 : 0));
+  const reg = components(map, (t) => (isWater(t) || isImpassable(t) ? -1 : 0), false);
   for (const t of map.tiles) t.region = reg[t.index];
 }
 

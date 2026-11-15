@@ -34,6 +34,7 @@
   readings:
     - "The map's regions (AnalyzeChokepoints, Region_Builder) — READ, ported"
     - "H-1: the barbarians' turn (0x1514a0) — READ (the max camps and the sight LAB)"
+    - "C-134 / C-124: the map's regions flood without wrap; City Defense's region test as read — READ (0x887810 at 0x8878d0..0x8878e0 and 0x887a7a, 0x77a50 at 0x77ac6 / 0x77b11, 0x817a0c..0x817a6a, 0x815d50 at 0x815d64..0x815d73)"
   context:
     - ...into Region_Builder 0x887810, which first runs the chokepoint analysis (MapAnalysis.cpp, 0x86c030 on the builder's +0x20) and then floods the regions. XP2 Continents.lua calls it twice (a...
   review: reviewed

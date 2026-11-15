@@ -11,6 +11,7 @@
   readings:
     - "The map's regions (AnalyzeChokepoints, Region_Builder) — READ, ported"
     - "H-1: the barbarians' turn (0x1514a0) — READ (the max camps and the sight LAB)"
+    - "C-134 / C-124: the map's regions flood without wrap; City Defense's region test as read — READ (0x887810 at 0x8878d0..0x8878e0 and 0x887a7a, 0x77a50 at 0x77ac6 / 0x77b11, 0x817a0c..0x817a6a, 0x815d50 at 0x815d64..0x815d73)"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ...ssable (byte +0x3a bit 3) and not water seeds a region, and a flood (0x77d10, the visitor 0x886dd0 counting and stamping each plot it closes, m_area its area) takes every plot the step tes...
@@ -19,30 +20,41 @@
   final: 0x5d16c0
   kind: function
   name: Region_Builder
-  semantics: "Region_Builder: the chokepoint analysis 0x86c030 on the builder's +0x20, a chokepoint object per record (its line's plots, 0x371d0), then in plot index order a plot of no region, not impassable (+0x3a bit 3) and not water seeds a region flooded (0x77d10, visitor 0x886dd0 stamping each plot, m_area its area) under the step test 0x887aa0."
+  semantics: "Region_Builder: the chokepoint analysis 0x86c030 on the builder's +0x20, a chokepoint object per record (its line's plots, 0x371d0), then in plot index order a plot of no region, not impassable (+0x3a bit 3) and not water seeds a region flooded (0x77d10, visitor 0x886dd0 stamping each plot, m_area its area) under the step test 0x887aa0. The path finder's wrap flags (+0xe4 / +0xe5) are saved, cleared for the floods (0x8878d0..0x8878e0) and restored (0x887a7a): no region crosses the map's x edge."
   status: READ
   cases:
+    - recording: h1_duels1146
+      turn: 1
+      value: "the camp step's region of 37:19 holds 5 best plots (0:16 across the x edge in a region of its own): the game's draws 11 / 3, then 5 / 4 onto 37:19, as the non-wrapping flood gives (the wrapping one held 6, 38:18)"
     - recording: 1103
       value: "The camp step's regions are not the continents (every Duel map of 1103–1128 but 1125 is one continent) nor the areas: they are Map_Region objects (Core/Common/MapGen/Map_Region.cpp: +0 id, +4 m_plotCo"
     - recording: 1126
       value: the port was checked stage by stage against the DLL itself run under an emulator (unicorn, the analysis 0x86c030 called on each duel's regenerated grid with the map's plot, area and log objects faked)
-  impl: [cpu/core/barbarians.ts:campStep]
+  impl:
+    - cpu/core/barbarians.ts:campStep
+    - tools/civ6map/regions.py:build_regions
+    - world/query.ts:deriveRegions
   readings:
     - "The map's regions (AnalyzeChokepoints, Region_Builder) — READ, ported"
     - "H-1: the barbarians' turn (0x1514a0) — READ (the max camps and the sight LAB)"
+    - "C-134 / C-124: the map's regions flood without wrap; City Defense's region test as read — READ (0x887810 at 0x8878d0..0x8878e0 and 0x887a7a, 0x77a50 at 0x77ac6 / 0x77b11, 0x817a0c..0x817a6a, 0x815d50 at 0x815d64..0x815d73)"
   context:
     - "...Chokepoints builds — the binding (0x2b500 -> 0x8923f0) jumps straight into Region_Builder 0x887810, which first runs the chokepoint analysis (MapAnalysis.cpp, 0x86c030 on the builder's +0x..."
   review: reviewed
 - addr: 0x887aa0
   final: 0x5d18e0
   kind: function
-  semantics: "the region flood's step test: passable land not yet the flood's; free off every chokepoint line; per chokepoint holding either plot — both on its line: free when the step misses the segment, else refused unless both lie on the line; one on it: refused when the step meets the segment, unless the target lies on the line and the source off it, then taken only while no region holds it."
-  status: PARTLY
-  impl: [cpu/core/barbarians.ts:campStep]
+  semantics: "the region flood's step test (rcx the builder, rdx the parent node, r8 the child): an impassable (+0x3a bit 3) or water child refused; the start (no parent) taken; a child of the flood's own region (builder +8) refused; free where neither plot is in the analysis' line list (builder +0x68..+0x70); per chokepoint (map +0x110 -> +0x88 list) holding either plot in its line (+0x40, count +0x50) — both: free when the step misses the segment of its ends (+0x28: 0x886bb0 / 0x886b50, axial), else refused unless both lie on it (0x881ed0); one: the next chokepoint when the step misses the segment, refused when the parent lies on it or the child off it, else the next where the child is the flood's own, taken only while no region holds it (the chokepoint and the region recorded beside each other, 0x375f0 / 0x376a0); none refusing, taken."
+  status: READ
+  cases:
+    - recording: h1_duels1146
+      turn: 1
+      value: "the camp step's regions under this test and the non-wrapping flood: 11 / 3 then 5 / 4 onto 37:19, as the game draws"
+  impl: [cpu/core/barbarians.ts:campStep, tools/civ6map/regions.py:build_regions]
   readings:
     - "The map's regions (AnalyzeChokepoints, Region_Builder) — READ, ported"
     - "H-1: the barbarians' turn (0x1514a0) — READ (the max camps and the sight LAB)"
-  notes: ["imported: READ in its section, no confirming case found beside it"]
+    - "C-134 / C-124: the map's regions flood without wrap; City Defense's region test as read — READ (0x887810 at 0x8878d0..0x8878e0 and 0x887a7a, 0x77a50 at 0x77ac6 / 0x77b11, 0x817a0c..0x817a6a, 0x815d50 at 0x815d64..0x815d73)"
   context:
     - "...ounting and stamping each plot it closes, m_area its area) takes every plot the step test 0x887aa0 admits: passable land not yet the flood's own; free between plots off every chokepoint li..."
   review: reviewed

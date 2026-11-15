@@ -267,7 +267,7 @@ A question the SOURCE under-determines; neither engine ships a branch until the 
   - LAB (sight): the unseen land's single-turn residue (sightLab.ts on Barbarians.csv: 1,065 of 1,245 turns equal; 1128 t25 +28)
   - LAB (scouts): 1127 t35 / t37 Scouts' cur region 9:4 / 9:6
   - LAB (camps): duels1145 t1 the camp step's top region holds 15 plots for the game's 14 (32 for 31 over the regions): 42:20 holds FEATURE_FOUNTAIN_OF_YOUTH, no feature of the engines' and camp ground in ours (the camp on 41:22 for the game's 32:23)
-  - LAB (camps): duels1137 t1 the camp step's region order: the game's draw 12 of 22 falls on the region of 3:12, ours (6, 2, 4 and 4 plots by region id) on the region of 11:15; duels1146 t1 the game's region of 37:19 holds 5 plots, ours 6 (38:18 for 37:19)
+  - LAB (camps): duels1137 t1 the camp step's region order: the game's draw 12 of 22 falls on the region of 3:12, ours (6, 2, 4 and 4 plots by region id) on the region of 11:15
   - LAB (camps): duels1136 t28 ours raises a camp on 14:21 with its Spearman and Scout, the game none; duels1134 t30 the barbarians' camps ours 0:14 for the game's 43:15 and t80 ours keeps 11:20; duels1140 t184 ours holds 4:2, the game none
 - **C-125. THE TACTICAL PLANNING: TARGETS AND THE COMBAT PREDICTION.** Weight 3.
   - LAB (exchange filter): +0x1ba bit 5 waiving the exchange and survival filters (0x776795)
@@ -503,7 +503,8 @@ A question the SOURCE under-determines; neither engine ships a branch until the 
   - LAB (claims and strikes): duelq1127 t145 city-state 4's Skirmisher 1638401 on 4:11 takes Chase Target on the barbarian Musketman 4325382 on 5:7 (80 damage after the Bombard 1703944's 24) and stands, the game's Wanders to 3:10 (plot 488 // 443)
   - LAB (city defense): 1117 t84 City Defense Catapult 917509's 2-turn spot on its Man-at-Arms' plot (game 32:5, no row)
   - LAB (city defense): 1117 t89 City Defense Catapult 917509 on 32:7 taking next turn's 32:8
-  - LAB (city defense): duels1133 t21-t29 city-state 3's City Defense Archer 327682 on its centre 42:6 (radius 1) takes its planning's 41:6 as logged, which our regions (the map script's AnalyzeChokepoints, orders.json) put in region 6 against the centre's 7, so ours takes the ring's plot (44 plot rows); alike duels1145 t32-t35 p4's Warrior on 33:11 for 34:10, duels1157 t13-t16, duels1173 t68-t70: 81 of 6,256 City Defense radius-1 moves over the recordings land on a plot our regions put off the goal's
+  - LAB (city defense): the read (0x817a1c, Plot +0x18) and our regions agree with the game's (the t1 camp draw ranges of 15 seeds, HL Explore's cur region 2,879 of 2,895 moves), yet where the goal or the planning plot lies on a chokepoint's line the game takes a planning plot the flood puts across that line: duels1133 t21-t29 city-state 3's City Defense Archer 327682 on its centre 42:6 takes 41:6 (ours holds 42:6, 44 plot rows), duels1145 t32-t35 34:10 / 33:11, duels1157 t13 43:23 / 43:22, where duels1180 t46-t55 34:17 / 35:17 and duels1184 t29 12:19 / 11:19 are passed
+  - LAB (city defense): the recorder holds no plot's Map_Region (Plot +0x18, Map_Region +0 its id): the game's region of a chokepoint line's plots against the flood's is unread (duels1133 42:6, duels1145 34:10 / 33:11)
   - LAB (upgrade units): 1121 Upgrade Units' walk 4:589828 t69-72 the 781 / 782 tie
   - LAB (upgrade units): 1121 Upgrade Units' walk 4:720896 t74-78
   - LAB (upgrade units): 1121 t69 Warrior 262146 back from 35:19 to 35:18, ours waiting for 34:19 (Upgrade Units)

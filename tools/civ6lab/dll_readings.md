@@ -17550,3 +17550,34 @@ its own accrual; `routeOriginFollowers` and the Chinguetti term of
   as logged (12.71 before); the Free Cities' Foreign Trade and the civics
   past it 602.4 at t86.
 - OPEN: the Free Cities' city terms (C-98).
+
+## C-134 / C-124: the map's regions flood without wrap; City Defense's region test as read — READ (0x887810 at 0x8878d0..0x8878e0 and 0x887a7a, 0x77a50 at 0x77ac6 / 0x77b11, 0x817a0c..0x817a6a, 0x815d50 at 0x815d64..0x815d73)
+
+`build_regions` (tools/civ6map/regions.py), the recordings' `.orders.json`
+`regions` (tools/civ6lab/h1/map_orders.py), `deriveRegions`
+(world/query.ts); the GPU reads the exported region per tile.
+
+- THE FLOOD DOES NOT WRAP: Region_Builder saves its path finder's wrap
+  flags (+0xe4 x, +0xe5 y), clears them for the floods and restores them
+  after; the node expansion 0x77a50 wraps a neighbour's column only under
+  +0xe4. A region never crosses the map's x edge (the chokepoint analysis
+  0x86c030 keeps its own wrap). Confirmed: duels1146 t1 the camp step's
+  region of 37:19 holds 5 best plots (0:16 across the edge in a region of
+  its own), the game's draws 11 / 3 then 5 / 4 onto 37:19, where the
+  wrapping flood held 6 (38:18); the t1 camp draws of 1117, 1121, 1132,
+  1133, 1135, 1136, 1137, 1140, 1150, 1151, 1157, 1160, 1172, 1188 equal
+  under it; duels1173 t7-t21 city-state 4's City Defense Warriors pass their
+  planning's 43:19 for the goal 0:19 across the edge and take 0:18 / 0:20.
+- THE READ: Operation Move compares the planning plot's and the goal's
+  Map_Region ids through the map (vt +0x50, Plot +0x18, Map_Region +0), a
+  null region on either taking the plot; the ring walk 0x815d50 prefers a
+  plot of the goal's id (ctx +0x20, the goal's region read at
+  0x817a94..0x817ab6). The plots' regions are written by Region_Builder
+  alone (the seed at 0x8879c1, the visitor 0x886dd0 on a node's close).
+  HL Explore's cur region (0x70aa40 at 0x70adad, the same Plot +0x18)
+  agrees with the flood on 2,879 of 2,895 logged moves.
+- OPEN: where the goal or the planning plot lies on a chokepoint's line the
+  game takes planning plots the flood puts across that line (duels1133
+  t21 42:6 / 41:6, duels1145 t32 34:10 / 33:11, duels1157 t13 43:23 /
+  43:22) and passes others (duels1180 t46 34:17 / 35:17, duels1184 t29
+  12:19 / 11:19); the game's own region ids per plot are unrecorded.

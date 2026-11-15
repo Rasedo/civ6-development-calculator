@@ -88,6 +88,7 @@
     - "C-126 / C-99: the purchase list's at-war sums, Garrison City's turn done and Operation Move's movers"
     - "C-95: Operation Move's ring test takes no path (0x815d50) — READ, both twins"
     - "C-95 / C-123: a move order's path passes a district of hit points out of sight and a unit of another map layer; a walk's step reads its own formation's riders; a raid's start zeroes the tribe's raid score — READ (0x586360 at 0x5866c9..0x58671f, 0x2720a0 at 0x272618..0x272689, 0x816cb0 at 0x8177cf..0x8177e9, 0x149980 at 0x149b01, 0x7c7330, 0x152c00, 0x154b80), both twins"
+    - "C-134 / C-124: the map's regions flood without wrap; City Defense's region test as read — READ (0x887810 at 0x8878d0..0x8878e0 and 0x887a7a, 0x77a50 at 0x77ac6 / 0x77b11, 0x817a0c..0x817a6a, 0x815d50 at 0x815d64..0x815d73)"
   context:
     - ...e Formation 0x7efd70 / 0x7ee630 (pairs 0x73b6c0 -> 0x73b8a0); Operation Move 0x81a130 / 0x816cb0; Settle 0x7f0b30 / 0x7ef530; Operation Is Ready 0x81a090; Operation Attack 0x80ec10 (...
     - "- Operation Move's destination (0x816cb0): radius = min(Range to goal, the unit's attack Range +0x19f8), 0 for a unit in a forma..."

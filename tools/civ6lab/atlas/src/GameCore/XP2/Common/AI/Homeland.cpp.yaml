@@ -147,6 +147,7 @@
     - "C-99: a move order's search sets out on the pool finder's +0x1bc, the last full-Movement search's GetMaxMoves — READ (0x26f330, 0x77d10, 0x270d70, 0x26e920, 0x26eea0, 0x26dcd0, 0x26df90, 0x26e2c0, 0x26fe20 at 0x270309), unported"
     - "C-95: HL Explore's unrevealed count holds nothing on a goody hut's plot — READ (0x70a6c0 at 0x70a746..0x70a76a, 0x82d90), both twins"
     - "C-95 / C-134: HL Explore's path tests under flags 0, Naval Choose Target's unit kinds, the swap partner's destination test — READ (0x70aa40 at 0x70aed0 / 0x70b063 / 0x70b173 / 0x70b2b6 / 0x70b3b3, 0x802ea0 at 0x802f15..0x802f69, 0x972540 at 0x97273a..0x97276c), both twins"
+    - "C-134 / C-124: the map's regions flood without wrap; City Defense's region test as read — READ (0x887810 at 0x8878d0..0x8878e0 and 0x887a7a, 0x77a50 at 0x77ac6 / 0x77b11, 0x817a0c..0x817a6a, 0x815d50 at 0x815d64..0x815d73)"
   context:
     - "...d Units 0x80d790 (\"Operation Protect Units\"), Naval Patrol 0x803060 (the explore move 0x70aa40), Naval Pillage 0x803250, Naval Escort 0x817f60; Operation Move's unit tactical block (..."
   review: reviewed
