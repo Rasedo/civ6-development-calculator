@@ -2961,17 +2961,6 @@
           "note": "the turn the minor's city was founded (city +0x2600, m_iTurnFounded); -99 for none"
         },
         {
-          "name": "minorFuelShort",
-          "compare": "exact",
-          "covers": [
-            "Seat.fuelShort"
-          ],
-          "planes": [
-            "citystate_fuel_short"
-          ],
-          "note": "the minor's strategic slots its units' fuel bill could not meet at its last upkeep pass, a bit per slot"
-        },
-        {
           "name": "minorProdReserved",
           "compare": "exact",
           "covers": [

@@ -374,8 +374,9 @@ export function unitResourceCost(unitType: string, formation = 0): { id: string;
  * turn, the unit will consume a certain amount of that resource as fuel".
  * One pass over the seat's living units, after the turn's income and before
  * the plants burn, because a unit's fuel and a plant's come out of one bank.
- * A bill the bank cannot meet takes what is there, leaves it at zero and marks
- * the slot short until the next pass — `fuelShortCS` is the penalty.
+ * A bill the bank cannot meet takes what is there, leaves it at zero and, for
+ * a major, marks the slot short until the next pass — `fuelShortCS`, a
+ * major's penalty alone, reads the mark.
  */
 export function chargeUnitUpkeep(state: GameState, seat: number): void {
   const s = seatOf(state, seat);
@@ -395,7 +396,7 @@ export function chargeUnitUpkeep(state: GameState, seat: number): void {
     // too. `unitCarbon` is zero for every other slot.
     emitCarbon(state, seat, unitCarbon(k, def.resourceUpkeep, cells));
   }
-  s.fuelShort = short;
+  if (isCiv(seat)) s.fuelShort = short;
   for (let k = 0; k < bk.length; k++) logStockWrite(state.turn, seat, k, 'up', bk[k]);
 }
 

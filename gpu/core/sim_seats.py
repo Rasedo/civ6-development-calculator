@@ -4394,7 +4394,8 @@ class SimSeats:
                                       * self._carbon_per_resource[slot]
                                       * self._carbon_unit_share
                                       * self._power_cells(row))
-        self._fuel_short_bank(row).copy_(bill > stock)
+        if row < self.n_majors:
+            self.civ_fuel_short[:, row].copy_(bill > stock)
         stock.copy_((stock - bill).clamp(min=0))
         if self._log_diff:
             for _k in range(stock.shape[1]):
@@ -11165,14 +11166,6 @@ class SimSeats:
                 improved = (owned & (self.res_id == rid)).any(dim=1)
                 bank[:, k] += (seen & ~improved).long() * _hat * self._suz_free_strat
         return bank
-
-    def _fuel_short_bank(self, row: int) -> torch.Tensor:
-        """[B, K] — the slots short at seat row `row`'s last fuel bill, a
-        view: a major's (`civ_fuel_short`), a city-state's
-        (`citystate_fuel_short`)"""
-        if row < self.n_majors:
-            return self.civ_fuel_short[:, row]
-        return self.citystate_fuel_short[:, row - self._CITY_MINOR0]
 
     def _stock_reserved(self, row: int) -> torch.Tensor:
         """[B, K] `stockReserved` — seat row `row`'s reservations by slot: a

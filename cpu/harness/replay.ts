@@ -6069,7 +6069,7 @@ const GAME_MEMORY = ['barbTribes', 'barbPool', 'barbCampsBegun', 'barbSpotNext']
  *  overflow, the progress its districts, projects and repairs switched from
  *  keep (`minorKeptCarried`; a building's and a unit's are the record's),
  *  its powered project and repair
- *  waits, its fuel shortfall, its strategic stockpile, its reservations and the queue front's
+ *  waits, its strategic stockpile, its reservations and the queue front's
  *  reservation on it (the importer reads a minor's none), the trade routes the record's routes laid (the
  *  importer reads a city-state's none), the turn its city was founded, its
  *  district projects' Great Person points (the record shows their sum alone,
@@ -6078,7 +6078,7 @@ const GAME_MEMORY = ['barbTribes', 'barbPool', 'barbCampsBegun', 'barbSpotNext']
  *  Bologna t180 on the path laid at t147) */
 const GAME_STORES = ['warTurns', 'tradeEdges'] as const;
 const SEAT_STORES = ['barbKills', 'netIncome'] as const;
-const MINOR_STORES = ['prodOverflow', 'repairWait', 'fuelShort', 'tradeRoutes', 'foundedTurn', 'stockpile', 'prodReserved', 'reserved', 'gpPoints', 'projectsDone'] as const;
+const MINOR_STORES = ['prodOverflow', 'repairWait', 'tradeRoutes', 'foundedTurn', 'stockpile', 'prodReserved', 'reserved', 'gpPoints', 'projectsDone'] as const;
 
 /** the progress a city-state's districts, projects and repairs it switched
  *  from keep, the engine's own, beside the record's kept on its buildings and

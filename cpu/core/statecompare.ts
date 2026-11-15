@@ -1169,7 +1169,6 @@ const CITY_STATE_G: Record<string, Extractor> = {
   minorProdSet: overCityStates((cityState) => cityState.prodSetValue ?? FX_MIN_RAW),
   minorFounded: overCityStates((cityState) => cityState.foundedTurn ?? -99),
   minorStockpile: overCityStates((cityState) => [...(cityState.stockpile ?? emptyStockpile())]),
-  minorFuelShort: overCityStates((cityState) => cityState.fuelShort ?? 0),
   minorProdReserved: overCityStates((cityState) => cityState.prodReserved ?? -1),
   minorReserved: overCityStates((cityState) => [...(cityState.reserved ?? emptyStockpile())]),
   minorCitizens: overCityStates((cityState) => [cityState.favoredFood ? 1 : 0, cityState.idleCitizens ?? 0,
