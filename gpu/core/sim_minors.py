@@ -2407,10 +2407,37 @@ class SimMinors:
         first = torch.where(ok, torch.arange(NB, device=self.device).unsqueeze(0), torch.full_like(ok, NB, dtype=torch.long)).min(dim=1).values
         return torch.where(first < NB, first, torch.full_like(first, -1))
 
+    def _city_unit_plot(self, row: int, col: int, ctr: torch.Tensor, u0: torch.Tensor) -> torch.Tensor:
+        """[B] — `cityUnitPlot` for the city in column `col` of seat row
+        `row`, its centre `ctr`, and chassis `u0`: a unit with Combat but a
+        Spy on its complete Encampment (a land unit) or Harbor (a hull), not
+        pillaged nor under fallout — where a military unit stands there, the
+        centre instead if none stands on it (a hull's only from a coastal
+        centre); else the centre."""
+        combat = (self._type_combat.take(u0) > 0) & (u0 != self._spy_idx) & (self._type_air.take(u0) == 0)
+        naval = self.unit_naval.take(u0)
+        held = lambda t: ((self.military_at.gather(1, t.unsqueeze(1)) >= 0)  # noqa: E731
+                          | (self.embarked_at.gather(1, t.unsqueeze(1)) >= 0)).squeeze(1)
+        at = ctr
+        for didx, sea in ((self._encamp_didx, False), (self._harbor_didx, True)):
+            if didx < 0:
+                continue
+            dt = self.city_dist_tile[:, row, col, didx]
+            dc = dt.clamp(min=0)
+            ok = (combat & (naval == sea) & (dt >= 0) & self.district_complete.gather(1, dc.unsqueeze(1)).squeeze(1)
+                  & ~self.district_pillaged.gather(1, dc.unsqueeze(1)).squeeze(1)
+                  & (self.tile_fallout.gather(1, dc.unsqueeze(1)).squeeze(1) <= 0))
+            back = held(dc) & ~held(ctr)
+            if sea:
+                back = back & self.coastal_land.gather(1, ctr.unsqueeze(1)).squeeze(1)
+            at = torch.where(ok, torch.where(back, ctr, dc), at)
+        return at
+
     def _minor_spawn(self, s: int, mask: torch.Tensor, ui: torch.Tensor,
                      grants: bool = True, stack: bool = False) -> torch.Tensor:
-        """[B] — a unit of chassis `ui` lands on the minor's centre or its ring
-        (`spawnUnit`; `stack`: one it trains, on the centre beside its own
+        """[B] — a unit of chassis `ui` lands on the minor's centre or its
+        district (`_city_unit_plot`) or that plot's ring
+        (`spawnUnit`; `stack`: one it trains, on the plot beside its own
         units, `_spawn_unit`'s `stack`) under its seat, carrying what the
         city's buildings hand a unit trained there (`applyTrainingGrants`)
         unless `grants` is off; a Builder counts toward the next one's price.
@@ -2426,7 +2453,8 @@ class SimMinors:
             bl = self.city_bldg[:, row, 0] & ~self._bldg_dark(
                 self.city_dist_tile[:, row, 0], self.city_bldg_pillaged[:, row, 0])
             xp = self._train_xp_pct(bl, u0, row, col0)
-        landed = self._spawn_unit(row, mask, self.citystate_center[:, s].clamp(min=0), u0, init_xp=xp, stack=stack)
+        landed = self._spawn_unit(row, mask, self._city_unit_plot(row, 0, self.citystate_center[:, s].clamp(min=0), u0),
+                                  u0, init_xp=xp, stack=stack)
         self._raise_best_trained(row, landed, u0)
         self._gen_ver += 1
         return landed
@@ -2754,12 +2782,12 @@ class SimMinors:
 
     def _naval_capable_minor(self, s: int) -> torch.Tensor:
         """[B] — `cityNavalCapable` for minor `s`'s city: enterable water
-        beside the centre, or a completed Harbor."""
+        beside the centre that the sea did not take, or a completed Harbor."""
         row = self._CITY_MINOR0 + s
         ctr = self.citystate_center[:, s].clamp(min=0)
         nb = self.neigh[ctr]
         nbc = nb.clamp(min=0)
-        out = ((nb >= 0) & self.wpass.gather(1, nbc)).any(dim=1)
+        out = ((nb >= 0) & (self.wpass & ~self.tile_submerged).gather(1, nbc)).any(dim=1)
         if self._harbor_didx >= 0:
             ht = self.city_dist_tile[:, row, 0, self._harbor_didx]
             out = out | ((ht >= 0) & self.district_complete.gather(1, ht.clamp(min=0).unsqueeze(1)).squeeze(1))

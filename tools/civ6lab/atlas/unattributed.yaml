@@ -401,13 +401,17 @@
     - recording: h1_duely1117
       turn: 185
       value: city-state 3's own water 42:14 lets its Bombard off with no embark cost (0x530240), unowned water not (AI_Planning.csv)
-  impl: [cpu/core/units.ts:shoreCrossing, gpu/core/sim_tactics.py:_owned_exit]
+  impl:
+    - cpu/core/units.ts:shoreCrossing
+    - gpu/core/sim_tactics.py:_owned_exit
+    - cpu/core/units.ts:cityNavalCapable
   readings:
     - "C-99: an owned water plot no shore, a move order carried on as the turn ends — READ (0x530240, 0x66790, 0x66a90, 0x66680, 0x814e0, 0x81240, 0x7eeba0), both twins"
     - "C-99: a move order carried on as the turn ends, the zone-of-control wait, the embark rule's TO plot — READ (0x962380, 0x52f50, 0x26fe20, 0x2675e0, 0x2673f0, 0x530420, 0x267650), both twins"
     - "C-132: the danger map's fitted rules in the DLL; a search's shore crossings on the formation's own domain — READ (0x26dab0, 0x586360 at 0x586624..0x586664, 0x2720a0 at 0x272618..0x272689, 0x66a90, 0x52fe90, 0x56e0a0, 0x26e570, 0x530240, 0x530420), FIT (the unmoved flag, the barbarians' raise, the grant's last turn), both twins"
     - "C-96 / C-98 / C-100 / C-99: the city AI's fitted rules read — the analysis before the job list, the unit term's upgrade price, the city's trained domains, a non-major's required power, the eruption's turns — READ (0x608870 at 0x608976..0x608988, 0x7b3e50 at 0x7b4564..0x7b45c8, 0x5376d0, 0x1c77c0, 0x1aed10, 0x1f0440 at 0x1f04c7..0x1f04dc, 0xa1d480), both twins"
     - "C-134 / C-95: the plots the sea took, a flooded route, a Trader's closed ground, a new turn's domain, the planning list's room — READ (0x586360 at 0x58645d..0x58648e / 0x5865e7..0x5865fd, 0x2720a0 at 0x272392 / 0x272618..0x272689, 0x52fe90, 0x26e920 at 0x26ea6d..0x26eaa2, 0x7920d0 at 0x792144..0x79216d, 0x790c60 at 0x790c87..0x790c8d, 0x586d40 at 0x587042..0x5870aa, 0x52fa40 at 0x52fa6a..0x52fa8e), LAB (the records' drowned plots), both twins"
+    - "C-99 / C-134: a city's new unit on its district, a centre's sea at its claim — READ (0x1e6570 at 0x1e66f9..0x1e6938, 0x24b370, 0x1ad720, 0x1aeff0, 0x66a90), both twins"
   review: reviewed
 - addr: 0x69010
   final: 0x4ddc0
@@ -9389,6 +9393,16 @@
   context:
     - "...itMoves command 0x953bd0 (0x953d97) and the script binding RestoreMovementToFormation 0x9f6750 (0x9f677d): the Barbarian Clans mode, the Heroes mode, a script. None runs in a turn of..."
   review: imported
+- addr: 0xa13270
+  final: 0x71c3b0
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-99 / C-134: a city's new unit on its district, a centre's sea at its claim — READ (0x1e6570 at 0x1e66f9..0x1e6938, 0x24b370, 0x1ad720, 0x1aeff0, 0x66a90), both twins"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...W UNIT'S PLOT (the city's create 0x1e6570, a trained unit and a bought one, 0xa540c0 -> 0xa13270): the centre; a unit with Combat (Units +0x48 above 0) not a Spy (+0x1ba bit 2) takes i..."
+  review: imported
 - addr: 0xa2ed80
   final: 0x7316e0
   kind: function
@@ -9485,6 +9499,7 @@
   status: PARTLY
   readings:
     - "C-134 / C-95: the plots the sea took, a flooded route, a Trader's closed ground, a new turn's domain, the planning list's room — READ (0x586360 at 0x58645d..0x58648e / 0x5865e7..0x5865fd, 0x2720a0 at 0x272392 / 0x272618..0x272689, 0x52fe90, 0x26e920 at 0x26ea6d..0x26eaa2, 0x7920d0 at 0x792144..0x79216d, 0x790c60 at 0x790c87..0x790c8d, 0x586d40 at 0x587042..0x5870aa, 0x52fa40 at 0x52fa6a..0x52fa8e), LAB (the records' drowned plots), both twins"
+    - "C-99 / C-134: a city's new unit on its district, a centre's sea at its claim — READ (0x1e6570 at 0x1e66f9..0x1e6938, 0x24b370, 0x1ad720, 0x1aeff0, 0x66a90), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...ation while the plot is still land and writes the plot's domain mask then (0xa3b000 / 0xa3ac70 -> 0x66a90, the terrain set after): the mask holds the land bit alone. A land unit stan..."
@@ -9495,6 +9510,7 @@
   status: PARTLY
   readings:
     - "C-134 / C-95: the plots the sea took, a flooded route, a Trader's closed ground, a new turn's domain, the planning list's room — READ (0x586360 at 0x58645d..0x58648e / 0x5865e7..0x5865fd, 0x2720a0 at 0x272392 / 0x272618..0x272689, 0x52fe90, 0x26e920 at 0x26ea6d..0x26eaa2, 0x7920d0 at 0x792144..0x79216d, 0x790c60 at 0x790c87..0x790c8d, 0x586d40 at 0x587042..0x5870aa, 0x52fa40 at 0x52fa6a..0x52fa8e), LAB (the records' drowned plots), both twins"
+    - "C-99 / C-134: a city's new unit on its district, a centre's sea at its claim — READ (0x1e6570 at 0x1e66f9..0x1e6938, 0x24b370, 0x1ad720, 0x1aeff0, 0x66a90), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...rmation's location while the plot is still land and writes the plot's domain mask then (0xa3b000 / 0xa3ac70 -> 0x66a90, the terrain set after): the mask holds the land bit alone. A l..."
@@ -9526,6 +9542,7 @@
     - cpu/harness/replay.ts:minorBuysAfter
   readings:
     - "C-127 / C-98: a minor's purchase charges its strategic cost; the resource value's project term; a minor's MajorCivOnly units in its unit production table — READ (0xa540c0, 0x7a21e0 at 0x7a2b71, 0xa9cfb0, 0x4f4a50, 0x172941), both twins"
+    - "C-99 / C-134: a city's new unit on its district, a centre's sea at its claim — READ (0x1e6570 at 0x1e66f9..0x1e6938, 0x24b370, 0x1ad720, 0x1aeff0, 0x66a90), both twins"
   context:
     - "...e value's project term; a minor's MajorCivOnly units in its unit production table — READ (0xa540c0, 0x7a21e0 at 0x7a2b71, 0xa9cfb0, 0x4f4a50, 0x172941), both twins"
     - "- THE PURCHASE (0xa540c0, the city purchase's execution behind its test 0xa53980, which holds the World Congress..."

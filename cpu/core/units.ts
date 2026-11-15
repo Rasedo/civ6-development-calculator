@@ -31,7 +31,7 @@ export function setRecordFormation(r: ArmyRecord, unit: Unit): ArmyRecord {
 export const FORTIFY_MAX_TURNS = 2;
 import { logUnitOrder } from './seatTurn';
 import { neighbors, neighborTile, hexDistance, directionTo, DIR_E, DIR_W, DIRECTION_TYPES } from '../../world/hex';
-import { isWater, isImpassable, isMountain, hullPassage, hullTile, naturalWonderAt } from '../../world/query';
+import { isWater, isImpassable, isMountain, hullPassage, hullTile, naturalWonderAt, isCoastalLand } from '../../world/query';
 import { canRemoveFeature, portalAt, type RuleResult } from './rules';
 import { IMPROVEMENTS } from '../data/improvements';
 import { tileAppeal } from './appeal';
@@ -1622,10 +1622,15 @@ export function traderCost(state: GameState, seat: number): number {
 }
 
 /**
- * A city may build/buy NAVAL units iff its CENTER is adjacent to a
- * water tile OR it owns a COMPLETED Harbor. Mirrors the GPU naval-build gate
- * (static center-water-adjacency plane | dynamic completed-Harbor). Takes any
- * city shape that carries centerIndex + districts.
+ * A city trains the sea domain (0x1c77c0) where its CENTRE's plot holds the
+ * domain mask's sea bit, or it owns a COMPLETED Harbor. The claim writes the
+ * bit (0x66a90 after 0x66790) on a city's plot that IsCoastalLand(plot, 1):
+ * enterable water beside it, a lake's too. A plot the sea took later is no
+ * such water to the centre, whose mask nothing writes again
+ * (`Tile.submerged`; runs/h1_duels1156 Valletta on 4:12, 3:13 drowned at
+ * t231: Naval Superiority starts only as its Harbor on 3:13 completes, t244;
+ * runs/h1_duels1191 Chinguetti on 15:19, 15:20 drowned at t240: none to
+ * t250). Takes any city shape that carries centerIndex + districts.
  */
 export function cityNavalCapable(
   state: GameState,
@@ -1633,12 +1638,59 @@ export function cityNavalCapable(
 ): boolean {
   const center = state.map.tiles[city.centerIndex];
   // Enterable water only (the GPU `wpass` plane = isWater && !impassable): a
-  // center facing only impassable water (ice) cannot field ships. Matching this
-  // exactly keeps the naval-build gate turn-identical across the engines.
-  if (neighbors(state.map, center).some((n) => isWater(n) && !isImpassable(n))) return true;
+  // center facing only impassable water (ice) cannot field ships.
+  if (neighbors(state.map, center).some((n) => isWater(n) && !isImpassable(n) && !n.submerged)) return true;
   return city.districts.some(
     (d) => d.type === 'HARBOR' && state.map.tiles[d.tileIndex].districtComplete,
   );
+}
+
+/** CIV6 (Districts MilitaryDomain, read by 0x24b370): the domain of the
+ *  units a city places on the district — the Encampment's DOMAIN_LAND, the
+ *  Harbor's DOMAIN_SEA (its unique variants the same district here), the
+ *  Aerodrome's DOMAIN_AIR */
+const DISTRICT_MILITARY_DOMAIN: Readonly<Record<string, 'land' | 'sea' | 'air'>> = {
+  ENCAMPMENT: 'land', HARBOR: 'sea', AERODROME: 'air',
+};
+
+/** a unit type's Domain (Units +0x1c) */
+const unitTypeDomain = (type: string): 'land' | 'sea' | 'air' => (isAirUnit(type) ? 'air' : UNITS[type]?.naval ? 'sea' : 'land');
+
+/** a unit of the plot's layer the new unit cannot share it with (the unit
+ *  manager's +0xc8 on the two types: the same stacking class) */
+function stackedAgainst(state: GameState, plot: number, type: string): boolean {
+  const cls = unitDomain(type);
+  const layer = mapLayer(type);
+  return unitsAt(state, plot).some((u) => !isAirUnit(u.type) && !isSpy(u.type) && mapLayer(u.type) === layer && unitDomain(u.type) === cls);
+}
+
+/**
+ * THE PLOT A CITY'S NEW UNIT LANDS ON (the city's create 0x1e6570, a unit
+ * it trains or buys): a unit with Combat (Units +0x48 above 0) but a Spy
+ * takes each district of the city in its list's order that stands
+ * complete, not pillaged (0x1ad720) nor under fallout (0x1aeff0), whose
+ * MilitaryDomain is the unit's Domain — the last such; where a unit of its
+ * stacking class stands there, the centre instead if none stands on the
+ * centre (a sea unit's only from a coastal centre, IsCoastalLand(-1) at
+ * 0x1e688f). Any other unit, the centre. runs/h1_duels1158 Granada on
+ * 31:19, its Encampment on 32:21: the Warrior it trains at t108 is added on
+ * 32:21 (UnitAddedToMap), so each land unit it trains after.
+ */
+export function cityUnitPlot(state: GameState, city: { centerIndex: number; districts: { type: string; tileIndex: number }[] },
+  unitType: string): number {
+  const def = UNITS[unitType];
+  if (!def || !(def.combat > 0) || isSpy(unitType)) return city.centerIndex;
+  const dom = unitTypeDomain(unitType);
+  let at = city.centerIndex;
+  for (const d of city.districts) {
+    const t = state.map.tiles[d.tileIndex];
+    if (DISTRICT_MILITARY_DOMAIN[d.type] !== dom || !t.districtComplete || t.districtPillaged || (t.falloutTurns ?? 0) > 0) continue;
+    at = d.tileIndex;
+    if (!stackedAgainst(state, at, unitType)) continue;
+    if (dom === 'sea' && !isCoastalLand(state.map, state.map.tiles[city.centerIndex])) continue;
+    if (!stackedAgainst(state, city.centerIndex, unitType)) at = city.centerIndex;
+  }
+  return at;
 }
 
 /**

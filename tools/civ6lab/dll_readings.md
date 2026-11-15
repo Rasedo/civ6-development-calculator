@@ -17698,3 +17698,39 @@ Free Cities row).
   0x687bf0 skips them or another reader holds their +0x528 is unread.
 - OPEN (C-98): the Free City's City Analysis unit values themselves (ours
   Archer 15.96 for the game's 26.6 there); the resources term.
+
+## C-99 / C-134: a city's new unit on its district, a centre's sea at its claim — READ (0x1e6570 at 0x1e66f9..0x1e6938, 0x24b370, 0x1ad720, 0x1aeff0, 0x66a90), both twins
+
+`cityUnitPlot` (cpu/core/units.ts) / `_city_unit_plot`
+(gpu/core/sim_minors.py), at a city-state's trained and bought unit
+(`minorFinish`, `minorBuyUnit` / `_minor_spawn`) and a Free City's
+trained one (`freeFinish` / `_free_city_build`); `cityNavalCapable`
+(cpu/core/units.ts) / `_naval_capable`, `_naval_capable_minor`.
+
+- THE NEW UNIT'S PLOT (the city's create 0x1e6570, a trained unit and a
+  bought one, 0xa540c0 -> 0xa13270): the centre; a unit with Combat (Units
+  +0x48 above 0) not a Spy (+0x1ba bit 2) takes instead each district of
+  the city's list (+0x1a48) that is complete (+0xb08), not pillaged
+  (0x1ad720), not under fallout (0x1aeff0), whose MilitaryDomain (0x24b370
+  on Districts +0x78: LAND 2, SEA 0, AIR 1) is the unit's Domain — the last
+  such. Where a unit of the plot's layer (0x75c50) of the new unit's
+  stacking class (the unit manager's +0xc8 on the two types) stands there,
+  the centre instead where none stands on it; for a sea unit only where the
+  centre IsCoastalLand(-1) (0x1e688f). Confirmed: duels1158 t108 Granada
+  (31:19, its Encampment 32:21) adds its trained Warrior 1179655 on 32:21,
+  city-state 3's record of it there at age 0, as for its Courser (t115),
+  Pikeman (t128), Scout (t154), Cavalry (t222).
+- A CENTRE'S SEA (0x1c77c0): the sea bit of the centre's domain mask is
+  written by the claim (0x66790 -> 0x66a90) where the plot IsCoastalLand(1);
+  a neighbour the sea takes after (the drowning 0xa3b000 / 0xa3ac70 writes
+  the drowned plot's own mask) leaves it unwritten: the centre trains no
+  ship and starts no Naval Superiority until a Harbor completes. Confirmed:
+  duels1156 Valletta on 4:12, 3:13 drowned at t231 (Coast), its Naval
+  Superiority on 3:13 Started at t244 as its Harbor there completes;
+  duels1191 Chinguetti on 15:19, 15:20 drowned at t240, none to t250.
+- OPEN: 0x1af120 (the district's type held, then 0x5313f0 on its plot with
+  flag 1) also turns a district away; what 0x5313f0 asks is unread, and no
+  recording shows it. A centre claimed after its neighbour drowned would
+  hold the sea bit; the engines read every drowned neighbour as no sea. A
+  major's new unit lands on the centre in the engines (an aircraft on its
+  Aerodrome, `airTrainTile`).

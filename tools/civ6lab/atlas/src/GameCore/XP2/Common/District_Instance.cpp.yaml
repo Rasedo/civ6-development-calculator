@@ -392,6 +392,23 @@
   context:
     - "...uilds the law's struct: +0 / +4 the two strengths, +8 the district's maximum hit points 0x24b290, +0xc / +0x10 the outer defense's damage and maximum, +0x14 the pool's hash, +0x1c CO..."
   review: reviewed
+- addr: 0x24b370
+  final: 0x191a50
+  kind: function
+  name: the district's military domain
+  semantics: "the district's Districts row MilitaryDomain (+0x78): DOMAIN_LAND 2, DOMAIN_SEA 0, DOMAIN_AIR 1, else -1. The city's unit create (0x1e6570) and CanTrain (0x172820) read it."
+  status: READ
+  cases:
+    - recording: h1_duels1158
+      turn: 108
+      value: Granada's Encampment 32:21 (DOMAIN_LAND) takes the Warrior 1179655 it trained
+  impl:
+    - cpu/core/units.ts:cityUnitPlot
+    - gpu/core/sim_minors.py:_city_unit_plot
+    - cpu/core/units.ts:DISTRICT_MILITARY_DOMAIN
+  readings:
+    - "C-99 / C-134: a city's new unit on its district, a centre's sea at its claim — READ (0x1e6570 at 0x1e66f9..0x1e6938, 0x24b370, 0x1ad720, 0x1aeff0, 0x66a90), both twins"
+  review: reviewed
 - addr: 0x24b4b0
   final: 0x191b50
   kind: function

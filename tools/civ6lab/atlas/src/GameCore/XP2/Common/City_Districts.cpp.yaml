@@ -23,6 +23,7 @@
     - cpu/core/freeCityBuild.ts:growth
     - gpu/core/sim_cityvalue.py:holds_pillaged_district
     - cpu/core/production.ts:districtPillagedIn
+    - cpu/core/units.ts:cityUnitPlot
   readings:
     - "C-96: the plot analysis's owner test, Build Unit's pillaged district and a unique's install type — READ (0x5ceba7, 0x7f5112 -> 0x1aec20 / 0x1ad720), both twins"
     - "C-96: a city-state's City Center projects, Build Unit's pillaged building, the pick's pillaged district and the war footing's writer — READ (0x7f50e9, 0x71fb80 at 0x721158 / 0x72118a), the pick's district test PARTLY (0x170450 at 0x17071d), both twins"
@@ -31,6 +32,7 @@
     - "C-127 / C-100: the buildings' dependents and the districts' buildings (0x5cadc0) — ported, both twins"
     - "C-96: the plot analysis's owner test, Build Unit's pillaged district and a unique's install type"
     - "C-96: every player's build step drops a building CanConstruct refuses at the queue's head, the front check asking the next — READ (0x16f050 at 0x16f09a..0x16f180, 0x178250 -> 0x17f070 -> 0x17e8d0, 0x170450 at 0x17071d), both twins"
+    - "C-99 / C-134: a city's new unit on its district, a centre's sea at its claim — READ (0x1e6570 at 0x1e66f9..0x1e6938, 0x24b370, 0x1ad720, 0x1aeff0, 0x66a90), both twins"
   review: reviewed
 - addr: 0x1ad930
   final: 0x11e140
@@ -236,10 +238,12 @@
   kind: function
   semantics: the city's district of a type holds fallout (CanConstruct's refusal +0x2b).
   status: PARTLY
+  impl: [cpu/core/units.ts:cityUnitPlot]
   readings:
     - "C-96: a city-state's City Center projects, Build Unit's pillaged building, the pick's pillaged district and the war footing's writer — READ (0x7f50e9, 0x71fb80 at 0x721158 / 0x72118a), the pick's district test PARTLY (0x170450 at 0x17071d), both twins"
     - "C-96: a city-state's City Center projects, Build Unit's pillaged building, the pick's pillaged district and the war footing's writer"
     - "C-127 / C-100 / C-96 / C-99: Check Plot's district test and Add Goal Tech's Goal Plot, a flooded lowland's district, the unit production table's at-war field, the pick's repair project — READ (0x7f6ea0 at 0x7f7600..0x7f7662, 0x35f2d0 at 0x35f46b..0x35f48a / 0x35f60f..0x35f81d, 0x7e7d20 at 0x7e888b..0x7e8a9d, 0x173940 at 0x173a05..0x173be1), LAB (the aiunits unit tables, the Default Specialization's project), both twins"
+    - "C-99 / C-134: a city's new unit on its district, a centre's sea at its claim — READ (0x1e6570 at 0x1e66f9..0x1e6938, 0x24b370, 0x1ad720, 0x1aeff0, 0x66a90), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ...hen 0x1ad720 (a district of the type in the city stands pillaged) sets +0x2a and fails, 0x1aeff0 (fallout) +0x2b, 0x1af120 +0x29. A held pillaged building's path (0x1707ec -> 0x17084...
@@ -252,6 +256,7 @@
   readings:
     - "C-96: a city-state's City Center projects, Build Unit's pillaged building, the pick's pillaged district and the war footing's writer — READ (0x7f50e9, 0x71fb80 at 0x721158 / 0x72118a), the pick's district test PARTLY (0x170450 at 0x17071d), both twins"
     - "C-96: a city-state's City Center projects, Build Unit's pillaged building, the pick's pillaged district and the war footing's writer"
+    - "C-99 / C-134: a city's new unit on its district, a centre's sea at its claim — READ (0x1e6570 at 0x1e66f9..0x1e6938, 0x24b370, 0x1ad720, 0x1aeff0, 0x66a90), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ...the type in the city stands pillaged) sets +0x2a and fails, 0x1aeff0 (fallout) +0x2b, 0x1af120 +0x29. A held pillaged building's path (0x1707ec -> 0x170840) reads its district again...

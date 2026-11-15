@@ -6,20 +6,27 @@
 - addr: 0x1e6570
   final: 0x141330
   kind: function
-  semantics: "the city's unit create: picks the plot (the centre; a district for a domain that needs one) and places the unit with 0x586d40(unit, plot, 1, 0). A trained unit lands on the centre whatever of its owner's stands there, stacked until one of them moves."
+  semantics: "the city's unit create: picks the plot and places the unit with 0x586d40(unit, plot, 1, 0). The plot: the centre; for a unit with Combat (Units +0x48 above 0) not a Spy (+0x1ba bit 2), each district of the city's list (+0x1a48) complete (+0xb08), not pillaged (0x1ad720) nor under fallout (0x1aeff0), whose MilitaryDomain (0x24b370) is the unit's Domain (0xadd590 on +0x1c) — the last such; where a unit of the plot's layer (0x75c50) of the new unit's stacking class (the unit manager's vt +0xc8 on the two types) stands there, the centre where none stands on it (a sea unit only where the centre IsCoastalLand(-1), 0x1e688f). A trained unit lands whatever of its owner's stands there, stacked until one of them moves."
   status: READ
   cases:
     - recording: h1_dueld1128
       turn: 19
       value: Hong Kong's Warrior 327683 added on 9:7 with its Warrior 196610 there
+    - recording: h1_duels1158
+      turn: 108
+      value: Granada (31:19, its Encampment 32:21) adds the Warrior 1179655 it trained on 32:21 (UnitAddedToMap); city-state 3's knowledge base records it there at age 0
     - recording: 1112
       turn: 213
       value: "Records: 1112 China's Mechanized Infantry   made at sea at t213 (an upgrade, xp 0) left the centres at 80 until the   corps upgraded on land at t216 read 95."
     - recording: 1106
       turn: 243
       value: "it also   clears 1106 t243's Giant Death Robot, 80 checks, which was trained on land   and raised nothing — 0x4bffa0's row test, unnamed, a LAB line)."
-  impl: [cpu/core/units.ts:spawnUnit]
+  impl:
+    - cpu/core/units.ts:spawnUnit
+    - cpu/core/units.ts:cityUnitPlot
+    - gpu/core/sim_minors.py:_city_unit_plot
   readings:
+    - "C-99 / C-134: a city's new unit on its district, a centre's sea at its claim — READ (0x1e6570 at 0x1e66f9..0x1e6938, 0x24b370, 0x1ad720, 0x1aeff0, 0x66a90), both twins"
     - "H-1: the best melee, the drought's turns, the Trader's sea, the harvest's lump, the district discount — READ"
     - "C-96: the knowledge base's army records and the Combat Desire — READ (the records, the update, the desire), PARTLY READ (the signals' looks; the standing-army count in its own section below)"
     - "Units made, kept progress and the culture banks from the game's memory — READ (0x4c1a30, 0x4bed20, 0x4f2fc0, 0x3939b0, 0x3a1fb0), both twins; the importer reads them"

@@ -239,6 +239,7 @@
   readings:
     - "C-111: a major's district lets go of the queue under a hostile unit, the queue's progress and overflow read from the city's memory — READ (0x184660 at 0x1847dc, 0x5313f0, 0x17f630), both twins"
     - "H-4: a wonder under a hostile unit, the economy before the luxury rebuild, the extraction a pillage and a centre change — READ, both twins"
+    - "C-99 / C-134: a city's new unit on its district, a centre's sea at its claim — READ (0x1e6570 at 0x1e66f9..0x1e6938, 0x24b370, 0x1ad720, 0x1aeff0, 0x66a90), both twins"
   review: reviewed
 - addr: 0x531510
   final: 0x379000

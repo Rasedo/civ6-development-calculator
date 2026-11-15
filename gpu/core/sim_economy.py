@@ -3212,7 +3212,8 @@ class SimEconomy:
         B, C = self.B, self.RC
         ctr = self.city_center[:, row].clamp(min=0)  # [B, C]
         nb = self.neigh[ctr]  # [B, C, 6]
-        out = ((nb >= 0) & self.wpass.gather(1, nb.clamp(min=0).reshape(B, -1)).reshape(B, C, 6)).any(dim=2)
+        # `cityNavalCapable`: a neighbour the sea took is no water to the centre
+        out = ((nb >= 0) & (self.wpass & ~self.tile_submerged).gather(1, nb.clamp(min=0).reshape(B, -1)).reshape(B, C, 6)).any(dim=2)
         if self._harbor_idx >= 0:
             hb = self.city_dist_tile[:, row, :, self._harbor_idx]
             out = out | ((hb >= 0) & self.district_complete.gather(1, hb.clamp(min=0)))

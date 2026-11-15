@@ -77,9 +77,12 @@
   final: 0x131a10
   kind: function
   name: the city trains a domain
-  semantics: "the city trains a domain (city, domain): a complete district of the domain (0x1aed10); land (2) always; the sea (0) where the centre's plot (vt +0x40) holds bit 1 of its domain mask (the plot info's word +0x14, 0x81230), which the claim's 0x66a90 sets on a city's plot that IsCoastalLand(plot, 1) (0x82a10: a passable water neighbour of an area of at least one plot; a lake counts, a river does not)."
+  semantics: "the city trains a domain (city, domain): a complete district of the domain (0x1aed10); land (2) always; the sea (0) where the centre's plot (vt +0x40) holds bit 1 of its domain mask (the plot info's word +0x14, 0x81230), which the claim's 0x66a90 sets on a city's plot that IsCoastalLand(plot, 1) (0x82a10: a passable water neighbour of an area of at least one plot; a lake counts, a river does not). A neighbour the sea takes later writes no centre's mask again (the drowning's 0xa3b000 / 0xa3ac70 write the drowned plot's own)."
   status: READ
   cases:
+    - recording: h1_duels1156
+      turn: 231
+      value: "Valletta on 4:12, its neighbour 3:13 drowned at t231 (Coast): no Naval Superiority until its Harbor on 3:13 completes, t244; runs/h1_duels1191 Chinguetti on 15:19, 15:20 drowned at t240: none to t250"
     - recording: h1_duels1132
       turn: 2
       value: Babylon (20:20, beside the one-plot lake 20:19) and Lahore (42:15, beside a five-plot lake) start Naval Superiority on t2, their targets the sea plots 21:22 and 41:13
@@ -95,6 +98,7 @@
     - cpu/core/minorCityAi.ts:minorPlotEvals
     - cpu/core/aiViewTypes.ts:AiView
     - cpu/core/minorCityAi.ts:minorBestPlotToBuy
+    - cpu/core/units.ts:cityNavalCapable
   readings:
     - "C-99: a unit bought in the turn sits out the operations, a Harbor trains ships"
     - "C-97: the operations — the manager and its candidates READ, the staging list and City Defense's start unread"
@@ -103,6 +107,7 @@
     - "C-96 / C-98 / C-100 / C-99: the city AI's fitted rules read — the analysis before the job list, the unit term's upgrade price, the city's trained domains, a non-major's required power, the eruption's turns — READ (0x608870 at 0x608976..0x608988, 0x7b3e50 at 0x7b4564..0x7b45c8, 0x5376d0, 0x1c77c0, 0x1aed10, 0x1f0440 at 0x1f04c7..0x1f04dc, 0xa1d480), both twins"
     - "C-95 / C-99: a cleared camp's scout still reports; a lake city trains ships; IsCoastalTarget; the recruit's priority; a candidate's own strength — READ (0x153ef0, 0x1485c0, 0x1c77c0 -> 0x82a10, 0x73a440 -> 0x73a880, 0x81c820 at 0x81cacf..0x81cb14, 0x7d1e40 at 0x7d2004..0x7d205f, 0x5cced0 at 0x5cd0c1..0x5cd11e, 0x7f5240), both twins"
     - "C-95 / C-99: a cleared camp's scout still reports; a lake city trains ships; IsCoastalTarget; the recruit's priority; a candidate's own strength — READ (0x153ef0, 0x1485c0, 0x1488a0 at 0x148c38..0x148c64, 0x1c77c0 -> 0x82a10, 0x73a440 -> 0x73a880, 0x81c820 at 0x81cacf..0x81cb14, 0x7d1e40 at 0x7d2004..0x7d205f, 0x5cced0 at 0x5cd0c1..0x5cd11e, 0x7f5240), both twins"
+    - "C-99 / C-134: a city's new unit on its district, a centre's sea at its claim — READ (0x1e6570 at 0x1e66f9..0x1e6938, 0x24b370, 0x1ad720, 0x1aeff0, 0x66a90), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...score's whole part << 8 (0x6fe2b0); NAVAL_SUPERIORITY — of the player's coastal cities (0x1c77c0) the most populous (+0x588, strictly, the first of equals) whose ring walk within 4 h..."

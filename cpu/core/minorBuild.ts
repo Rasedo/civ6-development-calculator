@@ -53,7 +53,7 @@ import { centerBuildingIds } from './prodLayout';
 import { cityLowlands, coastalLowlandCounts, floodBarrierCost, repairBehindBarrier } from './climate';
 import { minorTrade, minorTradePick, tradeCapacity, tradeGraphTurn } from './trade';
 import { BARB_SEAT, FREE_SEAT, atWarWithMajor, civsAtWar, denounceActive, freeSeatOf, hiddenResourcesFor, isCiv, majorityReligionOf, majorsAlive, seatOf, tileSeat } from './seats';
-import { builderCost, cityNavalCapable, disbandUnit, holdGarrison, raiseBestTrained, spawnUnit, traderCost, unitFullMoves, unitIsMilitary, unitMadeAnew, upgradeAnew } from './units';
+import { builderCost, cityNavalCapable, cityUnitPlot, disbandUnit, holdGarrison, raiseBestTrained, spawnUnit, traderCost, unitFullMoves, unitIsMilitary, unitMadeAnew, upgradeAnew } from './units';
 import { irradiated } from './nuclear';
 import { atRngPoint } from './rand';
 import { dangerPlane, knowledgeLook, seatPoolSlots } from './tactical';
@@ -970,7 +970,8 @@ export function minorUnitPrice(state: GameState, cityState: CityState, id: strin
 }
 
 /** THE MINOR BUYS A UNIT in its city: the purse covers the price, the unit
- *  stands on or beside the centre (none bought with no free tile) and carries
+ *  stands on or beside the centre or its district (`cityUnitPlot`; none
+ *  bought with no free tile) and carries
  *  the city's training grants and its strategic cost (the purchase 0xa540c0:
  *  the queue's charge 0x17c2e0 through ChangeResourceAmount, the stock held
  *  at 0; runs/h1_duelq1121 Hunza's Horseman bought at t42, its Horses 25 ->
@@ -979,7 +980,7 @@ export function minorUnitPrice(state: GameState, cityState: CityState, id: strin
 export function minorBuyUnit(state: GameState, cityState: CityState, id: string, currency: 'gold' | 'faith'): Unit | undefined {
   const price = minorUnitPrice(state, cityState, id, currency);
   if (!goldAffordable(currency === 'gold' ? cityState.treasury : cityState.faith, price)) return undefined;
-  const u = spawnUnit(state, id, cityState.centerIndex, cityState.seat);
+  const u = spawnUnit(state, id, cityUnitPlot(state, minorCity(cityState), id), cityState.seat);
   if (!u) return undefined;
   // a unit bought stands its turn out at Movement 0 (runs/h1_duely1127 t30:
   // Muscat's Builder bought onto its centre 42:15 lays 43:15's Farm at t31;
@@ -2401,8 +2402,9 @@ export function projectGreatPersonPoints(project: string, pct: number): { cls: s
   }));
 }
 
-/** THE MINOR'S ITEM COMPLETES: the unit stands on the centre, beside the
- *  minor's own units there (`spawnUnit`'s 'stack'), with the city's training
+/** THE MINOR'S ITEM COMPLETES: the unit stands on the centre or its
+ *  district (`cityUnitPlot`), beside the minor's own units there
+ *  (`spawnUnit`'s 'stack'), with the city's training
  *  grants (none where no plot takes it: the item waits), the
  *  building rises, the district is laid, the project or the repair lands —
  *  a district project's Great Person points into the minor's store
@@ -2412,7 +2414,7 @@ function minorFinish(state: GameState, cityState: CityState, item: Exclude<Minor
   const city = minorCity(cityState);
   let built = -1;
   if ('unit' in item) {
-    const unit = spawnUnit(state, item.unit, cityState.centerIndex, cityState.seat, 'stack');
+    const unit = spawnUnit(state, item.unit, cityUnitPlot(state, city, item.unit), cityState.seat, 'stack');
     if (!unit) return false;
     built = unit.id;
     applyTrainingGrants(state, minorCity(cityState), unit);
@@ -2635,11 +2637,11 @@ function freeItemCost(state: GameState, city: City, q: QueueItem): number {
   return Infinity;
 }
 
-/** a Free City's item completes: its unit on the centre, beside the Free
- *  Cities' own units there (`spawnUnit`'s 'stack'); false where no plot
- *  takes it */
+/** a Free City's item completes: its unit on the centre or its district
+ *  (`cityUnitPlot`), beside the Free Cities' own units there
+ *  (`spawnUnit`'s 'stack'); false where no plot takes it */
 function freeFinish(state: GameState, city: City, q: QueueItem): boolean {
-  if (q.kind === 'unit') return !!spawnUnit(state, q.unit, city.centerIndex, FREE_SEAT, 'stack');
+  if (q.kind === 'unit') return !!spawnUnit(state, q.unit, cityUnitPlot(state, city, q.unit), FREE_SEAT, 'stack');
   if (q.kind === 'building') {
     city.buildings.push(q.building);
     if (BUILDINGS[q.building].walls) {
