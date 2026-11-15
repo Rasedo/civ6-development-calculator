@@ -16,11 +16,16 @@ _AI_DEFENDER = 4
 _WANDER_CAMP_RANGE = 5
 _DEFEND_CAMP_TURNS = 3
 _PLAN_TURNS = 2
-# an open node's key: its key cost (+0x18), then its cost past it (a turn-end
-# node's Movement left, `_tac_search`), then its order among equals
+# an open node's key: its key cost (+0x18), then its level among its key
+# cost's nodes (a re-keyed node past a turn-end node of its key, `_tac_search`'s
+# `rekey_level`), then its cost past the key cost (a turn-end node's Movement
+# left), then its order among equals
 _KEY_SHIFT = 1 << 30
-_SUB_SHIFT = 1 << 18
-_TIE_OFF = 1 << 17
+_LVL_SHIFT = 1 << 28
+_LVL_MAX = 3
+_SUB_SHIFT = 1 << 16
+_SUB_SIZE = 1 << 12
+_TIE_OFF = 1 << 15
 _KEY_NONE = 1 << 62
 # BARBARIAN_DEFENSE_ALL_UNITS / BARBARIAN_DEFENSE_RANGED_UNITS (GlobalParameters)
 _BARB_DEFENSE_ALL = 4
@@ -671,12 +676,15 @@ class SimTactics:
                     strike: bool = False) -> dict:
         """THE PATHFINDER (`search`) for the units at local `slots` of pool
         `pre` in the games `rows` [N]: Dijkstra from each unit's plot over
-        the open nodes by (key, cost, tie) — every search but the planning's
+        the open nodes in the open list's own order (`search`: the key cost,
+        the level, the cost past the key cost, the tie) — every search but
+        the planning's
         opens a turn-end node beside each new node with Movement left
         (`search`); a
         node inserted where its key lies
         nearer the cheapest open node goes before its equals, else after them;
-        a node made cheaper goes after its new equals, a closed one re-prices
+        a node made cheaper goes after the last node of a key cost at or
+        below its own (`rekey_level`), a closed one re-prices
         its children from it (UpdateParents, `update_parents`); each closed node links
         its neighbours in DirectionTypes order. A land unit whose player may
         embark it takes water too, a turn starting on the Movement of the
@@ -1191,6 +1199,27 @@ class SimTactics:
             gn = bg + cst * 1000 + (ends + 2 + unrev_c + wet) * _FIX
             return nb, nbc, a6, turns, moves, gn, cliff6, bt, carry6, wet6, unrev6
 
+        # a node of the open list stands past a turn-end node of its key cost
+        lvl_any = False
+
+        def rekey_level(f: torch.Tensor, m: torch.Tensor) -> torch.Tensor:
+            """UpdateOpenNode's place (0x79560, `search`'s `reparent`) for an
+            open node re-keyed to the key cost `f` where `m`: it walks
+            headward by the key cost alone and stands after the last node of
+            a key cost at or below its own — after a turn-end node of its
+            key cost too, whose cost is above its own. Its level: the
+            highest its key cost's open nodes hold, one more where a
+            turn-end node stands at that level."""
+            nonlocal lvl_any
+            grp = (torch.div(key, _KEY_SHIFT, rounding_mode="floor") == f.unsqueeze(1)) & m.unsqueeze(1)
+            lv_all = torch.div(key, _LVL_SHIFT, rounding_mode="floor") % (_LVL_MAX + 1)
+            sb_all = torch.div(key, _SUB_SHIFT, rounding_mode="floor") % _SUB_SIZE
+            top = torch.where(grp, lv_all, -1).max(dim=1).values
+            te = (grp & (lv_all == top.unsqueeze(1)) & (sb_all > 0)).any(dim=1)
+            lv = (top.clamp(min=0) + te.long()).clamp(max=_LVL_MAX)
+            lvl_any = lvl_any or bool(lv.count_nonzero())
+            return lv
+
         def update_parents(rm: torch.Tensor, node: torch.Tensor, seq: torch.Tensor, lo: torch.Tensor) -> tuple:
             """UpdateParents (0x79660, `search`) from each row's re-parented
             closed `node` where `rm`: a stack of nodes, each one's links (its
@@ -1226,6 +1255,8 @@ class SimTactics:
                     op = bet & (st[ar, k] == 1)
                     seq = seq + op.long()
                     nk = gn[:, j] * _KEY_SHIFT + seq + _TIE_OFF
+                    if pays_stack and bool(op.count_nonzero()):
+                        nk = nk + rekey_level(gn[:, j], op) * _LVL_SHIFT
                     tie[ar, k] = torch.where(op, seq, tie[ar, k])
                     key[ar, k] = torch.where(op, nk, key[ar, k])
                     lo = torch.where(op, torch.minimum(lo, nk), lo)
@@ -1337,15 +1368,16 @@ class SimTactics:
                 # a move order's danger flags (0x2720a0 at 0x272590..
                 # 0x272612): from a node of the path's first turn, under flag
                 # 8 no child of danger, under flag 0x8000 no water child of it;
-                # under flag 2 (at 0x2724c8) no child on the ground of a
-                # player at war with the unit's
+                # under flag 2 (at 0x2724c8, the owner read at 0x27220d from
+                # the parent's plot) no link from a parent on the ground of a
+                # player at war with the unit's, the unit's own plot included
                 d_pl, d_any, d_wat, d_war = danger
                 hot = (d_pl.gather(1, nbc) > 0) & (d_any.unsqueeze(1) | (d_wat.unsqueeze(1) & water_n.gather(1, nbc)))
                 ok = ok & ~(hot & (bt <= 1))
                 if bool(d_war.any()):
                     own_t = self.tile_seat[rows]
                     war_t = (own_t >= 0) & (own_t != seat) & self._seats_hostile(seat, self.tile_seat)[rows]
-                    ok = ok & ~(war_t.gather(1, nbc) & d_war.unsqueeze(1))
+                    ok = ok & ~(war_t.gather(1, b1) & d_war.unsqueeze(1))
             if link is not None:
                 link(nbc, best, turns, moves, ok)
             linked6[ar, bn] = torch.where(act.unsqueeze(1), ok, linked6[ar, bn])
@@ -1366,22 +1398,45 @@ class SimTactics:
                 # planning's opens a turn-end node beside each new node with
                 # Movement left: the links land one by one, each closed one
                 # re-parented then walked
-                sub = _KEY_SHIFT // _SUB_SHIFT
-
-                def place(fm: torch.Tensor, f: torch.Tensor, m: torch.Tensor) -> torch.Tensor:
-                    """AddToOpen's place (0x775a0) for a key (key cost `f`,
-                    `fm` with the cost past it) where `m`: its tie, 0 below
-                    the cheapest or above the dearest, else before its
-                    equals nearer the cheapest's key cost (or as near),
-                    after them nearer the dearest's"""
+                def place(f: torch.Tensor, mj: torch.Tensor, m: torch.Tensor) -> tuple:
+                    """AddToOpen's place (0x775a0) for a node of key cost `f`
+                    whose cost stands `mj` past it (a turn-end node's
+                    Movement left, else 0) where `m`: its tie and its level.
+                    Strictly below the cheapest or above the dearest by (key
+                    cost, cost) it goes first or last, tie 0; else nearer
+                    the cheapest's key cost (or as near) the walk from the
+                    head puts it before the first node at or above it,
+                    nearer the dearest's the walk from the tail after the
+                    last node at or below it. Where a re-keyed node stands
+                    past a turn-end node (`lvl_any`) a key cost's nodes are
+                    not in their costs' order, and the walks stop on the
+                    nodes as they stand: from the head a node of the key
+                    cost alone goes first (level 0), a turn-end node to the
+                    lowest level holding a turn-end node at or above its
+                    cost, else the highest; from the tail to the highest
+                    level holding a node at or below its cost."""
                     nonlocal seq
                     lo_f = torch.div(lo, _KEY_SHIFT, rounding_mode="floor")
                     hi_f = torch.div(hi, _KEY_SHIFT, rounding_mode="floor")
-                    inr = m & (lo < NONE) & (fm >= torch.div(lo, _SUB_SHIFT, rounding_mode="floor")) \
-                        & (fm <= torch.div(hi, _SUB_SHIFT, rounding_mode="floor"))
-                    head = (f - lo_f).abs() <= (f - hi_f).abs()
+                    lo_s = torch.div(lo, _SUB_SHIFT, rounding_mode="floor") % _SUB_SIZE
+                    hi_s = torch.div(hi, _SUB_SHIFT, rounding_mode="floor") % _SUB_SIZE
+                    below = (f < lo_f) | ((f == lo_f) & (mj < lo_s))
+                    above = (f > hi_f) | ((f == hi_f) & (mj > hi_s))
+                    inr = m & (lo < NONE) & ~below & ~above
+                    head = below | (~above & ((f - lo_f).abs() <= (f - hi_f).abs()))
                     seq = seq + inr.long()
-                    return torch.where(inr, torch.where(head, -seq, seq), 0)
+                    t = torch.where(inr, torch.where(head, -seq, seq), 0)
+                    if not lvl_any:
+                        return t, torch.zeros_like(t)
+                    grp = (torch.div(key, _KEY_SHIFT, rounding_mode="floor") == f.unsqueeze(1)) & m.unsqueeze(1)
+                    lv_all = torch.div(key, _LVL_SHIFT, rounding_mode="floor") % (_LVL_MAX + 1)
+                    sb_all = torch.div(key, _SUB_SHIFT, rounding_mode="floor") % _SUB_SIZE
+                    mj1 = mj.unsqueeze(1)
+                    lv_ge = torch.where(grp & (sb_all > 0) & (sb_all >= mj1), lv_all, _LVL_MAX + 1).min(dim=1).values
+                    lv_top = torch.where(grp, lv_all, -1).max(dim=1).values.clamp(min=0)
+                    lv_h = torch.where(mj > 0, torch.where(lv_ge <= _LVL_MAX, lv_ge, lv_top), 0)
+                    lv_t = torch.where(grp & (sb_all <= mj1), lv_all, -1).max(dim=1).values.clamp(min=0)
+                    return t, torch.where(head, lv_h, lv_t)
 
                 for j in range(6):
                     new = new6[:, j]
@@ -1389,10 +1444,13 @@ class SimTactics:
                     cl = cl6[:, j]
                     k = nbc[:, j]
                     gj = gn[:, j]
-                    tnew = place(gj * sub, gj, new)
+                    tnew, lj = place(gj, torch.zeros_like(gj), new)
                     seq += upo.long()
+                    if pays_stack and bool(upo.count_nonzero()):
+                        # an open node re-keyed (UpdateOpenNode 0x79560)
+                        lj = torch.where(upo, rekey_level(gj, upo), lj)
                     tj = torch.where(new, tnew, torch.where(upo, seq, t0[:, j]))
-                    nk = gj * _KEY_SHIFT + tj + _TIE_OFF
+                    nk = gj * _KEY_SHIFT + lj * _LVL_SHIFT + tj + _TIE_OFF
                     ins = new | upo
                     lo = torch.where(ins, torch.minimum(lo, nk), lo)
                     hi = torch.where(new, torch.maximum(hi, nk), hi)
@@ -1416,8 +1474,8 @@ class SimTactics:
                             tw = tw & (k != dest)
                         if bool(tw.count_nonzero()):
                             kt = k + T
-                            tt = place(gj * sub + mj, gj, tw)
-                            nkt = gj * _KEY_SHIFT + mj * _SUB_SHIFT + tt + _TIE_OFF
+                            tt, lt = place(gj, mj, tw)
+                            nkt = gj * _KEY_SHIFT + lt * _LVL_SHIFT + mj * _SUB_SHIFT + tt + _TIE_OFF
                             lo = torch.where(tw, torch.minimum(lo, nkt), lo)
                             hi = torch.where(tw, torch.maximum(hi, nkt), hi)
                             g[ar, kt] = torch.where(tw, gj + mj * 1000, g[ar, kt])
@@ -1756,7 +1814,7 @@ class SimTactics:
         not; with no `explore` (its flag 1) the path leaves no plot the player
         never revealed; with `danger` (the danger map [B, T], the order's
         flag 8 [B], flag 0x8000 [B] and flag 2 [B]) its first turn steps onto
-        no plot of danger, and under flag 2 no step onto the ground of a
+        no plot of danger, and under flag 2 no step leaves the ground of a
         player at war with it; with `scout` (its flag 0x40, HL Explore's
         order) its path prices its steps as Explore Land's (`_tac_search`'s
         reach). In an AI player's pass a unit whose last step

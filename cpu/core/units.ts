@@ -1491,33 +1491,31 @@ export function stepUnit(state: GameState, unit: Unit, to: Tile, formed?: readon
   arrive(state, unit);
   carryAirWith(state, unit, from.index);
   logUnitOrder(state, unit.seat, unit.id, 'move', to.index);
-  // a step off an owned water plot (no shore crossing to the pathfinder) lands
-  // on its land pool: its Movement capped at the land full before the step is
-  // paid (runs/h1_duelz1117 t160 city-state 2's Line Infantry 1179654 off its
+  // a member's placement that changes its embarked state caps its Movement
+  // at its GetMaxMoves in the new state (the placement 0x586d40 at
+  // 0x58741c..0x587486: SetEmbarked 0x5706e0, then Rules::Placement's
+  // 0x531ef0 takes the excess off by ChangeMoves), before the walk's step
+  // pays its cost (0x26fe20: the placement at 0x270444, the payment
+  // 0x265d80 at 0x270776), at every shore, owned water or not
+  // (runs/h1_duelz1117 t160 city-state 2's Line Infantry 1179654 off its
   // Harbor water 14:7 to 15:8, one step more to 15:9, as logged)
-  if (transition && isWater(from) && !shoreCrossing(unit.type, from, to)) unit.movesLeft = Math.min(unit.movesLeft, unitFullMoves(state, unit));
+  if (transition) unit.movesLeft = Math.min(unit.movesLeft, unitFullMoves(state, unit));
   unit.movesLeft = Math.max(0, unit.movesLeft - cost);
   grantFeatureAbilities(state, unit);
   // the NEW mode's pool becomes the granted pool every later afford this
-  // turn reads; a shore crossing's transfer caps what carries over at it
-  // (the pathfinder's `carry`), a step off an owned water plot capped above
-  if (transition) {
-    const modeFull = unitFullMoves(state, unit);
-    if (shoreCrossing(unit.type, from, to)) unit.movesLeft = Math.min(unit.movesLeft, modeFull);
-    unit.movesFull = modeFull;
-  }
+  // turn reads
+  if (transition) unit.movesFull = unitFullMoves(state, unit);
   for (const rider of riders) {
     const rTrans = !UNITS[rider.type]?.naval && !waterWalks(rider.type)
       && isWater(from) !== isWater(to);
     if (rTrans) rider.embarked = isWater(to);
     rider.tileIndex = to.index;
     arrive(state, rider);
-    if (!riderFree) rider.movesLeft = Math.max(0, rider.movesLeft - cost);
     if (rTrans) {
-      const rModeFull = unitFullMoves(state, rider);
-      if (shoreCrossing(rider.type, from, to)) rider.movesLeft = Math.min(rider.movesLeft, rModeFull);
-      rider.movesFull = rModeFull;
+      rider.movesFull = unitFullMoves(state, rider);
+      rider.movesLeft = Math.min(rider.movesLeft, rider.movesFull);
     }
+    if (!riderFree) rider.movesLeft = Math.max(0, rider.movesLeft - cost);
   }
   unit.attacksLeft = stepAttacksLeft(unit);
   // CIV6 (Combat): an Encampment emptied of its garrison is not walk-over

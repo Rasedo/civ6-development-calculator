@@ -183,6 +183,15 @@
   context:
     - ...nothing), x1.5 if favored ([+0x268], the leader's Civics lists' AiFavoredItems; 1.5 at 0xd2f32c).
   review: reviewed
+- addr: 0xd503b0
+  kind: global
+  status: PARTLY
+  readings:
+    - "C-133 / C-128: flag 2's parent plot, the open list as the list itself, the embarked state's Movement cap, the zone's improvement test — READ (0x2720a0 at 0x27220d / 0x2724c8, 0x775a0, 0x79560, 0x586d40 at 0x587042..0x5870aa / 0x58741c..0x587486, 0x5706e0, 0x531ef0, 0x26fe20 at 0x270444 / 0x270776, 0x270be0, 0x52f970), both twins"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...1fdd6), then Rules::Placement's vt +0x68 (0x531ef0; the instance 0x533260, its vtable 0xd503b0): the unit's Movement (+0xdb0) above its GetMaxMoves (0x56e130 << 8) in the new state i..."
+  review: imported
 - addr: 0xd55ff0
   kind: global
   semantics: "0.05f: the Combat Desire's step (Enemy - Regional) below the enemy's strength."
@@ -748,6 +757,15 @@
   context:
     - "- THE TRANSFER (0x93fa10, the unit manager's vtable +0x80 at 0xd92c18; the levy's return 0x4502b0 calls it with the 5th argument 1): the old unit is destro..."
   review: reviewed
+- addr: 0xd92ca8
+  kind: global
+  status: PARTLY
+  readings:
+    - "C-133 / C-128: flag 2's parent plot, the open list as the list itself, the embarked state's Movement cap, the zone's improvement test — READ (0x2720a0 at 0x27220d / 0x2724c8, 0x775a0, 0x79560, 0x586d40 at 0x587042..0x5870aa / 0x58741c..0x587486, 0x5706e0, 0x531ef0, 0x26fe20 at 0x270444 / 0x270776, 0x270be0, 0x52f970), both twins"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...at 0x4eee52, 0x941240 at 0x9416b7 and the unit manager's virtual 0x941b50 (vtable slot 0xd92ca8) — and by the formation's reset 0x266a60. OPEN: which of these runs between a player's..."
+  review: imported
 - addr: 0xd95490
   kind: global
   status: PARTLY

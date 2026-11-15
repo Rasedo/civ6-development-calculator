@@ -65,3 +65,12 @@
   context:
     - "...rn 0x4502b0 calls it with the 5th argument 1): the old unit is destroyed (vtable +0x60, 0x941130), a new one of the new owner made off the map (vtable +0x48), then placed at the old pl..."
   review: reviewed
+- addr: 0x941240
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-133 / C-128: flag 2's parent plot, the open list as the list itself, the embarked state's Movement cap, the zone's improvement test — READ (0x2720a0 at 0x27220d / 0x2724c8, 0x775a0, 0x79560, 0x586d40 at 0x587042..0x5870aa / 0x58741c..0x587486, 0x5706e0, 0x531ef0, 0x26fe20 at 0x270444 / 0x270776, 0x270be0, 0x52f970), both twins"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...2673f0 alone — DoTurn 0x4e4560 at 0x4e49d3, the unit's allocation 0x4eeb70 at 0x4eee52, 0x941240 at 0x9416b7 and the unit manager's virtual 0x941b50 (vtable slot 0xd92ca8) — and by the..."
+  review: imported

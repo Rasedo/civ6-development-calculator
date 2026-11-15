@@ -1,0 +1,34 @@
+# The DLL atlas, curated layer (tools/civ6lab/atlas.py documents the record).
+# Records keyed by GameCore_XP2_Release.dll RVA; `final` the FinalRelease RVA.
+# `review: imported` = bootstrapped from dll_readings.md / code comments / saved
+# labels and not yet reviewed: verify against the disassembly, then edit and
+# set `review: reviewed`.
+- addr: 0x531ef0
+  final: 0x379960
+  kind: function
+  name: the embarked state's Movement cap
+  semantics: "Rules::Placement's vt +0x68 (the instance 0x533260, vtable 0xd503b0), called by the placement 0x586d40 at 0x587486 after SetEmbarked 0x5706e0: the unit's Movement (+0xdb0) above its GetMaxMoves (0x56e130 << 8) in the new state is taken off by ChangeMoves (0x56cc70). The walk's step 0x26fe20 places its members (0x587ca0 at 0x270444) before it pays the step (0x265d80 at 0x270776), so the cap comes before the cost, at every shore."
+  status: READ
+  cases:
+    - recording: h1_duelz1117
+      turn: 160
+      value: city-state 2's Line Infantry 1179654 off its Harbor water 14:7 to 15:8 takes one step more to 15:9, as logged (t201 alike)
+    - recording: h1_duelq1117
+      turn: 201
+      value: "the cap before the cost at every shore: the one-seed aimem traces of the five duelq recordings hold every row of the measure at the base"
+  impl: [cpu/core/units.ts:stepUnit, gpu/core/sim_seats.py:_step_verb]
+  readings:
+    - "C-133 / C-128: flag 2's parent plot, the open list as the list itself, the embarked state's Movement cap, the zone's improvement test — READ (0x2720a0 at 0x27220d / 0x2724c8, 0x775a0, 0x79560, 0x586d40 at 0x587042..0x5870aa / 0x58741c..0x587486, 0x5706e0, 0x531ef0, 0x26fe20 at 0x270444 / 0x270776, 0x270be0, 0x52f970), both twins"
+  context:
+    - ...x2724c8, 0x775a0, 0x79560, 0x586d40 at 0x587042..0x5870aa / 0x58741c..0x587486, 0x5706e0, 0x531ef0, 0x26fe20 at 0x270444 / 0x270776, 0x270be0, 0x52f970), both twins
+    - "...bool +0x658, its value +0x6b0, the event 0x84c1fdd6), then Rules::Placement's vt +0x68 (0x531ef0; the instance 0x533260, its vtable 0xd503b0): the unit's Movement (+0xdb0) above its Ge..."
+  review: reviewed
+- addr: 0x533260
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-133 / C-128: flag 2's parent plot, the open list as the list itself, the embarked state's Movement cap, the zone's improvement test — READ (0x2720a0 at 0x27220d / 0x2724c8, 0x775a0, 0x79560, 0x586d40 at 0x587042..0x5870aa / 0x58741c..0x587486, 0x5706e0, 0x531ef0, 0x26fe20 at 0x270444 / 0x270776, 0x270be0, 0x52f970), both twins"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...+0x6b0, the event 0x84c1fdd6), then Rules::Placement's vt +0x68 (0x531ef0; the instance 0x533260, its vtable 0xd503b0): the unit's Movement (+0xdb0) above its GetMaxMoves (0x56e130 <..."
+  review: imported

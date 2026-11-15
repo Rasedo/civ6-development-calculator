@@ -59,9 +59,6 @@ export interface Reach {
 interface PNode {
   tile: number;
   g: number;
-  /** the order among equal costs: below 0 put before its equals, above 0
-   *  after them, 0 alone */
-  tie: number;
   moves: number;
   turns: number;
   /** the Movement a shore crossing onto this plot carried past the new
@@ -577,11 +574,12 @@ function domainPool(state: GameState, unit: Unit, sea: boolean): number {
 /**
  * THE PATHFINDER (Pathfinder_Instance 0x77d10, its step 0x793f0): Dijkstra
  * from the unit's plot — no heuristic (the pool's default, 0x26f330) — over
- * the open nodes by (key, cost, tie) — every search but the planning's
- * opens a turn-end node beside each node with Movement left — : a node
- * inserted where its key lies nearer
- * the cheapest open node goes before its equals, else after them (0x775a0),
- * a node made cheaper goes after its new equals (0x79560), a closed one made
+ * the open list, the list itself in its order — every search but the
+ * planning's opens a turn-end node beside each node with Movement left — :
+ * a node inserted where its key lies nearer the head walks from the head to
+ * the first node not below it by (key, cost), else from the tail to the
+ * first not above it (0x775a0), a node made cheaper walks headward by its
+ * key alone (0x79560), a closed one made
  * cheaper re-prices its children from it (UpdateParents 0x79660); each closed
  * node links its neighbours in DirectionTypes order (0xeff730). A step's turns and
  * Movement (0x26e920): a node reached with no Movement starts the next turn
@@ -611,8 +609,8 @@ type ReachSearch = 'planning' | 'danger' | 'explore' | 'patrol';
 
 /** a move order's danger flags over the player's danger map (`dangerPlane`):
  *  `any` its flag 8, every plot of danger; `water` its flag 0x8000, a water
- *  plot of danger; `war` its flag 2, the ground of a player at war with the
- *  unit's */
+ *  plot of danger; `war` its flag 2, no step off the ground of a player at
+ *  war with the unit's */
 export interface PathDanger {
   plane: ArrayLike<number>;
   any: boolean;
@@ -684,7 +682,7 @@ function search(state: GameState, unit: Unit, maxTurns: number, zoc: boolean, on
   const planningSearch = !zoc && !standToAttack;
   const fortAtWar = (t: Tile): boolean => planningSearch && garrisonDistrict(state, t) && tileSeat(t) !== NO_SEAT
     && unitsHostile(state, unit, { seat: tileSeat(t) });
-  const start: PNode = { tile: unit.tileIndex, g: 0, tie: 0,
+  const start: PNode = { tile: unit.tileIndex, g: 0,
     // (the danger map's search alike: runs/h1_duelq1127 t249, the barbarian
     // Musketman on player 1's unbuilt Encampment 13:2 lays nothing about it)
     moves: fortAtWar(map.tiles[unit.tileIndex]) || (standToAttack && districtAttack(map.tiles[unit.tileIndex])) ? 0 : Math.floor(startMoves * FIX / MP_SCALE),
@@ -692,45 +690,47 @@ function search(state: GameState, unit: Unit, maxTurns: number, zoc: boolean, on
   nodes.set(start.tile, start);
   // the start is priced too, linked from itself
   onLink?.(start.tile, start.tile, start.turns, start.moves, false);
-  // the open nodes, no two of one key; the cheapest and the dearest
+  // the open list itself (the pathfinder's +0xf0 head, +0xf8 tail), in its
+  // order: by key (+0x18), a key's nodes as the walks below leave them
   const open: PNode[] = [start];
-  let lo: PNode | null = null;
-  let hi: PNode | null = null;
-  let seq = 0;
-  // the open list's order: its key (+0x18), then its cost (+0x1c), then its
-  // place among equals
   const kf = (a: PNode) => a.f ?? a.g;
+  // strictly below by its key (+0x18), then its cost (+0x1c)
   const below = (a: PNode, b: PNode) => kf(a) < kf(b) || (kf(a) === kf(b) && a.g < b.g);
-  const before = (a: PNode, b: PNode) => below(a, b) || (kf(a) === kf(b) && a.g === b.g && a.tie < b.tie);
-  // AddToOpen (0x775a0): below the cheapest first, above the dearest last;
-  // else by its key's distance to theirs, nearer the cheapest (or as near)
-  // before its equals, nearer the dearest after them
+  // AddToOpen (0x775a0): strictly below the head first, strictly above the
+  // tail last; else by its key's distance to theirs: nearer the head (or as
+  // near) the walk from the head passes every node strictly below it and
+  // puts it before the first that is not, nearer the tail the walk from the
+  // tail passes every node strictly above it and puts it after the first
+  // that is not
   const addOpen = (n: PNode) => {
-    if (lo && hi && !below(n, lo) && !below(hi, n)) n.tie = Math.abs(kf(n) - kf(lo)) <= Math.abs(kf(n) - kf(hi)) ? -++seq : ++seq;
-    open.push(n);
-    if (!lo || before(n, lo)) lo = n;
-    if (!hi || before(hi, n)) hi = n;
+    const head = open[0];
+    const tail = open[open.length - 1];
+    if (!open.length) {
+      open.push(n);
+      return;
+    }
+    if (below(n, head)) {
+      open.unshift(n);
+      return;
+    }
+    if (below(tail, n)) {
+      open.push(n);
+      return;
+    }
+    if (Math.abs(kf(n) - kf(head)) <= Math.abs(kf(n) - kf(tail))) {
+      let i = 0;
+      while (i < open.length && below(open[i], n)) i += 1;
+      open.splice(i, 0, n);
+    } else {
+      let i = open.length - 1;
+      while (i >= 0 && below(n, open[i])) i -= 1;
+      open.splice(i + 1, 0, n);
+    }
   };
   for (;;) {
-    if (!open.length) break;
-    // the cheapest node, and the cheapest once it is out
-    let bi = 0;
-    let si = -1;
-    for (let i = 1; i < open.length; i++) {
-      if (before(open[i], open[bi])) {
-        si = bi;
-        bi = i;
-      } else if (si < 0 || before(open[i], open[si])) si = i;
-    }
-    const best = open[bi];
-    lo = si >= 0 ? open[si] : null;
-    open[bi] = open[open.length - 1];
-    open.pop();
-    if (!open.length) hi = null;
-    else if (hi === null || hi === best) {
-      hi = open[0];
-      for (const o of open) if (before(hi, o)) hi = o;
-    }
+    // the head is the node the step takes
+    const best = open.shift();
+    if (!best) break;
     best.closed = true;
     // a turn-end node lists nothing (the reach lists take a plot once,
     // 0x791270) and is no path's destination
@@ -846,9 +846,12 @@ function search(state: GameState, unit: Unit, maxTurns: number, zoc: boolean, on
       // 0x272590..0x272612): from a node of the path's first turn, under
       // flag 8 no child of danger (the player's danger map 0x716a90 above
       // 0), under flag 0x8000 no water child of danger; under flag 2 (at
-      // 0x2724c8) no child on the ground of a player at war with the unit's
+      // 0x2724c8, the owner read at 0x27220d from the parent's plot) no link
+      // from a parent on the ground of a player at war with the unit's, the
+      // unit's own plot included: a path enters such ground and goes no
+      // further
       if (danger && best.turns <= 1 && danger.plane[to.index] > 0 && (danger.any || (danger.water && isWater(to)))) continue;
-      if (danger?.war && tileSeat(to) !== NO_SEAT && tileSeat(to) !== unit.seat && unitsHostile(state, unit, { seat: tileSeat(to) })) continue;
+      if (danger?.war && tileSeat(from) !== NO_SEAT && tileSeat(from) !== unit.seat && unitsHostile(state, unit, { seat: tileSeat(from) })) continue;
       const s = price(best, to, di, attack, blind);
       if (s.turns > maxTurns) continue;
       // a move order's attack child (0x2720a0 at 0x272434..0x272544): a
@@ -878,7 +881,7 @@ function search(state: GameState, unit: Unit, maxTurns: number, zoc: boolean, on
       onLink?.(to.index, best.tile, s.turns, s.moves, attack);
       const c = nodes.get(to.index);
       if (!c) {
-        const n: PNode = { tile: to.index, g: s.g, tie: 0, moves: s.moves, turns: s.turns, carry: s.carry, closed: false, parent: best, attack, wet: s.wet };
+        const n: PNode = { tile: to.index, g: s.g, moves: s.moves, turns: s.turns, carry: s.carry, closed: false, parent: best, attack, wet: s.wet };
         nodes.set(n.tile, n);
         (best.kids ??= []).push({ node: n, di });
         addOpen(n);
@@ -901,7 +904,7 @@ function search(state: GameState, unit: Unit, maxTurns: number, zoc: boolean, on
         // (flag 4) opens one on a mountain or a canyon alone, none the unit
         // enters
         if (paysStack && n.moves > 0 && n.tile !== dest) {
-          addOpen({ tile: n.tile, g: n.g + n.moves * 1000, f: n.g, tie: 0, moves: 0, turns: n.turns, carry: n.carry, closed: false, parent: best, wet: n.wet });
+          addOpen({ tile: n.tile, g: n.g + n.moves * 1000, f: n.g, moves: 0, turns: n.turns, carry: n.carry, closed: false, parent: best, wet: n.wet });
         }
         continue;
       }
@@ -1038,11 +1041,16 @@ function search(state: GameState, unit: Unit, maxTurns: number, zoc: boolean, on
     c.wet = s.wet;
     c.parent = p;
     if (c.closed) return;
-    c.tie = ++seq;
-    if (!lo || before(c, lo)) lo = c;
-    if (c === hi) {
-      hi = open[0];
-      for (const o of open) if (before(hi, o)) hi = o;
+    // UpdateOpenNode (0x79560): a node whose key fell below its
+    // predecessor's leaves its place and walks headward past every node of
+    // a greater key — no cost read — to stand after the first of a key at or
+    // below its own, a turn-end node of its key among them; else it stays
+    const at = open.indexOf(c);
+    if (at > 0 && kf(c) < kf(open[at - 1])) {
+      open.splice(at, 1);
+      let i = at - 1;
+      while (i >= 0 && kf(c) < kf(open[i])) i -= 1;
+      open.splice(i + 1, 0, c);
     }
   }
 }
@@ -1145,7 +1153,7 @@ function pathNodes(state: GameState, unit: Unit, dest: number, laterTurns: boole
  *  own stacking unit holds, its first not; with no `explore` (its flag 1) the
  *  path leaves no plot the player never revealed; with `danger` (its flags
  *  8 / 0x8000) its first turn steps onto no plot of danger, (its flag 2)
- *  no step onto the ground of a player at war with it; with `scout` (its
+ *  no step off the ground of a player at war with it; with `scout` (its
  *  flag 0x40, HL Explore's order) the path prices its steps as Explore
  *  Land's (`search`'s reach 'explore'). In an AI player's
  *  pass a unit whose last step of the turn ended in a zone of control does

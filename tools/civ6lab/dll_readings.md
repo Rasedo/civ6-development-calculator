@@ -15734,3 +15734,105 @@ built on it.
 - OPEN: every offset above against a running game; the combat modifiers'
   member (m_kCombatModifers) and a queue entry's twelve ints are written
   raw, their fields unread.
+
+## C-133 / C-128: flag 2's parent plot, the open list as the list itself, the embarked state's Movement cap, the zone's improvement test — READ (0x2720a0 at 0x27220d / 0x2724c8, 0x775a0, 0x79560, 0x586d40 at 0x587042..0x5870aa / 0x58741c..0x587486, 0x5706e0, 0x531ef0, 0x26fe20 at 0x270444 / 0x270776, 0x270be0, 0x52f970), both twins
+
+`search`'s `danger.war` link test, its open list (`addOpen`, `reparent`),
+`stepUnit`'s cap (cpu/core/tactical.ts, cpu/core/units.ts); GPU `_tac_search`'s
+flag-2 mask, `rekey_level` and `place`'s levels (gpu/core/sim_tactics.py),
+the step's `spent` and `_escort_carry_with` (gpu/core/sim_seats.py).
+
+- FLAG 2 (0x2720a0 at 0x2724c8): the owner tested (r12d) is read at
+  0x27220d off the PARENT node's plot (the plot of [rsp+0x58], the parent's
+  x / y at 0x272176..0x2721f2) and written nowhere after: a link whose
+  parent stands on the ground of a player at war with the mover's is
+  refused, the unit's own plot included (the own-plot waiver at 0x272618
+  comes after it). A path under Move Unit's 0x100a enters such ground and
+  goes no further; a unit standing on it has no path. Ported so: `search`
+  refuses the link from `best`'s plot; the GPU masks the six links of a
+  parent on it.
+- Confirmed as no row moved: the one-seed aimem traces of the five duelq
+  recordings hold the rows of the measure at the base (cityState.move.*,
+  barb.move.*).
+- THE OPEN LIST (0x775a0, 0x79560) is a doubly linked list (+0xf0 head,
+  +0xf8 tail, a node's +8 next, +0x10 previous), sorted by key (+0x18);
+  within a key its nodes stand as the walks leave them. AddToOpen: an empty
+  list takes the node; strictly below the head by (key, cost +0x1c) it goes
+  first (0x77622..0x77632), strictly above the tail last
+  (0x77646..0x77656); else, |key - head's| against |key - tail's|
+  (0x774c0): nearer the tail the walk from the tail passes every node
+  strictly above it and puts it after the first that is not
+  (0x77710..0x7773f); else the walk from the head passes every node
+  strictly below it and puts it before the first that is not
+  (0x777d0..0x77823). UpdateOpenNode: a re-keyed node whose key is at or
+  above its predecessor's stays (0x795c0); else it is unlinked and walks
+  headward past every node of a greater key, no cost read, to stand after
+  the first of a key at or below its own (0x795f0..0x795ff), at the head
+  where none. So a re-keyed node stands after a turn-end node of its key
+  (the turn-end node's cost is above its key), and the walks that follow
+  stop on a key's nodes as they stand, not in their costs' order.
+- Ported: TS keeps the list itself (`open` in list order, `addOpen`'s two
+  walks, `reparent`'s headward walk, the head popped). The GPU keeps its
+  sort key and adds a level between the key cost and the cost past it: a
+  key cost's nodes stand as blocks — the nodes of the key cost alone that
+  came by a re-key or after one, then the turn-end nodes after them, in
+  their costs' order — and a block's index is the level. A re-keyed node
+  takes the highest level of its key cost, one more where a turn-end node
+  holds it (`rekey_level`); from the head a node of the key cost alone
+  takes level 0, a turn-end node the lowest level holding a turn-end node
+  at or above its cost, else the highest; from the tail a node takes the
+  highest level holding a node at or below its cost (`place`). The level
+  holds 0..3 (two bits of the key; the tie 16).
+- Confirmed: the level order against the list itself, 60,000 random runs of
+  inserts, re-keys and pops (keys of two to six values): every pop equal,
+  no level past 3. The one-seed aimem traces hold every row of the base.
+- THE EMBARKED STATE'S MOVEMENT CAP: the placement 0x586d40 picks the
+  unit's state at 0x587042..0x5870aa — on a water plot, unless the plot is
+  owned (vt +0x40) and its domain mask (+0x14, 0x81240) takes the unit's
+  own domain (+0x650), a unit that can embark (0x56c480) and is not
+  embarked takes UNIT_EMBARKED (0xfbb4f61); on any other plot an embarked
+  unit takes 0x23c8f020 — and applies it at 0x58741c..0x587486: where the
+  state differs from IsEmbarked (0x8be30), SetEmbarked 0x5706e0 (the
+  tracked bool +0x658, its value +0x6b0, the event 0x84c1fdd6), then
+  Rules::Placement's vt +0x68 (0x531ef0; the instance 0x533260, its vtable
+  0xd503b0): the unit's Movement (+0xdb0) above its GetMaxMoves (0x56e130
+  << 8) in the new state is taken off by ChangeMoves (0x56cc70). The walk's
+  step 0x26fe20 prices the step first (0x270be0 / 0x270980 at
+  0x270287 / 0x2702f1 off the formation's +0x218), places the members
+  (0x587ca0 at 0x270444) and only then pays (0x265d80 at 0x270776: the
+  formation's +0x218 and each member's ChangeMoves by the cost, floored at
+  0). 0x270be0's chain keeps the disembark rule's excess (0x26ee90 into the
+  context's +0x38) out of the cost it returns (+0x34 clamped by +0x2c /
+  +0x30). So at every shore, owned water or not, embarking or landing: the
+  Movement is capped at the new state's GetMaxMoves, then the step's cost
+  is paid. The engines capped before the payment off owned water alone and
+  after it at the other shores.
+- Confirmed: runs/h1_duelq1117 t160 / t201 city-state 2's Line Infantry
+  1179654 off its Harbor water 14:7 as before; the five one-seed aimem
+  traces hold every row of the base.
+- A unit placed onto water (`jumpMadeAnew`) stands embarked and one put
+  ashore lands by the same 0x587042..0x5870aa: runs/h1_duelq1124 t92
+  Granada's Knight 1310720 made on the water plot 41:13
+  (UnitEmbarkedStateChanged at its placement); runs/h1_duelq1121 t154 the
+  Musketman 2424833 home on 10:6.
+- THE ZONE'S IMPROVEMENT TEST (0x52f970): the two property hashes are
+  TypeProperties names — 0x7d27db83 PLOT_DAMAGE_TO_WALKING_INTO (the plot
+  entered), 0x8634aa0f PLOT_DAMAGE_TO_WALKING_ADJACENT (the plots beside
+  it) —, read off the Improvements row's property map (0x8e7bf0: the row's
+  +8, its vt +0x58), a number above 0. The install sets them in
+  DLC/Portugal/Data/Portugal_Improvements*_MODE.xml alone (the Zombie
+  Defense mode's towers and traps, its Great Wall, Fort and Roman Fort
+  rows); Base, Expansion1 and Expansion2 hold no TypeProperties row of
+  either name, so the pass zones nothing under the rules the engines hold.
+  Nothing to port.
+- THE FORMATION'S MOVED FLAG (+0x460, its value +0x4b8): set by the walk's
+  step (0x267540 with 1 at 0x2707d4), and the refresh 0x267650 ORs each
+  member's hasMoved (0x56e760: Movement below GetMaxMoves) into it
+  (0x2678ae..0x2678c5) without clearing it; cleared by 0x267540 with 0 from
+  the formation's turn start 0x2673f0 alone — DoTurn 0x4e4560 at 0x4e49d3,
+  the unit's allocation 0x4eeb70 at 0x4eee52, 0x941240 at 0x9416b7 and the
+  unit manager's virtual 0x941b50 (vtable slot 0xd92ca8) — and by the
+  formation's reset 0x266a60. OPEN: which of these runs between a player's
+  walk and the next player's DoTurn (the danger search reads every unit
+  unmoved: runs/h1_duelq1128 t126); 0x941b50's callers are virtual calls,
+  unread.

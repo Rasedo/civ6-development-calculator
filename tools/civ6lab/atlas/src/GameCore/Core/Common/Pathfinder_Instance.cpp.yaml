@@ -135,14 +135,20 @@
   final: 0x590a0
   kind: function
   name: UpdateOpenNode
-  semantics: "UpdateOpenNode: moves a node made cheaper toward the head past those of higher f only (after its new equals)."
-  status: PARTLY
+  semantics: "UpdateOpenNode: a re-keyed open node whose key (+0x18) is at or above its predecessor's (+0x10) stays (0x795c0); else it is unlinked and walks headward past every node of a greater key, the cost (+0x1c) not read, to stand after the first node of a key at or below its own (0x795f0..0x795ff), at the head where none (0x79601): after a turn-end node of its key too, whose cost is above its own. Ported: the list itself in TS (reparent), the level of the sort key in the GPU (rekey_level)."
+  status: READ
+  cases:
+    - recording: h1_duelq1121
+      turn: 240
+      value: "the open list kept as the list itself, a re-keyed node past the turn-end nodes of its key: the one-seed aimem traces of the five duelq recordings hold every row of the measure at the base"
   impl:
     - cpu/core/tactical.ts:search
     - cpu/core/tactical.ts:reparent
     - cpu/core/tactical.ts:PathDanger
     - cpu/core/tactical.ts:ReachSearch
     - cpu/core/tradePath.ts:OpenList
+    - gpu/core/sim_tactics.py:rekey_level
+    - gpu/core/sim_tactics.py:place
   readings:
     - "H-1: the trade path's search, its score and the Canal — READ"
     - "C-95: the unit pathfinder and the planning's reach — READ, confirmed on the Wander draws"
@@ -150,7 +156,7 @@
     - "C-108: the trade path's portals, its open list and CanStartRoute's gates — READ, both twins"
     - "C-95: the reach searches open turn-end nodes, and the zone of control's domain is the formation's — READ (0x271920 from 0x26dab0, 0x26f980 -> 0x530f50, 0x267650), both twins"
     - "C-133 / C-95: the carried orders run in the unit list's order; a path comes ashore off water only by the disembark test — READ (0x7df30, 0x554e0, 0x523e0, 0x52e90, 0x54910, 0x2720a0 at 0x272380..0x27240d, 0x52fb90 at 0x52fb9d), both twins; UpdateOpenNode's walk and flag 2's plot — READ (0x79560, 0x2720a0 at 0x2721c3..0x27220d / 0x2724c8), unported"
-  notes: ["imported: READ in its section, no confirming case found beside it"]
+    - "C-133 / C-128: flag 2's parent plot, the open list as the list itself, the embarked state's Movement cap, the zone's improvement test — READ (0x2720a0 at 0x27220d / 0x2724c8, 0x775a0, 0x79560, 0x586d40 at 0x587042..0x5870aa / 0x58741c..0x587486, 0x5706e0, 0x531ef0, 0x26fe20 at 0x270444 / 0x270776, 0x270be0, 0x52f970), both twins"
   context:
     - ...allback passed; an open child is re-parented on a STRICTLY cheaper cost (UpdateOpenNode 0x79560), a closed one likewise with UpdateParents 0x79660, a new one opened. The trade path's...
     - "...st equal). A node re-keyed while open walks toward the head past strictly greater keys (0x79560). The step pops the head (0x781e0: NotifyList 2 then 3, closed) and links its neighbour..."
@@ -169,6 +175,7 @@
     - gpu/core/sim_tactics.py:update_parents
     - cpu/core/tactical.ts:PathDanger
     - cpu/core/tactical.ts:ReachSearch
+    - gpu/core/sim_tactics.py:place
   readings:
     - "H-1: the trade path's search, its score and the Canal — READ"
     - "C-95: the unit pathfinder and the planning's reach — READ, confirmed on the Wander draws"

@@ -548,6 +548,8 @@
     - cpu/core/tactical.ts:ReachSearch
     - cpu/core/tactical.ts:before
     - gpu/core/sim_tactics.py:place
+    - cpu/core/tactical.ts:below
+    - cpu/core/tactical.ts:addOpen
   readings:
     - "C-108: the trade path's portals, its open list and CanStartRoute's gates — READ, both twins"
     - "C-124: a move order's path opens a turn-end node beside each node with Movement left — READ (0x271920, 0x7a880, 0x271490, 0x775a0, 0x26f330), both twins"
@@ -558,6 +560,7 @@
     - "C-124: a move order's path prices a turn's end at the stacking limit +1e6, and its destination there stops the search — READ (0x270dd0 at 0x27101e..0x2710a0, 0x2720a0 at 0x272230..0x272364, 0x77a50, 0x26dcd0's callbacks), both twins"
     - "C-95: the reach searches open turn-end nodes, and the zone of control's domain is the formation's — READ (0x271920 from 0x26dab0, 0x26f980 -> 0x530f50, 0x267650), both twins"
     - "C-133 / C-95: the carried orders run in the unit list's order; a path comes ashore off water only by the disembark test — READ (0x7df30, 0x554e0, 0x523e0, 0x52e90, 0x54910, 0x2720a0 at 0x272380..0x27240d, 0x52fb90 at 0x52fb9d), both twins; UpdateOpenNode's walk and flag 2's plot — READ (0x79560, 0x2720a0 at 0x2721c3..0x27220d / 0x2724c8), unported"
+    - "C-133 / C-128: flag 2's parent plot, the open list as the list itself, the embarked state's Movement cap, the zone's improvement test — READ (0x2720a0 at 0x27220d / 0x2724c8, 0x775a0, 0x79560, 0x586d40 at 0x587042..0x5870aa / 0x58741c..0x587486, 0x5706e0, 0x531ef0, 0x26fe20 at 0x270444 / 0x270776, 0x270be0, 0x52f970), both twins"
   context:
     - ...st. The open list is a list sorted by total cost, equal totals by known cost (AddToOpen 0x775a0 scans from the head or the tail by a float midpoint, so a tie lands first or last by th...
     - "...is its cost. The open list (+0xf0 head, +0xf8 tail, doubly linked) is sorted by (f, g) (0x775a0): a key below the head's goes first, above the tail's last; otherwise the insertion s..."
@@ -695,6 +698,7 @@
     - "C-99: an owned water plot no shore, a move order carried on as the turn ends — READ (0x530240, 0x66790, 0x66a90, 0x66680, 0x814e0, 0x81240, 0x7eeba0), both twins"
     - "C-99: a move order carried on as the turn ends, the zone-of-control wait, the embark rule's TO plot — READ (0x962380, 0x52f50, 0x26fe20, 0x2675e0, 0x2673f0, 0x530420, 0x267650), both twins"
     - "C-132: the danger map's fitted rules in the DLL; a search's shore crossings on the formation's own domain — READ (0x26dab0, 0x586360 at 0x586624..0x586664, 0x2720a0 at 0x272618..0x272689, 0x66a90, 0x52fe90, 0x56e0a0, 0x26e570, 0x530240, 0x530420), FIT (the unmoved flag, the barbarians' raise, the grant's last turn), both twins"
+    - "C-133 / C-128: flag 2's parent plot, the open list as the list itself, the embarked state's Movement cap, the zone's improvement test — READ (0x2720a0 at 0x27220d / 0x2724c8, 0x775a0, 0x79560, 0x586d40 at 0x587042..0x5870aa / 0x58741c..0x587486, 0x5706e0, 0x531ef0, 0x26fe20 at 0x270444 / 0x270776, 0x270be0, 0x52f970), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...rtual +0x40 holds (a district stands there), they read the plot info's word +0x14 through 0x81240 — argument 0 tests bit 1, 1 bit 2, 2 bit 4: land = bit 4 and not bit 1, water = bit 1 and..."
@@ -789,6 +793,7 @@
     - "C-99: an embarked unit passes no other player's passenger — the step's flag-1 test READ (0x2720a0 at 0x272372, 0x271be0, 0x586360 at 0x586542, 0x208b80 under 0x108, 0x20a2a0), both twins"
     - "C-125 / C-95: flanking and support count about the defender unit's own plot, no river edge read; MEDIUM by the plot's layer-0 list; a killed target's record; the camp strike's orders — READ (0x521530, 0x51c810 at 0x51cc1c..0x51cc56, 0x5228c0, 0x786d50, 0x776140 at 0x776333, 0x8e9d0, 0x772940 at 0x772d2f..0x772f78), FIT (the camp strike's path), both twins"
     - "C-110 / C-125: an embarked unit's strengths in a unit's blow, a promotion's side, ground closed to a strike — READ (0x51f070 at 0x51f3ef..0x51f457, 0x206960 at 0x2069b4..0x2069e0 and 0x206a78..0x206b29, 0x520270 at 0x520576..0x5205db, 0x5228c0, 0x77a4b0), FIT (the closed ground), both twins"
+    - "C-133 / C-128: flag 2's parent plot, the open list as the list itself, the embarked state's Movement cap, the zone's improvement test — READ (0x2720a0 at 0x27220d / 0x2724c8, 0x775a0, 0x79560, 0x586d40 at 0x587042..0x5870aa / 0x58741c..0x587486, 0x5706e0, 0x531ef0, 0x26fe20 at 0x270444 / 0x270776, 0x270be0, 0x52f970), both twins"
   notes:
     - ".claude/scratchpad/mu1/readings_c96.md: ...ts moves 0x7737c0): each unit (+0x770 clear) that has   taken damage (+0xcf0 > 0), in no formation (0x8be30), on a plot of no   danger (the influence map 0x716a90 <= 0) is queued (\"Heal\"); the queue's   move..."
   context:
@@ -3125,10 +3130,15 @@
   final: 0x377570
   kind: function
   name: the zone's improvement test
-  semantics: "0x530f50's early pass over the plots within 1 of the plot entered (0x6aef0): an unpillaged improvement (+0x44, +0x4d bit 0) of an owner (+0x46) at war with the mover whose Improvements row carries a property above 0 (hash 0x7d27db83 on the plot itself, 0x8634aa0f beside it) sets the zone, no sight test. The property's name unread."
-  status: PARTLY
+  semantics: "0x530f50's early pass over the plots within 1 of the plot entered (0x6aef0): an unpillaged improvement (+0x44, +0x4d bit 0) of an owner (+0x46) at war with the mover whose Improvements row carries a TypeProperties number above 0 (0x8e7bf0: the row's property map) — PLOT_DAMAGE_TO_WALKING_INTO (hash 0x7d27db83) on the plot itself, PLOT_DAMAGE_TO_WALKING_ADJACENT (0x8634aa0f) beside it — sets the zone, no sight test. Both names are the Zombie Defense mode's alone (DLC/Portugal/Data/Portugal_Improvements*_MODE.xml); Base, Expansion1 and Expansion2 set neither, so the pass zones nothing under the engines' rules."
+  status: READ
+  cases:
+    - recording: install
+      turn: 0
+      value: "Base / Expansion1 / Expansion2 hold no TypeProperties row named PLOT_DAMAGE_TO_WALKING_INTO or PLOT_DAMAGE_TO_WALKING_ADJACENT (DLC/Portugal's _MODE files alone): CRC32 without the final inversion gives 0x7d27db83 / 0x8634aa0f"
   readings:
     - "C-133 / C-95: the carried orders run in the unit list's order; a path comes ashore off water only by the disembark test — READ (0x7df30, 0x554e0, 0x523e0, 0x52e90, 0x54910, 0x2720a0 at 0x272380..0x27240d, 0x52fb90 at 0x52fb9d), both twins; UpdateOpenNode's walk and flag 2's plot — READ (0x79560, 0x2720a0 at 0x2721c3..0x27220d / 0x2724c8), unported"
+    - "C-133 / C-128: flag 2's parent plot, the open list as the list itself, the embarked state's Movement cap, the zone's improvement test — READ (0x2720a0 at 0x27220d / 0x2724c8, 0x775a0, 0x79560, 0x586d40 at 0x587042..0x5870aa / 0x58741c..0x587486, 0x5706e0, 0x531ef0, 0x26fe20 at 0x270444 / 0x270776, 0x270be0, 0x52f970), both twins"
   context:
     - "- THE ZONE'S EARLY PASS (0x530f50 at 0x531067..0x53108c -> 0x52f970): before the six neighbours, every plot within 1 of the plot entered holding an unpil..."
   review: reviewed
@@ -3549,13 +3559,20 @@
 - addr: 0x5706e0
   final: 0x3a5b50
   kind: function
-  status: PARTLY
+  name: SetEmbarked
+  semantics: "SetEmbarked (unit, flag): where the flag differs from +0x6b0, the tracked bool +0x658 takes it and the event 0x84c1fdd6 fires; no Movement moved (the placement's cap is 0x531ef0)."
+  status: READ
+  cases:
+    - recording: h1_duelq1124
+      turn: 92
+      value: Granada's Knight 1310720 made on the water plot 41:13 stands embarked (UnitEmbarkedStateChanged at its placement)
+  impl: [cpu/core/units.ts:stepUnit, cpu/core/phase.ts:jumpMadeAnew]
   readings:
     - "C-129: a killed player's records forgotten; a capture's new unit; an air strike's record — READ (0x534c50, 0x787fc0 -> 0x5ee370, 0x212500's create), both twins; the replay's later-player timings"
-  notes: ["imported: READ in its section, no confirming case found beside it"]
+    - "C-133 / C-128: flag 2's parent plot, the open list as the list itself, the embarked state's Movement cap, the zone's improvement test — READ (0x2720a0 at 0x27220d / 0x2724c8, 0x775a0, 0x79560, 0x586d40 at 0x587042..0x5870aa / 0x58741c..0x587486, 0x5706e0, 0x531ef0, 0x26fe20 at 0x270444 / 0x270776, 0x270be0, 0x52f970), both twins"
   context:
     - "...x58f3f0), then the victim's charges (0x56cb00), damage (0x5705f0) and embarked state (0x5706e0), its Movement spent (0x56d6f0) and its turn ended (0x570b40). Ported: a new id and a n..."
-  review: imported
+  review: reviewed
 - addr: 0x5707b0
   final: 0x3a5c20
   kind: function
@@ -8170,6 +8187,7 @@
   status: PARTLY
   readings:
     - "C-127 / C-96: a minor's unit versions, the unit table's religion gate and the building value's era reasons — READ, both twins"
+    - "C-133 / C-128: flag 2's parent plot, the open list as the list itself, the embarked state's Movement cap, the zone's improvement test — READ (0x2720a0 at 0x27220d / 0x2724c8, 0x775a0, 0x79560, 0x586d40 at 0x587042..0x5870aa / 0x58741c..0x587486, 0x5706e0, 0x531ef0, 0x26fe20 at 0x270444 / 0x270776, 0x270be0, 0x52f970), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ...a TraitType row (+0x2d0) the player's traits do not name, and the level-hashed rows (0x8e7bf0); a trait's unit replaces its base. It never reads EnabledByReligion (+0x1b8 bit 0x40)....

@@ -456,12 +456,15 @@
 - addr: 0x586d40
   final: 0x3b11b0
   kind: function
-  semantics: "places a unit at a plot (unit, plot, flags, ...): flags 1 run the location test 0x586360 with no flag bit set; a refused plot goes to FindAlternateLocation 0x585940 (range 10). Each player whose visibility count of the plot is above 0 meets the unit's owner (0x5246f0). Its look taken (0x58f3f0), the unit's fortification is set 0 (0x587789), then the plot's unpillaged improvement's GrantFortification (+0x3c, 0x5877f7), else each building of the plot's city with a GrantFortification (Buildings +0x30, 0x5878cf)."
+  semantics: "places a unit at a plot (unit, plot, flags, ...): the embarked state it leaves the unit in is picked at 0x587042..0x5870aa — on a water plot, unless the plot is owned (vt +0x40) and its domain mask (+0x14, 0x81240) takes the unit's own domain (+0x650), a unit that can embark (0x56c480) and is not embarked takes UNIT_EMBARKED (0xfbb4f61); on any other plot an embarked unit takes 0x23c8f020 — and applied at 0x58741c..0x587486: SetEmbarked 0x5706e0 where it differs, then the Movement cap 0x531ef0; flags 1 run the location test 0x586360 with no flag bit set; a refused plot goes to FindAlternateLocation 0x585940 (range 10). Each player whose visibility count of the plot is above 0 meets the unit's owner (0x5246f0). Its look taken (0x58f3f0), the unit's fortification is set 0 (0x587789), then the plot's unpillaged improvement's GrantFortification (+0x3c, 0x5877f7), else each building of the plot's city with a GrantFortification (Buildings +0x30, 0x5878cf)."
   status: PARTLY
   cases:
     - recording: h1_duelq1128
       turn: 150
       value: "Bologna's Warrior 2162692, two turns dug in on 4:9, swapped off and back: 0 in the record, as the engine's placement gives"
+    - recording: h1_duelq1121
+      turn: 154
+      value: China's embarked Musketman 3735567 on 10:14 home to city-state 2 as 2424833 on the land plot 10:6 stands ashore; 1124 t92 Granada's Knight 1310720 made on the water plot 41:13 embarked
   impl:
     - cpu/core/fog.ts:majorLookMeets
     - cpu/core/units.ts:spawnUnit
@@ -477,6 +480,7 @@
     - cpu/core/minorBuild.ts:major
     - cpu/harness/replay.ts:home
     - cpu/core/minorBuild.ts:pool
+    - cpu/core/units.ts:stepUnit
   readings:
     - "C-110 / C-99: a placement resets the fortification, a struck SENTRY wakes, a siege striker asks no Movement — READ (0x586d40 at 0x587789, 0x20d280 at 0x20d5ce, 0x775340 at 0x7754c7), both twins"
     - "H-1: the raids — READ"
@@ -496,7 +500,7 @@
     - "C-99 / C-128: every technology gained starts an Upgrade Units tree, the civic event never fires; a tree's units after its tick; the Nearest City Search's resource test; the plot's unit list — READ (0x4cd4c0 -> 0x800c60, 0x5bbf80 -> 0x27a180, 0x3a1ac0, 0x7cb3d0 -> 0x7d2190, 0x7eba40 -> 0x510d30, 0x74f40 / 0x763b0), the trigger both twins"
     - "C-99 / C-95: a melee blow's river is the defender plot's edge on the attacker's side at any distance; a levied unit home reveals its sight — READ (0x522c10 at 0x522f1d..0x52301b, 0x51f070 at 0x51f603..0x51f639), both twins"
     - "C-98 / C-130 / C-96: a levied unit home with no plot dies on its minor's list; the unit term's upgrade Gold is the minor's; the pick refuses a held building under its pillaged district — READ (0x93fa10 at 0x93ff0b, 0x7cb8b0, 0x4cb350, 0x7f2970 at 0x7f3bd1), LAB (the placement's embark state, the unit term's Gold on the records), both twins"
-  notes: ["imported: READ in its section, no confirming case found beside it"]
+    - "C-133 / C-128: flag 2's parent plot, the open list as the list itself, the embarked state's Movement cap, the zone's improvement test — READ (0x2720a0 at 0x27220d / 0x2724c8, 0x775a0, 0x79560, 0x586d40 at 0x587042..0x5870aa / 0x58741c..0x587486, 0x5706e0, 0x531ef0, 0x26fe20 at 0x270444 / 0x270776, 0x270be0, 0x52f970), both twins"
   context:
     - "...om 0 to more — newly visible to the barbarian player, not to the scout alone. A move (0x586d40 → 0x58f3f0 with add) adds the new sight before it drops the old, so a plot both sights..."
     - "...The triggers: a unit placed on a plot another player sees (0x5246f0, from the placement 0x586d40: each player whose visibility count of the plot is above 0); a plot coming into view me..."
@@ -517,4 +521,5 @@
     - "C-99: a move order carried on as the turn ends, the zone-of-control wait, the embark rule's TO plot — READ (0x962380, 0x52f50, 0x26fe20, 0x2675e0, 0x2673f0, 0x530420, 0x267650), both twins"
     - "C-128: a crowded plot's unit goes beside it as its AI player's turn ends — READ (0x775e50, 0x585d90, 0x93f870, 0x585940), both twins"
     - "C-95 / C-123: a formation's walk steps its own escort; the team update's district blow is the district's own — READ (0x26fe20 / 0x587ca0; 0x738f20 at 0x7393e5..0x7394c4 -> 0x408770, 0x249ee0, 0x249e40, 0x519370), both twins; the minors' and barbarians' copy keeps record t+1's unfinished districts"
+    - "C-133 / C-128: flag 2's parent plot, the open list as the list itself, the embarked state's Movement cap, the zone's improvement test — READ (0x2720a0 at 0x27220d / 0x2724c8, 0x775a0, 0x79560, 0x586d40 at 0x587042..0x5870aa / 0x58741c..0x587486, 0x5706e0, 0x531ef0, 0x26fe20 at 0x270444 / 0x270776, 0x270be0, 0x52f970), both twins"
   review: reviewed
