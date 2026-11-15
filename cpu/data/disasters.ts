@@ -153,18 +153,18 @@ export function droughtGround(t: {
  * 100 on both rows, and which "cannot be rebuilt until the Drought ends"
  * (LOC_CLIMATE_DROUGHT_EVENT_DESCRIPTION_TOOLTIP; "cannot be repaired while a
  * drought is in progress", LOC_UNITOPERATION_REPAIR_BLOCKED_BY_DROUGHT). The
- * install's list also names the Cahokia Mound, the Outback Station and the
- * Hacienda, which this roster does not carry.
+ * install's list also names the Outback Station and the Hacienda, which this
+ * roster does not carry.
  */
 const droughtImp = (imp: string) => xml('RandomEvent_PillagedImprovements',
   `RandomEventType=RANDOM_EVENT_DROUGHT_MAJOR&ImprovementType=IMPROVEMENT_${imp}`, 'ImprovementType',
   { expect: `IMPROVEMENT_${imp}` });
 export const DROUGHT_IMPROVEMENTS: readonly string[] = srcConst('disasters.droughtImprovements',
-  ['FARM', 'PASTURE', 'CAMP', 'PLANTATION', 'TERRACE_FARM', 'MEKEWAP'], {
+  ['FARM', 'PASTURE', 'CAMP', 'PLANTATION', 'TERRACE_FARM', 'MEKEWAP', 'MOUND'], {
     derived: 'the RandomEvent_PillagedImprovements rows of RANDOM_EVENT_DROUGHT_MAJOR (EXTREME lists the '
       + 'same) whose improvement this roster carries — Expansion2_RandomEvents.xml and '
       + 'Expansion1_Expansion2.xml (the Mekewap)',
-    inputs: ['FARM', 'PASTURE', 'CAMP', 'PLANTATION', 'TERRACE_FARM', 'MEKEWAP'].map(droughtImp),
+    inputs: ['FARM', 'PASTURE', 'CAMP', 'PLANTATION', 'TERRACE_FARM', 'MEKEWAP', 'MOUND'].map(droughtImp),
   });
 /** SPECIFIC_IMPROVEMENT_DESTROYED by severity: MAJOR carries no row, EXTREME
  *  30 — the chance a listed improvement is taken away instead of pillaged. */

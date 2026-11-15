@@ -2836,6 +2836,17 @@ class SimInit:
         self._imp_amenity = [int(r["amen"]) for r in imp["rows"]]
         self._imp_water_amenity = [int(r["watAmen"]) for r in imp["rows"]]
         self._imp_amenity_any = any(a > 0 for a in self._imp_amenity + self._imp_water_amenity)
+        # (limit, civic, limit with the civic): at most so many of a row's
+        # `amen` payments reach one city (`amenityStack`); limit -1 none
+        self._imp_amen_stack = [tuple(int(v) for v in r["amenStack"]) for r in imp["rows"]]
+        # the features none of a row's neighbours may carry
+        # (`invalidAdjacentFeatures`)
+        self._imp_no_adj_feats = [list(r["noAdjFeats"]) for r in imp["rows"]]
+        # the plot's modifier yields (`plotModifierYields`): per row
+        # [(yields, shallow water on or beside it, feature on or beside it)]
+        self._imp_plot_mod = [[(tuple(float(v) for v in q["y"]), bool(q["sw"]), int(q["f"])) for q in r["plotMod"]]
+                              for r in imp["rows"]]
+        self._imp_plot_mod_any = any(self._imp_plot_mod)
         # the rows whose Tourism is their plot's Appeal (TOURISMSOURCE_APPEAL)
         self._imp_tour_appeal = [k for k, r in enumerate(imp["rows"]) if int(r["tourAppeal"])]
         # `Workable` false: no citizen works the plot, indexed by improvement

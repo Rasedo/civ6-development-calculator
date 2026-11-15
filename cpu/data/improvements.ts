@@ -258,6 +258,25 @@ export interface ImprovementDef {
   /** CIV6 (MODIFIER_CITY_OWNER_ADJUST_IMPROVEMENT_AMENITY): amenities this
    *  row pays the city that owns its plot — per instance, unconditionally. */
   amenity?: number;
+  /** CIV6 (the amenity modifier's `SubjectStackLimit`): at most `limit` of
+   *  the row's `amenity` payments reach one city, `civicLimit` once the
+   *  city's owner holds `civic` (the Mound's MOUND_AMENITY_MAX_ONE behind
+   *  PLAYER_DOES_NOT_HAVE_NATURAL_HISTORY_REQUIREMENTS, MOUND_AMENITY_MAX_TWO
+   *  behind PLAYER_HAS_NATURAL_HISTORY_REQUIREMENTS). */
+  amenityStack?: { limit: number; civic: string; civicLimit: number };
+  /** CIV6 (Improvement_InvalidAdjacentFeatures): the row refuses a plot with
+   *  a live one of these features beside it (the Moai's Woods and
+   *  Rainforest). */
+  invalidAdjacentFeatures?: FeatureId[];
+  /** CIV6 (MODIFIER_SINGLE_PLOT_ADJUST_PLOT_YIELDS on the row's
+   *  ImprovementModifiers): what the plot pays while the modifier's
+   *  requirement set holds — Coast or Lake beside it (PLOT_IS_OR_ADJACENT_TO
+   *  _COAST: the engine's LAKE is the install's COAST), or the feature on the
+   *  plot or beside it (REQUIREMENT_PLOT_FEATURE_TYPE_MATCHES or
+   *  REQUIREMENT_PLOT_ADJACENT_FEATURE_TYPE_MATCHES, TEST_ANY). A modifier,
+   *  not an Adjacency_YieldChanges row: the AI's adjacency term (0x365ae0)
+   *  never reads it. */
+  plotModifierYields?: readonly { yields: Partial<Yields>; nearShallowWater?: boolean; nearFeature?: FeatureId }[];
   /** CIV6 (`Improvement_Tourism` TOURISMSOURCE_APPEAL, ScalingFactor 100):
    *  Tourism equal to its plot's Appeal, floored at 0 (`resortTourism`). */
   tourismFromAppeal?: boolean;
@@ -977,6 +996,140 @@ export const IMPROVEMENTS: Record<ImprovementId, ImprovementDef> = {
       'ownerAdjacentYields.4.yields.production': xml('ModifierArguments', 'ModifierId=NAZCA_LINE_ADJACENCY_PRODUCTION_FLAT_MASS_PRODUCTION&Name=Amount', 'Value'),
       'ownerAdjacentYields.4.notHills': xml('Requirements', 'RequirementId=REQUIRES_PLOT_IS_FLAT', 'Inverse', { expect: true }),
       'ownerAdjacentYields.4.tech': xml('RequirementArguments', 'RequirementId=REQUIRES_PLAYER_HAS_MASS_PRODUCTION_XP2&Name=TechnologyType', 'Value', { expect: 'TECH_MASS_PRODUCTION' }),
+    },
+  },
+  // CIV6 (Expansion2_Improvements.xml, IMPROVEMENT_MOUND): Cahokia's suzerain
+  // improvement — "+3 Gold. Cities receive +1 Amenity from their first
+  // Cahokia Mound improvement. Upon discovering Natural History, cities
+  // receive +1 Amenity from their second Cahokia Mound improvement. +1 Food
+  // for every 2 adjacent Districts once Feudalism is discovered or for every
+  // adjacent District once Replaceable Parts is researched. Provides +1
+  // Housing. Receive an additional Housing once Cultural Heritage is
+  // discovered. Cannot be built adjacent to other Cahokia Mounds."
+  MOUND: {
+    id: 'MOUND',
+    name: 'Cahokia Mounds',
+    code: 'Md',
+    plunder: { kind: 'heal', amount: 50 },
+    yields: { gold: 3 },
+    housing: 1,
+    housingCivic: 'CULTURAL_HERITAGE',
+    resourceOnly: false,
+    suzerainOf: 'Cahokia',
+    terrains: ['PLAINS', 'GRASSLAND', 'DESERT', 'TUNDRA'],
+    elevations: ['FLAT'],
+    features: ['FLOODPLAINS', 'FLOODPLAINS_GRASSLAND', 'FLOODPLAINS_PLAINS'],
+    noAdjacentSame: true,
+    adjacency: [{ anyDistrict: true, requiresCivic: 'FEUDALISM', per: 2, yields: { food: 1 },
+      upgradeTech: 'REPLACEABLE_PARTS', upgradePer: 1 }],
+    amenity: 1,
+    amenityStack: { limit: 1, civic: 'NATURAL_HISTORY', civicLimit: 2 },
+    description: '+3 gold, +1 housing (+1 with Cultural Heritage), +1 amenity to its city from the first (the second too with Natural History), +1 food per 2 adjacent districts from Feudalism (per 1 with Replaceable Parts). Flat, not beside another Mound.',
+    src: {
+      'plunder.kind': xml('Improvements', 'ImprovementType=IMPROVEMENT_MOUND', 'PlunderType', { expect: 'PLUNDER_HEAL' }),
+      'plunder.amount': xml('Improvements', 'ImprovementType=IMPROVEMENT_MOUND', 'PlunderAmount'),
+      'yields.gold': xml('Improvement_YieldChanges', 'ImprovementType=IMPROVEMENT_MOUND&YieldType=YIELD_GOLD', 'YieldChange'),
+      housing: { derived: 'Housing / TilesRequired — the install writes the CLUSTER total', inputs: [xml('Improvements', 'ImprovementType=IMPROVEMENT_MOUND', 'Housing'), xml('Improvements', 'ImprovementType=IMPROVEMENT_MOUND', 'TilesRequired')] },
+      housingCivic: xml('RequirementArguments', 'RequirementId=REQUIRES_PLAYER_HAS_CULTURAL_HERITAGE&Name=CivicType', 'Value', { expect: 'CIVIC_CULTURAL_HERITAGE' }),
+      resourceOnly: { derived: 'true where the install writes Improvement_ValidResources rows for the row', inputs: [xml('Improvement_ValidResources', 'ImprovementType=IMPROVEMENT_MOUND', 'ResourceType')] },
+      suzerainOf: xml('Improvements', 'ImprovementType=IMPROVEMENT_MOUND', 'TraitType', { expect: 'MINOR_CIV_CAHOKIA_TRAIT' }),
+      terrains: { derived: 'the Improvement_ValidTerrains rows of IMPROVEMENT_MOUND, as engine terrain ids', inputs: [xml('Improvement_ValidTerrains', 'ImprovementType=IMPROVEMENT_MOUND', 'TerrainType')] },
+      elevations: { derived: 'the HILLS / MOUNTAIN half of the Improvement_ValidTerrains rows of IMPROVEMENT_MOUND', inputs: [xml('Improvement_ValidTerrains', 'ImprovementType=IMPROVEMENT_MOUND', 'TerrainType')] },
+      features: { derived: 'the Improvement_ValidFeatures rows of IMPROVEMENT_MOUND, as engine feature ids', inputs: [xml('Improvement_ValidFeatures', 'ImprovementType=IMPROVEMENT_MOUND', 'FeatureType')] },
+      noAdjacentSame: xml('Improvements', 'ImprovementType=IMPROVEMENT_MOUND', 'SameAdjacentValid', { expect: false }),
+      'adjacency.0.anyDistrict': xml('Adjacency_YieldChanges', 'ID=Mound_MedievalAdjacency', 'OtherDistrictAdjacent', { expect: true }),
+      'adjacency.0.requiresCivic': xml('Adjacency_YieldChanges', 'ID=Mound_MedievalAdjacency', 'PrereqCivic', { expect: 'CIVIC_FEUDALISM' }),
+      'adjacency.0.per': xml('Adjacency_YieldChanges', 'ID=Mound_MedievalAdjacency', 'TilesRequired'),
+      'adjacency.0.yields.food': xml('Adjacency_YieldChanges', 'ID=Mound_MedievalAdjacency', 'YieldChange'),
+      'adjacency.0.upgradeTech': xml('Adjacency_YieldChanges', 'ID=Mound_MechanizedAdjacency', 'PrereqTech', { expect: 'TECH_REPLACEABLE_PARTS' }),
+      'adjacency.0.upgradePer': xml('Adjacency_YieldChanges', 'ID=Mound_MechanizedAdjacency', 'TilesRequired'),
+      amenity: xml('ModifierArguments', 'ModifierId=MOUND_AMENITY_MAX_ONE&Name=Amount', 'Value'),
+      'amenityStack.limit': xml('Modifiers', 'ModifierId=MOUND_AMENITY_MAX_ONE', 'SubjectStackLimit'),
+      'amenityStack.civic': xml('RequirementArguments', 'RequirementId=REQUIRES_PLAYER_HAS_NATURAL_HISTORY&Name=CivicType', 'Value', { expect: 'CIVIC_NATURAL_HISTORY' }),
+      'amenityStack.civicLimit': xml('Modifiers', 'ModifierId=MOUND_AMENITY_MAX_TWO', 'SubjectStackLimit'),
+    },
+  },
+  // CIV6 (Babylon_Improvements.xml, IMPROVEMENT_TRADING_DOME): Samarkand's
+  // suzerain improvement — "+2 Gold. +1 Gold for every adjacent Luxury
+  // resource. ... Cannot be built next to another Trading Dome."
+  TRADING_DOME: {
+    id: 'TRADING_DOME',
+    name: 'Trading Dome',
+    code: 'Td',
+    plunder: { kind: 'gold', amount: 50 },
+    yields: { gold: 2 },
+    housing: 0,
+    resourceOnly: false,
+    suzerainOf: 'Samarkand',
+    terrains: ['PLAINS', 'GRASSLAND', 'DESERT', 'TUNDRA', 'SNOW'],
+    elevations: ['FLAT', 'HILLS'],
+    noAdjacentSame: true,
+    adjacency: [{ luxuryResource: true, per: 1, yields: { gold: 1 } }],
+    description: '+2 gold, +1 per adjacent luxury resource. Not beside another Trading Dome.',
+    src: {
+      'plunder.kind': xml('Improvements', 'ImprovementType=IMPROVEMENT_TRADING_DOME', 'PlunderType', { expect: 'PLUNDER_GOLD' }),
+      'plunder.amount': xml('Improvements', 'ImprovementType=IMPROVEMENT_TRADING_DOME', 'PlunderAmount'),
+      'yields.gold': xml('Improvement_YieldChanges', 'ImprovementType=IMPROVEMENT_TRADING_DOME&YieldType=YIELD_GOLD', 'YieldChange'),
+      housing: xml('Improvements', 'ImprovementType=IMPROVEMENT_TRADING_DOME', 'Housing'),
+      resourceOnly: { derived: 'true where the install writes Improvement_ValidResources rows for the row', inputs: [xml('Improvement_ValidResources', 'ImprovementType=IMPROVEMENT_TRADING_DOME', 'ResourceType')] },
+      suzerainOf: xml('Improvements', 'ImprovementType=IMPROVEMENT_TRADING_DOME', 'TraitType', { expect: 'MINOR_CIV_SAMARKAND_TRAIT' }),
+      terrains: { derived: 'the Improvement_ValidTerrains rows of IMPROVEMENT_TRADING_DOME, as engine terrain ids', inputs: [xml('Improvement_ValidTerrains', 'ImprovementType=IMPROVEMENT_TRADING_DOME', 'TerrainType')] },
+      elevations: { derived: 'the HILLS / MOUNTAIN half of the Improvement_ValidTerrains rows of IMPROVEMENT_TRADING_DOME', inputs: [xml('Improvement_ValidTerrains', 'ImprovementType=IMPROVEMENT_TRADING_DOME', 'TerrainType')] },
+      noAdjacentSame: xml('Improvements', 'ImprovementType=IMPROVEMENT_TRADING_DOME', 'SameAdjacentValid', { expect: false }),
+      'adjacency.0.luxuryResource': xml('Adjacency_YieldChanges', 'ID=TradingDome_LuxuryAdjacency', 'AdjacentResourceClass', { expect: 'RESOURCECLASS_LUXURY' }),
+      'adjacency.0.per': xml('Adjacency_YieldChanges', 'ID=TradingDome_LuxuryAdjacency', 'TilesRequired'),
+      'adjacency.0.yields.gold': xml('Adjacency_YieldChanges', 'ID=TradingDome_LuxuryAdjacency', 'YieldChange'),
+    },
+  },
+  // CIV6 (Expansion2_Improvements.xml, IMPROVEMENT_MOAI): Rapa Nui's suzerain
+  // improvement — "+1 Culture. +1 Culture for every 2 adjacent Moai. +2
+  // Culture if on or adjacent to a Volcanic Soil tile. +1 Culture if adjacent
+  // to a Coast or Lake tile ... Can be built on Plains, Plains Hills,
+  // Grassland, Grassland Hills, or Volcanic Soil. Cannot be placed adjacent
+  // to a Woods or Rainforest tile."
+  MOAI: {
+    id: 'MOAI',
+    name: 'Moai',
+    code: 'Mo',
+    plunder: { kind: 'faith', amount: 25 },
+    yields: { culture: 1 },
+    housing: 0,
+    resourceOnly: false,
+    suzerainOf: 'Rapa Nui',
+    terrains: ['PLAINS', 'GRASSLAND'],
+    elevations: ['FLAT', 'HILLS'],
+    features: ['VOLCANIC_SOIL'],
+    invalidAdjacentFeatures: ['WOODS', 'RAINFOREST'],
+    adjacency: [{ sameImprovement: true, per: 2, yields: { culture: 1 }, upgradeCivic: 'MEDIEVAL_FAIRES', upgradePer: 1 }],
+    plotModifierYields: [
+      { yields: { culture: 1 }, nearShallowWater: true },
+      { yields: { culture: 2 }, nearFeature: 'VOLCANIC_SOIL' },
+    ],
+    tourismFrom: 'culture',
+    tourismTech: 'FLIGHT',
+    description: '+1 culture, +1 per 2 adjacent Moai (per 1 with Medieval Faires), +2 on or beside Volcanic Soil, +1 beside Coast or Lake. Plains or Grassland, never beside Woods or Rainforest.',
+    src: {
+      'plunder.kind': xml('Improvements', 'ImprovementType=IMPROVEMENT_MOAI', 'PlunderType', { expect: 'PLUNDER_FAITH' }),
+      'plunder.amount': xml('Improvements', 'ImprovementType=IMPROVEMENT_MOAI', 'PlunderAmount'),
+      'yields.culture': xml('Improvement_YieldChanges', 'ImprovementType=IMPROVEMENT_MOAI&YieldType=YIELD_CULTURE', 'YieldChange'),
+      housing: xml('Improvements', 'ImprovementType=IMPROVEMENT_MOAI', 'Housing'),
+      resourceOnly: { derived: 'true where the install writes Improvement_ValidResources rows for the row', inputs: [xml('Improvement_ValidResources', 'ImprovementType=IMPROVEMENT_MOAI', 'ResourceType')] },
+      suzerainOf: xml('Improvements', 'ImprovementType=IMPROVEMENT_MOAI', 'TraitType', { expect: 'MINOR_CIV_RAPA_NUI_TRAIT' }),
+      terrains: { derived: 'the Improvement_ValidTerrains rows of IMPROVEMENT_MOAI, as engine terrain ids', inputs: [xml('Improvement_ValidTerrains', 'ImprovementType=IMPROVEMENT_MOAI', 'TerrainType')] },
+      elevations: { derived: 'the HILLS / MOUNTAIN half of the Improvement_ValidTerrains rows of IMPROVEMENT_MOAI', inputs: [xml('Improvement_ValidTerrains', 'ImprovementType=IMPROVEMENT_MOAI', 'TerrainType')] },
+      features: { derived: 'the Improvement_ValidFeatures rows of IMPROVEMENT_MOAI, as engine feature ids', inputs: [xml('Improvement_ValidFeatures', 'ImprovementType=IMPROVEMENT_MOAI', 'FeatureType')] },
+      invalidAdjacentFeatures: { derived: 'the Improvement_InvalidAdjacentFeatures rows of IMPROVEMENT_MOAI (FEATURE_FOREST, FEATURE_JUNGLE), as engine feature ids', inputs: [xml('Improvement_InvalidAdjacentFeatures', 'ImprovementType=IMPROVEMENT_MOAI', 'FeatureType')] },
+      'adjacency.0.sameImprovement': xml('Adjacency_YieldChanges', 'ID=Moai_FirstBonusAdjacency', 'AdjacentImprovement', { expect: 'IMPROVEMENT_MOAI' }),
+      'adjacency.0.per': xml('Adjacency_YieldChanges', 'ID=Moai_FirstBonusAdjacency', 'TilesRequired'),
+      'adjacency.0.yields.culture': xml('Adjacency_YieldChanges', 'ID=Moai_FirstBonusAdjacency', 'YieldChange'),
+      'adjacency.0.upgradeCivic': xml('Adjacency_YieldChanges', 'ID=Moai_SecondBonusAdjacency', 'PrereqCivic', { expect: 'CIVIC_MEDIEVAL_FAIRES' }),
+      'adjacency.0.upgradePer': xml('Adjacency_YieldChanges', 'ID=Moai_SecondBonusAdjacency', 'TilesRequired'),
+      'plotModifierYields.0.yields.culture': xml('ModifierArguments', 'ModifierId=MOAI_COASTADJACENCY_CULTURE&Name=Amount', 'Value'),
+      'plotModifierYields.0.nearShallowWater': xml('Modifiers', 'ModifierId=MOAI_COASTADJACENCY_CULTURE', 'SubjectRequirementSetId', { expect: 'PLOT_IS_OR_ADJACENT_TO_COAST' }),
+      'plotModifierYields.1.yields.culture': xml('ModifierArguments', 'ModifierId=MOAI_VOLCANICADJACENCY_CULTURE&Name=Amount', 'Value'),
+      'plotModifierYields.1.nearFeature': xml('Modifiers', 'ModifierId=MOAI_VOLCANICADJACENCY_CULTURE', 'SubjectRequirementSetId', { expect: 'PLOT_WITHIN_ONE_HEX_TO_VOLCANIC_SOIL_REQUIREMENTS' }),
+      tourismFrom: xml('Improvement_Tourism', 'ImprovementType=IMPROVEMENT_MOAI', 'TourismSource', { expect: 'TOURISMSOURCE_CULTURE' }),
+      tourismTech: xml('Improvement_Tourism', 'ImprovementType=IMPROVEMENT_MOAI', 'PrereqTech', { expect: 'TECH_FLIGHT' }),
     },
   },
   // CIV6 (Offshore Wind Farm): "+2 Production", "Provides 2 Power per turn",

@@ -2807,6 +2807,20 @@ export function buildRules() {
           watAmen: def.amenityAdjacentWater ?? 0,
           // amenities the row pays its city unconditionally, per instance
           amen: def.amenity ?? 0,
+          // [limit, civic, limit with the civic]: at most so many of `amen`
+          // reach one city (`SubjectStackLimit`); [-1, -1, -1] no limit
+          amenStack: def.amenityStack
+            ? [def.amenityStack.limit, civicIdx.get(def.amenityStack.civic) ?? -3, def.amenityStack.civicLimit]
+            : [-1, -1, -1],
+          // the features none of the row's neighbours may carry
+          noAdjFeats: (def.invalidAdjacentFeatures ?? []).map((f) => FEAT_IDS.indexOf(f)),
+          // the plot's modifier yields: [yields, shallow water on or beside
+          // it, the feature on or beside it (-1 none)]
+          plotMod: (def.plotModifierYields ?? []).map((r) => ({
+            y: YIELD_KEYS.map((k) => r.yields[k] ?? 0),
+            sw: r.nearShallowWater ? 1 : 0,
+            f: r.nearFeature ? FEAT_IDS.indexOf(r.nearFeature) : -1,
+          })),
           // Tourism equal to the plot's Appeal (TOURISMSOURCE_APPEAL)
           tourAppeal: def.tourismFromAppeal ? 1 : 0,
           // `Workable` false: no citizen works the plot

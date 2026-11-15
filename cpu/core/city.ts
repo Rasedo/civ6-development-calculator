@@ -1122,7 +1122,9 @@ function improvementAmenityAuras(state: GameState) {
  * What the city's own improvements pay it in amenities, PER INSTANCE — both
  * modifiers adjust the improvement's own amenity, one payment per
  * improvement. CIV6 (SKI_RESORT_AMENITY,
- * MODIFIER_CITY_OWNER_ADJUST_IMPROVEMENT_AMENITY): `amenity`, always.
+ * MODIFIER_CITY_OWNER_ADJUST_IMPROVEMENT_AMENITY): `amenity`, always; a row
+ * with an `amenityStack` (the Mound's) pays at most its limit of them to one
+ * city, the larger limit once the city's owner holds the civic.
  * CIV6 (CITY_PARK_WATER_AMENITY, MODIFIER_SINGLE_CITY_ADJUST_IMPROVEMENT_AMENITY
  * behind ADJACENT_TO_WATER_REQUIREMENTS): `amenityAdjacentWater`, for
  * standing beside water — the RING, so a drowned neighbour counts as the sea
@@ -1137,14 +1139,23 @@ function improvementAmenityAuras(state: GameState) {
 function improvementAmenities(state: GameState, city: City): number {
   let n = 0;
   const auras = improvementAmenityAuras(state);
+  // CIV6 (`SubjectStackLimit`): a row's stacked payments, per row, capped
+  const stacked = new Map<ImprovementId, number>();
   for (const t of state.map.tiles) {
     if (!t.improvement || t.pillaged || !tileBelongsTo(t, city)) continue;
     const def = IMPROVEMENTS[t.improvement as ImprovementId];
-    n += def?.amenity ?? 0;
+    if (def?.amenityStack) stacked.set(def.id, (stacked.get(def.id) ?? 0) + 1);
+    else n += def?.amenity ?? 0;
     const wet = def?.amenityAdjacentWater ?? 0;
     if (wet && (hasRiver(t) || neighbors(state.map, t).some((nb) => isWater(nb)))) n += wet;
     if (auras.some((a) => a.improvements.includes(t.improvement!)
       && hexDistance(state.map, a.tile.col, a.tile.row, t.col, t.row) <= a.range)) n += 1;
+  }
+  for (const [id, count] of stacked) {
+    const def = IMPROVEMENTS[id];
+    const st = def.amenityStack!;
+    const limit = isCivicComplete(state, st.civic, city.seat) ? st.civicLimit : st.limit;
+    n += (def.amenity ?? 0) * Math.min(count, limit);
   }
   return n;
 }

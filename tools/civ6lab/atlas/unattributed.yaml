@@ -10650,6 +10650,12 @@
   context:
     - ...ped) and calls SetGovernment only where the player is in one (+0x158 != -1); the detach 0xbf3d00 -> 0x39fe90 the same in reverse. The trait attaches at the game's start, under no gover...
   review: imported
+- addr: 0xbf8360
+  kind: function
+  semantics: "EFFECT_ADJUST_PLAYER_INTERNATIONAL_TRADE_ROUTE_YIELD_PER_IMPROVEMENT_IN_ORIGIN_CITY's apply (effect vtable 0xe0fe18 slot 12; its object's Amount +8, the yield +0xc and the improvement +0x10, the arguments read by 0xbf7c30; factory vtable 0xe135d0): Player_Trade (player +0x12e0) 0x4d7ae0(yield, improvement, Amount << 8)"
+  status: PARTLY
+  notes: [the reader of Player_Trade +0x1220 in the route yield is unread]
+  review: reviewed
 - addr: 0xc03070
   final: 0x8a3d80
   kind: function

@@ -286,7 +286,8 @@ export function featureOk(def: ImprovementDef, tile: Tile, unlocks: Unlocks | nu
  * The placement columns the install gives a UNIQUE improvement beyond terrain
  * and elevation, in one predicate so all three arms of `validImprovementsIn`
  * ask the same question: one per city, an Appeal floor, a Bonus-or-Luxury
- * neighbour, a count of passable LAND neighbours, and the frontier.
+ * neighbour, no neighbour of a refused feature, a count of passable LAND
+ * neighbours, and the frontier.
  *
  * `BuildInLine` is NOT here: it is the install's line-DRAWING helper for the
  * placement UI, not a legality rule.
@@ -312,6 +313,11 @@ function uniqueGroundOk(
       return c === 'bonus' || c === 'luxury';
     });
     if (!ok) return false;
+  }
+  if (def.invalidAdjacentFeatures) {
+    if (!opts.map) return false;
+    const bad = def.invalidAdjacentFeatures;
+    if (neighbors(opts.map, tile).some((n) => n.feature !== null && bad.includes(n.feature))) return false;
   }
   if (def.adjacentLandMin !== undefined) {
     if (!opts.map) return false;

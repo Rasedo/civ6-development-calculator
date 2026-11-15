@@ -79,7 +79,11 @@ describe('the unique improvement catalog', () => {
     expect(IMPROVEMENT_IDS.indexOf('ALCAZAR')).toBe(43);
     // ...and Nazca's Nazca Line after that
     expect(IMPROVEMENT_IDS.indexOf('NAZCA_LINE')).toBe(44);
-    expect(IMPROVEMENT_IDS.length).toBe(45);
+    // ...and Cahokia's Mound, Samarkand's Trading Dome and Rapa Nui's Moai
+    expect(IMPROVEMENT_IDS.indexOf('MOUND')).toBe(45);
+    expect(IMPROVEMENT_IDS.indexOf('TRADING_DOME')).toBe(46);
+    expect(IMPROVEMENT_IDS.indexOf('MOAI')).toBe(47);
+    expect(IMPROVEMENT_IDS.length).toBe(48);
   });
 
   it('gives one civilization at most one unique improvement', () => {

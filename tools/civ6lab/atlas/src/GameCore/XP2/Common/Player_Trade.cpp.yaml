@@ -3,6 +3,13 @@
 # `review: imported` = bootstrapped from dll_readings.md / code comments / saved
 # labels and not yet reviewed: verify against the disassembly, then edit and
 # set `review: reviewed`.
+- addr: 0x4d7ae0
+  final: 0x33c8c0
+  kind: function
+  semantics: "adds a 24.8 amount to Player_Trade +0x1220[improvement][yield] (m_axFlatInternationalYieldPerImprovementAtOrigin, its serializer's name at 0x4d4bfa: the international routes' yield per improvement in the origin city: Samarkand's MINOR_CIV_SAMARKAND_TRADE_GOLD_MODIFIER through 0xbf8360), the improvement bounded by +0x1278..+0x1280, the yield by DB.Yields"
+  status: PARTLY
+  notes: [the route yield's reader of +0x1220 is unread]
+  review: reviewed
 - addr: 0x4d8220
   final: 0x33cdc0
   kind: function

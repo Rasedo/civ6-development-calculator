@@ -63,7 +63,7 @@ export type SuzEffect =
   | 'faithBuildings'     // Valletta
   | 'wallsFullDamage'    // Akkad
   | 'routePostGold'      // Jakarta
-  | 'suzImprovement'     // Caguana / La Venta / Armagh / Nalanda / Granada / Nazca
+  | 'suzImprovement'     // Caguana / La Venta / Armagh / Nalanda / Granada / Nazca / Cahokia / Rapa Nui / Samarkand
   | 'sciencePeace'       // Geneva
   | 'gpCulturePct'       // Antananarivo
   | 'districtGpp'        // Bologna
@@ -94,7 +94,7 @@ export const SUZ_EFFECTS: SuzEffect[] = [
   'xpDouble', 'militaryBuildingLoyalty', 'regionalReach', 'worksScience', 'csRouteYields', 'holySitePressure',
   'apostlePromoChoice', 'eraInspiration', 'harborPower', 'faithBuildings',
   'wallsFullDamage',
-  // the six whose perk is "your Builders can build X improvements",
+  // the ones whose perk is "your Builders can build X improvements",
   // which `validImprovementsIn`'s suzerain block answers off `suzerainOf`.
   'suzImprovement',
   'routePostGold',
@@ -418,6 +418,16 @@ const RAW_CITY_STATE_SUZERAIN_BONUS: Record<string, SuzerainBonusDef> = {
   // CIV6 (Expansion2_Leaders.xml, MINOR_CIV_NAZCA_UNIQUE_INFLUENCE_BONUS
   // attaching MINOR_CIV_NAZCA_CAN_NAZCA_LINE to the suzerain)
   Nazca: { name: 'Nazca', type: 'religious', bonus: 'Your Builders can now make Nazca Line improvements.', suz: 'suzImprovement' },
+  // CIV6 (Expansion2_Leaders.xml, MINOR_CIV_CAHOKIA_UNIQUE_INFLUENCE_BONUS
+  // attaching MINOR_CIV_CAHOKIA_CAN_MOUND to the suzerain)
+  Cahokia: { name: 'Cahokia', type: 'trade', bonus: 'Your Builders can now make Cahokia Mounds improvements.', suz: 'suzImprovement' },
+  // CIV6 (Expansion2_Leaders.xml, MINOR_CIV_RAPA_NUI_UNIQUE_INFLUENCE_BONUS
+  // attaching MINOR_CIV_RAPA_NUI_CAN_MOAI to the suzerain)
+  'Rapa Nui': { name: 'Rapa Nui', type: 'cultural', bonus: 'Your Builders can now make Moai improvements.', suz: 'suzImprovement' },
+  // CIV6 (Babylon_Leaders.xml, MINOR_CIV_SAMARKAND_UNIQUE_INFLUENCE_BONUS
+  // attaching MINOR_CIV_SAMARKAND_CAN_TRADING_DOME to the suzerain; the
+  // trait's second modifier, MINOR_CIV_SAMARKAND_TRADE_GOLD, is not modeled)
+  Samarkand: { name: 'Samarkand', type: 'trade', bonus: 'Your Builders can now make Trading Dome improvements.', suz: 'suzImprovement' },
   // CIV6 (Leaders.xml, MINOR_CIV_MOHENJO_DARO_CITIES_FRESHWATER_HOUSING_BONUS:
   // MODIFIER_PLAYER_GRANT_CITIES_FRESHWATER_HOUSING_BONUS, HasBonus true)
   'Mohenjo-Daro': { name: 'Mohenjo-Daro', type: 'cultural', bonus: 'Your cities have full Housing from water, as if they were adjacent to a River.', suz: 'freshWaterHousing' },

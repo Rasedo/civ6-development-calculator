@@ -4620,9 +4620,10 @@ class SimSeats:
     def _imp_unique_ground_ok(self, k: int) -> torch.Tensor:
         """[B, T] — the placement columns the install gives a UNIQUE
         improvement beyond terrain and elevation (`uniqueGroundOk`): an Appeal
-        floor, a Bonus-or-Luxury neighbour, and a count of passable LAND
-        neighbours. `BuildInLine` is the install's line-DRAWING helper for the
-        placement UI, not a legality rule; the frontier and the
+        floor, a Bonus-or-Luxury neighbour, no neighbour of a refused feature,
+        and a count of passable LAND neighbours. `BuildInLine` is the
+        install's line-DRAWING helper for the placement UI, not a legality
+        rule; the frontier and the
         one-per-city clauses join at their own callers, because both need a
         seat (`_uniq_improvement_ok`)."""
         ok = torch.ones(self.B, self.T, dtype=torch.bool, device=self.device)
@@ -4635,6 +4636,16 @@ class SimSeats:
             _bl = ((self.res_priority[:, nbc] == 1) | (self.res_priority[:, nbc] == 3)) \
                 & ~self.res_stripped[:, nbc] & (nb >= 0).unsqueeze(0)
             ok &= _bl.any(dim=2)
+        # CIV6 (Improvement_InvalidAdjacentFeatures): no neighbour carries a
+        # live feature the row refuses (the Moai's Woods and Rainforest)
+        _naf = self._imp_no_adj_feats[k]
+        if _naf:
+            nb = self.neigh
+            nbc = nb.clamp(min=0)
+            _bad = torch.zeros(self.B, self.T, nb.shape[1], dtype=torch.bool, device=self.device)
+            for _f in _naf:
+                _bad |= (self.feat_id[:, nbc] == int(_f)) & ~self.feat_stripped[:, nbc]
+            ok &= ~(_bad & (nb >= 0).unsqueeze(0)).any(dim=2)
         _lm = self._imp_adj_land_min[k]
         if _lm > 0:
             nb = self.neigh
@@ -9510,18 +9521,41 @@ class SimSeats:
 
     def _imp_feat_plane(self) -> torch.Tensor | None:
         """[B, T, 6] — what an improvement pays extra for standing on one of
-        its `featureYields` features (the Sphinx on Floodplains), None where
-        no row carries the column."""
-        if not self._imp_feat_any:
+        its `featureYields` features (the Sphinx on Floodplains), and what its
+        `plotModifierYields` rows pay where they hold (`plotModifierHolds`:
+        shallow water on or beside the plot, the live feature on or beside
+        it); None where no row carries either column."""
+        if not self._imp_feat_any and not self._imp_plot_mod_any:
             return None
         live = (self.feat_id >= 0) & ~self.feat_stripped
-        on = torch.zeros(self.B, self.T, dtype=torch.bool, device=self.device)
-        for k, feats in enumerate(self._imp_feat_list):
-            if feats:
-                on |= (self.improvement == k) & live & torch.isin(
-                    self.feat_id, torch.tensor(feats, dtype=torch.long, device=self.device))
-        return (self._imp_gather(self._imp_feat_y.unsqueeze(0).expand(self.B, -1, -1))
-                * on.unsqueeze(2).to(self.dtype))
+        out = torch.zeros(self.B, self.T, 6, dtype=self.dtype, device=self.device)
+        if self._imp_feat_any:
+            on = torch.zeros(self.B, self.T, dtype=torch.bool, device=self.device)
+            for k, feats in enumerate(self._imp_feat_list):
+                if feats:
+                    on |= (self.improvement == k) & live & torch.isin(
+                        self.feat_id, torch.tensor(feats, dtype=torch.long, device=self.device))
+            out = out + (self._imp_gather(self._imp_feat_y.unsqueeze(0).expand(self.B, -1, -1))
+                         * on.unsqueeze(2).to(self.dtype))
+        if self._imp_plot_mod_any:
+            nb = self.neigh
+            nbc = nb.clamp(min=0)
+            for k, rows in enumerate(self._imp_plot_mod):
+                if not rows:
+                    continue
+                here = (self.improvement == k) & ~self.pillaged
+                if not bool(here.count_nonzero()):
+                    continue
+                for y, sw, f in rows:
+                    hold = here.clone()
+                    if sw:
+                        hold &= self.shallow_adj
+                    if f >= 0:
+                        lf = live & (self.feat_id == f)
+                        hold &= lf | (lf[:, nbc] & (nb >= 0).unsqueeze(0)).any(dim=2)
+                    out = out + hold.unsqueeze(2).to(self.dtype) * torch.tensor(
+                        y, dtype=self.dtype, device=self.device).reshape(1, 1, 6)
+        return out
 
     def _imp_unique_plane(self, row: int) -> torch.Tensor | None:
         """[B, T, 6] — the four yield clauses a UNIQUE improvement carries that
@@ -10720,6 +10754,17 @@ class SimSeats:
                 continue
             here = live & (self.improvement == k)
             if not bool(here.count_nonzero()):
+                continue
+            lim, lc, llim = self._imp_amen_stack[k]
+            if lim >= 0:
+                # CIV6 (`SubjectStackLimit`): at most `lim` of the row's
+                # payments reach one city, `llim` once its owner holds civic `lc`
+                cnt = torch.zeros(self.B, self.RC, dtype=torch.float64, device=self.device)
+                cnt = cnt.scatter_add(1, sl.clamp(min=0), here.double())
+                cap = torch.full((self.B,), float(lim), dtype=torch.float64, device=self.device)
+                if lc >= 0:
+                    cap = torch.where(self._seat_civics(row)[:, lc], torch.full_like(cap, float(llim)), cap)
+                z = z + torch.minimum(cnt, cap.unsqueeze(1)) * float(amt)
                 continue
             pay = here.double() * float(amt) + (here & wet).double() * float(wamt)
             z = z.scatter_add(1, sl.clamp(min=0), pay)

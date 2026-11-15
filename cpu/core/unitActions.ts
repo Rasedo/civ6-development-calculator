@@ -24,7 +24,9 @@ export const IMPROVEMENT_IDS: readonly string[] = ['FARM', 'MINE', 'LUMBER_MILL'
   // ...and Granada's Alcázar after that
   'ALCAZAR',
   // ...and Nazca's Nazca Line after that
-  'NAZCA_LINE'];
+  'NAZCA_LINE',
+  // ...and Cahokia's Mound, Samarkand's Trading Dome and Rapa Nui's Moai
+  'MOUND', 'TRADING_DOME', 'MOAI'];
 
 export const DEDICATED_IMPROVEMENTS = 3;
 

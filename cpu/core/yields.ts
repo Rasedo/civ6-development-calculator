@@ -89,6 +89,17 @@ export function improvementAdjacency(ctx: YieldCtx, tile: Tile, imp: Improvement
   return out;
 }
 
+/** an improvement's `plotModifierYields` row holds on `tile`: shallow water
+ *  (Coast or Lake) on it or beside it, or the live feature on it or beside
+ *  it (`_imp_feat_plane`) */
+export function plotModifierHolds(map: GameMap, tile: Tile,
+  r: { nearShallowWater?: boolean; nearFeature?: FeatureId }): boolean {
+  if (r.nearShallowWater && !onOrNextToShallowWater(map, tile)) return false;
+  if (r.nearFeature && tile.feature !== r.nearFeature
+      && !neighbors(map, tile).some((n) => n.feature === r.nearFeature)) return false;
+  return true;
+}
+
 /** CIV6 (Feature_AdjacentYields): what the natural wonders beside `tile` pay
  *  it, one row per neighbouring wonder plot. */
 export function wonderAdjacentYields(map: GameMap, tile: Tile): Yields {
@@ -195,6 +206,9 @@ export function tileYields(ctx: YieldCtx, tile: Tile): Yields {
     if (IMPROVEMENTS[imp].riverYields && hasRiver(tile)) addYields(out, IMPROVEMENTS[imp].riverYields!);
     const fy = IMPROVEMENTS[imp].featureYields;
     if (fy && tile.feature !== null && fy.features.includes(tile.feature)) addYields(out, fy.yields);
+    for (const r of IMPROVEMENTS[imp].plotModifierYields ?? []) {
+      if (plotModifierHolds(ctx.map, tile, r)) addYields(out, r.yields);
+    }
     // The Seaside Resort's gold IS the tile's appeal (real Civ 6),
     // so it cannot live in the static roster row. Negative appeal pays nothing.
     if (imp === 'SEASIDE_RESORT') out.gold += Math.max(0, tileAppeal(ctx.map, tile, ctx.camps, ctx.gpAppeal));
