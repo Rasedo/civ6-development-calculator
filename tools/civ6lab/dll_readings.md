@@ -16343,3 +16343,88 @@ capture of `_cv_yields_seen` (gpu/core/sim_minors.py).
 - Open (C-130): runs/h1_duelq1124 Bologna t245 — the game's t244
   government values read its route's origin Gold as record 245 holds it
   (11.40625; records 241-244 10.7734375), ours a turn later.
+
+## C-125 / C-95: the planning's unmoved flag, a district's blow back, the combat's kind from its members, the camp strike's push — READ (0x791e00 at 0x791eb6..0x791ec4, 0x791470 at 0x7916fb..0x79174f / 0x7917f7..0x7918f7, 0x205720 at 0x205835..0x20592f, 0x209550, 0x772940 at 0x772a85..0x772ad3 / 0x772eea / 0x772f78), both twins
+
+`search`'s `unmoved`, `predictBlow`'s kind, `planUnit`'s district branch,
+`defendCamps` (cpu/core/tactical.ts), `predictDistrictExchange`
+(cpu/core/combat.ts); GPU `_tac_search`'s `unmoved`, `_tac_predict_pool`'s
+kind, `_tac_plan`'s district jobs, `_tac_assign`'s district back dealt, the
+camp strike in `_tac_pass` (gpu/core/sim_tactics.py),
+`_predict_district_exchange` (gpu/core/sim_seats.py). Read on the game's own
+planning memory (`<stem>.aiunits.jsonl`, the `plans` of the `tacpass`
+records: the reach with turns and Movement, each target's spots and blows).
+
+- THE PLANNING'S UNMOVED FLAG: UnitPlanning 0x791e00 passes its search the
+  flags 0x115 (0x791eb6..0x791ec4) with the full-Movement start: bit 8, the
+  unmoved flag, is its own, whatever Movement the unit holds. A first step
+  dearer than the full Movement spends it all in turn 1. The planning is
+  built before the operations' trees move a unit (846 of 8,187 plans of
+  runs/h1_duels1121 open on a plot the unit has left by the tactical
+  pass's record) and for a unit of no Movement alike.
+- ON THE RECORDS: a unit of no Movement is planned from its full Movement
+  (runs/h1_duels1121 t1 the barbarian Spearman 65536 on 12:14, raised that
+  turn, Movement 0 at the tactical pass's record: its reach opens 12:14 at
+  (1/512)). No recorded plan tells the flag apart from the
+  Movement left — a unit short of Movement at its planning beside a step
+  dearer than its full Movement —: with the flag carried the plans the
+  engines share with the game's stand as before (runs/h1_duels1124: 4,235
+  of 4,592 reach lists equal either way) and no scored row moves.
+- THE COMBAT'S KIND FROM ITS MEMBERS (0x211cc0 -> 0x209870 -> 0x209550, a
+  unit on a unit): an attacker of the air domain COMBAT_AIR; two units of a
+  religious strength 0x5e2f7468; RANGED (0x2ec4ce4d) where GetRangedCombat
+  0x56e3e0 is above 0, above GetBombardCombat 0x56daa0 and above
+  GetCombat 0x56dc90(unit, 0); BOMBARD (0x4fc9163d) where the bombard is
+  above 0, above the ranged and above GetCombat; else MELEE (0x2ca3edd1).
+  GetCombat of an embarked land unit is its owner's era's embarked
+  strength: an embarked unit of a ranged strike fights in melee, both ways,
+  where that strength is not under its ranged strength. 0x205720 dispatches
+  on the kind: 0x205f70 melee, 0x206f40 ranged, 0x204a00 bombard, 0x202440
+  air, 0x207e60 religious, 0x205eb0 for 0x61c414a2.
+- CONFIRMED: runs/h1_duels1124 t198 player 1's embarked Skirmisher 2293776
+  (58 damage) on 21:8, a LOW target of the barbarian Galley 720906 (28
+  damage, on 20:9): dealt 14, taken 0, per spot back taken 65 / back dealt
+  14 (the Galley 1179665, unhurt: 17 / 0, 54 / 17); as a shot the engines
+  held 14 / 0 and 12 / 0.
+- A DISTRICT'S BLOW (0x791470's district branch, 0x791677..0x79174f): the
+  simulation's member 1 is the district (0x213d30); the dealt word (+0x64)
+  is the larger of its two damage words ([rbp-0xc] the hit points', [rbp-8]
+  the outer defence's), the taken word (+0x7c) member 0's ([rbp-0x54]);
+  the kill byte and `wins` compare that larger word with the hit points
+  left (0x24b290 less 0x24ae50 under 0x5e97d629).
+- A DISTRICT'S BLOW BACK (0x7917f7..0x7918f7): the district's strike
+  strength 0x249ee0 asked with its flag clear (0 unless the outer defence
+  0x24b960 stands) gates it; with none every spot keeps 0 / 0. With one the
+  members are swapped (0x213d30 the district as member 0, 0x213e00 the unit
+  as member 1) and 0x205720 runs per spot, then +0x94 takes [rbp-0xc] and
+  +0xac [rbp-0x54]. On the records the swapped run writes neither word:
+  every spot of a district with a strike holds the forward run's — back
+  taken the hit points' damage the unit deals, back dealt the damage the
+  unit takes (5,571 of 5,571 spots of the five games' plans with back
+  dealt equal to taken; back taken 1 under standing walls on 5,311, else
+  at most the dealt word: 82 of 82 on Rome's 42:20 at runs/h1_duels1128
+  t212). The swapped run's own path (0x209870's district attacker through
+  0x209480) is unread.
+- CONFIRMED: runs/h1_duels1121 t160 the camp 3:19's Spearman 1376265 (27
+  damage) on 3:18: player 1's Encampment 5:15 dealt 1 / taken 100, its spot
+  5:16 back taken 1 / back dealt 100; player 0's Warrior 131073 on 3:16
+  dealt 27 / taken 33, the spot 3:17 back taken 37 / back dealt 24. No
+  target's first spot holds a back dealt of 0, so the camp strike's `out`
+  (r12b, 0x772a85..0x772ad3) opens clear and the melee Spearman takes no
+  spot off its camp: 0x773fb0 to the camp with its flag clear, the camp
+  held by its Skirmisher — no step, its moves ended, as logged (the engines
+  held the Encampment's blow back at 0 / 0, `out` set, and picked 3:17).
+  runs/h1_duels1128 t242 the Cavalry 7012372 (67 damage) on Rome's breached
+  42:20: dealt 56 / taken 16, 0 / 0 on its five spots.
+- THE CAMP STRIKE'S PUSH (0x772940 at 0x772eea / 0x772f78 -> 0x526a0 at
+  0x52788..0x527ac, mode 0 with the parameters' +0x20 clear): the strike
+  empties the unit's queue and starts at once. Ported: `defendCamps` and
+  the GPU's camp strike set the shot or the move onto the target out from
+  where the unit stands, a move its spot's walk left waiting carried no
+  further.
+- OPEN: the outer defence's damage word in the planning's dealt and `wins`
+  (the engines hold the hit points' damage alone: `predictCityBlow`); the
+  Encampment's own damage loss in its strength (0x51eaf0); the swapped
+  run's path for a district attacker (0x209480); the planning of an
+  embarked unit with a range (0x790c60's range read, the engines' `rangeOf`
+  the type's).

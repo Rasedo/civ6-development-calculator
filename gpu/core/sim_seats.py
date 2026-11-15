@@ -15592,6 +15592,63 @@ class SimSeats:
         """[B] `predictCityBlow`: the exchange's blow (`_predict_city_exchange`)"""
         return self._predict_city_exchange(pre, us, tgt)[0]
 
+    def _predict_district_exchange(self, pre: str, us: torch.Tensor,
+                                   tgt: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+        """[B] three times `predictDistrictExchange` for the unit at local
+        slot `us` [B] of pool `pre` on the COMBAT_DISTRICT at `tgt` [B]: a
+        city centre's exchange (`_predict_city_exchange`) or an Encampment's
+        — the hit points' damage dealt, the damage a melee unit takes, the
+        law at its expectation on the strengths its assault or shot resolves
+        on (`_attack_encampment`, `_ranged_strike_encampment`), the standing
+        outer defence's share off, a blow felling both sides as
+        `_district_both_fall` — and whether the district's strike stands
+        (its outer defence above 0)"""
+        B, dev = self.B, self.device
+        bidx = torch.arange(B, device=dev)
+        blow, took = self._predict_city_exchange(pre, us, tgt)
+        ttc = tgt.clamp(min=0)
+        ctr = self._centre_seat_plane().gather(1, ttc.unsqueeze(1)).squeeze(1)
+        city = self._centre_target_seat(ctr) >= 0
+        hrow = self._holder_row(ctr)
+        hcol = self.centre_slot_at.gather(1, ttc.unsqueeze(1)).squeeze(1).clamp(min=0)
+        if self.S > 0:
+            csx = self.citystate_at.gather(1, ttc.unsqueeze(1)).squeeze(1).clamp(min=0, max=self.S - 1)
+            hrow = torch.where(city, hrow, self._CITY_MINOR0 + csx)
+            hcol = torch.where(city, hcol, torch.zeros_like(hcol))
+        pool = torch.minimum(self.city_outer_hp[bidx, hrow, hcol].long(), self._walls_max_at(hrow, hcol).long())
+        shoots = (tgt >= 0) & (blow > 0) & (pool > 0)
+        if self._encamp_didx < 0:
+            return blow, took, shoots
+        enc = (tgt >= 0) & (us >= 0) & (self.district.gather(1, ttc.unsqueeze(1)).squeeze(1) == self._encamp_didx)
+        if not bool(enc.any()):
+            return blow, took, shoots
+        _hp_p, _tile_p, _type_p, _xp_p, _emb_p, _alive_p, _seat_p = self._pool_of(pre)
+        def_cs, _hrow, _hcol, wtier, held = self._encamp_terms(ttc)
+        emax = torch.where(held, self._walls_tier_hp[wtier], torch.zeros_like(self._walls_tier_hp[wtier])).to(torch.long)
+        outer = torch.minimum(self.encamp_outer_hp[bidx, ttc].to(torch.long), emax)
+        hseat = self.tile_seat.gather(1, ttc.unsqueeze(1)).squeeze(1)
+        roll = torch.full((B,), self._dmg_max_extra // 2, dtype=torch.long, device=dev)
+        for u in torch.unique(us[enc]).tolist():
+            a_seat = _seat_p[:, u]
+            m = enc & (us == u) & self._encamp_block(ttc.unsqueeze(1), a_seat.unsqueeze(1)).squeeze(1)
+            if not bool(m.any()):
+                continue
+            ut0 = _type_p[:, u].clamp(min=0, max=self.NU - 1)
+            ranged = self._type_ranged_strength.take(ut0) > 0
+            atk = torch.where(ranged, self._city_ranged_atk_cs(pre, u, tgt, outer, hseat).to(torch.float64),
+                              self._city_assault_atk_cs(pre, u, tgt).to(torch.float64))
+            assist = torch.where(ranged, torch.zeros_like(wtier), self._siege_assist(a_seat, ut0, ttc, wtier))
+            share = torch.where((outer > 0) & (emax > 0) & ((assist & ASSIST_TOWER) == 0),
+                                torch.div(outer * 256, emax.clamp(min=1), rounding_mode="floor"), torch.zeros_like(outer))
+            raw = self._damage_raw(roll, atk - def_cs.to(torch.float64))
+            b = (raw - torch.div(raw * share, 256, rounding_mode="floor")).clamp(min=self._dmg_min, max=self._encamp_hp_max)
+            back = self._damage_expected(def_cs.to(torch.float64) - atk)
+            mb, mk = self._district_both_fall(b, self.encamp_hp[bidx, ttc].to(torch.long), back, _hp_p[:, u])
+            blow = torch.where(m, torch.where(ranged, b, mb).to(blow.dtype), blow)
+            took = torch.where(m, torch.where(ranged, torch.zeros_like(took), mk.to(took.dtype)), took)
+            shoots = torch.where(m, outer > 0, shoots)
+        return blow, took, shoots
+
     def _predict_city_exchange(self, pre: str, us: torch.Tensor, tgt: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
         """[B] twice `predictCityExchange`: the predicted damage the unit at
         local slot `us` [B] of pool `pre` deals the city centre at `tgt` [B]

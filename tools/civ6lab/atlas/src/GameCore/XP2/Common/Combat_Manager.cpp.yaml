@@ -115,6 +115,7 @@
   readings:
     - "C-98: the unit efficiencies — READ (0x79a440, its simulated combats 0x205720 off the map), ported: every entry the logged table's"
     - "C-98: the unit efficiencies"
+    - "C-125 / C-95: the planning's unmoved flag, a district's blow back, the combat's kind from its members, the camp strike's push — READ (0x791e00 at 0x791eb6..0x791ec4, 0x791470 at 0x7916fb..0x79174f / 0x7917f7..0x7918f7, 0x205720 at 0x205835..0x20592f, 0x209550, 0x772940 at 0x772a85..0x772ad3 / 0x772eea / 0x772f78), both twins"
   context:
     - "...s 17 on a land defender, a land unit's ranged blow 17 on a naval one. THE AIR STRIKE (0x202440 -> 0x203cb0, the interceptor +0x10 and the anti-air cover +0x18 null): on an air target..."
   review: reviewed
@@ -140,6 +141,16 @@
     - "Rules_Combat 0x5197e0 (called by every resolver; the air strike 0x203cb0 picks the combat type 0x204451: BOMBARD when the plane's Bombard > its Ranged). Check: `d..."
     - "- The air resolver 0x203cb0 (struct: [+0] the plane, [+8] the target, [+0x10] the interceptor, [+0x18] the anti-air..."
   review: reviewed
+- addr: 0x204a00
+  final: 0x156090
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-125 / C-95: the planning's unmoved flag, a district's blow back, the combat's kind from its members, the camp strike's push — READ (0x791e00 at 0x791eb6..0x791ec4, 0x791470 at 0x7916fb..0x79174f / 0x7917f7..0x7918f7, 0x205720 at 0x205835..0x20592f, 0x209550, 0x772940 at 0x772a85..0x772ad3 / 0x772eea / 0x772f78), both twins"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...its ranged strength. 0x205720 dispatches on the kind: 0x205f70 melee, 0x206f40 ranged, 0x204a00 bombard, 0x202440 air, 0x207e60 religious, 0x205eb0 for 0x61c414a2."
+  review: imported
 - addr: 0x204b10
   final: 0x156120
   kind: function
@@ -162,7 +173,7 @@
 - addr: 0x205720
   final: 0x156ae0
   kind: function
-  semantics: "a combat simulation off the map (the efficiencies' two per pair): the damage each side takes (+0x7c / +0xc4 words). 0x205720(combat, 1, 1) resolves by the combat's kind (0x206f40 the melee one) on the units as they stand — their damage, promotions and fortification untouched by a forward result: the blow back reads the unit's own fortification. The combat's kind (0x209550): an air attacker's COMBAT_AIR; else RANGED where RangedCombat tops Bombard and Combat, BOMBARD where Bombard tops both, else MELEE (the Giant Death Robot's 120 under its 130 Combat fights melee). Each side's strength its base (0x56dc90 / 0x56e3e0 / 0x56daa0) plus the strength terms (0x51c810 attacking, 0x51f070 defending)."
+  semantics: "a combat simulation off the map (the efficiencies' two per pair): the damage each side takes (+0x7c / +0xc4 words). 0x205720(combat, 1, 1) resolves by the combat's kind (+0x50, set from the members where -1: 0x205f70 melee 0x2ca3edd1, 0x206f40 ranged 0x2ec4ce4d, 0x204a00 bombard 0x4fc9163d, 0x202440 air, 0x207e60 religious, 0x205eb0 for 0x61c414a2) on the units as they stand — their damage, promotions and fortification untouched by a forward result: the blow back reads the unit's own fortification. The combat's kind (0x209550): an air attacker's COMBAT_AIR; else RANGED where RangedCombat tops Bombard and Combat, BOMBARD where Bombard tops both, else MELEE (the Giant Death Robot's 120 under its 130 Combat fights melee). Each side's strength its base (0x56dc90 / 0x56e3e0 / 0x56daa0) plus the strength terms (0x51c810 attacking, 0x51f070 defending)."
   status: PARTLY
   cases:
     - recording: h1_duelw1117
@@ -182,6 +193,7 @@
     - "C-125: the planning's blow back where both blows would kill — READ, ported"
     - "C-110 / C-125: an embarked unit's strengths in a unit's blow, a promotion's side, ground closed to a strike — READ (0x51f070 at 0x51f3ef..0x51f457, 0x206960 at 0x2069b4..0x2069e0 and 0x206a78..0x206b29, 0x520270 at 0x520576..0x5205db, 0x5228c0, 0x77a4b0), FIT (the closed ground), both twins"
     - "C-110 / C-125: the amphibious penalty reads the plot the defender stands on — READ (0x51bba0, 0x51c810 at 0x51cb7a..0x51cba1, 0x51d670 at 0x51d92e..0x51d957, 0x205f70, 0x211cc0, 0x209870), both twins"
+    - "C-125 / C-95: the planning's unmoved flag, a district's blow back, the combat's kind from its members, the camp strike's push — READ (0x791e00 at 0x791eb6..0x791ec4, 0x791470 at 0x7916fb..0x79174f / 0x7917f7..0x7918f7, 0x205720 at 0x205835..0x20592f, 0x209550, 0x772940 at 0x772a85..0x772ad3 / 0x772eea / 0x772f78), both twins"
   context:
     - "...ombat 0) 1.0; one without against one with 0.01 / 100.0; else two combat simulations (0x205720) of the neutral player's units, each attacking the other: the damage each takes in both..."
   review: reviewed
@@ -194,6 +206,16 @@
   context:
     - "...: 0x1fbae0 sets its fortify turns to 0 (0x5707b0(attacker, 0)) once the result is made (0x205da0). Fortification grows only in the Fortify operation's tick (0x95ebb0, 0x960800, 0x959..."
   review: reviewed
+- addr: 0x205eb0
+  final: 0x156e10
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-125 / C-95: the planning's unmoved flag, a district's blow back, the combat's kind from its members, the camp strike's push — READ (0x791e00 at 0x791eb6..0x791ec4, 0x791470 at 0x7916fb..0x79174f / 0x7917f7..0x7918f7, 0x205720 at 0x205835..0x20592f, 0x209550, 0x772940 at 0x772a85..0x772ad3 / 0x772eea / 0x772f78), both twins"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...d: 0x205f70 melee, 0x206f40 ranged, 0x204a00 bombard, 0x202440 air, 0x207e60 religious, 0x205eb0 for 0x61c414a2."
+  review: imported
 - addr: 0x205f70
   final: 0x156e90
   kind: function
@@ -202,6 +224,7 @@
   readings:
     - "C-125: the planning's blow back where both blows would kill — READ, ported"
     - "C-110 / C-125: the amphibious penalty reads the plot the defender stands on — READ (0x51bba0, 0x51c810 at 0x51cb7a..0x51cba1, 0x51d670 at 0x51d92e..0x51d957, 0x205f70, 0x211cc0, 0x209870), both twins"
+    - "C-125 / C-95: the planning's unmoved flag, a district's blow back, the combat's kind from its members, the camp strike's push — READ (0x791e00 at 0x791eb6..0x791ec4, 0x791470 at 0x7916fb..0x79174f / 0x7917f7..0x7918f7, 0x205720 at 0x205835..0x20592f, 0x209550, 0x772940 at 0x772a85..0x772ad3 / 0x772eea / 0x772f78), both twins"
   notes: [read whole; no recorded case tells it apart]
   context:
     - "...e combat's location the spot (+0x48, 0x7918b0). A melee blow resolves through 0x205720 -> 0x205f70 -> 0x206960, whose result already holds the mutual-kill rule (0x206c34..0x206d62): where..."
@@ -295,7 +318,9 @@
     - recording: h1_duelw1117
       turn: 9
       value: "So the blow back reads the unit's own   fortification (runs/h1_duelw1117 t9: city-state 2's Warrior 131073 at 60   health, fortified 2 on 14:10 at the turn's start: 30 taken + 26 back, the   spot kept"
-  readings: ["C-95: Attack Units — READ, ported"]
+  readings:
+    - "C-95: Attack Units — READ, ported"
+    - "C-125 / C-95: the planning's unmoved flag, a district's blow back, the combat's kind from its members, the camp strike's push — READ (0x791e00 at 0x791eb6..0x791ec4, 0x791470 at 0x7916fb..0x79174f / 0x7917f7..0x7918f7, 0x205720 at 0x205835..0x20592f, 0x209550, 0x772940 at 0x772a85..0x772ad3 / 0x772eea / 0x772f78), both twins"
   context:
     - "...ender, still on its own plot). 0x205720(combat, 1, 1) resolves it by the combat's kind (0x206f40 the melee one) on the units as they stand — their damage, promotions and fortification..."
   review: reviewed
@@ -349,6 +374,16 @@
   context:
     - "...100 leaves the attacker at 99 (the overshoots equal, 0x206d01 `jle`). The ranged result 0x207a80: the attacker takes none. The domain term (0x51c810, \"H-1: the melee result, a ranged..."
   review: reviewed
+- addr: 0x207e60
+  final: 0x158700
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-125 / C-95: the planning's unmoved flag, a district's blow back, the combat's kind from its members, the camp strike's push — READ (0x791e00 at 0x791eb6..0x791ec4, 0x791470 at 0x7916fb..0x79174f / 0x7917f7..0x7918f7, 0x205720 at 0x205835..0x20592f, 0x209550, 0x772940 at 0x772a85..0x772ad3 / 0x772eea / 0x772f78), both twins"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...patches on the kind: 0x205f70 melee, 0x206f40 ranged, 0x204a00 bombard, 0x202440 air, 0x207e60 religious, 0x205eb0 for 0x61c414a2."
+  review: imported
 - addr: 0x208b80
   final: 0x159250
   kind: function
@@ -437,19 +472,37 @@
     - "...s with HitPoints: the centre and the Encampment) 0x24b170 takes the plot's best defender (0x208b80) where it is a combat unit (0x209dd0: Combat, Ranged or Bombard above 0) and, with a Mili..."
     - "...live: the base 0x24a000 plus the garrison term 0x24a180 over the plot's best defender 0x208b80. The record's unit list stands before the in-turn player's start while the plot reads t..."
   review: reviewed
+- addr: 0x209480
+  final: 0x159b10
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-125 / C-95: the planning's unmoved flag, a district's blow back, the combat's kind from its members, the camp strike's push — READ (0x791e00 at 0x791eb6..0x791ec4, 0x791470 at 0x7916fb..0x79174f / 0x7917f7..0x7918f7, 0x205720 at 0x205835..0x20592f, 0x209550, 0x772940 at 0x772a85..0x772ad3 / 0x772eea / 0x772f78), both twins"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - .../h1_duels1128 t212). The swapped run's own path (0x209870's district attacker through 0x209480) is unread.
+    - "...damage loss in its strength (0x51eaf0); the swapped run's path for a district attacker (0x209480); the planning of an embarked unit with a range (0x790c60's range read, the engines' `r..."
+  review: imported
 - addr: 0x209550
   final: 0x159b60
   kind: function
-  semantics: "the combat type of a unit pair: COMBAT_AIR for an air attacker; RANGED where RangedCombat tops Bombard and Combat; BOMBARD where Bombard tops both; else MELEE."
+  semantics: "the combat type of a unit pair: COMBAT_AIR 0x46a0d8c5 for an attacker of the air domain (+0x650 1); 0x5e2f7468 where both hold a religious strength (+0x1ce0); RANGED 0x2ec4ce4d where GetRangedCombat 0x56e3e0 is above 0, above GetBombardCombat 0x56daa0 and above GetCombat 0x56dc90(unit, 0); BOMBARD 0x4fc9163d where the bombard is above 0, above the ranged and above GetCombat; else MELEE 0x2ca3edd1. GetCombat of an embarked land unit is its owner's era's embarked strength, so an embarked unit of a ranged strike fights in melee where that is not under its ranged strength."
   status: READ
   cases:
     - recording: AI_UnitEfficiency.csv
       value: "the unit-efficiency job's simulated combats: 20,736 of 20,736 entries at the printed 0.01"
-  impl: [cpu/core/aiUnitEfficiency.ts:combatType]
+    - recording: h1_duels1124
+      turn: 198
+      value: "player 1's embarked Skirmisher 2293776 (58 damage) on 21:8 under the barbarian Galley 720906 (28 damage): the planning's dealt 14 / taken 0, back taken 65 / back dealt 14 on its six spots; the Galley 1179665, unhurt: 17 / 0 and 54 / 17 (aiunits tacpass plans)"
+  impl:
+    - cpu/core/aiUnitEfficiency.ts:combatType
+    - cpu/core/tactical.ts:predictBlow
+    - gpu/core/sim_tactics.py:_tac_predict_pool
   readings:
     - "C-98: the unit efficiencies — READ (0x79a440, its simulated combats 0x205720 off the map), ported: every entry the logged table's"
     - "C-98: the unit efficiencies"
     - "C-110 / C-125: the amphibious penalty reads the plot the defender stands on — READ (0x51bba0, 0x51c810 at 0x51cb7a..0x51cba1, 0x51d670 at 0x51d92e..0x51d957, 0x205f70, 0x211cc0, 0x209870), both twins"
+    - "C-125 / C-95: the planning's unmoved flag, a district's blow back, the combat's kind from its members, the camp strike's push — READ (0x791e00 at 0x791eb6..0x791ec4, 0x791470 at 0x7916fb..0x79174f / 0x7917f7..0x7918f7, 0x205720 at 0x205835..0x20592f, 0x209550, 0x772940 at 0x772a85..0x772ad3 / 0x772eea / 0x772f78), both twins"
   context:
     - "- THE SIMULATION'S COMBAT (0x205720 -> the type of 0x209550): an air attacker's COMBAT_AIR; else RANGED where RangedCombat tops Bombard and Comba..."
   review: reviewed
@@ -461,6 +514,7 @@
   status: PARTLY
   readings:
     - "C-110 / C-125: the amphibious penalty reads the plot the defender stands on — READ (0x51bba0, 0x51c810 at 0x51cb7a..0x51cba1, 0x51d670 at 0x51d92e..0x51d957, 0x205f70, 0x211cc0, 0x209870), both twins"
+    - "C-125 / C-95: the planning's unmoved flag, a district's blow back, the combat's kind from its members, the camp strike's push — READ (0x791e00 at 0x791eb6..0x791ec4, 0x791470 at 0x7916fb..0x79174f / 0x7917f7..0x7918f7, 0x205720 at 0x205835..0x20592f, 0x209550, 0x772940 at 0x772a85..0x772ad3 / 0x772eea / 0x772f78), both twins"
   notes: [0x209700 and 0x209480 unread]
   context:
     - ...bba0, 0x51c810 at 0x51cb7a..0x51cba1, 0x51d670 at 0x51d92e..0x51d957, 0x205f70, 0x211cc0, 0x209870), both twins
@@ -658,8 +712,10 @@
   kind: function
   semantics: sets the combat's kind (+0x50) from its members (0x209870), asserting it is not NO_COMBAT (-1); the planning's simulation calls it after setting the sides and the location, before 0x205720 (0x7916d6, 0x7918c1).
   status: PARTLY
+  impl: [cpu/core/tactical.ts:predictBlow]
   readings:
     - "C-110 / C-125: the amphibious penalty reads the plot the defender stands on — READ (0x51bba0, 0x51c810 at 0x51cb7a..0x51cba1, 0x51d670 at 0x51d92e..0x51d957, 0x205f70, 0x211cc0, 0x209870), both twins"
+    - "C-125 / C-95: the planning's unmoved flag, a district's blow back, the combat's kind from its members, the camp strike's push — READ (0x791e00 at 0x791eb6..0x791ec4, 0x791470 at 0x7916fb..0x79174f / 0x7917f7..0x7918f7, 0x205720 at 0x205835..0x20592f, 0x209550, 0x772940 at 0x772a85..0x772ad3 / 0x772eea / 0x772f78), both twins"
   notes: [read whole (28 instructions); no recorded case tells it apart]
   context:
     - ...READ (0x51bba0, 0x51c810 at 0x51cb7a..0x51cba1, 0x51d670 at 0x51d92e..0x51d957, 0x205f70, 0x211cc0, 0x209870), both twins

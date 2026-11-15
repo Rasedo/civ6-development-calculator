@@ -55,6 +55,7 @@
     - cpu/core/tactical.ts:ReachSearch
     - cpu/core/tactical.ts:reach
     - cpu/core/tactical.ts:c
+    - cpu/core/tactical.ts:unmoved
   readings:
     - "C-99 / C-128: a danger feature is no step of a search, a land unit's danger stops at the shore — READ (0x271be0 at 0x271fd3, 0x2720a0 at 0x27216c, 0x26e570), both twins"
     - "C-95: the danger map's search pays no zone of control, a ranged unit strikes from its range; the rampage strike's ring — READ (0x26df90, 0x26e920, 0x771670, 0x691f0, 0x76ecf0), FIT (the ranged unit's strike), both twins"

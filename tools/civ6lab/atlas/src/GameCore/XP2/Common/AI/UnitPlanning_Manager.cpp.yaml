@@ -56,6 +56,7 @@
     - "C-125: a melee unit's spot beside its target — READ (0x790c60 at 0x790faa..0x79103c, 0x776140's claim loop, 0x7702b0), both twins"
     - "C-95: the planning strikes a religious unit and a Trader on their plot, its foreign test reads the mover's map layer, the blow on them 1.5 x their health — READ (0x790c60 at 0x790f22, 0x790fc9..0x791016, 0x7910b3..0x791162; 0x791470 at 0x791703..0x79174a, 0x7917b1..0x7917f7; 0x793400), both twins"
     - "C-110 / C-125: an embarked unit's strengths in a unit's blow, a promotion's side, ground closed to a strike — READ (0x51f070 at 0x51f3ef..0x51f457, 0x206960 at 0x2069b4..0x2069e0 and 0x206a78..0x206b29, 0x520270 at 0x520576..0x5205db, 0x5228c0, 0x77a4b0), FIT (the closed ground), both twins"
+    - "C-125 / C-95: the planning's unmoved flag, a district's blow back, the combat's kind from its members, the camp strike's push — READ (0x791e00 at 0x791eb6..0x791ec4, 0x791470 at 0x7916fb..0x79174f / 0x7917f7..0x7918f7, 0x205720 at 0x205835..0x20592f, 0x209550, 0x772940 at 0x772a85..0x772ad3 / 0x772eea / 0x772f78), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ...t again keeps its place and takes the fewer turns, or at equal turns the more Movement (0x790c60). The planning runs once for every unit at the start of the AI's turn. Flag 0x800 skips...
@@ -145,7 +146,7 @@
   final: 0x51c4b0
   kind: function
   name: predictCombat
-  semantics: "the planning's combat simulation: the blow from where the attacker stands at the expected roll (COMBAT_MAX_EXTRA_DAMAGE/2); dealt +0x64, taken +0x7c, per spot the target's blow back +0x94 / +0xac; a kill sets +0x60 At 0x79174a: per spot dealt = the larger of the simulation's two results ([rbp-0xc], [rbp-8]; 150 a civilian or a Trader; a RELIGIOUS or TRADER target in a combat other than COMBAT_RELIGIOUS 0x5e2f7468 trunc(health x 1.5), 0x791703..0x79174a), the kill byte (+0xc4) dealt >= the target's health, `wins` (+0x60) dealt > it; the blow back per spot re-simulated (0x205720 with the sides swapped through 0x213e00, the location the spot) into +0x94 / +0xac, for a LOW..HIGH target or a RELIGIOUS one struck by a religious mover alone (0x7917b1..0x7917f7). The roll at COMBAT_MAX_EXTRA_DAMAGE / 2 (damageExpected); the strengths the blow resolves on from the plot the attacker stands on (meleeUnitStrengths, rangedUnitStrengths); a ranged blow and one on an embarked defender take none. Ported: predictBlow, _tac_predict."
+  semantics: "the planning's combat simulation: the blow from where the attacker stands at the expected roll (COMBAT_MAX_EXTRA_DAMAGE/2); dealt +0x64, taken +0x7c, per spot the target's blow back +0x94 / +0xac; a district's dealt the larger of its hit points' and its outer defence's damage words ([rbp-0xc], [rbp-8]); a district's blow back gated by its strike strength (0x249ee0, flag clear: 0 unless the outer defence stands), the swapped run 0x205720 leaving both result words as the forward run wrote them — back taken the hit points' damage the unit deals, back dealt the damage the unit takes — and 0 / 0 with no strike; a kill sets +0x60 At 0x79174a: per spot dealt = the larger of the simulation's two results ([rbp-0xc], [rbp-8]; 150 a civilian or a Trader; a RELIGIOUS or TRADER target in a combat other than COMBAT_RELIGIOUS 0x5e2f7468 trunc(health x 1.5), 0x791703..0x79174a), the kill byte (+0xc4) dealt >= the target's health, `wins` (+0x60) dealt > it; the blow back per spot re-simulated (0x205720 with the sides swapped through 0x213e00, the location the spot) into +0x94 / +0xac, for a LOW..HIGH target or a RELIGIOUS one struck by a religious mover alone (0x7917b1..0x7917f7). The roll at COMBAT_MAX_EXTRA_DAMAGE / 2 (damageExpected); the strengths the blow resolves on from the plot the attacker stands on (meleeUnitStrengths, rangedUnitStrengths); a ranged blow and one on an embarked defender take none. Ported: predictBlow, _tac_predict."
   status: READ
   cases:
     - recording: h1_duelq1128
@@ -162,6 +163,12 @@
     - recording: h1_duely1128
       turn: 242
       value: "Operation City Attack leaves the hurt Cavalry 7012372 on 42:21 (33 hit points) out: the city's blow 22 and its shot on the spot top its health; the Cavalry 7143430 on 41:19 takes 42:21 at turn 2, as logged"
+    - recording: h1_duels1121
+      turn: 160
+      value: "the camp's Spearman 1376265 on 3:18: player 1's Encampment 5:15 dealt 1 / taken 100, its spot 5:16 back taken 1 / back dealt 100; five games: 5,571 of 5,571 spots of a district with a strike hold back dealt equal to taken (aiunits tacpass plans)"
+    - recording: h1_duels1128
+      turn: 242
+      value: "the barbarian Cavalry 7012372 (67 damage) on Rome's breached 42:20: dealt 56 / taken 16, back taken 0 / back dealt 0 on its five spots"
   impl:
     - cpu/core/tactical.ts:predictBlow
     - cpu/core/tactical.ts:kills
@@ -179,8 +186,8 @@
     - gpu/core/sim_tactics.py:_tac_plan
     - cpu/core/tactical.ts:wins
     - cpu/core/combat.ts:predictCityExchange
-    - cpu/core/combat.ts:predictCityShot
-    - gpu/core/sim_tactics.py:_plan_city_shots
+    - cpu/core/combat.ts:predictDistrictExchange
+    - gpu/core/sim_seats.py:_predict_district_exchange
     - gpu/core/sim_phase.py:_city_shot_def
     - gpu/core/sim_phase.py:_city_shot_atk
     - cpu/core/combat.ts:districtDamageLoss
@@ -209,7 +216,7 @@
     - "C-123 / C-110: the barbarians' rules run as the first job of their AI turn start, after the DoTurn tail; a centre a player that is no major may not raze keeps its last hit point; a melee blow on a district that would fell both sides — READ (0x6096c0 at 0x6097af..0x609802, 0x608870, 0x7280a0, 0x1514a0, 0x14d25d; 0x248800, 0x533e50, 0x206080 at 0x206684..0x206715 and 0x206868..0x2068c8, 0x20dd30, 0x1fdea0 at 0x1fe098..0x1fe0ab), both twins"
     - "C-110 / C-125: an embarked unit's strengths in a unit's blow, a promotion's side, ground closed to a strike — READ (0x51f070 at 0x51f3ef..0x51f457, 0x206960 at 0x2069b4..0x2069e0 and 0x206a78..0x206b29, 0x520270 at 0x520576..0x5205db, 0x5228c0, 0x77a4b0), FIT (the closed ground), both twins"
     - "C-110 / C-125: the amphibious penalty reads the plot the defender stands on — READ (0x51bba0, 0x51c810 at 0x51cb7a..0x51cba1, 0x51d670 at 0x51d92e..0x51d957, 0x205f70, 0x211cc0, 0x209870), both twins"
-  notes: ["imported: READ in its section, no confirming case found beside it"]
+    - "C-125 / C-95: the planning's unmoved flag, a district's blow back, the combat's kind from its members, the camp strike's push — READ (0x791e00 at 0x791eb6..0x791ec4, 0x791470 at 0x7916fb..0x79174f / 0x7917f7..0x7918f7, 0x205720 at 0x205835..0x20592f, 0x209550, 0x772940 at 0x772a85..0x772ad3 / 0x772eea / 0x772f78), both twins"
   context:
     - "...each unit's spots per target from its planning (turns, the planning's combat simulation 0x791470: the damage dealt +0x64, received +0x7c, and against a counterattack +0x94 / +0xac); fo..."
   review: reviewed
@@ -230,8 +237,12 @@
 - addr: 0x791e00
   kind: function
   name: UnitPlanning
-  semantics: "plans one unit (AI Unit Planning's chunk body). Calls the breadth-first search 0x26dcd0 with its third argument 1 (flags 0x115), which installs the start callback 0x26eea0 at +0xa8. Ported: search's fromFull (planUnit), _tac_search's from_full."
-  status: PARTLY
+  semantics: "plans one unit (AI Unit Planning's chunk body). Calls the breadth-first search 0x26dcd0 with its third argument 1 and the flags 0x115 (0x791eb6..0x791ec4), which installs the start callback 0x26eea0 at +0xa8: the search sets out on the formation's full Movement and carries the unmoved flag 0x100 by its own flags, whatever Movement the unit holds. Ported: search's fromFull and unmoved (planUnit), _tac_search's from_full."
+  status: READ
+  cases:
+    - recording: h1_duels1121
+      turn: 1
+      value: "the barbarian Spearman 65536 on 12:14, raised that turn, Movement 0 at the tactical pass's record: its planning's reach opens 12:14 at (1/512), the full Movement (aiunits tacpass plans); no recorded plan tells the unmoved flag from the Movement left"
   impl:
     - cpu/core/tactical.ts:reachPlots
     - cpu/core/tactical.ts:planUnit
@@ -245,7 +256,7 @@
     - "C-95: the planning sets out on the full Movement, the walk on the turn's restored"
     - "C-99: a move order's search sets out on the pool finder's +0x1bc, the last full-Movement search's GetMaxMoves — READ (0x26f330, 0x77d10, 0x270d70, 0x26e920, 0x26eea0, 0x26dcd0, 0x26df90, 0x26e2c0, 0x26fe20 at 0x270309), unported"
     - "C-132 / C-128 / C-95 / C-123 / C-133: the danger map's unmoved flag, a unit made anew's place, the operation queue's push, the strike's turn, the raid's recruit, the shore tests — READ (0x26df90 at 0x26e128..0x26e159, 0x716400 at 0x71672d, 0x586360 at 0x586542..0x58657e / 0x5867ab..0x586875, 0x93fa10 at 0x93fd94..0x93fdab / 0x93fe79, 0x526a0 at 0x52788..0x527ac, 0x523e0, 0x55460, 0x962380 at 0x96268f, 0x60a440, 0x26e570 at 0x26e904, 0x2720a0 at 0x272618..0x272689), both twins"
-  notes: ["imported: READ in its section, no confirming case found beside it"]
+    - "C-125 / C-95: the planning's unmoved flag, a district's blow back, the combat's kind from its members, the camp strike's push — READ (0x791e00 at 0x791eb6..0x791ec4, 0x791470 at 0x7916fb..0x79174f / 0x7917f7..0x7918f7, 0x205720 at 0x205835..0x20592f, 0x209550, 0x772940 at 0x772a85..0x772ad3 / 0x772eea / 0x772f78), both twins"
   context:
     - ...h finder pool's count) chunks; N <= 1 plans each unit serially on the calling thread (0x791e00 per unit), else N-1 jobs, chunk 0 inline, then the wait. The pool (0xf01920, count at +...
     - "- The planning's reach (AI Unit Planning 0x792c90 -> 0x791e00 -> the breadth-first search 0x26dcd0 for 2 turns, flags 0x115 | 0x800 | 0x100 where t..."

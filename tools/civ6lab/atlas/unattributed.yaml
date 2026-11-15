@@ -1469,6 +1469,7 @@
   status: PARTLY
   readings:
     - "C-123 / C-95: a Trader stands on the trade layer; a city's shot is a COMBAT_DISTRICT spot's blow back — READ (0x901e0, 0x586360 -> 0x208b80, 0x585eb0 -> 0x585d90, 0x791470 at 0x7917f7..0x7918f7 -> 0x249ee0 / 0x205720, 0x776140 at 0x776780..0x7767fa), both twins"
+    - "C-125 / C-95: the planning's unmoved flag, a district's blow back, the combat's kind from its members, the camp strike's push — READ (0x791e00 at 0x791eb6..0x791ec4, 0x791470 at 0x7916fb..0x79174f / 0x7917f7..0x7918f7, 0x205720 at 0x205835..0x20592f, 0x209550, 0x772940 at 0x772a85..0x772ad3 / 0x772eea / 0x772f78), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...d simulation (0x205720) with the sides swapped (the district the attacker, 0x213c80 / 0x213d30, the unit the defender, 0x213e00), its location each spot (+0x1c + 8 i): the unit's dam..."
@@ -1489,6 +1490,7 @@
     - "C-123 / C-95: a Trader stands on the trade layer; a city's shot is a COMBAT_DISTRICT spot's blow back — READ (0x901e0, 0x586360 -> 0x208b80, 0x585eb0 -> 0x585d90, 0x791470 at 0x7917f7..0x7918f7 -> 0x249ee0 / 0x205720, 0x776140 at 0x776780..0x7767fa), both twins"
     - "C-125: the planning's blow back where both blows would kill — READ, ported"
     - "C-110 / C-125: the amphibious penalty reads the plot the defender stands on — READ (0x51bba0, 0x51c810 at 0x51cb7a..0x51cba1, 0x51d670 at 0x51d92e..0x51d957, 0x205f70, 0x211cc0, 0x209870), both twins"
+    - "C-125 / C-95: the planning's unmoved flag, a district's blow back, the combat's kind from its members, the camp strike's push — READ (0x791e00 at 0x791eb6..0x791ec4, 0x791470 at 0x7916fb..0x79174f / 0x7917f7..0x7918f7, 0x205720 at 0x205835..0x20592f, 0x209550, 0x772940 at 0x772a85..0x772ad3 / 0x772eea / 0x772f78), both twins"
   context:
     - "...player +0x12f0 +0xf4 above 0; unread, taken clear); else the combat simulation's blow (0x213e00 .. 0x205720, dealt +0x24, taken +0x28 — the blow back none in the port) against COMBA..."
     - "...xc], [rbp−8]), kill byte +0xc4; the blow back re-simulated (0x205720, sides swapped via 0x213e00). The combat object (0x213ab0): each side its unit, owner, id (+0x2e0, +0x100) and plot..."

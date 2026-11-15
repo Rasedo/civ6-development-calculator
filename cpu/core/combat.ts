@@ -7,7 +7,7 @@ import { isWater, isImpassable,  isCoastalLand } from '../../world/query';
 import { civEraIndex, extractionChanged, seatBuildingSum } from './city';
 import { logUnitOrder } from './seatTurn';
 import { MODERN_ERA_INDEX } from '../data/techs';
-import { emergencyAttackCS, emergencyStrikeCS, raiseEmergency, EMERGENCY_CITY_STATE } from './emergency';
+import { emergencyAttackCS, raiseEmergency, EMERGENCY_CITY_STATE } from './emergency';
 import { NUCLEAR_DEVICES, NUKE_ROBOT_DAMAGE, NUKE_SILO_DEFENSE, NUKE_SUB_DEFENSE, NUKE_INTERCEPT_DAMAGE } from '../data/nuclear';
 import { AGE_GOLDEN, EMERGENCY_NUCLEAR } from '../data/seats';
 import { addWmd, nukeBlast, nukeCarrier, nukeInterceptStrength, nukeOffers, nukeVictims, wmdHeld } from './nuclear';
@@ -1693,25 +1693,49 @@ export function predictCityExchange(state: GameState, attacker: Unit, targetInde
   return districtBothFall(dealt, held ? held.city.hp : cs!.hp ?? CITY_MAX_HP, damageExpected(defCS - atkCS), attacker.hp);
 }
 
-/** the AI's predicted shot of the city centre on `targetIndex` at `attacker`
- *  standing on `spot` (0x791470's district branch at 0x7917f7..0x7918f7: the
- *  combat simulated with the sides swapped, its location the spot): the law
- *  at its expectation on the city's strike strength (`cityStrikeStrength`,
- *  its emergency term) against the unit's strength under a city's shot
- *  there (`cityStrikeDefenderCS`); 0 where no city of a player hostile to it
- *  stands there, and 0 where its outer defence is down or it has none (the
- *  strike strength 0x249ee0 asked with the flag clear, 0 unless 0x24b960's
- *  perimeter stands, 0x79181c..0x791827: runs/h1_duelz1128 t248 the
- *  Cavalry 7143430 at 25 hit points keeps its own 41:20 beside Rome's
- *  breached 42:20) */
-export function predictCityShot(state: GameState, attacker: Unit, targetIndex: number, spot: number): number {
-  const held = cityAtIndex(state, targetIndex);
-  const cs = held ? undefined : cityStateAt(state, targetIndex);
-  const city = held ? held.city : cs && cs.centerIndex === targetIndex ? minorCity(cs) : null;
-  if (!city || !unitsHostile(state, attacker, { seat: city.seat })) return 0;
-  if (outerPool(state, held ? held.city : { buildings: cs!.buildings ?? [], seat: cs!.seat, outerHp: cs!.outerHp }) <= 0) return 0;
-  const atk = cityStrikeStrength(state, city) + emergencyStrikeCS(state, city.seat, attacker.seat);
-  return damageExpected(atk - cityStrikeDefenderCS(state, attacker, state.map.tiles[spot], city.seat));
+/** THE AI'S PREDICTED EXCHANGE WITH A COMBAT DISTRICT (0x791470's district
+ *  branch): a city centre's (`predictCityExchange`) or an Encampment's — the
+ *  hit points' damage `attacker` would deal it from where it stands and the
+ *  damage a melee attacker takes, the law at its expectation on the strengths
+ *  the assault (`attackEncampment`) or the shot (`rangedStrikeEncampment`)
+ *  resolves on, the standing outer defence's share off (`districtHit`'s
+ *  split), a blow that would fell both sides as `districtBothFall` — and
+ *  `shoots`, whether the district's strike strength stands (0x249ee0 asked
+ *  with its flag clear at 0x79181c: 0 unless the outer defence 0x24b960
+ *  stands). Where it stands the blow back's simulation, the sides swapped,
+ *  writes neither result (0x7918b0..0x7918f7 read the forward simulation's
+ *  words): each spot's back taken is the hit points' damage dealt, its back
+ *  dealt the damage taken; where it does not, both are 0
+ *  (runs/h1_duels1121 t160: the camp's Spearman 1376265 on 3:18 holds player
+ *  1's Encampment 5:15 at dealt 1 / taken 100, its spot 5:16 at back taken 1
+ *  / back dealt 100; runs/h1_duels1128 t242 the Cavalry 7012372 on Rome's
+ *  breached 42:20: 56 / 16, 0 / 0) */
+export function predictDistrictExchange(state: GameState, attacker: Unit, targetIndex: number): { dealt: number; taken: number; shoots: boolean } {
+  const tile = state.map.tiles[targetIndex];
+  if (tile.district !== 'ENCAMPMENT') {
+    const held = cityAtIndex(state, targetIndex);
+    const cs = held ? undefined : cityStateAt(state, targetIndex);
+    const shape = held ? held.city : cs && cs.centerIndex === targetIndex ? { buildings: cs.buildings ?? [], seat: cs.seat, outerHp: cs.outerHp } : null;
+    const shoots = !!shape && unitsHostile(state, attacker, { seat: shape.seat }) && outerPool(state, shape) > 0;
+    return { ...predictCityExchange(state, attacker, targetIndex), shoots };
+  }
+  const def = encampmentDefense(state, attacker, tile);
+  if (!def) return { dealt: 0, taken: 0, shoots: false };
+  const held = cityAtTile(state, tile);
+  const cs = held || !isCityStateSeat(tileSeat(tile)) ? undefined : state.cityStates?.find((c) => c.seat === tileSeat(tile));
+  const shape = held ?? (cs ? { buildings: cs.buildings ?? [], seat: cs.seat } : null);
+  const outer = encampOuter(state, tile);
+  const max = shape ? wallsMax(state, shape) : 0;
+  const ranged = !!UNITS[attacker.type]?.ranged;
+  const atkCS = ranged
+    ? rangedCityAtkCS(state, attacker, outer, tileSeat(tile), isCiv(attacker.seat) ? religionAttackCS(state, attacker, targetIndex) : 0)
+    : assaultAtkCS(state, attacker, targetIndex);
+  const assist = ranged || !shape ? 0 : siegeAssist(state, attacker, targetIndex, wallsTier(state, shape));
+  const share = outer > 0 && max > 0 && (assist & ASSIST_TOWER) === 0 ? Math.floor((outer * 256) / max) : 0;
+  const raw = damageRaw(COMBAT_MAX_EXTRA_DAMAGE >> 1, damageExponent(atkCS - def.defCS));
+  const dealt = Math.min(ENCAMPMENT_HP, Math.max(COMBAT_MINIMUM_DAMAGE, raw - Math.floor((raw * share) / 256)));
+  if (ranged) return { dealt, taken: 0, shoots: outer > 0 };
+  return { ...districtBothFall(dealt, tile.encampHp ?? ENCAMPMENT_HP, damageExpected(def.defCS - atkCS), attacker.hp), shoots: outer > 0 };
 }
 
 /**

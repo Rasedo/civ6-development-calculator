@@ -35,15 +35,17 @@
 - addr: 0x526a0
   kind: function
   name: the queue's push
-  semantics: "the operations manager's vt +0x60 (manager, unit, parameters, mode): an operation added to the unit's queue (\"%03d, Adding\"). With mode 0 and the parameters' byte +0x20 clear, or mode 1 (0x52788..0x52797), it first empties the unit's queue (vt +0x68, 0x52e90 at 0x527ac) and passes the start flag 1; else it appends with the flag 0. Then the parameters' +0x21 (vt +0xb8), the handler by type (vt +0x80), the handler's test (its vt +0x58 at 0x528f9: refused, nothing is queued), the operation built (vt +0x128) and pushed (vt +0x160, 0x546f0, r9b the start flag). Every order a tactical node pushes with zeroed parameters and mode 0 replaces what the unit held and starts at once. Unported: the engines hold a camp strike short of its spot (`defendCamps`)."
+  semantics: "the operations manager's vt +0x60 (manager, unit, parameters, mode): an operation added to the unit's queue (\"%03d, Adding\"). With mode 0 and the parameters' byte +0x20 clear, or mode 1 (0x52788..0x52797), it first empties the unit's queue (vt +0x68, 0x52e90 at 0x527ac) and passes the start flag 1; else it appends with the flag 0. Then the parameters' +0x21 (vt +0xb8), the handler by type (vt +0x80), the handler's test (its vt +0x58 at 0x528f9: refused, nothing is queued), the operation built (vt +0x128) and pushed (vt +0x160, 0x546f0, r9b the start flag). Every order a tactical node pushes with zeroed parameters and mode 0 replaces what the unit held and starts at once. Ported for the camp strike: the shot or the move onto the target sets out from where the unit stands (`defendCamps`, the GPU's camp strike in `_tac_pass`)."
   status: READ
   cases:
     - recording: h1_duelq1128
       turn: 32
       value: "the camp's Spearman 589832, its MOVE_TO of t31 kept through that turn's deactivation, takes its t32 strike from 32:7 in its row's place: the new order's push emptied the queue, nothing of t31's ran first"
+  impl: [cpu/core/tactical.ts:defendCamps, gpu/core/sim_tactics.py:_tac_pass, cpu/core/tactical.ts:s]
   readings:
     - "C-133 / C-95: the carried orders run in the unit list's order; a path comes ashore off water only by the disembark test — READ (0x7df30, 0x554e0, 0x523e0, 0x52e90, 0x54910, 0x2720a0 at 0x272380..0x27240d, 0x52fb90 at 0x52fb9d), both twins; UpdateOpenNode's walk and flag 2's plot — READ (0x79560, 0x2720a0 at 0x2721c3..0x27220d / 0x2724c8), unported"
     - "C-132 / C-128 / C-95 / C-123 / C-133: the danger map's unmoved flag, a unit made anew's place, the operation queue's push, the strike's turn, the raid's recruit, the shore tests — READ (0x26df90 at 0x26e128..0x26e159, 0x716400 at 0x71672d, 0x586360 at 0x586542..0x58657e / 0x5867ab..0x586875, 0x93fa10 at 0x93fd94..0x93fdab / 0x93fe79, 0x526a0 at 0x52788..0x527ac, 0x523e0, 0x55460, 0x962380 at 0x96268f, 0x60a440, 0x26e570 at 0x26e904, 0x2720a0 at 0x272618..0x272689), both twins"
+    - "C-125 / C-95: the planning's unmoved flag, a district's blow back, the combat's kind from its members, the camp strike's push — READ (0x791e00 at 0x791eb6..0x791ec4, 0x791470 at 0x7916fb..0x79174f / 0x7917f7..0x7918f7, 0x205720 at 0x205835..0x20592f, 0x209550, 0x772940 at 0x772a85..0x772ad3 / 0x772eea / 0x772f78), both twins"
   context:
     - "- THE MANAGER'S VTABLE begins at 0xcff7c0 (the first slot 0x523a0): the queue's push 0x526a0 is its +0x60, the handler by operation type 0x53e80 its +0x80, an operation's start 0x5..."
   review: reviewed

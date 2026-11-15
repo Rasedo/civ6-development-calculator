@@ -27,7 +27,7 @@ import {
 import { BARB_SEAT, FREE_SEAT, NO_SEAT, campTiles, cityHolders, civsAtWar, isBarbSeat, isCityStateSeat, isCiv, isTerritorial, seatOf, tileCity, tileSeat } from './seats';
 import { OPEN_BORDERS_CIVIC } from '../data/seats';
 import { randRange } from './rand';
-import { cityDefenseStrength, districtGarrisonedStrength, embarkedDefenseCS, cityStrikeBase, coastalRaid, damageExpected, hostilePillage, hostileRangedStrike, meleeAttack, meleeUnitStrengths, movesAndShoots, predictCityBlow, predictCityExchange, predictCityShot, rangedUnitStrengths, stackDefender, unitAttackRange } from './combat';
+import { cityDefenseStrength, districtGarrisonedStrength, embarkedDefenseCS, cityStrikeBase, coastalRaid, damageExpected, hostilePillage, hostileRangedStrike, meleeAttack, meleeUnitStrengths, movesAndShoots, predictCityBlow, predictDistrictExchange, rangedUnitStrengths, stackDefender, unitAttackRange } from './combat';
 import { CITY_STRIKE_RANGE } from './phase';
 import { encampOuterPool, outerPool, wallsMax } from './rules';
 import { cityStateAt, minorCity, suzerainOf } from './cityStates';
@@ -666,7 +666,11 @@ function search(state: GameState, unit: Unit, maxTurns: number, zoc: boolean, on
   const naval = !!UNITS[unit.type]?.naval;
   const fullLand = domainPool(state, unit, false) * FIX;
   const fullSea = domainPool(state, unit, true) * FIX;
-  const unmoved = unit.movesLeft >= (unit.movesFull ?? unitFullMoves(state, unit));
+  // the planning's search carries the unmoved flag 0x100 by its own flags
+  // (UnitPlanning 0x791e00 at 0x791eb6..0x791ec4: 0x115), whatever Movement
+  // the unit holds; the reach searches 0x26df90 add it where the formation
+  // has not moved
+  const unmoved = fromFull || unit.movesLeft >= (unit.movesFull ?? unitFullMoves(state, unit));
   // the planning and the danger map set out on the formation's full Movement
   // (0x791e00 -> 0x26dcd0 with its third argument set: 0x26eea0 takes
   // 0x266660, the least GetMaxMoves 0x56e130 of its members, 0x262cd0), any
@@ -2035,7 +2039,14 @@ function targetUnit(state: GameState, e: Target): Unit | null {
  *  player 1's Warrior on 15:12 under the exchange filter, Move 14 13 as
  *  logged) */
 export function predictBlow(state: GameState, attacker: Unit, defender: Unit, at: number, stands = at): { dealt: number; taken: number } {
-  if (rangedStrength(attacker) > 0) {
+  // the combat's kind from its members (0x211cc0 -> 0x209550): RANGED or
+  // BOMBARD where that strength tops the attacker's combat strength as the
+  // AI reads it (`aiStrengths`: an embarked land unit's its era's embarked
+  // strength), else MELEE (runs/h1_duels1124 t198: player 1's embarked
+  // Skirmisher 2293776 on 21:8 strikes back in melee, the barbarian Galley
+  // 720906's back taken 65 / back dealt 14)
+  const st = aiStrengths(state, attacker);
+  if (st.ranged > st.melee || st.bombard > st.melee) {
     const s = rangedUnitStrengths(state, attacker, at, defender);
     return { dealt: damageExpected(s.atk - s.def), taken: 0 };
   }
@@ -2073,8 +2084,8 @@ export function predictBlow(state: GameState, attacker: Unit, defender: Unit, at
  *    (`predictBlow`; a civilian taken 150, a religious unit or a Trader 1.5
  *    x its health, the blow no theological combat), copied to every spot, and per
  *    spot of a fighter the fighter's blow back on it standing there, of a
- *    COMBAT_DISTRICT the city's shot on it there (`predictCityShot`); a blow
- *    that kills marks the planning `wins`.
+ *    COMBAT_DISTRICT whose strike stands the forward blow's own two damages
+ *    (`predictDistrictExchange`); a blow that kills marks the planning `wins`.
  */
 export function planUnit(state: GameState, unit: Unit, targets: readonly Target[]): Planner {
   const R = rangeOf(unit);
@@ -2153,18 +2164,16 @@ export function planUnit(state: GameState, unit: Unit, targets: readonly Target[
     // 52 hit points, their blows 59 / 55, hold and wander, as logged)
     if (E.target.type === 'COMBAT_DISTRICT') {
       const d = districtHealth(state, E.target.tile);
-      const x = predictCityExchange(state, unit, E.target.tile);
+      const x = predictDistrictExchange(state, unit, E.target.tile);
       E.taken = x.taken;
       if (d && x.dealt > d.hp) wins = true;
-      // per spot the city's shot on the unit standing there (the combat
-      // simulated with the sides swapped, its location the spot: 0x791470 at
-      // 0x7917f7..0x7918f7, the city's strike strength 0x249ee0 never 0),
-      // its blow back; the city takes none (runs/h1_duely1128 t242: the hurt
-      // Cavalry 7012372 on 42:21, 33 hit points, out of City Attack's
-      // assignment by the survival filter, as logged)
+      // per spot the blow back (0x791470 at 0x7917f7..0x7918f7): where the
+      // district's strike stands the swapped simulation leaves the forward
+      // one's words, the hit points' damage dealt and the damage taken;
+      // where it does not, none
       for (const s of E.spots) {
-        s.backTaken = predictCityShot(state, unit, E.target.tile, s.tile);
-        s.backDealt = 0;
+        s.backTaken = x.shoots ? x.dealt : 0;
+        s.backDealt = x.shoots ? x.taken : 0;
       }
       continue;
     }
@@ -2606,9 +2615,9 @@ const onList = (state: GameState, pass: Pass, u: Unit) => !(pass.listedFrom ?? p
  * moves kept (0x773fb0, the flag set), the order's path over the turns it
  * takes (a spot of the second turn its own unit holds is walked toward, one
  * beside it that its own unit holds is no step), and plunders the Trader or
- * condemns the heretics on its plot, and standing on the spot shoots the
+ * condemns the heretics on its plot, and from where it stands shoots the
  * target (0x964a40) or goes for the target's plot with the attack flag
- * (0x962190, flag 0x10)
+ * (0x962190, flag 0x10), the push emptying its queue
  * (runs/h1_duelq1128 t31-34: the Spearman 589832 of the camp 30:6 goes out
  * to 31:7 for the spot 32:8 its Warrior holds, to 33:8 striking player 4's
  * Archer, and on to 34:9 under "Barb. Camp Defense" rows AT 30:6).
@@ -2625,13 +2634,11 @@ function defendCamps(state: GameState, pass: Pass): void {
       if (state.units.includes(u)) {
         if (s.kind === 'TRADER') plunderTrader(state, u);
         else if (s.kind === 'RELIGIOUS') condemnHeretic(state, u);
-        // the strike is pushed on the unit's operations behind the move to
-        // the spot (0x772940 at 0x772ece / 0x772f51, the manager's vt +0x60):
-        // a unit the move left short of its spot strikes nothing this turn
-        // (runs/h1_duelq1121 t160 the Spearman 1376265 on 3:18 for the spot
-        // 3:17 its Line Infantry holds stays there, player 0's Warrior on
-        // 3:16 unstruck)
-        else if (u.tileIndex !== s.spot) { /* the strike waits */ }
+        // the strike's push (0x772940 at 0x772eea / 0x772f78: mode 0, the
+        // parameters' +0x20 clear) empties the unit's queue and starts at
+        // once (0x526a0 at 0x52788..0x527ac): a move the spot's walk left
+        // waiting is carried no further, the shot or the move onto the
+        // target set out from where the unit stands
         else if (rangeOf(u) > 0) {
           if (state.units.includes(s.unit) && plotDistance(state, u.tileIndex, s.unit.tileIndex) <= unitAttackRange(u)
             && u.movesLeft > 0 && attacksLeftOf(u) > 0) hostileRangedStrike(state, u, s.unit.tileIndex);

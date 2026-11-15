@@ -754,8 +754,9 @@ class SimTactics:
         unmoved = mp >= granted
         if from_full:
             # the planning sets out on the unit's full Movement (0x791e00 ->
-            # 0x26dcd0 -> 0x26eea0), unmoved by its Movement left
-            unmoved = getattr(self, f"{pre}_unit_mp")[rows, slots] >= granted
+            # 0x26dcd0 -> 0x26eea0) and carries the unmoved flag 0x100 by
+            # its own flags (0x115), whatever Movement the unit holds
+            unmoved = torch.ones_like(unmoved)
             mp = self._tac_full_now(pre)[rows, slots]
         if full or from_full:
             # ...the formation's: the least GetMaxMoves of its members
@@ -2687,7 +2688,7 @@ class SimTactics:
             dn_i, de_i = djob.nonzero(as_tuple=True)
             dplot = tpc[dn_i, de_i]
             g_i = rows[dn_i]
-            # one job a game at a time: `_predict_city_exchange` takes a unit per game
+            # one job a game at a time: `_predict_district_exchange` takes a unit per game
             left = torch.ones_like(dn_i, dtype=torch.bool)
             while bool(left.any()):
                 first = torch.full((self.B,), -1, dtype=torch.long, device=dev)
@@ -2698,67 +2699,25 @@ class SimTactics:
                 tgt = torch.full((self.B,), -1, dtype=torch.long, device=dev)
                 us[g_i[pick]] = slots[dn_i[pick]]
                 tgt[g_i[pick]] = dplot[pick]
-                blow, took = self._predict_city_exchange(pre, us, tgt)
-                # per spot the city's shot on the unit standing there
-                # (`planUnit`'s backTaken; its backDealt none)
-                sp_b = torch.full((self.B, 6), -1, dtype=torch.long, device=dev)
-                sn_b = torch.zeros(self.B, dtype=torch.long, device=dev)
-                sp_b[g_i[pick]] = res["spot"][dn_i[pick], de_i[pick]]
-                sn_b[g_i[pick]] = sn[dn_i[pick], de_i[pick]].long()
-                shots = self._plan_city_shots(pre, us, tgt, blow > 0, sp_b, sn_b)
-                back_t[dn_i[pick], de_i[pick]] = shots[g_i[pick]]
+                blow, took, shoots = self._predict_district_exchange(pre, us, tgt)
+                # per spot the blow back (`planUnit`): where the district's
+                # strike stands the forward blow's own two damages — the hit
+                # points' damage dealt its back taken, the damage taken its
+                # back dealt — else none
+                k6 = torch.arange(6, device=dev).unsqueeze(0)
+                on6 = shoots[g_i[pick]].unsqueeze(1) & (k6 < sn[dn_i[pick], de_i[pick]].long().unsqueeze(1))
+                back_t[dn_i[pick], de_i[pick]] = torch.where(on6, blow[g_i[pick]].to(torch.long).unsqueeze(1), torch.zeros_like(k6))
+                back_d[dn_i[pick], de_i[pick]] = torch.where(on6, took[g_i[pick]].to(torch.long).unsqueeze(1), torch.zeros_like(k6))
                 blow = blow[g_i[pick]]
                 # the damage the unit takes from the city (`planUnit`'s E.taken)
                 taken[dn_i[pick], de_i[pick]] = took[g_i[pick]]
                 dmax, dhp, _ = self._centre_health(tgt.clamp(min=0).unsqueeze(1))
-                kill = (dmax[g_i[pick], 0] > 0) & (blow > dhp[g_i[pick], 0])
-                wins[dn_i[pick[kill]]] = True
+                falls = (dmax[g_i[pick], 0] > 0) & (blow > dhp[g_i[pick], 0])
+                wins[dn_i[pick[falls]]] = True
                 left[pick] = False
         res.update({"tp": tp, "te": te, "civ": civ, "other": other, "dealt": dealt, "taken": taken, "back_taken": back_t,
                     "back_dealt": back_d, "wins": wins, "kill": kill})
         return res
-
-    def _plan_city_shots(self, pre: str, us: torch.Tensor, tgt: torch.Tensor, on: torch.Tensor,
-                         spots: torch.Tensor, n: torch.Tensor) -> torch.Tensor:
-        """[B, 6] long — `predictCityShot` for the unit at local slot `us` [B]
-        of pool `pre` on each of its `n` [B] spots `spots` [B, 6], the city
-        centre at `tgt` [B] a hostile one where `on` [B] (0x791470's district
-        branch: the combat with the sides swapped, its location the spot):
-        the law at its expectation on the city's strike strength
-        (`_city_shot_atk`) against the unit's strength under a city's shot
-        there (`_city_shot_def`); none where the city's outer defence is down
-        or it has none (0x249ee0 with the flag clear)"""
-        B, dev = self.B, self.device
-        out = torch.zeros(B, 6, dtype=torch.long, device=dev)
-        if not bool(on.any()):
-            return out
-        ttc = tgt.clamp(min=0)
-        ctr = self._centre_seat_plane().gather(1, ttc.unsqueeze(1)).squeeze(1)
-        city = self._centre_target_seat(ctr) >= 0
-        hrow = self._holder_row(ctr)
-        hcol = self.centre_slot_at.gather(1, ttc.unsqueeze(1)).squeeze(1).clamp(min=0)
-        if self.S > 0:
-            csx = self.citystate_at.gather(1, ttc.unsqueeze(1)).squeeze(1).clamp(min=0, max=self.S - 1)
-            hrow = torch.where(city, hrow, self._CITY_MINOR0 + csx)
-            hcol = torch.where(city, hcol, torch.zeros_like(hcol))
-        pool = torch.minimum(self.city_outer_hp[self._bidx, hrow, hcol].long(), self._walls_max_at(hrow, hcol).long())
-        on = on & (pool > 0)
-        if not bool(on.any()):
-            return out
-        d_slot = torch.where(on, us + self.POOL_LO[pre], torch.full_like(us, -1))
-        d_seat = torch.where(on, self.unit_seat[self._bidx, d_slot.clamp(min=0)], torch.full_like(us, -1))
-        atk = torch.zeros(B, dtype=torch.float64, device=dev)
-        for r in torch.unique(hrow[on]).tolist():
-            m = on & (hrow == r)
-            atk = torch.where(m, self._city_shot_atk(int(r), hcol, d_seat).to(torch.float64), atk)
-        for k in range(6):
-            live = on & (k < n)
-            if not bool(live.any()):
-                continue
-            de = self._city_shot_def(torch.where(live, d_slot, torch.full_like(d_slot, -1)), d_seat,
-                                     spots[:, k].clamp(min=0), ctr)
-            out[:, k] = torch.where(live, self._damage_expected(atk - de.to(torch.float64)), out[:, k])
-        return out
 
     def _tac_predict(self, rows: torch.Tensor, a_slot: torch.Tensor, d_slot: torch.Tensor,
                      tiles: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
@@ -2803,8 +2762,12 @@ class SimTactics:
         g = _GameRows(self, rows)
         cls = type(self)
         d_seat = g.unit_seat.gather(1, d_slot.unsqueeze(1)).squeeze(1)
-        at = g.unit_type.gather(1, a_slot.unsqueeze(1)).squeeze(1).clamp(min=0, max=self.NU - 1)
-        ranged = self._type_ranged_strength.take(at) > 0
+        # the combat's kind from its members (0x209550): RANGED or BOMBARD
+        # where that strength tops the attacker's combat strength as the AI
+        # reads it (`_ai_combat`: an embarked land unit's its era's embarked
+        # strength), else MELEE
+        cmb = self._ai_combat()[rows, a_slot]
+        ranged = (self._ai_ranged()[rows, a_slot] > cmb) | (self._ai_bombard()[rows, a_slot] > cmb)
         dealt = torch.zeros(rows.numel(), dtype=torch.long, device=self.device)
         taken = torch.zeros_like(dealt)
         if not bool(ranged.all()):
@@ -3677,8 +3640,8 @@ class SimTactics:
         sn = res["spot_n"][nn, e_ix]
         if district:
             # the unit's predicted blow on each city (`predictCityBlow`), the
-            # damage it takes its planning's (`predictCityExchange`), the
-            # city's shot on it per spot its planning's too (`predictCityShot`)
+            # damage it takes its planning's (`predictDistrictExchange`), the
+            # blow back per spot its planning's too
             dealt = torch.zeros(B, U, K, dtype=torch.long, device=dev)
             for ui in range(U):
                 for ki in range(K):
@@ -3687,7 +3650,7 @@ class SimTactics:
                         dealt[:, ui, ki] = torch.where(m_, self._predict_city_blow(pre, us[:, ui], tplot[:, ki]), dealt[:, ui, ki])
             taken = torch.where(has_e, res["taken"][nn, e_ix], torch.zeros_like(dealt))
             bt = torch.where(has_e.unsqueeze(3), res["back_taken"][nn, e_ix], torch.zeros_like(spot))
-            bd = torch.zeros_like(bt)
+            bd = torch.where(has_e.unsqueeze(3), res["back_dealt"][nn, e_ix], torch.zeros_like(spot))
         else:
             dealt = res["dealt"][nn, e_ix]                                    # [B, U, K]
             taken = res["taken"][nn, e_ix]
@@ -4613,10 +4576,10 @@ class SimTactics:
                         self._condemn_heretic(BARB_SEAT, c_ok, c_tc, c_rl, gs)
                 pc = pick.clamp(min=0)
                 tt = self.unit_tile[bidx, pc]
-                # the strike waits behind the move to the spot: none from a
-                # unit the move left short of it
-                hi = (up & (pkind == 3) & self.unit_alive[bidx, pc] & (tt >= 0)
-                      & (self.barb_unit_tile[bidx, u_b] == pspot))
+                # the strike's push empties the unit's queue and starts at
+                # once: the shot or the move onto the target from where the
+                # unit stands, the spot's walk carried no further
+                hi = up & (pkind == 3) & self.unit_alive[bidx, pc] & (tt >= 0)
                 rng = self._tac_range(bidx, u_b)
                 at = self.barb_unit_tile[bidx, u_b].clamp(min=0)
                 fire = (hi & (rng > 0) & (self.pair_dist[at, tt.clamp(min=0)].to(torch.long) <= rng)
