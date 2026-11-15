@@ -52,7 +52,7 @@ import { buildingPillaged, cityPower, repairBuilding } from './yields';
 import { centerBuildingIds } from './prodLayout';
 import { cityLowlands, coastalLowlandCounts, floodBarrierCost, repairBehindBarrier } from './climate';
 import { minorTrade, minorTradePick, tradeCapacity, tradeGraphTurn } from './trade';
-import { BARB_SEAT, FREE_SEAT, civsAtWar, denounceActive, freeSeatOf, hiddenResourcesFor, isCiv, majorityReligionOf, majorsAlive, seatOf, tileSeat } from './seats';
+import { BARB_SEAT, FREE_SEAT, atWarWithMajor, civsAtWar, denounceActive, freeSeatOf, hiddenResourcesFor, isCiv, majorityReligionOf, majorsAlive, seatOf, tileSeat } from './seats';
 import { builderCost, cityNavalCapable, disbandUnit, holdGarrison, raiseBestTrained, spawnUnit, traderCost, unitFullMoves, unitIsMilitary, unitMadeAnew, upgradeAnew } from './units';
 import { irradiated } from './nuclear';
 import { atRngPoint } from './rand';
@@ -82,6 +82,7 @@ import { cityStateSight, revealAround, unitSeesThrough, unitSight } from './fog'
 import { combatDesire, type CombatDesire } from './aiMilitary';
 import { minorTradeList, minorTradeValue } from './aiTrade';
 import { militaryFavTech } from './operations/unitRows';
+import { minorStrategyTurn } from './minorStrategy';
 import { opsOf } from './operations/manager';
 
 /** One minor at a time — a district one minor lands may lend a neighbour's
@@ -121,6 +122,9 @@ export function minorPhase(state: GameState): void {
     // (the replay's hook lands their turns here; nothing moves otherwise)
     if (prev) minorEndTurnList(state, prev);
     prev = cityState;
+    // its strategies at its activation, then its grand strategy's island
+    // test on the plots it knows as its turn opens
+    minorStrategyTurn(state, cityState);
     minorPower(state, cityState);
     minorEconomy(state, cityState);
     // its levied army home at its Influence turn (0x44bb20 -> 0x44da30), in
@@ -1972,7 +1976,7 @@ export function minorBuildFacts(state: GameState, cityState: CityState, known: (
     districtCount: 1 + (cityState.districts?.length ?? 0),
     // a city-state builds no wonder
     hasWonder: false,
-    atWar: (seatOf(state, cityState.seat)?.wars.length ?? 0) > 0,
+    atWar: atWarWithMajor(state, cityState.seat),
     // its one city's threat as its last update left it
     cityThreat: cityState.threat ?? -1,
     anyCityThreat: (cityState.threat ?? -1) > -1,
@@ -2031,15 +2035,18 @@ export function minorBuildFacts(state: GameState, cityState: CityState, known: (
     cities: 1,
     extraCopies: () => 0,
     promotionWeight: (cls) => promotionWeight(['MINOR_CIV_DEFAULT_TRAIT'], cls),
-    // a plot it owns hands the resource over (0x4aa790), or its city's
-    // counts as its last update left them hold it (CityBuildAI +0x978,
-    // 0x5d45c0: owned, unimproved; runs/h1_duelv1121 t17 Hunza's Horseman
-    // 0.00, its Horses unowned)
+    // its stock of the resource less its reservations is not 0 (0x7b62c0 at
+    // 0x7b71dd..0x7b7217: 0x4aa790, ownership 0 then 1, the reservations
+    // off — a city-state under a suzerain banks none: runs/h1_duels1136
+    // Chinguetti's Iron Mine laid t63 under its suzerain, its Swordsman 0.00
+    // t64-t97), or its city's counts as its last update left them hold it
+    // (CityBuildAI +0x978, 0x5d45c0: owned, unimproved; runs/h1_duelv1121
+    // t17 Hunza's Horseman 0.00, its Horses unowned)
     resourceAccess: (res) => {
       const id = engineId('resource', res, 'RESOURCE_', RESOURCES);
       if (!id) return false;
       if ((cityState.resourceCounts?.[res] ?? 0) > 0) return true;
-      return state.map.tiles.some((t) => t.resource === id && tileSeat(t) === cityState.seat && extractsResource(t));
+      return stockFree(state, cityState.seat, id) !== 0;
     },
     handicap: 0,
     artifacts: worldArtifacts(state),

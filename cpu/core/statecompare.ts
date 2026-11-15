@@ -1079,6 +1079,8 @@ const CITY_STATE_G: Record<string, Extractor> = {
   minorCivicQueue: overCityStates((cityState) => civicQueueRow(cityState.research)),
   minorTechGoal: overCityStates((cityState) => idx(TECH_IDX, cityState.research.goal ?? null)),
   minorFavTech: overCityStates((cityState) => idx(TECH_IDX, cityState.research.favTech ?? null)),
+  minorIsland: overCityStates((cityState) => cityState.island ?? 0),
+  minorNaval: overCityStates((cityState) => cityState.naval ?? 0),
   minorResearchTurns: overCityStates((cityState) => researchTurnsRow(cityState.research)),
   minorResearchAi: overCityStates((cityState) => {
     const ents = new Map((cityState.research.aiEntries ?? []).map((e) => [e.tech, e]));

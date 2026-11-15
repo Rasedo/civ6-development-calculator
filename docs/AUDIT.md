@@ -338,6 +338,7 @@ A question the SOURCE under-determines; neither engine ships a branch until the 
   - LAB (unit values): a minor's CITY_DEFENSES weight (+0.25 fits)
   - LAB (unit values): PSEUDOYIELD_GPP_GENERAL -1.0 (0x700810's writer)
   - LAB (unit values): locked units by +0x388
+  - BUILD (unit values): duels1136 the UNITS table's Trader: player 4 t64 397.54 ours 227.08, player 3 t65 550.14 ours 308.38, player 2 t100-t123 246.72 ours 0.00
   - LAB (unit production table): the military AI's unit production table (0x7989e0's +0x20 counts, the obsolete entry's hold) left on the units standing, no case telling the two apart
   - LAB (unit production table): a gone non-army COMBAT unit joining the standing-army walk below the quota (its +0x7d0 after the kill unread), a gone member's Combat as it stood and its place in the pool order
   - LAB (unit production table): the unit production table's shortfall divide also scaling +0x30 / +0x2c (0x79a0c7..0x79a0e9), which the unit choice sorts on, ours raw
@@ -530,7 +531,7 @@ A question the SOURCE under-determines; neither engine ships a branch until the 
   - LAB (ops.strength): the team's attack strength at the military AI's refresh (each member's planning of its last pass, the engines' planned anew): duelq1128 city-state 3's City Defense t178 0 for the game's 115, t179 0 for 55, t181 / t182 60 for 0, its Attack Barb Camp t197 0 for 70; duelq1127 t64 the barbarians' 0 for 25
 - **C-98. CITY-STATES' RESEARCH AND CIVIC VALUES.** Weight 3.
   - BUILD (free cities and majors): the Free Cities' resource value (resourceValueOf 0)
-  - BUILD (free cities and majors): a Free City's research and civic city terms (minorResearch passes none)
+  - BUILD (free cities and majors): a Free City's research and civic city terms (minorResearch passes none: duels1143 t209 player 62 Archery ours 824.6, the game's 1090.6, its unit-unlocking rows 134 to 401 short t209-t212, Sailing taken for Archery t210)
   - BUILD (free cities and majors): a full civilization's religious unit value (0x7b62c0's heal, Evangelize, evict, inquisition terms)
   - LAB (research values): 1121 the trees' goal techs (Present Values)
   - LAB (research values): the Industrial Zone value low (1128 Hong Kong t84)
@@ -541,6 +542,10 @@ A question the SOURCE under-determines; neither engine ships a branch until the 
   - BUILD (research values): Add Goal Tech's Goal-Plot-only block (+0xd8 / +0xe0)
   - BUILD (research values): the tech sort 0x7e7080
   - LAB (research values): the research term's improvement tourism does not read the city's +0x1b20 percent (none in a city-state)
+  - LAB (research values): duels1138 t38-t49 player 4 Shipbuilding ours 526.1, the game's 600.7, from the turn after STRATEGY_NAVAL starts (350.7 against 400.5 before the favored raise, 61.2 more at 11 turns; the City Analysis's Quadrireme -9999 in both): a term the strategy's pseudo-yield weights raise, unread; duels1144 t43-t58 player 4 alike
+  - LAB (research values): duels1143 player 4 follows STRATEGY_NAVAL from t126, ours from t112: its area 2 lies in region 7, the island count's unseen revealed plots those of the region numbered 2 (36 at record t111 on deriveRegions' numbering) — the game's region ids unconfirmed where they are not the area's
+  - LAB (research values): duels1136 t215-t230 player 4 Plastics ours 847.2, the game's 856.8, the gap growing to 19.6 by t230
+  - LAB (research values): duels1146 t145 player 2 Steel ours 637.2 inside the horizon, the game's -9426.2 at 54 turns (Rifling 12 and Refining 54 in both; it owns no Coal or Niter plot, the record holds no Steel boost): Steel's own turns short in ours, on players 2, 3 and 4 from t144 (about 170 rows); duels1133 t148 player 2 Rifling 178.6 for -9898.4 and duels1134 t242 player 2 Robotics alike
   - LAB (civic values): 1121 civics short (Divine Right 5.0, Games & Recreation 7.7)
   - LAB (unit term): 1127 p3 t63 +7.4 / -5.1 untraced
   - LAB (resource values): a minor's upgrade strategic cost

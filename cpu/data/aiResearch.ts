@@ -66,3 +66,26 @@ export const RESEARCH_AI_FAVORED: Readonly<Partial<Record<LeaderId, readonly str
     inputs: techs.map((t): Src => xml('AiFavoredItems', `ListType=${list}&Item=TECH_${t}`, 'Favored', { expect: 'true' })),
   })]),
 );
+
+/** STRATEGY_NAVAL (Strategies NumConditionsNeeded 1; StrategyConditions "Is
+ *  On Island", no "Is Not Major" row: a city-state follows it): the
+ *  technologies its Strategy_Priorities list NavalPreferredTechs favors
+ *  (AiLists System Technologies), a favored row's score taken 1.5 times. */
+const NAVAL_TECHS = ['SAILING', 'CELESTIAL_NAVIGATION', 'SHIPBUILDING', 'CARTOGRAPHY'] as const;
+export const NAVAL_STRATEGY_TECHS: readonly string[] = srcConst('aiResearch.navalTechs', [...NAVAL_TECHS], {
+  derived: 'the techs of AiFavoredItems NavalPreferredTechs (Favored true), the Strategy_Priorities list of STRATEGY_NAVAL with System Technologies',
+  inputs: NAVAL_TECHS.map((t): Src => xml('AiFavoredItems', `ListType=NavalPreferredTechs&Item=TECH_${t}`, 'Favored', { expect: 'true' })),
+});
+
+const navalPseudo = (item: string) => xml('AiFavoredItems', `ListType=NavalUnitPreferences&Item=${item}`, 'Value');
+
+/** STRATEGY_NAVAL's pseudo-yield weights (its Strategy_Priorities list
+ *  NavalUnitPreferences, AiLists System PseudoYields), in percent. */
+export const NAVAL_STRATEGY_PSEUDOYIELDS: Readonly<Record<string, number>> = {
+  PSEUDOYIELD_UNIT_NAVAL_COMBAT: srcConst('aiResearch.navalPseudo.navalCombat', 150, navalPseudo('PSEUDOYIELD_UNIT_NAVAL_COMBAT')),
+  PSEUDOYIELD_UNIT_COMBAT: srcConst('aiResearch.navalPseudo.combat', -90, navalPseudo('PSEUDOYIELD_UNIT_COMBAT')),
+};
+
+/** "Is On Island" (GrandStrategic 0x6fafc0 at 0x6fc7ff): a city's area holds
+ *  at least this share of coastal land plots, in percent. */
+export const AI_ISLAND_COAST_PERCENTAGE = srcConst('aiResearch.islandCoastPct', 20, gp('AI_ISLAND_COAST_PERCENTAGE'));

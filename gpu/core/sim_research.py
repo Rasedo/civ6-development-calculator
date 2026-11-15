@@ -333,6 +333,14 @@ class SimResearch:
             parent_on, parent_tech = on, tech
         return out
 
+    def _at_war_with_major(self, row: int) -> torch.Tensor:
+        """`atWarWithMajor`: [B] the war plane's row `row` at war with a
+        living major — a war with a city-state, the Free Cities or the
+        barbarians is none; the Free Cities fight every major"""
+        if row == self.FREE_ROW:
+            return self.civ_alive.any(dim=1)
+        return (self.war[:, row, : self.n_majors] & self.civ_alive).any(dim=1)
+
     def _rai_analysis(self, s: int, sci: torch.Tensor):
         """`researchAnalysis` for minor `s` ([B] Science a turn): per row
         (engine order) its turns (-1 spent or out of reach), next step, base,
@@ -369,22 +377,25 @@ class SimResearch:
         nxt = torch.where(spent, col.expand(B, -1), nxt)
         # the value (`techValue`) before its modifiers and the city terms
         # `researchAnalysis` adds; the military AI's favoured technology 1.5
-        # times where the minor is at war with a player but the barbarians
-        # (the Free Cities always); then the modifiers
+        # times where the minor is at war with a living major
+        # (`atWarWithMajor`: the Free Cities with every one); then the modifiers
         own = self._rai_value(s, turns, mods=False) + self._rai_resources(s, turns) + self._rai_unit_term(s, turns, False, False)
         h = int(T["horizon"])
-        if s == self.FR:
-            fight = torch.ones(B, dtype=torch.bool, device=self.device)
-        else:
-            w = self.war[:, self._CITY_MINOR0 + s].clone()
-            w[:, self.BARB_ROW] = False
-            fight = w.any(dim=1)
+        fight = self._at_war_with_major(self.FREE_ROW if s == self.FR else self._CITY_MINOR0 + s)
         fav = self.citystate_fav_tech[:, s]
         hit = (col == fav.unsqueeze(1)) & (fav >= 0).unsqueeze(1) & fight.unsqueeze(1) & (turns >= 0) & (turns <= h)
         own = torch.where(hit, _fmul(own, _fx_const(1.5)), own)
         val = torch.where(turns > h, own, own + self._rai_mods(s, turns.clamp(min=0)))
         base = torch.where(turns < 0, torch.zeros_like(val), val)
         score = base + self._rai_contracts(s, base, spent) + self._rai_upstream(have, base, turns)
+        # a favored row in reach 1.5 times: STRATEGY_NAVAL's technologies
+        # where the minor follows it (`citystate_naval`; the Free Cities none)
+        if s != self.FR:
+            fav_row = torch.zeros(NT, dtype=torch.bool, device=self.device)
+            for i in self.rules.research_ai["navalTechs"]:
+                fav_row[int(i)] = True
+            favored = (self.citystate_naval[:, s] > 0).unsqueeze(1) & fav_row.unsqueeze(0) & (turns >= 0)
+            score = torch.where(favored, _fmul(score, _fx_const(1.5)), score)
         return turns, nxt, base, score, spent
 
     def _rai_unit_term(self, s: int, turns: torch.Tensor, civic: bool, below: bool) -> torch.Tensor:

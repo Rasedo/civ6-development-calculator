@@ -479,12 +479,16 @@
     - recording: h1_duelq1124
       turn: 236
       value: "the Scientists' last, Abdus Salam, granted at t235 after the city-states' turns: their Solar, Wind and Offshore Wind Farm rows 40.00 lower from t236 (EFFECT_ADJUST_CITY_FREE_POWER's GPP_SCIENTIST term 0), 238 Offshore Wind rows exact"
-  impl: [cpu/core/aiWeights.ts:pseudoYieldWeights, gpu/core/sim_cityvalue.py:pseudo_w]
+  impl:
+    - cpu/core/aiWeights.ts:pseudoYieldWeights
+    - gpu/core/sim_cityvalue.py:pseudo_w
+    - cpu/data/aiResearch.ts:AI_ISLAND_COAST_PERCENTAGE
   readings:
     - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
     - "C-97: the settle site evaluation — READ (the score, the choices), PARTLY READ (the danger, the plot yield)"
     - "C-97: the victory manager's strategies — READ (the evaluation, the apply, the conditions below), PARTLY READ (three conditions, the island's count)"
     - "C-100 / C-118 / C-98: the plot values' yield-source tourism, the exhausted Great Person class, a technology's improvement tourism — READ, both twins"
+    - "H-1 / C-96: at war with a living major, a unit's strategic resource in the City Analysis, a city-state's naval strategy — READ (0x3dcf50, 0x7b62c0 at 0x7b71cd..0x7b725d, 0x6fafc0 at 0x6fc771..0x6fc873, 0x783980 at 0x783ade..0x783d93 and 0x785271..0x7852df, 0x786080, 0x865f20), both twins"
   notes:
     - ".claude/scratchpad/st1/reading.md: ...ess the danger << 8. AI_SiteEval.csv logs no score below 0:   the port clamps there. - The regions (0x6fafc0, the \"Settle City Evaluation\" jobs, one per map   region of the regions list, run and waited): each..."
   context:

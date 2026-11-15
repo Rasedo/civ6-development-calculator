@@ -37,6 +37,9 @@ class SimMinors:
             alive = self.citystate_alive[:, s]
             if not bool(alive.count_nonzero()):
                 continue
+            # its strategies at its activation, then its grand strategy's
+            # island test on the plots it knows as its turn opens
+            self._minor_strategy_turn(s)
             self._minor_power(s)
             self._minor_economy(s)
             # its levied army home after the bank (`minorPhase`)
@@ -363,6 +366,37 @@ class SimMinors:
         pick, goal = self._rai_choice(s, fire, (turns, self.citystate_ai_next[:, s], base, score, self.citystate_ai_owned[:, s]), done)
         self._rai_take(s, pick, goal)
         self._rai_completion_left(s, fire, pick, sci)
+
+    def _minor_strategy_turn(self, s: int) -> None:
+        """`minorStrategyTurn` — minor `s`'s strategies' turn: it follows
+        STRATEGY_NAVAL from the turn after its island test set (1 that
+        turn, 2 from the next); the test,
+        skipped once an area was found half known and short of coast: its
+        centre's area is half known where the plots it sees now in it and
+        the plots revealed and out of sight whose REGION's id is the area's
+        (`minorAreaKnown`) pass half its plots, an island where its coastal
+        land plots are at least the island percent of them."""
+        centre = self.citystate_center[:, s]
+        alive = self.citystate_alive[:, s] & (centre >= 0)
+        state = self.citystate_island[:, s]
+        naval = self.citystate_naval[:, s]
+        step = torch.where(naval == 1, torch.full_like(naval, 2),
+                           torch.where((state == 2) & (naval == 0), torch.ones_like(naval), naval))
+        self.citystate_naval[:, s] = torch.where(alive, step, naval)
+        area = self.tile_area.gather(1, centre.clamp(min=0).unsqueeze(1)).squeeze(1)
+        on = alive & (state != 1) & (area >= 0)
+        if not bool(on.count_nonzero()):
+            return
+        sight = self._minor_sight(s)
+        inside = self.tile_area == area.unsqueeze(1)
+        size = inside.sum(dim=1)
+        known = (sight & inside) | (~sight & self.mops_revealed[:, s].bool() & (self.tile_region == area.unsqueeze(1)))
+        half = known.sum(dim=1) * 2 > size
+        coastal = (inside & self.coastal_land.bool()).sum(dim=1)
+        pct = int(self.rules.research_ai["islandCoastPct"])
+        short = coastal < torch.div(size * pct, 100, rounding_mode="floor")
+        now = torch.where(short, torch.ones_like(state), torch.full_like(state, 2))
+        self.citystate_island[:, s] = torch.where(on & half, now, state)
 
     def _minor_sight(self, s: int) -> torch.Tensor:
         """[B, T] bool — `cityStateSight`: the plots minor `s` sees now — its

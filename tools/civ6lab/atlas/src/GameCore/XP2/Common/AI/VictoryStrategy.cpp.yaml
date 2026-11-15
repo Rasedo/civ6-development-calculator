@@ -10,6 +10,7 @@
   status: PARTLY
   readings:
     - "C-97: the victory manager's strategies — READ (the evaluation, the apply, the conditions below), PARTLY READ (three conditions, the island's count)"
+    - "H-1 / C-96: at war with a living major, a unit's strategic resource in the City Analysis, a city-state's naval strategy — READ (0x3dcf50, 0x7b62c0 at 0x7b71cd..0x7b725d, 0x6fafc0 at 0x6fc771..0x6fc873, 0x783980 at 0x783ade..0x783d93 and 0x785271..0x7852df, 0x786080, 0x865f20), both twins"
   context:
     - "- The apply (0x7bb3e0): the first victory strategy marked exclusive that follows or changes makes every other..."
   review: reviewed
@@ -37,6 +38,7 @@
       value: AI_Victories 120 of 163 lines equal on the record's state over the five verbose duels
   readings:
     - "C-97: the victory manager's strategies — READ (the evaluation, the apply, the conditions below), PARTLY READ (three conditions, the island's count)"
+    - "H-1 / C-96: at war with a living major, a unit's strategic resource in the City Analysis, a city-state's naval strategy — READ (0x3dcf50, 0x7b62c0 at 0x7b71cd..0x7b725d, 0x6fafc0 at 0x6fc771..0x6fc873, 0x783980 at 0x783ade..0x783d93 and 0x785271..0x7852df, 0x786080, 0x865f20), both twins"
   context:
     - "- The evaluation (0x7bc580, vtable 0xd71c30 slot 1, at the player's activation): a strategy disqualified for good..."
   review: reviewed

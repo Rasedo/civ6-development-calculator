@@ -16521,3 +16521,86 @@ records: the reach with turns and Movement, each target's spots and blows).
   Fighter 14:13); the knowledge base's entries' order in the target list
   (runs/h1_duels1124 t96 city-state 4: the barbarian Galley on 19:7 before
   the Spearman on 18:7).
+
+## H-1 / C-96: at war with a living major, a unit's strategic resource in the City Analysis, a city-state's naval strategy — READ (0x3dcf50, 0x7b62c0 at 0x7b71cd..0x7b725d, 0x6fafc0 at 0x6fc771..0x6fc873, 0x783980 at 0x783ade..0x783d93 and 0x785271..0x7852df, 0x786080, 0x865f20), both twins
+
+- AT WAR (0x3dcf50): the players' list +0xb50 is the game's majors; a
+  player of it other than the caller, alive (+0x728) and at war with it
+  (0x2a92d0), answers true. A war with a city-state, the Free Cities or
+  the barbarians is none. Ported: `atWarWithMajor` (cpu/core/seats.ts) /
+  `_at_war_with_major` — the research value's Fav Tech raise
+  (0x7b5b22..0x7b5b7f) and the City Analysis's `atWar` (the unit cut
+  0x7b63aa, the walls' terms). Confirmed: runs/h1_duels1145 city-state 3 at
+  war with city-state 4 alone from t37, its Fav Tech Iron Working 123.9 at
+  14 turns unraised t37-t38 (185.8 raised), Flight 372.1 t184-t208.
+- A UNIT'S STRATEGIC RESOURCE (0x7b62c0 at 0x7b71cd..0x7b725d, the unit
+  row's +0x2c8): the value is 0 outright unless Player_Resources 0x4aa790
+  answers other than 0 for ownership 0 or ownership 1, both with the
+  reservations off (r9b 1), or some city's CityBuildAI counts the resource
+  (0x5d45c0 above 0). Ownership 0 of a strategic resource is its stockpile
+  (+0x2e0), which a city-state under a suzerain does not bank. Ported:
+  `minorBuildFacts.resourceAccess` on `stockFree` / `_MinorFacts.resource_access`
+  on `citystate_stockpile` less `citystate_reserved`. Confirmed:
+  runs/h1_duels1136 Chinguetti (player 4, suzerain player 1 from before
+  t55): its Iron Mine on 15:8 laid t63, the UNITS table's Swordsman and
+  Man-at-Arms 0.00 t64-t97 and Iron Working 181.8 at t65
+  (ours 619.4 with the plot's test); player 2 suzerained from
+  t127, its Musketman 0.00 from t128.
+- A CITY-STATE'S STRATEGIES: every Strategies row but STRATEGY_NAVAL holds
+  an "Is Not Major" disqualifier (STRATEGY_WONDER_OBSESSED an agenda), so
+  a city-state follows STRATEGY_NAVAL alone, NumConditionsNeeded 1 on "Is
+  On Island" (GrandStrategic +0x4a0). The evaluation 0x7bc580 runs at the
+  activation on the flag the turn before left; the apply 0x7bb3e0 (in
+  GrandStrategic's turn 0x6fafc0 at 0x6fb31d) follows the turn's City
+  Analysis and precedes its research AI.
+- THE ISLAND TEST (0x6fafc0 at 0x6fc771..0x6fc873, after the apply): run
+  while +0x440 is clear or +0x4a0 set. Per city of the player's list
+  (+0x12f0 +0xd8): the plot's area (plot +8: id +0, m_iPlotCount +4,
+  m_iCoastalPlotCount +8 — the plots IsCoastalLand 0x82a10 holds, counted
+  by the area's plot callback 0x865f20) and the knowledge base's share of
+  it (0x786080: the +0x2e0 map's entry, +0x28 over +0x24) above 0.5 sets
+  +0x440; then m_iCoastalPlotCount below m_iPlotCount x
+  AI_ISLAND_COAST_PERCENTAGE (20) / 100 clears +0x4a0 and ends the walk,
+  else +0x4a0 is set.
+- THE SHARE'S COUNT (the target list 0x783980): the two maps (+0x2b0 keyed
+  by the plot's +0x18 record's id, the REGION; +0x2e0 keyed by the plot's
+  +8, the AREA) are filled once with each record's plot count (+0x24) and
+  their counts (+0x28, +0x2c) zeroed on every later call
+  (0x783ade..0x783c13). A plot the player sees now (+0x290 above 0) adds
+  one to its region's entry and one to its area's (0x783d2f..0x783d93). A
+  plot out of sight and revealed (+0x2f0), where it lies in a region, adds
+  one to the region's entry and one to the AREA map's entry of the SAME
+  key — the region's id (0x78529b..0x7852df: the key at [rbp+0xe8] is not
+  reloaded). An area's count is its plots in sight plus the unseen revealed
+  plots of the region numbered as the area.
+- THE STRATEGY'S ROWS: NavalPreferredTechs (System Technologies: Sailing,
+  Celestial Navigation, Shipbuilding, Cartography) join the research AI's
+  favored rows (x 1.5 in the propagation 0x7604e0) from the turn the
+  strategy starts; NavalUnitPreferences (System PseudoYields:
+  PSEUDOYIELD_UNIT_NAVAL_COMBAT +1.5, PSEUDOYIELD_UNIT_COMBAT -0.9) stand
+  under the military AI's terms (Combat + the Combat Desire, Naval Combat
+  - 1.0) in the City Analysis from the turn after.
+- Ported: `minorStrategyTurn` / `minorAreaKnown` (cpu/core/minorStrategy.ts),
+  `CityState.island` / `.naval` (`minorNavalApplied`, `minorNavalWeighted`),
+  `pseudoYieldWeights`, `researchAnalysis`;
+  GPU `_minor_strategy_turn`, `citystate_island` / `citystate_naval`,
+  `_MinorFacts.pseudo_w`, `_rai_analysis`.
+- Confirmed (the island probe over the fourteen games' records, the areas
+  and regions as `deriveAreas` / `deriveRegions` number them): the count
+  first passes half at runs/h1_duels1138 player 4 record t36 (area 4 =
+  region 4: 48 seen + 22 of 136), 1140 player 2 t111 (area 7 = region 7:
+  51 + 16 of 133), 1144 player 4 t41 and player 3 t237 (area 5 = region 5:
+  46 + 36 and 29 + 52 of 161) — AI_Victories.csv's STRATEGY_NAVAL,
+  Following at t37, t112, t42 and t238; no other city-state's passes
+  (1138 players 2 and 3, 1144 player 2 and every city-state of ten more
+  games: none logged). The plots revealed in the area alone pass half
+  earlier or where the game follows nothing (1140 player 2 t106; 1136,
+  1137, 1134: three each). runs/h1_duels1140 player 2 t113: its UNITS
+  table's Caravel 21.40, Galley 2.45, Archer -4.16, Warrior 0.29 as
+  logged, t112's still without the weights.
+- OPEN: runs/h1_duels1143 player 4 (area 2, region 7) passes at record
+  t111 on the engines' numbering (38 seen + 36 revealed of the region
+  numbered 2, of 140), the game follows from t126 — the game's region ids
+  where they are not the area's are unconfirmed; the Free Cities' and a
+  major's island test (the same code) and the strategy's stop (+0x90, turn
+  + 20) are not ported: no recording shows them.

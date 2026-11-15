@@ -24,8 +24,9 @@
  *
  * THE PSEUDO-YIELD WEIGHT (0x700810), which the pseudo-yield value
  * (`aiValue.pseudoYieldValue`, 0x7a60d0) pays at (1 + w): the followed
- * strategies' PseudoYields lists, none for a city-state or the Free Cities
- * (no trait's PseudoYields list moves them), held at -1.0 at least;
+ * strategies' PseudoYields lists — a city-state's STRATEGY_NAVAL's from
+ * the turn after it starts (`minorNavalWeighted`), the Free Cities' none —
+ * held at -1.0 at least;
  * PSEUDOYIELD_DISTRICT adds 0.5 x the ChronologyIndex of the player's era
  * (player +0x1358 +0xf8, Eras +0x1c).
  */
@@ -33,6 +34,7 @@ import { AI_AGENDA_TRAITS, AI_CIVILIZATION_TRAITS, AI_DIFFICULTIES, AI_ERA_STRAT
   AI_GP_CLASS_PSEUDOYIELD, AI_STRATEGY_LISTS, AI_TRAIT_LISTS } from '../data/aiTables';
 import { ERAS } from '../data/techs';
 import { GP_CLASSES } from '../data/greatPeople';
+import { NAVAL_STRATEGY_PSEUDOYIELDS } from '../data/aiResearch';
 import { gpCapped, gpOffer } from './greatPeople';
 import type { GreatPersonClass } from './types';
 import { CIV_LEADERS } from '../data/seats';
@@ -42,6 +44,7 @@ import { getModifiers, unitUpkeep } from './effects';
 import { wmdUpkeep } from './nuclear';
 import { FREE_SEAT, isCiv, majorsMet, seatOf } from './seats';
 import { minorCity } from './cityStates';
+import { minorNavalWeighted } from './minorStrategy';
 import type { GameState, Seat } from './types';
 
 /** the yields in YieldTypes order */
@@ -229,9 +232,9 @@ export function pseudoYieldWeights(state: GameState, seat: number): Map<string, 
     const c = cls.replace(/^GREAT_PERSON_CLASS_/, '') as GreatPersonClass;
     if (GP_CLASSES.includes(c) && (gpOffer(state, c) === -2 || gpCapped(s, c))) out.set(pseudo, -FX);
   }
-  // a city-state's military AI writes its Combat Desire over its
+  // a city-state's military AI adds its Combat Desire to its
   // PSEUDOYIELD_UNIT_COMBAT weight, and its explorers' and naval scouts'
-  // desire less what it holds, less 1.0, into PSEUDOYIELD_UNIT_EXPLORER and
+  // desire less what it holds, less 1.0, to PSEUDOYIELD_UNIT_EXPLORER and
   // PSEUDOYIELD_UNIT_NAVAL_COMBAT (0x71fb80, 0x7204c3..0x7205ae): a
   // city-state desires none and counts none (AI_Military.csv "0:0, 0:0" on
   // every city-state turn), so both read -1.0 — a Galley valued at its
@@ -244,7 +247,10 @@ export function pseudoYieldWeights(state: GameState, seat: number): Map<string, 
   }
   const cs = state.cityStates.find((c) => c.seat === seat);
   if (cs) {
-    out.set('PSEUDOYIELD_UNIT_COMBAT', cs.combatDesire ?? 0);
+    // the strategy it follows: STRATEGY_NAVAL's PseudoYields list under the
+    // military AI's terms
+    if (minorNavalWeighted(cs)) for (const [p, pct] of Object.entries(NAVAL_STRATEGY_PSEUDOYIELDS)) out.set(p, (out.get(p) ?? 0) + fxConst(pct * 0.01));
+    out.set('PSEUDOYIELD_UNIT_COMBAT', (out.get('PSEUDOYIELD_UNIT_COMBAT') ?? 0) + (cs.combatDesire ?? 0));
     for (const p of ['PSEUDOYIELD_UNIT_EXPLORER', 'PSEUDOYIELD_UNIT_NAVAL_COMBAT']) out.set(p, Math.max(-FX, (out.get(p) ?? 0) - FX));
     // LAB: a city-state values its Great General points at nothing — the
     // weight at its floor (-1.0), its writer unread: the Barracks', the

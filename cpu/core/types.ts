@@ -1467,6 +1467,16 @@ export interface CityState extends Seat {
    *  city terms read them (0x5d4cd0, 0x5d45c0); a founding turn's first look
    *  counts none */
   unitValues?: readonly number[];
+  /** its grand strategy's island test as its last turn left it
+   *  (GrandStrategic +0x440 / +0x4a0, `minorStrategyTurn`): 0 no city's
+   *  area half known, 1 one half known and short of coastal land (kept),
+   *  2 on an island */
+  island?: number;
+  /** it follows STRATEGY_NAVAL (the victory manager's following flag): 1
+   *  the turn the strategy starts — its research AI's favored rows hold
+   *  the strategy's, its City Analysis ran before the apply — 2 from the
+   *  turn after, the strategy's pseudo-yield weights its own as well */
+  naval?: number;
   /** its unit list as its turn's end left it, unit id -> type: the end of
    *  turn (Player::Processor::EndTurn 0x7ecc0 -> 0x4e44e0 -> 0x4ef6d0)
    *  erases the units killed since (unit +0x770), so a unit gone off the map

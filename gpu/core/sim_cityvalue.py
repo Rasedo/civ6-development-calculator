@@ -1993,14 +1993,18 @@ class _MinorFacts:
     def pseudo_w(self, p):
         if p == "PSEUDOYIELD_DISTRICT":
             return (self.era() + 1) * (_FX // 2)
-        # a city-state's military AI writes its Combat Desire over
-        # PSEUDOYIELD_UNIT_COMBAT (the Free Cities' row past the city-states')
-        if p == "PSEUDOYIELD_UNIT_COMBAT" and self.s < self.sim.S:
-            return self.sim.citystate_combat_desire[:, self.s]
-        # its explorers' and naval scouts' desire less what it holds, less
-        # 1.0: none desired, none counted (`pseudoYieldWeights`)
-        if p in ("PSEUDOYIELD_UNIT_EXPLORER", "PSEUDOYIELD_UNIT_NAVAL_COMBAT") and self.s < self.sim.S:
-            return -_FX
+        # a city-state's military AI adds its Combat Desire to
+        # PSEUDOYIELD_UNIT_COMBAT (the Free Cities' row past the
+        # city-states'), over STRATEGY_NAVAL's weight where it follows the
+        # strategy since a turn before (`citystate_naval` 2)
+        if p in ("PSEUDOYIELD_UNIT_COMBAT", "PSEUDOYIELD_UNIT_EXPLORER", "PSEUDOYIELD_UNIT_NAVAL_COMBAT") and self.s < self.sim.S:
+            naval = self.sim.citystate_naval[:, self.s] == 2
+            base = naval.long() * int(self.sim.rules.research_ai["navalPseudo"].get(p, 0))
+            if p == "PSEUDOYIELD_UNIT_COMBAT":
+                return base + self.sim.citystate_combat_desire[:, self.s]
+            # its explorers' and naval scouts' desire less what it holds,
+            # less 1.0: none desired, none counted (`pseudoYieldWeights`)
+            return torch.clamp(base - _FX, min=-_FX)
         # its Great General points valued at nothing, the weight at its
         # floor (`pseudoYieldWeights`)
         if p == "PSEUDOYIELD_GPP_GENERAL" and self.s < self.sim.S:
@@ -2050,7 +2054,7 @@ class _MinorFacts:
         return 0
 
     def at_war(self):
-        return self.sim.war[:, self.row].any(dim=1)
+        return self.sim._at_war_with_major(self.row)
 
     def city_threat(self):
         """the city's threat as its last update left it (CityBuildAI +0x1b8)"""
@@ -2328,15 +2332,18 @@ class _MinorFacts:
         return self.T["promo_minor"].get(c, _FX) if c else _FX
 
     def resource_access(self, res):
-        # a plot it owns hands the resource over, or its city's counts as
-        # its last update left them hold it (owned, unimproved)
+        # its stock of the resource less its reservations is not 0, or its
+        # city's counts as its last update left them hold it (owned,
+        # unimproved)
         ri = self.E["resource"].get(res, -1)
         if ri < 0:
             return 0
         sim = self.sim
         counted = sim.citystate_res_counts[:, self.s, ri] > 0
-        ext = (sim.res_id == ri) & (sim.tile_seat == self.seat) & sim._res_live() & sim._res_extracting()
-        return counted | ext.any(dim=1)
+        if ri not in sim._strat_rid:
+            return counted
+        k = sim._strat_rid.index(ri)
+        return counted | ((sim.citystate_stockpile[:, self.s, k] - sim.citystate_reserved[:, self.s, k]) != 0)
 
     def handicap(self):
         return 0
@@ -3007,7 +3014,7 @@ class _FreeFacts(_MinorFacts):
         return (self.sim.city_wonder[:, self.row, self.j] >= 0).any(dim=1)
 
     def at_war(self):
-        return self.sim.war[:, self.row].any(dim=1)
+        return self.sim._at_war_with_major(self.row)
 
     def yield_pct(self, y):
         return 0

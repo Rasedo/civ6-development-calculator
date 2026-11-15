@@ -45,17 +45,18 @@ import { tileSeat } from './seats';
 import {
   AI_PROJECT_SHARE, AI_SPACE_RACE_SHARE, AI_UNLOCK_SHARE, AI_VALUE_HORIZON, PSEUDOYIELD_DISTRICT, PSEUDOYIELD_NUCLEAR_WEAPON, PSEUDOYIELD_TECHNOLOGY, PSEUDOYIELD_WONDER,
 } from '../data/aiValue';
-import { RESEARCH_AI_EMBARK_ALL, RESEARCH_AI_FAVORED, RESEARCH_AI_TASK_BIAS } from '../data/aiResearch';
+import { NAVAL_STRATEGY_TECHS, RESEARCH_AI_EMBARK_ALL, RESEARCH_AI_FAVORED, RESEARCH_AI_TASK_BIAS } from '../data/aiResearch';
 import { researchCost } from './economy';
 import { treePrereqs, requiredRows } from './researchTree';
 import { randRange } from './rand';
-import { isBarbSeat, isFreeSeat, leaderOf, seatOf } from './seats';
+import { atWarWithMajor, leaderOf, seatOf } from './seats';
 import { AI_RATE, FX, aiGameEra, fmul, fromLanding, fxConst, fxOf, pseudoYield, turnsAt, type AiValueView } from './aiValue';
 import { AI_PSEUDOYIELD_DEFAULT, AI_TECH_MODIFIERS } from '../data/aiTables';
 import { projectChain } from './aiProjectValue';
 import { modifiersValue } from './aiModifiers';
 import { aiView } from './aiView';
 import { pseudoYieldWeights } from './aiWeights';
+import { minorNavalApplied } from './minorStrategy';
 import type { GameState, ImprovementId, ResearchState } from './types';
 
 
@@ -259,13 +260,6 @@ function techTourism(state: GameState, seat: number, tech: string): number {
   return sum;
 }
 
-/** 0x3dcf50: the seat at war with a player of the game but the barbarians —
- *  the Free Cities with every major */
-function atWarForValue(state: GameState, seat: number): boolean {
-  if (isFreeSeat(seat)) return true;
-  return (seatOf(state, seat)?.wars ?? []).some((p) => !isBarbSeat(p));
-}
-
 /** PSEUDOYIELD_SPACE_RACE's DefaultValue and a space race project's share, raw */
 const SPACE_RACE = AI_PSEUDOYIELD_DEFAULT.PSEUDOYIELD_SPACE_RACE;
 const SPACE_SHARE = fxConst(AI_SPACE_RACE_SHARE);
@@ -335,8 +329,10 @@ function researchOf(state: GameState, seat: number): ResearchState {
  *  the resources' (per improvement the row unlocks, the resources its cities
  *  hold unimproved, 0x5d45c0 -> 0x7a21e0); the military AI's favoured
  *  technology (`ResearchState.favTech`, written at its last turn) takes its
- *  value before the modifiers 1.5 times where the seat is at war
- *  (0x7b5b22: the row [player +0x12a0] +0xd88 and 0x3dcf50; runs/h1_duely1127
+ *  value before the modifiers 1.5 times where the seat is at war with a
+ *  living major (0x7b5b22: the row [player +0x12a0] +0xd88 and 0x3dcf50,
+ *  `atWarWithMajor`; runs/h1_duels1145 city-state 3 at war with city-state
+ *  4 alone t37, Iron Working its Fav Tech 123.9 unraised; runs/h1_duely1127
  *  the Free Cities' Archery 83.7 -> 125.6 at t34, Horseback Riding 4.3 ->
  *  6.4 from t61, as logged); `contracts` the seat's Tech
  *  Contracts, each adding its value (raw) to its row's score before the
@@ -349,7 +345,8 @@ export function researchAnalysis(state: GameState, seat: number, science: number
   const pw = pseudoYieldWeights(state, seat);
   const required = requiredRows(state);
   let view: AiValueView | undefined;
-  const fav = r.favTech && atWarForValue(state, seat) ? r.favTech : null;  const entries: ResearchEntry[] = TECH_TABLE_ORDER.filter((id) => TECHS[id]).map((id) => {
+  const fav = r.favTech && atWarWithMajor(state, seat) ? r.favTech : null;
+  const entries: ResearchEntry[] = TECH_TABLE_ORDER.filter((id) => TECHS[id]).map((id) => {
     const leaf = !required.has(id);
     if (owned(r, id)) return { tech: id, next: id, turns: -1, owned: true, leaf, base: 0, score: 0, logged: 0 };
     const { turns, next } = walk(state, seat, r, id, rate);
@@ -365,7 +362,10 @@ export function researchAnalysis(state: GameState, seat: number, science: number
   });
   addContracts(entries, contracts);
   const leader = leaderOf(state, seat);
-  propagate(state, r, entries, new Set(leader ? RESEARCH_AI_FAVORED[leader] ?? [] : []));
+  // the favored rows: the leader's lists', and a city-state's strategy's
+  // (STRATEGY_NAVAL's, `CityState.naval`)
+  const naval = minorNavalApplied(state.cityStates.find((c) => c.seat === seat));
+  propagate(state, r, entries, new Set([...(leader ? RESEARCH_AI_FAVORED[leader] ?? [] : []), ...(naval ? NAVAL_STRATEGY_TECHS : [])]));
   for (const e of entries) e.logged = e.score;
   return entries;
 }

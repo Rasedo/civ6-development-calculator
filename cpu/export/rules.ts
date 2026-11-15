@@ -36,7 +36,8 @@ import {
   AI_DISCOUNT_PCT, AI_POLICY_HORIZON, AI_PROJECT_SHARE, AI_SPACE_RACE_SHARE, AI_UNLOCK_SHARE, AI_VALUE_HORIZON, PSEUDOYIELD_CIVIC, PSEUDOYIELD_DISTRICT, PSEUDOYIELD_NUCLEAR_WEAPON,
   PSEUDOYIELD_TECHNOLOGY, PSEUDOYIELD_WONDER,
 } from '../data/aiValue';
-import { RESEARCH_AI_EMBARK_ALL, RESEARCH_AI_TASK_BIAS } from '../data/aiResearch';
+import { AI_ISLAND_COAST_PERCENTAGE, NAVAL_STRATEGY_PSEUDOYIELDS, NAVAL_STRATEGY_TECHS, RESEARCH_AI_EMBARK_ALL, RESEARCH_AI_TASK_BIAS } from '../data/aiResearch';
+import { fxConst } from '../core/aiValue';
 import { AI_GOVERNMENTS, AI_GREAT_PERSON_CLASSES, AI_POLICIES, AI_SLOT_TYPES, AI_SPACE_RACE_PROJECTS } from '../data/aiTables';
 import { CIVIC_AI_FORMATION_UNITS, CIVIC_AI_POLICY_FLOOR } from '../data/aiCivics';
 import { TECH_IMPROVEMENT_TOURISM, techUnlocks } from '../core/aiResearch';
@@ -1170,6 +1171,12 @@ export function buildRules() {
     researchAi: {
       taskBias: RESEARCH_AI_TASK_BIAS,
       embarkAll: RESEARCH_AI_EMBARK_ALL,
+      // STRATEGY_NAVAL as a city-state follows it (`minorStrategy.ts`): its
+      // favored technologies as rows of `techs`, its pseudo-yield weights
+      // raw, the island test's coastal percent
+      navalTechs: NAVAL_STRATEGY_TECHS.map((id) => techList.findIndex((t) => t.id === id)),
+      navalPseudo: Object.fromEntries(Object.entries(NAVAL_STRATEGY_PSEUDOYIELDS).map(([p, pct]) => [p, fxConst(pct * 0.01)])),
+      islandCoastPct: AI_ISLAND_COAST_PERCENTAGE,
     },
     civicAi: {
       policyFloor: CIVIC_AI_POLICY_FLOOR,

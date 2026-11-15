@@ -6001,7 +6001,7 @@ const RESEARCH_MEMORY = ['goal', 'aiEntries', 'civicAiEntries', 'civicGovValues'
   'favTech', 'civicQueue', 'researchTurns'] as const;
 const MINOR_MEMORY = ['prodSetValue', 'favoredFood', 'tradeCities', 'tradeRejected', 'citiesKnown', 'tradeValue', 'metMinors', 'unitValues', 'buildingValues', 'resourceCounts',
   'economy', 'threat', 'threatNear', 'aiGrowth', 'aiGrowthSeen', 'revealed', 'standingArmyShort', 'explored', 'upgradeTrees', 'unitsListed', 'defendersListed',
-  'bestPlotToBuy'] as const;
+  'bestPlotToBuy', 'island', 'naval'] as const;
 const CITY_MEMORY = ['aiThreat', 'aiThreatNear', 'freeRaid', 'tradeCities', 'tradeRejected'] as const;
 const UNIT_MEMORY = ['slot', 'aiDefender', 'aiHomed', 'escorted', 'originalOwner', 'look', 'mpBonus'] as const;
 const GAME_MEMORY = ['barbTribes', 'barbPool', 'barbCampsBegun', 'barbSpotNext'] as const;

@@ -78,6 +78,7 @@
     - cpu/core/tactical.ts:combat
     - cpu/core/tactical.ts:rel
     - gpu/core/sim_tactics.py:seat_of
+    - cpu/core/minorStrategy.ts:minorAreaKnown
   readings:
     - "C-95: the tactical pass — READ (the barbarians' moves; the minors share it)"
     - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
@@ -94,6 +95,7 @@
     - "C-133 / C-95 / C-134: the kept path's searches inside a queue run; the Trader target, the defending district and Pillage's own plot; the safe plot's unit at war that fights — READ (0x272aa0 at 0x272af9..0x272c76, 0x26ef40 at 0x26f123..0x26f162, 0x26e3a0, 0x782d0, 0x783980 at 0x7842df..0x7842eb / 0x784aec..0x784b36, 0x24c2f0, 0x774380 at 0x774481..0x7744a9, 0x716b90 at 0x716d53..0x716da1), FIT (the planning list's seen unit at war), both twins"
     - "C-125 / C-95: the target list's trade layer and its one unit of the units' layer; a siege unit's step onto civilians; the city-states' Attack Civilians; the flankers' test, the support's caller, the camp strike's queue — READ (0x783980 at 0x7849bb..0x784c2b and 0x784c30..0x784f57, 0x26fe20 -> 0x212500, 0x521530, 0x51f070 at 0x51f70e..0x51f737, 0x546f0, 0x52f50), both twins"
     - "C-129 / C-125 / C-95: the known cities by any district plot the look takes, their whole strike; the target list's revealed plots, its two district entries, its religious and neutral entries — READ (0x7877e0 at 0x7878a0..0x78796e / 0x787c38..0x787cac, 0x5f0280, 0x5f0490 -> 0x5eff10, 0x810d0, 0x81330, 0x783980 at 0x783e98..0x7842eb / 0x7843b8..0x7844f3 / 0x784f5c..0x785008 / 0x785271..0x78555d), FIT (a unit at peace takes no spot), both twins"
+    - "H-1 / C-96: at war with a living major, a unit's strategic resource in the City Analysis, a city-state's naval strategy — READ (0x3dcf50, 0x7b62c0 at 0x7b71cd..0x7b725d, 0x6fafc0 at 0x6fc771..0x6fc873, 0x783980 at 0x783ade..0x783d93 and 0x785271..0x7852df, 0x786080, 0x865f20), both twins"
   notes:
     - ".claude/scratchpad/cb5/NOTES.md: ...m absent at minors. NEXT: KB port (CivKnowledge.cpp 0x5eb8b0/0x5eadb0 from the tactical target list 0x783980 + 0x73abf0/0x747230),   Combat Desire (0x71fb80 0x721302..), support units (Ram/Siege Tower), proje..."
     - ".claude/scratchpad/mu1/readings_c96.md: ...ATION, f2e1d0 GOODY_HUT, f2e1d4   ALLY_SUPPORT, f2e1d8 AIR_UNIT. The list's entries per plot owner (0x783980   0x783ec5..0x7856a5): the player's own district FRIENDLY_CITY, an ally's   (0x3da560) ALLY_SUPPORT..."
@@ -166,14 +168,15 @@
   review: reviewed
 - addr: 0x786080
   kind: function
-  semantics: "a landmass's revealed share: the knowledge base's +0x2e8 map's +0x28 / +0x24, keyed by the plot's +8 id (the map refreshed by 0x783980 from a per-plot visibility word > 0)."
-  status: PARTLY
+  semantics: "an area's known share: the knowledge base's +0x2e0 map's entry of the area id (the plot's +8), its count +0x28 over the area's plot count +0x24. The target list 0x783980 zeroes the counts on every call, adds one per plot in sight to the plot's area, and one per unseen revealed plot in a region to the entry keyed by the REGION's id."
+  status: READ
   cases:
-    - recording: h1_duelv1124
-      turn: 71
-      value: "the game turns later (runs/h1_duelv1124: Qin's Naval at t71, the port's   at t48), so the +0x12f0 list and the visibility word are unread."
+    - recording: h1_duels1138
+      turn: 36
+      value: "city-state 4's area 4 (136 plots): 48 in sight and 22 unseen revealed plots of region 4, above half; AI_Victories.csv STRATEGY_NAVAL, Following at t37"
   readings:
     - "C-97: the victory manager's strategies — READ (the evaluation, the apply, the conditions below), PARTLY READ (three conditions, the island's count)"
+    - "H-1 / C-96: at war with a living major, a unit's strategic resource in the City Analysis, a city-state's naval strategy — READ (0x3dcf50, 0x7b62c0 at 0x7b71cd..0x7b725d, 0x6fafc0 at 0x6fc771..0x6fc873, 0x783980 at 0x783ade..0x783d93 and 0x785271..0x7852df, 0x786080, 0x865f20), both twins"
   context:
     - "...entry of the player +0x12f0 list, the share of its landmass the knowledge base counts (0x786080: the +0x2e8 map's +0x28 / +0x24, keyed by the plot's +8 id; the map refreshed by the..."
   review: reviewed

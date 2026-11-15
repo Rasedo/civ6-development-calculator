@@ -19,7 +19,9 @@
     - cpu/core/aiResearch.ts:upstream
     - cpu/core/aiResearch.ts:propagate
     - cpu/data/aiResearch.ts:FAVORED_ROWS
-  readings: ["H-1: the research AI — READ (the choice), PARTLY READ (the value)"]
+  readings:
+    - "H-1: the research AI — READ (the choice), PARTLY READ (the value)"
+    - "H-1 / C-96: at war with a living major, a unit's strategic resource in the City Analysis, a city-state's naval strategy — READ (0x3dcf50, 0x7b62c0 at 0x7b71cd..0x7b725d, 0x6fafc0 at 0x6fc771..0x6fc873, 0x783980 at 0x783ade..0x783d93 and 0x785271..0x7852df, 0x786080, 0x865f20), both twins"
   context:
     - "- THE PROPAGATION, 0x7604e0: a row in reach adds the +0x10 of its unowned prerequisites one and two levels up (each..."
   review: reviewed

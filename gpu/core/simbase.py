@@ -552,7 +552,7 @@ class Rules:
     c_ai_unlocks: torch.Tensor  # long [NC, 3] — what the civics AI's value counts: buildings, districts, wonders (`civicUnlocks`)
     c_ai_mods: torch.Tensor  # long [NC, 6] — the civics AI value's modifiers and formations: envoys, spies, combat adjacency, land formations, trade capacity, tourism
     ai_value: dict  # the AI's value tables (`aiValue.ts`): horizon, discountPct, the pseudo-yields, unlockShare
-    research_ai: dict  # the research AI's constants (`aiResearch.ts`): taskBias, embarkAll
+    research_ai: dict  # the research AI's constants (`aiResearch.ts`): taskBias, embarkAll, STRATEGY_NAVAL's rows
     ai_city_build: dict  # the city build AI's value tables (`aiCityBuild.ts`): DefaultValues, the improvements, features, resources, districts, projects, savings
     ai_operations: dict  # the city-states' operations (`minorOps.ts`): the definitions, teams, requirements, trees, unit AI types, limits
     civic_ai: dict  # the civics AI's constants (`aiCivics.ts`): policyFloor
@@ -1327,7 +1327,7 @@ _MUTABLE = [
     "citystate_civic_queue",  # the civics queued behind the one in hand
     "citystate_tech_ovf", "citystate_civic_ovf", "citystate_road_tier",
     "citystate_tech_boosted", "citystate_civic_boosted", "citystate_barb_kills",  # the minor's boosts and barbarian kills
-    "citystate_tech_goal", "citystate_fav_tech", "citystate_ai_turns", "citystate_ai_next", "citystate_ai_base", "citystate_ai_score", "citystate_ai_owned",
+    "citystate_tech_goal", "citystate_fav_tech", "citystate_island", "citystate_naval", "citystate_ai_turns", "citystate_ai_next", "citystate_ai_base", "citystate_ai_score", "citystate_ai_owned",
     "citystate_ai_valid", "citystate_ai_left", "citystate_ai_left_seen", "citystate_ai_tech_seen",  # the research AI's goal, its last turn's analysis, its turns left
     "citystate_research_turns",  # its turns per unit as its last end of turn kept them
     "citystate_cai_turns", "citystate_cai_next", "citystate_cai_base", "citystate_cai_score", "citystate_cai_owned",

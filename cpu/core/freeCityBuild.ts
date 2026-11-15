@@ -32,7 +32,7 @@ import { analysedTurns, installType, promotionWeight, strongerFoe } from './mino
 import { civEraIndex, computeCityStats } from './city';
 import { researchCost } from './economy';
 import { getModifiers, prodBoostPct, seatGovernment } from './effects';
-import { citiesOf, isCiv, isCityStateSeat, isFreeSeat, seatOf } from './seats';
+import { atWarWithMajor, citiesOf, isCiv, isCityStateSeat, isFreeSeat, seatOf } from './seats';
 import { minorCity } from './cityStates';
 import { cityLowlands, coastalLowlandCounts } from './climate';
 import { accumulatedPerTurn, stockFree, strategicSlot, strategicSurplus } from './stockpile';
@@ -176,7 +176,7 @@ function majorBuildFacts(state: GameState, city: City, known: (unit: string) => 
     capital: city.isCapital,
     districtCount: city.districts.length,
     hasWonder: (city.wonders ?? []).length > 0,
-    atWar: s.wars.length > 0,
+    atWar: atWarWithMajor(state, seat),
     // the threats its cities' last updates left (`City.aiThreat`)
     cityThreat: city.aiThreat ?? -1,
     anyCityThreat: own.some((c) => (c.aiThreat ?? -1) > -1),

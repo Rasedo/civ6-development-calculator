@@ -2305,6 +2305,28 @@
           "note": "the military AI's favoured technology (+0xd88) its last turn wrote, -1 none"
         },
         {
+          "name": "minorIsland",
+          "compare": "exact",
+          "covers": [
+            "CityState.island"
+          ],
+          "planes": [
+            "citystate_island"
+          ],
+          "note": "the grand strategy's island test as its last turn left it: 0 no area half known, 1 half known and short of coast, 2 on an island"
+        },
+        {
+          "name": "minorNaval",
+          "compare": "exact",
+          "covers": [
+            "CityState.naval"
+          ],
+          "planes": [
+            "citystate_naval"
+          ],
+          "note": "the city-state follows STRATEGY_NAVAL: 0 no, 1 the turn it starts, 2 from the turn after"
+        },
+        {
           "name": "minorResearchTurns",
           "compare": "exact",
           "covers": [

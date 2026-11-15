@@ -288,6 +288,12 @@ class SimInit:
         # the military AI's favoured technology its last turn wrote (-1 none;
         # `ResearchState.favTech`, `_military_fav_tech`)
         self.citystate_fav_tech = torch.full((B, r_pad), -1, dtype=torch.long, device=device)
+        # its grand strategy's island test as its last turn left it (0 no
+        # area half known, 1 half known and short of coast, 2 on an island)
+        # and whether it follows STRATEGY_NAVAL (`_minor_strategy_turn`: 1 the
+        # turn the strategy starts, 2 from the turn after)
+        self.citystate_island = torch.zeros(B, r_pad, dtype=torch.long, device=device)
+        self.citystate_naval = torch.zeros(B, r_pad, dtype=torch.long, device=device)
         self.citystate_ai_turns = torch.full((B, r_pad, nt_ai), -1, dtype=torch.long, device=device)
         self.citystate_ai_next = torch.zeros(B, r_pad, nt_ai, dtype=torch.long, device=device)
         self.citystate_ai_base = torch.zeros(B, r_pad, nt_ai, dtype=torch.long, device=device)
