@@ -430,9 +430,7 @@ describe('flanking & support', () => {
     expect(d1).toBe(d0 - SUPPORT_CS * 10); // defender +2 CS -> −20 in diff·10
   });
 
-  it('CIV6: no Support inside a defensible district — a city-state\'s centre included', () => {
-    // TS never paves a minor's centre with a district, so the gate must ask
-    // the minor's own centre list (seed 9170 t114 paid +2 there)
+  it('Support asks no district: a unit on a city-state\'s centre counts its neighbours', () => {
     const setup = (minorCentre: boolean) => {
       const { state } = armed();
       const atkTile = tileAtCoords(state.map, 11, 9).index;
@@ -457,7 +455,7 @@ describe('flanking & support', () => {
     const open = setup(false);
     expect(supportCount(open.state, open.defTile, open.def)).toBe(1);
     const inside = setup(true);
-    expect(supportCount(inside.state, inside.defTile, inside.def)).toBe(0);
+    expect(supportCount(inside.state, inside.defTile, inside.def)).toBe(1);
   });
   it('CIV6: "ranged attacks ignore any Support received by the defender"', () => {
     const setup = () => {
@@ -485,13 +483,12 @@ describe('flanking & support', () => {
     expect(d1).toBe(d0);
   });
 
-  it('CIV6: a defender inside a defensible district gains no Support', () => {
+  it('a unit on its own centre counts the unit beside it, and supports it', () => {
     const { state, city } = armed();
     const def = spawnUnit(state, 'WARRIOR', city.centerIndex, 0)!;
     const sn = neighbors(state.map, state.map.tiles[city.centerIndex]).find((t) => unitPassable(t))!;
     const beside = spawnUnit(state, 'WARRIOR', sn.index, 0)!;
-    expect(supportCount(state, city.centerIndex, def)).toBe(0);
-    // the unit beside the centre does get it, from the one inside
+    expect(supportCount(state, city.centerIndex, def)).toBeGreaterThan(0);
     expect(supportCount(state, sn.index, beside)).toBeGreaterThan(0);
   });
 });

@@ -308,6 +308,7 @@
     - "C-94: the wounded law and the garrison"
     - "C-95: a damaged centre defends at its wounded strength, the planning's city shot needs standing walls, the barbarians plan on the turn's unhealed centres — READ (0x51eaf0, 0x791470 at 0x79181c..0x791827 -> 0x249ee0 / 0x24b960), both twins; the replay's barbarian copy"
     - "C-110 / C-125: an embarked unit's strengths in a unit's blow, a promotion's side, ground closed to a strike — READ (0x51f070 at 0x51f3ef..0x51f457, 0x206960 at 0x2069b4..0x2069e0 and 0x206a78..0x206b29, 0x520270 at 0x520576..0x5205db, 0x5228c0, 0x77a4b0), FIT (the closed ground), both twins"
+    - "C-125 / C-110 / C-134: a defending district's terrain, a ship's shot at a district, the fuel term's player, the planning's dealt word on a district, Support on a centre, a city-state's plannings — READ (0x51eaf0 at 0x51ec87..0x51ecca, 0x522c10 at 0x522cc6..0x522f16, 0x51d670 at 0x51d7cd..0x51d7fa / 0x51d9c9..0x51da3d, 0x51c810 at 0x51ca2d..0x51ca57, 0x51f070 at 0x51f253..0x51f27a, 0x520270 at 0x520413..0x520429, 0x519440 at 0x51963d..0x51975a, 0x791470 at 0x7916fb..0x79175e, 0x812cc0 at 0x812ecb..0x812f41, 0x51e980), LAB (the aiunits plannings), both twins"
   context:
     - "- 0x522630, the Combat a wounded unit loses, 24.8: m = COMBAT_WOUNDED_DAMAGE_ MULTIPLIER (gp +0x23..."
     - "...56dc90 with the formation's) is strictly greater, and only then takes its wounds off (0x522630). Recorded: 1121 Guangzhou t191, a Line Infantry Corps (75, 16 HP) over an Ironclad (70..."
@@ -331,6 +332,9 @@
     - recording: h1_duelw1127
       turn: 16
       value: "So the   gap at runs/h1_duelw1127 t16 — a barbarian Slinger on city-state 3's   Warrior at 51 HP on Floodplains beside a friend, 23 logged and the   engines' 26, the log's DefenderStrMod −4 where the "
+    - recording: h1_duels1124
+      turn: 33
+      value: "city-state 4's Heavy Chariot 524293 on 35:8, its Warriors 131073 on 36:8 and 327683 on 34:7, set on its centre 32:8 against the barbarian Scout on 31:8: back taken 8 / back dealt 100, two Supports"
   impl:
     - cpu/core/combat.ts:FLANKING_CS
     - cpu/core/combat.ts:supportCount
@@ -341,6 +345,7 @@
     - "C-125 / C-95: flanking and support count about the defender unit's own plot, no river edge read; MEDIUM by the plot's layer-0 list; a killed target's record; the camp strike's orders — READ (0x521530, 0x51c810 at 0x51cc1c..0x51cc56, 0x5228c0, 0x786d50, 0x776140 at 0x776333, 0x8e9d0, 0x772940 at 0x772d2f..0x772f78), FIT (the camp strike's path), both twins"
     - "C-125 / C-95: the target list's trade layer and its one unit of the units' layer; a siege unit's step onto civilians; the city-states' Attack Civilians; the flankers' test, the support's caller, the camp strike's queue — READ (0x783980 at 0x7849bb..0x784c2b and 0x784c30..0x784f57, 0x26fe20 -> 0x212500, 0x521530, 0x51f070 at 0x51f70e..0x51f737, 0x546f0, 0x52f50), both twins"
     - "C-110 / C-125: an embarked unit's strengths in a unit's blow, a promotion's side, ground closed to a strike — READ (0x51f070 at 0x51f3ef..0x51f457, 0x206960 at 0x2069b4..0x2069e0 and 0x206a78..0x206b29, 0x520270 at 0x520576..0x5205db, 0x5228c0, 0x77a4b0), FIT (the closed ground), both twins"
+    - "C-125 / C-110 / C-134: a defending district's terrain, a ship's shot at a district, the fuel term's player, the planning's dealt word on a district, Support on a centre, a city-state's plannings"
   context:
     - "- Flanking (0x521530) and Support (0x521ed0, 0x5228c0) are gated on the player's m_bMilitaryCombatAdjacency (+0x1268), which only EFFECT_GR..."
   review: reviewed

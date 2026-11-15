@@ -56,7 +56,7 @@ export function passView(state: GameState, seat: number, pass: Pass, base: AiVie
       const e = pass.plan.get(id)?.entries.find((x) => x.target.tile === p);
       return e ? e.spots.map((x) => ({ plot: x.tile, turns: x.turns })) : [];
     },
-    cityBlow: (id, p) => (pass.plan.get(id)?.entries.some((x) => x.target.tile === p && x.spots.length > 0) ? base.cityBlow(id, p) : 0),
+    cityBlow: (id, p) => pass.plan.get(id)?.entries.find((x) => x.target.type === 'COMBAT_DISTRICT' && x.target.tile === p && x.spots.length > 0)?.dealt ?? 0,
   };
 }
 

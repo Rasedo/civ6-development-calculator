@@ -58,10 +58,9 @@ describe('the siege roster', () => {
     const { state } = war();
     const cat = { type: 'CATAPULT', seat: ATK };
     const arc = { type: 'ARCHER', seat: ATK };
-    expect(cityRangedStrength(state, cat, WALLS_TIER_HP[1])).toBe(35);
-    expect(cityRangedStrength(state, cat, 0)).toBe(35);
+    expect(cityRangedStrength(state, cat)).toBe(35);
     // an ordinary land ranged unit still pays it
-    expect(cityRangedStrength(state, arc, WALLS_TIER_HP[1])).toBe(25 - 17);
+    expect(cityRangedStrength(state, arc)).toBe(25 - 17);
     expect(cityHitClass('CATAPULT', true)).toBe('bombard');
     expect(cityHitClass('CATAPULT', false)).toBe('bombard');
     expect(cityHitClass('ARCHER', true)).toBe('ranged');

@@ -112,7 +112,9 @@
   kind: function
   semantics: "the ram test: the district's +0x1910 against the support's tier."
   status: PARTLY
-  readings: ["H-1: the melee result, a ranged blow's domain, a city's shot — READ"]
+  readings:
+    - "H-1: the melee result, a ranged blow's domain, a city's shot — READ"
+    - "C-125 / C-110 / C-134: a defending district's terrain, a ship's shot at a district, the fuel term's player, the planning's dealt word on a district, Support on a centre, a city-state's plannings — READ (0x51eaf0 at 0x51ec87..0x51ecca, 0x522c10 at 0x522cc6..0x522f16, 0x51d670 at 0x51d7cd..0x51d7fa / 0x51d9c9..0x51da3d, 0x51c810 at 0x51ca2d..0x51ca57, 0x51f070 at 0x51f253..0x51f27a, 0x520270 at 0x520413..0x520429, 0x519440 at 0x51963d..0x51975a, 0x791470 at 0x7916fb..0x79175e, 0x812cc0 at 0x812ecb..0x812f41, 0x51e980), LAB (the aiunits plannings), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...ge is taken at its percent: melee 15 unless a player flag (0x5212f0) or the ram test (0x51af50, the district's +0x1910 against the support's tier) gives 100; ranged 50 unless the uni..."
@@ -158,7 +160,7 @@
   review: reviewed
 - addr: 0x51c810
   kind: function
-  semantics: "the unit-vs-unit attack strength; its domain term: a bombard attack (combat type 0x4fc9163d) loses COMBAT_BOMBARD_VS_UNIT_STRENGTH_MODIFIER (GlobalParameters +0x188, 17) on a defender of the land domain (+0x650 == 2, LESS_EFFECTIVE_VS_LAND_UNITS); a ranged attack (0x2ec4ce4d) by a land unit loses it on a defender of the sea domain (0, LESS_EFFECTIVE_VS_NAVAL_UNITS). Its modifier walk reads unit abilities (the Spear of Fionn's +5). Its amphibious term 0x51bba0 is handed the plot the defender's unit stands on (0x90290 on arg5, 0x51cb7a..0x51cba1), as the friendly-territory term and the flanking are."
+  semantics: "the unit-vs-unit attack strength; its domain term: a bombard attack (combat type 0x4fc9163d) loses COMBAT_BOMBARD_VS_UNIT_STRENGTH_MODIFIER (GlobalParameters +0x188, 17) on a defender of the land domain (+0x650 == 2, LESS_EFFECTIVE_VS_LAND_UNITS); a ranged attack (0x2ec4ce4d) by a land unit loses it on a defender of the sea domain (0, LESS_EFFECTIVE_VS_NAVAL_UNITS). Its modifier walk reads unit abilities (the Spear of Fionn's +5). Its amphibious term 0x51bba0 is handed the plot the defender's unit stands on (0x90290 on arg5, 0x51cb7a..0x51cba1), as the friendly-territory term and the flanking are. the unit's fuel shortfall +0x187c is taken off under a FULL_CIV owner alone (0x469db0 at 0x51ca3b, 0x51ca2d..0x51ca57)."
   status: READ
   cases:
     - recording: h1_duelw1124
@@ -176,6 +178,9 @@
     - recording: 1126
       turn: 75
       value: 1126 the Archer 2818053 on every shot t75-88;
+    - recording: h1_duels1124
+      turn: 181
+      value: "city-state 3's Battleship 1900550 on the barbarian Field Cannon on 37:17: the planning's dealt 56, back taken 16, at its whole 70 / 60 with no Coal"
   impl:
     - cpu/core/combat.ts:rangedDomainCS
     - cpu/data/constants.ts:COMBAT_BOMBARD_VS_UNIT
@@ -184,22 +189,37 @@
     - cpu/core/combat.ts:meleeUnitStrengths
     - gpu/core/sim_masks.py:_flank_support
     - cpu/core/combat.ts:amphibiousAttackCS
+    - cpu/core/stockpile.ts:fuelShortCS
+    - gpu/core/sim_seats.py:_fuel_short_cs
   readings:
     - "H-1: the melee result, a ranged blow's domain, a city's shot — READ"
     - "C-98: the unit efficiencies — READ (0x79a440, its simulated combats 0x205720 off the map), ported: every entry the logged table's"
     - "C-125 / C-95: flanking and support count about the defender unit's own plot, no river edge read; MEDIUM by the plot's layer-0 list; a killed target's record; the camp strike's orders — READ (0x521530, 0x51c810 at 0x51cc1c..0x51cc56, 0x5228c0, 0x786d50, 0x776140 at 0x776333, 0x8e9d0, 0x772940 at 0x772d2f..0x772f78), FIT (the camp strike's path), both twins"
     - "C-110 / C-125: the amphibious penalty reads the plot the defender stands on — READ (0x51bba0, 0x51c810 at 0x51cb7a..0x51cba1, 0x51d670 at 0x51d92e..0x51d957, 0x205f70, 0x211cc0, 0x209870), both twins"
+    - "C-125 / C-110 / C-134: a defending district's terrain, a ship's shot at a district, the fuel term's player, the planning's dealt word on a district, Support on a centre, a city-state's plannings — READ (0x51eaf0 at 0x51ec87..0x51ecca, 0x522c10 at 0x522cc6..0x522f16, 0x51d670 at 0x51d7cd..0x51d7fa / 0x51d9c9..0x51da3d, 0x51c810 at 0x51ca2d..0x51ca57, 0x51f070 at 0x51f253..0x51f27a, 0x520270 at 0x520413..0x520429, 0x519440 at 0x51963d..0x51975a, 0x791470 at 0x7916fb..0x79175e, 0x812cc0 at 0x812ecb..0x812f41, 0x51e980), LAB (the aiunits plannings), both twins"
   context:
     - "- A ranged blow's domain term (0x51c810, the unit-vs-unit attack strength): a bombard attack (combat type 0x4fc9163d) loses C..."
     - ...IER_UNIT_ADJUST_COMBAT_STRENGTH, the barbarian traits, the difficulty rows), no term of 0x51c810 / 0x51f070 read here, and the dumps' promotions are empty.
   review: reviewed
 - addr: 0x51d670
   kind: function
-  semantics: "the unit-on-district attack strength composer (callers 0x206080 melee, 0x204b10, 0x2074b0, 0x202580): read at 0x51d92e..0x51d957 alone — it hands the amphibious term 0x51bba0 the attacker (r8), the district's own plot (0x24b530 on the district, its arg at [rbp+0x550]) and the combat type; its other terms unread."
+  semantics: "the unit-on-district attack strength composer (callers 0x206080 melee, 0x204b10, 0x2074b0, 0x202580): the wound; the unit's fuel shortfall +0x187c off under a FULL_CIV owner alone (0x51d7cd..0x51d7fa); the amphibious term 0x51bba0 handed the attacker (r8), the district's own plot (0x24b530 on the district, its arg at [rbp+0x550]) and the combat type (0x51d92e..0x51d957); under COMBAT_RANGED 0x2ec4ce4d, for a unit whose domain +0x650 is not the sea's 0 and whose +0x18c2 is clear, GlobalParameters +0x218 off (LOC_COMBAT_PREVIEW_LESS_EFFECTIVE_VS_WALLS_DESC, 0x51d9c9..0x51da3d: no outer defence asked); then the luxury, espionage, the city's friendly bonus 0x51e980, the governor's and the religion's terms and the modifier lists (unread)."
   status: PARTLY
-  impl: [cpu/core/combat.ts:amphibiousAttackCS, cpu/core/combat.ts:assaultAtkCS]
+  cases:
+    - recording: h1_duels1137
+      turn: 224
+      value: "the barbarian Frigate 2293767 on player 1's walled district 3997756: CombatLog 55 + 0 against 75 + 2, the hit points' damage 1"
+  impl:
+    - cpu/core/combat.ts:amphibiousAttackCS
+    - cpu/core/combat.ts:assaultAtkCS
+    - cpu/core/combat.ts:rangedCityPenalty
+    - cpu/core/stockpile.ts:fuelShortCS
+    - cpu/core/combat.ts:cityRangedStrength
+    - gpu/core/sim_masks.py:_city_ranged_strength
+    - gpu/core/sim_seats.py:_fuel_short_cs
   readings:
     - "C-110 / C-125: the amphibious penalty reads the plot the defender stands on — READ (0x51bba0, 0x51c810 at 0x51cb7a..0x51cba1, 0x51d670 at 0x51d92e..0x51d957, 0x205f70, 0x211cc0, 0x209870), both twins"
+    - "C-125 / C-110 / C-134: a defending district's terrain, a ship's shot at a district, the fuel term's player, the planning's dealt word on a district, Support on a centre, a city-state's plannings — READ (0x51eaf0 at 0x51ec87..0x51ecca, 0x522c10 at 0x522cc6..0x522f16, 0x51d670 at 0x51d7cd..0x51d7fa / 0x51d9c9..0x51da3d, 0x51c810 at 0x51ca2d..0x51ca57, 0x51f070 at 0x51f253..0x51f27a, 0x520270 at 0x520413..0x520429, 0x519440 at 0x51963d..0x51975a, 0x791470 at 0x7916fb..0x79175e, 0x812cc0 at 0x812ecb..0x812f41, 0x51e980), LAB (the aiunits plannings), both twins"
   notes: [no recorded case of an embarked unit's blow on a district]
   context:
     - "...y reads the plot the defender stands on — READ (0x51bba0, 0x51c810 at 0x51cb7a..0x51cba1, 0x51d670 at 0x51d92e..0x51d957, 0x205f70, 0x211cc0, 0x209870), both twins"
@@ -217,15 +237,32 @@
   context:
     - "...r15`); with none it takes every term a unit ashore takes: the bonus against barbarians 0x51e640 (the unit's +0x1844), the friendly-territory term 0x5230b0 (+0x1848), the terrain term..."
   review: reviewed
+- addr: 0x51e980
+  final: 0x36a810
+  kind: function
+  name: cityFriendlyCombatBonus
+  semantics: "a term of the four strength composers (rdx the result, r8 the unit, r9 the plot, the preview list): 0 for a unit of a religious strength (+0x1ce0) or with no plot; else the city whose ground the plot is (0x66480 on the plot's coordinates) gives its +0x18a4 (x 256, LOC_COMBAT_PREVIEW_CITY_FRIENDLY_COMBAT_BONUS; EFFECT_ADJUST_CITY_COMBAT_BONUS, the governors' Garrison Commander) where the unit's owner is the city's (+0x1b8), or the city's owner's diplomacy answers 1 for it under 0x3ce940 (unread), or it is the suzerain (0x44c850) of the city's owner."
+  status: PARTLY
+  impl: [cpu/core/combat.ts:defenderCS]
+  readings:
+    - "C-125 / C-110 / C-134: a defending district's terrain, a ship's shot at a district, the fuel term's player, the planning's dealt word on a district, Support on a centre, a city-state's plannings — READ (0x51eaf0 at 0x51ec87..0x51ecca, 0x522c10 at 0x522cc6..0x522f16, 0x51d670 at 0x51d7cd..0x51d7fa / 0x51d9c9..0x51da3d, 0x51c810 at 0x51ca2d..0x51ca57, 0x51f070 at 0x51f253..0x51f27a, 0x520270 at 0x520413..0x520429, 0x519440 at 0x51963d..0x51975a, 0x791470 at 0x7916fb..0x79175e, 0x812cc0 at 0x812ecb..0x812f41, 0x51e980), LAB (the aiunits plannings), both twins"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - ...40 at 0x51963d..0x51975a, 0x791470 at 0x7916fb..0x79175e, 0x812cc0 at 0x812ecb..0x812f41, 0x51e980), LAB (the aiunits plannings), both twins
+    - "- THE CITY'S FRIENDLY COMBAT BONUS 0x51e980 (a term of the four composers, LOC_COMBAT_PREVIEW_CITY_FRIENDLY_COMBAT_BONUS): for a un..."
+  review: reviewed
 - addr: 0x51eaf0
   kind: function
   name: districtDamageLoss
-  semantics: "the defending district's terms in melee 0x206080, ranged 0x204b10, bombard 0x2074b0 and the preview 0x202580: first the damaged district's loss, the wounded law 0x522630 at COMBAT_WOUNDED_DISTRICT_DAMAGE_MULTIPLIER (gp +0x23c, 10) on GetDamage x 100 / GetMaxDamage of the hit points' hash 0x5e97d629 (integer), the reduction the plot's best combat defender's +0x1868 (0x24b170), negated onto the strength; then the terrain term 0x522c10 and the modifier lists (unported, no recorded case moves)."
+  semantics: "the defending district's terms in melee 0x206080, ranged 0x204b10, bombard 0x2074b0 and the preview 0x202580: first the damaged district's loss, the wounded law 0x522630 at COMBAT_WOUNDED_DISTRICT_DAMAGE_MULTIPLIER (gp +0x23c, 10) on GetDamage x 100 / GetMaxDamage of the hit points' hash 0x5e97d629 (integer), the reduction the plot's best combat defender's +0x1868 (0x24b170), negated onto the strength; then the terrain term 0x522c10 on the district's own plot (0x24b530 at 0x51ec9c, with the attacker's plot 0x90290 and the combat type); then the combat reference's +0x30 << 8 (0x51edae..0x51edbb: the modifier lists' sum, unread)."
   status: READ
   cases:
     - recording: h1_duelz1128
       turn: 242
       value: Rome's centre 42:20, standing 48 (record d[5]) with 179 of 200 lost, defends at 39.05 (CombatLog 35 + 4; the cuirassier's 11 and the Cavalry's 12 and 17 fit only 38-39); t241 128 lost, 38 - 6.4 = 32 (35 - 3)
+    - recording: h1_duels1127
+      turn: 22
+      value: "the barbarian Scout 786442 on city-state 4's centre 8:10 (Grassland Hills): CombatLog 10 - 5 against 15 + 12, the centre standing at 24; t24 the Slinger 1245192 15 - 17 against 15 + 7 on a standing 19"
   impl:
     - cpu/core/combat.ts:districtDamageLoss
     - cpu/core/combat.ts:cityCombatDefense
@@ -233,14 +270,19 @@
     - gpu/core/sim_seats.py:_district_damage_loss
     - gpu/core/sim_seats.py:_city_combat_defense
     - gpu/core/sim_seats.py:_minor_combat_defense
+    - cpu/core/combat.ts:districtFightTerms
+    - gpu/core/sim_seats.py:_district_fight_terms
+    - cpu/core/combat.ts:encampmentDefense
+    - gpu/core/sim_seats.py:_encamp_terms
   readings:
     - "C-95: a damaged centre defends at its wounded strength, the planning's city shot needs standing walls, the barbarians plan on the turn's unhealed centres"
     - "C-95: a damaged centre defends at its wounded strength, the planning's city shot needs standing walls, the barbarians plan on the turn's unhealed centres — READ (0x51eaf0, 0x791470 at 0x79181c..0x791827 -> 0x249ee0 / 0x24b960), both twins; the replay's barbarian copy"
     - "C-125 / C-95: the planning's unmoved flag, a district's blow back, the combat's kind from its members, the camp strike's push — READ (0x791e00 at 0x791eb6..0x791ec4, 0x791470 at 0x7916fb..0x79174f / 0x7917f7..0x7918f7, 0x205720 at 0x205835..0x20592f, 0x209550, 0x772940 at 0x772a85..0x772ad3 / 0x772eea / 0x772f78), both twins"
+    - "C-125 / C-110 / C-134: a defending district's terrain, a ship's shot at a district, the fuel term's player, the planning's dealt word on a district, Support on a centre, a city-state's plannings — READ (0x51eaf0 at 0x51ec87..0x51ecca, 0x522c10 at 0x522cc6..0x522f16, 0x51d670 at 0x51d7cd..0x51d7fa / 0x51d9c9..0x51da3d, 0x51c810 at 0x51ca2d..0x51ca57, 0x51f070 at 0x51f253..0x51f27a, 0x520270 at 0x520413..0x520429, 0x519440 at 0x51963d..0x51975a, 0x791470 at 0x7916fb..0x79175e, 0x812cc0 at 0x812ecb..0x812f41, 0x51e980), LAB (the aiunits plannings), both twins"
   review: reviewed
 - addr: 0x51f070
   kind: function
-  semantics: "the defender's strength composer: 0x521ed0 for the combat type 0x5e2f7468, 0x5228c0 for every other; its modifier walk reads the unit abilities (ABILITY_SPEAR_OF_FIONN's +5). At 0x51f603..0x51f737 the terrain term 0x522c10, the fortification 0x521830 and the support are added one after the other with no test of the defender's plot: no district is asked before 0x5228c0. Arguments: rdx the result, r8 the defender, r9 the combat's plot, then the attacker, the combat type, the modifiers' context and the preview list. After the wound (0x522630) and the fuel term an embarked defender that does not fight embarked (0x8be30, +0x18c3 clear) is cut to those alone only where the preview list is given (0x51f3ef..0x51f457: test r15, r15); with none it takes every term a unit ashore takes — the bonus against barbarians 0x51e640, the friendly territory 0x5230b0, the terrain 0x522c10, the fortification 0x521830, the Support, the unused Movement 0x5232d0, the modifiers' sum — on its era's embarked strength (0x56dc90 with dl 0)."
+  semantics: "the defender's strength composer: 0x521ed0 for the combat type 0x5e2f7468, 0x5228c0 for every other; its modifier walk reads the unit abilities (ABILITY_SPEAR_OF_FIONN's +5). At 0x51f603..0x51f737 the terrain term 0x522c10, the fortification 0x521830 and the support are added one after the other with no test of the defender's plot: no district is asked before 0x5228c0. Arguments: rdx the result, r8 the defender, r9 the combat's plot, then the attacker, the combat type, the modifiers' context and the preview list. After the wound (0x522630) and the fuel term an embarked defender that does not fight embarked (0x8be30, +0x18c3 clear) is cut to those alone only where the preview list is given (0x51f3ef..0x51f457: test r15, r15); with none it takes every term a unit ashore takes — the bonus against barbarians 0x51e640, the friendly territory 0x5230b0, the terrain 0x522c10, the fortification 0x521830, the Support, the unused Movement 0x5232d0, the modifiers' sum — on its era's embarked strength (0x56dc90 with dl 0). the unit's fuel shortfall +0x187c is taken off under a FULL_CIV owner alone (0x469db0 at 0x51f261, 0x51f253..0x51f27a)."
   status: READ
   cases:
     - recording: h1_duelq1127
@@ -264,10 +306,16 @@
     - recording: 1124
       turn: 14
       value: "- Not explained by this reading (C-94 ASK): a +5 a barbarian unit carries on   some attacks and not others (1124 t14 a Spearman and a Warrior on Rome's   Scout, t32, t37, t84;"
+    - recording: h1_duels1124
+      turn: 209
+      value: "the barbarian Field Cannon 5767174 on city-state 3's Battleship 1900550: CombatLog 60 - 17 against 60 + 0; t33 city-state 4's Heavy Chariot 524293 set on its centre 32:8, its Warriors beside its own 35:8: back taken 8 / back dealt 100"
   impl:
     - cpu/core/combat.ts:defenderCS
     - gpu/core/sim_seats.py:_melee_unit_strengths
     - gpu/core/sim_seats.py:_ranged_unit_strengths
+    - cpu/core/combat.ts:supportCount
+    - cpu/core/stockpile.ts:fuelShortCS
+    - gpu/core/sim_masks.py:_flank_support
   readings:
     - "H-1: the melee result, a ranged blow's domain, a city's shot — READ"
     - "C-98: the unit efficiencies — READ (0x79a440, its simulated combats 0x205720 off the map), ported: every entry the logged table's"
@@ -275,6 +323,7 @@
     - "C-125 / C-95: flanking and support count about the defender unit's own plot, no river edge read; MEDIUM by the plot's layer-0 list; a killed target's record; the camp strike's orders — READ (0x521530, 0x51c810 at 0x51cc1c..0x51cc56, 0x5228c0, 0x786d50, 0x776140 at 0x776333, 0x8e9d0, 0x772940 at 0x772d2f..0x772f78), FIT (the camp strike's path), both twins"
     - "C-125 / C-95: the target list's trade layer and its one unit of the units' layer; a siege unit's step onto civilians; the city-states' Attack Civilians; the flankers' test, the support's caller, the camp strike's queue — READ (0x783980 at 0x7849bb..0x784c2b and 0x784c30..0x784f57, 0x26fe20 -> 0x212500, 0x521530, 0x51f070 at 0x51f70e..0x51f737, 0x546f0, 0x52f50), both twins"
     - "C-110 / C-125: an embarked unit's strengths in a unit's blow, a promotion's side, ground closed to a strike — READ (0x51f070 at 0x51f3ef..0x51f457, 0x206960 at 0x2069b4..0x2069e0 and 0x206a78..0x206b29, 0x520270 at 0x520576..0x5205db, 0x5228c0, 0x77a4b0), FIT (the closed ground), both twins"
+    - "C-125 / C-110 / C-134: a defending district's terrain, a ship's shot at a district, the fuel term's player, the planning's dealt word on a district, Support on a centre, a city-state's plannings — READ (0x51eaf0 at 0x51ec87..0x51ecca, 0x522c10 at 0x522cc6..0x522f16, 0x51d670 at 0x51d7cd..0x51d7fa / 0x51d9c9..0x51da3d, 0x51c810 at 0x51ca2d..0x51ca57, 0x51f070 at 0x51f253..0x51f27a, 0x520270 at 0x520413..0x520429, 0x519440 at 0x51963d..0x51975a, 0x791470 at 0x7916fb..0x79175e, 0x812cc0 at 0x812ecb..0x812f41, 0x51e980), LAB (the aiunits plannings), both twins"
   context:
     - "...pportLive` / `_flank_support_live` read each player's civics. The defender's composer 0x51f070 calls 0x521ed0 for the combat type 0x5e2f7468 and 0x5228c0 for every other; 0x5228c0 ad..."
     - ...JUST_COMBAT_STRENGTH, the barbarian traits, the difficulty rows), no term of 0x51c810 / 0x51f070 read here, and the dumps' promotions are empty.
@@ -282,12 +331,13 @@
 - addr: 0x520270
   kind: function
   name: visibilityCS
-  semantics: "the district-defender strength (called by the district attack 0x207080): carries the diplomatic-visibility (ESPIONAGE) bonus (visibilityCS). An embarked defender that does not fight embarked is left its wound and fuel terms alone, preview list or none (0x520576..0x5205db: the list only guards the preview's line), where the unit composer 0x51f070 cuts it so under a list alone."
+  semantics: "the district-defender strength (called by the district attack 0x207080): carries the diplomatic-visibility (ESPIONAGE) bonus (visibilityCS). An embarked defender that does not fight embarked is left its wound and fuel terms alone, preview list or none (0x520576..0x5205db: the list only guards the preview's line), where the unit composer 0x51f070 cuts it so under a list alone. the unit's fuel shortfall +0x187c is taken off under a FULL_CIV owner alone (0x469db0 at 0x520413, 0x520413..0x520429)."
   status: PARTLY
-  impl: [cpu/core/combat.ts:cityStrikeDefenderCS]
+  impl: [cpu/core/combat.ts:cityStrikeDefenderCS, cpu/core/stockpile.ts:fuelShortCS]
   readings:
     - "C-26: the struck unit's terms (install audit)"
     - "C-110 / C-125: an embarked unit's strengths in a unit's blow, a promotion's side, ground closed to a strike — READ (0x51f070 at 0x51f3ef..0x51f457, 0x206960 at 0x2069b4..0x2069e0 and 0x206a78..0x206b29, 0x520270 at 0x520576..0x5205db, 0x5228c0, 0x77a4b0), FIT (the closed ground), both twins"
+    - "C-125 / C-110 / C-134: a defending district's terrain, a ship's shot at a district, the fuel term's player, the planning's dealt word on a district, Support on a centre, a city-state's plannings — READ (0x51eaf0 at 0x51ec87..0x51ecca, 0x522c10 at 0x522cc6..0x522f16, 0x51d670 at 0x51d7cd..0x51d7fa / 0x51d9c9..0x51da3d, 0x51c810 at 0x51ca2d..0x51ca57, 0x51f070 at 0x51f253..0x51f27a, 0x520270 at 0x520413..0x520429, 0x519440 at 0x51963d..0x51975a, 0x791470 at 0x7916fb..0x79175e, 0x812cc0 at 0x812ecb..0x812f41, 0x51e980), LAB (the aiunits plannings), both twins"
   context:
     - "...erm's modifiers and requirements from the layered install; the district-defender strength 0x520270 (called by the district attack 0x207080) carries the diplomatic-visibility (\"ESPIONAGE\")..."
     - "...TYPE_MATCHES COMBAT_RANGED and NOT attacking: a city's shot is ranged); `visibilityCS` (0x520270)."
@@ -296,7 +346,9 @@
   kind: function
   semantics: "a player flag that takes a melee attack's outer defense damage at 100%."
   status: PARTLY
-  readings: ["H-1: the melee result, a ranged blow's domain, a city's shot — READ"]
+  readings:
+    - "H-1: the melee result, a ranged blow's domain, a city's shot — READ"
+    - "C-125 / C-110 / C-134: a defending district's terrain, a ship's shot at a district, the fuel term's player, the planning's dealt word on a district, Support on a centre, a city-state's plannings — READ (0x51eaf0 at 0x51ec87..0x51ecca, 0x522c10 at 0x522cc6..0x522f16, 0x51d670 at 0x51d7cd..0x51d7fa / 0x51d9c9..0x51da3d, 0x51c810 at 0x51ca2d..0x51ca57, 0x51f070 at 0x51f253..0x51f27a, 0x520270 at 0x520413..0x520429, 0x519440 at 0x51963d..0x51975a, 0x791470 at 0x7916fb..0x79175e, 0x812cc0 at 0x812ecb..0x812f41, 0x51e980), LAB (the aiunits plannings), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...(0x6da56a3d) the clamped damage is taken at its percent: melee 15 unless a player flag (0x5212f0) or the ram test (0x51af50, the district's +0x1910 against the support's tier) gives..."

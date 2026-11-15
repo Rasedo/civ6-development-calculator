@@ -17018,3 +17018,121 @@ with the seat as the return player; `h1/dump.py play`).
   with the suzerain's sight (`hiddenResourcesFor`);
   REQUIREMENT_PLOT_ADJACENT_TO_COAST's evaluator is unread (a water body's
   size, or an answer kept from the attach).
+
+## C-125 / C-110 / C-134: a defending district's terrain, a ship's shot at a district, the fuel term's player, the planning's dealt word on a district, Support on a centre, a city-state's plannings — READ (0x51eaf0 at 0x51ec87..0x51ecca, 0x522c10 at 0x522cc6..0x522f16, 0x51d670 at 0x51d7cd..0x51d7fa / 0x51d9c9..0x51da3d, 0x51c810 at 0x51ca2d..0x51ca57, 0x51f070 at 0x51f253..0x51f27a, 0x520270 at 0x520413..0x520429, 0x519440 at 0x51963d..0x51975a, 0x791470 at 0x7916fb..0x79175e, 0x812cc0 at 0x812ecb..0x812f41, 0x51e980), LAB (the aiunits plannings), both twins
+
+`districtFightTerms`, `cityCombatDefense`, `minorCombatDefense`,
+`encampmentDefense`, `rangedCityPenalty`, `districtBlowWords`,
+`predictCityExchange`, `predictDistrictExchange`, `supportCount`
+(cpu/core/combat.ts); `fuelShortCS` (cpu/core/stockpile.ts); `planUnit`,
+`assignTo`, `openPass` (cpu/core/tactical.ts); `cityBlow`
+(cpu/core/aiView.ts, cpu/core/opsOrders.ts); GPU `_district_fight_terms`,
+`_city_combat_defense`, `_minor_combat_defense`, `_encamp_terms`,
+`_fuel_short_cs`, `_predict_city_exchange`, `_predict_district_exchange`
+(gpu/core/sim_seats.py), `_city_ranged_strength`, `_district_blow_words`,
+`_flank_support` (gpu/core/sim_masks.py), `_tac_plan`'s district jobs and
+`_tac_assign`'s district dealt (gpu/core/sim_tactics.py). Read on the
+recordings' CombatLog and on the game's own planning memory
+(`<stem>.aiunits.jsonl`, the `plans` of the `tacpass` records).
+
+- A DEFENDING DISTRICT'S TERRAIN TERM. The defending district's composer
+  0x51eaf0 (melee 0x206080, ranged 0x204b10, bombard 0x2074b0, the planning's
+  simulation with them) adds three things to the district's standing
+  strength: its damage's loss (0x522630), then the terrain term 0x522c10
+  handed the district's own plot (0x24b530 at 0x51ec9c, the attacker's plot
+  0x90290, the combat type), then the combat reference's +0x30 << 8
+  (0x51edae..0x51edbb: the modifier lists' sum, unread). 0x522c10 outside
+  COMBAT_RELIGIOUS: the plot's own DefenseModifier (its vt +0x20: Hills 3,
+  a floodplain -2); a plot with an improvement adds the improvement's +0x34
+  where unpillaged (0x522d34..0x522d7d); one with none the DefenseModifier
+  (+0x28) above 0 of each building the plot's city holds on that plot
+  (0x522dd7..0x522ef5: Alhambra 4 and Mont St. Michel 6 alone carry one, on
+  their own plots); under COMBAT_MELEE the river term. Ported: the plot's
+  DefenseModifier on a centre and on an Encampment, the Encampment its own
+  damage's loss too.
+- CONFIRMED: runs/h1_duels1127 t22 the barbarian Scout 786442 on city-state
+  4's centre 8:10 (Grassland Hills), CombatLog 10 - 5 against 15 + 12, the
+  centre standing at 24 in the barbarians' known cities; t24 the Slinger
+  1245192, 15 - 17 against 15 + 7 on a standing 19. The planning:
+  runs/h1_duels1124 t7 the Scout 524295 on city-state 4's 32:8 (Plains
+  Hills, across the river) dealt 16 / taken 56 (the engines held 18 / 50);
+  t18 the Galley 262147 on city-state 3's 41:12 (a floodplain) 50 / 18 (46 /
+  20).
+- A SHIP'S SHOT AT A DISTRICT. The district attack's composer 0x51d670 takes
+  GlobalParameters +0x218 (17) off the attacker only under COMBAT_RANGED
+  (0x2ec4ce4d), for a unit whose domain (+0x650) is not 0, the sea's, and
+  whose +0x18c2 is clear (the Giant Death Robot's siege cannon,
+  LOC_COMBAT_PREVIEW_SIEGE_CANNON_UPGRADE): 0x51d9c9..0x51da3d. No outer
+  defence is asked. Ported: `rangedCityPenalty` 0 for a ship.
+- CONFIRMED: runs/h1_duels1137 t224 the barbarian Frigate 2293767 on player
+  1's walled district 3997756, CombatLog 55 + 0 against 75 + 2, the hit
+  points' damage 1; runs/h1_duels1124 t222 the Nuclear Submarine 6160412 on
+  player 1's walled 17:9, the planning's dealt 16 (the engines held 8).
+- THE FUEL TERM IS A MAJOR'S. Each of the four strength composers takes the
+  unit's +0x187c (its strategic resource shortfall) off only where the
+  unit's owner is a FULL_CIV (0x469db0): 0x51c810 at 0x51ca2d..0x51ca57,
+  0x51d670 at 0x51d7cd..0x51d7fa, 0x51f070 at 0x51f253..0x51f27a, 0x520270
+  at 0x520413..0x520429. A city-state's, the Free Cities' and the
+  barbarians' units fight at their whole strength with no fuel. Ported:
+  `fuelShortCS`.
+- CONFIRMED: runs/h1_duels1124 t209 the barbarian Field Cannon 5767174 on
+  city-state 3's Battleship 1900550, CombatLog 60 - 17 against 60 + 0; t181
+  the Battleship's planning on the Field Cannon on 37:17: dealt 56, back
+  taken 16 (the engines held 25 / 35, the Battleship 20 short on both
+  strengths); t206 its Tank 2097154 on the Field Cannon on 38:19: 86 / 10,
+  back taken 34.
+- THE PLANNING'S DEALT WORD ON A DISTRICT (0x791470 at 0x7916fb..0x79175e):
+  the larger of the simulation's two damage words, the hit points' and the
+  outer defence's; the kill byte (+0xc4) is the word at or above the hit
+  points left, `wins` (+0x60) the word above them. The outer defence's word
+  is 0x519440 on the hash 0x6da56a3d (0x51963d..0x51975a): the law's value
+  held to [COMBAT_MINIMUM_DAMAGE, the district's hit points], times the
+  attack's percent — melee GlobalParameters +0x1a4 (15), the bombard's
+  +0x1a0 (100) for a melee blow under the ram test 0x51af50, the player's
+  flag 0x5212f0 or the attacker's religion's city (0x5196b9..0x51971a),
+  ranged +0x1a8 (50), the bombard's for a unit of +0x18c2, a bombard +0x1a0
+  — over 100, truncated. The attack assignment's claim reads the entry's
+  +0x64 per spot (0x776140), and Can Alpha City 0x812cc0 sums over the
+  teams' units with Movement left the largest +0x64 of the spots of the
+  unit's planning entry for the city (0x793210 with
+  TARGET_ENEMY_COMBAT_DISTRICT; 0x812ecb..0x812f41). Ported: the planning's
+  entry keeps the word, the assignment and `cityBlow` read it; the engines
+  lay an outer defence's word only where the outer defence stands.
+- CONFIRMED: runs/h1_duels1124 t182 the barbarian Ironclad 5832724 on player
+  0's walled 34:19 from 33:19: dealt 16, taken 8, back dealt 8, back taken 1
+  (the hit points' word); t86 the Archer 3801089 dealt 6, the Swordsman
+  3932165 dealt 4 / taken 29.
+- SUPPORT ON A CENTRE. The defender's composer asks no district before the
+  Support term (the section on the support's caller): ported, `supportCount`
+  and `_flank_support` count the neighbours of the unit's own plot whatever
+  the plot it defends on. runs/h1_duels1124 t33 city-state 4's Heavy Chariot
+  524293 on 35:8, its Warriors 131073 on 36:8 and 327683 on 34:7, set on its
+  centre 32:8 against the barbarian Scout 131073 on 31:8: back taken 8 /
+  back dealt 100 (the engines held 10 / 92, no Support on the centre).
+- A CITY-STATE'S PLANNINGS (the aiunits `tacpass` records): every unit of a
+  city-state holds a planning as its pass opens, its Builders, Traders,
+  Settlers and support units among them (runs/h1_duels1124: 1,006 civilian
+  and 34 support unit-turns; t6 city-state 3's Builder 262144 on 41:12, t216
+  city-state 2's Supply Convoy 2359303 on 11:13); a unit made in its turn
+  after the planning ran, bought or upgraded and at no Movement, holds none
+  (38 unit-turns; t18 city-state 4's Warrior 458757 on 32:8). Ported:
+  `openPass` plans every unit of the seat, a city-state's unit of no
+  Movement none. A civilian's or a support unit's planning lays no spot (it
+  fights with nothing) and a unit made in the turn is none of the pass and
+  out of the operations' offers: no move reads either.
+- THE CITY'S FRIENDLY COMBAT BONUS 0x51e980 (a term of the four composers,
+  LOC_COMBAT_PREVIEW_CITY_FRIENDLY_COMBAT_BONUS): for a unit of no religious
+  strength, the city whose ground the plot is (0x66480) gives its +0x18a4
+  where the unit's owner is the city's, or stands with the city's owner
+  under 0x3ce940 (unread), or is the suzerain of the city's owner. The
+  engines' `territoryCS` gives it to the city's owner's units alone.
+- OPEN: the modifier lists' sum in a defending district's strength
+  (0x51eaf0 at 0x51edae); the city's friendly combat bonus for a suzerain's
+  units and under 0x3ce940; the outer defence's word where no outer defence
+  stands (no recorded case tells it from the hit points' word); a barbarian
+  unit raised in the turn stands at Movement 0 and holds a planning laid
+  from its full Movement (runs/h1_duels1124 t45 the Warrior 3211290 on
+  30:13: its reach opens at (1/512)), the engines' pass plans none; an
+  Encampment's standing strength with its own plot's garrison (the known
+  cities hold player 1's 16:16 at 94 where the engines hold 89, runs/
+  h1_duels1124 t225).

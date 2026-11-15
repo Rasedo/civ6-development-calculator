@@ -77,14 +77,12 @@ describe('the outer-defense perimeter (0x519440)', () => {
 });
 
 describe('the ranged penalty against city defenses', () => {
-  it('CIV6: land ranged pay -17 whether or not a perimeter stands', () => {
-    expect(rangedCityPenalty('ARCHER', WALLS_HP)).toBe(17);
-    expect(rangedCityPenalty('ARCHER', 0)).toBe(17);
+  it('CIV6: land ranged pay -17', () => {
+    expect(rangedCityPenalty('ARCHER')).toBe(17);
   });
 
-  it('CIV6: naval ranged pay it against Walls only', () => {
-    expect(rangedCityPenalty('QUADRIREME', WALLS_HP)).toBe(17);
-    expect(rangedCityPenalty('QUADRIREME', 0)).toBe(0);
+  it('CIV6: naval ranged pay none', () => {
+    expect(rangedCityPenalty('QUADRIREME')).toBe(0);
   });
 });
 

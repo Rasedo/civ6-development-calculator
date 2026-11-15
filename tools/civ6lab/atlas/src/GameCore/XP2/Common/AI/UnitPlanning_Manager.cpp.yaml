@@ -170,6 +170,9 @@
     - recording: h1_duels1128
       turn: 242
       value: "the barbarian Cavalry 7012372 (67 damage) on Rome's breached 42:20: dealt 56 / taken 16, back taken 0 / back dealt 0 on its five spots"
+    - recording: h1_duels1124
+      turn: 182
+      value: "the Ironclad 5832724 on player 0's walled 34:19 from 33:19: dealt 16 / taken 8, back dealt 8 / back taken 1; t86 the Archer 3801089 dealt 6, the Swordsman 3932165 dealt 4 / taken 29"
   impl:
     - cpu/core/tactical.ts:predictBlow
     - cpu/core/tactical.ts:kills
@@ -183,7 +186,6 @@
     - cpu/core/combat.ts:predictCityBlow
     - cpu/core/aiViewTypes.ts:AiView
     - cpu/core/tactical.ts:RELIGIOUS_TAKEN
-    - cpu/core/tactical.ts:planUnit
     - gpu/core/sim_tactics.py:_tac_plan
     - cpu/core/tactical.ts:wins
     - cpu/core/combat.ts:predictCityExchange
@@ -194,6 +196,8 @@
     - cpu/core/combat.ts:districtDamageLoss
     - gpu/core/sim_tactics.py:_UNSTACK_RANGE
     - cpu/core/combat.ts:defenderCS
+    - cpu/core/combat.ts:districtBlowWords
+    - gpu/core/sim_masks.py:_district_blow_words
   readings:
     - "C-95: the camp defender's strike, a captured civilian's dead target, a lone DEFENDER out of Pillage"
     - "C-125: the planning's blow back where both blows would kill — READ, ported"
@@ -218,6 +222,7 @@
     - "C-110 / C-125: an embarked unit's strengths in a unit's blow, a promotion's side, ground closed to a strike — READ (0x51f070 at 0x51f3ef..0x51f457, 0x206960 at 0x2069b4..0x2069e0 and 0x206a78..0x206b29, 0x520270 at 0x520576..0x5205db, 0x5228c0, 0x77a4b0), FIT (the closed ground), both twins"
     - "C-110 / C-125: the amphibious penalty reads the plot the defender stands on — READ (0x51bba0, 0x51c810 at 0x51cb7a..0x51cba1, 0x51d670 at 0x51d92e..0x51d957, 0x205f70, 0x211cc0, 0x209870), both twins"
     - "C-125 / C-95: the planning's unmoved flag, a district's blow back, the combat's kind from its members, the camp strike's push — READ (0x791e00 at 0x791eb6..0x791ec4, 0x791470 at 0x7916fb..0x79174f / 0x7917f7..0x7918f7, 0x205720 at 0x205835..0x20592f, 0x209550, 0x772940 at 0x772a85..0x772ad3 / 0x772eea / 0x772f78), both twins"
+    - "C-125 / C-110 / C-134: a defending district's terrain, a ship's shot at a district, the fuel term's player, the planning's dealt word on a district, Support on a centre, a city-state's plannings — READ (0x51eaf0 at 0x51ec87..0x51ecca, 0x522c10 at 0x522cc6..0x522f16, 0x51d670 at 0x51d7cd..0x51d7fa / 0x51d9c9..0x51da3d, 0x51c810 at 0x51ca2d..0x51ca57, 0x51f070 at 0x51f253..0x51f27a, 0x520270 at 0x520413..0x520429, 0x519440 at 0x51963d..0x51975a, 0x791470 at 0x7916fb..0x79175e, 0x812cc0 at 0x812ecb..0x812f41, 0x51e980), LAB (the aiunits plannings), both twins"
   context:
     - "...each unit's spots per target from its planning (turns, the planning's combat simulation 0x791470: the damage dealt +0x64, received +0x7c, and against a counterattack +0x94 / +0xac); fo..."
   review: reviewed
@@ -380,6 +385,7 @@
   status: PARTLY
   readings:
     - "C-97: the war operations — the war candidates, the city value's frame, the assault nodes and Attack Units READ; the loyalty lead's sources, the team update's danger and the assault's executions PARTLY READ"
+    - "C-125 / C-110 / C-134: a defending district's terrain, a ship's shot at a district, the fuel term's player, the planning's dealt word on a district, Support on a centre, a city-state's plannings — READ (0x51eaf0 at 0x51ec87..0x51ecca, 0x522c10 at 0x522cc6..0x522f16, 0x51d670 at 0x51d7cd..0x51d7fa / 0x51d9c9..0x51da3d, 0x51c810 at 0x51ca2d..0x51ca57, 0x51f070 at 0x51f253..0x51f27a, 0x520270 at 0x520413..0x520429, 0x519440 at 0x51963d..0x51975a, 0x791470 at 0x7916fb..0x79175e, 0x812cc0 at 0x812ecb..0x812f41, 0x51e980), LAB (the aiunits plannings), both twins"
   context:
     - "...90: +0xdb0 > 0) of the largest predicted damage of their planning's entry for the city (0x793210, +0x64 per spot; 0x791470 runs the combat under the simulation flag) against half the c..."
   review: reviewed

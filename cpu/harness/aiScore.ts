@@ -68,7 +68,7 @@ export const STATE_NOTES: Record<string, string> = {
   'plan.targets': 'the targets its planning holds, of the entries both target lists hold: type, plot, owner, unit type',
   'plan.spots': 'per target both plannings hold: the spots with their turns, in order',
   'plan.kills': 'per target both hold a spot of: whether its blow kills (the entry\'s kill flag)',
-  'plan.blow': 'per spot both hold: the blow dealt / taken and the blow back dealt / taken (a district\'s dealt the planning\'s own `predictDistrictExchange`)',
+  'plan.blow': 'per spot both hold: the blow dealt / taken and the blow back dealt / taken',
   'targets': 'the player\'s tactical target list: type, plot, owner, unit type',
   'targets.order': 'the list\'s order (the entries equal)',
   'kb.cities': 'per city either knowledge base holds (ours the one the operations read, `knownCities`): owner, population, capital flags, each defensible district\'s defense / walls / strike',

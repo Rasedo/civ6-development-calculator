@@ -4002,9 +4002,7 @@ export const REPAIR_HP_PER_COST = 10;
 /** the ANCIENT tier's pool, which is what a fresh set of Walls is worth. */
 export const WALLS_HP = WALLS_TIER_HP[1];
 /** CIV6: "Ranged attacks receive a -17 penalty when attacking city and
- * district defenses". Naval ranged pay it against the perimeter only — they
- * "do not suffer the -17 RS penalty against cities (but still suffer against
- * Walls, just like other ranged units)". */
+ * district defenses". A ship pays none (`rangedCityPenalty`). */
 export const RANGED_CITY_PENALTY = 17;
 
 /**

@@ -470,14 +470,41 @@ class SimMasks:
         centre = self._damage_roll(
             mask, diff, k=k, tile=tile,
             finish=lambda raw: (raw - torch.div(raw * share, 256, rounding_mode="floor")).clamp(min=lo, max=hp_max))
-        pct = torch.where((klass == HIT_BOMBARD) | ((klass == HIT_MELEE) & ram),
-                          torch.full_like(left, self._def_pct_bombard),
-                          torch.where(klass == HIT_MELEE, torch.full_like(left, self._def_pct_melee),
-                                      torch.full_like(left, self._def_pct_ranged)))
+        pct = self._outer_damage_pct(klass, ram, left)
         dfn = self._damage_roll(
             mask, diff, k=k + "w", tile=tile,
             finish=lambda raw: torch.div(raw.clamp(min=lo, max=hp_max) * pct, 100, rounding_mode="floor"))
         return torch.minimum(left, dfn).to(outer.dtype), centre
+
+    def _outer_damage_pct(self, klass: torch.Tensor, ram: torch.Tensor, like: torch.Tensor) -> torch.Tensor:
+        """`outerDamagePercent`: the percent of the law's damage an attack of
+        `klass` lays on a district's outer defence — a bombard's and a
+        Battering Ram's melee attacker's the bombard's, a melee attack's, a
+        ranged one's"""
+        return torch.where((klass == HIT_BOMBARD) | ((klass == HIT_MELEE) & ram),
+                           torch.full_like(like, self._def_pct_bombard),
+                           torch.where(klass == HIT_MELEE, torch.full_like(like, self._def_pct_melee),
+                                       torch.full_like(like, self._def_pct_ranged)))
+
+    def _district_blow_words(self, diff: torch.Tensor, outer: torch.Tensor, walls_max: torch.Tensor, hp_max: int,
+                             klass: torch.Tensor, assist: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
+        """`districtBlowWords`, [B] long each: THE PREDICTED BLOW'S TWO DAMAGE
+        WORDS ON A DISTRICT at the law's expectation — the hit points' (the
+        law's value less the share the standing outer defence turns, in
+        [COMBAT_MINIMUM_DAMAGE, `hp_max`]) and the outer defence's (the law's
+        held value at the attack's percent, none where no outer defence
+        stands)"""
+        left = outer.clamp(min=0).to(torch.long)
+        wm = walls_max.clamp(min=0).to(torch.long)
+        stands = (left > 0) & (wm > 0)
+        share = torch.where(stands & ((assist & ASSIST_TOWER) == 0),
+                            torch.div(left * 256, wm.clamp(min=1), rounding_mode="floor"), torch.zeros_like(left))
+        roll = torch.full_like(left, self._dmg_max_extra // 2)
+        raw = self._damage_raw(roll, diff)
+        hp = (raw - torch.div(raw * share, 256, rounding_mode="floor")).clamp(min=self._dmg_min, max=hp_max)
+        pct = self._outer_damage_pct(klass, (assist & ASSIST_RAM) != 0, left)
+        word = torch.div(raw.clamp(min=self._dmg_min, max=hp_max) * pct, 100, rounding_mode="floor")
+        return hp, torch.where(stands, word, torch.zeros_like(word))
 
     def _hit_class(self, type_idx: torch.Tensor, ranged: bool) -> torch.Tensor:
         """`cityHitClass` — a siege unit's attack "uses Bombard Strength"
@@ -825,22 +852,20 @@ class SimMasks:
             out = out | torch.where(hit, torch.full_like(out, bit), torch.zeros_like(out))
         return torch.where(helped, out, torch.zeros_like(out))
 
-    def _city_ranged_strength(self, type_idx: torch.Tensor, seat: torch.Tensor,
-                              outer: torch.Tensor) -> torch.Tensor:
+    def _city_ranged_strength(self, type_idx: torch.Tensor, seat: torch.Tensor) -> torch.Tensor:
         """`cityRangedStrength` — what a RANGED order brings against a city or
         district. A siege unit fires at its Bombard Strength and pays no city
         penalty; the -17 it carries is "against land units", which its ranged
-        strength already holds. Everything else pays the ranged city penalty,
-        which naval ranged owe only while a perimeter stands.
+        strength already holds. A land unit pays the ranged city penalty, a
+        ship none (`rangedCityPenalty`).
 
         CIV6 (Particle Beam Siege Cannon): "Ranged attacks against Cities and
         Encampments are 100% effective" — the penalty waived, and the +30 rides
         in beside it."""
         t = type_idx.clamp(min=0, max=self.NU - 1)
         naval = self.unit_naval.take(t)
-        pen = torch.full(outer.shape, self._ranged_city_pen,
-                         dtype=torch.float64, device=outer.device)
-        pen = torch.where(naval & (outer <= 0), torch.zeros_like(pen), pen)
+        pen = torch.full(t.shape, self._ranged_city_pen, dtype=torch.float64, device=t.device)
+        pen = torch.where(naval, torch.zeros_like(pen), pen)
         beam = self._gdr_beam_cs(t, seat).double()
         pen = torch.where(beam > 0, torch.zeros_like(pen), pen)
         base = self._type_ranged_strength.take(t).double() + beam - pen
@@ -2023,8 +2048,8 @@ class SimMasks:
         that flanks like any other, so the exclusion is by unit, not by tile.
 
         SUPPORT counts the DEFENDER's own adjacent military, embarked ones
-        included ("embarked land units provide Support like normal"), and pays
-        nothing at all while the defender stands in a defensible district.
+        included ("embarked land units provide Support like normal"); no
+        district is asked (`supportCount`).
 
         Stacking blocks foreign units, so each tile holds at most ONE military
         unit — each of the 6 neighbours contributes 0 or 1. Returns
@@ -2060,9 +2085,7 @@ class SimMasks:
         not_self = (mslot != defender_slot.unsqueeze(1))
         friendly = (here & not_self & (n_seat == def_seat.unsqueeze(1))).long()             + (e_here & e_mil & (eslot != defender_slot.unsqueeze(1)) & (e_seat == def_seat.unsqueeze(1))).long()
         sup = friendly.sum(dim=1) * self._flank_support_live(def_seat).long()
-        in_district = (self._centre_seat_plane().gather(1, dt.unsqueeze(1)).squeeze(1) >= 0) \
-            | self._encamp_live().gather(1, dt.unsqueeze(1)).squeeze(1)
-        return flank, torch.where(in_district, torch.zeros_like(sup), sup)
+        return flank, sup
 
     def _theo_flank_support(
         self, def_tile: torch.Tensor, def_seat: torch.Tensor,

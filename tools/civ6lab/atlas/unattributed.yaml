@@ -966,6 +966,7 @@
     - "C-99 / C-95: a melee blow's river is the defender plot's edge on the attacker's side at any distance; a levied unit home reveals its sight — READ (0x522c10 at 0x522f1d..0x52301b, 0x51f070 at 0x51f603..0x51f639), both twins"
     - "C-125 / C-95: flanking and support count about the defender unit's own plot, no river edge read; MEDIUM by the plot's layer-0 list; a killed target's record; the camp strike's orders — READ (0x521530, 0x51c810 at 0x51cc1c..0x51cc56, 0x5228c0, 0x786d50, 0x776140 at 0x776333, 0x8e9d0, 0x772940 at 0x772d2f..0x772f78), FIT (the camp strike's path), both twins"
     - "C-110 / C-125: the amphibious penalty reads the plot the defender stands on — READ (0x51bba0, 0x51c810 at 0x51cb7a..0x51cba1, 0x51d670 at 0x51d92e..0x51d957, 0x205f70, 0x211cc0, 0x209870), both twins"
+    - "C-125 / C-110 / C-134: a defending district's terrain, a ship's shot at a district, the fuel term's player, the planning's dealt word on a district, Support on a centre, a city-state's plannings — READ (0x51eaf0 at 0x51ec87..0x51ecca, 0x522c10 at 0x522cc6..0x522f16, 0x51d670 at 0x51d7cd..0x51d7fa / 0x51d9c9..0x51da3d, 0x51c810 at 0x51ca2d..0x51ca57, 0x51f070 at 0x51f253..0x51f27a, 0x520270 at 0x520413..0x520429, 0x519440 at 0x51963d..0x51975a, 0x791470 at 0x7916fb..0x79175e, 0x812cc0 at 0x812ecb..0x812f41, 0x51e980), LAB (the aiunits plannings), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...vement, kept (+0x40) SUCCESS. Execution 0x7f6630 (@0xf2ef18): on the plot it stands on (0x90290) one request (0x53e20, vt +0x60): the improvement's removal (0x967100), else with Harve..."
@@ -3039,18 +3040,27 @@
 - addr: 0x519440
   final: 0x366b80
   kind: function
-  semantics: "a district's hit: builds the law's struct (+0 / +4 the two strengths, +8 the district's maximum hit points 0x24b290, +0xc / +0x10 the outer defense's damage and maximum, +0x14 the pool's hash, +0x1c COMBAT_MINIMUM_DAMAGE, +0x20 COMBAT_BASE_DAMAGE, +0x2d the bypass flag) and calls 0x519090. On the outer defense's hash (0x6da56a3d) the clamped damage is taken at its percent: melee 15 unless a player flag (0x5212f0) or the ram test (0x51af50) gives 100; ranged 50 unless the unit's +0x18c2 gives 100; bombard 100; times / 100 truncated. The bypass flag: no walls-ignore value and 0x51acb0 (the Siege Tower) without the ram."
+  semantics: "a district's hit: builds the law's struct (+0 / +4 the two strengths, +8 the district's maximum hit points 0x24b290, +0xc / +0x10 the outer defense's damage and maximum, +0x14 the pool's hash, +0x1c COMBAT_MINIMUM_DAMAGE, +0x20 COMBAT_BASE_DAMAGE, +0x2d the bypass flag) and calls 0x519090. On the outer defense's hash (0x6da56a3d) the clamped damage is taken at its percent: melee 15 unless a player flag (0x5212f0) or the ram test (0x51af50) gives 100; ranged 50 unless the unit's +0x18c2 gives 100; bombard 100; times / 100 truncated. The bypass flag: no walls-ignore value and 0x51acb0 (the Siege Tower) without the ram. under the simulation flag the outer defence's word is what the planning's dealt word takes where it tops the hit points' (0x791470 at 0x7916fb..0x79170b): 0x51963d..0x51975a, the percent the bombard's also for a melee blow of a player under 0x5212f0 or of the attacker's religion's city (0x5196b9..0x51971a) and for a ranged unit of +0x18c2."
   status: READ
   cases:
     - recording: 1117
       turn: 14
       value: "The log carries   one UnitDamageChanged for the three (1117 t14: a barbarian Warrior at 27 HP   on Valletta;"
+    - recording: h1_duels1124
+      turn: 182
+      value: "the barbarian Ironclad 5832724 on player 0's walled 34:19: the planning's dealt 16 (the outer defence's word, 15 percent of the law's 107 or more), back taken 1 (the hit points')"
   impl:
     - cpu/core/combat.ts:districtHit
     - cpu/data/constants.ts:COMBAT_DEFENSE_DAMAGE_PERCENT_MELEE
     - cpu/harness/replayActions.ts:unit
     - gpu/core/sim_masks.py:_district_hit
-  readings: ["H-1: the melee result, a ranged blow's domain, a city's shot — READ"]
+    - cpu/core/combat.ts:outerDamagePercent
+    - cpu/core/combat.ts:districtBlowWords
+    - gpu/core/sim_masks.py:_district_blow_words
+    - gpu/core/sim_masks.py:_outer_damage_pct
+  readings:
+    - "H-1: the melee result, a ranged blow's domain, a city's shot — READ"
+    - "C-125 / C-110 / C-134: a defending district's terrain, a ship's shot at a district, the fuel term's player, the planning's dealt word on a district, Support on a centre, a city-state's plannings — READ (0x51eaf0 at 0x51ec87..0x51ecca, 0x522c10 at 0x522cc6..0x522f16, 0x51d670 at 0x51d7cd..0x51d7fa / 0x51d9c9..0x51da3d, 0x51c810 at 0x51ca2d..0x51ca57, 0x51f070 at 0x51f253..0x51f27a, 0x520270 at 0x520413..0x520429, 0x519440 at 0x51963d..0x51975a, 0x791470 at 0x7916fb..0x79175e, 0x812cc0 at 0x812ecb..0x812f41, 0x51e980), LAB (the aiunits plannings), both twins"
   context:
     - "...ack on a city (0x206080, melee) draws three times: 0x519370 the attacker's damage, then 0x519440 the district's hit points (hash 0x5e97d629) and 0x519440 its outer defense (0x6da56a3d)..."
     - "- The district's hit (0x519440 builds the law's struct: +0 / +4 the two strengths, +8 the district's maximum hit point..."
@@ -3061,8 +3071,8 @@
   final: 0x36d4b0
   kind: function
   name: defenceTerrainTerm
-  semantics: "the defender's terrain term (rcx the defender, r8 the location plot, r9 the attacker's plot or null, arg5 the attacker, arg6 the combat type, arg7 the preview list): the religious terrain bonus under COMBAT_RELIGIOUS, else the plot's terrain bonus (vt +0x20), a defensive improvement's +0x34 unpillaged or the city's buildings' DefenseModifier; under COMBAT_MELEE with an attacker's plot, COMBAT_RIVER_DEFENSE (GlobalParameters +0x228) where the location plot's river byte +0x38 holds the bit of the direction toward the attacker, read off the signs of the axial step at any distance (0x522f33..0x522ff7: dr > 0 NE / NW as dq >= 0 / < 0, dr = 0 E / W, dr < 0 SE / SW as dq > 0 / <= 0; dq wrapped by half the width), waived where the attacker's +0x1935 is set; the sum x 256."
-  status: PARTLY
+  semantics: "the defender's terrain term (rcx the defender, r8 the location plot, r9 the attacker's plot or null, arg5 the attacker, arg6 the combat type, arg7 the preview list): the religious terrain bonus under COMBAT_RELIGIOUS, else the plot's own DefenseModifier (vt +0x20), plus on a plot with an improvement the improvement's +0x34 where unpillaged (0x522d34..0x522d7d), on one with none the DefenseModifier (+0x28) above 0 of each building the plot's city holds on that plot (0x522dd7..0x522ef5); under COMBAT_MELEE with an attacker's plot, COMBAT_RIVER_DEFENSE (GlobalParameters +0x228) where the location plot's river byte +0x38 holds the bit of the direction toward the attacker, read off the signs of the axial step at any distance (0x522f33..0x522ff7: dr > 0 NE / NW as dq >= 0 / < 0, dr = 0 E / W, dr < 0 SE / SW as dq > 0 / <= 0; dq wrapped by half the width), waived where the attacker's +0x1935 is set; the sum x 256. Its callers: the unit defender's composer 0x51f070 and the defending district's 0x51eaf0, which hands it the district's own plot."
+  status: READ
   cases:
     - recording: h1_duelq1128
       turn: 22
@@ -3070,17 +3080,24 @@
     - recording: h1_duelq1128
       turn: 35
       value: "the Swordsman 589827 on 10:9 reads the barbarian Warrior's 11:6 river edge toward it, 655364 on 9:6 none: 655364 takes 10:7, as logged"
+    - recording: h1_duels1124
+      turn: 7
+      value: "the barbarian Scout 524295 on city-state 4's centre 32:8 (Plains Hills, across the river): the planning's dealt 16 / taken 56; t18 the Galley 262147 on city-state 3's 41:12 (a floodplain) 50 / 18"
   impl:
     - cpu/core/units.ts:meleeCrossesRiver
     - cpu/core/combat.ts:meleeUnitStrengths
     - cpu/core/combat.ts:assaultAtkCS
     - gpu/core/sim_masks.py:_melee_river
     - gpu/core/sim_masks.py:_atk_pens
+    - cpu/core/combat.ts:districtFightTerms
+    - cpu/core/combat.ts:plotDefenseModifier
+    - gpu/core/sim_seats.py:_district_fight_terms
   readings:
     - "C-95: a damaged centre defends at its wounded strength, the planning's city shot needs standing walls, the barbarians plan on the turn's unhealed centres — READ (0x51eaf0, 0x791470 at 0x79181c..0x791827 -> 0x249ee0 / 0x24b960), both twins; the replay's barbarian copy"
     - "C-99 / C-95: a melee blow's river is the defender plot's edge on the attacker's side at any distance; a levied unit home reveals its sight — READ (0x522c10 at 0x522f1d..0x52301b, 0x51f070 at 0x51f603..0x51f639), both twins"
     - "C-125 / C-95: the target list's trade layer and its one unit of the units' layer; a siege unit's step onto civilians; the city-states' Attack Civilians; the flankers' test, the support's caller, the camp strike's queue — READ (0x783980 at 0x7849bb..0x784c2b and 0x784c30..0x784f57, 0x26fe20 -> 0x212500, 0x521530, 0x51f070 at 0x51f70e..0x51f737, 0x546f0, 0x52f50), both twins"
     - "C-110 / C-125: an embarked unit's strengths in a unit's blow, a promotion's side, ground closed to a strike — READ (0x51f070 at 0x51f3ef..0x51f457, 0x206960 at 0x2069b4..0x2069e0 and 0x206a78..0x206b29, 0x520270 at 0x520576..0x5205db, 0x5228c0, 0x77a4b0), FIT (the closed ground), both twins"
+    - "C-125 / C-110 / C-134: a defending district's terrain, a ship's shot at a district, the fuel term's player, the planning's dealt word on a district, Support on a centre, a city-state's plannings — READ (0x51eaf0 at 0x51ec87..0x51ecca, 0x522c10 at 0x522cc6..0x522f16, 0x51d670 at 0x51d7cd..0x51d7fa / 0x51d9c9..0x51da3d, 0x51c810 at 0x51ca2d..0x51ca57, 0x51f070 at 0x51f253..0x51f27a, 0x520270 at 0x520413..0x520429, 0x519440 at 0x51963d..0x51975a, 0x791470 at 0x7916fb..0x79175e, 0x812cc0 at 0x812ecb..0x812f41, 0x51e980), LAB (the aiunits plannings), both twins"
   notes:
     - the terrain, improvement and building terms read, unported here (the engines' defenderCS); the attacker's +0x1935 unread (read as Amphibious)
     - "imported: READ in its section, no confirming case found beside it"

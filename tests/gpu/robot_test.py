@@ -131,14 +131,13 @@ def main() -> int:
     s4 = fresh(rules, paths[0])
     pen = int(s4._ranged_city_pen)
     rs = int(s4._type_ranged_strength[gdr])
-    assert float(s4._city_ranged_strength(L(s4, gdr), L(s4, row), L(s4, 100))[0]) == rs - pen
+    assert float(s4._city_ranged_strength(L(s4, gdr), L(s4, row))[0]) == rs - pen
     s4.civ_techs[b, row, s4._gdr_upgrade_tech[s4._gdr_u_beam]] = True
     # CIV6: "Ranged attacks against Cities and Encampments are 100% effective
     # and gain +30 Ranged Strength."
-    for outer in (100, 0):
-        assert float(s4._city_ranged_strength(L(s4, gdr), L(s4, row), L(s4, outer))[0]) == rs + 30
+    assert float(s4._city_ranged_strength(L(s4, gdr), L(s4, row))[0]) == rs + 30
     lr = int(s4._type_ranged_strength[land_r])
-    assert float(s4._city_ranged_strength(L(s4, land_r), L(s4, row), L(s4, 100))[0]) == lr - pen, \
+    assert float(s4._city_ranged_strength(L(s4, land_r), L(s4, row))[0]) == lr - pen, \
         "no other chassis moves"
     # and the beam rides the MELEE assault too — one adder, asked by both
     assert int(s4._gdr_beam_cs(L(s4, gdr), L(s4, row))[0]) == 30

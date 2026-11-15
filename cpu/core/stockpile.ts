@@ -17,7 +17,7 @@ import { GP_CITY_FREE_EXTRACTION, GP_FREE_EXTRACTION, gpCityPermOf, gpPermOf } f
 import { governorSum, governorTileSum } from './governors';
 import { RESOURCES, extractsResource, resourceImprovement } from '../../world/resources';
 import { engineId } from '../data/aliases';
-import { citiesOf, civOf, isCityStateSeat, leaderOf, seatOf, tileOwnedByCiv, tileSeat, hiddenResourcesFor } from './seats';
+import { citiesOf, civOf, isCiv, isCityStateSeat, leaderOf, seatOf, tileOwnedByCiv, tileSeat, hiddenResourcesFor } from './seats';
 import { minorCity, regionalReach, suzerainEffectCount, suzerainMinorSeats, suzerainOf } from './cityStates';
 import { HATTUSA_FREE_STRATEGIC } from '../data/cityStates';
 import { hexDistance } from '../../world/hex';
@@ -401,9 +401,15 @@ export function chargeUnitUpkeep(state: GameState, seat: number): void {
 
 /**
  * CIV6 (Resource, GS): "-20 Insufficient <resource>" on every strength read of
- * a unit whose seat could not meet its fuel bill at the last upkeep pass.
+ * a unit whose seat could not meet its fuel bill at the last upkeep pass — a
+ * major's unit alone: the four strength composers take the unit's shortfall
+ * (+0x187c) off only under a FULL_CIV owner (0x51c810 at 0x51ca3b, 0x51d670
+ * at 0x51d7dc, 0x51f070 at 0x51f261, 0x520270 at 0x520413). runs/h1_duels1124
+ * t209: the barbarian Field Cannon 5767174 strikes city-state 3's Battleship
+ * 1900550, CombatLog 60 - 17 against 60 + 0.
  */
 export function fuelShortCS(state: GameState, u: Unit): number {
+  if (!isCiv(u.seat)) return 0;
   const def = UNITS[u.type];
   const k = strategicSlot(def?.requiresResource);
   if (k < 0 || !def?.resourceUpkeep || u.noResourceUpkeep) return 0;

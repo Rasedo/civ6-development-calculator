@@ -2717,7 +2717,7 @@ class SimTactics:
                 tgt = torch.full((self.B,), -1, dtype=torch.long, device=dev)
                 us[g_i[pick]] = slots[dn_i[pick]]
                 tgt[g_i[pick]] = dplot[pick]
-                blow, took, shoots = self._predict_district_exchange(pre, us, tgt)
+                blow, word, took, shoots = self._predict_district_exchange(pre, us, tgt)
                 # per spot the blow back (`planUnit`): where the district's
                 # strike stands the forward blow's own two damages — the hit
                 # points' damage dealt its back taken, the damage taken its
@@ -2726,11 +2726,17 @@ class SimTactics:
                 on6 = shoots[g_i[pick]].unsqueeze(1) & (k6 < sn[dn_i[pick], de_i[pick]].long().unsqueeze(1))
                 back_t[dn_i[pick], de_i[pick]] = torch.where(on6, blow[g_i[pick]].to(torch.long).unsqueeze(1), torch.zeros_like(k6))
                 back_d[dn_i[pick], de_i[pick]] = torch.where(on6, took[g_i[pick]].to(torch.long).unsqueeze(1), torch.zeros_like(k6))
-                blow = blow[g_i[pick]]
+                # the dealt word: the larger of the hit points' and the outer
+                # defence's damage (`planUnit`'s E.dealt), the kill and `wins`
+                # against the hit points left
+                blow = torch.maximum(blow, word)[g_i[pick]].to(torch.long)
+                dealt[dn_i[pick], de_i[pick]] = blow
                 # the damage the unit takes from the city (`planUnit`'s E.taken)
                 taken[dn_i[pick], de_i[pick]] = took[g_i[pick]]
                 dmax, dhp, _ = self._centre_health(tgt.clamp(min=0).unsqueeze(1))
-                falls = (dmax[g_i[pick], 0] > 0) & (blow > dhp[g_i[pick], 0])
+                stands = dmax[g_i[pick], 0] > 0
+                kill[dn_i[pick], de_i[pick]] = stands & (blow >= dhp[g_i[pick], 0])
+                falls = stands & (blow > dhp[g_i[pick], 0])
                 wins[dn_i[pick[falls]]] = True
                 left[pick] = False
         res.update({"tp": tp, "te": te, "civ": civ, "other": other, "dealt": dealt, "taken": taken, "back_taken": back_t,
@@ -3602,8 +3608,8 @@ class SimTactics:
         to the spots in the order first claimed, and each assigned unit's
         move, sorted (`assignedBefore`). With `district` the targets are the
         list's COMBAT_DISTRICT entries over [B, T] — a city's centre, its health the
-        city's, the unit's blow its predicted one (`_predict_city_blow`), the
-        damage it takes its planning's, no blow back. Returns "slot", "move", "attack" [B, U] in the order they
+        city's, the unit's blow and the damage it takes its planning's own
+        words. Returns "slot", "move", "attack" [B, U] in the order they
         run, -1 past each game's."""
         dev = self.device
         B = self.B
@@ -3657,15 +3663,10 @@ class SimTactics:
         sturn = res["spot_turns"][nn, e_ix]
         sn = res["spot_n"][nn, e_ix]
         if district:
-            # the unit's predicted blow on each city (`predictCityBlow`), the
-            # damage it takes its planning's (`predictDistrictExchange`), the
-            # blow back per spot its planning's too
-            dealt = torch.zeros(B, U, K, dtype=torch.long, device=dev)
-            for ui in range(U):
-                for ki in range(K):
-                    m_ = uv[:, ui] & tgt_ok[:, ki] & has_e[:, ui, ki]
-                    if bool(m_.any()):
-                        dealt[:, ui, ki] = torch.where(m_, self._predict_city_blow(pre, us[:, ui], tplot[:, ki]), dealt[:, ui, ki])
+            # the unit's blow on each city, the damage it takes and the blow
+            # back per spot its planning's own words (`_tac_plan`'s district
+            # jobs)
+            dealt = torch.where(has_e, res["dealt"][nn, e_ix], torch.zeros(B, U, K, dtype=torch.long, device=dev))
             taken = torch.where(has_e, res["taken"][nn, e_ix], torch.zeros_like(dealt))
             bt = torch.where(has_e.unsqueeze(3), res["back_taken"][nn, e_ix], torch.zeros_like(spot))
             bd = torch.where(has_e.unsqueeze(3), res["back_dealt"][nn, e_ix], torch.zeros_like(spot))

@@ -106,7 +106,7 @@ describe('the chassis itself', () => {
     expect(rangedDomainCS(cat, 'FRIGATE')).toBe(COMBAT_BOMBARD_VS_UNIT);
     expect(UNITS.CATAPULT.ranged!.strength + rangedDomainCS(cat, 'FRIGATE')).toBe(UNITS.CATAPULT.bombard);
     // and the district half is unchanged for this chassis
-    expect(cityRangedStrength(state, b, 100))
+    expect(cityRangedStrength(state, b))
       .toBe(UNITS[BOT].ranged!.strength - RANGED_CITY_PENALTY);
   });
 });
@@ -134,14 +134,13 @@ describe('the Particle Beam Siege Cannon', () => {
     const state = world();
     const b = bot(state, 10, 8);
     const base = UNITS[BOT].ranged!.strength;
-    expect(cityRangedStrength(state, b, 100)).toBe(base - RANGED_CITY_PENALTY);
+    expect(cityRangedStrength(state, b)).toBe(base - RANGED_CITY_PENALTY);
     grantTechs(state, 'ADVANCED_POWER_CELLS');
     // CIV6: "Ranged attacks against Cities and Encampments are 100% effective
     // and gain +30 Ranged Strength."
-    expect(cityRangedStrength(state, b, 100)).toBe(base + GDR_PARTICLE_BEAM_CS);
-    expect(cityRangedStrength(state, b, 0)).toBe(base + GDR_PARTICLE_BEAM_CS);
+    expect(cityRangedStrength(state, b)).toBe(base + GDR_PARTICLE_BEAM_CS);
     // no other chassis moves
-    expect(cityRangedStrength(state, { type: 'ARCHER', seat: 0 }, 100))
+    expect(cityRangedStrength(state, { type: 'ARCHER', seat: 0 }))
       .toBe(UNITS.ARCHER.ranged!.strength - RANGED_CITY_PENALTY);
   });
 });

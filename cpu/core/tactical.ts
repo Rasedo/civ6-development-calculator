@@ -27,7 +27,7 @@ import {
 import { BARB_SEAT, FREE_SEAT, NO_SEAT, campTiles, cityHolders, civsAtWar, isBarbSeat, isCityStateSeat, isCiv, isTerritorial, seatOf, tileCity, tileSeat } from './seats';
 import { OPEN_BORDERS_CIVIC } from '../data/seats';
 import { randRange } from './rand';
-import { cityDefenseStrength, districtGarrisonedStrength, embarkedDefenseCS, cityStrikeBase, coastalRaid, damageExpected, hostilePillage, hostileRangedStrike, meleeAttack, meleeUnitStrengths, movesAndShoots, predictCityBlow, predictDistrictExchange, rangedUnitStrengths, stackDefender, unitAttackRange } from './combat';
+import { cityDefenseStrength, districtGarrisonedStrength, embarkedDefenseCS, cityStrikeBase, coastalRaid, damageExpected, hostilePillage, hostileRangedStrike, meleeAttack, meleeUnitStrengths, movesAndShoots, predictDistrictExchange, rangedUnitStrengths, stackDefender, unitAttackRange } from './combat';
 import { CITY_STRIKE_RANGE } from './phase';
 import { encampOuterPool, outerPool, wallsMax } from './rules';
 import { cityStateAt, minorCity, suzerainOf } from './cityStates';
@@ -2104,9 +2104,11 @@ export function predictBlow(state: GameState, attacker: Unit, defender: Unit, at
  *  - per target with a spot the predicted blow from where it stands
  *    (`predictBlow`; a civilian taken 150, a religious unit or a Trader 1.5
  *    x its health, the blow no theological combat), copied to every spot, and per
- *    spot of a fighter the fighter's blow back on it standing there, of a
- *    COMBAT_DISTRICT whose strike stands the forward blow's own two damages
- *    (`predictDistrictExchange`); a blow that kills marks the planning `wins`.
+ *    spot of a fighter the fighter's blow back on it standing there; a
+ *    COMBAT_DISTRICT's blow the larger of its hit points' and its outer
+ *    defence's damage, its blow back where its strike stands the hit points'
+ *    damage and the damage taken (`predictDistrictExchange`); a blow that
+ *    kills marks the planning `wins`.
  */
 export function planUnit(state: GameState, unit: Unit, targets: readonly Target[]): Planner {
   const R = rangeOf(unit);
@@ -2189,8 +2191,15 @@ export function planUnit(state: GameState, unit: Unit, targets: readonly Target[
     if (E.target.type === 'COMBAT_DISTRICT') {
       const d = districtHealth(state, E.target.tile);
       const x = predictDistrictExchange(state, unit, E.target.tile);
+      // the dealt word is the larger of the simulation's two damage words,
+      // the hit points' and the outer defence's (0x7916fb..0x79170b); the
+      // kill and `wins` compare it with the hit points left
+      E.dealt = Math.max(x.dealt, x.outer);
       E.taken = x.taken;
-      if (d && x.dealt > d.hp) wins = true;
+      if (d) {
+        E.kills = E.dealt >= d.hp;
+        if (E.dealt > d.hp) wins = true;
+      }
       // per spot the blow back (0x791470 at 0x7917f7..0x7918f7): where the
       // district's strike stands the swapped simulation leaves the forward
       // one's words, the hit points' damage dealt and the damage taken;
@@ -3237,8 +3246,8 @@ export interface Assigned { unit: Unit; move: number; attack: number; from: numb
 /**
  * THE ASSIGNMENT (0x776140) of `units` to the spots of `targets`:
  *  - each target's health (1.1 x its whole, less its damage): a unit's, a
- *    district's (a City Center's hit points; its blow the predicted one,
- *    `predictCityBlow`, the damage it takes the planning's, `predictCityExchange`);
+ *    district's (a City Center's hit points; its blow and the damage it
+ *    takes the planning's own words, entry +0x64 / +0x7c);
  *    a unit target whose unit the pass has killed keeps its entry, its
  *    health that of a unit with every hit point lost (0x776333: the lookup
  *    0x8e9d0 -> 0x4f2310 reads the unit's slot, no test of its death), its
@@ -3304,7 +3313,7 @@ export function assignTo(state: GameState, pass: Pass, units: Unit[], targets: T
       const job = jobOf(state, pass, u);
       const E = p.entries.find((e) => e.target === T.target);
       if (!E) return;
-      const dealt = T.target.unit ? E.dealt : predictCityBlow(state, u, T.target.tile);
+      const dealt = E.dealt;
       for (const s of E.spots) {
         const takes = E.taken + s.backTaken;
         if (T.target.type !== 'HIGH' && ((exchange && takes > dealt + s.backDealt) || (survive && takes > healthOf(u)))) continue;
@@ -4522,7 +4531,15 @@ export function openPass(state: GameState, seat: number, aiOf: (u: Unit) => numb
   const targets = tacticalTargets(state, seat, plotsSeenNow(state, new Set([seat])), revealedPlots(state, seat), seatOf(state, seat)?.armyKnown ?? []);
   const reach = new Map<number, Reach[]>();
   const plan = new Map<number, Planner>();
-  for (const u of units) {
+  // the planning runs for every unit of the player (0x792c90), its civilians
+  // and support units among them; a city-state's unit made in its turn after
+  // the planning ran — bought or upgraded, no Movement — holds none (runs/
+  // h1_duels1124 t6 city-state 3's Builder 262144 on 41:12 and t216
+  // city-state 2's Supply Convoy 2359303 plan; t18 city-state 4's Warrior
+  // 458757, bought that turn, does not)
+  const minor = isCityStateSeat(seat);
+  for (const u of state.units) {
+    if (u.seat !== seat || !onMap(u) || (minor && u.movesLeft <= 0)) continue;
     const p = planUnit(state, u, targets);
     plan.set(u.id, p);
     reach.set(u.id, p.reach);

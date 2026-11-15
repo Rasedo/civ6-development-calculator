@@ -27,8 +27,7 @@
  *     their turns, in order;
  *   - plan.kills: per target both hold a spot of, whether its blow kills;
  *   - plan.blow: per spot both hold, the predicted blow dealt and taken and
- *     the blow back dealt and taken (a district's blow dealt the planning's
- *     own `predictDistrictExchange`, which its entry does not keep);
+ *     the blow back dealt and taken;
  *   - targets: the player's tactical target list (targets.order its order
  *     where the entries agree);
  *   - kb.cities: per city either knowledge base holds — ours the one the
@@ -58,7 +57,6 @@ import { closeSync, existsSync, fstatSync, openSync, readSync } from 'node:fs';
 import { neighbors } from '../../world/hex';
 import { isWater } from '../../world/query';
 import { aiView } from '../core/aiView';
-import { predictDistrictExchange } from '../core/combat';
 import { installType, minorKnownUnits, minorUnitProduction } from '../core/minorBuild';
 import { cityHolders, isBarbSeat, tileSeat } from '../core/seats';
 import type { Pass, PlanEntry, Target, TargetType } from '../core/tactical';
@@ -336,7 +334,7 @@ export function readPass(game: GameUnits, w: PassWorld, state: GameState, pass: 
   const taken = new Set<number>();
   const unkeyed: Unit[] = [];
   const lone: Unit[] = [];
-  const ours = pass.units.filter((u) => pass.plan.has(u.id));
+  const ours = state.units.filter((u) => u.seat === pass.seat && pass.plan.has(u.id));
   for (const u of ours) {
     const key = w.keyOf(u);
     const id = key !== undefined && key.startsWith(`${player}:`) ? Number(key.slice(key.indexOf(':') + 1)) : undefined;
@@ -466,22 +464,18 @@ export function readPass(game: GameUnits, w: PassWorld, state: GameState, pass: 
       const n = Math.max(0, Math.min(t[6], 6));
       if (!n && !E.spots.length) continue;
       const spot = (k: number) => t[7 + 2 * k] + t[8 + 2 * k] * w.W;
-      // a district's blow dealt is the planning's own (`planUnit` keeps it
-      // in no entry: the assignment prices a district as it runs)
-      let own: number | undefined;
-      const dealt = () => (E.target.type === 'COMBAT_DISTRICT' ? (own ??= predictDistrictExchange(state, u, E.target.tile).dealt) : E.dealt);
       const a = E.spots.map((s) => `${xy(s.tile)}/${s.turns}`).join(' ') || 'none';
       const b = Array.from({ length: n }, (_, k) => `${xy(spot(k))}/${t[19 + k]}`).join(' ') || 'none';
       out.push({ kind: 'plan.spots', subject: `${U} > ${entry}`, equal: a === b, ours: a, game: b });
       // whether the blow kills (the entry's +0xc4), where both hold a spot
       if (n && E.spots.length) {
         const kills = (t[49] & 0xff) !== 0;
-        out.push({ kind: 'plan.kills', subject: `${U} > ${entry}`, equal: E.kills === kills, ours: `${E.kills ? 'kills' : 'no kill'} d${dealt()}`,
+        out.push({ kind: 'plan.kills', subject: `${U} > ${entry}`, equal: E.kills === kills, ours: `${E.kills ? 'kills' : 'no kill'} d${E.dealt}`,
           game: `${kills ? 'kills' : 'no kill'} d${t[25]}` });
       }
       for (let k = 0; k < n; k++) {
         const s = E.spots.find((x) => x.tile === spot(k));
-        if (s) out.push(blowRead(`${U} > ${entry} from ${xy(s.tile)}`, dealt(), E, s, t, k));
+        if (s) out.push(blowRead(`${U} > ${entry} from ${xy(s.tile)}`, E, s, t, k));
       }
     }
   }
@@ -489,8 +483,8 @@ export function readPass(game: GameUnits, w: PassWorld, state: GameState, pass: 
 }
 
 /** one spot's predicted blows: dealt / taken, the blow back dealt / taken */
-function blowRead(subject: string, dealt: number, E: PlanEntry, s: PlanEntry['spots'][number], t: readonly number[], k: number): StateRead {
-  const a = `d${dealt} t${E.taken} bd${s.backDealt} bt${s.backTaken}`;
+function blowRead(subject: string, E: PlanEntry, s: PlanEntry['spots'][number], t: readonly number[], k: number): StateRead {
+  const a = `d${E.dealt} t${E.taken} bd${s.backDealt} bt${s.backTaken}`;
   const b = `d${t[25 + k]} t${t[31 + k]} bd${t[43 + k]} bt${t[37 + k]}`;
   return { kind: 'plan.blow', subject, equal: a === b, ours: a, game: b };
 }

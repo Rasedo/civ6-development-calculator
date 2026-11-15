@@ -770,7 +770,8 @@ export function aiView(state: GameState, opts: { updated?: boolean } = {}): AiVi
       const u = state.units.find((x) => x.id === id);
       if (!u) return 0;
       const target = { type: 'COMBAT_DISTRICT' as const, tile: p, seat: tileSeat(map.tiles[p]), unit: null };
-      return planUnit(state, u, [target]).entries.some((e) => e.spots.length > 0) ? predictCityBlow(state, u, p) : 0;
+      const e = planUnit(state, u, [target]).entries.find((x) => x.spots.length > 0);
+      return e ? e.dealt : 0;
     },
     cityDefense: (p) => {
       const held = cityAtIndex(state, p);

@@ -244,30 +244,20 @@ def test_embarked_defense_by_era(sim) -> None:
 
 
 def test_support_in_district(sim) -> None:
-    """CIV6 (Support): "Units will not gain Support when inside defensible
-    Districts (City Center, Encampment). However, units inside these Districts
-    can still provide Support to their friends." """
+    """Support asks no district (`supportCount`): a defender on a City
+    Center counts its own neighbours as one off it does."""
     sim.civ_civics[:, :, sim._flank_support_civic] = True
     ctr = int(sim.city_center[0, 0, 0])
     nb = [int(t) for t in sim.neigh[ctr].tolist() if t >= 0]
     assert nb, "the centre has no neighbours"
-    open_t = nb[0]
     dseat = torch.zeros(sim.B, dtype=torch.long, device=sim.device)
     noatk = torch.full((sim.B,), -1, dtype=torch.long, device=sim.device)
     on_ctr = torch.full((sim.B,), ctr, dtype=torch.long, device=sim.device)
-    off_ctr = torch.full((sim.B,), open_t, dtype=torch.long, device=sim.device)
     _, s_ctr = sim._flank_support(on_ctr, dseat, noatk, dseat, noatk)
-    _, s_off = sim._flank_support(off_ctr, dseat, noatk, dseat, noatk)
-    assert int(s_ctr[0]) == 0, "a defender on a City Center must gain no Support"
-    assert int(s_off[0]) >= int(s_ctr[0]), "the same neighbours off the centre still support"
-    # a CITY-STATE's centre is a City Center too: a foreign unit standing in
-    # one gains no Support either (seed 9170 t114 — TS paid it there)
-    if sim.S > 0 and bool(sim.citystate_alive[0, 0]):
-        mc = torch.full((sim.B,), int(sim.citystate_center[0, 0]), dtype=torch.long, device=sim.device)
-        _, s_minor = sim._flank_support(mc, dseat, noatk, dseat, noatk)
-        assert int(s_minor[0]) == 0, "a defender on a city-state's centre must gain no Support"
-        print("  H2. a city-state's centre is defensible too: no Support inside it")
-    print(f"  H. district support OK: {int(s_ctr[0])} on the centre, {int(s_off[0])} one tile off")
+    held = sim.military_at[0, torch.tensor(nb, device=sim.device)]
+    mine = int(((held >= 0) & (sim.unit_seat[0, held.clamp(min=0)] == 0)).sum())
+    assert int(s_ctr[0]) >= mine, "a defender on a City Center counts its neighbours"
+    print(f"  H. district support OK: {int(s_ctr[0])} on the centre")
 
 
 def test_river_cross(sim) -> None:

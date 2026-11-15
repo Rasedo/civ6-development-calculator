@@ -227,9 +227,10 @@ export interface AiView extends AiValueView {
   /** the city centre's hit points on the plot: its most and its damage,
    *  null where no city stands there */
   cityHitPoints(plot: number): { max: number; damage: number } | null;
-  /** the hit points a unit's blow would take from the city on the plot as
-   *  its planning predicts it (0x791470's district branch), 0 where its
-   *  planning holds no plot to strike the city from within two turns */
+  /** the blow a unit would strike the city on the plot with as its planning
+   *  predicts it (0x791470's district branch: the larger of the hit points'
+   *  and the outer defence's damage), 0 where its planning holds no plot to
+   *  strike the city from within two turns */
   cityBlow(unitId: number, plot: number): number;
   /** the hit points a unit's blow from where it stands would take from the
    *  city on the plot (the combat simulation 0x213e00 / 0x205720) */
