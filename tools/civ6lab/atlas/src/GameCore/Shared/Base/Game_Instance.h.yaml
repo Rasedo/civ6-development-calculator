@@ -73,9 +73,12 @@
   final: 0x64f420
   kind: function
   name: transferUnit
-  semantics: "the unit manager's transfer (vtable +0x80; unit, new owner, r9b, 5th argument): the old unit destroyed (vtable +0x60), a new one of the new owner made off the map (vtable +0x48) with the old one's damage, charges, promotions and formation, placed at the old plot by 0x586d40 (flags 1, and 0x10 where the 5th argument is set); placement answering 0 destroys the new unit (0x93ff0b)."
+  semantics: "the unit manager's transfer (vtable +0x80; unit, new owner, r9b, 5th argument): the old unit destroyed (vtable +0x60), a new one of the new owner made off the map (vtable +0x48) with the old one's damage, charges, promotions and formation, placed at the old plot by 0x586d40 (flags 1, and 0x10 where the 5th argument is set); placement answering 0 destroys the new unit (0x93ff0b: vtable +0x60 with the flag 1, the delayed kill 0x4ef040 — dead on its player's list, its pool slot held, to that player's end of turn)."
   status: READ
   cases:
+    - recording: h1_duelq1124
+      turn: 82
+      value: "city-state 3 counts six units at its t82 analysis (its four, the Catapult made that turn, the dead Warrior of creation index 18): every unit FX(-9999), Military Tactics 120.7 at t83; the Catapult on slot 2 over the dead unit's slot 0"
     - recording: h1_duely1124
       turn: 82
       value: China's levied Warrior 1638402 on city-state 2's ground 13:14 removed at city-state 3's start, no unit added
@@ -86,9 +89,13 @@
     - gpu/core/sim_minors.py:_jump_made_anew
     - cpu/core/units.ts:holdGarrison
     - gpu/core/sim_minors.py:_hold_garrison
+    - cpu/core/minorBuild.ts:pool
+    - cpu/core/minorBuild.ts:major
+    - gpu/core/sim_minors.py:_minor_levy_return
   readings:
     - "C-129: a unit made anew that no plot takes is destroyed, its own plot refused by a hostile defender alone; a bankruptcy's disband before the look — READ, both twins"
     - "C-106: a levied unit's return leaves its holder's garrison requirement met to the holder's turn end — a fit, both twins"
+    - "C-98 / C-130 / C-96: a levied unit home with no plot dies on its minor's list; the unit term's upgrade Gold is the minor's; the pick refuses a held building under its pillaged district — READ (0x93fa10 at 0x93ff0b, 0x7cb8b0, 0x4cb350, 0x7f2970 at 0x7f3bd1), LAB (the placement's embark state, the unit term's Gold on the records), both twins"
   context:
     - "- THE TRANSFER (0x93fa10, the unit manager's vtable +0x80 at 0xd92c18; the levy's return 0x4502b0 calls it with..."
   review: reviewed

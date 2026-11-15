@@ -2223,7 +2223,23 @@ function minorAi(ctx: Ctx, b: TurnRecord, turn: number, made: ReadonlySet<Unit>,
   // their research AI's turn, whose research in hand the AI turn noted (one
   // with none noted the research as the units' turn left it)
   for (const cs of ctx.state.cityStates) if (!ctx.researchAtTurn.has(cs.seat)) ctx.researchAtTurn.set(cs.seat, cs.research.tech);
-  for (const cs of ctx.state.cityStates) detectBoosts(ctx.state, cs.seat);  const ended = new Map<Unit, number>();
+  // a Corps or an Army their units' pass formed on the copy counts in those
+  // boosts, as the formation's own boost lands in the turn (runs/h1_duelq1121
+  // t149: city-state 4's third Corps completes Mobilization, the
+  // completion's choice queues Scorched Earth behind Reformed Church, in
+  // hand at t153, Urbanization at t154)
+  const formed: [Unit, number | undefined][] = [];
+  for (const [c, u] of twin) {
+    if (!minorAiSeat(c.seat) || !copy.units.includes(c) || (c.formation ?? 0) <= (u.formation ?? 0)) continue;
+    formed.push([u, u.formation]);
+    u.formation = c.formation;
+  }
+  for (const cs of ctx.state.cityStates) detectBoosts(ctx.state, cs.seat);
+  for (const [u, was] of formed) {
+    if (was === undefined) delete u.formation;
+    else u.formation = was;
+  }
+  const ended = new Map<Unit, number>();
   for (const [c, u] of twin) if (copy.units.includes(c) && minorAiSeat(c.seat)) ended.set(u, c.tileIndex);
   const opOf = new Map<Unit, string>();
   for (const c of copy.cityStates) {

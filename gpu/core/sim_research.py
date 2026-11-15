@@ -395,7 +395,8 @@ class SimResearch:
         the city trains the unit's domain, at least 0 — a technology's at most
         50.0 and taken 10 times, a civic's once; and per upgrade source of the
         unit each of the minor's units of it adds that value less the
-        upgrade's Gold valued as a yield, at least 20.0. A row in reach only,
+        upgrade's Gold as the minor pays it (`upgradeGold`), valued as a
+        yield, at least 20.0. A row in reach only,
         landing within the horizon (`below`: before it); the Free Cities'
         row none"""
         out = torch.zeros_like(turns)
@@ -417,7 +418,6 @@ class SimResearch:
             return out
         tab = self.citystate_unit_values[:, s]
         on = self.citystate_unit_on[:, s]
-        row = self._CITY_MINOR0 + s
         # the units its list holds (`minorListedUnits`)
         listed = self._minor_listed_units(s)
         floor = 20 * _FX
@@ -439,11 +439,9 @@ class SimResearch:
                     n = listed[:, src]
                     if not bool(n.count_nonzero()):
                         continue
-                    gold = self._upgrade_gold_cost(row, torch.full((self.B,), src, dtype=torch.long, device=self.device),
-                                                   torch.full((self.B,), eng, dtype=torch.long, device=self.device),
-                                                   torch.zeros(self.B, dtype=torch.bool, device=self.device),
-                                                   torch.zeros(self.B, dtype=torch.long, device=self.device))
-                    gv = self._cv_yield(gold.long() * _FX, "YIELD_GOLD", f.yield_w("YIELD_GOLD"))
+                    # the upgrade's Gold as the minor pays it (`upgradeGold`)
+                    gold = torch.full((self.B,), int(self._mb_upgrade_gold) * _FX, dtype=torch.long, device=self.device)
+                    gv = self._cv_yield(gold, "YIELD_GOLD", f.yield_w("YIELD_GOLD"))
                     v = v + n * torch.maximum(avg - gv, torch.full_like(avg, floor))
             out[:, i] = v
         h = int(self._rai_tables()["horizon"])

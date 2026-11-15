@@ -593,8 +593,9 @@ class SimMinors:
         ground, nor another player's unit; else it goes to the first plot of
         the rings round it (`barb_ring_table`, the game's ring order) passing
         the same, revealed to `seat` (a major's explored plots under the fog,
-        every plot with the fog off) and free for it (`_spot_free`); one no
-        plot takes is destroyed."""
+        every plot with the fog off) and free for it (`_spot_free`), a land
+        unit embarked where that plot is water and ashore where it is land;
+        one no plot takes is destroyed."""
         if not bool(m.count_nonzero()):
             return
         ring = getattr(self, "_jump_ring", None)
@@ -652,6 +653,10 @@ class SimMinors:
             gs = torch.full_like(rows, g)
             self._occ_clear(rows, here[rows], gs)
             self.major_unit_tile[rows, u] = spot[rows]
+            # the placement embarks a land unit put on water and lands one
+            # put ashore (`jumpMadeAnew`); `_occ_set` reads the flag
+            walks = naval[rows] | self.unit_water_walk.take(ty[rows])
+            self.major_unit_emb[rows, u] = torch.where(walks, self.major_unit_emb[rows, u], self.water[rows, spot[rows]])
             self._occ_set(rows, spot[rows], gs)
             self._gen_ver += 1
 
@@ -670,14 +675,29 @@ class SimMinors:
         m = self.major_unit_alive & (self.major_unit_levy_src == 100 + s) & back.unsqueeze(1)
         if bool(m.count_nonzero()):
             self._hold_garrison(m)
+            # each is made under the minor before its placement (the
+            # transfer 0x93fa10): the minor's pool brought up to date, then
+            # in pool order each takes a slot of it, placed or not
+            # (`sendLevyHome`)
+            made = back & m.any(dim=1)
+            self._seat_pool_slots(s, "major", 100 + s, made)
             self.major_unit_seat[m] = 100 + s
             self.major_unit_levied[m] = False
             self.major_unit_levy_src[m] = -1
             self._gen_ver += 1
+            self._seat_pool_slots(s, "major", 100 + s, made)
             # where the minor may stand (`jumpMadeAnew`), made anew with its
             # whole Movement (the aura's none)
             self._jump_made_anew(100 + s, m)
             home = m & self.major_unit_alive
+            # one no plot takes died by the delayed kill (0x93fa10 at
+            # 0x93ff0b): on the minor's list, its slot held, until the
+            # minor's end of turn (`levyUnitHome`, `_minor_end_turn_list`)
+            dead = m & ~self.major_unit_alive
+            if bool(dead.count_nonzero()):
+                cnt = torch.zeros_like(self.citystate_list_count[:, s])
+                cnt.scatter_add_(1, self.major_unit_type.clamp(min=0), dead.to(cnt.dtype))
+                self.citystate_list_count[:, s] += cnt
             full = self._full_mp("major") - self.major_unit_aura_mp
             self.major_unit_mp.copy_(torch.where(home, full, self.major_unit_mp))
             self.major_unit_mp_full.copy_(torch.where(home, full, self.major_unit_mp_full))

@@ -2741,13 +2741,12 @@ class _MinorFacts:
         return self.current_is(b)
 
     def can_construct(self, b):
-        held = _t(self.has_building(b), self.like()).bool()
-        return self.sim._cv_constructible(self, self.T["bld"][b]) & (held | ~self._pick_district_pillaged(self.T["bld"][b]))
+        return self.sim._cv_constructible(self, self.T["bld"][b]) & ~self._pick_district_pillaged(self.T["bld"][b])
 
     def _pick_district_pillaged(self, row: dict):
         """`pickDistrictPillaged`: the building's district held complete and
-        pillaged (CanConstruct 0x170450 at 0x17071d, 0x1ad720); the callers
-        pass a building the city holds"""
+        pillaged (CanConstruct 0x170450 at 0x17071d, 0x1ad720), a building
+        the city holds pillaged among them"""
         d = row["district"]
         dv = self._didx(d) if d and d != "DISTRICT_CITY_CENTER" else -1
         if dv < 0:
@@ -3236,7 +3235,7 @@ class _FreeFacts(_MinorFacts):
             return self._bools(False)
         f_t, f_c = sim.citystate_techs[:, self.s], sim.citystate_civics[:, self.s]
         return (sim._free_building_ok(self.j, bi, f_t, f_c) & sim._cv_constructible(self, self.T["bld"][b])
-                & (_t(self.has_building(b), self.like()).bool() | ~self._pick_district_pillaged(self.T["bld"][b])))
+                & ~self._pick_district_pillaged(self.T["bld"][b]))
 
     def can_train(self, u):
         """CanTrain of a Free City: the Free Cities' research unlocks the

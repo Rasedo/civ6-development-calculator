@@ -15444,3 +15444,76 @@ refusal (cpu/core/tactical.ts); GPU `_tac_with_short`, the entry's key at
   (runs/h1_duelq1127 t37-42 the barbarians' enemy 70 on 12:6 for ours 45).
   A city known by an Encampment's plot alone (its centre never revealed)
   holds no entry in the engines.
+
+## C-98 / C-130 / C-96: a levied unit home with no plot dies on its minor's list; the unit term's upgrade Gold is the minor's; the pick refuses a held building under its pillaged district — READ (0x93fa10 at 0x93ff0b, 0x7cb8b0, 0x4cb350, 0x7f2970 at 0x7f3bd1), LAB (the placement's embark state, the unit term's Gold on the records), both twins
+
+`sendLevyHome` / `levyUnitHome` (cpu/core/minorBuild.ts), `jumpMadeAnew`
+(cpu/core/phase.ts), `minorUnitTerm` and `minorPickFacts` /
+`freeCityPickFacts`' `canConstruct` (cpu/core/minorBuild.ts); the replay's
+formation boosts (cpu/harness/replay.ts, the city-states' pass). GPU
+`_minor_levy_return` and `_jump_made_anew` (gpu/core/sim_minors.py),
+`_rai_unit_term` (gpu/core/sim_research.py), `can_construct`
+(gpu/core/sim_cityvalue.py).
+
+- THE RETURN WITH NO PLOT (the transfer 0x93fa10): the new owner's unit is
+  made off the map (vtable +0x48) before the placement 0x586d40; where the
+  placement answers 0 the manager's destroy runs with the flag 1 (0x93ff0b:
+  vt +0x60 -> 0x941130 -> 0x9402a0), the delayed kill 0x4ef040 — the unit
+  dead, on its player's list and in the pool slot it took until its
+  player's end of turn (0x4ef6d0). So a levied unit no plot takes counts in
+  its minor's unit count (0x7b62c0 at 0x7b63aa) and by type on its list for
+  that turn, and its slot is not free for the unit the minor's production
+  makes that turn. Each unit home takes its slot in the units' order,
+  placed or not.
+- Confirmed (one-seed aimem trace from t1): runs/h1_duelq1124 t82, China's
+  levied Warrior 1638402 home to city-state 3 with no plot: creation index
+  18 in no record, slot 0 held as the Catapult 1245186 (index 19) takes
+  slot 2, the Knight 1310720 (index 20) on slot 0 at t91; six units counted
+  at the t82 analysis, every unit FX(-9999), the t83 research rows as
+  logged (Military Tactics 120.7, Machinery 84.7).
+- THE PLACEMENT'S EMBARK STATE (the records; 0x586d40 unread for it): a land
+  unit placed on water is embarked, one placed ashore is not. Confirmed:
+  runs/h1_duelq1124 t92, Granada's Knight 1310720 made on the water plot
+  41:13, UnitEmbarkedStateChanged at its UnitAddedToMap; runs/h1_duelq1121
+  t154, China's embarked Musketman 3735567 on 10:14 home to city-state 2 as
+  2424833 on the land plot 10:6: its Movement 3 (2 and Commando) in
+  Logistics' analyzer (0x6ac440), the card 24.0 as logged.
+- THE UNIT TERM'S UPGRADE GOLD (0x7b3e50 / 0x7a9a10 through 0x5376d0): the
+  upgrade's price as the player pays it; a city-state's is its discounted
+  one (Leaders.xml MINOR_CIV_GOLD_MILITARY_UPGRADE, 100 percent: 5 at the
+  online speed, `MINOR_UPGRADE_GOLD`), 2.5 at its Gold weight. Confirmed:
+  runs/h1_duelq1124 Bologna t81, one Catapult listed, the Trebuchet's City
+  Analysis value 38.87: 10 x 38.87 + (38.87 - 2.5), Military Engineering
+  479.8 and Gunpowder -9050.8 as logged.
+- THE PICK'S DISTRICT TEST (0x5d0860 with its third argument set ->
+  CanConstruct 0x170450 at 0x17071d): a building the city holds pillaged is
+  refused under its pillaged district as an unbuilt one is. Confirmed:
+  runs/h1_duelq1121 Hunza t244, its Market and Bank pillaged under its
+  pillaged Commercial Hub: the Market contract 776 taken in hand and FAILED
+  at the queue, the Sewer picked at 449.0; runs/h1_duelq1117 Valletta
+  t134-141, its pillaged Lighthouse under its pillaged Harbor, nothing else
+  valued: NO BUILDS AT ALL.
+- THE REPLAY: a Corps or an Army the city-states' units' pass forms on its
+  copy counts in the boosts that pass lands, so the formation's boost
+  completes its civic in the turn and the completion's choice (0x6293e0)
+  joins the queue. runs/h1_duelq1121 t149: city-state 4's third Corps
+  completes Mobilization, Scorched Earth queued behind Reformed Church, in
+  hand at t153, Urbanization at t154, as recorded.
+- A NEW "BUILD CITY BUILDING" TREE'S FIRST TICK, read for runs/h1_duelq1124
+  Cardiff t89: Decode Trigger (0x7f2970) FAILS only where nothing decoded
+  and its value is not above 0 (0x7f3bd1), a city or an item decoding; Add
+  Goal Tech's update (0x7e7d20) lists a building's PrereqTech on plain
+  HasTech, its kept contracts looked up in the tree's own list (0x7cb8b0:
+  +0x8e8, count +0x8f8, by the contract's id +0x280); its execution
+  (0x7e7200) posts where the goal is set and no kept contract of the tree
+  holds it; Build Unit's update (0x7f4e00) FAILS a building whose
+  PrereqTech or PrereqCivic the player lacks (0x4cb350: no PrereqTech, or
+  HasTech of it). CivKnowledge 0x5eb650 returns the size of the player's
+  record list of the type.
+- Open (C-127): Cardiff t89's tree (pool slot 1, never used before it) made
+  after the t89 log and gone by the end look with no contract id used: no
+  path above ends a Castle trigger so with Castles one turn from done, so
+  the event's pick at that update (0x5cd150 over the t89 BUILDINGS table,
+  the repair queued the same update) is the unread part. C-130: Bologna's
+  Suffrage and Digital Democracy at 1124 t245, the turn Class Struggle
+  completes at its start.

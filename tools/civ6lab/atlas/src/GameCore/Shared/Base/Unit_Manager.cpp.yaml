@@ -12,6 +12,7 @@
   impl: [cpu/core/units.ts:upgradeAnew, gpu/core/sim_seats.py:_upgrade_anew]
   readings:
     - "C-129: the upgrade is a new unit, its old self dying in its pool slot to the turn's end — READ (0xa49cb0, 0x9402a0, 0x4ef040, 0x4ef6d0), both twins"
+    - "C-98 / C-130 / C-96: a levied unit home with no plot dies on its minor's list; the unit term's upgrade Gold is the minor's; the pick refuses a held building under its pillaged district — READ (0x93fa10 at 0x93ff0b, 0x7cb8b0, 0x4cb350, 0x7f2970 at 0x7f3bd1), LAB (the placement's embark state, the unit term's Gold on the records), both twins"
   notes:
     - the head's plot walk (vt +0x58 over the plot and its ring) unread; reached from the destroy's thunk 0x941130 (vt +0x68) by its signature, not by a vtable read
   review: reviewed
@@ -60,6 +61,7 @@
     - cpu/core/phase.ts:jumpMadeAnew
   readings:
     - "C-129: a unit made anew that no plot takes is destroyed, its own plot refused by a hostile defender alone; a bankruptcy's disband before the look — READ, both twins"
+    - "C-98 / C-130 / C-96: a levied unit home with no plot dies on its minor's list; the unit term's upgrade Gold is the minor's; the pick refuses a held building under its pillaged district — READ (0x93fa10 at 0x93ff0b, 0x7cb8b0, 0x4cb350, 0x7f2970 at 0x7f3bd1), LAB (the placement's embark state, the unit term's Gold on the records), both twins"
   context:
     - "...rn 0x4502b0 calls it with the 5th argument 1): the old unit is destroyed (vtable +0x60, 0x941130), a new one of the new owner made off the map (vtable +0x48), then placed at the old pl..."
   review: reviewed

@@ -349,6 +349,7 @@
     - "C-97: the government and policy choice — the choice READ, the values PARTLY READ"
     - "C-96: a completion's contract walk COMPLETES its Tech Contracts mid-turn; a city-state's route boosts land before its army's walk — READ (0x762d60 at 0x762ed0..0x762f8a, 0x5f5940), both twins"
     - "C-130 / C-98: the civic queue, the best plot to buy and the plot purchase analyzer — READ, both twins"
+    - "C-98 / C-130 / C-96: a levied unit home with no plot dies on its minor's list; the unit term's upgrade Gold is the minor's; the pick refuses a held building under its pillaged district — READ (0x93fa10 at 0x93ff0b, 0x7cb8b0, 0x4cb350, 0x7f2970 at 0x7f3bd1), LAB (the placement's embark state, the unit term's Gold on the records), both twins"
   context:
     - "...h key -1 only where nothing is in hand (0x399a90 = -1). A COMPLETION fires the delegate 0x6293e0 — the government pass 0x625d70, then 0x626600 with the completed civic as the key — o..."
     - "- The choice (0x625d70; on the completed-civic event 0x6293e0 with the civic, and from the AI turn 0x620110 with -1 when +0x758 is set): on a civic..."

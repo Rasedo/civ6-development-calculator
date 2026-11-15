@@ -56,7 +56,7 @@ import { BARB_SEAT, FREE_SEAT, freeSeatOf, hiddenResourcesFor, isCiv, majorityRe
 import { builderCost, cityNavalCapable, disbandUnit, holdGarrison, raiseBestTrained, spawnUnit, traderCost, unitFullMoves, unitIsMilitary, unitMadeAnew, upgradeAnew } from './units';
 import { irradiated } from './nuclear';
 import { atRngPoint } from './rand';
-import { dangerPlane, knowledgeLook } from './tactical';
+import { dangerPlane, knowledgeLook, seatPoolSlots } from './tactical';
 import { plotsSeenNow } from './barbarians';
 import { cityStateMilitary, minorCampsLook, minorCitiesLook, minorMilitaryUpgrade, minorOpsRefresh, upgradeTreesStart } from './minorOps';
 import { tilesWithin } from '../../world/hex';
@@ -73,7 +73,7 @@ import { AI_BUILDING_INDEX, AI_UNIT_INDEX, amenityCityOf, amenityPerTurn, buildi
 import { defensiveCancel } from './aiCityTrees';
 import { projectTable, type ProjectTableFacts } from './aiProjectValue';
 import { economicGoldBoost } from './aiWeights';
-import { accrueStockpiles, canPayStockpile, capStockpiles, chargeUnitResource, chargeUnitUpkeep, reserveStockpile, spendStockpile, stockFree, stockOf, stockpileCap, stockpileIncome, strategicSlot, strategicSurplus, unitResourceCost, unitUpkeepBill, upgradeGoldCost, upgradeType } from './stockpile';
+import { accrueStockpiles, canPayStockpile, capStockpiles, chargeUnitResource, chargeUnitUpkeep, reserveStockpile, spendStockpile, stockFree, stockOf, stockpileCap, stockpileIncome, strategicSlot, strategicSurplus, unitResourceCost, unitUpkeepBill, upgradeType } from './stockpile';
 import { FX, FX_MIN, fmul, fxConst, fxOf, pseudoYieldValue, turnsAt, valueBetween, yieldValue } from './aiValue';
 import { aiCityStats, cityGrowth, aiView, storeUnitStrength } from './aiView';
 import { congressBannedLuxury, congressQueueMult } from './congress';
@@ -400,7 +400,15 @@ export function holdMinorStart(fn: ((state: GameState, cityState: CityState) => 
  *  the log, Discipline's own strength 36 under the barbarians' 85 (102 as
  *  logged) */
 function sendLevyHome(state: GameState, cityState: CityState): void {
-  for (const u of state.units) if (u.leviedFrom === cityState.seat) levyUnitHome(state, cityState, u);
+  const home = state.units.filter((u) => u.leviedFrom === cityState.seat);
+  if (home.length) {
+    // each is made under the minor before its placement (the transfer
+    // 0x93fa10: the manager's create, then 0x586d40): in their order each
+    // takes a slot of the minor's pool, placed or not
+    const pool = seatPoolSlots(state, cityState)!;
+    for (const u of home) u.slot = pool.free.length ? pool.free.pop()! : pool.size++;
+  }
+  for (const u of home) levyUnitHome(state, cityState, u);
   delete cityState.levySeat;
   delete cityState.levyEnds;
 }
@@ -428,7 +436,16 @@ function levyUnitHome(state: GameState, cityState: CityState, u: Unit): void {
     u.movesLeft = unitFullMoves(state, u);
     u.movesFull = u.movesLeft;
   } else {
+    // the transfer made the minor's unit before the placement refused it
+    // (0x93fa10 at 0x93ff0b: the manager's destroy with the flag 1, the
+    // delayed kill): dead, it stays on the minor's list and in the pool slot
+    // it took (`sendLevyHome`) until the minor's end of turn
+    // (`minorEndTurnList`, `poolDying`) — runs/h1_duelq1124 t82: China's
+    // levied Warrior 1638402 home to city-state 3 with no plot, six units
+    // counted at its analysis, every unit at FX(-9999); its Catapult made
+    // that turn on slot 2 over the dead Warrior's slot 0
     u.seat = major;
+    (cityState.unitsListed ??= {})[u.id] = u.type;
     disbandUnit(state, u.id);
   }
 }
@@ -1849,8 +1866,9 @@ const UNIT_CITY_VALUE_CAP = fxConst(50);
  * (0x5d4cd0) — a technology's (0x7b3e50) each at most 50.0 and the average
  * taken 10 times, a civic's (0x7a9a10) as they stand and once; and per
  * upgrade source of the unit (UnitUpgrades), each of the units its list holds
- * (0x4f2c90, `minorListedUnits`) adds that average less the upgrade's Gold valued as a yield
- * (0x5376d0 -> 0x7a6690), at least 20.0.
+ * (0x4f2c90, `minorListedUnits`) adds that average less the upgrade's Gold
+ * as the minor pays it, valued as a yield (0x5376d0 -> 0x7a6690), at least
+ * 20.0.
  */
 function minorUnitTerm(state: GameState, cityState: CityState, table: readonly (number | null)[] | undefined): (units: readonly AiUnitRow[], civic: boolean) => number {
   let facts: CityBuildFacts | undefined;
@@ -1870,7 +1888,11 @@ function minorUnitTerm(state: GameState, cityState: CityState, table: readonly (
         if (!id || src.upgradesTo !== id) continue;
         const n = (listed ??= minorListedUnits(state, cityState)).get(src.id) ?? 0;
         if (n === 0) continue;
-        const gold = yieldValue(facts.view, cityState.seat, upgradeGoldCost(state, cityState.seat, src.id, id) * FX, 'YIELD_GOLD');
+        // the upgrade's Gold is the player's price of it (0x5376d0), a
+        // minor's under its 100 percent discount (`MINOR_UPGRADE_GOLD`):
+        // runs/h1_duelq1124 Bologna t81, its Catapult toward the Trebuchet's
+        // 38.87 less 2.5, Military Engineering 479.8 as logged
+        const gold = yieldValue(facts.view, cityState.seat, MINOR_UPGRADE_GOLD * FX, 'YIELD_GOLD');
         v += n * Math.max(avg - gold, UPGRADE_SOURCE_FLOOR);
       }
     }
@@ -2110,9 +2132,11 @@ export function minorTables(state: GameState, cityState: CityState, known: (unit
  *  +0x2a — the pick's CanConstruct (0x5d0860 with its third argument set):
  *  runs/h1_duely1128 Nazca t32, its Holy Site pillaged, the Shrine refused
  *  and the Horseman picked at 33.7. A building the city holds pillaged is
- *  not refused here (a fit: runs/h1_duely1117 Valletta t134-141, its
- *  pillaged Lighthouse picked under its pillaged Harbor, the queue refusing
- *  it, NO BUILDS AT ALL). `district` the install type */
+ *  refused alike (runs/h1_duelq1121 Hunza t244: its Market and Bank pillaged
+ *  under its pillaged Commercial Hub, the Market contract FAILED at the
+ *  queue, the Sewer picked at 449.0; runs/h1_duelq1117 Valletta t134-141:
+ *  its pillaged Lighthouse under its pillaged Harbor, nothing else valued,
+ *  NO BUILDS AT ALL). `district` the install type */
 function pickDistrictPillaged(state: GameState, districts: readonly { type: string; tileIndex: number }[], district: string | null | undefined): boolean {
   return !!district && districtPillagedIn(state, districts, engineId('district', district, 'DISTRICT_', DISTRICTS));
 }
@@ -2130,16 +2154,15 @@ export function minorPickFacts(state: GameState, cityState: CityState, facts: Ci
   return {
     // 0x17e690: the queue's building entries of the type — the item in hand,
     // a repair's its building's; a building the city holds the CanConstruct
-    // refuses unless pillaged (runs/h1_duely1117 Valletta t134-141: its
-    // pillaged Lighthouse picked, the queue refusing it under the pillaged
-    // Harbor, NO BUILDS AT ALL)
+    // refuses unless pillaged, and a pillaged one under its pillaged
+    // district (`pickDistrictPillaged`)
     buildingHeld: (b) => {
       const id = engineId('building', b, 'BUILDING_', BUILDINGS);
       return !!id && (cityState.prodItem === `building:${id}` || cityState.prodItem === `repair:${id}`);
     },
     canConstruct: (b) => {
       const row = AI_BUILDINGS[AI_BUILDING_INDEX.get(b)!];
-      return constructibleNow(facts, row) && (facts.hasBuilding(b) || !pickDistrictPillaged(state, cityState.districts ?? [], row.district));
+      return constructibleNow(facts, row) && !pickDistrictPillaged(state, cityState.districts ?? [], row.district);
     },
     // a pillaged prerequisite stands for none (runs/h1_duely1127 Muscat
     // t156: its Market pillaged and under repair, the event's Pike and Shot
@@ -2634,7 +2657,7 @@ export function freeCityPickFacts(state: GameState, city: City, facts: CityBuild
       const id = engineId('building', b, 'BUILDING_', BUILDINGS);
       const row = AI_BUILDINGS[AI_BUILDING_INDEX.get(b)!];
       return !!id && freeCityBuildingOk(state, city, id, unlocks) && constructibleNow(facts, row)
-        && (facts.hasBuilding(b) || !pickDistrictPillaged(state, city.districts ?? [], row.district));
+        && !pickDistrictPillaged(state, city.districts ?? [], row.district);
     },
     // a pillaged prerequisite stands for none (runs/h1_duely1127 Muscat
     // t156: its Market pillaged and under repair, the event's Pike and Shot
