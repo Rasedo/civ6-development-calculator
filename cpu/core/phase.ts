@@ -5,7 +5,7 @@ import { advanceGreatPeople, passGreatPerson, patronizeGreatPerson, recruitClaim
 import { activateGreatPerson } from './gpAbility';
 import { GW_KINDS } from '../data/greatWorks';
 import { drainRelicReserve, gwCountKind, gwHasRoom, gwLastOfKind, moveGreatWork } from './greatWorks';
-import { completeQueueItem, dropQueuedBuilding, cultureBomb, grantFreeResearch, districtPlotHostile, keepItem, stepAmount, stepMultiplier, wonderLetGo } from './production';
+import { completeQueueItem, dropQueuedBuilding, cultureBomb, grantFreeResearch, districtPlotHostile, headLetGo, keepItem, stepAmount, stepMultiplier } from './production';
 import { cityLook, fogActive, isExplored, meetMajors, revealAround, unitSight, unitSeesThrough } from './fog';
 import { tilesWithin, hexDistance, hexRingWalk, neighbors, neighborTile } from '../../world/hex';
 import { isWater, isCoastalLand } from '../../world/query';
@@ -3488,16 +3488,16 @@ export function seatPhase(state: GameState, only?: { seats: ReadonlySet<number>;
     {
       const luxMap = standingLuxuries(state, actor.seat);
       for (const civCity of walkCities) {
-        // a wonder under a hostile unit leaves the head before the step
-        // reads its Production (`wonderLetGo`)
-        wonderLetGo(state, civCity);
         const st = computeCityStats(state, civCity, luxMap, seatMods);
         madeOf.set(civCity.id, st.total.production);
         plainOf.set(civCity.id, st.plainProduction);
       }
     }
     for (const civCity of walkCities) {
+      // the Production the step reads toward the head it starts on; a
+      // building CanConstruct refuses then leaves the head (`headLetGo`)
       const production = madeOf.get(civCity.id)!;
+      headLetGo(state, civCity);
       const q = civCity.queue[0];
       // CIV6 (City_BuildQueue 0x177d10): the step clears the yield the last
       // one converted before it puts this turn's Production in
@@ -3556,9 +3556,10 @@ export function seatPhase(state: GameState, only?: { seats: ReadonlySet<number>;
           if (made > lacked) civCity.productionBank = (civCity.productionBank ?? 0) + made - lacked;
         }
       } else if (!q) {
-        // CIV6 (City_BuildQueue 0x16f050): a city with nothing queued adds
-        // the turn's Production to its overflow store
-        civCity.productionBank = (civCity.productionBank ?? 0) + production;
+        // CIV6 (City_BuildQueue 0x16f050 at 0x16f62d): a city with nothing
+        // queued adds its plain Production (B, read with no item) to its
+        // overflow store
+        civCity.productionBank = (civCity.productionBank ?? 0) + plainOf.get(civCity.id)!;
       }
     }
     const grown = new Map<number, CityStats>();

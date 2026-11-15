@@ -57,6 +57,7 @@
     - "C-96: a city-state's City Center projects, Build Unit's pillaged building, the pick's pillaged district and the war footing's writer"
     - "C-100: the plot values' golden-age, claims and tourism-percent terms, the required features, the power value's negative Amount — READ"
     - "C-96 / C-130: a building's district copy, the player's Gold as its cities stand, a minor's power after its production; a technology's improvement tourism — READ (0x18e570, 0x7a7dc3, 0x4e0bf0, 0x7b4971..0x7b4b5b), both twins but the tourism"
+    - "C-96: every player's build step drops a building CanConstruct refuses at the queue's head, the front check asking the next — READ (0x16f050 at 0x16f09a..0x16f180, 0x178250 -> 0x17f070 -> 0x17e8d0, 0x170450 at 0x17071d), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...e 0x5d0860 calls), 0x17071d: the building's PrereqDistrict (+0x160) or its replacement (0x408860) looked up in the city's districts (+0x1a48, 0x1ae530); held and complete (+0xb08), t..."

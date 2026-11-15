@@ -272,22 +272,43 @@ export function districtPlotHostile(state: GameState, city: City, tileIndex: num
 }
 
 /**
- * CIV6 (City_BuildQueue 0x16f050 at 0x16f09a..0x16f180): before the step a
- * wonder at the head (ORDER_CONSTRUCT on a plot) is asked CanConstruct
- * (0x170450); a wonder with progress on its plot is refused where a hostile
- * unit holds the plot (0x170db8, `districtPlotHostile`), and leaves the
- * queue, its progress kept by type (0x17f5a0, 0x17f630). The step then
- * works the next item, or puts the turn's Production in the overflow store
- * (runs/h1_duelq1128 Xi'an t22: Stonehenge at 14 under the barbarian
- * Warrior on 15:11, no step logged, the Builder picked at 0 taking 9 + 9 at
- * t23). True when the head left.
+ * CanConstruct's district test (0x170450 at 0x17071d): a city holding the
+ * building's district (engine id; none and the City Center never) complete
+ * and pillaged (0x1ad720) refuses the building, the reason +0x2a.
  */
-export function wonderLetGo(state: GameState, city: City): boolean {
-  const q = city.queue[0];
-  if (q?.kind !== 'wonder' || q.progress <= 0 || !districtPlotHostile(state, city, q.tileIndex)) return false;
-  city.queue.shift();
-  keepItem(city, q);
-  return true;
+export function districtPillagedIn(state: GameState, districts: readonly { type: string; tileIndex: number }[], district: string | null | undefined): boolean {
+  if (!district || district === 'CITY_CENTER') return false;
+  return districts.some((x) => x.type === district && state.map.tiles[x.tileIndex].districtComplete && !!state.map.tiles[x.tileIndex].districtPillaged);
+}
+
+/**
+ * CIV6 (City_BuildQueue 0x16f050 at 0x16f09a..0x16f180): before the step a
+ * building at the head (ORDER_CONSTRUCT, a wonder among them) is asked
+ * CanConstruct (0x170450, its last argument set): a building whose district
+ * the city holds pillaged is refused, held and under repair or not
+ * (`districtPillagedIn`; runs/h1_duelq1124 Wuhan t236: its Ferris Wheel at 0
+ * under the Water Park pillaged again at t235's close, the queue empty at
+ * the turn's start, the Builder picked at 0 and at 43 a turn on), and a wonder
+ * with progress on its plot where a hostile unit holds the plot (0x170db8,
+ * `districtPlotHostile`; runs/h1_duelq1128 Xi'an t22: Stonehenge at 14 under
+ * the barbarian Warrior on 15:11, the Builder picked at 0 taking 9 + 9 at
+ * t23). The refused head leaves the queue, its progress kept by type
+ * (0x17f5a0, 0x17f630), and the queue process's front check (0x178250 ->
+ * 0x17f070 -> 0x17e8d0) asks the same of the next building at the head,
+ * until one stands; the step then works the head, or puts the turn's
+ * Production in the overflow store. True when a head left.
+ */
+export function headLetGo(state: GameState, city: City): boolean {
+  let left = false;
+  for (;;) {
+    const q = city.queue[0];
+    const refused = q?.kind === 'building' ? districtPillagedIn(state, city.districts, BUILDINGS[q.building]?.district)
+      : q?.kind === 'wonder' && q.progress > 0 && districtPlotHostile(state, city, q.tileIndex);
+    if (!q || !refused) return left;
+    city.queue.shift();
+    keepItem(city, q);
+    left = true;
+  }
 }
 
 /** A step factor as the DLL turns it into 24.8 (0x183db0: the float32

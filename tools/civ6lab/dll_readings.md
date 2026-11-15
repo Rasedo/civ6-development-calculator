@@ -15010,3 +15010,40 @@ cpu/harness/replay.ts; `loadBorderGrants`, cpu/harness/import.ts).
   from 28:14, no path there; the order's plot searched from 28:14 on 2
   Movement gives ours 27:15 / 28:16, the game's unit steps 28:15 and holds
   with 1 Movement.
+
+## C-96: every player's build step drops a building CanConstruct refuses at the queue's head, the front check asking the next — READ (0x16f050 at 0x16f09a..0x16f180, 0x178250 -> 0x17f070 -> 0x17e8d0, 0x170450 at 0x17071d), both twins
+
+`headLetGo` and `districtPillagedIn` (cpu/core/production.ts), run by the
+majors' walk (`seatPhase`), a lump (`applyLumpYield`) and `freeCityBuild`;
+`_head_let_go` (gpu/core/sim_phase.py), run by the walk, `_lump_step` and
+`_free_city_build`. The city-states' pick shares `districtPillagedIn`
+(`pickDistrictPillaged`).
+
+- THE STEP'S HEAD CHECK (0x16f050 at 0x16f09a) is every player's: the
+  caller (0x177d10) has read A toward the head the step starts on; a head of
+  entry type 1 is asked CanConstruct (0x170450, last argument set). Its
+  prerequisite-district test (0x17071d) runs before the held-building test
+  (0x1707f1): the city's district of the building's PrereqDistrict (or its
+  replacement, 0x408860) complete, 0x1ad720 (pillaged) clears the result
+  (+0x2a), held building or not. A wonder with progress on a plot a hostile
+  unit holds is refused at 0x170db8.
+- A MULTI-ITEM QUEUE: the refused front is removed, not moved (0x17f630:
+  the entries shift down one, the count falls), its progress kept by type
+  (0x17f5a0); the queue process (0x178250, +0x3ac set) runs the front check
+  0x17f070 on the new head, whose building arm (0x17e8d0) asks the same
+  CanConstruct and pops again, the process re-running while an arm pops;
+  then the step works the head with A, or with nothing queued adds B (the
+  plain Production) to the overflow (0x16f62d), and 0x175c80 fires the
+  empty-queue event. The unit / district / project arms (0x17f3a0, 0x17ed30,
+  0x17f110) are not ported for the majors.
+- Confirmed: runs/h1_duelq1124 Wuhan t236 (one-seed aimem trace t235-238):
+  its Water Park repaired in its t235 step and pillaged again at the turn's
+  close, the Ferris Wheel queued at 0 in record 236; record 237's memory
+  holds no Ferris Wheel progress and the overflow 21.6015625, the Builder
+  taken at 0 in its t236 start (CityProductionChanged before
+  PlayerTurnActivated) and at 43.203125 in record 238. Ours: overflow
+  21.6015625 at record 237, the Builder at 43.203125 at 238.
+  runs/h1_duelq1128 Xi'an t22's Stonehenge unchanged (overflow 9, the
+  Builder at 18).
+- Open: no duelq recording holds a Free City's building under its pillaged
+  district, nor a major's multi-item queue behind a refused head.

@@ -1769,6 +1769,9 @@ class SimMinorAi:
         rd = self.rules_dev
         jc = torch.full((B,), j, dtype=torch.long, device=dev)
         bidx = self._bidx
+        # a building CanConstruct refuses leaves the head before the step
+        # (`headLetGo`)
+        self._head_let_go(row, j, act)
         cur = self.city_current[:, row, j, 0]
         bank = self.city_prod_bank[:, row, j].double().clone()
         none = act & (cur < 0)

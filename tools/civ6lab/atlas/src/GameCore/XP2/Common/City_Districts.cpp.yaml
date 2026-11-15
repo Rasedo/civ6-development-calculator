@@ -22,6 +22,7 @@
     - cpu/core/aiCityBuild.ts:buildingsPass
     - cpu/core/freeCityBuild.ts:growth
     - gpu/core/sim_cityvalue.py:holds_pillaged_district
+    - cpu/core/production.ts:districtPillagedIn
   readings:
     - "C-96: the plot analysis's owner test, Build Unit's pillaged district and a unique's install type — READ (0x5ceba7, 0x7f5112 -> 0x1aec20 / 0x1ad720), both twins"
     - "C-96: a city-state's City Center projects, Build Unit's pillaged building, the pick's pillaged district and the war footing's writer — READ (0x7f50e9, 0x71fb80 at 0x721158 / 0x72118a), the pick's district test PARTLY (0x170450 at 0x17071d), both twins"
@@ -29,6 +30,7 @@
     - "C-96: a unit's strategic cost through the game speed, the pick's pillaged district and the queue's pillaged project — READ (0x17c2e0, 0x4f2cc0, 0x4f2df0 / 0x4f31f0), a fit for the project, both twins"
     - "C-127 / C-100: the buildings' dependents and the districts' buildings (0x5cadc0) — ported, both twins"
     - "C-96: the plot analysis's owner test, Build Unit's pillaged district and a unique's install type"
+    - "C-96: every player's build step drops a building CanConstruct refuses at the queue's head, the front check asking the next — READ (0x16f050 at 0x16f09a..0x16f180, 0x178250 -> 0x17f070 -> 0x17e8d0, 0x170450 at 0x17071d), both twins"
   review: reviewed
 - addr: 0x1ad930
   final: 0x11e140

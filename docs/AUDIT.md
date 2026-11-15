@@ -374,7 +374,7 @@ A question the SOURCE under-determines; neither engine ships a branch until the 
   - LAB (1128 nazca and hong kong): fit, unread: 1128 Nazca NO BUILDS t26-31 / t33-47 (the Horseman's 20 Horses)
   - LAB (1128 nazca and hong kong): 1128 Hong Kong t79 Trader 238.9 for 277.7
   - LAB (1128 nazca and hong kong): 1128 Hong Kong t196-203 valued at 6 units (at war by the cut)
-  - BUILD (repairs): a major's and the Free Cities' build step keep a building head that CanConstruct refuses (its district pillaged): the step's check (City_BuildQueue 0x16f050 at 0x16f09a) is the city-states' alone (`minorBuild` / `_minor_build`), the cities' step in cpu/core/phase.ts and gpu/core/sim_phase.py asking only a wonder's hostile plot (`wonderLetGo`)
+  - LAB (repairs): unconfirmed: a Free City's building under its pillaged district, and a major's queue of several items behind a refused building head (`headLetGo` pops each refused building head in turn); the five duelq recordings hold neither, 1124 Wuhan t236 (a one-item queue) the one major case
 - **C-126. CITY-STATES' PURCHASES, TREASURY, UPGRADES AND DISBANDS.** Weight 2.
   - LAB (treasury): a minor's treasury off the record's: duelz1121 Hunza t155 677 for 691.43
   - LAB (treasury): a minor's treasury off the record's: 1124 Cardiff t189 156 for 163.84
@@ -554,7 +554,6 @@ A question the SOURCE under-determines; neither engine ships a branch until the 
   - LAB (research values): 1121 the trees' goal techs (Present Values)
   - LAB (research values): the Industrial Zone value low (1128 Hong Kong t84)
   - LAB (research values): the military AI's Fav Tech 466 of 513 (duely1127 t1-130: city-state 2's Masonry for the Wheel t21-26)
-  - LAB (research values): a research value's unit term off the city AI's unit table (1127 city-state 4 Machinery +22.4 .. +13.0 t75-78)
   - LAB (research values): 1127 city-state 3's Science at t92 (turns a third under ours)
   - LAB (research values): late picks: 1124 t183 / t191-192
   - LAB (research values): late picks: 1117 t194 / t214-218
@@ -562,8 +561,8 @@ A question the SOURCE under-determines; neither engine ships a branch until the 
   - BUILD (research values): the tech sort 0x7e7080
   - LAB (research values): the research term's improvement tourism does not read the city's +0x1b20 percent (none in a city-state)
   - LAB (civic values): 1121 civics short (Divine Right 5.0, Games & Recreation 7.7)
-  - LAB (unit term): 1124 p4 t81 -16 (Bologna's t80 Trebuchet production value 3.98 where the game's reads one opposing Warrior more, about 4.14, on the same five Warrior records)
-  - LAB (unit term): 1124 p3 t83 +130 (Granada's t82 table, the turn its Catapult completed: Pikeman 12.99 at T 27 and Crossbowman 10.76 at T 25, nothing in hand, 5 units listed, at peace, where the game's are 0; its t81 and t83 tables match; neither the research listing, Military Tactics 1 turn and Machinery 10 at t81's end, nor the six-unit cut, five units in record 83)
+  - LAB (unit term): 1124 p4 t81 -16 (Bologna's t80 Trebuchet production value 3.98 where the game's reads one opposing Warrior more, about 4.14: its Warrior records 1 + 1 + 3 on the t79 log and every t80 site, the barbarian Warrior record 3670034 at age 21 in its t79 tactical site gone by the t79 log)
+  - LAB (unit term): 1124 p3 t83 +130 (Granada's t82 table, the turn its Catapult completed: every unit FX(-9999) as at more than five units at peace, ours valued on the five of record 83; Granada's unit of creation index 18 is in no record and no event, its slot 0 held at the Catapult's creation (index 19, slot 2) and taken by index 20 at t91, the only such index in the five duelq recordings; its t81 and t83 tables match)
   - LAB (unit term): 1127 p3 t63 +7.4 / -5.1 untraced
   - LAB (resource values): a minor's upgrade strategic cost
   - LAB (resource values): Resources +0x350 / +0x1168
@@ -582,7 +581,6 @@ A question the SOURCE under-determines; neither engine ships a branch until the 
   - LAB (card values): 1124 t245 Bologna Suffrage −3
   - LAB (card values): Civil Prestige 1127 p3 t159 / t160 (154 / 127 for 150 / 126: the Amenity term 124 for 126 and the Housing 30 for 24 on the city's yields at the job; Limes, Retainers, Liberalism t159 124 for 127 / 126 / 126)
   - LAB (card values): 1127 city-state 3 t62-63 policies, research and civics (Ilkum 0 / 1, Limes 0 / 12, Civil Prestige 76 / 74, Military Tactics +7.4, Civil Service +2) carried from the t61 border draw (C-107)
-  - LAB (six-unit cut): 1121 Hunza t194 six units a turn early
   - LAB (yields at the job): fit, unread: the city yields' cache (0x1cb8b0, per yield, cleared at the lock's first count only): the totals but Food and Production, the bases but Food kept from the Trader's dispatch through the update's re-placement, on 1124 Bologna t218-230 / 1128 Bologna t16-30, each yield's first reader unread
   - LAB (yields at the job): a project begun at 0 converting an unrecorded overflow (1121 Hunza t85)
   - LAB (archaeologist): the Archaeologist's artifact count: an excavated site's entry unread

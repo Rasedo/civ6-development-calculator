@@ -271,11 +271,6 @@ class SimPhase:
         # The SEAT halves of the per-city bodies are derived once above their
         # loop and handed to every column: nothing in either reads a plane a
         # column writes (see `_produce_pre` / `_loyalty_pre`).
-        # a wonder under a hostile unit leaves the head before the step reads
-        # its Production (`wonderLetGo`)
-        for j in range(self.RC):
-            if cact_any_l[j]:
-                self._wonder_let_go(row, j, cact_all[:, j])
         made = self._seat_city_stats(row, record=False)[0][:, :, 1]
         # the cities' PLAIN Production, which a completion's overflow is capped
         # at (`plainProduction`): the same read without the city-states' flat
@@ -287,6 +282,10 @@ class SimPhase:
         prod_pre = self._produce_pre(row)
         for j in range(self.RC):
             if cact_any_l[j]:
+                # the Production the step read toward the head it starts on;
+                # a building CanConstruct refuses then leaves the head
+                # (`headLetGo`)
+                self._head_let_go(row, j, cact_all[:, j])
                 jc = torch.full((B,), j, dtype=torch.long, device=dev)
                 self._seat_city_produce(row, jc, cact_all[:, j], made[:, j], sci_turn, prod_pre, plain=plain[:, j])
         total, eff, need, tier_idx, lux = self._seat_city_stats(row)
@@ -1223,10 +1222,10 @@ class SimPhase:
         it fills completes at once, the overflow store taking the lump less
         what the head lacked before it (0x16f3bf, the flag set). With nothing
         queued the lump goes to the overflow store."""
-        # a wonder under a hostile unit leaves the head first (`wonderLetGo`)
+        # a building CanConstruct refuses leaves the head first (`headLetGo`)
         _wg = torch.zeros(self.B, dtype=torch.bool, device=self.device)
         _wg[b] = True
-        self._wonder_let_go(row, j, _wg)
+        self._head_let_go(row, j, _wg)
         if int(self.city_current[b, row, j, 0]) < 0:
             self.city_prod_bank[b, row, j] += amount
             return
@@ -1260,25 +1259,38 @@ class SimPhase:
         if amount > lacked:
             self.city_prod_bank[b, row, j] += amount - lacked
 
-    def _wonder_let_go(self, row: int, j: int, act: torch.Tensor) -> None:
-        """`wonderLetGo` for city `j` of major row `row` in the games of
-        `act` [B] (City_BuildQueue 0x16f050 at 0x16f09a..0x16f180): a wonder
-        at the head with progress on a plot a hostile unit holds
-        (CanConstruct 0x170450 at 0x170db8, `_district_plot_hostile`) leaves
-        the queue, its progress kept by type."""
+    def _head_let_go(self, row: int, j: int, act: torch.Tensor) -> None:
+        """`headLetGo` for city `j` of seat row `row` in the games of `act`
+        [B] (City_BuildQueue 0x16f050 at 0x16f09a..0x16f180): a building at
+        the head whose district the city holds complete and pillaged
+        (CanConstruct 0x170450 at 0x17071d, `districtPillagedIn`), or a
+        wonder there with progress on a plot a hostile unit holds (0x170db8,
+        `_district_plot_hostile`, a major's), leaves the queue, its progress
+        kept by type; the front check asks the same of the next head, until
+        one stands."""
         nw = self._wond_n
-        if row >= self.n_majors or not nw:
-            return
-        cur = self.city_current[:, row, j, 0]
-        won = act & (cur >= self.WONDER_BASE) & (cur < self.WONDER_BASE + nw) & (self.city_progress[:, row, j, 0] > 0)
-        if not bool(won.count_nonzero()):
-            return
-        plot = self.city_wonder[self._bidx, row, j, (cur - self.WONDER_BASE).clamp(min=0, max=nw - 1)]
-        hit = won & self._district_plot_hostile(row, torch.where(won, plot, torch.full_like(plot, -1)))
-        if not bool(hit.count_nonzero()):
-            return
-        self._q_keep_head(hit.nonzero(as_tuple=True)[0], row, j)
-        self._q_pop(row, torch.full((self.B,), j, dtype=torch.long, device=self.device), hit)
+        bidx = self._bidx
+        jc = torch.full((self.B,), j, dtype=torch.long, device=self.device)
+        for _ in range(self.city_current.shape[3]):
+            cur = self.city_current[:, row, j, 0]
+            is_b = act & (cur >= 0) & (cur < self.NB)
+            d = self._b_req_district.take(cur.clamp(min=0, max=self.NB - 1))
+            is_b = is_b & (d >= 0) & (d != self._center_didx)
+            hit = torch.zeros_like(act)
+            if bool(is_b.count_nonzero()):
+                t = self.city_dist_tile[bidx, row, j, d.clamp(min=0)]
+                tc = t.clamp(min=0).unsqueeze(1)
+                hit = is_b & (t >= 0) & self.district_complete.gather(1, tc).squeeze(1) \
+                    & self.district_pillaged.gather(1, tc).squeeze(1)
+            if row < self.n_majors and nw:
+                won = act & (cur >= self.WONDER_BASE) & (cur < self.WONDER_BASE + nw) & (self.city_progress[:, row, j, 0] > 0)
+                if bool(won.count_nonzero()):
+                    plot = self.city_wonder[bidx, row, j, (cur - self.WONDER_BASE).clamp(min=0, max=nw - 1)]
+                    hit = hit | (won & self._district_plot_hostile(row, torch.where(won, plot, torch.full_like(plot, -1))))
+            if not bool(hit.count_nonzero()):
+                return
+            self._q_keep_head(hit.nonzero(as_tuple=True)[0], row, j)
+            self._q_pop(row, jc, hit)
 
     def _district_plot_hostile(self, row: int, plot: torch.Tensor) -> torch.Tensor:
         """[B] `districtPlotHostile` for major row `row` (0x5313f0 with its
@@ -1689,10 +1701,12 @@ class SimPhase:
         # the head's PLOT, read before the shift takes it away
         qt0 = self.city_qtile[bidx, row, col, 0].clone()
         has_q = act & (cur >= 0)
-        # CIV6 (City_BuildQueue 0x16f050): a city with nothing queued adds the
-        # turn's Production to its overflow store
+        # CIV6 (City_BuildQueue 0x16f050 at 0x16f62d): a city with nothing
+        # queued adds its plain Production (B, read with no item) to its
+        # overflow store
         _bk0 = self.city_prod_bank[bidx, row, col]
-        self.city_prod_bank[bidx, row, col] = torch.where(act & (cur < 0), _bk0 + prod.to(_bk0.dtype), _bk0)
+        _b = prod if plain is None else plain
+        self.city_prod_bank[bidx, row, col] = torch.where(act & (cur < 0), _bk0 + _b.to(_bk0.dtype), _bk0)
         if not bool(has_q.count_nonzero()):
             return
         _emall = self._step_mult(row, col, cur, qt0, pre)

@@ -38,7 +38,7 @@ import { cityPowerFacts, freeCityBuildFacts, majorQueueItem, seatResearchTurns }
 import { freeCityThreat, minorAiTurn, minorContractPurchases, minorEconomicDisband, minorItemBuilt, minorMilitaryTurn } from './minorCityAi';
 import { bankruptcy, cityBorderGrowth, cultureAfterGrowth, jumpMadeAnew, paveGround } from './phase';
 import { applyTrainingGrants } from './combat';
-import { keepItem, resumeItem } from './production';
+import { districtPillagedIn, headLetGo, keepItem, resumeItem } from './production';
 import { districtScaledBase, goldAffordable, projectCost, repairAvailable, repairWanted } from './game';
 import { civEraIndex, computeCityStats, extractionChanged, rebuildLuxuries, withPercent256 } from './city';
 import { upgradeRoads } from './eras';
@@ -2114,10 +2114,7 @@ export function minorTables(state: GameState, cityState: CityState, known: (unit
  *  pillaged Lighthouse picked under its pillaged Harbor, the queue refusing
  *  it, NO BUILDS AT ALL). `district` the install type */
 function pickDistrictPillaged(state: GameState, districts: readonly { type: string; tileIndex: number }[], district: string | null | undefined): boolean {
-  if (!district) return false;
-  const id = engineId('district', district, 'DISTRICT_', DISTRICTS);
-  if (!id || id === 'CITY_CENTER') return false;
-  return districts.some((x) => x.type === id && state.map.tiles[x.tileIndex].districtComplete && !!state.map.tiles[x.tileIndex].districtPillaged);
+  return !!district && districtPillagedIn(state, districts, engineId('district', district, 'DISTRICT_', DISTRICTS));
 }
 
 /** What the Default Specialization pick (`defaultSpecialization`) reads of
@@ -2492,6 +2489,9 @@ function freeCityBuildingOk(state: GameState, city: City, id: string, unlocks: U
  * Chen t205 UNIT_ARCHER 118.5).
  */
 export function freeCityBuild(state: GameState, city: City, production: number): void {
+  // a building CanConstruct refuses leaves the head before the step
+  // (`headLetGo`)
+  headLetGo(state, city);
   const q = city.queue[0];
   if (!q) city.productionBank = (city.productionBank ?? 0) + production;
   else {
