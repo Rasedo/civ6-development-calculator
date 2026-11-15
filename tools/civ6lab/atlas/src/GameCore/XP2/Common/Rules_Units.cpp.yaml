@@ -80,6 +80,7 @@
     - cpu/core/minorBuild.ts:id
     - cpu/data/cityStates.ts:minorUpgradeGold
     - cpu/data/cityStates.ts:MINOR_UPGRADE_GOLD
+    - cpu/core/freeCityBuild.ts:freeResearchTerms
   readings:
     - "H-1: the upgrade's gold — READ"
     - "H-1: the research AI — READ (the choice), PARTLY READ (the value)"

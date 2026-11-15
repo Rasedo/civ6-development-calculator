@@ -3035,23 +3035,10 @@ class _FreeFacts(_MinorFacts):
             return -_FX
         return super().pseudo_w(p)
 
-    # the value view: the Gold weight of a seat losing Gold (`yieldWeights`:
-    # its gold per turn, the Free Cities' cities' Gold less their units'
-    # upkeep, x -0.2 while below 0)
+    # the value view: the Free Cities' yield weights hold no Economic boost
+    # and no list (`yieldWeights`)
     def yield_w(self, y):
-        if y != "YIELD_GOLD":
-            return 0
-        def build():
-            sim = self.sim
-            tot = self._stats()[0]
-            alive = sim.city_alive[:, self.row, : tot.shape[1]]
-            gold = (tot[:, :, 2] * alive.double()).sum(dim=1)
-            m = self._mine()
-            up = (sim._unit_maintenance(sim.barb_unit_type, sim.barb_unit_formation, None).double() * m.double()).sum(dim=1)
-            gpt = gold - up
-            return torch.where(gpt < 0, _fmul(torch.full_like(gpt, _fx_const(-0.2), dtype=torch.long), _fx_const_t(gpt)),
-                               torch.zeros_like(gpt, dtype=torch.long))
-        return self._get("gold_w", build)
+        return 0
 
     def _total(self, k: int) -> torch.Tensor:
         return self._stats()[0][:, self.j, k]

@@ -1857,17 +1857,18 @@ export function minorResearchTerms(state: GameState, cityState: CityState, units
   };
 }
 
-const UNITS_OF_TECH = new Map<string, AiUnitRow[]>();
-const UNITS_OF_CIVIC = new Map<string, AiUnitRow[]>();
+/** the AI_UNITS rows each technology and each civic unlocks */
+export const UNITS_OF_TECH = new Map<string, AiUnitRow[]>();
+export const UNITS_OF_CIVIC = new Map<string, AiUnitRow[]>();
 for (const u of AI_UNITS) {
   if (u.tech) UNITS_OF_TECH.set(u.tech, [...UNITS_OF_TECH.get(u.tech) ?? [], u]);
   if (u.civic) UNITS_OF_CIVIC.set(u.civic, [...UNITS_OF_CIVIC.get(u.civic) ?? [], u]);
 }
 
 /** A unit's at least this much per upgrade source unit (0x7b45..: 20.0) */
-const UPGRADE_SOURCE_FLOOR = fxConst(20);
+export const UPGRADE_SOURCE_FLOOR = fxConst(20);
 /** A city's unit value counts at most this much in a technology's value (50.0) */
-const UNIT_CITY_VALUE_CAP = fxConst(50);
+export const UNIT_CITY_VALUE_CAP = fxConst(50);
 
 /**
  * The value's UNIT TERM of a minor, paid whole (not from landing): per unit
@@ -2568,16 +2569,20 @@ export function freeCityBuild(state: GameState, city: City, production: number):
   // its city AI's update: the city's threat (`freeCityThreat`); under
   // threat the City Defense event's defensive cancel on the item queued
   // (the Free Cities hold no contract: their one tree, Free Cities Assault,
-  // names no Contract ID); on an empty queue the Default Specialization
+  // names no Contract ID); on an empty queue the Default Specialization.
+  // Its UNITS table every update, which the Free Cities' research values
+  // read (`City.aiUnitValues`)
   const t = freeCityThreat(state, city);
   city.aiThreat = t.level;
   city.aiThreatNear = t.near;
+  const facts = freeCityBuildFacts(state, city);
+  const units = unitTable(facts).map((v) => v ?? FX_MIN);
+  city.aiUnitValues = units;
   const under = freeUnderThreat(city);
   if (city.queue.length && !under) return;
-  const facts = freeCityBuildFacts(state, city);
   const tables: CityBuildTables = {
     buildings: buildingTable(facts),
-    units: unitTable(facts).map((v) => v ?? FX_MIN),
+    units,
     projects: projectTable(freeCityProjectFacts(state, city, facts)),
   };
   const pf = freeCityPickFacts(state, city, facts);

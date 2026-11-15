@@ -510,6 +510,7 @@ GAME = {
     "freeEnemyCounts": lambda sim, b, rows: [_enemy_counts(sim, b, sim.FK)],
     "freeCombatDesire": lambda sim, b, rows: [int(sim.citystate_combat_desire[b, sim.FR])],
     "freeTradeValue": lambda sim, b, rows: [int(sim.free_trade_value[b])],
+    "freeTradeSeat": lambda sim, b, rows: [int(sim.free_trade_seat[b])],
     "freeOps": lambda sim, b, rows: [_minor_ops(sim, b, sim.FR)],
     "freeAiSerials": lambda sim, b, rows: [[int(sim.cai_c_serial[b, sim.FR]), *_tree_pool(sim, b, sim.FR)]],
     "storms": lambda sim, b, rows: [_storm_table(sim, b)],
@@ -1489,6 +1490,9 @@ CITY = {
     "cityTradeList": lambda sim, b, rows: [_city_trade_list(sim, b, c, s) for c, s in rows],
     "freeCityThreat": _cty("city_ai_threat"),
     "freeCityThreatNear": lambda sim, b, rows: [int(bool(sim.city_ai_near[b, c, s])) for c, s in rows],
+    "freeCityUnitValues": lambda sim, b, rows: [([int(x) for x in sim.free_unit_values[b, s].tolist()]
+                                                 if c == sim.FREE_ROW and bool(sim.free_unit_values[b, s].any()) else [])
+                                                for c, s in rows],
     "freeCityRaid": _cty("city_free_raid"),
     "freeAllowed": lambda sim, b, rows: [[i for i, on in enumerate(sim.city_free_allowed[b, c, s].tolist()) if on]
                                          for c, s in rows],

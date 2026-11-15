@@ -1115,11 +1115,12 @@
     - recording: 1124
       turn: 28
       value: "below handicap 3 (player   +0x908) less Maintenance (+0x5c) less player +0x13a0 +0x338 (at least 0)   as Gold — measured 0.5 a Maintenance at a city-state, the unweighted   DefaultValue (1124 t28 Arch"
-  impl: [cpu/core/aiCityBuild.ts:CityBuildFacts]
+  impl: [cpu/core/aiCityBuild.ts:CityBuildFacts, cpu/core/freeCityBuild.ts:freeResearchTerms]
   readings:
     - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
     - "C-96 / C-97: the unit value — READ (the combat, trade, explorer branches, the tail, the military AI's unit production), PARTLY READ (its inputs)"
     - "H-1: the research AI — READ (the choice), PARTLY READ (the value)"
+    - "C-127 / C-98: the Free Cities' trade record on a city-state meeting; their research and civics values' unit term; their Gold weight — READ (0x5ecb50 through 0x787f50 on a Free Cities meeting; 0x7b3e50 at 0x7b421e..0x7b4513, 0x7a9a10 at 0x7aa0f0..0x7aa272), LAB (the Gold weight), both twins"
   context:
     - ...unit not the player's version (player +0x12e8 +0x1c0); a domain the city cannot build (0x17d660); a player that is neither CIVILIZATION_LEVEL_FULL_CIV (0x469db0, hash 0x253718b0) nor...
     - ...nit not the player's version (player +0x12e8 +0x1c0), a domain the city cannot train (0x17d660), a non-full, non-tribe player at peace with more than five units, a Spy for a non-full...

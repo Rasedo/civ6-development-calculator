@@ -616,12 +616,23 @@
         {
           "name": "freeTradeValue",
           "compare": "exact",
-          "note": "the Free Cities' trade AI's route value K (`freeTradeValue` on `freeSeat.tradeValue`), raw 24.8, over the last major's cities; 0 until the seat is made.",
+          "note": "the Free Cities' trade AI's route value K (`freeTradeValue` on `freeSeat.tradeValue`), raw 24.8, over the cities of the player their knowledge base last met; 0 until the seat is made.",
           "covers": [
             "Seat.tradeValue"
           ],
           "planes": [
             "free_trade_value"
+          ]
+        },
+        {
+          "name": "freeTradeSeat",
+          "compare": "exact",
+          "note": "the city-state the Free Cities' knowledge base last met (`meetFreeCities` on `freeSeat.tradeSeat`), the absolute seat; -1 before any (their walk over the last major's cities).",
+          "covers": [
+            "Seat.tradeSeat"
+          ],
+          "planes": [
+            "free_trade_seat"
           ]
         },
         {
@@ -3906,6 +3917,17 @@
             "city_ai_near"
           ],
           "note": "a FREE CITY's enemy at the gates (CityBuildAI +0x218, `cityThreat`) as its city AI's last update left it, 1 / 0; 0 for any other city"
+        },
+        {
+          "name": "freeCityUnitValues",
+          "compare": "exact",
+          "covers": [
+            "City.aiUnitValues"
+          ],
+          "planes": [
+            "free_unit_values"
+          ],
+          "note": "a FREE CITY's UNITS table (raw, AI_UNITS' order) as its City Analysis's last update left it (`freeCityBuild`), which the Free Cities' research values read (`freeResearchTerms`); empty before its first update and for any other city."
         },
         {
           "name": "freeCityRaid",

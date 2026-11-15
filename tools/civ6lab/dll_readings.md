@@ -17653,3 +17653,48 @@ last (cpu/harness/replay.ts).
   CLASS_WARRIOR_MONK; the engines take every unit with a Combat); the
   Admiral's aura on an embarked land unit (AOE_REQUIRES_SEA_DOMAIN on the
   unit's type domain, the engines' aura by the embarked flag).
+
+## C-127 / C-98: the Free Cities' trade record on a city-state meeting; their research and civics values' unit term; their Gold weight — READ (0x5ecb50 through 0x787f50 on a Free Cities meeting; 0x7b3e50 at 0x7b421e..0x7b4513, 0x7a9a10 at 0x7aa0f0..0x7aa272), LAB (the Gold weight), both twins
+
+`meetFreeCities` (cpu/core/cityStates.ts; `minorLook`, `freeLook` in
+cpu/core/fog.ts), `freeTradeValue` over `Seat.tradeSeat`
+(cpu/core/aiTrade.ts); `freeResearchTerms` (cpu/core/freeCityBuild.ts) on
+`City.aiUnitValues`, which `freeCityBuild` (cpu/core/minorBuild.ts) writes
+each update. GPU `_meet_free_cities`, `free_trade_seat` (sim_masks.py,
+sim_minors.py `_free_trade_value`), `free_unit_values` (sim_minorai.py
+`_free_city_build`, `_free_unit_term`; sim_research.py `_rai_unit_term`'s
+Free Cities row).
+
+- THE MEETING: the Free Cities' knowledge base meets like any other
+  (0x787f50 -> 0x5ecb50): a city-state they meet becomes the player whose
+  cities their route value K walks, and they become the city-state's (K 0
+  over the Free Cities, neither a city-state nor a major). A meeting with
+  the barbarians writes neither.
+- Confirmed: duels1143 t208 the Free Cities meet city-state 4 (DiplomacyMeet
+  in city-state 4's turn), K 7.00 that turn over its city, city-state 4's
+  0.00 from t209; t212 city-state 2, K 6.00, city-state 2's 0.00 from t213
+  (ours 6.00 at t212, 0.00 at t213). duels1173 t212 the barbarians met, K
+  19.72 kept; t214 city-state 4, K 4.00.
+- THE UNIT TERM over the player's cities: per city that trains the unit's
+  domain (0x17d660), its City Analysis value (0x5d4cd0), at most 50.0 in a
+  technology's (0x3200, cmovl at 0x7b437d), counts where above 0 (the count
+  esi only then, 0x7b43dd); the sum over the count (0x3640e0) is the
+  average, x10 in a technology's (0x7b4425..0x7b442d); a civic's the same
+  without the cap. The upgrade sources' loop (0x7b4513..) runs with the
+  average 0 where no city gave a value: each unit of a source adds 20.0.
+  A city-state's one city is the case of one.
+- Confirmed: duels1143 t208 the Free City on 8:8 (taken from China that
+  turn) gives no term at t208, the game's Archery 1595.6 / Bronze Working
+  1643.8 on none; at t209 the rows its update wrote: Archery, Bronze
+  Working, the Wheel, Horseback Riding, Iron Working and Apprenticeship each
+  266.0 over the rows without the term, Masonry 159.6, Construction their
+  sum 425.6 (Masonry and Horseback Riding up the tree), Engineering 403.7.
+- THE FREE CITIES' GOLD WEIGHT (LAB): no Economic boost (`yieldWeights`,
+  GPU `_FreeFacts.yield_w`): duels1143 t208-219 their treasury's
+  m_xCachedNetIncome 0, -16, then -8 and -16 (one Mechanized Infantry's
+  Maintenance), their Caravansaries 14.0 every turn as logged, the value at
+  a Gold weight of 0 (ours 38.0 / 62.0 under -0.2 x their Gold per turn),
+  their Raid 138 for 141 at t215 (364 under the boost). Whether
+  0x687bf0 skips them or another reader holds their +0x528 is unread.
+- OPEN (C-98): the Free City's City Analysis unit values themselves (ours
+  Archer 15.96 for the game's 26.6 there); the resources term.

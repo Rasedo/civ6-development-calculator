@@ -31,6 +31,7 @@ import { allRoadsLeadToRome, addTradeRoute, addCsTradeRoute, addIntlTradeRoute, 
 import { addEnvoys, allianceSuzInfluence, cityStateById, declareWarOnCityState, envoysOf, hasMet, isSuzerain, minorCity, resolveSuzerains, sueForPeaceWithCityState, suzerainBuildingLoyalty, suzerainGpCultureMult, meetCityState, buildingCreatedCulture, cityStateAt } from './cityStates';
 import { LEVY_TURNS, govInfluence } from '../data/cityStates';
 import { freeCityBuild, freeCombatDesire, freeKnowledge, minorBestOfClass, minorCatchUp, minorCompleteNow, minorOrdersHeld, minorResearch, trainableIn } from './minorBuild';
+import { freeResearchTerms } from './freeCityBuild';
 import { researchUnitTurns } from './aiResearch';
 import { storeUnitStrength } from './aiView';
 import { militaryFavTech } from './operations/unitRows';
@@ -1073,7 +1074,7 @@ function joinFromFreeCity(state: GameState, city: City): void {
 /** The FREE CITIES player's turn, after every major's and city-state's,
  *  every turn of the game: its research is a city-state's (`minorResearch`:
  *  its cities' Science and Culture, the research and civics
- *  AIs, its Combat Desire between their policy jobs and government values,
+ *  AIs on their unit term (`freeResearchTerms`), its Combat Desire between their policy jobs and government values,
  *  `freeDesire`), with no city on no yield. Each Free City's
  *  amenities are the ordinary composer's over the Free Cities seat — the full
  *  need of its population, the supply of what that seat holds (its own
@@ -1099,7 +1100,7 @@ export function freeCitiesPhase(state: GameState): void {
   const urban = () => urbanDefensesFit(state, FREE_SEAT);
   storeUnitStrength(state, FREE_SEAT);
   if (free.cities.length === 0) {
-    const { government } = minorResearch(state, free.research, FREE_SEAT, 0, 0, () => undefined, urban, []);
+    const { government } = minorResearch(state, free.research, FREE_SEAT, 0, 0, () => freeResearchTerms(state), urban, []);
     freeDesire(state);
     government();
     freeMilitaryTurn(state);
@@ -1123,7 +1124,7 @@ export function freeCitiesPhase(state: GameState): void {
     science += s.total.science;
     culture += s.total.culture;
   }
-  const research = minorResearch(state, free.research, FREE_SEAT, science, culture, () => undefined, urban, []);
+  const research = minorResearch(state, free.research, FREE_SEAT, science, culture, () => freeResearchTerms(state), urban, []);
   freeDesire(state);
   research.government();
   if (research.gained > 0) {
@@ -1691,9 +1692,11 @@ export function transferCity(
     if (isCiv(fromSeat)) relocatePalace(loser.cities);
     if (loser.tradeRoutes) loser.tradeRoutes = loser.tradeRoutes.filter((x) => x.from !== civCity.id && x.to !== civCity.id);
   }
-  // its City Analysis job starts its trade list anew under the new owner
+  // its City Analysis job starts its trade list and its UNITS table anew
+  // under the new owner
   delete civCity.tradeCities;
   delete civCity.tradeRejected;
+  delete civCity.aiUnitValues;
   if (why === 'conquered' && to.cities.length >= MAX_CITIES_PER_SEAT) {
     // CIV6 (LOC_RAZE_CITY_DISTRICTS): "Raze city clearing it and all its
     // districts and buildings from the map" — every district and wonder on

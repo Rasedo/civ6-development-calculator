@@ -1340,7 +1340,7 @@ _MUTABLE = [
     "citystate_builders_trained", "citystate_ai_builders", "citystate_best_melee", "citystate_best_ranged",
     # its city AI: the district's plot, the item's turn and value, the threat, its update's growth, the savings
     "citystate_prod_site", "citystate_dist_cost", "citystate_founded_turn", "citystate_prod_set_value", "citystate_threat", "citystate_fav_food", "citystate_ai_growth", "citystate_ai_seen", "citystate_combat_desire", "citystate_standing_short",
-    "citystate_savings", "citystate_balance", "citystate_gold_boost", "citystate_ai_on", "citystate_unit_values", "citystate_unit_on", "citystate_list_count", "citystate_building_values", "citystate_project_values", "citystate_res_counts", "citystate_best_plot_buy", "citystate_trade_ok", "citystate_trade_no", "citystate_kb_city_rank", "citystate_kb_city_id", "citystate_kb_city_n", "citystate_trade_value", "citystate_trade_seat", "citystate_met_minor", "citystate_met_free", "free_trade_value", "city_trade_ok", "city_trade_no", "civ_agendas", "civ_strategies",
+    "citystate_savings", "citystate_balance", "citystate_gold_boost", "citystate_ai_on", "citystate_unit_values", "citystate_unit_on", "citystate_list_count", "citystate_building_values", "citystate_project_values", "citystate_res_counts", "citystate_best_plot_buy", "citystate_trade_ok", "citystate_trade_no", "citystate_kb_city_rank", "citystate_kb_city_id", "citystate_kb_city_n", "citystate_trade_value", "citystate_trade_seat", "citystate_met_minor", "citystate_met_free", "free_trade_value", "free_trade_seat", "city_trade_ok", "city_trade_no", "civ_agendas", "civ_strategies",
     # its events' slots, trees, contracts and reservations (`CityAi`)
     "cai_slots", "cai_tr_alive", "cai_tr_id", "cai_tr_status", "cai_tr_mem_a", "cai_tr_mem_b", "cai_tr_bb", "cai_tr_trigger",
     "cai_tr_units", "cai_c_id", "cai_c_tree", "cai_c_unit", "cai_c_building", "cai_c_district", "cai_c_goal_kind", "cai_c_goal",
@@ -1363,6 +1363,7 @@ _MUTABLE = [
     "city_free_grant",  # a Free City's count of turns toward its next grant
     "city_ai_threat",  # a Free City's threat at its city AI's last update
     "city_ai_near", "citystate_threat_near",  # a Free City's, a minor's city's enemy at the gates
+    "free_unit_values",  # a Free City's UNITS table its last update left
     "city_free_raid",  # a Free City's raid record
     "city_free_allowed",  # a Free City's allowed units
     "city_proj_conv", "city_proj_yield",  # a district project's converted yield, read until the next step

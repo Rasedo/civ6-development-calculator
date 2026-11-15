@@ -10,7 +10,7 @@
  *   religious unit choice ranks on the City Analysis values the engine does
  *   not run;
  * - the Economic AI's gold boost (0x687bf0, Gold only): -0.2 x the gold per
- *   turn while that is negative;
+ *   turn while that is negative; the Free Cities none;
  * - the Yields lists (0x6fde70, 0x7ba440): the leader's and the
  *   civilization's trait lists, a major's agendas' and the strategies it
  *   follows' (`strategyRefs`; a list kept while the player's handicap lies
@@ -195,10 +195,11 @@ export function yieldWeights(state: GameState, seat: number): Record<string, num
   // their Maintenance unread (runs/h1_duelp1128: Rome's unit of its t89
   // start, Maintenance 5 -> 7, at -1.6 net from its t90 gold step;
   // city-states 2 and 4's route value K over its weights 6.37 from t90 as
-  // logged); the Free Cities' on their gold per turn now
+  // logged); the Free Cities' none (runs/h1_duels1143 t209-212: their
+  // treasury's cached net income -16, then -8, their Caravansaries 14.0
+  // throughout, the value at no boost)
   const cs = state.cityStates.find((x) => x.seat === seat);
-  w.YIELD_GOLD += cs ? cs.economy?.goldBoost ?? 0
-    : economicGoldBoost(isCiv(seat) ? s.netIncome ?? 0 : goldPerTurn(state, seat));
+  w.YIELD_GOLD += cs ? cs.economy?.goldBoost ?? 0 : isCiv(seat) ? economicGoldBoost(s.netIncome ?? 0) : 0;
   // the Yields lists
   for (const [y, v] of listSum(seat, s, 'Yields')) if (y in w) w[y] += v;
   // the sensitivity boost

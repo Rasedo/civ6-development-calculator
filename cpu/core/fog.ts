@@ -2,7 +2,7 @@
 import type { GameState, Tile, Unit } from './types';
 import type { GameMap } from '../../world/types';
 import { FREE_SEAT, citiesOf, civOf, isBarbSeat, isCityStateSeat, isCiv, leaderOf, majorsAlive, majorsMet, seatOf, seatsAllied, setMetTurnWith, tileSeat, unitsOf } from './seats';
-import { hasMet, meetCityState, meetCityStates, setMet, suzerainOf } from './cityStates';
+import { hasMet, meetCityState, meetCityStates, meetFreeCities, suzerainOf } from './cityStates';
 import { boostOnEvent } from './boosts';
 import { metAllMajorsMoment } from './eras';
 import { ALLIANCE_SHARED_VIS_ROWS, rowIsFor } from '../data/civilizations';
@@ -248,7 +248,7 @@ export function unitSeesThrough(u: { type: string; promos?: number }): boolean {
  *  look takes in (`meetCityStates`), in the city-states' order; and the Free
  *  Cities, one of whose plots or units it takes in (the meets 0x524890 /
  *  0x5249c0 take any player's plot or unit coming into view: the lab's
- *  runs/c108_t225 Preslav and the Free Cities met, `CityState.met`). */
+ *  runs/c108_t225 Preslav and the Free Cities met, `meetFreeCities`). */
 function minorLook(state: GameState, seat: number, tileIndex: number, radius: number, los: Look): void {
   const cs = state.cityStates.find((c) => c.seat === seat);
   if (!cs) return;
@@ -282,13 +282,13 @@ function minorLook(state: GameState, seat: number, tileIndex: number, radius: nu
   // and every other city-state one of whose plots or units the look takes
   // in, in the city-states' order
   for (const o of state.cityStates) if (seen.has(o.seat)) meetCityStates(cs, o);
-  if (seen.has(FREE_SEAT)) setMet(cs, FREE_SEAT);
+  if (seen.has(FREE_SEAT)) meetFreeCities(state, cs);
 }
 
 /** A FREE CITIES' UNIT STANDS on `tileIndex` and looks: every city-state one
  *  of whose plots or units the look takes in meets the Free Cities
- *  (`CityState.met`; the meets 0x524890 / 0x5249c0 on the Free Cities'
- *  visibility, the pair's meeting recorded and nothing more). */
+ *  (`meetFreeCities`; the meets 0x524890 / 0x5249c0 on the Free Cities'
+ *  visibility). */
 function freeLook(state: GameState, tileIndex: number, radius: number, los: Look): void {
   const t = state.map.tiles[tileIndex];
   const sees = losDisk(state.map, t, radius, los.seeThrough);
@@ -299,7 +299,7 @@ function freeLook(state: GameState, tileIndex: number, radius: number, los: Look
     if (isCityStateSeat(owner)) seen.add(owner);
   }
   for (const u of state.units) if (isCityStateSeat(u.seat) && sees.has(u.tileIndex)) seen.add(u.seat);
-  for (const cs of state.cityStates) if (seen.has(cs.seat)) setMet(cs, FREE_SEAT);
+  for (const cs of state.cityStates) if (seen.has(cs.seat)) meetFreeCities(state, cs);
 }
 
 /** a major that has met every other living major (`majorsAlive`) */

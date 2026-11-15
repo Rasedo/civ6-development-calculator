@@ -1296,11 +1296,12 @@ class SimMinors:
 
     def _free_trade_value(self, mask: torch.Tensor) -> None:
         """`freeTradeValue` where `mask` [B]: the Free Cities' route value K
-        (`free_trade_value` raw) over the last major's cities — they meet
-        every major on the first turn in seat order and nobody after"""
-        if self.n_majors == 0:
-            return
-        seat = torch.full((self.B,), self.n_majors - 1, dtype=torch.long, device=self.device)
+        (`free_trade_value` raw) over the cities of the player their
+        knowledge base last met: the last major's — they meet every major on
+        the first turn in seat order — until they meet a city-state
+        (`free_trade_seat`, `_meet_free_cities`); 0 over none"""
+        seat = torch.where(self.free_trade_seat >= 0, self.free_trade_seat,
+                           torch.full_like(self.free_trade_seat, self.n_majors - 1))
         v = self._route_value_over(seat, mask)
         self.free_trade_value.copy_(torch.where(mask, v, self.free_trade_value))
 

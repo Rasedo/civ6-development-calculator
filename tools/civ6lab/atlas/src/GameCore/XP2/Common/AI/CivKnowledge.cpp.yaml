@@ -338,14 +338,20 @@
     - recording: h1_duely1127
       turn: 3
       value: the Free Cities (last met China, t1) print K 2.10 from t3, China's route to city-state 4; city-state 4 (met China t2, city-state 3 t4) 2.10 at t3-t4, 0.00 from t5
+    - recording: h1_duels1143
+      turn: 208
+      value: the Free Cities meet city-state 4 (their K 7.00 at t208 over its city; city-state 4's 0.00 from t209, over the Free Cities) and city-state 2 at t212 (6.00; city-state 2's 0.00 from t213)
   impl:
     - cpu/core/cityStates.ts:meetCityState
     - cpu/core/cityStates.ts:meetCityStates
+    - cpu/core/cityStates.ts:meetFreeCities
     - gpu/core/sim_masks.py:_meet_citystates
     - gpu/core/sim_masks.py:_minor_look
+    - gpu/core/sim_masks.py:_meet_free_cities
     - cpu/core/types.ts:Seat
   readings:
     - "H-1: the trade record's player — READ (0x5ecb50, 0x787f50, 0x5e9b20's walk), PARTLY READ (the city-states' meetings with each other, the majors' weights)"
+    - "C-127 / C-98: the Free Cities' trade record on a city-state meeting; their research and civics values' unit term; their Gold weight — READ (0x5ecb50 through 0x787f50 on a Free Cities meeting; 0x7b3e50 at 0x7b421e..0x7b4513, 0x7a9a10 at 0x7aa0f0..0x7aa272), LAB (the Gold weight), both twins"
   context:
     - "## H-1: the trade record's player — READ (0x5ecb50, 0x787f50, 0x5e9b20's walk), PARTLY READ (the city-states' meetings with each other, the majors' weights)"
     - "...f0 vtable @0xd70418): a meeting's two players; where one is the knowledge base's owner, 0x5ecb50 (the knowledge base, the other): \"Invalid player initialized\" guard, m_playerKnowledg..."

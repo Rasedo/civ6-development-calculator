@@ -182,6 +182,11 @@ export interface City {
   /** A FREE CITY's enemy at the gates (CityBuildAI +0x218) as its city AI's
    *  last update left it (`cityThreat`); absent, none */
   aiThreatNear?: boolean;
+  /** A FREE CITY's UNITS table (raw, `AI_UNITS`' order) as its City
+   *  Analysis's last update left it (`freeCityBuild`), which the Free Cities'
+   *  research and civics values' unit term reads (`freeResearchTerms`);
+   *  absent, none */
+  aiUnitValues?: readonly number[];
   /** A MAJOR's city's trade list (CityBuildAI +0x870, `majorTradeLists`):
    *  the destination centres a trade path reaches, and the ones it did not;
    *  absent, none */

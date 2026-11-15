@@ -410,8 +410,11 @@ class SimInit:
         self.citystate_met_minor = torch.zeros(B, s_pad, s_pad, dtype=torch.bool, device=device)
         # has the minor met the Free Cities (`CityState.met` holding FREE_SEAT)
         self.citystate_met_free = torch.zeros(B, s_pad, dtype=torch.bool, device=device)
-        # the Free Cities' route value K (raw, `freeTradeValue`)
+        # the Free Cities' route value K (raw, `freeTradeValue`), and the
+        # city-state their knowledge base last met (`freeSeat.tradeSeat`, an
+        # absolute seat; -1 none: the last major)
         self.free_trade_value = torch.zeros(B, dtype=torch.long, device=device)
+        self.free_trade_seat = torch.full((B,), -1, dtype=torch.long, device=device)
         self.citystate_unit_values = torch.full((B, s_pad, len(rules.ai_city_build["units"])), -9999 * 256,
                                                 dtype=torch.long, device=device)
         self.citystate_unit_on = torch.zeros(B, s_pad, dtype=torch.bool, device=device)
@@ -4315,6 +4318,9 @@ class SimInit:
         self.city_ai_threat = torch.full((B, self.CITY_ROWS, self.RC), -1, dtype=torch.long, device=device)
         # a FREE CITY's enemy at the gates (`City.aiThreatNear`, CityBuildAI +0x218)
         self.city_ai_near = torch.zeros(B, self.CITY_ROWS, self.RC, dtype=torch.bool, device=device)
+        # a FREE CITY's UNITS table (raw, AI_UNITS' order) as its City
+        # Analysis's last update left it (`City.aiUnitValues`); 0 none
+        self.free_unit_values = torch.zeros(B, self.RC, len(rules.ai_city_build["units"]), dtype=torch.long, device=device)
         # a FREE CITY's raid record (`City.freeRaid`): the player it raided
         # and its operation's tree id (-1 once gone); -1 never raided
         self.city_free_raid = torch.full((B, self.CITY_ROWS, self.RC, 2), -1, dtype=torch.long, device=device)

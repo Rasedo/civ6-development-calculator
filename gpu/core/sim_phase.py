@@ -3632,7 +3632,10 @@ class SimPhase:
         # the majors' block, then the Free Cities row — two contiguous row
         # ranges, so every plane compacts through an in-place VIEW
         self._compact_city_rows(0, self.n_majors)
+        perm = torch.argsort((~self.city_alive[:, self.FREE_ROW]).long(), dim=1, stable=True)
         self._compact_city_rows(self.FREE_ROW, self.FREE_ROW + 1)
+        # the Free Cities' own per-slot plane rides the same permutation
+        self.free_unit_values.copy_(self.free_unit_values.gather(1, perm.unsqueeze(2).expand_as(self.free_unit_values)))
         self._eff_version += 1  # no (row, j)-keyed cache may survive the permutation
         self._tile_owner_ver += 1  # owner / center_at derive slots from permuted state
 

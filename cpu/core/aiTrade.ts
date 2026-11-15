@@ -239,12 +239,15 @@ export function minorTradeValue(state: GameState, cs: CityState): void {
 }
 
 /** 0x5e9b20: the Free Cities' route value K (raw, `Seat.tradeValue`) at their
- *  knowledge base's ageing. They meet every major on the first turn in seat
- *  order (DiplomacySummary, every duel: 62 meets 0, then 1) and nobody
- *  after, so the walk is over the last major's cities, its lists as its turn
- *  left them (runs/h1_duely1127: K 2.10 from t3, China's route to city-state
- *  4, met at t2) */
+ *  knowledge base's ageing, over the cities of the player their knowledge
+ *  base last met (`Seat.tradeSeat`). They meet every major on the first turn
+ *  in seat order (DiplomacySummary, every duel: 62 meets 0, then 1), so the
+ *  walk is over the last major's cities, its lists as its turn left them
+ *  (runs/h1_duely1127: K 2.10 from t3, China's route to city-state 4, met
+ *  at t2), until they meet a city-state (`meetFreeCities`) */
 export function freeTradeValue(state: GameState): void {
+  const free = freeSeatOf(state);
   const majors = state.seats.filter((s) => isCiv(s.seat));
-  freeSeatOf(state).tradeValue = majors.length ? routeValueOver(state, majors[majors.length - 1].seat) : 0;
+  const over = free.tradeSeat ?? (majors.length ? majors[majors.length - 1].seat : -1);
+  free.tradeValue = over >= 0 ? routeValueOver(state, over) : 0;
 }

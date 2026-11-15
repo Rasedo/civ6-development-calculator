@@ -2,7 +2,7 @@
 import type { City, CityState, CityStateType, GameState, QueueItem, Yields } from './types';
 import { giveQuest } from './quests';
 import { losDisk, suzerainSight, unitSight } from './fog';
-import { NO_SEAT, cityStateOfSeat, isCiv, civsAtWar, emptySeat, isCityStateSeat, markCityCentre, seatOf, seatOfCityState, setTileOwner, setTreatyTurnsWith, setWar, setWarTurnsWith, tileBelongsTo, tileSeat, hiddenResourcesFor, treatyTurnsWith, warTurnsWith, alliedAtLevel, warBanned, civOf } from './seats';
+import { FREE_SEAT, NO_SEAT, cityStateOfSeat, isCiv, civsAtWar, emptySeat, isCityStateSeat, markCityCentre, seatOf, seatOfCityState, setTileOwner, setTreatyTurnsWith, setWar, setWarTurnsWith, tileBelongsTo, tileSeat, hiddenResourcesFor, treatyTurnsWith, warTurnsWith, alliedAtLevel, warBanned, civOf } from './seats';
 import { cancelRoutes } from './trade';
 import { ATHEISM_PRESSURE_PER_POP } from '../data/religion';
 import { grievanceCityStateWar } from './grievance';
@@ -236,6 +236,19 @@ export function meetCityStates(a: CityState, b: CityState): void {
   (b.metMinors ??= []).push(a.seat);
   a.tradeSeat = b.seat;
   b.tradeSeat = a.seat;
+}
+
+/** A CITY-STATE AND THE FREE CITIES MEET: each knowledge base takes the
+ *  other as the player its route value walks (the meeting signal's 0x787f50
+ *  -> 0x5ecb50; runs/h1_duels1143 t208: the Free Cities meet city-state 4,
+ *  their route value 7.00 that turn over its city, city-state 4's 0.00 from
+ *  t209; t212 city-state 2, 6.00). A meeting with the barbarians writes
+ *  neither (1173 t212: the Free Cities' 19.72 kept) */
+export function meetFreeCities(state: GameState, cityState: CityState): void {
+  if (hasMet(cityState, FREE_SEAT)) return;
+  setMet(cityState, FREE_SEAT);
+  cityState.tradeSeat = FREE_SEAT;
+  if (state.freeSeat) state.freeSeat.tradeSeat = cityState.seat;
 }
 
 /** A MAJOR MEETS A CITY-STATE: the major's first city revealed to the

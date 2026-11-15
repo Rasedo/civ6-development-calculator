@@ -413,7 +413,9 @@ class SimResearch:
         upgrade's Gold as the minor pays it (`upgradeGold`), valued as a
         yield, at least 20.0. A row in reach only,
         landing within the horizon (`below`: before it); the Free Cities'
-        row none"""
+        row over their cities (`_free_unit_term`)"""
+        if s == self.FR:
+            return self._free_unit_term(turns, civic, below)
         out = torch.zeros_like(turns)
         if s >= self.citystate_unit_values.shape[1]:
             return out

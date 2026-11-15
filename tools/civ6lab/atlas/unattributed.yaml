@@ -6305,9 +6305,20 @@
     - recording: h1_duely1127
       turn: 2
       value: China meets city-state 4 at t2 (DiplomacySummary); city-state 4's K prints China's route value 2.10 at t3-t4, 0.00 after meeting city-state 3 at t4
-  impl: [cpu/core/cityStates.ts:meetCityStates, cpu/core/cityStates.ts:meetCityState]
+    - recording: h1_duels1143
+      turn: 208
+      value: the Free Cities meet city-state 4 at t208 (DiplomacySummary, DiplomacyMeet in city-state 4's turn); the Free Cities' K 7.00 that turn over city-state 4's city, city-state 4's 0.00 from t209; t212 city-state 2, the Free Cities' 6.00, city-state 2's 0.00 from t213
+    - recording: h1_duels1173
+      turn: 212
+      value: the Free Cities meet the barbarians at t212 and keep their K 19.72 (no write for a barbarian meeting); city-state 4 at t214, K 4.00
+  impl:
+    - cpu/core/cityStates.ts:meetCityStates
+    - cpu/core/cityStates.ts:meetCityState
+    - cpu/core/cityStates.ts:meetFreeCities
+    - gpu/core/sim_masks.py:_meet_free_cities
   readings:
     - "H-1: the trade record's player — READ (0x5ecb50, 0x787f50, 0x5e9b20's walk), PARTLY READ (the city-states' meetings with each other, the majors' weights)"
+    - "C-127 / C-98: the Free Cities' trade record on a city-state meeting; their research and civics values' unit term; their Gold weight — READ (0x5ecb50 through 0x787f50 on a Free Cities meeting; 0x7b3e50 at 0x7b421e..0x7b4513, 0x7a9a10 at 0x7aa0f0..0x7aa272), LAB (the Gold weight), both twins"
   context:
     - "## H-1: the trade record's player — READ (0x5ecb50, 0x787f50, 0x5e9b20's walk), PARTLY READ (the city-states' meetings with each other, the majors' weights)"
     - "- 0x787f50 (the delegate the Targets constructor 0x7864c0 binds on game signal +0xc78, every AI pl..."

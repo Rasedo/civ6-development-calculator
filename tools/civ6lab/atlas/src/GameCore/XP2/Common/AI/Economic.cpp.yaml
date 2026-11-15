@@ -121,6 +121,7 @@
     - "A minor's items' turns at the Production its AI read before its free Trader's route — the C-130 cache applied to the build turns, both twins"
     - "C-100: the City Analysis reads the city before the free Trader's route, the Neighbourhood's install Housing beside a feature, a pillaged district's repair turns — READ (0x5c24e0 on +0x258 before the dispatch 0x78e0a0 and the update 0x5ce680; 0x79e140 on Districts +0x40), both twins"
     - "C-96 / C-98 / C-100 / C-99: the city AI's fitted rules read — the analysis before the job list, the unit term's upgrade price, the city's trained domains, a non-major's required power, the eruption's turns — READ (0x608870 at 0x608976..0x608988, 0x7b3e50 at 0x7b4564..0x7b45c8, 0x5376d0, 0x1c77c0, 0x1aed10, 0x1f0440 at 0x1f04c7..0x1f04dc, 0xa1d480), both twins"
+    - "C-127 / C-98: the Free Cities' trade record on a city-state meeting; their research and civics values' unit term; their Gold weight — READ (0x5ecb50 through 0x787f50 on a Free Cities meeting; 0x7b3e50 at 0x7b421e..0x7b4513, 0x7a9a10 at 0x7aa0f0..0x7aa272), LAB (the Gold weight), both twins"
   notes:
     - "imported: READ in its section, no confirming case found beside it"
     - ".claude/scratchpad/dp2/NOTES.md: ...2, -cost) (refund); r==0xc -> +0x6338[to][a]=1; always 0x64a300(+0xc28[to], a). - Economic AI turn 0x687bf0: delta = treasury(+0x13a0 +0xf8) - last(+0x1b8); each saving slot i:   savings(+0x540)[i] += delta..."

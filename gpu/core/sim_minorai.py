@@ -1770,7 +1770,8 @@ class SimMinorAi:
         full), the walls' repair at the HP it puts back — leaving the bank the
         Production less what it lacked; with nothing in hand the Production
         banks. Then its city AI's update stores the city's threat
-        (`city_ai_threat`) and, on an empty queue, the Default Specialization
+        (`city_ai_threat`) and its UNITS table (`free_unit_values`) and, on
+        an empty queue, the Default Specialization
         over the city's tables (`_FreeFacts`) queues its pick."""
         from .sim_cityvalue import _FreeFacts
         B, dev = self.B, self.device
@@ -1841,13 +1842,18 @@ class SimMinorAi:
         threat, near = self._free_city_threat(j)
         self.city_ai_threat[:, row, j] = torch.where(act, threat, self.city_ai_threat[:, row, j])
         self.city_ai_near[:, row, j] = torch.where(act, near, self.city_ai_near[:, row, j])
+        # its UNITS table every update, which the Free Cities' research
+        # values read (`free_unit_values`, `_free_unit_term`)
+        f = _FreeFacts(self, j)
+        u_tab = [torch.where(read, v, torch.full_like(v, _FX_MIN)) for v, read in self._cv_unit_table(f)]
+        if u_tab:
+            self.free_unit_values[:, j] = torch.where(act.unsqueeze(1), torch.stack(u_tab, dim=1).long(),
+                                                      self.free_unit_values[:, j])
         under = act & (threat > -1) & ((self.city_hp[:, row, j] < int(self.rules.combat["cityMaxHp"])) | near)
         go = act & ((self.city_current[:, row, j, 0] < 0) | under)
         if not bool(go.count_nonzero()):
             return
-        f = _FreeFacts(self, j)
         b_tab = self._cv_building_table(f)
-        u_tab = [torch.where(read, v, torch.full_like(v, _FX_MIN)) for v, read in self._cv_unit_table(f)]
         p_tab = self._cv_project_table(f)
         self._free_defensive_cancel(j, f, (b_tab, u_tab, p_tab), go & under & (self.city_current[:, row, j, 0] >= 0))
         idle = go & (self.city_current[:, row, j, 0] < 0)
@@ -1859,6 +1865,70 @@ class SimMinorAi:
         if bool(ok.count_nonzero()):
             self._q_push(row, jc, ok, code, cost)
         _ = bidx
+
+    def _free_unit_term(self, turns: torch.Tensor, civic: bool, below: bool) -> torch.Tensor:
+        """[B, N] the Free Cities' research (or, `civic`, civics) value's UNIT
+        TERM (`freeResearchTerms`), paid whole: per unit a row unlocks that is
+        their version, over their cities that train the unit's domain the
+        values above 0 of the UNITS tables their last updates left
+        (`free_unit_values`; a technology's each at most 50.0) averaged over
+        the cities that gave one — a technology's taken 10 times, a civic's
+        once; per upgrade source of the unit each of their units of it adds
+        that average less the upgrade's Gold (`_upgrade_gold_cost`) valued as
+        a yield, at least 20.0. A row in reach only, landing within the
+        horizon (`below`: before it)"""
+        from .sim_cityvalue import _FreeFacts
+        out = torch.zeros_like(turns)
+        T = self._cv_tables()
+        E = T["engine"]
+        row = self.FREE_ROW
+        f0 = _FreeFacts(self, 0)
+        key = "civic" if civic else "tech"
+        rows = {}
+        for k, u in enumerate(T["unit_rows"]):
+            g = u.get(key)
+            if not g or f0.unit_version(u["type"]) != u["type"]:
+                continue
+            i = E[key].get(g, -1)
+            if i >= 0:
+                rows.setdefault(i, []).append(k)
+        if not rows:
+            return out
+        alive = self.city_alive[:, row]
+        naval = self._naval_capable(row)
+        mine = self.barb_unit_alive & (self.barb_unit_seat == FREE_SEAT)
+        floor = 20 * _FX
+        cap = 50 * _FX
+        for i, ks in rows.items():
+            v = torch.zeros(self.B, dtype=torch.long, device=self.device)
+            for k in ks:
+                u = T["unit_rows"][k]
+                eng = int(E["unit"][k])
+                tr = alive & (naval if u["domain"] == "DOMAIN_SEA" else torch.ones_like(alive))
+                raw = self.free_unit_values[:, :, k]
+                x = raw if civic else torch.minimum(raw, torch.full_like(raw, cap))
+                got = tr & (x > 0)
+                n = got.long().sum(dim=1)
+                tot = torch.where(got, x, torch.zeros_like(x)).sum(dim=1)
+                avg = torch.where(n > 0, torch.div(tot * _FX, (n * _FX).clamp(min=1), rounding_mode="trunc"),
+                                  torch.zeros_like(tot))
+                v = v + (avg if civic else avg * 10)
+                if eng < 0:
+                    continue
+                for src in (self._type_up_to == eng).nonzero(as_tuple=True)[0].tolist():
+                    held = (mine & (self.barb_unit_type == src)).long().sum(dim=1)
+                    if not bool(held.count_nonzero()):
+                        continue
+                    gold = self._upgrade_gold_cost(row, torch.full((self.B,), src, dtype=torch.long, device=self.device),
+                                                   torch.full((self.B,), eng, dtype=torch.long, device=self.device),
+                                                   torch.zeros(self.B, dtype=torch.bool, device=self.device),
+                                                   torch.zeros(self.B, dtype=torch.long, device=self.device))
+                    gv = self._cv_yield((gold * _FX).long(), "YIELD_GOLD", f0.yield_w("YIELD_GOLD"))
+                    v = v + held * torch.maximum(avg - gv, torch.full_like(avg, floor))
+            out[:, i] = v
+        h = int(self._rai_tables()["horizon"])
+        live = (turns >= 0) & ((turns < h) if below else (turns <= h))
+        return torch.where(live, out, torch.zeros_like(out))
 
     def _free_defensive_cancel(self, j: int, f, tables, go: torch.Tensor) -> None:
         """`defensiveCancel` (0x5d7640, `_defensive_cancel`) of the Free City

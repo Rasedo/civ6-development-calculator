@@ -12022,6 +12022,8 @@ class SimSeats:
             self.city_trade_ok[b, row, col] = False
             self.city_trade_no[b, row, col] = False
         self.city_ai_near[b, row, col] = False
+        if row == self.FREE_ROW:
+            self.free_unit_values[b, col] = 0
         self.city_free_raid[b, row, col] = -1
         self.city_free_allowed[b, row, col] = False
         self.city_lasers[b, row, col] = 0
@@ -12526,6 +12528,8 @@ class SimSeats:
             self.city_trade_ok[b, dst_row, col] = False
             self.city_trade_no[b, dst_row, col] = False
         self.city_ai_near[b, dst_row, col] = False
+        if dst_row == self.FREE_ROW:
+            self.free_unit_values[b, col] = 0
         self.city_free_raid[b, dst_row, col] = -1
         self.city_free_allowed[b, dst_row, col] = False
         # ...and the turn its new owner took it

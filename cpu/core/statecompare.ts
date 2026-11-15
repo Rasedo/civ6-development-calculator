@@ -708,6 +708,7 @@ const GAME: Record<string, Extractor> = {
   freeEnemyCounts: (s) => [enemyCountsRecord(s.freeSeat?.enemyCounts)],
   freeCombatDesire: (s) => [s.freeSeat?.combatDesire ?? 0],
   freeTradeValue: (s) => [s.freeSeat?.tradeValue ?? 0],
+  freeTradeSeat: (s) => [s.freeSeat?.tradeSeat ?? -1],
   // the Free Cities' operations (the Free Cities Raid) and the ids their
   // next contract takes and their tree pool (`newTreeId`)
   freeOps: (s) => [opsRecord(s.freeSeat?.ops, FREE_SEAT, [...MINOR_OP_DEFS, FREE_RAID_DEF], s)],
@@ -1324,6 +1325,7 @@ const CITY: Record<string, Extractor> = {
     .concat(-1, [...(r.city.tradeRejected ?? [])].sort((a, b) => a - b))),
   freeCityThreat: overCities((r) => r.city.aiThreat ?? -1),
   freeCityThreatNear: overCities((r) => (r.city.aiThreatNear ? 1 : 0)),
+  freeCityUnitValues: overCities((r) => [...(r.city.aiUnitValues ?? [])]),
   freeCityRaid: overCities((r) => [r.city.freeRaid?.player ?? -1, r.city.freeRaid?.op ?? -1]),
   // a FREE CITY's allowed units (`freeCityAllowed`), as unit rows
   freeAllowed: overCities((r) => (r.city.freeAllowed ?? []).map((x) => idx(UNIT_IDX, x)).sort((a, b) => a - b)),

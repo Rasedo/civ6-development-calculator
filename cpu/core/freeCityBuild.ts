@@ -18,24 +18,24 @@ import { CIV_LEADERS } from '../data/seats';
 import { congressQueueMult } from './congress';
 import { AI_CIVILIZATION_TRAITS, AI_LEADER_TRAITS } from '../data/aiTables';
 import { AI_BUILDINGS, AI_RESOURCES, AI_UNITS } from '../data/aiBuildTables';
-import { engineId } from '../data/aliases';
+import { engineId, gameTypeOf } from '../data/aliases';
 import { RESOURCES } from '../../world/resources';
 import { hasRiver } from '../../world/query';
 import { hexDistance, tilesWithin } from '../../world/hex';
-import { AI_BUILDING_INDEX, AI_UNIT_INDEX, amenityCityOf, growthForecast, worldArtifacts, type AmenityCity, type CityBuildFacts } from './aiCityBuild';
-import { FX, fmul, fxOf, turnsAt } from './aiValue';
+import { AI_BUILDING_INDEX, AI_UNIT_INDEX, amenityCityOf, growthForecast, worldArtifacts, type AiUnitRow, type AmenityCity, type CityBuildFacts } from './aiCityBuild';
+import { FX, fdiv, fmul, fxOf, turnsAt, yieldValue } from './aiValue';
 import { seatListed, unitProductionTable } from './aiUnitProduction';
 import { researchAnalysis } from './aiResearch';
 import { civicAnalysis } from './aiCivics';
 import { aiCityStats, cityGrowth, aiView } from './aiView';
-import { analysedTurns, installType, promotionWeight, strongerFoe } from './minorBuild';
+import { UNITS_OF_CIVIC, UNITS_OF_TECH, UNIT_CITY_VALUE_CAP, UPGRADE_SOURCE_FLOOR, analysedTurns, installType, promotionWeight, strongerFoe, type minorResearchTerms } from './minorBuild';
 import { civEraIndex, computeCityStats } from './city';
 import { researchCost } from './economy';
 import { getModifiers, prodBoostPct, seatGovernment } from './effects';
-import { atWarWithMajor, citiesOf, isCiv, isCityStateSeat, isFreeSeat, seatOf } from './seats';
+import { FREE_SEAT, atWarWithMajor, citiesOf, freeSeatOf, isCiv, isCityStateSeat, isFreeSeat, seatOf } from './seats';
 import { minorCity } from './cityStates';
 import { cityLowlands, coastalLowlandCounts } from './climate';
-import { accumulatedPerTurn, stockFree, strategicSlot, strategicSurplus } from './stockpile';
+import { accumulatedPerTurn, stockFree, strategicSlot, strategicSurplus, upgradeGoldCost } from './stockpile';
 import { buildingPillaged, cityPower } from './yields';
 import { buildingCostIn, outerDamage, worshipOffered } from './rules';
 import { builderCost, cityNavalCapable, traderCost } from './units';
@@ -347,6 +347,63 @@ export function majorUnitExpected(state: GameState, city: City, type: string): n
   const col = queueItemColumn(q);
   const open = productionObs(state, s, { ...city, queue: [] }, unitGates(state, city.seat)).prodOpen;
   return col >= 0 && open.includes(col) ? FX / 2 : 0;
+}
+
+/**
+ * THE RESEARCH AND CIVICS VALUES' UNIT TERM of the Free Cities (0x7b3e50 at
+ * 0x7b421e..0x7b4513, 0x7a9a10 at 0x7aa0f0..0x7aa272), paid whole: per unit
+ * a row unlocks that is their version, over their cities that train the
+ * unit's domain (0x17d660) the City Analysis values above 0 (0x5d4cd0 on each
+ * city's last update, `City.aiUnitValues`; a technology's each at most 50.0)
+ * averaged over the cities that gave one — a technology's taken 10 times, a
+ * civic's once; and per upgrade source of the unit, each of their units of
+ * it adds that average less the upgrade's Gold valued as a yield (0x5376d0
+ * -> 0x7a6690), at least 20.0 (runs/h1_duels1143 t209: the Free City on 8:8
+ * taken from China at t208, Archery, Bronze Working, the Wheel, Horseback
+ * Riding, Iron Working and Apprenticeship each 266.0 over t208's rows)
+ */
+export function freeResearchTerms(state: GameState): ReturnType<typeof minorResearchTerms> {
+  const free = freeSeatOf(state);
+  const traits = majorTraits(state, FREE_SEAT);
+  const view = aiView(state);
+  let held: Map<string, number> | undefined;
+  const term = (units: readonly AiUnitRow[], civic: boolean): number => {
+    let v = 0;
+    for (const u of units) {
+      if (majorUnitVersion(traits, u.type) !== u.type) continue;
+      const k = AI_UNIT_INDEX.get(u.type)!;
+      let sum = 0;
+      let n = 0;
+      for (const c of free.cities) {
+        if (u.domain === 'DOMAIN_SEA' && !cityNavalCapable(state, c)) continue;
+        const x = c.aiUnitValues?.[k] ?? 0;
+        const y = civic ? x : Math.min(x, UNIT_CITY_VALUE_CAP);
+        if (y <= 0) continue;
+        sum += y;
+        n += 1;
+      }
+      const avg = n > 0 ? fdiv(sum, n * FX) : 0;
+      v += civic ? avg : avg * 10;
+      const id = engineId('unit', u.type, 'UNIT_', UNITS);
+      for (const src of Object.values(UNITS)) {
+        if (!id || src.upgradesTo !== id) continue;
+        if (!held) {
+          held = new Map();
+          for (const x of state.units) if (x.seat === FREE_SEAT) held.set(x.type, (held.get(x.type) ?? 0) + 1);
+        }
+        const m = held.get(src.id) ?? 0;
+        if (m === 0) continue;
+        const gold = yieldValue(view, FREE_SEAT, upgradeGoldCost(state, FREE_SEAT, src.id, id) * FX, 'YIELD_GOLD');
+        v += m * Math.max(avg - gold, UPGRADE_SOURCE_FLOOR);
+      }
+    }
+    return v;
+  };
+  return {
+    civicContracts: [],
+    tech: (tech) => term(UNITS_OF_TECH.get(gameTypeOf('tech', tech, 'TECH_')) ?? [], false),
+    civic: (civic) => term(UNITS_OF_CIVIC.get(gameTypeOf('civic', civic, 'CIVIC_')) ?? [], true),
+  };
 }
 
 /** THE CITY BUILD AI'S VIEW OF A FREE CITY: a major's view of the city

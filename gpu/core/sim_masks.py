@@ -3638,18 +3638,32 @@ class SimMasks:
             self.citystate_trade_seat[nr, ns] = seat_o
             self.citystate_trade_seat[nr, o] = 100 + ns
         # and the Free Cities, one of whose plots or units (the barbarian
-        # pool's) the look takes in (`CityState.met`)
+        # pool's) the look takes in (`meetFreeCities`)
         bt = self.barb_unit_tile[rows].clamp(min=0)
         fin = disk.gather(1, bt) & self.barb_unit_alive[rows] & (self.barb_unit_seat[rows] == FREE_SEAT)
         fseen = ((disk & (own == FREE_SEAT)).any(dim=1) | fin.any(dim=1)) & (s >= 0)
         if bool(fseen.count_nonzero()):
-            self.citystate_met_free[rows[fseen], sc[fseen]] = True
+            self._meet_free_cities(rows[fseen], sc[fseen])
+
+    def _meet_free_cities(self, rows: torch.Tensor, o: torch.Tensor) -> None:
+        """`meetFreeCities`: city-state `o` ([K] long) meets the Free Cities in
+        the games `rows` ([K], unique) where it has not: each knowledge base
+        takes the other as the player its route value walks
+        (`citystate_trade_seat`, `free_trade_seat`)"""
+        new = ~self.citystate_met_free[rows, o]
+        if not bool(new.count_nonzero()):
+            return
+        nr, no = rows[new], o[new]
+        self.citystate_met_free[nr, no] = True
+        self.citystate_trade_seat[nr, no] = FREE_SEAT
+        self.free_trade_seat[nr] = 100 + no
 
     def _free_look(self, rows: torch.Tensor, tiles: torch.Tensor, radius, see_through: torch.Tensor) -> None:
         """`freeLook`: a Free Cities' unit stands on `tiles` ([K]) and looks,
         in the games `rows` ([K], unique); every city-state one of whose
         plots or units the look takes in meets the Free Cities
-        (`citystate_met_free`). No-op with fog off, as `revealAround` gates."""
+        (`_meet_free_cities`), in the city-states' order. No-op with fog off,
+        as `revealAround` gates."""
         if not self.fog_of_war or rows.numel() == 0 or self.S == 0:
             return
         disk = self._los_disk(rows, tiles.clamp(min=0), radius, see_through)
@@ -3659,7 +3673,7 @@ class SimMasks:
         for o in range(self.S):
             seen = (disk & (own == 100 + o)).any(dim=1) | (uin & (us == 100 + o)).any(dim=1)
             if bool(seen.count_nonzero()):
-                self.citystate_met_free[rows[seen], o] = True
+                self._meet_free_cities(rows[seen], torch.full_like(rows[seen], o))
 
     def _eyes_of(self, rows: torch.Tensor, seats: torch.Tensor, g: int) -> torch.Tensor:
         """`seatSeesPlot`'s eyes: where `seats` ([K, X] absolute seats, the

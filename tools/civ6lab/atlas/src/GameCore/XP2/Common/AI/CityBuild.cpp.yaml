@@ -1072,12 +1072,14 @@
     - cpu/core/aiDistrictValue.ts:DistrictValueFacts
     - cpu/core/minorBuild.ts:minorUnitTerm
     - cpu/core/types.ts:CityState
+    - cpu/core/freeCityBuild.ts:freeResearchTerms
   readings:
     - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
     - "H-1: the research AI — READ (the choice), PARTLY READ (the value)"
     - "H-1: the civics AI — READ (the choice, the walk, the propagation), PARTLY READ (the value)"
     - "C-97: the religion AI — the belief scores READ (the job, the value, the analysis's attach), the picks READ, the analyzers PARTLY READ"
     - "C-96: the district value — READ (0x7a51f0, 0x7aaf80's terms below, 0x366df0, the purchase price 0x1b1cb0, 0x1c77c0, 0x1b4450), PARTLY READ (the golden-age term, the claims, modifiers and neighbours terms, the domain's resources path), unwired"
+    - "C-127 / C-98: the Free Cities' trade record on a city-state meeting; their research and civics values' unit term; their Gold weight — READ (0x5ecb50 through 0x787f50 on a Free Cities meeting; 0x7b3e50 at 0x7b421e..0x7b4513, 0x7a9a10 at 0x7aa0f0..0x7aa272), LAB (the Gold weight), both twins"
   notes:
     - ".claude/scratchpad/cb4/NOTES.md: ...NREAD -> ASK. - Stockpile cap analyzer 0x6b8e10: max over resource units' city-centre UNITS values (0x5d4cd0), whole; needs unit table. - Trade knowledge K logged in AI_Knowledge.csv \"TRADE, TO x, VAL v\" (0x5..."
   context:
