@@ -472,14 +472,15 @@ class SimTactics:
         return unit_z | (on & town[:, nb])
 
     def _tac_zoc_path(self, rows: torch.Tensor, seat: int, naval: torch.Tensor, ign: torch.Tensor,
-                      dest: torch.Tensor | None, crowd: torch.Tensor) -> torch.Tensor:
+                      dest: torch.Tensor | None, crowd: torch.Tensor, seen: torch.Tensor | None = None) -> torch.Tensor:
         """[N, T] bool — `inEnemyZoc` for the movers of the games `rows` [N]
         (`naval` [N] each one's domain, `ign` [N] its chassis ignoring zones)
         on each one's path destination `dest` [N] (None: none): an exerter on
         the destination answers no zone where the plot entered is not at its
-        stacking limit (`crowd` [N, T])."""
-        z = torch.where(naval.view(-1, 1, 1), self._tac_zoc_dirs(seat, naval=True)[rows],
-                        self._tac_zoc_dirs(seat, naval=False)[rows])
+        stacking limit (`crowd` [N, T]). With `seen` [B, T] (the plots the
+        mover's player sees now) a unit exerts one only on a plot of them."""
+        z = torch.where(naval.view(-1, 1, 1), self._tac_zoc_dirs(seat, seen, naval=True)[rows],
+                        self._tac_zoc_dirs(seat, seen, naval=False)[rows])
         zoned = z.any(dim=2)
         if dest is not None:
             at = (self.neigh.unsqueeze(0) == dest.view(-1, 1, 1)) & (dest >= 0).view(-1, 1, 1) & z
@@ -947,7 +948,7 @@ class SimTactics:
         if bool(haz[rows].any()):
             haz_n = haz[rows] & self._barb_seen("barbarians" if seat == BARB_SEAT else seat)[rows]
         # a zone of control's step on the path's destination (`groundOf`'s zoc)
-        zp = self._tac_zoc_path(rows, seat, zsea, self._tac_zoc_ignored(utype), dest, crowd_n) if zoc else None
+        zp = self._tac_zoc_path(rows, seat, zsea, self._tac_zoc_ignored(utype), dest, crowd_n, sn) if zoc else None
         tseat = self.tile_seat
         # the nodes: one per plot, and in every search but the planning's a
         # second layer of turn-end nodes at T + plot (`search`'s turn-end
@@ -1880,8 +1881,27 @@ class SimTactics:
             spent = torch.where(zs, mp, spent)
             mp = torch.where(zs, torch.zeros_like(mp), mp)
             on = on & (mp > 0) & ~halts[ar, pc]
+        # a walk whose next step takes a plot of civilians ends on none of its
+        # own (`walk`'s through, `civiliansAlone`): the capture is that
+        # step's, so it passes the plot beside it whatever stands there
+        through = torch.zeros(R, dtype=torch.bool, device=dev)
+        if strike and bool(into.count_nonzero()):
+            milh = torch.zeros(self.B, self.T, dtype=torch.bool, device=dev)
+            for pl in (self.military_at, self.embarked_at):
+                plc = pl.clamp(min=0)
+                ot_ = self.unit_type.gather(1, plc).clamp(min=0, max=self.NU - 1)
+                os_ = torch.where(pl >= 0, self.unit_seat.gather(1, plc), torch.full_like(pl, -1))
+                milh |= (pl >= 0) & self._type_dom_mil.take(ot_) & self._seats_hostile(seat, os_)
+            cap = (into & ~late & ~milh[rows, dr] & ~city_in[rows, dr]
+                   & (getattr(self, f"{pre}_unit_attacks")[rows, sr] > 0)
+                   & (self._type_combat.take(ut) > 0) & (self._type_bombard.take(ut) <= 0)
+                   & ~getattr(self, f"{pre}_unit_emb")[rows, sr])
+            dcl = (self.neigh[frm] == dr.unsqueeze(1)).long().argmax(dim=1)
+            c_on = self._tac_step(rows, frm, dr, dcl, ut, ign_shore, waive) + carry
+            through = cap & (stop == plen) & (mp > 0) & ~((mp < c_on) & (mp < full))
         for _ in range(L):
-            back_off = (stop > 0) & no_end[ar, path.gather(1, (stop - 1).clamp(min=0).unsqueeze(1)).squeeze(1).clamp(min=0)]
+            back_off = (~through & (stop > 0)
+                        & no_end[ar, path.gather(1, (stop - 1).clamp(min=0).unsqueeze(1)).squeeze(1).clamp(min=0)])
             if not bool(back_off.count_nonzero()):
                 break
             stop = stop - back_off.long()
@@ -2923,8 +2943,9 @@ class SimTactics:
         """ATTACK CIVILIANS (`attackCivilians`): each CIVILIAN target of the
         list in its order, the units whose reach takes its plot within two
         turns go for it in pool order — each that can act moves onto it, a
-        melee one's turn then done, until the civilian is taken; then each
-        ranged one within its range strikes it."""
+        melee one's turn then done, until the civilian is captured or killed
+        (one that withdraws still stands); then each ranged one within its
+        range strikes it."""
         dev = self.device
         B, T = self.B, self.T
         bidx = torch.arange(B, device=dev)
@@ -2949,6 +2970,11 @@ class SimTactics:
                 return (self.unit_alive[bidx, s0] & (self.unit_tile[bidx, s0] == t)
                         & (self.unit_seat[bidx, s0] == seat0))
 
+            def stands() -> torch.Tensor:
+                # the target's unit still stands (`attackCivilians`' taken):
+                # one an entry only sent off its plot does
+                return self.unit_alive[bidx, s0] & (self.unit_seat[bidx, s0] == seat0)
+
             on = act & held()
             if not bool(on.count_nonzero()):
                 continue
@@ -2967,7 +2993,7 @@ class SimTactics:
                 self._tac_move_to(go, u_b, t)
                 melee = go & (self._tac_range(bidx, u_b) == 0)
                 done[bidx[melee], u_b[melee]] = True
-                gone |= go & ~held()
+                gone |= go & ~stands()
             for jj in js:
                 u_b = order[:, jj]
                 rng = self._tac_range(bidx, u_b)

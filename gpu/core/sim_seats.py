@@ -15175,8 +15175,9 @@ class SimSeats:
     def _retreat_plot(self, rows: torch.Tensor, slots: torch.Tensor) -> torch.Tensor:
         """`retreatPlot`: [n] the plot each unit (merged `slots` of games
         `rows`) withdraws to — the nearest district plot of its own seat other
-        than its own where it may stand, a non-centre district only for a
-        land unit, the lowest plot on a tie; -1 none."""
+        than its own where it may be placed (its own player's units keep it
+        off no plot, a hostile defender alone does), a non-centre district
+        only for a land unit, the lowest plot on a tie; -1 none."""
         T = self.T
         here = self.unit_tile[rows, slots]
         seat = self.unit_seat[rows, slots]
@@ -15188,15 +15189,14 @@ class SimSeats:
                 & self.passable[rows] & ~self.water[rows])
         n = rows.numel()
         cand[torch.arange(n, device=self.device), here.clamp(min=0)] = False
-        # `tileFreeForUnit` on dry ground: a foreign unit blocks, and an own
-        # unit of the class the withdrawer stands in
-        sup = self._type_support[ut].unsqueeze(1)
-        own_class = torch.where(sup, self.support_at[rows], self.civilian_at[rows])
-        for plane in (self.military_at, self.civilian_at, self.support_at):
-            occ = plane[rows]
-            o_seat = torch.where(occ >= 0, self.unit_seat[rows.unsqueeze(1), occ.clamp(min=0)], torch.full_like(occ, -1))
-            cand = cand & ~((occ >= 0) & (o_seat != seat.unsqueeze(1)))
-        cand = cand & ~(own_class >= 0)
+        # `tileFreeForUnit` with `stacks` on dry ground: a hostile military
+        # unit alone keeps it off
+        occ = self.military_at[rows]
+        o_seat = torch.where(occ >= 0, self.unit_seat[rows.unsqueeze(1), occ.clamp(min=0)], torch.full_like(occ, -1))
+        hn = self.HOST_N
+        hostile = self._hostile_table()[rows.unsqueeze(1), torch.where(seat >= 0, seat, hn - 1).unsqueeze(1),
+                                        torch.where(o_seat >= 0, o_seat, hn - 1)]
+        cand = cand & ~((occ >= 0) & (o_seat != seat.unsqueeze(1)) & hostile)
         allt = torch.arange(T, device=self.device).unsqueeze(0).expand(n, T)
         d = self.pair_dist[here.clamp(min=0)].to(torch.long)
         key = torch.where(cand, d * T + allt, torch.full_like(d, 1 << 40))

@@ -304,13 +304,23 @@
 - addr: 0x773270
   final: 0x505260
   kind: function
-  semantics: "Attack Civilians' moves: each unit that can act takes the move order onto the target (0x962190, flag 0x10), one with no ranged or bombard strength then done (0x56d6f0, 0x570b40, 0x77d180); the civilian taken ends the target; then each ranged one within range strikes it (0x964a40)."
-  status: PARTLY
-  impl: [cpu/core/tactical.ts:attackCivilians]
+  semantics: "Attack Civilians' moves over the move's unit list (the tactical object's +0x270, count +0x280): each unit that can act (0x56c690) takes the move order onto the target entry's plot ([entry+4] / [entry+8]; 0x962190, flag 0x10), one with no ranged or bombard strength then done (0x56d6f0, 0x570b40, 0x77d180); after each the entry's unit handle (+0x10 through 0x8e9d0) naming no unit, or a dead one (+0x770), ends the target (0x773383..0x77339c -> 0x77358f) — a civilian that withdrew from its plot still stands, so the units after take the order for the plot it left and a melee one's turn is done there; then each unit with a ranged or bombard strength within its range of the entry's plot takes the ranged order on it (0x964a40) and is done."
+  status: READ
+  cases:
+    - recording: h1_duelq1121
+      turn: 85
+      value: the Warrior 2555906 steps onto China's Great Scientist 1900548 on 6:17 (it withdraws to Xi'an 6:12); the row's other two available units, Man-At-Arms 2949124 on 3:16 and Warrior 2621454 on 4:16, hold with no row of their own
+    - recording: h1_duelq1121
+      turn: 213
+      value: the Galley 2424835 takes the Great Admiral's 27:5; the Ironclad 5046298 on 22:4 and the Frigate 4915205 on 26:5 hold with no row
+    - recording: h1_duelq1128
+      turn: 95
+      value: "the Swordsman 3997709's row, Available Units: 2; the Archer 3276822 on 15:5 holds"
+  impl: [cpu/core/tactical.ts:attackCivilians, gpu/core/sim_tactics.py:_tac_attack_civilians]
   readings:
+    - "C-95 / C-123: a zone of control out of sight is none in a path's cost; Attack Civilians past a withdrawn civilian; the capture step through a plot of its own; a withdrawal's plot — READ (0x5033a0 at 0x5033f9..0x503400, 0x773270 at 0x773383..0x77339c, 0x530650 at 0x5307a4..0x5307d3), both twins"
     - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
     - "C-124: an attack order to a plot out of sight loses its attack flag — READ (0x962310), both twins"
-  notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...her unit goes in; the sort 0x76f210 is on +8, -1 for all — stable), go for it in order (0x773270): each that can act (0x56c690) takes the move order onto it (0x962190, flag 0x10), a..."
   review: reviewed

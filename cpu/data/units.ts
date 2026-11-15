@@ -2438,8 +2438,10 @@ export const UNITS: Record<string, UnitDef> = Object.fromEntries(
         combat: 0,
         charges: 1,
         spawnOnly: true,
+        retreatsWhenCaptured: true,
         description: `Great ${c[0]}${c.slice(1).toLowerCase()} — walks to a legal site and spends a charge there.`,
         src: {
+          retreatsWhenCaptured: xml('Units', `UnitType=UNIT_GREAT_${c}`, 'CanRetreatWhenCaptured', { expect: true }),
           cost: { stylized: 'great people arrive by points, never production — this model prices the chassis at 0 (units.ts header)' },
           maintenance: xml('Units', `UnitType=UNIT_GREAT_${c}`, 'Maintenance'),
           moves: xml('Units', `UnitType=UNIT_GREAT_${c}`, 'BaseMoves'),

@@ -102,11 +102,22 @@
 - addr: 0x530650
   final: 0x3781e0
   kind: function
-  semantics: the nearest of the victim's player's districts (the list at the player's +0x1308 -> +0xd8) other than its own plot where it may be placed (0x586360), a city centre only for a unit of a domain other than land; the first strictly nearest in the list's order.
-  status: PARTLY
-  impl: [cpu/core/combat.ts:seizeCivilian, cpu/core/combat.ts:retreatPlot]
-  readings: ["H-1: a civilian stepped on — READ"]
-  notes: ["imported: READ in its section, no confirming case found beside it"]
+  semantics: "the nearest of the victim's player's districts (the list at the player's +0x1308 -> +0xd8) other than its own plot where it may be placed — the location test 0x586360 called with no flag (r8d and r9d 0 at 0x5307a4..0x5307d3), which its own player's units never fail: a hostile defender alone keeps it off — a city centre only for a unit of a domain other than land; the first strictly nearest in the list's order."
+  status: READ
+  cases:
+    - recording: h1_duelq1121
+      turn: 213
+      value: player 1's Great Admiral 2555913, stepped on at 27:5, stands on its centre 12:9 in record 214 beside its Rock Band and Line Infantry
+    - recording: h1_duelq1121
+      turn: 85
+      value: China's Great Scientist 1900548, stepped on at 6:17, stands on Xi'an's centre 6:12 in record 86
+  impl:
+    - cpu/core/combat.ts:seizeCivilian
+    - cpu/core/combat.ts:retreatPlot
+    - gpu/core/sim_seats.py:_retreat_plot
+  readings:
+    - "H-1: a civilian stepped on — READ"
+    - "C-95 / C-123: a zone of control out of sight is none in a path's cost; Attack Civilians past a withdrawn civilian; the capture step through a plot of its own; a withdrawal's plot — READ (0x5033a0 at 0x5033f9..0x503400, 0x773270 at 0x773383..0x77339c, 0x530650 at 0x5307a4..0x5307d3), both twins"
   context:
     - "...ured: the Great People, the Archaeologist, the Naturalist, the Rock Band) retreats to 0x530650's plot and returns 2, or returns 0 where none is valid; otherwise the type the unit inf..."
     - "- 0x530650: the nearest of the victim's player's districts (the list at the player's +0x1308 -> +0..."
@@ -188,6 +199,7 @@
     - "C-124: the formation's kept path, and a path's other players' units — READ (0x272aa0, 0x26e3a0, 0x782d0, 0x586360 at 0x586542..0x5865a1), unported"
     - "C-99: the zone-of-control wait's test names no destination — READ (0x26fe20 at 0x2707f4..0x270813, 0x26f980, 0x530f50 at 0x53118a / 0x53129f), both twins"
     - "C-95: the embark rules for a formation that may embark, a district's zone unseen, a city's kill in the planning, a raised unit's AI type, a move order's attack spot — READ (0x530420, 0x530240, 0x52fe90 at 0x52fed4, 0x530f50 at 0x531168, 0x791470 at 0x791677, 0x79b9c0), FIT (the move order's attack spot), both twins"
+    - "C-95 / C-123: a zone of control out of sight is none in a path's cost; Attack Civilians past a withdrawn civilian; the capture step through a plot of its own; a withdrawal's plot — READ (0x5033a0 at 0x5033f9..0x503400, 0x773270 at 0x773383..0x77339c, 0x530650 at 0x5307a4..0x5307d3), both twins"
   context:
     - ...nit's own plot and lies in the unit's enemy zone of control (0x26f980 -> Rules_Movement 0x530f50, the mover's owner, its stacking count 0x585eb0) is refused unless it is an attack (r14...
     - "...mpments exert the zone of control on the land beside them (Civ 6's rule; Rules_Movement 0x530f50 unread). runs/h1_duelw1124 t7-t52: city-state 4's city at 32:8 — the barbarian Scouts b..."

@@ -2000,8 +2000,10 @@ function seizable(state: GameState, mover: Unit, targetIndex: number): Unit[] | 
 
 /** the plot a civilian that CanRetreatWhenCaptured withdraws to (0x530650):
  *  the nearest district plot of its own player other than its own, where it
- *  may stand — a non-centre district only for a land unit — the lowest plot
- *  on a tie; -1 none */
+ *  may be placed (the location test 0x586360 with no flag: its own
+ *  player's units keep it off no plot, a hostile defender alone does) — a
+ *  non-centre district only for a land unit — the lowest plot on a tie; -1
+ *  none */
 function retreatPlot(state: GameState, u: Unit): number {
   const at = state.map.tiles[u.tileIndex];
   const land = !UNITS[u.type]?.naval && !UNITS[u.type]?.seaDomain;
@@ -2011,7 +2013,7 @@ function retreatPlot(state: GameState, u: Unit): number {
     if (!t.district || t.index === u.tileIndex || tileSeat(t) !== u.seat) continue;
     if (t.district !== 'CITY_CENTER' && !land) continue;
     const d = hexDistance(state.map, at.col, at.row, t.col, t.row);
-    if (d >= bd || !tileFreeForUnit(state, t.index, u.seat, u)) continue;
+    if (d >= bd || !tileFreeForUnit(state, t.index, u.seat, u, false, true)) continue;
     bd = d;
     best = t.index;
   }

@@ -789,6 +789,7 @@
   status: PARTLY
   readings:
     - "C-123 / C-125: Coastal Raid's queue walks on, a raid ends the raider's moves; Attack Units' targets keep one the pass killed — READ (0x7735d0, 0x95b100, 0x95b7c0, 0xa4fbc0 at 0xa501e2..0xa502e6, 0x5218f0, 0x76eb50, 0x776140 at 0x776333 -> 0x7765e4), both twins"
+    - "C-95 / C-123: a zone of control out of sight is none in a path's cost; Attack Civilians past a withdrawn civilian; the capture step through a plot of its own; a withdrawal's plot — READ (0x5033a0 at 0x5033f9..0x503400, 0x773270 at 0x773383..0x77339c, 0x530650 at 0x5307a4..0x5307d3), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ...the pass has killed stays. The assignment (0x776140) looks each unit target's unit up (0x8e9d0 at 0x776333); with none it keeps the record as initialised (health +0x10 0, plot +0x8 -...
@@ -2423,6 +2424,7 @@
   status: PARTLY
   readings:
     - "C-129: a killed player's records forgotten; a capture's new unit; an air strike's record — READ (0x534c50, 0x787fc0 -> 0x5ee370, 0x212500's create), both twins; the replay's later-player timings"
+    - "C-95 / C-123: a zone of control out of sight is none in a path's cost; Attack Civilians past a withdrawn civilian; the capture step through a plot of its own; a withdrawal's plot — READ (0x5033a0 at 0x5033f9..0x503400, 0x773270 at 0x773383..0x77339c, 0x530650 at 0x5307a4..0x5307d3), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "- OPEN: the hidden-visibility test the look asks (0x5033a0 -> 0x503320, the per-plot counts at visibility +0x570 keyed by [+0x98]+0x24) is unread: what reve..."
@@ -2430,9 +2432,25 @@
 - addr: 0x5033a0
   final: 0x358010
   kind: function
-  semantics: "the player may see a hidden unit (Unit +0x15f0): the look records a hidden unit only where it answers."
-  status: PARTLY
+  semantics: "the player (its visibility object, rcx) sees the unit (rdx) now: the unit's plot (+0x220 / +0x224, both above -9999) indexes the visibility counts (+0x290 -> +0x10, int16 per plot, width +0x160) and a count of 0 or less answers false (0x5033f9..0x503400); then a hidden unit (+0x15f0 set, +0x1650 clear) of another player (+0x2e0 against +0xa0) answers only where 0x503320 finds the plot's count above 0 in the per-kind table (+0x570, keyed by [+0x98]+0x24); last a unit whose type's +0x1ba bit 8 is set answers only for its own player. Every caller's 'seen' is 'on a plot the player sees now'."
+  status: READ
+  cases:
+    - recording: h1_duelq1121
+      turn: 26
+      value: the barbarian Scout 262147 on 38:13, its tree's Move Unit for the camp 33:7, steps to 37:12 beside player 0's Warrior 393216 on 36:11 (out of every barbarian's sight, distance 3) and stops there with 1 Movement; with the Warrior's zone counted the path goes 38:12 / 38:11 / 38:10
+    - recording: h1_duelq1128
+      turn: 171
+      value: Builder Capture's Builder 6619152 and Musketman 6422533 on 9:3 for 14:16 step to 9:4 as recorded (a zone out of sight sent them to 10:3)
+    - recording: h1_duelq1124
+      turn: 128
+      value: Builder Capture's Builder 5111833 and Man-At-Arms 4784141 on 34:7 for 6:3 end on 35:9 as recorded (36:7 with the unseen zone)
+  impl:
+    - cpu/core/units.ts:inEnemyZoc
+    - cpu/core/tactical.ts:groundOf
+    - gpu/core/sim_tactics.py:_tac_zoc_path
+    - gpu/core/sim_tactics.py:_tac_zoc_dirs
   readings:
+    - "C-95 / C-123: a zone of control out of sight is none in a path's cost; Attack Civilians past a withdrawn civilian; the capture step through a plot of its own; a withdrawal's plot — READ (0x5033a0 at 0x5033f9..0x503400, 0x773270 at 0x773383..0x77339c, 0x530650 at 0x5307a4..0x5307d3), both twins"
     - "C-97: the settle site evaluation — READ (the score, the choices), PARTLY READ (the danger, the plot yield)"
     - "C-96: the knowledge base's army records and the Combat Desire — READ (the records, the update, the desire), PARTLY READ (the signals' looks, the standing-army count)"
     - "C-95: the danger map and Move to Safety — READ, ported"

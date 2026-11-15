@@ -14648,3 +14648,70 @@ copy (`barbarianAi`, cpu/harness/replay.ts). GPU `_tac_enter`'s `rel` /
   173 / 300, 1036.7).
 - OPEN: whether a placement (0x195940) refuses a pillaged district's slots
   (the engines refuse them; unread).
+
+## C-95 / C-123: a zone of control out of sight is none in a path's cost; Attack Civilians past a withdrawn civilian; the capture step through a plot of its own; a withdrawal's plot — READ (0x5033a0 at 0x5033f9..0x503400, 0x773270 at 0x773383..0x77339c, 0x530650 at 0x5307a4..0x5307d3), both twins
+
+`inEnemyZoc`'s `seen` (cpu/core/units.ts) from `groundOf`'s `zoc`,
+`attackCivilians`' `taken`, `orderOnce`'s `capture` / `walk`'s `onto`,
+`civiliansAlone` (cpu/core/tactical.ts); `retreatPlot` (cpu/core/combat.ts);
+the Great People's `retreatsWhenCaptured` (cpu/data/units.ts). GPU
+`_tac_zoc_path`'s `seen` from `_tac_search`, `_tac_attack_civilians`'
+`stands`, `_tac_move_to`'s `through` (gpu/core/sim_tactics.py);
+`_retreat_plot` (gpu/core/sim_seats.py).
+
+- THE SIGHT TEST 0x5033a0 (visibility object, unit): the unit's plot
+  (+0x220 / +0x224) indexes the player's visibility counts (+0x290 -> +0x10,
+  an int16 a plot); a count of 0 or less answers false before any other test
+  (0x5033f9..0x503400: `movsx ecx, word [rax + rdx*2]`, `jle`). Past it a
+  hidden unit (+0x15f0) of another player answers by 0x503320. The zone of
+  control 0x530f50 asks it of each exerting unit beside the plot entered
+  (0x53128e), after the district arm: a unit at war on a plot the mover's
+  player does not see now zones nothing, in the path's cost (0x26e920 through
+  0x26f980) as in the planning's. A district at war zones whatever is seen.
+  The walk's own test (0x26fe20 at 0x270800) runs on the plot the unit has
+  entered, whose six neighbours it sees: a path that walked into a zone it
+  did not see stops there with its Movement.
+- ATTACK CIVILIANS' END OF A TARGET (0x773270): after each unit's order the
+  target entry's unit handle (+0x10 through 0x8e9d0) is resolved, and the
+  loop returns only where it names no unit or a dead one (+0x770,
+  0x773383..0x77339c). A civilian that CanRetreatWhenCaptured is the same
+  unit on another plot: the loop goes on, each unit after takes the move
+  order for the entry's own plot ([entry + 4] / [entry + 8], where the first
+  unit now stands: no path), a melee one's turn done, and each ranged one
+  within its range of that plot takes the ranged order on it and is done.
+  The row's "Available Units: N" counts them; none logs a row of its own.
+- THE CAPTURE IS THE WALK'S STEP (0x26fe20 -> 0x212500): a move order onto a
+  plot of civilians alone walks its whole path in one walk, the plot before
+  the civilians' one held by a unit of its own or not.
+- THE WITHDRAWAL'S PLOT (0x530650): each district of the victim's player is
+  tested by the location test 0x586360 with r8d = r9d = 0 (0x5307a4..0x5307d3),
+  which never refuses a plot for its owner's own units: a civilian withdraws
+  onto a centre its player's civilian holds.
+- THE INSTALL: Units.xml's CanRetreatWhenCaptured is true on every Great
+  Person chassis (UNIT_GREAT_SCIENTIST, _ENGINEER, _MERCHANT, _PROPHET,
+  _ARTIST, _WRITER, _MUSICIAN beside the General and the Admiral), the
+  Archaeologist, the Naturalist and the Rock Band.
+- CONFIRMED (one-seed aimem traces from the game's start, the rows the port
+  closed): runs/h1_duelq1121 t26 the barbarian Scout 262147 on 38:13 for its
+  camp 33:7 steps to 37:12 beside player 0's Warrior on 36:11, out of the
+  barbarians' sight; runs/h1_duelq1128 t171 Builder Capture's Builder
+  6619152 and Musketman 6422533 on 9:3 for 14:16 step to 9:4, t12 / t24 the
+  Scout 393221's Explore ends on 15:15 / 13:7; runs/h1_duelq1124 t128 Builder
+  Capture's Builder 5111833 and Man-At-Arms 4784141 end on 35:9, t47 the
+  Scout 3145752 on 37:9; runs/h1_duelq1127 t31 the Scouts 393221 / 1441809,
+  t145 / t163 / t164 city-state 3's Galley 393216 under Upgrade Units;
+  runs/h1_duelq1121 t173 the Quadrireme 2228245 for 29:5 stops on 28:5 in
+  the zone of player 0's Quadrireme on 29:6. Attack Civilians:
+  runs/h1_duelq1121 t85 (the Warrior 2555906 onto China's Great Scientist on
+  6:17, which stands on Xi'an's 6:12 in record 86; the Man-At-Arms 2949124
+  and the Warrior 2621454 hold 3:16 / 4:16), t109 (four available units,
+  the Musketman 3473423 ends on 6:17, the Skirmisher 3342353 on 7:14), t213
+  (the Galley 2424835 walks 24:5 -> 27:5 over the Frigate's 26:5 onto player
+  1's Great Admiral, which stands on its centre 12:9 beside its Rock Band in
+  record 214; the Frigate 4915205 and the Ironclad 5046298 hold), t221 (the
+  Ironclad holds 23:8); runs/h1_duelq1128 t95 the Archer 3276822 holds 15:5,
+  t134 the Warrior 786443 ends on 15:6.
+- OPEN: runs/h1_duelq1121 t172 the Quadrireme 1900549 on 26:3 for 29:5
+  reaches it in the game (by 29:4), ours walks 27:3 / 28:4 / 28:5 into the
+  zone of the Quadrireme on 29:6 it does not see: two four-step paths, the
+  open list's order between them unread.

@@ -739,13 +739,17 @@ export function districtZones(state: GameState, tile: Tile, mover: { seat: numbe
  *  not across a river but from a city centre. An exerter on the path's
  *  destination `dest` answers no zone at all unless the plot entered is at
  *  its stacking limit (`crowded`: 0x585eb0 against +0x58c): the move onto
- *  its target keeps its Movement for the blow. */
+ *  its target keeps its Movement for the blow. With `seen` (the plots the
+ *  mover's player sees now) a unit exerts one only on a plot of them
+ *  (0x5033a0: the player's visibility count of the unit's plot above 0), a
+ *  district whatever it sees. */
 export function inEnemyZoc(
   state: GameState,
   tileIndex: number,
   mover: { seat: number; type?: string; embarked?: boolean },
   dest = -1,
   crowded = false,
+  seen?: ArrayLike<number>,
 ): boolean {
   // CIV6: a naval raider "ignores enemy zone of control", and cavalry-class
   // units ignore it too.
@@ -775,6 +779,7 @@ export function inEnemyZoc(
     // one standing in a city centre (0x5311a0..0x5311c9: the river bit,
     // then IsCity on the neighbour)
     if (crossesRiver(state.map, tile, n) && n.district !== 'CITY_CENTER') continue;
+    if (seen && seen[n.index] !== 1) continue;
     for (const u of unitsAt(state, n.index)) {
       const relU = unitReligious(u.type);
       if (relU !== relMover) continue;

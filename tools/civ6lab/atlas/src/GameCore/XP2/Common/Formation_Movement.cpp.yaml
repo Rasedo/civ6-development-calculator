@@ -224,6 +224,7 @@
     - "C-95: the embark rules for a formation that may embark, a district's zone unseen, a city's kill in the planning, a raised unit's AI type, a move order's attack spot — READ (0x530420, 0x530240, 0x52fe90 at 0x52fed4, 0x530f50 at 0x531168, 0x791470 at 0x791677, 0x79b9c0), FIT (the move order's attack spot), both twins"
     - "C-99: a move order's search sets out on the pool finder's +0x1bc, the last full-Movement search's GetMaxMoves — READ (0x26f330, 0x77d10, 0x270d70, 0x26e920, 0x26eea0, 0x26dcd0, 0x26df90, 0x26e2c0, 0x26fe20 at 0x270309), unported"
     - "C-95: a strike's step from beside its plot, a formation's planning plot at a radius, the ring walk's own location test — READ (0x962380 at 0x96267e..0x9626d2, 0x26ef40 at 0x26f0a4, 0x78fa10 at 0x78fab4..0x78facf, 0x815d50 -> 0x586360), both twins"
+    - "C-95 / C-123: a zone of control out of sight is none in a path's cost; Attack Civilians past a withdrawn civilian; the capture step through a plot of its own; a withdrawal's plot — READ (0x5033a0 at 0x5033f9..0x503400, 0x773270 at 0x773383..0x77339c, 0x530650 at 0x5307a4..0x5307d3), both twins"
   review: reviewed
 - addr: 0x26ee80
   final: 0x1a74c0
@@ -411,6 +412,7 @@
     - "C-99: the zone-of-control wait's test names no destination — READ (0x26fe20 at 0x2707f4..0x270813, 0x26f980, 0x530f50 at 0x53118a / 0x53129f), both twins"
     - "C-95 / C-123: a move order's step costs by the formation's fighter flag; an operation that ends in its tick lets its units go — READ (0x26fe20 at 0x27021b, 0x270980, 0x270be0, 0x267650 at 0x2677fa), FIT (the release), both twins"
     - "C-95: the reach searches open turn-end nodes, and the zone of control's domain is the formation's — READ (0x271920 from 0x26dab0, 0x26f980 -> 0x530f50, 0x267650), both twins"
+    - "C-95 / C-123: a zone of control out of sight is none in a path's cost; Attack Civilians past a withdrawn civilian; the capture step through a plot of its own; a withdrawal's plot — READ (0x5033a0 at 0x5033f9..0x503400, 0x773270 at 0x773383..0x77339c, 0x530650 at 0x5307a4..0x5307d3), both twins"
   context:
     - "...or the parent began a turn (it spends everything); a zone of control spends everything (0x26f980) — save under flag 0x800. Between two plots the player never revealed (node +0x51 bit 0..."
     - "- THE ZONE OF CONTROL'S TEST (Rules_Movement 0x530f50, READ; through 0x26f980(finder, from, to, the path's destination) from the path cost 0x26e920, the move's step..."
@@ -451,6 +453,7 @@
     - gpu/core/sim_tactics.py:_tac_swap
     - cpu/core/tactical.ts:embarks
     - cpu/core/tactical.ts:spent
+    - cpu/core/tactical.ts:through
   readings:
     - "C-95 / C-123: a move order's step costs by the formation's fighter flag; an operation that ends in its tick lets its units go — READ (0x26fe20 at 0x27021b, 0x270980, 0x270be0, 0x267650 at 0x2677fa), FIT (the release), both twins"
     - "C-99: a move order carried on as the turn ends, the zone-of-control wait, the embark rule's TO plot — READ (0x962380, 0x52f50, 0x26fe20, 0x2675e0, 0x2673f0, 0x530420, 0x267650), both twins"
@@ -473,6 +476,7 @@
     - "C-99: the assignment's Movement and the swap's walk — READ (0x776140 at 0x776643 / 0x7768e4, 0x56d6f0, 0x972a50 -> 0x26fe20 under flag 4, 0x2720a0 at 0x27229b), both twins"
     - "C-99: every pool search sets out on its own formation's value, a queue run walks its first search's path — READ (0x2715a0 at 0x271909..0x271910, 0x77d10 at 0x77d8b..0x77db0 / 0x77f0b / 0x78007 / 0x7805d, 0x52f50 at 0x52f9e / 0x52fce / 0x53394, 0x265fd0, 0x272aa0 at 0x272ad7..0x272c24, 0x26e3a0), the engines' model"
     - "C-95: the reach searches open turn-end nodes, and the zone of control's domain is the formation's — READ (0x271920 from 0x26dab0, 0x26f980 -> 0x530f50, 0x267650), both twins"
+    - "C-95 / C-123: a zone of control out of sight is none in a path's cost; Attack Civilians past a withdrawn civilian; the capture step through a plot of its own; a withdrawal's plot — READ (0x5033a0 at 0x5033f9..0x503400, 0x773270 at 0x773383..0x77339c, 0x530650 at 0x5307a4..0x5307d3), both twins"
   context:
     - "- A unit's move onto a plot holding a religious unit it kills (0x26fe20 → 0x493f80 with the capture flag 1) swings religion: RELIGION_SPREAD_ UNIT_CAPTURE (g..."
     - "- The move 0x26fe20 walks the destination plot's units from the last to the first; for each one not dead (+..."

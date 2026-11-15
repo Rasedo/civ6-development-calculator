@@ -510,7 +510,10 @@ function groundOf(state: GameState, unit: Unit, revealedOnly = true, planning = 
     },
     zoc: (t) => {
       let v = zocs.get(t.index);
-      if (v === undefined) zocs.set(t.index, (v = inEnemyZoc(state, t.index, unit, dest, crowded(t.index))));
+      if (v === undefined) {
+        seenNow ??= plotsSeenNow(state, new Set([unit.seat]));
+        zocs.set(t.index, (v = inEnemyZoc(state, t.index, unit, dest, crowded(t.index), seenNow)));
+      }
       return v;
     },
   };
@@ -1195,7 +1198,11 @@ function orderOnce(state: GameState, unit: Unit, dest: number, strike: boolean,
   if (into) path = path.slice(0, -1);
   if (zocMoved?.has(unit) && path.length) return false;
   const from = unit.tileIndex;
-  const refused = walk(state, unit, path, dest, mates);
+  // a plot of civilians alone the order's strike takes this turn: the walk
+  // passes the plot beside it (`walk`'s `onto`)
+  const capture = into && strike && nodes[nodes.length - 1].turns === 1 && attacksLeftOf(unit) > 0 && !unit.embarked
+    && (UNITS[unit.type]?.combat ?? 0) > 0 && !((UNITS[unit.type]?.bombard ?? 0) > 0) && civiliansAlone(state, unit, last);
+  const refused = walk(state, unit, path, dest, mates, capture ? last : -1);
   if (zocMoved && unit.tileIndex !== from) {
     // the zone test on the plot it stands on, no destination (0x270800:
     // 0x26f980's fourth argument null), so no exerter's plot is waived
@@ -1238,8 +1245,20 @@ function attackPlot(state: GameState, unit: Unit, p: number): boolean {
   return encampmentBlocks(state, t, unit);
 }
 
+/** an attack plot (`attackPlot`) no fighter of a player at war holds and no
+ *  district at war guards: the order's step onto it is a move that takes
+ *  its civilians */
+function civiliansAlone(state: GameState, unit: Unit, p: number): boolean {
+  const t = state.map.tiles[p];
+  const owner = tileSeat(t);
+  if (t.district === 'CITY_CENTER' && owner !== unit.seat && unitsHostile(state, unit, { seat: owner })) return false;
+  if (encampmentBlocks(state, t, unit)) return false;
+  return !state.units.some((u) => u.tileIndex === p && onMap(u) && unitDomain(u.type) === 'military' && unitsHostile(state, unit, u));
+}
+
 /** the walk of a path as far as the unit's Movement carries it this turn,
- *  short of a plot it may not end on, a zone of control ending it
+ *  short of a plot it may not end on (but, with `onto`, the plot beside a
+ *  plot of civilians its next step takes), a zone of control ending it
  *  (`inEnemyZoc` on the order's destination `dest`, a plot its own stacking
  *  unit or another player's holds at the limit: the count 0x585eb0, another
  *  player's Trader or unit of another map layer none — runs/h1_duely1128
@@ -1248,7 +1267,7 @@ function attackPlot(state: GameState, unit: Unit, p: number): boolean {
  *  player 1's Missionary); true where a step was
  *  refused (the placement 0x587ca0 refusing: the order done, 0x26fe20 at
  *  0x270933) */
-function walk(state: GameState, unit: Unit, path: number[], dest: number, mates: readonly Unit[]): boolean {
+function walk(state: GameState, unit: Unit, path: number[], dest: number, mates: readonly Unit[], onto = -1): boolean {
   const { tiles } = state.map;
   // how far its Movement carries it along the path this turn: a formation's,
   // the least its members hold (0x262cd0)
@@ -1296,7 +1315,12 @@ function walk(state: GameState, unit: Unit, path: number[], dest: number, mates:
     }
     if (mp <= 0 || zoned) break;
   }
-  while (stop > 0 && (stackedWith(state, unit, mates, path[stop - 1]) || peaceAt(state, unit, path[stop - 1]))) stop -= 1;
+  // a walk whose next step takes a plot of civilians (`onto`) ends on none of
+  // its own: the capture is that step's (0x26fe20 -> 0x212500), so it passes
+  // the plot beside it whatever stands there
+  const through = onto >= 0 && stop === path.length && mp > 0
+    && !(mp < stepCost(state, unit, tiles[from], tiles[onto], embarks) + carry && mp < full);
+  while (!through && stop > 0 && (stackedWith(state, unit, mates, path[stop - 1]) || peaceAt(state, unit, path[stop - 1]))) stop -= 1;
   // the formation the walk sets out with (unit +0x1fb8): the riders on a
   // plot it passes are another formation's (runs/h1_duely1128 t56: the Scout
   // 3538967 walks over 13:14, Builder Capture's Settler 2228251 stays there
@@ -2734,7 +2758,11 @@ function attackCivilians(state: GameState, pass: Pass): void {
     const at = v.tileIndex;
     const cands = reachers(state, pass, at, PLAN_TURNS);
     if (!cands.length) continue;
-    const taken = () => !state.units.includes(v) || v.seat !== e.seat || v.tileIndex !== at;
+    // the target's unit gone (0x773270 at 0x773383..0x77339c: its handle
+    // names no live unit): a civilian captured or killed. One a unit's entry
+    // only sends off its plot (a Great Person) still stands: the units after
+    // take the order for the plot it stood on, a melee one's turn done
+    const taken = () => !state.units.includes(v) || v.seat !== e.seat;
     let gone = false;
     let logged = false;
     for (const u of cands) {
