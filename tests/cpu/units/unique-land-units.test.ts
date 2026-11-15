@@ -9,7 +9,7 @@ import { emptySeat, seatOf, setTileOwner, setWar } from '../../../cpu/core/seats
 import { spawnUnit, terrainMp, ignoresShores } from '../../../cpu/core/units';
 import { chassisAbilityCS, chassisFlankMult, woundPenalty, siegeMayShoot, defenderCS } from '../../../cpu/core/combat';
 import { attacksPerTurn } from '../../../cpu/core/promotions';
-import { routePlunderer, TRADER_GUARD_RADIUS } from '../../../cpu/core/trade';
+import { traderImmune, TRADER_GUARD_RADIUS } from '../../../cpu/core/trade';
 import { unitKillEvent } from '../../../cpu/core/eras';
 import { UNITS, UNIT_HP, civUnitAllowed, civReplacement, civUpgradeTarget } from '../../../cpu/data/units';
 import { scaleByGameSpeed } from '../../../cpu/data/constants';
@@ -252,9 +252,9 @@ describe('the reward and protection clauses', () => {
     setWar(state, 0, 1, true);
     const road = tileAtCoords(state.map, 6, 6);
     put(state, 'WARRIOR', 6, 6, 1); // a raider standing on the Trader
-    expect(routePlunderer(state, road.index, 0)).toBe(1);
+    expect(traderImmune(state, 0, road.index)).toBe(false);
     put(state, 'MANDEKALU_CAVALRY', 7, 6, 0);
-    expect(routePlunderer(state, road.index, 0)).toBe(null);
+    expect(traderImmune(state, 0, road.index)).toBe(true);
   });
 
   it('reaches a Trader within 4 tiles of the Mandekalu, and no farther', () => {
@@ -262,19 +262,19 @@ describe('the reward and protection clauses', () => {
     // are immune to being plundered if they are within 4 tiles of a
     // Mandekalu Cavalry and on a land tile"
     expect(TRADER_GUARD_RADIUS).toBe(4);
-    const guardAt = (col: number, seat: number): number | null => {
+    const guardAt = (col: number, seat: number): boolean => {
       const state = scene();
       state.seats.push(emptySeat(1), emptySeat(2));
       setWar(state, 0, 1, true);
       put(state, 'WARRIOR', 6, 6, 1);
       put(state, 'MANDEKALU_CAVALRY', col, 6, seat);
-      return routePlunderer(state, tileAtCoords(state.map, 6, 6).index, 0);
+      return traderImmune(state, 0, tileAtCoords(state.map, 6, 6).index);
     };
-    expect(guardAt(10, 0)).toBe(null);  // 4 tiles along the row
-    expect(guardAt(11, 0)).toBe(1);     // 5 tiles: out of reach
+    expect(guardAt(10, 0)).toBe(true);  // 4 tiles along the row
+    expect(guardAt(11, 0)).toBe(false); // 5 tiles: out of reach
     // the ability goes to the escort's OWN seat's units alone
     // (MODIFIER_PLAYER_UNITS_GRANT_ABILITY)
-    expect(guardAt(7, 2)).toBe(1);
+    expect(guardAt(7, 2)).toBe(false);
   });
 
   it('lets the Mountie found a park off a charge and ride on', () => {

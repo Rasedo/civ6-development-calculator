@@ -818,7 +818,7 @@ export function buildRules() {
       // the plunder payout's turns and the Gold weight of every other yield (`routePlunderGold`)
       plunderTurns: PLUNDER_ROUTE_TURNS,
       goldEquivalentOther: GOLD_EQUIVALENT_OTHER_YIELDS,
-      // an escort's protection reaches this far from it (`routePlunderer`)
+      // an escort's protection reaches this far from it (`traderImmune`)
       guardRadius: TRADER_GUARD_RADIUS,
       walkRail: TRADE_WALK_EXPIRY_RAIL,
       // the path term (`routePathGold`): the score per water plot, railroad

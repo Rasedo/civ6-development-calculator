@@ -17581,3 +17581,24 @@ its own accrual; `routeOriginFollowers` and the Chinguetti term of
   t21 42:6 / 41:6, duels1145 t32 34:10 / 33:11, duels1157 t13 43:23 /
   43:22) and passes others (duels1180 t46 34:17 / 35:17, duels1184 t29
   12:19 / 11:19); the game's own region ids per plot are unrecorded.
+
+## C-130 / C-98: a Trader's walk onto a hostile unit's plot takes nothing — READ (0x89dae0, 0x89dfc0, 0x9555a0 as "C-123 / C-95: the Plunder Trade Route command" reads them), LAB, both twins
+
+`tradeRouteWalk` (cpu/core/trade.ts), `_trade_walk_tick` (gpu/core/sim_seats.py);
+`plunderTargets` / `plunderTrader`, `_plunder_ok` / `_plunder_trader`.
+
+- A route is plundered only by the Plunder Trade Route command of a unit on
+  the Trader's plot (CanStart 0x89dae0, Start 0x89dfc0); the walk's step onto
+  a plot a hostile unit holds takes nothing. The engines' walk no longer
+  tests a raider on the walker's plot (`routePlunderer` deleted); the GPU
+  command's route lookup covers a major's routes as the TS command does.
+- CONFIRMED: runs/h1_duels1167 t63, Hong Kong's Trader 786437 moves onto
+  11:16 in its turn (UnitMoved, ord 15921) where the barbarian Scout 1703954
+  stands until the barbarians' turn moves it (ord 15991); the route to
+  Beijing runs to its t82 expiry (Game_TradeManager). The engines kept the
+  route and the city's Science 5.85 / net Gold 2.10 at t64 as recorded.
+  runs/h1_duels1151 t39 alike (Mohenjo-Daro, its route's Science 1 at t45
+  once Beijing's Campus stands). The recordings hold such a step on 13 of
+  the 60 new games (1143, 1145, 1148, 1151, 1154, 1159, 1162, 1164, 1167,
+  1176, 1178, 1187, 1189).
+- Open: none.

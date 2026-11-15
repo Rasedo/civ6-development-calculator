@@ -355,15 +355,6 @@ export const TRADE_WALK_EXPIRY_RAIL = 2 * TRADE_COURSE_MAX;
 export const TRADER_GUARD_RADIUS = srcConst('trade.guardRadius', 4,
   xml('RequirementArguments', 'RequirementId=TRADER_IS_WITHIN_FOUR_REQUIREMENT&Name=MaxDistance', 'Value'));
 
-/** a unit that may plunder a route (the command's can-do 0x9555a0): a
- *  Combat, Ranged or Bombard strength above 0, not embarked — a civilian
- *  or a support unit never (runs/h1_duely1124 t205-t206: the barbarians'
- *  captured Builder on Bologna's Trader's plot 431, the route standing) */
-function canPlunder(u: Unit): boolean {
-  const d = UNITS[u.type];
-  return !!d && !u.embarked && (d.combat > 0 || (d.ranged?.strength ?? 0) > 0 || (d.bombard ?? 0) > 0);
-}
-
 /**
  * Is `seat`'s Trader on `tileIndex` immune to plunder — the domain immunity
  * the command reads off the Trader for the plot's ground (unit +0x1eb8 by
@@ -387,25 +378,6 @@ export function traderImmune(state: GameState, seat: number, tileIndex: number):
     const gt = state.map.tiles[g.tileIndex];
     return !!gt && hexDistance(state.map, gt.col, gt.row, here.col, here.row) <= TRADER_GUARD_RADIUS;
   });
-}
-
-/**
- * The seat that would PLUNDER a Trader standing on `tileIndex` — the LOWEST
- * hostile seat id with a unit there that may plunder (`canPlunder`;
- * barbarians always hostile, others by the war matrix), or null. CIV6
- * (Reform the Coinage, Golden face): "your Traders cannot be plundered."
- */
-export function routePlunderer(state: GameState, tileIndex: number, seat: number): number | null {
-  if (!state.unitsMode) return null;
-  if (traderImmune(state, seat, tileIndex)) return null;
-  let raider: number | null = null;
-  for (const u of state.units) {
-    if (u.tileIndex !== tileIndex || !canPlunder(u)) continue;
-    const hostile = isBarbSeat(u.seat) || (u.seat !== seat && civsAtWar(state, u.seat, seat));
-    if (!hostile) continue;
-    if (raider === null || u.seat < raider) raider = u.seat;
-  }
-  return raider;
 }
 
 /**
@@ -1400,32 +1372,19 @@ function tradeRouteStep(state: GameState, actor: Seat, r: TradeRoute): void {
 }
 
 /**
- * THE WALK and PLUNDER of one holder's routes — a major's or a city-state's.
- *
- * THE WALK: each route's Trader advances one plot along the route's stored
- * course (`TradeRoute.course`) toward its leg's end, laying road as it goes;
- * it turns around at the destination and starts a fresh round trip at home.
+ * THE WALK of one holder's routes — a major's or a city-state's: each
+ * route's Trader advances one plot along the route's stored course
+ * (`TradeRoute.course`) toward its leg's end, laying road as it goes; it
+ * turns around at the destination and starts a fresh round trip at home.
  * Both legs walk the one course. A route whose origin or destination city is
- * gone does not walk.
- *
- * PLUNDER, real Civ 6: a unit hostile to the route's owner standing on the
- * Trader's tile destroys the route AND its Trader, and the raider's seat
- * banks the gold — a major, or a city-state into its own treasury.
+ * gone does not walk. A step onto a plot a hostile unit holds takes nothing:
+ * a route is plundered only by the Plunder Trade Route command of a unit on
+ * the Trader's plot (`plunderTrader`, 0x89dfc0; runs/h1_duels1167 t63:
+ * Hong Kong's Trader 786437 steps onto 11:16 beside the barbarian Scout
+ * 1703954 standing there, its route to Beijing running to its t82 expiry).
  */
 export function tradeRouteWalk(state: GameState, actor: Seat): void {
-  const routes = (actor.tradeRoutes ??= []);
-  for (const r of routes) tradeRouteStep(state, actor, r);
-  const plundered = new Set<TradeRoute>();
-  for (const r of routes) {
-    const raider = r.walkTile === undefined ? null : routePlunderer(state, r.walkTile, actor.seat);
-    if (raider === null) continue;
-    plundered.add(r);
-    const rs = seatOf(state, raider);
-    if (rs) rs.treasury += routePlunderGold(state, raider, actor, r, r.walkTile!);
-    const walker = routeTrader(state, r);
-    if (walker) disbandUnit(state, walker.id);
-  }
-  if (plundered.size > 0) actor.tradeRoutes = routes.filter((r) => !plundered.has(r));
+  for (const r of (actor.tradeRoutes ??= [])) tradeRouteStep(state, actor, r);
 }
 
 /** the Trader unit walking route `r` (`TradeRoute.trader`), none where no
@@ -1508,8 +1467,8 @@ export function minorTradePick(state: GameState, cityState: CityState): void {
   commitRoute(state, cityState.seat, cityState.centerIndex, routeDestCenter(state, cityState, r), r);
 }
 
-/** A city-state's routes in its units' turn: the walk and plunder of those
- *  begun before this turn (one begun in it took its first plot at its
+/** A city-state's routes in its units' turn: the walk of those begun
+ *  before this turn (one begun in it took its first plot at its
  *  commit), then the round-trip expiry */
 export function minorTrade(state: GameState, cityState: CityState): void {
   const all = cityState.tradeRoutes ?? [];

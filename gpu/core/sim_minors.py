@@ -1305,8 +1305,8 @@ class SimMinors:
         self.free_trade_value.copy_(torch.where(mask, v, self.free_trade_value))
 
     def _minor_trade(self, s: int) -> None:
-        """`minorTrade` — minor `s`'s routes begun before this turn walk and
-        meet their raiders (`_trade_walk_tick`); then the round trips that
+        """`minorTrade` — minor `s`'s routes begun before this turn walk
+        (`_trade_walk_tick`); then the round trips that
         are done end (`_expire_seat_routes`)."""
         row = self._CITY_MINOR0 + s
         alive = self.citystate_alive[:, s]

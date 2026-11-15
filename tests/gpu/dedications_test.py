@@ -147,32 +147,18 @@ def main() -> None:
     print("coinage completion ok")
 
     # ---- Reform the Coinage, Golden face: no plunder -----------------------
+    # the face makes the major's Traders immune to the Plunder Trade Route
+    # command (`_trader_immune`, read by `_plunder_ok`)
     commit(sim, 0, sim._ded_coinage, golden=True)
-    # a live barb REGISTERED on the walker's tile (plunder reads the
-    # military_at/civilian_at maps, the same lookup combat uses)
-    bslot = 0
     cap_t = int(sim.city_center[0, 0, col])
     nb = int(sim.neigh[cap_t][0])
-    sim.barb_unit_alive[0, bslot] = True
-    sim.barb_unit_tile[0, bslot] = nb
-    sim.military_at[0, nb] = bslot + sim.POOL_LO["barb"]
-    sim.seat_routes[0, 0, 0, 0] = sim.city_id[0, 0, col]
-    sim.seat_routes[0, 0, 0, 1] = sim.city_id[0, 0, col]
-    sim.seat_route_exp[0, 0, 0] = sim.turn + 20
-    sim.seat_route_walk[0, 0, 0] = nb
-    sim.seat_route_leg[0, 0, 0] = -1
-    act1 = torch.ones(sim.B, dtype=torch.bool)
-    sim._trade_walk_tick(0, act1)
-    assert int(sim.seat_routes[0, 0, 0, 0]) >= 0, "golden Coinage must suppress the plunder"
+    _r = torch.tensor([0])
+    _o = torch.tensor([0])
+    _t = torch.tensor([nb])
+    assert bool(sim._trader_immune(_r, _o, _t)[0]), "golden Coinage must suppress the plunder"
     commit(sim, 0, sim._ded_exodus, golden=True)  # a different pick: the face lapses
-    gold0 = float(sim.civ_treasury[0, 0])
-    sim._trade_walk_tick(0, act1)
-    assert int(sim.seat_routes[0, 0, 0, 0]) == -1, "without the face the barb plunders"
-    # a BARBARIAN raider banks nothing (only a major has a treasury row here)
-    assert float(sim.civ_treasury[0, 0]) == gold0
-    sim.barb_unit_alive[0, bslot] = False
-    sim.military_at[0, nb] = -1
     sim._eff_version += 1
+    assert not bool(sim._trader_immune(_r, _o, _t)[0]), "without the face the Trader may be plundered"
     print("coinage no-plunder ok")
 
     # ---- Heartbeat of Steam: purchased Industrial+ building pays +2 --------

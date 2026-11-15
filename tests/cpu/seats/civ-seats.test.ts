@@ -18,7 +18,7 @@ import { tilesWithin, hexDistance } from '../../../world/hex';
 import { MAJOR_START_DIST } from '../../../seeder/place';
 import { applySeatUnitOrders, assertCityRegistryCoherent, declareWar, seatPhase, sueForPeace, transferCity } from '../../../cpu/core/phase';
 import { meleeAttack, attackTargets, captureCityState } from '../../../cpu/core/combat';
-import { routePlunderer, tradeCapacity } from '../../../cpu/core/trade';
+import { tradeCapacity } from '../../../cpu/core/trade';
 import { tradeCourse, tradeReach } from '../../../cpu/core/tradePath';
 import { spawnUnit, unitsHostile } from '../../../cpu/core/units';
 import { ensureGpOffer, gpOfferCost } from '../../../cpu/core/greatPeople';
@@ -487,35 +487,6 @@ describe('civ trade routes', () => {
     civ.cities = civ.cities.filter((c) => c.id !== second.id);
     civ.tradeRoutes = civ.tradeRoutes.filter((x) => x.from !== second.id && x.to !== second.id);
     expect(civ.tradeRoutes.length).toBe(0);
-  });
-
-  it('a hostile ON the Trader tile plunders: barbarians always, seat-0 units only at war', () => {
-    const state = makeState();
-    state.unitsMode = true;
-    const civ = addCiv(state, 8, 8);
-    const center = state.map.tiles[civ.cities[0].centerIndex];
-    const wt = tileAtCoords(state.map, center.col + 2, center.row).index;
-    expect(routePlunderer(state, wt, civ.seat)).toBe(null);
-    const mine = spawnUnit(state, 'WARRIOR', wt, 0)!;
-    expect(routePlunderer(state, wt, civ.seat)).toBe(null); // at peace
-    setWar(state, civ.seat, 0, true);
-    expect(routePlunderer(state, wt, civ.seat)).toBe(0);
-    state.units = state.units.filter((u) => u.id !== mine.id);
-    expect(routePlunderer(state, wt, civ.seat)).toBe(null);
-    spawnUnit(state, 'WARRIOR', wt, BARB_SEAT);
-    setWar(state, civ.seat, 0, false);
-    expect(routePlunderer(state, wt, civ.seat)).toBe(BARB_SEAT); // barbs always
-  });
-
-  it('an at-war unit plunders, whoever owns the route', () => {
-    const state = makeState();
-    state.unitsMode = true;
-    const civ = addCiv(state, 10, 10);
-    const ht = tileAtCoords(state.map, 5, 4).index;
-    spawnUnit(state, 'WARRIOR', ht, civ.seat);
-    expect(routePlunderer(state, ht, 0)).toBe(null); // at peace: no plunder
-    setWar(state, civ.seat, 0, true);
-    expect(routePlunderer(state, ht, 0)).toBe(civ.seat);
   });
 });
 

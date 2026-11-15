@@ -40,12 +40,25 @@ def fresh(rules, path) -> BatchSim:
 
 
 def park_route(sim, row: int, tile: int) -> None:
-    """A route of seat row `row`, its walker PARKED on `tile` (no step)."""
+    """A route of seat row `row`, its walker PARKED on `tile` (no step), its
+    Trader standing there on the trade layer"""
     sim.seat_routes[0, row, 0, 0] = int(sim.city_id[0, row, 0])
     sim.seat_routes[0, row, 0, 1] = int(sim.city_id[0, row, 0])
     sim.seat_route_exp[0, row, 0] = int(sim.turn) + sim._trade_duration
     sim.seat_route_walk[0, row, 0] = tile
     sim.seat_route_leg[0, row, 0] = -1
+    sim.seat_route_unit[0, row, 0] = put(sim, row, sim._trader_idx, tile)
+    assert int(sim.trader_at[0, tile]) >= 0, "the Trader files on the trade layer"
+
+
+def plunder(sim, slot: int) -> bool:
+    """the major-pool unit `slot`'s Plunder Trade Route command
+    (`_plunder_ok`, `_plunder_trader`): whether it may"""
+    m = torch.ones(sim.B, dtype=torch.bool)
+    sc = torch.full((sim.B,), slot + sim.POOL_LO["major"], dtype=torch.long)
+    ok, tc, tr = sim._plunder_ok(m, sc)
+    sim._plunder_trader(ok, tc, tr, sc)
+    return bool(ok[0])
 
 
 def put(sim, row: int, utype: int, tile: int, *, embarked: bool = False) -> int:
@@ -89,12 +102,12 @@ def test_escort_radius(rules, path) -> None:
         assert sim._trader_guard_radius == 4
         t = free_tile(sim, water=False)
         park_route(sim, 1, t)
-        put(sim, 0, sim._warrior_idx, t)
+        raider = put(sim, 0, sim._warrior_idx, t)
         at_war(sim, 0, 1)
         g = next(x for x in range(sim.T) if int(sim.pair_dist[t, x]) == dist and not bool(sim.water[0, x]))
         slot = put(sim, 1, mand, g)
         assert int(sim.major_unit_tile[0, slot]) == g
-        sim._trade_walk_tick(1, torch.ones(sim.B, dtype=torch.bool))
+        plunder(sim, raider)
         alive = int(sim.seat_routes[0, 1, 0, 0]) >= 0
         assert alive == guarded, f"a Mandekalu {dist} tiles off: route alive {alive}, want {guarded}"
     print("  1 the escort OK — a Mandekalu 4 tiles off guards the Trader, 5 off does not")
@@ -114,16 +127,16 @@ def test_admiral_hull(rules, path) -> None:
         if hull:
             sea = free_tile(sim, water=True)
             park_route(sim, 1, sea)
-            put(sim, 0, gal, sea)
+            raider = put(sim, 0, gal, sea)
             assert int(sim.military_at[0, sea]) >= 0, "the hull files on the military plane"
         else:
             dry = free_tile(sim, water=False)
             park_route(sim, 1, dry)
-            put(sim, 0, sim._warrior_idx, dry)
+            raider = put(sim, 0, sim._warrior_idx, dry)
         at_war(sim, 0, 1)
         sim.civ_gp_perm[0, 0, k] = pct
         g0 = float(sim.civ_treasury[0, 0])
-        sim._trade_walk_tick(1, torch.ones(sim.B, dtype=torch.bool))
+        plunder(sim, raider)
         assert int(sim.seat_routes[0, 1, 0, 0]) == -1, "the route was not plundered"
         got = float(sim.civ_treasury[0, 0]) - g0
         assert abs(got - sim._trade_plunder_gold * want) < 1e-9, \
@@ -152,10 +165,10 @@ def test_plunder_value(rules, path) -> None:
         hb, hk = torch.zeros(1, dtype=torch.long), torch.zeros(1, dtype=torch.long)
         v = float(sim._route_yield_value(1, hb, hk)[0])
         assert v == want_v, f"V {v}, want {want_v}"
-        put(sim, 0, sim._warrior_idx, t)
+        raider = put(sim, 0, sim._warrior_idx, t)
         at_war(sim, 0, 1)
         g0 = float(sim.civ_treasury[0, 0])
-        sim._trade_walk_tick(1, torch.ones(sim.B, dtype=torch.bool))
+        plunder(sim, raider)
         assert int(sim.seat_routes[0, 1, 0, 0]) == -1, "the route was not plundered"
         got = float(sim.civ_treasury[0, 0]) - g0
         assert got == want_gold, f"banked {got}, want {want_gold}"

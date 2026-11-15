@@ -5229,15 +5229,15 @@ class SimSeats:
         g = sc[r]
         seat = self.unit_seat[r, g]
         t = tile[r]
-        # a Trader walking a route of its city-state (`seat_route_unit`): the
-        # route's worth, max(50, floor(V x the turns)), and the route ends
+        # a Trader walking a route of its player (`seat_route_unit`; a
+        # major's or a city-state's): the route's worth, max(50, floor(V x
+        # the turns)), and the route ends
         base_all = torch.full((r.numel(),), float(self._trade_plunder_gold), dtype=torch.float64, device=self.device)
         owner = self.unit_seat[r, tr[r]]
-        for s2 in range(self.S):
-            m2 = owner == 100 + s2
+        for mrow in [*range(self.n_majors), *(self._CITY_MINOR0 + s2 for s2 in range(self.S))]:
+            m2 = owner == int(self._ROW_SEAT[mrow])
             if not bool(m2.count_nonzero()):
                 continue
-            mrow = self._CITY_MINOR0 + s2
             hitk = (self.seat_route_unit[r, mrow] == tr[r].unsqueeze(1)) & (self.seat_routes[r, mrow, :, 0] >= 0)
             on = m2 & hitk.any(dim=1)
             if not bool(on.count_nonzero()):
@@ -9810,7 +9810,7 @@ class SimSeats:
         seat_route_dseat) pays the table's INTERNATIONAL column over the
         dest's completed districts plus the centre row (gold 3), into every
         yield the rows name. A route pays while it LIVES — interdiction is the
-        PLUNDER kill in _trade_walk_tick, and a war CANCELS the pair's routes
+        Plunder Trade Route command (`_plunder_trader`), and a war CANCELS the pair's routes
         at the declaration, so no per-read war or raid gate survives here.
 
         Every specialty count is a DISTRICT REGISTRY read, for this row's own
@@ -17538,25 +17538,19 @@ class SimSeats:
 
     def _trade_walk_tick(self, row: int, active: torch.Tensor, only: torch.Tensor | None = None,
                          skip: torch.Tensor | None = None) -> None:
-        """The Trader's WALK, then PLUNDER — phase.ts's trade-block head.
-        With `only` [B, K], the walk of those route slots alone and no
-        plunder: a route's first plot the turn it starts (`commitRoute`'s
-        `tradeRouteStep`). With `skip` [B, K], those route slots neither walk
-        nor meet a raider (a city-state's routes begun this turn: `minorTrade`).
+        """The Trader's WALK — phase.ts's trade-block head (`tradeRouteWalk`).
+        With `only` [B, K], the walk of those route slots alone: a route's
+        first plot the turn it starts (`commitRoute`'s `tradeRouteStep`).
+        With `skip` [B, K], those route slots do not walk (a city-state's
+        routes begun this turn: `minorTrade`).
 
-        WALK: every route's walker takes one plot along the route's stored
-        course (`seat_route_course`) toward its leg's end (dest out, origin
-        home), lays road where it lands on land, turns around at the
-        destination and starts a fresh round trip at home; a route whose
-        origin or destination city is gone does not walk.
-
-        PLUNDER: a unit hostile to the route's owner that may plunder (a
-        Combat, Ranged or Bombard strength, not embarked) standing on the
-        walker's tile destroys the route AND its Trader (`routePlunderer`); a
-        MAJOR raider (the lowest hostile seat id on a shared tile — the
-        cross-engine tie-break) banks the gold (`routePlunderGold`), the
-        admirals' percentage only where its hull stands on the tile. An
-        immune walker (`_trader_immune`) is never plundered.
+        Every route's walker takes one plot along the route's stored course
+        (`seat_route_course`) toward its leg's end (dest out, origin home),
+        lays road where it lands on land, turns around at the destination and
+        starts a fresh round trip at home; a route whose origin or destination
+        city is gone does not walk. A step onto a plot a hostile unit holds
+        takes nothing: a route is plundered only by the Plunder Trade Route
+        command (`_plunder_trader`).
         """
         act = self.seat_routes[:, row, :, 0] >= 0  # [B, K]
         if skip is not None:
@@ -17605,85 +17599,6 @@ class SimSeats:
                         rb = bb[m]
                         self._look_reveal(rb, torch.full_like(rb, seat_v), nxt[m],
                                           torch.full_like(rb, self._trader_idx), torch.zeros_like(rb))
-        if only is not None:
-            return
-        wt = self.seat_route_walk[:, row]
-        chk = act & (wt >= 0) & active.unsqueeze(1)
-        if not bool(chk.count_nonzero()):
-            return
-        bb, kk = chk.nonzero(as_tuple=True)
-        tiles = wt[bb, kk]
-        # `routePlunderer` walks EVERY unit on the tile — the support plane too
-        ms = self.military_at[bb, tiles]
-        cv = self.civilian_at[bb, tiles]
-        su = self.support_at[bb, tiles]
-
-        # a unit that may plunder (`canPlunder`, the command's can-do
-        # 0x9555a0): a Combat, Ranged or Bombard strength above 0; an
-        # embarked unit never, so the embarked plane holds no raider
-        def raider_seat(ix: torch.Tensor) -> torch.Tensor:
-            ty = self.unit_type[bb, ix.clamp(min=0)].clamp(min=0)
-            can = ((self._type_combat.take(ty) > 0) | (self._type_ranged_strength.take(ty) > 0)
-                   | (self._type_bombard.take(ty) > 0))
-            return torch.where((ix >= 0) & can, self.unit_seat[bb, ix.clamp(min=0)], torch.full_like(ix, -1))
-        s_m, s_c, s_s = raider_seat(ms), raider_seat(cv), raider_seat(su)
-
-        def hostile(sp: torch.Tensor) -> torch.Tensor:
-            valid = sp >= 0
-            barb = sp == BARB_SEAT
-            rb = self._seat_row.take(sp.clamp(min=0))
-            at_war = self.war[bb, row, rb]
-            return valid & (sp != row) & (barb | at_war)
-
-        h_m, h_c, h_s = hostile(s_m), hostile(s_c), hostile(s_s)
-        big = torch.full_like(s_m, 1 << 30)
-        raider = torch.minimum(torch.where(h_m, s_m, big), torch.where(h_c, s_c, big))
-        raider = torch.minimum(raider, torch.where(h_s, s_s, big))
-        # an immune walker (`traderImmune`: Reform the Coinage's golden face,
-        # Lisbon's suzerain on water, an escort of its owner's in reach) takes
-        # the raider off the Trader
-        _own = torch.full_like(tiles, int(self._ROW_SEAT[row]))
-        raider = torch.where(self._trader_immune(bb, _own, tiles), big, raider)
-        hit = raider < (1 << 30)
-        if not bool(hit.count_nonzero()):
-            return
-        hb, hk, hr = bb[hit], kk[hit], raider[hit]
-        # the raider's HULL on the Trader's tile (`plunderedByHull`): the
-        # military plane is where a ship stands, and no other plane holds one
-        _hull = (s_m[hit] == hr) & self.unit_naval[self.unit_type[hb, ms[hit].clamp(min=0)].clamp(min=0)]
-        # THE PAYOUT (`routePlunderGold`): max(50, floor(V x the turns)), V
-        # the route's yield value, read before the route goes
-        _v = self._route_yield_value(row, hb, hk)
-        _base = torch.maximum(torch.full_like(_v, float(self._trade_plunder_gold)),
-                              torch.floor(_v * self._trade_plunder_turns))
-        mj = hr < self.n_majors
-        if bool(mj.count_nonzero()):
-            # the plundering unit's one percent (0x5545e0, unit +0x1858): the
-            # raider's policies' (Total War, Letter of Marque) plus, when a
-            # hull plunders, the admirals' (Francis Drake, Ching Shih) — each
-            # an EFFECT_ADJUST_UNIT_PLUNDER_YIELDS on the unit, so they add
-            _pp = self._gp_perm_at(hr[mj], "routePlunderPct", hb[mj]).double()
-            _pct = (self._fx_at_seat("rplun", hr[mj], hb[mj]).double()
-                    + torch.where(_hull[mj], _pp, torch.zeros_like(_pp)))
-            _gold = _base[mj] + torch.floor(_base[mj] * _pct / 100)
-            self.civ_treasury.index_put_((hb[mj], hr[mj]), _gold, accumulate=True)
-        # a city-state raider banks the base into its own treasury (it
-        # carries no government or Great Person rows)
-        cs = (hr >= 100) & (hr < 100 + self.citystate_treasury.shape[1])
-        if bool(cs.count_nonzero()):
-            self.citystate_treasury.index_put_((hb[cs], hr[cs] - 100), _base[cs], accumulate=True)
-        # ...and the Trader unit walking it dies with it
-        _drop = torch.zeros_like(act)
-        _drop[hb, hk] = True
-        self._routes_kill_walkers(row, _drop)
-        self.seat_routes[hb, row, hk] = -1
-        self.seat_route_dseat[hb, row, hk] = -1
-        self.seat_route_dcity[hb, row, hk] = -1
-        self.seat_route_born[hb, row, hk] = -1
-        self.seat_route_walk[hb, row, hk] = -1
-        self.seat_route_leg[hb, row, hk] = -1
-        self.seat_route_unit[hb, row, hk] = -1
-        self._compact_routes(row)
 
     def _compact_routes(self, row: int) -> None:
         """Close the holes in one seat row's route slots, live routes keeping

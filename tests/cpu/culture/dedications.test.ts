@@ -7,7 +7,7 @@ import { archaeologistExcavate, spawnUnit, unitIsMilitary } from '../../../cpu/c
 import { meleeAttack } from '../../../cpu/core/combat';
 import { revealAround } from '../../../cpu/core/fog';
 import { completeQueueItem, fxFactor, stepAmount } from '../../../cpu/core/production';
-import { routePlunderer, cityTradeYields, tradeRouteMinDuration } from '../../../cpu/core/trade';
+import { traderImmune, cityTradeYields, tradeRouteMinDuration } from '../../../cpu/core/trade';
 import { computeCityStats, seatTourism } from '../../../cpu/core/city';
 import { effectiveAdjacency } from '../../../cpu/core/yields';
 import { enterEra, goldenMoveBonus } from '../../../cpu/core/eras';
@@ -131,13 +131,13 @@ describe('the four new dedications', () => {
     dt.district = 'CAMPUS';
     dt.districtComplete = true;
     dest.districts.push({ type: 'CAMPUS', tileIndex: dt.index });
-    // a hostile barb standing ON the Trader's tile plunders the route...
+    // a Trader may be plundered on its plot...
     const bt = tileAtCoords(state.map, 10, 9).index;
     spawnUnit(state, 'WARRIOR', bt, BARB_SEAT);
-    expect(routePlunderer(state, bt, 0)).toBe(BARB_SEAT);
+    expect(traderImmune(state, 0, bt)).toBe(false);
     // ...until the Golden face
     commit(state, 0, DED_COINAGE, true);
-    expect(routePlunderer(state, bt, 0)).toBe(null);
+    expect(traderImmune(state, 0, bt)).toBe(true);
     state.units = state.units.filter((u) => u.seat !== BARB_SEAT); // the raider leaves before the yield reads
     seatOf(state, 0)!.tradeRoutes = [
       { from: city.id, to: -1, toSeat: 1, toSeatCity: dest.id },

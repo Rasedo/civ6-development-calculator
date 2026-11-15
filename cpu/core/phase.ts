@@ -3820,7 +3820,7 @@ export function seatPhase(state: GameState, only?: { seats: ReadonlySet<number>;
     // Trade. The route DECISION rides the wire — a real player spends a
     // Trader on a chosen pair — so the engine only re-validates the named
     // pair; the pair-picking scan lives with the deciders (the driver's
-    // candidate row / drive.py). The engine rules are the walk and plunder
+    // candidate row / drive.py). The engine rules are the walk
     // (`tradeRouteWalk`) and the round-trip expiry (`tradeRouteExpiry`), the
     // same two a city-state's routes run (`minorTrade`).
     {

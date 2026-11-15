@@ -3551,7 +3551,7 @@ class SimInit:
         self._trade_plunder_gold = int(_tr["plunderGold"])
         self._trade_plunder_turns = int(_tr["plunderTurns"])  # V × this (`routePlunderGold`)
         self._gold_equiv_other = int(_tr["goldEquivalentOther"])  # a non-Gold yield's Gold weight in V
-        self._trader_guard_radius = int(_tr["guardRadius"])  # an escort's reach (`routePlunderer`)
+        self._trader_guard_radius = int(_tr["guardRadius"])  # an escort's reach (`traderImmune`)
         self._trade_walk_rail = int(_tr["walkRail"])
         # the path term (`routePathGold`): the score per water plot, railroad
         # plot, Canal plot and portal taken, the ratio's cap (in denominators)

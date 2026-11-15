@@ -20,9 +20,8 @@ income + expiry):
     seat no longer holds is dropped while a live pair survives;
   * a CAPTURED destination drops the route even though its centre tile is
     still a live city centre — the case a tile key could not see;
-  * plunder takes a unit that may plunder (a Combat, Ranged or Bombard
-    strength, not embarked: the command's can-do 0x9555a0), so an EMBARKED hostile
-    on the walker's tile leaves the route standing;
+  * the walk beside a hostile on the walker's tile takes nothing: a route is
+    plundered by the Plunder Trade Route command alone;
   * the route tensors ride snapshot/restore.
 """
 
@@ -298,8 +297,8 @@ def main() -> None:
     assert int(s5.seat_routes[0, orow, 0, 0]) == -1, "term + walker HOME must end the route"
     print("walk + round-trip expiry ok")
 
-    # --- 8) PLUNDER: an at-war major on the walker tile kills the route and
-    #        banks the gold; the Trader does NOT come back --------------------
+    # --- 8) an at-war major on the walker tile: the walk takes nothing — a
+    #        route is plundered by the Plunder Trade Route command alone ------
     s6 = settle_all(BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64))
     o6 = int(s6.city_center[0, 1, 0])
     nb6 = int(s6.neigh[o6][0])
@@ -318,46 +317,9 @@ def main() -> None:
     s6.sync_war()  # close the poke under transpose
     g0 = float(s6.civ_treasury[0, 0])
     s6._trade_walk_tick(1, torch.ones(s6.B, dtype=torch.bool))
-    assert int(s6.seat_routes[0, 1, 0, 0]) == -1, "an at-war unit on the walker tile plunders"
-    assert abs(float(s6.civ_treasury[0, 0]) - g0 - s6._trade_plunder_gold) < 1e-9, "the raider banks plunderGold"
-    tr6 = int((s6.major_unit_alive[0] & (s6.major_unit_seat[0] == 1)
-               & (s6.major_unit_type[0] == s6._trader_idx)).sum())
-    assert tr6 == 0, "plunder DESTROYS the Trader — no return"
-    print("plunder ok")
-
-    # --- 8b) the hostile is a PASSENGER: an embarked unit may not plunder
-    #         (`canPlunder`), so the route stands -----------------------------
-    s6b = settle_all(BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64))
-    sea = next((t_ for t_ in range(s6b.T)
-                if bool(s6b.wpass[0, t_]) and int(s6b.military_at[0, t_]) < 0
-                and int(s6b.civilian_at[0, t_]) < 0 and int(s6b.embarked_at[0, t_]) < 0), -1)
-    assert sea >= 0, "fixture has no free water tile"
-    s6b.seat_routes[0, 1, 0, 0] = int(s6b.city_id[0, 1, 0])
-    s6b.seat_routes[0, 1, 0, 1] = int(s6b.city_id[0, 1, 0])
-    s6b.seat_route_exp[0, 1, 0] = int(s6b.turn) + s6b._trade_duration
-    s6b.seat_route_walk[0, 1, 0] = sea
-    s6b.seat_route_leg[0, 1, 0] = -1          # parked: the walker stays under the raider
-    born = s6b._spawn_unit(0, torch.ones(s6b.B, dtype=torch.bool),
-                           torch.full((s6b.B,), int(s6b.city_center[0, 0, 0]), dtype=torch.long),
-                           s6b._warrior_idx)
-    assert bool(born[0]), "the raider must land for this lane to prove anything"
-    p_slot = int(((s6b.major_unit_seat[0] == 0) & s6b.major_unit_alive[0]
-                  & (s6b.major_unit_type[0] == s6b._warrior_idx)).long().argmax())
-    g6 = torch.tensor([p_slot + s6b.POOL_LO["major"]])
-    r6 = torch.zeros(1, dtype=torch.long)
-    s6b._occ_clear(r6, s6b.major_unit_tile[0:1, p_slot], g6)
-    s6b.major_unit_tile[0, p_slot] = sea
-    s6b.major_unit_emb[0, p_slot] = True
-    s6b._occ_set(r6, torch.tensor([sea]), g6)
-    assert int(s6b.embarked_at[0, sea]) == p_slot + s6b.POOL_LO["major"], "the raider must file as a PASSENGER"
-    assert int(s6b.military_at[0, sea]) < 0 and int(s6b.civilian_at[0, sea]) < 0, "and on NO other plane"
-    s6b.war[0, 0, 1] = s6b.war[0, 1, 0] = True
-    s6b.sync_war()
-    g6b = float(s6b.civ_treasury[0, 0])
-    s6b._trade_walk_tick(1, torch.ones(s6b.B, dtype=torch.bool))
-    assert int(s6b.seat_routes[0, 1, 0, 0]) >= 0, "an EMBARKED hostile on the walker tile plunders nothing"
-    assert float(s6b.civ_treasury[0, 0]) == g6b, "the passenger banks nothing"
-    print("plunder (passenger) ok")
+    assert int(s6.seat_routes[0, 1, 0, 0]) >= 0, "the walk beside an at-war unit plunders nothing"
+    assert float(s6.civ_treasury[0, 0]) == g0, "the unit beside the walker banks nothing"
+    print("walk beside a hostile ok")
 
     # --- 9) the candidate + apply pair -------------------------------------
     s7 = settle_all(BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64))
@@ -757,7 +719,7 @@ def main() -> None:
     print("  Sankore OK (incoming x2 sci + domestic faith in the walk; sender +1/+1 on the intl leg)")
 
     print("trade2_test OK — intl District_TradeRouteYields (centre 3 gold, Harbor +3 gold, Campus +1 science), war-cancel with Trader return, "
-          "round-trip expiry, walk + plunder, candidate/apply spend, "
+          "round-trip expiry, the walk, candidate/apply spend, "
           "(seat, city) dest keying incl. a capture, sea legs, trading posts, "
           "the stored course (reach parity, chain gold, Land Acquisition), _MUTABLE round-trip")
 

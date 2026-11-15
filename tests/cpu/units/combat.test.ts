@@ -13,7 +13,7 @@ import {
   XP_BARB_VETERAN, battleXp, cityXp, bankXp, xpToNextLevel, unitLevel,
   promoAvailable, promoReady, takePromotion, promoCS, unitPromoRows,
 } from '../../../cpu/core/promotions';
-import { PLUNDER_ROUTE_GOLD, plunderTargets, plunderTrader, routePlunderer } from '../../../cpu/core/trade';
+import { PLUNDER_ROUTE_GOLD, plunderTargets, plunderTrader } from '../../../cpu/core/trade';
 import { barbarianTechs, raiseCamp } from '../../../cpu/core/barbarians';
 import { neighbors } from '../../../world/hex';
 import { isWater } from '../../../world/query';
@@ -263,15 +263,6 @@ describe('barbarians', () => {
     state.units = []; // barbarians gone
     healCities(state); // unbesieged cities heal at the game turn's end
     expect(city.hp).toBe(21);
-  });
-
-  it('a barbarian ON the Trader tile plunders the route', () => {
-    const { state } = battlefield();
-    settleAt(state, tileAtCoords(state.map, 14, 9).index);
-    const wt = tileAtCoords(state.map, 12, 9).index;
-    expect(routePlunderer(state, wt, 0)).toBe(null);
-    spawnUnit(state, 'WARRIOR', wt, BARB_SEAT);
-    expect(routePlunderer(state, wt, 0)).toBe(BARB_SEAT);
   });
 
   it('the barbarian phase runs inside endTurn without disturbing peace-mode saves', () => {

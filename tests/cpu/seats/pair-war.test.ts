@@ -3,10 +3,10 @@ import { describe, it, expect } from 'vitest';
 import { setWar, BARB_SEAT } from '../../../cpu/core/seats';
 import { seededGame } from '../helpers';
 import { spawnUnit, unitsHostile } from '../../../cpu/core/units';
-import { routePlunderer } from '../../../cpu/core/trade';
+import { plunderTargets } from '../../../cpu/core/trade';
 import { hostileRangedStrike, attackTargets } from '../../../cpu/core/combat';
 import { neighbors } from '../../../world/hex';
-import type { GameState } from '../../../cpu/core/types';
+import type { GameState, Unit } from '../../../cpu/core/types';
 
 // — a civ's war with another civ is a real war.
 //
@@ -45,39 +45,49 @@ function tilesNear(state: GameState, centre: number): { near: number; far: numbe
 }
 
 describe('civ↔civ trade plunder', () => {
-  it('an at-war CIV SEAT suspends another civ\'s route, exactly as seat 0 does', () => {
+  /** the raider's Plunder Trade Route targets on its plot, the owner's Trader there */
+  const targets = (state: GameState, raider: Unit) => plunderTargets(state, raider).length;
+  /** a unit of `seat` standing on `tile` */
+  const put = (state: GameState, type: string, tile: number, seat: number): Unit => {
+    const u = spawnUnit(state, type, tile, seat)!;
+    u.tileIndex = tile;
+    return u;
+  };
+
+  it('an at-war CIV SEAT plunders another civ\'s Trader, exactly as seat 0 does', () => {
     const state = newGame();
     const centre = seatOf(state, 0)!.cities[0].centerIndex;
     const { near, far } = tilesNear(state, centre);
     const owner = 1;
     const raider = 2;
+    put(state, 'TRADER', near, owner);
 
     const u = spawnUnit(state, 'WARRIOR', far, raider)!;
-    expect(routePlunderer(state, near, owner)).toBe(null); // not on the tile
+    expect(targets(state, u)).toBe(0); // not on the tile
 
     u.tileIndex = near;
-    expect(routePlunderer(state, near, owner)).toBe(null); // on the tile, at PEACE
+    expect(targets(state, u)).toBe(0); // on the tile, at PEACE
 
     setWar(state, owner, raider, true);
-    expect(routePlunderer(state, near, owner)).toBe(raider); // AT WAR
+    expect(targets(state, u)).toBe(1); // AT WAR
 
     setWar(state, owner, raider, false);
-    expect(routePlunderer(state, near, owner)).toBe(null); // peace again
+    expect(targets(state, u)).toBe(0); // peace again
   });
 
   it('a barbarian plunders with no war at all, and a THIRD civ at peace does not', () => {
     const state = newGame();
     const centre = seatOf(state, 0)!.cities[0].centerIndex;
-    const { near, far } = tilesNear(state, centre);
+    const { near } = tilesNear(state, centre);
     const owner = 1;
+    put(state, 'TRADER', near, owner);
 
-    const neutral = spawnUnit(state, 'WARRIOR', near, 3)!;
-    expect(routePlunderer(state, near, owner)).toBe(null);
+    const neutral = put(state, 'WARRIOR', near, 3);
+    expect(targets(state, neutral)).toBe(0);
 
     // ...and the barbarian standing on the same tile does plunder (caps.alwaysHostile)
-    neutral.tileIndex = far;
-    spawnUnit(state, 'WARRIOR', near, BARB_SEAT);
-    expect(routePlunderer(state, near, owner)).toBe(BARB_SEAT);
+    const barb = put(state, 'WARRIOR', near, BARB_SEAT);
+    expect(targets(state, barb)).toBe(1);
   });
 
   it('a civ does not plunder its OWN route', () => {
@@ -85,8 +95,9 @@ describe('civ↔civ trade plunder', () => {
     const centre = seatOf(state, 0)!.cities[0].centerIndex;
     const { near } = tilesNear(state, centre);
     const owner = 1;
-    spawnUnit(state, 'WARRIOR', near, owner);
-    expect(routePlunderer(state, near, owner)).toBe(null);
+    put(state, 'TRADER', near, owner);
+    const u = put(state, 'WARRIOR', near, owner);
+    expect(targets(state, u)).toBe(0);
   });
 
   it('plunder needs a war, whichever pair of seats it is', () => {
@@ -94,10 +105,11 @@ describe('civ↔civ trade plunder', () => {
     const centre = seatOf(state, 0)!.cities[0].centerIndex;
     const { near } = tilesNear(state, centre);
     const raider = 1;
-    spawnUnit(state, 'WARRIOR', near, raider);
-    expect(routePlunderer(state, near, 0)).toBe(null);
+    put(state, 'TRADER', near, 0);
+    const u = put(state, 'WARRIOR', near, raider);
+    expect(targets(state, u)).toBe(0);
     setWar(state, 0, raider, true);
-    expect(routePlunderer(state, near, 0)).toBe(raider);
+    expect(targets(state, u)).toBe(1);
   });
 });
 

@@ -8,7 +8,7 @@ import { makeMap, makeState, tileAtCoords } from '../helpers';
 import { emptySeat, setWar } from '../../../cpu/core/seats';
 import { spawnUnit } from '../../../cpu/core/units';
 import { chassisAbilityCS, mayCapture } from '../../../cpu/core/combat';
-import { routePlunderer } from '../../../cpu/core/trade';
+import { traderImmune } from '../../../cpu/core/trade';
 import { UNITS } from '../../../cpu/data/units';
 import { scaleByGameSpeed } from '../../../cpu/data/constants';
 import type { GameState, Unit } from '../../../cpu/core/types';
@@ -131,30 +131,30 @@ describe('the sea and air clauses', () => {
     sea(state, [6, 7], 6);
     const wet = tileAtCoords(state.map, 6, 6);
     put(state, 'GALLEY', 6, 6, 1); // the raider afloat
-    expect(routePlunderer(state, wet.index, 0)).toBe(1);
+    expect(traderImmune(state, 0, wet.index)).toBe(false);
     put(state, 'BIREME', 7, 6, 0);
-    expect(routePlunderer(state, wet.index, 0)).toBe(null);
+    expect(traderImmune(state, 0, wet.index)).toBe(true);
     // the LAND guard does not answer for water
     const land = tileAtCoords(state.map, 16, 16);
     put(state, 'WARRIOR', 16, 16, 1);
     put(state, 'MANDEKALU_CAVALRY', 17, 16, 0);
-    expect(routePlunderer(state, land.index, 0)).toBe(null);
+    expect(traderImmune(state, 0, land.index)).toBe(true);
   });
 
   it('lets the Bireme reach a Trader 4 tiles off, and no farther', () => {
     // CIV6: "Trader units are immune to being plundered if they are within 4
     // tiles of a Bireme and on a water tile" (TRADER_IS_WITHIN_FOUR_REQUIREMENT)
-    const guardAt = (col: number): number | null => {
+    const guardAt = (col: number): boolean => {
       const state = scene();
       state.seats.push(emptySeat(1));
       setWar(state, 0, 1, true);
       sea(state, [6, 7, 8, 9, 10, 11], 6);
       put(state, 'GALLEY', 6, 6, 1);
       put(state, 'BIREME', col, 6, 0);
-      return routePlunderer(state, tileAtCoords(state.map, 6, 6).index, 0);
+      return traderImmune(state, 0, tileAtCoords(state.map, 6, 6).index);
     };
-    expect(guardAt(10)).toBe(null);
-    expect(guardAt(11)).toBe(1);
+    expect(guardAt(10)).toBe(true);
+    expect(guardAt(11)).toBe(false);
   });
 
   it('gives the Janissary its free promotion and the Saka its early bow', () => {

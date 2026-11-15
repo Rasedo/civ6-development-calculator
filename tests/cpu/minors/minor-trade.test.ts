@@ -6,7 +6,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import { makeMap, makeState, settleAt, tileAtCoords } from '../helpers';
-import { emptySeat, seatOfCityState, setTileOwner } from '../../../cpu/core/seats';
+import { BARB_SEAT, emptySeat, seatOfCityState, setTileOwner } from '../../../cpu/core/seats';
 import { declareWarOnCityState, minorCity } from '../../../cpu/core/cityStates';
 import {
   cityStateRouteYields, cityTradeYields, minorTrade, minorTradePick, routeDestCenter, routeOriginCenter,
@@ -134,6 +134,20 @@ describe("a city-state's route", () => {
     tradeTurn(state, cs);
     expect(routeDestCenter(state, cs, cs.tradeRoutes![0])).toBe(dest);
     expect(cityTradeYields(state, minorCity(cs)).gold).toBe(firstGold + 1);
+  });
+
+  it('its Trader steps onto a plot a barbarian holds and the route runs on', () => {
+    const { state, cs } = scene();
+    const trader = spawnUnit(state, 'TRADER', cs.centerIndex, cs.seat)!;
+    tradeTurn(state, cs);
+    const r = cs.tradeRoutes![0];
+    const next = r.course![r.course!.indexOf(r.walkTile!) + 1];
+    spawnUnit(state, 'SCOUT', next, BARB_SEAT);
+    state.turn += 1;
+    tradeTurn(state, cs);
+    expect(r.walkTile).toBe(next);
+    expect(cs.tradeRoutes).toEqual([r]);
+    expect(state.units.includes(trader)).toBe(true);
   });
 
   it("a war with the destination's holder cancels it, and a destination at war is never taken", () => {
