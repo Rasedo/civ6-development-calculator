@@ -7,7 +7,7 @@
 import type { AiCityDefenceView, AiKnownCityView, AiKnownDistrictView, AiMapPlotView, AiUnitView, AiView } from './aiViewTypes';
 import { DIRECTION_TYPES, hexDistance, neighborTile, neighbors, tilesWithin } from '../../world/hex';
 import { isCoastalLand, isImpassable, isMountain, isWater } from '../../world/query';
-import type { Tile } from '../../world/types';
+import { NO_SEAT, type Tile } from '../../world/types';
 import { FX, fmul, fxOf, turnsAt, type AiCityView, type AiDistrictView, type AiPlotView } from './aiValue';
 import { AI_YIELDS, pseudoYieldWeights, yieldWeights } from './aiWeights';
 import { engineId, gameTypeOf, installFeature, installTerrain } from '../data/aliases';
@@ -16,11 +16,11 @@ import { CITY_STRIKE_RANGE, plotPressureLead } from './phase';
 import { governorSum } from './governors';
 import { CITY_STATE_SUZERAIN_BONUS, MINOR_UPGRADE_GOLD, govInfluence } from '../data/cityStates';
 import { BARB_SEAT, FREE_SEAT, campTiles, cityHolders, citiesOf, civsAtWar, denounceActive, seatsAllied, seatsFriends, hiddenResourcesFor, homeContinent, isCiv, onHomeContinent, isCityStateSeat, tradeRoutesJoin, leaderOf, majorityReligionOf, seatOf, tileSeat, unitsOf, warsOf } from './seats';
-import { aiDefenderOf, aiFormed, aiRanged, aiStrengths, districtHealth, planUnit, planningAt, reachPlots, tacticalTargets, type Target } from './tactical';
+import { aiDefenderOf, aiFormed, aiRanged, aiStrengths, districtHealth, planUnit, planningAt, reachPlots, revealedPlots, tacticalTargets, type Target } from './tactical';
 import { AIR_REBASE_COLS, AIR_STRIKE_COLS, IMPROVEMENT_IDS, unitActionIndex } from './unitActions';
 import { airPillageTargets, airStrikeTargets, rebaseTargets } from './air';
 import { plotsSeenNow, ringPlots } from './barbarians';
-import { cityDefenseStrength, cityStrikeBase, cityStrikeStrength, districtGarrisonedStrength, encircled, garrisonTerm, predictCityBlow, siegeAssist, unitAttackRange } from './combat';
+import { cityDefenseStrength, cityStrikeBase, districtGarrisonedStrength, encircled, garrisonTerm, predictCityBlow, siegeAssist, unitAttackRange } from './combat';
 import { encampOuterPool, outerPool, portalAt, wallsMax, wallsTier } from './rules';
 import { targetStrength } from './opsOrders';
 import { borderClosedTo, builderCost, cityAtIndex, embarkTechMoves, formationMates, plotUnits, traderCost, unitFullMoves, unitDomain, unitExertsZoc, unitsHostile, unitVisibleTo } from './units';
@@ -141,7 +141,7 @@ export function aiView(state: GameState, opts: { updated?: boolean } = {}): AiVi
   const targetLists = new Map<number, Target[]>();
   const targetsOf = (i: number): Target[] => {
     let t = targetLists.get(i);
-    if (!t) targetLists.set(i, (t = tacticalTargets(state, i, plotsSeenNow(state, new Set([i])), null, seatOf(state, i)?.armyKnown ?? [])));
+    if (!t) targetLists.set(i, (t = tacticalTargets(state, i, plotsSeenNow(state, new Set([i])), revealedPlots(state, i), seatOf(state, i)?.armyKnown ?? [])));
     return t;
   };
   const unitTables = new Map<number, ReadonlyMap<string, { value: number }>>();
@@ -824,26 +824,72 @@ export function aiView(state: GameState, opts: { updated?: boolean } = {}): AiVi
   };
 }
 
-/** the cities the seat has revealed the centre of, as its knowledge base
- *  records them (0x5f0280 -> 0x5efaf0, a look's fill of each revealed plot
- *  holding a district with hit points): the centre, then each Encampment
- *  placed on a plot the seat revealed — its city's standing strength with
- *  its own plot's garrison (0x24ae80), its walls and strike while its own
- *  perimeter stands (one not yet built behind its city's whole walls) */
+/** the cities a look names (0x7877e0 at 0x7878e1..0x78791f for a plot seen,
+ *  0x787c64..0x787ca7 for one only revealed, -> 0x5f0280): the plots in
+ *  index order, each one `seen` that holds a district of any kind under an
+ *  owner (plot +0x10 and +0x1c: a city's centre, a district placed, a
+ *  wonder's plot) names that district's city — its owner's seat and its
+ *  city id (-1 a city-state's one city) — once, at its first such plot */
+export function lookCities(state: GameState, seen: (plot: number) => boolean): { owner: number; id: number }[] {
+  const out: { owner: number; id: number }[] = [];
+  const has = new Set<string>();
+  for (const t of state.map.tiles) {
+    const owner = tileSeat(t);
+    if ((t.district === null && !t.builtWonder) || owner === NO_SEAT || !seen(t.index)) continue;
+    const id = isCityStateSeat(owner) ? -1 : t.ownerCity;
+    const key = `${owner}:${id}`;
+    if (has.has(key)) continue;
+    has.add(key);
+    out.push({ owner, id });
+  }
+  return out;
+}
+
+/** the plots a seat's knowledge base's look takes (0x7877e0: visibility
+ *  count +0x290 above 0, else the revealed byte +0x2f0): a city-state's
+ *  revealed plots, a major's and the barbarians' explored ones, the Free
+ *  Cities' those they see */
+function lookPlots(state: GameState, seat: number): (plot: number) => boolean {
+  if (isCityStateSeat(seat)) {
+    const revealed = state.cityStates.find((c) => c.seat === seat)?.revealed;
+    return (p) => revealed?.[p] === 1;
+  }
+  if (seat === FREE_SEAT) {
+    const sees = plotsSeenNow(state, new Set([FREE_SEAT]));
+    return (p) => sees[p] === 1;
+  }
+  return (p) => isExplored(state, seat, p);
+}
+
+/** the cities the seat's knowledge base holds, as it records them (the look
+ *  0x7877e0 -> 0x5f0280 -> 0x5efaf0): a city-state's the cities of its list
+ *  (`CityState.citiesKnown`), any other seat's each city a district of which
+ *  stands on a plot its look takes (`lookCities`); the majors' cities and
+ *  the Free Cities' first, then the city-states'. Per
+ *  city its record, then an entry for each district with hit points on a
+ *  plot the look takes: the centre, and each Encampment — its city's
+ *  standing strength with its own plot's garrison (0x24ae80), its walls and
+ *  strike while its own perimeter stands (one not yet built behind its
+ *  city's whole walls). The strike is the city's whole one (0x249ee0 with no
+ *  damage: `cityStrikeBase`). A city known by another district's plot alone
+ *  holds no district entry. */
 function knownCities(state: GameState, seat: number): AiKnownCityView[] {
   const out: AiKnownCityView[] = [];
+  const looked = lookPlots(state, seat);
   const add = (c: City, originalCapital: boolean) => {
-    if (!isExplored(state, seat, c.centerIndex)) return;
     const t = computeCityStats(state, c).total;
-    const defense = cityDefenseStrength(state, c);
-    const walled = outerPool(state, c) > 0;
-    const forts: AiKnownDistrictView[] = [];
+    const districts: AiKnownDistrictView[] = [];
+    if (looked(c.centerIndex)) {
+      const defense = cityDefenseStrength(state, c);
+      const walled = outerPool(state, c) > 0;
+      districts.push({ plot: c.centerIndex, defense, walls: walled ? defense : 0, strike: walled ? cityStrikeBase(state, c) : 0 });
+    }
     for (const d of c.districts) {
-      if (d.type !== 'ENCAMPMENT' || !isExplored(state, seat, d.tileIndex)) continue;
+      if (d.type !== 'ENCAMPMENT' || !looked(d.tileIndex)) continue;
       const tile = state.map.tiles[d.tileIndex];
       const stands = (tile.districtComplete ? encampOuterPool(state, c, tile) : wallsMax(state, c)) > 0;
       const own = districtGarrisonedStrength(state, c, d.tileIndex);
-      forts.push({ plot: d.tileIndex, defense: own, walls: stands ? own : 0, strike: stands ? cityStrikeStrength(state, c) : 0 });
+      districts.push({ plot: d.tileIndex, defense: own, walls: stands ? own : 0, strike: stands ? cityStrikeBase(state, c) : 0 });
     }
     const resources = new Map<string, number>();
     for (const tile of state.map.tiles) {
@@ -853,12 +899,13 @@ function knownCities(state: GameState, seat: number): AiKnownCityView[] {
     }
     out.push({
       plot: c.centerIndex, owner: c.seat, id: c.id, population: c.population, originalCapital, capital: c.isCapital,
-      yields: aiYieldKeys().map((k) => Math.trunc(t[k])), wonders: c.wonders.length,
-      districts: [{ plot: c.centerIndex, defense, walls: walled ? defense : 0, strike: walled ? cityStrikeStrength(state, c) : 0 }, ...forts]
+      yields: aiYieldKeys().map((k) => Math.trunc(t[k])), wonders: c.wonders.length, districts
     });
   };
-  for (const h of cityHolders(state)) for (const c of h.cities) add(c, (c.origCapitalSeat ?? -1) >= 0);
-  for (const cs of state.cityStates) if (cs.centerIndex >= 0) add({ ...minorCity(cs), isCapital: true }, true);
+  const listed = new Set((isCityStateSeat(seat) ? state.cityStates.find((c) => c.seat === seat)?.citiesKnown ?? [] : lookCities(state, looked))
+    .map((k) => `${k.owner}:${k.id}`));
+  for (const h of cityHolders(state)) for (const c of h.cities) if (listed.has(`${h.seat}:${c.id}`)) add(c, (c.origCapitalSeat ?? -1) >= 0);
+  for (const cs of state.cityStates) if (cs.centerIndex >= 0 && listed.has(`${cs.seat}:-1`)) add({ ...minorCity(cs), isCapital: true }, true);
   return out;
 }
 

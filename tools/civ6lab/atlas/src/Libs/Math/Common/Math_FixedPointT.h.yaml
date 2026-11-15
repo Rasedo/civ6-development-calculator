@@ -748,6 +748,7 @@
   readings:
     - "C-97: the other actions' desires, the trust and the transitions — the friendship, the alliance, the trust, the threat term and the transitions READ; the war value, the deals and the victories' progress PARTLY READ"
     - "C-97: the war desires, the war operation's readiness and the assault's executions — the war value, the not-ready hook, the readiness and the executions READ; the leader's war factor, the WMD flags, the deal items and the war record's writer unread"
+    - "C-129 / C-125 / C-95: the known cities by any district plot the look takes, their whole strike; the target list's revealed plots, its two district entries, its religious and neutral entries — READ (0x7877e0 at 0x7878a0..0x78796e / 0x787c38..0x787cac, 0x5f0280, 0x5f0490 -> 0x5eff10, 0x810d0, 0x81330, 0x783980 at 0x783e98..0x7842eb / 0x7843b8..0x7844f3 / 0x784f5c..0x785008 / 0x785271..0x78555d), FIT (a unit at peace takes no spot), both twins"
   context:
     - "...more majors (0x3dfae0); disfavoured -9999 (@f04cb0); else X the war value (0x7b7760: 0x7b7ab0 + 0x7b7830 unless the flag + 0x7b87b0 where a casus belli is named; the parts unread),..."
   review: reviewed

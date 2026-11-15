@@ -414,6 +414,7 @@
       value: "a   Neighborhood, an Aqueduct none: 1124 t201, the Ironclads pass the   Neighborhood at 17:15 for the Campus at 17:14), complete (+0xb08) and not   pillaged (0x24c3a0);"
   readings:
     - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
+    - "C-129 / C-125 / C-95: the known cities by any district plot the look takes, their whole strike; the target list's revealed plots, its two district entries, its religious and neutral entries — READ (0x7877e0 at 0x7878a0..0x78796e / 0x787c38..0x787cac, 0x5f0280, 0x5f0490 -> 0x5eff10, 0x810d0, 0x81330, 0x783980 at 0x783e98..0x7842eb / 0x7843b8..0x7844f3 / 0x784f5c..0x785008 / 0x785271..0x78555d), FIT (a unit at peace takes no spot), both twins"
   context:
     - "...lse of the plot — and a PASSIVE_DISTRICT where its type counts toward the city's limit (0x527e30: Districts.RequiresPopulation; a Neighborhood, an Aqueduct none: 1124 t201, the Ironcla..."
   review: reviewed

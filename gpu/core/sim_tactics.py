@@ -351,6 +351,19 @@ class SimTactics:
             return ex | ~ex.any(dim=1, keepdim=True)
         return None
 
+    def _tac_rev(self, seat: int) -> torch.Tensor | None:
+        """[B, T] bool — `revealedPlots`: the plots `seat` revealed as its
+        target list reads them beside the plots it sees (a city-state's
+        revealed plots, a major's explored plane, the barbarians' under fog);
+        None for a player that holds none."""
+        if 0 <= seat < self.n_majors:
+            return self.seat_explored[:, seat]
+        if 100 <= seat < 100 + self.S:
+            return self.mops_revealed[:, seat - 100]
+        if seat == BARB_SEAT and self.fog_of_war:
+            return self.barb_explored
+        return None
+
     def _tac_enter(self, seat: int, revealed_only: bool = True, foes: bool = True,
                    plain_civ: bool = False,
                    foes_seen: bool = False, rel: bool = False, forts: bool = True) -> tuple[torch.Tensor, torch.Tensor]:
@@ -2310,11 +2323,11 @@ class SimTactics:
 
     def _tac_targets(self, seat: int, kb: int) -> dict:
         """THE TACTICAL TARGET LIST of `seat` (`tacticalTargets`) as plot
-        planes over the plots it sees (a plot the barbarians only revealed
+        planes over the plots it sees (a plot it only revealed, `_tac_rev`,
         giving its districts, camp, goody hut, improvement), the plots in
         index order and each plot's district entry before its other: `dk`
         [B, T] the district
-        entry (0 none, 1 COMBAT_DISTRICT, 2 PASSIVE_DISTRICT) and `ds` its
+        entries (bit 1 COMBAT_DISTRICT, bit 2 PASSIVE_DISTRICT after it) and `ds` their
         player; `ok` the other entry (0 none, 1 LOW, 2 MEDIUM, 3 HIGH, 4 CAMP,
         5 GOODY, 6 TRADER, 7 CIVILIAN, 8 RELIGIOUS, 9 IMPROVEMENT) and `os` its
         player (-1 for a camp, a goody hut or an improvement); `unit` [B, T]
@@ -2343,13 +2356,14 @@ class SimTactics:
         # a district that defends (0x24c2f0): a centre, an Encampment complete
         # and not pillaged
         combat = ctr | (enc & self.district_complete & ~self.district_pillaged)
-        passive = (dd >= 0) & ~enc & ~ctr & self.district_complete & ~self.district_pillaged & spec
+        # the two entries tested apart (0x784051, then 0x7841a6): a standing
+        # Encampment is both
+        passive = (dd >= 0) & ~ctr & self.district_complete & ~self.district_pillaged & spec
         h_own = hostile(ts)
-        dk = torch.zeros_like(ts)
         # a plot only revealed gives its districts, camp, goody hut, improvement
-        rev = self.barb_explored if (seat == BARB_SEAT and self.fog_of_war) else None
+        rev = self._tac_rev(seat)
         look = seen if rev is None else seen | rev
-        dk = torch.where(look & h_own & combat, 1, torch.where(look & h_own & passive, 2, dk))
+        dk = torch.where(look & h_own, combat.long() + 2 * passive.long(), torch.zeros_like(ts))
         ds = torch.where(dk > 0, ts, torch.full_like(ts, -1))
         none = torch.full_like(ts, -1)
 
@@ -2418,7 +2432,9 @@ class SimTactics:
             # layer of more units, or the player's own one, goes on to the
             # religious unit and the improvement
             (7, (n_layer == 1) & (civ_seat != seat), civ_seat),
-            (8, (rel_slot >= 0) & hostile(rel_seat), rel_seat),
+            # the religious layer's one unit, another player's, at peace as
+            # at war (0x784f73..0x785008: no war test)
+            (8, (rel_slot >= 0) & (rel_seat != seat), rel_seat),
             (9, (self.improvement >= 0) & ~self.pillaged & h_own & ~goody, none),
         ):
             hit = cond & ~taken
@@ -2433,10 +2449,10 @@ class SimTactics:
             rk = torch.where(camp, 4, torch.where(goody, 5, torch.where(imp, 9, 0)))
             okk = torch.where(ronly, rk, okk)
             oss = torch.where(ronly, none, oss)
-        # a TRADER, a CIVILIAN or a RELIGIOUS entry only of a player at war
-        # with `seat`, a TRADER one only of a Trader that may be plundered
+        # a TRADER or a CIVILIAN entry only of a player at war with `seat`, a
+        # TRADER one only of a Trader that may be plundered
         okk = torch.where((okk == 6) & ~trader, 0, okk)
-        okk = torch.where(((okk == 6) | (okk == 7) | (okk == 8)) & ~hostile(oss), 0, okk)
+        okk = torch.where(((okk == 6) | (okk == 7)) & ~hostile(oss), 0, okk)
         # the layer's one unit at war: of the civilian class a CIVILIAN, of
         # the support class a LOW unit entry, of any other none
         sup_low = (okk == 7) & one_sup
@@ -2446,7 +2462,9 @@ class SimTactics:
         dseat = torch.where(sup_low, civ_seat, dseat)
         # the walk's unit entries in layer 0 on the plots it sees, the
         # knowledge base's after them on plots it does not
-        uk = torch.where(fight, 1, torch.where((okk == 6) | (okk == 7) | (okk == 8), okk, 0))
+        # (a religious unit of a player at peace takes no spot in a planning:
+        # it is no unit entry of these planes)
+        uk = torch.where(fight, 1, torch.where((okk == 6) | (okk == 7) | ((okk == 8) & hostile(oss)), okk, 0))
         us = torch.where(uk > 0, torch.where(fight, dseat, oss), none)
         uu = torch.where(fight, dslot, torch.where(okk == 7, civ_slot, torch.where(okk == 6, trd, torch.where(okk == 8, rel_slot, none))))
         uo = torch.where(uk > 0, self._arange_bt, torch.full_like(ts, 1 << 40))
@@ -2623,7 +2641,7 @@ class SimTactics:
         inl = self.pair_dist[here].to(torch.long) <= lim.unsqueeze(1)
         BIG = 1 << 40
         ar = torch.arange(T, device=dev).unsqueeze(0)
-        kd = torch.where((dk == 1) & inl, 2 * ar, torch.full_like(dk, BIG))
+        kd = torch.where(((dk & 1) > 0) & inl, 2 * ar, torch.full_like(dk, BIG))
         ku = torch.where((uk > 0) & inl.repeat(1, uk.shape[1] // T), 2 * uo + 1, torch.full_like(uk, BIG))
         allk = torch.cat((kd, ku), dim=1)
         E = max(int((allk < BIG).sum(dim=1).max()) if N else 0, 1)
@@ -2901,7 +2919,7 @@ class SimTactics:
         has = torch.minimum(ma, mb) < MAXK
         pt = torch.where(use_b, ib, ia)
         pick[b_k, s_k] = torch.where(has, pt, torch.full_like(pt, -1))
-        pick_cd[b_k, s_k] = has & ~use_b & (dk.gather(1, pt.unsqueeze(1)).squeeze(1) == 1)
+        pick_cd[b_k, s_k] = has & ~use_b & ((dk.gather(1, pt.unsqueeze(1)).squeeze(1) & 1) > 0)
         rank, turns, moves = res["rank"], res["turns"], res["moves"]
         BIG = 1 << 40
 
@@ -4416,7 +4434,7 @@ class SimTactics:
         raider = live() & self._type_raider[ut] & (rowof >= 0)
         if not bool(raider.count_nonzero()):
             return
-        tgt = ((tg["ok"] == 9) | (tg["dk"] == 2)) & self.coastal_land
+        tgt = ((tg["ok"] == 9) | ((tg["dk"] & 2) > 0)) & self.coastal_land
         queue = []
         for t in tgt.any(dim=0).nonzero(as_tuple=True)[0].tolist():
             on = tgt[:, t]
@@ -4600,7 +4618,7 @@ class SimTactics:
         for districts in (True, False):
             # the list's PASSIVE_DISTRICT, then IMPROVEMENT, targets still pillageable
             if districts:
-                ok = ((tg["dk"] == 2) & (self.district >= 0) & (self.district != self._encamp_didx)
+                ok = (((tg["dk"] & 2) > 0) & (self.district >= 0) & (self.district != self._encamp_didx)
                       & self.district_complete & ~self.district_pillaged)
             else:
                 ok = (tg["ok"] == 9) & (self.improvement >= 0) & ~self.pillaged

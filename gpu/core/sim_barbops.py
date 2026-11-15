@@ -835,7 +835,7 @@ class SimBarbOps:
         dmg = self._damage_expected((torch.maximum(ecb, erg) - mcb.unsqueeze(1)).to(torch.float64))
         total = torch.where(ent, dmg, torch.zeros_like(dmg)).sum(dim=1)
         # the combat districts: each one that strikes, its own strike
-        ent_d = (tg["dk"] == 1) & (d <= near.unsqueeze(1))
+        ent_d = ((tg["dk"] & 1) > 0) & (d <= near.unsqueeze(1))
         total = total + self._endangered_districts(ent_d, plot, mcb, on)
         hp_max = int(self.rules.combat["unitHp"])
         dmg_now = hp_max - self.barb_unit_hp[b, jc].long()
@@ -1184,7 +1184,7 @@ class SimBarbOps:
         ground = (owner.unsqueeze(1) < 0) | (self.tile_seat == owner.unsqueeze(1))
         nil = torch.zeros_like(ground)
         imp = (tg["ok"] == 9) & ground if improvements else nil
-        dis = (tg["dk"] == 2) & ground if districts else nil
+        dis = ((tg["dk"] & 2) > 0) & ground if districts else nil
         goody = (tg["ok"] == 5) & ground if goodies else nil
         ut = self.barb_unit_type.clamp(min=0, max=self.NU - 1)
         mp_whole = torch.div(self.barb_unit_mp, self._mp_scale, rounding_mode="floor")
@@ -1230,7 +1230,7 @@ class SimBarbOps:
         tplot = self.tribe_op_plot[:, k]
         mem = self._bop_members(k)
         units = mem & (self.barb_unit_mp > 0) & on.unsqueeze(1) & (rowof >= 0)
-        near = ((tg["dk"] == 1) & (self.pair_dist[tplot.clamp(min=0)].to(torch.long) <= 3) & (tplot >= 0).unsqueeze(1)
+        near = (((tg["dk"] & 1) > 0) & (self.pair_dist[tplot.clamp(min=0)].to(torch.long) <= 3) & (tplot >= 0).unsqueeze(1)
                 & on.unsqueeze(1))
         if not bool((units.any(dim=1) & near.any(dim=1)).any()):
             return

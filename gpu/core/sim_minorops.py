@@ -1077,7 +1077,7 @@ class SimMinorOps:
         # PASSIVE) and each of its unit entries one, a Trader's and a
         # religious unit's none
         wk = (tg["uk"] > 0) & (tg["uk"] != 6) & (tg["uk"] != 8)
-        ent = (tg["dk"] > 0).long() + wk.view(B, -1, T).sum(dim=1)     # [B, T]
+        ent = (tg["dk"] & 1) + ((tg["dk"] >> 1) & 1) + wk.view(B, -1, T).sum(dim=1)     # [B, T]
         reach = 2 * u["base_moves"]
         near = torch.zeros(B, T, dtype=torch.bool, device=dev)
         pairs = []
@@ -1110,7 +1110,7 @@ class SimMinorOps:
         there = wk & (tg["uu"] >= 0) & self.unit_alive.gather(1, uu) & near.repeat(1, L)
         larger = torch.maximum(self._ai_combat(None), self._ai_ranged(None)).gather(1, uu)
         ene = torch.where(there, larger, torch.zeros_like(larger)).sum(dim=1)
-        ene = ene + self._mops_district_strikes(near & (tg["dk"] == 1) & eng.unsqueeze(1)).sum(dim=1)
+        ene = ene + self._mops_district_strikes(near & ((tg["dk"] & 1) > 0) & eng.unsqueeze(1)).sum(dim=1)
         self.mops_tene[:, s, k, ti] = torch.where(eng, ene, self.mops_tene[:, s, k, ti])
         ax = self._arange_bt % W
         ay = torch.div(self._arange_bt, W, rounding_mode="floor")
@@ -1164,9 +1164,19 @@ class SimMinorOps:
         theirs = near & (rec["owner"] == enemy.unsqueeze(1)) & (enemy >= 0).unsqueeze(1)
         enemy_units = torch.where(theirs, term, torch.zeros_like(term)).sum(dim=1)
         garrison = (enemy >= 0) & (enemy >= self.n_majors)
-        # the cities whose centre the player has explored (`knownCities`'
-        # `isExplored`: every one for a city-state)
-        known = None if 100 <= seat < 100 + self.S else self._tac_known(seat)
+        # the cities its knowledge base holds (`knownCities`): a city-state's
+        # those of its list, any other seat's each city a district of which
+        # stands on a plot its look takes (`lookPlots`: the Free Cities' the
+        # plots they see); a district's entry only on such a plot
+        if 100 <= seat < 100 + self.S:
+            s0 = seat - 100
+            looked = self.mops_revealed[:, s0]
+            listed = (self.citystate_kb_city_rank[:, s0] >= 0) & (self.citystate_kb_city_id[:, s0] == self._known_trade_ids())
+        else:
+            looked = self._barb_seen(seat) if seat == FREE_SEAT else self._tac_known(seat)
+            if looked is None:
+                looked = torch.ones(B, self.T, dtype=torch.bool, device=dev)
+            listed = self._known_city_first(looked) < self.T
         bidx = self._bidx
         order = list(range(self.n_majors)) + [self._CITY_MINOR0 + s for s in range(self.S)] + [self.FREE_ROW]
         for row in order:
@@ -1175,14 +1185,14 @@ class SimMinorOps:
             if not bool(cnt.any()):
                 continue
             minor = self._CITY_MINOR0 <= row < self._CITY_MINOR0 + self.S
-            for c in range(1 if minor else self.city_alive.shape[2]):
+            # the row's first known-city slot (`_known_trade_cands`' order)
+            slot0 = row - self._CITY_MINOR0 if minor else self.S + (self.n_majors if row == self.FREE_ROW else row) * self.RC
+            for c in range(1 if minor else self.RC):
                 ctr = self.city_center[:, row, c]
-                m = cnt & self.city_alive[:, row, c] & (ctr >= 0)
+                m = cnt & self.city_alive[:, row, c] & (ctr >= 0) & listed[:, slot0 + c]
                 if not bool(m.any()):
                     continue
                 cc = ctr.clamp(min=0)
-                if known is not None:
-                    m &= known.gather(1, cc.unsqueeze(1)).squeeze(1)
                 m &= self.pair_dist[cc, tc].to(torch.long) <= 3
                 if not bool(m.any()):
                     continue
@@ -1191,17 +1201,16 @@ class SimMinorOps:
                 wmax = self._walls_max_at(rt, col).long()
                 pool = torch.minimum(self.city_outer_hp[bidx, row, col].long(), wmax)
                 d = self._city_defense_cs(rt, col)[0].to(torch.float64)
-                top = torch.where(pool > 0, d, d - 10)
-                # its Encampment placed on a plot the player revealed: the
+                # the centre's entry where the look takes its plot
+                top = torch.where(looked.gather(1, cc.unsqueeze(1)).squeeze(1), torch.where(pool > 0, d, d - 10), torch.zeros_like(d))
+                # its Encampment placed on a plot the look takes: the
                 # city's standing strength with its own plot's garrison,
                 # behind its own perimeter (one not yet built behind its
                 # city's whole walls)
                 if self._encamp_didx >= 0:
                     ep = self.city_dist_tile[:, row, c, self._encamp_didx]
                     e0 = ep.clamp(min=0)
-                    em = m & (ep >= 0)
-                    if known is not None:
-                        em &= known.gather(1, e0.unsqueeze(1)).squeeze(1)
+                    em = m & (ep >= 0) & looked.gather(1, e0.unsqueeze(1)).squeeze(1)
                     if bool(em.any()):
                         stands = torch.where(self.district_complete[bidx, e0],
                                              torch.minimum(self.encamp_outer_hp[bidx, e0].long(), wmax), wmax) > 0
@@ -2321,7 +2330,7 @@ class SimMinorOps:
         dmg = self._damage_expected((torch.maximum(ecb, erg) - mcb.unsqueeze(1)).to(torch.float64))
         total = torch.where(ent, dmg, torch.zeros_like(dmg)).sum(dim=1)
         # the combat districts: each one that strikes, its own strike
-        ent_d = (tg["dk"] == 1) & (d <= near.unsqueeze(1))
+        ent_d = ((tg["dk"] & 1) > 0) & (d <= near.unsqueeze(1))
         total = total + self._endangered_districts(ent_d, plot, mcb, on, skip_seat=seat)
         hp_max = int(self.rules.combat["unitHp"])
         dmg_now = hp_max - pu("hp")[b, jc].long()
@@ -3239,7 +3248,7 @@ def _x_attack_city(sim, c: _OpCtx, i: int, on: torch.Tensor) -> None:
     if not bool(on.any()) or op["tg"] is None:
         return
     pre, seat = sim._mops_pre(s), sim._mops_seat(s)
-    near = (tg["dk"] == 1) & (sim.pair_dist[t.clamp(min=0)].to(torch.long) <= 3) & on.unsqueeze(1)
+    near = ((tg["dk"] & 1) > 0) & (sim.pair_dist[t.clamp(min=0)].to(torch.long) <= 3) & on.unsqueeze(1)
     held = torch.zeros_like(op["units"])
     for ti in range(N_TEAMS):
         held |= sim._mops_member_mask(s, k, ti)

@@ -170,7 +170,7 @@ def scalar_spots(sim, b, slot, tg):
     for p in range(sim.T):
         if int(sim.pair_dist[here, p]) > lim:
             continue
-        if dk[p] == 1:
+        if dk[p] & 1:
             keys.append(2 * p)
         if uk[p] > 0:
             keys.append(2 * p + 1)

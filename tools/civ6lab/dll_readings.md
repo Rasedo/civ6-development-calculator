@@ -16428,3 +16428,96 @@ records: the reach with turns and Movement, each target's spots and blows).
   run's path for a district attacker (0x209480); the planning of an
   embarked unit with a range (0x790c60's range read, the engines' `rangeOf`
   the type's).
+
+## C-129 / C-125 / C-95: the known cities by any district plot the look takes, their whole strike; the target list's revealed plots, its two district entries, its religious and neutral entries — READ (0x7877e0 at 0x7878a0..0x78796e / 0x787c38..0x787cac, 0x5f0280, 0x5f0490 -> 0x5eff10, 0x810d0, 0x81330, 0x783980 at 0x783e98..0x7842eb / 0x7843b8..0x7844f3 / 0x784f5c..0x785008 / 0x785271..0x78555d), FIT (a unit at peace takes no spot), both twins
+
+`lookCities`, `knownCities` (cpu/core/aiView.ts), `minorCitiesLook`
+(cpu/core/minorOps.ts), `revealedPlots`, `tacticalTargets`, `planUnit`
+(cpu/core/tactical.ts); `_known_city_first`, `_minor_cities_look`
+(gpu/core/sim_minors.py), `_ops_enemy_str` (gpu/core/sim_minorops.py),
+`_tac_rev`, `_tac_targets` (gpu/core/sim_tactics.py).
+
+- THE LOOK'S CITIES (0x7877e0, the plots in index order). A plot whose
+  visibility count (+0x290) is above 0: its plot info (vtable +0x30) with an
+  owner (+0x1c not -1) and a district id (+0x10 not -1) takes 0x5f0280 with
+  the district's handle {owner, 3, id}, whatever the district — a centre, a
+  Harbor, a Campus; else, with a wonder on it (the word +0x1e not -1:
+  0x81330 IsWonderComplete tests the same word, then the city's buildings),
+  0x5f0490 with the plot, which finds or appends the entry of the plot's
+  owning city (+0xc) and marks the wonder (0x5eff10). A plot not seen whose
+  revealed byte (+0x2f0) stands takes the first arm alone (0x787c64). Only
+  these two functions make an entry (the callers of 0x5e7ae0). So a city
+  joins the list at the first plot, in index order, of a look that holds one
+  of its districts seen or revealed; its entry holds a district entry only
+  for a district with hit points on such a plot (0x5efaf0). `lookCities`
+  names those cities; a city-state's list takes them (`minorCitiesLook`),
+  the barbarians' and a major's are read off their explored plots, the Free
+  Cities' off the plots they see.
+- CONFIRMED (the records' `revealed` planes and maps): runs/h1_duels1124
+  city-state 3 has 2:9 revealed from t35, player 1 places its capital's
+  Harbor there in t37, and the game's list holds player 1's 3:10 from t37
+  with no district entry, its centre never revealed (to t249); city-state 2
+  reveals the Holy Site 4:14 of 3:14 in its t52 moves and, in t53, the
+  Campus 4:11 of 3:10 and the centre of 6:13 founded that turn: its list
+  takes 3:14, 3:10, 6:13 in that order, 3:14 and 3:10 with no district
+  entry. An entry leaves every list when its city is taken: runs/h1_duels1127
+  t213 player 1 takes city-state 4's 8:10, the entry of player 4 gone from
+  players 1, 3 and the barbarians at their next pass, player 1's 8:10 added
+  at the end.
+- THE STRIKE of a known district (+0x1c, 0x249ee0) carries no damage loss:
+  runs/h1_duels1124 city-state 3's 41:12 at 25 / 55 / 70 / 90 through its
+  walls' damage (t75-t249), city-state 2's walled 11:13 at 3 (t86-t107)
+  (`cityStrikeBase`).
+- THE TARGET LIST'S DISTRICTS (0x783980 at 0x783e98..0x7842eb): the plot's
+  district defends (0x24c2f0) and counts toward the limit (0x527e30) are
+  read first; the player's own is FRIENDLY_CITY; a player's at war gives
+  COMBAT_DISTRICT where it defends and then, tested apart at 0x7841a6,
+  PASSIVE_DISTRICT where it counts toward the limit, complete and not
+  pillaged — a standing Encampment is both entries (runs/h1_duels1124 the
+  barbarians' list holds COMBAT_DISTRICT and PASSIVE_DISTRICT on city-state
+  3's Encampment 40:10 from t97, 125 player-turns); an ally's ALLY_SUPPORT;
+  any other player's NEUTRAL_CITY (0x7844f3). A defending district ends its
+  plot (0x7842df).
+- THE RELIGIOUS ENTRY (0x784f5c..0x785008): the religious layer's list of
+  exactly one unit, not the player's, with the CIVILIAN type's flag on: each
+  unit of it not the player's whose religion (unit +0x1ce4) is not the one
+  the player founded (GetReligionTypeCreated 0x497520) is a
+  RELIGIOUS_CIVILIAN entry — no war test. The engines' religious unit
+  carries its owner's religion, so every other player's is an entry.
+  runs/h1_duels1124 t113-115 city-state 3's list holds player 1's
+  Missionary on 39:19, 38:17, 37:17 at peace.
+- FIT: a planning lays no spot on a unit of a player its own is not at war
+  with: the city-states' plannings hold 285 RELIGIOUS entries of a major on
+  runs/h1_duels1124 and 1117, none with a spot; the barbarians' hold a spot
+  on 44 of 134. `planUnit` / the GPU's unit planes leave such a unit out of
+  the spots (0x790c60's test unread).
+- A PLOT ONLY REVEALED (0x785271..0x78555d), for every player: its goody
+  hut, else its camp, else its unpillaged improvement of a player at war,
+  else its district's entries as a seen plot's. `revealedPlots` / `_tac_rev`
+  hand each player's plane to the list (a city-state's revealed plots, the
+  barbarians' and a major's explored ones): runs/h1_duels1124 t6 city-state
+  2's CAMP 8:14, t18 city-state 3's GOODY 40:7 and CAMP 41:7.
+- THE NEUTRAL ENTRIES: TARGET_NEUTRAL_CITY (a district of a player at
+  peace, 0xf2e1a4) and TARGET_NEUTRAL_CIVILIAN_UNIT (the layer's one
+  civilian at peace, 0xf2e1ac) are written by 0x783980 and named by the
+  type table's loader 0x5bbf80. No other function reads 0xf2e1a4; 0xf2e1ac
+  is read besides by the war value's spoils alone (0x7b7ab0 at 0x7b7b3b, a
+  major's war value: a civilian it would capture). The operations, the
+  tactical moves and the planning's spots read neither (their compares at
+  0x73a902, 0x73b2d3, 0x7476dc, 0x778980, 0x779134, 0x786ef0 load the camp's
+  0xf2e1a8; those at 0x73916b, 0x73a269, 0x73a959, 0x73e8e2, 0x747330,
+  0x770e7b, 0x77449f, 0x777376, 0x77953d, 0x810176, 0x8115bd the passive
+  district's 0xf2e1a0), no Operations.xml row names them, and every
+  planning entry of the two kinds holds no spot (runs/h1_duels1124: 11,537
+  and 654 entries). The engines keep no such entry.
+- One-seed aimem traces, the base against this patch: runs/h1_duels1124
+  kb.cities 8,213 -> 130 missed of 12,506, kb.cities.list 570 -> 0, targets
+  459 -> 24; no decision or memory row moved.
+- OPEN: the Free Cities' revealed plots (the engines keep none: their
+  known cities read the plots they see); the order of a look's cities in
+  the replay, whose copy takes a minor's own moves' plots a turn late
+  (runs/h1_duels1124 city-state 2 from t53); the target list's AIR_UNIT
+  entry (runs/h1_duels1124 t231 the barbarians' HIGH on player 1's Jet
+  Fighter 14:13); the knowledge base's entries' order in the target list
+  (runs/h1_duels1124 t96 city-state 4: the barbarian Galley on 19:7 before
+  the Spearman on 18:7).

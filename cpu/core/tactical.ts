@@ -1673,16 +1673,21 @@ function rangedStrength(u: Unit): number {
 /**
  * THE TACTICAL TARGET LIST (0x783980) of `seat`: the plots in index order,
  * each one `seen` (visible) giving
- *  - a district of its own as FRIENDLY_CITY; of a player at war a City
- *    Center or an Encampment as COMBAT_DISTRICT (and nothing else of the
- *    plot), a complete unpillaged other district as PASSIVE_DISTRICT;
+ *  - a district of its own as FRIENDLY_CITY; of a player at war a district
+ *    that defends (a City Center, a standing Encampment) as COMBAT_DISTRICT
+ *    (and no unit of the plot), and a complete unpillaged district that
+ *    counts toward the limit as PASSIVE_DISTRICT — a standing Encampment
+ *    both; of a player at peace none (the game's NEUTRAL_CITY, which no
+ *    operation, move or planning spot reads);
  *  - its defending unit of a player at war (0x208b80) as LOW;
  *  - else the first of: a barbarian camp, a goody hut, a unit of its trade
  *    layer (a Trader at war a TRADER), the one unit of its units' layer where
  *    another player's (a civilian at war a CIVILIAN, a support unit at war a
- *    LOW), its religious unit at war (RELIGIOUS), an unpillaged improvement
- *    of a player at war (IMPROVEMENT);
- * and each one only `revealed` its camp, goody hut, improvement or districts.
+ *    LOW; a civilian at peace the game's NEUTRAL_CIVILIAN_UNIT, none here),
+ *    another player's religious unit at peace or at war (RELIGIOUS), an
+ *    unpillaged improvement of a player at war (IMPROVEMENT);
+ * and each one only `revealed` (`revealedPlots`) its camp, goody hut,
+ * improvement or districts.
  * Then a LOW unit stacked with a unit that cannot fight is MEDIUM (0x786d50),
  * and the player's prioritization (TacticalAI +0xa8) runs: the barbarians'
  * (0x786e70) make HIGH every LOW or MEDIUM unit within
@@ -1812,6 +1817,15 @@ function knowledgeEntries(state: GameState, seat: number, seen: ArrayLike<number
 /** the knowledge base's query's distance (0x5eb8b0's fifth argument) */
 const KNOWN_UNIT_RANGE = 2;
 
+/** the plots a seat has revealed, as its target list reads them beside the
+ *  plots it sees (the player's +0x2f0, 0x783980 at 0x785271): a city-state's
+ *  revealed plots, any other seat's explored ones; null for a seat that
+ *  holds none */
+export function revealedPlots(state: GameState, seat: number): ArrayLike<number> | null {
+  const ex = isCityStateSeat(seat) ? state.cityStates.find((c) => c.seat === seat)?.revealed : seatOf(state, seat)?.explored;
+  return ex && ex.length ? ex : null;
+}
+
 export function tacticalTargets(state: GameState, seat: number, seen: ArrayLike<number>, revealed: ArrayLike<number> | null,
   known: readonly ArmyRecord[]): Target[] {
   const { map } = state;
@@ -1842,8 +1856,11 @@ export function tacticalTargets(state: GameState, seat: number, seen: ArrayLike<
       // 3's pillaged Encampment 40:10 is the barbarians' TRADER target)
       combat = t.district === 'CITY_CENTER' || (t.district === 'ENCAMPMENT' && !!t.districtComplete && !t.districtPillaged);
       if (hostile(owner)) {
+        // the two entries are tested apart (0x784051 the defending district,
+        // then 0x7841a6 the one counting toward the limit): a standing
+        // Encampment is both
         if (combat) out.push({ type: 'COMBAT_DISTRICT', tile: t.index, seat: owner, unit: null });
-        else if (t.districtComplete && !t.districtPillaged && DISTRICTS[t.district]?.countsTowardLimit) out.push({ type: 'PASSIVE_DISTRICT', tile: t.index, seat: owner, unit: null });
+        if (t.districtComplete && !t.districtPillaged && DISTRICTS[t.district]?.countsTowardLimit) out.push({ type: 'PASSIVE_DISTRICT', tile: t.index, seat: owner, unit: null });
       }
     }
     if (!vis) {
@@ -1910,9 +1927,13 @@ export function tacticalTargets(state: GameState, seat: number, seen: ArrayLike<
       }
       continue;
     }
+    // the religious layer's one unit, another player's, is an entry at
+    // peace as at war where its religion is not the one the player founded
+    // (0x784f73..0x785008: GetReligionTypeCreated against unit +0x1ce4, no
+    // war test) — a unit carries its owner's religion, never the player's
     const rel = here.filter((u) => unitReligious(u.type));
     if (rel.length === 1 && rel[0].seat !== seat) {
-      if (unitsHostile(state, me, rel[0])) out.push({ type: 'RELIGIOUS', tile: t.index, seat: rel[0].seat, unit: rel[0] });
+      out.push({ type: 'RELIGIOUS', tile: t.index, seat: rel[0].seat, unit: rel[0] });
       continue;
     }
     if (t.improvement !== null && !t.pillaged && hostile(owner) && !t.goodyHut) {
@@ -2115,6 +2136,9 @@ export function planUnit(state: GameState, unit: Unit, targets: readonly Target[
     for (const E of entries) {
       const ty = E.target.type;
       if (!STRUCK.has(ty)) continue;
+      // a unit of a player at peace takes no spot (a city-state's plannings
+      // of a major's religious unit hold none)
+      if (E.target.unit && !unitsHostile(state, unit, E.target.unit)) continue;
       const TP = E.target.tile;
       const d = plotDistance(state, P, TP);
       let spot = P;
@@ -4495,7 +4519,7 @@ export function openPass(state: GameState, seat: number, aiOf: (u: Unit) => numb
   const units = state.units.filter((u) => u.seat === seat && aiOf(u) >= 0).sort((a, b) => (a.slot ?? 0) - (b.slot ?? 0));
   const ai = new Map<number, number>();
   for (const u of units) ai.set(u.id, aiOf(u));
-  const targets = tacticalTargets(state, seat, plotsSeenNow(state, new Set([seat])), null, seatOf(state, seat)?.armyKnown ?? []);
+  const targets = tacticalTargets(state, seat, plotsSeenNow(state, new Set([seat])), revealedPlots(state, seat), seatOf(state, seat)?.armyKnown ?? []);
   const reach = new Map<number, Reach[]>();
   const plan = new Map<number, Planner>();
   for (const u of units) {
@@ -4835,7 +4859,6 @@ function tacticalPass(state: GameState, acting: ReadonlySet<number>): void {
   const ai = new Map<number, number>();
   for (const u of all) ai.set(u.id, aiTypeOf(state, u));
   const seen = plotsSeenNow(state, new Set([BARB_SEAT]));
-  const ex = state.barbSeat.explored;
   // the military AI's candidates on the knowledge base the last look left
   barbarianOpsEvaluate(state);
   // the knowledge base ages and looks, then the target list (0x785f30)
@@ -4849,7 +4872,7 @@ function tacticalPass(state: GameState, acting: ReadonlySet<number>): void {
   // runs/h1_duelw1110 t42 "Barbarian City Assault, Started" before the
   // running raid's line)
   barbarianOpsTurn(state);
-  const targets = tacticalTargets(state, BARB_SEAT, seen, ex.length ? ex : null, state.barbSeat.armyKnown ?? []);
+  const targets = tacticalTargets(state, BARB_SEAT, seen, revealedPlots(state, BARB_SEAT), state.barbSeat.armyKnown ?? []);
   const reach = new Map<number, Reach[]>();
   const plan = new Map<number, Planner>();
   // the planning runs for every unit of the player (0x792c90), its

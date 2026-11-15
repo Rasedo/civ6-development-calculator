@@ -97,6 +97,7 @@
     - "C-95: the tactical pass — READ (the barbarians' moves; the minors share it)"
     - "C-95: the full search sets out on the formation's least Movement, a major's formations from the log, a tactical move walks its own done units — READ (0x26eea0, 0x266660, 0x262cd0, 0x770ce0 at 0x770d30..0x771097, 0x77d180, 0x775340, 0x771f80 at 0x7723cb / 0x772663, 0x77a810, 0x774380), both twins"
     - "C-95: the rampage strikes with the move's whole list; its defender is one the barbarians see — READ (0x778b40, 0x771670, 0x208b80, 0x20a2a0), both twins"
+    - "C-129 / C-125 / C-95: the known cities by any district plot the look takes, their whole strike; the target list's revealed plots, its two district entries, its religious and neutral entries — READ (0x7877e0 at 0x7878a0..0x78796e / 0x787c38..0x787cac, 0x5f0280, 0x5f0490 -> 0x5eff10, 0x810d0, 0x81330, 0x783980 at 0x783e98..0x7842eb / 0x7843b8..0x7844f3 / 0x784f5c..0x785008 / 0x785271..0x78555d), FIT (a unit at peace takes no spot), both twins"
   context:
     - "...x240, 0x77d100 from the player's unit evaluator 0x60a8c0 / 0x6092c0), then the moves (0x770ce0) in the order of the player's AiFavoredItems tactical list (Tactics.xml \"Default Barbar..."
   review: reviewed
@@ -496,6 +497,7 @@
     - "C-133 / C-95 / C-134: the kept path's searches inside a queue run; the Trader target, the defending district and Pillage's own plot; the safe plot's unit at war that fights"
     - "C-133 / C-95 / C-134: the kept path's searches inside a queue run; the Trader target, the defending district and Pillage's own plot; the safe plot's unit at war that fights — READ (0x272aa0 at 0x272af9..0x272c76, 0x26ef40 at 0x26f123..0x26f162, 0x26e3a0, 0x782d0, 0x783980 at 0x7842df..0x7842eb / 0x784aec..0x784b36, 0x24c2f0, 0x774380 at 0x774481..0x7744a9, 0x716b90 at 0x716d53..0x716da1), both twins"
     - "C-133 / C-95 / C-134: the kept path's searches inside a queue run; the Trader target, the defending district and Pillage's own plot; the safe plot's unit at war that fights — READ (0x272aa0 at 0x272af9..0x272c76, 0x26ef40 at 0x26f123..0x26f162, 0x26e3a0, 0x782d0, 0x783980 at 0x7842df..0x7842eb / 0x784aec..0x784b36, 0x24c2f0, 0x774380 at 0x774481..0x7744a9, 0x716b90 at 0x716d53..0x716da1), FIT (the planning list's seen unit at war), both twins"
+    - "C-129 / C-125 / C-95: the known cities by any district plot the look takes, their whole strike; the target list's revealed plots, its two district entries, its religious and neutral entries — READ (0x7877e0 at 0x7878a0..0x78796e / 0x787c38..0x787cac, 0x5f0280, 0x5f0490 -> 0x5eff10, 0x810d0, 0x81330, 0x783980 at 0x783e98..0x7842eb / 0x7843b8..0x7844f3 / 0x784f5c..0x785008 / 0x785271..0x78555d), FIT (a unit at peace takes no spot), both twins"
   context:
     - ...is turn (0x775340, 1 turn) in pool order, none standing on a plot of the kind itself (0x774380), go to it until one stands on it and pillages it.
   review: reviewed
@@ -750,6 +752,16 @@
   context:
     - "- THE ASSIGNMENT (0x776140): a target's health floor(100 x 281 / 256) less its damage (1.1 in 24.8); for MEDIUM /..."
   review: reviewed
+- addr: 0x777200
+  final: 0x508f10
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-129 / C-125 / C-95: the known cities by any district plot the look takes, their whole strike; the target list's revealed plots, its two district entries, its religious and neutral entries — READ (0x7877e0 at 0x7878a0..0x78796e / 0x787c38..0x787cac, 0x5f0280, 0x5f0490 -> 0x5eff10, 0x810d0, 0x81330, 0x783980 at 0x783e98..0x7842eb / 0x7843b8..0x7844f3 / 0x784f5c..0x785008 / 0x785271..0x78555d), FIT (a unit at peace takes no spot), both twins"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - ...xf2e1a8; those at 0x73916b, 0x73a269, 0x73a959, 0x73e8e2, 0x747330, 0x770e7b, 0x77449f, 0x777376, 0x77953d, 0x810176, 0x8115bd the passive district's 0xf2e1a0), no Operations.xml row n...
+  review: imported
 - addr: 0x7784b0
   kind: function
   name: attackUnits
@@ -778,7 +790,9 @@
   kind: function
   semantics: Attack Camps.
   status: PARTLY
-  readings: ["C-95: the tactical pass — READ (the barbarians' moves; the minors share it)"]
+  readings:
+    - "C-95: the tactical pass — READ (the barbarians' moves; the minors share it)"
+    - "C-129 / C-125 / C-95: the known cities by any district plot the look takes, their whole strike; the target list's revealed plots, its two district entries, its religious and neutral entries — READ (0x7877e0 at 0x7878a0..0x78796e / 0x787c38..0x787cac, 0x5f0280, 0x5f0490 -> 0x5eff10, 0x810d0, 0x81330, 0x783980 at 0x783e98..0x7842eb / 0x7843b8..0x7844f3 / 0x784f5c..0x785008 / 0x785271..0x78555d), FIT (a unit at peace takes no spot), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ...2e10c Attack Civilians (0x779240), f2e120 Defend Camps (0x779010), f2e124 Attack Camps (0x778910), f2e130 Chase Target (0x775670 then 0x773030), f2e134 Wander (0x77b580), f2e138 / f2e1...
@@ -826,6 +840,7 @@
     - "C-95: the tactical pass — READ (the barbarians' moves; the minors share it)"
     - "C-95: the camp defender's strike, a captured civilian's dead target, a lone DEFENDER out of Pillage"
     - "C-95: the camp defender's strike, a captured civilian's dead target, a lone DEFENDER out of Pillage — READ (0x772940, 0x779010, 0x774e90, 0x779240 at 0x7792be..0x7792da, 0x775340 at 0x77551e..0x775534, 0x791470 at 0x79174a..0x791756), both twins"
+    - "C-129 / C-125 / C-95: the known cities by any district plot the look takes, their whole strike; the target list's revealed plots, its two district entries, its religious and neutral entries — READ (0x7877e0 at 0x7878a0..0x78796e / 0x787c38..0x787cac, 0x5f0280, 0x5f0490 -> 0x5eff10, 0x810d0, 0x81330, 0x783980 at 0x783e98..0x7842eb / 0x7843b8..0x7844f3 / 0x784f5c..0x785008 / 0x785271..0x78555d), FIT (a unit at peace takes no spot), both twins"
   context:
     - ...IGH/MEDIUM/LOW_PRIORITY_UNIT), f2e10c Attack Civilians (0x779240), f2e120 Defend Camps (0x779010), f2e124 Attack Camps (0x778910), f2e130 Chase Target (0x775670 then 0x773030), f2e13...
     - "- Defend Camps (0x779010): each TARGET_BARBARIAN_CAMP target, the units of AI type DEFENDER within 3 turns (0x77..."
@@ -873,6 +888,7 @@
     - "C-95: the danger map and Move to Safety — READ, ported"
     - "C-95: Coastal Raid — READ, ported"
     - "C-95: Coastal Raid"
+    - "C-129 / C-125 / C-95: the known cities by any district plot the look takes, their whole strike; the target list's revealed plots, its two district entries, its religious and neutral entries — READ (0x7877e0 at 0x7878a0..0x78796e / 0x787c38..0x787cac, 0x5f0280, 0x5f0490 -> 0x5eff10, 0x810d0, 0x81330, 0x783980 at 0x783e98..0x7842eb / 0x7843b8..0x7844f3 / 0x784f5c..0x785008 / 0x785271..0x78555d), FIT (a unit at peace takes no spot), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ...140 Plunder Trader (0x77aa20), f2e158 Wander Near Camp (0x77b9a0), f2e168 Coastal Raid (0x7794b0), f2e17c Barbarian Rampage (0x778b40).

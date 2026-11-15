@@ -1629,24 +1629,42 @@
   kind: global
   name: TARGET_ENEMY_PASSIVE_DISTRICT
   status: PARTLY
+  readings:
+    - "C-129 / C-125 / C-95: the known cities by any district plot the look takes, their whole strike; the target list's revealed plots, its two district entries, its religious and neutral entries — READ (0x7877e0 at 0x7878a0..0x78796e / 0x787c38..0x787cac, 0x5f0280, 0x5f0490 -> 0x5eff10, 0x810d0, 0x81330, 0x783980 at 0x783e98..0x7842eb / 0x7843b8..0x7844f3 / 0x784f5c..0x785008 / 0x785271..0x78555d), FIT (a unit at peace takes no spot), both twins"
   notes: ["imported: a saved global name (.claude/scratchpad/cb/gnames.json)"]
   review: imported
 - addr: 0xf2e1a4
   kind: global
   name: TARGET_NEUTRAL_CITY
-  status: PARTLY
+  semantics: "the TargetTypes index of TARGET_NEUTRAL_CITY: the target list's builder 0x783980 writes it for a district of a player neither at war nor allied (0x7844f3); the type table's loader 0x5bbf80 names it; no other function reads it. The engines keep no such entry."
+  status: READ
+  cases:
+    - recording: h1_duels1124
+      turn: 53
+      value: city-state 2's plannings hold NEUTRAL_CITY entries with no spot, as all 11,537 of the game do
+  readings:
+    - "C-129 / C-125 / C-95: the known cities by any district plot the look takes, their whole strike; the target list's revealed plots, its two district entries, its religious and neutral entries — READ (0x7877e0 at 0x7878a0..0x78796e / 0x787c38..0x787cac, 0x5f0280, 0x5f0490 -> 0x5eff10, 0x810d0, 0x81330, 0x783980 at 0x783e98..0x7842eb / 0x7843b8..0x7844f3 / 0x784f5c..0x785008 / 0x785271..0x78555d), FIT (a unit at peace takes no spot), both twins"
   notes: ["imported: a saved global name (.claude/scratchpad/cb/gnames.json)"]
   review: imported
 - addr: 0xf2e1a8
   kind: global
   name: TARGET_BARBARIAN_CAMP
   status: PARTLY
+  readings:
+    - "C-129 / C-125 / C-95: the known cities by any district plot the look takes, their whole strike; the target list's revealed plots, its two district entries, its religious and neutral entries — READ (0x7877e0 at 0x7878a0..0x78796e / 0x787c38..0x787cac, 0x5f0280, 0x5f0490 -> 0x5eff10, 0x810d0, 0x81330, 0x783980 at 0x783e98..0x7842eb / 0x7843b8..0x7844f3 / 0x784f5c..0x785008 / 0x785271..0x78555d), FIT (a unit at peace takes no spot), both twins"
   notes: ["imported: a saved global name (.claude/scratchpad/cb/gnames.json)"]
   review: imported
 - addr: 0xf2e1ac
   kind: global
   name: TARGET_NEUTRAL_CIVILIAN_UNIT
-  status: PARTLY
+  semantics: "the TargetTypes index of TARGET_NEUTRAL_CIVILIAN_UNIT: the target list's builder 0x783980 writes it for the units' layer's one civilian of a player at peace; read besides by the war value's spoils alone (0x7b7ab0 at 0x7b7b3b). No operation, tactical move or planning spot reads it. The engines keep no such entry."
+  status: READ
+  cases:
+    - recording: h1_duels1124
+      turn: 11
+      value: city-state 3's Warrior 131073 plans a NEUTRAL_CIVILIAN_UNIT entry on 2:10 with no spot, as all 654 of the game do
+  readings:
+    - "C-129 / C-125 / C-95: the known cities by any district plot the look takes, their whole strike; the target list's revealed plots, its two district entries, its religious and neutral entries — READ (0x7877e0 at 0x7878a0..0x78796e / 0x787c38..0x787cac, 0x5f0280, 0x5f0490 -> 0x5eff10, 0x810d0, 0x81330, 0x783980 at 0x783e98..0x7842eb / 0x7843b8..0x7844f3 / 0x784f5c..0x785008 / 0x785271..0x78555d), FIT (a unit at peace takes no spot), both twins"
   notes: ["imported: a saved global name (.claude/scratchpad/cb/gnames.json)"]
   review: imported
 - addr: 0xf2e1b0

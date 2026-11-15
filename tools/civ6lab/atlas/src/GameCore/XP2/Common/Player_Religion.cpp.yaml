@@ -150,6 +150,7 @@
   readings:
     - "C-97: the religion AI — the belief scores READ (the job, the value, the analysis's attach), the picks READ, the analyzers PARTLY READ"
     - "C-101 / C-95: the attack carried out condemns a religious target's heretics, a move order walks onto a religious unit's plot — READ (0x771f80 at 0x772331 / 0x7725c9 / 0x7727fa, 0x776140 at 0x776424..0x776470 / 0x777045, 0x947dd0, 0x89c6f0, 0x89cc00), both twins"
+    - "C-129 / C-125 / C-95: the known cities by any district plot the look takes, their whole strike; the target list's revealed plots, its two district entries, its religious and neutral entries — READ (0x7877e0 at 0x7878a0..0x78796e / 0x787c38..0x787cac, 0x5f0280, 0x5f0490 -> 0x5eff10, 0x810d0, 0x81330, 0x783980 at 0x783e98..0x7842eb / 0x7843b8..0x7844f3 / 0x784f5c..0x785008 / 0x785271..0x78555d), FIT (a unit at peace takes no spot), both twins"
   context:
     - "...text of the player (+0x40 its id, +0x80 it) and a religion (+0x48): the one it founded (0x497520), else its majority religion (0x497240)."
   review: reviewed

@@ -25,7 +25,7 @@
 import type { ArmyRecord, CityState, GameState, Unit, UpgradeTree } from './types';
 import { UNITS } from '../data/units';
 import { gameTypeOf } from '../data/aliases';
-import { aiView } from './aiView';
+import { aiView, lookCities } from './aiView';
 import { cityStateTactics, moveTo, moveUnitDanger, passEnd, passFinish, passReachAt, plotDistance, seatPoolSlots, stackedAt, swapUnits, type Pass } from './tactical';
 import { defenderAiType, ownAiType, passOrders, passView } from './opsOrders';
 import { newOpsAi, operationsEvaluate, operationsRefresh, operationsRun, opContracts, opsOf, startOperationNamed, type OpsAi, type OpsEnv } from './operations/manager';
@@ -111,23 +111,24 @@ export function minorCampsLook(state: GameState, cs: CityState, aged: boolean): 
 }
 
 /** the knowledge base's cities (its look 0x7877e0 -> the city arm 0x5f0280,
- *  in plot order): every city whose centre the minor has revealed, of any
- *  owner (the Free Cities' included), joins the end of its list where no
- *  entry of its owner and id stands (0x5e7ae0). An entry whose city stands
- *  no more never resolves again (a capture mints a new id) */
+ *  in plot order): every city a district of which stands on a plot the
+ *  minor has revealed (`lookCities`), of any owner (the Free Cities'
+ *  included), joins the end of its list where no entry of its owner and id
+ *  stands (0x5e7ae0). An entry whose city stands no more leaves the list (a
+ *  capture mints a new id, which joins at the end) */
 export function minorCitiesLook(state: GameState, cs: CityState): void {
   const revealed = cs.revealed ?? [];
-  const known = cs.citiesKnown ?? [];
+  const stands = (k: { owner: number; id: number }): boolean => (k.id < 0
+    ? state.cityStates.some((o) => o.seat === k.owner && o.centerIndex >= 0)
+    : !!cityHolders(state).find((h) => h.seat === k.owner)?.cities.some((c) => c.id === k.id));
+  const known = (cs.citiesKnown ?? []).filter(stands);
   const has = new Set(known.map((k) => `${k.owner}:${k.id}`));
-  const found: { plot: number; owner: number; id: number }[] = [];
-  for (const h of cityHolders(state)) for (const c of h.cities) found.push({ plot: c.centerIndex, owner: h.seat, id: c.id });
-  for (const o of state.cityStates) if (o.centerIndex >= 0) found.push({ plot: o.centerIndex, owner: o.seat, id: -1 });
-  found.sort((a, b) => a.plot - b.plot);
-  for (const f of found) {
-    if (revealed[f.plot] !== 1 || has.has(`${f.owner}:${f.id}`)) continue;
-    known.push({ owner: f.owner, id: f.id });
+  for (const f of lookCities(state, (p) => revealed[p] === 1)) {
+    if (has.has(`${f.owner}:${f.id}`) || !stands(f)) continue;
+    known.push(f);
   }
   if (known.length) cs.citiesKnown = known;
+  else delete cs.citiesKnown;
 }
 
 function minorEnv(state: GameState, cs: CityState, pass: Pass | null): OpsEnv {

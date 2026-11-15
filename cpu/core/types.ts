@@ -1510,8 +1510,8 @@ export interface CityState extends Seat {
   campsKnown?: number[];
   /** the cities its knowledge base holds, in their order (m_knownCities,
    *  `minorCitiesLook`): each its owner's seat and its city id (-1 a
-   *  city-state's one city), appended at the look that first finds its
-   *  centre revealed */
+   *  city-state's one city), appended at the look that first finds a
+   *  district of it on a revealed plot */
   citiesKnown?: { owner: number; id: number }[];
   /** per plot 1 where its knowledge base's looks have seen it or a meeting
    *  revealed it (the player's revealed plots, visibility +0x2f0, as

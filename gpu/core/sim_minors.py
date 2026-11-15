@@ -924,20 +924,40 @@ class SimMinors:
                 ids.append(self.city_id[:, r2, j].long())
         return torch.stack(ids, dim=1)
 
+    def _known_city_first(self, plane: torch.Tensor) -> torch.Tensor:
+        """[B, ND] long — `lookCities` over the plots of `plane` [B, T]: per
+        known-city slot (`_known_trade_cands`' order) the first plot, in
+        index order, holding a district of the city standing there (its
+        centre, a district placed, a wonder's plot); T where none does"""
+        T = self.T
+        held = ((self.district >= 0) | (self.built_wonder >= 0) | self._centre_plane()) & plane
+        key = torch.where(held, self._arange_bt, torch.full_like(self._arange_bt, T))
+        none = torch.full_like(key, T)
+        out = []
+        for s2 in range(self.S):
+            out.append(torch.where(self.tile_seat == 100 + s2, key, none).min(dim=1).values)
+        for r2 in [*range(self.n_majors), self.FREE_ROW]:
+            own = self.tile_seat == int(self._ROW_SEAT[r2])
+            for j in range(self.RC):
+                m = own & self.city_alive[:, r2, j].unsqueeze(1) & (self.tile_city == self.city_id[:, r2, j].unsqueeze(1))
+                out.append(torch.where(m, key, none).min(dim=1).values)
+        return torch.stack(out, dim=1)
+
     def _minor_cities_look(self, s: int, alive: torch.Tensor) -> None:
         """`minorCitiesLook` — minor `s`'s knowledge base's cities: every
-        known-city slot whose city stands with its centre revealed
-        (`mops_revealed`) and holds no entry of that city's id joins the end
-        of the list, in centre plot order"""
+        known-city slot whose city stands with a district on a plot the
+        minor revealed (`mops_revealed`, `_known_city_first`) and holds no
+        entry of that city's id joins the end of the list, in the order of
+        those plots"""
         live, ctr = self._known_trade_cands(torch.full((self.B,), -1, dtype=torch.long, device=self.device))
         ids = self._known_trade_ids()
         rank = self.citystate_kb_city_rank[:, s]
-        rev = self.mops_revealed[:, s].gather(1, ctr.clamp(min=0))
-        new = alive.unsqueeze(1) & live & rev & ((rank < 0) | (self.citystate_kb_city_id[:, s] != ids))
+        first = self._known_city_first(self.mops_revealed[:, s])
+        new = alive.unsqueeze(1) & live & (first < self.T) & ((rank < 0) | (self.citystate_kb_city_id[:, s] != ids))
         if not bool(new.count_nonzero()):
             return
         big = 1 << 40
-        order = torch.argsort(torch.where(new, ctr, torch.full_like(ctr, big)), dim=1, stable=True)
+        order = torch.argsort(torch.where(new, first, torch.full_like(first, big)), dim=1, stable=True)
         pos = torch.empty_like(order)
         pos.scatter_(1, order, torch.arange(order.shape[1], device=self.device).unsqueeze(0).expand_as(order).contiguous())
         n = self.citystate_kb_city_n[:, s]

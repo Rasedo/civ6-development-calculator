@@ -135,6 +135,7 @@
     - gpu/core/sim_tactics.py:_danger_districts
     - cpu/core/opsOrders.ts:targetStrength
     - gpu/core/sim_minorops.py:_mops_district_strikes
+    - cpu/core/aiView.ts:knownCities
   readings:
     - "C-130: a city's undamaged strike in Bastions' analyzer; a city-state's danger map at its DoTurn; the plot purchase analyzer — READ / PARTLY READ"
     - "H-1: the melee result, a ranged blow's domain, a city's shot — READ"
@@ -150,6 +151,7 @@
     - "C-95: the danger map's list and its districts — a ship's city, a peaceful unit's plot, the undamaged strike, an unbuilt Encampment's — READ (0x26dab0, 0x586900, 0x717460, 0x249ee0 / 0x24b960), both twins"
     - "C-129 / C-99 / C-134: a known city's Encampment in the enemy strength, the rally's advance, the team's battle strengths and Garrison City's fortify test — READ (0x7877e0 at 0x7878e1..0x78791f / 0x787c64..0x787ca7, 0x5f0280, 0x5efaf0, 0x73f0c0, 0x73f7d0 at 0x73face, 0x738f20 at 0x7391a4..0x7395e1, 0x810d30 at 0x810f80..0x81115e), both twins; the replay's buildings before the next start"
     - "C-125 / C-95: the planning's unmoved flag, a district's blow back, the combat's kind from its members, the camp strike's push — READ (0x791e00 at 0x791eb6..0x791ec4, 0x791470 at 0x7916fb..0x79174f / 0x7917f7..0x7918f7, 0x205720 at 0x205835..0x20592f, 0x209550, 0x772940 at 0x772a85..0x772ad3 / 0x772eea / 0x772f78), both twins"
+    - "C-129 / C-125 / C-95: the known cities by any district plot the look takes, their whole strike; the target list's revealed plots, its two district entries, its religious and neutral entries — READ (0x7877e0 at 0x7878a0..0x78796e / 0x787c38..0x787cac, 0x5f0280, 0x5f0490 -> 0x5eff10, 0x810d0, 0x81330, 0x783980 at 0x783e98..0x7842eb / 0x7843b8..0x7844f3 / 0x784f5c..0x785008 / 0x785271..0x78555d), FIT (a unit at peace takes no spot), both twins"
   notes:
     - ".claude/scratchpad/st1/reading.md: .... Each such city whose centre the player sees: its   strength (0x24ae80) on the centre, its strike (0x249ee0) over its reach   (0x249e40) or, with none, 1 on each plot beside it (0x715ff0). Then the   player'..."
   context:
@@ -559,6 +561,7 @@
     - "C-133 / C-95 / C-134: the kept path's searches inside a queue run; the Trader target, the defending district and Pillage's own plot; the safe plot's unit at war that fights"
     - "C-133 / C-95 / C-134: the kept path's searches inside a queue run; the Trader target, the defending district and Pillage's own plot; the safe plot's unit at war that fights — READ (0x272aa0 at 0x272af9..0x272c76, 0x26ef40 at 0x26f123..0x26f162, 0x26e3a0, 0x782d0, 0x783980 at 0x7842df..0x7842eb / 0x784aec..0x784b36, 0x24c2f0, 0x774380 at 0x774481..0x7744a9, 0x716b90 at 0x716d53..0x716da1), both twins"
     - "C-133 / C-95 / C-134: the kept path's searches inside a queue run; the Trader target, the defending district and Pillage's own plot; the safe plot's unit at war that fights — READ (0x272aa0 at 0x272af9..0x272c76, 0x26ef40 at 0x26f123..0x26f162, 0x26e3a0, 0x782d0, 0x783980 at 0x7842df..0x7842eb / 0x784aec..0x784b36, 0x24c2f0, 0x774380 at 0x774481..0x7744a9, 0x716b90 at 0x716d53..0x716da1), FIT (the planning list's seen unit at war), both twins"
+    - "C-129 / C-125 / C-95: the known cities by any district plot the look takes, their whole strike; the target list's revealed plots, its two district entries, its religious and neutral entries — READ (0x7877e0 at 0x7878a0..0x78796e / 0x787c38..0x787cac, 0x5f0280, 0x5f0490 -> 0x5eff10, 0x810d0, 0x81330, 0x783980 at 0x783e98..0x7842eb / 0x7843b8..0x7844f3 / 0x784f5c..0x785008 / 0x785271..0x78555d), FIT (a unit at peace takes no spot), both twins"
   context:
     - "...IENDLY_CITY; a player's at war (0x469cd0) a COMBAT_DISTRICT where the district defends (0x24c2f0: a City Center, an Encampment) — and then nothing else of the plot — and a PASSIVE_DIST..."
   review: reviewed
