@@ -511,23 +511,35 @@
 - addr: 0x727db0
   final: 0x4d2e20
   kind: function
-  name: minorMilitaryUpgrade
-  status: PARTLY
+  name: the military AI's upgrade
+  semantics: "called by the military AI's job 0x722690 right after its strengths' line (0x727510): over the player's units (Player +0x12e8 +0xd8), alive (+0x770 clear) and on the map, each with an upgrade type (0x5904c0 -> 0x5909a0), the gain 0x79ca90(player +0x1290 +0x268, the new type) - 0x79ca90(..., its own type); the largest above 0 (strict, the first of equals) whose full test passes (0x58fff0, r8 0 r9 0) and whose upgrade Gold (0x590520 << 8) the economic AI affords at the UNITS slot with the reserve 0.5 (@0xd20458 as 24.8; 0x6874d0) is kept; after the walk that one unit, for a player no human drives, is bought through 0x68c940 (UNITCOMMAND_UPGRADE)."
+  status: READ
+  cases:
+    - recording: h1_duely1121
+      turn: 154
+      value: "city-state 2's Musketman 2424833, home from China's levy, UnitCommandStarted -750032448 (UNITCOMMAND_UPGRADE) after ResearchChanged(-1) and before PlayerTurnActivated, no Upgrade Units tree in the aimem: UnitUpgraded to the Line Infantry 2490368"
+    - recording: h1_duely1121
+      turn: 61
+      value: "every upgrade the log orders before a city-state's PlayerTurnActivated (at most one a player-turn, 129 over the five duely duels) is the engine's pick: 1121 t61-t98 26 of 26 (the Warriors t61-t72 first, the Swordsmen t73-t75 next, Galley t91, Men-at-Arms t96-t98)"
+    - recording: h1_duely1124
+      turn: 43
+      value: city-state 2's Warrior 262144 upgraded before its PlayerTurnActivated stays a Warrior at age 0 in its own records of the turn (the look before the upgrade), the Swordsman from t44
   impl:
-    - cpu/core/minorBuild.ts:prev
-    - cpu/core/minorOps.ts:minorOpsRefresh
     - cpu/core/minorOps.ts:minorMilitaryUpgrade
     - gpu/core/sim_minorops.py:_mops_military_upgrade
+    - cpu/core/minorBuild.ts:minorPhase
+    - gpu/core/sim_minors.py:_city_state_phase
+    - cpu/core/minorBuild.ts:prev
+    - cpu/core/minorOps.ts:minorOpsRefresh
   readings:
     - "C-129: the military AI's upgrade — READ (0x727db0, 0x6874d0), both twins"
     - "C-129: the military AI's upgrade after the look; the Free Cities buy none — READ (0x6096c0's lists, 0x687bf0), both twins"
     - "C-99 / C-129: the military AI's job refreshes the operations before its upgrade; Recruit Units updates the teams only on a changed count — READ (0x722690, 0x81c820), both twins"
-  notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "## C-129: the military AI's upgrade — READ (0x727db0, 0x6874d0), both twins"
     - "- THE WALK (0x727db0, from the military AI's job 0x722690 after 0x727510): the player's units in pool order..."
     - ".... The UNITS slot stays 0, the can-afford (0x6874d0, slot 1 at half the cost) fails, and 0x727db0 buys nothing: no Free City upgrade in any recording; neither twin walks it for them."
-  review: imported
+  review: reviewed
 - addr: 0x74cf50
   final: 0x4eb610
   kind: function

@@ -226,15 +226,18 @@
 - addr: 0x70cba0
   final: 0x4bd830
   kind: function
+  name: the homeland's End Turn
+  semantics: "HL End Turn (from the homeland's moves 0x709d80): over the homeland's unit list (+0x208, count +0x218) each unit (0x4f2310) whose turn is not done (+0x530) and not dead (+0x770) is given a Skip Turn request (0x9686d0) queued on the homeland's command list (+0x220) and logs \"HL: End Turn\" where the logger takes it; the list then carried out (0x70a440)."
   status: READ
   cases:
-    - recording: 1128
-      value: "the barbarians' explorers and   pillagers, whose turns the engines' passes close, take it too   (runs/h1_duelq1117-1128: 1,031 HL: Explore rows beside an HL: End Turn,   176 Pillage Improvement turns "
-  impl: [cpu/core/tactical.ts:endTurn, cpu/core/units.ts:skipTurn]
+    - recording: h1_duelq1117
+      turn: 9
+      value: "the barbarian Scout 262147's HL: End Turn row, its Skip Turn and HOLD (UnitActivityChanged)"
+  impl: [cpu/core/tactical.ts:endTurn, gpu/core/sim_tactics.py:_skip_turn, cpu/core/units.ts:skipTurn]
   readings: ["C-110 / C-99: the unit's activity and the Fortify order's refusal — READ"]
   context:
     - "...CanStart 0x9685d0 (an AI's unit: not INTERCEPT, +0x1b28 -1). The homeland's End Turn (0x70cba0, from the homeland's moves 0x709d80) builds it (0x9686d0) for each unit of its list who..."
-  review: imported
+  review: reviewed
 - addr: 0x70ce90
   final: 0x4bdb20
   kind: function
