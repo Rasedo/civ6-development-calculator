@@ -1009,10 +1009,12 @@ export interface Seat {
    *  `aiCityStats`); and its growth as its City Analysis read it, before
    *  the dispatch (`minorPlotEvals`); absent outside that turn */
   aiYields?: { total: Yields; base: Yields; growth: CityGrowth };
-  /** a city-state's danger map (`dangerPlane`) per plot as its DoTurn
-   *  builds it (0x4e4560 -> 0x46cdd0 -> 0x717460, after its city's turn),
-   *  the one its city trees read all turn, the replay's copy's included;
-   *  rebuilt at each DoTurn */
+  /** a city-state's or the barbarians' danger map (`dangerPlane`) per plot
+   *  as its DoTurn builds it (0x4e4560 -> 0x46cdd0 -> 0x717460: a
+   *  city-state's after its city's turn, the barbarians' before their rules
+   *  raise the turn's units and camps), the one its city trees and its
+   *  tactical pass read all turn, the replay's copy's included; rebuilt at
+   *  each DoTurn, the barbarians' dropped as their pass ends */
   dangerOpen?: number[];
   /** the military AI's Combat Desire of a city-state (`minorCombatDesire`)
    *  or the Free Cities (`freeCombatDesire`), raw 24.8: its

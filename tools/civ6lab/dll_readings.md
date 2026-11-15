@@ -14438,3 +14438,64 @@ blocks of `_tac_pass`, `_tac_plan`'s "kill" (gpu/core/sim_tactics.py).
   next unit move both fit; 0xc7ede0 / 0xc7f640 unread), and whether any
   other removal of a garrison (a death, an upgrade, a transfer of another
   kind) leaves it met the same way.
+
+## C-95: the danger map is the DoTurn's all turn — the tactical pass reads it, the barbarians' is built before their rules; a ship's district strike, a district at war it may enter, a major's closed borders — READ (0x7e9d0 -> 0x4e4560 -> 0x46cdd0), FIT (the barbarians' raise, the ship's strike, the borders), both twins
+
+`passDanger` / `openPass` / `barbarianPhase` / `dangerPlane`, `search`'s
+`price` and `groundOf`'s `shut` (cpu/core/tactical.ts), `Seat.dangerOpen`
+(cpu/core/types.ts); GPU `_seat_pass_open`, `_barbarian_tactics`,
+`_danger_plane`, `_tac_search`'s `pay6`, `_tac_closed`
+(gpu/core/sim_tactics.py), `_barbarian_phase` (gpu/core/sim_orders.py),
+`_barb_danger_open` (gpu/core/sim_init.py). The replay's check
+(`barbarianAi`, the majors' maps in `runReplay`, cpu/harness/replay.ts).
+
+- ONE MAP A TURN: 0x7e9d0 (Player::Processor, the player's pending-turn flag
+  @f29090[player] cleared) calls DoTurn 0x4e4560 and then raises the
+  player's turn event (0x8b9120, hash 0x8953f126); DoTurn's tail 0x46cdd0
+  builds the map. The tactical pass builds none: a city-state's pass reads
+  the map its DoTurn built after its city's turn, a unit that fell since
+  still on it.
+- THE BARBARIANS' map holds no sight of a unit or a camp their turn raises
+  (a fit on the AI memory's `danger`: the log puts the raise's
+  UnitAddedToMap before PlayerTurnActivated 63, the map shows none of what
+  the raised unit sees): the engines build it before `barbarianRules`.
+- A SHIP'S STRIKE on a city centre or an Encampment is a plot of its reach
+  (a fit); its strike on a land unit's plot is none.
+- A DISTRICT AT WAR WITH HIT POINTS spends the Movement the step leaves in
+  the danger map's search whether the mover may enter it or not (0x26e570's
+  attack test reads the plot's district, DistrictInfo +0x58 / +0x5c): an
+  Encampment placed and not yet built ends the reach there, and a unit with
+  a range reaches it with no Movement left, so lists it not.
+- A MAJOR'S UNIT lays no danger on ground behind borders closed to it
+  (`borderClosedTo`: the owner's Early Empire, no war, no alliance, no
+  grant; a city-state's ground to all but its suzerain) — a fit, the path
+  validity's border test unread.
+- THE CHECK: a major's map is built as its start of the turn ends (the
+  record's start rows landed), the wars the log declares between the player
+  before it closing and its own activation not yet declared; the
+  barbarians' on the replay's copy without the units and camps the turn
+  raised.
+- CONFIRMED (one-seed aimem traces, `danger` / `danger.major` against the
+  game's): runs/h1_duelq1117 t13 city-state 2 holds the barbarian Warrior
+  589832's 20 round 14:10, which falls on its city in the barbarians' turn
+  (16 plots), t48 city-state 4 alike; t21 the barbarians' map without Rome's
+  Warrior on 10:21, which only the Warrior 1703944 raised that turn on 9:23
+  sees (t56 / t61 alike; h1_duelq1127 t1 / t7 / t10 / t21 / t38 / t56 / t58);
+  1117 t28 China's start envoy makes it city-state 3's suzerain, the
+  barbarian Warrior on 39:11 in its map through that city-state's Warriors;
+  h1_duelq1128 t203 China's war on Rome, logged after its start's rows,
+  leaves Rome's units off its map until t204 (t204-211 equal);
+  1117 t131-133 the barbarian Galley on 14:6 lays its 30 on city-state 2's
+  centre 14:8 in Rome's map (h1_duelq1124 t72-74 41:12); 1128 t96-103 the
+  barbarian Swordsman on 12:13 and Slinger on 14:14 beside China's unbuilt
+  Encampment 13:13: 13:12 / 12:13 / 14:13 at 1 in China's map (35 and 15
+  less its strike 40), not 10; 1128 t94-96 Rome's Warrior on 13:7 lays no
+  20 on China's 14:8, 1117 t131 / t132 Rome's Warrior on 15:6 none on
+  city-state 2's Harbor 14:7, h1_duelq1121 t124 / t156-161 / t179-184 /
+  t208-213 and 1127 t119-124 equal.
+- OPEN: where the barbarians' DoTurn stands against their rules' turn in the
+  DLL (the raise's caller unread); the Free Cities' map is built as their
+  pass opens, no recorded case telling it from their DoTurn's; a major's
+  Trader walks in its seat's block before the check's map (1117 t42: the
+  barbarian Scout on 37:14 reaches 35:13 past the Trader's 36:13, the game's
+  Trader still on 35:13 until its turn's end).

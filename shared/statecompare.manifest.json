@@ -5096,7 +5096,7 @@
       },
       {
         "path": "Seat.dangerOpen",
-        "why": "a city-state's danger map as its DoTurn builds it, read by its city trees inside its turn: a function of the units, districts and features at that point (each compared on their own), rebuilt by minorPhase after its growth before any read; the GPU twin builds it at the same point (`_minor_danger_open`, transient)."
+        "why": "a city-state's or the barbarians' danger map as its DoTurn builds it, read by its city trees and its tactical pass inside its turn: a function of the units, districts and features at that point (each compared on their own), rebuilt by minorPhase after its growth before any read, the barbarians' by barbarianPhase before their rules and dropped as their pass ends; the GPU twin builds each at the same point (`_minor_danger_open`, `_barb_danger_open`, transient)."
       },
       {
         "path": "Tile.mountainRange",

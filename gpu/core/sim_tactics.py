@@ -304,10 +304,14 @@ class SimTactics:
         return out
 
     def _tac_closed(self, seat: int) -> torch.Tensor:
-        """[B, T] bool — `closedToMinor`: for a city-state's `seat`, a major's
-        or another city-state's territory whose owner holds the open-borders
-        civic and is not at war with it; nothing for any other seat."""
+        """[B, T] bool — `groundOf`'s shut ground: for a city-state's `seat`
+        (`closedToMinor`), a major's or another city-state's territory whose
+        owner holds the open-borders civic and is not at war with it; for a
+        major's, the ground behind borders not opened to it
+        (`_border_closed`); nothing for any other seat."""
         zero = torch.zeros(self.B, self.T, dtype=torch.bool, device=self.device)
+        if 0 <= seat < self.n_majors:
+            return self._border_closed(torch.arange(self.T, device=self.device).unsqueeze(0).expand(self.B, self.T), seat)
         if not (100 <= seat < 100 + self.S) or self._open_borders_civic < 0:
             return zero
         R = self.n_majors
@@ -1075,8 +1079,9 @@ class SimTactics:
             # the attack's step priced as any step, then spending the
             # Movement it leaves (`search`), as a planning step onto a
             # district at war with HitPoints does; the danger map's search
-            # pays the attack's spend on a district alone (`pay_n`)
-            pay6 = a6 if pay_n is None else a6 & pay_n.gather(1, nbc)
+            # pays the attack's spend on a district alone (`pay_n`), one it
+            # may enter (an Encampment not yet built) among them
+            pay6 = a6 if pay_n is None else pay_n.gather(1, nbc) & (nb >= 0)
             spend6 = pay6 | (fort_n.gather(1, nbc) & (nb >= 0)) if fort_n is not None else pay6
             cst = torch.where(spend6, cst + moves, cst)
             moves = torch.where(spend6, 0, moves)
@@ -4202,18 +4207,13 @@ class SimTactics:
             rturn = rank.clone()
             res = {"rank": rank, "turns": rturn, "moves": rank.clone()}
         rsafe = rowof.clamp(min=0)
-        # the barbarians' danger map as the pass opens
-        need = self._tac_danger_need(live(), "barb", rowof, res)
-        # an explorer reads it over the plots two turns of its steps take in
-        # (its rounds of Explore Land)
-        xb, xs = (live() & (ai == _AI_EXPLORE)).nonzero(as_tuple=True)
-        if xb.numel():
-            reach2 = 2 * (torch.div(self._tac_full_now("barb")[xb, xs], self._tac_min_step_mp(), rounding_mode="floor") + 1)
-            near = (self.pair_dist[self.barb_unit_tile[xb, xs].clamp(min=0)].to(torch.long) <= reach2.unsqueeze(1)).float()
-            acc = torch.zeros(B, T, dtype=torch.float32, device=dev)
-            acc.index_add_(0, xb, near)
-            need = need | (acc > 0)
-        danger = self._danger_plane(BARB_SEAT, need)
+        # the barbarians' danger map as their DoTurn built it
+        # (`_barb_danger_open`, built here where their turn has not), dropped
+        # as their pass takes it
+        danger = self._barb_danger_open
+        if danger is None:
+            danger = self._danger_plane(BARB_SEAT, torch.ones(B, T, dtype=torch.bool, device=dev))
+        self._barb_danger_open = None
 
         def reach_at(tiles: torch.Tensor) -> torch.Tensor:
             """[B, P] the turn each unit's reach reaches the game's plot, -1 none"""
@@ -4962,8 +4962,12 @@ class SimTactics:
         else:
             empty = torch.full((1, T), -1, dtype=torch.long, device=dev)
             res = {"rank": empty, "turns": empty.clone(), "moves": empty.clone()}
-        # the player's danger map as the pass opens
-        danger = self._danger_plane(seat, self._tac_danger_need(units, pre, rowof, res))
+        # the player's danger map: a city-state's as its DoTurn built it
+        # (`_minor_danger_open`, built here where its turn has not), the Free
+        # Cities' as their pass opens after their cities' turn
+        danger = self._minor_danger_open.get(seat - 100) if 100 <= seat < 100 + self.S else None
+        if danger is None:
+            danger = self._danger_plane(seat, self._tac_danger_need(units, pre, rowof, res))
         return {"units": units, "order": order, "npass": npass, "rowof": rowof, "res": res, "tg": tg,
                 "danger": danger}
 
@@ -5039,8 +5043,9 @@ class SimTactics:
         with it that it sees, with a combat, ranged or bombard strength, adds
         its danger (`unitDanger`) over the plots its one-turn search closes
         from where it stands on its full Movement and may stand on (none
-        another player's unit at peace holds in its sight; a ship's strike onto land
-        none, a city it may enter one; a unit with a range only those it reaches with Movement left),
+        another player's unit at peace holds in its sight; a ship's strike onto a
+        land unit none, a city it may enter and a city centre or Encampment it
+        strikes one; a unit with a range only those it reaches with Movement left),
         those within its range of
         them and, a raider's, the land beside them — each set once; an
         aircraft over its range. Each district of such a player
@@ -5111,9 +5116,13 @@ class SimTactics:
                     # holds on a plot the player sees now)
                     reach = res["turns"] >= 1
                     # a ship's strike onto land is no plot of its reach (a
-                    # city it may enter is)
+                    # city it may enter is, and a city centre or an
+                    # Encampment it strikes)
                     ship = self.unit_naval[ut[b_i[mm], u_i[mm]]]
-                    reach &= ~(ship.unsqueeze(1) & ~self.water[b_i[mm]] & res["attack"])
+                    fort = self._centre_plane()
+                    if self._encamp_didx >= 0:
+                        fort = fort | (self.district == self._encamp_didx)
+                    reach &= ~(ship.unsqueeze(1) & ~self.water[b_i[mm]] & res["attack"] & ~fort[b_i[mm]])
                     rr = R[b_i[mm], u_i[mm]]
                     # a unit with a range lists a plot only with Movement
                     # left there to strike from (0x7921e0 -> 0x791270)

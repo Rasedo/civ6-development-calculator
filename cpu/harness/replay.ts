@@ -370,8 +370,8 @@ interface Ctx {
   gameMemory?: GameMemory;
   /** per seat its knowledge base as its last tactical turn logged it */
   armyLogged: Map<number, ArmyLogged>;
-  /** per seat the danger map its last tactical pass opened on, with that
-   *  turn */
+  /** per seat the danger map its last DoTurn built (a minor's and the
+   *  barbarians' as the tactical pass read it), with that turn */
   dangerLogged: Map<number, { turn: number; plane: Int16Array }>;
   /** each unit's type as the city-states' and Free Cities' turns left the
    *  units (the moment of their end looks), by id */
@@ -1031,6 +1031,7 @@ function barbarianTurn(ctx: Ctx, b: TurnRecord, closing: number): void {
   traceBarbOps((l, candidate) => (candidate ? opEvals : opLines).push(l));
   // their Movement as the turn opens, before their rules grant its techs
   const opened = barbMovesNow(state);
+  const campsWas = [...state.barbSeat.camps];
   barbarianRules(state, closing);
   for (const land of ctx.barbBattles.splice(0)) land();
   // where the pair's first record holds each unit its moves took off
@@ -1062,7 +1063,7 @@ function barbarianTurn(ctx: Ctx, b: TurnRecord, closing: number): void {
     if (isBarbSeat(u.seat) && !before.has(u) && state.units.includes(u)) u.slot = slotOfKey(key);
   }
   barbSlots(state);
-  barbarianAi(ctx, b, closing, before, from, opened);
+  barbarianAi(ctx, b, closing, before, from, opened, campsWas);
   // each unit looks from each plot the record's steps of the turn entered,
   // after the AI's planning read the plots revealed as the turn opened, the
   // units walking one after another in the record's order — those yet to
@@ -1164,7 +1165,7 @@ function landRepairs(ctx: Ctx, b: TurnRecord, turn: number, takes: (player: numb
  *  holds them (`from`, else where they stand): its moves tallied
  *  (`tallyTactics`) */
 function barbarianAi(ctx: Ctx, b: TurnRecord, closing: number, before: ReadonlySet<Unit>, from: ReadonlyMap<Unit, number>,
-  opened: ReadonlyMap<number, number>): void {
+  opened: ReadonlyMap<number, number>, campsWas: readonly number[]): void {
   const { state } = ctx;
   const copy = deserialize(serialize(state));
   landMajorDistricts(ctx, b, closing, copy);
@@ -1356,11 +1357,6 @@ function barbarianAi(ctx: Ctx, b: TurnRecord, closing: number, before: ReadonlyS
     const u = twin.get(c);
     if (u && !moves.has(u)) moves.set(u, { move, plot, attack, from: from.get(u) ?? u.tileIndex });
   });
-  // the danger map the barbarians' turn opens on, beside the game's logged
-  // "Current Danger" of each unit it moved to safety
-  const plane = dangerPlane(copy, BARB_SEAT);
-  const danger = new Map<Unit, number>();
-  for (const [c, u] of twin) if (isBarbSeat(c.seat)) danger.set(u, plane[c.tileIndex]);
   // a civilian they seized in the pair is its owner's still at their
   // tactical turn's ageing and look, on its plot, and in their pass's
   // targets until the seizure (runs/h1_dueldA1117 t33: China's Settler steps
@@ -1388,6 +1384,18 @@ function barbarianAi(ctx: Ctx, b: TurnRecord, closing: number, before: ReadonlyS
     stood.length = 0;
   };
   seizedNow = taken;
+  // the danger map their DoTurn built, before their rules raised the turn's
+  // units and camps (`barbarianPhase`), beside the game's logged "Current
+  // Danger" of each unit it moved to safety
+  const raised = { units: copy.units, camps: copy.barbSeat.camps };
+  copy.units = copy.units.filter((c) => !isBarbSeat(c.seat) || acting.has(c.id));
+  copy.barbSeat.camps = raised.camps.filter((p) => campsWas.includes(p));
+  const plane = dangerPlane(copy, BARB_SEAT);
+  copy.units = raised.units;
+  copy.barbSeat.camps = raised.camps;
+  copy.barbSeat.dangerOpen = Array.from(plane);
+  const danger = new Map<Unit, number>();
+  for (const [c, u] of twin) if (isBarbSeat(c.seat)) danger.set(u, plane[c.tileIndex]);
   const logged = armyLog(ctx);
   traceKnowledge(logged);
   try {
@@ -6283,7 +6291,7 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
   // each knowledge base as its tactical turn's ageing and look leave it, the
   // moment the game writes its ARMY lines
   traceKnowledge(armyLog(ctx));
-  // each danger map as its tactical pass opens on it, with the pair's turn
+  // each danger map its tactical pass reads, with the pair's turn
   traceDanger((seat, plane) => ctx.dangerLogged.set(seat, { turn: ctx.turn, plane: plane.slice() }));
   // the operations each AI party started, against the log's
   operations.onStarts = (turn, player, log, ours) => {
@@ -6357,9 +6365,11 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
       break;
     }
     ctx.turn = a.turn;
-    // a major's danger map on the world record t holds, its turn opening
+    // the active major's danger map on the world record t holds, its start
+    // of t behind it
     if (opts.aiScore && ctx.gameMemory) {
-      for (const [seat] of ctx.playerOfSeat) if (isCiv(seat)) ctx.dangerLogged.set(seat, { turn: a.turn, plane: dangerPlane(state, seat) });
+      const seat = seatOfP(ctx, activePlayer(a));
+      if (isCiv(seat)) ctx.dangerLogged.set(seat, { turn: a.turn, plane: dangerPlane(state, seat) });
     }
     ctx.groundWas = state.map.tiles.map(groundWasOf);
     // the city-states' revealed plots as the turn opens, which their units'
@@ -6600,6 +6610,28 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
     try {
       ctx.streams = new Map();
       seatPhase(state, { seats: new Set(others), deals: true });
+      // each other major's danger map at its DoTurn's tail, its start done
+      // (runs/h1_duelq1117 t28: China's start envoy makes it city-state 3's
+      // suzerain, whose Warriors see the barbarian Warrior on 39:11)
+      // ...the wars the log declares between the player before it closing
+      // and its own activation not yet declared (runs/h1_duelq1128 t203:
+      // China's war on Rome after its start's rows, Rome's units no plot of
+      // its map until t204)
+      if (opts.aiScore && ctx.gameMemory) {
+        const acts = (b as { actions?: unknown[][] }).actions ?? [];
+        for (const seat of others) {
+          const pid = ctx.playerOfSeat.get(seat);
+          const late = new Set<number>();
+          for (let j = acts.findIndex((x) => x[2] === 'PlayerTurnActivated' && x[3] === pid) - 1; j >= 0 && acts[j][2] !== 'PlayerTurnDeactivated'; j--) {
+            if (acts[j][2] !== 'DiplomacyDeclareWar' || (acts[j][3] !== pid && acts[j][4] !== pid)) continue;
+            late.add(seatOfP(ctx, (acts[j][3] === pid ? acts[j][4] : acts[j][3]) as number));
+          }
+          const wars = state.seats[seat].wars;
+          state.seats[seat].wars = wars.filter((o) => !late.has(o));
+          ctx.dangerLogged.set(seat, { turn: a.turn, plane: dangerPlane(state, seat) });
+          state.seats[seat].wars = wars;
+        }
+      }
       stream.actions(a.turn);
       otherMajorsTurn();
       completeRecordedResearch(ctx, a, b, a.turn);
@@ -7278,7 +7310,7 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
       ctx.memoryClean = clean;
       // each danger map against the game's at the player's tactical step,
       // outside its cleanness: the minors' and the barbarians' as their
-      // passes opened on them, the majors' on the world record t holds
+      // passes read them, the majors' as their starts of the turn ended
       for (const [seat, opened] of ctx.dangerLogged) {
         const pid = ctx.playerOfSeat.get(seat);
         const m = pid === undefined || opened.turn !== a.turn ? undefined

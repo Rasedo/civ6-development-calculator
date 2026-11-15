@@ -15,9 +15,10 @@
  *   - revealed: the city-states' and the barbarians' revealed plots against
  *     the next record's (`readRevealed`), outside the player's cleanness.
  *   - danger: the city-states', the Free Cities' and the barbarians' danger
- *     maps as their tactical passes open on them against the game's at its
- *     tactical step (`readDanger`), outside the player's cleanness;
- *     danger.major the majors' maps alike, built on the world record t holds.
+ *     maps as their DoTurns built them, read as their tactical passes open,
+ *     against the game's at its tactical step (`readDanger`), outside the
+ *     player's cleanness; danger.major the majors' maps alike, each built as
+ *     its start of the turn ends.
  *
  * A recording with the game's own AI memory beside it (`<stem>.aimem.jsonl`,
  * `GameMemory`) is compared against that instead (`readGameMemory`): the
@@ -420,7 +421,7 @@ export function readRevealed(ours: readonly number[] | undefined, game: readonly
   return { kind: 'revealed', equal: mine.length + theirs.length === 0, ours: show(count(ours), mine), game: show(count(game), theirs) };
 }
 
-/** a player's danger map as its tactical pass opened on it against the
+/** a player's danger map as its DoTurn built it against the
  *  game's at its tactical step (`GameMemoryRead.danger`): each side its count
  *  of plots of danger, then the plots that differ (x:y ours/game, the first
  *  eight) */

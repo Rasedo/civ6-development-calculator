@@ -22,7 +22,7 @@ import { engineId, gameTypeOf, installFeature } from '../data/aliases';
 import {
   arrive, canEmbark, cityAtIndex, crossesRiver, embarkTechMoves, escortUnit, inEscort, cliffBlocksStep, shoreCrossing, districtZones, encampmentBlocks, inEnemyZoc, rosterEmbarkMoves, stepCost, stepUnit, terrainMp, unitDomain, unitExertsZoc, unitFullMoves, unitIsNoncombat, mapLayer, unitReligious,
   setBarbStepLook, unitsHostile, unitVisibleTo, fortifyOrder, operationStart, skipTurn,
-  waterEnterable, waterWalks, formationBanned, formationCS, setRecordFormation, formationMates, dropLoneRiders, escortOf, escortRiders, disbandUnit,
+  waterEnterable, waterWalks, borderClosedTo, formationBanned, formationCS, setRecordFormation, formationMates, dropLoneRiders, escortOf, escortRiders, disbandUnit,
 } from './units';
 import { BARB_SEAT, FREE_SEAT, NO_SEAT, campTiles, cityHolders, civsAtWar, isBarbSeat, isCityStateSeat, isCiv, isTerritorial, seatOf, tileCity, tileSeat } from './seats';
 import { OPEN_BORDERS_CIVIC } from '../data/seats';
@@ -224,7 +224,8 @@ interface Ground {
    *  embarked Man-At-Arms on 9:10 plans no 9:9, player 1's embarked Builder
    *  on it, AI_Planning.csv) */
   boarded: (i: number) => boolean;
-  /** another player's ground closed to a city-state's unit (`closedToMinor`) */
+  /** another player's ground closed to the unit: a city-state's
+   *  (`closedToMinor`), a major's (`borderClosedTo`) */
   closed: (i: number) => boolean;
 }
 
@@ -309,6 +310,11 @@ function groundOf(state: GameState, unit: Unit, revealedOnly = true, planning = 
   // round by land 6:17 / 7:18 / 7:19 / 8:19 for 11:14, never over 10:12)
   const embarks = [unit, ...mates].every((m) => canEmbark(state, m));
   const minor = isCityStateSeat(unit.seat);
+  // another player's territory closed to the unit: a city-state's
+  // (`closedToMinor`), a major's behind borders its owner has not opened to
+  // it (`borderClosedTo`; runs/h1_duelq1128 t94-96: player 0's Warrior on
+  // 13:7 lays no danger on player 1's 14:8 beside it)
+  const shut = (t: Tile): boolean => (minor ? closedToMinor(state, unit.seat, t) : isCiv(unit.seat) && borderClosedTo(state, unit.seat, t));
   // the planning list's units of the mover's map layer alone (the plot list
   // of the formation's layer, 0x2665b0 -> 0x75c50 -> 0x585eb0): a religious
   // unit stands on a layer of its own (runs/h1_duely1127 t80-91: city-state
@@ -356,7 +362,7 @@ function groundOf(state: GameState, unit: Unit, revealedOnly = true, planning = 
     known,
     revealed,
     boarded,
-    closed: (i) => minor && closedToMinor(state, unit.seat, state.map.tiles[i]),
+    closed: (i) => shut(state.map.tiles[i]),
     stand: (i) => {
       if (!held.has(i)) return true;
       if (!planning || boarded(i)) return false;
@@ -417,7 +423,7 @@ function groundOf(state: GameState, unit: Unit, revealedOnly = true, planning = 
       let v = enters.get(t.index);
       if (v === undefined) {
         enters.set(t.index, (v = enterable(state, unit, t, plainCivilians ? fighters : foes, embarks)
-          && !(minor && closedToMinor(state, unit.seat, t))));
+          && !shut(t)));
       }
       return v;
     },
@@ -430,7 +436,7 @@ function groundOf(state: GameState, unit: Unit, revealedOnly = true, planning = 
           foesSeen = new Set([...foes].filter((i) => sn[i] === 1));
         }
         passes.set(t.index, (v = enterable(state, unit, t, foesSeen, embarks)
-          && !(minor && closedToMinor(state, unit.seat, t))));
+          && !shut(t)));
       }
       return v;
     },
@@ -881,8 +887,11 @@ function search(state: GameState, unit: Unit, maxTurns: number, zoc: boolean, on
     // Movement it leaves there kept (0x26e570 at 0x26e6d3), no step going on
     // from it (0x26e5cd) (runs/h1_duely1127 t8: the barbarian Slinger on 5:8
     // reaches city-state 4's Warrior on 5:9 with Movement left, 6:10 beside
-    // it in its range)
-    if ((attack && !(standToAttack && !districtAttack(to))) || fortAtWar(to)) {
+    // it in its range); a district at war it may enter, an Encampment not yet
+    // built, spends it alike (runs/h1_duelq1128 t96-103: the barbarian
+    // Swordsman on 12:13 lays no danger on 14:13 past player 1's unbuilt
+    // Encampment 13:13, its Slinger none from it)
+    if ((attack && !(standToAttack && !districtAttack(to))) || fortAtWar(to) || (standToAttack && districtAttack(to))) {
       // the attack's step priced as any step — a river's 2 above the
       // Movement left waits for the next turn (runs/h1_duelv1121 t4: city-state
       // 4's Warrior at 32:22 lists 32:23 (1/1) and the barbarian Scout's
@@ -1989,8 +1998,10 @@ export const aiRanged = (u: Unit): number => (UNITS[u.type]?.bombard ? 0 : aiFor
  * (`unitDanger`) to every plot its one-turn planning search closes from where
  * it stands on its full Movement and may stand on, none another player's
  * unit at peace with it holds in its sight (0x7921e0 -> 0x26df90, no zone of
- * control, its melee attacks included but a ship's onto land, a city it may
- * enter a ship's plot: runs/h1_duelv1128 t45 / t80 / t109, a
+ * control, its melee attacks included but a ship's onto a land unit, a city
+ * it may enter and a city centre or an Encampment it strikes a ship's plot
+ * (runs/h1_duelq1117 t131: the barbarian Galley on 14:6 lays its 30 on
+ * city-state 2's centre 14:8 in player 0's map): runs/h1_duelv1128 t45 / t80 / t109, a
  * city-state's land unit beside a barbarian Galley and Quadriremes logs the
  * Quadriremes' ranged danger alone; a unit with a range only the plots it
  * reaches with Movement left), and to a second list, each plot once: every other plot within
@@ -2002,7 +2013,9 @@ export const aiRanged = (u: Unit): number => (UNITS[u.type]?.bombard ? 0 : aiFor
  * plot beside it (0x715ff0). Then the seat's own districts: each plot of one
  * with a defence 0, each plot their strike covers down by its strength, to 1
  * at least (0x716080). Last, each plot's feature its DangerValue
- * (`featureDanger`). The game builds it as the player's turn opens.
+ * (`featureDanger`). The game builds it once a turn, at the tail of the
+ * player's DoTurn (0x4e4560 -> 0x46cdd0), and every read of the turn is of
+ * that map (`Seat.dangerOpen`).
  */
 export function dangerPlane(state: GameState, seat: number): Int16Array {
   const { map } = state;
@@ -2044,7 +2057,7 @@ export function dangerPlane(state: GameState, seat: number): Int16Array {
       // a unit with a range lists a plot only with Movement left there to
       // strike from (the list's ranged flag, 0x7921e0 -> 0x791270)
       if (R > 0 && n.moves <= 0) return false;
-      if (!naval || !n.attack || isWater(map.tiles[n.tile])) reach.push(n.tile);
+      if (!naval || !n.attack || isWater(map.tiles[n.tile]) || garrisonDistrict(state, map.tiles[n.tile])) reach.push(n.tile);
       return false;
     }, undefined, 'danger');
     const inReach = new Set(reach);
@@ -2203,7 +2216,7 @@ export interface Pass {
   /** the tactical target list as the pass began, and each unit's planning */
   targets: Target[];
   plan: Map<number, Planner>;
-  /** the player's danger map as the pass began (`dangerPlane`) */
+  /** the player's danger map (`dangerPlane`) as its DoTurn built it */
   danger: Int16Array;
   /** the regions of every plot the player revealed as the pass began — the
    *  target list's set (0x783980), its tertiary region list (0x6fad50) */
@@ -2233,14 +2246,17 @@ export function traceTactics(fn: ((unit: Unit, move: string, plot: number, attac
 }
 
 let dangerTrace: ((seat: number, plane: Int16Array) => void) | null = null;
-/** REPLAY: each player's danger map as its tactical pass opens on it */
+/** REPLAY: each player's danger map as its tactical pass reads it */
 export function traceDanger(fn: ((seat: number, plane: Int16Array) => void) | null): void {
   dangerTrace = fn;
 }
 
-/** a pass's danger map, the replay's trace shown it */
-function passDanger(state: GameState, seat: number): Int16Array {
-  const plane = dangerPlane(state, seat);
+/** a pass's danger map, the replay's trace shown it: the one the player's
+ *  DoTurn built (`holder`'s `Seat.dangerOpen`), else built as the pass
+ *  opens (the Free Cities' after their cities' turn, a pass run outside its
+ *  player's turn) */
+function passDanger(state: GameState, seat: number, holder?: Seat): Int16Array {
+  const plane = holder?.dangerOpen ? Int16Array.from(holder.dangerOpen) : dangerPlane(state, seat);
   dangerTrace?.(seat, plane);
   return plane;
 }
@@ -4040,7 +4056,7 @@ export function cityStateTactics(state: GameState, cityState: CityState, operati
   costsHeld = new Map();
   try {
     withShortOrders(() => {
-      const pass = openPass(state, cityState.seat, militaryAiTypeOf);
+      const pass = openPass(state, cityState.seat, militaryAiTypeOf, cityState);
       // a unit with no Movement left as the pass opens is none of its (the
       // game logs no tactical row: runs/h1_duely1117 t19 city-state 3's
       // Warrior 393220 bought at its start, 1121 t61 city-state 2's Swordsman
@@ -4141,7 +4157,7 @@ function freeHome(state: GameState, u: Unit): number {
 
 /** a player's tactical pass as it opens: its units in pool order, their AI
  *  types, their planning reach, its tactical target list (what it sees) */
-export function openPass(state: GameState, seat: number, aiOf: (u: Unit) => number): Pass {
+export function openPass(state: GameState, seat: number, aiOf: (u: Unit) => number, holder?: Seat): Pass {
   const units = state.units.filter((u) => u.seat === seat && aiOf(u) >= 0).sort((a, b) => (a.slot ?? 0) - (b.slot ?? 0));
   const ai = new Map<number, number>();
   for (const u of units) ai.set(u.id, aiOf(u));
@@ -4155,7 +4171,7 @@ export function openPass(state: GameState, seat: number, aiOf: (u: Unit) => numb
   }
   const ended = new Set<number>();
   movesEnded = ended;
-  return { seat, strike: false, units, reach, done: new Set(), ended, ai, targets, plan, danger: passDanger(state, seat), regions: seenRegions(state, seat) };
+  return { seat, strike: false, units, reach, done: new Set(), ended, ai, targets, plan, danger: passDanger(state, seat, holder), regions: seenRegions(state, seat) };
 }
 
 /** an operation's member of the player, null for one killed */
@@ -4463,6 +4479,7 @@ export function barbarianTactics(state: GameState, acting: ReadonlySet<number>):
   } finally {
     costsHeld = null;
     movesEnded = null;
+    delete state.barbSeat.dangerOpen;
   }
   // the turn's end: no unit left on a plot another keeps it out of
   // (`unstackUnits`); the turn's captures start their operations on the
@@ -4507,7 +4524,7 @@ function tacticalPass(state: GameState, acting: ReadonlySet<number>): void {
     reach.set(u.id, p.reach);
   }
   const pass: Pass = { seat: BARB_SEAT, strike: true, units: all, reach, done: new Set(), ended: (movesEnded = new Set<number>()), ai, targets, plan,
-    danger: passDanger(state, BARB_SEAT), regions: seenRegions(state, BARB_SEAT) };
+    danger: passDanger(state, BARB_SEAT, state.barbSeat), regions: seenRegions(state, BARB_SEAT) };
   // the operations first (their manager's job opens the player's turn);
   // then an operation's units are the operation's
   const opUnits = barbarianTrees(state, pass);
@@ -4563,7 +4580,8 @@ export function refreshBarbarians(state: GameState, opened?: ReadonlyMap<number,
 
 /**
  * THE BARBARIANS' TURN: their unit pool (`barbSlots`), their Movement as the
- * turn opens (`barbMovesNow`), the game's rules for them (`barbarianRules`:
+ * turn opens (`barbMovesNow`), their danger map (`Seat.dangerOpen`), the
+ * game's rules for them (`barbarianRules`:
  * their techs, the camp step, each tribe's turn), their units' AI
  * (`barbarianTactics`: their operations' trees, then their tactical pass),
  * their scouts looking at each step (`barbScoutLook`).
@@ -4572,6 +4590,11 @@ export function barbarianPhase(state: GameState): void {
   barbSlots(state);
   const acting = new Set(state.units.filter((u) => isBarbSeat(u.seat)).map((u) => u.id));
   const opened = barbMovesNow(state);
+  // their danger map, built before their rules' turn: no unit or camp the
+  // turn raises sees for it (runs/h1_duelq1117 t21: the Warrior raised on
+  // 9:23 sees Rome's Warrior on 10:21, no plot of the map; h1_duelq1127 t1:
+  // the first camp's turn, the map empty)
+  state.barbSeat.dangerOpen = Array.from(dangerPlane(state, BARB_SEAT));
   barbarianRules(state, state.turn);
   barbSlots(state);
   refreshBarbarians(state, opened);

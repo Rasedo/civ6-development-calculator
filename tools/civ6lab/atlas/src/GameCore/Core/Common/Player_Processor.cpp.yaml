@@ -3,6 +3,22 @@
 # `review: imported` = bootstrapped from dll_readings.md / code comments / saved
 # labels and not yet reviewed: verify against the disassembly, then edit and
 # set `review: reviewed`.
+- addr: 0x7e9d0
+  final: 0x5ca80
+  kind: function
+  semantics: "Player::Processor's turn step: where the player's pending-turn flag (@f29090[player +0x128]) is set, takes the second flag (@f290d0), clears both, calls the player's DoTurn 0x4e4560 (at 0x7eb18, the player at +0x13a8) and then raises the player's turn event (0x8b9120, hash 0x8953f126). DoTurn's only caller: the danger map its tail builds is the one map of the player's turn."
+  status: READ
+  cases:
+    - recording: h1_duelq1117
+      turn: 13
+      value: city-state 2's danger map at its tactical step holds the barbarian Warrior 589832's 20 round 14:10 (16 plots), as its DoTurn built it
+  impl: [cpu/core/tactical.ts:passDanger, cpu/core/tactical.ts:barbarianPhase]
+  readings:
+    - "C-95: the danger map is the DoTurn's all turn — the tactical pass reads it, the barbarians' is built before their rules; a ship's district strike, a district at war it may enter, a major's closed borders — READ (0x7e9d0 -> 0x4e4560 -> 0x46cdd0), FIT (the barbarians' raise, the ship's strike, the borders), both twins"
+  context:
+    - "...ship's district strike, a district at war it may enter, a major's closed borders — READ (0x7e9d0 -> 0x4e4560 -> 0x46cdd0), FIT (the barbarians' raise, the ship's strike, the borders), bo..."
+    - "- ONE MAP A TURN: 0x7e9d0 (Player::Processor, the player's pending-turn flag @f29090[player] cleared) calls DoTur..."
+  review: reviewed
 - addr: 0x7eb60
   final: 0x5cb00
   kind: function

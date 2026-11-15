@@ -1985,8 +1985,9 @@ class SimOrders:
 
     def _barbarian_phase(self) -> None:
         """`barbarianPhase`: the barbarians' unit pool (`_barb_slots`), the
-        game's rules for them (`_barbarian_rules`: their techs, the camp step,
-        each tribe's turn), their units' AI (`_barbarian_tactics`) for the
+        danger map (`_barb_danger_open`), the game's rules for them
+        (`_barbarian_rules`: their techs, the camp step, each tribe's turn),
+        their units' AI (`_barbarian_tactics`) for the
         units that stood before their camps raised this turn's (their operations'
         trees first), their scouts looking at each step (`_step_verb`'s
         `_barb_scout_look`)."""
@@ -1994,6 +1995,10 @@ class SimOrders:
         acting = self.barb_unit_alive & (self.barb_unit_seat == BARB_SEAT)
         # their Movement as the turn opens, before their rules grant its techs
         opened = self._full_mp("barb").clone()
+        # their danger map, built before their rules' turn: no unit or camp
+        # the turn raises sees for it (`barbarianPhase`)
+        self._barb_danger_open = self._danger_plane(
+            BARB_SEAT, torch.ones(self.B, self.T, dtype=torch.bool, device=self.device))
         self._barbarian_rules()
         self._barb_slots()
         # a unit the rules raised takes its own full Movement

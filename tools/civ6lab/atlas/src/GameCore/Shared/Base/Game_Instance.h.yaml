@@ -39,6 +39,7 @@
     - gpu/core/sim_phase.py:econ_lux
     - gpu/core/sim_phase.py:_seat_turn
     - cpu/harness/replay.ts:gov
+    - cpu/core/tactical.ts:dangerPlane
   readings:
     - "H-1: every draw of a player's start (witnesses, RandCalls.csv)"
     - "H-1: the luxury allocation's rebuilds — PARTLY READ"
@@ -61,6 +62,7 @@
     - "C-95: a damaged centre defends at its wounded strength, the planning's city shot needs standing walls, the barbarians plan on the turn's unhealed centres — READ (0x51eaf0, 0x791470 at 0x79181c..0x791827 -> 0x249ee0 / 0x24b960), both twins; the replay's barbarian copy"
     - "H-4: a wonder under a hostile unit, the economy before the luxury rebuild, the extraction a pillage and a centre change — READ, both twins"
     - "H-4: the step's item multiplier in 24.8 and a Builder's wonder charge through it; the resources step after the economy; an event's pillage and a district's resource re-rank the luxuries — READ, both twins"
+    - "C-95: the danger map is the DoTurn's all turn — the tactical pass reads it, the barbarians' is built before their rules; a ship's district strike, a district at war it may enter, a major's closed borders — READ (0x7e9d0 -> 0x4e4560 -> 0x46cdd0), FIT (the barbarians' raise, the ship's strike, the borders), both twins"
   context:
     - "- each city in the player's order (0x4e4560 -> city turn 0x1fa1d0: production, growth, the border turn 0x1a9bc0, loyalty): a WONDER..."
     - "- Player DoTurn 0x4e4560, in order: the culture (+0x1310, 0x396860: the civic progress), the resources (+0x1320,..."

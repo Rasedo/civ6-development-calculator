@@ -2133,11 +2133,12 @@
   cases:
     - recording: 1117
       value: "Each DISTRICT of such   a player (the player's +0x1308 -> +0xd8, its district list: every district   placed, built or not — the recordings' city district lists hold districts   under construction — an"
-  impl: [cpu/core/minorBuild.ts:prev, cpu/core/types.ts:Seat]
+  impl: [cpu/core/minorBuild.ts:prev, cpu/core/types.ts:Seat, cpu/core/tactical.ts:dangerPlane]
   readings:
     - "C-95: the danger map and Move to Safety — READ, ported"
     - "C-99: when the pool finder's +0x1bc is written — the danger map at DoTurn, the planning at the AI turn's start, nothing inside a pass — READ (0x46cdd0, 0x717460, 0x6096c0, 0x792c90, 0x7921a0, 0x790890, 0x47ffb0), unported"
     - "C-130: a city's undamaged strike in Bastions' analyzer; a city-state's danger map at its DoTurn; the plot purchase analyzer — READ / PARTLY READ"
+    - "C-95: the danger map is the DoTurn's all turn — the tactical pass reads it, the barbarians' is built before their rules; a ship's district strike, a district at war it may enter, a major's closed borders — READ (0x7e9d0 -> 0x4e4560 -> 0x46cdd0), FIT (the barbarians' raise, the ship's strike, the borders), both twins"
   context:
     - ...(DLC GranColombia_Maya), no other. The map is built at the player's DoTurn (0x4e4560 -> 0x46cdd0 at 0x4e4aa4); the engines build it as each tactical pass opens, the hostile units' sear...
   review: reviewed
@@ -7249,7 +7250,9 @@
   name: GovernorChanged
   semantics: logs GovernorChanged (hash 0xcb6c9e05).
   status: PARTLY
-  readings: ["H-1: the governors' clocks — READ"]
+  readings:
+    - "H-1: the governors' clocks — READ"
+    - "C-95: the danger map is the DoTurn's all turn — the tactical pass reads it, the barbarians' is built before their rules; a ship's district strike, a district at war it may enter, a major's closed borders — READ (0x7e9d0 -> 0x4e4560 -> 0x46cdd0), FIT (the barbarians' raise, the ship's strike, the borders), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...> 0 -> 0x35d220(-1), \"returning to service\" at 0); every governor logs GovernorChanged (0x8b9120, hash 0xcb6c9e05) — the per-turn GovernorChanged rows, which stand before the city ro..."
