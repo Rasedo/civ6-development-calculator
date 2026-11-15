@@ -36,6 +36,28 @@
   context:
     - "...50 on 0x6da56a3d: district +0x8d8) below its outer maximum (0x24b290 -> City +0x1880, 0x198310) adds Amount raw. EFFECT_ADJUST_CITY_RANGED_STRIKE 0x6a69c0 (@f03d20, vtable 0xd62ad0):..."
   review: reviewed
+- addr: 0x1f0440
+  final: 0x147e80
+  kind: function
+  name: City_Power update
+  semantics: "City_Power's update (run by ChangeFreePower 0x1ed860, the modifiers' required power 0x1ee0d0 and the temporary power 0x1ee180): clears the required total (+0x58) and its list (+0x60 / +0x68); only where the city's owner is a FULL_CIV (0x469db0 at 0x1f04c7..0x1f04dc) adds each Buildings_XP2 row with RequiredPower (+0x28) the city holds (0x18e9f0) unpillaged (0x18fe60), the project at the queue's head and the modifiers' part (0x1ede80); then raises the powered signal where the shortfall (0x1f01f0) changes sign. A city-state's and the Free Cities' cities require no power."
+  status: READ
+  cases:
+    - recording: h1_duely1124
+      turn: 214
+      value: Cardiff's Production 9.30078125 with its Factory's powered yields, no generator on its plots; runs/h1_duelv1124 Bologna t207-t220 each Solar Farm row its 2 Power's 40.00 alone
+  impl:
+    - cpu/core/aiView.ts:centres
+    - cpu/core/freeCityBuild.ts:cityPowerFacts
+    - cpu/core/aiView.ts:cityPowerShort
+    - cpu/core/minorBuild.ts:minorPower
+    - gpu/core/sim_cityvalue.py:power_short
+  readings:
+    - "C-96 / C-98 / C-100 / C-99: the city AI's fitted rules read — the analysis before the job list, the unit term's upgrade price, the city's trained domains, a non-major's required power, the eruption's turns — READ (0x608870 at 0x608976..0x608988, 0x7b3e50 at 0x7b4564..0x7b45c8, 0x5376d0, 0x1c77c0, 0x1aed10, 0x1f0440 at 0x1f04c7..0x1f04dc, 0xa1d480), both twins"
+  context:
+    - ...8870 at 0x608976..0x608988, 0x7b3e50 at 0x7b4564..0x7b45c8, 0x5376d0, 0x1c77c0, 0x1aed10, 0x1f0440 at 0x1f04c7..0x1f04dc, 0xa1d480), both twins
+    - "- A NON-MAJOR'S REQUIRED POWER. City_Power's update 0x1f0440 (run by ChangeFreePower 0x1ed860, the modifiers' required power 0x1ee0d0 and the temp..."
+  review: reviewed
 - addr: 0x1f6360
   final: 0x14b720
   kind: function

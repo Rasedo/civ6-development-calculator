@@ -19,6 +19,7 @@
     - "C-98: a city-state's City Analysis counts its knowledge base as its last turn left it — READ (0x608580 at 0x6085c9, 0x5c24e0 / 0x6fae70 on player signal +0x258, 0x785f30 in 0x6096c0's +0x370 list), both twins"
     - "C-127: the growth forecast the city AI reads is the one its last full update wrote — READ (0x5ce680 at 0x5ce831 / 0x5ce841, 0x5c27e0's +0x258), both twins"
     - "C-100: the City Analysis reads the city before the free Trader's route, the Neighbourhood's install Housing beside a feature, a pillaged district's repair turns — READ (0x5c24e0 on +0x258 before the dispatch 0x78e0a0 and the update 0x5ce680; 0x79e140 on Districts +0x40), both twins"
+    - "C-96 / C-98 / C-100 / C-99: the city AI's fitted rules read — the analysis before the job list, the unit term's upgrade price, the city's trained domains, a non-major's required power, the eruption's turns — READ (0x608870 at 0x608976..0x608988, 0x7b3e50 at 0x7b4564..0x7b45c8, 0x5376d0, 0x1c77c0, 0x1aed10, 0x1f0440 at 0x1f04c7..0x1f04dc, 0xa1d480), both twins"
   review: reviewed
 - addr: 0x5c2610
   final: 0x3d90f0

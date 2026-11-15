@@ -54,8 +54,7 @@
  * (`baseAdjacency`) for both the whole and the rows, its own pillaged
  * district's plot at the repair's turns, the plot's price where
  * the city may buy it (`borderCandidates`), one city (no regional reach, no
- * Dam, Canal or projects); LAB: an inland city-state on a river trains ships
- * (0x1c77c0's sea test unread).
+ * Dam, Canal or projects).
  */
 import { existsSync, readFileSync } from 'node:fs';
 import { loadCatalog, memField, type TurnRecord } from './record';
@@ -601,11 +600,8 @@ for (const rec of recs) {
           chronology: facts.era + 1,
           districtCount: specialty,
           districtCap: 1 + Math.floor((cs.population - 1) / 3),
-          // LAB: 0x1c77c0's sea test (the centre's plot's +0x40 and its
-          // flags +0x14 bit 0) unread; every inland city-state of the five
-          // verbose duels sits on a river and values as one that trains ships
-          cityTrains: (dom) => facts.trainsDomain(dom) || (dom === 'DOMAIN_SEA' && (state.map.tiles[cs.centerIndex].riverMask ?? 0) !== 0),
-          playerTrains: (dom) => facts.trainsDomain(dom) || (dom === 'DOMAIN_SEA' && (state.map.tiles[cs.centerIndex].riverMask ?? 0) !== 0),
+          cityTrains: (dom) => facts.trainsDomain(dom),
+          playerTrains: (dom) => facts.trainsDomain(dom),
           domainUnitsValue: () => 0,
           // a city-state: one city
           regionalCities: () => 0,

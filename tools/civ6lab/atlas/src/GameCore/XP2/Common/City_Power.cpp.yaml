@@ -7,9 +7,53 @@
   final: 0x146f30
   kind: function
   name: ChangeFreePower
-  status: UNREAD
+  semantics: changes the city's free power (+0x08, m_xFreePower) and its per-source entries, then the update 0x1f0440; its callers the free-power modifiers (0xafe320, 0xaff790). The sources' arithmetic unread.
+  status: PARTLY
   readings:
     - "C-100: the luxury's ban, the power value's RequiredPower term and the plot adjacency's sight — READ"
+    - "C-96 / C-98 / C-100 / C-99: the city AI's fitted rules read — the analysis before the job list, the unit term's upgrade price, the city's trained domains, a non-major's required power, the eruption's turns — READ (0x608870 at 0x608976..0x608988, 0x7b3e50 at 0x7b4564..0x7b45c8, 0x5376d0, 0x1c77c0, 0x1aed10, 0x1f0440 at 0x1f04c7..0x1f04dc, 0xa1d480), both twins"
   context:
     - "...n: a city-state's free power past its grid (City_Power +0x08's sources, ChangeFreePower 0x1ed860) unread, the grid's supply read for it; the strategic branch's income (`ResourceFacts.i..."
-  review: imported
+  review: reviewed
+- addr: 0x1ede80
+  kind: function
+  name: ChangeRequiredPower
+  semantics: adds a required-power entry (building or project, an amount) to the city's list and total (+0x58); called by the update 0x1f0440 for a FULL_CIV's city.
+  status: PARTLY
+  cases:
+    - recording: h1_duelv1124
+      turn: 207
+      value: runs/h1_duelv1124 Bologna   t207-t220, each Solar Farm row its 2 Power's 40.00 alone.
+  readings:
+    - "C-96 / C-98 / C-100 / C-99: the city AI's fitted rules read — the analysis before the job list, the unit term's upgrade price, the city's trained domains, a non-major's required power, the eruption's turns — READ (0x608870 at 0x608976..0x608988, 0x7b3e50 at 0x7b4564..0x7b45c8, 0x5376d0, 0x1c77c0, 0x1aed10, 0x1f0440 at 0x1f04c7..0x1f04dc, 0xa1d480), both twins"
+  context:
+    - "...18e9f0) unpillaged (0x18fe60), the project at the queue's head and the modifiers' part (0x1ede80). The shortfall 0x1f01f0 is the required total less the free power (0x1f0020: +0x08, ra..."
+  review: reviewed
+- addr: 0x1ee0d0
+  kind: function
+  name: ChangeRequiredPowerFromModifiers
+  semantics: changes the city's required power from modifiers (m_xRequiredPowerFromModifiers), then the update 0x1f0440.
+  status: PARTLY
+  cases:
+    - recording: h1_duelv1124
+      turn: 207
+      value: runs/h1_duelv1124 Bologna   t207-t220, each Solar Farm row its 2 Power's 40.00 alone.
+  readings:
+    - "C-96 / C-98 / C-100 / C-99: the city AI's fitted rules read — the analysis before the job list, the unit term's upgrade price, the city's trained domains, a non-major's required power, the eruption's turns — READ (0x608870 at 0x608976..0x608988, 0x7b3e50 at 0x7b4564..0x7b45c8, 0x5376d0, 0x1c77c0, 0x1aed10, 0x1f0440 at 0x1f04c7..0x1f04dc, 0xa1d480), both twins"
+  context:
+    - ...Power's update 0x1f0440 (run by ChangeFreePower 0x1ed860, the modifiers' required power 0x1ee0d0 and the temporary power 0x1ee180) clears the required total (+0x58) and its list, and...
+  review: reviewed
+- addr: 0x1ee180
+  kind: function
+  name: ChangeTemporaryPower
+  semantics: changes the city's temporary power (+0x30) from a source city and location, then the update 0x1f0440.
+  status: PARTLY
+  cases:
+    - recording: h1_duelv1124
+      turn: 207
+      value: runs/h1_duelv1124 Bologna   t207-t220, each Solar Farm row its 2 Power's 40.00 alone.
+  readings:
+    - "C-96 / C-98 / C-100 / C-99: the city AI's fitted rules read — the analysis before the job list, the unit term's upgrade price, the city's trained domains, a non-major's required power, the eruption's turns — READ (0x608870 at 0x608976..0x608988, 0x7b3e50 at 0x7b4564..0x7b45c8, 0x5376d0, 0x1c77c0, 0x1aed10, 0x1f0440 at 0x1f04c7..0x1f04dc, 0xa1d480), both twins"
+  context:
+    - ...hangeFreePower 0x1ed860, the modifiers' required power 0x1ee0d0 and the temporary power 0x1ee180) clears the required total (+0x58) and its list, and only where the city's owner is a F...
+  review: reviewed

@@ -32,7 +32,7 @@ import { analysedTurns, installType, promotionWeight } from './minorBuild';
 import { civEraIndex, computeCityStats } from './city';
 import { researchCost } from './economy';
 import { getModifiers, prodBoostPct, seatGovernment } from './effects';
-import { citiesOf, isCityStateSeat, isFreeSeat, seatOf } from './seats';
+import { citiesOf, isCiv, isCityStateSeat, isFreeSeat, seatOf } from './seats';
 import { minorCity } from './cityStates';
 import { cityLowlands, coastalLowlandCounts } from './climate';
 import { accumulatedPerTurn, stockFree, strategicSlot, strategicSurplus } from './stockpile';
@@ -120,7 +120,10 @@ export function majorUnitVersion(traits: readonly string[], u: string): string |
 }
 
 /** a city's power as the power value reads it (`CityBuildFacts.power`): its
- *  grid's supply and load (`cityPower`) and its player's turn's fuel — each
+ *  free power (0x1f0020: its own renewables, `cityPower`'s supply), its
+ *  required power (City_Power +0x58: its grid's load for a major's city,
+ *  none for a city-state's or the Free Cities' — the update 0x1f0440 counts
+ *  a FULL_CIV's buildings alone) and its player's turn's fuel — each
  *  resource's income a turn (`accumulatedPerTurn`) above 0 times its
  *  Resource_Consumption PowerProvided */
 export function cityPowerFacts(state: GameState, city: City): CityBuildFacts['power'] {
@@ -133,7 +136,7 @@ export function cityPowerFacts(state: GameState, city: City): CityBuildFacts['po
     const k = id ? strategicSlot(id) : -1;
     if (k >= 0 && income[k] > 0) fuel += income[k] * r.powerProvided;
   }
-  return { free: p.supply, required: p.demand, fuel };
+  return { free: p.supply, required: isCiv(city.seat) ? p.demand : 0, fuel };
 }
 
 /** THE CITY BUILD AI'S VIEW OF A MAJOR'S CITY, its knowledge base's unit

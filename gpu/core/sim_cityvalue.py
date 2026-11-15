@@ -2676,16 +2676,18 @@ class _MinorFacts:
         return self._stats()[0][:, self._slot, _YIELDS.index(y)]
 
     def power_short(self):
-        """a city-state's city never short (`cityPowerShort`)"""
+        """a city-state's and the Free Cities' city never short
+        (`cityPowerShort`: no required power)"""
         return self._bools(False)
 
     def power(self):
-        """`cityPowerFacts`: the city's free power and required power (its
-        grid's supply and load, `_city_power_need`) and its row's fuel a turn
-        (each accumulating resource's income, `_seat_accumulated`, above 0
-        times its PowerProvided), [B] each"""
+        """`cityPowerFacts`: the city's free power (its own renewables,
+        `_city_power_need`'s supply), no required power (a city-state's and
+        the Free Cities') and its row's fuel a turn (each accumulating
+        resource's income, `_seat_accumulated`, above 0 times its
+        PowerProvided), [B] each"""
         sim = self.sim
-        demand, supply, _near, _ppr = sim._city_power_need(self.row)
+        _demand, supply, _near, _ppr = sim._city_power_need(self.row)
         acc = sim._seat_accumulated(self.row)
         fuel = torch.zeros(sim.B, dtype=torch.long, device=sim.device)
         for r in sim._cv_tables()["res"].values():
@@ -2694,7 +2696,7 @@ class _MinorFacts:
             k = int(sim._strat_slot_of[ri]) if pp > 0 and ri >= 0 else -1
             if k >= 0:
                 fuel = fuel + acc[:, k].long().clamp(min=0) * pp
-        return supply[:, self._slot].long(), demand[:, self._slot].long(), fuel
+        return supply[:, self._slot].long(), torch.zeros(sim.B, dtype=torch.long, device=sim.device), fuel
 
     def city_strikes(self):
         """the outer defences' pool above 0"""
@@ -2847,10 +2849,6 @@ class _FreeFacts(_MinorFacts):
         mx = sim._walls_max_all(self.row)[:, self.j]
         most = mx - torch.minimum(sim.city_outer_hp[:, self.row, self.j], mx)
         return torch.maximum(most, sim._enc_outer_missing(self.row)[:, self.j]).clamp(min=0)
-
-    def power_short(self):
-        demand, supply, _near, _ppr = self.sim._city_power_need(self.row)
-        return supply[:, self.j] < demand[:, self.j]
 
     # the defensive pick where the city is under threat (0x5cdc50): its
     # threat above -1 with its centre's hit points damaged or the enemy at

@@ -3,6 +3,41 @@
 # `review: imported` = bootstrapped from dll_readings.md / code comments / saved
 # labels and not yet reviewed: verify against the disassembly, then edit and
 # set `review: reviewed`.
+- addr: 0x18ae70
+  final: 0x109dc0
+  kind: function
+  name: ChangeBuildingYieldChange
+  semantics: "City_Buildings: changes the (building, yield) entry of m_aYieldChanges (+0x80, count +0x90), the modifier-made building yields 0x18e570 adds; lookup 0x18c2a0, removal 0x190880."
+  status: PARTLY
+  readings:
+    - "C-96 / C-98 / C-100 / C-99: the city AI's fitted rules read — the analysis before the job list, the unit term's upgrade price, the city's trained domains, a non-major's required power, the eruption's turns — READ (0x608870 at 0x608976..0x608988, 0x7b3e50 at 0x7b4564..0x7b45c8, 0x5376d0, 0x1c77c0, 0x1aed10, 0x1f0440 at 0x1f04c7..0x1f04dc, 0xa1d480), both twins"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - ...0x80 (count +0x90) is m_aYieldChanges, the modifier-made building yields 0x18e570 adds (0x18ae70, 0x190880, the lookup 0x18c2a0).
+  review: reviewed
+- addr: 0x18b280
+  final: 0x10a1d0
+  kind: function
+  name: ChangeBuildingYieldModifier
+  semantics: "City_Buildings: changes the (building, yield) entry of m_aYieldModifiers (+0x68, count +0x78), the building yield percents 0x18e890 reads; removal 0x190b20."
+  status: PARTLY
+  readings:
+    - "C-96 / C-98 / C-100 / C-99: the city AI's fitted rules read — the analysis before the job list, the unit term's upgrade price, the city's trained domains, a non-major's required power, the eruption's turns — READ (0x608870 at 0x608976..0x608988, 0x7b3e50 at 0x7b4564..0x7b45c8, 0x5376d0, 0x1c77c0, 0x1aed10, 0x1f0440 at 0x1f04c7..0x1f04dc, 0xa1d480), both twins"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - ...unt +0x78) is m_aYieldModifiers, the building yield percents 0x18e890 reads (changed by 0x18b280, removed by 0x190b20); +0x80 (count +0x90) is m_aYieldChanges, the modifier-made buildi...
+  review: reviewed
+- addr: 0x18c2a0
+  final: 0x10aa90
+  kind: function
+  semantics: "City_Buildings: the (building, yield) entry of m_aYieldChanges (+0x80)."
+  status: PARTLY
+  readings:
+    - "C-96 / C-98 / C-100 / C-99: the city AI's fitted rules read — the analysis before the job list, the unit term's upgrade price, the city's trained domains, a non-major's required power, the eruption's turns — READ (0x608870 at 0x608976..0x608988, 0x7b3e50 at 0x7b4564..0x7b45c8, 0x5376d0, 0x1c77c0, 0x1aed10, 0x1f0440 at 0x1f04c7..0x1f04dc, 0xa1d480), both twins"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - ...hanges, the modifier-made building yields 0x18e570 adds (0x18ae70, 0x190880, the lookup 0x18c2a0).
+  review: reviewed
 - addr: 0x18c590
   final: 0x10ac10
   kind: function
@@ -67,15 +102,18 @@
   readings:
     - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
     - "C-96 / C-130: a building's district copy, the player's Gold as its cities stand, a minor's power after its production; a technology's improvement tourism — READ (0x18e570, 0x7a7dc3, 0x4e0bf0, 0x7b4971..0x7b4b5b), both twins but the tourism"
+    - "C-96 / C-98 / C-100 / C-99: the city AI's fitted rules read — the analysis before the job list, the unit term's upgrade price, the city's trained domains, a non-major's required power, the eruption's turns — READ (0x608870 at 0x608976..0x608988, 0x7b3e50 at 0x7b4564..0x7b45c8, 0x5376d0, 0x1c77c0, 0x1aed10, 0x1f0440 at 0x1f04c7..0x1f04dc, 0xa1d480), both twins"
   review: reviewed
 - addr: 0x18e890
   final: 0x10c350
   kind: function
   name: buildingYieldLookup
-  semantics: the building's own yield percent for a yield (Building_YieldChanges' percent term).
+  semantics: "the building's own yield percent for a yield: the (building, yield) entry of the city's m_aYieldModifiers (City_Buildings +0x68, count +0x78; 12 bytes each), written by 0x18b280. A city-state holds no card, so its cities' table stays empty."
   status: PARTLY
   impl: [cpu/core/aiCityBuild.ts:buildingPerTurn]
-  readings: ["C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"]
+  readings:
+    - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
+    - "C-96 / C-98 / C-100 / C-99: the city AI's fitted rules read — the analysis before the job list, the unit term's upgrade price, the city's trained domains, a non-major's required power, the eruption's turns — READ (0x608870 at 0x608976..0x608988, 0x7b3e50 at 0x7b4564..0x7b45c8, 0x5376d0, 0x1c77c0, 0x1aed10, 0x1f0440 at 0x1f04c7..0x1f04dc, 0xa1d480), both twins"
   notes: ["label: buildingYieldLookup(cityBuildings,bld,yield)"]
   context:
     - ...e amount x fx(1 + cityPct[y] 0.01) x fx(1 + bldPct 0.01) (city +0xbc0 through 0x7a2fa0; 0x18e890) through the yield value 0x7a6690 = amount x Yields.DefaultValue (Gold 0.5) x (1 + min(...
@@ -108,6 +146,7 @@
     - "C-96: a city-state's City Center projects, Build Unit's pillaged building, the pick's pillaged district and the war footing's writer — READ (0x7f50e9, 0x71fb80 at 0x721158 / 0x72118a), the pick's district test PARTLY (0x170450 at 0x17071d), both twins"
     - "C-127 / C-100: the buildings' dependents and the districts' buildings (0x5cadc0) — ported, both twins"
     - "C-96: a city-state's City Center projects, Build Unit's pillaged building, the pick's pillaged district and the war footing's writer"
+    - "C-96 / C-98 / C-100 / C-99: the city AI's fitted rules read — the analysis before the job list, the unit term's upgrade price, the city's trained domains, a non-major's required power, the eruption's turns — READ (0x608870 at 0x608976..0x608988, 0x7b3e50 at 0x7b4564..0x7b45c8, 0x5376d0, 0x1c77c0, 0x1aed10, 0x1f0440 at 0x1f04c7..0x1f04dc, 0xa1d480), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...Amount +0x10): a city subject; Amount weighted, x0.5 where the city lacks the building (0x18e9f0), span."
@@ -131,6 +170,7 @@
     - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
     - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
     - "C-96: a city-state's City Center projects, Build Unit's pillaged building, the pick's pillaged district and the war footing's writer — READ (0x7f50e9, 0x71fb80 at 0x721158 / 0x72118a), the pick's district test PARTLY (0x170450 at 0x17071d), both twins"
+    - "C-96 / C-98 / C-100 / C-99: the city AI's fitted rules read — the analysis before the job list, the unit term's upgrade price, the city's trained domains, a non-major's required power, the eruption's turns — READ (0x608870 at 0x608976..0x608988, 0x7b3e50 at 0x7b4564..0x7b45c8, 0x5376d0, 0x1c77c0, 0x1aed10, 0x1f0440 at 0x1f04c7..0x1f04dc, 0xa1d480), both twins"
   context:
     - "...its row's base (+0x54 behind +0x50) plus each building of the district not pillaged (0x18fe60 on the city's buildings +0x1c78: the byte array the Lua IsPillaged binding 0x9847b0 ->..."
   review: reviewed
@@ -142,6 +182,26 @@
   readings: ["H-1: a wonder's and an improvement's tourism — PARTLY READ"]
   context:
     - "- A wonder (0x18e160, and the city walk 0x18ffe0 over the city's wonders): TOURISM_BASE_FROM_WONDER (2, GP +0x6c4); when TOURISM_ADVANCE..."
+  review: reviewed
+- addr: 0x190880
+  kind: function
+  semantics: "City_Buildings: removes an entry of m_aYieldChanges (+0x80)."
+  status: PARTLY
+  readings:
+    - "C-96 / C-98 / C-100 / C-99: the city AI's fitted rules read — the analysis before the job list, the unit term's upgrade price, the city's trained domains, a non-major's required power, the eruption's turns — READ (0x608870 at 0x608976..0x608988, 0x7b3e50 at 0x7b4564..0x7b45c8, 0x5376d0, 0x1c77c0, 0x1aed10, 0x1f0440 at 0x1f04c7..0x1f04dc, 0xa1d480), both twins"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - ...t +0x90) is m_aYieldChanges, the modifier-made building yields 0x18e570 adds (0x18ae70, 0x190880, the lookup 0x18c2a0).
+  review: reviewed
+- addr: 0x190b20
+  kind: function
+  semantics: "City_Buildings: removes an entry of m_aYieldModifiers (+0x68)."
+  status: PARTLY
+  readings:
+    - "C-96 / C-98 / C-100 / C-99: the city AI's fitted rules read — the analysis before the job list, the unit term's upgrade price, the city's trained domains, a non-major's required power, the eruption's turns — READ (0x608870 at 0x608976..0x608988, 0x7b3e50 at 0x7b4564..0x7b45c8, 0x5376d0, 0x1c77c0, 0x1aed10, 0x1f0440 at 0x1f04c7..0x1f04dc, 0xa1d480), both twins"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - ...dModifiers, the building yield percents 0x18e890 reads (changed by 0x18b280, removed by 0x190b20); +0x80 (count +0x90) is m_aYieldChanges, the modifier-made building yields 0x18e570...
   review: reviewed
 - addr: 0x192de0
   final: 0x10e5e0

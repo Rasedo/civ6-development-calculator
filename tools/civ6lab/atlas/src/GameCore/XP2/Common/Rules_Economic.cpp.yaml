@@ -91,6 +91,7 @@
     - cpu/core/cityStates.ts:buildingCreatedCulture
     - cpu/core/eras.ts:unitKillEvent
     - cpu/core/eras.ts:wcls
+    - cpu/data/cityStates.ts:minorUpgradeGold
   readings:
     - "B-31r-S1: the plunder payout — CLOSED"
     - "C-94: the game era, the ages and the founding moments — READ"
@@ -112,6 +113,7 @@
     - "C-96: a unit's strategic cost through the game speed, the pick's pillaged district and the queue's pillaged project — READ (0x17c2e0, 0x4f2cc0, 0x4f2df0 / 0x4f31f0), a fit for the project, both twins"
     - "H-1: a great person's price and its draw's era — READ (0x2f1c50, 0x2f8f70 -> 0x93e9e0 -> 0x2f94d0), both twins"
     - "C-117: the suzerain bonuses of Ayutthaya, Fez and Wolin; the Tsikhe's Conservation Tourism — READ (0xb0e380, 0xb0ee40, 0xc70830, 0x17f870; 0x1fce20), PARTLY READ (Fez's list on the unit), both twins"
+    - "C-96 / C-98 / C-100 / C-99: the city AI's fitted rules read — the analysis before the job list, the unit term's upgrade price, the city's trained domains, a non-major's required power, the eruption's turns — READ (0x608870 at 0x608976..0x608988, 0x7b3e50 at 0x7b4564..0x7b45c8, 0x5376d0, 0x1c77c0, 0x1aed10, 0x1f0440 at 0x1f04c7..0x1f04dc, 0xa1d480), both twins"
   context:
     - "...op 0x554860..0x554a4e, route yields 0x559b30 origin / 0x559bc0 destination, speed scaling 0x5254d0). Check: `dll_plunder.py`."
     - "...xTurn 0x2c37c0 = start + scale(GameEraMaximumTurns) (Eras_XP1 row +0x24 / +0x2c), scale 0x5254d0 = x × GameSpeeds. CostMultiplier / 100 truncated: online 20 / 30. The first era's start..."

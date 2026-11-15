@@ -338,11 +338,13 @@ export function aiView(state: GameState, opts: { updated?: boolean } = {}): AiVi
       return c ? fxOf(computeCityStats(state, c).foodSurplus) : 0;
     },
     cityPowerShort: (i, id) => {
-      // a city-state's city never short (LAB: City_Power +0x58 / +0x08 unread
-      // for a minor; runs/h1_duelv1124 Cardiff t209-t220 with a Factory and
-      // Bologna t207-t220 with a Research Lab, no renewable, each Solar Farm
-      // row its 2 Power's 40.00 alone, no Production term)
-      if (isCityStateSeat(i)) return false;
+      // City_Power's update (0x1f0440 at 0x1f04c7..0x1f04dc) counts the
+      // required power (+0x58) of a FULL_CIV's city alone: a city-state's and
+      // the Free Cities' need none and are never short (runs/h1_duelv1124
+      // Cardiff t209-t220 with a Factory and Bologna t207-t220 with a
+      // Research Lab, no renewable, each Solar Farm row its 2 Power's 40.00
+      // alone, no Production term)
+      if (!isCiv(i)) return false;
       const c = cityOf(i, id);
       if (!c) return false;
       const p = cityPower(state, c);

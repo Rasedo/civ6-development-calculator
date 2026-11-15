@@ -825,7 +825,10 @@
     - recording: h1_duelw1116
       turn: 6
       value: "On runs/h1_duelw1116 t6 and t8 the replay needed no roll: no volcano named yet."
-  readings: ["C-74: the volcano roll's gate — READ"]
+  impl: [cpu/core/disasters.ts:eruptionHazardTurns]
+  readings:
+    - "C-74: the volcano roll's gate — READ"
+    - "C-96 / C-98 / C-100 / C-99: the city AI's fitted rules read — the analysis before the job list, the unit term's upgrade price, the city's trained domains, a non-major's required power, the eruption's turns — READ (0x608870 at 0x608976..0x608988, 0x7b3e50 at 0x7b4564..0x7b45c8, 0x5376d0, 0x1c77c0, 0x1aed10, 0x1f0440 at 0x1f04c7..0x1f04dc, 0xa1d480), both twins"
   context:
     - "0x335040 reads the volcano component's counts (vtable 0xdb11b8): +0x68(b) 0xa1d2b0 counts the volcano entries (+0x1a0, stride 0xa0), with b true only th..."
   review: reviewed

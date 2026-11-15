@@ -15836,3 +15836,98 @@ the step's `spent` and `_escort_carry_with` (gpu/core/sim_seats.py).
   walk and the next player's DoTurn (the danger search reads every unit
   unmoved: runs/h1_duelq1128 t126); 0x941b50's callers are virtual calls,
   unread.
+
+## C-96 / C-98 / C-100 / C-99: the city AI's fitted rules read — the analysis before the job list, the unit term's upgrade price, the city's trained domains, a non-major's required power, the eruption's turns — READ (0x608870 at 0x608976..0x608988, 0x7b3e50 at 0x7b4564..0x7b45c8, 0x5376d0, 0x1c77c0, 0x1aed10, 0x1f0440 at 0x1f04c7..0x1f04dc, 0xa1d480), both twins
+
+`minorPhase`'s `boostWas` (cpu/core/minorBuild.ts), `MINOR_UPGRADE_GOLD`
+(cpu/data/cityStates.ts) in `minorUnitTerm`, `minorPlotEvals`' `cityTrains`
+(cpu/core/minorCityAi.ts), `cityPowerShort` (cpu/core/aiView.ts),
+`cityPowerFacts` (cpu/core/freeCityBuild.ts), `eruptionHazardTurns`
+(cpu/core/disasters.ts). GPU `_minor_gold_boost` after `_minor_ai_turn`,
+`_rai_unit_term`, `_PlotFacts._trains` and `_minor_eruption_turns`
+(gpu/core/sim_minorai.py), `_MinorFacts.power` / `.power_short`
+(gpu/core/sim_cityvalue.py).
+
+- THE ANALYSIS BEFORE THE JOB LIST. The AI turn start 0x608870 (from
+  DoTurn's tail with the flag set) raises player signal +0x258
+  (0x608976..0x608988) and waits its jobs (0x6e3020, up to 0x19 rounds while
+  a handler answers true) before it sets the pass to 4 and walks the +0x370
+  list (0x608ac2). The City Analysis (0x5c24e0 -> 0x5ce3f0, the unit,
+  building and plot tables) and the military AI's strengths and table
+  rebuild (0x7271d0, 0x6fae70) are handlers of +0x258; the Economic AI
+  writes its Gold boost at 0x6880a1 inside its pass-3 job of that list. So
+  the tables the city update's events and Default Specialization read (pass
+  2) hold the Gold weight of the turn before, the dispatch and the
+  government values this turn's. Confirmed: runs/h1_duely1117 Valletta t105
+  (net -5.6 -> +0.4 after its two Crossbowmen's disband): the Warrior's
+  contract over the Crossbowman's at the t104 boost; runs/h1_duely1128 Hong
+  Kong t79 the Warrior over the Archer.
+- THE UNIT TERM'S UPGRADE GOLD (0x7b3e50 at 0x7b4564..0x7b45c8; the civic
+  value 0x7a9a10 at 0x7aa35e): per upgrade source of the unlocked unit, the
+  count of that type on the player's list (0x4f2c90) times the larger of
+  20.0 (0x1400) and the average city value less 0x5376d0(manager, source,
+  unit, the player, 0, -1, no unit) << 8 as Gold at the player's weight
+  (0x7a6690). 0x5376d0 takes the player's discount percent (treasury +0x398)
+  off the whole price, and a price left under UPGRADE_MINIMUM_COST (15 << 8,
+  unscaled) becomes that minimum at the game's speed (0x5254d0: whole, 7
+  online), then falls to a multiple of PURCHASE_DIVISOR: a city-state's 100
+  percent (Leaders.xml MINOR_CIV_GOLD_MILITARY_UPGRADE) leaves 5 Gold online
+  whatever the chassis. Confirmed: runs/h1_duelq1124 Bologna t81, one
+  Catapult listed, the Trebuchet's City Analysis value 38.87: Military
+  Engineering 479.8 as logged.
+- THE CITY TRAINS A DOMAIN (0x1c77c0): a complete district of the city
+  (0x1aed10: District +0xb08) whose Districts row's MilitaryDomain (+0x20
+  through 0xadd590) is the domain; land always; the sea where the centre's
+  plot's domain mask holds bit 1 (0x81230), which the claim's 0x66a90 sets
+  on a city's plot that IsCoastalLand(plot, 1) (0x82a10: a neighbour that is
+  water, not impassable, of an area of at least one plot — a lake counts, a
+  river does not). The district value's domain term (0x7aaf80 at
+  0x7acb36..0x7ace51) runs for a row with a MilitaryDomain the city does not
+  train: 5.0 as PSEUDOYIELD_UNIT_NAVAL_COMBAT / _AIR_COMBAT, twice where no
+  city of the player trains it, and then the domain's units' city values
+  once. A city-state's and the Free Cities' naval weight reads -1.0
+  (0x71fb80), so the term is nothing for them whatever the centre.
+  Confirmed: runs/h1_duelq1127 Muscat on inland 42:15 (a river, no water
+  beside it): its 937 Harbor rows carry the term at 0, the five districts'
+  rows of the three city-states as logged (Harbor 1,486 within 0.01).
+- A NON-MAJOR'S REQUIRED POWER. City_Power's update 0x1f0440 (run by
+  ChangeFreePower 0x1ed860, the modifiers' required power 0x1ee0d0 and the
+  temporary power 0x1ee180) clears the required total (+0x58) and its list,
+  and only where the city's owner is a FULL_CIV (0x469db0 at
+  0x1f04c7..0x1f04dc) adds each Buildings_XP2 row with RequiredPower the
+  city holds (0x18e9f0) unpillaged (0x18fe60), the project at the queue's
+  head and the modifiers' part (0x1ede80). The shortfall 0x1f01f0 is the
+  required total less the free power (0x1f0020: +0x08, raised by the percent
+  +0xa8) less the temporary power (+0x30). So a city-state's and the Free
+  Cities' cities require none and are never short: the power value 0x7a67f0
+  reads 0x1f02f0 (+0x58) as 0 for them — a negative Amount worth nothing
+  where the free power reaches the Amount alone (0x7a6845..0x7a68ba), a
+  positive one never short (0x7a6c69..0x7a6c8c). Confirmed:
+  runs/h1_duely1124 Cardiff t214, Production 9.30078125 with its Factory's
+  powered yields and no generator on its plots; runs/h1_duelv1124 Bologna
+  t207-t220, each Solar Farm row its 2 Power's 40.00 alone.
+- THE ERUPTION'S TURNS (the volcano component, vtable 0xdb11b8: +0x28
+  0xa1db40, +0x98 0xa1d480; called by the district value 0x7aaf80 at
+  0x7ab198 / 0x7ab1df with severity 0): 0xa1db40 lists every volcano entry
+  (+0x1a0, stride 0xa0) whose plot list (+0x40) holds the plot; 0xa1d480
+  sums, over those volcanoes, 100.0 over each entry of the volcano's +0x60
+  list from the severity up, and returns 100.0 over the sum — the horizon's
+  cut where it is under H. `eruptionHazardTurns` / `_minor_eruption_turns`
+  count the rows once per volcano beside the plot. The +0x60 entries stay
+  the fit N / OccurrencesPerGame (31.29 turns beside one volcano:
+  runs/h1_duelw1121 Antioch t2's Commercial Hub on (32,22), 0.59 as logged);
+  no recorded row lies beside two volcanoes.
+- m_prepareForWarWith (Military +0xbb0, data +0xc58) is written by
+  PrepareForWarWith 0x724f30 from the diplomatic AI's handlers (0x650890,
+  0x6742d0, 0x681c10) and Lua; m_playerRivals (+0xc70, data +0xd18) by the
+  Lua SetRival alone (a scenario script's call). Neither is set for a
+  city-state or the Free Cities, whose war tests read the diplomacy alone.
+- City_Buildings +0x68 (count +0x78) is m_aYieldModifiers, the building
+  yield percents 0x18e890 reads (changed by 0x18b280, removed by 0x190b20);
+  +0x80 (count +0x90) is m_aYieldChanges, the modifier-made building yields
+  0x18e570 adds (0x18ae70, 0x190880, the lookup 0x18c2a0).
+- Open (C-96): the m_aYieldChanges term of 0x18e570 is unported — a
+  follower belief's building yields in a city-state's city of that
+  religion; a city-state holds no card, so its m_aYieldModifiers stay empty.
+  C-120: the Free Cities' cities' own powered state still follows the
+  grid in the engines.

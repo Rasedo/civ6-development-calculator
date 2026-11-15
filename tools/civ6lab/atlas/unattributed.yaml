@@ -338,6 +338,7 @@
     - "C-99: an owned water plot no shore, a move order carried on as the turn ends — READ (0x530240, 0x66790, 0x66a90, 0x66680, 0x814e0, 0x81240, 0x7eeba0), both twins"
     - "C-99: a move order carried on as the turn ends, the zone-of-control wait, the embark rule's TO plot — READ (0x962380, 0x52f50, 0x26fe20, 0x2675e0, 0x2673f0, 0x530420, 0x267650), both twins"
     - "C-132: the danger map's fitted rules in the DLL; a search's shore crossings on the formation's own domain — READ (0x26dab0, 0x586360 at 0x586624..0x586664, 0x2720a0 at 0x272618..0x272689, 0x66a90, 0x52fe90, 0x56e0a0, 0x26e570, 0x530240, 0x530420), FIT (the unmoved flag, the barbarians' raise, the grant's last turn), both twins"
+    - "C-96 / C-98 / C-100 / C-99: the city AI's fitted rules read — the analysis before the job list, the unit term's upgrade price, the city's trained domains, a non-major's required power, the eruption's turns — READ (0x608870 at 0x608976..0x608988, 0x7b3e50 at 0x7b4564..0x7b45c8, 0x5376d0, 0x1c77c0, 0x1aed10, 0x1f0440 at 0x1f04c7..0x1f04dc, 0xa1d480), both twins"
   review: reviewed
 - addr: 0x69010
   final: 0x4ddc0
@@ -676,6 +677,7 @@
   status: PARTLY
   readings:
     - "C-99: a unit bought in the turn sits out the operations, a Harbor trains ships — the recruit's turn-done offer READ (0x60a8c0, 0x60a440), 0x1c77c0's district arm READ, the candidates' own strength a FIT, both twins"
+    - "C-96 / C-98 / C-100 / C-99: the city AI's fitted rules read — the analysis before the job list, the unit term's upgrade price, the city's trained domains, a non-major's required power, the eruption's turns — READ (0x608870 at 0x608976..0x608988, 0x7b3e50 at 0x7b4564..0x7b45c8, 0x5376d0, 0x1c77c0, 0x1aed10, 0x1f0440 at 0x1f04c7..0x1f04dc, 0xa1d480), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...1a48, DB.Districts) — a completed Harbor — else its centre's plot is coastal (vt +0x40, 0x81230). runs/h1_duely1121 Hunza on inland 11:5: its Harbor completes at t218 (City_BuildQueue..."
@@ -1354,6 +1356,7 @@
   readings:
     - "C-96: the improvement value — READ (0x7a58f0, 0x7b1320's yields, tourism and modifiers, the feature removal 0x7a3010, the harvest 0x7a37d0, the build unit 0x7a2e20, EFFECT_ADJUST_CITY_FREE_POWER), PARTLY READ (the hazards' turns, 0x7b1320's defence, claimed plots and neighbours terms)"
     - "C-100: the plot values' golden-age, claims and tourism-percent terms, the required features, the power value's negative Amount — READ"
+    - "C-96 / C-98 / C-100 / C-99: the city AI's fitted rules read — the analysis before the job list, the unit term's upgrade price, the city's trained domains, a non-major's required power, the eruption's turns — READ (0x608870 at 0x608976..0x608988, 0x7b3e50 at 0x7b4564..0x7b45c8, 0x5376d0, 0x1c77c0, 0x1aed10, 0x1f0440 at 0x1f04c7..0x1f04dc, 0xa1d480), both twins"
   context:
     - "...0x1f0020, +0x08 x (100 + +0xa8)% where +0xa8 > 0) is below its required power (+0x58, 0x1f02f0; the unpowered notification 0x1ee5c0 prints +0x58 against +0x30 plus the free power), h..."
     - "...where free power (+0x30d0: 0x1f0020, +0x08 × (100 + +0xa8)%) is below required (+0x58, 0x1f02f0; 0x1ee5c0) half the Production (@0xd20458) T to H (0x7a2140), else the Amount at GPP_..."
@@ -5268,6 +5271,7 @@
     - "C-126: the unit choice walks the stored table, stable-sorted at its build, and the table is rebuilt every turn — 0x797980 / 0x79d3a0 and the build's signals READ, both twins; the sea entries' absence open"
     - "C-98: a city-state's City Analysis counts its knowledge base as its last turn left it — READ (0x608580 at 0x6085c9, 0x5c24e0 / 0x6fae70 on player signal +0x258, 0x785f30 in 0x6096c0's +0x370 list), both twins"
     - "H-1: the recorder's unit, planning and city AI reads — READ off the disassembly, not yet read from a running game"
+    - "C-96 / C-98 / C-100 / C-99: the city AI's fitted rules read — the analysis before the job list, the unit term's upgrade price, the city's trained domains, a non-major's required power, the eruption's turns — READ (0x608870 at 0x608976..0x608988, 0x7b3e50 at 0x7b4564..0x7b45c8, 0x5376d0, 0x1c77c0, 0x1aed10, 0x1f0440 at 0x1f04c7..0x1f04dc, 0xa1d480), both twins"
   context:
     - ...(0x45cf70), Governor Analyzer (0x4a79b0), Victory Conditions + Settle City Evaluation (0x4b13f0), Belief Analysis (0x4ec440), Tech Tree Analysis (0x4f87e0). Spawned and waited at once...
     - "- THE UNIT PRODUCTION TABLE 0x7989e0 (AI/UnitProduction.cpp; run from 0x6fae70 at the player AI's turn while 0x79d320 — the built flag +0x28 — is clear): entries, in..."
@@ -9632,6 +9636,7 @@
     - "C-96: the district value — READ (0x7a51f0, 0x7aaf80's terms below, 0x366df0, the purchase price 0x1b1cb0, 0x1c77c0, 0x1b4450), PARTLY READ (the golden-age term, the claims, modifiers and neighbours terms, the domain's resources path), unwired"
     - "C-97: the behaviour trees — READ (the interpreter), the nodes PARTLY READ"
     - "C-98: the unit efficiencies — READ (0x79a440, its simulated combats 0x205720 off the map), ported: every entry the logged table's"
+    - "C-96 / C-98 / C-100 / C-99: the city AI's fitted rules read — the analysis before the job list, the unit term's upgrade price, the city's trained domains, a non-major's required power, the eruption's turns — READ (0x608870 at 0x608976..0x608988, 0x7b3e50 at 0x7b4564..0x7b45c8, 0x5376d0, 0x1c77c0, 0x1aed10, 0x1f0440 at 0x1f04c7..0x1f04dc, 0xa1d480), both twins"
   context:
     - "...the spawn plot: the class row (+0x70 its district, +0x98 its unit) and the unit's domain (0xadd590 on unit info +0x1c). A land unit (domain 2): walk the player's cities (+0x12f0 -> +0xd8,..."
     - "The grant 0x2f74b0 asks 0x2f6500: class row +0x70 district, +0x98 unit; domain 0xadd590 on unit info +0x1c. Land: the first city in list order (+0x12f0 → +0xd8) holding the comp..."

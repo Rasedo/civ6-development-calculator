@@ -282,9 +282,10 @@ export function plotImprovementType(tile: Tile, camps: ReadonlySet<number>): str
  * District" submitted on it at 5469.0). T: an improvement's the research and civics AIs' turns to
  * its technology and civic (the larger), a district's its build turns plus
  * those. A flood's and an eruption's turns as the AI expects them
- * (`floodHazardTurns`, `eruptionHazardTurns`); an inland
- * city-state on a river trains ships (0x1c77c0's sea test unread). A
- * positive district slot carries its district's buildings term
+ * (`floodHazardTurns`, `eruptionHazardTurns`); the city trains a
+ * district's domain as its unit value reads it (0x1c77c0: a complete
+ * district of the domain, else for the sea a centre beside passable water).
+ * A positive district slot carries its district's buildings term
  * (`districtBuildings`, `cityBuildingsPass`'s; the centre's slots stay 0).
  */
 /**
@@ -338,7 +339,6 @@ export function minorPlotEvals(state: GameState, cs: CityState, facts: CityBuild
   const growth = cs.aiYields?.growth ?? facts.growth;
   const view: typeof facts.view = { ...facts.view, cityHousingValue: (i, id, housing, t, h) =>
     (i === cs.seat && id === facts.cityId ? housingValue(growth, forecast, housing, t, h) : facts.view.cityHousingValue(i, id, housing, t, h)) };
-  const centre = map.tiles[cs.centerIndex];
   const candidates = new Set(borderCandidates(state, city));
   const specialty = (cs.districts ?? []).filter((x) => DISTRICTS[x.type]?.countsTowardLimit).length;
   const unseen = hiddenResourcesFor(state, cs.seat);
@@ -350,7 +350,6 @@ export function minorPlotEvals(state: GameState, cs: CityState, facts: CityBuild
   const sees = (nb: Tile): boolean => cs.revealed?.[nb.index] === 1 && !!nb.resource && !unseen.has(nb.resource);
   const impT = AI_IMPROVEMENTS.map((row) => Math.max(facts.techTurns(row.tech), facts.civicTurns(row.civic)));
   const distT = AI_DISTRICTS.map((row) => facts.buildTurns(row.type) + Math.max(facts.techTurns(row.tech), facts.civicTurns(row.civic)));
-  const trainsSea = facts.trainsDomain('DOMAIN_SEA') || (centre.riverMask ?? 0) !== 0;
   const camps = campTiles(state);
   const gp = cityAppealResolver(state);
   const out: PlotEval[] = [];
@@ -455,8 +454,8 @@ export function minorPlotEvals(state: GameState, cs: CityState, facts: CityBuild
       chronology: facts.era + 1,
       districtCount: specialty,
       districtCap: 1 + Math.floor((cs.population - 1) / 3),
-      cityTrains: (dom) => facts.trainsDomain(dom) || (dom === 'DOMAIN_SEA' && trainsSea),
-      playerTrains: (dom) => facts.trainsDomain(dom) || (dom === 'DOMAIN_SEA' && trainsSea),
+      cityTrains: (dom) => facts.trainsDomain(dom),
+      playerTrains: (dom) => facts.trainsDomain(dom),
       domainUnitsValue: () => 0,
       regionalCities: () => 0,
       riverPlots: () => ({ improved: 0, districted: 0 }),

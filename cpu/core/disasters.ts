@@ -823,18 +823,22 @@ export function floodHazardTurns(state: GameState, plot: number): number | null 
  * manager's +0x98, raw fixed point; the improvement and district values cut
  * their horizon there): a plot beside a volcano reads 100 over the volcano
  * rows' sum of 100 / (N / OccurrencesPerGame) — gentle, catastrophic and
- * megacolossal, 31.29 turns; null elsewhere. LAB (its reader unread): the
- * logged values of the plots beside a volcano fit it (runs/h1_duelv1127's
+ * megacolossal, 31.29 turns; null elsewhere. The volcano component's reader
+ * (its vtable 0xdb11b8 +0x98, 0xa1d480, on the list +0x28 0xa1db40 gives)
+ * sums the rows of every volcano whose plots hold the plot, so a plot beside
+ * two volcanoes reads half those turns. The rows' entries (the volcano's
+ * +0x60 list) are a fit on the logged values (runs/h1_duelv1127's
  * improvements at 31; runs/h1_duelv1121 Antioch t2's Commercial Hub at
  * (32,22), Forest and Deer beside its volcano, 0.59 as logged, 8.21 read
  * whole).
  */
 export function eruptionHazardTurns(state: GameState, plot: number): number | null {
   const t = state.map.tiles[plot];
-  if (!neighbors(state.map, t).some((n) => n.volcano)) return null;
+  const volcanoes = neighbors(state.map, t).filter((n) => n.volcano).length;
+  if (!volcanoes) return null;
   let sum = 0;
   for (let sev = 0; sev < 3; sev++) sum += fxDiv(fxOf(100), fxDiv(fxOf(TURN_LIMIT), fxOf(ERUPTION_WEIGHT[volcanoRow(sev)])));
-  return fxDiv(fxOf(100), sum);
+  return fxDiv(fxOf(100), sum * volcanoes);
 }
 
 /**

@@ -236,6 +236,38 @@
   context:
     - "...the volcanic wonders (+0x218), 100 with none; +0x58 0xa1d130 the active volcanoes; +0x60 0xa1d450 the total. With N the game's turns (0x339020): no draw when the named count N' is 0 or N..."
   review: reviewed
+- addr: 0xa1d480
+  final: 0x723dc0
+  kind: function
+  name: eruptionTurns
+  semantics: "the volcano component's vt +0x98 (out, plot, severity): over the volcanoes vt +0x28 (0xa1db40) lists for the plot, the sum of 100.0 over each entry of the volcano's +0x60 list from the severity up; returns 100.0 over the sum, nothing where the sum is 0. The +0x60 list's writer unread."
+  status: PARTLY
+  cases:
+    - recording: h1_duelw1121
+      turn: 2
+      value: "Antioch's Commercial Hub on (32,22) beside one volcano: the horizon cut at 31.29 turns, 0.59 as logged"
+  impl: [cpu/core/disasters.ts:eruptionHazardTurns, gpu/core/sim_minorai.py:_minor_eruption_turns]
+  readings:
+    - "C-96 / C-98 / C-100 / C-99: the city AI's fitted rules read — the analysis before the job list, the unit term's upgrade price, the city's trained domains, a non-major's required power, the eruption's turns — READ (0x608870 at 0x608976..0x608988, 0x7b3e50 at 0x7b4564..0x7b45c8, 0x5376d0, 0x1c77c0, 0x1aed10, 0x1f0440 at 0x1f04c7..0x1f04dc, 0xa1d480), both twins"
+  context:
+    - ...3e50 at 0x7b4564..0x7b45c8, 0x5376d0, 0x1c77c0, 0x1aed10, 0x1f0440 at 0x1f04c7..0x1f04dc, 0xa1d480), both twins
+    - "- THE ERUPTION'S TURNS (the volcano component, vtable 0xdb11b8: +0x28 0xa1db40, +0x98 0xa1d480; called by the district value 0x7aaf80 at 0x7ab198 / 0x7ab1df with severity 0): 0xa1db4..."
+  review: reviewed
+- addr: 0xa1db40
+  kind: function
+  name: volcanoesAtPlot
+  semantics: "the volcano component's vt +0x28 (out, plot): the ids (+8) of the volcano entries (+0x1a0, stride 0xa0) whose plot list (+0x40..+0x48) holds the plot."
+  status: PARTLY
+  cases:
+    - recording: h1_duelw1121
+      turn: 2
+      value: "The +0x60 entries stay   the fit N / OccurrencesPerGame (31.29 turns beside one volcano:   runs/h1_duelw1121 Antioch t2's Commercial Hub on (32,22), 0.59 as logged);"
+  impl: [cpu/core/disasters.ts:eruptionHazardTurns, gpu/core/sim_minorai.py:_minor_eruption_turns]
+  readings:
+    - "C-96 / C-98 / C-100 / C-99: the city AI's fitted rules read — the analysis before the job list, the unit term's upgrade price, the city's trained domains, a non-major's required power, the eruption's turns — READ (0x608870 at 0x608976..0x608988, 0x7b3e50 at 0x7b4564..0x7b45c8, 0x5376d0, 0x1c77c0, 0x1aed10, 0x1f0440 at 0x1f04c7..0x1f04dc, 0xa1d480), both twins"
+  context:
+    - "- THE ERUPTION'S TURNS (the volcano component, vtable 0xdb11b8: +0x28 0xa1db40, +0x98 0xa1d480; called by the district value 0x7aaf80 at 0x7ab198 / 0x7ab1df with seve..."
+  review: reviewed
 - addr: 0xa1e370
   final: 0x724a80
   kind: function

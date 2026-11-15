@@ -54,7 +54,7 @@ Hand-weighted 1–8 by the size of what is LEFT to build. One row per entry, no 
 | C-96 city-states' build values | 4 | the unit value's unported terms and the unit production table, a major's and the Free Cities' step's building check (BUILD); the event unit, building and district terms, pick ties and fits, 1128 Nazca and Hong Kong (LAB) |
 | C-126 city-states' purchases, treasury, upgrades and disbands | 2 | a treasury off the record's on four minors, a Builder purchase, an upgrade past an obsolete rung, the disband count and refusals (LAB) |
 | C-127 city-states' builders, trade and contracts | 3 | improvement re-lays and loops, a late start envoy, the route value K's residues, the quests' ranges, contracts' ends and releases with Cardiff t89 (LAB); the GPU's builder lay (BUILD) |
-| C-100 city-states' plot and district values | 4 | a minor's free power (BUILD); district rows and placements, build turns T off by one, improvement rows, the yields a turn ahead, the Great Person share (LAB) |
+| C-100 city-states' plot and district values | 4 | the free power's sources, district rows and placements, build turns T off by one, improvement rows, the yields a turn ahead, the Great Person share (LAB) |
 | C-99 city-states' operations | 3 | a team's unit to build and its recruits, Naval Superiority's request, one-turn shifts, the trees' tick order, Garrison City's swap (BUILD, LAB); Protect Units, Naval Pillage, the religious AI's buys (LAB) |
 | C-134 city-states' unit moves | 4 | cityState.move.plot misses: the unit gather and families, claims and strikes, City Defense, Upgrade Units' walks (Galley 393216, Heavy Chariot 983040), Wander and Wander Back to City (LAB); Garrison City's fortify test at the refresh (LAB) |
 | C-128 city-states' units, formations and stacking | 3 | a re-made levied unit's jump on four seeds, the swap pair, formation size and the Corps rules, the turn-end stacking check, a teleport off a shared plot (LAB) |
@@ -315,7 +315,7 @@ A question the SOURCE under-determines; neither engine ships a branch until the 
 - **C-96. CITY-STATES' BUILD VALUES.** Weight 4.
   - BUILD (unit values): the standing army's EXPLORE clause (0x79b9c0; its +0xf30 release, 0x5ca7e0)
   - BUILD (unit values): a DEFENDER's release
-  - BUILD (unit values): the unit value's terms named by offset or address alone: +0xc58 / +0xd18, 0x54c630, 0x18e890 / 0x18e570, 0x6b8e10, 0x79a440
+  - BUILD (unit values): the unit value's terms named by address alone: the route's origin yield term 0x54c630, the stockpile-cap analyzer 0x6b8e10 (the best city-centre value of the units a resource lists)
   - BUILD (unit values): the trade city order
   - BUILD (unit values): defence threats
   - BUILD (unit values): Buildings_XP2
@@ -336,10 +336,9 @@ A question the SOURCE under-determines; neither engine ships a branch until the 
   - LAB (buildings and districts): the Sewer's housing term alternating 14.07 / 20.75 (duelv1121 p3 t187-193, T 26 / 31)
   - LAB (buildings and districts): the walls' threat (0x7a84c0..0x7a8758; 1124 Granada's Walls t24-56, 1105 t63-69 181 vs 468.4)
   - LAB (buildings and districts): CanProduce's district test
-  - BUILD (buildings and districts): 0x18e570's flag-0x40 list (+0xb0) and modifier-made building-yield table (+0x80), unported (empty on a city-state's recorded rows)
+  - BUILD (buildings and districts): 0x18e570's flag-0x40 list (+0xb0) and m_aYieldChanges (+0x80, written by 0x18ae70: a follower belief's building yields in a city-state's city of that religion), unported (empty on a city-state's recorded rows)
   - LAB (buildings and districts): the Free Cities' pick still asks the repair's quiet turns (their queue's refusal unported)
   - LAB (buildings and districts): a held walls building under damaged walls is valued in the game's BUILDINGS table: 1124 Cardiff's Castle 2414.90 / 2546.90 at t104-107 (FX(-9999) at t96-103 and from t108), a tree made and ended in its tick each of those turns (tree ids 64-66, 68: Build Unit succeeds on a held building, 0x7f4e00 at 0x7f50e9), ours FX(-9999) and no tree
-  - LAB (picks): fit, unread: the previous-turn Gold boost
   - LAB (picks): a 0.0 pick tie (1117 t168-214)
   - LAB (picks): 1127 Mexico City t22's cancel
   - LAB (picks): the forecast's place (1121 t18)
@@ -347,13 +346,11 @@ A question the SOURCE under-determines; neither engine ships a branch until the 
   - LAB (picks): the founding's food and growth
   - LAB (picks): the founding Archer (1124 t2)
   - LAB (picks): the founding Production (1121 Hunza a turn quicker, 1124 Granada two slower)
-  - LAB (picks): fit, unread (action replay): a city-state building one item at a time, its progress kept per item, its overflow carried (`minorBuild`; 1115 Valletta t27)
   - LAB (picks): 1128 Nazca t27-32 the idle store ~9 over the idle Production (Shrine T 6..2, ours 8..4)
   - LAB (1128 nazca and hong kong): 1128 Nazca t77 / t84 Shipping for the game's Trader
   - LAB (1128 nazca and hong kong): 1128 Nazca t59 / t69 / t90 / t119 the game's SHIPPING (34.0 at t59)
   - LAB (1128 nazca and hong kong): 1128 Nazca t15 Equestrian Orders unscored in ours
   - LAB (1128 nazca and hong kong): 1128 Nazca t32 the plain pick with the pillaged Holy Site's Shrine refused (0x170450 at 0x17071d; the queue's refusal unported)
-  - LAB (1128 nazca and hong kong): fit, unread: 1128 Nazca NO BUILDS t26-31 / t33-47 (the Horseman's 20 Horses)
   - LAB (1128 nazca and hong kong): 1128 Hong Kong t79 Trader 238.9 for 277.7
   - LAB (1128 nazca and hong kong): 1128 Hong Kong t196-203 valued at 6 units (at war by the cut)
   - LAB (repairs): unconfirmed: a Free City's building under its pillaged district, and a major's queue of several items behind a refused building head (`headLetGo` pops each refused building head in turn); the five duelq recordings hold neither, 1124 Wuhan t236 (a one-item queue) the one major case
@@ -399,8 +396,7 @@ A question the SOURCE under-determines; neither engine ships a branch until the 
   - LAB (cardiff t89): the ending rule unread: of the duelq FAILED Build City Building Tech Contracts with no building tree the next turn, 1124 t67 / t101 and 1128 Bologna t89 under NO BUILDS AT ALL, Cardiff t89 the repair turn (the game's Default Specialization queues the repair in its t89 update, the engine's production step holds it in hand before the events), where Add Goal Tech's update (0x7e7d20) reads kept contracts SUBMITTED / FAILED / COMPLETED / 0 released, IN PROGRESS RUNNING, no turn test
   - LAB (cardiff t89): 1124 Cardiff t89: the game's BUILDINGS table holds the Castle at 405.19 (318.98 at t88, 493.96 at t90) and no unit above FX(-9999), its event's building the Castle, where ours reads 365.1 with the repair in hand from the production step (+10 turns) and the game's analysis ran on the empty queue at its turn-start pick (CityProductionChanged before PlayerTurnActivated)
 - **C-100. CITY-STATES' PLOT AND DISTRICT VALUES.** Weight 4.
-  - BUILD (power): a city-state's free power past its grid (City_Power +0x08's sources, ChangeFreePower 0x1ed860) unread, its grid's supply read for it
-  - LAB (power): fit, unread: a minor never power-short (City_Power's minor path unread; 1124 Cardiff t214 Production 9.30078125)
+  - LAB (power): the free power's sources (ChangeFreePower 0x1ed860 from 0xafe320 / 0xaff790, the percent +0xa8) unread, the city's own renewables read for it
   - LAB (district placement): on the older recordings only (the duelz logs hold no DISTRICTS rows): 1128 Bologna t2 the Campus at 3:8 (355) for the game's 3:7 (311)
   - LAB (district placement): on the older recordings only (the duelz logs hold no DISTRICTS rows): 1128 Bologna t73 1:9 for 3:7
   - LAB (district placement): 1117 p4 Theater from t99
@@ -422,8 +418,6 @@ A question the SOURCE under-determines; neither engine ships a branch until the 
   - LAB (improvement rows): 1124 IMPROVEMENTS Plantation, Farm and Lumber Mill rows (about 19 each)
   - LAB (improvement rows): 1124 t91 p3 Farm rows +10.80 over the game's and t93-94 p2 Farm rows (housing / growth one-turn shifts)
   - LAB (improvement rows): 1117 Farm rows p2 t150 (+44), p4 t185-189 / t213
-  - LAB (improvement rows): fit, unread: 0x1c77c0's sea test
-  - LAB (improvement rows): fit, unread: a hill Mine
   - LAB (yields at the analysis): the analysis' yields a turn ahead of the record's: duelp1121 Hunza t164 Production 7 -> 4
   - LAB (yields at the analysis): the analysis' yields a turn ahead of the record's: duelp1121 Hunza t124-129 the surplus the Neighbourhood's housing reads
   - LAB (yields at the analysis): the analysis' yields a turn ahead of the record's: 1121 p3's T alternating 27 / 34
@@ -449,7 +443,7 @@ A question the SOURCE under-determines; neither engine ships a branch until the 
   - LAB (nodes): Protect Units' plunder test (0x51a160 +0x48, partly)
   - LAB (nodes): EXPLORE in an operation
   - LAB (nodes): Naval Pillage's +0x18 (0x803250)
-  - LAB (nodes): fit, unread: the eruption cut at 31.29 turns (+0x98)
+  - LAB (nodes): fit, unread: the eruption turns' rows (the volcano's +0x60 list read by 0xa1d480, its writer unread; 31.29 turns beside one volcano)
   - BUILD (other): the 1127 t46 savings edge (114.96 vs 115)
   - LAB (other): experience cumulative (+0x1bc0 +8)
   - LAB (other): the religious AI's contract test past PurchaseYield (0x5f6920), its faith buys
@@ -541,7 +535,6 @@ A question the SOURCE under-determines; neither engine ships a branch until the 
   - LAB (research values): the research term's improvement tourism does not read the city's +0x1b20 percent (none in a city-state)
   - LAB (civic values): 1121 civics short (Divine Right 5.0, Games & Recreation 7.7)
   - LAB (unit term): 1127 p3 t63 +7.4 / -5.1 untraced
-  - LAB (unit term): fit, unread: the unit term's upgrade Gold is the minor's own upgrade price (`MINOR_UPGRADE_GOLD`, 2.5 at its Gold weight; `minorUnitTerm` / `_rai_unit_term`), fitted to one logged number (1124 Bologna t81 Military Engineering 479.8)
   - LAB (resource values): a minor's upgrade strategic cost
   - LAB (resource values): Resources +0x350 / +0x1168
   - LAB (resource values): the strategic charge's formation discount and Black Marketeer, no case

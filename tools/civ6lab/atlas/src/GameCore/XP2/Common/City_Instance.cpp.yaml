@@ -67,15 +67,12 @@
   final: 0x131a10
   kind: function
   name: the city trains a domain
-  semantics: "the city trains a domain: a district of the domain, land, or the sea where the centre's plot's +0x40 and its flags +0x14 bit 0 hold."
-  status: PARTLY
+  semantics: "the city trains a domain (city, domain): a complete district of the domain (0x1aed10); land (2) always; the sea (0) where the centre's plot (vt +0x40) holds bit 1 of its domain mask (the plot info's word +0x14, 0x81230), which the claim's 0x66a90 sets on a city's plot that IsCoastalLand(plot, 1) (0x82a10: a passable water neighbour of an area of at least one plot; a lake counts, a river does not)."
+  status: READ
   cases:
     - recording: h1_duely1121
       turn: 218
-      value: Hunza on inland 11:5 starts Naval Superiority at 12:3 the turn its Harbor completes
-    - recording: h1_duelv1127
-      turn: 5
-      value: player 2's inland river city values the Harbor as one that trains ships (6.09 at (1,15))
+      value: "Hunza on inland 11:5 (a river) starts Naval Superiority at 12:3 the turn its Harbor completes, never before; runs/h1_duelq1127 Muscat on inland 42:15 (a river): its 937 Harbor rows carry the district value's domain term, 0 at a city-state's naval weight, as logged"
   impl:
     - cpu/core/aiView.ts:cityTrainsSea
     - cpu/core/operations/evaluate.ts:targetsOf
@@ -90,6 +87,7 @@
     - "C-97: the operations — the manager and its candidates READ, the staging list and City Defense's start unread"
     - "C-96: the district value — READ (0x7a51f0, 0x7aaf80's terms below, 0x366df0, the purchase price 0x1b1cb0, 0x1c77c0, 0x1b4450), PARTLY READ (the golden-age term, the claims, modifiers and neighbours terms, the domain's resources path), unwired"
     - "C-99: a unit bought in the turn sits out the operations, a Harbor trains ships — the recruit's turn-done offer READ (0x60a8c0, 0x60a440), 0x1c77c0's district arm READ, the candidates' own strength a FIT, both twins"
+    - "C-96 / C-98 / C-100 / C-99: the city AI's fitted rules read — the analysis before the job list, the unit term's upgrade price, the city's trained domains, a non-major's required power, the eruption's turns — READ (0x608870 at 0x608976..0x608988, 0x7b3e50 at 0x7b4564..0x7b45c8, 0x5376d0, 0x1c77c0, 0x1aed10, 0x1f0440 at 0x1f04c7..0x1f04dc, 0xa1d480), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...score's whole part << 8 (0x6fe2b0); NAVAL_SUPERIORITY — of the player's coastal cities (0x1c77c0) the most populous (+0x588, strictly, the first of equals) whose ring walk within 4 h..."

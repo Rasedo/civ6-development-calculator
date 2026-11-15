@@ -60,8 +60,12 @@
 - addr: 0x608870
   final: 0x4012f0
   kind: function
-  semantics: "the AI turn start: sets the pass (Control Manager +0x278) to 4 and runs the +0x370 job list at passes 4, 3, 2, 1, 0."
+  semantics: "the AI turn start (from DoTurn's tail with the flag set, from the AI update 0x608580 with it clear): raises player signal +0x258 (0x608976..0x608988: the City Analysis 0x5c24e0, the military AI's strengths 0x7271d0 and table rebuild 0x6fae70) and waits its jobs (0x6e3020, up to 0x19 rounds while a handler answers true); clears the assignments of units whose operation is gone; then sets the pass (Control Manager +0x278) to 4 and runs the +0x370 job list at passes 4, 3, 2, 1, 0 (0x608ac2). The analysis tables so hold what the turn before's jobs wrote: the Economic AI's Gold boost (0x6880a1, pass 3), the knowledge base."
   status: PARTLY
+  cases:
+    - recording: h1_duely1117
+      turn: 105
+      value: "Valletta's update reads the t104 Gold boost (net -5.6 -> +0.4 after its two Crossbowmen's disband): the Warrior's contract over the Crossbowman's"
   impl: [cpu/core/operations/manager.ts:CITY_AI_PASS]
   readings:
     - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
@@ -73,6 +77,7 @@
     - "C-130: the city yields' cache holds through the update's re-placement — READ (0x1cb8b0, 0x91e540), the split a fit, both twins"
     - "C-123 / C-110: the barbarians' rules run as the first job of their AI turn start, after the DoTurn tail; a centre a player that is no major may not raze keeps its last hit point — READ (0x6096c0 at 0x6097af..0x609802, 0x608870, 0x7280a0, 0x1514a0, 0x14d25d; 0x248800, 0x533e50, 0x206080 at 0x206868..0x2068c8, 0x20dd30, 0x1fdea0 at 0x1fe098..0x1fe0ab), both twins"
     - "C-123 / C-110: the barbarians' rules run as the first job of their AI turn start, after the DoTurn tail; a centre a player that is no major may not raze keeps its last hit point; a melee blow on a district that would fell both sides — READ (0x6096c0 at 0x6097af..0x609802, 0x608870, 0x7280a0, 0x1514a0, 0x14d25d; 0x248800, 0x533e50, 0x206080 at 0x206684..0x206715 and 0x206868..0x2068c8, 0x20dd30, 0x1fdea0 at 0x1fe098..0x1fe0ab), both twins"
+    - "C-96 / C-98 / C-100 / C-99: the city AI's fitted rules read — the analysis before the job list, the unit term's upgrade price, the city's trained domains, a non-major's required power, the eruption's turns — READ (0x608870 at 0x608976..0x608988, 0x7b3e50 at 0x7b4564..0x7b45c8, 0x5376d0, 0x1c77c0, 0x1aed10, 0x1f0440 at 0x1f04c7..0x1f04dc, 0xa1d480), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...its watched setter 0x731d10 on +0x220) and acts only in its own pass: the turn start 0x608870 sets the pass to 4 and runs the whole +0x370 list at 4, 3, 2, 1, 0; 0x608580 then runs..."

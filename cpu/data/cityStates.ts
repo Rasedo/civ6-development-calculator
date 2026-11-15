@@ -10,7 +10,7 @@ import type { CityStateType, DistrictId, QueueItem, YieldKey } from '../core/typ
 import type { PromoClass } from './promotions';
 import type { PlotYieldRow } from './civilizations';
 import { type Src, type SrcMap, srcConst, xml } from './provenance';
-import { GAME_SPEED, scaleByGameSpeed } from './constants';
+import { PURCHASE_DIVISOR, UPGRADE_MINIMUM_COST, scaleByGameSpeed } from './constants';
 
 /** The government a city-state is in: Chiefdom from its founding to the end
  *  of the game, whatever its civics unlock — every city-state's government
@@ -698,13 +698,22 @@ export const MINOR_EXCLUDED_UNIT_CLASSES: readonly PromoClass[] = srcConst('city
   }) as readonly PromoClass[];
 
 /** CIV6 (Leaders.xml, MINOR_CIV_GOLD_MILITARY_UPGRADE): a minor upgrades at
- *  `MODIFIER_PLAYER_ADJUST_UNIT_UPGRADE_DISCOUNT_PERCENT` 100, and the census
- *  reads every upgrade at exactly 5 Gold (146 of the 171 single-upgrade turns whose
- *  neighbouring income is flat) — `UPGRADE_BASE_COST` at the online speed, the
- *  one install figure the discount leaves. */
-export const MINOR_UPGRADE_GOLD = srcConst('cityState.upgradeGold', 5,
-  xml('GlobalParameters', 'Name=UPGRADE_BASE_COST', 'Value', {
-    scale: GAME_SPEED, note: 'C-38 census: exactly 5 per upgrade, whatever the chassis' }));
+ *  `MODIFIER_PLAYER_ADJUST_UNIT_UPGRADE_DISCOUNT_PERCENT` 100. The price
+ *  (Unit_Upgrade_Manager 0x5376d0) takes the player's percent off the whole
+ *  of it, raises what is left under UPGRADE_MINIMUM_COST to that minimum at
+ *  the game's speed (0x5254d0, whole) and cuts it to a multiple of
+ *  PURCHASE_DIVISOR: 5 Gold online whatever the chassis (the census: 146 of
+ *  the 171 single-upgrade turns whose neighbouring income is flat). The
+ *  research and civic values' unit term reads the same price for the player
+ *  (0x7b3e50 at 0x7b45a4, 0x7a9a10 at 0x7aa35e: no formation, no unit). */
+const minorUpgradeGold = (): number => {
+  const c = scaleByGameSpeed(UPGRADE_MINIMUM_COST);
+  return c - (c % PURCHASE_DIVISOR);
+};
+export const MINOR_UPGRADE_GOLD = srcConst('cityState.upgradeGold', minorUpgradeGold(), {
+  derived: 'UPGRADE_MINIMUM_COST through the game speed, rounded down to a multiple of PURCHASE_DIVISOR (0x5376d0 under the 100 percent discount)',
+  inputs: [xml('GlobalParameters', 'Name=UPGRADE_MINIMUM_COST', 'Value'), xml('GlobalParameters', 'Name=PURCHASE_DIVISOR', 'Value')],
+});
 /** CIV6 (LOC_CITY_STATES_LEVY_MILITARY_DETAILS): "The Suzerain of this
  *  city-state can pay {1_GoldCost} Gold to take temporary control of all its
  *  current military units. The units will not be able to move on the turn

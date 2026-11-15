@@ -109,6 +109,7 @@
   status: PARTLY
   readings:
     - "H-1: why a seed does not replay — the AI's worker threads — READ, the replay patch MEASURED"
+    - "C-96 / C-98 / C-100 / C-99: the city AI's fitted rules read — the analysis before the job list, the unit term's upgrade price, the city's trained domains, a non-major's required power, the eruption's turns — READ (0x608870 at 0x608976..0x608988, 0x7b3e50 at 0x7b4564..0x7b45c8, 0x5376d0, 0x1c77c0, 0x1aed10, 0x1f0440 at 0x1f04c7..0x1f04dc, 0xa1d480), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...+0x660, job set +0x648), spawn 0x6e2980 (EXP_JobManager_SpawnList; flag +0x3afc), wait 0x6e3020 (EXP_JobManager_Wait), called from Game::Processor::Update at 0x6540f (asserting `!Ge..."

@@ -1098,7 +1098,8 @@ class SimMinorAi:
         """[B, T] `eruptionHazardTurns` — the turns the AI expects to an
         eruption beside each plot (raw fixed point): a plot beside a volcano
         reads 100 over the volcano rows' sum of 100 / (N /
-        OccurrencesPerGame); raw -1 (none) elsewhere."""
+        OccurrencesPerGame), the rows counted once per volcano beside it;
+        raw -1 (none) elsewhere."""
         def fx_of(x: float) -> int:
             return (math.floor(x) << 8) | int((x - math.floor(x)) * 256)
 
@@ -1109,11 +1110,13 @@ class SimMinorAi:
         for occ, on in zip(self._eruption_weight, self._er_on_volcano):
             if on:
                 tot += fx_div(fx_of(100), fx_div(fx_of(self._event_turns), fx_of(occ)))
-        turns = fx_div(fx_of(100), tot) if tot > 0 else -1
         nb = self.neigh
-        beside = (self.volcano_at[:, nb.clamp(min=0)] & (nb >= 0).unsqueeze(0)).any(dim=2)
-        return torch.where(beside, torch.full_like(beside, turns, dtype=torch.long),
-                           torch.full_like(beside, -1, dtype=torch.long))
+        count = (self.volcano_at[:, nb.clamp(min=0)] & (nb >= 0).unsqueeze(0)).sum(dim=2)
+        out = torch.full_like(count, -1, dtype=torch.long)
+        if tot > 0:
+            for k in range(1, 7):
+                out = torch.where(count == k, torch.full_like(out, fx_div(fx_of(100), tot * k)), out)
+        return out
 
     def _minor_flood_turns(self) -> torch.Tensor:
         """[B, T] `floodHazardTurns` — THE TURNS THE AI EXPECTS TO A FLOOD of
@@ -1192,8 +1195,8 @@ class SimMinorAi:
         improvement's the research and civics AIs' turns to its technology
         and civic (the larger), a district's its build turns plus those. The
         hazards' turns (flood `_minor_flood_turns`, eruption
-        `_minor_eruption_turns`); an inland city-state on a
-        river trains ships. A positive district slot carries its district's
+        `_minor_eruption_turns`); the city trains a district's domain as
+        its unit value reads it. A positive district slot carries its district's
         buildings term (`d_tab`, `_cv_buildings_pass`'s; the centre's stay 0)."""
         B, dev = self.B, self.device
         T = self._cv_tables()
@@ -2293,12 +2296,7 @@ class _PlotFacts:
         return self._at(1 + torch.div(sim.city_pop[:, self.ctx.row, 0].long() - 1, 3, rounding_mode="floor"))
 
     def _trains(self, dom):
-        sim = self.sim
-        t = _t(self.mf.trains_domain(dom), self.mf.like()).bool()
-        if dom == "DOMAIN_SEA":
-            ctr = sim.citystate_center[:, self.s].clamp(min=0)
-            t = t | sim.tile_river.gather(1, ctr.unsqueeze(1)).squeeze(1)
-        return self._at(t)
+        return self._at(_t(self.mf.trains_domain(dom), self.mf.like()).bool())
 
     def city_trains(self, dom):
         return self._trains(dom)

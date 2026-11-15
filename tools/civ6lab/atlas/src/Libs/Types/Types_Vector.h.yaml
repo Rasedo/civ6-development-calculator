@@ -633,6 +633,7 @@
     - "C-96: a city-state's City Center projects, Build Unit's pillaged building, the pick's pillaged district and the war footing's writer"
     - "C-130: the Combat Desire between the policy jobs and the government values; a released contract on its city's list — READ, both twins"
     - "C-98 / C-130: the unit production table's research listing and its no-opposition sums; the favoured technology over the stored table — READ (0x7989e0 at 0x798c26..0x798c4c and 0x7997bd..0x799924, 0x79ba50, 0x75d3d0, 0x761090, 0x763b00, 0x761b70, 0x71fb80 at 0x721b12), both twins"
+    - "C-96 / C-98 / C-100 / C-99: the city AI's fitted rules read — the analysis before the job list, the unit term's upgrade price, the city's trained domains, a non-major's required power, the eruption's turns — READ (0x608870 at 0x608976..0x608988, 0x7b3e50 at 0x7b4564..0x7b45c8, 0x5376d0, 0x1c77c0, 0x1aed10, 0x1f0440 at 0x1f04c7..0x1f04dc, 0xa1d480), both twins"
   notes:
     - ".claude/scratchpad/cb5/NOTES.md: ...cpp 0x5eb8b0/0x5eadb0 from the tactical target list 0x783980 + 0x73abf0/0x747230),   Combat Desire (0x71fb80 0x721302..), support units (Ram/Siege Tower), project value 0x7b28c0 (district projects,   Manhatta..."
   context:
@@ -670,7 +671,7 @@
   final: 0x4d0770
   kind: function
   name: PrepareForWarWith
-  semantics: "PrepareForWarWith (Lua 0x9bbaa0): set by the war declarations' not-ready hook (0x6742d0) where the players at war or prepared for number at most half the +0xb50 list and the player is neither a declared friend nor an ally; cleared by 0x650890."
+  semantics: "PrepareForWarWith(military AI, player, flag): sets m_prepareForWarWith (+0xbb0, data +0xc58) for a player; called by the diplomatic AI's handlers (0x650890 the clear, 0x6742d0 the war declarations' not-ready hook, 0x681c10 OnDenouncePlayer) and the Lua binding (0x9bbaa0). m_playerRivals (+0xc70, data +0xd18) beside it is written by the Lua SetRival alone. Neither is set for a city-state or the Free Cities."
   status: READ
   cases:
     - recording: h1_duelv1117
@@ -681,6 +682,7 @@
     - "C-97: the other actions' desires, the trust and the transitions — the friendship, the alliance, the trust, the threat term and the transitions READ; the war value, the deals and the victories' progress PARTLY READ"
     - "C-97: the war operations — the war candidates, the city value's frame, the assault nodes and Attack Units READ; the loyalty lead's sources, the team update's danger and the assault's executions PARTLY READ"
     - "C-97: the war desires, the war operation's readiness and the assault's executions — the war value, the not-ready hook, the readiness and the executions READ; the leader's war factor, the WMD flags, the deal items and the war record's writer unread"
+    - "C-96 / C-98 / C-100 / C-99: the city AI's fitted rules read — the analysis before the job list, the unit term's upgrade price, the city's trained domains, a non-major's required power, the eruption's turns — READ (0x608870 at 0x608976..0x608988, 0x7b3e50 at 0x7b4564..0x7b45c8, 0x5376d0, 0x1c77c0, 0x1aed10, 0x1f0440 at 0x1f04c7..0x1f04dc, 0xa1d480), both twins"
   context:
     - ...nDenouncePlayer (0x681c10) sends the denouncement, the military AI's PrepareForWarWith (0x724f30), returns true. OnOfferAlliance (0x681e80) picks an alliance type and performs it (0x67...
   review: reviewed
@@ -702,6 +704,7 @@
   readings:
     - "C-130: the Combat Desire between the policy jobs and the government values; a released contract on its city's list — READ, both twins"
     - "H-1: the City Analysis runs on player signal +0x258 and reads each plot's owner live — READ (0x5c27e0, 0x5c24e0, 0x5ce970), the 1117 t44 Mine unexplained"
+    - "C-96 / C-98 / C-100 / C-99: the city AI's fitted rules read — the analysis before the job list, the unit term's upgrade price, the city's trained domains, a non-major's required power, the eruption's turns — READ (0x608870 at 0x608976..0x608988, 0x7b3e50 at 0x7b4564..0x7b45c8, 0x5376d0, 0x1c77c0, 0x1aed10, 0x1f0440 at 0x1f04c7..0x1f04dc, 0xa1d480), both twins"
   review: reviewed
 - addr: 0x727510
   final: 0x4d26e0
