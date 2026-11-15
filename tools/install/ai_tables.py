@@ -30,7 +30,7 @@ import pathlib
 import sqlite3
 import sys
 
-from xml_check import Install
+from xml_check import Install, game_database
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent.parent
 # the value layer's tables every AI party reads (cpu/core/aiValue.ts)
@@ -39,12 +39,9 @@ OUT_CORE = ROOT / "cpu" / "data" / "aiTables.ts"
 OUT_CITY = ROOT / "cpu" / "data" / "aiBuildTables.ts"
 # the World Congress's valid targets (cpu/core/congress.ts)
 OUT_CONGRESS = ROOT / "cpu" / "data" / "congressTargets.ts"
-# the game's own database as a lab instance last loaded the duel's ruleset
-# (each instance writes its Cache under its own profile, tools/civ6lab/game.py
-# PROFILES): its row order
-GAME_DB = max(pathlib.Path(r"C:/civ6lab_profiles").glob(
-    "*/AppData/Local/Firaxis Games/Sid Meier's Civilization VI/Cache/DebugGameplay.sqlite"),
-    key=lambda p: p.stat().st_mtime, default=pathlib.Path(r"C:/civ6lab_profiles/DebugGameplay.sqlite"))
+# the game's own database as a lab instance last hosted the duel's ruleset
+# (`xml_check.game_database`): its row order
+GAME_DB = game_database()
 # the systems the yield weight reads by trait
 WEIGHT_SYSTEMS = ("Yields", "YieldSensitivities")
 # the recordings live in the checkout (a worktree under .claude/worktrees reads its parent's)

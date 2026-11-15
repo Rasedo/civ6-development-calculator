@@ -58,7 +58,14 @@ a game with a human seat the seat is Autoplayed one turn at a time
 the state cannot move under it; the dump waits (`--start-wait`) until the
 seat's own turn start has run (`wait_started`), so every record holds it.
 After each record, before the seat's turn, a Dedication due is answered
-(`lab.answer_dedication`), never on a timer. `--observer` follows an all-AI game as
+(`lab.answer_dedication`), never on a timer. A seat's game is recorded turn
+by turn or not at all: `play` exits 3 with a `fault:` line where the UI's
+Auto End Turn is on (it ends a seat's turn that has nothing to answer, so
+that turn passes with no hold), where the game stands past the turn after
+the last record, and where the counter moved under a record. It ends with
+`game_over {"seatEliminated": seat, "turn": the game's, "last": the last
+recorded}` and no further record once the seat is dead: Autoplay then ends
+into the local observer and the game runs on with no hold. `--observer` follows an all-AI game as
 `watch.py` does; the counter can move during a dump there (an observer game
 cannot be paused from the tuner), which the `moved` flag records.
 """
@@ -303,14 +310,44 @@ def cmd_snap(a, t: Tuner) -> int:
     return 0
 
 
+# `play`'s exit code where a turn of a seat's game was not recorded
+FAULT = 3
+# the UI's Auto End Turn (ActionPanel.lua CheckAutoEndTurn): with the user
+# option on, a seat's turn with no blocker and no unit wanting orders is ended
+# by the UI as it opens, so the game passes it with no hold
+LUA_AUTO_END = ('local ok, v = pcall(function() return UserConfiguration.IsAutoEndTurn() end); '
+                'print(ok and tostring(v) or ("err:" .. tostring(v)))')
+LUA_SEAT_ALIVE = 'print(tostring(Players[ZSEAT] ~= nil and Players[ZSEAT]:IsAlive()))'
+
+
 def cmd_play(a, t: Tuner) -> int:
     lp = -1 if a.observer else lab.local_player(t)
     done = recorded_turns(a.out)
     left = a.turns
     end = a.t0 + a.deadline - a.reserve
     log = lambda s: print(s, flush=True)  # noqa: E731
+    if lp >= 0:
+        auto = t.run(IG, LUA_AUTO_END)[-1]
+        if auto == "true":
+            print("fault: the UI's Auto End Turn is on (UserOptions AutoEndTurn): a seat's turn with nothing to answer"
+                  " would pass with no hold and no record; `game.py profile apply` turns it off", flush=True)
+            return FAULT
+        if auto != "false":
+            log(f"    Auto End Turn unread: {auto}")
     while left > 0:
         now = lab.turn(t)
+        if lp >= 0:
+            # the seat is gone: Autoplay has no seat to hand the game back to
+            # (it ends into the local observer) and no turn is held again
+            if t.run(GC, LUA_SEAT_ALIVE.replace("ZSEAT", str(lp)))[-1] != "true":
+                print(f"game_over {json.dumps({'seatEliminated': lp, 'turn': now, 'last': max(done) if done else None})}")
+                break
+            # the game stands at the last recorded turn (a call resumed) or at
+            # the one after it: any other turn passed with no hold
+            if done and now not in (max(done), max(done) + 1):
+                print(f"fault: turn {max(done) + 1} was not recorded: the game stands at turn {now} after the record"
+                      f" of turn {max(done)}", flush=True)
+                return FAULT
         # the witness listens from here on (once per game; a loaded game arms
         # afresh) — the turn starts before this call ran are not witnessed
         st = starts(t, "arm")
@@ -331,11 +368,13 @@ def cmd_play(a, t: Tuner) -> int:
             print(f"turn {rec.get('turn')} moved={rec['moved']} cities={len(rec['cities'])}"
                   f" units={len(rec['units'])} errors={len(rec['errors'])}"
                   f" at {time.monotonic() - a.t0:.0f}s", flush=True)
-            # the seat is gone (the dump lists only living players): with no
-            # seat's turn to hold, the game would run on unheld — stop here
-            if lp >= 0 and not any(p.get("id") == lp for p in rec["players"]):
-                print(f"game_over {json.dumps({'seatEliminated': lp, 'turn': rec.get('turn')})}")
-                break
+            # a seat's game holds while its record is read: a counter that
+            # moved under the record, or a record of another turn, is a turn
+            # that passed with no hold
+            if lp >= 0 and (rec["moved"] or rec.get("turn") != now):
+                print(f"fault: turn {now} was not held: its record reads turn {rec.get('turn')}, the counter"
+                      f" {rec['turnBefore']} before and {rec['turnAfter']} after", flush=True)
+                return FAULT
         if left <= 0 or time.monotonic() >= end:
             break
         wait = max(5.0, end - time.monotonic())

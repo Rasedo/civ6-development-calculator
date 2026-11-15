@@ -54,10 +54,11 @@ import json
 import math
 import pathlib
 import re
+import sqlite3
 import sys
 import xml.etree.ElementTree as ET
 
-INSTALL = pathlib.Path(r"C:\Program Files (x86)\Steam\steamapps\common\Sid Meier's Civilization VI")
+INSTALL =pathlib.Path(r"C:\Program Files (x86)\Steam\steamapps\common\Sid Meier's Civilization VI")
 ROOT = pathlib.Path(__file__).resolve().parent.parent.parent
 DUMP = ROOT / "seeder" / "worlds" / "provenance.json"
 
@@ -68,6 +69,33 @@ SKIP_FILE = re.compile(r"Icons|Text|Civilopedia|Colors|Gossip|DiplomacyStatement
 # action on criteria; these are the answers the evaluator gives.
 GAME_CORE = "Expansion2"
 RULESET = "RULESET_EXPANSION_2"
+
+# THE GAME'S OWN DATABASE: each lab instance writes Cache/DebugGameplay.sqlite
+# under its own profile (tools/civ6lab/game.py PROFILES) — the shell's
+# base-rules database as it starts, the hosted game's as it hosts one.
+LAB_PROFILES = pathlib.Path(r"C:/civ6lab_profiles")
+GAME_DB_GLOB = "*/AppData/Local/Firaxis Games/Sid Meier's Civilization VI/Cache/DebugGameplay.sqlite"
+
+
+def _hosted(db: pathlib.Path) -> bool:
+    """the database is a hosted game's under RULESET: it holds an Expansion 2
+    row, which the shell's database of an instance at the main menu lacks; a
+    file an instance is writing does not read"""
+    try:
+        con = sqlite3.connect(f"file:{db.as_posix()}?mode=ro", uri=True)
+        try:
+            return con.execute("select 1 from Units where UnitType = 'UNIT_GIANT_DEATH_ROBOT'").fetchone() is not None
+        finally:
+            con.close()
+    except sqlite3.Error:
+        return False
+
+
+def game_database() -> pathlib.Path:
+    """the newest database a lab instance wrote hosting a game (a path that
+    does not exist where none has)"""
+    return max((p for p in LAB_PROFILES.glob(GAME_DB_GLOB) if _hosted(p)), key=lambda p: p.stat().st_mtime,
+               default=LAB_PROFILES / "DebugGameplay.sqlite")
 
 
 def _criteria_ok(crit: ET.Element | None) -> bool:

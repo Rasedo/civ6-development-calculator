@@ -33,16 +33,14 @@ import pathlib
 import sqlite3
 import sys
 
-from xml_check import Install
+from xml_check import Install, game_database
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent.parent
 OUT = ROOT / "cpu" / "data" / "aiOperations.ts"
 CITY_OUT = ROOT / "cpu" / "data" / "aiCityTrees.ts"
-# the game's own database as a lab instance last loaded the duel's ruleset
-# (each instance writes its Cache under its own profile, tools/civ6lab/game.py PROFILES)
-GAME_DB = max(pathlib.Path(r"C:/civ6lab_profiles").glob(
-    "*/AppData/Local/Firaxis Games/Sid Meier's Civilization VI/Cache/DebugGameplay.sqlite"),
-    key=lambda p: p.stat().st_mtime, default=pathlib.Path(r"C:/civ6lab_profiles/DebugGameplay.sqlite"))
+# the game's own database as a lab instance last hosted the duel's ruleset
+# (`xml_check.game_database`)
+GAME_DB = game_database()
 
 
 def num(v, default=0):

@@ -948,13 +948,21 @@ def hit_record(r: Reader, mb: bytes, units: Units | None = None) -> tuple[dict |
     return rec, {**head, **units.safe(rec["site"], rec["player"], pl)}
 
 
-def wait_module(host: str, limit: float, pm: ProcMem | None = None) -> tuple[ProcMem, int]:
+def wait_module(host: str, limit: float, pm: ProcMem | None = None,
+                stop: pathlib.Path | None = None) -> tuple[ProcMem, int]:
+    """the instance's game DLL once its game object stands: a module seen
+    while the loader still maps it is not written to (a DLL loaded off its
+    base has its sections' protection put back after the fixups, which
+    takes the mailbox's write access from hooks installed before that).
+    Ends (SystemExit) past `limit` seconds or once the `stop` file stands."""
     t0 = time.monotonic()
     while time.monotonic() - t0 < limit:
+        if stop is not None and stop.exists():
+            raise SystemExit(f"stopped: 0 records, waiting for {DLL} in the {host} instance")
         try:
             pm = pm or ProcMem.of_host(host)
             base = pm.module(DLL)
-            if base:
+            if base and pm.u64(base + G_GAME):
                 return pm, base
         except MemError:
             pm = None
@@ -977,7 +985,7 @@ def cmd_watch(a) -> int:
     """A hosted game loads the DLL afresh: a module that goes, or whose
     first site no longer holds the hook, is waited for again and re-armed."""
     stop = a.out.with_suffix(a.out.suffix + ".stop")
-    pm, base = wait_module(a.host, a.wait)
+    pm, base = wait_module(a.host, a.wait, stop=stop)
     r = Reader(pm, base)
     seq = arm(pm, base)
     M = base + H.MAIL
@@ -1005,7 +1013,7 @@ def cmd_watch(a) -> int:
                 if stop.exists():
                     break
                 try:
-                    pm, base = wait_module(a.host, a.wait, pm)
+                    pm, base = wait_module(a.host, a.wait, pm, stop)
                 except SystemExit:
                     break
                 r = Reader(pm, base)

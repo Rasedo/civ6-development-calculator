@@ -27,14 +27,30 @@ spawned through `game.spawn` so each runs in its host's profile.
 `--aimem` runs the AI memory reader beside each game (`aimem.py watch`,
 started before the host loads the game DLL, armed before the first turn):
 `<dump stem>.aimem.jsonl`, the manifest's `aimem` its path and last line.
+
+A game's manifest line names what the dump holds (`recorded`, `turns_of`:
+`first`, `last` — the run of turns recorded one after the other from the
+first —, `missing`, `moved`) beside the turn the game reached (`turn`). Its
+`end`: `target`; `game_over` (the seat eliminated or the game ended: the
+records stop at `recorded.last`, the game's valid range); `fault` (a turn
+was not recorded: `dump.py play`'s exit 3, or a dump at its target with a
+turn missing); `stalled`; `crash`. After a `crash` or a `stalled` game the
+host's instance is closed and started anew through the spawn path (`h4.py
+spawn`, `menu`) and the seed goes back to the queue once, its partial files
+deleted (`attempt` 2 on its second line); a host whose instance does not
+come back is dropped (an `event` line) and the queue is the other hosts'.
+`--runs` names the folder the recordings and the manifest are written to.
 """
 from __future__ import annotations
 
 import argparse
 import datetime as dt
 import json
+import os
 import pathlib
 import queue
+import re
+import shutil
 import subprocess
 import sys
 import threading
@@ -46,11 +62,77 @@ ROOT = LAB.parents[1]
 RUNS = LAB / "runs"
 PY = sys.executable
 sys.path.insert(0, str(LAB))
+sys.path.insert(0, str(HERE))
 import aimem  # noqa: E402
 import aimem_hook  # noqa: E402
 import game  # noqa: E402
 import logstore  # noqa: E402
 import procmem  # noqa: E402
+from dump import FAULT  # noqa: E402
+
+# a lab command started from here prints UTF-8, which is how its output is read
+ENV = dict(os.environ, PYTHONIOENCODING="utf-8:replace")
+# a game's files beside its dump, by suffix (and the folder `<stem>.logs`)
+SUFFIXES = (".jsonl", ".aimem.jsonl", ".aiunits.jsonl", ".cat.json", ".orders.json", ".randcalls.csv", ".logs.sqlite")
+# a record's head: `dump.py` writes these three keys first
+HEAD = re.compile(rb'\{"turnBefore":(-?\d+),"turnAfter":(-?\d+),"moved":(true|false)')
+
+
+def stdio_utf8() -> None:
+    """this process prints UTF-8 whatever the console's or the pipe's code
+    page, a character with no encoding replaced"""
+    for stream in (sys.stdout, sys.stderr):
+        stream.reconfigure(encoding="utf-8", errors="replace")
+
+
+def stem_file(dump: pathlib.Path, suffix: str) -> pathlib.Path:
+    return dump if suffix == ".jsonl" else dump.with_suffix("").with_suffix(suffix)
+
+
+def turns_of(dump: pathlib.Path) -> dict:
+    """The turns a dump holds, read from each record's head: `records` (the
+    records whose counter stood), `first`, `last` (the end of the run of
+    turns recorded one after the other from the first), `missing` (the turns
+    between the lowest and the highest with no record), `moved` (the records
+    whose counter moved under them), `repeated` (records of a turn already
+    held) and `unread` (lines that open with no record's head)."""
+    turns: list[int] = []
+    out: dict = {"records": 0, "first": None, "last": None, "missing": [], "moved": [], "repeated": 0, "unread": 0}
+    try:
+        with open(dump, "rb") as fh:
+            for ln in fh:
+                if not ln.strip():
+                    continue
+                m = HEAD.match(ln[:96])
+                if m is None:
+                    out["unread"] += 1
+                elif m.group(3) == b"true":
+                    out["moved"].append(int(m.group(1)))
+                else:
+                    turns.append(int(m.group(1)))
+    except OSError:
+        return out
+    if turns:
+        have = set(turns)
+        last = turns[0]
+        while last + 1 in have:
+            last += 1
+        out.update(records=len(turns), first=turns[0], last=last, repeated=len(turns) - len(have),
+                   missing=[t for t in range(min(have), max(have) + 1) if t not in have])
+    return out
+
+
+def gapless(t: dict) -> bool:
+    """a dump's turns (`turns_of`) run from its first record to its last with
+    none missing, moved, repeated or unread"""
+    return bool(t["records"]) and not (t["missing"] or t["moved"] or t["repeated"] or t["unread"])
+
+
+def clear(dump: pathlib.Path) -> None:
+    """a game's files deleted: the dump, the streams, the logs"""
+    for suf in SUFFIXES:
+        stem_file(dump, suf).unlink(missing_ok=True)
+    shutil.rmtree(dump.with_suffix(".logs"), ignore_errors=True)
 
 
 # the AI's behaviour-tree trace runs to 150 MB a game and carries no rule
@@ -120,7 +202,7 @@ def bounded(cmd: list[str], seconds: float, log: pathlib.Path) -> tuple[int, str
         fh.write(f"\n$ {' '.join(cmd)}\n")
         fh.flush()
         proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, cwd=ROOT, text=True,
-                                encoding="utf-8", errors="replace")
+                                encoding="utf-8", errors="replace", env=ENV)
         try:
             out, _ = proc.communicate(timeout=seconds)
             rc = proc.returncode
@@ -148,7 +230,7 @@ class MemoryWatch:
         if units is not None:
             cmd += ["--units", str(units), "--plan-from", str(plan_from)]
         self.proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, cwd=ROOT, text=True,
-                                     encoding="utf-8", errors="replace")
+                                     encoding="utf-8", errors="replace", env=ENV)
         self.log = log
         threading.Thread(target=self._read, daemon=True).start()
 
@@ -192,15 +274,21 @@ def game_turn(tail: str) -> int | None:
     return None
 
 
-def play_game(host: str, seed: int, a, stamp: str, lock: threading.Lock) -> dict:
+def play_game(host: str, seed: int, a, stamp: str, lock: threading.Lock, attempt: int = 1) -> dict:
     tag = f"{a.tag}{seed}"
-    dump = RUNS / f"h1_{tag}_{stamp}.jsonl"
-    log = RUNS / f"h1_fleet_{tag}_{stamp}.log"
+    dump = a.runs / f"h1_{tag}_{stamp}.jsonl"
+    log = a.runs / f"h1_fleet_{tag}_{stamp}.log"
     rec: dict = {"host": host, "map_seed": seed, "game_seed": seed + 1000, "config": a.config, "dump": str(dump),
-                 "log": str(log), "wall_start": time.time(), "end": None}
+                 "log": str(log), "wall_start": time.time(), "end": None, "attempt": attempt}
+    # a seed played again starts from no file: `dump.py play` carries on from a dump's last record
+    clear(dump)
+    if not game.instance_pids(host):
+        rec.update(end="crash", why=f"no instance: no CivilizationVI process carries -TunerIP {host}",
+                   wall_end=time.time())
+        return rec
     rc, tail = bounded([PY, str(LAB / "h4.py"), "--host", host, "--deadline", str(a.chunk), "menu"], a.chunk + 10, log)
     if rc != 0:
-        rec.update(end="crash", why=f"no main menu: {tail[-300:]}")
+        rec.update(end="crash", why=f"no main menu: {tail[-300:]}", wall_end=time.time())
         return rec
     log_start = log_sizes(host)  # the new game's set-up rows are its own
     mem = MemoryWatch(host, dump.with_suffix(".aimem.jsonl"), log, dump.with_suffix(".aiunits.jsonl"),
@@ -211,7 +299,7 @@ def play_game(host: str, seed: int, a, stamp: str, lock: threading.Lock) -> dict
     if rc != 0 or "in game" not in tail:
         if mem:
             mem.stop()
-        rec.update(end="crash", why=f"new game failed: {tail[-300:]}")
+        rec.update(end="crash", why=f"new game failed: {tail[-300:]}", wall_end=time.time())
         return rec
     if mem and not mem.wait_armed(host):
         rec["aimem"] = {"armed": False}
@@ -219,6 +307,9 @@ def play_game(host: str, seed: int, a, stamp: str, lock: threading.Lock) -> dict
     while True:
         rc, tail = bounded([PY, str(HERE / "dump.py"), "--host", host, "--deadline", str(a.chunk), "play",
                             "--out", str(dump), "--turns", str(max(1, a.turns - last))], a.chunk + 20, log)
+        if rc == FAULT:
+            rec.update(end="fault", why=next((ln for ln in reversed(tail.splitlines()) if ln.startswith("fault:")), tail[-300:]))
+            break
         now = game_turn(tail)
         if now is None or now <= last:
             still += 1
@@ -234,10 +325,18 @@ def play_game(host: str, seed: int, a, stamp: str, lock: threading.Lock) -> dict
             rec["end"] = "game_over"
             break
     rec["turn"] = last
+    # what the dump holds: the game's valid range ends at `recorded.last`
+    rec["recorded"] = turns_of(dump)
+    if rec["end"] == "target" and not (gapless(rec["recorded"]) and rec["recorded"]["last"] >= a.turns):
+        rec.update(end="fault", why=f"the dump at its target holds turns {rec['recorded']['first']}..{rec['recorded']['last']},"
+                                    f" missing {rec['recorded']['missing'][:8]}, moved {rec['recorded']['moved'][:8]}")
     if mem:
         rec["aimem"] = {**rec.get("aimem", {}), "path": str(mem.out), "units": str(mem.units), "end": mem.stop()}
     bounded([PY, str(LAB / "h4.py"), "--host", host, "--deadline", "30", "lua", "--state", "InGame",
              "Events.ExitToMainMenu()"], 40, log)
+    if not rec["recorded"]["records"]:
+        rec["wall_end"] = time.time()
+        return rec
     rec["logs"] = save_logs(host, log_start, dump)
     # the game's river and volcano orders beside the dump (`map_orders.py`)
     bounded([PY, str(HERE / "map_orders.py"), str(dump), "--map-seed", str(seed), "--config", a.config], 120, log)
@@ -259,6 +358,15 @@ def play_game(host: str, seed: int, a, stamp: str, lock: threading.Lock) -> dict
     return rec
 
 
+def respawn(host: str, log: pathlib.Path, menu: float = 230.0) -> bool:
+    """`host`'s instance closed and started anew through the spawn path
+    (`h4.py spawn`: `game.spawn` in the host's profile), up to the main menu"""
+    game.close_instance(host)
+    bounded([PY, str(LAB / "h4.py"), "--host", host, "spawn"], 60, log)
+    rc, _ = bounded([PY, str(LAB / "h4.py"), "--host", host, "--deadline", str(menu), "menu"], menu + 20, log)
+    return rc == 0
+
+
 def seeds_of(spec: str) -> list[int]:
     out: list[int] = []
     for part in spec.split(","):
@@ -270,33 +378,113 @@ def seeds_of(spec: str) -> list[int]:
     return out
 
 
-def cmd_run(a) -> int:
-    stamp = a.stamp or dt.datetime.now(dt.timezone.utc).strftime("%Y%m%dT%H%M%SZ")
-    manifest = RUNS / f"h1_fleet_{a.tag}_{stamp}.jsonl"
+# the ends after which a host's instance is started anew and the seed played once more
+DEAD = ("crash", "stalled")
+
+
+def run_queue(hosts: list[str], seeds: list[int], play, spawn, close, line, idle: float = 5.0) -> None:
+    """The fleet's loop: each host takes the next seed (`play(host, seed,
+    attempt)` returns the game's manifest line, written by `line`). After a
+    game that ends `crash` or `stalled` the host's instance is started anew
+    (`spawn(host, seed)`) and the seed, at its first attempt, is played
+    again there; a host whose instance does not come back is dropped, its
+    seed back in the queue for the others. A host with no seed left has its
+    instance closed (`close`) and waits while another host plays, for a
+    seed a dropped host may hand back; it starts its instance anew to take
+    one."""
     jobs: "queue.Queue[int]" = queue.Queue()
-    for s in seeds_of(a.seeds):
+    for s in seeds:
         jobs.put(s)
-    lock, mlock = threading.Lock(), threading.Lock()
+    lock = threading.Lock()
+    playing: set[str] = set()
+    attempts: dict[int, int] = {}
 
     def worker(host: str) -> None:
+        up = True
         while True:
-            try:
-                seed = jobs.get_nowait()
-            except queue.Empty:
-                # no seed left for this host: its instance closes now, not when the last host is done
-                if not a.keep_open:
-                    print(f"[{host}] queue empty, closed {game.close_instance(host)}", flush=True)
+            with lock:
+                try:
+                    seed = jobs.get_nowait()
+                    playing.add(host)
+                    attempts[seed] = attempts.get(seed, 0) + 1
+                except queue.Empty:
+                    seed = None
+                    others = bool(playing - {host})
+            if seed is None:
+                if up:
+                    close(host)
+                    up = False
+                if not others:
+                    return
+                time.sleep(idle)
+                continue
+            if not up:
+                up = spawn(host, seed)
+            while up:
+                rec = play(host, seed, attempts[seed])
+                line(rec)
+                if rec.get("end") not in DEAD:
+                    break
+                up = spawn(host, seed)
+                if attempts[seed] >= 2:
+                    seed = None
+                    break
+                if up:
+                    attempts[seed] += 1
+            if not up:
+                # dropped: the seed it holds goes back to the queue before the host leaves the players
+                line({"host": host, "event": "dropped", "seed": seed, "wall": time.time(),
+                      "why": "the instance did not come back to the main menu"})
+                if seed is not None:
+                    jobs.put(seed)
+                with lock:
+                    playing.discard(host)
                 return
-            rec = play_game(host, seed, a, stamp, lock)
-            with mlock, open(manifest, "a", encoding="utf-8", newline="\n") as fh:
-                fh.write(json.dumps(rec) + "\n")
-            print(f"[{host}] seed {seed}: {rec.get('end')} turn {rec.get('turn')} report {rec.get('report')}", flush=True)
+            with lock:
+                playing.discard(host)
 
-    threads = [threading.Thread(target=worker, args=(h.strip(),)) for h in a.hosts.split(",") if h.strip()]
+    threads = [threading.Thread(target=worker, args=(h,)) for h in hosts]
     for th in threads:
         th.start()
     for th in threads:
         th.join()
+
+
+def cmd_run(a) -> int:
+    stamp = a.stamp or dt.datetime.now(dt.timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    a.runs.mkdir(parents=True, exist_ok=True)
+    manifest = a.runs / f"h1_fleet_{a.tag}_{stamp}.jsonl"
+    lock, mlock = threading.Lock(), threading.Lock()
+
+    def line(rec: dict) -> None:
+        with mlock, open(manifest, "a", encoding="utf-8", newline="\n") as fh:
+            fh.write(json.dumps(rec) + "\n")
+        if "event" in rec:
+            print(f"[{rec['host']}] {rec['event']}: {rec.get('why', '')} (seed {rec.get('seed')})", flush=True)
+        else:
+            got = rec.get("recorded") or {}
+            print(f"[{rec['host']}] seed {rec['map_seed']} attempt {rec['attempt']}: {rec.get('end')} turn {rec.get('turn')}"
+                  f" recorded {got.get('first')}..{got.get('last')} report {rec.get('report')}", flush=True)
+
+    def spawn(host: str, seed: int) -> bool:
+        ok = respawn(host, a.runs / f"h1_fleet_{a.tag}{seed}_{stamp}.log")
+        line({"host": host, "event": "respawn", "seed": seed, "ok": ok, "wall": time.time(),
+              "why": "the instance started anew" if ok else "no main menu after the spawn"})
+        return ok
+
+    def close(host: str) -> None:
+        # no seed left for this host: its instance closes now, not when the last host is done
+        if not a.keep_open:
+            print(f"[{host}] queue empty, closed {game.close_instance(host)}", flush=True)
+
+    def play(host: str, seed: int, attempt: int) -> dict:
+        try:
+            return play_game(host, seed, a, stamp, lock, attempt)
+        except Exception as e:  # noqa: BLE001 — the queue goes on whatever a game's calls raised
+            return {"host": host, "map_seed": seed, "attempt": attempt, "end": "crash", "wall_end": time.time(),
+                    "dump": str(a.runs / f"h1_{a.tag}{seed}_{stamp}.jsonl"), "why": f"{type(e).__name__}: {e}"}
+
+    run_queue([h.strip() for h in a.hosts.split(",") if h.strip()], seeds_of(a.seeds), play, spawn, close, line)
     print(f"manifest -> {manifest}")
     return 0
 
@@ -305,7 +493,12 @@ def cmd_summary(a) -> int:
     rows = [json.loads(ln) for ln in pathlib.Path(a.manifest).read_text(encoding="utf-8").splitlines() if ln.strip()]
     tot: dict[str, dict[str, int]] = {}
     for r in rows:
-        print(f"seed {r['map_seed']}: {r.get('end')} turn {r.get('turn')} records {r.get('records')}")
+        if "event" in r:
+            print(f"host {r['host']}: {r['event']} (seed {r.get('seed')}) {r.get('why', '')}")
+            continue
+        got = r.get("recorded") or {}
+        print(f"seed {r['map_seed']}: {r.get('end')} turn {r.get('turn')} recorded {got.get('first')}..{got.get('last')}"
+              f" records {r.get('records')}")
         for k, v in (r.get("checks") or {}).items():
             t = tot.setdefault(k, {"pass": 0, "fail": 0, "skip": 0})
             for f in t:
@@ -317,6 +510,7 @@ def cmd_summary(a) -> int:
 
 
 def main(argv=None) -> int:
+    stdio_utf8()
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = p.add_subparsers(dest="cmd", required=True)
     s = sub.add_parser("run")
@@ -335,11 +529,14 @@ def main(argv=None) -> int:
                    help="the config's major players (ids 0..n-1): the units' stream leaves their plannings out")
     s.add_argument("--no-report", action="store_true", help="record only: no engine report over the dump")
     s.add_argument("--stamp", help="the run's stamp in its file names (default: now, UTC)")
+    s.add_argument("--runs", type=pathlib.Path, default=RUNS, help="the folder the recordings and the manifest go to")
     s.set_defaults(fn=cmd_run)
     s = sub.add_parser("summary")
     s.add_argument("manifest")
     s.set_defaults(fn=cmd_summary)
     a = p.parse_args(argv)
+    if a.cmd == "run":
+        a.runs = a.runs.resolve()
     return a.fn(a)
 
 

@@ -157,9 +157,13 @@ LAB_PROFILE: dict[str, dict[str, str]] = {
         "UIOnlyRendering": "1",
     },
     "SoundOpts.txt": {"Master Volume": "0"},
+    # Auto End Turn off: with it on the UI ends a human seat's turn that has
+    # no blocker and no unit wanting orders as the turn opens (ActionPanel.lua
+    # CheckAutoEndTurn), so an Autoplayed seat's game passes that turn with no
+    # hold and the seat's AI never plays it
     "UserOptions.txt": {"QuickMovement": "1", "QuickCombat": "1", "LookAtPlayerTurnCombat": "0",
                         "LookAtPlayerOffTurnCombat": "0", "PlayHistoricMomentAnimation": "0",
-                        "AutoSaveFrequency": "50"},
+                        "AutoSaveFrequency": "50", "AutoEndTurn": "0"},
 }
 
 # THE AI'S VERBOSE LOGS (`profile apply --ai-verbose`): the city build AI's

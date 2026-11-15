@@ -948,6 +948,7 @@ A question the SOURCE under-determines; neither engine ships a branch until the 
   - LAB (recording): the turn-start wait (`h1/h1_starts.lua`, `dump.py` `wait_started`; duel 1113 `starts` exact on all 250 records): its `witness` (GameCore's readers) read by no check, a loaded game's re-arm untested
   - LAB (recording): HIGH_DIFFICULTY_*_SCALING on an AI above the harness's Warlord
   - LAB (recording): re-record the five duels with the reader that follows the vectors' arrays (probez1117), then read City m_kGrowth +0x84 for growthDrift, m_kBuildQueue's per-item progress (+0x218 buildings, +0x230 units) and the builders from `mem`, deleting their reconstructions
+  - LAB (recording): a duel's turns after its Autoplayed seat is destroyed are held by nothing and not recorded: runs/h1_duels1133_20261115T065337Z holds t1-177 of a game the instance played on to t238, 1148 t1-195 of 226 (Autoplay's end hands a dead return seat the local observer, dll_readings 'H-1: Autoplay's turn limit and the seat's hold'); recording them needs a hold that is no seat's turn (turn_lock.lua's TurnBegin hold, another point of the turn than the records')
   - BUILD (congress): the replay's Regular Sessions vote every major on the AI line, not the record's ballots (World_Congress.csv)
   - LAB (placement): whether an acquired city runs the placement 0x1eae70's district refresh
   - LAB (placement): the Free Cities' placement

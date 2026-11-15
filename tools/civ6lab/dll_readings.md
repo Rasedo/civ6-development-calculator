@@ -16908,3 +16908,49 @@ GPU `_pol_enemy_plunder`, `_pol_admits`, `_free_power_wrapper`,
   Parks'); the player's valid-feature counts (0x408ce0 / 0x408f40); Check
   Plot's SUCCESS on a plot with no coordinates (0x7f793d); the per-player
   field's formula.
+
+## H-1: Autoplay's turn limit and the seat's hold — READ
+
+What the recorder's hold rests on (`lab.py` LUA_AUTOPLAY: one Autoplay turn
+with the seat as the return player; `h1/dump.py play`).
+
+- THE STATE: `AutoplayManager` (GameCore_Tuner) is a handful of globals:
+  the turns left @f28c40, active @f28c44, a change pending @f28c45, the
+  state asked for @f28c46, "a game turn has ended" @f28c48, the return seat
+  @efed08. `SetTurns` 0x563f0 stores the count. `SetActive` 0x56340 does
+  nothing where the state asked for is the state held; else it sets pending
+  and asked, and no more (so `IsActive()` reads false right after
+  `SetActive(true)`). `SetReturnAsPlayer` 0x563e0 stores the seat.
+- THE STEP: 0x56430, called as Game::Processor::Update 0x64ae0 opens and
+  as it closes (0x64b2d, 0x655a1). After a game turn's end (@f28c48) it
+  applies the pending change at once. Otherwise it applies one only while
+  the local player's turn is active (player +0x7e8), or, with no local
+  player, a pending activation.
+- THE CHANGE: 0x55fb0. On: the local seat (with none, every human seat) is
+  made an AI player (0x4859c0), the local player set to none with the
+  observe-as seat, the `AutoPlayStart` event raised. Off: a return seat
+  that is alive (0x4848c0) is made human and local (0x485a70, 0x485d40); a
+  dead one gets the local observer instead (0x485c50) and the game goes on
+  as an all-AI game, with no seat's turn to stand at; `AutoPlayEnd`.
+- THE TURN LIMIT: the game's turn end 0x631e0 tail-jumps to 0x561a0. Active,
+  it takes one from the turns left and at 0 asks for off (pending); it
+  raises @f28c48 either way. The Update call that ended the turn applies
+  the change as it closes, before the next call's BeginTurn 0x626a0: one
+  turn asked is one turn played, and the seat is human again before its
+  next turn opens. The game writes each step to Logs/Autoplay.log.
+- Cases. `runs/h1_duels1150_20261115T081254Z` (host 127.0.0.3's
+  Autoplay.log over its three games): 2,764 lines, 691 cycles of `Limit set
+  to 1` / `Active` / `Limit Hit. Deactivating.` / `Inactive`, none
+  irregular — 195 + 248 + 248, the two 250-turn games one cycle short each:
+  the turn each passed with no hold was not Autoplay's. Its record's rows
+  at turn 3: `LocalPlayerTurnBegin` (seq 295), `PlayerTurnActivated 0 true`
+  (301), `LocalPlayerTurnEnd` (301), the Warrior's kept move and its tribal
+  village, `PlayerTurnDeactivated 0` (308): the seat was the local human
+  and the UI ended its turn (ActionPanel.lua `CheckAutoEndTurn`: the user
+  option AutoEndTurn, no end-turn blocker, no unit wanting orders); the
+  seat's AI never played that turn. The same rows stand in 1142 (turn 4)
+  and 1156 (turn 4). `runs/h1_duels1133_20261115T065337Z`: the seat is
+  destroyed in turn 177 under Autoplay and the game runs on with no hold
+  (the memory stream: 24 moments a turn against 29, turns 178..238).
+- Engine: none; the recorder (`game.py` LAB_PROFILE turns AutoEndTurn off,
+  `h1/dump.py play` refuses to record with it on and ends at a dead seat).

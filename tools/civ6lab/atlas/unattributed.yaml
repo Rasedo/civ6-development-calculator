@@ -241,6 +241,73 @@
     - "C-110 / C-99: a placement resets the fortification, a struck SENTRY wakes, a siege striker asks no Movement — READ (0x586d40 at 0x587789, 0x20d280 at 0x20d5ce, 0x775340 at 0x7754c7), both twins"
     - "C-133 / C-95: the carried orders run in the unit list's order; a path comes ashore off water only by the disembark test — READ (0x7df30, 0x554e0, 0x523e0, 0x52e90, 0x54910, 0x2720a0 at 0x272380..0x27240d, 0x52fb90 at 0x52fb9d), both twins; UpdateOpenNode's walk and flag 2's plot — READ (0x79560, 0x2720a0 at 0x2721c3..0x27220d / 0x2724c8), unported"
   review: reviewed
+- addr: 0x55fb0
+  final: 0x42310
+  kind: function
+  name: autoplayApplyChange
+  semantics: "applies a pending Autoplay change (@f28c45, asked @f28c46 against active @f28c44). On: the local seat (with none, every human seat) made an AI player (0x4859c0), the local player none with the observe-as seat (@efed0c), the AutoPlayStart event. Off: a return seat (@efed08) that is alive (0x4848c0) made human and local (0x485a70, 0x485d40), else the local observer set (0x485c50); the AutoPlayEnd event. Then active = asked; active with no turn left asks for off again."
+  status: READ
+  cases:
+    - recording: h1_duels1133_20261115T065337Z
+      turn: 177
+      value: "the seat destroyed in turn 177 under Autoplay: the game runs on with no hold, turns 178..238 in the memory stream"
+  readings: ["H-1: Autoplay's turn limit and the seat's hold — READ"]
+  review: reviewed
+- addr: 0x561a0
+  final: 0x424f0
+  kind: function
+  name: autoplayEndTurn
+  semantics: "Autoplay at a game turn's end (tail-jumped to from the game's turn end 0x631e0): active with a turn count >= 0 it takes one off (@f28c40) and at 0 asks for off (pending @f28c45, asked @f28c46 0), logging Autoplay Turn Limit Hit; the AutoPlayEndTurn hook may ask for off too; it raises @f28c48 either way."
+  status: READ
+  cases:
+    - recording: h1_duels1150_20261115T081254Z
+      value: "host 127.0.0.3's Autoplay.log over its three games: 691 cycles of Limit set to 1 / Active / Limit Hit. Deactivating. / Inactive, none irregular (195 + 248 + 248 turns passed)"
+  readings: ["H-1: Autoplay's turn limit and the seat's hold — READ"]
+  review: reviewed
+- addr: 0x56340
+  final: 0x42690
+  kind: function
+  name: SetActive
+  semantics: "AutoplayManager.SetActive: nothing where the state asked for is the active state (@f28c44); else logs Autoplay Active / Inactive and sets pending (@f28c45) and asked (@f28c46): the change itself waits for 0x56430."
+  status: READ
+  cases:
+    - recording: h1_duels1150_20261115T081254Z
+      value: "host 127.0.0.3's Autoplay.log over its three games: 691 cycles of Limit set to 1 / Active / Limit Hit. Deactivating. / Inactive, none irregular (195 + 248 + 248 turns passed)"
+  readings: ["H-1: Autoplay's turn limit and the seat's hold — READ"]
+  review: reviewed
+- addr: 0x563e0
+  final: 0x42730
+  kind: function
+  name: SetReturnAsPlayer
+  semantics: "AutoplayManager.SetReturnAsPlayer: stores the seat (@efed08)."
+  status: READ
+  cases:
+    - recording: h1_duels1150_20261115T081254Z
+      value: "host 127.0.0.3's Autoplay.log over its three games: 691 cycles of Limit set to 1 / Active / Limit Hit. Deactivating. / Inactive, none irregular (195 + 248 + 248 turns passed)"
+  readings: ["H-1: Autoplay's turn limit and the seat's hold — READ"]
+  review: reviewed
+- addr: 0x563f0
+  final: 0x42740
+  kind: function
+  name: SetTurns
+  semantics: "AutoplayManager.SetTurns: logs Autoplay Turn Limit set to %i and stores the count (@f28c40)."
+  status: READ
+  cases:
+    - recording: h1_duels1150_20261115T081254Z
+      value: "host 127.0.0.3's Autoplay.log over its three games: 691 cycles of Limit set to 1 / Active / Limit Hit. Deactivating. / Inactive, none irregular (195 + 248 + 248 turns passed)"
+  readings: ["H-1: Autoplay's turn limit and the seat's hold — READ"]
+  review: reviewed
+- addr: 0x56430
+  final: 0x42780
+  kind: function
+  name: autoplayStep
+  semantics: "Autoplay's step, called as Game::Processor::Update 0x64ae0 opens and closes (0x64b2d, 0x655a1) and from 0x835700: after a game turn's end (@f28c48) it applies the pending change (0x55fb0) at once; otherwise only while the local player's turn is active (player +0x7e8), or, with no local player, a pending activation."
+  status: READ
+  cases:
+    - recording: h1_duels1150_20261115T081254Z
+      value: "host 127.0.0.3's Autoplay.log over its three games: 691 cycles of Limit set to 1 / Active / Limit Hit. Deactivating. / Inactive, none irregular (195 + 248 + 248 turns passed)"
+  readings: ["H-1: Autoplay's turn limit and the seat's hold — READ"]
+  review: reviewed
 - addr: 0x5cbc0
   final: 0x447d0
   kind: function
@@ -2458,7 +2525,9 @@
   kind: function
   semantics: the player is alive.
   status: PARTLY
-  readings: ["C-94: the aid request's gate — READ (0x2597d0 over the event tally 0x33b350), both twins"]
+  readings:
+    - "C-94: the aid request's gate — READ (0x2597d0 over the event tally 0x33b350), both twins"
+    - "H-1: Autoplay's turn limit and the seat's hold — READ"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "- 0x2597d0: the player is a living full civilization (0x484a10, 0x4848c0), and a x 0.5 + b + c >= GlobalParameters +0x7c4 — WORLD_CONGRESS_REQUEST_FOR_AID_DAM..."
@@ -2520,6 +2589,42 @@
     - "The players manager's meet (0x484ab0) and its three callers in the visibility manager. Ported in both twins (`meetMajors`, `ma..."
     - "The meet 0x484ab0 from the visibility manager: a unit placed where another sees (0x5246f0 from 0x586d40), a..."
   review: reviewed
+- addr: 0x4859c0
+  final: 0x308930
+  kind: function
+  status: PARTLY
+  readings: ["H-1: Autoplay's turn limit and the seat's hold — READ"]
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...CHANGE: 0x55fb0. On: the local seat (with none, every human seat) is made an AI player (0x4859c0), the local player set to none with the observe-as seat, the `AutoPlayStart` event rais..."
+  review: imported
+- addr: 0x485a70
+  final: 0x3089e0
+  kind: function
+  status: PARTLY
+  readings: ["H-1: Autoplay's turn limit and the seat's hold — READ"]
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...ayStart` event raised. Off: a return seat that passes 0x4848c0 is made human and local (0x485a70, 0x485d40); one that does not gets the local observer instead (0x485c50) and the game..."
+  review: imported
+- addr: 0x485c50
+  final: 0x308bb0
+  kind: function
+  status: PARTLY
+  readings: ["H-1: Autoplay's turn limit and the seat's hold — READ"]
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...uman and local (0x485a70, 0x485d40); one that does not gets the local observer instead (0x485c50) and the game goes on as an all-AI game, with no seat's turn to stand at; `AutoPlayEnd`..."
+  review: imported
+- addr: 0x485d40
+  final: 0x308ca0
+  kind: function
+  status: PARTLY
+  readings: ["H-1: Autoplay's turn limit and the seat's hold — READ"]
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...vent raised. Off: a return seat that passes 0x4848c0 is made human and local (0x485a70, 0x485d40); one that does not gets the local observer instead (0x485c50) and the game goes on a..."
+  review: imported
 - addr: 0x4a0e90
   final: 0x319150
   kind: function

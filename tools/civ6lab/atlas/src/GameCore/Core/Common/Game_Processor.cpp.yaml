@@ -3,6 +3,23 @@
 # `review: imported` = bootstrapped from dll_readings.md / code comments / saved
 # labels and not yet reviewed: verify against the disassembly, then edit and
 # set `review: reviewed`.
+- addr: 0x626a0
+  final: 0x49390
+  kind: function
+  name: BeginTurn
+  status: PARTLY
+  readings: ["H-1: Autoplay's turn limit and the seat's hold — READ"]
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...l that ended the turn applies the change as it closes, before the next call's BeginTurn 0x626a0: one turn asked is one turn played, and the seat is human again before its next turn..."
+  review: imported
+- addr: 0x631e0
+  final: 0x498f0
+  kind: function
+  semantics: "the game's turn end: raises the two turn-ended flags (@f28d40, @f28d41) that make the next Update call BeginTurn 0x626a0, the players' EndTurn 0x7ecc0, the turn-ended log line and signal, then tail-jumps to Autoplay's turn end 0x561a0."
+  status: PARTLY
+  readings: ["H-1: Autoplay's turn limit and the seat's hold — READ"]
+  review: reviewed
 - addr: 0x64ae0
   final: 0x4afc0
   kind: function
@@ -10,6 +27,7 @@
   status: PARTLY
   readings:
     - "H-1: why a seed does not replay — the AI's worker threads — READ, the replay patch MEASURED"
+    - "H-1: Autoplay's turn limit and the seat's hold — READ"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...g +0x3afc), wait 0x6e3020 (EXP_JobManager_Wait), called from Game::Processor::Update at 0x6540f (asserting `!GetGlobalAi().IsProcessingAi()`). The JobManager lives in the engine (Pl..."
