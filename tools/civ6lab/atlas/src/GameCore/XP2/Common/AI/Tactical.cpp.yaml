@@ -1003,13 +1003,18 @@
       value: "Their logs hold 11 \"Wander\" rows (runs/h1_duelw1114 t124-127, 1130   t152-154), each after the recording's last snapshot (t123, t151): no   record pins them;"
     - recording: 1123
       value: 1123's eight are Attack Units.
+    - recording: h1_duelq1128
+      turn: 129
+      value: "the Man-At-Arms 5570561 on 15:14 draws player 1's Encampment 13:13 (the barbarians' Builder on it) and stays: the order's flags 0 hold no attack flag, the hostile district no path; t157 the Musketman 6422533 on 16:5 draws player 1's centre 15:6 and stays"
   impl:
     - gpu/core/sim_tactics.py:_free_pass
+    - gpu/core/sim_tactics.py:_tac_pass
     - cpu/core/tactical.ts:WANDER_CAMP_RANGE
     - cpu/core/tactical.ts:wanderNearCamp
     - cpu/harness/drawSites.ts:DRAW_SITES
     - gpu/core/sim_tactics.py:_AI_DEFENDER
     - cpu/core/tactical.ts:keptOut
+    - gpu/core/sim_tactics.py:live
   readings:
     - "C-93: Operation Pillage takes a member on its target alone; a capture is its step's; Wander asks Movement; a captor leaves the pass — READ (0x811390 at 0x811786..0x811838, 0x26fe20, 0x77b9a0 at 0x77baa1, 0x212500), both twins"
     - "C-99 / C-128: a shore crossing's cliff onto a revealed plot alone, Wander Back to Camp's path flag 0x1000, the path's destination count — READ (0x52fb90, 0x2720a0 at 0x272230..0x27229e / 0x272380, 0x270dd0 at 0x270f24, 0x271be0 at 0x271d03..0x271d18, 0x77b9a0 at 0x77be0b), both twins"
@@ -1019,6 +1024,7 @@
     - "C-99: the stacking count holds other players' units, the wanders' kept-out plots, a Harbor's water no shore — READ (0x585d90, 0x585eb0, 0x2720a0, 0x77bf50, 0x77b9a0, 0x530240), both twins"
     - "C-93: Make Formation's formation outlives its operation, a captive embarks by its original owner — READ (0x7ee630, 0x94bbe0, 0x94bc70, 0x212825..0x2128f3, 0x56c480, 0x77b9a0 at 0x77bedd), both twins"
     - "C-99: Wander Near City ends its unit's moves; a unit whose moves an order ended runs its order no more — READ (0x77bf50 at 0x77c62a, 0x56d6f0, 0x52f50 at 0x530fd..0x53113), both twins"
+    - "C-95: Wander Near Camp's orders carry no attack flag — READ (0x77b9a0 at 0x77bce4 / 0x77be0b -> 0x962030, 0x2720a0 at 0x272434..0x272544), both twins; the replay's copies"
   notes:
     - ".claude/scratchpad/mu1/readings_c96.md: ...ngine's candidate count on the   rows the records pin (below). - THE FREE CITIES' Wander Near Camp (0x77b9a0, C-95's reading): a unit with   a group (+0x11d0 >= 0) whose camp the player's signals answer (0x77..."
   context:

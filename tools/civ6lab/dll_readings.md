@@ -14575,3 +14575,43 @@ copy (`barbarianAi`, cpu/harness/replay.ts). GPU `_tac_enter`'s `rel` /
 - OPEN: a turn's end on an unseen district of hit points unread (no
   recorded path ends one there); a coastal raid's score in the replay's copy
   (no record of the five holds one in a raid's turn).
+
+## C-95: Wander Near Camp's orders carry no attack flag — READ (0x77b9a0 at 0x77bce4 / 0x77be0b -> 0x962030, 0x2720a0 at 0x272434..0x272544), both twins; the replay's copies
+
+`wanderNearCamp` (cpu/core/tactical.ts); GPU `_tac_pass`'s Wander Near Camp
+(gpu/core/sim_tactics.py); the replay's `barbOpened`, `standLevied`,
+`standLeaving`, `roadTierWas` (cpu/harness/replay.ts).
+
+- THE ORDER'S FLAGS: the Wander's move order is built with r9d = 0
+  (0x77bce4, the call of 0x962030 at 0x77bcf7), the move back to the camp
+  with 0x1000 alone (0x77be0b). Neither holds the attack flag 0x10, so the
+  path's attack child (0x2720a0 at 0x272434..0x272544: a city at war, a
+  district at war, a seen unit at war) is refused in the path's first
+  turn: a candidate that is a city centre or an Encampment of a player at
+  war — the planning's reach lists it at turn 1, the candidate test
+  (0x5862e0, 0x585eb0) passes a plot holding no unit at war — has no
+  path, and the unit stands with its draw taken and its turn done.
+- Confirmed (aimem, one-seed traces): runs/h1_duelq1128 t129 the
+  Man-At-Arms 5570561 on 15:14 draws 13:13, player 1's Encampment under
+  the barbarians' captured Builder 5046293, and stays on 15:14; t157 the
+  Musketman 6422533 on 16:5 draws player 1's centre 15:6 and stays.
+- THE REPLAY'S COPIES (no engine rule): the barbarians' Movement as their
+  turn opens is read before a recorded blow of theirs takes the turn's
+  techs (runs/h1_duelq1124 t64: Mathematics that turn, the Galleys
+  1376265 / 720906 / 1966102 plan on 4 Movement and walk 3, ending on
+  21:8 / 20:8 / 19:7); a unit home from a levy is the major's, where the
+  major's turn left it and at the damage the log last gave it, through
+  the passes of the minors before its own (1124 t83: city-state 3's Heavy
+  Chariot 1114117 draws over 16 plots, 43:9 one; 1117 t42: city-state 3's
+  Warrior 589824 home hurt takes Heal); a minor's unit the log removes
+  before its own turn opens stands through the earlier minors' passes
+  (1127 t122: city-state 4's Crossbowman 1179656 on 5:12, city-state 3's
+  Musketman 1114117 draws over 8 plots); a city-state's road is re-laid
+  in the copy only where its research raised its road tier in the pair
+  (1124 t126: city-state 3's Knight 1310720 plans its own 40:10 on the
+  Classical road, 39:8 and 40:9 closing before it).
+- OPEN (C-95): runs/h1_duelq1124 t85 / t87 city-state 4's Heavy Chariot
+  983040, Wander Back to City for 32:8 from 8:10 / 8:11 over plots it
+  never revealed: the game steps to 7:10 and stops with Movement left,
+  then holds 8:11 a whole turn; ours walks 3 plots on the path found
+  once.

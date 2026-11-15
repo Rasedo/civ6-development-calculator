@@ -4439,9 +4439,11 @@ class SimTactics:
             pick = self._rand_range(ok & (count > 0), count)
             by_rank = torch.where(cand, rku, torch.full_like(rku, BIG)).argsort(dim=1, stable=True)
             dest = torch.where(count > 0, by_rank.gather(1, pick.clamp(max=T - 1).unsqueeze(1)).squeeze(1), camp)
-            self._tac_move_to(ok & (count > 0), u_b, dest)
+            # the Wander's order carries no attack flag (0x77bce4: flags 0): a
+            # hostile city centre or Encampment picked is no path
+            self._tac_move_to(ok & (count > 0), u_b, dest, strike=False)
             # Wander Back to Camp moves under the order's path flag 0x1000
-            self._tac_move_to(ok & (count == 0), u_b, dest, later_turns=True)
+            self._tac_move_to(ok & (count == 0), u_b, dest, strike=False, later_turns=True)
             # its moves end (0x56d6f0, `wanderNearCamp`)
             self._tac_moves_ended[bidx[ok], u_b[ok] + self.POOL_LO["barb"]] = True
             done[bidx[ok], u_b[ok]] = True

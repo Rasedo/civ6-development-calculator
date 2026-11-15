@@ -2232,8 +2232,8 @@ const DEFEND_CAMP_TURNS = 3;
 const PLAN_TURNS = 2;
 
 /** One pass's state: its player, whether a move that ends on a plot it
- *  attacks into strikes it (the barbarians'; not a city-state's or the Free
- *  Cities' wander or chase), the units left, each one's planning reach,
+ *  attacks into strikes it (the barbarians' but their Wander; not a
+ *  city-state's or the Free Cities' wander or chase), the units left, each one's planning reach,
  *  those done (`0x570b40`) and those whose moves an order ended (`0x56d6f0`:
  *  their Movement read as none, their rest kept). */
 export interface Pass {
@@ -3322,8 +3322,13 @@ function wanderNearCamp(state: GameState, pass: Pass, homeOf: (u: Unit) => numbe
     const to = cands.length ? cands[randRange(state, cands.length, 'Random Direction')].tile : home;
     drawing = null;
     // the Wander under the order's path flags 0 (0x77bce4), the move back to
-    // the camp under 0x1000 (0x77be0b)
-    moveTo(state, u, to, pass.strike, !cands.length);
+    // the camp under 0x1000 (0x77be0b): neither carries the attack flag
+    // 0x10, so a plot picked that is a city centre or an Encampment of a
+    // player at war is no path and the unit stands (runs/h1_duelq1128 t129:
+    // the Man-At-Arms 5570561 on 15:14 draws player 1's Encampment 13:13
+    // under its captured Builder; t157 the Musketman 6422533 on 16:5 draws
+    // player 1's centre 15:6)
+    moveTo(state, u, to, false, !cands.length);
     pass.ended.add(u.id);
     finish(pass, u, cands.length ? 'Wander' : 'Wander Back to Camp', to);
   }

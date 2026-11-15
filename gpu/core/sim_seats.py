@@ -13535,8 +13535,8 @@ class SimSeats:
                     a_type[vr, u].clamp(min=0, max=self.NU - 1)]
                 self._occ_set(vr, ttc[vr], _gs)
                 # ...and looks from the plot it entered, as a step does
-                self._unit_look(vr, a_seat[vr, u], ttc[vr], a_type[vr, u].clamp(min=0, max=self.NU - 1),
-                                self._promo_pool(atk_kind)[0][vr, u], movers=_gs.unsqueeze(1), from_tile=here[vr])
+                self._look_reveal(vr, a_seat[vr, u], ttc[vr], a_type[vr, u].clamp(min=0, max=self.NU - 1),
+                                  self._promo_pool(atk_kind)[0][vr, u], movers=_gs.unsqueeze(1), from_tile=here[vr])
                 if major:
                     self._clear_camp_at(adv, ttc, a_seat[:, u], self._row_of(a_seat[:, u]))
             # the defender's player records the attacker that stands, where
@@ -15258,9 +15258,9 @@ class SimSeats:
                 f":{int(self.unit_tile[_b, _u])}:{int(self.unit_type[_b, _u])}"
                 f":{tag} {int(self.unit_xp[_b, _u])}")
 
-    def _unit_look(self, rows: torch.Tensor, seat: torch.Tensor, tile: torch.Tensor,
-                   u_type: torch.Tensor, u_promos: torch.Tensor, movers: torch.Tensor | None = None,
-                   from_tile: torch.Tensor | None = None) -> None:
+    def _look_reveal(self, rows: torch.Tensor, seat: torch.Tensor, tile: torch.Tensor,
+                     u_type: torch.Tensor, u_promos: torch.Tensor, movers: torch.Tensor | None = None,
+                     from_tile: torch.Tensor | None = None) -> None:
         """`revealAround` of a unit's look from `tile` ([K] each, `rows`
         unique): the barbarians' revealed plots, a major's fog (its meetings
         with it), a city-state's revealed plots, meetings and its suzerain's
@@ -17441,7 +17441,7 @@ class SimSeats:
                                       torch.where(on & (lg == 1) & (i == 0), torch.zeros_like(lg), lg))
                 self.seat_route_leg[bb, row, kk] = new_leg
                 # the Trader looks from the plot it reaches, as a unit's step
-                # does (`_unit_look`: a major's fog and meetings, a
+                # does (`_look_reveal`: a major's fog and meetings, a
                 # city-state's revealed plots, meetings and its suzerain's
                 # look), one route column at a time (the games unique)
                 seat_v = int(self._ROW_SEAT[row])
@@ -17449,8 +17449,8 @@ class SimSeats:
                     for k in sorted(set(kk[on].tolist())):
                         m = on & (kk == k)
                         rb = bb[m]
-                        self._unit_look(rb, torch.full_like(rb, seat_v), nxt[m],
-                                        torch.full_like(rb, self._trader_idx), torch.zeros_like(rb))
+                        self._look_reveal(rb, torch.full_like(rb, seat_v), nxt[m],
+                                          torch.full_like(rb, self._trader_idx), torch.zeros_like(rb))
         if only is not None:
             return
         wt = self.seat_route_walk[:, row]

@@ -262,6 +262,10 @@ interface Ctx {
    *  and the game's first damage draw's state —, each the barbarians' AI
    *  takes once for its own blow of that attacker on that plot */
   barbDraws: { attacker: string; at: number; s0: number }[];
+  /** the barbarians' Movement as their turn of this pair opens
+   *  (`barbMovesNow`), read before a recorded blow of theirs takes the
+   *  turn's techs */
+  barbOpened?: Map<number, number>;
   /** the health a recorded promotion healed a unit to this pair (its pick
    *  heals: a spent unit's clamp keeps it) */
   promoteHp: Map<Unit, number>;
@@ -299,6 +303,8 @@ interface Ctx {
   /** each plot's ground at the pair's first record — its road tier (-1 no
    *  road), feature, improvement and pillage: the one its minors plan on */
   groundWas?: GroundWas[];
+  /** each city-state's road tier (its research's) at the pair's first record */
+  roadTierWas?: Map<number, number>;
   /** the barbarian units' plots of this pair the record's steps entered,
    *  in their order, for their scouts' looks at the end of the barbarians'
    *  turn (`barbarianTurn`) */
@@ -1031,7 +1037,8 @@ function barbarianTurn(ctx: Ctx, b: TurnRecord, closing: number): void {
   const opEvals: string[] = [];
   traceBarbOps((l, candidate) => (candidate ? opEvals : opLines).push(l));
   // their Movement as the turn opens, before their rules grant its techs
-  const opened = barbMovesNow(state);
+  const opened = ctx.barbOpened ?? barbMovesNow(state);
+  ctx.barbOpened = undefined;
   const campsWas = [...state.barbSeat.camps];
   barbarianRules(state, closing);
   for (const land of ctx.barbBattles.splice(0)) land();
@@ -1665,6 +1672,16 @@ function minorAi(ctx: Ctx, b: TurnRecord, turn: number, made: ReadonlySet<Unit>,
     keyOf.set(u, key);
   }
   const gone = new Set<Unit>();
+  // the units home from a levy this pair: each its minor's seat, the major
+  // that held it and the plot the major's turn left it on (its last step of
+  // the log, else the first record's)
+  const levied: { c: Unit; minor: number; major: number; plot: number; own?: number }[] = [];
+  const lastStep = new Map<string, number>();
+  const lastDamage = new Map<string, number>();
+  for (const x of acts) {
+    if (x[2] === 'UnitMoved') lastStep.set(`${x[3]}:${x[4]}`, (x[6] as number) * ctx.W + (x[5] as number));
+    if (x[2] === 'UnitDamageChanged') lastDamage.set(`${x[3]}:${x[4]}`, x[5] as number);
+  }
   const upgraded = new Set<Unit>();
   const madeAshore = new Set<Unit>();
   const mine: Unit[] = [];
@@ -1705,12 +1722,18 @@ function minorAi(ctx: Ctx, b: TurnRecord, turn: number, made: ReadonlySet<Unit>,
       gone.add(c);
       continue;
     }
+    if (home && minorAiSeat(c.seat)) levied.push({ c, minor: c.seat, major: seatOfP(ctx, Number(home.split(':')[0])), plot: lastStep.get(home) ?? at ?? c.tileIndex });
     if (at !== undefined) c.tileIndex = at;
     if (!minorAiSeat(c.seat) || !key) continue;
     // its health the first record's: the game heals its units at the turn's
     // end, after their pass (runs/h1_duelw1117 t10: city-state 3's Warrior
     // 131073, 8 damage at the turn's start, takes Heal)
-    const r0 = hpWas.get(first!);
+    // ...one home from a levy at the health the major's turn left it, the
+    // log's last damage of the major's unit (runs/h1_duelq1117 t42: China's
+    // levied Warrior 1245191 takes its damage in China's turn, city-state 3's
+    // 589824 on 32:15 takes Heal)
+    const d0 = home ? lastDamage.get(home) : undefined;
+    const r0 = d0 !== undefined ? UNIT_HP - d0 : hpWas.get(first!);
     if (r0 !== undefined && !ctx.minorBlows.has(u)) c.hp = r0;
     // ...a unit its city made in the turn whole (runs/h1_duely1117 t62:
     // Valletta's new Archer 720902 on 14:8 Wanders to 13:9, no Heal)
@@ -1859,6 +1882,7 @@ function minorAi(ctx: Ctx, b: TurnRecord, turn: number, made: ReadonlySet<Unit>,
   // and 11:5 a turn on; t45: city-state 4's Trader lays the road of 34:16 as
   // it steps on after the Warrior there planned 34:18 two turns away,
   // AI_Planning.csv)
+  const raised = new Set(copy.cityStates.filter((c) => (c.research.roadTier ?? 0) > (ctx.roadTierWas?.get(c.seat) ?? 0)).map((c) => c.seat));
   copy.map.tiles.forEach((t, i) => {
     const r = ctx.next.state.map.tiles[i];
     const was = ctx.groundWas![i];
@@ -1874,8 +1898,14 @@ function minorAi(ctx: Ctx, b: TurnRecord, turn: number, made: ReadonlySet<Unit>,
     // at the turn's end (runs/h1_duely1128 t145: China's Industrial era, the
     // minors' planning on Medieval roads, Industrial ones from record 146),
     // a city-state's at its research step (the engine's turn re-laid them:
-    // `minorPhase`)
-    const tier = was.roadTier >= 0 && t.road && isCityStateSeat(t.ownerSeat) ? Math.max(was.roadTier, t.roadTier ?? 0) : was.roadTier;
+    // `minorPhase`) where its research raised its road this pair — a road
+    // of its ground a Trader's step re-laid in the turn is the first
+    // record's (runs/h1_duelq1124 t126: city-state 3's Knight 1310720 on
+    // 39:9 plans its own 40:10 on the Classical road of record 126,
+    // 39:8 and 40:9 closing before it, city-state 4's Trader laying the
+    // Medieval one after)
+    const relaid = was.roadTier >= 0 && t.road && isCityStateSeat(t.ownerSeat) && raised.has(t.ownerSeat);
+    const tier = relaid ? Math.max(was.roadTier, t.roadTier ?? 0) : was.roadTier;
     t.road = was.roadTier >= 0;
     if (tier > 0) t.roadTier = tier;
     else delete t.roadTier;
@@ -1981,6 +2011,55 @@ function minorAi(ctx: Ctx, b: TurnRecord, turn: number, made: ReadonlySet<Unit>,
       c.tileIndex = u.tileIndex;
     }
   };
+  // ...and a unit home from a levy the major's still, where the major's
+  // turn left it, through the passes of the players before its minor: the
+  // game makes it anew under its minor as that minor's turn opens
+  // (runs/h1_duelq1124 t83: China's levied Catapult 1835023 on 4:9 removed
+  // and city-state 4's 917507 added on 43:9 after city-state 3's units
+  // moved, whose Heavy Chariot 1114117 wanders over 16 plots, 43:9 one)
+  const standLevied = (player: number): void => {
+    for (const h of levied) {
+      const away = playerOf(h.minor) > player && h.major !== NO_SEAT && copy.units.includes(h.c);
+      if (away && h.own === undefined) {
+        h.own = h.c.tileIndex;
+        h.c.seat = h.major;
+        h.c.leviedFrom = h.minor;
+        h.c.tileIndex = h.plot;
+      } else if (!away && h.own !== undefined) {
+        h.c.seat = h.minor;
+        delete h.c.leviedFrom;
+        h.c.tileIndex = h.own;
+        h.own = undefined;
+      }
+    }
+  };
+  // ...and a city-state's unit the log takes off the map before its own
+  // turn opens — no kill, no upgrade's chassis — on the first record's plot
+  // through the passes of the minors whose turns opened before the removal
+  // (runs/h1_duelq1127 t122: city-state 4's Crossbowman 1179656 removed
+  // from 5:12 after city-state 3's units moved, whose Musketman 1114117
+  // wanders over 8 plots, 5:12 none of them)
+  const opened = new Map<number, number>();
+  for (const x of acts) if (x[2] === 'PlayerTurnActivated' && !opened.has(x[3] as number)) opened.set(x[3] as number, x[0] as number);
+  const leaving: { c: Unit; owner: number; ord: number }[] = [];
+  const standing = new Set(twin.values());
+  acts.forEach((x, j) => {
+    if (x[2] !== 'UnitRemovedFromMap' || acts[j + 1]?.[2] === 'UnitAddedToMap') return;
+    const key = `${x[3]}:${x[4]}`;
+    const u = ctx.gone.get(key);
+    const open = opened.get(x[3] as number);
+    const at = was.get(key);
+    if (!u || !minorAiSeat(u.seat) || standing.has(u) || killed.has(key) || at === undefined || open === undefined || (x[0] as number) > open) return;
+    leaving.push({ c: Object.assign(structuredClone(u), { tileIndex: at }), owner: x[3] as number, ord: x[0] as number });
+  });
+  const standLeaving = (player: number): void => {
+    for (const g of leaving) {
+      const here = player < g.owner && (opened.get(player) ?? Infinity) < g.ord;
+      const i = copy.units.indexOf(g.c);
+      if (here && i < 0) copy.units.push(g.c);
+      else if (!here && i >= 0) copy.units.splice(i, 1);
+    }
+  };
   // a city-state's shots of the pair land in its pass, after its units'
   // planning: the unit struck as the shot left it
   holdCityStrikes(true, (st, city) => {
@@ -1995,15 +2074,21 @@ function minorAi(ctx: Ctx, b: TurnRecord, turn: number, made: ReadonlySet<Unit>,
   });
   try {
     for (const cs of [...copy.cityStates].sort((x, y) => playerOf(x.seat) - playerOf(y.seat))) {
+      standLevied(playerOf(cs.seat));
+      standLeaving(playerOf(cs.seat));
       standGame(playerOf(cs.seat));
       passPlayer = playerOf(cs.seat);
       // a city founded in the pair ran its second hook at its founding
       if (cs.centerIndex >= 0 && founded.has(playerOf(cs.seat))) cityStateMilitary(copy, cs);
     }
+    standLevied(playerOf(FREE_SEAT));
+    standLeaving(playerOf(FREE_SEAT));
     standGame(playerOf(FREE_SEAT));
     passPlayer = playerOf(FREE_SEAT);
     freeCitiesMilitary(copy);
   } finally {
+    standLevied(Infinity);
+    standLeaving(Infinity);
     for (const [c, p] of ownEnd) c.tileIndex = p;
     copy.turn = clock;
     traceTactics(null);
@@ -4567,7 +4652,10 @@ const res = buyTile(state, city.id, d.plot, seat);        if (!res.ok) setTileOw
         // techs and civics the majors hold (`barbarianTechs`; 1127 t26:
         // China's Military Tradition at its start, the barbarians' Warrior
         // flanking at theirs)
-        if (isBarbSeat(atk.seat)) barbarianTechs(state);
+        if (isBarbSeat(atk.seat)) {
+          ctx.barbOpened ??= barbMovesNow(state);
+          barbarianTechs(state);
+        }
         const restore = standAtBlow(ctx, d.ord, [atk, def]);
         state.rngState = s0;
         const hp0 = [atk.hp, def.hp];
@@ -6380,6 +6468,7 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
       if (isCiv(seat)) ctx.dangerLogged.set(seat, { turn: a.turn, plane: dangerPlane(state, seat) });
     }
     ctx.groundWas = state.map.tiles.map(groundWasOf);
+    ctx.roadTierWas = new Map(state.cityStates.map((c) => [c.seat, c.research.roadTier ?? 0]));
     // the city-states' revealed plots as the turn opens, which their units'
     // planning reads (runs/h1_duely1117 t2: Valletta's Warrior on 13:8
     // closes 11:10, which the other Warrior's step to 12:9 reveals later in
