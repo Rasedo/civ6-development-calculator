@@ -348,7 +348,7 @@ class SimTactics:
 
     def _tac_enter(self, seat: int, revealed_only: bool = True, foes: bool = True,
                    plain_civ: bool = False,
-                   foes_seen: bool = False) -> tuple[torch.Tensor, torch.Tensor]:
+                   foes_seen: bool = False, rel: bool = False, forts: bool = True) -> tuple[torch.Tensor, torch.Tensor]:
         """[B, T] bool twice — the plots a LAND and a NAVAL unit of `seat` may
         enter (`enterable`): its domain's ground, no unit of a player at war
         with it (another player's unit it passes; with `plain_civ`, the
@@ -360,15 +360,17 @@ class SimTactics:
         With no `foes` the location test alone (`groundOf`'s fits): no unit
         and no closed ground counted. With `foes_seen` (`groundOf`'s pass: a
         move order's path) a unit of a player at war with it counts on a plot
-        the player sees now alone. The NAVAL plane is the water an embarking
+        the player sees now alone, and only one of the mover's map layer (a
+        religious mover's, `rel`, or any other's). With no `forts` neither the
+        city centre nor the Encampment bars a plot. The NAVAL plane is the water an embarking
         land unit takes too."""
-        block = self._centre_plane() & (self.tile_seat != seat)
+        block = self._centre_plane() & (self.tile_seat != seat) if forts else torch.zeros(self.B, self.T, dtype=torch.bool, device=self.device)
         if foes:
             hostile = self._tac_fighters(seat) if plain_civ else self._tac_hostile(seat)
             if foes_seen:
-                hostile = hostile & self._barb_seen("barbarians" if seat == BARB_SEAT else seat)
+                hostile = self._tac_hostile_on(seat, rel) & self._barb_seen("barbarians" if seat == BARB_SEAT else seat)
             block = block | hostile | self._tac_closed(seat)
-        if self._encamp_didx >= 0:
+        if forts and self._encamp_didx >= 0:
             block = block | self._encamp_block_plane(seat)
         known = self._tac_known(seat) if revealed_only else None
         if known is not None:
@@ -779,6 +781,37 @@ class SimTactics:
             # sight (`groundOf`'s pass)
             land_p, wat_p = self._tac_enter(seat, False, foes_seen=True)
             ent_n = torch.where(naval.unsqueeze(1), wat_p[rows], land_p[rows] | (wat_p[rows] & placed.unsqueeze(1)))
+            if any_rel:
+                land_r, wat_r = self._tac_enter(seat, False, foes_seen=True, rel=True)
+                ent_n = torch.where(rel_u.unsqueeze(1),
+                                    torch.where(naval.unsqueeze(1), wat_r[rows], land_r[rows] | (wat_r[rows] & placed.unsqueeze(1))),
+                                    ent_n)
+            # a district of hit points of a player at war out of the player's
+            # sight is a plain node, but the destination and for a formation
+            # holding a member whose ranged or bombard strength tops its
+            # combat strength (`groundOf`'s pass: the location test under
+            # flag 1, 0x586360 at 0x5866c9..0x58671f)
+            fort_u = self._centre_plane()
+            if self._encamp_didx >= 0:
+                fort_u = fort_u | (self.district == self._encamp_didx)
+            fort_u = (fort_u & (self.tile_seat >= 0) & (self.tile_seat != seat) & self._seats_hostile(seat, self.tile_seat)
+                      & ~self._barb_seen("barbarians" if seat == BARB_SEAT else seat))
+            if bool(fort_u.count_nonzero()):
+                cmb_a = self._ai_combat(pre)
+                sh_a = (self._ai_ranged(pre) > cmb_a) | (self._ai_bombard(pre) > cmb_a)
+                sh_n = sh_a[rows, slots]
+                if bool(mate_on.count_nonzero()):
+                    sh_n = sh_n | (mate_on & sh_a[rows, mate.clamp(min=0)])
+                land_o, _ = self._tac_enter(seat, False, foes_seen=True, forts=False)
+                if any_rel:
+                    land_ro, _ = self._tac_enter(seat, False, foes_seen=True, rel=True, forts=False)
+                    land_on = torch.where(rel_u.unsqueeze(1), land_ro[rows], land_o[rows])
+                else:
+                    land_on = land_o[rows]
+                open_n = fort_u[rows] & land_on & ~naval.unsqueeze(1) & ~sh_n.unsqueeze(1)
+                if dest is not None:
+                    open_n = open_n & (torch.arange(T, device=dev).unsqueeze(0) != dest.unsqueeze(1))
+                ent_n = ent_n | open_n
         water_n = self.water[rows]
         # the plots each unit attacks into (`groundOf`'s attack): an enemy
         # unit's of its own domain (the planning's: one that fights, on its own
@@ -1825,9 +1858,10 @@ class SimTactics:
             if not bool(on.count_nonzero()):
                 break
             pc = p.clamp(min=0)
-            # a plot a unit at war with it holds, passed out of its sight,
+            # a plot a unit at war with it holds, passed out of its sight, or
+            # a district of hit points at war its path took out of its sight,
             # ends the walk short of it (`walk`)
-            on = on & ~foe_n[ar, pc]
+            on = on & ~foe_n[ar, pc] & ~city_in[rows, pc]
             dcol = (self.neigh[frm] == pc.unsqueeze(1)).long().argmax(dim=1)
             c = self._tac_step(rows, frm, pc, dcol, ut, ign_shore, waive) + carry
             on = on & ~((mp < c) & (mp < full))
@@ -1862,6 +1896,25 @@ class SimTactics:
         under_emb = torch.zeros(R, dtype=torch.bool, device=dev)
         # a step refused (the placement 0x587ca0): the order done
         refused = torch.zeros(R, dtype=torch.bool, device=dev)
+        # the formation the walk sets out with (`walk`'s formed): the riders
+        # on its escort's plot; another formation's rider on a plot it passes
+        # neither stops its step nor rides on
+        formedB = torch.full((B, 4), -1, dtype=torch.long, device=dev)
+        if bool(self.unit_escorted.count_nonzero()):
+            g0 = sr + self.POOL_LO[pre]
+            t0 = tile_p[rows, sr].clamp(min=0)
+            mil0 = self.military_at[rows, t0]
+            lead0 = (self.unit_escorted[rows, g0] & (mil0 >= 0) & (mil0 != g0)
+                     & (self.unit_seat[rows, mil0.clamp(min=0)] == self.unit_seat[rows, g0]))
+            e0 = torch.where(lead0, mil0, g0)
+            et = self.unit_type[rows, e0].clamp(min=0, max=self.NU - 1)
+            carries = ~self._type_civilian.take(et) & ~self._type_support.take(et) & ~self.unit_emb[rows, e0]
+            for k, plane in enumerate((self.civilian_at, self.support_at, self.embarked_at, self.trader_at)):
+                r0 = plane[rows, t0]
+                rc0 = r0.clamp(min=0)
+                ok0 = (carries & (r0 >= 0) & (r0 != e0) & self.unit_escorted[rows, rc0]
+                       & (self.unit_seat[rows, rc0] == self.unit_seat[rows, e0]))
+                formedB[rows, k] = torch.where(ok0, r0, torch.full_like(r0, -1))
         for i in range(L):
             go = going & (i < stop)
             if not bool(go.count_nonzero()):
@@ -1880,7 +1933,7 @@ class SimTactics:
             dirB = torch.zeros(B, dtype=torch.long, device=dev)
             dirB[rows] = dcol
             mvB = self._step_verb(okB, gslot, hereB, nxtB, dirB, seat, torch.zeros_like(okB),
-                                  clear_camp=seat != BARB_SEAT)
+                                  clear_camp=seat != BARB_SEAT, formed=formedB)
             moved = mvB[rows]
             refused = refused | (go & ~moved)
             back_on = moved & (under >= 0)

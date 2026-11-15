@@ -3674,9 +3674,11 @@ class SimSeats:
             self.unit_tile[b, v] = int(key.argmin())
 
     def _escort_rider(self, gslot: torch.Tensor, here: torch.Tensor, dest: torch.Tensor,
-                      u_type: torch.Tensor, u_promos: torch.Tensor, cost: torch.Tensor):
+                      u_type: torch.Tensor, u_promos: torch.Tensor, cost: torch.Tensor,
+                      formed: torch.Tensor | None = None):
         """(rider slots [B, 3], dragged free, the pair may go) — `escortRiders`
-        plus the two clauses `stepUnit` puts in front of its own write.
+        plus the two clauses `stepUnit` puts in front of its own write; with
+        `formed` ([B, 4] slots, -1 none) only the riders among them.
 
         CIV6 (Formations): a formation's Movement "is equal to that of the
         slowest unit that belongs to it", so a rider that cannot afford the
@@ -3708,6 +3710,8 @@ class SimSeats:
             good = ((s >= 0) & carrier
                     & self.unit_escorted.gather(1, k.unsqueeze(1)).squeeze(1)
                     & (self.unit_seat.gather(1, k.unsqueeze(1)).squeeze(1) == seat))
+            if formed is not None:
+                good = good & (formed == s.unsqueeze(1)).any(dim=1)
             return torch.where(good, s, none)
 
         # CIV6 (Formations): "a military unit can create a formation with a
@@ -3760,10 +3764,17 @@ class SimSeats:
                 dry_ok = dry_ok | (_rwalk & self.passable.gather(1, dc.unsqueeze(1)).squeeze(1))
             # the class the rider will STAND in at the destination, which is what
             # `_blocked_for` asks: a civilian ashore, a passenger on water.
-            stand = torch.where(wet, wet_ok, dry_ok) & ~self._blocked_for(
-                dc.unsqueeze(1), seat.unsqueeze(1),
-                is_civilian=(self._type_civilian[rt] & ~wet).unsqueeze(1),
-                is_support=(self._type_support[rt] & ~wet).unsqueeze(1)).squeeze(1)
+            if formed is not None:
+                # a walk's step passes a plot its rider may not end on (the
+                # walk stops short of one; the plane takes the plot's other
+                # unit back as the rider leaves, `_occ_clear`)
+                blk = self._encamp_block(dc.unsqueeze(1), seat.unsqueeze(1)).squeeze(1)
+            else:
+                blk = self._blocked_for(
+                    dc.unsqueeze(1), seat.unsqueeze(1),
+                    is_civilian=(self._type_civilian[rt] & ~wet).unsqueeze(1),
+                    is_support=(self._type_support[rt] & ~wet).unsqueeze(1)).squeeze(1)
+            stand = torch.where(wet, wet_ok, dry_ok) & ~blk
             may = free | (r_mp >= cost) | (r_mp >= r_full)
             okm = okm & (~live | (stand & may))
         return torch.stack(picks, dim=1), free & anylive, okm
@@ -14312,6 +14323,7 @@ class SimSeats:
         is_civ: torch.Tensor,
         clear_camp: bool = True,
         dry: bool = False,
+        formed: torch.Tensor | None = None,
     ) -> torch.Tensor:
         """The `stepUnit` twin for the ACTION appliers — [B] masks in, the
         mask of units that actually stepped out.
@@ -14348,7 +14360,9 @@ class SimSeats:
 
         A formed rider's step is its formation's: its escort steps and carries
         it; a flag whose escort is gone is no formation, the unit steps alone
-        and leaves it."""
+        and leaves it. With `formed` ([B, 4] slots, -1 none: the riders a walk
+        set out with) its riders are those of them on its plot: another
+        formation's rider there neither stops the step nor rides on."""
         hc = here.clamp(min=0)
         if bool(self.unit_escorted.count_nonzero()):
             gc = gslot.clamp(min=0).unsqueeze(1)
@@ -14438,7 +14452,7 @@ class SimSeats:
         # THE FORMATION MOVES AS ONE — no further than its slowest member, and
         # free of it under Escort Mobility.
         rider, rider_free, rider_ok = self._escort_rider(
-            gslot, here, dest, u_type, u_promos, cost)
+            gslot, here, dest, u_type, u_promos, cost, formed)
         moved = ok & ((mp >= cost) | (mp >= full)) & rider_ok
         if dry:
             return moved

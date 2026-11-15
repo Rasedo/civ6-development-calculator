@@ -65,8 +65,8 @@ import { chargeUnitResource, strategicSlot, unitResourceCost, upgradeGoldCost, u
 import { airStrike, applyTrainingGrants, cityStrikeStrength, clearCampFor, combatBlow, type Blow, flankSupportLive, hostilePillage, meleeAttack, rangedAttack, seizeCivilian, terrainDefense } from '../core/combat';
 import { freeCitiesMilitary, traceFreeOps } from '../core/freeOps';
 import { barbarianTactics, barbMovesNow, dangerPlane, refreshBarbarians, tacticsDrawing, knowledgeLook, traceDanger, traceKnowledge, traceTactics } from '../core/tactical';
-import { barbBattleDeath, barbBattlesFromRecord, barbSlots, barbSlotsDying, barbarianRules, barbarianTechs, barbScoutLook, foundTribe, plotsSeenNow, tribeDies, tribeKindAt } from '../core/barbarians';
-import { DIFFICULTIES } from '../data/barbarians';
+import { barbBattleDeath, barbBattlesFromRecord, barbSlots, barbSlotsDying, barbarianRules, barbarianTechs, barbScoutLook, foundTribe, plotsSeenNow, tribeDies, tribeKindAt, tribeOf } from '../core/barbarians';
+import { BARB_PILLAGE_SCORE, DIFFICULTIES } from '../data/barbarians';
 import { MINOR_UPGRADE_GOLD, LEVY_TURNS } from '../data/cityStates';
 import { addCsTradeRoute, addIntlTradeRoute, addTradeRoute, minorRouteTo, plunderTrader, routeDestCenter, routeOriginCenter } from '../core/trade';
 import { minorRouteCandidate } from '../core/aiTrade';
@@ -304,8 +304,9 @@ interface Ctx {
    *  turn (`barbarianTurn`) */
   barbSteps: { u: Unit; plots: number[] }[];
   /** the plots the record's barbarian pillages of the pair wrecked, and what
-   *  each held before (improvement, district) */
-  barbPillaged: { plot: number; was: [boolean, boolean]; fell?: string }[];
+   *  each held before (improvement, district), and the unit that pillaged
+   *  (`by`) */
+  barbPillaged: { plot: number; was: [boolean, boolean]; fell?: string; by: number }[];
   /** the other players' envoys this pair staged for the engine's turn (`stageEnvoys`) */
   envoys: EnvoyDecision[];
   /** the record's units (`owner:id`) a battle of this pair the engine fought */
@@ -1229,12 +1230,17 @@ function barbarianAi(ctx: Ctx, b: TurnRecord, closing: number, before: ReadonlyS
     else delete c.escorted;
   }
   // the plots stand as the barbarians' turn opens: their pillages of the
-  // turn, which the record's actions landed, not yet made
-  for (const { plot, was, fell } of ctx.barbPillaged.splice(0)) {
+  // turn, which the record's actions landed, not yet made, nor counted in
+  // their tribes' raid scores (runs/h1_duelq1128 t86-t88: the raid on 15:10
+  // pillages at t86 and t87 and goes home at t88, its Raid Check reading 0
+  // and 5 before them)
+  for (const { plot, was, fell, by } of ctx.barbPillaged.splice(0)) {
     copy.map.tiles[plot].pillaged = was[0];
     copy.map.tiles[plot].districtPillaged = was[1];
     const held = fell !== undefined ? districtBuildingsAt(copy, copy.map.tiles[plot]) : undefined;
     if (held && fell !== undefined) repairBuilding(held, fell);
+    const tr = tribeOf(copy, by);
+    if (tr) tr.score = Math.max(0, (tr.score ?? 0) - BARB_PILLAGE_SCORE);
   }
   // the turn's captures are the record's, landed on the state with its
   // battles: one whose captor an operation holds starts its operation once
@@ -1425,6 +1431,8 @@ function barbarianAi(ctx: Ctx, b: TurnRecord, closing: number, before: ReadonlyS
   (copy.barbTribes ?? []).forEach((c, i) => {
     const tr = state.barbTribes?.[i];
     if (!tr) return;
+    // a raid the copy started zeroed its tribe's raid score (`barbOpStart`)
+    if (c.op && !c.op.assault && tr.op?.id !== c.op.id) tr.score = 0;
     tr.op = c.op;
     tr.queue = c.queue;
     tr.every = c.every;
@@ -4408,7 +4416,7 @@ const res = buyTile(state, city.id, d.plot, seat);        if (!res.ok) setTileOw
         } else hostilePillage(state, u);
         const fell = (held?.pillagedBuildings ?? []).find((b) => !pb.has(b));
         const done = (!!t.pillaged && !was[0]) || (!!t.districtPillaged && !was[1]) || fell !== undefined;
-        if (done && isBarbSeat(u.seat)) ctx.barbPillaged.push({ plot: d.plot, was: [was[0], was[1]], fell });
+        if (done && isBarbSeat(u.seat)) ctx.barbPillaged.push({ plot: d.plot, was: [was[0], was[1]], fell, by: u.id });
         count(ctx, 'pillage', done ? 'applied' : 'refused', d.player, done ? undefined : 'the engine wrecked nothing');
         break;
       }

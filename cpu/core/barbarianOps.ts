@@ -238,7 +238,8 @@ function barbEnv(state: GameState, pass: Pass | null): OpsEnv {
  * beside another; the manager's start by name with the city's plot, the
  * target set (0x73e7d0) — the rally the tribe's camp —, the assault against
  * the city's owner (op +0x2a0) after the start (whose strengths count every
- * player), the tree's Tribe tag the tribe.
+ * player), the tree's Tribe tag the tribe; a raid's start zeroes the
+ * tribe's raid score.
  * Whether it started; its tree ticks in the trees' walk.
  */
 export function barbOpStart(state: GameState, tribe: BarbTribe, target: BarbTarget, assault: boolean): boolean {
@@ -247,6 +248,9 @@ export function barbOpStart(state: GameState, tribe: BarbTribe, target: BarbTarg
   const env = barbEnv(state, null);
   const op = startOperationAt(ai, env, assault ? BARB_ASSAULT_DEF : BARB_RAID_DEF, -1, target.plot, tribe.plot);
   if (assault) op.enemy = target.seat;
+  // a raid's start takes the tribe's raid score to 0 (0x149980 at 0x149b01):
+  // Barbarian Raid Check counts this raid's pillages alone
+  else tribe.score = 0;
   op.triggerValue = (state.barbTribes ?? []).indexOf(tribe);
   tribe.op = { id: op.id, assault, target };
   return true;

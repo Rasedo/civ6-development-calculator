@@ -89,16 +89,17 @@ interface PNode {
  *  a land unit's water too where its player may embark it (`canEmbark`); no
  *  unit of a player at war with it (an aircraft or a spy holds no plot) —
  *  another player's unit it passes, never ending there (`groundOf`'s
- *  `stand`); no city centre but its own, no live enemy Encampment; its own
- *  units it walks through */
+ *  `stand`); no city centre but its own, no live enemy Encampment (with no
+ *  `forts`, neither test); its own units it walks through */
 function enterable(state: GameState, unit: Unit, t: Tile, foes: ReadonlySet<number>,
-  embarks: boolean): boolean {
+  embarks: boolean, forts = true): boolean {
   if (isImpassable(t)) return false;
   const naval = !!UNITS[unit.type]?.naval;
   // a hull on water or in a passage (`hullPassage`: its own centre, below)
   if (naval ? !isWater(t) && !hullPassage(t) : isWater(t) && !embarks) return false;
   if (isWater(t) && !waterEnterable(state, t, unit)) return false;
   if (foes.has(t.index)) return false;
+  if (!forts) return true;
   if (t.district === 'CITY_CENTER' && tileSeat(t) !== unit.seat) return false;
   return !encampmentBlocks(state, t, unit);
 }
@@ -155,10 +156,13 @@ interface Ground {
   enter: (t: Tile) => boolean;
   /** `enter` for a move order's path: the step's location test (0x271be0 -> 0x586900 under flag
    *  1 -> 0x586360 at 0x586542..0x5865a1) refuses no plot for another
-   *  player's unit but an embarked pair (`boarded`), and a hostile unit makes
+   *  player's unit but an embarked pair (`boarded`), and a hostile unit of
+   *  the mover's map layer makes
    *  the plot an attack only where the player sees it now (+0x51 bits 5 / 6,
    *  0x5861f0 under +0x50 & 2): one it does not see now is passed as empty
-   *  ground (runs/h1_duely1121 t58-77: the barbarian Scout 131073's
+   *  ground, a district of hit points at war it does not see now as a plain
+   *  plot but the path's destination
+   *  (runs/h1_duely1121 t58-77: the barbarian Scout 131073's
    *  "tertiary regions" 10:9 past China's units out of its sight). A
    *  destination holding another player's unit it does not see now has no
    *  path, the order's attack flag dropped at its request (`pathTo`, 0x962310;
@@ -295,6 +299,11 @@ function groundOf(state: GameState, unit: Unit, revealedOnly = true, planning = 
   // 0x56e3e0 / 0x56daa0)
   const str = aiStrengths(state, fighter);
   const shoots = str.ranged > str.melee || str.bombard > str.melee;
+  // any member's (the location test 0x586900 asks each member's own)
+  const formationShoots = [unit, ...mates].some((m) => {
+    const s = aiStrengths(state, m);
+    return s.ranged > s.melee || s.bombard > s.melee;
+  });
   const naval = !!def?.naval;
   // the formation's domain (+0x278: the least of its members', sea for an
   // embarked member, 0x267650; its members share the unit's plot), which the
@@ -433,9 +442,30 @@ function groundOf(state: GameState, unit: Unit, revealedOnly = true, planning = 
         if (!foesSeen) {
           seenNow ??= plotsSeenNow(state, new Set([unit.seat]));
           const sn = seenNow;
-          foesSeen = new Set([...foes].filter((i) => sn[i] === 1));
+          // the units of the mover's map layer alone (the best defender
+          // 0x208b80 reads the plot list of the mover's layer): a plot whose
+          // only units at war stand on another layer is a plain node, its
+          // stacking count the path's as any plot's (runs/h1_duelq1121 t164:
+          // the rampaging Crossbowman 3866651 on 15:19 holds for player 1's
+          // Apostle's 9:19 once its Scout 131073 stands there; t165 / t167
+          // the Crossbowmen 3735574 and 3801114 for 13:19 / 14:19 under the
+          // Man-At-Arms 2883594)
+          foesSeen = new Set([...foes].filter((i) => sn[i] === 1
+            && state.units.some((x) => x.tileIndex === i && x.seat !== unit.seat && onLayer(x) && unitsHostile(state, unit, x))));
         }
-        passes.set(t.index, (v = enterable(state, unit, t, foesSeen, embarks)
+        // a district of hit points of a player at war out of the player's
+        // sight is a plain node: the location test under flag 1 (0x586360 at
+        // 0x5866c9..0x58671f) refuses it only to a member whose ranged or
+        // bombard strength tops its combat strength, and the attack bits
+        // (+0x51 & 0x34) are set on a plot seen now alone (runs/h1_duelq1124
+        // t114-t116: Builder Capture's Builder 5111833 and Man-At-Arms
+        // 4784141 on 31:11 / 30:11 for 6:4 walk for city-state 4's centre
+        // 32:8, the only way east the barbarians revealed); the path's
+        // destination is tested under flag 0 (0x2714b0), which refuses it
+        const owner = tileSeat(t);
+        const fortUnseen = seenNow![t.index] !== 1 && garrisonDistrict(state, t) && owner !== NO_SEAT && owner !== unit.seat
+          && unitsHostile(state, unit, { seat: owner }) && !formationShoots && t.index !== dest;
+        passes.set(t.index, (v = enterable(state, unit, t, foesSeen, embarks, !fortUnseen)
           && !shut(t)));
       }
       return v;
@@ -1241,11 +1271,12 @@ function walk(state: GameState, unit: Unit, path: number[], dest: number, mates:
   let spendAt = -1;
   let spent = 0;
   for (const p of path) {
-    // a plot a unit at war with it holds, passed out of its sight, ends the
+    // a plot a unit at war with it holds, passed out of its sight, or a
+    // district of hit points at war its path took out of its sight, ends the
     // walk short of it: the order moves one node at a time on a path found
     // afresh (0x962380 -> 0x26fe20 to the node after its start), its first
     // step ending the order unmoved on a defender at war it sees (0x209e30)
-    if (enemyOnLayer(state, unit, p)) break;
+    if (attackPlot(state, unit, p)) break;
     const cost = stepCost(state, unit, tiles[from], tiles[p], embarks) + carry;
     if (mp < cost && mp < full) break;
     // a land unit's step across the shore carries, a step off an owned water

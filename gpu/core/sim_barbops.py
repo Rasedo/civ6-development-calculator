@@ -176,7 +176,8 @@ class SimBarbOps:
     def _barb_start_op(self, mask: torch.Tensor, k: int, assault: bool, seat: torch.Tensor, plot: torch.Tensor) -> None:
         """`barbOpStart`: tribe `k`'s raid or city assault on `seat`'s city at
         `plot` in the games `mask` — its rally the camp, its tree's id the
-        player's next, its tree fresh, its team empty and not ready"""
+        player's next, its tree fresh, its team empty and not ready; a raid's
+        start zeroes the tribe's raid score"""
         rows = mask.nonzero(as_tuple=True)[0]
         if not rows.numel():
             return
@@ -194,6 +195,10 @@ class SimBarbOps:
         self.tribe_op_dead[rows, k] = 0
         self.tribe_store[rows, k] = False
         self.tribe_store_goal[rows, k] = -1
+        # a raid's start takes the tribe's raid score to 0 (0x149980 at
+        # 0x149b01)
+        if not assault:
+            self.tribe_score[rows, k] = 0
         self.barb_unit_op[rows] &= self.barb_unit_tribe[rows] != k
 
     def _barb_op_bury(self) -> None:

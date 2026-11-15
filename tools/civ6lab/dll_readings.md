@@ -14499,3 +14499,79 @@ blocks of `_tac_pass`, `_tac_plan`'s "kill" (gpu/core/sim_tactics.py).
   Trader walks in its seat's block before the check's map (1117 t42: the
   barbarian Scout on 37:14 reaches 35:13 past the Trader's 36:13, the game's
   Trader still on 35:13 until its turn's end).
+
+## C-95 / C-123: a move order's path passes a district of hit points out of sight and a unit of another map layer; a walk's step reads its own formation's riders; a raid's start zeroes the tribe's raid score — READ (0x586360 at 0x5866c9..0x58671f, 0x2720a0 at 0x272618..0x272689, 0x816cb0 at 0x8177cf..0x8177e9, 0x149980 at 0x149b01, 0x7c7330, 0x152c00, 0x154b80), both twins
+
+`groundOf`'s `pass` (`fortUnseen`, the layered `foesSeen`), `enterable`'s
+`forts` (cpu/core/tactical.ts); `stepRefusal` / `stepUnit`'s `formed`
+(cpu/core/units.ts); `barbOpStart` (cpu/core/barbarianOps.ts); the replay's
+copy (`barbarianAi`, cpu/harness/replay.ts). GPU `_tac_enter`'s `rel` /
+`forts`, `_tac_search`'s `fort_u`, `_tac_move_to`'s `formedB`
+(gpu/core/sim_tactics.py); `_step_verb` / `_escort_rider`'s `formed`
+(gpu/core/sim_seats.py); `_barb_start_op` (gpu/core/sim_barbops.py).
+
+- A DISTRICT OF HIT POINTS OUT OF SIGHT: the path node's location bit
+  (+0x50 bit 0x40) is 0x586900 under flag 1, each member's 0x586360. Its
+  district test (0x5866c9..0x58671f), on a plot of another player at war
+  holding a district of hit points (the city centre, the Encampment),
+  refuses a unit whose ranged or bombard strength tops its combat strength,
+  and a unit that fights only without flag 1. The node's attack bits (+0x51
+  & 0x34: a city, a district, a unit at war) are set by 0x271be0 on a plot
+  the player sees now alone. So a move order's path takes such a plot the
+  player does not see now as a plain node, at any turn. The destination is
+  tested under flag 0 (0x2714b0), which refuses it: an order for a city out
+  of sight still has no path.
+- FLAG 1 OF THE PATH (0x2720a0 at 0x272618..0x272635): the parent's plot
+  ([rbp+0x30] / +0x32 through the map's vt +0x80) against the search's start
+  (+0x158 / +0x15c) — equal, valid; else under flag 1 a parent whose +0x51
+  bit 0 is clear refuses the child. Operation Move sets 0x1001 where the
+  node's Can Explore datum is false, and for the barbarians (0x469ce0)
+  whatever it holds (0x816cb0 at 0x8177cf..0x8177e9). A plot the player
+  never revealed is entered and never left; an unseen centre it revealed is
+  the way through.
+- A UNIT OF ANOTHER MAP LAYER: the hostile defender the location test reads
+  (0x208b80) is of the mover's layer. A plot whose only units at war stand
+  on another layer (a religious unit under a land unit's path) is a plain
+  node: its stacking count (+0x54) is tested as any plot's, so the
+  destination at its stacking limit ends the search with no path.
+- A WALK'S RIDERS: a formation's walk steps the riders it set out with.
+  Another formation's rider on a plot it passes neither stops the step (its
+  Movement, its stacking) nor rides on; the walk's own rider passes a plot
+  it may not end on, the walk stopping short of one.
+- THE RAID SCORE: the tribe's score Barbarian Raid Check reads (0x7c7330 ->
+  0x152c00: tribe +0x78 + +0x7c against the node's Score 10) grows 5 at each
+  pillage of a unit of the tribe (0x154b80: the unit's owner the barbarians,
+  its group +0x11d0 the tribe). The raid's start 0x149980 writes +0x78 = 0
+  (0x149b01) once its operation stands; the tribe manager's functions
+  write +0x7c in the tribe's copy 0x14c9e6 alone. Each raid counts its own
+  pillages.
+- THE REPLAY'S COPY: the record's pillages of the barbarians' turn land on
+  the state before their AI's copy runs; the copy takes each back from its
+  tribe's score with the plot (`barbPillaged`), and a raid the copy starts
+  zeroes the state's score.
+- CONFIRMED (one-seed aimem traces, the barbarians' rows alone moving):
+  runs/h1_duelq1124 t114 / t115 / t116 Builder Capture's Builder 5111833
+  and Man-At-Arms 4784141 for 6:4 step 31:11 -> 30:11 -> 31:11 -> 31:10 as
+  recorded, the only way east the barbarians revealed city-state 4's unseen
+  centre 32:8 (33:6 / 33:7 / 34:8 unrevealed in the record's plane; the
+  first-turn danger of 30:9 / 31:9, then 30:10 / 31:10, turning the first
+  step); runs/h1_duelq1121 t11 the Horseman 851980 on 34:5 for 36:14 steps
+  34:6, t13 the Horseman 720906 on 30:6 for 34:15 steps 31:9 (player 0's
+  unseen centre 35:14 on their paths); t164 the rampaging Crossbowman
+  3866651 holds on 15:19 for player 1's Apostle's 9:19 once the Scout
+  131073 stands there, t165 / t167 the Crossbowmen 3735574 / 3801114 for
+  13:19 / 14:19 under the Man-At-Arms 2883594; t96 the Man-At-Arms 3014664
+  walks 6:16 -> 6:17 -> 7:17 over Builder Capture's Settler 3211277 and
+  Man-At-Arms 2949124 (out of Movement on 6:17, which stay there), t112
+  the Settler 3407879 ends on 13:18 and t151 the Settler 4325384 on 11:15
+  as recorded; t161 the Settler 4325384 and Musketman 3538967
+  walk 5:17 -> 5:18 -> 4:18 over their Builder on 5:18; runs/h1_duelq1128
+  tribe 2's raid on 15:10 (started t78, the tribe's earlier pillages at 10):
+  Operation Pillage at t86 (Swordsman 4522010 on 15:12) and t87
+  (Crossbowman 4587528 on 14:11), home at t88, the check reading 0 / 0 / 5 /
+  10 over t85-t88; runs/h1_duelq1121 t124 / t126 / t127 the raid's
+  Musketman 3473423 holds 5:13 / 5:12; runs/h1_duelq1127 t33 the Settler
+  2097173 and Slinger 1114127 end on 17:8.
+- OPEN: a turn's end on an unseen district of hit points unread (no
+  recorded path ends one there); a coastal raid's score in the replay's copy
+  (no record of the five holds one in a raid's turn).

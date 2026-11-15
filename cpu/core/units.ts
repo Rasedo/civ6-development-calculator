@@ -1389,8 +1389,13 @@ export function setBarbStepLook(fn: ((state: GameState, unit: Unit) => void) | n
 
 /** why the unit (its formation's lead) may not step onto the adjacent plot
  *  now — a cliff, its Movement short of the step's cost (or a rider's), a
- *  rider that may not stand there — null where it may */
-export function stepRefusal(state: GameState, unit: Unit, to: Tile): 'blocked' | 'cantAfford' | null {
+ *  rider that may not stand there — null where it may; its riders those a
+ *  walk set out with (`formed`) still on its plot, else those on its plot:
+ *  another formation's rider on a plot the walk passes neither stops it nor
+ *  rides on (runs/h1_duelq1121 t96: the Man-At-Arms 3014664 walks 6:16 ->
+ *  6:17 -> 7:17 over Builder Capture's Settler 3211277 and Man-At-Arms
+ *  2949124, both out of Movement on 6:17) */
+export function stepRefusal(state: GameState, unit: Unit, to: Tile, formed?: readonly Unit[]): 'blocked' | 'cantAfford' | null {
   const from = state.map.tiles[unit.tileIndex];
   // CIV6 (Movement): the one-step allowance reads "full Movement" as "has
   // spent nothing this turn" — measured against the GRANTED pool, exactly as
@@ -1402,13 +1407,18 @@ export function stepRefusal(state: GameState, unit: Unit, to: Tile): 'blocked' |
   if (unit.movesLeft < cost && unit.movesLeft < full) return 'cantAfford';
   // THE FORMATION MOVES AS ONE — and no further than its slowest member,
   // unless the escort carries Escort Mobility.
-  const riders = escortRiders(state, unit);
+  const riders = formed ? formed.filter((r) => r !== unit && r.tileIndex === unit.tileIndex && state.units.includes(r)) : escortRiders(state, unit);
   // CIV6 (Keshig): "Can escort moving civilian and support units at their
   // higher Movement speed" — Escort Mobility's clause, on the chassis.
   const riderFree = riders.length > 0
     && (promoFlag(unit, 'ESCORT_SPEED') || !!UNITS[unit.type]?.escortSpeed);
   for (const rider of riders) {
-    if (!tileFreeForUnit(state, to.index, unit.seat, rider, true)) return 'blocked';
+    // a walk's step (`formed`) passes a plot its rider may not end on: the
+    // walk stops short of one (`walk`'s stacking test); a hostile military
+    // unit there refuses it all the same (runs/h1_duelq1121 t161: Builder
+    // Capture's Settler 4325384 and Musketman 3538967 walk 5:17 -> 5:18 ->
+    // 4:18 over their Builder on 5:18)
+    if (!tileFreeForUnit(state, to.index, unit.seat, rider, true, !!formed)) return 'blocked';
     const rFull = rider.movesFull ?? unitFullMoves(state, rider);
     if (!riderFree && rider.movesLeft < cost && rider.movesLeft < rFull) return 'cantAfford';
   }
@@ -1427,7 +1437,7 @@ export function stepUnit(state: GameState, unit: Unit, to: Tile, formed?: readon
   // leaves it (runs/h1_duely1128 t51: the Settler 3014684, its Warrior
   // killed, walks to 17:13 past the Warrior on 16:13 alone)
   if (unit.escorted) unit.escorted = false;
-  const refused = stepRefusal(state, unit, to);
+  const refused = stepRefusal(state, unit, to, formed);
   if (refused) return refused;
   const from = state.map.tiles[unit.tileIndex];
   const naval = !!UNITS[unit.type]?.naval;
