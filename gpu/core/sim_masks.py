@@ -1988,8 +1988,12 @@ class SimMasks:
         mtype = self.unit_type.gather(1, mslot).clamp(min=0, max=self.NU - 1)
         chassis = self._type_stealth[mtype]
         veil = self._promo_flag(mtype, self.unit_promos.gather(1, mslot), "STEALTH")
+        # ...one that attacked is seen for its turn, a barbarian's for good
+        # (`unitVisibleTo`: their player's turn gives back no hidden
+        # visibility)
+        rt = self.unit_revealed_turn.gather(1, mslot)
         hid = ((occ >= 0) & (chassis | veil)
-               & (self.unit_revealed_turn.gather(1, mslot) < self.turn)
+               & (rt < self.turn) & ~((rt >= 0) & (self.unit_seat.gather(1, mslot) == BARB_SEAT))
                & (self.unit_seat.gather(1, mslot) != sc))
         if not bool(hid.count_nonzero()):
             return hidden
@@ -4480,9 +4484,9 @@ class SimMasks:
             holds = self._golden_ded_table(kind).gather(1, civ)
             out = torch.where(civ_ok & tsel & holds, torch.full_like(out, self._golden_move), out)
         # CIV6 (Hic Sunt Dracones, Golden face): "+2 Movement for naval and
-        # embarked units."
-        emb = getattr(self, f"{pre}_unit_emb", None)
-        nsel = self.unit_naval[typ] if emb is None else (self.unit_naval.take(typ) | emb)
+        # embarked units" — a hull's here, an embarked unit's on its embarked
+        # pool (`_sea_move_mp`)
+        nsel = self.unit_naval.take(typ)
         holds_d = self._golden_ded_table(self._ded_dracones).gather(1, civ)
         out = torch.where(civ_ok & nsel & holds_d, torch.full_like(out, self._golden_move), out)
         return out

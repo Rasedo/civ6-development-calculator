@@ -547,7 +547,7 @@ export function goldenDedication(state: GameState, civ: number, kind: number): b
  * one reset rule and one step contract, so the bonus has exactly one place to
  * live on each side.
  */
-export function goldenMoveBonus(state: GameState, unit: { type: string; seat: number; embarked?: boolean }): number {
+export function goldenMoveBonus(state: GameState, unit: { type: string; seat: number }): number {
   const civ = isBarbSeat(unit.seat) ? -1 : unit.seat; // barbarians hold no dedications
   if (unit.type === 'BUILDER') {
     return goldenDedication(state, civ, DED_MONUMENTALITY) ? GOLDEN_MOVE_BONUS : 0;
@@ -556,11 +556,20 @@ export function goldenMoveBonus(state: GameState, unit: { type: string; seat: nu
     return goldenDedication(state, civ, DED_EXODUS) ? GOLDEN_MOVE_BONUS : 0;
   }
   /* CIV6 (Hic Sunt Dracones, Golden face): "+2 Movement for naval and
-     embarked units." */
-  if (UNITS[unit.type]?.naval || unit.embarked) {
+     embarked units" — a hull's here (COMMEMORATION_EXPLORATION_GA_SEA_
+     MOVEMENT), an embarked unit's on its embarked pool
+     (`goldenEmbarkedMoves`) */
+  if (UNITS[unit.type]?.naval) {
     return goldenDedication(state, civ, DED_DRACONES) ? GOLDEN_MOVE_BONUS : 0;
   }
   return 0;
+}
+
+/** Hic Sunt Dracones' embarked Movement (COMMEMORATION_EXPLORATION_GA_
+ *  EMBARKED_MOVEMENT, MODIFIER_PLAYER_ADJUST_EMBARKED_MOVEMENT Amount 2):
+ *  the seat's embarked pool while its Golden age holds the dedication */
+export function goldenEmbarkedMoves(state: GameState, seat: number): number {
+  return !isBarbSeat(seat) && goldenDedication(state, seat, DED_DRACONES) ? GOLDEN_MOVE_BONUS : 0;
 }
 
 export function goldenProphetPoints(state: GameState, civ: number): number {

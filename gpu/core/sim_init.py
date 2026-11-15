@@ -5277,6 +5277,7 @@ class SimInit:
         self._gen_aura_cs_val = float(rr["generalAuraCs"])
         self._gen_aura_range = int(rr["generalAuraRange"])
         self._gen_aura_mp = int(rr["generalAuraMp"])  # the aura's movement half, already in mp_scale units
+        self._gen_aura_last_era = int(rr["generalAuraLastEra"])  # `auraCoversEra`: the last era an aura names
         self._gen_off = tiles_within_offsets(self._gen_aura_range).to(device)  # aura disk (hexDistance ≤ range)
 
         # the technologies whose EmbarkUnitType names a unit type, per type

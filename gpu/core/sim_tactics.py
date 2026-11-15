@@ -789,7 +789,8 @@ class SimTactics:
                 # Admiral's Movement where each stands now (`generalAuraMP`)
                 live = self.major_unit_alive & (self._type_combat.take(self.major_unit_type.clamp(min=0, max=self.NU - 1)) > 0)
                 hit = self._gen_aura_hit(self.major_unit_seat, self.major_unit_tile,
-                                         self.unit_naval.take(self.major_unit_type.clamp(min=0, max=self.NU - 1)) | self.major_unit_emb)
+                                         self.unit_naval.take(self.major_unit_type.clamp(min=0, max=self.NU - 1)) | self.major_unit_emb,
+                                         self.major_unit_type)
                 fnow = fnow + (hit & live).long() * self._gen_aura_mp
                 mp = fnow[rows, slots]
             mp = torch.where(mate >= 0, torch.minimum(mp, fnow[rows, mm]), mp)

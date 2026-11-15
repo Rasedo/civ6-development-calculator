@@ -10,7 +10,7 @@ import { completeQueueItem, fxFactor, stepAmount } from '../../../cpu/core/produ
 import { traderImmune, cityTradeYields, tradeRouteMinDuration } from '../../../cpu/core/trade';
 import { computeCityStats, seatTourism } from '../../../cpu/core/city';
 import { effectiveAdjacency } from '../../../cpu/core/yields';
-import { enterEra, goldenMoveBonus } from '../../../cpu/core/eras';
+import { enterEra, goldenEmbarkedMoves, goldenMoveBonus } from '../../../cpu/core/eras';
 import {
   DEDICATIONS,
   DED_EVENT_SCORE,
@@ -104,7 +104,7 @@ describe('the four new dedications', () => {
     settleAt(state, tileAtCoords(state.map, 3, 9).index);
     commit(state, 0, DED_DRACONES, true);
     expect(goldenMoveBonus(state, { type: 'GALLEY', seat: 0 })).toBe(GOLDEN_MOVE_BONUS);
-    expect(goldenMoveBonus(state, { type: 'WARRIOR', seat: 0, embarked: true })).toBe(GOLDEN_MOVE_BONUS);
+    expect(goldenEmbarkedMoves(state, 0)).toBe(GOLDEN_MOVE_BONUS);
     expect(goldenMoveBonus(state, { type: 'WARRIOR', seat: 0 })).toBe(0);
   });
 

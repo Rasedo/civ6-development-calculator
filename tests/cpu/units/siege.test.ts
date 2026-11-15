@@ -405,7 +405,7 @@ describe('the move-and-shoot rule', () => {
 
   it('CIV6: "maximum Movement at least 1 greater than normal" lifts the gate', () => {
     const { state, city, cat } = scene();
-    spawnUnit(state, 'GENERAL', cat.tileIndex, ATK);
+    spawnUnit(state, 'GENERAL', cat.tileIndex, ATK)!.gpAt = 0; // Boudica: the Classical Catapult is hers
     cat.movesFull = UNITS.CATAPULT.moves + 1; // what refreshUnits granted beside the general
     cat.movesLeft = cat.movesFull - 1;        // and it spent one of them
     expect(siegeMayShoot(state, cat)).toBe(true);

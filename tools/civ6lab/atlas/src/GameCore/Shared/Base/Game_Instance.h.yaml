@@ -40,6 +40,7 @@
     - gpu/core/sim_phase.py:_seat_turn
     - cpu/harness/replay.ts:gov
     - cpu/core/tactical.ts:dangerPlane
+    - cpu/core/units.ts:unitVisibleTo
   readings:
     - "H-1: every draw of a player's start (witnesses, RandCalls.csv)"
     - "H-1: the luxury allocation's rebuilds — PARTLY READ"
@@ -68,6 +69,7 @@
     - "C-123 / C-110: the barbarians' rules run as the first job of their AI turn start, after the DoTurn tail; a centre a player that is no major may not raze keeps its last hit point; a melee blow on a district that would fell both sides — READ (0x6096c0 at 0x6097af..0x609802, 0x608870, 0x7280a0, 0x1514a0, 0x14d25d; 0x248800, 0x533e50, 0x206080 at 0x206684..0x206715 and 0x206868..0x2068c8, 0x20dd30, 0x1fdea0 at 0x1fe098..0x1fe0ab), both twins"
     - "C-133 / C-128: flag 2's parent plot, the open list as the list itself, the embarked state's Movement cap, the zone's improvement test — READ (0x2720a0 at 0x27220d / 0x2724c8, 0x775a0, 0x79560, 0x586d40 at 0x587042..0x5870aa / 0x58741c..0x587486, 0x5706e0, 0x531ef0, 0x26fe20 at 0x270444 / 0x270776, 0x270be0, 0x52f970), both twins"
     - "C-132 / C-128 / C-95 / C-123 / C-133: the danger map's unmoved flag, a unit made anew's place, the operation queue's push, the strike's turn, the raid's recruit, the shore tests — READ (0x26df90 at 0x26e128..0x26e159, 0x716400 at 0x71672d, 0x586360 at 0x586542..0x58657e / 0x5867ab..0x586875, 0x93fa10 at 0x93fd94..0x93fdab / 0x93fe79, 0x526a0 at 0x52788..0x527ac, 0x523e0, 0x55460, 0x962380 at 0x96268f, 0x60a440, 0x26e570 at 0x26e904, 0x2720a0 at 0x272618..0x272689), both twins"
+    - "C-132: the Great General's and Admiral's aura by its person's era; a barbarian stealth unit's forfeited hidden visibility — READ (0xb2c600, 0x56de20, 0x20ad00 at 0x20ae90, 0x4f1b20, 0x4e4560 at 0x4e45c8), both twins"
   context:
     - "- each city in the player's order (0x4e4560 -> city turn 0x1fa1d0: production, growth, the border turn 0x1a9bc0, loyalty): a WONDER..."
     - "- Player DoTurn 0x4e4560, in order: the culture (+0x1310, 0x396860: the civic progress), the resources (+0x1320,..."

@@ -35,7 +35,7 @@
   kind: function
   semantics: "an attack ends the attacker's fortification: sets its fortify turns to 0 (0x5707b0(attacker, 0)) once the result is made (0x205da0)."
   status: PARTLY
-  impl: [cpu/core/combat.ts:spendAttack]
+  impl: [cpu/core/combat.ts:markStealthAttack, cpu/core/combat.ts:spendAttack]
   readings:
     - "H-1: the melee result, a ranged blow's domain, a city's shot — READ"
     - "C-123: Operation Move's danger flags, the MoveTo execution and m_blockedTurns — READ (0x816cb0 at 0x816e70 / 0x817839, 0x962380, 0x73e610), both twins"
@@ -644,6 +644,19 @@
     - "C-123 / C-110: the barbarians' rules run as the first job of their AI turn start, after the DoTurn tail; a centre a player that is no major may not raze keeps its last hit point; a melee blow on a district that would fell both sides — READ (0x6096c0 at 0x6097af..0x609802, 0x608870, 0x7280a0, 0x1514a0, 0x14d25d; 0x248800, 0x533e50, 0x206080 at 0x206684..0x206715 and 0x206868..0x2068c8, 0x20dd30, 0x1fdea0 at 0x1fe098..0x1fe0ab), both twins"
   context:
     - "...741) reads the damage before the cut. In 0x1fdea0 the units on the district's plot die (0x20a400), and a captor that is no FULL_CIV destroys the district (0x1e6f50 at 0x1fe0a6: a cen..."
+  review: reviewed
+- addr: 0x20ad00
+  final: 0x15b090
+  kind: function
+  semantics: "a battle's attacker set-up (asserts neither unit delayed-dead): the attacker's fortify turns 0 (0x5707b0) and its m_bHiddenVisibilityForfeited (the property +0x15f8) set true (0x20ae90..0x20aea8)"
+  status: PARTLY
+  cases:
+    - recording: h1_duels1149
+      turn: 207
+      value: "the barbarian Nuclear Submarine 2883601 strikes city-state 3's Ranger 1835008 (CombatLog t206 / t207): m_bHiddenVisibilityForfeited 0 at t205, 1 from t207"
+  impl: [cpu/core/combat.ts:markStealthAttack, cpu/core/units.ts:unitVisibleTo]
+  readings:
+    - "C-132: the Great General's and Admiral's aura by its person's era; a barbarian stealth unit's forfeited hidden visibility — READ (0xb2c600, 0x56de20, 0x20ad00 at 0x20ae90, 0x4f1b20, 0x4e4560 at 0x4e45c8), both twins"
   review: reviewed
 - addr: 0x20bae0
   final: 0x15bd50

@@ -58,7 +58,7 @@ import {
   promoValue, promoValueFor, stepAttacksLeft, XP_PER_LEVEL,
 } from './promotions';
 import { logXpWrite, logPopWrite, logStockWrite } from './difflog';
-import { dedicationEvent, goldenMoveBonus, goodyMoment } from './eras';
+import { dedicationEvent, goldenEmbarkedMoves, goldenMoveBonus, goodyMoment } from './eras';
 import { upgradeMoments } from './moments';
 import { warBuffMoves } from './casusBelli'; // MONUMENTALITY / EXODUS +2 MP
 import { DED_WISH, LOYALTY_MAX, OPEN_BORDERS_CIVIC } from '../data/seats';
@@ -640,7 +640,14 @@ export function unitVisibleTo(state: GameState, u: Unit, seat: number): boolean 
   const chassis = !!UNITS[u.type]?.stealth;
   if (!chassis && !promoFlag(u, 'STEALTH')) return true;
   if (u.seat === seat) return true;
-  if ((u.revealedTurn ?? -1) >= state.turn) return true;
+  // a stealth unit that attacked forfeits its hidden visibility (the battle
+  // 0x20ad00 at 0x20ae90, m_bHiddenVisibilityForfeited); each player's turn
+  // gives its units' back (0x4e4560 -> 0x4f1b20), but the barbarians' skips
+  // that step (0x4e45c8), so theirs stays seen (runs/h1_duels1149 t207-249:
+  // the barbarian Nuclear Submarine 2883601 after its strikes of t206 / t207
+  // in player 1's and city-state 3's danger maps, none of their units beside
+  // it)
+  if (u.revealedTurn !== undefined && (u.revealedTurn >= state.turn || isBarbSeat(u.seat))) return true;
   const t = state.map.tiles[u.tileIndex];
   for (const v of state.units) {
     if (v.seat !== seat) continue;
@@ -1270,7 +1277,11 @@ export function seaMoveBonus(state: GameState, seat: number): number {
 export function embarkTechMoves(state: GameState, seat: number): number {
   const techs = seatOf(state, seat)?.research.techs;
   if (!techs) return 0;
-  let n = seatWonderSum(state, seat, 'embarkedMoves');
+  // ...and Hic Sunt Dracones' Golden face (COMMEMORATION_EXPLORATION_GA_
+  // EMBARKED_MOVEMENT, MODIFIER_PLAYER_ADJUST_EMBARKED_MOVEMENT 2;
+  // runs/h1_duels1171 t152-: Rome's heroic age, its embarked Warriors
+  // 3473455 and 3932214 on 4 Movement)
+  let n = seatWonderSum(state, seat, 'embarkedMoves') + goldenEmbarkedMoves(state, seat);
   for (const [id, v] of EMBARK_MOVE_TECHS) if (techs.includes(id)) n += v;
   return n;
 }

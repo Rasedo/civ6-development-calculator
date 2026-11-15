@@ -412,6 +412,23 @@
     - "- The centre's garrison term (0x24a180): FP(Combat incl. formation, 0x56dc90) less the wounded loss, less the base, where positive (H-1 1108 Jiaodong 30.8359375 = 2..."
     - "...hero 0x8ffac0) and the era's starting units (0x4580b0 through 0x4c1c10), raises it to 0x56dc90(unit, 0) — the unit's strength as it stands, its formation's in it — where 0x4bffa0 pas..."
   review: reviewed
+- addr: 0x56de20
+  final: 0x3a3720
+  kind: function
+  name: unitEra
+  semantics: "a unit's era (REQUIREMENT_UNIT_ERA_TYPE_MATCHES's subject, 0xb2c600): of its type's (+0xa0) PrereqTech's (+0x280 -> +0xc8) and PrereqCivic's (+0x270 -> +0xc0) eras the later by ChronologyIndex (+0x1c), the era's hash (+0x14) returned; with neither, its owner's era (0x467eb0, owner +0x2e0) where the type holds the tag CLASS_ALL_ERAS, else the era of the least ChronologyIndex (the Ancient)"
+  status: READ
+  cases:
+    - recording: h1_duels1165
+      turn: 130
+      value: player 1's Bombard 4063258 (Metal Casting, Renaissance) beside its Classical Sun Tzu holds maxMoves 2; record t129 its Medieval Crossbowman 4194315 on the General's plot maxMoves 3
+  impl:
+    - cpu/core/aura.ts:auraCoversEra
+    - cpu/data/units.ts:UNIT_ERA_INDEX
+    - gpu/core/sim_economy.py:_gen_aura_planes
+  readings:
+    - "C-132: the Great General's and Admiral's aura by its person's era; a barbarian stealth unit's forfeited hidden visibility — READ (0xb2c600, 0x56de20, 0x20ad00 at 0x20ae90, 0x4f1b20, 0x4e4560 at 0x4e45c8), both twins"
+  review: reviewed
 - addr: 0x56df30
   final: 0x3a3830
   kind: function

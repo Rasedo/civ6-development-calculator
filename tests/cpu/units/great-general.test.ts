@@ -62,13 +62,18 @@ describe('aura', () => {
     const state = newGame();
     const cap = seatOf(state, 0)!.cities[0].centerIndex;
     const gen = spawnUnit(state, 'GENERAL', cap, 0)!;
+    gen.gpAt = 0; // Boudica, a Classical General
     const gt = gen.tileIndex;
     const t2 = tileAt(state, gt, 2, [gt]);
     const t3 = tileAt(state, gt, 3, [gt, t2]);
     expect(t2).toBeGreaterThanOrEqual(0);
     expect(t3).toBeGreaterThanOrEqual(0);
-    const war = spawnUnit(state, 'WARRIOR', t2, 0)!;
+    const war = spawnUnit(state, 'SWORDSMAN', t2, 0)!;
     expect(generalAuraCS(state, war, war.tileIndex)).toBe(GENERAL_AURA_CS);
+    // a General with no person known lays none
+    gen.gpAt = undefined;
+    expect(generalAuraCS(state, war, war.tileIndex)).toBe(0);
+    gen.gpAt = 0;
     // range 3 → 0
     war.tileIndex = t3;
     expect(generalAuraCS(state, war, war.tileIndex)).toBe(0);
@@ -87,8 +92,9 @@ describe('aura', () => {
     const state = newGame();
     const cap = seatOf(state, 0)!.cities[0].centerIndex;
     const adm = spawnUnit(state, 'ADMIRAL', cap, 0)!;
+    adm.gpAt = 0; // Artemisia, a Classical Admiral
     const t2 = tileAt(state, adm.tileIndex, 2, [adm.tileIndex]);
-    const war = spawnUnit(state, 'WARRIOR', t2, 0)!;
+    const war = spawnUnit(state, 'SWORDSMAN', t2, 0)!;
     // a LAND unit gets nothing from an admiral
     expect(generalAuraCS(state, war, war.tileIndex)).toBe(0);
     // an EMBARKED land unit reads the ADMIRAL aura
@@ -115,15 +121,16 @@ describe('aura', () => {
       }
       expect(at).toBeGreaterThanOrEqual(0);
       const nb = neighbors(state.map, state.map.tiles[at]).find(land)!;
-      const atk = spawnUnit(state, 'WARRIOR', at, 0)!;
+      const atk = spawnUnit(state, 'SWORDSMAN', at, 0)!;
       atk.tileIndex = at;
-      atk.movesLeft = UNITS.WARRIOR.moves;
+      atk.movesLeft = UNITS.SWORDSMAN.moves;
       const def = spawnUnit(state, 'WARRIOR', nb.index, (state.seats[(0) + 1] as Seat).seat)!;
       def.tileIndex = nb.index;
       if (withGen) {
         const gt = tileAt(state, at, 1, [at, nb.index]);
         const g = spawnUnit(state, 'GENERAL', gt, 0)!;
         g.tileIndex = gt;
+        g.gpAt = 0;
       }
       const hp0 = def.hp;
       const res = meleeAttack(state, atk.id, nb.index, 0);

@@ -6156,12 +6156,15 @@ class SimEconomy:
         _z = torch.zeros(B, simbase.MAJOR_POOL_MAX, dtype=torch.bool, device=dev)
         m_g = self.major_unit_alive & (self.major_unit_type == gi) if gi >= 0 else _z
         m_a = self.major_unit_alive & (self.major_unit_type == ai) if ai >= 0 else _z
+        # the person each carries (`gpAt`): no known person lays no aura
+        m_g = m_g & (self.major_unit_gp_at >= 0)
+        m_a = m_a & (self.major_unit_gp_at >= 0)
         live = m_g | m_a
         present = bool(live.count_nonzero())
         if present:
             ar = torch.arange(1, m_g.shape[1] + 1, device=dev)
             fp = int((((self.major_unit_tile + 1) * (1 + 2 * m_a.long()) * ar
-                       * (self.major_unit_seat + 1)) * live.long()).sum()) + int(live.sum()) * 31
+                       * (self.major_unit_seat + 1) * (self.major_unit_gp_at + 2)) * live.long()).sum()) + int(live.sum()) * 31
         else:
             fp = 0
         key = (self.turn, self._gen_ver, fp)
@@ -6171,9 +6174,16 @@ class SimEconomy:
             self._gen_aura_cache = (key, None)
             return None
         off = self._gen_off
-        land = torch.zeros(B, O, T, dtype=torch.bool, device=dev)
-        sea = torch.zeros(B, O, T, dtype=torch.bool, device=dev)
+        # per seat and UNIT era: a person of era e covers the units of its era
+        # and the next, the last aura era its own alone (`auraCoversEra`)
+        NE = int(self._type_era.max()) + 2
+        last = self._gen_aura_last_era
+        land = torch.zeros(B, O, NE, T, dtype=torch.bool, device=dev)
+        sea = torch.zeros(B, O, NE, T, dtype=torch.bool, device=dev)
         mwin = tiles_from_offsets(self.major_unit_tile.clamp(min=0).reshape(-1), off, self.W, self.H, self.wrap_x).reshape(B, simbase.MAJOR_POOL_MAX, -1)
+        at = self.major_unit_gp_at.clamp(min=0, max=self._gp_era.shape[1] - 1)
+        era_g = self._gp_era[self._general_cls].take(at)
+        era_a = self._gp_era[self._admiral_cls].take(at)
 
         def dilate(mask: torch.Tensor, win: torch.Tensor) -> torch.Tensor:
             src = torch.zeros(B, T, dtype=torch.long, device=dev)
@@ -6181,21 +6191,30 @@ class SimEconomy:
             src.scatter_add_(1, w.clamp(min=0), (w >= 0).long())
             return src > 0
 
+        def lay(plane: torch.Tensor, row: int, mask: torch.Tensor, era: torch.Tensor) -> None:
+            for e in era[mask].unique().tolist():
+                d = dilate(mask & (era == e), mwin)
+                plane[:, row, e] |= d
+                if e < last:
+                    plane[:, row, e + 1] |= d
+
         for _row in range(O):
             rg = m_g & (self.major_unit_seat == _row)
             ra = m_a & (self.major_unit_seat == _row)
             if bool(rg.count_nonzero()):
-                land[:, _row] = dilate(rg, mwin)
+                lay(land, _row, rg, era_g)
             if bool(ra.count_nonzero()):
-                sea[:, _row] = dilate(ra, mwin)
+                lay(sea, _row, ra, era_a)
         out = (land, sea)
         self._gen_aura_cache = (key, out)
         return out
 
-    def _gen_aura_hit(self, seat: torch.Tensor, tile: torch.Tensor, naval: torch.Tensor) -> torch.Tensor:
+    def _gen_aura_hit(self, seat: torch.Tensor, tile: torch.Tensor, naval: torch.Tensor,
+                      utype: torch.Tensor) -> torch.Tensor:
         """The RAW aura predicate — bool, shaped like `tile` — for a unit of
-        `seat` standing on `tile`, ADMIRAL-keyed when `naval`
-        (naval|embarked) else GENERAL-keyed. Only a MAJOR owns an aura, so
+        type `utype` of `seat` standing on `tile`, ADMIRAL-keyed when `naval`
+        (naval|embarked) else GENERAL-keyed, of a person whose era covers the
+        type's (`auraCoversEra`). Only a MAJOR owns an aura, so
         callers pass -1 for anyone else and the predicate is False there.
         THE single predicate behind both
         halves of the aura, mirroring `aura.inGeneralAura` — `_gen_aura_cs`
@@ -6214,12 +6233,15 @@ class SimEconomy:
         # its seat is screened here, never clamped onto a major's plane
         valid = (seat >= 0) & (seat < self.n_majors) & (tile >= 0)
         g = seat.clamp(min=0, max=self.n_majors - 1)
-        idx = (g * self.T + tile.clamp(min=0)).reshape(self.B, -1)
+        NE = land.shape[2]
+        e = self._type_era.take(utype.clamp(min=0, max=self.NU - 1)).clamp(max=NE - 1)
+        idx = ((g * NE + e) * self.T + tile.clamp(min=0)).reshape(self.B, -1)
         land_hit = land.reshape(self.B, -1).gather(1, idx).reshape(tile.shape)
         sea_hit = sea.reshape(self.B, -1).gather(1, idx).reshape(tile.shape)
         return torch.where(naval, sea_hit, land_hit) & valid
 
-    def _gen_aura_cs(self, seat: torch.Tensor, tile: torch.Tensor, naval: torch.Tensor) -> torch.Tensor:
+    def _gen_aura_cs(self, seat: torch.Tensor, tile: torch.Tensor, naval: torch.Tensor,
+                     utype: torch.Tensor) -> torch.Tensor:
         """The +generalAuraCs adder [B] (dtype) for own military near an own
         GENERAL (land) / ADMIRAL (naval|embarked); `seat` < 0 scores nothing.
         An INTEGER add joining the
@@ -6230,7 +6252,7 @@ class SimEconomy:
         csty/cstyc, rngcs, vrngc, attacker side) and every
         CITY-STRIKE roll (cstk/estk, DEFENDER side). Absent from
         'rngrc' — TS does not add it there."""
-        return self._gen_aura_hit(seat, tile, naval).to(self.dtype) * self._gen_aura_cs_val
+        return self._gen_aura_hit(seat, tile, naval, utype).to(self.dtype) * self._gen_aura_cs_val
 
     def _seat_heal(self, pre: str) -> torch.Tensor:
         """What this pool's units heal — the refreshUnits rule.
@@ -6579,6 +6601,11 @@ class SimEconomy:
             out = out + (has_tech(self._sea_move_tech) & naval).long() * self._sea_move_bonus
         for ti, v in self._embark_move_techs:
             out = out + (has_tech(ti) & emb & ~naval).long() * v
+        # ...and Hic Sunt Dracones' Golden face on the embarked pool
+        # (`goldenEmbarkedMoves`)
+        if self._golden_move > 0:
+            dracones = self._golden_ded_table(self._ded_dracones).gather(1, r0) & ok
+            out = out + (dracones & emb & ~naval).long() * self._golden_move
         # the seat's wonders' Movement (the Great Lighthouse): a hull's, and
         # an embarked passenger's, summed over its COMPLETE wonders
         if self._wond_mv_on and bool((self.built_wonder_complete
@@ -6821,6 +6848,7 @@ class SimEconomy:
             self.major_unit_seat,
             self.major_unit_tile,
             self.unit_naval.take(self.major_unit_type) | self.major_unit_emb,
+            self.major_unit_type,
         )
         self.major_unit_aura_mp.copy_((hit & ok).long() * self._gen_aura_mp)
 

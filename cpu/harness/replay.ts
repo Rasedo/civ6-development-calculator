@@ -837,6 +837,20 @@ function spawnRecorded(ctx: Ctx, rec: TurnRecord, key: string): Unit | undefined
   const unit = recordedUnit(ctx, rec, key, ctx.state.nextUnitId);
   if (!unit) return undefined;
   ctx.state.nextUnitId += 1;
+  // a Great Person is the person of its class the record names its player
+  // granted last that no unit of the seat carries (its Great General's aura
+  // is its person's era's: runs/h1_duels1165 t130, player 1's Sun Tzu)
+  const cls = gpClassOfUnit(unit);
+  if (cls !== undefined && unit.gpAt === undefined) {
+    const owner = num(rec.units.find((x) => `${x.owner}:${x.id}` === key)?.owner);
+    const held = new Set(ctx.state.units.filter((u) => u.seat === unit.seat && u.type === unit.type).map((u) => u.gpAt));
+    const at = (Array.isArray(rec.greatPeople) ? rec.greatPeople : [])
+      .filter(([, player, c]) => player === owner && ctx.cat.greatPersonClasses?.[c] === `GREAT_PERSON_CLASS_${cls}`)
+      .sort((x, y) => y[4] - x[4])
+      .map(([ind]) => GREAT_PEOPLE[cls].findIndex((p) => p.id === aliasOrPrefixed(ctx.cat.greatPeople?.[ind] ?? '')))
+      .find((k) => k >= 0 && !held.has(k));
+    if (at !== undefined) unit.gpAt = at;
+  }
   ctx.state.units.push(unit);
   ctx.units.set(key, unit);
   // the unit added answers the engine's Train Unit quests

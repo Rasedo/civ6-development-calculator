@@ -17602,3 +17602,54 @@ its own accrual; `routeOriginFollowers` and the Chinguetti term of
   the 60 new games (1143, 1145, 1148, 1151, 1154, 1159, 1162, 1164, 1167,
   1176, 1178, 1187, 1189).
 - Open: none.
+
+## C-132: the Great General's and Admiral's aura by its person's era; a barbarian stealth unit's forfeited hidden visibility — READ (0xb2c600, 0x56de20, 0x20ad00 at 0x20ae90, 0x4f1b20, 0x4e4560 at 0x4e45c8), both twins
+
+`auraCoversEra`, `inGeneralAura` (cpu/core/aura.ts), `UNIT_ERA_INDEX`
+(cpu/data/units.ts); GPU `_gen_aura_planes`, `_gen_aura_hit`
+(gpu/core/sim_economy.py), every `_gen_aura_cs` caller passing the unit's
+type. The replay: each Great Person unit the import makes carries the
+person `History.people` bound it to (`importTurn`, cpu/harness/import.ts),
+and one `spawnRecorded` adds the person the record names its player granted
+last (cpu/harness/replay.ts).
+
+- THE INSTALL: a General's birth modifiers are its era's
+  (GREATPERSON_COMBAT_STRENGTH_AOE_<era>_LAND and GREATPERSON_MOVEMENT_AOE_
+  <era>_LAND, an Admiral's _SEA; every individual of Base, Expansion1/2 and
+  the DLC packs by its EraType), MODIFIER_PLAYER_UNITS_GRANT_ABILITY under
+  AOE_<era>_LAND_REQUIREMENTS: the land domain, REQUIREMENT_PLOT_ADJACENT_
+  TO_OWNER (0..2) and AOE_<era>_REQUIREMENTS, REQUIREMENTSET_TEST_ANY of
+  REQUIREMENT_UNIT_ERA_TYPE_MATCHES on its own era and the next
+  (AOE_INFORMATION_REQUIREMENTS its own alone).
+- REQUIREMENT_UNIT_ERA_TYPE_MATCHES (vtable 0xde6998; its name 0xb664f0,
+  its factory 0xb67000): its parse 0xb2c600 reads EraType and sets the
+  result 2 (met) where the subject unit's era 0x56de20 equals it, else 3.
+- THE UNIT'S ERA 0x56de20: of its type's PrereqTech's (+0x280) and
+  PrereqCivic's (+0x270) eras the later by ChronologyIndex (+0x1c),
+  returning the era's hash (+0x14); with neither, its owner's era (0x467eb0)
+  where the type holds CLASS_ALL_ERAS (no unit type does), else the era of
+  the least ChronologyIndex, the Ancient. No unit type has both prerequisites.
+- Confirming: duels1165 player 1's Sun Tzu (Classical, granted t125): the
+  Bombard 4063258 (Metal Casting, Renaissance) beside it holds maxMoves 2
+  (t130-137, the game's danger map on 2 Movement), the Crossbowman 4194315
+  (Machinery, Medieval) on its plot maxMoves 3 (record t129, the game's map
+  of t128 on 3); duels1144 t99-101 player 1's Archers 589827 / 524293
+  (Ancient) beside its General hold maxMoves 2.
+- A STEALTH UNIT'S FORFEITED HIDDEN VISIBILITY (m_bHiddenVisibilityForfeited,
+  the property +0x15f8, its value +0x1650, which the sight test 0x5033a0
+  reads: a forfeiter is seen as any unit): the battle 0x20ad00 sets it on the
+  attacker (0x20ae90..0x20aea8); the player's units' turn step 0x4f1b20
+  clears it on every unit of the player (0x4f1bff), run from its DoTurn
+  (0x4e4560 at 0x4e46cf) past the branch the barbarians take
+  (0x4e45c8 IsBarbarian -> 0x4e4711), so a barbarian's stays set
+  (`unitVisibleTo`'s barbarian arm, `markStealthAttack`; GPU
+  `_stealth_hidden`; the import's `History.struck` from the records' combat
+  log, a barbarian stealth unit that struck carried seen). Confirming:
+  duels1149 the barbarian Nuclear Submarine 2883601 strikes city-state 3's
+  Ranger at t206 / t207, its flag 1 from t207 through t249 (aiunits) with
+  strikes only at t215 / t225 / t226, in player 1's and city-state 3's
+  danger maps (85 on 95 plots) with none of their units beside it.
+- OPEN: the ability's class tags (ABILITY_GREAT_GENERAL_* on CLASS_RECON ..
+  CLASS_WARRIOR_MONK; the engines take every unit with a Combat); the
+  Admiral's aura on an embarked land unit (AOE_REQUIRES_SEA_DOMAIN on the
+  unit's type domain, the engines' aura by the embarked flag).

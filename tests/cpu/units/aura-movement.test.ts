@@ -25,6 +25,14 @@ function newGame(): GameState {
   return state;
 }
 
+/** a Classical Great General (Boudica): its aura covers the Classical and
+ *  Medieval units */
+function general(state: GameState, tile: number) {
+  const g = spawnUnit(state, 'GENERAL', tile, 0)!;
+  g.gpAt = 0;
+  return g;
+}
+
 /** A free, spawnable LAND tile at exactly `dist` from `ctr`. */
 function tileAt(state: GameState, ctr: number, dist: number): number {
   const c = state.map.tiles[ctr];
@@ -44,12 +52,12 @@ describe('general aura: +1 movement', () => {
     const ctr = seatOf(state, 0)!.cities[0].centerIndex;
     const near = tileAt(state, ctr, 1);
     const far = tileAt(state, ctr, 5);
-    const warriorIn = spawnUnit(state, 'WARRIOR', near, 0)!;
-    const warriorOut = spawnUnit(state, 'WARRIOR', far, 0)!;
-    const base = MP_SCALE * (UNITS.WARRIOR.moves ?? 2);
+    const warriorIn = spawnUnit(state, 'SWORDSMAN', near, 0)!;
+    const warriorOut = spawnUnit(state, 'SWORDSMAN', far, 0)!;
+    const base = MP_SCALE * (UNITS.SWORDSMAN.moves ?? 2);
 
     expect(generalAuraMP(state, warriorIn)).toBe(0); // no general yet
-    spawnUnit(state, 'GENERAL', ctr, 0);
+    general(state, ctr);
 
     expect(generalAuraMP(state, warriorIn)).toBe(GENERAL_AURA_MP);
     expect(generalAuraMP(state, warriorOut)).toBe(0);
@@ -61,10 +69,22 @@ describe('general aura: +1 movement', () => {
     expect(warriorOut.movesLeft).toBe(base);
   });
 
+  it('covers its own era and the next alone (AOE_CLASSICAL_REQUIREMENTS)', () => {
+    const state = newGame();
+    const ctr = seatOf(state, 0)!.cities[0].centerIndex;
+    general(state, ctr);
+    const ancient = spawnUnit(state, 'WARRIOR', tileAt(state, ctr, 1), 0)!;
+    const medieval = spawnUnit(state, 'MAN_AT_ARMS', tileAt(state, ctr, 1), 0)!;
+    const renaissance = spawnUnit(state, 'BOMBARD', tileAt(state, ctr, 1), 0)!;
+    expect(generalAuraMP(state, ancient)).toBe(0);
+    expect(generalAuraMP(state, medieval)).toBe(GENERAL_AURA_MP);
+    expect(generalAuraMP(state, renaissance)).toBe(0);
+  });
+
   it('never reaches civilians (the general itself included)', () => {
     const state = newGame();
     const ctr = seatOf(state, 0)!.cities[0].centerIndex;
-    const gen = spawnUnit(state, 'GENERAL', ctr, 0)!;
+    const gen = general(state, ctr);
     const builder = spawnUnit(state, 'BUILDER', tileAt(state, ctr, 1), 0)!;
     expect(inGeneralAura(state, gen, gen.tileIndex)).toBe(false);
     expect(generalAuraMP(state, builder)).toBe(0);
@@ -73,12 +93,14 @@ describe('general aura: +1 movement', () => {
   it('an aura unit that SPENT MP does not heal; one that sat still does', () => {
     const state = newGame();
     const ctr = seatOf(state, 0)!.cities[0].centerIndex;
-    spawnUnit(state, 'GENERAL', ctr, 0);
-    const moved = spawnUnit(state, 'WARRIOR', tileAt(state, ctr, 1), 0)!;
-    const still = spawnUnit(state, 'WARRIOR', tileAt(state, ctr, 2), 0)!;
+    general(state, ctr);
+    // a Medieval unit with no strategic resource: a Swordsman without Iron
+    // would not heal at all
+    const moved = spawnUnit(state, 'PIKEMAN', tileAt(state, ctr, 1), 0)!;
+    const still = spawnUnit(state, 'PIKEMAN', tileAt(state, ctr, 2), 0)!;
     refreshUnits(state); // both granted base+1, movesFull recorded
     const granted = moved.movesFull!;
-    expect(granted).toBe(MP_SCALE * (UNITS.WARRIOR.moves ?? 2) + GENERAL_AURA_MP);
+    expect(granted).toBe(MP_SCALE * (UNITS.PIKEMAN.moves ?? 2) + GENERAL_AURA_MP);
 
     moved.hp = 50;
     still.hp = 50;
@@ -96,9 +118,9 @@ describe('general aura: +1 movement', () => {
   it('the Fortify order ticks only for the unit that spent nothing', () => {
     const state = newGame();
     const ctr = seatOf(state, 0)!.cities[0].centerIndex;
-    spawnUnit(state, 'GENERAL', ctr, 0);
-    const moved = spawnUnit(state, 'WARRIOR', tileAt(state, ctr, 1), 0)!;
-    const still = spawnUnit(state, 'WARRIOR', tileAt(state, ctr, 2), 0)!;
+    general(state, ctr);
+    const moved = spawnUnit(state, 'SWORDSMAN', tileAt(state, ctr, 1), 0)!;
+    const still = spawnUnit(state, 'SWORDSMAN', tileAt(state, ctr, 2), 0)!;
     refreshUnits(state);
     moved.movesLeft = moved.movesFull! - 1;
     fortifyOrder(state, moved, 2);

@@ -96,6 +96,9 @@ def place_civilian(sim, seat: int, t: int, type_idx: int, hp: int = 100) -> int:
     sim.major_unit_charges[0, slot] = int(sim._type_charges[type_idx])
     sim.major_unit_fortify[0, slot] = 0
     sim.major_unit_emb[0, slot] = False
+    # a Great General / Admiral carries its person: queue position 0, a
+    # Classical one, whose aura covers the Classical and Medieval units
+    sim.major_unit_gp_at[0, slot] = 0 if type_idx in (sim._general_unit_idx, sim._admiral_unit_idx) else -1
     sim.civilian_at[0, t] = slot + sim.POOL_LO["major"]
     sim.unit_next[0] += 1
     sim._gen_ver += 1
@@ -204,21 +207,27 @@ def poke_aura_helper(rules, rj, path):
     t3 = tile_within(sim, ctr, 3, banned=[ctr, t1])
     assert t1 >= 0 and t3 >= 0
     B = sim.B
+    ids = [u["id"] for u in rules.units]
+    sword = torch.full((B,), ids.index("SWORDSMAN"), dtype=torch.long)    # Classical land
+    quad = torch.full((B,), ids.index("QUADRIREME"), dtype=torch.long)    # Classical naval
+    warrior = torch.full((B,), ids.index("WARRIOR"), dtype=torch.long)    # Ancient: no aura
     land = torch.zeros(B, dtype=torch.bool)   # land unit
     civ0 = torch.zeros(B, dtype=torch.long)   # seat 0 in the unified civ space
     # in range → +5, out of range → 0
-    a_in = float(sim._gen_aura_cs(civ0, torch.tensor([t1]), land)[0])
-    a_out = float(sim._gen_aura_cs(civ0, torch.tensor([t3]), land)[0])
+    a_in = float(sim._gen_aura_cs(civ0, torch.tensor([t1]), land, sword)[0])
+    a_out = float(sim._gen_aura_cs(civ0, torch.tensor([t3]), land, sword)[0])
+    a_old = float(sim._gen_aura_cs(civ0, torch.tensor([t1]), land, warrior)[0])
+    assert a_old == 0.0, f"a Classical General must not aura an Ancient unit, got {a_old}"
     assert a_in == CS, f"land aura in-range must be {CS}, got {a_in}"
     assert a_out == 0.0, f"land aura at range 3 must be 0, got {a_out}"
     # a GENERAL does NOT aura a NAVAL/embarked unit (needs an ADMIRAL)
-    a_nav = float(sim._gen_aura_cs(civ0, torch.tensor([t1]), torch.ones(B, dtype=torch.bool))[0])
+    a_nav = float(sim._gen_aura_cs(civ0, torch.tensor([t1]), torch.ones(B, dtype=torch.bool), quad)[0])
     assert a_nav == 0.0, f"GENERAL must not aura a naval unit, got {a_nav}"
     # another seat's unit standing by a SEAT-0 general → 0
-    a_civ = float(sim._gen_aura_cs(torch.ones(B, dtype=torch.long), torch.tensor([t1]), land)[0])
+    a_civ = float(sim._gen_aura_cs(torch.ones(B, dtype=torch.long), torch.tensor([t1]), land, sword)[0])
     assert a_civ == 0.0, f"a civ unit must not read seat 0's general aura, got {a_civ}"
     # barbarian (-1) → 0
-    a_barb = float(sim._gen_aura_cs(torch.full((B,), -1, dtype=torch.long), torch.tensor([t1]), land)[0])
+    a_barb = float(sim._gen_aura_cs(torch.full((B,), -1, dtype=torch.long), torch.tensor([t1]), land, sword)[0])
     assert a_barb == 0.0, f"barb must get no aura, got {a_barb}"
     # ADMIRAL: auras a NAVAL unit, not a LAND unit
     sim2 = build(rules, path)
@@ -226,8 +235,8 @@ def poke_aura_helper(rules, rj, path):
     ctr2 = int(sim2.city_center[0, 0, 0])
     place_civilian(sim2, 0, ctr2, ai)  # seat-0 admiral
     tt = tile_within(sim2, ctr2, 2, banned=[ctr2])
-    s_nav = float(sim2._gen_aura_cs(civ0, torch.tensor([tt]), torch.ones(B, dtype=torch.bool))[0])
-    s_land = float(sim2._gen_aura_cs(civ0, torch.tensor([tt]), torch.zeros(B, dtype=torch.bool))[0])
+    s_nav = float(sim2._gen_aura_cs(civ0, torch.tensor([tt]), torch.ones(B, dtype=torch.bool), quad)[0])
+    s_land = float(sim2._gen_aura_cs(civ0, torch.tensor([tt]), torch.zeros(B, dtype=torch.bool), sword)[0])
     assert s_nav == CS, f"admiral naval aura must be {CS}, got {s_nav}"
     assert s_land == 0.0, f"ADMIRAL must not aura a land unit, got {s_land}"
     print(f"  3 aura helper OK — GENERAL +{int(CS)} land<=2, ADMIRAL +{int(CS)} naval<=2; range/civ/domain gated")
@@ -237,7 +246,7 @@ def poke_aura_in_combat(rules, rj, path):
     """4. The aura in a REAL damage roll (_hostile_vs_unit, same-RNG two-run):
     a civ attacker within 2 of its own GENERAL deals strictly MORE; a seat-0
     defender within 2 of its own GENERAL takes strictly LESS."""
-    WARRIOR = [u["id"] for u in rules.units].index("WARRIOR")
+    SWORDSMAN = [u["id"] for u in rules.units].index("SWORDSMAN")  # Classical: a Classical General's
     gi = None
 
     def setup(with_atk_gen: bool, with_def_gen: bool):
@@ -252,8 +261,8 @@ def poke_aura_in_combat(rules, rj, path):
         dtile = tile_within(sim, ctr, 4)
         atile = adj_free(sim, dtile, banned=[ctr])
         assert dtile >= 0 and atile >= 0
-        pdef = place_mil(sim, 0, dtile, WARRIOR, hp=100)
-        ratk = place_mil(sim, 1, atile, WARRIOR, hp=100)
+        pdef = place_mil(sim, 0, dtile, SWORDSMAN, hp=100)
+        ratk = place_mil(sim, 1, atile, SWORDSMAN, hp=100)
         if with_atk_gen:  # a civ general within 2 of the civ attacker
             gt = tile_within(sim, atile, 1, banned=[dtile, atile, ctr])
             place_civilian(sim, 1, gt, gi)

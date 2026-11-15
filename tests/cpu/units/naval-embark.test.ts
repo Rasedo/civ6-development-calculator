@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { emptySeat, isCiv, seatOf, seatOfCityState, setTileOwner, setWar, tileCity } from '../../../cpu/core/seats';
+import { BARB_SEAT, emptySeat, isCiv, seatOf, seatOfCityState, setTileOwner, setWar, tileCity } from '../../../cpu/core/seats';
 import { stepThrough, makeMap, makeState, settleAt, tileAtCoords, grantTechs } from '../helpers';
 import { MP_SCALE } from '../../../cpu/data/constants';
 import { moveCostInto, unitPassable, canEmbark, stepUnit, waterEnterable, ownerHasTech, inEnemyZoc, spawnUnit, tileFreeForUnit, cityNavalCapable, trainableUnits, unitFullMoves, unitVisibleTo, visibleHostilesAt } from '../../../cpu/core/units';
@@ -620,6 +620,14 @@ describe('the naval raider is invisible', () => {
     expect(unitVisibleTo(state, raider, 0)).toBe(true);
     state.turn += 1;
     expect(unitVisibleTo(state, raider, 0)).toBe(false);
+  });
+
+  it("a barbarian hull that fired stays seen: their turn gives back no hidden visibility", () => {
+    const { state, raider } = scene('FRIGATE', 2);
+    raider.seat = BARB_SEAT;
+    raider.revealedTurn = state.turn;
+    state.turn += 5;
+    expect(unitVisibleTo(state, raider, 0)).toBe(true);
   });
 });
 

@@ -54,7 +54,7 @@ import { envoysWith, minorCity, mostEnvoysReceived } from '../core/cityStates';
 import { GOVERNOR_DEFAULT_PROMOTION, GOVERNOR_INDEX, GOVERNOR_PROMOTION_INDEX, GOVERNOR_PROMOTIONS, promotionBit, promotionBitValue } from '../data/governors';
 import { CIV_LEADERS, COMPETITIONS, EMERGENCY_TYPES, DEAL_ITEMS, DEAL_LUXURY, DEAL_TURNS, DEDICATION_COMMEMORATIONS, HEROIC_DEDICATIONS } from '../data/seats';
 import { updateCulturalDominance } from '../core/seatTurn';
-import { addCityPerm, addSeatPerm } from '../core/gpAbility';
+import { addCityPerm, addSeatPerm, gpClassOfUnit } from '../core/gpAbility';
 import { BUILDINGS, POWER_PLANT_IDS } from '../data/buildings';
 import { BUILT_WONDERS } from '../data/builtWonders';
 import { CIVICS } from '../data/civics';
@@ -69,7 +69,7 @@ import { ENHANCER_BELIEFS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, PANTHEONS, WORSHIP
 import { AGE_GOLDEN } from '../data/seats';
 import { CITY_STATE_SUZERAIN_BONUS, CITY_STATE_TYPES, LEVY_TURNS } from '../data/cityStates';
 import { ALPINE_FEATURE, FIONN_FEATURE, PROMO_CLASSES } from '../data/promotions';
-import { unitPromoRows } from '../core/promotions';
+import { promoFlag, unitPromoRows } from '../core/promotions';
 import { FEATURES, clearableFeatures, isFloodplains } from '../../world/features';
 import { RESOURCES } from '../../world/resources';
 import { hexDistance, neighborTile } from '../../world/hex';
@@ -509,6 +509,10 @@ export interface History {
   /** captured units, by the captor's `owner:id`, with the player id they
    *  were taken from (`UnitCaptured` in the records' action log) */
   captives: Map<string, number>;
+  /** the units that have struck a blow, by `owner:id`, with the last turn
+   *  the records' combat log (`TurnRecord.combatLog`) has one strike: a
+   *  stealth unit's forfeited hidden visibility (`Unit.revealedTurn`) */
+  struck: Map<string, number>;
   /** each unit's activity the Fortify order refuses, by `owner:id`: its last
    *  `UnitActivityChanged` in the records' action log (`foldActivities`) */
   activities: Map<string, UnitActivity>;
@@ -971,7 +975,7 @@ function foldActivities(acts: Map<string, UnitActivity>, rows: readonly unknown[
 }
 
 export function newHistory(): History {
-  return { firstTurn: -1, last: null, before: null, beforeThat: null, trained: new Map(), levied: new Map(), captives: new Map(), activities: new Map(), formed: new Set(), arrivals: new Map(), alpine: new Set(), fionn: new Set(), govSeated: new Map(), growthDrift: new Map(), lastHit: new Map(), gpSpent: new Map(), revealed: new Map(),
+  return { firstTurn: -1, last: null, before: null, beforeThat: null, trained: new Map(), levied: new Map(), captives: new Map(), struck: new Map(), activities: new Map(), formed: new Set(), arrivals: new Map(), alpine: new Set(), fionn: new Set(), govSeated: new Map(), growthDrift: new Map(), lastHit: new Map(), gpSpent: new Map(), revealed: new Map(),
     unknownSince: new Set(), cityFirstSeen: new Map(), nextPlotUnheld: new Set(), fireFood: new Map(), fireProd: new Map(), eventYields: new Map(), eventCounts: new Map(), openEvents: [], eventRead: new Map(), eventDraws: new Map(), droughts: [], bare: new Map(), discountDistricts: new Map(), discountPlaced: new Map(), ages: new Map(), moments: new Map(), momentsWorld: [], villageKinds: new Map(),
     eraTurns: [], gameEra: 0, eraStartTurn: 1, eraCountdown: -1, routeSeen: new Map(), routeCourse: new Map(), trail: new Map(), legs: new Map(), posts: new Map(), policySlots: new Map(),
     competition: null, podium: new Map(), culture: new Map(), tourismTo: new Map(),
@@ -1591,8 +1595,16 @@ export function advanceHistory(h: History, rec: TurnRecord, cat: Catalog): void 
     had[kind] += 1;
     h.villageKinds.set(pid, had);
   });
+  // each unit's blows in the combat log before the record (an attacker of
+  // object kind 1, a unit; runs/h1_duels1149 t206: the barbarian Nuclear
+  // Submarine 2883601's strike of t206 comes after player 1's start of t206,
+  // its map without it)
+  for (const c of rec.combatLog ?? []) {
+    if (c.atkObj === 1 && c.turn < rec.turn) h.struck.set(`${c.atkCiv}:${c.atkId}`, Math.max(c.turn, h.struck.get(`${c.atkCiv}:${c.atkId}`) ?? -1));
+  }
   const held = new Set(rec.units.map((u) => `${u.owner}:${u.id}`));
   for (const k of [...h.captives.keys()]) if (!held.has(k)) h.captives.delete(k);
+  for (const k of [...h.struck.keys()]) if (!held.has(k)) h.struck.delete(k);
   foldActivities(h.activities, rows);
   for (const k of [...h.activities.keys()]) if (!held.has(k)) h.activities.delete(k);
   formationRows(h.formed, rows);
@@ -2972,6 +2984,11 @@ export function importTurn(rec: TurnRecord, cat: Catalog, history?: History): Im
     if (history?.fionn.has(`${u.owner}:${u.id}`) && fionnChassis(unit.type)) unit.fionn = true;
     const levy = history?.levied.get(`${u.owner}:${u.id}`);
     if (levy !== undefined && seatOfGame(levy) !== NO_SEAT) unit.leviedFrom = seatOfGame(levy);
+    // a barbarian stealth unit that has struck stands seen (`unitVisibleTo`:
+    // their turn gives back no forfeited hidden visibility)
+    const hider = !!def.stealth || promoFlag(unit, 'STEALTH');
+    const struck = isBarbSeat(seat) && hider ? history?.struck.get(`${u.owner}:${u.id}`) : undefined;
+    if (struck !== undefined) unit.revealedTurn = struck;
     const taken = history?.captives.get(`${u.owner}:${u.id}`);
     if (taken !== undefined && seatOfGame(taken) !== NO_SEAT && seatOfGame(taken) !== unit.seat) unit.originalOwner = seatOfGame(taken);
     // a major's rider in its formation, its escort the fighter on its plot
@@ -3001,6 +3018,16 @@ export function importTurn(rec: TurnRecord, cat: Catalog, history?: History): Im
     }
   }
   state.nextUnitId = nextId;
+  // each Great Person unit carries the person the records bound it to
+  // (`History.people`): its Great General's aura is its person's era's
+  // (runs/h1_duels1165 t128: player 1's Sun Tzu lays its Movement on the
+  // Medieval Crossbowman 4194315 beside it)
+  for (const [ind, p] of history?.people ?? []) {
+    const unit = p.unit === null || p.spent !== null ? undefined : unitByKey.get(p.unit);
+    const cls = unit ? gpClassOfUnit(unit) : undefined;
+    const at = cls === undefined ? -1 : GREAT_PEOPLE[cls].findIndex((x) => x.id === aliasOrPrefixed(cat.greatPeople?.[ind] ?? ''));
+    if (unit && at >= 0) unit.gpAt = at;
+  }
 
   // the World Congress, then the build queues: last, so the prices the
   // engine locks at queueing read the whole imported state

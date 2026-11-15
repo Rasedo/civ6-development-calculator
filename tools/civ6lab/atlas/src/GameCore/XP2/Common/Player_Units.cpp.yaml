@@ -159,6 +159,20 @@
     - "C-110 / C-99: a placement resets the fortification, a struck SENTRY wakes, a siege striker asks no Movement — READ (0x586d40 at 0x587789, 0x20d280 at 0x20d5ce, 0x775340 at 0x7754c7), both twins"
     - "C-98 / C-130 / C-96: a levied unit home with no plot dies on its minor's list; the unit term's upgrade Gold is the minor's; the pick refuses a held building under its pillaged district — READ (0x93fa10 at 0x93ff0b, 0x7cb8b0, 0x4cb350, 0x7f2970 at 0x7f3bd1), LAB (the placement's embark state, the unit term's Gold on the records), both twins"
   review: reviewed
+- addr: 0x4f1b20
+  final: 0x34e9d0
+  kind: function
+  name: unitsDoTurn
+  semantics: "the player's units' turn step, from its DoTurn (0x4e4560 at 0x4e46cf, skipped for the barbarians at 0x4e45c8): every unit of the list (+0xd8, next +0x10) has its m_bHiddenVisibilityForfeited (the property +0x15f8, value +0x1650) set false (0x4f1bff), and each unit not dead (+0x1710) whose Units_XP2 row holds a resource maintenance adds it to the player's tally (+0x1110)"
+  status: READ
+  cases:
+    - recording: h1_duels1149
+      turn: 209
+      value: the barbarian Nuclear Submarine 2883601 m_bHiddenVisibilityForfeited 1 from t207 (its strikes of t206 / t207) through t249 (aiunits), in player 1's and city-state 3's danger maps
+  impl: [cpu/core/units.ts:unitVisibleTo, gpu/core/sim_masks.py:_stealth_hidden]
+  readings:
+    - "C-132: the Great General's and Admiral's aura by its person's era; a barbarian stealth unit's forfeited hidden visibility — READ (0xb2c600, 0x56de20, 0x20ad00 at 0x20ae90, 0x4f1b20, 0x4e4560 at 0x4e45c8), both twins"
+  review: reviewed
 - addr: 0x4f2310
   final: 0x2c4360
   kind: function

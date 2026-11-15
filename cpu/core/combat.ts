@@ -606,13 +606,14 @@ export function supportCount(state: GameState, defTileIndex: number, defender: U
   return n;
 }
 
-// Great General / Great Admiral aura. Real Civ 6 grants nearby own
+// Great General / Great Admiral aura. Civ 6 grants nearby own
 // units +5 CS AND +1 MP. An own LAND military unit within GENERAL_AURA_RANGE of
 // an own live GENERAL — or an own NAVAL/EMBARKED unit within range of an own
-// live ADMIRAL — gains +GENERAL_AURA_CS at every damage-roll site (attack AND
+// live ADMIRAL — of the person's era or the next (`auraCoversEra`) gains
+// +GENERAL_AURA_CS at every damage-roll site (attack AND
 // defense), an INTEGER add joining the quantized assembly (q=round(Δ·10)
 // preserved) exactly like the JUST_WAR / DEFENDER_OF_THE_FAITH religion adders. "Own" = same
-// owner AND civId. The GENERAL/ADMIRAL units themselves are combat-0 civilians
+// owner. The GENERAL/ADMIRAL units themselves are combat-0 civilians
 // and never trigger this on their own account.
 //
 // The scope is every unit-vs-unit roll AND every roll where a unit fights
@@ -2004,10 +2005,11 @@ export function cityStateAttackable(state: GameState, cityState: CityState, seat
 }
 
 /**
- * CIV6 (Unit): "if a stealth unit attacks, it will become visible for a turn
- * before becoming invisible again" — so the blow stamps the live turn and
- * `unitVisibleTo` reads it until the turn rolls over. No AIR chassis is a
- * stealth unit, so the air path carries no stamp.
+ * A stealth unit that attacks forfeits its hidden visibility (the battle
+ * 0x20ad00 at 0x20ae90) — so the blow stamps the live turn and
+ * `unitVisibleTo` reads it until its player's turn gives it back, a
+ * barbarian's never. No AIR chassis is a stealth unit, so the air path
+ * carries no stamp.
  */
 function markStealthAttack(state: GameState, u: Unit): void {
   if (UNITS[u.type]?.stealth || promoFlag(u, 'STEALTH')) u.revealedTurn = state.turn;
