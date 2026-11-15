@@ -137,9 +137,9 @@ describe('Workshop of the World', () => {
     const city = settleAt(state, tileAtCoords(state.map, 7, 7).index, 0);
     expect(stockpileCap(state, 0)).toBe(STOCKPILE_CAP_BASE);
     city.buildings.push('LIGHTHOUSE');
-    expect(stockpileCap(state, 0)).toBe(STOCKPILE_CAP_BASE + 10);
+    expect(stockpileCap(state, 0)).toBe(STOCKPILE_CAP_BASE + 5);
     city.buildings.push('SEAPORT');
-    expect(stockpileCap(state, 0)).toBe(STOCKPILE_CAP_BASE + 20);
+    expect(stockpileCap(state, 0)).toBe(STOCKPILE_CAP_BASE + 10);
   });
 
   it('gives a Military Engineer two more charges', () => {

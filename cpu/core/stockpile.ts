@@ -54,11 +54,12 @@ export function stockOf(state: GameState, seat: number, resourceId: string): num
 }
 
 /**
- * CIV6 (GS): "The maximum stockpile amount is initially 50 for each resource
- * but constructing Encampment buildings in your empire (Barracks, Armory,
- * etc.) will increase your maximum stockpile by 10 per building for all
- * resources." A building in a pillaged district is dark here for every other
- * purpose, so it does not raise the ceiling either. A city-state's one city
+ * THE STOCKPILE CAP (0x4aabe0): the resource's StockpileCap through the game
+ * speed, plus what each Encampment building's
+ * EFFECT_ADJUST_PLAYER_RESOURCE_STOCKPILE_CAP adds, its Amount through the
+ * game speed (0x4a7960) — 25 and 5 a building online. A building in a
+ * pillaged district is dark here for every other purpose, so it does not
+ * raise the ceiling either. A city-state's one city
  * counts as a major's do.
  */
 export function stockpileCap(state: GameState, seat: number): number {
@@ -69,10 +70,11 @@ export function stockpileCap(state: GameState, seat: number): number {
       if (BUILDINGS[id]?.district === 'ENCAMPMENT' && !dark.has(id)) n += 1;
     }
   }
-  // CIV6 (EFFECT_ADJUST_PLAYER_RESOURCE_STOCKPILE_CAP): the roster's per-building rows
+  // CIV6 (EFFECT_ADJUST_PLAYER_RESOURCE_STOCKPILE_CAP): the roster's
+  // per-building rows, each Amount through the game speed (0x4a7960)
   let extra = 0;
   for (const r of getModifiers(state, seat).stockpileCap) {
-    for (const city of capCities(state, seat)) if (city.buildings.includes(r.building)) extra += r.amount;
+    for (const city of capCities(state, seat)) if (city.buildings.includes(r.building)) extra += scaleByGameSpeed(r.amount);
   }
   return STOCKPILE_CAP_BASE + STOCKPILE_CAP_PER_ENCAMPMENT_BUILDING * n + extra;
 }

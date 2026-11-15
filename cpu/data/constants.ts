@@ -608,10 +608,14 @@ export const TRADE_EDGES_MAX = srcConst('trade.edgesMax', 2048, {
  *  player's per-resource extra +0x858), 25 online. */
 export const STOCKPILE_CAP_BASE = srcConst('strategic.capBase', scaleByGameSpeed(50),
   xml('Resource_Consumption', 'ResourceType=RESOURCE_HORSES', 'StockpileCap', { scale: GAME_SPEED }));
-export const STOCKPILE_CAP_PER_ENCAMPMENT_BUILDING =
-  srcConst('strategic.capPerEncampmentBuilding', 10, {
-    pedia: 'the GS Resources page ("increase your maximum stockpile by 10 per building")',
-  });
+/** What each Encampment building adds to the cap: its
+ *  EFFECT_ADJUST_PLAYER_RESOURCE_STOCKPILE_CAP Amount through the game speed
+ *  (0x4a7960: 0x5254d0 of the Amount added to the per-resource extra), 5
+ *  online — runs/h1_duels1158 city-state 3's Horses held at 32 at its AI
+ *  turn (the cap 30 at the turn end, the turn's 2 landed since) from its
+ *  Barracks on, Equestrian Orders 20 as logged t63-79. */
+export const STOCKPILE_CAP_PER_ENCAMPMENT_BUILDING = srcConst('strategic.capPerEncampmentBuilding', scaleByGameSpeed(10),
+  xml('ModifierArguments', 'ModifierId=BARRACKS_ADJUST_RESOURCE_STOCKPILE_CAP&Name=Amount', 'Value', { scale: GAME_SPEED }));
 
 /** Units_XP2 ResourceCost of every unit in this roster that asks for a
  *  production strategic resource (Horseman, Swordsman, Knight, Musketman,

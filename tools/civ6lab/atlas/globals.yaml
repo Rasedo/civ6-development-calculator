@@ -74,6 +74,7 @@
   readings:
     - "C-96: the improvement value's resource copies, a minor's strategic copies, the district count — READ (0x7a58f0's count, 0x4a93c0, 0x1ae8a0, 0x1ae8f0), a LAB (a city-state's Great General weight)"
     - "C-96: the improvement value's resource copies, a minor's strategic copies, the district count"
+    - "C-130 / C-98: the space race analyzer's Amount, the stockpile cap's building extra, a district project on a pillaged district — READ (0x6bde60, 0xf04030 -> vtable 0xd63700, 0x4a7960 from 0xb3f250 / 0xb3f860), LAB (the project's head check), both twins"
   context:
     - "...onRate (+0x24) x (1 + 0.01 x the city's +0x1e00 at the plot's terrain +0x2c, 0x4a9ff0; @0xd136f0 0.01, @0xcfc9f8 1.0) from T to H; the count passed is its whole part (`sar 8`). The plo..."
   review: reviewed
@@ -490,6 +491,25 @@
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "- EFFECT_ADJUST_UNIT_MOVEMENT (registry 0x6c9640 at 0x6cb139, object @f04110, vtable 0xd63688; parser 0x6bd390: Amount whole at +8; analyzer 0x6bd520): with the context's unit (+0x9..."
+  review: imported
+- addr: 0xd63700
+  kind: global
+  status: PARTLY
+  readings:
+    - "C-130 / C-98: the space race analyzer's Amount, the stockpile cap's building extra, a district project on a pillaged district — READ (0x6bde60, 0xf04030 -> vtable 0xd63700, 0x4a7960 from 0xb3f250 / 0xb3f860), LAB (the project's head check), both twins"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...ing extra, a district project on a pillaged district — READ (0x6bde60, 0xf04030 -> vtable 0xd63700, 0x4a7960 from 0xb3f250 / 0xb3f860), LAB (the project's head check), both twins"
+    - ...T_ADJUST_SPACE_RACE_PROJECTS_PRODUCTION the object at 0xf04030 (0x6cadcb), whose vtable 0xd63700 holds the parser 0x6bde60 at +0 and the analyzer 0x6be2d0 at +8. The parser reads Amoun...
+  review: imported
+- addr: 0xd63718
+  kind: global
+  status: PARTLY
+  readings:
+    - "C-130 / C-98: the space race analyzer's Amount, the stockpile cap's building extra, a district project on a pillaged district — READ (0x6bde60, 0xf04030 -> vtable 0xd63700, 0x4a7960 from 0xb3f250 / 0xb3f860), LAB (the project's head check), both twins"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...ntegrated Space Cell's 15: 1.1484). The parser 0x6be5b0 stands at +0 of the next vtable 0xd63718 (beside 0x6be6f0), another analyzer's."
   review: imported
 - addr: 0xd63760
   kind: global
@@ -1137,6 +1157,16 @@
   context:
     - "- EFFECT_ADJUST_IMPROVEMENT_HOUSING, READ (registry 0x6c9640: the name's object @0xf03ef8, its vtable @0xd62e78, slot 1 0x6ad2b0): with the modifier's arguments (r8) and the con..."
   review: reviewed
+- addr: 0xf04030
+  kind: global
+  status: PARTLY
+  readings:
+    - "C-130 / C-98: the space race analyzer's Amount, the stockpile cap's building extra, a district project on a pillaged district — READ (0x6bde60, 0xf04030 -> vtable 0xd63700, 0x4a7960 from 0xb3f250 / 0xb3f860), LAB (the project's head check), both twins"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...ockpile cap's building extra, a district project on a pillaged district — READ (0x6bde60, 0xf04030 -> vtable 0xd63700, 0x4a7960 from 0xb3f250 / 0xb3f860), LAB (the project's head check), b..."
+    - ...lyzer table (0x6c9640) hands EFFECT_ADJUST_SPACE_RACE_PROJECTS_PRODUCTION the object at 0xf04030 (0x6cadcb), whose vtable 0xd63700 holds the parser 0x6bde60 at +0 and the analyzer 0x...
+  review: imported
 - addr: 0xf04278
   kind: global
   semantics: EFFECT_MOUNTAIN_PORTAL's static analyzer (vtable 0xd632c8).

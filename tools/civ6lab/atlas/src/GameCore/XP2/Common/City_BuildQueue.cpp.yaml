@@ -215,6 +215,7 @@
   readings:
     - "C-127 / C-96: the improvement pick's unit test, a Fort's tree, Find Available Unit's types, a held district not OnePerCity, the walls' repair cooldown — READ (0x5c9a00 at 0x5c9c85..0x5c9ca4, 0x35ede0 at 0x35f058..0x35f05f, 0x5ccc10, 0x7f6ea0 at 0x7f7028..0x7f72b7, 0x7ec7b0 at 0x7ec90f..0x7eca80, 0x16f7b0 at 0x16fd9f..0x16fe10, 0x198180, 0x248800 at 0x2488d6..0x2488f9), both twins"
     - "C-97: the World Congress AI — the evaluation, the outcome, the votes, the hints, the option values and the targets READ"
+    - "C-130 / C-98: the space race analyzer's Amount, the stockpile cap's building extra, a district project on a pillaged district — READ (0x6bde60, 0xf04030 -> vtable 0xd63700, 0x4a7960 from 0xb3f250 / 0xb3f860), LAB (the project's head check), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ...costliest (+0x20) project of row +0xe8 bit 2 (SpaceRace) one of its cities may advance (0x16f7b0), else, pursuing conquest, of bit 8 (WMD); B, not pursuing the technology victory, the...
@@ -823,6 +824,7 @@
     - "C-96: the project value — READ (0x7b28c0, the PROJECTS table 0x5ce970), PARTLY READ (the space-race standing 0x7b8a30, the diplomatic-victory rows, the repair count), unwired"
     - "C-96: the project value's weapon test, CanConstruct's district gates and Nazca's early turns — READ (0x7b2aee -> +0x148, 0xa99160; 0x170450's exit 0x17143f, 0x406c00 / +0xb08), a fit for the rest, both twins"
     - "C-96: the project value's weapon test, CanConstruct's district gates and Nazca's early turns"
+    - "C-130 / C-98: the space race analyzer's Amount, the stockpile cap's building extra, a district project on a pillaged district — READ (0x6bde60, 0xf04030 -> vtable 0xd63700, 0x4a7960 from 0xb3f250 / 0xb3f860), LAB (the project's head check), both twins"
   review: reviewed
 - addr: 0x17bb40
   kind: function

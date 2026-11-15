@@ -162,9 +162,9 @@ def test_stockpile_and_charges(rules, path) -> None:
     play(sim, 0, "ENGLAND")
     base = int(sim._stockpile_cap(0)[B0])
     sim.city_bldg[B0, 0, 0, BLDGS.index("LIGHTHOUSE")] = True
-    assert int(sim._stockpile_cap(0)[B0]) == base + 10, "Workshop of the World's ceiling"
+    assert int(sim._stockpile_cap(0)[B0]) == base + 5, "Workshop of the World's ceiling"
     sim.city_bldg[B0, 0, 0, BLDGS.index("SEAPORT")] = True
-    assert int(sim._stockpile_cap(0)[B0]) == base + 20
+    assert int(sim._stockpile_cap(0)[B0]) == base + 10
     play(sim, 0, "ROME")
     assert int(sim._stockpile_cap(0)[B0]) == base, "the ceiling outlived England"
     me = UNITS.index("MILITARY_ENGINEER")

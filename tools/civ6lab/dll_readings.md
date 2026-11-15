@@ -17734,3 +17734,49 @@ trained one (`freeFinish` / `_free_city_build`); `cityNavalCapable`
   hold the sea bit; the engines read every drowned neighbour as no sea. A
   major's new unit lands on the centre in the engines (an aircraft on its
   Aerodrome, `airTrainTile`).
+
+## C-130 / C-98: the space race analyzer's Amount, the stockpile cap's building extra, a district project on a pillaged district — READ (0x6bde60, 0xf04030 -> vtable 0xd63700, 0x4a7960 from 0xb3f250 / 0xb3f860), LAB (the project's head check), both twins
+
+`EFFECT_ADJUST_SPACE_RACE_PROJECTS_PRODUCTION` (cpu/core/aiModifiers.ts),
+`_pol_analyze` (gpu/core/sim_policy.py); `stockpileCap` (cpu/core/stockpile.ts),
+`STOCKPILE_CAP_PER_ENCAMPMENT_BUILDING`, `_stockpile_cap` (gpu/core/sim_seats.py);
+`minorBuild`'s head check (cpu/core/minorBuild.ts), `_minor_build`
+(gpu/core/sim_minors.py).
+
+- THE ANALYZER'S PARSER: the analyzer table (0x6c9640) hands
+  EFFECT_ADJUST_SPACE_RACE_PROJECTS_PRODUCTION the object at 0xf04030
+  (0x6cadcb), whose vtable 0xd63700 holds the parser 0x6bde60 at +0 and the
+  analyzer 0x6be2d0 at +8. The parser reads Amount through 0xc7dc60, takes
+  its whole part and stores fx(Amount x 0.01f) at +8 (the 0.01 at 0xd136f0,
+  floor | trunc(frac x 256)), as EFFECT_ADJUST_UNIT_PRODUCTION's 0x6b1d00
+  does; 0x17b890 adds it to 1.0 (Integrated Space Cell's 15: 1.1484). The
+  parser 0x6be5b0 stands at +0 of the next vtable 0xd63718 (beside
+  0x6be6f0), another analyzer's.
+- CONFIRMED: runs/h1_duels1157 city-state 3, the two lasers at the city's
+  Production as logged: t206 13.2 (23 turns, 20 lifted) 10, t207-211 13.6
+  (23 / 20) 10, t212-227 14.4 (21 / 19) 6, t228-230 11.4 / 11.1 (27 / 23,
+  28 / 24) 12, t231 12.0 (25 / 22) 8, t232 11.7 (26 / 23) 10, as logged.
+- THE CAP'S BUILDING EXTRA: 0x4a7960 (Player_Resources, the resource, the
+  amount) adds speed(amount) (0x5254d0) to the per-resource extra (the watched
+  array at +0x800 the cap 0x4aabe0 reads at +0x858); its callers 0xb3f250 /
+  0xb3f860 walk the resources for EFFECT_ADJUST_PLAYER_RESOURCE_STOCKPILE_CAP
+  (the Encampment buildings' Amount 10, England's harbour rows): 5 a building
+  online.
+- CONFIRMED: runs/h1_duels1158 city-state 3's Horses at its AI turn held at
+  27 (the cap 25 at the turn end, the turn's 2 landed since) to its
+  Barracks, then 29, 31, 32 and held (the cap 30):
+  Equestrian Orders 32 / 27 / 22 / 20 at t54-60 / t61 / t62 / t63-79 and 30
+  from t80 (the era's 75 / 20 a copy), as logged.
+- A DISTRICT PROJECT ON A PILLAGED DISTRICT leaves the queue at the step's
+  head check unworked, its progress kept, the turn's Production banked
+  nowhere (LAB: the check's project branch unread): runs/h1_duels1179
+  city-state 4's Campus pillaged in its t29, Campus Research Grants at 26.5
+  of 30 unworked in t30 (no City_BuildQueue row, the build queue's overflow
+  +0x1f4 0 at t30's close, 3.5 at t31's on the empty queue, record 31's
+  queue empty), back at 26.5 in record 33 and completed in t33; the Campus
+  pillaged again in t241, the project held at 79.2, the overflow 0 at
+  t242's close and 9.3 / 18.6 / 27.9 t243-245. Its Great Scientist points,
+  the three governments' GREAT_PEOPLE terms and Political Philosophy 319.2
+  at t31 as logged (395.2 with the completion).
+- Open: the head check's test for a project (CanProduce 0x16f7b0 lets a
+  pillaged district through); the analyzer 0x6be6f0's effect.

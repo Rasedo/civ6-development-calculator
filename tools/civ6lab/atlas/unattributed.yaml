@@ -5281,6 +5281,7 @@
     - "C-130: the analyzers a minor's policy jobs never reach, the treaties on a minor's queue, a major's cached net income — READ, both twins"
     - "C-130: the damage modifier's analyzer, a unit's tag requirement, the player's units walked by pool slot, a minor's one-time projects — READ (0x6bba30, 0x6d2610, 0x69ec70), both twins"
     - "C-130: the pillage analyzers, the Favor grant's and the extra accumulation's analyzers, CITY_HAS_DISTRICT's evaluator, the Luxury Policy's players — READ (0x6b7ec0, 0x6b92c0, 0x6c2f90, 0x6ae390, 0x6d3d50), both twins"
+    - "C-130 / C-98: the space race analyzer's Amount, the stockpile cap's building extra, a district project on a pillaged district — READ (0x6bde60, 0xf04030 -> vtable 0xd63700, 0x4a7960 from 0xb3f250 / 0xb3f860), LAB (the project's head check), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "- The registry (`reg.py` over 0x6c9640): 211 effect names, 27 collections, 66 requirements; the effects the policies and gover..."
@@ -10238,6 +10239,26 @@
     - ...search flag 4 (the planning's 0x115) only a mountain (terrain bits 0x4924) or a canyon (0xb3c380) opens one.
     - "...), a wonder (the plot info's +0x1e, IsWonderComplete 0x81330's field) or is a canyon (0xb3c380) skips the improvement loop: its IMPROVEMENTS row stays as an earlier analysis wrote it..."
   review: reviewed
+- addr: 0xb3f250
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-130 / C-98: the space race analyzer's Amount, the stockpile cap's building extra, a district project on a pillaged district — READ (0x6bde60, 0xf04030 -> vtable 0xd63700, 0x4a7960 from 0xb3f250 / 0xb3f860), LAB (the project's head check), both twins"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...oject on a pillaged district — READ (0x6bde60, 0xf04030 -> vtable 0xd63700, 0x4a7960 from 0xb3f250 / 0xb3f860), LAB (the project's head check), both twins"
+    - ...ource extra (the watched array at +0x800 the cap 0x4aabe0 reads at +0x858); its callers 0xb3f250 / 0xb3f860 walk the resources for EFFECT_ADJUST_PLAYER_RESOURCE_STOCKPILE_CAP (the En...
+  review: imported
+- addr: 0xb3f860
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-130 / C-98: the space race analyzer's Amount, the stockpile cap's building extra, a district project on a pillaged district — READ (0x6bde60, 0xf04030 -> vtable 0xd63700, 0x4a7960 from 0xb3f250 / 0xb3f860), LAB (the project's head check), both twins"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...pillaged district — READ (0x6bde60, 0xf04030 -> vtable 0xd63700, 0x4a7960 from 0xb3f250 / 0xb3f860), LAB (the project's head check), both twins"
+    - ...the watched array at +0x800 the cap 0x4aabe0 reads at +0x858); its callers 0xb3f250 / 0xb3f860 walk the resources for EFFECT_ADJUST_PLAYER_RESOURCE_STOCKPILE_CAP (the Encampment buil...
+  review: imported
 - addr: 0xb468d0
   kind: function
   semantics: adds its Amount (WC_RES_MODIFY_CITY_STATE_TRADE_YIELD 100) into Player::Congress's int vector +0x4b8 indexed by MinorCivBonusType.
@@ -10809,6 +10830,16 @@
     - "...\"SELECT ModifierId from DistrictModifiers where DistrictType = ? ORDER BY ModifierId\" (0xc7a880): the Aqueduct's, the Bath's, the Cothon's and the Suguba's; no specialty district carr..."
     - "...20 at 0x7adc10): GlobalAI +0x39a8 by district (0x675e40), filled at 0x6e0736..0x6e08f5 (0xc7a880): only the Aqueduct's, Bath's, Cothon's, Suguba's."
   review: reviewed
+- addr: 0xc7dc60
+  final: 0x953e10
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-130 / C-98: the space race analyzer's Amount, the stockpile cap's building extra, a district project on a pillaged district — READ (0x6bde60, 0xf04030 -> vtable 0xd63700, 0x4a7960 from 0xb3f250 / 0xb3f860), LAB (the project's head check), both twins"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - ...parser 0x6bde60 at +0 and the analyzer 0x6be2d0 at +8. The parser reads Amount through 0xc7dc60, takes its whole part and stores fx(Amount x 0.01f) at +8 (the 0.01 at 0xd136f0, floo...
+  review: imported
 - addr: 0xc7e9b0
   final: 0x954be0
   kind: function

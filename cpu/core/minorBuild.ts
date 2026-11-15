@@ -1264,7 +1264,19 @@ export function minorBuild(state: GameState, cityState: CityState, production: n
   // progress kept (0x17f5a0), and the step works what follows — nothing in a
   // minor's queue (runs/h1_duelq1124 Granada t167: its Barracks in hand, the
   // Encampment pillaged at t166's close, the queue empty in record 168 and
-  // the Barracks back at 3 after its first turn at t187)
+  // the Barracks back at 3 after its first turn at t187). A district project
+  // whose district stands pillaged leaves the queue unworked, its progress
+  // kept, the turn's Production banked nowhere (runs/h1_duels1179
+  // city-state 4: its Campus pillaged in t29, Campus Research Grants held at
+  // 26.5 of 30 through t30, the queue empty in record 31, the overflow 0 at
+  // t30's close and 3.5 at t31's; the Campus pillaged again in t241, the
+  // project held at 79.2, the overflow 0 at t242's close, then 9.3 / 18.6 /
+  // 27.9 on the empty queue t243-245)
+  if ('project' in item && PROJECTS[item.project]?.district !== 'CITY_CENTER'
+    && minorProjectHome(state, cityState, item.project)?.districtPillaged) {
+    minorSetItem(state, cityState, null);
+    return;
+  }
   if ('building' in item && !minorQueueOk(state, cityState, item)) item = { none: true };
   minorSetItem(state, cityState, 'none' in item ? null : item);
   if ('none' in item) {

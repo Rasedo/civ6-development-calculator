@@ -810,6 +810,7 @@
   impl: [cpu/core/aiModifiers.ts:ANALYZERS]
   readings:
     - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
+    - "C-130 / C-98: the space race analyzer's Amount, the stockpile cap's building extra, a district project on a pillaged district — READ (0x6bde60, 0xf04030 -> vtable 0xd63700, 0x4a7960 from 0xb3f250 / 0xb3f860), LAB (the project's head check), both twins"
   context:
     - "...D, Ilkum's EFFECT_ADJUST_UNIT_PRODUCTION 0x6b2350 (@f040d0, vtable 0xd63100; its parser 0x6b1d00 stores UnitType +8 and fx(Amount x 0.01f) +0x10): with a player, per city of its list (..."
   review: imported
@@ -1403,16 +1404,36 @@
   context:
     - "...t x 0.01), weighted, between, halved (sar 9). EFFECT_ADJUST_PLAYER_FAITH_FROM_DISPERSAL 0x6bdd40: min(the knowledge base's camps +0x648, 5) x Amount, Faith weighted, discounted from th..."
   review: reviewed
+- addr: 0x6bde60
+  final: 0x46ef40
+  kind: function
+  name: parseSpaceRaceProjectsProduction
+  semantics: "EFFECT_ADJUST_SPACE_RACE_PROJECTS_PRODUCTION's parser (vtable 0xd63700 +0, the analyzer table's object at 0xf04030): Amount through 0xc7dc60, its whole part x 0.01f (@0xd136f0) stored at +8 as 24.8 (floor << 8 | trunc(frac x 256)); none stored for an Amount of 0."
+  status: READ
+  cases:
+    - recording: h1_duels1157
+      turn: 206
+      value: "Integrated Space Cell's 15 as 0.1484: city-state 3's lasers 23 turns at Production 13.2 and 20 lifted, 10 as logged (t206-249 every logged value)"
+  impl:
+    - cpu/core/aiModifiers.ts:ANALYZERS
+    - gpu/core/sim_policy.py:_pol_analyze
+    - gpu/core/sim_policy.py:full
+  readings:
+    - "C-130 / C-98: the space race analyzer's Amount, the stockpile cap's building extra, a district project on a pillaged district — READ (0x6bde60, 0xf04030 -> vtable 0xd63700, 0x4a7960 from 0xb3f250 / 0xb3f860), LAB (the project's head check), both twins"
+  review: reviewed
 - addr: 0x6be2d0
   final: 0x46f310
   kind: function
   name: EFFECT_ADJUST_SPACE_RACE_PROJECTS_PRODUCTION
-  semantics: "EFFECT_ADJUST_SPACE_RACE_PROJECTS_PRODUCTION: the owner's PSEUDOYIELD_SPACE_RACE (@0xf2e2ac) of 1.0 at its weight; per SpaceRace project (+0xe8 bit 1) its value whole where the owner advanced it (0x4be7b0); else, where the build turns at the Amount (parser 0x6be5b0, whole) fall before the horizon, discounted (0x7a1240) at them less at the turns without; every space project counts whether the city may build it."
+  semantics: "EFFECT_ADJUST_SPACE_RACE_PROJECTS_PRODUCTION: the owner's PSEUDOYIELD_SPACE_RACE (@0xf2e2ac) of 1.0 at its weight; per SpaceRace project (+0xe8 bit 1) its value whole where the owner advanced it (0x4be7b0); else, where the build turns at the Amount (its parser 0x6bde60's fx(Amount x 0.01f), which 0x17b890 adds to 1.0) fall before the horizon, discounted (0x7a1240) at them less at the turns without; every space project counts whether the city may build it."
   status: READ
   cases:
     - recording: h1_duelw1117
       turn: 28
       value: Space Initiative 66 on the replayed state (the log 111 under its science weight)
+    - recording: h1_duels1157
+      turn: 206
+      value: "city-state 3's Integrated Space Cell 10: the two lasers 23 turns at Production 13.2, 20 at x 1.1484, 5 each, as logged; t212-227 6 at 14.4 (21 / 19)"
   impl:
     - cpu/core/aiModifiers.ts:ANALYZERS
     - gpu/core/sim_policy.py:_pol_analyze
@@ -1421,6 +1442,7 @@
     - "C-97: the governor AI — the analysis, the choice and the seats READ, the analyzers PARTLY READ"
     - "C-130: the Free Cities' city subjects and space race projects on the GPU — both twins"
     - "C-98: an EmbarkAll technology favored doubles its EmbarkAll term; a minor's upgrade pays no strategic resource; a space race project's turns in a city-state's city — READ (0x7b3e50 at 0x7b3f9a..0x7b4057, 0x7a4850), LAB (the upgrade, the project turns), both twins"
+    - "C-130 / C-98: the space race analyzer's Amount, the stockpile cap's building extra, a district project on a pillaged district — READ (0x6bde60, 0xf04030 -> vtable 0xd63700, 0x4a7960 from 0xb3f250 / 0xb3f860), LAB (the project's head check), both twins"
   context:
     - ...owner's envoys' worth 0x7a46c0 at Amount), EFFECT_ADJUST_SPACE_RACE_PROJECTS_PRODUCTION 0x6be2d0 (the context city's owner's PSEUDOYIELD_SPACE_RACE @0xf2e2ac of 1.0 at its weight; per...
     - "...r's: its pressure 0x1f33e0 x Amount, raw), EFFECT_ADJUST_SPACE_RACE_PROJECTS_PRODUCTION 0x6be2d0 (per SpaceRace project the owner has not completed: PSEUDOYIELD_SPACE_RACE 1.0 weighted..."
@@ -1428,6 +1450,7 @@
 - addr: 0x6be5b0
   final: 0x46f580
   kind: function
+  semantics: "a parser at vtable 0xd63718 +0 (beside the analyzer 0x6be6f0): Amount's whole part stored at +8. Not EFFECT_ADJUST_SPACE_RACE_PROJECTS_PRODUCTION's (that is 0x6bde60)."
   status: PARTLY
   cases:
     - recording: h1_duelw1117
@@ -1435,8 +1458,20 @@
       value: "Every space project counts whether the   city may build it: China's Space Initiative 66 at t28 of   runs/h1_duelw1117 on the replayed state, the log's 111 under its   science-victory weight)."
   readings:
     - "C-97: the governor AI — the analysis, the choice and the seats READ, the analyzers PARTLY READ"
+    - "C-130 / C-98: the space race analyzer's Amount, the stockpile cap's building extra, a district project on a pillaged district — READ (0x6bde60, 0xf04030 -> vtable 0xd63700, 0x4a7960 from 0xb3f250 / 0xb3f860), LAB (the project's head check), both twins"
   context:
     - "..., m_aiNumProjectsAdvanced 0x4be7b0; else, where the build turns at the Amount (parser 0x6be5b0: whole, 30) lifted fall before the horizon, the value discounted (0x7a1240) at them les..."
+  review: imported
+- addr: 0x6be6f0
+  final: 0x46f6c0
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-130 / C-98: the space race analyzer's Amount, the stockpile cap's building extra, a district project on a pillaged district — READ (0x6bde60, 0xf04030 -> vtable 0xd63700, 0x4a7960 from 0xb3f250 / 0xb3f860), LAB (the project's head check), both twins"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...l's 15: 1.1484). The parser 0x6be5b0 stands at +0 of the next vtable 0xd63718 (beside 0x6be6f0), another analyzer's."
+    - ...test for a project (CanProduce 0x16f7b0 lets a pillaged district through); the analyzer 0x6be6f0's effect.
   review: imported
 - addr: 0x6beb00
   final: 0x46fac0

@@ -823,9 +823,9 @@ const ANALYZERS: Readonly<Record<string, Analyzer>> = {
   // its owner (PSEUDOYIELD_SPACE_RACE 1.0 at its weight); per SpaceRace
   // project, the owner having completed it that worth whole, else, where
   // the city builds it within the horizon at the Production lifted by the
-  // Amount — whole, read as the raw of a 24.8 fraction (0x17b890 adds it to
-  // 1.0: 30 is +11.7%) —, the worth discounted at those turns less at the
-  // turns without it
+  // Amount — its parser 0x6bde60 stores fx(Amount x 0.01f), which 0x17b890
+  // adds to 1.0 (15 is +14.8%) —, the worth discounted at those turns less
+  // at the turns without it
   EFFECT_ADJUST_SPACE_RACE_PROJECTS_PRODUCTION: (t, args) => {
     const c = ownerCity(t);
     if (!c || c.kind !== 'city') return 0;
@@ -837,7 +837,7 @@ const ANALYZERS: Readonly<Record<string, Analyzer>> = {
         continue;
       }
       const t0 = t.view.projectTurns(c.seat, c.id, p, 0);
-      const t1 = t.view.projectTurns(c.seat, c.id, p, Number(args.Amount ?? 0) | 0);
+      const t1 = t.view.projectTurns(c.seat, c.id, p, pctOf(args));
       if (t1 < t.horizon) sum += whole(discounted(v, t.rate, t1) - discounted(v, t.rate, t0));
     }
     return sum;

@@ -158,6 +158,25 @@
     - "- ChangeResourceAmount 0x4a7560 (resource, ownership, amount) rebuilds the allocation at once (0x4a77d4, unless the gam..."
     - "...owned resources off the old suzerain (0x4a91a0) and hands them to the new (0x4a6d90 -> 0x4a7560): a rebuild for the new one. A city-state's own resource change re-hands its copies to..."
   review: reviewed
+- addr: 0x4a7960
+  final: 0x31eb10
+  kind: function
+  name: changeExtraStockpileCap
+  semantics: "the per-resource stockpile cap extra: (the resource, the amount) adds speed(amount) (0x5254d0) to the watched array at +0x800 (the cap 0x4aabe0 reads it at +0x858); called from 0xb3f250 / 0xb3f860, EFFECT_ADJUST_PLAYER_RESOURCE_STOCKPILE_CAP's walk of the resources (the Encampment buildings' Amount 10: 5 online)."
+  status: READ
+  cases:
+    - recording: h1_duels1158
+      turn: 63
+      value: "city-state 3's Horses held at 32 at its AI turn from its Barracks (the cap 25 + 5, the turn's 2 landed since the cap): Equestrian Orders 20 t63-79, 30 from t80, as logged"
+  impl:
+    - cpu/core/stockpile.ts:stockpileCap
+    - cpu/data/constants.ts:STOCKPILE_CAP_PER_ENCAMPMENT_BUILDING
+    - gpu/core/sim_seats.py:_stockpile_cap
+    - cpu/core/stockpile.ts:extra
+    - cpu/export/rules.ts:rules
+  readings:
+    - "C-130 / C-98: the space race analyzer's Amount, the stockpile cap's building extra, a district project on a pillaged district — READ (0x6bde60, 0xf04030 -> vtable 0xd63700, 0x4a7960 from 0xb3f250 / 0xb3f860), LAB (the project's head check), both twins"
+  review: reviewed
 - addr: 0x4a79e0
   final: 0x31eb90
   kind: function
@@ -451,7 +470,7 @@
 - addr: 0x4aabe0
   final: 0x320560
   kind: function
-  semantics: "a resource's stockpile cap: speed(StockpileCap of the Resource_Consumption row) (0x5254d0) plus the player's per-resource extra +0x858 the Encampment buildings' modifiers raise; 25 online before the buildings."
+  semantics: "a resource's stockpile cap: speed(StockpileCap of the Resource_Consumption row) (0x5254d0) plus the player's per-resource extra +0x858 the Encampment buildings' modifiers raise, each through the game speed (0x4a7960); 25 online before the buildings, 5 a building."
   status: READ
   cases:
     - recording: h1_duelw1119
@@ -469,11 +488,14 @@
     - cpu/core/aiResource.ts:ResourceFacts
     - cpu/core/aiResource.ts:take
     - gpu/core/sim_minorai.py:_cv_resource_value
+    - cpu/core/stockpile.ts:stockpileCap
+    - gpu/core/sim_seats.py:_stockpile_cap
   readings:
     - "H-1: the luxury allocation's rebuilds — PARTLY READ"
     - "H-1: the goody hut's other gates and the Relic — READ"
     - "C-96: the resource value and the research value's resources — READ (bonus, luxury, the call), PARTLY READ (the strategic stockpile terms)"
     - "C-96: the improvement value's resource copies, a minor's strategic copies, the district count — READ (0x7a58f0's count, 0x4a93c0, 0x1ae8a0, 0x1ae8f0), a LAB (a city-state's Great General weight)"
+    - "C-130 / C-98: the space race analyzer's Amount, the stockpile cap's building extra, a district project on a pillaged district — READ (0x6bde60, 0xf04030 -> vtable 0xd63700, 0x4a7960 from 0xb3f250 / 0xb3f860), LAB (the project's head check), both twins"
   context:
     - "...m_aiReservedResources +0x528), where that is above 0, is tested strictly over the cap (0x4aabe0: 0x5254d0, the game speed's scaling, of the Resource_Consumption row's StockpileCap, pl..."
     - "...whose condition the player meets (0x4ac140) with its stockpile (0x4aa790) below the cap (0x4aabe0). The engines take CityState, StrategicResources and Relic (`goodyEligible` / `_goody_eli..."

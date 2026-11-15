@@ -11297,8 +11297,9 @@ class SimSeats:
         return out
 
     def _stockpile_cap(self, row: int) -> torch.Tensor:
-        """[B] — CIV6 (GS): 50 for each resource, "+10 per building" for every
-        Encampment building standing in the empire."""
+        """[B] — `stockpileCap` (0x4aabe0): the StockpileCap through the game
+        speed, plus each Encampment building standing in the empire its
+        Amount through the game speed (0x4a7960)."""
         cols = self.RC
         if self._encampment_didx < 0:
             return torch.full((self.B,), self._stock_cap_base, dtype=torch.long, device=self.device)
@@ -11307,7 +11308,8 @@ class SimSeats:
         n = (stand & enc & self.city_alive[:, row, :cols].unsqueeze(2)).sum(dim=(1, 2))
         cap = self._stock_cap_base + self._stock_cap_per_enc * n
         # CIV6 (EFFECT_ADJUST_PLAYER_RESOURCE_STOCKPILE_CAP): the roster's
-        # per-building rows (`STOCKPILE_CAP_ROWS`), every standing copy
+        # per-building rows (`STOCKPILE_CAP_ROWS`, their Amounts exported
+        # through the game speed), every standing copy
         for _kc, _kl, _kb, _ka in self._live_rows(row, self._stockpile_cap_rows):
             _kw = self._row_is(row, _kc, _kl)
             if bool(_kw.count_nonzero()):

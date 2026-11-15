@@ -563,7 +563,8 @@ class SimPolicy:
         if eff == "EFFECT_ADJUST_SPACE_RACE_PROJECTS_PRODUCTION":
             # 0x6be2d0 on the subject city (the context's, +0x70): per
             # SpaceRace project, where the city builds it within the horizon
-            # at the Production lifted by the Amount (raw over 1.0), its
+            # at the Production lifted by the Amount (its parser 0x6bde60's
+            # fx(Amount x 0.01f) over 1.0), its
             # owner's PSEUDOYIELD_SPACE_RACE worth discounted at those turns
             # less at the turns without it; a completed one's whole worth is
             # not paid here (the engine keeps a major's completions alone,
@@ -575,9 +576,10 @@ class SimPolicy:
             p = "PSEUDOYIELD_SPACE_RACE"
             v = self._cv_pseudo(full(_FX), p, f0.pseudo_w(p))
             acc = zero
+            lift = _fx_const(_f32(amount * _f32(0.01)))
             for pi in self.rules.civic_ai["spaceRaceProjects"]:
                 t_0 = f.project_turns(int(pi), 0)
-                t_1 = f.project_turns(int(pi), amount)
+                t_1 = f.project_turns(int(pi), lift)
                 d = (_discounted(v, r, t_1) - _discounted(v, r, t_0)) >> 8
                 acc = acc + torch.where(t_1 < h, d, zero)
             return acc

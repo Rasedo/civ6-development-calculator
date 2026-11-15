@@ -2504,9 +2504,26 @@ class SimMinors:
         # the step's head check (0x16f050 at 0x16f09a..0x16f180): a building
         # at the queue's head that CanConstruct refuses leaves the front, its
         # progress kept (0x17f5a0), and the step works what follows — nothing
-        # in a minor's queue
-        _hu, head_b, _hd, _hp, _hr = self._mk_kinds(item)
+        # in a minor's queue. A district project whose district stands
+        # pillaged leaves the queue unworked, its progress kept, the turn's
+        # Production banked nowhere (`lost`)
+        _hu, head_b, _hd, head_p, _hr = self._mk_kinds(item)
         head_b = alive & head_b
+        head_p = alive & head_p
+        lost = torch.zeros_like(head_p)
+        if bool(head_p.any()):
+            P = self._mb_proj()
+            for pi in sorted({int(x) - self._mk_p0 for x in item[head_p].tolist()}):
+                d = int(P["d"][pi])
+                if d < 0 or d == self._center_didx:
+                    continue
+                t = self.city_dist_tile[:, row, 0, d]
+                t0 = t.clamp(min=0).unsqueeze(1)
+                home = (t >= 0) & self.district_complete.gather(1, t0).squeeze(1) & self.district_pillaged.gather(1, t0).squeeze(1)
+                lost = lost | (head_p & (item == self._mk_p0 + pi) & home)
+            if bool(lost.any()):
+                self._minor_set_item(s, lost, -1)
+                item = torch.where(lost, torch.full_like(item, -1), item)
         if bool(head_b.any()):
             refused = head_b & ~self._minor_queue_ok(s, item, site)
             if bool(refused.any()):
@@ -2528,7 +2545,7 @@ class SimMinors:
                 if bool(drop.count_nonzero()):
                     self._minor_set_item(s, drop, -1)
                     item = torch.where(drop, torch.full_like(item, -1), item)
-        none = alive & (item < 0)
+        none = alive & (item < 0) & ~lost
         self.citystate_ovf[:, s] += torch.where(none, made, zero_b)
         act = alive & (item >= 0)
         if not bool(act.count_nonzero()):

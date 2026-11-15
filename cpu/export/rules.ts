@@ -2650,7 +2650,8 @@ export function buildRules() {
         r.terrain !== undefined ? TERRAIN_IDS.indexOf(r.terrain) : -1,
         r.amount ?? 0, r.pct ?? 0,
       ]),
-      stockpileCap: STOCKPILE_CAP_ROWS.map((r) => [rowCiv(r), rowLeader(r), buildingIdx.get(r.building) ?? -1, r.amount]),
+      // each Amount through the game speed, as the cap's extra takes it (0x4a7960)
+      stockpileCap: STOCKPILE_CAP_ROWS.map((r) => [rowCiv(r), rowLeader(r), buildingIdx.get(r.building) ?? -1, scaleByGameSpeed(r.amount)]),
       unitCharges: UNIT_CHARGE_ROWS.map((r) => [rowCiv(r), rowLeader(r), Object.keys(UNITS).indexOf(r.unit), r.amount]),
       tileCost: TILE_COST_ROWS.map((r) => [rowCiv(r), rowLeader(r), TERRAIN_IDS.indexOf(r.terrain), r.pct]),
       // [civ, leaderRow, terrain, hills, civic]
