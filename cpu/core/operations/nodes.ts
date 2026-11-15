@@ -340,7 +340,15 @@ const recruitUnits: BtHandler<OpsContext> = {
     m.listed = before;
     // the evaluator's two offers (0x60a8c0): the seat's units in no
     // operation; then the units the recruit signal frees — those of its
-    // unlocked operations of a lower priority, which leave them
+    // unlocked operations whose priority the request's passes (the trees'
+    // listener 0x7d1e40), which leave them. The request's priority (0x81cacf)
+    // is the tree's recruit priority (+0x5a8) where its start wrote one,
+    // else the definition's: the city's defence event writes the city's
+    // threat there as it starts its operation (runs/h1_duels1133 city-state
+    // 3 t52-61: City Defense started at threat 1 leaves Naval Superiority's
+    // Galley; runs/h1_duels1128 city-state 4 t32: started at threat 5 it
+    // takes Attack Barb Camp's Archer)
+    const asked = op.recruitPriority ?? opDef(op).priority;
     const busy = ctx.assigned();
     const offer = view.units(ctx.seat).filter((u) => !busy.has(u.id));
     // the teams' lists read by id (0x4f2310): a member an upgrade took off
@@ -349,7 +357,7 @@ const recruitUnits: BtHandler<OpsContext> = {
     // Recruited 0" over four Catapults)
     const members = new Map([...view.unitsDying(ctx.seat).map((u) => [u.id, u] as const), ...units]);
     recruitOperation(view, ctx.seat, op, offer, inProgress, range, members, (l) => ctx.log(l));
-    const lower = ctx.others().filter((o) => o !== op && !o.locked && opDef(o).priority < opDef(op).priority);
+    const lower = ctx.others().filter((o) => o !== op && !o.locked && opDef(o).priority < asked);
     const freed = lower.flatMap(opUnits).map((id) => units.get(id)).filter((u): u is AiUnitView => !!u);
     if (freed.length) {
       const taken = recruitOperation(view, ctx.seat, op, [...freed], inProgress, range, members, (l) => ctx.log(l));

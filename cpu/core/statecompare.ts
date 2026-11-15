@@ -242,7 +242,7 @@ function minorOpsRecord(cs: CityState, state: GameState): number[] {
 
 /** a seat's operations (a city-state's, the Free Cities'): the pool, the
  *  pick, per slot its definition (its index in `defs`), target, rally,
- *  backup, strengths and teams */
+ *  backup, strengths, recruit priority and teams */
 function opsRecord(ai: OpsAi | undefined, seat: number, defs: readonly string[], state: GameState): number[] {
   if (!ai) return [0, 0, -1, -1, -1];
   const out: number[] = [ai.slots.length, ai.free.length, ...ai.free];
@@ -253,7 +253,7 @@ function opsRecord(ai: OpsAi | undefined, seat: number, defs: readonly string[],
       continue;
     }
     out.push(defs.indexOf(op.def), op.id, op.target, op.rally, op.backup?.target ?? -1, op.backup?.rally ?? -1,
-      op.enemyStrength, op.strength);
+      op.enemyStrength, op.strength, op.recruitPriority ?? -1);
     for (let k = 0; k < 2; k++) {
       const t = op.teams[k];
       if (!t) {
@@ -641,7 +641,7 @@ const GAME: Record<string, Extractor> = {
       t.boldness ?? 0, t.every ?? -1, (t.queue ?? []).length, ...(t.queue ?? []).map(tagIdx),
       (t.raidTargets ?? []).length, ...(t.raidTargets ?? []).map((x) => x.seat), ...(t.raidTargets ?? []).map((x) => x.plot),
       (t.assaultTargets ?? []).length, ...(t.assaultTargets ?? []).map((x) => x.seat), ...(t.assaultTargets ?? []).map((x) => x.plot),
-      ...barbHomingRecord(t),
+      ...barbHomingRecord(t), t.scoutTreeHeld ? 1 : 0,
       // the raid's score, the operation on the manager (`barbOpRecord`)
       t.score ?? 0, ...barbOpRecord(s, t),
       // the player its units rampage against, its camp taken

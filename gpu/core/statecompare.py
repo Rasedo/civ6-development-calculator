@@ -402,7 +402,7 @@ def _barb_tribes_row(sim, b: int) -> list[int]:
                  int(sim.tribe_op_rstart[b, k]), int(sim.tribe_raid_from[b, k]), opu, dead]
                 if op else [0, -1, -1, -1, -1, -1, -1, -1, -1, 0, 0])
         row += [int(sim.tribe_bold[b, k]), int(sim.tribe_every[b, k]), len(queue), *queue,
-                len(raidq), *raidq, *raidp, len(assq), *assq, *assp, *home,
+                len(raidq), *raidq, *raidp, len(assq), *assq, *assp, *home, int(sim.tribe_home_set[b, k]),
                 int(sim.tribe_score[b, k]), *oper,
                 int(sim.tribe_ramp[b, k])]
     row += [int(x) for x in sim.barb_spot_next[b, : sim.n_majors].tolist()]
@@ -1242,7 +1242,7 @@ def _minor_ops(sim, b: int, s: int) -> list[int]:
     """holder `s`'s operations (a minor's, the Free Cities' row `FR`) as
     `opsRecord` reads them: the pool's
     size, its free slots, the pick, per slot its definition (-1 free), id,
-    target, rally, backup, strengths, per team its team, its members' pool
+    target, rally, backup, strengths, recruit priority, per team its team, its members' pool
     slots (-1 unslotted, -2 gone), each one released (1) or not, each one's
     slot as the last keep saw it, the units listed again (their count, their
     pool slots ascending, -2 gone), its requirements' counts, goals, flags,
@@ -1263,7 +1263,7 @@ def _minor_ops(sim, b: int, s: int) -> list[int]:
             continue
         out += [d, int(sim.mops_id[b, s, k]), int(sim.mops_target[b, s, k]), int(sim.mops_rally[b, s, k]),
                 int(sim.mops_bk_target[b, s, k]), int(sim.mops_bk_rally[b, s, k]), int(sim.mops_estr[b, s, k]),
-                int(sim.mops_str[b, s, k])]
+                int(sim.mops_str[b, s, k]), int(sim.mops_recpri[b, s, k])]
         for ti in range(2):
             tm = int(sim.mops_tm[b, s, k, ti])
             if tm < 0:

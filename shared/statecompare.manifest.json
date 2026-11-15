@@ -297,6 +297,7 @@
             "tribe_home_id",
             "tribe_home_resume",
             "tribe_home_mu",
+            "tribe_home_set",
             "barb_tree_next",
             "barb_unit_op",
             "barb_unit_fresh",
@@ -665,7 +666,8 @@
             "mops_pick",
             "mops_pick_target",
             "mops_pick_rally",
-            "mops_enemy"
+            "mops_enemy",
+            "mops_recpri"
           ],
           "note": "the Free Cities' operations (`opsRecord` on `freeSeat.ops` / `_minor_ops` on the row `FR`): the Free Cities Raid's pool, pick, slots and teams, as minorOps; the player each runs against (`mops_enemy`) is its Free City's raid record's (freeCityRaid)"
         },
@@ -2609,9 +2611,10 @@
             "mops_size",
             "mops_pick",
             "mops_pick_target",
-            "mops_pick_rally"
+            "mops_pick_rally",
+            "mops_recpri"
           ],
-          "note": "the minor's operations (`minorOpsRecord` / `_minor_ops`): the pool, the pick, per slot its definition, target, rally, backup, strengths and teams (members by pool slot, counts, goals, engaged, the battle strengths, flags, unit, strength); the trees' node memories and Operation Move's stores are not compared"
+          "note": "the minor's operations (`minorOpsRecord` / `_minor_ops`): the pool, the pick, per slot its definition, target, rally, backup, strengths, recruit priority and teams (members by pool slot, counts, goals, engaged, the battle strengths, flags, unit, strength); the trees' node memories and Operation Move's stores are not compared"
         },
         {
           "name": "minorCampsKnown",

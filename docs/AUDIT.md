@@ -252,6 +252,8 @@ A question the SOURCE under-determines; neither engine ships a branch until the 
   - LAB (raids and assaults): 1121's raid: t69 one Warrior over the game's team
   - LAB (raids and assaults): 1121 t122's City Assault, ours at t116 for the game's t119 (Skirmisher 3342353 reports seat 1 at our t109, Notifies t116; the game's tactical rows by t114: the scout tree's end, Notify timing)
   - LAB (raids and assaults): 1128 t221 / t237 / t243 raid and assault starts
+  - LAB (raids and assaults): duels1145 t136 the game starts a second Barbarian Attack, ours none (t136-143), and at t144-146 ours holds a Builder Capture the game does not
+  - LAB (raids and assaults): duels1145 t66 the barbarians' Horseman 3276801 takes back the Builder city-state 3 took on 42:21 from 42:20 that turn: Builder Capture's target ours 42:22 for the game's 42:21, and their log look's record of the Builder still city-state 3's where ours is theirs
   - LAB (scouts): fit, unread: a scout's report ignoring a barbarian civilian's sight (1128 t76)
   - LAB (scouts): fit, unread: a scout reporting a plot newly in its own sight, the plots in index order (the barbarian player's count turning positive, 0x58aa90 → 0x508d50; the engines count per scout)
   - LAB (scouts): fit, unread: a hurt scout's report waiting on Protect Unit's danger (0x7f07c0 reads the AI's influence map; the engines: an enemy within its moves plus its reach; 1121 camp (3,19), hurt at t25 beside China's Warrior, reporting at t33)
@@ -261,6 +263,9 @@ A question the SOURCE under-determines; neither engine ships a branch until the 
   - BUILD (sight): the alliances' outgoing visibility (0x2ab4f0 -> 0x508330; no recorded duel holds an alliance)
   - LAB (sight): the unseen land's single-turn residue (sightLab.ts on Barbarians.csv: 1,065 of 1,245 turns equal; 1128 t25 +28)
   - LAB (scouts): 1127 t35 / t37 Scouts' cur region 9:4 / 9:6
+  - LAB (camps): duels1145 t1 the camp step's top region holds 15 plots for the game's 14 (32 for 31 over the regions): 42:20 holds FEATURE_FOUNTAIN_OF_YOUTH, no feature of the engines' and camp ground in ours (the camp on 41:22 for the game's 32:23)
+  - LAB (camps): duels1137 t1 the camp step's region order: the game's draw 12 of 22 falls on the region of 3:12, ours (6, 2, 4 and 4 plots by region id) on the region of 11:15; duels1146 t1 the game's region of 37:19 holds 5 plots, ours 6 (38:18 for 37:19)
+  - LAB (camps): duels1136 t28 ours raises a camp on 14:21 with its Spearman and Scout, the game none; duels1134 t30 the barbarians' camps ours 0:14 for the game's 43:15 and t80 ours keeps 11:20; duels1140 t184 ours holds 4:2, the game none
 - **C-125. THE TACTICAL PLANNING: TARGETS AND THE COMBAT PREDICTION.** Weight 3.
   - LAB (exchange filter): +0x1ba bit 5 waiving the exchange and survival filters (0x776795)
   - LAB (targets): duelq1124 t183 the barbarian Field Cannon 5767174 on 37:17 strikes city-state 3's Battleship 1900550 on 38:15, two plots off over water, where it moved from 39:16 in city-state 3's turn before theirs; the game's wanders to 38:18 with no target, the barbarians' knowledge base at their tactical pass holding the Battleship on 39:16 at age 0
@@ -441,8 +446,11 @@ A question the SOURCE under-determines; neither engine ships a branch until the 
   - LAB (cadence and trees): City Defense one-turn shifts (1121 p3 ends t31 vs t33)
   - LAB (cadence and trees): a tree technology makes and ends within one tick takes, moves and lets go a unit in no tree at either look, the replay's gameJob labelling it (no row) (duelp1128 t180 2490370, t184 1179650, t243 3342340)
   - LAB (cadence and trees): the DLL builds every tree's update before the priority's executions where the engines tick each tree whole (no miss yet)
-  - LAB (cadence and trees): the second offer's marked tree (+0x180)
+  - LAB (cadence and trees): the recruit listener's equal-priority answer by value (0x7d1e40 at 0x7d203b..0x7d2059: a marked tree of the request's priority answers a request of a higher present value, +0x608 >> 8) and the second offer's turn-done filter (0x60ac91) are unported: no tree's present value is held; duels1133 city-state 3's City Defense tree holds 208128 beside Naval Superiority's 51200
   - LAB (cadence and trees): a pre-turn draw (seed9235 t12)
+  - LAB (cadence and trees): duels1137 t22 city-state 4's Attack Barb Camp on 14:11 stands in ours with its two Warriors, the game's gone with the camp its knowledge base drops that turn (knowledge.camps 14:11 // none)
+  - LAB (cadence and trees): duels1132 t172-175 / t179 / t188 city-state 2 holds no Naval Superiority where the game's stands on 22:20 with its Caravel (t202 the Caravel 1441798 in the game's Upgrade Units, ours no row)
+  - LAB (cadence and trees): duels1135 city-state 3: t141 the game holds City Defense beside Attack Barb Camp, ours Attack Barb Camp alone; t148 ours' Attack Barb Camp is gone, the game's stands; t167 ours' stands, the game's none
   - BUILD (garrison city): Garrison City's swap 0x972880
   - BUILD (garrison city): the garrison's and candidate's AI types post-swap (0x1e60f0 on +0x168)
   - LAB (nodes): Protect Units' plunder test (0x51a160 +0x48, partly)
@@ -452,6 +460,7 @@ A question the SOURCE under-determines; neither engine ships a branch until the 
   - BUILD (other): the 1127 t46 savings edge (114.96 vs 115)
   - LAB (other): experience cumulative (+0x1bc0 +8)
   - LAB (other): the religious AI's contract test past PurchaseYield (0x5f6920), its faith buys
+  - BUILD (war operations): a city-state runs no WAR definition (`MINOR_OP_DEFS`; the GPU carries no Is At War, Operation Diplomacy, Lock Units, Build Military Improvement or enemy-city candidate): duels1145 city-state 4, at war with player 1, starts Wartime Attack Enemy City on 34:14 at t36 (value 230.4, no member, three Archers by t44) and t66 and Attack Enemy City at t46 and t56, each complete on its tenth turn; duels1133 t170 city-state 4 starts Wartime Attack Walled City
 - **C-134. CITY-STATES' UNIT MOVES.** Weight 4.
   - LAB (planning): the city-state pass's unit gather leaving out a unit at Movement 0 (199 unit-turns; 0x7710f0's +0xf90 test)
   - LAB (planning): 18 no-row unit-turns in the city-state pass
@@ -515,6 +524,8 @@ A question the SOURCE under-determines; neither engine ships a branch until the 
   - LAB (army memory): 1124 Granada t50 a barbarian Archer seen a turn later in ours
   - BUILD (army memory): 1124 p4's army records at t133 / t201
   - BUILD (army memory): duelq1124 t231 China's Jet Fighter 8978447 kills the barbarians' Ironclad 6029330 from 14:13 (44 dealt): airStrikeOffers gives a Fighter no ship, the replay's battle is refused (Not a target this aircraft answers) and the barbarians hold no record of the Fighter, the game's at age 0 on 14:13
+  - LAB (army memory): a second record of one unit: duels1136 t84 city-state 4 holds player 1's Catapult on 16:7 twice (ours starts City Defense, the game none), duels1143 t36 city-state 2 player 1's Warrior on 31:14, duels1139 t63 city-state 3 player 1's Archer on 5:11, duels1135 t122 city-state 2 a barbarian Skirmisher on 4:14
+  - LAB (army memory): a record a turn older or a plot behind the game's: duels1136 t20 city-state 4's of player 1's Builder on 12:11 at age 1 for 0 (duels1134 t87 city-state 3, duels1140 t69 city-state 4 the same); duels1140 t12 city-state 4's of city-state 3's Warrior on 14:17 at age 3 for 14:18 at 0, t61 city-state 3's of player 1's Warrior 15:14 for 14:14; duels1134 t67 the barbarians' of player 0's Legion 40:16 for 41:16; duels1137 t42 the barbarians' of player 1's Settler and Warrior on 17:19 for 17:18 and 18:20
   - LAB (knowledge base): the knowledge base's +0x128 the turn reaches (0x70beab / 0x709dc2; its writer unread, no recorded turn short)
   - LAB (knowledge base): a major's elimination raises no +0x900 in the engines (its units stand on)
   - LAB (knowledge base): a major's unit pool unmodelled

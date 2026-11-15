@@ -638,9 +638,11 @@ function tickScout(state: GameState, pass: Pass, tribe: BarbTribe): void {
 
 /** THE SCOUT'S TREE'S START (0x1485c0, from the scout's look): on the scout
  *  alone, its trigger the camp and the tribe, the city it saw; a new tree
- *  of the player's pool (`newTreeId`) */
+ *  of the player's pool (`newTreeId`), its id the tribe's to hold
+ *  (`BarbTribe.scoutTreeHeld`) */
 export function barbScoutTreeStart(state: GameState, tribe: BarbTribe, scout: number, target: BarbTarget): void {
   const nodes = scoutTreeNodes();
   const id = newTreeId(state.barbSeat);
   tribe.homing = { id, scout, target, status: nodes.map(() => BT_FRESH), mem: nodes.map(() => ({})), bb: {} };
+  tribe.scoutTreeHeld = true;
 }

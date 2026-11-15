@@ -105,9 +105,11 @@ function targetsOf(view: AiView, seat: number, c: Candidate, inputs: EvalInputs)
       const whole = best ? best.score >> 8 : 0;
       return best && whole > 0 ? [{ plot: best.plot, value: whole << 8, enemyStr: 0 }] : [];
     }
-    // of the seat's cities that train ships (0x1c77c0: coastal land, or a
-    // completed Harbor — runs/h1_duely1121 Hunza on inland 11:5 starts
-    // Naval Superiority at 12:3 the turn its Harbor completes, t218) the
+    // of the seat's cities that train ships (0x1c77c0: enterable water
+    // beside the centre, a lake's too — runs/h1_duels1132 Babylon on 20:20
+    // beside the one-plot lake 20:19 starts Naval Superiority at 21:22 on
+    // t2 —, or a completed Harbor — runs/h1_duely1121 Hunza on inland 11:5
+    // starts Naval Superiority at 12:3 the turn its Harbor completes, t218) the
     // most populous (the first of equals), the first sea plot (not a Lake)
     // of the ring walk within 4 of it; the enemy strength the largest best
     // combat strength of the majors

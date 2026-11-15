@@ -206,9 +206,14 @@ function startOperation(ai: OpsAi, env: OpsEnv, def: AiOpDef, enemy: number, tar
 }
 
 /** the manager's start by name (0x7265b0): the definition against no enemy
- *  at the plot, its rally the plot; the operation's id */
-export function startOperationNamed(ai: OpsAi, env: OpsEnv, name: string, plot: number): number {
-  return startOperation(ai, env, AI_OP_DEFS[name], -1, plot, plot).id;
+ *  at the plot, its rally the plot; `recruitPriority` (0 or more) its
+ *  tree's recruit priority, written after the start (the city's defence
+ *  event 0x5cced0 at 0x5cd102..0x5cd11e: the city's threat); the
+ *  operation's id */
+export function startOperationNamed(ai: OpsAi, env: OpsEnv, name: string, plot: number, recruitPriority = -1): number {
+  const op = startOperation(ai, env, AI_OP_DEFS[name], -1, plot, plot);
+  if (recruitPriority >= 0) op.recruitPriority = recruitPriority;
+  return op.id;
 }
 
 /** the start by name (0x7265b0) with the target set after it (0x73e7d0:

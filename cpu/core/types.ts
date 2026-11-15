@@ -744,6 +744,10 @@ export interface BarbTribe {
   /** a scout that saw a city walks home to report it: its tree "Barbarian
    *  Found City" (`barbarianOps.ts`) */
   homing?: BarbHoming;
+  /** the tribe holds a scout's tree's id (tribe +0x38): set as the tree
+   *  starts, forgotten in the tribe's turn once the tree runs no more — a
+   *  cleared camp's tribe takes no turn and keeps it */
+  scoutTreeHeld?: boolean;
   /** per scout, the city plots it saw at its last look */
   saw?: Record<number, number[]>;
   /** its raid or city assault (the AI operation it runs) */

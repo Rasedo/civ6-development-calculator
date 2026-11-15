@@ -1580,6 +1580,7 @@ function barbarianAi(ctx: Ctx, b: TurnRecord, closing: number, before: ReadonlyS
     tr.assaultTargets = c.assaultTargets;
     tr.raidTargets = c.raidTargets;
     tr.homing = c.homing;
+    tr.scoutTreeHeld = c.scoutTreeHeld;
   });
   // ...and the knowledge base as the tactical turn's ageing and look left it
   // (its records name the units by id); its turn-end look runs once the

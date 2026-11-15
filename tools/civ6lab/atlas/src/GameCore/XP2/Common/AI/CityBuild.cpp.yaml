@@ -318,6 +318,9 @@
   semantics: "City Defense's start (slot 5): first the defensive cancel 0x5d7640; a threat (CityBuildAI +0x1b8) above -1 with slot 5 free starts the list's CITY_UNDER_THREAT operation (\"City Defense\") at the city's plot through the player's operation manager (0x7265b0), slot 5 holding its tree (+0x780), its target the city, its worth the city's (0x7a0ac0), its threat CityBuildAI +0x1b8."
   status: READ
   cases:
+    - recording: h1_duels1133
+      turn: 52
+      value: "city-state 3's City Defense tree holds recruit priority 1 (+0x5a8, written at 0x5cd102..0x5cd11e from the city's threat) and present value 208128 (+0x608, the city's worth) at the end look; runs/h1_duels1137 holds recruit priority 5 beside threat 1 on 7 end looks: written at the start alone"
     - recording: h1_duelv1128
       turn: 15
       value: Xi'an's City Defense started on the log's turn
@@ -336,6 +339,10 @@
     - cpu/core/aiCityTrees.ts:defensiveCancel
     - cpu/core/minorCityAi.ts:list
     - gpu/core/sim_minorai.py:_minor_ai_turn
+    - cpu/core/minorOps.ts:minorOpsStart
+    - cpu/core/operations/manager.ts:startOperationNamed
+    - gpu/core/sim_minorai.py:start_operation
+    - gpu/core/sim_minorops.py:_u_recruit
   readings:
     - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
     - "C-97: the operations — the manager READ (no-enemy candidates), the war candidates unread"
@@ -344,6 +351,8 @@
     - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
     - "C-97: City Defense and the assault target's validity — the city's threat, the defence event, Is City Threatened, Garrison City and the district target's validity READ; the threat's level terms, the garrison's swap and the team's unit to build unread"
     - "C-96 / C-60: the defensive cancel — READ (0x5d7640), ported for the city-states and the Free Cities"
+    - "C-95 / C-99: a cleared camp's scout still reports; a lake city trains ships; IsCoastalTarget; the recruit's priority; a candidate's own strength — READ (0x153ef0, 0x1485c0, 0x1c77c0 -> 0x82a10, 0x73a440 -> 0x73a880, 0x81c820 at 0x81cacf..0x81cb14, 0x7d1e40 at 0x7d2004..0x7d205f, 0x5cced0 at 0x5cd0c1..0x5cd11e, 0x7f5240), both twins"
+    - "C-95 / C-99: a cleared camp's scout still reports; a lake city trains ships; IsCoastalTarget; the recruit's priority; a candidate's own strength — READ (0x153ef0, 0x1485c0, 0x1488a0 at 0x148c38..0x148c64, 0x1c77c0 -> 0x82a10, 0x73a440 -> 0x73a880, 0x81c820 at 0x81cacf..0x81cb14, 0x7d1e40 at 0x7d2004..0x7d205f, 0x5cced0 at 0x5cd0c1..0x5cd11e, 0x7f5240), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...does not replay\"). Then, for a player the AI drives: 0x5cdae0, the City Defense event 0x5cced0, the unit-or-building event 0x5cd150 (tree \"Build City Building\"), the district event 0..."

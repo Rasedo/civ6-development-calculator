@@ -6,7 +6,7 @@
  */
 import type { AiCityDefenceView, AiKnownCityView, AiKnownDistrictView, AiMapPlotView, AiUnitView, AiView } from './aiViewTypes';
 import { DIRECTION_TYPES, hexDistance, neighborTile, neighbors, tilesWithin } from '../../world/hex';
-import { isCoastalLand, isImpassable, isMountain, isWater } from '../../world/query';
+import { isImpassable, isMountain, isWater } from '../../world/query';
 import { NO_SEAT, type Tile } from '../../world/types';
 import { FX, fmul, fxOf, turnsAt, type AiCityView, type AiDistrictView, type AiPlotView } from './aiValue';
 import { AI_YIELDS, pseudoYieldWeights, yieldWeights } from './aiWeights';
@@ -23,7 +23,7 @@ import { plotsSeenNow, ringPlots } from './barbarians';
 import { cityDefenseStrength, cityStrikeBase, districtGarrisonedStrength, encircled, garrisonTerm, predictCityBlow, siegeAssist, unitAttackRange } from './combat';
 import { encampOuterPool, outerPool, portalAt, wallsMax, wallsTier } from './rules';
 import { targetStrength } from './opsOrders';
-import { borderClosedTo, builderCost, cityAtIndex, embarkTechMoves, formationMates, plotUnits, traderCost, unitFullMoves, unitDomain, unitExertsZoc, unitsHostile, unitVisibleTo } from './units';
+import { borderClosedTo, builderCost, cityAtIndex, cityNavalCapable, embarkTechMoves, formationMates, plotUnits, traderCost, unitFullMoves, unitDomain, unitExertsZoc, unitsHostile, unitVisibleTo } from './units';
 import { CIVICS } from '../data/civics';
 import { TECHS } from '../data/techs';
 import { COST_MULTIPLIER_PCT, EMBARK_MOVES, MP_SCALE } from '../data/constants';
@@ -654,8 +654,7 @@ export function aiView(state: GameState, opts: { updated?: boolean } = {}): AiVi
       ?? state.cityStates.find((cs) => cs.centerIndex === p)?.population ?? 0,
     cityTrainsSea: (i, p) => {
       const city = seatCities(i).find((c) => c.centerIndex === p);
-      return !!city && (isCoastalLand(map, map.tiles[p])
-        || city.districts.some((d) => d.type === 'HARBOR' && map.tiles[d.tileIndex].districtComplete));
+      return !!city && cityNavalCapable(state, city);
     },
     // the engine's roster is the seven governors every seat may appoint
     // a title civic the caller's moment holds and the state does not yet

@@ -322,6 +322,27 @@
   context:
     - "...(0x73eb60, 0x73f7d0) and team lines (0x73b360) come first, then the start (0x726470 -> 0x73a120, \"Started\")."
   review: reviewed
+- addr: 0x73a440
+  final: 0x4de060
+  kind: function
+  name: the team conditions' registry
+  semantics: "registers the team condition \"IsCoastalTarget\" (its hash by 0x8c4af0) in the operation's condition map with the test 0x73a880; an AiOperationTeams row's Condition names it, and a team whose condition fails is not made at the operation's start (0x73a5e0)."
+  status: READ
+  cases:
+    - recording: h1_duels1132
+      turn: 44
+      value: "Babylon (20:20, beside a one-plot lake): its City Defense logs team 0 alone; runs/h1_duels1133 t52 city-state 3 (42:6, on the sea) logs teams 0 and 1"
+  impl:
+    - cpu/core/operations/operation.ts:teamApplies
+    - cpu/core/operations/operation.ts:newTeams
+    - gpu/core/sim_minorops.py:_mops_start
+  readings:
+    - "C-95 / C-99: a cleared camp's scout still reports; a lake city trains ships; IsCoastalTarget; the recruit's priority; a candidate's own strength — READ (0x153ef0, 0x1485c0, 0x1c77c0 -> 0x82a10, 0x73a440 -> 0x73a880, 0x81c820 at 0x81cacf..0x81cb14, 0x7d1e40 at 0x7d2004..0x7d205f, 0x5cced0 at 0x5cd0c1..0x5cd11e, 0x7f5240), both twins"
+    - "C-95 / C-99: a cleared camp's scout still reports; a lake city trains ships; IsCoastalTarget; the recruit's priority; a candidate's own strength — READ (0x153ef0, 0x1485c0, 0x1488a0 at 0x148c38..0x148c64, 0x1c77c0 -> 0x82a10, 0x73a440 -> 0x73a880, 0x81c820 at 0x81cacf..0x81cb14, 0x7d1e40 at 0x7d2004..0x7d205f, 0x5cced0 at 0x5cd0c1..0x5cd11e, 0x7f5240), both twins"
+  context:
+    - "...t's priority; a candidate's own strength — READ (0x153ef0, 0x1485c0, 0x1c77c0 -> 0x82a10, 0x73a440 -> 0x73a880, 0x81c820 at 0x81cacf..0x81cb14, 0x7d1e40 at 0x7d2004..0x7d205f, 0x5cced0 at..."
+    - "- IsCoastalTarget (the team condition registered at 0x73a440, its test 0x73a880): IsCoastalLand(the operation's target plot, -1) — land, with a pa..."
+  review: reviewed
 - addr: 0x73a5e0
   final: 0x4de200
   kind: function
@@ -355,6 +376,24 @@
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...t list (+0x60), the tribe's next turn starting it at CityAttackBoldness. The tree done, 0x73a840 finds the operation's tree gone and the manager ends it (\"Operation complete\", 0x725000..."
+  review: reviewed
+- addr: 0x73a880
+  final: 0x4de3a0
+  kind: function
+  name: IsCoastalTarget
+  semantics: "the team condition IsCoastalTarget (operation): the plot of the operation's target (+0x2a8 / +0x2ac) through the map (vt +0x50), then IsCoastalLand(plot, -1) (0x82a10 at the ocean's least water size): land with a passable water neighbour of an ocean-sized body; a lake's shore and a water target are none."
+  status: READ
+  cases:
+    - recording: h1_duels1132
+      turn: 44
+      value: Babylon's City Defense on 20:20 (a one-plot lake beside it) holds no City Naval Defense team and takes no Galley; runs/h1_duels1133 t52 city-state 3's on 42:6 (the sea beside it) holds both teams
+  impl: [cpu/core/operations/operation.ts:teamApplies, gpu/core/sim_minorops.py:_mops_start]
+  readings:
+    - "C-95 / C-99: a cleared camp's scout still reports; a lake city trains ships; IsCoastalTarget; the recruit's priority; a candidate's own strength — READ (0x153ef0, 0x1485c0, 0x1c77c0 -> 0x82a10, 0x73a440 -> 0x73a880, 0x81c820 at 0x81cacf..0x81cb14, 0x7d1e40 at 0x7d2004..0x7d205f, 0x5cced0 at 0x5cd0c1..0x5cd11e, 0x7f5240), both twins"
+    - "C-95 / C-99: a cleared camp's scout still reports; a lake city trains ships; IsCoastalTarget; the recruit's priority; a candidate's own strength — READ (0x153ef0, 0x1485c0, 0x1488a0 at 0x148c38..0x148c64, 0x1c77c0 -> 0x82a10, 0x73a440 -> 0x73a880, 0x81c820 at 0x81cacf..0x81cb14, 0x7d1e40 at 0x7d2004..0x7d205f, 0x5cced0 at 0x5cd0c1..0x5cd11e, 0x7f5240), both twins"
+  context:
+    - "...; a candidate's own strength — READ (0x153ef0, 0x1485c0, 0x1c77c0 -> 0x82a10, 0x73a440 -> 0x73a880, 0x81c820 at 0x81cacf..0x81cb14, 0x7d1e40 at 0x7d2004..0x7d205f, 0x5cced0 at 0x5cd0c1..0x..."
+    - "- IsCoastalTarget (the team condition registered at 0x73a440, its test 0x73a880): IsCoastalLand(the operation's target plot, -1) — land, with a passable water neighbou..."
   review: reviewed
 - addr: 0x73a8e0
   final: 0x4de400

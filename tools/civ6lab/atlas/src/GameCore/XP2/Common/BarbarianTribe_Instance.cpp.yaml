@@ -248,6 +248,9 @@
   semantics: "the scout's tree started: \"Barbarian Found City\" on the scout, the camp its Home Camp and the tribe its index From the scout's look 0x153ef0 once the player's throttle allows and the tribe's scout walks none yet: the tree \"Barbarian Found City\" (\"Barbarian Behavior\", 0x7ff9a0) on the scout alone, the trigger's Location its tribe's camp (\"Home Camp\") and Value the tribe's index (\"Tribe Index\"); the game signals BARBARIAN_SPOTTED_CITY and BARBARIAN_RAID_STARTED linked (0x1808c4af0). The tree: Sequence 0 (JumpTo 6) — Decode Trigger 1, Concurrent 2 (JumpTo 5) over Protect Unit 3 (Damage Percentage 0.25) and Move Unit 4 (Location \"Home Camp\", Release when done true, Allow Danger true, To Range 1), Notify Owner 5 (Data Payload \"Tribe Index\", 0x7c6fa0 -> 0x148270)."
   status: PARTLY
   cases:
+    - recording: h1_duels1145
+      turn: 32
+      value: "tribe 3 (camp 35:6 cleared): its scout's tree t29-31, the raid on 36:17 Started at t32 with rally 35:6, no member to its end"
     - recording: h1_duelw1117
       turn: 6
       value: "the first trees: 1117 t6, 1121 t4, 1124 t6 and t20, 1128 t6 and t8, 1127 t27, each the engines' start turn"
@@ -262,6 +265,8 @@
     - "C-95: the scout's tree \"Barbarian Found City\" — READ (the tree, its start, Protect Unit's update), PARTLY READ (the nodes' executions), unported"
     - "C-95: the scout's tree \"Barbarian Found City\" — READ, ported"
     - "C-99: a non-major player's tree pool — every city-state tree, its operations' and its \"Upgrade Units\" trees in one pool, ticked in slot order — READ (0x7ff9a0 / 0x7ff7b0 / 0x800c60 -> 0x7fef20, 0x7ffdd0 -> 0x7cb2e0), both twins"
+    - "C-95 / C-99: a cleared camp's scout still reports; a lake city trains ships; IsCoastalTarget; the recruit's priority; a candidate's own strength — READ (0x153ef0, 0x1485c0, 0x1c77c0 -> 0x82a10, 0x73a440 -> 0x73a880, 0x81c820 at 0x81cacf..0x81cb14, 0x7d1e40 at 0x7d2004..0x7d205f, 0x5cced0 at 0x5cd0c1..0x5cd11e, 0x7f5240), both twins"
+    - "C-95 / C-99: a cleared camp's scout still reports; a lake city trains ships; IsCoastalTarget; the recruit's priority; a candidate's own strength — READ (0x153ef0, 0x1485c0, 0x1488a0 at 0x148c38..0x148c64, 0x1c77c0 -> 0x82a10, 0x73a440 -> 0x73a880, 0x81c820 at 0x81cacf..0x81cb14, 0x7d1e40 at 0x7d2004..0x7d205f, 0x5cced0 at 0x5cd0c1..0x5cd11e, 0x7f5240), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...ing an owned plot of a city, its owner's throttle (manager +0x3d8, data +0x430) passed: 0x1485c0 starts the tribe's ScoutingBehaviorTree (\"Barbarian Found City\": Move Unit to the camp,..."
@@ -272,16 +277,22 @@
   kind: function
   semantics: "a tribe's turn: the clock counts to TurnsToWarriorSpawn (speed scaled) and resets. On a spawn turn (0x148ab6..0x148c08), the first that applies: the asked list (+0x90, count +0xa0) its head raised (0x144fb0, uncounted) and popped (0x149f30); else a pending melee +0xa8 > 0 (0x144b20, counted), ranged +0xac (0x144bf0), siege +0xb0 (0x144e00), support +0xb4 (0x144ed0), each decremented; else, +0x34 under NumMilitary +0x30, the roll Barbarian Ranged unit roll rand(100) < PercentRangedUnits picks ranged, else melee. Off a spawn turn a tribe short of its scout (+0x28) counts 5 turns (+0x2c) and raises one (0x144cc0)."
   status: PARTLY
+  cases:
+    - recording: h1_duels1133
+      turn: 25
+      value: "the tribe's turn alone forgets its scout's tree's id (0x148c38..0x148c64): tribe 0's camp 7:12 is cleared in t8 with its tree of t7 over; its Scout 131073 takes player 1's Builder on 8:5 at t25 beside Xi'an's ground and no tree starts; runs/h1_duels1132 tribe 1 (cleared in t75, no id held) starts one at t75"
   impl:
     - cpu/core/barbarians.ts:tribeTurn
     - cpu/data/barbarians.ts:BARB_REGION_MIN
     - cpu/data/barbarians.ts:BARB_SCOUT_WAIT
     - cpu/data/barbarians.ts:BARB_BOLD_TURN
     - cpu/harness/drawSites.ts:DRAW_SITES
+    - gpu/core/sim_barb.py:_barb_tribe_turn
   readings:
     - "H-1: the barbarians' turn (0x1514a0) — READ (the max camps and the sight LAB)"
     - "H-1: the raids — READ"
     - "H-1: the raids — READ"
+    - "C-95 / C-99: a cleared camp's scout still reports; a lake city trains ships; IsCoastalTarget; the recruit's priority; a candidate's own strength — READ (0x153ef0, 0x1485c0, 0x1488a0 at 0x148c38..0x148c64, 0x1c77c0 -> 0x82a10, 0x73a440 -> 0x73a880, 0x81c820 at 0x81cacf..0x81cb14, 0x7d1e40 at 0x7d2004..0x7d205f, 0x5cced0 at 0x5cd0c1..0x5cd11e, 0x7f5240), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "- Tribe turn 0x1488a0: the clock counts to TurnsToWarriorSpawn (speed scaled) and resets; under 5 units \"Barb..."

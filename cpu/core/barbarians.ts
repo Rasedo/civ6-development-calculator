@@ -442,6 +442,9 @@ function tribeTurn(state: GameState, tribe: BarbTribe): void {
     }
   }
   tribe.boldness = (tribe.boldness ?? 0) + BARB_BOLD_TURN;
+  // its scout's tree's id forgotten once the tree runs no more
+  // (0x148c38..0x148c64)
+  if (tribe.scoutTreeHeld && !tribe.homing) delete tribe.scoutTreeHeld;
   if (tribe.op && !barbOpLive(state, tribe)) delete tribe.op;
   if (tribe.assaultTargets?.length && !tribe.op?.assault) {
     if (tribe.boldness < BARB_ASSAULT_BOLDNESS) return;
@@ -491,7 +494,12 @@ function othersSee(state: GameState, unit: Unit, plots: readonly number[]): Set<
 }
 
 export function barbScoutLook(state: GameState, unit: Unit): void {
-  const tribe = tribesOf(state).find((tr) => tr.alive && tr.scouts.includes(unit.id));
+  // the unit's tribe by its index (unit +0x11d0), its camp standing or not:
+  // a cleared camp's scout still reports, and its tree walks it to where
+  // the camp stood — one tree, the tribe's turn alone forgetting its id
+  // (`scoutTreeHeld`; runs/h1_duels1132 t75-77 tribe 1's Scout 262147;
+  // runs/h1_duels1133 t25 tribe 0's Scout 131073, its tree of t7 held, none)
+  const tribe = tribesOf(state).find((tr) => tr.scouts.includes(unit.id));
   if (!tribe) return;
   const { map } = state;
   const from = map.tiles[unit.tileIndex];
@@ -519,7 +527,7 @@ export function barbScoutLook(state: GameState, unit: Unit): void {
     // wonder among them) alone; a major's city sends the scout home
     // (0x484a10: a full civ)
     if (t.improvement === null && t.district === null && !wonders.has(p)) continue;
-    if (!tribe.homing && seat >= 0 && seat < state.seats.length) barbScoutTreeStart(state, tribe, unit.id, { seat, plot: cityCentreOf(state, t) });
+    if (!tribe.scoutTreeHeld && seat >= 0 && seat < state.seats.length) barbScoutTreeStart(state, tribe, unit.id, { seat, plot: cityCentreOf(state, t) });
     next[seat] = state.turn + Math.max(0, BARB_SPOT_THROTTLE - BARB_SPOT_THROTTLE_PER_LEVEL * handicapOf(state, seat));
   }
 }

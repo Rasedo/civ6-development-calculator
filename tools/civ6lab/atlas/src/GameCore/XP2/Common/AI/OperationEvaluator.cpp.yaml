@@ -33,6 +33,8 @@
     - "C-95: an operation's enemy strength — READ (0x73eb60), ported"
     - "C-99: a unit bought in the turn sits out the operations, a Harbor trains ships — the recruit's turn-done offer READ (0x60a8c0, 0x60a440), 0x1c77c0's district arm READ, the candidates' own strength a FIT, both twins"
     - "C-95: the barbarians' candidates before the look, a capture's rally, a formation's embark flag and fighter — READ (0x722d70, 0x746920, 0x747230, 0x7877e0, 0x7265b0, 0x747fa0, 0x73e610, 0x73e870, 0x267650), both twins"
+    - "C-95 / C-99: a cleared camp's scout still reports; a lake city trains ships; IsCoastalTarget; the recruit's priority; a candidate's own strength — READ (0x153ef0, 0x1485c0, 0x1c77c0 -> 0x82a10, 0x73a440 -> 0x73a880, 0x81c820 at 0x81cacf..0x81cb14, 0x7d1e40 at 0x7d2004..0x7d205f, 0x5cced0 at 0x5cd0c1..0x5cd11e, 0x7f5240), both twins"
+    - "C-95 / C-99: a cleared camp's scout still reports; a lake city trains ships; IsCoastalTarget; the recruit's priority; a candidate's own strength — READ (0x153ef0, 0x1485c0, 0x1488a0 at 0x148c38..0x148c64, 0x1c77c0 -> 0x82a10, 0x73a440 -> 0x73a880, 0x81c820 at 0x81cacf..0x81cb14, 0x7d1e40 at 0x7d2004..0x7d205f, 0x5cced0 at 0x5cd0c1..0x5cd11e, 0x7f5240), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "- The evaluation (job \"Op Evaluation\", 0x746920): MustBeAtWar, MustHaveNukes, MustHaveUnits (player +0x12e8 +0xc0) first; then each tar..."

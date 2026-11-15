@@ -4408,6 +4408,9 @@ class SimInit:
         self.tribe_raidq = torch.full((B, self.KT, self.TL), -1, dtype=torch.long, device=device)
         self.tribe_assq = torch.full((B, self.KT, self.TL), -1, dtype=torch.long, device=device)
         self.tribe_home_slot = torch.full((B, self.KT), -1, dtype=torch.long, device=device)
+        # the tribe holds a scout's tree's id (tribe +0x38): set as the tree
+        # starts, forgotten in the tribe's turn once the tree runs no more
+        self.tribe_home_set = torch.zeros(B, self.KT, dtype=torch.bool, device=device)
         self.tribe_home_seat = torch.full((B, self.KT), -1, dtype=torch.long, device=device)
         self.tribe_home_id = torch.full((B, self.KT), -1, dtype=torch.long, device=device)
         self.tribe_home_resume = torch.full((B, self.KT), -1, dtype=torch.long, device=device)

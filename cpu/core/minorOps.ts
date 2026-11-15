@@ -144,19 +144,16 @@ function minorEnv(state: GameState, cs: CityState, pass: Pass | null): OpsEnv {
     turn: state.turn,
     view: fresh,
     defs: MINOR_OP_DEFS,
-    // its own army as it stands, and the records its knowledge base keeps of
-    // its units gone, read to their age: a Warrior lost still counts two
-    // turns (runs/h1_duelw1121 Antioch: Attack Barb Camp invalid at t5 on
-    // its two Warriors as they stand, valid at t9 alone, its Warrior lost
-    // at t7 counted from its t6 record once the camp's Scout's record has
-    // aged out, invalid again at t10)
-    army: (p) => {
-      if (p !== cs.seat) return recentOf(cs, p);
-      const live = fresh().units(cs.seat);
-      const ids = new Set(live.map((u) => u.id));
-      return [...live.map((u) => ({ id: u.id, owner: cs.seat, type: u.type, plot: u.plot, combat: u.combat, ranged: u.ranged, damage: u.damage, seen: state.turn })),
-        ...recentOf(cs, p).filter((r) => !ids.has(r.id))];
-    },
+    // a player's army the records its knowledge base keeps, read to their
+    // age (0x5eadb0), its own units' among them as its last look left them:
+    // a Warrior lost still counts two turns (runs/h1_duelw1121 Antioch:
+    // Attack Barb Camp invalid at t5 on its two Warriors, valid at t9
+    // alone, its Warrior lost at t7 counted from its t6 record once the
+    // camp's Scout's record has aged out, invalid again at t10), one hurt
+    // since the look at the damage the look saw (runs/h1_duels1133
+    // city-state 3 t5: its Warrior 131073, struck for 34 in the barbarians'
+    // t4 turn, counts 20 and Attack Barb Camp on 38:7 is valid, 40 against 39)
+    army: (p) => recentOf(cs, p),
     camps: () => cs.campsKnown ?? [],
     known: () => fresh().knownCities(cs.seat),
     threat: (plot) => (plot === cs.centerIndex ? cs.threat ?? -1 : -1),
@@ -219,9 +216,10 @@ export function minorOpsRefresh(state: GameState, cs: CityState): void {
   if (cs.ops) operationsRefresh(cs.ops, minorEnv(state, cs, null));
 }
 
-/** A: the defence event's start (0x7265b0): the operation's id */
+/** A: the defence event's start (0x7265b0), its tree's recruit priority the
+ *  city's threat (0x5cced0 at 0x5cd102..0x5cd11e): the operation's id */
 export function minorOpsStart(state: GameState, cs: CityState, name: string, plot: number): number {
-  return startOperationNamed(opsOfMinor(cs), minorEnv(state, cs, null), name, plot);
+  return startOperationNamed(opsOfMinor(cs), minorEnv(state, cs, null), name, plot, cs.threat ?? -1);
 }
 
 /** the operation of the id still runs */

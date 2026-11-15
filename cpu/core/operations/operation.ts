@@ -87,6 +87,10 @@ export interface Operation {
   triggerValue: number;
   /** the units locked to the operation (Lock Units) */
   locked: boolean;
+  /** the priority its recruits ask at (tree +0x5a8) where its start wrote
+   *  one — the city's defence event writes the city's threat as it starts
+   *  its operation —, else its definition's */
+  recruitPriority?: number;
   /** its units may be built for it (op +0x5d8, AllowUnitConstruction: set
    *  by an Operation Diplomacy that desires war) */
   allowUnitConstruction: boolean;
@@ -121,11 +125,15 @@ export function newTeams(def: AiOpDef, view: AiView, target: number): OpTeam[] {
   });
 }
 
-/** a team's Condition: IsCoastalTarget, the target beside water */
+/** a team's Condition: IsCoastalTarget (0x73a880), the target's plot coastal
+ *  land (IsCoastalLand 0x82a10 at the ocean's least size): land beside water
+ *  that is no lake's (runs/h1_duels1132 Babylon on 20:20 beside the one-plot
+ *  lake 20:19: its City Defense holds no City Naval Defense team, t44) */
 function teamApplies(t: AiOpTeam, view: AiView, target: number): boolean {
   if (!t.condition) return true;
-  if (t.condition === 'IsCoastalTarget') return target >= 0 && view.plotsWithin(target, 1).some((p) => view.plots()[p].water);
-  return false;
+  if (t.condition !== 'IsCoastalTarget' || target < 0) return false;
+  const plots = view.plots();
+  return !plots[target].water && view.plotsWithin(target, 1).some((p) => plots[p].water && !plots[p].lake);
 }
 
 /** a unit's strength as a team member (0x73fba0): the larger of its combat

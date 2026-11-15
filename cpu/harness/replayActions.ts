@@ -1159,7 +1159,14 @@ export class RecordedActions implements ActionSource {
         // player's units record t+1 holds on the plot, from its record t plot
         const mover = b.units.find((u) => u.owner === by && u.y * W + u.x === plot && (!added || u.id !== n(added, 1))
           && a.units.some((x) => unitKey(x) === unitKey(u)));
-        if (!mover) return;
+        if (!mover) {
+          // no mover either record holds on the plot (runs/h1_duels1145 t66:
+          // city-state 3's unit takes the barbarians' Builder on 42:21 from
+          // 42:20 and dies in the barbarians' turn, whose Horseman then takes
+          // the Builder back): the record's seizure alone, its captive named
+          if (added) out0.push({ kind: 'seize', phase: phaseOf(by), player: by, unit: `${by}:-1`, from: plot, plot, victim, ...into });
+          return;
+        }
         const was = a.units.find((x) => unitKey(x) === unitKey(mover))!;
         out0.push({ kind: 'seize', phase: phaseOf(by), player: by, unit: unitKey(mover), from: was.y * W + was.x, plot, victim, ...into });
       });

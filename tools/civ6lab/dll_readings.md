@@ -16604,3 +16604,87 @@ records: the reach with turns and Movement, each target's spots and blows).
   where they are not the area's are unconfirmed; the Free Cities' and a
   major's island test (the same code) and the strategy's stop (+0x90, turn
   + 20) are not ported: no recording shows them.
+
+## C-95 / C-99: a cleared camp's scout still reports; a lake city trains ships; IsCoastalTarget; the recruit's priority; a candidate's own strength — READ (0x153ef0, 0x1485c0, 0x1488a0 at 0x148c38..0x148c64, 0x1c77c0 -> 0x82a10, 0x73a440 -> 0x73a880, 0x81c820 at 0x81cacf..0x81cb14, 0x7d1e40 at 0x7d2004..0x7d205f, 0x5cced0 at 0x5cd0c1..0x5cd11e, 0x7f5240), both twins
+
+`barbScoutLook` (cpu/core/barbarians.ts) / `_barb_scout_look`
+(gpu/core/sim_barb.py); `AiView.cityTrainsSea` (cpu/core/aiView.ts) /
+`_mops_naval_target`; `teamApplies` (cpu/core/operations/operation.ts) /
+`_mops_start`; `recruitUnits` (cpu/core/operations/nodes.ts),
+`Operation.recruitPriority`, `startOperationNamed`, `minorOpsStart` /
+`_u_recruit`, `mops_recpri`, `_MinorWorld.start_operation`; `minorEnv`'s
+`army` (cpu/core/minorOps.ts) / `_mops_army_near` (gpu/core/sim_minorops.py).
+
+- THE SCOUT'S REPORT OF A CLEARED CAMP'S TRIBE (0x153ef0): the tribe is the
+  unit's index (unit +0x11d0, refused only below 0), read from the manager's
+  list with no test of its camp; 0x1485c0 refuses only a tree already
+  walking (tribe +0x38 not -1) and a city of no full civ. A tribe whose camp
+  is gone still starts "Barbarian Found City": its Home Camp the plot the
+  camp stood on (tribe +0x10), its Notify Owner the raid at once where the
+  tribe's Boldness allows. The raid's Barbarian Recruit then asks the dead
+  tribe's queue, which no tribe turn serves: the operation stands with no
+  member. The start writes the tree's id to tribe +0x38 (0x1487cb); the
+  tribe's turn alone forgets it once the tree runs no more (0x1488a0 at
+  0x148c38..0x148c64, the raid's +0x3c and the assault's +0x40 beside it),
+  so a tribe whose camp is gone, taking no turn, starts one tree and no
+  other (`BarbTribe.scoutTreeHeld` / `tribe_home_set`): runs/h1_duels1133
+  tribe 0's Scout 131073 takes player 1's Builder on 8:5 at t25 and no
+  tree starts, its one tree of t7 over since t8.
+  Confirmed: runs/h1_duels1132 — tribe 1's camp 16:23 cleared in
+  t75; its Scout 262147 rampages onto 16:23 that turn and reports Xi'an
+  (13:18): the tree at the t75 end look, the Scout's "Operation" row to 16:23
+  at t76, "Barbarian Attack, Started" at t77 (target 13:18, rally 16:23),
+  "Not Ready" with no member to t249. runs/h1_duels1145 t29-32: tribe 3
+  (camp 35:6 gone) the same, its raid on 36:17 from t32.
+- A CITY TRAINS SHIPS BESIDE A LAKE (0x1c77c0: the centre plot's domain
+  bit, set where IsCoastalLand(plot, 1), 0x82a10 with a least water size of
+  1): any enterable water neighbour, a lake's too. TARGET_NAVAL_SUPERIORITY
+  (0x747230) reads it; its target stays the first sea plot that is no Lake
+  within 4. Confirmed: runs/h1_duels1132 t2 Babylon (20:20, beside the
+  one-plot lake 20:19) starts Naval Superiority at 21:22, Lahore (42:15,
+  beside a five-plot lake) at 41:13; runs/h1_duels1138 t2 city-state 3,
+  runs/h1_duels1139 t2 city-state 4.
+- IsCoastalTarget (the team condition registered at 0x73a440, its test
+  0x73a880): IsCoastalLand(the operation's target plot, -1) — land, with a
+  passable water neighbour whose body holds OCEAN_MIN_WATER_SIZE plots or
+  more: a lake's shore is none, a water target none. Confirmed:
+  runs/h1_duels1132 t44 Babylon's City Defense logs team 0 alone and takes
+  no Galley; runs/h1_duels1133 t52 city-state 3 (42:6, on the sea) logs
+  teams 0 and 1.
+- THE RECRUIT'S PRIORITY (0x81c820 at 0x81cacf..0x81cb14): the tree's
+  recruit priority (+0x5a8) where it is not -1, else the operation's
+  (0x723b90), else the tree's own (+0x548); with it the tree's present value
+  (+0x608 >> 8), its job and Allow Stealing go to 0x60a8c0. The listener
+  (0x7d1e40 at 0x7d2004..0x7d205f): a tree of another job, marked
+  (m_allowRecruiting +0x3c8) or asked with Allow Stealing, answers where
+  the request's priority is above its own (+0x548), or — marked, at an
+  equal priority — where the request's value is above its own (+0x608 >> 8).
+  Lock Units (0x7f5240) writes the mark: !Lock. The second offer keeps the
+  answered units whose turn is not done (+0x530) and that live
+  (0x60ac91..0x60aca1).
+- THE CITY'S DEFENCE EVENT (0x5cced0) writes, after the start, the tree's
+  present value (the watched +0x5b0, value +0x608: the city's worth
+  0x7a0ac0 of its knowledge-base record, 0 with none) and its recruit
+  priority (the watched +0x550, value +0x5a8: CityBuildAI +0x1b8, the city's
+  threat). The priority stays as written while the threat moves: the end
+  looks of runs/h1_duels1137 hold recruit priority 5 beside threat 1 on 7
+  turns, runs/h1_duels1127 4 beside 1 on 8. Confirmed: runs/h1_duels1133
+  city-state 3 t52-61, City Defense (recruit priority 1) leaves Naval
+  Superiority's Galley 524292 (tree priority 2) and Attack Barb Camp's
+  units (3); runs/h1_duels1135 city-state 2 t67, City Defense at 1 recruits
+  none beside Attack Barb Camp's Archer and completes; runs/h1_duels1128
+  city-state 4 t32 at 5 takes Attack Barb Camp's Archer.
+- A CANDIDATE'S OWN STRENGTH (0x746920 -> 0x5eadb0): the knowledge base's
+  records of the player's own units, as its last look left them, aged at
+  most 2 — not the units as they stand. Confirmed: runs/h1_duels1133
+  city-state 3 t5: its Warrior 131073 was struck for 34 in the barbarians'
+  t4 turn, its record still at 0 damage at the t5 tactical site; Attack
+  Barb Camp on 38:7 is valid at 40 against 6 + the Scout's 10 + the
+  Spearman's 23 (its record at 24 damage from its blow), and starts.
+- OPEN: the equal-priority answer by value (no tree's present value is
+  held beside City Defense's; no recorded City Defense starts at threat 2
+  or 3); the turn-done filter of the second offer (the engines offer every
+  unit of the answering operations); a locked operation's answer to a
+  recruit that allows stealing (the engines keep a locked operation's
+  units; no tree a city-state runs locks).
+

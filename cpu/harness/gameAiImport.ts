@@ -29,7 +29,7 @@
  * and enemy, start and build permission: its enemy, target and
  * rally, its strengths (op +0x220, +0x238), its tree's run, its trigger (the
  * Decode Trigger's units and value), its lock (a Lock Units node that
- * succeeded), its contracts; per team (op +0x150, 0x118 bytes each, in the
+ * succeeded), its tree's recruit priority, its contracts; per team (op +0x150, 0x118 bytes each, in the
  * definition's order) its members (+0x18) — those whose assignment (unit +0x300)
  * is not the operation's released (`Operation.released`) —, the counts per requirement
  * (+0x30), every requirement's minimum met, its readiness and the ongoing
@@ -270,6 +270,7 @@ function opOf(w: ImportWorld, g: GameOperation, tree: GameTree | undefined, base
     enemyStrength: g.targetStrength, strength: g.opStrength, triggerUnits, triggerValue, locked,
     allowUnitConstruction: base?.allowUnitConstruction ?? false,
     contracts: (tree.contracts ?? []).filter((c) => c >= 0),
+    ...((tree.recruitPriority ?? -1) >= 0 ? { recruitPriority: tree.recruitPriority } : {}),
     ...(base?.killed !== undefined ? { killed: base.killed } : {}),
     ...(released.length ? { released } : {}),
   };

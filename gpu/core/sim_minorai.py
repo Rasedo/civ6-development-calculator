@@ -2590,8 +2590,10 @@ class _MinorWorld:
         return self.sim._mops_live(self.s, ids)
 
     def start_operation(self, name, plot, mask):
+        # the city's defence event's start: the tree's recruit priority the
+        # city's threat (0x5cced0 at 0x5cd102..0x5cd11e)
         T = self.sim._mops_tables()
-        return self.sim._mops_start(self.s, T.names.index(name), plot, plot, mask)
+        return self.sim._mops_start(self.s, T.names.index(name), plot, plot, mask, recruit=self._threat.reshape(-1))
 
     def builder_lays(self, imp):
         """[B] the improvement row (AI_IMPROVEMENTS' order, -1 none) is one

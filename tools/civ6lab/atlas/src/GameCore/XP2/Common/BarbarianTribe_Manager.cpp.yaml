@@ -306,6 +306,9 @@
   semantics: "the barbarian scout's report (bound at 0x153b0d to the game signal +0x10c8 the sight update 0x58aa90 raises per plot newly visible to the barbarian player, 0x508d50 answering 2): a tribe's scout (unit +0x1c0 2) seeing an owned plot of a city, its owner's throttle (manager +0x3d8, data +0x430) passed: 0x1485c0 starts the tribe's ScoutingBehaviorTree when none runs (+0x38) and the owner is a full civ (0x484a10); the throttle becomes turn + max(0, BARBARIAN_MAX_THROTTLE_PER_RAID 18 - handicap x BARBARIAN_LOWER_THROTTLE_PER_DIFFICULTY 3), handicap player +0x908, written whether or not a tree starts. Per plot newly visible to the barbarian player: the plot's owner (+0x1c) any player; for a scout (unit AI type +0x1c0 == 2), the owner's throttle passed (@f28c78 +0x110, the game turn, at the player's +0x430 entry), a plot holding an improvement (+0x44, -1 none) or a district (0x810d0; a wonder's plot is DISTRICT_WONDER, built or placed): the tree starts where its tribe's scout walks none (0x1485c0; a full civilization's city, 0x484a10) and the throttle is written (+0x3d8: the turn + BARBARIAN_MAX_THROTTLE_PER_RAID less the level's, whether or not a tree started). Raised by each step's sight update (0x58aa90)."
   status: READ
   cases:
+    - recording: h1_duels1132
+      turn: 75
+      value: "tribe 1's camp 16:23 cleared in t75; its Scout 262147 rampages onto 16:23 and reports Xi'an: the tree at the t75 end look (Home Camp 16:23, Tribe Index 1), the raid on 13:18 Started at t77 with rally 16:23"
     - recording: h1_duelw1121
       turn: 31
       value: the scout steps 4:15 -> 4:14 and sees China's complete wonder at 5:12; its tree runs from t32, the raid starts at t33
@@ -329,6 +332,8 @@
     - "H-1: the raids — READ"
     - "C-95: the scout's tree \"Barbarian Found City\" — READ, ported"
     - "C-95: HL Explore's plot test refuses every other player's ground, Explore Land's flags 0x40 — READ (0x70bd40 at 0x70bd87..0x70beee, 0x709d80 at 0x709da0..0x709dc2, 0x70ce90 at 0x70ced5), FIT (the knowledge base's +0x128 at or below the turn), both twins"
+    - "C-95 / C-99: a cleared camp's scout still reports; a lake city trains ships; IsCoastalTarget; the recruit's priority; a candidate's own strength — READ (0x153ef0, 0x1485c0, 0x1c77c0 -> 0x82a10, 0x73a440 -> 0x73a880, 0x81c820 at 0x81cacf..0x81cb14, 0x7d1e40 at 0x7d2004..0x7d205f, 0x5cced0 at 0x5cd0c1..0x5cd11e, 0x7f5240), both twins"
+    - "C-95 / C-99: a cleared camp's scout still reports; a lake city trains ships; IsCoastalTarget; the recruit's priority; a candidate's own strength — READ (0x153ef0, 0x1485c0, 0x1488a0 at 0x148c38..0x148c64, 0x1c77c0 -> 0x82a10, 0x73a440 -> 0x73a880, 0x81c820 at 0x81cacf..0x81cb14, 0x7d1e40 at 0x7d2004..0x7d205f, 0x5cced0 at 0x5cd0c1..0x5cd11e, 0x7f5240), both twins"
   context:
     - "- The report (0x153ef0, a barbarian unit's sight of a plot): a tribe's scout (unit +0x1c0 == 2) seeing an owne..."
     - "- The report's event: 0x153ef0 is bound (0x153b0d) to the game signal at signals +0x10c8, which the unit sight update..."

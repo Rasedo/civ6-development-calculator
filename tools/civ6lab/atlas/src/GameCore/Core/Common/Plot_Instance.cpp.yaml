@@ -72,7 +72,10 @@
     - recording: h1_duelq1124
       turn: 91
       value: "8:7 beside the lake 9:7 / 9:8 is no coastal land: city-state 2's embarked Man-At-Arms 1310723 strikes it at the embarked strength (no Attack Medium Priority claim, as logged)"
-  impl: [cpu/core/combat.ts:meleeUnitStrengths, cpu/core/combat.ts:amphibiousAttackCS]
+  impl:
+    - cpu/core/combat.ts:meleeUnitStrengths
+    - cpu/core/combat.ts:amphibiousAttackCS
+    - cpu/core/operations/operation.ts:teamApplies
   readings:
     - "C-74: the event draw, the volcanoes, the drought"
     - "C-96 / C-97: the unit value — READ (the combat, trade, explorer branches, the tail, the military AI's unit production), PARTLY READ (its inputs)"
@@ -85,6 +88,8 @@
     - "C-96 / C-98 / C-100 / C-99: the city AI's fitted rules read — the analysis before the job list, the unit term's upgrade price, the city's trained domains, a non-major's required power, the eruption's turns — READ (0x608870 at 0x608976..0x608988, 0x7b3e50 at 0x7b4564..0x7b45c8, 0x5376d0, 0x1c77c0, 0x1aed10, 0x1f0440 at 0x1f04c7..0x1f04dc, 0xa1d480), both twins"
     - "C-110 / C-125: the amphibious penalty reads the plot the defender stands on — READ (0x51bba0, 0x51c810 at 0x51cb7a..0x51cba1, 0x51d670 at 0x51d92e..0x51d957, 0x205f70, 0x211cc0, 0x209870), both twins"
     - "H-1 / C-96: at war with a living major, a unit's strategic resource in the City Analysis, a city-state's naval strategy — READ (0x3dcf50, 0x7b62c0 at 0x7b71cd..0x7b725d, 0x6fafc0 at 0x6fc771..0x6fc873, 0x783980 at 0x783ade..0x783d93 and 0x785271..0x7852df, 0x786080, 0x865f20), both twins"
+    - "C-95 / C-99: a cleared camp's scout still reports; a lake city trains ships; IsCoastalTarget; the recruit's priority; a candidate's own strength — READ (0x153ef0, 0x1485c0, 0x1c77c0 -> 0x82a10, 0x73a440 -> 0x73a880, 0x81c820 at 0x81cacf..0x81cb14, 0x7d1e40 at 0x7d2004..0x7d205f, 0x5cced0 at 0x5cd0c1..0x5cd11e, 0x7f5240), both twins"
+    - "C-95 / C-99: a cleared camp's scout still reports; a lake city trains ships; IsCoastalTarget; the recruit's priority; a candidate's own strength — READ (0x153ef0, 0x1485c0, 0x1488a0 at 0x148c38..0x148c64, 0x1c77c0 -> 0x82a10, 0x73a440 -> 0x73a880, 0x81c820 at 0x81cacf..0x81cb14, 0x7d1e40 at 0x7d2004..0x7d205f, 0x5cced0 at 0x5cd0c1..0x5cd11e, 0x7f5240), both twins"
   notes:
     - ".claude/scratchpad/st1/reading.md: ...promise's plot   (PROMISE_DONT_SETTLE_NEAR_ME, 0xfadf5055). Then: the continent (+0x30),   coastal (0x82a10) and fresh water (0x82c20); the nearest own city (a min,   0 with none); the danger (the influence..."
   context:

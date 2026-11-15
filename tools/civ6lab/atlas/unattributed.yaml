@@ -5591,6 +5591,8 @@
     - "C-96 / C-97: the team's unit to build, the recruit's contract and the knowledge base's camps — the team update's requirements and readiness, the unit choice, Recruit Units' result and contract, the camps READ; the maintenance resource test, the recruit's stealing and levy unread"
     - "C-99: the upgrade trees — READ (the trigger, Find Available Unit's upgradeable offer, Find Unit Targets' job, Upgrade Units, the economic AI's upgrade, Move Unit with no Location), ported; the deletion of an excess obsolete unit unported"
     - "C-130 / C-96: a contract's priority in the expected unit count, the strength's treasury flag — READ, both twins"
+    - "C-95 / C-99: a cleared camp's scout still reports; a lake city trains ships; IsCoastalTarget; the recruit's priority; a candidate's own strength — READ (0x153ef0, 0x1485c0, 0x1c77c0 -> 0x82a10, 0x73a440 -> 0x73a880, 0x81c820 at 0x81cacf..0x81cb14, 0x7d1e40 at 0x7d2004..0x7d205f, 0x5cced0 at 0x5cd0c1..0x5cd11e, 0x7f5240), both twins"
+    - "C-95 / C-99: a cleared camp's scout still reports; a lake city trains ships; IsCoastalTarget; the recruit's priority; a candidate's own strength — READ (0x153ef0, 0x1485c0, 0x1488a0 at 0x148c38..0x148c64, 0x1c77c0 -> 0x82a10, 0x73a440 -> 0x73a880, 0x81c820 at 0x81cacf..0x81cb14, 0x7d1e40 at 0x7d2004..0x7d205f, 0x5cced0 at 0x5cd0c1..0x5cd11e, 0x7f5240), both twins"
   context:
     - "...raised (0x6075b0) with the recruit's priority (the tree's +0x5a8, else its operation's 0x723b90: the root tree's +0x548, its definition's Priority, 0x73a120 -> 0x7cb230), its value, i..."
     - ...ose upgrade passes the visible test (0x58fff0, r8 1); the evaluator (0x60a8c0; priority 0x723b90) offers free units, then lower-priority operations' (Naval Superiority's at 2, never...
@@ -7404,7 +7406,10 @@
   semantics: Lock Units' update.
   status: PARTLY
   impl: [cpu/core/operations/nodes.ts:lockUnits]
-  readings: ["C-97: the behaviour trees — READ (the interpreter), the nodes PARTLY READ"]
+  readings:
+    - "C-97: the behaviour trees — READ (the interpreter), the nodes PARTLY READ"
+    - "C-95 / C-99: a cleared camp's scout still reports; a lake city trains ships; IsCoastalTarget; the recruit's priority; a candidate's own strength — READ (0x153ef0, 0x1485c0, 0x1c77c0 -> 0x82a10, 0x73a440 -> 0x73a880, 0x81c820 at 0x81cacf..0x81cb14, 0x7d1e40 at 0x7d2004..0x7d205f, 0x5cced0 at 0x5cd0c1..0x5cd11e, 0x7f5240), both twins"
+    - "C-95 / C-99: a cleared camp's scout still reports; a lake city trains ships; IsCoastalTarget; the recruit's priority; a candidate's own strength — READ (0x153ef0, 0x1485c0, 0x1488a0 at 0x148c38..0x148c64, 0x1c77c0 -> 0x82a10, 0x73a440 -> 0x73a880, 0x81c820 at 0x81cacf..0x81cb14, 0x7d1e40 at 0x7d2004..0x7d205f, 0x5cced0 at 0x5cd0c1..0x5cd11e, 0x7f5240), both twins"
   context:
     - "...: the free units, then the units of the lower-priority unlocked operations); Lock Units 0x7f5240; Make Formation 0x7efd70 / 0x7ee630 (pairs 0x73b6c0 -> 0x73b8a0); Operation Move 0x81a1..."
     - "...0x7ec7b0; Build Unit 0x7f4e00; Recruit Units 0x81c820 (0x60a8c0 → 0x738050); Lock Units 0x7f5240; Make Formation 0x7efd70 / 0x7ee630 (0x73b6c0 → 0x73b8a0); Operation Move 0x81a130 / 0x..."
@@ -8007,6 +8012,7 @@
     - cpu/core/operations/nodes.ts:OP_NODES
     - cpu/core/operations/nodes.ts:recruitUnits
     - gpu/core/sim_minorops.py:_u_recruit
+    - cpu/core/operations/nodes.ts:asked
   readings:
     - "C-99 / C-129: the military AI's job refreshes the operations before its upgrade; Recruit Units updates the teams only on a changed count — READ (0x722690, 0x81c820), both twins"
     - "C-97: the behaviour trees — READ (the interpreter), the nodes PARTLY READ"
@@ -8015,6 +8021,8 @@
     - "C-96: the standing army and the Combat Desire's city terms — READ (0x5ca7e0, the watched setter 0x731d10, 0x79b9c0), the unit table's orientation READ"
     - "C-96: the standing army and the Combat Desire's city terms"
     - "C-128: the standing army's home and Garrison City's DEFENDER — READ, both twins"
+    - "C-95 / C-99: a cleared camp's scout still reports; a lake city trains ships; IsCoastalTarget; the recruit's priority; a candidate's own strength — READ (0x153ef0, 0x1485c0, 0x1c77c0 -> 0x82a10, 0x73a440 -> 0x73a880, 0x81c820 at 0x81cacf..0x81cb14, 0x7d1e40 at 0x7d2004..0x7d205f, 0x5cced0 at 0x5cd0c1..0x5cd11e, 0x7f5240), both twins"
+    - "C-95 / C-99: a cleared camp's scout still reports; a lake city trains ships; IsCoastalTarget; the recruit's priority; a candidate's own strength — READ (0x153ef0, 0x1485c0, 0x1488a0 at 0x148c38..0x148c64, 0x1c77c0 -> 0x82a10, 0x73a440 -> 0x73a880, 0x81c820 at 0x81cacf..0x81cb14, 0x7d1e40 at 0x7d2004..0x7d205f, 0x5cced0 at 0x5cd0c1..0x5cd11e, 0x7f5240), both twins"
   context:
     - "...up, TOO WEAK FAILURE); Find Available Unit 0x7ec7b0; Build Unit 0x7f4e00; Recruit Units 0x81c820 (the recruit 0x60a8c0 -> 0x738050: the free units, then the units of the lower-priority..."
     - "- Recruit Units' update (0x81c820), after 0x60a8c0, sets each of the operation's units (0x6092c0: +0x7d0, +0x770) to its..."

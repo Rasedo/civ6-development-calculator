@@ -218,6 +218,7 @@ class SimBarb:
         self.tribe_raidq[rows, k[rows]] = -1
         self.tribe_assq[rows, k[rows]] = -1
         self.tribe_home_slot[rows, k[rows]] = -1
+        self.tribe_home_set[rows, k[rows]] = False
         self.tribe_home_id[rows, k[rows]] = -1
         self.tribe_home_resume[rows, k[rows]] = -1
         self.tribe_home_mu[rows, k[rows]] = False
@@ -466,6 +467,9 @@ class SimBarb:
         self.tribe_scoutn[:, k] += self._barb_raise(due, kk, self._barb_kind_col(5, kind), 2, 1, scout=True)
         self.tribe_scoutc[:, k] = torch.where(due, torch.zeros_like(self.tribe_scoutc[:, k]), self.tribe_scoutc[:, k])
         self.tribe_bold[:, k] += on.long() * int(bb["boldTurn"])
+        # the scout's tree's id forgotten once the tree runs no more
+        # (0x148c38..0x148c64)
+        self.tribe_home_set[:, k] &= ~(on & (self.tribe_home_slot[:, k] == -1))
         # an operation stands until its tree ends
         gone = on & (self.tribe_op[:, k] > 0) & self.tribe_op_done[:, k]
         self.tribe_op[:, k] = torch.where(gone, torch.zeros_like(self.tribe_op[:, k]), self.tribe_op[:, k])
@@ -494,12 +498,13 @@ class SimBarb:
         barbarian player by its sight (in it now, not at its last look, seen
         by no other unit of theirs) holding an improvement or a district (a
         wonder among them), in plot order — per major the first, once its
-        throttle allows, sends the scout home when none walks yet and spares
-        the major further reports."""
+        throttle allows, sends the scout home where its tribe holds no scout's
+        tree's id (`tribe_home_set`) and spares the major further reports."""
         ac = at.clamp(min=0).unsqueeze(1)
         sc = (self.barb_unit_alive.gather(1, ac) & (self.barb_unit_tribe.gather(1, ac) == k)
               & self.barb_unit_scout.gather(1, ac)).squeeze(1)
-        has = on & (at >= 0) & sc & self.tribe_alive[:, k]
+        # the tribe by the unit's index, its camp standing or not
+        has = on & (at >= 0) & sc
         rows = has.nonzero(as_tuple=True)[0]
         if not rows.numel():
             return
@@ -533,12 +538,15 @@ class SimBarb:
             take = ok & (first < best)
             best = torch.where(take, first, best)
             best_g = torch.where(take, torch.full_like(best_g, g), best_g)
-        go = (best_g >= 0) & (self.tribe_home_slot[rows, k] == -1)
+        # none where the tribe holds a scout's tree's id (tribe +0x38): its
+        # turn alone forgets it, so a cleared camp's tribe starts one tree more
+        go = (best_g >= 0) & ~self.tribe_home_set[rows, k]
         r2 = rows[go]
         # the scout's tree starts (0x1485c0): its id the player's next
         start = torch.zeros(self.B, dtype=torch.bool, device=self.device)
         start[r2] = True
         nid = self._bop_next_id(start)
+        self.tribe_home_set[r2, k] = True
         self.tribe_home_id[r2, k] = nid[r2]
         self.tribe_home_resume[r2, k] = -1
         self.tribe_home_mu[r2, k] = False

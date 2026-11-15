@@ -226,6 +226,8 @@ export interface GameTree {
   name: string | null;
   operation?: number;
   contracts?: number[];
+  /** the tree's recruit priority (-1 none) */
+  recruitPriority?: number;
   /** at the end look: per node [status, shape, handler, its data as hex,
    *  its TreeData values by DefnId: [DataTypes id, slot, value], its graph
    *  entry: parent, end, first child, last child, current child] */
