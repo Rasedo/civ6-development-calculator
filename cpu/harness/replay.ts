@@ -273,6 +273,12 @@ interface Ctx {
   /** the ground as the city-states' turns found it (`minorTurns`): their
    *  city trees' orders in the copy's turn read it (`holdSecondHook`) */
   minorGround: GroundOf[];
+  /** each city-state's luxury amenities as its turn left them: its second
+   *  hook reads them with that ground (a drought of the turn's random-event
+   *  step, after the city-states' turns, takes a luxury off later:
+   *  runs/h1_duelq1128 Hong Kong t160, the Neighborhood's 142.53 on 8:8 at
+   *  its turn's Production and Culture as logged) */
+  minorLux: Map<number, number | undefined>;
   /** the replay's own tracer of the minors' purchases, restored after the
    *  copy's turn (`minorAi`) */
   buyTrace: Parameters<typeof traceMinorPurchases>[0];
@@ -1924,17 +1930,20 @@ function minorAi(ctx: Ctx, b: TurnRecord, turn: number, made: ReadonlySet<Unit>,
   // ...and its city trees' Builders' layings
   const lays: { u: Unit; plot: number; imp: string }[] = [];
   traceMinorLays((u, plot, imp) => lays.push({ u, plot, imp }));
-  // its city trees order on the ground the city's turn found (the engine's,
-  // the record's of the pair answered after, `minorLaysAfter`), the copy's
-  // ground record t+1's again after
-  holdSecondHook((st, _cs, run) => {
+  // its city trees order on the ground and the luxury amenities the city's
+  // turn found (the engine's, the record's of the pair answered after,
+  // `minorLaysAfter`), the copy's record t+1's again after
+  holdSecondHook((st, cs, run) => {
     if (st !== copy) return run();
     const end = copy.map.tiles.map(groundOf);
+    const lux = cs.luxuryAmenities;
     copy.map.tiles.forEach((t, i) => Object.assign(t, ctx.minorGround[i] ?? end[i]));
+    if (ctx.minorLux.has(cs.seat)) cs.luxuryAmenities = ctx.minorLux.get(cs.seat);
     try {
       run();
     } finally {
       copy.map.tiles.forEach((t, i) => Object.assign(t, end[i]));
+      cs.luxuryAmenities = lux;
     }
   });
   // the minors' turns in the pair's turn (the copy's clock stands on the
@@ -6253,7 +6262,7 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
   const ctx: Ctx = {
     state, cat, W: recs[0].head.W, seatOfPlayer: first.seatOfPlayer, playerOfSeat: first.playerOfSeat,
     units: new Map(), pendingMinors: new Map(), next: first, tally: new Map(), fellBack: new Map(), imposed: new Map(), reasons: new Map(),
-    engineKilled: new Set(), paths: new Map(), walked: new Set(), steps: new Map(), barbBlows: new Map(), barbCentres: new Map(), gone: new Map(), barbSeized: [], minorBlows: new Map(), minorShots: [], minorPromoted: new Map(), minorBuys: [], minorImproves: [], minorClears: [], minorCleared: new Set(), minorClearItems: new Map(), minorClearUnits: [], barbBattles: [], barbFought: new Set(), barbDraws: [], promoteHp: new Map(), minorUnits: [], minorGround: [], buyTrace, lateBlows: [], upgradeInto: new Set(), upgradedFrom: new Map(), levyFrom: new Map(), barbSteps: [], barbPillaged: [], envoys: [], battled: new Set(), fortified: new Map(), undug: new Map(), streams: new Map(), applied: new Set(), barbNew: [], lateEnvoys: [], log: history.randLog, warKinds: history.warKinds, stream, prev: recs[0],
+    engineKilled: new Set(), paths: new Map(), walked: new Set(), steps: new Map(), barbBlows: new Map(), barbCentres: new Map(), gone: new Map(), barbSeized: [], minorBlows: new Map(), minorShots: [], minorPromoted: new Map(), minorBuys: [], minorImproves: [], minorClears: [], minorCleared: new Set(), minorClearItems: new Map(), minorClearUnits: [], barbBattles: [], barbFought: new Set(), barbDraws: [], promoteHp: new Map(), minorUnits: [], minorGround: [], minorLux: new Map(), buyTrace, lateBlows: [], upgradeInto: new Set(), upgradedFrom: new Map(), levyFrom: new Map(), barbSteps: [], barbPillaged: [], envoys: [], battled: new Set(), fortified: new Map(), undug: new Map(), streams: new Map(), applied: new Set(), barbNew: [], lateEnvoys: [], log: history.randLog, warKinds: history.warKinds, stream, prev: recs[0],
     researchAi: report.researchAi, researchScores: report.researchScores, agendaCivics: null, strategyLog: loadStrategyLog(dumpPath), researchBefore: new Map(), researchAtTurn: new Map(), aiResearchLog,
     tactical: loadTactical(dumpPath), barbTally: report.barbTactics, minorTally: report.minorTactics, minorDraws: report.minorDraws,
     civicAi: report.civicAi, civicScores: report.civicScores, civicBefore: new Map(), aiCivicLog: govtLog.civics, aiPolicyLog: govtLog.policies,
@@ -6884,6 +6893,7 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
         unhurt();
         if (before !== undefined) ended(before);
         ctx.minorGround = state.map.tiles.map(groundOf);
+        ctx.minorLux = new Map(state.cityStates.map((c) => [c.seat, c.luxuryAmenities] as const));
       } finally {
         unrestore();
         unhurt();

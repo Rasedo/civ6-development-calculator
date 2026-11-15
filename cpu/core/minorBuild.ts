@@ -533,8 +533,12 @@ export function minorResearchAi(state: GameState, cityState: CityState): () => v
  * banks and pays its units' upkeep (the treasury's turn 0x4e08f0, before
  * the culture 0x396860) — each unit's own Maintenance, a minor carrying no
  * government or policy that cuts it — and meets the `bankruptcy` every seat
- * meets; then the civics complete (`minorResearchBank`), and its Faith banks
- * (PlayerReligion 0x4967f0, after the culture): the city's, and the
+ * meets; then the civics complete (`minorResearchBank`) and its Faith banks
+ * (PlayerReligion 0x4967f0, after the culture), each on the city as the
+ * treasury left it (runs/h1_duelq1128 Hong Kong t122: its bankruptcy's
+ * amenity -1, Displeased to Unhappy, its Culture 5.40 -> 4.80 banked, the
+ * Military Training progress 9.20 of record 123 and its 9 turns as logged):
+ * the city's Faith, and the
  * Great Person points a turn of every class it cannot earn (GetFaithYield
  * 0x496fd0 -> 0x494090 -> 0x43c9a0 over the store +0x168), a city-state's
  * every class (`CityState.gpPoints`) (runs/h1_duely1124 Cardiff t230: the
@@ -542,8 +546,8 @@ export function minorResearchAi(state: GameState, cityState: CityState): () => v
  * stat holds).
  */
 export function minorEconomy(state: GameState, cityState: CityState): void {
-  let y = computeCityStats(state, minorCity(cityState)).total;
-  const bank = (techs: number) => {
+  const y = computeCityStats(state, minorCity(cityState)).total;
+  const bank = (techs: number): number => {
     const g = techs > 0 ? computeCityStats(state, minorCity(cityState)).total.gold : y.gold;
     let upkeep = 0;
     for (const u of state.units) if (u.seat === cityState.seat) upkeep += unitMaintenance(u);
@@ -551,11 +555,11 @@ export function minorEconomy(state: GameState, cityState: CityState): void {
     cityState.treasury -= upkeep;
     cityState.netIncome = g - upkeep;
     bankruptcy(state, cityState, (u) => unitMaintenance(u));
+    return computeCityStats(state, minorCity(cityState)).total.culture;
   };
-  const gained = minorResearchBank(state, cityState.research, cityState.seat, y.science, y.culture,
+  minorResearchBank(state, cityState.research, cityState.seat, y.science, y.culture,
     () => minorCityTerms(state, cityState), () => minorUrbanFit(state, cityState), minorTechContracts(cityState), bank);
-  if (gained.techs + gained.civics > 0) y = computeCityStats(state, minorCity(cityState)).total;
-  cityState.faith += y.faith;
+  cityState.faith += computeCityStats(state, minorCity(cityState)).total.faith;
   for (const v of Object.values(cityState.gpPoints ?? {})) cityState.faith += v;
 }
 
@@ -626,12 +630,13 @@ export function minorResearch(state: GameState, r: ResearchState, seat: number, 
  * and their Encampment districts" — `urban` fits the holder's cities on its
  * completion. `terms` gives the analyses their city terms
  * (`minorResearchTerms`), `contracts` the seat's Tech Contracts; the after-technologies callback
- * runs between the technologies and the civics; a city-state's technology starts its "Upgrade Units" tree (`minorTechGained`). Returns how
+ * runs between the technologies and the civics and gives the Culture the
+ * civics bank (`culture` without one); a city-state's technology starts its "Upgrade Units" tree (`minorTechGained`). Returns how
  * many technologies and civics it completed.
  */
 export function minorResearchBank(state: GameState, r: ResearchState, seat: number, science: number, culture: number,
   terms: () => ReturnType<typeof minorResearchTerms> | undefined, urban: () => void,
-  contracts: readonly TechContract[], afterTechs?: (techs: number) => void): { techs: number; civics: number } {
+  contracts: readonly TechContract[], afterTechs?: (techs: number) => number): { techs: number; civics: number } {
   const gained = { techs: 0, civics: 0 };
   r.techProgress += science + (r.techOverflow ?? 0);
   r.techOverflow = 0;
@@ -651,7 +656,7 @@ export function minorResearchBank(state: GameState, r: ResearchState, seat: numb
     // the boosts it triggers land at once, before the Culture banks
     if (seat !== FREE_SEAT) boostOnResearch(state, seat, cur);
   }
-  afterTechs?.(gained.techs);
+  if (afterTechs) culture = afterTechs(gained.techs);
   r.civicProgress += culture + (r.civicOverflow ?? 0);
   r.civicOverflow = 0;
   const civ = r.civic;

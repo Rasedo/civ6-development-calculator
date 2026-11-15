@@ -6,7 +6,7 @@
  * Cities' seat holds. The city-states' twins are `minorBuildFacts` /
  * `minorPickFacts` (`minorBuild.ts`).
  */
-import type { City, DistrictId, GameState, QueueItem, YieldKey } from './types';
+import type { City, CityState, DistrictId, GameState, QueueItem, YieldKey } from './types';
 import { BUILDINGS } from '../data/buildings';
 import { UNITS, formationCost } from '../data/units';
 import { DISTRICTS } from '../data/districts';
@@ -27,7 +27,7 @@ import { FX, fmul, fxOf, turnsAt } from './aiValue';
 import { seatListed, unitProductionTable } from './aiUnitProduction';
 import { researchAnalysis } from './aiResearch';
 import { civicAnalysis } from './aiCivics';
-import { cityGrowth, aiView } from './aiView';
+import { aiCityStats, cityGrowth, aiView } from './aiView';
 import { analysedTurns, installType, promotionWeight } from './minorBuild';
 import { civEraIndex, computeCityStats } from './city';
 import { researchCost } from './economy';
@@ -272,7 +272,12 @@ export function seatResearchTurns(state: GameState, seat: number): (type: string
   const r = seatOf(state, seat)!.research;
   const stored = isCityStateSeat(seat) || isFreeSeat(seat);
   const cities = isCityStateSeat(seat) ? [minorCity(seatOf(state, seat) as never)] : citiesOf(state, seat);
-  const sum = (k: YieldKey): number => cities.reduce((n, c) => n + computeCityStats(state, c).total[k], 0);
+  // a city-state's Culture as its AI read it (`aiCityStats`: before its free
+  // Trader's dispatch; runs/h1_duelq1117 Caguana t196: its route run out at
+  // t195 and begun again, the Rock Band's Cold War read at Nuclear Program's
+  // 26 turns on the Culture without the route, 32.89 as logged)
+  const cs = isCityStateSeat(seat) ? seatOf(state, seat) as CityState : undefined;
+  const sum = (k: YieldKey): number => cities.reduce((n, c) => n + aiCityStats(computeCityStats(state, c), cs).total[k], 0);
   const culture = sum('culture');
   let tech: { id: string; next: string; turns: number; owned: boolean }[];
   let civic: { id: string; next: string; turns: number; owned: boolean }[];

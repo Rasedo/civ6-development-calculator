@@ -1454,13 +1454,14 @@ class SimMinors:
         `citystate_treasury` and pays the minor's units' upkeep — each unit's
         own Maintenance, a minor carrying no card that cuts it — and meets
         the `_bankruptcy` every seat meets, then the civics complete
-        (`_minor_research_bank`), and Faith banks into `citystate_faith`, the store `citystate_gp_points` with it."""
+        (`_minor_research_bank`) and Faith banks into `citystate_faith`, the store `citystate_gp_points` with it,
+        each on the city as the treasury left it (its bankruptcy's amenities)."""
         row = self._CITY_MINOR0 + s
         alive = self.citystate_alive[:, s]
         keep = alive.double()
         tot = self._seat_city_stats(row, record=False)[0][:, 0]  # [B, 6], zero where the city is dead
 
-        def bank(techs: torch.Tensor) -> None:
+        def bank(techs: torch.Tensor) -> torch.Tensor:
             # the Gold off the city as the technologies left it (the
             # treasury's turn 0x4e08f0, before the culture)
             gold = tot[:, 2]
@@ -1476,15 +1477,16 @@ class SimMinors:
             self.citystate_net_income[:, s] = torch.where(alive, gold - upkeep, self.citystate_net_income[:, s])
             maint = self._unit_maintenance(self.unit_type, self.unit_formation, self.unit_levied).double()
             self.citystate_treasury[:, s] = self._bankruptcy(row, paid, alive, maint)
+            # the Culture the civics bank: the city's as the treasury left it
+            # (its bankruptcy's amenities)
+            return self._seat_city_stats(row, record=False)[0][:, 0, 4] * keep
 
-        techs, civics = self._minor_research_bank(s, tot[:, 3] * keep, tot[:, 4] * keep, bank)
-        gained = techs + civics
-        if bool((gained > 0).count_nonzero()):
-            fresh = self._seat_city_stats(row, record=False)[0][:, 0]
-            tot = torch.where((gained > 0).unsqueeze(1), fresh, tot)
-        # the city's Faith and the Great Person points a turn of every class
-        # it cannot earn (GetFaithYield 0x494090 -> 0x43c9a0 over the store)
-        self.citystate_faith[:, s] += (tot[:, 5] + self.citystate_gp_points[:, s].sum(dim=1)) * keep
+        self._minor_research_bank(s, tot[:, 3] * keep, tot[:, 4] * keep, bank)
+        # the city's Faith as the treasury and the completions left it, and the
+        # Great Person points a turn of every class it cannot earn
+        # (GetFaithYield 0x494090 -> 0x43c9a0 over the store)
+        faith = self._seat_city_stats(row, record=False)[0][:, 0, 5]
+        self.citystate_faith[:, s] += (faith + self.citystate_gp_points[:, s].sum(dim=1)) * keep
 
     def _minor_production(self, s: int) -> torch.Tensor:
         """[B] — the Production minor `s`'s city makes as it stands now, for
@@ -1630,7 +1632,7 @@ class SimMinors:
         the overflow bank and complete the civic in hand at its cost, whose
         choice reads the civics AI's analysis of the turn before
         (`_cai_completion`); `after_techs` (the [B] technologies completed)
-        runs between the two; a city-state's technology starts its "Upgrade Units" tree (`minorTechGained`). CIV6 (Urban Defenses): the tech "builds modern
+        runs between the two and gives the [B] Culture the civics bank; a city-state's technology starts its "Upgrade Units" tree (`minorTechGained`). CIV6 (Urban Defenses): the tech "builds modern
         fortifications around the City Centers of all current and future
         cities and their Encampment districts", so the holder's perimeters
         reach the urban tier's maximum, their damage kept (`_minor_urban_fit`). Returns two [B] long, the technologies and
@@ -1677,7 +1679,7 @@ class SimMinors:
                 self._minor_research_boosts(s, torch.where(fire, c, torch.full_like(c, -1)))
 
         if after_techs is not None:
-            after_techs(techs)
+            cul = after_techs(techs)
         # THE CIVICS
         have, prog, cur = self.citystate_civics, self.citystate_civic_prog, self.citystate_cur_civic
         retain, ovf = self.citystate_civic_retain, self.citystate_civic_ovf
