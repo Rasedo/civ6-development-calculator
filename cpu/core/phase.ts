@@ -14,7 +14,7 @@ import type { FeatureId } from '../../world/types';
 import { EPIC_QUEST_LEVY_DISCOUNT_PCT, CLEOPATRA_TRADE_QP_MULT, ENKIDU_COMMON_FOE_QP, SKIP_FREE_CITY_ROWS, rowIsFor } from '../data/civilizations';
 import { atRngPoint, randRange } from './rand';
 import { emergencyEnvoyIncome, seatAccumulators, seatTallies, seatGrowth, commitProduction } from './seatTurn';
-import { arrive, cityAtIndex, spawnUnit, unitsAt, unitsHostile, unitIsMilitary, encampmentIntact, stepUnit, unitFullMoves, ownerHasTech, tileFreeForUnit, visibleHostilesAt, navalMelee, builderHarvest, unitIsNoncombat, waterWalks } from './units';
+import { arrive, embarksOn, cityAtIndex, spawnUnit, unitsAt, unitsHostile, unitIsMilitary, encampmentIntact, stepUnit, unitFullMoves, ownerHasTech, tileFreeForUnit, visibleHostilesAt, navalMelee, builderHarvest, unitIsNoncombat, waterWalks } from './units';
 import { cityStrikeStrength, cityStrikeDefenderCS, airPillage, airStrike, detonate, nukeTargets, siloReaches, shootable } from './combat';
 import { nukeOffers } from './nuclear';
 import { NUCLEAR_DEVICES } from '../data/nuclear';
@@ -421,7 +421,7 @@ export function jumpMadeAnew(state: GameState, u: Unit): boolean {
   // 10:14 home to city-state 2 as 2424833 on 10:6, its Movement 3 in
   // Logistics' 24.0; 1124 t92: Granada's Knight 1310720 made on the water
   // plot 41:13, UnitEmbarkedStateChanged at its placement)
-  const sea = isWater(state.map.tiles[p]);
+  const sea = embarksOn(state.map.tiles[p]);
   if (!UNITS[u.type]?.naval && !waterWalks(u.type) && !!u.embarked !== sea) u.embarked = sea;
   arrive(state, u);
   return true;

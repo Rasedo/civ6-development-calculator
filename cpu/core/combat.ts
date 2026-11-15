@@ -62,7 +62,7 @@ import { inGeneralAura, GENERAL_AURA_CS, generalAuraMP } from './aura'; // the s
 // drift from every other seat's. units.ts already imports from here, so this
 // closes a cycle — both directions are called at RUN time, never at module
 // init, which is what makes that safe.
-import { gdrHas, unitFullMoves, waterWalks, grantedMoves } from './units';
+import { embarksOn, gdrHas, unitFullMoves, waterWalks, grantedMoves } from './units';
 import { warWearinessBattle, warWearinessLaunch } from './weariness';
 import { unitKillEvent, campMoment } from './eras';
 import { boostOnEvent } from './boosts';
@@ -2353,7 +2353,7 @@ function meleeAttackInner(state: GameState, attackerId: number, targetIndex: num
     arrive(state, attacker);
     // an amphibious victor comes ashore: `stepUnit`'s own transition rule
     if (!def.naval && !waterWalks(attacker.type)) {
-      attacker.embarked = isWater(state.map.tiles[targetIndex]);
+      attacker.embarked = embarksOn(state.map.tiles[targetIndex]);
     }
     // ...and looks from the plot it entered, as a step does
     // (runs/h1_duelw1121 t33: Rome's Warrior kills the barbarians' Scout on

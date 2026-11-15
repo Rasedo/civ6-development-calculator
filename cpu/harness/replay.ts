@@ -47,7 +47,7 @@ import { applySeatUnitOrders, buySeatBuilding, declareWar, districtSiteCost, dis
 import { addEnvoys, buildingCreatedCulture, cityStateAt, declareWarOnCityState, minorCity, minorReplaceCitizens, placeCityStateAt, sueForPeaceWithCityState } from '../core/cityStates';
 import { CP_ACCEPTED, CP_CANCELLED, CP_IN_PROGRESS, contractById } from '../core/aiContracts';
 import { availableBuildings, canPlaceWonder, validImprovements, wallsMax } from '../core/rules';
-import { arrive, arriveAll, plotFortification, builderHarvest, builderRemoveFeature, spawnUnit, tallyUnitMade, trainableUnits, builderCost, traderCost, disbandUnit, escortable, drawAndPayGoody, grantedMoves, unitFullMoves, restUnit, canFortify, upgradeUnit, naturalistPark, upgradeAnew, unitsAt, unitDomain, fortifyBonus, crossesRiver, waterWalks, cityAtIndex, raiseBestTrained, recordAttacker, unitMadeAnew, holdGarrison, retestGarrisons, FORTIFY_MAX_TURNS, ANTIQUITY_CIVIC, SHIPWRECK_CIVIC } from '../core/units';
+import { arrive, arriveAll, embarksOn, plotFortification, builderHarvest, builderRemoveFeature, spawnUnit, tallyUnitMade, trainableUnits, builderCost, traderCost, disbandUnit, escortable, drawAndPayGoody, grantedMoves, unitFullMoves, restUnit, canFortify, upgradeUnit, naturalistPark, upgradeAnew, unitsAt, unitDomain, fortifyBonus, crossesRiver, waterWalks, cityAtIndex, raiseBestTrained, recordAttacker, unitMadeAnew, holdGarrison, retestGarrisons, FORTIFY_MAX_TURNS, ANTIQUITY_CIVIC, SHIPWRECK_CIVIC } from '../core/units';
 import { availableCivicsIn, availableTechsIn, computeUnlocks, goldPrice, governmentSlots, policyWireOf, seatGovernment, darkAgeEra,
   unlockedPolicyIds } from '../core/effects';
 import { selectResearch, chopGrant, harvestGrant, applyLumpYield, holdResearchEra, researchCost } from '../core/economy';
@@ -1453,7 +1453,7 @@ function barbarianAi(ctx: Ctx, b: TurnRecord, closing: number, before: ReadonlyS
   // rampaging Galleys 589825 and 1048590 at its embarked 15 with no blow
   // back, the second taking it and its plot)
   for (const c of copy.units) {
-    if (!UNITS[c.type]?.naval && !waterWalks(c.type) && unitDomain(c.type) !== 'air' && unitDomain(c.type) !== 'spy') c.embarked = isWater(copy.map.tiles[c.tileIndex]) || undefined;
+    if (!UNITS[c.type]?.naval && !waterWalks(c.type) && unitDomain(c.type) !== 'air' && unitDomain(c.type) !== 'spy') c.embarked = embarksOn(copy.map.tiles[c.tileIndex]) || undefined;
   }
   refreshBarbarians(copy, opened);
   // the AI's "Random Direction" draws are the game's: the barbarians take the
@@ -1957,7 +1957,7 @@ function minorAi(ctx: Ctx, b: TurnRecord, turn: number, made: ReadonlySet<Unit>,
   // it was made on stands it, not as record t+1 does (runs/h1_duely1117
   // t163: Caguana's new Pike and Shot 1900546 plans from its centre 42:13 on
   // its 2 Movement, embarked on 42:15 by the record after, AI_Planning.csv)
-  for (const c of madeAshore) c.embarked = isWater(copy.map.tiles[c.tileIndex]) || undefined;
+  for (const c of madeAshore) c.embarked = embarksOn(copy.map.tiles[c.tileIndex]) || undefined;
   // a city-state's research in its actions is its start's, which record
   // t+1 holds (its embarking), and the majors' as their actions left it
   // (the open-borders civic that closes their ground)
@@ -2035,9 +2035,14 @@ function minorAi(ctx: Ctx, b: TurnRecord, turn: number, made: ReadonlySet<Unit>,
     t.feature = was.feature;
     t.improvement = was.improvement;
     t.pillaged = was.pillaged;
-    t.district = r.district;
-    t.districtComplete = r.districtComplete;
-    t.districtPillaged = r.districtPillaged;
+    // (a plot the sea takes at record t+1's start keeps its district through
+    // the turn: runs/h1_duels1146 t184, city-state 2's 40:12 in its target
+    // list and its Builder's reach through it)
+    if (!r.submerged || t.submerged) {
+      t.district = r.district;
+      t.districtComplete = r.districtComplete;
+      t.districtPillaged = r.districtPillaged;
+    }
     // ...on the first record's road types: a road a major's era brings lands
     // at the turn's end (runs/h1_duely1128 t145: China's Industrial era, the
     // minors' planning on Medieval roads, Industrial ones from record 146),
@@ -3268,7 +3273,7 @@ function strike(ctx: Ctx, wit: TurnRecord, b: TurnRecord, d: BattleDecision, s: 
   if (def.tileIndex !== d.at) def.fortifyTurns = 0;
   dugIn(ctx, d, def);
   def.tileIndex = d.at;
-  if (!UNITS[def.type]?.naval && !waterWalks(def.type)) def.embarked = isWater(state.map.tiles[def.tileIndex]) || undefined;
+  if (!UNITS[def.type]?.naval && !waterWalks(def.type)) def.embarked = embarksOn(state.map.tiles[def.tileIndex]) || undefined;
   // a city-state's shot comes after its units' planning (`cityStateTactics`):
   // the copy of its turn holds the unit it strikes as before the shot, and
   // the shot lands there (`minorAi`'s `landed`)
@@ -3380,7 +3385,7 @@ function assault(ctx: Ctx, wit: TurnRecord, b: TurnRecord, d: BattleDecision): v
   if (s0 === undefined) { count(ctx, 'battle', 'refused', d.player, 'no damage draw in the log'); if (TRACE.has('battle')) console.error(`   ${d.attacker || 'city@' + d.from} vs ${d.defender || 'city@' + d.at} seq${d.seq}`); return; }
   if (atk.tileIndex !== d.from) atk.fortifyTurns = 0;
   atk.tileIndex = d.from;
-  if (!UNITS[atk.type]?.naval && !waterWalks(atk.type)) atk.embarked = isWater(state.map.tiles[atk.tileIndex]) || undefined;
+  if (!UNITS[atk.type]?.naval && !waterWalks(atk.type)) atk.embarked = embarksOn(state.map.tiles[atk.tileIndex]) || undefined;
   atk.movesLeft = Math.max(atk.movesLeft, grantedMoves(state, atk));
   atk.attacksLeft = Math.max(1, atk.attacksLeft ?? 1);
   if (isBarbSeat(atk.seat)) ctx.barbDraws.push({ attacker: d.attacker, at: d.at, s0 });
@@ -4811,7 +4816,7 @@ const res = buyTile(state, city.id, d.plot, seat);        if (!res.ok) setTileOw
         unstack(ctx, b, def);
         // a land unit the log's steps left on water fights embarked
         for (const u of [atk, def]) {
-          if (!UNITS[u.type]?.naval && !waterWalks(u.type)) u.embarked = isWater(state.map.tiles[u.tileIndex]) || undefined;
+          if (!UNITS[u.type]?.naval && !waterWalks(u.type)) u.embarked = embarksOn(state.map.tiles[u.tileIndex]) || undefined;
         }
         atk.movesLeft = Math.max(atk.movesLeft, grantedMoves(state, atk));
         atk.attacksLeft = Math.max(1, atk.attacksLeft ?? 1);

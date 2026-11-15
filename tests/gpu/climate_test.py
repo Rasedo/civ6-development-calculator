@@ -179,7 +179,7 @@ def main() -> int:
     land = next((v for v in range(s5b.major_unit_alive.shape[1])
                  if bool(s5b.major_unit_alive[b, v])
                  and not bool(s5b.unit_naval[s5b.major_unit_type[b, v]])), -1)
-    assert land >= 0, "the fixture fields no unit to drown"
+    assert land >= 0, "the fixture fields no land unit"
     lo = s5b.POOL_LO["major"]
     s5b.military_at[b, s5b.major_unit_tile[b, land]] = -1
     s5b.civilian_at[b, s5b.major_unit_tile[b, land]] = -1
@@ -203,8 +203,9 @@ def main() -> int:
     if wh0 != s5b._h_fresh:
         assert float(s5b.tile_wh[b, t0]) == s5b._h_none, (
             "the ground the sea took is no longer coastal LAND")
-    assert not bool(s5b.major_unit_alive[b, land]), "the land unit went down with it"
-    assert int(s5b.military_at[b, t0]) < 0, "and left the plane it was holding"
+    assert bool(s5b.major_unit_alive[b, land]), "the land unit stands on it"
+    assert int(s5b.major_unit_tile[b, land]) == t0 and not bool(s5b.major_unit_emb[b, land]), (
+        "unembarked: the plot's domain mask holds the land bit")
     assert not bool(s5b.tile_submerged[b, keep].any()), "band 2 goes at Phase VI"
     _emit_points(s5b, row, 2)
     s5b._climate_turn()

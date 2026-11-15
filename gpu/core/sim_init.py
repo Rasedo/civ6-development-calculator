@@ -2414,6 +2414,10 @@ class SimInit:
         # (`Tile.submerged`). Open water for every rule that asks, and unusable
         # besides — it yields nothing and no citizen may work it.
         self.tile_submerged = torch.zeros(B, self.T, dtype=torch.bool, device=device)
+        # the plot's route pillaged (`Tile.routePillaged`): a flood's work,
+        # cleared with the route where the sea takes the plot; a step takes
+        # no route term on it
+        self.route_pillaged = torch.zeros(B, self.T, dtype=torch.bool, device=device)
         # A dig REMEMBERS its era and its civilization — the theming rule's
         # inputs travel with the Artifact out of the ground.
         self.antiquity_era = torch.full((B, self.T), -1, dtype=torch.long, device=device)

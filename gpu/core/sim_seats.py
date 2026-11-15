@@ -3789,7 +3789,9 @@ class SimSeats:
             return
         g = take.nonzero(as_tuple=True)[0]
         s = rider[g]
-        wet = self.water.gather(1, dest.clamp(min=0).unsqueeze(1)).squeeze(1)[g]
+        # its embarked state by `embarksOn` (water the sea took holds a land unit)
+        dg = dest.clamp(min=0).unsqueeze(1)
+        wet = (self.water.gather(1, dg) & ~self.tile_submerged.gather(1, dg)).squeeze(1)[g]
         naval = self.unit_naval[self.unit_type[g, s].clamp(min=0, max=self.NU - 1)]
         was = self.unit_emb[g, s]
         now = wet & ~naval
@@ -5473,7 +5475,7 @@ class SimSeats:
                     # a victor that comes ashore stops being embarked — the
                     # melee advance's rule, and a religious unit is never naval.
                     # `_occ_set` reads this, so it is written first.
-                    self.major_unit_emb[_mv, u] = self.water[_mv, _dst]
+                    self.major_unit_emb[_mv, u] = self.water[_mv, _dst] & ~self.tile_submerged[_mv, _dst]
                     self._occ_set(_mv, _dst, _g)
         self._eff_version += 1
 
@@ -13516,7 +13518,7 @@ class SimSeats:
                 # an amphibious victor comes ashore, on `_step_verb`'s rule —
                 # and the class it lands in follows from that, so the flag is
                 # written before the plane.
-                a_emb[vr, u] = self.water[vr, ttc[vr]] & ~self.unit_naval[
+                a_emb[vr, u] = self.water[vr, ttc[vr]] & ~self.tile_submerged[vr, ttc[vr]] & ~self.unit_naval[
                     a_type[vr, u].clamp(min=0, max=self.NU - 1)]
                 self._occ_set(vr, ttc[vr], _gs)
                 # ...and looks from the plot it entered, as a step does
@@ -14402,13 +14404,21 @@ class SimSeats:
         # `_hull_pass()` rebuilds a [B, T] plane to be asked.
         if bool(naval.count_nonzero()):
             to_water = to_water | (naval & self._hull_pass().gather(1, dc1).squeeze(1))
-        # a SHORE crossing is the two plots' water differing (`stepUnit`'s
-        # `isWater(from) !== isWater(to)`), never the mover's own flag
+        # the embarked flag moves where the two plots' `embarksOn` differ
+        # (`stepUnit`): water the sea took holds the land bit, a land unit
+        # stands on it unembarked; never the mover's own flag
         from_water = self.wpass.gather(1, hc.unsqueeze(1)).squeeze(1)
-        transition = (from_water != to_water) & ~naval & ~self.unit_water_walk.take(_ut)
+        sub_f = self.tile_submerged.gather(1, hc.unsqueeze(1)).squeeze(1)
+        sub_t = self.tile_submerged.gather(1, dc1).squeeze(1)
+        walker = ~naval & ~self.unit_water_walk.take(_ut)
+        transition = ((from_water & ~sub_f) != (to_water & ~sub_t)) & walker
+        # ...and a SHORE crossing prices the step (`shoreCrossing` on the
+        # walker's own domain): the two plots' water differing, none where
+        # the water plot is one the sea took
+        crossing = (from_water != to_water) & walker & ~torch.where(from_water, sub_f, sub_t)
         base_step = torch.where(
             to_water, torch.full_like(land_cost, self._mp_scale), land_cost)
-        if bool(transition.count_nonzero()):
+        if bool(crossing.count_nonzero()):
             # A TRANSITION pays no river charge: a river is an edge between
             # two LAND tiles, so stepping off the water crosses none.
             # `land_cost` folds `riv` in for the ordinary land step, and
@@ -14426,7 +14436,7 @@ class SimSeats:
             owned_exit = from_water & (self.tile_seat.gather(1, hc1).squeeze(1) >= 0)
             easy_dock = self._embark_waived(hc1, dc1).squeeze(1) | owned_exit
             cost = torch.where(
-                transition,
+                crossing,
                 # CIV6 (EFFECT_ADJUST_UNIT_IGNORE_SHORES): the Knarr's units, the
                 # Mediterranean Colonies' Settlers. `seat` is the mover's row here.
                 trans_step + torch.where(easy_dock | self._ignore_shores(torch.full_like(u_type, int(seat)), u_type), torch.zeros_like(land_cost),
@@ -14550,8 +14560,8 @@ class SimSeats:
                     _near & (_pv > 0), _pu, self.unit_promo_used[rows, gs])
                 self.unit_charges[rows, gs] += _pv
         # the flag moves with a shore crossing alone (`unit.embarked =
-        # isWater(to)` under `transition`)
-        self.unit_emb[rows, gs] = torch.where(transition, to_water, emb)[rows]
+        # embarksOn(to)` under `transition`)
+        self.unit_emb[rows, gs] = torch.where(transition, to_water & ~sub_t, emb)[rows]
         # OCCUPANCY FIRST, and it has to be: a village may GRANT a unit, and
         # `_first_free_spot` would otherwise hand it the tile the mover has
         # just taken. TS reads `unit.tileIndex`, already updated by here, so

@@ -1646,6 +1646,7 @@ TILE = {
     "lowland": lambda sim, b, rows: sim.tile_lowland[b].long().numpy(),
     "flooded": lambda sim, b, rows: sim.tile_flooded[b].long().numpy(),
     "railroad": lambda sim, b, rows: sim.railroad[b].long().numpy(),
+    "routePillaged": lambda sim, b, rows: sim.route_pillaged[b].long().numpy(),
     "submerged": lambda sim, b, rows: sim.tile_submerged[b].long().numpy(),
     "falloutTurns": lambda sim, b, rows: sim.tile_fallout[b].long().numpy(),
     "water": lambda sim, b, rows: sim.water[b].long().numpy(),

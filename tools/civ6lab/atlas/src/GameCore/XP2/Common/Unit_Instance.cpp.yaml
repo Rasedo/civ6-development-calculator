@@ -492,6 +492,7 @@
     - cpu/core/tactical.ts:domainPool
     - cpu/core/tactical.ts:formationFullMoves
     - cpu/core/tactical.ts:whole
+    - cpu/core/tactical.ts:reachRoom
   readings:
     - "C-96: the city-states' tactical pass — READ (Wander Near City, Heal, the non-barbarian priorities, FindAlternateLocation), the families it needs PARTLY READ"
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
@@ -510,6 +511,7 @@
     - "C-133 / C-128: flag 2's parent plot, the open list as the list itself, the embarked state's Movement cap, the zone's improvement test — READ (0x2720a0 at 0x27220d / 0x2724c8, 0x775a0, 0x79560, 0x586d40 at 0x587042..0x5870aa / 0x58741c..0x587486, 0x5706e0, 0x531ef0, 0x26fe20 at 0x270444 / 0x270776, 0x270be0, 0x52f970), both twins"
     - "H-1: the recorder's reads against a running game — READ (the unit, the formation, the planning, the target list, the known cities, the unit production table, the queue), PARTLY READ (the path's node, the modifiers)"
     - "C-132 / C-128 / C-95 / C-123 / C-133: the danger map's unmoved flag, a unit made anew's place, the operation queue's push, the strike's turn, the raid's recruit, the shore tests — READ (0x26df90 at 0x26e128..0x26e159, 0x716400 at 0x71672d, 0x586360 at 0x586542..0x58657e / 0x5867ab..0x586875, 0x93fa10 at 0x93fd94..0x93fdab / 0x93fe79, 0x526a0 at 0x52788..0x527ac, 0x523e0, 0x55460, 0x962380 at 0x96268f, 0x60a440, 0x26e570 at 0x26e904, 0x2720a0 at 0x272618..0x272689), both twins"
+    - "C-134 / C-95: the plots the sea took, a flooded route, a Trader's closed ground, a new turn's domain, the planning list's room — READ (0x586360 at 0x58645d..0x58648e / 0x5865e7..0x5865fd, 0x2720a0 at 0x272392 / 0x272618..0x272689, 0x52fe90, 0x26e920 at 0x26ea6d..0x26eaa2, 0x7920d0 at 0x792144..0x79216d, 0x790c60 at 0x790c87..0x790c8d, 0x586d40 at 0x587042..0x5870aa, 0x52fa40 at 0x52fa6a..0x52fa8e), LAB (the records' drowned plots), both twins"
   notes:
     - ".claude/scratchpad/mu1/readings_c96.md: ...bard (0x56daa0) strength   within its range (0x56e3d0), any other nearer than twice its Movement   (0x56e130) — HIGH for a FRIENDLY_CITY, MEDIUM for an ALLY_SUPPORT. The   type ids (0x5bcb80, each global the..."
   context:

@@ -105,3 +105,11 @@
   context:
     - "- THE TRANSFER (0x93fa10, the unit manager's vtable +0x80 at 0xd92c18; the levy's return 0x4502b0 calls it with..."
   review: reviewed
+- addr: 0xa3b720
+  final: 0x73a340
+  kind: function
+  semantics: "the sea's taking of a plot (Coastal Lowlands): each formation's location is tested while the plot is still land and the plot's domain mask written then (0xa3b000 / 0xa3ac70 -> 0x66a90), the terrain set after; the mask holds the land bit alone, so a land unit there stands unembarked"
+  status: PARTLY
+  impl: [cpu/core/climate.ts:submergeTile]
+  readings:
+    - "C-134 / C-95: the plots the sea took, a flooded route, a Trader's closed ground, a new turn's domain, the planning list's room — READ (0x586360 at 0x58645d..0x58648e / 0x5865e7..0x5865fd, 0x2720a0 at 0x272392 / 0x272618..0x272689, 0x52fe90, 0x26e920 at 0x26ea6d..0x26eaa2, 0x7920d0 at 0x792144..0x79216d, 0x790c60 at 0x790c87..0x790c8d, 0x586d40 at 0x587042..0x5870aa, 0x52fa40 at 0x52fa6a..0x52fa8e), LAB (the records' drowned plots), both twins"

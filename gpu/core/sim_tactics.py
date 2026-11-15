@@ -219,8 +219,9 @@ class SimTactics:
         rr_f = self.railroad.unsqueeze(2)
         rr_t = self.railroad[:, nb]
         rd = (self.road.unsqueeze(2) | rr_f) & (self.road[:, nb] | rr_t)
-        # the route term (0x52fa40): the dearer of the two plots' routes,
-        # across a river only where both bridge it
+        # the route term (0x52fa40): both plots' routes unpillaged, the dearer
+        # of the two, across a river only where both bridge it
+        rd = rd & ~self.route_pillaged.unsqueeze(2) & ~self.route_pillaged[:, nb]
         tier_f = self.road_tier.unsqueeze(2).expand_as(tm)
         tier_t = self.road_tier[:, nb]
         rail = torch.full_like(tm, self._railroad_mp)
@@ -366,14 +367,16 @@ class SimTactics:
 
     def _tac_enter(self, seat: int, revealed_only: bool = True, foes: bool = True,
                    plain_civ: bool = False,
-                   foes_seen: bool = False, rel: bool = False, forts: bool = True) -> tuple[torch.Tensor, torch.Tensor]:
+                   foes_seen: bool = False, rel: bool = False, forts: bool = True,
+                   closed: bool = True) -> tuple[torch.Tensor, torch.Tensor]:
         """[B, T] bool twice — the plots a LAND and a NAVAL unit of `seat` may
         enter (`enterable`): its domain's ground, no unit of a player at war
         with it (another player's unit it passes; with `plain_civ`, the
         planning's search, none but one that fights, `_tac_fighters`), no
         city centre but its own (a hull's passage, `_hull_pass`, the NAVAL
         plane's too), no live enemy Encampment, no major's or city-state's
-        ground closed to a city-state (`_tac_closed`), with `revealed_only`
+        ground closed to a city-state (`_tac_closed`; with no `closed` the
+        caller's), with `revealed_only`
         (the lists', not a path's) none it never revealed (`_tac_known`).
         With no `foes` the location test alone (`groundOf`'s fits): no unit
         and no closed ground counted. With `foes_seen` (`groundOf`'s pass: a
@@ -387,7 +390,9 @@ class SimTactics:
             hostile = self._tac_fighters(seat) if plain_civ else self._tac_hostile(seat)
             if foes_seen:
                 hostile = self._tac_hostile_on(seat, rel) & self._barb_seen("barbarians" if seat == BARB_SEAT else seat)
-            block = block | hostile | self._tac_closed(seat)
+            block = block | hostile
+            if closed:
+                block = block | self._tac_closed(seat)
         if forts and self._encamp_didx >= 0:
             block = block | self._encamp_block_plane(seat)
         if forts:
@@ -396,7 +401,10 @@ class SimTactics:
         if known is not None:
             block = block | ~known
         cart = self._ocean_open(torch.full((self.B,), seat, dtype=torch.long, device=self.device))
-        land = self.passable & ~block
+        # a land unit stands on water the sea took as on land, embarking or
+        # not: its domain mask holds the land bit alone (`enterable`, 0x586360
+        # at 0x58645d..0x58648e)
+        land = (self.passable | (self.wpass & self.tile_submerged)) & ~block
         naval = ((self.wpass & (~self.ocean_tile | cart.unsqueeze(1))) | self._hull_pass()) & ~block
         return land, naval
 
@@ -790,7 +798,7 @@ class SimTactics:
                 # spends everything where it is dearer than that Movement
                 unmoved = torch.ones_like(unmoved)
         # the planning's search passes a civilian at war (`plainCivilians`)
-        land, wat = self._tac_enter(seat, False, plain_civ=not zoc and not stand)
+        land, wat = self._tac_enter(seat, False, plain_civ=not zoc and not stand, closed=False)
         # the plots the player revealed (`groundOf`'s known; a path reads
         # every plot as revealed): one it never revealed is entered, and no
         # step leaves it but the unit's own
@@ -836,14 +844,29 @@ class SimTactics:
             embarks = embarks | m_emb
         else:
             placed = embarks
+        # ground closed to the unit (`groundOf`'s shut): none to a formation
+        # of Traders or Spies, whose location test skips the border branch
+        # (0x586360 at 0x5865e7..0x5865fd); and whatever the unit, no step
+        # leaves it under the search's flag 1 but from the unit's own plot
+        # (0x2720a0 at 0x272618..0x272689, `groundOf`'s shutParent)
+        shut_n = self._tac_closed(seat)[rows]
+
+        def borderless(t: torch.Tensor) -> torch.Tensor:
+            return (t == self._trader_idx) | (t == self._spy_idx)
+        free_b = borderless(utype)
+        if bool(mate_on.count_nonzero()):
+            free_b = free_b & (~mate_on | borderless(m_type))
+        cl_n = shut_n & ~free_b.unsqueeze(1)
+        # (the plots the sea took: their shores, `price6`)
+        sub_n = self.tile_submerged[rows]
         ent_n = torch.where(naval.unsqueeze(1), wat[rows], land[rows] | (wat[rows] & placed.unsqueeze(1)))  # [N, T]
         if zoc:
             # a move order's path passes a unit at war with it out of its
             # sight (`groundOf`'s pass)
-            land_p, wat_p = self._tac_enter(seat, False, foes_seen=True)
+            land_p, wat_p = self._tac_enter(seat, False, foes_seen=True, closed=False)
             ent_n = torch.where(naval.unsqueeze(1), wat_p[rows], land_p[rows] | (wat_p[rows] & placed.unsqueeze(1)))
             if any_rel:
-                land_r, wat_r = self._tac_enter(seat, False, foes_seen=True, rel=True)
+                land_r, wat_r = self._tac_enter(seat, False, foes_seen=True, rel=True, closed=False)
                 ent_n = torch.where(rel_u.unsqueeze(1),
                                     torch.where(naval.unsqueeze(1), wat_r[rows], land_r[rows] | (wat_r[rows] & placed.unsqueeze(1))),
                                     ent_n)
@@ -863,9 +886,9 @@ class SimTactics:
                 sh_n = sh_a[rows, slots]
                 if bool(mate_on.count_nonzero()):
                     sh_n = sh_n | (mate_on & sh_a[rows, mate.clamp(min=0)])
-                land_o, _ = self._tac_enter(seat, False, foes_seen=True, forts=False)
+                land_o, _ = self._tac_enter(seat, False, foes_seen=True, forts=False, closed=False)
                 if any_rel:
-                    land_ro, _ = self._tac_enter(seat, False, foes_seen=True, rel=True, forts=False)
+                    land_ro, _ = self._tac_enter(seat, False, foes_seen=True, rel=True, forts=False, closed=False)
                     land_on = torch.where(rel_u.unsqueeze(1), land_ro[rows], land_o[rows])
                 else:
                     land_on = land_o[rows]
@@ -873,6 +896,7 @@ class SimTactics:
                 if dest is not None:
                     open_n = open_n & (torch.arange(T, device=dev).unsqueeze(0) != dest.unsqueeze(1))
                 ent_n = ent_n | open_n
+        ent_n = ent_n & ~cl_n
         water_n = self.water[rows]
         # the plots each unit attacks into (`groundOf`'s attack): an enemy
         # unit's of its own domain (the planning's: one that fights, on its own
@@ -891,7 +915,7 @@ class SimTactics:
         # ground closed to the unit is none it strikes into (`groundOf`'s
         # attack)
         atk_n = torch.where(naval.unsqueeze(1), a_nav[rows], a_land[rows] | (a_fw[rows] & placed.unsqueeze(1))) \
-            & fights.unsqueeze(1) & ~ent_n & ~self._tac_closed(seat)[rows]
+            & fights.unsqueeze(1) & ~ent_n & ~cl_n
         # a district of hit points at war is no plot for a unit whose ranged
         # or bombard strength tops its combat strength (`groundOf`'s attack:
         # the location test 0x586360 at 0x5866c9..0x58671f)
@@ -1011,6 +1035,11 @@ class SimTactics:
             haz_n = haz[rows] & self._barb_seen("barbarians" if seat == BARB_SEAT else seat)[rows]
         # a zone of control's step on the path's destination (`groundOf`'s zoc)
         zp = self._tac_zoc_path(rows, seat, zsea, self._tac_zoc_ignored(utype), dest, crowd_n, sn) if zoc else None
+        # ...and on every plot whatever the search (`groundOf`'s zoc): the
+        # domain a new turn sets out on
+        zt = zp if zp is not None else self._tac_zoc_path(
+            rows, seat, zsea, self._tac_zoc_ignored(utype), dest,
+            crowd_n if crowd_n is not None else torch.zeros(N, T, dtype=torch.bool, device=dev), sn)
         tseat = self.tile_seat
         # the nodes: one per plot, and in every search but the planning's a
         # second layer of turn-end nodes at T + plot (`search`'s turn-end
@@ -1113,11 +1142,15 @@ class SimTactics:
                 blind6 = unrev6
             cst = (self._tac_cost_rows(rows, best, waive) if any_hf else cost_b[rows, best])[:, cols]
             fw = water_n.gather(1, b1)  # [N, 1]
-            # no shore crossing where the step's water plot is owned and the
-            # formation embarked as the search sets out (`shoreCrossing`'s
-            # sea): off owned water, and from land onto it
-            hx = emb_now.unsqueeze(1) & torch.where(fw, self._owned_exit(rows, best).unsqueeze(1),
-                                                     own_w_n.gather(1, nbc))
+            # no shore crossing where the step's water plot is owned and not
+            # one the sea took and the formation embarked as the search sets
+            # out (`shoreCrossing`'s sea): off owned water, and from land onto
+            # it; nor, the formation ashore, where the water plot is one the
+            # sea took (its domain mask the land bit alone)
+            w_sub = torch.where(fw, sub_n.gather(1, b1), sub_n.gather(1, nbc))
+            hx = torch.where(emb_now.unsqueeze(1),
+                             torch.where(fw, self._owned_exit(rows, best).unsqueeze(1), own_w_n.gather(1, nbc)) & ~w_sub,
+                             w_sub)
             cliff6 = None
             if any_embark:
                 # an embarked step costs one Movement; a land/water step
@@ -1149,8 +1182,14 @@ class SimTactics:
             cst = torch.div(cst * _FIX, self._mp_scale, rounding_mode="floor")
             fresh = bm <= 0
             pw = wt.gather(1, b1n)  # [N, 1]
-            full_here = torch.where(pw.squeeze(1) & ~naval, full_s, full_l)
-            pm = torch.where(fresh, full_here.unsqueeze(1), bm).expand(-1, 6)
+            tw6 = water_n.gather(1, nbc)
+            wet6 = torch.where(blind6, pw.expand(-1, 6), tw6)
+            # a new turn sets out on the pool of the plot entered (0x26e920 at
+            # 0x26ea6d..0x26ea86), of the plot left where the plot entered
+            # lies in a zone of control (0x26ea88..0x26eaa2)
+            sea6 = torch.where((fw != wet6) & zt.gather(1, nbc), fw.expand(-1, 6), wet6)
+            full6 = torch.where(sea6 & ~naval.unsqueeze(1), full_s.unsqueeze(1), full_l.unsqueeze(1))
+            pm = torch.where(fresh, full6, bm.expand(-1, 6))
             turns = (bt + fresh.long()).expand(-1, 6)
             # the parent's carry on top (0x26e920); a shore crossing carries
             # the Movement left above the new domain's full Movement
@@ -1159,8 +1198,6 @@ class SimTactics:
             crp = cr.gather(1, b1n)
             cst = cst + crp
             cst = torch.where(blind6, torch.where(crp > 0, crp, _FIX).expand(-1, 6), cst)
-            tw6 = water_n.gather(1, nbc)
-            wet6 = torch.where(blind6, pw.expand(-1, 6), tw6)
             cross = (fw != tw6) & (nb >= 0) & (~naval & ~ww_n & embarks).unsqueeze(1) & ~hx & ~blind6
             max_to = torch.where(wet6, full_s.unsqueeze(1), full_l.unsqueeze(1))
             carry6 = torch.where(cross & (pm > max_to), pm - max_to, torch.zeros_like(pm))
@@ -1317,6 +1354,10 @@ class SimTactics:
             act = act & ~stop & (kn_n.gather(1, b1).squeeze(1) | (best == start))
             if rev_n is not None:
                 act = act & (rev_n.gather(1, b1).squeeze(1) | (best == start))
+            if not zoc or not explore:
+                # ...nor one on ground closed to the unit under flag 1
+                # (`groundOf`'s shutParent): a Trader steps no further
+                act = act & ~(shut_n.gather(1, b1).squeeze(1) & (best != start))
             if not bool(act.count_nonzero()):
                 continue
             nb, nbc, a6, turns, moves, gn, cliff6, bt, carry6, wet6, unrev6 = price6(bn)
@@ -1380,6 +1421,10 @@ class SimTactics:
             # on the parent's own water, whatever the player revealed of it:
             # a formation that may not embark fails it at its head (`search`)
             ok = ok & ~((~naval & ~ww_n & ~embarks).unsqueeze(1) & water_n.gather(1, b1) & ~water_n.gather(1, nbc) & ~unrev6)
+            # ...and its step off land onto a revealed water plot the embark
+            # test (0x2720a0 at 0x272392 -> 0x52fe90): one on water the sea
+            # took steps only onto another
+            ok = ok & ~((~naval & ~ww_n & ~embarks).unsqueeze(1) & ~water_n.gather(1, b1) & water_n.gather(1, nbc) & ~unrev6)
             if danger is not None:
                 # a move order's danger flags (0x2720a0 at 0x272590..
                 # 0x272612): from a node of the path's first turn, under flag
@@ -1584,6 +1629,8 @@ class SimTactics:
         # embarked unit's boarded holds (+0x50 bit 0x40)
         own = torch.zeros(N, T, dtype=torch.bool, device=dev)
         own[ar, start] = True
+        # (the danger map's search lists its plots as it found them)
+        stand_mode = stand
         if zoc:
             kept_out = self._tac_foreign(seat)[rows]
         else:
@@ -1606,8 +1653,20 @@ class SimTactics:
         if listed and not zoc:
             # the planning's list keeps no plot of ground closed to a
             # city-state, an attack's neither (0x26d890's 0x586900 under 9)
-            stand = stand & ~self._tac_closed(seat)[rows]
+            stand = stand & ~cl_n
         stand = stand | own
+        if listed and not zoc and not stand_mode:
+            # the room of the planning list (0x7920d0 at 0x792144..0x79216d):
+            # 3r(r + 1) + 1 plots, r GetMaxMoves x the planning's turns, in
+            # the order the search closed them; a full list takes no plot
+            # (0x790c60 at 0x790c87..0x790c8d, `reachRoom`)
+            r_ = torch.div(self._tac_full_now(pre)[rows, slots], self._mp_scale, rounding_mode="floor") * _PLAN_TURNS
+            room = 3 * r_ * (r_ + 1) + 1
+            on_l = stand & (rank >= 0)
+            order = torch.where(on_l, rank, torch.full_like(rank, NONE)).argsort(dim=1, stable=True)
+            pos = torch.empty_like(order)
+            pos.scatter_(1, order, torch.arange(T, device=dev).unsqueeze(0).expand(N, T).contiguous())
+            stand = stand & (pos < room.unsqueeze(1))
         closed = rturn
         rank = torch.where(stand, rank, torch.full_like(rank, -1))
         rturn = torch.where(stand, rturn, torch.full_like(rturn, -1))

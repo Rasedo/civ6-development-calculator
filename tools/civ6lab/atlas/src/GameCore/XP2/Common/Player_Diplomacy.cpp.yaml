@@ -374,7 +374,7 @@
   kind: function
   name: may enter the player's territory (open borders, alliance)
   status: PARTLY
-  impl: [cpu/core/aiView.ts:borderClosed, cpu/core/tactical.ts:exploreOk]
+  impl: [cpu/core/aiView.ts:borderClosed, cpu/core/tactical.ts:exploreOk, cpu/core/tactical.ts:addOpen]
   readings:
     - "C-97: the war operations — the war candidates, the city value's frame, the assault nodes and Attack Units READ; the loyalty lead's sources, the team update's danger and the assault's executions PARTLY READ"
     - "C-95: the unit pathfinder and the planning's reach — READ, confirmed on the Wander draws"
@@ -384,6 +384,7 @@
     - "C-95: HL Explore's plot test refuses every other player's ground, Explore Land's flags 0x40 — READ (0x70bd40 at 0x70bd87..0x70beee, 0x709d80 at 0x709da0..0x709dc2, 0x70ce90 at 0x70ced5), FIT (the knowledge base's +0x128 at or below the turn), both twins"
     - "C-132: the danger map's fitted rules in the DLL; a search's shore crossings on the formation's own domain — READ (0x26dab0, 0x586360 at 0x586624..0x586664, 0x2720a0 at 0x272618..0x272689, 0x66a90, 0x52fe90, 0x56e0a0, 0x26e570, 0x530240, 0x530420), FIT (the unmoved flag, the barbarians' raise, the grant's last turn), both twins"
     - "C-132 / C-128 / C-95 / C-123 / C-133: the danger map's unmoved flag, a unit made anew's place, the operation queue's push, the strike's turn, the raid's recruit, the shore tests — READ (0x26df90 at 0x26e128..0x26e159, 0x716400 at 0x71672d, 0x586360 at 0x586542..0x58657e / 0x5867ab..0x586875, 0x93fa10 at 0x93fd94..0x93fdab / 0x93fe79, 0x526a0 at 0x52788..0x527ac, 0x523e0, 0x55460, 0x962380 at 0x96268f, 0x60a440, 0x26e570 at 0x26e904, 0x2720a0 at 0x272618..0x272689), both twins"
+    - "C-134 / C-95: the plots the sea took, a flooded route, a Trader's closed ground, a new turn's domain, the planning list's room — READ (0x586360 at 0x58645d..0x58648e / 0x5865e7..0x5865fd, 0x2720a0 at 0x272392 / 0x272618..0x272689, 0x52fe90, 0x26e920 at 0x26ea6d..0x26eaa2, 0x7920d0 at 0x792144..0x79216d, 0x790c60 at 0x790c87..0x790c8d, 0x586d40 at 0x587042..0x5870aa, 0x52fa40 at 0x52fa6a..0x52fa8e), LAB (the records' drowned plots), both twins"
   notes: [read; no recorded decision of the five verbose duels tells it apart yet]
   context:
     - "...sign rebuilt), the first plot P may enter — its own, no one's, open borders / alliance (0x3dab70), or an owner not enforcing its borders (diplomacy +0x6c0) — the rally where the walk..."

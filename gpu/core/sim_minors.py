@@ -655,9 +655,12 @@ class SimMinors:
             here = self.major_unit_tile[:, u].clamp(min=0)
             ty = self.major_unit_type[:, u].clamp(min=0, max=self.NU - 1)
             naval = self.unit_naval.take(ty)
-            land_ent, wat_ent = self._tac_enter(seat, revealed_only=False)
+            land_ent, wat_ent = self._tac_enter(seat, revealed_only=False, closed=False)
             emb = self._tac_embarks(bidx, ty, seat, self.major_unit_orig_owner[:, u])
             ent = torch.where(naval.unsqueeze(1), wat_ent, land_ent | (wat_ent & emb.unsqueeze(1)))
+            # ground closed to it, none to a Trader or a Spy (`groundOf`'s shut)
+            free = (ty == self._trader_idx) | (ty == self._spy_idx)
+            ent = ent & ~(self._tac_closed(seat) & ~free.unsqueeze(1))
             # where it stands, the location test (0x586360 under 0x10): any
             # other player's unit of its map layer refuses the plot (the best
             # defender 0x208b80 under 0x108)
@@ -684,7 +687,7 @@ class SimMinors:
             # the placement embarks a land unit put on water and lands one
             # put ashore (`jumpMadeAnew`); `_occ_set` reads the flag
             walks = naval[rows] | self.unit_water_walk.take(ty[rows])
-            self.major_unit_emb[rows, u] = torch.where(walks, self.major_unit_emb[rows, u], self.water[rows, spot[rows]])
+            self.major_unit_emb[rows, u] = torch.where(walks, self.major_unit_emb[rows, u], self.water[rows, spot[rows]] & ~self.tile_submerged[rows, spot[rows]])
             self._occ_set(rows, spot[rows], gs)
             self._gen_ver += 1
 

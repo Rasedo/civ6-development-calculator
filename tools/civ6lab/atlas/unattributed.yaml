@@ -407,6 +407,7 @@
     - "C-99: a move order carried on as the turn ends, the zone-of-control wait, the embark rule's TO plot — READ (0x962380, 0x52f50, 0x26fe20, 0x2675e0, 0x2673f0, 0x530420, 0x267650), both twins"
     - "C-132: the danger map's fitted rules in the DLL; a search's shore crossings on the formation's own domain — READ (0x26dab0, 0x586360 at 0x586624..0x586664, 0x2720a0 at 0x272618..0x272689, 0x66a90, 0x52fe90, 0x56e0a0, 0x26e570, 0x530240, 0x530420), FIT (the unmoved flag, the barbarians' raise, the grant's last turn), both twins"
     - "C-96 / C-98 / C-100 / C-99: the city AI's fitted rules read — the analysis before the job list, the unit term's upgrade price, the city's trained domains, a non-major's required power, the eruption's turns — READ (0x608870 at 0x608976..0x608988, 0x7b3e50 at 0x7b4564..0x7b45c8, 0x5376d0, 0x1c77c0, 0x1aed10, 0x1f0440 at 0x1f04c7..0x1f04dc, 0xa1d480), both twins"
+    - "C-134 / C-95: the plots the sea took, a flooded route, a Trader's closed ground, a new turn's domain, the planning list's room — READ (0x586360 at 0x58645d..0x58648e / 0x5865e7..0x5865fd, 0x2720a0 at 0x272392 / 0x272618..0x272689, 0x52fe90, 0x26e920 at 0x26ea6d..0x26eaa2, 0x7920d0 at 0x792144..0x79216d, 0x790c60 at 0x790c87..0x790c8d, 0x586d40 at 0x587042..0x5870aa, 0x52fa40 at 0x52fa6a..0x52fa8e), LAB (the records' drowned plots), both twins"
   review: reviewed
 - addr: 0x69010
   final: 0x4ddc0
@@ -1414,6 +1415,16 @@
     - "...5, 0x6b000): invalid where the player has not revealed the plot or may not found there (0x1eaa30: not impassable (+0x3a bit 3), a feature with Settlement (Features +0xc2 bit 2), no dis..."
     - "...aluation 0x6fd1d0 (ring 0x6f93a0 within 5, 0x6b000): invalid unrevealed or unfoundable (0x1eaa30: impassable +0x3a, Settlement +0xc2 bit 2, a district, another's, a city within 3 — Rul..."
   review: reviewed
+- addr: 0x1eac40
+  final: 0x144a20
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-134 / C-95: the plots the sea took, a flooded route, a Trader's closed ground, a new turn's domain, the planning list's room — READ (0x586360 at 0x58645d..0x58648e / 0x5865e7..0x5865fd, 0x2720a0 at 0x272392 / 0x272618..0x272689, 0x52fe90, 0x26e920 at 0x26ea6d..0x26eaa2, 0x7920d0 at 0x792144..0x79216d, 0x790c60 at 0x790c87..0x790c8d, 0x586d40 at 0x587042..0x5870aa, 0x52fa40 at 0x52fa6a..0x52fa8e), LAB (the records' drowned plots), both twins"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "- OPEN: a claim (0x66790), a city's transfer (0x668e0) or its end (0x1eac40) writes a plot's domain mask anew by its terrain (0x66a90), so a drowned plot claimed..."
+  review: imported
 - addr: 0x1f02f0
   final: 0x147d40
   kind: function
@@ -3321,13 +3332,20 @@
   kind: function
   semantics: "the step's route term (in 0x26e920's chain): both plots carry an unpillaged route; where the step crosses a river (0x531510) both routes must bridge it (0x530e80) or no route term applies; the step costs the dearer of the two routes' MovementCost (maxss), 24.8."
   status: PARTLY
+  cases:
+    - recording: h1_duels1146
+      turn: 187
+      value: "city-state 4's Infantry 1900552 on 11:13 plans the Theater Square 10:11 past the flooded 11:12 at (2/0): its Modern road pillaged, no route term"
   impl:
     - cpu/core/units.ts:routeApplies
     - cpu/core/units.ts:routeStepMp
     - gpu/core/sim_masks.py:_road_terms
     - gpu/core/sim_tactics.py:_tac_step_cost
+    - cpu/core/units.ts:roadStep
   readings:
     - "C-95: the roads' type per plot — READ (Route_Builder, Player_Trade, Trade_Manager, Rules_Movement), both twins"
+    - "C-134 / C-95: the plots the sea took, a flooded route, a Trader's closed ground, a new turn's domain, the planning list's room — READ"
+    - "C-134 / C-95: the plots the sea took, a flooded route, a Trader's closed ground, a new turn's domain, the planning list's room — READ (0x586360 at 0x58645d..0x58648e / 0x5865e7..0x5865fd, 0x2720a0 at 0x272392 / 0x272618..0x272689, 0x52fe90, 0x26e920 at 0x26ea6d..0x26eaa2, 0x7920d0 at 0x792144..0x79216d, 0x790c60 at 0x790c87..0x790c8d, 0x586d40 at 0x587042..0x5870aa, 0x52fa40 at 0x52fa6a..0x52fa8e), LAB (the records' drowned plots), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "- The step's route term (0x52fa40, in the cost chain of 0x26e920): both plots carry an unpillaged route; where the step c..."
@@ -3381,6 +3399,12 @@
     - recording: AI_Planning.csv
       turn: 69
       value: "So an AI land unit's reach and path take   water as one Movement dearer a plot (runs/h1_duely1117 t69: Valletta's   Archer on 13:8 closes its Harbor's 14:7 (1/0) and the coast's 12:7 after   the land'"
+    - recording: h1_duels1141
+      turn: 207
+      value: the barbarian Field Cannon 3670033 on the drowned 32:12 steps onto no land plot and none onto water off land
+    - recording: h1_duels1141
+      turn: 207
+      value: the barbarian Field Cannon 3670033 on the drowned 32:12 steps onto no land plot and none onto water off land
   impl:
     - cpu/core/tactical.ts:from
     - cpu/core/tactical.ts:blind
@@ -3401,6 +3425,8 @@
     - "C-133 / C-95: the carried orders run in the unit list's order; a path comes ashore off water only by the disembark test — READ (0x7df30, 0x554e0, 0x523e0, 0x52e90, 0x54910, 0x2720a0 at 0x272380..0x27240d, 0x52fb90 at 0x52fb9d), both twins; UpdateOpenNode's walk and flag 2's plot — READ (0x79560, 0x2720a0 at 0x2721c3..0x27220d / 0x2724c8), unported"
     - "C-132: the danger map's fitted rules in the DLL; a search's shore crossings on the formation's own domain — READ (0x26dab0, 0x586360 at 0x586624..0x586664, 0x2720a0 at 0x272618..0x272689, 0x66a90, 0x52fe90, 0x56e0a0, 0x26e570, 0x530240, 0x530420), FIT (the unmoved flag, the barbarians' raise, the grant's last turn), both twins"
     - "C-132 / C-128 / C-95 / C-123 / C-133: the danger map's unmoved flag, a unit made anew's place, the operation queue's push, the strike's turn, the raid's recruit, the shore tests — READ (0x26df90 at 0x26e128..0x26e159, 0x716400 at 0x71672d, 0x586360 at 0x586542..0x58657e / 0x5867ab..0x586875, 0x93fa10 at 0x93fd94..0x93fdab / 0x93fe79, 0x526a0 at 0x52788..0x527ac, 0x523e0, 0x55460, 0x962380 at 0x96268f, 0x60a440, 0x26e570 at 0x26e904, 0x2720a0 at 0x272618..0x272689), both twins"
+    - "C-134 / C-95: the plots the sea took, a flooded route, a Trader's closed ground, a new turn's domain, the planning list's room — READ"
+    - "C-134 / C-95: the plots the sea took, a flooded route, a Trader's closed ground, a new turn's domain, the planning list's room — READ (0x586360 at 0x58645d..0x58648e / 0x5865e7..0x5865fd, 0x2720a0 at 0x272392 / 0x272618..0x272689, 0x52fe90, 0x26e920 at 0x26ea6d..0x26eaa2, 0x7920d0 at 0x792144..0x79216d, 0x790c60 at 0x790c87..0x790c8d, 0x586d40 at 0x587042..0x5870aa, 0x52fa40 at 0x52fa6a..0x52fa8e), LAB (the records' drowned plots), both twins"
   context:
     - "...Planning.csv — the row equal once priced so). The embark and disembark tests beside it (0x52fe90 / 0x52fb90, +1e6 where refused) and the mountain and canyon +1e6 the engines leave to t..."
     - "...(0x3e800) unless human (+0x1f6) or +0x590 (runs/h1_duely1117 t69 Archer); embark tests 0x52fe90 / 0x52fb90 (+1e6). The init: +0x1f1 sea, +0x1f5 embarked, +0x1f7 +0x590, +0x198 owner,..."
@@ -9427,6 +9453,26 @@
     - "- Flood 0xa2f200: unless mitigated (a complete unpillaged Dam on one of its Floodplains, 0xa2c280; the G..."
     - "- a flood (0xa2f200) skips its yield pass 0xa2ed80 (runs/h1_duelw1124 t243);"
   review: reviewed
+- addr: 0xa3ac70
+  final: 0x739890
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-134 / C-95: the plots the sea took, a flooded route, a Trader's closed ground, a new turn's domain, the planning list's room — READ (0x586360 at 0x58645d..0x58648e / 0x5865e7..0x5865fd, 0x2720a0 at 0x272392 / 0x272618..0x272689, 0x52fe90, 0x26e920 at 0x26ea6d..0x26eaa2, 0x7920d0 at 0x792144..0x79216d, 0x790c60 at 0x790c87..0x790c8d, 0x586d40 at 0x587042..0x5870aa, 0x52fa40 at 0x52fa6a..0x52fa8e), LAB (the records' drowned plots), both twins"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...ation while the plot is still land and writes the plot's domain mask then (0xa3b000 / 0xa3ac70 -> 0x66a90, the terrain set after): the mask holds the land bit alone. A land unit stan..."
+  review: imported
+- addr: 0xa3b000
+  final: 0x739c20
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-134 / C-95: the plots the sea took, a flooded route, a Trader's closed ground, a new turn's domain, the planning list's room — READ (0x586360 at 0x58645d..0x58648e / 0x5865e7..0x5865fd, 0x2720a0 at 0x272392 / 0x272618..0x272689, 0x52fe90, 0x26e920 at 0x26ea6d..0x26eaa2, 0x7920d0 at 0x792144..0x79216d, 0x790c60 at 0x790c87..0x790c8d, 0x586d40 at 0x587042..0x5870aa, 0x52fa40 at 0x52fa6a..0x52fa8e), LAB (the records' drowned plots), both twins"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...rmation's location while the plot is still land and writes the plot's domain mask then (0xa3b000 / 0xa3ac70 -> 0x66a90, the terrain set after): the mask holds the land bit alone. A l..."
+  review: imported
 - addr: 0xa53980
   final: 0x74ef40
   kind: function

@@ -2661,7 +2661,7 @@ class SimMasks:
         # none where either plot is a city's) only where both bridge it
         ends = torch.stack((frm.clamp(min=0), dc), dim=1)
         rr = self.railroad.gather(1, ends)
-        rd = (self.road.gather(1, ends) | rr).all(dim=1)
+        rd = ((self.road.gather(1, ends) | rr) & ~self.route_pillaged.gather(1, ends)).all(dim=1)
         tier = self.road_tier.gather(1, ends)
         step = torch.where(rr, torch.full_like(tier, self._railroad_mp),
                            self._road_tier_mp.take(tier)).max(dim=1).values
@@ -3072,7 +3072,9 @@ class SimMasks:
         waterEnterable allows them, with no arm of its own."""
         dc = dest.clamp(min=0).unsqueeze(1)
         ut = u_type.clamp(min=0, max=self.NU - 1)
-        land_ok = self.passable.gather(1, dc).squeeze(1)
+        # (water the sea took stands a land unit as land: its domain mask's
+        # land bit, `tileFreeForUnit`)
+        land_ok = (self.passable | (self.wpass & self.tile_submerged)).gather(1, dc).squeeze(1)
         water_ok = self.wpass.gather(1, dc).squeeze(1) & (
             ~self.ocean_tile.gather(1, dc).squeeze(1)
             | self._ocean_open(u_seat)

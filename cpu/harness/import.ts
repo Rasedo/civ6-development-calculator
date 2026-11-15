@@ -448,6 +448,7 @@ function tileOf(ctx: Ctx, rec: TurnRecord, i: number): Tile {
     ...(route >= 0 ? { road: true } : {}),
     ...(ROAD_ROUTES.indexOf(routeName) > 0 ? { roadTier: ROAD_ROUTES.indexOf(routeName) } : {}),
     ...(routeName === 'ROUTE_RAILROAD' ? { railroad: true } : {}),
+    ...(route >= 0 && p[P.routePillaged] === 1 ? { routePillaged: true } : {}),
     ...digs,
   };
 }

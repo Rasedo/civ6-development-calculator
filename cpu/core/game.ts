@@ -38,7 +38,7 @@ import { darkBuildings, laserSpeed, stampBuildingEra } from './yields';
 import { competitionOf, payCompetition } from './competition';
 import { canRunProject, chargeUnitResource } from './stockpile';
 import { FEATURES } from '../../world/features';
-import { isWater, deriveAreas, deriveContinents, deriveMountainRanges, deriveRegions } from '../../world/query';
+import { deriveAreas, deriveContinents, deriveMountainRanges, deriveRegions } from '../../world/query';
 import { DISTRICTS, PLACEABLE_DISTRICTS } from '../data/districts';
 import { BUILDINGS, effectiveBuilding } from '../data/buildings';
 import { governorFlag, governorSum, governorTileMult } from './governors';
@@ -54,7 +54,7 @@ import type { CivId, LeaderId } from '../../world/roster';
 import { majorCityTradeList } from './aiTrade';
 import { BARB_SEAT, grantFoundingPressure, majorityReligionOf, prophetsOf, citiesOf, civOf, emptySeat, isBarbSeat, isCityStateSeat, isCiv, markCityCentre, seatOf, setTileOwner, tileClaimed, tileSeat, unitSeat, visibilityCS, allianceTheoCS, alliedAtLevel, civVariantOf , leaderOf, onHomeContinent, civLevelOf } from './seats';
 import { irradiated } from './nuclear';
-import { formationBanned } from './units';
+import { embarksOn, formationBanned } from './units';
 import { giveEraQuests } from './quests';
 import { allRoadsLeadToRome, routeCities, routeDestCenter } from './trade';
 
@@ -1961,7 +1961,7 @@ function theologicalCombatPhase(state: GameState): void {
       arrive(state, att);
       // a victor that comes ashore stops being embarked: `stepUnit`'s own
       // transition rule, which a direct tile write does not reach.
-      att.embarked = isWater(state.map.tiles[def.tileIndex]);
+      att.embarked = embarksOn(state.map.tiles[def.tileIndex]);
     }
   }
 }

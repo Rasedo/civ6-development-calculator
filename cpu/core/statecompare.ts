@@ -1428,6 +1428,7 @@ const TILE: Record<string, Extractor> = {
   lowland: overTiles((t) => t.lowland ?? 0),
   flooded: overTiles((t) => (t.flooded ? 1 : 0)),
   railroad: overTiles((t) => (t.railroad ? 1 : 0)),
+  routePillaged: overTiles((t) => (t.routePillaged ? 1 : 0)),
   submerged: overTiles((t) => (t.submerged ? 1 : 0)),
   falloutTurns: overTiles((t) => t.falloutTurns ?? 0),
   water: overTiles((t) => (isWater(t) ? 1 : 0)),

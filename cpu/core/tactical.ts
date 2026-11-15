@@ -92,8 +92,10 @@ function enterable(state: GameState, unit: Unit, t: Tile, foes: ReadonlySet<numb
   embarks: boolean, forts = true): boolean {
   if (isImpassable(t)) return false;
   const naval = !!UNITS[unit.type]?.naval;
-  // a hull on water or in a passage (`hullPassage`: its own centre, below)
-  if (naval ? !isWater(t) && !hullPassage(t) : isWater(t) && !embarks) return false;
+  // a hull on water or in a passage (`hullPassage`: its own centre, below);
+  // a land unit that may not embark on water whose domain mask holds the
+  // land bit alone (0x586360 at 0x58645d..0x58648e, `Tile.submerged`)
+  if (naval ? !isWater(t) && !hullPassage(t) : isWater(t) && !embarks && !t.submerged) return false;
   if (isWater(t) && !waterEnterable(state, t, unit)) return false;
   if (foes.has(t.index)) return false;
   if (!forts) return true;
@@ -242,8 +244,12 @@ interface Ground {
    *  on it, AI_Planning.csv) */
   boarded: (i: number) => boolean;
   /** another player's ground closed to the unit: a city-state's
-   *  (`closedToMinor`), a major's (`borderClosedTo`) */
+   *  (`closedToMinor`), a major's (`borderClosedTo`) — none to a Trader or
+   *  a Spy */
   closed: (i: number) => boolean;
+  /** the same ground whatever the unit: no step leaves it under the search's
+   *  flag 1 but from the unit's own plot (0x2720a0 at 0x272618..0x272689) */
+  shutParent: (i: number) => boolean;
 }
 
 const NO_FOES: ReadonlySet<number> = new Set();
@@ -335,8 +341,14 @@ function groundOf(state: GameState, unit: Unit, revealedOnly = true, planning = 
   // another player's territory closed to the unit: a city-state's
   // (`closedToMinor`), a major's behind borders its owner has not opened to
   // it (`borderClosedTo`; runs/h1_duelq1128 t94-96: player 0's Warrior on
-  // 13:7 lays no danger on player 1's 14:8 beside it)
-  const shut = (t: Tile): boolean => (minor ? closedToMinor(state, unit.seat, t) : isCiv(unit.seat) && borderClosedTo(state, unit.seat, t));
+  // 13:7 lays no danger on player 1's 14:8 beside it); none to a formation
+  // of units with MakeTradeRoute or Spy, whose location test skips the
+  // border branch (0x586360 at 0x5865e7..0x5865fd: the type's +0x1b9 bit
+  // 0x40, +0x1ba bit 2; runs/h1_duels1146 t107-110: city-state 4's Trader
+  // 1507334 on 11:12 .. 8:13 plans player 1's ground about it)
+  const borderless = [unit, ...mates].every((m) => !!UNITS[m.type]?.trader || stackClass(m.type) === 'spy');
+  const closedTo = (t: Tile): boolean => (minor ? closedToMinor(state, unit.seat, t) : isCiv(unit.seat) && borderClosedTo(state, unit.seat, t));
+  const shut = (t: Tile): boolean => !borderless && closedTo(t);
   // the planning list's units of the mover's map layer alone (the plot list
   // of the formation's layer, 0x2665b0 -> 0x75c50 -> 0x585eb0): a religious
   // unit stands on a layer of its own (runs/h1_duely1127 t80-91: city-state
@@ -385,6 +397,7 @@ function groundOf(state: GameState, unit: Unit, revealedOnly = true, planning = 
     revealed,
     boarded,
     closed: (i) => shut(state.map.tiles[i]),
+    shutParent: (i) => closedTo(state.map.tiles[i]),
     stand: (i) => {
       if (!held.has(i)) return true;
       if (!planning || boarded(i)) return false;
@@ -757,6 +770,13 @@ function search(state: GameState, unit: Unit, maxTurns: number, zoc: boolean, on
     // a move order's path under flag 1 (no `explore`) leaves no plot the
     // player never revealed but the unit's own
     if (!explore && best !== start && !ground.revealed(best.tile)) continue;
+    // ...and under flag 1 none on ground closed to it, whose owner is not at
+    // war with it (0x2720a0 at 0x272618..0x272689: the parent's owner, its
+    // closed borders +0x6c0, 0x3dab70): a Trader, whose location test lets it
+    // onto such ground, steps no further (runs/h1_duels1146 t214: city-state
+    // 4's Trader 1507334 on 11:12 lists player 1's 9:12 / 9:11 beside its
+    // way, none past them)
+    if ((!zoc || !explore) && best !== start && ground.shutParent(best.tile)) continue;
     // the planning's search (no flag 0x200: 0x26e570 at 0x26e83e) moves on
     // from no plot of a zone of control the player sees but the unit's own;
     // an attack it strikes from there all the same
@@ -820,6 +840,13 @@ function search(state: GameState, unit: Unit, maxTurns: number, zoc: boolean, on
       // steps to 7:12, no way round by the unrevealed 8:11 and the water
       // 9:12)
       if (!naval && !embarks && !waterWalks(unit.type) && ground.revealed(to.index) && isWater(from) && !isWater(to)) continue;
+      // ...and its step off land onto a revealed water plot the embark test
+      // (0x2720a0 at 0x272392 -> 0x52fe90, refused at 0x52fed4), a plot the
+      // sea took too: one standing on such a plot steps only onto another
+      // (runs/h1_duels1141 t207-249: the barbarian Field Cannon 3670033 on the
+      // drowned 32:12 holds; t243-247 the Cavalry 3538967 goes between the
+      // drowned 23:17 and 23:18)
+      if (!naval && !embarks && !waterWalks(unit.type) && ground.revealed(to.index) && !isWater(from) && isWater(to)) continue;
       if (attack && !fortBlind && !ground.attack(to)) continue;
       if (zoned && !attack) continue;
       // the step's validity (0x2720a0 at 0x272372..0x27242e): onto a revealed
@@ -950,15 +977,24 @@ function search(state: GameState, unit: Unit, maxTurns: number, zoc: boolean, on
     const from = map.tiles[p.tile];
     let pm = p.moves;
     let turns = p.turns;
+    const wet = blind ? p.wet : isWater(to);
     if (pm <= 0) {
       turns += 1;
-      pm = !naval && p.wet ? fullSea : fullLand;
+      // a new turn sets out on the pool of the plot entered (0x26e920 at
+      // 0x26ea6d..0x26ea86: the child's water), of the plot left where the
+      // plot entered lies in a zone of control (0x26f870 -> 0x530f50, at
+      // 0x26ea88..0x26eaa2): a unit at sea with no Movement lands on its
+      // land pool, one ashore embarks on its embarked pool (runs/h1_duels1146
+      // t189: city-state 2's Field Cannon 1507330 plans the Neighbourhood
+      // 38:10 off its water 38:11 at (2/0), its Builder 1376259 the water
+      // 38:11 off its centre 39:12 at (2/4), the game's own plannings)
+      const sea = isWater(from) !== wet && ground.zoc(to) ? isWater(from) : wet;
+      pm = !naval && sea ? fullSea : fullLand;
     }
     // the step's rules, then the parent's carry on top (0x26e920: the
     // parent's +0x20 added to the step's cost); between two plots the
     // player never revealed no rule runs: the parent's carry, else 1
     let cost = blind ? (p.carry || FIX) : Math.floor(stepCostHeld(state, unit, from, to, di, held, embarks) * FIX / MP_SCALE) + (p.carry ?? 0);
-    const wet = blind ? p.wet : isWater(to);
     // a shore crossing carries the Movement held past the new domain's full
     // Movement to the next step (0x530420 / 0x530240: Movement left above
     // the domain's, a FreeEmbark district's crossing too; runs/h1_duely1128
@@ -1066,13 +1102,27 @@ function search(state: GameState, unit: Unit, maxTurns: number, zoc: boolean, on
  *  the order the pathfinder closed them, the unit's own plot first. */
 export function reachPlots(state: GameState, unit: Unit, maxTurns: number): Reach[] {
   const out: Reach[] = [];
+  const room = reachRoom(state, unit);
   search(state, unit, maxTurns, false, (n, ground) => {
     // a plot the unit may not stand on it only passes (`stand`), its own
     // plot listed whatever holds it, none of ground closed to a city-state
-    if (n.tile === unit.tileIndex || (!ground.closed(n.tile) && (n.attack || (ground.stand(n.tile) && ground.fits(n.tile))))) out.push({ tile: n.tile, turns: n.turns, moves: n.moves, attack: !!n.attack });
+    if (out.length < room && (n.tile === unit.tileIndex || (!ground.closed(n.tile) && (n.attack || (ground.stand(n.tile) && ground.fits(n.tile)))))) out.push({ tile: n.tile, turns: n.turns, moves: n.moves, attack: !!n.attack });
     return false;
   });
   return out;
+}
+
+/** the room of a unit's planning list (the planning's set-up 0x7920d0 at
+ *  0x792144..0x79216d): the plots within r of a plot, 3r(r + 1) + 1, r its
+ *  GetMaxMoves (0x56e130) x the planning's turns; the list takes no plot
+ *  once it is full (the listing 0x790c60 at 0x790c87..0x790c8d) — a land unit
+ *  whose reach goes on over water on its embarked Movement
+ *  (runs/h1_duels1146 t189: city-state 2's Field Cannon 1507330 and Infantry
+ *  1572871, 2 Movement, list 61 plots; t249 its Mechanized Infantry 1638406,
+ *  3 Movement, 127; the game's own plannings) */
+function reachRoom(state: GameState, unit: Unit): number {
+  const r = maxMoves(state, unit) * PLAN_TURNS;
+  return 3 * r * (r + 1) + 1;
 }
 
 /** a path's destination placed (0x272880's "Destination is invalid" and the
@@ -2134,6 +2184,7 @@ export function planUnit(state: GameState, unit: Unit, targets: readonly Target[
   const foreign = new Set(entries.filter((E) => state.units.some((u) => u.tileIndex === E.target.tile && u.seat !== unit.seat
     && onMap(u) && mapLayer(u.type) === layer)).map((E) => E.target.tile));
   const reach: Reach[] = [];
+  const room = reachRoom(state, unit);
   const onLink =(P: number, parent: number, T: number, M: number) => {
     for (const E of entries) {
       const ty = E.target.type;
@@ -2177,7 +2228,7 @@ export function planUnit(state: GameState, unit: Unit, targets: readonly Target[
     // (0x26d890's 0x586900 under 9 -> 0x586360's territory test; runs/
     // h1_duely1127 t70-74: city-state 4's Catapult on 10:10 lists none of
     // 11:10, the barbarian Swordsman's on player 1's ground, AI_Planning.csv)
-    if (n.tile === unit.tileIndex || (!ground.closed(n.tile) && (n.attack || (ground.stand(n.tile) && ground.fits(n.tile))))) reach.push({ tile: n.tile, turns: n.turns, moves: n.moves, attack: !!n.attack });
+    if (reach.length < room && (n.tile === unit.tileIndex || (!ground.closed(n.tile) && (n.attack || (ground.stand(n.tile) && ground.fits(n.tile)))))) reach.push({ tile: n.tile, turns: n.turns, moves: n.moves, attack: !!n.attack });
     return false;
   }, entries.length ? onLink : undefined, undefined, false, true);
   let wins = false;

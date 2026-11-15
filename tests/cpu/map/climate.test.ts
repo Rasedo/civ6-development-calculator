@@ -233,9 +233,11 @@ describe('the seven phases', () => {
     const ctx = bareCtx(state.map);
     const y = tileYields(ctx, front);
     expect([y.food, y.production, y.gold]).toEqual([1, 0, 1]);
-    // ...and the land unit caught on it went down with the ground, while the
-    // hull beside it is simply afloat
-    expect(state.units.includes(foot)).toBe(false);
+    // ...and the land unit caught on it stands there unembarked (the plot's
+    // domain mask holds the land bit), the hull beside it simply afloat
+    expect(state.units.includes(foot)).toBe(true);
+    expect(foot.tileIndex).toBe(front.index);
+    expect(!!foot.embarked).toBe(false);
     expect(state.units.includes(hull)).toBe(true);
     // band 2 is still dry: it goes at Phase VI
     const behind = tileAtCoords(state.map, 2, 3);

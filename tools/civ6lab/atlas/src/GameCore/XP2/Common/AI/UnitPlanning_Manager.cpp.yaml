@@ -36,6 +36,9 @@
     - recording: h1_duely1128
       turn: 47
       value: city-state 2's Swordsman 589827 on 12:5 against the barbarian Scout on 14:4 lays the attack parents in the reach's closing order 13:4, 13:5, 13:3 (all turn 2, value 30) and takes 13:4 (189) as logged; Swordsman 720898 on 12:6 lays no three-turn spot beside the Scout and takes 13:7 (321) against the Swordsman on 14:6 as logged
+    - recording: h1_duels1146
+      turn: 249
+      value: "city-state 2's Mechanized Infantry 1638406 lists 127 plots, its reach running on over water: the full list takes no plot"
   impl:
     - cpu/core/tactical.ts:planUnit
     - gpu/core/sim_tactics.py:_tac_spot_link
@@ -47,6 +50,9 @@
     - cpu/core/tactical.ts:UNIT_TARGET
     - cpu/core/tactical.ts:FIGHTER_TARGET
     - cpu/core/tactical.ts:layer
+    - cpu/core/tactical.ts:reachPlots
+    - cpu/core/tactical.ts:reachRoom
+    - gpu/core/sim_tactics.py:update_parents
   readings:
     - "C-95: the unit pathfinder and the planning's reach — READ, confirmed on the Wander draws"
     - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
@@ -58,6 +64,8 @@
     - "C-110 / C-125: an embarked unit's strengths in a unit's blow, a promotion's side, ground closed to a strike — READ (0x51f070 at 0x51f3ef..0x51f457, 0x206960 at 0x2069b4..0x2069e0 and 0x206a78..0x206b29, 0x520270 at 0x520576..0x5205db, 0x5228c0, 0x77a4b0), FIT (the closed ground), both twins"
     - "C-125 / C-95: the planning's unmoved flag, a district's blow back, the combat's kind from its members, the camp strike's push — READ (0x791e00 at 0x791eb6..0x791ec4, 0x791470 at 0x7916fb..0x79174f / 0x7917f7..0x7918f7, 0x205720 at 0x205835..0x20592f, 0x209550, 0x772940 at 0x772a85..0x772ad3 / 0x772eea / 0x772f78), both twins"
     - "C-129 / C-125 / C-95: the known cities by any district plot the look takes, their whole strike; the target list's revealed plots, its two district entries, its religious and neutral entries — READ (0x7877e0 at 0x7878a0..0x78796e / 0x787c38..0x787cac, 0x5f0280, 0x5f0490 -> 0x5eff10, 0x810d0, 0x81330, 0x783980 at 0x783e98..0x7842eb / 0x7843b8..0x7844f3 / 0x784f5c..0x785008 / 0x785271..0x78555d), FIT (a unit at peace takes no spot), both twins"
+    - "C-134 / C-95: the plots the sea took, a flooded route, a Trader's closed ground, a new turn's domain, the planning list's room — READ"
+    - "C-134 / C-95: the plots the sea took, a flooded route, a Trader's closed ground, a new turn's domain, the planning list's room — READ (0x586360 at 0x58645d..0x58648e / 0x5865e7..0x5865fd, 0x2720a0 at 0x272392 / 0x272618..0x272689, 0x52fe90, 0x26e920 at 0x26ea6d..0x26eaa2, 0x7920d0 at 0x792144..0x79216d, 0x790c60 at 0x790c87..0x790c8d, 0x586d40 at 0x587042..0x5870aa, 0x52fa40 at 0x52fa6a..0x52fa8e), LAB (the records' drowned plots), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ...t again keeps its place and takes the fewer turns, or at equal turns the more Movement (0x790c60). The planning runs once for every unit at the start of the AI's turn. Flag 0x800 skips...
@@ -269,13 +277,25 @@
   review: reviewed
 - addr: 0x7920d0
   kind: function
-  status: PARTLY
+  status: READ
+  cases:
+    - recording: h1_duels1146
+      turn: 189
+      value: city-state 2's Field Cannon 1507330 and Infantry 1572871, 2 Movement, list 61 plots; t249 its Mechanized Infantry 1638406, 3 Movement, 127
+    - recording: h1_duels1146
+      turn: 189
+      value: city-state 2's Field Cannon 1507330 and Infantry 1572871, 2 Movement, list 61 plots; t249 its Mechanized Infantry 1638406, 3 Movement, 127
   impl:
     - cpu/core/tactical.ts:DEFEND_CAMP_TURNS
     - gpu/core/sim_tactics.py:_WANDER_CAMP_RANGE
     - cpu/core/tactical.ts:planUnit
+    - cpu/core/tactical.ts:reachRoom
+    - gpu/core/sim_tactics.py:_tac_search
+  readings:
+    - "C-134 / C-95: the plots the sea took, a flooded route, a Trader's closed ground, a new turn's domain, the planning list's room — READ"
+    - "C-134 / C-95: the plots the sea took, a flooded route, a Trader's closed ground, a new turn's domain, the planning list's room — READ (0x586360 at 0x58645d..0x58648e / 0x5865e7..0x5865fd, 0x2720a0 at 0x272392 / 0x272618..0x272689, 0x52fe90, 0x26e920 at 0x26ea6d..0x26eaa2, 0x7920d0 at 0x792144..0x79216d, 0x790c60 at 0x790c87..0x790c8d, 0x586d40 at 0x587042..0x5870aa, 0x52fa40 at 0x52fa6a..0x52fa8e), LAB (the records' drowned plots), both twins"
   notes: ["imported: cited by the code, in no dll_readings section"]
-  review: imported
+  review: reviewed
 - addr: 0x7921a0
   final: 0x51ce80
   kind: function

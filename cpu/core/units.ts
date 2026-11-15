@@ -187,7 +187,11 @@ export function waterEnterable(
  * nothing. A RAILROAD carries the road under it, so it answers here too.
  */
 function roadStep(from: Tile, to: Tile): boolean {
-  return (!!from.road || !!from.railroad) && (!!to.road || !!to.railroad);
+  // (0x52fa40 at 0x52fa6a..0x52fa8e: each plot's route there and unpillaged;
+  // runs/h1_duels1146 t174-198: the flooded 11:12 and 35:13, their Modern
+  // roads pillaged, cost their own terrain — t187 city-state 4's Infantry
+  // 1900552 on 11:13 plans the Theater Square 10:11 past 11:12 at (2/0))
+  return (!!from.road || !!from.railroad) && (!!to.road || !!to.railroad) && !from.routePillaged && !to.routePillaged;
 }
 
 /** a route plot's own Movement (Routes.MovementCost of its RouteType, in
@@ -986,7 +990,9 @@ export function tileFreeForUnit(
   if (isWater(tile)) {
     if (naval) {
       if (!unit || !waterEnterable(state, tile, unit)) return false;
-    } else if (!walks) {
+    } else if (!walks && !tile.submerged) {
+      // (a plot the sea took stands a land unit as land: the location test
+      // 0x586360 at 0x58645d..0x58648e, the mask's land bit)
       if (!allowEmbark || !unit || !canEmbark(state, unit) || !waterEnterable(state, tile, unit)) return false;
     }
   } else {
@@ -1002,7 +1008,7 @@ export function tileFreeForUnit(
   // the slot the mover would hold HERE: a land unit standing on water is a
   // passenger, whatever it is on land.
   const domain: StackSlot = unit
-    ? (isWater(tile) && !naval && !walks ? 'embarked' : unitDomain(unit.type))
+    ? (embarksOn(tile) && !naval && !walks ? 'embarked' : unitDomain(unit.type))
     : 'civilian';
   for (const u of unitsAt(state, tileIndex)) {
     // a Trader stands on the trade layer: it keeps no unit out
@@ -1318,10 +1324,26 @@ export function embarkTechMoves(state: GameState, seat: number): number {
  *  water or not (runs/h1_duely1124 t73-t91 city-state 3's Heavy Chariots
  *  onto its owned 40:14 / 41:14; h1_duelq1121 t200: player 1's Field Cannon
  *  in its centre 11:18, 3 Movement, embarks free onto its water 10:17 and
- *  lands on 11:16 with none left, no 77 on 12:14 / 12:15) */
-export function shoreCrossing(type: string, from: Tile, to: Tile, sea = isWater(from)): boolean {
+ *  lands on 11:16 with none left, no 77 on 12:14 / 12:15). A plot the sea
+ *  took holds the land bit alone (`Tile.submerged`): a formation ashore
+ *  crosses its shores as land, one embarked pays there, owned or not
+ *  (runs/h1_duels1146 t189: city-state 2's Builder 1376259 on 40:13 plans
+ *  the drowned 40:12 (1/1), its Field Cannon 1507330 on 40:12 the Farm 40:13
+ *  (1/1), the game's own plannings) */
+export function shoreCrossing(type: string, from: Tile, to: Tile, sea = embarksOn(from)): boolean {
   if (UNITS[type]?.naval || waterWalks(type) || isWater(from) === isWater(to)) return false;
-  return !(sea && (isWater(from) ? from : to).ownerSeat !== NO_SEAT);
+  const water = isWater(from) ? from : to;
+  return !(sea ? water.ownerSeat !== NO_SEAT && !water.submerged : !!water.submerged);
+}
+
+/** the state the placement gives a land unit on the plot (0x586d40 at
+ *  0x587042..0x5870aa): embarked on water, but where the plot's domain mask
+ *  takes the land domain (`Tile.submerged`): there it stands unembarked, and
+ *  an embarked one put there lands (runs/h1_duels1146 t187-188: city-state
+ *  2's Field Cannon 1507330, embarked on 35:10, stands unembarked on the
+ *  drowned 38:12, its Movement 2) */
+export function embarksOn(t: Tile): boolean {
+  return isWater(t) && !t.submerged;
 }
 
 /** a shore crossing the embark and disembark rules (0x530420 / 0x530240)
@@ -1343,7 +1365,7 @@ function shoreStep(type: string, from: Tile, to: Tile, mayEmbark: boolean, sea: 
  *  (`shoreCrossing`): a walker's own step leaves water embarked, a search
  *  passes its unit's as it sets out. */
 export function stepCost(state: GameState, unit: { type: string; seat: number; promos?: number; alpine?: boolean; originalOwner?: number }, from: Tile, to: Tile,
-  mayEmbark = canEmbark(state, unit), sea = isWater(from)): number {
+  mayEmbark = canEmbark(state, unit), sea = embarksOn(from)): number {
   const transition = shoreStep(unit.type, from, to, mayEmbark, sea);
   let cost: number;
   if (!transition) cost = moveCostInto(state, from, to, unit) + riverCharge(state, from, to, unit);
@@ -1477,7 +1499,7 @@ export function stepUnit(state: GameState, unit: Unit, to: Tile, formed?: readon
   if (refused) return refused;
   const from = state.map.tiles[unit.tileIndex];
   const naval = !!UNITS[unit.type]?.naval;
-  const transition = !naval && !waterWalks(unit.type) && isWater(from) !== isWater(to);
+  const transition = !naval && !waterWalks(unit.type) && embarksOn(from) !== embarksOn(to);
   // its formation's riders: those a walk set out with (`formed`, its
   // formation's membership: another formation's rider on a plot it passes
   // stays with its own escort), else those on its plot; the step priced on
@@ -1486,7 +1508,7 @@ export function stepUnit(state: GameState, unit: Unit, to: Tile, formed?: readon
   const cost = stepCost(state, unit, from, to, [unit, ...riders].some((m) => canEmbark(state, m)));
   const riderFree = riders.length > 0
     && (promoFlag(unit, 'ESCORT_SPEED') || !!UNITS[unit.type]?.escortSpeed);
-  if (transition) unit.embarked = isWater(to);
+  if (transition) unit.embarked = embarksOn(to);
   unit.tileIndex = to.index;
   arrive(state, unit);
   carryAirWith(state, unit, from.index);
@@ -1507,8 +1529,8 @@ export function stepUnit(state: GameState, unit: Unit, to: Tile, formed?: readon
   if (transition) unit.movesFull = unitFullMoves(state, unit);
   for (const rider of riders) {
     const rTrans = !UNITS[rider.type]?.naval && !waterWalks(rider.type)
-      && isWater(from) !== isWater(to);
-    if (rTrans) rider.embarked = isWater(to);
+      && embarksOn(from) !== embarksOn(to);
+    if (rTrans) rider.embarked = embarksOn(to);
     rider.tileIndex = to.index;
     arrive(state, rider);
     if (rTrans) {

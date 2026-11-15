@@ -175,6 +175,7 @@
     - cpu/core/tactical.ts:search
     - gpu/core/sim_tactics.py:_tac_search
     - cpu/core/tactical.ts:fortBlind
+    - gpu/core/sim_tactics.py:borderless
   readings:
     - "C-125: a civilian at war in the planning's search, a zone of control across a river, the attack's move onto a city — READ (0x26e570, 0x530f50 at 0x5310c8..0x5311c9, 0x771f80 at 0x772121), both twins"
     - "C-95: the planning's valid wrapper on a district at war, and a land unit's embarking by its original owner — READ (0x26e570 at 0x26e5e2..0x26e7f1, 0x56c480), the first both twins"
@@ -219,6 +220,9 @@
       value: "- THE PLANNING'S GROUND, beside the barbarians': the list (0x26d890) keeps a   plot only where 0x586900 lets the unit end — another player's unit at   peace it passes and never ends on (runs/h1_duelw1"
     - recording: 1117
       value: the barbarians' land units take none   (0 of 6,269 of their AI_Planning.csv rows on 1117, 1121 and 1124 hold a   water plot;
+    - recording: h1_duels1146
+      turn: 189
+      value: "city-state 2's Field Cannon 1507330 plans 38:10 off its water 38:11 at (2/0), its Builder 1376259 the water 38:11 off its centre 39:12 at (2/4): a new turn on the domain of the plot entered"
   impl:
     - cpu/core/tactical.ts:search
     - cpu/core/tactical.ts:price
@@ -228,6 +232,8 @@
     - cpu/core/tactical.ts:blind
     - gpu/core/sim_tactics.py:_tac_search
     - cpu/core/tactical.ts:ReachSearch
+    - cpu/core/tactical.ts:wet
+    - cpu/core/tactical.ts:sea
   readings:
     - "C-124: a path enters a plot the player never revealed whatever it is — READ (0x2720a0 at 0x272372..0x27242e, 0x271be0's +0x50 bit 0x20, 0x26e920), both twins"
     - "C-95: a river crossing's Movement — READ"
@@ -247,6 +253,8 @@
     - "C-99: a move order's search sets out on the pool finder's +0x1bc, the last full-Movement search's GetMaxMoves — READ (0x26f330, 0x77d10, 0x270d70, 0x26e920, 0x26eea0, 0x26dcd0, 0x26df90, 0x26e2c0, 0x26fe20 at 0x270309), unported"
     - "C-95: a strike's step from beside its plot, a formation's planning plot at a radius, the ring walk's own location test — READ (0x962380 at 0x96267e..0x9626d2, 0x26ef40 at 0x26f0a4, 0x78fa10 at 0x78fab4..0x78facf, 0x815d50 -> 0x586360), both twins"
     - "C-95 / C-123: a zone of control out of sight is none in a path's cost; Attack Civilians past a withdrawn civilian; the capture step through a plot of its own; a withdrawal's plot — READ (0x5033a0 at 0x5033f9..0x503400, 0x773270 at 0x773383..0x77339c, 0x530650 at 0x5307a4..0x5307d3), both twins"
+    - "C-134 / C-95: the plots the sea took, a flooded route, a Trader's closed ground, a new turn's domain, the planning list's room — READ"
+    - "C-134 / C-95: the plots the sea took, a flooded route, a Trader's closed ground, a new turn's domain, the planning list's room — READ (0x586360 at 0x58645d..0x58648e / 0x5865e7..0x5865fd, 0x2720a0 at 0x272392 / 0x272618..0x272689, 0x52fe90, 0x26e920 at 0x26ea6d..0x26eaa2, 0x7920d0 at 0x792144..0x79216d, 0x790c60 at 0x790c87..0x790c8d, 0x586d40 at 0x587042..0x5870aa, 0x52fa40 at 0x52fa6a..0x52fa8e), LAB (the records' drowned plots), both twins"
   review: reviewed
 - addr: 0x26ee80
   final: 0x1a74c0
@@ -397,9 +405,10 @@
     - recording: h1_duely1124
       turn: 9
       value: "the barbarian Scout 524295 on 30:8, its Explore move to 33:11: 31:8 beside Bologna's centre 32:8 in its zone, the path through 30:9 where it ends as logged"
-  impl: [cpu/core/units.ts:inEnemyZoc, gpu/core/sim_tactics.py:_tac_zoc_path]
+  impl: [cpu/core/units.ts:inEnemyZoc, gpu/core/sim_tactics.py:_tac_zoc_path, cpu/core/tactical.ts:sea]
   readings:
     - "C-125: a district's zone of control in a move's path, waived on the path's destination; a city-state's strikes after its units' planning — READ (0x530f50 at 0x531127..0x531302, 0x26f980, 0x26f870), FIT (the strikes' place), both twins"
+    - "C-134 / C-95: the plots the sea took, a flooded route, a Trader's closed ground, a new turn's domain, the planning list's room — READ (0x586360 at 0x58645d..0x58648e / 0x5865e7..0x5865fd, 0x2720a0 at 0x272392 / 0x272618..0x272689, 0x52fe90, 0x26e920 at 0x26ea6d..0x26eaa2, 0x7920d0 at 0x792144..0x79216d, 0x790c60 at 0x790c87..0x790c8d, 0x586d40 at 0x587042..0x5870aa, 0x52fa40 at 0x52fa6a..0x52fa8e), LAB (the records' drowned plots), both twins"
   review: reviewed
 - addr: 0x26f980
   final: 0x1a7e90
@@ -883,6 +892,12 @@
     - recording: h1_duelq1121
       turn: 11
       value: the barbarian Horseman 851980 on 34:5 for 36:14 steps 34:6, its path over player 0's unseen centre 35:14; t164 the Crossbowman 3866651 holds for the Apostle's 9:19 under its Scout
+    - recording: h1_duels1146
+      turn: 214
+      value: "city-state 4's Trader 1507334 on 11:12 lists player 1's 9:12 / 9:11 and none past them: the flag 1 tail refuses a parent on closed ground"
+    - recording: h1_duels1141
+      turn: 243
+      value: "the barbarian Cavalry 3538967 goes between the drowned 23:17 and 23:18 alone: the embark test off land"
   impl:
     - cpu/core/tactical.ts:pathTo
     - gpu/core/sim_tactics.py:_tac_move_to
@@ -903,6 +918,7 @@
     - cpu/core/tactical.ts:held
     - gpu/core/sim_tactics.py:_tac_attack_planes
     - cpu/core/tactical.ts:f
+    - cpu/core/tactical.ts:Ground
   readings:
     - "C-95: a move order's path steps on from an attack's plot, its attack child by the order's flags, a non-attack order's destination, a melee blow on a civilian — READ (0x2720a0 at 0x272434..0x272544, 0x2715a0 at 0x2717cd / 0x271870..0x2718d7, 0x1385c0, 0x889e0, 0x2714b0, 0x206960 at 0x206a1f), both twins"
     - "C-99 / C-128: a danger feature is no step of a search, a land unit's danger stops at the shore — READ (0x271be0 at 0x271fd3, 0x2720a0 at 0x27216c, 0x26e570), both twins"
@@ -940,6 +956,8 @@
     - "C-132: the danger map's fitted rules in the DLL; a search's shore crossings on the formation's own domain — READ (0x26dab0, 0x586360 at 0x586624..0x586664, 0x2720a0 at 0x272618..0x272689, 0x66a90, 0x52fe90, 0x56e0a0, 0x26e570, 0x530240, 0x530420), FIT (the unmoved flag, the barbarians' raise, the grant's last turn), both twins"
     - "C-133 / C-128: flag 2's parent plot, the open list as the list itself, the embarked state's Movement cap, the zone's improvement test — READ (0x2720a0 at 0x27220d / 0x2724c8, 0x775a0, 0x79560, 0x586d40 at 0x587042..0x5870aa / 0x58741c..0x587486, 0x5706e0, 0x531ef0, 0x26fe20 at 0x270444 / 0x270776, 0x270be0, 0x52f970), both twins"
     - "C-132 / C-128 / C-95 / C-123 / C-133: the danger map's unmoved flag, a unit made anew's place, the operation queue's push, the strike's turn, the raid's recruit, the shore tests — READ (0x26df90 at 0x26e128..0x26e159, 0x716400 at 0x71672d, 0x586360 at 0x586542..0x58657e / 0x5867ab..0x586875, 0x93fa10 at 0x93fd94..0x93fdab / 0x93fe79, 0x526a0 at 0x52788..0x527ac, 0x523e0, 0x55460, 0x962380 at 0x96268f, 0x60a440, 0x26e570 at 0x26e904, 0x2720a0 at 0x272618..0x272689), both twins"
+    - "C-134 / C-95: the plots the sea took, a flooded route, a Trader's closed ground, a new turn's domain, the planning list's room — READ"
+    - "C-134 / C-95: the plots the sea took, a flooded route, a Trader's closed ground, a new turn's domain, the planning list's room — READ (0x586360 at 0x58645d..0x58648e / 0x5865e7..0x5865fd, 0x2720a0 at 0x272392 / 0x272618..0x272689, 0x52fe90, 0x26e920 at 0x26ea6d..0x26eaa2, 0x7920d0 at 0x792144..0x79216d, 0x790c60 at 0x790c87..0x790c8d, 0x586d40 at 0x587042..0x5870aa, 0x52fa40 at 0x52fa6a..0x52fa8e), LAB (the records' drowned plots), both twins"
   context:
     - "- THE PATH'S TURN ENDS (0x2720a0, the move order's validity at the end of 0x26e570): each node records (0x271be0) whethe..."
     - "- A plot the player never revealed is the reach's leaf (READ): the validity 0x2720a0 under the search's flag 1 (0x115) refuses a step whose parent is not revealed (node +0x..."

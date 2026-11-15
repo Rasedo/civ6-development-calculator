@@ -17183,3 +17183,77 @@ recordings' CombatLog and on the game's own planning memory
   Heal and Grant Experience stand for every claimer (1117 t204 ours over
   100 for the game's 55); the Units row's +0x1b8 bit 2 and the
   experience's +0xa are unnamed.
+
+## C-134 / C-95: the plots the sea took, a flooded route, a Trader's closed ground, a new turn's domain, the planning list's room — READ (0x586360 at 0x58645d..0x58648e / 0x5865e7..0x5865fd, 0x2720a0 at 0x272392 / 0x272618..0x272689, 0x52fe90, 0x26e920 at 0x26ea6d..0x26eaa2, 0x7920d0 at 0x792144..0x79216d, 0x790c60 at 0x790c87..0x790c8d, 0x586d40 at 0x587042..0x5870aa, 0x52fa40 at 0x52fa6a..0x52fa8e), LAB (the records' drowned plots), both twins
+
+`submergeTile`, `floodLowland` (cpu/core/climate.ts); `embarksOn`,
+`shoreCrossing`, `stepCost`, `stepUnit`, `tileFreeForUnit`, `roadStep`
+(cpu/core/units.ts); `enterable`, `groundOf`'s `shut` / `shutParent`,
+`search`'s price and links, `reachRoom`, `reachPlots`, `planUnit`
+(cpu/core/tactical.ts); the victor's and the placement's embarked state
+(cpu/core/combat.ts, game.ts, phase.ts); GPU `_submerge` and the flood
+(sim_economy.py), `_tac_enter(closed)`, `_tac_search` (its entry planes,
+`shut_n` / `cl_n`, the step tests, price6's pool and crossing, the list's
+room), `_tac_step_cost` (sim_tactics.py), the walk's `transition` /
+`crossing` and the rider (sim_seats.py), `_road_terms` and the advance's
+terrain half (sim_masks.py), `jumpMadeAnew`'s twin (sim_minors.py);
+`Tile.routePillaged` / `route_pillaged` (statecompare `routePillaged`).
+
+- THE PLOTS THE SEA TOOK: 0xa3b720 tests each formation's location while
+  the plot is still land and writes the plot's domain mask then (0xa3b000 /
+  0xa3ac70 -> 0x66a90, the terrain set after): the mask holds the land bit
+  alone. A land unit stands on such a plot unembarked, a unit caught there
+  stays (no unit dies), one placed or advancing there lands, an embarked one
+  stepping on lands and one stepping off onto other water embarks
+  (`embarksOn`: water and not submerged). The location test (0x586360 at
+  0x58645d..0x58648e) lets a land unit that may not embark stand on it; the
+  embark test (0x52fe90, run by 0x2720a0 at 0x272392 on a revealed child)
+  refuses such a unit any step off land onto water, so one there steps
+  only onto another drowned plot. Its shores are no shore crossing to a
+  formation ashore; to an embarked one they are, owned or not. Records: of
+  769 (duels1146) and 90 (duels1141) unit records on a drowned plot none is
+  embarked (1146 t186 city-state 2's Infantry 1572871 on 38:12, t188 its
+  Field Cannon 1507330 there off its embarked 35:10; 1141 t207-249 the
+  barbarian Field Cannon 3670033 on 32:12, t243-247 the Cavalry 3538967
+  between 23:17 and 23:18).
+- A FLOODED ROUTE: a flood pillages the plot's route (the plot's +0x4d bit
+  2): every flooded plot with a route in the records reads it pillaged
+  (duels1146 134 plot-turns, duels1141 18), and the step's route term
+  (0x52fa40 at 0x52fa6a..0x52fa8e) asks both routes unpillaged (duels1146
+  t187 city-state 4's Infantry 1900552 on 11:13 plans 10:11 past the
+  flooded 11:12 at (2/0)). A Flood Barrier's repair leaves it: duels1146
+  5:6, flooded t166-172, Beijing's barrier t172, reads its route pillaged
+  to t250. The sea's taking clears it with the route.
+- A TRADER ON CLOSED GROUND: the location test's border branch (0x586360
+  at 0x5865e7..0x5865fd) is skipped for a unit type with MakeTradeRoute
+  (+0x1b9 bit 0x40) or Spy (+0x1ba bit 2): a formation of such units is
+  shut out of no player's ground. The validity's flag 1 tail (0x2720a0 at
+  0x272618..0x272689) refuses any link whose PARENT's plot is closed ground
+  (the owner's +0x6c0, not at war, 0x3dab70 refusing), the unit's own plot
+  waived: a Trader enters one plot of closed ground off open ground and
+  steps no further (duels1146 t107-110 city-state 4's Trader 1507334 on
+  11:12 .. 8:13 and t214 on 11:12: the game lists player 1's plots beside
+  its way, none past them; plan.reach 810 -> 249 rows on duels1146 with
+  the two rules).
+- A NEW TURN'S DOMAIN: a step from a node with no Movement starts the next
+  turn on the full Movement of the domain of the plot entered (0x26e920 at
+  0x26ea6d..0x26ea86, the child's water), of the plot left where the plot
+  entered lies in a zone of control (0x26f870 -> 0x530f50, at
+  0x26ea88..0x26eaa2) (duels1146 t189 city-state 2's Field Cannon 1507330
+  plans the Neighbourhood 38:10 off its water 38:11 at (2/0), its Builder
+  1376259 the water 38:11 off its centre 39:12 at (2/4)).
+- THE PLANNING LIST'S ROOM: the planning's set-up (0x7920d0 at
+  0x792144..0x79216d) sizes each unit's list at 3r(r + 1) + 1 plots, r
+  GetMaxMoves (0x56e130) x the planning's turns, and the listing (0x790c60 at
+  0x790c87..0x790c8d) takes no plot once it is full: a land unit whose reach
+  runs on over water lists that many (duels1146 t189 city-state 2's Field
+  Cannon 1507330 and Infantry 1572871, 2 Movement, 61 plots; t249 its
+  Mechanized Infantry 1638406, 3 Movement, 127).
+- OPEN: a claim (0x66790), a city's transfer (0x668e0) or its end (0x1eac40)
+  writes a plot's domain mask anew by its terrain (0x66a90), so a drowned
+  plot claimed after the sea took it would hold the water bit alone; no
+  record shows a land unit on such a plot (duels1146 43:20, 0:20, 43:14,
+  claimed t206 / t214 / t232), the engines keep the land bit; a road a
+  major's Trader lays in its turn before the city-states plan is out of the
+  copy's ground (duels1146 t155 player 1's Trader 2097169 onto 38:12: the
+  game's city-state 2 Builder 1376259 reaches 38:12 at (1/128), ours (1/0)).

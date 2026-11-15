@@ -22,9 +22,8 @@ import {
   FAVOR_PER_POLLUTION_OVER, FAVOR_POLLUTION_CAP,
 } from '../data/climate';
 import { citiesOf, isCityStateSeat, seatOf } from './seats';
-import { cityAtIndex, disbandUnit, unitsAt, waterWalks } from './units';
+import { cityAtIndex } from './units';
 import { displaceAirFrom } from './air';
-import { UNITS } from '../data/units';
 import { randRange } from './rand';
 
 /** Whether this seat's units emit at the reduced rate. */
@@ -197,6 +196,9 @@ function floodLowland(state: GameState, tile: Tile): void {
   // an improvement newly pillaged changes what its owner extracts
   if (tile.improvement && !was) extractionChanged(state, tile);
   if (tile.district) tile.districtPillaged = true;
+  // ...and its route (runs/h1_duels1146 t174: the flooded 11:12 and 35:13
+  // read their Modern roads pillaged, to their drowning at t199)
+  if (tile.road || tile.railroad) tile.routePillaged = true;
 }
 
 /**
@@ -205,19 +207,18 @@ function floodLowland(state: GameState, tile: Tile): void {
  * like any Coast, a hull sails over it and the city beside it turns coastal
  * (runs/h1_duelw1122 t229: 356 drowned plots read TERRAIN_COAST with Food 1
  * Gold 1, worked plots among them). What stood on the ground goes with it —
- * the improvement, the district and its city's record of it, the resource,
- * and any LAND unit caught there (a hull is simply afloat now, and so is a
- * chassis water is ground to). A CITY CENTRE is never taken: no sea destroys
- * a city in this game. The river edges stay as recorded.
+ * the improvement, the district and its city's record of it, the resource.
+ * The units on it stay as they stand, unembarked (0xa3b720 tests each
+ * formation's location while the plot is still land, and writes the plot's
+ * domain mask then too: `Tile.submerged`; runs/h1_duels1141 t206-249: the
+ * barbarian Field Cannon 3670033 on 32:12, drowned at t207, stands there
+ * unembarked to the game's end). A CITY CENTRE is never taken: no sea
+ * destroys a city in this game. The river edges stay as recorded.
  */
 export function submergeTile(state: GameState, tile: Tile): void {
   if (isWater(tile)) return;
   if (cityAtIndex(state, tile.index)) return;
   if (state.cityStates?.some((cs) => cs.centerIndex === tile.index)) return;
-  for (const u of [...unitsAt(state, tile.index)]) {
-    if (UNITS[u.type]?.naval || waterWalks(u.type)) continue;
-    disbandUnit(state, u.id);
-  }
   displaceAirFrom(state, tile.index, false);
   if (tile.district && tile.ownerSeat >= 0 && tile.ownerCity >= 0) {
     const city = citiesOf(state, tile.ownerSeat).find((c) => c.id === tile.ownerCity);
@@ -245,6 +246,7 @@ export function submergeTile(state: GameState, tile: Tile): void {
   tile.builtWonderComplete = false;
   tile.road = false;
   tile.railroad = false;
+  delete tile.routePillaged;
   tile.pillaged = false;
   tile.flooded = false;
   tile.lowland = undefined;   // nothing left to price a Flood Barrier against

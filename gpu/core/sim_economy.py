@@ -1381,24 +1381,12 @@ class SimEconomy:
         (`submergeTile`). The plot becomes a flat, featureless COAST plot —
         a Coast's yields, worked like any Coast — and what stood on the
         ground goes with it: the improvement, the district and its city's
-        record of it, the resource, and any LAND unit caught there. A hull is
-        simply afloat now, and so is a chassis water is ground to. The river
-        edges stay as recorded."""
+        record of it, the resource, the route. The units on it stay as they
+        stand, unembarked: the plot's domain mask, written while it is still
+        land, takes a land unit (`embarksOn`). The river edges stay as
+        recorded."""
         if not bool(take.count_nonzero()):
             return
-        ty = self.unit_type.clamp(min=0, max=self.NU - 1)
-        drown = (self.unit_alive
-                 & take.gather(1, self.unit_tile.clamp(min=0))
-                 & ~self.unit_naval[ty] & ~self.unit_water_walk[ty]
-                 & (self._type_air[ty] == 0))
-        for pool in ("major", "barb"):
-            lo, hi = self.POOL_LO[pool], self.POOL_HI[pool]
-            d = drown[:, lo:hi]
-            if not bool(d.count_nonzero()):
-                continue
-            r, s = d.nonzero(as_tuple=True)
-            getattr(self, f"{pool}_unit_alive")[r, s] = False
-            self._vacate(pool, r, s)
         # the improved bonus or luxury resource the sea takes
         _ext = (take & (self.improvement >= 0) & ~self.pillaged & (self.res_id >= 0)
                 & ~self.res_stripped & (self.res_priority != 2))
@@ -1417,7 +1405,7 @@ class SimEconomy:
         self.work_ok |= take
         for _p in ("passable", "settle_ok", "d_usable", "d_usable0", "camp_ok",
                    "coastal_land", "coastal_water", "_sr_c", "district_complete", "hills",
-                   "district_pillaged", "built_wonder_complete", "road", "railroad",
+                   "district_pillaged", "built_wonder_complete", "road", "railroad", "route_pillaged",
                    "pillaged", "tile_flooded", "antiquity", "tile_locked", "tile_forced", "feat_stripped"):
             getattr(self, _p)[take] = False
         for _p, _v in (("improvement", -1), ("district", -1), ("built_wonder", -1),
@@ -1539,6 +1527,8 @@ class SimEconomy:
                     _fr, _ft = fresh.nonzero(as_tuple=True)
                     self._extraction_changed_pairs(_fr, _ft)
                 self.district_pillaged |= wet & (self.district >= 0)
+                # ...and its route (`floodLowland`)
+                self.route_pillaged |= wet & (self.road | self.railroad)
             sb = int(self._cl_submerge[p])
             if sb > 0:
                 self._submerge((self.tile_lowland == sb) & ~barrier

@@ -289,8 +289,17 @@ export interface Tile {
    *  Barrier. */
   flooded?: boolean;
   /** CIV6 (Coastal Lowlands): the sea has taken this tile FOREVER; it is a
-   *  Coast now (`submergeTile`), and no Flood Barrier repairs it. */
+   *  Coast now (`submergeTile`), and no Flood Barrier repairs it. Its domain
+   *  mask (the plot info's word +0x14) holds the land bit alone: the sea's
+   *  taking writes the mask while the plot is still land (0xa3b720: 0xa3b000
+   *  / 0xa3ac70 -> 0x66a90, the terrain set after). A land unit stands on it
+   *  unembarked and crosses its shores as land (`embarksOn`). */
   submerged?: boolean;
+  /** the plot's route is pillaged (the plot's +0x4d bit 2): a flood's work
+   *  (`floodLowland`), the route there until the sea takes the plot — a
+   *  Flood Barrier's repair leaves it; a step takes no route term on it
+   *  (0x52fa40) */
+  routePillaged?: boolean;
   /** CIV6 (Nuclear weapons): turns of radioactive fallout still on this tile.
    *  A blast writes the device's own count; a build charge clears it. */
   falloutTurns?: number;

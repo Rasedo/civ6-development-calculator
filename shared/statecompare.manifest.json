@@ -4838,6 +4838,17 @@
           ]
         },
         {
+          "name": "routePillaged",
+          "compare": "exact",
+          "covers": [
+            "Tile.routePillaged"
+          ],
+          "planes": [
+            "route_pillaged"
+          ],
+          "note": "a flood pillages the plot's route; the sea's taking clears it with the route, a Flood Barrier's repair leaves it."
+        },
+        {
           "name": "submerged",
           "compare": "exact",
           "covers": [
