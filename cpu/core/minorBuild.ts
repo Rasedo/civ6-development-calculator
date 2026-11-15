@@ -1213,7 +1213,8 @@ export function minorItemKey(item: MinorItem): string {
  * item the minor was working on when it fell (`CityState.repairWait`) and
  * then comes first, or at once with nothing in hand: it resumes at
  * `MINOR_REPAIR_RESUME_PCT` of its cost and the rest is built
- * (`minorRepairTarget`).
+ * (`minorRepairTarget`). A building in hand the queue's CanConstruct
+ * refuses leaves it before the step (`minorQueueOk`).
  */
 export function minorBuild(state: GameState, cityState: CityState, production: number): void {
   delete cityState.buildProject;
@@ -1234,6 +1235,13 @@ export function minorBuild(state: GameState, cityState: CityState, production: n
       item = repair ? { repair } : { none: true };
     }
   }
+  // the step's head check (0x16f050 at 0x16f09a..0x16f180): a building at
+  // the queue's head that CanConstruct refuses leaves the front, its
+  // progress kept (0x17f5a0), and the step works what follows — nothing in a
+  // minor's queue (runs/h1_duelq1124 Granada t167: its Barracks in hand, the
+  // Encampment pillaged at t166's close, the queue empty in record 168 and
+  // the Barracks back at 3 after its first turn at t187)
+  if ('building' in item && !minorQueueOk(state, cityState, item)) item = { none: true };
   minorSetItem(state, cityState, 'none' in item ? null : item);
   if ('none' in item) {
     cityState.prodOverflow = (cityState.prodOverflow ?? 0) + made;

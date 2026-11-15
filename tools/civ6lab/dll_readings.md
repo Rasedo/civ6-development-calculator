@@ -14889,3 +14889,39 @@ cpu/harness/replay.ts; `loadBorderGrants`, cpu/harness/import.ts).
   the barbarians' copy (1121 t126: 55 for 65); the Open Borders grant's last
   turn (open through the barbarians' turn of t118 for a grant of t99, 20
   turns; the turn it ends unread).
+
+## C-96 / C-130: the build step asks CanConstruct of every building at the queue's head — READ (0x16f050 at 0x16f09a..0x16f180, 0x17f070, 0x17e8d0, 0x5f6050's building branch), the city-states' step, both twins
+
+`minorBuild`'s head check on `minorQueueOk` (cpu/core/minorBuild.ts);
+`_minor_build`'s on `_minor_queue_ok` (gpu/core/sim_minors.py).
+
+- THE STEP (0x16f050 at 0x16f09a): a queue head of entry type 1 (+0x30, the
+  queue's ORDER_CONSTRUCT: a building; 0 a unit, 2 a district, 3 a project,
+  as the front check 0x17f070 dispatches them) with a building (+0x14) is
+  asked CanConstruct (0x170450, its last argument set); refused, the front
+  leaves with its progress kept by type (0x17f5a0, 0x17f630, +0x3ac set),
+  the queue process runs (0x178250) and the step works what follows, or
+  with nothing queued puts the turn's Production in the overflow store. A
+  city-state's queue holds one item: its step then builds nothing. The front
+  check of a building (0x17e8d0) asks CanConstruct with the same arguments
+  and pops the front the same way.
+- THE CONTRACT: the eligibility's building branch (0x5f6050 at
+  0x5f6127..0x5f6288) refuses an IN PROGRESS contract whose building is not
+  the queue's head (0x179570), and after CanConstruct only on its result's
+  +0x1 byte (a refusal for good) or MustPurchase (+0x159 bit 4): a
+  pillaged district's refusal (+0x2a) does not cancel a contract by itself.
+  The step's pop of the head does, at the city update's in-hand check
+  (0x5d7e00: not eligible, CANCELLED).
+- Confirmed: runs/h1_duelq1124 Granada t167 (one-seed aimem trace from the
+  game's start to t173): its Encampment repaired in its t166 step and
+  pillaged again at the turn's close (DistrictPillaged after the barbarians'
+  turn), the Barracks of contract 693 at its head at 0 in record 167; the
+  game's queue empty in record 168, contract 693 CANCELLED, NO BUILDS AT ALL
+  t167-169 under the walls' repair, the Barracks back at 0 / 3 / 7 in
+  records 187-189 (none of t167's Production in it). Ours now holds none at
+  t167, the contract CANCELLED; Limes t167-170 (85 / 87 / 84 / 87), the
+  civics t171 (Natural History 433.8, Ideology 988.1) and Exploration t172
+  as logged. runs/h1_duelq1117 Caguana t51 (its Lighthouse at 59 under its
+  pillaged Harbor) keeps the Theater Square the game queued.
+- Open: a major's and the Free Cities' step (cpu/core/phase.ts,
+  `wonderLetGo`) ask only a wonder's hostile plot of their head.

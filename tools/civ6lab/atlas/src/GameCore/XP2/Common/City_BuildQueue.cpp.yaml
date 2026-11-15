@@ -125,7 +125,7 @@
   final: 0xf5080
   kind: function
   name: City_BuildQueue
-  semantics: "reads the city's Production twice through 0x1c5350: A with the head's id (toward the item), B with none (the plain Production). With an item at the head it adds A plus the stored overflow (m_xProductionOverflow +0x1f4, 0x16f1db) and clears the overflow (0x16f31b); on a completion the overflow becomes min(A, B) - (cost - progress before the step) (0x16f3bf: B under the remainder -> 0, else the smaller less the remainder), the carried overflow not counted. With nothing queued the step adds B to the overflow (0x16f62d -> 0xac650). Before the step (0x16f09a..0x16f180) a head ORDER_CONSTRUCT on a plot (a wonder) is asked CanConstruct (0x170450); refused, the front leaves (0x17f5a0, 0x17f630, +0x3ac set) and the step works the next item, or with none adds the Production to the overflow."
+  semantics: "reads the city's Production twice through 0x1c5350: A with the head's id (toward the item), B with none (the plain Production). With an item at the head it adds A plus the stored overflow (m_xProductionOverflow +0x1f4, 0x16f1db) and clears the overflow (0x16f31b); on a completion the overflow becomes min(A, B) - (cost - progress before the step) (0x16f3bf: B under the remainder -> 0, else the smaller less the remainder), the carried overflow not counted. With nothing queued the step adds B to the overflow (0x16f62d -> 0xac650). Before the step (0x16f09a..0x16f180) a head of entry type 1 (+0x30, ORDER_CONSTRUCT: any building, a wonder among them) with a building (+0x14) is asked CanConstruct (0x170450, its last argument set); refused, the front leaves (0x17f5a0, 0x17f630, +0x3ac set), the queue process runs (0x178250) and the step works the next item, or with none adds the Production to the overflow."
   status: READ
   cases:
     - recording: h1_duelw1117
@@ -146,6 +146,9 @@
     - recording: h1_duelq1128
       turn: 22
       value: "Xi'an's Stonehenge at 14 under the barbarian Warrior on 15:11: no step logged at t22, the Builder picked at 0 takes 9 + 9 at t23, kept at 18 to its t54 pick"
+    - recording: h1_duelq1124
+      turn: 167
+      value: "Granada's Barracks at its head at 0 under its Encampment pillaged at t166's close: the queue empty in record 168, contract 693 CANCELLED, the Barracks at 3 one turn after its t186 re-queue"
   impl:
     - cpu/core/minorBuild.ts:minorBuild
     - cpu/core/phase.ts:banked
@@ -172,6 +175,7 @@
     - "C-111: a major's district lets go of the queue under a hostile unit, the queue's progress and overflow read from the city's memory — READ (0x184660 at 0x1847dc, 0x5313f0, 0x17f630), both twins"
     - "H-4: a wonder under a hostile unit, the economy before the luxury rebuild, the extraction a pillage and a centre change — READ, both twins"
     - "H-4: the step's item multiplier in 24.8 and a Builder's wonder charge through it; the resources step after the economy; an event's pillage and a district's resource re-rank the luxuries — READ, both twins"
+    - "C-96 / C-130: the build step asks CanConstruct of every building at the queue's head — READ (0x16f050 at 0x16f09a..0x16f180, 0x17f070, 0x17e8d0, 0x5f6050's building branch), the city-states' step, both twins"
   context:
     - ...e city's yield component) and its project id (+0x1360 = -1), then applies the Production (0x16f050), whose ORDER_ADVANCE arm 0x184ae0 walks the project's Project_YieldConversions rows (Pro...
     - "- The queue's step (City_BuildQueue 0x177d10 → 0x16f050) reads the city's Production twice through 0x1c5350: A with the head's id (the Producti..."
@@ -245,6 +249,7 @@
     - "C-96: the project value's weapon test, CanConstruct's district gates and Nazca's early turns"
     - "C-96: a city-state's City Center projects, Build Unit's pillaged building, the pick's pillaged district and the war footing's writer"
     - "H-4: a wonder under a hostile unit, the economy before the luxury rebuild, the extraction a pillage and a centre change — READ, both twins"
+    - "C-96 / C-130: the build step asks CanConstruct of every building at the queue's head — READ (0x16f050 at 0x16f09a..0x16f180, 0x17f070, 0x17e8d0, 0x5f6050's building branch), the city-states' step, both twins"
   notes: ["label: CanConstruct(city.buildQueue,...)"]
   context:
     - "...lain pick (flags 1, 0): the building not queued or held (0x17e690 > 0), CanConstruct (0x170450) true with its reason fields +0x54 / +0x68 clear, not MustPurchase (Buildings +0x159 bi..."
@@ -447,6 +452,7 @@
     - "C-96: the resource value and the research value's resources — READ (bonus, luxury, the call), PARTLY READ (the strategic stockpile terms)"
     - "C-96: the queue's strategic charge, a placed district's resource, the minors' resource turn — READ (0x17c2e0, 0x186460's names), a fit for the district, both twins"
     - "C-111: a major's district lets go of the queue under a hostile unit, the queue's progress and overflow read from the city's memory — READ (0x184660 at 0x1847dc, 0x5313f0, 0x17f630), both twins"
+    - "C-96 / C-130: the build step asks CanConstruct of every building at the queue's head — READ (0x16f050 at 0x16f09a..0x16f180, 0x17f070, 0x17e8d0, 0x5f6050's building branch), the city-states' step, both twins"
   context:
     - "...s strategic queue (City_BuildQueue 0x17f3a0, the front check 0x17f070 the queue process 0x178250 runs where the queue changed, +0x3ac): the front unit not CanTrain leaves the front; a..."
   review: reviewed
@@ -521,6 +527,19 @@
   context:
     - "...loader 0xa98af0): for each, amount = min(the Production passed in, the item's full cost (0x179510)) x (PercentOfProductionRate << 8) / 100 — fixed point, so the rate is the percent trunca..."
   review: reviewed
+- addr: 0x179570
+  final: 0xfd080
+  kind: function
+  name: the queue head's building
+  semantics: "the building of the queue's head (-1 for none): the contract eligibility's IN PROGRESS test against the contract's building (0x5f6143)."
+  status: PARTLY
+  impl: [cpu/core/aiContracts.ts:contractEligible]
+  readings:
+    - "C-96 / C-130: the build step asks CanConstruct of every building at the queue's head — READ (0x16f050 at 0x16f09a..0x16f180, 0x17f070, 0x17e8d0, 0x5f6050's building branch), the city-states' step, both twins"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - ...6127..0x5f6288) refuses an IN PROGRESS contract whose building is not the queue's head (0x179570), and after CanConstruct only on its result's +0x1 byte (a refusal for good) or MustPur...
+  review: imported
 - addr: 0x1795d0
   final: 0xfd0e0
   kind: function
@@ -1125,6 +1144,23 @@
     - "...e on the district — READ (0x17f5a0, 0x175730 at 0x175bd3, 0x17d910, 0x175140, 0x1af5b0 -> 0x17e770 -> 0x183a60, 0x193190 -> 0x183950), both twins"
     - "- THE PILLAGE: a district's pillage (0x1af5b0 -> the queue's hook 0x17e770) sets +0x248 to (cost x (100 - PILLAGE_BUILDING_REPAIR_PERCENT)) / 100 truncated, <<..."
   review: reviewed
+- addr: 0x17e8d0
+  final: 0x1007a0
+  kind: function
+  name: the front check of a building
+  semantics: "the front check 0x17f070's arm for a building head (entry type 1): CanConstruct (0x170450) with the step's arguments; refused, the front's progress kept by type (0x17f5a0) and the front popped (0x17f630, +0x3ac set); else the building's strategic reservations (Buildings_XP2 rows, 0x4aa790 / 0x4a7400, a shortfall 0x17d8e0) and, for a building of Buildings +0x159 bit 0x10, its placement (0x360cc0)."
+  status: READ
+  cases:
+    - recording: h1_duelq1124
+      turn: 167
+      value: Granada's Barracks leaves its head under its pillaged Encampment (the step's own check, 0x16f09a, the same call)
+  impl: [cpu/core/minorBuild.ts:minorBuild, gpu/core/sim_minors.py:_minor_build]
+  readings:
+    - "C-96 / C-130: the build step asks CanConstruct of every building at the queue's head — READ (0x16f050 at 0x16f09a..0x16f180, 0x17f070, 0x17e8d0, 0x5f6050's building branch), the city-states' step, both twins"
+  context:
+    - "...t of every building at the queue's head — READ (0x16f050 at 0x16f09a..0x16f180, 0x17f070, 0x17e8d0, 0x5f6050's building branch), the city-states' step, both twins"
+    - "...te's queue holds one item: its step then builds nothing. The front check of a building (0x17e8d0) asks CanConstruct with the same arguments and pops the front the same way."
+  review: imported
 - addr: 0x17f070
   final: 0x100e80
   kind: function
@@ -1137,6 +1173,7 @@
   readings:
     - "H-1: the luxury allocation's rebuilds — PARTLY READ"
     - "C-96: the resource value and the research value's resources — READ (bonus, luxury, the call), PARTLY READ (the strategic stockpile terms)"
+    - "C-96 / C-130: the build step asks CanConstruct of every building at the queue's head — READ (0x16f050 at 0x16f09a..0x16f180, 0x17f070, 0x17e8d0, 0x5f6050's building branch), the city-states' step, both twins"
   context:
     - "- The reservation (City_BuildQueue 0x17f3a0 from the front check 0x17f070): a unit at the queue's front with a strategic cost and no progress (0x17d1a0) reserv..."
   review: reviewed
@@ -1182,10 +1219,13 @@
     - gpu/core/sim_seats.py:_q_keep_head
     - gpu/core/sim_seats.py:_q_push
     - cpu/core/production.ts:wonderLetGo
+    - cpu/core/minorBuild.ts:minorBuild
+    - gpu/core/sim_minors.py:_minor_build
   readings:
     - "C-111: a major's district lets go of the queue under a hostile unit, the queue's progress and overflow read from the city's memory — READ (0x184660 at 0x1847dc, 0x5313f0, 0x17f630), both twins"
     - "C-111: every item's progress kept by type outside the queue, a pillaged building's or district's repair on the share its pillage left, a district's locked price on the district — READ (0x17f5a0, 0x175730 at 0x175bd3, 0x17d910, 0x175140, 0x1af5b0 -> 0x17e770 -> 0x183a60, 0x193190 -> 0x183950), both twins"
     - "H-4: a wonder under a hostile unit, the economy before the luxury rebuild, the extraction a pillage and a centre change — READ, both twins"
+    - "C-96 / C-130: the build step asks CanConstruct of every building at the queue's head — READ (0x16f050 at 0x16f09a..0x16f180, 0x17f070, 0x17e8d0, 0x5f6050's building branch), the city-states' step, both twins"
   review: reviewed
 - addr: 0x17f630
   final: 0x101400
@@ -1206,6 +1246,7 @@
     - "C-111: a major's district lets go of the queue under a hostile unit, the queue's progress and overflow read from the city's memory — READ (0x184660 at 0x1847dc, 0x5313f0, 0x17f630), both twins"
     - "C-111: every item's progress kept by type outside the queue, a pillaged building's or district's repair on the share its pillage left, a district's locked price on the district — READ (0x17f5a0, 0x175730 at 0x175bd3, 0x17d910, 0x175140, 0x1af5b0 -> 0x17e770 -> 0x183a60, 0x193190 -> 0x183950), both twins"
     - "H-4: a wonder under a hostile unit, the economy before the luxury rebuild, the extraction a pillage and a centre change — READ, both twins"
+    - "C-96 / C-130: the build step asks CanConstruct of every building at the queue's head — READ (0x16f050 at 0x16f09a..0x16f180, 0x17f070, 0x17e8d0, 0x5f6050's building branch), the city-states' step, both twins"
   review: reviewed
 - addr: 0x17f830
   final: 0x1014c0

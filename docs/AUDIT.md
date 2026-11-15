@@ -51,7 +51,7 @@ Hand-weighted 1–8 by the size of what is LEFT to build. One row per entry, no 
 | C-125 the tactical planning: targets and the combat prediction | 3 | the +0x1ba waiver, units fleeing where the game strikes, a seat's difficulty, predicted blows off by a term, target lists against sight (LAB) |
 | C-132 the danger map | 3 | danger / danger.major rows: the Ironclad's Movement, rings ours lacks, the Giant Death Robot, single plots; the search's blocking, endangered sums beside an Encampment, an embarked captive (LAB) |
 | C-133 unit paths and move orders | 3 | MoveTo 0x962380's placement, defender and wait, carried runs, the walk's zone and embark steps, the kept path's re-search, unrevealed plots, portal exits (LAB, BUILD) |
-| C-96 city-states' build values | 4 | the unit value's unported terms and the unit production table (BUILD); the event unit, building and district terms, pick ties and fits, 1128 Nazca and Hong Kong, repairs (LAB) |
+| C-96 city-states' build values | 4 | the unit value's unported terms and the unit production table, a major's and the Free Cities' step's building check (BUILD); the event unit, building and district terms, pick ties and fits, 1128 Nazca and Hong Kong (LAB) |
 | C-126 city-states' purchases, treasury, upgrades and disbands | 2 | a treasury off the record's on four minors, a Builder purchase, an upgrade past an obsolete rung, the disband count and refusals (LAB) |
 | C-127 city-states' builders, trade and contracts | 3 | improvement re-lays and loops, a late start envoy, the route value K's residues, the quests' ranges, contracts' ends and releases with Cardiff t89 (LAB); the GPU's builder lay (BUILD) |
 | C-100 city-states' plot and district values | 4 | a minor's free power (BUILD); district rows and placements, build turns T off by one, improvement rows, the yields a turn ahead, the Great Person share (LAB) |
@@ -60,7 +60,7 @@ Hand-weighted 1–8 by the size of what is LEFT to build. One row per entry, no 
 | C-128 city-states' units, formations and stacking | 3 | a re-made levied unit's jump on four seeds, the swap pair, formation size and the Corps rules, the turn-end stacking check, a teleport off a shared plot (LAB) |
 | C-129 the knowledge bases and operations' strength | 3 | the army memory's misses over full games, the military AI's turn against the job order, district-only city entries, the hidden-unit test (LAB); ops.strength's enemy and own-team terms (LAB) |
 | C-98 city-states' research and civic values | 3 | the Free Cities' terms and a civilization's religious unit value, Add Goal Tech's block (BUILD); goal techs, civics short, resource values, the unit term's misses, late picks (LAB) |
-| C-130 city-states' policy and government analyzers | 4 | card values off by a term (Limes' Tsikhe turns, Civil Prestige, Logistics, Totalitarianism), the six-unit cut, the yields' cache, the Archaeologist's count, unread offsets (LAB) |
+| C-130 city-states' policy and government analyzers | 4 | card values off by a term (Civil Prestige, Logistics, Totalitarianism), the six-unit cut, the yields' cache, the Archaeologist's count, unread offsets (LAB) |
 | C-101 religious pressure and spread | 2 | Kandy's 8, a Missionary's 250, a unit's spread, rules read off the records alone (LAB); the condemnation's +0x80 / +0x18c3, the holy city's DED_EXODUS (BUILD) |
 | C-102 loyalty and identity | 2 | the age flags, "Other" terms (Aquileia, Hunza, Wuhan), the dominance count on 1129 / 1130, the falloff, a cached population (LAB) |
 | C-103 wonders' unported effects | 2 | Kilwa, Terracotta Army, Amundsen-Scott, Torre de Belém, the Panama Canal and Golden Gate Bridge, Ik Kil (BUILD); Meenakshi's Gurus, Huey Teocalli, Kilwa's coast, Pamukkale (LAB) |
@@ -374,10 +374,7 @@ A question the SOURCE under-determines; neither engine ships a branch until the 
   - LAB (1128 nazca and hong kong): fit, unread: 1128 Nazca NO BUILDS t26-31 / t33-47 (the Horseman's 20 Horses)
   - LAB (1128 nazca and hong kong): 1128 Hong Kong t79 Trader 238.9 for 277.7
   - LAB (1128 nazca and hong kong): 1128 Hong Kong t196-203 valued at 6 units (at war by the cut)
-  - LAB (repairs): 1127 Muscat's repairs: one losing its turn to a contract t156-159
-  - LAB (repairs): 1127 Muscat's repairs: two in one step (t168)
-  - LAB (repairs): 1127 Muscat's repairs: the Market's repair contract (t165)
-  - LAB (repairs): a minor's repair of a pillaged district, neither engine repairing one (conflicting notes: C-127's Cardiff t89 has the engine's production step hold a repair)
+  - BUILD (repairs): a major's and the Free Cities' build step keep a building head that CanConstruct refuses (its district pillaged): the step's check (City_BuildQueue 0x16f050 at 0x16f09a) is the city-states' alone (`minorBuild` / `_minor_build`), the cities' step in cpu/core/phase.ts and gpu/core/sim_phase.py asking only a wonder's hostile plot (`wonderLetGo`)
 - **C-126. CITY-STATES' PURCHASES, TREASURY, UPGRADES AND DISBANDS.** Weight 2.
   - LAB (treasury): a minor's treasury off the record's: duelz1121 Hunza t155 677 for 691.43
   - LAB (treasury): a minor's treasury off the record's: 1124 Cardiff t189 156 for 163.84
@@ -410,7 +407,6 @@ A question the SOURCE under-determines; neither engine ships a branch until the 
   - LAB (contracts): t178 p2 a Stock Exchange contract the game has none of (seed not named)
   - LAB (contracts): after a failed plot contract the game re-picks the same unowned district plot (1124 Granada t69, Cardiff t95)
   - LAB (contracts): 1121 p2 t231 / t238 / t245 the game's Market contract a turn early
-  - LAB (contracts): 1124 t167 Granada's Barracks contract 693, CANCELLED by the game as its Encampment is pillaged again before the city's turn ('NO BUILDS AT ALL'), the engines' city AI seeing the district whole
   - LAB (contracts): the civics AI's walk order for a Civic Contract (kept on the civic in hand)
   - LAB (contracts): a mid-turn reveal other than the ground's sight (unread)
   - LAB (contracts): a release's status on a COMPLETED / FAILED contract
@@ -591,11 +587,9 @@ A question the SOURCE under-determines; neither engine ships a branch until the 
   - LAB (card values): 1124 t245 Bologna Suffrage −3
   - LAB (card values): Civil Prestige 1127 p3 t159 / t160 (154 / 127 for 150 / 126: the Amenity term 124 for 126 and the Housing 30 for 24 on the city's yields at the job; Limes, Retainers, Liberalism t159 124 for 127 / 126 / 126)
   - LAB (card values): 1127 city-state 3 t62-63 policies, research and civics (Ilkum 0 / 1, Limes 0 / 12, Civil Prestige 76 / 74, Military Tactics +7.4, Civil Service +2) carried from the t61 border draw (C-107)
-  - LAB (limes): 1124 p3 t167-170 Limes 88 / 85 / 87 / 89 for 85 / 87 / 84 / 87 on the Tsikhe alone: ours at T0 / T1 30 / 15, 29 / 15, 28 / 14, 25 / 13, the game's values fitting 29 / 15, 28 / 14, 27 / 14, 28 / 14 (Granada's Encampment pillaged t166-167; its Production at the policy job untraced)
   - LAB (six-unit cut): 1121 Hunza t194 six units a turn early
   - LAB (yields at the job): fit, unread: the city yields' cache (0x1cb8b0, per yield, cleared at the lock's first count only): the totals but Food and Production, the bases but Food kept from the Trader's dispatch through the update's re-placement, on 1124 Bologna t218-230 / 1128 Bologna t16-30, each yield's first reader unread
   - LAB (yields at the job): a project begun at 0 converting an unrecorded overflow (1121 Hunza t85)
-  - LAB (archaeologist): the Archaeologist's artifact count read as the map's dig sites: the active player's revealing civic inside its own actions is not laid early (1124 city-state 3 t171 424.3 for 433.8)
   - LAB (archaeologist): the Archaeologist's artifact count: an excavated site's entry unread
   - LAB (archaeologist): the Archaeologist's artifact count: t179 9.1 at T 49 where the game counts none (1124 city-state 3)
   - LAB (boosts): 1121 city-state 4's t149 Mobilization boost waits on the corps its two Skirmishers form (1638401 + 1966084, t149 -> t150), which queues Scorched Earth (t153-154)

@@ -2372,7 +2372,9 @@ class SimMinors:
         first. A PILLAGED building is queued after the item the minor was
         working on when it fell (`citystate_repair_wait`) and then comes
         first, or at once with nothing in hand (`_minor_repair_target`); a
-        repair in hand stands only while its building is the one to repair."""
+        repair in hand stands only while its building is the one to repair.
+        A building in hand the queue's CanConstruct refuses leaves it before
+        the step (`_minor_queue_ok`)."""
         if self.S == 0:
             return
         alive = self.citystate_alive[:, s]
@@ -2394,6 +2396,17 @@ class SimMinors:
         item = torch.where(first, rep_key, torch.where(held >= 0, held, rep_key))
         site = torch.where(item == cur, self.citystate_prod_site[:, s], torch.full_like(item, -1))
         self._minor_set_item(s, alive, item, site)
+        # the step's head check (0x16f050 at 0x16f09a..0x16f180): a building
+        # at the queue's head that CanConstruct refuses leaves the front, its
+        # progress kept (0x17f5a0), and the step works what follows — nothing
+        # in a minor's queue
+        _hu, head_b, _hd, _hp, _hr = self._mk_kinds(item)
+        head_b = alive & head_b
+        if bool(head_b.any()):
+            refused = head_b & ~self._minor_queue_ok(s, item, site)
+            if bool(refused.any()):
+                self._minor_set_item(s, refused, -1)
+                item = torch.where(refused, torch.full_like(item, -1), item)
         # the queue's front check (0x17f070 -> 0x17f3a0): a unit with a
         # strategic cost and no progress reserves its cost where the stock
         # less the reservations covers it, else leaves the front
