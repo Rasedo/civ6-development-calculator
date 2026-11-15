@@ -6934,8 +6934,13 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
           u.seat = seatOfP(ctx, d.player);
           jumpMadeAnew(state, u);
           const ours = u.tileIndex;
-          u.seat = seat;
           u.tileIndex = plot;
+          // placed, it looks for the minor before the next unit's placement
+          // (`levyUnitHome`; runs/h1_duelq1117 t42: the Warrior home on 32:15
+          // reveals 32:14, which the Warrior off China's centre 33:12 takes;
+          // 1124 t83 the Warrior on 43:8 and the Catapult's 43:9)
+          revealAround(state, u.seat, plot, unitSight(u, state), { seeThrough: unitSeesThrough(u), mover: { units: [u], from: -1 } });
+          u.seat = seat;
           if (ours === plot) count(ctx, 'levyEnd:jump', 'applied', d.player);
           else count(ctx, 'levyEnd:jump', 'fallback', d.player, `the engine's jump ${ours}, the game's ${plot}`);
         }

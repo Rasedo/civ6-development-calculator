@@ -1,0 +1,16 @@
+# The DLL atlas, curated layer (tools/civ6lab/atlas.py documents the record).
+# Records keyed by GameCore_XP2_Release.dll RVA; `final` the FinalRelease RVA.
+# `review: imported` = bootstrapped from dll_readings.md / code comments / saved
+# labels and not yet reviewed: verify against the disassembly, then edit and
+# set `review: reviewed`.
+- addr: 0x936380
+  final: 0x648a90
+  kind: function
+  name: HireClan::Start
+  status: PARTLY
+  readings:
+    - "C-132 / C-128 / C-95 / C-123 / C-133: the danger map's unmoved flag, a unit made anew's place, the operation queue's push, the strike's turn, the raid's recruit, the shore tests — READ (0x26df90 at 0x26e128..0x26e159, 0x716400 at 0x71672d, 0x586360 at 0x586542..0x58657e / 0x5867ab..0x586875, 0x93fa10 at 0x93fd94..0x93fdab / 0x93fe79, 0x526a0 at 0x52788..0x527ac, 0x523e0, 0x55460, 0x962380 at 0x96268f, 0x60a440, 0x26e570 at 0x26e904, 0x2720a0 at 0x272618..0x272689), both twins"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...vtable 0xd92c18): its callers behind the manager's getter 0x9406e0 are HireClan::Start 0x936380 (0x9366c2), the Hero's RestoreUnitMoves command 0x953bd0 (0x953d97) and the script bind..."
+  review: imported

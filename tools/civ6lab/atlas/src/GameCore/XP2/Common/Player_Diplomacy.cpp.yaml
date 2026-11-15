@@ -368,6 +368,7 @@
     - "C-130: Online Communities' route tourism, the tourism toward a player — READ (0x6a1380, 0x6a1240, 0x394830's modifiers, 0x552fb0), both twins"
     - "C-95: HL Explore's plot test refuses every other player's ground, Explore Land's flags 0x40 — READ (0x70bd40 at 0x70bd87..0x70beee, 0x709d80 at 0x709da0..0x709dc2, 0x70ce90 at 0x70ced5), FIT (the knowledge base's +0x128 at or below the turn), both twins"
     - "C-132: the danger map's fitted rules in the DLL; a search's shore crossings on the formation's own domain — READ (0x26dab0, 0x586360 at 0x586624..0x586664, 0x2720a0 at 0x272618..0x272689, 0x66a90, 0x52fe90, 0x56e0a0, 0x26e570, 0x530240, 0x530420), FIT (the unmoved flag, the barbarians' raise, the grant's last turn), both twins"
+    - "C-132 / C-128 / C-95 / C-123 / C-133: the danger map's unmoved flag, a unit made anew's place, the operation queue's push, the strike's turn, the raid's recruit, the shore tests — READ (0x26df90 at 0x26e128..0x26e159, 0x716400 at 0x71672d, 0x586360 at 0x586542..0x58657e / 0x5867ab..0x586875, 0x93fa10 at 0x93fd94..0x93fdab / 0x93fe79, 0x526a0 at 0x52788..0x527ac, 0x523e0, 0x55460, 0x962380 at 0x96268f, 0x60a440, 0x26e570 at 0x26e904, 0x2720a0 at 0x272618..0x272689), both twins"
   notes: [read; no recorded decision of the five verbose duels tells it apart yet]
   context:
     - "...sign rebuilt), the first plot P may enter — its own, no one's, open borders / alliance (0x3dab70), or an owner not enforcing its borders (diplomacy +0x6c0) — the rally where the walk..."
@@ -443,6 +444,18 @@
     - ...l (city +0x5e8 m_bCapital), +1 with a wonder (0x18e930), population / 5 + 1, +2 at war (0x3dcf50), the city's CityBuildAI +0x1b8 where above -1, +4 where any city of the player has i...
     - "...VEL_FULL_CIV (0x469db0, hash 0x253718b0) nor _TRIBE (0x469ce0, 0xd959ec24), not at war (0x3dcf50) and holding more than five units (player +0x12e8 +0xc0); a Spy (Units +0x1ba bit 2 — t..."
     - ...21e0); the governments' (+0x130, 0x7b26b0); x1.5 where the row is [+0x12a0]+0xd88 and 0x3dcf50 holds; + the row's modifiers analysed (0x7a4b20). The discount is the GlobalAI's +0x290...
+  review: reviewed
+- addr: 0x3dd230
+  final: 0xdbbe0
+  kind: function
+  semantics: "(diplomacy, unit type): the byte at the diplomacy's +0x40f0[unit type] (count +0x4100); the location test 0x586360 refuses another player's plot where it is set (0x58651b..0x58653f). Its writer unread."
+  status: PARTLY
+  readings:
+    - "C-132 / C-128 / C-95 / C-123 / C-133: the danger map's unmoved flag, a unit made anew's place, the operation queue's push, the strike's turn, the raid's recruit, the shore tests — READ (0x26df90 at 0x26e128..0x26e159, 0x716400 at 0x71672d, 0x586360 at 0x586542..0x58657e / 0x5867ab..0x586875, 0x93fa10 at 0x93fd94..0x93fdab / 0x93fe79, 0x526a0 at 0x52788..0x527ac, 0x523e0, 0x55460, 0x962380 at 0x96268f, 0x60a440, 0x26e570 at 0x26e904, 0x2720a0 at 0x272618..0x272689), both twins"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...st 0x586360 under 0x10 alone: the terrain and domain tests, the owner's unit-type byte (0x3dd230: diplomacy +0x40f0[type], its writer unread), the best defender 0x208b80 under 0x108 —..."
+    - "- OPEN: +0x1934's writer; 0x3dd230's writer; the planning of a unit that moved before it (the engines' `search` reads the..."
   review: reviewed
 - addr: 0x3dd9a0
   final: 0x2a9030

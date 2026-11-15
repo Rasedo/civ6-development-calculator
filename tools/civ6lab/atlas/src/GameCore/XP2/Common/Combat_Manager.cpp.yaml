@@ -402,6 +402,8 @@
     - cpu/core/tactical.ts:strike
     - gpu/core/sim_tactics.py:first_in_reach
     - cpu/core/tactical.ts:v
+    - cpu/core/tactical.ts:placementPlot
+    - gpu/core/sim_minors.py:_jump_made_anew
   readings:
     - "C-95: the rampage strikes with the move's whole list; its defender is one the barbarians see — READ (0x778b40, 0x771670, 0x208b80, 0x20a2a0), both twins"
     - "C-102 / C-99: the plot's unit list as an arrival stamp, the best defender's tie and Garrison City's standing unit — READ (0x75c50, 0x74f40 / 0x763b0 / 0x75280, 0x208b80 / 0x523d60, 0x810fd7..0x81101b), both twins"
@@ -423,6 +425,7 @@
     - "C-123 / C-95: a Trader stands on the trade layer; a city's shot is a COMBAT_DISTRICT spot's blow back — READ (0x901e0, 0x586360 -> 0x208b80, 0x585eb0 -> 0x585d90, 0x791470 at 0x7917f7..0x7918f7 -> 0x249ee0 / 0x205720, 0x776140 at 0x776780..0x7767fa), both twins"
     - "C-95 / C-123: a move order's path passes a district of hit points out of sight and a unit of another map layer; a walk's step reads its own formation's riders; a raid's start zeroes the tribe's raid score — READ (0x586360 at 0x5866c9..0x58671f, 0x2720a0 at 0x272618..0x272689, 0x816cb0 at 0x8177cf..0x8177e9, 0x149980 at 0x149b01, 0x7c7330, 0x152c00, 0x154b80), both twins"
     - "C-125 / C-95: the target list's trade layer and its one unit of the units' layer; a siege unit's step onto civilians; the city-states' Attack Civilians; the flankers' test, the support's caller, the camp strike's queue — READ (0x783980 at 0x7849bb..0x784c2b and 0x784c30..0x784f57, 0x26fe20 -> 0x212500, 0x521530, 0x51f070 at 0x51f70e..0x51f737, 0x546f0, 0x52f50), both twins"
+    - "C-132 / C-128 / C-95 / C-123 / C-133: the danger map's unmoved flag, a unit made anew's place, the operation queue's push, the strike's turn, the raid's recruit, the shore tests — READ (0x26df90 at 0x26e128..0x26e159, 0x716400 at 0x71672d, 0x586360 at 0x586542..0x58657e / 0x5867ab..0x586875, 0x93fa10 at 0x93fd94..0x93fdab / 0x93fe79, 0x526a0 at 0x52788..0x527ac, 0x523e0, 0x55460, 0x962380 at 0x96268f, 0x60a440, 0x26e570 at 0x26e904, 0x2720a0 at 0x272618..0x272689), both twins"
   context:
     - "- The centre's garrison term 0x24a180 takes ONE unit, the plot's best defender 0x208b80 (flag 0x10): among the plot's units in its own order the comparator 0x523d60 keeps the..."
     - "...s with HitPoints: the centre and the Encampment) 0x24b170 takes the plot's best defender (0x208b80) where it is a combat unit (0x209dd0: Combat, Ranged or Bombard above 0) and, with a Mili..."
@@ -501,6 +504,7 @@
   readings:
     - "C-123: Operation Move's danger flags, the MoveTo execution and m_blockedTurns — READ (0x816cb0 at 0x816e70 / 0x817839, 0x962380, 0x73e610), both twins"
     - "C-124: the kept path is never taken; a move order's path passes other players' units out of sight — READ (0x272aa0, 0x2714b0, 0x586360 at 0x586542..0x5865a1, 0x26fe20), both twins"
+    - "C-132 / C-128 / C-95 / C-123 / C-133: the danger map's unmoved flag, a unit made anew's place, the operation queue's push, the strike's turn, the raid's recruit, the shore tests — READ (0x26df90 at 0x26e128..0x26e159, 0x716400 at 0x71672d, 0x586360 at 0x586542..0x58657e / 0x5867ab..0x586875, 0x93fa10 at 0x93fd94..0x93fdab / 0x93fe79, 0x526a0 at 0x52788..0x527ac, 0x523e0, 0x55460, 0x962380 at 0x96268f, 0x60a440, 0x26e570 at 0x26e904, 0x2720a0 at 0x272618..0x272689), both twins"
   review: reviewed
 - addr: 0x20a220
   final: 0x15a700
@@ -635,6 +639,7 @@
   status: PARTLY
   readings:
     - "C-123: Operation Move's danger flags, the MoveTo execution and m_blockedTurns — READ (0x816cb0 at 0x816e70 / 0x817839, 0x962380, 0x73e610), both twins"
+    - "C-132 / C-128 / C-95 / C-123 / C-133: the danger map's unmoved flag, a unit made anew's place, the operation queue's push, the strike's turn, the raid's recruit, the shore tests — READ (0x26df90 at 0x26e128..0x26e159, 0x716400 at 0x71672d, 0x586360 at 0x586542..0x58657e / 0x5867ab..0x586875, 0x93fa10 at 0x93fd94..0x93fdab / 0x93fe79, 0x526a0 at 0x52788..0x527ac, 0x523e0, 0x55460, 0x962380 at 0x96268f, 0x60a440, 0x26e570 at 0x26e904, 0x2720a0 at 0x272618..0x272689), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...goal first) reached this turn (+4 at most 1): under the attack flag 0x10 the battle (0x211f80, 0x1fbae0); else a visible defender at war or a hostile district with defence unpillage..."

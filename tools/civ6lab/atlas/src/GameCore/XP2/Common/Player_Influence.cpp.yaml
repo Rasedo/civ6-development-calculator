@@ -225,6 +225,17 @@
   context:
     - "- Player_Influence 0x44da30 (the minor's levy counter, m_iLevyTurnCounter +0xc90): +1, then against 0x5254d0(LEVY_M..."
   review: reviewed
+- addr: 0x44e670
+  final: 0x2eb810
+  kind: function
+  semantics: "a levied unit's return from the influence turn 0x44bb20: the unit manager's transfer (vt +0x80, 0x93fa10) to the unit's +0x340 with the fifth argument 1 (0x44e8bc)."
+  status: PARTLY
+  readings:
+    - "C-132 / C-128 / C-95 / C-123 / C-133: the danger map's unmoved flag, a unit made anew's place, the operation queue's push, the strike's turn, the raid's recruit, the shore tests — READ (0x26df90 at 0x26e128..0x26e159, 0x716400 at 0x71672d, 0x586360 at 0x586542..0x58657e / 0x5867ab..0x586875, 0x93fa10 at 0x93fd94..0x93fdab / 0x93fe79, 0x526a0 at 0x52788..0x527ac, 0x523e0, 0x55460, 0x962380 at 0x96268f, 0x60a440, 0x26e570 at 0x26e904, 0x2720a0 at 0x272618..0x272689), both twins"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - ...ifth argument set (neg / sbb at 0x93fd94..0x93fda7; the levy 0x95c360 and its returns 0x44e670 / 0x4502b0 / 0x9575e0 pass 1), the location flags 0x10. The location test 0x586360 unde...
+  review: reviewed
 - addr: 0x44eaa0
   final: 0x2ebbb0
   kind: function
@@ -298,6 +309,7 @@
     - "C-129: a unit made anew that no plot takes is destroyed, its own plot refused by a hostile defender alone; a bankruptcy's disband before the look — READ, both twins"
     - "C-130: a minor's levy home after its bank; its free Trader's route before its city update, the AI's yields cached before it; a deleted unit off its list at once; a major's founded city keeps its trade list at once — READ (0x4e4560 at 0x4e45ee / 0x4e4638, 0x6096c0's passes, 0x688eaa, 0x1cb8b0, 0x948500 at 0x9485e5, 0x1eae70 at 0x1eb335 -> 0x5cdd70 at 0x5ce191), the cache's span a fit, both twins"
     - "C-106: a levied unit's return leaves its holder's garrison requirement met to the holder's turn end — a fit, both twins"
+    - "C-132 / C-128 / C-95 / C-123 / C-133: the danger map's unmoved flag, a unit made anew's place, the operation queue's push, the strike's turn, the raid's recruit, the shore tests — READ (0x26df90 at 0x26e128..0x26e159, 0x716400 at 0x71672d, 0x586360 at 0x586542..0x58657e / 0x5867ab..0x586875, 0x93fa10 at 0x93fd94..0x93fdab / 0x93fe79, 0x526a0 at 0x52788..0x527ac, 0x523e0, 0x55460, 0x962380 at 0x96268f, 0x60a440, 0x26e570 at 0x26e904, 0x2720a0 at 0x272618..0x272689), both twins"
   context:
     - "...ultiplier, 15 online, not GameSpeed_Durations' 21 — and at it the levied units go home (0x4502b0); 0x4501c0 resets it at the levy. The counter ticks at the minor's own turn starts, t..."
   review: reviewed

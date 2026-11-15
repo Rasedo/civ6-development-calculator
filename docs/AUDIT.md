@@ -49,7 +49,7 @@ Hand-weighted 1–8 by the size of what is LEFT to build. One row per entry, no 
 | C-123 barbarians' raids and scout reports | 2 | raid and assault starts and teams (1121, 1128), members lost to drift, the scouts' reports and their fits (LAB) |
 | C-124 barbarians' camps and sight | 1 | the alliances' outgoing visibility (BUILD); the unseen land's residue, the Scouts' regions (LAB) |
 | C-125 the tactical planning: targets and the combat prediction | 3 | the +0x1ba waiver, units fleeing where the game strikes, a seat's difficulty, predicted blows off by a term, target lists against sight (LAB) |
-| C-132 the danger map | 3 | danger / danger.major rows: the Giant Death Robot's water, a Submarine's Movement, player 1's map by its Observation Balloon, an unbuilt Encampment's defence, single plots; the search's blocking, endangered sums beside an Encampment, an embarked captive; three fits unread (LAB) |
+| C-132 the danger map | 3 | danger / danger.major rows: the Giant Death Robot's water, a Submarine's Movement, player 1's map by its Observation Balloon, an unbuilt Encampment's defence, single plots; the search's blocking, endangered sums beside an Encampment, an embarked captive; the grant's last turn unread (LAB) |
 | C-133 unit paths and move orders | 3 | MoveTo 0x962380's placement, defender and wait, carried runs, the walk's zone and embark steps, the kept path's re-search, unrevealed plots, portal exits (LAB, BUILD) |
 | C-96 city-states' build values | 4 | the unit value's unported terms and the unit production table, a major's and the Free Cities' step's building check (BUILD); the event unit, building and district terms, pick ties and fits, 1128 Nazca and Hong Kong (LAB) |
 | C-126 city-states' purchases, treasury, upgrades and disbands | 2 | a treasury off the record's on four minors, a Builder purchase, an upgrade past an obsolete rung, the disband count and refusals (LAB) |
@@ -57,7 +57,7 @@ Hand-weighted 1–8 by the size of what is LEFT to build. One row per entry, no 
 | C-100 city-states' plot and district values | 4 | the free power's sources, district rows and placements, build turns T off by one, improvement rows, the yields a turn ahead, the Great Person share (LAB) |
 | C-99 city-states' operations | 3 | a team's unit to build and its recruits, Naval Superiority's request, one-turn shifts, the trees' tick order, Garrison City's swap (BUILD, LAB); Protect Units, Naval Pillage, the religious AI's buys (LAB) |
 | C-134 city-states' unit moves | 4 | cityState.move.plot misses: the unit gather and families, claims and strikes, City Defense, Upgrade Units' walks (Galley 393216, Heavy Chariot 983040), Wander and Wander Back to City (LAB); Garrison City's fortify test at the refresh (LAB) |
-| C-128 city-states' units, formations and stacking | 3 | a re-made levied unit's jump on four seeds, the swap pair, formation size and the Corps rules, the turn-end stacking check, a teleport off a shared plot (LAB) |
+| C-128 city-states' units, formations and stacking | 3 | the swap pair, formation size and the Corps rules, the turn-end stacking check, a teleport off a shared plot, the placement's unit-type byte (LAB); a levy home on a suzerain change (BUILD) |
 | C-129 the knowledge bases and operations' strength | 3 | the army memory's misses over full games, the military AI's turn against the job order, district-only city entries, the hidden-unit test (LAB); a Fighter's strike on a ship (BUILD); the teams' battle strengths, the imported operations' strength (LAB) |
 | C-98 city-states' research and civic values | 3 | the Free Cities' terms and a civilization's religious unit value, Add Goal Tech's block (BUILD); goal techs, civics short, resource values, the unit term's misses, late picks (LAB) |
 | C-130 city-states' policy and government analyzers | 4 | card values off by a term (Civil Prestige, Logistics, Totalitarianism, Suffrage), the yields' cache, the Archaeologist's count, unread offsets (LAB) |
@@ -203,7 +203,6 @@ A question the SOURCE under-determines; neither engine ships a branch until the 
   - LAB (planning): the planning reach against AI_Planning (1124: 1230 of 1829 rows)
   - LAB (planning): duelq1121 t237 the captive Settler 4587543 on 3:10: its safe plot ours 5:13 (player 1's Great Writer's, out of sight: no path, it stands), the game's 6:12, stepping to 3:11
   - LAB (planning): duelq1121 t208 the captive Settler 4063247 on 17:12, every plot of its first turn at danger 77: its safe plot ours 17:14, the game's 15:13, both two plots off at (1/0), the reach closing 17:14 first
-  - LAB (attack units): fit, unread: the strike domain test
   - LAB (attack units): 1128 t197 Ranger 6750212 walks 5:12 -> 5:13 where the game's goes to 5:11 and strikes the Field Cannon 5:10 (the attack assignment; noted too as the Ranger out of the barbarians' pass)
   - LAB (attack units): duelq1128 t197 the Ranger 6750212 is done before Attack Units in ours, so the camp's Pike and Shot 6684692, a lone DEFENDER, is no striker on city-state 3's Man-At-Arms on 4:11 (the game's Move 4 12 Attack 4 11 behind the Ranger's Move 5 11 Attack 5 10)
   - BUILD (attack units): PLUNDER_TRADE_ROUTE after a Trader target's move (0x771f80 +0x34) unported (the step replay, duelw1121)
@@ -214,7 +213,6 @@ A question the SOURCE under-determines; neither engine ships a branch until the 
   - LAB (rampage): extras round major cities (1124 t31-52)
   - LAB (rampage): t11 a Warrior's turn-3 claim the game refuses (0x790c60) (seed not named; listed after a 1124 case)
   - LAB (rampage): a melee rampager's move-order end (1117 t8 / t10; 1127 Galley 1048590 t109 / t199)
-  - LAB (rampage): fit, unread: a move order's strike held when its path reaches the attack node only in a later turn (0x962380 at 0x96268f; 1127 Galley 1048590 t109 / t199)
   - LAB (rampage): 1121 t155 (from t148) Settler 4390925 / Musketman 3670041 end on 16:16 (our Crossbowmen kept on 16:18 / 15:19; the t148-154 rampage family)
   - LAB (rampage): 1121 t127 the formed Man-At-Arms 2949124 pillages 8:12 (ours Move to safety)
   - LAB (rampage): duelq1121 t199 the Crossbowman 3801114's Barbarian Rampage from 17:14 to 17:16 carries the captive Builder 4980745 it escorts (escorted in ours; the two walked 16:12 -> 17:14 together at t195), the game's leaves the Builder on 17:14 under HL: End Turn (plot 721 // 633)
@@ -225,7 +223,7 @@ A question the SOURCE under-determines; neither engine ships a branch until the 
   - LAB (wander): duelq1121 t13 Horseman 655369's Wander draw 5 of 17 lands on 31:6 for the game's 32:6, Operation Move's Horseman 720906 still on 30:6 in ours where the game's stands on 31:9
   - LAB (wander): 1121 t107-109 barbarian Musketman 3473423 carried drift (t107 ours HL: End Turn for Wander; t109 our Skirmisher 3342353 on 3:16, the game's 6:16)
   - LAB (camp defense): duelq1128 t198 the camp 4:12's Pike and Shot 6684692 (52 health) stays under Barb. Camp Defense, ours goes out to 3:11 for the knowledge base's Scout in city-state 3's centre 4:9, a HIGH target with the spot 4:10 at turn 2 in our planning (the camp defender's mover 0x772940; the target list's unseen unit on a district)
-  - LAB (camp defense): fit, unread: the camp strike's shot or attack move, queued behind a move to the spot that waits (0x546f0 appends, 0x52f50 runs the front alone), dropped by the engines: whether it runs once the move completes on a later turn (duelq1121 t160 Spearman 1376265 on 3:18, duelq1128 t31 Spearman 589832 for 32:8)
+  - LAB (camp defense): the camp strike's push (0x772940 at 0x772eea / 0x772f78: mode 0, the parameters' +0x20 clear) empties the unit's queue and starts at once (0x526a0 at 0x52788..0x527ac), no strike waiting behind the move to its spot; unported: the engines' hold keeps duelq1121 t160, where the game's Spearman 1376265 took no strike (Movement 0 in record 161, 0x773fb0's flag 0) and ours picks player 0's Warrior on 3:16 at the spot 3:17 (taken 33 + back taken 37 under its health 73), ending on 5:18 for the game's 3:18 with the push as read
   - LAB (operation members): 1121 t36 Barbarian Attack's Archer 1835022 on 5:14: ours Operation Protect Units to 4:15 in the tree's second walk of the turn, the game's a second Operation Move holding 5:14 (no endangered member)
   - LAB (operation members): 1121 t27 the Scout 262147 (79 damage) on 37:12 under its tree's Protect Unit goes to 38:12, the game's 37:13 (both off the danger map)
   - LAB (operation members): 1127 Galley 589825 t229
@@ -254,7 +252,6 @@ A question the SOURCE under-determines; neither engine ships a branch until the 
   - LAB (raids and assaults): 1121's raid: t69 one Warrior over the game's team
   - LAB (raids and assaults): 1121 t122's City Assault, ours at t116 for the game's t119 (Skirmisher 3342353 reports seat 1 at our t109, Notifies t116; the game's tactical rows by t114: the scout tree's end, Notify timing)
   - LAB (raids and assaults): 1128 t221 / t237 / t243 raid and assault starts
-  - LAB (raids and assaults): fit, unread: a unit its tribe raised in the turn is not yet one its raid recruits (StandardRaid: 1124 camp (40,21) t9–t12, 1117 camp (9,24) t10–t14, 1124 camp (41,7) t23–t27; the evaluator 0x60a8c0 unread; dll_readings "H-1: the raids")
   - LAB (scouts): fit, unread: a scout's report ignoring a barbarian civilian's sight (1128 t76)
   - LAB (scouts): fit, unread: a scout reporting a plot newly in its own sight, the plots in index order (the barbarian player's count turning positive, 0x58aa90 → 0x508d50; the engines count per scout)
   - LAB (scouts): fit, unread: a hurt scout's report waiting on Protect Unit's danger (0x7f07c0 reads the AI's influence map; the engines: an enemy within its moves plus its reach; 1121 camp (3,19), hurt at t25 beside China's Warrior, reporting at t33)
@@ -278,6 +275,7 @@ A question the SOURCE under-determines; neither engine ships a branch until the 
   - LAB (targets): 1124 t87 city-state 2's Men-At-Arms on 9:12 / 9:14 list 11:12 unseen, 11:14 / 9:11 seen
   - LAB (targets): the planning's seen-now plane past our sight (1117 t8 13:13, t61 33:8 / 32:7; 1127 t3's Scout on 5:10)
   - LAB (targets): 1124 t119 Man-At-Arms 4521989 for 37:17 on a Missionary
+  - BUILD (planning): the planning's search carries 0x100 by its own flags and sets out on the formation's GetMaxMoves (UnitPlanning 0x791e00 at 0x791eb6..0x791ec4: 0x115, the start 0x26eea0), where the engines' `search` reads the start's Movement and `unmoved` off the unit's Movement left for a unit that moved before its planning (no recorded case)
 - **C-132. THE DANGER MAP.** Weight 3. Scored against the aimem `danger` (aiscore kinds `danger` / `danger.major`, one-seed traces).
   - LAB (danger): 1124 t228 / t230 / t238 / t239 player 1's Giant Death Robot: ours 130 on 86 plots past the game's reach at t228 from 39:9, on 96 at t230 from 37:16 embarked (the engines' walks water as ground on its land Movement, `waterWalk`; the record's is embarked there, maxMoves 5)
   - LAB (danger): 1128 t164 the danger map 0 on 33:11 beside the barbarian Man-At-Arms on 35:10
@@ -293,7 +291,6 @@ A question the SOURCE under-determines; neither engine ships a branch until the 
   - LAB (endangered units): an embarked captive's danger from a land unit beside it: 1127 t166 Settler 2097173 on 16:12 by player 0's Warrior on 15:12, the game's Move To Safety to 17:9, ours to 17:10
   - LAB (search): the danger search's blocking for ranged movers (1128 t159 Man-At-Arms 5505044)
   - LAB (search): Move Unit's flag 8 on our danger map (1124 t92 Catapult 1245186 via 699, ours 25 from Archer 3801089)
-  - LAB (search): fit, unread: every unit reads unmoved in another player's danger search, one that walked in its own turn too (1128 t126: player 1's Courser 2162694 and Settler, walked onto 12:6, lay 46 on 12:5 across the river): the moved flag +0x4b8 is set by the walk's step and the refresh's hasMoved (0x267650 at 0x2678ae), cleared by the turn start 0x2673f0 alone (DoTurn at 0x4e49d3, 0x4eeb70, 0x941240, the manager's virtual 0x941b50), which of them runs before the next player's DoTurn unread
   - LAB (search): fit, unread: an Open Borders grant's last turn (1127: player 1's grant to player 0 of t99, 20 turns, open through the barbarians' turn of t118): the count 0x3e6b50 keeps one a source, the turn the deal's action DIPLOACTION_OPEN_BORDERS (0x238d00) ends unread
 - **C-133. UNIT PATHS AND MOVE ORDERS.** Weight 3.
   - LAB (move order): MoveTo 0x962380's visible-goal placement
@@ -301,7 +298,7 @@ A question the SOURCE under-determines; neither engine ships a branch until the 
   - LAB (move order): MoveTo 0x962380's zone-of-control wait (+0x518)
   - LAB (move order): MoveTo of an HL Move To Safety order (1121 Builder 3604504 t124-127: 0x962380, the finder's +0x1f7 / +0x1e0, no direct writer)
   - LAB (move order): Operation Move's alternate order for a solo unit with +0x1939 reaching no plot at the radius in two turns (0x817bea..0x817d9e)
-  - BUILD (move order): the path's flag 1 closed-borders test (0x2720a0 at 0x27263b..0x272689) refuses a link whose PARENT stands on a major's ground not at war that the mover may not enter (the owner read at 0x27220d, the unit's own plot waived at 0x272618), where the engines refuse the link onto such ground (`shut`)
+  - BUILD (move order): the path's flag 1 tail (0x2720a0 at 0x272618..0x272689) refuses a link from a PARENT on closed ground; a revealed child there is refused by its location bit first, so it bites only a unit the border branch exempts (+0x1934, its writer unread), which the engines' `shut` keeps off the ground itself
   - LAB (carried runs): a carried run's hold: duelp1117 t33 the barbarian Galley 720906 (HL Explore for 21:17) stops on 27:14 through its turn-end node with 1 Movement, the game's queue run (its one segment, before HL End Turn's 745019656) moving nothing, the engines' carried run stepping back to 28:14 (noted twice, once as 1117 t33 Galley 720906's plot)
   - LAB (carried runs): HL End Turn drops only the turn-end run (1117 t33 2097152 / 1769487 second segments), the engines modelling one carried run
   - LAB (walk steps): the walk's zone test takes the formation's domain as it sets out, whether 0x26fe20 re-reads +0x278 after an embarking step unread
@@ -480,12 +477,6 @@ A question the SOURCE under-determines; neither engine ships a branch until the 
   - LAB (wander): 1124 t182 / t194 Nuclear Submarine 6160412 Coastal Raid 372 // 416
   - LAB (move to safety): 1127 t92-96 Galley 393216 ends on 29:16 for its safe 28:17 past player 0's Warriors on 29:17 / 29:15
 - **C-128. CITY-STATES' UNITS, FORMATIONS AND STACKING.** Weight 3.
-  - LAB (a unit made anew): fit, unread: a unit made anew's place (`jumpMadeAnew`; 0x590a30 / 0x4502b0; 30 / 31 levied, 15 / 22 returned)
-  - LAB (a unit made anew): a unit made anew's place: 1117 t42 608 (China's ground in ours, unowned in the game's)
-  - LAB (a unit made anew): a unit made anew's place: 1117 t42 / t88 648 / 690 past plots our revealed planes lack
-  - LAB (a unit made anew): a unit made anew's place: 1121 t56 361 / levy 187
-  - LAB (a unit made anew): a unit made anew's place: 1124 439
-  - LAB (a unit made anew): a unit made anew's place: 1127 707 / 533
   - LAB (stacking): the swap partner's type pair (vtable +0xc8) unread
   - LAB (stacking): the turn-end stacking check's +0x228 handler order beside the barbarians' captures unread
   - LAB (stacking): 1128 t174 Hong Kong's Warrior 2293764 steps onto 9:8 under player 1's Trebuchet and the game teleports it to 8:8 after Hong Kong's Trader enters 9:8
@@ -497,6 +488,8 @@ A question the SOURCE under-determines; neither engine ships a branch until the 
   - LAB (formations): the city threat and standing army read no formation
   - LAB (formations): a member a Corps absorbs standing the minor's turn (1117 t142 / t161)
   - LAB (promotions): a city-state's promotions unscored
+  - BUILD (a unit made anew): the transfer ends a new unit's moves (0x56d6f0 at 0x93fe79): a levied unit home on a suzerain change in another player's turn stands at Movement 0 until its minor's DoTurn, where the engines return every levy at the minor's start (`minorLevyReturn`; no recorded case)
+  - LAB (a unit made anew): the location test's owner unit-type byte (0x3dd230: diplomacy +0x40f0[type], 0x586360 at 0x58651b) and its owned-water clause for a land unit that may not embark (0x58645d..0x58648e) unported in `placementPlot`, the byte's writer unread
 - **C-129. THE KNOWLEDGE BASES AND OPERATIONS' STRENGTH.** Weight 3.
   - LAB (army memory): the army memory over full games (carried 92.3%, aimem 98.3%): own units only ours hold
   - LAB (army memory): a city-state's unit trained before its look, the game's a turn later: 1127 t22 Mexico City's Builder

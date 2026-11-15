@@ -534,11 +534,13 @@ function groundOf(state: GameState, unit: Unit, revealedOnly = true, planning = 
       if (shoots && garrisonDistrict(state, t) && owner !== NO_SEAT && owner !== unit.seat && unitsHostile(state, unit, { seat: owner })) return false;
       // the danger map's search takes a civilian at war on water so too
       // (runs/h1_duelq1127 t166: player 0's Warrior on 15:12 lays its 20 on
-      // 16:12, the barbarians' embarked Settler 2097173 on it), and strikes
-      // into no water its player may not enter (runs/h1_duelq1127 t199:
-      // player 0's embarked Warrior on 29:13, no Cartography, lays no 15 on
-      // the barbarian Galley's Ocean 28:15; h1_duelq1121 t164 28:6)
-      if (dangerSearch && planning && isWater(t) && !waterEnterable(state, t, unit)) return false;
+      // 16:12, the barbarians' embarked Settler 2097173 on it); no search
+      // strikes into water its player may not enter (the validity's location
+      // test on the water plot, 0x2720a0 -> 0x586900 -> 0x586360's terrain
+      // test 0x56e0a0; runs/h1_duelq1127 t199: player 0's embarked Warrior on
+      // 29:13, no Cartography, lays no 15 on the barbarian Galley's Ocean
+      // 28:15; h1_duelq1121 t164 28:6)
+      if (isWater(t) && !waterEnterable(state, t, unit)) return false;
       if ((fighters.has(t.index) && (isWater(t) === naval || (embarks && isWater(t))))
         || (!plainCivilians && foes.has(t.index) && (isWater(t) === naval || (dangerSearch && planning && embarks && isWater(t))))) return true;
       if (t.district === 'CITY_CENTER' && owner !== unit.seat && unitsHostile(state, unit, { seat: owner })) return true;
@@ -4129,13 +4131,15 @@ function wanderNearCity(state: GameState, pass: Pass, home: number): void {
  * under city-state 3's Trader); the nearest `plot` wins, a plot
  * of another area than `plot`'s counted three times as far, the first of
  * equals; with `skipOrigin` (its fourth argument) `plot` itself is none.
- * -1 none.
+ * -1 none. `known`: the plots the unit's player revealed.
  */
-function alternateLocation(state: GameState, unit: Unit, plot: number, range: number, skipOrigin = false): number {
+function alternateLocation(state: GameState, unit: Unit, plot: number, range: number, skipOrigin = false,
+  known?: (i: number) => boolean): number {
   const { map } = state;
   const at = map.tiles[plot];
   const [q0, r0] = offsetToAxial(at.col, at.row);
   const ground = groundOf(state, unit);
+  known ??= ground.known;
   const dom = unitDomain(unit.type);
   const layer = mapLayer(unit.type);
   let best = -1;
@@ -4146,7 +4150,7 @@ function alternateLocation(state: GameState, unit: Unit, plot: number, range: nu
       if (n > range || (skipOrigin && dx === 0 && dy === 0)) continue;
       const [c, r] = axialToOffset(q0 + dx, r0 + dy);
       const t = tileAt(map, c, r);
-      if (!t || !ground.known(t.index) || !ground.enter(t)) continue;
+      if (!t || !known(t.index) || !ground.enter(t)) continue;
       if (state.units.some((o) => o !== unit && o.tileIndex === t.index && onMap(o) && mapLayer(o.type) === layer
         && (o.seat !== unit.seat || unitDomain(o.type) === dom))) continue;
       let score = plotDistance(state, plot, t.index);
@@ -4158,6 +4162,29 @@ function alternateLocation(state: GameState, unit: Unit, plot: number, range: nu
     }
   }
   return best;
+}
+
+/** the range the placement's location test hands FindAlternateLocation
+ *  (0x586360 at 0x58683a, the placement's 0x7fffffff read as 10) */
+const PLACEMENT_RANGE = 10;
+
+/**
+ * THE PLACEMENT'S PLOT (Unit_Placement 0x586d40 under its flag 1, the
+ * location test 0x586360 under 0x10: the transfer's 0x93fa10 at 0x93fdab)
+ * for a unit placed on `plot`: the plot itself where the test takes the unit
+ * — its ground (`groundOf`'s `enter`: terrain, domain, closed borders, a
+ * district of hit points), whether its player revealed it or not, holding no
+ * other player's unit of its map layer (the best defender 0x208b80 under
+ * 0x108 at 0x586542..0x58657e: any, a civilian among them, at war or not) —,
+ * else the plot FindAlternateLocation finds within 10 of it, the plot itself
+ * none (0x586833..0x586875: its fourth argument set); -1 none. `known`: the
+ * plots the unit's player revealed.
+ */
+export function placementPlot(state: GameState, unit: Unit, plot: number, known?: (i: number) => boolean): number {
+  const layer = mapLayer(unit.type);
+  if (groundOf(state, unit).enter(state.map.tiles[plot])
+    && !state.units.some((o) => o !== unit && o.tileIndex === plot && onMap(o) && o.seat !== unit.seat && mapLayer(o.type) === layer)) return plot;
+  return alternateLocation(state, unit, plot, PLACEMENT_RANGE, true, known);
 }
 
 /** the radius the turn's stacking check searches round a crowded plot

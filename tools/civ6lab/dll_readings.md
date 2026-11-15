@@ -16023,3 +16023,137 @@ production table stand where this section names them.
 - OPEN: a path node's first and third ints; the combat modifiers' member
   and a target list entry's +0xc and +0x18..; the dump's `deals` held no
   deal in 250 turns (none was enacted), its item fields are unread.
+
+## C-132 / C-128 / C-95 / C-123 / C-133: the danger map's unmoved flag, a unit made anew's place, the operation queue's push, the strike's turn, the raid's recruit, the shore tests — READ (0x26df90 at 0x26e128..0x26e159, 0x716400 at 0x71672d, 0x586360 at 0x586542..0x58657e / 0x5867ab..0x586875, 0x93fa10 at 0x93fd94..0x93fdab / 0x93fe79, 0x526a0 at 0x52788..0x527ac, 0x523e0, 0x55460, 0x962380 at 0x96268f, 0x60a440, 0x26e570 at 0x26e904, 0x2720a0 at 0x272618..0x272689), both twins
+
+`placementPlot` / `alternateLocation` (cpu/core/tactical.ts), `jumpMadeAnew`
+(cpu/core/phase.ts), `groundOf`'s attack; GPU `_jump_made_anew`
+(gpu/core/sim_minors.py), `_tac_alternate`, `_tac_attack_planes`
+(gpu/core/sim_tactics.py). The replay's levy return (`runReplay`,
+cpu/harness/replay.ts). The operation queue's push is read, not ported.
+
+- THE DANGER MAP'S UNMOVED FLAG: 0x26df90 reads its flags from its fifth
+  argument ([rsp+0x8e0]: four pushes and 0x898 of frame), adds 0x800 and,
+  where the formation's moved flag +0x4b8 is clear, 0x100. The danger map's
+  call (0x716400 at 0x71672d) passes 0x311: bit 8 is in it. Its search
+  carries 0x100 whatever the formation's flag, on the formation's full
+  Movement (the third argument 1: the start 0x26eea0): every unit reads
+  unmoved. The engines' `dangerPlane` searches a copy at its whole Movement.
+  The planning's call (UnitPlanning 0x791e00 at 0x791eb6..0x791ec4) passes
+  0x115 with its third argument 1: bit 8 too.
+- THE MOVED FLAG'S OTHER CLEARER, the unit manager's vt +0x90 (0x941b50, the
+  vtable 0xd92c18): its callers behind the manager's getter 0x9406e0 are
+  HireClan::Start 0x936380 (0x9366c2), the Hero's RestoreUnitMoves command
+  0x953bd0 (0x953d97) and the script binding RestoreMovementToFormation
+  0x9f6750 (0x9f677d): the Barbarian Clans mode, the Heroes mode, a script.
+  None runs in a turn of the rules the engines hold.
+- A UNIT MADE ANEW'S PLACE: the transfer 0x93fa10 places the new owner's
+  unit on the old one's plot by 0x586d40 with flags 1 and, its fifth
+  argument set (neg / sbb at 0x93fd94..0x93fda7; the levy 0x95c360 and its
+  returns 0x44e670 / 0x4502b0 / 0x9575e0 pass 1), the location flags 0x10.
+  The location test 0x586360 under 0x10 alone: the terrain and domain
+  tests, the owner's unit-type byte (0x3dd230: diplomacy +0x40f0[type],
+  its writer unread), the best defender 0x208b80 under 0x108 — any other
+  player's live unit of the unit's map layer, a civilian too, at war or not
+  (its flag 1, the war test, is the location flag 8's) — refusing the plot
+  where the location flag 1 is clear (0x58656e..0x58657e), then the border
+  and district branches. Refused under 0x10 (0x5867ab..0x5867e6) it calls
+  FindAlternateLocation 0x585940 (0x586875) with the range 10 (0x58683a:
+  the placement's 0x7fffffff) and its fourth argument 1, the plot itself
+  none; found, it answers 2 and the placement takes that plot; none, 0 and
+  the transfer destroys the unit (0x93ff0b). Ported: `placementPlot`
+  (`jumpMadeAnew`), `_jump_made_anew` through `_tac_alternate`.
+- ITS MOVEMENT: placed, the transfer ends the new unit's moves (0x56d6f0 at
+  0x93fe79) and sets its turn done (0x570b40 at 0x93fe83); the unit, made
+  off the map, held GetMaxMoves with no plot term (0x56e130 skips its ground
+  terms on a null plot, 0x56e1cc), capped by the placement to the state it
+  lands in. The engines' levy stands at 0; their return comes at the
+  minor's start, before its units' Movement is read.
+- THE OPERATION QUEUE'S PUSH (the operations manager's vt +0x60, 0x526a0:
+  manager, unit, parameters, mode): with mode 0 and the parameters' byte
+  +0x20 clear, or mode 1 (0x52788..0x52797), it empties the unit's queue
+  (vt +0x68, 0x52e90 at 0x527ac) and passes the start flag 1 to the inner
+  push 0x546f0 (vt +0x160 at 0x52948); the handler's test (its vt +0x58 at
+  0x528f9) refusing, nothing is queued. The camp strike's two pushes
+  (0x772940 at 0x772eea / 0x772f78) pass mode 0 over parameters zeroed at
+  +0x20 (0x772ec8 / 0x772f4b; the builders 0x964a40 / 0x962190 write +0 and
+  +8 alone): the strike empties the queue — a move to the spot that waits
+  is carried no further — and starts at once, the shot or the move onto
+  the target (flag 0x10) from where the unit stands. Unported: the engines
+  hold the strike of a unit short of its spot (`defendCamps`, `_tac_pass`),
+  which keeps runs/h1_duelq1121 t160 — there the game's Spearman 1376265
+  took no strike at all (0x773fb0's flag 0 to the camp 3:19 its Skirmisher
+  holds: one OPERATION / AWAKE pair, no step, Movement 0 in record 161)
+  where the engines' `campStrike` picks player 0's Warrior on 3:16 at the
+  spot 3:17 (taken 33 + back taken 37 under its health 73); with the push
+  as read the engines' Spearman ends on 5:18 (plot 797 for the game's
+  795).
+- THE QUEUE'S TURN (vt +0x170, 0x523e0), past 0x524d5: for a unit out of
+  ACTIVITY_OPERATION the front operation's CanStart (vt +0x48 on the unit's
+  plot); refused, it is kept where the unit has moved (0x56e760) and the
+  operation's turn (+0x20) is not behind the game's, else swept (vt
+  +0x150); accepted, started (vt +0x130), swept where the start answers
+  done. The loop goes on while the unit lives and holds operations: an
+  operation behind one that completes starts in the same queue turn. The
+  player's DoTurn calls the manager's vt +0x58 (0x55460) on each unit
+  (0x4e497f): a live unit's front operation whose handler answers its vt
+  +0x30 is swept.
+- THE STRIKE'S TURN (the MoveTo execution 0x962380 at 0x96268f): the first
+  step 0x266690 is the kept path's next node, its turn at +4; above 1, the
+  battle test (0x211f80 under the attack flag 0x10) and the defender test
+  (0x209e30) are both skipped, and a formation whose last step ended in a
+  zone of control (+0x518) waits. The turn is the one the queue run's first
+  search gave the node (0x272aa0 keeps that path): an attack node the
+  search put in a later turn — a zone on the way spending the turn's
+  Movement — is not struck in the run, though the unit comes to stand
+  beside it with Movement left. As `orderRun` holds it.
+- THE RAID'S RECRUIT: the unit-created handler 0x60a440 (player signal
+  +0x60, from the creation 0x4eeb70) ends the moves (0x56d6f0) and sets the
+  turn done (0x570b40) of a unit made for a player that is not human while
+  its Control Manager's job list (+0x2b8) holds an entry with +8 == 0; the
+  recruit's offer 0x60a8c0 passes no unit whose turn is done (+0x530). The
+  barbarians' rules are the first job of their turn (0x6096c0), so a unit
+  a tribe raises there is no recruit of its raid until their next DoTurn.
+- THE STRIKE'S DOMAIN: the planning's valid wrapper 0x26e570 ends in the
+  validity 0x2720a0 (0x26e904) for every child, an attack's too: a land
+  formation's revealed child across the shore takes the embark test
+  0x52fe90 or the disembark test 0x52fb90 (0x2720a0 at 0x272372..0x27240d),
+  any other revealed child its location bit (0x586900 under flag 1 ->
+  0x586360: the terrain test 0x56e0a0, the domain branch). A land unit
+  strikes onto water only where its formation may embark, no ship onto
+  land but a coastal city centre, and no unit into water its player may not
+  enter (the Ocean before its technology) — in every search. Ported:
+  `groundOf`'s attack and `_tac_attack_planes` refuse the water strike its
+  player may not enter in the planning and a move order's path too.
+- FLAG 1'S TAIL (0x2720a0 at 0x272618..0x272689; the link's parent rbp, its
+  child rdi): waived where the parent is the unit's own plot; a parent the
+  player never revealed (+0x51 bit 0) refuses the link; then the PARENT
+  plot's owner (r12d, 0x27220d) with closed borders (+0x6c0), not at war,
+  whose ground the mover's player may not enter (0x3dab70) refuses it. A
+  revealed child on such ground is refused by its location bit first
+  (0x586360's border branch), so only a unit that branch exempts (+0x1934)
+  stands on a parent this clause refuses. The engines' `shut` refuses the
+  ground itself to every unit.
+- THE CHECK: the replay's levy return places each unit in the record's
+  order, each looking for its minor as it lands (`levyUnitHome`'s reveal)
+  before the next is placed.
+- CONFIRMED (one-seed aimem traces from the game's start, the replay's
+  levy:jump / levyEnd:jump against the game's plots): runs/h1_duelq1121 the
+  levy's twelfth unit on 187 and the return's on 361; h1_duelq1117 t88 690;
+  h1_duelq1127 707; h1_duelq1117 t42 city-state 3's Warrior off China's
+  centre 33:12 to 32:14, revealed by its Warrior home on 32:15 before it;
+  h1_duelq1124 t83 city-state 4's Catapult off 4:9 to 43:9 beside its
+  Warrior home on 43:8. The queue: h1_duelq1128 t31 the camp's Spearman
+  589832 short of 32:8 at no Movement, its MOVE_TO kept (segment completes
+  at seq 6354 and 6375), t32 a new strike from 32:7 in its row's place,
+  nothing of t31's queue run first. The strike's turn: runs/h1_duelp1127
+  t109 / t199 the Galley 1048590. No missed row of the five traces moved.
+- OPEN: the camp strike's pick at runs/h1_duelq1121 t160 (the prediction's
+  taken and back taken against the game's), behind which the push's port
+  waits; +0x1934's writer; 0x3dd230's writer; the planning of a unit that
+  moved before it (the engines' `search` reads the unit's Movement left and
+  `unmoved` off it, the DLL's 0x115 and full Movement); a levied unit home
+  on a suzerain change in another player's turn (Movement 0 until its
+  minor's DoTurn; the engines return it at the minor's start alone); the
+  location test's owned-water clause for a land unit that may not embark
+  (0x58645d..0x58648e) in `placementPlot`.

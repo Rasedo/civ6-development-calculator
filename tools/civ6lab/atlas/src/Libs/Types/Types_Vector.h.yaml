@@ -530,6 +530,7 @@
     - "C-95: a ranged unit's danger reach holds only plots with Movement left — READ (0x7921e0, 0x791270, 0x26dab0), both twins"
     - "C-124 / C-95: every search but the planning's pays the stacking +1e6, the cost reads the child's revealed bit, Explore's flag 0x40 prices the unrevealed — READ (0x270dd0 at 0x270e55 / 0x270e86 / 0x270ff2 / 0x2711c3..0x271268 / 0x2713d3, 0x502aa0, 0x26df90's callers 0x716739 / 0x70aadd, 0x70ce90 at 0x70ced5, 0x803060 at 0x80316f), both twins"
     - "C-99: a move order's search sets out on the pool finder's +0x1bc, the last full-Movement search's GetMaxMoves — READ (0x26f330, 0x77d10, 0x270d70, 0x26e920, 0x26eea0, 0x26dcd0, 0x26df90, 0x26e2c0, 0x26fe20 at 0x270309), unported"
+    - "C-132 / C-128 / C-95 / C-123 / C-133: the danger map's unmoved flag, a unit made anew's place, the operation queue's push, the strike's turn, the raid's recruit, the shore tests — READ (0x26df90 at 0x26e128..0x26e159, 0x716400 at 0x71672d, 0x586360 at 0x586542..0x58657e / 0x5867ab..0x586875, 0x93fa10 at 0x93fd94..0x93fdab / 0x93fe79, 0x526a0 at 0x52788..0x527ac, 0x523e0, 0x55460, 0x962380 at 0x96268f, 0x60a440, 0x26e570 at 0x26e904, 0x2720a0 at 0x272618..0x272689), both twins"
   notes:
     - ".claude/scratchpad/st1/reading.md: ...5033a0) with a   combat, ranged or bombard strength (0x56dc90, 0x56e3e0, 0x56daa0): its   strength (0x716400: bombard > 0 — the combat strength where it tops the   bombard less COMBAT_BOMBARD_VS_UNIT_STRENGTH..."
   context:
@@ -1002,11 +1003,12 @@
 - addr: 0x941b50
   final: 0x650e80
   kind: function
-  semantics: "Unit_Manager (formation): each member through the manager's virtual +0x98 (the unit's turn start DoTurn 0x4e4560 calls at 0x4e4955), then the formation's turn start 0x2673f0: the formation's Movement and moved flag restored outside DoTurn. A virtual of the manager (the pointer at 0x83d985); its callers unread."
+  semantics: "Unit_Manager (formation), the manager's vt +0x90 (0xd92ca8; the vtable 0xd92c18): each member through the manager's virtual +0x98, then the formation's turn start 0x2673f0: the formation's Movement and moved flag restored outside DoTurn. Its callers, each behind the manager's getter 0x9406e0: HireClan::Start 0x936380 at 0x9366c2 (the Barbarian Clans mode), the Hero's RestoreUnitMoves command 0x953bd0 at 0x953d97 (the Heroes mode), the script binding RestoreMovementToFormation 0x9f6750 at 0x9f677d: none runs in a turn of the base rules."
   status: PARTLY
   readings:
     - "C-132: the danger map's fitted rules in the DLL; a search's shore crossings on the formation's own domain — READ (0x26dab0, 0x586360 at 0x586624..0x586664, 0x2720a0 at 0x272618..0x272689, 0x66a90, 0x52fe90, 0x56e0a0, 0x26e570, 0x530240, 0x530420), FIT (the unmoved flag, the barbarians' raise, the grant's last turn), both twins"
     - "C-133 / C-128: flag 2's parent plot, the open list as the list itself, the embarked state's Movement cap, the zone's improvement test — READ (0x2720a0 at 0x27220d / 0x2724c8, 0x775a0, 0x79560, 0x586d40 at 0x587042..0x5870aa / 0x58741c..0x587486, 0x5706e0, 0x531ef0, 0x26fe20 at 0x270444 / 0x270776, 0x270be0, 0x52f970), both twins"
+    - "C-132 / C-128 / C-95 / C-123 / C-133: the danger map's unmoved flag, a unit made anew's place, the operation queue's push, the strike's turn, the raid's recruit, the shore tests — READ (0x26df90 at 0x26e128..0x26e159, 0x716400 at 0x71672d, 0x586360 at 0x586542..0x58657e / 0x5867ab..0x586875, 0x93fa10 at 0x93fd94..0x93fdab / 0x93fe79, 0x526a0 at 0x52788..0x527ac, 0x523e0, 0x55460, 0x962380 at 0x96268f, 0x60a440, 0x26e570 at 0x26e904, 0x2720a0 at 0x272618..0x272689), both twins"
   review: reviewed
 - addr: 0xb8eb50
   kind: function

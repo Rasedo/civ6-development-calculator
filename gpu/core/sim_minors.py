@@ -3,8 +3,9 @@ from __future__ import annotations
 from .simbase import *  # noqa: F401,F403 — torch, constants, helpers: the shared floor
 from . import simbase
 
-# the furthest ring a unit made anew is looked for a plot in (`JUMP_RADIUS`)
-_JUMP_RADIUS = 12
+# the range the placement's location test hands FindAlternateLocation
+# (`PLACEMENT_RANGE`)
+_PLACEMENT_RANGE = 10
 
 
 class SimMinors:
@@ -588,68 +589,55 @@ class SimMinors:
 
     def _jump_made_anew(self, seat: int, m: torch.Tensor) -> None:
         """`jumpMadeAnew` for the major-pool units `m` [B, U] made anew under
-        `seat`, in unit order: each keeps its plot where no other player's
-        district or wonder stands, nor (for a minor's unit) another player's
-        ground, nor another player's unit; else it goes to the first plot of
-        the rings round it (`barb_ring_table`, the game's ring order) passing
-        the same, revealed to `seat` (a major's explored plots under the fog,
-        every plot with the fog off) and free for it (`_spot_free`), a land
+        `seat`, in unit order — the placement's plot (`placementPlot`,
+        0x586d40 under the location flag 0x10): each keeps its plot where its
+        ground takes it (`_tac_enter`, the revealed plots not read) and no
+        other player's unit of its map layer stands there; else it goes to
+        the plot FindAlternateLocation finds within 10 of it
+        (`_tac_alternate`, its own plot none), revealed to `seat` (a major's
+        explored plots under the fog, every plot with the fog off), a land
         unit embarked where that plot is water and ashore where it is land;
         one no plot takes is destroyed."""
         if not bool(m.count_nonzero()):
             return
-        ring = getattr(self, "_jump_ring", None)
-        if ring is None:
-            ring = self._jump_ring = torch.tensor(simbase.barb_ring_table(self.W, self.H, self.wrap_x, _JUMP_RADIUS),
-                                                  dtype=torch.long, device=self.device)
         B, dev = self.B, self.device
+        bidx = torch.arange(B, device=dev)
         minor = seat >= 100
         rev = (self.mops_revealed[:, seat - 100] if minor
                else self.seat_explored[:, seat] if self.fog_of_war
                else torch.ones(self.B, self.T, dtype=torch.bool, device=self.device))
         lo = self.POOL_LO["major"]
-        K = ring.shape[1]
         for u in m.any(dim=0).nonzero(as_tuple=True)[0].tolist():
             on = m[:, u] & self.major_unit_alive[:, u] & (self.major_unit_tile[:, u] >= 0)
             if not bool(on.count_nonzero()):
                 continue
             g = u + lo
             here = self.major_unit_tile[:, u].clamp(min=0)
-            cand = torch.where(on.unsqueeze(1), ring[here], torch.full((B, K), -1, dtype=torch.long, device=dev))
-            cc = cand.clamp(min=0)
             ty = self.major_unit_type[:, u].clamp(min=0, max=self.NU - 1)
-            sup = self._type_support.take(ty)
-            civ = self._type_civilian.take(ty)
             naval = self.unit_naval.take(ty)
-            free = self._spot_free(cand, seat, civ_mask=civ, naval_mask=naval, sup_mask=sup, utype=ty)
-            owner = self.tile_seat.gather(1, cc)
-            foreign = (owner >= 0) & (owner != seat)
-            built = (self.district.gather(1, cc) >= 0) | (self.built_wonder.gather(1, cc) >= 0)
-            ok = (cand >= 0) & ~(foreign & built) & rev.gather(1, cc)
-            if minor:
-                ok = ok & ~foreign
-            # where it stands, the location test (0x586360): a hostile
-            # defender alone refuses it, never another's civilian nor its own
-            stay = (cand[:, 0] >= 0) & ~(foreign[:, 0] & built[:, 0]) & ~(foreign[:, 0] & minor)
-            for plane in (self.military_at, self.embarked_at):
-                occ = plane.gather(1, here.unsqueeze(1))
-                who = torch.where(occ >= 0, self.unit_seat.gather(1, occ.clamp(min=0)), torch.full_like(occ, -1))
-                stay = stay & ~((occ >= 0) & (occ != g) & self._seats_hostile(seat, who)).squeeze(1)
-            ok = ok & free
-            ok[:, 0] = stay
-            first = torch.where(ok, torch.arange(K, device=dev), K).min(dim=1).values
-            spot = cand.gather(1, first.clamp(max=K - 1).unsqueeze(1)).squeeze(1)
+            land_ent, wat_ent = self._tac_enter(seat, revealed_only=False)
+            emb = self._tac_embarks(bidx, ty, seat, self.major_unit_orig_owner[:, u])
+            ent = torch.where(naval.unsqueeze(1), wat_ent, land_ent | (wat_ent & emb.unsqueeze(1)))
+            # where it stands, the location test (0x586360 under 0x10): any
+            # other player's unit of its map layer refuses the plot (the best
+            # defender 0x208b80 under 0x108)
+            rel = self._rel_strength.take(ty) > 0
+            foreign = torch.where(rel.unsqueeze(1), self._tac_foreign_on(seat, True), self._tac_foreign_on(seat, False))
+            stay = on & ent[bidx, here] & ~foreign[bidx, here]
+            us = torch.full((B,), u, dtype=torch.long, device=dev)
+            alt = self._tac_alternate(on & ~stay, us, here, "major", seat, ent & rev, rng=_PLACEMENT_RANGE, skip_origin=True)
             # no plot passes: the unit is not placed, destroyed (the transfer
             # 0x93fa10, the destroy 0x941130)
-            gone = (on & (first >= K)).nonzero(as_tuple=True)[0]
+            gone = (on & ~stay & (alt < 0)).nonzero(as_tuple=True)[0]
             if gone.numel():
                 self._occ_clear(gone, here[gone], torch.full_like(gone, g))
                 self.major_unit_alive[gone, u] = False
                 self._gen_ver += 1
-            go = on & (first > 0) & (first < K)
+            go = on & ~stay & (alt >= 0)
             rows = go.nonzero(as_tuple=True)[0]
             if not rows.numel():
                 continue
+            spot = alt.clamp(min=0)
             gs = torch.full_like(rows, g)
             self._occ_clear(rows, here[rows], gs)
             self.major_unit_tile[rows, u] = spot[rows]

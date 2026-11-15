@@ -437,13 +437,15 @@ class SimTactics:
         naval = (self.wpass & foe) | (self.passable & ctr) | (fight & self.water)
         fight_w = fight & self.water
         if planning and danger_search:
-            # the danger map's search: a civilian at war on water too, and
-            # no strike into water the player may not enter (the Ocean
-            # before its technology)
+            # the danger map's search: a civilian at war on water too
             fight_w = fight_w | (foe & self.water & self.wpass)
-            cart = self._ocean_open(torch.full((self.B,), seat, dtype=torch.long, device=self.device))
-            shut = self.ocean_tile & ~cart.unsqueeze(1)
-            naval, fight_w = naval & ~shut, fight_w & ~shut
+        # no strike into water the player may not enter (the Ocean before
+        # its technology): the validity's location test on the water plot
+        # (0x2720a0 -> 0x586900 -> 0x586360's terrain test 0x56e0a0), every
+        # search's
+        cart = self._ocean_open(torch.full((self.B,), seat, dtype=torch.long, device=self.device))
+        shut = self.ocean_tile & ~cart.unsqueeze(1)
+        naval, fight_w = naval & ~shut, fight_w & ~shut
         # another player's district of hit points not at war: no strike into
         # it, whatever stands there (`peaceFort`)
         pf = self._tac_peace_fort(seat)

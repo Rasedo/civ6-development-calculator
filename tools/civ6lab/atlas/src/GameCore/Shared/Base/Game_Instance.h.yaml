@@ -67,6 +67,7 @@
     - "C-123 / C-110: the barbarians' rules run as the first job of their AI turn start, after the DoTurn tail; a centre a player that is no major may not raze keeps its last hit point — READ (0x6096c0 at 0x6097af..0x609802, 0x608870, 0x7280a0, 0x1514a0, 0x14d25d; 0x248800, 0x533e50, 0x206080 at 0x206868..0x2068c8, 0x20dd30, 0x1fdea0 at 0x1fe098..0x1fe0ab), both twins"
     - "C-123 / C-110: the barbarians' rules run as the first job of their AI turn start, after the DoTurn tail; a centre a player that is no major may not raze keeps its last hit point; a melee blow on a district that would fell both sides — READ (0x6096c0 at 0x6097af..0x609802, 0x608870, 0x7280a0, 0x1514a0, 0x14d25d; 0x248800, 0x533e50, 0x206080 at 0x206684..0x206715 and 0x206868..0x2068c8, 0x20dd30, 0x1fdea0 at 0x1fe098..0x1fe0ab), both twins"
     - "C-133 / C-128: flag 2's parent plot, the open list as the list itself, the embarked state's Movement cap, the zone's improvement test — READ (0x2720a0 at 0x27220d / 0x2724c8, 0x775a0, 0x79560, 0x586d40 at 0x587042..0x5870aa / 0x58741c..0x587486, 0x5706e0, 0x531ef0, 0x26fe20 at 0x270444 / 0x270776, 0x270be0, 0x52f970), both twins"
+    - "C-132 / C-128 / C-95 / C-123 / C-133: the danger map's unmoved flag, a unit made anew's place, the operation queue's push, the strike's turn, the raid's recruit, the shore tests — READ (0x26df90 at 0x26e128..0x26e159, 0x716400 at 0x71672d, 0x586360 at 0x586542..0x58657e / 0x5867ab..0x586875, 0x93fa10 at 0x93fd94..0x93fdab / 0x93fe79, 0x526a0 at 0x52788..0x527ac, 0x523e0, 0x55460, 0x962380 at 0x96268f, 0x60a440, 0x26e570 at 0x26e904, 0x2720a0 at 0x272618..0x272689), both twins"
   context:
     - "- each city in the player's order (0x4e4560 -> city turn 0x1fa1d0: production, growth, the border turn 0x1a9bc0, loyalty): a WONDER..."
     - "- Player DoTurn 0x4e4560, in order: the culture (+0x1310, 0x396860: the civic progress), the resources (+0x1320,..."
@@ -76,7 +77,7 @@
   final: 0x64f420
   kind: function
   name: transferUnit
-  semantics: "the unit manager's transfer (vtable +0x80; unit, new owner, r9b, 5th argument): the old unit destroyed (vtable +0x60), a new one of the new owner made off the map (vtable +0x48) with the old one's damage, charges, promotions and formation, placed at the old plot by 0x586d40 (flags 1, and 0x10 where the 5th argument is set); placement answering 0 destroys the new unit (0x93ff0b: vtable +0x60 with the flag 1, the delayed kill 0x4ef040 — dead on its player's list, its pool slot held, to that player's end of turn)."
+  semantics: "the unit manager's transfer (vtable +0x80; unit, new owner, r9b, 5th argument): the old unit destroyed (vtable +0x60), a new one of the new owner made off the map (vtable +0x48) with the old one's damage, charges, promotions and formation, placed at the old plot by 0x586d40 (flags 1, and 0x10 where the 5th argument is set); placement answering 0 destroys the new unit (0x93ff0b: vtable +0x60 with the flag 1, the delayed kill 0x4ef040 — dead on its player's list, its pool slot held, to that player's end of turn). the placement at 0x93fdab: flags 1, the location flags 0x10 where the fifth argument is set (neg / sbb at 0x93fd94..0x93fda7: the levy 0x95c360, its returns 0x44e670 / 0x4502b0 / 0x9575e0), so a refused plot goes to FindAlternateLocation within 10; placed, the new unit's moves end (0x56d6f0 at 0x93fe79) and its turn is done (0x570b40 at 0x93fe83)."
   status: READ
   cases:
     - recording: h1_duelq1124
@@ -95,10 +96,12 @@
     - cpu/core/minorBuild.ts:pool
     - cpu/core/minorBuild.ts:major
     - gpu/core/sim_minors.py:_minor_levy_return
+    - cpu/core/tactical.ts:placementPlot
   readings:
     - "C-129: a unit made anew that no plot takes is destroyed, its own plot refused by a hostile defender alone; a bankruptcy's disband before the look — READ, both twins"
     - "C-106: a levied unit's return leaves its holder's garrison requirement met to the holder's turn end — a fit, both twins"
     - "C-98 / C-130 / C-96: a levied unit home with no plot dies on its minor's list; the unit term's upgrade Gold is the minor's; the pick refuses a held building under its pillaged district — READ (0x93fa10 at 0x93ff0b, 0x7cb8b0, 0x4cb350, 0x7f2970 at 0x7f3bd1), LAB (the placement's embark state, the unit term's Gold on the records), both twins"
+    - "C-132 / C-128 / C-95 / C-123 / C-133: the danger map's unmoved flag, a unit made anew's place, the operation queue's push, the strike's turn, the raid's recruit, the shore tests — READ (0x26df90 at 0x26e128..0x26e159, 0x716400 at 0x71672d, 0x586360 at 0x586542..0x58657e / 0x5867ab..0x586875, 0x93fa10 at 0x93fd94..0x93fdab / 0x93fe79, 0x526a0 at 0x52788..0x527ac, 0x523e0, 0x55460, 0x962380 at 0x96268f, 0x60a440, 0x26e570 at 0x26e904, 0x2720a0 at 0x272618..0x272689), both twins"
   context:
     - "- THE TRANSFER (0x93fa10, the unit manager's vtable +0x80 at 0xd92c18; the levy's return 0x4502b0 calls it with..."
   review: reviewed

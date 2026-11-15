@@ -36,9 +36,9 @@ import { storeUnitStrength } from './aiView';
 import { militaryFavTech } from './operations/unitRows';
 import { freeTradeValue, majorTradeLists } from './aiTrade';
 import { FREE_CITY_PAIR_CLASS, LOYALTY_RELIGION_MATCHING, LOYALTY_RELIGION_MISMATCHING, LOYALTY_STARVATION } from '../data/seats';
-import { plotDistance, seatPoolSlots, tacticalTargets } from './tactical';
+import { placementPlot, plotDistance, seatPoolSlots, tacticalTargets } from './tactical';
 import { freeCitiesMilitary, freeRaidCheck, freeRaidSignal } from './freeOps';
-import { plotsSeenNow, ringPlots } from './barbarians';
+import { plotsSeenNow } from './barbarians';
 import { PROJECTS, projectConversionRate } from '../data/projects';
 import { adoptGovernment, carryPolicies, slotCountRebuild, slotLossRebuild, seatGovernment, governmentBit, darkAgeEra, unlockedPolicyIds, governmentSlots, governmentChanges, policyLayoutChanges, policyLayoutOf, policyUnlockCost } from './effects';
 import type { RuleResult } from './rules';
@@ -393,70 +393,38 @@ export function levyGoldCost(state: GameState, seat: number, cityState: CityStat
   return cost;
 }
 
-/** the furthest ring a unit made anew is looked for a plot in */
-const JUMP_RADIUS = 12;
-
 /**
- * A UNIT MADE ANEW (a levy, its return) stands where its new owner may: its
- * own plot where no other player's district or wonder stands, nor (for a
- * minor's unit) another player's ground, nor a hostile defender; else the
- * first plot of the rings round it in the game's ring order (`ringPlots`)
- * passing the first two, revealed to its owner, that it may enter
- * (`tileFreeForUnit`: no other player's unit nor one of its stacking class,
- * a major's where the borders stand open). runs/h1_duely1117 t42 China's Warrior on its centre 561 home to
- * city-state 3 on 648, the first ground of no owner two rings out (608 and
- * 692, unowned, kept); t74 city-state 3's Heavy Chariot levied off its
- * centre 614 onto 613, the ring's second plot (its first water); t76 the
- * Archer off China's wonder site 516 -> 471 past 428's foreign Builder;
- * runs/h1_duely1121 t56 Hunza's Warriors off China's ground 405 -> 361,
- * 404 -> 360 (361 taken), 493 -> 494, and two past the plots Hunza never
- * revealed (534 -> 359, 577 -> 316). A major's revealed plots are its
- * explored ones under the fog; with the fog off every plot is revealed.
- * Where no plot passes, the unit is not placed and is destroyed (the
- * transfer 0x93fa10: the placement 0x586d40 answering 0, the unit manager's
- * destroy 0x941130): false (runs/h1_duely1124 t82, China's levied Warrior
- * 1638402 on city-state 2's ground 13:14, removed at city-state 3's start
- * with no unit added, none of the plots round it revealed to city-state 3).
+ * A UNIT MADE ANEW (a levy, its return: the transfer 0x93fa10, which makes
+ * the new owner's unit off the map and places it on the old one's plot by
+ * 0x586d40 under the location flag 0x10) stands where the placement puts it
+ * (`placementPlot`): its own plot where the location test takes it, else the
+ * plot FindAlternateLocation finds within 10 of it. runs/h1_duely1117 t42
+ * China's levied Warrior 720902 home to city-state 3 as 655361 on 36:13
+ * under China's Trader (the trade layer's unit none); t74 city-state 3's
+ * Heavy Chariot levied off its centre 614 onto 613. A major's revealed plots
+ * are its explored ones under the fog; with the fog off every plot is
+ * revealed. Where no plot passes, the unit is not placed and is destroyed
+ * (the placement answering 0, the unit manager's destroy 0x941130): false
+ * (runs/h1_duely1124 t82, China's levied Warrior 1638402 on city-state 2's
+ * ground 13:14, removed at city-state 3's start with no unit added, none of
+ * the plots round it revealed to city-state 3).
  */
 export function jumpMadeAnew(state: GameState, u: Unit): boolean {
   const revealed = isCityStateSeat(u.seat)
     ? state.cityStates.find((c) => c.seat === u.seat)?.revealed
     : state.fogOfWar && seatOf(state, u.seat)?.explored.length ? seatOf(state, u.seat)!.explored : undefined;
-  const here = u.tileIndex;
-  const ok = (p: number): boolean => {
-    const t = state.map.tiles[p];
-    const owner = tileSeat(t);
-    const foreign = owner !== NO_SEAT && owner !== u.seat;
-    // another player's district or wonder bars it, its city centre among them
-    // (runs/h1_duely1117 t74's Heavy Chariot off city-state 3's centre, t76
-    // the Archer off China's wonder site 516)
-    if (foreign && (t.district || t.builtWonder)) return false;
-    // a minor's unit on no other player's ground, a major's where its
-    // borders stand open (`tileFreeForUnit`)
-    if (foreign && !isCiv(u.seat)) return false;
-    // a plot it goes to revealed to its owner
-    if (p !== here && revealed && !revealed[p]) return false;
-    // where it stands, the location test (0x586360): a hostile defender
-    // alone refuses it, never another's civilian nor its own units
-    // (runs/h1_duely1117 t42: China's levied Warrior 720902 home to
-    // city-state 3 as 655361 on 36:13 under China's Trader)
-    if (p === here) return unitsAt(state, p).every((x) => x === u || !(unitIsMilitary(x.type) && unitsHostile(state, u, x)));
-    return tileFreeForUnit(state, p, u.seat, u);
-  };
-  for (const p of ringPlots(state, here, JUMP_RADIUS)) {
-    if (!ok(p)) continue;
-    u.tileIndex = p;
-    // the placement embarks a land unit put on water and lands one put
-    // ashore (runs/h1_duelq1121 t154: China's embarked Musketman 3735567 on
-    // 10:14 home to city-state 2 as 2424833 on 10:6, its Movement 3 in
-    // Logistics' 24.0; 1124 t92: Granada's Knight 1310720 made on the water
-    // plot 41:13, UnitEmbarkedStateChanged at its placement)
-    const sea = isWater(state.map.tiles[p]);
-    if (!UNITS[u.type]?.naval && !waterWalks(u.type) && !!u.embarked !== sea) u.embarked = sea;
-    arrive(state, u);
-    return true;
-  }
-  return false;
+  const p = placementPlot(state, u, u.tileIndex, (i) => !revealed || revealed[i] === 1);
+  if (p < 0) return false;
+  u.tileIndex = p;
+  // the placement embarks a land unit put on water and lands one put
+  // ashore (runs/h1_duelq1121 t154: China's embarked Musketman 3735567 on
+  // 10:14 home to city-state 2 as 2424833 on 10:6, its Movement 3 in
+  // Logistics' 24.0; 1124 t92: Granada's Knight 1310720 made on the water
+  // plot 41:13, UnitEmbarkedStateChanged at its placement)
+  const sea = isWater(state.map.tiles[p]);
+  if (!UNITS[u.type]?.naval && !waterWalks(u.type) && !!u.embarked !== sea) u.embarked = sea;
+  arrive(state, u);
+  return true;
 }
 
 /**

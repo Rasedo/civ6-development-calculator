@@ -754,6 +754,7 @@
       value: China's levied Warrior 1638402 on city-state 2's ground 13:14 removed at city-state 3's start, no unit added
   readings:
     - "C-129: a unit made anew that no plot takes is destroyed, its own plot refused by a hostile defender alone; a bankruptcy's disband before the look — READ, both twins"
+    - "C-132 / C-128 / C-95 / C-123 / C-133: the danger map's unmoved flag, a unit made anew's place, the operation queue's push, the strike's turn, the raid's recruit, the shore tests — READ (0x26df90 at 0x26e128..0x26e159, 0x716400 at 0x71672d, 0x586360 at 0x586542..0x58657e / 0x5867ab..0x586875, 0x93fa10 at 0x93fd94..0x93fdab / 0x93fe79, 0x526a0 at 0x52788..0x527ac, 0x523e0, 0x55460, 0x962380 at 0x96268f, 0x60a440, 0x26e570 at 0x26e904, 0x2720a0 at 0x272618..0x272689), both twins"
   context:
     - "- THE TRANSFER (0x93fa10, the unit manager's vtable +0x80 at 0xd92c18; the levy's return 0x4502b0 calls it with the 5th argument 1): the old unit is destro..."
   review: reviewed

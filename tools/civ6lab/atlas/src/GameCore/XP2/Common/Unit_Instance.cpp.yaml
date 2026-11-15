@@ -215,6 +215,7 @@
     - "C-110: the Fortify order and its ticks; the heal's plot gate — READ"
     - "C-95: the rampage strikes with the move's whole list; its defender is one the barbarians see — READ (0x778b40, 0x771670, 0x208b80, 0x20a2a0), both twins"
     - "C-123 / C-125: Coastal Raid's queue walks on, a raid ends the raider's moves; Attack Units' targets keep one the pass killed — READ (0x7735d0, 0x95b100, 0x95b7c0, 0xa4fbc0 at 0xa501e2..0xa502e6, 0x5218f0, 0x76eb50, 0x776140 at 0x776333 -> 0x7765e4), both twins"
+    - "C-132 / C-128 / C-95 / C-123 / C-133: the danger map's unmoved flag, a unit made anew's place, the operation queue's push, the strike's turn, the raid's recruit, the shore tests — READ (0x26df90 at 0x26e128..0x26e159, 0x716400 at 0x71672d, 0x586360 at 0x586542..0x58657e / 0x5867ab..0x586875, 0x93fa10 at 0x93fd94..0x93fdab / 0x93fe79, 0x526a0 at 0x52788..0x527ac, 0x523e0, 0x55460, 0x962380 at 0x96268f, 0x60a440, 0x26e570 at 0x26e904, 0x2720a0 at 0x272618..0x272689), both twins"
   notes:
     - ".claude/scratchpad/mu1/readings_c96.md: ...flag 0x1000, else the skip 0x95eae0 (\"Wander Back to City\", \"Move To\" the   city). The turn ends (0x56d6f0, 0x570b40). Confirmed: the turn's \"Random   Direction\" draws pair one to one with the AI_Tactical.c..."
   context:
@@ -430,9 +431,13 @@
     - recording: h1_duelq1127
       turn: 199
       value: player 0's embarked Warrior on 29:13, no Cartography, lays no 15 on the barbarian Galley's Ocean 28:15 in the barbarians' danger map
-  impl: [cpu/core/tactical.ts:groundOf, gpu/core/sim_tactics.py:_tac_attack_planes]
+  impl:
+    - cpu/core/tactical.ts:groundOf
+    - gpu/core/sim_tactics.py:_tac_attack_planes
+    - cpu/core/tactical.ts:f
   readings:
     - "C-132: the danger map's fitted rules in the DLL; a search's shore crossings on the formation's own domain — READ (0x26dab0, 0x586360 at 0x586624..0x586664, 0x2720a0 at 0x272618..0x272689, 0x66a90, 0x52fe90, 0x56e0a0, 0x26e570, 0x530240, 0x530420), FIT (the unmoved flag, the barbarians' raise, the grant's last turn), both twins"
+    - "C-132 / C-128 / C-95 / C-123 / C-133: the danger map's unmoved flag, a unit made anew's place, the operation queue's push, the strike's turn, the raid's recruit, the shore tests — READ (0x26df90 at 0x26e128..0x26e159, 0x716400 at 0x71672d, 0x586360 at 0x586542..0x58657e / 0x5867ab..0x586875, 0x93fa10 at 0x93fd94..0x93fdab / 0x93fe79, 0x526a0 at 0x52788..0x527ac, 0x523e0, 0x55460, 0x962380 at 0x96268f, 0x60a440, 0x26e570 at 0x26e904, 0x2720a0 at 0x272618..0x272689), both twins"
   review: reviewed
 - addr: 0x56e0d0
   final: 0x3a39a0
@@ -502,6 +507,7 @@
     - "H-1: the recorder's unit, planning and city AI reads — READ off the disassembly, not yet read from a running game"
     - "C-133 / C-128: flag 2's parent plot, the open list as the list itself, the embarked state's Movement cap, the zone's improvement test — READ (0x2720a0 at 0x27220d / 0x2724c8, 0x775a0, 0x79560, 0x586d40 at 0x587042..0x5870aa / 0x58741c..0x587486, 0x5706e0, 0x531ef0, 0x26fe20 at 0x270444 / 0x270776, 0x270be0, 0x52f970), both twins"
     - "H-1: the recorder's reads against a running game — READ (the unit, the formation, the planning, the target list, the known cities, the unit production table, the queue), PARTLY READ (the path's node, the modifiers)"
+    - "C-132 / C-128 / C-95 / C-123 / C-133: the danger map's unmoved flag, a unit made anew's place, the operation queue's push, the strike's turn, the raid's recruit, the shore tests — READ (0x26df90 at 0x26e128..0x26e159, 0x716400 at 0x71672d, 0x586360 at 0x586542..0x58657e / 0x5867ab..0x586875, 0x93fa10 at 0x93fd94..0x93fdab / 0x93fe79, 0x526a0 at 0x52788..0x527ac, 0x523e0, 0x55460, 0x962380 at 0x96268f, 0x60a440, 0x26e570 at 0x26e904, 0x2720a0 at 0x272618..0x272689), both twins"
   notes:
     - ".claude/scratchpad/mu1/readings_c96.md: ...bard (0x56daa0) strength   within its range (0x56e3d0), any other nearer than twice its Movement   (0x56e130) — HIGH for a FRIENDLY_CITY, MEDIUM for an ALLY_SUPPORT. The   type ids (0x5bcb80, each global the..."
   context:
@@ -606,6 +612,7 @@
     - "C-99 / C-128: the swap's partner test and its step along its own path; Move Unit's update before the executions; a Trader no passenger — READ (0x972540, 0x56e760, 0x972a50 -> 0x26fe20, 0x7d3a00 -> 0x7f0020, 0x586360 -> 0x208b80 / 0x523d60), both twins"
     - "C-110: the Fortify order and its ticks; the heal's plot gate — READ"
     - "C-133 / C-128: flag 2's parent plot, the open list as the list itself, the embarked state's Movement cap, the zone's improvement test — READ (0x2720a0 at 0x27220d / 0x2724c8, 0x775a0, 0x79560, 0x586d40 at 0x587042..0x5870aa / 0x58741c..0x587486, 0x5706e0, 0x531ef0, 0x26fe20 at 0x270444 / 0x270776, 0x270be0, 0x52f970), both twins"
+    - "C-132 / C-128 / C-95 / C-123 / C-133: the danger map's unmoved flag, a unit made anew's place, the operation queue's push, the strike's turn, the raid's recruit, the shore tests — READ (0x26df90 at 0x26e128..0x26e159, 0x716400 at 0x71672d, 0x586360 at 0x586542..0x58657e / 0x5867ab..0x586875, 0x93fa10 at 0x93fd94..0x93fdab / 0x93fe79, 0x526a0 at 0x52788..0x527ac, 0x523e0, 0x55460, 0x962380 at 0x96268f, 0x60a440, 0x26e570 at 0x26e904, 0x2720a0 at 0x272618..0x272689), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...swap's partner and the move order's first turn — READ, ported; the swap's path tests and 0x56e760 unread"

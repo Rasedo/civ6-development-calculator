@@ -12,6 +12,9 @@
   cases:
     - recording: AI_Tactical.csv
       value: "Confirmed: the turn's \"Random   Direction\" draws pair one to one with the AI_Tactical.csv rows \"Wander\" and   \"Garrison\", every player's in log order (1,199 of 1,199 turn-pairs of the   five seeds), a"
+    - recording: h1_duelq1124
+      turn: 83
+      value: city-state 4's Catapult home off 4:9 (China's ground) to 43:9, the nearest revealed plot once its Warrior home on 43:8 looked
   impl:
     - cpu/core/tactical.ts:WANDER_CITY_RANGE
     - cpu/core/tactical.ts:alternateLocation
@@ -24,6 +27,7 @@
     - "C-96: the knowledge base's army records and the Combat Desire — READ (the records, the update, the desire), PARTLY READ (the signals' looks; the standing-army count in its own section below)"
     - "C-99: the pathfinder's later-turn pool, Heal's hull, the tactical list's explorers, Move Unit's planning — READ, both twins"
     - "C-128: a crowded plot's unit goes beside it as its AI player's turn ends — READ (0x775e50, 0x585d90, 0x93f870, 0x585940), both twins"
+    - "C-132 / C-128 / C-95 / C-123 / C-133: the danger map's unmoved flag, a unit made anew's place, the operation queue's push, the strike's turn, the raid's recruit, the shore tests — READ (0x26df90 at 0x26e128..0x26e159, 0x716400 at 0x71672d, 0x586360 at 0x586542..0x58657e / 0x5867ab..0x586875, 0x93fa10 at 0x93fd94..0x93fdab / 0x93fe79, 0x526a0 at 0x52788..0x527ac, 0x523e0, 0x55460, 0x962380 at 0x96268f, 0x60a440, 0x26e570 at 0x26e904, 0x2720a0 at 0x272618..0x272689), both twins"
   notes:
     - ".claude/scratchpad/mu1/readings_c96.md: ...move 0x962030 to the plot drawn (\"Wander\", \"Move To\" the plot). With none:   FindAlternateLocation (0x585940) round the city within 3, moved to with   flag 0x1000, else the skip 0x95eae0 (\"Wander Back to City..."
     - ".claude/scratchpad/mu1/readings_c96.md: ...'s ASK).   Their logs hold 23 such rows (runs/h1_duelw1114, 1123, 1130). - FIND ALTERNATE LOCATION (0x585940): over the game's axial steps (dx, dy),   dx outer from -range to range, dy inner, the plot at the..."
@@ -301,6 +305,9 @@
     - recording: h1_duelq1124
       turn: 114
       value: "Builder Capture's Builder 5111833 and Man-At-Arms 4784141 on 31:11 for 6:4 step to 30:11, t115 back to 31:11, t116 to 31:10: their way east city-state 4's unseen centre 32:8"
+    - recording: h1_duelq1121
+      turn: 56
+      value: "the levy's and its return's units (flag 0x10): each refused plot's unit goes to FindAlternateLocation's plot within 10, the game's 12 of 12 levied and 11 of 11 returned"
   impl:
     - cpu/core/units.ts:tileFreeForUnit
     - gpu/core/sim_masks.py:_spot_free
@@ -339,6 +346,10 @@
     - cpu/core/combat.ts:retreatPlot
     - cpu/core/tactical.ts:peaceFort
     - gpu/core/sim_tactics.py:_tac_peace_fort
+    - cpu/core/tactical.ts:PLACEMENT_RANGE
+    - cpu/core/tactical.ts:placementPlot
+    - gpu/core/sim_tactics.py:_tac_attack_planes
+    - cpu/core/tactical.ts:f
   readings:
     - "H-1: a civilian stepped on — READ"
     - "C-96: the city-states' tactical pass — READ (Wander Near City, Heal, the non-barbarian priorities, FindAlternateLocation), the families it needs PARTLY READ"
@@ -370,6 +381,7 @@
     - "C-95 / C-123: a move order's path passes a district of hit points out of sight and a unit of another map layer; a walk's step reads its own formation's riders; a raid's start zeroes the tribe's raid score — READ (0x586360 at 0x5866c9..0x58671f, 0x2720a0 at 0x272618..0x272689, 0x816cb0 at 0x8177cf..0x8177e9, 0x149980 at 0x149b01, 0x7c7330, 0x152c00, 0x154b80), both twins"
     - "C-95 / C-123: a zone of control out of sight is none in a path's cost; Attack Civilians past a withdrawn civilian; the capture step through a plot of its own; a withdrawal's plot — READ (0x5033a0 at 0x5033f9..0x503400, 0x773270 at 0x773383..0x77339c, 0x530650 at 0x5307a4..0x5307d3), both twins"
     - "C-132: the danger map's fitted rules in the DLL; a search's shore crossings on the formation's own domain — READ (0x26dab0, 0x586360 at 0x586624..0x586664, 0x2720a0 at 0x272618..0x272689, 0x66a90, 0x52fe90, 0x56e0a0, 0x26e570, 0x530240, 0x530420), FIT (the unmoved flag, the barbarians' raise, the grant's last turn), both twins"
+    - "C-132 / C-128 / C-95 / C-123 / C-133: the danger map's unmoved flag, a unit made anew's place, the operation queue's push, the strike's turn, the raid's recruit, the shore tests — READ (0x26df90 at 0x26e128..0x26e159, 0x716400 at 0x71672d, 0x586360 at 0x586542..0x58657e / 0x5867ab..0x586875, 0x93fa10 at 0x93fd94..0x93fdab / 0x93fe79, 0x526a0 at 0x52788..0x527ac, 0x523e0, 0x55460, 0x962380 at 0x96268f, 0x60a440, 0x26e570 at 0x26e904, 0x2720a0 at 0x272618..0x272689), both twins"
   notes:
     - ".claude/scratchpad/mu1/readings_c96.md: ...k; the distance max(|dx|, |dy|) where the   signs differ, |dx| + |dy| else); the unit may enter it (0x586360 flag   0x40), the player revealed it, no other player's unit on it and none of   its own that it ma..."
     - ".claude/scratchpad/mu1/readings_c96.md: ...a hull outside   its own territory heads for its player's nearest city (first of equals) —   where 0x586360 (flag 0x10) allows it, PARTLY READ. The engines carry no   influence map: every plot reads no dange..."
@@ -416,6 +428,7 @@
     - cpu/core/tactical.ts:from
     - cpu/core/tactical.ts:shoots
     - cpu/core/tactical.ts:naval
+    - gpu/core/sim_tactics.py:_tac_attack_planes
   readings:
     - "C-96: the city-states' tactical pass — READ (Wander Near City, Heal, the non-barbarian priorities, FindAlternateLocation), the families it needs PARTLY READ"
     - "C-95: the scout's tree \"Barbarian Found City\" — READ, ported"
@@ -437,6 +450,7 @@
     - "C-132: the danger map's sight, its list's closed ground, the search's whole Movement and its strikes onto water; the embark waiver off a wonder's plot — READ (0x5033a0 -> 0x503320, 0x530420), FIT (the list's closed ground, the start on a district at war, the strikes onto water, the Great General's Movement), both twins"
     - "C-133 / C-95 / C-134: the kept path's searches inside a queue run; the Trader target, the defending district and Pillage's own plot; the safe plot's unit at war that fights — READ (0x272aa0 at 0x272af9..0x272c76, 0x26ef40 at 0x26f123..0x26f162, 0x26e3a0, 0x782d0, 0x783980 at 0x7842df..0x7842eb / 0x784aec..0x784b36, 0x24c2f0, 0x774380 at 0x774481..0x7744a9, 0x716b90 at 0x716d53..0x716da1), FIT (the planning list's seen unit at war), both twins"
     - "C-132: the danger map's fitted rules in the DLL; a search's shore crossings on the formation's own domain — READ (0x26dab0, 0x586360 at 0x586624..0x586664, 0x2720a0 at 0x272618..0x272689, 0x66a90, 0x52fe90, 0x56e0a0, 0x26e570, 0x530240, 0x530420), FIT (the unmoved flag, the barbarians' raise, the grant's last turn), both twins"
+    - "C-132 / C-128 / C-95 / C-123 / C-133: the danger map's unmoved flag, a unit made anew's place, the operation queue's push, the strike's turn, the raid's recruit, the shore tests — READ (0x26df90 at 0x26e128..0x26e159, 0x716400 at 0x71672d, 0x586360 at 0x586542..0x58657e / 0x5867ab..0x586875, 0x93fa10 at 0x93fd94..0x93fdab / 0x93fe79, 0x526a0 at 0x52788..0x527ac, 0x523e0, 0x55460, 0x962380 at 0x96268f, 0x60a440, 0x26e570 at 0x26e904, 0x2720a0 at 0x272618..0x272689), both twins"
   notes:
     - ".claude/scratchpad/mu1/readings_c96.md: ...it. - THE PLANNING'S GROUND, beside the barbarians': the list (0x26d890) keeps a   plot only where 0x586900 lets the unit end — another player's unit at   peace it passes and never ends on (runs/h1_duelw1117..."
   context:
@@ -481,6 +495,8 @@
     - cpu/harness/replay.ts:home
     - cpu/core/minorBuild.ts:pool
     - cpu/core/units.ts:stepUnit
+    - cpu/core/tactical.ts:placementPlot
+    - gpu/core/sim_minors.py:_jump_made_anew
   readings:
     - "C-110 / C-99: a placement resets the fortification, a struck SENTRY wakes, a siege striker asks no Movement — READ (0x586d40 at 0x587789, 0x20d280 at 0x20d5ce, 0x775340 at 0x7754c7), both twins"
     - "H-1: the raids — READ"
@@ -501,6 +517,7 @@
     - "C-99 / C-95: a melee blow's river is the defender plot's edge on the attacker's side at any distance; a levied unit home reveals its sight — READ (0x522c10 at 0x522f1d..0x52301b, 0x51f070 at 0x51f603..0x51f639), both twins"
     - "C-98 / C-130 / C-96: a levied unit home with no plot dies on its minor's list; the unit term's upgrade Gold is the minor's; the pick refuses a held building under its pillaged district — READ (0x93fa10 at 0x93ff0b, 0x7cb8b0, 0x4cb350, 0x7f2970 at 0x7f3bd1), LAB (the placement's embark state, the unit term's Gold on the records), both twins"
     - "C-133 / C-128: flag 2's parent plot, the open list as the list itself, the embarked state's Movement cap, the zone's improvement test — READ (0x2720a0 at 0x27220d / 0x2724c8, 0x775a0, 0x79560, 0x586d40 at 0x587042..0x5870aa / 0x58741c..0x587486, 0x5706e0, 0x531ef0, 0x26fe20 at 0x270444 / 0x270776, 0x270be0, 0x52f970), both twins"
+    - "C-132 / C-128 / C-95 / C-123 / C-133: the danger map's unmoved flag, a unit made anew's place, the operation queue's push, the strike's turn, the raid's recruit, the shore tests — READ (0x26df90 at 0x26e128..0x26e159, 0x716400 at 0x71672d, 0x586360 at 0x586542..0x58657e / 0x5867ab..0x586875, 0x93fa10 at 0x93fd94..0x93fdab / 0x93fe79, 0x526a0 at 0x52788..0x527ac, 0x523e0, 0x55460, 0x962380 at 0x96268f, 0x60a440, 0x26e570 at 0x26e904, 0x2720a0 at 0x272618..0x272689), both twins"
   context:
     - "...om 0 to more — newly visible to the barbarian player, not to the scout alone. A move (0x586d40 → 0x58f3f0 with add) adds the new sight before it drops the old, so a plot both sights..."
     - "...The triggers: a unit placed on a plot another player sees (0x5246f0, from the placement 0x586d40: each player whose visibility count of the plot is above 0); a plot coming into view me..."

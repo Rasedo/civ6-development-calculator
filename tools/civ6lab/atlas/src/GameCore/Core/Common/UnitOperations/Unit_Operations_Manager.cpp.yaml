@@ -17,11 +17,16 @@
 - addr: 0x523e0
   kind: function
   name: the unit's queue turn
-  semantics: "the operations manager's vt +0x170: while the unit holds operations, one in ACTIVITY_OPERATION (+0x5f0 = 0x490cc8e1) runs the queue run 0x52f50 (+0x138) and sweeps the front operation (+0x150) where the run is done; else the front operation is started (+0x130). Its start conditions past 0x524d5 unread."
-  status: PARTLY
+  semantics: "the operations manager's vt +0x170: none for a unit with no operation (+0x2178) or under 0x56eea0; while the unit holds operations and lives: one in ACTIVITY_OPERATION (+0x5f0 = 0x490cc8e1) runs the queue run 0x52f50 (+0x138) — not done, the turn ends; done, the front operation is swept (+0x150) —; else the front operation's CanStart (vt +0x48 on the unit's plot): refused (\"%03d, Can't Start\"), it is kept where the unit has moved (0x56e760) and the operation's turn (+0x20) is not behind the game's, else swept; accepted, it is started (+0x130) and swept where the start answers done, the turn ending where the unit is left out of ACTIVITY_OPERATION. So an operation behind one that completes starts in the same queue turn."
+  status: READ
+  cases:
+    - recording: h1_duelq1128
+      turn: 31
+      value: "the camp's Spearman 589832 short of its spot at no Movement: its MOVE_TO kept, UnitOperationSegmentComplete at the end-turn pass and at the deactivation (seq 6354, 6375)"
   impl: [cpu/core/tactical.ts:withShortOrders, cpu/core/tactical.ts:mine]
   readings:
     - "C-133 / C-95: the carried orders run in the unit list's order; a path comes ashore off water only by the disembark test — READ (0x7df30, 0x554e0, 0x523e0, 0x52e90, 0x54910, 0x2720a0 at 0x272380..0x27240d, 0x52fb90 at 0x52fb9d), both twins; UpdateOpenNode's walk and flag 2's plot — READ (0x79560, 0x2720a0 at 0x2721c3..0x27220d / 0x2724c8), unported"
+    - "C-132 / C-128 / C-95 / C-123 / C-133: the danger map's unmoved flag, a unit made anew's place, the operation queue's push, the strike's turn, the raid's recruit, the shore tests — READ (0x26df90 at 0x26e128..0x26e159, 0x716400 at 0x71672d, 0x586360 at 0x586542..0x58657e / 0x5867ab..0x586875, 0x93fa10 at 0x93fd94..0x93fdab / 0x93fe79, 0x526a0 at 0x52788..0x527ac, 0x523e0, 0x55460, 0x962380 at 0x96268f, 0x60a440, 0x26e570 at 0x26e904, 0x2720a0 at 0x272618..0x272689), both twins"
   context:
     - "...order; a path comes ashore off water only by the disembark test — READ (0x7df30, 0x554e0, 0x523e0, 0x52e90, 0x54910, 0x2720a0 at 0x272380..0x27240d, 0x52fb90 at 0x52fb9d), both twins; Upd..."
     - ...its +0x138, the front operation's validity sweep 0x54910 its +0x150, the queue's turn 0x523e0 its +0x170.
@@ -30,10 +35,15 @@
 - addr: 0x526a0
   kind: function
   name: the queue's push
-  semantics: "the operations manager's vt +0x60: an operation added to the unit's queue (\"%03d, Adding\")."
-  status: PARTLY
+  semantics: "the operations manager's vt +0x60 (manager, unit, parameters, mode): an operation added to the unit's queue (\"%03d, Adding\"). With mode 0 and the parameters' byte +0x20 clear, or mode 1 (0x52788..0x52797), it first empties the unit's queue (vt +0x68, 0x52e90 at 0x527ac) and passes the start flag 1; else it appends with the flag 0. Then the parameters' +0x21 (vt +0xb8), the handler by type (vt +0x80), the handler's test (its vt +0x58 at 0x528f9: refused, nothing is queued), the operation built (vt +0x128) and pushed (vt +0x160, 0x546f0, r9b the start flag). Every order a tactical node pushes with zeroed parameters and mode 0 replaces what the unit held and starts at once. Unported: the engines hold a camp strike short of its spot (`defendCamps`)."
+  status: READ
+  cases:
+    - recording: h1_duelq1128
+      turn: 32
+      value: "the camp's Spearman 589832, its MOVE_TO of t31 kept through that turn's deactivation, takes its t32 strike from 32:7 in its row's place: the new order's push emptied the queue, nothing of t31's ran first"
   readings:
     - "C-133 / C-95: the carried orders run in the unit list's order; a path comes ashore off water only by the disembark test — READ (0x7df30, 0x554e0, 0x523e0, 0x52e90, 0x54910, 0x2720a0 at 0x272380..0x27240d, 0x52fb90 at 0x52fb9d), both twins; UpdateOpenNode's walk and flag 2's plot — READ (0x79560, 0x2720a0 at 0x2721c3..0x27220d / 0x2724c8), unported"
+    - "C-132 / C-128 / C-95 / C-123 / C-133: the danger map's unmoved flag, a unit made anew's place, the operation queue's push, the strike's turn, the raid's recruit, the shore tests — READ (0x26df90 at 0x26e128..0x26e159, 0x716400 at 0x71672d, 0x586360 at 0x586542..0x58657e / 0x5867ab..0x586875, 0x93fa10 at 0x93fd94..0x93fdab / 0x93fe79, 0x526a0 at 0x52788..0x527ac, 0x523e0, 0x55460, 0x962380 at 0x96268f, 0x60a440, 0x26e570 at 0x26e904, 0x2720a0 at 0x272618..0x272689), both twins"
   context:
     - "- THE MANAGER'S VTABLE begins at 0xcff7c0 (the first slot 0x523a0): the queue's push 0x526a0 is its +0x60, the handler by operation type 0x53e80 its +0x80, an operation's start 0x5..."
   review: reviewed
@@ -45,6 +55,7 @@
   status: PARTLY
   readings:
     - "C-133 / C-95: the carried orders run in the unit list's order; a path comes ashore off water only by the disembark test — READ (0x7df30, 0x554e0, 0x523e0, 0x52e90, 0x54910, 0x2720a0 at 0x272380..0x27240d, 0x52fb90 at 0x52fb9d), both twins; UpdateOpenNode's walk and flag 2's plot — READ (0x79560, 0x2720a0 at 0x2721c3..0x27220d / 0x2724c8), unported"
+    - "C-132 / C-128 / C-95 / C-123 / C-133: the danger map's unmoved flag, a unit made anew's place, the operation queue's push, the strike's turn, the raid's recruit, the shore tests — READ (0x26df90 at 0x26e128..0x26e159, 0x716400 at 0x71672d, 0x586360 at 0x586542..0x58657e / 0x5867ab..0x586875, 0x93fa10 at 0x93fd94..0x93fdab / 0x93fe79, 0x526a0 at 0x52788..0x527ac, 0x523e0, 0x55460, 0x962380 at 0x96268f, 0x60a440, 0x26e570 at 0x26e904, 0x2720a0 at 0x272618..0x272689), both twins"
   context:
     - "...path comes ashore off water only by the disembark test — READ (0x7df30, 0x554e0, 0x523e0, 0x52e90, 0x54910, 0x2720a0 at 0x272380..0x27240d, 0x52fb90 at 0x52fb9d), both twins; UpdateOpenNo..."
     - "...peration swept (+0x150) where the run is done —; where it does not and sets its flag, 0x52e90 empties the queue and clears the formation's kept path (0x265fd0). So the move orders a..."
@@ -129,10 +140,12 @@
     - recording: h1_duelq1121
       turn: 160
       value: "the camp's Spearman 1376265 on 3:18, its move to the spot 3:17 its Line Infantry holds kept, strikes nothing: the strike pushed behind it never starts; h1_duelq1128 t31 the Spearman 589832 walks 30:6 -> 31:7 for 32:8 with no strike"
+  impl: [cpu/core/tactical.ts:kept]
   readings:
     - "C-125 / C-95: the target list's trade layer and its one unit of the units' layer; a siege unit's step onto civilians; the city-states' Attack Civilians; the flankers' test, the support's caller, the camp strike's queue — READ (0x783980 at 0x7849bb..0x784c2b and 0x784c30..0x784f57, 0x26fe20 -> 0x212500, 0x521530, 0x51f070 at 0x51f70e..0x51f737, 0x546f0, 0x52f50), both twins"
     - "H-1: the recorder's unit, planning and city AI reads — READ off the disassembly, not yet read from a running game"
     - "H-1: the recorder's reads against a running game"
+    - "C-132 / C-128 / C-95 / C-123 / C-133: the danger map's unmoved flag, a unit made anew's place, the operation queue's push, the strike's turn, the raid's recruit, the shore tests — READ (0x26df90 at 0x26e128..0x26e159, 0x716400 at 0x71672d, 0x586360 at 0x586542..0x58657e / 0x5867ab..0x586875, 0x93fa10 at 0x93fd94..0x93fdab / 0x93fe79, 0x526a0 at 0x52788..0x527ac, 0x523e0, 0x55460, 0x962380 at 0x96268f, 0x60a440, 0x26e570 at 0x26e904, 0x2720a0 at 0x272618..0x272689), both twins"
   context:
     - ...b and 0x784c30..0x784f57, 0x26fe20 -> 0x212500, 0x521530, 0x51f070 at 0x51f70e..0x51f737, 0x546f0, 0x52f50), both twins
     - "- THE CAMP STRIKE'S QUEUE (0x772940's two pushes through the manager's vt +0x60, 0x546f0): the operation is appended at the back of the unit's queue (+0x2040: the list +0xd0, i..."
@@ -147,6 +160,19 @@
   context:
     - "...s ashore off water only by the disembark test — READ (0x7df30, 0x554e0, 0x523e0, 0x52e90, 0x54910, 0x2720a0 at 0x272380..0x27240d, 0x52fb90 at 0x52fb9d), both twins; UpdateOpenNode's walk..."
     - ...5280 its +0x130, the queue run 0x52f50 its +0x138, the front operation's validity sweep 0x54910 its +0x150, the queue's turn 0x523e0 its +0x170.
+  review: reviewed
+- addr: 0x55460
+  final: 0x41a90
+  kind: function
+  name: the unit's operations at its turn start
+  semantics: "the operations manager's vt +0x58, called on each unit by the player's DoTurn (0x4e4560 at 0x4e497f): vt +0xc8 on the unit, then for a live unit with a pending operation the front operation's handler (vt +0x80 by its type) asked its vt +0x30; where it answers, the front operation is swept (vt +0x150)."
+  status: PARTLY
+  readings:
+    - "C-132 / C-128 / C-95 / C-123 / C-133: the danger map's unmoved flag, a unit made anew's place, the operation queue's push, the strike's turn, the raid's recruit, the shore tests — READ (0x26df90 at 0x26e128..0x26e159, 0x716400 at 0x71672d, 0x586360 at 0x586542..0x58657e / 0x5867ab..0x586875, 0x93fa10 at 0x93fd94..0x93fdab / 0x93fe79, 0x526a0 at 0x52788..0x527ac, 0x523e0, 0x55460, 0x962380 at 0x96268f, 0x60a440, 0x26e570 at 0x26e904, 0x2720a0 at 0x272618..0x272689), both twins"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - ...x586875, 0x93fa10 at 0x93fd94..0x93fdab / 0x93fe79, 0x526a0 at 0x52788..0x527ac, 0x523e0, 0x55460, 0x962380 at 0x96268f, 0x60a440, 0x26e570 at 0x26e904, 0x2720a0 at 0x272618..0x272689), b...
+    - "...pletes starts in the same queue turn. The player's DoTurn calls the manager's vt +0x58 (0x55460) on each unit (0x4e497f): a live unit's front operation whose handler answers its vt..."
   review: reviewed
 - addr: 0x554e0
   final: 0x41b10
