@@ -3985,7 +3985,11 @@ class SimTactics:
         seen = self._barb_seen("barbarians" if seat == BARB_SEAT else seat)
         peace = self._tac_peaceful(seat) & seen
         held = peace.gather(1, dest_c.unsqueeze(1)).squeeze(1) | peace.gather(1, here_c.unsqueeze(1)).squeeze(1)
-        sw = sw & enough & ~zoned & ~held
+        # each of the two placed on the other's plot (`placedOn`)
+        none = torch.full_like(u_b, -1)
+        placed = (self._tac_placed(bidx, u_b, none, pre, seat, dest_c)
+                  & self._tac_placed(bidx, other, none, pre, seat, here_c))
+        sw = sw & enough & ~zoned & ~held & placed
         if not bool(sw.count_nonzero()):
             return
         rs, oc = bidx[sw], occ[sw].clamp(min=0)
@@ -5008,8 +5012,9 @@ class SimTactics:
             on = p >= 0
             if bool(on.count_nonzero()):
                 r_i = bidx[on]
-                # the path 0x272a60 (`turnsToPlot`: flag 0x1000)
-                res = self._tac_search(r_i, u_b[on], seat, 1 << 30, True, dest=p[on], pre=pre, later_turns=True)
+                # the path 0x272a60 under the path's flags 0 (`turnsToPlot`
+                # with no later turns)
+                res = self._tac_search(r_i, u_b[on], seat, 1 << 30, True, dest=p[on], pre=pre, later_turns=False)
                 ok = torch.zeros(B, dtype=torch.bool, device=dev)
                 ok[r_i] = res["turns"][torch.arange(r_i.shape[0], device=dev), p[on]] > 0
                 p = torch.where(ok, p, torch.full_like(p, -1))

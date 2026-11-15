@@ -981,6 +981,7 @@
     - "C-124: the formation's kept path, and a path's other players' units — READ (0x272aa0, 0x26e3a0, 0x782d0, 0x586360 at 0x586542..0x5865a1), unported"
     - "C-99: a move order carried on as the turn ends, the zone-of-control wait, the embark rule's TO plot — READ (0x962380, 0x52f50, 0x26fe20, 0x2675e0, 0x2673f0, 0x530420, 0x267650), both twins"
     - "C-99 / C-128: the swap's partner test and its step along its own path; Move Unit's update before the executions; a Trader no passenger — READ (0x972540, 0x56e760, 0x972a50 -> 0x26fe20, 0x7d3a00 -> 0x7f0020, 0x586360 -> 0x208b80 / 0x523d60), both twins"
+    - "C-95 / C-134: HL Explore's path tests under flags 0, Naval Choose Target's unit kinds, the swap partner's destination test — READ (0x70aa40 at 0x70aed0 / 0x70b063 / 0x70b173 / 0x70b2b6 / 0x70b3b3, 0x802ea0 at 0x802f15..0x802f69, 0x972540 at 0x97273a..0x97276c), both twins"
   context:
     - "...cost (plot vt +0x18) << 8 needs 0x56e760 clear), and the destinations valid both ways (0x2726b0 flag 4). Start (0x972a50): the unit's formation to the target (flags | 4), then the p..."
   review: imported

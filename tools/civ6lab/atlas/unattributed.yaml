@@ -1797,6 +1797,7 @@
     - "C-95: the danger map's search pays no zone of control, a ranged unit strikes from its range; the rampage strike's ring — READ (0x26df90, 0x26e920, 0x771670, 0x691f0, 0x76ecf0), FIT (the ranged unit's strike), both twins"
     - "C-127: a unit bought this turn holds no planning, so the tree that bought it ends — READ (records, aimem), both twins"
     - "C-99 / C-128: the swap's partner test and its step along its own path; Move Unit's update before the executions; a Trader no passenger — READ (0x972540, 0x56e760, 0x972a50 -> 0x26fe20, 0x7d3a00 -> 0x7f0020, 0x586360 -> 0x208b80 / 0x523d60), both twins"
+    - "C-95 / C-134: HL Explore's path tests under flags 0, Naval Choose Target's unit kinds, the swap partner's destination test — READ (0x70aa40 at 0x70aed0 / 0x70b063 / 0x70b173 / 0x70b2b6 / 0x70b3b3, 0x802ea0 at 0x802f15..0x802f69, 0x972540 at 0x97273a..0x97276c), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...order, strictly nearer replaces, +0x4c clear, enterable 0x586360), with a path to it (0x272a60), not chosen (\"HL: Explore cur region\"); a unit off any region the nearest of its area..."
@@ -3859,6 +3860,7 @@
     - "C-95: the rampage strikes with the move's whole list; its defender is one the barbarians see — READ (0x778b40, 0x771670, 0x208b80, 0x20a2a0), both twins"
     - "C-99: a unit an Upgrade Units tree lets go keeps the tree's job — READ (0x7d2190 -> 0x1e60f0 on +0x778, 0x810d30 at 0x81100a -> 0x81116f, 0x570b40), the tally's label (CPU)"
     - "C-132 / C-128 / C-95 / C-123 / C-133: the danger map's unmoved flag, a unit made anew's place, the operation queue's push, the strike's turn, the raid's recruit, the shore tests — READ (0x26df90 at 0x26e128..0x26e159, 0x716400 at 0x71672d, 0x586360 at 0x586542..0x58657e / 0x5867ab..0x586875, 0x93fa10 at 0x93fd94..0x93fdab / 0x93fe79, 0x526a0 at 0x52788..0x527ac, 0x523e0, 0x55460, 0x962380 at 0x96268f, 0x60a440, 0x26e570 at 0x26e904, 0x2720a0 at 0x272618..0x272689), both twins"
+    - "C-95 / C-134: HL Explore's path tests under flags 0, Naval Choose Target's unit kinds, the swap partner's destination test — READ (0x70aa40 at 0x70aed0 / 0x70b063 / 0x70b173 / 0x70b2b6 / 0x70b3b3, 0x802ea0 at 0x802f15..0x802f69, 0x972540 at 0x97273a..0x97276c), both twins"
   notes:
     - ".claude/scratchpad/mu1/readings_c96.md: ...000, else the skip 0x95eae0 (\"Wander Back to City\", \"Move To\" the   city). The turn ends (0x56d6f0, 0x570b40). Confirmed: the turn's \"Random   Direction\" draws pair one to one with the AI_Tactical.csv rows \"W..."
   context:
@@ -7806,13 +7808,19 @@
 - addr: 0x802ea0
   final: 0x566110
   kind: function
-  semantics: "Naval Choose Target's list: the player's tactical target list (+0x12b8 +0x368, 0x28-byte entries) filtered to the entries of type TARGET_CIVILIAN_UNIT through TARGET_HIGH_PRIORITY_UNIT whose plot is water exactly where the domain is 0 (DOMAIN_SEA)."
-  status: PARTLY
+  semantics: "Naval Choose Target's list: the player's tactical target list (+0x12b8 +0x368, 0x28-byte entries) filtered to the entries of type TARGET_CIVILIAN_UNIT through TARGET_HIGH_PRIORITY_UNIT by the enum's value (0x802f15..0x802f69: 6..11, TARGET_RELIGIOUS_CIVILIAN 7 and TARGET_TRADER 8 among them) whose plot is water exactly where the domain is 0 (DOMAIN_SEA)."
+  status: READ
+  cases:
+    - recording: h1_duels1136
+      turn: 102
+      value: city-state 2's Naval Superiority (target 16:16) takes player 1's embarked Missionary 2490390 on 25:14, its Caravels' Operation Move for 25:14 as logged
   impl:
     - cpu/core/operations/nodes.ts:navalChooseTarget
     - gpu/core/sim_minorops.py:_u_naval_choose
     - cpu/core/operations/nodes.ts:NAVAL_CHOOSE_TYPES
-  readings: ["C-97: the behaviour trees — READ (the interpreter), the nodes PARTLY READ"]
+  readings:
+    - "C-97: the behaviour trees — READ (the interpreter), the nodes PARTLY READ"
+    - "C-95 / C-134: HL Explore's path tests under flags 0, Naval Choose Target's unit kinds, the swap partner's destination test — READ (0x70aa40 at 0x70aed0 / 0x70b063 / 0x70b173 / 0x70b2b6 / 0x70b3b3, 0x802ea0 at 0x802f15..0x802f69, 0x972540 at 0x97273a..0x97276c), both twins"
   context:
     - "...D / unread: Naval Choose Target 0x803590 (the tactical analysis's target list by domain 0x802ea0 unread: the port finds none and skips its children); the executions of Operation Attack..."
     - "- NAVAL CHOOSE TARGET 0x803590 (list 0x802ea0): the target list (+0x12b8 +0x368, 0x28 bytes) CIVILIAN..HIGH entries on water for doma..."
@@ -8963,9 +8971,12 @@
   final: 0x67c350
   kind: function
   name: swapPartner
-  semantics: "the swap's partner (the operation's vt +0xc0; CanStart 0x9724c0 and Start 0x972a50 through it): the unit with Movement left (0x56c690), not moved into a zone of control (0x56e780), the target at distance 1 (0x1deb0); where it has moved (0x56e760) the path test 0x272a60 flag 4. Over the units on the target's layer (0x75c50) one of the same owner (+0x2e0) and type pair (vt +0xc8 on +0x160) with Movement left, not moved into a zone of control, its Movement (+0xdb0) at least the unit's plot's own cost (plot vt +0x18 << 8) unless at its full Movement (0x56e760 clear), and the destinations valid both ways (0x2726b0 flag 4: a seen goal where another player's unit at peace stands none)."
+  semantics: "the swap's partner (the operation's vt +0xc0; CanStart 0x9724c0 and Start 0x972a50 through it): the unit with Movement left (0x56c690), not moved into a zone of control (0x56e780), the target at distance 1 (0x1deb0); where it has moved (0x56e760) the path test 0x272a60 flag 4. Over the units on the target's layer (0x75c50) one of the same owner (+0x2e0) and type pair (vt +0xc8 on +0x160) with Movement left, not moved into a zone of control, its Movement (+0xdb0) at least the unit's plot's own cost (plot vt +0x18 << 8) unless at its full Movement (0x56e760 clear), and the destinations valid both ways (0x2726b0 flag 4 at 0x97273a / 0x972765: a seen goal where another player's unit at peace stands none; the destination test `placedOn`, so a ship and a land unit never partner off a hull's passage)."
   status: READ
   cases:
+    - recording: h1_duels1145
+      turn: 90
+      value: city-state 3's City Defense Catapult 1114115 on 42:16, Garrison City's candidate, finds no partner in the Galley 1179650 on its centre 42:15 and holds 42:16 (record t91)
     - recording: h1_duely1128
       turn: 174
       value: Hong Kong's Warrior 2490370 on 8:7 swaps onto its centre 9:7; its Warrior 2293764 steps first onto 9:8, 8:7 beside the barbarians on 9:6; its Man-At-Arms 1507331 on 10:7 swaps not with 2490370, moved into the barbarians' zone (record t+1)
@@ -8987,6 +8998,7 @@
     - "C-125 / C-99: the swap's partner pays its step, the stacking count's classes, the walk's end among other players' units, a siege unit's RangedCombat — READ (0x972a50, 0x585d90, 0x26fe20 via 0x585eb0, 0x56e3e0), both twins"
     - "C-99 / C-128: the swap's partner test and its step along its own path; Move Unit's update before the executions — READ (0x972540, 0x56e760, 0x972a50 -> 0x26fe20, 0x7d3a00 -> 0x7f0020), both twins"
     - "C-99 / C-128: the swap's partner test and its step along its own path; Move Unit's update before the executions; a Trader no passenger — READ (0x972540, 0x56e760, 0x972a50 -> 0x26fe20, 0x7d3a00 -> 0x7f0020, 0x586360 -> 0x208b80 / 0x523d60), both twins"
+    - "C-95 / C-134: HL Explore's path tests under flags 0, Naval Choose Target's unit kinds, the swap partner's destination test — READ (0x70aa40 at 0x70aed0 / 0x70b063 / 0x70b173 / 0x70b2b6 / 0x70b3b3, 0x802ea0 at 0x802f15..0x802f69, 0x972540 at 0x97273a..0x97276c), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "- THE SWAP'S PARTNER (0x972540, the operation's vt +0xc0, CanStart 0x9724c0 and Start 0x972a50 through it): the unit w..."

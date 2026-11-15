@@ -791,9 +791,12 @@ const navalPatrol: BtHandler<OpsContext> = {
   execute: (_node, _run, ctx) => ctx.patrol?.(opJobUnits(ctx.op)),
 };
 
-/** the unit targets Naval Choose Target's list takes (0x802ea0:
- *  TARGET_CIVILIAN_UNIT through TARGET_HIGH_PRIORITY_UNIT) */
-const NAVAL_CHOOSE_TYPES = new Set(['CIVILIAN', 'LOW', 'MEDIUM', 'HIGH']);
+/** the unit targets Naval Choose Target's list takes (0x802ea0 at
+ *  0x802f15..0x802f69: TARGET_CIVILIAN_UNIT through
+ *  TARGET_HIGH_PRIORITY_UNIT by the enum's value, the religious unit and the
+ *  Trader between them; runs/h1_duels1136 t102: city-state 2's Naval
+ *  Superiority takes player 1's embarked Missionary 2490390 on 25:14) */
+const NAVAL_CHOOSE_TYPES = new Set(['CIVILIAN', 'RELIGIOUS', 'TRADER', 'LOW', 'MEDIUM', 'HIGH']);
 
 // NAVAL CHOOSE TARGET (0x803590, its list 0x802ea0): of the seat's tactical
 // target list, the unit targets (civilian through high priority) on a plot

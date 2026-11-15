@@ -1620,7 +1620,11 @@ export function swapUnits(state: GameState, pass: Pass, unit: Unit, tile: number
 const plotMoveCost = (t: Tile): number => (t.district === 'CITY_CENTER' ? MP_SCALE : terrainMp(t));
 
 /** THE SWAP'S PARTNER (0x972540): a unit of the unit's player and domain on
- *  the plot (vt +0xc8 on the two types) with Movement left (0x56c690; one
+ *  the plot (vt +0xc8 on the two types), each of the two placed on the
+ *  other's plot (0x2726b0's destination test, `placedOn`: runs/h1_duels1145
+ *  t90 city-state 3's City Defense Catapult 1114115 on 42:16, Garrison
+ *  City's candidate, takes no swap with the Galley 1179650 on its centre
+ *  42:15 and holds 42:16), with Movement left (0x56c690; one
  *  whose moves an order of the pass ended has none) as much as the unit's
  *  plot costs (its vt +0x18) unless at its full Movement (0x56e760), and
  *  each placeable on the other's plot (0x2726b0 flag 4: a goal it sees
@@ -1633,8 +1637,9 @@ function swapPartner(state: GameState, pass: Pass, unit: Unit, tile: number): Un
   const from = state.map.tiles[unit.tileIndex];
   const seen = plotsSeenNow(state, new Set([unit.seat]));
   if (zocMoved?.has(unit) || (seen[tile] === 1 && peaceAt(state, unit, tile))) return undefined;
+  if (!placedOn(state, [unit], state.map.tiles[tile])) return undefined;
   return state.units.find((u) => u !== unit && u.tileIndex === tile && u.seat === unit.seat && unitDomain(u.type) === dom
-    && u.movesLeft > 0 && !pass.ended.has(u.id) && !zocMoved?.has(u)
+    && placedOn(state, [u], from) && u.movesLeft > 0 && !pass.ended.has(u.id) && !zocMoved?.has(u)
     && (u.movesLeft >= plotMoveCost(from) || u.movesLeft >= (u.movesFull ?? unitFullMoves(state, u)))
     && !(seen[unit.tileIndex] === 1 && peaceAt(state, u, unit.tileIndex)));
 }
@@ -4024,10 +4029,13 @@ function nearestUnrevealed(state: GameState, u: Unit, revealed: (i: number) => b
  * goody hut's plot holds none); else,
  * on the move's first round, the nearest unrevealed plot of its region
  * where the player has not revealed all of it ("cur region", a path to it
- * existing — 0x272a60, `turnsToPlot`; a unit off any region the nearest of
+ * existing — 0x272a60 on the unit's formation under the path's flags 0,
+ * `turnsToPlot` with no later turns: runs/h1_duels1139 t23 the barbarian
+ * Scout 524295 on 37:11 finds none to 39:7 under them, 12 turns under flag
+ * 0x1000, and takes the fallback 37:12; a unit off any region the nearest of
  * its area, "cur area");
  * else the nearest unrevealed plot of the player's region lists (0x70b6f0,
- * a path to it existing) — the primary and the secondary its cities' (a
+ * a path to it existing, the same flags) — the primary and the secondary its cities' (a
  * player with none holds none), the tertiary the regions of the plots it
  * revealed ("tertiary regions"); else the plot whose sight holds the most
  * plots the player does not see now (0x70a8b0, "fallback"). The unit's own
@@ -4082,16 +4090,16 @@ function exploreTarget(state: GameState, pass: Pass, u: Unit, chosen: Set<number
   if (reg >= 0) {
     if (map.tiles.some((t) => t.region === reg && !revealed(t.index))) {
       const p = nearestUnrevealed(state, u, revealed, (t) => t.region === reg);
-      if (p >= 0 && !chosen.has(p) && turnsToPlot(state, u, p) > 0) return { plot: p, move: 'HL: Explore cur region' };
+      if (p >= 0 && !chosen.has(p) && turnsToPlot(state, u, p, false) > 0) return { plot: p, move: 'HL: Explore cur region' };
     }
   } else {
     const area = here.area ?? -1;
     const p = nearestUnrevealed(state, u, revealed, (t) => (t.area ?? -1) === area);
-    if (p >= 0 && !chosen.has(p) && turnsToPlot(state, u, p) > 0) return { plot: p, move: 'HL: Explore cur area' };
+    if (p >= 0 && !chosen.has(p) && turnsToPlot(state, u, p, false) > 0) return { plot: p, move: 'HL: Explore cur area' };
   }
   if (pass.regions.size) {
     const p = nearestUnrevealed(state, u, revealed, (t) => pass.regions.has(t.region ?? -1));
-    if (p >= 0 && !chosen.has(p) && turnsToPlot(state, u, p) > 0) return { plot: p, move: 'HL: Explore tertiary regions' };
+    if (p >= 0 && !chosen.has(p) && turnsToPlot(state, u, p, false) > 0) return { plot: p, move: 'HL: Explore tertiary regions' };
   }
   return best2 >= 0 ? { plot: best2, move: 'HL: Explore fallback' } : null;
 }

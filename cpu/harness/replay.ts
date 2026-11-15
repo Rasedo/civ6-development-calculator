@@ -1017,6 +1017,17 @@ function madeInTurn(ctx: Ctx, copy: GameState, acts: readonly unknown[][], key: 
   return c;
 }
 
+/** the barbarian unit the log's capture of `key` in their turn (its
+ *  UnitCaptured row from row `open` on) makes: the barbarians' unit the log
+ *  adds last before that row */
+function capturedInto(acts: readonly unknown[][], key: string, open: number, barbP: number | undefined): string | undefined {
+  const k = acts.findIndex((x) => x[2] === 'UnitCaptured' && `${x[3]}:${x[4]}` === key && (x[0] as number) >= open && x[6] === barbP);
+  for (let i = k - 1; i >= 0 && (acts[i][0] as number) >= open; i--) {
+    if (acts[i][2] === 'UnitAddedToMap' && acts[i][3] === barbP) return `${barbP}:${acts[i][4]}`;
+  }
+  return undefined;
+}
+
 const PURCHASE_UNIT_HASH = gameHash('UNIT');
 
 /** the majors' best strengths trained in a copy of the turn t's close (the
@@ -1423,15 +1434,25 @@ function barbarianAi(ctx: Ctx, b: TurnRecord, closing: number, before: ReadonlyS
   // city-state 4's Horseman, on their record at age 0 before it falls
   // attacking in their turn)
   const standing = new Set([...twin.values()]);
+  const madeSeized: { u: Unit; was: Unit }[] = [];
   for (const key of open === undefined ? [] : lived) {
     const u = ctx.units.get(key) ?? ctx.gone.get(key);
     // ...and one made in the turn that no record holds, on the log's plot
     // (runs/h1_duelq1121 t110: player 1's Missionary 2621448 bought on 7:15
     // in its turn, the barbarian Man-at-Arms 2883594's Operation Move onto
-    // it removing it)
+    // it removing it), the last its steps before their turn reach; one they
+    // seize in their turn is the record's captive until the seizure, as a
+    // civilian of the pair's records (runs/h1_duels1142 t67: player 1's
+    // Builder 983045 made on 29:8 walks to 29:9, the barbarian Swordsman
+    // 2686981's Attack Civilian taking it as their Builder 2949146)
     if (!u) {
       const c = madeInTurn(ctx, copy, acts, key, open!);
-      if (c) copy.units.push(c);
+      if (!c) continue;
+      c.tileIndex = last.get(key) ?? c.tileIndex;
+      const into = capturedInto(acts, key, open!, barbP);
+      const v = into ? ctx.units.get(into) : undefined;
+      if (!v || !isBarbSeat(v.seat) || !state.units.includes(v)) copy.units.push(c);
+      else if (!ctx.barbSeized.some((s) => s.u === v)) madeSeized.push({ u: v, was: c });
       continue;
     }
     if (standing.has(u) || state.units.includes(u)) continue;
@@ -1511,7 +1532,7 @@ function barbarianAi(ctx: Ctx, b: TurnRecord, closing: number, before: ReadonlyS
   // 0, its Warrior taking it from 7:15, Barbarian Builder Capture started)
   const seized: [Unit, Pick<Unit, 'id' | 'seat' | 'type' | 'tileIndex' | 'hp'>][] = [];
   const stood: Unit[] = [];
-  for (const { u, was } of ctx.barbSeized) {
+  for (const { u, was } of [...ctx.barbSeized, ...madeSeized]) {
     const c = back.get(u);
     if (c && state.units.includes(u)) {
       seized.push([c, { id: c.id, seat: c.seat, type: c.type, tileIndex: c.tileIndex, hp: c.hp }]);
@@ -1818,9 +1839,15 @@ function minorAi(ctx: Ctx, b: TurnRecord, turn: number, made: ReadonlySet<Unit>,
   const levied: { c: Unit; minor: number; major: number; plot: number; own?: number }[] = [];
   const lastStep = new Map<string, number>();
   const lastDamage = new Map<string, number>();
+  // each unit's damage as the last blow before its own player's turn opens
+  // left it (the log's UnitDamageChanged that raises it)
+  const struck = new Map<string, number>();
+  const turnOpened = new Set<number>();
   for (const x of acts) {
+    if (x[2] === 'PlayerTurnActivated' && x[1] === turn) turnOpened.add(x[3] as number);
     if (x[2] === 'UnitMoved') lastStep.set(`${x[3]}:${x[4]}`, (x[6] as number) * ctx.W + (x[5] as number));
     if (x[2] === 'UnitDamageChanged') lastDamage.set(`${x[3]}:${x[4]}`, x[5] as number);
+    if (x[2] === 'UnitDamageChanged' && x[1] === turn && !turnOpened.has(x[3] as number) && (x[5] as number) > (x[6] as number)) struck.set(`${x[3]}:${x[4]}`, x[5] as number);
   }
   const upgraded = new Set<Unit>();
   const madeAshore = new Set<Unit>();
@@ -1876,7 +1903,10 @@ function minorAi(ctx: Ctx, b: TurnRecord, turn: number, made: ReadonlySet<Unit>,
     // log's last damage of the major's unit (runs/h1_duelq1117 t42: China's
     // levied Warrior 1245191 takes its damage in China's turn, city-state 3's
     // 589824 on 32:15 takes Heal)
-    const d0 = home ? lastDamage.get(home) : undefined;
+    // ...and one another player's turn struck before its own at the health
+    // the blow left (runs/h1_duels1145 t106: player 1's centre strikes
+    // city-state 4's Man-At-Arms 917506 to 11 damage, its planning at 11)
+    const d0 = home ? lastDamage.get(home) : struck.get(key);
     const r0 = d0 !== undefined ? UNIT_HP - d0 : hpWas.get(first!);
     if (r0 !== undefined && !ctx.minorBlows.has(u)) c.hp = r0;
     // ...a unit its city made in the turn whole (runs/h1_duely1117 t62:
@@ -2282,6 +2312,14 @@ function minorAi(ctx: Ctx, b: TurnRecord, turn: number, made: ReadonlySet<Unit>,
   for (const [u, was] of formed) {
     if (was === undefined) delete u.formation;
     else u.formation = was;
+  }
+  // ...and the formations their units' pass made or undid (runs/h1_duels1145
+  // t102: city-state 4's Settler 786438 enters its Man-At-Arms 917506's
+  // under Support Formation, the two Wandering together from t103)
+  for (const [c, u] of twin) {
+    if (!minorAiSeat(c.seat) || !copy.units.includes(c)) continue;
+    if (c.escorted) u.escorted = true;
+    else delete u.escorted;
   }
   const ended = new Map<Unit, number>();
   for (const [c, u] of twin) if (copy.units.includes(c) && minorAiSeat(c.seat)) ended.set(u, c.tileIndex);
@@ -4720,7 +4758,22 @@ const res = buyTile(state, city.id, d.plot, seat);        if (!res.ok) setTileOw
         // the move is the player's, through the engine's own: its mover from
         // the plot the log's steps had it on, onto the civilian's plot, which
         // seizes it (`seizeCivilian`); the game's new id names the captive
-        const vic = unitOf(ctx, d.victim);
+        let vic = unitOf(ctx, d.victim);
+        // a civilian made in its owner's turn that no record holds stands on
+        // the plot of its seizure (runs/h1_duels1142 t67: player 1's Builder
+        // 983045 made on 29:8, walked to 29:9 and taken there by the
+        // barbarian Swordsman 2686981, Barbarian Builder Capture started)
+        if (!vic && !ctx.units.has(d.victim)) {
+          const acts = (b as { actions?: unknown[][] }).actions ?? [];
+          const at = acts.find((x) => x[2] === 'UnitCaptured' && `${x[3]}:${x[4]}` === d.victim)?.[0] as number | undefined;
+          const c = at === undefined ? undefined : madeInTurn(ctx, state, acts, d.victim, at);
+          if (c) {
+            c.tileIndex = d.plot;
+            state.units.push(c);
+            ctx.units.set(d.victim, c);
+            vic = c;
+          }
+        }
         // a victor's advance took it already, in the battle the log names
         // (runs/h1_duelw1117 t54: China's Warrior killed the escort)
         if (vic && vic.seat === seatOfP(ctx, d.player)) {

@@ -17257,3 +17257,42 @@ terrain half (sim_masks.py), `jumpMadeAnew`'s twin (sim_minors.py);
   major's Trader lays in its turn before the city-states plan is out of the
   copy's ground (duels1146 t155 player 1's Trader 2097169 onto 38:12: the
   game's city-state 2 Builder 1376259 reaches 38:12 at (1/128), ours (1/0)).
+
+## C-95 / C-134: HL Explore's path tests under flags 0, Naval Choose Target's unit kinds, the swap partner's destination test — READ (0x70aa40 at 0x70aed0 / 0x70b063 / 0x70b173 / 0x70b2b6 / 0x70b3b3, 0x802ea0 at 0x802f15..0x802f69, 0x972540 at 0x97273a..0x97276c), both twins
+
+`exploreTarget` (cpu/core/tactical.ts), GPU `_tac_explore_region`
+(gpu/core/sim_tactics.py); `NAVAL_CHOOSE_TYPES` / `navalChooseTarget`
+(cpu/core/operations/nodes.ts), GPU `_u_naval_choose`
+(gpu/core/sim_minorops.py); `swapPartner` (cpu/core/tactical.ts), GPU
+`_tac_swap`'s partner test.
+
+- HL EXPLORE'S PATH TESTS: each region branch's plot ("cur region", "cur
+  area", the region lists) is tested by 0x272a60 on the unit's formation
+  (+0x1fb8) with the path's flags 0 (r8d 0 at each of the five calls), the
+  `turnsToPlot` of no later turns: no turn of the path ends where a unit of
+  its own that stacks with it stands. Confirmed: duels1139 t23 the
+  barbarian Scout 524295 on 37:11, its region's nearest unrevealed plot 39:7
+  at 12 turns under flag 0x1000 and none under flags 0, takes "HL: Explore
+  fallback" to 37:12 as logged (t21 from 36:13, 4 turns either way, "cur
+  region" 39:7 as logged); the Scout's 66 plot rows t23-t88 of the survey.
+- NAVAL CHOOSE TARGET'S LIST: the tactical target list's entries whose type
+  lies from TARGET_CIVILIAN_UNIT to TARGET_HIGH_PRIORITY_UNIT by the enum's
+  value (6..11): the religious unit (7) and the Trader (8) among them.
+  Confirmed: duels1136 t102 city-state 2's Naval Superiority, target 16:16,
+  takes player 1's embarked Missionary 2490390 on 25:14 (Operation Move for
+  25:14, AI_Operation.csv), where the list without them held no entry and
+  the target stood; t130 city-state 4's for 32:8 alike (ops.targets 10
+  rows to 0 on duels1136 to t138).
+- THE SWAP'S PARTNER: of the same owner and type pair (vt +0xc8), with
+  Movement left, then the formation's path test 0x2726b0 under flag 4 both
+  ways — the unit onto the partner's plot, the partner onto the unit's —
+  whose destination test is `placedOn` (a hull on water or a hull's
+  passage, a land unit on land or on water it may embark onto). Confirmed:
+  duels1145 t90 city-state 3's City Defense Catapult 1114115 on 42:16,
+  Garrison City's candidate against the Galley 1179650 on its centre 42:15:
+  no partner (the Galley placed on no land plot), the Catapult holds 42:16
+  with its Operation Move row as logged, t90-t98 (8 plot rows).
+- OPEN: the type pair's own test (vt +0xc8 on the two types' +0x160) is
+  unread; Operation Move logs the Catapult after Garrison City's candidate
+  branch took its turn (0x570b40 at 0x8111d7), where the engines' movers
+  leave a unit whose turn is done out.

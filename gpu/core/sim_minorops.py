@@ -3619,8 +3619,9 @@ def _x_naval_pillage(sim, c: _OpCtx, i: int, on: torch.Tensor) -> None:
 
 def _u_naval_choose(sim, c: _OpCtx, i: int, at: torch.Tensor) -> torch.Tensor:
     """NAVAL CHOOSE TARGET (0x803590, its list 0x802ea0): of the minor's
-    tactical target list, the unit targets (civilian through high priority:
-    the list's kinds 1-3 and 7) on a plot of the node's Target Domain
+    tactical target list, the unit targets (TARGET_CIVILIAN_UNIT through
+    TARGET_HIGH_PRIORITY_UNIT by the enum's value, the religious unit and the
+    Trader among them: every unit kind of the list) on a plot of the node's Target Domain
     (DOMAIN_SEA: water; any other, the default DOMAIN_LAND among them:
     land), the nearest the operation's target, the first of equals in the
     list's order, becomes its target and rally with each team's goals
@@ -3636,7 +3637,7 @@ def _u_naval_choose(sim, c: _OpCtx, i: int, at: torch.Tensor) -> torch.Tensor:
     fail = True if fl is None else bool(fl)
     uk, uo = tg["uk"], tg["uo"]
     L = uk.shape[1] // T
-    kind = (uk == 1) | (uk == 2) | (uk == 3) | (uk == 7)
+    kind = uk > 0
     ok = kind & (sim.water.repeat(1, L) == sea)
     tgt = sim.mops_target[:, s, k]
     d = sim.pair_dist[tgt.clamp(min=0)].to(torch.long).repeat(1, L)

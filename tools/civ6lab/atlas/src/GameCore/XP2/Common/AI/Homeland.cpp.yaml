@@ -129,9 +129,16 @@
 - addr: 0x70aa40
   kind: function
   name: exploreTarget
-  semantics: "HL Explore: the reach plot whose sight holds the most unrevealed; cur region / cur area; the region lists (writer unread); the unseen-now fallback The unit's one-turn breadth-first search (0x7921e0 -> 0x26df90, flags 0x40 / 0x42) on its Movement left; per plot closed, in order: no danger (0x716a90), not chosen, one it may go to (0x70bd40); its two counts over its sight (0x58b1d0, within the unit's sight +0x1998): never revealed (0x70a6c0) and not visible now (0x70a8b0, [player +0x290] <= 0). The first plot of the largest first count above 0 wins (\"HL: Explore\"); the first plot in closing order with the route flag and a count above 0 takes the lead once (0x70abe6..0x70ac15), after it a plot leads only with a strictly larger count. Else, on the first round: the unit's region (plot +0x18) where the player's region record holds less than all of it revealed (0x7861d0: +0x28 / +0x24 < 1.0) — the nearest unrevealed plot of the region (0x70b6f0) with a path to it (0x272a60), not chosen (\"cur region\"); off any region the nearest of its area (0x70b550, \"cur area\"); then the primary, secondary and tertiary region lists (+0x1290 +0x2f0 / +0x360 / +0x3d0); else the first plot of the largest second count (\"HL: Explore fallback\"). The unit's plot joins the chosen."
+  semantics: "HL Explore: the reach plot whose sight holds the most unrevealed; cur region / cur area; the region lists (writer unread); the unseen-now fallback The unit's one-turn breadth-first search (0x7921e0 -> 0x26df90, flags 0x40 / 0x42) on its Movement left; per plot closed, in order: no danger (0x716a90), not chosen, one it may go to (0x70bd40); its two counts over its sight (0x58b1d0, within the unit's sight +0x1998): never revealed (0x70a6c0) and not visible now (0x70a8b0, [player +0x290] <= 0). The first plot of the largest first count above 0 wins (\"HL: Explore\"); the first plot in closing order with the route flag and a count above 0 takes the lead once (0x70abe6..0x70ac15), after it a plot leads only with a strictly larger count. Else, on the first round: the unit's region (plot +0x18) where the player's region record holds less than all of it revealed (0x7861d0: +0x28 / +0x24 < 1.0) — the nearest unrevealed plot of the region (0x70b6f0) with a path to it (0x272a60 on the formation +0x1fb8 under the path's flags 0, every region branch alike), not chosen (\"cur region\"); off any region the nearest of its area (0x70b550, \"cur area\"); then the primary, secondary and tertiary region lists (+0x1290 +0x2f0 / +0x360 / +0x3d0); else the first plot of the largest second count (\"HL: Explore fallback\"). The unit's plot joins the chosen."
   status: PARTLY
-  impl: [cpu/core/tactical.ts:exploreTarget, gpu/core/sim_tactics.py:_tac_explore]
+  cases:
+    - recording: h1_duels1139
+      turn: 23
+      value: "the barbarian Scout 524295 on 37:11: its region's nearest unrevealed plot 39:7 has no path under flags 0 (12 turns under 0x1000), HL: Explore fallback to 37:12 as logged"
+  impl:
+    - cpu/core/tactical.ts:exploreTarget
+    - gpu/core/sim_tactics.py:_tac_explore
+    - gpu/core/sim_tactics.py:_tac_explore_region
   readings:
     - "C-97: the behaviour trees — READ (the interpreter), the nodes PARTLY READ"
     - "C-95: Explore Land and the barbarians' revealed plots — READ, ported (two tests below unread)"
@@ -139,6 +146,7 @@
     - "C-124 / C-95: every search but the planning's pays the stacking +1e6, the cost reads the child's revealed bit, Explore's flag 0x40 prices the unrevealed — READ (0x270dd0 at 0x270e55 / 0x270e86 / 0x270ff2 / 0x2711c3..0x271268 / 0x2713d3, 0x502aa0, 0x26df90's callers 0x716739 / 0x70aadd, 0x70ce90 at 0x70ced5, 0x803060 at 0x80316f), both twins"
     - "C-99: a move order's search sets out on the pool finder's +0x1bc, the last full-Movement search's GetMaxMoves — READ (0x26f330, 0x77d10, 0x270d70, 0x26e920, 0x26eea0, 0x26dcd0, 0x26df90, 0x26e2c0, 0x26fe20 at 0x270309), unported"
     - "C-95: HL Explore's unrevealed count holds nothing on a goody hut's plot — READ (0x70a6c0 at 0x70a746..0x70a76a, 0x82d90), both twins"
+    - "C-95 / C-134: HL Explore's path tests under flags 0, Naval Choose Target's unit kinds, the swap partner's destination test — READ (0x70aa40 at 0x70aed0 / 0x70b063 / 0x70b173 / 0x70b2b6 / 0x70b3b3, 0x802ea0 at 0x802f15..0x802f69, 0x972540 at 0x97273a..0x97276c), both twins"
   context:
     - "...d Units 0x80d790 (\"Operation Protect Units\"), Naval Patrol 0x803060 (the explore move 0x70aa40), Naval Pillage 0x803250, Naval Escort 0x817f60; Operation Move's unit tactical block (..."
   review: reviewed
