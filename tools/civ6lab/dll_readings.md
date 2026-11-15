@@ -15047,3 +15047,94 @@ majors' walk (`seatPhase`), a lump (`applyLumpYield`) and `freeCityBuild`;
   Builder at 18).
 - Open: no duelq recording holds a Free City's building under its pillaged
   district, nor a major's multi-item queue behind a refused head.
+
+## C-133 / C-95: the carried orders run in the unit list's order; a path comes ashore off water only by the disembark test — READ (0x7df30, 0x554e0, 0x523e0, 0x52e90, 0x54910, 0x2720a0 at 0x272380..0x27240d, 0x52fb90 at 0x52fb9d), both twins; UpdateOpenNode's walk and flag 2's plot — READ (0x79560, 0x2720a0 at 0x2721c3..0x27220d / 0x2724c8), unported
+
+`withShortOrders`, `moveTo`'s `shortOrders` entry, `search`'s disembark
+refusal (cpu/core/tactical.ts); GPU `_tac_with_short`, the entry's key at
+`_tac_move_to`'s end, `_tac_search`'s shore mask (gpu/core/sim_tactics.py).
+
+- THE MANAGER'S VTABLE begins at 0xcff7c0 (the first slot 0x523a0): the
+  queue's push 0x526a0 is its +0x60, the handler by operation type 0x53e80
+  its +0x80, an operation's start 0x55280 its +0x130, the queue run 0x52f50
+  its +0x138, the front operation's validity sweep 0x54910 its +0x150, the
+  queue's turn 0x523e0 its +0x170.
+- THE TURN'S DEACTIVATION (Player::Processor::DoAutomation 0x7df30, from
+  DoTurnDeactivate 0x7eb60 at 0x7eba2): for a live player it walks the
+  player's unit list (PlayerUnits +0x12e8 -> +0xd8, next +0x10: 0x7e06e,
+  0x7e32a) and calls the manager's +0x50 (0x554e0) on every unit. 0x554e0:
+  a unit alive (+0x770) with a pending operation (+0x2178, the front
+  +0x2168) asks the front operation's handler (its vt +0x38); where it
+  answers, the queue's turn 0x523e0 runs — for a unit in ACTIVITY_OPERATION
+  (+0x5f0 = 0x490cc8e1) the queue run 0x52f50 (+0x138), the operation
+  swept (+0x150) where the run is done —; where it does not and sets its
+  flag, 0x52e90 empties the queue and clears the formation's kept path
+  (0x265fd0). So the move orders a player's turn left short run again as
+  its turn deactivates, in the unit list's order — the pool's slots
+  ascending —, not in the order they were given; a formation's order at
+  the least slot of its members (each member holds the operation).
+- Confirmed: runs/h1_duelq1121 t110. Builder Capture's Settler 3407879 and
+  Man-At-Arms 3014664 (slots 7 / 8) step 11:19 -> 12:18 (record seq 36003),
+  then the Scout 131073 (slot 1, Operation for the camp 12:14) 10:19 ->
+  11:18 (36015), its path's next node 11:17 a second turn's; the Wander's
+  Man-At-Arms 2949124 takes 11:17 (36046). At the deactivation the Scout's
+  order runs first (UnitOperationSegmentComplete 36097, no UnitMoved: 12:18
+  still held, 11:17 held), then slot 4's (36098), then the pair's (36099 /
+  36100: 12:18 -> 13:18). In the order given the pair left 12:18 first and
+  the Scout stepped onto it (the engines' 12:18, the game's 11:18).
+- THE DISEMBARK TEST ON THE PARENT'S WATER (0x2720a0 at 0x272372..0x27240d):
+  for a land formation (the finder's +0x1f2) onto a revealed child (+0x51
+  bit 0), the validity reads the PARENT's own water bit (+0x50 bit 0x10, set
+  from IsWater by 0x271be0 whatever the player revealed) against the
+  child's: land to water the embark test 0x52fe90, water to land the
+  disembark test 0x52fb90, the same domain the child's location bit (+0x50
+  bit 0x40). 0x52fb90 answers false at its head for a formation that may
+  not embark (+0x338 clear, 0x52fb9d..0x52fbaf). The water a search takes a
+  node for (+0x50 bit 0x20, the parent's where both are unrevealed) prices
+  the steps; it is not this test's. So a path that entered water its player
+  never revealed comes ashore on no revealed plot unless the formation may
+  embark.
+- Confirmed: runs/h1_duelq1124 t20. The rampaging Scout 1638420 on 6:12 for
+  city-state 2's Warrior on 8:13 (MOVE_TO under flag 0x10, 0x771e44): the
+  barbarians' record holds 8:11 and the Coast 9:12 unrevealed; a path 6:11 /
+  7:11 / 8:11 / 9:12 onto 8:13 reaches it in two turns, the one by 7:12 /
+  8:12 in three. The game steps to 7:12 and waits (one UnitMoved, the
+  segment kept); the engines, with 9:12 -> 8:13 refused, the same.
+- UPDATEOPENNODE (0x79560), unported: a re-keyed open node whose key (+0x18)
+  is below its predecessor's leaves its place and walks headward past every
+  node of a greater KEY — the cost (+0x1c) is not read — to stand after the
+  first node of a key at or below its own (0x795f0..0x795ff); with a key at
+  or above its predecessor's it stays (0x795c0). A turn-end node holds its
+  plot's node's key and a greater cost, so a node re-keyed to a key a
+  turn-end node holds stands after it, where the (key, cost) order of the
+  engines' open list puts it before; AddToOpen's walks (0x775a0) then read
+  a list not sorted by cost within that key. The engines' open list as the
+  list itself (insertions by position) moved no row of one-seed aimem
+  traces (1117 to t40, 1121 to t240, 1124 to t89, 1128 to t217).
+- SEARCHSTEP (0x793f0): the popped node's children are made (0x77a50)
+  before the destination test (+0x18) answers on it.
+- FLAG 2 (0x2720a0 at 0x2724c8), unported: the owner it tests (r12d,
+  0x27220d) is the PARENT plot's (the plot of [rsp+0x58] = the parent
+  node's x / y, 0x272176..0x2721f2): a link whose parent stands on the
+  ground of a player at war with the mover's (IsAtWarWith on that owner's
+  diplomacy) is refused, the unit's own plot included — a path enters such
+  ground and goes no further. Flag 1's closed-borders test (0x27263b..
+  0x272689) reads the same parent owner. The engines refuse the link onto
+  such ground (`search`'s `danger.war`, the child's owner).
+- THE ZONE'S EARLY PASS (0x530f50 at 0x531067..0x53108c -> 0x52f970): before
+  the six neighbours, every plot within 1 of the plot entered holding an
+  unpillaged improvement (+0x44, +0x4d bit 0) of an owner (+0x46) at war
+  with the mover whose Improvements row carries a property (hash
+  0x7d27db83 on the plot itself, 0x8634aa0f beside it) above 0 zones it,
+  no sight test, no destination waiver. Unported (no such improvement in
+  the recorded games' paths).
+- OPEN: runs/h1_duelq1121 t110 the Man-At-Arms 2883594 (Operation, 6:15 for
+  11:14) steps onto 7:15, where player 1's city bought a unit (2621448,
+  UnitAddedToMap seq 35907, CityMadePurchase 35909) that the step removes
+  (36011): the replay's copy holds no such unit, the engines' path takes
+  7:16, and Pillage Improvement's Skirmisher 3342353 takes the 7:15 the
+  game's Man-At-Arms holds. runs/h1_duelq1127 t145 city-state 3's Galley
+  393216 (Upgrade Units, 27:12 for 3:13): the game's third step is its
+  first path's own next node 28:15, where it holds with 1 Movement beside
+  the barbarian Galley on 29:16; the engines search the order's plot from
+  28:14 and take 27:15 / 28:16.

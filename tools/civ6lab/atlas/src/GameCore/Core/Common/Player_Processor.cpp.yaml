@@ -3,6 +3,26 @@
 # `review: imported` = bootstrapped from dll_readings.md / code comments / saved
 # labels and not yet reviewed: verify against the disassembly, then edit and
 # set `review: reviewed`.
+- addr: 0x7df30
+  final: 0x5c4a0
+  kind: function
+  name: Player::Processor::DoAutomation
+  semantics: "the turn's deactivation (from DoTurnDeactivate 0x7eb60): for a live player walks its unit list (PlayerUnits +0x12e8 -> +0xd8, next +0x10) and calls the operations manager's +0x50 (0x554e0) on every unit, so the kept move orders run in the unit list's order; for a human player it then names the units ready to move."
+  status: READ
+  cases:
+    - recording: h1_duelq1121
+      turn: 110
+      value: "the Scout 131073 (slot 1) on 11:18 runs its kept order before Builder Capture's pair (slots 7 / 8) leaves 12:18 (UnitOperationSegmentComplete 36097, the pair's UnitMoved 36099): it holds 11:18"
+  impl:
+    - cpu/core/tactical.ts:withShortOrders
+    - gpu/core/sim_tactics.py:_tac_with_short
+    - cpu/core/tactical.ts:mine
+  readings:
+    - "C-133 / C-95: the carried orders run in the unit list's order; a path comes ashore off water only by the disembark test — READ (0x7df30, 0x554e0, 0x523e0, 0x52e90, 0x54910, 0x2720a0 at 0x272380..0x27240d, 0x52fb90 at 0x52fb9d), both twins; UpdateOpenNode's walk and flag 2's plot — READ (0x79560, 0x2720a0 at 0x2721c3..0x27220d / 0x2724c8), unported"
+  context:
+    - "...n the unit list's order; a path comes ashore off water only by the disembark test — READ (0x7df30, 0x554e0, 0x523e0, 0x52e90, 0x54910, 0x2720a0 at 0x272380..0x27240d, 0x52fb90 at 0x52fb9d..."
+    - "- THE TURN'S DEACTIVATION (Player::Processor::DoAutomation 0x7df30, from DoTurnDeactivate 0x7eb60 at 0x7eba2): for a live player it walks the player's u..."
+  review: reviewed
 - addr: 0x7e9d0
   final: 0x5ca80
   kind: function
@@ -26,7 +46,9 @@
   semantics: Player::Processor::DoTurnDeactivate (-> 0x4e4ad0, which tail-jumps to the resources' cap 0x4a8f10).
   status: PARTLY
   impl: [cpu/core/stockpile.ts:capStockpiles, cpu/harness/import.ts:importPower]
-  readings: ["H-1: the luxury allocation's rebuilds — PARTLY READ"]
+  readings:
+    - "H-1: the luxury allocation's rebuilds — PARTLY READ"
+    - "C-133 / C-95: the carried orders run in the unit list's order; a path comes ashore off water only by the disembark test — READ (0x7df30, 0x554e0, 0x523e0, 0x52e90, 0x54910, 0x2720a0 at 0x272380..0x27240d, 0x52fb90 at 0x52fb9d), both twins; UpdateOpenNode's walk and flag 2's plot — READ (0x79560, 0x2720a0 at 0x2721c3..0x27220d / 0x2724c8), unported"
   context:
     - "- The turn end's cap (Player::Processor::DoTurnDeactivate 0x7eb60 -> 0x4e4ad0, which tail-jumps to Player_Resources 0x4a8f10): for each accumulated res..."
   review: reviewed

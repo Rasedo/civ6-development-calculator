@@ -239,6 +239,7 @@
   readings:
     - "C-110 / C-99: the unit's activity and the Fortify order's refusal — READ"
     - "C-110 / C-99: a placement resets the fortification, a struck SENTRY wakes, a siege striker asks no Movement — READ (0x586d40 at 0x587789, 0x20d280 at 0x20d5ce, 0x775340 at 0x7754c7), both twins"
+    - "C-133 / C-95: the carried orders run in the unit list's order; a path comes ashore off water only by the disembark test — READ (0x7df30, 0x554e0, 0x523e0, 0x52e90, 0x54910, 0x2720a0 at 0x272380..0x27240d, 0x52fb90 at 0x52fb9d), both twins; UpdateOpenNode's walk and flag 2's plot — READ (0x79560, 0x2720a0 at 0x2721c3..0x27220d / 0x2724c8), unported"
   review: reviewed
 - addr: 0x5cbc0
   final: 0x447d0
@@ -541,6 +542,7 @@
     - "C-124: an attack order to a plot out of sight loses its attack flag — READ (0x962310), both twins"
     - "C-124: a move order's path prices a turn's end at the stacking limit +1e6, and its destination there stops the search — READ (0x270dd0 at 0x27101e..0x2710a0, 0x2720a0 at 0x272230..0x272364, 0x77a50, 0x26dcd0's callbacks), both twins"
     - "C-95: the reach searches open turn-end nodes, and the zone of control's domain is the formation's — READ (0x271920 from 0x26dab0, 0x26f980 -> 0x530f50, 0x267650), both twins"
+    - "C-133 / C-95: the carried orders run in the unit list's order; a path comes ashore off water only by the disembark test — READ (0x7df30, 0x554e0, 0x523e0, 0x52e90, 0x54910, 0x2720a0 at 0x272380..0x27240d, 0x52fb90 at 0x52fb9d), both twins; UpdateOpenNode's walk and flag 2's plot — READ (0x79560, 0x2720a0 at 0x2721c3..0x27220d / 0x2724c8), unported"
   context:
     - ...st. The open list is a list sorted by total cost, equal totals by known cost (AddToOpen 0x775a0 scans from the head or the tail by a float midpoint, so a tie lands first or last by th...
     - "...is its cost. The open list (+0xf0 head, +0xf8 tail, doubly linked) is sorted by (f, g) (0x775a0): a key below the head's goes first, above the tail's last; otherwise the insertion s..."
@@ -2639,6 +2641,17 @@
   context:
     - "...0980, the walk 0x26fe20 at 0x270800, stored +0x518; layer 0x2665b0): the ring functor 0x52f710 (0x6aef0), else per direction a district at war exerting (0x24c2f0) or a unit at war (r..."
   review: imported
+- addr: 0x52f970
+  final: 0x377570
+  kind: function
+  name: the zone's improvement test
+  semantics: "0x530f50's early pass over the plots within 1 of the plot entered (0x6aef0): an unpillaged improvement (+0x44, +0x4d bit 0) of an owner (+0x46) at war with the mover whose Improvements row carries a property above 0 (hash 0x7d27db83 on the plot itself, 0x8634aa0f beside it) sets the zone, no sight test. The property's name unread."
+  status: PARTLY
+  readings:
+    - "C-133 / C-95: the carried orders run in the unit list's order; a path comes ashore off water only by the disembark test — READ (0x7df30, 0x554e0, 0x523e0, 0x52e90, 0x54910, 0x2720a0 at 0x272380..0x27240d, 0x52fb90 at 0x52fb9d), both twins; UpdateOpenNode's walk and flag 2's plot — READ (0x79560, 0x2720a0 at 0x2721c3..0x27220d / 0x2724c8), unported"
+  context:
+    - "- THE ZONE'S EARLY PASS (0x530f50 at 0x531067..0x53108c -> 0x52f970): before the six neighbours, every plot within 1 of the plot entered holding an unpil..."
+  review: reviewed
 - addr: 0x52fa40
   final: 0x377640
   kind: function
@@ -2658,13 +2671,18 @@
   final: 0x377790
   kind: function
   status: PARTLY
-  impl: [cpu/core/tactical.ts:blind, cpu/core/tactical.ts:from, gpu/core/sim_tactics.py:price6]
+  impl:
+    - cpu/core/tactical.ts:blind
+    - cpu/core/tactical.ts:from
+    - gpu/core/sim_tactics.py:price6
+    - gpu/core/sim_tactics.py:update_parents
   readings:
     - "C-96: the city-states' tactical pass — READ (Wander Near City, Heal, the non-barbarian priorities, FindAlternateLocation), the families it needs PARTLY READ"
     - "C-99: an embarked unit passes no other player's passenger — the step's flag-1 test READ (0x2720a0 at 0x272372, 0x271be0, 0x586360 at 0x586542, 0x208b80 under 0x108, 0x20a2a0), both twins"
     - "C-124: a path enters a plot the player never revealed whatever it is — READ (0x2720a0 at 0x272372..0x27242e, 0x271be0's +0x50 bit 0x20, 0x26e920), both twins"
     - "C-99 / C-128: a shore crossing's cliff onto a revealed plot alone, Wander Back to Camp's path flag 0x1000, the path's destination count — READ (0x52fb90, 0x2720a0 at 0x272230..0x27229e / 0x272380, 0x270dd0 at 0x270f24, 0x271be0 at 0x271d03..0x271d18, 0x77b9a0 at 0x77be0b), both twins"
     - "C-99 / C-128: the embark step's location test, the destination test's map layer; the Supply Convoy's Movement — READ (0x52fe90 at 0x530024, 0x208b80 at 0x208bbf -> 0x901e0 -> 0x75c50), both twins"
+    - "C-133 / C-95: the carried orders run in the unit list's order; a path comes ashore off water only by the disembark test — READ (0x7df30, 0x554e0, 0x523e0, 0x52e90, 0x54910, 0x2720a0 at 0x272380..0x27240d, 0x52fb90 at 0x52fb9d), both twins; UpdateOpenNode's walk and flag 2's plot — READ (0x79560, 0x2720a0 at 0x2721c3..0x27220d / 0x2724c8), unported"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...unless human (+0x1f6) or +0x590 (runs/h1_duely1117 t69 Archer); embark tests 0x52fe90 / 0x52fb90 (+1e6). The init: +0x1f1 sea, +0x1f5 embarked, +0x1f7 +0x590, +0x198 owner, +0x1a4 0x26..."
@@ -2687,6 +2705,7 @@
     - "C-99 / C-128: a shore crossing's cliff onto a revealed plot alone, Wander Back to Camp's path flag 0x1000, the path's destination count — READ (0x52fb90, 0x2720a0 at 0x272230..0x27229e / 0x272380, 0x270dd0 at 0x270f24, 0x271be0 at 0x271d03..0x271d18, 0x77b9a0 at 0x77be0b), both twins"
     - "C-95: the embark rules for a formation that may embark, a district's zone unseen, a city's kill in the planning, a raised unit's AI type, a move order's attack spot — READ (0x530420, 0x530240, 0x52fe90 at 0x52fed4, 0x530f50 at 0x531168, 0x791470 at 0x791677, 0x79b9c0), FIT (the move order's attack spot), both twins"
     - "C-99 / C-128: the embark step's location test, the destination test's map layer; the Supply Convoy's Movement — READ (0x52fe90 at 0x530024, 0x208b80 at 0x208bbf -> 0x901e0 -> 0x75c50), both twins"
+    - "C-133 / C-95: the carried orders run in the unit list's order; a path comes ashore off water only by the disembark test — READ (0x7df30, 0x554e0, 0x523e0, 0x52e90, 0x54910, 0x2720a0 at 0x272380..0x27240d, 0x52fb90 at 0x52fb9d), both twins; UpdateOpenNode's walk and flag 2's plot — READ (0x79560, 0x2720a0 at 0x2721c3..0x27220d / 0x2724c8), unported"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...(0x3e800) unless human (+0x1f6) or +0x590 (runs/h1_duely1117 t69 Archer); embark tests 0x52fe90 / 0x52fb90 (+1e6). The init: +0x1f1 sea, +0x1f5 embarked, +0x1f7 +0x590, +0x198 owner,..."

@@ -118,6 +118,7 @@
   impl: [cpu/core/tactical.ts:orderOnce, gpu/core/sim_tactics.py:_tac_move_to]
   readings:
     - "C-99: every pool search sets out on its own formation's value, a queue run walks its first search's path — READ (0x2715a0 at 0x271909..0x271910, 0x77d10 at 0x77d8b..0x77db0 / 0x77f0b / 0x78007 / 0x7805d, 0x52f50 at 0x52f9e / 0x52fce / 0x53394, 0x265fd0, 0x272aa0 at 0x272ad7..0x272c24, 0x26e3a0), the engines' model"
+    - "C-133 / C-95: the carried orders run in the unit list's order; a path comes ashore off water only by the disembark test — READ (0x7df30, 0x554e0, 0x523e0, 0x52e90, 0x54910, 0x2720a0 at 0x272380..0x27240d, 0x52fb90 at 0x52fb9d), both twins; UpdateOpenNode's walk and flag 2's plot — READ (0x79560, 0x2720a0 at 0x2721c3..0x27220d / 0x2724c8), unported"
   review: reviewed
 - addr: 0x266220
   final: 0x1a3ae0

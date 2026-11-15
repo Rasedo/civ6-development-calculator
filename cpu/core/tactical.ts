@@ -782,6 +782,16 @@ function search(state: GameState, unit: Unit, maxTurns: number, zoc: boolean, on
       // list no 5:5, its Woods burning, AI_Planning.csv)
       if (to.index !== dest && ground.hazard(to.index)) continue;
       if (ground.revealed(to.index) && cliffBlocksStep(state, from, to, unit)) continue;
+      // a land formation's step off a water plot onto a revealed land plot
+      // runs the disembark test (0x2720a0 at 0x2723c7 -> 0x52fb90) on the
+      // parent's own water (its +0x50 bit 0x10), whatever the player revealed
+      // of it: a formation that may not embark fails it at its head (+0x338
+      // clear, 0x52fb9d), so a path that entered water it never revealed
+      // comes ashore on no revealed plot (runs/h1_duelq1124 t20: the
+      // rampaging Scout 1638420 on 6:12 for city-state 2's Warrior on 8:13
+      // steps to 7:12, no way round by the unrevealed 8:11 and the water
+      // 9:12)
+      if (!naval && !embarks && !waterWalks(unit.type) && ground.revealed(to.index) && isWater(from) && !isWater(to)) continue;
       if (attack && !fortBlind && !ground.attack(to)) continue;
       if (zoned && !attack) continue;
       // the step's validity (0x2720a0 at 0x272372..0x27242e): onto a revealed
@@ -1125,14 +1135,16 @@ export function moveTo(state: GameState, unit: Unit, dest: number, strike = true
   // an order its walk left short of its destination, Movement left, stays
   // on the unit, carried on as the player's turn ends
   if (shortOrders && open && state.units.includes(unit) && unit.movesLeft > 0 && unit.tileIndex !== dest) {
-    shortOrders.push(() => orderOnce(state, unit, dest, strike, laterTurns, explore, danger, mates, scout));
+    shortOrders.push({ slot: Math.min(unit.slot ?? 0, ...mates.map((m) => m.slot ?? 0)),
+      run: () => orderOnce(state, unit, dest, strike, laterTurns, explore, danger, mates, scout) });
   }
 }
 
 /** the move orders a player's turn left short of their destinations with
  *  Movement left (the unit's operation queue +0x60 holding the order), in
- *  the order given; null outside an AI player's pass */
-let shortOrders: (() => void)[] | null = null;
+ *  the order given, each with the least pool slot of its formation's
+ *  members; null outside an AI player's pass */
+let shortOrders: { slot: number; run: () => void }[] | null = null;
 
 /** the units whose last step of the player's turn ended in a zone of
  *  control (their formation's m_bHasMovedIntoZOC +0x518, set by each step
@@ -1168,7 +1180,7 @@ let movesEnded: ReadonlySet<number> | null = null;
 function withShortOrders(fn: () => void): void {
   const outer = shortOrders;
   const outerZoc = zocMoved;
-  const mine: (() => void)[] = [];
+  const mine: { slot: number; run: () => void }[] = [];
   shortOrders = mine;
   zocMoved = new Set();
   try {
@@ -1177,7 +1189,12 @@ function withShortOrders(fn: () => void): void {
     } finally {
       shortOrders = outer;
     }
-    for (const run of mine) run();
+    // the player's turn deactivating (Player::Processor::DoAutomation
+    // 0x7df30) walks its unit list (+0x12e8 -> +0xd8, the pool's slots
+    // ascending) and runs each unit's kept operation (0x554e0 -> 0x523e0 ->
+    // the queue run 0x52f50): the carried orders go in their units' slot
+    // order, a unit's own in the order given
+    for (const o of mine.map((x, i) => ({ ...x, i })).sort((a, b) => a.slot - b.slot || a.i - b.i)) o.run();
   } finally {
     zocMoved = outerZoc;
   }

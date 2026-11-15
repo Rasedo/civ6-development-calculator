@@ -217,6 +217,7 @@
     - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
     - "C-95: a strike's move order onto a plot out of sight — READ (the strike), FIT (the path's sight test)"
     - "C-95: a strike's move order onto a plot out of sight"
+    - "C-133 / C-95: the carried orders run in the unit list's order; a path comes ashore off water only by the disembark test — READ (0x7df30, 0x554e0, 0x523e0, 0x52e90, 0x54910, 0x2720a0 at 0x272380..0x27240d, 0x52fb90 at 0x52fb9d), both twins; UpdateOpenNode's walk and flag 2's plot — READ (0x79560, 0x2720a0 at 0x2721c3..0x27220d / 0x2724c8), unported"
   context:
     - "...lse the nearest (strictly nearer replaces; the list's first of equals), and strikes it (0x771670: a civilian, Trader or religious unit it moves onto; a ranged unit at a fighter or CO..."
   review: reviewed

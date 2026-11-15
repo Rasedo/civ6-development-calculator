@@ -3,6 +3,52 @@
 # `review: imported` = bootstrapped from dll_readings.md / code comments / saved
 # labels and not yet reviewed: verify against the disassembly, then edit and
 # set `review: reviewed`.
+- addr: 0x523a0
+  final: 0x3f700
+  kind: function
+  name: the operations manager's first slot
+  semantics: the first slot of the operations manager's vtable 0xcff7c0; unread.
+  status: PARTLY
+  readings:
+    - "C-133 / C-95: the carried orders run in the unit list's order; a path comes ashore off water only by the disembark test — READ (0x7df30, 0x554e0, 0x523e0, 0x52e90, 0x54910, 0x2720a0 at 0x272380..0x27240d, 0x52fb90 at 0x52fb9d), both twins; UpdateOpenNode's walk and flag 2's plot — READ (0x79560, 0x2720a0 at 0x2721c3..0x27220d / 0x2724c8), unported"
+  context:
+    - "- THE MANAGER'S VTABLE begins at 0xcff7c0 (the first slot 0x523a0): the queue's push 0x526a0 is its +0x60, the handler by operation type 0x53e80 its +0..."
+  review: reviewed
+- addr: 0x523e0
+  kind: function
+  name: the unit's queue turn
+  semantics: "the operations manager's vt +0x170: while the unit holds operations, one in ACTIVITY_OPERATION (+0x5f0 = 0x490cc8e1) runs the queue run 0x52f50 (+0x138) and sweeps the front operation (+0x150) where the run is done; else the front operation is started (+0x130). Its start conditions past 0x524d5 unread."
+  status: PARTLY
+  impl: [cpu/core/tactical.ts:withShortOrders, cpu/core/tactical.ts:mine]
+  readings:
+    - "C-133 / C-95: the carried orders run in the unit list's order; a path comes ashore off water only by the disembark test — READ (0x7df30, 0x554e0, 0x523e0, 0x52e90, 0x54910, 0x2720a0 at 0x272380..0x27240d, 0x52fb90 at 0x52fb9d), both twins; UpdateOpenNode's walk and flag 2's plot — READ (0x79560, 0x2720a0 at 0x2721c3..0x27220d / 0x2724c8), unported"
+  context:
+    - "...order; a path comes ashore off water only by the disembark test — READ (0x7df30, 0x554e0, 0x523e0, 0x52e90, 0x54910, 0x2720a0 at 0x272380..0x27240d, 0x52fb90 at 0x52fb9d), both twins; Upd..."
+    - ...its +0x138, the front operation's validity sweep 0x54910 its +0x150, the queue's turn 0x523e0 its +0x170.
+    - "...) asks the front operation's handler (its vt +0x38); where it answers, the queue's turn 0x523e0 runs — for a unit in ACTIVITY_OPERATION (+0x5f0 = 0x490cc8e1) the queue run 0x52f50 (+0..."
+  review: reviewed
+- addr: 0x526a0
+  kind: function
+  name: the queue's push
+  semantics: "the operations manager's vt +0x60: an operation added to the unit's queue (\"%03d, Adding\")."
+  status: PARTLY
+  readings:
+    - "C-133 / C-95: the carried orders run in the unit list's order; a path comes ashore off water only by the disembark test — READ (0x7df30, 0x554e0, 0x523e0, 0x52e90, 0x54910, 0x2720a0 at 0x272380..0x27240d, 0x52fb90 at 0x52fb9d), both twins; UpdateOpenNode's walk and flag 2's plot — READ (0x79560, 0x2720a0 at 0x2721c3..0x27220d / 0x2724c8), unported"
+  context:
+    - "- THE MANAGER'S VTABLE begins at 0xcff7c0 (the first slot 0x523a0): the queue's push 0x526a0 is its +0x60, the handler by operation type 0x53e80 its +0x80, an operation's start 0x5..."
+  review: reviewed
+- addr: 0x52e90
+  final: 0x3ffd0
+  kind: function
+  name: the unit's operations emptied
+  semantics: "the operations manager's vt +0x68: with operations pending, +0x178 then the sweep +0x150 until none is left, then the formation's kept path cleared (0x265fd0)."
+  status: PARTLY
+  readings:
+    - "C-133 / C-95: the carried orders run in the unit list's order; a path comes ashore off water only by the disembark test — READ (0x7df30, 0x554e0, 0x523e0, 0x52e90, 0x54910, 0x2720a0 at 0x272380..0x27240d, 0x52fb90 at 0x52fb9d), both twins; UpdateOpenNode's walk and flag 2's plot — READ (0x79560, 0x2720a0 at 0x2721c3..0x27220d / 0x2724c8), unported"
+  context:
+    - "...path comes ashore off water only by the disembark test — READ (0x7df30, 0x554e0, 0x523e0, 0x52e90, 0x54910, 0x2720a0 at 0x272380..0x27240d, 0x52fb90 at 0x52fb9d), both twins; UpdateOpenNo..."
+    - "...peration swept (+0x150) where the run is done —; where it does not and sets its flag, 0x52e90 empties the queue and clears the formation's kept path (0x265fd0). So the move orders a..."
+  review: reviewed
 - addr: 0x52f50
   kind: function
   name: the unit's operation run
@@ -24,6 +70,7 @@
     - cpu/core/tactical.ts:orderOnce
     - gpu/core/sim_tactics.py:_tac_move_to
     - cpu/core/tactical.ts:orderRun
+    - cpu/core/tactical.ts:mine
   readings:
     - "C-99: Wander Near City ends its unit's moves; a unit whose moves an order ended runs its order no more — READ (0x77bf50 at 0x77c62a, 0x56d6f0, 0x52f50 at 0x530fd..0x53113), both twins"
     - "C-99: every pool search sets out on its own formation's value, a queue run walks its first search's path — READ (0x2715a0 at 0x271909..0x271910, 0x77d10 at 0x77d8b..0x77db0 / 0x77f0b / 0x78007 / 0x7805d, 0x52f50 at 0x52f9e / 0x52fce / 0x53394, 0x265fd0, 0x272aa0 at 0x272ad7..0x272c24, 0x26e3a0), the engines' model"
@@ -35,6 +82,7 @@
     - "C-125 / C-95: flanking and support count about the defender unit's own plot, no river edge read; MEDIUM by the plot's layer-0 list; a killed target's record; the camp strike's orders — READ (0x521530, 0x51c810 at 0x51cc1c..0x51cc56, 0x5228c0, 0x786d50, 0x776140 at 0x776333, 0x8e9d0, 0x772940 at 0x772d2f..0x772f78), FIT (the camp strike's path), both twins"
     - "C-133 / C-95 / C-134: the kept path's searches inside a queue run; the Trader target, the defending district and Pillage's own plot; the safe plot's unit at war that fights — READ (0x272aa0 at 0x272af9..0x272c76, 0x26ef40 at 0x26f123..0x26f162, 0x26e3a0, 0x782d0, 0x783980 at 0x7842df..0x7842eb / 0x784aec..0x784b36, 0x24c2f0, 0x774380 at 0x774481..0x7744a9, 0x716b90 at 0x716d53..0x716da1), both twins"
     - "C-133 / C-95 / C-134: the kept path's searches inside a queue run; the Trader target, the defending district and Pillage's own plot; the safe plot's unit at war that fights — READ (0x272aa0 at 0x272af9..0x272c76, 0x26ef40 at 0x26f123..0x26f162, 0x26e3a0, 0x782d0, 0x783980 at 0x7842df..0x7842eb / 0x784aec..0x784b36, 0x24c2f0, 0x774380 at 0x774481..0x7744a9, 0x716b90 at 0x716d53..0x716da1), FIT (the planning list's seen unit at war), both twins"
+    - "C-133 / C-95: the carried orders run in the unit list's order; a path comes ashore off water only by the disembark test — READ (0x7df30, 0x554e0, 0x523e0, 0x52e90, 0x54910, 0x2720a0 at 0x272380..0x27240d, 0x52fb90 at 0x52fb9d), both twins; UpdateOpenNode's walk and flag 2's plot — READ (0x79560, 0x2720a0 at 0x2721c3..0x27220d / 0x2724c8), unported"
   review: reviewed
 - addr: 0x53e20
   final: 0x408f0
@@ -59,4 +107,45 @@
     - "C-110 / C-99: the unit's activity and the Fortify order's refusal — READ"
   context:
     - ...is turn (0x791300), else the location; a plot of danger only where Allow Danger; woken (0x53e20) and moved (0x972880 / 0x962030).
+  review: reviewed
+- addr: 0x53e80
+  kind: function
+  name: the handler by operation type
+  semantics: "the operations manager's vt +0x80: the handler of an operation type (m_aHandlers)."
+  status: PARTLY
+  readings:
+    - "C-133 / C-95: the carried orders run in the unit list's order; a path comes ashore off water only by the disembark test — READ (0x7df30, 0x554e0, 0x523e0, 0x52e90, 0x54910, 0x2720a0 at 0x272380..0x27240d, 0x52fb90 at 0x52fb9d), both twins; UpdateOpenNode's walk and flag 2's plot — READ (0x79560, 0x2720a0 at 0x2721c3..0x27220d / 0x2724c8), unported"
+  context:
+    - "...rst slot 0x523a0): the queue's push 0x526a0 is its +0x60, the handler by operation type 0x53e80 its +0x80, an operation's start 0x55280 its +0x130, the queue run 0x52f50 its +0x138,..."
+  review: reviewed
+- addr: 0x54910
+  kind: function
+  name: the front operation's sweep
+  semantics: "the operations manager's vt +0x150: the front operation's handler is asked (its vt +0x60); where it answers no, +0x168 takes the operation off; a queue left empty raises event 0x383669f1."
+  status: PARTLY
+  readings:
+    - "C-133 / C-95: the carried orders run in the unit list's order; a path comes ashore off water only by the disembark test — READ (0x7df30, 0x554e0, 0x523e0, 0x52e90, 0x54910, 0x2720a0 at 0x272380..0x27240d, 0x52fb90 at 0x52fb9d), both twins; UpdateOpenNode's walk and flag 2's plot — READ (0x79560, 0x2720a0 at 0x2721c3..0x27220d / 0x2724c8), unported"
+  context:
+    - "...s ashore off water only by the disembark test — READ (0x7df30, 0x554e0, 0x523e0, 0x52e90, 0x54910, 0x2720a0 at 0x272380..0x27240d, 0x52fb90 at 0x52fb9d), both twins; UpdateOpenNode's walk..."
+    - ...5280 its +0x130, the queue run 0x52f50 its +0x138, the front operation's validity sweep 0x54910 its +0x150, the queue's turn 0x523e0 its +0x170.
+  review: reviewed
+- addr: 0x554e0
+  final: 0x41b10
+  kind: function
+  name: the unit's kept operation at the turn's deactivation
+  semantics: "the operations manager's vt +0x50: a unit alive (+0x770) with a pending operation (+0x2178, the front +0x2168) asks the front operation's handler (its vt +0x38); where it answers the queue's turn 0x523e0 (+0x170) runs, else with its flag set 0x52e90 (+0x68) empties the queue."
+  status: READ
+  cases:
+    - recording: h1_duelq1121
+      turn: 110
+      value: "the Scout 131073 (slot 1) on 11:18 runs its kept order before Builder Capture's pair (slots 7 / 8) leaves 12:18 (UnitOperationSegmentComplete 36097, the pair's UnitMoved 36099): it holds 11:18"
+  impl:
+    - cpu/core/tactical.ts:withShortOrders
+    - gpu/core/sim_tactics.py:_tac_with_short
+    - cpu/core/tactical.ts:mine
+  readings:
+    - "C-133 / C-95: the carried orders run in the unit list's order; a path comes ashore off water only by the disembark test — READ (0x7df30, 0x554e0, 0x523e0, 0x52e90, 0x54910, 0x2720a0 at 0x272380..0x27240d, 0x52fb90 at 0x52fb9d), both twins; UpdateOpenNode's walk and flag 2's plot — READ (0x79560, 0x2720a0 at 0x2721c3..0x27220d / 0x2724c8), unported"
+  context:
+    - "...t list's order; a path comes ashore off water only by the disembark test — READ (0x7df30, 0x554e0, 0x523e0, 0x52e90, 0x54910, 0x2720a0 at 0x272380..0x27240d, 0x52fb90 at 0x52fb9d), both t..."
+    - "...yerUnits +0x12e8 -> +0xd8, next +0x10: 0x7e06e, 0x7e32a) and calls the manager's +0x50 (0x554e0) on every unit. 0x554e0: a unit alive (+0x770) with a pending operation (+0x2178, the f..."
   review: reviewed

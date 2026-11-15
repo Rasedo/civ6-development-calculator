@@ -1303,6 +1303,11 @@ class SimTactics:
                 ok = ok & ~lone
             if cliff6 is not None:
                 ok = ok & ~cliff6
+            # a land formation's step off a water plot onto a revealed land
+            # plot runs the disembark test (0x2720a0 at 0x2723c7 -> 0x52fb90)
+            # on the parent's own water, whatever the player revealed of it:
+            # a formation that may not embark fails it at its head (`search`)
+            ok = ok & ~((~naval & ~ww_n & ~embarks).unsqueeze(1) & water_n.gather(1, b1) & ~water_n.gather(1, nbc) & ~unrev6)
             if danger is not None:
                 # a move order's danger flags (0x2720a0 at 0x272590..
                 # 0x272612): from a node of the path's first turn, under flag
@@ -2128,7 +2133,13 @@ class SimTactics:
             if bool(short.count_nonzero()):
                 sm = torch.zeros(B, dtype=torch.bool, device=dev)
                 sm[rows[short]] = True
-                pend.append((sm, us.clone(), (dest if order is None else order).clone(),
+                # the least pool slot of the formation's members (`moveTo`)
+                slot_p = self.barb_unit_slotno if seat == BARB_SEAT else getattr(self, f"{pre}_unit_pslot")
+                ks = slot_p[rows, sr].clamp(min=0)
+                ks = torch.where(mr >= 0, torch.minimum(ks, slot_p[rows, mr.clamp(min=0)].clamp(min=0)), ks)
+                key = torch.zeros(B, dtype=torch.long, device=dev)
+                key[rows] = ks
+                pend.append((sm, us.clone(), (dest if order is None else order).clone(), key,
                              dict(pre=pre, seat=seat, strike=strike, later_turns=later_turns,
                                   explore=explore, danger=danger, mate=mate, scout=scout)))
         # a unit standing on the plot a run for a kept path's node searched:
@@ -2165,9 +2176,11 @@ class SimTactics:
     def _tac_with_short(self, fn) -> None:
         """`withShortOrders`: a player's AI turn `fn` with its move orders
         carried on — each order `_tac_move_to` left short of its destination
-        with Movement left walks again, in the order given, from where its
-        unit stands once the player's other units have moved, its path found
-        anew — and its units' zone-of-control waits (`_tac_zoc_moved_of`)"""
+        with Movement left walks again from where its unit stands once the
+        player's other units have moved, its path found anew, the orders of
+        a game in their units' pool-slot order (the turn's deactivation
+        walks the player's unit list, 0x7df30), a unit's own in the order
+        given — and its units' zone-of-control waits (`_tac_zoc_moved_of`)"""
         outer = getattr(self, "_tac_short", None)
         outer_zoc = getattr(self, "_tac_zocm", None)
         mine: list = []
@@ -2182,13 +2195,21 @@ class SimTactics:
                 return
             self._tac_short = None
             try:
-                for sm, us, dest, kw in mine:
-                    pre = kw["pre"]
-                    bidx = torch.arange(self.B, device=self.device)
-                    now = getattr(self, f"{pre}_unit_tile")[bidx, us]
-                    go = (sm & getattr(self, f"{pre}_unit_alive")[bidx, us] & (getattr(self, f"{pre}_unit_mp")[bidx, us] > 0)
-                          & (now != dest.clamp(min=0)))
-                    self._tac_move_to(go, us, dest, **kw)
+                bidx = torch.arange(self.B, device=self.device)
+                # each game's orders by slot, then as given: its r-th order
+                big = torch.iinfo(torch.long).max
+                keys = torch.stack([torch.where(sm, key, torch.full_like(key, big)) for sm, _us, _dest, key, _kw in mine])
+                order = keys.argsort(dim=0, stable=True)
+                for r in range(len(mine)):
+                    for e, (sm, us, dest, _key, kw) in enumerate(mine):
+                        turn = sm & (order[r] == e)
+                        if not bool(turn.count_nonzero()):
+                            continue
+                        pre = kw["pre"]
+                        now = getattr(self, f"{pre}_unit_tile")[bidx, us]
+                        go = (turn & getattr(self, f"{pre}_unit_alive")[bidx, us] & (getattr(self, f"{pre}_unit_mp")[bidx, us] > 0)
+                              & (now != dest.clamp(min=0)))
+                        self._tac_move_to(go, us, dest, **kw)
             finally:
                 self._tac_short = outer
         finally:
