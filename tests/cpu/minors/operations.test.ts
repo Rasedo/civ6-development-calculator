@@ -51,7 +51,7 @@ describe('the city value\'s defense (0x5eb2c0)', () => {
 
 describe('the team update (0x738f20)', () => {
   const team = (members: number[], rally: number, target: number): OpTeam => ({
-    team: '', members, counts: [], goals: [rally, target, -1, -1, -1, -1], engaged: false, minsMet: false, ready: false, ongoing: false, unit: null, strength: 0, joined: 0, twice: [], slots: {},
+    team: '', members, counts: [], goals: [rally, target, -1, -1, -1, -1], engaged: false, enemy: 0, attack: 0, minsMet: false, ready: false, ongoing: false, unit: null, strength: 0, joined: 0, twice: [], slots: {},
   });
   const op = (enemy: number) => ({ enemy } as Operation);
   it('marches to the first plot from the target back to the rally the seat may enter', () => {
@@ -73,10 +73,21 @@ describe('the team update (0x738f20)', () => {
   });
   it('draws the battle line halfway to the targets in reach', () => {
     const t = team([1], at(2, 2), at(8, 2));
-    const v = view({ units: () => [unit(1, at(2, 2))], atWar: () => true, borderClosed: () => false });
-    updateTeam(v, 0, op(1), t, [{ type: 'LOW', plot: at(6, 2), owner: 1, unitType: 'UNIT_WARRIOR', range: 0 }]);
+    const v = view({ units: () => [unit(1, at(2, 2))], atWar: () => true, borderClosed: () => false, planSpot: () => -1 });
+    updateTeam(v, 0, op(1), t, [{ type: 'LOW', plot: at(6, 2), owner: 1, unitType: 'UNIT_WARRIOR', range: 0, strength: 20 }]);
     expect(t.engaged).toBe(true);
     expect(t.goals[4]).toBe(at(4, 2));
+    expect([t.enemy, t.attack]).toEqual([20, 0]);
+  });
+  it('sums the members that reach a target this turn against the targets in reach', () => {
+    const t = team([1, 2], at(2, 2), at(8, 2));
+    const reach = (id: number, plot: number) => (id === 1 && plot === at(3, 2) ? plot : -1);
+    const v = view({ units: () => [unit(1, at(2, 2)), unit(2, at(1, 2), { combat: 30 })], atWar: () => true, borderClosed: () => false, planSpot: reach });
+    updateTeam(v, 0, op(1), t, [
+      { type: 'LOW', plot: at(3, 2), owner: 1, unitType: 'UNIT_WARRIOR', range: 0, strength: 20 },
+      { type: 'HIGH', plot: at(4, 2), owner: 1, unitType: 'UNIT_ARCHER', range: 2, strength: 25 },
+    ]);
+    expect([t.enemy, t.attack]).toEqual([45, 20]);
   });
 });
 

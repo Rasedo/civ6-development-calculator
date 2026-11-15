@@ -63,6 +63,9 @@
     - recording: h1_duely1127
       turn: 72
       value: "Mexico City's City Defense (t70-78): t70 Heavy Chariot 655362 moved onto 8:10 with no garrison (no DEFENDER), from t71 the garrison a DEFENDER homed on the city (its standing army's since t69): the shortfall 3 -> 2 at t72's update, the Combat Desire 0.3 / 0.2 / 0.1 at t72 / t73 / t75 (an Archer joining) as AI_Military.csv"
+    - recording: h1_duelq1128
+      turn: 130
+      value: "Hong Kong's garrison Warrior 2293764 (attack 90 against 45, above 10): no Fortify order, its Movement kept, Operation Move's row on its own plot 9:7; record t131 fortify 0"
   impl:
     - cpu/core/opsOrders.ts:defenderAiType
     - cpu/core/operations/assault.ts:garrisonCity
@@ -85,6 +88,7 @@
     - "C-99: Operation Move's and Operation Attack's planning plot keeps out another player's unit at peace, not one at war; Operation Attack's march carries the attack flag; a refresh reads the knowledge base's target entries — READ (0x78fa10 -> 0x585eb0 -> 0x585d90, 0x791300's callers 0x80c397 / 0x810e98 / 0x811213, 0x80c180 at 0x80c3c4 / 0x80c4be / 0x80c7ee), both twins"
     - "C-110: the Fortify order and its ticks; the heal's plot gate — READ"
     - "C-99: a unit an Upgrade Units tree lets go keeps the tree's job — READ (0x7d2190 -> 0x1e60f0 on +0x778, 0x810d30 at 0x81100a -> 0x81116f, 0x570b40), the tally's label (CPU)"
+    - "C-129 / C-99 / C-134: a known city's Encampment in the enemy strength, the rally's advance, the team's battle strengths and Garrison City's fortify test — READ (0x7877e0 at 0x7878e1..0x78791f / 0x787c64..0x787ca7, 0x5f0280, 0x5efaf0, 0x73f0c0, 0x73f7d0 at 0x73face, 0x738f20 at 0x7391a4..0x7395e1, 0x810d30 at 0x810f80..0x81115e), both twins; the replay's buildings before the next start"
   notes:
     - the fortify test's teams' +0x98 less +0x94 (the team update's attack and enemy strengths) unported, taken as held; the swap command 0x972880 unported
   context:

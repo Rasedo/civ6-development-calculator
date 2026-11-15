@@ -14,6 +14,9 @@ export interface AiMapPlotView {
   x: number;
   y: number;
   water: boolean;
+  /** no unit may stand on it (plot +0x3a bit 3: a mountain, an impassable
+   *  feature) */
+  impassable: boolean;
   /** the seat whose territory holds it, -1 for none */
   owner: number;
   /** a district stands on it, a city centre included */
@@ -83,14 +86,17 @@ export interface AiCityDefenceView {
 /** an entry of the seat's tactical target list (the knowledge base's +0x368
  *  list, 0x783980), in the list's order: its TargetType (cpu/core/tactical's
  *  names), plot, player (-1 for none), its unit's UnitType (null for a target
- *  that is no unit) and the reach its blows have (+0x18: a unit's attack
- *  Range, a district's strike range) */
+ *  that is no unit), the reach its blows have (+0x18: a unit's attack
+ *  Range, a district's strike range) and its strength as a team's update
+ *  sums it (its unit's larger of Combat and RangedCombat, a district's
+ *  strike) */
 export interface AiAttackTargetView {
   type: string;
   plot: number;
   owner: number;
   unitType: string | null;
   range: number;
+  strength: number;
 }
 
 /** one unit's part in an attack assignment (0x776140), in the order the
@@ -139,6 +145,10 @@ export interface AiView extends AiValueView {
    *  each ring from its six corners, each corner walked along its side */
   plotsRing(plot: number, radius: number): readonly number[];
   plotDistance(a: number, b: number): number;
+  /** the map's width in plots (a plot's index its row x the width + its
+   *  column) and whether it wraps in x */
+  mapWidth: number;
+  wrapX: boolean;
   /** the plots of the seat's city centres */
   cityPlots(seat: number): readonly number[];
   leaderType(seat: number): string | null;

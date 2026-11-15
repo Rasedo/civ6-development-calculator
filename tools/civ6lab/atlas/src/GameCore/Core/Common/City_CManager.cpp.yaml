@@ -38,6 +38,7 @@
   impl: [cpu/core/units.ts:districtZones]
   readings:
     - "C-95: the embark rules for a formation that may embark, a district's zone unseen, a city's kill in the planning, a raised unit's AI type, a move order's attack spot — READ (0x530420, 0x530240, 0x52fe90 at 0x52fed4, 0x530f50 at 0x531168, 0x791470 at 0x791677, 0x79b9c0), FIT (the move order's attack spot), both twins"
+    - "C-129 / C-99 / C-134: a known city's Encampment in the enemy strength, the rally's advance, the team's battle strengths and Garrison City's fortify test — READ (0x7877e0 at 0x7878e1..0x78791f / 0x787c64..0x787ca7, 0x5f0280, 0x5efaf0, 0x73f0c0, 0x73f7d0 at 0x73face, 0x738f20 at 0x7391a4..0x7395e1, 0x810d30 at 0x810f80..0x81115e), both twins; the replay's buildings before the next start"
   context:
     - "- THE ZONE OF CONTROL (0x530f50): the district test (0x57b20 -> 0x24c2f0, IsAtWarWith at 0x531181) runs on each neighbour before any sight test; a..."
   review: reviewed

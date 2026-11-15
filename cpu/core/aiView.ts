@@ -4,7 +4,7 @@
  * writes the state; the slot rebuild a government change would make is laid
  * on copies (`carryLayout`).
  */
-import type { AiCityDefenceView, AiKnownCityView, AiMapPlotView, AiUnitView, AiView } from './aiViewTypes';
+import type { AiCityDefenceView, AiKnownCityView, AiKnownDistrictView, AiMapPlotView, AiUnitView, AiView } from './aiViewTypes';
 import { DIRECTION_TYPES, hexDistance, neighborTile, neighbors, tilesWithin } from '../../world/hex';
 import { isCoastalLand, isImpassable, isMountain, isWater } from '../../world/query';
 import type { Tile } from '../../world/types';
@@ -20,8 +20,9 @@ import { aiDefenderOf, aiFormed, aiRanged, aiStrengths, districtHealth, planUnit
 import { AIR_REBASE_COLS, AIR_STRIKE_COLS, IMPROVEMENT_IDS, unitActionIndex } from './unitActions';
 import { airPillageTargets, airStrikeTargets, rebaseTargets } from './air';
 import { plotsSeenNow, ringPlots } from './barbarians';
-import { cityDefenseStrength, cityStrikeBase, cityStrikeStrength, encircled, garrisonTerm, predictCityBlow, siegeAssist, unitAttackRange } from './combat';
-import { outerPool, portalAt, wallsTier } from './rules';
+import { cityDefenseStrength, cityStrikeBase, cityStrikeStrength, districtGarrisonedStrength, encircled, garrisonTerm, predictCityBlow, siegeAssist, unitAttackRange } from './combat';
+import { encampOuterPool, outerPool, portalAt, wallsMax, wallsTier } from './rules';
+import { targetStrength } from './opsOrders';
 import { borderClosedTo, builderCost, cityAtIndex, embarkTechMoves, formationMates, plotUnits, traderCost, unitFullMoves, unitDomain, unitExertsZoc, unitsHostile, unitVisibleTo } from './units';
 import { CIVICS } from '../data/civics';
 import { TECHS } from '../data/techs';
@@ -188,7 +189,7 @@ export function aiView(state: GameState, opts: { updated?: boolean } = {}): AiVi
   for (const cs of state.cityStates) if (cs.centerIndex >= 0) centres.add(cs.centerIndex);
   return {
     plots: () => (plots ??= map.tiles.map((t): AiMapPlotView => ({
-      index: t.index, x: t.col, y: t.row, water: isWater(t),
+      index: t.index, x: t.col, y: t.row, water: isWater(t), impassable: isImpassable(t),
       owner: tileSeat(t), district: !!t.district || centres.has(t.index), city: centres.has(t.index),
       area: t.area ?? -1, region: t.region ?? -1,
       lake: t.terrain === 'LAKE',
@@ -198,6 +199,8 @@ export function aiView(state: GameState, opts: { updated?: boolean } = {}): AiVi
       return tilesWithin(map, t.col, t.row, r).map((x) => x.index);
     },
     plotsRing: (p, r) => ringPlots(state, p, r),
+    mapWidth: map.width,
+    wrapX: !!map.wrapX,
     plotDistance: (a, b) => {
       const ta = map.tiles[a];
       const tb = map.tiles[b];
@@ -743,6 +746,7 @@ export function aiView(state: GameState, opts: { updated?: boolean } = {}): AiVi
     attackTargets: (i) => targetsOf(i).map((t) => ({
       type: t.type, plot: t.tile, owner: t.seat, unitType: t.unit ? gameTypeOf('unit', t.unit.type, 'UNIT_') : null,
       range: t.unit ? unitAttackRange(t.unit) : t.type === 'COMBAT_DISTRICT' ? CITY_STRIKE_RANGE : 0,
+      strength: targetStrength(state, t),
     })),
     planSpot: (id, p, turns, needMoves, range) => {
       const u = state.units.find((x) => x.id === id);
@@ -799,7 +803,11 @@ export function aiView(state: GameState, opts: { updated?: boolean } = {}): AiVi
 }
 
 /** the cities the seat has revealed the centre of, as its knowledge base
- *  records them (0x5efaf0): the centre its one defensible district */
+ *  records them (0x5f0280 -> 0x5efaf0, a look's fill of each revealed plot
+ *  holding a district with hit points): the centre, then each Encampment
+ *  placed on a plot the seat revealed — its city's standing strength with
+ *  its own plot's garrison (0x24ae80), its walls and strike while its own
+ *  perimeter stands (one not yet built behind its city's whole walls) */
 function knownCities(state: GameState, seat: number): AiKnownCityView[] {
   const out: AiKnownCityView[] = [];
   const add = (c: City, originalCapital: boolean) => {
@@ -807,6 +815,14 @@ function knownCities(state: GameState, seat: number): AiKnownCityView[] {
     const t = computeCityStats(state, c).total;
     const defense = cityDefenseStrength(state, c);
     const walled = outerPool(state, c) > 0;
+    const forts: AiKnownDistrictView[] = [];
+    for (const d of c.districts) {
+      if (d.type !== 'ENCAMPMENT' || !isExplored(state, seat, d.tileIndex)) continue;
+      const tile = state.map.tiles[d.tileIndex];
+      const stands = (tile.districtComplete ? encampOuterPool(state, c, tile) : wallsMax(state, c)) > 0;
+      const own = districtGarrisonedStrength(state, c, d.tileIndex);
+      forts.push({ plot: d.tileIndex, defense: own, walls: stands ? own : 0, strike: stands ? cityStrikeStrength(state, c) : 0 });
+    }
     const resources = new Map<string, number>();
     for (const tile of state.map.tiles) {
       if (tile.ownerCity !== c.id || tileSeat(tile) !== c.seat || !tile.resource || !tile.improvement || tile.pillaged) continue;
@@ -816,7 +832,7 @@ function knownCities(state: GameState, seat: number): AiKnownCityView[] {
     out.push({
       plot: c.centerIndex, owner: c.seat, id: c.id, population: c.population, originalCapital, capital: c.isCapital,
       yields: AI_YIELD_KEYS.map((k) => Math.trunc(t[k])), wonders: c.wonders.length,
-      districts: [{ plot: c.centerIndex, defense, walls: walled ? defense : 0, strike: walled ? cityStrikeStrength(state, c) : 0 }]
+      districts: [{ plot: c.centerIndex, defense, walls: walled ? defense : 0, strike: walled ? cityStrikeStrength(state, c) : 0 }, ...forts]
     });
   };
   for (const h of cityHolders(state)) for (const c of h.cities) add(c, (c.origCapitalSeat ?? -1) >= 0);

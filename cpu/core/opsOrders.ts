@@ -13,7 +13,7 @@ import { gameTypeOf } from '../data/aliases';
 import { aiPromotionPick, attacksLeftOf, promoReady, takePromotion } from './promotions';
 import { cityStrikeBase, damageExpected, hostilePillage, hostilePillageAmount, hostileRangedStrike, unitAttackRange } from './combat';
 import { aiStrengths, dangerDistricts, maxMoves, militaryAiTypeOf, moveTo, passAttack, passFinish, passFortify, passMoveExec, passMoveUpdate, passNavalPillage, passPatrol, passSafePlot, planningAt, plotDistance, rangeOf, swapUnits,
-  type Pass } from './tactical';
+  type Pass, type Target } from './tactical';
 import type { OpsEnv } from './operations/manager';
 import type { DefendOrders } from './operations/nodes';
 import { breakEscort, escortRiders, escortUnit, unitDomain } from './units';
@@ -40,6 +40,7 @@ export function passView(state: GameState, seat: number, pass: Pass, base: AiVie
     attackTargets: (i) => (i !== seat ? base.attackTargets(i) : pass.targets.map((t): AiAttackTargetView => ({
       type: t.type, plot: t.tile, owner: t.seat, unitType: t.unit ? gameTypeOf('unit', t.unit.type, 'UNIT_') : null,
       range: t.unit ? unitAttackRange(t.unit) : t.type === 'COMBAT_DISTRICT' ? CITY_STRIKE_RANGE : 0,
+      strength: targetStrength(state, t),
     }))),
     unitReach: (id, turns) => {
       const r = reach(id);
@@ -74,6 +75,23 @@ function cityOfPlot(state: GameState, plot: number): City | undefined {
   const t = state.map.tiles[plot];
   const cs = cityStateAt(state, plot);
   return cs ? minorCity(cs) : cityAtTile(state, t);
+}
+
+/** a tactical target's strength as a team's update sums it (0x738f20 at
+ *  0x739581..0x7395e1): its unit's larger of Combat and RangedCombat as the
+ *  AI reads them (0x56dc90 with 0, 0x56e3e0), a district that defends its
+ *  city's strike with no damage term (0x249ee0, whole; its perimeter
+ *  standing or not: runs/h1_duelq1127 t37 the barbarians' Barbarian Attack
+ *  on the unwalled 12:6, 45 for a Warrior's 20), any other 0 */
+export function targetStrength(state: GameState, t: Target): number {
+  if (t.unit) {
+    if (!state.units.includes(t.unit)) return 0;
+    const s = aiStrengths(state, t.unit);
+    return Math.max(s.melee, s.ranged);
+  }
+  if (t.type !== 'COMBAT_DISTRICT') return 0;
+  const city = cityOfPlot(state, t.tile);
+  return city ? Math.floor(cityStrikeBase(state, city)) : 0;
 }
 
 /** a unit's damage, its hit points' complement */

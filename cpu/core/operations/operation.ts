@@ -38,6 +38,11 @@ export interface OpTeam {
   goals: number[];
   /** enemy targets stand within reach of its members (team +0x90) */
   engaged: boolean;
+  /** the team update's battle strengths (0x738f20): the strength of those
+   *  targets (team +0x94) and of its members whose planning reaches one of
+   *  them this turn (+0x98) */
+  enemy: number;
+  attack: number;
   /** every requirement's minimum met (team +0x10); that and the initial
    *  strength advantage (+0x11, its readiness); that and the ongoing one
    *  (+0x12) */
@@ -112,7 +117,7 @@ export function newTeams(def: AiOpDef, view: AiView, target: number): OpTeam[] {
   return (AI_OP_TEAMS[def.name] ?? []).filter((t) => teamApplies(t, view, target)).map((t) => {
     const reqs = AI_TEAM_REQS[t.team] ?? [];
     return { team: t.team, members: [], counts: reqs.map(() => 0), goals: [NO_PLOT, NO_PLOT, NO_PLOT, NO_PLOT, NO_PLOT, NO_PLOT], engaged: false,
-      minsMet: false, ready: false, ongoing: false, unit: null, strength: 0, joined: 0, twice: [], slots: {} };
+      enemy: 0, attack: 0, minsMet: false, ready: false, ongoing: false, unit: null, strength: 0, joined: 0, twice: [], slots: {} };
   });
 }
 

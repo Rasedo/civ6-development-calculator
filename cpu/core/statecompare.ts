@@ -233,7 +233,8 @@ function cityAiTrees(cs: CityState, state: GameState): number[] {
  *  each one released by Defend Units (1) or not (0), each one's slot as the
  *  last keep saw it (-1 none), the units listed again (their count, then
  *  their pool slots ascending, -2 gone), its
- *  requirements' counts behind their number, the six goals, engaged,
+ *  requirements' counts behind their number, the six goals, engaged, the
+ *  battle strengths (the enemy's, the attack's),
  *  minimums met, ready, ongoing, the unit to build (AI row), strength] */
 function minorOpsRecord(cs: CityState, state: GameState): number[] {
   return opsRecord(cs.ops, cs.seat, MINOR_OP_DEFS, state);
@@ -271,7 +272,7 @@ function opsRecord(ai: OpsAi | undefined, seat: number, defs: readonly string[],
       });
       out.push((AI_OP_TEAMS[op.def] ?? []).findIndex((x) => x.team === t.team), slots.length, ...slots, ...released, ...seen,
         twice.length, ...twice.sort((a, b) => a - b), t.counts.length, ...t.counts,
-        ...t.goals, t.engaged ? 1 : 0, t.minsMet ? 1 : 0, t.ready ? 1 : 0, t.ongoing ? 1 : 0,
+        ...t.goals, t.engaged ? 1 : 0, t.enemy, t.attack, t.minsMet ? 1 : 0, t.ready ? 1 : 0, t.ongoing ? 1 : 0,
         t.unit ? AI_UNIT_INDEX.get(t.unit) ?? -1 : -1, t.strength);
     }
   }

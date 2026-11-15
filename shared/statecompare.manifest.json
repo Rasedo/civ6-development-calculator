@@ -647,6 +647,8 @@
             "mops_cnt",
             "mops_goal",
             "mops_eng",
+            "mops_tene",
+            "mops_tatk",
             "mops_mins",
             "mops_ready",
             "mops_ong",
@@ -2568,6 +2570,8 @@
             "mops_cnt",
             "mops_goal",
             "mops_eng",
+            "mops_tene",
+            "mops_tatk",
             "mops_mins",
             "mops_ready",
             "mops_ong",
@@ -2585,7 +2589,7 @@
             "mops_pick_target",
             "mops_pick_rally"
           ],
-          "note": "the minor's operations (`minorOpsRecord` / `_minor_ops`): the pool, the pick, per slot its definition, target, rally, backup, strengths and teams (members by pool slot, counts, goals, flags, unit, strength); the trees' node memories and Operation Move's stores are not compared"
+          "note": "the minor's operations (`minorOpsRecord` / `_minor_ops`): the pool, the pick, per slot its definition, target, rally, backup, strengths and teams (members by pool slot, counts, goals, engaged, the battle strengths, flags, unit, strength); the trees' node memories and Operation Move's stores are not compared"
         },
         {
           "name": "minorCampsKnown",

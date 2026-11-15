@@ -238,6 +238,9 @@
     - recording: h1_duelp1121
       turn: 174
       value: "the district's own plot: Builder Capture's Line Infantry 4128797 at 67 damage on 5:16 beside Xi'an's Encampment 5:15 (77), its centre 6:12 four away, Protect Units to 3:16"
+    - recording: h1_duelq1128
+      turn: 130
+      value: "Hong Kong's City Defense at its end look: team +0x94 45 (the barbarian Man-At-Arms on 9:5), +0x98 90 (its two Man-At-Arms beside it; the Warriors on 9:7 reach it not)"
   impl:
     - gpu/core/sim_tactics.py:_endangered_districts
     - cpu/core/operations/assault.ts:WEIGHED
@@ -249,12 +252,16 @@
     - cpu/core/opsOrders.ts:endangered
     - gpu/core/sim_minorops.py:_mops_endangered
     - gpu/core/sim_barbops.py:_bop_endangered
+    - cpu/core/opsOrders.ts:targetStrength
+    - gpu/core/sim_minorops.py:_mops_reaches
+    - gpu/core/sim_minorops.py:_mops_district_strikes
   readings:
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
     - "C-97: the war operations — the war candidates, the city value's frame, the assault nodes and Attack Units READ; the loyalty lead's sources, the team update's danger and the assault's executions PARTLY READ"
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
     - "C-95: the danger map and Move to Safety — READ, ported"
     - "C-95 / C-123: a formation's walk steps its own escort; the team update's district blow is the district's own — READ (0x26fe20 / 0x587ca0; 0x738f20 at 0x7393e5..0x7394c4 -> 0x408770, 0x249ee0, 0x249e40, 0x519370), both twins; the minors' and barbarians' copy keeps record t+1's unfinished districts"
+    - "C-129 / C-99 / C-134: a known city's Encampment in the enemy strength, the rally's advance, the team's battle strengths and Garrison City's fortify test — READ (0x7877e0 at 0x7878e1..0x78791f / 0x787c64..0x787ca7, 0x5f0280, 0x5efaf0, 0x73f0c0, 0x73f7d0 at 0x73face, 0x738f20 at 0x7391a4..0x7395e1, 0x810d30 at 0x810f80..0x81115e), both twins; the replay's buildings before the next start"
   context:
     - "...ays Running); FAILURE where a team is in battle (+0x90, the team update's battle points 0x738f20) and the operation holds no unit — a team in battle has a member, so never in a turn...."
   review: reviewed
@@ -550,6 +557,7 @@
     - "C-95: the barbarians' Builder Capture — READ (the event, the start, the tree's walk), ported"
     - "C-123: Operation Move's danger flags, the MoveTo execution and m_blockedTurns — READ (0x816cb0 at 0x816e70 / 0x817839, 0x962380, 0x73e610), both twins"
     - "C-95: the barbarians' candidates before the look, a capture's rally, a formation's embark flag and fighter — READ (0x722d70, 0x746920, 0x747230, 0x7877e0, 0x7265b0, 0x747fa0, 0x73e610, 0x73e870, 0x267650), both twins"
+    - "C-129 / C-99 / C-134: a known city's Encampment in the enemy strength, the rally's advance, the team's battle strengths and Garrison City's fortify test — READ (0x7877e0 at 0x7878e1..0x78791f / 0x787c64..0x787ca7, 0x5f0280, 0x5efaf0, 0x73f0c0, 0x73f7d0 at 0x73face, 0x738f20 at 0x7391a4..0x7395e1, 0x810d30 at 0x810f80..0x81115e), both twins; the replay's buildings before the next start"
   context:
     - "- The pick: a running operation's valid candidate sets its backup (0x73e610); of the new ones that start themselves the highest Priority (+0x40), then the larger o..."
     - ...e candidate is weighed again for the new operation (0x747fa0, vt +8) and switched to (0x73e610, 0x73e870).
@@ -572,6 +580,7 @@
     - "C-60: the Free Cities Raid"
     - "C-99: an operation's start takes its strengths; a unit's AI strengths with its formation — READ (0x73a120, 0x56dc90, 0x56e3e0, 0x56daa0, 0x1497d0), both twins"
     - "C-129: the recruit's minimums leave the offer, the strength counts the list as listed — READ (0x73be10 at 0x73c63e..0x73c77b, 0x73c7c0, 0x7383d0, 0x8fd8f0), both twins; the replay's upgrade a new id"
+    - "C-129 / C-99 / C-134: a known city's Encampment in the enemy strength, the rally's advance, the team's battle strengths and Garrison City's fortify test — READ (0x7877e0 at 0x7878e1..0x78791f / 0x787c64..0x787ca7, 0x5f0280, 0x5efaf0, 0x73f0c0, 0x73f7d0 at 0x73face, 0x738f20 at 0x7391a4..0x7395e1, 0x810d30 at 0x810f80..0x81115e), both twins; the replay's buildings before the next start"
   notes: ["imported: cited by the code, in no dll_readings section"]
   review: reviewed
 - addr: 0x73e870
@@ -589,6 +598,7 @@
     - "C-97: the operations — the manager and its candidates READ, the staging list and City Defense's start unread"
     - "C-95: the barbarians' candidates before the look, a capture's rally, a formation's embark flag and fighter — READ (0x722d70, 0x746920, 0x747230, 0x7877e0, 0x7265b0, 0x747fa0, 0x73e610, 0x73e870, 0x267650), both twins"
     - "C-129: the recruit's minimums leave the offer, the strength counts the list as listed — READ (0x73be10 at 0x73c63e..0x73c77b, 0x73c7c0, 0x7383d0, 0x8fd8f0), both twins; the replay's upgrade a new id"
+    - "C-129 / C-99 / C-134: a known city's Encampment in the enemy strength, the rally's advance, the team's battle strengths and Garrison City's fortify test — READ (0x7877e0 at 0x7878e1..0x78791f / 0x787c64..0x787ca7, 0x5f0280, 0x5efaf0, 0x73f0c0, 0x73f7d0 at 0x73face, 0x738f20 at 0x7391a4..0x7395e1, 0x810d30 at 0x810f80..0x81115e), both twins; the replay's buildings before the next start"
   context:
     - ...ate is weighed again for the new operation (0x747fa0, vt +8) and switched to (0x73e610, 0x73e870).
   review: reviewed
@@ -645,11 +655,38 @@
   context:
     - "...; a type of none has no limit. The running lines (\"%s running, TARGET\"), the strengths (0x73eb60, 0x73f7d0) and team lines (0x73b360) come first, then the start (0x726470 -> 0x73a120,..."
   review: reviewed
+- addr: 0x73f0c0
+  final: 0x4e2010
+  kind: function
+  name: advanceRally
+  semantics: "the rally's advance (from 0x73f7d0 at 0x73fadb where op +0x128, the definition's AllowTargetUpdate, stands): goal 0 (team +0xe8; goal 1 where none) slides along its line to goal 1 (+0xf0) to the projection of the member furthest along it. Axial columns x - floor(y / 2) (x differences wrapped by the map's width) and rows; v the rally's step to the target; a . b = 3 (a.q + a.y / 2)(b.q + b.y / 2) + 2.25 a.y b.y in single precision (0.5 @0xd20458, 3.0 @0xd26894, 2.25 @0xd6df90). Per live member (team +0x18): p = (rally - unit) . v above 0 skips; ((target - unit) . v) x p above 0 skips; p below the least so far (from 0) sets the point (rally.q - trunc(v.q x p / v . v), rally.y - trunc(v.y x p / v . v)) in doubles. The point's plot (vt +0x50) becomes goal 0 where valid, not impassable (plot +0x3a bit 3) and unowned or the player's (+0x128) — the player's alone where the team definition's +0x10 (SafeRallyPoint) stands. With a member of domain 0 (sea) and that plot land, 0x6b000 within 3 of the target with the lambda 0x740bd0 (the first water plot of the ring walk) sets it. Goal 0 is then its plot's own coordinates."
+  status: READ
+  cases:
+    - recording: h1_duelq1128
+      turn: 121
+      value: "city-state 3's Attack Barb Camp (rally 4:9, target 4:1): with the Warriors on 3:9 / 4:10 and the Man-At-Arms 983040 on 3:4, goal 0 is 4:4 (p -30 over 48); the in-progress recruit then takes 1572868 on 3:3 over 1179650 on 2:4"
+    - recording: h1_duelq1128
+      turn: 122
+      value: "the point 4:3 is a mountain: goal 0 stays 4:4 at the end look; 4:2 at t123"
+  impl:
+    - cpu/core/operations/assault.ts:advanceRally
+    - gpu/core/sim_minorops.py:_mops_advance_rally
+    - cpu/core/operations/nodes.ts:teamsUpdate
+  readings:
+    - "C-129 / C-99 / C-134: a known city's Encampment in the enemy strength, the rally's advance, the team's battle strengths and Garrison City's fortify test — READ (0x7877e0 at 0x7878e1..0x78791f / 0x787c64..0x787ca7, 0x5f0280, 0x5efaf0, 0x73f0c0, 0x73f7d0 at 0x73face, 0x738f20 at 0x7391a4..0x7395e1, 0x810d30 at 0x810f80..0x81115e), both twins; the replay's buildings before the next start"
+  context:
+    - "...ify test — READ (0x7877e0 at 0x7878e1..0x78791f / 0x787c64..0x787ca7, 0x5f0280, 0x5efaf0, 0x73f0c0, 0x73f7d0 at 0x73face, 0x738f20 at 0x7391a4..0x7395e1, 0x810d30 at 0x810f80..0x81115e), b..."
+    - "- THE RALLY'S ADVANCE (0x73f0c0, called per team by the teams' update 0x73f7d0 at 0x73fadb behind the team update 0x73f..."
+  review: reviewed
 - addr: 0x73f7d0
   final: 0x4e2670
   kind: function
   semantics: "the team rebuild (before the team update): lists the operation's units by its id (0x6092c0 on +0x720) and adds each one alive that no team of it holds to its first team (0x737f90); resets no field. Its dl goes to the team update as its fifth argument (the start 0x73a120 passes 1, the refreshes 0x727510 / 0x728010 0), its r8b as the sixth (1 at all three)."
   status: PARTLY
+  cases:
+    - recording: h1_duelq1128
+      turn: 161
+      value: Barbarian Attack (AllowTargetUpdate false, op +0x128 0) holds goal 0 on its rally at every end look of the five duelq recordings; Attack Barb Camp, Builder Capture, Settle New City and Naval Superiority teams with members move it
   impl:
     - cpu/core/operations/assault.ts:WEIGHED
     - cpu/core/operations/nodes.ts:refreshStrengths
@@ -658,6 +695,7 @@
     - cpu/core/operations/nodes.ts:recruitUnits
     - cpu/core/operations/nodes.ts:teamsUpdate
     - gpu/core/sim_minorops.py:_mops_teams_update
+    - cpu/core/operations/assault.ts:advanceRally
   readings:
     - "C-97: the operations — the manager READ (no-enemy candidates), the war candidates unread"
     - "C-97: the operations — the manager and its candidates READ, the staging list and City Defense's start unread"
@@ -668,6 +706,7 @@
     - "C-99: Defend Units' ship release and the team update's members — READ (0x73d1f0, 0x73fba0 at 0x73fc75 -> 0x732cd0), both twins"
     - "C-99: an operation's start takes its strengths; a unit's AI strengths with its formation — READ (0x73a120, 0x56dc90, 0x56e3e0, 0x56daa0, 0x1497d0), both twins"
     - "C-99 / C-129: the military AI's job refreshes the operations before its upgrade; Recruit Units updates the teams only on a changed count — READ (0x722690, 0x81c820), both twins"
+    - "C-129 / C-99 / C-134: a known city's Encampment in the enemy strength, the rally's advance, the team's battle strengths and Garrison City's fortify test — READ (0x7877e0 at 0x7878e1..0x78791f / 0x787c64..0x787ca7, 0x5f0280, 0x5efaf0, 0x73f0c0, 0x73f7d0 at 0x73face, 0x738f20 at 0x7391a4..0x7395e1, 0x810d30 at 0x810f80..0x81115e), both twins; the replay's buildings before the next start"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...f none has no limit. The running lines (\"%s running, TARGET\"), the strengths (0x73eb60, 0x73f7d0) and team lines (0x73b360) come first, then the start (0x726470 -> 0x73a120, \"Started\")..."
@@ -708,5 +747,6 @@
     - "C-99: Defend Units' ship release and the team update's members — READ (0x73d1f0, 0x73fba0 at 0x73fc75 -> 0x732cd0), both twins"
     - "C-99: an operation's start takes its strengths; a unit's AI strengths with its formation — READ (0x73a120, 0x56dc90, 0x56e3e0, 0x56daa0, 0x1497d0), both twins"
     - "C-128: a unit made anew leaves its operation and its standing army — READ, both twins"
+    - "C-129 / C-99 / C-134: a known city's Encampment in the enemy strength, the rally's advance, the team's battle strengths and Garrison City's fortify test — READ (0x7877e0 at 0x7878e1..0x78791f / 0x787c64..0x787ca7, 0x5f0280, 0x5efaf0, 0x73f0c0, 0x73f7d0 at 0x73face, 0x738f20 at 0x7391a4..0x7395e1, 0x810d30 at 0x810f80..0x81115e), both twins; the replay's buildings before the next start"
   notes: ["imported: cited by the code, in no dll_readings section"]
   review: reviewed

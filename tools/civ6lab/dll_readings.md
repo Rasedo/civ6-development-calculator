@@ -15344,3 +15344,103 @@ refusal (cpu/core/tactical.ts); GPU `_tac_with_short`, the entry's key at
   no recorded case: a child the player never revealed on closed ground (the
   validity's tail); the Great General's era classes (the engines' aura reads
   none).
+
+## C-129 / C-99 / C-134: a known city's Encampment in the enemy strength, the rally's advance, the team's battle strengths and Garrison City's fortify test — READ (0x7877e0 at 0x7878e1..0x78791f / 0x787c64..0x787ca7, 0x5f0280, 0x5efaf0, 0x73f0c0, 0x73f7d0 at 0x73face, 0x738f20 at 0x7391a4..0x7395e1, 0x810d30 at 0x810f80..0x81115e), both twins; the replay's buildings before the next start
+
+`knownCities` (cpu/core/aiView.ts), `advanceRally`, `updateTeam`,
+`garrisonExecute` (cpu/core/operations/assault.ts), `teamsUpdate`
+(cpu/core/operations/nodes.ts), `targetStrength` (cpu/core/opsOrders.ts),
+`OpTeam.enemy` / `OpTeam.attack`; `_ops_enemy_str`, `_mops_advance_rally`,
+`_mops_update_team`, `_mops_reaches`, `_mops_district_strikes`,
+`_x_garrison`, `mops_tene` / `mops_tatk` (gpu/core/sim_minorops.py);
+`buildingsBeforeStart` (cpu/harness/replay.ts, replay only).
+
+- THE LOOK'S DISTRICT PLOTS (0x7877e0): a plot seen (visibility count above
+  0, 0x7878e1) or only revealed (+0x2f0, 0x787c64) that holds a district of
+  any kind (plot +0x10 not -1, an owner at +0x1c) takes 0x5f0280 with the
+  district's handle — the city's centre is one such district, not a case
+  apart; a plot with no district and a +0x1e not -1 takes 0x5f0490.
+  0x5f0280 resolves the district (0x57b20), finds or appends its city's
+  entry and fills it from that district (0x5efaf0): the city record
+  (0x5ef9a0, where the entry's age is not 0), then, where the district has
+  hit points (GetMaxDamage of 0x5e97d629 above 0: the City Centre, the
+  Encampment), its own 0x20-byte entry by its handle: +0x14
+  GetDefenseStrength with the garrison flag 0 (0x24ae80: the city's standing
+  strength and the garrison term of the district's own plot), +0x18 the same
+  where its own outer damage is below its most, +0x1c its strike
+  (0x249ee0). So a known city holds an entry for its Encampment on a
+  revealed plot, and 0x5eb2c0 (without its byte: the strongest of each
+  entry's defense - 10 and walls) reads the Encampment's garrison.
+- CONFIRMED: runs/h1_duelq1128 t161 the barbarians' Barbarian Attack on
+  Xi'an 15:10: its Trebuchet on the Encampment 13:13 upgraded that turn to
+  the Bombard 3342346 (Combat 45 over the base 36: 9), 35 (the Trebuchet's
+  record) + 62 + 46 = 143, 134 the turns the Trebuchet (35) stood there;
+  t213 / t215 the Field Cannon Corps 5177352 (60 over 52: 8) on it, 150 for
+  142; runs/h1_duelq1121 t174 Barbarian Attack 243 and Barbarian City
+  Assault 168 on 6:12.
+- THE RALLY'S ADVANCE (0x73f0c0, called per team by the teams' update
+  0x73f7d0 at 0x73fadb behind the team update 0x73fba0, where the
+  operation's definition byte op +0x128 stands: AllowTargetUpdate, def
+  +0x30 beside TargetType +0x28 and TargetParameter +0x2c): goal 0 (team
+  +0xe8; goal 1 where it is none) against goal 1 (+0xf0), in axial columns
+  (x - floor(y / 2), the x difference wrapped by the map's width) and rows.
+  With v the step from the rally to the target and a . b = 3 (a.q + a.y /
+  2)(b.q + b.y / 2) + 2.25 a.y b.y (single precision; constants 0.5, 3.0,
+  2.25 at 0xd20458, 0xd26894, 0xd6df90): each live member (team +0x18) whose
+  step back to the rally has a product p with v at or below 0, and whose
+  step on to the target has a product whose product with p is not above 0,
+  where p is below the least so far (from 0) sets the point (rally.q -
+  trunc(v.q x p / (v . v)), rally.y - trunc(v.y x p / (v . v))), in double
+  precision. The point's plot becomes goal 0 where it is on the map, not
+  impassable (plot +0x3a bit 3) and unowned or the player's own — the
+  player's own alone where the team definition's byte +0x10 stands
+  (SafeRallyPoint, behind the two strength advantages +0x8 / +0xc). With a
+  member of the sea domain (+0x650 0) and that plot not water, the ring walk
+  0x6b000 (-> 0x6af80 -> 0x69010) within 3 of the target with the lambda
+  0x740bd0 takes the first water plot. Only 0x73e7d0 (the start, Naval
+  Choose Target, a settler's new plot) and 0x73e870 (the switch to the
+  backup, whose value at op +0x380 holds the candidate's target +0x64 and
+  rally +0x5c, 0x73e610) write goal 0 besides.
+- CONFIRMED: runs/h1_duelq1128 t121 city-state 3's Attack Barb Camp (rally
+  4:9, target 4:1): after its first recruit (Warriors on 3:9 and 4:10,
+  Man-At-Arms 983040 on 3:4) goal 0 is 4:4 (p -30 over 48: 2.5 columns cut
+  to 2, 5 rows), the in-progress recruit's nearest of 4:4 the Man-At-Arms
+  1572868 on 3:3 over 1179650 on 2:4, as logged (ops.strength 129, the two
+  units' move rows); t122 the point 4:3 a mountain, goal 0 kept 4:4; the
+  game's goal 0 at every end look of the trace to t216 (1,075 player-turns
+  with operations) equals ours; over the five recordings Barbarian Attack
+  and Barbarian City Assault (AllowTargetUpdate false) hold goal 0 on their
+  rally at every end look, every other definition's teams with members
+  move it.
+- THE TEAM'S BATTLE STRENGTHS (0x738f20): +0x94 / +0x98 cleared, then per
+  live member, per tactical target (kb +0x370) of a unit kind CIVILIAN to
+  HIGH or a COMBAT / PASSIVE district within twice the member's base
+  Movement: the member's first such target its planning reaches this turn
+  (unit +0x1fc0, 0x791300 with one turn, the target's plot, or with a Range
+  that range and Movement left) adds the larger of its Combat (0x56dc90
+  with 0) and RangedCombat to +0x98; a target not yet in the team's list
+  (+0xb8) joins it and adds to +0x94 its unit's larger of Combat and
+  RangedCombat, or its district's strike (0x249ee0 with no flag, whole).
+- GARRISON CITY (0x810d30): the flag of 0x810f80..0x810fac, every team's
+  +0x98 less +0x94 at most 10, gates the Fortify order and the moves' end
+  of a garrison of no Range (0x811152..0x8111bd).
+- CONFIRMED: runs/h1_duelq1128 t130 Hong Kong's City Defense (attack 90,
+  the two Man-At-Arms beside the barbarian Man-At-Arms on 9:5; enemy 45):
+  its garrison Warrior 2293764 takes no Fortify order, keeps its Movement
+  and logs Operation Move on its own plot (the game's memory: enemy 45,
+  attack 90 at its end look; runs/h1_duelq1127 Mexico City t70 / t71 / t73
+  enemy 35 / 35 / 55 against attack 25, its Heavy Chariot fortifying).
+- THE REPLAY: a building the log completes in the active player's start of
+  the next turn does not stand in the barbarians' copy of the turn
+  (`buildingsBeforeStart`): runs/h1_duelq1124 t84 Rome's Ancient Walls
+  (CityProductionCompleted at its start of t85), the barbarians' Barbarian
+  Attack on 34:19 at 137 (the defense 23 unwalled).
+- OPEN: the member's planning at the military AI's refresh is the one its
+  last tactical pass left (the engines plan anew there): runs/h1_duelq1127
+  t72 Mexico City's City Defense attack 81 (both Heavy Chariots and the
+  Catapult) for ours 25, its garrison fortifying in ours; runs/h1_duelq1128
+  city-state 3 t178 / t179 / t181 / t182 / t197. A defending district with
+  a unit on it is one entry of ours and two of the game's sums
+  (runs/h1_duelq1127 t37-42 the barbarians' enemy 70 on 12:6 for ours 45).
+  A city known by an Encampment's plot alone (its centre never revealed)
+  holds no entry in the engines.

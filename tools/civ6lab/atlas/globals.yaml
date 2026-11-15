@@ -118,6 +118,7 @@
     - "C-127: the improvement loop's housing — EFFECT_ADJUST_IMPROVEMENT_HOUSING READ (0x6ad2b0), the growth forecast as the last analysis read it (a LAB fit), the water arm's resource rows, the Mountain Tunnel's analysis rows"
     - "C-129: the military AI's upgrade — READ (0x727db0, 0x6874d0), both twins"
     - "C-100: the plot values' golden-age, claims and tourism-percent terms, the required features, the power value's negative Amount — READ"
+    - "C-129 / C-99 / C-134: a known city's Encampment in the enemy strength, the rally's advance, the team's battle strengths and Garrison City's fortify test — READ (0x7877e0 at 0x7878e1..0x78791f / 0x787c64..0x787ca7, 0x5f0280, 0x5efaf0, 0x73f0c0, 0x73f7d0 at 0x73face, 0x738f20 at 0x7391a4..0x7395e1, 0x810d30 at 0x810f80..0x81115e), both twins; the replay's buildings before the next start"
   context:
     - "...the knowledge base's update 0x783980 from a per-plot visibility word > 0) above 0.5 (0xd20458) sets +0x440 and decides: coastal plots >= trunc(total x 20 / 100) sets the island, els..."
   review: reviewed
@@ -133,6 +134,15 @@
   context:
     - "...nt's +0x30 (1 for the one-offs: the plot alone) under the predicate 0x28ec10 (the functor 0xd267d0's call, 0x292e10): with AvoidTerritory (+0xc8 bit 1) the plot unowned (its info +0x1c is..."
   review: reviewed
+- addr: 0xd26894
+  kind: global
+  status: PARTLY
+  readings:
+    - "C-129 / C-99 / C-134: a known city's Encampment in the enemy strength, the rally's advance, the team's battle strengths and Garrison City's fortify test — READ (0x7877e0 at 0x7878e1..0x78791f / 0x787c64..0x787ca7, 0x5f0280, 0x5efaf0, 0x73f0c0, 0x73f7d0 at 0x73face, 0x738f20 at 0x7391a4..0x7395e1, 0x810d30 at 0x810f80..0x81115e), both twins; the replay's buildings before the next start"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...(b.q + b.y / 2) + 2.25 a.y b.y (single precision; constants 0.5, 3.0, 2.25 at 0xd20458, 0xd26894, 0xd6df90): each live member (team +0x18) whose step back to the rally has a product p..."
+  review: imported
 - addr: 0xd2f320
   kind: global
   semantics: "0.1: pseudoYieldValue's magnitude where |q| > |f| and f q < 0."
@@ -585,6 +595,15 @@
   context:
     - "...- 20 above Enemy: where Regional + 60 is below Other, (Other - Regional - 60) x 0.025 (0xd6ced0) capped at 2.0, else (Enemy - max(Other - 60, Regional)) x 0.025 capped at 3.0. W below..."
   review: reviewed
+- addr: 0xd6df90
+  kind: global
+  status: PARTLY
+  readings:
+    - "C-129 / C-99 / C-134: a known city's Encampment in the enemy strength, the rally's advance, the team's battle strengths and Garrison City's fortify test — READ (0x7877e0 at 0x7878e1..0x78791f / 0x787c64..0x787ca7, 0x5f0280, 0x5efaf0, 0x73f0c0, 0x73f7d0 at 0x73face, 0x738f20 at 0x7391a4..0x7395e1, 0x810d30 at 0x810f80..0x81115e), both twins; the replay's buildings before the next start"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - ".../ 2) + 2.25 a.y b.y (single precision; constants 0.5, 3.0, 2.25 at 0xd20458, 0xd26894, 0xd6df90): each live member (team +0x18) whose step back to the rally has a product p with v at..."
+  review: imported
 - addr: 0xd6f258
   kind: global
   status: PARTLY

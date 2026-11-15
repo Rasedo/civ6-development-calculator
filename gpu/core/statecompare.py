@@ -1282,7 +1282,8 @@ def _minor_ops(sim, b: int, s: int) -> list[int]:
             twice.sort()
             out += [tm, len(slots)] + slots + rel + seen + [len(twice)] + twice + [R] + [int(x) for x in sim.mops_cnt[b, s, k, ti, :R].tolist()]
             out += [int(x) for x in sim.mops_goal[b, s, k, ti].tolist()]
-            out += [int(bool(sim.mops_eng[b, s, k, ti])), int(bool(sim.mops_mins[b, s, k, ti])),
+            out += [int(bool(sim.mops_eng[b, s, k, ti])), int(sim.mops_tene[b, s, k, ti]), int(sim.mops_tatk[b, s, k, ti]),
+                    int(bool(sim.mops_mins[b, s, k, ti])),
                     int(bool(sim.mops_ready[b, s, k, ti])), int(bool(sim.mops_ong[b, s, k, ti])),
                     int(sim.mops_unit[b, s, k, ti]), int(sim.mops_tstr[b, s, k, ti])]
     return out

@@ -110,6 +110,7 @@
     - cpu/core/minorCityAi.ts:minorTreeWorld
     - cpu/core/tactical.ts:planningAt
     - gpu/core/sim_minorops.py:_mops_plan_spot
+    - gpu/core/sim_minorops.py:_mops_reaches
   readings:
     - "C-97: the behaviour trees — READ (the interpreter), the nodes PARTLY READ"
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
@@ -133,6 +134,7 @@
     - "C-99: Operation Move takes a planning plot of no region; a step off owned water caps the Movement it lands with — READ (0x816cb0 at 0x817a03..0x817a6a), a fit (the cap), both twins"
     - "C-99: Operation Move's and Operation Attack's planning plot keeps out another player's unit at peace, not one at war; Operation Attack's march carries the attack flag; a refresh reads the knowledge base's target entries — READ (0x78fa10 -> 0x585eb0 -> 0x585d90, 0x791300's callers 0x80c397 / 0x810e98 / 0x811213, 0x80c180 at 0x80c3c4 / 0x80c4be / 0x80c7ee), both twins"
     - "C-110 / C-99: a placement resets the fortification, a struck SENTRY wakes, a siege striker asks no Movement — READ (0x586d40 at 0x587789, 0x20d280 at 0x20d5ce, 0x775340 at 0x7754c7), both twins"
+    - "C-129 / C-99 / C-134: a known city's Encampment in the enemy strength, the rally's advance, the team's battle strengths and Garrison City's fortify test — READ (0x7877e0 at 0x7878e1..0x78791f / 0x787c64..0x787ca7, 0x5f0280, 0x5efaf0, 0x73f0c0, 0x73f7d0 at 0x73face, 0x738f20 at 0x7391a4..0x7395e1, 0x810d30 at 0x810f80..0x81115e), both twins; the replay's buildings before the next start"
   context:
     - ...Pillage 0x803250, Naval Escort 0x817f60; Operation Move's unit tactical block (+0x1fc0, 0x791300); the city assault nodes (Can Alpha City, Is At War, Operation Diplomacy, Operation Pil...
   review: reviewed

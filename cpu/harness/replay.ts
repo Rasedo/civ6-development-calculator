@@ -1010,6 +1010,24 @@ function researchBeforeStart(ctx: Ctx, b: TurnRecord, copy: GameState): void {
   }
 }
 
+/** the majors' buildings in a copy of the turn t's close: a building the log
+ *  completes in the next turn (its CityProductionCompleted row of record
+ *  t+1's turn, the active player's start) does not stand yet
+ *  (runs/h1_duelq1124 t84: Rome's Ancient Walls complete at its start of t85,
+ *  the barbarians' Barbarian Attack on 34:19 reading its defense unwalled at
+ *  23 in their turn of t84, the enemy strength 137) */
+function buildingsBeforeStart(ctx: Ctx, b: TurnRecord, copy: GameState): void {
+  for (const x of (b as { actions?: unknown[][] }).actions ?? []) {
+    if (x[1] !== b.turn || x[2] !== 'CityProductionCompleted' || x[5] !== 1) continue;
+    const seat = ctx.seatOfPlayer.get(Number(x[3]));
+    const row = b.cities.find((c) => c.owner === x[3] && c.id === x[4]);
+    const id = engineRowOf(ctx.cat, 'building', Number(x[6]));
+    if (seat === undefined || !isCiv(seat) || !row || !id) continue;
+    const city = cityAtIndex(copy, row.y * ctx.W + row.x)?.city;
+    if (city && city.seat === seat) city.buildings = city.buildings.filter((k) => k !== id);
+  }
+}
+
 /**
  * THE BARBARIANS CLOSE THE PAIR: after every player's actions of the turn
  * (the record's, landed), their unit pool takes the game's slots (each unit
@@ -1211,6 +1229,7 @@ function barbarianAi(ctx: Ctx, b: TurnRecord, closing: number, before: ReadonlyS
   copy.units = copy.units.filter((c) => !unborn.has(twin.get(c)!));
   bestsBeforeStart(ctx, copy, twin, unborn);
   researchBeforeStart(ctx, b, copy);
+  buildingsBeforeStart(ctx, b, copy);
   // ...and every other player's unit, and each of theirs their camps raised,
   // where the log's last step before their turn opens put it, not a later
   // teleport's plot (runs/h1_duely1121 t85: China's Great Scientist walks to

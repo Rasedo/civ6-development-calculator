@@ -17,7 +17,7 @@ import { NO_PLOT, type OpTeam, type Operation } from './operation';
 import { generalizedAssignment } from '../aiAssignment';
 import { holdsUnits, moveTo, opUnits, targetGone, unitsById, xy } from './operation';
 import type { OpsContext } from './nodes';
-import type { AiAttackTargetView, AiUnitView, AiView } from '../aiViewTypes';
+import type { AiAttackTargetView, AiMapPlotView, AiUnitView, AiView } from '../aiViewTypes';
 
 
 /** a datum's value where the node holds the datum, `absent` where not (the
@@ -101,11 +101,77 @@ function marchPoint(view: AiView, seat: number, op: Operation, t: OpTeam): numbe
   }
 }
 
+/** THE RALLY'S ADVANCE (0x73f0c0, from the teams' update 0x73f7d0 at
+ *  0x73face where the definition's AllowTargetUpdate stands): the team's
+ *  rally (goal 0; the target where it has none) slides along its line to
+ *  the target (goal 1) to the member standing furthest along it. In axial
+ *  columns and rows, x wrapped, the step v from the rally to the target and
+ *  the product a . b = 3 (a.q + a.y / 2)(b.q + b.y / 2) + 2.25 a.y b.y: of
+ *  the live members whose step back to the rally has a product with v at or
+ *  below 0 and whose step on to the target has one not of the other sign
+ *  (between the two), the one of the least product p, below 0 (the first
+ *  of equals), sets the point: the rally less v x p / (v . v), each
+ *  component cut toward 0. The point's plot becomes the rally where it is
+ *  on the map, not impassable (plot +0x3a bit 3), and no other player's —
+ *  the seat's own alone for a team of SafeRallyPoint. With a sea member in
+ *  the team and that plot land, the first water plot of the ring walk
+ *  (0x6b000 -> 0x69010) within 3 of the target becomes the rally. */
+export function advanceRally(view: AiView, seat: number, safe: boolean, t: OpTeam): void {
+  const P = view.plots();
+  if (t.goals[0] === NO_PLOT) t.goals[0] = t.goals[1];
+  const rally = t.goals[0];
+  const target = t.goals[1];
+  if (rally === NO_PLOT || target === NO_PLOT) return;
+  const f = Math.fround;
+  const W = view.mapWidth;
+  const fold = (d: number): number => (!view.wrapX ? d : d > W >>> 1 ? d - W : d < -(W >>> 1) ? d + W : d);
+  const R = P[rally];
+  const T = P[target];
+  // b's step from a, columns then rows
+  const step = (a: AiMapPlotView, b: AiMapPlotView): [number, number] => [fold(half(a.y) - half(b.y) - fold(a.x - b.x)), b.y - a.y];
+  const [vq, vy] = step(R, T);
+  const vx = f(f(vy * 0.5) + vq);
+  const dot = (q: number, y: number): number => f(f(f(f(f(y * 0.5) + q) * 3) * vx) + f(f(y * 2.25) * vy));
+  const len = f(f(f(vx * 3) * vx) + f(f(vy * 2.25) * vy));
+  const units = unitsById(view, seat);
+  let pq = R.x - half(R.y);
+  let py = R.y;
+  const rq = pq;
+  let best = 0;
+  let sea = false;
+  for (const id of t.members) {
+    const u = units.get(id);
+    if (!u) continue;
+    if (u.domain === 'sea') sea = true;
+    const back = dot(...step(P[u.plot], R));
+    if (back > 0) continue;
+    if (dot(...step(P[u.plot], T)) * back > 0) continue;
+    if (!(best > back)) continue;
+    best = back;
+    pq = rq - Math.trunc((vq * back) / len);
+    py = R.y - Math.trunc((vy * back) / len);
+  }
+  const x = view.wrapX ? (((pq + half(py)) % W) + W) % W : pq + half(py);
+  const at = x >= 0 && x < W && py >= 0 && py * W < P.length ? py * W + x : NO_PLOT;
+  if (at !== NO_PLOT && !P[at].impassable) {
+    const owner = P[at].owner;
+    if ((owner < 0 || owner === seat) && (!safe || owner === seat)) t.goals[0] = at;
+  }
+  if (sea && at !== NO_PLOT && !P[at].water) {
+    const water = view.plotsRing(target, 3).find((p) => P[p].water);
+    if (water !== undefined) t.goals[0] = water;
+  }
+}
+
 /** the team update's goals: the centre (slot 3), the march point (slot 5),
  *  and the battle line (slot 4) — halfway, in axial steps cut toward 0, from
  *  the centre to the average of the targets within twice a member's base
  *  Movement of it (the sums' unsigned quotients) — with the team engaged
- *  where it has such targets */
+ *  where it has such targets; and its battle strengths: the enemy's, each
+ *  such target's strength once (0x739581..0x7395e1), and the attack's, the
+ *  larger of Combat and RangedCombat of each member whose planning reaches
+ *  one of them this turn — the target's plot, or with a Range a plot at
+ *  that range with Movement left (0x7391a4..0x739227) */
 export function updateTeam(view: AiView, seat: number, op: Operation, t: OpTeam, targets: readonly AiAttackTargetView[]): void {
   const units = unitsById(view, seat);
   const P = view.plots();
@@ -113,15 +179,24 @@ export function updateTeam(view: AiView, seat: number, op: Operation, t: OpTeam,
   let sq = 0;
   let sy = 0;
   const near: number[] = [];
+  t.enemy = 0;
+  t.attack = 0;
   for (const id of t.members) {
     const u = units.get(id);
     if (!u) continue;
     n++;
     sq += P[u.plot].x - half(P[u.plot].y);
     sy += P[u.plot].y;
+    let reaches = false;
     targets.forEach((g, k) => {
-      if (!WEIGHED.has(g.type) || view.plotDistance(u.plot, g.plot) > 2 * u.baseMoves || near.includes(k)) return;
+      if (!WEIGHED.has(g.type) || view.plotDistance(u.plot, g.plot) > 2 * u.baseMoves) return;
+      if (!reaches && view.planSpot(u.id, g.plot, 1, u.range > 0, u.range) >= 0) {
+        reaches = true;
+        t.attack += Math.max(u.combat, u.ranged);
+      }
+      if (near.includes(k)) return;
       near.push(k);
+      t.enemy += g.strength;
     });
   }
   t.engaged = false;
@@ -228,9 +303,11 @@ const garrisonCity: BtHandler<OpsContext> = {
  *  into it with the garrison (0x972880), its moves ended there (0x56d6f0),
  *  else a garrison of no Range
  *  takes the Fortify order, its moves ended (0x95eae0 at 0x81116f on its
- *  operation queue, `fortifyOrder`'s one tick; 0x56d6f0; where every team's
- *  +0x98 less +0x94 is at most 10, those sums unported and the test taken
- *  as held). Each unit the execution takes has its turn done (0x570b40),
+ *  operation queue, `fortifyOrder`'s one tick; 0x56d6f0) where every team's
+ *  attack strength passes its enemy's by 10 at most (+0x98 less +0x94,
+ *  0x810f80..0x810fac, the team update's: runs/h1_duelq1128 t130 Hong Kong's
+ *  Warrior 2293764 at 90 against 45 takes no order and keeps its Movement,
+ *  Operation Move's row on its own plot). Each unit the execution takes has its turn done (0x570b40),
  *  a garrison not the operation's in its own job still (runs/h1_duelq1128
  *  t144 Hong Kong's Warrior 2293764, its "Upgrade Units" tree's at the end
  *  look), and keeps its Movement otherwise: Operation Move moves a ranged
@@ -318,7 +395,7 @@ function garrisonExecute(_node: Parameters<BtHandler<OpsContext>['update']>[0], 
     ctx.ownAiType([garrison.id]);
     return;
   }
-  if (garrison.range === 0) {
+  if (garrison.range === 0 && ctx.op.teams.every((t) => t.attack - t.enemy <= 10)) {
     ctx.fortify?.(garrison.id);
     ctx.endMoves?.(garrison.id);
   }

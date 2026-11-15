@@ -33,7 +33,8 @@
  * definition's order) its members (+0x18) — those whose assignment (unit +0x300)
  * is not the operation's released (`Operation.released`) —, the counts per requirement
  * (+0x30), every requirement's minimum met, its readiness and the ongoing
- * one (+0x10, +0x11, +0x12), engaged (+0x90), the units it took in (+0x58)
+ * one (+0x10, +0x11, +0x12), engaged (+0x90), its battle strengths (+0x94,
+ * +0x98), the units it took in (+0x58)
  * and its goals (+0xe8 + 8 x the slot). Its team's unit to build and
  * strength stay ours (the FinalRelease team holds neither where the
  * Release's does). A city-state's operations are the game's whole, each
@@ -211,6 +212,8 @@ function teamOf(w: ImportWorld, name: string, members: GameOperation['teams'][nu
     counts,
     goals: [0, 1, 2, 3, 4, 5].map((s) => plotOf(w, readInt(hex, 0xe8 + 8 * s), readInt(hex, 0xec + 8 * s))),
     engaged: readByte(hex, 0x90) !== 0,
+    enemy: readInt(hex, 0x94),
+    attack: readInt(hex, 0x98),
     minsMet: readByte(hex, 0x10) !== 0,
     ready: readByte(hex, 0x11) !== 0,
     ongoing: readByte(hex, 0x12) !== 0,

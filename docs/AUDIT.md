@@ -56,9 +56,9 @@ Hand-weighted 1–8 by the size of what is LEFT to build. One row per entry, no 
 | C-127 city-states' builders, trade and contracts | 3 | improvement re-lays and loops, a late start envoy, the route value K's residues, the quests' ranges, contracts' ends and releases with Cardiff t89 (LAB); the GPU's builder lay (BUILD) |
 | C-100 city-states' plot and district values | 4 | a minor's free power (BUILD); district rows and placements, build turns T off by one, improvement rows, the yields a turn ahead, the Great Person share (LAB) |
 | C-99 city-states' operations | 3 | a team's unit to build and its recruits, Naval Superiority's request, one-turn shifts, the trees' tick order, Garrison City's swap (BUILD, LAB); Protect Units, Naval Pillage, the religious AI's buys (LAB) |
-| C-134 city-states' unit moves | 4 | cityState.move.plot misses: the unit gather and families, claims and strikes, City Defense, Upgrade Units' walks (Galley 393216, Heavy Chariot 983040), Wander and Wander Back to City (LAB); an operation's unit the engine fortifies (BUILD) |
+| C-134 city-states' unit moves | 4 | cityState.move.plot misses: the unit gather and families, claims and strikes, City Defense, Upgrade Units' walks (Galley 393216, Heavy Chariot 983040), Wander and Wander Back to City (LAB); Garrison City's fortify test at the refresh (LAB) |
 | C-128 city-states' units, formations and stacking | 3 | a re-made levied unit's jump on four seeds, the swap pair, formation size and the Corps rules, the turn-end stacking check, a teleport off a shared plot (LAB) |
-| C-129 the knowledge bases and operations' strength | 3 | the army memory's misses over full games, the military AI's turn against the job order, district-only city entries, the hidden-unit test (LAB); ops.strength's enemy and own-team terms (LAB) |
+| C-129 the knowledge bases and operations' strength | 3 | the army memory's misses over full games, the military AI's turn against the job order, district-only city entries, the hidden-unit test (LAB); a Fighter's strike on a ship (BUILD); the teams' battle strengths, the imported operations' strength (LAB) |
 | C-98 city-states' research and civic values | 3 | the Free Cities' terms and a civilization's religious unit value, Add Goal Tech's block (BUILD); goal techs, civics short, resource values, the unit term's misses, late picks (LAB) |
 | C-130 city-states' policy and government analyzers | 4 | card values off by a term (Civil Prestige, Logistics, Totalitarianism), the six-unit cut, the yields' cache, the Archaeologist's count, unread offsets (LAB) |
 | C-101 religious pressure and spread | 2 | Kandy's 8, a Missionary's 250, a unit's spread, rules read off the records alone (LAB); the condemnation's +0x80 / +0x18c3, the holy city's DED_EXODUS (BUILD) |
@@ -445,14 +445,13 @@ A question the SOURCE under-determines; neither engine ships a branch until the 
   - LAB (teams and recruits): 1124 t93 p4 Attack Barb Camp's extra Heavy Chariot
   - LAB (teams and recruits): 1128 t199 the game logs both Recruit Units nodes (15 and 19) in the tick Operation Move arrives, ours the second only
   - LAB (teams and recruits): 1128 t199 City Defense / Attack Barb Camp
-  - LAB (teams and recruits): 1128 t121 the in-progress recruit's team goal 0 on 4:4 (team +0xe8, the op's rally 4:9 kept), its writer (0x73e7d0 / 0x73e870 via 0x73eb60's op +0x450, Change Target) unread: 1572868 taken over 1179650, then the game's third recruit (node 19) where ours goes to Op Attack Units
   - LAB (teams and recruits): operation units the game holds still (1124 t27 Caguana's Warrior on 568)
   - LAB (cadence and trees): City Defense one-turn shifts (1121 p3 ends t31 vs t33)
   - LAB (cadence and trees): a tree technology makes and ends within one tick takes, moves and lets go a unit in no tree at either look, the replay's gameJob labelling it (no row) (duelp1128 t180 2490370, t184 1179650, t243 3342340)
   - LAB (cadence and trees): the DLL builds every tree's update before the priority's executions where the engines tick each tree whole (no miss yet)
   - LAB (cadence and trees): the second offer's marked tree (+0x180)
   - LAB (cadence and trees): a pre-turn draw (seed9235 t12)
-  - BUILD (garrison city): Garrison City's fortify test 0x810f80 and swap 0x972880
+  - BUILD (garrison city): Garrison City's swap 0x972880
   - BUILD (garrison city): the garrison's and candidate's AI types post-swap (0x1e60f0 on +0x168)
   - LAB (nodes): Protect Units' plunder test (0x51a160 +0x48, partly)
   - LAB (nodes): EXPLORE in an operation
@@ -475,7 +474,7 @@ A question the SOURCE under-determines; neither engine ships a branch until the 
   - LAB (claims and strikes): 1124 t94 Man-At-Arms 1310728 (Attack Units, Move 32:8) swaps with the Trebuchet 1245189 on 32:8 in ours, the game not
   - LAB (claims and strikes): the strikers' garrison clause (0x775340 at 0x77541f, not HIGH) ported with no confirming case
   - LAB (claims and strikes): 1127 t127 Knight 1114117's Wander onto 6:9 under the barbarian Spearman 3473440, which the game takes only as a strike (the destination test 0x208b80 on the mover's layer: a destination held by a unit at war is an attack, not a move)
-  - BUILD (claims and strikes): an operation's unit with no tactical row the engine fortifies (duelq1127 t72 city-state 4's Heavy Chariot 655362 2 / 1, 1128 t130 Hong Kong's Warrior 2293764 1 / 0)
+  - LAB (claims and strikes): Garrison City's fortify test reads the team's attack strength (team +0x98) as the military AI's refresh left it, on each member's planning of its last tactical pass where the engines plan anew: duelq1127 t72 city-state 4's City Defense attack 25 for the game's 81 (enemy 55 on both), its Heavy Chariot 655362 fortified 2 / 1
   - LAB (claims and strikes): duelq1124 t91 city-state 2's embarked Man-At-Arms 1310723 on 9:10 claims 9:8 (turn 2, dealt 71, taken 13 and 44 back) on the barbarian Archer 3997716 its knowledge base holds on 8:7 with the Builder 4456474 (MEDIUM) and moves there under Attack Units; the game assigns it none and takes the Builder under Attack Civilian with no step (9:10)
   - LAB (claims and strikes): duelq1128 t132 city-state 3's Trebuchet 1966081 Heals on 3:4, the game's Attack Units to 3:3 on the barbarian Quadrireme 2097177 on 5:1 its Man-At-Arms 983040 on 5:3 sees: the replay's state holds none of the Men-At-Arms 983040 / 1572868 / 2031619 the record keeps on 5:3 / 4:4 / 4:8 at 58 / 52 / 56 damage
   - LAB (city defense): 1117 t84 City Defense Catapult 917509's 2-turn spot on its Man-at-Arms' plot (game 32:5, no row)
@@ -518,25 +517,23 @@ A question the SOURCE under-determines; neither engine ships a branch until the 
   - LAB (army memory): a city-state's unit trained before its look, the game's a turn later: 1127 t39 Hattusa's Trader a turn early
   - LAB (army memory): 1121 t177 p4's record of China's embarked Warrior 3866670 at 32:18, the game's 29:17 age 6
   - LAB (army memory): records off move misses (1127 t17 / t108, 1128 t88, 1121 t155)
-  - LAB (army memory): 1117 t177 China's Builder 4390921 used up on a wonder charge in the engine, its record re-matched to a new Builder
+  - LAB (army memory): 1117 t177 the Pyramids China completes at its start give each Builder standing a charge (UnitChargesChanged 1 -> 2 on all five) and the engine none: its Builder 4390921 spends its last charge and is used up, the record re-matched to a new unit, player 3's record of the old one stale on 40:10
   - LAB (army memory): an upgraded unit keeps its id, so a team entry names the new chassis where the game's names the dead one (1117 t91 TREBUCHET for CATAPULT, 1127 t94 KNIGHT for HEAVY_CHARIOT, ops.members)
-  - LAB (army memory): knowledge.army: 1117 t177 p3 a stale second Builder record on 40:10
   - LAB (army memory): the look's hidden-unit test 0x5033a0 -> 0x503320 (per-plot counts at visibility +0x570) unread: a striking stealth unit's visibility to later players is the recorded behaviour, the replay restamping revealedTurn (1121 t234 / t247)
   - LAB (army memory): 1124 Granada t50 a barbarian Archer seen a turn later in ours
   - BUILD (army memory): 1124 p4's army records at t133 / t201
+  - BUILD (army memory): duelq1124 t231 China's Jet Fighter 8978447 kills the barbarians' Ironclad 6029330 from 14:13 (44 dealt): airStrikeOffers gives a Fighter no ship, the replay's battle is refused (Not a target this aircraft answers) and the barbarians hold no record of the Fighter, the game's at age 0 on 14:13
   - LAB (knowledge base): the knowledge base's +0x128 the turn reaches (0x70beab / 0x709dc2; its writer unread, no recorded turn short)
-  - LAB (knowledge base): the knowledge base's district-only city entries (centre never revealed, 0x5f0490 -> 0x5eff10) unmodelled
+  - LAB (knowledge base): a city known by a district's plot alone (its centre never revealed: 0x5f0280 on any revealed district plot, an Encampment's entry with it) holds no entry in the engines (1121 player 2's 6:12 t60-80)
   - LAB (knowledge base): a major's elimination raises no +0x900 in the engines (its units stand on)
   - LAB (knowledge base): a major's unit pool unmodelled
   - LAB (job order): the military AI's turn 0x722690 against the job order: its evaluation 0x727510 sees the minor before its look and purchases, its upgrade 0x727db0 after (1124 t43)
   - LAB (job order): the military AI's turn 0x722690 against the job order: 0x6096c0's lists (after the look, camp operations start a turn early: 1124 t15 p3, 1128 t16 / t23 / t30 p4)
   - LAB (ops.strength): 1124 t219 player 1 holds no Nuclear Submarine in records 219-221, the game's maxMelee 75 to t220 and 85 at t221 (untraced)
-  - LAB (ops.strength): duelq1124 t84 Barbarian Attack on Rome 34:19 ours 150, the game's 137 (107 at its t83 end look, 165 at t85's; Rome's defense ours walled 36, the game's 23: its walls in record t85 only, the replay's copy holding record t+1's buildings at the barbarians' t84 turn)
-  - LAB (ops.strength): the enemy strength reads a known city's defense the engines take live: 1128 t213 / t215 China 15:10 (80 for the game's 88, best melee 62 on both)
-  - LAB (ops.strength): the district record 0x5ef9a0 refreshed only where its age is not 0 (unread)
-  - LAB (ops.strength): 1128 t121 p3's own-team strength 125 for 129 (members' combat damage)
   - LAB (ops.strength): +0x18a8 / +0x18ac / +0x18b0, +0x1170 and 0x4f2b50's Corps / Army terms held 0
   - LAB (ops.strength): the imported operations' strength (ops.strength 89.0% carried vs 86.5% aimem, 1117 t4 Attack Barb Camp)
+  - LAB (ops.strength): the team's battle strengths (team +0x94 / +0x98): a defending district with a unit on it is one entry of ours and two of the game's sum: duelq1127 t37-42 the barbarians' Barbarian Attack on 12:6 enemy 45 for the game's 70
+  - LAB (ops.strength): the team's attack strength at the military AI's refresh (each member's planning of its last pass, the engines' planned anew): duelq1128 city-state 3's City Defense t178 0 for the game's 115, t179 0 for 55, t181 / t182 60 for 0, its Attack Barb Camp t197 0 for 70; duelq1127 t64 the barbarians' 0 for 25
 - **C-98. CITY-STATES' RESEARCH AND CIVIC VALUES.** Weight 3.
   - BUILD (free cities and majors): the Free Cities' resource value (resourceValueOf 0)
   - BUILD (free cities and majors): a Free City's research and civic city terms (minorResearch passes none)

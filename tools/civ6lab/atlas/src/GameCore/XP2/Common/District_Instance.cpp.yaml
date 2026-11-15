@@ -111,6 +111,8 @@
     - cpu/core/opsOrders.ts:endangered
     - cpu/core/opsOrders.ts:city
     - gpu/core/sim_tactics.py:_danger_districts
+    - cpu/core/opsOrders.ts:targetStrength
+    - gpu/core/sim_minorops.py:_mops_district_strikes
   readings:
     - "C-130: a city's undamaged strike in Bastions' analyzer; a city-state's danger map at its DoTurn; the plot purchase analyzer — READ / PARTLY READ"
     - "H-1: the melee result, a ranged blow's domain, a city's shot — READ"
@@ -124,6 +126,7 @@
     - "C-95: a damaged centre defends at its wounded strength, the planning's city shot needs standing walls, the barbarians plan on the turn's unhealed centres — READ (0x51eaf0, 0x791470 at 0x79181c..0x791827 -> 0x249ee0 / 0x24b960), both twins; the replay's barbarian copy"
     - "C-95 / C-123: a formation's walk steps its own escort; the team update's district blow is the district's own — READ (0x26fe20 / 0x587ca0; 0x738f20 at 0x7393e5..0x7394c4 -> 0x408770, 0x249ee0, 0x249e40, 0x519370), both twins; the minors' and barbarians' copy keeps record t+1's unfinished districts"
     - "C-95: the danger map's list and its districts — a ship's city, a peaceful unit's plot, the undamaged strike, an unbuilt Encampment's — READ (0x26dab0, 0x586900, 0x717460, 0x249ee0 / 0x24b960), both twins"
+    - "C-129 / C-99 / C-134: a known city's Encampment in the enemy strength, the rally's advance, the team's battle strengths and Garrison City's fortify test — READ (0x7877e0 at 0x7878e1..0x78791f / 0x787c64..0x787ca7, 0x5f0280, 0x5efaf0, 0x73f0c0, 0x73f7d0 at 0x73face, 0x738f20 at 0x7391a4..0x7395e1, 0x810d30 at 0x810f80..0x81115e), both twins; the replay's buildings before the next start"
   notes:
     - ".claude/scratchpad/st1/reading.md: .... Each such city whose centre the player sees: its   strength (0x24ae80) on the centre, its strike (0x249ee0) over its reach   (0x249e40) or, with none, 1 on each plot beside it (0x715ff0). Then the   player'..."
   context:
@@ -281,6 +284,7 @@
     - gpu/core/sim_tactics.py:_danger_districts
     - cpu/core/operations/cityThreat.ts:cityThreat
     - cpu/core/aiViewTypes.ts:cityDefense
+    - cpu/core/aiView.ts:knownCities
   readings:
     - "H-1: a pillaged building's specialist, the centre's defence, three moments — READ"
     - "C-97: the settle site evaluation — READ (the score, the choices), PARTLY READ (the danger, the plot yield)"
@@ -288,6 +292,7 @@
     - "C-97: City Defense and the assault target's validity — the city's threat, the defence event, Is City Threatened, Garrison City and the district target's validity READ; the threat's level terms, the garrison's swap and the team's unit to build unread"
     - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
     - "C-99: a unit bought in the turn sits out the operations, a Harbor trains ships — the recruit's turn-done offer READ (0x60a8c0, 0x60a440), 0x1c77c0's district arm READ, the candidates' own strength a FIT, both twins"
+    - "C-129 / C-99 / C-134: a known city's Encampment in the enemy strength, the rally's advance, the team's battle strengths and Garrison City's fortify test — READ (0x7877e0 at 0x7878e1..0x78791f / 0x787c64..0x787ca7, 0x5f0280, 0x5efaf0, 0x73f0c0, 0x73f7d0 at 0x73face, 0x738f20 at 0x7391a4..0x7395e1, 0x810d30 at 0x810f80..0x81115e), both twins; the replay's buildings before the next start"
   notes:
     - ".claude/scratchpad/st1/reading.md: ...in) onto the   plots within its range. Each such city whose centre the player sees: its   strength (0x24ae80) on the centre, its strike (0x249ee0) over its reach   (0x249e40) or, with none, 1 on each plot bes..."
   context:

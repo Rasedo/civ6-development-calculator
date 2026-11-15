@@ -20,7 +20,7 @@ import { desiredStrength, recruitOperation } from './recruit';
 import { cityDefense } from './cityValue';
 import { armyStrength } from './evaluate';
 import type { KnownUnit } from './knowledge';
-import { ASSAULT_NODES, attackUnitsExecute, operationAttackExecute, updateTeam } from './assault';
+import { ASSAULT_NODES, advanceRally, attackUnitsExecute, operationAttackExecute, updateTeam } from './assault';
 import { BARBARIAN_NODES, type BarbarianHooks } from './barbarian';
 import type { AiAttackView, AiUnitView, AiView } from '../aiViewTypes';
 import type { MoveStore } from '../tactical';
@@ -448,8 +448,10 @@ export function refreshStrengths(ctx: OpsContext): void {
 }
 
 /** the teams' rebuild and update (0x73f7d0): the members released leave,
- *  each team updated (`teamUpdate`, `updateTeam`), the teams' strengths
- *  summed */
+ *  each team updated (`teamUpdate`) and, in an operation whose definition
+ *  allows the target's update, its rally advanced (`advanceRally`), the
+ *  teams' strengths summed; then each team's centre, march point and battle
+ *  line (`updateTeam`) */
 function teamsUpdate(ctx: OpsContext): void {
   const { op } = ctx;
   const view = ctx.view();
@@ -462,12 +464,14 @@ function teamsUpdate(ctx: OpsContext): void {
   const gone = op.released;
   delete op.released;
   if (gone) for (const t of op.teams) t.members = t.members.filter((id) => !gone.includes(id));
+  const advance = opDef(op).allowTargetUpdate;
   for (const t of op.teams) {
     teamUpdate(ctx, t);
-    updateTeam(view, ctx.seat, op, t, targets);
+    if (advance) advanceRally(view, ctx.seat, teamDef(op, t).safeRallyPoint, t);
     total += t.strength;
   }
   op.strength = total;
+  for (const t of op.teams) updateTeam(view, ctx.seat, op, t, targets);
 }
 
 function enemyStrengthAbout(ctx: OpsContext, view: AiView): number {

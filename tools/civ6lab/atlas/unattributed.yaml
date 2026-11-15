@@ -353,10 +353,12 @@
     - gpu/core/sim_init.py:__init__
     - gpu/core/simbase.py:barb_ring_table
     - cpu/core/aiViewTypes.ts:AiView
+    - cpu/core/operations/assault.ts:advanceRally
   readings:
     - "H-1: the barbarians' turn (0x1514a0) — READ (the max camps and the sight LAB)"
     - "C-97: the behaviour trees — READ (the interpreter), the nodes PARTLY READ"
     - "C-126 / C-128: the outer defences' repair, a city-state's centre and a unit made anew — the repair READ (0x17a680, 0x7b28c0's count), the jump a fit, both twins"
+    - "C-129 / C-99 / C-134: a known city's Encampment in the enemy strength, the rally's advance, the team's battle strengths and Garrison City's fortify test — READ (0x7877e0 at 0x7878e1..0x78791f / 0x787c64..0x787ca7, 0x5f0280, 0x5efaf0, 0x73f0c0, 0x73f7d0 at 0x73face, 0x738f20 at 0x7391a4..0x7395e1, 0x810d30 at 0x810f80..0x81115e), both twins; the replay's buildings before the next start"
   context:
     - ...Combat in the tag that the barbarians' techs and civics allow; placement walks rings 0x69010 (the centre, then each ring from axial corner (0,1),(-1,0),(1,-1),(0,-1),(1,0),(-1,1) a...
     - "...e the node names a Leader Tag and Range above 0. With a radius the ring walk 0x6aef0 (0x69010's order) around the goal with the test 0x815d50: a plot in the goal's region (plot +0x1..."
@@ -440,13 +442,25 @@
     - "...barian Camp (0x849a70): a camp within 5 of the minor's capital (the plots in range 5, 0x6aef0); no target; done when the actor clears a camp within 5 (0x849c00: distance <= 5); a..."
     - "...mation where the node names a Leader Tag and Range above 0. With a radius the ring walk 0x6aef0 (0x69010's order) around the goal with the test 0x815d50: a plot in the goal's region..."
   review: reviewed
+- addr: 0x6af80
+  final: 0x4f810
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-129 / C-99 / C-134: a known city's Encampment in the enemy strength, the rally's advance, the team's battle strengths and Garrison City's fortify test — READ (0x7877e0 at 0x7878e1..0x78791f / 0x787c64..0x787ca7, 0x5f0280, 0x5efaf0, 0x73f0c0, 0x73f7d0 at 0x73face, 0x738f20 at 0x7391a4..0x7395e1, 0x810d30 at 0x810f80..0x81115e), both twins; the replay's buildings before the next start"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - ...member of the sea domain (+0x650 0) and that plot not water, the ring walk 0x6b000 (-> 0x6af80 -> 0x69010) within 3 of the target with the lambda 0x740bd0 takes the first water plot....
+  review: imported
 - addr: 0x6b000
   final: 0x4f890
   kind: function
   semantics: a walk of the plots within a radius with a lambda.
   status: PARTLY
+  impl: [cpu/core/operations/assault.ts:advanceRally]
   readings:
     - "C-97: the settle site evaluation — READ (the score, the choices), PARTLY READ (the danger, the plot yield)"
+    - "C-129 / C-99 / C-134: a known city's Encampment in the enemy strength, the rally's advance, the team's battle strengths and Garrison City's fortify test — READ (0x7877e0 at 0x7878e1..0x78791f / 0x787c64..0x787ca7, 0x5f0280, 0x5efaf0, 0x73f0c0, 0x73f7d0 at 0x73face, 0x738f20 at 0x7391a4..0x7395e1, 0x810d30 at 0x810f80..0x81115e), both twins; the replay's buildings before the next start"
   notes:
     - ".claude/scratchpad/st1/reading.md: ...e as without it). - The evaluation (0x6fd1d0, its ring callback 0x6f93a0 over the plots   within 5, 0x6b000): invalid where the player has not revealed the plot or   may not found there (0x1eaa30: not impass..."
   context:
@@ -5684,6 +5698,16 @@
     - ...rn is done (0x570b40). The operation's end (0x7353d0 -> 0x73ea10, the teams' destructor 0x735790) writes no unit, and the release 0x73d1f0 is Defend Units'; yet 1117 city-state 2's War...
     - "...) with no operation (+0x888), else turn done; the operation's end (0x7353d0 → 0x73ea10, 0x735790) writes none; the rebuild 0x73f7d0 adds the live unheld to the first team; the team upd..."
   review: reviewed
+- addr: 0x740bd0
+  final: 0x4e3ac0
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-129 / C-99 / C-134: a known city's Encampment in the enemy strength, the rally's advance, the team's battle strengths and Garrison City's fortify test — READ (0x7877e0 at 0x7878e1..0x78791f / 0x787c64..0x787ca7, 0x5f0280, 0x5efaf0, 0x73f0c0, 0x73f7d0 at 0x73face, 0x738f20 at 0x7391a4..0x7395e1, 0x810d30 at 0x810f80..0x81115e), both twins; the replay's buildings before the next start"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - ...the ring walk 0x6b000 (-> 0x6af80 -> 0x69010) within 3 of the target with the lambda 0x740bd0 takes the first water plot. Only 0x73e7d0 (the start, Naval Choose Target, a settler's...
+  review: imported
 - addr: 0x745f40
   final: 0x4e5790
   kind: function
