@@ -72,6 +72,16 @@
   context:
     - "...ELD_CHANGE_PER_TRIBUTARY 0x6ac7f0 (the same filter): the city-states it is suzerain of (0x44a5a0) x Amount, weighted, span."
   review: reviewed
+- addr: 0x44acb0
+  final: 0x2e9d20
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-132: the danger map's fitted rules in the DLL; a search's shore crossings on the formation's own domain — READ (0x26dab0, 0x586360 at 0x586624..0x586664, 0x2720a0 at 0x272618..0x272689, 0x66a90, 0x52fe90, 0x56e0a0, 0x26e570, 0x530240, 0x530420), FIT (the unmoved flag, the barbarians' raise, the grant's last turn), both twins"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - ..., an alliance (0x3dc1f0), an emergency's members (0x257b50 / 0x25ec70), the influence's 0x44acb0.
+  review: imported
 - addr: 0x44bb20
   kind: function
   name: influenceTurn
@@ -152,6 +162,7 @@
     - "H-1: a city-state sees its suzerain's resources — READ"
     - "C-96: the district value's remaining terms — READ (the envoys' term, the golden-age term's reader, the modifiers' list, the neighbours' functor), a LAB (the district's buildings), and the Farm's adjacency in the plot values"
     - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
+    - "C-132: the danger map's fitted rules in the DLL; a search's shore crossings on the formation's own domain — READ (0x26dab0, 0x586360 at 0x586624..0x586664, 0x2720a0 at 0x272618..0x272689, 0x66a90, 0x52fe90, 0x56e0a0, 0x26e570, 0x530240, 0x530420), FIT (the unmoved flag, the barbarians' raise, the grant's last turn), both twins"
   context:
     - "...yer's own reveal bit (+0xf0), then — where its influence component's suzerain (+0x1368 -> 0x44c850) is a player — the SUZERAIN's resource condition, recursively; then the reveal modifiers,..."
   review: reviewed

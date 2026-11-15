@@ -6663,10 +6663,12 @@ class SimEconomy:
         tile under it at the turn's start: CIV6 (Heavy Chariot / Maryannu
         Chariot Archer / War-Cart, EFFECT_ADJUST_UNIT_CLEAR_TERRAIN_START_MOVEMENT)
         +N Movement on a plot of movement cost 1; (Berserker Movement) "+2 Movement
-        if this unit starts in enemy territory"; (Longship Movement) "+1
+        if this unit starts in enemy territory" — any other player's ground
+        that is not friendly; (Longship Movement) "+1
         Movement while in coastal waters"; (Logistics) "+1 Movement if
         starting turn in friendly territory" — a civilization's unit on its
-        seat's own ground; (Supply Convoy) +1 Movement for a land unit within
+        own ground, a city-state's it is suzerain of or an ally's; (Supply
+        Convoy) +1 Movement for a land unit within
         1 of its player's convoy. The barbarian pool trains no unique, and the
         Heavy Chariot's term reads the same for every pool."""
         tile = getattr(self, f"{pre}_unit_tile").clamp(min=0)
@@ -6678,22 +6680,32 @@ class SimEconomy:
             clear = (self._tac_entry().gather(1, tile) == self._mp_scale) | self._centre_plane().gather(1, tile)
             clear = clear & ~self.water.gather(1, tile)
             out = out + self._type_open_mp.take(typ) * clear.long()
-        if pre == "major" and bool((self._type_enemy_mp > 0).count_nonzero()):
+        any_enemy = pre == "major" and bool((self._type_enemy_mp > 0).count_nonzero())
+        any_home = pre == "major" and self._pol_home_moves_any
+        if any_enemy or any_home:
+            # the start plot's ground (`friendlyGround`, 0x530880): friendly
+            # its own, a city-state's it is suzerain of, an ally's; any other
+            # player's foreign, at war or not
             seat = getattr(self, f"{pre}_unit_seat")
             owner = self.tile_seat.gather(1, tile)
-            ra = self._seat_row.take(seat.clamp(min=0))
-            rb = self._seat_row.take(owner.clamp(min=0))
-            at_war = self.war[torch.arange(self.B, device=self.device).unsqueeze(1), ra, rb]
-            enemy = (owner >= 0) & (owner != seat) & (seat >= 0) & at_war
-            out = out + self._type_enemy_mp.take(typ) * enemy.long()
+            R = self.n_majors
+            civ = (seat >= 0) & (seat < R)
+            sc = seat.clamp(min=0, max=R - 1)
+            friendly = owner == seat
+            if self.S > 0:
+                cs_own = (owner >= 100) & (owner < 100 + self.S)
+                suz = self.citystate_suzerain[:, :self.S].gather(1, (owner - 100).clamp(min=0, max=self.S - 1))
+                friendly = friendly | (cs_own & (suz == seat))
+            ally = (self.seat_ally_turns[:, :R, :R] > 0).reshape(self.B, -1).gather(1, sc * R + owner.clamp(min=0, max=R - 1))
+            friendly = friendly | (civ & (owner >= 0) & (owner < R) & ally)
+            if any_enemy:
+                enemy = (owner >= 0) & (seat >= 0) & ~friendly
+                out = out + self._type_enemy_mp.take(typ) * enemy.long()
+            if any_home:
+                hm = self._fx_by_row("homemove").gather(1, sc)
+                out = out + hm * (civ & (owner >= 0) & friendly).long()
         if bool((self._type_coast_mp > 0).count_nonzero()):
             out = out + self._type_coast_mp.take(typ) * (terr == self._coast_terr).long()
-        if pre == "major" and self._pol_home_moves_any:
-            seat = getattr(self, f"{pre}_unit_seat")
-            civ = (seat >= 0) & (seat < self.n_majors)
-            hm = self._fx_by_row("homemove").gather(1, seat.clamp(min=0, max=self.n_majors - 1))
-            home = civ & (self.tile_seat.gather(1, tile) == seat)
-            out = out + hm * home.long()
         # (SUPPLY_CONVOY_BONUS_MOVEMENT) a land unit within 1 of its player's
         # Supply Convoy, the convoy itself included, once however many stand by
         alive = getattr(self, f"{pre}_unit_alive")

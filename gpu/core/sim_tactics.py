@@ -372,6 +372,8 @@ class SimTactics:
             block = block | hostile | self._tac_closed(seat)
         if forts and self._encamp_didx >= 0:
             block = block | self._encamp_block_plane(seat)
+        if forts:
+            block = block | self._tac_peace_fort(seat)
         known = self._tac_known(seat) if revealed_only else None
         if known is not None:
             block = block | ~known
@@ -379,6 +381,16 @@ class SimTactics:
         land = self.passable & ~block
         naval = ((self.wpass & (~self.ocean_tile | cart.unsqueeze(1))) | self._hull_pass()) & ~block
         return land, naval
+
+    def _tac_peace_fort(self, seat: int) -> torch.Tensor:
+        """[B, T] bool — `peaceFort`: another player's district of hit points
+        (the centre, the Encampment) not at war with `seat` (the location
+        test 0x586360 at 0x58666a..0x5866c7): no plot its unit stands on,
+        passes or strikes into"""
+        fort = self._centre_plane()
+        if self._encamp_didx >= 0:
+            fort = fort | (self.district == self._encamp_didx)
+        return fort & (self.tile_seat >= 0) & (self.tile_seat != seat) & ~self._seats_hostile(seat, self.tile_seat)
 
     def _tac_fighters(self, seat: int) -> torch.Tensor:
         """[B, T] bool — a unit of a player at war with `seat` that fights
@@ -427,6 +439,10 @@ class SimTactics:
             cart = self._ocean_open(torch.full((self.B,), seat, dtype=torch.long, device=self.device))
             shut = self.ocean_tile & ~cart.unsqueeze(1)
             naval, fight_w = naval & ~shut, fight_w & ~shut
+        # another player's district of hit points not at war: no strike into
+        # it, whatever stands there (`peaceFort`)
+        pf = self._tac_peace_fort(seat)
+        land, naval, fight_w = land & ~pf, naval & ~pf, fight_w & ~pf
         known = self._tac_known(seat) if revealed_only else None
         if known is not None:
             land, naval, fight_w = land & known, naval & known, fight_w & known
@@ -1046,6 +1062,10 @@ class SimTactics:
         none6 = torch.full((N, 6), NONE, dtype=torch.long, device=dev)
         neg6 = torch.full((N, 6), -1, dtype=torch.long, device=dev)
         big6 = torch.full((N, 6), NONE, dtype=torch.long, device=dev)
+        # the formation's domain as the search sets out (+0x278: sea for a
+        # unit embarked now), and the owned water plots (`shoreCrossing`)
+        emb_now = getattr(self, f"{pre}_unit_emb")[rows, slots]
+        own_w_n = (self.water & (self.tile_seat >= 0))[rows]
         def price6(best: torch.Tensor) -> tuple:
             """a step's turns, Movement and cost from each row's node `best`
             onto its six neighbours (the cost callback 0x26e920 and 0x270dd0):
@@ -1067,8 +1087,11 @@ class SimTactics:
                 blind6 = unrev6
             cst = (self._tac_cost_rows(rows, best, waive) if any_hf else cost_b[rows, best])[:, cols]
             fw = water_n.gather(1, b1)  # [N, 1]
-            # a step off an owned water plot is no shore crossing (`shoreCrossing`)
-            hx = self._owned_exit(rows, best).unsqueeze(1)
+            # no shore crossing where the step's water plot is owned and the
+            # formation embarked as the search sets out (`shoreCrossing`'s
+            # sea): off owned water, and from land onto it
+            hx = emb_now.unsqueeze(1) & torch.where(fw, self._owned_exit(rows, best).unsqueeze(1),
+                                                     own_w_n.gather(1, nbc))
             cliff6 = None
             if any_embark:
                 # an embarked step costs one Movement; a land/water step

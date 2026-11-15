@@ -15225,3 +15225,122 @@ refusal (cpu/core/tactical.ts); GPU `_tac_with_short`, the entry's key at
   defender on a district (0x791470's swapped combat on a unit's own centre);
   the religious pair 0x521be0 / 0x521ed0 unread (`theoFlankCount` keeps its
   river test); a dead target's damage as 0x776409 reads it.
+
+## C-132: the danger map's fitted rules in the DLL; a search's shore crossings on the formation's own domain — READ (0x26dab0, 0x586360 at 0x586624..0x586664, 0x2720a0 at 0x272618..0x272689, 0x66a90, 0x52fe90, 0x56e0a0, 0x26e570, 0x530240, 0x530420), FIT (the unmoved flag, the barbarians' raise, the grant's last turn), both twins
+
+`shoreCrossing` / `stepCost` / `startTileMoves` (cpu/core/units.ts),
+`search`'s `price`, `stepCostHeld`, `enterable` / `peaceFort`, `groundOf`'s
+`shut` / `attack`, `dangerPlane` (cpu/core/tactical.ts); GPU `_tac_search`'s
+`price6`, `_tac_enter`, `_tac_peace_fort`, `_tac_attack_planes`,
+`_danger_plane` (gpu/core/sim_tactics.py), `_start_tile_mp`
+(gpu/core/sim_economy.py). The replay's check
+(`barbarianAi`, cpu/harness/replay.ts).
+
+- A SEARCH'S SHORE CROSSINGS: the embark rule 0x530420 (at
+  0x53047a..0x530499, on the TO plot) and the disembark rule 0x530240 (at
+  0x5302a5..0x5302c8, on the FROM plot) pass the step's water plot where it
+  is claimed (vt +0x40) and its domain mask (0x81240 on the word +0x14,
+  0x66a90: the sea bit on a city's water, the land bit on its land) takes
+  the formation's domain +0x278 — the formation's as it stands, sea for an
+  embarked member (0x267650), not the node's. A search from an embarked
+  unit pays no embark cost and carries no Movement at the shore of owned
+  water, landing or embarking again; a search from a unit ashore pays both
+  at every shore, the owned water's too. A walk's own step is priced on the
+  formation as that step finds it (`stepCost`'s default).
+- THE LIST (0x26dab0 at 0x26dbeb..0x26dc50) runs 0x586900 under the flags the
+  finder's own (+0xe0) give: 8 under 4, 1 under 0x10, 2 under 0x20, 0x80
+  under 0x2000 — the danger map's 0x311 | 0x800 gives 1. Before it, on a
+  plot the player sees (+0x50 & 2): none of a mountain or an impassable
+  feature (+0x50 & 0xc), the location bit 0x40, and with a count +0x54 above
+  0 the layer's first unit the formation's own player's.
+- THE BORDER BRANCH (0x586360 at 0x586624..0x586664; the plot's owner
+  another player not at war, the unit's type neither Spy nor
+  MakeTradeRoute, Units +0x1ba bit 2 / +0x1b9 bit 0x40): unless flags & 3 =
+  3, a unit without +0x1934 whose player may not enter (0x3dab70: the
+  open-borders count +0x720[owner] 0, no alliance 0x3da560, not 0x3daea0)
+  is refused where the owner's diplomacy +0x6c0 is set. The node's location
+  bit is that test under flag 1 (0x271be0 at 0x271d9e), and the validity
+  (0x2720a0 at 0x27240d / 0x27242a) refuses a revealed child without it: no
+  search of any player's unit enters closed ground, the list's own test
+  (flag 1) refusing it again. The validity's tail under flag 1
+  (0x272618..0x272689) refuses a child the player never revealed on such
+  ground unless its parent is the unit's own plot.
+- A SHIP'S CENTRE: the wrapper 0x26e570 marks a district of hit points at
+  war an attack before it reads the flag 0x200 (0x26e64d..0x26e6c4, the
+  flag at 0x26e6d3); the location test's domain branch
+  (0x586421..0x58648e) stands a sea unit on a plot not of water only where
+  the mask holds the sea bit, which 0x66a90 sets on a coastal city's centre
+  alone (IsCity 0x81120 and IsCoastalLand 0x82a10), and its district branch
+  (0x5866c9..0x586738) refuses one whose ranged or bombard strength tops its
+  combat. A melee ship reaches a coastal city centre at war; no Encampment,
+  no land unit's plot.
+- THE STRIKES ACROSS THE SHORE: under 0x200 the wrapper tests no unit; a
+  child on water from a parent on land takes the embark test 0x52fe90
+  (0x2720a0 at 0x272392..0x2723be): the formation may embark (+0x338), no
+  cliff toward it, then 0x586900 under flag 1 on the water plot — its
+  terrain byte (0x56e0a0 at 0x5863fc: the Ocean of a player without
+  Cartography refused), each member's CanEmbark, and the best defender under
+  0x108 (any other player's unit, a civilian too), which refuses under flag
+  1 only an embarked mover an embarked defender (0x586581..0x58659e).
+- THE START ON A DISTRICT AT WAR: 0x26df90 installs the planning's wrapper
+  0x26e570 (+0x58, at 0x26e08f); its district branch runs on the start,
+  linked with no parent, before the flag 0x200 is read: the start's
+  Movement spent.
+- THE GREAT GENERAL'S MOVEMENT is the unit's own modifier
+  (GreatPeople_Generals.xml: GREATPERSON_MOVEMENT_AOE_<era>_LAND, a
+  MODIFIER_PLAYER_UNITS_GRANT_ABILITY of ABILITY_GREAT_GENERAL_MOVEMENT
+  under AOE_<era>_LAND_REQUIREMENTS), a term of GetMaxMoves (0x56e130's
+  +0x1920) the start 0x26eea0 -> 0x266660 reads.
+- THE UNMOVED FLAG: 0x26df90 (at 0x26e14c..0x26e159) adds 0x100 where the
+  formation's moved flag +0x4b8 (the tracked bool +0x460) is clear. A
+  walk's step sets it (0x26fe20 at 0x2707cf: 0x267540(formation, 1)), the
+  combat's end of moves too (0x2660c0), each refresh ORs a member's
+  hasMoved into it (0x267650 at 0x2678ae..0x2678c5); the formation's turn
+  start clears it (0x2673f0 -> 0x267540(formation, 0), from DoTurn 0x4e4560
+  at 0x4e49d3 and the unit manager's 0x941b50). FIT: on the records every
+  unit reads unmoved at another player's DoTurn, one that walked in its
+  turn too.
+- A DISTRICT OF HIT POINTS NOT AT WAR (0x586360 at 0x58666a..0x5866c7,
+  behind the border branch): another player's plot holding a district whose
+  defence (0x24a000) is above 0 — the centre, the Encampment — is refused
+  under every flag but 3, whatever stands on it: no node of any search, no
+  strike into it (`peaceFort`, `_tac_peace_fort`).
+- THE START PLOT'S GROUND in GetMaxMoves (0x56e130 at 0x56e1ee..0x56e22c):
+  Rules_Movement's 0x530880(player, plot) answers 2 on no one's plot, 1 on
+  the player's own, on one whose owner's suzerain (0x44c850) is the player
+  and on an ally's (0x3da560), 3 on any other; 1 adds the unit's own-ground
+  Movement (+0x1928, Logistics), 3 its foreign-ground Movement (+0x192c, the
+  Berserker's), at war or not (`startTileMoves` / `friendlyGround`,
+  `_start_tile_mp`).
+- THE OPEN-BORDERS COUNT (0x3e6b50): +0x720[player] up or down by 1, held at
+  0 or more, one a source — the deal's action DIPLOACTION_OPEN_BORDERS
+  (0x238d00), an alliance (0x3dc1f0), an emergency's members (0x257b50 /
+  0x25ec70), the influence's 0x44acb0.
+- THE CHECK: a Corps or an Army the log formed before the barbarians' turn
+  opens stands formed on their copy.
+- CONFIRMED (one-seed aimem traces from the game's start, `danger` against
+  the game's): runs/h1_duelq1121 t149 player 1's embarked Line Infantry on
+  its water 13:10 reaches 14:7 over its wonder's 13:9 and its water 14:8
+  (60 more on 14:7); t200-202 its Field Cannon in its centre 11:18, 3
+  Movement, embarks free onto 10:17 and 10:16 and lands on 11:16 with none
+  left (no 77 on 12:14 / 12:15), its Cuirassier on 10:19 not past the
+  barbarian Bombard's 11:16; t227 its Cuirassier on 16:12 crosses its water
+  14:7 / 14:8 / 14:9 and lands on none of 13:7 / 12:8 / 13:8 / 11:9 / 13:9;
+  t146 7:9; runs/h1_duelq1124 t130 / t137-139 player 1's Courser on 6:6
+  crosses its water 5:5 and lands on no 6:4; 1124 t229-241 the barbarians'
+  captive Builder on city-state 3's Encampment 40:10, player 1's Giant Death
+  Robot and Modern AT laying nothing on 40:10 / 39:11 / 40:12 through it;
+  1121 t200 its levied Line Infantry 6422549 on city-state 2's 9:5
+  sets out on 3 Movement (75 on 12:4 / 12:6 / 12:8); t126 city-state 2's
+  Musketman 1900545, a Corps by the log, 65. The unmoved flag: with the flag off for a major's unit the
+  replay holds as moved, 1121 t39-41 lose the 20 on 7:12 / 6:13 / 7:13 the
+  game's map holds; h1_duelq1128 t126 player 1's Courser 2162694 and
+  Settler, walked onto 12:6 that turn, lay 46 on 12:5 across the river.
+- OPEN: what clears the moved flag between a unit's own turn and the next
+  player's DoTurn; the barbarians' raise against their DoTurn (the manager's
+  turn 0x1514a0 is a job aiTurnJobs 0x6096c0 registers in its first group,
+  0x6097b6..0x609802; when the group runs against 0x7e9d0 unread); the turn
+  the deal's Open Borders action ends; 0x2a9320 behind 0x3daea0. Unported,
+  no recorded case: a child the player never revealed on closed ground (the
+  validity's tail); the Great General's era classes (the engines' aura reads
+  none).

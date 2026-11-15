@@ -3,6 +3,16 @@
 # `review: imported` = bootstrapped from dll_readings.md / code comments / saved
 # labels and not yet reviewed: verify against the disassembly, then edit and
 # set `review: reviewed`.
+- addr: 0x257b50
+  final: 0x197a00
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-132: the danger map's fitted rules in the DLL; a search's shore crossings on the formation's own domain — READ (0x26dab0, 0x586360 at 0x586624..0x586664, 0x2720a0 at 0x272618..0x272689, 0x66a90, 0x52fe90, 0x56e0a0, 0x26e570, 0x530240, 0x530420), FIT (the unmoved flag, the barbarians' raise, the grant's last turn), both twins"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - ...on DIPLOACTION_OPEN_BORDERS (0x238d00), an alliance (0x3dc1f0), an emergency's members (0x257b50 / 0x25ec70), the influence's 0x44acb0.
+  review: imported
 - addr: 0x2597d0
   final: 0x199290
   kind: function

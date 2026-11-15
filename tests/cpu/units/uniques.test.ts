@@ -143,9 +143,10 @@ describe('start-of-turn Movement from the tile', () => {
     const theirs = tileAtCoords(state.map, 2, 2);
     setTileOwner(theirs, 1, 1);
     const b = { type: 'BERSERKER', seat: 0, tileIndex: theirs.index };
-    expect(startTileMoves(state, b)).toBe(0); // at peace: not "enemy" territory
+    expect(startTileMoves(state, b)).toBe(2); // another player's ground, at peace too
     setWar(state, 0, 1, true);
     expect(startTileMoves(state, b)).toBe(2);
+    expect(startTileMoves(state, { ...b, tileIndex: tileAtCoords(state.map, 6, 6).index })).toBe(0); // no one's ground
     const mine = tileAtCoords(state.map, 3, 2);
     setTileOwner(mine, 0, 1);
     expect(startTileMoves(state, { ...b, tileIndex: mine.index })).toBe(0);

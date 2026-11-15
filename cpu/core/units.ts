@@ -1140,14 +1140,26 @@ export function gdrJump(state: GameState, unit: { type: string; seat: number } |
   return !!unit && isMountain(tile) && gdrHas(state, unit, 'ENHANCED_MOBILITY');
 }
 
+/** a plot's owner is friendly to `seat` (Rules_Movement 0x530880 = 1): the
+ *  seat itself, a city-state it is suzerain of, an ally */
+function friendlyGround(state: GameState, seat: number, owner: number): boolean {
+  if (owner === seat) return true;
+  if (isCityStateSeat(owner)) {
+    const cs = state.cityStates.find((c) => c.seat === owner);
+    return !!cs && suzerainOf(cs) === seat;
+  }
+  return seatsAllied(state, seat, owner);
+}
+
 /** the Movement a chassis draws from the tile under it at the turn's start:
  *  CIV6 (Heavy Chariot / Maryannu Chariot Archer / War-Cart) +N Movement
  *  starting on clear ground;
  *  (Berserker Movement) "+2 Movement if this unit starts in enemy
- *  territory"; (Longship Movement) "+1 Movement while in coastal waters";
- *  (Logistics) "+1 Movement if starting turn in friendly territory" — the
- *  seat's own ground, every unit of a civilization; (Supply Convoy) +1
- *  Movement for a land unit within 1 of its player's convoy. */
+ *  territory" — any other player's ground that is not friendly; (Longship
+ *  Movement) "+1 Movement while in coastal waters"; (Logistics) "+1 Movement
+ *  if starting turn in friendly territory" — its own ground, a city-state's
+ *  it is suzerain of, an ally's, every unit of a civilization; (Supply
+ *  Convoy) +1 Movement for a land unit within 1 of its player's convoy. */
 export function startTileMoves(state: GameState, unit: { type: string; seat: number; tileIndex?: number }): number {
   const def = UNITS[unit.type];
   if (!def || unit.tileIndex === undefined) return 0;
@@ -1159,12 +1171,18 @@ export function startTileMoves(state: GameState, unit: { type: string; seat: num
   // Antananarivo's Heavy Chariot on its centre, Grassland Hills, 3 Movement;
   // t72 on 33:7, Grassland Woods, 2)
   if (def.openTerrainMoves && !isWater(tile) && (tile.district === 'CITY_CENTER' || terrainMp(tile) === MP_SCALE)) m += def.openTerrainMoves;
-  if (def.enemyTerritoryMoves) {
-    const owner = tileSeat(tile);
-    if (owner >= 0 && owner !== unit.seat && civsAtWar(state, unit.seat, owner)) m += def.enemyTerritoryMoves;
-  }
+  // the start plot's ground (GetMaxMoves 0x56e130 at 0x56e1ee..0x56e22c on
+  // Rules_Movement's 0x530880): friendly — the player's own, a city-state's
+  // it is suzerain of, an ally's — takes the own-ground Movement (+0x1928,
+  // Logistics); any other player's the foreign-ground Movement (+0x192c, the
+  // Berserker's), at war or not; no one's neither (runs/h1_duelq1121 t200:
+  // player 1's levied Line Infantry 6422549 on city-state 2's 9:5, 3
+  // Movement, its 75 on 12:4 / 12:6 / 12:8 in the barbarians' danger map)
+  const owner = tileSeat(tile);
+  const friendly = owner !== NO_SEAT && friendlyGround(state, unit.seat, owner);
+  if (def.enemyTerritoryMoves && owner !== NO_SEAT && !friendly) m += def.enemyTerritoryMoves;
   if (def.coastMoves && tile.terrain === 'COAST') m += def.coastMoves;
-  if (isCiv(unit.seat) && tileSeat(tile) === unit.seat) m += getModifiers(state, unit.seat).homeStartMoves;
+  if (isCiv(unit.seat) && friendly) m += getModifiers(state, unit.seat).homeStartMoves;
   // (SUPPLY_CONVOY_BONUS_MOVEMENT) a land unit within 1 of its player's
   // Supply Convoy, the convoy itself included, once however many stand by
   // (runs/h1_duelp1124 t216: city-state 2's Mechanized Infantry 2293765 on
@@ -1283,27 +1301,34 @@ export function embarkTechMoves(state: GameState, seat: number): number {
  * injected at the call site rather than flagged in here.
  */
 /** a land unit's step across the shore under the embark and disembark rules
- *  (0x530420 / 0x530240): a step off an owned water plot is none — the
- *  disembark rule passes a plot whose domain mask takes the formation
- *  (0x530297..0x5302c8: the plot's +0x14 word, 0x81240), the mask a city's
- *  claim sets on every plot it owns (0x66790 -> 0x66a90), so it pays no
- *  embark cost and carries no Movement (runs/h1_duely1117 t185: city-state
- *  3's embarked Bombard on its own water 42:14 plans 41:14's Farm (1/2);
- *  t176 city-state 2's Line Infantry on its Harbor 14:7 plans its centre
- *  14:8 (1/4), AI_Planning.csv). The embark rule's own test of the TO
- *  plot's mask (0x530467..0x530499) asks the land formation's domain, a
- *  bit no water plot holds: every embarking step crosses (runs/h1_duely1124
- *  t73-t91 city-state 3's Heavy Chariots onto its owned 40:14 / 41:14) */
-export function shoreCrossing(type: string, from: Tile, to: Tile): boolean {
+ *  (0x530420 / 0x530240): each passes the step's water plot — the embark's
+ *  TO (0x530467..0x530499), the disembark's FROM (0x530297..0x5302c8) —
+ *  where its domain mask (the plot's +0x14 word, 0x81240; set by a city's
+ *  claim on every plot it owns, 0x66790 -> 0x66a90: the sea bit on its
+ *  water, the land bit on its land) takes the formation's domain (+0x278:
+ *  sea for one embarked, land for one ashore, as it stands — a search's
+ *  formation as it sets out, `sea`). So an embarked formation pays no embark
+ *  cost and carries no Movement across the shore of owned water, either way
+ *  (runs/h1_duely1117 t185: city-state 3's embarked Bombard on its own water
+ *  42:14 plans 41:14's Farm (1/2); t176 city-state 2's Line Infantry on its
+ *  Harbor 14:7 plans its centre 14:8 (1/4), AI_Planning.csv; runs/
+ *  h1_duelq1121 t149: player 1's embarked Line Infantry on its water 13:10
+ *  reaches 14:7 over its wonder's 13:9 and its water 14:8, its 60 in the
+ *  barbarians' danger map), and one ashore crosses at every shore, owned
+ *  water or not (runs/h1_duely1124 t73-t91 city-state 3's Heavy Chariots
+ *  onto its owned 40:14 / 41:14; h1_duelq1121 t200: player 1's Field Cannon
+ *  in its centre 11:18, 3 Movement, embarks free onto its water 10:17 and
+ *  lands on 11:16 with none left, no 77 on 12:14 / 12:15) */
+export function shoreCrossing(type: string, from: Tile, to: Tile, sea = isWater(from)): boolean {
   if (UNITS[type]?.naval || waterWalks(type) || isWater(from) === isWater(to)) return false;
-  return !(isWater(from) && from.ownerSeat !== NO_SEAT);
+  return !(sea && (isWater(from) ? from : to).ownerSeat !== NO_SEAT);
 }
 
 /** a shore crossing the embark and disembark rules (0x530420 / 0x530240)
  *  price: they run for a formation that may embark alone (`mayEmbark`, its
  *  +0x338: the OR of its members' `canEmbark`) */
-function shoreStep(type: string, from: Tile, to: Tile, mayEmbark: boolean): boolean {
-  return shoreCrossing(type, from, to) && mayEmbark;
+function shoreStep(type: string, from: Tile, to: Tile, mayEmbark: boolean, sea: boolean): boolean {
+  return shoreCrossing(type, from, to, sea) && mayEmbark;
 }
 
 /** What one step from `from` into its neighbour `to` costs this unit, in
@@ -1314,10 +1339,12 @@ function shoreStep(type: string, from: Tile, to: Tile, mayEmbark: boolean): bool
  *  (runs/h1_duely1127 t2: the barbarian Scout on 6:9 closes the unrevealed
  *  coast 3:9 at (1/0) beside 4:10, so 4:10 lands after 5:10 and 5:7 and
  *  Move To Safety takes 5:10, AI_Planning.csv). `mayEmbark` the formation's
- *  flag, the unit's own where it moves alone. */
+ *  flag, the unit's own where it moves alone; `sea` the formation's domain
+ *  (`shoreCrossing`): a walker's own step leaves water embarked, a search
+ *  passes its unit's as it sets out. */
 export function stepCost(state: GameState, unit: { type: string; seat: number; promos?: number; alpine?: boolean; originalOwner?: number }, from: Tile, to: Tile,
-  mayEmbark = canEmbark(state, unit)): number {
-  const transition = shoreStep(unit.type, from, to, mayEmbark);
+  mayEmbark = canEmbark(state, unit), sea = isWater(from)): number {
+  const transition = shoreStep(unit.type, from, to, mayEmbark, sea);
   let cost: number;
   if (!transition) cost = moveCostInto(state, from, to, unit) + riverCharge(state, from, to, unit);
   else {

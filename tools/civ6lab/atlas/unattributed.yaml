@@ -337,6 +337,7 @@
   readings:
     - "C-99: an owned water plot no shore, a move order carried on as the turn ends — READ (0x530240, 0x66790, 0x66a90, 0x66680, 0x814e0, 0x81240, 0x7eeba0), both twins"
     - "C-99: a move order carried on as the turn ends, the zone-of-control wait, the embark rule's TO plot — READ (0x962380, 0x52f50, 0x26fe20, 0x2675e0, 0x2673f0, 0x530420, 0x267650), both twins"
+    - "C-132: the danger map's fitted rules in the DLL; a search's shore crossings on the formation's own domain — READ (0x26dab0, 0x586360 at 0x586624..0x586664, 0x2720a0 at 0x272618..0x272689, 0x66a90, 0x52fe90, 0x56e0a0, 0x26e570, 0x530240, 0x530420), FIT (the unmoved flag, the barbarians' raise, the grant's last turn), both twins"
   review: reviewed
 - addr: 0x69010
   final: 0x4ddc0
@@ -612,6 +613,7 @@
     - "H-1: a city centre's floors — READ"
     - "H-1: the trade path's search, its score and the Canal — READ"
     - "C-100: the plot's own subject, PLOT_IS_HILLS and the plot analysis' replaced camp — READ (0x69ed60 / 0x69ec20, 0x6d0970, 0x5cf160..0x5cf1ab), both twins"
+    - "C-132: the danger map's fitted rules in the DLL; a search's shore crossings on the formation's own domain — READ (0x26dab0, 0x586360 at 0x586624..0x586664, 0x2720a0 at 0x272618..0x272689, 0x66a90, 0x52fe90, 0x56e0a0, 0x26e570, 0x530240, 0x530420), FIT (the unmoved flag, the barbarians' raise, the grant's last turn), both twins"
   context:
     - ...erritory (+0xc8 bit 1) the plot unowned (its info +0x1c is 0xff); with +0xc8 bit 4 a test 0x81120 on the plot's info (unread; no recorded case needs it); the terrain in the event's Random...
     - "- The plot yield 0x538a60 sums the plot's own rows, then, on a plot holding a city (0x81120), raises Food to YIELD_FOOD_CITY_TERRAIN_REPLACE 2 and Production to YIELD_PRODUCTION_C..."
@@ -678,6 +680,7 @@
     - "C-99: the stacking count holds other players' units, the wanders' kept-out plots, a Harbor's water no shore — READ (0x585d90, 0x585eb0, 0x2720a0, 0x77bf50, 0x77b9a0, 0x530240), both twins"
     - "C-99: an owned water plot no shore, a move order carried on as the turn ends — READ (0x530240, 0x66790, 0x66a90, 0x66680, 0x814e0, 0x81240, 0x7eeba0), both twins"
     - "C-99: a move order carried on as the turn ends, the zone-of-control wait, the embark rule's TO plot — READ (0x962380, 0x52f50, 0x26fe20, 0x2675e0, 0x2673f0, 0x530420, 0x267650), both twins"
+    - "C-132: the danger map's fitted rules in the DLL; a search's shore crossings on the formation's own domain — READ (0x26dab0, 0x586360 at 0x586624..0x586664, 0x2720a0 at 0x272618..0x272689, 0x66a90, 0x52fe90, 0x56e0a0, 0x26e570, 0x530240, 0x530420), FIT (the unmoved flag, the barbarians' raise, the grant's last turn), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...rtual +0x40 holds (a district stands there), they read the plot info's word +0x14 through 0x81240 — argument 0 tests bit 1, 1 bit 2, 2 bit 4: land = bit 4 and not bit 1, water = bit 1 and..."
@@ -1446,6 +1449,16 @@
     - ...OSES_POP_TO_RANDOM_EVENT (hash 0x63e0b202) is subscribed in the emergency manager's setup 0x25c460 (CAPABILITY_EMERGENCIES, hash 0x370521e0, gates it) to the game signal at GameSignals +0x...
     - "EMERGENCY_TRIGGER_PLAYER_LOSES_POP_TO_RANDOM_EVENT (0x63e0b202), subscribed in 0x25c460 (CAPABILITY_EMERGENCIES 0x370521e0) to GameSignals +0xc48; 0x261ce0 → 0x2597d0(player, a,..."
   review: reviewed
+- addr: 0x25ec70
+  final: 0x19daf0
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-132: the danger map's fitted rules in the DLL; a search's shore crossings on the formation's own domain — READ (0x26dab0, 0x586360 at 0x586624..0x586664, 0x2720a0 at 0x272618..0x272689, 0x66a90, 0x52fe90, 0x56e0a0, 0x26e570, 0x530240, 0x530420), FIT (the unmoved flag, the barbarians' raise, the grant's last turn), both twins"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - ...N_OPEN_BORDERS (0x238d00), an alliance (0x3dc1f0), an emergency's members (0x257b50 / 0x25ec70), the influence's 0x44acb0.
+  review: imported
 - addr: 0x261ce0
   final: 0x1a07b0
   kind: function
@@ -1566,11 +1579,24 @@
     - recording: h1_duelq1127
       turn: 216
       value: "the danger map's list: city-state 3's Galley on 30:19 lists neither 30:18 nor 30:17, player 0's embarked Scouts at peace with it there in its sight (+0x50 bit 0x40 clear); the barbarians' map 0 on both"
+    - recording: 1128
+      turn: 24
+      value: 1128 t24 the same Galley's fallback 2:3;
+    - recording: 1121
+      turn: 45
+      value: 1121 t45 /   t72 Galley 1572882 and t73 / t81 Scout 2752534;
+    - recording: 1124
+      turn: 43
+      value: 1124 t43 Galley 262147;
+    - recording: 1121
+      turn: 82
+      value: Naval Patrol 1121 t82 / t87 city-state 3's Galley 524294 (38:17 for   36:23), 1127 t62 / t63 city-state 3's Galley 393216.
   impl:
     - cpu/core/tactical.ts:dangerPlane
     - gpu/core/sim_tactics.py:_danger_plane
     - cpu/core/tactical.ts:within
     - cpu/core/tactical.ts:seers
+    - cpu/core/tactical.ts:naval
   readings:
     - "C-99: Naval Patrol's explore target — the list and the tests READ, two cases unexplained"
     - "C-124: a path enters a plot the player never revealed whatever it is — READ (0x2720a0 at 0x272372..0x27242e, 0x271be0's +0x50 bit 0x20, 0x26e920), both twins"
@@ -1578,6 +1604,7 @@
     - "C-95: the danger map's list and its districts — a ship's city, a peaceful unit's plot, the undamaged strike, an unbuilt Encampment's — READ (0x26dab0, 0x586900, 0x717460, 0x249ee0 / 0x24b960), both twins"
     - "C-95: the reach searches open turn-end nodes, and the zone of control's domain is the formation's — READ (0x271920 from 0x26dab0, 0x26f980 -> 0x530f50, 0x267650), both twins"
     - "C-132: the danger map's sight, its list's closed ground, the search's whole Movement and its strikes onto water; the embark waiver off a wonder's plot — READ (0x5033a0 -> 0x503320, 0x530420), FIT (the list's closed ground, the start on a district at war, the strikes onto water, the Great General's Movement), both twins"
+    - "C-132: the danger map's fitted rules in the DLL; a search's shore crossings on the formation's own domain — READ (0x26dab0, 0x586360 at 0x586624..0x586664, 0x2720a0 at 0x272618..0x272689, 0x66a90, 0x52fe90, 0x56e0a0, 0x26e570, 0x530240, 0x530420), FIT (the unmoved flag, the barbarians' raise, the grant's last turn), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "- THE CANDIDATE LIST (0x26df90's list callback 0x26dab0): a plot is appended on GetBest's NotifyList 3 (0x781e0, parent argument 0), once (0x79..."
@@ -1957,6 +1984,15 @@
     - "...+ min(n, GrantFortification), n = 0x3dfae0 the majors at war (+0xb50, +0x2b48, +0x728, 0x2a92d0) (runs/h1_duelv1128 Hong Kong's Forts t196; `warCount` / `war_count`); the trap prope..."
     - "...T_WAR 50 (+0x75c, \"At War Decay\") while o's flag +0x728 is set and o is at war with it (0x2a92d0), else _AT_PEACE 200 (+0x758, \"At Peace Decay\"); a turn of combat does not hold it back..."
   review: reviewed
+- addr: 0x2a9320
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-132: the danger map's fitted rules in the DLL; a search's shore crossings on the formation's own domain — READ (0x26dab0, 0x586360 at 0x586624..0x586664, 0x2720a0 at 0x272618..0x272689, 0x66a90, 0x52fe90, 0x56e0a0, 0x26e570, 0x530240, 0x530420), FIT (the unmoved flag, the barbarians' raise, the grant's last turn), both twins"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - ...n the group runs against 0x7e9d0 unread); the turn the deal's Open Borders action ends; 0x2a9320 behind 0x3daea0.
+  review: imported
 - addr: 0x2ab4f0
   kind: function
   semantics: "alliances' shared visibility (\"Permanently Allied\" 0x2aba80)."
@@ -3116,6 +3152,7 @@
     - "C-95: the embark rules for a formation that may embark, a district's zone unseen, a city's kill in the planning, a raised unit's AI type, a move order's attack spot — READ (0x530420, 0x530240, 0x52fe90 at 0x52fed4, 0x530f50 at 0x531168, 0x791470 at 0x791677, 0x79b9c0), FIT (the move order's attack spot), both twins"
     - "C-99 / C-128: the embark step's location test, the destination test's map layer; the Supply Convoy's Movement — READ (0x52fe90 at 0x530024, 0x208b80 at 0x208bbf -> 0x901e0 -> 0x75c50), both twins"
     - "C-133 / C-95: the carried orders run in the unit list's order; a path comes ashore off water only by the disembark test — READ (0x7df30, 0x554e0, 0x523e0, 0x52e90, 0x54910, 0x2720a0 at 0x272380..0x27240d, 0x52fb90 at 0x52fb9d), both twins; UpdateOpenNode's walk and flag 2's plot — READ (0x79560, 0x2720a0 at 0x2721c3..0x27220d / 0x2724c8), unported"
+    - "C-132: the danger map's fitted rules in the DLL; a search's shore crossings on the formation's own domain — READ (0x26dab0, 0x586360 at 0x586624..0x586664, 0x2720a0 at 0x272618..0x272689, 0x66a90, 0x52fe90, 0x56e0a0, 0x26e570, 0x530240, 0x530420), FIT (the unmoved flag, the barbarians' raise, the grant's last turn), both twins"
   context:
     - "...Planning.csv — the row equal once priced so). The embark and disembark tests beside it (0x52fe90 / 0x52fb90, +1e6 where refused) and the mountain and canyon +1e6 the engines leave to t..."
     - "...(0x3e800) unless human (+0x1f6) or +0x590 (runs/h1_duely1117 t69 Archer); embark tests 0x52fe90 / 0x52fb90 (+1e6). The init: +0x1f1 sea, +0x1f5 embarked, +0x1f7 +0x590, +0x198 owner,..."

@@ -49,7 +49,7 @@ Hand-weighted 1–8 by the size of what is LEFT to build. One row per entry, no 
 | C-123 barbarians' raids and scout reports | 2 | raid and assault starts and teams (1121, 1128), late-era raises, members lost to drift, the scouts' reports and their fits (LAB) |
 | C-124 barbarians' camps and sight | 1 | the alliances' outgoing visibility (BUILD); the unseen land's residue, the Scouts' regions (LAB) |
 | C-125 the tactical planning: targets and the combat prediction | 3 | the +0x1ba waiver, units fleeing where the game strikes, a seat's difficulty, predicted blows off by a term, target lists against sight (LAB) |
-| C-132 the danger map | 3 | danger / danger.major rows: the Ironclad's Movement, rings ours lacks, the Giant Death Robot, single plots; the search's blocking, endangered sums beside an Encampment, an embarked captive (LAB) |
+| C-132 the danger map | 3 | danger / danger.major rows: the Giant Death Robot's water, a Submarine's Movement, player 1's map by its Observation Balloon, an unbuilt Encampment's defence, single plots; the search's blocking, endangered sums beside an Encampment, an embarked captive; three fits unread (LAB) |
 | C-133 unit paths and move orders | 3 | MoveTo 0x962380's placement, defender and wait, carried runs, the walk's zone and embark steps, the kept path's re-search, unrevealed plots, portal exits (LAB, BUILD) |
 | C-96 city-states' build values | 4 | the unit value's unported terms and the unit production table, a major's and the Free Cities' step's building check (BUILD); the event unit, building and district terms, pick ties and fits, 1128 Nazca and Hong Kong (LAB) |
 | C-126 city-states' purchases, treasury, upgrades and disbands | 2 | a treasury off the record's on four minors, a Builder purchase, an upgrade past an obsolete rung, the disband count and refusals (LAB) |
@@ -284,22 +284,11 @@ A question the SOURCE under-determines; neither engine ships a branch until the 
   - LAB (targets): the planning's seen-now plane past our sight (1117 t8 13:13, t61 33:8 / 32:7; 1127 t3's Scout on 5:10)
   - LAB (targets): 1124 t119 Man-At-Arms 4521989 for 37:17 on a Missionary
 - **C-132. THE DANGER MAP.** Weight 3. Scored against the aimem `danger` (aiscore kinds `danger` / `danger.major`, one-seed traces).
-  - LAB (danger): a ring the game holds and ours lacks for a turn or two: 1121 t126 10 on 14 plots about 9:3..12:6 (city-state 2's Musketmen 1966080 / 1900545 form Corps in its turn, UnitFormCorps: 65 each in the game's map, 55 unformed on the barbarians' copy)
-  - LAB (danger): 1121 t146 7:9 ours 1 / 51
-  - LAB (danger): 1121 t149 14:7 50 / 110
   - LAB (danger): 1124 t228 / t230 / t238 / t239 player 1's Giant Death Robot: ours 130 on 86 plots past the game's reach at t228 from 39:9, on 96 at t230 from 37:16 embarked (the engines' walks water as ground on its land Movement, `waterWalk`; the record's is embarked there, maxMoves 5)
-  - LAB (danger): 1124 t229 40:10 ours 365 / 205, 39:11 341 / 181, 40:12 265 / 180 (t231 / t232 40:10 280 / 205, 39:11 256 / 181; t237-241 40:10 and 39:11 85 to 180 over)
   - LAB (danger): 1128 t164 the danger map 0 on 33:11 beside the barbarian Man-At-Arms on 35:10
-  - LAB (danger): 1121 t200 the barbarians' map lacks the 75 of one of player 1's two levied Line Infantry Corps (6357012 / 6422549 on 9:4 / 9:5 in record t201): 9:3 ours 75 / 150, 12:4 / 12:6 / 9:7 / 11:7 / 12:8 0 / 75, 10:7 / 10:8 1 / 76
-  - LAB (danger): 1121 t200-202 12:14 / 12:15 ours 77 / 0 and t201-203 11:15 / 11:16 141 / 77 (the barbarian Bombard 3932188 on 11:15 then 11:16)
-  - LAB (danger): 1121 t227 13:7 / 12:8 / 13:8 / 11:9 / 13:9 ours 64 over the game's 77..79 (the barbarian Ironclad 5046298 on 12:10)
-  - LAB (danger): 1121 t236 the barbarians' map lacks player 1's Submarine 7733252's 75 on 32 plots about 3:9 (a hidden unit the game's barbarians see)
-  - LAB (danger): 1124 t130 / t137 / t138 / t139 6:4 ours 46 / 0: player 1's Courser 4063239 on 6:6 embarks onto its own water 5:5 and lands on the tundra 6:4 (riverBits 6) in ours, the game's reach stops at 5:5 / 5:4
-  - LAB (danger): 1124 t168 / t169 33:20 ours 80 / 40 (Rome's centre 34:19, the barbarian Field Cannon 5570579 on 34:20)
-  - LAB (danger): 1124 t234 38:13 ours 65 / 0
+  - LAB (danger): 1121 t236 player 1's Submarine 7733252 on its own water 3:9 lays its 75 a ring short, 32 plots: ours sets out on 4 Movement, the record's maxMoves 5 at t237 (4 on 5:5 at t236; Logistics, slotted in its start of t236, stands on our copy)
   - LAB (danger): 1124 t237 / t246 / t248 16:16 ours 100 / 105
   - LAB (danger): an unbuilt Encampment's defence under a unit at war: 1127 t248 / t249 13:2 ours 79 / 84 (Chengdu's, placed in t248, the barbarian Musketman 4456452 on it; the record's 83)
-  - LAB (danger.major): 1128 t205 / t206 player 0's 41:23 ours 62 / 112 and 102 / 152
   - LAB (danger.major): 1121 t235 player 1's 6:4 ours 0 / 30
   - LAB (danger.major): 1128 t227 / t228 player 1's map lacks the barbarians' 62 / 30 on 49 and 38 plots about 40:17 (their Cavalry 7143430 on 40:16, its Observation Balloon 4980748 on 41:15 beside it), t231 62 / 60 on 15 plots about 41:18
   - LAB (danger.major): 1128 t179 player 1's 13:11 / 14:12 ours 0 / 1, 14:13 0 / 25
@@ -309,7 +298,9 @@ A question the SOURCE under-determines; neither engine ships a branch until the 
   - LAB (endangered units): an embarked captive's danger from a land unit beside it: 1127 t166 Settler 2097173 on 16:12 by player 0's Warrior on 15:12, the game's Move To Safety to 17:9, ours to 17:10
   - LAB (search): the danger search's blocking for ranged movers (1128 t159 Man-At-Arms 5505044)
   - LAB (search): Move Unit's flag 8 on our danger map (1124 t92 Catapult 1245186 via 699, ours 25 from Archer 3801089)
-  - LAB (search): fit, unread: a ship's land strike outside its danger reach
+  - LAB (search): fit, unread: the barbarians' map holds no sight of what their turn raises (1117 t21: no Warrior of Rome's on 10:21, seen only by the Warrior 1703944 raised that turn on 9:23): the manager's turn 0x1514a0 is a job aiTurnJobs 0x6096c0 registers in its first group, when the group runs against the DoTurn 0x7e9d0 calls unread
+  - LAB (search): fit, unread: every unit reads unmoved in another player's danger search, one that walked in its own turn too (1128 t126: player 1's Courser 2162694 and Settler, walked onto 12:6, lay 46 on 12:5 across the river): the formation's moved flag +0x4b8 is set by the walk's step (0x26fe20 at 0x2707cf) and cleared by its turn start (0x2673f0), what clears it before the next player's DoTurn unread
+  - LAB (search): fit, unread: an Open Borders grant's last turn (1127: player 1's grant to player 0 of t99, 20 turns, open through the barbarians' turn of t118): the count 0x3e6b50 keeps one a source, the turn the deal's action DIPLOACTION_OPEN_BORDERS (0x238d00) ends unread
 - **C-133. UNIT PATHS AND MOVE ORDERS.** Weight 3.
   - LAB (move order): MoveTo 0x962380's visible-goal placement
   - LAB (move order): MoveTo 0x962380's first-step defender

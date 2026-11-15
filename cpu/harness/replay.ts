@@ -1264,6 +1264,16 @@ function barbarianAi(ctx: Ctx, b: TurnRecord, closing: number, before: ReadonlyS
     if (formed.has(keyOf.get(twin.get(c)!) ?? '')) c.escorted = true;
     else delete c.escorted;
   }
+  // ...and a Corps or an Army the log formed before their turn opens stands
+  // formed (runs/h1_duelq1121 t126: city-state 2's Musketman 1900545,
+  // UnitFormCorps in its turn, lays its 65 in the barbarians' danger map)
+  const byKey = new Map(copy.units.map((c) => [keyOf.get(twin.get(c)!) ?? '', c] as const));
+  for (const x of open === undefined ? [] : acts) {
+    if ((x[0] as number) >= open!) break;
+    if (x[1] !== closing || (x[2] !== 'UnitFormCorps' && x[2] !== 'UnitFormArmy')) continue;
+    const c = byKey.get(`${x[3]}:${x[4]}`);
+    if (c) c.formation = Math.max(c.formation ?? 0, x[2] === 'UnitFormArmy' ? 2 : 1);
+  }
   // the plots stand as the barbarians' turn opens: their pillages of the
   // turn, which the record's actions landed, not yet made, nor counted in
   // their tribes' raid scores (runs/h1_duelq1128 t86-t88: the raid on 15:10

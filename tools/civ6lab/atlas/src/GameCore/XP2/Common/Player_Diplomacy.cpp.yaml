@@ -269,6 +269,7 @@
     - "C-97: the war desires, the war operation's readiness and the assault's executions — the war value, the not-ready hook, the readiness and the executions READ; the leader's war factor, the WMD flags, the deal items and the war record's writer unread"
     - "C-95: HL Explore's plot test refuses every other player's ground, Explore Land's flags 0x40 — READ (0x70bd40 at 0x70bd87..0x70beee, 0x709d80 at 0x709da0..0x709dc2, 0x70ce90 at 0x70ced5), FIT (the knowledge base's +0x128 at or below the turn), both twins"
     - "C-109: war weariness per combat, the turn's decay and the percent — READ"
+    - "C-132: the danger map's fitted rules in the DLL; a search's shore crossings on the formation's own domain — READ (0x26dab0, 0x586360 at 0x586624..0x586664, 0x2720a0 at 0x272618..0x272689, 0x66a90, 0x52fe90, 0x56e0a0, 0x26e570, 0x530240, 0x530420), FIT (the unmoved flag, the barbarians' raise, the grant's last turn), both twins"
   notes:
     - "imported: READ in its section, no confirming case found beside it"
     - ".claude/scratchpad/mu1/readings_c96.md: ...r plot owner (0x783980   0x783ec5..0x7856a5): the player's own district FRIENDLY_CITY, an ally's   (0x3da560) ALLY_SUPPORT, a player at war COMBAT/PASSIVE_DISTRICT, else   NEUTRAL_CITY — each where the player..."
@@ -364,9 +365,18 @@
     - "C-99: the planning list's map layer and closed ground, a siege unit in Attack Units — READ (0x2665b0 -> 0x585eb0, 0x26d890's 0x586900 under 9 -> 0x586360 at 0x586624, 0x80ceb0 at 0x80d015 / 0x80d1cf), both twins"
     - "C-130: Online Communities' route tourism, the tourism toward a player — READ (0x6a1380, 0x6a1240, 0x394830's modifiers, 0x552fb0), both twins"
     - "C-95: HL Explore's plot test refuses every other player's ground, Explore Land's flags 0x40 — READ (0x70bd40 at 0x70bd87..0x70beee, 0x709d80 at 0x709da0..0x709dc2, 0x70ce90 at 0x70ced5), FIT (the knowledge base's +0x128 at or below the turn), both twins"
+    - "C-132: the danger map's fitted rules in the DLL; a search's shore crossings on the formation's own domain — READ (0x26dab0, 0x586360 at 0x586624..0x586664, 0x2720a0 at 0x272618..0x272689, 0x66a90, 0x52fe90, 0x56e0a0, 0x26e570, 0x530240, 0x530420), FIT (the unmoved flag, the barbarians' raise, the grant's last turn), both twins"
   notes: [read; no recorded decision of the five verbose duels tells it apart yet]
   context:
     - "...sign rebuilt), the first plot P may enter — its own, no one's, open borders / alliance (0x3dab70), or an owner not enforcing its borders (diplomacy +0x6c0) — the rally where the walk..."
+  review: reviewed
+- addr: 0x3daea0
+  final: 0x2a6f60
+  kind: function
+  semantics: "Player_Diplomacy (player): 0x2a9320 on the game's influence (0x2a7750) with this diplomacy's own player (+0x128) and the argument; the third term of the entry test 0x3dab70 after the open-borders count and the alliance. PARTLY READ: 0x2a9320 unread (taken as the suzerain's test)."
+  status: PARTLY
+  readings:
+    - "C-132: the danger map's fitted rules in the DLL; a search's shore crossings on the formation's own domain — READ (0x26dab0, 0x586360 at 0x586624..0x586664, 0x2720a0 at 0x272618..0x272689, 0x66a90, 0x52fe90, 0x56e0a0, 0x26e570, 0x530240, 0x530420), FIT (the unmoved flag, the barbarians' raise, the grant's last turn), both twins"
   review: reviewed
 - addr: 0x3dbcb0
   kind: function
@@ -375,6 +385,16 @@
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...EACE 200 (+0x758, \"At Peace Decay\"); a turn of combat does not hold it back. A peace (0x3dbcb0) sheds 2000 on both sides (\"We / They Made Peace\")."
+  review: imported
+- addr: 0x3dc1f0
+  final: 0x2a7a90
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-132: the danger map's fitted rules in the DLL; a search's shore crossings on the formation's own domain — READ (0x26dab0, 0x586360 at 0x586624..0x586664, 0x2720a0 at 0x272618..0x272689, 0x66a90, 0x52fe90, 0x56e0a0, 0x26e570, 0x530240, 0x530420), FIT (the unmoved flag, the barbarians' raise, the grant's last turn), both twins"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...ore, one a source — the deal's action DIPLOACTION_OPEN_BORDERS (0x238d00), an alliance (0x3dc1f0), an emergency's members (0x257b50 / 0x25ec70), the influence's 0x44acb0."
   review: imported
 - addr: 0x3dcec0
   final: 0x2a86c0
@@ -495,6 +515,14 @@
   impl: [cpu/core/deals.ts:establishMission, gpu/core/sim_deals.py:_deal_move_kind]
   readings:
     - "C-119: the revealed plots against the records' planes — an embassy reveals the capital, a new suzerain's reveal meets, a sight raised looks again — READ (0x238330 -> 0x3e6820 -> 0x508bd0 -> 0x507c00 -> 0x508d50, 0x508330 -> 0x50d390, 0x56ce90 -> 0x58f3f0), both twins; the replay's steps and added units"
+  review: reviewed
+- addr: 0x3e6b50
+  kind: function
+  semantics: "Player_Diplomacy (player, add): the open-borders count of the player (+0x720[player], read by 0x3dab70) up by 1 or down by 1, held at 0 or more, mirrored in the synced array +0x6c8; at 0 the game turn is stamped (+0x820[player]) and the relation re-read (0x3d7830); the signals +0xdc8 (first source) / +0xde0 (last gone) and the event 0x52e2805c. One count a source: the deal's action DIPLOACTION_OPEN_BORDERS (0x238d00), an alliance (0x3dc1f0, unless 0x2a9320 already holds), an emergency's members (0x257b50 begun / 0x25ec70 over, each pair both ways), the influence's 0x44acb0 / 0x44dcd0, 0x822c10. PARTLY READ: the turn the deal's action ends."
+  status: PARTLY
+  impl: [cpu/core/units.ts:borderClosedTo, cpu/harness/import.ts:loadBorderGrants]
+  readings:
+    - "C-132: the danger map's fitted rules in the DLL; a search's shore crossings on the formation's own domain — READ (0x26dab0, 0x586360 at 0x586624..0x586664, 0x2720a0 at 0x272618..0x272689, 0x66a90, 0x52fe90, 0x56e0a0, 0x26e570, 0x530240, 0x530420), FIT (the unmoved flag, the barbarians' raise, the grant's last turn), both twins"
   review: reviewed
 - addr: 0x3e6d20
   kind: function

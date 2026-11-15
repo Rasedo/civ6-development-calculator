@@ -994,6 +994,14 @@
   context:
     - "...is one weighted pick over the offered routes (weights as read in C-16); \"Spy EscapeRoute\" 0x81d360 is the AI's route choice, which the driver makes."
   review: reviewed
+- addr: 0x941b50
+  final: 0x650e80
+  kind: function
+  semantics: "Unit_Manager (formation): each member through the manager's virtual +0x98 (the unit's turn start DoTurn 0x4e4560 calls at 0x4e4955), then the formation's turn start 0x2673f0: the formation's Movement and moved flag restored outside DoTurn. A virtual of the manager (the pointer at 0x83d985); its callers unread."
+  status: PARTLY
+  readings:
+    - "C-132: the danger map's fitted rules in the DLL; a search's shore crossings on the formation's own domain — READ (0x26dab0, 0x586360 at 0x586624..0x586664, 0x2720a0 at 0x272618..0x272689, 0x66a90, 0x52fe90, 0x56e0a0, 0x26e570, 0x530240, 0x530420), FIT (the unmoved flag, the barbarians' raise, the grant's last turn), both twins"
+  review: reviewed
 - addr: 0xb8eb50
   kind: function
   status: PARTLY

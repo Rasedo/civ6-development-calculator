@@ -101,7 +101,21 @@ function enterable(state: GameState, unit: Unit, t: Tile, foes: ReadonlySet<numb
   if (foes.has(t.index)) return false;
   if (!forts) return true;
   if (t.district === 'CITY_CENTER' && tileSeat(t) !== unit.seat) return false;
+  if (peaceFort(state, unit, t)) return false;
   return !encampmentBlocks(state, t, unit);
+}
+
+/** another player's district of hit points not at war with the unit's (the
+ *  location test 0x586360 at 0x58666a..0x5866c7: the plot's district of a
+ *  defence 0x24a000 above 0, the centre and the Encampment, refused under
+ *  every flag but 3): no plot the unit stands on, passes or strikes into,
+ *  whatever stands there (runs/h1_duelq1124 t229: the barbarians' captive
+ *  Builder 5111833 on city-state 3's Encampment 40:10, player 1's Giant
+ *  Death Robot and Modern AT laying nothing on it nor past it) */
+function peaceFort(state: GameState, unit: Unit, t: Tile): boolean {
+  const owner = tileSeat(t);
+  return (t.district === 'ENCAMPMENT' || t.district === 'CITY_CENTER') && owner !== NO_SEAT && owner !== unit.seat
+    && !unitsHostile(state, unit, { seat: owner });
 }
 
 /** another player's territory closed to a city-state's unit: a major's or
@@ -124,16 +138,18 @@ let costsHeld: Map<string, Int32Array> | null = null;
 
 function heldCostsOf(state: GameState, unit: Unit, mayEmbark: boolean): Int32Array | null {
   if (!costsHeld) return null;
-  const k = `${unit.type}:${unit.promos ?? 0}:${unit.alpine ? 1 : 0}:${mayEmbark ? 1 : 0}`;
+  const k = `${unit.type}:${unit.promos ?? 0}:${unit.alpine ? 1 : 0}:${mayEmbark ? 1 : 0}:${unit.embarked ? 1 : 0}`;
   let a = costsHeld.get(k);
   if (!a) costsHeld.set(k, (a = new Int32Array(state.map.tiles.length * 6).fill(-1)));
   return a;
 }
 
+/** a search's step: the formation's domain is its unit's as the search sets
+ *  out (`shoreCrossing`'s sea) */
 function stepCostHeld(state: GameState, unit: Unit, from: Tile, to: Tile, di: number, held: Int32Array | null, mayEmbark: boolean): number {
-  if (!held) return stepCost(state, unit, from, to, mayEmbark);
+  if (!held) return stepCost(state, unit, from, to, mayEmbark, !!unit.embarked);
   const at = from.index * 6 + di;
-  if (held[at] < 0) held[at] = stepCost(state, unit, from, to, mayEmbark);
+  if (held[at] < 0) held[at] = stepCost(state, unit, from, to, mayEmbark, !!unit.embarked);
   return held[at];
 }
 
@@ -481,7 +497,7 @@ function groundOf(state: GameState, unit: Unit, revealedOnly = true, planning = 
       return v;
     },
     attack: (t) => {
-      if (!melee || !known(t.index) || isImpassable(t)) return false;
+      if (!melee || !known(t.index) || isImpassable(t) || peaceFort(state, unit, t)) return false;
       // a move order's path attacks into no plot the player does not see now:
       // a city or a unit it last knew there out of its sight bars the plot
       // (runs/h1_duely1117 t127-134: the rampaging Man-At-Arms at 37:16 holds
@@ -933,7 +949,7 @@ function search(state: GameState, unit: Unit, maxTurns: number, zoc: boolean, on
     // the domain's, a FreeEmbark district's crossing too; runs/h1_duely1128
     // t88: Nazca's Horseman 31:6 (1/4) embarks onto 31:5 (1/1) carrying 2,
     // 32:4 beyond it (2/0), AI_Planning.csv)
-    const cross = !blind && embarks && shoreCrossing(unit.type, from, to);
+    const cross = !blind && embarks && shoreCrossing(unit.type, from, to, !!unit.embarked);
     const maxTo = wet ? fullSea : fullLand;
     let carry = cross && pm > maxTo ? pm - maxTo : 0;
     let moves = pm - cost;
