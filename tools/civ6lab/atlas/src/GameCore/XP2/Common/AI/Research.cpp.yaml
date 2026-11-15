@@ -22,6 +22,7 @@
   readings:
     - "H-1: the research AI — READ (the choice), PARTLY READ (the value)"
     - "H-1 / C-96: at war with a living major, a unit's strategic resource in the City Analysis, a city-state's naval strategy — READ (0x3dcf50, 0x7b62c0 at 0x7b71cd..0x7b725d, 0x6fafc0 at 0x6fc771..0x6fc873, 0x783980 at 0x783ade..0x783d93 and 0x785271..0x7852df, 0x786080, 0x865f20), both twins"
+    - "C-98: an EmbarkAll technology favored doubles its EmbarkAll term; a minor's upgrade pays no strategic resource; a space race project's turns in a city-state's city — READ (0x7b3e50 at 0x7b3f9a..0x7b4057, 0x7a4850), LAB (the upgrade, the project turns), both twins"
   context:
     - "- THE PROPAGATION, 0x7604e0: a row in reach adds the +0x10 of its unowned prerequisites one and two levels up (each..."
   review: reviewed
@@ -67,6 +68,7 @@
     - "C-130: the city update's Default Specialization on an empty queue, before the civics AI's turn; the dig sites a major's civic lays before the minors' turns — READ (0x5ce8f0, 0x6096c0's +0x370 list, CultureAI +0x208), both twins"
     - "C-127: a contract its tree leaves is CANCELLED in the city's hand too; a Tech Contract's research test before the research AI's choice — LAB (the aimem contracts), READ (0x760980 -> 0x5f5940), both twins"
     - "C-130 / C-98: a completion with no pick leaves the research AI's in-hand turns at 0; a seated specialist keeps a pillaged district's slot — READ (0x762d60 at 0x762d96, 0x763020 at 0x7630e4 / 0x7632ad), FIT (the district slot), both twins"
+    - "C-98: an EmbarkAll technology favored doubles its EmbarkAll term; a minor's upgrade pays no strategic resource; a space race project's turns in a city-state's city — READ (0x7b3e50 at 0x7b3f9a..0x7b4057, 0x7a4850), LAB (the upgrade, the project turns), both twins"
   context:
     - "...h the research in hand — a tracked int (+0x4d0, data +0x58) written only by its turn (0x7609d7) and its completion's choice (0x7630ec), each 0x4ca120: the turns left on the research..."
     - "- THE TURN, 0x760980: contracts (0x761980 adds a contract's value to the score), the propagation, then: with..."

@@ -748,7 +748,7 @@ export function aiView(state: GameState, opts: { updated?: boolean } = {}): AiVi
       return id ? seat(i).projectsDone.filter((x) => x === id).length : 0;
     },
     projectTurns: (i, cityId, type, extra) => {
-      const city = citiesOf(state, i).find((c) => c.id === cityId);
+      const city = cityOf(i, cityId);
       const id = engineId('project', type, 'PROJECT_', PROJECTS);
       if (!city || !id) return -1;
       // the Production toward the project as the turn step pays it

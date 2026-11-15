@@ -567,9 +567,9 @@ class SimPolicy:
             # owner's PSEUDOYIELD_SPACE_RACE worth discounted at those turns
             # less at the turns without it; a completed one's whole worth is
             # not paid here (the engine keeps a major's completions alone,
-            # `project_done`). A city-state's city has no project turns
-            # (`projectTurns` -1 both ways: nothing)
-            if not city or ctx["s"] != self.FR:
+            # `project_done`); a city-state's city at its Production as it
+            # stands (`projectTurns`)
+            if not city:
                 return zero
             f = sub["f"]
             p = "PSEUDOYIELD_SPACE_RACE"

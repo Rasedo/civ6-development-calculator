@@ -356,11 +356,21 @@
   review: reviewed
 - addr: 0x7a4850
   kind: function
-  semantics: a research value condition worth +5.0.
-  status: PARTLY
-  readings: ["H-1: the research AI — READ (the choice), PARTLY READ (the value)"]
-  context:
-    - ...ays, unread), +1.0 where row +0xc0 is set, +5.0 for EmbarkAll (+0x70 bit 4), +5.0 where 0x7a4850 holds; a row of an era before the game's x (game - era + 1), else + PSEUDOYIELD_GOLDENA...
+  name: ResearchAI favored
+  semantics: "the research AI's favored byte of a technology row (rcx the research AI, rdx the row: [+0x4b0 + 0x10 count, +0x18 array] at rdx, 0 out of range); 0x7b3e50 calls it at 0x7b3ffa inside its EmbarkAll block only, so an EmbarkAll row favored adds 5.0 more to its own pseudo-yield; the analysis reads the array before the turn's strategy apply, the propagation (0x7604e0's r8b from +0x4b0 at 0x760baf) after it."
+  status: READ
+  cases:
+    - recording: h1_duels1144
+      turn: 43
+      value: city-state 4 Shipbuilding 150.9 at 22 turns = 1.5 x the own value of 16 parts (5 Technology, 5 EmbarkAll, 5 favored, 1 more) to 11 without the favored 5; t42, STRATEGY_NAVAL's first turn, 464.3 = 1.5 x 309.5 without it; Celestial Navigation (favored, no EmbarkAll) 346.9 at t43 without it
+  impl:
+    - cpu/core/aiResearch.ts:favoredRows
+    - gpu/core/sim_research.py:_rai_value
+    - cpu/core/aiResearch.ts:techValue
+  readings:
+    - "C-98: an EmbarkAll technology favored doubles its EmbarkAll term; a minor's upgrade pays no strategic resource; a space race project's turns in a city-state's city"
+    - "H-1: the research AI — READ (the choice), PARTLY READ (the value)"
+    - "C-98: an EmbarkAll technology favored doubles its EmbarkAll term; a minor's upgrade pays no strategic resource; a space race project's turns in a city-state's city — READ (0x7b3e50 at 0x7b3f9a..0x7b4057, 0x7a4850), LAB (the upgrade, the project turns), both twins"
   review: reviewed
 - addr: 0x7a48d0
   kind: function
@@ -1049,6 +1059,7 @@
     - "C-96 / C-98 / C-100 / C-99: the city AI's fitted rules read — the analysis before the job list, the unit term's upgrade price, the city's trained domains, a non-major's required power, the eruption's turns — READ (0x608870 at 0x608976..0x608988, 0x7b3e50 at 0x7b4564..0x7b45c8, 0x5376d0, 0x1c77c0, 0x1aed10, 0x1f0440 at 0x1f04c7..0x1f04dc, 0xa1d480), both twins"
     - "H-1 / C-96: at war with a living major, a unit's strategic resource in the City Analysis, a city-state's naval strategy — READ (0x3dcf50, 0x7b62c0 at 0x7b71cd..0x7b725d, 0x6fafc0 at 0x6fc771..0x6fc873, 0x783980 at 0x783ade..0x783d93 and 0x785271..0x7852df, 0x786080, 0x865f20), both twins"
     - "C-98 / C-130: a village's free technology, the resource a plot's record shows a city-state, the research value's improvements by trait alone, the Lighthouse's coast — READ (0x4caeb0, 0x50a690, 0x50b3e0, 0x35ecb0, 0x35f100), FIT (the record's refresh, the drowned plot), both twins"
+    - "C-98: an EmbarkAll technology favored doubles its EmbarkAll term; a minor's upgrade pays no strategic resource; a space race project's turns in a city-state's city — READ (0x7b3e50 at 0x7b3f9a..0x7b4057, 0x7a4850), LAB (the upgrade, the project turns), both twins"
   context:
     - "...ntouched: 0 for every row the walk never reached). Else turns = max(0, sum) and value = 0x7b3e50(row, turns, H, discount); score = value."
     - "- THE VALUE, 0x7b3e50 (args: row, &discount, turns, H, player, the row's record +0x530): past H, -9999 (0xf04..."

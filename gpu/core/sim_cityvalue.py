@@ -2598,6 +2598,24 @@ class _MinorFacts:
         rate = self._item_rate_mult(item, rate)
         return _turns_at(torch.floor(cost * _FX).long() - torch.floor(progress * _FX + 0.5).long(), rate)
 
+    def project_turns(self, pi: int, extra: int):
+        """`projectTurns` [B] of engine project `pi` in the minor's city: its
+        cost at the city's Production as it stands lifted by 1.0 + `extra`
+        raw, the city holding no project progress nor bank; -1 for a project
+        the engine has none of (`pi` -1) or at no Production"""
+        sim = self.sim
+        if pi < 0:
+            return torch.full((sim.B,), -1, dtype=torch.long, device=sim.device)
+        base = torch.floor(self._stats()[0][:, 0, 1] * _FX + 0.5).long()
+        rate = _fmul(base, torch.full_like(base, _FX + int(extra)))
+        pct = sim._progress_pct_of(sim.citystate_techs[:, self.s].sum(dim=1), sim.citystate_civics[:, self.s].sum(dim=1))
+        prow = sim._proj_rows[pi]
+        if int(prow["pgb"]) >= 0:
+            cost = sim._progress_cost(int(prow["pgb"]), int(prow["pk"]), pct).double()
+        else:
+            cost = torch.full((sim.B,), float(max(int(prow["pc"]), 0)), dtype=torch.float64, device=sim.device)
+        return _turns_at(torch.floor(cost * _FX + 0.5).long(), rate)
+
     def _founding_production(self):
         """[B] f64 — `foundingProduction`: the founding city's Production
         as its founding City Analysis reads it, before the Palace and the

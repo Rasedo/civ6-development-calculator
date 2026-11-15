@@ -22,7 +22,7 @@ function minor(state: GameState): CityState {
 
 describe('the research value (0x7b3e50)', () => {
   it('is a yield a turn from landing to the horizon, in 24.8 fixed point', () => {
-    const st = { gameEra: 0 } as unknown as GameState;
+    const st = { gameEra: 0, seats: [], cityStates: [] } as unknown as GameState;
     // the row's own 5, a building's share, a district's and a wonder's, at
     // the 4% discount: Pottery at 12 turns 78.3 as every city-state of
     // runs/h1_duelw1124 logs it at t1, Mining 60.3
@@ -32,7 +32,7 @@ describe('the research value (0x7b3e50)', () => {
     // an Ancient player's district weight, 0.5 x ChronologyIndex 1: runs/h1_duelw1124 t2 minor 3's Astrology 124.0 at 10 turns
     expect(techValue(st, 0, 'ASTROLOGY', 25, new Map([['PSEUDOYIELD_DISTRICT', 128]]))).toBe(13091);
     expect(techValue(st, 0, 'WRITING', 37, new Map())).toBe(4159);
-    // EmbarkAll adds 5
+    // EmbarkAll adds 5, unfavored
     expect(techValue(st, 0, 'SHIPBUILDING', 4, new Map())).toBe(48958);
     // at the horizon the value is one discounted turn; past it -9999
     expect(techValue(st, 0, 'MINING', 50, new Map())).toBe(35);

@@ -571,19 +571,18 @@ A question the SOURCE under-determines; neither engine ships a branch until the 
   - BUILD (research values): Add Goal Tech's Goal-Plot-only block (+0xd8 / +0xe0)
   - BUILD (research values): the tech sort 0x7e7080
   - LAB (research values): the research term's improvement tourism does not read the city's +0x1b20 percent (none in a city-state)
-  - LAB (research values): duels1138 t38-t49 player 4 Shipbuilding ours 526.1, the game's 600.7, from the turn after STRATEGY_NAVAL starts (350.7 against 400.5 before the favored raise, 61.2 more at 11 turns; the City Analysis's Quadrireme -9999 in both): a term the strategy's pseudo-yield weights raise, unread; duels1144 t43-t58 player 4 alike
   - LAB (research values): duels1143 player 4 follows STRATEGY_NAVAL from t126, ours from t112: its area 2 lies in region 7, the island count's unseen revealed plots those of the region numbered 2 (36 at record t111 on deriveRegions' numbering) — the game's region ids unconfirmed where they are not the area's
   - LAB (research values): duels1133 t148 player 2 Rifling ours 178.6 inside the horizon, the game's -9898.4; duels1134 t242 player 2 Robotics alike (neither game's RandCalls holds a village's free technology before it; duels1134's two free-technology draws fall at t235)
   - LAB (research values): duels1137 t61-63 as the game era changes (the research prices 60 -> 48 in record t61): city-states 3 and 4 Mathematics 316.7 for 146.0 at t61 and the rows past it by the same 124-171, city-state 2 t61 Mathematics 0 for 239.5
   - LAB (research values): duels1137 city-state 2 t17-25 Bronze Working 16-35 over and Iron Working 21-42 over (241.6 for 225.7 at t17, 2 over at t26)
   - LAB (research values): duels1140 city-state 4 t43-47 Engineering 42-89 short (227.5 for 302.6 at t43, its Combat Desire 0.5 from t42); city-state 2 t201-206 Telecommunications 147-244 short
+  - LAB (research values): duels1144 city-state 4 t46: its Wheel completes and ours takes Currency toward Mathematics (332.0 after the completion's re-add) where the game draws (RandCalls t45 BT Research Choice over 5, Shipbuilding)
   - LAB (civic values): 1121 civics short (Divine Right 5.0, Games & Recreation 7.7)
   - LAB (civic values): one turn, every civic in reach off by one amount: duels1146 city-state 4 t30 149.0 over (Foreign Trade 269.6 for 120.6), duels1135 city-state 2 t123 150.0 over (Nationalism 867.1 for 717.1), duels1139 player 62 t154 50.0 under, duels1143 city-state 3 t33 567.0 under, duels1143 city-states 2, 3 and 4 t180 Space Race, Globalization and Social Media 116.4 over
   - LAB (civic values): duels1140 city-state 4 t43-46 every civic in reach 1.0-2.0 under; duels1138 city-state 2 t36 2.0 under; duels1146 city-state 2 Suffrage 3.0 under t230-249 and Digital Democracy 1.0 under t241-249
   - LAB (civic values): duels1146 city-state 4 Suffrage 4-12 over t214-223 and t230-239, Class Struggle between 8 under and 2 over t201-235, Totalitarianism 2 over t227-238, Digital Democracy 35 under at t241, Corporate Libertarianism 0 for 134.6 at t245 (ours 51 turns, the game's 48)
   - LAB (civic values): duels1143 player 62 t216-218 every civic in reach ours 210 to 3900 where the game logs 0 (Guilds 1616.4, Humanism 2521.8), t210-215 between 51 under and 226 over; duels1143 city-state 4 Totalitarianism 60-120 under t240-245
   - LAB (unit term): 1127 p3 t63 +7.4 / -5.1 untraced
-  - LAB (resource values): a minor's upgrade strategic cost
   - LAB (resource values): Resources +0x350 / +0x1168
   - LAB (resource values): the strategic charge's formation discount and Black Marketeer, no case
   - LAB (resource values): a district extracting its resource before completion (a fit) against 0x4aa8e0's +0xb08 (0x811b0)
@@ -603,10 +602,12 @@ A question the SOURCE under-determines; neither engine ships a branch until the 
   - LAB (card values): duels1146 city-state 4 at 15 citizens: Liberalism's and Civil Prestige's Amenity 4 over t200 and t224-241 (182 for 178 at t224), 24-26 under t242-247 (150 for 176); Civil Prestige 141 for 162 at t199
   - LAB (card values): duels1146 city-state 4 t224-247 Liberalism 4 over, then 24-26 under from t242; Market Economy 7 under t242-248; Third Alternative and E-Commerce 4-5 over t246-248
   - LAB (card values): duels1140 city-state 4 t34-48 Land Surveyors 0.5 for none; Expropriation 0.5 for none duels1134 city-state 2 t242-249 and duels1146 city-state 4 t219-223 (the plot's price over the gross Gold a whole 1 where the game's is 0)
-  - LAB (card values): duels1136 city-state 2 t229-247 Integrated Space Cell 0 for 6-10; Nobel Prize 0 for 15 (duels1144 city-state 2 t242, duels1145 city-state 2 t247)
+  - LAB (card values): duels1136 city-state 2 t229-247 Integrated Space Cell 2-6 for 6-10 (each space race project's turns at its city's Production as it stands, 12: the lasers 25 / 24 turns at the policy horizon 25, the Earth Satellite 38 / 36; the analyzer's horizon, Production and bank for a minor unread); Nobel Prize 0 for 15 (duels1144 city-state 2 t242, duels1145 city-state 2 t247)
   - LAB (card values): duels1145 city-state 4 Conscription 14 for 22 at t57, 7 for 14 at t59, 0 for 7 at t72 and t119
   - LAB (card values): a plot's record of its resource (0x50a690) is not held: the district adjacency of a city-state reads its own research (a fit: a plot first seen after its suzerain's reveal would show the resource), a plot's own resource yield and the boosts' improvements the condition with the suzerain's sight; the record's writer 0x50b3e0 and its refresh are unread
   - LAB (card values): the Lighthouse's coastal Housing on a centre beside a drowned plot is a fit (duels1146 Kumasi from t199): REQUIREMENT_PLOT_ADJACENT_TO_COAST's evaluator unread, the engines' other coastal tests count a drowned plot as coast
+  - LAB (card values): duels1176 city-state 3 Caravansaries 65 for 53 t71-92 and Triangular Trade 147 for 124 t93-97: its Gold 9 for the record's 11 from t70, the Trading Dome on plot 922 (Samarkand's improvement, 2 Gold in the record) having no engine improvement row, its Gold boost on a net -6 for the game's -4
+  - LAB (card values): duels1148 city-state 3 Equestrian Orders 2 under t40-48 on the same Iron (5 a copy, the game's 5 a copy plus 2) and a turn behind the game's fall t49-52
   - LAB (yields at the job): a project begun at 0 converting an unrecorded overflow (1121 Hunza t85)
   - LAB (archaeologist): the Archaeologist's artifact count: an excavated site's entry unread
   - LAB (archaeologist): the Archaeologist's artifact count: t179 9.1 at T 49 where the game counts none (1124 city-state 3)

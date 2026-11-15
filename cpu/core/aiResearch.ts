@@ -56,7 +56,7 @@ import { projectChain } from './aiProjectValue';
 import { modifiersValue } from './aiModifiers';
 import { aiView } from './aiView';
 import { pseudoYieldWeights } from './aiWeights';
-import { minorNavalApplied } from './minorStrategy';
+import { minorNavalApplied, minorNavalWeighted } from './minorStrategy';
 import type { GameState, ImprovementId, ResearchState } from './types';
 
 
@@ -164,9 +164,27 @@ function walk(state: GameState, seat: number, r: ResearchState, id: string, rate
 }
 
 /**
+ * The research AI's favored rows (+0x4b0): the leader's lists' and a
+ * city-state's strategy's (STRATEGY_NAVAL's). `analysis` gives them as the
+ * Tech Tree Analysis job reads them, before the turn's strategy apply (the
+ * strategy from the turn after it starts, `minorNavalWeighted`); else as
+ * the turn's propagation reads them (from the turn it starts,
+ * `minorNavalApplied`).
+ */
+function favoredRows(state: GameState, seat: number, analysis: boolean): Set<string> {
+  const leader = leaderOf(state, seat);
+  const cs = state.cityStates.find((c) => c.seat === seat);
+  const naval = analysis ? minorNavalWeighted(cs) : minorNavalApplied(cs);
+  return new Set([...(leader ? RESEARCH_AI_FAVORED[leader] ?? [] : []), ...(naval ? NAVAL_STRATEGY_TECHS : [])]);
+}
+
+/**
  * 0x7b3e50, THE VALUE of landing `id` in `turns` turns: the technology's own
  * pseudo-yield (PSEUDOYIELD_TECHNOLOGY; an EmbarkUnitType adds 1.0, EmbarkAll
- * 5; a row of an era before the game's counts once per era between, plus
+ * 5 and 5 more where the row is favored (0x7a4850 on +0x4b0 at 0x7b3ffa,
+ * `favoredRows` as the analysis reads them: runs/h1_duels1144 city-state 4
+ * t43-58 Shipbuilding 16 parts to 11 without it, t42 the strategy's first
+ * turn without it); a row of an era before the game's counts once per era between, plus
  * one; the game era `aiGameEra`), and per building it unlocks a share (a wonder's at
  * PSEUDOYIELD_WONDER), per district a share at PSEUDOYIELD_DISTRICT, per
  * project `AI_PROJECT_SHARE` and a weapon project PSEUDOYIELD_NUCLEAR_WEAPON
@@ -195,7 +213,10 @@ function techValueParts(state: GameState, seat: number, id: string, turns: numbe
   const w = (p: string): number => pw.get(p) ?? 0;
   let own = pseudoYield(PSEUDOYIELD_TECHNOLOGY, FX, w('PSEUDOYIELD_TECHNOLOGY'));
   if (def.embarkUnit) own += FX;
-  if (def.embarkAll) own += fxConst(RESEARCH_AI_EMBARK_ALL);
+  if (def.embarkAll) {
+    own += fxConst(RESEARCH_AI_EMBARK_ALL);
+    if (favoredRows(state, seat, true).has(id)) own += fxConst(RESEARCH_AI_EMBARK_ALL);
+  }
   const era = ERAS.indexOf(def.era);
   const game = aiGameEra(state);
   if (era < game) own = fmul(own, (game - era + 1) * FX);
@@ -361,11 +382,7 @@ export function researchAnalysis(state: GameState, seat: number, science: number
     return { tech: id, next, turns, owned: false, leaf, base, score: base, logged: 0 };
   });
   addContracts(entries, contracts);
-  const leader = leaderOf(state, seat);
-  // the favored rows: the leader's lists', and a city-state's strategy's
-  // (STRATEGY_NAVAL's, `CityState.naval`)
-  const naval = minorNavalApplied(state.cityStates.find((c) => c.seat === seat));
-  propagate(state, r, entries, new Set([...(leader ? RESEARCH_AI_FAVORED[leader] ?? [] : []), ...(naval ? NAVAL_STRATEGY_TECHS : [])]));
+  propagate(state, r, entries, favoredRows(state, seat, false));
   for (const e of entries) e.logged = e.score;
   return entries;
 }

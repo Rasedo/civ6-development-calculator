@@ -391,12 +391,16 @@ class SimResearch:
         # a favored row in reach 1.5 times: STRATEGY_NAVAL's technologies
         # where the minor follows it (`citystate_naval`; the Free Cities none)
         if s != self.FR:
-            fav_row = torch.zeros(NT, dtype=torch.bool, device=self.device)
-            for i in self.rules.research_ai["navalTechs"]:
-                fav_row[int(i)] = True
-            favored = (self.citystate_naval[:, s] > 0).unsqueeze(1) & fav_row.unsqueeze(0) & (turns >= 0)
+            favored = (self.citystate_naval[:, s] > 0).unsqueeze(1) & self._rai_naval_rows().unsqueeze(0) & (turns >= 0)
             score = torch.where(favored, _fmul(score, _fx_const(1.5)), score)
         return turns, nxt, base, score, spent
+
+    def _rai_naval_rows(self) -> torch.Tensor:
+        """[NT] STRATEGY_NAVAL's favored technologies"""
+        rows = torch.zeros(self._rai_tables()["embark"].shape[0], dtype=torch.bool, device=self.device)
+        for i in self.rules.research_ai["navalTechs"]:
+            rows[int(i)] = True
+        return rows
 
     def _rai_unit_term(self, s: int, turns: torch.Tensor, civic: bool, below: bool) -> torch.Tensor:
         """[B, N] the research (or, `civic`, the civics) value's UNIT TERM of
@@ -692,6 +696,11 @@ class SimResearch:
         game = self._ai_game_era().unsqueeze(1)
         own = torch.full((B, NT), T["own"], dtype=torch.long, device=self.device)
         own = own + T["embark_unit"].long().unsqueeze(0) * _FX + T["embark"].long().unsqueeze(0) * T["embark_add"]
+        # an EmbarkAll row favored as the analysis reads it adds as much
+        # again: STRATEGY_NAVAL's technologies from the turn after the
+        # strategy starts (`citystate_naval` 2; the Free Cities none)
+        if s != self.FR:
+            own = own + (self._rai_naval_rows().unsqueeze(0) & T["embark"].unsqueeze(0) & (self.citystate_naval[:, s] == 2).unsqueeze(1)).long() * T["embark_add"]
         own = torch.where(era < game, _fmul(own, (game - era + 1) * _FX), own)
         nn = turns.clamp(min=0)
         u = T["unlocks"].unsqueeze(0)

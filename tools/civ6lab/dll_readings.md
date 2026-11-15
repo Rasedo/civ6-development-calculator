@@ -17353,3 +17353,38 @@ log's `History.captives` alone).
   (AOE_*_REQUIREMENTS, REQUIREMENT_UNIT_ERA_TYPE_MATCHES: duels1165 t130
   player 1's Bombard 4063258 beside its General plans on 2 Movement, the
   engines 3).
+
+## C-98: an EmbarkAll technology favored doubles its EmbarkAll term; a minor's upgrade pays no strategic resource; a space race project's turns in a city-state's city — READ (0x7b3e50 at 0x7b3f9a..0x7b4057, 0x7a4850), LAB (the upgrade, the project turns), both twins
+
+- THE TERM: in the research value 0x7b3e50, a row with EmbarkAll (+0x70 bit
+  4) adds 5.0 to its own pseudo-yield (0x500 at 0x7b3fa6), then, inside the
+  same block, 0x7a4850 (the research AI [player +0x12a8], the row) reads the
+  favored byte array at +0x4b0 (count +0x10, data +0x18) and adds 5.0 more
+  where it is set (0x7b4005); a favored row without EmbarkAll adds nothing
+  (`favoredRows`, `techValueParts`; `_rai_naval_rows`, `_rai_value`).
+- THE TIMING: the Tech Tree Analysis job reads the array before the turn's
+  strategy apply, the propagation (0x7604e0, its r8b loaded from +0x4b0 at
+  0x760baf in the turn 0x760980) after it: STRATEGY_NAVAL's rows are favored
+  in the value from the turn after the strategy starts
+  (`minorNavalWeighted`), in the propagation's 1.5 from its first turn
+  (`minorNavalApplied`).
+- Confirmed: runs/h1_duels1144 city-state 4 Shipbuilding t43-t58 (150.9 at
+  22 turns, 482.7 at 1: 1.5 x the own value at 16 parts for the 11 without
+  the term; Buttress 31.4-100.6 more through its prerequisite); t42, the
+  strategy's first turn, 464.3 = 1.5 x 309.5 without it; Celestial
+  Navigation, favored without EmbarkAll, 346.9 at t43 as before.
+- A MINOR'S UPGRADE pays no strategic resource (`minorUpgradeUnit`,
+  `_minor_upgrade_unit`): runs/h1_duels1161 city-state 2's upgrade at t94
+  leaves its 10 Iron (Equestrian Orders 37 as logged t95-107, the record's
+  reservations empty), runs/h1_duels1148 city-state 3's at t44 alike (32-47
+  on it t45-t52, 56 / 75 from t64 / t81). The DLL's upgrade charge is unread.
+- A SPACE RACE PROJECT'S TURNS in a city-state's city (`projectTurns` on
+  the minor's city, `_MinorFacts.project_turns`): its cost at the city's
+  Production as it stands, no progress nor bank, for
+  EFFECT_ADJUST_SPACE_RACE_PROJECTS_PRODUCTION (0x6be2d0): runs/h1_duels1136
+  city-state 2 Integrated Space Cell 6-10 t229-247 as logged. Open: the
+  bank (+0x1f4) the analyzer's turns read for a minor.
+- The replay's carry of a minor's parked progress carries the boost its
+  landing marked (`seatPair`): runs/h1_duels1156 city-state 4's Rifling,
+  boosted at its Niter Mine (Game_Boosts.csv t95, logged twice), 255 of 642
+  in record t96, not landed again on the record's unboosted list.

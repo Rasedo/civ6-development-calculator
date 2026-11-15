@@ -73,7 +73,7 @@ import { AI_BUILDING_INDEX, AI_UNIT_INDEX, amenityCityOf, amenityPerTurn, buildi
 import { defensiveCancel } from './aiCityTrees';
 import { projectTable, type ProjectTableFacts } from './aiProjectValue';
 import { economicGoldBoost } from './aiWeights';
-import { accrueStockpiles, canPayStockpile, capStockpiles, chargeUnitResource, chargeUnitUpkeep, reserveStockpile, spendStockpile, stockFree, stockOf, stockpileCap, stockpileIncome, strategicSlot, strategicSurplus, unitResourceCost, unitUpkeepBill, upgradeType } from './stockpile';
+import { accrueStockpiles, capStockpiles, chargeUnitResource, chargeUnitUpkeep, reserveStockpile, stockFree, stockOf, stockpileCap, stockpileIncome, strategicSlot, strategicSurplus, unitResourceCost, unitUpkeepBill, upgradeType } from './stockpile';
 import { FX, FX_MIN, fmul, fxConst, fxOf, pseudoYieldValue, turnsAt, valueBetween, yieldValue } from './aiValue';
 import { aiCityStats, cityGrowth, aiView, storeUnitStrength } from './aiView';
 import { congressBannedLuxury, congressQueueMult } from './congress';
@@ -916,20 +916,14 @@ function civicQueueNext(r: ResearchState): void {
  *  `MINOR_UPGRADE_GOLD` from a treasury that covers it; the upgrade spends
  *  the unit's turn. A minor ignores the strategic resource the new chassis
  *  asks (`CivilizationLevels.IgnoresUnitStrategicResourceRequirements`,
- *  CITY_STATE true), paying its cost where its stock covers it. Returns
+ *  CITY_STATE true) and pays none of it: runs/h1_duels1161 city-state 2's
+ *  upgrade at t94 and runs/h1_duels1148 city-state 3's at t44 leave their
+ *  10 Iron, Equestrian Orders 37 and 32-47 on it as logged. Returns
  *  whether it upgraded. */
 export function minorUpgradeUnit(state: GameState, cityState: CityState, u: Unit): boolean {
   if (!goldAffordable(cityState.treasury, MINOR_UPGRADE_GOLD) || !minorCanUpgrade(state, cityState, u)) return false;
   cityState.treasury -= MINOR_UPGRADE_GOLD;
-  // the new chassis' strategic cost where its stock covers it, none where
-  // both rungs ask the same resource (`upgradeResourceCost`'s rule; a
-  // city-state upgrades without it)
   const next = upgradeType(state, cityState.seat, u.type)!;
-  const res = unitResourceCost(next);
-  if (res && res.id !== UNITS[u.type].requiresResource && canPayStockpile(state, cityState.seat, res.id, res.n)) {
-    spendStockpile(state, cityState.seat, res.id, res.n, 'ug');
-    rebuildLuxuries(state, cityState.seat);
-  }
   // the upgrade a new unit (`upgradeAnew`): of its type's own AI type and
   // homed nowhere, out of the standing army (runs/h1_duely1127 city-state 2
   // t43: its garrison Warrior 44's Swordsman, the Combat Desire -0.1 ->

@@ -6327,13 +6327,21 @@ function perTurnWorld(ctx: Ctx, a: TurnRecord, imp: Imported, history: History, 
       // own where it holds one: the record shows the item in hand alone,
       // and an item picked on a completion's overflow shows none of it
       // (runs/h1_duely1128 city-state 2's Mathematics: 0 in record t66 on
-      // the 44.5 overflow, 48.5 parked for Irrigation at t66, 8 turns at t67)
+      // the 44.5 overflow, 48.5 parked for Irrigation at t66, 8 turns at t67);
+      // a boost the engine landed in that progress stays landed, its trigger
+      // read again adding nothing (runs/h1_duels1156 city-state 4's Rifling:
+      // Game_Boosts.csv logs its boost twice at t95, 255 of 642 in record
+      // t96's m_axResearchProgress)
       for (const civic of [false, true]) {
         const fr = civic ? f.research.civicRetained : f.research.techRetained;
         const tr = civic ? t.research.civicRetained : t.research.techRetained;
         const have = civic ? t.research.civics : t.research.techs;
         const cur = civic ? t.research.civic : t.research.tech;
-        for (const [id, v] of Object.entries(fr)) if (id !== cur && !have.includes(id)) tr[id] = v;
+        for (const [id, v] of Object.entries(fr)) {
+          if (id === cur || have.includes(id)) continue;
+          tr[id] = v;
+          if (f.research.boosted.includes(id) && !t.research.boosted.includes(id)) t.research.boosted.push(id);
+        }
       }
     }
     for (const c of to.cities ?? []) {

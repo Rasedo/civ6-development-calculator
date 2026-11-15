@@ -2716,8 +2716,8 @@ class SimMinors:
     def _minor_upgrade_unit(self, s: int, go: torch.Tensor, first: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
         """`minorUpgradeUnit` for the unit at major pool slot `first` [B] where
         `go`: the treasury covering `upgradeGold` and the full test passing,
-        it pays; the minor asks no strategic resource, paying the new chassis'
-        cost where its stock covers it; the upgrade spends the unit's turn.
+        it pays; the minor asks and pays no strategic resource; the upgrade
+        spends the unit's turn.
         [B] whether it upgraded, and [B] the new unit's major pool slot (-1
         none)."""
         fc = first.clamp(min=0)
@@ -2726,27 +2726,10 @@ class SimMinors:
         go = go & (first >= 0) & ok
         if not bool(go.count_nonzero()):
             return go, torch.full_like(first, -1)
-        ut = self.major_unit_type.clamp(min=0, max=self.NU - 1)
         nxt = self._minor_upgrade_type(s)
         rr = go.nonzero(as_tuple=True)[0]
         u = first[rr]
         self.citystate_treasury[rr, s] -= self._mb_upgrade_gold
-        # the new chassis' strategic cost where its stock covers it, none
-        # where both rungs ask the same resource (a city-state upgrades
-        # without it)
-        if self._n_strategic:
-            was, to = ut[rr, u], nxt[rr, u].clamp(min=0)
-            k = self._type_res_slot.take(to)
-            n_res = self._type_res_cost.take(to)
-            bank = self.citystate_stockpile[rr, s]
-            have = bank.gather(1, k.clamp(min=0).unsqueeze(1)).squeeze(1)
-            pay = (k >= 0) & (n_res > 0) & (k != self._type_res_slot.take(was)) & (have >= n_res)
-            if bool(pay.count_nonzero()):
-                bank.scatter_add_(1, k.clamp(min=0).unsqueeze(1), -(pay.long() * n_res).unsqueeze(1))
-                self.citystate_stockpile[rr, s] = bank
-                paid = torch.zeros(self.B, dtype=torch.bool, device=self.device)
-                paid[rr] = pay
-                self._rebuild_luxuries(self._CITY_MINOR0 + s, paid)
         # the upgrade a new unit (`upgradeAnew`), in no job of an operation:
         # the old unit's team lists it until its next update, released
         # (`minorUpgradeUnit`)
