@@ -217,8 +217,9 @@ A question the SOURCE under-determines; neither engine ships a branch until the 
   - LAB (rampage): a melee rampager's move-order end (1117 t8 / t10; 1127 Galley 1048590 t109 / t199)
   - LAB (rampage): fit, unread: a move order's strike held when its path reaches the attack node only in a later turn (0x962380 at 0x96268f; 1127 Galley 1048590 t109 / t199)
   - LAB (rampage): 1121 t155 (from t148) Settler 4390925 / Musketman 3670041 end on 16:16 (our Crossbowmen kept on 16:18 / 15:19; the t148-154 rampage family)
-  - LAB (rampage): Barbarian Rampage after the list strike: 1127 t170 Galley 262147 on 39:8 strikes player 0's Warrior 4849729 on 38:7 at 43 damage: the game's blow of 55 leaves it standing and the Galley on 39:8, the copy's own draw kills it and the Galley takes 38:7
+  - LAB (rampage): Barbarian Rampage after the list strike: 1127 t170 Galley 262147 on 39:8 strikes player 0's Warrior 4849729 on 38:7 at 43 damage: the game's blow of 55 leaves it standing and the Galley on 39:8; the copy takes the game's draw of the recorded blow and deals 61 (the embarked Warrior on the Reef at defender strength 10.7, the CombatLog's 15 / -1), killing it, and the Galley takes 38:7 (the replay's landing of the same blow 61 for 55)
   - LAB (rampage): 1121 t127 the formed Man-At-Arms 2949124 pillages 8:12 (ours Move to safety)
+  - LAB (rampage): duelq1121 t199 the Crossbowman 3801114's Barbarian Rampage from 17:14 to 17:16 carries the captive Builder 4980745 it escorts (escorted in ours; the two walked 16:12 -> 17:14 together at t195), the game's leaves the Builder on 17:14 under HL: End Turn (plot 721 // 633)
   - LAB (explore): 1127 t12 Scout 393221 10:19 for 10:16 (n 3 / 2; the barbarians' plane equal to the record's)
   - LAB (explore): Explore path: 1124 t15 Scout 524295 on 33:11 for 33:8, the game west to 32:11 (t17 held by player 4's Warrior on 32:10), ours east via 33:12 at 7 turns
   - LAB (explore): 1124 t22 barbarian Scout 131073 (HL: Explore) off once a cliff bars only revealed crossings
@@ -240,7 +241,6 @@ A question the SOURCE under-determines; neither engine ships a branch until the 
   - LAB (operation moves): 1128 t225 Barbarian Attack's Ranger 6946838 holds 41:17 and its Cavalry 7012372 walks 41:21 -> 41:18, the game's Ranger to 41:18 and the Cavalry holding
   - LAB (operation moves): 1128 t249 City Assault's Cuirassier 7405596 and Cavalry 7143430 end on 41:20 / 41:19, the game's 41:19 / 41:20
   - LAB (operation moves): 1124 t16 / t28 Barbarian Attack's Warriors 983054 / 2031629 end beside their targets on 37:22 / 42:10, the game's on the targets' 36:22 / 41:10
-  - LAB (operation moves): 1121 t110 Man-At-Arms 2883594 (6:15 for 11:14) ends on 7:16, the game's 7:15 onto player 1's unit 2621448, bought there in the turn (UnitAddedToMap seq 35907, CityMadePurchase 35909) and removed by the step (36011): the replay's copy holds no unit a major bought and lost within the turn
   - LAB (operation moves): 1128 t242 the hurt Cavalry 7012372 walks to 41:21 under Operation Move, ours holds 42:21
   - LAB (operation moves): 1121 t169 / t172 the 5:17 team past our danger map
   - LAB (operation moves): 1121 t157 the 16:17 team past its Crossbowmen
@@ -251,7 +251,7 @@ A question the SOURCE under-determines; neither engine ships a branch until the 
   - LAB (builder capture): 1121 t149 Builder Capture's Builder 4259860 / Bombard 3997700 stop the Bombard on 14:19 where the game carries both to 14:18
   - LAB (builder capture): 1121 t160 the capture pair's Musketman 3538967 for 3:19 walks 6:18 -> 6:16, the game's 5:17 (our danger map's 4:16 / 5:16 at 20, the game's none, close 5:17's children to the first-turn danger flag)
   - LAB (builder capture): 1121 t161 the second and third pairs' goals 4:18 for the game's 4:19
-  - LAB (pillage): duelq1121 t110 the Skirmisher 3342353, Pillage Improvement's second available unit, walks 7:14 -> 7:15, the game's holds 7:14 with no row, 7:15 held there by the Man-At-Arms 2883594 (the operation move's miss on the unit player 1 bought on 7:15)
+  - LAB (pillage): duelq1121 t133 the Quadrireme 2228245 on 16:9 takes Pillage Improvement for player 1's Fishing Boats on 13:10, under player 1's embarked Great Scientist 2162698, and ends there; the game's logs its Pillage Improvement row (Available Units: 1), pillages nothing and Wanders to 17:5 (plot 453 // 237)
 - **C-123. BARBARIANS' RAIDS AND SCOUT REPORTS.** Weight 2.
   - LAB (raids and assaults): 1110 t42 City Assault (a member lost to combat drift)
   - LAB (raids and assaults): 1130 t43 raid (a member lost to combat drift)
@@ -264,6 +264,7 @@ A question the SOURCE under-determines; neither engine ships a branch until the 
   - LAB (scouts): fit, unread: a scout's report ignoring a barbarian civilian's sight (1128 t76)
   - LAB (scouts): fit, unread: a scout reporting a plot newly in its own sight, the plots in index order (the barbarian player's count turning positive, 0x58aa90 → 0x508d50; the engines count per scout)
   - LAB (scouts): fit, unread: a hurt scout's report waiting on Protect Unit's danger (0x7f07c0 reads the AI's influence map; the engines: an enemy within its moves plus its reach; 1121 camp (3,19), hurt at t25 beside China's Warrior, reporting at t33)
+  - LAB (scouts): duelq1121 t78 the barbarian Scout 131073 on 8:17 sees player 1's Holy Site on 7:15, pillaged since t73 in the records, and reports it, its homing tree from t79 (ours no tactical row at t79 / t80, plot 801 // 668 at t80); the game's Barbarian Found City tree (917508) stands from t81, after player 1 repaired the Holy Site in its turn 79 (DistrictPillaged seq 23086) and the Scout came back in sight of it from 7:17 at t80
 - **C-124. BARBARIANS' CAMPS AND SIGHT.** Weight 1.
   - BUILD (sight): the alliances' outgoing visibility (0x2ab4f0 -> 0x508330; no recorded duel holds an alliance)
   - LAB (sight): the unseen land's single-turn residue (sightLab.ts on Barbarians.csv: 1,065 of 1,245 turns equal; 1128 t25 +28)
@@ -317,6 +318,7 @@ A question the SOURCE under-determines; neither engine ships a branch until the 
   - LAB (walk steps): 1117 t243 Infantry 1376263's embark from 15:6 onto city-state 2's Harbor 14:7, a waiting step priced cheaper in the game (g <= 2820352, ours 3331072) moving the open list's tie order
   - LAB (walk steps): 1117 t188 Line Infantry 1179654's Wander to 16:4 through 15:6 under player 0's Warrior 458757, ending on 16:6 in two segments, our walk refusing the first step
   - BUILD (walk steps): the zone of control's early pass (0x530f50 at 0x531067 -> 0x52f970): an unpillaged improvement of a player at war within 1 of the plot entered whose Improvements row carries a property above 0 (hashes 0x7d27db83 / 0x8634aa0f, unnamed) zones it, no sight test; unported
+  - LAB (walk steps): a walk stopping with Movement left: duelq1117 t31 the barbarian Scout 1638403 (HL Explore for 14:20) steps 6:20 -> 6:21 and stops on 2 Movement (record 32), ours onto the Marsh 7:20 (plot 887 // 930); duelq1121 t44 the Galley 1572882 (HL Explore for 27:14) 22:14 -> 20:14 on 1 left, ours on to 19:14 (635 // 636)
   - LAB (unrevealed plots): 1124 t119 Man-At-Arms 4849682 lays the water 36:16 its barbarians never revealed and steps from no unrevealed 35:17
   - LAB (unrevealed plots): 1128 t21 the raid's Slinger / Warrior find no path through our revealed plots under flag 1
   - BUILD (portals): the unit pathfinder also takes 0x271b50's portal exits (0x26f330 installs it), where ours steps onto the tunnel and uses `portalExit` (A_PORTAL)
@@ -476,7 +478,8 @@ A question the SOURCE under-determines; neither engine ships a branch until the 
   - LAB (claims and strikes): 1127 t127 Knight 1114117's Wander onto 6:9 under the barbarian Spearman 3473440, which the game takes only as a strike (the destination test 0x208b80 on the mover's layer: a destination held by a unit at war is an attack, not a move)
   - LAB (claims and strikes): Garrison City's fortify test reads the team's attack strength (team +0x98) as the military AI's refresh left it, on each member's planning of its last tactical pass where the engines plan anew: duelq1127 t72 city-state 4's City Defense attack 25 for the game's 81 (enemy 55 on both), its Heavy Chariot 655362 fortified 2 / 1
   - LAB (claims and strikes): duelq1124 t91 city-state 2's embarked Man-At-Arms 1310723 on 9:10 claims 9:8 (turn 2, dealt 71, taken 13 and 44 back) on the barbarian Archer 3997716 its knowledge base holds on 8:7 with the Builder 4456474 (MEDIUM) and moves there under Attack Units; the game assigns it none and takes the Builder under Attack Civilian with no step (9:10)
-  - LAB (claims and strikes): duelq1128 t132 city-state 3's Trebuchet 1966081 Heals on 3:4, the game's Attack Units to 3:3 on the barbarian Quadrireme 2097177 on 5:1 its Man-At-Arms 983040 on 5:3 sees: the replay's state holds none of the Men-At-Arms 983040 / 1572868 / 2031619 the record keeps on 5:3 / 4:4 / 4:8 at 58 / 52 / 56 damage
+  - LAB (claims and strikes): duelq1127 t73 City Defense's Heavy Chariot 720899 on 7:11: ours an Operation Attack Units (Move 9:11, no strike) beside the Catapult 589825's strike on the barbarian Warrior 1835024 on 10:11 (25 damage, the blow 36), the game's Operation Move holding 7:11 (plot 493 // 491)
+  - LAB (claims and strikes): duelq1127 t145 city-state 4's Skirmisher 1638401 on 4:11 takes Chase Target on the barbarian Musketman 4325382 on 5:7 (80 damage after the Bombard 1703944's 24) and stands, the game's Wanders to 3:10 (plot 488 // 443)
   - LAB (city defense): 1117 t84 City Defense Catapult 917509's 2-turn spot on its Man-at-Arms' plot (game 32:5, no row)
   - LAB (city defense): 1117 t89 City Defense Catapult 917509 on 32:7 taking next turn's 32:8
   - LAB (upgrade units): 1121 Upgrade Units' walk 4:589828 t69-72 the 781 / 782 tie
@@ -937,7 +940,6 @@ A question the SOURCE under-determines; neither engine ships a branch until the 
   - LAB (action replay): the barbarians' end-of-turn knowledge look after the replay's unit sync reads record t+1's health, the game's own event damage included
   - BUILD (action replay): 1127 record t96 read before Rome's t96 start (its CityProductionCompleted in pair 96 -> 97): Rome's Warrior 0 queued in the record, completed in ours
   - BUILD (action replay): (engine) a Production lump (AddProgress 0x16f6e0 -> 0x16f050) takes the step's argument the charge takes, where the engines add it without the item multiplier (no case read)
-  - LAB (action replay): duelq1121 t207 the barbarians' embarked captive Settler 4063247 on 18:11 opens the copy's turn on 2 Movement where the record holds 5 / 5: its Move To Safety for 17:12 stops on 17:11, the game's reaches 17:12
   - LAB (drift): economy drift: an event's civilian kill's unit layers (1127 t160 Muscat's Trader spared)
   - LAB (drift): economy drift: 1127 Muscat's citizens and amenities t84-137
   - LAB (drift): economy drift: 1124 Granada's third envoy a turn late (t52 / t51)

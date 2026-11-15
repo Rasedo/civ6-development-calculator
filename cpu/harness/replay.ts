@@ -967,6 +967,30 @@ function goneAfterBarbs(ctx: Ctx, b: TurnRecord, turn: number): Unit[] {
   return out;
 }
 
+/** a unit the log adds in the turn before row `before` and no record holds
+ *  (made and lost inside the turn), as a new unit of `copy` on its plot: its
+ *  type the city's completion or purchase row that follows its addition */
+function madeInTurn(ctx: Ctx, copy: GameState, acts: readonly unknown[][], key: string, before: number): Unit | undefined {
+  const j = acts.findIndex((x) => x[2] === 'UnitAddedToMap' && `${x[3]}:${x[4]}` === key && (x[0] as number) < before);
+  if (j < 0) return undefined;
+  const player = acts[j][3];
+  let type: string | null = null;
+  for (const x of acts.slice(j + 1, j + 4)) {
+    if (x[3] !== player) continue;
+    if (x[2] === 'CityMadePurchase' && x[7] === PURCHASE_UNIT_HASH) type = engineRowOf(ctx.cat, 'unit', x[8] as number);
+    else if (x[2] === 'CityProductionCompleted' && x[5] === 0) type = engineRowOf(ctx.cat, 'unit', x[6] as number);
+    if (type) break;
+  }
+  const seat = seatOfP(ctx, player as number);
+  if (!type || seat === NO_SEAT) return undefined;
+  const tileIndex = (acts[j][6] as number) * ctx.W + (acts[j][5] as number);
+  const c: Unit = { id: copy.nextUnitId++, type, seat, tileIndex, movesLeft: 0, hp: UNIT_HP, charges: UNITS[type].charges ?? null, xp: 0, level: 1 };
+  c.movesFull = unitFullMoves(copy, c);
+  return c;
+}
+
+const PURCHASE_UNIT_HASH = gameHash('UNIT');
+
 /** the majors' best strengths trained in a copy of the turn t's close (the
  *  minors' and the barbarians' turns): as the next turn's start opened
  *  (`Ctx.startBests`), raised by each unit of the copy made or upgraded since
@@ -1055,11 +1079,18 @@ function barbarianTurn(ctx: Ctx, b: TurnRecord, closing: number): void {
   // (9,19), and (7,20) is no candidate)
   const was = new Map<string, number>(ctx.prev.units.map((r) => [`${r.owner}:${r.id}`, r.y * ctx.W + r.x]));
   const moved = new Map<Unit, number>();
+  // ...embarked as it stands there, the pool their turn opens on (runs/
+  // h1_duelq1121 t207: the captive Settler 4063247 embarked on 18:11 at 5
+  // Movement, ashore on 17:12 by record t+1)
+  const embWas = new Map<string, boolean>(ctx.prev.units.map((r) => [`${r.owner}:${r.id}`, bool(r.embarked)]));
+  const ashore = new Map<Unit, boolean | undefined>();
   for (const [key, u] of ctx.units) {
     const at = was.get(key);
     if (!isBarbSeat(u.seat) || at === undefined || at === u.tileIndex || !state.units.includes(u)) continue;
     moved.set(u, u.tileIndex);
     u.tileIndex = at;
+    ashore.set(u, u.embarked);
+    u.embarked = embWas.get(key) || undefined;
   }
   const slotOfKey = (key: string) => Number(key.split(':')[1]) & 0xffff;
   const pool = (state.barbPool ??= { size: 0, free: [], dying: [] });
@@ -1083,6 +1114,7 @@ function barbarianTurn(ctx: Ctx, b: TurnRecord, closing: number): void {
   // where the pair's first record holds each unit its moves took off
   const from = new Map([...moved.keys()].map((u) => [u, u.tileIndex] as const));
   for (const [u, at] of moved) u.tileIndex = at;
+  for (const [u, e] of ashore) u.embarked = e;
   matchNewUnits(ctx, b);
   for (const key of ctx.barbNew) {
     if (unitOf(ctx, key)) {
@@ -1359,7 +1391,16 @@ function barbarianAi(ctx: Ctx, b: TurnRecord, closing: number, before: ReadonlyS
   const standing = new Set([...twin.values()]);
   for (const key of open === undefined ? [] : lived) {
     const u = ctx.units.get(key) ?? ctx.gone.get(key);
-    if (!u || standing.has(u) || state.units.includes(u)) continue;
+    // ...and one made in the turn that no record holds, on the log's plot
+    // (runs/h1_duelq1121 t110: player 1's Missionary 2621448 bought on 7:15
+    // in its turn, the barbarian Man-at-Arms 2883594's Operation Move onto
+    // it removing it)
+    if (!u) {
+      const c = madeInTurn(ctx, copy, acts, key, open!);
+      if (c) copy.units.push(c);
+      continue;
+    }
+    if (standing.has(u) || state.units.includes(u)) continue;
     standing.add(u);
     const r = ctx.prev.units.find((x) => `${x.owner}:${x.id}` === key);
     const at = last.get(key) ?? (r ? r.y * ctx.W + r.x : undefined);
@@ -1645,6 +1686,11 @@ function minorAi(ctx: Ctx, b: TurnRecord, turn: number, made: ReadonlySet<Unit>,
   state.units.forEach((u, i) => twin.set(copy.units[i], u));
   const keyOf = new Map<Unit, string>();
   for (const [key, u] of ctx.units) keyOf.set(u, key);
+  // (a unit the turn's change kills stands under its record key: runs/
+  // h1_duelq1128 t132, city-state 3's Men-at-Arms 983040 on 5:3 and 1572868
+  // on 4:4, killed by the eruption of 4:3 at the change, beside its
+  // Trebuchet 1966081's strike)
+  for (const [key, u] of ctx.gone) if (!keyOf.has(u)) keyOf.set(u, key);
   bestsBeforeStart(ctx, copy, twin, unbornUnits(ctx, b));
   const was = new Map(ctx.prev.units.map((r) => [`${r.owner}:${r.id}`, r.y * ctx.W + r.x]));
   const hpWas = new Map(ctx.prev.units.map((r) => [`${r.owner}:${r.id}` as string, UNIT_HP - num(r.damage)]));
