@@ -1959,6 +1959,9 @@ class SimTactics:
         # own (`walk`'s through, `civiliansAlone`): the capture is that
         # step's, so it passes the plot beside it whatever stands there
         through = torch.zeros(R, dtype=torch.bool, device=dev)
+        # the order's plot holds no fighter at war and no district of hit
+        # points at war: a siege unit moves onto it too (`meleeAttackInner`)
+        civ_only = torch.zeros(R, dtype=torch.bool, device=dev)
         if strike and bool(into.count_nonzero()):
             milh = torch.zeros(self.B, self.T, dtype=torch.bool, device=dev)
             for pl in (self.military_at, self.embarked_at):
@@ -1966,9 +1969,10 @@ class SimTactics:
                 ot_ = self.unit_type.gather(1, plc).clamp(min=0, max=self.NU - 1)
                 os_ = torch.where(pl >= 0, self.unit_seat.gather(1, plc), torch.full_like(pl, -1))
                 milh |= (pl >= 0) & self._type_dom_mil.take(ot_) & self._seats_hostile(seat, os_)
-            cap = (into & ~late & ~milh[rows, dr] & ~city_in[rows, dr]
+            civ_only = ~milh[rows, dr] & ~city_in[rows, dr]
+            cap = (into & ~late & civ_only
                    & (getattr(self, f"{pre}_unit_attacks")[rows, sr] > 0)
-                   & (self._type_combat.take(ut) > 0) & (self._type_bombard.take(ut) <= 0)
+                   & (self._type_combat.take(ut) > 0)
                    & ~getattr(self, f"{pre}_unit_emb")[rows, sr])
             dcl = (self.neigh[frm] == dr.unsqueeze(1)).long().argmax(dim=1)
             c_on = self._tac_step(rows, frm, dr, dcl, ut, ign_shore, waive) + carry
@@ -2083,7 +2087,8 @@ class SimTactics:
                         zm[rows[pm], mr[pm]] = zoned[pm]
         # the strike (`orderOnce` -> `meleeAttack`), where no step was refused
         # and its Movement and attacks last beside the plot, under
-        # `meleeAttack`'s own refusals: a unit that fights, no siege unit, and
+        # `meleeAttack`'s own refusals: a unit that fights, a siege unit only
+        # onto a plot of civilians alone, and
         # the amphibious reach — an embarked unit strikes an open LAND shore,
         # never a plot afloat nor one a cliff closes (`amphibiousReach`) —
         # its step priced afresh from beside the plot as any step of the
@@ -2101,7 +2106,7 @@ class SimTactics:
             into = into & ~held_off
             hit = (into & ~late & ~refused & getattr(self, f"{pre}_unit_alive")[rows, sr] & (mp_p[rows, sr] > 0)
                    & (getattr(self, f"{pre}_unit_attacks")[rows, sr] > 0) & (self.pair_dist[here, dr].to(torch.long) == 1)
-                   & (self._type_combat.take(ut) > 0) & (self._type_bombard.take(ut) <= 0))
+                   & (self._type_combat.take(ut) > 0) & ((self._type_bombard.take(ut) <= 0) | civ_only))
             emb = getattr(self, f"{pre}_unit_emb")[rows, sr]
             if bool((hit & emb).count_nonzero()):
                 hereB = torch.zeros(B, dtype=torch.long, device=dev)
@@ -2279,7 +2284,6 @@ class SimTactics:
         cs_ = seat_of(civ)
         ct = self.unit_type.gather(1, civ.clamp(min=0)).clamp(min=0, max=self.NU - 1)
         sup = self.support_at
-        ss = seat_of(sup)
         trd = self.trader_at
         ts_ = seat_of(trd)
         # a Trader walking a route (0x58fc40: `seat_route_unit` names its
@@ -2296,9 +2300,17 @@ class SimTactics:
         erel = (emb >= 0) & (self._rel_strength.take(et) > 0)
         rel_slot = torch.where(relig, civ, torch.where(erel, emb, none))
         rel_seat = torch.where(relig, cs_, torch.where(erel, es, none))
-        n_civ = ((civ >= 0) & ~relig).long() + (sup >= 0).long()
-        civ_seat = torch.where((civ >= 0) & ~relig, cs_, ss)
-        civ_slot = torch.where((civ >= 0) & ~relig, civ, sup)
+        # the units' map layer of the plot (no Trader, no religious unit): its
+        # military unit, its passenger, its civilian and its support unit;
+        # the layer's one unit, its player and its formation class
+        c_unit = (civ >= 0) & ~relig
+        e_unit = (emb >= 0) & ~erel
+        n_layer = (self.military_at >= 0).long() + e_unit.long() + c_unit.long() + (sup >= 0).long()
+        civ_slot = torch.where(c_unit, civ, torch.where(sup >= 0, sup, torch.where(e_unit, emb, self.military_at)))
+        civ_seat = seat_of(civ_slot)
+        one_t = self.unit_type.gather(1, civ_slot.clamp(min=0)).clamp(min=0, max=self.NU - 1)
+        one_sup = (civ_slot >= 0) & self._type_support.take(one_t)
+        one_civ = (civ_slot >= 0) & self._type_civilian.take(one_t) & ~one_sup
         camp = torch.zeros_like(seen)
         cp = self.camp_tile
         if cp.numel():
@@ -2313,10 +2325,13 @@ class SimTactics:
         taken = ~rest
         for kind, cond, who in (
             (4, camp, none), (5, goody, none),
-            (6, trader & hostile(ts_), ts_),
-            # the plot's one civilian of another player ends its chain; the
-            # player's own goes on to the religious unit and the improvement
-            (7, (n_civ == 1) & (civ_seat != seat), civ_seat),
+            # a unit on the trade layer ends the plot's chain, a Trader at
+            # war walking a route and not immune alone an entry
+            (6, trd >= 0, ts_),
+            # the layer's one unit of another player ends the plot's chain; a
+            # layer of more units, or the player's own one, goes on to the
+            # religious unit and the improvement
+            (7, (n_layer == 1) & (civ_seat != seat), civ_seat),
             (8, (rel_slot >= 0) & hostile(rel_seat), rel_seat),
             (9, (self.improvement >= 0) & ~self.pillaged & h_own & ~goody, none),
         ):
@@ -2332,8 +2347,17 @@ class SimTactics:
             rk = torch.where(camp, 4, torch.where(goody, 5, torch.where(imp, 9, 0)))
             okk = torch.where(ronly, rk, okk)
             oss = torch.where(ronly, none, oss)
-        # a CIVILIAN or a RELIGIOUS entry only of a player at war with `seat`
-        okk = torch.where(((okk == 7) | (okk == 8)) & ~hostile(oss), 0, okk)
+        # a TRADER, a CIVILIAN or a RELIGIOUS entry only of a player at war
+        # with `seat`, a TRADER one only of a Trader that may be plundered
+        okk = torch.where((okk == 6) & ~trader, 0, okk)
+        okk = torch.where(((okk == 6) | (okk == 7) | (okk == 8)) & ~hostile(oss), 0, okk)
+        # the layer's one unit at war: of the civilian class a CIVILIAN, of
+        # the support class a LOW unit entry, of any other none
+        sup_low = (okk == 7) & one_sup
+        okk = torch.where((okk == 7) & ~one_civ, 0, okk)
+        fight = fight | sup_low
+        dslot = torch.where(sup_low, civ_slot, dslot)
+        dseat = torch.where(sup_low, civ_seat, dseat)
         # the walk's unit entries in layer 0 on the plots it sees, the
         # knowledge base's after them on plots it does not
         uk = torch.where(fight, 1, torch.where((okk == 6) | (okk == 7) | (okk == 8), okk, 0))
@@ -2351,7 +2375,7 @@ class SimTactics:
         # the units' map layer (no Trader, no religious unit)
         efight = uk == 1
         eslot = uu.clamp(min=0)
-        nonc = ((civ >= 0) & ~relig) | (sup >= 0)
+        nonc = (((civ >= 0) & ~relig) | (sup >= 0)) & (n_layer > 1)
         lowk = torch.where(efight & rep(nonc), 2, torch.ones_like(uk))
         dt = self.unit_type.gather(1, eslot).clamp(min=0, max=self.NU - 1)
         rs = self._type_ranged_strength.take(dt)
@@ -3076,13 +3100,16 @@ class SimTactics:
         return pick, pspot, pkind
 
     def _tac_attack_civilians(self, live, done: torch.Tensor, ai: torch.Tensor, reach_at, tg: dict,
-                              order: torch.Tensor, npass: torch.Tensor) -> None:
-        """ATTACK CIVILIANS (`attackCivilians`): each CIVILIAN target of the
+                              order: torch.Tensor, npass: torch.Tensor, pre: str = "barb",
+                              seat: int = BARB_SEAT) -> None:
+        """ATTACK CIVILIANS (`attackCivilians`) of the units of pool `pre`
+        (their player `seat`): each CIVILIAN target of the
         list in its order, the units whose reach takes its plot within two
         turns go for it in pool order — each that can act moves onto it, a
         melee one's turn then done, until the civilian is captured or killed
         (one that withdraws still stands); then each ranged one within its
         range strikes it."""
+        mp_p = getattr(self, f"{pre}_unit_mp")
         dev = self.device
         B, T = self.B, self.T
         bidx = torch.arange(B, device=dev)
@@ -3093,8 +3120,8 @@ class SimTactics:
             return
         ents = self._tac_in_order(civ, tg)
         U = civ.shape[1]
-        fights = self._tac_can_fight()
-        on_list = self._tac_on_list(live, done, "barb")
+        fights = self._tac_can_fight(pre)
+        on_list = self._tac_on_list(live, done, pre)
         npos = int(npass.max())
         for j in range(J):
             e = ents[:, j].clamp(max=U - 1)
@@ -3124,24 +3151,24 @@ class SimTactics:
             js = c_o.any(dim=0).nonzero(as_tuple=True)[0].tolist()
             for jj in js:
                 u_b = order[:, jj]
-                go = cand[bidx, u_b] & ~gone & live()[bidx, u_b] & (self.barb_unit_mp[bidx, u_b] > 0)
+                go = cand[bidx, u_b] & ~gone & live()[bidx, u_b] & (mp_p[bidx, u_b] > 0)
                 if not bool(go.count_nonzero()):
                     continue
-                self._tac_move_to(go, u_b, t)
-                melee = go & (self._tac_range(bidx, u_b) == 0)
+                self._tac_move_to(go, u_b, t, pre, seat)
+                melee = go & (self._tac_range(bidx, u_b, pre) == 0)
                 done[bidx[melee], u_b[melee]] = True
                 gone |= go & ~stands()
             for jj in js:
                 u_b = order[:, jj]
-                rng = self._tac_range(bidx, u_b)
-                at = self.barb_unit_tile[bidx, u_b].clamp(min=0)
-                go = (cand[bidx, u_b] & ~gone & live()[bidx, u_b] & (self.barb_unit_mp[bidx, u_b] > 0) & (rng > 0)
+                rng = self._tac_range(bidx, u_b, pre)
+                at = getattr(self, f"{pre}_unit_tile")[bidx, u_b].clamp(min=0)
+                go = (cand[bidx, u_b] & ~gone & live()[bidx, u_b] & (mp_p[bidx, u_b] > 0) & (rng > 0)
                       & (self.pair_dist[at, t].to(torch.long) <= rng))
                 if not bool(go.count_nonzero()):
                     continue
-                fire = go & (self.barb_unit_attacks[bidx, u_b] > 0)
+                fire = go & (getattr(self, f"{pre}_unit_attacks")[bidx, u_b] > 0)
                 for u in torch.unique(u_b[fire]).tolist():
-                    self._hostile_ranged_strike(fire & (u_b == u), t, "barb", u)
+                    self._hostile_ranged_strike(fire & (u_b == u), t, pre, u)
                 done[bidx[go], u_b[go]] = True
 
     def _tac_homeland_plunder(self, live, done: torch.Tensor, order: torch.Tensor, npass: torch.Tensor,
@@ -5947,6 +5974,15 @@ class SimTactics:
         self._tac_move_to_safety(live, done, order, npass, op["rowof"], op["res"], danger, pre, seat, False)
         if tg is not None:
             self._tac_attack_units(live, done, ai, order, op["rowof"], op["res"], tg, 2, peers, pre, seat)
+            # ATTACK CIVILIANS
+
+            def reach_at(tiles: torch.Tensor) -> torch.Tensor:
+                """[B, P] the turn each unit's reach reaches the game's plot, -1 none"""
+                rowof = op["rowof"]
+                v = op["res"]["turns"][rowof.clamp(min=0), tiles.clamp(min=0, max=T - 1).unsqueeze(1).expand(-1, rowof.shape[1])]
+                return torch.where(rowof >= 0, v, torch.full_like(v, -1))
+
+            self._tac_attack_civilians(live, done, ai, reach_at, tg, order, npass, pre, seat)
         # PROMOTION, MAKE MILITARY FORMATION
         self._tac_promotion(live, done, pre)
         ghost = self._tac_make_formation(live, done, order, npass, pre, s) & units & tac

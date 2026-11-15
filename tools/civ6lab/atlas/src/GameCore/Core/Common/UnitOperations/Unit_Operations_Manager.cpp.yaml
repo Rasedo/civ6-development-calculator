@@ -83,6 +83,7 @@
     - "C-133 / C-95 / C-134: the kept path's searches inside a queue run; the Trader target, the defending district and Pillage's own plot; the safe plot's unit at war that fights — READ (0x272aa0 at 0x272af9..0x272c76, 0x26ef40 at 0x26f123..0x26f162, 0x26e3a0, 0x782d0, 0x783980 at 0x7842df..0x7842eb / 0x784aec..0x784b36, 0x24c2f0, 0x774380 at 0x774481..0x7744a9, 0x716b90 at 0x716d53..0x716da1), both twins"
     - "C-133 / C-95 / C-134: the kept path's searches inside a queue run; the Trader target, the defending district and Pillage's own plot; the safe plot's unit at war that fights — READ (0x272aa0 at 0x272af9..0x272c76, 0x26ef40 at 0x26f123..0x26f162, 0x26e3a0, 0x782d0, 0x783980 at 0x7842df..0x7842eb / 0x784aec..0x784b36, 0x24c2f0, 0x774380 at 0x774481..0x7744a9, 0x716b90 at 0x716d53..0x716da1), FIT (the planning list's seen unit at war), both twins"
     - "C-133 / C-95: the carried orders run in the unit list's order; a path comes ashore off water only by the disembark test — READ (0x7df30, 0x554e0, 0x523e0, 0x52e90, 0x54910, 0x2720a0 at 0x272380..0x27240d, 0x52fb90 at 0x52fb9d), both twins; UpdateOpenNode's walk and flag 2's plot — READ (0x79560, 0x2720a0 at 0x2721c3..0x27220d / 0x2724c8), unported"
+    - "C-125 / C-95: the target list's trade layer and its one unit of the units' layer; a siege unit's step onto civilians; the city-states' Attack Civilians; the flankers' test, the support's caller, the camp strike's queue — READ (0x783980 at 0x7849bb..0x784c2b and 0x784c30..0x784f57, 0x26fe20 -> 0x212500, 0x521530, 0x51f070 at 0x51f70e..0x51f737, 0x546f0, 0x52f50), both twins"
   review: reviewed
 - addr: 0x53e20
   final: 0x408f0
@@ -117,6 +118,22 @@
     - "C-133 / C-95: the carried orders run in the unit list's order; a path comes ashore off water only by the disembark test — READ (0x7df30, 0x554e0, 0x523e0, 0x52e90, 0x54910, 0x2720a0 at 0x272380..0x27240d, 0x52fb90 at 0x52fb9d), both twins; UpdateOpenNode's walk and flag 2's plot — READ (0x79560, 0x2720a0 at 0x2721c3..0x27220d / 0x2724c8), unported"
   context:
     - "...rst slot 0x523a0): the queue's push 0x526a0 is its +0x60, the handler by operation type 0x53e80 its +0x80, an operation's start 0x55280 its +0x130, the queue run 0x52f50 its +0x138,..."
+  review: reviewed
+- addr: 0x546f0
+  final: 0x40f50
+  kind: function
+  name: the unit's operation push
+  semantics: "Unit_Operations_Manager vtable 0xcff8c0 +0x60: appends the operation at the back of the unit's queue (+0x2040: the list +0xd0, 0x30 entries, its count +0xe0, asserted under 10), signals 0x15c35863, and starts it at once (vt +0x170) only where it is the queue's one entry and the caller's flag (r9b) is set: an operation pushed behind one that stays queued does not run until the front leaves (0x52f50 runs the front alone)."
+  status: READ
+  cases:
+    - recording: h1_duelq1121
+      turn: 160
+      value: "the camp's Spearman 1376265 on 3:18, its move to the spot 3:17 its Line Infantry holds kept, strikes nothing: the strike pushed behind it never starts; h1_duelq1128 t31 the Spearman 589832 walks 30:6 -> 31:7 for 32:8 with no strike"
+  readings:
+    - "C-125 / C-95: the target list's trade layer and its one unit of the units' layer; a siege unit's step onto civilians; the city-states' Attack Civilians; the flankers' test, the support's caller, the camp strike's queue — READ (0x783980 at 0x7849bb..0x784c2b and 0x784c30..0x784f57, 0x26fe20 -> 0x212500, 0x521530, 0x51f070 at 0x51f70e..0x51f737, 0x546f0, 0x52f50), both twins"
+  context:
+    - ...b and 0x784c30..0x784f57, 0x26fe20 -> 0x212500, 0x521530, 0x51f070 at 0x51f70e..0x51f737, 0x546f0, 0x52f50), both twins
+    - "- THE CAMP STRIKE'S QUEUE (0x772940's two pushes through the manager's vt +0x60, 0x546f0): the operation is appended at the back of the unit's queue (+0x2040: the list +0xd0, i..."
   review: reviewed
 - addr: 0x54910
   kind: function

@@ -293,6 +293,7 @@
     - "C-95: the camp defender's strike, a captured civilian's dead target, a lone DEFENDER out of Pillage"
     - "C-95: the camp defender's strike, a captured civilian's dead target, a lone DEFENDER out of Pillage — READ (0x772940, 0x779010, 0x774e90, 0x779240 at 0x7792be..0x7792da, 0x775340 at 0x77551e..0x775534, 0x791470 at 0x79174a..0x791756), both twins"
     - "C-125 / C-95: flanking and support count about the defender unit's own plot, no river edge read; MEDIUM by the plot's layer-0 list; a killed target's record; the camp strike's orders — READ (0x521530, 0x51c810 at 0x51cc1c..0x51cc56, 0x5228c0, 0x786d50, 0x776140 at 0x776333, 0x8e9d0, 0x772940 at 0x772d2f..0x772f78), FIT (the camp strike's path), both twins"
+    - "C-125 / C-95: the target list's trade layer and its one unit of the units' layer; a siege unit's step onto civilians; the city-states' Attack Civilians; the flankers' test, the support's caller, the camp strike's queue — READ (0x783980 at 0x7849bb..0x784c2b and 0x784c30..0x784f57, 0x26fe20 -> 0x212500, 0x521530, 0x51f070 at 0x51f70e..0x51f737, 0x546f0, 0x52f50), both twins"
   review: reviewed
 - addr: 0x773030
   final: 0x505020
@@ -328,6 +329,7 @@
     - "C-95 / C-123: a zone of control out of sight is none in a path's cost; Attack Civilians past a withdrawn civilian; the capture step through a plot of its own; a withdrawal's plot — READ (0x5033a0 at 0x5033f9..0x503400, 0x773270 at 0x773383..0x77339c, 0x530650 at 0x5307a4..0x5307d3), both twins"
     - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
     - "C-124: an attack order to a plot out of sight loses its attack flag — READ (0x962310), both twins"
+    - "C-125 / C-95: the target list's trade layer and its one unit of the units' layer; a siege unit's step onto civilians; the city-states' Attack Civilians; the flankers' test, the support's caller, the camp strike's queue — READ (0x783980 at 0x7849bb..0x784c2b and 0x784c30..0x784f57, 0x26fe20 -> 0x212500, 0x521530, 0x51f070 at 0x51f70e..0x51f737, 0x546f0, 0x52f50), both twins"
   context:
     - "...her unit goes in; the sort 0x76f210 is on +8, -1 for all — stable), go for it in order (0x773270): each that can act (0x56c690) takes the move order onto it (0x962190, flag 0x10), a..."
   review: reviewed
@@ -729,6 +731,7 @@
     - "C-99: the attack assignment's ties go to the earlier striker — READ (0x776140 -> 0x8b5bf0 -> 0x629480 -> 0x616570 -> 0x61ddb0 at 0x61de20..0x61de39, 0x775340 -> 0x76f210 -> 0x76f5c0 -> 0x76efc0 at 0x76f000..0x76f00f), no port"
     - "C-125: the planning's blow back where both blows would kill — READ, ported"
     - "C-125 / C-95: flanking and support count about the defender unit's own plot, no river edge read; MEDIUM by the plot's layer-0 list; a killed target's record; the camp strike's orders — READ (0x521530, 0x51c810 at 0x51cc1c..0x51cc56, 0x5228c0, 0x786d50, 0x776140 at 0x776333, 0x8e9d0, 0x772940 at 0x772d2f..0x772f78), FIT (the camp strike's path), both twins"
+    - "C-125 / C-95: the target list's trade layer and its one unit of the units' layer; a siege unit's step onto civilians; the city-states' Attack Civilians; the flankers' test, the support's caller, the camp strike's queue — READ (0x783980 at 0x7849bb..0x784c2b and 0x784c30..0x784f57, 0x26fe20 -> 0x212500, 0x521530, 0x51f070 at 0x51f70e..0x51f737, 0x546f0, 0x52f50), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "- THE ASSIGNMENT (0x776140): a target's health floor(100 x 281 / 256) less its damage (1.1 in 24.8); for MEDIUM /..."
@@ -832,6 +835,7 @@
     - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
     - "C-95: the embark rules for a formation that may embark, a district's zone unseen, a city's kill in the planning, a raised unit's AI type, a move order's attack spot — READ (0x530420, 0x530240, 0x52fe90 at 0x52fed4, 0x530f50 at 0x531168, 0x791470 at 0x791677, 0x79b9c0), FIT (the move order's attack spot), both twins"
     - "C-95: the camp defender's strike, a captured civilian's dead target, a lone DEFENDER out of Pillage — READ (0x772940, 0x779010, 0x774e90, 0x779240 at 0x7792be..0x7792da, 0x775340 at 0x77551e..0x775534, 0x791470 at 0x79174a..0x791756), both twins"
+    - "C-125 / C-95: the target list's trade layer and its one unit of the units' layer; a siege unit's step onto civilians; the city-states' Attack Civilians; the flankers' test, the support's caller, the camp strike's queue — READ (0x783980 at 0x7849bb..0x784c2b and 0x784c30..0x784f57, 0x26fe20 -> 0x212500, 0x521530, 0x51f070 at 0x51f70e..0x51f737, 0x546f0, 0x52f50), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ...dium/Low (0x7784b0 with TARGET_HIGH/MEDIUM/LOW_PRIORITY_UNIT), f2e10c Attack Civilians (0x779240), f2e120 Defend Camps (0x779010), f2e124 Attack Camps (0x778910), f2e130 Chase Target (...
@@ -1088,6 +1092,7 @@
     - cpu/core/tactical.ts:keptOut
     - gpu/core/sim_tactics.py:live
     - cpu/core/units.ts:fortifyOrder
+    - gpu/core/sim_tactics.py:reach_at
   readings:
     - "C-99: Wander Near City ends its unit's moves; a unit whose moves an order ended runs its order no more — READ (0x77bf50 at 0x77c62a, 0x56d6f0, 0x52f50 at 0x530fd..0x53113), both twins"
     - "C-96: the city-states' tactical pass — READ (Wander Near City, Heal, the non-barbarian priorities, FindAlternateLocation), the families it needs PARTLY READ"

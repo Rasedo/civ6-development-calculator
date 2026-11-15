@@ -190,6 +190,7 @@
     - gpu/core/sim_tactics.py:_tac_rampage
     - gpu/core/sim_tactics.py:first_in_reach
     - cpu/core/tactical.ts:coastalRaids
+    - gpu/core/sim_tactics.py:reach_at
   readings:
     - "C-99: Wander Near City ends its unit's moves; a unit whose moves an order ended runs its order no more — READ (0x77bf50 at 0x77c62a, 0x56d6f0, 0x52f50 at 0x530fd..0x53113), both twins"
     - "C-99: the assignment's Movement and the swap's walk — READ (0x776140 at 0x776643 / 0x7768e4, 0x56d6f0, 0x972a50 -> 0x26fe20 under flag 4, 0x2720a0 at 0x27229b), both twins"

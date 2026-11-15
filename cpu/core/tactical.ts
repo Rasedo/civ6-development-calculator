@@ -20,7 +20,7 @@ import { AI_FEATURES, AI_UNITS } from '../data/aiBuildTables';
 import { AI_UNIT_AI } from '../data/aiOperations';
 import { engineId, gameTypeOf, installFeature } from '../data/aliases';
 import {
-  arrive, canEmbark, cityAtIndex, crossesRiver, embarkTechMoves, escortUnit, inEscort, cliffBlocksStep, shoreCrossing, districtZones, encampmentBlocks, inEnemyZoc, rosterEmbarkMoves, stepCost, stepUnit, terrainMp, unitDomain, unitExertsZoc, unitFullMoves, unitIsNoncombat, mapLayer, unitReligious,
+  arrive, canEmbark, cityAtIndex, crossesRiver, embarkTechMoves, escortUnit, inEscort, cliffBlocksStep, shoreCrossing, districtZones, encampmentBlocks, inEnemyZoc, rosterEmbarkMoves, stepCost, stepUnit, terrainMp, unitDomain, unitExertsZoc, unitFullMoves, mapLayer, unitReligious,
   setBarbStepLook, unitsHostile, unitVisibleTo, fortifyOrder, operationStart, skipTurn,
   waterEnterable, waterWalks, borderClosedTo, formationBanned, formationCS, setRecordFormation, formationMates, dropLoneRiders, escortOf, escortRiders, disbandUnit,
 } from './units';
@@ -1273,7 +1273,7 @@ function orderRun(state: GameState, unit: Unit, dest: number, strike: boolean,
   // a plot of civilians alone the order's strike takes this turn: the walk
   // passes the plot beside it (`walk`'s `onto`)
   const capture = into && strike && nodes[nodes.length - 1].turns === 1 && attacksLeftOf(unit) > 0 && !unit.embarked
-    && (UNITS[unit.type]?.combat ?? 0) > 0 && !((UNITS[unit.type]?.bombard ?? 0) > 0) && civiliansAlone(state, unit, last);
+    && (UNITS[unit.type]?.combat ?? 0) > 0 && civiliansAlone(state, unit, last);
   const refused = walk(state, unit, path, dest, mates, capture ? last : -1, kept);
   if (zocMoved && unit.tileIndex !== from) {
     // the zone test on the plot it stands on, no destination (0x270800:
@@ -1641,9 +1641,11 @@ function rangedStrength(u: Unit): number {
  *    Center or an Encampment as COMBAT_DISTRICT (and nothing else of the
  *    plot), a complete unpillaged other district as PASSIVE_DISTRICT;
  *  - its defending unit of a player at war (0x208b80) as LOW;
- *  - else the first of: a barbarian camp, a goody hut, a Trader at war, its
- *    one civilian at war (CIVILIAN), its religious unit at war (RELIGIOUS), an
- *    unpillaged improvement of a player at war (IMPROVEMENT);
+ *  - else the first of: a barbarian camp, a goody hut, a unit of its trade
+ *    layer (a Trader at war a TRADER), the one unit of its units' layer where
+ *    another player's (a civilian at war a CIVILIAN, a support unit at war a
+ *    LOW), its religious unit at war (RELIGIOUS), an unpillaged improvement
+ *    of a player at war (IMPROVEMENT);
  * and each one only `revealed` its camp, goody hut, improvement or districts.
  * Then a LOW unit stacked with a unit that cannot fight is MEDIUM (0x786d50),
  * and the player's prioritization (TacticalAI +0xa8) runs: the barbarians'
@@ -1831,25 +1833,45 @@ export function tacticalTargets(state: GameState, seat: number, seen: ArrayLike<
       out.push({ type: 'GOODY', tile: t.index, seat: NO_SEAT, unit: null });
       continue;
     }
-    // a Trader of a player at war walking a route (0x58fc40), not immune to
-    // plunder on the plot's ground (0x58fc20 at 0x784b2f: `traderImmune`;
-    // runs/h1_duelq1117 t107-109: the barbarian Man-At-Arms 3932182 beside
-    // player 1's Trader 1310732 on 33:13 / 34:13 takes no Plunder Trader)
-    const traders = here.filter((u) => UNITS[u.type]?.trader && u.seat !== seat && !!u.routed && unitsHostile(state, me, u)
-      && !traderImmune(state, u.seat, t.index));
+    // a unit on the plot's trade layer ends the plot's chain (0x7849bb..
+    // 0x784c2b: the layer's list not empty, then the plot's tail whatever it
+    // added; runs/h1_duelq1124 t138 the barbarians' captive Builder 5111833
+    // on city-state 4's Trader's plot is no CIVILIAN of city-state 3's, its
+    // Cuirassiers wandering as logged), each Trader of a player at war
+    // walking a route (0x58fc40), not immune to plunder on the plot's ground
+    // (0x58fc20 at 0x784b2f: `traderImmune`; runs/h1_duelq1117 t107-109: the
+    // barbarian Man-At-Arms 3932182 beside player 1's Trader 1310732 on
+    // 33:13 / 34:13 takes no Plunder Trader), an entry
+    const traders = here.filter((u) => UNITS[u.type]?.trader);
     if (traders.length) {
-      for (const u of traders) out.push({ type: 'TRADER', tile: t.index, seat: u.seat, unit: u });
+      for (const u of traders) {
+        if (u.seat !== seat && !!u.routed && unitsHostile(state, me, u) && !traderImmune(state, u.seat, t.index)) {
+          out.push({ type: 'TRADER', tile: t.index, seat: u.seat, unit: u });
+        }
+      }
       continue;
     }
-    const civs = here.filter((u) => unitIsNoncombat(u.type) && !UNITS[u.type]?.trader && !unitReligious(u.type));
-    // the plot's one civilian of another player ends its chain (a
-    // NEUTRAL_CIVILIAN, no entry); the player's own goes on to the religious
-    // unit and the improvement (0x784c4b..0x784c5f, the layer's one unit's
-    // owner against the player: runs/h1_duelp1121 t127 the barbarians'
-    // Man-At-Arms 2949124 pillages the Mine on 8:12 under their own Builder
-    // 3604504)
-    if (civs.length === 1 && civs[0].seat !== seat) {
-      if (unitsHostile(state, me, civs[0])) out.push({ type: 'CIVILIAN', tile: t.index, seat: civs[0].seat, unit: civs[0] });
+    // the units' map layer holding exactly one unit, another player's, ends
+    // the plot's chain (0x784c30..0x784c5f: the layer's list of one, its
+    // owner against the player): of the civilian formation class a CIVILIAN
+    // at war (a NEUTRAL_CIVILIAN, no entry, at peace), of the support class
+    // a LOW at war (0x784e34..0x784e6d), of any other none. A layer of more
+    // units, or the player's own one, goes on to the religious unit and the
+    // improvement (runs/h1_duelp1121 t127 the barbarians' Man-At-Arms 2949124
+    // pillages the Mine on 8:12 under their own Builder 3604504;
+    // runs/h1_duelq1117 t87 player 1's Great Admiral made on its Harbor
+    // 31:12 under the barbarian Galley 2228229 is no target, the Galleys
+    // moving to safety and wandering as logged; runs/h1_duelq1128 t220 /
+    // t221 player 1's Observation Balloon 5046292 alone on 42:22,
+    // TARGET_LOW_PRIORITY_UNIT in the Cavalry 7012372's Attack Units rows)
+    const layer = here.filter((u) => mapLayer(u.type) === 'units');
+    if (layer.length === 1 && layer[0].seat !== seat) {
+      const u = layer[0];
+      const cls = unitDomain(u.type);
+      if (unitsHostile(state, me, u) && unitVisibleTo(state, u, seat)) {
+        if (cls === 'civilian') out.push({ type: 'CIVILIAN', tile: t.index, seat: u.seat, unit: u });
+        else if (cls === 'support') out.push({ type: 'LOW', tile: t.index, seat: u.seat, unit: u });
+      }
       continue;
     }
     const rel = here.filter((u) => unitReligious(u.type));
@@ -4284,9 +4306,9 @@ export function seatPoolSlots(state: GameState, s: Seat): UnitPool | undefined {
  * the tactical list's units (`tacticalUnit`) the moves in the
  * list's order, each walking the units the moves before it left, in pool
  * order — Support Formation, Attack High Priority, Move to Safety, Attack
- * Medium Priority, Promotion, Make Military Formation, Attack Low Priority,
- * Heal, Chase Target (no strike), Wander Near City (Attack Civilians not
- * ported); the homeland's Move to Safety over every unit, then its End
+ * Medium Priority, Attack Civilians, Promotion, Make Military Formation,
+ * Attack Low Priority, Heal, Chase Target (no strike), Wander Near City;
+ * the homeland's Move to Safety over every unit, then its End
  * Turn takes the rest (its Promotion finds no unit the tactical one left
  * due).
  */
@@ -4323,6 +4345,7 @@ export function cityStateTactics(state: GameState, cityState: CityState, operati
       attackUnits(state, pass, 'HIGH');
       moveToSafety(state, pass);
       attackUnits(state, pass, 'MEDIUM');
+      attackCivilians(state, pass);
       promotion(state, pass);
       makeMilitaryFormation(state, pass);
       attackUnits(state, pass, 'LOW');

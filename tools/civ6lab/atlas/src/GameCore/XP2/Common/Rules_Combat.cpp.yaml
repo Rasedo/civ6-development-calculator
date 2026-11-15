@@ -177,9 +177,12 @@
   review: reviewed
 - addr: 0x51f070
   kind: function
-  semantics: "the defender's strength composer: 0x521ed0 for the combat type 0x5e2f7468, 0x5228c0 for every other; its modifier walk reads the unit abilities (ABILITY_SPEAR_OF_FIONN's +5)."
+  semantics: "the defender's strength composer: 0x521ed0 for the combat type 0x5e2f7468, 0x5228c0 for every other; its modifier walk reads the unit abilities (ABILITY_SPEAR_OF_FIONN's +5). At 0x51f603..0x51f737 the terrain term 0x522c10, the fortification 0x521830 and the support are added one after the other with no test of the defender's plot: no district is asked before 0x5228c0."
   status: READ
   cases:
+    - recording: h1_duelq1128
+      turn: 30
+      value: the barbarian Warrior 2031630's blow back about its own plot 14:15 (three of its own beside it) keeps its spot 14:13 under the exchange filter, Move 14 13 as logged
     - recording: 1117
       turn: 23
       value: "- Flanking (0x521530) and Support (0x521ed0, 0x5228c0) are gated on the   player's m_bMilitaryCombatAdjacency (+0x1268), which only   EFFECT_GRANT_COMBAT_ADJACENCY sets (CIVIC_GRANT_COMBAT_ADJACENCY_B"
@@ -197,6 +200,7 @@
     - "C-98: the unit efficiencies — READ (0x79a440, its simulated combats 0x205720 off the map), ported: every entry the logged table's"
     - "C-99 / C-95: a melee blow's river is the defender plot's edge on the attacker's side at any distance; a levied unit home reveals its sight — READ (0x522c10 at 0x522f1d..0x52301b, 0x51f070 at 0x51f603..0x51f639), both twins"
     - "C-125 / C-95: flanking and support count about the defender unit's own plot, no river edge read; MEDIUM by the plot's layer-0 list; a killed target's record; the camp strike's orders — READ (0x521530, 0x51c810 at 0x51cc1c..0x51cc56, 0x5228c0, 0x786d50, 0x776140 at 0x776333, 0x8e9d0, 0x772940 at 0x772d2f..0x772f78), FIT (the camp strike's path), both twins"
+    - "C-125 / C-95: the target list's trade layer and its one unit of the units' layer; a siege unit's step onto civilians; the city-states' Attack Civilians; the flankers' test, the support's caller, the camp strike's queue — READ (0x783980 at 0x7849bb..0x784c2b and 0x784c30..0x784f57, 0x26fe20 -> 0x212500, 0x521530, 0x51f070 at 0x51f70e..0x51f737, 0x546f0, 0x52f50), both twins"
   context:
     - "...pportLive` / `_flank_support_live` read each player's civics. The defender's composer 0x51f070 calls 0x521ed0 for the combat type 0x5e2f7468 and 0x5228c0 for every other; 0x5228c0 ad..."
     - ...JUST_COMBAT_STRENGTH, the barbarian traits, the difficulty rows), no term of 0x51c810 / 0x51f070 read here, and the dumps' promotions are empty.
@@ -224,9 +228,12 @@
 - addr: 0x521530
   final: 0x36c2a0
   kind: function
-  semantics: "Flanking (COMBAT_MELEE, an attacker whose +0x650 is not 1), gated on the player's m_bMilitaryCombatAdjacency (+0x1268, set only by EFFECT_GRANT_COMBAT_ADJACENCY: every player's own, city-states' and barbarians' included): r9 the defender unit's own plot (0x90290, from 0x51c810 at 0x51cc1c), its six neighbours on every layer, each unit of the attacker's owner but the attacker, passing 0x209dd0, +0x650 not 1, not embarked; GlobalParameters +0x1b0 x the count, scaled by the attacker's +0x184c percent. No river edge is read."
+  semantics: "Flanking (COMBAT_MELEE, an attacker whose +0x650 is not 1), gated on the player's m_bMilitaryCombatAdjacency (+0x1268, set only by EFFECT_GRANT_COMBAT_ADJACENCY: every player's own, city-states' and barbarians' included): r9 the defender unit's own plot (0x90290, from 0x51c810 at 0x51cc1c), its six neighbours on every layer, each unit of the attacker's owner but the attacker, passing 0x209dd0, +0x650 not 1, not embarked; GlobalParameters +0x1b0 x the count, scaled by the attacker's +0x184c percent. No river edge is read. Unit +0x650 is the domain (sea 0, air 1, land 2): an air attacker takes none and an air unit gives none; 0x209dd0 a Combat, Ranged or Bombard strength above 0 — the engines' flanker (unitDomain military, not embarked) on every unit type of the rules."
   status: READ
   cases:
+    - recording: h1_duelq1128
+      turn: 33
+      value: "the rules' 124 unit types: the engines' flanker set equals 0x209dd0 with the domain not air on every one (the barbarian Warrior 2490396's +0 on 15:13 as before)"
     - recording: h1_duelq1128
       turn: 33
       value: "CombatLog: the barbarian Warrior 2490396 (80 health) on 15:12 strikes player 1's Scout on 15:13 at AttackerStrMod 0, its Warrior 1245202 on 15:14 across the river"
@@ -251,9 +258,20 @@
   readings:
     - "H-1: the melee result, a ranged blow's domain, a city's shot — READ"
     - "C-125 / C-95: flanking and support count about the defender unit's own plot, no river edge read; MEDIUM by the plot's layer-0 list; a killed target's record; the camp strike's orders — READ (0x521530, 0x51c810 at 0x51cc1c..0x51cc56, 0x5228c0, 0x786d50, 0x776140 at 0x776333, 0x8e9d0, 0x772940 at 0x772d2f..0x772f78), FIT (the camp strike's path), both twins"
+    - "C-125 / C-95: the target list's trade layer and its one unit of the units' layer; a siege unit's step onto civilians; the city-states' Attack Civilians; the flankers' test, the support's caller, the camp strike's queue — READ (0x783980 at 0x7849bb..0x784c2b and 0x784c30..0x784f57, 0x26fe20 -> 0x212500, 0x521530, 0x51f070 at 0x51f70e..0x51f737, 0x546f0, 0x52f50), both twins"
   context:
     - "- Flanking (0x521530) and Support (0x521ed0, 0x5228c0) are gated on the player's m_bMilitaryCombatAdjacency..."
   review: reviewed
+- addr: 0x521830
+  final: 0x36c590
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-125 / C-95: the target list's trade layer and its one unit of the units' layer; a siege unit's step onto civilians; the city-states' Attack Civilians; the flankers' test, the support's caller, the camp strike's queue — READ (0x783980 at 0x7849bb..0x784c2b and 0x784c30..0x784f57, 0x26fe20 -> 0x212500, 0x521530, 0x51f070 at 0x51f70e..0x51f737, 0x546f0, 0x52f50), both twins"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...S CALLER (0x51f070 at 0x51f70e..0x51f737): the terrain term 0x522c10, the fortification 0x521830 and the support (0x521ed0 for the combat type 0x5e2f7468, 0x5228c0 for every other) are..."
+  review: imported
 - addr: 0x5218f0
   final: 0x36c650
   kind: function

@@ -2075,9 +2075,6 @@ function meleeAttackInner(state: GameState, attackerId: number, targetIndex: num
   if (!attacker) return no('No such unit.');
   const def = UNITS[attacker.type];
   if (!def || def.combat <= 0) return no('Civilians cannot attack.');
-  // CIV6: a siege unit's only attack is the bombard one — its Combat Strength
-  // is what it defends with.
-  if (def.bombard !== undefined) return no('Siege units attack at range.');
   if (attacker.movesLeft <= 0) return no('No movement left.');
   if (attacksLeftOf(attacker) <= 0) return no('The attack is spent.');
   const from = state.map.tiles[attacker.tileIndex];
@@ -2133,6 +2130,16 @@ function meleeAttackInner(state: GameState, attackerId: number, targetIndex: num
       return no(`You are at peace with ${civCityHere.holder.name} — declare war first.`);
     }
     return no('Nothing to attack there.');
+  }
+  // CIV6: a siege unit's only attack is the bombard one — its Combat Strength
+  // is what it defends with. A plot no fighter and no district holds it
+  // moves onto as any unit does, the step taking the civilians there
+  // (0x26fe20 -> 0x212500: runs/h1_duelq1121 t143 the barbarian Bombard
+  // 3997700 walks 16:14 -> 15:13 -> 16:12 and captures player 1's Builder
+  // 2031620, UnitMoved then UnitCaptured in the record)
+  if (def.bombard !== undefined && (encamp || seatTarget || cityStateTarget
+    || (enemies.length > 0 && (UNITS[stackDefender(state, enemies, false).type]?.combat ?? 0) > 0))) {
+    return no('Siege units attack at range.');
   }
   if (encamp && !seatTarget && !cityStateTarget) {
     attackEncampment(state, attacker, targetIndex, encamp.defCS);

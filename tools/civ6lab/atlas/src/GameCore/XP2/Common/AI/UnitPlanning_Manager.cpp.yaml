@@ -199,6 +199,7 @@
     - "C-95: the camp defender's strike, a captured civilian's dead target, a lone DEFENDER out of Pillage — READ (0x772940, 0x779010, 0x774e90, 0x779240 at 0x7792be..0x7792da, 0x775340 at 0x77551e..0x775534, 0x791470 at 0x79174a..0x791756), both twins"
     - "C-99 / C-95: a melee blow's river is the defender plot's edge on the attacker's side at any distance; a levied unit home reveals its sight — READ (0x522c10 at 0x522f1d..0x52301b, 0x51f070 at 0x51f603..0x51f639), both twins"
     - "C-125 / C-95: flanking and support count about the defender unit's own plot, no river edge read; MEDIUM by the plot's layer-0 list; a killed target's record; the camp strike's orders — READ (0x521530, 0x51c810 at 0x51cc1c..0x51cc56, 0x5228c0, 0x786d50, 0x776140 at 0x776333, 0x8e9d0, 0x772940 at 0x772d2f..0x772f78), FIT (the camp strike's path), both twins"
+    - "C-125 / C-95: the target list's trade layer and its one unit of the units' layer; a siege unit's step onto civilians; the city-states' Attack Civilians; the flankers' test, the support's caller, the camp strike's queue — READ (0x783980 at 0x7849bb..0x784c2b and 0x784c30..0x784f57, 0x26fe20 -> 0x212500, 0x521530, 0x51f070 at 0x51f70e..0x51f737, 0x546f0, 0x52f50), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...each unit's spots per target from its planning (turns, the planning's combat simulation 0x791470: the damage dealt +0x64, received +0x7c, and against a counterattack +0x94 / +0xac); fo..."

@@ -164,6 +164,7 @@
     - "C-96: the knowledge base's army records and the Combat Desire — READ (the records, the update, the desire), PARTLY READ (the signals' looks; the standing-army count in its own section below)"
     - "C-95: the target list's knowledge-base entries — READ, ported (two records on one plot below)"
     - "C-95: the target list's knowledge-base entries"
+    - "C-125 / C-95: the target list's trade layer and its one unit of the units' layer; a siege unit's step onto civilians; the city-states' Attack Civilians; the flankers' test, the support's caller, the camp strike's queue — READ (0x783980 at 0x7849bb..0x784c2b and 0x784c30..0x784f57, 0x26fe20 -> 0x212500, 0x521530, 0x51f070 at 0x51f70e..0x51f737, 0x546f0, 0x52f50), both twins"
   context:
     - "...0 — a city -> the known cities (0x5f0280), a district -> 0x5f0490 — each unit on it (0x75ce0's list), one hidden (+0x15f0, not +0x1650) only where 0x5033a0 lets the player see it,..."
   review: reviewed

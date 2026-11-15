@@ -473,6 +473,7 @@
     - cpu/core/tactical.ts:spent
     - cpu/core/tactical.ts:through
     - cpu/core/tactical.ts:orderRun
+    - cpu/core/combat.ts:meleeAttackInner
   readings:
     - "C-95 / C-123: a move order's step costs by the formation's fighter flag; an operation that ends in its tick lets its units go — READ (0x26fe20 at 0x27021b, 0x270980, 0x270be0, 0x267650 at 0x2677fa), FIT (the release), both twins"
     - "C-99: a move order carried on as the turn ends, the zone-of-control wait, the embark rule's TO plot — READ (0x962380, 0x52f50, 0x26fe20, 0x2675e0, 0x2673f0, 0x530420, 0x267650), both twins"
@@ -496,6 +497,7 @@
     - "C-99: every pool search sets out on its own formation's value, a queue run walks its first search's path — READ (0x2715a0 at 0x271909..0x271910, 0x77d10 at 0x77d8b..0x77db0 / 0x77f0b / 0x78007 / 0x7805d, 0x52f50 at 0x52f9e / 0x52fce / 0x53394, 0x265fd0, 0x272aa0 at 0x272ad7..0x272c24, 0x26e3a0), the engines' model"
     - "C-95: the reach searches open turn-end nodes, and the zone of control's domain is the formation's — READ (0x271920 from 0x26dab0, 0x26f980 -> 0x530f50, 0x267650), both twins"
     - "C-95 / C-123: a zone of control out of sight is none in a path's cost; Attack Civilians past a withdrawn civilian; the capture step through a plot of its own; a withdrawal's plot — READ (0x5033a0 at 0x5033f9..0x503400, 0x773270 at 0x773383..0x77339c, 0x530650 at 0x5307a4..0x5307d3), both twins"
+    - "C-125 / C-95: the target list's trade layer and its one unit of the units' layer; a siege unit's step onto civilians; the city-states' Attack Civilians; the flankers' test, the support's caller, the camp strike's queue — READ (0x783980 at 0x7849bb..0x784c2b and 0x784c30..0x784f57, 0x26fe20 -> 0x212500, 0x521530, 0x51f070 at 0x51f70e..0x51f737, 0x546f0, 0x52f50), both twins"
   context:
     - "- A unit's move onto a plot holding a religious unit it kills (0x26fe20 → 0x493f80 with the capture flag 1) swings religion: RELIGION_SPREAD_ UNIT_CAPTURE (g..."
     - "- The move 0x26fe20 walks the destination plot's units from the last to the first; for each one not dead (+..."

@@ -15138,3 +15138,90 @@ refusal (cpu/core/tactical.ts); GPU `_tac_with_short`, the entry's key at
   first path's own next node 28:15, where it holds with 1 Movement beside
   the barbarian Galley on 29:16; the engines search the order's plot from
   28:14 and take 27:15 / 28:16.
+
+## C-125 / C-95: the target list's trade layer and its one unit of the units' layer; a siege unit's step onto civilians; the city-states' Attack Civilians; the flankers' test, the support's caller, the camp strike's queue — READ (0x783980 at 0x7849bb..0x784c2b and 0x784c30..0x784f57, 0x26fe20 -> 0x212500, 0x521530, 0x51f070 at 0x51f70e..0x51f737, 0x546f0, 0x52f50), both twins
+
+`tacticalTargets`, `cityStateTactics`, `orderOnce` (cpu/core/tactical.ts);
+`meleeAttackInner` (cpu/core/combat.ts); `_tac_targets`,
+`_tac_attack_civilians`, `_minor_pass`, `_tac_move_to`
+(gpu/core/sim_tactics.py).
+
+- THE TARGET LIST'S UNIT CHAIN (0x783980, a plot the player sees, after its
+  districts, its defender 0x208b80, its camp and its goody hut), three unit
+  lists of the plot by map layer (0x75ce0 with the layers the function holds
+  at +0x68, +0x70, +0x78, which the entries they give name the trade, the
+  units' and the religious layer):
+  - THE TRADE LAYER (0x7849bb..0x784c2b): a list that is not empty ends the
+    plot's chain (0x784c2b jumps to the plot's tail whatever the loop
+    added); each unit of another player, of the civilian formation class
+    (0x8bcd0 == 2), holding a route (0x58fc40), of a player at war
+    (0x3dcec0), not immune (0x58fc20), is a TARGET_TRADER entry.
+  - THE UNITS' LAYER (0x784c30..0x784f57), where the trade layer is empty:
+    a list of EXACTLY ONE unit whose owner is not the player (0x784c4b..
+    0x784c5f) ends the chain; that unit, alive (+0x770), not flagged
+    (Units +0x1ba bit 1), seen where hidden (+0x15f0, 0x5033a0), is by its
+    formation class (0x8bcd0): 2, civilian — TARGET_CIVILIAN_UNIT at war,
+    TARGET_NEUTRAL_CIVILIAN_UNIT at peace (0x784d79..0x784d9f); 1, support —
+    TARGET_LOW_PRIORITY_UNIT at war (0x784e34..0x784e6d); any other class
+    no entry. A list of any other count, or the player's own one unit, goes
+    on to the religious layer (0x784f5c) and the improvement.
+  - So a civilian sharing its plot with any unit of the units' layer — the
+    player's own fighter among them — is no target of the walk, a support
+    unit alone is a LOW one (MEDIUM never: 0x786d50 asks a list of more than
+    one; HIGH by the prioritization), and a plot under any Trader gives
+    neither. The knowledge base's entries (0x7856f6..0x785853) keep their
+    own rule: LOW by the type's Combat, else CIVILIAN.
+- A SIEGE UNIT'S STEP ONTO CIVILIANS: the capture is the walk's own step
+  (0x26fe20 -> 0x212500), any unit with a Combat strength taking the
+  civilians of a plot no fighter and no district holds; `meleeAttackInner`
+  refuses a siege unit only where a district or a fighter defends.
+- THE CITY-STATES' ATTACK CIVILIANS: Tactics.xml's "Minor Civ Tactical"
+  holds Attack Civilians between Attack Medium Priority and Promotion; the
+  move is the barbarians' (0x779240 -> 0x773270).
+- THE FLANKERS' TEST (0x521530): Unit +0x650 is the domain (sea 0, air 1,
+  land 2): an air attacker takes no flanking and an air unit gives none;
+  0x209dd0 is a Combat, Ranged or Bombard strength above 0. The engines'
+  flanker — `unitDomain` 'military', not embarked — is that set on every
+  unit type of the rules (124 of 124). 0x5228c0 asks the strengths alone,
+  no domain: an aircraft beside the defender supports in the game, not in
+  the engines.
+- THE SUPPORT'S CALLER (0x51f070 at 0x51f70e..0x51f737): the terrain term
+  0x522c10, the fortification 0x521830 and the support (0x521ed0 for the
+  combat type 0x5e2f7468, 0x5228c0 for every other) are added one after the
+  other with no test of the defender's plot between them; 0x5228c0 reads
+  the player's flag, the combat type and the neighbours' units. No district
+  is asked: the engines' `defensibleDistrict` test lives only where a unit
+  is the melee defender on a district that defends, which the engines'
+  blows never make (the district answers first) and the planning's blow
+  back on a unit set on its own centre does.
+- THE CAMP STRIKE'S QUEUE (0x772940's two pushes through the manager's vt
+  +0x60, 0x546f0): the operation is appended at the back of the unit's
+  queue (+0x2040: the list +0xd0, its count +0xe0, under 10) and started at
+  once only where it is the queue's one entry; 0x52f50 runs the queue's
+  front alone and leaves it there with UnitOperationSegmentComplete where
+  it neither completes nor may go on. So the shot or the attack move pushed
+  behind a move to the spot that waits does not run that turn, as the
+  engines hold it.
+- Confirmed (aimem, one-seed traces): runs/h1_duelq1117 t87 player 1's Great
+  Admiral 2424839 made on its Harbor 31:12 under the barbarian Galley
+  2228229 (UnitAddedToMap before the Galley's UnitMoved): no Attack Civilian
+  row, the Galley 2228229 Move to safety to 27:12 and 1835026 Wander to
+  26:15, as logged. runs/h1_duelq1128 t220 / t221 player 1's Observation
+  Balloon 5046292 alone on 42:22: "Attack Units, TARGET_LOW_PRIORITY_UNIT,
+  UNIT_OBSERVATION_BALLOON" of the Cavalry 7012372, Move 41 21, as logged
+  (player 0's rows t206 / t207 hold it TARGET_CIVILIAN_UNIT out of sight,
+  LOW in sight). runs/h1_duelq1124 t138 the barbarians' captive Builder
+  5111833 on 37:9 under city-state 4's Trader 655362: city-state 3's
+  Cuirassiers 1769478 / 1835008 Wander, no Attack Civilian. runs/
+  h1_duelq1121 t143 the barbarian Bombard 3997700, the first of Attack
+  Civilian's four units, walks 16:14 -> 15:13 -> 16:12 and captures player
+  1's Builder 2031620 (UnitMoved, UnitCaptured), the Man-At-Arms 3080206
+  Wandering to 15:13, as logged.
+- OPEN: runs/h1_duelq1124 t91 city-state 2's embarked Man-At-Arms 1310723
+  takes the Builder its knowledge base holds on 8:7 under Attack Civilian
+  with no step, the Archer beside it unclaimed under Attack Medium Priority
+  (the engines claim 9:8 at turn 2 and move); whether the queued camp
+  strike runs once its move completes on a later turn; the simulation's
+  defender on a district (0x791470's swapped combat on a unit's own centre);
+  the religious pair 0x521be0 / 0x521ed0 unread (`theoFlankCount` keeps its
+  river test); a dead target's damage as 0x776409 reads it.
