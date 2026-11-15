@@ -192,6 +192,7 @@
   readings:
     - "H-1: the melee result, a ranged blow's domain, a city's shot — READ"
     - "C-98: the unit efficiencies — READ (0x79a440, its simulated combats 0x205720 off the map), ported: every entry the logged table's"
+    - "C-99 / C-95: a melee blow's river is the defender plot's edge on the attacker's side at any distance; a levied unit home reveals its sight — READ (0x522c10 at 0x522f1d..0x52301b, 0x51f070 at 0x51f603..0x51f639), both twins"
   context:
     - "...pportLive` / `_flank_support_live` read each player's civics. The defender's composer 0x51f070 calls 0x521ed0 for the combat type 0x5e2f7468 and 0x5228c0 for every other; 0x5228c0 ad..."
     - ...JUST_COMBAT_STRENGTH, the barbarian traits, the difficulty rows), no term of 0x51c810 / 0x51f070 read here, and the dumps' promotions are empty.

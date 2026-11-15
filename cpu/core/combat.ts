@@ -30,7 +30,7 @@ import { grievanceCityStateTaken } from './grievance';
 import { goldenDedication, worldEraIndex } from './eras';
 import { captureAnew, drawAndPayGoody, forgetPlayer, raiseBestTrained, recordAttacker, mapLayer, unitReligious, unitStackSlot } from './units';
 import { randRange } from './rand';
-import { arrive, bestDefender, formationCS, escortRiders, unitsAt, unitDomain, tileFreeForUnit, disbandUnit, unitsHostile, fortifyBonus, cityAtIndex, encampmentBlocks, encampmentIntact, crossesRiver, cliffBlocks, stepUnit, stepRefusal, unitVisibleTo, unitExertsZoc, formationTierFor } from './units';
+import { arrive, bestDefender, formationCS, escortRiders, unitsAt, unitDomain, tileFreeForUnit, disbandUnit, unitsHostile, fortifyBonus, cityAtIndex, encampmentBlocks, encampmentIntact, crossesRiver, meleeCrossesRiver, cliffBlocks, stepUnit, stepRefusal, unitVisibleTo, unitExertsZoc, formationTierFor } from './units';
 import { isAirUnit, airRange, airCoverAgainst, airPillageFit, airPillageOffers, airStrikeReaches, airStrikeOffers, airDefenseOf, antiAirAt, displaceAirFrom, interceptorAgainst, priorityDefender, PRIORITY_TARGET_DAMAGE } from './air';
 import { outerPool, wallsMax, wallsTier, encampOuterPool } from './rules';
 import { fuelShortCS } from './stockpile';
@@ -1574,7 +1574,7 @@ export function assaultAtkCS(state: GameState, attacker: Unit, targetIndex: numb
   return (
     (UNITS[attacker.type]?.combat ?? 0) + formationCS(attacker) + convoyCS(state, attacker) - fuelShortCS(state, attacker) + chassisAttackCS(attacker) -
     woundPenalty(attacker) -
-    (!amph && crossesRiver(state.map, state.map.tiles[attacker.tileIndex], state.map.tiles[targetIndex])
+    (!amph && meleeCrossesRiver(state.map, state.map.tiles[targetIndex], state.map.tiles[attacker.tileIndex])
       ? RIVER_ATTACK_PENALTY
       : 0) -
     (attacker.embarked && !amph ? AMPHIBIOUS_ATTACK_CS : 0) +
@@ -2024,7 +2024,7 @@ export function meleeUnitStrengths(state: GameState, attacker: Unit, targetIndex
   const from = state.map.tiles[attacker.tileIndex];
   const target = state.map.tiles[targetIndex];
   const amph = promoFlag(attacker, 'AMPHIBIOUS');
-  const atk = (UNITS[attacker.type]?.combat ?? 0) + formationCS(attacker) + convoyCS(state, attacker) - fuelShortCS(state, attacker) + chassisAttackCS(attacker) - woundPenalty(attacker) - (!amph && crossesRiver(state.map, from, target) ? RIVER_ATTACK_PENALTY : 0)
+  const atk = (UNITS[attacker.type]?.combat ?? 0) + formationCS(attacker) + convoyCS(state, attacker) - fuelShortCS(state, attacker) + chassisAttackCS(attacker) - woundPenalty(attacker) - (!amph && meleeCrossesRiver(state.map, target, from) ? RIVER_ATTACK_PENALTY : 0)
     - (attacker.embarked && !amph ? AMPHIBIOUS_ATTACK_CS : 0)
     + FLANKING_CS * promoStackMult(attacker, 'FLANK_MULT') * chassisFlankMult(attacker) * flankCount(state, targetIndex, attacker)
       * (1 + gpPermOf(seatOf(state, attacker.seat),

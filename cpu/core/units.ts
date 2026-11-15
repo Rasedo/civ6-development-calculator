@@ -30,7 +30,7 @@ export function setRecordFormation(r: ArmyRecord, unit: Unit): ArmyRecord {
 /** CIV6: fortification tops out at two turns dug in. */
 export const FORTIFY_MAX_TURNS = 2;
 import { logUnitOrder } from './seatTurn';
-import { neighbors, neighborTile, hexDistance, directionTo, DIR_E, DIR_W } from '../../world/hex';
+import { neighbors, neighborTile, hexDistance, directionTo, DIR_E, DIR_W, DIRECTION_TYPES } from '../../world/hex';
 import { isWater, isImpassable, isMountain, hullPassage, hullTile, naturalWonderAt } from '../../world/query';
 import { canRemoveFeature, portalAt, type RuleResult } from './rules';
 import { IMPROVEMENTS } from '../data/improvements';
@@ -366,6 +366,31 @@ export function crossesRiver(map: GameMap, from: Tile, to: Tile): boolean {
   if (from.riverMask === 0) return false;
   const d = directionTo(map, from, to);
   return d >= 0 && (from.riverMask & (1 << d)) !== 0;
+}
+
+/** THE RIVER A MELEE BLOW CROSSES (0x522c10 at 0x522f26..0x522ff7, the
+ *  defence's COMBAT_RIVER_DEFENSE): the defender plot's river edge on the
+ *  side the attacker stands, the side read off the signs of the axial step
+ *  from the defender to the attacker at any distance (the columns wrapped
+ *  by half the width) — a row above the defender its NORTHEAST edge, its
+ *  NORTHWEST where the step's q is below 0; the same row its EAST or WEST
+ *  edge; a row below its SOUTHWEST edge, its SOUTHEAST where q is above 0.
+ *  Beside the defender that is the edge between the two plots; the
+ *  planning's predicted blow from a unit two plots off reads it too
+ *  (runs/h1_duelq1128 t22: city-state 2's Warrior 196610 on 10:5 against
+ *  the barbarian Scout on 12:6 reads 12:6's river edge, 327683 on 10:7
+ *  does not, and the game assigns 327683). */
+export function meleeCrossesRiver(map: GameMap, def: Tile, att: Tile): boolean {
+  if (def.riverMask === 0) return false;
+  let dq = att.col - (att.row >> 1) - (def.col - (def.row >> 1));
+  if (map.wrapX) {
+    const half = map.width >> 1;
+    if (dq > half) dq -= map.width;
+    else if (dq < -half) dq += map.width;
+  }
+  const dr = att.row - def.row;
+  const g = dr > 0 ? (dq < 0 ? 5 : 0) : dr === 0 ? (dq > 0 ? 1 : dq < 0 ? 4 : -1) : (dq <= 0 ? 3 : 2);
+  return g >= 0 && (def.riverMask & (1 << DIRECTION_TYPES[g])) !== 0;
 }
 
 export function unitsAt(state: GameState, tileIndex: number): Unit[] {

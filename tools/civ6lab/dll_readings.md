@@ -14369,3 +14369,48 @@ blocks of `_tac_pass`, `_tac_plan`'s "kill" (gpu/core/sim_tactics.py).
   stays on its camp 4:12 where the engines' planning holds the knowledge
   base's Scout in city-state 3's centre 4:9 as a HIGH target with the spot
   4:10 at turn 2.
+
+## C-99 / C-95: a melee blow's river is the defender plot's edge on the attacker's side at any distance; a levied unit home reveals its sight — READ (0x522c10 at 0x522f1d..0x52301b, 0x51f070 at 0x51f603..0x51f639), both twins
+
+`meleeCrossesRiver` (cpu/core/units.ts), `meleeUnitStrengths` /
+`assaultAtkCS` (cpu/core/combat.ts); `_melee_river` / `_atk_pens`
+(gpu/core/sim_masks.py). `levyUnitHome` (cpu/core/minorBuild.ts),
+`_minor_levy_return` (gpu/core/sim_minors.py); the replay's minor copy
+(`minorAi`, cpu/harness/replay.ts).
+
+- THE RIVER TERM: the defence's terrain term 0x522c10 (rcx the defender,
+  r8 the location plot, r9 the attacker's plot from 0x90290 on the
+  attacker 0x51f603..0x51f61d, its fifth argument the attacker unit, its
+  sixth the combat type) adds GlobalParameters +0x228 COMBAT_RIVER_DEFENSE
+  (5) under COMBAT_MELEE (0x2ca3edd1) where an attacker's plot is given
+  and the attacker's +0x1935 is 0: dq = (att.x - att.y >> 1) - (def.x -
+  def.y >> 1), wrapped by half the width where the map wraps, dr = att.y -
+  def.y; the direction 0 (NORTHEAST) / 5 (NORTHWEST) for dr > 0 as dq >= 0
+  / < 0, 1 (EAST) / 4 (WEST) for dr = 0 as dq > 0 / < 0 (none at dq 0),
+  2 (SOUTHEAST) / 3 (SOUTHWEST) for dr < 0 as dq > 0 / <= 0; the bit of
+  that direction in the location plot's river byte +0x38. No adjacency is
+  asked: beside the defender it is the edge between the plots, and the
+  planning's simulated blow (0x791470, the attacker where it stands) reads
+  it from a unit two or more plots off.
+- Confirmed (aimem, one-seed traces): runs/h1_duelq1128 t22 city-state 2's
+  Warriors 196610 on 10:5 and 327683 on 10:7 against the barbarian Scout on
+  12:6 (river edges NE / NW / W, this grid's names): 196610's side NW,
+  river, its blow under 327683's (SW, none), which tied at 36 without it;
+  the game assigns 327683 to 11:6, 196610
+  wanders, as logged; t35 the Swordsmen 589827 on 10:9 (its side 11:6's
+  SW edge, river) and 655364 on 9:6 (W, none) on the barbarian Warrior on
+  11:6: 655364 takes 10:7, as logged; runs/h1_duelq1124 t32 city-state 3's
+  Operation Warriors 786433 / 458755 on 524 / 525; runs/h1_duelq1127 t40
+  the barbarian Galley 262147's HL: Explore. Reading only the plot's own
+  three edges (E, NE, NW of this grid) loses 1128 t35 and 1124 t31 / t32
+  and breaks 1128 t32's barbarian Warrior 1572886.
+- A LEVIED UNIT HOME: made anew under its minor (0x586d40), its sight is
+  revealed to the minor as any placed unit's, before the minor's turn:
+  runs/h1_duelq1124 t83 city-state 4's Heavy Chariot 983040, home on 8:9
+  far from its city, plans 7:10 / 8:11 (1/1) and 8:7 (2/0) and takes
+  Chase Target onto the barbarian Swordsman on 8:7, as logged.
+- OPEN: runs/h1_duelq1128 t33 the barbarian Warrior 1245202 on 15:15
+  against player 1's Scout on 15:13 (river edges NW / W / SW): its side
+  NW (the grid's SW edge, river), its blow 25 under 2490396's 27 from 15:12,
+  so 2490396 takes 15:14 and 1245202 16:14, where the game sets 1245202 on
+  15:14 (its blow 30 without the river); the attacker's +0x1935 unread.

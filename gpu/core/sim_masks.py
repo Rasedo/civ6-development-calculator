@@ -1387,6 +1387,31 @@ class SimMasks:
         bits = (rm.unsqueeze(1) >> arange6) & 1  # [B, 6]
         return (bits * match.long()).sum(dim=1)  # 0 or 1
 
+    def _melee_river(self, dfd: torch.Tensor, att: torch.Tensor) -> torch.Tensor:
+        """[B] 0 / 1 `meleeCrossesRiver`: the defender plot's river edge on
+        the side the attacker stands at any distance, the side read off the
+        signs of the axial step from `dfd` to `att` (0x522c10 at
+        0x522f26..0x522ff7), the game's direction as this grid's bit"""
+        ok = (dfd >= 0) & (att >= 0)
+        d = dfd.clamp(min=0)
+        a = att.clamp(min=0)
+        W = self.W
+        drow, arow = d // W, a // W
+        dq = (a % W - (arow >> 1)) - (d % W - (drow >> 1))
+        if self.wrap_x:
+            half = W >> 1
+            dq = torch.where(dq > half, dq - W, torch.where(dq < -half, dq + W, dq))
+        dr = arow - drow
+        k = lambda v: torch.full_like(dq, v)  # noqa: E731
+        g = torch.where(dr > 0, torch.where(dq < 0, k(5), k(0)),
+                        torch.where(dr == 0, torch.where(dq > 0, k(1), torch.where(dq < 0, k(4), k(-1))),
+                                    torch.where(dq <= 0, k(3), k(2))))
+        # the game's NORTHEAST, EAST, SOUTHEAST, SOUTHWEST, WEST, NORTHWEST
+        # as this grid's direction bits (`DIRECTION_TYPES`)
+        bit = torch.tensor([5, 0, 1, 2, 3, 4], device=dq.device)[g.clamp(min=0)]
+        rm = self.river_mask.gather(1, d.unsqueeze(1)).squeeze(1)
+        return ((rm >> bit) & 1) * (ok & (g >= 0)).long()
+
     def _flank_support_live(self, seat: torch.Tensor) -> torch.Tensor:
         """[B] bool `flankSupportLive` — the player's own combat-adjacency
         flag (0x521530, 0x521ed0), which Military Tradition sets: a major's, a
@@ -4499,7 +4524,7 @@ class SimMasks:
         attacking from Sea or over a River" waives BOTH."""
         amph = self._promo_flag(utype, promos, "AMPHIBIOUS")
         z = torch.zeros_like(frm)
-        pen = 5 * torch.where(amph, z, self._river_cross(frm, to))
+        pen = 5 * torch.where(amph, z, self._melee_river(to, frm))
         return pen + torch.where(amph, z, self._amph_atk_cs(emb))
 
     def _assault_promo_cs(self, utype: torch.Tensor, promos: torch.Tensor,

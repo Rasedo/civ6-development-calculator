@@ -680,6 +680,17 @@ class SimMinors:
             full = self._full_mp("major") - self.major_unit_aura_mp
             self.major_unit_mp.copy_(torch.where(home, full, self.major_unit_mp))
             self.major_unit_mp_full.copy_(torch.where(home, full, self.major_unit_mp_full))
+            # placed under the minor, its sight revealed to it as any placed
+            # unit's (`levyUnitHome`'s revealAround)
+            for u in home.any(dim=0).nonzero(as_tuple=True)[0].tolist():
+                r = home[:, u].nonzero(as_tuple=True)[0]
+                ut = self.major_unit_type[r, u].clamp(min=0, max=self.NU - 1)
+                up = self._promo_pool("major")[0][r, u]
+                ms = torch.full_like(r, s)
+                sight = self._unit_sight(ut, up, ms + 100, r)
+                thr = self._sees_through(ut, up)
+                self._minor_look(r, ms, self.major_unit_tile[r, u], sight, thr)
+                self._suzerain_look(r, ms, self.major_unit_tile[r, u], sight, thr)
             # each unit made anew under the minor (`sendLevyHome`): the
             # record any knowledge base held of the unit before the levy a
             # gone unit's; the minor's own takes it at its tactical look

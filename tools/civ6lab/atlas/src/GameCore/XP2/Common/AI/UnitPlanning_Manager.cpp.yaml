@@ -197,6 +197,7 @@
     - "C-125 / C-99: the attack assignment's stacking block is by formation class; a garrison on a defending district is no striker against a target not HIGH — READ (0x776140 at 0x776890..0x776909, 0x8bcd0, 0x775340 at 0x77541f..0x7754ab, 0x7784b0 at 0x7785ad, 0x61ddb0 at 0x61de20..0x61de2f), both twins"
     - "C-123 / C-125: Coastal Raid's queue walks on, a raid ends the raider's moves; Attack Units' targets keep one the pass killed — READ (0x7735d0, 0x95b100, 0x95b7c0, 0xa4fbc0 at 0xa501e2..0xa502e6, 0x5218f0, 0x76eb50, 0x776140 at 0x776333 -> 0x7765e4), both twins"
     - "C-95: the camp defender's strike, a captured civilian's dead target, a lone DEFENDER out of Pillage — READ (0x772940, 0x779010, 0x774e90, 0x779240 at 0x7792be..0x7792da, 0x775340 at 0x77551e..0x775534, 0x791470 at 0x79174a..0x791756), both twins"
+    - "C-99 / C-95: a melee blow's river is the defender plot's edge on the attacker's side at any distance; a levied unit home reveals its sight — READ (0x522c10 at 0x522f1d..0x52301b, 0x51f070 at 0x51f603..0x51f639), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...each unit's spots per target from its planning (turns, the planning's combat simulation 0x791470: the damage dealt +0x64, received +0x7c, and against a counterattack +0x94 / +0xac); fo..."

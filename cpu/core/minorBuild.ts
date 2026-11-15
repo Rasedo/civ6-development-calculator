@@ -78,7 +78,7 @@ import { FX, FX_MIN, fmul, fxConst, fxOf, pseudoYieldValue, turnsAt, valueBetwee
 import { aiCityStats, cityGrowth, aiView, storeUnitStrength } from './aiView';
 import { congressBannedLuxury, congressQueueMult } from './congress';
 import { civicPolicyBest, governmentValues, policyScores, slotTypeBest } from './aiPolicyValue';
-import { cityStateSight } from './fog';
+import { cityStateSight, revealAround, unitSeesThrough, unitSight } from './fog';
 import { combatDesire, type CombatDesire } from './aiMilitary';
 import { minorTradeList, minorTradeValue } from './aiTrade';
 import { militaryFavTech } from './operations/unitRows';
@@ -418,6 +418,12 @@ function levyUnitHome(state: GameState, cityState: CityState, u: Unit): void {
   // is gone and none of the minor's stands
   if (jumpMadeAnew(state, u)) {
     unitMadeAnew(state, u);
+    // placed under the minor (0x586d40), its sight revealed to it as any
+    // placed unit's: the minor's planning walks the plots round a unit home
+    // far from its city (runs/h1_duelq1124 t83: city-state 4's Heavy
+    // Chariot 983040 home on 8:9 plans 7:10, 8:11 and 8:7, Chase Target onto
+    // the barbarian Swordsman on 8:7, as logged)
+    revealAround(state, cityState.seat, u.tileIndex, unitSight(u, state), { seeThrough: unitSeesThrough(u), mover: { units: [u], from: -1 } });
     u.movesLeft = unitFullMoves(state, u);
     u.movesFull = u.movesLeft;
   } else {

@@ -834,6 +834,7 @@
     - "C-130: Discipline's knowledge records and a levied unit's return"
     - "C-95: Operation Move's ring test takes no path (0x815d50) — READ, both twins"
     - "C-98: a unit's value adds its abilities' modifiers; EFFECT_ADJUST_UNIT_MOVEMENT and REQUIREMENT_PLOT_ADJACENT_TO_OWNER; a second completion adds again — READ (0x7b62c0 at 0x7b7658..0x7b76d8, 0x6e11c7 / 0xc85140, 0x6bd520, 0x6d3200, 0x762d60's rows), both twins"
+    - "C-99 / C-95: a melee blow's river is the defender plot's edge on the attacker's side at any distance; a levied unit home reveals its sight — READ (0x522c10 at 0x522f1d..0x52301b, 0x51f070 at 0x51f603..0x51f639), both twins"
   context:
     - "...ION_PLAYER_UNITS (the context's unit +0x90), with the player (+0x80): a unit on a plot (0x90290) that fights (0x209dd0: GetCombat, GetRangedCombat or GetBombardCombat above 0); its kn..."
   review: imported
@@ -2579,13 +2580,30 @@
 - addr: 0x522c10
   final: 0x36d4b0
   kind: function
+  name: defenceTerrainTerm
+  semantics: "the defender's terrain term (rcx the defender, r8 the location plot, r9 the attacker's plot or null, arg5 the attacker, arg6 the combat type, arg7 the preview list): the religious terrain bonus under COMBAT_RELIGIOUS, else the plot's terrain bonus (vt +0x20), a defensive improvement's +0x34 unpillaged or the city's buildings' DefenseModifier; under COMBAT_MELEE with an attacker's plot, COMBAT_RIVER_DEFENSE (GlobalParameters +0x228) where the location plot's river byte +0x38 holds the bit of the direction toward the attacker, read off the signs of the axial step at any distance (0x522f33..0x522ff7: dr > 0 NE / NW as dq >= 0 / < 0, dr = 0 E / W, dr < 0 SE / SW as dq > 0 / <= 0; dq wrapped by half the width), waived where the attacker's +0x1935 is set; the sum x 256."
   status: PARTLY
+  cases:
+    - recording: h1_duelq1128
+      turn: 22
+      value: "city-state 2's Warrior 196610 on 10:5 against the barbarian Scout on 12:6 reads 12:6's river edge toward it (two plots off), 327683 on 10:7 none: the game assigns 327683 to 11:6, as logged"
+    - recording: h1_duelq1128
+      turn: 35
+      value: "the Swordsman 589827 on 10:9 reads the barbarian Warrior's 11:6 river edge toward it, 655364 on 9:6 none: 655364 takes 10:7, as logged"
+  impl:
+    - cpu/core/units.ts:meleeCrossesRiver
+    - cpu/core/combat.ts:meleeUnitStrengths
+    - cpu/core/combat.ts:assaultAtkCS
+    - gpu/core/sim_masks.py:_melee_river
+    - gpu/core/sim_masks.py:_atk_pens
   readings:
     - "C-95: a damaged centre defends at its wounded strength, the planning's city shot needs standing walls, the barbarians plan on the turn's unhealed centres — READ (0x51eaf0, 0x791470 at 0x79181c..0x791827 -> 0x249ee0 / 0x24b960), both twins; the replay's barbarian copy"
-  notes: ["imported: READ in its section, no confirming case found beside it"]
+    - "C-99 / C-95: a melee blow's river is the defender plot's edge on the attacker's side at any distance; a levied unit home reveals its sight — READ (0x522c10 at 0x522f1d..0x52301b, 0x51f070 at 0x51f603..0x51f639), both twins"
+  notes:
+    - the terrain, improvement and building terms read, unported here (the engines' defenderCS); the attacker's +0x1935 unread (read as Amphibious)
   context:
     - ...wn damage loss (the same 0x51eaf0 on its encampHp) is unported; 0x51eaf0's terrain term 0x522c10 and modifier lists unread; the engine's barbarian sack of a major's centre at 0 hit p...
-  review: imported
+  review: reviewed
 - addr: 0x523520
   final: 0x36dca0
   kind: function

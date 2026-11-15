@@ -72,7 +72,7 @@ import { addCsTradeRoute, addIntlTradeRoute, addTradeRoute, minorRouteTo, plunde
 import { minorRouteCandidate } from '../core/aiTrade';
 import { questCampCleared, questRouteStarted, questUnitAdded } from '../core/quests';
 import { commitDedications, goodyMoment, pantheonMoment, religionMoment, unitKillEvent } from '../core/eras';
-import { cityStateSight, initFog, revealAround, unitSeesThrough, unitSight } from '../core/fog';
+import { cityStateSight, initFog, revealAround, unitLook, unitSeesThrough, unitSight } from '../core/fog';
 import { holdFavor, seatFavor } from '../core/seatTurn';
 import { displaceAirFrom, isAirUnit } from '../core/air';
 import { BARB_SEAT, cityStateOfSeat, civsAtWar, clearWarKind, delegationWith, FREE_SEAT, isBarbSeat, isCityStateSeat, isCiv, MISSION_DELEGATION, MISSION_EMBASSY, prophetsOf, seatOf, setPeaceTurnWith, setTileOwner, setWar, tileSeat, unitsOf } from '../core/seats';
@@ -1544,10 +1544,15 @@ function minorAi(ctx: Ctx, b: TurnRecord, turn: number, made: ReadonlySet<Unit>,
   // it (runs/h1_duely1117 t44: Antananarivo's 210 annexed in China's start,
   // the coast 211 beside it revealed, its Builder on 296 finds no path to
   // the Mine there and Build City Improvement ends, the Builder unmoved)
+  // ...and the plots round each unit its levy's end made anew under it,
+  // placed (0x586d40) before its turn (runs/h1_duelq1124 t83: city-state
+  // 4's Heavy Chariot 983040 home on 8:9 plans 7:10, 8:11 and 8:7)
+  const home = [...ctx.levyFrom.keys()].map((k) => ctx.units.get(k)).filter((u): u is Unit => !!u && minorAiSeat(u.seat));
   for (const cs of copy.cityStates) {
     const r = revealedWas.get(cs.seat);
     if (!r) continue;
     const ground = cityStateSight(state, cs.seat, false);
+    for (const u of home) if (u.seat === cs.seat) for (const n of unitLook(state, u)) ground[n] = 1;
     cs.revealed = r.map((v, p) => (ground[p] ? 1 : v));
   }
   const twin = new Map<Unit, Unit>();
