@@ -3698,16 +3698,20 @@ class SimSeats:
         dc = dest.clamp(min=0)
         ut = u_type.clamp(min=0, max=self.NU - 1)
         seat = self.unit_seat.gather(1, gslot.unsqueeze(1)).squeeze(1)
-        # `unitDomain(unit.type) === 'military' && !unit.embarked` — and a
-        # support chassis is its OWN domain, so it rides, it does not carry.
+        # `unitDomain(unit.type) === 'military'`, unembarked or embarked with
+        # no unembarked fighter of its player on the plot (`escortFor`) — and
+        # a support chassis is its OWN domain, so it rides, it does not carry.
+        emb = self.unit_emb.gather(1, gslot.unsqueeze(1)).squeeze(1)
+        mil = self.military_at.gather(1, hc.unsqueeze(1)).squeeze(1)
+        dry = (mil >= 0) & (self.unit_seat.gather(1, mil.clamp(min=0).unsqueeze(1)).squeeze(1) == seat)
         carrier = (~self._type_civilian[u_type.clamp(min=0)]
                    & ~self._type_support[u_type.clamp(min=0)]
-                   & ~self.unit_emb.gather(1, gslot.unsqueeze(1)).squeeze(1))
+                   & (~emb | ~dry))
 
         def _pick(plane: torch.Tensor) -> torch.Tensor:
             s = plane.gather(1, hc.unsqueeze(1)).squeeze(1)
             k = s.clamp(min=0)
-            good = ((s >= 0) & carrier
+            good = ((s >= 0) & (s != gslot) & carrier
                     & self.unit_escorted.gather(1, k.unsqueeze(1)).squeeze(1)
                     & (self.unit_seat.gather(1, k.unsqueeze(1)).squeeze(1) == seat))
             if formed is not None:

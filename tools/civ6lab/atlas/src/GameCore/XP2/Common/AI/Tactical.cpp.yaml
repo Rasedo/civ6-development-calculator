@@ -474,6 +474,7 @@
     - "C-95: the danger map and Move to Safety — READ, ported"
     - "C-125: Protect Units' safe plot toward the operation's target — READ (0x716b90 at 0x716ca5 / 0x716f9a..0x717007, 0x80d790 at 0x80db1a / 0x80e44a / 0x80e8ab, 0x497d20), both twins"
     - "C-110: the Fortify order and its ticks; the heal's plot gate — READ"
+    - "C-128 / C-134: the homeland's take leaves a formation whose other member is in a job; a land formation embarked stays one; Operation Move's radius is a ranged ship's Range; Move to Safety logs as it lists — READ (0x70a250 -> 0x712850 -> 0x60a8c0 at 0x60aa1b..0x60ab14, 0x816cb0 at 0x8178c4..0x8178f2, 0x77a4b0 at 0x77a763..0x77a7a7), both twins"
   context:
     - "...however hurt; a whole one where the danger exceeds its strength + 20 — and moves them (0x774190, unread)."
   review: reviewed
@@ -962,11 +963,15 @@
     - recording: h1_duelw1117-1128
       turn: all
       value: "the barbarians' logged Current Danger 114 of 240 equal; HL: Move To Safety ends 184 of 371"
+    - recording: h1_duels1171
+      turn: 96
+      value: "the barbarian Warrior 1245201 on 14:9 logs \"Move to safety, Current Danger: 15\" as it is listed (0x77a763..0x77a7a7), finds no safe plot, then Wanders Back to Camp; t97-t105 alike"
   impl:
     - cpu/core/tactical.ts:flees
     - cpu/core/tactical.ts:moveToSafety
     - gpu/core/sim_tactics.py:_tac_move_to_safety
   readings:
+    - "C-128 / C-134: the homeland's take leaves a formation whose other member is in a job; a land formation embarked stays one; Operation Move's radius is a ranged ship's Range; Move to Safety logs as it lists — READ (0x70a250 -> 0x712850 -> 0x60a8c0 at 0x60aa1b..0x60ab14, 0x816cb0 at 0x8178c4..0x8178f2, 0x77a4b0 at 0x77a763..0x77a7a7), both twins"
     - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
     - "C-95: the danger map and Move to Safety — READ, ported"
     - "C-95: Attack Units — READ, ported"

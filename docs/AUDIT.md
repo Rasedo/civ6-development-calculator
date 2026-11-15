@@ -222,6 +222,7 @@ A question the SOURCE under-determines; neither engine ships a branch until the 
   - LAB (explore): 1127 t12 Scout 393221 10:19 for 10:16 (n 3 / 2; the barbarians' plane equal to the record's)
   - LAB (explore): Explore path: 1124 t15 Scout 524295 on 33:11 for 33:8, the game west to 32:11 (t17 held by player 4's Warrior on 32:10), ours east via 33:12 at 7 turns
   - LAB (explore): 1124 t22 barbarian Scout 131073 (HL: Explore) off once a cliff bars only revealed crossings
+  - LAB (explore): duels1136 t97 the barbarians' copy holds the Scout 3473424 at 43 damage where their turn found it at 96 (player 1's city strike, UnitDamageChanged seq 28960 before their PlayerTurnActivated seq 29110): its hurt-scout HL: End Turn turns on it
   - LAB (wander): Wander 1124 t64 Galley 1376265 on 20:5 for 22:8 (AI_Planning 1/0) ends on 21:8, ours 22:8, shifting the Random Direction picks of Galleys 720906, 1966102, 2359319
   - LAB (wander): duelq1121 t13 Horseman 655369's Wander draw 5 of 17 lands on 31:6 for the game's 32:6, Operation Move's Horseman 720906 still on 30:6 in ours where the game's stands on 31:9
   - LAB (wander): 1121 t107-109 barbarian Musketman 3473423 carried drift (t107 ours HL: End Turn for Wander; t109 our Skirmisher 3342353 on 3:16, the game's 6:16)
@@ -232,6 +233,7 @@ A question the SOURCE under-determines; neither engine ships a branch until the 
   - LAB (operation members): 1127 Galley 589825 t229
   - BUILD (operation members): the barbarians' Defend Units release
   - LAB (operation members): an escort's Defend Units move ending Operation Move rows (1128 t174-175)
+  - LAB (operation members): Barbarian City Attack's Make Formation (nodes 12 / 16 / 22: Combat Unit UNITTYPE_MELEE, Support Unit UNITTYPE_SIEGE_SUPPORT) pairs a siege support unit with a melee one: duels1140 t71 UnitEnterFormation of the Battering Ram 2883611 with the Warrior 2490391, the pair one formation to t80; ours makes no support pair (`makeFormation` reads Civilian Unit alone) and walks the Ram alone (49 Battering Ram Operation plot rows over 14 seeds at p74m)
   - LAB (operation moves): Operation Move's plot misses (121 of 267)
   - LAB (operation moves): Operation Move: 1121 t56-58 the raid west (MoveTo 0x962380)
   - LAB (operation moves): Operation Move: 1127 Galleys 1048590 / 262147 on an embarked Warrior's spot
@@ -265,6 +267,7 @@ A question the SOURCE under-determines; neither engine ships a branch until the 
   - LAB (scouts): duelq1121 t78 the barbarian Scout 131073 on 8:17 sees player 1's Holy Site on 7:15, pillaged since t73 in the records, and reports it, its homing tree from t79 (ours no tactical row at t79 / t80, plot 801 // 668 at t80); the game's Barbarian Found City tree (917508) stands from t81, after player 1 repaired the Holy Site in its turn 79 (DistrictPillaged seq 23086) and the Scout came back in sight of it from 7:17 at t80
   - LAB (scouts): 1121 t78-80 Scout 131073: ours reports player 1's Holy Site 7:15 at t78 (the Scout beside it on 8:16 in record 79) and walks home (9:18 at t80), the game's explores to 8:15 at t80 and its tree stands from t81; the district's pillaged flag clears in record 80 (DistrictPillaged 23086 of t79); the report 0x153ef0 reads no pillage (the plot's improvement +0x44 or its district's type 0x810d0): the owner's throttle +0x3d8 and the plot's first sight (0x508d50) untraced
   - LAB (scouts): duels1162 t113 tribe 5's Skirmisher 3473426, raised on 39:4 beside its camp 38:3 (the Spearman 1048580 on it), reports and its tree runs in the game (Move Unit RUNNING for 38:3, the raid on 37:7 at t114); ours starts the tree and Move Unit fails (`turnsToPlot` 0: the crowded camp linked in the first turn), no raid
+  - LAB (scouts): duels1136 t97-t108 the barbarian Scout 3473424 on 12:14 holds no tree in the game's memory (Raid City alone) and its HL: End Turn keeps 12:14; ours ticks its tribe's homing tree (Barbarian Found City), which walks it to 11:12 each turn and lets it go (16 plot rows); duels1172 t75-t101 the Scout 2490372 alike (31 rows)
 - **C-124. BARBARIANS' CAMPS AND SIGHT.** Weight 1.
   - BUILD (sight): the alliances' outgoing visibility (0x2ab4f0 -> 0x508330; no recorded duel holds an alliance)
   - LAB (sight): the unseen land's single-turn residue (sightLab.ts on Barbarians.csv: 1,065 of 1,245 turns equal; 1128 t25 +28)
@@ -501,6 +504,7 @@ A question the SOURCE under-determines; neither engine ships a branch until the 
   - LAB (planning): duels1146 t155 player 1's Trader 2097169 lays the road of 38:12 in its turn, before the city-states plan: the game's city-state 2 Builder 1376259 reaches 38:12 at (1/128) and its Trader 524293 at (1/384), ours (1/0) and (1/256) on the copy's first-record roads (t158 35:13 alike; aiscore kind `plan.reach.moves`)
   - LAB (planning): duels1146 t232-248 city-state 2's embarked Machine Gun 1835015 plans on 6 Movement, the game's 7 (aiscore kind `plan.input`), its Wander plots t235 / t243 / t247 (566 // 610, 479 // 522, 522 // 523)
   - LAB (planning): duels1136 t103 city-state 2's Naval Superiority takes player 1's embarked Missionary 2490390 on 25:13, where it spread from in player 1's turn (UnitMoved 25:13, then its charge spent), as its target; the copy holds the Missionary on 25:14 (the replay's spread puts the unit back on its plot before the order), so ours keeps 25:14 and its Caravels end on 24:15 / 23:13 for the game's 24:14 / 24:13 (t103-t113, 9 plot rows)
+  - LAB (planning): duels1162 t69-t76 city-state 4's Attack Barb Camp team (Warriors 393219 / 131073 / 524292, Swordsman 786440) goes for 16:14 beside the camp 16:15 and steps toward it each turn ("10:9, 16:14, 11:9", queue flags 0x9001); ours holds the four where they stand (27 plot rows)
   - LAB (claims and strikes): 1124 t32 the Warrior 786433 made that turn on Granada's centre acts as hasMoved (0x56e760) where ours holds full Movement, its turn-1 claim on 41:11 kept (the game's 40:11, no attack)
   - LAB (claims and strikes): 1124 t94 city-state 4's Man-At-Arms 1310728 and Trebuchet 1245189, recruited by Attack Barb Camp that turn (Op Attack Units Targets: the barbarian Swordsman on 31:9), swap 33:8 / 32:8 in ours; the game's stand at t94 and hold the swapped plots from t95
   - LAB (claims and strikes): the strikers' garrison clause (0x775340 at 0x77541f, not HIGH) ported with no confirming case
@@ -511,6 +515,8 @@ A question the SOURCE under-determines; neither engine ships a branch until the 
   - LAB (city defense): 1117 t89 City Defense Catapult 917509 on 32:7 taking next turn's 32:8
   - LAB (city defense): the read (0x817a1c, Plot +0x18) and our regions agree with the game's (the t1 camp draw ranges of 15 seeds, HL Explore's cur region 2,879 of 2,895 moves), yet where the goal or the planning plot lies on a chokepoint's line the game takes a planning plot the flood puts across that line: duels1133 t21-t29 city-state 3's City Defense Archer 327682 on its centre 42:6 takes 41:6 (ours holds 42:6, 44 plot rows), duels1145 t32-t35 34:10 / 33:11, duels1157 t13 43:23 / 43:22, where duels1180 t46-t55 34:17 / 35:17 and duels1184 t29 12:19 / 11:19 are passed
   - LAB (city defense): the recorder holds no plot's Map_Region (Plot +0x18, Map_Region +0 its id): the game's region of a chokepoint line's plots against the flood's is unread (duels1133 42:6, duels1145 34:10 / 33:11)
+  - LAB (city defense): duels1176 t116-t130 city-state 4's City Defense Privateer 1245191 (its naval team) on 1:14 beside its centre 0:14, the team's embarked Musketman 983043 on the plot in a formation of its own, logs "1:14, 1:14, 1:14" and holds the plot; ours holds it out of Operation Move's movers and it ends on the centre (28 plot rows)
+  - LAB (city defense): duels1145 t47-t54 city-state 4's Attack Enemy City Archer 589825 on its rally 34:10 (Unit distance 2, Range 2) holds it in the game, its planning's 35:11 passed; ours takes 35:11 (our region 7 with 34:10): the game's 34:10 lies across the chokepoint line from 35:11, with 33:11 (t32), our region 6 (8 plot rows, shown once the Archer leaves its Settler's formation at t46)
   - LAB (upgrade units): 1121 Upgrade Units' walk 4:589828 t69-72 the 781 / 782 tie
   - LAB (upgrade units): 1121 Upgrade Units' walk 4:720896 t74-78
   - LAB (upgrade units): 1121 t69 Warrior 262146 back from 35:19 to 35:18, ours waiting for 34:19 (Upgrade Units)
@@ -522,7 +528,6 @@ A question the SOURCE under-determines; neither engine ships a branch until the 
   - LAB (wander): 589828 t68 ends turn 2 on player 0's Warrior on 33:18 (seed not named; listed after 1121 cases)
   - LAB (wander): duelq1121 t238 city-state 2's Infantry 2818052 Wander for 9:3 from 13:4 ends on 11:4, ours on 11:5
   - LAB (wander): 1117 city-state 3's Wander draws t163 / t186
-  - LAB (wander): 1124 t75 the Quadrireme 1048577 to 40:13 (612), ours staying on 569
   - LAB (wander): 1124 t182 / t194 Nuclear Submarine 6160412 Coastal Raid 372 // 416
   - LAB (move to safety): 1127 t92-96 Galley 393216 ends on 29:16 for its safe 28:17 past player 0's Warriors on 29:17 / 29:15
 - **C-128. CITY-STATES' UNITS, FORMATIONS AND STACKING.** Weight 3.
@@ -536,6 +541,8 @@ A question the SOURCE under-determines; neither engine ships a branch until the 
   - LAB (formations): the Form command's Start merge (`mergeFormation`'s veteran rule) unread
   - LAB (formations): the city threat and standing army read no formation
   - LAB (formations): a member a Corps absorbs standing the minor's turn (1117 t142 / t161)
+  - BUILD (formations): the GPU's occupancy planes hold one embarked unit a plot, so an embarked formation's escort and rider share `embarked_at` (duels1155 t114-t157 city-state 2's Man-At-Arms 1245187 and its Settler 786439 embark as one formation): the twin finds the escort by a unit scan (`_tac_wet_escort`), the plane keeping the unit placed last
+  - LAB (formations): the homeland's take (0x712850 -> 0x60a8c0 at 0x60aa78..0x60ab14) is ported for the city-states alone: duels1155 t28 the barbarians' Builder 1572883 leaves its formation with the Warrior 655368 an operation took that turn (UnitExitFormation, then its UnitTeleported), the engines' barbarians keep it
   - LAB (promotions): a city-state's promotions unscored
   - BUILD (a unit made anew): the transfer ends a new unit's moves (0x56d6f0 at 0x93fe79): a levied unit home on a suzerain change in another player's turn stands at Movement 0 until its minor's DoTurn, where the engines return every levy at the minor's start (`minorLevyReturn`; no recorded case)
   - LAB (a unit made anew): the location test's owner unit-type byte (0x3dd230: diplomacy +0x40f0[type], 0x586360 at 0x58651b) and its owned-water clause for a land unit that may not embark (0x58645d..0x58648e) unported in `placementPlot`, the byte's writer unread

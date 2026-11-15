@@ -17780,3 +17780,60 @@ trained one (`freeFinish` / `_free_city_build`); `cityNavalCapable`
   at t31 as logged (395.2 with the completion).
 - Open: the head check's test for a project (CanProduce 0x16f7b0 lets a
   pillaged district through); the analyzer 0x6be6f0's effect.
+
+## C-128 / C-134: the homeland's take leaves a formation whose other member is in a job; a land formation embarked stays one; Operation Move's radius is a ranged ship's Range; Move to Safety logs as it lists — READ (0x70a250 -> 0x712850 -> 0x60a8c0 at 0x60aa1b..0x60ab14, 0x816cb0 at 0x8178c4..0x8178f2, 0x77a4b0 at 0x77a763..0x77a7a7), both twins
+
+`homelandTake`, `escortOf` / `escortFor` / `escortRiders` / `escortUnit`,
+`passMoveExec` (cpu/core/tactical.ts, cpu/core/units.ts);
+`_tac_homeland_take`, `_tac_wet_escort`, `_tac_mate`, `_drop_lone_riders`,
+`_tac_formation_exit`, `_escort_rider`, `_tac_support_formation`, the
+Operation Move radius in sim_tactics.py (gpu/core/sim_tactics.py,
+sim_seats.py).
+
+- THE HOMELAND'S TAKE: the homeland's turn (0x70a250, after the tactical
+  pass has let its units go) first offers itself the player's units
+  (0x712850 -> 0x60a8c0, its own evaluator, priority 3, its job +0x100):
+  those in no job (+0x7d0 -1), their turn not done (+0x530), alive. Each
+  unit taken has its assignment set (+0x778 through 0x1e60f0) and, its
+  formation (+0x1fb8) holding more than one (+0x738 > 1), for each other
+  member (+0x728) found (0x4f2310) whose +0x7d0 is not -1, the command
+  UNITCOMMAND_EXIT_FORMATION built at 0x60aa1b (0x94bc70) is tested and
+  carried out on the unit taken (vt +0x48 / +0x58 at 0x60aafa / 0x60ab14).
+  The signal path's units (0x60ad40..0x60ad9b, a tree's units offered
+  again) leave their formation with no member test. Recruit Units' offer
+  (0x81c820) and Find Available Unit's (0x7ec7b0) run the same test on the
+  unit they take: a fighter recruited away from its unassigned civilian
+  stays in the formation through the operation's moves.
+- CONFIRMED (the records' UnitExitFormation, aiunits' formations):
+  runs/h1_duels1155 city-state 2's Settler 786439 — City Defense recruits
+  its Warrior 393220 at t72 and t107, an "Upgrade Units" tree takes its
+  Man-At-Arms 1245187 at t158 and 1441803 at t179; each formation whole at
+  the pass's open (the escort's +0x7d0 already the job's), the tree's Move
+  Unit carrying the Settler with it (t158 27:9 -> 28:11); then after the
+  pass's last move "UnitExitFormation 786439 with the escort", "the escort
+  with -1" and the Settler's UnitTeleported, before its HL: End Turn's
+  Skip Turn; Support Formation runs for it the turns after (t73-78, t159,
+  t180-182). duels1145 t46 / t56 city-state 4's Settler 786438 and its
+  Warrior 589825 likewise.
+- A LAND FORMATION EMBARKED STAYS ONE (the engines' link: a civilian or
+  support rider's escort is its player's unembarked military unit on the
+  plot, else its embarked one): runs/h1_duels1155 t114-t157 city-state 2's
+  Man-At-Arms 1245187 and its Settler 786439 embark (29:16, 28:15, both
+  m_bEmbarked) in one formation at every end look; t159 the Musketman
+  1572870 embarks onto the Settler's 28:11 for Support Formation and
+  UnitEnterFormation follows.
+- OPERATION MOVE'S RADIUS (0x8178c4..0x8178f2): 0 for a member of a
+  formation of more than one or of the node's Leader Tag (0x79cb30), else
+  GetRange (0x56e3d0, unit +0x19f8), the smaller of it and the node's Unit
+  distance: no domain test, a ranged ship's its own Range. Confirmed:
+  runs/h1_duels1154 t97 city-state 2's City Defense Quadrireme on its
+  centre 37:19 logs "37:19, 37:18, 37:18", t100 39:18 -> 38:18.
+- MOVE TO SAFETY LOGS AS IT LISTS (0x77a4b0 at 0x77a763..0x77a7a7): each
+  unit listed logs "Move to safety, Current Danger: d" before the moves
+  (0x774190), so a unit with no safe plot holds that row ahead of its later
+  move (runs/h1_duels1171 t96-t105: the barbarian Warrior 1245201 on 14:9,
+  then Wander Back to Camp); the replay's tracer takes the row at the
+  listing (`moveToSafety`).
+- OPEN: the GPU's occupancy planes hold one embarked unit a plot, so an
+  embarked formation's escort and rider share `embarked_at` (the twin
+  finds the escort by a unit scan).

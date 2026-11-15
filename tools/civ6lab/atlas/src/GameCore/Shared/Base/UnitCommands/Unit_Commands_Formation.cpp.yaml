@@ -55,8 +55,10 @@
     - gpu/core/sim_tactics.py:_tac_formation_exit
     - cpu/core/operations/nodes.ts:OpsContext
     - cpu/core/opsOrders.ts:unitOf
+    - cpu/core/tactical.ts:homelandTake
   readings:
     - "C-93: Make Formation's formation outlives its operation, a captive embarks by its original owner — READ (0x7ee630, 0x94bbe0, 0x94bc70, 0x212825..0x2128f3, 0x56c480, 0x77b9a0 at 0x77bedd), both twins"
+    - "C-128 / C-134: the homeland's take leaves a formation whose other member is in a job; a land formation embarked stays one; Operation Move's radius is a ranged ship's Range; Move to Safety logs as it lists — READ (0x70a250 -> 0x712850 -> 0x60a8c0 at 0x60aa1b..0x60ab14, 0x816cb0 at 0x8178c4..0x8178f2, 0x77a4b0 at 0x77a763..0x77a7a7), both twins"
   context:
     - "...tlives its operation, a captive embarks by its original owner — READ (0x7ee630, 0x94bbe0, 0x94bc70, 0x212825..0x2128f3, 0x56c480, 0x77b9a0 at 0x77bedd), both twins"
     - "...whose formation (unit +0x1fb8) holds more than one (+0x738 > 1) takes the unit command 0x94bc70 builds (hash 0xfcfe4c4d, UNITCOMMAND_EXIT_FORMATION: CanDo +0x48, Do +0x58; 0x7ee7b0..0..."

@@ -33,9 +33,16 @@
 - addr: 0x70a250
   final: 0x4bafa0
   kind: function
+  semantics: "the homeland's turn for a player no human drives (0x469d70): its take (0x712850), then its moves (0x709d80)."
   status: PARTLY
+  cases:
+    - recording: h1_duels1155
+      turn: 72
+      value: "city-state 2's Settler 786439 leaves its formation after the tactical pass's last move, before its HL: End Turn"
+  impl: [cpu/core/tactical.ts:cityStateTactics, cpu/core/tactical.ts:homelandTake]
   readings:
     - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
+    - "C-128 / C-134: the homeland's take leaves a formation whose other member is in a job; a land formation embarked stays one; Operation Move's radius is a ranged ship's Range; Move to Safety logs as it lists — READ (0x70a250 -> 0x712850 -> 0x60a8c0 at 0x60aa1b..0x60ab14, 0x816cb0 at 0x8178c4..0x8178f2, 0x77a4b0 at 0x77a763..0x77a7a7), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...0x785ec0, the second city hook 0x5c2610, the tree manager's tick 0x7ffdd0, 0x74f5a0, 0x70a250, the tactical pass 0x771530) and +0x3a0 (0x60e820: 0x7ffed0, ...). Each job takes a pas..."
@@ -360,4 +367,18 @@
   readings: ["H-1: draws the AI takes, draws the engines lack"]
   context:
     - "...lled only through 0x327d50 / 0x327de0 from the behaviour tree — \"HL: Rock Band Move\" (0x710f40) and the CITY_ASSAULT operation (0x722690), each building a unit's name for its log (th..."
+  review: reviewed
+- addr: 0x712850
+  final: 0x4c3810
+  kind: function
+  name: the homeland's take
+  semantics: "the homeland's units at its turn's open (from 0x70a250): its list's count (+0x218) cleared, the recruit's offer 0x60a8c0 (its own evaluator, priority 3, its job id +0x100) on the player's units in no job, their turn not done, alive — each taken leaving its formation where another member is in a job (0x60aa78..0x60ab14) — then its unit list (+0x208) the units of its job (0x6092c0)."
+  status: READ
+  cases:
+    - recording: h1_duels1155
+      turn: 72
+      value: "city-state 2's Settler 786439, its Warrior 393220 recruited by City Defense: UnitExitFormation 786439 / 393220 and the Settler's UnitTeleported after the pass's last move; t107, t158, t179 alike"
+  impl: [cpu/core/tactical.ts:homelandTake, gpu/core/sim_tactics.py:_tac_homeland_take]
+  readings:
+    - "C-128 / C-134: the homeland's take leaves a formation whose other member is in a job; a land formation embarked stays one; Operation Move's radius is a ranged ship's Range; Move to Safety logs as it lists — READ (0x70a250 -> 0x712850 -> 0x60a8c0 at 0x60aa1b..0x60ab14, 0x816cb0 at 0x8178c4..0x8178f2, 0x77a4b0 at 0x77a763..0x77a7a7), both twins"
   review: reviewed

@@ -1051,13 +1051,25 @@ type StepOutcome =
  * and the tile names its escort. A flag with no military unit beside it is
  * not a formation, which is what frees the civilian the moment its escort
  * dies — no sweep, and no stale link to clear at a capture.
+ *
+ * A land formation that embarks stays one: its fighter embarked is still
+ * the escort of its civilian or support rider where no unembarked fighter
+ * of its player holds the plot (runs/h1_duels1155 t114-t115: city-state 2's
+ * Man-At-Arms 1245187 and its Settler 786439 embark onto 29:16 and 28:15,
+ * one formation at each end look).
  */
 export function escortOf(state: GameState, unit: Unit): Unit | undefined {
-  if (!unit.escorted) return undefined;
-  return state.units.find(
-    (u) => u.id !== unit.id && u.tileIndex === unit.tileIndex && u.seat === unit.seat
-      && unitDomain(u.type) === 'military' && !u.embarked,
+  return unit.escorted ? escortFor(state, unit) : undefined;
+}
+
+/** the unit's escort on its plot, its flag aside: its player's unembarked
+ *  military unit there, else — for a civilian or support unit — its
+ *  embarked one */
+function escortFor(state: GameState, unit: Unit): Unit | undefined {
+  const fighters = state.units.filter(
+    (u) => u.id !== unit.id && u.tileIndex === unit.tileIndex && u.seat === unit.seat && unitDomain(u.type) === 'military',
   );
+  return fighters.find((u) => !u.embarked) ?? (unitDomain(unit.type) !== 'military' ? fighters.find((u) => u.embarked) : undefined);
 }
 
 /** MAY this unit be the escorted half of a formation? CIV6 (Formations): a
@@ -1072,13 +1084,11 @@ export function escortable(unit: Unit): boolean {
  *  class, which is Civ 6's three-unit formation on a tile that holds all
  *  three. */
 export function escortRiders(state: GameState, unit: Unit): Unit[] {
-  if (unitDomain(unit.type) === 'military' && !unit.embarked) {
-    return state.units.filter(
-      (u) => !!u.escorted && u.id !== unit.id && u.tileIndex === unit.tileIndex
-        && u.seat === unit.seat && escortable(u),
-    );
-  }
-  return [];
+  if (unitDomain(unit.type) !== 'military') return [];
+  return state.units.filter(
+    (u) => !!u.escorted && u.id !== unit.id && u.tileIndex === unit.tileIndex
+      && u.seat === unit.seat && escortable(u) && escortOf(state, u) === unit,
+  );
 }
 
 export function inEscort(state: GameState, unit: Unit): boolean {
@@ -1106,10 +1116,10 @@ export function formationMates(state: GameState, unit: Unit): Unit[] {
 export function escortUnit(state: GameState, unit: Unit): RuleResult {
   if (!escortable(unit)) return no('Only a civilian or a passenger joins an escort.');
   if (unit.escorted) return no('Already in a formation.');
-  const esc = state.units.find(
-    (u) => u.id !== unit.id && u.tileIndex === unit.tileIndex && u.seat === unit.seat
-      && unitDomain(u.type) === 'military' && !u.embarked,
-  );
+  // an embarked fighter forms with an embarked civilian (runs/h1_duels1155
+  // t159: city-state 2's Musketman 1572870 embarks onto 28:11 for Support
+  // Formation, UnitEnterFormation with the Settler 786439 there)
+  const esc = escortFor(state, unit);
   if (!esc) return no('No military unit here to escort it.');
   // ONE RIDER PER STACKING CLASS. CIV6 (Formations): a military unit forms
   // with "a support or civilian unit", and a tile holding all three carries

@@ -224,6 +224,7 @@
   readings:
     - "C-97: the behaviour trees — READ (the interpreter), the nodes PARTLY READ"
     - "C-95: the camp defender's strike, a captured civilian's dead target, a lone DEFENDER out of Pillage — READ (0x772940, 0x779010, 0x774e90, 0x779240 at 0x7792be..0x7792da, 0x775340 at 0x77551e..0x775534, 0x791470 at 0x79174a..0x791756), both twins"
+    - "C-128 / C-134: the homeland's take leaves a formation whose other member is in a job; a land formation embarked stays one; Operation Move's radius is a ranged ship's Range; Move to Safety logs as it lists — READ (0x70a250 -> 0x712850 -> 0x60a8c0 at 0x60aa1b..0x60ab14, 0x816cb0 at 0x8178c4..0x8178f2, 0x77a4b0 at 0x77a763..0x77a7a7), both twins"
   context:
     - "...0 for a unit in a formation (+0x1fb8 +0x738 above 1) or carrying the node's Leader Tag (0x79cb30); at least 1 where the goal is barred — no path (0x586360), a visible enemy unit there..."
   review: reviewed

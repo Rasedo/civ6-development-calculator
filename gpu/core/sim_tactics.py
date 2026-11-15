@@ -1842,15 +1842,37 @@ class SimTactics:
         none = torch.full_like(slots, -1)
         mil = self.military_at[rows, tc]
         mc = mil.clamp(min=0)
-        rider = on & self.unit_escorted[rows, g] & (mil >= 0) & (mil != g) & (self.unit_seat[rows, mc] == seat)
-        out = torch.where(rider, mil - lo, none)
-        carrier = on & ~self._type_civilian.take(ty) & ~self._type_support.take(ty) & ~self.unit_emb[rows, g] & (mil == g)
+        dry = (mil >= 0) & (self.unit_seat[rows, mc] == seat)
+        esc = torch.where(dry & (mil != g), mil, none)
+        fighter = ~self._type_civilian.take(ty) & ~self._type_support.take(ty) & (self._type_air.take(ty) == 0)
+        # a civilian or support rider's embarked escort where no unembarked
+        # fighter of its player holds the plot (`escortFor`)
+        wet = on & ~fighter & ~dry & self.unit_escorted[rows, g]
+        if bool(wet.count_nonzero()):
+            k = wet.nonzero(as_tuple=True)[0]
+            esc[k] = self._tac_wet_escort(rows[k], g[k])
+        rider = on & self.unit_escorted[rows, g] & (esc >= 0)
+        out = torch.where(rider, esc - lo, none)
+        carrier = on & fighter & ((~self.unit_emb[rows, g] & (mil == g)) | (self.unit_emb[rows, g] & ~dry))
         for plane in (self.civilian_at, self.support_at, self.embarked_at, self.trader_at):
             r = plane[rows, tc]
             rc = r.clamp(min=0)
             hit = carrier & (out < 0) & (r >= 0) & (r != g) & self.unit_escorted[rows, rc] & (self.unit_seat[rows, rc] == seat)
             out = torch.where(hit, r - lo, out)
         return out
+
+    def _tac_wet_escort(self, rows: torch.Tensor, g: torch.Tensor) -> torch.Tensor:
+        """[N] long — `escortFor`'s embarked escort of the units at global
+        slots `g` [N] of the games `rows`: the first embarked military unit of
+        its player on its plot, -1 none"""
+        tile = self.unit_tile[rows, g]
+        seat = self.unit_seat[rows, g]
+        ut = self.unit_type[rows].clamp(min=0, max=self.NU - 1)
+        fight = ~self._type_civilian.take(ut) & ~self._type_support.take(ut) & (self._type_air.take(ut) == 0)
+        hit = (self.unit_alive[rows] & self.unit_emb[rows] & fight & (tile.unsqueeze(1) >= 0)
+               & (self.unit_tile[rows] == tile.unsqueeze(1)) & (self.unit_seat[rows] == seat.unsqueeze(1)))
+        hit[torch.arange(rows.numel(), device=self.device), g] = False
+        return torch.where(hit.any(dim=1), hit.long().argmax(dim=1), torch.full_like(g, -1))
 
     def _tac_formed(self, pre: str) -> torch.Tensor:
         """[B, P] bool — each unit of pool `pre` in a formation (`_tac_mate`)"""
@@ -1863,7 +1885,8 @@ class SimTactics:
 
     def _drop_lone_riders(self, act: torch.Tensor, seat: int) -> None:
         """`dropLoneRiders`: in the games `act` [B], each rider of `seat`
-        whose plot holds no escort of its player (the military plane's unit)
+        whose plot holds no escort of its player (the military plane's unit,
+        else a civilian or support rider's embarked one, `escortFor`)
         leaves its formation, as the AI player's turn opens"""
         lone = self.unit_escorted & self.unit_alive & (self.unit_seat == seat) & act.unsqueeze(1)
         if not bool(lone.count_nonzero()):
@@ -1872,6 +1895,12 @@ class SimTactics:
         mil = self.military_at.gather(1, tc)
         m_seat = self.unit_seat.gather(1, mil.clamp(min=0))
         lone &= ~((mil >= 0) & (m_seat == seat) & (self.unit_tile >= 0))
+        ut = self.unit_type.clamp(min=0, max=self.NU - 1)
+        rider = lone & (self._type_civilian.take(ut) | self._type_support.take(ut))
+        if bool(rider.count_nonzero()):
+            rows, g = rider.nonzero(as_tuple=True)
+            kept = self._tac_wet_escort(rows, g) >= 0
+            lone[rows[kept], g[kept]] = False
         self.unit_escorted &= ~lone
 
     def _tac_formation_exit(self, m: torch.Tensor, us: torch.Tensor, pre: str) -> None:
@@ -1884,7 +1913,13 @@ class SimTactics:
         g = us[rows] + self.POOL_LO[pre]
         tc = self.unit_tile[rows, g].clamp(min=0)
         seat = self.unit_seat[rows, g]
-        carrier = self.military_at[rows, tc] == g
+        mil = self.military_at[rows, tc]
+        ty = self.unit_type[rows, g].clamp(min=0, max=self.NU - 1)
+        fighter = ~self._type_civilian.take(ty) & ~self._type_support.take(ty) & (self._type_air.take(ty) == 0)
+        # an embarked fighter carries where no unembarked one of its player
+        # holds the plot (`escortRiders`)
+        dry = (mil >= 0) & (self.unit_seat[rows, mil.clamp(min=0)] == seat)
+        carrier = (mil == g) | (fighter & self.unit_emb[rows, g] & ~dry)
         self.unit_escorted[rows, g] = False
         for plane in (self.civilian_at, self.support_at, self.embarked_at, self.trader_at):
             r = plane[rows, tc]
@@ -4409,7 +4444,7 @@ class SimTactics:
             mt = self._tac_mate(rows, ur, pre)
             fm = mt >= 0
             z = (zero[rows, ur] if zero is not None else torch.zeros_like(naval)) | fm
-            r = torch.where(naval | z, torch.zeros_like(ut), torch.clamp(self._tac_range(rows, ur, pre), max=rng))
+            r = torch.where(z, torch.zeros_like(ut), torch.clamp(self._tac_range(rows, ur, pre), max=rng))
             here = tile_p[rows, ur]
             path = self._tac_search(rows, ur, seat, 1 << 30, True, pre=pre)["closed"] >= 0    # [N, T]
             # one of its own stacking with it or with its formation's other
@@ -6040,13 +6075,8 @@ class SimTactics:
         if not bool(cand.count_nonzero()):
             return
         # a Settler in a formation: its flag with a military unit of its
-        # player, not embarked, on its plot (`inEscort`)
-        gv = torch.arange(P, device=dev).unsqueeze(0).expand(B, P) + lo
-        mil = self.military_at.gather(1, vt)
-        mc = mil.clamp(min=0)
-        formed = (self.unit_escorted.gather(1, gv) & (mil >= 0) & (self.unit_seat.gather(1, mc) == seat)
-                  & ~self.unit_emb.gather(1, mc))
-        cand &= ~formed
+        # player on its plot, unembarked, else embarked (`inEscort`)
+        cand &= ~self._tac_formed(pre)
         if not bool(cand.count_nonzero()):
             return
         order, npass = op["order"], op["npass"]
@@ -6073,9 +6103,9 @@ class SimTactics:
             alive = getattr(self, f"{pre}_unit_alive")
             utile = getattr(self, f"{pre}_unit_tile")
             gp = pick + lo
-            gu = u_b + lo
+            # an embarked fighter forms with an embarked Settler (`escortUnit`)
             arrived = (go & (utile[bidx, u_b] == plot) & alive[bidx, pick] & (utile[bidx, pick] == plot)
-                       & ~self.unit_escorted[bidx, gp] & ~self.unit_emb[bidx, gu])
+                       & ~self.unit_escorted[bidx, gp])
             if bool(arrived.count_nonzero()):
                 r = arrived.nonzero(as_tuple=True)[0]
                 self.unit_escorted[r, gp[r]] = True
@@ -6194,10 +6224,38 @@ class SimTactics:
             # its moves end (0x56d6f0 at 0x77c62a, `wanderNearCity`)
             self._tac_moves_ended[bidx[ok], u_b[ok] + self.POOL_LO[pre]] = True
             done[bidx[ok], u_b[ok]] = True
-        # THE HOMELAND: Move to Safety over every unit; the rest end their turn
-        # (`endTurn`, `skipTurn`: the activity HOLD)
+        # THE HOMELAND: its take (`homelandTake`), Move to Safety over every
+        # unit; the rest end their turn (`endTurn`, `skipTurn`: the activity
+        # HOLD)
+        self._tac_homeland_take(s, live_all(), pre, seat)
         self._tac_move_to_safety(live_all, done, order, npass, op["rowof"], op["res"], danger, pre, seat, True)
         self._skip_turn(live_all(), pre)
+
+    def _tac_homeland_take(self, s: int, left: torch.Tensor, pre: str, seat: int) -> None:
+        """THE HOMELAND'S TAKE of minor `s`'s units (`homelandTake`, 0x712850
+        -> the offer 0x60a8c0): each unit in no job (`_mops_held`) whose turn
+        is not done — a civilian or support unit, a military unit of `left`
+        [B, P] the pass left — in a formation with a member in a job leaves
+        it (UNITCOMMAND_EXIT_FORMATION), an escort's rider freed with it"""
+        held = self._mops_held(s)
+        P = held.shape[1]
+        ut = getattr(self, f"{pre}_unit_type")[:, :P].clamp(min=0, max=self.NU - 1)
+        civ = self._type_civilian.take(ut) | self._type_support.take(ut)
+        cand = (getattr(self, f"{pre}_unit_alive")[:, :P] & (getattr(self, f"{pre}_unit_seat")[:, :P] == seat)
+                & ~held & (civ | left[:, :P]))
+        if not bool(self.unit_escorted.count_nonzero()) or not bool(cand.count_nonzero()):
+            return
+        rows, slots = cand.nonzero(as_tuple=True)
+        mate = self._tac_mate(rows, slots, pre)
+        mc = mate.clamp(min=0, max=P - 1)
+        hit = (mate >= 0) & (mate < P) & held[rows, mc]
+        if not bool(hit.count_nonzero()):
+            return
+        lo = self.POOL_LO[pre]
+        r, g, m = rows[hit], slots[hit] + lo, mate[hit] + lo
+        self.unit_escorted[r, g] = False
+        carrier = ~civ[r, slots[hit]]
+        self.unit_escorted[r[carrier], m[carrier]] = False
 
     def _minor_ai(self, units: torch.Tensor, pre: str) -> torch.Tensor:
         """[B, P] long — `militaryAiTypeOf` over pool `pre`'s `units`:

@@ -3948,13 +3948,16 @@ function safePlot(state: GameState, pass: Pass, u: Unit, taken: ReadonlySet<numb
 /**
  * MOVE TO SAFETY (0x77a4b0, its moves 0x774190): each unit left on a plot of
  * danger that flees (`flees`) is listed ("Move to safety", its danger
- * logged), then each in turn goes to its safe plot (`safePlot`, the plots
- * the ones before it took left out), its turn done (0x773fb0); one with no
- * safe plot stays for the moves after.
+ * logged as it is listed, 0x77a763..0x77a7a7), then each in turn goes to
+ * its safe plot (`safePlot`, the plots the ones before it took left out),
+ * its turn done (0x773fb0); one with no safe plot stays for the moves after
+ * (runs/h1_duels1171 t96-t105: the barbarian Warrior 1245201 on 14:9 logs
+ * "Move to safety, Current Danger: 15", then Wander Back to Camp).
  */
 function moveToSafety(state: GameState, pass: Pass): void {
   const list = pass.units.filter((u) => live(state, pass, u) && pass.danger[u.tileIndex] > 0
     && flees(state, pass, u, pass.danger[u.tileIndex], false));
+  for (const u of list) tacticsTrace?.(u, 'Move to safety', -1, -1);
   const taken = new Set<number>();
   for (const u of list) {
     if (!live(state, pass, u)) continue;
@@ -4501,9 +4504,9 @@ export function seatPoolSlots(state: GameState, s: Seat): UnitPool | undefined {
  * order — Support Formation, Attack High Priority, Move to Safety, Attack
  * Medium Priority, Attack Civilians, Promotion, Make Military Formation,
  * Attack Low Priority, Heal, Chase Target (no strike), Wander Near City;
- * the homeland's Move to Safety over every unit, then its End
- * Turn takes the rest (its Promotion finds no unit the tactical one left
- * due).
+ * the homeland's take (`homelandTake`), its Move to Safety over every unit,
+ * then its End Turn takes the rest (its Promotion finds no unit the
+ * tactical one left due).
  */
 export function cityStateTactics(state: GameState, cityState: CityState, operations: (pass: Pass) => void, strikes: () => void): void {
   const pool = seatPoolSlots(state, cityState)!;
@@ -4546,6 +4549,7 @@ export function cityStateTactics(state: GameState, cityState: CityState, operati
       chaseTarget(state, pass);
       wanderNearCity(state, pass, cityState.centerIndex);
       pass.units = all;
+      homelandTake(state, cityState, pass);
       homelandSafety(state, pass);
       for (const u of pass.units) if (live(state, pass, u)) endTurn(pass, u);
     });
@@ -4556,6 +4560,32 @@ export function cityStateTactics(state: GameState, cityState: CityState, operati
   // its turn's end: no unit left on a plot another keeps it out of
   unstackUnits(state, cityState.seat);
   poolDying(pool, state.units.filter((u) => u.seat === cityState.seat));
+}
+
+/**
+ * THE HOMELAND'S TAKE of a city-state's units (its turn 0x70a250 -> 0x712850
+ * -> the offer 0x60a8c0, once the tactical pass has let its units go): the
+ * units in no job (+0x7d0 -1: no operation's team, no "Upgrade Units"
+ * tree's) whose turn is not done — its civilians, the military units the
+ * pass left — join the homeland's job (+0x778), and each in a formation
+ * with another member in a job leaves it (0x60aa78..0x60ab14: the command
+ * UNITCOMMAND_EXIT_FORMATION 0x94bc70 built at 0x60aa1b, carried out on the
+ * unit taken where that member's +0x7d0 is not -1). runs/h1_duels1155
+ * city-state 2's Settler 786439: City Defense recruits its Warrior 393220 at
+ * t72 and t107, an "Upgrade Units" tree takes its Man-At-Arms 1245187 at
+ * t158 and 1441803 at t179 — each formation whole through the tactical
+ * pass, the record's UnitExitFormation (the Settler, then its escort) and
+ * the Settler's UnitTeleported after the pass's last move, before its HL:
+ * End Turn's Skip Turn; Support Formation runs for it the turns after
+ * (t73-78, t159, t180-182).
+ */
+function homelandTake(state: GameState, cs: CityState, pass: Pass): void {
+  const jobs = new Set([...(cs.ops ? opsOf(cs.ops).flatMap(opJobUnits) : []), ...(cs.upgradeTrees ?? []).flatMap((t) => t.units)]);
+  for (const u of state.units) {
+    if (u.seat !== cs.seat || jobs.has(u.id) || (unitDomain(u.type) === 'military' && !live(state, pass, u))) continue;
+    if (!formationMates(state, u).some((m) => jobs.has(m.id))) continue;
+    for (const r of [u, ...escortRiders(state, u)]) if (r.escorted) r.escorted = false;
+  }
 }
 
 /**
@@ -4817,10 +4847,12 @@ function moveBarred(state: GameState, u: Unit, goal: number, paths: ReadonlySet<
  * +0xdb0: its turn done or not, 0x81705b..0x81706f; a unit whose moves an
  * order ended has none), nearest the goal first, takes a move
  * order (0x962030): its radius the smaller of `range` (the node's Unit
- * distance) and its Range (GetRange, unit +0x19f8: 0 for a melee unit; 0
- * for a ship) — runs/h1_duelw1121 t73-t74: the raid's Archer (Range 2)
- * under Unit distance 1 goes for 6:13 beside its target 6:12 and stays
- * there —, at least 1 where the goal is barred to it (`moveBarred`; a
+ * distance) and its Range (GetRange, unit +0x19f8: 0 for a melee unit, a
+ * ranged ship's its own: 0x8178e3) — runs/h1_duelw1121 t73-t74: the raid's
+ * Archer (Range 2) under Unit distance 1 goes for 6:13 beside its target
+ * 6:12 and stays there; runs/h1_duels1154 t97 city-state 2's City Defense
+ * Quadrireme on its centre 37:19 goes for 37:18 —, at least 1 where the
+ * goal is barred to it (`moveBarred`; a
  * member on the goal itself skips the test, 0x817905..0x817921: runs/
  * h1_duely1121 t31-t32 city-state 3's City Defense Warrior on 42:18 goes
  * for 42:18, runs/h1_duely1117 t112-t121 its Crossbowman of Range 2 on
@@ -4867,7 +4899,7 @@ export function passMoveExec(state: GameState, pass: Pass, members: readonly num
   for (const u of movers) {
     if (!state.units.includes(u) || u.seat !== pass.seat) continue;
     const z = zero(u);
-    let r = UNITS[u.type]?.naval || z ? 0 : Math.min(range, rangeOf(u));
+    let r = z ? 0 : Math.min(range, rangeOf(u));
     const paths = pathPlots(state, u);
     const mine = formationMates(state, u);
     if (u.tileIndex !== goal && moveBarred(state, u, goal, paths, mine)) r = Math.max(1, r);
