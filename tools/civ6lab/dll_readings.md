@@ -16688,3 +16688,92 @@ records: the reach with turns and Movement, each target's spots and blows).
   recruit that allows stealing (the engines keep a locked operation's
   units; no tree a city-state runs locks).
 
+## C-130: the pillage analyzers, the Favor grant's and the extra accumulation's analyzers, CITY_HAS_DISTRICT's evaluator, the Luxury Policy's players — READ (0x6b7ec0, 0x6b92c0, 0x6c2f90, 0x6ae390, 0x6d3d50), both twins
+
+`plunderValue`, `ANALYZERS`, `EVALUATORS` (cpu/core/aiModifiers.ts),
+`enemyPlunder`, `cityDistrictComplete`, `districtType` (cpu/core/aiView.ts),
+`rankLuxuries` (cpu/core/city.ts), the Dam's row (cpu/data/districts.ts);
+GPU `_pol_enemy_plunder`, `_pol_admits`, `_free_power_wrapper`,
+`_pol_attach_free_power` (gpu/core/sim_policy.py), `_cai_value`
+(gpu/core/sim_civics.py), `_luxury_amenities` (gpu/core/sim_economy.py).
+
+- THE REGISTRY'S OBJECTS (0x6c9640): after each name's hash the entry's
+  +0x18 takes a static object whose first qword is its vtable — [0] the
+  parser, [1] the analyzer (an effect) or the evaluator (a requirement),
+  [2] slot 2.
+- EFFECT_ADJUST_UNIT_PILLAGE_IMPROVEMENT_MODIFIER 0x6b7ec0 (its parser
+  0x6b7c40: the Amount whole at +8, no object for 0): over the knowledge
+  base's cities (0x786160, 0xe0-byte entries) whose owner word the player
+  is at war with (0x3dcec0) and whose city resolves (0x57960): the plots of
+  that city's owner (player +0x1380 +0xf0, count +0x100), each plot's
+  improvement (+0x44) its Improvements row's PlunderAmount (+0x48, loader
+  0xa63870), summed — the whole list again for each city known of that
+  owner; float(sum) x 0.2f x Amount x 0.01f to 24.8 as Gold at the
+  player's weight (0x7a6690), discounted from the start (0x7a1240), whole.
+- EFFECT_ADJUST_UNIT_PILLAGE_DISTRICT_MODIFIER 0x6b92c0 (parser 0x6b8fc0):
+  the same walk, per city its own districts (City +0x1a48: 0x1ae510 each)
+  their Districts row's PlunderAmount (+0x48, loader 0xa5dfb0), the same
+  value. The Dam's row holds PLUNDER_HEAL 50 (Expansion2_Districts.xml).
+- EFFECT_ADD_PLAYER_FAVOR 0x6c2f90 (parser 0x6c2e40: the Amount whole at
+  +8): the Amount as PSEUDOYIELD_DIPLOMATIC_FAVOR at the player's weight
+  (0x7a60d0), a turn, from the start to the horizon (0x7a2140), whole — the
+  Future Civic's CIVIC_GRANT_FAVOR and Carbon Recapture's completion.
+- EFFECT_ADJUST_CITY_EXTRA_ACCUMULATION 0x6ae390 (Amount +8): a city
+  subject (context +0x70) and a player; per Resources row of class
+  RESOURCECLASS_STRATEGIC (+0x18 0xc163880a) the city's count 0x1f7010
+  (City +0x1e00, the resource, 0): over the plots of its three rings
+  (0x5cbc0(2) + 18) the city works by the map's city-plot owner (0x66480),
+  those whose resource as its owner sees it (0x4ab4b0) is the row's —
+  with the flag set, improved and unpillaged alone; above 0, the resource
+  value 0x7a21e0 of count x Amount from the start to the horizon, whole.
+- REQUIREMENT_CITY_HAS_DISTRICT 0x6d3d50 (parser 0x6d3c10: DistrictType's
+  index at +8): with the context's city (+0x70) — met where the context's
+  district type (+0x1c, a district's own evaluation) is the type, where the
+  city holds a completed district of the type or of one replacing it
+  (0x1aec20 (type, 1, 1): +0xb08, pillaged or not), or where the context's
+  district type is among the type's replacements (Districts +0x1e8). The
+  engines hold no district type in these contexts and test the city's
+  completed district.
+- THE LUXURY POLICY'S PLAYERS (Expansion2_Modifiers.xml): both
+  MODIFIER_PLAYER_ADJUST_BAN_RESOURCE and _NO_CAP_RESOURCE stand on
+  COLLECTION_MAJOR_PLAYERS: a city-state's and the Free Cities' luxuries
+  serve as ever under either outcome.
+- AN ENGINE DISTRICT'S INSTALL TYPE: THEATER_SQUARE is DISTRICT_THEATER,
+  WATER_PARK DISTRICT_WATER_ENTERTAINMENT_COMPLEX, GOVERNMENT_PLAZA
+  DISTRICT_GOVERNMENT (`districtType` through `gameTypeOf`).
+- THE GOVERNMENT VALUES' WEIGHTS: the civics AI's government values
+  (0x620110 after its propagation, later in the turn than its policy and
+  civic jobs) read the pseudo-yield weights after the turn's strategy
+  apply: a city-state's STRATEGY_NAVAL list stands in them from the turn it
+  starts, a turn before the City Analysis's (`pseudoYieldWeights`'
+  `applied` through `aiView`'s `updated`; GPU `_MinorFacts.pseudo_w`). The
+  civic value's formation term (0x7a9a10 at 0x7aa5c4 / 0x7aa69e: 100.0 as
+  PSEUDOYIELD_UNIT_COMBAT) takes the strategy's -0.9 with the Combat
+  Desire (GPU `_cai_value`).
+- CONFIRMED (one-seed aimem traces): runs/h1_duels1145 city-state 4, at
+  war with player 1 from t36 with one of its cities known: Raid 16.0 (300
+  Plunder on player 1's improvements, 15; that city's Campus 25, 1), 37.0
+  from t68 with its capital known by its Theater Square's plot, 90.0 at
+  t93 with the Dam's 50 in a known city, Total War 184.0 at t155 to 487.0
+  at t249 — every turn as logged (237 rows). runs/h1_duels1137 city-state
+  4's Future Civic 823.6 at 1 turn t230-249 and city-state 3's 1133.5 at 4
+  turns t237 (703.0 / 607.0 short without the Favor). runs/h1_duels1140
+  city-state 4 keeps its Cotton's Amenity from t62, the turn the Congress
+  bans Cotton (the record's luxAlloc and amenities 3 through t82): Civil
+  Prestige 93.0 and Retainers 14.0 at t62 as logged (149 / 70 with the
+  ban); city-state 2, a completed Commercial Hub and Harbor: Corporate
+  Libertarianism 280.8 at 1 turn t245-249 (54.0 short without its
+  Production row and its extraction), Nationalism 1268.5 at t120 with the
+  formation term at 9.77. runs/h1_duels1146 city-state 4 (a Theater
+  Square, 15 citizens): Grand Opera 35.0 t177-199 and 42.0 t224-249 (49
+  rows), Opera and Ballet 72.4 t178-186. runs/h1_duels1144 city-state 4 (STRATEGY_NAVAL
+  from t42) t43 and 1138 city-state 4 (from t37) t38: every civic in reach
+  as logged on the government values of the start turn (3.0 over on the
+  values without the list).
+- OPEN: REQUIREMENT_CITY_HAS_DISTRICT in a district's own evaluation
+  (context +0x1c) is not held by the engines; the Free Cities' extraction
+  (their resource value 0); the Free Cities' pillage value walks the
+  cities on the plots they see now, not a kept list (runs/h1_duels1143
+  player 62 t215-249: Raid 364 / 0 for 141-146, 0 for 289 from t222); the
+  GPU analyses the attach wrapper over the player's cities for the bare
+  EFFECT_ADJUST_CITY_FREE_POWER alone.

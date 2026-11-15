@@ -193,6 +193,7 @@
     - "C-95: the target list's knowledge-base entries"
     - "C-130: a lump's queue step completes the head; a major's trade list tries what its last turn revealed; a city-state's researched technology lands its boosts before the Culture — READ, both twins"
     - "C-108 / C-127: the trade AI's list searches fresh over its knowledge base's cities, the Free Cities' among them; a city-state's Trader walks its route — READ (0x78f210 at 0x78f400..0x78f41b, 0x559140, 0x77d10's +0xe0, 0x5f0280, 0x78e0a0 -> 0x53e20), both twins"
+    - "C-130: the pillage analyzers, the Favor grant's and the extra accumulation's analyzers, CITY_HAS_DISTRICT's evaluator, the Luxury Policy's players — READ (0x6b7ec0, 0x6b92c0, 0x6c2f90, 0x6ae390, 0x6d3d50), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "....+0x4a8) and, for each its player is at war with (0x469cd0), asks its knowledge base (0x786160) for that player's units (0x5eb8b0, age 1, distance 2): per unit type in DB order, each..."

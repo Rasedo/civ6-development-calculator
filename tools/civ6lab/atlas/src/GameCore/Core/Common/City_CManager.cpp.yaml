@@ -23,6 +23,7 @@
     - "C-96: the trade AI's route value — READ (0x5e9b20, 0x78f210, 0x78e010, 0x559140's use), PARTLY READ (0x526330's terms, the knowledge base's city order)"
     - "H-1: the civics AI — READ (the choice, the walk, the propagation), PARTLY READ (the value)"
     - "C-108: Rockefeller's route Gold and the Free Cities' meetings — READ (0x54c6c0's count functors, 0x556610, 0x524890 / 0x5249c0), both twins"
+    - "C-130: the pillage analyzers, the Favor grant's and the extra accumulation's analyzers, CITY_HAS_DISTRICT's evaluator, the Luxury Policy's players — READ (0x6b7ec0, 0x6b92c0, 0x6c2f90, 0x6ae390, 0x6d3d50), both twins"
   context:
     - ...isted (0x78d630) or rejected passes; the city itself passes; a city no longer standing (0x57960 null) leaves the list (0x78d6d0 / 0x78f5d0); the destination's plot asked of the player...
   review: reviewed

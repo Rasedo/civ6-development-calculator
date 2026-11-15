@@ -40,6 +40,8 @@ _POL_ANALYZERS = {
     "EFFECT_ADJUST_PLAYER_TRADE_ROUTE_TOURISM_MODIFIER",
     "EFFECT_ADJUST_CITY_TRADE_ROUTE_YIELD_PER_DESTINATION_LUXURY_RESOURCE_FOR_INTERNATIONAL",
     "EFFECT_ADJUST_CITY_TRADE_ROUTE_YIELD_PER_DESTINATION_STRATEGIC_RESOURCE_FOR_INTERNATIONAL",
+    "EFFECT_ADJUST_UNIT_PILLAGE_IMPROVEMENT_MODIFIER", "EFFECT_ADJUST_UNIT_PILLAGE_DISTRICT_MODIFIER",
+    "EFFECT_ADJUST_CITY_EXTRA_ACCUMULATION",
 }
 # the analyzers that name a yield in their context (`YIELD_NAMED`)
 _POL_YIELD_NAMED = {"EFFECT_ADJUST_PLOT_PURCHASE_COST": "YIELD_GOLD"}
@@ -73,7 +75,7 @@ _POL_EVALUATORS = {"REQUIREMENT_DISTRICT_TYPE_MATCHES", "REQUIREMENT_CITY_HAS_BU
                    "REQUIREMENT_CITY_HAS_GARRISON_UNIT", "REQUIREMENT_CITY_HAS_X_SPECIALTY_DISTRICTS",
                    "REQUIREMENT_CITY_IS_OWNER_CAPITAL_CONTINENT", "REQUIREMENT_PLAYER_IS_MINOR",
                    "REQUIREMENT_UNIT_PROMOTION_CLASS_MATCHES", "REQUIREMENT_CITY_HAS_X_POPULATION",
-                   "REQUIREMENT_CITY_HAS_HIGH_ADJACENCY_DISTRICT"}
+                   "REQUIREMENT_CITY_HAS_HIGH_ADJACENCY_DISTRICT", "REQUIREMENT_CITY_HAS_DISTRICT"}
 
 
 class SimPolicy:
@@ -149,6 +151,8 @@ class SimPolicy:
         if wrapper and (self._pol_refused(m.get("subjectReqs"), reads) or m.get("collection") not in reads["collections"]):
             # a wrapper its set refuses, or over a collection not read, is
             # worth 0 whatever it nests
+            return
+        if self._free_power_wrapper(m):
             return
         for a in m.get("ability") or []:
             self._pol_check_read(a, reads, owner, depth + 1)
@@ -297,6 +301,15 @@ class SimPolicy:
                         dsub = {"j": sub["j"], "dv": dv, "tile": tl}
                         y = self._pol_district_yield({"row": sub["f"].row, "B": mask.shape[0], "dev": mask.device}, dsub, a.get("YieldType", ""))
                         v = (tl >= 0) & (y >= float(a.get("Amount", 0) or 0))
+            elif ty == "REQUIREMENT_CITY_HAS_DISTRICT":
+                # 0x6d3d50: the city holds a completed district of the type
+                # (0x1aec20), pillaged or not
+                dv = self._pol_district_index(a.get("DistrictType", "")) if sub["kind"] == "city" else None
+                if dv is None:
+                    v = no
+                else:
+                    tl = self.city_dist_tile[:, sub["f"].row, sub["j"], dv]
+                    v = (tl >= 0) & self.district_complete.gather(1, tl.clamp(min=0).unsqueeze(1)).squeeze(1)
             elif ty == "REQUIREMENT_CITY_HAS_X_SPECIALTY_DISTRICTS":
                 # 0x6d4190: the city's finished specialty districts, pillaged
                 # or not, at least Amount
@@ -492,6 +505,17 @@ class SimPolicy:
             p = "PSEUDOYIELD_TOURISM"
             ct = self._ai_cities_tourism(ctx["row"]) * _FX
             return between(self._cv_pseudo(_fmul(full(_fx_const(_f32(amount * _f32(0.01)))), ct), p, f0.pseudo_w(p))) >> 8
+        if eff in ("EFFECT_ADJUST_UNIT_PILLAGE_IMPROVEMENT_MODIFIER", "EFFECT_ADJUST_UNIT_PILLAGE_DISTRICT_MODIFIER"):
+            # 0x6b7ec0 / 0x6b92c0: the enemies' PlunderAmount (`enemyPlunder`)
+            # x 0.2f x Amount x 0.01f as Gold at the player's weight,
+            # discounted from the start; none for an Amount of 0
+            if not amount:
+                return zero
+            n = self._pol_enemy_plunder(ctx, eff == "EFFECT_ADJUST_UNIT_PILLAGE_DISTRICT_MODIFIER").to(torch.float32)
+            x = (n * torch.tensor(_f32(0.2), dtype=torch.float32)).to(torch.float32)
+            x = (x * torch.tensor(float(amount), dtype=torch.float32)).to(torch.float32)
+            x = (x * torch.tensor(_f32(0.01), dtype=torch.float32)).to(torch.float32)
+            return _discounted(self._cv_yield(_fx_const_t(x.double()), "YIELD_GOLD", f0.yield_w("YIELD_GOLD")), r, t0) >> 8
         if eff in ("EFFECT_ADJUST_CITY_TRADE_ROUTE_YIELD_PER_DESTINATION_LUXURY_RESOURCE_FOR_INTERNATIONAL",
                    "EFFECT_ADJUST_CITY_TRADE_ROUTE_YIELD_PER_DESTINATION_STRATEGIC_RESOURCE_FOR_INTERNATIONAL"):
             # 0x6b2aa0 / 0x6b44d0: on the subject city, per route out of it
@@ -621,6 +645,28 @@ class SimPolicy:
                     continue
                 cnt = free[:, self._strat_rid.index(ri)] * amount
                 acc = acc + (self._cv_resource_value(s, f0, name, cnt, t0, hh, bb) >> 8)
+            return acc
+        if eff == "EFFECT_ADJUST_CITY_EXTRA_ACCUMULATION":
+            # 0x6ae390 on the subject city: per strategic resource the plots
+            # of its three rings it owns holding it revealed (0x1f7010,
+            # improved or not), above 0: the resource value of that count x
+            # Amount from the start to the horizon, each whole; a
+            # city-state's alone (`resourceValueOf`)
+            s = ctx["s"]
+            if not city or s == self.FR or not self._n_strategic:
+                return zero
+            f = sub["f"]
+            inv = {int(ri): n for n, ri in self._cv_tables()["engine"]["resource"].items()}
+            own = f.plot_valid() & f.plot_is("resourceVisible", None)
+            bb = torch.arange(B, device=dev)
+            acc = zero
+            for ri in self._strat_rid:
+                name = inv.get(ri)
+                if name is None:
+                    continue
+                cnt = (own & f.plot_is("resource", name)).long().sum(dim=1)
+                v = self._cv_resource_value(s, f0, name, cnt * amount, t0, hh, bb) >> 8
+                acc = acc + torch.where(cnt > 0, v, zero)
             return acc
         if eff == "EFFECT_ADJUST_UNIT_TAG_ERA_PRODUCTION":
             # the owner's era the EraType; its strongest unit of the class
@@ -793,6 +839,36 @@ class SimPolicy:
             tot = (torch.clamp(m, max=amount) * mine.long()).sum(dim=1) * _FX
             return span(self._cv_yield(tot, "YIELD_GOLD")) >> 8
         raise NotImplementedError(eff)
+
+    def _pol_enemy_plunder(self, ctx: dict, districts: bool) -> torch.Tensor:
+        """`enemyPlunder` [B] for the context's minor: over the cities its
+        knowledge base holds (a city-state's entries standing,
+        `_minor_cities_look`; the Free Cities' those their look names on the
+        plots they see, `_known_city_first`) whose owner it is at war with, the PlunderAmount of
+        the improvements on every plot of that owner, summed again for each
+        of its cities known — or, with `districts`, of the city's own
+        districts"""
+        B, dev = ctx["B"], ctx["dev"]
+        s = ctx["s"]
+        live, _ctr = self._known_trade_cands(torch.full((B,), -1, dtype=torch.long, device=dev))
+        if s != self.FR:
+            live = live & (self.citystate_kb_city_rank[:, s] >= 0) & (self.citystate_kb_city_id[:, s] == self._known_trade_ids())
+        else:
+            live = live & (self._known_city_first(self._barb_seen(FREE_SEAT)) < self.T)
+        war = self.war[:, ctx["row"]]
+        ground = torch.where(self.improvement >= 0, self._imp_plun_amt[self.improvement.clamp(min=0)], torch.zeros_like(self.improvement))
+        out = torch.zeros(B, dtype=torch.long, device=dev)
+        for d in range(live.shape[1]):
+            row, j = (self._CITY_MINOR0 + d, 0) if d < self.S else self._trade_cand_row(d)
+            m = live[:, d] & war[:, row]
+            if not bool(m.any()):
+                continue
+            if districts:
+                amt = (self._d_plun_amt.unsqueeze(0) * (self.city_dist_tile[:, row, j] >= 0).long()).sum(dim=1)
+            else:
+                amt = (ground * (self.tile_seat == int(self._ROW_SEAT[row])).long()).sum(dim=1)
+            out = out + torch.where(m, amt, torch.zeros_like(amt))
+        return out
 
     def _pol_building_production(self, ctx: dict, a: dict, sub: dict, h: int) -> torch.Tensor:
         """0x6c1a80 on a city subject (`EFFECT_ADJUST_BUILDING_PRODUCTION`):
@@ -969,6 +1045,39 @@ class SimPolicy:
                 if r["type"] in reads["evaluators"] and r["type"] not in ok:
                     raise NotImplementedError(f"modifier {m.get('id')}: requirement {r['type']} on a strength modifier's units")
         return True
+
+    def _free_power_wrapper(self, m: dict) -> bool:
+        """a wrapper over the player's cities attaching one bare
+        EFFECT_ADJUST_CITY_FREE_POWER on each (the Future Victory Science
+        card's Spaceport power)"""
+        inner = m.get("attach")
+        return (m.get("effect") == "EFFECT_ATTACH_MODIFIER" and m.get("collection") == "COLLECTION_PLAYER_CITIES" and bool(inner)
+                and inner.get("effect") == "EFFECT_ADJUST_CITY_FREE_POWER" and inner.get("collection") == "COLLECTION_OWNER"
+                and not inner.get("subjectReqs"))
+
+    def _pol_attach_free_power(self, ctx: dict, m: dict, h: int) -> torch.Tensor:
+        """`analysis`'s EFFECT_ATTACH_MODIFIER for `_free_power_wrapper` [B]:
+        the last city subject the wrapper's set admits leaves the attached
+        analysis's whole value there — a minor's city is never short of
+        power (`cityPowerShort`), so the Amount at PSEUDOYIELD_GPP_SCIENTIST
+        from the start to the horizon, none for an Amount of 0 or below"""
+        B, dev = ctx["B"], ctx["dev"]
+        acc = torch.zeros(B, dtype=torch.long, device=dev)
+        amount = int(float((m["attach"].get("args") or {}).get("Amount", 0) or 0))
+        if amount <= 0:
+            return acc
+        r = self._cv_tables()["rate"]
+        t0 = torch.zeros(B, dtype=torch.long, device=dev)
+        p = "PSEUDOYIELD_GPP_SCIENTIST"
+        a = self._cv_pseudo(torch.full((B,), amount * _FX, dtype=torch.long, device=dev), p, ctx["f0"].pseudo_w(p))
+        if h != 0:
+            v = (_present_value(a, r, torch.full((B,), h, dtype=torch.long, device=dev)) - _present_value(a, r, t0)) >> 8
+        else:
+            v = _discounted(a, r, t0) >> 8
+        for sub in self._pol_subjects(ctx, m["collection"])[:51]:
+            ok = self._pol_admits(m.get("subjectReqs"), sub) & sub["mask"]
+            acc = torch.where(ok, v, acc)
+        return acc
 
     def _strength_unit_admits(self, rs, row: torch.Tensor) -> torch.Tensor:
         """[B, P] the wrapper's own set over each unit (0x6cf3c0):
@@ -1203,6 +1312,8 @@ class SimPolicy:
         eff = m.get("effect")
         if self._strength_wrapper(m, reads):
             return self._strength_mod_value(ctx["s"], m)
+        if self._free_power_wrapper(m):
+            return zero if self._pol_refused(m.get("subjectReqs"), reads) else self._pol_attach_free_power(ctx, m, h)
         if eff not in reads["analyzers"] or eff in ("EFFECT_ATTACH_MODIFIER", "EFFECT_ATTACH_MODIFIER_TO_PLAYERTYPE", "EFFECT_GRANT_ABILITY"):
             return zero
         if m.get("collection") not in reads["collections"] or self._pol_refused(m.get("subjectReqs"), reads):

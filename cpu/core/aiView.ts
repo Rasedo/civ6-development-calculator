@@ -60,7 +60,9 @@ import { tileAppeal } from './appeal';
 import { DEFAULT_HANDICAP } from '../data/barbarians';
 import { availableProjects, districtCost, districtScaledBase, projectCost, settlerCost, tilePurchaseCost, unitProdCost } from './game';
 
-const districtType = (id: string): string => `DISTRICT_${id}`;
+/** an engine district's DistrictType in the install (THEATER_SQUARE is
+ *  DISTRICT_THEATER) */
+const districtType = (id: string): string => gameTypeOf('district', id, 'DISTRICT_');
 
 /** a district's yield of a kind (0x24b5a0: District::GetYield 0x249850 and
  *  0x24aae0): its adjacency yield of that kind at its plot (0x366df0); none
@@ -114,8 +116,10 @@ export function cityGrowth(state: GameState, city: City): CityGrowth {
 /** `updated`, the civics AI's government values' view: a city-state's
  *  housing value on the forecast of its city as its city AI's update this
  *  turn read it (`CityState.aiGrowthSeen`) instead of the one its turn's
- *  production set (`CityState.aiGrowth`), and its city's yield totals as the
- *  city stands instead of those its City Analysis read (`aiCityStats`) */
+ *  production set (`CityState.aiGrowth`), its city's yield totals as the
+ *  city stands instead of those its City Analysis read (`aiCityStats`), and
+ *  its pseudo-yield weights after the turn's strategy apply
+ *  (`pseudoYieldWeights`' applied) */
 export function aiView(state: GameState, opts: { updated?: boolean } = {}): AiView {
   const seat = (i: number) => {
     const s = seatOf(state, i);
@@ -131,7 +135,7 @@ export function aiView(state: GameState, opts: { updated?: boolean } = {}): AiVi
   const pseudo = new Map<number, Map<string, number>>();
   const pseudoOf = (i: number): Map<string, number> => {
     let w = pseudo.get(i);
-    if (!w) pseudo.set(i, (w = pseudoYieldWeights(state, i)));
+    if (!w) pseudo.set(i, (w = pseudoYieldWeights(state, i, !!opts.updated)));
     return w;
   };
   const { map } = state;
@@ -332,6 +336,10 @@ export function aiView(state: GameState, opts: { updated?: boolean } = {}): AiVi
       const city = cityOf(i, id);
       return !!city && city.districts.some((d) => districtType(d.type) === type);
     },
+    cityDistrictComplete: (i, id, type) => {
+      const city = cityOf(i, id);
+      return !!city && city.districts.some((d) => districtType(d.type) === type && map.tiles[d.tileIndex].districtComplete);
+    },
     cityReligion: (i, id) => {
       if (isCityStateSeat(i)) return majorityReligionOf(state, i);
       return cityOf(i, id)?.followedReligion ?? -1;
@@ -416,6 +424,29 @@ export function aiView(state: GameState, opts: { updated?: boolean } = {}): AiVi
     // is not read
     tradeKnowledge: (i) => (isCityStateSeat(i) || i === FREE_SEAT ? seatOf(state, i)?.tradeValue ?? 0 : null),
     citiesTourism: (i) => seatCities(i).reduce((s, c) => s + cityTourism(state, c), 0),
+    enemyPlunder: (i, of) => {
+      if (!warsOf(state, i).length) return 0;
+      // a city-state's knowledge base's cities (`minorCitiesLook`); any
+      // other player's, the cities its look names (`lookCities`)
+      const known = isCityStateSeat(i) ? (seatOf(state, i) as CityState).citiesKnown ?? [] : lookCities(state, lookPlots(state, i));
+      const ground = new Map<number, number>();
+      let sum = 0;
+      for (const k of known) {
+        if (!civsAtWar(state, i, k.owner)) continue;
+        const city = cityOf(k.owner, k.id);
+        if (!city) continue;
+        if (of === 'districts') {
+          for (const d of city.districts) sum += DISTRICTS[d.type]?.plunder?.amount ?? 0;
+          continue;
+        }
+        if (!ground.has(k.owner)) {
+          ground.set(k.owner, map.tiles.reduce((n, t) =>
+            n + (t.improvement && tileSeat(t) === k.owner ? IMPROVEMENTS[t.improvement as ImprovementId]?.plunder?.amount ?? 0 : 0), 0));
+        }
+        sum += ground.get(k.owner)!;
+      }
+      return sum;
+    },
     cityRouteDestPlots: (i, id, category) => cityRouteDestPlots(state, i, id, category),
     // over the major civilizations, those a route joins the seat to: a
     // route between two city-states counts nothing (runs/h1_duely1121

@@ -33,7 +33,7 @@ import { bankruptAmenities, DEAL_LUXURY, DED_FREE_INQUIRY, HOLY_CITY_TOURISM, TO
 import { LUXURY_IDS, RESOURCES, resourceImprovement } from '../../world/resources';
 import { FEATURES, isFloodplains } from '../../world/features';
 import { CITY_WORK_RADIUS, BORDER_MAX_RADIUS, PLOT_INFLUENCE, borderGrowthCost, FOOD_PER_CITIZEN, CITIZEN_SCIENCE, CITIZEN_CULTURE, UNASSIGNED_CITIZEN_GOLD, CITY_CENTER_MIN_FOOD, CITY_CENTER_MIN_PRODUCTION, HOUSING_FRESH_WATER, HOUSING_COASTAL, HOUSING_NO_WATER, AQUEDUCT_FRESH_BONUS, AQUEDUCT_NO_FRESH_TOTAL, LUXURY_AMENITY_CITIES, growthFoodNeeded, housingGrowthFactor, amenitiesNeeded, amenityTier, amenityTierIndex, type AmenityTier } from '../data/constants';
-import { hiddenResourcesFor, onHomeContinent } from './seats';
+import { hiddenResourcesFor, isCiv, onHomeContinent } from './seats';
 import { tileSeat, tileCity, setTileOwner, tileBelongsTo,tileOwnedByCiv, seatOf, citiesOf, civOf, civVariantOf, tileClaimed, campTiles, borderTurnsFrom, isCityStateSeat, tradeRoutesJoin } from './seats';
 import { warWearinessLosses } from './weariness';
 import { ANTIQUITY_CIVIC, SHIPWRECK_CIVIC, cityGarrisoned } from './units';
@@ -733,8 +733,11 @@ export function rankLuxuries(state: GameState, seat: number): Map<number, number
   // luxury outright; A widens the luxury's pass by every copy the seat holds
   // — its own, its city-states', its Great Persons', its deals' (1104
   // China's six Cocoa, four of them its own plots, reach 24, t143-162).
-  const banned = congressBannedLuxury(state);
-  const dupLux = congressDuplicateLuxury(state);
+  // Both modifiers stand on the major players alone (BAN_LUXURY_RESOURCE,
+  // NO_CAP_LUXURY_RESOURCE: COLLECTION_MAJOR_PLAYERS): a city-state's and
+  // the Free Cities' luxuries serve as ever
+  const banned = isCiv(seat) ? congressBannedLuxury(state) : null;
+  const dupLux = isCiv(seat) ? congressDuplicateLuxury(state) : null;
   const held = luxuryHoldings(state, seat).held;
   const dupCopies = dupLux && dupLux !== banned ? Math.max(0, held.get(dupLux) ?? 0) : 0;
   // every luxury the seat holds a copy of — its own, its city-states', its

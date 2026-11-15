@@ -3,6 +3,16 @@
 # `review: imported` = bootstrapped from dll_readings.md / code comments / saved
 # labels and not yet reviewed: verify against the disassembly, then edit and
 # set `review: reviewed`.
+- addr: 0x66480
+  final: 0x4c320
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-130: the pillage analyzers, the Favor grant's and the extra accumulation's analyzers, CITY_HAS_DISTRICT's evaluator, the Luxury Policy's players — READ (0x6b7ec0, 0x6b92c0, 0x6c2f90, 0x6ae390, 0x6d3d50), both twins"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...plots of its three rings (0x5cbc0(2) + 18) the city works by the map's city-plot owner (0x66480), those whose resource as its owner sees it (0x4ab4b0) is the row's — with the flag s..."
+  review: imported
 - addr: 0x66680
   final: 0x4c4e0
   kind: function

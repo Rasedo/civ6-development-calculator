@@ -286,6 +286,11 @@ const EVALUATORS: Readonly<Record<string, Evaluator>> = {
   // 0x6d2760: the evaluating player (context +0x80) is no full civilization
   // and no barbarian — a city-state or the Free Cities
   REQUIREMENT_PLAYER_IS_MINOR: (t) => !t.view.fullCiv(t.seat) && !t.view.barbarianSeats().includes(t.seat),
+  // 0x6d3d50: a city subject (the context's city, +0x70) holding a completed
+  // district of the type or of one replacing it (0x1aec20); in a district's
+  // own evaluation (context +0x1c, none in a policy's or a government's
+  // analysis) that district's type or one it replaces
+  REQUIREMENT_CITY_HAS_DISTRICT: (t, args, s) => s.kind === 'city' && t.view.cityDistrictComplete(s.seat, s.id, args.DistrictType ?? ''),
   // 0x6cfad0: a city subject (the context's city, +0x70) of at least Amount
   // citizens (+0x588)
   REQUIREMENT_CITY_HAS_X_POPULATION: (t, args, s) => s.kind === 'city' && t.view.cityCitizens(s.seat, s.id) >= (Number(args.Amount ?? 0) | 0),
@@ -404,6 +409,13 @@ function destPlotsValue(t: ValueTerms, args: Readonly<Record<string, string>>, c
     sum += whole(valueBetween(v, t.start, t.horizon, t.rate));
   }
   return sum;
+}
+/** the pillage analyzers' value of the enemies' plunder (`enemyPlunder`) */
+function plunderValue(t: ValueTerms, args: Readonly<Record<string, string>>, of: 'improvements' | 'districts'): number {
+  const amount = Number(args.Amount ?? 0) | 0;
+  if (!amount) return 0;
+  const gold = Math.fround(Math.fround(Math.fround(t.view.enemyPlunder(t.seat, of) * Math.fround(0.2)) * amount) * Math.fround(0.01));
+  return whole(discounted(yieldValue(t.view, t.seat, fxConst(gold), 'YIELD_GOLD'), t.rate, t.start));
 }
 /** a bool argument as the analyzer's parser reads it (0xc7a1c0), with its
  *  default */
@@ -966,6 +978,11 @@ const ANALYZERS: Readonly<Record<string, Analyzer>> = {
   // 0x6c4820: PSEUDOYIELD_DIPLOMATIC_FAVOR at the player's weight,
   // PV(horizon) - PV(start)
   EFFECT_ADJUST_PLAYER_EXTRA_FAVOR_PER_TURN: (t, args) => whole(span(t, pseudoYieldValue(t.view, t.seat, amountOf(args), 'PSEUDOYIELD_DIPLOMATIC_FAVOR'))),
+  // 0x6c2f90 (the Future Civic's grant; its parser 0x6c2e40 stores the
+  // Amount whole at +8): the Amount as PSEUDOYIELD_DIPLOMATIC_FAVOR at the
+  // player's weight, a turn, from the start to the horizon (0x7a2140)
+  EFFECT_ADD_PLAYER_FAVOR: (t, args) =>
+    whole(valueBetween(pseudoYieldValue(t.view, t.seat, amountOf(args), 'PSEUDOYIELD_DIPLOMATIC_FAVOR'), t.start, t.horizon, t.rate)),
   // 0x6c0ff0: a Trader's worth (0x7a7110) with the amount's capacity more,
   // from the start to the horizon; 0 where the route value is not read
   // 0x6b0700 (@f04258, vtable 0xd63028; its parser 0x6b0430 stores
@@ -977,6 +994,15 @@ const ANALYZERS: Readonly<Record<string, Analyzer>> = {
     const x = fmul(fxConst(Math.fround((Number(args.Amount ?? 0) | 0) * Math.fround(0.01))), t.view.citiesTourism(t.seat) * FX);
     return whole(valueBetween(pseudoYieldValue(t.view, t.seat, x, 'PSEUDOYIELD_TOURISM'), t.start, t.horizon, t.rate));
   },
+  // 0x6b7ec0 / 0x6b92c0 (Raid, Total War; their parsers 0x6b7c40 / 0x6b8fc0
+  // store the Amount whole at +8, none for 0): over the cities the player's
+  // knowledge base holds whose owner it is at war with, the PlunderAmount of
+  // the improvements on every plot of that owner (its plot list, walked
+  // again for each of its cities known) — or of the city's own districts —
+  // x 0.2f x Amount x 0.01f as Gold at the player's weight, discounted from
+  // the start
+  EFFECT_ADJUST_UNIT_PILLAGE_IMPROVEMENT_MODIFIER: (t, args) => plunderValue(t, args, 'improvements'),
+  EFFECT_ADJUST_UNIT_PILLAGE_DISTRICT_MODIFIER: (t, args) => plunderValue(t, args, 'districts'),
   // 0x6a1380 (@f04068, vtable 0xd62818; its parser 0x6a1240 stores the
   // Amount whole at +8): per player a trade route joins the player to, the
   // Tourism toward it (0x394830) x Amount x fx(0.01f) as PSEUDOYIELD_TOURISM,
@@ -1213,6 +1239,23 @@ const ANALYZERS: Readonly<Record<string, Analyzer>> = {
     const list = args.ResourceType ? [args.ResourceType] : ACCUMULATING;
     let sum = 0;
     for (const res of list) sum += whole(t.view.resourceValueOf(t.seat, res, t.view.resourceStockFree(t.seat, res) * a, t.start, t.horizon));
+    return sum;
+  },
+  // 0x6ae390 (Corporate Libertarianism's extraction; Amount +8): on a city
+  // subject, per strategic resource (the Resources rows of class
+  // RESOURCECLASS_STRATEGIC) the plots of the city's three rings it owns
+  // holding it revealed to its owner (0x1f7010 with its flag clear: improved
+  // or not), above 0: the resource value (0x7a21e0) of that count x Amount
+  // from the start to the horizon, each whole
+  EFFECT_ADJUST_CITY_EXTRA_ACCUMULATION: (t, args, s) => {
+    if (s.kind !== 'city') return 0;
+    const a = Number(args.Amount ?? 0) | 0;
+    const n = new Map<string, number>();
+    for (const p of t.view.cityOwnedPlots(s.seat, s.id)) {
+      if (p.resource && p.resourceVisible && p.resourceClass === 'RESOURCECLASS_STRATEGIC') n.set(p.resource, (n.get(p.resource) ?? 0) + 1);
+    }
+    let sum = 0;
+    for (const [res, c] of n) sum += whole(t.view.resourceValueOf(t.seat, res, c * a, t.start, t.horizon));
     return sum;
   },
   // 0x6c4650: a city subject whose centre's outer defence stands (its

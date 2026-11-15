@@ -153,7 +153,7 @@ export interface DistrictDef {
   cityStrength: number;
   /** CIV6 (Pillaging, GS data): what wrecking it pays the pillager; absent =
    *  NO_PLUNDER (the City Center and the Encampment, which is conquered
-   *  instead — and the Dam, whose row is a 0 HP heal). */
+   *  instead). */
   plunder?: PlunderRow;
   /** CIV6 (Government Plaza): "+8 Loyalty to this city." A flat per-turn term
    *  like a building's, paid while the district stands complete. */
@@ -951,6 +951,7 @@ export const DISTRICTS: Record<DistrictId, DistrictDef> = {
   // ENGINEERING districts, which is also what lets a Military Engineer rush it.
   DAM: D({
     id: 'DAM',
+    plunder: { kind: 'heal', amount: 50 },
     costProgressGame: 1000,
     name: 'Dam',
     code: 'DM',
@@ -977,6 +978,8 @@ export const DISTRICTS: Record<DistrictId, DistrictDef> = {
       maintenance: xml('Districts', 'DistrictType=DISTRICT_DAM', 'Maintenance'),
       appealAdjacent: xml('Districts', 'DistrictType=DISTRICT_DAM', 'Appeal'),
       cityStrength: xml('Districts', 'DistrictType=DISTRICT_DAM', 'CityStrengthModifier'),
+      'plunder.kind': xml('Districts', 'DistrictType=DISTRICT_DAM', 'PlunderType', { expect: 'PLUNDER_HEAL' }),
+      'plunder.amount': xml('Districts', 'DistrictType=DISTRICT_DAM', 'PlunderAmount'),
       code: { stylized: 'a display code, not a game constant' },
       color: { stylized: 'a display colour, not a game constant' },
       costProgressGame: xml('Districts', 'DistrictType=DISTRICT_DAM', 'CostProgressionParam1'),

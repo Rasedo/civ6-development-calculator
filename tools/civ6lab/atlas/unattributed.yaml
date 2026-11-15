@@ -254,6 +254,7 @@
     - "C-95: Explore Land and the barbarians' revealed plots — READ, ported (two tests below unread)"
     - "H-1: the civics AI — READ (the choice, the walk, the propagation), PARTLY READ (the value)"
     - "C-130: Market Economy's per-destination-resource route analyzers — READ (0x6b2aa0, 0x6b44d0, 0x6c89b0, 0x6c87a0, 0x1f71b0's viewer), both twins"
+    - "C-130: the pillage analyzers, the Favor grant's and the extra accumulation's analyzers, CITY_HAS_DISTRICT's evaluator, the Luxury Policy's players — READ (0x6b7ec0, 0x6b92c0, 0x6c2f90, 0x6ae390, 0x6d3d50), both twins"
   context:
     - "...a city-state; COLLECTION_CITY_PLOT_YIELDS (0x69feb0: the city's plots of index below 0x5cbc0(2) + 18 that it owns) with EFFECT_ADJUST_PLOT_YIELD 0x6afa10 (a plot not impassable: ha..."
   review: reviewed
@@ -5079,6 +5080,7 @@
     - "C-100: the plot's own subject, PLOT_IS_HILLS and the plot analysis' replaced camp — READ (0x69ed60 / 0x69ec20, 0x6d0970, 0x5cf160..0x5cf1ab), both twins"
     - "C-130: the analyzers a minor's policy jobs never reach, the treaties on a minor's queue, a major's cached net income — READ, both twins"
     - "C-130: the damage modifier's analyzer, a unit's tag requirement, the player's units walked by pool slot, a minor's one-time projects — READ (0x6bba30, 0x6d2610, 0x69ec70), both twins"
+    - "C-130: the pillage analyzers, the Favor grant's and the extra accumulation's analyzers, CITY_HAS_DISTRICT's evaluator, the Luxury Policy's players — READ (0x6b7ec0, 0x6b92c0, 0x6c2f90, 0x6ae390, 0x6d3d50), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "- The registry (`reg.py` over 0x6c9640): 211 effect names, 27 collections, 66 requirements; the effects the policies and gover..."
@@ -9299,6 +9301,26 @@
     - "- 0x365ae0, one row (column map from the loader 0xa57930's SELECT: flag byte +0xc0 = AdjacentNaturalWonder 1, AdjacentResource 2, AdjacentRiver..."
     - "- 0x365ae0 one row (loader 0xa57930; flags +0xc0 NaturalWonder 1, Resource 2, River 4, SeaResource 8, Wonder 0x10, OtherDis..."
   review: reviewed
+- addr: 0xa5dfb0
+  final: 0x759440
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-130: the pillage analyzers, the Favor grant's and the extra accumulation's analyzers, CITY_HAS_DISTRICT's evaluator, the Luxury Policy's players — READ (0x6b7ec0, 0x6b92c0, 0x6c2f90, 0x6ae390, 0x6d3d50), both twins"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...tricts (City +0x1a48: 0x1ae510 each) their Districts row's PlunderAmount (+0x48, loader 0xa5dfb0), the same value. The Dam's row holds PLUNDER_HEAL 50 (Expansion2_Districts.xml)."
+  review: imported
+- addr: 0xa63870
+  final: 0x75ed00
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-130: the pillage analyzers, the Favor grant's and the extra accumulation's analyzers, CITY_HAS_DISTRICT's evaluator, the Luxury Policy's players — READ (0x6b7ec0, 0x6b92c0, 0x6c2f90, 0x6ae390, 0x6d3d50), both twins"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "..., each plot's improvement (+0x44) its Improvements row's PlunderAmount (+0x48, loader 0xa63870), summed — the whole list again for each city known of that owner; float(sum) x 0.2f x..."
+  review: imported
 - addr: 0xa6a7b0
   final: 0x765c40
   kind: function
@@ -10474,7 +10496,7 @@
   final: 0x950900
   kind: function
   status: PARTLY
-  impl: [cpu/core/aiModifiers.ts:destPlotsValue]
+  impl: [cpu/core/aiModifiers.ts:destPlotsValue, cpu/core/aiModifiers.ts:plunderValue]
   notes: ["imported: cited by the code, in no dll_readings section"]
   review: imported
 - addr: 0xc7a880

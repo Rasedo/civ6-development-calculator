@@ -1526,11 +1526,12 @@ class SimCityValue:
                       "REQUIREMENT_PLOT_HAS_ANY_IMPROVEMENT", "REQUIREMENT_DISTRICT_TYPE_MATCHES",
                       "REQUIREMENT_CITY_HAS_BUILDING", "REQUIREMENT_CITY_IS_OWNER_CAPITAL_CONTINENT",
                       "REQUIREMENT_CITY_HAS_GARRISON_UNIT", "REQUIREMENT_CITY_HAS_X_SPECIALTY_DISTRICTS",
-                      "REQUIREMENT_CITY_HAS_X_POPULATION", "REQUIREMENT_PLOT_IS_HILLS", "REQUIREMENT_PLOT_ADJACENT_TO_OWNER")
+                      "REQUIREMENT_CITY_HAS_X_POPULATION", "REQUIREMENT_PLOT_IS_HILLS", "REQUIREMENT_PLOT_ADJACENT_TO_OWNER",
+                      "REQUIREMENT_CITY_HAS_DISTRICT")
     _CV_ANALYZERS = ("EFFECT_ADJUST_PLOT_YIELD", "EFFECT_ADJUST_CITY_YIELD_CHANGE", "EFFECT_ADJUST_UNIT_EXPERIENCE_MODIFIER",
                      "EFFECT_ADJUST_CITY_INNER_DEFENSE", "EFFECT_ADJUST_TRADE_ROUTE_CAPACITY",
                      "EFFECT_ADJUST_PLAYER_EXTRA_FAVOR_PER_TURN", "EFFECT_ADJUST_INFLUENCE_POINTS_PER_TURN",
-                     "EFFECT_GRANT_UNIT_IN_CITY", "EFFECT_GRANT_ABILITY", "EFFECT_ATTACH_MODIFIER",
+                     "EFFECT_ADD_PLAYER_FAVOR", "EFFECT_GRANT_UNIT_IN_CITY", "EFFECT_GRANT_ABILITY", "EFFECT_ATTACH_MODIFIER",
                      "EFFECT_GRANT_INFLUENCE_TOKEN", "EFFECT_GRANT_SPY", "EFFECT_GRANT_COMBAT_ADJACENCY",
                      "EFFECT_ADJUST_UNIT_PRODUCTION", "EFFECT_ADJUST_CITY_FREE_POWER", "EFFECT_MOUNTAIN_PORTAL",
                      "EFFECT_ADJUST_IMPROVEMENT_HOUSING")
@@ -1651,6 +1652,15 @@ class SimCityValue:
             elif ty == "REQUIREMENT_CITY_HAS_X_POPULATION":
                 # 0x6cfad0: the city's population at least Amount
                 v = _t(cf.population() >= int(float(a.get("Amount", 0) or 0)), shape).bool() if k == "city" else no
+            elif ty == "REQUIREMENT_CITY_HAS_DISTRICT":
+                # 0x6d3d50: the city holds a completed district of the type
+                # (0x1aec20), pillaged or not
+                dv = next((d for d, n in self._cv_tables()["dist_name"].items() if n == a.get("DistrictType")), None)
+                if k != "city" or dv is None:
+                    v = no
+                else:
+                    tl = self.city_dist_tile[:, cf.row, getattr(cf, "j", 0), dv]
+                    v = _t((tl >= 0) & self.district_complete.gather(1, tl.clamp(min=0).unsqueeze(1)).squeeze(1), shape).bool()
             elif ty == "REQUIREMENT_CITY_HAS_X_SPECIALTY_DISTRICTS":
                 # 0x6d4190: the city's finished specialty districts at least Amount
                 if k != "city":
@@ -1765,6 +1775,11 @@ class SimCityValue:
         if eff in ("EFFECT_ADJUST_PLAYER_EXTRA_FAVOR_PER_TURN", "EFFECT_ADJUST_INFLUENCE_POINTS_PER_TURN"):
             p = "PSEUDOYIELD_DIPLOMATIC_FAVOR" if eff == "EFFECT_ADJUST_PLAYER_EXTRA_FAVOR_PER_TURN" else "PSEUDOYIELD_INFLUENCE"
             return span(self._cv_pseudo(torch.full_like(like, amount * _FX), p, f.pseudo_w(p))) >> 8
+        if eff == "EFFECT_ADD_PLAYER_FAVOR":
+            # 0x6c2f90: the Amount a turn as PSEUDOYIELD_DIPLOMATIC_FAVOR, from
+            # the start to the horizon
+            p = "PSEUDOYIELD_DIPLOMATIC_FAVOR"
+            return between(self._cv_pseudo(torch.full_like(like, amount * _FX), p, f.pseudo_w(p))) >> 8
         if eff == "EFFECT_ADJUST_UNIT_PRODUCTION":
             # the context's city alone, with none every city of the player
             # (`EFFECT_ADJUST_UNIT_PRODUCTION`)
@@ -1996,9 +2011,11 @@ class _MinorFacts:
         # a city-state's military AI adds its Combat Desire to
         # PSEUDOYIELD_UNIT_COMBAT (the Free Cities' row past the
         # city-states'), over STRATEGY_NAVAL's weight where it follows the
-        # strategy since a turn before (`citystate_naval` 2)
+        # strategy since a turn before (`citystate_naval` 2) — in the
+        # government values' read (`updated`), after the turn's strategy
+        # apply, from the turn it starts
         if p in ("PSEUDOYIELD_UNIT_COMBAT", "PSEUDOYIELD_UNIT_EXPLORER", "PSEUDOYIELD_UNIT_NAVAL_COMBAT") and self.s < self.sim.S:
-            naval = self.sim.citystate_naval[:, self.s] == 2
+            naval = self.sim.citystate_naval[:, self.s] >= (1 if self.updated else 2)
             base = naval.long() * int(self.sim.rules.research_ai["navalPseudo"].get(p, 0))
             if p == "PSEUDOYIELD_UNIT_COMBAT":
                 return base + self.sim.citystate_combat_desire[:, self.s]

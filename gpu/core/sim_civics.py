@@ -152,9 +152,13 @@ class SimCivics:
         spies = whole(self._rai_from_landing(m[:, :, 1] * T["spy"], nn))
         strength = self._cai_strength(s).unsqueeze(1).expand(B, NC)
         adjacency = whole(self._rai_from_landing(strength * _FX, nn)) * m[:, :, 2]
-        # a formation's units at the minor's PSEUDOYIELD_UNIT_COMBAT weight,
-        # its military AI's Combat Desire (the Free Cities' on the row `FR`)
+        # a formation's units at the minor's PSEUDOYIELD_UNIT_COMBAT weight:
+        # its military AI's Combat Desire (the Free Cities' on the row `FR`),
+        # over STRATEGY_NAVAL's weight where a city-state follows the
+        # strategy since a turn before (`pseudoYieldWeights`)
         desire = self.citystate_combat_desire[:, s]
+        if s < self.S:
+            desire = desire + (self.citystate_naval[:, s] == 2).long() * int(self.rules.research_ai["navalPseudo"].get("PSEUDOYIELD_UNIT_COMBAT", 0))
         formation = _fmul(torch.full_like(desire, T["formation"]),
                           _fmul(_FX + desire, torch.full_like(desire, T["formation_def"])))
         # its cards: the best as the civics AI's last turn wrote it (a minor
@@ -184,8 +188,11 @@ class SimCivics:
                             _present_value(kk, T["rate"], end) - _present_value(kk, T["rate"], nn))
             full = traders.unsqueeze(1) >= capacity.unsqueeze(1) + cap_n
             trade = torch.where(full | (cap_n == 0), torch.zeros_like(v), ((v * 4) >> 8) * _FX)
+        # the Favor granted (EFFECT_ADD_PLAYER_FAVOR): the Amount a turn as
+        # PSEUDOYIELD_DIPLOMATIC_FAVOR from landing to the horizon
+        favor = whole(self._rai_from_landing(self._cv_pseudo(m[:, :, 6].expand(B, NC) * _FX, "PSEUDOYIELD_DIPLOMATIC_FAVOR"), nn))
         val = (own + u[:, :, 0] * land(T["share"]) + u[:, :, 2] * land(T["wonder"]) + u[:, :, 1] * district
-               + m[:, :, 3] * formation.unsqueeze(1) + cards + tokens + spies + adjacency + trade
+               + m[:, :, 3] * formation.unsqueeze(1) + cards + tokens + spies + adjacency + trade + favor
                + self._rai_tourism(s, T["mods"][:, 5], nn))
         return torch.where(turns >= T["horizon"], torch.full_like(val, _fx_const(-9999)), val)
 

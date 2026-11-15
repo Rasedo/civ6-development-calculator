@@ -558,6 +558,10 @@ A question the SOURCE under-determines; neither engine ships a branch until the 
   - LAB (research values): duels1136 t215-t230 player 4 Plastics ours 847.2, the game's 856.8, the gap growing to 19.6 by t230
   - LAB (research values): duels1146 t145 player 2 Steel ours 637.2 inside the horizon, the game's -9426.2 at 54 turns (Rifling 12 and Refining 54 in both; it owns no Coal or Niter plot, the record holds no Steel boost): Steel's own turns short in ours, on players 2, 3 and 4 from t144 (about 170 rows); duels1133 t148 player 2 Rifling 178.6 for -9898.4 and duels1134 t242 player 2 Robotics alike
   - LAB (civic values): 1121 civics short (Divine Right 5.0, Games & Recreation 7.7)
+  - LAB (civic values): one turn, every civic in reach off by one amount: duels1146 city-state 4 t30 149.0 over (Foreign Trade 269.6 for 120.6), duels1135 city-state 2 t123 150.0 over (Nationalism 867.1 for 717.1), duels1139 player 62 t154 50.0 under, duels1143 city-state 3 t33 567.0 under, duels1143 city-states 2, 3 and 4 t180 Space Race, Globalization and Social Media 116.4 over
+  - LAB (civic values): duels1140 city-state 4 t43-46 every civic in reach 1.0-2.0 under; duels1138 city-state 2 t36 2.0 under; duels1146 city-state 2 Suffrage 3.0 under t230-249 and Digital Democracy 1.0 under t241-249
+  - LAB (civic values): duels1146 city-state 4 t240-249 Synthetic Technocracy 65-88 over, Digital Democracy 74 over, Corporate Libertarianism 56-69 over (t245 ours 51 turns, the game's 48: 0 for 134.6); Suffrage, Class Struggle and Totalitarianism between 59 under and 102 over t201-238 on the city under siege
+  - LAB (civic values): duels1143 player 62 t216-218 every civic in reach ours 210 to 3900 where the game logs 0 (Guilds 1616.4, Humanism 2521.8), t210-215 between 51 under and 226 over; duels1143 city-state 4 Totalitarianism 60-120 under t240-245
   - LAB (unit term): 1127 p3 t63 +7.4 / -5.1 untraced
   - LAB (resource values): a minor's upgrade strategic cost
   - LAB (resource values): Resources +0x350 / +0x1168
@@ -576,17 +580,27 @@ A question the SOURCE under-determines; neither engine ships a branch until the 
   - LAB (card values): 1124 Bologna t245, the turn Class Struggle completes at its start (Collectivization first scored, 87.0): Suffrage 651.242 for 654.2 and Digital Democracy 1140.344 for 1141.3, both as logged at t244 and t246: the game's t244 government values read its route's origin Gold as record 245 holds it (11.40625; records 241-244 10.7734375: GOLD_PURCHASES 23 for 22, Digital Democracy's amenity term 152 for 151), ours a turn later
   - LAB (card values): Civil Prestige 1127 p3 t159 / t160 (154 / 127 for 150 / 126: the Amenity term 124 for 126 and the Housing 30 for 24 on the city's yields at the job; Limes, Retainers, Liberalism t159 124 for 127 / 126 / 126)
   - LAB (card values): 1127 city-state 3 t62-63 policies, research and civics (Ilkum 0 / 1, Limes 0 / 12, Civil Prestige 76 / 74, Military Tactics +7.4, Civil Service +2) carried from the t61 border draw (C-107)
+  - LAB (card values): duels1146 city-state 4 t201-223 Civil Prestige 160 for none or 1-2 (296 for 162 at t199): its Housing term about 146 over on the city under siege (population 15 to 14 at t200; Liberalism's Amenity 14 as logged), the housing value 0x7a3d70 on a falling city unread
+  - LAB (card values): duels1146 city-state 4 t224-247 Liberalism 4 over, then 24-26 under from t242; Market Economy 7 under t242-248; Third Alternative and E-Commerce 4-5 over t246-248
+  - LAB (card values): duels1135 city-state 2 t135-177 Naval Infrastructure 7-8 over and Economic Union t156-202 7-8 over (the Harbor's adjacency Gold above the game's), Limes t126-213 between 7 under and 10 over
+  - LAB (card values): duels1135 city-state 2 t135-202 Liberalism, Civil Prestige and Retainers 1-4 over (Liberalism 99 for 96 at t139)
+  - LAB (card values): duels1140 city-state 4 t34-48 Land Surveyors 0.5 for none; Expropriation 0.5 for none duels1134 city-state 2 t242-249 and duels1146 city-state 4 t219-223 (the plot's price over the gross Gold a whole 1 where the game's is 0)
+  - LAB (card values): duels1136 city-state 2 t229-247 Integrated Space Cell 0 for 6-10; Nobel Prize 0 for 15 (duels1144 city-state 2 t242, duels1145 city-state 2 t247)
+  - LAB (card values): duels1145 city-state 4 Conscription 14 for 22 at t57, 7 for 14 at t59, 0 for 7 at t72 and t119
   - LAB (yields at the job): a project begun at 0 converting an unrecorded overflow (1121 Hunza t85)
   - LAB (archaeologist): the Archaeologist's artifact count: an excavated site's entry unread
   - LAB (archaeologist): the Archaeologist's artifact count: t179 9.1 at T 49 where the game counts none (1124 city-state 3)
   - LAB (boosts): a major's own RESEARCH_TECH boost lands at its block's detectBoosts, after its Culture (no case)
   - LAB (majors and free cities): a major's victory-manager strategies imported from AI_Victories.csv (Seat.strategies), none in self-play
   - LAB (majors and free cities): a major's and the Free Cities' best plot to buy (none)
+  - LAB (majors and free cities): the Free Cities' Raid: duels1143 player 62 t215-249 ours 364 / 0 / 370 / 0 / 377 for 141-146, 141 / 279 for 143 / 284 at t220-221, 0 for 289-525 from t222: their knowledge base's cities are those on the plots they see now (lookCities), no kept list
+  - LAB (majors and free cities): duels1143 player 62 t208-219 cards off (Caravansaries 62 / 38 for 14, Agoge and Feudal Contract up to 102 over, Bastions 6 under, Civil Prestige 22-44 under, Colonization 4 for none)
   - LAB (unread): 0x4dd3b0's counter +0x1724
   - LAB (unread): +0x390
   - LAB (unread): 0x5d17b0 (valued 0)
   - LAB (unread): the flat bonus's DISTRICT_PROJECTS (0xbcfe99b8)
   - LAB (unread): 0x5eab80's player list +0xfa0 read as every player but the barbarians
+  - BUILD (unread): REQUIREMENT_CITY_HAS_DISTRICT in a district's own evaluation (0x6d3d50: the context's district type +0x1c meets it) is not held, the engines test the city's completed district alone (no case)
 - **C-101. RELIGIOUS PRESSURE AND SPREAD.** Weight 2.
   - LAB (pressure): read off the records, the DLL unread: the Heritage Organization's +100% summed with Printing's (1117 t222)
   - LAB (pressure): read off the records, the DLL unread: a drowned plot a worked Coast (1122 t229)

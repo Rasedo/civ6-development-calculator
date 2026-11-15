@@ -3289,7 +3289,7 @@ function techAiModifiers(id: string): { aiSpies: number; aiSeaMoves: number; aiT
 
 /** the CivicModifiers the civics AI's value reads of a civic, as the GPU twin
  *  takes them: each effect's Amount (Enable as 1) */
-function civicAiModifiers(id: string): { aiTokens: number; aiSpies: number; aiAdjacency: number; aiTradeCapacity: number; aiTourism: number } {
+function civicAiModifiers(id: string): { aiTokens: number; aiSpies: number; aiAdjacency: number; aiTradeCapacity: number; aiTourism: number; aiFavor: number } {
   const mods = AI_CIVIC_MODIFIERS[gameTypeOf('civic', id, 'CIVIC_')] ?? [];
   const sum = (effect: string, arg: string): number => mods.filter((m) => m.effect === effect)
     .reduce((n, m) => n + (arg === 'Enable' ? (m.args.Enable === 'true' ? 1 : 0) : Number(m.args[arg] ?? 0) | 0), 0);
@@ -3299,5 +3299,6 @@ function civicAiModifiers(id: string): { aiTokens: number; aiSpies: number; aiAd
     aiAdjacency: sum('EFFECT_GRANT_COMBAT_ADJACENCY', 'Enable'),
     aiTradeCapacity: sum('EFFECT_ADJUST_TRADE_ROUTE_CAPACITY', 'Amount'),
     aiTourism: sum('EFFECT_ADJUST_PLAYER_TOURISM', 'Amount'),
+    aiFavor: sum('EFFECT_ADD_PLAYER_FAVOR', 'Amount'),
   };
 }

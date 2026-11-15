@@ -607,12 +607,19 @@
 - addr: 0x6ae390
   kind: function
   name: EFFECT_ADJUST_CITY_EXTRA_ACCUMULATION
-  status: PARTLY
+  semantics: "EFFECT_ADJUST_CITY_EXTRA_ACCUMULATION's analyzer (object @f03c80, vtable 0xd62f20 slot 1): a city subject (context +0x70) and a player; per Resources row whose class hash (+0x18) is RESOURCECLASS_STRATEGIC's (0xc163880a) the city's count 0x1f7010(City +0x1e00, the resource, 0); above 0, the resource value 0x7a21e0 of count x the parser's +8 from the start to the horizon, its whole part added to +0xc0."
+  status: READ
+  cases:
+    - recording: h1_duels1137
+      turn: 225
+      value: city-state 3's Corporate Libertarianism 566.5 at 39 turns t225 and 537.3 at 3 turns t226-230 as logged (20.0 short without the term)
+  impl: [cpu/core/aiModifiers.ts:ANALYZERS, gpu/core/sim_policy.py:_pol_analyze]
   readings:
     - "C-97: the governor AI — the analysis, the choice and the seats READ, the analyzers PARTLY READ"
+    - "C-130: the pillage analyzers, the Favor grant's and the extra accumulation's analyzers, CITY_HAS_DISTRICT's evaluator, the Luxury Policy's players — READ (0x6b7ec0, 0x6b92c0, 0x6c2f90, 0x6ae390, 0x6d3d50), both twins"
   context:
     - ...FFECT_ADJUST_CITY_AIR_DEFENSE_BONUS 0x6a3a80, and EFFECT_ADJUST_CITY_EXTRA_ACCUMULATION 0x6ae390 (the resource value 0x7a21e0), EFFECT_ADJUST_UNIT_GRANT_EXPERIENCE 0x6af1e0.
-  review: imported
+  review: reviewed
 - addr: 0x6ae510
   kind: function
   name: EFFECT_ADJUST_INFLUENCE_POINTS_PER_TURN
@@ -1106,6 +1113,38 @@
   context:
     - "...the parser's order; \"span\" PV(H) - PV(T), \"between\" 0x7a2140): EFFECT_TERRAIN_ADJACENCY 0x6b76f0 and EFFECT_FEATURE_ADJACENCY 0x6aee30 (Amount, YieldType, Terrain/FeatureType, Distri..."
   review: reviewed
+- addr: 0x6b7c40
+  final: 0x469390
+  kind: function
+  semantics: "EFFECT_ADJUST_UNIT_PILLAGE_IMPROVEMENT_MODIFIER's parser: the Amount whole at +8, no object for an Amount of 0."
+  status: PARTLY
+  impl: [cpu/core/aiModifiers.ts:ANALYZERS]
+  readings:
+    - "C-130: the pillage analyzers, the Favor grant's and the extra accumulation's analyzers, CITY_HAS_DISTRICT's evaluator, the Luxury Policy's players — READ (0x6b7ec0, 0x6b92c0, 0x6c2f90, 0x6ae390, 0x6d3d50), both twins"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "- EFFECT_ADJUST_UNIT_PILLAGE_IMPROVEMENT_MODIFIER 0x6b7ec0 (its parser 0x6b7c40: the Amount whole at +8, no object for 0): over the knowledge base's cities (0x786160,..."
+  review: reviewed
+- addr: 0x6b7ec0
+  final: 0x469610
+  kind: function
+  name: EFFECT_ADJUST_UNIT_PILLAGE_IMPROVEMENT_MODIFIER
+  semantics: "EFFECT_ADJUST_UNIT_PILLAGE_IMPROVEMENT_MODIFIER's analyzer (registry 0x6c9640, object @f03f30, vtable 0xd633a0 slot 1): over the knowledge base's cities (0x786160, 0xe0-byte entries) whose owner word the context's player is at war with (0x3dcec0) and whose city resolves (0x57960): the plots of that city's owner (player +0x1380 +0xf0, count +0x100), each plot's improvement (+0x44) its Improvements row's PlunderAmount (+0x48) summed, the whole list again for each known city of that owner; float(sum) x 0.2f (@d5aff0) x the parser's +8 x 0.01f (@d136f0) to 24.8 as Gold (@f2f97c) at the player's weight (0x7a6690), discounted from the start (0x7a1240), its whole part added to +0xc0."
+  status: READ
+  cases:
+    - recording: h1_duels1145
+      turn: 36
+      value: "city-state 4 at war with player 1, one of its cities known: Raid 16.0 (15 of 300 Plunder on player 1's improvements, 1 of its Campus's 25), 37.0 from t68 with its capital known, Total War 184.0 at t155 to 487.0 at t249, every turn as logged"
+  impl:
+    - cpu/core/aiModifiers.ts:ANALYZERS
+    - cpu/core/aiValue.ts:AiValueView
+    - gpu/core/sim_policy.py:_pol_analyze
+  readings:
+    - "C-130: the pillage analyzers, the Favor grant's and the extra accumulation's analyzers, CITY_HAS_DISTRICT's evaluator, the Luxury Policy's players — READ (0x6b7ec0, 0x6b92c0, 0x6c2f90, 0x6ae390, 0x6d3d50), both twins"
+  context:
+    - "...umulation's analyzers, CITY_HAS_DISTRICT's evaluator, the Luxury Policy's players — READ (0x6b7ec0, 0x6b92c0, 0x6c2f90, 0x6ae390, 0x6d3d50), both twins"
+    - "- EFFECT_ADJUST_UNIT_PILLAGE_IMPROVEMENT_MODIFIER 0x6b7ec0 (its parser 0x6b7c40: the Amount whole at +8, no object for 0): over the knowledge ba..."
+  review: reviewed
 - addr: 0x6b8150
   final: 0x4698a0
   kind: function
@@ -1183,6 +1222,38 @@
     - ".claude/scratchpad/cb4/NOTES.md: ...(lab: Barracks 0 -> 219/572 exact on 1124 with it) — SOURCE UNREAD -> ASK. - Stockpile cap analyzer 0x6b8e10: max over resource units' city-centre UNITS values (0x5d4cd0), whole; needs unit table. - Trade kno..."
   context:
     - "...s worth with the Amount's capacity more); EFFECT_ADJUST_PLAYER_RESOURCE_STOCKPILE_CAP 0x6b8e10 READ, not ported (no Amount: the whole part of the best of the city centre's UNITS valu..."
+  review: reviewed
+- addr: 0x6b8fc0
+  final: 0x46a640
+  kind: function
+  semantics: "EFFECT_ADJUST_UNIT_PILLAGE_DISTRICT_MODIFIER's parser: the Amount whole at +8, no object for an Amount of 0."
+  status: PARTLY
+  impl: [cpu/core/aiModifiers.ts:ANALYZERS]
+  readings:
+    - "C-130: the pillage analyzers, the Favor grant's and the extra accumulation's analyzers, CITY_HAS_DISTRICT's evaluator, the Luxury Policy's players — READ (0x6b7ec0, 0x6b92c0, 0x6c2f90, 0x6ae390, 0x6d3d50), both twins"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "- EFFECT_ADJUST_UNIT_PILLAGE_DISTRICT_MODIFIER 0x6b92c0 (parser 0x6b8fc0): the same walk, per city its own districts (City +0x1a48: 0x1ae510 each) their Distr..."
+  review: reviewed
+- addr: 0x6b92c0
+  final: 0x46a940
+  kind: function
+  name: EFFECT_ADJUST_UNIT_PILLAGE_DISTRICT_MODIFIER
+  semantics: "EFFECT_ADJUST_UNIT_PILLAGE_DISTRICT_MODIFIER's analyzer (object @f03f38, vtable 0xd63430 slot 1): the improvement analyzer's walk (0x6b7ec0), per known city at war its own districts (City +0x1a48: +8 the ids, +0x18 the count, 0x1ae510 each) their Districts row's PlunderAmount (+0x48) summed; the same value."
+  status: READ
+  cases:
+    - recording: h1_duels1145
+      turn: 36
+      value: "city-state 4's Raid 16.0: the district half 1 on the known city's Campus (25 x 0.2 x 50 x 0.01 x 0.5)"
+  impl:
+    - cpu/core/aiModifiers.ts:ANALYZERS
+    - cpu/core/aiValue.ts:AiValueView
+    - gpu/core/sim_policy.py:_pol_analyze
+  readings:
+    - "C-130: the pillage analyzers, the Favor grant's and the extra accumulation's analyzers, CITY_HAS_DISTRICT's evaluator, the Luxury Policy's players — READ (0x6b7ec0, 0x6b92c0, 0x6c2f90, 0x6ae390, 0x6d3d50), both twins"
+  context:
+    - "...s analyzers, CITY_HAS_DISTRICT's evaluator, the Luxury Policy's players — READ (0x6b7ec0, 0x6b92c0, 0x6c2f90, 0x6ae390, 0x6d3d50), both twins"
+    - "- EFFECT_ADJUST_UNIT_PILLAGE_DISTRICT_MODIFIER 0x6b92c0 (parser 0x6b8fc0): the same walk, per city its own districts (City +0x1a48: 0x1ae510 ea..."
   review: reviewed
 - addr: 0x6b9d90
   final: 0x46b390
@@ -1612,6 +1683,35 @@
     - "C-97: the governor AI — the analysis, the choice and the seats READ, the analyzers PARTLY READ"
   context:
     - ...ion (+0xe1 bit 6), pillaged or not; unweighted, span), EFFECT_ADJUST_CITY_INNER_DEFENSE 0x6c2dc0 (Amount, raw, where the context city's centre strikes, 0x249ee0 > 0, and stands), EFF...
+  review: reviewed
+- addr: 0x6c2e40
+  final: 0x473b70
+  kind: function
+  semantics: "EFFECT_ADD_PLAYER_FAVOR's parser: the Amount whole at +8."
+  status: PARTLY
+  impl: [cpu/core/aiModifiers.ts:ANALYZERS]
+  readings:
+    - "C-130: the pillage analyzers, the Favor grant's and the extra accumulation's analyzers, CITY_HAS_DISTRICT's evaluator, the Luxury Policy's players — READ (0x6b7ec0, 0x6b92c0, 0x6c2f90, 0x6ae390, 0x6d3d50), both twins"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "- EFFECT_ADD_PLAYER_FAVOR 0x6c2f90 (parser 0x6c2e40: the Amount whole at +8): the Amount as PSEUDOYIELD_DIPLOMATIC_FAVOR at the player's we..."
+  review: reviewed
+- addr: 0x6c2f90
+  final: 0x473cc0
+  kind: function
+  name: EFFECT_ADD_PLAYER_FAVOR
+  semantics: "EFFECT_ADD_PLAYER_FAVOR's analyzer (object @f03dc0, vtable 0xd63970 slot 1): the parser's +8 << 8 as PSEUDOYIELD_DIPLOMATIC_FAVOR (@f2e204) at the context's player's weight (0x7a60d0), a turn, between the start (+0xb4) and the horizon (+0xb8) at the rate (+0xbc) (0x7a2140), its whole part added to +0xc0."
+  status: READ
+  cases:
+    - recording: h1_duels1137
+      turn: 230
+      value: city-state 4's Future Civic 823.6 at 1 turn t230-249 and city-state 3's 1133.5 at 4 turns t237 as logged (703.0 and 607.0 short without CIVIC_GRANT_FAVOR's 50)
+  impl: [cpu/core/aiModifiers.ts:ANALYZERS, gpu/core/sim_cityvalue.py:_cv_analyze]
+  readings:
+    - "C-130: the pillage analyzers, the Favor grant's and the extra accumulation's analyzers, CITY_HAS_DISTRICT's evaluator, the Luxury Policy's players — READ (0x6b7ec0, 0x6b92c0, 0x6c2f90, 0x6ae390, 0x6d3d50), both twins"
+  context:
+    - "...s, CITY_HAS_DISTRICT's evaluator, the Luxury Policy's players — READ (0x6b7ec0, 0x6b92c0, 0x6c2f90, 0x6ae390, 0x6d3d50), both twins"
+    - "- EFFECT_ADD_PLAYER_FAVOR 0x6c2f90 (parser 0x6c2e40: the Amount whole at +8): the Amount as PSEUDOYIELD_DIPLOMATIC_FAVOR a..."
   review: reviewed
 - addr: 0x6c3bc0
   kind: function

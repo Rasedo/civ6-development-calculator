@@ -177,6 +177,9 @@ export interface AiValueView {
   cityHasBuilding(seat: number, cityId: number, building: string): boolean;
   /** a city has a district of the type, built or building (0x1ae530) */
   cityHasDistrict(seat: number, cityId: number, district: string): boolean;
+  /** a city holds a completed district of the type, or of one that replaces
+   *  it (0x1aec20 (type, 1, 1): District +0xb08; pillaged or not) */
+  cityDistrictComplete(seat: number, cityId: number, district: string): boolean;
   /** a city's religion (City +0x1910: the religion its majority follows),
    *  -1 for none */
   cityReligion(seat: number, cityId: number): number;
@@ -304,6 +307,12 @@ export interface AiValueView {
   /** the Tourism a turn the seat's cities make, each city's both halves
    *  (0x1ab750 on City +0x1ac8: `cityTourism`), summed */
   citiesTourism(seat: number): number;
+  /** the PlunderAmount the seat's enemies' ground holds (0x6b7ec0 /
+   *  0x6b92c0), over the cities its knowledge base holds whose owner it is at
+   *  war with: the improvements on every plot of that owner, its plot list
+   *  walked again for each of its cities known; or each such city's own
+   *  districts */
+  enemyPlunder(seat: number, of: 'improvements' | 'districts'): number;
   /** the luxury or strategic plots at the destination of each route out of
    *  the seat's city (`cityRouteDestPlots`) */
   cityRouteDestPlots(seat: number, cityId: number, category: 'luxury' | 'strategic'): readonly number[];

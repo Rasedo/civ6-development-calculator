@@ -25,8 +25,9 @@
  * THE PSEUDO-YIELD WEIGHT (0x700810), which the pseudo-yield value
  * (`aiValue.pseudoYieldValue`, 0x7a60d0) pays at (1 + w): the followed
  * strategies' PseudoYields lists — a city-state's STRATEGY_NAVAL's from
- * the turn after it starts (`minorNavalWeighted`), the Free Cities' none —
- * held at -1.0 at least;
+ * the turn after it starts (`minorNavalWeighted`), from the turn it starts
+ * in the civics AI's government values (`minorNavalApplied`), the Free
+ * Cities' none — held at -1.0 at least;
  * PSEUDOYIELD_DISTRICT adds 0.5 x the ChronologyIndex of the player's era
  * (player +0x1358 +0xf8, Eras +0x1c).
  */
@@ -44,7 +45,7 @@ import { getModifiers, unitUpkeep } from './effects';
 import { wmdUpkeep } from './nuclear';
 import { FREE_SEAT, isCiv, majorsMet, seatOf } from './seats';
 import { minorCity } from './cityStates';
-import { minorNavalWeighted } from './minorStrategy';
+import { minorNavalApplied, minorNavalWeighted } from './minorStrategy';
 import type { GameState, Seat } from './types';
 
 /** the yields in YieldTypes order */
@@ -216,8 +217,10 @@ export function yieldWeights(state: GameState, seat: number): Record<string, num
 }
 
 /** THE PSEUDO-YIELD WEIGHTS of a seat, raw 24.8 per PseudoYieldType
- *  (0x700810); a pseudo-yield absent reads 0 */
-export function pseudoYieldWeights(state: GameState, seat: number): Map<string, number> {
+ *  (0x700810); a pseudo-yield absent reads 0. `applied`: a read after the
+ *  turn's strategy apply (the civics AI's government values), a
+ *  city-state's STRATEGY_NAVAL list standing from the turn it starts */
+export function pseudoYieldWeights(state: GameState, seat: number, applied = false): Map<string, number> {
   const out = new Map<string, number>();
   const s = seatOf(state, seat);
   if (!s) return out;
@@ -249,7 +252,7 @@ export function pseudoYieldWeights(state: GameState, seat: number): Map<string, 
   if (cs) {
     // the strategy it follows: STRATEGY_NAVAL's PseudoYields list under the
     // military AI's terms
-    if (minorNavalWeighted(cs)) for (const [p, pct] of Object.entries(NAVAL_STRATEGY_PSEUDOYIELDS)) out.set(p, (out.get(p) ?? 0) + fxConst(pct * 0.01));
+    if (applied ? minorNavalApplied(cs) : minorNavalWeighted(cs)) for (const [p, pct] of Object.entries(NAVAL_STRATEGY_PSEUDOYIELDS)) out.set(p, (out.get(p) ?? 0) + fxConst(pct * 0.01));
     out.set('PSEUDOYIELD_UNIT_COMBAT', (out.get('PSEUDOYIELD_UNIT_COMBAT') ?? 0) + (cs.combatDesire ?? 0));
     for (const p of ['PSEUDOYIELD_UNIT_EXPLORER', 'PSEUDOYIELD_UNIT_NAVAL_COMBAT']) out.set(p, Math.max(-FX, (out.get(p) ?? 0) - FX));
     // LAB: a city-state values its Great General points at nothing — the

@@ -3,6 +3,21 @@
 # `review: imported` = bootstrapped from dll_readings.md / code comments / saved
 # labels and not yet reviewed: verify against the disassembly, then edit and
 # set `review: reviewed`.
+- addr: 0x1f7010
+  final: 0x14c300
+  kind: function
+  semantics: "a city's count of a resource (City_Resources at City +0x1e00; the resource; a flag): over the plots of the city's three rings (0x5cbc0(2) + 18 = 37) the city works by the map's city-plot owner (0x66480 against City +0xf8), those whose resource as the city's owner sees it (0x4ab4b0 on the plot's +0x40) is the resource; with the flag set only an improved (+0x44), unpillaged (+0x4d bit 1 clear) plot counts."
+  status: READ
+  cases:
+    - recording: h1_duels1137
+      turn: 226
+      value: city-state 3's Corporate Libertarianism 537.3 as logged through EFFECT_ADJUST_CITY_EXTRA_ACCUMULATION's count (the flag clear)
+  impl: [cpu/core/aiModifiers.ts:ANALYZERS, gpu/core/sim_policy.py:full]
+  readings:
+    - "C-130: the pillage analyzers, the Favor grant's and the extra accumulation's analyzers, CITY_HAS_DISTRICT's evaluator, the Luxury Policy's players — READ (0x6b7ec0, 0x6b92c0, 0x6c2f90, 0x6ae390, 0x6d3d50), both twins"
+  context:
+    - "...per Resources row of class RESOURCECLASS_STRATEGIC (+0x18 0xc163880a) the city's count 0x1f7010 (City +0x1e00, the resource, 0): over the plots of its three rings (0x5cbc0(2) + 18)..."
+  review: reviewed
 - addr: 0x1f71b0
   final: 0x14c400
   kind: function

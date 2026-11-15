@@ -308,6 +308,37 @@
   context:
     - ...+0x78; else the district type the evaluation is of, +0x1c), REQUIREMENT_CITY_HAS_BUILDING 0x6d3830 (a city subject holding it; a wonder (Buildings +0x158 & 0x40) only when the evaluation i...
   review: reviewed
+- addr: 0x6d3c10
+  final: 0x491070
+  kind: function
+  semantics: "REQUIREMENT_CITY_HAS_DISTRICT's parser: DistrictType's index (DB.Districts) at +8."
+  status: PARTLY
+  readings:
+    - "C-130: the pillage analyzers, the Favor grant's and the extra accumulation's analyzers, CITY_HAS_DISTRICT's evaluator, the Luxury Policy's players — READ (0x6b7ec0, 0x6b92c0, 0x6c2f90, 0x6ae390, 0x6d3d50), both twins"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "- REQUIREMENT_CITY_HAS_DISTRICT 0x6d3d50 (parser 0x6d3c10: DistrictType's index at +8): with the context's city (+0x70) — met where the context's..."
+  review: reviewed
+- addr: 0x6d3d50
+  final: 0x4911b0
+  kind: function
+  name: REQUIREMENT_CITY_HAS_DISTRICT
+  semantics: "REQUIREMENT_CITY_HAS_DISTRICT's evaluator (object @f04380, vtable 0xd67820 slot 1; DistrictType's index at the parser's +8): false with no city in the context (+0x70) or no type; met where the context's district type (+0x1c) is the type, where the city holds a completed district of the type or of one replacing it (0x1aec20 (type, 1, 1)), or where the context's district type is among the type's replacements (Districts +0x1e8 .. +0x1f0, each entry's +0x38 +0x14)."
+  status: READ
+  cases:
+    - recording: h1_duels1140
+      turn: 245
+      value: "city-state 2 with a completed Commercial Hub: Corporate Libertarianism 280.8 at 1 turn t245-249 as logged, its Production row and its extraction counted (54.0 short without the two)"
+  impl:
+    - cpu/core/aiModifiers.ts:EVALUATORS
+    - gpu/core/sim_cityvalue.py:_cv_admits
+    - gpu/core/sim_policy.py:_pol_admits
+  readings:
+    - "C-130: the pillage analyzers, the Favor grant's and the extra accumulation's analyzers, CITY_HAS_DISTRICT's evaluator, the Luxury Policy's players — READ (0x6b7ec0, 0x6b92c0, 0x6c2f90, 0x6ae390, 0x6d3d50), both twins"
+  context:
+    - "...'s evaluator, the Luxury Policy's players — READ (0x6b7ec0, 0x6b92c0, 0x6c2f90, 0x6ae390, 0x6d3d50), both twins"
+    - "- REQUIREMENT_CITY_HAS_DISTRICT 0x6d3d50 (parser 0x6d3c10: DistrictType's index at +8): with the context's city (+0x70) — met wh..."
+  review: reviewed
 - addr: 0x6d4190
   final: 0x4915f0
   kind: function

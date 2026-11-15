@@ -94,10 +94,12 @@ class SimEconomy:
         # luxury is ONE pass reaching `_lux_k` cities per copy the row holds,
         # wrapping round the list while copies are left (Player_Resources
         # 0x4a6110: a no-cap resource's reach times its copies). `dup` is the
-        # copies beyond the first, 0 where no such pass runs.
+        # copies beyond the first, 0 where no such pass runs. Both modifiers
+        # stand on the major players alone (COLLECTION_MAJOR_PLAYERS): a
+        # city-state's and the Free Cities' luxuries serve as ever.
         lp_out, lp_tgt = self._congress_by_id("LUXURY_POLICY")
         dup = torch.zeros(B, dtype=torch.long, device=self.device)
-        if bool((lp_out >= 0).count_nonzero()):
+        if row < self.n_majors and bool((lp_out >= 0).count_nonzero()):
             t0 = lp_tgt.clamp(min=0, max=self._n_lux - 1)
             ban = lp_out == 1
             counts[ban, t0[ban]] = 0

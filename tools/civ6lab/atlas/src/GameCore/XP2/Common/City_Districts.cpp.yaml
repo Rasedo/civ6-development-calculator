@@ -70,6 +70,7 @@
   readings:
     - "C-96: the project value — READ (0x7b28c0, the PROJECTS table 0x5ce970), PARTLY READ (the space-race standing 0x7b8a30, the diplomatic-victory rows, the repair count), unwired"
     - "C-118: a district's flat tourism on a pillaged district, Mary Leakey's Artifact percent in the summed scalings — READ (0x1ab780, 0x2486e0), both twins"
+    - "C-130: the pillage analyzers, the Favor grant's and the extra accumulation's analyzers, CITY_HAS_DISTRICT's evaluator, the Luxury Policy's players — READ (0x6b7ec0, 0x6b92c0, 0x6c2f90, 0x6ae390, 0x6d3d50), both twins"
   context:
     - "...) x 0x1ae8f0 x 10.0. 0x197ff0, READ: over the city's districts (+0x1a50, count +0x1a60, 0x1ae510) with outer defences (district +0xb08 set) the most GetDamage (0x24ae50, hash 0x6da56a3..."
   review: reviewed
@@ -172,12 +173,18 @@
     - recording: 1116
       turn: 112
       value: "The importer (`spentAtSpawn`) takes a person spent before any record showed its unit to its site in that city: 1116 Ibn Khaldun t112 on Xian's Campus (the city's Districts housing part 3 -> 5 in the n"
-  impl: [cpu/core/aiDistrictValue.ts:DistrictValueFacts]
+  impl:
+    - cpu/core/aiDistrictValue.ts:DistrictValueFacts
+    - cpu/core/aiModifiers.ts:EVALUATORS
+    - cpu/core/aiValue.ts:AiValueView
+    - gpu/core/sim_cityvalue.py:pl
+    - gpu/core/sim_policy.py:_pol_admits
   readings:
     - "H-1: the great person's spawn — READ"
     - "C-96: the district value — READ (0x7a51f0, 0x7aaf80's terms below, 0x366df0, the purchase price 0x1b1cb0, 0x1c77c0, 0x1b4450), PARTLY READ (the golden-age term, the claims, modifiers and neighbours terms, the domain's resources path), unwired"
     - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
     - "C-96: the plot analysis's owner test, Build Unit's pillaged district and a unique's install type — READ (0x5ceba7, 0x7f5112 -> 0x1aec20 / 0x1ad720), both twins"
+    - "C-130: the pillage analyzers, the Favor grant's and the extra accumulation's analyzers, CITY_HAS_DISTRICT's evaluator, the Luxury Policy's players — READ (0x6b7ec0, 0x6b92c0, 0x6c2f90, 0x6ae390, 0x6d3d50), both twins"
   context:
     - "...the player's cities (+0x12f0 -> +0xd8, list order); a city holding the class's district (0x1aec20 on city +0x1a48 with (district, true, 0) — completed) and of greater population (+0x588,..."
   review: reviewed
