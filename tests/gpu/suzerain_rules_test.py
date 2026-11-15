@@ -339,11 +339,19 @@ def main() -> None:
         assert bool(_bare.any()), "the seat owns no bare land plot"
         _p = int(_bare.long().argmax())
         _bs.res_id[0, _p] = _bs.res_id[0, _src]
+        _bs.res_imp[0, _p] = _bs.res_imp[0, _src]
         _bs.res_priority[0, _p] = 1
         _bs.res_stripped[0, _p] = False
         _bs._eff_version += 1
         _own = ((_bs.res_id >= 0) & (_bs.res_priority == 1) & ~_bs.res_stripped)[0] & _mine
-    assert bool(_own.any()), "the scene owns no unstripped bonus resource"
+    # a copy serves only where its plot hands it over (`_res_extracting`):
+    # each owned copy takes its own improvement
+    _own = _own & (_bs.res_imp[0] >= 0)
+    _bs.improvement[0][_own] = _bs.res_imp[0][_own]
+    _bs.pillaged[0][_own] = False
+    _bs._eff_version += 1
+    _own = _own & _bs._res_extracting()[0]
+    assert bool(_own.any()), "the scene owns no unstripped, extracted bonus resource"
     _have = torch.zeros(_bs.B, _bs.RC, dtype=torch.float64, device=_bs.device)
     _need = torch.full((_bs.B, _bs.RC), 9.0, dtype=torch.float64, device=_bs.device)
     _before = float(_bs._luxury_amenities(_row, _have, _need)[0].sum())

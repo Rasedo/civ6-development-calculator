@@ -30,7 +30,7 @@ import { congressBannedLuxury, congressDuplicateLuxury, congressGrowthMult, cong
 import { cityStateItemProduction, suzerainEffect, suzerainHubAmenities, suzerainPartnerProduction, suzerainResourceTypeProduction, minorCity, minorLuxuries, suzerainMinorSeats, suzerainTypeCount } from './cityStates';
 import { ANSHAN_WRITING_SCIENCE, ANSHAN_RELIC_SCIENCE, ZANZIBAR_LUXURIES, ZANZIBAR_LUXURY_AMENITIES, BUENOS_AIRES_AMENITIES, MINOR_PRODUCTION_PCT } from '../data/cityStates';
 import { bankruptAmenities, DEAL_LUXURY, DED_FREE_INQUIRY, HOLY_CITY_TOURISM, TOURISM_PCT_ROWS, LOYALTY_MAX, GOV_INTOLERANCE, TOURISM_GOV_MULT, TOURISM_OPEN_BORDERS_PCT, TOURISM_ROUTE_PCT } from '../data/seats';
-import { LUXURY_IDS, RESOURCES, resourceImprovement } from '../../world/resources';
+import { LUXURY_IDS, RESOURCES, extractsResource, resourceImprovement } from '../../world/resources';
 import { FEATURES, isFloodplains } from '../../world/features';
 import { CITY_WORK_RADIUS, BORDER_MAX_RADIUS, PLOT_INFLUENCE, borderGrowthCost, FOOD_PER_CITIZEN, CITIZEN_SCIENCE, CITIZEN_CULTURE, UNASSIGNED_CITIZEN_GOLD, CITY_CENTER_MIN_FOOD, CITY_CENTER_MIN_PRODUCTION, HOUSING_FRESH_WATER, HOUSING_COASTAL, HOUSING_NO_WATER, AQUEDUCT_FRESH_BONUS, AQUEDUCT_NO_FRESH_TOTAL, LUXURY_AMENITY_CITIES, growthFoodNeeded, housingGrowthFactor, amenitiesNeeded, amenityTier, amenityTierIndex, type AmenityTier } from '../data/constants';
 import { hiddenResourcesFor, isCiv, onHomeContinent } from './seats';
@@ -778,12 +778,15 @@ export function rankLuxuries(state: GameState, seat: number): Map<number, number
     ? new Array<number>(ZANZIBAR_LUXURIES).fill(ZANZIBAR_LUXURY_AMENITIES) : [];
   // CIV6 (Buenos Aires): "Your bonus resources behave like luxury resources,
   // providing +1 Amenity per resource"
-  // (`MODIFIER_PLAYER_OWNED_BONUS_RESOURCE_EXTRA_AMENITIES`, Amount 1). The
-  // modifier's gate is OWNERSHIP, so an unimproved copy counts.
+  // (`MODIFIER_PLAYER_OWNED_BONUS_RESOURCE_EXTRA_AMENITIES`, Amount 1): the
+  // bonus resources the seat's plots hand it (`extractsResource`), an
+  // unimproved copy none (runs/h1_duels1162 t221: player 1's allocation
+  // serves Cattle under its capital, its Fishing Boats' Crabs and its Farm's
+  // Maize one city each, its unimproved Sheep and Wheat none)
   const bonusLux = new Set<string>();
   if (suzerainEffect(state, seat, 'bonusAmenities')) {
     for (const t of state.map.tiles) {
-      if (!t.resource || tileSeat(t) !== seat) continue;
+      if (!t.resource || tileSeat(t) !== seat || !extractsResource(t)) continue;
       if (RESOURCES[t.resource]?.category === 'bonus') bonusLux.add(t.resource);
     }
   }

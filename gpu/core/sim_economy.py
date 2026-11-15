@@ -123,8 +123,9 @@ class SimEconomy:
         if self._suz_c_spice >= 0 and row < self.n_majors:
             spice_n = self._suz_effect(row, self._suz_c_spice).long() * self._suz_spice_n
         # CIV6 (Buenos Aires): "Your bonus resources behave like luxury
-        # resources, providing +1 Amenity per resource" — the modifier's gate is
-        # OWNERSHIP, so an unimproved copy counts, and each serves ONE city.
+        # resources, providing +1 Amenity per resource" — each distinct bonus
+        # resource the row's plots hand it (`_res_extracting`) serves ONE city,
+        # an unimproved copy none.
         bonus_n = torch.zeros_like(rounds)
         if self._suz_c_bonus_amen >= 0 and row < self.n_majors:
             _ba = self._suz_effect(row, self._suz_c_bonus_amen)
@@ -138,7 +139,7 @@ class SimEconomy:
                     # sites, so a reader that forgets the mark counts
                     # resources that no longer exist — two of them, by turn
                     # 99, each worth a full amenity round.
-                    _mine = (self.res_id >= 0) & (self.res_priority == 1)                         & ~self.res_stripped                         & (self.tile_seat == int(self._ROW_SEAT[row]))
+                    _mine = (self.res_id >= 0) & (self.res_priority == 1)                         & ~self.res_stripped                         & (self.tile_seat == int(self._ROW_SEAT[row]))                         & self._res_extracting()
                     _bc = torch.zeros(B, _nres, dtype=torch.long, device=self.device)
                     _bc.scatter_add_(1, self.res_id.clamp(min=0), _mine.long())
                     bonus_n = (_bc > 0).long().sum(dim=1) * _ba.long()

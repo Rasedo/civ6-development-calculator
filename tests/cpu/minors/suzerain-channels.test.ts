@@ -183,11 +183,14 @@ describe("Zanzibar's spices and Buenos Aires' bonuses", () => {
     expect(sum() - before).toBe(ZANZIBAR_LUXURIES * Math.min(ZANZIBAR_LUXURY_AMENITIES, cities));
   });
 
-  it('turns each DISTINCT owned bonus resource into a one-city luxury', () => {
+  it('turns each DISTINCT extracted bonus resource into a one-city luxury', () => {
     const { state, city } = scene();
-    const owned = state.map.tiles.filter((t) => t.ownerCity === city.id && t.ownerSeat === 0);
+    const owned = state.map.tiles.filter((t) => t.ownerCity === city.id && t.ownerSeat === 0 && !t.district);
     owned[0].resource = 'WHEAT';
+    owned[0].improvement = 'FARM';
     owned[1].resource = 'WHEAT'; // a second copy is not a second head
+    owned[1].improvement = 'FARM';
+    owned[2].resource = 'SHEEP'; // unimproved: the seat is handed none
     const sum = (): number => [...rankLuxuries(state, 0).values()].reduce((a, b) => a + b, 0);
     const before = sum();
     suzerainOf(state, 'bonusAmenities');

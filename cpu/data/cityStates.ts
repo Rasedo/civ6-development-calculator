@@ -300,10 +300,9 @@ export const MILITARISTIC_BUILDING_ROWS: readonly (readonly string[])[] = [
 ];
 
 /** CIV6 (Leaders.xml, MINOR_CIV_BUENOS_AIRES_BONUS_RESOURCE_AMENITY_BONUS):
- *  `MODIFIER_PLAYER_OWNED_BONUS_RESOURCE_EXTRA_AMENITIES` Amount 1. The gate
- *  the modifier names is OWNERSHIP, not an improvement — so every distinct
- *  bonus resource on this seat's tiles serves ONE city, the reach an
- *  `Happiness="1"` luxury would have. */
+ *  `MODIFIER_PLAYER_OWNED_BONUS_RESOURCE_EXTRA_AMENITIES` Amount 1: every
+ *  distinct bonus resource a plot of this seat hands it (`extractsResource`)
+ *  serves ONE city, the reach an `Happiness="1"` luxury would have. */
 export const BUENOS_AIRES_AMENITIES = 1;
 
 /** CIV6 (Expansion2_Leaders.xml, MINOR_CIV_HATTUSA_<R>_RESOURCE_XP2, one per

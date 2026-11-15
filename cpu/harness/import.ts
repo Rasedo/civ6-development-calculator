@@ -74,7 +74,7 @@ import { FEATURES, clearableFeatures, isFloodplains } from '../../world/features
 import { RESOURCES } from '../../world/resources';
 import { hexDistance, neighborTile } from '../../world/hex';
 import { YIELD_KEYS } from '../../world/types';
-import { GP_BUILDING_YIELDS, GP_CITY_PERM, GP_CLASSES, GP_CLASS_DISTRICT, GP_INVENTED_LUXURY, GP_PERM, GP_RESOURCE_REVEAL, GP_TILE_PERM, GREAT_PEOPLE, gpChargesOf, gpEffectOf, gpSiteOf, type GreatPersonDef } from '../data/greatPeople';
+import { GP_BUILDING_YIELDS, GP_CITY_PERM, GP_CLASSES, GP_CLASS_DISTRICT, GP_INVENTED_LUXURY, GP_PERM, GP_RESOURCE_REVEAL, GP_TILE_PERM, GREAT_PEOPLE, gpChargesOf, gpEffectOf, gpSiteOf, personWorkObjects, type GreatPersonDef } from '../data/greatPeople';
 import {
   GW_GP_EXTRA_SLOTS, GW_HOLDERS, GW_LAYOUT, GWO_ARTIFACT, GWO_LANDSCAPE, GWO_MUSIC, GWO_PORTRAIT, GWO_RELIC, GWO_RELIGIOUS,
   GWO_NAMES, GWO_SCULPTURE, GWO_WRITING, holderSlots, type GreatWork,
@@ -3053,7 +3053,7 @@ export function importTurn(rec: TurnRecord, cat: Catalog, history?: History): Im
     const unit = p.unit === null || p.spent !== null ? undefined : unitByKey.get(p.unit);
     const cls = unit ? gpClassOfUnit(unit) : undefined;
     const at = cls === undefined ? -1 : GREAT_PEOPLE[cls].findIndex((x) => x.id === aliasOrPrefixed(cat.greatPeople?.[ind] ?? ''));
-    if (unit && at >= 0) unit.gpAt = at;
+    if (unit && cls !== undefined && at >= 0) bindPerson(state, unit, cls, at);
   }
 
   // the World Congress, then the build queues: last, so the prices the
@@ -4157,6 +4157,19 @@ export function gwWorkOfRow(cat: Catalog, row: number): { obj: number; maker: nu
   const pid = aliasOrPrefixed(gw[2]);
   const person = pid ? PEOPLE[pid] : undefined;
   return person ? { obj, maker: GREAT_PEOPLE[person.class].indexOf(person) } : { obj, maker: -1, unnamed: gw[2] };
+}
+
+/** A Great Person unit bound to the person at `at` of class `cls`: its
+ *  charges the person's less the works it already made that stand in the
+ *  world, one at least (runs/h1_duely1117: Donatello 5636117's second
+ *  activation at t180, one Sculpture standing; runs/h1_duels1121 t175 /
+ *  t176: Great Artist 5111822 activated on both turns) */
+export function bindPerson(state: GameState, unit: Unit, cls: GreatPersonClass, at: number): void {
+  unit.gpAt = at;
+  const objs = personWorkObjects(cls, at);
+  const made = [...state.seats.flatMap((s) => s.cities), ...state.cityStates.map(minorCity)]
+    .flatMap((c) => c.greatWorks ?? []).filter((w) => w.maker === at && objs.includes(w.obj)).length;
+  unit.charges = Math.max(1, gpChargesOf(GREAT_PEOPLE[cls][at]) - made);
 }
 
 function importGreatWorks(ctx: Ctx, c: DumpCity, city: City): void {

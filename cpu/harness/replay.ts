@@ -106,7 +106,7 @@ import { opUnits } from '../core/operations/operation';
 import { newCityAi } from '../core/aiCityTrees';
 import { newEconomicMemory, purchaseSpend, savingsTurn, upgradePurchase, type EconomicMemory } from '../core/aiEconomic';
 import { FX } from '../core/aiValue';
-import { advanceHistory, aliasOrPrefixed, engineRowOf, formationRows, gwHolderOfRow, gwWorkOfRow, importTurn, loggedCongressTarget, minorHead, loadBorderGrants, loadWarKinds, loadWeariness, newHistory, resolutionOfLog, warKindAt, wearyAt, recordRoutes, type History, type Imported, type WarKindRow } from './import';
+import { advanceHistory, aliasOrPrefixed, bindPerson, engineRowOf, formationRows, gwHolderOfRow, gwWorkOfRow, importTurn, loggedCongressTarget, minorHead, loadBorderGrants, loadWarKinds, loadWeariness, newHistory, resolutionOfLog, warKindAt, wearyAt, recordRoutes, type History, type Imported, type WarKindRow } from './import';
 import { holdCongressBallots, type CongressBallot, type CongressSlate } from '../core/congress';
 import { TribeFold } from './windowFold';
 import { AI_UNITS } from '../data/aiBuildTables';
@@ -121,7 +121,7 @@ import { holdRng, rngHold } from '../core/rand';
 import { seedMoments, stateChecks, transitionChecks, type CheckResult } from './checks';
 import { engineId, gameHash, gameTypeOf } from '../data/aliases';
 import { OperationsProbe, operationsMarkdown, type OperationsTally } from './operationsScore';
-import { GP_CLASSES, GREAT_PEOPLE, gpChargesOf, gpCost, gpEffectOf, personWorkObjects } from '../data/greatPeople';
+import { GP_CLASSES, GREAT_PEOPLE, gpCost, gpEffectOf } from '../data/greatPeople';
 import { loadGpTimeline, standGreatPeople, type GpTimeline } from './gpTimeline';
 import { gpClaimLeft, patronageCost, patronizeGreatPerson, recruit, recruitClaimable } from '../core/greatPeople';
 import { GW_LAYOUT, holderSlots, slotAccepts } from '../data/greatWorks';
@@ -878,7 +878,7 @@ function spawnRecorded(ctx: Ctx, rec: TurnRecord, key: string): Unit | undefined
       .sort((x, y) => y[4] - x[4])
       .map(([ind]) => GREAT_PEOPLE[cls].findIndex((p) => p.id === aliasOrPrefixed(ctx.cat.greatPeople?.[ind] ?? '')))
       .find((k) => k >= 0 && !held.has(k));
-    if (at !== undefined) unit.gpAt = at;
+    if (at !== undefined) bindPerson(ctx.state, unit, cls, at);
   }
   ctx.state.units.push(unit);
   ctx.units.set(key, unit);
@@ -4201,22 +4201,12 @@ const res = buyTile(state, city.id, d.plot, seat);        if (!res.ok) setTileOw
         const u = unitOf(ctx, d.unit) ?? pairPerson(ctx, d);
         if (!u) { count(ctx, 'gpActivate', 'refused', d.player, 'a unit the replay does not hold'); break; }
         u.tileIndex = d.plot;
-        // the person the log names: a unit the replay spawned from the
-        // record carries no identity of its own
+        // the person the log names, where the records bound the unit to none
         if (u.gpAt === undefined) {
           const id = aliasOrPrefixed(ctx.cat.greatPeople?.[d.individual] ?? '');
           const cls = gpClassOfUnit(u);
           const at = id && cls !== undefined ? GREAT_PEOPLE[cls].findIndex((p) => p.id === id) : -1;
-          if (at >= 0 && cls !== undefined) {
-            u.gpAt = at;
-            // ...its charges less the works the person already made, the
-            // world's (runs/h1_duely1117: Donatello 5636117's second
-            // activation at t180, one Sculpture standing)
-            const objs = personWorkObjects(cls, at);
-            const made = [...state.seats.flatMap((s) => s.cities), ...state.cityStates.map(minorCity)]
-              .flatMap((c) => c.greatWorks ?? []).filter((w) => w.maker === at && objs.includes(w.obj)).length;
-            u.charges = Math.max(1, gpChargesOf(GREAT_PEOPLE[cls][at]) - made);
-          }
+          if (at >= 0 && cls !== undefined) bindPerson(state, u, cls, at);
         }
         const person = gpPersonOf(u);
         if (person && gpEffectOf(person).perm?.navalSight) stepsBeforeSight(ctx, b, d.unit, u.seat);
