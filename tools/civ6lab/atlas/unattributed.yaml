@@ -904,6 +904,18 @@
     - "...on the city's buildings +0x1c78: the byte array the Lua IsPillaged binding 0x9847b0 -> 0x9ed20 reads; its other callers are the pillaged-building gates, the building upkeep among the..."
     - "...hind +0x50) plus each unpillaged building (0x18fe60 on +0x1c78; IsPillaged 0x9847b0 → 0x9ed20); only a placement reads it (1128 Xi'an t105 keeps its specialist) (`citySpecialistSlot..."
   review: reviewed
+- addr: 0xa8f60
+  final: 0x75250
+  kind: function
+  name: lCanRaze
+  semantics: "Lua CanRaze: Rules CanRaze 0x533e50 on the city with the player -1; true with no city."
+  status: PARTLY
+  readings:
+    - "C-123 / C-110: the barbarians' rules run as the first job of their AI turn start, after the DoTurn tail; a centre a player that is no major may not raze keeps its last hit point — READ (0x6096c0 at 0x6097af..0x609802, 0x608870, 0x7280a0, 0x1514a0, 0x14d25d; 0x248800, 0x533e50, 0x206080 at 0x206868..0x2068c8, 0x20dd30, 0x1fdea0 at 0x1fe098..0x1fe0ab), both twins"
+    - "C-123 / C-110: the barbarians' rules run as the first job of their AI turn start, after the DoTurn tail; a centre a player that is no major may not raze keeps its last hit point; a melee blow on a district that would fell both sides — READ (0x6096c0 at 0x6097af..0x609802, 0x608870, 0x7280a0, 0x1514a0, 0x14d25d; 0x248800, 0x533e50, 0x206080 at 0x206684..0x206715 and 0x206868..0x2068c8, 0x20dd30, 0x1fdea0 at 0x1fe098..0x1fe0ab), both twins"
+  context:
+    - "- CanRaze 0x533e50 (the city, the player; -1 the city's owner; Lua CanRaze 0xa8f60): true under the game's +0x21c of @f28c80 (its writer unread); false for a city flagged..."
+  review: reviewed
 - addr: 0xaa060
   final: 0x75ee0
   kind: function
@@ -1141,6 +1153,18 @@
     - "...4bf0 / 0x144e00 / 0x144ed0; written only by the load 0x1433b0 / 0x143d80 and the copies 0x14c930 / 0x142650 / 0x142e90 / 0x7ca670, so 0); else under NumMilitary (+0x30) \"Barbarian Rang..."
     - ...nce its operation stands; the tribe manager's functions write +0x7c in the tribe's copy 0x14c9e6 alone. Each raid counts its own pillages.
   review: reviewed
+- addr: 0x14ecc0
+  final: 0xe1950
+  kind: function
+  name: the barbarian manager's save
+  semantics: writes the manager's AutoVariables, m_priority (+0x230) among them (0x14ed46).
+  status: PARTLY
+  readings:
+    - "C-123 / C-110: the barbarians' rules run as the first job of their AI turn start, after the DoTurn tail; a centre a player that is no major may not raze keeps its last hit point — READ (0x6096c0 at 0x6097af..0x609802, 0x608870, 0x7280a0, 0x1514a0, 0x14d25d; 0x248800, 0x533e50, 0x206080 at 0x206868..0x2068c8, 0x20dd30, 0x1fdea0 at 0x1fe098..0x1fe0ab), both twins"
+    - "C-123 / C-110: the barbarians' rules run as the first job of their AI turn start, after the DoTurn tail; a centre a player that is no major may not raze keeps its last hit point; a melee blow on a district that would fell both sides — READ (0x6096c0 at 0x6097af..0x609802, 0x608870, 0x7280a0, 0x1514a0, 0x14d25d; 0x248800, 0x533e50, 0x206080 at 0x206684..0x206715 and 0x206868..0x2068c8, 0x20dd30, 0x1fdea0 at 0x1fe098..0x1fe0ab), both twins"
+  context:
+    - "...m_priority (the AutoVariable +0x1d8, value +0x230, constructed 4 at 0x14d25d, saved at 0x14ed46): the first pass, with only the cities' job before it."
+  review: reviewed
 - addr: 0x1a7710
   final: 0x11a290
   kind: function
@@ -1272,6 +1296,26 @@
     - "...operation's units (0x6092c0: +0x7d0, +0x770) to its type's own AI type (+0x168, setter 0x1e60f0, via 0x79b9c0) at 0x81cb90..0x81cbd3, before the strengths (0x73f7d0): it leaves the st..."
     - "...vest (0x95fb20), else the feature's removal (0x965fd0); Release on Complete (+0x778 −1, 0x1e60f0). Check Plot sets Harvest only on a bare resource (0x7f7844, +0x74). Confirmed: runs/..."
     - "...ground (0x530880) collected (0x80e39f..0x80e3d8) and released (0x73d1f0: +0x778 −1 via 0x1e60f0, erased only from a COPY of each team (0x735110) — the team keeps it; runs/h1_duelw11..."
+  review: reviewed
+- addr: 0x1e6460
+  final: 0x141220
+  kind: function
+  name: the combat's district damage
+  semantics: "(district, the amount, the damage kind, the player): District::ChangeDamage 0x248800 on a district given (a thunk)."
+  status: READ
+  cases:
+    - recording: h1_duelq1128
+      turn: 241
+      value: "Rome's 42:20 under the barbarians' City Assault: 128 of 200 lost in record 241, the t241 blow deals 113, record 242 holds 179 (199 less the turn's 20); every record to 250 holds 179 and player 0's Pikeman 3407878 stands whole on the centre"
+  impl:
+    - cpu/core/combat.ts:centreDamage
+    - cpu/core/combat.ts:canRazeCity
+    - gpu/core/sim_seats.py:_centre_damage
+  readings:
+    - "C-123 / C-110: the barbarians' rules run as the first job of their AI turn start, after the DoTurn tail; a centre a player that is no major may not raze keeps its last hit point — READ (0x6096c0 at 0x6097af..0x609802, 0x608870, 0x7280a0, 0x1514a0, 0x14d25d; 0x248800, 0x533e50, 0x206080 at 0x206868..0x2068c8, 0x20dd30, 0x1fdea0 at 0x1fe098..0x1fe0ab), both twins"
+    - "C-123 / C-110: the barbarians' rules run as the first job of their AI turn start, after the DoTurn tail; a centre a player that is no major may not raze keeps its last hit point; a melee blow on a district that would fell both sides — READ (0x6096c0 at 0x6097af..0x609802, 0x608870, 0x7280a0, 0x1514a0, 0x14d25d; 0x248800, 0x533e50, 0x206080 at 0x206684..0x206715 and 0x206868..0x2068c8, 0x20dd30, 0x1fdea0 at 0x1fe098..0x1fe0ab), both twins"
+  context:
+    - ...0x20dd30 lays the outer and the hit-point damage through it with the attacker's player (0x1e6460 at 0x20dee9 / 0x20df06 / 0x20e00c).
   review: reviewed
 - addr: 0x1eaa30
   final: 0x144810
@@ -2356,6 +2400,8 @@
     - "C-99: when the pool finder's +0x1bc is written — the danger map at DoTurn, the planning at the AI turn's start, nothing inside a pass — READ (0x46cdd0, 0x717460, 0x6096c0, 0x792c90, 0x7921a0, 0x790890, 0x47ffb0), unported"
     - "C-130: a city's undamaged strike in Bastions' analyzer; a city-state's danger map at its DoTurn; the plot purchase analyzer — READ / PARTLY READ"
     - "C-95: the danger map is the DoTurn's all turn — the tactical pass reads it, the barbarians' is built before their rules; a ship's district strike, a district at war it may enter, a major's closed borders — READ (0x7e9d0 -> 0x4e4560 -> 0x46cdd0), FIT (the barbarians' raise, the ship's strike, the borders), both twins"
+    - "C-123 / C-110: the barbarians' rules run as the first job of their AI turn start, after the DoTurn tail; a centre a player that is no major may not raze keeps its last hit point — READ (0x6096c0 at 0x6097af..0x609802, 0x608870, 0x7280a0, 0x1514a0, 0x14d25d; 0x248800, 0x533e50, 0x206080 at 0x206868..0x2068c8, 0x20dd30, 0x1fdea0 at 0x1fe098..0x1fe0ab), both twins"
+    - "C-123 / C-110: the barbarians' rules run as the first job of their AI turn start, after the DoTurn tail; a centre a player that is no major may not raze keeps its last hit point; a melee blow on a district that would fell both sides — READ (0x6096c0 at 0x6097af..0x609802, 0x608870, 0x7280a0, 0x1514a0, 0x14d25d; 0x248800, 0x533e50, 0x206080 at 0x206684..0x206715 and 0x206868..0x2068c8, 0x20dd30, 0x1fdea0 at 0x1fe098..0x1fe0ab), both twins"
   context:
     - ...(DLC GranColombia_Maya), no other. The map is built at the player's DoTurn (0x4e4560 -> 0x46cdd0 at 0x4e4aa4); the engines build it as each tactical pass opens, the hostile units' sear...
     - "- THE DANGER MAP (0x717460, read 0x716a90; built at DoTurn's end 0x4e4560 → 0x46cdd0 at 0x4e4aa4): per player at war (0x469cd0) each seen (0x5033a0) live (+0x770) fighting..."
@@ -3203,6 +3249,28 @@
     - "- A step (0x26e920, 24.8): no Movement → the next turn at full Movement; the cost (0x531660..0x530240: terrain, feature and improvement MovementChange, river 2, embark 2, a route'..."
     - "...9 + 0x180 + domain × 4]); the barbarians' land units none. The step: into a city ≤ 1 (0x531660, 0x272ca0), no river crossing at a city or water (0x531510); the embark 0x530420 / dise..."
     - ...te +0x398 picks the callback. Set, the step is priced by 0x270be0 (the movement rules 0x531660 .. 0x530240, no zone call); clear, by 0x270980, which under no flag 0x800 asks the zone...
+  review: reviewed
+- addr: 0x533e50
+  final: 0x37b5a0
+  kind: function
+  name: Rules CanRaze
+  semantics: "(rules, the city, the player; -1 the city's owner +0x1b8): true under the game's +0x21c of @f28c80; false for a city flagged an original capital (+0x648) whose original owner (+0x218) is a FULL_CIV, for the original owner, for the player of +0x468, and where the city's owner is allied (0x3da560) with the original owner or with +0x468's; else true."
+  status: READ
+  cases:
+    - recording: h1_duelq1128
+      turn: 241
+      value: "Rome's 42:20 under the barbarians' City Assault: 128 of 200 lost in record 241, the t241 blow deals 113, record 242 holds 179 (199 less the turn's 20); every record to 250 holds 179 and player 0's Pikeman 3407878 stands whole on the centre"
+  impl:
+    - cpu/core/combat.ts:centreDamage
+    - cpu/core/combat.ts:canRazeCity
+    - gpu/core/sim_seats.py:_centre_damage
+  readings:
+    - "C-123 / C-110: the barbarians' rules run as the first job of their AI turn start, after the DoTurn tail; a centre a player that is no major may not raze keeps its last hit point — READ (0x6096c0 at 0x6097af..0x609802, 0x608870, 0x7280a0, 0x1514a0, 0x14d25d; 0x248800, 0x533e50, 0x206080 at 0x206868..0x2068c8, 0x20dd30, 0x1fdea0 at 0x1fe098..0x1fe0ab), both twins"
+    - "C-123 / C-110: the barbarians' rules run as the first job of their AI turn start, after the DoTurn tail; a centre a player that is no major may not raze keeps its last hit point; a melee blow on a district that would fell both sides — READ (0x6096c0 at 0x6097af..0x609802, 0x608870, 0x7280a0, 0x1514a0, 0x14d25d; 0x248800, 0x533e50, 0x206080 at 0x206684..0x206715 and 0x206868..0x2068c8, 0x20dd30, 0x1fdea0 at 0x1fe098..0x1fe0ab), both twins"
+  context:
+    - "...— READ (0x6096c0 at 0x6097af..0x609802, 0x608870, 0x7280a0, 0x1514a0, 0x14d25d; 0x248800, 0x533e50, 0x206080 at 0x206868..0x2068c8, 0x20dd30, 0x1fdea0 at 0x1fe098..0x1fe0ab), both twins"
+    - ...IV (0x469db0) and a district that is its city's centre (0x24c250), unless Rules CanRaze 0x533e50 (the city, the player) answers true the amount is cut to GetMaxDamage - the damage - 1...
+    - "- CanRaze 0x533e50 (the city, the player; -1 the city's owner; Lua CanRaze 0xa8f60): true under the game's..."
   review: reviewed
 - addr: 0x536480
   final: 0x37cee0
@@ -5428,6 +5496,8 @@
     - "C-129: the military AI's upgrade — READ (0x727db0, 0x6874d0), both twins"
     - "C-129: the military AI's upgrade after the look; the Free Cities buy none — READ (0x6096c0's lists, 0x687bf0), both twins"
     - "C-130: the city update's Default Specialization on an empty queue, before the civics AI's turn; the dig sites a major's civic lays before the minors' turns — READ (0x5ce8f0, 0x6096c0's +0x370 list, CultureAI +0x208), both twins"
+    - "C-123 / C-110: the barbarians' rules run as the first job of their AI turn start, after the DoTurn tail; a centre a player that is no major may not raze keeps its last hit point — READ (0x6096c0 at 0x6097af..0x609802, 0x608870, 0x7280a0, 0x1514a0, 0x14d25d; 0x248800, 0x533e50, 0x206080 at 0x206868..0x2068c8, 0x20dd30, 0x1fdea0 at 0x1fe098..0x1fe0ab), both twins"
+    - "C-123 / C-110: the barbarians' rules run as the first job of their AI turn start, after the DoTurn tail; a centre a player that is no major may not raze keeps its last hit point; a melee blow on a district that would fell both sides — READ (0x6096c0 at 0x6097af..0x609802, 0x608870, 0x7280a0, 0x1514a0, 0x14d25d; 0x248800, 0x533e50, 0x206080 at 0x206684..0x206715 and 0x206868..0x2068c8, 0x20dd30, 0x1fdea0 at 0x1fe098..0x1fe0ab), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...om the behaviour tree — \"HL: Rock Band Move\" (0x710f40) and the CITY_ASSAULT operation (0x722690), each building a unit's name for its log (the band template over 118 and 155): the AI'..."
@@ -5535,6 +5605,8 @@
   readings:
     - "C-130: the Combat Desire between the policy jobs and the government values; a released contract on its city's list — READ, both twins"
     - "C-129: a killed player's records forgotten; a capture's new unit; an air strike's record — READ (0x534c50, 0x787fc0 -> 0x5ee370, 0x212500's create), both twins; the replay's later-player timings"
+    - "C-123 / C-110: the barbarians' rules run as the first job of their AI turn start, after the DoTurn tail; a centre a player that is no major may not raze keeps its last hit point — READ (0x6096c0 at 0x6097af..0x609802, 0x608870, 0x7280a0, 0x1514a0, 0x14d25d; 0x248800, 0x533e50, 0x206080 at 0x206868..0x2068c8, 0x20dd30, 0x1fdea0 at 0x1fe098..0x1fe0ab), both twins"
+    - "C-123 / C-110: the barbarians' rules run as the first job of their AI turn start, after the DoTurn tail; a centre a player that is no major may not raze keeps its last hit point; a melee blow on a district that would fell both sides — READ (0x6096c0 at 0x6097af..0x609802, 0x608870, 0x7280a0, 0x1514a0, 0x14d25d; 0x248800, 0x533e50, 0x206080 at 0x206684..0x206715 and 0x206868..0x2068c8, 0x20dd30, 0x1fdea0 at 0x1fe098..0x1fe0ab), both twins"
   context:
     - ...on the others runs the turn start 0x608870 (the +0x370 job list) and the +0x388 passes. 0x724280 binds 0x7271d0 to that signal (0x724a97); 0x7271d0 runs the military AI's strengths 0x7...
     - "...), espionage (0x41d6e0, 0x41e450 erases the player's entries), the emergencies, the AI (0x724280) and every Targets (0x7864c0 at 0x786984, vtable @0xd703e8 -> 0x787fc0): 0x5ee370(kb, p..."
@@ -5628,6 +5700,24 @@
   context:
     - "...update (0x7877e0: the tactical knowledge turn 0x785f30, the scripted starts 0x725b80 / 0x726a20) — a barbarian player's: the knowledge base's camps (KB +0x638, 16 bytes each, count..."
     - "...tartPoints (+0x12b8 +0xb00, +0xb58 / +0xb68), rebuilt by 0x7877e0 (0x785f30, 0x725b80 / 0x726a20): a barbarian's the KB's camps (+0x638 / +0x648), else its cities (+0x158 / +0x15c); th..."
+  review: reviewed
+- addr: 0x7280a0
+  final: 0x4d30e0
+  kind: function
+  name: an AI job's thunk
+  semantics: "the job functor's vt +0x10 (vtables @d5cf60, @d5cf30): calls the bound function (+0x10) on the bound object (+8) with the pass (*rdx) and the turn start's flag (*r8), as the turn start 0x608870 hands them (0x608ae0..0x608b04)."
+  status: READ
+  cases:
+    - recording: h1_duelq1117
+      turn: 21
+      value: "the barbarians' danger map holds no 20 of Rome's Warrior on 10:21, which only the Warrior 1703944 their rules raise that turn on 9:23 sees: the map is built before the raise"
+  impl: [cpu/core/tactical.ts:barbarianPhase, gpu/core/sim_orders.py:_barbarian_phase]
+  readings:
+    - "C-123 / C-110: the barbarians' rules run as the first job of their AI turn start, after the DoTurn tail; a centre a player that is no major may not raze keeps its last hit point — READ (0x6096c0 at 0x6097af..0x609802, 0x608870, 0x7280a0, 0x1514a0, 0x14d25d; 0x248800, 0x533e50, 0x206080 at 0x206868..0x2068c8, 0x20dd30, 0x1fdea0 at 0x1fe098..0x1fe0ab), both twins"
+    - "C-123 / C-110: the barbarians' rules run as the first job of their AI turn start, after the DoTurn tail; a centre a player that is no major may not raze keeps its last hit point; a melee blow on a district that would fell both sides — READ (0x6096c0 at 0x6097af..0x609802, 0x608870, 0x7280a0, 0x1514a0, 0x14d25d; 0x248800, 0x533e50, 0x206080 at 0x206684..0x206715 and 0x206868..0x2068c8, 0x20dd30, 0x1fdea0 at 0x1fe098..0x1fe0ab), both twins"
+  context:
+    - "...r may not raze keeps its last hit point — READ (0x6096c0 at 0x6097af..0x609802, 0x608870, 0x7280a0, 0x1514a0, 0x14d25d; 0x248800, 0x533e50, 0x206080 at 0x206868..0x2068c8, 0x20dd30, 0x1fde..."
+    - ...k 0x7ffdd0 and the tactical pass 0x771530 are jobs of the +0x388 list. A job's thunk (0x7280a0, the functor's vt +0x10) hands it the pass (*rdx) and the turn start's flag (*r8).
   review: reviewed
 - addr: 0x731d10
   final: 0x64a6d0
@@ -7348,6 +7438,8 @@
     - "C-95: the scout's tree \"Barbarian Found City\" — READ, ported"
     - "C-99: the district and improvement events on one plot — the eruption's turns (a LAB, both twins)"
     - "C-99: a non-major player's tree pool — every city-state tree, its operations' and its \"Upgrade Units\" trees in one pool, ticked in slot order — READ (0x7ff9a0 / 0x7ff7b0 / 0x800c60 -> 0x7fef20, 0x7ffdd0 -> 0x7cb2e0), both twins"
+    - "C-123 / C-110: the barbarians' rules run as the first job of their AI turn start, after the DoTurn tail; a centre a player that is no major may not raze keeps its last hit point — READ (0x6096c0 at 0x6097af..0x609802, 0x608870, 0x7280a0, 0x1514a0, 0x14d25d; 0x248800, 0x533e50, 0x206080 at 0x206868..0x2068c8, 0x20dd30, 0x1fdea0 at 0x1fe098..0x1fe0ab), both twins"
+    - "C-123 / C-110: the barbarians' rules run as the first job of their AI turn start, after the DoTurn tail; a centre a player that is no major may not raze keeps its last hit point; a melee blow on a district that would fell both sides — READ (0x6096c0 at 0x6097af..0x609802, 0x608870, 0x7280a0, 0x1514a0, 0x14d25d; 0x248800, 0x533e50, 0x206080 at 0x206684..0x206715 and 0x206868..0x2068c8, 0x20dd30, 0x1fdea0 at 0x1fe098..0x1fe0ab), both twins"
   context:
     - "...is empty, then TryPurchaseUnits 0x68be60 over the city's units; the tree manager's tick 0x7ffdd0; tactical). A city founded during the turn exists for C only: the Default Specializatio..."
     - "- The tree manager's tick 0x7ffdd0: each tree 0x7d3a00, then 0x7cb2e0 in a loop destroys a tree whose +0x368 is set or who..."
@@ -7389,6 +7481,8 @@
       value: "city-state 3's Banking boosted complete by Guilds: the tree made at the boost (5111814) holds Warriors 1900551 / 1835016"
   readings:
     - "C-99 / C-128: every technology gained starts an Upgrade Units tree, the civic event never fires; a tree's units after its tick; the Nearest City Search's resource test; the plot's unit list — READ (0x4cd4c0 -> 0x800c60, 0x5bbf80 -> 0x27a180, 0x3a1ac0, 0x7cb3d0 -> 0x7d2190, 0x7eba40 -> 0x510d30, 0x74f40 / 0x763b0), the trigger both twins"
+    - "C-123 / C-110: the barbarians' rules run as the first job of their AI turn start, after the DoTurn tail; a centre a player that is no major may not raze keeps its last hit point — READ (0x6096c0 at 0x6097af..0x609802, 0x608870, 0x7280a0, 0x1514a0, 0x14d25d; 0x248800, 0x533e50, 0x206080 at 0x206868..0x2068c8, 0x20dd30, 0x1fdea0 at 0x1fe098..0x1fe0ab), both twins"
+    - "C-123 / C-110: the barbarians' rules run as the first job of their AI turn start, after the DoTurn tail; a centre a player that is no major may not raze keeps its last hit point; a melee blow on a district that would fell both sides — READ (0x6096c0 at 0x6097af..0x609802, 0x608870, 0x7280a0, 0x1514a0, 0x14d25d; 0x248800, 0x533e50, 0x206080 at 0x206684..0x206715 and 0x206868..0x2068c8, 0x20dd30, 0x1fdea0 at 0x1fe098..0x1fe0ab), both twins"
   context:
     - ...ts, the bank's completion and a boost's alike; the trigger handler 0x800c60 (bound by 0x8007a0 at 0x800a33) makes the row's tree at that moment. runs/h1_duelp1128 t127 city-state 3:...
   review: reviewed

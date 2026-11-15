@@ -15,7 +15,6 @@ import {
 } from '../../../cpu/core/promotions';
 import { PLUNDER_ROUTE_GOLD, plunderTargets, plunderTrader, routePlunderer } from '../../../cpu/core/trade';
 import { barbarianTechs, raiseCamp } from '../../../cpu/core/barbarians';
-import { CITY_MAX_HP } from '../../../cpu/data/units';
 import { neighbors } from '../../../world/hex';
 import { isWater } from '../../../world/query';
 import { unitPassable } from '../../../cpu/core/units';
@@ -240,26 +239,30 @@ describe('barbarians', () => {
     expect(farm.pillaged).toBe(false);
   });
 
-  it('cities take siege damage, get sacked at 0, and heal when clear', () => {
+  it('a barbarian\'s blows leave a major\'s original capital its last hit point, and it heals when clear', () => {
     const { state, city } = battlefield();
     city.population = 8;
-    seatOf(state, 0)!.treasury = 200;
     const barb = spawnUnit(state, 'HORSEMAN', tileAtCoords(state.map, 10, 9).index, BARB_SEAT)!;
     barb.tileIndex = tileAtCoords(state.map, 10, 9).index;
-
-    let guard = 0;
-    while (city.hp > 0 && city.population === 8 && guard++ < 60) {
+    const strike = () => {
       barb.movesLeft = 4 * MP_SCALE;
       barb.attacksLeft = 1;
       barb.hp = 100;
       meleeAttack(state, barb.id, city.centerIndex, 0);
-    }
-    expect(city.population).toBeLessThan(8); // sacked
-    expect(city.hp).toBe(CITY_MAX_HP / 2);
+    };
+
+    let guard = 0;
+    while (city.hp > 1 && guard++ < 60) strike();
+    expect(city.hp).toBe(1);
+    // a blow on the centre at its last hit point takes none
+    strike();
+    expect(city.hp).toBe(1);
+    expect(city.population).toBe(8);
+    expect(state.units).toContain(barb);
 
     state.units = []; // barbarians gone
     healCities(state); // unbesieged cities heal at the game turn's end
-    expect(city.hp).toBe(CITY_MAX_HP / 2 + 20);
+    expect(city.hp).toBe(21);
   });
 
   it('a barbarian ON the Trader tile plunders the route', () => {

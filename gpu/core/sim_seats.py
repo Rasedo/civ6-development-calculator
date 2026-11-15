@@ -15648,10 +15648,28 @@ class SimSeats:
             roll = torch.full((B,), self._dmg_max_extra // 2, dtype=torch.long, device=dev)
             raw = self._damage_raw(roll, atk - def_cs.to(torch.float64))
             blow = torch.minimum(hp_max, (raw - torch.div(raw * share, 256, rounding_mode="floor")).clamp(min=self._dmg_min))
-            out = torch.where(on, blow, out)
             back = self._damage_expected(def_cs.to(torch.float64) - atk)
-            took = torch.where(on & ~ranged, back, took)
+            hp_c = self.citystate_hp.gather(1, csx.unsqueeze(1)).squeeze(1) if self.S > 0 else hp_max
+            melee_blow, melee_back = self._district_both_fall(
+                blow, torch.where(major, self.city_hp[bidx, hrow, hcol].to(torch.long), hp_c.to(torch.long)), back, _hp_p[:, u])
+            out = torch.where(on, torch.where(ranged, blow, melee_blow), out)
+            took = torch.where(on & ~ranged, melee_back, took)
         return out, took
+
+    @staticmethod
+    def _district_both_fall(dealt: torch.Tensor, hp: torch.Tensor, taken: torch.Tensor,
+                            health: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
+        """`districtBothFall` — a melee blow on a district that would fell
+        both sides (0x206080 at 0x206684..0x206715): where the damage to the
+        district's hit points reaches those it has left and the damage the
+        attacker takes its own, the side the less overkilled keeps 1, the
+        attacker at equal overkill. (dealt, taken), each in its own dtype."""
+        d, t = dealt.to(torch.long), taken.to(torch.long)
+        h, a = hp.to(torch.long), health.to(torch.long)
+        both = (d >= h) & (t >= a)
+        unit_out = both & ((t - a) > (d - h))
+        return (torch.where(unit_out, h - 1, d).to(dealt.dtype),
+                torch.where(both & ~unit_out, a - 1, t).to(taken.dtype))
 
     def _centre_health(self, tk: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         """`districtHealth` for the plots `tk` [B, K]: a city's centre its
@@ -15723,6 +15741,7 @@ class SimSeats:
         wall, centre = self._district_hit(att, atk_e - def_cs, self.city_outer_hp[bidx, hrow, slot], _wmax,
                                           self._city_max_hp, _klass, _assist, "rcty", tgt)
         _chp = self.city_hp[bidx, hrow, slot]
+        centre, d_atk = self._district_both_fall(centre, _chp, d_atk, a_hp[:, u])
         self._award_city_xp(att, atk_kind, u, a_type[:, u], a_seat[:, u],
                             torch.where(_chp - centre <= 0,
                                         torch.full_like(_chp, XP_CITY_FELLED),
@@ -15731,7 +15750,7 @@ class SimSeats:
         hr, sl = hrow[rows], slot[rows]
         outer = self.city_outer_hp[rows, hr, sl]
         self.city_outer_hp[rows, hr, sl] = outer - wall[rows]
-        self.city_hp[rows, hr, sl] -= centre[rows]
+        self.city_hp[rows, hr, sl] -= self._centre_damage(rows, hr, sl, a_seat[rows, u], centre[rows]).to(self.city_hp.dtype)
         self.city_last_hit[rows, hr, sl] = self.turn
         # a combat on a Free City's district starts its raid (0x276d90)
         self._free_raid_signal(att, hrow, slot, a_seat[:, u])
@@ -15746,6 +15765,26 @@ class SimSeats:
             self._dig_at(dr, a_tile[dr, u], a_seat[dr, u], torch.full_like(dr, u + self.POOL_LO[atk_kind]))
             self._occ_clear(dr, a_tile[dr, u], torch.full_like(dr, u + self.POOL_LO[atk_kind]))
         return rows, hrow, slot, died, ttc
+
+    def _centre_damage(self, rows: torch.Tensor, hr: torch.Tensor, sl: torch.Tensor, seat: torch.Tensor,
+                       dealt: torch.Tensor) -> torch.Tensor:
+        """`centreDamage` — the hit points a blow of `seat` takes off the city
+        centre at (`rows`, `hr`, `sl`) (District ChangeDamage, 0x248800): a
+        blow of a player that is no major on a centre it may not raze
+        (`canRazeCity`, Rules CanRaze 0x533e50: the original capital of a
+        major, a city it founded or a Free City that revolted from it, one
+        whose holder is allied with its founder or with the seat it revolted
+        from) leaves it its last hit point."""
+        nm = self.n_majors
+        major = (seat >= 0) & (seat < nm)
+        ocap = self.city_orig_cap[rows, hr, sl]
+        kept = (ocap >= 0) & (ocap < nm)
+        for plane in (self.city_founder, self.city_former):
+            o = plane[rows, hr, sl]
+            allied = self.seat_ally_turns[rows, hr.clamp(max=nm - 1), o.clamp(min=0, max=nm - 1)] > 0
+            kept = kept | (o == seat) | ((hr < nm) & (o >= 0) & (o < nm) & (o != hr) & allied)
+        left = (self.city_hp[rows, hr, sl] - 1).to(dealt.dtype)
+        return torch.where(~major & kept, torch.minimum(dealt, left), dealt)
 
     def _raze_garrison(self, rows: torch.Tensor, centres: torch.Tensor, captor: torch.Tensor) -> None:
         """CIV6: "when a city is captured, all units within it are destroyed" —
@@ -15911,7 +15950,9 @@ class SimSeats:
         rows = att.nonzero(as_tuple=True)[0]
         self.city_outer_hp[rows, cs_mrow[rows], 0] = cs_outer[rows] - cs_wall[rows]
         self.city_last_hit[rows, cs_mrow[rows], 0] = self.turn
-        self.citystate_hp[rows, citystate_sc[rows]] -= cs_centre[rows]
+        cs_centre, d_atk = self._district_both_fall(
+            cs_centre, self.citystate_hp.gather(1, citystate_sc.unsqueeze(1)).squeeze(1), d_atk, a_hp[:, u])
+        self.citystate_hp[rows, citystate_sc[rows]] -= cs_centre[rows].to(self.citystate_hp.dtype)
         if atk_kind == "barb":
             # CIV6: barbarians never capture a city — their assault leaves the
             # minor standing at 1 HP, `_hostile_ranged_strike`'s own floor.

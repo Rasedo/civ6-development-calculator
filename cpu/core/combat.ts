@@ -1541,6 +1541,40 @@ export function markShipwreck(state: GameState, tileIndex: number, civSeat: numb
   t.shipwreckSeat = civSeat;
 }
 
+/** MAY THE PLAYER RAZE THE CITY (Rules CanRaze, 0x533e50): not the original
+ *  capital of a major, not a city it founded or a Free City that revolted
+ *  from it, and not one whose holder is allied with its founder or with the
+ *  seat it revolted from */
+function canRazeCity(state: GameState, city: City, seat: number): boolean {
+  if (isCiv(city.origCapitalSeat ?? NO_SEAT)) return false;
+  const founder = city.founderSeat ?? NO_SEAT;
+  const former = city.formerSeat ?? NO_SEAT;
+  if (founder === seat || former === seat) return false;
+  return !seatsAllied(state, city.seat, founder) && !seatsAllied(state, city.seat, former);
+}
+
+/** THE HIT POINTS A BLOW OF `seat` TAKES OFF A CITY CENTRE (District
+ *  ChangeDamage, 0x248800): a blow of a player that is no major — the
+ *  barbarians, a city-state, the Free Cities — on a centre it may not raze
+ *  (`canRazeCity`) leaves it its last hit point (runs/h1_duelq1128 t241-249:
+ *  Rome's 42:20, 21 hit points at every turn's start under the barbarians'
+ *  City Assault — its 1 and the turn's 20 — and its Pikeman 3407878 whole) */
+function centreDamage(state: GameState, city: City, seat: number, dealt: number): number {
+  if (isCiv(seat) || canRazeCity(state, city, seat)) return dealt;
+  return Math.min(dealt, city.hp - 1);
+}
+
+/** A MELEE BLOW ON A DISTRICT THAT WOULD FELL BOTH SIDES (0x206080 at
+ *  0x206684..0x206715): where the damage to the district's hit points
+ *  reaches those it has left (`hp`) and the damage the attacker takes its
+ *  own (`health`), the side the less overkilled keeps 1 — the attacker at
+ *  equal overkill (runs/h1_duelq1128 t249: the Cavalry 7143430 at 10 hit
+ *  points strikes Rome's 42:20 and takes 9) */
+export function districtBothFall(dealt: number, hp: number, taken: number, health: number): { dealt: number; taken: number } {
+  if (dealt < hp || taken < health) return { dealt, taken };
+  return taken - health > dealt - hp ? { dealt: hp - 1, taken } : { dealt, taken: health - 1 };
+}
+
 /** Sack: population and gold loss, improvements around the center pillaged.
  *  Barbarians sack; they never govern. `seat` owns the city being sacked. */
 function sackCity(state: GameState, city: City | City, seat: number): void {
@@ -1647,8 +1681,9 @@ export function predictCityExchange(state: GameState, attacker: Unit, targetInde
   const max = wallsMax(state, shape);
   const share = outer > 0 && max > 0 && (assist & ASSIST_TOWER) === 0 ? Math.floor((outer * 256) / max) : 0;
   const raw = damageRaw(COMBAT_MAX_EXTRA_DAMAGE >> 1, damageExponent(atkCS - defCS));
-  return { dealt: Math.min(CITY_MAX_HP, Math.max(COMBAT_MINIMUM_DAMAGE, raw - Math.floor((raw * share) / 256))),
-    taken: ranged ? 0 : damageExpected(defCS - atkCS) };
+  const dealt = Math.min(CITY_MAX_HP, Math.max(COMBAT_MINIMUM_DAMAGE, raw - Math.floor((raw * share) / 256)));
+  if (ranged) return { dealt, taken: 0 };
+  return districtBothFall(dealt, held ? held.city.hp : cs!.hp ?? CITY_MAX_HP, damageExpected(defCS - atkCS), attacker.hp);
 }
 
 /** the AI's predicted shot of the city centre on `targetIndex` at `attacker`
@@ -1698,13 +1733,14 @@ function cityAssault(
   const split = districtHit(state, atkCS - defCS, outer, wallsMax(state, city), CITY_MAX_HP,
     cityHitClass(attacker.type, false),
     siegeAssist(state, attacker, city.centerIndex, wallsTier(state, city)), kCity, city.centerIndex);
-  awardCityXp(state, attacker, city.hp - split.centre <= 0 ? XP_CITY_FELLED : XP_CITY_ATTACK);
+  const fall = districtBothFall(split.centre, city.hp, dmgToAttacker, attacker.hp);
+  awardCityXp(state, attacker, city.hp - fall.dealt <= 0 ? XP_CITY_FELLED : XP_CITY_ATTACK);
   if (split.wall > 0) city.outerHp = outer - split.wall;
-  city.hp -= split.centre;
+  city.hp -= centreDamage(state, city, attacker.seat, fall.dealt);
   city.lastHitTurn = state.turn;
   // a combat on a Free City's district starts its raid (0x276d90)
   if (city.seat === FREE_SEAT) freeRaidSignal(state, city.centerIndex, attacker.seat);
-  attacker.hp -= dmgToAttacker;
+  attacker.hp -= fall.taken;
   spendAttack(attacker, true);
   warWearinessBattle(state, attacker.seat, city.seat, city.centerIndex,
     { aDied: attacker.hp <= 0, dCity: true });
@@ -3114,12 +3150,13 @@ function attackCityState(state: GameState, attacker: Unit, cityState: CityState)
   const csSplit = districtHit(state, atkCS - defCS, csOuter, wallsMax(state, csShape), CITY_MAX_HP,
     cityHitClass(attacker.type, false), siegeAssist(state, attacker, cityState.centerIndex, csTier), 'csty', cityState.centerIndex);
   if (csSplit.wall > 0) cityState.outerHp = csOuter - csSplit.wall;
-  cityState.hp = (cityState.hp ?? CITY_MAX_HP) - csSplit.centre;
+  const fall = districtBothFall(csSplit.centre, cityState.hp ?? CITY_MAX_HP, dmgToAttacker, attacker.hp);
+  cityState.hp = (cityState.hp ?? CITY_MAX_HP) - fall.dealt;
   cityState.lastHitTurn = state.turn;
   // CIV6: barbarians never capture a city — their assault leaves the minor
   // standing at 1 HP, `hostileRangedStrike`'s own city floor.
   if (capsOf(attacker.seat).alwaysHostile) cityState.hp = Math.max(1, cityState.hp);
-  attacker.hp -= dmgToAttacker;
+  attacker.hp -= fall.taken;
   warWearinessBattle(state, attacker.seat, seatOfCityState(cityState.id), cityState.centerIndex,
     { aDied: attacker.hp <= 0, dCity: true });
   spendAttack(attacker, true);

@@ -16,6 +16,28 @@
   readings:
     - "C-118: a district's flat tourism on a pillaged district, Mary Leakey's Artifact percent in the summed scalings — READ (0x1ab780, 0x2486e0), both twins"
   review: reviewed
+- addr: 0x248800
+  final: 0x190370
+  kind: function
+  name: District::ChangeDamage
+  semantics: "(district, the damage kind, the amount, the player): for the hit points (0x5e97d629), a player given that is no FULL_CIV (0x469db0) and a district that is its city's centre (0x24c250), unless Rules CanRaze 0x533e50 (the city, the player) answers true the amount is cut to GetMaxDamage - the damage - 1 (0x24887d..0x248893); the outer defence (0x6da56a3d) takes the amount whole; then SetDamage 0x24cc50 and, on an amount above 0, the turn stamp +0x8e0."
+  status: READ
+  cases:
+    - recording: h1_duelq1128
+      turn: 241
+      value: "Rome's 42:20 under the barbarians' City Assault: 128 of 200 lost in record 241, the t241 blow deals 113, record 242 holds 179 (199 less the turn's 20); every record to 250 holds 179 and player 0's Pikeman 3407878 stands whole on the centre"
+  impl:
+    - cpu/core/combat.ts:centreDamage
+    - cpu/core/combat.ts:canRazeCity
+    - gpu/core/sim_seats.py:_centre_damage
+  readings:
+    - "C-123 / C-110: the barbarians' rules run as the first job of their AI turn start, after the DoTurn tail; a centre a player that is no major may not raze keeps its last hit point — READ (0x6096c0 at 0x6097af..0x609802, 0x608870, 0x7280a0, 0x1514a0, 0x14d25d; 0x248800, 0x533e50, 0x206080 at 0x206868..0x2068c8, 0x20dd30, 0x1fdea0 at 0x1fe098..0x1fe0ab), both twins"
+    - "C-123 / C-110: the barbarians' rules run as the first job of their AI turn start, after the DoTurn tail; a centre a player that is no major may not raze keeps its last hit point; a melee blow on a district that would fell both sides — READ (0x6096c0 at 0x6097af..0x609802, 0x608870, 0x7280a0, 0x1514a0, 0x14d25d; 0x248800, 0x533e50, 0x206080 at 0x206684..0x206715 and 0x206868..0x2068c8, 0x20dd30, 0x1fdea0 at 0x1fe098..0x1fe0ab), both twins"
+  context:
+    - "...hit point — READ (0x6096c0 at 0x6097af..0x609802, 0x608870, 0x7280a0, 0x1514a0, 0x14d25d; 0x248800, 0x533e50, 0x206080 at 0x206868..0x2068c8, 0x20dd30, 0x1fdea0 at 0x1fe098..0x1fe0ab), bot..."
+    - "- A CENTRE'S LAST HIT POINT. District ChangeDamage 0x248800 (district, the damage kind, the amount, the player): for the hit points (0x5e97d629), a..."
+    - "...— with no recorded case; a FULL_CIV's ranged blow is floored at 1 in the engines where 0x248800 cuts none."
+  review: reviewed
 - addr: 0x249850
   final: 0x1905f0
   kind: function
@@ -417,6 +439,18 @@
   context:
     - "...ON_ UNIT, 0xbbb1a0) walks the city's districts (+0x1a48); for each that seats a garrison (0x24b820, the districts with HitPoints: the centre and the Encampment) 0x24b170 takes the plot's b..."
   review: reviewed
+- addr: 0x24b8b0
+  final: 0x191ea0
+  kind: function
+  name: the district's hit points gone
+  semantics: the district's hit-point damage (+0x878) at or above its Districts row's HitPoints (+0x5c under +0x58), 0 without.
+  status: PARTLY
+  readings:
+    - "C-123 / C-110: the barbarians' rules run as the first job of their AI turn start, after the DoTurn tail; a centre a player that is no major may not raze keeps its last hit point — READ (0x6096c0 at 0x6097af..0x609802, 0x608870, 0x7280a0, 0x1514a0, 0x14d25d; 0x248800, 0x533e50, 0x206080 at 0x206868..0x2068c8, 0x20dd30, 0x1fdea0 at 0x1fe098..0x1fe0ab), both twins"
+    - "C-123 / C-110: the barbarians' rules run as the first job of their AI turn start, after the DoTurn tail; a centre a player that is no major may not raze keeps its last hit point; a melee blow on a district that would fell both sides — READ (0x6096c0 at 0x6097af..0x609802, 0x608870, 0x7280a0, 0x1514a0, 0x14d25d; 0x248800, 0x533e50, 0x206080 at 0x206684..0x206715 and 0x206868..0x2068c8, 0x20dd30, 0x1fdea0 at 0x1fe098..0x1fe0ab), both twins"
+  context:
+    - ...ls the capture 0x1fdea0 only where the district's hit-point damage reached its maximum (0x24b8b0); 0x206080 (at 0x206868..0x2068c8) sets the attacker's advance (+0x58) for a unit who...
+  review: reviewed
 - addr: 0x24b960
   final: 0x191f10
   kind: function
@@ -468,6 +502,8 @@
   status: PARTLY
   readings:
     - "C-111: a captured city keeps its completed districts' locked prices and no progress by type; a district's repair is its city's queue; a unit's pillage takes the district's dearest building first — READ (0x1e8880, 0x173f70 at 0x17480e, 0x967300 / 0x967740, 0x9633c0 -> 0x24af90 -> 0x193190), both twins"
+    - "C-123 / C-110: the barbarians' rules run as the first job of their AI turn start, after the DoTurn tail; a centre a player that is no major may not raze keeps its last hit point — READ (0x6096c0 at 0x6097af..0x609802, 0x608870, 0x7280a0, 0x1514a0, 0x14d25d; 0x248800, 0x533e50, 0x206080 at 0x206868..0x2068c8, 0x20dd30, 0x1fdea0 at 0x1fe098..0x1fe0ab), both twins"
+    - "C-123 / C-110: the barbarians' rules run as the first job of their AI turn start, after the DoTurn tail; a centre a player that is no major may not raze keeps its last hit point; a melee blow on a district that would fell both sides — READ (0x6096c0 at 0x6097af..0x609802, 0x608870, 0x7280a0, 0x1514a0, 0x14d25d; 0x248800, 0x533e50, 0x206080 at 0x206684..0x206715 and 0x206868..0x2068c8, 0x20dd30, 0x1fdea0 at 0x1fe098..0x1fe0ab), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...8 / +0x260) empty. Each COMPLETED district of the old city (+0xb08 set, not the centre: 0x24c250) is recorded (x, y, type +0x218, complete, pillaged, the two damages, +0xaa8 the locked..."

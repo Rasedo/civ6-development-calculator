@@ -46,7 +46,7 @@ Hand-weighted 1–8 by the size of what is LEFT to build. One row per entry, no 
 | C-122 goody huts, dig sites, names and quests | 2 | the replay's untaken combat, promotion and goody draws, the goody hut's gates, the draw sites the engines lack (BUILD); dig sites' eras, the level offer, names (LAB) |
 | C-93 the turn's order | 2 | tourism's banking, the victory and turn-limit checks, the turn-opening Great Person draw, the city walk's fits (LAB); road re-lays, a captor's team, the move order's second walk (BUILD) |
 | C-95 barbarians' unit moves | 5 | barb.move.plot misses by family: Attack Units, the rampage, Explore and Wander, Camp Defense, operation members and their goals, Builder Capture pairs (LAB); Defend Units' release, PLUNDER_TRADE_ROUTE (BUILD) |
-| C-123 barbarians' raids and scout reports | 2 | raid and assault starts and teams (1121, 1128), late-era raises, members lost to drift, the scouts' reports and their fits (LAB) |
+| C-123 barbarians' raids and scout reports | 2 | raid and assault starts and teams (1121, 1128), members lost to drift, the scouts' reports and their fits (LAB) |
 | C-124 barbarians' camps and sight | 1 | the alliances' outgoing visibility (BUILD); the unseen land's residue, the Scouts' regions (LAB) |
 | C-125 the tactical planning: targets and the combat prediction | 3 | the +0x1ba waiver, units fleeing where the game strikes, a seat's difficulty, predicted blows off by a term, target lists against sight (LAB) |
 | C-132 the danger map | 3 | danger / danger.major rows: the Giant Death Robot's water, a Submarine's Movement, player 1's map by its Observation Balloon, an unbuilt Encampment's defence, single plots; the search's blocking, endangered sums beside an Encampment, an embarked captive; three fits unread (LAB) |
@@ -70,7 +70,7 @@ Hand-weighted 1–8 by the size of what is LEFT to build. One row per entry, no 
 | C-107 borders and culture claims | 2 | captured counts, the envoy annex's plot, plots gained with no claim, a border draw's tie, a reveal's turn at the border scorer (LAB) |
 | C-108 trade routes' yields and paths | 3 | route.originYields' rest on the 1105 / 1107 / 1109 recordings, dropped routes, the lab game's paths and eligibility, the trade graph's import, a minor's Trading Posts (LAB, BUILD); Satrapies waits on C-131 |
 | C-131 the DLC packs' civilizations | 6 | every standalone pack's civilization and leader, their uniques and traits (BUILD, owner: later) |
-| C-110 combat strength, fortification and healing | 2 | the majors' Fortify column, the move-or-fortify sites, an Encampment's own damage loss, a centre sacked at 0 (BUILD, LAB); the +5s, a barbarian's rest, the kill path (LAB) |
+| C-110 combat strength, fortification and healing | 2 | the majors' Fortify column, the move-or-fortify sites, an Encampment's own damage loss, a razable centre taken by a non-major, a major's ranged blow floored at 1 (BUILD, LAB); the +5s, a barbarian's rest, the kill path (LAB) |
 | C-111 unit rules | 3 | 0x4bffa0's refusals, an embarked civilian's capture, a stale embarked flag, a city felled by a non-major (BUILD, LAB); withdrawals, goody gates, the coastal raid, the plunder command (LAB) |
 | C-112 growth and citizens | 3 | the citizen placement's triggers and fill, a favored yield, a pinned specialist (BUILD, LAB); the growth accumulator's fits and −1 residues, citizens lost or gained with no cause (LAB) |
 | C-113 random events' footprints and rivers | 3 | the plots an event's draws took, river ownership and chains, the importer's silt and soil readings, the Meteor Shower, a drought's Duration (LAB); Farms the turn change takes (BUILD) |
@@ -230,7 +230,6 @@ A question the SOURCE under-determines; neither engine ships a branch until the 
   - LAB (camp defense): fit, unread: the camp strike's shot or attack move, queued behind a move to the spot that waits (0x546f0 appends, 0x52f50 runs the front alone), dropped by the engines: whether it runs once the move completes on a later turn (duelq1121 t160 Spearman 1376265 on 3:18, duelq1128 t31 Spearman 589832 for 32:8)
   - LAB (operation members): 1121 t36 Barbarian Attack's Archer 1835022 on 5:14: ours Operation Protect Units to 4:15 in the tree's second walk of the turn, the game's a second Operation Move holding 5:14 (no endangered member)
   - LAB (operation members): 1121 t27 the Scout 262147 (79 damage) on 37:12 under its tree's Protect Unit goes to 38:12, the game's 37:13 (both off the danger map)
-  - LAB (operation members): 1128's lone raid Crossbowman (t90-142)
   - LAB (operation members): 1127 Galley 589825 t229
   - BUILD (operation members): the barbarians' Defend Units release
   - LAB (operation members): an escort's Defend Units move ending Operation Move rows (1128 t174-175)
@@ -238,8 +237,7 @@ A question the SOURCE under-determines; neither engine ships a branch until the 
   - LAB (operation moves): Operation Move: 1121 t56-58 the raid west (MoveTo 0x962380)
   - LAB (operation moves): Operation Move: 1127 Galleys 1048590 / 262147 on an embarked Warrior's spot
   - LAB (operation moves): Operation Move's goal: 1124 t116 Builder Capture's Man-At-Arms 4784141 goes for 6:4, the game's 6:3 (its Builder's)
-  - LAB (operation moves): 1128 t225 Barbarian Attack's Ranger 6946838 holds 41:17 and its Cavalry 7012372 walks 41:21 -> 41:18, the game's Ranger to 41:18 and the Cavalry holding
-  - LAB (operation moves): 1128 t249 City Assault's Cuirassier 7405596 and Cavalry 7143430 end on 41:20 / 41:19, the game's 41:19 / 41:20
+  - LAB (operation moves): 1128 t225 Barbarian Attack on the Field Cannon 42:18: the Cavalry 7012372 (41:21) lists its spots 41:18, 41:19, 41:17, so the Cavalry 7077911 (41:18) takes 41:19 and the Ranger 6946838 keeps 41:17 with its strike; the game's 7077911 takes 41:17 and the Ranger 42:18 at turn 2 (Move 42:18, no attack), swapped onto 41:18 where 7012372 then finds no room: the assignment's one pass gives the game's rows on the spot order 41:18, 41:17, 41:19 (the planning's link order of 42:18 from 41:21)
   - LAB (operation moves): 1124 t16 / t28 Barbarian Attack's Warriors 983054 / 2031629 end beside their targets on 37:22 / 42:10, the game's on the targets' 36:22 / 41:10
   - LAB (operation moves): 1128 t242 the hurt Cavalry 7012372 walks to 41:21 under Operation Move, ours holds 42:21
   - LAB (operation moves): 1121 t169 / t172 the 5:17 team past our danger map
@@ -259,12 +257,11 @@ A question the SOURCE under-determines; neither engine ships a branch until the 
   - LAB (raids and assaults): 1121 t122's City Assault, ours at t116 for the game's t119 (Skirmisher 3342353 reports seat 1 at our t109, Notifies t116; the game's tactical rows by t114: the scout tree's end, Notify timing)
   - LAB (raids and assaults): 1128 t221 / t237 / t243 raid and assault starts
   - LAB (raids and assaults): fit, unread: a unit its tribe raised in the turn is not yet one its raid recruits (StandardRaid: 1124 camp (40,21) t9–t12, 1117 camp (9,24) t10–t14, 1124 camp (41,7) t23–t27; the evaluator 0x60a8c0 unread; dll_readings "H-1: the raids")
-  - LAB (raises): late-era raises ours lacks (t215 / t237 / t242, 1128 t159-249: Musketman, Line Infantry, Cavalry, Ranger, Cuirassier)
-  - LAB (raises): 1128 t235 / t245-249 raises the game lacks
   - LAB (scouts): fit, unread: a scout's report ignoring a barbarian civilian's sight (1128 t76)
   - LAB (scouts): fit, unread: a scout reporting a plot newly in its own sight, the plots in index order (the barbarian player's count turning positive, 0x58aa90 → 0x508d50; the engines count per scout)
   - LAB (scouts): fit, unread: a hurt scout's report waiting on Protect Unit's danger (0x7f07c0 reads the AI's influence map; the engines: an enemy within its moves plus its reach; 1121 camp (3,19), hurt at t25 beside China's Warrior, reporting at t33)
   - LAB (scouts): duelq1121 t78 the barbarian Scout 131073 on 8:17 sees player 1's Holy Site on 7:15, pillaged since t73 in the records, and reports it, its homing tree from t79 (ours no tactical row at t79 / t80, plot 801 // 668 at t80); the game's Barbarian Found City tree (917508) stands from t81, after player 1 repaired the Holy Site in its turn 79 (DistrictPillaged seq 23086) and the Scout came back in sight of it from 7:17 at t80
+  - LAB (scouts): 1121 t78-80 Scout 131073: ours reports player 1's Holy Site 7:15 at t78 (the Scout beside it on 8:16 in record 79) and walks home (9:18 at t80), the game's explores to 8:15 at t80 and its tree stands from t81; the district's pillaged flag clears in record 80 (DistrictPillaged 23086 of t79); the report 0x153ef0 reads no pillage (the plot's improvement +0x44 or its district's type 0x810d0): the owner's throttle +0x3d8 and the plot's first sight (0x508d50) untraced
 - **C-124. BARBARIANS' CAMPS AND SIGHT.** Weight 1.
   - BUILD (sight): the alliances' outgoing visibility (0x2ab4f0 -> 0x508330; no recorded duel holds an alliance)
   - LAB (sight): the unseen land's single-turn residue (sightLab.ts on Barbarians.csv: 1,065 of 1,245 turns equal; 1128 t25 +28)
@@ -299,7 +296,6 @@ A question the SOURCE under-determines; neither engine ships a branch until the 
   - LAB (endangered units): an embarked captive's danger from a land unit beside it: 1127 t166 Settler 2097173 on 16:12 by player 0's Warrior on 15:12, the game's Move To Safety to 17:9, ours to 17:10
   - LAB (search): the danger search's blocking for ranged movers (1128 t159 Man-At-Arms 5505044)
   - LAB (search): Move Unit's flag 8 on our danger map (1124 t92 Catapult 1245186 via 699, ours 25 from Archer 3801089)
-  - LAB (search): fit, unread: the barbarians' map holds no sight of what their turn raises (1117 t21: no Warrior of Rome's on 10:21, seen only by the Warrior 1703944 raised that turn on 9:23): the manager's turn 0x1514a0 is a job aiTurnJobs 0x6096c0 registers in its first group, when the group runs against the DoTurn 0x7e9d0 calls unread
   - LAB (search): fit, unread: every unit reads unmoved in another player's danger search, one that walked in its own turn too (1128 t126: player 1's Courser 2162694 and Settler, walked onto 12:6, lay 46 on 12:5 across the river): the formation's moved flag +0x4b8 is set by the walk's step (0x26fe20 at 0x2707cf) and cleared by its turn start (0x2673f0), what clears it before the next player's DoTurn unread
   - LAB (search): fit, unread: an Open Borders grant's last turn (1127: player 1's grant to player 0 of t99, 20 turns, open through the barbarians' turn of t118): the count 0x3e6b50 keeps one a source, the turn the deal's action DIPLOACTION_OPEN_BORDERS (0x238d00) ends unread
 - **C-133. UNIT PATHS AND MOVE ORDERS.** Weight 3.
@@ -738,7 +734,8 @@ A question the SOURCE under-determines; neither engine ships a branch until the 
   - LAB (strength terms): a defender at exactly 0 strength takes the minimum counter (1127 t40 a Warrior on a 50-HP Slinger: 100 / 1 logged, 72 / 16 ours; 1105 t12; unread)
   - LAB (districts): the Encampment's own damage loss (0x51eaf0 on its hit points) unported (TS encampHp undefined reads full, the GPU plane 0 until mustered)
   - LAB (districts): 0x51eaf0's terrain term 0x522c10 and its modifier lists unread
-  - LAB (districts): the engine sacks a major's centre a barbarian blow takes to 0 (hp reset to 100, population, Gold, pillage) where the game's Rome stands at 200 damage t242-249 uncaptured
+  - LAB (districts): a centre a player that is no major may raze (Rules CanRaze 0x533e50) and takes to 0: the engines sack it (hp reset to 100, population, Gold, pillage) and floor a barbarian's blow on a city-state's centre at 1, where the game's capture 0x1fdea0 destroys the city (0x1e6f50 -> 0x36dfe0 at 0x1fe0a6); no recorded case
+  - BUILD (districts): a major's ranged blow on a city centre is floored at 1 hit point in the engines (`hostileRangedStrike`, `rangedAttack`), where District ChangeDamage 0x248800 cuts a FULL_CIV's damage none (no recorded case of a centre at 0 under a major's ranged blow)
   - LAB (healing): a barbarian never heals by resting: 0x538040 refuses another's plot under the owner's m_bNoForeignHeal (+0x290) and no one's under m_bNoNeutralHeal (+0x2f0), the flags' writer unread (only Player::Units' read 0x4e7f00 writes them)
   - LAB (kills and strikes): a combat's kill path (which kills take the destroy 0x4ef100) unread, every logged UnitKilledInCombat a destroy
   - LAB (kills and strikes): a fighter's strike on a sea unit refused by airStrikeOffers (land only: duelz1124 t231 China's Jet Fighter 8978447 on the barbarians' Ironclad 6029330, CombatLog 604), the replay landing none
@@ -751,7 +748,7 @@ A question the SOURCE under-determines; neither engine ships a branch until the 
   - LAB (captures): which district a CanRetreatWhenCaptured civilian withdraws to on a tie (0x530650; ours the lowest plot; no recorded case)
   - LAB (captures): a captured city's unfinished district plot (the DLL makes none again, the engines leave it paved)
   - LAB (captures): a captured minor's stay in the registry
-  - BUILD (captures): a city felled by a non-major captor: TS transferCity gives it to the Free City or city-state, the GPU sacks it (`_melee_city`) leaving the minor at <= 0 HP, the game's capture by a non-major unread (no recorded case)
+  - BUILD (captures): a city felled by a non-major captor: TS transferCity gives it to the Free City or city-state, the GPU sacks it (`_melee_city`) leaving the minor at <= 0 HP, the game's capture destroys the city (0x1fdea0 at 0x1fe098..0x1fe0ab -> 0x1e6f50; no recorded case)
   - LAB (goody huts): the HEAL goody's damage gate (0x42c980 +0x1c vs unit +0xcf0), read, not wired
   - LAB (goody huts): the goody's Experience gate (bit 1, 0x55d650), read, not wired
   - LAB (purchases and raids): a held unfinished district's purchase (the DLL test unread; both twins refuse)

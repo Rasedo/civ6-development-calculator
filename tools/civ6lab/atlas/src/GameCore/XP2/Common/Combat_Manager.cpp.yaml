@@ -86,7 +86,10 @@
   final: 0x151910
   kind: function
   status: PARTLY
-  readings: ["C-128: the standing army's home and Garrison City's DEFENDER — READ, both twins"]
+  readings:
+    - "C-128: the standing army's home and Garrison City's DEFENDER — READ, both twins"
+    - "C-123 / C-110: the barbarians' rules run as the first job of their AI turn start, after the DoTurn tail; a centre a player that is no major may not raze keeps its last hit point — READ (0x6096c0 at 0x6097af..0x609802, 0x608870, 0x7280a0, 0x1514a0, 0x14d25d; 0x248800, 0x533e50, 0x206080 at 0x206868..0x2068c8, 0x20dd30, 0x1fdea0 at 0x1fe098..0x1fe0ab), both twins"
+    - "C-123 / C-110: the barbarians' rules run as the first job of their AI turn start, after the DoTurn tail; a centre a player that is no major may not raze keeps its last hit point; a melee blow on a district that would fell both sides — READ (0x6096c0 at 0x6097af..0x609802, 0x608870, 0x7280a0, 0x1514a0, 0x14d25d; 0x248800, 0x533e50, 0x206080 at 0x206684..0x206715 and 0x206868..0x2068c8, 0x20dd30, 0x1fdea0 at 0x1fe098..0x1fe0ab), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...writers of the home: the unit's init (0x5657b2, -1) and a city's capture (0x5c9d40 from 0x1fdea0: the capturing unit's assignment -1, DEFENDER, homed on the city). Recruit Units' upd..."
@@ -218,9 +221,13 @@
     - gpu/core/sim_seats.py:_attack_encampment
     - gpu/core/sim_seats.py:_assault_city
     - cpu/core/combat.ts:districtDamageLoss
+    - cpu/core/combat.ts:districtBothFall
+    - gpu/core/sim_seats.py:_district_both_fall
   readings:
     - "H-1: the melee result, a ranged blow's domain, a city's shot — READ"
     - "C-95: a damaged centre defends at its wounded strength, the planning's city shot needs standing walls, the barbarians plan on the turn's unhealed centres — READ (0x51eaf0, 0x791470 at 0x79181c..0x791827 -> 0x249ee0 / 0x24b960), both twins; the replay's barbarian copy"
+    - "C-123 / C-110: the barbarians' rules run as the first job of their AI turn start, after the DoTurn tail; a centre a player that is no major may not raze keeps its last hit point — READ (0x6096c0 at 0x6097af..0x609802, 0x608870, 0x7280a0, 0x1514a0, 0x14d25d; 0x248800, 0x533e50, 0x206080 at 0x206868..0x2068c8, 0x20dd30, 0x1fdea0 at 0x1fe098..0x1fe0ab), both twins"
+    - "C-123 / C-110: the barbarians' rules run as the first job of their AI turn start, after the DoTurn tail; a centre a player that is no major may not raze keeps its last hit point; a melee blow on a district that would fell both sides — READ (0x6096c0 at 0x6097af..0x609802, 0x608870, 0x7280a0, 0x1514a0, 0x14d25d; 0x248800, 0x533e50, 0x206080 at 0x206684..0x206715 and 0x206868..0x2068c8, 0x20dd30, 0x1fdea0 at 0x1fe098..0x1fe0ab), both twins"
   context:
     - "- A unit's attack on a city (0x206080, melee) draws three times: 0x519370 the attacker's damage, then 0x519440 the district's..."
   review: reviewed
@@ -536,6 +543,18 @@
   context:
     - "...s): the unit's own plot 0; a plot off the map 0; the plot tested (0x2669d0 / 0x586900 / 0x20a3c0) and the path generated (0x26f1d0: the flags to the instance's +0x398, bit 8 where the..."
   review: reviewed
+- addr: 0x20a400
+  final: 0x15a8e0
+  kind: function
+  name: the capture's units on the plot
+  semantics: "(district, the player, the unit, a map layer, the centre flag): the capture 0x1fdea0 runs it on layers 0, 3 and 1 of the district's plot (LOC_COMBAT_YOUR_UNIT_DIED_DEFENDING); its body unread."
+  status: PARTLY
+  readings:
+    - "C-123 / C-110: the barbarians' rules run as the first job of their AI turn start, after the DoTurn tail; a centre a player that is no major may not raze keeps its last hit point — READ (0x6096c0 at 0x6097af..0x609802, 0x608870, 0x7280a0, 0x1514a0, 0x14d25d; 0x248800, 0x533e50, 0x206080 at 0x206868..0x2068c8, 0x20dd30, 0x1fdea0 at 0x1fe098..0x1fe0ab), both twins"
+    - "C-123 / C-110: the barbarians' rules run as the first job of their AI turn start, after the DoTurn tail; a centre a player that is no major may not raze keeps its last hit point; a melee blow on a district that would fell both sides — READ (0x6096c0 at 0x6097af..0x609802, 0x608870, 0x7280a0, 0x1514a0, 0x14d25d; 0x248800, 0x533e50, 0x206080 at 0x206684..0x206715 and 0x206868..0x2068c8, 0x20dd30, 0x1fdea0 at 0x1fe098..0x1fe0ab), both twins"
+  context:
+    - "...741) reads the damage before the cut. In 0x1fdea0 the units on the district's plot die (0x20a400), and a captor that is no FULL_CIV destroys the district (0x1e6f50 at 0x1fe0a6: a cen..."
+  review: reviewed
 - addr: 0x20bae0
   final: 0x15bd50
   kind: function
@@ -571,6 +590,20 @@
     - "C-109: war weariness per combat, the turn's decay and the percent — READ"
   context:
     - "- War weariness (0x1fb680, from the combat log 0x20d280): it reads only the struct's [+0] and [+8] and the combat's location — the interceptor..."
+  review: reviewed
+- addr: 0x20dd30
+  final: 0x15dd50
+  kind: function
+  name: the melee district combat's end
+  semantics: "lays the result on a district defender: the outer and the hit-point damage through 0x1e6460 with the attacker's player (0x20dee9 / 0x20df06 / 0x20e00c), the attacker's experience and damage; with the attacker alive and the district's hit-point damage at its maximum (0x24b8b0) the capture 0x1fdea0 (0x20e48b..0x20e4a4); the attacker advances onto the plot only under the result's +0x58 (0x20e5db)."
+  status: PARTLY
+  readings:
+    - "C-123 / C-110: the barbarians' rules run as the first job of their AI turn start, after the DoTurn tail; a centre a player that is no major may not raze keeps its last hit point — READ (0x6096c0 at 0x6097af..0x609802, 0x608870, 0x7280a0, 0x1514a0, 0x14d25d; 0x248800, 0x533e50, 0x206080 at 0x206868..0x2068c8, 0x20dd30, 0x1fdea0 at 0x1fe098..0x1fe0ab), both twins"
+    - "C-123 / C-110: the barbarians' rules run as the first job of their AI turn start, after the DoTurn tail; a centre a player that is no major may not raze keeps its last hit point; a melee blow on a district that would fell both sides — READ (0x6096c0 at 0x6097af..0x609802, 0x608870, 0x7280a0, 0x1514a0, 0x14d25d; 0x248800, 0x533e50, 0x206080 at 0x206684..0x206715 and 0x206868..0x2068c8, 0x20dd30, 0x1fdea0 at 0x1fe098..0x1fe0ab), both twins"
+  context:
+    - ...608870, 0x7280a0, 0x1514a0, 0x14d25d; 0x248800, 0x533e50, 0x206080 at 0x206868..0x2068c8, 0x20dd30, 0x1fdea0 at 0x1fe098..0x1fe0ab), both twins
+    - ...e amount is cut to GetMaxDamage - the damage - 1 (0x24887d..0x248893). The combat's end 0x20dd30 lays the outer and the hit-point damage through it with the attacker's player (0x1e6460...
+    - "- THE CAPTURE: 0x20dd30 (at 0x20e48b..0x20e4a4) calls the capture 0x1fdea0 only where the district's hit-point..."
   review: reviewed
 - addr: 0x20e720
   final: 0x15e6b0

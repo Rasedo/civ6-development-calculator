@@ -15517,3 +15517,92 @@ formation boosts (cpu/harness/replay.ts, the city-states' pass). GPU
   the repair queued the same update) is the unread part. C-130: Bologna's
   Suffrage and Digital Democracy at 1124 t245, the turn Class Struggle
   completes at its start.
+
+## C-123 / C-110: the barbarians' rules run as the first job of their AI turn start, after the DoTurn tail; a centre a player that is no major may not raze keeps its last hit point; a melee blow on a district that would fell both sides — READ (0x6096c0 at 0x6097af..0x609802, 0x608870, 0x7280a0, 0x1514a0, 0x14d25d; 0x248800, 0x533e50, 0x206080 at 0x206684..0x206715 and 0x206868..0x2068c8, 0x20dd30, 0x1fdea0 at 0x1fe098..0x1fe0ab), both twins
+
+`barbarianPhase` (cpu/core/tactical.ts), `_barbarian_phase`
+(gpu/core/sim_orders.py): the order they hold. `centreDamage` / `canRazeCity`
+in `cityAssault`, `districtBothFall` in `cityAssault`, `attackCityState` and
+`predictCityExchange` (cpu/core/combat.ts); `_centre_damage` in
+`_assault_city`, `_district_both_fall` in `_assault_city`,
+`_assault_city_state` and `_predict_city_exchange` (gpu/core/sim_seats.py).
+
+- THE BARBARIANS' RULES ARE A JOB OF THE AI TURN START. aiTurnJobs 0x6096c0
+  pushes the jobs of the Control Manager's +0x370 list: first the cities'
+  0x5c2650, then — where the manager's player (+0x98) is the barbarians'
+  (0x469ce0, at 0x6097af..0x609802) — the barbarian manager's (0x151550) turn
+  0x1514a0, then 0x275fa0 and the rest (the knowledge base's 0x785f30, the
+  military AI's 0x722690 among them); the tree manager's tick 0x7ffdd0 and
+  the tactical pass 0x771530 are jobs of the +0x388 list. A job's thunk
+  (0x7280a0, the functor's vt +0x10) hands it the pass (*rdx) and the turn
+  start's flag (*r8).
+- THE TURN START 0x608870 runs the whole +0x370 list at the passes 4, 3, 2,
+  1, 0 (0x608a95..0x608b3a), the flag its own dl. 0x1514a0 acts only where
+  the flag is set and the pass is its manager's m_priority (the AutoVariable
+  +0x1d8, value +0x230, constructed 4 at 0x14d25d, saved at 0x14ed46): the
+  first pass, with only the cities' job before it.
+- AGAINST DoTurn: Player DoTurn 0x4e4560 ends with its tail 0x46cdd0 (the
+  danger map, at 0x4e4aa4) and jumps to 0x608870 with dl 1
+  (0x4e4aa9..0x4e4abe); Player::Processor 0x7e9d0 raises the player's turn
+  event after DoTurn returns. So, in order: the danger map, the barbarians'
+  techs, camp step and tribes' turns (the raises), the other +0x370 jobs,
+  PlayerTurnActivated, then the +0x388 list's trees and tactical pass — the
+  order the engines hold (`barbarianPhase`). The AI update 0x608580 calls
+  0x608870 with the flag clear (0x6086ca), which 0x1514a0 refuses.
+- The manager's init 0x153720 also binds 0x1514a0 to the barbarian player's
+  signal +0x1f8 (0x153c37..0x153c68), as the AI's parts bind theirs
+  (0x5c27e0, 0x724280, 0x775870, 0x7864c0, 0x8007a0 ...).
+- A CENTRE'S LAST HIT POINT. District ChangeDamage 0x248800 (district, the
+  damage kind, the amount, the player): for the hit points (0x5e97d629), a
+  player given that is no FULL_CIV (0x469db0) and a district that is its
+  city's centre (0x24c250), unless Rules CanRaze 0x533e50 (the city, the
+  player) answers true the amount is cut to GetMaxDamage - the damage - 1
+  (0x24887d..0x248893). The combat's end 0x20dd30 lays the outer and the
+  hit-point damage through it with the attacker's player (0x1e6460 at
+  0x20dee9 / 0x20df06 / 0x20e00c).
+- CanRaze 0x533e50 (the city, the player; -1 the city's owner; Lua CanRaze
+  0xa8f60): true under the game's +0x21c of @f28c80 (its writer unread);
+  false for a city flagged an original capital (+0x648) whose original owner
+  (+0x218) is a FULL_CIV, for the original owner, for the player of +0x468
+  (the capture's second liberation target beside the original owner,
+  0x1fe004 / 0x1fe250; the engines' `formerSeat`, a fit), and where the
+  city's owner is allied (0x3da560) with either.
+- THE CAPTURE: 0x20dd30 (at 0x20e48b..0x20e4a4) calls the capture 0x1fdea0
+  only where the district's hit-point damage reached its maximum (0x24b8b0);
+  0x206080 (at 0x206868..0x2068c8) sets the attacker's advance (+0x58) for a
+  unit whose Combat is not under its ranged or bombard strength (0x51ad30),
+  and for a land unit on a city centre only where its player is a FULL_CIV.
+  The experience's felled flag (0x206719..0x206741) reads the damage before
+  the cut. In 0x1fdea0 the units on the district's plot die (0x20a400), and a
+  captor that is no FULL_CIV destroys the district (0x1e6f50 at 0x1fe0a6: a
+  centre's city through its owner's 0x36dfe0) where a FULL_CIV's takes the
+  city (0x1e8880).
+- A MELEE BLOW THAT WOULD FELL BOTH SIDES (0x206080 at 0x206684..0x206715,
+  the combat the AI's simulation 0x791470 runs too): where the district's
+  hit-point damage with the blow reaches its maximum and the attacker's with
+  the blow back its own hit points, the overkills are compared — the
+  attacker's the larger, the blow is cut to leave the district 1 hit point;
+  else the damage the attacker takes is cut to leave it 1. Ported in the
+  resolution and in the planning's exchange (the survival filter reads the
+  cut damage). Confirmed: runs/h1_duelq1128 t249 the Cavalry 7143430 at 10
+  hit points beside Rome's 42:20 (21 left): CombatLog AttackerDmg 9,
+  DefenderDmg 48; City Attack assigns it its own 41:20, the Ranger 42:19 and
+  the Cavalry 7208976 41:19, the Cuirassier 7405596 (17 hit points) none, as
+  logged.
+- CONFIRMED: runs/h1_duelq1128 Rome's 42:20 under the barbarians' City
+  Assault: record 241 holds 128 of 200 lost, the t241 blow deals 113 and
+  record 242 holds 179 (199 less the turn's 20); t242-249 the blows of each
+  turn pass its 21 hit points (t245 28 + 58 + 64) and every record to 250
+  holds 179, player 0's Pikeman 3407878 whole on the centre. With the cut
+  the barbarians' Wander draws of t245 (Cuirassier 7471118 to 38:18), t248
+  and t249 (Cavalry 7077911 to 40:22 and 39:20) take the game's plots: 42:20
+  no candidate under the Pikeman. The job order: every raise the game logs
+  (Barbarians_Units.csv) is the engines' by turn, tribe and type on the five
+  recordings (1117 62, 1121 66, 1124 97, 1127 68, 1128 107), the danger rows
+  of the C-95 section above on the map built before them.
+- OPEN: the raiser of the player's signal +0x1f8 (none found by the raise's
+  call shape); the capture by a player that is no FULL_CIV (the city
+  destroyed, 0x1e6f50 -> 0x36dfe0) is unported — the engines sack a centre
+  such a player may raze, and a barbarian's blow leaves a city-state's
+  centre at 1 — with no recorded case; a FULL_CIV's ranged blow is floored
+  at 1 in the engines where 0x248800 cuts none.

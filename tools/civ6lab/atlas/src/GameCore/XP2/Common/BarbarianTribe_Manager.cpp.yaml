@@ -69,7 +69,7 @@
 - addr: 0x1514a0
   final: 0xe30f0
   kind: function
-  semantics: "the barbarian manager's turn, first in the turn's close: the techs 0x14f530, the camp step 0x14fcc0, each living tribe's turn (0x1488a0) in the tribes' order, then the clans' 0x8e1bf0. The barbarians' Movement is restored as their turn opens, before this turn grants the techs (0x14f530) — a FIT (barbMovesNow / refreshBarbarians, _barb_reset_mp)."
+  semantics: "the barbarian manager's turn, first in the turn's close: the techs 0x14f530, the camp step 0x14fcc0, each living tribe's turn (0x1488a0) in the tribes' order, then the clans' 0x8e1bf0. A job of the Control Manager's +0x370 list (aiTurnJobs 0x6096c0 at 0x6097af..0x609802, second after the cities' 0x5c2650): it acts where the turn start's flag (r8b) is set and the pass (edx) is its m_priority (+0x230, 4), the first pass of the turn start 0x608870 that DoTurn 0x4e4560 jumps to after its tail 0x46cdd0. The barbarians' Movement is restored as their turn opens, before this turn grants the techs (0x14f530) — a FIT (barbMovesNow / refreshBarbarians, _barb_reset_mp)."
   status: PARTLY
   readings:
     - "H-1: the barbarians' turn (0x1514a0) — READ (the max camps and the sight LAB)"
@@ -78,6 +78,8 @@
     - "C-95: the planning sets out on the full Movement, the walk on the turn's restored — READ (the planning), FIT (the restore's place)"
     - "C-95: the planning sets out on the full Movement, the walk on the turn's restored"
     - "C-132: the danger map's fitted rules in the DLL; a search's shore crossings on the formation's own domain — READ (0x26dab0, 0x586360 at 0x586624..0x586664, 0x2720a0 at 0x272618..0x272689, 0x66a90, 0x52fe90, 0x56e0a0, 0x26e570, 0x530240, 0x530420), FIT (the unmoved flag, the barbarians' raise, the grant's last turn), both twins"
+    - "C-123 / C-110: the barbarians' rules run as the first job of their AI turn start, after the DoTurn tail; a centre a player that is no major may not raze keeps its last hit point — READ (0x6096c0 at 0x6097af..0x609802, 0x608870, 0x7280a0, 0x1514a0, 0x14d25d; 0x248800, 0x533e50, 0x206080 at 0x206868..0x2068c8, 0x20dd30, 0x1fdea0 at 0x1fe098..0x1fe0ab), both twins"
+    - "C-123 / C-110: the barbarians' rules run as the first job of their AI turn start, after the DoTurn tail; a centre a player that is no major may not raze keeps its last hit point; a melee blow on a district that would fell both sides — READ (0x6096c0 at 0x6097af..0x609802, 0x608870, 0x7280a0, 0x1514a0, 0x14d25d; 0x248800, 0x533e50, 0x206080 at 0x206684..0x206715 and 0x206868..0x2068c8, 0x20dd30, 0x1fdea0 at 0x1fe098..0x1fe0ab), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context: ["## H-1: the barbarians' turn (0x1514a0) — READ (the max camps and the sight LAB)"]
   review: reviewed
@@ -92,7 +94,10 @@
     - recording: 1124
       turn: 1
       value: "The   planning's search (0x115 | 0x800 | 0x100) carries +4: none of them runs   there (the planning classifier, 1124 t1-60: applying the stacking test   takes 822 equal rows to 472)."
-  readings: ["C-95: the unit pathfinder and the planning's reach — READ, confirmed on the Wander draws"]
+  readings:
+    - "C-95: the unit pathfinder and the planning's reach — READ, confirmed on the Wander draws"
+    - "C-123 / C-110: the barbarians' rules run as the first job of their AI turn start, after the DoTurn tail; a centre a player that is no major may not raze keeps its last hit point — READ (0x6096c0 at 0x6097af..0x609802, 0x608870, 0x7280a0, 0x1514a0, 0x14d25d; 0x248800, 0x533e50, 0x206080 at 0x206868..0x2068c8, 0x20dd30, 0x1fdea0 at 0x1fe098..0x1fe0ab), both twins"
+    - "C-123 / C-110: the barbarians' rules run as the first job of their AI turn start, after the DoTurn tail; a centre a player that is no major may not raze keeps its last hit point; a melee blow on a district that would fell both sides — READ (0x6096c0 at 0x6097af..0x609802, 0x608870, 0x7280a0, 0x1514a0, 0x14d25d; 0x248800, 0x533e50, 0x206080 at 0x206684..0x206715 and 0x206868..0x2068c8, 0x20dd30, 0x1fdea0 at 0x1fe098..0x1fe0ab), both twins"
   context:
     - "...revealed child; flag 2: a child owned by a player at war refused; a clans' tribe test (0x151550, 0x147c20); under the unit's +0x1f7 byte or flag 8, a child whose danger (0x716a90) is..."
   review: imported
@@ -245,6 +250,8 @@
     - "H-1: the raids — READ"
     - "H-1: the raids — READ"
     - "C-97: City Defense and the assault target's validity — the city's threat, the defence event, Is City Threatened, Garrison City and the district target's validity READ; the threat's level terms, the garrison's swap and the team's unit to build unread"
+    - "C-123 / C-110: the barbarians' rules run as the first job of their AI turn start, after the DoTurn tail; a centre a player that is no major may not raze keeps its last hit point — READ (0x6096c0 at 0x6097af..0x609802, 0x608870, 0x7280a0, 0x1514a0, 0x14d25d; 0x248800, 0x533e50, 0x206080 at 0x206868..0x2068c8, 0x20dd30, 0x1fdea0 at 0x1fe098..0x1fe0ab), both twins"
+    - "C-123 / C-110: the barbarians' rules run as the first job of their AI turn start, after the DoTurn tail; a centre a player that is no major may not raze keeps its last hit point; a melee blow on a district that would fell both sides — READ (0x6096c0 at 0x6097af..0x609802, 0x608870, 0x7280a0, 0x1514a0, 0x14d25d; 0x248800, 0x533e50, 0x206080 at 0x206684..0x206715 and 0x206868..0x2068c8, 0x20dd30, 0x1fdea0 at 0x1fe098..0x1fe0ab), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "- The report's event: 0x153ef0 is bound (0x153b0d) to the game signal at signals +0x10c8, which the unit sight update 0x58aa90 raises per..."

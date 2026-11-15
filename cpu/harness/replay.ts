@@ -1374,7 +1374,7 @@ function barbarianAi(ctx: Ctx, b: TurnRecord, closing: number, before: ReadonlyS
   // ...and every city centre as it stood before the turn's close healed it
   // and before their battles of the pair struck it (runs/h1_duelz1128 t242:
   // Rome on 42:20 at 21 hit points, 179 damage as the combat log's 39
-  // defence reads it, not the replay's sacked 100)
+  // defence reads it)
   for (const [plot, was] of ctx.barbCentres) {
     const major = cityAtIndex(copy, plot)?.city;
     const minor = major ? undefined : cityStateAt(copy, plot);

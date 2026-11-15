@@ -3,6 +3,18 @@
 # `review: imported` = bootstrapped from dll_readings.md / code comments / saved
 # labels and not yet reviewed: verify against the disassembly, then edit and
 # set `review: reviewed`.
+- addr: 0x275fa0
+  final: 0x1ad2a0
+  kind: function
+  name: a job of the +0x370 list
+  semantics: the job aiTurnJobs 0x6096c0 pushes after the cities' 0x5c2650 and the barbarian manager's 0x1514a0 (0x60988c); unread.
+  status: PARTLY
+  readings:
+    - "C-123 / C-110: the barbarians' rules run as the first job of their AI turn start, after the DoTurn tail; a centre a player that is no major may not raze keeps its last hit point — READ (0x6096c0 at 0x6097af..0x609802, 0x608870, 0x7280a0, 0x1514a0, 0x14d25d; 0x248800, 0x533e50, 0x206080 at 0x206868..0x2068c8, 0x20dd30, 0x1fdea0 at 0x1fe098..0x1fe0ab), both twins"
+    - "C-123 / C-110: the barbarians' rules run as the first job of their AI turn start, after the DoTurn tail; a centre a player that is no major may not raze keeps its last hit point; a melee blow on a district that would fell both sides — READ (0x6096c0 at 0x6097af..0x609802, 0x608870, 0x7280a0, 0x1514a0, 0x14d25d; 0x248800, 0x533e50, 0x206080 at 0x206684..0x206715 and 0x206868..0x2068c8, 0x20dd30, 0x1fdea0 at 0x1fe098..0x1fe0ab), both twins"
+  context:
+    - "...469ce0, at 0x6097af..0x609802) — the barbarian manager's (0x151550) turn 0x1514a0, then 0x275fa0 and the rest (the knowledge base's 0x785f30, the military AI's 0x722690 among them); th..."
+  review: reviewed
 - addr: 0x276310
   final: 0x1ad310
   kind: function
