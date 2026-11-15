@@ -2522,6 +2522,13 @@ export function traceDanger(fn: ((seat: number, plane: Int16Array) => void) | nu
   dangerTrace = fn;
 }
 
+let planningTrace: ((state: GameState, pass: Pass) => void) | null = null;
+/** REPLAY: each player's tactical pass as it opens, before any unit of it
+ *  moves: its target list and every unit's planning */
+export function tracePlanning(fn: ((state: GameState, pass: Pass) => void) | null): void {
+  planningTrace = fn;
+}
+
 /** a pass's danger map, the replay's trace shown it: the one the player's
  *  DoTurn built (`holder`'s `Seat.dangerOpen`), else built as the pass
  *  opens (the Free Cities' after their cities' turn, a pass run outside its
@@ -4498,7 +4505,9 @@ export function openPass(state: GameState, seat: number, aiOf: (u: Unit) => numb
   }
   const ended = new Set<number>();
   movesEnded = ended;
-  return { seat, strike: false, units, reach, done: new Set(), ended, ai, targets, plan, danger: passDanger(state, seat, holder), regions: seenRegions(state, seat) };
+  const pass: Pass = { seat, strike: false, units, reach, done: new Set(), ended, ai, targets, plan, danger: passDanger(state, seat, holder), regions: seenRegions(state, seat) };
+  planningTrace?.(state, pass);
+  return pass;
 }
 
 /** an operation's member of the player, null for one killed */
@@ -4852,6 +4861,7 @@ function tacticalPass(state: GameState, acting: ReadonlySet<number>): void {
   }
   const pass: Pass = { seat: BARB_SEAT, strike: true, units: all, reach, done: new Set(), ended: (movesEnded = new Set<number>()), ai, targets, plan,
     danger: passDanger(state, BARB_SEAT, state.barbSeat), regions: seenRegions(state, BARB_SEAT) };
+  planningTrace?.(state, pass);
   // the operations first (their manager's job opens the player's turn);
   // then an operation's units are the operation's
   const opUnits = barbarianTrees(state, pass);

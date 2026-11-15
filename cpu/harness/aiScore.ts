@@ -57,6 +57,27 @@ export const KIND_NOTES: Record<string, string> = {
   'trade.route.minor': 'the destination a city-state\'s Trader takes (minorRouteCandidate) vs record t+1\'s new route',
 };
 
+/** what each kind of the game's intermediate state compares (`aiUnits.ts`) */
+export const STATE_NOTES: Record<string, string> = {
+  'plan.unit': 'per unit either side plans as the tactical pass opens: both hold a planning',
+  'plan.input': 'per unit both plan: its plot, Movement left, damage and embarked flag vs the game\'s unit row at its tactical step',
+  'plan.aiType': 'a military unit\'s AI type as the pass takes it (EXPLORE 2, COMBAT 3, DEFENDER 4) vs the game\'s unit row, unchanged from its tactical step to its pass',
+  'plan.reach': 'its planning\'s reach, the plots with their turns',
+  'plan.reach.moves': 'the Movement left on each reach plot (the plots and turns equal)',
+  'plan.reach.order': 'the reach list\'s order (the plots, turns and Movement equal)',
+  'plan.targets': 'the targets its planning holds, of the entries both target lists hold: type, plot, owner, unit type',
+  'plan.spots': 'per target both plannings hold: the spots with their turns, in order',
+  'plan.kills': 'per target both hold a spot of: whether its blow kills (the entry\'s kill flag)',
+  'plan.blow': 'per spot both hold: the blow dealt / taken and the blow back dealt / taken (a district\'s dealt the planning\'s own `predictDistrictExchange`)',
+  'targets': 'the player\'s tactical target list: type, plot, owner, unit type',
+  'targets.order': 'the list\'s order (the entries equal)',
+  'kb.cities': 'per city either knowledge base holds (ours the one the operations read, `knownCities`): owner, population, capital flags, each defensible district\'s defense / walls / strike',
+  'kb.cities.list': 'a city-state\'s list of the cities it knows (`citiesKnown`): its members',
+  'kb.cities.list.order': 'that list\'s order (the members equal)',
+  'unit.table': 'a city-state\'s unit production table: each entry\'s value (the engine\'s at its military AI\'s upgrade step, the game\'s at its end look)',
+  'unit.table.held': 'the units held per entry both tables list',
+};
+
 export function newScores(): DecisionScores {
   return {};
 }
@@ -113,9 +134,35 @@ export function memoryTable(s: DecisionScores): string[] {
   return out;
 }
 
+/** the game's intermediate state against ours (`aiUnits.ts`), apart from the
+ *  decisions and the memory: per kind the rows compared, those equal, the
+ *  first that was not; then what was left out of the comparison, by reason.
+ *  Empty for a recording with no unit stream beside it. */
+export function stateTable(s: DecisionScores | undefined, leftOut?: Record<string, number>): string[] {
+  if (!s || !Object.keys(s).length) return [];
+  const out = ['| the game\'s intermediate state | compared | equal to the game\'s | % | missed | first differing (turn, subject: ours / game) |',
+    '|---|---:|---:|---:|---:|---|'];
+  const kinds = [...Object.keys(STATE_NOTES).filter((k) => s[k]), ...Object.keys(s).filter((k) => !(k in STATE_NOTES)).sort()];
+  for (const k of kinds) {
+    const x = s[k];
+    out.push(`| ${k} | ${x.compared} | ${x.equal} | ${pct(x)} | ${x.compared - x.equal} | ${firstOf(x.first)} |`);
+  }
+  const left = Object.entries(leftOut ?? {});
+  if (left.length) out.push('', 'Not compared:', ...left.map(([why, n]) => `- ${n}: ${why}`));
+  return out;
+}
+
+/** several seeds' counts of what was left out, summed by reason */
+export function sumLeftOut(seeds: (Record<string, number> | undefined)[]): Record<string, number> {
+  const out: Record<string, number> = {};
+  for (const s of seeds) for (const [why, n] of Object.entries(s ?? {})) out[why] = (out[why] ?? 0) + n;
+  return out;
+}
+
 /** one seed's per-turn AI score as Markdown */
-export function aiScoreMarkdown(r: { dump: string; turns: number[]; stopped?: string; scores: DecisionScores; memory: DecisionScores },
-  pairs: number): string {
+export function aiScoreMarkdown(r: { dump: string; turns: number[]; stopped?: string; scores: DecisionScores; memory: DecisionScores;
+  state?: DecisionScores; stateLeftOut?: Record<string, number> }, pairs: number): string {
+  const state = stateTable(r.state, r.stateLeftOut);
   const out = [`# Per-turn AI score: ${r.dump}`, '',
     `${pairs} pairs, turns ${r.turns.join('-')}${r.stopped ? `; stopped: ${r.stopped}` : ''}. Each pair starts from record t as the importer`,
     'reads it, the AI\'s memory carried from our own turn before; the city-states\', Free Cities\' and barbarians\' AI plays',
@@ -123,8 +170,10 @@ export function aiScoreMarkdown(r: { dump: string; turns: number[]; stopped?: st
     'the decisions of a minor or barbarian player whose carried memory, at the end of its turn before, equalled every kind',
     'the game\'s logs show of it (the memory table below).', '',
     ...scoreTable(r.scores), '', '## The AI\'s memory against the game\'s (its own memory beside the recording, else its logs)', '', ...memoryTable(r.memory),
+    ...(state.length ? ['', '## The game\'s intermediate state against ours (the recording\'s unit stream; compared only, never fed to the engine)', '', ...state] : []),
     '', '## What each kind compares', '',
-    ...Object.entries(KIND_NOTES).map(([k, v]) => `- ${k}: ${v}`)];
+    ...Object.entries(KIND_NOTES).map(([k, v]) => `- ${k}: ${v}`),
+    ...(state.length ? Object.entries(STATE_NOTES).map(([k, v]) => `- ${k}: ${v}`) : [])];
   const none = unscored(r.scores);
   if (none.length) out.push('', `No decision compared: ${none.join(', ')}.`);
   return out.join('\n') + '\n';

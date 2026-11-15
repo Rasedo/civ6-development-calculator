@@ -64,7 +64,7 @@ import { BOOSTS } from '../data/boosts';
 import { chargeUnitResource, strategicSlot, unitResourceCost, upgradeGoldCost, upgradeType, capStockpiles } from '../core/stockpile';
 import { airStrike, applyTrainingGrants, cityStrikeStrength, clearCampFor, combatBlow, type Blow, flankSupportLive, hostilePillage, meleeAttack, rangedAttack, seizeCivilian, terrainDefense } from '../core/combat';
 import { freeCitiesMilitary, traceFreeOps } from '../core/freeOps';
-import { barbarianTactics, barbMovesNow, dangerPlane, refreshBarbarians, tacticsDrawing, knowledgeLook, traceDanger, traceKnowledge, traceTactics } from '../core/tactical';
+import { barbarianTactics, barbMovesNow, dangerPlane, refreshBarbarians, tacticsDrawing, knowledgeLook, traceDanger, traceKnowledge, tracePlanning, traceTactics, type Pass } from '../core/tactical';
 import { barbBattleDeath, barbBattlesFromRecord, barbSlots, barbSlotsDying, barbarianRules, barbarianTechs, barbScoutLook, foundTribe, plotsSeenNow, tribeDies, tribeKindAt, tribeOf } from '../core/barbarians';
 import { BARB_PILLAGE_SCORE, DIFFICULTIES } from '../data/barbarians';
 import { MINOR_UPGRADE_GOLD, LEVY_TURNS } from '../data/cityStates';
@@ -129,6 +129,7 @@ import { gwWorks, removeGreatWork } from '../core/greatWorks';
 import { InferredActions, RecordedActions, activePlayer, type ActionSource, type Decision, type LogTally, type QueueSpec } from './replayActions';
 import { newScores, scoreDecision, scoreTable, memoryTable, type DecisionScores } from './aiScore';
 import { GameMemory, MemoryLogs, readDanger, readGameMemory, readMemory, readRevealed, syncContracts, type ArmyLogged } from './aiMemory';
+import { GameUnits, readPass, readUnitTable, type StateRead } from './aiUnits';
 import { gameSpawnChanges, importCityAi, importOps, type GameSpawnChange } from './gameAiImport';
 import { NO_SCORE } from '../core/aiPolicyValue';
 
@@ -375,6 +376,13 @@ interface Ctx {
   /** the game's own AI memory beside the recording, where it holds one
    *  (`<stem>.aimem.jsonl`): the memory compared against it instead */
   gameMemory?: GameMemory;
+  /** the game's unit stream beside the recording, where it holds one
+   *  (`<stem>.aiunits.jsonl`), under the per-turn AI score: the game's
+   *  intermediate state compared against ours (`aiUnits.ts`), its scores and
+   *  what the comparison left out by reason */
+  gameUnits?: GameUnits;
+  stateScores: DecisionScores;
+  stateLeftOut: Record<string, number>;
   /** per seat its knowledge base as its last tactical turn logged it */
   armyLogged: Map<number, ArmyLogged>;
   /** per seat the danger map its last DoTurn built (a minor's and the
@@ -701,6 +709,26 @@ let unitsLog: Map<string, Record<string, number[]>> | undefined;
 function score(ctx: Ctx, kind: string, turn: number, player: number | undefined, subject: string, equal: boolean,
   ours: unknown, game: unknown): void {
   scoreDecision(ctx.scores, kind, turn, subject, equal, ours, game, player === undefined ? undefined : ctx.memoryClean.get(player));
+}
+
+/** the game's intermediate state against ours, scored (`aiUnits.ts`) */
+function scoreState(ctx: Ctx, turn: number, rows: readonly StateRead[]): void {
+  for (const r of rows) scoreDecision(ctx.stateScores, r.kind, turn, r.subject, r.equal, r.ours, r.game);
+}
+
+/** a tactical pass of the copy `copy` as it opens against the game's record
+ *  of the player's turn `turn` (`readPass`), its units named by their record
+ *  keys: its twin's (`twin`, `keyOf`), one the pair took off by the key it
+ *  left under */
+function scorePass(ctx: Ctx, copy: GameState, pass: Pass, turn: number, twin: ReadonlyMap<Unit, Unit>, keyOf: ReadonlyMap<Unit, string>): void {
+  if (!ctx.gameUnits) return;
+  const gone = new Map([...ctx.gone].map(([key, u]) => [u, key] as const));
+  const key = (c: Unit) => {
+    const u = twin.get(c);
+    return u ? keyOf.get(u) ?? gone.get(u) : undefined;
+  };
+  scoreState(ctx, turn, readPass(ctx.gameUnits, { W: ctx.W, unitNames: ctx.cat.units, keyOf: key, playerOf: (seat) => ctx.playerOfSeat.get(seat) ?? seat },
+    copy, pass, turn, ctx.stateLeftOut));
 }
 
 /** a record unit key's owner (`owner:id`) */
@@ -1515,9 +1543,11 @@ function barbarianAi(ctx: Ctx, b: TurnRecord, closing: number, before: ReadonlyS
   for (const [c, u] of twin) if (isBarbSeat(c.seat)) danger.set(u, plane[c.tileIndex]);
   const logged = armyLog(ctx);
   traceKnowledge(logged);
+  tracePlanning((st, pass) => { if (st === copy) scorePass(ctx, copy, pass, closing, twin, keyOf); });
   try {
     barbarianTactics(copy, acting);
   } finally {
+    tracePlanning(null);
     holdBarbCaptures(null);
     traceKnowledge(logged);
     taken();
@@ -2185,6 +2215,7 @@ function minorAi(ctx: Ctx, b: TurnRecord, turn: number, made: ReadonlySet<Unit>,
       else c.hp = s.hp;
     }
   });
+  tracePlanning((st, pass) => { if (st === copy) scorePass(ctx, copy, pass, turn, twin, keyOf); });
   try {
     for (const cs of [...copy.cityStates].sort((x, y) => playerOf(x.seat) - playerOf(y.seat))) {
       standLevied(playerOf(cs.seat));
@@ -2205,6 +2236,7 @@ function minorAi(ctx: Ctx, b: TurnRecord, turn: number, made: ReadonlySet<Unit>,
     for (const [c, p] of ownEnd) c.tileIndex = p;
     copy.turn = clock;
     traceTactics(null);
+    tracePlanning(null);
     holdCityStrikes(true);
     holdRng(held);
     traceMinorPurchases(ctx.buyTrace);
@@ -5794,6 +5826,11 @@ export interface ReplayReport {
   /** the AI's memory against the game's logs, per memory kind: the
    *  player-turns compared, those equal (`aiMemory.ts`) */
   memory: DecisionScores;
+  /** under the per-turn AI score of a recording with its unit stream: the
+   *  game's intermediate state against ours, per kind (`aiUnits.ts`), and
+   *  what the comparison left out, by reason */
+  state?: DecisionScores;
+  stateLeftOut?: Record<string, number>;
   /** the pairs started from the record's world, the AI's memory carried
    *  (`aiScore`) */
   perTurnWorld?: boolean;
@@ -6519,6 +6556,7 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
     tactical: loadTactical(dumpPath), barbTally: report.barbTactics, minorTally: report.minorTactics, minorDraws: report.minorDraws,
     civicAi: report.civicAi, civicScores: report.civicScores, civicBefore: new Map(), aiCivicLog: govtLog.civics, aiPolicyLog: govtLog.policies,
     scores: report.scores, turn: recs[0].turn, memoryLogs: new MemoryLogs(dumpPath), gameMemory: GameMemory.of(dumpPath), armyLogged: new Map(), dangerLogged: new Map(), minorLookTypes: new Map(), minorDying: [],
+    gameUnits: opts.aiScore ? GameUnits.of(dumpPath) : undefined, stateScores: newScores(), stateLeftOut: {},
     // a game from its first turn opens on no memory, the game's as well
     memoryClean: new Map([...first.playerOfSeat].filter(([seat]) => minorAiSeat(seat) || isBarbSeat(seat)).map(([, p]) => [p, recs[0].turn <= 1] as const)),
     cityBuildLog: loadCityBuildTables(dumpPath), cityBuild: newCityBuildTally(), cityBuildPer: new Map(),
@@ -7156,6 +7194,7 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
       const landed = new Set<Decision>();
       traceMinorUpgrade((cs, u) => {
         const p = ctx.playerOfSeat.get(cs.seat)!;
+        if (ctx.gameUnits) scoreState(ctx, ctx.turn, readUnitTable(ctx.gameUnits, ctx.cat.units, state, cs, ctx.turn, p));
         const open = opens.get(p);
         const k = acts.findIndex((x) => x[2] === 'UnitCommandStarted' && x[3] === p && x[5] === UNITCOMMAND_UPGRADE
           && (open === undefined || (x[0] as number) < open));
@@ -7712,6 +7751,11 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
   traceMinorPurchases(null);
   traceMinorPolicyScores(null);
   if (operations.active) report.operations = operations.tally;
+  if (ctx.gameUnits) {
+    ctx.gameUnits.close();
+    report.state = ctx.stateScores;
+    report.stateLeftOut = ctx.stateLeftOut;
+  }
   if (ctx.cityBuildLog.size) {
     report.cityBuild = ctx.cityBuild;
     report.cityBuildPer = Object.fromEntries(ctx.cityBuildPer);

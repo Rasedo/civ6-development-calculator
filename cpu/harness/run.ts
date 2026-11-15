@@ -24,7 +24,9 @@
  * `<out>.md`; `--memory log` takes the memory the game's logs hold whole
  * from them each pair instead, `--memory aimem` the game's own knowledge bases and contracts
  * (`<stem>.aimem.jsonl`). A recording with the game's AI memory beside it is
- * compared against that (`readGameMemory`), else against its logs.
+ * compared against that (`readGameMemory`), else against its logs; one with
+ * the game's unit stream beside it (`<stem>.aiunits.jsonl`) has the game's
+ * intermediate state compared too, in a table of its own (`aiUnits.ts`).
  */
 import { readFileSync, writeFileSync } from 'node:fs';
 import { loadCatalog, type TurnRecord } from './record';
@@ -36,7 +38,7 @@ import { turnDraws, type DrawLedger } from './drawLedger';
 import { lastStreamLedger } from './streamHold';
 import { replayMarkdown, runReplay } from './replay';
 import { EventPicks } from './eventPick';
-import { aiScoreMarkdown, memoryTable, scoreTable } from './aiScore';
+import { aiScoreMarkdown, memoryTable, scoreTable, stateTable } from './aiScore';
 
 interface Tally {
   pass: number;
@@ -219,7 +221,8 @@ function main() {
     writeFileSync(`${stem}.json`, JSON.stringify({ ...rest, pairs: perTurn.length }, null, 1) + '\n');
     writeFileSync(`${stem}.md`, aiScoreMarkdown(r, perTurn.length));
     console.log(`aiscore: ${perTurn.length} pairs, turns ${r.turns.join('-')}${r.stopped ? `; stopped: ${r.stopped}` : ''} -> ${stem}.json, ${stem}.md`);
-    console.log([...scoreTable(r.scores), '', ...memoryTable(r.memory)].join('\n'));
+    const state = stateTable(r.state, r.stateLeftOut);
+    console.log([...scoreTable(r.scores), '', ...memoryTable(r.memory), ...(state.length ? ['', ...state] : [])].join('\n'));
     return;
   }
   if (opt.replay) {
