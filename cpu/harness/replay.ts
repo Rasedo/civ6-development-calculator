@@ -47,7 +47,7 @@ import { applySeatUnitOrders, buySeatBuilding, declareWar, districtSiteCost, dis
 import { addEnvoys, buildingCreatedCulture, cityStateAt, declareWarOnCityState, minorCity, minorReplaceCitizens, placeCityStateAt, sueForPeaceWithCityState } from '../core/cityStates';
 import { CP_ACCEPTED, CP_CANCELLED, CP_IN_PROGRESS, contractById } from '../core/aiContracts';
 import { availableBuildings, canPlaceWonder, validImprovements, wallsMax } from '../core/rules';
-import { arrive, arriveAll, plotFortification, builderHarvest, builderRemoveFeature, spawnUnit, tallyUnitMade, trainableUnits, builderCost, traderCost, disbandUnit, escortable, drawAndPayGoody, grantedMoves, unitFullMoves, restUnit, canFortify, upgradeUnit, naturalistPark, upgradeAnew, unitsAt, unitDomain, fortifyBonus, crossesRiver, waterWalks, cityAtIndex, raiseBestTrained, recordAttacker, unitMadeAnew, FORTIFY_MAX_TURNS, ANTIQUITY_CIVIC, SHIPWRECK_CIVIC } from '../core/units';
+import { arrive, arriveAll, plotFortification, builderHarvest, builderRemoveFeature, spawnUnit, tallyUnitMade, trainableUnits, builderCost, traderCost, disbandUnit, escortable, drawAndPayGoody, grantedMoves, unitFullMoves, restUnit, canFortify, upgradeUnit, naturalistPark, upgradeAnew, unitsAt, unitDomain, fortifyBonus, crossesRiver, waterWalks, cityAtIndex, raiseBestTrained, recordAttacker, unitMadeAnew, holdGarrison, retestGarrisons, FORTIFY_MAX_TURNS, ANTIQUITY_CIVIC, SHIPWRECK_CIVIC } from '../core/units';
 import { availableCivicsIn, availableTechsIn, computeUnlocks, goldPrice, governmentSlots, policyWireOf, seatGovernment, darkAgeEra,
   unlockedPolicyIds } from '../core/effects';
 import { selectResearch, chopGrant, harvestGrant, applyLumpYield, holdResearchEra, researchCost } from '../core/economy';
@@ -6413,8 +6413,12 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
     if (actor0) actor0.tradeSeen = [...actor0.explored];
     // ...and its turn's end holds each strategic stockpile to its cap after
     // those actions (DoTurnDeactivate -> 0x4a8f10; `seatPhase` leaves it
-    // here), a bank over it re-ranking the luxuries
-    if (actor0) capStockpiles(state, actor0.seat);
+    // here), a bank over it re-ranking the luxuries, and tests its cities'
+    // garrison requirement again
+    if (actor0) {
+      capStockpiles(state, actor0.seat);
+      retestGarrisons(state, actor0.seat);
+    }
     activeBoosts(ctx, b, activePlayer(a));
     stageEnvoys(ctx, ds, a, b, history.randLog);
     stageAgendas(ctx, a.turn, history.randLog);
@@ -6558,8 +6562,12 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
       // stockpile held to its cap, a bank over it re-ranking the luxuries
       // (DoTurnDeactivate -> 0x4a8f10; runs/h1_duelq1128 t106: China's
       // Taiyuan, founded in its actions, allocated at the LuxAllocArrived
-      // after its PlayerTurnDeactivated)
-      for (const seat of others) capStockpiles(state, seat);
+      // after its PlayerTurnDeactivated); their cities' garrison requirement
+      // tested again
+      for (const seat of others) {
+        capStockpiles(state, seat);
+        retestGarrisons(state, seat);
+      }
       // ...taking into the turn's heal the moves their actions spent
       for (const [u, kept] of movesKept) if (others.includes(u.seat)) u.movesLeft = kept ? grantedMoves(state, u) : 0;
       for (const seat of others) detectBoosts(state, seat);
@@ -6597,6 +6605,8 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
         for (const [from, , plot] of d.units) {
           const u = unitOf(ctx, from);
           if (!u) continue;
+          // the garrison it leaves stands met (`holdGarrison`)
+          holdGarrison(state, u);
           const seat = u.seat;
           u.seat = seatOfP(ctx, d.player);
           jumpMadeAnew(state, u);

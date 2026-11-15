@@ -81,8 +81,11 @@
     - cpu/core/minorBuild.ts:levyUnitHome
     - cpu/core/phase.ts:levyUnits
     - gpu/core/sim_minors.py:_jump_made_anew
+    - cpu/core/units.ts:holdGarrison
+    - gpu/core/sim_minors.py:_hold_garrison
   readings:
     - "C-129: a unit made anew that no plot takes is destroyed, its own plot refused by a hostile defender alone; a bankruptcy's disband before the look — READ, both twins"
+    - "C-106: a levied unit's return leaves its holder's garrison requirement met to the holder's turn end — a fit, both twins"
   context:
     - "- THE TRANSFER (0x93fa10, the unit manager's vtable +0x80 at 0xd92c18; the levy's return 0x4502b0 calls it with..."
   review: reviewed

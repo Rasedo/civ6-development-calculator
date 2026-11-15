@@ -2441,6 +2441,12 @@ class SimInit:
         # A registered CITY plane, so it rides the compaction.
         self.city_lux_amen = torch.zeros(
             (B, self.CITY_ROWS, self.RC), dtype=torch.long, device=device)
+        # THE GARRISON REQUIREMENT a levied unit's return left met
+        # (`holdGarrison`, `_hold_garrison`) until its owner's turn end
+        # (`retestGarrisons`). A registered CITY plane, so it rides the
+        # compaction.
+        self.city_garrison_held = torch.zeros(
+            (B, self.CITY_ROWS, self.RC), dtype=torch.bool, device=device)
         self._off5 = tiles_within_offsets(5).to(device)
         self._off7 = tiles_within_offsets(7).to(device)
         self._off2 = tiles_within_offsets(2).to(device)

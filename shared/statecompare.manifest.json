@@ -3525,6 +3525,17 @@
           "note": "the luxury amenities the owner's last allocation rebuild stored (rebuildLuxuries): its processing's resources step and every change of its resources; a city's amenities read this, never a live ranking."
         },
         {
+          "name": "garrisonHeld",
+          "compare": "exact",
+          "covers": [
+            "City.garrisonHeld"
+          ],
+          "planes": [
+            "city_garrison_held"
+          ],
+          "note": "the garrison requirement a levied unit's return left met (holdGarrison), until the owner's turn end tests it again (retestGarrisons)."
+        },
+        {
           "name": "foodBox",
           "compare": "milli",
           "covers": [

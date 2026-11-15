@@ -1426,6 +1426,7 @@ CITY = {
     "amenityTier": _cty("city_amen_tier"),
     "parkAmenities": _cty("city_park_amen"),
     "luxuryAmenities": _cty("city_lux_amen"),
+    "garrisonHeld": lambda sim, b, rows: [int(v) for v in _cty("city_garrison_held")(sim, b, rows)],
     "foodBox": _cty("city_growth"),
     "cultureBox": _cty("city_cbox"),
     "nextPlot": _cty("city_next_plot"),

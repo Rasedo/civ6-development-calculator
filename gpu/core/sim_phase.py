@@ -17,7 +17,9 @@ class SimPhase:
             active = self._seat_turn(row)
             self._seat_unit_walk(row)
             # the turn's end holds each strategic bank to its cap (`capStockpiles`)
+            # and tests its cities' garrison requirement again (`retestGarrisons`)
             self._seat_cap_stockpile(row)
+            self._retest_garrisons(row)
             # the eurekas and inspirations the seat's processing and actions
             # earned land within its turn (`detectBoosts` at the block's end)
             self._detect_seat_boosts(row, active)

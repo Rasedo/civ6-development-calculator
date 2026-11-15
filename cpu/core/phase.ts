@@ -68,7 +68,7 @@ import { logDistrictCost } from './difflog';
 import { canBuildRoad, canBuildRailroad, canPlaceDistrictIn, canPlaceWonder, suzerainNames, adjacentPlotRowOk, adjacentPlotTarget, portalExit, PORTAL_MP, validImprovementsIn, wonderExists } from './rules';
 import { BUILT_WONDERS, type BuiltWonderDef } from '../data/builtWonders';
 import { seatWonders } from './wonders';
-import { cleanFallout, escortUnit, breakEscort, disbandUnit, builderCost, traderCost, builderRemoveFeature, trainableUnits, goldBuyableUnits, purchaseSpotBlocked, unitMadeAnew, archaeologistExcavate, naturalistPark, performConcert, upgradeUnit, unitDomain, formationBanned, cityGarrisons, promotionsHeld } from './units';
+import { cleanFallout, escortUnit, breakEscort, disbandUnit, builderCost, traderCost, builderRemoveFeature, trainableUnits, goldBuyableUnits, purchaseSpotBlocked, unitMadeAnew, archaeologistExcavate, naturalistPark, performConcert, upgradeUnit, unitDomain, formationBanned, cityGarrisons, cityGarrisoned, retestGarrisons, promotionsHeld } from './units';
 import { killUnit, wakeInBattle } from './combat';
 import { adoptBeliefs, itemCost, availableProjects, buyTile, buyWorshipBuilding, purchaseBuildingWithFaith, purchaseUnitWithFaith, wallsGoldBlocked, boostProject, wonderChargeBoost, condemnHeretic, formUp, convertHeathens, districtScaledBase, districtDiscounted, refreshDistrictDiscount, engineerFinish, foundCity, goldAffordable, launchInquisition, evangelizeBelief, purchaseCivilianWithFaith, purchaseNaturalist, purchaseReligiousUnit, purchaseRockBand, purchaseSettler, queueProject, removeHeresy, guruHeal, settlerCost, unitGoldPrice, unitStepCost, unitsAcquired, districtVariantCost, buildingPurchaseCost, spreadReligiousPressure } from './game';
 import { DISTRICTS, PLACEABLE_DISTRICTS, SCAFFOLD_DISTRICTS } from '../data/districts';
@@ -790,7 +790,7 @@ export function standingLoyalty(state: GameState, city: City): number {
     n += mods.domesticRouteLoyalty * domestic;
   }
   const garrisons = cityGarrisons(state, city);
-  if (garrisons.length > 0) {
+  if (cityGarrisoned(state, city)) {
     for (const r of mods.garrisonLoyalty) {
       if (!r.formation || garrisons.some((g) => (g.formation ?? 0) > 0)) n += r.amount;
     }
@@ -3059,8 +3059,8 @@ export function researchLump(state: GameState, seat: number, amount: number, civ
  * the seats it names alone (the action replay runs each player's start in
  * the place its record's pair holds it), the standing deals' turn with them
  * where `deals` says so, and leaves each seat's turn end (the stockpiles'
- * cap, `capStockpiles`) to the replay, which lands it after the actions it
- * applies; every seat, the deals first, without it.
+ * cap, `capStockpiles`, and the garrison retest, `retestGarrisons`) to the
+ * replay, which lands it after the actions it applies; every seat, the deals first, without it.
  */
 export function seatPhase(state: GameState, only?: { seats: ReadonlySet<number>; deals: boolean }): void {
 
@@ -3880,8 +3880,12 @@ export function seatPhase(state: GameState, only?: { seats: ReadonlySet<number>;
       tradeRouteExpiry(state, actor);
     }
     if (recU) applySeatUnitOrders(state, actor, recU.units);
-    // the turn's end holds each strategic stockpile to its cap
-    if (!only) capStockpiles(state, actor.seat);
+    // the turn's end holds each strategic stockpile to its cap and tests its
+    // cities' garrison requirement again
+    if (!only) {
+      capStockpiles(state, actor.seat);
+      retestGarrisons(state, actor.seat);
+    }
     // the eurekas and inspirations the seat's processing and actions earned
     // land within its turn, as the game's events land them (a city founded on
     // the coast shows Sailing's boost in the record of the turn it was

@@ -14414,3 +14414,27 @@ blocks of `_tac_pass`, `_tac_plan`'s "kill" (gpu/core/sim_tactics.py).
   NW (the grid's SW edge, river), its blow 25 under 2490396's 27 from 15:12,
   so 2490396 takes 15:14 and 1245202 16:14, where the game sets 1245202 on
   15:14 (its blow 30 without the river); the attacker's +0x1935 unread.
+
+## C-106: a levied unit's return leaves its holder's garrison requirement met to the holder's turn end — a fit, both twins
+
+- THE RULE AS PORTED: the levy's return (0x4502b0, each unit through the
+  transfer 0x93fa10) takes a levied military unit, not embarked, off a
+  garrison plot of its holder's city (the centre or a complete Encampment,
+  the plots REQUIREMENT_CITY_HAS_GARRISON_UNIT 0xbbb1a0 walks), and the
+  city's garrison requirement stays met: its Retainers amenity and its
+  garrison loyalty rows pay on. The holder's next turn end tests the
+  requirement again on what stands there. Engines: `holdGarrison` /
+  `_hold_garrison` before the unit leaves its plot (`levyUnitHome`,
+  `_minor_levy_return`; the replay's levyEnd jump), `City.garrisonHeld` /
+  `city_garrison_held`, read by `cityGarrisoned` / `_city_garrisoned`,
+  cleared by `retestGarrisons` / `_retest_garrisons` beside the turn end's
+  stockpile cap.
+- Confirmed: runs/h1_duelq1117 t88, China's levied Heavy Chariot home from
+  Xi'an's centre at city-state 3's start: the record's t89 Xi'an amenities
+  6 of 8 (ours 5 without the hold), China's t89 step on it (Chichen Itza
+  164.707, the city's food 23.746 and culture 82.527 at record t90, all
+  equal with the hold), Retainers' term gone at record t90.
+- Open: where GameEffects re-tests the requirement (the turn end and the
+  next unit move both fit; 0xc7ede0 / 0xc7f640 unread), and whether any
+  other removal of a garrison (a death, an upgrade, a transfer of another
+  kind) leaves it met the same way.

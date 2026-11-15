@@ -53,7 +53,7 @@ import { centerBuildingIds } from './prodLayout';
 import { cityLowlands, coastalLowlandCounts, floodBarrierCost, repairBehindBarrier } from './climate';
 import { minorTrade, minorTradePick, tradeCapacity, tradeGraphTurn } from './trade';
 import { BARB_SEAT, FREE_SEAT, freeSeatOf, hiddenResourcesFor, isCiv, majorityReligionOf, majorsAlive, seatOf, tileSeat } from './seats';
-import { builderCost, cityNavalCapable, disbandUnit, raiseBestTrained, spawnUnit, traderCost, unitFullMoves, unitIsMilitary, unitMadeAnew, upgradeAnew } from './units';
+import { builderCost, cityNavalCapable, disbandUnit, holdGarrison, raiseBestTrained, spawnUnit, traderCost, unitFullMoves, unitIsMilitary, unitMadeAnew, upgradeAnew } from './units';
 import { irradiated } from './nuclear';
 import { atRngPoint } from './rand';
 import { dangerPlane, knowledgeLook } from './tactical';
@@ -412,6 +412,7 @@ function sendLevyHome(state: GameState, cityState: CityState): void {
  *  10:6 passes the upgrade's Movement test) */
 function levyUnitHome(state: GameState, cityState: CityState, u: Unit): void {
   const major = u.seat;
+  holdGarrison(state, u);
   u.seat = cityState.seat;
   delete u.leviedFrom;
   // where the minor may stand (`jumpMadeAnew`); where none, the major's unit

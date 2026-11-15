@@ -1245,6 +1245,8 @@ const CITY: Record<string, Extractor> = {
   parkAmenities: overCities((r) => r.city.parkAmenities ?? 0),
   // the luxury amenities the owner's last allocation rebuild stored
   luxuryAmenities: overCities((r) => r.city.luxuryAmenities ?? 0),
+  // the garrison requirement a levied unit's return left met
+  garrisonHeld: overCities((r) => (r.city.garrisonHeld ? 1 : 0)),
   foodBox: overCities((r) => r.city.foodBox),
   cultureBox: overCities((r) => r.city.cultureBox),
   nextPlot: overCities((r) => r.city.nextPlot ?? -1),

@@ -669,6 +669,7 @@ class SimMinors:
             return
         m = self.major_unit_alive & (self.major_unit_levy_src == 100 + s) & back.unsqueeze(1)
         if bool(m.count_nonzero()):
+            self._hold_garrison(m)
             self.major_unit_seat[m] = 100 + s
             self.major_unit_levied[m] = False
             self.major_unit_levy_src[m] = -1
@@ -698,6 +699,37 @@ class SimMinors:
             self._kb_unit_anew(b, u + self.POOL_LO["major"])
         self.citystate_levy_seat[:, s] = torch.where(back, torch.full_like(ls, -1), ls)
         self.citystate_levy_ends[:, s] = torch.where(back, torch.full_like(ls, -1), self.citystate_levy_ends[:, s])
+
+    def _hold_garrison(self, m: torch.Tensor) -> None:
+        """`holdGarrison` — CIV6 (the levy's return, 0x4502b0, its transfer
+        0x93fa10): each major-pool unit of `m` [B, U], military and not
+        embarked, on a garrison plot of its holder's city (its centre, its
+        complete Encampment) as it goes home leaves that city's garrison
+        requirement met (`city_garrison_held`) until the holder's turn end
+        (`_retest_garrisons`). Called before the units leave their plots."""
+        mil = self._occ_class(self._bidx)[0][:, :m.shape[1]] & m
+        if not bool(mil.count_nonzero()):
+            return
+        tile = self.major_unit_tile
+        for row in range(self.n_majors):
+            mr = mil & (self.major_unit_seat == int(self._ROW_SEAT[row]))
+            if not bool(mr.count_nonzero()):
+                continue
+            plots = [(self.city_center[:, row], None)]
+            if self._encamp_didx >= 0:
+                et = self.city_dist_tile[:, row, :, self._encamp_didx]
+                plots.append((et, self.district_complete.gather(1, et.clamp(min=0))))
+            for tiles, live in plots:
+                hit = ((tiles.unsqueeze(2) == tile.unsqueeze(1)) & mr.unsqueeze(1)).any(dim=2) & (tiles >= 0)
+                if live is not None:
+                    hit = hit & live
+                self.city_garrison_held[:, row] |= hit
+
+    def _retest_garrisons(self, row: int) -> None:
+        """`retestGarrisons` — the seat row's turn end tests its cities'
+        garrison requirement again: what stands on their plots from then on
+        (`_hold_garrison`)."""
+        self.city_garrison_held[:, row] = False
 
     def _minor_power(self, s: int) -> None:
         """`minorPower` — a city-state's city is never short of power: a load

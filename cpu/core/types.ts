@@ -101,6 +101,11 @@ export interface City {
    *  every change of the resources it holds re-rank them; absent (none) on a
    *  city founded since. */
   luxuryAmenities?: number;
+  /** the garrison requirement (REQUIREMENT_CITY_HAS_GARRISON_UNIT) standing
+   *  met with no garrison on its plots: a levied unit that garrisoned the
+   *  city gone home (`holdGarrison`), until its owner's turn end tests it
+   *  again (`retestGarrisons`); absent otherwise. */
+  garrisonHeld?: boolean;
   cultureBox: number;
   tilesAcquired: number;
   /** CIV6 (City_Culture): the plot this city's culture claims next — drawn

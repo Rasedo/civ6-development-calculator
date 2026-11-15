@@ -277,11 +277,16 @@
     - recording: h1_duely1124
       turn: 82
       value: "China's levied Warrior 1638402 home to a living city-state 3: transferred, no plot taking it, no unit added"
-  impl: [cpu/core/minorBuild.ts:sendLevyHome, gpu/core/sim_minors.py:_minor_levy_return]
+  impl:
+    - cpu/core/minorBuild.ts:sendLevyHome
+    - gpu/core/sim_minors.py:_minor_levy_return
+    - cpu/core/units.ts:holdGarrison
+    - gpu/core/sim_minors.py:_hold_garrison
   readings:
     - "H-1: the levy's term — READ"
     - "C-129: a unit made anew that no plot takes is destroyed, its own plot refused by a hostile defender alone; a bankruptcy's disband before the look — READ, both twins"
     - "C-130: a minor's levy home after its bank; its free Trader's route before its city update, the AI's yields cached before it; a deleted unit off its list at once; a major's founded city keeps its trade list at once — READ (0x4e4560 at 0x4e45ee / 0x4e4638, 0x6096c0's passes, 0x688eaa, 0x1cb8b0, 0x948500 at 0x9485e5, 0x1eae70 at 0x1eb335 -> 0x5cdd70 at 0x5ce191), the cache's span a fit, both twins"
+    - "C-106: a levied unit's return leaves its holder's garrison requirement met to the holder's turn end — a fit, both twins"
   context:
     - "...ultiplier, 15 online, not GameSpeed_Durations' 21 — and at it the levied units go home (0x4502b0); 0x4501c0 resets it at the levy. The counter ticks at the minor's own turn starts, t..."
   review: reviewed

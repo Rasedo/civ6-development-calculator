@@ -12001,6 +12001,7 @@ class SimSeats:
         self.city_park_amen[b, row, col] = 0
         # a city founded holds no luxury until its owner's next rebuild
         self.city_lux_amen[b, row, col] = 0
+        self.city_garrison_held[b, row, col] = False
 
     def _city_col_at(self, row: int, rows: torch.Tensor, tiles: torch.Tensor) -> torch.Tensor:
         """`cityAtTile` in COLUMN space — the column of seat row `row`'s
@@ -12424,6 +12425,7 @@ class SimSeats:
         self.city_amen_tier[b, dst_row, col] = -1
         self.city_park_amen[b, dst_row, col] = 0
         self.city_lux_amen[b, dst_row, col] = 0
+        self.city_garrison_held[b, dst_row, col] = False
         # CIV6 (Military Emergency): "The Target has conquered the city of
         # another nation; it must be Liberated!" The seat that LOST it is the
         # affected one.
@@ -14091,9 +14093,10 @@ class SimSeats:
         requirement 0xbbb1a0): does each of this seat row's cities hold a
         garrison — the row's own military unit on its centre or on its
         complete Encampment, the districts with HitPoints, the plot's best
-        defender (`_best_defender`) — and is one of those garrisons a Corps or
-        an Army (`cityGarrisons`)."""
-        gar = torch.zeros(self.B, self.RC, dtype=torch.bool, device=self.device)
+        defender (`_best_defender`), or the requirement a levied unit's return
+        left met (`city_garrison_held`, `cityGarrisoned`) — and is one of the
+        garrisons on its plots a Corps or an Army (`cityGarrisons`)."""
+        gar = self.city_garrison_held[:, row].clone()
         form = torch.zeros_like(gar)
         plots = [(self.city_center[:, row], None)]
         if self._encamp_didx >= 0:

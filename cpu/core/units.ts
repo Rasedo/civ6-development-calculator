@@ -482,6 +482,35 @@ export function cityGarrisons(state: GameState, city: City): Unit[] {
   return out;
 }
 
+/** the garrison requirement as the city's modifiers read it: a garrison on
+ *  its plots (`cityGarrisons`), or the requirement a levied unit's return
+ *  left met (`City.garrisonHeld`) */
+export function cityGarrisoned(state: GameState, city: City): boolean {
+  return city.garrisonHeld === true || cityGarrisons(state, city).length > 0;
+}
+
+/** CIV6 (the levy's return, 0x4502b0, its transfer 0x93fa10): a levied unit
+ *  on a garrison plot of its holder's city (its centre, its complete
+ *  Encampment) as it goes home leaves the city's garrison requirement met —
+ *  its Retainers / Limitanei terms paid on — until the holder's turn end
+ *  tests it again (`retestGarrisons`; runs/h1_duelq1117 t88: China's levied
+ *  Heavy Chariot home from Xi'an's centre at city-state 3's start,
+ *  Retainers' +1 read at record t89 and by China's t89 turn, gone at record
+ *  t90). Called before the unit leaves its plot. */
+export function holdGarrison(state: GameState, u: Unit): void {
+  if (unitDomain(u.type) !== 'military' || u.embarked) return;
+  for (const city of (seatOf(state, u.seat) as Seat | undefined)?.cities ?? []) {
+    if (city.centerIndex === u.tileIndex || city.districts.some((d) => d.type === 'ENCAMPMENT'
+      && d.tileIndex === u.tileIndex && state.map.tiles[d.tileIndex].districtComplete)) city.garrisonHeld = true;
+  }
+}
+
+/** the seat's turn end tests its cities' garrison requirement again: what
+ *  stands on their plots from then on (`holdGarrison`) */
+export function retestGarrisons(state: GameState, seat: number): void {
+  for (const city of (seatOf(state, seat) as Seat | undefined)?.cities ?? []) delete city.garrisonHeld;
+}
+
 /**
  * The STACKING slot a chassis holds. Four, not two: CIV6 bases an air unit
  * INSIDE a city centre, an Aerodrome or a carrier, where it neither blocks a

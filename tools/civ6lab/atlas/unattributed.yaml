@@ -9089,8 +9089,13 @@
     - recording: 1124
       turn: 157
       value: a military unit its city's production completes garrisons from that city's turn (1124 t157 Taiyuan grows Content).
-  impl: [cpu/core/units.ts:cityGarrisons, gpu/core/sim_seats.py:_city_garrisoned]
-  readings: ["H-1: the garrison requirement — READ"]
+  impl:
+    - cpu/core/units.ts:cityGarrisons
+    - cpu/core/units.ts:cityGarrisoned
+    - gpu/core/sim_seats.py:_city_garrisoned
+  readings:
+    - "H-1: the garrison requirement — READ"
+    - "C-106: a levied unit's return leaves its holder's garrison requirement met to the holder's turn end — a fit, both twins"
   context:
     - GameEffects_Requirements_CityHasGarrisonUnit (REQUIREMENT_CITY_HAS_GARRISON_ UNIT, 0xbbb1a0) walks the city's districts (+0x1a48); for each that seats a garrison (0x24b820, the dist...
   review: reviewed
@@ -9338,6 +9343,24 @@
     - "...s +0x7d4 / +0x7dc, the cmovl at 0x53916e), and only then adds the game effects' rows (0xc7e9b0) and the neighbours' (the walk over the plot's x, y from 0x5391c0) — Feature_AdjacentYi..."
     - "- The plot yield 0x538a60 adds the game effects' per-plot rows (0xc7e9b0, a scan of the plot's (amount, yield) pairs) AFTER the city's floors (the cmovl at 0x..."
   review: reviewed
+- addr: 0xc7ede0
+  final: 0x9550b0
+  kind: function
+  status: UNREAD
+  readings:
+    - "C-106: a levied unit's return leaves its holder's garrison requirement met to the holder's turn end — a fit, both twins"
+  context:
+    - ...ere GameEffects re-tests the requirement (the turn end and the next unit move both fit; 0xc7ede0 / 0xc7f640 unread), and whether any other removal of a garrison (a death, an upgrade, a...
+  review: imported
+- addr: 0xc7f640
+  final: 0x955840
+  kind: function
+  status: UNREAD
+  readings:
+    - "C-106: a levied unit's return leaves its holder's garrison requirement met to the holder's turn end — a fit, both twins"
+  context:
+    - ...ects re-tests the requirement (the turn end and the next unit move both fit; 0xc7ede0 / 0xc7f640 unread), and whether any other removal of a garrison (a death, an upgrade, a transfer o...
+  review: imported
 - addr: 0xc85140
   final: 0x95b1d0
   kind: function
