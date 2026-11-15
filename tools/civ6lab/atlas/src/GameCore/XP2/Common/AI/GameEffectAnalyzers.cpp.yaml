@@ -1762,3 +1762,13 @@
   readings:
     - "C-97: the World Congress AI — the evaluation, the outcome, the votes, the hints, the option values and the targets READ"
   review: reviewed
+- addr: 0x4828f0
+  binary: F
+  kind: function
+  semantics: reads the unit production value (0x524e30) of the type of the context's unit (context +0x90, its +0xc8) from [the context's player (+0x80) +0x670] + 0x188, the pointer loaded at 0x48295f; the rest unread.
+  status: PARTLY
+  readings:
+    - "H-1: the recorder's reads against a running game — READ (the unit, the formation, the planning, the target list, the known cities, the unit production table, the queue), PARTLY READ (the path's node, the modifiers)"
+  context:
+    - "...der FinalRelease 0x524e30 is called with [player +0x670] + 0x188, the pointer loaded at 0x48295f, 0x4d2e46, 0x533892; the handler 0x4b13f0 runs \"Victory Conditions\" and \"Settle City Ev..."
+  review: reviewed

@@ -2877,8 +2877,29 @@
   ]
  },
  "TacticalAI": {
-  "ctor": "0x4ba1f0",
+  "ctor": "0x501e80",
   "component": "0x690",
+  "fields": [
+   [
+    "m_prioritizedMoves",
+    160,
+    64
+   ],
+   [
+    "m_controlId",
+    224,
+    40
+   ],
+   [
+    "m_controlPriority",
+    264,
+    24
+   ]
+  ]
+ },
+ "HomelandAI": {
+  "ctor": "0x4ba1f0",
+  "component": "0x678",
   "fields": [
    [
     "m_controlId",

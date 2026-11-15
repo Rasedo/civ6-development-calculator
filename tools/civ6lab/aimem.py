@@ -12,7 +12,7 @@ With `--units`, a second stream beside the memory's (`Units`): every
 unit's row with its formation, kept path and operation queue, the player's
 unit container slot by slot, each unit's planning (reach, targets, the
 predicted blows), the tactical target list, the known cities' cached
-strengths, the military AI's unit production table and each city's build
+strengths, the grand strategic AI's unit production table and each city's build
 queue — at the four sites below and at the tactical pass's own
 (`tacpass`, hook site 6, written to the units' stream only). The memory's
 stream holds what it held without it.
@@ -558,31 +558,47 @@ class Reader:
     def formation_row(self, f: int) -> list | None:
         """a formation's row (`aimem_fields.rows()["formation"]`): its scalar
         members in offset order (m_xMovesRemaining 24.8, m_bHasMoved,
-        m_bHasMovedIntoZOC ...), then its plot's y, its kept path
-        (m_kLastPath's items as int32s) and its members' unit ids"""
+        m_bHasMovedIntoZOC ...), then its plot's y, the kept path's cache
+        plot's y (m_kLastPathCacheLocation), its kept path (m_kLastPath: its
+        value {items, capacity, count} at +0x10, 16 bytes a node: three
+        ints and the plot as two int16s, written [int, int, int, x, y]) and
+        its members' unit ids (m_kUnitIDList: the items' pointer at +0x30,
+        their count at +0x40, an int32 each)"""
         import aimem_fields  # noqa: PLC0415
         tab = {n: o for n, o, _ in aimem_fields.load()["Formation"]["fields"]}
-        b = self.pm.read(f, tab["m_kUnitIDList"] + 0x28)
+        b = self.pm.read(f, tab["m_kUnitIDList"] + 0x48)
         row: list = []
         for name, off in aimem_fields.scalars("Formation"):
             v = struct.unpack_from("<i", b, off + 0x10)[0]
             row.append(v & 0xFF if name.startswith("m_b") else v)
         row.append(struct.unpack_from("<i", b, tab["m_kLocation"] + 0x14)[0])
-        row.append(self.member_vector(b, tab["m_kLastPath"]))
-        row.append(self.member_vector(b, tab["m_kUnitIDList"]))
+        row.append(struct.unpack_from("<i", b, tab["m_kLastPathCacheLocation"] + 0x14)[0])
+        p_p, _, p_n = struct.unpack_from("<QQI", b, tab["m_kLastPath"] + 0x10)
+        path = []
+        if ptr(p_p) and 0 < p_n <= 512:
+            raw = self.pm.read(p_p, 16 * p_n)
+            path = [list(struct.unpack_from("<iiihh", raw, 16 * k)) for k in range(p_n)]
+        row.append(path)
+        m_p, m_n = struct.unpack_from("<Q", b, tab["m_kUnitIDList"] + 0x30)[0], struct.unpack_from("<I", b, tab["m_kUnitIDList"] + 0x40)[0]
+        row.append(list(struct.unpack(f"<{m_n}i", self.pm.read(m_p, 4 * m_n))) if ptr(m_p) and 0 < m_n <= 64 else [])
         return row
 
     def unit_row(self, u: int) -> list:
         """a unit's row (`aimem_fields.rows()["unit"]`): its scalar members in
         offset order, then its plot's y, its Movement modifiers
-        (m_kMovementModifiers' eight ints: +8 the unit's own, +0xc the
-        clear-terrain start's, +0x10 own ground's, +0x14 foreign ground's, as
-        GetMaxMoves FinalRelease 0x3a3a00 adds them), its experience [points,
-        level, promotion ready], its formation's row (unit +0xbb8),
-        m_aiAbilitiesPossessed's non-zero [index, value] pairs, the combat
-        modifiers' ints (m_kCombatModifers) and its operation queue
-        (m_kOperations' value +0xd0 the entries, 0x30 bytes each, +0xe0
-        their count: each entry's twelve ints)"""
+        (m_kMovementModifiers' value, seven ints: the unit's own, the start
+        plot's where its vtable slot +0x18 answers 1, own ground's, the
+        ground's of the owner's relation 3, as GetMaxMoves FinalRelease
+        0x3a3a00 adds them from +0x838 / +0x83c / +0x840 / +0x844; three
+        unread), its experience [points, level, promotion ready], its
+        formation's row (unit +0xbb8), m_aiAbilitiesPossessed's non-zero
+        [index, value] pairs, the combat modifiers' ints (m_kCombatModifers,
+        unread) and its operation queue (m_kOperations' value +0xd0 the
+        entries, 0x30 bytes each, +0xe0 their count): per entry its twelve
+        ints (+0 the UnitOperations index, +0x18 the order's flags, +0x20
+        the turn it was added, +0x24 the activity's hash) and then the four
+        ints at +8 of the object its +8 points to: the flags, 0, and the
+        order's plot x, y (a MoveTo's destination)"""
         import aimem_fields  # noqa: PLC0415
         tab = {n: o for n, o, _ in aimem_fields.load()["Unit"]["fields"]}
         ops = tab["m_kOperations"] + 0x10
@@ -593,7 +609,7 @@ class Reader:
             row.append(v & 0xFF if name.startswith("m_b") else v)
         row.append(struct.unpack_from("<i", b, tab["m_kLocation"] + 0x14)[0])
         mv = tab["m_kMovementModifiers"]
-        row.append(self.ints(b[mv + 0x10:mv + 0x30]))
+        row.append(self.ints(b[mv + 0x10:mv + 0x2C]))
         xp = tab["m_kExperience"] + 0x10
         row.append([struct.unpack_from("<i", b, xp + 0xC)[0], struct.unpack_from("<i", b, xp + 0x10)[0], b[xp + 8]])
         f = ptr(struct.unpack_from("<Q", b, 0xBB8)[0])
@@ -604,13 +620,23 @@ class Reader:
         ab = self.member_vector(b, tab["m_aiAbilitiesPossessed"])
         row.append([[k, v] for k, v in enumerate(ab) if v])
         cm = tab["m_kCombatModifers"]
-        row.append(self.ints(b[cm + 0x10:tab["m_kMovementModifiers"]]))
+        # the member's last four bytes are padding the game never writes
+        row.append(self.ints(b[cm + 0x10:tab["m_kMovementModifiers"] - 8]))
         q_p, q_n = struct.unpack_from("<Q", b, ops + 0xD0)[0], struct.unpack_from("<I", b, ops + 0xE0)[0]
         queue = []
         if ptr(q_p) and 0 < q_n <= 16:
             try:
                 raw = self.pm.read(q_p, 0x30 * q_n)
-                queue = [self.ints(raw[0x30 * k:0x30 * (k + 1)]) for k in range(q_n)]
+                for k in range(q_n):
+                    e = raw[0x30 * k:0x30 * (k + 1)]
+                    ints = list(struct.unpack("<12i", e))
+                    args = ptr(struct.unpack_from("<Q", e, 8)[0])
+                    ints[2:6] = [None] * 4      # two pointers: the order's arguments, its path request
+                    try:
+                        ints += list(struct.unpack("<4i", self.pm.read(args + 8, 16))) if args else []
+                    except MemError:
+                        pass
+                    queue.append(ints)
             except MemError:
                 pass
         row.append(queue)
@@ -674,10 +700,13 @@ class Reader:
         FinalRelease 0x51c340 reads): `head` its first 0x30 bytes, `reach`
         the reach list flat, four ints a plot [x, y, turns, Movement left]
         (+0x30 the items, +0x40 their count), `targets` each target's 0xd0
-        bytes as 52 ints (+0x48 the items, +0x58 their count: the target's
-        plot +8 / +0xc, its spots' count +0x18, per spot the blow dealt
-        +0x64, taken +0x7c, the blow back taken +0x94 and dealt +0xac, the
-        kill byte +0xc4, wins +0x60)"""
+        bytes as 52 ints (+0x48 the items, +0x58 their count: +0 the target
+        list entry's kind, +4 unwritten, +8 its owner word and its component
+        type word (1 a unit, 3 a district, owner 0xffff none), +0xc its id,
+        +0x10 / +0x14 its plot, +0x18 its spots' count, +0x1c the spots'
+        plots, six [x, y]; per spot the turns +0x4c, the blow dealt +0x64,
+        taken +0x7c, the blow back taken +0x94 and dealt +0xac, the kill
+        byte +0xc4, wins +0x60)"""
         p = ptr(self.pm.u64(u + 0xBC0))
         if not p:
             return None
@@ -702,26 +731,34 @@ class Reader:
         return out
 
     def unit_table(self, pl: int) -> dict:
-        """the military AI's unit production table (the military AI +0x188:
-        +0x10 the entries, 0x168 bytes each, +0x20 their count, +0x28 the
-        built flag; the value's reader FinalRelease 0x524e30): per entry its
-        ints, the trailing zeros cut (+0 the Units index, +8.. its flags,
-        +0x20 the units held, +0x2c the at-war count, +0x30 the opposition,
-        +0x160 the value, 24.8)"""
-        up = self.pm.u64(pl + 0x680) + 0x188
+        """the unit production table (the grand strategic AI, player +0x670,
+        its +0x188: +0x10 the entries, 0x168 bytes each, +0x20 their count,
+        +0x28 the built flag; the value's reader FinalRelease 0x524e30 and
+        its callers take it there): per entry its 90 ints, the trailing
+        zeros cut (+0 the Units index, +8.. its flags, +0x20 the units held,
+        +0x2c the at-war count, +0x30 the opposition, +0x160 the value,
+        24.8), in the table's own order"""
+        up = self.pm.u64(pl + 0x670) + 0x188
         raw = self.items(up + 0x10, up + 0x20, 0x168, 1024)
-        return {"built": self.pm.u8(up + 0x28),
-                "entries": [self.ints(raw[k:k + 0x168]) for k in range(0, len(raw), 0x168)]}
+        out = []
+        for k in range(0, len(raw), 0x168):
+            e = list(struct.unpack("<90i", raw[k:k + 0x168]))
+            while e and not e[-1]:
+                e.pop()
+            out.append(e)
+        return {"built": self.pm.u8(up + 0x28), "entries": out}
 
     def kb_cities(self, kb: int) -> list:
-        """the knowledge base's known cities (+0xe0: the entries, 0xe0 bytes
-        each, +0x10 their count; the look's city arm FinalRelease 0x3f5db0
-        fills them): per city its first 0x30 bytes as ints (the owner and
-        the entry's type in the first, the city id, +8 / +0xc its plot,
-        +0x1c the population) and its defensible districts, eight ints each
-        (+0x14 the defense strength, +0x18 the same while the outer defense
-        holds, +0x1c the strike)"""
-        raw = self.items(kb + 0xE0, kb + 0xF0, 0xE0, 512)
+        """the knowledge base's known cities (its first member: +0 the
+        entries, 0xe0 bytes each, +0x10 their count; the look's city arm
+        FinalRelease 0x3f5db0 fills them): per city its first 0x30 bytes as
+        ints (the owner word and the entry's type word in the first, the
+        city id, +8 / +0xc its plot, +0x1c the population) and its
+        defensible districts, eight ints each (+0 the district's owner word
+        and type word, +4 its id, +0xc / +0x10 its plot, +0x14 the defense
+        strength, 24.8, +0x18 the same while the outer defense holds, +0x1c
+        the strike)"""
+        raw = self.items(kb, kb + 0x10, 0xE0, 512)
         out = []
         for k in range(0, len(raw), 0xE0):
             e = raw[k:k + 0xE0]
@@ -730,11 +767,13 @@ class Reader:
             out.append([list(struct.unpack("<12i", e[:0x30])), list(struct.unpack(f"<{len(d) // 4}i", d))])
         return out
 
-    def kb_targets(self, kb: int) -> list:
-        """the tactical target list (the knowledge base +0x370 the entries,
-        0x28 bytes each, +0x380 their count; planTargets FinalRelease
-        0x51da80 walks it): ten ints an entry, flat (+4 / +8 the plot)"""
-        raw = self.items(kb + 0x370, kb + 0x380, 0x28, 8192)
+    def targets(self, tg: int) -> list:
+        """the tactical target list (the player's Targets, player +0x698:
+        +0x248 the entries, 0x28 bytes each, +0x258 their count; planTargets
+        FinalRelease 0x51da80 walks it there): ten ints an entry, flat (+0
+        the kind, +4 / +8 the plot, +0x10 the owner word and the component
+        type word, +0x14 the id; +0xc and +0x18.. unread)"""
+        raw = self.items(tg + 0x248, tg + 0x258, 0x28, 8192)
         return list(struct.unpack(f"<{len(raw) // 4}i", raw))
 
     def city_queues(self, pl: int) -> list:
@@ -802,10 +841,10 @@ class Units:
       log       `slots`, `targets`, `kbCities`
       endlook   `units` the player's own, `plans` the plannings that differ
                 from its tacpass's (a unit left out holds the same),
-                `unitTable` the military AI's unit production table,
-                `military` and `tactical` those AIs' named fields, `cities`
-                each city's build queue, combat and districts members,
-                `slots`
+                `unitTable` the unit production table (`Reader.unit_table`),
+                `military`, `tactical` and `homeland` those AIs' named
+                fields, `cities` each city's build queue, combat and
+                districts members, `slots`
     The plannings are read for the players from `plan_from` up (the majors'
     AI is not recorded)."""
 
@@ -827,7 +866,8 @@ class Units:
 
     def record(self, site: str, pid: int, pl: int) -> dict:
         r = self.r
-        kb = r.pm.u64(pl + 0x698) + 0x270
+        tg = r.pm.u64(pl + 0x698)
+        kb = tg + 0x270
         out: dict = {}
         if site in ("start", "tactical"):
             self.section(out, "units", r.all_units)
@@ -835,7 +875,7 @@ class Units:
             if site != "log":
                 self.section(out, "units", lambda: r.units(pl))
             if site != "endlook":
-                self.section(out, "targets", lambda: r.kb_targets(kb))
+                self.section(out, "targets", lambda: r.targets(tg))
                 self.section(out, "kbCities", lambda: r.kb_cities(kb))
         self.section(out, "slots", lambda: r.slots(pl))
         if site in ("tacpass", "endlook") and pid >= self.plan_from:
@@ -850,6 +890,7 @@ class Units:
             self.section(out, "unitTable", lambda: r.unit_table(pl))
             self.section(out, "military", lambda: r.component(pl, "MilitaryAI"))
             self.section(out, "tactical", lambda: r.component(pl, "TacticalAI"))
+            self.section(out, "homeland", lambda: r.component(pl, "HomelandAI"))
             self.section(out, "cities", lambda: r.city_queues(pl))
         return out
 

@@ -5,9 +5,9 @@
     python tools/civ6lab/h1/record_round.py --tag duels --seeds 1131-1160
 
 For a tag and a seed list (map seed s, game seed s + 1000, `fleet.py`): the
-install patch and the lab profile with the AI's verbose logs and the
-recording's logs (`game.py patch apply`, `profile apply --ai-verbose
---record-logs`), one instance per host brought to the main menu, the fleet
+install patch and the lab profile with the AI's verbose logs (`game.py
+patch apply`, `profile apply --ai-verbose`), one instance per host brought
+to the main menu, the fleet
 with the AI memory reader and the units' stream and no engine report
 (`fleet.py run --aimem --no-report`), then, whatever happened, every
 instance closed, the owner's options restored, the patch reverted and the
@@ -123,7 +123,6 @@ def main(argv=None) -> int:
     p.add_argument("--config", default=str(HERE / "h1_duel.json"))
     p.add_argument("--majors", type=int, default=2, help="the config's major players (fleet.py --majors)")
     p.add_argument("--redo", action="store_true", help="record again the seeds already at their target under the tag")
-    p.add_argument("--no-record-logs", action="store_true", help="leave the recording's logs (game.RECORD_LOGS) off")
     p.add_argument("--game-minutes", type=float, default=60.0, help="the wall a game may take before the round gives it up")
     a = p.parse_args(argv)
 
@@ -151,7 +150,7 @@ def main(argv=None) -> int:
         rc, out = run(g + ["patch", "apply"], 120)
         if rc != 0 or "NOT applied" in out:
             raise RuntimeError(f"patch apply: {out[-300:]}")
-        rc, out = run(g + ["profile", "apply", "--ai-verbose"] + ([] if a.no_record_logs else ["--record-logs"]), 60)
+        rc, out = run(g + ["profile", "apply", "--ai-verbose"], 60)
         if rc != 0:
             raise RuntimeError(f"profile apply: {out[-300:]}")
         up = []

@@ -589,6 +589,7 @@
     - "C-108: every seat's Trader walks its route; a major's trade list and route value read the Free Cities' cities — READ (0x5f0280, 0x78f210, 0x5e9b20), both twins"
     - "C-129 / C-99 / C-134: a known city's Encampment in the enemy strength, the rally's advance, the team's battle strengths and Garrison City's fortify test — READ (0x7877e0 at 0x7878e1..0x78791f / 0x787c64..0x787ca7, 0x5f0280, 0x5efaf0, 0x73f0c0, 0x73f7d0 at 0x73face, 0x738f20 at 0x7391a4..0x7395e1, 0x810d30 at 0x810f80..0x81115e), both twins; the replay's buildings before the next start"
     - "H-1: the recorder's unit, planning and city AI reads — READ off the disassembly, not yet read from a running game"
+    - "H-1: the recorder's reads against a running game — READ (the unit, the formation, the planning, the target list, the known cities, the unit production table, the queue), PARTLY READ (the path's node, the modifiers)"
   review: reviewed
 - addr: 0x5f0440
   final: 0x3f5f20

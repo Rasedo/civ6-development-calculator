@@ -17,7 +17,10 @@ The objects (player component offsets, FinalRelease): PlayerStats +0x710
 PlayerReligion +0x720 (0x3103d0), PlayerEras +0x738 (0x2c9030),
 CulturalIdentity +0x770 (0x26de90), Player::Units +0x6c8 (0x347bd0),
 Player::Trade +0x6c0 (0x338450), the military AI +0x680 (0x4c88d0), the
-tactical AI +0x690 (0x4ba1f0); a City
+tactical AI +0x690 (0x501e80), the homeland AI +0x678 (0x4ba1f0), each
+stored by the Player's constructor 0x2f1510 (the grand strategic AI,
+0x4ae380 at +0x670, holds the unit production table and is not listed); a
+City
 (Player::Cities +0xd0's list, node +0 the city, +0x10 the next; 0x127de0); a CityBuild
 (the city AI manager's list, 0x3db2f0); a Unit (Player::Units' pages and
 list; its three constructors 0x66bf0 the instance, 0x66180 its state,
@@ -47,7 +50,8 @@ OBJECTS = {
     "PlayerCities": (0x262590, 0x6D0), "PlayerCulture": (0x273C30, 0x6F0), "PlayerTechs": (0x331AA0, 0x718),
     "PlayerReligion": (0x3103D0, 0x720), "PlayerEras": (0x2C9030, 0x738), "CulturalIdentity": (0x26DE90, 0x770),
     "PlayerUnits": (0x347BD0, 0x6C8), "City": (0x127DE0, None), "CityBuild": (0x3DB2F0, None),
-    "PlayerTrade": (0x338450, 0x6C0), "MilitaryAI": (0x4C88D0, 0x680), "TacticalAI": (0x4BA1F0, 0x690),
+    "PlayerTrade": (0x338450, 0x6C0), "MilitaryAI": (0x4C88D0, 0x680), "TacticalAI": (0x501E80, 0x690),
+    "HomelandAI": (0x4BA1F0, 0x678),
     "Unit": ((0x66BF0, 0x66180, 0x39B140), None), "Formation": (0x1A1AE0, None), "District": (0x18D7A0, None),
     "Operation": (0x4D80B0, None),
 }
@@ -56,7 +60,7 @@ OBJECTS = {
 # Operation are read by their own walks
 # a row's lists after its scalars, in order (`rows`)
 UNIT_LISTS = ("y", "movement", "experience", "formation", "abilities", "combat", "queue")
-FORMATION_LISTS = ("y", "path", "members")
+FORMATION_LISTS = ("y", "cacheY", "path", "members")
 LEA = re.compile(r"^(r(?:cx|bx|di|14|15|13|12)), \[(r(?:si|di|bx|14|15|13|12)) \+ (0x[0-9a-f]+)\]$")
 
 

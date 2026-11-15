@@ -15931,3 +15931,95 @@ the step's `spent` and `_escort_carry_with` (gpu/core/sim_seats.py).
   religion; a city-state holds no card, so its m_aYieldModifiers stay empty.
   C-120: the Free Cities' cities' own powered state still follows the
   grid in the engines.
+
+## H-1: the recorder's reads against a running game — READ (the unit, the formation, the planning, the target list, the known cities, the unit production table, the queue), PARTLY READ (the path's node, the modifiers)
+
+`tools/civ6lab/aimem.py` (`Reader.unit_row`, `formation_row`, `slots`,
+`plan`, `targets`, `kb_cities`, `unit_table`, `city_queues`; the stream
+`Units`), `aimem_hook.py` (site 6), `aimem_fields.py`. Read from a running
+game and checked against the same recording's Lua rows and logs:
+`runs/h1_duels1117_20261115T055144Z` (seed 1117, 250 turns; its draws and
+every Lua section equal `h1_duelq1117_20261108T234731Z`'s). Where this
+section and "H-1: the recorder's unit, planning and city AI reads" differ,
+this one holds: the tactical target list, the known cities and the unit
+production table stand where this section names them.
+
+- THE PLAYER'S AI COMPONENTS (the Player's constructor FinalRelease
+  0x2f1510 stores each): +0x670 the grand strategic AI (0x4ae380), +0x678
+  the homeland AI (0x4ba1f0), +0x680 the military AI (0x4c88d0), +0x688
+  Research, +0x690 the tactical AI (0x501e80), +0x698 Targets.
+- A WATCHED MEMBER'S VALUE: FinalRelease 0x72a920 returns the member + 0x10
+  (after noting the read); the knowledge base "at Targets +0x270" is the
+  value of the member at Targets +0x260.
+- THE KNOWN CITIES: the knowledge base's first words — +0 the entries, 0xe0
+  bytes each, +0x10 their count (the look, FinalRelease 0x515d70, passes
+  the member's value to the city arm 0x3f5db0). An entry: +0 the owner
+  word, +2 the type word 2, +4 the city id, +8 / +0xc its plot, +0x1c the
+  population, +0x48 its district entries (0x20 bytes each, +0x58 their
+  count): +0 the district's owner and type 3, +4 its id, +0xc / +0x10 its
+  plot, +0x14 the defense strength, 24.8. Checked: 13,377 of 13,377
+  entries are that owner's city on that plot with a population the dump
+  holds; 13,199 of 13,223 district strengths are a value the dump's
+  district row holds x 256 (the rest read between two holds).
+- THE TACTICAL TARGET LIST: the player's Targets (player +0x698) +0x248 the
+  entries, 0x28 bytes each, +0x258 their count (the planning manager's
+  pass FinalRelease 0x51d2b0 hands the Targets to planTargets 0x51da80,
+  which reads them there). An entry: +0 the kind, +4 / +8 the plot, +0x10
+  the owner word, +0x12 the component type word (1 a unit, 3 a district; an
+  entry of no component 0xffff / 0), +0x14 the id. Checked: 42,439 of
+  42,439 district entries are that owner's district on that plot, 6,550 of
+  6,578 unit entries that owner's unit on that plot in the dump of the
+  turn or its neighbour.
+- THE PLANNING (unit +0xbc0): +0x30 the reach, 16 bytes a plot (x, y, turns,
+  Movement left), +0x40 its count; +0x48 the targets, 0xd0 bytes each,
+  +0x58 their count. A target: +0 the list entry's kind, +8 its owner and
+  type words, +0xc its id, +0x10 / +0x14 its plot, +0x18 its spots' count,
+  +0x1c the spots' plots; per spot the blow dealt +0x64, taken +0x7c, the
+  blow back taken +0x94 and dealt +0xac. Checked: 5,418 of 5,418 reach
+  lists at the tactical pass equal an AI_Planning.csv row of their turn and
+  player; 443 of 443 AI_Tactical.csv rows naming a target for a planned
+  unit find it in the unit's targets. The planning stands as built before
+  the pass: no planning differs at the end look.
+- THE UNIT PRODUCTION TABLE: the grand strategic AI's +0x188 (the value's
+  reader FinalRelease 0x524e30 is called with [player +0x670] + 0x188, the
+  pointer loaded at 0x48295f, 0x4d2e46, 0x533892; the handler 0x4b13f0 runs
+  "Victory Conditions" and "Settle City Evaluation" beside the table's
+  build): +0x10 the entries, 0x168 bytes each, +0x20 their count, +0x28 the
+  built flag; an entry's +0 the Units index, +0x20 the units held, +0x160
+  the value. Checked: 68,260 of 68,591 entries' held count equals the
+  player's units of that type at the end look (the rest: a unit made or
+  lost after the turn's build).
+- A UNIT: its scalar members' values at member + 0x10. Checked on the
+  dump's `memUnits` against the Lua unit rows at the same hold, 22,877 rows:
+  the id, type, plot, owner, damage, fortify turns, embarked flag, build
+  charges, formation class, experience and level equal on all; the
+  Movement left (+0x4f0, 24.8) on 22,818 (59 rows of the seat's own units
+  read across its turn start). The Movement modifiers' value (+0x838): the
+  unit's own, then the three GetMaxMoves FinalRelease 0x3a3a00 adds by the
+  start plot and the ground's owner (+0x83c, +0x840, +0x844); the own
+  modifier reads 1 on a Galley of 4 Movement and 3 on one of 6 (base 3).
+- A FORMATION (unit +0xbb8): m_kLastPath's value at +0x10 is {the nodes,
+  capacity, count}, 16 bytes a node — an int, the node's turn, an int, the
+  plot as two int16s — the destination first, the unit's plot last: 4,481
+  of 4,482 kept paths at the tactical pass open on the plot the unit's
+  queued MoveTo names. m_kUnitIDList (+0x228): the items' pointer at +0x30
+  (inline storage at +0x18), the capacity +0x38, the count +0x40, an int32
+  a member; every formation holds its own unit (379,634 of 379,634 rows),
+  an escort's two members stand on one plot of the dump's `plotUnits` (110
+  of 110). m_kLastPathCacheLocation's value is a plot (x +0x10, y +0x14).
+- THE OPERATION QUEUE (m_kOperations' value +0xd0 the entries, 0x30 bytes
+  each, +0xe0 their count): +0 the UnitOperations index (19 MoveTo, 18,
+  12, 14 as UnitOperations.log names them), +8 the order's arguments
+  (their +8 the flags, +0x10 / +0x14 the plot), +0x18 the flags, +0x20
+  the turn it was added, +0x24 the activity's hash. 114 of 183 queued
+  MoveTo destinations are a plot AI_Tactical.csv names for that unit on the
+  turn it was added (the rest are attack orders, whose row names the plot
+  moved to).
+- THE TACTICAL PASS'S SITE (hook 6, FinalRelease 0x503520): one hit a
+  player a turn passes its filter, after AI_Knowledge.csv's moment and
+  before the end look (1,743 records over 250 turns; the seat's between
+  its two end looks). With it armed the game draws the same 23,363 draws
+  and the memory stream's 7,224 reads stand at the same generator states.
+- OPEN: a path node's first and third ints; the combat modifiers' member
+  and a target list entry's +0xc and +0x18..; the dump's `deals` held no
+  deal in 250 turns (none was enacted), its item fields are unread.

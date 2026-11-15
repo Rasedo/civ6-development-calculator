@@ -401,3 +401,18 @@
   context:
     - ...ERS writes it). A major's city adds X as it stands. A minor's city with a bonus type (0x469de0, 0x467f50) adds X x (100 + a) / 100 where a is the ORIGIN player's Congress entry for t...
   review: reviewed
+- addr: 0x2f1510
+  binary: F
+  kind: function
+  name: Player
+  semantics: "the Player's constructor: allocates and stores the AI components — +0x670 the grand strategic AI (0x4ae380), +0x678 the homeland AI (0x4ba1f0), +0x680 the military AI (0x4c88d0), +0x688 Research (0x4f70f0), +0x690 the tactical AI (0x501e80), +0x698 Targets (0x510d60)."
+  status: READ
+  cases:
+    - recording: h1_duels1117_20261115T055144Z
+      turn: 1-250
+      value: the tactical AI's named members read at [player +0x690] hold its 36 prioritized moves and their control ids; the unit production table at [player +0x670] + 0x188 holds the player's unit counts
+  readings:
+    - "H-1: the recorder's reads against a running game — READ (the unit, the formation, the planning, the target list, the known cities, the unit production table, the queue), PARTLY READ (the path's node, the modifiers)"
+  context:
+    - "- THE PLAYER'S AI COMPONENTS (the Player's constructor FinalRelease 0x2f1510 stores each): +0x670 the grand strategic AI (0x4ae380), +0x678 the homeland AI (0x4ba1f..."
+  review: reviewed

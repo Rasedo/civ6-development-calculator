@@ -137,6 +137,7 @@
     - "C-110 / C-99: a placement resets the fortification, a struck SENTRY wakes, a siege striker asks no Movement — READ (0x586d40 at 0x587789, 0x20d280 at 0x20d5ce, 0x775340 at 0x7754c7), both twins"
     - "C-129 / C-99 / C-134: a known city's Encampment in the enemy strength, the rally's advance, the team's battle strengths and Garrison City's fortify test — READ (0x7877e0 at 0x7878e1..0x78791f / 0x787c64..0x787ca7, 0x5f0280, 0x5efaf0, 0x73f0c0, 0x73f7d0 at 0x73face, 0x738f20 at 0x7391a4..0x7395e1, 0x810d30 at 0x810f80..0x81115e), both twins; the replay's buildings before the next start"
     - "H-1: the recorder's unit, planning and city AI reads — READ off the disassembly, not yet read from a running game"
+    - "H-1: the recorder's reads against a running game"
   context:
     - ...Pillage 0x803250, Naval Escort 0x817f60; Operation Move's unit tactical block (+0x1fc0, 0x791300); the city assault nodes (Can Alpha City, Is At War, Operation Diplomacy, Operation Pil...
   review: reviewed
@@ -302,6 +303,21 @@
   context:
     - ...ch player's danger map at its DoTurn, its units' planning (aiTurnJobs; the planning job 0x792250 -> 0x791b20 is also pushed from 0x790890 and 0x7921a0), the carried operations run as t...
   review: imported
+- addr: 0x7925d0
+  final: 0x51d2b0
+  kind: function
+  name: planTargetsPass
+  semantics: "the planning manager's targets pass: for each planning node (0x68 bytes, the manager's +0xd8 list) planTargets 0x51da80 with the player's Targets ([manager +0x98] +0x698), whose +0x248 / +0x258 hold the tactical target list."
+  status: READ
+  cases:
+    - recording: h1_duels1117_20261115T055144Z
+      turn: 1-250
+      value: "the list read at Targets +0x248: 42,439 of 42,439 district entries are that owner's district on that plot"
+  readings:
+    - "H-1: the recorder's reads against a running game — READ (the unit, the formation, the planning, the target list, the known cities, the unit production table, the queue), PARTLY READ (the path's node, the modifiers)"
+  context:
+    - "...entries, 0x28 bytes each, +0x258 their count (the planning manager's pass FinalRelease 0x51d2b0 hands the Targets to planTargets 0x51da80, which reads them there). An entry: +0 the ki..."
+  review: reviewed
 - addr: 0x792c90
   kind: function
   semantics: "the planning's turn-start read of the revealed plots (once at the AI's turn start). \"AI Unit Planning\": a fork-join over N = min(units, the path finder pool's count) chunks; N <= 1 plans each unit serially on the calling thread (0x791e00 per unit), else N-1 jobs, chunk 0 inline, then the wait."
@@ -337,6 +353,7 @@
     - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
     - "C-95: the planning's spots and the combat prediction — READ, ported"
     - "H-1: the recorder's unit, planning and city AI reads — READ off the disassembly, not yet read from a running game"
+    - "H-1: the recorder's reads against a running game — READ (the unit, the formation, the planning, the target list, the known cities, the unit production table, the queue), PARTLY READ (the path's node, the modifiers)"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "- THE PLANNING'S TARGETS (0x792f90): every target within its Movement x 2 + its range of the unit; the spots (0x790c60 on..."

@@ -1969,19 +1969,33 @@
   offset: 0x188
   name: m_bHasMoved
   type: byte
-  semantics: the formation moved this turn (its value at +0x198; Release +0x4b8). Read off the FinalRelease disassembly; not yet read from a running game.
+  semantics: "the formation moved this turn (its value at +0x198; Release +0x4b8): 0 as its player's tactical turn opens, 1 at the end look on a unit that moved."
   status: PARTLY
-  readings:
-    - "H-1: the recorder's unit, planning and city AI reads — READ off the disassembly, not yet read from a running game"
+  readings: ["H-1: the recorder's reads against a running game"]
   review: reviewed
 - kind: field
   owner: Formation (FinalRelease)
   offset: 0x1e8
   name: m_kLastPath
-  semantics: the formation's kept path (a vector, its header at +0x1f8). Read off the FinalRelease disassembly; not yet read from a running game.
+  semantics: "the formation's kept path: its value at +0x1f8 is {the nodes, capacity, count}, 16 bytes a node (an int, the node's turn, an int, the plot as two int16s), the destination first and the unit's plot last. The node's first and third ints are unread."
   status: PARTLY
-  readings:
-    - "H-1: the recorder's unit, planning and city AI reads — READ off the disassembly, not yet read from a running game"
+  cases:
+    - recording: h1_duels1117_20261115T055144Z
+      turn: 1-250
+      value: 4,481 of 4,482 kept paths at the tactical pass open on the plot the unit's queued MoveTo names
+  readings: ["H-1: the recorder's reads against a running game"]
+  review: reviewed
+- kind: field
+  owner: Formation (FinalRelease)
+  offset: 0x228
+  name: m_kUnitIDList
+  semantics: "the formation's member unit ids: inline storage at +0x18, the items' pointer at +0x30, the capacity at +0x38, the count at +0x40, an int32 a member."
+  status: READ
+  cases:
+    - recording: h1_duels1117_20261115T055144Z
+      turn: 45
+      value: the barbarians' Warrior 786443 and the Settler 2293774 it escorts, both at 30:14, hold [786443, 2293774]
+  readings: ["H-1: the recorder's reads against a running game"]
   review: reviewed
 - kind: field
   owner: FreeCityRecord
@@ -2347,6 +2361,18 @@
   writers: [0x6fde70, 0x7ba440]
   readings:
     - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
+  review: reviewed
+- kind: field
+  owner: GrandStrategicAI (FinalRelease)
+  offset: 0x188
+  name: unitProduction
+  semantics: "the unit production table (the grand strategic AI, player +0x670): +0x10 its entries (0x168 bytes each: +0 the Units index, +0x20 the units held, +0x160 the value), +0x20 their count, +0x28 the built flag; the value's reader 0x524e30 takes [player +0x670] + 0x188 (0x48295f, 0x4d2e46, 0x533892)."
+  status: READ
+  cases:
+    - recording: h1_duels1117_20261115T055144Z
+      turn: 1-250
+      value: 68,260 of 68,591 entries' held count equals the player's units of that type at its end look
+  readings: ["H-1: the recorder's reads against a running game"]
   review: reviewed
 - kind: field
   owner: Improvements
@@ -2746,15 +2772,6 @@
   readings:
     - "H-1: the research AI — READ (the choice), PARTLY READ (the value)"
     - "H-1: the military AI's favoured technology — READ (the pick, its use), PARTLY READ (the Free Cities' counts)"
-  review: reviewed
-- kind: field
-  owner: MilitaryAI (FinalRelease)
-  offset: 0x188
-  name: unitProduction
-  semantics: "the unit production table: +0x10 its entries (0x168 bytes each: +0 the Units index, +0x160 the value), +0x20 their count, +0x28 the built flag. Read off the FinalRelease disassembly; not yet read from a running game."
-  status: PARTLY
-  readings:
-    - "H-1: the recorder's unit, planning and city AI reads — READ off the disassembly, not yet read from a running game"
   review: reviewed
 - kind: field
   owner: OpDefinition
@@ -4112,10 +4129,13 @@
   offset: 0x118
   name: signalIndex
   type: int
-  semantics: "the signal index the tactical pass runs on: the pass builds its unit list and runs its moves where edx equals it (+0x98 the tactical AI's player). Read off the FinalRelease disassembly; not yet read from a running game."
-  status: PARTLY
-  readings:
-    - "H-1: the recorder's unit, planning and city AI reads — READ off the disassembly, not yet read from a running game"
+  semantics: "m_controlPriority's value: the signal index the tactical pass runs on; the pass (0x503520) builds its unit list and runs its moves where edx equals it (+0x98 the tactical AI's player)."
+  status: READ
+  cases:
+    - recording: h1_duels1117_20261115T055144Z
+      turn: 1-250
+      value: "the hook at 0x503520 passes this test once a player a turn, between AI_Knowledge.csv's moment and the end look: 1,743 hits over 249 turns of 7 players"
+  readings: ["H-1: the recorder's reads against a running game"]
   review: reviewed
 - kind: field
   owner: Targets
@@ -4146,6 +4166,30 @@
   status: PARTLY
   readings:
     - "H-1: the AI memory reader — READ (the hooks, the pointer paths, the contracts, the knowledge base, the operations, the trees), PARTLY READ (the religious AI's holder)"
+  review: reviewed
+- kind: field
+  owner: Targets (FinalRelease)
+  offset: 0x248
+  name: tacticalTargets
+  semantics: "the tactical target list (the player's Targets, player +0x698): the entries, 0x28 bytes each (+0 the kind, +4 / +8 the plot, +0x10 the owner word, +0x12 the component type word, +0x14 the id), their count at +0x258; planTargets 0x51da80 reads it there, handed the Targets by 0x51d2b0."
+  status: READ
+  cases:
+    - recording: h1_duels1117_20261115T055144Z
+      turn: 1-250
+      value: 42,439 of 42,439 district entries are that owner's district on that plot; 6,550 of 6,578 unit entries that owner's unit on that plot
+  readings: ["H-1: the recorder's reads against a running game"]
+  review: reviewed
+- kind: field
+  owner: Targets (FinalRelease)
+  offset: 0x270
+  name: knownCities
+  semantics: "the knowledge base's first words (the value of the watched member at Targets +0x260): the known city entries, 0xe0 bytes each (+0 the owner word, +2 the type word 2, +4 the city id, +8 / +0xc the plot, +0x1c the population, +0x48 the district entries of 0x20 bytes, +0x58 their count), the count at +0x280; the look 0x515d70 passes it to the city arm 0x3f5db0."
+  status: READ
+  cases:
+    - recording: h1_duels1117_20261115T055144Z
+      turn: 1-250
+      value: 13,377 of 13,377 entries are that owner's city on that plot; 13,199 of 13,223 district strengths (+0x14, 24.8) equal a value the dump's district row holds
+  readings: ["H-1: the recorder's reads against a running game"]
   review: reviewed
 - kind: field
   owner: Targets (FinalRelease)
@@ -4684,19 +4728,25 @@
   offset: 0x4e0
   name: m_xMovesRemaining
   type: fx
-  semantics: the Movement left, 24.8 (its value at +0x4f0; hasMoved compares it with GetMaxMoves << 8). Read off the FinalRelease disassembly; not yet read from a running game.
-  status: PARTLY
-  readings:
-    - "H-1: the recorder's unit, planning and city AI reads — READ off the disassembly, not yet read from a running game"
+  semantics: the Movement left, 24.8 (its value at +0x4f0; hasMoved compares it with GetMaxMoves << 8).
+  status: READ
+  cases:
+    - recording: h1_duels1117_20261115T055144Z
+      turn: 1-250
+      value: "equal to the Lua row's GetMovesRemaining x 256 at the same hold on 22,818 of 22,877 unit rows (the rest: the seat's units read across its turn start)"
+  readings: ["H-1: the recorder's reads against a running game"]
   review: reviewed
 - kind: field
   owner: Unit (FinalRelease)
   offset: 0x828
   name: m_kMovementModifiers
-  semantics: "the Movement modifiers GetMaxMoves adds: +0x838 the unit's own, +0x83c the clear-terrain start's, +0x840 own ground's. Read off the FinalRelease disassembly; not yet read from a running game."
+  semantics: "the Movement modifiers GetMaxMoves (0x3a3a00) adds: +0x838 the unit's own, +0x83c where the start plot's vtable slot +0x18 answers 1, +0x840 / +0x844 by the ground's owner (0x378410 answering 1 / 3)."
   status: PARTLY
-  readings:
-    - "H-1: the recorder's unit, planning and city AI reads — READ off the disassembly, not yet read from a running game"
+  cases:
+    - recording: h1_duels1117_20261115T055144Z
+      turn: 63
+      value: the own modifier reads 1 on the barbarians' Galley 2228229 of 4 Movement (base 3), 3 on China's Galley 2490370 of 6 at t89
+  readings: ["H-1: the recorder's reads against a running game"]
   review: reviewed
 - kind: field
   owner: Unit (FinalRelease)
@@ -4711,28 +4761,37 @@
   owner: Unit (FinalRelease)
   offset: 0xbb8
   name: formation
-  semantics: "the unit's formation (Release +0x1fb8); its members by name in aimem_fields.json \"Formation\". Read off the FinalRelease disassembly; not yet read from a running game."
-  status: PARTLY
-  readings:
-    - "H-1: the recorder's unit, planning and city AI reads — READ off the disassembly, not yet read from a running game"
+  semantics: "the unit's formation (Release +0x1fb8); its members by name in aimem_fields.json \"Formation\"; m_kUnitIDList (+0x228) holds the member unit ids: the items' pointer at +0x30, the count at +0x40, an int32 each."
+  status: READ
+  cases:
+    - recording: h1_duels1117_20261115T055144Z
+      turn: 1-250
+      value: every formation's member list holds its own unit (379,634 rows); an escort's two members stand on one plot of the dump's plotUnits (110 of 110)
+  readings: ["H-1: the recorder's reads against a running game"]
   review: reviewed
 - kind: field
   owner: Unit (FinalRelease)
   offset: 0xbc0
   name: planning
-  semantics: "the unit's planning (Release +0x1fc0): +0x30 the reach list (16 bytes a plot: x, y, turns, Movement left), +0x40 its count, +0x48 the targets (0xd0 bytes each), +0x58 their count. Read off the FinalRelease disassembly; not yet read from a running game."
-  status: PARTLY
-  readings:
-    - "H-1: the recorder's unit, planning and city AI reads — READ off the disassembly, not yet read from a running game"
+  semantics: "the unit's planning (Release +0x1fc0): +0x30 the reach list (16 bytes a plot: x, y, turns, Movement left), +0x40 its count, +0x48 the targets (0xd0 bytes each: +0 the kind, +8 the owner and type words, +0xc the id, +0x10 / +0x14 the plot, +0x18 the spots' count), +0x58 their count."
+  status: READ
+  cases:
+    - recording: h1_duels1117_20261115T055144Z
+      turn: 1-250
+      value: 5,418 of 5,418 reach lists at the tactical pass equal an AI_Planning.csv row of their turn and player; 443 of 443 AI_Tactical.csv rows naming a target find it in the unit's targets
+  readings: ["H-1: the recorder's reads against a running game"]
   review: reviewed
 - kind: field
   owner: Unit (FinalRelease)
   offset: 0xbf8
   name: m_kOperations
-  semantics: "the operation queue, its value at +0x10: +0xd0 the entries (0x30 bytes each), +0xe0 their count. Read off the FinalRelease disassembly; not yet read from a running game."
-  status: PARTLY
-  readings:
-    - "H-1: the recorder's unit, planning and city AI reads — READ off the disassembly, not yet read from a running game"
+  semantics: "the operation queue, its value at +0x10: +0xd0 the entries (0x30 bytes each: +0 the UnitOperations index, +8 the order's arguments with the plot at their +0x10 / +0x14, +0x18 the flags, +0x20 the turn added, +0x24 the activity's hash), +0xe0 their count."
+  status: READ
+  cases:
+    - recording: h1_duels1117_20261115T055144Z
+      turn: 1-250
+      value: the first int is the index UnitOperations.log names (19 MoveTo); 114 of 183 queued MoveTo plots are a plot AI_Tactical.csv names for the unit on the turn the entry was added, the rest attack orders
+  readings: ["H-1: the recorder's reads against a running game"]
   review: reviewed
 - kind: field
   owner: UnitAiTypes

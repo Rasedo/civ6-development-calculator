@@ -169,16 +169,6 @@ LAB_PROFILE: dict[str, dict[str, str]] = {
 AI_VERBOSE = {"AI_MasterLogging": "1", "AICityBuildPlotLog": "1", "AISettlementEvaluationLog": "1",
               "AiDiplomaticActionLog": "1", "AIOperationEvalLog": "1"}
 
-# THE RECORDING'S LOGS (`profile apply --record-logs`): the game's own logs a
-# recording turns on beside the AI's — the modifiers' attach and detach
-# (GameEffects.log), every game core event in the order the core raises it,
-# the game history and every era moment. Per option file.
-RECORD_LOGS: dict[str, dict[str, str]] = {
-    "UserOptions.txt": {"GameEffectsLogLevel": "2", "GameHistoryLogLevel": "1", "GameHistorySequentialLogLevel": "1",
-                        "GameEraMomentsLog": "1"},
-    "AppOptions.txt": {"EnableGameCoreEventLog": "1"},
-}
-
 # THE STARTUP PATCH: what no mod reaches, because the engine plays it before
 # the mod system loads — the two logo movies (a missing movie is skipped) and
 # the copyright screen's 5 s legal delay (IntroScreen.lua ACCEPT_DELAY).
@@ -276,8 +266,6 @@ def cmd_profile(a) -> int:
             b.write_bytes(f.read_bytes())
         if name == "UserOptions.txt":
             keys = {**keys, **(AI_VERBOSE if a.ai_verbose else {k: "0" for k in AI_VERBOSE if k != "AI_MasterLogging"})}
-        if a.record_logs:
-            keys = {**keys, **RECORD_LOGS.get(name, {})}
         miss = _set_keys(f, keys)
         print("lab profile", name, "- not found:" if miss else "", *miss)
     return 0
@@ -820,7 +808,6 @@ def main(argv=None) -> int:
     s = sub.add_parser("profile", help="apply / restore the lean lab profile in the owner's option files")
     s.add_argument("action", choices=("apply", "restore"))
     s.add_argument("--ai-verbose", action="store_true", help="also turn on the AI's verbose logs (AI_VERBOSE)")
-    s.add_argument("--record-logs", action="store_true", help="also turn on the recording's logs (RECORD_LOGS)")
     s.set_defaults(fn=cmd_profile)
     s = sub.add_parser("patch", help="apply / revert the startup patch (logo movies off, copyright delay 0)"
                                      " and the replay patch (the AI's job spawn waits)")

@@ -5260,7 +5260,7 @@
 - addr: 0x6fae70
   final: 0x4b13f0
   kind: function
-  semantics: "the military AI's handler on player signal +0x258 (bound by 0x6fff90; the AI job passes 0x608580 fire it every turn): builds the unit production table 0x7989e0 while 0x79d320 is clear (the built flag, cleared at each turn's start by 0x6fa950)."
+  semantics: "the grand strategic AI's handler on player signal +0x258 (bound by 0x6fff90; the AI job passes 0x608580 fire it every turn; its object the FinalRelease player's +0x670, the table that object's +0x188; it queues the \"Victory Conditions\" and \"Settle City Evaluation\" jobs beside the build): builds the unit production table 0x7989e0 while 0x79d320 is clear (the built flag, cleared at each turn's start by 0x6fa950)."
   status: READ
   cases:
     - recording: AI_Knowledge.csv
@@ -5272,6 +5272,7 @@
     - "C-98: a city-state's City Analysis counts its knowledge base as its last turn left it — READ (0x608580 at 0x6085c9, 0x5c24e0 / 0x6fae70 on player signal +0x258, 0x785f30 in 0x6096c0's +0x370 list), both twins"
     - "H-1: the recorder's unit, planning and city AI reads — READ off the disassembly, not yet read from a running game"
     - "C-96 / C-98 / C-100 / C-99: the city AI's fitted rules read — the analysis before the job list, the unit term's upgrade price, the city's trained domains, a non-major's required power, the eruption's turns — READ (0x608870 at 0x608976..0x608988, 0x7b3e50 at 0x7b4564..0x7b45c8, 0x5376d0, 0x1c77c0, 0x1aed10, 0x1f0440 at 0x1f04c7..0x1f04dc, 0xa1d480), both twins"
+    - "H-1: the recorder's reads against a running game — READ (the unit, the formation, the planning, the target list, the known cities, the unit production table, the queue), PARTLY READ (the path's node, the modifiers)"
   context:
     - ...(0x45cf70), Governor Analyzer (0x4a79b0), Victory Conditions + Settle City Evaluation (0x4b13f0), Belief Analysis (0x4ec440), Tech Tree Analysis (0x4f87e0). Spawned and waited at once...
     - "- THE UNIT PRODUCTION TABLE 0x7989e0 (AI/UnitProduction.cpp; run from 0x6fae70 at the player AI's turn while 0x79d320 — the built flag +0x28 — is clear): entries, in..."
@@ -8247,6 +8248,7 @@
     - "C-95: the clear-terrain start Movement"
     - "C-124: the kept path is never taken; a move order's path passes other players' units out of sight — READ (0x272aa0, 0x2714b0, 0x586360 at 0x586542..0x5865a1, 0x26fe20), both twins"
     - "C-100: the plot values' golden-age, claims and tourism-percent terms, the required features, the power value's negative Amount — READ"
+    - "H-1: the recorder's reads against a running game — READ (the unit, the formation, the planning, the target list, the known cities, the unit production table, the queue), PARTLY READ (the path's node, the modifiers)"
   notes:
     - "a synced variable's mutable access: marks the holder changed (0xccf080) where it is tracked (+0x50), returns the holder + 0x58 (CityBuildAI +0xd10 -> +0xd68, +0xd80 -> +0xdd8)"
     - "imported: READ in its section, no confirming case found beside it"

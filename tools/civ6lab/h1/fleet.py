@@ -58,11 +58,8 @@ SKIP_LOGS = {"AI_Behavior_Trees.csv"}
 # the game's .log files a recording keeps beside its CSVs: every unit
 # operation added or refused (UnitOperations.log), every unit path search
 # with its goal, flags and checksum (AStar_GC.log) — both with a header
-# line — and, with no header, the game core's own log, the modifiers'
-# (GameEffects.log, written under `game.RECORD_LOGS`), the game core's
-# events and the game's history where the profile turns them on
-LOG_FILES = {"UnitOperations.log": True, "AStar_GC.log": True, "GameCore.log": False, "GameEffects.log": False,
-             "GameCoreEvents.log": False, "GameHistory.log": False, "Game_History.log": False}
+# line — and, with no header, the game core's own log
+LOG_FILES = {"UnitOperations.log": True, "AStar_GC.log": True, "GameCore.log": False}
 
 
 def log_files(host: str) -> list[pathlib.Path]:
