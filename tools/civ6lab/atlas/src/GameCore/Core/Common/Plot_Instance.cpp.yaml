@@ -211,7 +211,7 @@
       value: 1116 city.tourism 78 -> 13, seat.tourism 75 -> 10, city.housing 35 -> 0, plot.yields 66 -> 1.
     - recording: 1110
       value: "Unexplained: a plot China acquired by purchase reads 0 for the rest of the game (1110 plots 760/761, 1113 plot 57) — Plot appeal is a cached value refreshed on events (the PLOT_APPEAL event instances)"
-  impl: [cpu/core/opsOrders.ts:afloatInDanger]
+  impl: [cpu/core/opsOrders.ts:afloatInDanger, cpu/core/tradePath.ts:tradeWater]
   readings:
     - "C-20 tail: the trade path's land and water tests and the switch — READ"
     - "Border plot: GetNextBuyablePlot — READ"
@@ -223,6 +223,7 @@
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
     - "H-1: the barbarians' turn (0x1514a0) — READ (the max camps and the sight LAB)"
     - "C-108: the trade path's portals, its open list and CanStartRoute's gates — READ, both twins"
+    - "C-127: a major's Religious AI faith boost and the trade path's drowned plots — READ (0x74f5a0, 0x5583a0 / 0x558460's plot info), the wanted unit's value unread, both twins"
   context:
     - "...rrying both (or neither) is neither land nor water. Without a district: land = not water (0x834d0). Who writes word +0x14 is unread; the records fix the answers (below)."
     - ...eveal condition) adds RESOURCE_COST when d <= 3, any other plot adds WATER_COST if water (0x834d0) and RING_COST when d > 3; an improvement adds RING_COST if it is the barbarian camp (0x3...

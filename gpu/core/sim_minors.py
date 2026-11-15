@@ -1120,6 +1120,27 @@ class SimMinors:
         out = out + self._era_yield_bias[era.clamp(min=0, max=self._era_yield_bias.shape[0] - 1)]
         return out + (self.civ_strategies[:, r].long() @ self._strategy_yield_bias)
 
+    def _religious_faith_boost(self, r: int) -> torch.Tensor:
+        """[B] raw — `religiousFaithBoost` of major row `r`: 0, and with a
+        religious unit wanted (`civ_faith_want`) -0.25 where its faith
+        balance passes the unit's Production cost (`unitStepCost` at its
+        copies) and -0.25 more where its cities' Faith a turn passes half of
+        it"""
+        want = self.civ_faith_want[:, r]
+        ui = want.clamp(min=0)
+        step = self._type_cost_step.gather(0, ui)
+        acq = self.civ_unit_acq[:, r].gather(1, ui.unsqueeze(1)).squeeze(1).double()
+        cost = torch.where(step > 0, torch.floor(self._type_step_base.gather(0, ui) + acq * step),
+                           self._type_cost.gather(0, ui).double())
+        tot = self._seat_city_stats(r, record=False)[0]
+        alive = self.city_alive[:, r, : tot.shape[1]]
+        per_turn = (tot[:, :, 5] * alive.double()).sum(dim=1)
+        q = _fx_const(0.25)
+        bal = torch.round(self.civ_faith[:, r].double() * 256) > cost * 256
+        fpt = torch.round(per_turn * 256) > cost * 128
+        b = -(bal.long() + fpt.long()) * q
+        return torch.where(want >= 0, b, torch.zeros_like(b))
+
     def _major_yield_w(self, r: int) -> dict:
         """`yieldWeights` of major row `r`, per YieldType [B] raw: the
         Economic AI's Gold boost, -0.2 x the net income its last gold step
@@ -1135,6 +1156,7 @@ class SimMinors:
                             torch.zeros_like(gpt, dtype=torch.long))
         out = {y: lists[:, k].clone() for k, y in enumerate(_YIELDS)}
         out["YIELD_GOLD"] = out["YIELD_GOLD"] + boost
+        out["YIELD_FAITH"] = out["YIELD_FAITH"] + self._religious_faith_boost(r)
         sens = lists[:, 6:]
         n = self.n_majors
         met = [(self.seat_met_turn[:, r, o] >= 0) if o != r else None for o in range(n)]

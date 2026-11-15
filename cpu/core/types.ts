@@ -1047,6 +1047,11 @@ export interface Seat {
   /** the player its knowledge base last met (the trade record's +0x6e0,
    *  0x5ecb50), whose cities its route value walks; absent, itself */
   tradeSeat?: number;
+  /** a major's: the religious unit its Religious AI wants this turn (the
+   *  contract 0x74f5a0 makes in its turn, held at +0x438), which its Faith
+   *  weight reads (`religiousFaithBoost`); a major's AI chooses it, so the
+   *  replay imports the game's; absent, none */
+  faithWant?: string;
   /** the trade AI's route value K of a city-state or the Free Cities (raw,
    *  knowledge base +0x6d8; `minorTradeValue`, `freeTradeValue`) */
   tradeValue?: number;

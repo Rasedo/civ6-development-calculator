@@ -976,6 +976,17 @@
           "note": "the strategies a major follows beside its era ones (the replay imports the record's), as indices of AI_STRATEGIES ascending"
         },
         {
+          "name": "faithWant",
+          "compare": "exact",
+          "covers": [
+            "Seat.faithWant"
+          ],
+          "planes": [
+            "civ_faith_want"
+          ],
+          "note": "the religious unit a major's Religious AI wants this turn (the replay imports the game's contract), a unit index; -1 none"
+        },
+        {
           "name": "tourRate",
           "compare": "exact",
           "covers": [

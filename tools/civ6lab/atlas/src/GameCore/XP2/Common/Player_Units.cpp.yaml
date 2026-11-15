@@ -263,6 +263,7 @@
     - cpu/core/aiValue.ts:AiValueView
     - cpu/core/aiPlotValue.ts:PlotValueFacts
     - cpu/data/units.ts:FORMATION_UNIT_MULT
+    - cpu/core/aiWeights.ts:religiousFaithBoost
   readings:
     - "H-1: the upgrade's gold — READ"
     - "H-1: a unit's Production cost in the queue — READ"
@@ -274,6 +275,7 @@
     - "C-98: the research bank with nothing in hand; a city-state's unit cost under Mercenary Companies"
     - "H-1: a formation's Production cost in the queue — READ (0x17bfa0 -> 0x17bef0 / 0x17be50), both twins"
     - "C-100: the build turns' store — a completion's overflow, an idle city's Production — and a Builder's charge at the count before the turn's contract purchases"
+    - "C-127: a major's Religious AI faith boost and the trade path's drowned plots — READ (0x74f5a0, 0x5583a0 / 0x558460's plot info), the wanted unit's value unread, both twins"
   context:
     - "...at the game's speed (0x525400); net = (the new chassis' production cost − the old one's, 0x4f2b20) x UPGRADE_NET_PRODUCTION_PERCENT_COST (+0x74c, 100) / 100, never below 0; cost = base +..."
     - "...90 fills per unit row: c = the owner's unit manager (+0x12e8) current cost array (+0x3c0, 0x4f2b20, `m_aCurrentUnitCost`, an int); where c > 0, the row's +0x20 class does not read 2 throug..."

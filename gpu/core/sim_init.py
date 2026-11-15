@@ -4884,6 +4884,9 @@ class SimInit:
         self._strategy_yield_bias = torch.tensor(_av["strategyYieldBias"] or [[0] * 12], dtype=torch.long, device=device)
         self.civ_agendas = torch.zeros(B, self.n_majors, self._agenda_yield_bias.shape[0], dtype=torch.bool, device=device)
         self.civ_strategies = torch.zeros(B, self.n_majors, self._strategy_yield_bias.shape[0], dtype=torch.bool, device=device)
+        # the religious unit a major's Religious AI wants (`Seat.faithWant`,
+        # the replay's import), a unit index; -1 none
+        self.civ_faith_want = torch.full((B, self.n_majors), -1, dtype=torch.long, device=device)
         _ab = _uq["abilities"]
         self._iteru_mult = float(_ab["iteruProdMult"])
         self._knarr_heal = int(_ab["knarrNeutralHeal"])

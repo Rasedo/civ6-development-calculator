@@ -44,13 +44,28 @@
 - addr: 0x74f5a0
   final: 0x4ecf20
   kind: function
-  semantics: "the religious AI's turn: m_yieldPriorityBoost 0; when a religious unit is wanted, -0.25 once the faith balance (player +0x1340 +0x100) passes its faith cost and -0.25 more once the faith per turn (0x496fd0) passes half of it. For a full civilization's AI with a favored religion, the religious unit it wants (the Units with a Faith purchase yield, by CityBuildAI's unit value 0x5d4cd0 in a city that may buy it, 0x172820, worth more than its Faith cost valued or with twice the cost in hand; then the heroes) gets a contract; the boost takes -0.25 (@0xd2f324) once the balance passes its cost, -0.25 more once the Faith per turn (0x496fd0) passes half of it."
+  semantics: "the religious AI's turn: m_yieldPriorityBoost[Faith] 0 (0x74f61e); for a full civilization's AI (not human, 0x469d70 / 0x469db0) with a favored religion (+0x1c0, the religion 0x750fe0 founds), over the Units of PseudoYieldType PSEUDOYIELD_UNIT_RELIGIOUS (@0xf2e268) and each city that may buy one (CanTrain 0x172820, sixth argument 0), the unit whose city value (0x5d4cd0) is highest, admitted where it passes its Production cost (0x4f2b20) in Faith valued (0x7a6690) or the balance holds twice the cost; then the heroes (0x8fd8f0). The unit gets a build contract (0x5f47c0 -> 0x60bb50, held at +0x438, the last one released first); then -0.25 (@0xd2f324) where the balance (player +0x1340 +0x100) passes the cost and -0.25 more where the Faith per turn (0x496fd0) passes fx(cost x 0.5) (@0xd20458)."
   status: PARTLY
+  cases:
+    - recording: h1_duels1191
+      turn: 118
+      value: "China's Missionary contracts t118-163 (Taiyuan's Shrine, cost 37 to 76), none from t164: the Free Cities' K over China's routes' Faith one step below the unboosted on the turns its balance as its turn left it lay under the cost, two steps on the rest, 46 of 46 turns (t118 9.40, t119 15.14, t120 12.39 ... t163 14.98)"
+    - recording: h1_duels1153
+      turn: 151
+      value: "China's Apostle contract at cost 145, its Faith a turn 46-70 under half: the K 12.00 / 12.25 turn about t151-160, one Faith step where the balance after its turn passed 145"
+  impl:
+    - cpu/core/aiWeights.ts:religiousFaithBoost
+    - gpu/core/sim_minors.py:_religious_faith_boost
+    - cpu/core/types.ts:Seat
+    - cpu/harness/replay.ts:stageFaithWants
   readings:
     - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
     - "C-97: the religion AI — the belief scores READ (the job, the value, the analysis's attach), the picks READ, the analyzers PARTLY READ"
     - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
-  notes: ["imported: READ in its section, no confirming case found beside it"]
+    - "C-127: a major's Religious AI faith boost and the trade path's drowned plots"
+    - "C-127: a major's Religious AI faith boost and the trade path's drowned plots — READ (0x74f5a0, 0x5583a0 / 0x558460's plot info), the wanted unit's value unread, both twins"
+  notes:
+    - "the wanted unit's city value (0x7b62c0's RELIGIOUS branch at 0x7b6587) unported: the replay imports the game's contract"
   context:
     - "...m_yieldPriorityBoost (0x4681a0 -> GlobalAI +0x628 per player, data +0x340): Faith only. 0x74f5a0 each turn: 0; when a religious unit is wanted, -0.25 once the faith balance (player +0x..."
     - "- The signals (0x750830): the AI turn 0x74fbf0, the faith boost 0x74f5a0, the founding 0x750fe0, the belief add 0x751430, the Belief Analysis start 0x74ea60 (..."
@@ -148,6 +163,7 @@
     - "C-97: the religion AI — the belief scores READ (the job, the value, the analysis's attach), the picks READ, the analyzers PARTLY READ"
     - "C-97: the proposals and the religion's choices as seat actions — the price READ, the receiver's value READ but the trust term"
     - "C-97: the proposals and the religion's choices as seat actions"
+    - "C-127: a major's Religious AI faith boost and the trade path's drowned plots — READ (0x74f5a0, 0x5583a0 / 0x558460's plot info), the wanted unit's value unread, both twins"
   context:
     - "- The signals (0x750830): the AI turn 0x74fbf0, the faith boost 0x74f5a0, the founding 0x750fe0, the belief add 0x751430, the Belief Analysis start 0x74ea60 (registered for a full civ..."
     - "...ss whatever it scores, and once one stands only a better Follower does. The founding (0x750fe0, after waiting for the job): the leader's FavoredReligions, then the civilization's, th..."

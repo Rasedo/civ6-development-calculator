@@ -141,13 +141,28 @@ function tradeGraph(state: GameState, seat: number, origin: number): TradeGraph 
   return { water: tradeWaterLevel(state, seat), major: !isCityStateSeat(seat), holder, neither, embark, refuel, exit };
 }
 
+/** IsWater 0x558460 (IsLand 0x5583a0 its mirror) on a plot no centre or
+ *  Canal holds: a plot holding a domain mask (vt +0x40; the plot info's word
+ *  +0x14, 0x81240) by the mask, any other by its ground (0x834d0). The sea's
+ *  taking writes the drowned plot's mask while it is still land (0xa3b000 /
+ *  0xa3ac70 -> 0x66a90), the land bit alone (`Tile.submerged`), owned or
+ *  not; a claim writes the mask by the ground. The node test, the switch and
+ *  the refuel's domain read it; the step cost and the path term's score read
+ *  the ground (runs/h1_duels1191 t222: Zanzibar's route to Yiyang on 280,
+ *  279, the drowned 322, Xiurong's centre 366, then 365, 5.99 Gold;
+ *  runs/h1_duels1184 t229: Kumasi's route to Rome on 495, the unowned
+ *  drowned 451, 450, 4.66 Gold, one water plot of nine) */
+export function tradeWater(t: Tile): boolean {
+  return isWater(t) && !t.submerged;
+}
+
 /** 0x558db0: may the walk enter this plot? Impassable ground and every
  *  mountain (no portal stands on one), a plot a major has not revealed, water
- *  where the seat's Trader cannot embark, and a foreign centre of a holder at
- *  war are closed. */
+ *  (`tradeWater`) where the seat's Trader cannot embark, and a foreign centre
+ *  of a holder at war are closed. */
 function plotOpen(state: GameState, gr: TradeGraph, seat: number, t: Tile): boolean {
   if (isImpassable(t)) return false;
-  if (isWater(t) && gr.water < TRADE_WATER_OPEN) return false;
+  if (tradeWater(t) && gr.water < TRADE_WATER_OPEN) return false;
   if (gr.major && !isExplored(state, seat, t.index)) return false;
   const who = gr.holder.get(t.index);
   return who === undefined || who === seat || !civsAtWar(state, seat, who);
@@ -209,7 +224,7 @@ class OpenList {
  * THE WALK from `origin` for `seat`'s Traders, over every plot. Per edge
  * u -> v: a switch, a step between land and water (0x558300 over IsLand
  * 0x5583a0 / IsWater 0x558460: a City Centre's plot and a Canal's answer
- * neither, any other plot its ground, a Harbor water), needs a TradeEmbark
+ * neither, any other plot `tradeWater`, a Harbor water), needs a TradeEmbark
  * district at one end (0x558db0) and caps the range r left at u to 1; r is
  * then refuelled at u's refuelling district to TRADE_LAND_REFUEL onto land,
  * TRADE_WATER_REFUEL onto water, the larger onto a neither plot, or else at a
@@ -244,7 +259,7 @@ function walk(state: GameState, seat: number, origin: number, gr: TradeGraph, de
       if (n) nb.push(n.index);
     }
     for (const ex of gr.exit.get(u) ?? []) nb.push(ex);
-    const wu = isWater(at);
+    const wu = tradeWater(at);
     const cu = gr.neither.has(u);
     const eu = gr.embark.has(u);
     const fuel = gr.refuel.has(u);
@@ -253,7 +268,7 @@ function walk(state: GameState, seat: number, origin: number, gr: TradeGraph, de
       if (done[v]) continue;
       const to = tiles[v];
       if (!plotOpen(state, gr, seat, to)) continue;
-      const wv = isWater(to);
+      const wv = tradeWater(to);
       const cv = gr.neither.has(v);
       const sw = !cu && !cv && wu !== wv;
       if (sw && !eu && !gr.embark.has(v)) continue;

@@ -17,6 +17,7 @@
     - "C-20 tail: the trade path's land and water tests and the switch — READ"
     - "H-1: the trade path's search, its score and the Canal — READ"
     - "C-20 tail: the trade path's land and water tests and the switch"
+    - "C-127: a major's Religious AI faith boost and the trade path's drowned plots"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...fd0: step cost 0x558970, node valid 0x558db0, node init 0x558900, context 0x558ba0, range 0x5579b0. Check: `dll_tradepath.py`."
@@ -67,6 +68,8 @@
     - "C-20: the Trader's path and range"
     - "C-20 tail: the trade path's land and water tests and the switch — READ"
     - "C-20 tail: the trade path's land and water tests and the switch"
+    - "C-127: a major's Religious AI faith boost and the trade path's drowned plots"
+    - "C-127: a major's Religious AI faith boost and the trade path's drowned plots — READ (0x74f5a0, 0x5583a0 / 0x558460's plot info), the wanted unit's value unread, both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...at TRADE_ROUTE_BASE_RANGE 15 (+ player trade +0x1b0). Per edge: a land<->water switch (0x558300) caps the budget at 1; then a from-plot holding a TradeEmbark district (Districts byte..."
@@ -76,19 +79,27 @@
   final: 0x3930d0
   kind: function
   name: IsLand
-  semantics: "IsLand: a district plot's info word +0x14 & 4 (both masks, or neither, is neither land nor water). With a district on the plot (plot virtual +0x40) land = bit 4 and not bit 1 of the info word +0x14 (0x81240); without one, land = not water (0x834d0). A City Centre's plot is neither. Ported: walk / _trade_reach."
+  semantics: "IsLand: where the plot holds its info (plot virtual +0x40: a district, a claim's 0x66790 -> 0x66a90, the sea's taking 0xa3b000 / 0xa3ac70 -> 0x66a90) land = bit 4 and not bit 1 of the info word +0x14 (0x81240; both masks, or neither, is neither land nor water); without it, land = not water (0x834d0). A City Centre's plot is neither; a plot the sea took holds the land bit alone. Ported: tradeWater / walk / _trade_graphs / _trade_reach."
   status: READ
   cases:
+    - recording: h1_duels1184
+      turn: 229
+      value: "Kumasi's route to Rome on 541, 496, 495, the unowned 451 the sea took at t228, 450 ... 402: no switch at 451, one water plot of nine in the path term, 4.66 Gold as Game_TradeManager logs"
     - recording: h1_duelw1108
       turn: 212
       value: "Rome's Trader to Shenyang: Rome -> Antium's centre 796 -> the coast -> Shenyang's Harbor 479 -> 522, the step onto Rome's Harbor a switch paying 10000"
     - recording: h1_duelw1124
       value: "A Canal is that two-mask plot: runs/h1_duelw1124 Cardiff ->   Xiurong through Shenyang's Canal, 11 plots, 4 water, pays its 6 Gold   district rows twice over (score 23 >= 11) — 12 Gold, which water al"
-  impl: [cpu/core/tradePath.ts:walk]
+  impl:
+    - cpu/core/tradePath.ts:tradeWater
+    - cpu/core/tradePath.ts:walk
+    - gpu/core/sim_masks.py:_trade_graphs
   readings:
     - "C-20 tail: the trade path's land and water tests and the switch — READ"
     - "H-1: the trade path's search, its score and the Canal — READ"
     - "C-20 tail: the trade path's land and water tests and the switch"
+    - "C-127: a major's Religious AI faith boost and the trade path's drowned plots"
+    - "C-127: a major's Religious AI faith boost and the trade path's drowned plots — READ (0x74f5a0, 0x5583a0 / 0x558460's plot info), the wanted unit's value unread, both twins"
   context:
     - "IsLand 0x5583a0 / IsWater 0x558460 (Trade_Movement.cpp): when the plot's virtual +0x40 holds (a district..."
     - "- IsLand 0x5583a0 / IsWater 0x558460 read a district plot's info word +0x14 (masks 4 and 1): both, or nei..."
@@ -97,19 +108,27 @@
   final: 0x393150
   kind: function
   name: IsWater
-  semantics: "IsWater: a district plot's info word +0x14 & 1. With a district, water = bit 1 and not bit 4 of the info word +0x14 (a plot carrying both or neither is neither); without one 0x834d0."
+  semantics: "IsWater: where the plot holds its info (plot virtual +0x40: a district, a claim, the sea's taking), water = bit 1 and not bit 4 of the info word +0x14 (a plot carrying both or neither is neither); without it 0x834d0 (the terrain). A plot the sea took reads land."
   status: READ
   cases:
+    - recording: h1_duels1191
+      turn: 222
+      value: "Zanzibar's route to Yiyang on 239, 238, 237, 281, 280, 279, the China-owned 322 the sea took at t221, Xiurong's centre 366, 365, 408, 452, 495: no switch at 322, 5.99 Gold (3 + 3 x 170/256 + its post) as Game_TradeManager logs"
     - recording: h1_duelw1108
       turn: 212
       value: "Rome's Trader to Shenyang: Rome -> Antium's centre 796 -> the coast -> Shenyang's Harbor 479 -> 522, the step onto Rome's Harbor a switch paying 10000"
     - recording: h1_duelw1124
       value: "A Canal is that two-mask plot: runs/h1_duelw1124 Cardiff ->   Xiurong through Shenyang's Canal, 11 plots, 4 water, pays its 6 Gold   district rows twice over (score 23 >= 11) — 12 Gold, which water al"
-  impl: [cpu/core/tradePath.ts:walk]
+  impl:
+    - cpu/core/tradePath.ts:tradeWater
+    - cpu/core/tradePath.ts:walk
+    - gpu/core/sim_masks.py:_trade_graphs
   readings:
     - "C-20 tail: the trade path's land and water tests and the switch — READ"
     - "H-1: the trade path's search, its score and the Canal — READ"
     - "C-20 tail: the trade path's land and water tests and the switch"
+    - "C-127: a major's Religious AI faith boost and the trade path's drowned plots"
+    - "C-127: a major's Religious AI faith boost and the trade path's drowned plots — READ (0x74f5a0, 0x5583a0 / 0x558460's plot info), the wanted unit's value unread, both twins"
   context:
     - "IsLand 0x5583a0 / IsWater 0x558460 (Trade_Movement.cpp): when the plot's virtual +0x40 holds (a district stands there), they..."
     - "- IsLand 0x5583a0 / IsWater 0x558460 read a district plot's info word +0x14 (masks 4 and 1): both, or neither, is neither la..."
@@ -155,7 +174,9 @@
     - "C-20 tail: the trade path's land and water tests and the switch — READ"
     - "H-1: the trade path's search, its score and the Canal — READ"
     - "C-20 tail: the trade path's land and water tests and the switch"
+    - "C-127: a major's Religious AI faith boost and the trade path's drowned plots"
     - "C-108: the trade path's portals, its open list and CanStartRoute's gates — READ, both twins"
+    - "C-127: a major's Religious AI faith boost and the trade path's drowned plots — READ (0x74f5a0, 0x5583a0 / 0x558460's plot info), the wanted unit's value unread, both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "XP2 Trade_Movement.cpp: the pathfinder's callbacks are installed at 0x557fd0: step cost 0x558970, node valid 0x558db0, node init 0x558900, context 0x558ba0, range 0x5579b0. Check: `dll_t..."

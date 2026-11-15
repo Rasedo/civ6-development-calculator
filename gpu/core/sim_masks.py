@@ -2219,7 +2219,8 @@ class SimMasks:
         embark plots short of a centre.
 
         open: `plotOpen` — walkable at the row's water level, revealed to a
-        major, not a centre of a holder at war with the row. neither: a living
+        major, not a centre of a holder at war with the row. water:
+        `tradeWater`, a plot the sea took land. neither: a living
         city's centre (majors, the Free Cities, city-states) or a Canal's plot
         (`_multi_domain_plot`), neither land nor water to the walk. embark: the
         centre of the city a TradeEmbark plot belongs to, -1 elsewhere. refuel
@@ -2234,7 +2235,10 @@ class SimMasks:
         n = len(games)
         tiles = torch.arange(T, device=dev).unsqueeze(0).expand(n, T)
         wl = self._trade_water_level(row).take(gi)
-        opn = self._trade_walkable(gi.unsqueeze(1), tiles, wl.unsqueeze(1))
+        # `tradeWater`: a plot the sea took reads land by its domain mask, an
+        # open plot to any Trader; the step cost reads the ground
+        drowned = self.tile_submerged[gi]
+        opn = self._trade_walkable(gi.unsqueeze(1), tiles, wl.unsqueeze(1)) | (drowned & self.wpass[gi])
         if row < self.n_majors and self.fog_of_war:
             opn = opn & self.seat_explored[gi, row]
         # every living city: its centre's holder row and its embark plots
@@ -2261,7 +2265,7 @@ class SimMasks:
         post = self.trading_post[gi, row] & centre & ((holder == row) | ~war_h)
         refuel = (embark >= 0) & post.gather(1, embark.clamp(min=0))
         danger = self._fid_in(self._trade_danger_fid)[gi]
-        water = self.water[gi]
+        water = self.water[gi] & ~drowned
         portal = self._portal_plane()[gi]
         land = self._trade_cost_land * (self.tmove[gi] + self._mp_scale) // self._mp_scale
         term = torch.where(self.road[gi], torch.full_like(land, self._trade_cost_route), land)

@@ -839,6 +839,8 @@ const SEAT: Record<string, Extractor> = {
   // the strategies a major follows beside its era ones, as STRATEGY_NAMES
   // indices ascending
   strategies: overSeats((s) => (s.strategies ?? []).map((a) => STRATEGY_NAMES.indexOf(a)).sort((x, y) => x - y)),
+  // the religious unit a major's Religious AI wants, a unit index; -1 none
+  faithWant: overSeats((s) => (s.faithWant ? UNIT_INDEX[s.faithWant] ?? -1 : -1)),
   tourRate: overSeats((s) => s.tourRate ?? 0),
   tourismTo: overSeats((s, st) => perCiv(st, (seat) => (seat === s.seat ? 0 : s.tourismTo?.[seat] ?? 0))),
   tourismReligiousTo: overSeats((s, st) => perCiv(st, (seat) => (seat === s.seat ? 0 : s.tourismReligiousTo?.[seat] ?? 0))),

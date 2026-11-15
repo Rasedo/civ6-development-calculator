@@ -470,6 +470,34 @@ function stageStrategies(ctx: Ctx, turn: number): void {
   }
 }
 
+/** the Units whose PseudoYieldType is PSEUDOYIELD_UNIT_RELIGIOUS (Units.xml,
+ *  Expansion2_Units.xml), as the engine's ids */
+const RELIGIOUS_UNITS = new Set(['MISSIONARY', 'APOSTLE', 'INQUISITOR', 'GURU', 'NATURALIST', 'ROCK_BAND']);
+
+/** THE MAJORS' WANTED RELIGIOUS UNIT (`Seat.faithWant`): a major's
+ *  Religious AI is its AI's, so each major wants what the game's memory has
+ *  its turn want — the religious unit of the newest open build contract its
+ *  turn's end look holds with no city (0x74f5a0's; runs/h1_duels1191 China's
+ *  Missionary contracts t118-163, none from t164) */
+function stageFaithWants(ctx: Ctx, turn: number): void {
+  for (const s of ctx.state.seats) {
+    if (!isCiv(s.seat)) continue;
+    const read = ctx.gameMemory?.at('endlook', turn, ctx.playerOfSeat.get(s.seat) ?? -1);
+    let want: string | undefined;
+    let id = -1;
+    for (const c of read?.contracts ?? []) {
+      if (c.kind !== 'build' || c.status !== 3 || (c.city ?? -1) !== -1 || c.unit === undefined || c.unit < 0 || c.id < id) continue;
+      const type = engineRowOf(ctx.cat, 'unit', c.unit);
+      if (type && RELIGIOUS_UNITS.has(type)) {
+        want = type;
+        id = c.id;
+      }
+    }
+    if (want) s.faithWant = want;
+    else delete s.faithWant;
+  }
+}
+
 /** the game's World Congress log beside the dump (`<dump>.logs/
  *  World_Congress.csv`): per session turn, its VOTES, OPTIONS and
  *  DISCUSSION VOTES rows in the log's order; an empty map without it */
@@ -6801,6 +6829,7 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
     stageEnvoys(ctx, ds, a, b, history.randLog);
     stageAgendas(ctx, a.turn, history.randLog);
     stageStrategies(ctx, a.turn);
+    stageFaithWants(ctx, a.turn);
     const staged = stagePolicies(ctx, ds);
     // the generator: held at each witnessed point (`streamHold`)
     const seed = turnSeed(b);

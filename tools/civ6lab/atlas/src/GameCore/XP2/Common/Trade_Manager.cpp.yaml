@@ -222,6 +222,7 @@
     - "H-1: a route's yield per path plot (Hunza) — READ"
     - "H-1: the trade path's search, its score and the Canal — READ"
     - "H-1: the trade record's player — READ (0x5ecb50, 0x787f50, 0x5e9b20's walk), PARTLY READ (the city-states' meetings with each other, the majors' weights)"
+    - "C-127: a major's Religious AI faith boost and the trade path's drowned plots — READ (0x74f5a0, 0x5583a0 / 0x558460's plot info), the wanted unit's value unread, both twins"
   context:
     - "- Trade_Manager 0x5500b0 counts the Trading Posts on a route's path from index 1 through the destination, own an..."
     - ...th, 0x5526a0), n its plots (4-byte entries, both ends included); the posts counted on it (0x5500b0) times the player's own / foreign post bonuses (0x4d9750, 0x4d9670); then the per-path-ti...

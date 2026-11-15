@@ -17938,3 +17938,62 @@ Check Plot's `canPlaceDistrict` / `gpu/core/sim_minorai.py`
 - OPEN: the teleport's candidate functor and ring order, and its draw's
   place among the turn's draws (no engine runs it); Lysefjorden's
   LYSEFJORDEN_GRANT_NAVAL_UNIT_EXPERIENCE.
+
+## C-127: a major's Religious AI faith boost and the trade path's drowned plots — READ (0x74f5a0, 0x5583a0 / 0x558460's plot info), the wanted unit's value unread, both twins
+
+`religiousFaithBoost` / `yieldWeights` (cpu/core/aiWeights.ts), `Seat.faithWant`
+(`stageFaithWants`, cpu/harness/replay.ts); `tradeWater` / `walk`
+(cpu/core/tradePath.ts); GPU `_religious_faith_boost` / `_major_yield_w`
+(gpu/core/sim_minors.py), `civ_faith_want`, `_trade_graphs`
+(gpu/core/sim_masks.py).
+
+- THE FAITH BOOST (0x74f5a0, in a major's AI turn; AI::Religious
+  m_yieldPriorityBoost[Faith], GlobalAI +0x628): set 0 (0x74f61e); for a full
+  civilization's AI with a favored religion (+0x1c0, the religion its
+  founding 0x750fe0 picks), the unit wanted over the Units of PseudoYieldType
+  PSEUDOYIELD_UNIT_RELIGIOUS (@0xf2e268) and the cities that may buy it
+  (CanTrain 0x172820, sixth argument 0) is the one of the highest city value
+  (0x5d4cd0), admitted where that value passes its Production cost (0x4f2b20)
+  in Faith valued (0x7a6690, the boost at 0) or the balance holds twice the
+  cost; the heroes after (0x8fd8f0). It gets a build contract (0x5f47c0 ->
+  0x60bb50, kept at +0x438, the last released first), and the boost takes
+  -0.25 (@0xd2f324) where the balance (player +0x1340 +0x100) passes the cost
+  and -0.25 more where the Faith a turn (0x496fd0) passes fx(cost x 0.5)
+  (@0xd20458). The yield weight 0x702ad0 adds it to the Faith weight; the
+  route value K over the major's routes reads it at the minors' turns, the
+  balance as the major's turn left it (its purchases made).
+- THE WANTED UNIT is the major's AI's: the replay takes it from the game's
+  memory, the newest open build contract with no city naming a religious
+  unit in the major's end look of the turn (`stageFaithWants`); the cost is
+  the unit's step cost at the copies acquired (`unitStepCost`), the Faith a
+  turn its cities'.
+- CONFIRMED: runs/h1_duels1191 China (Taoism, Chinguetti's suzerain): its
+  Missionary contracts t118-163 (Taiyuan's Shrine; cost 37 to 76, Faith a
+  turn 39-52 over half), none from t164 (all its cities Taoist); the Free
+  Cities' K over its routes' 11-14 Faith one step below the unboosted on the
+  turns its balance after its turn lay under the cost (t119, t121, t124, t126,
+  t128, t131, t133, t136, t138, t141) and two on the rest (t118 9.40, t120
+  12.39, t122-123 12.44, ... t139-140 14.21), as logged; the engine's K the
+  game's on 45 of the 46 (t131 16.02 for 15.73). runs/h1_duels1153 China's
+  Apostle (cost 145, its Faith a turn 46-70 under half): the game's K 12.00
+  where its balance after its turn passed 145, 12.25 where not, t151-160
+  (the engine's best route there is another, C-127).
+- THE TRADE PATH'S PLOT INFO: IsLand 0x5583a0 / IsWater 0x558460 read the
+  domain mask (word +0x14, 0x81240) of a plot holding its info (virtual
+  +0x40), the terrain (0x834d0) of any other. A claim (0x66790) and the sea's
+  taking (0xa3b000 / 0xa3ac70, while the plot is still land) write the mask
+  through 0x66a90: a drowned plot holds the land bit alone, owned or not, so
+  the node test, the switch (0x558300) and the range's refuel read it as land
+  (`tradeWater`), while the step cost (0x558970) and the path term's score
+  (0x5500b0) read the terrain's water.
+- CONFIRMED: runs/h1_duels1191 t222 Zanzibar's route to Yiyang on 239, 238,
+  237, 281, 280, 279, the China-owned 322 the sea took at t221, Xiurong's
+  centre 366, 365, 408, 452, 495: 3 + 3 x floor(256 x 8 / 12) / 256 + its
+  post = 5.99 Gold, as Game_TradeManager's Route Started logs.
+  runs/h1_duels1184 t229 Kumasi's route to Rome over the unowned 451 the sea
+  took at t228: one water plot of nine, 4.66 Gold as logged.
+- Open: the wanted unit's city value (0x7b62c0's RELIGIOUS branch at
+  0x7b6587: ReligiousStrength x 0.01 x SpreadCharges, the heal charges by
+  0x4be880, the city's followers) is unported, so the engines want nothing
+  without the game's memory; a drowned plot claimed after the sea took it
+  would hold the water bit alone (the engines keep the land bit).

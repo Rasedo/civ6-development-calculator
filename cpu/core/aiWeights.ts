@@ -6,9 +6,8 @@
  * THE YIELD WEIGHT w[y] (0x702ad0) is the sum of four 24.8 parts; the yield
  * value (`aiValue.yieldValue`, 0x7a6690) pays a yield at (1 + min(w, 9.0)) of
  * its DefaultValue:
- * - the Religious AI's faith boost (0x74f5a0, Faith only) — reads 0 here: its
- *   religious unit choice ranks on the City Analysis values the engine does
- *   not run;
+ * - the Religious AI's faith boost (0x74f5a0, Faith only), a major's
+ *   (`religiousFaithBoost`);
  * - the Economic AI's gold boost (0x687bf0, Gold only): -0.2 x the gold per
  *   turn while that is negative; the Free Cities none;
  * - the Yields lists (0x6fde70, 0x7ba440): the leader's and the
@@ -39,7 +38,8 @@ import { NAVAL_STRATEGY_PSEUDOYIELDS } from '../data/aiResearch';
 import { gpCapped, gpOffer } from './greatPeople';
 import type { GreatPersonClass } from './types';
 import { CIV_LEADERS } from '../data/seats';
-import { FX, fmul, fxConst, type AiListItem, type AiListRef } from './aiValue';
+import { FX, fmul, fxConst, fxOf, type AiListItem, type AiListRef } from './aiValue';
+import { unitStepCost, unitsAcquired } from './game';
 import { civEraIndex, computeCityStats, standingLuxuries } from './city';
 import { getModifiers, unitUpkeep } from './effects';
 import { wmdUpkeep } from './nuclear';
@@ -184,6 +184,30 @@ export function economicGoldBoost(net: number): number {
   return net < 0 ? fmul(fxConst(-0.2), fxConst(net)) : 0;
 }
 
+/** THE RELIGIOUS AI'S FAITH BOOST of a major (0x74f5a0 in its AI's turn,
+ *  AI::Religious m_yieldPriorityBoost [Faith], raw): 0, and with a religious
+ *  unit wanted (`Seat.faithWant`) -0.25 (@0xd2f324) where the faith balance
+ *  as its turn leaves it (player +0x1340 +0x100) passes the unit's
+ *  Production cost (0x4f2b20) and -0.25 more where its Faith a turn
+ *  (0x496fd0: its cities') passes half of it (runs/h1_duels1191 China t118-163
+ *  wanting the Missionary at 37 to 76: the Free Cities' K over its routes'
+ *  Faith one step below the unboosted on the turns its balance lay under the
+ *  cost, two on the rest, 46 of 46 turns; runs/h1_duels1153 China t111-169
+ *  wanting the Apostle at 145, its Faith a turn under half of it, one step on
+ *  the turns its balance passed 145) */
+export function religiousFaithBoost(state: GameState, s: Seat): number {
+  if (!s.faithWant) return 0;
+  const cost = unitStepCost(s.faithWant, unitsAcquired(state, s.seat, s.faithWant));
+  const lux = standingLuxuries(state, s.seat);
+  const mods = getModifiers(state, s.seat);
+  let perTurn = 0;
+  for (const c of s.cities) perTurn += computeCityStats(state, c, lux, mods).total.faith;
+  let b = 0;
+  if (fxOf(s.faith) > cost * FX) b -= fxConst(0.25);
+  if (fxOf(perTurn) > fxConst(cost * 0.5)) b -= fxConst(0.25);
+  return b;
+}
+
 /** THE YIELD WEIGHTS of a seat, raw 24.8 per YieldType (0x702ad0) */
 export function yieldWeights(state: GameState, seat: number): Record<string, number> {
   const s = seatOf(state, seat);
@@ -200,6 +224,7 @@ export function yieldWeights(state: GameState, seat: number): Record<string, num
   // throughout, the value at no boost)
   const cs = state.cityStates.find((x) => x.seat === seat);
   w.YIELD_GOLD += cs ? cs.economy?.goldBoost ?? 0 : isCiv(seat) ? economicGoldBoost(s.netIncome ?? 0) : 0;
+  if (isCiv(seat)) w.YIELD_FAITH += religiousFaithBoost(state, s);
   // the Yields lists
   for (const [y, v] of listSum(seat, s, 'Yields')) if (y in w) w[y] += v;
   // the sensitivity boost
