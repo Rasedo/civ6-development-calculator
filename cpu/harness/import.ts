@@ -33,7 +33,7 @@ import { NO_SEAT } from '../core/types';
 import { minorItemKey, minorRepairResumed, type MinorItem } from '../core/minorBuild';
 import { keptKey } from '../core/production';
 import { createGameFromMap } from '../core/game';
-import { BARB_SEAT, FREE_SEAT, civOf, emptySeat, isBarbSeat, isCityStateSeat, startMeleeCS, freeSeatOf, grantKey, isCiv, markCityCentre, seatOf, tileBelongsTo, seatOfCityState, setTileOwner, setWar, setWarKind, majorsMet, setMetTurnWith } from '../core/seats';
+import { BARB_SEAT, FREE_SEAT, civOf, emptySeat, isBarbSeat, isCityStateSeat, startMeleeCS, freeSeatOf, grantKey, isCiv, markCityCentre, seatOf, tileBelongsTo, seatOfCityState, setTileOwner, setWar, setWarKind, majorsMet, setMetTurnWith, setBorderTurnsFrom } from '../core/seats';
 import { WAR_KINDS, type WarKindId } from '../data/warKinds';
 import { routeDestCenter, routeOriginCenter, stampTradingPost } from '../core/trade';
 import { setTradeEdge, tradeCourse, tradeReach } from '../core/tradePath';
@@ -672,6 +672,8 @@ export interface History {
   weary?: WearyRow[];
   /** the wars the logs declared (`loadWarKinds`), where the recording kept them */
   warKinds?: WarKindRow[];
+  /** the Open Borders grants the logs' deals carried (`loadBorderGrants`) */
+  borderGrants?: BorderGrantRow[];
   /** the removable features of the turn-1 record (`GameState.removableAtStart`) */
   removableAtStart?: number;
   /** by `${turn}:${owner}:${city id}`, a city's closing-pick ties as the
@@ -816,6 +818,27 @@ export function loadWarKinds(dumpPath: string): WarKindRow[] | undefined {
     if (c[3] !== 'At War' || !(c[4] in WAR_NAMES)) continue;
     const id = WAR_NAMES[c[4]];
     out.push({ turn: Number(c[0]), from: Number(c[1]), to: Number(c[2]), kind: id === null ? -1 : WAR_KINDS.findIndex((k) => k.id === id) });
+  }
+  return out;
+}
+
+/** An Open Borders grant the logs' deal carried: DiplomacySummary.csv's
+ *  "Deal Accepted" row holding "Open Borders for N turns from A to B" (the
+ *  game's player ids), made in `turn`. */
+export interface BorderGrantRow { turn: number; from: number; to: number; turns: number }
+
+/** The Open Borders grants the recording's accepted deals carried, in the
+ *  log's order. */
+export function loadBorderGrants(dumpPath: string): BorderGrantRow[] | undefined {
+  const path = dumpPath.replace(/\.jsonl$/, '.logs/DiplomacySummary.csv');
+  if (!existsSync(path)) return undefined;
+  const out: BorderGrantRow[] = [];
+  for (const line of readFileSync(path, 'utf8').split('\n').slice(1)) {
+    const c = line.split(',').map((s) => s.trim());
+    if (c[3] !== 'Deal Accepted') continue;
+    for (const m of (c[4] ?? '').matchAll(/Open Borders for (\d+) turns from (\d+) to (\d+)/g)) {
+      out.push({ turn: Number(c[0]), from: Number(m[2]), to: Number(m[3]), turns: Number(m[1]) });
+    }
   }
   return out;
 }
@@ -2476,6 +2499,19 @@ export function importTurn(rec: TurnRecord, cat: Catalog, history?: History): Im
       const b = seatOfGame(num(q));
       if (isCiv(a) && isCiv(b) && a !== b && !majorsMet(state, a, b)) setMetTurnWith(state, a, b, rec.turn);
     }
+  }
+  // an Open Borders grant a deal of an earlier turn carried runs its turns
+  // out, a war between the two ending it: the turns left as the record's
+  // turn opens, the engine's clock taking one in it (runs/h1_duelq1127:
+  // China's grant to Rome at t99 for 20 turns, Rome's Scout 196608 on
+  // China's 11:6 at t102, a Scout's 10 on China's 14:4 / 14:5 in the
+  // barbarians' danger map of t118)
+  for (const g of history?.borderGrants ?? []) {
+    const from = seatOfGame(g.from);
+    const to = seatOfGame(g.to);
+    if (g.turn >= rec.turn || g.turn + g.turns < rec.turn || !isCiv(from) || !isCiv(to)) continue;
+    if (players.find((p) => p.id === g.from)?.wars?.includes(g.to)) continue;
+    setBorderTurnsFrom(state, from, to, g.turn + g.turns - rec.turn + 1);
   }
   for (const p of minors) {
     const cs = minorOfPlayer.get(p.id)!;

@@ -71,11 +71,11 @@ import { MINOR_UPGRADE_GOLD, LEVY_TURNS } from '../data/cityStates';
 import { addCsTradeRoute, addIntlTradeRoute, addTradeRoute, minorRouteTo, plunderTrader, routeDestCenter, routeOriginCenter } from '../core/trade';
 import { minorRouteCandidate } from '../core/aiTrade';
 import { questCampCleared, questRouteStarted, questUnitAdded } from '../core/quests';
-import { commitDedications, goodyMoment, pantheonMoment, religionMoment, unitKillEvent } from '../core/eras';
+import { commitDedications, goodyMoment, layRoad, pantheonMoment, religionMoment, unitKillEvent } from '../core/eras';
 import { cityStateSight, initFog, revealAround, unitLook, unitSeesThrough, unitSight } from '../core/fog';
 import { holdFavor, seatFavor } from '../core/seatTurn';
 import { displaceAirFrom, isAirUnit } from '../core/air';
-import { BARB_SEAT, cityStateOfSeat, civsAtWar, clearWarKind, delegationWith, FREE_SEAT, isBarbSeat, isCityStateSeat, isCiv, MISSION_DELEGATION, MISSION_EMBASSY, prophetsOf, seatOf, setPeaceTurnWith, setTileOwner, setWar, tileSeat, unitsOf } from '../core/seats';
+import { BARB_SEAT, cityStateOfSeat, civsAtWar, clearWarKind, delegationWith, FREE_SEAT, isBarbSeat, isCityStateSeat, isCiv, MISSION_DELEGATION, MISSION_EMBASSY, prophetsOf, seatOf, setBorderTurnsFrom, setPeaceTurnWith, setTileOwner, setWar, tileSeat, unitsOf } from '../core/seats';
 import { activateGreatPerson, gpActivateOk, gpClassOfUnit, gpPersonOf } from '../core/gpAbility';
 import { BUILDINGS } from '../data/buildings';
 import { BUILT_WONDERS } from '../data/builtWonders';
@@ -106,7 +106,7 @@ import { opUnits } from '../core/operations/operation';
 import { newCityAi } from '../core/aiCityTrees';
 import { newEconomicMemory, purchaseSpend, savingsTurn, upgradePurchase, type EconomicMemory } from '../core/aiEconomic';
 import { FX } from '../core/aiValue';
-import { advanceHistory, aliasOrPrefixed, engineRowOf, formationRows, gwHolderOfRow, gwWorkOfRow, importTurn, loggedCongressTarget, minorHead, loadWarKinds, loadWeariness, newHistory, resolutionOfLog, warKindAt, wearyAt, recordRoutes, type History, type Imported, type WarKindRow } from './import';
+import { advanceHistory, aliasOrPrefixed, engineRowOf, formationRows, gwHolderOfRow, gwWorkOfRow, importTurn, loggedCongressTarget, minorHead, loadBorderGrants, loadWarKinds, loadWeariness, newHistory, resolutionOfLog, warKindAt, wearyAt, recordRoutes, type History, type Imported, type WarKindRow } from './import';
 import { holdCongressBallots, type CongressBallot, type CongressSlate } from '../core/congress';
 import { TribeFold } from './windowFold';
 import { AI_UNITS } from '../data/aiBuildTables';
@@ -990,6 +990,26 @@ function bestsBeforeStart(ctx: Ctx, copy: GameState, twin: ReadonlyMap<Unit, Uni
   }
 }
 
+/** the majors' research in a copy of the turn t's close: a technology or
+ *  civic the log completes in the next turn (its ResearchCompleted /
+ *  CivicCompleted rows of record t+1's turn, the active player's start) is
+ *  not yet held (runs/h1_duelq1117 t81: Rome's Shipbuilding completes at its
+ *  start of t82, its Warriors on 10:23 and 11:22 laying no danger on the
+ *  coast beside them in the barbarians' map of t81) */
+function researchBeforeStart(ctx: Ctx, b: TurnRecord, copy: GameState): void {
+  for (const x of (b as { actions?: unknown[][] }).actions ?? []) {
+    if (x[1] !== b.turn || (x[2] !== 'ResearchCompleted' && x[2] !== 'CivicCompleted')) continue;
+    const seat = ctx.seatOfPlayer.get(Number(x[3]));
+    const r = seat !== undefined && isCiv(seat) ? copy.seats[seat]?.research : undefined;
+    if (!r) continue;
+    const civic = x[2] === 'CivicCompleted';
+    const id = civic ? engineId('civic', ctx.cat.civics[Number(x[4])], 'CIVIC_', CIVICS) : engineId('tech', ctx.cat.techs[Number(x[4])], 'TECH_', TECHS);
+    if (!id) continue;
+    if (civic) r.civics = r.civics.filter((c) => c !== id);
+    else r.techs = r.techs.filter((c) => c !== id);
+  }
+}
+
 /**
  * THE BARBARIANS CLOSE THE PAIR: after every player's actions of the turn
  * (the record's, landed), their unit pool takes the game's slots (each unit
@@ -1137,6 +1157,10 @@ function landMajorDistricts(ctx: Ctx, b: TurnRecord, turn: number, copy: GameSta
     if (!t.district || t.ownerSeat !== seat) continue;
     t.districtComplete = true;
     t.districtPillaged = false;
+    // a district completed carries its owner's road (runs/h1_duelq1124 t77:
+    // Beijing's Campus on 6:7, route 1 in record t78, China's Scout on 5:7
+    // reaching 7:7 / 7:8 through it in the barbarians' danger map)
+    if (x[2] === 'CityProductionCompleted' && !isWater(t)) layRoad(copy, seat, t);
   }
 }
 
@@ -1186,6 +1210,7 @@ function barbarianAi(ctx: Ctx, b: TurnRecord, closing: number, before: ReadonlyS
   const unborn = unbornUnits(ctx, b);
   copy.units = copy.units.filter((c) => !unborn.has(twin.get(c)!));
   bestsBeforeStart(ctx, copy, twin, unborn);
+  researchBeforeStart(ctx, b, copy);
   // ...and every other player's unit, and each of theirs their camps raised,
   // where the log's last step before their turn opens put it, not a later
   // teleport's plot (runs/h1_duely1121 t85: China's Great Scientist walks to
@@ -2285,6 +2310,10 @@ function minorBuysAfter(ctx: Ctx, copy: GameState, buys: readonly CopyBuy[], twi
     cs.treasury -= price;
     chargeUnitResource(state, cs.seat, u.type);
     tallyUnitMade(cs, u.type);
+    // the purchase raises its best strengths at once (runs/h1_duelq1124
+    // t72: Granada's Archers, its strike 25 in the barbarians' danger map of
+    // the turn)
+    raiseBestTrained(state, cs.seat, u.type, u.formation ?? 0);
     // a record unit the turn's new units already stand for (`matchNewUnits`)
     const real = unitOf(ctx, d.unit) ?? spawnRecorded(ctx, rec, d.unit);
     if (real) {
@@ -2314,6 +2343,7 @@ function minorBuysAfter(ctx: Ctx, copy: GameState, buys: readonly CopyBuy[], twi
       if (eco) purchaseSpend(eco, price * FX, (minor.threat ?? -1) > -1);
     } else minor.faith -= Math.min(price, Math.max(0, minor.faith));
     if (id) chargeUnitResource(state, seat, id);
+    if (id) raiseBestTrained(state, seat, id);
     const real = spawnRecorded(ctx, rec, d.unit);
     // the record's unit stands in the copy for the end look
     if (real) {
@@ -5828,7 +5858,7 @@ function turnSeed(rec: TurnRecord): number | undefined {
  * Food focus, trade list and value, the city-states it met, UNITS and BUILDINGS tables, resource counts, economic
  * memory (savings), threat, enemy at the gates, growth forecast, revealed
  * plots, standing army's lack, "Upgrade Units" trees, unit list and its standing army's members as its last end of turn left them. Per Free City: its threat, enemy at the gates
- * and raid; per major's city its trade list. Per unit: its id, its pool slot, its DEFENDER type, its formation, the player a capture took it from, its look. The
+ * and raid; per major's city its trade list. Per unit: its id, its pool slot, its DEFENDER type, its formation, the player a capture took it from, its look, the Movement it carries for life (`mpBonus`: a Great Person's grant, its training city's). The
  * barbarians' tribes (their clocks, raids, scouts' trees), unit pool, camp
  * step's start and scout throttle. The non-majors' explored plots.
  */
@@ -5839,7 +5869,7 @@ const MINOR_MEMORY = ['prodSetValue', 'favoredFood', 'tradeCities', 'tradeReject
   'economy', 'threat', 'threatNear', 'aiGrowth', 'aiGrowthSeen', 'revealed', 'standingArmyShort', 'explored', 'upgradeTrees', 'unitsListed', 'defendersListed',
   'bestPlotToBuy'] as const;
 const CITY_MEMORY = ['aiThreat', 'aiThreatNear', 'freeRaid', 'tradeCities', 'tradeRejected'] as const;
-const UNIT_MEMORY = ['slot', 'aiDefender', 'aiHomed', 'escorted', 'originalOwner', 'look'] as const;
+const UNIT_MEMORY = ['slot', 'aiDefender', 'aiHomed', 'escorted', 'originalOwner', 'look', 'mpBonus'] as const;
 const GAME_MEMORY = ['barbTribes', 'barbPool', 'barbCampsBegun', 'barbSpotNext'] as const;
 /** THE RULES' STORES NO RECORD SHOWS, carried the same way: the barbarian
  *  kills a boost counts, the wars' clocks; a city-state's production
@@ -6275,6 +6305,7 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
   }
   history.weary = loadWeariness(dumpPath);
   history.warKinds = loadWarKinds(dumpPath);
+  history.borderGrants = loadBorderGrants(dumpPath);
   history.replay = replayEvents(all, cat, history.randLog);
   // a window started past the first record takes the history every record
   // before it leaves (the game era and its countdown, the eras' ages, the
@@ -6686,6 +6717,11 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
       ctx.engineKilled = new Set([...ctx.units].filter(([, u]) => !live.has(u)).map(([k]) => k));
       // their missions of the turn, the record's
       applyMissions(ctx, missions.get(a.turn) ?? []);
+      // ...and the Open Borders grants its deals carried, as the next
+      // record's import reads them (the turn's own tick of the clock ahead)
+      for (const g of history.borderGrants ?? []) {
+        if (g.turn === a.turn) setBorderTurnsFrom(state, seatOfP(ctx, g.from), seatOfP(ctx, g.to), g.turns + 1);
+      }
       applyPhase(ctx, ds, 'after', b, b, otherMajors);
       landRepairs(ctx, b, a.turn, (p, s) => otherMajors.has(p) && isCiv(s));
       // their units stand where their actions left them: their looks reveal
@@ -6726,6 +6762,7 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
     // the active player's start of t+1
     try {
       ctx.streams = new Map();
+      const roadsWas = opts.aiScore && ctx.gameMemory ? state.map.tiles.map((t) => [t.road, t.roadTier] as const) : undefined;
       seatPhase(state, { seats: new Set(others), deals: true });
       // each other major's danger map at its DoTurn's tail, its start done
       // (runs/h1_duelq1117 t28: China's start envoy makes it city-state 3's
@@ -6733,21 +6770,52 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
       // ...the wars the log declares between the player before it closing
       // and its own activation not yet declared (runs/h1_duelq1128 t203:
       // China's war on Rome after its start's rows, Rome's units no plot of
-      // its map until t204)
-      if (opts.aiScore && ctx.gameMemory) {
+      // its map until t204), a unit its start teleports standing where the
+      // log's row puts it (runs/h1_duelq1127 t145: China's start moves
+      // city-state 4's Bombard 1703944 off 8:6 to 7:6, which sees the
+      // barbarian Musketman on 5:7 for its suzerain), the roads as its
+      // Traders' walks of the turn found them: the game walks them as its
+      // turn ends, the engine's seat block as it opens (runs/h1_duelq1117
+      // t42: China's Trader 1310732 lays 36:13's road as its turn ends, the
+      // barbarian Scout on 37:14 short of 35:13 across the river until then)
+      if (opts.aiScore && ctx.gameMemory && roadsWas) {
         const acts = (b as { actions?: unknown[][] }).actions ?? [];
+        const roadsNow = state.map.tiles.map((t) => [t.road, t.roadTier] as const);
+        const layRoads = (rows: readonly (readonly [boolean | undefined, number | undefined])[]) => state.map.tiles.forEach((t, i) => {
+          if (rows[i][0] === undefined) delete t.road;
+          else t.road = rows[i][0];
+          if (rows[i][1] === undefined) delete t.roadTier;
+          else t.roadTier = rows[i][1];
+        });
+        layRoads(roadsWas);
         for (const seat of others) {
           const pid = ctx.playerOfSeat.get(seat);
           const late = new Set<number>();
+          const ports = new Map<Unit, number>();
           for (let j = acts.findIndex((x) => x[2] === 'PlayerTurnActivated' && x[3] === pid) - 1; j >= 0 && acts[j][2] !== 'PlayerTurnDeactivated'; j--) {
+            const u = acts[j][2] === 'UnitTeleported' ? unitOf(ctx, `${acts[j][3]}:${acts[j][4]}`) : undefined;
+            if (u && !ports.has(u)) ports.set(u, (acts[j][6] as number) * ctx.W + (acts[j][5] as number));
             if (acts[j][2] !== 'DiplomacyDeclareWar' || (acts[j][3] !== pid && acts[j][4] !== pid)) continue;
             late.add(seatOfP(ctx, (acts[j][3] === pid ? acts[j][4] : acts[j][3]) as number));
+          }
+          // (a war it declares there teleports units too, after its map:
+          // runs/h1_duelq1128 t203, its three units set out of Rome's ground)
+          const moved = new Map<Unit, { at: number; look: Unit['look'] }>();
+          for (const [u, at] of late.size ? [] : ports) {
+            moved.set(u, { at: u.tileIndex, look: u.look });
+            u.tileIndex = at;
           }
           const wars = state.seats[seat].wars;
           state.seats[seat].wars = wars.filter((o) => !late.has(o));
           ctx.dangerLogged.set(seat, { turn: a.turn, plane: dangerPlane(state, seat) });
           state.seats[seat].wars = wars;
+          for (const [u, was] of moved) {
+            u.tileIndex = was.at;
+            if (was.look) u.look = was.look;
+            else delete u.look;
+          }
         }
+        layRoads(roadsNow);
       }
       stream.actions(a.turn);
       otherMajorsTurn();

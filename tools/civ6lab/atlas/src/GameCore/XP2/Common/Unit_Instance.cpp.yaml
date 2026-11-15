@@ -393,6 +393,7 @@
     - "C-130: the damage modifier's analyzer, a unit's tag requirement, the player's units walked by pool slot, a minor's one-time projects — READ (0x6bba30, 0x6d2610, 0x69ec70), both twins"
     - "C-117: the suzerain bonuses of Ayutthaya, Fez and Wolin; the Tsikhe's Conservation Tourism — READ (0xb0e380, 0xb0ee40, 0xc70830, 0x17f870; 0x1fce20), PARTLY READ (Fez's list on the unit), both twins"
     - "C-125 / C-95: flanking and support count about the defender unit's own plot, no river edge read; MEDIUM by the plot's layer-0 list; a killed target's record; the camp strike's orders — READ (0x521530, 0x51c810 at 0x51cc1c..0x51cc56, 0x5228c0, 0x786d50, 0x776140 at 0x776333, 0x8e9d0, 0x772940 at 0x772d2f..0x772f78), FIT (the camp strike's path), both twins"
+    - "C-132: the danger map's sight, its list's closed ground, the search's whole Movement and its strikes onto water; the embark waiver off a wonder's plot — READ (0x5033a0 -> 0x503320, 0x530420), FIT (the list's closed ground, the start on a district at war, the strikes onto water, the Great General's Movement), both twins"
   notes:
     - ".claude/scratchpad/st1/reading.md: ...he player (0x469cd0), each unit it sees now (0x5033a0) with a   combat, ranged or bombard strength (0x56dc90, 0x56e3e0, 0x56daa0): its   strength (0x716400: bombard > 0 — the combat strength where it tops the..."
   context:
@@ -462,6 +463,7 @@
     - cpu/core/tactical.ts:startMoves
     - cpu/core/tactical.ts:domainPool
     - cpu/core/tactical.ts:formationFullMoves
+    - cpu/core/tactical.ts:whole
   readings:
     - "C-96: the city-states' tactical pass — READ (Wander Near City, Heal, the non-barbarian priorities, FindAlternateLocation), the families it needs PARTLY READ"
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"

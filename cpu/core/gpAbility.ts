@@ -465,10 +465,14 @@ export function activateGreatPerson(state: GameState, unit: Unit): boolean {
     }
   }
   // CIV6 (Hanno the Navigator): the strongest unlocked chassis of the class,
-  // carrying its Movement for life — born with it, as a trained unit is
+  // carrying its Movement for life — born with it, as a trained unit is —
+  // and raising the seat's best strengths as a named grant does
+  // (runs/h1_duelq1127 t202: China's Ironclad, its best melee 65 -> 70,
+  // Chengdu's 66 + 5 in the barbarians' danger map of the turn)
   if (fx.unitBestClass) {
     const id = bestUnlockedOfClass(state, unit.seat, fx.unitBestClass);
     const made = id ? spawnUnit(state, id, unit.tileIndex, unit.seat, 'far') : null;
+    if (made) raiseBestTrained(state, unit.seat, made.type, made.formation ?? 0);
     if (made && fx.unitMpBonus) {
       made.mpBonus = fx.unitMpBonus;
       made.movesLeft = unitFullMoves(state, made);

@@ -1327,9 +1327,13 @@ export function stepCost(state: GameState, unit: { type: string; seat: number; p
     // TO plot, its completion (0x811b0) read off the FROM plot's district
     // in both cases: a land unit embarking from a plot of no district onto
     // a complete Harbor pays (runs/h1_duelw1121 t72, city-state 2's
-    // Swordsman from (15,6) onto (14,7) plans (1/0))
+    // Swordsman from (15,6) onto (14,7) plans (1/0)), one from a complete
+    // wonder's plot (DISTRICT_WONDER) onto a Harbor not yet built does not
+    // (runs/h1_duelq1117 t70: player 1's Archer on the Oracle's 32:12
+    // reaches its unbuilt Harbor 31:12 with Movement left, its 25 on 30:10 /
+    // 29:11 / 29:12 in the barbarians' danger map)
     const freeEmbark = (t: Tile) => t.district === 'HARBOR' || t.district === 'CITY_CENTER';
-    const fromComplete = from.district === 'CITY_CENTER' || (from.district !== null && !!from.districtComplete);
+    const fromComplete = from.district === 'CITY_CENTER' || (from.district !== null && !!from.districtComplete) || from.builtWonderComplete;
     const easyDock = ((freeEmbark(from) || freeEmbark(to)) && fromComplete) || ignoresShores(state, unit);
     cost = moveCostInto(state, from, to, unit) + (easyDock ? 0 : EMBARK_TRANSITION_MP);
   }

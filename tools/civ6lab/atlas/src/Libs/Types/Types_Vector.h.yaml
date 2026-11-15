@@ -558,6 +558,7 @@
     - "C-99: Move Unit's path flags 0x2 / 0x8 — READ (0x2720a0, 0x716080), both twins"
     - "C-99: when the pool finder's +0x1bc is written — the danger map at DoTurn, the planning at the AI turn's start, nothing inside a pass — READ (0x46cdd0, 0x717460, 0x6096c0, 0x792c90, 0x7921a0, 0x790890, 0x47ffb0), unported"
     - "C-95: the danger map's list and its districts — a ship's city, a peaceful unit's plot, the undamaged strike, an unbuilt Encampment's — READ (0x26dab0, 0x586900, 0x717460, 0x249ee0 / 0x24b960), both twins"
+    - "C-132: the danger map's sight, its list's closed ground, the search's whole Movement and its strikes onto water; the embark waiver off a wonder's plot — READ (0x5033a0 -> 0x503320, 0x530420), FIT (the list's closed ground, the start on a district at war, the strikes onto water, the Great General's Movement), both twins"
   notes:
     - "imported: READ in its section, no confirming case found beside it"
     - ".claude/scratchpad/st1/reading.md: ...tance, x5 unowned; later ones 100 /   turns where it may found). - The danger map (InfluenceMap.cpp 0x717460, m_influence): per player at   war with the player (0x469cd0), each unit it sees now (0x5033a0) wit..."

@@ -66,6 +66,9 @@
   semantics: "the embark rule (land to water): none for a formation that may not embark (+0x338 clear, 0x53044d), which pays the plot's own cost; none where the TO water plot passes vt +0x40 and its domain mask takes the formation's domain +0x278 (0x530467..0x530499): a land formation asks bit 4, set on land plots alone (0x66a90, 0x66680), so no water plot passes and every embarking step pays (runs/h1_duely1124 t73-t91 city-state 3's Heavy Chariots onto its owned 40:14 / 41:14 / 42:13, AI_Planning.csv); else it waives MOVEMENT_EMBARK_COST at a FreeEmbark district (completion read off the FROM plot). Then, FreeEmbark or not, where the Movement the step starts with exceeds the TO domain's full Movement, the excess (0x774c0: +0x20 - +0x18) is carried."
   status: READ
   cases:
+    - recording: h1_duelq1117
+      turn: 70
+      value: "the waiver (0x5304ce..0x53057a) reads each plot's district type's FreeEmbark (Districts +0xe1 bit 1) only where the FROM plot's district is complete (0x811b0 on the FROM plot both times): player 1's Archer on the Oracle's 32:12 (DISTRICT_WONDER, complete) reaches its unbuilt Harbor 31:12 with Movement left, its 25 on 30:10 / 29:11 / 29:12 in the barbarians' danger map (t73 / t108 / t109 alike)"
     - recording: h1_duely1127
       turn: 2
       value: the barbarian Scout 131073 on 6:9 closes the unrevealed coast 3:9 at (1/0), 4:10 after 5:10 and 5:7 as AI_Planning.csv lists; Move To Safety takes 5:10
@@ -94,6 +97,7 @@
     - "C-99: a move order carried on as the turn ends, the zone-of-control wait, the embark rule's TO plot — READ (0x962380, 0x52f50, 0x26fe20, 0x2675e0, 0x2673f0, 0x530420, 0x267650), both twins"
     - "C-95: the embark rules for a formation that may embark, a district's zone unseen, a city's kill in the planning, a raised unit's AI type, a move order's attack spot — READ (0x530420, 0x530240, 0x52fe90 at 0x52fed4, 0x530f50 at 0x531168, 0x791470 at 0x791677, 0x79b9c0), FIT (the move order's attack spot), both twins"
     - "C-99: the assignment's Movement and the swap's walk — READ (0x776140 at 0x776643 / 0x7768e4, 0x56d6f0, 0x972a50 -> 0x26fe20 under flag 4, 0x2720a0 at 0x27229b), both twins"
+    - "C-132: the danger map's sight, its list's closed ground, the search's whole Movement and its strikes onto water; the embark waiver off a wonder's plot — READ (0x5033a0 -> 0x503320, 0x530420), FIT (the list's closed ground, the start on a district at war, the strikes onto water, the Great General's Movement), both twins"
   notes:
     - ".claude/scratchpad/mu1/readings_c96.md: ...0x272ca0), no river   crossing where either plot is a city's or water (0x531510); the embark   rule 0x530420 (land to water) and the disembark 0x530240 waive   MOVEMENT_EMBARK_COST where a district with FreeE..."
   context:

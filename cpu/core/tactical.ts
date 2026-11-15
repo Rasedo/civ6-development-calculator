@@ -30,7 +30,7 @@ import { randRange } from './rand';
 import { cityDefenseStrength, districtGarrisonedStrength, embarkedDefenseCS, cityStrikeBase, coastalRaid, damageExpected, hostilePillage, hostileRangedStrike, meleeAttack, meleeUnitStrengths, movesAndShoots, predictCityBlow, predictCityExchange, predictCityShot, rangedUnitStrengths, stackDefender, unitAttackRange } from './combat';
 import { CITY_STRIKE_RANGE } from './phase';
 import { encampOuterPool, outerPool, wallsMax } from './rules';
-import { cityStateAt, minorCity } from './cityStates';
+import { cityStateAt, minorCity, suzerainOf } from './cityStates';
 import { irradiated } from './nuclear';
 import { canSee, losDisk, unitSight } from './fog';
 import { barbScoutLook, barbarianRules, barbSlots, barbSlotsDying, plotsSeenNow, poolDying, poolSlots, ringPlots, tribeOf } from './barbarians';
@@ -503,8 +503,15 @@ function groundOf(state: GameState, unit: Unit, revealedOnly = true, planning = 
       // Warrior on 13:8 at t38 listed it (2/0), AI_Planning.csv)
       const owner = tileSeat(t);
       if (shoots && garrisonDistrict(state, t) && owner !== NO_SEAT && owner !== unit.seat && unitsHostile(state, unit, { seat: owner })) return false;
+      // the danger map's search takes a civilian at war on water so too
+      // (runs/h1_duelq1127 t166: player 0's Warrior on 15:12 lays its 20 on
+      // 16:12, the barbarians' embarked Settler 2097173 on it), and strikes
+      // into no water its player may not enter (runs/h1_duelq1127 t199:
+      // player 0's embarked Warrior on 29:13, no Cartography, lays no 15 on
+      // the barbarian Galley's Ocean 28:15; h1_duelq1121 t164 28:6)
+      if (dangerSearch && planning && isWater(t) && !waterEnterable(state, t, unit)) return false;
       if ((fighters.has(t.index) && (isWater(t) === naval || (embarks && isWater(t))))
-        || (!plainCivilians && foes.has(t.index) && isWater(t) === naval)) return true;
+        || (!plainCivilians && foes.has(t.index) && (isWater(t) === naval || (dangerSearch && planning && embarks && isWater(t))))) return true;
       if (t.district === 'CITY_CENTER' && owner !== unit.seat && unitsHostile(state, unit, { seat: owner })) return true;
       return !naval && encampmentBlocks(state, t, unit);
     },
@@ -646,7 +653,9 @@ function search(state: GameState, unit: Unit, maxTurns: number, zoc: boolean, on
   const fortAtWar = (t: Tile): boolean => planningSearch && garrisonDistrict(state, t) && tileSeat(t) !== NO_SEAT
     && unitsHostile(state, unit, { seat: tileSeat(t) });
   const start: PNode = { tile: unit.tileIndex, g: 0, tie: 0,
-    moves: fortAtWar(map.tiles[unit.tileIndex]) ? 0 : Math.floor(startMoves * FIX / MP_SCALE),
+    // (the danger map's search alike: runs/h1_duelq1127 t249, the barbarian
+    // Musketman on player 1's unbuilt Encampment 13:2 lays nothing about it)
+    moves: fortAtWar(map.tiles[unit.tileIndex]) || (standToAttack && districtAttack(map.tiles[unit.tileIndex])) ? 0 : Math.floor(startMoves * FIX / MP_SCALE),
     turns: 1, closed: false, parent: null, wet: isWater(map.tiles[unit.tileIndex]) };
   nodes.set(start.tile, start);
   // the start is priced too, linked from itself
@@ -2028,15 +2037,17 @@ export function unitDanger(melee: number, ranged: number, bombard: number): numb
 
 /** a unit's strengths as the AI reads them (0x56dc90(unit, 0), 0x56e3e0,
  *  0x56daa0): combat — an embarked land combat unit's its owner's era's
- *  embarked strength (IsEmbarked, formation class neither SUPPORT nor
- *  CIVILIAN) — ranged (none for a unit with a bombard) and bombard, its own
+ *  embarked strength (IsEmbarked, no unit that fights embarked, +0x18c3:
+ *  EFFECT_ADJUST_UNIT_FIGHT_WHILE_EMBARKED, the Giant Death Robot's —
+ *  runs/h1_duelq1124 t230: player 1's, embarked on 37:16, lays 130 —,
+ *  formation class neither SUPPORT nor CIVILIAN) — ranged (none for a unit with a bombard) and bombard, its own
  *  embarked or not; each above 0 with its formation's strength (+0xc90: a
  *  Corps COMBAT_CORPS_STRENGTH_MODIFIER, an Army
  *  COMBAT_ARMY_STRENGTH_MODIFIER, `aiFormed`) */
 export function aiStrengths(state: GameState, u: Unit): { melee: number; ranged: number; bombard: number } {
   const d = UNITS[u.type];
   const bombard = aiFormed(u, d?.bombard ?? 0);
-  const melee = aiFormed(u, u.embarked && unitDomain(u.type) === 'military' ? embarkedDefenseCS(state, u.seat) : d?.combat ?? 0);
+  const melee = aiFormed(u, u.embarked && unitDomain(u.type) === 'military' && !waterWalks(u.type) ? embarkedDefenseCS(state, u.seat) : d?.combat ?? 0);
   return { melee, ranged: aiRanged(u), bombard };
 }
 
@@ -2062,7 +2073,8 @@ export const aiRanged = (u: Unit): number => (UNITS[u.type]?.bombard ? 0 : aiFor
  * sees now with a combat, ranged or bombard strength adds its danger
  * (`unitDanger`) to every plot its one-turn planning search closes from where
  * it stands on its full Movement and may stand on, none another player's
- * unit at peace with it holds in its sight (0x7921e0 -> 0x26df90, no zone of
+ * unit at peace with it holds in its sight, none but its own of ground closed
+ * to it (0x7921e0 -> 0x26df90, no zone of
  * control, its melee attacks included but a ship's onto a land unit, a city
  * it may enter and a city centre or an Encampment it strikes a ship's plot
  * (runs/h1_duelq1117 t131: the barbarian Galley on 14:6 lays its 30 on
@@ -2090,9 +2102,15 @@ export function dangerPlane(state: GameState, seat: number): Int16Array {
     const t = map.tiles[p];
     return tilesWithin(map, t.col, t.row, r).map((x) => x.index);
   };
+  // a hidden unit is seen where the seat or a city-state it is suzerain of
+  // sees it (the minor's outgoing visibility, the hidden layer's counts
+  // 0x5033a0 -> 0x503320; runs/h1_duelq1124 t204: the barbarian Nuclear
+  // Submarine on 30:7 beside city-state 4's Builder on 31:8, its 85 in
+  // player 1's map)
+  const seers = [seat, ...state.cityStates.filter((cs) => cs.centerIndex >= 0 && suzerainOf(cs) === seat).map((cs) => cs.seat)];
   for (const u of state.units) {
     if (!onMap(u) && unitDomain(u.type) !== 'air') continue;
-    if (unitReligious(u.type) || !unitsHostile(state, { seat }, u) || !seen[u.tileIndex] || !unitVisibleTo(state, u, seat)) continue;
+    if (unitReligious(u.type) || !unitsHostile(state, { seat }, u) || !seen[u.tileIndex] || !seers.some((s) => unitVisibleTo(state, u, s))) continue;
     const st = aiStrengths(state, u);
     if (st.melee <= 0 && st.ranged <= 0 && st.bombard <= 0) continue;
     const s = unitDanger(st.melee, st.ranged, st.bombard);
@@ -2103,9 +2121,17 @@ export function dangerPlane(state: GameState, seat: number): Int16Array {
     }
     const reach: number[] = [];
     // its search sets out on its formation's full Movement (0x26df90's
-    // start 0x26eea0: `formationFullMoves`)
+    // start 0x26eea0: `formationFullMoves`), unmoved: a first step dearer
+    // than that Movement spends it all (runs/h1_duelq1128 t126: player 1's
+    // Courser 2162694 escorting its Settler on 12:6, 2 Movement, lays its 46
+    // on the Woods of 12:5 and the hills of 11:6)
     const mates = formationMates(state, u);
-    const full = { ...u, movesLeft: formationFullMoves(state, u, mates) };
+    // ...with the Great General's or Admiral's Movement where it stands
+    // (GetMaxMoves 0x56e130; runs/h1_duelq1128 t137: player 1's Trebuchet
+    // 2490368 beside its Great General on 15:14, maxMoves 3, lays its 35
+    // three plots out)
+    const whole = Math.min(...[u, ...mates].map((m) => unitFullMoves(state, m) + generalAuraMP(state, m)));
+    const full = { ...u, movesLeft: whole, movesFull: whole };
     // a ship's strike onto land is no plot of its reach: the land a ship
     // threatens is the range of its water plots and the cities it may
     // enter (runs/h1_duelq1124 t163: the barbarians' map holds Rome's centre
@@ -2119,6 +2145,11 @@ export function dangerPlane(state: GameState, seat: number): Int16Array {
       // 3's Galley on 30:19 lists neither 30:18 nor 30:17, player 0's
       // embarked Scouts on them)
       if (!ground.fits(n.tile) || (n.tile !== u.tileIndex && !n.attack && !ground.stand(n.tile))) return false;
+      // ...and none of ground closed to the unit, an attack's neither, as
+      // the planning's list (the list's location test 0x586900;
+      // runs/h1_duelq1117 t88 / t89: city-state 3's Heavy Chariot on 31:16
+      // lays no 28 on the barbarian Warrior's 31:15, player 1's ground)
+      if (n.tile !== u.tileIndex && ground.closed(n.tile)) return false;
       // a unit with a range lists a plot only with Movement left there to
       // strike from (the list's ranged flag, 0x7921e0 -> 0x791270)
       if (R > 0 && n.moves <= 0) return false;

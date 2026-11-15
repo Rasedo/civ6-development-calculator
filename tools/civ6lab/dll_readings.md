@@ -14796,3 +14796,96 @@ the Great People's `retreatsWhenCaptured` (cpu/data/units.ts). GPU
   engines' `defensibleDistrict` test unread in its caller 0x51f070; the
   religious pair 0x521be0 / 0x521ed0 untouched (`theoFlankCount` keeps its
   river test).
+
+## C-132: the danger map's sight, its list's closed ground, the search's whole Movement and its strikes onto water; the embark waiver off a wonder's plot — READ (0x5033a0 -> 0x503320, 0x530420), FIT (the list's closed ground, the start on a district at war, the strikes onto water, the Great General's Movement), both twins
+
+`dangerPlane`, `search`'s start and `groundOf`'s `attack`, `aiStrengths`
+(cpu/core/tactical.ts), `stepCost` (cpu/core/units.ts),
+`activateGreatPerson` (cpu/core/gpAbility.ts); GPU `_danger_plane`,
+`_tac_search`, `_tac_attack_planes`, `_ai_combat`, `_embark_waived`
+(gpu/core/sim_tactics.py), `_gp_unit_grants` (gpu/core/sim_gp.py). The
+replay's check (`barbarianAi`, `researchBeforeStart`, `landMajorDistricts`,
+`minorBuysAfter`, the majors' maps in `runReplay`, `UNIT_MEMORY`,
+cpu/harness/replay.ts; `loadBorderGrants`, cpu/harness/import.ts).
+
+- THE SIGHT TEST 0x5033a0 (player, unit), the builder's one test of a unit
+  (0x717460 at 0x717669): the player's visibility count (+0x290) on the
+  unit's plot above 0; another player's hidden unit (+0x15f0 set, +0x1650
+  clear) only where 0x503320 finds the hidden layer's count on the plot
+  above 0 (the player's layer table +0x570 / +0x580, 0x18-byte entries
+  keyed by [+0x98]+0x24); a unit of Units.flags2 bit 8 its own player's
+  alone. The counts are the player's with what every outgoing visibility
+  adds: a hidden unit a city-state sees is seen by its suzerain (`seers`).
+- THE EMBARK WAIVER 0x530420 (at 0x5304ce..0x53057a): the FROM plot's and
+  the TO plot's district types (0x810d0); each type's FreeEmbark flag
+  (Districts +0xe1 bit 1) is read only where the FROM plot's district is
+  complete (0x811b0 on the FROM plot both times), the TO plot's read last.
+  A complete wonder's plot holds DISTRICT_WONDER complete: a land unit
+  leaving one onto a Harbor, built or not, pays no MOVEMENT_EMBARK_COST
+  (`stepCost`'s fromComplete, `_embark_waived`).
+- THE LIST (0x26dab0) runs the location test 0x586900 on each plot it takes,
+  the planning list's test: none of ground closed to the unit, an attack's
+  neither, its own plot kept (a fit on the map, the test's border branch
+  unread).
+- THE SEARCH'S START (0x26df90 -> 0x26eea0): the formation's least
+  GetMaxMoves, the Great General's or Admiral's Movement where each member
+  stands among its terms (a fit on the records' maxMoves), and unmoved: a
+  first step dearer than that Movement spends it all. A unit standing on a
+  district with hit points of a player at war sets out with none, as the
+  planning's (the wrapper 0x26e570 links the start from itself): its reach
+  its own plot alone (a fit).
+- THE STRIKES ONTO WATER (fits): a land unit its player may embark strikes a
+  civilian at war on water as it does a unit that fights; no unit strikes
+  into water its player may not enter (the Ocean before Cartography).
+- THE AI'S COMBAT STRENGTH 0x56dc90's +0x18c3 is
+  EFFECT_ADJUST_UNIT_FIGHT_WHILE_EMBARKED (ABILITY_UNIT_FIGHT_WHILE_EMBARKED
+  on CLASS_GIANT_DEATH_ROBOT, Expansion2_UnitAbilities.xml): an embarked
+  Giant Death Robot reads its own Combat (`aiStrengths`, `_ai_combat`).
+- HANNO'S GRANT (MODIFIER_PLAYER_GRANT_UNIT_OF_ABILITY_WITH_MODIFIER,
+  Babylon_GreatPeople.xml) raises the best strengths trained as the named
+  grant does (`raiseBestTrained`).
+- THE CHECK: the barbarians' copy holds no technology or civic the log
+  completes in the next turn (`researchBeforeStart`), a district a major
+  completed in the turn with its owner's road (`landMajorDistricts`), a
+  city-state's purchase's best strengths (`minorBuysAfter`); a major's map
+  is built on the roads as its Traders' walks of the turn found them and
+  with each unit its start teleports where the log's row puts it (none
+  where it declares a war before its activation: those teleports are the
+  war's, after its map, runs/h1_duelq1128 t203); a unit's
+  lifelong Movement (`mpBonus`) is carried from pair to pair; an Open
+  Borders grant a logged deal carried (DiplomacySummary.csv "Deal Accepted")
+  stands for its turns (`loadBorderGrants`).
+- CONFIRMED (one-seed aimem traces, `danger` / `danger.major` against the
+  game's): runs/h1_duelq1124 t204 / t207 the barbarian Nuclear Submarine
+  6160412 on 30:7 beside city-state 4's Builder lays its 85 on player 1's
+  map; h1_duelq1117 t70 / t73 / t108 / t109 player 1's Archer on the
+  Oracle's 32:12 reaches its unbuilt Harbor 31:12 with Movement left (25 on
+  30:10 / 29:11 / 29:12); 1117 t88 / t89 city-state 3's Heavy Chariot on
+  31:16 lays no 28 on the barbarian Warrior's 31:15, player 1's ground;
+  h1_duelq1128 t126 player 1's Courser 2162694 escorting its Settler on 12:6
+  lays its 46 on 12:5 / 11:6; 1128 t137 / t138 player 1's Trebuchet 2490368
+  and Courser beside its Great General lay 35 / 46 a plot farther;
+  h1_duelq1127 t249 the barbarian Musketman on player 1's unbuilt Encampment
+  13:2 lays nothing in its map; 1127 t166 player 0's Warrior on 15:12 lays
+  20 on the barbarians' embarked Settler's 16:12; 1127 t199 / t202 / t221,
+  h1_duelq1121 t164, 1124 t156 player 0's embarked units, no Cartography,
+  lay no 15 on the barbarian ships' Ocean plots; 1124 t230 player 1's
+  embarked Giant Death Robot lays 130; 1127 t202 Hanno's Ironclad raises
+  Chengdu's defence 66 -> 71 in the barbarians' map of the turn. The check:
+  1117 t81 (Rome's Shipbuilding of its start of t82), 1124 t77 (Beijing's
+  Campus 6:7 a road), 1124 t72 (Granada's Archers bought, its strike 25),
+  1117 t42 (36:13's road laid as China's turn ends), 1127 t145 (city-state
+  4's Bombard teleported to 7:6 by China's start), 1127 t203-215 (the
+  Ironclad's 8 Movement), 1127 t102 / t116 / t118 and 1128 t118 (China's
+  Open Borders to Rome, t99 and t108 for 20 turns).
+- OPEN: the engines' Giant Death Robot walks water as ground on its land
+  Movement (`waterWalk`), the game's embarks (record t230 embarked, maxMoves
+  5) and fights embarked: 1124 t228 / t230 / t238 / t239 ours 130 beyond the
+  game's reach; when ABILITY_ALPINE_TRAINING attaches (1124 t104: the
+  barbarian Archer 3997716, on 8:8 beside the Matterhorn since their turn
+  before, pays 2 for the hills in player 1's map, ours 1); an unbuilt
+  Encampment's defence under a unit at war (1127 t248 / t249 13:2 ours 79,
+  the game's 84); a city-state's Corps formed in its turn stands unformed on
+  the barbarians' copy (1121 t126: 55 for 65); the Open Borders grant's last
+  turn (open through the barbarians' turn of t118 for a grant of t99, 20
+  turns; the turn it ends unread).

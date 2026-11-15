@@ -404,7 +404,8 @@ class SimTactics:
         path, the danger map's) any unit at war on ground of the mover's
         domain too — on plots it revealed, a move order's path (not
         `planning`) on plots it sees now; and the fighters' water a land unit
-        its player may embark attacks into too."""
+        its player may embark attacks into too (in the danger map's search
+        the water of any unit at war)."""
         foe = self._tac_hostile(seat)
         if planning and not danger_search:
             # the planning's search: a civilian at war is a plain step
@@ -418,6 +419,14 @@ class SimTactics:
         land = land | (fight & ~self.water)
         naval = (self.wpass & foe) | (self.passable & ctr) | (fight & self.water)
         fight_w = fight & self.water
+        if planning and danger_search:
+            # the danger map's search: a civilian at war on water too, and
+            # no strike into water the player may not enter (the Ocean
+            # before its technology)
+            fight_w = fight_w | (foe & self.water & self.wpass)
+            cart = self._ocean_open(torch.full((self.B,), seat, dtype=torch.long, device=self.device))
+            shut = self.ocean_tile & ~cart.unsqueeze(1)
+            naval, fight_w = naval & ~shut, fight_w & ~shut
         known = self._tac_known(seat) if revealed_only else None
         if known is not None:
             land, naval, fight_w = land & known, naval & known, fight_w & known
@@ -687,8 +696,8 @@ class SimTactics:
         child under flag 8, a water child under flag 0x8000), and under flag
         2 no node links a child on the ground of a player at war with the
         unit's. With `listed` (the planning's list, `reachPlots` /
-        `planUnit`) no plot of ground closed to a city-state is kept, an
-        attack's neither. `reach` names the search's flags (`search`'s
+        `planUnit`, and the danger map's) no plot of ground closed to the
+        unit is kept, an attack's neither. `reach` names the search's flags (`search`'s
         reach): with no `zoc` "explore" is Explore Land's 0x26df90 (0x40 /
         0x42) and "patrol" Naval Patrol's (0), which like `stand` (the danger
         map's) and a move order's path pay the stacking +1e6 on a turn's end
@@ -726,9 +735,20 @@ class SimTactics:
             # ...the formation's: the least GetMaxMoves of its members
             # (0x266660 -> 0x262cd0, `formationFullMoves`)
             mm = mate.clamp(min=0)
-            mp = torch.where(mate >= 0, torch.minimum(mp, self._tac_full_now(pre)[rows, mm]), mp)
+            fnow = self._tac_full_now(pre)
+            if full and not from_full and pre == "major":
+                # the danger map's search: with the Great General's or
+                # Admiral's Movement where each stands now (`generalAuraMP`)
+                live = self.major_unit_alive & (self._type_combat.take(self.major_unit_type.clamp(min=0, max=self.NU - 1)) > 0)
+                hit = self._gen_aura_hit(self.major_unit_seat, self.major_unit_tile,
+                                         self.unit_naval.take(self.major_unit_type.clamp(min=0, max=self.NU - 1)) | self.major_unit_emb)
+                fnow = fnow + (hit & live).long() * self._gen_aura_mp
+                mp = fnow[rows, slots]
+            mp = torch.where(mate >= 0, torch.minimum(mp, fnow[rows, mm]), mp)
             if not from_full:
-                unmoved = mp >= granted
+                # the danger map's search sets out whole: its first step
+                # spends everything where it is dearer than that Movement
+                unmoved = torch.ones_like(unmoved)
         # the planning's search passes a civilian at war (`plainCivilians`)
         land, wat = self._tac_enter(seat, False, plain_civ=not zoc and not stand)
         # the plots the player revealed (`groundOf`'s known; a path reads
@@ -992,6 +1012,10 @@ class SimTactics:
         mv[ar, start] = torch.div(mp * _FIX, self._mp_scale, rounding_mode="floor")
         if fort_n is not None:
             mv[ar, start] = torch.where(fort_n[ar, start], 0, mv[ar, start])
+        if pay_n is not None:
+            # the danger map's search alike: its unit on such a district's
+            # plot reaches its own plot alone
+            mv[ar, start] = torch.where(pay_n[ar, start], 0, mv[ar, start])
         tn[ar, start] = 1
         st[ar, start] = 1
         key[ar, start] = _TIE_OFF
@@ -5076,12 +5100,13 @@ class SimTactics:
         """[B, P] long — `aiStrengths`' combat over pool `pre` (the merged
         pool for None), 0x56dc90 with 0: the type's Combat, an embarked land
         combat unit's its owner's era's embarked strength
-        (`_embarked_def_cs`); above 0 with its formation's (`_ai_formed`)."""
+        (`_embarked_def_cs`), none that fights embarked (the Giant Death
+        Robot's chassis); above 0 with its formation's (`_ai_formed`)."""
         p = "unit" if pre is None else f"{pre}_unit"
         ut = getattr(self, f"{p}_type").clamp(min=0, max=self.NU - 1)
         seat = getattr(self, f"{p}_seat")
         out = self._type_combat.take(ut)
-        emb = getattr(self, f"{p}_alive") & getattr(self, f"{p}_emb") & self._type_dom_mil.take(ut)
+        emb = getattr(self, f"{p}_alive") & getattr(self, f"{p}_emb") & self._type_dom_mil.take(ut) & ~self.unit_water_walk.take(ut)
         if bool(emb.any()):
             for sv in torch.unique(seat[emb]).tolist():
                 cs = self._embarked_def_cs(torch.full((self.B,), int(sv), dtype=torch.long, device=self.device))
@@ -5115,14 +5140,16 @@ class SimTactics:
         disembark 0x530240) for the steps `frm` -> `to` ([N, K] plots of the
         games `rows`, every game where None): a district with FreeEmbark —
         a city's centre or a Harbor — at either plot, the FROM plot's
-        district complete (0x811b0 read off the FROM plot)"""
+        district complete (0x811b0 read off the FROM plot), a complete
+        wonder's plot one (DISTRICT_WONDER)"""
         dist = self.district if rows is None else self.district[rows]
         comp = self.district_complete if rows is None else self.district_complete[rows]
+        wond = self.built_wonder_complete if rows is None else self.built_wonder_complete[rows]
         ctr = self._centre_plane() if rows is None else self._centre_plane()[rows]
         f_d, t_d = dist.gather(1, frm), dist.gather(1, to)
         f_c, t_c = ctr.gather(1, frm), ctr.gather(1, to)
         fe = (f_d == self._harbor_didx) | f_c | (t_d == self._harbor_didx) | t_c
-        return fe & (f_c | ((f_d >= 0) & comp.gather(1, frm)))
+        return fe & (f_c | ((f_d >= 0) & comp.gather(1, frm)) | wond.gather(1, frm))
 
     def _danger_plane(self, seat: int, need: torch.Tensor) -> torch.Tensor:
         """[B, T] long — `dangerPlane`, `seat`'s danger map, on the plots of
@@ -5130,7 +5157,8 @@ class SimTactics:
         with it that it sees, with a combat, ranged or bombard strength, adds
         its danger (`unitDanger`) over the plots its one-turn search closes
         from where it stands on its full Movement and may stand on (none
-        another player's unit at peace holds in its sight; a ship's strike onto a
+        another player's unit at peace holds in its sight, none but its own
+        of ground closed to it; a ship's strike onto a
         land unit none, a city it may enter and a city centre or Encampment it
         strikes one; a unit with a range only those it reaches with Movement left),
         those within its range of
@@ -5160,6 +5188,13 @@ class SimTactics:
             me = torch.arange(U, device=dev).unsqueeze(0)
             for pl in (self.military_at, self.embarked_at):
                 hid = self._stealth_hidden(seat, pl)
+                # ...a hidden unit a city-state it is suzerain of sees is
+                # seen (the minor's outgoing visibility)
+                if 0 <= seat < self.n_majors:
+                    for cs in range(self.S):
+                        mine = self.citystate_suzerain[:, cs] == seat
+                        if bool(mine.count_nonzero()):
+                            hid = hid & ~(mine.unsqueeze(1) & ~self._stealth_hidden(100 + cs, pl))
                 ok &= ~((pl.gather(1, tc) == me) & hid.gather(1, tc))
         vs = bomb - self._bombard_vs_unit
         s = torch.where(bomb > 0, torch.maximum(melee, vs), torch.maximum(melee, rng_s))
@@ -5170,7 +5205,7 @@ class SimTactics:
         raider = self._type_raider.take(ut)
         # the reach bound: a turn's steps on the cheapest Movement a step may
         # cost, the last step taking what is left
-        full_all = torch.cat((self._full_mp("major") - self.major_unit_aura_mp,
+        full_all = torch.cat((self._full_mp("major") - self.major_unit_aura_mp + self._gen_aura_mp,
                               self._full_mp("barb") - self.barb_unit_aura_mp), dim=1)
         steps = torch.where(air, torch.zeros_like(full_all),
                             torch.div(full_all, self._tac_min_step_mp(), rounding_mode="floor") + 1)
@@ -5197,10 +5232,11 @@ class SimTactics:
                     mm = m[(u_i[m] >= lo) & (u_i[m] < hi)]
                     if not mm.numel():
                         continue
-                    res = self._tac_search(b_i[mm], u_i[mm] - lo, int(sv), 1, False, pre=pre, full=True, stand=True)
+                    res = self._tac_search(b_i[mm], u_i[mm] - lo, int(sv), 1, False, pre=pre, full=True, stand=True, listed=True)
                     # the plots it may stand on, attacks into and its own
                     # (the list 0x26dab0: none another player's unit at peace
-                    # holds on a plot the player sees now)
+                    # holds on a plot the player sees now, none of ground
+                    # closed to the unit, an attack's neither)
                     reach = res["turns"] >= 1
                     # a ship's strike onto land is no plot of its reach (a
                     # city it may enter is, and a city centre or an

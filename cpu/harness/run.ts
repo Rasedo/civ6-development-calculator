@@ -28,7 +28,7 @@
  */
 import { readFileSync, writeFileSync } from 'node:fs';
 import { loadCatalog, type TurnRecord } from './record';
-import { advanceHistory, importTurn, loadWarKinds, loadWeariness, newHistory, routeLegs } from './import';
+import { advanceHistory, importTurn, loadBorderGrants, loadWarKinds, loadWeariness, newHistory, routeLegs } from './import';
 import { replayEvents } from './eventReplay';
 import { stateChecks, transitionChecks, type CheckResult, type StartReplay } from './checks';
 import { loadClimateLog, loadRandLog, randLogPath } from './randLog';
@@ -122,6 +122,7 @@ export function runReport(dumpPath: string, from = -Infinity, to = Infinity) {
   // the war-weariness ledger, where the recording kept its logs
   history.weary = loadWeariness(dumpPath);
   history.warKinds = loadWarKinds(dumpPath);
+  history.borderGrants = loadBorderGrants(dumpPath);
   history.replay = replayEvents(all, cat, history.randLog, moved);
   history.legs = routeLegs(all);
   all.length = 0;

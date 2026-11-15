@@ -404,6 +404,7 @@
     - gpu/core/sim_tactics.py:_tac_placed
     - cpu/core/tactical.ts:from
     - cpu/core/tactical.ts:shoots
+    - cpu/core/tactical.ts:naval
   readings:
     - "C-96: the city-states' tactical pass — READ (Wander Near City, Heal, the non-barbarian priorities, FindAlternateLocation), the families it needs PARTLY READ"
     - "C-95: the scout's tree \"Barbarian Found City\" — READ, ported"
@@ -422,6 +423,7 @@
     - "C-99 / C-128: the embark step's location test, the destination test's map layer; the Supply Convoy's Movement — READ (0x52fe90 at 0x530024, 0x208b80 at 0x208bbf -> 0x901e0 -> 0x75c50), both twins"
     - "C-95: the danger map's list and its districts — a ship's city, a peaceful unit's plot, the undamaged strike, an unbuilt Encampment's — READ (0x26dab0, 0x586900, 0x717460, 0x249ee0 / 0x24b960), both twins"
     - "C-95 / C-123: a move order's path passes a district of hit points out of sight and a unit of another map layer; a walk's step reads its own formation's riders; a raid's start zeroes the tribe's raid score — READ (0x586360 at 0x5866c9..0x58671f, 0x2720a0 at 0x272618..0x272689, 0x816cb0 at 0x8177cf..0x8177e9, 0x149980 at 0x149b01, 0x7c7330, 0x152c00, 0x154b80), both twins"
+    - "C-132: the danger map's sight, its list's closed ground, the search's whole Movement and its strikes onto water; the embark waiver off a wonder's plot — READ (0x5033a0 -> 0x503320, 0x530420), FIT (the list's closed ground, the start on a district at war, the strikes onto water, the Great General's Movement), both twins"
   notes:
     - ".claude/scratchpad/mu1/readings_c96.md: ...it. - THE PLANNING'S GROUND, beside the barbarians': the list (0x26d890) keeps a   plot only where 0x586900 lets the unit end — another player's unit at   peace it passes and never ends on (runs/h1_duelw1117..."
   context:

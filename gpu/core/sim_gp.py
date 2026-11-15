@@ -886,7 +886,9 @@ class SimGp:
                     hit = wantb & (bcls == pc) & (best == u)
                     if u < 0 or not bool(hit.count_nonzero()):
                         continue
-                    self._spawn_unit(row, hit, hc, u, init_mp=mpb, far=True)
+                    born = self._spawn_unit(row, hit, hc, u, init_mp=mpb, far=True)
+                    # ...raising the best strengths as a named grant does
+                    self._raise_best_trained(row, born, u)
         # CIV6 (Marco Polo, Zheng He): "a free Trader unit in this city"
         cu = self._gp_fx(cls, at, "cityUnitIdx").long()
         wantc = m & (cu >= 0) & (cu < self.NU) & (ccol >= 0)

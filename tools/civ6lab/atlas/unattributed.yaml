@@ -584,6 +584,7 @@
     - "C-100: the plot's own subject, PLOT_IS_HILLS and the plot analysis' replaced camp — READ (0x69ed60 / 0x69ec20, 0x6d0970, 0x5cf160..0x5cf1ab), both twins"
     - "C-107: the founding's annex, lifetime culture and the border reads of the duelp records — READ (0x1a9f10, 0x1a8a30, 0x1a7710, 0x3a1fb0), both twins"
     - "C-99: the safe plot's fort is any district of the player's own territory — READ (0x716b90 at 0x716de5..0x716e19, 0xabfc20 at 0xabfff5..0xac001b), both twins"
+    - "C-132: the danger map's sight, its list's closed ground, the search's whole Movement and its strikes onto water; the embark waiver off a wonder's plot — READ (0x5033a0 -> 0x503320, 0x530420), FIT (the list's closed ground, the start on a district at war, the strikes onto water, the Great General's Movement), both twins"
   context:
     - "...330); OtherDistrictAdjacent: the neighbour's owner (+0x1c) is the player, its district (0x810d0) is not InternalOnly (Districts +0xe1 bit 4 — the Wonder district), is complete (Dist..."
     - "...rovement (+0x44, read as none while pillaged, +0x4d bit 0) and, when the plot's district (0x810d0, the district at the plot's id) is complete (district +0xb08, Lua `District:IsComplete` 0..."
@@ -628,6 +629,7 @@
     - "C-96: the city-states' tactical pass — READ (Wander Near City, Heal, the non-barbarian priorities, FindAlternateLocation), the families it needs PARTLY READ"
     - "H-1: the luxury allocation's rebuilds — PARTLY READ"
     - "C-96: the queue's strategic charge, a placed district's resource, the minors' resource turn — READ (0x17c2e0, 0x186460's names), a fit for the district, both twins"
+    - "C-132: the danger map's sight, its list's closed ground, the search's whole Movement and its strikes onto water; the embark waiver off a wonder's plot — READ (0x5033a0 -> 0x503320, 0x530420), FIT (the list's closed ground, the start on a district at war, the strikes onto water, the Great General's Movement), both twins"
   notes:
     - ".claude/scratchpad/mu1/readings_c96.md: ...e Cothon,   the Royal Navy Dockyard) stands at the FROM plot, or at the TO plot — the   completion (0x811b0) read off the FROM plot's district in both cases (t72:   2's Swordsman embarking from (15,6) onto i..."
   context:
@@ -1432,18 +1434,17 @@
     - recording: 1121
       turn: 82
       value: Naval Patrol 1121 t82 / t87 city-state 3's Galley 524294 (38:17 for   36:23), 1127 t62 / t63 city-state 3's Galley 393216.
-  impl: [cpu/core/tactical.ts:within, gpu/core/sim_tactics.py:_danger_plane]
+  impl:
+    - cpu/core/tactical.ts:within
+    - gpu/core/sim_tactics.py:_danger_plane
+    - cpu/core/tactical.ts:seers
   readings:
     - "C-99: Naval Patrol's explore target — the list and the tests READ, two cases unexplained"
     - "C-124: a path enters a plot the player never revealed whatever it is — READ (0x2720a0 at 0x272372..0x27242e, 0x271be0's +0x50 bit 0x20, 0x26e920), both twins"
     - "C-95: a ranged unit's danger reach holds only plots with Movement left — READ (0x7921e0, 0x791270, 0x26dab0), both twins"
     - "C-95: the danger map's list and its districts — a ship's city, a peaceful unit's plot, the undamaged strike, an unbuilt Encampment's — READ (0x26dab0, 0x586900, 0x717460, 0x249ee0 / 0x24b960), both twins"
     - "C-95: the reach searches open turn-end nodes, and the zone of control's domain is the formation's — READ (0x271920 from 0x26dab0, 0x26f980 -> 0x530f50, 0x267650), both twins"
-  context:
-    - "- THE CANDIDATE LIST (0x26df90's list callback 0x26dab0): a plot is appended on GetBest's NotifyList 3 (0x781e0, parent argument 0), once (0x79..."
-    - "- THE LISTS (0x26d890 / 0x26dab0 -> 0x586900 -> 0x586360): a closed plot never revealed is listed (the reach, the planni..."
-    - "...anged unit's danger reach holds only plots with Movement left — READ (0x7921e0, 0x791270, 0x26dab0), both twins"
-  review: imported
+    - "C-132: the danger map's sight, its list's closed ground, the search's whole Movement and its strikes onto water; the embark waiver off a wonder's plot — READ (0x5033a0 -> 0x503320, 0x530420), FIT (the list's closed ground, the start on a district at war, the strikes onto water, the Great General's Movement), both twins"
 - addr: 0x272a60
   final: 0x1aa7e0
   kind: function
@@ -2258,13 +2259,16 @@
   final: 0x357f90
   kind: function
   status: PARTLY
+  impl: [cpu/core/tactical.ts:seers]
   readings:
     - "C-129: a killed player's records forgotten; a capture's new unit; an air strike's record — READ (0x534c50, 0x787fc0 -> 0x5ee370, 0x212500's create), both twins; the replay's later-player timings"
     - "C-95 / C-123: a zone of control out of sight is none in a path's cost; Attack Civilians past a withdrawn civilian; the capture step through a plot of its own; a withdrawal's plot — READ (0x5033a0 at 0x5033f9..0x503400, 0x773270 at 0x773383..0x77339c, 0x530650 at 0x5307a4..0x5307d3), both twins"
+    - "C-132: the danger map's sight, its list's closed ground, the search's whole Movement and its strikes onto water; the embark waiver off a wonder's plot — READ (0x5033a0 -> 0x503320, 0x530420), FIT (the list's closed ground, the start on a district at war, the strikes onto water, the Great General's Movement), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "- OPEN: the hidden-visibility test the look asks (0x5033a0 -> 0x503320, the per-plot counts at visibility +0x570 keyed by [+0x98]+0x24) is unread: what reve..."
     - "...rd [rax + rdx*2]`, `jle`). Past it a hidden unit (+0x15f0) of another player answers by 0x503320. The zone of control 0x530f50 asks it of each exerting unit beside the plot entered (..."
+    - "...ent and its strikes onto water; the embark waiver off a wonder's plot — READ (0x5033a0 -> 0x503320, 0x530420), FIT (the list's closed ground, the start on a district at war, the strikes on..."
   review: imported
 - addr: 0x5033a0
   final: 0x358010
@@ -2274,7 +2278,7 @@
     - recording: h1_duelw1117
       turn: 8
       value: A move keeps its Movement on entering a zone   (runs/h1_duelw1117 t8 Warrior 196610;
-  impl: [cpu/core/units.ts:inEnemyZoc]
+  impl: [cpu/core/tactical.ts:seers, cpu/core/units.ts:inEnemyZoc]
   readings:
     - "C-96: the knowledge base's army records and the Combat Desire — READ (the records, the update, the desire), PARTLY READ (the signals' looks; the standing-army count in its own section below)"
     - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
@@ -2284,6 +2288,7 @@
     - "C-95: the embark rules for a formation that may embark, a district's zone unseen, a city's kill in the planning, a raised unit's AI type, a move order's attack spot — READ (0x530420, 0x530240, 0x52fe90 at 0x52fed4, 0x530f50 at 0x531168, 0x791470 at 0x791677, 0x79b9c0), FIT (the move order's attack spot), both twins"
     - "C-129: a killed player's records forgotten; a capture's new unit; an air strike's record — READ (0x534c50, 0x787fc0 -> 0x5ee370, 0x212500's create), both twins; the replay's later-player timings"
     - "C-95 / C-123: a zone of control out of sight is none in a path's cost; Attack Civilians past a withdrawn civilian; the capture step through a plot of its own; a withdrawal's plot — READ (0x5033a0 at 0x5033f9..0x503400, 0x773270 at 0x773383..0x77339c, 0x530650 at 0x5307a4..0x5307d3), both twins"
+    - "C-132: the danger map's sight, its list's closed ground, the search's whole Movement and its strikes onto water; the embark waiver off a wonder's plot — READ (0x5033a0 -> 0x503320, 0x530420), FIT (the list's closed ground, the start on a district at war, the strikes onto water, the Great General's Movement), both twins"
   notes:
     - ".claude/scratchpad/st1/reading.md: ....cpp 0x717460, m_influence): per player at   war with the player (0x469cd0), each unit it sees now (0x5033a0) with a   combat, ranged or bombard strength (0x56dc90, 0x56e3e0, 0x56daa0): its   strength (0x7164..."
   context:
