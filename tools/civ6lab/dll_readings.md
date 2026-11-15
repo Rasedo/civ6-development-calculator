@@ -14301,3 +14301,71 @@ cpu/core/units.ts); `_tac_search`'s second layer under `pays_stack`, its
   game 17:10's path ending on 17:11), no open-list tie; Operation Move's
   first steps 1121 t11 / t96 / t112 untraced (t96 / t112 Builder Capture's
   Settler and escort: the formation's join, not the order of equals).
+
+## C-95: the camp defender's strike, a captured civilian's dead target, a lone DEFENDER out of Pillage — READ (0x772940, 0x779010, 0x774e90, 0x779240 at 0x7792be..0x7792da, 0x775340 at 0x77551e..0x775534, 0x791470 at 0x79174a..0x791756), both twins
+
+`campStrike`, `defendCamps`, `attackCivilians`, `pillage`, `PlanEntry.kills`
+(cpu/core/tactical.ts); `_tac_camp_strike`, the DEFEND CAMPS and PILLAGE
+blocks of `_tac_pass`, `_tac_plan`'s "kill" (gpu/core/sim_tactics.py).
+
+- DEFEND CAMPS' UNIT (0x779010 -> 0x774e90): per TARGET_BARBARIAN_CAMP the
+  first unit of the list (+0x240) whose turn is not done (+0x530), of AI type
+  DEFENDER, whose planning holds the camp within 3 turns; the move's list
+  (+0x270) is reset to it alone, the row logged AT the camp's plot, and the
+  camp's plot handed to 0x772940.
+- THE CAMP DEFENDER'S MOVER (0x772940), over the unit's planning targets in
+  their order (0xd0 each: +0x18 the spots' count, +0x1c their plots, +0x4c
+  their turns, +0x64 dealt, +0x7c taken, +0x94 back taken, +0xac back dealt,
+  +0xc4 the kill byte, each per spot):
+  - a flag r12b opens as whether some target with a spot has back dealt 0
+    on its first spot (0x772a85..0x772ad3);
+  - a TRADER or TARGET_RELIGIOUS_CIVILIAN whose plot is the unit's own is
+    chosen while the planning holds no HIGH target with a spot, or nothing
+    is chosen yet (0x772af0..0x772b6e);
+  - a HIGH target's spot is weighed where its turn is 2 at most and taken +
+    back taken is under the unit's health (0x772ba2..0x772bce), and where
+    nothing is chosen, or its dealt tops the choice's, or r12b holds and the
+    spot is the camp's plot (0x772bd4..0x772bff). It is good where the
+    planning holds one HIGH target, the kill byte is set and the spot's turn
+    is 1 (0x772c05..0x772c1b); else for a unit with a range only on the
+    camp's plot (0x772c1d..0x772c38); else, unless r12b, only on the camp's
+    plot, and then only where back dealt is 0 or taken does not top back
+    taken (0x772c3d..0x772c63). A good spot whose target's unit stands is
+    the choice: its plot, its dealt, r12b now whether it is off the camp
+    (0x772c65..0x772cd6).
+  - no choice: 0x773fb0 to the camp, its flag 0 (the move or the Fortify
+    order, the moves ended). A choice: 0x773fb0 to the spot with its flag 1
+    (the moves kept), then the Trader's PLUNDER_TRADE_ROUTE or the heretics'
+    UNITCOMMAND_CONDEMN_HERETIC where CanStart answers, a ranged unit's
+    strike on the target's plot (0x964a40), any other's move onto it with the
+    attack flag (0x962190, flag 0x10).
+  Confirmed: runs/h1_duelq1128 t31-34 the Spearman 589832 of the camp 30:6,
+  each row AT 30 6, ends on 31:7, on 33:8 (CombatLog t32: its blow on player
+  4's Archer 327680) and on 34:9; t207 / t214 the Pike and Shot 6815748;
+  runs/h1_duelq1117 t27 Spearman 458758; 1121 t28 Spearman 1376265; 1127
+  t56 Spearman 327684: the recorded end plots. Told from "the kill as the
+  mover runs": runs/h1_duelq1121 t8 the Spearman 196610 stays on its camp
+  33:7 beside player 0's Scout on 32:8, at 53 health after the pass's
+  Horseman struck it, the planning's blow 54 on its 100 no kill.
+- THE KILL BYTE (0x791470 at 0x79174a..0x791756): set where the planning's
+  dealt is the target's health at least (setge), copied to every spot
+  (0x791780..0x7917af); `wins` (+0x60) where it tops it.
+- ATTACK CIVILIANS' TARGET (0x779240 at 0x7792be..0x7792da): the target's
+  unit by the entry's handle (+0x10), skipped where it resolves to none or
+  to a dead unit (+0x770). A captured civilian is a new unit under a new id:
+  the engines' re-seated unit is the entry's no more. Confirmed:
+  runs/h1_duelq1128 t25 the raid's Slinger 1441812 takes player 1's Settler
+  458755 on 13:14 (2228251 after), and the Warrior 2031630 on 14:16, whose
+  planning held 13:14 at turn 2, logs Wander to 13:15; t37 the Archer
+  2752535 logs Chase Target.
+- PILLAGE'S LIST (0x77a810 -> 0x775340 for 1 turn, at 0x77551e..0x775534): a
+  unit of AI type DEFENDER reaching the plot while the list is empty is held
+  (r15), and goes in only ahead of the next unit listed; a later DEFENDER
+  held replaces it. Confirmed: runs/h1_duelq1128 t38 the camp 30:6's
+  Spearman 589832 on 33:10, the one barbarian in reach of city-state 4's
+  Farm on 32:10, logs Wander, ends on 32:10 and leaves the Farm whole
+  (record 39).
+- Open (C-95): runs/h1_duelq1128 t198 the Pike and Shot 6684692 (52 health)
+  stays on its camp 4:12 where the engines' planning holds the knowledge
+  base's Scout in city-state 3's centre 4:9 as a HIGH target with the spot
+  4:10 at turn 2.

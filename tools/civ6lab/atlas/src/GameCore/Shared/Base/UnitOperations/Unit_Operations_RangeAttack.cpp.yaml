@@ -8,10 +8,12 @@
   kind: function
   semantics: a ranged strike order.
   status: PARTLY
+  impl: [cpu/core/tactical.ts:defendCamps]
   readings:
     - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
     - "C-95: the danger map's search pays no zone of control, a ranged unit strikes from its range; the rampage strike's ring — READ (0x26df90, 0x26e920, 0x771670, 0x691f0, 0x76ecf0), FIT (the ranged unit's strike), both twins"
     - "C-95: the rampage strikes with the move's whole list; its defender is one the barbarians see — READ (0x778b40, 0x771670, 0x208b80, 0x20a2a0), both twins"
+    - "C-95: the camp defender's strike, a captured civilian's dead target, a lone DEFENDER out of Pillage — READ (0x772940, 0x779010, 0x774e90, 0x779240 at 0x7792be..0x7792da, 0x775340 at 0x77551e..0x775534, 0x791470 at 0x79174a..0x791756), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ...180); the civilian taken ends the target; then each ranged one within range strikes it (0x964a40).

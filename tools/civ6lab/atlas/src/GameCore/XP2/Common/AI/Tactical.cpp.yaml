@@ -263,6 +263,30 @@
   context:
     - "- THE EXECUTION (0x771f80): the moves (retried where not blocked), the bombard strikes, the ranged strikes (unles..."
   review: reviewed
+- addr: 0x772940
+  final: 0x504930
+  kind: function
+  name: campStrike
+  semantics: "the camp defender's mover (Defend Camps 0x779010, the move's one listed unit and the camp's plot): over the unit's planning targets (+0x1fc0 -> +0x48, 0xd0 each) a TRADER or TARGET_RELIGIOUS_CIVILIAN on the unit's own plot is chosen while no HIGH target holds a spot or nothing is chosen (0x772af0..0x772b6e); a HIGH target's spot i with turns (+0x4c) of 2 at most and taken + back taken (+0x7c, +0x94) under the unit's health (0x772ba2..0x772bce) is chosen where nothing is, or its dealt (+0x64) tops the choice's, or r12b holds and the spot is the camp (0x772bd4..0x772bff), and then: the planning's one HIGH target with the kill byte (+0xc4) at turn 1 (0x772c05..0x772c1b); else a ranged unit (GetRange above 0) only on the camp's plot (0x772c1d..0x772c38); else, unless r12b, only on the camp's plot, and only where back dealt (+0xac) is 0 or taken does not top back taken (0x772c3d..0x772c63). r12b opens as whether some target with a spot has back dealt 0 on its first (0x772a85..0x772ad3) and each choice sets it to the spot being off the camp (0x772cc4..0x772ccd). With no choice: 0x773fb0 to the camp, flag 0. With one: 0x773fb0 to the spot, flag 1 (its moves kept), then PLUNDER_TRADE_ROUTE or UNITCOMMAND_CONDEMN_HERETIC where CanStart answers, a ranged unit's strike on the target's plot (0x964a40), else the move onto it with flag 0x10 (0x962190)."
+  status: READ
+  cases:
+    - recording: h1_duelq1128
+      turn: 31-34
+      value: the camp 30:6's Spearman 589832 goes out to 31:7, to 33:8 striking player 4's Archer 327680 and on to 34:9 under Barb. Camp Defense rows AT 30 6; t207 / t214 the Pike and Shot 6815748's end plots 40:18 / 40:19
+    - recording: h1_duelq1121
+      turn: 8
+      value: "the camp 33:7's Spearman 196610 stays: player 0's Scout on 32:8 at 53 health after the Horseman's blow, the planning's blow 54 on its 100 no kill, the spot 32:7 off the camp with a blow back dealing 68"
+    - recording: h1_duelq1117
+      turn: 27
+      value: the Spearman 458758 ends on 9:23 as recorded (t28's 1121 Spearman 1376265 on 4:17, 1127 t56's 327684 on 13:2 alike)
+  impl:
+    - cpu/core/tactical.ts:campStrike
+    - cpu/core/tactical.ts:defendCamps
+    - gpu/core/sim_tactics.py:_tac_camp_strike
+  readings:
+    - "C-95: the camp defender's strike, a captured civilian's dead target, a lone DEFENDER out of Pillage"
+    - "C-95: the camp defender's strike, a captured civilian's dead target, a lone DEFENDER out of Pillage — READ (0x772940, 0x779010, 0x774e90, 0x779240 at 0x7792be..0x7792da, 0x775340 at 0x77551e..0x775534, 0x791470 at 0x79174a..0x791756), both twins"
+  review: reviewed
 - addr: 0x773030
   final: 0x505020
   kind: function
@@ -392,11 +416,13 @@
     - cpu/core/tactical.ts:moveToSafety
     - cpu/core/tactical.ts:plunderTraders
     - cpu/core/units.ts:fortifyOrder
+    - cpu/core/tactical.ts:defendCamps
   readings:
     - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
     - "C-95: the danger map and Move to Safety — READ, ported"
     - "C-123 / C-95: the Plunder Trade Route command and the AI's plunder after the move — READ (0x89dae0, 0x89dfc0, 0x9555a0, 0x9559a0, 0x5545e0 at 0x554667 / 0x554d4c, 0x58fc20, 0x7746a0, 0x70a440, 0x771f80 at 0x7722b6 / 0x77254e / 0x77277f, 0x776140 at 0x776424..0x776470), both twins"
     - "C-110: the Fortify order and its ticks; the heal's plot gate — READ"
+    - "C-95: the camp defender's strike, a captured civilian's dead target, a lone DEFENDER out of Pillage — READ (0x772940, 0x779010, 0x774e90, 0x779240 at 0x7792be..0x7792da, 0x775340 at 0x77551e..0x775534, 0x791470 at 0x79174a..0x791756), both twins"
   context:
     - "...lot this turn (0x775340, 1 turn) go for it (0x7746a0): each that can act moves onto it (0x773fb0, its Movement kept) and plunders (PLUNDER_TRADE_ROUTE 0x955950), its turn done, until o..."
   review: reviewed
@@ -472,14 +498,21 @@
 - addr: 0x774e90
   final: 0x506ec0
   kind: function
-  semantics: the units of an AI type within a number of turns of a plot.
-  status: PARTLY
+  semantics: "the first unit of the list (+0x240) whose turn is not done (+0x530), of the AI type asked (its own +0x1c0, or one its type holds, 0x79cb30; -1 any), whose planning holds the plot within the turns (0x791300; one with no planning by its formation's path 0x2726b0): the move's list (+0x270) reset to it alone at 0x774f84..0x774ff2."
+  status: READ
+  cases:
+    - recording: h1_duelq1128
+      turn: 31
+      value: "one \"Barb. Camp Defense\" row a camp, the Spearman 589832's for 30:6"
   impl:
-    - cpu/core/tactical.ts:WANDER_CAMP_RANGE
+    - cpu/core/tactical.ts:DEFEND_CAMP_TURNS
     - cpu/core/tactical.ts:defendCamps
     - gpu/core/sim_tactics.py:_AI_DEFENDER
-  readings: ["C-95: the tactical pass — READ (the barbarians' moves; the minors share it)"]
-  notes: ["imported: READ in its section, no confirming case found beside it"]
+    - cpu/core/tactical.ts:WANDER_CAMP_RANGE
+  readings:
+    - "C-95: the tactical pass — READ (the barbarians' moves; the minors share it)"
+    - "C-95: the camp defender's strike, a captured civilian's dead target, a lone DEFENDER out of Pillage"
+    - "C-95: the camp defender's strike, a captured civilian's dead target, a lone DEFENDER out of Pillage — READ (0x772940, 0x779010, 0x774e90, 0x779240 at 0x7792be..0x7792da, 0x775340 at 0x77551e..0x775534, 0x791470 at 0x79174a..0x791756), both twins"
   context:
     - "...9010): each TARGET_BARBARIAN_CAMP target, the units of AI type DEFENDER within 3 turns (0x774e90), the nearest moved to the camp (\"Barb. Camp Defense\", AT the camp). The engines take t..."
   review: reviewed
@@ -505,6 +538,9 @@
   semantics: "the units whose planning holds the target within two turns (one with a range at exactly its range, Movement left asked where GetRangedCombat is above 0, 0x7754c7..0x7754e0: none of a siege unit, its Bombard alone); a DEFENDER on its own plot. With its fifth argument (Attack Units for a target not HIGH) a unit with no range and no bombard strength on a district that defends (DistrictInfo +0x58 / +0x5c: a city's centre, an Encampment) is left out (0x77541f..0x7754ab); the list sorted by 0x76f210 on +8, -1 for every entry."
   status: READ
   cases:
+    - recording: h1_duelq1128
+      turn: 38
+      value: "Pillage's list for the Farm on 32:10 holds no unit: the lone DEFENDER Spearman 589832 is held (0x77551e..0x775534) and never listed"
     - recording: h1_duelp1121
       turn: 183
       value: the camp's DEFENDER Spearman 1376265 goes in behind the Line Infantry 4653085 its move already finished
@@ -523,7 +559,9 @@
     - gpu/core/sim_tactics.py:_tac_attack_units
     - cpu/core/tactical.ts:R
     - cpu/core/tactical.ts:moves
+    - gpu/core/sim_tactics.py:live
   readings:
+    - "C-95: the camp defender's strike, a captured civilian's dead target, a lone DEFENDER out of Pillage"
     - "C-110 / C-99: a placement resets the fortification, a struck SENTRY wakes, a siege striker asks no Movement — READ (0x586d40 at 0x587789, 0x20d280 at 0x20d5ce, 0x775340 at 0x7754c7), both twins"
     - "C-95: the tactical pass — READ (the barbarians' moves; the minors share it)"
     - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
@@ -533,6 +571,7 @@
     - "C-95: the full search sets out on the formation's least Movement, a major's formations from the log, a tactical move walks its own done units — READ (0x26eea0, 0x266660, 0x262cd0, 0x770ce0 at 0x770d30..0x771097, 0x77d180, 0x775340, 0x771f80 at 0x7723cb / 0x772663, 0x77a810, 0x774380), both twins"
     - "C-125 / C-99: the attack assignment's stacking block is by formation class; a garrison on a defending district is no striker against a target not HIGH — READ (0x776140 at 0x776890..0x776909, 0x8bcd0, 0x775340 at 0x77541f..0x7754ab, 0x7784b0 at 0x7785ad, 0x61ddb0 at 0x61de20..0x61de2f), both twins"
     - "C-99: the attack assignment's ties go to the earlier striker — READ (0x776140 -> 0x8b5bf0 -> 0x629480 -> 0x616570 -> 0x61ddb0 at 0x61de20..0x61de39, 0x775340 -> 0x76f210 -> 0x76f5c0 -> 0x76efc0 at 0x76f000..0x76f00f), no port"
+    - "C-95: the camp defender's strike, a captured civilian's dead target, a lone DEFENDER out of Pillage — READ (0x772940, 0x779010, 0x774e90, 0x779240 at 0x7792be..0x7792da, 0x775340 at 0x77551e..0x775534, 0x791470 at 0x79174a..0x791756), both twins"
   context:
     - "...rovement — the units of AI type EXPLORE or above whose planning reaches it this turn (0x775340, 1 turn) in pool order, none standing on a plot of the kind itself (0x774380), go to it..."
     - "...79240): each CIVILIAN target, the units whose planning holds its plot within two turns (0x775340: pool order, a strength to fight with, a DEFENDER held until another unit goes in; the..."
@@ -726,11 +765,21 @@
 - addr: 0x779010
   final: 0x50af60
   kind: function
-  semantics: "Defend Camps: each TARGET_BARBARIAN_CAMP target, the units of AI type DEFENDER within 3 turns (0x774e90), the nearest moved to the camp (\"Barb. Camp Defense\", AT the camp)."
-  status: PARTLY
-  impl: [cpu/core/tactical.ts:WANDER_CAMP_RANGE, cpu/core/tactical.ts:defendCamps]
-  readings: ["C-95: the tactical pass — READ (the barbarians' moves; the minors share it)"]
-  notes: ["imported: READ in its section, no confirming case found beside it"]
+  semantics: "Defend Camps: each TARGET_BARBARIAN_CAMP target, the first unit of AI type DEFENDER whose planning holds the camp within 3 turns (0x774e90), logged (\"Barb. Camp Defense\", AT the camp) and handed to the camp defender's mover 0x772940 with the camp's plot."
+  status: READ
+  cases:
+    - recording: h1_duelq1128
+      turn: 31-34
+      value: the camp 30:6's Spearman 589832, logged AT 30 6 each turn, ends on 31:7, on 33:8 (striking player 4's Archer 327680, CombatLog t32) and on 34:9
+  impl:
+    - cpu/core/tactical.ts:DEFEND_CAMP_TURNS
+    - cpu/core/tactical.ts:defendCamps
+    - gpu/core/sim_tactics.py:_tac_camp_strike
+    - cpu/core/tactical.ts:WANDER_CAMP_RANGE
+  readings:
+    - "C-95: the tactical pass — READ (the barbarians' moves; the minors share it)"
+    - "C-95: the camp defender's strike, a captured civilian's dead target, a lone DEFENDER out of Pillage"
+    - "C-95: the camp defender's strike, a captured civilian's dead target, a lone DEFENDER out of Pillage — READ (0x772940, 0x779010, 0x774e90, 0x779240 at 0x7792be..0x7792da, 0x775340 at 0x77551e..0x775534, 0x791470 at 0x79174a..0x791756), both twins"
   context:
     - ...IGH/MEDIUM/LOW_PRIORITY_UNIT), f2e10c Attack Civilians (0x779240), f2e120 Defend Camps (0x779010), f2e124 Attack Camps (0x778910), f2e130 Chase Target (0x775670 then 0x773030), f2e13...
     - "- Defend Camps (0x779010): each TARGET_BARBARIAN_CAMP target, the units of AI type DEFENDER within 3 turns (0x77..."
@@ -741,14 +790,19 @@
   semantics: "ATTACK CIVILIANS: each CIVILIAN target, the units whose planning holds its plot within two turns (0x775340; the sort 0x76f210 on +8, stable), go for it in order (0x773270)."
   status: PARTLY
   cases:
+    - recording: h1_duelq1128
+      turn: 25
+      value: "the raid's Slinger 1441812 takes player 1's Settler 458755 on 13:14 (a new unit, 2228251); the Warrior 2031630, two turns off, logs Wander: the target's unit handle (+0x10, 0x7792be..0x7792da) names a dead unit"
     - recording: h1_duely1127
       turn: 21
       value: "one row for player 1's Builder on 13:5, Available Units: 2, naming the Slinger 720905; both Slingers walk for it (14:5, 13:4)"
-  impl: [cpu/core/tactical.ts:attackCivilians]
+  impl: [cpu/core/tactical.ts:attackCivilians, cpu/core/tactical.ts:v]
   readings:
+    - "C-95: the camp defender's strike, a captured civilian's dead target, a lone DEFENDER out of Pillage"
     - "C-95: the tactical pass — READ (the barbarians' moves; the minors share it)"
     - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
     - "C-95: the embark rules for a formation that may embark, a district's zone unseen, a city's kill in the planning, a raised unit's AI type, a move order's attack spot — READ (0x530420, 0x530240, 0x52fe90 at 0x52fed4, 0x530f50 at 0x531168, 0x791470 at 0x791677, 0x79b9c0), FIT (the move order's attack spot), both twins"
+    - "C-95: the camp defender's strike, a captured civilian's dead target, a lone DEFENDER out of Pillage — READ (0x772940, 0x779010, 0x774e90, 0x779240 at 0x7792be..0x7792da, 0x775340 at 0x77551e..0x775534, 0x791470 at 0x79174a..0x791756), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ...dium/Low (0x7784b0 with TARGET_HIGH/MEDIUM/LOW_PRIORITY_UNIT), f2e10c Attack Civilians (0x779240), f2e120 Defend Camps (0x779010), f2e124 Attack Camps (0x778910), f2e130 Chase Target (...
@@ -855,10 +909,16 @@
   kind: function
   semantics: "Pillage District / Improvement: each target of the kind in the tactical target list (0x783980) on the ground of a player at war with them — a complete district but a city centre or an Encampment, else an unpillaged improvement — the units of AI type EXPLORE or above whose planning reaches it this turn (0x775340, 1 turn) in pool order, none standing on a plot of the kind itself (0x774380), go to it until one stands on it and pillages it."
   status: PARTLY
+  cases:
+    - recording: h1_duelq1128
+      turn: 38
+      value: the camp's Spearman 589832 (a DEFENDER) on 33:10, alone in reach of city-state 4's Farm on 32:10, logs Wander, ends on 32:10 and the Farm stands unpillaged in record 39
   impl: [cpu/core/tactical.ts:pillage, cpu/harness/replay.ts:cur, cpu/harness/replay.ts:Tactical]
   readings:
+    - "C-95: the camp defender's strike, a captured civilian's dead target, a lone DEFENDER out of Pillage"
     - "C-95: the tactical pass — READ (the barbarians' moves; the minors share it)"
     - "C-95: the full search sets out on the formation's least Movement, a major's formations from the log, a tactical move walks its own done units — READ (0x26eea0, 0x266660, 0x262cd0, 0x770ce0 at 0x770d30..0x771097, 0x77d180, 0x775340, 0x771f80 at 0x7723cb / 0x772663, 0x77a810, 0x774380), both twins"
+    - "C-95: the camp defender's strike, a captured civilian's dead target, a lone DEFENDER out of Pillage — READ (0x772940, 0x779010, 0x774e90, 0x779240 at 0x7792be..0x7792da, 0x775340 at 0x77551e..0x775534, 0x791470 at 0x79174a..0x791756), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ...0x773030), f2e134 Wander (0x77b580), f2e138 / f2e13c Pillage Improvement / District (0x77a810), f2e140 Plunder Trader (0x77aa20), f2e158 Wander Near Camp (0x77b9a0), f2e168 Coastal...

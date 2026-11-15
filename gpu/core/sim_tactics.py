@@ -2282,7 +2282,8 @@ class SimTactics:
         unit stands ("dealt", "taken" [N, E]; a civilian taken 150, a Trader
         or a religious unit 1.5 x its health), and per
         spot of a fighter its blow back on the unit standing there
-        ("back_taken", "back_dealt" [N, E, 6]); "wins" [N] a blow that kills."""
+        ("back_taken", "back_dealt" [N, E, 6]); "wins" [N] a blow that kills,
+        "kill" [N, E] a unit target's blow dealing its health at least."""
         dev = self.device
         N, T = rows.shape[0], self.T
         dk, uk, uo = tg["dk"][rows], tg["uk"][rows], tg["uo"][rows]
@@ -2330,6 +2331,7 @@ class SimTactics:
         back_t = torch.zeros(N, E, 6, dtype=torch.long, device=dev)
         back_d = torch.zeros(N, E, 6, dtype=torch.long, device=dev)
         wins = torch.zeros(N, dtype=torch.bool, device=dev)
+        kill = torch.zeros(N, E, dtype=torch.bool, device=dev)
         dslot = tg["uu"][rows].gather(1, tec)                         # [N, E] the target's unit
         job = (sn > 0) & other & (dslot >= 0)
         if bool(job.count_nonzero()):
@@ -2343,6 +2345,7 @@ class SimTactics:
             dealt[n_i, e_i] = dl
             taken[n_i, e_i] = tk
             wins[n_i[dl > hp]] = True
+            kill[n_i, e_i] = dl >= hp
             # the fighter's blow back on the unit standing on each spot
             fj = fight[n_i, tec[n_i, e_i]]
             k6 = torch.arange(6, device=dev).unsqueeze(0)
@@ -2388,7 +2391,7 @@ class SimTactics:
                 wins[dn_i[pick[kill]]] = True
                 left[pick] = False
         res.update({"tp": tp, "te": te, "civ": civ, "other": other, "dealt": dealt, "taken": taken, "back_taken": back_t,
-                    "back_dealt": back_d, "wins": wins})
+                    "back_dealt": back_d, "wins": wins, "kill": kill})
         return res
 
     def _plan_city_shots(self, pre: str, us: torch.Tensor, tgt: torch.Tensor, on: torch.Tensor,
@@ -2783,6 +2786,79 @@ class SimTactics:
         done0 = done.clone()
         alive = getattr(self, f"{pre}_unit_alive")
         return lambda: live() | (done & ~done0 & alive)
+
+    def _tac_camp_strike(self, has: torch.Tensor, u_b: torch.Tensor, camp: torch.Tensor, rowof: torch.Tensor,
+                         res: dict, tg: dict) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+        """THE CAMP DEFENDER'S STRIKE (`campStrike`, 0x772940) for the
+        defender `u_b` [B] of the camp `camp` [B] in the games `has`, over its
+        planning's targets in their order: [B] the target unit's global slot
+        (-1 none), the spot and the target's kind (6 TRADER, 8 RELIGIOUS, 3
+        HIGH). A TRADER or a religious unit on its own plot is taken while no
+        HIGH target holds a spot or nothing is yet chosen; a HIGH target's
+        spot within two turns that leaves the unit alive — the first, then
+        one dealing more than the choice, or the camp's own plot while the
+        choice stands off it — where the planning's one HIGH target falls to
+        the blow this turn, else a ranged unit's only on the camp, a melee
+        one's off the camp only while `out` holds and only where the blow
+        back deals nothing or the blow takes no more than the blow back
+        does. `out` opens as whether some target's first spot has a blow back
+        dealing nothing; each choice sets it to whether its spot is off the
+        camp."""
+        dev = self.device
+        B = self.B
+        bidx = torch.arange(B, device=dev)
+        pick = torch.full((B,), -1, dtype=torch.long, device=dev)
+        pspot = pick.clone()
+        pkind = torch.zeros(B, dtype=torch.long, device=dev)
+        if "te" not in res:
+            return pick, pspot, pkind
+        row = rowof[bidx, u_b]
+        on = has & (row >= 0)
+        r = row.clamp(min=0)
+        te, tp = res["te"][r], res["tp"][r]
+        tec = te.clamp(min=0)
+        ek = torch.where(te >= 0, tg["uk"].gather(1, tec), torch.zeros_like(te))
+        uu = torch.where(te >= 0, tg["uu"].gather(1, tec), torch.full_like(te, -1))
+        sn = res["spot_n"][r].long()
+        spot, sturn = res["spot"][r], res["spot_turns"][r]
+        dealt, taken = res["dealt"][r], res["taken"][r]
+        bt, bd = res["back_taken"][r], res["back_dealt"][r]
+        here = self.barb_unit_tile[bidx, u_b]
+        hp = self.unit_hp[bidx, u_b + self.POOL_LO["barb"]]
+        ranged = self._tac_range(bidx, u_b) > 0
+        highs = (ek == 3) & (sn > 0)
+        high_n = highs.sum(dim=1)
+        onplot = ((ek == 6) | (ek == 8)) & (tp == here.unsqueeze(1)) & (uu >= 0)
+        on = on & (highs | onplot).any(dim=1)
+        if not bool(on.count_nonzero()):
+            return pick, pspot, pkind
+        out = ((sn > 0) & (bd[:, :, 0] == 0)).any(dim=1)
+        best = torch.zeros(B, dtype=torch.long, device=dev)
+        for e in range(te.shape[1]):
+            k = ek[:, e]
+            tr = on & ((high_n == 0) | (pick < 0)) & onplot[:, e]
+            pick = torch.where(tr, uu[:, e], pick)
+            pspot = torch.where(tr, here, pspot)
+            pkind = torch.where(tr, k, pkind)
+            hi = on & ~tr & highs[:, e]
+            if not bool(hi.count_nonzero()):
+                continue
+            v = uu[:, e].clamp(min=0)
+            v_ok = (uu[:, e] >= 0) & self.unit_alive[bidx, v] & (self.unit_tile[bidx, v] >= 0)
+            kill1 = (high_n == 1) & res["kill"][r][:, e]
+            for s in range(6):
+                st = spot[:, e, s]
+                atc = st == camp
+                c = hi & (s < sn[:, e]) & (sturn[:, e, s] <= _PLAN_TURNS) & (bt[:, e, s] + taken[:, e] < hp)
+                c = c & ~((pick >= 0) & (dealt[:, e] <= best) & ~(out & atc))
+                good = torch.where(ranged, atc, (out | atc) & ((bd[:, e, s] == 0) | (taken[:, e] <= bt[:, e, s])))
+                c = c & ((kill1 & (sturn[:, e, s] == 1)) | good) & v_ok
+                pick = torch.where(c, uu[:, e], pick)
+                pspot = torch.where(c, st, pspot)
+                pkind = torch.where(c, torch.full_like(pkind, 3), pkind)
+                out = torch.where(c, ~atc, out)
+                best = torch.where(c, dealt[:, e], best)
+        return pick, pspot, pkind
 
     def _tac_attack_civilians(self, live, done: torch.Tensor, ai: torch.Tensor, reach_at, tg: dict,
                               order: torch.Tensor, npass: torch.Tensor) -> None:
@@ -4189,7 +4265,32 @@ class SimTactics:
             has, u_b = first_by_slot(cand)
             if not bool(has.count_nonzero()):
                 continue
-            self._tac_move_or_fortify(has, u_b, camp)
+            # unless its planning holds a strike it takes instead
+            # (`campStrike`): to that spot, then the Trader's plunder, the
+            # heretics' condemnation, its shot or the move onto the target
+            pick, pspot, pkind = self._tac_camp_strike(has, u_b, camp, rowof, res, tg)
+            st = has & (pick >= 0)
+            self._tac_move_or_fortify(has & ~st, u_b, camp)
+            if bool(st.count_nonzero()):
+                self._tac_move_to(st & (self.barb_unit_tile[bidx, u_b] != pspot), u_b, pspot)
+                up = st & self.barb_unit_alive[bidx, u_b] & (self.barb_unit_seat[bidx, u_b] == BARB_SEAT)
+                self._tac_plunder_cmd(up & (pkind == 6), u_b)
+                rl = up & (pkind == 8)
+                if bool(rl.count_nonzero()):
+                    gs = u_b + self.POOL_LO["barb"]
+                    c_ok, c_tc, c_rl = self._condemn_ok(BARB_SEAT, rl, gs)
+                    if bool(c_ok.count_nonzero()):
+                        self._condemn_heretic(BARB_SEAT, c_ok, c_tc, c_rl, gs)
+                pc = pick.clamp(min=0)
+                tt = self.unit_tile[bidx, pc]
+                hi = up & (pkind == 3) & self.unit_alive[bidx, pc] & (tt >= 0)
+                rng = self._tac_range(bidx, u_b)
+                at = self.barb_unit_tile[bidx, u_b].clamp(min=0)
+                fire = (hi & (rng > 0) & (self.pair_dist[at, tt.clamp(min=0)].to(torch.long) <= rng)
+                        & (self.barb_unit_mp[bidx, u_b] > 0) & (self.barb_unit_attacks[bidx, u_b] > 0))
+                for u in torch.unique(u_b[fire]).tolist():
+                    self._hostile_ranged_strike(fire & (u_b == u), tt.clamp(min=0), "barb", u)
+                self._tac_move_to(hi & (rng == 0), u_b, tt)
             done[bidx[has], u_b[has]] = True
 
         if rows.numel():
@@ -4222,6 +4323,14 @@ class SimTactics:
                 t = tiles[:, j]
                 active = j < ntg
                 last = torch.full((B,), -1, dtype=torch.long, device=dev)
+                # the list (0x775340): of the DEFENDERs ahead of the first
+                # other unit only the last goes in, and only with that unit
+                c0 = live() & (ai >= _AI_EXPLORE) & (reach_at(t) == 1) & active.unsqueeze(1)
+                isd = ai == _AI_DEFENDER
+                f0 = torch.where(c0 & ~isd, slotno, torch.full_like(slotno, BIG)).amin(dim=1, keepdim=True)
+                early = c0 & isd & (slotno < f0)
+                lastd = torch.where(early, slotno, torch.full_like(slotno, -1)).amax(dim=1, keepdim=True)
+                held = early & ((f0 >= BIG) | (slotno != lastd))
                 while bool(active.count_nonzero()):
                     rt = reach_at(t)
                     here = self.barb_unit_tile.clamp(min=0)
@@ -4231,7 +4340,7 @@ class SimTactics:
                     else:
                         stand = self.improvement.gather(1, here) >= 0
                     cand = (live() & (ai >= _AI_EXPLORE) & (rt == 1) & (slotno > last.unsqueeze(1))
-                            & (at_t | ~stand) & active.unsqueeze(1))
+                            & (at_t | ~stand) & active.unsqueeze(1) & ~held)
                     has, u_b = first_by_slot(cand)
                     if not bool(has.count_nonzero()):
                         break

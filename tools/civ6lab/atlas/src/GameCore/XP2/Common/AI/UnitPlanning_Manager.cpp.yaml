@@ -159,6 +159,7 @@
       value: "Operation City Attack leaves the hurt Cavalry 7012372 on 42:21 (33 hit points) out: the city's blow 22 and its shot on the spot top its health; the Cavalry 7143430 on 41:19 takes 42:21 at turn 2, as logged"
   impl:
     - cpu/core/tactical.ts:predictBlow
+    - cpu/core/tactical.ts:kills
     - gpu/core/sim_tactics.py:_tac_predict
     - cpu/core/combat.ts:damageExpected
     - cpu/core/tactical.ts:Spot
@@ -180,6 +181,7 @@
     - cpu/core/combat.ts:districtDamageLoss
     - gpu/core/sim_tactics.py:_UNSTACK_RANGE
   readings:
+    - "C-95: the camp defender's strike, a captured civilian's dead target, a lone DEFENDER out of Pillage"
     - "C-125: the planning's blow back where both blows would kill — READ, ported"
     - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
     - "C-95: the planning's spots and the combat prediction — READ, ported"
@@ -194,6 +196,7 @@
     - "C-95: a damaged centre defends at its wounded strength, the planning's city shot needs standing walls, the barbarians plan on the turn's unhealed centres — READ (0x51eaf0, 0x791470 at 0x79181c..0x791827 -> 0x249ee0 / 0x24b960), both twins; the replay's barbarian copy"
     - "C-125 / C-99: the attack assignment's stacking block is by formation class; a garrison on a defending district is no striker against a target not HIGH — READ (0x776140 at 0x776890..0x776909, 0x8bcd0, 0x775340 at 0x77541f..0x7754ab, 0x7784b0 at 0x7785ad, 0x61ddb0 at 0x61de20..0x61de2f), both twins"
     - "C-123 / C-125: Coastal Raid's queue walks on, a raid ends the raider's moves; Attack Units' targets keep one the pass killed — READ (0x7735d0, 0x95b100, 0x95b7c0, 0xa4fbc0 at 0xa501e2..0xa502e6, 0x5218f0, 0x76eb50, 0x776140 at 0x776333 -> 0x7765e4), both twins"
+    - "C-95: the camp defender's strike, a captured civilian's dead target, a lone DEFENDER out of Pillage — READ (0x772940, 0x779010, 0x774e90, 0x779240 at 0x7792be..0x7792da, 0x775340 at 0x77551e..0x775534, 0x791470 at 0x79174a..0x791756), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...each unit's spots per target from its planning (turns, the planning's combat simulation 0x791470: the damage dealt +0x64, received +0x7c, and against a counterattack +0x94 / +0xac); fo..."

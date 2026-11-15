@@ -1730,12 +1730,14 @@ export interface Spot {
 
 /** One planning target (the planner's 0xd0 entries): the list's target, its
  *  spots (six at most) and the predicted blow from where the unit stands
- *  (0x791470): the damage dealt and taken. */
+ *  (0x791470): the damage dealt and taken, and whether the blow dealt the
+ *  target's health at least as the planning ran (the kill byte +0xc4). */
 export interface PlanEntry {
   target: Target;
   spots: Spot[];
   dealt: number;
   taken: number;
+  kills: boolean;
 }
 
 /** A unit's planning (AI Unit Planning 0x792c90): its reach, its targets,
@@ -1836,7 +1838,7 @@ export function planUnit(state: GameState, unit: Unit, targets: readonly Target[
   const entries: PlanEntry[] = [];
   for (const e of targets) {
     if (plotDistance(state, unit.tileIndex, e.tile) > lim) continue;
-    entries.push({ target: e, spots: [], dealt: 0, taken: 0 });
+    entries.push({ target: e, spots: [], dealt: 0, taken: 0, kills: false });
   }
   const { tiles } = state.map;
   const water = (p: number) => isWater(tiles[p]);
@@ -1923,6 +1925,7 @@ export function planUnit(state: GameState, unit: Unit, targets: readonly Target[
     E.dealt = E.target.type === 'CIVILIAN' ? CIVILIAN_TAKEN
       : E.target.type === 'RELIGIOUS' || E.target.type === 'TRADER' ? Math.trunc(healthOf(v) * RELIGIOUS_TAKEN) : blow.dealt;
     E.taken = blow.taken;
+    E.kills = E.dealt >= healthOf(v);
     if (E.dealt > healthOf(v)) wins = true;
     if (!FIGHTER_TARGET.has(E.target.type)) continue;
     const at = unit.tileIndex;
@@ -2320,23 +2323,94 @@ const onList = (state: GameState, pass: Pass, u: Unit) => !(pass.listedFrom ?? p
 /**
  * DEFEND CAMPS (0x779010): each camp in plot order, the first DEFENDER in
  * pool order whose planning reaches it within 3 turns (0x774e90) goes to it
- * ("Barb. Camp Defense"), its turn done.
+ * ("Barb. Camp Defense"), its turn done — unless its planning holds a
+ * strike it takes instead (`campStrike`): then it moves to that spot, its
+ * moves kept (0x773fb0, the flag set), and plunders the Trader or condemns
+ * the heretics on its plot, shoots the target (0x964a40) or goes for the
+ * target's plot with the attack flag (0x962190, flag 0x10)
+ * (runs/h1_duelq1128 t31-34: the Spearman 589832 of the camp 30:6 goes out
+ * to 31:7, to 33:8 striking player 4's Archer, and on to 34:9 under "Barb.
+ * Camp Defense" rows AT 30:6).
  */
 function defendCamps(state: GameState, pass: Pass): void {
   for (const camp of [...state.barbSeat.camps].sort((a, b) => a - b)) {
     const u = pass.units.find((x) => live(state, pass, x) && pass.ai.get(x.id) === AI_DEFENDER
       && !!pass.reach.get(x.id)?.some((e) => e.tile === camp && e.turns <= DEFEND_CAMP_TURNS));
     if (!u) continue;
-    moveOrFortify(state, pass, u, camp);
+    const s = campStrike(state, pass, u, camp);
+    if (!s) moveOrFortify(state, pass, u, camp);
+    else {
+      if (s.spot !== u.tileIndex) moveTo(state, u, s.spot);
+      if (state.units.includes(u)) {
+        if (s.kind === 'TRADER') plunderTrader(state, u);
+        else if (s.kind === 'RELIGIOUS') condemnHeretic(state, u);
+        else if (rangeOf(u) > 0) {
+          if (state.units.includes(s.unit) && plotDistance(state, u.tileIndex, s.unit.tileIndex) <= unitAttackRange(u)
+            && u.movesLeft > 0 && attacksLeftOf(u) > 0) hostileRangedStrike(state, u, s.unit.tileIndex);
+        } else if (state.units.includes(s.unit)) moveTo(state, u, s.unit.tileIndex);
+      }
+    }
     finish(pass, u, 'Barb. Camp Defense', camp);
   }
+}
+
+/**
+ * THE CAMP DEFENDER'S STRIKE (0x772940 over its planning's targets, in
+ * their order), null where it takes none:
+ *  - a TRADER or a religious unit on its own plot is taken while no HIGH
+ *    target holds a spot or nothing is yet chosen;
+ *  - a HIGH target's spot within two turns that leaves the unit alive (the
+ *    blow's and the blow back's damage under its health): the first one,
+ *    then one dealing more than the choice, or the camp's own plot while the
+ *    choice stands off it. A spot is good where the planning's one HIGH
+ *    target falls to the blow this turn; else a ranged unit's only on the
+ *    camp, a melee one's off the camp only while `out` holds, and only where
+ *    the blow back deals nothing or the blow takes no more than the blow
+ *    back does.
+ * `out` opens as whether some target's first spot has a blow back dealing
+ * nothing; each choice sets it to whether its spot is off the camp.
+ */
+function campStrike(state: GameState, pass: Pass, u: Unit, camp: number): { unit: Unit; spot: number; kind: TargetType } | null {
+  const entries = pass.plan.get(u.id)?.entries ?? [];
+  const high = entries.filter((E) => E.target.type === 'HIGH' && E.spots.length > 0).length;
+  let out = entries.some((E) => E.spots.length > 0 && E.spots[0].backDealt === 0);
+  const ranged = rangeOf(u) > 0;
+  let pick: { unit: Unit; spot: number; kind: TargetType } | null = null;
+  let best = 0;
+  for (const E of entries) {
+    const ty = E.target.type;
+    if ((high === 0 || !pick) && (ty === 'TRADER' || ty === 'RELIGIOUS') && E.target.tile === u.tileIndex && E.target.unit) {
+      pick = { unit: E.target.unit, spot: u.tileIndex, kind: ty };
+      continue;
+    }
+    if (ty !== 'HIGH') continue;
+    const v = targetUnit(state, E.target);
+    for (const s of E.spots) {
+      if (s.turns > PLAN_TURNS) continue;
+      if (s.backTaken + E.taken >= healthOf(u)) continue;
+      if (pick && E.dealt <= best && !(out && s.tile === camp)) continue;
+      const kills = high === 1 && E.kills && s.turns === 1;
+      if (!kills) {
+        if (ranged ? s.tile !== camp : !out && s.tile !== camp) continue;
+        if (!ranged && s.backDealt !== 0 && E.taken > s.backTaken) continue;
+      }
+      if (!v || !onMap(v)) continue;
+      pick = { unit: v, spot: s.tile, kind: ty };
+      out = s.tile !== camp;
+      best = E.dealt;
+    }
+  }
+  return pick;
 }
 
 /**
  * PILLAGE (0x77a810, Pillage District then Pillage Improvement): each
  * PASSIVE_DISTRICT target of the list, then each IMPROVEMENT one (0x783980),
  * still pillageable, in the list's order: the units in pool order whose
- * planning reaches it this turn (0x775340 for 1 turn) and that do not stand on such a
+ * planning reaches it this turn (0x775340 for 1 turn: a DEFENDER listed
+ * only ahead of another unit, 0x77551e..0x775534; runs/h1_duelq1128 t38 the
+ * camp's Spearman 589832 on 33:10, alone in reach of city-state 4's Farm on
+ * 32:10, wanders onto it and leaves it whole) and that do not stand on such a
  * plot themselves (0x774380) go there, each one's turn done, until one stands
  * on it and pillages it (`hostilePillage`). Both log "Pillage Improvement"
  * (AI_Tactical.csv: 158 of its rows target a PASSIVE_DISTRICT under that
@@ -2353,9 +2427,22 @@ function pillage(state: GameState, pass: Pass, districts: boolean): void {
       ? t.district !== null && t.district !== 'CITY_CENTER' && t.district !== 'ENCAMPMENT' && t.districtComplete && !t.districtPillaged
       : t.improvement !== null && !t.pillaged && !!IMPROVEMENTS[t.improvement as ImprovementId];
     if (!ok) continue;
+    // the list (0x775340): a camp's DEFENDER goes in only before another unit
+    const list: Unit[] = [];
+    let held: Unit | null = null;
     for (const u of pass.units) {
       if (!live(state, pass, u) || pass.ai.get(u.id) === undefined || pass.ai.get(u.id)! < AI_EXPLORE) continue;
       if (!pass.reach.get(u.id)?.some((e) => e.tile === t.index && e.turns <= 1)) continue;
+      if (pass.ai.get(u.id) === AI_DEFENDER && !list.length) {
+        held = u;
+        continue;
+      }
+      if (held) list.push(held);
+      held = null;
+      list.push(u);
+    }
+    for (const u of list) {
+      if (!live(state, pass, u)) continue;
       if (u.tileIndex !== t.index) {
         const here = map.tiles[u.tileIndex];
         if (!districts && here.improvement !== null) continue;
@@ -2592,7 +2679,11 @@ function attackCivilians(state: GameState, pass: Pass): void {
   pass.listedFrom = new Set(pass.done);
   for (const e of pass.targets) {
     const v = e.unit;
-    if (e.type !== 'CIVILIAN' || !v || !state.units.includes(v)) continue;
+    // the target's unit by its id, standing (0x7792be..0x7792da): a civilian
+    // the pass has captured is a new unit, its entry's a dead one
+    // (runs/h1_duelq1128 t25: the raid's Slinger 1441812 takes player 1's
+    // Settler on 13:14, the Warrior 2031630 two turns off wanders)
+    if (e.type !== 'CIVILIAN' || !v || !state.units.includes(v) || v.seat !== e.seat) continue;
     const at = v.tileIndex;
     const cands = reachers(state, pass, at, PLAN_TURNS);
     if (!cands.length) continue;

@@ -57,7 +57,7 @@
   kind: function
   semantics: a move order with flags. The homeland's move order onto a target's plot (Plunder Trader).
   status: PARTLY
-  impl: [cpu/core/tactical.ts:homelandPlunder]
+  impl: [cpu/core/tactical.ts:homelandPlunder, cpu/core/tactical.ts:defendCamps]
   readings:
     - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
     - "C-95: Coastal Raid — READ, ported"
@@ -67,6 +67,7 @@
     - "C-101 / C-95: the attack carried out condemns a religious target's heretics, a move order walks onto a religious unit's plot — READ (0x771f80 at 0x772331 / 0x7725c9 / 0x7727fa, 0x776140 at 0x776424..0x776470 / 0x777045, 0x947dd0, 0x89c6f0, 0x89cc00), both twins"
     - "C-123 / C-95: a Trader stands on the trade layer; a city's shot is a COMBAT_DISTRICT spot's blow back — READ (0x901e0, 0x586360 -> 0x208b80, 0x585eb0 -> 0x585d90, 0x791470 at 0x7917f7..0x7918f7 -> 0x249ee0 / 0x205720, 0x776140 at 0x776780..0x7767fa), both twins"
     - "C-123 / C-125: Coastal Raid's queue walks on, a raid ends the raider's moves; Attack Units' targets keep one the pass killed — READ (0x7735d0, 0x95b100, 0x95b7c0, 0xa4fbc0 at 0xa501e2..0xa502e6, 0x5218f0, 0x76eb50, 0x776140 at 0x776333 -> 0x7765e4), both twins"
+    - "C-95: the camp defender's strike, a captured civilian's dead target, a lone DEFENDER out of Pillage — READ (0x772940, 0x779010, 0x774e90, 0x779240 at 0x7792be..0x7792da, 0x775340 at 0x77551e..0x775534, 0x791470 at 0x79174a..0x791756), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...for it in order (0x773270): each that can act (0x56c690) takes the move order onto it (0x962190, flag 0x10), a unit with no ranged or bombard strength then done (0x56d6f0, 0x570b40,..."

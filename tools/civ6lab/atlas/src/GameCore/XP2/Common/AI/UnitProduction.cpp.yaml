@@ -219,7 +219,9 @@
     - recording: 1124
       turn: 17
       value: "The logged moves agree in form (1124 t17: 3:9 ->   3:9, 3:13 -> 3:11 around a held rally 3:10)."
-  readings: ["C-97: the behaviour trees — READ (the interpreter), the nodes PARTLY READ"]
+  readings:
+    - "C-97: the behaviour trees — READ (the interpreter), the nodes PARTLY READ"
+    - "C-95: the camp defender's strike, a captured civilian's dead target, a lone DEFENDER out of Pillage — READ (0x772940, 0x779010, 0x774e90, 0x779240 at 0x7792be..0x7792da, 0x775340 at 0x77551e..0x775534, 0x791470 at 0x79174a..0x791756), both twins"
   context:
     - "...0 for a unit in a formation (+0x1fb8 +0x738 above 1) or carrying the node's Leader Tag (0x79cb30); at least 1 where the goal is barred — no path (0x586360), a visible enemy unit there..."
   review: reviewed
