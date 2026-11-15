@@ -17296,3 +17296,60 @@ terrain half (sim_masks.py), `jumpMadeAnew`'s twin (sim_minors.py);
   unread; Operation Move logs the Catapult after Garrison City's candidate
   branch took its turn (0x570b40 at 0x8111d7), where the engines' movers
   leave a unit whose turn is done out.
+
+## C-95 / C-134 / C-125: a raised unit's planning, a Trader's districts at peace, a civilian's district at war, a captive's first owner, the meteor site's goody — READ (0x792c90, 0x586360 at 0x5865e7..0x5865fd / 0x58666a..0x5866c7 / 0x586729..0x586733, 0x26e570 at 0x26e5e2..0x26e6c4, 0x2720a0 at 0x272434..0x272544, 0x82d90, 0x212500 at 0x212825..0x2128f3), LAB (the aiunits plannings), both twins
+
+`tacticalPass` and `refreshBarbarians` (cpu/core/tactical.ts), `_tac_pass`
+(gpu/core/sim_tactics.py) and `_barb_reset_mp` (gpu/core/sim_orders.py);
+`enterable`'s `borderless`, `groundOf`'s `attack` (cpu/core/tactical.ts),
+`_tac_search`'s `pf_b` and `weak` arms (sim_tactics.py); `goodyPlot`
+(tactical.ts: `tacticalTargets`, `exploreTarget`), `_tac_targets`' goody and
+`_tac_explore_counts`' hut (sim_tactics.py); the replay's unit memory
+(cpu/harness/replay.ts `UNIT_MEMORY`, the captive's first owner now the
+log's `History.captives` alone).
+
+- A RAISED UNIT'S PLANNING: the planning (0x792c90) runs for every unit of
+  the barbarians as their pass opens, a unit their camps raised in the turn
+  among them, which stands at Movement 0 and plans from its full Movement as
+  any other (the planning's search sets out on the formation's GetMaxMoves);
+  no move of the pass takes it (duels1135 t8 the Warrior 589832 raised on
+  13:8 at 0, planned 13:8/1/512 .. 14:10/2/256; plan.unit 29 -> 0 to t40 on
+  1135, 51 -> 0 on 1134 to t79, 37 -> 0 on 1133 to t99).
+- A TRADER'S DISTRICTS AT PEACE: the location test's owner branch
+  (0x586360 at 0x5865e7..0x5865fd: the type's +0x1b9 bit 0x40 MakeTradeRoute,
+  +0x1ba bit 2 the Spy) skips the war test, the border test and the peace
+  district test (0x58666a..0x5866c7) whole: another player's centre or
+  Encampment at peace with a formation of Traders or Spies bars it no plot;
+  the closed ground's parent test (0x2720a0 at 0x272618..0x272689) still lets
+  no step leave it (duels1134 t37 city-state 4's Trader 589830 on 7:11 plans
+  player 1's centre 7:12 at (1/256), nothing past it).
+- A CIVILIAN'S DISTRICT AT WAR: the location test passes a unit with no
+  strength onto a district of hit points at war (0x586729..0x586733), which
+  the breadth-first searches' valid wrapper makes an attack whatever the
+  mover (0x26e570 at 0x26e5e2..0x26e6c4: its Movement spent); the validity
+  links a formation with no fighter (+0x1f8 clear, 0x272434) onto no child
+  whose +0x51 & 0x34 is set (0x272528..0x272544: a city, a district or a unit
+  at war on a plot the player sees now), so the attack stands only out of
+  the player's sight (duels1133 t43 the barbarians' captive Builder 1900564
+  on 10:3 lists player 1's unseen centre 7:5 at (2/0); duels1142 t100 the
+  Builder 3670047 on 34:8 lists nothing of player 1's centre 32:7 in their
+  sight).
+- A CAPTIVE'S FIRST OWNER: the importer reads it from the log's UnitCaptured
+  row (`History.captives`); a captive the barbarians took in their own turn
+  is the record's new unit in the replay, so the engine's copy of it held
+  none and its carry erased the importer's (duels1142 t67 the Builder
+  2949146 taken from player 1, alone from t82 on 41:14, embarks by player 1's
+  Shipbuilding: the game lists the water about it, 167 unit-turns).
+- THE METEOR SITE IS A GOODY: the target list's and HL Explore's goody test
+  (0x82d90) reads Improvements.Goody, true for IMPROVEMENT_METEOR_GOODY as for
+  the village (duels1154 t6-t10 the barbarians' list holds the meteor site
+  4:10 as TARGET_GOODY_HUT; targets 58 -> 6 to t59 on 1154).
+- OPEN: what [rsp + 0xd0] of the validity (0x2720a0) is, under which the
+  no-fighter refusal is waived; the refusal for a seen unit at war, which
+  the engines take as a listing fit (`groundOf`'s stand) and not as a
+  refused link; a captive that has moved this turn lists no water though its
+  formation may embark (duels1142 t74-81 the Builder 2949146, m_bHasMoved
+  set, against t82 on); the Great General's aura by its era
+  (AOE_*_REQUIREMENTS, REQUIREMENT_UNIT_ERA_TYPE_MATCHES: duels1165 t130
+  player 1's Bombard 4063258 beside its General plans on 2 Movement, the
+  engines 3).

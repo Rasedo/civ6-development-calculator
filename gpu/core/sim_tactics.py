@@ -896,6 +896,14 @@ class SimTactics:
                 if dest is not None:
                     open_n = open_n & (torch.arange(T, device=dev).unsqueeze(0) != dest.unsqueeze(1))
                 ent_n = ent_n | open_n
+        # a formation of Traders or Spies skips the location test's owner
+        # branch whole (`enterable`'s borderless): another player's centre or
+        # Encampment at peace with it bars it no plot
+        pf_b = None
+        if bool(free_b.count_nonzero()):
+            pf_b = free_b.unsqueeze(1) & self._tac_peace_fort(seat)[rows]
+            land_b, wat_b = self._tac_enter(seat, False, plain_civ=not zoc and not stand, foes_seen=zoc, closed=False, forts=False)
+            ent_n = ent_n | (pf_b & torch.where(naval.unsqueeze(1), wat_b[rows], land_b[rows] | (wat_b[rows] & placed.unsqueeze(1))))
         ent_n = ent_n & ~cl_n
         water_n = self.water[rows]
         # the plots each unit attacks into (`groundOf`'s attack): an enemy
@@ -927,6 +935,19 @@ class SimTactics:
                 fort_d = fort_d | (self.district == self._encamp_didx)
             fort_w = fort_d & (self.tile_seat >= 0) & (self.tile_seat != seat) & self._seats_hostile(seat, self.tile_seat)
             atk_n = atk_n & ~(shoots.unsqueeze(1) & fort_w[rows])
+        if not zoc:
+            # a formation with no strength at all: the location test passes it
+            # onto a district of hit points at war, which the breadth-first
+            # searches' valid wrapper makes an attack whatever the mover, on a
+            # plot the player does not see now (`groundOf`'s attack)
+            weak = ~fights & ~shoots
+            if bool(weak.count_nonzero()):
+                fort_v = self._centre_plane()
+                if self._encamp_didx >= 0:
+                    fort_v = fort_v | (self.district == self._encamp_didx)
+                fort_v = (fort_v & (self.tile_seat >= 0) & (self.tile_seat != seat) & self._seats_hostile(seat, self.tile_seat)
+                          & ~self._barb_seen("barbarians" if seat == BARB_SEAT else seat))
+                atk_n = atk_n | (weak.unsqueeze(1) & fort_v[rows] & ~ent_n & ~cl_n)
         if rv_n is not None:
             # a plot the player never revealed is entered, never attacked into
             # — but in the breadth-first searches (the valid wrapper 0x26e570
@@ -1648,6 +1669,9 @@ class SimTactics:
         if rv_n is not None:
             land_f, wat_f = self._tac_enter(seat, False, foes=False)
             fits = rv_n | torch.where(naval.unsqueeze(1), wat_f[rows], land_f[rows] | (wat_f[rows] & placed.unsqueeze(1)))
+            if pf_b is not None:
+                land_fb, wat_fb = self._tac_enter(seat, False, foes=False, forts=False)
+                fits = fits | (pf_b & torch.where(naval.unsqueeze(1), wat_fb[rows], land_fb[rows] | (wat_fb[rows] & placed.unsqueeze(1))))
         if not zoc:
             stand = stand & fits
         if listed and not zoc:
@@ -2476,7 +2500,9 @@ class SimTactics:
             camp.scatter_(1, cp.clamp(min=0), cp >= 0)
             # the scatter's clamped -1 slots land on plot 0: put it back
             camp[:, 0] = (cp == 0).any(dim=1)
-        goody = self.tile_goody.bool() if self.tile_goody.dtype != torch.bool else self.tile_goody
+        # a goody (0x82d90, Improvements.Goody): the village's and the meteor
+        # site's (`goodyPlot`)
+        goody = (self.tile_goody.bool() if self.tile_goody.dtype != torch.bool else self.tile_goody) | self.tile_meteor
         rest = seen & ~combat & ~fight
         okk = torch.zeros_like(ts)
         oss = none.clone()
@@ -4567,8 +4593,10 @@ class SimTactics:
         treg = self._tac_seen_regions(BARB_SEAT)
         # the planning: the reach of two turns, no zones of control, and the
         # targets' spots and predicted blows, for every unit of the player
-        # (0x792c90): its civilians and support units read it for their safe plot
-        want = live()
+        # (0x792c90): its civilians and support units read it for their safe
+        # plot; a unit raised this turn too, from its full Movement, none of
+        # the pass's moves
+        want = live() | (self.barb_unit_alive & (self.barb_unit_seat == BARB_SEAT) & ~acting & (self.barb_unit_tile >= 0))
         rows, slots = want.nonzero(as_tuple=True)
         rowof = torch.full((B, P), -1, dtype=torch.long, device=dev)
         if rows.numel():
@@ -4914,7 +4942,7 @@ class SimTactics:
             disk = self._los_disk(rows[n_i], t_i, sight, torch.zeros_like(n_i, dtype=torch.bool))
             # a goody hut on the plot counts nothing and flags no route
             # (0x70a6c0 at 0x70a746: 0x82d90)
-            hut = self.tile_goody[rows[n_i], t_i]
+            hut = self.tile_goody[rows[n_i], t_i].bool() | self.tile_meteor[rows[n_i], t_i]
             v1[n_i, t_i] = torch.where(hut, 0, (disk & ~revealed[rows[n_i]]).sum(dim=1))
             v2[n_i, t_i] = (disk & ~seen_now[rows[n_i]]).sum(dim=1)
             route = self.road | self.railroad

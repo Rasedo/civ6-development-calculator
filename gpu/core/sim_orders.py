@@ -1971,14 +1971,15 @@ class SimOrders:
         (`_full_mp`, which reads the barbarians' own research for the
         Mathematics rung) — a unit that stood as the turn opened (`stood`
         [B, P]) to its Movement then (`opened` [B, P], before their rules
-        grant the turn's techs) — and its `attacksLeft` to `attacksPerTurn`.
+        grant the turn's techs), one their camps raised since to none — and
+        its `attacksLeft` to `attacksPerTurn`.
         The hostile pool also holds the Free Cities' units, which are no
         barbarians and keep theirs.
         """
         barb = self.barb_unit_seat == BARB_SEAT
         f = self._full_mp("barb")
         if opened is not None:
-            f = torch.where(stood, opened, f)
+            f = torch.where(stood, opened, torch.zeros_like(f))
         self.barb_unit_mp_full.copy_(torch.where(barb, f, self.barb_unit_mp_full))
         self.barb_unit_mp.copy_(torch.where(barb, f, self.barb_unit_mp))
         self.barb_unit_attacks.copy_(torch.where(barb, self._full_attacks("barb"), self.barb_unit_attacks))
@@ -2001,7 +2002,7 @@ class SimOrders:
             BARB_SEAT, torch.ones(self.B, self.T, dtype=torch.bool, device=self.device))
         self._barbarian_rules()
         self._barb_slots()
-        # a unit the rules raised takes its own full Movement
+        # a unit the rules raised holds no Movement this turn
         self._barb_reset_mp(opened, acting)
         self._barbarian_tactics(acting)
         self._barb_slots_dying()

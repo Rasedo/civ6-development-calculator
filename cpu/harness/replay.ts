@@ -1476,7 +1476,7 @@ function barbarianAi(ctx: Ctx, b: TurnRecord, closing: number, before: ReadonlyS
   for (const c of copy.units) {
     if (!UNITS[c.type]?.naval && !waterWalks(c.type) && unitDomain(c.type) !== 'air' && unitDomain(c.type) !== 'spy') c.embarked = embarksOn(copy.map.tiles[c.tileIndex]) || undefined;
   }
-  refreshBarbarians(copy, opened);
+  refreshBarbarians(copy, opened, acting);
   // the AI's "Random Direction" draws are the game's: the barbarians take the
   // turn's last ones, one a Wander row of the game's tactical log in its
   // order; a unit the game wandered draws its own, one it did not runs free
@@ -6051,7 +6051,7 @@ function turnSeed(rec: TurnRecord): number | undefined {
  * Food focus, trade list and value, the city-states it met, UNITS and BUILDINGS tables, resource counts, economic
  * memory (savings), threat, enemy at the gates, growth forecast, revealed
  * plots, standing army's lack, "Upgrade Units" trees, unit list and its standing army's members as its last end of turn left them. Per Free City: its threat, enemy at the gates
- * and raid; per major's city its trade list. Per unit: its id, its pool slot, its DEFENDER type, its formation, the player a capture took it from, its look, the Movement it carries for life (`mpBonus`: a Great Person's grant, its training city's). The
+ * and raid; per major's city its trade list. Per unit: its id, its pool slot, its DEFENDER type, its formation, its look (the player a capture took it from is the log's, `History.captives`: runs/h1_duels1142 t67 the barbarians' Builder 2949146 taken from player 1 in their own turn embarks by player 1's technologies), the Movement it carries for life (`mpBonus`: a Great Person's grant, its training city's). The
  * barbarians' tribes (their clocks, raids, scouts' trees), unit pool, camp
  * step's start and scout throttle. The non-majors' explored plots.
  */
@@ -6062,7 +6062,7 @@ const MINOR_MEMORY = ['prodSetValue', 'favoredFood', 'tradeCities', 'tradeReject
   'economy', 'threat', 'threatNear', 'aiGrowth', 'aiGrowthSeen', 'revealed', 'standingArmyShort', 'explored', 'upgradeTrees', 'unitsListed', 'defendersListed',
   'bestPlotToBuy', 'island', 'naval'] as const;
 const CITY_MEMORY = ['aiThreat', 'aiThreatNear', 'freeRaid', 'tradeCities', 'tradeRejected'] as const;
-const UNIT_MEMORY = ['slot', 'aiDefender', 'aiHomed', 'escorted', 'originalOwner', 'look', 'mpBonus'] as const;
+const UNIT_MEMORY = ['slot', 'aiDefender', 'aiHomed', 'escorted', 'look', 'mpBonus'] as const;
 const GAME_MEMORY = ['barbTribes', 'barbPool', 'barbCampsBegun', 'barbSpotNext'] as const;
 /** THE RULES' STORES NO RECORD SHOWS, carried the same way: the barbarian
  *  kills a boost counts, the wars' clocks; a city-state's production

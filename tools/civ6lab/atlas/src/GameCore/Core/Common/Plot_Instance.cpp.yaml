@@ -120,13 +120,20 @@
       value: "the Tribal Village on 20:3 counts nothing for the barbarian Scout 262147: it takes 20:1 (6) as logged"
     - recording: h1_duelv1124
       value: "- PARTLY READ: the region lists' writer (the engines carry none: 36 of the   barbarians' 223 Explore rows of runs/h1_duelv1124 are \"tertiary regions\");"
+    - recording: h1_duels1154
+      turn: 6
+      value: the barbarians' target list holds the meteor site 4:10 (IMPROVEMENT_METEOR_GOODY, Goody true) as TARGET_GOODY_HUT t6-t10
   impl:
     - cpu/core/tactical.ts:exploreTarget
     - gpu/core/sim_tactics.py:_tac_explore_counts
     - cpu/core/tactical.ts:hut
+    - cpu/core/tactical.ts:goodyPlot
+    - gpu/core/sim_tactics.py:_tac_targets
+    - gpu/core/sim_tactics.py:seat_of
   readings:
     - "C-95: HL Explore's unrevealed count holds nothing on a goody hut's plot — READ (0x70a6c0 at 0x70a746..0x70a76a, 0x82d90), both twins"
     - "C-95: Explore Land and the barbarians' revealed plots — READ, ported (two tests below unread)"
+    - "C-95 / C-134 / C-125: a raised unit's planning, a Trader's districts at peace, a civilian's district at war, a captive's first owner, the meteor site's goody — READ (0x792c90, 0x586360 at 0x5865e7..0x5865fd / 0x58666a..0x5866c7 / 0x586729..0x586733, 0x26e570 at 0x26e5e2..0x26e6c4, 0x2720a0 at 0x272434..0x272544, 0x82d90, 0x212500 at 0x212825..0x2128f3), LAB (the aiunits plannings), both twins"
   context:
     - "...d's +0x128; taken as passing); a goody hut's plot taken at once by a full civilization (0x82d90: no barbarian)."
   review: reviewed

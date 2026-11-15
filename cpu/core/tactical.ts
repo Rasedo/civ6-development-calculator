@@ -87,9 +87,14 @@ interface PNode {
  *  unit of a player at war with it (an aircraft or a spy holds no plot) —
  *  another player's unit it passes, never ending there (`groundOf`'s
  *  `stand`); no city centre but its own, no live enemy Encampment (with no
- *  `forts`, neither test); its own units it walks through */
+ *  `forts`, neither test); its own units it walks through. A formation of
+ *  Traders or Spies (`borderless`) skips the test's owner branch whole
+ *  (0x586360 at 0x5865e7..0x5865fd): another player's centre or Encampment
+ *  at peace with it bars it no plot (runs/h1_duels1134 t37: city-state 4's
+ *  Trader 589830 on 7:11 plans player 1's centre 7:12 at (1/256), nothing
+ *  past it) */
 function enterable(state: GameState, unit: Unit, t: Tile, foes: ReadonlySet<number>,
-  embarks: boolean, forts = true): boolean {
+  embarks: boolean, forts = true, borderless = false): boolean {
   if (isImpassable(t)) return false;
   const naval = !!UNITS[unit.type]?.naval;
   // a hull on water or in a passage (`hullPassage`: its own centre, below);
@@ -99,6 +104,7 @@ function enterable(state: GameState, unit: Unit, t: Tile, foes: ReadonlySet<numb
   if (isWater(t) && !waterEnterable(state, t, unit)) return false;
   if (foes.has(t.index)) return false;
   if (!forts) return true;
+  if (borderless && peaceFort(state, unit, t)) return true;
   if (t.district === 'CITY_CENTER' && tileSeat(t) !== unit.seat) return false;
   if (peaceFort(state, unit, t)) return false;
   return !encampmentBlocks(state, t, unit);
@@ -343,7 +349,8 @@ function groundOf(state: GameState, unit: Unit, revealedOnly = true, planning = 
   // it (`borderClosedTo`; runs/h1_duelq1128 t94-96: player 0's Warrior on
   // 13:7 lays no danger on player 1's 14:8 beside it); none to a formation
   // of units with MakeTradeRoute or Spy, whose location test skips the
-  // border branch (0x586360 at 0x5865e7..0x5865fd: the type's +0x1b9 bit
+  // owner branch, borders and districts at peace (`enterable`; 0x586360 at
+  // 0x5865e7..0x5865fd: the type's +0x1b9 bit
   // 0x40, +0x1ba bit 2; runs/h1_duels1146 t107-110: city-state 4's Trader
   // 1507334 on 11:12 .. 8:13 plans player 1's ground about it)
   const borderless = [unit, ...mates].every((m) => !!UNITS[m.type]?.trader || stackClass(m.type) === 'spy');
@@ -463,11 +470,11 @@ function groundOf(state: GameState, unit: Unit, revealedOnly = true, planning = 
       seenZocs.set(i, v);
       return v;
     },
-    fits: (i) => revealed(i) || enterable(state, unit, state.map.tiles[i], NO_FOES, embarks),
+    fits: (i) => revealed(i) || enterable(state, unit, state.map.tiles[i], NO_FOES, embarks, true, borderless),
     enter: (t) => {
       let v = enters.get(t.index);
       if (v === undefined) {
-        enters.set(t.index, (v = enterable(state, unit, t, plainCivilians ? fighters : foes, embarks)
+        enters.set(t.index, (v = enterable(state, unit, t, plainCivilians ? fighters : foes, embarks, true, borderless)
           && !shut(t)));
       }
       return v;
@@ -501,12 +508,28 @@ function groundOf(state: GameState, unit: Unit, revealedOnly = true, planning = 
         const owner = tileSeat(t);
         const fortUnseen = seenNow![t.index] !== 1 && garrisonDistrict(state, t) && owner !== NO_SEAT && owner !== unit.seat
           && unitsHostile(state, unit, { seat: owner }) && !formationShoots && t.index !== dest;
-        passes.set(t.index, (v = enterable(state, unit, t, foesSeen, embarks, !fortUnseen)
+        passes.set(t.index, (v = enterable(state, unit, t, foesSeen, embarks, !fortUnseen, borderless)
           && !shut(t)));
       }
       return v;
     },
     attack: (t) => {
+      // a formation with no strength at all: the location test passes a unit
+      // that does not fight onto a district of hit points at war (0x586360 at
+      // 0x586729..0x586733), which the breadth-first searches' valid wrapper
+      // makes an attack whatever the mover (0x26e570 at 0x26e5e2..0x26e6c4),
+      // where the player does not see it now: the validity links a
+      // formation with no fighter onto no plot it sees holding a city or a
+      // district at war (0x2720a0 at 0x272528..0x272544, the child's +0x51 &
+      // 0x34) (runs/h1_duels1133 t43: the barbarians' captive Builder
+      // 1900564 on 10:3 plans player 1's centre 7:5, out of their sight, at
+      // (2/0); h1_duels1142 t100 the Builder 3670047 on 34:8 nothing of
+      // player 1's centre 32:7 in their sight)
+      if (!melee && !shoots && planning && known(t.index) && garrisonDistrict(state, t) && !shut(t)) {
+        const owner = tileSeat(t);
+        seenNow ??= plotsSeenNow(state, new Set([unit.seat]));
+        return seenNow[t.index] !== 1 && owner !== NO_SEAT && owner !== unit.seat && unitsHostile(state, unit, { seat: owner });
+      }
       if (!melee || !known(t.index) || isImpassable(t) || peaceFort(state, unit, t)) return false;
       // ground closed to the unit is none it strikes into: no search links
       // it, so the planning lays no spot on a target there and holds no blow
@@ -1881,6 +1904,13 @@ export function revealedPlots(state: GameState, seat: number): ArrayLike<number>
   return ex && ex.length ? ex : null;
 }
 
+/** the plot holds a goody (0x82d90: its improvement's Improvements.Goody,
+ *  the village's and the meteor site's; runs/h1_duels1154 t6-t10: the
+ *  barbarians' target list holds the meteor site 4:10 as TARGET_GOODY_HUT) */
+function goodyPlot(t: Tile): boolean {
+  return !!t.goodyHut || !!t.meteor;
+}
+
 export function tacticalTargets(state: GameState, seat: number, seen: ArrayLike<number>, revealed: ArrayLike<number> | null,
   known: readonly ArmyRecord[]): Target[] {
   const { map } = state;
@@ -1921,7 +1951,7 @@ export function tacticalTargets(state: GameState, seat: number, seen: ArrayLike<
     if (!vis) {
       if (t.district !== null) continue;
       if (camps.has(t.index)) out.push({ type: 'CAMP', tile: t.index, seat: NO_SEAT, unit: null });
-      else if (t.goodyHut) out.push({ type: 'GOODY', tile: t.index, seat: NO_SEAT, unit: null });
+      else if (goodyPlot(t)) out.push({ type: 'GOODY', tile: t.index, seat: NO_SEAT, unit: null });
       else if (t.improvement !== null && !t.pillaged && hostile(owner)) out.push({ type: 'IMPROVEMENT', tile: t.index, seat: NO_SEAT, unit: null });
       continue;
     }
@@ -1937,7 +1967,7 @@ export function tacticalTargets(state: GameState, seat: number, seen: ArrayLike<
       out.push({ type: 'CAMP', tile: t.index, seat: NO_SEAT, unit: null });
       continue;
     }
-    if (t.goodyHut) {
+    if (goodyPlot(t)) {
       out.push({ type: 'GOODY', tile: t.index, seat: NO_SEAT, unit: null });
       continue;
     }
@@ -1991,7 +2021,7 @@ export function tacticalTargets(state: GameState, seat: number, seen: ArrayLike<
       out.push({ type: 'RELIGIOUS', tile: t.index, seat: rel[0].seat, unit: rel[0] });
       continue;
     }
-    if (t.improvement !== null && !t.pillaged && hostile(owner) && !t.goodyHut) {
+    if (t.improvement !== null && !t.pillaged && hostile(owner) && !goodyPlot(t)) {
       out.push({ type: 'IMPROVEMENT', tile: t.index, seat: NO_SEAT, unit: null });
     }
   }
@@ -4064,7 +4094,7 @@ function exploreTarget(state: GameState, pass: Pass, u: Unit, chosen: Set<number
     const seen = look(p);
     // a goody hut on the plot (revealed, `exploreOk`) counts nothing and
     // flags no route (0x70a6c0 at 0x70a746: 0x82d90)
-    const hut = !!map.tiles[p].goodyHut;
+    const hut = goodyPlot(map.tiles[p]);
     const v1 = hut ? 0 : seen.filter((q) => !revealed(q)).length;
     const v2 = seen.filter((q) => !seenNow[q]).length;
     const route = !hut && seen.some((q) => revealed(q) && (!!map.tiles[q].road || !!map.tiles[q].railroad));
@@ -4952,8 +4982,12 @@ function tacticalPass(state: GameState, acting: ReadonlySet<number>): void {
   const reach = new Map<number, Reach[]>();
   const plan = new Map<number, Planner>();
   // the planning runs for every unit of the player (0x792c90), its
-  // civilians and support units among them: their safe plot reads it
-  for (const u of all) {
+  // civilians and support units among them: their safe plot reads it; a
+  // unit raised this turn too, from its full Movement, none of the pass's
+  // moves (runs/h1_duels1135 t8: the Warrior 589832 raised on 13:8 plans
+  // 13:8/1/512 and 14:10/2/256)
+  for (const u of state.units) {
+    if (!isBarbSeat(u.seat) || (!acting.has(u.id) && !onMap(u))) continue;
     const p = planUnit(state, u, targets);
     plan.set(u.id, p);
     reach.set(u.id, p.reach);
@@ -5004,11 +5038,13 @@ export function barbMovesNow(state: GameState): Map<number, number> {
  *  Movement restored as the turn opened (`opened`, before their rules grant
  *  the turn's techs: runs/h1_duely1121 t61, the Quadriremes 1900549 / 2228245
  *  and the Galley 2293780 at 3 walk 3 of the 4 their planning reaches), a
- *  unit raised since at its full Movement */
-export function refreshBarbarians(state: GameState, opened?: ReadonlyMap<number, number>): void {
+ *  unit of their pass (`stood`) it lacks at its full Movement; a unit their
+ *  camps raised since, none of `stood`, holds none (runs/h1_duels1135 t8:
+ *  the Warrior 589832 raised on 13:8 at 0, its planning laid on its full 2) */
+export function refreshBarbarians(state: GameState, opened?: ReadonlyMap<number, number>, stood?: ReadonlySet<number>): void {
   for (const u of state.units) {
     if (!isBarbSeat(u.seat)) continue;
-    u.movesLeft = opened?.get(u.id) ?? unitFullMoves(state, u) + generalAuraMP(state, u);
+    u.movesLeft = stood && !stood.has(u.id) ? 0 : opened?.get(u.id) ?? unitFullMoves(state, u) + generalAuraMP(state, u);
     u.movesFull = u.movesLeft;
     u.attacksLeft = attacksPerTurn(u);
   }
@@ -5033,7 +5069,7 @@ export function barbarianPhase(state: GameState): void {
   state.barbSeat.dangerOpen = Array.from(dangerPlane(state, BARB_SEAT));
   barbarianRules(state, state.turn);
   barbSlots(state);
-  refreshBarbarians(state, opened);
+  refreshBarbarians(state, opened, acting);
   // a scout looks at each step it takes, in move order: the sight update of
   // the step (0x58aa90) raises the report (0x153ef0) as its plots come into
   // the barbarian player's view
