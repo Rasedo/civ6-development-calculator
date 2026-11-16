@@ -19480,3 +19480,54 @@ after their turn (cpu/harness/replay.ts). GPU `_tac_search`'s and
   (Move To: 9 5) where ours takes 8:7, both of two unrevealed plots in
   sight and of one cost (548864) in Explore's search, 8:7 closing first in
   ours; the game's search order or its sight count unread.
+
+## C-134 / C-128: the plot's layer-0 unit count in HL Explore; a walk the shore's carry stops; the city threat's margin on the centre's terms — READ (0x75280 at 0x752ca / 0x7530e, 0x586d40 at 0x587102, 0x70bd40 at 0x70bef4, 0x70b6f0 at 0x70b863 / 0x70b8b0, 0x70b550 at 0x70b64d, 0x24a180, 0x5cbd10 at 0x5cc07b..0x5cc09a), both twins
+
+- THE PLOT'S COUNT +0x4c (a byte) counts the units of map layer 0, the
+  units' layer: the plot list's move 0x75280 decrements it where the unit
+  leaves layer 0 (0x763b0 found it there, 0x752ca) and increments it where
+  the new layer is 0 (0x7530e); the placement 0x586d40 increments it at
+  0x587102 for layer 0. A Trader (the trade layer) and a religious unit
+  (its own) count none. HL Explore's plot test (0x70bd40 at 0x70bef4) and
+  its nearest-unrevealed walks (0x70b6f0, 0x70b550) refuse a plot whose
+  count is above 0. Ported: `unitsLayerAt` in `exploreOk` and
+  `nearestUnrevealed` (cpu/core/tactical.ts); GPU `_tac_units_layer` in
+  `_tac_explore_ok` and `_tac_explore_region`.
+- CONFIRMED: runs/h1_duels1148 t130: city-state 4's Naval Superiority
+  Caravel 1310726 on 36:3 (Naval Patrol's HL Explore, no plot's sight
+  holding an unrevealed one) takes the fallback 40:4, its sight's most
+  plots unseen now, under its own Trader 589829 (aiunits tacpass: both on
+  40:4); again t134 / t146 / t150 / t166.
+- A WALK THE SHORE'S CARRY STOPS: the path prices a land unit's step off
+  the water as no crossing, the step caps the Movement it lands with (the
+  walk's carry). Where the step after the landing is dear only for the
+  carry, the walk ends on the landing plot, a plot its own unit of its
+  class holds or not; the turn's stacking check (0x775e50) then moves the
+  first crowded unit in slot order off. Ported: `walk`'s `landed`; GPU
+  `_tac_move_to`'s `landed` in the back-off.
+- CONFIRMED: runs/h1_duels1157 t151: city-state 3's Line Infantry 1900549
+  (embarked on 1:22, Wander for 43:24) lands on 43:23 short of its goal,
+  the Field Cannon 1835016 (embarked on 0:23, Wander for 42:23) lands on
+  43:23 under it (UnitMoved 43:23 for both), and the Line Infantry is
+  teleported to 42:23 (UnitTeleported); 1150 t205, 1143 t171 alike.
+- THE CITY THREAT'S MARGIN over a player not hostile is the larger of 20.0
+  and 0x24a180's out value for the centre with the garrison (0x5cc07b..
+  0x5cc09a: arguments 0, 0): the sum of the garrison, the walls while the
+  perimeter stands, the districts' strength, the envoy term and the inner
+  defence, all past the holder's base. D, the centre's GetDefenseStrength
+  with its flag set, holds no garrison. Ported: `centreTerms` (combat.ts)
+  read as the view's `cityDefense` terms by `cityThreat`; GPU
+  `_known_threat`'s margin.
+- CONFIRMED: runs/h1_duels1160 t178-t185: city-state 4's centre 7:6 at 52
+  (the record's kbCities strength 62 with its Frigate 1245188 garrisoned,
+  52 without at t181), player 1's Bombard record on 3:9 at 75: with the
+  Frigate (t180) or its Bombard 1310723 (t182, t184) on the centre the
+  terms are 27 and the city is not threatened (City Defense complete); with
+  none (t181, t183) 17 under the margin 20, City Defense Started.
+  runs/h1_duels1156 t206-t214: city-state 4's centre 16:14 at 60 against
+  player 1's Biplane record's 80 starts no City Defense, as logged.
+- Open: a walk short of its path's turn-1 end for another cause (the
+  formation's Movement, a zone out of sight) still backs off a plot its own
+  unit holds; the game's ends there on runs/h1_duels1180 t189 (the Field
+  Cannon 1638405's second run onto 29:9 under the Infantry 1769473) and
+  1157 t152 / t180.

@@ -171,6 +171,7 @@
   impl: [cpu/core/tactical.ts:nearestUnrevealed, gpu/core/sim_tactics.py:_tac_explore_region]
   readings:
     - "C-95: Explore Land and the barbarians' revealed plots — READ, ported (two tests below unread)"
+    - "C-134 / C-128: the plot's layer-0 unit count in HL Explore; a walk the shore's carry stops; the city threat's margin on the centre's terms — READ (0x75280 at 0x752ca / 0x7530e, 0x586d40 at 0x587102, 0x70bd40 at 0x70bef4, 0x70b6f0 at 0x70b863 / 0x70b8b0, 0x70b550 at 0x70b64d, 0x24a180, 0x5cbd10 at 0x5cc07b..0x5cc09a), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "..., not chosen (\"HL: Explore cur region\"); a unit off any region the nearest of its area (0x70b550, \"cur area\"); then the player's primary, secondary and tertiary region lists (+0x1290 +..."
@@ -195,6 +196,7 @@
   readings:
     - "C-95: Explore Land and the barbarians' revealed plots — READ, ported (two tests below unread)"
     - "C-95: HL Explore's plot test refuses every other player's ground, Explore Land's flags 0x40 — READ (0x70bd40 at 0x70bd87..0x70beee, 0x709d80 at 0x709da0..0x709dc2, 0x70ce90 at 0x70ced5), FIT (the knowledge base's +0x128 at or below the turn), both twins"
+    - "C-134 / C-128: the plot's layer-0 unit count in HL Explore; a walk the shore's carry stops; the city threat's margin on the centre's terms — READ (0x75280 at 0x752ca / 0x7530e, 0x586d40 at 0x587102, 0x70bd40 at 0x70bef4, 0x70b6f0 at 0x70b863 / 0x70b8b0, 0x70b550 at 0x70b64d, 0x24a180, 0x5cbd10 at 0x5cc07b..0x5cc09a), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...t revealed (0x7861d0: +0x28 / +0x24 < 1.0) — the nearest unrevealed plot of the region (0x70b6f0: plots in index order, strictly nearer replaces, +0x4c clear, enterable 0x586360), with..."
@@ -203,7 +205,7 @@
   final: 0x4bca20
   kind: function
   name: exploreOk
-  semantics: "may the explorer go to the plot: no live storm on it (0x28b120 -> 0x28b5d0, unported), revealed (the visibility's +0x2f0), no other player's ground — at war (0x469cd0) only while the turn (@f28c78 +0x110) falls short of the player's knowledge base (+0x12b8) +0x128 (0x70beab setl), at peace only by open borders (0x3dab70) or an alliance (0x3da560) — no unit on it (+0x4c), its own area unless it embarks (0x56c480) or a hull on water, no district but its own (0x70bf46)."
+  semantics: "may the explorer go to the plot: no live storm on it (0x28b120 -> 0x28b5d0, unported), revealed (the visibility's +0x2f0), no other player's ground — at war (0x469cd0) only while the turn (@f28c78 +0x110) falls short of the player's knowledge base (+0x12b8) +0x128 (0x70beab setl), at peace only by open borders (0x3dab70) or an alliance (0x3da560) — no unit of the units' layer on it (the plot's layer-0 count +0x4c: a Trader or a religious unit none), its own area unless it embarks (0x56c480) or a hull on water, no district but its own (0x70bf46)."
   status: READ
   cases:
     - recording: h1_duelv1124
@@ -211,11 +213,19 @@
     - recording: h1_duely1124
       turn: 12
       value: the barbarian Scout 131073's HL Explore pick off a player's ground, as logged (none of the barbarians' 1,142 Explore targets on runs/h1_duely1117-1128 a plain pick on a player's ground)
-  impl: [cpu/core/tactical.ts:exploreOk, gpu/core/sim_tactics.py:_tac_explore_ok]
+    - recording: h1_duels1148
+      turn: 130
+      value: city-state 4's Naval Superiority Caravel 1310726 on 36:3 patrols onto 40:4, its sight's most unseen plots, under its own Trader 589829 (aiunits tacpass), as again at t134 / t146 / t150 / t166
+  impl:
+    - cpu/core/tactical.ts:exploreOk
+    - cpu/core/tactical.ts:unitsLayerAt
+    - gpu/core/sim_tactics.py:_tac_explore_ok
+    - gpu/core/sim_tactics.py:_tac_units_layer
   readings:
     - "C-95: Explore Land and the barbarians' revealed plots — READ, ported (two tests below unread)"
     - "C-99: Naval Patrol's explore target — the list and the tests READ, two cases unexplained"
     - "C-95: HL Explore's plot test refuses every other player's ground, Explore Land's flags 0x40 — READ (0x70bd40 at 0x70bd87..0x70beee, 0x709d80 at 0x709da0..0x709dc2, 0x70ce90 at 0x70ced5), FIT (the knowledge base's +0x128 at or below the turn), both twins"
+    - "C-134 / C-128: the plot's layer-0 unit count in HL Explore; a walk the shore's carry stops; the city threat's margin on the centre's terms — READ (0x75280 at 0x752ca / 0x7530e, 0x586d40 at 0x587102, 0x70bd40 at 0x70bef4, 0x70b6f0 at 0x70b863 / 0x70b8b0, 0x70b550 at 0x70b64d, 0x24a180, 0x5cbd10 at 0x5cc07b..0x5cc09a), both twins"
   context:
     - "...left; per plot closed, in order: no danger (0x716a90), not chosen, one it may go to (0x70bd40: not its own plot; revealed; another player's ground only at war with it; +0x4c not abo..."
     - "...rger (0x70a6c0's second flag: not carried); the turn test on a plot of a player at war (0x70bd40: the game turn below the regions record's +0x128; taken as passing); a goody hut's plot..."

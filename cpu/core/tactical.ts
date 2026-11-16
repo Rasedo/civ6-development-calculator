@@ -1544,7 +1544,8 @@ function civiliansAlone(state: GameState, unit: Unit, p: number): boolean {
 
 /** the walk of a path as far as the unit's Movement carries it this turn,
  *  short of a plot it may not end on (but, with `onto`, the plot beside a
- *  plot of civilians its next step takes), a zone of control ending it
+ *  plot of civilians its next step takes, and the plot a shore crossing's
+ *  carry stops it on), a zone of control ending it
  *  (`inEnemyZoc` on the order's destination `dest`, a plot its own stacking
  *  unit or another player's holds at the limit: the count 0x585eb0, another
  *  player's Trader or unit of another map layer none — runs/h1_duely1128
@@ -1576,6 +1577,7 @@ function walk(state: GameState, unit: Unit, path: number[], dest: number, mates:
   // the step that spends the rest so, and the Movement it takes past its cost
   let spendAt = -1;
   let spent = 0;
+  let landed = false;
   for (const p of path) {
     // a plot a unit at war with it holds, passed out of its sight, or a
     // district of hit points at war its path took out of its sight, ends the
@@ -1584,7 +1586,15 @@ function walk(state: GameState, unit: Unit, path: number[], dest: number, mates:
     // step ending the order unmoved on a defender at war it sees (0x209e30)
     if (attackPlot(state, unit, p)) break;
     const cost = stepCost(state, unit, tiles[from], tiles[p], embarks) + carry;
-    if (mp < cost && mp < full) break;
+    if (mp < cost && mp < full) {
+      // a stop the shore's carry alone makes: the path priced the step as no
+      // crossing, so the walk ends where it landed, a plot its own unit holds
+      // or not, the turn's stacking check moving one off (runs/h1_duels1157
+      // t151: city-state 3's Field Cannon 1835016 lands on 43:23 under its
+      // Line Infantry 1900549, which the check teleports to 42:23)
+      landed = carry > 0 && mp >= cost - carry;
+      break;
+    }
     // a land unit's step across the shore carries, a step off an owned water
     // plot too: the pathfinder prices that step as no crossing, the walk caps
     // the Movement it lands with (`stepUnit`)
@@ -1607,7 +1617,7 @@ function walk(state: GameState, unit: Unit, path: number[], dest: number, mates:
   // the plot beside it whatever stands there
   const through = onto >= 0 && stop === path.length && mp > 0
     && !(mp < stepCost(state, unit, tiles[from], tiles[onto], embarks) + carry && mp < full);
-  while (!through && stop > 0 && (stackedWith(state, unit, mates, path[stop - 1]) || peaceAt(state, unit, path[stop - 1]))) stop -= 1;
+  while (!through && !landed && stop > 0 && (stackedWith(state, unit, mates, path[stop - 1]) || peaceAt(state, unit, path[stop - 1]))) stop -= 1;
   // the formation the walk sets out with (unit +0x1fb8): the riders on a
   // plot it passes are another formation's (runs/h1_duely1128 t56: the Scout
   // 3538967 walks over 13:14, Builder Capture's Settler 2228251 stays there
@@ -4126,7 +4136,8 @@ function seenRegions(state: GameState, seat: number): Set<number> {
  *  no recorded turn: of the barbarians' 1,142 HL Explore targets on
  *  runs/h1_duely1117-1128 none of the plain picks lies on a player's
  *  ground; at peace only through open borders or an alliance, 0x3dab70 /
- *  0x3da560, which no explorer here holds); no unit on it (+0x4c); on its
+ *  0x3da560, which no explorer here holds); no unit of the units' layer on
+ *  it (`unitsLayerAt`); on its
  *  own area unless it embarks (the barbarians never), a hull on water (a
  *  foreign city centre is a player's ground) */
 function exploreOk(state: GameState, u: Unit, p: number, revealed: (i: number) => boolean): boolean {
@@ -4134,15 +4145,24 @@ function exploreOk(state: GameState, u: Unit, p: number, revealed: (i: number) =
   const t = state.map.tiles[p];
   const owner = tileSeat(t);
   if (owner !== NO_SEAT && owner !== u.seat) return false;
-  if (state.units.some((x) => x.tileIndex === p && onMap(x))) return false;
+  if (unitsLayerAt(state, p)) return false;
   const naval = !!UNITS[u.type]?.naval;
   const here = state.map.tiles[u.tileIndex];
   return (t.area ?? -1) === (here.area ?? -1) || canEmbark(state, u) || (naval && isWater(t));
 }
 
+/** a unit of the units' layer (`mapLayer`: neither a Trader nor a religious
+ *  unit) on the plot: the plot's count +0x4c, which the plot list's move
+ *  0x75280 and the placement 0x586d40 at 0x587102 step for layer 0 alone
+ *  (runs/h1_duels1148 t130: city-state 4's Naval Superiority Caravel
+ *  1310726 patrols onto 40:4 under its own Trader 589829) */
+function unitsLayerAt(state: GameState, p: number): boolean {
+  return state.units.some((x) => x.tileIndex === p && onMap(x) && mapLayer(x.type) === 'units');
+}
+
 /** the nearest plot the unit's player never revealed that the set takes and
- *  the unit may enter, no unit on it (0x70b6f0, 0x70b550: plots in index
- *  order, the first of equals); -1 none */
+ *  the unit may enter, no unit of the units' layer on it (`unitsLayerAt`;
+ *  0x70b6f0, 0x70b550: plots in index order, the first of equals); -1 none */
 function nearestUnrevealed(state: GameState, u: Unit, revealed: (i: number) => boolean, inSet: (t: Tile) => boolean): number {
   const ground = groundOf(state, u, false);
   let best = -1;
@@ -4150,7 +4170,7 @@ function nearestUnrevealed(state: GameState, u: Unit, revealed: (i: number) => b
   for (const t of state.map.tiles) {
     if (!inSet(t) || revealed(t.index)) continue;
     const d = plotDistance(state, u.tileIndex, t.index);
-    if (d >= bd || state.units.some((x) => x.tileIndex === t.index && onMap(x)) || !ground.enter(t)) continue;
+    if (d >= bd || unitsLayerAt(state, t.index) || !ground.enter(t)) continue;
     best = t.index;
     bd = d;
   }

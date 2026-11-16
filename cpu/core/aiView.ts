@@ -20,7 +20,7 @@ import { aiDefenderOf, aiFormed, aiRanged, aiStrengths, districtHealth, planUnit
 import { AIR_REBASE_COLS, AIR_STRIKE_COLS, IMPROVEMENT_IDS, unitActionIndex } from './unitActions';
 import { airPillageTargets, airStrikeTargets, rebaseTargets } from './air';
 import { plotsSeenNow, ringPlots } from './barbarians';
-import { centreStrength, cityStrikeBase, districtGarrisonedStrength, encircled, garrisonTerm, predictCityBlow, siegeAssist, unitAttackRange } from './combat';
+import { centreStrength, cityStrikeBase, districtGarrisonedStrength, encircled, centreTerms, predictCityBlow, siegeAssist, unitAttackRange } from './combat';
 import { encampOuterPool, outerPool, portalAt, wallsMax, wallsTier } from './rules';
 import { targetStrength } from './opsOrders';
 import { borderClosedTo, builderCost, cityAtIndex, cityNavalCapable, embarkTechMoves, formationMates, plotUnits, gameProgressUnitCost, unitFullMoves, unitDomain, unitExertsZoc, unitsHostile, unitVisibleTo } from './units';
@@ -781,7 +781,7 @@ export function aiView(state: GameState, opts: { updated?: boolean } = {}): AiVi
       if (!city) return null;
       const hp = districtHealth(state, p);
       return {
-        defense: centreStrength(state, city, false), garrison: garrisonTerm(state, city), damaged: !!hp && hp.hp < hp.max,
+        defense: centreStrength(state, city, false), terms: centreTerms(state, city), damaged: !!hp && hp.hp < hp.max,
         districts: city.districts.length, capital: held ? city.isCapital : true,
         wonder: city.wonders.some((w) => state.map.tiles[w.tileIndex].builtWonderComplete), population: city.population,
       };

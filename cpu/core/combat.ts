@@ -1294,10 +1294,15 @@ export function centreStrength(state: GameState, city: City, garrisoned = true):
   return n;
 }
 
-/** the centre's GARRISON TERM alone (0x24a180): `garrisonCS` over the
- *  holder's base */
-export function garrisonTerm(state: GameState, city: City): number {
-  return garrisonCS(state, city, holderStrength(state, cityBaseSeat(city)));
+/** the centre's TERMS PAST THE HOLDER'S BASE (0x24a180 with the garrison,
+ *  its out value the sum of the garrison, the walls, the districts, the
+ *  envoys and the inner defence): `centreStrength` less the base. The city
+ *  threat's margin reads it (runs/h1_duels1160 t180 / t182: city-state 4's
+ *  centre 7:6 at 52 with its Frigate 1245188 or Bombard 1310723 garrisoned,
+ *  the terms 27 against player 1's Bombard's 75, no threat; t181 / t183
+ *  with none, 17, the margin 20, threatened) */
+export function centreTerms(state: GameState, city: City): number {
+  return centreStrength(state, city) - holderStrength(state, cityBaseSeat(city));
 }
 
 /** A DISTRICT WITH HIT POINTS' DEFENCE as the danger map reads it (0x24ae80

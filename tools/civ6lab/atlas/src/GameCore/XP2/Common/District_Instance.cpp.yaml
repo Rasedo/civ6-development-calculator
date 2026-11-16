@@ -233,7 +233,7 @@
     - cpu/core/tactical.ts:dangerDistricts
     - gpu/core/sim_seats.py:_garrison_cs
     - gpu/core/sim_tactics.py:_danger_districts
-    - cpu/core/combat.ts:garrisonTerm
+    - cpu/core/combat.ts:centreTerms
     - cpu/core/operations/cityThreat.ts:MARGIN_HOSTILE
     - gpu/core/sim_minorai.py:_known_threat
     - cpu/core/combat.ts:centreStrength
@@ -246,6 +246,7 @@
     - "C-95: the danger map and Move to Safety — READ, ported"
     - "C-126: a city-state centre's envoy term is the most envoys one player holds there, and the unit choice walks the game's unstable std::sort — 0x24a180's envoy arm and 0x7976f0 READ, both twins"
     - "C-132: a district's defence terms on the Encampment, the garrison of any player, an unrevealed district in the danger list, a hidden unit's forfeit by the turn order — READ (0x24a180 at 0x24a24c..0x24a275 and 0x24aa0d, 0x586360 at 0x5866c9..0x58671f under flag 1, 0x4f1b20 by the players' order), both twins"
+    - "C-134 / C-128: the plot's layer-0 unit count in HL Explore; a walk the shore's carry stops; the city threat's margin on the centre's terms — READ (0x75280 at 0x752ca / 0x7530e, 0x586d40 at 0x587102, 0x70bd40 at 0x70bef4, 0x70b6f0 at 0x70b863 / 0x70b8b0, 0x70b550 at 0x70b64d, 0x24a180, 0x5cbd10 at 0x5cc07b..0x5cc09a), both twins"
   context:
     - "- The centre's garrison term (0x24a180): FP(Combat incl. formation, 0x56dc90) less the wounded loss, less the base, where posi..."
     - "- The centre's garrison term 0x24a180 takes ONE unit, the plot's best defender 0x208b80 (flag 0x10): among the plot's units i..."

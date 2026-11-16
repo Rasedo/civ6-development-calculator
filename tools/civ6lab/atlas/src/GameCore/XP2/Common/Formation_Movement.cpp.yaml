@@ -520,6 +520,7 @@
     - cpu/core/tactical.ts:orderRun
     - cpu/core/combat.ts:meleeAttackInner
     - cpu/core/units.ts:stepUnit
+    - cpu/core/tactical.ts:landed
   readings:
     - "C-95 / C-123: a move order's step costs by the formation's fighter flag; an operation that ends in its tick lets its units go — READ (0x26fe20 at 0x27021b, 0x270980, 0x270be0, 0x267650 at 0x2677fa), FIT (the release), both twins"
     - "C-99: a move order carried on as the turn ends, the zone-of-control wait, the embark rule's TO plot — READ (0x962380, 0x52f50, 0x26fe20, 0x2675e0, 0x2673f0, 0x530420, 0x267650), both twins"

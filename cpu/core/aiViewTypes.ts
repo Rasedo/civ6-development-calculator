@@ -240,12 +240,13 @@ export interface AiView extends AiValueView {
   cityBlowFrom(unitId: number, plot: number): number;
   /** the city centre on the plot as its threat reads it: its defense
    *  strength without its garrison (GetDefenseStrength 0x24ae80 with its
-   *  flag set, which skips 0x24a180's garrison), its garrison term
-   *  (0x24a180), its damage above 0; its districts the centre included
+   *  flag set, which skips 0x24a180's garrison), its terms past the holder's
+   *  base with the garrison (0x24a180: the garrison, walls, districts,
+   *  envoys, inner defence), its damage above 0; its districts the centre included
    *  (+0x1a60), its capital flag (+0x5e8, a city-state's one city holding
    *  the Palace), a wonder built (0x18e930), its citizens (+0x588); null
    *  where no city stands there */
-  cityDefense(plot: number): { defense: number; garrison: number; damaged: boolean; districts: number; capital: boolean;
+  cityDefense(plot: number): { defense: number; terms: number; damaged: boolean; districts: number; capital: boolean;
     wonder: boolean; population: number } | null;
   /** the city's walls do not hold the unit back (a siege assist on it: unit
    *  +0x18b8 / +0x18b9 / +0xb94 / +0xc14) */

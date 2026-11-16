@@ -2239,6 +2239,7 @@ class SimTactics:
             fighter = fighter | (m_on & fights_t(ut_pool[rows, mr.clamp(min=0)].clamp(min=0, max=self.NU - 1)))
         spend_at = torch.full((R,), -1, dtype=torch.long, device=dev)
         spent = torch.zeros_like(spend_at)
+        landed = torch.zeros(R, dtype=torch.bool, device=dev)
         for i in range(L):
             p = path[:, i]
             on = on & (i < plen)
@@ -2251,6 +2252,10 @@ class SimTactics:
             on = on & ~foe_n[ar, pc] & ~city_in[rows, pc]
             dcol = (self.neigh[frm] == pc.unsqueeze(1)).long().argmax(dim=1)
             c = self._tac_step(rows, frm, pc, dcol, ut, ign_shore, waive) + carry
+            # a stop the shore's carry alone makes: the path priced the step
+            # as no crossing, so the walk ends where it landed (`walk`'s
+            # landed)
+            landed = landed | (on & (mp < c) & (mp < full) & (carry > 0) & (mp >= c - carry))
             on = on & ~((mp < c) & (mp < full))
             tw = self.water[rows, pc]
             # a land unit's step across the shore carries, a step off an owned
@@ -2290,7 +2295,7 @@ class SimTactics:
             c_on = self._tac_step(rows, frm, dr, dcl, ut, ign_shore, waive) + carry
             through = cap & (stop == plen) & (mp > 0) & ~((mp < c_on) & (mp < full))
         for _ in range(L):
-            back_off = (~through & (stop > 0)
+            back_off = (~through & ~landed & (stop > 0)
                         & no_end[ar, path.gather(1, (stop - 1).clamp(min=0).unsqueeze(1)).squeeze(1).clamp(min=0)])
             if not bool(back_off.count_nonzero()):
                 break
@@ -4937,19 +4942,29 @@ class SimTactics:
 
     # ------------------------------------------------------- Explore Land
 
+    def _tac_units_layer(self) -> torch.Tensor:
+        """[B, T] bool — `unitsLayerAt`: a unit of the units' layer (neither a
+        Trader nor a religious unit) on the plot, the plot's count +0x4c the
+        plot list's move 0x75280 and the placement 0x586d40 step for layer 0
+        alone."""
+        occ = (self.military_at >= 0) | (self.support_at >= 0)
+        for pl in (self.civilian_at, self.embarked_at):
+            t = self.unit_type.gather(1, pl.clamp(min=0)).clamp(min=0)
+            occ |= (pl >= 0) & (self._rel_strength.take(t) <= 0)
+        return occ
+
     def _tac_explore_ok(self, tile: torch.Tensor, ut: torch.Tensor, seat: int, revealed: torch.Tensor) -> torch.Tensor:
         """[B, T] bool — `exploreOk` for each game's explorer standing on
         `tile` [B], of type `ut` [B]: a plot not its own, revealed, no other
         player's ground (at war or not: the turn never short of the knowledge
-        base's +0x128 in a recorded turn), no unit on it, of its area (a hull
-        on water too; an embarking non-barbarian anywhere)."""
+        base's +0x128 in a recorded turn), no unit of the units' layer on it
+        (`_tac_units_layer`), of its area (a hull on water too; an embarking
+        non-barbarian anywhere)."""
         B, T, dev = self.B, self.T, self.device
         bidx = torch.arange(B, device=dev)
         own = self.tile_seat
         ok_owner = (own == NO_SEAT) | (own == seat)
-        occ = torch.zeros(B, T, dtype=torch.bool, device=dev)
-        for pl in (self.military_at, self.civilian_at, self.support_at, self.embarked_at, self.trader_at):
-            occ |= pl >= 0
+        occ = self._tac_units_layer()
         area = self.tile_area
         naval = self.unit_naval.take(ut)
         embark = self._tac_embarks(bidx, ut, seat)
@@ -5135,7 +5150,8 @@ class SimTactics:
         """[B] twice — `exploreTarget`'s first-round fallbacks for the unit
         at local slot `u_b`: the nearest unrevealed plot (the first of equals
         by index) of its region where the region holds one — off any region
-        of its area — that it may enter with no unit on it, not chosen, a path
+        of its area — that it may enter with no unit of the units' layer on
+        it, not chosen, a path
         to it existing; else the same over the regions `treg` marks; the plot
         (-1 none) and its kind (2 region, 3 area, 5 tertiary regions)."""
         B, T, dev = self.B, self.T, self.device
@@ -5149,9 +5165,7 @@ class SimTactics:
         land, wat = self._tac_enter(seat, False)
         naval = self.unit_naval.take(ut)
         ent = torch.where(naval.unsqueeze(1), wat, land)
-        occ = torch.zeros(B, T, dtype=torch.bool, device=dev)
-        for pl in (self.military_at, self.civilian_at, self.support_at, self.embarked_at, self.trader_at):
-            occ |= pl >= 0
+        occ = self._tac_units_layer()
         d = self.pair_dist[here].to(torch.long)
 
         def nearest(m: torch.Tensor, inset: torch.Tensor) -> torch.Tensor:

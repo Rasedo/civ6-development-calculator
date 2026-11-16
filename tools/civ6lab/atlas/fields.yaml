@@ -3858,11 +3858,17 @@
   owner: Plot
   offset: 0x4c
   name: units
-  type: int
-  semantics: taken as the units on the plot (> 0 occupied).
-  status: PARTLY
+  type: byte
+  semantics: "the plot's units on map layer 0, the units' layer (a Trader's and a religious unit's layers none): the plot list's move 0x75280 decrements it where the unit leaves layer 0 (0x763b0 found it there) and increments it where the new layer is 0, the placement 0x586d40 increments it at 0x587102 for layer 0. HL Explore's plot tests read it (0x70bd40 at 0x70bef4, 0x70b6f0, 0x70b550: above 0 refused)."
+  status: READ
+  cases:
+    - recording: h1_duels1148
+      turn: 130
+      value: city-state 4's Naval Superiority Caravel 1310726 patrols onto 40:4 under its own Trader 589829
+  writers: [0x75280, 0x586d40]
   readings:
     - "C-95: Explore Land and the barbarians' revealed plots — READ, ported (two tests below unread)"
+    - "C-134 / C-128: the plot's layer-0 unit count in HL Explore; a walk the shore's carry stops; the city threat's margin on the centre's terms"
   review: reviewed
 - kind: field
   owner: Plot

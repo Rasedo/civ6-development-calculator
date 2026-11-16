@@ -658,7 +658,8 @@ class SimMinorAi:
         and Bombard + 20; a Bombard unit counts, a ranged one above the
         defense less 15, any above the defense less 5; never an explorer nor
         a barbarian camp defender); at the city's defense plus the margin
-        (5.0 hostile, else 20.0 or the centre's garrison term) the city is
+        (5.0 hostile, else 20.0 or the centre's terms past its base, the
+        garrison among them, where higher) the city is
         threatened at `level`, at most 1 not hostile; a player the holder runs
         an operation against near the city (`op_near(p)`, 0x723cf0) passed
         over while the city is whole (not `damaged`). The first such player
@@ -673,9 +674,10 @@ class SimMinorAi:
         # D holds no garrison (GetDefenseStrength with its flag set)
         dcs = self._centre_strength(hrow, hcol, False)
         d = dcs * _FX
-        # the centre's garrison term (0x24a180) the margin over a full civ
-        # not hostile reads
-        gar = torch.trunc(self._garrison_cs(hrow, hcol, self._holder_strength(hrow, hcol)) * _FX)
+        # the centre's terms past the holder's base (0x24a180 with the
+        # garrison: the garrison, walls, districts, envoys, inner defence) the
+        # margin over a full civ not hostile reads
+        gar = torch.trunc((self._centre_strength(hrow, hcol, True) - self._holder_strength(hrow, hcol)) * _FX)
         slot = self.citystate_kb_slot[:, r].long()
         owner = self.citystate_kb_owner[:, r].long()
         typ = self.citystate_kb_type[:, r].long()

@@ -45,10 +45,15 @@
     - recording: h1_duelp1117
       turn: 20
       value: "Rome's centre: the wounded Warrior 393220 there from t19 (row 3047) over the Warrior 655361 made there t20 (row 3254), city.defense 13.4296875 as the game's"
-  impl: [cpu/core/units.ts:arrive, gpu/core/sim_seats.py:_arrive]
+  impl:
+    - cpu/core/units.ts:arrive
+    - gpu/core/sim_seats.py:_arrive
+    - cpu/core/tactical.ts:unitsLayerAt
+    - gpu/core/sim_tactics.py:_tac_units_layer
   readings:
     - "C-102 / C-99: the plot's unit list as an arrival stamp, the best defender's tie and Garrison City's standing unit — READ (0x75c50, 0x74f40 / 0x763b0 / 0x75280, 0x208b80 / 0x523d60, 0x810fd7..0x81101b), both twins"
     - "C-99 / C-128: every technology gained starts an Upgrade Units tree, the civic event never fires; a tree's units after its tick; the Nearest City Search's resource test; the plot's unit list — READ (0x4cd4c0 -> 0x800c60, 0x5bbf80 -> 0x27a180, 0x3a1ac0, 0x7cb3d0 -> 0x7d2190, 0x7eba40 -> 0x510d30, 0x74f40 / 0x763b0), the trigger both twins"
+    - "C-134 / C-128: the plot's layer-0 unit count in HL Explore; a walk the shore's carry stops; the city threat's margin on the centre's terms — READ (0x75280 at 0x752ca / 0x7530e, 0x586d40 at 0x587102, 0x70bd40 at 0x70bef4, 0x70b6f0 at 0x70b863 / 0x70b8b0, 0x70b550 at 0x70b64d, 0x24a180, 0x5cbd10 at 0x5cc07b..0x5cc09a), both twins"
   context:
     - "...0 / 0x586d40 -> 0x763b0) erases it keeping the rest in order (0x76a10), a layer change (0x75280) removes then appends: the list is the units' arrival order. Not ported: the recordings..."
   review: reviewed
@@ -188,6 +193,7 @@
   readings:
     - "C-102 / C-99: the plot's unit list as an arrival stamp, the best defender's tie and Garrison City's standing unit — READ (0x75c50, 0x74f40 / 0x763b0 / 0x75280, 0x208b80 / 0x523d60, 0x810fd7..0x81101b), both twins"
     - "C-99 / C-128: every technology gained starts an Upgrade Units tree, the civic event never fires; a tree's units after its tick; the Nearest City Search's resource test; the plot's unit list — READ (0x4cd4c0 -> 0x800c60, 0x5bbf80 -> 0x27a180, 0x3a1ac0, 0x7cb3d0 -> 0x7d2190, 0x7eba40 -> 0x510d30, 0x74f40 / 0x763b0), the trigger both twins"
+    - "C-134 / C-128: the plot's layer-0 unit count in HL Explore; a walk the shore's carry stops; the city threat's margin on the centre's terms — READ (0x75280 at 0x752ca / 0x7530e, 0x586d40 at 0x587102, 0x70bd40 at 0x70bef4, 0x70b6f0 at 0x70b863 / 0x70b8b0, 0x70b550 at 0x70b64d, 0x24a180, 0x5cbd10 at 0x5cc07b..0x5cc09a), both twins"
   context:
     - ...60, 0x5bbf80 -> 0x27a180, 0x3a1ac0, 0x7cb3d0 -> 0x7d2190, 0x7eba40 -> 0x510d30, 0x74f40 / 0x763b0), the trigger both twins
     - ...x750e0 -> 0x74f40) appends a unit not listed (0x76ae0), removal (0x586a90 / 0x586d40 -> 0x763b0) erases it keeping the rest in order (0x76a10), a layer change (0x75280) removes then a...
