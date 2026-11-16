@@ -3958,7 +3958,8 @@ class SimMasks:
         return ex.gather(1, tiles.clamp(min=0).reshape(self.B, -1)).reshape(tiles.shape)
 
     def _raise_best_trained(self, row: int, landed: torch.Tensor, type_idx,
-                          formation: torch.Tensor | None = None) -> None:
+                          formation: torch.Tensor | None = None,
+                          embarked: torch.Tensor | None = None) -> None:
         """`raiseBestTrained` — the row TRAINED, BOUGHT or UPGRADED to `type_idx`
         in the games of `landed`: a land or naval fighting unit's Combat, a
         ranged chassis' included, with its formation's strength (`formation`,
@@ -3969,13 +3970,23 @@ class SimMasks:
         runs/h1_duelq1121 t140). A unit created or captured, an aircraft and a
         merge move nothing (runs/b95t_p1_mech_bought_20260927.jsonl,
         runs/b95t_p1_mech_create_keep_20260927T002928Z.jsonl,
-        runs/h1_duelw1107 t176 and t229); the Free Cities keep no best Ranged
-        Strength."""
+        runs/h1_duelw1107 t176 and t229), nor a unit whose Units_XP2 row forms
+        no military formation (0x4bffa0: the Giant Death Robot,
+        runs/h1_duels1124 t225); the Free Cities keep no best Ranged
+        Strength. The melee best rises to the unit's Combat as it stands
+        (0x56dc90 with 0): an `embarked` land unit's its owner's embarked
+        strength (runs/h1_duels1185 t213, h1_duels1138 t135)."""
         if isinstance(type_idx, int):
             type_idx = torch.full((self.B,), type_idx, dtype=torch.long, device=self.device)
         ti = type_idx.clamp(min=0, max=self.NU - 1)
-        fights = (self._type_combat[ti] > 0) & ~self._type_civilian[ti] & (self._type_air[ti] == 0)
+        fights = ((self._type_combat[ti] > 0) & ~self._type_civilian[ti] & (self._type_air[ti] == 0)
+                  & (type_idx != self._gdr_idx))
         made = self._type_combat[ti]
+        if embarked is not None:
+            seat = torch.full_like(ti, row if row < self.n_majors else FREE_SEAT if row == self.FREE_ROW
+                                   else 100 + row - self._CITY_MINOR0)
+            afloat = embarked & ~self.unit_water_walk.take(ti)
+            made = torch.where(afloat, self._embarked_def_cs(seat).to(made.dtype), made)
         if formation is not None:
             made = made + self._formation_cs.take(formation.clamp(min=0, max=self._form_max))
         cs = torch.where(landed & (type_idx >= 0) & fights, made, torch.zeros_like(made))

@@ -2849,7 +2849,8 @@ class SimMinors:
         typ = self.major_unit_type.gather(1, fc.unsqueeze(1)).squeeze(1)
         typ[rr] = to
         self._raise_best_trained(self._CITY_MINOR0 + s, go, typ,
-                               formation=self.major_unit_formation.gather(1, fc.unsqueeze(1)).squeeze(1))
+                               formation=self.major_unit_formation.gather(1, fc.unsqueeze(1)).squeeze(1),
+                               embarked=self.major_unit_emb.gather(1, fc.unsqueeze(1)).squeeze(1))
         return go, made
 
     def _naval_capable_minor(self, s: int) -> torch.Tensor:

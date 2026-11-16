@@ -18871,3 +18871,51 @@ replay's imposed wonder placement (cpu/harness/replay.ts); GPU
   Rome on 14:7, its Ancient Walls standing, steps beside the city (9 rows).
 - Open: runs/h1_duels1168 t51 / t65-121 the Ram moving with a Warrior's
   formation; runs/h1_duels1156 t79-89 the Ram 3735584 (C-95).
+
+## C-129 / C-134: the units that raise a player's best strengths, the standing army's swap under a recruit — READ (0x4bffa0, 0x56dc90, 0x5ca7e0 at 0x5caac7..0x5cad19), both twins
+
+`raiseBestTrained` (cpu/core/units.ts), `_raise_best_trained`
+(gpu/core/sim_masks.py), the replay's `madeInTurnBests`
+(cpu/harness/replay.ts), the scorer's `readPassAi` (cpu/harness/aiUnits.ts).
+
+- THE ROW TEST (0x4bffa0): after the domain (row +0x1c, not 1) and the tag
+  0x36c125c9, the unit's Units_XP2 row (by the Units row's +0x24): none
+  passes; one whose +0x48 bit 0x4 is clear refuses. The loader's select
+  names the bits in order: CanCauseDisasters 0x1, CanEarnExperience 0x2,
+  CanFormMilitaryFormation 0x4, CanSacrificeUnits 0x8, MajorCivOnly 0x10. Of
+  the fighting units the Giant Death Robot alone holds
+  CanFormMilitaryFormation false (`formationBanned`, `_gdr_idx`).
+  runs/h1_duels1124 t225: player 1's Giant Death Robot 9044003 (130 / 120),
+  its bests 86 / 75 at t225 and t226, every look of t225 reading its cities'
+  strike at 75; h1_duels1191 t241 / t248 alike (97 / 102 kept).
+- THE COMBAT AS IT STANDS (0x56dc90 with 0, the value the melee best rises
+  to): an embarked land unit's is its owner's era's embarked strength, so a
+  unit upgraded on water raises the melee best to that, its Ranged Strength
+  and Bombard by its row. runs/h1_duels1185 t213: player 1's Line Infantry
+  3801090 made an Infantry on the water 30:19, the melee best 65 at t214 and
+  t215; h1_duels1138 t135: its Skirmisher made a Ranger on 30:17, melee 35
+  kept, ranged 40 to 60; h1_duels1157 t170: its Bombard made an Artillery on
+  11:10, melee 50 to 55, bombard 45 to 80; a city-state's alike
+  (h1_duels1184 t85: city-state 3's Swordsman made a Man-At-Arms on its
+  Harbor 12:20, its centre read at 34 by city-state 4 and the barbarians).
+- IN THE TURN (the replay): a major's unit made at its turn's start by
+  production (h1_duels1150 t223: a Tank Army, 85 to 102; h1_duels1169 t182 an
+  Ironclad, t197 a Nuclear Submarine) or upgraded in its turn on land
+  (h1_duels1124 t174: an Ironclad, 62 to 70) raises the bests the minors'
+  and the barbarians' looks of that turn read; a unit a levy hands over
+  raises nothing (h1_duels1142 t185-t242: the melee best 45 through four
+  levies of a Field Cannon, a Pike and Shot and Caravels; 489 of the 564
+  known-city rows bar p86 added to p85 stand on a turn with a levy), nor a
+  merge into a Corps after the unit was made (h1_duels1152 t110: a Courser
+  made and merged, 46 kept); a unit made a Corps or an Army has its
+  UnitFormCorps / UnitFormArmy row before its UnitAddedToMap.
+- THE STANDING ARMY UNDER A RECRUIT (0x5ca7e0 at 0x5caac7..0x5cad19, as
+  read): runs/h1_duels1143 t53-t83, city-state 4, quota 2: each turn its
+  city update swaps the Galley 589830 (Combat 30) in for the list's first
+  Warrior (20), Naval Superiority's recruit of the Galley then writes it
+  COMBAT again, so the unit rows at its tactical step and at its pass both
+  read 3 and the Warriors 131073 / 196610 alternate as its one DEFENDER
+  (t53 196610, t54 131073, t55 196610). The pass's record is read once the
+  operations ran, so the scorer's plan.aiType reads ours there.
+- Open: the tag 0x36c125c9 names no install or DLL string; a city-state's
+  +1 a turn per envoy in a look of the turn an envoy lands (C-129).

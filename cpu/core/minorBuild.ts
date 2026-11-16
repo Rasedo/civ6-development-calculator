@@ -945,7 +945,7 @@ export function minorUpgradeUnit(state: GameState, cityState: CityState, u: Unit
       (op.released ??= []).push(old);
     }
   }
-  raiseBestTrained(state, cityState.seat, u.type, u.formation ?? 0);
+  raiseBestTrained(state, cityState.seat, u.type, u.formation ?? 0, !!u.embarked);
   return true;
 }
 

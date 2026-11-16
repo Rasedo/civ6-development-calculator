@@ -129,7 +129,7 @@ import { gwWorks, removeGreatWork } from '../core/greatWorks';
 import { InferredActions, RecordedActions, activePlayer, type ActionSource, type Decision, type LogTally, type QueueSpec } from './replayActions';
 import { newScores, scoreDecision, scoreTable, memoryTable, type DecisionScores } from './aiScore';
 import { GameMemory, MemoryLogs, readDanger, readGameMemory, readMemory, readRevealed, syncContracts, type ArmyLogged } from './aiMemory';
-import { GameUnits, readPass, readUnitTable, type StateRead } from './aiUnits';
+import { GameUnits, readPass, readPassAi, readUnitTable, type StateRead } from './aiUnits';
 import { RecordStore, type RecordLight } from './recordStore';
 import { gameSpawnChanges, importCityAi, importOps, type GameSpawnChange } from './gameAiImport';
 import { NO_SCORE } from '../core/aiPolicyValue';
@@ -749,15 +749,15 @@ function scoreState(ctx: Ctx, turn: number, rows: readonly StateRead[]): void {
  *  of the player's turn `turn` (`readPass`), its units named by their record
  *  keys: its twin's (`twin`, `keyOf`), one the pair took off by the key it
  *  left under */
-function scorePass(ctx: Ctx, copy: GameState, pass: Pass, turn: number, twin: ReadonlyMap<Unit, Unit>, keyOf: ReadonlyMap<Unit, string>): void {
+function scorePass(ctx: Ctx, copy: GameState, pass: Pass, turn: number, twin: ReadonlyMap<Unit, Unit>, keyOf: ReadonlyMap<Unit, string>, opsRan: boolean): void {
   if (!ctx.gameUnits) return;
   const gone = new Map([...ctx.gone].map(([key, u]) => [u, key] as const));
   const key = (c: Unit) => {
     const u = twin.get(c);
     return u ? keyOf.get(u) ?? gone.get(u) : undefined;
   };
-  scoreState(ctx, turn, readPass(ctx.gameUnits, { W: ctx.W, unitNames: ctx.cat.units, keyOf: key, playerOf: (seat) => ctx.playerOfSeat.get(seat) ?? seat },
-    copy, pass, turn, ctx.stateLeftOut));
+  const world = { W: ctx.W, unitNames: ctx.cat.units, keyOf: key, playerOf: (seat: number) => ctx.playerOfSeat.get(seat) ?? seat };
+  scoreState(ctx, turn, opsRan ? readPassAi(ctx.gameUnits, world, copy, pass, turn) : readPass(ctx.gameUnits, world, copy, pass, turn, ctx.stateLeftOut));
 }
 
 /** a record unit key's owner (`owner:id`) */
@@ -1094,7 +1094,7 @@ function capturedInto(acts: readonly unknown[][], key: string, open: number, bar
  *  Archer 1900552 made at its start of t88, Rome striking at 3 in t87, the
  *  barbarians' Man-at-Arms 4063235 and Swordsman 3932165 two plots off it
  *  at Current Danger 3) */
-function bestsBeforeStart(ctx: Ctx, copy: GameState, twin: ReadonlyMap<Unit, Unit>, unborn: ReadonlySet<Unit>): void {
+function bestsBeforeStart(ctx: Ctx, b: TurnRecord, copy: GameState, twin: ReadonlyMap<Unit, Unit>, unborn: ReadonlySet<Unit>): void {
   const at = ctx.startBests;
   if (!at) return;
   for (const s of copy.seats) {
@@ -1102,29 +1102,60 @@ function bestsBeforeStart(ctx: Ctx, copy: GameState, twin: ReadonlyMap<Unit, Uni
     if (!was) continue;
     [s.bestMeleeCS, s.bestRangedCS] = was;
   }
-  madeInTurnBests(ctx, copy, twin, unborn);
+  madeInTurnBests(ctx, b, copy, twin, unborn);
 }
 
 /** the majors' best strengths trained raised by each unit of `target` its
  *  owner made or upgraded in turn t (`raiseBestTrained`): one the record of
  *  turn t's start holds under no key of that owner, or under another type;
- *  one that changed hands none, nor the next turn's start's (`unborn`)
+ *  one that changed hands none — a unit the log hands over in the turn
+ *  (another player's unit taken off the map in the row before its own is
+ *  added: a levy) is the unit that player held, raising only where its type
+ *  changed since —, nor the next turn's start's (`unborn`); a unit made in
+ *  the turn at the formation it was made at (its UnitFormCorps /
+ *  UnitFormArmy row before its UnitAddedToMap), a merge after it raising
+ *  nothing, an upgraded one at the formation it holds
  *  (runs/h1_duels1117 t204: player 1's Field Cannon 7208989 made on 37:13 in
  *  its turn, the city-states' and the barbarians' looks reading its cities'
- *  strike at 60, the start's 25 before it) */
-function madeInTurnBests(ctx: Ctx, target: GameState, twin: ReadonlyMap<Unit, Unit> | null, unborn: ReadonlySet<Unit>): void {
+ *  strike at 60, the start's 25 before it; h1_duels1142 t185-t242: player
+ *  1's melee best 45 through its levies of city-state 2's Field Cannon,
+ *  Pike and Shot and Caravels, the looks reading its 32:7 at 39;
+ *  h1_duels1124 t174: its levied Line Infantry 5963801 raising nothing, its
+ *  Ironclad 6029338 upgraded in the turn 62 to 70, the looks reading 6:13
+ *  at 66; h1_duels1152 t110: its Courser 3080204 made on 36:10 and merged
+ *  into a Corps in its turn, its melee best 46 kept; h1_duels1150 t223: its
+ *  Tank 8126493 made an Army, 85 to 102) */
+function madeInTurnBests(ctx: Ctx, b: TurnRecord, target: GameState, twin: ReadonlyMap<Unit, Unit> | null, unborn: ReadonlySet<Unit>): void {
   const startType = new Map<string, string | null | undefined>(ctx.prev.units.map((r) => [`${r.owner}:${r.id}`, engineRowOf(ctx.cat, 'unit', r.type)] as const));
   const startIds = new Set(ctx.prev.units.map((r) => r.id));
   const keyOf = new Map<Unit, string>();
   for (const [key, u] of ctx.units) keyOf.set(u, key);
+  // the units handed over in the turn, each by its new key the key it left
+  const handed = new Map<string, string>();
+  const acts = ((b as { actions?: unknown[][] }).actions ?? []).filter((x) => x[1] === ctx.prev.turn);
+  acts.forEach((x, i) => {
+    const nx = acts[i + 1];
+    if (x[2] === 'UnitRemovedFromMap' && nx?.[2] === 'UnitAddedToMap' && x[3] !== nx[3]) handed.set(`${nx[3]}:${nx[4]}`, `${x[3]}:${x[4]}`);
+  });
+  // the formation a unit made in the turn was made at; none for one the
+  // turn upgraded or the log adds in no row of the turn
+  const madeAt = (key: string): number | undefined => {
+    const rows = acts.filter((x) => `${x[3]}:${x[4]}` === key);
+    const add = rows.findIndex((x) => x[2] === 'UnitAddedToMap');
+    if (add < 0 || rows.some((x) => x[2] === 'UnitUpgraded')) return undefined;
+    const formed = rows.slice(0, add);
+    return formed.some((x) => x[2] === 'UnitFormArmy') ? 2 : formed.some((x) => x[2] === 'UnitFormCorps') ? 1 : 0;
+  };
   for (const c of target.units) {
     const u = twin ? twin.get(c) : c;
     if (!u || unborn.has(u) || !isCiv(c.seat)) continue;
     const key = keyOf.get(u);
     if (key === undefined) continue;
-    const was = startType.get(key);
-    if (was === undefined ? startIds.has(Number(key.slice(key.indexOf(':') + 1))) : was === c.type) continue;
-    raiseBestTrained(target, c.seat, c.type, c.formation ?? 0);
+    const from = handed.get(key);
+    const was = startType.get(from ?? key);
+    if (from !== undefined ? was === undefined || was === c.type
+      : was === undefined ? startIds.has(Number(key.slice(key.indexOf(':') + 1))) : was === c.type) continue;
+    raiseBestTrained(target, c.seat, c.type, madeAt(key) ?? c.formation ?? 0, !!c.embarked);
   }
 }
 
@@ -1488,7 +1519,7 @@ function barbarianAi(ctx: Ctx, b: TurnRecord, closing: number, before: ReadonlyS
   // t8, out of the barbarians' t7 records)
   const unborn = unbornUnits(ctx, b);
   copy.units = copy.units.filter((c) => !unborn.has(twin.get(c)!));
-  bestsBeforeStart(ctx, copy, twin, unborn);
+  bestsBeforeStart(ctx, b, copy, twin, unborn);
   researchBeforeStart(ctx, b, copy);
   buildingsBeforeStart(ctx, b, copy);
   const barbP = ctx.playerOfSeat.get(BARB_SEAT);
@@ -1788,7 +1819,7 @@ function barbarianAi(ctx: Ctx, b: TurnRecord, closing: number, before: ReadonlyS
   for (const [c, u] of twin) if (isBarbSeat(c.seat)) danger.set(u, plane[c.tileIndex]);
   const logged = armyLog(ctx);
   traceKnowledge(logged);
-  tracePlanning((st, pass) => { if (st === copy) scorePass(ctx, copy, pass, closing, twin, keyOf); });
+  tracePlanning((st, pass, opsRan) => { if (st === copy) scorePass(ctx, copy, pass, closing, twin, keyOf, opsRan); });
   try {
     barbarianTactics(copy, acting);
   } finally {
@@ -1972,7 +2003,7 @@ function minorAi(ctx: Ctx, b: TurnRecord, turn: number, made: ReadonlySet<Unit>,
   // on 4:4, killed by the eruption of 4:3 at the change, beside its
   // Trebuchet 1966081's strike)
   for (const [key, u] of ctx.gone) if (!keyOf.has(u)) keyOf.set(u, key);
-  bestsBeforeStart(ctx, copy, twin, unbornUnits(ctx, b));
+  bestsBeforeStart(ctx, b, copy, twin, unbornUnits(ctx, b));
   const was = new Map(ctx.prev.units.map((r) => [`${r.owner}:${r.id}`, r.y * ctx.W + r.x]));
   const hpWas = new Map(ctx.prev.units.map((r) => [`${r.owner}:${r.id}` as string, UNIT_HP - num(r.damage)]));
   const fortWas = new Map(ctx.prev.units.flatMap((r) => (typeof r.fortify === 'number' ? [[`${r.owner}:${r.id}` as string, r.fortify] as const] : [])));
@@ -2480,7 +2511,7 @@ function minorAi(ctx: Ctx, b: TurnRecord, turn: number, made: ReadonlySet<Unit>,
       else c.hp = s.hp;
     }
   });
-  tracePlanning((st, pass) => { if (st === copy) scorePass(ctx, copy, pass, turn, twin, keyOf); });
+  tracePlanning((st, pass, opsRan) => { if (st === copy) scorePass(ctx, copy, pass, turn, twin, keyOf, opsRan); });
   try {
     for (const cs of [...copy.cityStates].sort((x, y) => playerOf(x.seat) - playerOf(y.seat))) {
       standLevied(playerOf(cs.seat));
@@ -4927,7 +4958,7 @@ const res = buyTile(state, city.id, d.plot, seat);        if (!res.ok) setTileOw
           u.movesLeft = 0;
           // the upgrade the record made raises its seat's bests and answers
           // its Train Unit quests as the verb's does
-          if (t) raiseBestTrained(state, u.seat, t, u.formation ?? 0);
+          if (t) raiseBestTrained(state, u.seat, t, u.formation ?? 0, !!u.embarked);
           if (t) questUnitAdded(state, u.seat, t);
           if (t) upgradeMoments(state, u.seat, t);
         }
@@ -7695,7 +7726,7 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
       });
       // the majors' best strengths trained as the minors' turns open: raised
       // by the units the majors made in the turn (`madeInTurnBests`)
-      madeInTurnBests(ctx, state, null, unbornUnits(ctx, b));
+      madeInTurnBests(ctx, b, state, null, unbornUnits(ctx, b));
       try {
         minorTurns(state);
         // ...and the last city-state's, its units where its turn left them and

@@ -44,7 +44,7 @@ import { cityAppealResolver, governorTileFlag, governorTileSum } from './governo
 import { randRange } from './rand';
 import { createRelic, gwHasRoom, placeGreatWork } from './greatWorks';
 import { GWO_ARTIFACT } from '../data/greatWorks';
-import { clearCampFor, conquerEncampment } from './combat';
+import { clearCampFor, conquerEncampment, embarkedDefenseCS } from './combat';
 import { emergencyHeal, emergencyMoveBonus } from './emergency';
 import { civUnitAllowed, GDR_UPGRADES, GDR_ENHANCED_MOVES, UNITS, UNIT_HP, UNIT_TYPE_IDX, ENCAMPMENT_HP, ROCK_BAND_VENUES, ROCK_BAND_WONDER_VENUE, ROCK_BAND_TIERS, ROCK_BAND_TIER_ODDS, ROCK_BAND_MAX_LEVEL, type UnitDef } from '../data/units';
 import {
@@ -1959,7 +1959,7 @@ export function upgradeUnit(state: GameState, unit: Unit, seat: number): RuleRes
   }
   upgradeAnew(state, unit, next);
   unit.movesFull = unitFullMoves(state, unit);
-  raiseBestTrained(state, seat, next, unit.formation ?? 0);
+  raiseBestTrained(state, seat, next, unit.formation ?? 0, !!unit.embarked);
   questUnitAdded(state, seat, next);
   upgradeMoments(state, seat, next);
   return { ok: true };
@@ -2337,15 +2337,27 @@ export function formationTierFor(state: GameState, seat: number, unitType: strin
  *  t195: a Field Cannon made a Machine Gun, Combat 70; h1_duelw1103 t190: a
  *  Submarine made a Nuclear Submarine, 80), a merge into a Corps or an Army
  *  did not (h1_duelw1107 t176), nor did an aircraft (h1_duelw1103 t240: a Jet
- *  Bomber; h1_duelw1107 t247: a Fighter). */
-export function raiseBestTrained(state: GameState, seat: number, unitType: string, formation = 0): void {
+ *  Bomber; h1_duelw1107 t247: a Fighter), nor a unit whose Units_XP2 row
+ *  forms no military formation (the row test 0x4bffa0: its
+ *  CanFormMilitaryFormation clear — the Giant Death Robot, `formationBanned`;
+ *  runs/h1_duels1124 t225: player 1's Giant Death Robot 9044003, 130 / 120,
+ *  its bests 86 / 75 through t226 and the looks' strike at 75). The melee
+ *  best rises to the unit's Combat as it stands (0x56dc90 with 0): an
+ *  `embarked` one's its owner's embarked strength with its formation's, its
+ *  Ranged Strength its row's all the same (runs/h1_duels1185 t213: player
+ *  1's Line Infantry 3801090 upgraded to Infantry on the water 30:19, its
+ *  melee best 65 kept; h1_duels1138 t135: its Skirmisher made a Ranger on
+ *  30:17, melee 35 kept and ranged 40 to 60; h1_duels1157 t170: its Bombard
+ *  made an Artillery on 11:10, melee 50 to 55). */
+export function raiseBestTrained(state: GameState, seat: number, unitType: string, formation = 0, embarked = false): void {
   const def = UNITS[unitType];
   // the barbarians' stay none (PlayerStats +0xf0 0 through runs/h1_duelt1121
   // player 63's t1-t60, its units upgraded and raised)
-  if (!def || !(def.combat > 0) || unitDomain(unitType) !== 'military' || isBarbSeat(seat)) return;
+  if (!def || !(def.combat > 0) || unitDomain(unitType) !== 'military' || formationBanned(unitType) || isBarbSeat(seat)) return;
   const owner = seatOf(state, seat);
   if (!owner) return;
-  owner.bestMeleeCS = Math.max(owner.bestMeleeCS ?? 0, def.combat + (FORMATION_CS[formation] ?? 0));
+  const combat = embarked && !waterWalks(unitType) ? embarkedDefenseCS(state, seat) : def.combat;
+  owner.bestMeleeCS = Math.max(owner.bestMeleeCS ?? 0, combat + (FORMATION_CS[formation] ?? 0));
   // GameCore_XP2_Release.dll 0x4c1a30 raises the best Ranged Strength
   // (PlayerStats +0x150, m_iMaxRangedStrengthTrained) on the same unit:
   // the row's RangedCombat with the formation's strength (0x56e3e0) — a

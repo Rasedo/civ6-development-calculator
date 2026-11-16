@@ -2718,10 +2718,12 @@ export function traceDanger(fn: ((seat: number, plane: Int16Array) => void) | nu
   dangerTrace = fn;
 }
 
-let planningTrace: ((state: GameState, pass: Pass) => void) | null = null;
+let planningTrace: ((state: GameState, pass: Pass, opsRan: boolean) => void) | null = null;
 /** REPLAY: each player's tactical pass as it opens, before any unit of it
- *  moves: its target list and every unit's planning */
-export function tracePlanning(fn: ((state: GameState, pass: Pass) => void) | null): void {
+ *  moves — its target list and every unit's planning — and again once its
+ *  operations' trees ran (`opsRan`), before the pass's own moves: its units'
+ *  AI types as the moves take them */
+export function tracePlanning(fn: ((state: GameState, pass: Pass, opsRan: boolean) => void) | null): void {
   planningTrace = fn;
 }
 
@@ -4590,6 +4592,7 @@ export function cityStateTactics(state: GameState, cityState: CityState, operati
       // logged)
       for (const u of pass.units) if (u.movesLeft <= 0) pass.done.add(u.id);
       operations(pass);
+      planningTrace?.(state, pass, true);
       // its city's strikes after its units' planning and its operations' run
       // (runs/h1_duely1124 t131: city-state 3's Knight 1310720 on 40:11 lists
       // the barbarian Man-At-Arms' 39:9 as an attack (1/0), its Encampment's
@@ -4675,6 +4678,7 @@ export function freeCityTactics(state: GameState, operations: (pass: Pass) => vo
     withShortOrders(() => {
       const pass = openPass(state, FREE_SEAT, militaryAiTypeOf);
       operations(pass);
+      planningTrace?.(state, pass, true);
       // the tactical list (`tacticalUnit`); the homeland's End Turn takes all
       const all = pass.units;
       pass.units = all.filter((u) => tacticalUnit(state, u, pass.ai.get(u.id) ?? -1));
@@ -4734,7 +4738,7 @@ export function openPass(state: GameState, seat: number, aiOf: (u: Unit) => numb
   const ended = new Set<number>();
   movesEnded = ended;
   const pass: Pass = { seat, strike: false, units, reach, done: new Set(), ended, ai, targets, plan, danger: passDanger(state, seat, holder), regions: seenRegions(state, seat) };
-  planningTrace?.(state, pass);
+  planningTrace?.(state, pass, false);
   return pass;
 }
 
@@ -5105,10 +5109,11 @@ function tacticalPass(state: GameState, acting: ReadonlySet<number>): void {
   }
   const pass: Pass = { seat: BARB_SEAT, strike: true, units: all, reach, done: new Set(), ended: (movesEnded = new Set<number>()), ai, targets, plan,
     danger: passDanger(state, BARB_SEAT, state.barbSeat), regions: seenRegions(state, BARB_SEAT) };
-  planningTrace?.(state, pass);
+  planningTrace?.(state, pass, false);
   // the operations first (their manager's job opens the player's turn);
   // then an operation's units are the operation's
   const opUnits = barbarianTrees(state, pass);
+  planningTrace?.(state, pass, true);
   pass.units = all.filter((u) => !opUnits.has(u.id) && tacticalUnit(state, u, ai.get(u.id)!));
   pass.capsFrom = state.barbCaptures?.length ?? 0;
   rampage(state, pass);

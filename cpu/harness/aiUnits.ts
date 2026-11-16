@@ -16,8 +16,7 @@
  *     ours by its record key, one no record names with the game's planned
  *     unit of its type on its plot;
  *   - plan.input: per unit both plan, what its planning read of it — plot,
- *     Movement left, damage, embarked; plan.aiType a military unit's AI type
- *     as the pass takes it (EXPLORE 2, COMBAT 3, DEFENDER 4);
+ *     Movement left, damage, embarked;
  *   - plan.reach: its reach, the plots with their turns (plan.reach.moves the
  *     Movement left on each plot, plan.reach.order the list's order, each
  *     where the kind before it agrees);
@@ -38,6 +37,13 @@
  *     (`CityState.citiesKnown`), kb.cities.list.order its order where the
  *     members agree.
  *
+ * Once the pass's operations ran, before its own moves (`readPassAi`: the
+ * moment the game's record of the pass is read at, its city update's
+ * standing army and its operations' recruits behind it):
+ *
+ *   - plan.aiType: a military unit's AI type as the pass's moves take it
+ *     (EXPLORE 2, COMBAT 3, DEFENDER 4) against its row of that record.
+ *
  * At a city-state's military AI's upgrade step against the game's end look:
  *
  *   - unit.table: the unit production table's entries, each its value
@@ -50,8 +56,7 @@
  * runs before the turn's upgrades and a Builder's last charge); the target
  * list's and a planning's entries of a TargetType the engine's list has no
  * type for; a planning's entry only one side's target list holds (a miss of
- * `targets`, not of the planning); the AI type of a unit whose game row
- * changes it between its tactical step and its pass (ours is read between).
+ * `targets`, not of the planning).
  */
 import { closeSync, existsSync, openSync, readSync } from 'node:fs';
 import { neighbors } from '../../world/hex';
@@ -221,8 +226,8 @@ export function readPass(game: GameUnits, w: PassWorld, state: GameState, pass: 
 
   // every player's units as the player's tactical step found them, the
   // player's own by id
-  const [cId, cType, cX, cY, cMoves, cDamage, cEmbarked, cAi] = ['m_id', 'm_eTypeIndex', 'm_kLocation', 'y', 'm_xMovesRemaining', 'm_iDamage', 'm_bEmbarked',
-    'm_eAIType'].map((n) => game.col(n));
+  const [cId, cType, cX, cY, cMoves, cDamage, cEmbarked] = ['m_id', 'm_eTypeIndex', 'm_kLocation', 'y', 'm_xMovesRemaining', 'm_iDamage', 'm_bEmbarked']
+    .map((n) => game.col(n));
   const typeName = (index: number) => (w.unitNames[index] ?? `unit${index}`).replace(/^UNIT_/, '');
   const typeOfOurs = (u: Unit) => gameTypeOf('unit', u.type, 'UNIT_').replace(/^UNIT_/, '');
   const stepRows = new Map<number, number[]>();
@@ -390,14 +395,6 @@ export function readPass(game: GameUnits, w: PassWorld, state: GameState, pass: 
       const b = `${row[cX]}:${row[cY]} mv${row[cMoves]} dmg${row[cDamage]} ${row[cEmbarked] ? 'embarked' : '-'}`;
       out.push({ kind: 'plan.input', subject: U, equal: a === b, ours: a, game: b });
     }
-    // its AI type as the pass takes it (ours of a military unit), where the
-    // game's stands unchanged from its tactical step to its pass
-    const ai = pass.ai.get(u.id) ?? -1;
-    const atPass = passRows.get(id);
-    if (ai >= 0 && row && atPass) {
-      if (row[cAi] !== atPass[cAi]) leave('plan.aiType: the game\'s unit changes its AI type between its tactical step and its pass');
-      else out.push({ kind: 'plan.aiType', subject: U, equal: ai === row[cAi], ours: `ai${ai}`, game: `ai${row[cAi]}` });
-    }
     if (pl.reach[0] + pl.reach[1] * w.W !== u.tileIndex) {
       leave('plan: the unit\'s planning opens on another plot than the game\'s (reach, targets, spots, blows)');
       continue;
@@ -462,6 +459,31 @@ export function readPass(game: GameUnits, w: PassWorld, state: GameState, pass: 
         if (s) out.push(blowRead(`${U} > ${entry} from ${xy(s.tile)}`, E, s, t, k));
       }
     }
+  }
+  return out;
+}
+
+/**
+ * One tactical pass once its operations ran against the game's record of
+ * the pass, read at that moment: plan.aiType, each military unit's AI type
+ * of the units the record names.
+ */
+export function readPassAi(game: GameUnits, w: PassWorld, state: GameState, pass: Pass, turn: number): StateRead[] {
+  const player = w.playerOf(pass.seat);
+  const rows = game.at('tacpass', turn, player)?.units;
+  if (!Array.isArray(rows)) return [];
+  const [cId, cAi] = [game.col('m_id'), game.col('m_eAIType')];
+  const atPass = new Map(rows.map((row) => [row[cId], row] as const));
+  const out: StateRead[] = [];
+  for (const u of state.units) {
+    const ai = u.seat === pass.seat ? pass.ai.get(u.id) ?? -1 : -1;
+    const key = ai >= 0 ? w.keyOf(u) : undefined;
+    if (key === undefined || !key.startsWith(`${player}:`)) continue;
+    const id = Number(key.slice(key.indexOf(':') + 1));
+    const row = atPass.get(id);
+    if (!row) continue;
+    out.push({ kind: 'plan.aiType', subject: `p${player} u${id} ${gameTypeOf('unit', u.type, 'UNIT_').replace(/^UNIT_/, '')}`, equal: ai === row[cAi],
+      ours: `ai${ai}`, game: `ai${row[cAi]}` });
   }
   return out;
 }

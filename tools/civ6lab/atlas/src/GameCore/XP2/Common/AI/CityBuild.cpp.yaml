@@ -94,6 +94,7 @@
     - "C-128: the standing army's home and Garrison City's DEFENDER — READ, both twins"
     - "C-98 / C-96: a city-state's unit count and standing army read its list with the delayed kill's dead — READ (0x7b62c0 at 0x7b63aa, 0x5ca7e0 at 0x5ca978 / 0x5caa88, 0x4ef6d0), both twins"
     - "C-127: the growth forecast the city AI reads is the one its last full update wrote — READ (0x5ce680 at 0x5ce831 / 0x5ce841, 0x5c27e0's +0x258), both twins"
+    - "C-129 / C-134: the units that raise a player's best strengths, the standing army's swap under a recruit — READ (0x4bffa0, 0x56dc90, 0x5ca7e0 at 0x5caac7..0x5cad19), both twins"
   context:
     - "...] from 0x5d83c0, the YIELD_* list is CityBuildAI +0x908), 0x5c9a00, 0x5c9700, 0x5cb570, 0x5ca7e0, the military AI's city hook 0x79a320, and the City Analysis job (0x5ce3f0: the job o..."
   review: reviewed

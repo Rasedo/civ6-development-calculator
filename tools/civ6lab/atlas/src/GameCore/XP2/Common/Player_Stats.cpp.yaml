@@ -271,17 +271,22 @@
 - addr: 0x4bffa0
   final: 0x32e560
   kind: function
-  semantics: "the unit row raises the best melee: its domain (row +0x1c) not 1, no tag 0x36c125c9 and its row +0x24 entry's flag +0x48 bit 4."
+  semantics: "the unit row raises the best melee: its domain (row +0x1c) not 1, no tag 0x36c125c9, and its Units_XP2 row (0xad67b0 by the row's +0x24), where it has one, with +0x48 bit 0x4 set: CanFormMilitaryFormation (the loader's select order CanCauseDisasters 0x1, CanEarnExperience 0x2, CanFormMilitaryFormation 0x4, CanSacrificeUnits 0x8, MajorCivOnly 0x10); a unit with no Units_XP2 row passes. Of the fighting units the Giant Death Robot alone is refused."
   status: READ
   cases:
+    - recording: h1_duels1124
+      turn: 225
+      value: "player 1's Giant Death Robot 9044003 (130 / 120) made at its turn's start: PlayerStats' bests 86 / 75 at t225 and t226, the city-states' and the barbarians' looks of t225 reading its cities' strike at 75"
     - recording: 1112
       turn: 213
       value: "Records: 1112 China's Mechanized Infantry   made at sea at t213 (an upgrade, xp 0) left the centres at 80 until the   corps upgraded on land at t216 read 95."
     - recording: 1106
       turn: 243
       value: "it also   clears 1106 t243's Giant Death Robot, 80 checks, which was trained on land   and raised nothing — 0x4bffa0's row test, unnamed, a LAB line)."
+  impl: [cpu/core/units.ts:raiseBestTrained, gpu/core/sim_masks.py:_raise_best_trained]
   readings:
     - "H-1: the best melee, the drought's turns, the Trader's sea, the harvest's lump, the district discount — READ"
+    - "C-129 / C-134: the units that raise a player's best strengths, the standing army's swap under a recruit — READ (0x4bffa0, 0x56dc90, 0x5ca7e0 at 0x5caac7..0x5cad19), both twins"
   context:
     - "...o 0x56dc90(unit, 0) — the unit's strength as it stands, its formation's in it — where 0x4bffa0 passes the unit row: its domain (row +0x1c) not 1, no tag 0x36c125c9 (no install or DLL..."
   review: reviewed

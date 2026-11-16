@@ -4366,7 +4366,8 @@ class SimSeats:
         # the upgrade a new unit (`upgradeAnew`)
         rr = ok.nonzero(as_tuple=True)[0]
         self._upgrade_anew(rr, sc[rr], nc[rr])
-        self._raise_best_trained(row, ok, nc, formation=self.unit_formation.gather(1, sc.unsqueeze(1)).squeeze(1))
+        self._raise_best_trained(row, ok, nc, formation=self.unit_formation.gather(1, sc.unsqueeze(1)).squeeze(1),
+                                 embarked=self.unit_emb.gather(1, sc.unsqueeze(1)).squeeze(1))
         self._quest_unit_added(row, ok, nc)
         # CIV6 (UNIT_CREATED_FIRST_*): the upgrade is a unit the seat creates,
         # its keys recorded at the event, a levied unit's too (`upgradeMoments`)

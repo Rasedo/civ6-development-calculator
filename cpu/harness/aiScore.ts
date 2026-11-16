@@ -61,7 +61,7 @@ export const KIND_NOTES: Record<string, string> = {
 export const STATE_NOTES: Record<string, string> = {
   'plan.unit': 'per unit either side plans as the tactical pass opens: both hold a planning',
   'plan.input': 'per unit both plan: its plot, Movement left, damage and embarked flag vs the game\'s unit row at its tactical step',
-  'plan.aiType': 'a military unit\'s AI type as the pass takes it (EXPLORE 2, COMBAT 3, DEFENDER 4) vs the game\'s unit row, unchanged from its tactical step to its pass',
+  'plan.aiType': 'a military unit\'s AI type as the pass\'s own moves take it, its operations run (EXPLORE 2, COMBAT 3, DEFENDER 4) vs the game\'s unit row at its pass',
   'plan.reach': 'its planning\'s reach, the plots with their turns',
   'plan.reach.moves': 'the Movement left on each reach plot (the plots and turns equal)',
   'plan.reach.order': 'the reach list\'s order (the plots, turns and Movement equal)',
