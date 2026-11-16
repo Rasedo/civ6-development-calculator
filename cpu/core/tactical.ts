@@ -1681,8 +1681,12 @@ export function swapUnits(state: GameState, pass: Pass, unit: Unit, tile: number
  *  else its terrain's and feature's */
 const plotMoveCost = (t: Tile): number => (t.district === 'CITY_CENTER' ? MP_SCALE : terrainMp(t));
 
-/** THE SWAP'S PARTNER (0x972540): a unit of the unit's player and domain on
- *  the plot (vt +0xc8 on the two types), each of the two placed on the
+/** THE SWAP'S PARTNER (0x972540): a unit of the unit's player on the plot of
+ *  its FormationClass (the unit manager's vt +0xc8, 0x93f800 -> 0x93f7e0:
+ *  the two types' Units info +0x20 equal; runs/h1_duels1176 t116-t151
+ *  city-state 4's City Defense Privateer 1245191 on 1:14, Garrison City's
+ *  candidate, takes no swap with the Musketman garrisoning 0:14 and keeps
+ *  1:14, as logged), each of the two placed on the
  *  other's plot (0x2726b0's destination test, `placedOn`: runs/h1_duels1145
  *  t90 city-state 3's City Defense Catapult 1114115 on 42:16, Garrison
  *  City's candidate, takes no swap with the Galley 1179650 on its centre
@@ -1695,12 +1699,12 @@ const plotMoveCost = (t: Tile): number => (t.district === 'CITY_CENTER' ? MP_SCA
  *  centre with the Warrior 2490370 left 1 Movement, 10:7 Woods; its Warrior
  *  2293764 on 9:8, player 1's Trebuchet there, none */
 function swapPartner(state: GameState, pass: Pass, unit: Unit, tile: number): Unit | undefined {
-  const dom = unitDomain(unit.type);
+  const cls = formationClassOf(unit.type);
   const from = state.map.tiles[unit.tileIndex];
   const seen = plotsSeenNow(state, new Set([unit.seat]));
   if (zocMoved?.has(unit) || (seen[tile] === 1 && peaceAt(state, unit, tile))) return undefined;
   if (!placedOn(state, [unit], state.map.tiles[tile])) return undefined;
-  return state.units.find((u) => u !== unit && u.tileIndex === tile && u.seat === unit.seat && unitDomain(u.type) === dom
+  return state.units.find((u) => u !== unit && u.tileIndex === tile && u.seat === unit.seat && formationClassOf(u.type) === cls
     && placedOn(state, [u], from) && u.movesLeft > 0 && !pass.ended.has(u.id) && !zocMoved?.has(u)
     && (u.movesLeft >= plotMoveCost(from) || u.movesLeft >= (u.movesFull ?? unitFullMoves(state, u)))
     && !(seen[unit.tileIndex] === 1 && peaceAt(state, u, unit.tileIndex)));
@@ -1729,6 +1733,13 @@ function stackedWith(state: GameState, unit: Unit, mates: readonly Unit[], tile:
 function stackClass(type: string): 'civilian' | 'support' | 'military' | 'naval' | 'air' | 'spy' {
   const d = unitDomain(type);
   return d === 'military' && UNITS[type]?.naval ? 'naval' : d;
+}
+
+/** a unit type's FormationClass (Units.xml; Units info +0x20): a Spy's is
+ *  CIVILIAN, else its stacking class's */
+function formationClassOf(type: string): 'civilian' | 'support' | 'military' | 'naval' | 'air' {
+  const c = stackClass(type);
+  return c === 'spy' ? 'civilian' : c;
 }
 
 /** a unit of the unit's player on the plot that stacks with it, the unit

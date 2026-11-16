@@ -18506,3 +18506,28 @@ harness's seizure (`barbarianAi`, the `seize` decision, cpu/harness/replay.ts).
   4390919, Movement 0 and no planning in the game's aiunits, its Operation row on
   15:13.
 - OPEN: the majors' CanConstruct (`rules.ts`) still counts a pillaged prerequisite.
+
+## C-128: the swap partner's type pair is the two FormationClasses — READ (0x972540 at 0x9726b6..0x9726d7, 0x93f800 -> 0x93f7e0), both twins
+
+`swapPartner` / `formationClassOf` (cpu/core/tactical.ts); GPU `_tac_swap`
+(sim_tactics.py) and `_mops_swap`'s own unit beside it (sim_minorops.py).
+
+- THE TEST: over the target plot's units of the mover's map layer
+  (0x75c50), a partner is of the mover's owner (+0x2e0) and passes the unit
+  manager's vt +0xc8 (0x93f800) on the two types (+0x160): their DB.Units
+  rows, then vt +0xc0 (0x93f7e0), the rows' +0x20 equal. +0x20 is the
+  FormationClass hash (+0x1c the Domain hash: the stacking class test
+  0x93f870 takes DOMAIN_HOVER 0x44c22cdb as any and DOMAIN_AIR 0x5397d46f
+  as none, then +0x20). No domain test: a hull (FORMATION_CLASS_NAVAL) never
+  partners a land combat unit, even where both may stand (a city centre),
+  and a Spy's class is CIVILIAN.
+- CONFIRMED (whole games, aimem): runs/h1_duels1176 t116-t151 city-state
+  4's City Defense Privateer 1245191 on the Harbor 1:14, Garrison City's
+  candidate, takes no swap with the Musketman 1114113 garrisoning Buenos
+  Aires 0:14 and keeps 1:14, its Operation Move row "1:14, 1:14, 1:14" as
+  logged (28 plot rows gone); runs/h1_duels1152 t228-t237 the Machine Gun
+  1769474 (10), runs/h1_duels1181 t139-t156 the Privateer 1835011 (8),
+  1145 / 1178 one each; no row of any kind new on 59 seeds, 1124 unchanged.
+- The GPU's military plane holds one unit a plot, a ship or a land unit:
+  the partner and `_mops_swap`'s own unit beside it are taken where the two
+  types' sea domain agrees (the plane holds no other class).

@@ -224,10 +224,13 @@ A question the SOURCE under-determines; neither engine ships a branch until the 
   - LAB (rampage): 1121 t155 (from t148) Settler 4390925 / Musketman 3670041 end on 16:16 (our Crossbowmen kept on 16:18 / 15:19; the t148-154 rampage family)
   - LAB (rampage): 1121 t127 the formed Man-At-Arms 2949124 pillages 8:12 (ours Move to safety)
   - LAB (rampage): duelq1121 t199 the Crossbowman 3801114's Barbarian Rampage from 17:14 to 17:16 carries the captive Builder 4980745 it escorts (escorted in ours; the two walked 16:12 -> 17:14 together at t195), the game's leaves the Builder on 17:14 under HL: End Turn (plot 721 // 633)
+  - LAB (rampage): duels1180 t129-t145 the Crossbowman 3735555, its tribe's camp gone at t129 (Barbarians.csv 2 -> 1 camps), takes Barbarian Rampage in the game (t129 a civilian on 40:16, from t131 the district 37:19) and Attack Units / HL: End Turn in ours (20 move rows)
   - LAB (explore): 1127 t12 Scout 393221 10:19 for 10:16 (n 3 / 2; the barbarians' plane equal to the record's)
   - LAB (explore): Explore path: 1124 t15 Scout 524295 on 33:11 for 33:8, the game west to 32:11 (t17 held by player 4's Warrior on 32:10), ours east via 33:12 at 7 turns
   - LAB (explore): 1124 t22 barbarian Scout 131073 (HL: Explore) off once a cliff bars only revealed crossings
   - LAB (explore): duels1136 t97 the barbarians' copy holds the Scout 3473424 at 43 damage where their turn found it at 96 (player 1's city strike, UnitDamageChanged seq 28960 before their PlayerTurnActivated seq 29110): its hurt-scout HL: End Turn turns on it
+  - LAB (explore): HL Explore's first pick on the record's revealed plots (no line of sight): duels1184 t6 the Scout 393221 on 7:5 ours 8:7 (5 unrevealed within 2), the game's 9:5 (3); duels1172 t11 the Scout 524295 on 37:12 ours 37:10 (7), the game's 38:11 (11); duels1143 t9 the Scout 131073 on 39:6 ours 37:6 (11), the game's 38:7 (7)
+  - LAB (explore): duels1172 t74-t111 the barbarian Scout 2490372, hurt (64 damage), walks home under its scout tree in ours (t75 37:11 -> 36:13, no tactical row), where the game's logs HL: Move To Safety and HL: End Turn and holds 37:11 (30 plot rows)
   - LAB (wander): Wander 1124 t64 Galley 1376265 on 20:5 for 22:8 (AI_Planning 1/0) ends on 21:8, ours 22:8, shifting the Random Direction picks of Galleys 720906, 1966102, 2359319
   - LAB (wander): duelq1121 t13 Horseman 655369's Wander draw 5 of 17 lands on 31:6 for the game's 32:6, Operation Move's Horseman 720906 still on 30:6 in ours where the game's stands on 31:9
   - LAB (wander): 1121 t107-109 barbarian Musketman 3473423 carried drift (t107 ours HL: End Turn for Wander; t109 our Skirmisher 3342353 on 3:16, the game's 6:16)
@@ -540,7 +543,7 @@ A question the SOURCE under-determines; neither engine ships a branch until the 
   - LAB (city defense): 1117 t84 City Defense Catapult 917509's 2-turn spot on its Man-at-Arms' plot (game 32:5, no row)
   - LAB (city defense): 1117 t89 City Defense Catapult 917509 on 32:7 taking next turn's 32:8
   - LAB (city defense): the read (0x817a1c, Plot +0x18) and our regions agree with the game's (the t1 camp draw ranges of 15 seeds, HL Explore's cur region 2,879 of 2,895 moves), yet where the goal or the planning plot lies on a chokepoint's line the game takes a planning plot the flood puts across that line: duels1133 t21-t29 city-state 3's City Defense Archer 327682 on its centre 42:6 takes 41:6 (ours holds 42:6, 44 plot rows), duels1145 t32-t35 34:10 / 33:11, duels1157 t13 43:23 / 43:22, where duels1180 t46-t55 34:17 / 35:17 and duels1184 t29 12:19 / 11:19 are passed
-  - LAB (city defense): the recorder holds no plot's Map_Region (Plot +0x18, Map_Region +0 its id): the game's region of a chokepoint line's plots against the flood's is unread (duels1133 42:6, duels1145 34:10 / 33:11)
+  - LAB (city defense): the recorder holds no plot's Map_Region (Plot +0x18, Map_Region +0 its id): the game's region of a chokepoint line's plots against the flood's is unread (duels1133 42:6, duels1145 34:10 / 33:11); duels1133's AI_ChokePoint.csv lists our 27 chokepoints, 42:6 on (41:5, 41:7)'s line off its segment, so the flood as read seeds region 7 there and t21 the Archer on it takes no 41:6 (region 6)
   - LAB (city defense): duels1145 t47-t54 city-state 4's Attack Enemy City Archer 589825 on its rally 34:10 (Unit distance 2, Range 2) holds it in the game, its planning's 35:11 passed; ours takes 35:11 (our region 7 with 34:10): the game's 34:10 lies across the chokepoint line from 35:11, with 33:11 (t32), our region 6 (8 plot rows, shown once the Archer leaves its Settler's formation at t46)
   - LAB (upgrade units): 1121 Upgrade Units' walk 4:589828 t69-72 the 781 / 782 tie
   - LAB (upgrade units): 1121 Upgrade Units' walk 4:720896 t74-78
@@ -549,6 +552,7 @@ A question the SOURCE under-determines; neither engine ships a branch until the 
   - LAB (upgrade units): duelq1127 t145 city-state 3's Galley 393216 (Upgrade Units, on 27:12 for 3:13) steps 27:13, 28:14; the kept path's first-turn end 29:16 holds the barbarian Galley seen from 28:14, no path there, and the order's plot searched from 28:14 on 2 Movement gives ours 27:15 / 28:16 (732) where the game's unit steps 28:15, its first path's own next node, and holds with 1 Movement (688)
   - LAB (upgrade units): 1128 t117 2031620 Move to safety for the game's Upgrade Units
   - LAB (upgrade units): duelq1127 t94 city-state 4's Crossbowman 1048577, made on its centre 8:10 under the Heavy Chariot, ends on 7:11 in both with no row of ours where the game's memory holds it in an Upgrade Units tree
+  - LAB (upgrade units): duels1160 t179-t249 city-state 4's Frigate 1245188 on Babylon 7:6, the plot's NAVAL unit, is City Defense's Garrison City garrison in ours, its turn done (family "(no row)", 17 rows; t180 ours stands on 7:6, the game's Wanders to 6:7), where the game's "Upgrade Units" tree takes it at t179 and it Wanders from t180
   - LAB (wander): Wander Back to City 4:1048577 t81-98 (seed not named; listed after 1121 cases): from 36:19 ours lands on 37:17 at its turn-2 end under player 0's Warrior 1507343, the game sails to 38:18 (0x1000 refuses turn-1 ends alone, 0x27229b)
   - LAB (wander): 589828 t68 ends turn 2 on player 0's Warrior on 33:18 (seed not named; listed after 1121 cases)
   - LAB (wander): duelq1121 t238 city-state 2's Infantry 2818052 Wander for 9:3 from 13:4 ends on 11:4, ours on 11:5
@@ -556,7 +560,6 @@ A question the SOURCE under-determines; neither engine ships a branch until the 
   - LAB (wander): 1124 t182 / t194 Nuclear Submarine 6160412 Coastal Raid 372 // 416
   - LAB (move to safety): 1127 t92-96 Galley 393216 ends on 29:16 for its safe 28:17 past player 0's Warriors on 29:17 / 29:15
 - **C-128. CITY-STATES' UNITS, FORMATIONS AND STACKING.** Weight 3.
-  - LAB (stacking): the swap partner's type pair (vtable +0xc8) unread
   - LAB (stacking): the turn-end stacking check's +0x228 handler order beside the barbarians' captures unread
   - LAB (stacking): 1128 t174 Hong Kong's Warrior 2293764 steps onto 9:8 under player 1's Trebuchet and the game teleports it to 8:8 after Hong Kong's Trader enters 9:8
   - LAB (stacking): plot vt+0x40

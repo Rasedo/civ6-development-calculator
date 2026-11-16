@@ -2870,7 +2870,12 @@ class SimMinorOps:
         mp = self._mops_u(s, "mp")
         m = mask & (us >= 0) & (dest >= 0) & (mp[b, uc] > 0)
         occ = self.military_at[b, dc]
-        own = (occ >= 0) & (self.unit_seat[b, occ.clamp(min=0)] == seat)
+        # its own unit there that stacks with it (`stackedAt`): the military
+        # plane's land unit and ship apart
+        ut_u = self._mops_u(s, "type")[b, uc].clamp(min=0, max=self.NU - 1)
+        ut_o = self.unit_type[b, occ.clamp(min=0)].clamp(min=0, max=self.NU - 1)
+        own = ((occ >= 0) & (self.unit_seat[b, occ.clamp(min=0)] == seat)
+               & (self._type_sea_domain.take(ut_u) == self._type_sea_domain.take(ut_o)))
         other = (occ.clamp(min=0) - self.POOL_LO[pre]).clamp(min=0, max=mp.shape[1] - 1)
         beside = m & own & (self.pair_dist[here, dc].to(torch.long) == 1)
         sw = beside & (mp[b, other] > 0)

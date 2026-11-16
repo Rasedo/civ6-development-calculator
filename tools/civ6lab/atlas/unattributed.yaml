@@ -8702,13 +8702,33 @@
 - addr: 0x93f7e0
   final: 0x64f1f0
   kind: function
-  semantics: "the unit manager's vt +0xc0 on two unit infos: their +0x20 equal."
+  semantics: "the unit manager's vt +0xc0 on two unit infos: their +0x20 (FormationClass hash; +0x1c the Domain hash, DOMAIN_HOVER 0x44c22cdb, DOMAIN_AIR 0x5397d46f) equal."
   status: PARTLY
-  impl: [cpu/core/tactical.ts:stackClass]
+  impl:
+    - cpu/core/tactical.ts:stackClass
+    - cpu/core/tactical.ts:formationClassOf
+    - cpu/core/tactical.ts:swapPartner
   readings:
     - "C-128: a crowded plot's unit goes beside it as its AI player's turn ends — READ (0x775e50, 0x585d90, 0x93f870, 0x585940), both twins"
+    - "C-128: the swap partner's type pair is the two FormationClasses — READ (0x972540 at 0x9726b6..0x9726d7, 0x93f800 -> 0x93f7e0), both twins"
   context:
     - "...b either matching any; never 0x5397d46f), neither a MakeTradeRoute unit, then vt +0xc0 (0x93f7e0): their info +0x20 equal. 0x585d90 counts an own unit it answers, another player's no..."
+  review: reviewed
+- addr: 0x93f800
+  kind: function
+  name: the unit manager's swap type pair
+  semantics: "vt +0xc8 on two unit type indices (the swap partner's test 0x972540 at 0x9726ce): their DB.Units rows, then vt +0xc0 (0x93f7e0) on them: the rows' +0x20 (FormationClass hash) equal. No domain test, so a hull and a land unit never pair, two land combat units do."
+  status: READ
+  cases:
+    - recording: h1_duels1176
+      turn: 116
+      value: "city-state 4's City Defense Privateer 1245191 on the Harbor 1:14, Garrison City's candidate, takes no swap with the Musketman 1114113 garrisoning Buenos Aires 0:14 and keeps 1:14 to t151, as AI_Operation.csv logs (\"UNIT_PRIVATEER, 1:14, 1:14, 1:14\"; 28 plot rows gone)"
+  impl:
+    - cpu/core/tactical.ts:formationClassOf
+    - cpu/core/tactical.ts:swapPartner
+    - gpu/core/sim_tactics.py:_tac_swap
+  readings:
+    - "C-128: the swap partner's type pair is the two FormationClasses — READ (0x972540 at 0x9726b6..0x9726d7, 0x93f800 -> 0x93f7e0), both twins"
   review: reviewed
 - addr: 0x93f870
   final: 0x64f280
@@ -8723,6 +8743,7 @@
   impl: [cpu/core/tactical.ts:stackClass, gpu/core/sim_tactics.py:_tac_stacks]
   readings:
     - "C-128: a crowded plot's unit goes beside it as its AI player's turn ends — READ (0x775e50, 0x585d90, 0x93f870, 0x585940), both twins"
+    - "C-128: the swap partner's type pair is the two FormationClasses — READ (0x972540 at 0x9726b6..0x9726d7, 0x93f800 -> 0x93f7e0), both twins"
   context:
     - "...owded plot's unit goes beside it as its AI player's turn ends — READ (0x775e50, 0x585d90, 0x93f870, 0x585940), both twins"
     - "- THE CLASS TEST (the unit manager's vt +0xb8, 0x93f870, on two unit types): their info +0x1c equal (0x44c22cdb either matching any; never 0x..."
@@ -9063,7 +9084,7 @@
   final: 0x67c350
   kind: function
   name: swapPartner
-  semantics: "the swap's partner (the operation's vt +0xc0; CanStart 0x9724c0 and Start 0x972a50 through it): the unit with Movement left (0x56c690), not moved into a zone of control (0x56e780), the target at distance 1 (0x1deb0); where it has moved (0x56e760) the path test 0x272a60 flag 4. Over the units on the target's layer (0x75c50) one of the same owner (+0x2e0) and type pair (vt +0xc8 on +0x160) with Movement left, not moved into a zone of control, its Movement (+0xdb0) at least the unit's plot's own cost (plot vt +0x18 << 8) unless at its full Movement (0x56e760 clear), and the destinations valid both ways (0x2726b0 flag 4 at 0x97273a / 0x972765: a seen goal where another player's unit at peace stands none; the destination test `placedOn`, so a ship and a land unit never partner off a hull's passage)."
+  semantics: "the swap's partner (the operation's vt +0xc0; CanStart 0x9724c0 and Start 0x972a50 through it): the unit with Movement left (0x56c690), not moved into a zone of control (0x56e780), the target at distance 1 (0x1deb0); where it has moved (0x56e760) the path test 0x272a60 flag 4. Over the units on the target's layer (0x75c50) one of the same owner (+0x2e0) and type pair (vt +0xc8 on +0x160, 0x93f800: the same FormationClass) with Movement left, not moved into a zone of control, its Movement (+0xdb0) at least the unit's plot's own cost (plot vt +0x18 << 8) unless at its full Movement (0x56e760 clear), and the destinations valid both ways (0x2726b0 flag 4 at 0x97273a / 0x972765: a seen goal where another player's unit at peace stands none; the destination test `placedOn`, so a ship and a land unit never partner off a hull's passage)."
   status: READ
   cases:
     - recording: h1_duels1145
@@ -9091,6 +9112,7 @@
     - "C-99 / C-128: the swap's partner test and its step along its own path; Move Unit's update before the executions — READ (0x972540, 0x56e760, 0x972a50 -> 0x26fe20, 0x7d3a00 -> 0x7f0020), both twins"
     - "C-99 / C-128: the swap's partner test and its step along its own path; Move Unit's update before the executions; a Trader no passenger — READ (0x972540, 0x56e760, 0x972a50 -> 0x26fe20, 0x7d3a00 -> 0x7f0020, 0x586360 -> 0x208b80 / 0x523d60), both twins"
     - "C-95 / C-134: HL Explore's path tests under flags 0, Naval Choose Target's unit kinds, the swap partner's destination test — READ (0x70aa40 at 0x70aed0 / 0x70b063 / 0x70b173 / 0x70b2b6 / 0x70b3b3, 0x802ea0 at 0x802f15..0x802f69, 0x972540 at 0x97273a..0x97276c), both twins"
+    - "C-128: the swap partner's type pair is the two FormationClasses — READ (0x972540 at 0x9726b6..0x9726d7, 0x93f800 -> 0x93f7e0), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "- THE SWAP'S PARTNER (0x972540, the operation's vt +0xc0, CanStart 0x9724c0 and Start 0x972a50 through it): the unit w..."

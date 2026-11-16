@@ -4083,7 +4083,9 @@ class SimTactics:
         """`swapUnits`' exchange in the games of `sw`: the unit at local slot
         `u_b` of pool `pre` on `here` [B], held by its own unit `occ` [B] (a
         merged slot) on `dest` [B], where that one is its partner
-        (`swapPartner`, 0x972540: neither moved into a zone of control, the
+        (`swapPartner`, 0x972540: of the unit's FormationClass — the
+        military plane's land unit and ship apart —, neither moved into a
+        zone of control, the
         other's Movement as much as `here`'s own cost or full, each placeable
         on the other's plot — no unit of another player at peace on a plot
         the player sees), moves onto `dest`, the other read on `here` while
@@ -4097,7 +4099,10 @@ class SimTactics:
         mp_p = getattr(self, f"{pre}_unit_mp")
         lo = self.POOL_LO[pre]
         other = (occ.clamp(min=0) - lo).clamp(min=0, max=mp_p.shape[1] - 1)
-        # the partner test (`swapPartner`)
+        # the partner test (`swapPartner`): the FormationClass pair first
+        ut_u = getattr(self, f"{pre}_unit_type")[bidx, u_b].clamp(min=0, max=self.NU - 1)
+        ut_o = self.unit_type[bidx, occ.clamp(min=0)].clamp(min=0, max=self.NU - 1)
+        sw = sw & (self._type_sea_domain.take(ut_u) == self._type_sea_domain.take(ut_o))
         here_c = here.clamp(min=0)
         dest_c = dest.clamp(min=0)
         cost = torch.where(self._centre_plane().gather(1, here_c.unsqueeze(1)).squeeze(1),
