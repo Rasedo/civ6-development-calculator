@@ -311,6 +311,17 @@
     - ...r that is neither CIVILIZATION_LEVEL_FULL_CIV (0x469db0, hash 0x253718b0) nor _TRIBE (0x469ce0, 0xd959ec24), not at war (0x3dcf50) and holding more than five units (player +0x12e8 +0...
     - ...M; the barbarians' prioritization (0x786e70, the member at +0xa8 for a barbarian player 0x469ce0) makes HIGH every LOW or MEDIUM unit within BARBARIAN_DEFENSE_ALL_UNITS 4 of a CAMP of...
   review: reviewed
+- addr: 0x469d10
+  final: 0x2f97c0
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-96 / C-127: a district contract valued at its plot, Build Unit's submitted contract, the feature's removal under a resource — READ (0x5f5d50 at 0x5f5e68..0x5f5efd, 0x5d4a20, 0x7f4e00 at 0x7f4f1e, 0x7f4240 at 0x7f48cc, 0x35f2d0 at 0x35f773..0x35f81d, 0x892d40), both twins"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...0's set, the fallout test, the row's removal technology (+0x160 +0x14) held and the ban 0x469d10: not the plot's resource standing on the feature. Its resource arm (0x35f7b6..0x35f81d)..."
+    - "- Open: 0x3306f0's plot set and 0x469d10's ban are not asked apart from the Congress's chop ban; the city's own plot is the seat..."
+  review: imported
 - addr: 0x469d40
   final: 0x2f97f0
   kind: function

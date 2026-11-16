@@ -1050,10 +1050,19 @@
 - addr: 0x5d4a20
   final: 0x3e7f40
   kind: function
-  semantics: a district's table value at its plot (the defensive cancel's old value of a queued district).
-  status: PARTLY
-  impl: [cpu/core/aiContracts.ts:ContractCity]
+  semantics: "a district's table value (cityAI, out, district, plot): with a plot the plot evaluation (+0xcf8, 0x78-byte entries, x +8 / y +0xc) at it, its district row (+0x20 [district]), 0 where none holds the plot; with none the best of every evaluation's from 0. The defensive cancel's old value of a queued district and the contract evaluation's district arm."
+  status: READ
+  cases:
+    - recording: h1_duels1173
+      turn: 52
+      value: Ayutthaya's Harbor contract 121 (75.0) valued at 1:20's DISTRICTS row 309.36 (79196 / 256), queued over its Walls 121.5
+  impl:
+    - cpu/core/aiContracts.ts:ContractCity
+    - cpu/core/minorCityAi.ts:minorTreeCity
+    - gpu/core/sim_minorai.py:item_value
+    - cpu/core/minorCityAi.ts:districtOverLimit
   readings:
+    - "C-96 / C-127: a district contract valued at its plot, Build Unit's submitted contract, the feature's removal under a resource — READ (0x5f5d50 at 0x5f5e68..0x5f5efd, 0x5d4a20, 0x7f4e00 at 0x7f4f1e, 0x7f4240 at 0x7f48cc, 0x35f2d0 at 0x35f773..0x35f81d, 0x892d40), both twins"
     - "C-97: the governor AI — the analysis, the choice and the seats READ, the analyzers PARTLY READ"
     - "C-96 / C-60: the defensive cancel — READ (0x5d7640), ported for the city-states and the Free Cities"
     - "C-96 / C-60: the defensive cancel"

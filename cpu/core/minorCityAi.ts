@@ -610,7 +610,12 @@ function contractPlotRefused(state: GameState, cs: CityState, district: string, 
   const own = tileSeat(tile) === cs.seat;
   const g = plotGroundOf(state, cs.seat, plot);
   const f = g.feature ? FEATURE_ROW.get(g.feature) : undefined;
-  if (f?.removable && !f.validDistrictPlacement && !(own && canRemoveFeature(state, tile, cs.seat).ok)) return true;
+  // the removal's test (0x892d40) asks the feature's row, its research and
+  // the bans, not the plot's resource standing on the feature (runs/h1_duels1166
+  // Muscat t83: its Commercial Hub on the Rainforest and Bananas of 40:12
+  // taken, as 1183 t159, 1160 t130 on Bananas and 1121 t187, 1171 t243 on
+  // Woods and Deer)
+  if (f?.removable && !f.validDistrictPlacement && !(own && canRemoveFeature(state, { ...tile, resource: null }, cs.seat).ok)) return true;
   if (g.resource) {
     const techs = RES.get(g.resource)?.harvestTechs ?? [];
     if (!own || !techs.some((t) => !t || researchHolds(cs.research, t))) return true;
@@ -671,8 +676,19 @@ function minorTreeCity(state: GameState, cs: CityState, facts: CityBuildFacts, t
     canTrain: (u) => pf.canTrain(u),
     trainsSea: facts.trainsDomain('DOMAIN_SEA'),
     buildTurns: (c) => facts.buildTurns(c.unit ?? c.building ?? c.district ?? ''),
-    itemValue: (c) => (c.unit ? tables.units[AI_UNIT_INDEX.get(c.unit) ?? -1] ?? FX_MIN
-      : c.building ? tables.buildings[AI_BUILDING_INDEX.get(c.building) ?? -1] ?? FX_MIN : FX_MIN),
+    // a district's (0x5d4a20): its row in the plot's evaluation, 0 where the
+    // analysis holds no evaluation of the plot; with no plot the best of
+    // every evaluation's, from 0 (runs/h1_duels1173 Ayutthaya t52: its
+    // Harbor contract of 75.0 valued at 1:20's 309.36 over its Walls'
+    // 121.5, the Harbor queued)
+    itemValue: (c, plot) => {
+      if (c.unit) return tables.units[AI_UNIT_INDEX.get(c.unit) ?? -1] ?? FX_MIN;
+      if (c.building) return tables.buildings[AI_BUILDING_INDEX.get(c.building) ?? -1] ?? FX_MIN;
+      const row = c.district ? AI_DISTRICTS.findIndex((r) => r.type === c.district) : -1;
+      if (row < 0) return 0;
+      if (plot >= 0) return evals.find((e) => e.plot === plot)?.districts[row] ?? 0;
+      return evals.reduce((m, e) => Math.max(m, e.districts[row]), 0);
+    },
     unitRow: (u) => {
       const r = AI_UNITS[AI_UNIT_INDEX.get(u)!];
       return { combat: r.combat, buildCharges: r.buildCharges, sea: r.domain === 'DOMAIN_SEA', mustPurchase: r.mustPurchase, recon: r.recon };

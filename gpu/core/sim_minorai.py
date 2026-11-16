@@ -2623,10 +2623,12 @@ class _MinorWorld:
         frc = fr.clamp(min=0)
         clears = (fr >= 0) & CT.f_removable.to(dev)[frc] & ~CT.f_valid_district.to(dev)[frc]
         # the minor's removal (the Builder's: a removable row under its
-        # research, the Deforestation Treaty not standing on it)
+        # research, the Deforestation Treaty not standing on it), the plot's
+        # resource on the feature not asked: the resource-free chop key
         ftu = sim.tile_ftu.gather(1, fl)
         researched = (ftu >= 0) & sim.citystate_techs[:, self.s].gather(1, ftu.clamp(min=0))
-        removes = (sim.tile_ftr.gather(1, fl) > 0) & researched & ~sim._congress_chop(fid)[0]
+        ftr = torch.maximum(sim.tile_ftr, sim._nr_bare["tile_ftr"]).gather(1, fl)
+        removes = (ftr > 0) & researched & ~sim._congress_chop(fid)[0]
         row_m = sim._CITY_MINOR0 + self.s
         seen = sim._res_live().gather(1, fl) & ~sim._res_hidden(row_m).gather(1, fl)
         rid = sim.res_id.gather(1, fl)
@@ -2674,7 +2676,18 @@ class _MinorWorld:
     def item_value(self, unit, bld, dist, plot):
         u = torch.where(unit >= 0, self._ut.gather(1, unit.clamp(min=0).unsqueeze(1)).squeeze(1), _FX_MIN)
         b = torch.where(bld >= 0, self._bt.gather(1, bld.clamp(min=0).unsqueeze(1)).squeeze(1), _FX_MIN)
-        return torch.where(unit >= 0, u, b)
+        # a district's (0x5d4a20): its row in the plot's evaluation, 0 where
+        # the analysis holds none of the plot; with no plot the best of every
+        # evaluation's, from 0
+        ev = self._evals
+        dists = ev["dists"]
+        nd = dists.shape[2]
+        dsel = dists.gather(2, dist.clamp(min=0, max=max(nd - 1, 0)).view(-1, 1, 1).expand(-1, dists.shape[1], 1)).squeeze(2)
+        at = ev["plot"] == plot.unsqueeze(1)
+        d_at = (dsel * at.long()).sum(dim=1)
+        d_any = torch.where(ev["plot"] >= 0, dsel, torch.zeros_like(dsel)).amax(dim=1).clamp(min=0)
+        d = torch.where(dist >= 0, torch.where(plot >= 0, d_at, d_any), torch.zeros_like(dist))
+        return torch.where(unit >= 0, u, torch.where(bld >= 0, b, d))
 
     def building_held(self, row):
         names = self._b_names

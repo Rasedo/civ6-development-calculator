@@ -60,7 +60,7 @@ const TREE_SLOT: Readonly<Record<string, number>> = {
   'Build City Building': SLOT_UNIT_OR_BUILDING, 'Build City District': SLOT_DISTRICT, 'Build City Improvement': SLOT_IMPROVEMENT,
 };
 
-type FieldKind = 'unit' | 'int' | 'bool' | 'improvement' | 'unitType' | 'turn';
+type FieldKind = 'unit' | 'int' | 'bool' | 'improvement' | 'unitType' | 'turn' | 'id';
 
 /** a node's own fields by node type: [our mem key, its data offset, what it holds] */
 const NODE_FIELDS: Readonly<Record<string, readonly [string, number, FieldKind][]>> = {
@@ -68,6 +68,9 @@ const NODE_FIELDS: Readonly<Record<string, readonly [string, number, FieldKind][
   'Clear Plot': [['unit', 0x40, 'unit']],
   'Build Improvement': [['unit', 0x50, 'unit'], ['improvement', 0x54, 'improvement']],
   'Contract Manager Decorator': [['counter', 0x50, 'int']],
+  // the contract it submitted, taken or not (0x7f4240 at 0x7f48cc); one set
+  // with its tag's contract gone FAILS the node (0x7f4e00 at 0x7f4f1e)
+  'Build Unit': [['contract', 0x90, 'id']],
   'Turn Limiter': [['start', 0x30, 'turn']],
   'Recruit Units': [['listed', 0x80, 'int'], ['done', 0x88, 'bool'], ['unit', 0x8c, 'unitType']],
 };
@@ -160,6 +163,8 @@ function runOf(w: ImportWorld, rows: readonly AiTreeNode[], g: GameTree): GameRu
         if (raw > 0) mem[k][key] = raw + w.turnShift;
       } else if (kind === 'bool') {
         if (raw) mem[k][key] = true;
+      } else if (kind === 'id') {
+        if (raw > 0) mem[k][key] = raw;
       } else mem[k][key] = raw;
     }
     if (row.type === 'Sequence' && graph) mem[k].resume = graph[4];

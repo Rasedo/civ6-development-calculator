@@ -19332,3 +19332,53 @@ production step (cpu/core/phase.ts) and the import; GPU `_proj_converted`
   unseen boosts The Wheel once the Iron shows; which signals the four
   functors are bound to (the game's event table +0x7f8, +0x828, +0x10e0) is
   unread.
+
+## C-96 / C-127: a district contract valued at its plot, Build Unit's submitted contract, the feature's removal under a resource — READ (0x5f5d50 at 0x5f5e68..0x5f5efd, 0x5d4a20, 0x7f4e00 at 0x7f4f1e, 0x7f4240 at 0x7f48cc, 0x35f2d0 at 0x35f773..0x35f81d, 0x892d40), both twins
+
+- THE DISTRICT CONTRACT'S VALUE (the contract evaluation 0x5f5d50, its
+  district arm 0x5f5e68..0x5f5efd): the higher of the contract's value
+  (+0x3a0) and 0x5d4a20(city AI, district, the contract's plot +0x528):
+  the plot evaluation (+0xcf8, 0x78-byte entries, x +8 / y +0xc) at the
+  plot, its DISTRICTS row (+0x20 [district]), 0 where no evaluation holds
+  the plot; with no plot the best of every evaluation's from 0. The
+  Default Specialization's head values the contract in hand so.
+  Ported: the minor's `itemValue` (minorCityAi.ts `minorTreeCity`); GPU
+  `_MinorWorld.item_value`.
+- CONFIRMED: runs/h1_duels1173 Ayutthaya t52: its Harbor contract 121
+  (75.0) valued at 1:20's DISTRICTS row 309.36 (the end look's 79196 /
+  256), queued over its Walls contract's 121.5. The walls-for-district
+  rows of the same shape go on 1141 t74, 1143 t66, 1148 t44, 1154 t51,
+  1155 t72, 1169 t58 / t60, 1184 t56 (aimem windows).
+- BUILD UNIT'S SUBMITTED CONTRACT: the execution (0x7f4240 at 0x7f48cc)
+  writes the contract's id to the node's +0x90 after the submission,
+  whether a taker ACCEPTED it or not; the update (0x7f4e00 at 0x7f4f1e),
+  with no live contract under the Contract ID tag, FAILS where +0x90 is
+  set. A contract none took so ends its tree the next tick, and the slot
+  stays held through that turn's events (the update runs before the
+  tick). The importer reads +0x90 into the node's memory
+  (`NODE_FIELDS`, gameAiImport.ts).
+- CONFIRMED: runs/h1_duels1165 Vatican City t185-t191: its Neighborhood
+  trees of t185 / t187 / t189 submit to no taker (+0x90 902 / 924 / 939,
+  the tag 0) and end the turn after, the one of t191 taken (956); the
+  window t181-t191 loses the t186 / t190 contract rows, 1157 t207 / t209
+  and 1178 t183 alike.
+- THE FEATURE'S REMOVAL AT THE PLACEMENT: 0x35f2d0's feature arm
+  (0x35f773..0x35f7b0) passes a removable feature (Features +0xc1 bit
+  0x80) where its sixth argument holds — 0x892410: the plot the city's
+  own (owner +0x1c and city +0xc) and 0x892d40 — or the Features_XP2
+  flag 2 (sil). 0x892d40 asks the row removable, the plot outside
+  0x3306f0's set, the fallout test, the row's removal technology
+  (+0x160 +0x14) held and the ban 0x469d10: not the plot's resource
+  standing on the feature. Its resource arm (0x35f7b6..0x35f81d): a
+  resource the player sees (0x5112f0) refused where the seventh argument
+  (0x510dd0, the harvest) is clear, or where the Resources row's list
+  +0x78 is empty. Ported: `contractPlotRefused` asks the removal on the
+  plot with its resource set aside; GPU `_contract_plot_refused` on the
+  resource-free chop key (`_nr_bare` tile_ftr).
+- CONFIRMED: runs/h1_duels1166 Muscat t83: its Commercial Hub contract on
+  40:12 (Rainforest, Bananas) taken; 1183 t159 the Neighborhood on 36:11
+  (Rainforest, Bananas), 1160 t130 the Encampment on 38:14, 1121 t187 the
+  Neighborhood on 43:20 (Woods, Deer), 1171 t243 on 39:3 (Woods, Deer).
+- Open: 0x3306f0's plot set and 0x469d10's ban are not asked apart from
+  the Congress's chop ban; the city's own plot is the seat's in the
+  engines (the city id +0xc unasked).

@@ -978,7 +978,7 @@
 - addr: 0x7f4e00
   final: 0x55c550
   kind: function
-  semantics: "Build Unit's update: its \"already held\" test reads the city's buildings (0x18e9f0 City_Buildings -> 0x18fe60 HasBuilding), not its queue. At 0x7f510d: Build Unit's district test (to 0x7f513c): the desired district held (0x1aec20 on the city's districts +0x1a48, its third argument 1: complete) and 0x1ad720 false SUCCEEDS; a pillaged district is not held, the tree submits its contract, which the city's queue takes as the district's repair. Ported: districtHeld / district_held. At 0x7f50e9: Build Unit's building test (to 0x7f5103): the city holds the building (0x18e9f0) and it is not pillaged (0x18fe60) -> held (0x7f513c); a pillaged one is not held, the contract stands and the queue takes it as the repair. Ported: buildingHeld / buildingBlocked, _MinorWorld.building_held / building_blocked."
+  semantics: "Build Unit's update: its \"already held\" test reads the city's buildings (0x18e9f0 City_Buildings -> 0x18fe60 HasBuilding), not its queue. At 0x7f510d: Build Unit's district test (to 0x7f513c): the desired district held (0x1aec20 on the city's districts +0x1a48, its third argument 1: complete) and 0x1ad720 false SUCCEEDS; a pillaged district is not held, the tree submits its contract, which the city's queue takes as the district's repair. Ported: districtHeld / district_held. At 0x7f50e9: Build Unit's building test (to 0x7f5103): the city holds the building (0x18e9f0) and it is not pillaged (0x18fe60) -> held (0x7f513c); a pillaged one is not held, the contract stands and the queue takes it as the repair. Ported: buildingHeld / buildingBlocked, _MinorWorld.building_held / building_blocked. At 0x7f4f1e: with no live contract under its Contract ID tag, the contract it submitted (+0x90, set by the execution at 0x7f48cc, taken or not) FAILS the node; the importer reads +0x90 (gameAiImport NODE_FIELDS)."
   status: PARTLY
   cases:
     - recording: h1_duely1121
@@ -992,6 +992,7 @@
       value: "0x7f510d..0x7f513c: a pillaged district is not held; Nazca's Holy Site (pillaged t24) DISTRICT_HOLY_SITE contracts t49-t149"
   impl:
     - cpu/core/aiContracts.ts:buildUnitNode
+    - cpu/harness/gameAiImport.ts:NODE_FIELDS
     - gpu/core/sim_citytrees.py:_u_build_unit
     - cpu/core/minorCityAi.ts:minorTreeCity
     - gpu/core/sim_minorai.py:district_held
@@ -999,6 +1000,7 @@
     - cpu/core/minorCityAi.ts:districtDrowned
     - cpu/core/minorCityAi.ts:districtOverLimit
   readings:
+    - "C-96 / C-127: a district contract valued at its plot, Build Unit's submitted contract, the feature's removal under a resource — READ (0x5f5d50 at 0x5f5e68..0x5f5efd, 0x5d4a20, 0x7f4e00 at 0x7f4f1e, 0x7f4240 at 0x7f48cc, 0x35f2d0 at 0x35f773..0x35f81d, 0x892d40), both twins"
     - "C-96: the plot analysis's owner test, Build Unit's pillaged district and a unique's install type — READ (0x5ceba7, 0x7f5112 -> 0x1aec20 / 0x1ad720), both twins"
     - "C-97: the behaviour trees — READ (the interpreter), the nodes PARTLY READ"
     - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
