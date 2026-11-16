@@ -3,6 +3,17 @@
 # `review: imported` = bootstrapped from dll_readings.md / code comments / saved
 # labels and not yet reviewed: verify against the disassembly, then edit and
 # set `review: reviewed`.
+- addr: 0x892d40
+  final: 0x5d9610
+  kind: function
+  semantics: "the Remove Feature operation's test (LOC_OPERATION_REMOVE_FEATURE_*): the feature removable under the player's research"
+  status: PARTLY
+  impl: [cpu/core/minorCityAi.ts:contractPlotRefused, gpu/core/sim_minorai.py:_contract_plot_refused]
+  readings:
+    - "C-96 / C-127: a minor's unit order at its formation; a district contract's plot at the eligibility — READ (0x178820, 0x172820 at 0x17378b..0x173925, 0x1793d0, 0x5ca5a0 at 0x5ca63d..0x5ca68d, 0x5f6050 at 0x5f637f..0x5f6436, 0x173940 at 0x173db0..0x173e98, 0x35f2d0 at 0x35f46b..0x35f48a, 0x892410, 0x510dd0), both twins"
+  context:
+    - "...h the city: its sixth argument 0x892410 (the plot the city's own, the feature's removal 0x892d40), its seventh 0x510dd0 (the plot the city's own, the harvest 0x510e70: a Resource_Har..."
+  review: reviewed
 - addr: 0x896c40
   final: 0x5dce20
   kind: function

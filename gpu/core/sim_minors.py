@@ -1954,9 +1954,11 @@ class SimMinors:
         self._mb_d_k = torch.tensor([int(dcp["perK"][d]) if d < len(dcp["perK"]) else int(dcp["k"]) for d in range(n_d)] or [0],
                                     dtype=torch.long, device=dev)
         B, S = self.citystate_prod.shape
-        # the item in hand (-1 nothing), the overflow store, and the progress
+        # the item in hand (-1 nothing), its unit's military formation (0 a
+        # lone unit or another item), the overflow store, and the progress
         # each item it switched away from keeps (`minorBuild`)
         self.citystate_item = torch.full((B, S), -1, dtype=torch.long, device=dev)
+        self.citystate_formation = torch.zeros(B, S, dtype=torch.long, device=dev)
         self.citystate_ovf = torch.zeros(B, S, dtype=torch.float64, device=dev)
         self.citystate_kept = torch.zeros(B, S, self._mk_r0 + n_b, dtype=torch.float64, device=dev)
 
@@ -1985,9 +1987,10 @@ class SimMinors:
                 (key >= self._mk_d0) & (key < self._mk_p0), (key >= self._mk_p0) & (key < self._mk_r0),
                 key >= self._mk_r0)
 
-    def _minor_item_cost(self, s: int, key: torch.Tensor) -> torch.Tensor:
+    def _minor_item_cost(self, s: int, key: torch.Tensor, formation: torch.Tensor | None = None) -> torch.Tensor:
         """[B] f64 — `minorItemCost` of the key per game: a unit's Production
-        cost (a Builder's and a Trader's climbing), a building's (the Flood
+        cost (a Builder's and a Trader's climbing) at its military
+        `formation` ([B] long, None a lone unit: `_formation_cost`), a building's (the Flood
         Barrier's off the lowland it covers), a district's own base (the
         price its city locked at the type's placement, on any plot), a
         project's (the walls' repair the HP it puts back), a repair's rest
@@ -1997,6 +2000,8 @@ class SimMinors:
         is_u, is_b, is_d, is_p, is_r = self._mk_kinds(key)
         ui = key.clamp(min=0, max=self.NU - 1)
         out = self._unit_progress_cost(row, ui).double()
+        if formation is not None:
+            out = self._formation_cost(out, formation)
         if self._builder_idx >= 0:
             out = torch.where(ui == self._builder_idx, self._builder_cost(self.citystate_builders_trained[:, s]).double(), out)
         nb = int(rd.b_cost.shape[0])
@@ -2071,11 +2076,13 @@ class SimMinors:
             pd = torch.where(dv == int(self._harbor_didx), zero + self._mb_harbor_pct, pd)
         return torch.where(is_u, pu, torch.where(is_b, pb, torch.where(is_d, pd, zero)))
 
-    def _minor_set_item(self, s: int, mask: torch.Tensor, key, site=None) -> None:
+    def _minor_set_item(self, s: int, mask: torch.Tensor, key, site=None, formation=None) -> None:
         """`minorSetItem` where `mask` (`key` an int or [B] long, -1 none, a
-        district's plot `site`): the item left keeps its progress
-        (`citystate_kept`, where it holds any), the one taken resumes at what
-        it kept; a district's plot rides with it (`citystate_prod_site`)"""
+        district's plot `site`, a unit's military `formation` [B] long, None
+        a lone unit): the item left keeps its progress (`citystate_kept`,
+        where it holds any), the one taken resumes at what it kept, a unit's
+        its type's at any formation; a district's plot rides with it
+        (`citystate_prod_site`), a unit's formation (`citystate_formation`)"""
         k_all = key if torch.is_tensor(key) else torch.full((self.B,), int(key), dtype=torch.long, device=self.device)
         # the facts' memos of the build turns read the item in hand
         self._mi_ver = getattr(self, "_mi_ver", 0) + 1
@@ -2083,6 +2090,10 @@ class SimMinors:
         st = site if site is not None else torch.full_like(k_all, -1)
         self.citystate_prod_site[:, s] = torch.where(mask, torch.where(is_d, st, torch.full_like(st, -1)),
                                                      self.citystate_prod_site[:, s])
+        is_u = (k_all >= 0) & (k_all < self._mk_b0)
+        fm = formation if formation is not None else torch.zeros_like(k_all)
+        self.citystate_formation[:, s] = torch.where(mask, torch.where(is_u, fm, torch.zeros_like(fm)),
+                                                     self.citystate_formation[:, s])
         self._minor_place_district(s, mask & is_d, k_all, st)
         cur = self.citystate_item[:, s]
         ch = mask & (cur != k_all)
@@ -2111,7 +2122,7 @@ class SimMinors:
             item = self.citystate_item[:, s]
             ui = item.clamp(min=0, max=self.NU - 1)
             slot = self._type_res_slot.take(ui)
-            need = self._type_res_cost.take(ui)
+            need = self._minor_res_need(s, ui)
             fresh = (ch & (item >= 0) & (item < self._mk_b0) & (slot >= 0)
                      & (self.citystate_prod[:, s] <= 0) & (self.citystate_prod_reserved[:, s] < 0))
             if bool(fresh.count_nonzero()):
@@ -2121,6 +2132,42 @@ class SimMinors:
                 self._minor_reserve(s, fresh & ~drop, slot, need)
                 if bool(drop.count_nonzero()):
                     self._minor_set_item(s, drop, -1)
+
+    def _minor_res_need(self, s: int, ui: torch.Tensor) -> torch.Tensor:
+        """[B] long — the strategic cost of the minor's unit in hand `ui` at
+        its formation (`unitResourceCost`'s `formationResourceCost`)"""
+        need = self._type_res_cost.take(ui)
+        form = self.citystate_formation[:, s]
+        return torch.where(form > 0, self._formation_res_cost(self._type_res_base.take(ui), form), need)
+
+    def _minor_formation(self, s: int, key: torch.Tensor) -> torch.Tensor:
+        """[B] long — `minorFormation` (0x178820): the formation the city AI's
+        order of unit key `key` takes, 2 where CanTrain passes at an Army or
+        Armada, else 1 at a Corps or Fleet, else 0 (a lone unit, any key not
+        a unit's): a unit with Combat, of the land or sea domain, not the
+        Giant Death Robot, the tier's civic in, the Military Academy (land)
+        or the Seaport (sea) standing unpillaged in the city"""
+        B, dev = self.B, self.device
+        row = self._CITY_MINOR0 + s
+        ui = key.clamp(min=0, max=self.NU - 1)
+        naval = self.unit_naval.take(ui)
+        ok = ((key >= 0) & (key < self._mk_b0) & (self._type_combat.take(ui) > 0) & (self._type_air.take(ui) == 0)
+              & (ui != self._gdr_idx))
+        none = torch.zeros(B, dtype=torch.bool, device=dev)
+        has_ma = none
+        if self._ma_bidx >= 0:
+            has_ma = self.city_bldg[:, row, 0, self._ma_bidx] & ~self.city_bldg_pillaged[:, row, 0, self._ma_bidx]
+        has_sp = none
+        if self._seaport_bidx >= 0:
+            has_sp = self.city_bldg[:, row, 0, self._seaport_bidx] & ~self.city_bldg_pillaged[:, row, 0, self._seaport_bidx]
+        ok = ok & torch.where(naval, has_sp, has_ma)
+        out = torch.zeros(B, dtype=torch.long, device=dev)
+        if not bool(ok.count_nonzero()):
+            return out
+        land1, sea1 = self._form_civic_ok(row, 1)
+        land2, sea2 = self._form_civic_ok(row, 2)
+        out = torch.where(ok & torch.where(naval, sea1, land1), torch.ones_like(out), out)
+        return torch.where(ok & torch.where(naval, sea2, land2), torch.full_like(out, 2), out)
 
     def _minor_reserve(self, s: int, mask: torch.Tensor, slot: torch.Tensor, need: torch.Tensor) -> None:
         """`reserveStockpile` where `mask`: the queue front reserves the unit
@@ -2484,11 +2531,13 @@ class SimMinors:
         return at
 
     def _minor_spawn(self, s: int, mask: torch.Tensor, ui: torch.Tensor,
-                     grants: bool = True, stack: bool = False) -> torch.Tensor:
+                     grants: bool = True, stack: bool = False,
+                     formation: torch.Tensor | None = None) -> torch.Tensor:
         """[B] — a unit of chassis `ui` lands on the minor's centre or its
         district (`_city_unit_plot`) or that plot's ring
         (`spawnUnit`; `stack`: one it trains, on the plot beside its own
-        units, `_spawn_unit`'s `stack`) under its seat, carrying what the
+        units, `_spawn_unit`'s `stack`) under its seat, at its military
+        `formation` ([B] long, None a lone unit), carrying what the
         city's buildings hand a unit trained there (`applyTrainingGrants`)
         unless `grants` is off; a Builder counts toward the next one's price.
         Every such unit is trained or bought, so it raises the minor's best
@@ -2504,8 +2553,8 @@ class SimMinors:
                 self.city_dist_tile[:, row, 0], self.city_bldg_pillaged[:, row, 0])
             xp = self._train_xp_pct(bl, u0, row, col0)
         landed = self._spawn_unit(row, mask, self._city_unit_plot(row, 0, self.citystate_center[:, s].clamp(min=0), u0),
-                                  u0, init_xp=xp, stack=stack)
-        self._raise_best_trained(row, landed, u0)
+                                  u0, init_xp=xp, formation=formation, stack=stack)
+        self._raise_best_trained(row, landed, u0, formation)
         self._gen_ver += 1
         return landed
 
@@ -2550,7 +2599,7 @@ class SimMinors:
         self.citystate_repair_wait[:, s] &= ~(alive & ~first & (held < 0))
         item = torch.where(first, rep_key, torch.where(held >= 0, held, rep_key))
         site = torch.where(item == cur, self.citystate_prod_site[:, s], torch.full_like(item, -1))
-        self._minor_set_item(s, alive, item, site)
+        self._minor_set_item(s, alive, item, site, self.citystate_formation[:, s])
         # the step's head check (0x16f050 at 0x16f09a..0x16f180): a building
         # at the queue's head that CanConstruct refuses leaves the front, its
         # progress kept (0x17f5a0), and the step works what follows — nothing
@@ -2585,7 +2634,7 @@ class SimMinors:
         if self._n_strategic:
             ui = item.clamp(min=0, max=self.NU - 1)
             slot = self._type_res_slot.take(ui)
-            need = self._type_res_cost.take(ui)
+            need = self._minor_res_need(s, ui)
             fresh = (alive & (item >= 0) & (item < self._mk_b0) & (slot >= 0) & (need > 0)
                      & (self.citystate_prod[:, s] <= 0) & (self.citystate_prod_reserved[:, s] < 0))
             if bool(fresh.count_nonzero()):
@@ -2601,7 +2650,7 @@ class SimMinors:
         if not bool(act.count_nonzero()):
             return
         pct = self._minor_item_pct(s, item)
-        cost = self._minor_item_cost(s, item)
+        cost = self._minor_item_cost(s, item, self.citystate_formation[:, s])
         before = self.citystate_prod[:, s].clone()
         paid = made + self.citystate_ovf[:, s]
         self.citystate_prod[:, s] = torch.where(act, before + paid * ((100 + pct) / 100) * self._minor_item_mult(item), before)
@@ -2693,7 +2742,7 @@ class SimMinors:
         if bool(m.any()):
             ui = item.clamp(min=0, max=self.NU - 1)
             slot0 = self.unit_next.clone()
-            landed = self._minor_spawn(s, m, ui, stack=True)
+            landed = self._minor_spawn(s, m, ui, stack=True, formation=self.citystate_formation[:, s])
             uid = torch.where(landed, self.POOL_LO["major"] + slot0, uid)
             u_row = torch.where(landed, T["engine_row"].to(dev).take(ui), u_row)
             fin = fin | landed
@@ -2779,6 +2828,7 @@ class SimMinors:
         self.citystate_prod[:, s] = torch.where(fin, torch.zeros_like(self.citystate_prod[:, s]), self.citystate_prod[:, s])
         self.citystate_item[:, s] = torch.where(fin, torch.full_like(item, -1), self.citystate_item[:, s])
         self.citystate_prod_site[:, s] = torch.where(fin, torch.full_like(item, -1), self.citystate_prod_site[:, s])
+        self.citystate_formation[:, s] = torch.where(fin, torch.zeros_like(item), self.citystate_formation[:, s])
         built = fin & ((u_row >= 0) | (b_row >= 0) | (d_row >= 0)) & self.citystate_ai_on[:, s]
         if bool(built.any()):
             contract_built(self.cityai, s, -1, u_row, b_row, d_row, uid, built,

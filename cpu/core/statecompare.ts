@@ -1118,6 +1118,7 @@ const CITY_STATE_G: Record<string, Extractor> = {
   minorCivicRetained: overCityStates((cityState) => [...CIVIC_IDX.keys()].map((id) => cityState.research.civicRetained[id] ?? 0)),
   prodProgress: overCityStates((cityState) => cityState.prodProgress ?? 0),
   minorProdItem: overCityStates((cityState) => (cityState.prodItem ? minorItemIdx(cityState.prodItem) : -1)),
+  minorProdFormation: overCityStates((cityState) => cityState.prodFormation ?? 0),
   minorProdOverflow: overCityStates((cityState) => cityState.prodOverflow ?? 0),
   minorProdKept: overCityStates((cityState) => Object.entries(cityState.prodRetained ?? {})
     .map(([k, v]) => [minorItemIdx(k), v] as const).sort((a, b) => a[0] - b[0]).flat()),

@@ -344,6 +344,7 @@
     - gpu/core/sim_minors.py:_minor_can_train
     - cpu/core/aiCityBuild.ts:CityBuildFacts
     - cpu/core/minorBuild.ts:majorCivOnly
+    - cpu/core/minorBuild.ts:minorFormation
   readings:
     - "C-127 / C-96: a minor's unit versions, the unit table's religion gate and the building value's era reasons — READ, both twins"
     - "C-96: CanTrain's obsolescence and the contract purchase's refusal — READ (0x172820's prerequisite block, 0x538460, the callers' sixth argument), ported both twins"
@@ -357,6 +358,7 @@
     - "C-127 / C-98: a minor's purchase charges its strategic cost; the resource value's project term; a minor's MajorCivOnly units in its unit production table — READ (0xa540c0, 0x7a21e0 at 0x7a2b71, 0xa9cfb0, 0x4f4a50, 0x172941), both twins"
     - "C-127 / C-96: the improvement pick's unit test, a Fort's tree, Find Available Unit's types, a held district not OnePerCity, the walls' repair cooldown — READ (0x5c9a00 at 0x5c9c85..0x5c9ca4, 0x35ede0 at 0x35f058..0x35f05f, 0x5ccc10, 0x7f6ea0 at 0x7f7028..0x7f72b7, 0x7ec7b0 at 0x7ec90f..0x7eca80, 0x16f7b0 at 0x16fd9f..0x16fe10, 0x198180, 0x248800 at 0x2488d6..0x2488f9), both twins"
     - "C-127: a major's Religious AI faith boost and the trade path's drowned plots — READ (0x74f5a0, 0x5583a0 / 0x558460's plot info), the wanted unit's value unread, both twins"
+    - "C-96 / C-127: a minor's unit order at its formation; a district contract's plot at the eligibility — READ (0x178820, 0x172820 at 0x17378b..0x173925, 0x1793d0, 0x5ca5a0 at 0x5ca63d..0x5ca68d, 0x5f6050 at 0x5f637f..0x5f6436, 0x173940 at 0x173db0..0x173e98, 0x35f2d0 at 0x35f46b..0x35f48a, 0x892410, 0x510dd0), both twins"
   notes: ["label: CanTrain(unit)"]
   context:
     - ...x5 first); the unit without FoundCity (+0x1b9 bit 2) or BuildCharges (+0x44), CanTrain (0x172820), not MustPurchase (+0x1b9 bit 128). Defensive pick (flags 1, 1; the military AI's +0x4...
@@ -378,9 +380,11 @@
     - cpu/core/minorCityAi.ts:districtOverLimit
     - gpu/core/sim_minorai.py:district_blocked
     - cpu/core/minorCityAi.ts:minorTreeCity
+    - cpu/core/minorCityAi.ts:contractPlotRefused
   readings:
     - "C-127 / C-100: the plot test's SameAdjacentValid walk takes the plot itself; a district contract past the population's limit — READ (0x35fd60 at 0x35ffad..0x360008, 0x173940 at 0x173d2e..0x173dad, 0x5f6050 at 0x5f641d..0x5f6436), both twins"
     - "C-127 / C-100 / C-96 / C-99: Check Plot's district test and Add Goal Tech's Goal Plot, a flooded lowland's district, the unit production table's at-war field, the pick's repair project — READ (0x7f6ea0 at 0x7f7600..0x7f7662, 0x35f2d0 at 0x35f46b..0x35f48a / 0x35f60f..0x35f81d, 0x7e7d20 at 0x7e888b..0x7e8a9d, 0x173940 at 0x173a05..0x173be1), LAB (the aiunits unit tables, the Default Specialization's project), both twins"
+    - "C-96 / C-127: a minor's unit order at its formation; a district contract's plot at the eligibility — READ (0x178820, 0x172820 at 0x17378b..0x173925, 0x1793d0, 0x5ca5a0 at 0x5ca63d..0x5ca68d, 0x5f6050 at 0x5f637f..0x5f6436, 0x173940 at 0x173db0..0x173e98, 0x35f2d0 at 0x35f46b..0x35f48a, 0x892410, 0x510dd0), both twins"
   notes: ["imported: cited by the code, in no dll_readings section"]
   review: reviewed
 - addr: 0x173f70
@@ -555,6 +559,23 @@
     - "C-98 / C-130: a city-state's building turns under the Urban Development Treaty — READ (0x17b1e0's rate), both twins"
     - "C-130: the analyzers a minor's policy jobs never reach, the treaties on a minor's queue, a major's cached net income — READ, both twins"
   review: reviewed
+- addr: 0x178820
+  final: 0xfc970
+  kind: function
+  name: the order's formation
+  semantics: "the formation a unit order takes (the city AI's unit queue 0x5ca5a0, the Default Specialization 0x5d4d70): 2 where CanTrain (0x172820) passes at formation 2, else 1 where it passes at 1, else 0"
+  status: READ
+  cases:
+    - recording: h1_duels1158
+      turn: 203
+      value: "Granada: its Military Academy complete, the Default Specialization's Cavalry queued at formation 2, 372 needed (City_BuildQueue.csv), the record's MilitaryFormationType 2"
+  impl: [cpu/core/minorBuild.ts:minorFormation, gpu/core/sim_minors.py:_minor_formation]
+  readings:
+    - "C-96 / C-127: a minor's unit order at its formation; a district contract's plot at the eligibility — READ (0x178820, 0x172820 at 0x17378b..0x173925, 0x1793d0, 0x5ca5a0 at 0x5ca63d..0x5ca68d, 0x5f6050 at 0x5f637f..0x5f6436, 0x173940 at 0x173db0..0x173e98, 0x35f2d0 at 0x35f46b..0x35f48a, 0x892410, 0x510dd0), both twins"
+  context:
+    - "...inor's unit order at its formation; a district contract's plot at the eligibility — READ (0x178820, 0x172820 at 0x17378b..0x173925, 0x1793d0, 0x5ca5a0 at 0x5ca63d..0x5ca68d, 0x5f6050 at 0x..."
+    - "...ecialization's pick and its contract's alike): the order (0x97a450) takes the formation 0x178820 names — 2 where CanTrain (0x172820) passes at formation 2, else 1 where it passes at 1,..."
+  review: reviewed
 - addr: 0x178c50
   kind: function
   semantics: a district's project production modifier.
@@ -580,6 +601,21 @@
   context:
     - "...building multiplier): the queue's +0x324 above 1.0 where the building's district plot (0x179280 -> vt +0x60) is adjacent (0x823c0) to the city's plot with the river bit of their direc..."
   review: imported
+- addr: 0x1793d0
+  kind: function
+  semantics: "the city's Corps / Army discount on a unit type (City_BuildQueue +0x390 by unit: MODIFIER_CITY_CORPS_ARMY_ADJUST_DISCOUNT of the Military Academy, the Seaport), which CanTrain asks above 0 at formation 1 or 2"
+  status: READ
+  cases:
+    - recording: h1_duels1158
+      turn: 203
+      value: "Granada: its Military Academy complete, the Default Specialization's Cavalry queued at formation 2, 372 needed (City_BuildQueue.csv), the record's MilitaryFormationType 2"
+  impl: [cpu/core/minorBuild.ts:minorFormation]
+  readings:
+    - "C-96 / C-127: a minor's unit order at its formation; a district contract's plot at the eligibility — READ (0x178820, 0x172820 at 0x17378b..0x173925, 0x1793d0, 0x5ca5a0 at 0x5ca63d..0x5ca68d, 0x5f6050 at 0x5f637f..0x5f6436, 0x173940 at 0x173db0..0x173e98, 0x35f2d0 at 0x35f46b..0x35f48a, 0x892410, 0x510dd0), both twins"
+  context:
+    - "...rict contract's plot at the eligibility — READ (0x178820, 0x172820 at 0x17378b..0x173925, 0x1793d0, 0x5ca5a0 at 0x5ca63d..0x5ca68d, 0x5f6050 at 0x5f637f..0x5f6436, 0x173940 at 0x173db0..0x..."
+    - "...tier's civic) and the city's discount on the unit type (City_BuildQueue +0x390 by unit, 0x1793d0: MODIFIER_CITY_CORPS_ARMY_ADJUST_DISCOUNT of the Military Academy for land, the Seaport..."
+  review: reviewed
 - addr: 0x179510
   final: 0xfd020
   kind: function
@@ -884,6 +920,7 @@
     - "C-96: the unit value's unit count and the founding Production — READ, both twins"
     - "C-96: the unit value's unit count and the founding Production"
     - "A minor's items' turns at the Production its AI read before its free Trader's route — the C-130 cache applied to the build turns, both twins"
+    - "C-96 / C-127: a minor's unit order at its formation; a district contract's plot at the eligibility — READ (0x178820, 0x172820 at 0x17378b..0x173925, 0x1793d0, 0x5ca5a0 at 0x5ca63d..0x5ca68d, 0x5f6050 at 0x5f637f..0x5f6436, 0x173940 at 0x173db0..0x173e98, 0x35f2d0 at 0x35f46b..0x35f48a, 0x892410, 0x510dd0), both twins"
   context:
     - "...t, valueHorizons[1]). A unit: 0x7b62c0(unit, T from its prerequisites and train turns 0x17bb40, +10 likewise, valueHorizons[1]); a project 0x7b28c0; a wonder 0x7a4d40 at its plot wit..."
     - "...buildings' turns (+0x258), then, but for MustPurchase (+0x1b9 bit 128), the train turns 0x17bb40 and +10 while the city builds another item; negative T values FX(-9999). Measured: the..."
@@ -995,6 +1032,7 @@
     - "C-96: a unit's strategic cost through the game speed, the pick's pillaged district and the queue's pillaged project"
     - "C-127 / C-98: a minor's purchase charges its strategic cost; the resource value's project term; a minor's MajorCivOnly units in its unit production table — READ (0xa540c0, 0x7a21e0 at 0x7a2b71, 0xa9cfb0, 0x4f4a50, 0x172941), both twins"
     - "C-127: a city-state's completed unit keeps its strategic cost in the stock, reserved; a resource value's copies the stock less the reservations — READ (0x1853d0 at 0x18562c / 0x185988, 0x182b80 at 0x182bae, 0x17f3a0, 0x4a93c0), both twins; Add Goal Tech's kept contracts and execution — READ (0x7e7d20 at 0x7e7ea7..0x7e7fb2, 0x7e7200), unported"
+    - "C-96 / C-127: a minor's unit order at its formation; a district contract's plot at the eligibility — READ (0x178820, 0x172820 at 0x17378b..0x173925, 0x1793d0, 0x5ca5a0 at 0x5ca63d..0x5ca68d, 0x5f6050 at 0x5f637f..0x5f6436, 0x173940 at 0x173db0..0x173e98, 0x35f2d0 at 0x35f46b..0x35f48a, 0x892410, 0x510dd0), both twins"
   context:
     - ...8 / +0x1a0), no progress (0x17d1a0) and a StrategicResource (+0x2c8) reserves its cost (0x17c2e0, its formation's) where the stock less the reservations (0x4aa790) covers it (0x4a7400)...
   review: reviewed
@@ -1063,6 +1101,7 @@
   readings:
     - "C-96: the district value — READ (0x7a51f0, 0x7aaf80's terms below, 0x366df0, the purchase price 0x1b1cb0, 0x1c77c0, 0x1b4450), PARTLY READ (the golden-age term, the claims, modifiers and neighbours terms, the domain's resources path), unwired"
     - "C-100: a district on a feature it may not stand on, and the Mountain Portal's analyzer — READ"
+    - "C-96 / C-127: a minor's unit order at its formation; a district contract's plot at the eligibility — READ (0x178820, 0x172820 at 0x17378b..0x173925, 0x1793d0, 0x5ca5a0 at 0x5ca63d..0x5ca68d, 0x5f6050 at 0x5f637f..0x5f6436, 0x173940 at 0x173db0..0x173e98, 0x35f2d0 at 0x35f46b..0x35f48a, 0x892410, 0x510dd0), both twins"
   context:
     - "...ld value with no player, discounted T, taken off. A feature the district does not keep (0x17cb00) and the Features row does not let it clear: 0; else the feature removal (0x7a3010). A..."
   review: reviewed

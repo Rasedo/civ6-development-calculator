@@ -18,7 +18,10 @@
     - recording: h1_duelv1124
       turn: 155
       value: "of the   log's own-table misses 78 are the log's NO BUILDS where we pick (a valued   building the queue refuses — runs/h1_duelv1124 Cardiff t155..t157 holds an   unfilled Factory contract of t125 —, o"
-  impl: [cpu/harness/cityContractLab.ts:bests, cpu/core/minorBuild.ts:minorQueueOk]
+  impl:
+    - cpu/harness/cityContractLab.ts:bests
+    - cpu/core/minorBuild.ts:minorQueueOk
+    - cpu/core/minorBuild.ts:minorQueued
   readings: ["C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"]
   notes:
     - ".claude/scratchpad/cb/notes.txt: ...lue fx).  pick building if bv>=uv && bv>=pv; else unit if uv>=pv; else project. CanConstruct checks 0x5c9ea0/0x5ca5a0/0x5ca450;  fail -> 0x5d2810 fallback ('Generic Offense' / 'NO BUILDS AT ALL').  bestBuildi..."
@@ -41,7 +44,7 @@
     - recording: h1_duelv1124
       turn: 155
       value: "of the   log's own-table misses 78 are the log's NO BUILDS where we pick (a valued   building the queue refuses — runs/h1_duelv1124 Cardiff t155..t157 holds an   unfilled Factory contract of t125 —, o"
-  impl: [cpu/core/minorBuild.ts:minorQueueOk]
+  impl: [cpu/core/minorBuild.ts:minorQueueOk, cpu/core/minorBuild.ts:minorQueued]
   readings: ["C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"]
   notes:
     - ".claude/scratchpad/cb/notes.txt: ...lding if bv>=uv && bv>=pv; else unit if uv>=pv; else project. CanConstruct checks 0x5c9ea0/0x5ca5a0/0x5ca450;  fail -> 0x5d2810 fallback ('Generic Offense' / 'NO BUILDS AT ALL').  bestBuilding: value table pl..."
@@ -51,17 +54,22 @@
 - addr: 0x5ca5a0
   final: 0x3df600
   kind: function
-  semantics: queues the picked unit. Calls CanTrain (0x172820) with its sixth argument clear (0x5ca61e).
+  semantics: queues the picked unit. Calls CanTrain (0x172820) with its sixth argument clear (0x5ca61e); the order (0x97a450) at the formation 0x178820 names (0x5ca63d..0x5ca68d).
   status: PARTLY
   cases:
     - recording: h1_duelv1124
       turn: 155
       value: "of the   log's own-table misses 78 are the log's NO BUILDS where we pick (a valued   building the queue refuses — runs/h1_duelv1124 Cardiff t155..t157 holds an   unfilled Factory contract of t125 —, o"
-  impl: [cpu/harness/cityContractLab.ts:bests, cpu/core/minorBuild.ts:minorQueueOk]
+  impl:
+    - cpu/harness/cityContractLab.ts:bests
+    - cpu/core/minorBuild.ts:minorQueueOk
+    - cpu/core/minorBuild.ts:minorFormation
+    - cpu/core/minorBuild.ts:minorQueued
   readings:
     - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
     - "C-96: CanTrain's obsolescence and the contract purchase's refusal — READ (0x172820's prerequisite block, 0x538460, the callers' sixth argument), ported both twins"
     - "C-96: CanTrain's obsolescence and the contract purchase's refusal"
+    - "C-96 / C-127: a minor's unit order at its formation; a district contract's plot at the eligibility — READ (0x178820, 0x172820 at 0x17378b..0x173925, 0x1793d0, 0x5ca5a0 at 0x5ca63d..0x5ca68d, 0x5f6050 at 0x5f637f..0x5f6436, 0x173940 at 0x173db0..0x173e98, 0x35f2d0 at 0x35f46b..0x35f48a, 0x892410, 0x510dd0), both twins"
   notes:
     - ".claude/scratchpad/cb/notes.txt: ...pick building if bv>=uv && bv>=pv; else unit if uv>=pv; else project. CanConstruct checks 0x5c9ea0/0x5ca5a0/0x5ca450;  fail -> 0x5d2810 fallback ('Generic Offense' / 'NO BUILDS AT ALL').  bestBuilding: value..."
   context:

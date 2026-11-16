@@ -85,7 +85,7 @@ import { aiStrengths, dangerPlane, moveTo, moveUnitDanger, reachPlots, seatPoolS
 import { randRange } from './rand';
 import {
   installType, minorBuildFacts, minorBuilderLays, minorBuildingPrice, minorBuyBuilding, minorBuyUnit, minorItemFor, minorItemOfType, minorItemType, minorKnownUnits, minorPickFacts, minorRepairsDistrictAt, minorUnderThreat,
-  minorProjectFacts, minorResourceCounts, minorResourceFacts, minorSetItem, minorUnitPrice, minorUnitVersion, minorQueueOk,
+  minorProjectFacts, minorQueued, minorResourceCounts, minorResourceFacts, minorSetItem, minorUnitPrice, minorUnitVersion, minorQueueOk,
   minorCanTrain, minorListedCount, researchHolds, unitObsoleteIn,
 } from './minorBuild';
 
@@ -589,6 +589,35 @@ function currentItem(cs: CityState): ContractItem | null {
   return { unit: t.startsWith('UNIT_') ? t : null, building: t.startsWith('BUILDING_') ? t : null, district: t.startsWith('DISTRICT_') ? t : null };
 }
 
+/** THE DISTRICT CONTRACT'S PLOT REFUSED (the contract eligibility 0x5f6050
+ *  at 0x5f637f: CanConstruct 0x173940 at the contract's location, its
+ *  placement test 0x35f2d0 at 0x173e91 with the city's waivers): a plot in
+ *  the terrain manager's flooded set (0x35f46b, before the exemption of the
+ *  plot's own unfinished district: runs/h1_duels1146 Kandy t185-t198, its
+ *  Neighborhood on the flooded 38:10 submitted every second turn and taken
+ *  by none); else, on a plot not holding the district, a removable feature
+ *  without ValidDistrictPlacement the city may not remove there (the sixth
+ *  argument, 0x892410: the plot the city's own and the removal's test
+ *  0x892d40), a resource the minor sees it may not harvest there (the
+ *  seventh, 0x510dd0: the plot the city's own and a Resource_Harvests row
+ *  under its research, 0x510e70; runs/h1_duels1133 Kandy t11-t16: its Holy
+ *  Site on 6:14 taken by none while its harvest's research is a Tech
+ *  Contract), or a dig site it sees */
+function contractPlotRefused(state: GameState, cs: CityState, district: string, plot: number): boolean {
+  const tile = state.map.tiles[plot];
+  if (tile.flooded) return true;
+  if (tile.district && tile.district === engineId('district', district, 'DISTRICT_', DISTRICTS)) return false;
+  const own = tileSeat(tile) === cs.seat;
+  const g = plotGroundOf(state, cs.seat, plot);
+  const f = g.feature ? FEATURE_ROW.get(g.feature) : undefined;
+  if (f?.removable && !f.validDistrictPlacement && !(own && canRemoveFeature(state, tile, cs.seat).ok)) return true;
+  if (g.resource) {
+    const techs = RES.get(g.resource)?.harvestTechs ?? [];
+    if (!own || !techs.some((t) => !t || researchHolds(cs.research, t))) return true;
+  }
+  return digSeen(state, cs, tile);
+}
+
 /** the minor's city as its contracts, events and trees read it */
 function minorTreeCity(state: GameState, cs: CityState, facts: CityBuildFacts, tables: CityBuildTables, pf: PickFacts,
   evals: PlotEval[], threat: number): CityTreeCity {
@@ -637,7 +666,8 @@ function minorTreeCity(state: GameState, cs: CityState, facts: CityBuildFacts, t
       const id = engineId('building', b, 'BUILDING_', BUILDINGS);
       return !id || ((cs.buildings ?? []).includes(id) && !buildingPillaged(cs, id));
     },
-    districtBlocked: (d) => !engineId('district', d, 'DISTRICT_', DISTRICTS) || districtWhole(d) || districtDrowned(d) || districtOverLimit(d),
+    districtBlocked: (d, plot) => !engineId('district', d, 'DISTRICT_', DISTRICTS) || districtWhole(d) || districtDrowned(d) || districtOverLimit(d)
+      || (plot >= 0 && contractPlotRefused(state, cs, d, plot)),
     canTrain: (u) => pf.canTrain(u),
     trainsSea: facts.trainsDomain('DOMAIN_SEA'),
     buildTurns: (c) => facts.buildTurns(c.unit ?? c.building ?? c.district ?? ''),
@@ -1382,7 +1412,7 @@ function emptyQueuePick(state: GameState, cs: CityState, ai: CityAi, city: CityT
   // (0x5d5162 -> 0x5d516a)
   if (hand && takesTurn(hand, bests.unit.value, bests.project.value)
     && queueContract(hand, city, () => !!item && minorQueueOk(state, cs, item), () => undefined) && item) {
-    minorSetItem(state, cs, item);
+    minorSetItem(state, cs, minorQueued(state, cs, item));
     cs.prodSetValue = hand.value;
     return;
   }
@@ -1390,7 +1420,7 @@ function emptyQueuePick(state: GameState, cs: CityState, ai: CityAi, city: CityT
   const pick = defaultSpecialization(tables, pf);
   const it = pick ? minorItemFor(cs, pick.type) : null;
   if (pick && it && minorQueueOk(state, cs, it)) {
-    minorSetItem(state, cs, it);
+    minorSetItem(state, cs, minorQueued(state, cs, it));
     cs.prodSetValue = pick.value;
   }
 }

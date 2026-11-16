@@ -188,6 +188,9 @@ class CityTreeTables:
         k = max([len(x["harvestTechs"]) for x in ress] + [1])
         self.r_harvest_tech = torch.tensor([[self.tech_code.get(t, -2) if t else -1 for t in x["harvestTechs"]]
                                             + [-1] * (k - len(x["harvestTechs"])) for x in ress], dtype=torch.long)
+        # per resource row its Resource_Harvests rows' count (the columns of
+        # `r_harvest_tech` past it pad)
+        self.r_harvest_n = torch.tensor([len(x["harvestTechs"]) for x in ress] or [0], dtype=torch.long)
         # the Goal Plot alone: per feature row whether a district stands on
         # it unremoved; per resource row the technologies of the
         # improvements working it (its Improvement_ValidResources rows in

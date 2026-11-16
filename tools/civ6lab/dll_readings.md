@@ -19164,3 +19164,56 @@ wrapper over `_tac_spot_link` (gpu/core/sim_tactics.py).
     27:12 on player 0's Warrior on 27:13.
 - Open (AUDIT C-133, C-129): the target list's own district placed in the
   turn; an improvement the turn removes in the barbarians' list.
+
+## C-96 / C-127: a minor's unit order at its formation; a district contract's plot at the eligibility — READ (0x178820, 0x172820 at 0x17378b..0x173925, 0x1793d0, 0x5ca5a0 at 0x5ca63d..0x5ca68d, 0x5f6050 at 0x5f637f..0x5f6436, 0x173940 at 0x173db0..0x173e98, 0x35f2d0 at 0x35f46b..0x35f48a, 0x892410, 0x510dd0), both twins
+
+- THE ORDER'S FORMATION (0x5ca5a0 at 0x5ca63d..0x5ca68d, the city AI's
+  unit queue, the Default Specialization's pick and its contract's alike):
+  the order (0x97a450) takes the formation 0x178820 names — 2 where
+  CanTrain (0x172820) passes at formation 2, else 1 where it passes at 1,
+  else 0. CanTrain's formation (its fifth argument, 0x17378b..0x173925): a
+  unit with no Combat (Units +0x48) trains lone alone; a Units_XP2 row
+  without CanFormMilitaryFormation (+0x48 bit 0x4) none; each tier asks
+  the formation test (0x536da0 of the unit's domain 0xadd590, no unit:
+  the tier's civic) and the city's discount on the unit type (City_BuildQueue
+  +0x390 by unit, 0x1793d0: MODIFIER_CITY_CORPS_ARMY_ADJUST_DISCOUNT of the
+  Military Academy for land, the Seaport for sea) above 0. The queue
+  front's strategic reservation is the formation's charge (0x17c2e0 with
+  the formation). The value's turns (0x17bb40) read the lone unit.
+  Ported: `minorFormation` / `minorQueued` (minorBuild.ts), the unit item's
+  `formation` and `CityState.prodFormation` through `minorSetItem`,
+  `minorItemCost` (`formationCost`), `minorFinish`; the importer's
+  MilitaryFormationType; GPU `_minor_formation`, `citystate_formation`,
+  `_minor_set_item`'s formation, `_minor_item_cost`, `_minor_res_need`,
+  `_minor_spawn`'s formation.
+- CONFIRMED: runs/h1_duels1158 Granada t203: its Military Academy
+  complete, the Default Specialization's Cavalry queued at formation 2
+  (City_BuildQueue.csv 372 needed, the record's MilitaryFormationType 2,
+  m_aiReservedResources[42] 20 -> 43: the Army's 23), the Scouts of
+  t216-t229 at 34; the window t199-t247 loses every unit.trained and
+  cityState.build row of t211-t245 and the Sewer's contract rows.
+- THE DISTRICT CONTRACT'S PLOT (0x5f6050 at 0x5f637f..0x5f6436): the
+  eligibility asks CanConstruct (0x173940) at the contract's location
+  (+0x528), refused for good (the result's second byte) or on the
+  population (+0x20). With a location (0x173db0..0x173e98) CanConstruct
+  runs the placement test 0x35f2d0 with the city: its sixth argument
+  0x892410 (the plot the city's own, the feature's removal 0x892d40), its
+  seventh 0x510dd0 (the plot the city's own, the harvest 0x510e70: a
+  Resource_Harvests row under the player's research), its eighth the
+  district keeping the feature (0x17cb00); a refusal sets the second byte
+  (0x173e9a). 0x35f2d0 refuses a plot in the terrain manager's flooded set
+  (0x35f46b..0x35f48a) before its exemption of the plot holding the
+  district (0x35f4a6..0x35f4c4). A contract none takes goes, its tree's
+  Build Unit FAILING its next tick, and the district event starts the tree
+  anew.
+  Ported: `contractPlotRefused` in the minor's `districtBlocked`
+  (minorCityAi.ts); GPU `_MinorWorld._contract_plot_refused` in
+  `district_blocked`, `CityTreeTables.r_harvest_n`.
+- CONFIRMED: runs/h1_duels1146 Kandy t185-t198: its Neighborhood on the
+  flooded 38:10, the tree's Build Unit RUNNING with no contract at each
+  end look and the tree gone the turn after (the window t179-t200 loses its
+  20 contract rows); runs/h1_duels1133 Kandy t11-t16: the Holy Site on 6:14
+  taken by none while its Clear Ground Contract holds the harvest's
+  research (12 rows gone).
+- Open: the eighth argument's kept feature and the city's +0x1a8 district
+  list (0x173c64..0x173cca) are not asked by the engines' eligibility.

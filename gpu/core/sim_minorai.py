@@ -411,7 +411,8 @@ class SimMinorAi:
         ok = (key >= 0) & self._minor_queue_ok(s, key, site)
         q = queue_contract(ai, s, hand, w, ok, take)
         if bool(q.count_nonzero()):
-            self._minor_set_item(s, q, key, site)
+            # the queue's unit at its formation (`minorQueued`)
+            self._minor_set_item(s, q, key, site, self._minor_formation(s, key))
             self.citystate_prod_set_value[:, s] = torch.where(q, _cget(ai.c_value, s, hand), self.citystate_prod_set_value[:, s])
         # the queue's refusal FAILS the contract and the turn falls to the pick
         rest = idle & ~q
@@ -421,7 +422,7 @@ class SimMinorAi:
             pkey = self._minor_repair_key(s, self._minor_pick_key(kind, row))
             ok2 = rest & (pkey >= 0) & self._minor_queue_ok(s, pkey, torch.full_like(pkey, -1))
             if bool(ok2.count_nonzero()):
-                self._minor_set_item(s, ok2, pkey, torch.full_like(pkey, -1))
+                self._minor_set_item(s, ok2, pkey, torch.full_like(pkey, -1), self._minor_formation(s, pkey))
                 self.citystate_prod_set_value[:, s] = torch.where(ok2, val, self.citystate_prod_set_value[:, s])
 
     def _minor_defensive_cancel(self, s: int, w, f, tables, evals: dict, mask: torch.Tensor) -> None:
@@ -1716,7 +1717,7 @@ class SimMinorAi:
         self.citystate_ovf[:, s] = torch.where(has, torch.zeros_like(ovf), ovf)
         after = before + paid * ((100 + pct) / 100) * self._minor_item_mult(key)
         self.citystate_prod[:, s] = torch.where(has, after, before)
-        cost = self._minor_item_cost(s, key)
+        cost = self._minor_item_cost(s, key, self.citystate_formation[:, s])
         done = has & (self.citystate_prod[:, s] >= cost)
         if not bool(done.count_nonzero()):
             return
@@ -2592,7 +2593,49 @@ class _MinorWorld:
             allowed = 1 + torch.div(pop - 1, per, rounding_mode="floor")
             over = (tiles[:, dv] < 0) & (allowed <= count) & (pop < (count + 1) * per)
             return held | over
-        return self._rows_apply(row, one) | (row < 0)
+        return self._rows_apply(row, one) | (row < 0) | self._contract_plot_refused(row, plot)
+
+    def _contract_plot_refused(self, row, plot):
+        """`contractPlotRefused` of district rows `row` at plots `plot` (the
+        contract eligibility's CanConstruct at its location): a plot in the
+        flooded set; else, one not holding the district, a removable feature
+        without ValidDistrictPlacement the minor may not remove on its own
+        plot, a resource it sees it may not harvest on its own plot (a
+        Resource_Harvests row under its research), or a dig site it sees"""
+        sim = self.sim
+        dev = sim.device
+        CT = city_tree_tables(sim.rules)
+        B = sim.B
+        flat = plot.reshape(B, -1)
+        fl = flat.clamp(min=0)
+        ed = torch.tensor(self.E["district"] or [-1], dtype=torch.long, device=dev)
+        dv = torch.where(row.reshape(B, -1) >= 0, ed.take(row.reshape(B, -1).clamp(min=0, max=ed.numel() - 1)), -1)
+        flooded = sim.tile_flooded.gather(1, fl)
+        mine = sim.tile_seat.gather(1, fl) == self.seat
+        fid = sim.feat_id.gather(1, fl)
+        live_f = (fid >= 0) & ~sim.feat_stripped.gather(1, fl)
+        fr = torch.where(live_f, CT.feat_row.to(dev)[fid.clamp(min=0)], -1)
+        frc = fr.clamp(min=0)
+        clears = (fr >= 0) & CT.f_removable.to(dev)[frc] & ~CT.f_valid_district.to(dev)[frc]
+        # the minor's removal (the Builder's: a removable row under its
+        # research, the Deforestation Treaty not standing on it)
+        ftu = sim.tile_ftu.gather(1, fl)
+        researched = (ftu >= 0) & sim.citystate_techs[:, self.s].gather(1, ftu.clamp(min=0))
+        removes = (sim.tile_ftr.gather(1, fl) > 0) & researched & ~sim._congress_chop(fid)[0]
+        row_m = sim._CITY_MINOR0 + self.s
+        seen = sim._res_live().gather(1, fl) & ~sim._res_hidden(row_m).gather(1, fl)
+        rid = sim.res_id.gather(1, fl)
+        rr = torch.where(seen & (rid >= 0), CT.res_row.to(dev)[rid.clamp(min=0)], -1)
+        rc = rr.clamp(min=0)
+        ht = CT.r_harvest_tech.to(dev)[rc]
+        hn = CT.r_harvest_n.to(dev)[rc]
+        techs = sim.citystate_techs[:, self.s]
+        held = (ht == -1) | ((ht >= 0) & techs.gather(1, ht.clamp(min=0).reshape(B, -1)).reshape(ht.shape))
+        cols = torch.arange(ht.shape[-1], device=dev)
+        harvests = (held & (cols < hn.unsqueeze(-1))).any(dim=-1)
+        refused = (clears & ~(mine & removes)) | ((rr >= 0) & ~(mine & harvests)) | sim._dig_seen(row_m).gather(1, fl)
+        own = (dv >= 0) & (sim.district.gather(1, fl) == dv)
+        return ((flat >= 0) & (flooded | (~own & refused))).reshape(plot.shape)
 
     def can_train(self, row):
         sim = self.sim

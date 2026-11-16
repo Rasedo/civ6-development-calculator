@@ -1341,7 +1341,7 @@ _MUTABLE = [
     "citystate_gov_values", "citystate_gov_valid",  # the civics AI's government values (+0xb38) its last turn wrote
     "citystate_civic_pol_best", "citystate_slot_best",  # and its best card per civic (0x623b90) and per slot type
     "citystate_unit_strength",  # the strength over every domain its turn start stored
-    "citystate_item", "citystate_ovf", "citystate_kept",  # the minor's item in hand, overflow store and kept progress
+    "citystate_item", "citystate_formation", "citystate_ovf", "citystate_kept",  # the minor's item in hand, its unit's formation, overflow store and kept progress
     "citystate_treasury", "citystate_net_income", "citystate_faith", "citystate_gp_points", "citystate_project_done",
     "citystate_builders_trained", "citystate_ai_builders", "citystate_best_melee", "citystate_best_ranged",
     # its city AI: the district's plot, the item's turn and value, the threat, its update's growth, the savings

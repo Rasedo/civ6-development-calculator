@@ -27,3 +27,17 @@
   context:
     - "...units +0x7d0 skips. BUILD (AUDIT C-60): the repairs (requests on the city's production, 0x97a1b0 / 0x97a0d0, the Free City's build the pick takes over), the Builder's work."
   review: reviewed
+- addr: 0x97a450
+  final: 0x683820
+  kind: function
+  semantics: a unit order (unit, formation) for the city's production request
+  status: READ
+  cases:
+    - recording: h1_duels1158
+      turn: 203
+      value: "Granada: its Cavalry's order at formation 2, the record's queue MilitaryFormationType 2"
+  readings:
+    - "C-96 / C-127: a minor's unit order at its formation; a district contract's plot at the eligibility — READ (0x178820, 0x172820 at 0x17378b..0x173925, 0x1793d0, 0x5ca5a0 at 0x5ca63d..0x5ca68d, 0x5f6050 at 0x5f637f..0x5f6436, 0x173940 at 0x173db0..0x173e98, 0x35f2d0 at 0x35f46b..0x35f48a, 0x892410, 0x510dd0), both twins"
+  context:
+    - "...s unit queue, the Default Specialization's pick and its contract's alike): the order (0x97a450) takes the formation 0x178820 names — 2 where CanTrain (0x172820) passes at formation 2..."
+  review: reviewed

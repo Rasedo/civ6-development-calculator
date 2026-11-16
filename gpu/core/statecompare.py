@@ -1065,6 +1065,7 @@ CITY_STATE = {
     "minorCivicRetained": lambda sim, b, rows: [sim.citystate_civic_retain[b, s].tolist() for s in rows],
     "prodProgress": lambda sim, b, rows: [float(sim.citystate_prod[b, s]) for s in rows],
     "minorProdItem": lambda sim, b, rows: [int(sim.citystate_item[b, s]) for s in rows],
+    "minorProdFormation": lambda sim, b, rows: [int(sim.citystate_formation[b, s]) for s in rows],
     "minorProdOverflow": lambda sim, b, rows: [float(sim.citystate_ovf[b, s]) for s in rows],
     "minorProdKept": lambda sim, b, rows: [
         [x for i, v in enumerate(sim.citystate_kept[b, s].tolist()) if v != 0 for x in (i, v)] for s in rows],

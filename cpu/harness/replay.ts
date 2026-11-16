@@ -249,7 +249,7 @@ interface Ctx {
   /** per city-state of the copy whose Builder cleared a plot, its item as
    *  the first clearing found it: an item the copy's lump completed is the
    *  item the record's lump lands on (`minorClearsAfter`) */
-  minorClearItems: Map<CityState, Pick<CityState, 'prodItem' | 'prodSite'>>;
+  minorClearItems: Map<CityState, Pick<CityState, 'prodItem' | 'prodSite' | 'prodFormation'>>;
   /** the record's new units of those city-states the engine has not made,
    *  matched once the clearings' lumps have landed (`minorClearsAfter`) */
   minorClearUnits: { d: Extract<Decision, { kind: 'unitNew' }>; ds: readonly Decision[] }[];
@@ -2551,6 +2551,7 @@ function minorAi(ctx: Ctx, b: TurnRecord, turn: number, made: ReadonlySet<Unit>,
     if (c.prodItem || !was.prodItem) continue;
     c.prodItem = was.prodItem;
     if (was.prodSite !== undefined) c.prodSite = was.prodSite;
+    if (was.prodFormation !== undefined) c.prodFormation = was.prodFormation;
   }
   ctx.minorClearItems = new Map();
   minorOpsAfter(ctx, b, turn, copy, twin, keyOf, upgraded);
@@ -3111,7 +3112,7 @@ function minorOpsAfter(ctx: Ctx, b: TurnRecord, turn: number, copy: GameState, t
       if (c.revealed) cs.revealed = c.revealed;
     }
     // the item its second hook set (or a submission cleared)
-    if ((c.prodItem ?? '') !== (cs.prodItem ?? '') || c.prodSite !== cs.prodSite) minorSetItem(state, cs, minorItemInHand(c));
+    if ((c.prodItem ?? '') !== (cs.prodItem ?? '') || c.prodSite !== cs.prodSite || c.prodFormation !== cs.prodFormation) minorSetItem(state, cs, minorItemInHand(c));
     if (c.prodSetValue !== undefined) cs.prodSetValue = c.prodSetValue;
     else delete cs.prodSetValue;
     const player = ctx.playerOfSeat.get(cs.seat);
@@ -7072,7 +7073,7 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
     const r = ctx.next.state.map.tiles[plot];
     if (!(clears === 'feature' ? r.feature : r.resource)) {
       ctx.minorCleared.add(plot);
-      if (!ctx.minorClearItems.has(cs)) ctx.minorClearItems.set(cs, { prodItem: cs.prodItem, prodSite: cs.prodSite });
+      if (!ctx.minorClearItems.has(cs)) ctx.minorClearItems.set(cs, { prodItem: cs.prodItem, prodSite: cs.prodSite, prodFormation: cs.prodFormation });
       return false;
     }
     count(ctx, 'minorAi:clear', 'fallback', ctx.playerOfSeat.get(ctx.state.map.tiles[plot].ownerSeat),

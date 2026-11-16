@@ -2553,6 +2553,16 @@
           ]
         },
         {
+          "name": "minorProdFormation",
+          "compare": "exact",
+          "covers": [
+            "CityState.prodFormation"
+          ],
+          "planes": [
+            "citystate_formation"
+          ]
+        },
+        {
           "name": "minorProdOverflow",
           "compare": "milli",
           "covers": [

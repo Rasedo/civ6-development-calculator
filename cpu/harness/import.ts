@@ -327,7 +327,10 @@ export function minorHead(cat: Catalog, c: DumpCity, W: number): MinorItem | und
   if (!head || typeof head !== 'object' || !Object.keys(head).some((k) => k.endsWith('Type'))) return { none: true };
   if (head.UnitType !== undefined) {
     const unit = engineRowOf(cat, 'unit', head.UnitType);
-    return unit ? { unit } : undefined;
+    // the entry's MilitaryFormationType: 1 a Corps or Fleet, 2 an Army or
+    // Armada (runs/h1_duels1158 Granada t204: the Cavalry at 2, 372 needed)
+    const formation = Number(head.MilitaryFormationType ?? 0);
+    return unit ? (formation > 0 ? { unit, formation } : { unit }) : undefined;
   }
   if (head.BuildingType !== undefined) {
     const building = engineRowOf(cat, 'building', head.BuildingType);
@@ -2795,6 +2798,8 @@ export function importTurn(rec: TurnRecord, cat: Catalog, history?: History): Im
         minor.prodProgress = held.get(key) ?? (num(c.queueProgress?.[0]) || 0);
         held.delete(key);
       }
+      if (item && 'unit' in item && item.formation) minor.prodFormation = item.formation;
+      else delete minor.prodFormation;
       // the progress it holds on each district type not in hand (the
       // queue's district rows, m_kBuildQueue +146): a new plot of the type
       // resumes it (runs/h1_duels1146 Kandy t185: the Neighborhood left at

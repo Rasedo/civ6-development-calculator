@@ -25,7 +25,7 @@ import {
   MINOR_MILITARY_PROD_PCT, MINOR_SMALL_MILITARY, MINOR_TYPE_DISTRICT_PROD_PCT, MINOR_UPGRADE_GOLD,
   MINOR_WALLS_PROD_PCT, MINOR_REPAIR_RESUME_PCT, MINOR_CATCHUP_PCT, minorUnitTrait,
 } from '../data/cityStates';
-import { CITY_MAX_HP, ENCAMPMENT_HP, UNITS, URBAN_DEFENSES_TECH, type UnitDef } from '../data/units';
+import { CITY_MAX_HP, ENCAMPMENT_HP, FORMATION_TRAIN_BUILDING, UNITS, URBAN_DEFENSES_TECH, formationCost, type UnitDef } from '../data/units';
 import { UNIT_PROMO_CLASS, type PromoClass } from '../data/promotions';
 import { PROJECTS, projectConversionRate } from '../data/projects';
 import { worshipBuildingOf } from '../data/religion';
@@ -54,7 +54,7 @@ import { cityLowlands, coastalLowlandCounts, floodBarrierCost, repairBehindBarri
 import { districtAirBase } from './air';
 import { minorTrade, minorTradePick, tradeCapacity, tradeGraphTurn } from './trade';
 import { BARB_SEAT, FREE_SEAT, atWarWithMajor, civsAtWar, denounceActive, freeSeatOf, hiddenResourcesFor, isCiv, majorityReligionOf, majorsAlive, seatOf, tileSeat } from './seats';
-import { builderCost, cityNavalCapable, cityUnitPlot, disbandUnit, holdGarrison, raiseBestTrained, spawnUnit, gameProgressUnitCost, unitFullMoves, unitIsMilitary, unitMadeAnew, upgradeAnew } from './units';
+import { builderCost, cityNavalCapable, cityUnitPlot, disbandUnit, formationBanned, holdGarrison, raiseBestTrained, spawnUnit, gameProgressUnitCost, unitFullMoves, unitIsMilitary, unitMadeAnew, upgradeAnew } from './units';
 import { irradiated } from './nuclear';
 import { atRngPoint } from './rand';
 import { dangerPlane, knowledgeLook, seatPoolSlots } from './tactical';
@@ -1198,10 +1198,11 @@ export function minorItemFor(cityState: CityState, type: string): Exclude<MinorI
   return it && 'building' in it && buildingPillaged(cityState, it.building) ? { repair: it.building } : it;
 }
 
-/** What a minor's step may hold: a unit it trains, a building it raises, a
- *  district it lays on its plot, a project it runs, a pillaged building it
- *  repairs, or nothing. */
-export type MinorItem = { unit: string } | { building: string } | { district: DistrictId; site: number }
+/** What a minor's step may hold: a unit it trains (at its military
+ *  formation, absent a lone unit), a building it raises, a district it lays
+ *  on its plot, a project it runs, a pillaged building it repairs, or
+ *  nothing. */
+export type MinorItem = { unit: string; formation?: number } | { building: string } | { district: DistrictId; site: number }
   | { project: string } | { repair: string } | { none: true };
 
 /** The item's key: the progress it keeps (`CityState.prodRetained`) and the
@@ -1294,7 +1295,7 @@ export function minorBuild(state: GameState, cityState: CityState, production: n
   // strategic cost and no progress reserves its cost where the stock less
   // the reservations covers it, else leaves the front
   if ('unit' in item && !(cityState.prodProgress ?? 0) && cityState.prodReserved === undefined) {
-    const res = unitResourceCost(item.unit);
+    const res = unitResourceCost(item.unit, item.formation ?? 0);
     if (res) {
       if (stockFree(state, cityState.seat, res.id) < res.n) {
         minorSetItem(state, cityState, null);
@@ -1339,7 +1340,7 @@ export function minorItemInHand(cityState: CityState): Exclude<MinorItem, { none
   const at = key.indexOf(':');
   const kind = key.slice(0, at);
   const id = key.slice(at + 1);
-  if (kind === 'unit') return { unit: id };
+  if (kind === 'unit') return cityState.prodFormation ? { unit: id, formation: cityState.prodFormation } : { unit: id };
   if (kind === 'building') return { building: id };
   if (kind === 'district') return { district: id as DistrictId, site: cityState.prodSite ?? -1 };
   if (kind === 'project') return { project: id };
@@ -1349,14 +1350,17 @@ export function minorItemInHand(cityState: CityState): Exclude<MinorItem, { none
 
 /** THE MINOR'S ITEM IN HAND CHANGES (null: none, the queue emptied): the
  *  item left keeps its progress (`CityState.prodRetained`), the one taken
- *  resumes at what it kept; a district's plot rides with it
- *  (`CityState.prodSite`) */
+ *  resumes at what it kept, a unit's progress its type's at any formation
+ *  (City_BuildQueue +0x230 by unit); a district's plot rides with it
+ *  (`CityState.prodSite`), a unit's formation (`CityState.prodFormation`) */
 export function minorSetItem(state: GameState, cityState: CityState, item: Exclude<MinorItem, { none: true }> | null): void {
   const key = item ? minorItemKey(item) : '';
   if (item && 'district' in item) {
     cityState.prodSite = item.site;
     minorPlaceDistrict(state, cityState, item.district, item.site);
   } else delete cityState.prodSite;
+  if (item && 'unit' in item && item.formation) cityState.prodFormation = item.formation;
+  else delete cityState.prodFormation;
   if (key === (cityState.prodItem ?? '')) return;
   delete cityState.prodReserved;
   const kept = { ...cityState.prodRetained };
@@ -1373,7 +1377,7 @@ export function minorSetItem(state: GameState, cityState: CityState, item: Exclu
   // leaves the queue as it is taken (runs/h1_duely1128 Nazca t41: its
   // Horseman picked at 51.7 on no Horses, the record's queue empty at t42)
   if (item && 'unit' in item && !(cityState.prodProgress ?? 0)) {
-    const res = unitResourceCost(item.unit);
+    const res = unitResourceCost(item.unit, item.formation ?? 0);
     if (res && stockFree(state, cityState.seat, res.id) < res.n) minorSetItem(state, cityState, null);
     else if (res) reserveStockpile(cityState, res.id, res.n);
   }
@@ -1469,6 +1473,35 @@ export function minorCanTrain(state: GameState, cityState: CityState, id: string
   if (d.trader && minorTraders(state, cityState) >= tradeCapacity(state, cityState.seat)) return false;
   if (id === 'ARCHAEOLOGIST' && !held.includes('MUSEUM_ARTIFACT')) return false;
   return true;
+}
+
+/** THE FORMATION A MINOR'S UNIT ORDER TAKES (0x178820, as the city AI's
+ *  unit queue 0x5ca5a0 builds the order): an Army or Armada (2) where
+ *  CanTrain passes at formation 2, else a Corps or Fleet (1) where it passes
+ *  at 1, else the lone unit. CanTrain's formation test (0x172820 at
+ *  0x17378b..0x173925): a unit with Combat (+0x48), its Units_XP2 row not
+ *  barring formations (+0x48 bit 0x4), of the land or sea domain with the
+ *  formation test of the tier (0x536da0: the tier's civic in), whose type
+ *  the city discounts (City_BuildQueue +0x390 by unit, 0x1793d0: the
+ *  Military Academy's or the Seaport's MODIFIER_CITY_CORPS_ARMY_ADJUST_DISCOUNT
+ *  of the domain, the building standing unpillaged). runs/h1_duels1158
+ *  Granada t203: its Military Academy complete, the Default Specialization's
+ *  Cavalry queued at formation 2, 372 of 165 */
+export function minorFormation(state: GameState, cityState: CityState, id: string): number {
+  const d = UNITS[id];
+  if (!d || !(d.combat > 0) || d.air || formationBanned(id)) return 0;
+  const academy = d.naval ? FORMATION_TRAIN_BUILDING.naval : FORMATION_TRAIN_BUILDING.land;
+  if (!(cityState.buildings ?? []).includes(academy) || buildingPillaged(cityState, academy)) return 0;
+  if (formationCivicIn(state, cityState.seat, !!d.naval, 2)) return 2;
+  return formationCivicIn(state, cityState.seat, !!d.naval, 1) ? 1 : 0;
+}
+
+/** the item the city AI's queue takes (0x5c9ea0 / 0x5ca5a0 / 0x5ca450): a
+ *  unit at its formation (`minorFormation`) */
+export function minorQueued(state: GameState, cityState: CityState, item: Exclude<MinorItem, { none: true }>): Exclude<MinorItem, { none: true }> {
+  if (!('unit' in item)) return item;
+  const formation = minorFormation(state, cityState, item.unit);
+  return formation ? { unit: item.unit, formation } : { unit: item.unit };
 }
 
 /** the turns a minor's city builds an install type in (0x17bb40 a unit,
@@ -2401,13 +2434,14 @@ export function minorRepairResumed(state: GameState, cityState: CityState, item:
 }
 
 /** A minor's item's price: a unit's Production cost (a Builder's and a
- *  GAME_PROGRESS row's climbing), a building's (`minorBuildingCost`), a district's
- *  (`minorDistrictCost`), a project's, a repair's rest past
- *  `MINOR_REPAIR_RESUME_PCT`. */
+ *  GAME_PROGRESS row's climbing) at its formation (`formationCost`: the
+ *  record's Cavalry Army at Granada 372 of 165, runs/h1_duels1158 t204), a
+ *  building's (`minorBuildingCost`), a district's (`minorDistrictCost`), a
+ *  project's, a repair's rest past `MINOR_REPAIR_RESUME_PCT`. */
 export function minorItemCost(state: GameState, cityState: CityState, item: Exclude<MinorItem, { none: true }>): number {
   return 'unit' in item
     ? (item.unit === 'BUILDER' ? builderCost(state, cityState.seat)
-      : gameProgressUnitCost(state, cityState.seat, UNITS[item.unit]))
+      : formationCost(gameProgressUnitCost(state, cityState.seat, UNITS[item.unit]), item.formation ?? 0))
     : 'building' in item ? minorBuildingCost(state, cityState, item.building)
       // the row's OWN base, not the specialty one: a minor builds real
       // districts too and the install prices an Aqueduct at 36
@@ -2494,6 +2528,8 @@ function minorFinish(state: GameState, cityState: CityState, item: Exclude<Minor
     const unit = spawnUnit(state, item.unit, cityUnitPlot(state, city, item.unit), cityState.seat, 'stack');
     if (!unit) return false;
     built = unit.id;
+    // a formation's order arrives at its formation
+    if (item.formation) unit.formation = item.formation;
     applyTrainingGrants(state, minorCity(cityState), unit);
     // no charge and no release: 0x1853d0 charges the stock and releases the
     // reservation (0x1856b3 / 0x185a2a) under FULL_CIV alone (0x18562c /
@@ -2543,6 +2579,7 @@ function minorFinish(state: GameState, cityState: CityState, item: Exclude<Minor
   cityState.prodProgress = 0;
   delete cityState.prodItem;
   delete cityState.prodSite;
+  delete cityState.prodFormation;
   if ('unit' in item) minorItemBuilt(cityState, { unit: installType('unit', item.unit, 'UNIT_'), building: null, district: null }, built);
   else if ('building' in item) minorItemBuilt(cityState, { unit: null, building: installType('building', item.building, 'BUILDING_'), district: null }, -1);
   else if ('district' in item) minorItemBuilt(cityState, { unit: null, building: null, district: installType('district', item.district, 'DISTRICT_') }, -1);

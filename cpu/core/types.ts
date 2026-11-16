@@ -1472,6 +1472,10 @@ export interface CityState extends Seat {
   prodRetained?: Record<string, number>;
   prodOverflow?: number;
   prodSite?: number;
+  /** the military formation its unit in hand is queued at (the queue
+   *  entry's MilitaryFormationType: 1 a Corps or Fleet, 2 an Army or
+   *  Armada), absent a lone unit or another item */
+  prodFormation?: number;
   /** the strategic cost its unit in hand reserved at the queue's front
    *  check (0x17f3a0: the unit's cost, reserved where its stock less its
    *  reservations covers it), so the check reserves once per item taken;
