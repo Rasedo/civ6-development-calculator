@@ -334,6 +334,14 @@
   notes:
     - the array +0x18 indexed by the plot's terrain (+0x2c), bounds +0x28; read on the city's +0x1e00
   review: reviewed
+- addr: 0x4aa070
+  final: 0x31fe60
+  kind: function
+  name: Player_Resources +0x768 by resource
+  semantics: returns Player_Resources +0x768[resource], 0 for no resource. The holdings step 0x4ab6e0 (0x4ab84e..0x4ab871) adds it, where above 0, to an accumulating resource's stock (ChangeResourceAmount, ownership 0) each turn after +0x6f0's (0x4aab70); what writes the array is unread.
+  status: PARTLY
+  notes: ["open: see 0x4aab70"]
+  review: reviewed
 - addr: 0x4aa0e0
   final: 0x31fed0
   kind: function
@@ -471,6 +479,15 @@
   readings: ["H-1: a plot's resource for its owner (strategic access) — READ"]
   context:
     - "...ct:IsComplete` 0x9c83d0) and not pillaged (0x24c3a0, `IsPillaged`), that district's type; 0x4aaa70 then answers the plot's resource (+0x40, count +0x42 > 0) when the plot's owner is the pl..."
+  review: reviewed
+- addr: 0x4aab70
+  final: 0x3204f0
+  kind: function
+  name: Player_Resources +0x6f0 by resource
+  semantics: returns Player_Resources +0x6f0[resource], 0 for no resource. The holdings step 0x4ab6e0 (0x4ab826..0x4ab849) adds it, where above 0, to an accumulating resource's stock (ChangeResourceAmount, ownership 0) each turn ahead of the plots' extraction; what writes the array is unread.
+  status: PARTLY
+  notes:
+    - "open: runs/h1_duels1171 city-state 2 t32-t33, its Iron stock 0 to 3 in the turn Bronze Working lands where the plots' extraction gives 2"
   review: reviewed
 - addr: 0x4aabe0
   final: 0x320560

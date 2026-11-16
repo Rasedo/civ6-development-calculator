@@ -798,16 +798,18 @@ export const IMPROVEMENTS: Record<ImprovementId, ImprovementDef> = {
     // CIV6: "Cannot be built on Snow or Snow Hills."; its one
     // Improvement_ValidFeatures row is Volcanic Soil.
     excludeTerrains: ['SNOW'],
-    // CIV6: "+1 Faith for every 2 adjacent Woods or Rainforests (increasing to
-    // +1 Faith for every adjacent Woods or Rainforest with Humanism)."
-    adjacency: [{
-      features: ['WOODS', 'RAINFOREST'], per: 2, yields: { faith: 1 },
-      upgradeCivic: 'HUMANISM', upgradePer: 1,
-    }],
+    // CIV6: the Woods' rows and the Rainforests' rows of Adjacency_YieldChanges
+    // each count their own feature: +1 Faith per 2 adjacent Woods and +1 per
+    // 2 adjacent Rainforests (per 1 of each with Humanism); one Woods beside
+    // one Rainforest pays none before it
+    adjacency: [
+      { features: ['WOODS'], per: 2, yields: { faith: 1 }, upgradeCivic: 'HUMANISM', upgradePer: 1 },
+      { features: ['RAINFOREST'], per: 2, yields: { faith: 1 }, upgradeCivic: 'HUMANISM', upgradePer: 1 },
+    ],
     // CIV6: "Provides Tourism from Faith after researching Flight."
     tourismFrom: 'faith',
     tourismTech: 'FLIGHT',
-    description: '+2 faith, +1 more per 2 adjacent Woods/Rainforest (per 1 with Humanism). Anywhere but snow.',
+    description: '+2 faith, +1 more per 2 adjacent Woods and per 2 adjacent Rainforest (per 1 of each with Humanism). Anywhere but snow.',
     features: ['VOLCANIC_SOIL'],
     src: {
       features: { derived: 'the Improvement_ValidFeatures rows of IMPROVEMENT_COLOSSAL_HEAD, as engine feature ids', inputs: [xml('Improvement_ValidFeatures', 'ImprovementType=IMPROVEMENT_COLOSSAL_HEAD', 'FeatureType')] },
@@ -822,6 +824,11 @@ export const IMPROVEMENTS: Record<ImprovementId, ImprovementDef> = {
       'adjacency.0.yields.faith': xml('Adjacency_YieldChanges', 'ID=ColossalHead_FaithForestEarly', 'YieldChange'),
       'adjacency.0.upgradeCivic': xml('Adjacency_YieldChanges', 'ID=ColossalHead_FaithForestLate', 'PrereqCivic', { expect: 'CIVIC_HUMANISM' }),
       'adjacency.0.upgradePer': xml('Adjacency_YieldChanges', 'ID=ColossalHead_FaithForestLate', 'TilesRequired'),
+      'adjacency.1.features': xml('Adjacency_YieldChanges', 'ID=ColossalHead_FaithJungleEarly', 'AdjacentFeature', { expect: 'FEATURE_JUNGLE' }),
+      'adjacency.1.per': xml('Adjacency_YieldChanges', 'ID=ColossalHead_FaithJungleEarly', 'TilesRequired'),
+      'adjacency.1.yields.faith': xml('Adjacency_YieldChanges', 'ID=ColossalHead_FaithJungleEarly', 'YieldChange'),
+      'adjacency.1.upgradeCivic': xml('Adjacency_YieldChanges', 'ID=ColossalHead_FaithJungleLate', 'PrereqCivic', { expect: 'CIVIC_HUMANISM' }),
+      'adjacency.1.upgradePer': xml('Adjacency_YieldChanges', 'ID=ColossalHead_FaithJungleLate', 'TilesRequired'),
       tourismFrom: xml('Improvement_Tourism', 'ImprovementType=IMPROVEMENT_COLOSSAL_HEAD', 'TourismSource', { expect: 'TOURISMSOURCE_FAITH' }),
       tourismTech: xml('Improvement_Tourism', 'ImprovementType=IMPROVEMENT_COLOSSAL_HEAD', 'PrereqTech', { expect: 'TECH_FLIGHT' }),
     },

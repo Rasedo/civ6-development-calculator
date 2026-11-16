@@ -2296,6 +2296,9 @@ class SimInit:
         self._gp_eureka = torch.tensor(
             [c + [[0] * _euw] * (_maxN - len(c)) for c in _eu] if _eu
             else [[[0] * _euw] * _maxN for _ in range(n_gp)], dtype=torch.bool, device=device)
+        # the persons whose named eurekas complete a technology already boosted
+        self._gp_eureka_grant = torch.tensor(
+            [c + [0] * (_maxN - len(c)) for c in rr["gpEurekaGrant"]], dtype=torch.bool, device=device)
         self._gp_bldg = torch.tensor(
             [c + [[0] * _blw] * (_maxN - len(c)) for c in _bl_gp] if _bl_gp
             else [[[0] * _blw] * _maxN for _ in range(n_gp)], dtype=torch.bool, device=device)

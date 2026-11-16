@@ -645,11 +645,13 @@ class SimGp:
 
     # ---------------------------------------------------------------- research
     def _gp_named_eurekas(self, row: int, m: torch.Tensor, cls: torch.Tensor, at: torch.Tensor) -> None:
-        """CIV6 (Zhang Heng): the named technologies are boosted, and one
-        already boosted is COMPLETED instead."""
+        """The named technologies are boosted; one already boosted gives
+        nothing, or with the person's GrantTechIfBoosted (`_gp_eureka_grant`,
+        Zhang Heng) is COMPLETED instead."""
         if self._gp_eureka.numel() == 0:
             return
-        want = self._gp_eureka[cls.clamp(min=0), at.clamp(min=0, max=self._gp_eureka.shape[1] - 1)]
+        _at = at.clamp(min=0, max=self._gp_eureka.shape[1] - 1)
+        want = self._gp_eureka[cls.clamp(min=0), _at]
         want = want & m.unsqueeze(1)
         if not bool(want.count_nonzero()):
             return
@@ -657,7 +659,7 @@ class SimGp:
         w = want[:, :nt]
         held = self.civ_techs[:, row, :nt]
         boosted = self.civ_tech_boosted[:, row, :nt]
-        done = w & ~held & boosted
+        done = w & ~held & boosted & self._gp_eureka_grant[cls.clamp(min=0), _at].unsqueeze(1)
         land = torch.zeros_like(self.civ_techs[:, row])
         land[:, :nt] = w & ~held & ~boosted
         newly = self._land_boosts(row, land, False)

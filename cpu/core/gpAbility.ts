@@ -316,8 +316,10 @@ export function activateGreatPerson(state: GameState, unit: Unit): boolean {
     let fired = 0;
     for (const id of fx.eurekaTechs) {
       if (!TECHS[id] || rsr.techs.includes(id)) continue;
-      // CIV6 (Zhang Heng): already boosted, so the technology itself lands.
+      // already boosted: nothing, or with GrantTechIfBoosted (Zhang Heng) the
+      // technology itself lands
       if (rsr.boosted.includes(id)) {
+        if (!fx.eurekaGrant) continue;
         if (id === URBAN_DEFENSES_TECH) urbanDefensesFit(state, unit.seat);
         rsr.techs.push(id);
         minorCatchUp(state, unit.seat, id, false);

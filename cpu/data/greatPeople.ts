@@ -871,9 +871,12 @@ export interface GpEffect {
   faith?: number;
   gold?: number;
   productionToCapital?: number;
-  /** eurekas for NAMED technologies. CIV6 (Zhang Heng): "If they are already
-   *  triggered, instead completes the technology." */
+  /** eurekas for NAMED technologies (MODIFIER_PLAYER_GRANT_SPECIFIC_TECH_BOOST):
+   *  one already triggered gives nothing */
   eurekaTechs?: string[];
+  /** the modifiers' GrantTechIfBoosted (Zhang Heng's three alone): a named
+   *  technology whose eureka is already triggered is completed instead */
+  eurekaGrant?: boolean;
   /** eurekas for N technologies drawn at random over the eras
    *  `era + eurekaLo` .. `era + eurekaHi`, both 0 by default. */
   eurekaRandom?: number;
@@ -1104,7 +1107,7 @@ const GP_HANNO_CLASS = srcConst('greatPeople.GP_HANNO_CLASS', 'NAVAL_MELEE',
  */
 export const GP_ABILITY: Record<string, GpAbility> = {
   // ---- SCIENTIST: eurekas, and the Campus that hosts them ----
-  GP_ZHANG_HENG: { eurekaTechs: ['CELESTIAL_NAVIGATION', 'MATHEMATICS', 'ENGINEERING'] },
+  GP_ZHANG_HENG: { eurekaTechs: ['CELESTIAL_NAVIGATION', 'MATHEMATICS', 'ENGINEERING'], eurekaGrant: true },
   GP_ARYABHATA: { eurekaRandom: 3, eurekaHi: 1 },
   GP_EUCLID: { eurekaTechs: ['MATHEMATICS'], eurekaRandom: 1, eurekaLo: 1, eurekaHi: 1 },
   GP_HYPATIA: { buildings: ['LIBRARY'], perm: { libraryScience: gpArg('GP_HYPATIA_LIBRARY_SCIENCE', 'GREATPERSON_LIBRARIES_SCIENCE', 1) } },

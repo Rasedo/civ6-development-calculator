@@ -1527,6 +1527,8 @@ export function buildRules() {
         const ids = new Set(gpEffectOf(p).eurekaTechs ?? []);
         return Object.keys(TECHS).map((t) => (ids.has(t) ? 1 : 0));
       })),
+      // the persons whose named eurekas complete a technology already boosted
+      gpEurekaGrant: GP_CLASSES.map((c) => GREAT_PEOPLE[c].map((p) => (gpEffectOf(p).eurekaGrant ? 1 : 0))),
       gpBuildings: GP_CLASSES.map((c) => GREAT_PEOPLE[c].map((p) => {
         const ids = new Set(gpEffectOf(p).buildings ?? []);
         for (const id of ids) {
