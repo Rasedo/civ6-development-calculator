@@ -2680,7 +2680,7 @@ class SimMinors:
             pi = (item - self._mk_p0).clamp(min=0, max=int(P["y"].shape[0]) - 1)
             yi = P["y"].take(pi)
             conv = act & is_p & (yi >= 0)
-            self.city_proj_conv[:, row, 0] = torch.where(conv, torch.minimum(paid, cost) * self._proj_rate_t.take(pi),
+            self.city_proj_conv[:, row, 0] = torch.where(conv, self._proj_converted(torch.minimum(paid, cost), pi),
                                                          self.city_proj_conv[:, row, 0])
             self.city_proj_yield[:, row, 0] = torch.where(conv, yi, self.city_proj_yield[:, row, 0])
         if self._log_diff and bool((act & is_d).any()):

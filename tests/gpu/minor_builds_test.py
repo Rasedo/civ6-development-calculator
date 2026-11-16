@@ -390,7 +390,7 @@ def test_the_project_conversion(rules, path) -> None:
     cost = float(sim._minor_item_cost(s, sim.citystate_item[:, s])[B0])
     turn = 4.0
     sim._minor_build(s, torch.full((sim.B,), turn, dtype=torch.float64))
-    want = min(turn, cost) * ((int(prow["yp"]) * 256 // 100) / 256)
+    want = ((int(min(turn, cost) * 256) * (int(prow["yp"]) * 256 // 100)) // 256) / 256
     assert int(sim.city_proj_yield[B0, row, 0]) == 3, "the conversion is the project's Science"
     assert abs(float(sim.city_proj_conv[B0, row, 0]) - want) < 1e-12
     assert int(sim.citystate_build_proj[B0, s]) == grants, "the running project is the queue's head"

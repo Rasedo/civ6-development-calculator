@@ -24,7 +24,7 @@ import {
   MINOR_BUILDER_PROD_PCT, MINOR_HARBOR_PROD_PCT, MINOR_MILITARY_PROD_PCT, MINOR_PRODUCTION_PCT, MINOR_SMALL_MILITARY,
   MINOR_TYPE_DISTRICT_PROD_PCT, MINOR_WALLS_PROD_PCT, MINOR_REPAIR_RESUME_PCT,
 } from '../../../cpu/data/cityStates';
-import { PROJECTS, projectConversionRate } from '../../../cpu/data/projects';
+import { PROJECTS, projectConverted } from '../../../cpu/data/projects';
 import { BUILDINGS } from '../../../cpu/data/buildings';
 import { TECHS } from '../../../cpu/data/techs';
 import { UNITS, URBAN_DEFENSES_TECH, WALLS_TIER_HP, WALLS_TIER_URBAN } from '../../../cpu/data/units';
@@ -275,7 +275,7 @@ describe('the items the step completes', () => {
     inHand(cs, 'project:RESEARCH_GRANTS', 0);
     const stats = computeCityStats(state, minorCity(cs)).total;
     step(state, cs);
-    const conv = Math.min(stats.production, cost) * projectConversionRate(PROJECTS.RESEARCH_GRANTS);
+    const conv = projectConverted(PROJECTS.RESEARCH_GRANTS, stats.production, cost);
     expect(cs.projectYield).toEqual({ key: 'science', amount: conv });
     expect(conv).toBeGreaterThan(0);
     const withConv = computeCityStats(state, minorCity(cs)).total.science;

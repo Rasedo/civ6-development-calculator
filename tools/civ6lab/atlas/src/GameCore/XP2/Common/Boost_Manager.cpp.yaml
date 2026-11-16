@@ -14,3 +14,25 @@
   context:
     - "...bBoostTriggered, finds the item's Boosts row (0x3990d0) and, in the 24.8 fixed point: B = 0x161d60 = floor(Boost x cost / 100) (the row's +0x18 times the item's cost 0x29a010 / 0x353a70, s..."
   review: reviewed
+- addr: 0x1644e0
+  final: 0xedc70
+  kind: function
+  name: Boost_Manager improvement trigger
+  semantics: "(manager, plot, improvement row, Boosts row): the handler of BOOST_TRIGGER_HAVE_X_IMPROVEMENTS (class +0x1c 0x15) and BOOST_TRIGGER_IMPROVE_SPECIFIC_RESOURCE (0xb), run on an improvement event of one plot. The boost goes to the plot's owner (+0x1c, none: nothing) where the row's improvement (+0x150 -> +0x14) is the event's and the owner's unpillaged plots holding it (0x4be470) reach NumItems (+0x20); class 0x15 then asks, with RequiresResource (+0x110 bit 0), any resource on the event's plot the owner sees (0x50a690 not -1); class 0xb the row's resource (+0x158 -> +0x14) as the one seen there. The grant is 0x166bf0. Two thunks reach it: 0x167d10 (the event's plot and improvement row) and 0x167580 (a plot event, the plot's own improvement +0x44)."
+  status: READ
+  cases:
+    - recording: h1_duels1171
+      turn: 33
+      value: city-state 2's Bronze Working lands with its Mine standing on the Iron it reveals; Game_Boosts logs TECH_IRON_WORKING at t33 and never TECH_THE_WHEEL (researched unboosted by t42, AI_Research 289.3 at 3 turns at t33)
+  readings:
+    - "C-98: the improvement boosts fire on one plot's event — READ (0x1644e0, 0x4be470), not ported; a project's converted yield floors; a pillaged regional building pays no city; the majors' Railroads land before the minors — both twins"
+  review: reviewed
+- addr: 0x166bf0
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-98: the improvement boosts fire on one plot's event — READ (0x1644e0, 0x4be470), not ported; a project's converted yield floors; a pillaged regional building pays no city; the majors' Railroads land before the minors — both twins"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...PROVEMENT BOOSTS (0x1644e0, reached through the thunks 0x167d10 and 0x167580, the grant 0x166bf0): BOOST_TRIGGER_HAVE_X_IMPROVEMENTS and BOOST_TRIGGER_IMPROVE_SPECIFIC_RESOURCE are ans..."
+  review: imported

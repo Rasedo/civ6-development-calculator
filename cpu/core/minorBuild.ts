@@ -27,7 +27,7 @@ import {
 } from '../data/cityStates';
 import { CITY_MAX_HP, ENCAMPMENT_HP, FORMATION_TRAIN_BUILDING, UNITS, URBAN_DEFENSES_TECH, formationCost, type UnitDef } from '../data/units';
 import { UNIT_PROMO_CLASS, type PromoClass } from '../data/promotions';
-import { PROJECTS, projectConversionRate } from '../data/projects';
+import { PROJECTS, projectConverted } from '../data/projects';
 import { worshipBuildingOf } from '../data/religion';
 import { CIV_LEVELS } from '../data/civLevels';
 import { CITY_MIN_STRIKE_CS, FAITH_PURCHASE_MULT, GOLD_PURCHASE_MULT, amenityTier, gameProgressPct } from '../data/constants';
@@ -1314,7 +1314,7 @@ export function minorBuild(state: GameState, cityState: CityState, production: n
   cityState.prodProgress = before + paid * ((100 + pct) / 100) * minorItemMult(state, item);
   cityState.prodOverflow = 0;
   const def = 'project' in item ? PROJECTS[item.project] : undefined;
-  if (def?.yield) cityState.projectYield = { key: def.yield, amount: Math.min(paid, cost) * projectConversionRate(def) };
+  if (def?.yield) cityState.projectYield = { key: def.yield, amount: projectConverted(def, paid, cost) };
   if ('district' in item) {
     // the MINOR's own price and the progress it is judged against. A
     // minor's district feeds its suzerain's yields, so a build one turn

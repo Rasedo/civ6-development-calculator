@@ -857,6 +857,10 @@ export function regionalEffects(
       for (const id of other.buildings) {
         const def = effectiveBuilding(civ, id);
         if (!def || !def.regional || def.district !== inst.type) continue;
+        // a pillaged building pays no city (runs/h1_duels1157 Johannesburg
+        // t200-202: its Industrial Zone repaired, its Factory still
+        // pillaged, 25 Production; 28 at t203 with the Workshop repaired)
+        if (buildingPillaged(other, id)) continue;
         // CIV6 (Tesla, Paxton): the SOURCE district's own reach bonus, on
         // top of the row's range or the shared one
         const _gpReach = gpTilePermOf(tile, 'regionalRange');

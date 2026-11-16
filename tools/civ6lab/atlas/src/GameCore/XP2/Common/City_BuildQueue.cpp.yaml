@@ -1639,7 +1639,7 @@
   impl:
     - cpu/core/phase.ts:cost
     - cpu/core/types.ts:City
-    - cpu/data/projects.ts:projectConversionRate
+    - cpu/data/projects.ts:projectConverted
     - gpu/core/sim_phase.py:_seat_city_produce
     - cpu/core/stockpile.ts:chargeProjectResource
     - cpu/core/production.ts:stepMultiplier
@@ -1648,6 +1648,7 @@
     - "H-1: a district project's yield conversion — READ"
     - "H-1: the luxury allocation's rebuilds — PARTLY READ"
     - "H-1: the luxury allocation stored, its rebuild's triggers — READ (the triggers ported), LAB (the pillage)"
+    - "C-98: the improvement boosts fire on one plot's event — READ (0x1644e0, 0x4be470), not ported; a project's converted yield floors; a pillaged regional building pays no city; the majors' Railroads land before the minors — both twins"
   context:
     - "...roject id (+0x1360 = -1), then applies the Production (0x16f050), whose ORDER_ADVANCE arm 0x184ae0 walks the project's Project_YieldConversions rows (Project +0x168, loader 0xa98af0): for..."
     - "...rt / export. Its callers: a production completion's strategic costs (0x18433d building, 0x184d95 project, 0x1856b3 / 0x185a2a unit), a plot's extracted resource changing (0x4ab4d0 fr..."

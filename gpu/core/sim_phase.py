@@ -1671,6 +1671,12 @@ class SimPhase:
                     _add = _add + (_isp & _hit).to(_add.dtype) * (_spc / 100)
         return self._fx_by(_emall, 1 + _add)
 
+    def _proj_converted(self, paid: torch.Tensor, pi: torch.Tensor) -> torch.Tensor:
+        """The yield a district project's step converts (`projectConverted`):
+        the Production paid in, never above the cost, times the row's rate,
+        the product in 1/256 fixed point, truncated."""
+        return torch.floor(torch.floor(paid.double() * 256) * self._proj_rate_t.take(pi)) / 256
+
     def _seat_city_produce(self, row: int, col: torch.Tensor, act: torch.Tensor,
                            prod: torch.Tensor, sci_turn: torch.Tensor | None = None,
                            pre: dict | None = None, plain: torch.Tensor | None = None,
@@ -1752,7 +1758,7 @@ class SimPhase:
             _py = self._proj_y_t.take(_pic)
             _pon = has_q & (_pi >= 0) & (_pi < len(self._proj_rows)) & (_py >= 0)
             if bool(_pon.count_nonzero()):
-                _amt = torch.minimum(raw.double() + bank.double(), cost.double()) * self._proj_rate_t.take(_pic)
+                _amt = self._proj_converted(torch.minimum(raw.double() + bank.double(), cost.double()), _pic)
                 self.city_proj_conv[bidx, row, col] = torch.where(_pon, _amt, self.city_proj_conv[bidx, row, col])
                 self.city_proj_yield[bidx, row, col] = torch.where(_pon, _py, self.city_proj_yield[bidx, row, col])
         # CIV6 (City_BuildQueue 0x16f050): a completion's OVERFLOW is the

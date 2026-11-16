@@ -11396,7 +11396,7 @@ class SimSeats:
 
     def _seat_regional(self, row: int) -> tuple[torch.Tensor, torch.Tensor] | None:
         """The regionalEffects twin for seat row `row`:
-        each regional building owned by one of this seat's cities whose source
+        each regional building, held unpillaged by one of this seat's cities, whose source
         district (city_dist_tile of the building's type) is COMPLETE and
         unpillaged reaches every ALIVE same-seat city center within
         regional_range of the source tile; the same building id never stacks
@@ -11436,7 +11436,9 @@ class SimSeats:
             _gp_amen = self._gp_tile_perm("regionalAmenities")
         # which regional buildings any of the row's live cities holds, in
         # one read
+        # held and not pillaged: a pillaged building pays no city
         own_all = (self.city_bldg[:, row, :cols][:, :, self._reg_bidx]
+                   & ~self.city_bldg_pillaged[:, row, :cols][:, :, self._reg_bidx]
                    & alive.unsqueeze(2))                                 # [B, cols, R]
         own_any = own_all.any(dim=1).any(dim=0).tolist()
         for _ri, n in enumerate(self._reg_bidx):

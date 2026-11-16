@@ -604,12 +604,16 @@ export function isSpaceProject(id: string): boolean {
  *  requirement by 5 each time it is completed". */
 export const LASER_POWER_LOAD = 5;
 
-/** CIV6 (City_BuildQueue 0x184ae0): the rate a district project converts
- *  its Production at — PercentOfProductionRate over 100 in the game's 1/256
- *  fixed point, truncated (runs/h1_duelw1108, Aquileia t169-176: Commercial
- *  Hub Investment's 30% on 16 Production reads 4.75 Gold, 16 x 76/256). */
-export function projectConversionRate(p: ProjectDef): number {
-  return Math.floor(((p.yieldPct ?? 0) * 256) / 100) / 256;
+/** CIV6 (City_BuildQueue 0x184ae0): the yield a district project's step
+ *  converts — the smaller of the Production paid in and the item's cost
+ *  times PercentOfProductionRate over 100, the rate and the product each in
+ *  the game's 1/256 fixed point, truncated (runs/h1_duelw1108, Aquileia
+ *  t169-176: Commercial Hub Investment's 30% on 16 Production reads 4.75
+ *  Gold, 16 x 76/256; runs/h1_duels1152 Nan Madol t162: 15% on 692/256
+ *  reads 102/256 Culture, 692 x 38 >> 8). */
+export function projectConverted(p: ProjectDef, paid: number, cost: number): number {
+  const rate = Math.floor(((p.yieldPct ?? 0) * 256) / 100);
+  return Math.floor((Math.floor(Math.min(paid, cost) * 256) * rate) / 256) / 256;
 }
 export const PROJECT_GPP_FRACTION = 0.22;
 

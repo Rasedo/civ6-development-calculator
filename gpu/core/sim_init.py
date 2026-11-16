@@ -1975,7 +1975,7 @@ class SimInit:
         self._proj_seat_rows: list[tuple[int, int]] = [
             (int(p["cv"]), int(p["ld"])) for p in self._proj_rows]
         self._proj_move_cap = {i for i, p in enumerate(self._proj_rows) if int(p["mc"])}
-        # each row's yield-conversion rate (`projectConversionRate`: the
+        # each row's yield-conversion rate (`projectConverted`: the
         # percent over 100 in 1/256 fixed point, truncated; 0 for none), its
         # yield column (-1 for none), and the rows that power their city while
         # they head its queue (`fullyPowered`)

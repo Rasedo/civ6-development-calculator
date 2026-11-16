@@ -184,7 +184,7 @@ def test_a_project_converts_its_production(rules, path) -> None:
     act[B0] = True
     sim._seat_city_produce(ROW, col, act, torch.full((sim.B,), 9.9, dtype=torch.float64))
     assert int(sim.city_proj_yield[B0, ROW, j]) == 3, "the conversion is not the project's Science"
-    want = (9.9 + 2.5) * rate
+    want = ((int((9.9 + 2.5) * 256) * int(rate * 256)) // 256) / 256
     assert abs(float(sim.city_proj_conv[B0, ROW, j]) - want) < 1e-12, \
         f"converted {float(sim.city_proj_conv[B0, ROW, j])}, want {want}"
     load_queue(sim, j, [unit(sim, 0)], costs=[10_000])

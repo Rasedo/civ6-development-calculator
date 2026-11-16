@@ -170,6 +170,19 @@
     - "- The district discount (0x409870's under-average models): the type's count 0x4bdd70 (placed districts included) against 0x4bca20's average, the completed specialty distric..."
     - ...ost the actor's (0x93e580, 0x93e9e0), below MaxPerPlayer counting every one it holds (0x4bdd70); the picker over them in the table's order (0x84e3e0); done when the actor COMPLETES...
   review: reviewed
+- addr: 0x4be470
+  final: 0x32ce10
+  kind: function
+  name: Player_Stats improvement count
+  semantics: "(stats, improvement row): the map's plots whose owner (+0x1c) is the player, whose improvement (+0x44) is the row and whose improvement is not pillaged (+0x4d bit 0), counted — with or without a resource."
+  status: READ
+  cases:
+    - recording: h1_duels1171
+      turn: 33
+      value: city-state 2's one Mine reaches The Wheel's NumItems 1 and Iron Working's at the reveal's event (Iron Working boosted at t33)
+  readings:
+    - "C-98: the improvement boosts fire on one plot's event — READ (0x1644e0, 0x4be470), not ported; a project's converted yield floors; a pillaged regional building pays no city; the majors' Railroads land before the minors — both twins"
+  review: reviewed
 - addr: 0x4be720
   final: 0x32d0c0
   kind: function

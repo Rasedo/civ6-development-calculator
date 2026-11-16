@@ -1276,6 +1276,26 @@
   context:
     - "...m_priority (the AutoVariable +0x1d8, value +0x230, constructed 4 at 0x14d25d, saved at 0x14ed46): the first pass, with only the cities' job before it."
   review: reviewed
+- addr: 0x167580
+  final: 0xeef30
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-98: the improvement boosts fire on one plot's event — READ (0x1644e0, 0x4be470), not ported; a project's converted yield floors; a pillaged regional building pays no city; the majors' Railroads land before the minors — both twins"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "- THE IMPROVEMENT BOOSTS (0x1644e0, reached through the thunks 0x167d10 and 0x167580, the grant 0x166bf0): BOOST_TRIGGER_HAVE_X_IMPROVEMENTS and BOOST_TRIGGER_IMPROVE_SPECI..."
+  review: imported
+- addr: 0x167d10
+  final: 0xef710
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-98: the improvement boosts fire on one plot's event — READ (0x1644e0, 0x4be470), not ported; a project's converted yield floors; a pillaged regional building pays no city; the majors' Railroads land before the minors — both twins"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "- THE IMPROVEMENT BOOSTS (0x1644e0, reached through the thunks 0x167d10 and 0x167580, the grant 0x166bf0): BOOST_TRIGGER_HAVE_X_IMPROVEMENTS and BOOST_TRIGGE..."
+  review: imported
 - addr: 0x1a7710
   final: 0x11a290
   kind: function

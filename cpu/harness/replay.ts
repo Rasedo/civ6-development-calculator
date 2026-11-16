@@ -1413,6 +1413,34 @@ function landMajorDistricts(ctx: Ctx, b: TurnRecord, turn: number): void {
   }
 }
 
+/** the game's Build Route order (`UnitOperationStarted`'s operation hash) */
+const OP_BUILD_ROUTE = gameHash('UNITOPERATION_BUILD_ROUTE');
+
+/** the Railroads the majors' Military Engineers laid in their turns stand
+ *  for the players after them, landed before the first minor's turn: the
+ *  log's UnitOperationStarted of Build Route with the Railroad's row, on the
+ *  plot the unit's steps of the turn left it on, which record t+1 alone
+ *  holds otherwise (runs/h1_duels1157 t191-194: player 1's Military Engineer
+ *  7340056 lays 8:11, then a plot a turn along city-state 2's route to its
+ *  city, the route's path Gold 2.25 more each turn in the city-state's
+ *  Amenity values of that turn, Liberalism 134 / 139 / 141 / 143) */
+function landRailroads(ctx: Ctx, b: TurnRecord, turn: number): void {
+  const stand = new Map<string, number>();
+  for (const x of (b as { actions?: unknown[][] }).actions ?? []) {
+    if (x[1] !== turn) continue;
+    const key = `${x[3]}:${x[4]}`;
+    if (x[2] === 'UnitMoved' || x[2] === 'UnitTeleported') stand.set(key, (x[6] as number) * ctx.W + (x[5] as number));
+    if (x[2] !== 'UnitOperationStarted' || x[5] !== OP_BUILD_ROUTE || ctx.cat.routes[x[6] as number] !== 'ROUTE_RAILROAD') continue;
+    const seat = ctx.seatOfPlayer.get(x[3] as number);
+    const plot = stand.get(key) ?? unitOf(ctx, key)?.tileIndex;
+    if (seat === undefined || !isCiv(seat) || plot === undefined || !ctx.next.state.map.tiles[plot].railroad) continue;
+    const t = ctx.state.map.tiles[plot];
+    t.road = true;
+    t.railroad = true;
+    delete t.roadTier;
+  }
+}
+
 /** the roads the majors laid in their turns before row `open` stand for the
  *  minors' planning on `copy`, over the first record's: a district a major
  *  completed carries its road (`landMajorDistricts`), a major's Trader lays
@@ -7456,6 +7484,7 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
       stream.actions(a.turn);
       otherMajorsTurn();
       landMajorDistricts(ctx, b, a.turn);
+      landRailroads(ctx, b, a.turn);
       // the majors' completions before the first minor's turn opens; one
       // inside a minor's turn lands at the next one's start (`holdMinorStart`)
       const minorsOpen = ((b as { actions?: unknown[][] }).actions ?? [])

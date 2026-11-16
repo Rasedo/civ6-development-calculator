@@ -19282,3 +19282,53 @@ wrapper over `_tac_spot_link` (gpu/core/sim_tactics.py).
   (308.3 for 289.3) with Engineering and Machinery behind it, the game
   boosting Iron Working alone at the reveal (Game_Boosts t33) where the
   engines' HAVE_X_IMPROVEMENTS counts the Mine on the Iron now seen.
+
+## C-98: the improvement boosts fire on one plot's event — READ (0x1644e0, 0x4be470), not ported; a project's converted yield floors; a pillaged regional building pays no city; the majors' Railroads land before the minors — both twins
+
+`projectConverted` (cpu/data/projects.ts) from `minorBuild`, the seat's
+production step (cpu/core/phase.ts) and the import; GPU `_proj_converted`
+(gpu/core/sim_phase.py) from `_seat_city_produce` and the minor's build step
+(gpu/core/sim_minors.py). `regionalEffects` (cpu/core/yields.ts);
+`_seat_regional` (gpu/core/sim_seats.py). The replay's `landRailroads`
+(cpu/harness/replay.ts).
+
+- A PROJECT'S CONVERTED YIELD (0x184ae0): the Production paid in, never above
+  the cost, times the rate in 256ths is a fixed point product, floored to a
+  256th. runs/h1_duels1152 Nan Madol t162-170: 692/256 Production at 38/256
+  gives 102/256 Culture (2.703 x 0.1484 = 0.4012 is 102.7), its base Culture
+  3071/256 at 12 citizens as record 163's 9.598 under -20% holds it
+  (3072 gives 9.602); the Amenity value 1807/256 a turn, Liberalism 103 and
+  Civil Prestige 176 / 154 as logged (104 and 177 / 155 on 1808).
+- A PILLAGED REGIONAL BUILDING pays no city, its own included, while its
+  district stands repaired. runs/h1_duels1157 Johannesburg: the Industrial
+  Zone on 43:22 repaired in t199 with its Workshop and Factory pillaged,
+  Production 10.0 = 25 x 0.4 in records 200-202 and 11.2 = 28 x 0.4 in record
+  203 with the Workshop repaired, the Factory still pillaged; Limes 84 at
+  t199-201 and 97 from t202, Retainers 122 at t199-200 as logged.
+- THE MAJORS' RAILROADS: a Military Engineer's Build Route lands in its
+  player's turn, before the minors' turns, and raises a route's path term
+  (2 a Railroad plot) that turn. The replay lands it from the log's
+  UnitOperationStarted of UNITOPERATION_BUILD_ROUTE with the Railroad's row.
+  runs/h1_duels1157 t191-194: player 1's Military Engineer 7340056 lays 8:11
+  and a plot a turn along city-state 2's route to its city, the route's
+  origin Gold 10 / 12.25 / 14.5 / 16.75 / 19 in records 191-195, Liberalism
+  134 / 139 / 141 / 143 as logged; runs/h1_duels1174 t216-222: the route
+  city-state 4 begins at t222 walks the Railroad laid that turn, its Gold 7,
+  E-Commerce 86 / 71 from t226 as logged.
+- THE IMPROVEMENT BOOSTS (0x1644e0, reached through the thunks 0x167d10 and
+  0x167580, the grant 0x166bf0): BOOST_TRIGGER_HAVE_X_IMPROVEMENTS and
+  BOOST_TRIGGER_IMPROVE_SPECIFIC_RESOURCE are answered on one plot's
+  improvement event, for the plot's owner: the row's improvement is the
+  event's, the owner's unpillaged plots holding it (0x4be470, with or
+  without a resource) reach NumItems, and with RequiresResource the event's
+  plot holds a resource its owner sees (any resource); the specific class
+  asks the row's resource there. The functor of 0x167580 reads the plot's
+  own improvement: a plot event with no improvement laid. runs/h1_duels1171
+  city-state 2 t33: Bronze Working lands with its Mine on the Iron it
+  reveals, Game_Boosts logs Iron Working alone and The Wheel is researched
+  unboosted by t42.
+- Open (C-98): the engines read HAVE_X_IMPROVEMENTS off the standing state
+  each turn (`stateTrigger`, cpu/core/boosts.ts), so a Mine laid on Iron
+  unseen boosts The Wheel once the Iron shows; which signals the four
+  functors are bound to (the game's event table +0x7f8, +0x828, +0x10e0) is
+  unread.

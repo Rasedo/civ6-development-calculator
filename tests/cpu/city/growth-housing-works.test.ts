@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { housingGrowthFactor } from '../../../cpu/data/constants';
 import { gwWorkCulture, GW_MAKER_CLASS } from '../../../cpu/core/greatWorks';
 import { GREAT_PEOPLE } from '../../../cpu/data/greatPeople';
-import { PROJECTS, projectConversionRate } from '../../../cpu/data/projects';
+import { PROJECTS, projectConverted } from '../../../cpu/data/projects';
 
 describe('the housing left above the population', () => {
   // runs/h1_duelw11*: housingGrowthMod 1 at 2+ left, 0.5 at 1, 0.25 from 0
@@ -26,7 +26,8 @@ describe("a district project's conversion rate", () => {
   // Aquileia 1108 t169-176: Commercial Hub Investment's 30% on 16 Production
   // reads 4.75 Gold — the rate in 1/256 fixed point, truncated
   it('is the percent over 100 truncated to 256ths', () => {
-    expect(16 * projectConversionRate(PROJECTS.INVESTMENT)).toBe(4.75);
-    expect(projectConversionRate(PROJECTS.RESEARCH_GRANTS)).toBe(38 / 256);
+    expect(projectConverted(PROJECTS.INVESTMENT, 16, 100)).toBe(4.75);
+    expect(projectConverted(PROJECTS.RESEARCH_GRANTS, 1, 100)).toBe(38 / 256);
+    expect(projectConverted(PROJECTS.RESEARCH_GRANTS, 692 / 256, 100)).toBe(102 / 256);
   });
 });

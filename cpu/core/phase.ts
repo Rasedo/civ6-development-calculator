@@ -40,7 +40,7 @@ import { FREE_CITY_PAIR_CLASS, LOYALTY_RELIGION_MATCHING, LOYALTY_RELIGION_MISMA
 import { placementPlot, plotDistance, seatPoolSlots, tacticalTargets } from './tactical';
 import { freeCitiesMilitary, freeRaidCheck, freeRaidSignal } from './freeOps';
 import { plotsSeenNow } from './barbarians';
-import { PROJECTS, projectConversionRate } from '../data/projects';
+import { PROJECTS, projectConverted } from '../data/projects';
 import { adoptGovernment, carryPolicies, slotCountRebuild, slotLossRebuild, seatGovernment, governmentBit, darkAgeEra, unlockedPolicyIds, governmentSlots, governmentChanges, policyLayoutChanges, policyLayoutOf, policyUnlockCost } from './effects';
 import type { RuleResult } from './rules';
 import { TECHS, type ResearchEffect } from '../data/techs';
@@ -3543,7 +3543,7 @@ export function seatPhase(state: GameState, only?: { seats: ReadonlySet<number>;
         // yields read until the next step
         const conv = q.kind === 'project' ? PROJECTS[q.project] : undefined;
         if (conv?.yield) {
-          civCity.projectYield = { key: conv.yield, amount: Math.min(production + banked, cost) * projectConversionRate(conv) };
+          civCity.projectYield = { key: conv.yield, amount: projectConverted(conv, production + banked, cost) };
         }
         if (letGo && q.kind === 'district') {
           civCity.queue.shift();

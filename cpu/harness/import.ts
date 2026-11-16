@@ -81,7 +81,7 @@ import {
 } from '../data/greatWorks';
 import { CONGRESS_GROWTH_A, CONGRESS_GROWTH_B, CONGRESS_MIGRATION, CONGRESS_RESOLUTIONS, UDT_DISTRICTS } from '../data/seats';
 import { CONGRESS_CURRENCIES } from '../core/congress';
-import { PROJECTS, PROJECT_LIST, projectConversionRate } from '../data/projects';
+import { PROJECTS, PROJECT_LIST, projectConverted } from '../data/projects';
 import { GOVERNORS } from '../data/governors';
 import { GOVERNMENT_LIST, POLICY_LIST } from '../data/policies';
 import { LUXURY_IDS } from '../../world/resources';
@@ -4560,7 +4560,7 @@ function importProjectYield(state: GameState, cat: Catalog, c: DumpCity, prev: D
     const production = num(prev!.yields[1]);
     city.projectYield = {
       key: def.yield!,
-      amount: Math.min(production, projectCost(state, city.seat, before, city)) * projectConversionRate(def),
+      amount: projectConverted(def, production, projectCost(state, city.seat, before, city)),
     };
     return -1;
   }
