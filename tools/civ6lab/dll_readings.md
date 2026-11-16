@@ -19114,3 +19114,53 @@ replay's imposed wonder placement (cpu/harness/replay.ts); GPU
   upgrade (runs/h1_duels1155 t219 the Pike and Shot 2818056 swapped off the
   centre by City Defense's Skirmisher Army 2293760; runs/h1_duels1170 t241
   the Nihang 1966086 bought, which ours does not buy).
+
+## C-133: a unit's Movement in a domain that is not its own; the planning's spots on a plot it may be placed on — READ (0x56d9f0 at 0x56da28..0x56da36, 0x2715a0 at 0x2717f4..0x27181b, 0x26e920 at 0x26ee12..0x26ee1c, 0x790c60 at 0x790cf3..0x790cfa), both twins
+
+`domainPool`, `search`'s `price` (its new turn's pool, the short step's
+spend), `groundOf`'s `placed`, `planUnit`'s `onLink` (cpu/core/tactical.ts);
+`_tac_pool`, `_tac_search`'s `full_s` / `full6` / `spend_all` and its `link`
+wrapper over `_tac_spot_link` (gpu/core/sim_tactics.py).
+
+- A UNIT'S MOVEMENT IN A DOMAIN (0x56d9f0(unit, domain)): its Units row's
+  BaseMoves (+0x38) where the domain asked is its own (+0x650), or its own
+  is air (1) or 4; asked for the sea (0), a unit that may embark (0x56c480)
+  the embarked pool (game +0x510 + its player's +0x880), its BaseMoves with
+  +0x18c3; else 0 (0x56da28..0x56da36). So a hull holds no Movement on land
+  and a land unit that may not embark none on water.
+- THE POOL (0x2715a0 at 0x2717f4..0x27181b): per domain 0..4 the least of
+  the formation's members' values.
+- A NEW TURN ON A POOL OF 0 (0x26e920): a parent with no Movement starts the
+  next turn on the pool of the plot entered (the plot left where the plot
+  entered lies in a zone of control). With a pool of 0 the step's cost tops
+  it: Movement 0, no further turn (the parent's turn was already counted),
+  the cost the step's own (0x26ee12..0x26ee1c: the Movement it starts with
+  where above 0, else its cost, else 1). The cost 0x270dd0 then adds the
+  turn-end terms (+4, an unrevealed plot +3). Reached by a ship's step off a
+  plot it holds no Movement on onto its own centre, a strike ashore, or land
+  the player never revealed, and by a land unit's that may not embark onto
+  water it never revealed.
+- Such nodes list nothing but a ship's centre, yet stand in the open list:
+  AddToOpen's walk (0x775a0) weighs each later node against the head and the
+  tail with them in place, which sets the closing order of equal-cost plots.
+- THE LISTING'S OWN LOCATION TEST (0x790c60 at 0x790cf3..0x790cfa): before
+  the reach entry (NotifyList's call) and before the spots (the cost
+  callback's call, sixth argument set), 0x586900(formation, plot, 1, 0); a
+  refusal returns. A link onto a plot the unit may not be placed on lays no
+  spot.
+- Confirmed (the game's own plannings, aiunits):
+  - runs/h1_duels1184 t8 the barbarian Galley 851980 on 37:24 closes 32:22
+    before 31:23 and Galley 524295 on 31:20 closes 34:25, 35:24, 35:23: the
+    unrevealed Woods 37:20 / 29:17 at 1285120 hold the head.
+  - runs/h1_duels1124 t21 city-state 4's Warrior 131073 on 36:10 closes 38:8,
+    38:9, 38:10: the unrevealed water 37:12 / 36:12 off 36:11 (1/0) at 772096
+    hold the tail, 768 from 771328 against the head's 512.
+  - runs/h1_duels1124 t78-93 city-state 3's Quadrireme 1048577 plans its
+    centre 41:12 at (2/0).
+  - runs/h1_duels1121 t174 the barbarian Galley 2424835 on 15:9 holds the
+    spot 12:10 on player 1's centre 12:9 at turn 3: the centre's node (1/0)
+    links the zoned water 12:10 on the land pool, no Movement left.
+  - runs/h1_duels1187 t141 the barbarian Quadrireme 1835024 holds no spot
+    27:12 on player 0's Warrior on 27:13.
+- Open (AUDIT C-133, C-129): the target list's own district placed in the
+  turn; an improvement the turn removes in the barbarians' list.

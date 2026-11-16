@@ -492,6 +492,7 @@
     - "C-132: a district's defence terms on the Encampment, the garrison of any player, an unrevealed district in the danger list, a hidden unit's forfeit by the turn order — READ (0x24a180 at 0x24a24c..0x24a275 and 0x24aa0d, 0x586360 at 0x5866c9..0x58671f under flag 1, 0x4f1b20 by the players' order), both twins"
     - "C-134 / C-95: Operation Move's goal and ring plots refused by another player's unit of the mover's layer, at war or not; Pillage passes a unit with no Movement or none the target takes — READ (0x586360 at 0x586542..0x5865a1, 0x208b80 at 0x208c41..0x208d4e, 0x815d50 at 0x815d64..0x815d78 and 0x815e6f..0x815eb9, 0x774380 at 0x7744af..0x7744f8), both twins"
     - "C-95 / C-125 / C-129: the planning list's location test on an attack's plot; the majors' best strengths trained in the minors' looks — READ (0x26d890 at 0x26d9cb..0x26da37), both twins"
+    - "C-133: a unit's Movement in a domain that is not its own; the planning's spots on a plot it may be placed on — READ (0x56d9f0 at 0x56da28..0x56da36, 0x2715a0 at 0x2717f4..0x27181b, 0x26e920 at 0x26ee12..0x26ee1c, 0x790c60 at 0x790cf3..0x790cfa), both twins"
   notes:
     - ".claude/scratchpad/mu1/readings_c96.md: ...it. - THE PLANNING'S GROUND, beside the barbarians': the list (0x26d890) keeps a   plot only where 0x586900 lets the unit end — another player's unit at   peace it passes and never ends on (runs/h1_duelw1117..."
   context:

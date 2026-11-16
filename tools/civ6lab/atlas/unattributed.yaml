@@ -651,6 +651,7 @@
     - "C-95: the reach searches open turn-end nodes, and the zone of control's domain is the formation's — READ (0x271920 from 0x26dab0, 0x26f980 -> 0x530f50, 0x267650), both twins"
     - "C-133 / C-95: the carried orders run in the unit list's order; a path comes ashore off water only by the disembark test — READ (0x7df30, 0x554e0, 0x523e0, 0x52e90, 0x54910, 0x2720a0 at 0x272380..0x27240d, 0x52fb90 at 0x52fb9d), both twins; UpdateOpenNode's walk and flag 2's plot — READ (0x79560, 0x2720a0 at 0x2721c3..0x27220d / 0x2724c8), unported"
     - "C-133 / C-128: flag 2's parent plot, the open list as the list itself, the embarked state's Movement cap, the zone's improvement test — READ (0x2720a0 at 0x27220d / 0x2724c8, 0x775a0, 0x79560, 0x586d40 at 0x587042..0x5870aa / 0x58741c..0x587486, 0x5706e0, 0x531ef0, 0x26fe20 at 0x270444 / 0x270776, 0x270be0, 0x52f970), both twins"
+    - "C-133: a unit's Movement in a domain that is not its own; the planning's spots on a plot it may be placed on — READ (0x56d9f0 at 0x56da28..0x56da36, 0x2715a0 at 0x2717f4..0x27181b, 0x26e920 at 0x26ee12..0x26ee1c, 0x790c60 at 0x790cf3..0x790cfa), both twins"
   context:
     - ...st. The open list is a list sorted by total cost, equal totals by known cost (AddToOpen 0x775a0 scans from the head or the tail by a float midpoint, so a tie lands first or last by th...
     - "...is its cost. The open list (+0xf0 head, +0xf8 tail, doubly linked) is sorted by (f, g) (0x775a0): a key below the head's goes first, above the tail's last; otherwise the insertion s..."

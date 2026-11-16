@@ -42,6 +42,7 @@
     - cpu/core/tactical.ts:embarks
     - gpu/core/sim_tactics.py:_tac_search
     - cpu/core/tactical.ts:seaFormation
+    - cpu/core/tactical.ts:domainPool
   readings:
     - "C-95: the planning's valid wrapper on a district at war, and a land unit's embarking by its original owner — READ (0x26e570 at 0x26e5e2..0x26e7f1, 0x56c480), the first both twins"
     - "C-95: Explore Land and the barbarians' revealed plots — READ, ported (two tests below unread)"
@@ -51,6 +52,7 @@
     - "C-95: a formation stands where each member may, a path's destination placed, CanEmbark by the type's technology — READ (0x586900, 0x586360 at 0x58640c..0x586494, 0x267650 at 0x2677e0..0x2677f7, 0x2714b0, 0x272880, 0x4ee3f0 at 0x4ee4e1..0x4ee548), both twins"
     - "C-95: the barbarians' candidates before the look, a capture's rally, a formation's embark flag and fighter — READ (0x722d70, 0x746920, 0x747230, 0x7877e0, 0x7265b0, 0x747fa0, 0x73e610, 0x73e870, 0x267650), both twins"
     - "C-133 / C-128: flag 2's parent plot, the open list as the list itself, the embarked state's Movement cap, the zone's improvement test — READ (0x2720a0 at 0x27220d / 0x2724c8, 0x775a0, 0x79560, 0x586d40 at 0x587042..0x5870aa / 0x58741c..0x587486, 0x5706e0, 0x531ef0, 0x26fe20 at 0x270444 / 0x270776, 0x270be0, 0x52f970), both twins"
+    - "C-133: a unit's Movement in a domain that is not its own; the planning's spots on a plot it may be placed on — READ (0x56d9f0 at 0x56da28..0x56da36, 0x2715a0 at 0x2717f4..0x27181b, 0x26e920 at 0x26ee12..0x26ee1c, 0x790c60 at 0x790cf3..0x790cfa), both twins"
   context:
     - ...r with it; +0x4c not above 0, taken as no unit on it; its own area unless it embarks (0x56c480), a hull on water; no city centre but its player's); its two counts over its sight (0x5...
   review: reviewed
@@ -275,17 +277,26 @@
   final: 0x3a33d0
   kind: function
   name: a unit's base moves (embarked pool)
-  semantics: "a unit's Movement in a domain: Units +0x38 in its own domain (or -1), on water for a land unit that may embark the embarked pool (game +0x510 + player +0x880) unless +0x18c3; none of GetMaxMoves' terms (+0x1920, the player's +0x1300, +0x1924..+0x192c)"
+  semantics: "a unit's Movement in a domain: Units +0x38 in its own domain (or -1), on water for a land unit that may embark the embarked pool (game +0x510 + player +0x880) unless +0x18c3; 0 in a domain that is not its own (0x56da28..0x56da36: neither the domain asked, nor air 1, nor 4) — a hull on land, a land unit that may not embark (0x56c480) on water; none of GetMaxMoves' terms (+0x1920, the player's +0x1300, +0x1924..+0x192c)"
   status: READ
   cases:
     - recording: h1_duely1124
       turn: 29-55
       value: city-state 4's Heavy Chariot 83 (base 2, 3 on its clear start plot) plans its second turn's plots on 2 (AI_Planning.csv); the planning lab's rows equal 1112 -> 1230 of 1829
+    - recording: h1_duels1124
+      turn: 78
+      value: city-state 3's Quadrireme 1048577 plans its own centre 41:12 off a plot it reaches with no Movement at (2/0), the game's own planning (aiunits)
+    - recording: h1_duels1184
+      turn: 8
+      value: "the barbarian Galley 524295 on 31:20: the unrevealed Woods 29:17 off 30:18 (1/0) costs 2 with no Movement left (1285120), standing at the open list's head as 34:23 links 35:23, which lands from the tail after 34:25 and 35:24, the game's order"
   impl:
     - cpu/core/aiViewTypes.ts:AiUnitView
     - cpu/core/aiView.ts:unitView
     - cpu/core/tactical.ts:domainPool
+    - gpu/core/sim_tactics.py:_tac_pool
+    - gpu/core/sim_tactics.py:_tac_search
   readings:
+    - "C-133: a unit's Movement in a domain that is not its own; the planning's spots on a plot it may be placed on — READ (0x56d9f0 at 0x56da28..0x56da36, 0x2715a0 at 0x2717f4..0x27181b, 0x26e920 at 0x26ee12..0x26ee1c, 0x790c60 at 0x790cf3..0x790cfa), both twins"
     - "C-97: the war operations — the war candidates, the city value's frame, the assault nodes and Attack Units READ; the loyalty lead's sources, the team update's danger and the assault's executions PARTLY READ"
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"

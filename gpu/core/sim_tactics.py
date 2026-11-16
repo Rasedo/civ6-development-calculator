@@ -589,14 +589,17 @@ class SimTactics:
         """[B, P] twice — `domainPool` of each unit of pool `pre` ashore and on
         water, in `mp_scale` units: the type's base Moves; a land unit's on
         water the embarked pool (EMBARK_MOVES, the embark techs, the roster's
-        rows); a hull its base Moves on either"""
+        rows) — the caller's where the unit may not embark, none
+        (`_tac_search`); a hull none on land (0x56d9f0), a water walker its
+        base Moves on either"""
         typ = getattr(self, f"{pre}_unit_type").clamp(min=0, max=self.NU - 1)
         seat = getattr(self, f"{pre}_unit_seat")
         base = self._type_moves.take(typ)
         naval = self.unit_naval.take(typ)
         emb = (self._embark_moves + self._roster_embark_mp(seat, typ)
                + self._sea_move_mp(seat, torch.ones_like(naval), torch.zeros_like(naval)))
-        return base * self._mp_scale, torch.where(naval, base, emb) * self._mp_scale
+        land = torch.where(naval, torch.zeros_like(base), base)
+        return land * self._mp_scale, torch.where(naval | self.unit_water_walk.take(typ), base, emb) * self._mp_scale
 
     def _tac_full_now(self, pre: str = "barb") -> torch.Tensor:
         """[B, P] — `unitFullMoves` of each unit of pool `pre` as it stands,
@@ -844,6 +847,9 @@ class SimTactics:
             board_step = boarded_n & rev_b[rows] if rev_b is not None else boarded_n
         orig_of = getattr(self, f"{pre}_unit_orig_owner")
         embarks = self._tac_embarks(rows, utype, seat, orig_of[rows, slots])
+        # a land unit that may not embark holds no Movement on water
+        # (`domainPool`, 0x56d9f0 through 0x56c480)
+        full_s = torch.where(naval | self.unit_water_walk.take(utype) | embarks, full_s, torch.zeros_like(full_s))
         # the formation's location test (0x586900) asks each member's own
         # (0x586360 -> 0x56c480): water only where its mate may embark too;
         # the embark and disembark cost rules run on the formation's flag
@@ -1172,7 +1178,19 @@ class SimTactics:
             hills_n = self.hills[rows]
         link = None
         if plan is not None:
-            link = self._tac_spot_link(rows, start, naval, plan)
+            lay = self._tac_spot_link(rows, start, naval, plan)
+            # a link onto a plot the unit may not be placed on lays no spot
+            # (`groundOf`'s placed, 0x790c60's own location test): a plot the
+            # player never revealed but a city centre or one of its domain
+            spot_ok = None
+            if rv_n is not None:
+                land_sb, wat_sb = self._tac_enter(seat, False, foes=False, forts=False)
+                spot_ok = rv_n | self._centre_plane()[rows] | torch.where(
+                    naval.unsqueeze(1), wat_sb[rows], land_sb[rows] | (wat_sb[rows] & placed.unsqueeze(1)))
+
+            def link(P: torch.Tensor, par: torch.Tensor, T_: torch.Tensor, M: torch.Tensor, valid: torch.Tensor) -> None:
+                lay(P, par, T_, M, valid if spot_ok is None else valid & spot_ok.gather(1, P))
+
             link(start.unsqueeze(1), start, torch.ones_like(start).unsqueeze(1), mv[ar, start].unsqueeze(1),
                  torch.ones_like(start, dtype=torch.bool).unsqueeze(1))
         none6 = torch.full((N, 6), NONE, dtype=torch.long, device=dev)
@@ -1249,7 +1267,7 @@ class SimTactics:
             # 0x26ea6d..0x26ea86), of the plot left where the plot entered
             # lies in a zone of control (0x26ea88..0x26eaa2)
             sea6 = torch.where((fw != wet6) & zt.gather(1, nbc), fw.expand(-1, 6), wet6)
-            full6 = torch.where(sea6 & ~naval.unsqueeze(1), full_s.unsqueeze(1), full_l.unsqueeze(1))
+            full6 = torch.where(sea6, full_s.unsqueeze(1), full_l.unsqueeze(1))
             pm = torch.where(fresh, full6, bm.expand(-1, 6))
             turns = (bt + fresh.long()).expand(-1, 6)
             # the parent's carry on top (0x26e920); a shore crossing carries
@@ -1268,9 +1286,12 @@ class SimTactics:
             moves = moves.clamp(min=0)
             at_start = ((best == start) & unmoved).unsqueeze(1)
             same_turn = bt == turns
-            cst = torch.where(short & at_start, pm, cst)
+            # the step spends the Movement it starts with, its own cost
+            # where it starts with none (0x26ee12..0x26ee1c)
+            spend_all = torch.where(pm > 0, pm, torch.where(cst > 0, cst, torch.full_like(cst, _FIX)))
+            cst = torch.where(short & at_start, spend_all, cst)
             turns = torch.where(short & ~at_start & same_turn, turns + 1, turns)
-            cst = torch.where(short & ~at_start & ~same_turn, torch.where(pm > 0, pm, _FIX), cst)
+            cst = torch.where(short & ~at_start & ~same_turn, spend_all, cst)
             if zp is not None:
                 inz = zp.gather(1, nbc) & (moves > 0) & ~a6 & ~blind6
                 cst = torch.where(inz, pm, cst)

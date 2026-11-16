@@ -197,6 +197,10 @@ interface Ground {
    *  list's 0x586900 -> 0x586360: `enterable` with no unit counted), since
    *  the search enters a plot the player never revealed whatever it is */
   fits: (i: number) => boolean;
+  /** a linked plot the planning lays spots on (the listing 0x790c60's own
+   *  location test, 0x586900 under flag 1, before its spots): a revealed one
+   *  as the search linked it, a city centre, else one of the unit's domain */
+  placed: (i: number) => boolean;
   /** `inEnemyZoc` on the search's destination, the plot entered's
    *  `crowded` its stacking limit */
   zoc: (t: Tile) => boolean;
@@ -502,6 +506,11 @@ function groundOf(state: GameState, unit: Unit, revealedOnly = true, planning = 
       const fortAtWar = garrisonDistrict(state, t) && owner !== NO_SEAT && owner !== unit.seat && unitsHostile(state, unit, { seat: owner });
       return enterable(state, unit, t, NO_FOES, embarks, !fortAtWar || formationShoots, borderless);
     },
+    placed: (i) => {
+      if (revealed(i)) return true;
+      const t = state.map.tiles[i];
+      return t.district === 'CITY_CENTER' || enterable(state, unit, t, NO_FOES, embarks, false, borderless);
+    },
     enter: (t) => {
       let v = enters.get(t.index);
       if (v === undefined) {
@@ -640,12 +649,19 @@ function groundOf(state: GameState, unit: Unit, revealedOnly = true, planning = 
  *  +0x1300, the start plot's +0x1924..+0x192c) are none of it: a later turn
  *  of a search starts on it (runs/h1_duely1124 t29-55, city-state 4's Heavy
  *  Chariot 83: 3 Movement on its clear start plot, its second turn's plots
- *  planned on 2, AI_Planning.csv). A hull reads its base Moves on either. */
+ *  planned on 2, AI_Planning.csv). A unit holds none in a domain that is not
+ *  its own (0x56d9f0 at 0x56da28..0x56da36): a hull on land, a land unit
+ *  that may not embark (0x56c480) on water — a turn that starts onto such a
+ *  plot, a ship's own centre or a plot the player never revealed, starts on
+ *  0 (runs/h1_duels1124 t78: city-state 3's Quadrireme 1048577 plans its
+ *  centre 41:12 at (2/0), the game's own planning). */
 function domainPool(state: GameState, unit: Unit, sea: boolean): number {
   const def = UNITS[unit.type];
   const base = def?.moves ?? 2;
-  if (def?.naval || !sea) return base;
-  return EMBARK_MOVES + embarkTechMoves(state, unit.seat) + rosterEmbarkMoves(state, unit);
+  if (waterWalks(unit.type)) return base;
+  if (def?.naval) return sea ? base : 0;
+  if (!sea) return base;
+  return canEmbark(state, unit) ? EMBARK_MOVES + embarkTechMoves(state, unit.seat) + rosterEmbarkMoves(state, unit) : 0;
 }
 
 /**
@@ -670,7 +686,7 @@ function domainPool(state: GameState, unit: Unit, sea: boolean): number {
  * the unit's own territory; a land unit's water +1000 more. `onClose` sees each node as it closes; the
  * search stops where it answers true. `onLink` sees each link the search
  * prices (the cost callback 0x26d6f0): the plot, the plot it is linked from,
- * the turn and Movement the step reaches it with, and whether it attacks —
+ * the turn and Movement the step reaches it with, and the search's ground —
  * the start first, linked from itself. `reach` names the search's flags: a
  * search with no `zoc` is the planning's (0x26dcd0, flag 4), the danger
  * map's (0x26df90 under 0x311), Explore Land's (0x26df90 under 0x40 / 0x42)
@@ -706,7 +722,7 @@ function formationFullMoves(state: GameState, unit: Unit, mates: readonly Unit[]
 }
 
 function search(state: GameState, unit: Unit, maxTurns: number, zoc: boolean, onClose: (n: PNode, ground: Ground) => boolean,
-  onLink?: (tile: number, from: number, turns: number, moves: number, attack: boolean) => void, reach: ReachSearch = 'planning',
+  onLink?: (tile: number, from: number, turns: number, moves: number, ground: Ground) => void, reach: ReachSearch = 'planning',
   laterTurns = false, fromFull = false, explore = true, danger?: PathDanger, mates: readonly Unit[] = formationMates(state, unit), dest = -1,
   strike = false): void {
   const { map } = state;
@@ -770,7 +786,7 @@ function search(state: GameState, unit: Unit, maxTurns: number, zoc: boolean, on
     turns: 1, closed: false, parent: null, wet: isWater(map.tiles[unit.tileIndex]) };
   nodes.set(start.tile, start);
   // the start is priced too, linked from itself
-  onLink?.(start.tile, start.tile, start.turns, start.moves, false);
+  onLink?.(start.tile, start.tile, start.turns, start.moves, ground);
   // the open list itself (the pathfinder's +0xf0 head, +0xf8 tail), in its
   // order: by key (+0x18), a key's nodes as the walks below leave them
   const open: PNode[] = [start];
@@ -978,7 +994,7 @@ function search(state: GameState, unit: Unit, maxTurns: number, zoc: boolean, on
       // 36:19, player 0's Warriors on the shore's 36:18 and 35:19, sails to
       // 38:18 for its centre 32:21)
       if (zoc && s.turns > best.turns && ground.crowded(best.tile) && (!laterTurns || best.turns <= 1)) continue;
-      onLink?.(to.index, best.tile, s.turns, s.moves, attack);
+      onLink?.(to.index, best.tile, s.turns, s.moves, ground);
       const c = nodes.get(to.index);
       if (!c) {
         const n: PNode = { tile: to.index, g: s.g, moves: s.moves, turns: s.turns, carry: s.carry, closed: false, parent: best, attack, wet: s.wet };
@@ -1023,7 +1039,7 @@ function search(state: GameState, unit: Unit, maxTurns: number, zoc: boolean, on
           if (p.parent === k.node) continue;
           const kt = map.tiles[k.node.tile];
           const ks = price(p, kt, k.di, !!k.node.attack, blindStep(p, kt));
-          onLink?.(kt.index, p.tile, ks.turns, ks.moves, !!k.node.attack);
+          onLink?.(kt.index, p.tile, ks.turns, ks.moves, ground);
           if (ks.g >= k.node.g) continue;
           reparent(k.node, p, ks);
           if (!stack.includes(k.node)) stack.push(k.node);
@@ -1056,7 +1072,7 @@ function search(state: GameState, unit: Unit, maxTurns: number, zoc: boolean, on
       // 38:10 off its water 38:11 at (2/0), its Builder 1376259 the water
       // 38:11 off its centre 39:12 at (2/4), the game's own plannings)
       const sea = isWater(from) !== wet && ground.zoc(to) ? isWater(from) : wet;
-      pm = !naval && sea ? fullSea : fullLand;
+      pm = sea ? fullSea : fullLand;
     }
     // the step's rules, then the parent's carry on top (0x26e920: the
     // parent's +0x20 added to the step's cost); between two plots the
@@ -1074,9 +1090,12 @@ function search(state: GameState, unit: Unit, maxTurns: number, zoc: boolean, on
     if (moves < 0) {
       moves = 0;
       carry = 0;
-      if (p === start && unmoved) cost = pm;
+      // the step spends the Movement it starts with, its own cost where it
+      // starts with none (0x26ee12..0x26ee1c)
+      const all = pm > 0 ? pm : cost > 0 ? cost : FIX;
+      if (p === start && unmoved) cost = all;
       else if (p.turns === turns) turns += 1;
-      else cost = pm > 0 ? pm : FIX;
+      else cost = all;
     }
     // the danger map's search (flag 0x200) pays the attack's spend on a
     // district alone: a step onto a unit's plot is priced as any step, the
@@ -2291,7 +2310,11 @@ export function planUnit(state: GameState, unit: Unit, targets: readonly Target[
     && onMap(u) && mapLayer(u.type) === layer)).map((E) => E.target.tile));
   const reach: Reach[] = [];
   const room = reachRoom(state, unit);
-  const onLink =(P: number, parent: number, T: number, M: number) => {
+  const onLink = (P: number, parent: number, T: number, M: number, ground: Ground) => {
+    // a link onto a plot the unit may not be placed on lays no spot
+    // (0x790c60 at 0x790cf3..0x790cfa: a ship's onto land it never revealed,
+    // a land unit's that may not embark onto such water)
+    if (!ground.placed(P)) return;
     for (const E of entries) {
       const ty = E.target.type;
       if (!STRUCK.has(ty)) continue;
