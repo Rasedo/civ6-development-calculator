@@ -19850,39 +19850,6 @@ EFFECT_ADJUST_UNIT_MAINTENANCE_DISCOUNT).
   land plots unseen by the full civilizations (Barbarians.csv), ours counts
   304 and raises none (the full civilizations' sight of t5, three plots).
 
-## C-134: an operation whose members an upgrade took ends at its tick — LAB (the records), both twins
-
-- AN UPGRADE'S OLD UNIT dies with its erase delayed (0xa49cb0 -> 0x9402a0
-  with r8b 1 -> 0x4ef040): its team's list still names it through the
-  turn, and the military AI's refresh before the upgrade (0x727510, then
-  the upgrade 0x727db0) logs the team with it. Where every member of an
-  operation is such a unit, the operations' run finds its tree gone and
-  the manager ends it ("Operation complete", 0x73a840 -> 0x725000) before
-  any node runs: no Recruit, Move or Attack line. A member upgraded beside
-  others stays listed and the operation runs on; a member killed in
-  battle leaves the team at the next keep and the tree runs (its Recruit
-  failing with no unit). Ported: `treeEmptied` in `tickTree`
-  (cpu/core/operations/manager.ts) beside the recruit's `robbedOps`; GPU
-  `_mops_run`'s `gone` on the holder's `dying` plane.
-- CONFIRMED: runs/h1_duels1159 t45: city-state 4's Attack Barb Camp, its
-  one Warrior 327683 upgraded to the Swordsman 655366 (UnitUpgraded),
-  logs "Ready, UNIT_WARRIOR;" then "Operation complete"; 1135 t167 the
-  Trebuchet 1310722 -> Bombard 1703943, 1169 t145 the Crossbowman 1376256
-  -> Field Cannon 1507331, 1172 t181 the Crossbowman 1048577 -> Field
-  Cannon 1245189, each Attack Barb Camp's one member. Beside others:
-  runs/h1_duelz1127 t94 City Defense's Heavy Chariot 720899 listed to the
-  end look. Killed: runs/h1_duels1159 t82-83 city-state 4's Swordsman
-  786439 killed by the barbarian Skirmisher, Attack Barb Camp "Not Ready",
-  "Operation Recruit, 0 units", then complete.
-- Open: the tree's own end (the writer of the tree's destroy flag +0x368
-  on the unit's death signal, game signals +0x1470) is unread; the rule is
-  the records'. In each case that ends, the old unit's aiController is
-  clear at the tacpass read; runs/h1_duels1135 t163 city-state 3's
-  Attack Barb Camp, its one Swordsman 851973 upgraded to the Line Infantry
-  1572872, keeps the tree's id 8585224 as its controller and the tree runs
-  on (Recruit takes the Trebuchet 1310722), which the port ends: what
-  keeps the controller is unread.
-
 ## C-132 / C-133: a portal's exits in the unit pathfinder, the step's cost under the route's cap, the river's side at any distance — READ (0x77a50 over 0x271b50, 0x530100, 0x26e920 at 0x26ec1a..0x26ec38, 0x52fa40 -> 0x272ca0, 0x531510 -> 0x179890), both twins
 
 - THE LINKS: a node's children are its six neighbours, then its plot's
@@ -20034,3 +20001,31 @@ EFFECT_ADJUST_UNIT_MAINTENANCE_DISCOUNT).
   with the Warrior 2293761 in the barbarians' turn, the Ram's t59 / t61
   plannings holding the Warrior's attack plots 9:19 and 7:19; ours forms
   none) (C-95).
+
+## C-134: an operation whose members an upgrade took — LAB (the records), unported
+
+- AN UPGRADE'S OLD UNIT dies with its erase delayed (0xa49cb0 -> 0x9402a0
+  with r8b 1 -> 0x4ef040): its team's list still names it through the
+  turn, and the military AI's refresh before the upgrade (0x727510, then
+  the upgrade 0x727db0) logs the team with it. An operation stands while
+  its tree does (0x73a840). Neither twin ends an operation for its members'
+  upgrade: the tree ticks as for any operation.
+- THE RECORDS: twenty operations whose every member the military AI's
+  upgrade took that turn. Four end at their tick with no node line
+  ("Operation complete" after the team line), the old unit's aiController
+  clear at the tacpass read: runs/h1_duels1159 t45 city-state 4's Attack
+  Barb Camp (Warrior 327683 -> Swordsman 655366), 1135 t167 (Trebuchet
+  1310722 -> Bombard 1703943), 1169 t145 (Crossbowman 1376256 -> Field
+  Cannon 1507331), 1172 t181 (Crossbowman 1048577 -> Field Cannon
+  1245189), each Attack Barb Camp's one member. Sixteen run on, their
+  Recruit taking units, the old unit keeping the tree as its controller
+  (runs/h1_duels1135 t163 the Swordsman 851973 -> Line Infantry 1572872
+  under 8585224; 1174 t58 city-state 3's Warrior 196610 under City Defense
+  3670019, which recruits the new Swordsman 589828): City Defense on 1174
+  t58 p3 and t101 p2, 1183 t85 p2, 1162 t83 p2, 1132 t42 p3, 1144 t146
+  p2, 1182 t101 p4, 1184 t166 p2, 1138 t130 p3, 1176 t97 p4, 1168 t100 p2;
+  Attack Barb Camp on 1152 t140 p3, 1148 t180 p2, 1165 t131 p3, 1145 t240
+  p2, 1135 t163 p3.
+- Open: what tells the four from the sixteen — the writer that clears the
+  old unit's controller or the tree's destroy flag (+0x368) on its death
+  signal (game signals +0x1470) — is unread.

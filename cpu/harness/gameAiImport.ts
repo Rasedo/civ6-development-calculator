@@ -414,15 +414,18 @@ export function importCityAi(cs: CityState, read: GameMemoryRead, w: ImportWorld
   if (upgrades.length) cs.upgradeTrees = upgrades;
   else delete cs.upgradeTrees;
   // the tree pool: every control the look lists holds its slot, a slot none
-  // holds free (ours in their order, beneath them the rest), the next
-  // generation past the highest
+  // holds free (ours in their order, beneath them the rest as the destroy
+  // loop frees them, in slot order: the highest taken first — runs/
+  // h1_duels1187 city-state 4, slots 3 and 5 freed at t55, its t58 Upgrade
+  // Units tree 2883589 in slot 5), the next generation past the highest
   const controls = Object.keys(read.trees).map(Number);
   const taken = new Set(controls.map(treeSlot));
   cs.opsNext = Math.max(cs.opsNext ?? treeFirstGen(cs.seat), ...controls.map((c) => treeGen(c) + 1));
   cs.treeSlots = Math.max(cs.treeSlots ?? treeHeld(cs.seat), ...controls.map((c) => treeSlot(c) + 1));
-  const freeSlots = (cs.treeFree ?? []).filter((s) => !taken.has(s) && s < cs.treeSlots!);
-  for (let s = treeHeld(cs.seat); s < cs.treeSlots; s++) if (!taken.has(s) && !freeSlots.includes(s)) freeSlots.unshift(s);
-  cs.treeFree = freeSlots;
+  const ours = (cs.treeFree ?? []).filter((s) => !taken.has(s) && s < cs.treeSlots!);
+  const rest: number[] = [];
+  for (let s = treeHeld(cs.seat); s < cs.treeSlots; s++) if (!taken.has(s) && !ours.includes(s)) rest.push(s);
+  cs.treeFree = [...rest, ...ours];
   // every contract of a tree taken — the city trees' and the operations':
   // its owner's, else the taken tree whose list holds it — and every one
   // the research or culture AI holds (a civic goal's contract is owned by

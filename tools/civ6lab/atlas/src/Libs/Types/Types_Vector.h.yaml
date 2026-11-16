@@ -788,7 +788,7 @@
     - "H-1: the AI memory reader — READ (the hooks, the pointer paths, the contracts, the knowledge base, the operations, the trees), PARTLY READ (the religious AI's holder)"
     - "C-129: the military AI's upgrade — READ (0x727db0, 0x6874d0), both twins"
     - "C-99 / C-129: the military AI's job refreshes the operations before its upgrade; Recruit Units updates the teams only on a changed count — READ (0x722690, 0x81c820), both twins"
-    - "C-134: an operation whose members an upgrade took ends at its tick — LAB (the records), both twins"
+    - "C-134: an operation whose members an upgrade took — LAB (the records), unported"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "- The manager (0x722690 -> 0x727510). The candidates (0x722d70, 0x70-byte entries at +0x328), built and evaluated before th..."
