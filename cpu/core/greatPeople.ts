@@ -107,6 +107,27 @@ export function gpCapped(owner: Seat, cls: GreatPersonClass): boolean {
   return cls === 'PROPHET' && greatPeopleEarnedBy(owner, cls) >= PROPHET_MAX_PLAYER_INSTANCES;
 }
 
+/** A class the player cannot earn (0x2f1ed0): its offer exhausted (-2), or
+ *  its MaxPlayerInstances earned (`gpCapped`, the Prophet's 1, at
+ *  0x2f21b8..0x2f222b). Its points still bank, and its points a turn are
+ *  the player's Faith a turn (0x494090 -> 0x43c9a0). `_gp_pays_faith` is
+ *  the twin. */
+export function gpPaysFaith(state: GameState, owner: Seat, cls: GreatPersonClass): boolean {
+  return gpOffer(state, cls) === -2 || gpCapped(owner, cls);
+}
+
+/** The Faith a turn a major's Great Person points pay (0x43c9a0, in
+ *  GetFaithYield 0x496fd0 -> 0x494090): the points its Great Person turn
+ *  earned (`Seat.gppTurn`) in each class it cannot earn (`gpPaysFaith`)
+ *  (runs/h1_duels1191 China, its Great Prophet Laozi earned t68: its
+ *  Prophet points 119.30, 121.59, 123.89 over records 127-129 and its Faith
+ *  a turn 47.09 with them, 44.79 its cities') */
+export function gpFaithPerTurn(state: GameState, owner: Seat): number {
+  let f = 0;
+  for (const cls of GP_CLASSES) if (gpPaysFaith(state, owner, cls)) f += owner.gppTurn?.[cls] ?? 0;
+  return f;
+}
+
 /** CIV6 (Stonehenge): "Grants a free Great Prophet (or a free Apostle if
  *  no Prophets are available)" — religion founded or the class spent pays
  *  an Apostle; a standing Prophet with no religion pays nothing; otherwise
@@ -491,15 +512,16 @@ export function advanceGreatPeople(state: GameState, seat: number): void {
       changed = next !== pts;
       pts = next;
     }
-    // a class whose offer is exhausted (-2) keeps its points, and its points
-    // a turn are Faith a turn: the player's Faith yield (0x494090) sums the
-    // store +0x168 of each class it cannot earn (0x43c9a0), and a class with
-    // no timeline entry is one (0x2f1ed0 at 0x2f1ef9..0x2f1f1e, 0x2f63f0);
-    // the store's points still reach the bank (0x43c190) (runs/h1_duels1191
-    // China's Great General points 150, 174, 197 t220-t222 after Vijaya
-    // Wimalaratne, the last of the Information era, in the Future game era,
-    // its Faith a turn 87.55 -> 115.15)
-    if (gpOffer(state, cls) === -2) owner.faith += perTurn[cls];
+    // a class the player cannot earn keeps its points, and its points a turn
+    // are Faith a turn: the player's Faith yield (0x494090) sums the store
+    // +0x168 of each class 0x2f1ed0 refuses (0x43c9a0), one with no timeline
+    // entry (0x2f1ef9..0x2f1f1e, 0x2f63f0) or its MaxPlayerInstances earned
+    // (`gpPaysFaith`); the store's points still reach the bank (0x43c190)
+    // (runs/h1_duels1191 China's Great General points 150, 174, 197
+    // t220-t222 after Vijaya Wimalaratne, the last of the Information era,
+    // in the Future game era, its Faith a turn 87.55 -> 115.15; its Prophet
+    // points 2.30 a turn after Laozi, 2.30 of its 47.09 Faith a turn at t127)
+    if (gpPaysFaith(state, owner, cls)) owner.faith += perTurn[cls];
     owner.gpp[cls] = pts;
   }
 }

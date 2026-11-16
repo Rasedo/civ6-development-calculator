@@ -1124,8 +1124,9 @@ class SimMinors:
         """[B] raw — `religiousFaithBoost` of major row `r`: 0, and with a
         religious unit wanted (`civ_faith_want`) -0.25 where its faith
         balance passes the unit's Production cost (`unitStepCost` at its
-        copies) and -0.25 more where its cities' Faith a turn passes half of
-        it"""
+        copies) and -0.25 more where its Faith a turn (its cities' and its
+        Great Person points' in the classes it cannot earn, `gpFaithPerTurn`)
+        passes half of it"""
         want = self.civ_faith_want[:, r]
         ui = want.clamp(min=0)
         step = self._type_cost_step.gather(0, ui)
@@ -1135,6 +1136,9 @@ class SimMinors:
         tot = self._seat_city_stats(r, record=False)[0]
         alive = self.city_alive[:, r, : tot.shape[1]]
         per_turn = (tot[:, :, 5] * alive.double()).sum(dim=1)
+        for cls in range(self._gp_nc):
+            per_turn = per_turn + torch.where(self._gp_pays_faith(r, cls), self.civ_gpp_turn[:, r, cls].double(),
+                                              torch.zeros_like(per_turn))
         q = _fx_const(0.25)
         bal = torch.round(self.civ_faith[:, r].double() * 256) > cost * 256
         fpt = torch.round(per_turn * 256) > cost * 128

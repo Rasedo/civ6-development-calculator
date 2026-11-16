@@ -35,7 +35,7 @@ import { AI_AGENDA_TRAITS, AI_CIVILIZATION_TRAITS, AI_DIFFICULTIES, AI_ERA_STRAT
 import { ERAS } from '../data/techs';
 import { GP_CLASSES } from '../data/greatPeople';
 import { NAVAL_STRATEGY_PSEUDOYIELDS } from '../data/aiResearch';
-import { gpCapped, gpOffer } from './greatPeople';
+import { gpCapped, gpFaithPerTurn, gpOffer } from './greatPeople';
 import type { GreatPersonClass } from './types';
 import { CIV_LEADERS } from '../data/seats';
 import { FX, fmul, fxConst, fxOf, type AiListItem, type AiListRef } from './aiValue';
@@ -189,7 +189,8 @@ export function economicGoldBoost(net: number): number {
  *  unit wanted (`Seat.faithWant`) -0.25 (@0xd2f324) where the faith balance
  *  as its turn leaves it (player +0x1340 +0x100) passes the unit's
  *  Production cost (0x4f2b20) and -0.25 more where its Faith a turn
- *  (0x496fd0: its cities') passes half of it (runs/h1_duels1191 China t118-163
+ *  (0x496fd0 -> 0x494090: its cities' and its Great Person points' in the
+ *  classes it cannot earn, `gpFaithPerTurn`) passes half of it (runs/h1_duels1191 China t118-163
  *  wanting the Missionary at 37 to 76: the Free Cities' K over its routes'
  *  Faith one step below the unboosted on the turns its balance lay under the
  *  cost, two on the rest, 46 of 46 turns; runs/h1_duels1153 China t111-169
@@ -200,7 +201,7 @@ export function religiousFaithBoost(state: GameState, s: Seat): number {
   const cost = unitStepCost(s.faithWant, unitsAcquired(state, s.seat, s.faithWant));
   const lux = standingLuxuries(state, s.seat);
   const mods = getModifiers(state, s.seat);
-  let perTurn = 0;
+  let perTurn = gpFaithPerTurn(state, s);
   for (const c of s.cities) perTurn += computeCityStats(state, c, lux, mods).total.faith;
   let b = 0;
   if (fxOf(s.faith) > cost * FX) b -= fxConst(0.25);

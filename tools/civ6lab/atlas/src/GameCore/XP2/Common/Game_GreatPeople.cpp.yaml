@@ -50,14 +50,20 @@
     - recording: h1_duels1191
       turn: 220
       value: "China's Great Generals exhausted after Vijaya Wimalaratne (t219, the Future game era): the class's points 150, 174, 197 banked t220-t222 and paid again as Faith a turn (87.55 -> 115.15)"
+    - recording: h1_duels1191
+      turn: 127
+      value: "the maximum earned at 0x2f21b8..0x2f222b (GreatPersonClasses +0x20 / +0x24, MaxPlayerInstances, over the player's granted people of the class): China's Prophet Laozi earned t68, its Prophet points 119.30, 121.59, 123.89 over records 127-129 banked and paid as Faith a turn, 47.09 against its cities' 44.79"
   impl:
     - cpu/core/quests.ts:gpTargets
     - cpu/core/aiPolicyValue.ts:policyObsolete
     - cpu/core/greatPeople.ts:advanceGreatPeople
     - gpu/core/sim_phase.py:_advance_great_people
     - cpu/core/greatPeople.ts:perTurn
+    - cpu/core/greatPeople.ts:gpPaysFaith
+    - gpu/core/sim_phase.py:_gp_pays_faith
   readings:
     - "C-114: an exhausted Great Person class's points a turn as Faith — READ (0x2f1ed0 at 0x2f1ef9..0x2f1f1e, 0x2f63f0, 0x43c9a0, 0x43c190), both twins"
+    - "C-127 / C-114: a class past its MaxPlayerInstances pays its points a turn as Faith; the faith boost's Faith a turn holds them; the majors' districts land before the minors — READ (0x2f1ed0 at 0x2f21b8..0x2f222b, 0x496fd0 -> 0x494090 -> 0x43c9a0), the landing off the log, both twins"
     - "H-1: the city-states' quests — READ"
     - "C-97: the government and policy choice — the choice READ, the values PARTLY READ"
     - "C-130: a city-state's Great Person points store, its Faith and its flat bonus; Bastions' strike on standing walls — READ, both twins"

@@ -18289,3 +18289,41 @@ GPU `_walls_tier_at`, `_walls_tier_all`, `city_urban_kept`, `_transfer_city`.
 - OPEN: the tree on its own unfinished plot submits its contract a turn
   before the game's (duels1173 t186, duels1165 t186 / t190: ours
   DISTRICT_NEIGHBORHOOD, the game's none).
+
+## C-127 / C-114: a class past its MaxPlayerInstances pays its points a turn as Faith; the faith boost's Faith a turn holds them; the majors' districts land before the minors — READ (0x2f1ed0 at 0x2f21b8..0x2f222b, 0x496fd0 -> 0x494090 -> 0x43c9a0), the landing off the log, both twins
+
+`gpPaysFaith` / `gpFaithPerTurn` in `advanceGreatPeople` and
+`religiousFaithBoost` (cpu/core/greatPeople.ts, cpu/core/aiWeights.ts);
+`landMajorDistricts` (cpu/harness/replay.ts). GPU `_gp_pays_faith` in
+`_advance_great_people` (gpu/core/sim_phase.py) and `_religious_faith_boost`
+over `civ_gpp_turn` (gpu/core/sim_minors.py).
+
+- THE MAXIMUM EARNED: 0x2f1ed0 at 0x2f21b8..0x2f222b counts the people of
+  the class the player was granted and refuses the class where its
+  GreatPersonClasses row limits it (+0x20) and the count reaches its
+  MaxPlayerInstances (+0x24; the Great Prophet's 1, GreatPeople.xml). A
+  refused class is one 0x43c9a0 sums: its points still bank and its points
+  a turn are the player's Faith a turn, as for an exhausted class
+  (`gpCapped` with the offer -2). A major that earned its Prophet pays its
+  Prophet points a turn as Faith for the rest of the game.
+- THE FAITH BOOST'S FAITH A TURN is GetFaithYield 0x496fd0 -> 0x494090: the
+  cities' Faith and the 0x43c9a0 term, the points a turn of each class the
+  player cannot earn, as its Great Person turn stored them (`Seat.gppTurn`,
+  `civ_gpp_turn`, read at the minors' turns after the major's).
+- CONFIRMED: runs/h1_duels1191 China, Laozi earned t68: its Prophet points
+  119.30, 121.59, 123.89 over records 127-129, its Faith a turn 47.09 to
+  its cities' 44.79; the engine's balance after China's turn now the record
+  t+1's (18.61, 65.70, 12.79 for t126-128; 107.39 at t224 after its Rock
+  Band, against 99.39 before), its Faith a turn 122.63 at t222-226 as
+  recorded, and the Free Cities' t225 civic values (FOREIGN_TRADE 862.0) as
+  logged, the Apostle at 100 under a balance of 107.39 two steps.
+- THE MAJORS' DISTRICTS: a major's CityProductionCompleted of a district and
+  its DistrictPillaged clearing land on the replay's state as the first
+  minor's turn opens, so every later player's turn reads them (the minors'
+  route value K, their copies for the tactical and barbarian AIs).
+  Confirmed: runs/h1_duels1139 t153, China's Theater on Chengdu (7:11)
+  completed at its turn start: the Free Cities' K 9.07 that turn (7.62
+  before), their t154 civic values (FOREIGN_TRADE 562.6) as logged.
+- OPEN: duels1153 China's best route the game's K reads from t142 (1 Faith
+  in it, its value stepping with the faith boost) is in no list the
+  engines keep; duels1191 t131 K 16.02 for 15.73 at one boost step.

@@ -3050,10 +3050,10 @@ class SimPhase:
                 was = self.civ_gpp[:, row, cls].clone()
                 self._gp_spend(row, hit, cls)
                 changed = hit & (self.civ_gpp[:, row, cls] != was)
-            # a class whose offer is exhausted (-2) keeps its points, and its
-            # points a turn are Faith a turn (0x494090 -> 0x43c9a0 over the
-            # classes 0x2f1ed0 refuses, `advanceGreatPeople`)
-            exh = active & (self.gp_offer[:, cls] == -2)
+            # a class the seat cannot earn keeps its points, and its points a
+            # turn are Faith a turn (0x494090 -> 0x43c9a0 over the classes
+            # 0x2f1ed0 refuses, `advanceGreatPeople`)
+            exh = active & self._gp_pays_faith(row, cls)
             if bool(exh.count_nonzero()):
                 self.civ_faith[:, row] = torch.where(
                     exh, self.civ_faith[:, row] + pts.to(self.dtype), self.civ_faith[:, row])
@@ -3121,6 +3121,12 @@ class SimPhase:
         if cls != self._prophet_cls:
             return torch.zeros(self.B, dtype=torch.bool, device=self.device)
         return self.civ_gp_earned[:, row, cls] >= self._prophet_max
+
+    def _gp_pays_faith(self, row: int, cls: int) -> torch.Tensor:
+        """[B] bool — a class seat row `row` cannot earn (0x2f1ed0): its offer
+        exhausted (-2) or its MaxPlayerInstances earned (`_gp_capped`); its
+        points a turn are Faith a turn. `gpPaysFaith`'s twin."""
+        return (self.gp_offer[:, cls] == -2) | self._gp_capped(row, cls)
 
     def _gp_claim_left(self, row: int, cls: int, left: torch.Tensor) -> torch.Tensor:
         """[B] — a class's points after a claim spent them down to `left`:

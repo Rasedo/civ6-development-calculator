@@ -1315,14 +1315,17 @@ function barbarianTurn(ctx: Ctx, b: TurnRecord, closing: number): void {
   }
 }
 
-/** the districts a major completed or repaired in its turn stand so for the
- *  players after it (`copy`, the minors' and the barbarians'): the log's
- *  CityProductionCompleted of a district and its DistrictPillaged clearing
- *  the pillage, which record t+1 alone holds otherwise (runs/h1_duely1121
- *  t78: player 1's Campus on 8:14 repaired at its turn start, the
- *  barbarians' knowledge of 6:12 at 49; h1_duely1124 t55: player 1's Campus
- *  on 4:11 bought in its actions, the barbarians' at 30) */
-function landMajorDistricts(ctx: Ctx, b: TurnRecord, turn: number, copy: GameState): void {
+/** the districts the majors completed or repaired in their turns stand so
+ *  for the players after them, landed before the first minor's turn: the
+ *  log's CityProductionCompleted of a district and its DistrictPillaged
+ *  clearing the pillage, which record t+1 alone holds otherwise
+ *  (runs/h1_duely1121 t78: player 1's Campus on 8:14 repaired at its turn
+ *  start, the barbarians' knowledge of 6:12 at 49; h1_duely1124 t55: player
+ *  1's Campus on 4:11 bought in its actions, the barbarians' at 30;
+ *  runs/h1_duels1139 t153: China's Theater on Chengdu (7:11) completed at
+ *  its turn start, its domestic routes to Chengdu in the Free Cities' route
+ *  value K that turn, 7.62 -> 9.07 as their t154 civic values read it) */
+function landMajorDistricts(ctx: Ctx, b: TurnRecord, turn: number): void {
   for (const x of (b as { actions?: unknown[][] }).actions ?? []) {
     if (x[1] !== turn) continue;
     let plot = -1;
@@ -1333,14 +1336,14 @@ function landMajorDistricts(ctx: Ctx, b: TurnRecord, turn: number, copy: GameSta
     }
     const seat = ctx.seatOfPlayer.get(x[3] as number);
     if (plot < 0 || seat === undefined || !isCiv(seat)) continue;
-    const t = copy.map.tiles[plot];
+    const t = ctx.state.map.tiles[plot];
     if (!t.district || t.ownerSeat !== seat) continue;
     t.districtComplete = true;
     t.districtPillaged = false;
     // a district completed carries its owner's road (runs/h1_duelq1124 t77:
     // Beijing's Campus on 6:7, route 1 in record t78, China's Scout on 5:7
     // reaching 7:7 / 7:8 through it in the barbarians' danger map)
-    if (x[2] === 'CityProductionCompleted' && !isWater(t)) layRoad(copy, seat, t);
+    if (x[2] === 'CityProductionCompleted' && !isWater(t)) layRoad(ctx.state, seat, t);
   }
 }
 
@@ -1443,7 +1446,6 @@ function barbarianAi(ctx: Ctx, b: TurnRecord, closing: number, before: ReadonlyS
   opened: ReadonlyMap<number, number>, campsWas: readonly number[]): void {
   const { state } = ctx;
   const copy = deserialize(serialize(state));
-  landMajorDistricts(ctx, b, closing, copy);
   landRepairs(ctx, b, closing, (_p, s) => minorAiSeat(s), copy);
   const twin = new Map<Unit, Unit>();
   state.units.forEach((u, i) => twin.set(copy.units[i], u));
@@ -1878,7 +1880,6 @@ function minorAi(ctx: Ctx, b: TurnRecord, turn: number, made: ReadonlySet<Unit>,
   // ...its units' passes after the turn's close read the units the turn's
   // upgrades took off, as the game's turn does (`unitsDying`)
   if (ctx.minorDying.length) copy.unitsDying = structuredClone(ctx.minorDying);
-  landMajorDistricts(ctx, b, turn, copy);
   // the revealed plots as the turn opened and those its ground sees as its
   // turn comes, a plot annexed in a major's start revealing the plots beside
   // it (runs/h1_duely1117 t44: Antananarivo's 210 annexed in China's start,
@@ -7308,6 +7309,7 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
       }
       stream.actions(a.turn);
       otherMajorsTurn();
+      landMajorDistricts(ctx, b, a.turn);
       // the majors' completions before the first minor's turn opens; one
       // inside a minor's turn lands at the next one's start (`holdMinorStart`)
       const minorsOpen = ((b as { actions?: unknown[][] }).actions ?? [])
