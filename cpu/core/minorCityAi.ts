@@ -81,7 +81,7 @@ import { computeUnlocksIn, makeYieldCtx } from './effects';
 import { eruptionHazardTurns, floodHazardTurns } from './disasters';
 import { baseAdjacency, buildingPillaged, improvementAdjacency } from './yields';
 import { tileAppeal } from './appeal';
-import { builderHarvest, builderRemoveFeature, disbandUnit, promotionsHeld, purchaseSpotBlocked } from './units';
+import { builderHarvest, builderRemoveFeature, disbandUnit, promotionsHeld, purchaseSpotBlocked, unitsAt } from './units';
 import { aiStrengths, dangerPlane, moveTo, moveUnitDanger, reachPlots, seatPoolSlots, turnsToPlot } from './tactical';
 import { randRange } from './rand';
 import {
@@ -889,12 +889,15 @@ function minorTreeWorld(state: GameState, cs: CityState, ai: CityAi, city: CityT
       if (res.ok && last) spent.add(u);
     },
     unitAlive: (u) => !!unitOf(u) && !spent.has(u),
+    // a unit out of the turn's planning was bought this turn, its turn done
+    // at its creation (0x60a440)
+    turnDone: (u) => !!planned && !planned.has(u),
     startOperation: (name, plot) => minorOpsStart(state, cs, name, plot),
     operationLive: (id) => minorOpLive(cs, id),
     heldContracts: () => minorOpContracts(cs),
     trace: tracer ? (t, root, ups) => tracer?.(`t${state.turn} ${cs.name} tick ${t.id}:${t.name} root ${root} builders [${state.units
       .filter((u) => u.seat === cs.seat && (u.charges ?? 0) > 0).map((u) => `${u.id}@${u.tileIndex}/${u.movesLeft}/${u.charges ?? 0}`)
-      .join(' ')}] ${ups.join(' ')}`) : undefined,
+      .join(' ')}] units [${t.units.join(' ')}] ${ups.join(' ')}`) : undefined,
   };
 }
 
@@ -1206,7 +1209,7 @@ export function minorContractPurchases(state: GameState, cs: CityState,
   const bcity = minorBuildingPurchaseCity(state, cs, units);
   purchaseContracts(eco, cs.cityAi, false, (c) => (c.city === -1 || c.city === pcity.id ? [pcity] : []),
     (_c, u) => minorBuyInstall(state, cs, u), (c) => (c.city === -1 || c.city === pcity.id ? bcity : null));
-  religiousPurchases(cs.cityAi, false, () => false, (_c, b) => minorFaithBuilding(state, cs, b));
+  religiousPurchases(cs.cityAi, false, (_c, u) => minorFaithUnit(state, cs, u), (_c, b) => minorFaithBuilding(state, cs, b));
 }
 
 /** the Religious AI's building purchase (0x7522c0) in the minor's one city
@@ -1221,6 +1224,34 @@ function minorFaithBuilding(state: GameState, cs: CityState, b: string): boolean
   if (majorityReligionOf(state, cs.seat) < 0) return false;
   const id = engineId('building', b, 'BUILDING_', BUILDINGS);
   return !!id && minorQueueOk(state, cs, { building: id }) && minorBuyBuilding(state, cs, id, 'faith');
+}
+
+/** the purchase request's spot (0x977570): a unit bought stands on the
+ *  minor's centre, one of its stacking class there refusing it
+ *  (`purchaseSpotBlocked`), a hull its own hull there (runs/h1_duels1162
+ *  Cahokia t38-t44: threatened at 4, the balance at its Galley's 125 Gold
+ *  from t38, its Galley 655366 on the centre 6:9, nothing bought;
+ *  runs/h1_duels1160 Palenque t41-t43 the same) */
+function minorBuySpotBlocked(state: GameState, cs: CityState, id: string): boolean {
+  if (!UNITS[id]?.naval) return purchaseSpotBlocked(state, cs, cs.seat, id);
+  return unitsAt(state, cs.centerIndex).some((x) => x.seat === cs.seat && !!UNITS[x.type]?.naval);
+}
+
+/** the Religious AI's unit purchase (0x752440) in the minor's one city: a
+ *  threatened city takes no unit of Combat 0; a unit with ReligiousStrength
+ *  asks the AI's religion (+0x1c0) to be the city's, which a city-state,
+ *  founding none, never holds; then the purchase request in Faith (0x977570
+ *  on YIELD_FAITH): the city may train it, the centre takes it, the Faith
+ *  covers the price (runs/h1_duels1170 t239: Lahore's Nihang of contract
+ *  1123 bought for 345 Faith, "FAITH PURCHASE") */
+function minorFaithUnit(state: GameState, cs: CityState, u: string): boolean {
+  const id = engineId('unit', u, 'UNIT_', UNITS);
+  if (!id) return false;
+  const def = UNITS[id];
+  if ((cs.threat ?? -1) > -1 && !(def.combat ?? 0)) return false;
+  if ((def.religiousStrength ?? 0) > 0) return false;
+  if (!minorCanTrain(state, cs, id, true) || minorBuySpotBlocked(state, cs, id)) return false;
+  return !!minorBuyUnit(state, cs, id, 'faith');
 }
 
 /** a Great Person class is available in the game (0x2f7eb0, the majors'
@@ -1255,7 +1286,7 @@ function minorPurchaseCity(state: GameState, cs: CityState, threat: number): Pur
     canPurchase: (u) => {
       if (!goldAffordable(cs.treasury, price(u))) return false;
       const id = engineId('unit', u, 'UNIT_', UNITS);
-      return !!id && minorCanTrain(state, cs, id) && !purchaseSpotBlocked(state, cs, cs.seat, id);
+      return !!id && minorCanTrain(state, cs, id) && !minorBuySpotBlocked(state, cs, id);
     },
   };
 }

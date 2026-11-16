@@ -1798,7 +1798,13 @@ class SimOrders:
         self.lumber_ok[rows, tiles] = False
         self.farm_flat[rows, tiles] = self._fa_f_c[rows, tiles]
         self.farm_hill[rows, tiles] = self._fa_h_c[rows, tiles]
-        self.mine_ok[rows, tiles] = self._mi_c[rows, tiles]
+        self.mine_ok[rows, tiles] = self._mi_c[rows, tiles] | self._soil_mine(rows, tiles)
+
+    def _soil_mine(self, rows: torch.Tensor, tiles: torch.Tensor) -> torch.Tensor:
+        """[N] the Mine's Improvement_ValidFeatures ground: a land plot under
+        live Volcanic Soil with no resource of its own (`validImprovementsIn`)"""
+        soil = (self.feat_id[rows, tiles] == self._soil_fid) & ~self.feat_stripped[rows, tiles] & (self._soil_fid >= 0)
+        return soil & ~self.water[rows, tiles] & (self.res_imp[rows, tiles] < 0)
 
     def _drop_resource(self, rows: torch.Tensor, tiles: torch.Tensor) -> None:
         """`tile.resource = null` on (row, tile) pairs holding a live

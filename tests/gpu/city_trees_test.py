@@ -287,6 +287,9 @@ class World:
     def unit_alive(self, ids):
         return self._per(lambda b, u: any(x["id"] == u for x in self.g[b].units) and u not in self.g[b].spent, ids).bool()
 
+    def turn_done(self, ids):
+        return torch.zeros_like(ids, dtype=torch.bool)
+
     def builders_make_wonders(self):
         return False
 

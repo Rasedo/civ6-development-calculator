@@ -228,6 +228,9 @@ export interface CityTreeWorld {
   /** the unit still stands after the orders given (a Builder spending its
    *  last charge is gone) */
   unitAlive(unit: number): boolean;
+  /** the unit's turn is done as the tick opens (+0x530: a unit bought this
+   *  turn, done at its creation) */
+  turnDone(unit: number): boolean;
   /** the player's operation manager starts the operation of the name at the
    *  plot (0x7265b0), its tree's id; null where it does not */
   startOperation(name: string, plot: number): number | null;
@@ -525,6 +528,8 @@ interface Ctx {
   w: CityTreeWorld;
   tree: CityTree;
   city: CityTreeCity;
+  /** the units the tick's orders gave turn done (0x570b40) */
+  done: Set<number>;
 }
 
 const tagOf = (run: BtRun, node: BtNode, name: string): unknown => {
@@ -725,7 +730,8 @@ const reservePlot: BtHandler<Ctx> = {
 
 // CHECK PLOT (0x7f6ea0): the Builder type (the cheapest unit a city may
 // train that builds the improvement, with no improvement the cheapest with
-// build charges), an improvement's into its tag — none FAILS an
+// build charges) into its tag (runs/h1_duels1145 Kandy t14: the Holy Site
+// tree's Builder Type [UNIT_BUILDER] at the end look) — none FAILS an
 // improvement's check and is an ERROR without one; the plot as it stands can take the district or the
 // improvement: SUCCESS, an improvement's Plot To Move the plot the Builder
 // lays from (`builderPlot`), else FAILURE (the tree clears it first) — on a
@@ -741,11 +747,7 @@ const checkPlot: BtHandler<Ctx> = {
     if (!district && !imp) return BT_FAILURE;
     const builder = ctx.w.builderType(imp ?? null);
     if (!builder) return imp ? BT_FAILURE : BT_ERROR;
-    // a district's check hands its tree no Builder type: the game's Find
-    // Available Unit after it finds a Builder and its tree holds none at any
-    // end look (runs/h1_duels1146 Kandy t138: Builder 1310723 found by Build
-    // City District 83:7, assigned to Build City Improvement 84:8)
-    if (imp) setTag(run, node, 'Builder List', [builder]);
+    setTag(run, node, 'Builder List', [builder]);
     setTag(run, node, 'Plot To Move', plot);
     if (district && ctx.w.canPlaceDistrict(plot, district)) return BT_SUCCESS;
     if (imp && ctx.w.canImprove(plot, imp)) {
@@ -881,9 +883,11 @@ const moveUnit: BtHandler<Ctx> = {
   execute(node, run, ctx) {
     const plot = tagOf(run, node, 'Location');
     if (typeof plot !== 'number') return;
-    // the execution (0x7eeba0): the kept unit, else each of its units
+    // the execution (0x7eeba0): the kept unit, its turn done before its
+    // move (0x7eed4f), else each of its units
     const m = run.mem[node.index];
     const kept = typeof m.unit === 'number' && m.unit >= 0 ? ctx.w.units.filter((u) => u.id === m.unit) : null;
+    for (const u of kept ?? []) ctx.done.add(u.id);
     const safe = !(dataBool(node, 'Allow Danger') ?? false);
     for (const u of kept ?? unitsOf(ctx, run, node, 'Unit ID List')) if (u.plot !== plot) ctx.w.order(u.id, 'move', plot, undefined, safe);
   },
@@ -1043,8 +1047,14 @@ export const CITY_NODES: Readonly<Record<string, BtHandler<Ctx>>> = {
 /** THE TREE MANAGER'S TICK (0x7ffdd0): each running tree of the seat, in the
  *  tree pool's slot order (`treeSlot`), ticks once; a tree whose root ends,
  *  or one of whose units its orders spent, ends, its reservations and its
- *  units free */
+ *  units free. A tree running on lets go each of its units whose turn is not
+ *  done (0x7d3a00 -> 0x7cb3d0 -> 0x7d2190: every city tree marked, with no
+ *  operation, the unit's control +0x778, whose value is its assignment
+ *  +0x7d0, set to -1), a free unit the trees after it find (runs/h1_duels1145
+ *  Kandy t14: the Builder 262144 found by the Holy Site tree's node 16, then
+ *  by the Mine tree's node 21, which moves it and holds it at the end look) */
 export function tickCityTrees(ai: CityAi, w: CityTreeWorld): void {
+  const done = new Set<number>();
   for (const t of [...ai.trees].sort((a, b) => treeSlot(a.id) - treeSlot(b.id))) {
     if (t.done) continue;
     const city = w.cities.find((c) => c.id === t.city);
@@ -1062,11 +1072,12 @@ export function tickCityTrees(ai: CityAi, w: CityTreeWorld): void {
         return s;
       } }]));
     }
-    const root = tick(run, handlers, { ai, w, tree: t, city });
+    const root = tick(run, handlers, { ai, w, tree: t, city, done });
     w.trace?.(t, root, seen);
     t.bb = Object.fromEntries(run.blackboard);
     // a unit of the tree gone with the orders given ends the tree at once
     t.done = run.done || t.units.some((u) => !w.unitAlive(u));
+    if (!t.done) t.units = t.units.filter((u) => done.has(u) || w.turnDone(u));
   }
   ai.reservations = ai.reservations.filter((r) => live(ai, r.tree));
   ai.trees = ai.trees.filter((t) => !t.done);

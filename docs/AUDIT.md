@@ -419,7 +419,7 @@ A question the SOURCE under-determines; neither engine ships a branch until the 
   - LAB (1128 nazca and hong kong): 1128 Hong Kong t79 Trader 238.9 for 277.7
   - LAB (1128 nazca and hong kong): 1128 Hong Kong t196-203 valued at 6 units (at war by the cut)
   - LAB (repairs): unconfirmed: a Free City's building under its pillaged district, and a major's queue of several items behind a refused building head (`headLetGo` pops each refused building head in turn); the five duelq recordings hold neither, 1124 Wuhan t236 (a one-item queue) the one major case
-  - LAB (contracts): the improvement tree the game starts and ends the turn it starts, ours laying its improvement: duels1169 p3 t211-t214 the Solar Farm on 41:7 (the game's m_bestImprovementToMake 38 at 120.5, m_eventTrees slot 3 a new id each end look, no tree held), ours lays it (builder.improve; the Solar Farm rows of 1178, 1171, 1174, 1185, 1140 alike, untraced); on 1169 t211 ours' tree (pool slot 3) ticks before the Neighborhood's Build City District tree on the same plot 349 (slot 5), its Builder 1769479 on 43:7 unmoved in the record
+  - LAB (contracts): the improvement tree the game starts and ends the turn it starts, ours laying its improvement: duels1169 p3 t211-t214 the Solar Farm on 41:7 (the game's m_bestImprovementToMake 38 at 120.5, m_eventTrees slot 3 a new id each end look, no tree held), ours lays it (builder.improve; the Solar Farm rows of 1178, 1171, 1174, 1185, 1140 alike, untraced)
 - **C-126. CITY-STATES' PURCHASES, TREASURY, UPGRADES AND DISBANDS.** Weight 2.
   - LAB (treasury): a minor's treasury off the record's: duelz1121 Hunza t155 677 for 691.43
   - LAB (treasury): a minor's treasury off the record's: 1124 Cardiff t189 156 for 163.84
@@ -427,7 +427,8 @@ A question the SOURCE under-determines; neither engine ships a branch until the 
   - LAB (treasury): a minor's treasury off the record's: 1127 Hattusa t178
   - LAB (purchases): 1128 Nazca t25 a Builder PURCHASE (0x5f3c40) ours trains
   - LAB (purchases): unit purchases of the game ours does not make: duels1134 city-state 3 t47 a Spearman (threat 1, ours 98.9 Gold), 1146 city-state 2 t43 a Galley (ours 2.0 Gold), 1137 city-state 3 t178 a Caravel, 1146 city-state 3 t208 an AT Crew (untraced)
-  - BUILD (purchases): a city-state's Faith purchase of a unit (0x752440) is in neither twin (the suzerain's Nihang through MINOR_CIV_LAHORE_UNIQUE_UNIT_UNLOCK alike): duels1170 Lahore buys a Nihang t239 and t243 (unit.bought), its Build City Building contract of the Nihang gone, ours none bought and the contract held t239-t243
+  - BUILD (purchases): the suzerain's Faith purchase of the Nihang through MINOR_CIV_LAHORE_UNIQUE_UNIT_UNLOCK (0x752440 for a major) is in neither twin
+  - LAB (purchases): duels1170 t241 Lahore's Nihang bought for Faith (contract 1142, 350 Faith) forms a Corps with its Nihang 1900547 at once (UnitFormCorps, no new unit in record t242), ours keeps two units (unit.trained t241); 0x1b2930, a city's own Faith test of a religious unit, unread
   - LAB (upgrades): an upgrade past an obsolete rung (1128 t110 Hong Kong's Warrior 1966081: the game's Man-at-Arms 2097159, ours a Swordsman)
   - LAB (upgrades): duels1135 city-state 3's Trebuchet 1310722 upgrades at t126 in ours, at t127 in the game (untraced)
   - LAB (disbands): 0x4dd270's disband count floor(S/10) against runs/bankrupt_m35's one a turn
@@ -439,7 +440,6 @@ A question the SOURCE under-determines; neither engine ships a branch until the 
   - LAB (improvements): 1128 t48 272 Camp
   - LAB (improvements): 1124 p3's t149 / t159 Builder tree a turn late (untraced)
   - BUILD (improvements): the GPU has no city-state builder lay (`minorBuilderLays`)
-  - LAB (improvements): the district tree's Find Available Unit (node 16) finds a free Builder and its tree holds no unit at the end look (95 of 95 looks with the node SUCCESS on duels1146 / 1139 / 1124; 1146 Kandy t138 Builder 1310723 found by Build City District 83:7, assigned to Build City Improvement 84:8): how it lets the unit go unread; ours keeps it in the district's tree where its Check Plot fails, its improvement tree's node 21 failing and submitting a Builder contract the game lacks (duels1145 Kandy t14 Builder 262144, 1172 t17)
   - LAB (envoys): a start envoy our purse cannot fund lands after the minors' turns (1128 t81 Bologna FARM@444 for PLANTATION@398)
   - LAB (route value K): the route value K, a missed meeting: 1127 t47 China / Hattusa via Hattusa's Trader to Mexico City (our Hattusa queues the Granary at t33 for the game's Trader, Value 61.4, K 2.50)
   - LAB (route value K): the route value K, a missed meeting: 1127 t61 China / Muscat as China meets Rome
@@ -466,6 +466,7 @@ A question the SOURCE under-determines; neither engine ships a branch until the 
   - LAB (contracts): the district plot a tree's choice takes: duels1141 city-state 3 t223 the game's Purchase Plot on 12:21 (its rows 12:21 and 14:21 tied at 1369.34), ours 13:21; duels1191 city-state 2 t128 the game's 31:18, ours 30:20 (untraced)
   - LAB (contracts): duels1164 Cardiff t185-t196: its Siege City Assault contract's unit ours the Ranger, the game's the Cuirassier (the Ranger from t197), untraced
   - LAB (contracts): a district contract ours posts the turn the game's tree submits it to no taker, its tree gone the next turn and the contract taken from a new tree after (the eligibility's flooded, feature and resource tests ported): duels1189 Taruga t21-t22 the Campus on 39:20 (the game's contract 59 accepted at t23), duels1186 t37 the Harbor, duels1144 t45 / t47 the Campus, duels1170 t124 the Harbor, duels1133 t92 the Industrial Zone, duels1137 t33 Cardiff's Harbor on 37:4 (the game's contract 84 taken at t35)
+  - LAB (contracts): duels1169 p3 t211 the tree ids at the end look: the Neighborhood's district tree 13303809 (generation 203, pool slot 1) and the Solar Farm's tree 13369349 (204, slot 5), ours 13303813 (slot 5) and 13369347 (slot 3), ours' improvement tree ticking first and laying the Solar Farm on 41:7: the game's pool slot 1 holds trees from t192 (10354689), ours keeps slots 0-1 for good (treePool.ts); its Builder 1769479 on 43:7 unmoved in the record
 - **C-100. CITY-STATES' PLOT AND DISTRICT VALUES.** Weight 4.
   - LAB (power): the free power's sources (ChangeFreePower 0x1ed860 from 0xafe320 / 0xaff790, the percent +0xa8) unread, the city's own renewables read for it
   - LAB (district placement): on the older recordings only (the duelz logs hold no DISTRICTS rows): 1128 Bologna t2 the Campus at 3:8 (355) for the game's 3:7 (311)
@@ -488,7 +489,7 @@ A question the SOURCE under-determines; neither engine ships a branch until the 
   - LAB (improvement rows): 1124 IMPROVEMENTS Plantation, Farm and Lumber Mill rows (about 19 each)
   - LAB (improvement rows): 1124 t91 p3 Farm rows +10.80 over the game's and t93-94 p2 Farm rows (housing / growth one-turn shifts)
   - LAB (improvement rows): 1117 Farm rows p2 t150 (+44), p4 t185-189 / t213
-  - LAB (improvement rows): duels1146 Kumasi t176 / t202: the game lays the Mine on the Volcanic Soil 12:13 (53.38 over its Farm's 49.17) and the Farm at t180 after an eruption takes it, ours a Farm tree on 11:12 (untraced; the plot value lab's Farm and Mine rows far on t199-t230)
+  - LAB (improvement rows): duels1146 Kumasi: the Farm the game lays on 12:13 at t180 after an eruption takes its Mine, and the plot value lab's Farm and Mine rows far on t199-t230 (untraced)
   - LAB (yields at the analysis): the analysis' yields a turn ahead of the record's: duelp1121 Hunza t164 Production 7 -> 4
   - LAB (yields at the analysis): the analysis' yields a turn ahead of the record's: duelp1121 Hunza t124-129 the surplus the Neighbourhood's housing reads
   - LAB (yields at the analysis): the analysis' yields a turn ahead of the record's: 1121 p3's T alternating 27 / 34

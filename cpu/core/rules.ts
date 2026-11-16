@@ -510,7 +510,11 @@ export function validImprovementsIn(
   ) {
     out.push('FARM');
   }
-  if (unlocked('MINE') && hills && bareGround(tile)) out.push('MINE');
+  // the Mine's Improvement_ValidFeatures row (FEATURE_VOLCANIC_SOIL) makes
+  // the soil its ground on flat land too (runs/h1_duels1187 Nan Madol t168:
+  // the Grassland 33:10 under Volcanic Soil values its Mine at 55.38, the
+  // Build City Improvement tree's Mine there submitting Builder contract 623)
+  if (unlocked('MINE') && ((hills && bareGround(tile)) || tile.feature === 'VOLCANIC_SOIL')) out.push('MINE');
   // FORT — Military Engineer only, and only on open ground. Real
   // Civ 6 allows it on any passable land tile the owner holds; the district /
   // wonder / impassable paves are already refused above, and a resource tile

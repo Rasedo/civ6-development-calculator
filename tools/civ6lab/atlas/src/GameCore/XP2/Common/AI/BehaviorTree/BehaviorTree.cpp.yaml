@@ -34,12 +34,15 @@
     - cpu/core/barbarianOps.ts:barbarianTrees
     - cpu/core/minorOps.ts:upgradeTreesTick
     - gpu/core/sim_minorops.py:_mops_upgrade_tree
+    - cpu/core/aiCityTrees.ts:tickCityTrees
+    - gpu/core/sim_citytrees.py:tick_city_trees
   readings:
     - "C-97: the behaviour trees — READ (the interpreter), the nodes PARTLY READ"
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
     - "C-99: Naval Patrol's explore target — the list and the tests READ, two cases unexplained"
     - "C-99 / C-128: every technology gained starts an Upgrade Units tree, the civic event never fires; a tree's units after its tick; the Nearest City Search's resource test; the plot's unit list — READ (0x4cd4c0 -> 0x800c60, 0x5bbf80 -> 0x27a180, 0x3a1ac0, 0x7cb3d0 -> 0x7d2190, 0x7eba40 -> 0x510d30, 0x74f40 / 0x763b0), the trigger both twins"
     - "C-128 / C-99: an Upgrade Units tree lets go to the tactical pass each unit whose turn is not done — READ (0x7cb3d0 -> 0x7d2190, 0x7eeba0 at 0x7eef4c), both twins"
+    - "C-127 / C-126 / C-100: a running city tree lets go its units whose turn is not done; the Mine on Volcanic Soil; a hull bought onto its own hull; the Religious AI's unit purchase — READ (0x7d3a00 -> 0x7cb3d0 -> 0x7d2190 -> 0x1e60f0, 0x7eeba0 at 0x7eed4f, 0x60a8c0 at 0x60a993, 0x7ec7b0 at 0x7ece46..0x7eceae, 0x7d1e40 at 0x7d2004..0x7d2059, 0x977570, 0x752440), both twins"
   context:
     - ...SUCCESS, RUNNING or FAILURE every node left SUCCESS or RUNNING executes in node order (0x7cb3d0); a root RUNNING or FRESH resets the tree for the next turn, else the tree is done (the...
   review: reviewed
@@ -182,15 +185,19 @@
     - "C-95 / C-99: a cleared camp's scout still reports; a lake city trains ships; IsCoastalTarget; the recruit's priority; a candidate's own strength — READ (0x153ef0, 0x1485c0, 0x1c77c0 -> 0x82a10, 0x73a440 -> 0x73a880, 0x81c820 at 0x81cacf..0x81cb14, 0x7d1e40 at 0x7d2004..0x7d205f, 0x5cced0 at 0x5cd0c1..0x5cd11e, 0x7f5240), both twins"
     - "C-95 / C-99: a cleared camp's scout still reports; a lake city trains ships; IsCoastalTarget; the recruit's priority; a candidate's own strength — READ (0x153ef0, 0x1485c0, 0x1488a0 at 0x148c38..0x148c64, 0x1c77c0 -> 0x82a10, 0x73a440 -> 0x73a880, 0x81c820 at 0x81cacf..0x81cb14, 0x7d1e40 at 0x7d2004..0x7d205f, 0x5cced0 at 0x5cd0c1..0x5cd11e, 0x7f5240), both twins"
     - "C-129 / C-99: a walked unit's look in the replay; the recruit's answer from the trees with no operation; the offer's take leaves its member listed; the camp step before the barbarians' battles — READ (0x58f3f0, 0x60a8c0, 0x7d1e40, 0x14fcc0), both twins"
+    - "C-127 / C-126 / C-100: a running city tree lets go its units whose turn is not done; the Mine on Volcanic Soil; a hull bought onto its own hull; the Religious AI's unit purchase — READ (0x7d3a00 -> 0x7cb3d0 -> 0x7d2190 -> 0x1e60f0, 0x7eeba0 at 0x7eed4f, 0x60a8c0 at 0x60a993, 0x7ec7b0 at 0x7ece46..0x7eceae, 0x7d1e40 at 0x7d2004..0x7d2059, 0x977570, 0x752440), both twins"
   context:
     - "...a +0x60, no default: false); each behaviour tree listens (0x7cbb40 binds tree +0x628 to 0x7d1e40): a tree not the requester's job, marked (+0x3c8, set by its reset 0x7d3670) or asked w..."
   review: reviewed
 - addr: 0x7d2190
   final: 0x543a50
   kind: function
-  semantics: "a tree's units after its tick (from 0x7cb3d0 at 0x7cb75f), those not done (+0x530) of its job (0x6092c0 on +0x488): the tree's m_allowRecruiting (+0x3c8) set with no operation (+0x888 == -1) releases them (+0x778 -1 via 0x1e60f0), else their turn is done (0x570b40). Run for a tree not marked for destroy (+0x368) that is not temporary (+0x308) or whose root status (0x7cb7c0) is RUNNING or FRESH: an ended Upgrade Units tree runs none."
+  semantics: "a tree's units after its tick (from 0x7cb3d0 at 0x7cb75f), those not done (+0x530) of its job (0x6092c0 on +0x488): the tree's m_allowRecruiting (+0x3c8) set with no operation (+0x888 == -1) releases them (+0x778 -1 via 0x1e60f0, the assignment +0x7d0: the unit leaves the tree, free to any later tree's Find Available Unit), else their turn is done (0x570b40). Run for a tree not marked for destroy (+0x368) that is not temporary (+0x308) or whose root status (0x7cb7c0) is RUNNING or FRESH: an ended Upgrade Units tree runs none."
   status: READ
   cases:
+    - recording: h1_duels1145
+      turn: 14
+      value: "Kandy's Builder 262144 found by the Holy Site tree's node 16 (Found Unit [262144]), let go as that tree runs on, found by the Mine tree's node 21, moved (its turn done) and held at the end look: no Builder contract"
     - recording: 1117
       turn: 9
       value: "yet 1117 city-state 2's Warrior 131073, its Attack   Barb Camp complete at t9, takes tactical moves from t10 — the path that   frees an ended operation's units is unread (0x73f7d0 rebuilds a team   fr"
@@ -207,12 +214,15 @@
     - cpu/core/minorOps.ts:upgradeTreesTick
     - gpu/core/sim_minorops.py:_mops_upgrade_tree
     - cpu/core/tactical.ts:Pass
+    - cpu/core/aiCityTrees.ts:tickCityTrees
+    - gpu/core/sim_citytrees.py:tick_city_trees
   readings:
     - "C-99: a unit an Upgrade Units tree lets go keeps the tree's job — READ (0x7d2190 -> 0x1e60f0 on +0x778, 0x810d30 at 0x81100a -> 0x81116f, 0x570b40), the tally's label (CPU)"
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
     - "C-99: the upgrade trees — READ (the trigger, Find Available Unit's upgradeable offer, Find Unit Targets' job, Upgrade Units, the economic AI's upgrade, Move Unit with no Location), ported; the deletion of an excess obsolete unit unported"
     - "C-99 / C-128: every technology gained starts an Upgrade Units tree, the civic event never fires; a tree's units after its tick; the Nearest City Search's resource test; the plot's unit list — READ (0x4cd4c0 -> 0x800c60, 0x5bbf80 -> 0x27a180, 0x3a1ac0, 0x7cb3d0 -> 0x7d2190, 0x7eba40 -> 0x510d30, 0x74f40 / 0x763b0), the trigger both twins"
     - "C-128 / C-99: an Upgrade Units tree lets go to the tactical pass each unit whose turn is not done — READ (0x7cb3d0 -> 0x7d2190, 0x7eeba0 at 0x7eef4c), both twins"
+    - "C-127 / C-126 / C-100: a running city tree lets go its units whose turn is not done; the Mine on Volcanic Soil; a hull bought onto its own hull; the Religious AI's unit purchase — READ (0x7d3a00 -> 0x7cb3d0 -> 0x7d2190 -> 0x1e60f0, 0x7eeba0 at 0x7eed4f, 0x60a8c0 at 0x60a993, 0x7ec7b0 at 0x7ece46..0x7eceae, 0x7d1e40 at 0x7d2004..0x7d2059, 0x977570, 0x752440), both twins"
   context:
     - "...e homeland (0x70a370) release their units (-1) as they end. A tree's units each tick (0x7d2190 from the tree manager 0x7cb3d0), those not done: the tree marked (+0x3c8) with no opera..."
   review: reviewed
@@ -267,6 +277,7 @@
     - gpu/core/sim_citytrees.py:tick_tree
     - cpu/core/operations/manager.ts:operationsRun
     - cpu/core/minorOps.ts:upgradeTreesTick
+    - cpu/core/aiCityTrees.ts:tickCityTrees
   readings:
     - "C-97: the behaviour trees — READ (the interpreter), the nodes PARTLY READ"
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
@@ -277,6 +288,7 @@
     - "H-1: the AI memory reader — READ (the hooks, the pointer paths, the contracts, the knowledge base, the operations, the trees), PARTLY READ (the religious AI's holder)"
     - "C-99 / C-128: the swap's partner test and its step along its own path; Move Unit's update before the executions — READ (0x972540, 0x56e760, 0x972a50 -> 0x26fe20, 0x7d3a00 -> 0x7f0020), both twins"
     - "C-99 / C-128: the swap's partner test and its step along its own path; Move Unit's update before the executions; a Trader no passenger — READ (0x972540, 0x56e760, 0x972a50 -> 0x26fe20, 0x7d3a00 -> 0x7f0020, 0x586360 -> 0x208b80 / 0x523d60), both twins"
+    - "C-127 / C-126 / C-100: a running city tree lets go its units whose turn is not done; the Mine on Volcanic Soil; a hull bought onto its own hull; the Religious AI's unit purchase — READ (0x7d3a00 -> 0x7cb3d0 -> 0x7d2190 -> 0x1e60f0, 0x7eeba0 at 0x7eed4f, 0x60a8c0 at 0x60a993, 0x7ec7b0 at 0x7ece46..0x7eceae, 0x7d1e40 at 0x7d2004..0x7d2059, 0x977570, 0x752440), both twins"
   context:
     - "- The tick 0x7d3a00 runs where the root is FRESH or SKIPPED: each node in order is updated (0x7d3d30; a SKI..."
   review: reviewed

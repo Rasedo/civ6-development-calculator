@@ -1471,12 +1471,14 @@ export function minorQueueOk(state: GameState, cityState: CityState, item: Exclu
  *  a naval unit at a coastal centre, an air unit beside a complete
  *  Aerodrome, a Trader below the trade capacity, the Archaeologist with an
  *  Archaeological Museum; a city-state ignores the strategic resources.
- *  `id` the engine's unit */
-export function minorCanTrain(state: GameState, cityState: CityState, id: string): boolean {
+ *  `id` the engine's unit; `faith`: the purchase request in Faith, which
+ *  takes a unit bought with Faith alone (runs/h1_duels1170 Lahore t239: its
+ *  Nihang of contract 1123 bought for 345 Faith) */
+export function minorCanTrain(state: GameState, cityState: CityState, id: string, faith = false): boolean {
   const r = cityState.research;
   const held = cityState.buildings ?? [];
   const d = UNITS[id];
-  if (!d || d.uniqueTo || d.faithOnly || d.spawnOnly || d.spy) return false;
+  if (!d || d.uniqueTo || (d.faithOnly && !faith) || d.spawnOnly || d.spy) return false;
   if (majorCivOnly(installType('unit', id, 'UNIT_'))) return false;
   if (d.requiresTech && !r.techs.includes(d.requiresTech)) return false;
   if (d.requiresCivic && !r.civics.includes(d.requiresCivic)) return false;

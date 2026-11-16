@@ -48,10 +48,13 @@
     - gpu/core/sim_minorai.py:_minor_contract_purchases
     - gpu/core/sim_minorai.py:_minor_purchases
     - gpu/core/sim_minorai.py:_minor_gold_purchases
+    - cpu/core/minorCityAi.ts:minorBuySpotBlocked
+    - cpu/core/minorCityAi.ts:minorFaithUnit
   readings:
     - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
     - "C-96: CanTrain's obsolescence and the contract purchase's refusal — READ (0x172820's prerequisite block, 0x538460, the callers' sixth argument), ported both twins"
     - "C-96 / C-127: the building event after the defensive cancel, Urban Defenses' refusal of the walls, the Religious AI's Faith purchases — READ (0x5cd150 -> 0x5d0860, 0x17107a..0x171090, 0x3726c0, 0x74fbf0 at 0x74fce1..0x74fe0c, 0x749b40, 0x749cf0, 0x5f3ee0, 0x7522c0, 0x752440), the building purchase both twins, the unit purchase not ported"
+    - "C-127 / C-126 / C-100: a running city tree lets go its units whose turn is not done; the Mine on Volcanic Soil; a hull bought onto its own hull; the Religious AI's unit purchase — READ (0x7d3a00 -> 0x7cb3d0 -> 0x7d2190 -> 0x1e60f0, 0x7eeba0 at 0x7eed4f, 0x60a8c0 at 0x60a993, 0x7ec7b0 at 0x7ece46..0x7eceae, 0x7d1e40 at 0x7d2004..0x7d2059, 0x977570, 0x752440), both twins"
   notes:
     - "builds the purchase request; the command it submits validates it — the CanTrain refusal is read off the records, its code unread"
   context:

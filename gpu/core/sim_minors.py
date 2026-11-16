@@ -2270,11 +2270,12 @@ class SimMinors:
         held_c = (c >= 0) & have_c.gather(1, c.clamp(min=0))
         return held_t.any(dim=1) | held_c.any(dim=1)
 
-    def _minor_can_train(self, s: int, ui: torch.Tensor) -> torch.Tensor:
+    def _minor_can_train(self, s: int, ui: torch.Tensor, faith: bool = False) -> torch.Tensor:
         """[B] — `minorCanTrain` of chassis `ui` ([B], -1 none), its
         prerequisites asked (0x172820, sixth argument clear): the minor's
         research unlocks it and has not made it obsolete (0x538460), no
-        civilization's unique, none MajorCivOnly, faith-bought, spawned or a
+        civilization's unique, none MajorCivOnly, faith-bought (but by the
+        purchase request in Faith, `faith`), spawned or a
         spy, a naval unit at a coastal centre, an air unit beside a complete
         Aerodrome, a Trader below the trade capacity, the Archaeologist with
         an Archaeological Museum, a unit with its prerequisite building (the
@@ -2291,7 +2292,8 @@ class SimMinors:
                 if r["majorOnly"] and 0 <= ei < self.NU:
                     major_only[ei] = True
             self._type_major_only = major_only
-        ok = (ui >= 0) & (self._type_uniq.take(u0) < 0) & ~self._type_faith_only.take(u0) & ~self._type_spawn_only.take(u0)
+        faith_only = self._type_faith_only.take(u0) & (not faith)
+        ok = (ui >= 0) & (self._type_uniq.take(u0) < 0) & ~faith_only & ~self._type_spawn_only.take(u0)
         ok = ok & ~major_only.take(u0)
         if self._spy_idx >= 0:
             ok = ok & (u0 != self._spy_idx)

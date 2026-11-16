@@ -266,7 +266,7 @@ export function buildFixture(state: GameState, world: WorldFile): object {
         !t.district && !naturalWonderAt(t) && !isImpassable(t) &&
         (t.resource
           ? resourceImprovement(t) === 'MINE'
-          : !isWater(t) && t.elevation === 'HILLS' && t.feature === null)
+          : !isWater(t) && ((t.elevation === 'HILLS' && t.feature === null) || t.feature === 'VOLCANIC_SOIL'))
           ? 1
           : 0,
       // the Lumber Mill's listed features (`Improvement_ValidFeatures`); a

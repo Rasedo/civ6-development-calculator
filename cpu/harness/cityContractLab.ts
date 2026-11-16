@@ -333,6 +333,7 @@ for (let i = 0; i + 1 < recs.length; i++) {
         if (k !== 'move' && (treeUnits.find((x) => x.id === u)?.charges ?? 0) <= 1) spent.add(u);
       },
       unitAlive: (u) => treeUnits.some((x) => x.id === u) && !spent.has(u),
+      turnDone: () => false,
       trace: verbose ? (t, root, ups) => console.log(`TICK t${turn} p${player} tree ${t.id} ${t.name} root ${root} ${ups.join(" ")}`) : undefined,
     };
     // B: the purchases (from the log) and the turn's production

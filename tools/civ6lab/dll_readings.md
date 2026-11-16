@@ -20097,3 +20097,64 @@ searches and its own events (tools/aiport/show.py).
   unread beside the engines' cap at the domain's pool; 0x26fe20's branch at
   0x27009a..0x270212 (the location test 0x586900 of the next plot refusing,
   the members' 0x586d40) is unread.
+
+## C-127 / C-126 / C-100: a running city tree lets go its units whose turn is not done; the Mine on Volcanic Soil; a hull bought onto its own hull; the Religious AI's unit purchase — READ (0x7d3a00 -> 0x7cb3d0 -> 0x7d2190 -> 0x1e60f0, 0x7eeba0 at 0x7eed4f, 0x60a8c0 at 0x60a993, 0x7ec7b0 at 0x7ece46..0x7eceae, 0x7d1e40 at 0x7d2004..0x7d2059, 0x977570, 0x752440), both twins
+
+`tickCityTrees`, Check Plot's Builder List, Move Unit's execution
+(cpu/core/aiCityTrees.ts; GPU `tick_city_trees`, `_u_check_plot`, `_x_move`
+in gpu/core/sim_citytrees.py), `minorTreeWorld`'s `turnDone`,
+`minorBuySpotBlocked`, `minorFaithUnit` (cpu/core/minorCityAi.ts; GPU
+`_MinorWorld.turn_done`, `_minor_buy_spot_blocked`, `_minor_religious_purchases`,
+`_minor_faith_price`, `_minor_buy_unit`'s Faith in gpu/core/sim_minorai.py),
+the Mine's ground (`validImprovementsIn` in cpu/core/rules.ts, `mi` in
+cpu/export/planes.ts; GPU `_soil_mine` in gpu/core/sim_orders.py,
+`_paint_soil` in gpu/core/sim_economy.py).
+
+- THE RELEASE: the tree manager's tick (0x7ffdd0) runs btTick (0x7d3a00)
+  per tree, which after the executions calls 0x7cb3d0; for a tree running
+  on it walks the tree's units (0x6092c0 on +0x488) whose turn is not done
+  (+0x530) and, the tree marked (m_allowRecruiting +0x3c8, every city tree
+  at the aimem looks) with no operation (+0x888 -1), sets the unit's
+  control +0x778 to -1 through 0x1e60f0. 0x1e60f0 is a watched value's
+  setter whose value lies at the object +0x58 (0x1e60f9, the store at
+  0x1e6218): the unit's +0x7d0, its assignment, the field the first offer
+  (0x60a8c0 at 0x60a993) and the tree's unit list read. The unit so leaves
+  the tree, a free unit any later tree's Find Available Unit finds.
+- TURN DONE: Move Unit's execution gives its kept unit (+0x50) turn done
+  (0x570b40 at 0x7eed4f) before any test of danger or plot, so a Builder a
+  tree moves stays with it; a unit bought this turn is done at its creation
+  (0x60a440): those out of the turn's planning.
+- CHECK PLOT with a district named hands the tree its Builder type too
+  (runs/h1_duels1145 Kandy t14: the Holy Site tree's node 11 Builder Type
+  [1] at the end look, its node 16 Found Unit [262144]).
+- FIND AVAILABLE UNIT'S OFFER: the evaluator (0x60a8c0) is called with the
+  tree's recruit priority (+0x5a8, else 0x723b90 or +0x548) and its present
+  value (+0x608 >> 8); a marked tree of the same priority gives its units
+  only to a request whose value is above its own (0x7d1e40 at
+  0x7d2044..0x7d2059): the Mine tree (71) could not take the Holy Site
+  tree's (150) Builder; the release does it.
+- CONFIRMED (aimem windows): runs/h1_duels1145 Kandy t14 (the Builder found
+  by the Holy Site tree's node 16, then by the Mine tree's node 21, moved
+  and held: no Builder contract), runs/h1_duels1172 t17, runs/h1_duels1152 t31.
+- THE MINE'S GROUND: Improvement_ValidFeatures lists FEATURE_VOLCANIC_SOIL
+  for the Mine (Expansion2_Improvements.xml), and the game values it on flat
+  soil: runs/h1_duels1187 Nan Madol t168 the Grassland 33:10 (MINE 55.38,
+  FARM 28.96, FORT 38.38), its Build City Improvement tree's Needed
+  Improvement 2 there, Builder contract 623; t205 and t242 alike;
+  runs/h1_duels1146 Kumasi t176 / t202 the Mine laid on the soil 12:13
+  (53.38 over its Farm's 49.17).
+- A HULL BOUGHT: the purchase request (0x977570) refuses a hull where the
+  minor's own hull stands on its centre (runs/h1_duels1162 Cahokia t38-t44,
+  threatened at 4, its balance at the Galley's 125 Gold, its Galley 655366
+  on the centre 6:9; runs/h1_duels1160 Palenque t41-t43), as a land unit is
+  refused by its stacking class (`purchaseSpotBlocked`); the majors' rule is
+  left as it stands.
+- THE RELIGIOUS AI'S UNIT PURCHASE (0x752440) on the purchase list
+  (`religiousPurchases`): a threatened city takes no unit of Combat 0, a
+  unit with ReligiousStrength asks the AI's religion (+0x1c0) to be the
+  city's (a city-state founds none), then the purchase request in Faith:
+  runs/h1_duels1170 t239 Lahore's Nihang of contract 1123 for 345 Faith.
+- OPEN: 0x1b2930 (a city's own Faith test of a religious unit) unread; the
+  Nihang bought at 1170 t241 forms a Corps with the first at once
+  (UnitFormCorps 1900547, no new unit in record t242), ours keeps two
+  (C-126).

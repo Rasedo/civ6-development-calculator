@@ -882,8 +882,10 @@ def pick_improvement(ai: CityAi, s: int, w, mask: torch.Tensor) -> torch.Tensor:
 class _Ctx:
     """one slot's tree of one seat, over the games whose tree ticks"""
 
-    def __init__(self, ai: CityAi, s: int, k: int, w, turn: int):
+    def __init__(self, ai: CityAi, s: int, k: int, w, turn: int, done: list):
         self.ai, self.s, self.k, self.w, self.turn = ai, s, k, w, turn
+        # the units the tick's orders gave turn done ([B] ids, -1 none)
+        self.done = done
         self.tree: _Tree = ai.slot_trees[k]
         self.st = ai.tr_status[:, s, k]
         self.ma = ai.tr_mem_a[:, s, k]
@@ -1117,8 +1119,7 @@ def _u_check_plot(c: _Ctx, i: int, at: torch.Tensor) -> torch.Tensor:
     builder = _l(w.builder_type(imp_r), p)
     ok_b = builder >= 0
     go = at & ~none & (has_d | has_i) & ok_b
-    # a district's check hands its tree no Builder type (`checkPlot`)
-    c.set_tag(i, "Builder List", builder, go & has_i)
+    c.set_tag(i, "Builder List", builder, go)
     c.set_tag(i, "Plot To Move", p, go)
     d_ok = has_d & _b(w.can_place_district(p, torch.where(has_d, d, -1)), p)
     i_ok = has_i & ~d_ok & _b(w.can_improve(p, imp_r), p)
@@ -1247,12 +1248,14 @@ def _u_move(c: _Ctx, i: int, at: torch.Tensor) -> torch.Tensor:
 
 
 def _x_move(c: _Ctx, i: int, at: torch.Tensor) -> None:
-    """the execution (0x7eeba0): the kept unit, else each of its units; without
-    Allow Danger no walk ending on a plot of danger (0x7eed65)"""
+    """the execution (0x7eeba0): the kept unit, its turn done before its move
+    (0x7eed4f), else each of its units; without Allow Danger no walk ending
+    on a plot of danger (0x7eed65)"""
     plot = c.tag(i, "Location")
     go = at & (plot != NONE)
     u = c.units()
     kcol = u["valid"] & (u["id"] == c.ma[:, i].unsqueeze(1)) & (c.ma[:, i] >= 0).unsqueeze(1)
+    c.done.append(torch.where(go & kcol.any(dim=1), c.ma[:, i], torch.full_like(c.ma[:, i], -1)))
     us = torch.where(kcol.any(dim=1, keepdim=True), kcol, _units_of(c, i, "Unit ID List"))
     off = us & (u["plot"] != plot.unsqueeze(1)) & go.unsqueeze(1)
     safe = not c.tree.flag(i, "Allow Danger")
@@ -1647,11 +1650,12 @@ def _propagate(c: _Ctx, i: int, mask: torch.Tensor) -> torch.Tensor:
     return out
 
 
-def tick_tree(ai: CityAi, s: int, k: int, w, turn: int, act: torch.Tensor) -> torch.Tensor:
+def tick_tree(ai: CityAi, s: int, k: int, w, turn: int, act: torch.Tensor, done: list) -> torch.Tensor:
     """ONE TICK (0x7d3a00) of the slot's tree where `act`: the walk, then the
     actions' execution; [B] the root's status. A root ending anything but
-    RUNNING (or nothing) ends the tree."""
-    c = _Ctx(ai, s, k, w, turn)
+    RUNNING (or nothing) ends the tree. `done`: the units the tick's orders
+    gave turn done, appended to"""
+    c = _Ctx(ai, s, k, w, turn, done)
     tree = c.tree
     cur = torch.zeros_like(c.ref)
     for i, n in enumerate(tree.nodes):
@@ -1705,7 +1709,10 @@ def tick_city_trees(ai: CityAi, s: int, w, turn: int, mask: torch.Tensor) -> Non
     """THE TREE MANAGER'S TICK (`tickCityTrees`) where `mask`: each running
     tree of the seat, in the tree pool's slot order, ticks once; a tree whose
     root ends, or one of whose units its orders spent, ends; the
-    reservations of trees ended and the contracts no holder keeps go"""
+    reservations of trees ended and the contracts no holder keeps go. A tree
+    running on lets go each of its units whose turn is not done (0x7cb3d0 ->
+    0x7d2190), a free unit the trees after it find"""
+    done: list = []
     city_ok = _b(w.city_alive(), mask)
     ks = sorted(ai.slot_trees)
     ids = ai.tr_id[:, s]
@@ -1720,11 +1727,18 @@ def tick_city_trees(ai: CityAi, s: int, w, turn: int, mask: torch.Tensor) -> Non
             act = alive[:, k] & (rank[:, k] == r)
             if not bool(act.any()):
                 continue
-            tick_tree(ai, s, k, w, turn, act)
+            tick_tree(ai, s, k, w, turn, act, done)
             # a unit of the tree gone with the orders given ends the tree
             us = ai.tr_units[:, s, k]
             gone = ((us >= 0) & ~_b(w.unit_alive(us), us)).any(dim=1)
             ai.tr_alive[:, s, k] &= ~(act & gone)
+            # running on, it lets go each unit whose turn is not done
+            on = act & ai.tr_alive[:, s, k]
+            kept = _b(w.turn_done(us), us)
+            if done:
+                kept = kept | (us.unsqueeze(2) == torch.stack(done, dim=1).unsqueeze(1)).any(-1)
+            let = on.unsqueeze(1) & (us >= 0) & ~kept
+            ai.tr_units[:, s, k] = torch.where(let, torch.full_like(us, -1), us)
     rv = ai.r_plot[:, s] >= 0
     dead = rv & ~tree_live(ai, s, ai.r_tree[:, s])
     ai.r_plot[:, s] = torch.where(dead, -1, ai.r_plot[:, s])

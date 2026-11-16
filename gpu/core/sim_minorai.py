@@ -203,29 +203,45 @@ class SimMinorAi:
         """`religiousPurchases` where `act` (0x74fbf0 at 0x74fce1..0x74fe0c):
         the religious AI's list keeps the contracts alive, ACCEPTED and
         faith-bought; each, the higher value first, of equals in id order,
-        tries its Faith purchase: a building's (0x7522c0, `minorFaithBuilding`)
-        where the city follows a religion, the queue's CanConstruct and the
-        Faith covering the price, COMPLETED where it buys; a unit's buys none"""
+        tries its Faith purchase: a unit's (0x752440, `minorFaithUnit`) where
+        a threatened city's is no unit of Combat 0 and none of ReligiousStrength,
+        the city may train it, the centre takes it and the Faith covers the
+        price; a building's (0x7522c0, `minorFaithBuilding`) where the city
+        follows a religion, the queue's CanConstruct and the Faith covering the
+        price; COMPLETED where it buys"""
         ai = self.cityai
         cs = (slice(None), s)
         live = ai.c_id[cs] >= 0
         faith = faith_purchasable(ai, ai.c_unit[cs], ai.c_building[cs], ai.c_district[cs])
         keep = ai.c_faith[cs] & live & (ai.c_progress[cs] == CP_ACCEPTED) & faith
         ai.c_faith[cs] = torch.where(act.unsqueeze(1), keep, ai.c_faith[cs])
+        units = act.unsqueeze(1) & ai.c_faith[cs] & (ai.c_unit[cs] >= 0)
         blds = act.unsqueeze(1) & ai.c_faith[cs] & (ai.c_unit[cs] < 0) & (ai.c_building[cs] >= 0)
-        if not bool(blds.any()):
+        if not bool((units | blds).any()):
             return
         E = self._cv_tables()["engine"]
+        eu = torch.tensor(E["unit"] or [-1], dtype=torch.long, device=self.device)
         eb = torch.tensor(E["building"] or [-1], dtype=torch.long, device=self.device)
         follows = self._minor_followed()[:, s] >= 0
+        seat = 100 + s
+        ctr = self.citystate_center[:, s].clamp(min=0)
+        threat = self.citystate_threat[:, s] > -1
         # the higher value first, of equals in arrival (id) order (0x749cf0)
-        key = torch.where(blds, -ai.c_value[cs].long(), torch.full_like(ai.c_id[cs], 1 << 40))
+        key = torch.where(units | blds, -ai.c_value[cs].long(), torch.full_like(ai.c_id[cs], 1 << 40))
         order = torch.argsort(key * (1 << 20) + ai.c_id[cs].clamp(min=0), dim=1)
         for r in range(order.shape[1]):
             j = order[:, r]
-            on = blds.gather(1, j.unsqueeze(1)).squeeze(1) & follows
-            if not bool(blds.gather(1, j.unsqueeze(1)).squeeze(1).any()):
+            on_u = units.gather(1, j.unsqueeze(1)).squeeze(1)
+            if not bool((on_u | blds.gather(1, j.unsqueeze(1)).squeeze(1)).any()):
                 break
+            if bool(on_u.any()):
+                ui = torch.where(on_u, eu.take(_cget(ai.c_unit, s, j).clamp(min=0)), torch.full_like(j, -1))
+                pk = ui.clamp(min=0, max=self.NU - 1)
+                ok = on_u & (ui >= 0) & ~(threat & (self._type_combat.take(pk) == 0)) & (self._rel_strength.take(pk) == 0)
+                ok = ok & self._minor_can_train(s, ui, faith=True) & ~self._minor_buy_spot_blocked(ctr, seat, pk)
+                bought = self._minor_buy_unit(s, ok, ui, self._minor_faith_price(s, pk), faith=True)
+                _cset(ai.c_progress, s, j, CP_COMPLETED, bought)
+            on = blds.gather(1, j.unsqueeze(1)).squeeze(1) & follows
             if not bool(on.any()):
                 continue
             bi = torch.where(on, eb.take(_cget(ai.c_building, s, j).clamp(min=0)), torch.full_like(j, -1))
@@ -284,10 +300,9 @@ class SimMinorAi:
             price = self._minor_gold_price(s, ui.clamp(min=0))
             # the purchase request (0x977570): the city may train the unit (an
             # obsolete unit's contract stays ACCEPTED, unbought) and the centre
-            # itself takes it (`purchaseSpotBlocked`: a hull by its own water rule)
+            # itself takes it (`minorBuySpotBlocked`)
             pk = ui.clamp(min=0, max=self.NU - 1)
-            found = self.unit_naval.take(pk) | ~self._purchase_blocked(
-                ctr, seat, is_civilian=self._type_civilian.take(pk), is_support=self._type_support.take(pk))
+            found = ~self._minor_buy_spot_blocked(ctr, seat, pk)
             can = on & self._minor_can_train(s, ui) & found & self._afford(self.citystate_treasury[:, s], price)
             sav, bal, bought = self._cv_try_purchase(self.citystate_savings[:, s], self.citystate_balance[:, s],
                                                      price.long(), self.citystate_threat[:, s], can)
@@ -1687,10 +1702,9 @@ class SimMinorAi:
                 return
             price = self._minor_gold_price(s, pick)
             # the purchase request (0x977570): the centre itself takes the unit
-            # (`purchaseSpotBlocked`: a hull by its own water rule)
+            # (`minorBuySpotBlocked`)
             pk = pick.clamp(min=0, max=self.NU - 1)
-            found = self.unit_naval.take(pk) | ~self._purchase_blocked(
-                ctr, seat, is_civilian=self._type_civilian.take(pk), is_support=self._type_support.take(pk))
+            found = ~self._minor_buy_spot_blocked(ctr, seat, pk)
             can = found & self._afford(self.citystate_treasury[:, s], price)
             sav, bal, bought = self._cv_try_purchase(self.citystate_savings[:, s], self.citystate_balance[:, s],
                                                      price.long(), threat, can)
@@ -1699,6 +1713,18 @@ class SimMinorAi:
             self.citystate_balance[:, s] = torch.where(bought, bal, self.citystate_balance[:, s])
             self._minor_buy_unit(s, bought, pick, price)
             go = bought
+
+    def _minor_buy_spot_blocked(self, ctr: torch.Tensor, seat, pk: torch.Tensor) -> torch.Tensor:
+        """[B] the minor's centre `ctr` refuses the unit type `pk` bought
+        onto it (`minorBuySpotBlocked`): a hull where a hull of
+        its own stands there, any other unit by its stacking class
+        (`purchaseSpotBlocked`)"""
+        m = self.military_at.gather(1, ctr.unsqueeze(1)).squeeze(1)
+        mc = m.clamp(min=0).unsqueeze(1)
+        hull = (m >= 0) & (self.unit_seat.gather(1, mc).squeeze(1) == seat) \
+            & self.unit_naval.take(self.unit_type.gather(1, mc).squeeze(1).clamp(min=0, max=self.NU - 1))
+        land = self._purchase_blocked(ctr, seat, is_civilian=self._type_civilian.take(pk), is_support=self._type_support.take(pk))
+        return torch.where(self.unit_naval.take(pk), hull, land)
 
     def _minor_gold_price(self, s: int, ui: torch.Tensor) -> torch.Tensor:
         """[B] f64 — `minorUnitPrice` in Gold: the unit's Production cost (a
@@ -1711,17 +1737,26 @@ class SimMinorAi:
             cost = torch.where(u0 == self._builder_idx, self._builder_cost(self.citystate_builders_trained[:, s]).double(), cost)
         return self._purchase_step(cost * float(self.rules.gold_purchase_mult))
 
-    def _minor_buy_unit(self, s: int, mask: torch.Tensor, ui: torch.Tensor, price: torch.Tensor) -> torch.Tensor:
-        """`minorBuyUnit` in Gold where `mask`: the treasury covers the price,
-        the unit stands on or beside the centre with the city's training
-        grants at Movement 0 (none bought with no free tile), its strategic
-        cost charged (the purchase 0xa540c0 through 0x17c2e0, the stock held
-        at 0), the treasury pays; [B] the games where it landed"""
-        go = mask & self._afford(self.citystate_treasury[:, s], price)
+    def _minor_faith_price(self, s: int, u0: torch.Tensor) -> torch.Tensor:
+        """[B] f64 — `minorUnitPrice` in Faith: the unit's Production cost
+        times the Faith multiplier, rounded, floored to the purchase step"""
+        cost = self._unit_progress_cost(self._CITY_MINOR0 + s, u0).double()
+        return self._purchase_step(torch.floor(cost * float(self.rules.faith_purchase_mult) + 0.5))
+
+    def _minor_buy_unit(self, s: int, mask: torch.Tensor, ui: torch.Tensor, price: torch.Tensor,
+                        faith: bool = False) -> torch.Tensor:
+        """`minorBuyUnit` where `mask`: the treasury (the Faith with `faith`)
+        covers the price, the unit stands on or beside the centre at Movement
+        0 — with the city's training grants in Gold — (none bought with no
+        free tile), its strategic cost charged (the purchase 0xa540c0 through
+        0x17c2e0, the stock held at 0), the purse pays; [B] the games where
+        it landed"""
+        purse = self.citystate_faith if faith else self.citystate_treasury
+        go = mask & self._afford(purse[:, s], price)
         if not bool(go.count_nonzero()):
             return go
         slot = self.unit_next.clone()
-        landed = self._minor_spawn(s, go, ui)
+        landed = self._minor_spawn(s, go, ui, grants=not faith)
         rows = landed.nonzero(as_tuple=True)[0]
         self.major_unit_mp[rows, slot[rows]] = 0
         if self._n_strategic:
@@ -1736,7 +1771,7 @@ class SimMinorAi:
                 row = self._CITY_MINOR0 + s
                 self._log_stock(pay.nonzero(as_tuple=True)[0], row, rs[pay], "uc")
                 self._rebuild_luxuries(row, pay)
-        self.citystate_treasury[:, s] -= torch.where(landed, price, torch.zeros_like(price))
+        purse[:, s] -= torch.where(landed, price, torch.zeros_like(price)).to(purse.dtype)
         return landed
 
     # -- the trees' orders -----------------------------------------------------
@@ -3188,6 +3223,16 @@ class _MinorWorld:
             gone = torch.stack(self._spent, dim=1)
             ok = ok & ~(flat.unsqueeze(2) == gone.unsqueeze(1)).any(-1)
         return ok.reshape(ids.shape)
+
+    def turn_done(self, ids):
+        """a unit out of the turn's planning was bought this turn, its turn
+        done at its creation (0x60a440; `minorTreeWorld`'s `turnDone`)"""
+        if self._planned is None:
+            return torch.zeros_like(ids, dtype=torch.bool)
+        lo = self.sim.POOL_LO["major"]
+        flat = ids.reshape(self.sim.B, -1)
+        g = (flat - lo).clamp(min=0, max=self._planned.shape[1] - 1)
+        return ((flat >= lo) & ~self._planned.gather(1, g)).reshape(ids.shape)
 
     def builders_make_wonders(self):
         return False

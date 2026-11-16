@@ -907,6 +907,10 @@ class SimEconomy:
         self._nfeat_adj[rows, tiles] = 0
         self.feat_id[rows, tiles] = self._soil_fid
         self.feat_stripped[rows, tiles] = False
+        # the soil is the Mine's ground (`validImprovementsIn`), a row that
+        # cannot see the plot's resource reading it bare
+        self.mine_ok[rows, tiles] |= self._soil_mine(rows, tiles)
+        self._nr_bare["mine_ok"][rows, tiles] |= ~self.water[rows, tiles]
         self._eff_version += 1
 
     def _food_base(self) -> torch.Tensor:
