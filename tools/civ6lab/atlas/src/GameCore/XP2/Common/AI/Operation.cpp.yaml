@@ -242,6 +242,9 @@
     - recording: h1_duelq1128
       turn: 130
       value: "Hong Kong's City Defense at its end look: team +0x94 45 (the barbarian Man-At-Arms on 9:5), +0x98 90 (its two Man-At-Arms beside it; the Warriors on 9:7 reach it not)"
+    - recording: h1_duels1144
+      turn: 143
+      value: "the weighed target types are CIVILIAN_UNIT (6) to HIGH_PRIORITY_UNIT (11) by value (0x739150..0x739161), RELIGIOUS_CIVILIAN 7 and TRADER 8 among them: city-state 2's City Defense team +0x98 55, +0x94 0, its Musketman 1572870 on 12:13 beside a religious unit's entry on 11:13 (the list's type 7), no Fortify"
   impl:
     - gpu/core/sim_tactics.py:_endangered_districts
     - cpu/core/operations/assault.ts:WEIGHED
@@ -257,6 +260,7 @@
     - gpu/core/sim_minorops.py:_mops_reaches
     - gpu/core/sim_minorops.py:_mops_district_strikes
   readings:
+    - "C-134 / C-99: the chokepoint records across AnalyzeChokepoints calls; the team update's weighed targets; the unattributed Upgrade Units job — READ (0x86c030 at 0x86c04c, 0x87cff0 at 0x87d362..0x87d3b4 and 0x87d497..0x87d532, 0x887810 at 0x887877..0x8878c0, 0x738f20 at 0x739150..0x739161), both twins"
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
     - "C-97: the war operations — the war candidates, the city value's frame, the assault nodes and Attack Units READ; the loyalty lead's sources, the team update's danger and the assault's executions PARTLY READ"
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"

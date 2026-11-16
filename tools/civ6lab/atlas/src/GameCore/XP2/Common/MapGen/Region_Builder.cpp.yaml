@@ -38,6 +38,7 @@
     - "The map's regions (AnalyzeChokepoints, Region_Builder) — READ, ported"
     - "H-1: the barbarians' turn (0x1514a0) — READ (the max camps and the sight LAB)"
     - "C-134 / C-124: the map's regions flood without wrap; City Defense's region test as read — READ (0x887810 at 0x8878d0..0x8878e0 and 0x887a7a, 0x77a50 at 0x77ac6 / 0x77b11, 0x817a0c..0x817a6a, 0x815d50 at 0x815d64..0x815d73)"
+    - "C-134 / C-99: the chokepoint records across AnalyzeChokepoints calls; the team update's weighed targets; the unattributed Upgrade Units job — READ (0x86c030 at 0x86c04c, 0x87cff0 at 0x87d362..0x87d3b4 and 0x87d497..0x87d532, 0x887810 at 0x887877..0x8878c0, 0x738f20 at 0x739150..0x739161), both twins"
   context:
     - "...Chokepoints builds — the binding (0x2b500 -> 0x8923f0) jumps straight into Region_Builder 0x887810, which first runs the chokepoint analysis (MapAnalysis.cpp, 0x86c030 on the builder's +0x..."
   review: reviewed
@@ -55,6 +56,7 @@
     - "The map's regions (AnalyzeChokepoints, Region_Builder) — READ, ported"
     - "H-1: the barbarians' turn (0x1514a0) — READ (the max camps and the sight LAB)"
     - "C-134 / C-124: the map's regions flood without wrap; City Defense's region test as read — READ (0x887810 at 0x8878d0..0x8878e0 and 0x887a7a, 0x77a50 at 0x77ac6 / 0x77b11, 0x817a0c..0x817a6a, 0x815d50 at 0x815d64..0x815d73)"
+    - "C-134 / C-99: the chokepoint records across AnalyzeChokepoints calls; the team update's weighed targets; the unattributed Upgrade Units job — READ (0x86c030 at 0x86c04c, 0x87cff0 at 0x87d362..0x87d3b4 and 0x87d497..0x87d532, 0x887810 at 0x887877..0x8878c0, 0x738f20 at 0x739150..0x739161), both twins"
   context:
     - "...ounting and stamping each plot it closes, m_area its area) takes every plot the step test 0x887aa0 admits: passable land not yet the flood's own; free between plots off every chokepoint li..."
   review: reviewed

@@ -2523,7 +2523,7 @@ function minorAi(ctx: Ctx, b: TurnRecord, turn: number, made: ReadonlySet<Unit>,
   // bought): none of the pass's, their end plots compared
   const idle = new Set([...twin].filter(([c]) => upgraded.has(c) || boughtNow.has(`${c.seat}:${c.id}`))
     .map(([, u]) => u).filter((u) => !moves.has(u)));
-  tallyMinorTactics(ctx, b, turn, moves, ended, opOf, idle);
+  tallyMinorTactics(ctx, b, turn, copy, moves, ended, opOf, idle);
   scoreFortify(ctx, b, turn, copy, twin, (s) => (s === FREE_SEAT ? 'freeCities' : isCityStateSeat(s) ? 'cityState' : null));
 }
 
@@ -2538,8 +2538,9 @@ function minorAi(ctx: Ctx, b: TurnRecord, turn: number, made: ReadonlySet<Unit>,
  *  end look, else an "Upgrade Units" tree's at the end look, else an
  *  operation's at the tactical turn (its moves AI_Operation.csv's: runs/
  *  h1_duely1127 t3, city-state 4's Warriors in Attack Barb Camp from its
- *  start), else an "Upgrade Units" tree's at the log's look, else "(no row)" */
-function gameJob(ctx: Ctx, turn: number, player: number, id: number): string {
+ *  start), else an "Upgrade Units" tree's at the log's look, else "(no row)";
+ *  `upgradable`: the unit has an upgrade under the research its turn ran on */
+function gameJob(ctx: Ctx, turn: number, player: number, id: number, upgradable: boolean): string {
   const mem = ctx.gameMemory;
   if (!mem) return '(no row)';
   const inOp = (site: 'tactical' | 'endlook') => !!mem.at(site, turn, player)?.ops?.some((o) => o.teams.some((t) => t.some((x) => x[0] === id)));
@@ -2561,14 +2562,17 @@ function gameJob(ctx: Ctx, turn: number, player: number, id: number): string {
   // does started and ended in the turn, its units held between the looks
   // (runs/h1_duelq1128 t154: Bologna's tree 6356998, its four units' swaps
   // round the centre 4:9 with no tactical row; 1117 t227 city-state 3's Pike
-  // and Shot 1900546 under tree 10223623, its order OPERATION, AWAKE)
+  // and Shot 1900546 under tree 10223623, its order OPERATION, AWAKE) — of
+  // the units with an upgrade, as Find Available Unit takes no other
+  // (runs/h1_duels1160 t179-249: city-state 4's Frigate 1245188 on its
+  // centre 7:6, no Steel, no tactical row, the trees of the turn holding none)
   const log = mem.at('log', turn, player)?.trees ?? {};
   const end = mem.at('endlook', turn, player)?.trees ?? {};
-  if (Object.entries(log).some(([id, t]) => t.name === UPGRADE_MOVE && !(id in end))) return UPGRADE_MOVE;
+  if (upgradable && Object.entries(log).some(([id, t]) => t.name === UPGRADE_MOVE && !(id in end))) return UPGRADE_MOVE;
   return '(no row)';
 }
 
-function tallyMinorTactics(ctx: Ctx, b: TurnRecord, turn: number, moves: ReadonlyMap<Unit, { move: string; plot: number }>,
+function tallyMinorTactics(ctx: Ctx, b: TurnRecord, turn: number, copy: GameState, moves: ReadonlyMap<Unit, { move: string; plot: number }>,
   ended: ReadonlyMap<Unit, number>, opOf: ReadonlyMap<Unit, string>, idle: ReadonlySet<Unit>): void {
   const keyOf = new Map<Unit, string>();
   for (const [key, u] of ctx.units) keyOf.set(u, key);
@@ -2579,7 +2583,8 @@ function tallyMinorTactics(ctx: Ctx, b: TurnRecord, turn: number, moves: Readonl
     const key = keyOf.get(u);
     if (!key) continue;
     // a unit with no tactical row: its job in the game's AI memory
-    const game = rows ? tacticalCategory(rows.get(key) ?? gameJob(ctx, turn, ownerOf(key), Number(key.split(':')[1]))) : undefined;
+    const game = rows ? tacticalCategory(rows.get(key)
+      ?? gameJob(ctx, turn, ownerOf(key), Number(key.split(':')[1]), upgradeType(copy, u.seat, u.type) !== undefined)) : undefined;
     // the Free Cities' moves apart
     const label = `${u.seat === FREE_SEAT ? 'Free Cities: ' : ''}${game ?? m.move}`;
     const t = (ctx.minorTally[label] ??= { units: 0, move: 0, plot: 0, plotOf: 0 });

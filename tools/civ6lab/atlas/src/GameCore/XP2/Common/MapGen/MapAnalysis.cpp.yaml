@@ -35,6 +35,7 @@
     - "The map's regions (AnalyzeChokepoints, Region_Builder) — READ, ported"
     - "H-1: the barbarians' turn (0x1514a0) — READ (the max camps and the sight LAB)"
     - "C-134 / C-124: the map's regions flood without wrap; City Defense's region test as read — READ (0x887810 at 0x8878d0..0x8878e0 and 0x887a7a, 0x77a50 at 0x77ac6 / 0x77b11, 0x817a0c..0x817a6a, 0x815d50 at 0x815d64..0x815d73)"
+    - "C-134 / C-99: the chokepoint records across AnalyzeChokepoints calls; the team update's weighed targets; the unattributed Upgrade Units job — READ (0x86c030 at 0x86c04c, 0x87cff0 at 0x87d362..0x87d3b4 and 0x87d497..0x87d532, 0x887810 at 0x887877..0x8878c0, 0x738f20 at 0x739150..0x739161), both twins"
   context:
     - ...into Region_Builder 0x887810, which first runs the chokepoint analysis (MapAnalysis.cpp, 0x86c030 on the builder's +0x20) and then floods the regions. XP2 Continents.lua calls it twice (a...
   review: reviewed
@@ -189,12 +190,25 @@
 - addr: 0x87cff0
   final: 0x5cab60
   kind: function
-  status: PARTLY
-  readings: ["The map's regions (AnalyzeChokepoints, Region_Builder) — READ, ported"]
-  notes: ["imported: READ in its section, no confirming case found beside it"]
+  semantics: "per chokepoint end pair: the float walk from the lesser end in axial order (n steps, cube rounding 0x38070), each step's plot logged \"%d:%d,\" and added once to the analysis' line list (+0x48, the walk's far end among them, an end's step skipping only the area test); where every plot between the ends lies in one area the pair (ends, area, -1, 0; 0x28 bytes) joins the analysis' records (+0x68) unless a record holds the same ends. 0x86c030 clears +0x48 as it opens and never +0x68, and the analysis lives in the map (map +0x480 + 0x1c0 + 0x20): a second AnalyzeChokepoints adds its new pairs after the first's."
+  status: READ
+  cases:
+    - recording: h1_duels1133
+      turn: 21
+      value: "AI_ChokePoint.csv's first analysis keeps (41:7, 42:5) (walk 42:6,42:5), its second (41:5, 41:7) (walk 42:6,41:5): both records stand, the line list the second's; city-state 3's City Defense Archer 327682 on 42:6 takes 41:6 (44 plot rows t21-t65 gone)"
+    - recording: h1_duels1145
+      turn: 32
+      value: city-state 4's City Defense Warrior 327681 34:10 / 33:11 and Attack Enemy City Archer 589825 t47-t57 (18 plot rows gone)
+  impl:
+    - tools/civ6map/chokepoints.py:chokepoint_records
+    - tools/civ6map/chokepoints.py:hex_walk
+    - tools/civ6map/world.py:analyze_chokepoints
+  readings:
+    - "The map's regions (AnalyzeChokepoints, Region_Builder) — READ, ported"
+    - "C-134 / C-99: the chokepoint records across AnalyzeChokepoints calls; the team update's weighed targets; the unattributed Upgrade Units job — READ (0x86c030 at 0x86c04c, 0x87cff0 at 0x87d362..0x87d3b4 and 0x87d497..0x87d532, 0x887810 at 0x887877..0x8878c0, 0x738f20 at 0x739150..0x739161), both twins"
   context:
     - ...rest, else the edge nearest the cell (0x873b00); the best does not reset between pairs. 0x87cff0 keeps a pair (offset plots) when the plots its line passes between them (the cube wal...
-  review: imported
+  review: reviewed
 - addr: 0x87d6a0
   kind: function
   semantics: "marking: flag 0 on a cell of other than two neighbours, or whose 3r^2 exceeds 12 and no other cell within r has a radius as large."

@@ -18714,3 +18714,48 @@ replay's imposed wonder placement (cpu/harness/replay.ts); GPU
   on 35:7 placed t74 and routed in record 78.
 - Open: 0x512120's owned-tile and tech rules are `bestRoadTier`'s as "C-95:
   the roads' type per plot" ports them.
+
+## C-134 / C-99: the chokepoint records across AnalyzeChokepoints calls; the team update's weighed targets; the unattributed Upgrade Units job — READ (0x86c030 at 0x86c04c, 0x87cff0 at 0x87d362..0x87d3b4 and 0x87d497..0x87d532, 0x887810 at 0x887877..0x8878c0, 0x738f20 at 0x739150..0x739161), both twins
+
+`chokepoint_records`, `hex_walk`, `analyze` (tools/civ6map/chokepoints.py),
+`build_regions` (tools/civ6map/regions.py), `World.choke_records` /
+`analyze_chokepoints` (tools/civ6map/world.py), read into the recordings'
+`.orders.json` `regions` (tools/civ6lab/h1/map_orders.py); `WEIGHED`
+(cpu/core/operations/assault.ts), `_mops_update_team`'s `wk`
+(gpu/core/sim_minorops.py); `gameJob` (cpu/harness/replay.ts).
+
+- THE RECORDS OUTLIVE THE ANALYSIS: the chokepoint analysis lives in the
+  map (map +0x480 + 0x1c0, the builder; the analysis at its +0x20). 0x86c030
+  clears its line list (+0x48) as it opens, never its records (+0x68).
+  0x87cff0 walks each end pair from the lesser end in axial order, every
+  step's plot (the far end among them) joining the line list once; a pair
+  whose plots between the ends lie in one area joins the records unless a
+  record holds the same ends. XP2 Continents.lua calls AnalyzeChokepoints
+  twice: the second's new pairs follow the first's, and Region_Builder
+  makes a chokepoint object of every record (0x371d0, its line the ends
+  left out) while its step test (0x887aa0) asks first whether a plot is in
+  the line list, the second analysis' alone.
+- Confirmed: runs/h1_duels1133 t21-t65 city-state 3's City Defense Archer
+  327682 and Warrior 131073 on 42:6 take 41:6 (the first analysis' record
+  (41:7, 42:5) beside the second's (41:5, 41:7), AI_ChokePoint.csv; 44
+  plot rows gone, none new); runs/h1_duels1145 t32-t57 city-state 4's
+  Warrior 327681 and Archers 458756 / 589825 (18 gone). The regenerated
+  regions differ from the old sidecars on 26 of the 65 recorded maps.
+- THE WEIGHED TARGETS: the team update counts a tactical target whose type
+  lies from TARGET_CIVILIAN_UNIT to TARGET_HIGH_PRIORITY_UNIT by value (6 to
+  11: the religious unit 7 and the Trader 8 among them) or is an enemy
+  combat or passive district. Confirmed: runs/h1_duels1144 t143 city-state
+  2's City Defense team +0x98 55, +0x94 0, its Musketman 1572870 on its
+  centre 12:13 beside a religious unit's entry on 11:13: Garrison City
+  gives no Fortify (t122-t151 9 fortify rows gone; runs/h1_duels1172
+  t185-t190 6, runs/h1_duels1127 t72 1).
+- THE UNATTRIBUTED UPGRADE UNITS JOB (the replay's reading of the game's
+  memory, not the DLL's rule): a unit with no tactical row is an "Upgrade
+  Units" tree's that started and ended in the turn only where it has an
+  upgrade under the research the turn ran on (record t+1's, the minors'
+  copy), as Find Available Unit takes no other. Confirmed: runs/
+  h1_duels1160 t179, t203-t207 city-state 4's Frigate 1245188 on 7:6, no
+  Steel (the family rows gone).
+- Open: runs/h1_duels1157 t13 43:23 / 43:22 and the passed runs/h1_duels1180
+  t46 / runs/h1_duels1184 t29 plots stand as before (their regions
+  unchanged by the records).

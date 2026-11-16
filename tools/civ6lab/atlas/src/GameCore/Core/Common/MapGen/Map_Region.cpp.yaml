@@ -7,7 +7,9 @@
   final: 0x2b970
   kind: function
   status: PARTLY
-  readings: ["The map's regions (AnalyzeChokepoints, Region_Builder) — READ, ported"]
+  readings:
+    - "The map's regions (AnalyzeChokepoints, Region_Builder) — READ, ported"
+    - "C-134 / C-99: the chokepoint records across AnalyzeChokepoints calls; the team update's weighed targets; the unattributed Upgrade Units job — READ (0x86c030 at 0x86c04c, 0x87cff0 at 0x87d362..0x87d3b4 and 0x87d497..0x87d532, 0x887810 at 0x887877..0x8878c0, 0x738f20 at 0x739150..0x739161), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ...ir (offset plots) when the plots its line passes between them (the cube walk 0x38070 of 0x371d0) all lie in one area, once per ordered pair.

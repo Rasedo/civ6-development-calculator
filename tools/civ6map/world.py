@@ -71,10 +71,12 @@ class World:
         self.areas: dict[int, Area] = {}
         # the map's regions (Map_Region) as the last AnalyzeChokepoints left
         # them: per plot its region (-1 none), per region its plot count,
-        # and the chokepoints' end pairs
+        # and the chokepoints' end pairs; the chokepoint analysis' records,
+        # every AnalyzeChokepoints adding to them
         self.region = [-1] * N
         self.region_sizes: list[int] = []
         self.chokepoints: list[list[list[int]]] = []
+        self.choke_records: list[tuple[tuple[int, int], tuple[int, int]]] = []
         self.fractals: list[Fractal] = []
         self.player_start: dict[int, int] = {}
         self.unspecified: list[str] = []
@@ -585,13 +587,13 @@ class World:
         """TerrainBuilder.AnalyzeChokepoints: the chokepoints over the water
         and impassable plots (`chokepoints.analyze`, reading the areas as
         the last AreaBuilder.Recalculate left them) and the regions Region_
-        Builder floods between them (`regions.build_regions`)"""
+        Builder floods between them (`regions.build_regions`), over the
+        chokepoint records of every call before it, kept on the world"""
         water = [self.is_water(i) for i in range(self.N)]
         imp = [self.is_impassable(i) for i in range(self.N)]
         obstacle = [w or m for w, m in zip(water, imp)]
-        res = chokepoints.analyze(self.W, self.H, self.wrap_x, obstacle, self.area_of)
-        ends = [((c[0], c[1]), (c[2], c[3])) for c in res["chokes"]]
-        reg = regions.build_regions(self.W, self.H, water, imp, ends, self.neighbours)
+        res = chokepoints.analyze(self.W, self.H, self.wrap_x, obstacle, self.area_of, self.choke_records)
+        reg = regions.build_regions(self.W, self.H, water, imp, self.choke_records, res["lines"], self.neighbours)
         self.region = reg["region"]
         self.region_sizes = reg["sizes"]
         self.chokepoints = reg["chokepoints"]

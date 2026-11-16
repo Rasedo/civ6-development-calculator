@@ -168,6 +168,13 @@ def cube_round(q: float, r: float, s: float) -> tuple[float, float, float]:
 def hex_line(e0: tuple[int, int], e1: tuple[int, int]) -> list[tuple[int, int]]:
     """0x371d0: the plots between two ends (offset coordinates), the ends
     left out, each once, in walk order from the lesser end in axial order"""
+    return [p for p in hex_walk(e0, e1) if p != tuple(e0) and p != tuple(e1)]
+
+
+def hex_walk(e0: tuple[int, int], e1: tuple[int, int]) -> list[tuple[int, int]]:
+    """the float walk of 0x371d0 and 0x87cff0 from the lesser end in axial
+    order to the other: the plot each step rounds to (cube rounding 0x38070,
+    offset coordinates, unwrapped), each once, the far end the last"""
     a0, a1 = to_axial(*e0), to_axial(*e1)
     if a0 > a1:
         a0, a1 = a1, a0
@@ -185,9 +192,8 @@ def hex_line(e0: tuple[int, int], e1: tuple[int, int]) -> list[tuple[int, int]]:
         yy = int(cr)
         xx = int(cq) + _half(yy)
         p = (xx, yy)
-        if p == tuple(e0) or p == tuple(e1) or p in out:
-            continue
-        out.append(p)
+        if p not in out:
+            out.append(p)
     return out
 
 
@@ -990,13 +996,20 @@ def choke_points(pts, r: Region, cells: list[Cell]) -> list[tuple[tuple[int, int
     return out
 
 
-def chokepoint_records(chokes, W: int, wrap: bool, area) -> list[tuple[tuple[int, int], tuple[int, int]]]:
-    """0x87cff0: each end pair (offset plots) whose line's plots between
-    the ends all lie in one area, once per ordered pair"""
-    out = []
+def chokepoint_records(chokes, W: int, wrap: bool, area, records: list) -> list[tuple[int, int]]:
+    """0x87cff0 over each end pair: the pair (offset plots) joins `records`
+    (the analysis' +0x68, which no analysis clears: a second
+    AnalyzeChokepoints adds to the first's) where its line's plots between
+    the ends all lie in one area and no record holds it; every pair's walk,
+    its far end among it, joins the line list (+0x48, cleared as each
+    analysis opens), returned"""
+    lines: list[tuple[int, int]] = []
     for A, B in chokes:
         a = (A[0] + _half(A[1]), A[1])
         b = (B[0] + _half(B[1]), B[1])
+        for p in hex_walk(a, b):
+            if p not in lines:
+                lines.append(p)
         first = None
         same = True
         for x, y in hex_line(a, b):
@@ -1006,15 +1019,16 @@ def chokepoint_records(chokes, W: int, wrap: bool, area) -> list[tuple[tuple[int
                 first = k
             elif k != first:
                 same = False
-        if same and (a, b) not in out:
-            out.append((a, b))
-    return out
+        if same and (a, b) not in records:
+            records.append((a, b))
+    return lines
 
 
-def analyze(W: int, H: int, wrap: bool, obstacle, area, stages: bool = False) -> dict:
-    """AnalyzeChokepoints' analysis (0x86c030): the chokepoints, each its two
-    end plots (offset coordinates)"""
-    out: dict = {"stages": {}, "chokes": []}
+def analyze(W: int, H: int, wrap: bool, obstacle, area, records: list, stages: bool = False) -> dict:
+    """AnalyzeChokepoints' analysis (0x86c030) over the analysis' records of
+    the analyses before it (`records`, added to): the line list of this
+    analysis' end pairs (`lines`, offset plots)"""
+    out: dict = {"stages": {}, "lines": []}
     pts = obstacle_points(W, H, obstacle)
     r = triangulate(pts)
     if r is None:
@@ -1042,6 +1056,5 @@ def analyze(W: int, H: int, wrap: bool, obstacle, area, stages: bool = False) ->
     while merge_step(cells):
         pass
     snap("merged")
-    recs = chokepoint_records(choke_points(pts, r, cells), W, wrap, area)
-    out["chokes"] = [[a[0], a[1], b[0], b[1]] for a, b in recs]
+    out["lines"] = chokepoint_records(choke_points(pts, r, cells), W, wrap, area, records)
     return out

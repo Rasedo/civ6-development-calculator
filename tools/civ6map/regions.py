@@ -3,14 +3,21 @@ leaves them: the chokepoints (`chokepoints.py`) and Region_Builder's flood
 over them (XP2/Common/MapGen/Region_Builder.cpp, 0x887810), read from the
 install's DLL (tools/civ6lab/dll_readings.md, "The map's regions").
 
+The chokepoints are the analysis' records: every analysis' end pairs, a
+second AnalyzeChokepoints adding its new pairs after the first's (the
+records vector, analysis +0x68, is never cleared), each one's line its own
+(0x371d0). The line list is the last analysis' alone (+0x48, cleared as
+0x86c030 opens): the plots every end pair's walk rounds to, its far end
+among them, its records kept or not (0x87cff0).
+
 Region_Builder walks the plots in index order; a passable land plot (not
 impassable, not water) of no region seeds a new one, and a flood from it
 takes every plot its step test (0x887aa0) admits. The flood does not wrap:
 Region_Builder clears its path finder's wrap flags for it (+0xe4 / +0xe5,
 0x8878d0..0x8878e0), so a region never crosses the map's x edge. A step
 goes onto passable land of no region of the flood's own; a step between two plots of which
-neither lies on a chokepoint's line is free; otherwise each chokepoint whose
-line holds either plot is tested in order:
+neither lies in the line list is free; otherwise each chokepoint, in record
+order, whose line holds a plot of the step in the line list is tested:
 - both plots on its line: a step not meeting the line's segment is free;
   one that meets it is refused when either plot lies off the line;
 - one plot on its line: a step meeting the segment is refused unless the
@@ -38,14 +45,16 @@ class Chokepoint:
 
 
 def build_regions(W: int, H: int, water: list[bool], impassable: list[bool],
-                  chokes: list[tuple[tuple[int, int], tuple[int, int]]], neighbours) -> dict:
+                  chokes: list[tuple[tuple[int, int], tuple[int, int]]], lines: list[tuple[int, int]],
+                  neighbours) -> dict:
     """Region_Builder (0x887810): per plot its region (-1 for none), per
     region its plot count. `neighbours(i)` lists a plot's
     neighbours, of which the flood takes those it reaches without crossing
-    the map's x edge; `chokes` the analysis' (end, end) pairs in its order."""
+    the map's x edge; `chokes` the analysis' records, (end, end) pairs in
+    its order, `lines` its line list (builder +0x68)."""
     N = W * H
     cps = [Chokepoint(a, b) for a, b in chokes]
-    on_line = set().union(*(c.plots for c in cps)) if cps else set()
+    on_line = set(lines)
     region = [-1] * N
     sizes: list[int] = []
     land = [not water[i] and not impassable[i] for i in range(N)]

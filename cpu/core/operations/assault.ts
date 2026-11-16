@@ -28,9 +28,13 @@ const flag = (node: Parameters<BtHandler<OpsContext>['update']>[0], name: string
 // THE TEAM UPDATE (0x738f20, from 0x73f7d0): the members' centre, the march
 // point and, with enemy targets in reach, the battle line
 
-/** the tactical targets a team's members weigh (the unit targets CIVILIAN
- *  to HIGH, the enemy's districts) */
-const WEIGHED = new Set(['CIVILIAN', 'LOW', 'MEDIUM', 'HIGH', 'COMBAT_DISTRICT', 'PASSIVE_DISTRICT']);
+/** the tactical targets a team's members weigh: the target types from
+ *  CIVILIAN_UNIT to HIGH_PRIORITY_UNIT (0x739150..0x739161), the religious
+ *  unit and the Trader among them, and the enemy's districts (runs/
+ *  h1_duels1144 t143: city-state 2's City Defense Musketman 1572870 on its
+ *  centre 12:13, a religious unit on 11:13 its one target, the team's attack
+ *  55 against 0: no Fortify) */
+const WEIGHED = new Set(['CIVILIAN', 'RELIGIOUS', 'TRADER', 'LOW', 'MEDIUM', 'HIGH', 'COMBAT_DISTRICT', 'PASSIVE_DISTRICT']);
 
 /** floor(y / 2), as the plots' offset rows turn into axial columns */
 const half = (y: number): number => Math.floor(y / 2);

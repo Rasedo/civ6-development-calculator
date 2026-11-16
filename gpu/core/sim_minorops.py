@@ -1159,8 +1159,8 @@ class SimMinorOps:
         g[:, G_MARCH] = torch.where(go, torch.where(peace & either, g[:, G_RALLY], g[:, G_TARGET]), g[:, G_MARCH])
         # the list's weighed entries: a plot's district entry (COMBAT or
         # PASSIVE) and each of its unit entries one, a Trader's and a
-        # religious unit's none
-        wk = (tg["uk"] > 0) & (tg["uk"] != 6) & (tg["uk"] != 8)
+        # religious unit's among them (CIVILIAN_UNIT to HIGH_PRIORITY_UNIT)
+        wk = tg["uk"] > 0
         ent = (tg["dk"] & 1) + ((tg["dk"] >> 1) & 1) + wk.view(B, -1, T).sum(dim=1)     # [B, T]
         reach = 2 * u["base_moves"]
         near = torch.zeros(B, T, dtype=torch.bool, device=dev)
