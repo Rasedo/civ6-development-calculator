@@ -180,6 +180,7 @@
     - recording: h1_duels1171
       turn: 33
       value: city-state 2's one Mine reaches The Wheel's NumItems 1 and Iron Working's at the reveal's event (Iron Working boosted at t33)
+  impl: [cpu/core/boosts.ts:boostOnImprovement]
   readings:
     - "C-98: the improvement boosts fire on one plot's event — READ (0x1644e0, 0x4be470), not ported; a project's converted yield floors; a pillaged regional building pays no city; the majors' Railroads land before the minors — both twins"
   review: reviewed

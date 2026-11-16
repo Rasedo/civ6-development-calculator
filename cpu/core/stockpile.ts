@@ -7,6 +7,7 @@
  * The index space is `STRATEGIC_IDS`; a seat's `stockpile` is dense over it.
  */
 import { logStockWrite } from './difflog';
+import { boostOnReveal } from './boosts';
 import { STRATEGIC_IDS, STRATEGIC_PER_TURN, STOCKPILE_CAP_BASE, STOCKPILE_CAP_PER_ENCAMPMENT_BUILDING, UNIT_RESOURCE_COST, FUEL_SHORT_CS, RAILROAD_COST, emptyStockpile,
   PURCHASE_DIVISOR, UPGRADE_BASE_COST, UPGRADE_MINIMUM_COST, UPGRADE_MINIMUM_COST_LEVY, UPGRADE_NET_PRODUCTION_PERCENT_COST, scaleByGameSpeed } from '../data/constants';
 import { UNITS, civUpgradeTarget, formationCost } from '../data/units';
@@ -265,6 +266,8 @@ export function revealPass(state: GameState, seat: number, resource: string): vo
   }
   rebuildLuxuries(state, seat);
   if (suz >= 0) rebuildLuxuries(state, suz);
+  // the pass's signal for each plot: the revealed resource's boost
+  boostOnReveal(state, seat, resource);
 }
 
 /** The ownership pass of each resource the technology `tech` reveals, on the

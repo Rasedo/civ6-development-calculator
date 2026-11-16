@@ -1579,11 +1579,8 @@ export function killUnit(state: GameState, unit: Unit): void {
   if ((UNITS[unit.type]?.airSlots ?? 0) > 0) displaceAirFrom(state, unit.tileIndex, false);
   markAntiquitySite(state, unit.tileIndex, unitSeat(unit)); // a death leaves a dig
   markShipwreck(state, unit.tileIndex, unitSeat(unit)); // ...at sea, a wreck
-  // a combat's dead leaves its owner's unit list at once, not at its end of
-  // turn (`minorListedUnits`; runs/h1_duely1124 city-state 4's Warrior the
-  // barbarians killed in t54, Iron Working 124.7 at t55 as logged)
-  const cs = state.cityStates.find((c) => c.seat === unit.seat);
-  if (cs?.unitsListed) delete cs.unitsListed[unit.id];
+  // a combat's kill is the delayed kill: the dead stays on its owner's unit
+  // list to the game turn's end (`minorsEndTurn`)
   disbandUnit(state, unit.id);
 }
 

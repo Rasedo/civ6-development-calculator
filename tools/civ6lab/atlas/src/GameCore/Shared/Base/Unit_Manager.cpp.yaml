@@ -13,6 +13,7 @@
   readings:
     - "C-129: the upgrade is a new unit, its old self dying in its pool slot to the turn's end — READ (0xa49cb0, 0x9402a0, 0x4ef040, 0x4ef6d0), both twins"
     - "C-98 / C-130 / C-96: a levied unit home with no plot dies on its minor's list; the unit term's upgrade Gold is the minor's; the pick refuses a held building under its pillaged district — READ (0x93fa10 at 0x93ff0b, 0x7cb8b0, 0x4cb350, 0x7f2970 at 0x7f3bd1), LAB (the placement's embark state, the unit term's Gold on the records), both twins"
+    - "C-98: the improvement boosts' signals; a combat's dead on its owner's list to the game turn's end — READ (0x162010 at 0x163207..0x16330c and 0x16356a..0x163617, 0x164990, 0x362ec0, 0x362b30, 0xa13270, 0x7ecc0 from 0x631e0, 0x20e720 at 0x20f3c1, 0x212c30 at 0x213000), both twins"
   notes:
     - the head's plot walk (vt +0x58 over the plot and its ring) unread; reached from the destroy's thunk 0x941130 (vt +0x68) by its signature, not by a vtable read
   review: reviewed

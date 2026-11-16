@@ -21,6 +21,8 @@ class SimStep:
         # checks; the game era steps before the starts.
         if self.units_mode:
             self._barbarian_phase()
+        # the game turn's end: every player's unit list drops its dead
+        self._minors_end_turn()
         # the World Congress's Regular Session closing the turn the players
         # acted in (`worldCongress`: its draws the turn's last)
         self._world_congress()

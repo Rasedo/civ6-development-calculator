@@ -1095,6 +1095,7 @@ class SimOrders:
                         if row < self.n_majors:
                             self._moment_disaster_improvement(row, _r, hc[_r])
                         self._extraction_changed(_ok, hc)
+                        self._boost_on_improvement(row, _ok, hc, True)
                 # CIV6 (Mountain Tunnel, Qhapaq Ñan, Ski Resort): "Can only be built on an
                 # adjacent Mountain tile" — the rows whose target is not the
                 # builder's own tile, so each gets its own write. The pick is
@@ -1132,6 +1133,7 @@ class SimOrders:
                         laid_at[_r] = _tt[_r]
                         if row < self.n_majors:
                             self._moment_disaster_improvement(row, _r, _tt[_r])
+                        self._boost_on_improvement(row, _twin, _tt, True)
                 # CIV6 (Mana): "Culture Bomb adjacent tiles" on the named
                 # improvement — the same claim a district's bomb makes
                 # (`CULTURE_BOMB_ROWS`)
@@ -1202,6 +1204,7 @@ class SimOrders:
                     _fixed[_r[_imp]] = True
                     self._extraction_changed(_fixed, hc)
                     self.unit_mp[_r, sc[_r]] = 0
+                    self._boost_on_improvement(row, _fixed, hc, False)
                     self._eff_version += 1
                 # REMOVE_IMPROVEMENT — CIV6 (Builder / Military Engineer):
                 # "Can Remove Tile Improvements (costs no charge)". GONE, not

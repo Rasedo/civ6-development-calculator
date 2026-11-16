@@ -18,7 +18,10 @@
   kind: function
   semantics: "the game's turn end: raises the two turn-ended flags (@f28d40, @f28d41) that make the next Update call BeginTurn 0x626a0, the players' EndTurn 0x7ecc0, the turn-ended log line and signal, then tail-jumps to Autoplay's turn end 0x561a0."
   status: PARTLY
-  readings: ["H-1: Autoplay's turn limit and the seat's hold — READ"]
+  impl: [cpu/core/minorBuild.ts:minorsEndTurn]
+  readings:
+    - "H-1: Autoplay's turn limit and the seat's hold — READ"
+    - "C-98: the improvement boosts' signals; a combat's dead on its owner's list to the game turn's end — READ (0x162010 at 0x163207..0x16330c and 0x16356a..0x163617, 0x164990, 0x362ec0, 0x362b30, 0xa13270, 0x7ecc0 from 0x631e0, 0x20e720 at 0x20f3c1, 0x212c30 at 0x213000), both twins"
   review: reviewed
 - addr: 0x64ae0
   final: 0x4afc0
@@ -28,6 +31,7 @@
   readings:
     - "H-1: why a seed does not replay — the AI's worker threads — READ, the replay patch MEASURED"
     - "H-1: Autoplay's turn limit and the seat's hold — READ"
+    - "C-98: the improvement boosts' signals; a combat's dead on its owner's list to the game turn's end — READ (0x162010 at 0x163207..0x16330c and 0x16356a..0x163617, 0x164990, 0x362ec0, 0x362b30, 0xa13270, 0x7ecc0 from 0x631e0, 0x20e720 at 0x20f3c1, 0x212c30 at 0x213000), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...g +0x3afc), wait 0x6e3020 (EXP_JobManager_Wait), called from Game::Processor::Update at 0x6540f (asserting `!GetGlobalAi().IsProcessingAi()`). The JobManager lives in the engine (Pl..."

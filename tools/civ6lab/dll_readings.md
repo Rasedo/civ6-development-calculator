@@ -19571,3 +19571,67 @@ gpu/core/sim_minors.py, and `_free_knowledge`, gpu/core/sim_minorai.py).
   city-state 4's Trader 393218 plans from 32:5 in the game, ours from 32:6);
   the rebuild at a war declared inside the turn; two Traders on one plot
   enter the list in another order (1117 t79, 32:11).
+
+## C-98: the improvement boosts' signals; a combat's dead on its owner's list to the game turn's end — READ (0x162010 at 0x163207..0x16330c and 0x16356a..0x163617, 0x164990, 0x362ec0, 0x362b30, 0xa13270, 0x7ecc0 from 0x631e0, 0x20e720 at 0x20f3c1, 0x212c30 at 0x213000), both twins
+
+`boostOnImprovement` / `boostOnReveal` (cpu/core/boosts.ts) from the
+Builders' lays and repairs (`minorBuilderLays`, the seat's unit orders in
+cpu/core/phase.ts, the minor's repair in cpu/core/minorCityAi.ts), the plot
+purchase (`buyTile`) and the reveal's pass (`revealPass`); GPU
+`_boost_on_improvement` / `_boost_on_reveal` (gpu/core/sim_masks.py) from
+`_apply_seat_unit_actions`, the minor's Builder (gpu/core/sim_minorai.py),
+the plot purchase and `_reveal_pass` (gpu/core/sim_seats.py). `minorsEndTurn`
+(cpu/core/minorBuild.ts) from `endTurn`; GPU `_minors_end_turn`
+(gpu/core/sim_minors.py) from the step; `killUnit` and `_dig_at` leave the
+list alone.
+
+- THE IMPROVEMENT BOOSTS' SIGNALS: the Boost_Manager's registration 0x162010
+  binds each Boosts row by its class (the jump table at 0x164088).
+  BOOST_TRIGGER_HAVE_X_IMPROVEMENTS (0x15, the case at 0x163207) binds three
+  game signals to the handler 0x1644e0: +0x7f8 ImprovementCreated (the plot
+  and the improvement, thunk 0x167d10; raised by the plot's improvement
+  setter 0x362ec0 at 0x363036 for any improvement laid), +0x10e0 a city's
+  plot purchase (thunk 0x167580 with the plot's own improvement +0x44;
+  raised by the purchase 0xa13270 at 0xa135ba and by 0x977aa0 at 0x977f38
+  after the annex), and +0x828 an improvement repaired (thunk 0x167d10;
+  raised by 0x362b30 as it clears the pillage bit, +0x810 as it sets it).
+  BOOST_TRIGGER_IMPROVE_SPECIFIC_RESOURCE (0xb, the case at 0x16356a) binds
+  +0x7f8 to 0x1644e0 and +0x12a8 to 0x164990 (thunk 0x167840): the signal
+  the reveal's ownership pass 0x4ae4e0 raises at 0x4ae704 for each revealed
+  plot holding the resource (the player, the resource, the plot).
+- 0x164990 (the specific row at a reveal): the row's class is 0xb, the plot's
+  owner is the revealing player, the row's resource is the revealed one, and
+  the plot's improvement is one of the resource row's own (+0xa8 .. +0xb0)
+  and not pillaged; the grant is 0x166bf0.
+- So a standing state never answers these two classes: a Mine laid on Iron
+  its owner does not see passes neither The Wheel (no resource seen at the
+  event) nor Iron Working, and the Iron's reveal passes Iron Working alone.
+- CONFIRMED: runs/h1_duels1171 city-state 2, its Mine on 8:22 before Bronze
+  Working: Game_Boosts logs Iron Working at t33 and never The Wheel; The
+  Wheel 289.3 / 318.4 / 258.5 at t33-35 as logged, every research row of
+  t33-41 as logged. City-state 3's Pasture lands Horseback Riding at t32
+  (Game_Boosts "Completed"), its third Mine Apprenticeship at t65,
+  city-state 2's Lumber Mill Mass Production at t78, each at the event.
+- THE GAME TURN'S END ON THE UNIT LISTS: Player::Processor::EndTurn 0x7ecc0
+  walks every player (0..0x40) and calls each one's units' end of turn
+  (0x4e44e0 -> 0x4ef6d0, the destroy of the flagged dead); its one caller is
+  the game's end of turn 0x631e0 (Game_Processor.cpp, from
+  Game::Processor::Update at 0x653ec), after every player's turn. A
+  player's own deactivation (0x7eb60, from Update at 0x64d0f) destroys
+  nothing.
+- A COMBAT'S KILL IS THE DELAYED KILL: every kill of the combat manager calls
+  the units manager's kill (vt +0x60 -> 0x9402a0) with the flag 1 — the
+  attacker's death 0x20e720 at 0x20f3c1, the defender's 0x212c30 at
+  0x213000, the capture's 0x20a400 at 0x20a642, 0x212500 at 0x212879 and
+  0x212bf0 — so 0x9402a0 takes the delayed kill 0x4ef040 and the dead stays
+  on its owner's list (the counts' walk 0x4f2c90 reads no dead flag) until
+  the game turn's end.
+- CONFIRMED: runs/h1_duels1145 city-state 4: player 1's Archer 720896 kills
+  its Warrior 327681 in player 1's t37, before its own turn: Iron Working
+  99.7 at its t37 as logged (79.7 without the Warrior's upgrade source),
+  none of it at t38; its Warrior 196610 alike at t39. runs/h1_duels1124
+  city-state 4's Warrior the barbarians kill in t54, after its turn: gone
+  at the turn's end, Iron Working 124.7 at t55.
+- Open (C-98): BOOST_TRIGGER_NUM_IMPROVED_TILES and
+  BOOST_TRIGGER_HAVE_UNIT_AND_IMPROVEMENT are read off the standing state
+  (`stateTrigger`), their functors unread.

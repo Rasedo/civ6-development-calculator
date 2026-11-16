@@ -3229,6 +3229,8 @@ class SimSeats:
                     self._eff_version += 1
                     # and re-places every citizen (0x1a8b70 -> 0x196320)
                     self._place_citizens(row, jt, ok_t, None, full=True, fav_food=self.city_fav_food[bidx, row, jt])
+                    # the purchase's signal answers the bought plot's own improvement
+                    self._boost_on_improvement(row, ok_t, tt, False)
                     bought = bought | ok_t
         # THE MISSILE SILO'S LAUNCH. The silo is an improvement, so the order
         # is the SEAT's; both engines re-validate the named (device, tile) pair.
@@ -11121,6 +11123,8 @@ class SimSeats:
         self._rebuild_luxuries(row, pay)
         for g in held:
             self._rebuild_luxuries(g, pay & (suz == g))
+        # the pass's signal for each plot: the revealed resource's boost
+        self._boost_on_reveal(row, pay, int(rid))
 
     def _tech_revealed(self, row: int, tech: torch.Tensor, hit: torch.Tensor) -> None:
         """`techRevealed`: the ownership pass of each resource the technology

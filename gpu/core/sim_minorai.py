@@ -3073,6 +3073,7 @@ class _MinorWorld:
                 sim.unit_mp[rr, uid[rr]] = 0
                 sim._eff_version += 1
                 sim._gen_ver += 1
+                sim._boost_on_improvement(sim._CITY_MINOR0 + self.s, fix, pc, False)
             lay = here & (imp >= 0) & (k >= 0) & ~fix
             spent = lay & (ch <= 1)
             if bool(spent.count_nonzero()):
@@ -3083,6 +3084,7 @@ class _MinorWorld:
                 sim.improvement[rr, tt] = k[rr]
                 sim.pillaged[rr, tt] = False
                 sim._eff_version += 1
+                sim._boost_on_improvement(sim._CITY_MINOR0 + self.s, lay, pc, True)
                 sim._spend_build_charge(rr, uid, ut)
                 sim._gen_ver += 1
                 # an improvement laid re-places the citizens of the city it

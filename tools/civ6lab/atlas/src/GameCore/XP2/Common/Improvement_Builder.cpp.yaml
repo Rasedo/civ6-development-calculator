@@ -125,8 +125,10 @@
   final: 0x25cfa0
   kind: function
   status: PARTLY
+  impl: [cpu/core/boosts.ts:boostOnImprovement]
   readings:
     - "C-111: a captured city keeps its completed districts' locked prices and no progress by type; a district's repair is its city's queue; a unit's pillage takes the district's dearest building first — READ (0x1e8880, 0x173f70 at 0x17480e, 0x967300 / 0x967740, 0x9633c0 -> 0x24af90 -> 0x193190), both twins"
+    - "C-98: the improvement boosts' signals; a combat's dead on its owner's list to the game turn's end — READ (0x162010 at 0x163207..0x16330c and 0x16356a..0x163617, 0x164990, 0x362ec0, 0x362b30, 0xa13270, 0x7ecc0 from 0x631e0, 0x20e720 at 0x20f3c1, 0x212c30 at 0x213000), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...THE PILLAGE (Unit_Operations_Pillage 0x9633c0): an improvement on the plot is pillaged (0x362b30); else the district's chooser 0x24af90 names the first of strictly greater Cost (+0x24)..."
@@ -140,10 +142,11 @@
     - recording: h1_duelw1124
       turn: 1
       value: "Case (runs/h1_duelw1124, planning rows   t1-60, inside the replay): of the 123 plots the game listed that the   barbarians had not revealed, every one lies beside a revealed plot and   none within two"
-  impl: [cpu/core/barbarians.ts:CAMP_SIGHT]
+  impl: [cpu/core/barbarians.ts:CAMP_SIGHT, cpu/core/boosts.ts:boostOnImprovement]
   readings:
     - "C-95: Explore Land and the barbarians' revealed plots — READ, ported (two tests below unread)"
     - "H-1: the barbarians' turn (0x1514a0) — READ (the max camps and the sight LAB)"
+    - "C-98: the improvement boosts' signals; a combat's dead on its owner's list to the game turn's end — READ (0x162010 at 0x163207..0x16330c and 0x16356a..0x163617, 0x164990, 0x362ec0, 0x362b30, 0xa13270, 0x7ecc0 from 0x631e0, 0x20e720 at 0x20f3c1, 0x212c30 at 0x213000), both twins"
   context:
     - "...one for the barbarians), an improvement's owner (0x84340 from the placement 0x363080 -> 0x362ec0: the plot and the six beside it, no line of sight), the scripted operations. A camp's..."
   review: reviewed

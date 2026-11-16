@@ -1284,9 +1284,20 @@
   status: PARTLY
   readings:
     - "C-98: the improvement boosts fire on one plot's event — READ (0x1644e0, 0x4be470), not ported; a project's converted yield floors; a pillaged regional building pays no city; the majors' Railroads land before the minors — both twins"
+    - "C-98: the improvement boosts' signals; a combat's dead on its owner's list to the game turn's end — READ (0x162010 at 0x163207..0x16330c and 0x16356a..0x163617, 0x164990, 0x362ec0, 0x362b30, 0xa13270, 0x7ecc0 from 0x631e0, 0x20e720 at 0x20f3c1, 0x212c30 at 0x213000), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "- THE IMPROVEMENT BOOSTS (0x1644e0, reached through the thunks 0x167d10 and 0x167580, the grant 0x166bf0): BOOST_TRIGGER_HAVE_X_IMPROVEMENTS and BOOST_TRIGGER_IMPROVE_SPECI..."
+  review: imported
+- addr: 0x167840
+  final: 0xef1a0
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-98: the improvement boosts' signals; a combat's dead on its owner's list to the game turn's end — READ (0x162010 at 0x163207..0x16330c and 0x16356a..0x163617, 0x164990, 0x362ec0, 0x362b30, 0xa13270, 0x7ecc0 from 0x631e0, 0x20e720 at 0x20f3c1, 0x212c30 at 0x213000), both twins"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...RCE (0xb, the case at 0x16356a) binds +0x7f8 to 0x1644e0 and +0x12a8 to 0x164990 (thunk 0x167840): the signal the reveal's ownership pass 0x4ae4e0 raises at 0x4ae704 for each revealed..."
   review: imported
 - addr: 0x167d10
   final: 0xef710
@@ -1294,6 +1305,7 @@
   status: PARTLY
   readings:
     - "C-98: the improvement boosts fire on one plot's event — READ (0x1644e0, 0x4be470), not ported; a project's converted yield floors; a pillaged regional building pays no city; the majors' Railroads land before the minors — both twins"
+    - "C-98: the improvement boosts' signals; a combat's dead on its owner's list to the game turn's end — READ (0x162010 at 0x163207..0x16330c and 0x16356a..0x163617, 0x164990, 0x362ec0, 0x362b30, 0xa13270, 0x7ecc0 from 0x631e0, 0x20e720 at 0x20f3c1, 0x212c30 at 0x213000), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "- THE IMPROVEMENT BOOSTS (0x1644e0, reached through the thunks 0x167d10 and 0x167580, the grant 0x166bf0): BOOST_TRIGGER_HAVE_X_IMPROVEMENTS and BOOST_TRIGGE..."
@@ -2905,7 +2917,10 @@
     - cpu/core/minorBuild.ts:minorEndTurnList
     - gpu/core/sim_minors.py:_minor_end_turn_list
     - cpu/core/types.ts:CityState
-  readings: ["C-98: a unit off the map counts on its owner's list until its end of turn"]
+    - cpu/core/minorBuild.ts:minorsEndTurn
+  readings:
+    - "C-98: a unit off the map counts on its owner's list until its end of turn"
+    - "C-98: the improvement boosts' signals; a combat's dead on its owner's list to the game turn's end — READ (0x162010 at 0x163207..0x16330c and 0x16356a..0x163617, 0x164990, 0x362ec0, 0x362b30, 0xa13270, 0x7ecc0 from 0x631e0, 0x20e720 at 0x20f3c1, 0x212c30 at 0x213000), both twins"
   context:
     - ...0, 0x4f32d0). The owner's end of turn (Player::Processor::EndTurn 0x7ecc0 at 0x7ede9 -> 0x4e44e0 -> 0x4ef6d0) gathers the flagged units over the list and destroys each.
   review: reviewed
@@ -9330,8 +9345,10 @@
     - recording: 1108
       turn: 159
       value: "A purchase made after the turn's culture step so leaves the city with no stored plot until its next culture turn (the records' -1 after an AI's purchase: 1108 Chengdu t159–162);"
-  impl: [cpu/core/game.ts:buyTile]
-  readings: ["H-1: the annex, the purchase and the stored next plot — READ"]
+  impl: [cpu/core/game.ts:buyTile, cpu/core/boosts.ts:boostOnImprovement]
+  readings:
+    - "H-1: the annex, the purchase and the stored next plot — READ"
+    - "C-98: the improvement boosts' signals; a combat's dead on its owner's list to the game turn's end — READ (0x162010 at 0x163207..0x16330c and 0x16356a..0x163617, 0x164990, 0x362ec0, 0x362b30, 0xa13270, 0x7ecc0 from 0x631e0, 0x20e720 at 0x20f3c1, 0x212c30 at 0x213000), both twins"
   context:
     - "...e culture bombs (0x524e30), the Trader's tiles en route (0x558510) and the Gold purchase (0x977aa0: the price spent through 0x4e02e0, then the annex). A purchase made after the turn's cult..."
     - ...1a8a30, the swap 0x1ac910, culture bombs 0x524e30, the Trader 0x558510, the Gold purchase 0x977aa0 (price via 0x4e02e0). A purchase after the culture step leaves no stored plot (1108 Cheng...
@@ -9633,8 +9650,10 @@
   final: 0x71c3b0
   kind: function
   status: PARTLY
+  impl: [cpu/core/boosts.ts:boostOnImprovement]
   readings:
     - "C-99 / C-134: a city's new unit on its district, a centre's sea at its claim — READ (0x1e6570 at 0x1e66f9..0x1e6938, 0x24b370, 0x1ad720, 0x1aeff0, 0x66a90), both twins"
+    - "C-98: the improvement boosts' signals; a combat's dead on its owner's list to the game turn's end — READ (0x162010 at 0x163207..0x16330c and 0x16356a..0x163617, 0x164990, 0x362ec0, 0x362b30, 0xa13270, 0x7ecc0 from 0x631e0, 0x20e720 at 0x20f3c1, 0x212c30 at 0x213000), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...W UNIT'S PLOT (the city's create 0x1e6570, a trained unit and a bought one, 0xa540c0 -> 0xa13270): the centre; a unit with Combat (Units +0x48 above 0) not a Spy (+0x1ba bit 2) takes i..."

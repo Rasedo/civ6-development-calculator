@@ -75,6 +75,7 @@ import { BARB_SEAT, FREE_SEAT, campTiles, civOf, freeSeatOf, hiddenResourcesFor,
 import { cityAppealResolver } from './governors';
 import { adjacentPlotTargetOk, canPlaceDistrictIn, canRemoveFeature, suzerainNames, validImprovementsIn } from './rules';
 import { borderCandidates, computeCityStats, extractionChanged, seenResourceAt } from './city';
+import { boostOnImprovement } from './boosts';
 import { goldAffordable, tilePurchaseCost } from './game';
 import { computeUnlocksIn, makeYieldCtx } from './effects';
 import { eruptionHazardTurns, floodHazardTurns } from './disasters';
@@ -847,6 +848,7 @@ function minorTreeWorld(state: GameState, cs: CityState, ai: CityAi, city: CityT
           tile.pillaged = false;
           unit.movesLeft = 0;
           extractionChanged(state, tile);
+          boostOnImprovement(state, tile, false);
           return;
         }
         if ((unit.charges ?? 0) <= 1) spent.add(u);

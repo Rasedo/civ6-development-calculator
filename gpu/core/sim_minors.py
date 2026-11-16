@@ -165,6 +165,13 @@ class SimMinors:
             self._minor_end_turn_list(s, alive)
             self._research_unit_turns(s, alive)
 
+    def _minors_end_turn(self) -> None:
+        """`minorsEndTurn`: THE GAME TURN'S END on the players' unit lists
+        (Player::Processor::EndTurn 0x7ecc0 over every player -> 0x4ef6d0),
+        after the barbarians' turn — each city-state's list drops its dead"""
+        for s in range(self.S):
+            self._minor_end_turn_list(s, self.citystate_alive[:, s])
+
     def _minor_end_turn_list(self, s: int, alive: torch.Tensor) -> None:
         """`minorEndTurnList`: city-state `s`'s unit list as its end of turn
         leaves it, the units standing now (the delayed kill's dead erased) —

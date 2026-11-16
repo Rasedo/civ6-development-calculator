@@ -14,6 +14,17 @@
   context:
     - "...bBoostTriggered, finds the item's Boosts row (0x3990d0) and, in the 24.8 fixed point: B = 0x161d60 = floor(Boost x cost / 100) (the row's +0x18 times the item's cost 0x29a010 / 0x353a70, s..."
   review: reviewed
+- addr: 0x162010
+  final: 0xeb820
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-98: the improvement boosts' signals; a combat's dead on its owner's list to the game turn's end — READ (0x162010 at 0x163207..0x16330c and 0x16356a..0x163617, 0x164990, 0x362ec0, 0x362b30, 0xa13270, 0x7ecc0 from 0x631e0, 0x20e720 at 0x20f3c1, 0x212c30 at 0x213000), both twins"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...ement boosts' signals; a combat's dead on its owner's list to the game turn's end — READ (0x162010 at 0x163207..0x16330c and 0x16356a..0x163617, 0x164990, 0x362ec0, 0x362b30, 0xa13270, 0x7..."
+    - "- THE IMPROVEMENT BOOSTS' SIGNALS: the Boost_Manager's registration 0x162010 binds each Boosts row by its class (the jump table at 0x164088). BOOST_TRIGGER_HAVE_X..."
+  review: imported
 - addr: 0x1644e0
   final: 0xedc70
   kind: function
@@ -24,14 +35,35 @@
     - recording: h1_duels1171
       turn: 33
       value: city-state 2's Bronze Working lands with its Mine standing on the Iron it reveals; Game_Boosts logs TECH_IRON_WORKING at t33 and never TECH_THE_WHEEL (researched unboosted by t42, AI_Research 289.3 at 3 turns at t33)
+  impl: [cpu/core/boosts.ts:boostOnImprovement, gpu/core/sim_masks.py:_boost_on_improvement]
   readings:
     - "C-98: the improvement boosts fire on one plot's event — READ (0x1644e0, 0x4be470), not ported; a project's converted yield floors; a pillaged regional building pays no city; the majors' Railroads land before the minors — both twins"
+    - "C-98: the improvement boosts' signals; a combat's dead on its owner's list to the game turn's end — READ (0x162010 at 0x163207..0x16330c and 0x16356a..0x163617, 0x164990, 0x362ec0, 0x362b30, 0xa13270, 0x7ecc0 from 0x631e0, 0x20e720 at 0x20f3c1, 0x212c30 at 0x213000), both twins"
   review: reviewed
+- addr: 0x164990
+  kind: function
+  name: Boost_Manager specific resource at a reveal
+  semantics: "(manager, player, resource, plot, Boosts row): the handler of BOOST_TRIGGER_IMPROVE_SPECIFIC_RESOURCE (class +0x1c 0xb) on the game signal +0x12a8 the reveal's ownership pass 0x4ae4e0 raises for each revealed plot holding the resource (thunk 0x167840). The grant 0x166bf0 where the plot's owner (+0x1c) is the player (+0x128), the row's resource (+0x158 -> +0x14) is the revealed one and the plot's improvement (+0x44) is one of the resource row's own (+0xa8 .. +0xb0, each -> +0x30 -> +0x14) and not pillaged (+0x4d bit 0)."
+  status: READ
+  cases:
+    - recording: h1_duels1171
+      turn: 33
+      value: city-state 2's Bronze Working shows the Iron under its Mine on 8:22; Game_Boosts logs TECH_IRON_WORKING at t33, the engines' Iron Working boosted there and every research row of t33-41 as logged
+  impl: [cpu/core/boosts.ts:boostOnReveal, gpu/core/sim_masks.py:_boost_on_reveal]
+  readings:
+    - "C-98: the improvement boosts' signals; a combat's dead on its owner's list to the game turn's end — READ (0x162010 at 0x163207..0x16330c and 0x16356a..0x163617, 0x164990, 0x362ec0, 0x362b30, 0xa13270, 0x7ecc0 from 0x631e0, 0x20e720 at 0x20f3c1, 0x212c30 at 0x213000), both twins"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...ist to the game turn's end — READ (0x162010 at 0x163207..0x16330c and 0x16356a..0x163617, 0x164990, 0x362ec0, 0x362b30, 0xa13270, 0x7ecc0 from 0x631e0, 0x20e720 at 0x20f3c1, 0x212c30 at 0x..."
+    - "...E_SPECIFIC_RESOURCE (0xb, the case at 0x16356a) binds +0x7f8 to 0x1644e0 and +0x12a8 to 0x164990 (thunk 0x167840): the signal the reveal's ownership pass 0x4ae4e0 raises at 0x4ae704 fo..."
+    - "- 0x164990 (the specific row at a reveal): the row's class is 0xb, the plot's owner is the reveali..."
+  review: imported
 - addr: 0x166bf0
   kind: function
   status: PARTLY
   readings:
     - "C-98: the improvement boosts fire on one plot's event — READ (0x1644e0, 0x4be470), not ported; a project's converted yield floors; a pillaged regional building pays no city; the majors' Railroads land before the minors — both twins"
+    - "C-98: the improvement boosts' signals; a combat's dead on its owner's list to the game turn's end — READ (0x162010 at 0x163207..0x16330c and 0x16356a..0x163617, 0x164990, 0x362ec0, 0x362b30, 0xa13270, 0x7ecc0 from 0x631e0, 0x20e720 at 0x20f3c1, 0x212c30 at 0x213000), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...PROVEMENT BOOSTS (0x1644e0, reached through the thunks 0x167d10 and 0x167580, the grant 0x166bf0): BOOST_TRIGGER_HAVE_X_IMPROVEMENTS and BOOST_TRIGGER_IMPROVE_SPECIFIC_RESOURCE are ans..."

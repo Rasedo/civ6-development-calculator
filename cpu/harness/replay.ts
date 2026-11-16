@@ -56,7 +56,7 @@ import { computeCityStats, extractionChanged } from '../core/city';
 import { getModifiers } from '../core/effects';
 import { researchUnitTurns, type ResearchEntry } from '../core/aiResearch';
 import type { CivicEntry } from '../core/aiCivics';
-import { detectBoosts, grantBoost, markBoost } from '../core/boosts';
+import { boostOnImprovement, detectBoosts, grantBoost, markBoost } from '../core/boosts';
 import { improvementMoment, recordMoments, upgradeMoments } from '../core/moments';
 import { applyGovernorActions, governorsOf } from '../core/governors';
 import { GOVERNOR_PROMOTIONS, GOV_APPOINT, GOV_ASSIGN_CITY, GOV_ASSIGN_MINOR, GOV_PROMOTE, promotionBit } from '../data/governors';
@@ -2917,6 +2917,7 @@ function minorLaysAfter(ctx: Ctx, lays: readonly { u: Unit; plot: number; imp: s
       t.improvement = imp;
       t.pillaged = false;
       extractionChanged(state, t);
+      boostOnImprovement(state, t, true);
       replaceOwnerCitizens(state, t);
     }
     count(ctx, 'minorAi:improve', 'applied', d.player);
@@ -2928,6 +2929,7 @@ function minorLaysAfter(ctx: Ctx, lays: readonly { u: Unit; plot: number; imp: s
     t.improvement = want;
     t.pillaged = false;
     extractionChanged(state, t);
+    if (want) boostOnImprovement(state, t, true);
     replaceOwnerCitizens(state, t);
     count(ctx, 'minorAi:improve', 'fallback', d.player, `plot ${d.plot}: the engine laid none of ${want}`);
   }
@@ -4496,8 +4498,10 @@ const res = buyTile(state, city.id, d.plot, seat);        if (!res.ok) setTileOw
         // moment where the engine's verb did not lay it (runs/h1_duelq1121
         // t147: China's on 576, IMPROVEMENT_CONSTRUCTED_ON_DISASTER_YIELD_TILE_FIRST)
         if (isCiv(seat) && t.improvement !== want) improvementMoment(state, seat, t);
+        const laid = t.improvement !== want;
         t.improvement = want;
         t.pillaged = false;
+        if (laid) boostOnImprovement(state, t, true);
         count(ctx, 'improve', 'fallback', d.player, ok ? (builder ? 'the builder\'s order refused' : d.unit ? 'a builder the replay does not hold' : 'no builder the log names')
           : `${want} on ${t.terrain}/${t.elevation}/${t.feature}/${t.resource} seat ${seat}: the engine offers [${valid.join(',')}]`);
         break;

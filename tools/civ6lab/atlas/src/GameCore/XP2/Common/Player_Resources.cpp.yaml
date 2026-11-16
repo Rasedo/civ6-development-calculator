@@ -861,9 +861,11 @@
     - gpu/core/sim_seats.py:_reveal_pass
     - cpu/core/gpAbility.ts:activateGreatPerson
     - gpu/core/sim_gp.py:col
+    - cpu/core/boosts.ts:boostOnReveal
   readings:
     - "H-1: a plot's resource for its owner (strategic access) — READ"
     - "C-130 / C-98: a reveal's ownership pass pays a standing source's copy; the Free Cities' known cities — READ (0x4ae4e0, 0x4ad2f0), both twins"
+    - "C-98: the improvement boosts' signals; a combat's dead on its owner's list to the game turn's end — READ (0x162010 at 0x163207..0x16330c and 0x16356a..0x163617, 0x164990, 0x362ec0, 0x362b30, 0xa13270, 0x7ecc0 from 0x631e0, 0x20e720 at 0x20f3c1, 0x212c30 at 0x213000), both twins"
   context:
     - "...layer_Resources 0x4aa8e0 (callers: the per-city accumulation 0x4aafd0, the ownership pass 0x4ae4e0, Lua `IsResourceExtractableAt` 0x4ac120) takes the plot's improvement (+0x44, read as non..."
   review: reviewed

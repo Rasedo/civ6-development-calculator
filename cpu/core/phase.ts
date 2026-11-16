@@ -22,7 +22,7 @@ import { applyTrainingGrants, meleeAttack, rangedAttack, hostileRangedStrike, da
 import { promoValue, takePromotion } from './promotions';
 import { PROMO_COLS, type PromoClass } from '../data/promotions';
 import { availableTechsIn, availableCivicsIn, computeUnlocks, isCivicComplete, type Unlocks, notFoundedSum, peacefulFounderFaith, foreignFollowerCount, greatWorkLoyalty, goldPrice, faithPrice } from './effects';
-import { boostOnWarDeclared, detectBoosts, markBoost } from './boosts';
+import { boostOnImprovement, boostOnWarDeclared, detectBoosts, markBoost } from './boosts';
 import { BOOSTS } from '../data/boosts';
 import { addCivicProgress, researchCost, selectResearch, pillagePlunder } from './economy';
 import { IMPROVEMENTS } from '../data/improvements';
@@ -2620,6 +2620,7 @@ export function applySeatUnitOrders(state: GameState, actor: Seat, steps: number
             here.pillaged = false;
             unit.movesLeft = 0;
             extractionChanged(state, here);
+            boostOnImprovement(state, here, false);
           }
         } else {
           const ii = a < 18 ? a - 13 : DEDICATED_IMPROVEMENTS + (a - 18);
@@ -2636,6 +2637,7 @@ export function applySeatUnitOrders(state: GameState, actor: Seat, steps: number
                 && (unit.charges ?? 0) > 0) {
               state.map.tiles[tt].improvement = imp;
               improvementMoment(state, actor.seat, state.map.tiles[tt]);
+              boostOnImprovement(state, state.map.tiles[tt], true);
               unit.charges = (unit.charges ?? 0) - 1;
               unit.movesLeft = 0;
               if (unit.charges <= 0 && unitIsNoncombat(unit.type)) disbandUnit(state, unit.id);
@@ -2658,6 +2660,7 @@ export function applySeatUnitOrders(state: GameState, actor: Seat, steps: number
             here.improvement = imp;
             improvementMoment(state, actor.seat, here);
             extractionChanged(state, here);
+            boostOnImprovement(state, here, true);
             // CIV6 (Mana): "Culture Bomb adjacent tiles" on the named
             // improvement — the same claim a district's bomb makes
             // (`CULTURE_BOMB_ROWS`)

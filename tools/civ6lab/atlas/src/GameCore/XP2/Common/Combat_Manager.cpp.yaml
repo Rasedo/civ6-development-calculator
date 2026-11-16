@@ -669,9 +669,11 @@
   name: the capture's units on the plot
   semantics: "(district, the player, the unit, a map layer, the centre flag): the capture 0x1fdea0 runs it on layers 0, 3 and 1 of the district's plot (LOC_COMBAT_YOUR_UNIT_DIED_DEFENDING); its body unread."
   status: PARTLY
+  impl: [cpu/core/minorBuild.ts:minorEndTurnList]
   readings:
     - "C-123 / C-110: the barbarians' rules run as the first job of their AI turn start, after the DoTurn tail; a centre a player that is no major may not raze keeps its last hit point — READ (0x6096c0 at 0x6097af..0x609802, 0x608870, 0x7280a0, 0x1514a0, 0x14d25d; 0x248800, 0x533e50, 0x206080 at 0x206868..0x2068c8, 0x20dd30, 0x1fdea0 at 0x1fe098..0x1fe0ab), both twins"
     - "C-123 / C-110: the barbarians' rules run as the first job of their AI turn start, after the DoTurn tail; a centre a player that is no major may not raze keeps its last hit point; a melee blow on a district that would fell both sides — READ (0x6096c0 at 0x6097af..0x609802, 0x608870, 0x7280a0, 0x1514a0, 0x14d25d; 0x248800, 0x533e50, 0x206080 at 0x206684..0x206715 and 0x206868..0x2068c8, 0x20dd30, 0x1fdea0 at 0x1fe098..0x1fe0ab), both twins"
+    - "C-98: the improvement boosts' signals; a combat's dead on its owner's list to the game turn's end — READ (0x162010 at 0x163207..0x16330c and 0x16356a..0x163617, 0x164990, 0x362ec0, 0x362b30, 0xa13270, 0x7ecc0 from 0x631e0, 0x20e720 at 0x20f3c1, 0x212c30 at 0x213000), both twins"
   context:
     - "...741) reads the damage before the cut. In 0x1fdea0 the units on the district's plot die (0x20a400), and a captor that is no FULL_CIV destroys the district (0x1e6f50 at 0x1fe0a6: a cen..."
   review: reviewed
@@ -748,9 +750,11 @@
     - recording: 1121
       turn: 110
       value: "Recorded: 1121 t110, a barbarian   on China's Missionary beside Taiyuan, −125 in Xi'an and Taiyuan   (`religiousUnitLost`, the harness replaying the log's kill)."
+  impl: [cpu/core/minorBuild.ts:minorEndTurnList]
   readings:
     - "H-1: an annex re-places the citizens, the garrison's unit, a religious unit killed on a move — READ"
     - "C-101: the owner's religion percent is Scripture's, a religion swing walks every player's cities — READ, both twins"
+    - "C-98: the improvement boosts' signals; a combat's dead on its owner's list to the game turn's end — READ (0x162010 at 0x163207..0x16330c and 0x16356a..0x163617, 0x164990, 0x362ec0, 0x362b30, 0xa13270, 0x7ecc0 from 0x631e0, 0x20e720 at 0x20f3c1, 0x212c30 at 0x213000), both twins"
   context:
     - "...player's +0x4f0 percent; the condemn command (0x89cc00, 0x947f10) and a combat kill (0x20e720, 0x212c30) pass the same flag. Recorded: 1121 t110, a barbarian on China's Missionary b..."
   review: reviewed
@@ -811,6 +815,7 @@
     - cpu/core/tactical.ts:through
     - cpu/core/combat.ts:meleeAttackInner
     - cpu/harness/replay.ts:c
+    - cpu/core/minorBuild.ts:minorEndTurnList
   readings:
     - "H-4 / C-96: CanConstruct's prerequisite building held unpillaged; a barbarians' seizure by a battle's advance and its captive's spent Movement — READ (0x170450 at 0x1709b0..0x170a5e, 0x18fe60, 0x212500)"
     - "C-129: a killed player's records forgotten; a capture's new unit; an air strike's record — READ (0x534c50, 0x787fc0 -> 0x5ee370, 0x212500's create), both twins; the replay's later-player timings"
@@ -824,6 +829,7 @@
     - "C-95 / C-123: a zone of control out of sight is none in a path's cost; Attack Civilians past a withdrawn civilian; the capture step through a plot of its own; a withdrawal's plot — READ (0x5033a0 at 0x5033f9..0x503400, 0x773270 at 0x773383..0x77339c, 0x530650 at 0x5307a4..0x5307d3), both twins"
     - "C-125 / C-95: the target list's trade layer and its one unit of the units' layer; a siege unit's step onto civilians; the city-states' Attack Civilians; the flankers' test, the support's caller, the camp strike's queue — READ (0x783980 at 0x7849bb..0x784c2b and 0x784c30..0x784f57, 0x26fe20 -> 0x212500, 0x521530, 0x51f070 at 0x51f70e..0x51f737, 0x546f0, 0x52f50), both twins"
     - "C-95 / C-134 / C-125: a raised unit's planning, a Trader's districts at peace, a civilian's district at war, a captive's first owner, the meteor site's goody — READ (0x792c90, 0x586360 at 0x5865e7..0x5865fd / 0x58666a..0x5866c7 / 0x586729..0x586733, 0x26e570 at 0x26e5e2..0x26e6c4, 0x2720a0 at 0x272434..0x272544, 0x82d90, 0x212500 at 0x212825..0x2128f3), LAB (the aiunits plannings), both twins"
+    - "C-98: the improvement boosts' signals; a combat's dead on its owner's list to the game turn's end — READ (0x162010 at 0x163207..0x16330c and 0x16356a..0x163617, 0x164990, 0x362ec0, 0x362b30, 0xa13270, 0x7ecc0 from 0x631e0, 0x20e720 at 0x20f3c1, 0x212c30 at 0x213000), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ...e +0x1ba bit 2, and whose player the mover's player is at war with (0x469cd0), it calls 0x212500(victim, mover, plot, ...); a 0 back destroys the victim (the religion swing 0x493f80 wi...
@@ -838,9 +844,11 @@
     - recording: 1121
       turn: 110
       value: "Recorded: 1121 t110, a barbarian   on China's Missionary beside Taiyuan, −125 in Xi'an and Taiyuan   (`religiousUnitLost`, the harness replaying the log's kill)."
+  impl: [cpu/core/minorBuild.ts:minorEndTurnList]
   readings:
     - "H-1: an annex re-places the citizens, the garrison's unit, a religious unit killed on a move — READ"
     - "C-101: the owner's religion percent is Scripture's, a religion swing walks every player's cities — READ, both twins"
+    - "C-98: the improvement boosts' signals; a combat's dead on its owner's list to the game turn's end — READ (0x162010 at 0x163207..0x16330c and 0x16356a..0x163617, 0x164990, 0x362ec0, 0x362b30, 0xa13270, 0x7ecc0 from 0x631e0, 0x20e720 at 0x20f3c1, 0x212c30 at 0x213000), both twins"
   context:
     - "...+0x4f0 percent; the condemn command (0x89cc00, 0x947f10) and a combat kill (0x20e720, 0x212c30) pass the same flag. Recorded: 1121 t110, a barbarian on China's Missionary beside Taiy..."
   review: reviewed

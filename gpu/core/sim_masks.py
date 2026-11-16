@@ -100,8 +100,10 @@ class SimMasks:
         """[B, K] bool — `stateTrigger` for every Boosts row, seat row `row`
         (a city-state's city row with its research row `s`): each BoostClass
         the seat's standing state answers. An event class (a kill, a camp, a
-        declaration of war, a park, an artifact) lands where its event
-        happens; a class neither engine models never triggers. A city-state
+        declaration of war, a park, an artifact, an improvement laid,
+        repaired or bought: `_boost_on_improvement`, `_boost_on_reveal`) lands
+        where its event happens; a class neither engine models never
+        triggers. A city-state
         holds no pantheon, religion, government, great person or alliance,
         meets no city-state and keeps no revealed plots."""
         tab = self._boost_tables()
@@ -154,21 +156,10 @@ class SimMasks:
                 continue
             if cls == "NUM_IMPROVED_TILES":
                 p = mine.sum(dim=1) >= n
-            elif cls == "HAVE_X_IMPROVEMENTS":
-                imp = int(b["improvement"])
-                hit = mine & (self.improvement == imp)
-                if b["requiresResource"]:
-                    # on a resource it improves: a Farm laid on Horses unseen
-                    # stays plain ground once they show (runs/h1_duelw1124
-                    # China's Farm on Horses, Animal Husbandry at t41, no
-                    # Irrigation boost to t64)
-                    hit = hit & has_res & (self._res_harvest_imp.take(self.res_id.clamp(min=0)) == imp)
-                p = hit.sum(dim=1) >= n
-            elif cls in ("IMPROVE_SPECIFIC_RESOURCE", "HAVE_UNIT_AND_IMPROVEMENT"):
-                p = (mine & (self.improvement == int(b["improvement"])) & has_res
-                     & (self.res_id == int(b["resource"]))).any(dim=1)
-                if cls == "HAVE_UNIT_AND_IMPROVEMENT":
-                    p = p & (self._boost_units(row, unit_of(int(b["unit"]))) >= 1)
+            elif cls == "HAVE_UNIT_AND_IMPROVEMENT":
+                p = ((mine & (self.improvement == int(b["improvement"])) & has_res
+                      & (self.res_id == int(b["resource"]))).any(dim=1)
+                     & (self._boost_units(row, unit_of(int(b["unit"]))) >= 1))
             elif cls == "HAVE_X_UNIQUE_SPECIALTY_DISTRICTS":
                 p = (on_d().any(dim=1) & self._is_specialty.reshape(1, -1)).sum(dim=1) >= n
             elif cls == "HAVE_X_DISTRICTS":
@@ -277,6 +268,103 @@ class SimMasks:
                 continue
             newly = self._land_boosts(row, want[target], target == "civic")
             self._dedication_event(row, ded, newly.sum(dim=1))
+
+    def _boost_on_improvement(self, row: int, m: torch.Tensor, tile: torch.Tensor, laid: bool) -> None:
+        """`boostOnImprovement`: THE IMPROVEMENT BOOSTS ON A PLOT'S EVENT
+        (Boost_Manager 0x1644e0) for seat row `row` (a major's, or a
+        city-state's city row) in the games `m` [B] on the plot `tile` [B] of
+        its own. `laid`: the improvement was just laid there, which the
+        HAVE_X_IMPROVEMENTS and the IMPROVE_SPECIFIC_RESOURCE rows hear;
+        otherwise the plot was repaired or bought, which the HAVE_X rows alone
+        hear. A row answers where its improvement is the plot's and the
+        seat's unpillaged plots holding it reach its NumItems; a HAVE_X row
+        with RequiresResource asks any resource on the plot the seat sees, a
+        specific row its own resource seen there. Every row is read before
+        one lands, the technologies' then the civics'."""
+        s = row - self._CITY_MINOR0
+        minor = 0 <= s < self.S
+        if not (row < self.n_majors or minor) or not bool(m.count_nonzero()):
+            return
+        tab = self._boost_tables()
+        seat = int(self._ROW_SEAT[row])
+        bidx = self._bidx
+        tc = tile.clamp(min=0)
+        imp = self.improvement[bidx, tc]
+        on = m & (tile >= 0) & (self.tile_seat[bidx, tc] == seat) & (imp >= 0)
+        if not bool(on.count_nonzero()):
+            return
+        rid = self.res_id[bidx, tc]
+        seen = (rid >= 0) & ~self.res_stripped[bidx, tc] & ~self._res_hidden(row)[bidx, tc]
+        mine = (self.tile_seat == seat) & ~self.pillaged
+        want = {}
+        for target in ("tech", "civic"):
+            if minor:
+                held = (self.citystate_civics if target == "civic" else self.citystate_techs)[:, s]
+            else:
+                held = (self.civ_civics if target == "civic" else self.civ_techs)[:, row]
+            w = torch.zeros_like(held)
+            for i, idx in tab["to_" + target]:
+                b = tab["rows"][i]
+                have = b["cls"] == "HAVE_X_IMPROVEMENTS"
+                if not (have or (laid and b["cls"] == "IMPROVE_SPECIFIC_RESOURCE")) or idx >= w.shape[1]:
+                    continue
+                k = int(b["improvement"])
+                p = on & (imp == k)
+                if k < 0 or not bool(p.count_nonzero()):
+                    continue
+                p = p & ((mine & (self.improvement == k)).sum(dim=1) >= int(b["n"]))
+                if not have:
+                    p = p & seen & (rid == int(b["resource"]))
+                elif b["requiresResource"]:
+                    p = p & seen
+                w[:, idx] |= p
+            want[target] = w
+        self._land_boost_wants(row, want)
+
+    def _boost_on_reveal(self, row: int, on: torch.Tensor, rid: int) -> None:
+        """`boostOnReveal`: THE SPECIFIC RESOURCE'S BOOST AT ITS REVEAL
+        (Boost_Manager 0x164990 on the reveal's ownership pass) for seat row
+        `row` in the games `on` [B] — the IMPROVE_SPECIFIC_RESOURCE rows of
+        resource `rid` land where a plot of the seat holds it under an
+        unpillaged improvement of the resource's own."""
+        s = row - self._CITY_MINOR0
+        minor = 0 <= s < self.S
+        if not (row < self.n_majors or minor):
+            return
+        seat = int(self._ROW_SEAT[row])
+        hit = on & ((self.tile_seat == seat) & self._res_live() & (self.res_id == rid) & (self.improvement >= 0)
+                    & (self.improvement == self.res_imp) & ~self.pillaged).any(dim=1)
+        if not bool(hit.count_nonzero()):
+            return
+        tab = self._boost_tables()
+        want = {}
+        for target in ("tech", "civic"):
+            if minor:
+                held = (self.citystate_civics if target == "civic" else self.citystate_techs)[:, s]
+            else:
+                held = (self.civ_civics if target == "civic" else self.civ_techs)[:, row]
+            w = torch.zeros_like(held)
+            for i, idx in tab["to_" + target]:
+                b = tab["rows"][i]
+                if b["cls"] == "IMPROVE_SPECIFIC_RESOURCE" and int(b["resource"]) == rid and idx < w.shape[1]:
+                    w[:, idx] |= hit
+            want[target] = w
+        self._land_boost_wants(row, want)
+
+    def _land_boost_wants(self, row: int, want: dict) -> None:
+        """the items of `want` ("tech" / "civic" -> [B, N]) landed on seat row
+        `row`, techs first: a major's with its dedication (`grantBoost`), a
+        city-state's as its own boosts land (`_land_minor_boosts`)."""
+        s = row - self._CITY_MINOR0
+        for target, ded in (("tech", self._ded_free_inquiry), ("civic", self._ded_pen_brush)):
+            w = want[target]
+            if not bool(w.count_nonzero()):
+                continue
+            if row < self.n_majors:
+                newly = self._land_boosts(row, w, target == "civic")
+                self._dedication_event(row, ded, newly.sum(dim=1))
+            else:
+                self._land_minor_boosts(s, w, target == "civic")
 
     def _grant_boost_rows(self, row: int, m: torch.Tensor, keep) -> None:
         """`grantEvent`'s twin: in the games of `m` [B], every Boosts row
@@ -4246,17 +4334,10 @@ class SimMasks:
         `civ` is the EVENT's own civilization as a SEAT id: the unit that
         died, or the barbarians whose outpost was razed — an int or a tensor
         ALIGNED WITH `gd`, like `td`. `slots` are the dead units' merged
-        slots, aligned with `gd`: a combat's dead leaves its owner's unit
-        list at once (`killUnit`, `_minor_listed_units`)."""
+        slots, aligned with `gd`; a combat's dead stays on its owner's unit
+        list to the game turn's end (`killUnit`, `_minors_end_turn`)."""
         if len(gd) == 0:
             return
-        ls = self.unit_list_seat[gd, slots]
-        on = (ls >= 100) & (ls < 100 + self.citystate_list_count.shape[1])
-        if bool(on.count_nonzero()):
-            g = gd[on]
-            self.citystate_list_count.index_put_((g, ls[on] - 100, self.unit_list_type[g, slots[on]]),
-                                                 torch.full_like(g, -1), accumulate=True)
-        self.unit_list_seat[gd, slots] = -1
         m = torch.zeros(self.B, dtype=torch.bool, device=self.device)
         m[gd] = True
         t = torch.full((self.B,), -1, dtype=torch.long, device=self.device)

@@ -10,7 +10,7 @@ import { cityFlags, replaceAllCitizens } from './citizens';
 import { canFoundCity, availableBuildings, buildingCompletable, purchasableBuildings, worshipOffered, type RuleResult } from './rules';
 import { computeUnlocks, getModifiers, isCivicComplete, goldPrice, faithPrice } from './effects';
 import type { Modifiers, Unlocks } from './effects';
-import { boostPool, drawBoosts } from './boosts';
+import { boostOnImprovement, boostPool, drawBoosts } from './boosts';
 import { arrive, unitsHostile, spawnUnit, refreshUnits, trainableUnits, disbandUnit, reseatUnit, tileFreeForUnit, builderCost, traderCost, unitsAt, unitDomain, bestTrainableOfClass, purchaseSpotBlocked, raiseBestTrained } from './units';
 import { drawPromoOffer, promoFlag, unitPromoRows } from './promotions';
 import { logXpWrite, logPopWrite } from './difflog';
@@ -20,7 +20,7 @@ import { cityLook } from './fog';
 import { disasterPhase } from './disasters';
 import { climateTurn, deriveLowlands, standingRemovable } from './climate';
 import { buildingCreatedCulture, cityStateAt, minorCity, suzerainEffect, suzerainLandPurchaseOffPct } from './cityStates';
-import { minorPhase } from './minorBuild';
+import { minorPhase, minorsEndTurn } from './minorBuild';
 import { seatPhase, freeCitiesPhase, healCities, worldCongress, emergencySessions, nextCityName } from './phase';
 import { congressCondemnFavor, congressUdtBlockedDistrict, congressUnitCostMult, CONGRESS_CUR_GOLD, CONGRESS_CUR_PRODUCTION } from './congress';
 import { settleIncursion, promiseIncursion } from './grievance';
@@ -1626,6 +1626,8 @@ export function buyTile(state: GameState, cityId: number, tileIndex: number, sea
   // citizen (0x1a8b70 -> 0x196320)
   city.nextPlot = -1;
   replaceAllCitizens(state, city, cityFlags(city));
+  // the purchase's signal answers the bought plot's own improvement
+  boostOnImprovement(state, state.map.tiles[tileIndex], false);
   return { ok: true };
 }
 
@@ -1662,6 +1664,8 @@ function eraOpening(state: GameState): void {
  */
 export function endTurn(state: GameState): void {
   if (state.unitsMode) barbarianPhase(state);
+  // the game turn's end: every player's unit list drops its dead
+  minorsEndTurn(state);
   worldCongress(state);
   turnChange(state);
   seatPhase(state);

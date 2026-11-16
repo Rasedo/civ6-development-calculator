@@ -52,6 +52,7 @@
   readings:
     - "H-1: the luxury allocation's rebuilds — PARTLY READ"
     - "C-133 / C-95: the carried orders run in the unit list's order; a path comes ashore off water only by the disembark test — READ (0x7df30, 0x554e0, 0x523e0, 0x52e90, 0x54910, 0x2720a0 at 0x272380..0x27240d, 0x52fb90 at 0x52fb9d), both twins; UpdateOpenNode's walk and flag 2's plot — READ (0x79560, 0x2720a0 at 0x2721c3..0x27220d / 0x2724c8), unported"
+    - "C-98: the improvement boosts' signals; a combat's dead on its owner's list to the game turn's end — READ (0x162010 at 0x163207..0x16330c and 0x16356a..0x163617, 0x164990, 0x362ec0, 0x362b30, 0xa13270, 0x7ecc0 from 0x631e0, 0x20e720 at 0x20f3c1, 0x212c30 at 0x213000), both twins"
   context:
     - "- The turn end's cap (Player::Processor::DoTurnDeactivate 0x7eb60 -> 0x4e4ad0, which tail-jumps to Player_Resources 0x4a8f10): for each accumulated res..."
   review: reviewed
@@ -60,10 +61,15 @@
   kind: function
   name: Player::Processor::EndTurn
   status: PARTLY
-  impl: [cpu/core/minorBuild.ts:minorEndTurnList, cpu/core/types.ts:CityState]
+  impl:
+    - cpu/core/minorBuild.ts:minorEndTurnList
+    - cpu/core/types.ts:CityState
+    - cpu/core/minorBuild.ts:minorsEndTurn
+    - gpu/core/sim_minors.py:_minors_end_turn
   readings:
     - "H-1: why a seed does not replay — the AI's worker threads — READ, the replay patch MEASURED"
     - "C-98: a unit off the map counts on its owner's list until its end of turn"
+    - "C-98: the improvement boosts' signals; a combat's dead on its owner's list to the game turn's end — READ (0x162010 at 0x163207..0x16330c and 0x16356a..0x163617, 0x164990, 0x362ec0, 0x362b30, 0xa13270, 0x7ecc0 from 0x631e0, 0x20e720 at 0x20f3c1, 0x212c30 at 0x213000), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ...ed profiler (0x8c05a0 / 0x8c0640) and timing totals (0x5bce20, Player::Processor::EndTurn 0x7ed0a); none is compared to a limit.

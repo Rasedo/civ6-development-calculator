@@ -2,7 +2,7 @@ import { dedicationEvent, goldenBoostBonus } from './eras';
 import { seatOf, citiesOf, tileSeat, allianceLevelWith, isCiv, hiddenResourcesFor, isCityStateSeat } from './seats';
 import { minorCity } from './cityStates';
 import { DED_FREE_INQUIRY, DED_PEN_BRUSH_AND_VOICE } from '../data/seats';
-import type { GameState, ResearchState, Seat } from './types';
+import type { GameState, ResearchState, Seat, Tile } from './types';
 import { isExplored } from './fog';
 import { BOOSTLESS, BOOSTS, type BoostDef } from '../data/boosts';
 import { getModifiers, seatGovernment } from './effects';
@@ -18,7 +18,7 @@ import { completeResearchNow } from './phase';
 import { countLifetimeCulture, researchCost } from './economy';
 import { GREAT_PEOPLE } from '../data/greatPeople';
 import { isCoastalLand, isMountain, naturalWonderAt } from '../../world/query';
-import { RESOURCES } from '../../world/resources';
+import { resourceImprovement } from '../../world/resources';
 import { neighbors } from '../../world/hex';
 import { questBoosted } from './quests';
 
@@ -156,7 +156,9 @@ function ownUnits(state: GameState, seat: number, keep: (type: string, formation
  * THE STATE TRIGGERS: each BoostClass the seat's standing state answers,
  * read at the seat's turn (`detectBoosts`). An EVENT class (a kill, a camp
  * cleared, a declaration of war received, a park, an artifact) lands where
- * the event happens (`MEET_CIV` at the meeting, `meetMajors`); a class
+ * the event happens (`MEET_CIV` at the meeting, `meetMajors`;
+ * `HAVE_X_IMPROVEMENTS` and `IMPROVE_SPECIFIC_RESOURCE` at a plot's event,
+ * `boostOnImprovement` / `boostOnReveal`); a class
  * neither engine models (`DISCOVER_CONTINENT`: no continent discovery tracked;
  * `HAVE_X_THEMED_BUILDINGS`, `DISTRICT_APPEAL_LEVEL_MINIMUM_X`,
  * `AIRBASE_FOREIGN_CONTINENT`) and the late game's
@@ -169,15 +171,6 @@ function stateTrigger(state: GameState, seat: number, b: BoostDef): boolean {
   switch (b.cls) {
     case 'NUM_IMPROVED_TILES':
       return ownImprovements(state, seat, () => true) >= n;
-    case 'HAVE_X_IMPROVEMENTS':
-      // RequiresResource: the improvement on a resource it improves — a Farm
-      // laid on Horses unseen stays plain ground once they show
-      // (runs/h1_duelw1124: China's Farm on Horses from t9, Animal Husbandry
-      // at t41, a resourceless Farm at t44 and no Irrigation boost to t64)
-      return ownImprovements(state, seat, (imp, res) => imp === b.improvement
-        && (!b.requiresResource || (res !== null && RESOURCES[res]?.improvement === imp))) >= n;
-    case 'IMPROVE_SPECIFIC_RESOURCE':
-      return ownImprovements(state, seat, (imp, res) => imp === b.improvement && res === b.resource) >= 1;
     case 'HAVE_UNIT_AND_IMPROVEMENT':
       return ownImprovements(state, seat, (imp, res) => imp === b.improvement && res === b.resource) >= 1
         && ownUnits(state, seat, (t) => isUnitOf(t, b.unit!)) >= 1;
@@ -307,6 +300,55 @@ export function boostOnWarDeclared(state: GameState, declarer: number, target: n
  *  dedication */
 export function boostOnEvent(state: GameState, seat: number, cls: 'CLEAR_CAMP' | 'CREATED_NATIONAL_PARK' | 'ARTIFACT_EXTRACTED' | 'MEET_CIV'): void {
   if (cls === 'CLEAR_CAMP' ? earnsBoosts(seat) : isCiv(seat)) grantEvent(state, seat, cls, () => true);
+}
+
+/**
+ * THE IMPROVEMENT BOOSTS ON A PLOT'S EVENT (Boost_Manager 0x1644e0):
+ * BOOST_TRIGGER_HAVE_X_IMPROVEMENTS and BOOST_TRIGGER_IMPROVE_SPECIFIC_RESOURCE
+ * are answered for the plot's owner as one plot's improvement changes, never
+ * off the standing state. `laid`: the improvement was just laid there (the
+ * game signals' ImprovementCreated +0x7f8, the plot's setter 0x362ec0), which
+ * both classes hear; otherwise the plot's improvement was repaired (+0x828,
+ * 0x362b30 clearing its pillage) or a city bought the plot (+0x10e0, 0xa13270
+ * / 0x977aa0), which the HAVE_X rows alone hear. A row answers where its
+ * improvement is the plot's and the owner's unpillaged plots holding it
+ * (0x4be470) reach its NumItems; a HAVE_X row with RequiresResource then asks
+ * any resource on the event's plot its owner sees, a specific row its own
+ * resource seen there. So a Mine laid on Iron its owner does not see boosts
+ * neither The Wheel nor Iron Working, then or once the Iron shows
+ * (runs/h1_duels1171 city-state 2: the Mine on 8:22 before Bronze Working,
+ * The Wheel researched unboosted by t42). Every row is read before one lands.
+ */
+export function boostOnImprovement(state: GameState, tile: Tile, laid: boolean): void {
+  const seat = tileSeat(tile);
+  const imp = tile.improvement;
+  if (!imp || !earnsBoosts(seat) || !seatOf(state, seat)) return;
+  const res = tile.resource && !hiddenResourcesFor(state, seat).has(tile.resource) ? tile.resource : null;
+  const held = ownImprovements(state, seat, (i) => i === imp);
+  const due = Object.entries(BOOSTS).filter(([, b]) => {
+    const have = b.cls === 'HAVE_X_IMPROVEMENTS';
+    if (!(have || (laid && b.cls === 'IMPROVE_SPECIFIC_RESOURCE')) || b.improvement !== imp || held < (b.n ?? 1)) return false;
+    return have ? !b.requiresResource || res !== null : res !== null && res === b.resource;
+  }).map(([id]) => id);
+  // the technologies' rows, then the civics'
+  for (const civic of [false, true]) for (const id of due) if (!TECHS[id] === civic) grantBoost(state, seat, id);
+}
+
+/**
+ * THE SPECIFIC RESOURCE'S BOOST AT ITS REVEAL (Boost_Manager 0x164990 on the
+ * game signal +0x12a8 the reveal's ownership pass 0x4ae4e0 raises for each
+ * plot holding the resource): a BOOST_TRIGGER_IMPROVE_SPECIFIC_RESOURCE row
+ * of the revealed resource lands where a plot of the revealing player holds
+ * it under an unpillaged improvement of the resource's own
+ * (runs/h1_duels1171 city-state 2 t33: Bronze Working shows the Iron under
+ * its Mine, Game_Boosts logs Iron Working).
+ */
+export function boostOnReveal(state: GameState, seat: number, resource: string): void {
+  if (!earnsBoosts(seat) || !seatOf(state, seat)) return;
+  if (!state.map.tiles.some((t) => t.resource === resource && tileSeat(t) === seat && !t.pillaged
+    && !!t.improvement && t.improvement === resourceImprovement(t))) return;
+  const due = Object.entries(BOOSTS).filter(([, b]) => b.cls === 'IMPROVE_SPECIFIC_RESOURCE' && b.resource === resource).map(([id]) => id);
+  for (const civic of [false, true]) for (const id of due) if (!TECHS[id] === civic) grantBoost(state, seat, id);
 }
 
 /** a seat whose own deeds earn boosts: a major or a city-state (the

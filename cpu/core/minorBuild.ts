@@ -31,7 +31,7 @@ import { PROJECTS, projectConverted } from '../data/projects';
 import { worshipBuildingOf } from '../data/religion';
 import { CIV_LEVELS } from '../data/civLevels';
 import { CITY_MIN_STRIKE_CS, FAITH_PURCHASE_MULT, GOLD_PURCHASE_MULT, amenityTier, gameProgressPct } from '../data/constants';
-import { boostOnResearch, detectBoosts } from './boosts';
+import { boostOnImprovement, boostOnResearch, detectBoosts } from './boosts';
 import { canPlaceDistrictIn, fitEncampOuter, outerDamage, outerPool, urbanDefensesFit, urbanFit, wallsMax } from './rules';
 import { lumpFood, seatGrowth } from './seatTurn';
 import { cityPowerFacts, freeCityBuildFacts, majorQueueItem, seatResearchTurns } from './freeCityBuild';
@@ -325,13 +325,13 @@ export function minorPhase(state: GameState): void {
   }
 }
 
-/** THE MINOR'S END OF TURN on its unit list (Player::Processor::EndTurn
- *  0x7ecc0 -> 0x4e44e0 -> Player_Units 0x4ef6d0): the units killed since
- *  its last by the delayed kill (0x4ef040, unit +0x770: the unit commands,
- *  a levy, the turn's damage) are destroyed (0x4ef100 -> 0x4f32d0), so the
- *  list holds the units standing now, its standing army's members marked
- *  (`CityState.defendersListed`); a combat's dead leaves it at once
- *  (`killUnit`) */
+/** A MINOR'S UNIT LIST REBUILT (Player_Units 0x4ef6d0): the units killed
+ *  since its last by the delayed kill (0x4ef040, unit +0x770: the unit
+ *  commands, a levy, the turn's damage, a combat's kill — the combat
+ *  manager's every kill passes the flag 1: 0x20f3c1, 0x213000, 0x20a642,
+ *  0x212879, 0x212bf0) are destroyed (0x4ef100 -> 0x4f32d0), so the list
+ *  holds the units standing now, its standing army's members marked
+ *  (`CityState.defendersListed`) */
 function minorEndTurnList(state: GameState, cityState: CityState): void {
   const listed: Record<number, string> = {};
   const own = state.units.filter((u) => u.seat === cityState.seat);
@@ -340,11 +340,24 @@ function minorEndTurnList(state: GameState, cityState: CityState): void {
   cityState.defendersListed = own.filter((u) => u.aiDefender && u.aiHomed).sort((a, b) => (a.slot ?? 0) - (b.slot ?? 0)).map((u) => u.id);
 }
 
+/** THE GAME TURN'S END on the players' unit lists (Game::Processor 0x631e0
+ *  -> Player::Processor::EndTurn 0x7ecc0, every player in one loop ->
+ *  0x4e44e0 -> 0x4ef6d0), after every player's turn, the barbarians' the
+ *  last: each minor's list drops its dead. So a unit killed before its
+ *  owner's turn of the same game turn counts on its list through that turn
+ *  (runs/h1_duels1145 city-state 4's Warrior 327681, player 1's Archer's
+ *  kill in t37: Iron Working 99.7 at its t37 as logged, 79.7 at t38), and
+ *  one a later player killed is gone by its next (runs/h1_duels1124
+ *  city-state 4's Warrior the barbarians killed in t54: 124.7 at t55). */
+export function minorsEndTurn(state: GameState): void {
+  for (const cityState of state.cityStates) minorEndTurnList(state, cityState);
+}
+
 /** A MINOR'S UNIT LIST BY TYPE, as its counts walk it (0x4f2c90 over the
  *  player's list +0xd8, the dead flag unread): its units standing and those
- *  its last end of turn listed that are no longer its own on the map —
- *  levied, deleted, killed off a combat — until its next
- *  (`minorEndTurnList`). runs/h1_duely1124 city-state 3 t68: its Warrior
+ *  its list held at its last rebuild that are no longer its own on the map —
+ *  levied, deleted, killed in or off a combat — until its next
+ *  (`minorEndTurnList`, `minorsEndTurn`). runs/h1_duely1124 city-state 3 t68: its Warrior
  *  levied by Rome before its turn, Iron Working's upgrade source 241.2 as
  *  logged, 221.2 at t69; runs/h1_duely1128 city-state 3 t133: the two units
  *  the damage after the barbarians' turn of t132 killed, Gunpowder 281.1 as
@@ -1055,6 +1068,7 @@ export function minorBuilderLays(state: GameState, u: Unit, plot: number, imp: s
   tile.improvement = imp;
   tile.pillaged = false;
   extractionChanged(state, tile);
+  boostOnImprovement(state, tile, true);
   u.charges = (u.charges ?? 0) - 1;
   u.movesLeft = 0;
   if (u.charges <= 0) disbandUnit(state, u.id);

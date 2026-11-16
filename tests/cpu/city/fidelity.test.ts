@@ -7,7 +7,7 @@ import { placeSeatDistrict } from '../../../cpu/core/phase';
 import { computeUnlocks } from '../../../cpu/core/effects';
 import { validImprovements } from '../../../cpu/core/rules';
 import { scaleByGameSpeed } from '../../../cpu/data/constants';
-import { boostAmount, detectBoosts, isBoosted, markBoost, progressOn } from '../../../cpu/core/boosts';
+import { boostAmount, boostOnImprovement, isBoosted, markBoost, progressOn } from '../../../cpu/core/boosts';
 import { TECHS } from '../../../cpu/data/techs';
 import { CIVICS } from '../../../cpu/data/civics';
 import { BUILDINGS } from '../../../cpu/data/buildings';
@@ -17,7 +17,7 @@ import { buildingMaintenance, computeCityStats, computeHousing, cityMaintenance 
 import { tileAppeal, appealTier } from '../../../cpu/core/appeal';
 
 describe('eurekas & inspirations', () => {
-  it('auto-detects observable conditions and lands the boost as progress', () => {
+  it("lands an improvement's boost at its plot's event, as progress", () => {
     const state = makeState(makeMap(16, 16));
     foundCity(state, tileAtCoords(state.map, 8, 8).index, 0);
     grantTechs(state, 'MINING');
@@ -28,7 +28,7 @@ describe('eurekas & inspirations', () => {
     hills.improvement = 'QUARRY';
 
     expect(isBoosted(state, 'MASONRY', 0)).toBe(false);
-    detectBoosts(state, 0);
+    boostOnImprovement(state, hills, true);
     expect(isBoosted(state, 'MASONRY', 0)).toBe(true);
     const cost = TECHS.MASONRY.cost;
     expect(progressOn(seatOf(state, 0)!.research, 'MASONRY')).toBe(boostAmount(cost, 40, 0));
