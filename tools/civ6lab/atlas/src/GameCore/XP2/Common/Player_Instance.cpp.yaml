@@ -249,6 +249,7 @@
     - "C-111: a major's district lets go of the queue under a hostile unit, the queue's progress and overflow read from the city's memory — READ (0x184660 at 0x1847dc, 0x5313f0, 0x17f630), both twins"
     - "C-127 / C-100 / C-96 / C-99: Check Plot's district test and Add Goal Tech's Goal Plot, a flooded lowland's district, the unit production table's at-war field, the pick's repair project — READ (0x7f6ea0 at 0x7f7600..0x7f7662, 0x35f2d0 at 0x35f46b..0x35f48a / 0x35f60f..0x35f81d, 0x7e7d20 at 0x7e888b..0x7e8a9d, 0x173940 at 0x173a05..0x173be1), LAB (the aiunits unit tables, the Default Specialization's project), both twins"
     - "C-132 / C-95: the planning's attack onto a unit at war for any mover, a Trader's layer, the danger map's war table, the Bermuda Triangle's currents — READ (0x26e570 at 0x26e6c4, 0x586360 at 0x586542..0x5865a1, 0x585d90, 0x530f50, 0x469cd0 -> 0x3dcec0 -> 0x2a92d0, 0xc67f70), both twins"
+    - "C-95: the city encircled and Siege City's second encirclement test — READ (0x24bf70, 0x20a070, 0x811e80 at 0x81227b / 0x812769..0x8128c7), both twins"
   notes:
     - ".claude/scratchpad/st1/reading.md: ...d). - The danger map (InfluenceMap.cpp 0x717460, m_influence): per player at   war with the player (0x469cd0), each unit it sees now (0x5033a0) with a   combat, ranged or bombard strength (0x56dc90, 0x56e3e0,..."
   context:

@@ -886,10 +886,10 @@ def poke_raider_zoc(rules, path, PRIVATEER, SUBMARINE, FRIGATE):
     print("  13 raider ZOC OK (ignored by the raider, not exerted by the submarine)")
 
 
-def poke_submarine_siege(rules, path, FRIGATE, SUBMARINE):
-    """14. The siege gate is ZONE OF CONTROL — "if the invading army manages to
-    establish zone of control on all passable tiles surrounding the City
-    Center" — so a ring that exerts none lets the city heal."""
+def poke_ship_siege(rules, path, FRIGATE):
+    """14. The city encircled (`_city_encircled`): every passable plot beside
+    the centre held by a unit at war that fights, or in the holder's enemy
+    zone of control for the plot's domain; a ring of frigates holds it."""
     sim = build(rules, path)
     _lone_war(sim)
     ctr = int(sim.city_center[0, 0, 0])
@@ -904,9 +904,7 @@ def poke_submarine_siege(rules, path, FRIGATE, SUBMARINE):
         ring.append(place_mil(sim, 1, t, FRIGATE))
     assert len(ring) >= 3, "no passable ring on this seed"
 
-    def heal_of(kind: int) -> int:
-        for slot in ring:
-            sim.major_unit_type[0, slot] = kind
+    def heal() -> int:
         sim.city_hp[0, 0, 0] = 100
         snap = sim.snapshot()
         sim._heal_cities()
@@ -914,11 +912,9 @@ def poke_submarine_siege(rules, path, FRIGATE, SUBMARINE):
         sim.restore(snap)
         return got
 
-    besieged = heal_of(FRIGATE)
-    free = heal_of(SUBMARINE)
+    besieged = heal()
     assert besieged == 0, f"a frigate ring did not besiege the city (healed {besieged})"
-    assert free > 0, "a submarine ring besieged the city it exerts no control over"
-    print(f"  14 submarine siege OK (frigate ring heals {besieged}, submarine ring heals {free})")
+    print(f"  14 ship siege OK (frigate ring heals {besieged})")
 
 def rank_of(sim, slot: int, row: int = 0) -> int:
     smap = sim._seat_slot_map(row)
@@ -1162,7 +1158,7 @@ def main() -> None:
     poke_embarked_support(rules, path, WARRIOR, GALLEY)
     poke_stealth(rules, path, PRIVATEER, FRIGATE, DESTROYER, SCOUT)
     poke_raider_zoc(rules, path, PRIVATEER, SUBMARINE, FRIGATE)
-    poke_submarine_siege(rules, path, FRIGATE, SUBMARINE)
+    poke_ship_siege(rules, path, FRIGATE)
     poke_passenger_death(rules, path, WARRIOR, BUILDER)
     poke_boarding(rules, path, PRIVATEER, GALLEY, WARRIOR)
     poke_canal(rules, path, GALLEY, WARRIOR)

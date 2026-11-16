@@ -83,6 +83,7 @@
     - "C-123 / C-125: Coastal Raid's queue walks on, a raid ends the raider's moves; Attack Units' targets keep one the pass killed — READ (0x7735d0, 0x95b100, 0x95b7c0, 0xa4fbc0 at 0xa501e2..0xa502e6, 0x5218f0, 0x76eb50, 0x776140 at 0x776333 -> 0x7765e4), both twins"
     - "C-134 / C-95: Operation Move's goal and ring plots refused by another player's unit of the mover's layer, at war or not; Pillage passes a unit with no Movement or none the target takes — READ (0x586360 at 0x586542..0x5865a1, 0x208b80 at 0x208c41..0x208d4e, 0x815d50 at 0x815d64..0x815d78 and 0x815e6f..0x815eb9, 0x774380 at 0x7744af..0x7744f8), both twins"
     - "C-95: the barbarians' scout report on plots newly visible, the camp's taker, the rampage without the Clans mode, Siege City's walls units — READ (0x153ef0, 0x154830 at 0x154a11..0x154a83, 0x778b40 at 0x778f62, 0x8e3250, 0x811e80 at 0x812027..0x812219), both twins"
+    - "C-95: the city encircled and Siege City's second encirclement test — READ (0x24bf70, 0x20a070, 0x811e80 at 0x81227b / 0x812769..0x8128c7), both twins"
   notes: [read; no recorded decision of the five verbose duels tells it apart yet]
   context:
     - "...6f210 is on +8, -1 for all — stable), go for it in order (0x773270): each that can act (0x56c690) takes the move order onto it (0x962190, flag 0x10), a unit with no ranged or bombard s..."
@@ -635,6 +636,17 @@
     - "...s), in list order, makes each LOW or MEDIUM unit that threatens it — one with a ranged (0x56e3e0) or bombard (0x56daa0) strength within its range (0x56e3d0), any other nearer than twic..."
     - "..., each unit it sees now (0x5033a0) with a combat, ranged or bombard strength (0x56dc90, 0x56e3e0, 0x56daa0): its strength (0x716400: bombard > 0 — the combat strength where it tops the..."
   review: reviewed
+- addr: 0x56e4c0
+  final: 0x3a3d60
+  kind: function
+  name: ABILITY_AUTO_SIEGE
+  status: PARTLY
+  readings:
+    - "C-95: the city encircled and Siege City's second encirclement test — READ (0x24bf70, 0x20a070, 0x811e80 at 0x81227b / 0x812769..0x8128c7), both twins"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - ...ff the map or impassable (plot +0x3a bit 3). A unit there holding ABILITY_AUTO_SIEGE (0x56e4c0; the ability exists in a game mode's rows alone, none here) of a player at war with the...
+  review: imported
 - addr: 0x56e670
   final: 0x3a3f10
   kind: function

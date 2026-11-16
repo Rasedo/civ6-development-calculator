@@ -452,6 +452,7 @@
     - gpu/core/sim_seats.py:_garrison_cs
     - cpu/core/tactical.ts:bestIn
     - gpu/core/sim_tactics.py:_op_move_exec
+    - cpu/core/combat.ts:encircled
   readings:
     - "C-95: the rampage strikes with the move's whole list; its defender is one the barbarians see — READ (0x778b40, 0x771670, 0x208b80, 0x20a2a0), both twins"
     - "C-102 / C-99: the plot's unit list as an arrival stamp, the best defender's tie and Garrison City's standing unit — READ (0x75c50, 0x74f40 / 0x763b0 / 0x75280, 0x208b80 / 0x523d60, 0x810fd7..0x81101b), both twins"
@@ -476,6 +477,7 @@
     - "C-132 / C-128 / C-95 / C-123 / C-133: the danger map's unmoved flag, a unit made anew's place, the operation queue's push, the strike's turn, the raid's recruit, the shore tests — READ (0x26df90 at 0x26e128..0x26e159, 0x716400 at 0x71672d, 0x586360 at 0x586542..0x58657e / 0x5867ab..0x586875, 0x93fa10 at 0x93fd94..0x93fdab / 0x93fe79, 0x526a0 at 0x52788..0x527ac, 0x523e0, 0x55460, 0x962380 at 0x96268f, 0x60a440, 0x26e570 at 0x26e904, 0x2720a0 at 0x272618..0x272689), both twins"
     - "C-132: a district's defence terms on the Encampment, the garrison of any player, an unrevealed district in the danger list, a hidden unit's forfeit by the turn order — READ (0x24a180 at 0x24a24c..0x24a275 and 0x24aa0d, 0x586360 at 0x5866c9..0x58671f under flag 1, 0x4f1b20 by the players' order), both twins"
     - "C-134 / C-95: Operation Move's goal and ring plots refused by another player's unit of the mover's layer, at war or not; Pillage passes a unit with no Movement or none the target takes — READ (0x586360 at 0x586542..0x5865a1, 0x208b80 at 0x208c41..0x208d4e, 0x815d50 at 0x815d64..0x815d78 and 0x815e6f..0x815eb9, 0x774380 at 0x7744af..0x7744f8), both twins"
+    - "C-95: the city encircled and Siege City's second encirclement test — READ (0x24bf70, 0x20a070, 0x811e80 at 0x81227b / 0x812769..0x8128c7), both twins"
   context:
     - "- The centre's garrison term 0x24a180 takes ONE unit, the plot's best defender 0x208b80 (flag 0x10): among the plot's units in its own order the comparator 0x523d60 keeps the..."
     - "...s with HitPoints: the centre and the Encampment) 0x24b170 takes the plot's best defender (0x208b80) where it is a combat unit (0x209dd0: Combat, Ranged or Bombard above 0) and, with a Mili..."
@@ -556,6 +558,7 @@
     - cpu/core/tactical.ts:stacked
     - cpu/core/tactical.ts:f
     - cpu/core/tactical.ts:Ground
+    - cpu/core/combat.ts:encircled
   readings:
     - "H-1: the garrison requirement — READ"
     - "H-1: a civilian stepped on — READ"
@@ -567,6 +570,7 @@
     - "C-125 / C-95: the target list's trade layer and its one unit of the units' layer; a siege unit's step onto civilians; the city-states' Attack Civilians; the flankers' test, the support's caller, the camp strike's queue — READ (0x783980 at 0x7849bb..0x784c2b and 0x784c30..0x784f57, 0x26fe20 -> 0x212500, 0x521530, 0x51f070 at 0x51f70e..0x51f737, 0x546f0, 0x52f50), both twins"
     - "C-110 / C-125: an embarked unit's strengths in a unit's blow, a promotion's side, ground closed to a strike — READ (0x51f070 at 0x51f3ef..0x51f457, 0x206960 at 0x2069b4..0x2069e0 and 0x206a78..0x206b29, 0x520270 at 0x520576..0x5205db, 0x5228c0, 0x77a4b0), FIT (the closed ground), both twins"
     - "C-132 / C-95: the planning's attack onto a unit at war for any mover, a Trader's layer, the danger map's war table, the Bermuda Triangle's currents — READ (0x26e570 at 0x26e6c4, 0x586360 at 0x586542..0x5865a1, 0x585d90, 0x530f50, 0x469cd0 -> 0x3dcec0 -> 0x2a92d0, 0xc67f70), both twins"
+    - "C-95: the city encircled and Siege City's second encirclement test — READ (0x24bf70, 0x20a070, 0x811e80 at 0x81227b / 0x812769..0x8128c7), both twins"
   context:
     - "...Encampment) 0x24b170 takes the plot's best defender (0x208b80) where it is a combat unit (0x209dd0: Combat, Ranged or Bombard above 0) and, with a MilitaryFormation argument (+0x90), compa..."
     - ...'s units from the last to the first; for each one not dead (+0x770), not a combat unit (0x209dd0), whose unit info lacks the +0x1ba bit 2, and whose player the mover's player is at w...
@@ -590,6 +594,20 @@
     - "C-123: Operation Move's danger flags, the MoveTo execution and m_blockedTurns — READ (0x816cb0 at 0x816e70 / 0x817839, 0x962380, 0x73e610), both twins"
     - "C-124: the kept path is never taken; a move order's path passes other players' units out of sight — READ (0x272aa0, 0x2714b0, 0x586360 at 0x586542..0x5865a1, 0x26fe20), both twins"
     - "C-132 / C-128 / C-95 / C-123 / C-133: the danger map's unmoved flag, a unit made anew's place, the operation queue's push, the strike's turn, the raid's recruit, the shore tests — READ (0x26df90 at 0x26e128..0x26e159, 0x716400 at 0x71672d, 0x586360 at 0x586542..0x58657e / 0x5867ab..0x586875, 0x93fa10 at 0x93fd94..0x93fdab / 0x93fe79, 0x526a0 at 0x52788..0x527ac, 0x523e0, 0x55460, 0x962380 at 0x96268f, 0x60a440, 0x26e570 at 0x26e904, 0x2720a0 at 0x272618..0x272689), both twins"
+  review: reviewed
+- addr: 0x20a070
+  final: 0x15a550
+  kind: function
+  name: a plot held against a player
+  semantics: "(player, plot) — the city encircled's test of a plot beside the centre: true where the plot holds a unit alive (+0x770), not the player's, of a player at war with it (0x469cd0), that fights (0x209dd0) and counts for the player's look (0x20a2a0 under flag 1), the best of them by 0x523d60; else Rules_Movement's zone of control (0x530f50) for the player with no mover, domain 2 on land and 0 on water (IsWater 0x834d0)."
+  status: READ
+  cases:
+    - recording: h1_duels1168
+      turn: 51
+      value: 13:7 beside Rome's 14:7, no unit on it, held by the barbarian Warrior 1310738's zone from 14:6; Rome's 14:7 encircled, Operation Siege City Attack
+  impl: [cpu/core/combat.ts:encircled, gpu/core/sim_barbops.py:_city_encircled]
+  readings:
+    - "C-95: the city encircled and Siege City's second encirclement test — READ (0x24bf70, 0x20a070, 0x811e80 at 0x81227b / 0x812769..0x8128c7), both twins"
   review: reviewed
 - addr: 0x20a220
   final: 0x15a700
@@ -623,6 +641,7 @@
     - "C-124: the kept path is never taken; a move order's path passes other players' units out of sight — READ (0x272aa0, 0x2714b0, 0x586360 at 0x586542..0x5865a1, 0x26fe20), both twins"
     - "C-95: the rampage strikes with the move's whole list; its defender is one the barbarians see — READ (0x778b40, 0x771670, 0x208b80, 0x20a2a0), both twins"
     - "C-134 / C-95: Operation Move's goal and ring plots refused by another player's unit of the mover's layer, at war or not; Pillage passes a unit with no Movement or none the target takes — READ (0x586360 at 0x586542..0x5865a1, 0x208b80 at 0x208c41..0x208d4e, 0x815d50 at 0x815d64..0x815d78 and 0x815e6f..0x815eb9, 0x774380 at 0x7744af..0x7744f8), both twins"
+    - "C-95: the city encircled and Siege City's second encirclement test — READ (0x24bf70, 0x20a070, 0x811e80 at 0x81227b / 0x812769..0x8128c7), both twins"
   context:
     - ...-1 test READ (0x2720a0 at 0x272372, 0x271be0, 0x586360 at 0x586542, 0x208b80 under 0x108, 0x20a2a0), both twins
     - ...nder 0x108 any other player's unit, at war or not, combat or not (flag 8), seen or not (0x20a2a0 with 0x100 skips the visibility count +0x290; a TeamVisibility type, +0x1ba bit 8, of...

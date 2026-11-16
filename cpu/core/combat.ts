@@ -30,7 +30,7 @@ import { grievanceCityStateTaken } from './grievance';
 import { goldenDedication, worldEraIndex } from './eras';
 import { captureAnew, drawAndPayGoody, forgetPlayer, raiseBestTrained, recordAttacker, mapLayer, unitReligious, unitStackSlot } from './units';
 import { randRange } from './rand';
-import { arrive, bestDefender, formationCS, escortRiders, unitsAt, unitDomain, tileFreeForUnit, disbandUnit, unitsHostile, fortifyBonus, cityAtIndex, encampmentBlocks, encampmentIntact, crossesRiver, meleeCrossesRiver, cliffBlocks, stepUnit, stepRefusal, unitVisibleTo, unitExertsZoc, formationTierFor } from './units';
+import { arrive, bestDefender, formationCS, escortRiders, unitsAt, unitDomain, tileFreeForUnit, disbandUnit, unitsHostile, fortifyBonus, cityAtIndex, encampmentBlocks, encampmentIntact, crossesRiver, meleeCrossesRiver, cliffBlocks, stepUnit, stepRefusal, unitVisibleTo, inEnemyZoc, formationTierFor } from './units';
 import { isAirUnit, airRange, airCoverAgainst, airPillageFit, airPillageOffers, airStrikeReaches, airStrikeOffers, airDefenseOf, antiAirAt, displaceAirFrom, interceptorAgainst, priorityDefender, PRIORITY_TARGET_DAMAGE } from './air';
 import { outerPool, wallsMax, wallsTier, encampOuterPool } from './rules';
 import { fuelShortCS } from './stockpile';
@@ -1969,25 +1969,33 @@ function attackEncampment(
 }
 
 /**
- * CIV6's siege: "if the invading army manages to establish zone of control on
- * all passable tiles surrounding the City Center, it will no longer be able to
- * repair the damage it suffers". Every passable neighbour has to be held —
- * one raider standing beside a city is not a siege — and it takes a MILITARY
- * unit, because a civilian exerts no zone of control.
+ * THE CITY ENCIRCLED (0x24bf70, the city heal's and Operation Siege City's
+ * test) for its holder `seat`: a unit of another player that fights on the
+ * centre itself (0x208b80 under flag 1) encircles it; else each plot beside
+ * it that is not impassable (+0x3a bit 3) must be held (0x20a070): a unit
+ * there of a player at war with the holder that fights (0x209dd0; every plot
+ * beside a centre lies in its holder's sight), or the plot in the holder's
+ * enemy zone of control for the plot's domain (Rules_Movement 0x530f50 with
+ * no mover: a district at war that exerts one, a hostile unit of that domain
+ * that exerts one) — runs/h1_duels1168 t51, Rome's 14:7: 13:7 empty in the
+ * Warrior's zone from 14:6, 15:6 under Rome's own Archer in it, the Archers on
+ * 15:7 / 14:8 holding theirs; "Operation Siege City Attack". No passable
+ * plot beside it, encircled. The city's flag +0x1898 that answers no, and
+ * ABILITY_AUTO_SIEGE's units (a game mode's alone) are unported.
  */
 export function encircled(state: GameState, centre: Tile, seat: number): boolean {
-  let passable = 0;
+  const fights = (u: Unit) => {
+    const def = UNITS[u.type];
+    return (def?.combat ?? 0) > 0 || (def?.ranged?.strength ?? 0) > 0 || (def?.bombard ?? 0) > 0;
+  };
+  if (unitsAt(state, centre.index).some((u) => u.seat !== seat && fights(u))) return true;
   for (const n of neighbors(state.map, centre)) {
     if (isImpassable(n)) continue;
-    passable += 1;
-    // "establish zone of control on all passable tiles" — so the ring is held
-    // by what EXERTS it (`unitExertsZoc`), which a submarine never does.
-    const held = unitsAt(state, n.index).some(
-      (u) => unitExertsZoc(u) && unitsHostile(state, u, { seat }),
-    );
+    const held = unitsAt(state, n.index).some((u) => u.seat !== seat && fights(u) && unitsHostile(state, u, { seat }))
+      || inEnemyZoc(state, n.index, { seat, naval: isWater(n) });
     if (!held) return false;
   }
-  return passable > 0;
+  return true;
 }
 
 export function encampmentDefense(

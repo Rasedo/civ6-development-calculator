@@ -1334,25 +1334,35 @@ class SimBarbOps:
 
     # -- Operation Siege City -------------------------------------------------
 
-    def _city_encircled(self, tgt: torch.Tensor) -> torch.Tensor:
-        """[B] `encircled`: every passable plot beside the city centre at `tgt`
-        holds a unit at war with the city's holder that exerts a zone of
-        control (none of the Ranged or Siege class without SUPPRESSION, none
-        embarked, none of a chassis that exerts none); none passable, no"""
+    def _city_encircled(self, tgt: torch.Tensor, seat: int | None = None) -> torch.Tensor:
+        """[B] `encircled` (0x24bf70) of the city centre at `tgt` for its holder
+        (`seat`, else the centre's): a fighting unit of another player on the
+        centre itself encircles it; else every plot beside it that is not
+        impassable is held — a fighting unit there of a player at war with the
+        holder (a military or an embarked unit), or the plot in the holder's
+        enemy zone of control for the plot's domain (`_tac_zoc` with no
+        mover: a district at war that exerts one, a hostile exerter of that
+        domain); none passable, encircled"""
         tc = tgt.clamp(min=0)
         ctr = self._centre_seat_plane().gather(1, tc.unsqueeze(1)).squeeze(1)
+        if seat is not None:
+            ctr = torch.full_like(ctr, seat)
         nbh = self.neigh[tc]
         nbc = nbh.clamp(min=0)
-        am = self.military_at.gather(1, nbc)
-        at = self.unit_type.gather(1, am.clamp(min=0)).clamp(min=0, max=self.NU - 1)
-        aseat = torch.where(am >= 0, self.unit_seat.gather(1, am.clamp(min=0)), torch.full_like(am, -1))
-        ap = self.unit_promos.gather(1, am.clamp(min=0))
-        apc = self.rules_dev.u_promo_class.take(at)
-        no_ex = ((apc == self._pc_ranged) | (apc == self._pc_siege)) & ~self._promo_flag(at, ap, "ZOC_EXERT")
-        emb = self.unit_emb.gather(1, am.clamp(min=0)) & (am >= 0)
-        held = (self._seats_hostile(ctr.unsqueeze(1), aseat) & (am >= 0) & ~self._type_zoc_none.take(at) & ~no_ex & ~emb)
+        held = torch.zeros_like(nbh, dtype=torch.bool)
+        for pl in (self.military_at, self.embarked_at):
+            am = pl.gather(1, nbc)
+            aseat = torch.where(am >= 0, self.unit_seat.gather(1, am.clamp(min=0)), torch.full_like(am, -1))
+            held |= (am >= 0) & (aseat != ctr.unsqueeze(1)) & self._seats_hostile(ctr.unsqueeze(1), aseat)
+        wet = self.water.gather(1, nbc)
+        for s in torch.unique(ctr[(tgt >= 0) & (ctr >= 0)]).tolist():
+            m = (ctr == s).unsqueeze(1)
+            z = torch.where(wet, self._tac_zoc(int(s), naval=True).gather(1, nbc), self._tac_zoc(int(s), naval=False).gather(1, nbc))
+            held |= m & z
+        cm = self.military_at.gather(1, tc.unsqueeze(1)).squeeze(1)
+        on_ctr = (cm >= 0) & (torch.where(cm >= 0, self.unit_seat.gather(1, cm.clamp(min=0).unsqueeze(1)).squeeze(1), ctr) != ctr)
         passable = (nbh >= 0) & (self.passable.gather(1, nbc) | self.wpass.gather(1, nbc))
-        return (tgt >= 0) & (ctr >= 0) & passable.any(dim=1) & ~(passable & ~held).any(dim=1)
+        return (tgt >= 0) & (ctr >= 0) & (on_ctr | ~(passable & ~held).any(dim=1))
 
     def _op_siege(self, on: torch.Tensor, mem: torch.Tensor, target: torch.Tensor, join: torch.Tensor, ctx: dict,
                   seat: int = BARB_SEAT, pre: str = "barb") -> None:
@@ -1362,8 +1372,10 @@ class SimBarbOps:
         `on`: first each member in join order with Movement left whose type
         holds a walls ability (the Battering Ram, the Siege Tower) to its
         planning's first plot one from the city it reaches this turn, its
-        turn done; the city encircled, each member in join order with Movement left
-        and a range strikes it; else the six plots about it shared out by the
+        turn done; the city encircled (`_city_encircled`, as the step opens and
+        again after the slots' moves), each member in join order with Movement left
+        and a range, the city within it, strikes it, its turn done; not
+        encircled as it opens, the six plots about it shared out by the
         generalized assignment (three passes) — a unit on one starts there; a
         plot's gain for a unit of its domain whose fresh planning reaches it
         (`reachOf`) is 0 where every plot is held and it holds none of this
@@ -1399,21 +1411,29 @@ class SimBarbOps:
                     continue
                 ctx["done"][bidx[go], us[go]] = True
                 self._tac_move_to(go & (spot != getattr(self, f"{pre}_unit_tile")[bidx, us]), us, spot.clamp(min=0), pre, seat)
-        enc = on & self._city_encircled(target)
-        if bool(enc.any()):
+        def siege_attack(enc: torch.Tensor) -> None:
+            # the city encircled (asked as the step opens and again after the
+            # slots' moves): each member in join order alive with Movement
+            # left and a range whose ranged strike order may start (the city
+            # within its range) strikes it, its turn done
+            if not bool(enc.any()):
+                return
             for r in range(int(nmem.max())):
                 us = order[:, r]
                 m = enc & (r < nmem) & getattr(self, f"{pre}_unit_alive")[bidx, us] & (getattr(self, f"{pre}_unit_mp")[bidx, us] > 0) \
                     & (self._type_ranged_range.take(ut[bidx, us]) > 0)
                 if not bool(m.any()):
                     continue
-                ranged = self._type_ranged_strength.take(ut[bidx, us]) > 0
                 here = getattr(self, f"{pre}_unit_tile")[bidx, us].clamp(min=0)
-                inr = ranged & (self.pair_dist[here, target.clamp(min=0)].to(torch.long) <= self._tac_range(bidx, us, pre))
-                fire = m & inr & (getattr(self, f"{pre}_unit_attacks")[bidx, us] > 0)
+                inr = m & (self.pair_dist[here, target.clamp(min=0)].to(torch.long) <= self._tac_range(bidx, us, pre))
+                ranged = self._type_ranged_strength.take(ut[bidx, us]) > 0
+                fire = inr & ranged & (getattr(self, f"{pre}_unit_attacks")[bidx, us] > 0)
                 for u in torch.unique(us[fire]).tolist():
                     self._hostile_ranged_strike(fire & (us == u), target.clamp(min=0), pre, u)
-                self._tac_move_to(m & ~inr, us, target.clamp(min=0), pre, seat, strike=True)
+                ctx["done"][bidx[inr], us[inr]] = True
+
+        enc = on & self._city_encircled(target)
+        siege_attack(enc)
         go = on & ~enc
         if not bool(go.any()):
             return
@@ -1443,6 +1463,7 @@ class SimBarbOps:
         nU = cand.sum(dim=1)
         U = int(nU.max())
         if U == 0:
+            siege_attack(go & self._city_encircled(target))
             return
         uslot = corder[:, :U]
         uv = torch.arange(U, device=dev).unsqueeze(0) < nU.unsqueeze(1)
@@ -1593,6 +1614,7 @@ class SimBarbOps:
                 self._tac_move_to(m, us, slc[:, j], pre, seat, strike=False)
                 after = getattr(self, f"{pre}_unit_tile")[bidx, us]
                 again |= m & (after != now)
+        siege_attack(go & self._city_encircled(target))
 
     # -- Barbarian Found City ------------------------------------------------
 

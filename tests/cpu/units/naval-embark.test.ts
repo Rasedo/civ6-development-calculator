@@ -663,18 +663,20 @@ describe('the naval raider and the zone of control', () => {
     expect(inEnemyZoc(priv.state, priv.dest.index, priv.mover)).toBe(true);
   });
 
-  it('and a ring of submarines is no siege', () => {
+  it('a ring of ships at war encircles a centre, each plot held by a unit that fights', () => {
     const state = makeState(makeMap(14, 14, 'COAST'));
     state.unitsMode = true;
     const civ = addCivAtWar(state, 13, 0, []);
     const centre = tileAtCoords(state.map, 6, 6);
-    for (const n of neighbors(state.map, centre)) {
+    const ring = neighbors(state.map, centre);
+    for (const n of ring) {
       const u = spawnUnit(state, 'FRIGATE', n.index, civ.seat)!;
       u.tileIndex = n.index;
     }
     expect(encircled(state, centre, 0)).toBe(true);
-    for (const u of state.units) if (u.type === 'FRIGATE') u.type = 'SUBMARINE';
-    expect(encircled(state, centre, 0)).toBe(false);
+    // a plot left empty is held only where a ship zones it
+    state.units = state.units.filter((u) => u.tileIndex !== ring[0].index);
+    expect(encircled(state, centre, 0)).toBe(true);
   });
 });
 

@@ -2351,13 +2351,8 @@ class SimPhase:
         Free Cities' or a city-state's (`_heal_cities`). Returns the [B] mask
         of cities not besieged, which the Encampment's repair shares.
 
-        CIV6's siege: "if the invading army manages to establish zone of
-        control on all passable tiles surrounding the City Center, it will no
-        longer be able to repair the damage it suffers". EVERY passable
-        neighbour has to be held by a unit that EXERTS one: a civilian does
-        not, "Ranged and Bombard class units do not exert ZOC" (SUPPRESSION
-        hands it back), and CIV6 gives the two submarines "Does not exert
-        zone of control". `encircled` is the twin. "The city will
+        The city encircled (`_city_encircled`, 0x24bf70, the twin of
+        `encircled`) repairs nothing. "The city will
         automatically regain 20 HP per turn" until it is encircled; the outer
         defenses are NOT on this gate: "once damaged, the outer defenses of a
         City Center or defensible district will not regenerate on their own",
@@ -2365,19 +2360,7 @@ class SimPhase:
         bidx = self._bidx
         heal = int(self.rules.combat["cityHealPerTurn"])
         ctr = self.city_center[bidx, row, col].clamp(min=0)
-        nbh = self.neigh[ctr]
-        nbc = nbh.clamp(min=0)
-        _am = self.military_at.gather(1, nbc)
-        _at = self.unit_type.gather(1, _am.clamp(min=0)).clamp(min=0, max=self.NU - 1)
-        _as = torch.where(_am >= 0, self.unit_seat.gather(1, _am.clamp(min=0)), torch.full_like(_am, -1))
-        _ap = self.unit_promos.gather(1, _am.clamp(min=0))
-        _apc = self.rules_dev.u_promo_class.take(_at)
-        _no_ex = ((_apc == self._pc_ranged) | (_apc == self._pc_siege)) & ~self._promo_flag(_at, _ap, "ZOC_EXERT")
-        held = self._seats_hostile(int(self._ROW_SEAT[row]), _as) & (_am >= 0) & ~self._type_zoc_none.take(_at) & ~_no_ex
-        # the OR runs over the six neighbours, not over the whole map: gather
-        # distributes over `|` exactly, and this is a per-city call
-        passable = (nbh >= 0) & (self.passable.gather(1, nbc) | self.wpass.gather(1, nbc))
-        besieged = passable.any(dim=1) & ~(passable & ~held).any(dim=1)
+        besieged = self._city_encircled(ctr, seat=int(self._ROW_SEAT[row]))
         # CIV6 (Defense Logistics): "City cannot be put under siege" — the ring
         # may close and the heal still runs. A governor seats in a major's city.
         if self.n_governors and row < self.n_majors:

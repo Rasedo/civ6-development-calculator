@@ -768,11 +768,12 @@ export function districtZones(state: GameState, tile: Tile, mover: { seat: numbe
  *  its target keeps its Movement for the blow. With `seen` (the plots the
  *  mover's player sees now) a unit exerts one only on a plot of them
  *  (0x5033a0: the player's visibility count of the unit's plot above 0), a
- *  district whatever it sees. */
+ *  district whatever it sees. A mover of no unit zones by its domain alone
+ *  (`naval`: the city encircled's test of the plots beside it). */
 export function inEnemyZoc(
   state: GameState,
   tileIndex: number,
-  mover: { seat: number; type?: string; embarked?: boolean },
+  mover: { seat: number; type?: string; embarked?: boolean; naval?: boolean },
   dest = -1,
   crowded = false,
   seen?: ArrayLike<number>,
@@ -792,7 +793,8 @@ export function inEnemyZoc(
   // (runs/h1_duelq1124 t182: city-state 3's embarked Bombard on 39:17 plans
   // 39:20 / 37:18 (2/0) on from 39:19 / 38:18 beside the barbarian Line
   // Infantry on 38:19, AI_Planning.csv)
-  const navalMover = mover.type !== undefined && (!!UNITS[mover.type]?.naval || !!mover.embarked);
+  const navalMover = mover.naval ?? (mover.type !== undefined && (!!UNITS[mover.type]?.naval || !!mover.embarked));
+  const domained = mover.type !== undefined || mover.naval !== undefined;
   let zoned = false;
   for (const n of neighbors(state.map, tile)) {
     // the district before the river (0x24c2f0 at 0x531168)
@@ -809,7 +811,7 @@ export function inEnemyZoc(
     for (const u of unitsAt(state, n.index)) {
       const relU = unitReligious(u.type);
       if (relU !== relMover) continue;
-      if (mover.type !== undefined && !!UNITS[u.type]?.naval !== navalMover) continue;
+      if (domained && !!UNITS[u.type]?.naval !== navalMover) continue;
       const exerts = relU ? !u.embarked : unitExertsZoc(u);
       if (!exerts || !unitsHostile(state, u, mover)) continue;
       if (n.index === dest && !crowded) return false;

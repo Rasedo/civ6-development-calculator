@@ -18976,3 +18976,46 @@ replay's imposed wonder placement (cpu/harness/replay.ts); GPU
   Cavalry at 372 = `formationCost(165, 2)`, the Scout at 34, formation 2 in
   the record); the formation a minor's order takes is unread, ours trains
   the lone unit at 165.
+
+## C-95: the city encircled and Siege City's second encirclement test — READ (0x24bf70, 0x20a070, 0x811e80 at 0x81227b / 0x812769..0x8128c7), both twins
+
+- THE CITY ENCIRCLED (0x24bf70, District_Instance; the city heal's caller
+  0x1e7d20 and Operation Siege City's): for the city's owner, false where
+  the owner's city record (player +0x12f0 by the city's +0x1b8) holds
+  +0x1898 (unread, unported); true where 0x208b80 (the centre, any
+  defending player, the owner as the looker, no mover, flag 1) finds a
+  unit not the owner's that fights on the centre; else per direction the
+  plot beside the centre (0xeff670 / 0xeff688 offsets), skipped off the
+  map or impassable (plot +0x3a bit 3). A unit there holding
+  ABILITY_AUTO_SIEGE (0x56e4c0; the ability exists in a game mode's rows
+  alone, none here) of a player at war with the owner answers true at
+  once; else the plot must be held (0x20a070): a unit on it alive, not the
+  owner's, of a player at war with the owner (0x469cd0), that fights
+  (0x209dd0) and counts for the owner's look (0x20a2a0 under flag 1), or
+  the plot in the owner's enemy zone of control (Rules_Movement 0x530f50
+  with no mover: domain 2 on land, 0 on water by IsWater 0x834d0). No
+  passable plot beside it leaves the answer true (`encircled` with
+  `inEnemyZoc`'s `naval` mover of no unit; `_city_encircled`, which
+  `_city_heal` now calls too).
+- SIEGE CITY'S SECOND TEST (0x811e80): after the walls units, the city
+  encircled (0x812274) jumps past the slots to 0x812769; else the slots'
+  assignment and moves run and fall through to 0x812769, which asks
+  0x24bf70 again. Encircled there, each member alive (+0x770) with
+  Movement left (0x56c690) and GetRange above 0 takes a ranged strike
+  order on the city (0x964a40); one whose CanStart (vtable +0x48) passes is
+  logged "Operation Siege City Attack, <type> <x:y>", pushed (+0x60) and its
+  turn done (0x570b40 with 1). The engines take CanStart as the city
+  within the unit's range (`siegeAttack`; `siege_attack`).
+- Confirmed: runs/h1_duels1168 t51 Rome's 14:7: after the Archer
+  2752512's slot step 16:8 -> 15:7 the ring holds (13:7 empty in the
+  Warrior 1310738's zone from 14:6, 15:6 under Rome's own Archer in it),
+  the Archer on 14:8 strikes, logged as the game's; the Warrior and the Ram
+  stay on 14:6 (t49 / t51 3 rows gone); runs/h1_duels1155 t34-35 the City
+  Assault on 36:10 (6 rows gone); runs/h1_duels1117 whole game, 1156 to
+  t89, 1140 to t87 unchanged.
+- Open: runs/h1_duels1168 t51 our City Attack still assigns the Warrior
+  1310738 a blow on 14:7 from 14:6 where the game logs none, and our
+  Operation Move lists the Battering Ram 2883607; t65-121 our Operation
+  Defend Units moves the Ram off 15:8 (no unit of its own beside it,
+  Rome's Archer on 15:7 and a Horseman 4 off), the game logs no Protect
+  Units (C-95).

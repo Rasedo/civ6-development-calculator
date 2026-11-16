@@ -133,12 +133,15 @@
 - addr: 0x811e80
   kind: function
   name: Operation Siege City (execution)
-  semantics: "Operation Siege City's execution: first (0x812027..0x812219) each member with Movement left holding a walls ability (+0x18b8 / +0x18b9, 0x56e670 / 0x56e680) to its planning's first plot one from the city this turn (0x791300: 1 turn, range 1, any Movement), logged \"<type> <x:y>, Move <x:y>\", its turn done (0x570b40), none where the city's flags hold (the Free Cities' record +0x1c, the player's +0x12f0 +0xf4, the city's +0x2a10 / +0x2a70: unread); then without ABILITY_AUTO_SIEGE, the six plots round the city (0x812950) as slots, the members with Movement left and no bombard as agents, the generalized assignment 0x8b5bf0 (start 0x80f9d0, gain 0x80f6b0, move 0x80f4a0) logged \"From, Goal:, Move\"; encircled (0x24bf70) the ranged members strike \"Operation Siege City Attack\"."
+  semantics: "Operation Siege City's execution: first (0x812027..0x812219) each member with Movement left holding a walls ability (+0x18b8 / +0x18b9, 0x56e670 / 0x56e680) to its planning's first plot one from the city this turn (0x791300: 1 turn, range 1, any Movement), logged \"<type> <x:y>, Move <x:y>\", its turn done (0x570b40), none where the city's flags hold (the Free Cities' record +0x1c, the player's +0x12f0 +0xf4, the city's +0x2a10 / +0x2a70: unread); then, the city not encircled (0x24bf70 at 0x812274), the six plots round the city (0x812950) as slots, the members with Movement left and no bombard as agents, the generalized assignment 0x8b5bf0 (start 0x80f9d0, gain 0x80f6b0, move 0x80f4a0) logged \"From, Goal:, Move\"; then (0x812769, the slots skipped or after their moves) encircled again, each member alive with Movement left and GetRange above 0 takes a ranged strike order on the city (0x964a40); one its CanStart (vtable +0x48) passes is logged \"Operation Siege City Attack\", pushed (+0x60) and its turn done (0x570b40 with 1)."
   status: PARTLY
   cases:
     - recording: h1_duels1168
       turn: 47
       value: the Battering Ram 2883607 by Rome on 14:7, its Ancient Walls standing, steps 14:9 -> 14:8 before the slots; t53-58 two plots off it takes a slot
+    - recording: h1_duels1155
+      turn: 35
+      value: the Archer 1703956 on 36:8 logs Operation Siege City Attack and ends on the game's plot, the city encircled by the zones of control about it (t34 the Warrior 786442 and the Builder Capture pairs alike)
   impl:
     - cpu/core/operations/assault.ts:SiegeSlot
     - cpu/core/operations/assault.ts:siegeCityExecute
@@ -147,12 +150,14 @@
     - gpu/core/sim_minorops.py:_x_siege
     - cpu/core/aiView.ts:wallsAbility
     - cpu/core/operations/assault.ts:v
+    - cpu/core/operations/assault.ts:siegeAttack
   readings:
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
     - "C-97: the war operations — the war candidates, the city value's frame, the assault nodes and Attack Units READ; the loyalty lead's sources, the team update's danger and the assault's executions PARTLY READ"
     - "C-97: the war desires, the war operation's readiness and the assault's executions — the war value, the not-ready hook, the readiness and the executions READ; the leader's war factor, the WMD flags, the deal items and the war record's writer unread"
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
     - "C-95: the barbarians' scout report on plots newly visible, the camp's taker, the rampage without the Clans mode, Siege City's walls units — READ (0x153ef0, 0x154830 at 0x154a11..0x154a83, 0x778b40 at 0x778f62, 0x8e3250, 0x811e80 at 0x812027..0x812219), both twins"
+    - "C-95: the city encircled and Siege City's second encirclement test — READ (0x24bf70, 0x20a070, 0x811e80 at 0x81227b / 0x812769..0x8128c7), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ...ee70 / 0x80d790; Operation Pillage 0x8134a0 / 0x811390; Operation Siege City 0x8136a0 / 0x811e80; Operation Attack City 0x813250 / 0x8109e0; Barbarian Raid Check 0x7c7330; Barbarian Re...

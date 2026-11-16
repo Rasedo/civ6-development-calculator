@@ -559,10 +559,21 @@
   final: 0x1924e0
   kind: function
   name: a city encircled
-  status: PARTLY
-  impl: [cpu/core/combat.ts:encircled, cpu/core/operations/assault.ts:siegeCityExecute]
+  semantics: "the city (rcx) encircled for its owner: false where the owner's city record (player +0x12f0 by the city's +0x1b8) holds +0x1898 (unread); true where 0x208b80 (the centre, any player, the owner as the looker, no mover, flag 1) finds a fighting unit not the owner's on the centre; else per direction the neighbour plot (0xeff670 / 0xeff688), skipped off the map or impassable (+0x3a bit 3): a unit there holding ABILITY_AUTO_SIEGE (0x56e4c0; a game mode's ability alone) of a player at war with the owner answers true at once; else 0x20a070(owner, plot) false clears the answer. No passable neighbour leaves it true."
+  status: READ
+  cases:
+    - recording: h1_duels1168
+      turn: 51
+      value: "Rome's 14:7 encircled after the Archer 2752512's slot step 16:8 -> 15:7: 13:7 empty in the Warrior 1310738's zone from 14:6, 15:6 under Rome's own Archer in it, 15:7 / 14:8 under the barbarian Archers; the Archer on 14:8 logs Operation Siege City Attack"
+  impl:
+    - cpu/core/combat.ts:encircled
+    - cpu/core/operations/assault.ts:siegeCityExecute
+    - gpu/core/sim_barbops.py:_city_encircled
+    - gpu/core/sim_phase.py:_city_heal
+    - gpu/core/sim_phase.py:SimPhase
   readings:
     - "C-97: the war desires, the war operation's readiness and the assault's executions — the war value, the not-ready hook, the readiness and the executions READ; the leader's war factor, the WMD flags, the deal items and the war record's writer unread"
+    - "C-95: the city encircled and Siege City's second encirclement test — READ (0x24bf70, 0x20a070, 0x811e80 at 0x81227b / 0x812769..0x8128c7), both twins"
   context:
     - "...0x28] that dis.sh dropped —, the move 0x80f4a0) logged \"From, Goal:, Move\"; encircled (0x24bf70) the ranged members strike \"Operation Siege City Attack\". PILLAGE (0x811390): Pillage D..."
   review: reviewed

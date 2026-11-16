@@ -58,6 +58,16 @@
   context:
     - "...ings +0x159 bit 16), +0x15 its MaxWorldInstances (+0x40) reached by the world's copies (0x1e7b70); for a district its PrereqTech / PrereqCivic, +0x14 set): with the player and the co..."
   review: reviewed
+- addr: 0x1e7d20
+  final: 0x142390
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-95: the city encircled and Siege City's second encirclement test — READ (0x24bf70, 0x20a070, 0x811e80 at 0x81227b / 0x812769..0x8128c7), both twins"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "- THE CITY ENCIRCLED (0x24bf70, District_Instance; the city heal's caller 0x1e7d20 and Operation Siege City's): for the city's owner, false where the owner's city record..."
+  review: imported
 - addr: 0x1e8790
   final: 0x142cc0
   kind: function

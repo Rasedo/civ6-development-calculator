@@ -830,8 +830,11 @@ function siegeSlots(view: AiView, city: number): SiegeSlot[] {
  *  slot by slot each holder not already on a slot moves to it ("Operation
  *  Siege City, From, Goal, Move"), again while one moved. The step beside
  *  the city of the units that pass a zone of control (its gates unread)
- *  goes unported; where the city is encircled its ranged units strike it
- *  ("Operation Siege City Attack"). */
+ *  goes unported. Where the city is encircled — as the step opens, the
+ *  slots skipped, or after their moves — each ranged unit within its range
+ *  of it strikes it, its turn done ("Operation Siege City Attack":
+ *  runs/h1_duels1168 t51, the Archer 2752512 on 14:8 strikes Rome's 14:7
+ *  after the Archer 1310738's step 16:8 -> 15:7 closes the ring). */
 function siegeCityExecute(_node: Parameters<BtHandler<OpsContext>['update']>[0], _run: unknown, ctx: OpsContext): void {
   const { op } = ctx;
   const target = op.target;
@@ -850,13 +853,24 @@ function siegeCityExecute(_node: Parameters<BtHandler<OpsContext>['update']>[0],
     ctx.endTurn?.(id);
     moveTo(ctx, u, spot);
   }
-  if (v.encircled(target)) {
+  // the city encircled (0x24bf70, asked again after the slots' moves at
+  // 0x812769), each member alive with Movement left and a range takes a
+  // ranged strike order on it (0x964a40); one the order may start (the city
+  // within its range) is logged, strikes and its turn is done (0x570b40)
+  const siegeAttack = () => {
+    if (!ctx.view().encircled(target)) return;
     for (const id of opUnits(op)) {
       const u = now(id);
       if (!u || u.movesLeft <= 0 || u.range <= 0) continue;
-      ctx.log(`${op.def}, Operation Siege City Attack, ${u.type} ${xy(v, u.plot)}`);
+      const cv = ctx.view();
+      if (cv.plotDistance(u.plot, target) > u.range) continue;
+      ctx.log(`${op.def}, Operation Siege City Attack, ${u.type} ${xy(cv, u.plot)}`);
       ctx.strike(id, target);
+      ctx.endTurn?.(id);
     }
+  };
+  if (v.encircled(target)) {
+    siegeAttack();
     return;
   }
   const slots = siegeSlots(v, target);
@@ -941,6 +955,7 @@ function siegeCityExecute(_node: Parameters<BtHandler<OpsContext>['update']>[0],
       ctx.log(`${op.def}, Operation Siege City, ${u.type}, From ${xy(v, from)}, Goal: ${xy(v, s.plot)}, Move ${xy(v, after)}`);
     }
   }
+  siegeAttack();
 }
 
 /** the generalized assignment's passes in the siege (its last argument) */
