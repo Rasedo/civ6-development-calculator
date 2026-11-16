@@ -93,6 +93,7 @@
     - cpu/core/eras.ts:wcls
     - cpu/data/cityStates.ts:minorUpgradeGold
     - cpu/data/constants.ts:STOCKPILE_CAP_PER_ENCAMPMENT_BUILDING
+    - gpu/core/sim_minorops.py:child_of
   readings:
     - "B-31r-S1: the plunder payout — CLOSED"
     - "C-94: the game era, the ages and the founding moments — READ"

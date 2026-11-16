@@ -18349,3 +18349,34 @@ over `civ_gpp_turn` (gpu/core/sim_minors.py).
   and a Trebuchet gone after the build still counted (1 / 2); t69 city-state 4,
   the Warrior, Heavy Chariot and Catapult player 1 levied in its turn still
   counted (1 each); 1124 unit.table.held 15 rows to 0, no other row moved.
+
+## C-99: the city-states' war operations — the war candidates' trade-list gate READ (0x747230 -> 0x78e010), the city assaults ported in both twins; the city value's land strengths and the assault's GPU executions open
+
+`MINOR_OP_DEFS` (cpu/core/minorOps.ts: Attack Enemy City, Wartime Attack
+Enemy City, Attack Walled City, Wartime Attack Walled City, the Default_List's
+order), `enemyCities` (cpu/core/operations/evaluate.ts, `EvalInputs.tradeListed`,
+`OpsEnv.tradeListed`); `_mops_evaluate`, `_mops_war_eval`, `_mops_city_value`,
+`_mops_known_cities`, `_mops_pressure_lead` and the nodes `_u_is_at_war`,
+`_u_lock`, `_u_diplomacy`, `_u_turn_limiter` (`_OpCtx.child_of`),
+`_u_build_mil`, `_u_air_assault`, `_u_make_formation`, `_u_can_alpha_enemy`,
+`_assault_target_valid` (gpu/core/sim_minorops.py).
+
+- THE CANDIDATES (0x722d70): per player at war with the city-state, in seat
+  order, its WAR definitions; MustHaveUnits on every unit it holds (0x746920).
+- THE TARGET WALK'S TRADE GATE (0x747230 at its 0x78e010 call): an enemy city
+  is a target only where one of the evaluating player's cities lists it in
+  its trade list (CityBuildAI +0x870, `CityState.tradeCities`,
+  `citystate_trade_ok`); a player with no city (the barbarians) lists none.
+- Confirmed: runs/h1_duels1145 city-state 4 against player 1 starts at t36
+  (Wartime Attack Enemy City, 34:14), t46 / t56 (Attack Enemy City), t66, and
+  no candidate after (t67-250): Jiaodong 34:14 walled at t101, Xi'an 36:17 known with
+  no district entry and out of its trade list (its CITY VALUES line 88.0 at
+  t102); runs/h1_duels1164 city-state 3 t184 / t209 / t219 on 9:11;
+  runs/h1_duels1133 city-state 4 t170 on 42:14 — under the game's memory each
+  war start and its target, member and strength rows on the three seeds.
+- Open (C-99): the city value's A / B (0x4bd0d0 domain 2, +0x2d0) taken as
+  the land unit counts (runs/h1_duels1145 t36 Jiaodong ours 78.4, the
+  game's 230.4); a city-state's diplomatic request (Operation Diplomacy at
+  peace), its air strike, its Make Formation pairs, Attack Along March over a
+  district, a walled target's blows and its pillage over the majors' pool —
+  the GPU twin refuses each (NotImplementedError).

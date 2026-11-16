@@ -28,6 +28,7 @@
     - cpu/export/rules.ts:rules
     - cpu/core/barbarianOps.ts:barbarianOpsEvaluate
     - gpu/core/sim_barbops.py:_barb_camp_pick
+    - gpu/core/sim_minorops.py:_mops_war_eval
   readings:
     - "C-99: a unit bought in the turn sits out the operations, a Harbor trains ships"
     - "C-97: the operations — the manager and its candidates READ, the staging list and City Defense's start unread"
@@ -39,6 +40,7 @@
     - "C-95 / C-99: a cleared camp's scout still reports; a lake city trains ships; IsCoastalTarget; the recruit's priority; a candidate's own strength — READ (0x153ef0, 0x1485c0, 0x1c77c0 -> 0x82a10, 0x73a440 -> 0x73a880, 0x81c820 at 0x81cacf..0x81cb14, 0x7d1e40 at 0x7d2004..0x7d205f, 0x5cced0 at 0x5cd0c1..0x5cd11e, 0x7f5240), both twins"
     - "C-95 / C-99: a cleared camp's scout still reports; a lake city trains ships; IsCoastalTarget; the recruit's priority; a candidate's own strength — READ (0x153ef0, 0x1485c0, 0x1488a0 at 0x148c38..0x148c64, 0x1c77c0 -> 0x82a10, 0x73a440 -> 0x73a880, 0x81c820 at 0x81cacf..0x81cb14, 0x7d1e40 at 0x7d2004..0x7d205f, 0x5cced0 at 0x5cd0c1..0x5cd11e, 0x7f5240), both twins"
     - "C-95: the barbarians' scout is any tribe unit of AI type EXPLORE, a captive's sight counts — READ (0x153ef0 at 0x153f1d / 0x153f86), both twins"
+    - "C-99: the city-states' war operations — the war candidates' trade-list gate READ (0x747230 -> 0x78e010), the city assaults ported in both twins; the city value's land strengths and the assault's GPU executions open"
   context:
     - "- The evaluation (job \"Op Evaluation\", 0x746920): MustBeAtWar, MustHaveNukes, MustHaveUnits (player +0x12e8 +0xc0) first; then each tar..."
   review: reviewed

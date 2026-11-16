@@ -149,6 +149,7 @@
     - cpu/core/operations/nodes.ts:planFormations
     - gpu/core/sim_barbops.py:_bop_form_plan
     - cpu/core/operations/nodes.ts:formedOf
+    - gpu/core/sim_minorops.py:_u_make_formation
   readings:
     - "C-97: the behaviour trees — READ (the interpreter), the nodes PARTLY READ"
     - "C-95: Make Formation's support rider — READ (0x7efd70, 0x73b6c0, 0x73b8a0), both twins"

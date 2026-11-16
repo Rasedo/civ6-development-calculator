@@ -155,7 +155,11 @@ function targetsOf(view: AiView, seat: number, c: Candidate, inputs: EvalInputs)
  *  the enemy the seat knows — with TargetParameter 0 one whose districts'
  *  defenses and walls (0x5eb600) are no more than its districts, no walls
  *  standing — but the running operation's target and any running
- *  operation's (0x724dd0); valued by the city value (0x79fef0); the enemy's
+ *  operation's (0x724dd0), one a city of the seat's trade list holds
+ *  (CityBuildAI +0x870, 0x78e010: runs/h1_duels1145 city-state 4 at war
+ *  with player 1 from t36, Xi'an on 36:17 known by no district entry and out
+ *  of its trade list, no candidate t67-250 while its CITY VALUES line logs
+ *  88.0 at t102); valued by the city value (0x79fef0); the enemy's
  *  known units within 3 its strength where the seat's best combat strength
  *  passes the enemy's by more than 30, else none; above the definition's
  *  MaxTargetDefense (where it has one) left out */
@@ -172,6 +176,7 @@ function enemyCities(view: AiView, seat: number, c: Candidate, inputs: EvalInput
     }
     if (c.op && c.op.target === k.plot) continue;
     if (inputs.taken.has(k.plot)) continue;
+    if (!inputs.tradeListed(k.plot)) continue;
     const enemyStr = outclassed ? armyStrength(view, inputs.army(c.enemy), k.plot, 3, 0) : 0;
     if (def.maxTargetDefense >= 0 && enemyStr > def.maxTargetDefense) continue;
     out.push({ plot: k.plot, value: cityValue(view, seat, k, cities, inputs.army), enemyStr });
@@ -199,6 +204,8 @@ export interface EvalInputs {
   /** the camps the knowledge base holds */
   camps: readonly number[];
   known(): readonly AiKnownCityView[];
+  /** a city's centre one of the seat's cities' trade lists holds */
+  tradeListed(plot: number): boolean;
   /** a player's army as the knowledge base holds it (the seat's own: its
    *  units) */
   army: (player: number) => readonly ArmyUnit[];

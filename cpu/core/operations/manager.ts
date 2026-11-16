@@ -99,6 +99,9 @@ export interface OpsEnv {
   army(player: number): readonly KnownUnit[];
   camps(): readonly number[];
   known(): readonly AiKnownCityView[];
+  /** a known city's centre one of the seat's cities' trade lists holds
+   *  (CityBuildAI +0x870); none for a party with no trade list */
+  tradeListed?(plot: number): boolean;
   /** a city's threat by its plot (CityBuildAI +0x1b8), -1 none */
   threat(plot: number): number;
   /** the seat's contract book, its next contract's id, its cities as the
@@ -318,7 +321,8 @@ export function operationsEvaluate(ai: OpsAi, env: OpsEnv, slotOf: ReadonlyMap<n
     for (const def of allowed) if (def.enemyType === 'WAR') cands.push(blank(def, p));
   }
   for (const def of allowed) if (def.enemyType === 'NONE') cands.push(blank(def, -1));
-  const inputs = { settle: env.settle, camps: env.camps(), taken: new Set(opsOf(ai).map((o) => o.target)), known: env.known, army: env.army };
+  const inputs = { settle: env.settle, camps: env.camps(), taken: new Set(opsOf(ai).map((o) => o.target)), known: env.known,
+    tradeListed: (p: number) => env.tradeListed?.(p) ?? false, army: env.army };
   for (const c of cands) evaluate(view, ai.seat, c, staging, inputs);
   const { base, perWar } = limitsOf(view, ai.seat);
   // AI_EVENT_DESIRE_SETTLE (0x7265b0): for a seat that settles, Settle New City starts where the seat

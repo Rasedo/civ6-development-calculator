@@ -315,7 +315,9 @@ export function barbarianOpsEvaluate(state: GameState): void {
   const camps = campsKnown(state);
   const running = state.barbSeat.ops ? opsOf(state.barbSeat.ops) : [];
   const inputs: EvalInputs = {
-    settle: null, camps, taken: new Set(running.map((o) => o.target)), known: () => view.knownCities(BARB_SEAT), army: env.army,
+    settle: null, camps, taken: new Set(running.map((o) => o.target)), known: () => view.knownCities(BARB_SEAT),
+    // the barbarians hold no city whose trade list holds a target (0x78e010)
+    tradeListed: () => false, army: env.army,
   };
   const blank = (op: Operation | null, def = op ? opDef(op) : BARB_DEFS[0]): Candidate => ({ def, enemy: op ? op.enemy : -1,
     presetRally: op ? op.target : NO_PLOT, presetStrength: op ? op.strength : null, op, valid: false, odds: 0, value: 0, target: NO_PLOT, rally: NO_PLOT });

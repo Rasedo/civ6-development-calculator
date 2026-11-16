@@ -244,16 +244,16 @@ function minorOpsRecord(cs: CityState, state: GameState): number[] {
  *  pick, per slot its definition (its index in `defs`), target, rally,
  *  backup, strengths, recruit priority and teams */
 function opsRecord(ai: OpsAi | undefined, seat: number, defs: readonly string[], state: GameState): number[] {
-  if (!ai) return [0, 0, -1, -1, -1];
+  if (!ai) return [0, 0, -1, -1, -1, -1];
   const out: number[] = [ai.slots.length, ai.free.length, ...ai.free];
-  out.push(ai.pick ? defs.indexOf(ai.pick.def) : -1, ai.pick?.target ?? -1, ai.pick?.rally ?? -1);
+  out.push(ai.pick ? defs.indexOf(ai.pick.def) : -1, ai.pick?.target ?? -1, ai.pick?.rally ?? -1, ai.pick?.enemy ?? -1);
   for (const op of ai.slots) {
     if (!op) {
       out.push(-1);
       continue;
     }
     out.push(defs.indexOf(op.def), op.id, op.target, op.rally, op.backup?.target ?? -1, op.backup?.rally ?? -1,
-      op.enemyStrength, op.strength, op.recruitPriority ?? -1);
+      op.enemyStrength, op.strength, op.recruitPriority ?? -1, op.enemy, op.backup?.enemy ?? -1, op.locked ? 1 : 0, op.allowUnitConstruction ? 1 : 0);
     for (let k = 0; k < 2; k++) {
       const t = op.teams[k];
       if (!t) {

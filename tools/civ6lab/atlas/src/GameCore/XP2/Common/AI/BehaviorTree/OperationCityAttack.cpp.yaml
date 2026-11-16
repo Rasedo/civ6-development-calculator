@@ -13,6 +13,7 @@
   impl:
     - cpu/core/operations/assault.ts:airAssaultExecute
     - cpu/core/operations/assault.ts:airPriorities
+    - gpu/core/sim_minorops.py:_x_air_assault
   readings:
     - "C-97: the war operations — the war candidates, the city value's frame, the assault nodes and Attack Units READ; the loyalty lead's sources, the team update's danger and the assault's executions PARTLY READ"
     - "C-97: the war desires, the war operation's readiness and the assault's executions — the war value, the not-ready hook, the readiness and the executions READ; the leader's war factor, the WMD flags, the deal items and the war record's writer unread"
@@ -173,6 +174,8 @@
     - gpu/core/sim_minorops.py:_u_can_alpha
     - cpu/core/aiView.ts:cityBlow
     - cpu/core/opsOrders.ts:cityBlow
+    - gpu/core/sim_minorops.py:_u_can_alpha_enemy
+    - gpu/core/sim_minorops.py:_u_can_alpha_any
   readings:
     - "C-97: the war operations — the war candidates, the city value's frame, the assault nodes and Attack Units READ; the loyalty lead's sources, the team update's danger and the assault's executions PARTLY READ"
     - "C-125 / C-110 / C-134: a defending district's terrain, a ship's shot at a district, the fuel term's player, the planning's dealt word on a district, Support on a centre, a city-state's plannings — READ (0x51eaf0 at 0x51ec87..0x51ecca, 0x522c10 at 0x522cc6..0x522f16, 0x51d670 at 0x51d7cd..0x51d7fa / 0x51d9c9..0x51da3d, 0x51c810 at 0x51ca2d..0x51ca57, 0x51f070 at 0x51f253..0x51f27a, 0x520270 at 0x520413..0x520429, 0x519440 at 0x51963d..0x51975a, 0x791470 at 0x7916fb..0x79175e, 0x812cc0 at 0x812ecb..0x812f41, 0x51e980), LAB (the aiunits plannings), both twins"
@@ -204,6 +207,7 @@
   impl:
     - cpu/core/operations/assault.ts:ASSAULT_NODES
     - cpu/core/operations/assault.ts:operationAirAssault
+    - gpu/core/sim_minorops.py:_u_air_assault
   readings:
     - "C-97: the war operations — the war candidates, the city value's frame, the assault nodes and Attack Units READ; the loyalty lead's sources, the team update's danger and the assault's executions PARTLY READ"
   notes: [read; no recorded decision of the five verbose duels tells it apart yet]

@@ -18,15 +18,18 @@
  *
  * A minor runs the definitions both twins carry the trees of: Attack Barb
  * Camp (its own start), Barb Camp Tech Boost (never started: its trigger is
- * unported), Civilian Builder Capture (a candidate only: it starts itself
- * not), City Defense (the defence event), Naval Superiority (its own start,
- * off a coastal city) — the Default_List's order.
+ * unported), the city assaults — Attack Enemy City, Wartime Attack Enemy
+ * City, Attack Walled City, Wartime Attack Walled City (their own starts,
+ * against a player at war with it: Early and Siege City Assault) —,
+ * Civilian Builder Capture (a candidate only: it starts itself not), City
+ * Defense (the defence event), Naval Superiority (its own start, off a
+ * coastal city) — the Default_List's order.
  */
 import type { ArmyRecord, CityState, GameState, Unit, UpgradeTree } from './types';
 import { UNITS } from '../data/units';
 import { gameTypeOf } from '../data/aliases';
 import { aiView, lookCities } from './aiView';
-import { cityStateTactics, moveTo, moveUnitDanger, passEnd, passFinish, passReachAt, plotDistance, seatPoolSlots, stackedAt, swapUnits, type Pass } from './tactical';
+import { cityStateTactics, moveTo, moveUnitDanger, passEnd, passFinish, passPillage, passReachAt, plotDistance, seatPoolSlots, stackedAt, swapUnits, type Pass } from './tactical';
 import { defenderAiType, ownAiType, passOrders, passView } from './opsOrders';
 import { newOpsAi, operationsEvaluate, operationsRefresh, operationsRun, opContracts, opsOf, startOperationNamed, type OpsAi, type OpsEnv } from './operations/manager';
 import { ARMY_READ_AGE, lookCamps, type KnownUnit } from './operations/knowledge';
@@ -54,8 +57,8 @@ import type { UnitProductionRow } from './aiUnitProduction';
 import type { AiUnitView, AiView } from './aiViewTypes';
 
 /** the definitions a city-state runs */
-export const MINOR_OP_DEFS: readonly string[] = ['Attack Barb Camp', 'Barb Camp Tech Boost', 'Civilian Builder Capture', 'City Defense',
-  'Naval Superiority'];
+export const MINOR_OP_DEFS: readonly string[] = ['Attack Barb Camp', 'Barb Camp Tech Boost', 'Attack Enemy City', 'Wartime Attack Enemy City',
+  'Attack Walled City', 'Wartime Attack Walled City', 'Civilian Builder Capture', 'City Defense', 'Naval Superiority'];
 
 /** the replay's view of each minor's operation lines and candidate lines
  *  (null off) */
@@ -156,6 +159,7 @@ function minorEnv(state: GameState, cs: CityState, pass: Pass | null): OpsEnv {
     army: (p) => recentOf(cs, p),
     camps: () => cs.campsKnown ?? [],
     known: () => fresh().knownCities(cs.seat),
+    tradeListed: (plot) => cs.tradeCities?.includes(plot) ?? false,
     threat: (plot) => (plot === cs.centerIndex ? cs.threat ?? -1 : -1),
     book: () => ai,
     newContractId: () => ai.nextContract++,
@@ -177,8 +181,22 @@ function minorEnv(state: GameState, cs: CityState, pass: Pass | null): OpsEnv {
       // (0x469cd0), as the favoured technology's do
       return seatUnitRows(state, cs.seat, (u, p) => by.get(`${u}|${p}`) ?? 0, v.players(), (p) => p === BARB_SEAT || v.atWar(cs.seat, p));
     })()),
-    act: () => {
-      throw new Error('a city-state\'s operations give their units move and attack orders alone');
+    // a unit action row of its operations: a pillage where the unit stands
+    // (Operation Pillage's)
+    act: (rows) => {
+      if (!pass) refuse();
+      const v = fresh();
+      const units = v.units(cs.seat);
+      const pillage = v.unitActionColumn('PILLAGE');
+      for (const row of rows) {
+        row.forEach((a, col) => {
+          if (a < 0) return;
+          if (a !== pillage) throw new Error(`a city-state's operations give no action ${a}`);
+          const u = state.units.find((x) => x.id === units[col].id && x.seat === cs.seat);
+          if (u) passPillage(state, pass!, u);
+        });
+      }
+      changed();
     },
     ...(pass ? passOrders(state, cs.seat, pass, changed) : outsidePass),
     ownAiType: ownAiType(state, cs.seat, pass),

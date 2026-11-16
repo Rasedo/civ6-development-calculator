@@ -176,6 +176,7 @@
     - cpu/core/operations/cityValue.ts:cityDefense
     - cpu/core/operations/nodes.ts:refreshStrengths
     - gpu/core/sim_minorops.py:_ops_enemy_str
+    - gpu/core/sim_minorops.py:_mops_city_defense
   readings:
     - "C-97: the operations — the manager READ (no-enemy candidates), the war candidates unread"
     - "C-97: the operations — the manager and its candidates READ, the staging list and City Defense's start unread"

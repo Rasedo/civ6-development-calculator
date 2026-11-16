@@ -2634,9 +2634,13 @@
             "mops_pick",
             "mops_pick_target",
             "mops_pick_rally",
-            "mops_recpri"
+            "mops_recpri",
+            "mops_bk_enemy",
+            "mops_locked",
+            "mops_auc",
+            "mops_pick_enemy"
           ],
-          "note": "the minor's operations (`minorOpsRecord` / `_minor_ops`): the pool, the pick, per slot its definition, target, rally, backup, strengths, recruit priority and teams (members by pool slot, counts, goals, engaged, the battle strengths, flags, unit, strength); the trees' node memories and Operation Move's stores are not compared"
+          "note": "the minor's operations (`minorOpsRecord` / `_minor_ops`): the pool, the pick and its enemy, per slot its definition, target, rally, backup, strengths, recruit priority, enemy, backup enemy, lock, unit construction allowed and teams (members by pool slot, counts, goals, engaged, the battle strengths, flags, unit, strength); the trees' node memories and Operation Move's stores are not compared"
         },
         {
           "name": "minorCampsKnown",

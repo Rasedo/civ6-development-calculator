@@ -712,6 +712,7 @@
     - cpu/core/operations/cityValue.ts:axialDistance
     - cpu/core/operations/cityValue.ts:cityValue
     - cpu/core/operations/evaluate.ts:enemyCities
+    - gpu/core/sim_minorops.py:_mops_city_value
   readings:
     - "C-97: the operations — the manager READ (no-enemy candidates), the war candidates unread"
     - "C-97: the governor AI — the analysis, the choice and the seats READ, the analyzers PARTLY READ"

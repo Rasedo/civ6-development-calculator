@@ -1553,7 +1553,13 @@ _NEXT_MEM = ("Contract Manager Decorator", "Has Player Ability")
 
 
 def _child(c: _Ctx, p: dict, own: torch.Tensor, s: torch.Tensor, child: int):
-    """a selector's or decorator's parent function: (own, finished)"""
+    """a selector's or decorator's parent function: (own, finished); a
+    context's own decorators first (`child_of`: an operation's Turn Limiter)"""
+    hook = getattr(c, "child_of", None)
+    if hook is not None:
+        r = hook(p, own, s)
+        if r is not None:
+            return r
     t = p["type"]
     if t == "Contract Manager Decorator":
         v = torch.maximum(torch.where(own == BT_FRESH, s, own), s)

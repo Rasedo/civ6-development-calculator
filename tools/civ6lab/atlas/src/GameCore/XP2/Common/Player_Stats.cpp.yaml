@@ -115,6 +115,7 @@
     - "H-1: the civics AI — READ (the choice, the walk, the propagation), PARTLY READ (the value)"
     - "C-130 / C-112: the domain strength's treasury carry and the city's turn's citizen re-place — READ, both twins"
     - "C-130 / C-96: a contract's priority in the expected unit count, the strength's treasury flag — READ, both twins"
+    - "C-99: the city-states' war operations — the war candidates' trade-list gate READ (0x747230 -> 0x78e010), the city assaults ported in both twins; the city value's land strengths and the assault's GPU executions open"
   context:
     - "...h, -10 where +0x6780 names p, + (20 - T in mode 1) where the owner's military strength (0x4bd0d0(-1): PlayerStats +0x210) is above twice p's or its era (player +0x1358 +0xf8, the Eras..."
   review: reviewed

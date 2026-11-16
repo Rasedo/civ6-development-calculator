@@ -47,11 +47,11 @@ from .std_sort import std_sort
 
 # the pool's slots, the teams of an operation, a team's members, the camps
 # the knowledge base holds, the Operation Move nodes of a tree
-N_OPS = 3
+N_OPS = 4
 N_TEAMS = 2
 N_MEMBERS = 16
 N_CAMPS = 16
-N_MOVES = 2
+N_MOVES = 5
 # the "Upgrade Units" trees a city-state runs at once
 N_UPG = 4
 # the age at most of a record the army strength reads (`ARMY_READ_AGE`,
@@ -92,6 +92,8 @@ class MinorOpsTables:
         self.d_cd = self.names.index("City Defense")
         self.d_nav = self.names.index("Naval Superiority")
         self.d_raid = self.names.index("Free Cities Raid")
+        # the city assaults a minor runs, in its list's order (EnemyType WAR)
+        self.d_war = [k for k, d in enumerate(self.defs) if d["enemyType"] == "WAR" and k != self.d_raid]
         self.teams = {k: list(ao["teams"][d["name"]]) for k, d in enumerate(self.defs)}
         self.reqs = {t: list(r) for t, r in ao["reqs"].items()}
         self.trees = {k: _Tree(d["tree"], ao["trees"][d["tree"]]) for k, d in enumerate(self.defs) if d.get("tree")}
@@ -188,6 +190,29 @@ class _OpCtx:
             vv = v if torch.is_tensor(v) else torch.full_like(self.ref, int(v))
             self.bb[:, t] = torch.where(mask, vv, self.bb[:, t])
 
+    def child_of(self, p: dict, own: torch.Tensor, s: torch.Tensor):
+        """TURN LIMITER's child (0x7f1620): the child begun runs on; Limit Is
+        Min holds it RUNNING while the turns since the node first ran are
+        within Turns to Run and it neither failed nor erred; a RUNNING child
+        whose turns at the game's speed (0x5254d0) are spent ends it — Fail
+        at Limit false SUCCESS, else FAILURE; else the child's status. None
+        for another node"""
+        if p["type"] != "Turn Limiter":
+            return None
+        i = p["index"]
+        tree = self.tree
+        limit = tree.int_(i, "Turns to Run") or 0
+        elapsed = int(self.sim.turn) - self.ma[:, i]
+        fresh = s == BT_FRESH
+        v = s
+        held = torch.zeros_like(fresh)
+        if tree.flag(i, "Limit Is Min"):
+            held = ~fresh & (elapsed <= limit) & (s != BT_FAILURE) & (s != BT_ERROR)
+            v = torch.where(held, BT_RUNNING, v)
+        spent = ~fresh & ~held & (s == BT_RUNNING) & (elapsed >= limit * int(self.sim._bb["costPct"]) // 100)
+        v = torch.where(spent, BT_SUCCESS if tree.flag(i, "Fail at Limit") is False else BT_FAILURE, v)
+        return torch.where(fresh, own, v), ~fresh
+
     def tree_contract(self, cid: torch.Tensor) -> torch.Tensor:
         """[B] the slot of the operation's own contract of the id, -1 none"""
         ai, s = self.ai, self.s
@@ -251,6 +276,11 @@ class SimMinorOps:
         self.mops_rally = torch.full((B, S, NO), -1, dtype=L, device=device)
         self.mops_bk_target = torch.full((B, S, NO), -1, dtype=L, device=device)
         self.mops_bk_rally = torch.full((B, S, NO), -1, dtype=L, device=device)
+        self.mops_bk_enemy = torch.full((B, S, NO), -1, dtype=L, device=device)
+        # Lock Units' lock (op +0x5d8's) and Operation Diplomacy's unit
+        # construction (`Operation.locked`, `allowUnitConstruction`)
+        self.mops_locked = torch.zeros(B, S, NO, dtype=torch.bool, device=device)
+        self.mops_auc = torch.zeros(B, S, NO, dtype=torch.bool, device=device)
         self.mops_started = torch.full((B, S, NO), -1, dtype=L, device=device)
         # the player it is against (op +0x2a0, -1 none)
         self.mops_enemy = torch.full((B, S, NO), -1, dtype=L, device=device)
@@ -312,6 +342,7 @@ class SimMinorOps:
         self.mops_pick = torch.full((B, S), -1, dtype=L, device=device)
         self.mops_pick_target = torch.full((B, S), -1, dtype=L, device=device)
         self.mops_pick_rally = torch.full((B, S), -1, dtype=L, device=device)
+        self.mops_pick_enemy = torch.full((B, S), -1, dtype=L, device=device)
         # the camps the knowledge base holds, in its order (-1 padded); the
         # barbarians' (`barbSeat.campsKnown`)
         self.mops_camps = torch.full((B, S, N_CAMPS), -1, dtype=L, device=device)
@@ -577,7 +608,9 @@ class SimMinorOps:
         s_war = self._cv_unit_at_war(n_war, n_all.sum(dim=1, keepdim=True), self._cv_unit_surplus(srow))
         return {"entry": entry, "obsolete": obsolete, "buildable": buildable, "maintained": maintained,
                 "all": s_all, "war": s_war,
-                "strength": cache["strength"].unsqueeze(0).expand(B, -1)}
+                "strength": cache["strength"].unsqueeze(0).expand(B, -1),
+                # the records the per-player sums read (`perPlayer`)
+                "rec_row": rec["row"], "rec_owner": rec["owner"], "rec_live": live, "opp": opp}
 
     def _research_listed(self, s: int) -> torch.Tensor:
         """`researchListed`'s listener [B, NU] for research row `s`: per AI
@@ -666,22 +699,42 @@ class SimMinorOps:
         ok = rows["entry"] & rows["buildable"] & ~rows["obsolete"] & matched & ~fullh & rows["maintained"]
         return ok, prio & ok
 
-    def _mops_choice_order(self, rows: dict) -> torch.Tensor:
-        """`choiceOrder` against no player: [B, NU] the AI unit rows in the
+    def _mops_per_player(self, rows: dict, enemy: torch.Tensor) -> torch.Tensor:
+        """[B, NU] each entry's sum against the player `enemy` [B]
+        (`perPlayer`: its efficiency against each opposing combat unit the
+        knowledge base records of that player, 1.0 with no combat unit known
+        at all); 0 where the enemy is -1"""
+        T = self._cv_tables()
+        nu = rows["entry"].shape[1]
+        dev = self.device
+        mine = rows["rec_live"] & (rows["rec_owner"] == enemy.unsqueeze(1)) & (enemy >= 0).unsqueeze(1)
+        n_p = torch.zeros(self.B, nu + 1, dtype=torch.long, device=dev)
+        n_p.scatter_add_(1, torch.where(mine, rows["rec_row"], torch.full_like(rows["rec_row"], nu)), mine.long())
+        n_p = torch.where(rows["opp"], n_p[:, :nu], torch.zeros_like(n_p[:, :nu]))
+        per = n_p @ T["eff"].to(dev).t()
+        none = ~(rows["opp"].any(dim=1, keepdim=True))
+        per = torch.where(none, torch.full_like(per, _FX), per)
+        return torch.where((enemy >= 0).unsqueeze(1), per, torch.zeros_like(per))
+
+    def _mops_choice_order(self, rows: dict, enemy: torch.Tensor | None = None) -> torch.Tensor:
+        """`choiceOrder` against the player `enemy` [B] (None, or -1: none):
+        [B, NU] the AI unit rows in the
         order the choice walks — the stored table (the entries in the Units'
         order, stable-sorted under 0x79d3a0) sorted again by the game's
         std::sort (`std_sort`) under 0x79d3e0; both comparators read
-        buildable first, then the at-war sum, the every-player sum, the
-        strength, each greater first; the rows not in the table after them.
+        buildable first, then the sum against the player, the at-war sum,
+        the every-player sum, the strength, each greater first; the rows not
+        in the table after them.
         The second sort is unstable, so each batch row's order is the host
         sort over its keys' dense ranks, one sort per distinct rank pattern
         (memoised)."""
         B, dev = self.B, self.device
         entry = rows["entry"]
         nu = entry.shape[1]
-        keys = torch.stack([rows["buildable"].to(torch.float64), rows["war"].to(torch.float64),
+        per = torch.zeros(B, nu, dtype=torch.float64, device=dev) if enemy is None else self._mops_per_player(rows, enemy).to(torch.float64)
+        keys = torch.stack([rows["buildable"].to(torch.float64), per, rows["war"].to(torch.float64),
                             rows["all"].to(torch.float64), rows["strength"].to(torch.float64)], dim=2)
-        _u, rank = torch.unique(keys.reshape(B * nu, 4), dim=0, return_inverse=True)
+        _u, rank = torch.unique(keys.reshape(B * nu, 5), dim=0, return_inverse=True)
         rank = torch.where(entry, rank.reshape(B, nu), torch.full((B, nu), -1, dtype=torch.long, device=dev))
         pats, inv = torch.unique(rank, dim=0, return_inverse=True)
         memo = getattr(self, "_mops_order_memo", None)
@@ -698,13 +751,14 @@ class SimMinorOps:
             out.append(got)
         return torch.tensor(out, dtype=torch.long, device=dev).index_select(0, inv)
 
-    def _mops_choose(self, rows: dict, need: torch.Tensor, full: torch.Tensor, mask: torch.Tensor) -> torch.Tensor:
-        """`chooseUnit` (0x79bd30) against no player: [B] the AI unit row the
-        team asks to be built, -1 none"""
+    def _mops_choose(self, rows: dict, need: torch.Tensor, full: torch.Tensor, mask: torch.Tensor,
+                     enemy: torch.Tensor | None = None) -> torch.Tensor:
+        """`chooseUnit` (0x79bd30) against the operation's enemy (`enemy` [B],
+        -1 none): [B] the AI unit row the team asks to be built, -1 none"""
         B, dev = self.B, self.device
         ok, prio = self._mops_fits(rows, need, full)
         ok &= mask.unsqueeze(1)
-        order = self._mops_choice_order(rows)
+        order = self._mops_choice_order(rows, enemy)
         chosen = torch.full((B,), -1, dtype=torch.long, device=dev)
         cprio = torch.zeros(B, dtype=torch.bool, device=dev)
         call = torch.zeros(B, dtype=torch.long, device=dev)
@@ -815,6 +869,16 @@ class SimMinorOps:
                 cnt = self.mops_cnt[:, s, k, ti, :tr["n"]]
                 cnt += (has_t & g.unsqueeze(1)).long()
 
+    def _mops_enemy_best(self, enemy: torch.Tensor, none: torch.Tensor) -> torch.Tensor:
+        """[B] the best melee Combat Strength of each game's player `enemy`
+        (`bestCombatStrength`), `none` where it is -1"""
+        out = none.clone()
+        for p in self._mops_war_players():
+            m = enemy == p
+            if bool(m.any()):
+                out = torch.where(m, self._mops_best_of(p), out)
+        return out
+
     def _mops_team_update(self, s: int, k: int, ti: int, live: torch.Tensor, u: dict, rows: dict) -> None:
         """`teamUpdate` (0x73fba0) of team `ti` of slot `k` where `live`: the
         counts, the strength, the minimums, ready and ongoing against the
@@ -835,14 +899,16 @@ class SimMinorOps:
         urow = u["row"].clamp(min=0)
         strength = (torch.where(alive, self._mops_strength(u), torch.zeros_like(u["combat"])) * times).sum(dim=1)
         estr = self.mops_estr[:, s, k]
+        # `desiredStrength`'s strength: the smaller of the holder's best combat
+        # strength and its enemy's (its own against no enemy)
         ours = self._mops_best(s)
+        ours = torch.minimum(ours, self._mops_enemy_best(self.mops_enemy[:, s, k], ours))
         NAT = len(Tm.ai_types)
         for dd, ts in Tm.team_reqs.items():
             for tj, tr in enumerate(ts):
                 g = on & (d == dd) & (tm == tj)
                 if not bool(g.any()):
                     continue
-                assert all(x is None for x in tr["dep"]), "minor operations: a team requirement's Dependence"
                 R = tr["n"]
                 tix = tr["type"].to(dev)
                 carries = ua[urow][:, :, tix] & alive.unsqueeze(2) & (u["row"] >= 0).unsqueeze(2)   # [B, P, R]
@@ -856,21 +922,26 @@ class SimMinorOps:
                 for i in range(R):
                     c = cnt[:, i]
                     t = int(tix[i])
+                    # a requirement whose Dependence no member carries is passed by
+                    dep = tr["dep"][i]
+                    dg = torch.ones(B, dtype=torch.bool, device=dev)
+                    if dep is not None:
+                        dg = (ua[urow][:, :, Tm.ai_index[dep]] & alive & (u["row"] >= 0)).any(dim=1)
                     mn, mx = int(tr["min"][i]), int(tr["max"][i])
                     mp_, xp_ = float(tr["minp"][i]), float(tr["maxp"][i])
                     if mn >= 0:
-                        mins &= c >= mn
+                        mins &= (c >= mn) | ~dg
                         lack = c < mn
                     else:
                         want = _f(nf * mp_)
-                        mins &= c >= want.trunc().long()
+                        mins &= (c >= want.trunc().long()) | ~dg
                         lack = want > c.to(torch.float64)
-                    need[:, t] |= lack
-                    have[:, t] |= ~lack
+                    need[:, t] |= lack & dg
+                    have[:, t] |= ~lack & dg
                     if mx >= 0:
-                        full[:, t] |= c >= mx
+                        full[:, t] |= (c >= mx) & dg
                     else:
-                        full[:, t] |= (c + 1).to(torch.float64) > _f((nf + 1) * xp_)
+                        full[:, t] |= ((c + 1).to(torch.float64) > _f((nf + 1) * xp_)) & dg
                 tdef = Tm.teams[dd][tj]
                 was = self.mops_ready[:, s, k, ti].clone()
 
@@ -893,7 +964,7 @@ class SimMinorOps:
                 unit = torch.where(keep, old, torch.full_like(old, -1))
                 again = g & ((unit < 0) | (was != ready))
                 if bool(again.any()):
-                    unit = torch.where(again, self._mops_choose(rows, wanted, full, again), unit)
+                    unit = torch.where(again, self._mops_choose(rows, wanted, full, again, self.mops_enemy[:, s, k]), unit)
                 self.mops_unit[:, s, k, ti] = torch.where(g, unit, old)
 
     def _mops_advance_rally(self, s: int, k: int, ti: int, live: torch.Tensor, u: dict) -> None:
@@ -1078,7 +1149,14 @@ class SimMinorOps:
             return torch.where(ok, py * W + px, torch.full_like(px, -1))
         g = self.mops_goal[:, s, k, ti]
         g[:, G_CENTRE] = torch.where(go, plot_at(cq + torch.div(cy, 2, rounding_mode="floor"), cy), g[:, G_CENTRE])
-        g[:, G_MARCH] = torch.where(go, g[:, G_TARGET], g[:, G_MARCH])
+        # the march point (`marchPoint`): the target — with the enemy at
+        # peace, the first plot back from it toward the rally whose owner lets
+        # the holder in, which for a holder no full civ is the target itself
+        # (`borderClosedTo`), the rally where either goal is none
+        ene = self.mops_enemy[:, s, k]
+        peace = (ene >= 0) & ~self._mops_fights(s, ene.unsqueeze(1)).squeeze(1)
+        either = (g[:, G_RALLY] < 0) | (g[:, G_TARGET] < 0)
+        g[:, G_MARCH] = torch.where(go, torch.where(peace & either, g[:, G_RALLY], g[:, G_TARGET]), g[:, G_MARCH])
         # the list's weighed entries: a plot's district entry (COMBAT or
         # PASSIVE) and each of its unit entries one, a Trader's and a
         # religious unit's none
@@ -1316,6 +1394,9 @@ class SimMinorOps:
             self.mops_rally[rows, s, kk] = ral[rows]
             self.mops_bk_target[rows, s, kk] = -1
             self.mops_bk_rally[rows, s, kk] = -1
+            self.mops_bk_enemy[rows, s, kk] = -1
+            self.mops_locked[rows, s, kk] = False
+            self.mops_auc[rows, s, kk] = False
             self.mops_started[rows, s, kk] = int(self.turn)
             self.mops_enemy[rows, s, kk] = ene[rows]
             self.mops_recpri[rows, s, kk] = rec[rows]
@@ -1477,11 +1558,29 @@ class SimMinorOps:
 
     # -- the military AI's turn (B) ------------------------------------------
 
-    def _mops_odds(self, ours: torch.Tensor, enemy: torch.Tensor, dist: torch.Tensor, best: torch.Tensor) -> torch.Tensor:
-        """`oddsOf` against no enemy (single precision as the engine takes
-        it): [B] float64 holding the single"""
+    def _mops_odds(self, ours: torch.Tensor, enemy: torch.Tensor, dist: torch.Tensor, best: torch.Tensor,
+                   their_best: torch.Tensor | None = None) -> torch.Tensor:
+        """`oddsOf` (single precision as the engine takes it): [B] float64
+        holding the single; against an enemy (`their_best` its best combat
+        strength) the two best strengths bound it — theirs above ours caps it
+        at 1 - their lead x 0.75 / 25, ours above theirs raises it to min(1,
+        our lead x 0.75 / 25)"""
         mine = best.clamp(min=1).to(torch.float64)
-        theirs = torch.ones_like(mine)
+        theirs = torch.ones_like(mine) if their_best is None else their_best.clamp(min=1).to(torch.float64)
+        odds = self._mops_odds_base(ours, enemy, dist, mine, theirs)
+        if their_best is None:
+            return odds
+        f075 = float(torch.tensor(0.75, dtype=_F32))
+        cap = _f(1 - _f(_f((theirs - mine) * f075) / 25))
+        lead = _f(_f((mine - theirs) * f075) / 25)
+        floor_ = torch.where(lead < 1, lead, torch.ones_like(lead))
+        return torch.where(theirs > mine, torch.minimum(cap, odds), torch.maximum(odds, floor_))
+
+    def _mops_odds_base(self, ours: torch.Tensor, enemy: torch.Tensor, dist: torch.Tensor, mine: torch.Tensor,
+                        theirs: torch.Tensor) -> torch.Tensor:
+        """`oddsOf`'s first part: min(0.9, (a + 1) x 0.5) x 0.97 ^ (max(0,
+        theirs - ours) + the distance x 0.75 cut toward 0), a = (ours - the
+        enemy's) over the smaller of the two best strengths"""
         f09 = float(torch.tensor(0.9, dtype=_F32))
         q = _f(_f((ours - enemy).to(torch.float64)) / torch.minimum(mine, theirs))
         base = torch.minimum(torch.full_like(q, f09), _f(_f(q + 1) * 0.5))
@@ -1557,46 +1656,385 @@ class SimMinorOps:
             tgt = torch.where(on, c, tgt)
             codds = torch.where(on, odds, codds)
             valid |= on
-        return valid, tgt
+        return valid, tgt, codds
 
     def _mops_evaluate(self, s: int) -> None:
-        """`operationsEvaluate` for minor `s` (B)"""
+        """`operationsEvaluate` for minor `s` (B): the members gone leave
+        their operations; the candidates — the running operations', then per
+        player at war with the minor (in seat order) its city assaults, then
+        Attack Barb Camp and Naval Superiority — evaluated; a running
+        operation's names its backup on the strengths the last run refreshed;
+        of the new ones that start themselves the highest Priority, then the
+        best odds, the first of equals, under the trait's limits, is the pick"""
         alive = self.citystate_alive[:, s] & (self.citystate_center[:, s] >= 0)
         if not bool(alive.any()):
             return
         Tm = self._mops_tables()
+        B, dev = self.B, self.device
         self._seat_pool_slots(s, "major", 100 + s, alive)
         u = self._mops_units(s)
         self._mops_keep_members(s, alive, u)
         sea = self._mops_naval_target(s)
-        # the running operations' candidates name their backups, on the
-        # strengths the last run refreshed (`operationsEvaluate`)
+        kc = self._mops_known_cities(s)
+        taken = self.mops_target[:, s].masked_fill(self.mops_def[:, s] < 0, -1)
         for k in range(N_OPS):
-            for d in (Tm.d_abc, Tm.d_nav):
+            for d in (Tm.d_abc, Tm.d_nav, *Tm.d_war):
                 m = alive & (self.mops_def[:, s, k] == d)
                 if not bool(m.any()):
                     continue
+                ene = self.mops_enemy[:, s, k]
                 if d == Tm.d_abc:
-                    v, t = self._mops_camp_eval(s, self.mops_target[:, s, k], self.mops_str[:, s, k], m, u)
-                else:
+                    v, t, _ = self._mops_camp_eval(s, self.mops_target[:, s, k], self.mops_str[:, s, k], m, u)
+                elif d == Tm.d_nav:
                     v, t = self._mops_naval_eval(self.mops_target[:, s, k], sea), sea
+                else:
+                    v, t, _, _ = self._mops_war_eval(s, d, ene, self.mops_target[:, s, k], self.mops_str[:, s, k], m, u, kc, taken)
                 ok = m & v
                 self.mops_bk_target[:, s, k] = torch.where(ok, t, self.mops_bk_target[:, s, k])
                 self.mops_bk_rally[:, s, k] = torch.where(ok, self.mops_target[:, s, k], self.mops_bk_rally[:, s, k])
-        # of the new candidates that start themselves (Attack Barb Camp,
-        # priority 3, then Naval Superiority, priority 2) the first valid one
-        # under the trait's limits; a valid one at its limit leaves the next
-        # its place
+                self.mops_bk_enemy[:, s, k] = torch.where(ok, ene if d in Tm.d_war else torch.full_like(ene, -1),
+                                                          self.mops_bk_enemy[:, s, k])
         centre = self.citystate_center[:, s]
-        v_abc, t_abc = self._mops_camp_eval(s, centre, None, alive, u)
+        prio = torch.full((B,), -1, dtype=torch.long, device=dev)
+        bodds = torch.full((B,), -1.0, dtype=torch.float64, device=dev)
+        pick = torch.full((B,), -1, dtype=torch.long, device=dev)
+        ptgt = torch.full((B,), -1, dtype=torch.long, device=dev)
+        pene = torch.full((B,), -1, dtype=torch.long, device=dev)
+
+        def offer(d: int, valid: torch.Tensor, tgt: torch.Tensor, odds: torch.Tensor, ene: torch.Tensor) -> None:
+            nonlocal prio, bodds, pick, ptgt, pene
+            p = int(Tm.defs[d]["priority"])
+            better = (pick < 0) | (p > prio) | ((p == prio) & (odds > bodds))
+            go = alive & valid & better & self._mops_under_limit(s, d)
+            prio = torch.where(go, p, prio)
+            bodds = torch.where(go, odds, bodds)
+            pick = torch.where(go, d, pick)
+            ptgt = torch.where(go, tgt, ptgt)
+            pene = torch.where(go, ene, pene)
+
+        seat_row = int(self._seat_row[100 + s])
+        for p in self._mops_war_players():
+            war = alive & self.war[:, seat_row, int(self._seat_row[p])]
+            if not bool(war.any()):
+                continue
+            ene = torch.full((B,), p, dtype=torch.long, device=dev)
+            for d in Tm.d_war:
+                v, t, odds, _ = self._mops_war_eval(s, d, ene, None, None, war, u, kc, taken)
+                if bool(Tm.defs[d]["selfStart"]):
+                    offer(d, v, t, odds, ene)
+        none = torch.full((B,), -1, dtype=torch.long, device=dev)
+        v_abc, t_abc, o_abc = self._mops_camp_eval(s, centre, None, alive, u)
+        offer(Tm.d_abc, v_abc, t_abc, o_abc, none)
         v_nav = self._mops_naval_eval(centre, sea)
-        ok_abc = alive & v_abc & self._mops_under_limit(s, Tm.d_abc)
-        ok_nav = alive & v_nav & self._mops_under_limit(s, Tm.d_nav) & ~ok_abc
-        ok = ok_abc | ok_nav
-        pick = torch.where(ok_abc, Tm.d_abc, torch.where(ok_nav, Tm.d_nav, -1))
+        offer(Tm.d_nav, v_nav, sea, self._mops_naval_odds(s, centre, sea, u), none)
         self.mops_pick[:, s] = torch.where(alive, pick, self.mops_pick[:, s])
-        self.mops_pick_target[:, s] = torch.where(ok_abc, t_abc, torch.where(ok_nav, sea, self.mops_pick_target[:, s]))
-        self.mops_pick_rally[:, s] = torch.where(ok, centre, self.mops_pick_rally[:, s])
+        self.mops_pick_target[:, s] = torch.where(alive & (pick >= 0), ptgt, self.mops_pick_target[:, s])
+        self.mops_pick_rally[:, s] = torch.where(alive & (pick >= 0), centre, self.mops_pick_rally[:, s])
+        self.mops_pick_enemy[:, s] = torch.where(alive & (pick >= 0), pene, self.mops_pick_enemy[:, s])
+
+    def _mops_naval_odds(self, s: int, rally: torch.Tensor, sea: torch.Tensor, u: dict) -> torch.Tensor:
+        """Naval Superiority's odds from the rally (`oddsOf` against no enemy):
+        the own units within 10 of the rally against the majors' largest best
+        combat strength, the distance"""
+        ours = self._mops_army_near(s, rally, 10, True, u)
+        estr = self.civ_best_melee[:, :self.n_majors].long().amax(dim=1) if self.n_majors else torch.zeros_like(ours)
+        d = self.pair_dist[rally.clamp(min=0), sea.clamp(min=0)].to(torch.long)
+        return self._mops_odds(ours, estr, d, self.citystate_best_melee[:, s].long())
+
+    def _mops_war_players(self) -> list[int]:
+        """the players a minor's city assaults may name, in seat order (the
+        majors, the city-states, the Free Cities): those that hold cities"""
+        return list(range(self.n_majors)) + [100 + x for x in range(self.S)] + [FREE_SEAT]
+
+    def _mops_row_of(self, seat: int) -> int:
+        """the city row of a player"""
+        if seat == FREE_SEAT:
+            return self.FREE_ROW
+        return self._CITY_MINOR0 + seat - 100 if seat >= 100 else seat
+
+    def _mops_best_of(self, seat: int) -> torch.Tensor:
+        """[B] a player's best melee Combat Strength (`bestCombatStrength`)"""
+        if seat == FREE_SEAT:
+            return self.free_best_melee.long()
+        if seat >= 100:
+            return self.citystate_best_melee[:, seat - 100].long()
+        return self.civ_best_melee[:, seat].long()
+
+    def _mops_land_count(self, seat: int) -> torch.Tensor:
+        """[B] the player's living land combat units (`militaryUnits` of
+        DOMAIN_LAND: Combat above 0, neither naval nor air)"""
+        pre = "barb" if seat == FREE_SEAT else "major"
+        ut = getattr(self, f"{pre}_unit_type").clamp(min=0, max=self.NU - 1)
+        land = (self._type_combat.take(ut) > 0) & ~self.unit_naval.take(ut) & (self._type_air.take(ut) == 0)
+        own = getattr(self, f"{pre}_unit_alive") & (getattr(self, f"{pre}_unit_seat") == seat)
+        return (own & land).sum(dim=1)
+
+    def _mops_known_cities(self, s: int) -> list[dict]:
+        """minor `s`'s knowledge base's cities (`knownCities`) in the view's
+        order — the majors', the Free Cities', the city-states' — each [B]:
+        listed and standing, its owner, plot, and its district entries on
+        the plots the minor has revealed: the centre (its standing strength;
+        its walls and the city's strike while its perimeter stands) and its
+        Encampment (its own plot's garrisoned strength; its walls and strike
+        while its own perimeter stands, one not built behind the city's whole
+        walls); a city-state's an original capital"""
+        B, dev = self.B, self.device
+        bidx = self._bidx
+        looked = self.mops_revealed[:, s]
+        listed = (self.citystate_kb_city_rank[:, s] >= 0) & (self.citystate_kb_city_id[:, s] == self._known_trade_ids())
+        out = []
+        for row in list(range(self.n_majors)) + [self.FREE_ROW] + [self._CITY_MINOR0 + x for x in range(self.S)]:
+            minor = self._CITY_MINOR0 <= row < self._CITY_MINOR0 + self.S
+            seat = 100 + row - self._CITY_MINOR0 if minor else (FREE_SEAT if row == self.FREE_ROW else row)
+            slot0 = row - self._CITY_MINOR0 if minor else self.S + (self.n_majors if row == self.FREE_ROW else row) * self.RC
+            strike = None
+            for c in range(1 if minor else self.RC):
+                ctr = self.city_center[:, row, c]
+                m = self.city_alive[:, row, c] & (ctr >= 0) & listed[:, slot0 + c]
+                if not bool(m.any()):
+                    continue
+                if strike is None:
+                    strike = self._strike_base(row)
+                    if row < self.n_majors:
+                        strike = strike + self._gov_mods(row)[12]["crng"].double().floor().long()
+                cc = ctr.clamp(min=0)
+                col = torch.full((B,), c, dtype=torch.long, device=dev)
+                rt = torch.full_like(col, row)
+                wmax = self._walls_max_at(rt, col).long()
+                pool = torch.minimum(self.city_outer_hp[bidx, row, col].long(), wmax)
+                cdef = self._centre_strength(rt, col).to(torch.float64)
+                ch = m & looked.gather(1, cc.unsqueeze(1)).squeeze(1)
+                walled = pool > 0
+                ent = [{"has": ch, "plot": ctr, "def": cdef, "walls": torch.where(walled, cdef, torch.zeros_like(cdef)),
+                        "strike": torch.where(walled, strike, torch.zeros_like(strike))}]
+                if self._encamp_didx >= 0:
+                    ep = self.city_dist_tile[:, row, c, self._encamp_didx]
+                    e0 = ep.clamp(min=0)
+                    eh = m & (ep >= 0) & looked.gather(1, e0.unsqueeze(1)).squeeze(1)
+                    if bool(eh.any()):
+                        stands = torch.where(self.district_complete[bidx, e0],
+                                             torch.minimum(self.encamp_outer_hp[bidx, e0].long(), wmax), wmax) > 0
+                        gar = self._garrison_cs(rt, col, self._holder_strength(rt, col), plot=e0)
+                        own = (self._centre_strength(rt, col, garrisoned=False) + gar).to(torch.float64)
+                        ent.append({"has": eh, "plot": ep, "def": own, "walls": torch.where(stands, own, torch.zeros_like(own)),
+                                    "strike": torch.where(stands, strike, torch.zeros_like(strike))})
+                out.append({"m": m, "row": row, "col": c, "seat": seat, "minor": minor, "plot": ctr, "ent": ent,
+                            "traded": self.citystate_trade_ok[:, s, slot0 + c]})
+        return out
+
+    @staticmethod
+    def _mops_city_defense(k: dict, all_: bool) -> torch.Tensor:
+        """`cityDefense` (0x5eb2c0) of a known city's entries [B] f64: the
+        strongest of each entry's defense less 10 and its walls; with `all_`
+        per entry the strongest + 10 where its walls stand, else its defense,
+        summed"""
+        top = torch.zeros_like(k["ent"][0]["def"])
+        for e in k["ent"]:
+            top = torch.where(e["has"], torch.maximum(top, torch.maximum(e["def"] - 10, e["walls"])), top)
+        if not all_:
+            return top
+        tot = torch.zeros_like(top)
+        for e in k["ent"]:
+            tot = tot + torch.where(e["has"], torch.where(e["walls"] > 0, top + 10, e["def"]), torch.zeros_like(top))
+        return tot
+
+    def _mops_pressure_lead(self, k: dict) -> torch.Tensor:
+        """`plotPressureLead` of a minor on the known city's centre [B] f64:
+        the city's own citizens' pressure (`citizenPressure` of it alone) less
+        every major's and the Free Cities' there, the city's own taken off
+        theirs where a major or the Free Cities hold it (a minor presses with
+        no city of `state.seats`, allied with none, dominated by none)"""
+        here = k["plot"].clamp(min=0)
+        row, c = k["row"], k["col"]
+        foreign = torch.zeros(self.B, dtype=torch.float64, device=self.device)
+        for r in list(range(self.n_majors)) + [self.FREE_ROW]:
+            foreign = foreign + self._citizen_pressure_from(here, r)
+        rng = int(self.rules.seats["loyaltyRange"])
+        d = self.pair_dist[here, self.city_center[:, row, c].clamp(min=0)].long().unsqueeze(1)
+        pop = (self.city_pop[:, row, c].double() - self._emergency_pressure_cut(row)).clamp(min=0).unsqueeze(1)
+        each = (self._citizen_press_base + self._citizen_press_cap * self.city_is_cap[:, row, c].double()
+                + self._head_identity(row, row + 1)[:, 0, c])
+        if row < self.n_majors:
+            each = each + self._age_pressure.take(self.civ_age[:, row])
+        sub = self._pressure_fixed(d, pop, each.unsqueeze(1), self.city_alive[:, row, c].unsqueeze(1), rng).sum(dim=1)
+        if k["minor"]:
+            return sub - foreign
+        return sub - (foreign - sub)
+
+    def _mops_city_value(self, s: int, k: dict, kc: list[dict], recs: dict) -> torch.Tensor:
+        """`cityValue` (0x79fef0) of the known city `k` to minor `s` [B]
+        (24.8): its worth (`cityWorth` 0x7a0ac0: citizens, the city, a
+        capital, wonders, 7 x its Production, Science and Culture, the
+        minor's Loyalty pressure lead there) less its defenses against the
+        minor's best combat strength, less the same of its owner's cities
+        between it and the minor's city, quartered where the owner's army
+        outclasses the minor's, less the defenders about it; at least 0"""
+        from .sim_cityvalue import _MinorFacts
+        from .sim_research import _fdiv, _fmul, _fx_const
+        f = _MinorFacts(self, s)
+        py = lambda a, p: self._cv_pseudo(a, p, f.pseudo_w(p))  # noqa: E731
+        yv = lambda a, y: self._cv_yield(a, y, f.yield_w(y))  # noqa: E731
+        row, c, owner = k["row"], k["col"], k["seat"]
+        z = torch.zeros(self.B, dtype=torch.long, device=self.device)
+        pop = self.city_pop[:, row, c].long()
+        w = py(torch.div(pop, 5, rounding_mode="floor") * _FX, "PSEUDOYIELD_CITY_POPULATION")
+        w = w + py(z + _FX, "PSEUDOYIELD_CITY_BASE")
+        orig = torch.ones_like(pop, dtype=torch.bool) if k["minor"] else self.city_orig_cap[:, row, c] >= 0
+        cap = torch.ones_like(orig) if k["minor"] else self.city_is_cap[:, row, c]
+        w = w + torch.where(orig, py(z + _FX, "PSEUDOYIELD_CITY_ORIGINAL_CAPITAL"),
+                            torch.where(cap, py(z + _fx_const(0.5), "PSEUDOYIELD_CITY_ORIGINAL_CAPITAL"), z))
+        won = (self.city_wonder[:, row, c] >= 0).sum(dim=1).long()
+        w = w + py(won * 40 * _FX, "PSEUDOYIELD_WONDER")
+        tot = self._seat_city_stats(row, record=False)[0][:, c]
+        for j, y in ((1, "YIELD_PRODUCTION"), (3, "YIELD_SCIENCE"), (4, "YIELD_CULTURE")):
+            w = w + yv(tot[:, j].trunc().long() * 7 * _FX, y)
+        lead = torch.floor(self._mops_pressure_lead(k) * _FX + 0.5).long() >> 8
+        lost = lead <= -int(self.rules.seats["loyaltyPress"][0])
+        w = w + lead.clamp(max=5) * 10 * _FX
+        ld = lead.clone()
+        for _ in range(4):
+            more = ld < -5
+            w = w + torch.where(more, ld.clamp(max=5) * 10 * _FX, z)
+            ld = torch.where(more, ld + 5, ld)
+        v = torch.where(lost, z, w)
+        ours = self._mops_land_count(100 + s)
+        theirs = self._mops_land_count(owner)
+        best = self.citystate_best_melee[:, s].long()
+        tbest = self._mops_best_of(owner)
+        near = self.citystate_center[:, s]
+        has_near = near >= 0
+        kp = k["plot"].clamp(min=0)
+        near_d = self.pair_dist[near.clamp(min=0), kp].long()
+        defense = self._mops_city_defense(k, True)
+        # the defenders: the owner's known units within 3 whose strength is
+        # within 30 of the minor's best, and its known districts' strikes there
+        rd = self.pair_dist[recs["plot"].clamp(min=0), kp.unsqueeze(1)].long()
+        term = self._mops_army_term(recs["combat"], recs["ranged"], recs["dmg"], recs["form"])
+        sel = recs["recent"] & (recs["owner"] == owner) & (rd <= 3) \
+            & (torch.maximum(recs["combat"], recs["ranged"]) >= (best - 30).unsqueeze(1))
+        around = torch.where(sel, term, torch.zeros_like(term)).sum(dim=1)
+        for x in kc:
+            if x["seat"] != owner:
+                continue
+            for e in x["ent"]:
+                inr = x["m"] & e["has"] & (e["strike"] > 0) & (self.pair_dist[e["plot"].clamp(min=0), kp].long() <= 3)
+                around = around + torch.where(inr, e["strike"], z)
+        defenders = (around + tbest) * _FX
+        marchd = int(self._bb["costPct"]) * 25 // 100
+        march = _fdiv(near_d * 2 * _FX, z + marchd * _FX)
+        defenders = defenders + torch.where(theirs > 2 * (around + tbest), _fmul(march.clamp(max=_FX), theirs * _FX), z)
+        Wd = self.W
+
+        def vs_best(x: torch.Tensor) -> torch.Tensor:
+            q = (x * _FX * _FX / (best * _FX).clamp(min=1).double()).trunc().long()
+            return py(q, "PSEUDOYIELD_CITY_DEFENSES")
+        on = best > 0
+        v = v - torch.where(on & (defense >= best.double()), vs_best(defense), z)
+        kx, ky = kp % Wd, torch.div(kp, Wd, rounding_mode="floor")
+        nc = near.clamp(min=0)
+        nx, ny = nc % Wd, torch.div(nc, Wd, rounding_mode="floor")
+
+        def axial(ax, ay, bx, by):
+            dx, dy, dz = (ax - bx).abs(), (ay - by).abs(), (ax + ay - (bx + by)).abs()
+            return torch.minimum(torch.minimum(dx + dy, dx + dz), dy + dz)
+        reach = axial(nx, ny, kx, ky)
+        for x in kc:
+            if x["seat"] != owner or (x["row"] == row and x["col"] == c):
+                continue
+            xp = x["plot"].clamp(min=0)
+            xx, xy = xp % Wd, torch.div(xp, Wd, rounding_mode="floor")
+            dot = (kx - nx) * (kx - xx) + (ky - ny) * (ky - xy) + (nx + ny - (kx + ky)) * (xx + xy - (kx + ky))
+            g = on & has_near & x["m"] & (self.pair_dist[xp, kp].long() <= reach) & (dot > 0)
+            cut = _fmul(vs_best(self._mops_city_defense(x, False)), z + 2 * _FX)
+            v = v - torch.where(g, cut, z) - torch.where(g & (axial(xx, xy, kx, ky) <= 5), cut, z)
+        weak = on & (best < tbest + 30)
+        quarter = weak & ((best < tbest - 15) | (theirs > 3 * ours))
+        v = torch.where(quarter, _fmul(v, z + _fx_const(0.25)), v)
+        v = v - torch.where(weak, py(_fdiv(defenders, (best * _FX).clamp(min=1)), "PSEUDOYIELD_CITY_DEFENDING_UNITS"), z)
+        return v.clamp(min=0)
+
+    def _mops_war_eval(self, s: int, d: int, enemy: torch.Tensor, preset: torch.Tensor | None, pstr: torch.Tensor | None,
+                       alive: torch.Tensor, u: dict, kc: list[dict], taken: torch.Tensor):
+        """`evaluate` of the city assault `d` against `enemy` [B] (0x746920
+        over 0x747230's district branch): MustBeAtWar, MustHaveUnits (every
+        unit the minor holds); the enemy's known cities in the view's order —
+        with TargetParameter 0 one whose defenses and walls outnumber its
+        entries left out, any running operation's target left out — valued by
+        `cityValue` (none at 0 or less); the enemy's known units within 3 its
+        strength where the minor's best combat strength passes the enemy's by
+        more than 30; from the rally (`preset`, else the minor's city) the
+        distance limits, the odds against the enemy above MinOddsOfSuccess,
+        the best value x odds, the later of equals. [B] valid, target, odds,
+        value"""
+        Tm = self._mops_tables()
+        dfn = Tm.defs[d]
+        B, dev = self.B, self.device
+        seat = 100 + s
+        tgt = torch.full((B,), -1, dtype=torch.long, device=dev)
+        codds = torch.full((B,), -1.0, dtype=torch.float64, device=dev)
+        cval = torch.zeros(B, dtype=torch.long, device=dev)
+        valid = torch.zeros(B, dtype=torch.bool, device=dev)
+        on0 = alive & (enemy >= 0)
+        if bool(dfn["mustBeAtWar"]):
+            erow = self._seat_row.take(enemy.clamp(min=0, max=self._seat_row.numel() - 1))
+            on0 &= self.war[:, int(self._seat_row[seat])].gather(1, erow.unsqueeze(1)).squeeze(1)
+        need = int(dfn["mustHaveUnits"])
+        if need > 0:
+            mine = self.major_unit_alive & (self.major_unit_seat == seat)
+            on0 &= mine.sum(dim=1) >= need
+        if not bool(on0.any()):
+            return valid, tgt, codds, cval
+        rally = preset if preset is not None else self.citystate_center[:, s]
+        ours = pstr if pstr is not None else self._mops_army_near(s, rally, 10, True, u)
+        best = self.citystate_best_melee[:, s].long()
+        recs = self._mops_records(s)
+        ra = rally.clamp(min=0)
+        area_r = self.tile_area.gather(1, ra.unsqueeze(1)).squeeze(1)
+        reg_r = self.tile_region.gather(1, ra.unsqueeze(1)).squeeze(1)
+        for k in kc:
+            m = on0 & k["m"] & (enemy == k["seat"])
+            if not bool(m.any()):
+                continue
+            if int(dfn["targetParameter"]) == 0:
+                marks = sum(((e["has"] & (e["def"] > 0)).long() + (e["has"] & (e["walls"] > 0)).long()) for e in k["ent"])
+                m &= marks <= sum(e["has"].long() for e in k["ent"])
+            plot = k["plot"]
+            # a city its trade list holds (CityBuildAI +0x870, 0x78e010)
+            m &= ~(taken == plot.unsqueeze(1)).any(dim=1) & k["traded"]
+            if not bool(m.any()):
+                continue
+            theirs = self._mops_best_of(k["seat"])
+            pc = plot.clamp(min=0)
+            rd = self.pair_dist[recs["plot"].clamp(min=0), pc.unsqueeze(1)].long()
+            term = self._mops_army_term(recs["combat"], recs["ranged"], recs["dmg"], recs["form"])
+            sel = recs["recent"] & (recs["owner"] == k["seat"]) & (rd <= 3) & (torch.maximum(recs["combat"], recs["ranged"]) >= 0)
+            estr = torch.where(theirs + 30 < best, torch.where(sel, term, torch.zeros_like(term)).sum(dim=1), torch.zeros_like(best))
+            mtd = int(dfn["maxTargetDefense"])
+            if mtd >= 0:
+                m &= estr <= mtd
+            value = self._mops_city_value(s, k, kc, recs)
+            m &= value > 0
+            dd = self.pair_dist[ra, pc].to(torch.long)
+            m &= (dd != 0) & (rally >= 0)
+            area_c = self.tile_area.gather(1, pc.unsqueeze(1)).squeeze(1)
+            reg_c = self.tile_region.gather(1, pc.unsqueeze(1)).squeeze(1)
+            lim = torch.where(area_r != area_c, torch.full_like(dd, int(dfn["maxTargetDistInWorld"])),
+                              torch.where(reg_r == reg_c, torch.full_like(dd, int(dfn["maxTargetDistInRegion"])),
+                                          torch.full_like(dd, int(dfn["maxTargetDistInArea"]))))
+            m &= ~((lim >= 0) & (dd > lim))
+            odds = self._mops_odds(ours, estr, dd, best, theirs)
+            mo = float(dfn["minOddsOfSuccess"])
+            if mo > 0:
+                m &= odds > mo
+            fo = self._mops_fixed(odds)
+            fc = self._mops_fixed(codds.clamp(min=0))
+            worse = (tgt >= 0) & (torch.div(fo * value, 256, rounding_mode="trunc") < torch.div(cval * fc, 256, rounding_mode="trunc"))
+            m &= ~worse
+            tgt = torch.where(m, plot, tgt)
+            codds = torch.where(m, odds, codds)
+            cval = torch.where(m, value, cval)
+            valid |= m
+        return valid, tgt, codds, cval
 
     def _mops_under_limit(self, s: int, d: int) -> torch.Tensor:
         """[B] minor `s` runs fewer operations of definition `d`'s
@@ -1654,10 +2092,11 @@ class SimMinorOps:
         rows = self._mops_unit_rows(s, u)
         for k in range(N_OPS):
             self._mops_refresh(s, k, on, u, rows, tg, plan)
-        for d in (Tm.d_abc, Tm.d_nav):
+        for d in (Tm.d_abc, Tm.d_nav, *Tm.d_war):
             pick = on & (self.mops_pick[:, s] == d)
             if bool(pick.any()):
-                self._mops_start(s, d, self.mops_pick_target[:, s], self.mops_pick_rally[:, s], pick)
+                self._mops_start(s, d, self.mops_pick_target[:, s], self.mops_pick_rally[:, s], pick,
+                                 enemy=self.mops_pick_enemy[:, s])
         self.mops_pick[:, s] = torch.where(on, -1, self.mops_pick[:, s])
 
     def _mops_run(self, s: int, act: torch.Tensor, op: dict, done: torch.Tensor) -> None:
@@ -1852,7 +2291,7 @@ class SimMinorOps:
             for dd, dfn in enumerate(Tm.defs):
                 if int(dfn["priority"]) < Tm.upgrade_priority:
                     low |= self.mops_def[:, s, k] == dd
-            low &= go
+            low &= go & ~self.mops_locked[:, s, k]
             if not bool(low.any()):
                 continue
             for ti in range(N_TEAMS):
@@ -2557,15 +2996,42 @@ def _switch_backup(sim, c: _OpCtx, m: torch.Tensor) -> None:
     s, k = c.s, c.k
     if not bool(m.any()):
         return
-    bt, br = sim.mops_bk_target[:, s, k], sim.mops_bk_rally[:, s, k]
+    bt, br, be = sim.mops_bk_target[:, s, k], sim.mops_bk_rally[:, s, k], sim.mops_bk_enemy[:, s, k]
     sim.mops_target[:, s, k] = torch.where(m, bt, sim.mops_target[:, s, k])
     sim.mops_rally[:, s, k] = torch.where(m, br, sim.mops_rally[:, s, k])
+    sim.mops_enemy[:, s, k] = torch.where(m, be, sim.mops_enemy[:, s, k])
     sim.mops_bk_target[:, s, k] = torch.where(m, -1, bt)
     sim.mops_bk_rally[:, s, k] = torch.where(m, -1, br)
+    sim.mops_bk_enemy[:, s, k] = torch.where(m, -1, be)
     g = sim.mops_goal[:, s, k]
     has = sim.mops_tm[:, s, k] >= 0
     g[:, :, G_RALLY] = torch.where(m.unsqueeze(1) & has, sim.mops_rally[:, s, k].unsqueeze(1), g[:, :, G_RALLY])
     g[:, :, G_TARGET] = torch.where(m.unsqueeze(1) & has, sim.mops_target[:, s, k].unsqueeze(1), g[:, :, G_TARGET])
+
+
+def _assault_target_valid(sim, c: _OpCtx, at: torch.Tensor) -> torch.Tensor:
+    """`assaultTargetValid` (0x73abf0's COMBAT_DISTRICT branch) [B]: the
+    holder's known record of the city on the target, of the plot's owner —
+    none, invalid; its defenses and walls no more than its entries, valid; a
+    walled-city definition (TargetParameter 1), valid; else the members'
+    predicted blows on it, which the GPU's operations read not"""
+    s, k = c.s, c.k
+    t = sim.mops_target[:, s, k]
+    owner = sim.tile_seat.gather(1, t.clamp(min=0).unsqueeze(1)).squeeze(1)
+    found = torch.zeros_like(at)
+    open_ = torch.zeros_like(at)
+    for kc in sim._mops_known_cities(s):
+        hit = kc["m"] & (kc["plot"] == t) & (owner == kc["seat"]) & (t >= 0)
+        if not bool(hit.any()):
+            continue
+        marks = sum(((e["has"] & (e["def"] > 0)).long() + (e["has"] & (e["walls"] > 0)).long()) for e in kc["ent"])
+        found |= hit
+        open_ |= hit & (marks <= sum(e["has"].long() for e in kc["ent"]))
+    if int(c.T.defs[c.d]["targetParameter"]) == 1:
+        return found
+    if bool((at & found & ~open_ & (_n_units(sim, c) > 0)).any()):
+        raise NotImplementedError("minor operations: an assault's walled target weighed by its members' blows")
+    return found & open_
 
 
 def _u_change_target(sim, c: _OpCtx, i: int, at: torch.Tensor) -> torch.Tensor:
@@ -2578,12 +3044,17 @@ def _u_change_target(sim, c: _OpCtx, i: int, at: torch.Tensor) -> torch.Tensor:
     backup = sim.mops_bk_target[:, s, k] >= 0
     tgt = sim.mops_target[:, s, k]
     valid = tgt >= 0
+    if c.T.defs[c.d]["targetType"] == "TARGET_ENEMY_COMBAT_DISTRICT":
+        valid &= _assault_target_valid(sim, c, at)
     inv = at & ~valid
     swap = inv & backup
     out = torch.where(inv & ~backup, BT_FAILURE, out)
     estr = sim.mops_estr[:, s, k]
     rest = at & valid & (estr > 0)
-    ours = sim.citystate_best_melee[:, s].long().to(torch.float64)
+    # `desiredStrength`: the smaller of the holder's best combat strength and
+    # its enemy's
+    mine = sim._mops_best(s)
+    ours = torch.minimum(mine, sim._mops_enemy_best(sim.mops_enemy[:, s, k], mine)).to(torch.float64)
     ef = estr.to(torch.float64)
 
     def need(adv: float) -> torch.Tensor:
@@ -2603,9 +3074,28 @@ def _u_change_target(sim, c: _OpCtx, i: int, at: torch.Tensor) -> torch.Tensor:
 
 
 def _u_attack_units(sim, c: _OpCtx, i: int, at: torch.Tensor) -> torch.Tensor:
-    """OPERATION ATTACK UNITS (0x80ecf0): SUCCESS (no Always Running)"""
-    assert c.tree.flag(i, "Always Running") is None, "minor operations: Attack Units' Always Running"
-    return _status(c, BT_SUCCESS)
+    """OPERATION ATTACK UNITS (0x80ecf0): SUCCESS once the target is gone;
+    else RUNNING where the node says Always Running, SUCCESS where not"""
+    run = BT_RUNNING if c.tree.flag(i, "Always Running") else BT_SUCCESS
+    return torch.where(_gone(sim, c), BT_SUCCESS, run)
+
+
+def _ahead_of_line(sim, a: torch.Tensor, b: torch.Tensor) -> torch.Tensor:
+    """[B, T] the plots ahead of the battle line `b` [B] toward `a` [B] (the
+    axial dot product of (plot - b) and (a - b) above 0); none where either
+    is -1"""
+    W = sim.W
+    t = torch.arange(sim.T, device=sim.device).unsqueeze(0)
+
+    def ax(p):
+        y = torch.div(p, W, rounding_mode="floor")
+        q = p % W - torch.div(y, 2, rounding_mode="floor")
+        return q, y, -(q + y)
+    aq, ay, az = ax(a.clamp(min=0).unsqueeze(1))
+    bq, by, bz = ax(b.clamp(min=0).unsqueeze(1))
+    gq, gy, gz = ax(t)
+    dot = (gq - bq) * (aq - bq) + (gy - by) * (ay - by) + (gz - bz) * (az - bz)
+    return (dot > 0) & (a >= 0).unsqueeze(1) & (b >= 0).unsqueeze(1)
 
 
 def _x_attack_units(sim, c: _OpCtx, i: int, on: torch.Tensor) -> None:
@@ -2620,7 +3110,9 @@ def _x_attack_units(sim, c: _OpCtx, i: int, on: torch.Tensor) -> None:
     s, k = c.s, c.k
     tree = c.tree
     seat = sim._mops_seat(s)
-    assert tree.flag(i, "Attack Nearby Units"), "minor operations: Attack Units without Attack Nearby Units"
+    nearby = bool(tree.flag(i, "Attack Nearby Units"))
+    march = not nearby and bool(tree.flag(i, "Attack Along March"))
+    assert nearby or march, "minor operations: Attack Units with neither Attack Nearby Units nor Attack Along March"
     unequal = bool(tree.flag(i, "Allow Unequal Attacks"))
     pre = sim._mops_pre(s)
     enemy = sim.mops_enemy[:, s, k]
@@ -2640,20 +3132,38 @@ def _x_attack_units(sim, c: _OpCtx, i: int, on: torch.Tensor) -> None:
         memm = sim._mops_member_mask(s, k, ti) & u["own"]
         mem = (memm & (u["mp"] > 0) & ((u["bombard"] <= 0) | own_city.unsqueeze(1) | u["defender"]) & g.unsqueeze(1)
                & ~sim._tac_formed(pre))
-        reach = u["mp_whole"].clamp(min=2)
-        near = torch.zeros(B, sim.T, dtype=torch.bool, device=dev)
-        for j in mem.any(dim=0).nonzero(as_tuple=True)[0].tolist():
-            mj = mem[:, j]
-            dq = sim.pair_dist[u["tile"][:, j].clamp(min=0)].to(torch.long)
-            near |= mj.unsqueeze(1) & (dq <= reach[:, j].unsqueeze(1))
         uk, uu, us_ = tg["uk"], tg["uu"], tg["us"]
         L = uk.shape[1] // sim.T
         sl = uu.clamp(min=0)
         # each unit entry's unit still on its plot
         standing = (uu >= 0) & sim.unit_alive.gather(1, sl) & (sim.unit_tile.gather(1, sl) == sim._arange_bt.repeat(1, L)) \
             & (sim.unit_seat.gather(1, sl) == us_)
-        theirs = (enemy.unsqueeze(1) < 0) | (us_ == enemy.unsqueeze(1)) | (uk == 7)
-        near = near.repeat(1, L) & (uk > 0) & (us_ != seat) & standing & theirs
+        if march:
+            # Attack Along March: another player's targets ahead of the
+            # battle line (goal 4) toward the target (goal 1), the axial dot
+            # product above 0
+            ahead = _ahead_of_line(sim, sim.mops_goal[:, s, k, ti, G_TARGET], sim.mops_goal[:, s, k, ti, G_LINE])
+            near = ahead.repeat(1, L) & (uk > 0) & (us_ != seat) & standing
+            # a COMBAT_DISTRICT ahead a member's planning strikes joins the
+            # assignment, which the GPU's takes over units or districts alone
+            dist_ahead = ahead & ((tg["dk"] & 1) > 0) & (sim.tile_seat != seat) & g.unsqueeze(1)
+            res = op["res"]
+            if bool(dist_ahead.any()) and "tp" in res:
+                for j in (mem & (op["rowof"] >= 0)).any(dim=0).nonzero(as_tuple=True)[0].tolist():
+                    n = op["rowof"][:, j].clamp(min=0)
+                    tp = res["tp"][n]
+                    hit = (tp >= 0) & ~res["other"][n] & (res["spot_n"][n] > 0) & dist_ahead.gather(1, tp.clamp(min=0))
+                    if bool((hit.any(dim=1) & mem[:, j]).any()):
+                        raise NotImplementedError("minor operations: Attack Along March over a district target")
+        else:
+            reach = u["mp_whole"].clamp(min=2)
+            near = torch.zeros(B, sim.T, dtype=torch.bool, device=dev)
+            for j in mem.any(dim=0).nonzero(as_tuple=True)[0].tolist():
+                mj = mem[:, j]
+                dq = sim.pair_dist[u["tile"][:, j].clamp(min=0)].to(torch.long)
+                near |= mj.unsqueeze(1) & (dq <= reach[:, j].unsqueeze(1))
+            theirs = (enemy.unsqueeze(1) < 0) | (us_ == enemy.unsqueeze(1)) | (uk == 7)
+            near = near.repeat(1, L) & (uk > 0) & (us_ != seat) & standing & theirs
         cand = mem & (op["rowof"] >= 0)
         if not bool((cand.any(dim=1) & near.any(dim=1)).any()):
             continue
@@ -2717,7 +3227,7 @@ def _u_recruit(sim, c: _OpCtx, i: int, at: torch.Tensor) -> torch.Tensor:
         low = torch.zeros_like(at)
         for dd, dfn in enumerate(Tm.defs):
             low |= (sim.mops_def[:, s, kk] == dd) & (int(dfn["priority"]) < prio)
-        low &= at
+        low &= at & ~sim.mops_locked[:, s, kk]
         for ti in range(N_TEAMS):
             mem = sim.mops_mem[:, s, kk, ti]
             ok = (mem >= 0) & u["own"].gather(1, mem.clamp(min=0)) & low.unsqueeze(1)
@@ -2906,7 +3416,8 @@ def _x_move(sim, c: _OpCtx, i: int, on: torch.Tensor) -> None:
     rng = tree.int_(i, "Unit distance")
     rng = 1 if rng is None else rng
     op = c.view["op"]
-    ready = ((sim.mops_tm[:, s, k] < 0) | sim.mops_ready[:, s, k]).all(dim=1)
+    # the operation ready (0x73aa60): its units may be built, or every team ready
+    ready = sim.mops_auc[:, s, k] | ((sim.mops_tm[:, s, k] < 0) | sim.mops_ready[:, s, k]).all(dim=1)
     arrived = c.mb[:, i] == 1
     for ti in range(N_TEAMS):
         tm = sim.mops_tm[:, s, k, ti]
@@ -3094,10 +3605,8 @@ def _team_members(sim, c: _OpCtx) -> tuple[torch.Tensor, torch.Tensor]:
 
 
 def _x_pillage(sim, c: _OpCtx, i: int, on: torch.Tensor) -> None:
-    """OPERATION PILLAGE's execution (0x811390, `pillageExecute`) of the Free
-    Cities' operation over the holder's pool (`_op_pillage`)"""
-    if c.s != sim.FR:
-        raise NotImplementedError("operations: Operation Pillage over the majors' pool")
+    """OPERATION PILLAGE's execution (0x811390, `pillageExecute`) over the
+    holder's pool (`_op_pillage`)"""
     view = c.view
     op = view["op"]
     if op["tg"] is None:
@@ -3106,20 +3615,19 @@ def _x_pillage(sim, c: _OpCtx, i: int, on: torch.Tensor) -> None:
     t = sim.mops_target[:, c.s, c.k]
     ctx = {"rowof": op["rowof"], "res": op["res"], "tg": op["tg"], "done": view["done"]}
     sim._op_pillage(on, mem, rank, t, ctx, _pillage_flag(c, i, "Pillage Districts"),
-                    _pillage_flag(c, i, "Pillage Improvements"), _pillage_flag(c, i, "Get Goody Huts"), FREE_SEAT)
+                    _pillage_flag(c, i, "Pillage Improvements"), _pillage_flag(c, i, "Get Goody Huts"), sim._mops_seat(c.s),
+                    pre=sim._mops_pre(c.s))
 
 
 def _x_siege(sim, c: _OpCtx, i: int, on: torch.Tensor) -> None:
-    """OPERATION SIEGE CITY's execution (0x811e80, `siegeCityExecute`) of the
-    Free Cities' operation over the holder's pool (`_op_siege`)"""
-    if c.s != sim.FR:
-        raise NotImplementedError("operations: Operation Siege City over the majors' pool")
+    """OPERATION SIEGE CITY's execution (0x811e80, `siegeCityExecute`) over
+    the holder's pool (`_op_siege`)"""
     view = c.view
     op = view["op"]
     mem, rank = _team_members(sim, c)
     ctx = {"done": view["done"], "order": op["order"], "rowof": op["rowof"], "res": op["res"], "tg": op["tg"],
            "danger": op["danger"]}
-    sim._op_siege(on, mem, sim.mops_target[:, c.s, c.k], rank, ctx, seat=FREE_SEAT)
+    sim._op_siege(on, mem, sim.mops_target[:, c.s, c.k], rank, ctx, seat=sim._mops_seat(c.s), pre=sim._mops_pre(c.s))
 
 
 def _x_garrison(sim, c: _OpCtx, i: int, on: torch.Tensor) -> None:
@@ -3684,6 +4192,201 @@ def _u_naval_choose(sim, c: _OpCtx, i: int, at: torch.Tensor) -> torch.Tensor:
     return torch.where(has, BT_SUCCESS, BT_FAILURE if fail else BT_SUCCESS)
 
 
+def _has(c: _OpCtx, i: int, name: str) -> bool:
+    """the node holds the datum (its value or not)"""
+    return name in c.tree.nodes[i]["data"]
+
+
+def _war_with(sim, seat: int, other: torch.Tensor) -> torch.Tensor:
+    """[B] `seat` at war with each player of `other` [B] (-1 none: no)"""
+    orow = sim._seat_row.take(other.clamp(min=0, max=sim._seat_row.numel() - 1))
+    return (other >= 0) & sim.war[:, int(sim._seat_row[seat])].gather(1, orow.unsqueeze(1)).squeeze(1)
+
+
+def _u_is_at_war(sim, c: _OpCtx, i: int, at: torch.Tensor) -> torch.Tensor:
+    """IS AT WAR (0x7edde0): at least Minimum Number (1) players at war with
+    the minor — not the barbarians unless Include Barbarian, with With
+    Operation Target the operation's enemy alone"""
+    assert not _has(c, i, "Skip For Minors"), "minor operations: Is At War's Skip For Minors"
+    tree = c.tree
+    mn = 1 if not _has(c, i, "Minimum Number") else (tree.int_(i, "Minimum Number") or 0)
+    barb = bool(tree.flag(i, "Include Barbarian"))
+    seat = sim._mops_seat(c.s)
+    if tree.flag(i, "With Operation Target"):
+        n = _war_with(sim, seat, sim.mops_enemy[:, c.s, c.k]).long()
+    else:
+        n = torch.zeros_like(c.ref)
+        for p in list(range(sim.n_majors)) + [100 + x for x in range(sim.S)] + ([BARB_SEAT] if barb else []) + [FREE_SEAT]:
+            if p == seat:
+                continue
+            n = n + _war_with(sim, seat, torch.full_like(c.ref, p)).long()
+    return torch.where(n >= mn, BT_SUCCESS, BT_FAILURE)
+
+
+def _u_lock(sim, c: _OpCtx, i: int, at: torch.Tensor) -> torch.Tensor:
+    """LOCK UNITS (0x7f5240): the operation's units locked to it (`Lock
+    Units`); SUCCESS"""
+    sim.mops_locked[:, c.s, c.k] = torch.where(at, bool(c.tree.flag(i, "Lock Units")), sim.mops_locked[:, c.s, c.k])
+    return _status(c, BT_SUCCESS)
+
+
+def _u_diplomacy(sim, c: _OpCtx, i: int, at: torch.Tensor) -> torch.Tensor:
+    """OPERATION DIPLOMACY (0x819db0): ERROR with none of its four data or no
+    enemy; Had Denounced with the enemy not denounced (a minor denounces
+    none) SUCCESS; Is At War at peace FAILURE; with no Contract, desiring a
+    denouncement or not desiring war SUCCESS; else SUCCESS at war, RUNNING
+    at peace"""
+    if not any(_has(c, i, n) for n in ("Desires Denouncement", "Had Denounced", "Desires War", "Is At War")):
+        return _status(c, BT_ERROR)
+    tree = c.tree
+    enemy = sim.mops_enemy[:, c.s, c.k]
+    war = _war_with(sim, sim._mops_seat(c.s), enemy)
+    if tree.flag(i, "Had Denounced"):
+        return torch.where(enemy < 0, BT_ERROR, BT_SUCCESS)
+    out = _status(c, BT_SUCCESS)
+    if tree.flag(i, "Is At War"):
+        out = torch.where(~war, BT_FAILURE, out)
+    elif _has(c, i, "Contract") and not tree.flag(i, "Desires Denouncement") and tree.flag(i, "Desires War"):
+        out = torch.where(war, BT_SUCCESS, BT_RUNNING)
+    return torch.where(enemy < 0, BT_ERROR, out)
+
+
+def _x_diplomacy(sim, c: _OpCtx, i: int, on: torch.Tensor) -> None:
+    """OPERATION DIPLOMACY's execution (0x8163f0): desiring war, the
+    operation's units may be built (`allowUnitConstruction`); a request to
+    the diplomatic AI — a denouncement desired with the enemy at peace, or a
+    surprise war — is a city-state's diplomacy, which the engines carry not"""
+    tree = c.tree
+    war = _war_with(sim, sim._mops_seat(c.s), sim.mops_enemy[:, c.s, c.k])
+    denounce = bool(tree.flag(i, "Desires Denouncement"))
+    # a denouncement desired at war ends the execution (a minor denounces none)
+    if tree.flag(i, "Desires War"):
+        sim.mops_auc[:, c.s, c.k] |= on & ~(war & denounce)
+    asks = (denounce or bool(tree.flag(i, "Desires War"))) and bool((on & ~war).any())
+    if asks:
+        raise NotImplementedError("minor operations: a city-state's diplomatic request (Operation Diplomacy at peace)")
+
+
+def _u_turn_limiter(sim, c: _OpCtx, i: int, at: torch.Tensor) -> torch.Tensor:
+    """TURN LIMITER (0x7f21c0): ERROR with no child; the turn it first ran
+    kept (`c.ma`); its child runs (`_OpCtx.child`)"""
+    if c.tree.nodes[i]["first"] < 0:
+        return _status(c, BT_ERROR)
+    c.ma[:, i] = torch.where(at & (c.ma[:, i] == NONE), int(sim.turn), c.ma[:, i])
+    return _status(c, BT_FRESH)
+
+
+def _u_build_mil(sim, c: _OpCtx, i: int, at: torch.Tensor) -> torch.Tensor:
+    """BUILD MILITARY IMPROVEMENT (0x7e9b10): ERROR with neither a defensive
+    nor a specific improvement asked; else SUCCESS, the first of the
+    operation's units with build charges left that builds one held for the
+    execution — a minor's operation units' build is an action row its
+    orders give not (`act`)"""
+    defensive = bool(c.tree.flag(i, "Defensive Improvement"))
+    if not defensive and not (c.tree.value(i, "Specific Improvement") or ""):
+        return _status(c, BT_ERROR)
+    mem, _ = _team_members(sim, c)
+    charges = sim._mops_u(c.s, "charges") if hasattr(sim, f"{sim._mops_pre(c.s)}_unit_charges") else None
+    if charges is not None and bool((mem & (charges > 0) & at.unsqueeze(1)).any()):
+        raise NotImplementedError("minor operations: Build Military Improvement with a unit of build charges")
+    return _status(c, BT_SUCCESS)
+
+
+def _u_air_assault(sim, c: _OpCtx, i: int, at: torch.Tensor) -> torch.Tensor:
+    """OPERATION AIR ASSAULT (0x813140): SUCCESS once the target is gone, or
+    while it is a city or a district; else FAILURE"""
+    t = sim.mops_target[:, c.s, c.k]
+    tc = t.clamp(min=0).unsqueeze(1)
+    place = (t >= 0) & (sim._centre_plane().gather(1, tc).squeeze(1) | (sim.district.gather(1, tc).squeeze(1) >= 0))
+    return torch.where(_gone(sim, c) | place, BT_SUCCESS, BT_FAILURE)
+
+
+def _x_air_assault(sim, c: _OpCtx, i: int, on: torch.Tensor) -> None:
+    """OPERATION AIR ASSAULT's execution (0x80fb50): its bombers — air units
+    with a bombard strength and Movement left, the teams' members, then the
+    minor's units in no operation within their range of the target; a
+    minor's air strike and rebase are action rows its orders give not
+    (`act`)"""
+    s = c.s
+    u = sim._mops_units(s)
+    ut = sim._mops_u(s, "type").clamp(min=0, max=sim.NU - 1)
+    air = u["own"] & (sim._type_air.take(ut) != 0) & (u["bombard"] > 0) & (u["mp"] > 0) & on.unsqueeze(1)
+    if not bool(air.any()):
+        return
+    mem, _ = _team_members(sim, c)
+    t = sim.mops_target[:, s, c.k].clamp(min=0)
+    inr = sim.pair_dist[u["tile"].clamp(min=0), t.unsqueeze(1)].long() <= u["range"]
+    if bool((air & (mem | (~sim._mops_op_units(s) & inr))).any()):
+        raise NotImplementedError("minor operations: a city-state's air strike (Operation Air Assault)")
+
+
+def _u_make_formation(sim, c: _OpCtx, i: int, at: torch.Tensor) -> torch.Tensor:
+    """MAKE FORMATION (0x7efd70): Destroy Formations SUCCESS; else the planned
+    pairs of a Combat Unit escort and a Civilian or Support Unit member
+    (`planFormations`): with no such member, none, SUCCESS — a minor's
+    operation pairing one is unported"""
+    tree = c.tree
+    if tree.flag(i, "Destroy Formations"):
+        return _status(c, BT_SUCCESS)
+    combat = tree.value(i, "Combat Unit")
+    riders = [x for x in (tree.value(i, "Civilian Unit"), tree.value(i, "Support Unit")) if x]
+    if not combat or not riders:
+        return _status(c, BT_SUCCESS)
+    Tm = c.T
+    mem, _ = _team_members(sim, c)
+    u = sim._mops_units(c.s)
+    ua = Tm.unit_ai.to(sim.device)[u["row"].clamp(min=0)]
+    rides = torch.zeros_like(mem)
+    for r in riders:
+        if r in Tm.ai_index:
+            rides |= ua[:, :, Tm.ai_index[r]] & (u["row"] >= 0)
+    if bool((mem & rides & at.unsqueeze(1)).any()):
+        raise NotImplementedError("minor operations: Make Formation with a civilian or support member")
+    return _status(c, BT_SUCCESS)
+
+
+def _u_can_alpha_enemy(sim, c: _OpCtx, i: int, at: torch.Tensor) -> torch.Tensor:
+    """CAN ALPHA CITY (0x812cc0) on an enemy city: the blows the operation's
+    units with Movement left would strike the target city from where their
+    planning reaches it (the plan's COMBAT_DISTRICT entry with spots, its
+    dealt) take at least half of its hit points left; the target gone or no
+    city FAILURE"""
+    s, k = c.s, c.k
+    t = sim.mops_target[:, s, k]
+    tc = t.clamp(min=0)
+    op = c.view["op"]
+    hp = torch.full_like(t, -1)
+    for row in range(sim.city_alive.shape[1]):
+        on = sim.city_alive[:, row] & (sim.city_center[:, row] == tc.unsqueeze(1)) & (t >= 0).unsqueeze(1)
+        hp = torch.where(on.any(dim=1), torch.where(on, sim.city_hp[:, row].long(), torch.zeros_like(sim.city_hp[:, row].long())).sum(dim=1), hp)
+    mm = (sim.citystate_center == tc.unsqueeze(1)) & sim.citystate_alive & (t >= 0).unsqueeze(1)
+    hp = torch.where(mm.any(dim=1), torch.where(mm, sim.citystate_hp.long(), torch.zeros_like(sim.citystate_hp.long())).sum(dim=1), hp)
+    u = sim._mops_units(s)
+    mem, _ = _team_members(sim, c)
+    total = torch.zeros(sim.B, dtype=torch.float64, device=sim.device)
+    res = op["res"] if op is not None else None
+    if res is not None and "tp" in res:
+        go = mem & (u["mp"] > 0) & (op["rowof"] >= 0)
+        for j in go.any(dim=0).nonzero(as_tuple=True)[0].tolist():
+            g = go[:, j]
+            n = op["rowof"][:, j].clamp(min=0)
+            tp, oth, sn, dealt = res["tp"][n], res["other"][n], res["spot_n"][n], res["dealt"][n]
+            hit = (tp == t.unsqueeze(1)) & ~oth & (sn > 0)
+            e = hit.long().argmax(dim=1)
+            d = dealt.gather(1, e.unsqueeze(1)).squeeze(1).to(torch.float64)
+            total = total + torch.where(g & hit.any(dim=1), d, torch.zeros_like(d))
+    ok = (hp > 0) & ~_gone(sim, c) & (t >= 0)
+    return torch.where(ok & (_f(total) >= _f(_f(hp.to(torch.float64)) * 0.5)), BT_SUCCESS, BT_FAILURE)
+
+
+def _u_can_alpha_any(sim, c: _OpCtx, i: int, at: torch.Tensor) -> torch.Tensor:
+    """CAN ALPHA CITY (0x812cc0): on the minor's own city (City Defense's) or
+    an enemy's (the city assaults')"""
+    if c.T.defs[c.d]["targetType"] == "TARGET_FRIENDLY_CITY":
+        return _u_can_alpha(sim, c, i, at)
+    return _u_can_alpha_enemy(sim, c, i, at)
+
+
 _UPDATE = {
     "Decode Trigger": _u_decode,
     "Operation Defend Units": _u_defend,
@@ -3695,7 +4398,14 @@ _UPDATE = {
     "Operation Attack": _u_operation_attack,
     "Operation Is Ready": _u_is_ready,
     "Is City Threatened": _u_city_threatened,
-    "Can Alpha City": _u_can_alpha,
+    "Can Alpha City": _u_can_alpha_any,
+    "Is At War": _u_is_at_war,
+    "Lock Units": _u_lock,
+    "Operation Diplomacy": _u_diplomacy,
+    "Turn Limiter": _u_turn_limiter,
+    "Build Military Improvement": _u_build_mil,
+    "Operation Air Assault": _u_air_assault,
+    "Make Formation": _u_make_formation,
     "Garrison City": _u_running_units,
     "Operation Attack City": _u_attack_city,
     "Operation Pillage": _u_pillage,
@@ -3715,6 +4425,8 @@ _EXECUTE = {
     "Operation Attack City": _x_attack_city,
     "Operation Pillage": _x_pillage,
     "Operation Siege City": _x_siege,
+    "Operation Diplomacy": _x_diplomacy,
+    "Operation Air Assault": _x_air_assault,
     "Naval Pillage": _x_naval_pillage,
     "Naval Patrol": _x_naval_patrol,
 }

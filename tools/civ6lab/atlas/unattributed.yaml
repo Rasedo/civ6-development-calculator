@@ -6482,11 +6482,16 @@
     - recording: h1_duelv1117
       turn: 14
       value: Valletta's TRADE, TO -1, VAL 2.10 (0.00 before t14)
-  impl: [cpu/core/aiTrade.ts:minorRouteCandidate]
+  impl:
+    - cpu/core/aiTrade.ts:minorRouteCandidate
+    - cpu/core/operations/evaluate.ts:enemyCities
+    - gpu/core/sim_minorops.py:_mops_war_eval
+    - cpu/core/barbarianOps.ts:inputs
   readings:
     - "C-97: the war operations — the war candidates, the city value's frame, the assault nodes and Attack Units READ; the loyalty lead's sources, the team update's danger and the assault's executions PARTLY READ"
     - "C-96: the trade AI's route value — READ (0x5e9b20, 0x78f210, 0x78e010, 0x559140's use), PARTLY READ (0x526330's terms, the knowledge base's city order)"
     - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
+    - "C-99: the city-states' war operations — the war candidates' trade-list gate READ (0x747230 -> 0x78e010), the city assaults ported in both twins; the city value's land strengths and the assault's GPU executions open"
   context:
     - ...er's cities must list it in its trade AI's city list (CityBuildAI +0x870 m_cityTrade, 0x78e010); MustHaveNukes (definition +0x7a) asks the nuke check 0x2d1f20 / 0x2d2090; the value t...
     - "...0a0, per idle Trader): over the city's list (+0x870, 0x78f210) and +0xe0's entries that 0x78e010 admits, international (not at war 0x469cd0) Σ 0x7a6690 of 0x526330 × (1, × 3 for the..."
@@ -7397,6 +7402,7 @@
   impl:
     - cpu/core/operations/assault.ts:ASSAULT_NODES
     - cpu/core/operations/assault.ts:buildMilitaryImprovement
+    - gpu/core/sim_minorops.py:_u_build_mil
   readings:
     - "C-97: the war operations — the war candidates, the city value's frame, the assault nodes and Attack Units READ; the loyalty lead's sources, the team update's danger and the assault's executions PARTLY READ"
     - "C-97: the war desires, the war operation's readiness and the assault's executions — the war value, the not-ready hook, the readiness and the executions READ; the leader's war factor, the WMD flags, the deal items and the war record's writer unread"
@@ -7470,7 +7476,10 @@
     - recording: h1_duelv1117
       turn: 20
       value: "China never at war with Caguana: the march's Priority falls to the Declare War contract"
-  impl: [cpu/core/operations/assault.ts:ASSAULT_NODES, cpu/core/operations/assault.ts:isAtWar]
+  impl:
+    - cpu/core/operations/assault.ts:ASSAULT_NODES
+    - cpu/core/operations/assault.ts:isAtWar
+    - gpu/core/sim_minorops.py:_u_is_at_war
   readings:
     - "C-97: the war operations — the war candidates, the city value's frame, the assault nodes and Attack Units READ; the loyalty lead's sources, the team update's danger and the assault's executions PARTLY READ"
   context:
@@ -7531,7 +7540,7 @@
   kind: function
   semantics: Turn Limiter's parent function (update 0x7f21c0).
   status: PARTLY
-  impl: [cpu/core/operations/nodes.ts:turnLimiter]
+  impl: [cpu/core/operations/nodes.ts:turnLimiter, gpu/core/sim_minorops.py:child_of]
   readings: ["C-97: the behaviour trees — READ (the interpreter), the nodes PARTLY READ"]
   context:
     - ...rs failures and the last good child), Not 0x7f15f0, pass-through 0x7f15a0, Turn Limiter 0x7f1620 (update 0x7f21c0; the limit at the game speed, 0x5254d0), Contract Manager 0x7f1500 (up...
@@ -7576,7 +7585,7 @@
   kind: function
   semantics: "Turn Limiter's update: the limit at the game speed (0x5254d0)."
   status: PARTLY
-  impl: [cpu/core/operations/nodes.ts:turnLimiter]
+  impl: [cpu/core/operations/nodes.ts:turnLimiter, gpu/core/sim_minorops.py:_u_turn_limiter]
   readings: ["C-97: the behaviour trees — READ (the interpreter), the nodes PARTLY READ"]
   context:
     - ...he last good child), Not 0x7f15f0, pass-through 0x7f15a0, Turn Limiter 0x7f1620 (update 0x7f21c0; the limit at the game speed, 0x5254d0), Contract Manager 0x7f1500 (update 0x7f17a0,...
@@ -7688,7 +7697,7 @@
   kind: function
   semantics: Lock Units' update.
   status: PARTLY
-  impl: [cpu/core/operations/nodes.ts:lockUnits]
+  impl: [cpu/core/operations/nodes.ts:lockUnits, gpu/core/sim_minorops.py:_u_lock]
   readings:
     - "C-97: the behaviour trees — READ (the interpreter), the nodes PARTLY READ"
     - "C-95 / C-99: a cleared camp's scout still reports; a lake city trains ships; IsCoastalTarget; the recruit's priority; a candidate's own strength — READ (0x153ef0, 0x1485c0, 0x1c77c0 -> 0x82a10, 0x73a440 -> 0x73a880, 0x81c820 at 0x81cacf..0x81cb14, 0x7d1e40 at 0x7d2004..0x7d205f, 0x5cced0 at 0x5cd0c1..0x5cd11e, 0x7f5240), both twins"

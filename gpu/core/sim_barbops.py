@@ -1245,9 +1245,9 @@ class SimBarbOps:
                          BARB_SEAT)
 
     def _op_pillage(self, on: torch.Tensor, mem: torch.Tensor, join: torch.Tensor, tplot: torch.Tensor, ctx: dict,
-                    districts: bool, improvements: bool, goodies: bool, seat: int) -> None:
+                    districts: bool, improvements: bool, goodies: bool, seat: int, pre: str = "barb") -> None:
         """OPERATION PILLAGE's execution (0x811390, `pillageExecute`) for an
-        operation's members `mem` [B, P] of the hostile pool (their order
+        operation's members `mem` [B, P] of the pool `pre` (their order
         `join`, player `seat`) against the target `tplot` in the games `on`:
         per IMPROVEMENT, PASSIVE_DISTRICT or GOODY entry of the list (each
         kind unless the node's flag says false) in its order on the ground of
@@ -1270,21 +1270,21 @@ class SimBarbOps:
         imp = (tg["ok"] == 9) & ground if improvements else nil
         dis = ((tg["dk"] & 2) > 0) & ground if districts else nil
         goody = (tg["ok"] == 5) & ground if goodies else nil
-        ut = self.barb_unit_type.clamp(min=0, max=self.NU - 1)
-        mp_whole = torch.div(self.barb_unit_mp, self._mp_scale, rounding_mode="floor")
+        ut = getattr(self, f"{pre}_unit_type").clamp(min=0, max=self.NU - 1)
+        mp_whole = torch.div(getattr(self, f"{pre}_unit_mp"), self._mp_scale, rounding_mode="floor")
         naval = self.unit_naval.take(ut)
         water = self.water
-        formed = self._tac_formed("barb")
+        formed = self._tac_formed(pre)
         for p in (on.unsqueeze(1) & (imp | dis | goody)).any(dim=0).nonzero(as_tuple=True)[0].tolist():
             for kindm, is_goody in ((dis[:, p], False), (imp[:, p], False), (goody[:, p], True)):
                 g = on & kindm
                 if not bool(g.any()):
                     continue
-                el = (mem & self.barb_unit_alive & (self.barb_unit_seat == seat) & (self.barb_unit_mp > 0)
+                el = (mem & getattr(self, f"{pre}_unit_alive") & (getattr(self, f"{pre}_unit_seat") == seat) & (getattr(self, f"{pre}_unit_mp") > 0)
                       & (self._type_bombard.take(ut) <= 0) & g.unsqueeze(1) & ~(naval & water[:, p].unsqueeze(1)) & ~formed)
                 if not is_goody:
                     el &= self._type_combat.take(ut) > 0
-                cand = el & (self.barb_unit_tile == p) & (mp_whole >= 1)
+                cand = el & (getattr(self, f"{pre}_unit_tile") == p) & (mp_whole >= 1)
                 if not bool(cand.any()):
                     continue
                 # the planning holds its own plot within two turns with
@@ -1292,7 +1292,7 @@ class SimBarbOps:
                 spot_ok = torch.zeros_like(cand)
                 cb, cs = cand.nonzero(as_tuple=True)
                 pp = torch.full_like(cb, p)
-                sp = self._op_reach_at(cb, cs, pp, 2, True, torch.zeros_like(cb), rowof, res, "barb", seat)
+                sp = self._op_reach_at(cb, cs, pp, 2, True, torch.zeros_like(cb), rowof, res, pre, seat)
                 spot_ok[cb, cs] = sp >= 0
                 key = torch.where(spot_ok, join.clamp(min=0), torch.full_like(join, 1 << 40))
                 best = key.min(dim=1)
@@ -1301,6 +1301,8 @@ class SimBarbOps:
                     continue
                 us = best.indices
                 done[bidx[go], us[go]] = True
+                if pre != "barb":
+                    raise NotImplementedError("operations: Operation Pillage's pillage over the majors' pool")
                 self._barb_pillage_here(go, us)
 
     def _bop_attack_city(self, on: torch.Tensor, k: int, ctx: dict) -> None:
@@ -1353,9 +1355,9 @@ class SimBarbOps:
         return (tgt >= 0) & (ctr >= 0) & passable.any(dim=1) & ~(passable & ~held).any(dim=1)
 
     def _op_siege(self, on: torch.Tensor, mem: torch.Tensor, target: torch.Tensor, join: torch.Tensor, ctx: dict,
-                  seat: int = BARB_SEAT) -> None:
+                  seat: int = BARB_SEAT, pre: str = "barb") -> None:
         """OPERATION SIEGE CITY's execution (0x811e80, `siegeCityExecute`) for
-        an operation's members `mem` [B, P] of the hostile pool (their order
+        an operation's members `mem` [B, P] of the pool `pre` (their order
         `join`, player `seat`) in the games
         `on`: the city encircled, each member in join order with Movement left
         and a range strikes it; else the six plots about it shared out by the
@@ -1374,23 +1376,23 @@ class SimBarbOps:
         bidx = torch.arange(B, device=dev)
         on = on & (target >= 0)
         enc = on & self._city_encircled(target)
-        ut = self.barb_unit_type.clamp(min=0, max=self.NU - 1)
+        ut = getattr(self, f"{pre}_unit_type").clamp(min=0, max=self.NU - 1)
         order = torch.where(mem, join, torch.full_like(join, 1 << 30)).argsort(dim=1, stable=True)
         nmem = mem.sum(dim=1)
         if bool(enc.any()):
             for r in range(int(nmem.max())):
                 us = order[:, r]
-                m = enc & (r < nmem) & self.barb_unit_alive[bidx, us] & (self.barb_unit_mp[bidx, us] > 0) \
+                m = enc & (r < nmem) & getattr(self, f"{pre}_unit_alive")[bidx, us] & (getattr(self, f"{pre}_unit_mp")[bidx, us] > 0) \
                     & (self._type_ranged_range.take(ut[bidx, us]) > 0)
                 if not bool(m.any()):
                     continue
                 ranged = self._type_ranged_strength.take(ut[bidx, us]) > 0
-                here = self.barb_unit_tile[bidx, us].clamp(min=0)
-                inr = ranged & (self.pair_dist[here, target.clamp(min=0)].to(torch.long) <= self._tac_range(bidx, us))
-                fire = m & inr & (self.barb_unit_attacks[bidx, us] > 0)
+                here = getattr(self, f"{pre}_unit_tile")[bidx, us].clamp(min=0)
+                inr = ranged & (self.pair_dist[here, target.clamp(min=0)].to(torch.long) <= self._tac_range(bidx, us, pre))
+                fire = m & inr & (getattr(self, f"{pre}_unit_attacks")[bidx, us] > 0)
                 for u in torch.unique(us[fire]).tolist():
-                    self._hostile_ranged_strike(fire & (us == u), target.clamp(min=0), "barb", u)
-                self._tac_move_to(m & ~inr, us, target.clamp(min=0), "barb", seat, strike=True)
+                    self._hostile_ranged_strike(fire & (us == u), target.clamp(min=0), pre, u)
+                self._tac_move_to(m & ~inr, us, target.clamp(min=0), pre, seat, strike=True)
         go = on & ~enc
         if not bool(go.any()):
             return
@@ -1415,7 +1417,7 @@ class SimBarbOps:
         count = torch.where(valid, 0, 1).to(torch.long)
         holder = torch.full((B, 6), -1, dtype=torch.long, device=dev)
         # the units: members alive with Movement left and no bombard strength, in join order
-        cand = mem & (self.barb_unit_mp > 0) & (self._type_bombard.take(ut) <= 0) & go.unsqueeze(1)
+        cand = mem & (getattr(self, f"{pre}_unit_mp") > 0) & (self._type_bombard.take(ut) <= 0) & go.unsqueeze(1)
         corder = torch.where(cand, join, torch.full_like(join, 1 << 30)).argsort(dim=1, stable=True)
         nU = cand.sum(dim=1)
         U = int(nU.max())
@@ -1430,7 +1432,7 @@ class SimBarbOps:
             rows = (go & uv[:, i]).nonzero(as_tuple=True)[0]
             if not rows.numel():
                 continue
-            res = self._tac_search(rows, uslot[rows, i], seat, 2, False, pre="barb", from_full=True)
+            res = self._tac_search(rows, uslot[rows, i], seat, 2, False, pre=pre, from_full=True)
             t6 = res["turns"].gather(1, slc[rows])
             m6 = res["moves"].gather(1, slc[rows])
             naval = self.unit_naval.take(ut[rows, uslot[rows, i]])
@@ -1442,8 +1444,8 @@ class SimBarbOps:
             us = uslot[:, i]
             u_t = ut[bidx, us]
             pc = self.rules_dev.u_promo_class.take(u_t)
-            no_ex = ((pc == self._pc_ranged) | (pc == self._pc_siege)) & ~self._promo_flag(u_t, self.barb_unit_promos[bidx, us], "ZOC_EXERT")
-            uz[:, i] = uv[:, i] & ~self._type_zoc_none.take(u_t) & ~no_ex & ~self.barb_unit_emb[bidx, us]
+            no_ex = ((pc == self._pc_ranged) | (pc == self._pc_siege)) & ~self._promo_flag(u_t, getattr(self, f"{pre}_unit_promos")[bidx, us], "ZOC_EXERT")
+            uz[:, i] = uv[:, i] & ~self._type_zoc_none.take(u_t) & ~no_ex & ~getattr(self, f"{pre}_unit_emb")[bidx, us]
 
         def take(i: int, j: torch.Tensor, d: int, m: torch.Tensor) -> None:
             jc = j.clamp(min=0)
@@ -1501,7 +1503,7 @@ class SimBarbOps:
             return old
 
         at = torch.full((B, U), -1, dtype=torch.long, device=dev)
-        here = self.barb_unit_tile.gather(1, uslot)
+        here = getattr(self, f"{pre}_unit_tile").gather(1, uslot)
         for j in range(6):
             for i in range(U):
                 m = go & uv[:, i] & valid[:, j] & (here[:, i] == sl[:, j])
@@ -1555,20 +1557,20 @@ class SimBarbOps:
                 h = holder[:, j]
                 hc = h.clamp(min=0)
                 us = uslot.gather(1, hc.unsqueeze(1)).squeeze(1)
-                alive = prev_again & (h >= 0) & self.barb_unit_alive[bidx, us]
-                now = self.barb_unit_tile[bidx, us]
+                alive = prev_again & (h >= 0) & getattr(self, f"{pre}_unit_alive")[bidx, us]
+                now = getattr(self, f"{pre}_unit_tile")[bidx, us]
                 # a holder of a plot already standing on this one
                 held_tiles = torch.full((B, 6), -2, dtype=torch.long, device=dev)
                 for jj in range(6):
                     hj = holder[:, jj]
                     uj = uslot.gather(1, hj.clamp(min=0).unsqueeze(1)).squeeze(1)
-                    held_tiles[:, jj] = torch.where((hj >= 0) & self.barb_unit_alive[bidx, uj], self.barb_unit_tile[bidx, uj], -2)
+                    held_tiles[:, jj] = torch.where((hj >= 0) & getattr(self, f"{pre}_unit_alive")[bidx, uj], getattr(self, f"{pre}_unit_tile")[bidx, uj], -2)
                 on_slot = (held_tiles == sl[:, j:j + 1]).any(dim=1)
                 m = alive & (now != sl[:, j]) & ~on_slot & valid[:, j]
                 if not bool(m.any()):
                     continue
-                self._tac_move_to(m, us, slc[:, j], "barb", seat, strike=False)
-                after = self.barb_unit_tile[bidx, us]
+                self._tac_move_to(m, us, slc[:, j], pre, seat, strike=False)
+                after = getattr(self, f"{pre}_unit_tile")[bidx, us]
                 again |= m & (after != now)
 
     # -- Barbarian Found City ------------------------------------------------
