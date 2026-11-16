@@ -982,21 +982,34 @@ function campsTaken(ctx: Ctx, b: TurnRecord, turn: number): void {
   const { state } = ctx;
   const W = ctx.W;
   const stepped = new Map<number, number>();
+  // a removal the log writes before the step onto the camp's plot is that
+  // step's (runs/h1_duels1180 t129: player 1's Great General 3997698 steps
+  // onto the camp at 40:16, the removal logged before its step; tribe 2's
+  // Crossbowman 3735555 rampages against player 1 that turn)
+  const waiting = new Set<number>();
+  const take = (p: number, seat: number) => {
+    const k = state.barbSeat.camps.indexOf(p);
+    if (k < 0) return;
+    state.barbSeat.camps.splice(k, 1);
+    if (isCiv(seat)) questCampCleared(state, seat, p);
+    tribeDies(state, p, seat);
+  };
   for (const a of ((b as { actions?: unknown[][] }).actions ?? [])) {
     if (a[1] !== turn) continue;
     if (a[2] === 'UnitMoved') {
       const seat = seatOfP(ctx, a[3] as number);
-      if (seat !== NO_SEAT && !isBarbSeat(seat)) stepped.set((a[6] as number) * W + (a[5] as number), seat);
+      if (seat === NO_SEAT || isBarbSeat(seat)) continue;
+      const p = (a[6] as number) * W + (a[5] as number);
+      stepped.set(p, seat);
+      if (waiting.delete(p)) take(p, seat);
       continue;
     }
     if (a[2] !== 'ImprovementRemovedFromMap') continue;
     const p = (a[4] as number) * W + (a[3] as number);
-    const k = state.barbSeat.camps.indexOf(p);
+    if (!state.barbSeat.camps.includes(p)) continue;
     const seat = stepped.get(p);
-    if (k < 0 || seat === undefined) continue;
-    state.barbSeat.camps.splice(k, 1);
-    if (isCiv(seat)) questCampCleared(state, seat, p);
-    tribeDies(state, p, seat);
+    if (seat === undefined) waiting.add(p);
+    else take(p, seat);
   }
 }
 
@@ -1241,11 +1254,13 @@ function barbarianTurn(ctx: Ctx, b: TurnRecord, closing: number): void {
   const opened = ctx.barbOpened ?? barbMovesNow(state);
   ctx.barbOpened = undefined;
   const campsWas = [...state.barbSeat.camps];
-  // ...and every other player's unit their turn's battles killed stands, as
-  // it stood when their turn opened (runs/h1_duels1189 t33: player 0's
-  // Warrior 327683 on 31:14 and player 1's 393219 on 9:8, killed by the
-  // barbarians' units after the camp step, still see for it: 231 plots
-  // unseen, not 240, and no camp raised at t34)
+  // ...and every unit their turn's battles killed stands, as it stood when
+  // their turn opened (runs/h1_duels1189 t33: player 0's Warrior 327683 on
+  // 31:14 and player 1's 393219 on 9:8, killed by the barbarians' units
+  // after the camp step, still see for it: 231 plots unseen, not 240, and
+  // no camp raised at t34; runs/h1_duels1136 t87: tribe 3's Spearman 458758,
+  // killed attacking from its camp on 12:7, holds the camp as the tribe
+  // raises its Scout on 13:8)
   const acts = (b as { actions?: unknown[][] }).actions ?? [];
   const barbP = ctx.playerOfSeat.get(BARB_SEAT);
   const opens = acts.findIndex((x) => x[2] === 'PlayerTurnActivated' && x[3] === barbP && x[1] === closing);
@@ -1254,7 +1269,7 @@ function barbarianTurn(ctx: Ctx, b: TurnRecord, closing: number): void {
     if (x[2] === 'PlayerTurnDeactivated' && x[3] === barbP) break;
     if (x[2] !== 'UnitRemovedFromMap') continue;
     const u = ctx.gone.get(`${x[3]}:${x[4]}`);
-    if (u && !isBarbSeat(u.seat) && !state.units.includes(u) && !struck.includes(u)) struck.push(u);
+    if (u && !state.units.includes(u) && !struck.includes(u)) struck.push(u);
   }
   state.units.push(...struck);
   barbarianRules(state, closing);
@@ -1718,10 +1733,16 @@ function barbarianAi(ctx: Ctx, b: TurnRecord, closing: number, before: ReadonlyS
     },
   });
   const moves = new Map<Unit, { move: string; plot: number; attack: number; from: number }>();
-  // a unit's first logged move of the turn, as the game's first row
+  // a unit's first logged move of the turn, as the game's first row; a
+  // Pillage row a later move other than End Turn follows gives way to it, as
+  // the game's log is read (`loadTactical`)
   traceTactics((c, move, plot, attack) => {
     const u = twin.get(c);
-    if (u && !moves.has(u)) moves.set(u, { move, plot, attack, from: from.get(u) ?? u.tileIndex });
+    if (!u) return;
+    const cur = moves.get(u);
+    if (!cur || (/^Pillage /.test(cur.move) && !/^Pillage /.test(move) && move !== 'HL: End Turn')) {
+      moves.set(u, { move, plot, attack, from: cur?.from ?? from.get(u) ?? u.tileIndex });
+    }
   });
   // a civilian they seized in the pair is its owner's still at their
   // tactical turn's ageing and look, on its plot, and in their pass's

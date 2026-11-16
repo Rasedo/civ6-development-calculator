@@ -18818,3 +18818,56 @@ replay's imposed wonder placement (cpu/harness/replay.ts); GPU
 - Open: which units the placement's grant reaches (0x586d40 at 0x5877f7 /
   0x5878cf): `arrive` gives every land military unit the plot's turns, the
   game's Bombard on a Great Wall none (C-125).
+
+## C-95: the barbarians' scout report on plots newly visible, the camp's taker, the rampage without the Clans mode, Siege City's walls units — READ (0x153ef0, 0x154830 at 0x154a11..0x154a83, 0x778b40 at 0x778f62, 0x8e3250, 0x811e80 at 0x812027..0x812219), both twins
+
+- THE SCOUT'S REPORT reads plots NEWLY VISIBLE: the signal (0x153ef0) the
+  sight update raises per plot newly visible to the barbarian player, so a
+  plot already in the scout's sight that comes to be owned (a city founded
+  there, a border grown) raises none. Each scout keeps every plot its sight
+  held at its last look (`BarbTribe.saw`, `barb_unit_saw`); a report is an
+  owned plot in its sight now that was not then (`barbScoutLook`,
+  `_barb_scout_look`). A camp's scouts look from where they are placed as
+  the camp rises (`raiseCamp`'s `placedLook`; `_barb_raise(look=True)`).
+- THE CAMP'S TAKER: the camp's removal (0x154830) marks its tribe dead and
+  writes the owner of the first unit on the plot not the barbarians' to the
+  tribe (+0x1c, read by 0x152d60), the rampage's player. The replay takes a
+  removal the log writes before its taker's step onto the plot as that
+  step's (`campsTaken`), and a barbarian unit killed in the barbarians' own
+  turn stands for their camp step's looks as their turn opened
+  (`barbarianTurn`'s struck units).
+- THE RAMPAGE WITHOUT A TARGET STAYS: Barbarian Rampage (0x778b40) calls
+  the chase after its tribe's city (0x1479e0 -> 0x775c60, "Chasing target")
+  only where 0x8e3250 holds: the game's capabilities hold 0x6e293fcc,
+  CAPABILITY_BARBARIAN_CLANS (DLC/BarbarianClansMode). No recorded game
+  logs "Chasing target" (65 of 65 AI_Tactical.csv); `chaseCity` and
+  `_tac_chase_city` are deleted.
+- PILLAGE'S LOG: the move logs the list's first unit as it opens on the
+  target whether or not an order follows (`pillage`'s trace).
+- SIEGE CITY'S WALLS UNITS (0x811e80 at 0x812027..0x812219): before the
+  encirclement test each of the operation's units with Movement left
+  (0x56c690) holding a walls ability of its own (unit +0x18b8 / +0x18b9,
+  +0xb94 / +0xc14 through 0x56e670 / 0x56e680: ABILITY_BYPASS_WALLS /
+  ABILITY_ENABLE_WALL_ATTACK and their promotion-class twins, the Siege
+  Tower's and the Battering Ram's own) goes to its planning's first plot
+  one from the city it reaches this turn (0x791300: turns 1, any Movement,
+  range 1), logged "Operation Siege City, <type> <x:y>, Move <x:y>", its
+  turn done (0x570b40) (`siegeCityExecute`, `wallsAbility`; `_op_siege`).
+  The step is skipped for every unit where the target city's flags hold:
+  the Free Cities' record +0x1c, else the player's +0x12f0 +0xf4, the
+  city's +0x2a10 or +0x2a70 (unread: no recorded case holds one; the
+  Castle's PREVENT_MELEE_ATTACK_OUTER_DEFENSES and the Star Fort's
+  PREVENT_BYPASS_OUTER_DEFENSE their likely writers).
+- Confirmed: runs/h1_duels1172 t73-111 tribe 3's Scout 2490372 beside
+  player 1's city founded on 37:8 in its sight: no report, its HL moves as
+  logged (39 rows gone), the tree at t119; runs/h1_duels1136 t88-110 the
+  Scout 3473424 (19 rows); runs/h1_duels1153 t59 tribe 7's camp's Scout
+  reports as it is placed (5 rows); runs/h1_duels1180 t129 player 1's Great
+  General 3997698 takes the camp on 40:16, its removal logged before its
+  step: the Crossbowman 3735555 rampages t129-146 (27 rows) and tribe 7's
+  Scout 2293760 chases at t140; runs/h1_duels1186 t37-46 tribe 1's Scout
+  262147 holds 17:15 and logs Pillage Improvement (10 rows), 1140 t15,
+  1155 t17; runs/h1_duels1168 t47 / t67-114 the Battering Ram 2883607 by
+  Rome on 14:7, its Ancient Walls standing, steps beside the city (9 rows).
+- Open: runs/h1_duels1168 t51 / t65-121 the Ram moving with a Warrior's
+  formation; runs/h1_duels1156 t79-89 the Ram 3735584 (C-95).

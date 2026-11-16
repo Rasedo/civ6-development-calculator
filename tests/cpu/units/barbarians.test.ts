@@ -113,6 +113,9 @@ function farmInSight(state: GameState, camp: number, scout: number, city?: numbe
   const t = state.map.tiles.find((x) => plotDistance(state, x.index, camp) === 3 && plotDistance(state, x.index, scout) <= 2)!;
   setTileOwner(t, 0, city);
   t.improvement = 'FARM';
+  // the plot newly in the scout's sight: the look it took as it was placed
+  // forgotten (a plot owned where it already saw raises no report)
+  for (const tr of state.barbTribes ?? []) tr.saw = {};
 }
 
 // THE RAIDS (tools/civ6lab/dll_readings.md "H-1: the raids"): a scout that

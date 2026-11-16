@@ -578,7 +578,8 @@
   impl:
     - cpu/core/tactical.ts:CHASE_SIGHT
     - cpu/core/tactical.ts:chaseTarget
-    - gpu/core/sim_tactics.py:_CHASE_RANGE
+    - gpu/core/sim_tactics.py:_CHASE_SIGHT
+    - gpu/core/sim_tactics.py:_BARB_DEFENSE_RANGED
   readings:
     - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
   notes: ["imported: READ in its section, no confirming case found beside it"]
@@ -665,10 +666,14 @@
   cases:
     - recording: 1124
       value: "Shadow check over   1124: of 446 rows the logged target is in the list for 423 (the rest the   knowledge base's), the pick matches 415 of them;"
-  impl: [cpu/core/tactical.ts:rampage, cpu/core/tactical.ts:chaseTarget]
+  impl:
+    - cpu/core/tactical.ts:chaseTarget
+    - cpu/core/tactical.ts:rampage
+    - gpu/core/sim_tactics.py:_tac_rampage
   readings:
     - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
     - "C-110: the Fortify order and its ticks; the heal's plot gate — READ"
+    - "C-95: the barbarians' scout report on plots newly visible, the camp's taker, the rampage without the Clans mode, Siege City's walls units — READ (0x153ef0, 0x154830 at 0x154a11..0x154a83, 0x778b40 at 0x778f62, 0x8e3250, 0x811e80 at 0x812027..0x812219), both twins"
   context:
     - "...h of this turn within its range (1 at least) of the city with none of its own stacking (0x775c60) and logs no row. Shadow check over 1124: of 446 rows the logged target is in the list..."
     - "...of this turn within its range (1 at least) of the target with none of its own stacking (0x775c60); the row's \"Move To\" is the target's plot."
@@ -811,7 +816,7 @@
 - addr: 0x778b40
   final: 0x50aa90
   kind: function
-  semantics: "BARBARIAN RAMPAGE: the tribes whose camp a unit took (0x152df0); each of their units, in pool order, takes of the planning's targets of that player the nearest with a spot, else the nearest (strictly nearer replaces) and strikes it (0x771670) with the move's list: each unit given a target appended to the tactical object's +0x270 (0x778dd0..0x778e63), which only the dispatcher 0x770ce0 empties (+0x280 = 0 at 0x770d30) as a move opens, so the units before it with Movement left strike its target too; a unit with no target joins nothing (0x1479e0, the chase). With no target 0x1479e0. At 0x778f57: Barbarian Rampage passes both filters 0 and its one unit with r13 = 0 at +0x24 / +0x28: no filter."
+  semantics: "BARBARIAN RAMPAGE: the tribes whose camp a unit took (0x152df0); each of their units, in pool order, takes of the planning's targets of that player the nearest with a spot, else the nearest (strictly nearer replaces) and strikes it (0x771670) with the move's list: each unit given a target appended to the tactical object's +0x270 (0x778dd0..0x778e63), which only the dispatcher 0x770ce0 empties (+0x280 = 0 at 0x770d30) as a move opens, so the units before it with Movement left strike its target too; a unit with no target joins nothing; the chase after its tribe's city (0x1479e0 -> 0x775c60) runs only where 0x8e3250 (CAPABILITY_BARBARIAN_CLANS) holds (0x778f62..0x778f6d), so a standard game's rampaging unit with no target stays. At 0x778f57: Barbarian Rampage passes both filters 0 and its one unit with r13 = 0 at +0x24 / +0x28: no filter."
   status: READ
   cases:
     - recording: h1_duelw1124
@@ -823,6 +828,7 @@
     - gpu/core/sim_tactics.py:_tac_rampage
     - gpu/core/sim_tactics.py:first_in_reach
   readings:
+    - "C-95: the barbarians' scout report on plots newly visible, the camp's taker, the rampage without the Clans mode, Siege City's walls units — READ (0x153ef0, 0x154830 at 0x154a11..0x154a83, 0x778b40 at 0x778f62, 0x8e3250, 0x811e80 at 0x812027..0x812219), both twins"
     - "C-95: the rampage strikes with the move's whole list; its defender is one the barbarians see — READ (0x778b40, 0x771670, 0x208b80, 0x20a2a0), both twins"
     - "C-95: the tactical pass — READ (the barbarians' moves; the minors share it)"
     - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"

@@ -3922,6 +3922,7 @@
     - "C-95 / C-134: HL Explore's path tests under flags 0, Naval Choose Target's unit kinds, the swap partner's destination test — READ (0x70aa40 at 0x70aed0 / 0x70b063 / 0x70b173 / 0x70b2b6 / 0x70b3b3, 0x802ea0 at 0x802f15..0x802f69, 0x972540 at 0x97273a..0x97276c), both twins"
     - "C-95: Make Formation's support rider — READ (0x7efd70, 0x73b6c0, 0x73b8a0), both twins"
     - "H-4 / C-96: CanConstruct's prerequisite building held unpillaged; a barbarians' seizure by a battle's advance and its captive's spent Movement — READ (0x170450 at 0x1709b0..0x170a5e, 0x18fe60, 0x212500)"
+    - "C-95: the barbarians' scout report on plots newly visible, the camp's taker, the rampage without the Clans mode, Siege City's walls units — READ (0x153ef0, 0x154830 at 0x154a11..0x154a83, 0x778b40 at 0x778f62, 0x8e3250, 0x811e80 at 0x812027..0x812219), both twins"
   notes:
     - ".claude/scratchpad/mu1/readings_c96.md: ...000, else the skip 0x95eae0 (\"Wander Back to City\", \"Move To\" the   city). The turn ends (0x56d6f0, 0x570b40). Confirmed: the turn's \"Random   Direction\" draws pair one to one with the AI_Tactical.csv rows \"W..."
   context:
@@ -8645,9 +8646,10 @@
   cases:
     - recording: 1124
       value: "Shadow check over   1124: of 446 rows the logged target is in the list for 423 (the rest the   knowledge base's), the pick matches 415 of them;"
-  impl: [cpu/core/tactical.ts:CHASE_RANGE]
   readings:
     - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
+  notes:
+    - "unported: the rampage's chase after a city (0x1479e0) runs only under CAPABILITY_BARBARIAN_CLANS"
   context:
     - ...the player holds, the nearest its camp within 16, else the player's nearest within 16 (0x93d570); it moves to the first plot of its reach of this turn within its range (1 at least) of...
     - "...0); with none (0x1479e0) toward its raid's (+0x48) or assault's (+0x60) city within 16 (0x93d570) by 0x775c60. Confirmed: 1124 415 / 423 picks."

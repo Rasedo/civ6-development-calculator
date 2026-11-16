@@ -757,7 +757,7 @@ export interface BarbTribe {
    *  starts, forgotten in the tribe's turn once the tree runs no more — a
    *  cleared camp's tribe takes no turn and keeps it */
   scoutTreeHeld?: boolean;
-  /** per scout, the city plots it saw at its last look */
+  /** per scout, the plots in its sight at its last look */
   saw?: Record<number, number[]>;
   /** its raid or city assault (the AI operation it runs) */
   op?: BarbOp;

@@ -250,6 +250,11 @@ export interface AiView extends AiValueView {
   /** the city's walls do not hold the unit back (a siege assist on it: unit
    *  +0x18b8 / +0x18b9 / +0xb94 / +0xc14) */
   wallsBypassed(unitId: number, plot: number): boolean;
+  /** the unit holds a walls ability of its own (unit +0x18b8 / +0x18b9,
+   *  +0xb94 / +0xc14: its type's ABILITY_BYPASS_WALLS /
+   *  ABILITY_ENABLE_WALL_ATTACK and their promotion-class twins, the Siege
+   *  Tower's and the Battering Ram's) */
+  wallsAbility(unitId: number): boolean;
   /** the seat's tactical target list */
   attackTargets(seat: number): readonly AiAttackTargetView[];
   // THE ASSAULT EXECUTIONS' VIEW

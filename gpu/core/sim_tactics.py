@@ -32,8 +32,6 @@ _BARB_DEFENSE_ALL = 4
 # the knowledge base's query's distance (0x5eb8b0's fifth argument)
 _KNOWN_UNIT_RANGE = 2
 _BARB_DEFENSE_RANGED = 1
-# the reach of a rampaging tribe's city from its camp (0x1479e0)
-_CHASE_RANGE = 16
 # CHASE TARGET's reach of a target (0x775170)
 _CHASE_SIGHT = 8
 # WANDER NEAR CITY's radius (0x77bf50) and the one FindAlternateLocation searches
@@ -3070,11 +3068,9 @@ class SimTactics:
         whether a fighter the barbarians see holds it read once; each ranged
         unit with Movement from its spot or toward the ring, then each other
         one onto the plot, its moves ended; a unit none of this took not
-        done); with none it heads for the city of that player its tribe goes
-        after (`chaseCity`), to the first plot of its reach of this turn
-        within its range (1 at least) of the city with none of its own
-        stacking there, else it stays. The picks read the target list and the
-        reach as the pass began."""
+        done); with none it stays (the chase after a city, 0x1479e0 ->
+        0x775c60, runs under CAPABILITY_BARBARIAN_CLANS alone). The picks
+        read the target list and the reach as the pass began."""
         dev = self.device
         B, T = self.B, self.T
         P = simbase.BARB_POOL_MAX
@@ -3158,11 +3154,9 @@ class SimTactics:
             onj = (j < npass) & live()[bidx, u_b] & cand[bidx, u_b]
             if not bool(onj.count_nonzero()):
                 continue
-            row = rowof[bidx, u_b]
             tgt = pick[bidx, u_b]
             st = onj & (tgt >= 0)
             tc = tgt.clamp(min=0)
-            urng = self._tac_range(bidx, u_b)
             if bool(st.count_nonzero()):
                 listed[bidx[st], u_b[st]] = True
                 # a fighter on the target's plot the barbarians see there now
@@ -3243,21 +3237,6 @@ class SimTactics:
                     self._tac_move_to(mel, v_b, tc)
                     ended[bidx[mel], v_b[mel]] = True
                     done[bidx[mel], v_b[mel]] = True
-            ch = onj & (tgt < 0)
-            if not bool(ch.count_nonzero()):
-                continue
-            city = self._tac_chase_city(ch, utribe[bidx, u_b].clamp(min=0), rp[bidx, u_b])
-            go = ch & (city >= 0)
-            if not bool(go.count_nonzero()):
-                continue
-            rr = row.clamp(min=0)
-            dc = self.pair_dist[city.clamp(min=0)].to(torch.long)
-            ok = ((turns[rr] == 1) & (dc <= urng.clamp(min=1).unsqueeze(1))
-                  & ~self._tac_stacked_other(u_b) & go.unsqueeze(1))
-            spot = first_in_reach(row, ok)
-            mv = go & (spot >= 0)
-            self._tac_move_or_fortify(mv, u_b, spot)
-            done[bidx[mv], u_b[mv]] = True
 
     def _tac_reachers(self, cand: torch.Tensor, ai: torch.Tensor, order: torch.Tensor) -> torch.Tensor:
         """`reachers`' DEFENDER rule over the candidates `cand` [B, P]: in
@@ -3649,45 +3628,6 @@ class SimTactics:
         here = m & (getattr(self, f"{pre}_unit_tile")[torch.arange(self.B, device=self.device), u_b] == dest)
         self._fortify_slot(here, u_b, pre, 1)
         self._tac_move_to(m & ~here, u_b, dest, pre, seat, strike)
-
-    def _tac_chase_city(self, on: torch.Tensor, k: torch.Tensor, seat: torch.Tensor) -> torch.Tensor:
-        """`chaseCity` for tribe `k` [B] going after `seat` [B]: of the cities
-        its raid waits for that `seat` holds, the nearest its camp within 16,
-        else `seat`'s nearest city; -1 none."""
-        dev = self.device
-        B = self.B
-        bidx = torch.arange(B, device=dev)
-        camp = self.tribe_plot[bidx, k].clamp(min=0)
-        lim = _CHASE_RANGE + 1
-        rq = self.tribe_raidq[bidx, k]   # [B, TL]
-        rpl = self.tribe_raidp[bidx, k]
-        pc = rpl.clamp(min=0)
-        held = (rq >= 0) & (rq == seat.unsqueeze(1)) & (rpl >= 0) & (self.tile_seat.gather(1, pc) == seat.unsqueeze(1))
-        dr = self.pair_dist[camp.unsqueeze(1), pc].to(torch.long)
-        kr = torch.where(held & (dr < lim), dr * (rq.shape[1] + 1) + torch.arange(rq.shape[1], device=dev), 1 << 40)
-        m, i = kr.min(dim=1)
-        out = torch.where(on & (m < (1 << 40)), pc.gather(1, i.unsqueeze(1)).squeeze(1), torch.full_like(m, -1))
-        rest = on & (out < 0)
-        if bool(rest.count_nonzero()):
-            maj = rest & (seat >= 0) & (seat < self.n_majors)
-            if bool(maj.count_nonzero()):
-                g = seat.clamp(min=0, max=max(self.n_majors - 1, 0))
-                cc = self.city_center[bidx, g].clamp(min=0)   # [B, M]
-                ca = self.city_alive[bidx, g]
-                dcc = self.pair_dist[camp.unsqueeze(1), cc].to(torch.long)
-                M = cc.shape[1]
-                kc = torch.where(ca & (dcc < lim), dcc * (M + 1) + torch.arange(M, device=dev), 1 << 40)
-                m2, i2 = kc.min(dim=1)
-                out = torch.where(maj & (m2 < (1 << 40)), cc.gather(1, i2.unsqueeze(1)).squeeze(1), out)
-            if self.S > 0:
-                mi = rest & (seat >= 100) & (seat < 100 + self.S)
-                if bool(mi.count_nonzero()):
-                    j = (seat - 100).clamp(min=0, max=self.S - 1)
-                    cen = self.citystate_center[bidx, j]
-                    okc = (mi & self.citystate_alive[bidx, j] & (cen >= 0)
-                           & (self.pair_dist[camp, cen.clamp(min=0)].to(torch.long) < lim))
-                    out = torch.where(okc, cen, out)
-        return out
 
     # --------------------------------------------------------- attack units
 

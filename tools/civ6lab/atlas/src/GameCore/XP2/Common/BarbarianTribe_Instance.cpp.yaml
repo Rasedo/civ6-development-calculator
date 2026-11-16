@@ -168,10 +168,13 @@
   cases:
     - recording: 1124
       value: "Shadow check over   1124: of 446 rows the logged target is in the list for 423 (the rest the   knowledge base's), the pick matches 415 of them;"
-  impl: [cpu/core/tactical.ts:CHASE_RANGE, gpu/core/sim_tactics.py:_BARB_DEFENSE_RANGED]
+  impl: [cpu/core/tactical.ts:rampage, gpu/core/sim_tactics.py:_tac_rampage]
   readings:
+    - "C-95: the barbarians' scout report on plots newly visible, the camp's taker, the rampage without the Clans mode, Siege City's walls units — READ (0x153ef0, 0x154830 at 0x154a11..0x154a83, 0x778b40 at 0x778f62, 0x8e3250, 0x811e80 at 0x812027..0x812219), both twins"
     - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
     - "C-95: the rampage strikes with the move's whole list; its defender is one the barbarians see — READ (0x778b40, 0x771670, 0x208b80, 0x20a2a0), both twins"
+  notes:
+    - "unported: Barbarian Rampage calls it only under CAPABILITY_BARBARIAN_CLANS (0x778f62), which no recorded game holds"
   context:
     - "...stacking; else MOVE_TO the target's plot with the attack flag 0x10). With no target (0x1479e0): of the cities its raid (+0x48) then its assault (+0x60) wait for that the player hold..."
   review: reviewed

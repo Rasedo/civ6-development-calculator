@@ -23,3 +23,15 @@
   context:
     - ...the techs, the camp step, each living tribe's turn in the tribes' order, then the clans' 0x8e1bf0 (no clans in these games).
   review: reviewed
+- addr: 0x8e3250
+  kind: function
+  semantics: "the Barbarian Clans mode's test: the game's capabilities (0x60d30) hold the hash 0x6e293fcc (0x61100), DB.MakeHash(\"CAPABILITY_BARBARIAN_CLANS\") (DLC/BarbarianClansMode/Data/BarbarianClansMode_GameplayData.xml)."
+  status: READ
+  cases:
+    - recording: h1_duels1186
+      turn: 37
+      value: "tribe 1's Scout 262147, its camp 13:22 taken by city-state 4 at t32, no target of the city-state in its planning, holds 17:15 under HL: End Turn: no recorded game's AI_Tactical.csv logs a \"Chasing target\" row"
+  impl: [cpu/core/tactical.ts:rampage]
+  readings:
+    - "C-95: the barbarians' scout report on plots newly visible, the camp's taker, the rampage without the Clans mode, Siege City's walls units — READ (0x153ef0, 0x154830 at 0x154a11..0x154a83, 0x778b40 at 0x778f62, 0x8e3250, 0x811e80 at 0x812027..0x812219), both twins"
+  review: reviewed

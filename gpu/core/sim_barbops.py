@@ -1359,7 +1359,10 @@ class SimBarbOps:
         """OPERATION SIEGE CITY's execution (0x811e80, `siegeCityExecute`) for
         an operation's members `mem` [B, P] of the pool `pre` (their order
         `join`, player `seat`) in the games
-        `on`: the city encircled, each member in join order with Movement left
+        `on`: first each member in join order with Movement left whose type
+        holds a walls ability (the Battering Ram, the Siege Tower) to its
+        planning's first plot one from the city it reaches this turn, its
+        turn done; the city encircled, each member in join order with Movement left
         and a range strikes it; else the six plots about it shared out by the
         generalized assignment (three passes) — a unit on one starts there; a
         plot's gain for a unit of its domain whose fresh planning reaches it
@@ -1375,10 +1378,28 @@ class SimBarbOps:
         B, dev = self.B, self.device
         bidx = torch.arange(B, device=dev)
         on = on & (target >= 0)
-        enc = on & self._city_encircled(target)
         ut = getattr(self, f"{pre}_unit_type").clamp(min=0, max=self.NU - 1)
         order = torch.where(mem, join, torch.full_like(join, 1 << 30)).argsort(dim=1, stable=True)
         nmem = mem.sum(dim=1)
+        # the walls' own units first (`wallsAbility`): each member in join
+        # order with Movement left whose type holds a walls ability goes to
+        # its planning's first plot one from the city it reaches this turn
+        # (any Movement), its turn done
+        if self._siege_support_any and bool(on.any()):
+            one = torch.ones(B, dtype=torch.long, device=dev)
+            for r in range(int(nmem.max())):
+                us = order[:, r]
+                m = (on & (r < nmem) & getattr(self, f"{pre}_unit_alive")[bidx, us]
+                     & (getattr(self, f"{pre}_unit_mp")[bidx, us] > 0) & (self._type_siege_support.take(ut[bidx, us]) > 0))
+                if not bool(m.any()):
+                    continue
+                spot = self._op_reach_at(bidx, us, target.clamp(min=0), 1, False, one, ctx["rowof"], ctx["res"], pre, seat)
+                go = m & (spot >= 0)
+                if not bool(go.any()):
+                    continue
+                ctx["done"][bidx[go], us[go]] = True
+                self._tac_move_to(go & (spot != getattr(self, f"{pre}_unit_tile")[bidx, us]), us, spot.clamp(min=0), pre, seat)
+        enc = on & self._city_encircled(target)
         if bool(enc.any()):
             for r in range(int(nmem.max())):
                 us = order[:, r]

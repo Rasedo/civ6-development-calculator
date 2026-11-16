@@ -796,6 +796,10 @@ export function aiView(state: GameState, opts: { updated?: boolean } = {}): AiVi
       const shape = held ? held.city : cs && cs.centerIndex === p ? { buildings: cs.buildings ?? [], seat: cs.seat, outerHp: cs.outerHp } : null;
       return !!u && !!shape && siegeAssist(state, u, p, wallsTier(state, shape)) !== 0;
     },
+    wallsAbility: (id) => {
+      const u = state.units.find((x) => x.id === id);
+      return !!u && !!UNITS[u.type]?.siegeSupport;
+    },
     attackTargets: (i) => targetsOf(i).map((t) => ({
       type: t.type, plot: t.tile, owner: t.seat, unitType: t.unit ? gameTypeOf('unit', t.unit.type, 'UNIT_') : null,
       range: t.unit ? unitAttackRange(t.unit) : t.type === 'COMBAT_DISTRICT' ? CITY_STRIKE_RANGE : 0,

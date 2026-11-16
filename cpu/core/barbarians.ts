@@ -319,7 +319,11 @@ export const CAMP_SIGHT = 1;
  * A CAMP RISES (the improvement's arrival, 0x150a30): its tribe, named by
  * "Barb Tribe Roll", raises its defender on the camp and its scouts within
  * three plots (0x147fc0); what the barbarians reveal round it is those
- * units' looks.
+ * units' looks. Its scout looks from where it is placed (`placedLook`),
+ * so a camp risen in sight of a major's city starts its scout's tree that
+ * turn (runs/h1_duels1153 t59: tribe 7's camp and its Scout, the tree
+ * "Barbarian Found City" in the log read, the throttle on player 1 holding
+ * its t60 report back).
  */
 export function raiseCamp(state: GameState, plot: number): void {
   const def = tribeKindAt(state, plot);
@@ -330,6 +334,7 @@ export function raiseCamp(state: GameState, plot: number): void {
   const scouts = raise(state, tribe, def.scoutTag, 3, BARB_MAX_SCOUTS);
   tribe.scouts.push(...scouts);
   tribe.scoutCount += scouts.length;
+  placedLook(state, scouts);
 }
 
 /** the plots `radius` round `plot` in the game's ring order (0x69010): the
@@ -528,21 +533,25 @@ export function barbScoutLook(state: GameState, unit: Unit): void {
   const from = map.tiles[unit.tileIndex];
   const through = unitSeesThrough(unit);
   const sight = unitSight(unit, state);
+  // every plot in its sight, owned or not: a plot in sight at its last look
+  // was visible then, so a city founded or a border grown there in sight
+  // raises no report (runs/h1_duels1172 t73: player 1's city founded on 37:8
+  // in sight of tribe 3's Scout on 37:10, which steps to 37:9 — no report, no
+  // tree until t119)
   const now: number[] = [];
   const sees = losDisk(map, from, sight, through);
-  for (const t of tilesWithin(map, from.col, from.row, sight)) {
-    if (isTerritorial(tileSeat(t)) && sees.has(t.index)) now.push(t.index);
-  }
+  for (const t of tilesWithin(map, from.col, from.row, sight)) if (sees.has(t.index)) now.push(t.index);
   now.sort((x, y) => x - y);
   const saw = new Set((tribe.saw ??= {})[unit.id] ?? []);
   tribe.saw[unit.id] = now;
-  const others = othersSee(state, unit, now.filter((p) => !saw.has(p)));
+  const fresh = now.filter((p) => !saw.has(p) && isTerritorial(tileSeat(map.tiles[p])));
+  const others = othersSee(state, unit, fresh);
   const next = (state.barbSpotNext ??= {});
   // the wonders' plots, built or placed in a queue: DISTRICT_WONDER's
   const wonders = new Set(allCities(state).flatMap((c) => [...c.wonders.map((w) => w.tileIndex),
     ...c.queue.flatMap((q) => (q.kind === 'wonder' ? [q.tileIndex] : []))]));
-  for (const p of now) {
-    if (saw.has(p) || others.has(p)) continue;
+  for (const p of fresh) {
+    if (others.has(p)) continue;
     const t = map.tiles[p];
     const seat = tileSeat(t);
     if (state.turn < (next[seat] ?? 0)) continue;

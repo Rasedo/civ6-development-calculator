@@ -806,7 +806,15 @@ function siegeSlots(view: AiView, city: number): SiegeSlot[] {
   });
 }
 
-/** per team the operation's units with Movement left, no bombard strength
+/** first each of the operation's units with Movement left that holds a
+ *  walls ability of its own (`wallsAbility`: the Battering Ram, the Siege
+ *  Tower) and whose planning reaches a plot one from the city this turn
+ *  (0x791300: one turn, range 1, any Movement) goes to the first such plot,
+ *  its turn done ("Operation Siege City, <type> <plot>, Move <plot>";
+ *  runs/h1_duels1168 t47-51 / t60-86 the Battering Ram 2883607 by Rome on
+ *  14:7, its Ancient Walls standing; t53-58, two plots off, it takes a slot
+ *  as below). Then
+ *  per team the operation's units with Movement left, no bombard strength
  *  and a planning: where the city on the target is not encircled (0x24bf70),
  *  the six slots about it shared out by the generalized assignment (three
  *  passes): a unit standing on a slot starts on it (λ 0x80f9d0); a slot's
@@ -830,6 +838,18 @@ function siegeCityExecute(_node: Parameters<BtHandler<OpsContext>['update']>[0],
   if (target === NO_PLOT) return;
   const now = (id: number) => ctx.view().units(ctx.seat).find((x) => x.id === id);
   const v = ctx.view();
+  // the walls' own units first (0x812027..0x812219): each member with
+  // Movement left that holds a walls ability goes to its planning's first
+  // plot one from the city it reaches this turn, its turn done
+  for (const id of opUnits(op)) {
+    const u = now(id);
+    if (!u || u.movesLeft <= 0 || !v.wallsAbility(id)) continue;
+    const spot = v.planSpot(id, target, 1, false, 1);
+    if (spot < 0) continue;
+    ctx.log(`${op.def}, Operation Siege City, ${u.type} ${xy(v, u.plot)}, Move ${xy(v, spot)}`);
+    ctx.endTurn?.(id);
+    moveTo(ctx, u, spot);
+  }
   if (v.encircled(target)) {
     for (const id of opUnits(op)) {
       const u = now(id);

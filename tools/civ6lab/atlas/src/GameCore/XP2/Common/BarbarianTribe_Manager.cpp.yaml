@@ -186,6 +186,7 @@
   readings:
     - "C-99: the pathfinder's later-turn pool, Heal's hull, the tactical list's explorers, Move Unit's planning — READ, both twins"
     - "C-99: the pathfinder's later-turn pool, Heal's hull, the tactical list's explorers, Move Unit's planning"
+    - "C-95: the barbarians' scout report on plots newly visible, the camp's taker, the rampage without the Clans mode, Siege City's walls units — READ (0x153ef0, 0x154830 at 0x154a11..0x154a83, 0x778b40 at 0x778f62, 0x8e3250, 0x811e80 at 0x812027..0x812219), both twins"
   context:
     - "...RER, the Scout) at EXPLORE only while the barbarian tribe its +0x11d0 names rampages (0x152d60) — a city-state's or the Free Cities' never; a unit +0xf30 holds only where the player'..."
   review: reviewed
@@ -351,6 +352,7 @@
     - "C-95 / C-99: a cleared camp's scout still reports; a lake city trains ships; IsCoastalTarget; the recruit's priority; a candidate's own strength — READ (0x153ef0, 0x1485c0, 0x1c77c0 -> 0x82a10, 0x73a440 -> 0x73a880, 0x81c820 at 0x81cacf..0x81cb14, 0x7d1e40 at 0x7d2004..0x7d205f, 0x5cced0 at 0x5cd0c1..0x5cd11e, 0x7f5240), both twins"
     - "C-95 / C-99: a cleared camp's scout still reports; a lake city trains ships; IsCoastalTarget; the recruit's priority; a candidate's own strength — READ (0x153ef0, 0x1485c0, 0x1488a0 at 0x148c38..0x148c64, 0x1c77c0 -> 0x82a10, 0x73a440 -> 0x73a880, 0x81c820 at 0x81cacf..0x81cb14, 0x7d1e40 at 0x7d2004..0x7d205f, 0x5cced0 at 0x5cd0c1..0x5cd11e, 0x7f5240), both twins"
     - "C-95: the barbarians' scout is any tribe unit of AI type EXPLORE, a captive's sight counts — READ (0x153ef0 at 0x153f1d / 0x153f86), both twins"
+    - "C-95: the barbarians' scout report on plots newly visible, the camp's taker, the rampage without the Clans mode, Siege City's walls units — READ (0x153ef0, 0x154830 at 0x154a11..0x154a83, 0x778b40 at 0x778f62, 0x8e3250, 0x811e80 at 0x812027..0x812219), both twins"
   context:
     - "- The report (0x153ef0, a barbarian unit's sight of a plot): a tribe's scout (unit +0x1c0 == 2) seeing an owne..."
     - "- The report's event: 0x153ef0 is bound (0x153b0d) to the game signal at signals +0x10c8, which the unit sight update..."
@@ -412,6 +414,7 @@
     - "C-95: the tactical pass — READ (the barbarians' moves; the minors share it)"
     - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
     - "H-1: the barbarians' turn (0x1514a0) — READ (the max camps and the sight LAB)"
+    - "C-95: the barbarians' scout report on plots newly visible, the camp's taker, the rampage without the Clans mode, Siege City's walls units — READ (0x153ef0, 0x154830 at 0x154a11..0x154a83, 0x778b40 at 0x778f62, 0x8e3250, 0x811e80 at 0x812027..0x812219), both twins"
   context:
     - ...uts EXPLORE, the rest COMBAT; a camp destroyed turns its tribe's DEFENDER units COMBAT (0x154830).
     - "...(0x152df0: tribe +0x18 clear, +0x1c the taker's player, written by the camp's removal 0x154830); each of their units, in pool order, takes of the planning's targets of that player th..."

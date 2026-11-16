@@ -41,7 +41,7 @@ import { opJobUnits } from './operations/operation';
 import { BT_RUNNING, BT_SUCCESS } from './behaviorTree';
 import { generalAuraMP } from './aura';
 import { aiPromotionPick, attacksLeftOf, attacksPerTurn, takePromotion } from './promotions';
-import type { BarbTribe, ImprovementId } from './types';
+import type { ImprovementId } from './types';
 
 /** the pathfinder's fixed point: one Movement is 256 */
 const FIX = 256;
@@ -2946,6 +2946,11 @@ function pillage(state: GameState, pass: Pass, districts: boolean): void {
       held = null;
       list.push(u);
     }
+    // the move logs the list's first unit as it opens on the target, whether
+    // any order follows (runs/h1_duels1186 t38-46: tribe 1's Scout 262147,
+    // listed for the Farm under city-state 4's Builder on 17:17, takes none
+    // and ends its turn under HL: End Turn)
+    if (list.length) tacticsTrace?.(list[0], 'Pillage Improvement', t.index, -1);
     for (const u of list) {
       if (!live(state, pass, u)) continue;
       if (u.tileIndex !== t.index) {
@@ -3068,32 +3073,6 @@ function stackedOther(state: GameState, unit: Unit, tile: number): boolean {
   return state.units.some((u) => u !== unit && u.tileIndex === tile && u.seat === unit.seat && stackClass(u.type) === cls);
 }
 
-/** the city a rampaging tribe's unit with no target heads for (0x1479e0): of
- *  the cities its raid, then its assault, waited for that the player holds,
- *  the nearest its camp within 16, else the player's nearest (0x93d570) */
-const CHASE_RANGE = 16;
-function chaseCity(state: GameState, tr: BarbTribe, P: number): number {
-  let best = -1;
-  let bd = CHASE_RANGE + 1;
-  for (const c of [...(tr.raidTargets ?? []), ...(tr.assaultTargets ?? [])]) {
-    if (c.seat !== P || !state.map.tiles[c.plot] || tileSeat(state.map.tiles[c.plot]) !== P) continue;
-    const d = plotDistance(state, tr.plot, c.plot);
-    if (d < bd) { bd = d; best = c.plot; }
-  }
-  if (best >= 0) return best;
-  bd = CHASE_RANGE + 1;
-  for (const c of cityCentresOf(state, P)) {
-    const d = plotDistance(state, tr.plot, c);
-    if (d < bd) { bd = d; best = c; }
-  }
-  return best;
-}
-
-function cityCentresOf(state: GameState, P: number): number[] {
-  if (isCityStateSeat(P)) return state.cityStates.filter((c) => c.seat === P && c.centerIndex >= 0).map((c) => c.centerIndex);
-  return (seatOf(state, P) as { cities?: { centerIndex: number }[] } | undefined)?.cities?.map((c) => c.centerIndex) ?? [];
-}
-
 /**
  * BARBARIAN RAMPAGE (0x778b40): each unit, in pool order, of a tribe whose
  * camp a player's unit took (0x152df0) goes after that player's targets among
@@ -3104,11 +3083,12 @@ function cityCentresOf(state: GameState, P: number): number[] {
  * whole list as it stands (`strike`): the units before it with Movement
  * left go for it too (runs/h1_duelq1128 t124: the Quadriremes 1769482 on 0:3
  * and 851980 on 1:3, no plot to strike the Warrior on 3:3 from, sail on
- * for 1310739's Man-At-Arms on 4:1, to 2:1 and 4:0). With none, it heads
- * for the city of that player its tribe goes after (`chaseCity`): to the
- * first plot of its reach of this turn within its range (1 at least) of the
- * city with none of its own stacking there (0x775c60), its turn done; with
- * no such plot it stays for the moves after.
+ * for 1310739's Man-At-Arms on 4:1, to 2:1 and 4:0). With none it stays for
+ * the moves after: the chase after its tribe's city (0x1479e0 -> 0x775c60 at
+ * 0x778f62) runs only under CAPABILITY_BARBARIAN_CLANS (0x8e3250, the hash
+ * 0x6e293fcc), so no recorded game logs a "Chasing target" (runs/h1_duels1186
+ * t37: tribe 1's Scout 262147, its camp 13:22 taken by city-state 4 at t32,
+ * holds 17:15 under HL: End Turn).
  */
 function rampage(state: GameState, pass: Pass): void {
   const listed: Unit[] = [];
@@ -3132,20 +3112,10 @@ function rampage(state: GameState, pass: Pass): void {
       if (best && (bestSpot || bestD <= d)) continue;
       best = e; bestD = d;
     }
-    if (best) {
-      tacticsTrace?.(u, 'Barbarian Rampage', best.tile, -1);
-      listed.push(u);
-      strike(state, pass, listed, best);
-      continue;
-    }
-    const city = chaseCity(state, tr, P);
-    if (city < 0) continue;
-    const r = Math.max(1, rangeOf(u));
-    const spot = (pass.reach.get(u.id) ?? []).find((x) => x.turns === 1
-      && plotDistance(state, x.tile, city) <= r && !stackedOther(state, u, x.tile));
-    if (!spot) continue;
-    moveOrFortify(state, pass, u, spot.tile);
-    finish(pass, u, 'Chasing target', spot.tile);
+    if (!best) continue;
+    tacticsTrace?.(u, 'Barbarian Rampage', best.tile, -1);
+    listed.push(u);
+    strike(state, pass, listed, best);
   }
 }
 

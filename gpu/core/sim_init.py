@@ -4466,7 +4466,7 @@ class SimInit:
         self.tribe_home_id = torch.full((B, self.KT), -1, dtype=torch.long, device=device)
         self.tribe_home_resume = torch.full((B, self.KT), -1, dtype=torch.long, device=device)
         self.tribe_home_mu = torch.zeros(B, self.KT, dtype=torch.bool, device=device)
-        # per barbarian unit the owned plots its sight held at its last look
+        # per barbarian unit the plots its sight held at its last look
         # (`BarbTribe.saw`; a scout is any unit of AI type EXPLORE)
         self.barb_unit_saw = torch.zeros(B, simbase.BARB_POOL_MAX, self.T, dtype=torch.bool, device=device)
         self.tribe_op = torch.zeros(B, self.KT, dtype=torch.long, device=device)

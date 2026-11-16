@@ -128,7 +128,7 @@ class SimBarb:
         now) on the first free plots `radius` round its tribe `k`'s camp in
         ring order — no city on the plot, the unit's own domain
         (`tileFreeForUnit`) —, tagged the tribe's units (raised in its turn)
-        or its scouts where `track`; with `look` (a tribe's turn,
+        or its scouts where `track`; with `look` (a tribe's turn, a camp's scouts,
         `placedLook`) each looks from where it is placed. [B] long the units
         raised."""
         raised = torch.zeros(self.B, dtype=torch.long, device=self.device)
@@ -250,7 +250,7 @@ class SimBarb:
         kind's names no tribe took (else those only dead tribes took), raises
         its defender on the camp (`tribe_defender`) and its scouts within
         three plots; what the barbarians reveal round it is those units'
-        looks."""
+        looks, each scout looking from where it is placed (`placedLook`)."""
         if not bool(mask.count_nonzero()):
             return
         kind = self._barb_tribe_kind(plot)
@@ -278,7 +278,7 @@ class SimBarb:
         self.tribe_defender[got, k[got]] = before[got]
         kc = k.clamp(min=0)
         bi = torch.arange(self.B, device=self.device)
-        self.tribe_scoutn[bi, kc] += self._barb_raise(mask, k, stag, 3, int(self._bb["maxScouts"]), scout=True)
+        self.tribe_scoutn[bi, kc] += self._barb_raise(mask, k, stag, 3, int(self._bb["maxScouts"]), scout=True, look=True)
 
     def _barb_camp_step(self) -> None:
         """`campStep` (0x14fcc0): the target, the first step's share, the
@@ -520,9 +520,10 @@ class SimBarb:
         rad = self._unit_sight(ut, pr, st, rows)
         vis = self._los_disk(rows, self.barb_unit_tile[rows, slot].clamp(min=0), rad, self._sees_through(ut, pr))
         ts = self.tile_seat[rows]
-        now = vis & (ts >= 0) & ((ts < BARB_SEAT) | (ts == FREE_SEAT))
-        new = now & ~self.barb_unit_saw[rows, slot]
-        self.barb_unit_saw[rows, slot] = now
+        # every plot in its sight, owned or not: one in sight at its last
+        # look raises no report when it comes to be owned in sight
+        new = vis & ~self.barb_unit_saw[rows, slot] & (ts >= 0) & ((ts < BARB_SEAT) | (ts == FREE_SEAT))
+        self.barb_unit_saw[rows, slot] = vis
         new &= ~self._barb_others_see(rows, slot, new)
         T = self.T
         # the wonders' plots, built or placed in a queue (the `city_wonder`
