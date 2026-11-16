@@ -79,7 +79,10 @@ builds, research, events, record (several with commas). It reads the seed's
 `.aimem.jsonl` (sites tactical / log / endlook), `.aiunits.jsonl` (start /
 tactical / tacpass / log / endlook), record T and T+1 and the logs' sqlite
 (`logstore.py`); values in 24.8 fixed point are printed divided. Each
-section opens with `== <what> of p<N> ... t<T>`.
+section opens with `== <what> of p<N> ... t<T>`. A unit's row names its
+abilities (the UnitAbilities rows in the game's database order, less
+`ABILITY_`) and prints its era strength modifier, its hidden-visibility
+flags and its combat modifiers' ints where they are set.
 
 ## FIRSTDIFF: where a kind begins on a seed
 

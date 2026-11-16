@@ -210,11 +210,13 @@ export interface Ctx {
    *  (`barbarianAi`) */
   barbBlows: Map<Unit, Unit>;
   /** every city centre's hit points and outer defence by plot before the
-   *  turn's close heals it: the barbarians, the turn's last player, take
-   *  their turn before that heal (`barbarianAi`) */
+   *  turn's close heals it: the city-states, the Free Cities and the
+   *  barbarians, the turn's last players, take their turns before that heal
+   *  (`districtsBeforeClose`) */
   barbCentres: Map<number, { hp: number; outerHp?: number }>;
-  /** every standing Encampment's hit points by plot at the same moment */
-  barbEncampments: Map<number, number>;
+  /** every standing Encampment's hit points and outer defence by plot at the
+   *  same moment */
+  barbEncampments: Map<number, { hp: number; outerHp?: number }>;
   /** each major's best strengths trained as the minors' turns opened, before
    *  the next turn's start's units (`bestsBeforeStart`) */
   startBests?: Map<number, [number, number | undefined]>;
@@ -1703,9 +1705,12 @@ function barbarianAi(ctx: Ctx, b: TurnRecord, closing: number, before: ReadonlyS
   });
   // the units the barbarians' battles of the pair struck (or lost) stand as
   // they were before the first blow, another player's where the blow found
-  // it, a barbarian where their turn found it (`barbStart`)
+  // it, a barbarian where their turn found it (`barbStart`), each at the
+  // damage the log holds as their turn opens (runs/h1_duels1148 t98: the
+  // Crossbowman 3604501 struck from 35 to 79 before it, its planning at 79)
   const acting = new Set([...before].map((u) => u.id));
   const back = new Map([...twin].map(([c, u]) => [u, c] as const));
+  const goneKey = new Map([...ctx.gone].map(([k, u]) => [u, k] as const));
   for (const [u, snap] of ctx.barbBlows) {
     let c = back.get(u);
     if (!c) {
@@ -1714,27 +1719,18 @@ function barbarianAi(ctx: Ctx, b: TurnRecord, closing: number, before: ReadonlyS
       twin.set(c, u);
       if (isBarbSeat(u.seat)) acting.add(c.id);
     }
-    c.hp = snap.hp;
+    const key = keyOf.get(u) ?? goneKey.get(u) ?? '';
+    const hurt = open === undefined ? undefined : damage.get(key) ?? startDamage.get(key);
+    c.hp = hurt !== undefined ? UNIT_HP - hurt : snap.hp;
     c.tileIndex = snap.tileIndex;
   }
-  // ...and every city centre as it stood before the turn's close healed it
-  // and before their battles of the pair struck it (runs/h1_duelz1128 t242:
-  // Rome on 42:20 at 21 hit points, 179 damage as the combat log's 39
-  // defence reads it)
-  for (const [plot, was] of ctx.barbCentres) {
-    const major = cityAtIndex(copy, plot)?.city;
-    const minor = major ? undefined : cityStateAt(copy, plot);
-    const c = major ?? (minor?.centerIndex === plot ? minor : undefined);
-    if (!c) continue;
-    c.hp = was.hp;
-    c.outerHp = was.outerHp;
-  }
-  // ...and every Encampment alike (runs/h1_duels1188 t150: the Field Cannon
-  // 6881293's shot on player 1's 16:17 finds it whole, the combat log's
-  // 54 + 7)
-  for (const [plot, hp] of ctx.barbEncampments) {
-    if (copy.map.tiles[plot].district === 'ENCAMPMENT') copy.map.tiles[plot].encampHp = hp;
-  }
+  // ...and every city centre and Encampment as it stood before the turn's
+  // close healed it and before their battles of the pair struck it
+  // (runs/h1_duelz1128 t242: Rome on 42:20 at 21 hit points, 179 damage as
+  // the combat log's 39 defence reads it; runs/h1_duels1188 t150: the Field
+  // Cannon 6881293's shot on player 1's 16:17 finds it whole, the combat
+  // log's 54 + 7)
+  districtsBeforeClose(ctx, copy);
   // a unit the game holds as their turn opens that the replay's battles
   // killed or its record took off stands on its plot with the log's damage
   // (runs/h1_duely1128 t33: the barbarians' Warrior on 32:8, struck to 98 by
@@ -2024,6 +2020,30 @@ function tallyTactics(ctx: Ctx, b: TurnRecord, turn: number, moves: ReadonlyMap<
 /** a city-state's or the Free Cities' seat */
 const minorAiSeat = (seat: number) => isCityStateSeat(seat) || seat === FREE_SEAT;
 
+/** every city centre's and Encampment's hit points and outer defence on
+ *  `copy` as the turn's close found them (`Ctx.barbCentres`,
+ *  `Ctx.barbEncampments`): the close's heal and the next start's repairs
+ *  come after the city-states', the Free Cities' and the barbarians' turns
+ *  (runs/h1_duels1164 t192: player 1's Field Cannon leaves player 0's centre
+ *  9:11 at 36 outer damage of 100, city-state 3's Field Cannon 1245185 plans
+ *  its shot at 32 on the outer defence and 24 on the hit points) */
+function districtsBeforeClose(ctx: Ctx, copy: GameState): void {
+  for (const [plot, was] of ctx.barbCentres) {
+    const major = cityAtIndex(copy, plot)?.city;
+    const minor = major ? undefined : cityStateAt(copy, plot);
+    const c = major ?? (minor?.centerIndex === plot ? minor : undefined);
+    if (!c) continue;
+    c.hp = was.hp;
+    c.outerHp = was.outerHp;
+  }
+  for (const [plot, was] of ctx.barbEncampments) {
+    const t = copy.map.tiles[plot];
+    if (t.district !== 'ENCAMPMENT') continue;
+    t.encampHp = was.hp;
+    t.encampOuterHp = was.outerHp;
+  }
+}
+
 /**
  * THE CITY-STATES' AND THE FREE CITIES' UNIT AI (`cityStateTactics`,
  * `freeCitiesMilitary`) on a copy of the state, in the game's player order,
@@ -2044,6 +2064,7 @@ function minorAi(ctx: Ctx, b: TurnRecord, turn: number, made: ReadonlySet<Unit>,
   revealedWas: ReadonlyMap<number, number[] | undefined>): void {
   const { state } = ctx;
   const copy = deserialize(serialize(state));
+  districtsBeforeClose(ctx, copy);
   // ...its units' passes after the turn's close read the units the turn's
   // upgrades took off, as the game's turn does (`unitsDying`)
   if (ctx.minorDying.length) copy.unitsDying = structuredClone(ctx.minorDying);
@@ -2167,12 +2188,18 @@ function minorAi(ctx: Ctx, b: TurnRecord, turn: number, made: ReadonlySet<Unit>,
   // each unit's damage as the last blow before its own player's turn opens
   // left it (the log's UnitDamageChanged that raises it)
   const struck = new Map<string, number>();
+  // ...those a minor's turn struck among them: the copy's own passes land
+  // that blow
+  const struckByMinor = new Set<string>();
   const turnOpened = new Set<number>();
   for (const x of acts) {
     if (x[2] === 'PlayerTurnActivated' && x[1] === turn) turnOpened.add(x[3] as number);
     if (x[2] === 'UnitMoved') lastStep.set(`${x[3]}:${x[4]}`, (x[6] as number) * ctx.W + (x[5] as number));
     if (x[2] === 'UnitDamageChanged') lastDamage.set(`${x[3]}:${x[4]}`, x[5] as number);
-    if (x[2] === 'UnitDamageChanged' && x[1] === turn && !turnOpened.has(x[3] as number) && (x[5] as number) > (x[6] as number)) struck.set(`${x[3]}:${x[4]}`, x[5] as number);
+    if (x[2] === 'UnitDamageChanged' && x[1] === turn && !turnOpened.has(x[3] as number) && (x[5] as number) > (x[6] as number)) {
+      struck.set(`${x[3]}:${x[4]}`, x[5] as number);
+      if (minorsOpen !== undefined && (x[0] as number) > minorsOpen) struckByMinor.add(`${x[3]}:${x[4]}`);
+    }
   }
   const upgraded = new Set<Unit>();
   const madeAshore = new Set<Unit>();
@@ -2234,9 +2261,13 @@ function minorAi(ctx: Ctx, b: TurnRecord, turn: number, made: ReadonlySet<Unit>,
     // ...and one another player's turn struck before its own at the health
     // the blow left (runs/h1_duels1145 t106: player 1's centre strikes
     // city-state 4's Man-At-Arms 917506 to 11 damage, its planning at 11)
+    // (one the minors' battles of the pair struck or lost too, where no
+    // minor's turn struck it before its own: runs/h1_duels1182 t52
+    // city-state 3's Heavy Chariot 589828, struck to 90 damage in player 1's
+    // turn, plans its own blows at 90)
     const d0 = home ? lastDamage.get(home) : struck.get(key);
     const r0 = d0 !== undefined ? UNIT_HP - d0 : hpWas.get(first!);
-    if (r0 !== undefined && !ctx.minorBlows.has(u)) c.hp = r0;
+    if (r0 !== undefined && (!ctx.minorBlows.has(u) || !struckByMinor.has(key))) c.hp = r0;
     // ...a unit its city made in the turn whole (runs/h1_duely1117 t62:
     // Valletta's new Archer 720902 on 14:8 Wanders to 13:9, no Heal)
     else if (r0 === undefined && made.has(u) && !ctx.minorBlows.has(u)) c.hp = UNIT_HP;
@@ -2383,6 +2414,20 @@ function minorAi(ctx: Ctx, b: TurnRecord, turn: number, made: ReadonlySet<Unit>,
     const r = seatOf(ctx.next.state, s.seat)?.research;
     const late = midTurn.get(s.seat);
     if (r) s.research = { ...s.research, techs: r.techs.filter((x) => !late?.has(x)), civics: r.civics.filter((x) => !late?.has(x)) };
+  }
+  // ...and the barbarians' as the first record holds it: their own start of
+  // the turn, which takes what the majors completed (`barbarianTechs`), comes
+  // after the minors' turns (runs/h1_duels1138 t38: player 1 completes
+  // Military Tradition in its turn, the barbarian Warriors on 36:23 / 36:24
+  // flank none under city-state 3's Archer 393218's planning, 27 dealt back
+  // and 34 taken)
+  const barbRow = ctx.prev.players.find((q) => q.id === ctx.playerOfSeat.get(BARB_SEAT));
+  if (barbRow) {
+    const held = (bits: string | undefined, names: readonly string[], kind: 'tech' | 'civic') => [...(bits ?? '')].flatMap((ch, i) => {
+      const id = ch === '1' ? (kind === 'tech' ? engineId('tech', names[i], 'TECH_', TECHS) : engineId('civic', names[i], 'CIVIC_', CIVICS)) : null;
+      return id ? [id] : [];
+    });
+    copy.barbSeat.research = { ...copy.barbSeat.research, techs: held(barbRow.techs, ctx.cat.techs, 'tech'), civics: held(barbRow.civics, ctx.cat.civics, 'civic') };
   }
   // each unit's Movement whole (an upgraded one's none), its pool composed
   // on that research where the
@@ -2659,6 +2704,34 @@ function minorAi(ctx: Ctx, b: TurnRecord, turn: number, made: ReadonlySet<Unit>,
       else if (player > g.taker && i >= 0) copy.barbSeat.camps.splice(i, 1);
     }
   };
+  // ...and every major's and barbarian unit at the damage the log holds as
+  // that minor's turn opens — the first record's with the turn's
+  // UnitDamageChanged rows before it: the blows of the players before it
+  // landed, the barbarians' of the turn and the next start's heal not
+  // (runs/h1_duels1124 t9: the barbarian Warrior on 8:14 at the damage
+  // city-state 2's Warrior 196610's planned blow reads, 21 dealt and 43 taken)
+  const damageWas = new Map(ctx.prev.units.map((r) => [`${r.owner}:${r.id}` as string, num(r.damage)]));
+  const damageRows = acts.flatMap((x) => (x[2] === 'UnitDamageChanged' && x[1] === turn
+    ? [{ ord: x[0] as number, key: `${x[3]}:${x[4]}`, damage: x[5] as number }] : []));
+  const standDamage = (player: number): void => {
+    const open = opened.get(player);
+    if (open === undefined) return;
+    const at = new Map(damageWas);
+    for (const r of damageRows) if (r.ord < open) at.set(r.key, r.damage);
+    const away = new Set(levied.map((h) => h.c));
+    for (const [c, u] of twin) {
+      if (minorAiSeat(c.seat) || away.has(c) || !copy.units.includes(c)) continue;
+      const key = keyOf.get(u) ?? '';
+      const d = at.get(key);
+      if (d !== undefined) c.hp = UNIT_HP - d;
+      // ...and a major's unit that took the Fortify order before it dug in
+      // as record t+1 holds it (runs/h1_duels1182 t42: player 1's Warrior
+      // 524293 on 18:9, one turn dug in as the turn opens and two from its
+      // order, under city-state 3's Warrior 393217's planned blow, 21 dealt)
+      const f = isBarbSeat(c.seat) ? undefined : ctx.fortified.get(key);
+      if (f && f.ord < open && f.turns !== null && f.turns > (c.fortifyTurns ?? 0)) c.fortifyTurns = f.turns;
+    }
+  };
   // a city-state's shots of the pair land in its pass, after its units'
   // planning: the unit struck as the shot left it
   holdCityStrikes(true, (st, city) => {
@@ -2679,6 +2752,7 @@ function minorAi(ctx: Ctx, b: TurnRecord, turn: number, made: ReadonlySet<Unit>,
       standSeized(playerOf(cs.seat));
       standCamps(playerOf(cs.seat));
       standGame(playerOf(cs.seat));
+      standDamage(playerOf(cs.seat));
       popAtTurn(ctx, b, copy, turn, playerOf(cs.seat));
       passPlayer = playerOf(cs.seat);
       // a city founded in the pair ran its second hook at its founding
@@ -2689,6 +2763,7 @@ function minorAi(ctx: Ctx, b: TurnRecord, turn: number, made: ReadonlySet<Unit>,
     standSeized(playerOf(FREE_SEAT));
     standCamps(playerOf(FREE_SEAT));
     standGame(playerOf(FREE_SEAT));
+    standDamage(playerOf(FREE_SEAT));
     popAtTurn(ctx, b, copy, turn, playerOf(FREE_SEAT));
     passPlayer = playerOf(FREE_SEAT);
     freeCitiesMilitary(copy);
@@ -8061,10 +8136,10 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
       const centres = [...state.seats.flatMap((s) => s.cities), ...state.freeSeat?.cities ?? [], ...state.cityStates];
       ctx.barbCentres = new Map(centres.map((c) => [c.centerIndex, { hp: c.hp ?? CITY_MAX_HP, outerHp: c.outerHp }] as const));
       const encampments = state.map.tiles.filter((t) => t.district === 'ENCAMPMENT' && t.districtComplete);
-      ctx.barbEncampments = new Map(encampments.map((t) => [t.index, t.encampHp ?? ENCAMPMENT_HP] as const));
+      ctx.barbEncampments = new Map(encampments.map((t) => [t.index, { hp: t.encampHp ?? ENCAMPMENT_HP, outerHp: t.encampOuterHp }] as const));
       turnClose(state);
       for (const c of centres) centreHeal.set(c, { was: ctx.barbCentres.get(c.centerIndex)!.hp, healed: c.hp ?? CITY_MAX_HP });
-      for (const t of encampments) encampHeal.set(t, { was: ctx.barbEncampments.get(t.index)!, healed: t.encampHp ?? ENCAMPMENT_HP });
+      for (const t of encampments) encampHeal.set(t, { was: ctx.barbEncampments.get(t.index)!.hp, healed: t.encampHp ?? ENCAMPMENT_HP });
       // the Regular Session after the turn's close, as `endTurn` runs it: a
       // competition it starts scores from the next turn (runs/h1_duelq1117:
       // the World's Fair of the t161 session STARTED 162, its podium t181),
@@ -8257,7 +8332,14 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
     // 7:7's Mine, the t137 eruption beside it damaging the Mine again), the
     // change's damage standing on them after
     for (const [p, w] of eventWrecks) if (samePillage(pillageFlags(state.map.tiles[p]), w.now)) setPillage(state, p, w.was);
+    // (a session's outcome the record alone holds lands with them: the
+    // resolutions standing before it are the minors' and the barbarians'
+    // turns' too — runs/h1_duels1148 t60: Military Advisory's +5 on the melee
+    // class from record t61, the barbarian Horse Archer 2031629's shot on
+    // player 0's Warrior on 34:11 planned at 23 without it)
+    const congressOpen = state.congress;
     applyPhase(ctx, ds, 'after', b, b);
+    if (state.congress !== congressOpen && congressWas === null) congressWas = congressOpen;
     for (const [p, w] of eventWrecks) {
       w.turn = pillageFlags(state.map.tiles[p]);
       setPillage(state, p, { pillaged: w.turn.pillaged || w.now.pillaged, district: w.turn.district || w.now.district });

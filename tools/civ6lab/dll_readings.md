@@ -20438,3 +20438,51 @@ GPU `_mops_run`'s per-priority `_mops_free_trees` (gpu/core/sim_minorops.py),
   Operation Protect Units Move 13 7).
 - Open: whether a PASSIVE DISTRICT entry's district is always the plot's
   combat district where both stand (one case).
+
+## C-125 / C-132 / C-129: a unique unit's promotion class; what the city-states' and the barbarians' turns find standing — LAB (the install's Units rows, the records), both twins
+
+- A UNIQUE UNIT'S PROMOTION CLASS is its own Units row's PromotionClass
+  (UNIT_ROMAN_LEGION and the other melee uniques PROMOTION_CLASS_MELEE,
+  UNIT_CHINESE_CROUCHING_TIGER PROMOTION_CLASS_RANGED, and so on down the
+  roster): `UNIT_PROMO_CLASS` holds each, so the unit keeps the promotions
+  the record lists, takes the World Congress's Military Advisory on its
+  class, exerts a zone of control or none as its class does and holds the
+  natural wonders' abilities its class tag carries (`unitPromoRows`,
+  `congressUnitCS`, `unitExertsZoc`, `alpineChassis`; the GPU's
+  `u_promo_class` from the exported `unitClass`).
+- THE REPLAY's copies of a turn, as the city-states', the Free Cities' and
+  the barbarians' turns find it:
+  - every city centre and Encampment holds the hit points and the outer
+    defence the turn's close found (`districtsBeforeClose`): the close's
+    heal and the next start's repairs come after those turns. An
+    Encampment's own hit points and outer defence are the record's
+    (`districts` rows' garrison and outer damage).
+  - the World Congress's resolutions are the ones standing before the
+    turn's session, whether the engine's session or the record's outcome
+    lands it.
+  - a major's and a barbarian unit stands at the damage the log holds as
+    that player's turn opens (the first record's with the turn's
+    UnitDamageChanged rows before it), a unit the pair's battles struck
+    too; a major's unit that took the Fortify order before it is dug in as
+    record t+1 holds it.
+  - the barbarians hold, through the city-states' turns, the technologies
+    and civics the first record gives them: their own start of the turn
+    (0x14f530) takes the majors' completions after.
+- Confirmed: runs/h1_duels1134 t57-70 player 0's Legion 1245195 with
+  Battlecry (31 predicted blows); runs/h1_duels1148 t75-76 / t101-106 and
+  runs/h1_duels1171 t150-172 its Legions under Military Advisory's +5
+  (CombatLog defender 40 + 5 on 1171 t151); runs/h1_duels1148 t60 the
+  barbarian Horse Archer 2031629's shot on player 0's Warrior on 34:11 at 23,
+  the +5 of the t60 session not yet standing; runs/h1_duels1164 t196-219
+  city-state 3's Field Cannon 1245185 on player 0's breached centre 9:11 at
+  105; runs/h1_duels1121 t166-173 the Line Infantry 4128797 on the
+  Encampment 5:15 (35 outer damage of 300) at 2 hit points; runs/h1_duels1148
+  t98 the barbarian Crossbowman 3604501 planning at 79 damage;
+  runs/h1_duels1182 t42 / t51-52 player 1's Warrior 524293 two turns dug in
+  under city-state 3's blows and its Heavy Chariot 589828 at 90 damage;
+  runs/h1_duels1138 t38 the barbarian Warriors on 36:23 / 36:24 flanking
+  none the turn player 1 completes Military Tradition.
+- Open: a unit killed in the barbarians' turn keeps no record t+1 row, so
+  its Fortify order of the turn digs it in by the engine's own count
+  (runs/h1_duels1178 t38); a building a major's city completes inside its
+  turn on a harvest's production stands a turn late (runs/h1_duels1140 t80).

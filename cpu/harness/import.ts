@@ -2722,6 +2722,16 @@ export function importTurn(rec: TurnRecord, cat: Catalog, history?: History): Im
         t.district = id;
         t.districtComplete = complete === true;
         t.districtPillaged = dpil === true;
+        // an Encampment's own hit points and outer defence, the record's
+        // damage off each (a whole one keeps the absent fields the engine
+        // reads as whole)
+        if (id === 'ENCAMPMENT' && complete === true) {
+          const hurt = num(d[6] as number);
+          const outerMax = num(d[9] as number);
+          const outerHurt = num(d[8] as number);
+          if (hurt > 0) t.encampHp = Math.max(0, num(d[7] as number) - hurt);
+          if (outerMax > 0 && outerHurt > 0) t.encampOuterHp = outerMax - outerHurt;
+        }
       }
       districts.push({ type: id, tileIndex: at });
       // a district keeps the price locked at its placement, under

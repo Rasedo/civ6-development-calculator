@@ -61,7 +61,27 @@ STATUS = ["INVALID", "CLAIMED", "SUBMITTED", "ACCEPTED", "FAILED", "IN PROGRESS"
 QUIET = {"ResourceRemovedFromMap", "ResourceAddedToMap", "UnitMovementPointsChanged", "UnitMovementPointsRestored", "UnitMovementPointsCleared",
          "UnitVisibilityChanged", "PlotYieldChanged", "NotificationAdded", "CityVisibilityChanged", "UnitActivityChanged"}
 UNIT_SHOWN = ["m_eAIType", "m_eActivity", "m_bEmbarked", "m_eMilitaryFormation", "m_iDamage", "m_iFortifyTurns", "m_iAttacksRemaining", "m_iBuildCharges",
-              "m_aiController", "m_aiGoal", "m_iOperationTimer", "m_iBarbarianTribeIndex", "m_bProcessedTurn"]
+              "m_aiController", "m_aiGoal", "m_iOperationTimer", "m_iBarbarianTribeIndex", "m_bProcessedTurn", "m_iEraStrengthModifier",
+              "m_bHasHiddenVisibility", "m_bHiddenVisibilityForfeited"]
+
+_ABILITIES: list[str] | None = None
+
+
+def ability_name(index: int) -> str:
+    """the UnitAbilities row at `index` in the game's database order (the
+    lab instance's DebugGameplay.sqlite), less ABILITY_; the index where no
+    database is at hand"""
+    global _ABILITIES
+    if _ABILITIES is None:
+        try:
+            import sqlite3  # noqa: PLC0415
+            sys.path.insert(0, str(common.HERE.parent / "install"))
+            from xml_check import game_database  # noqa: PLC0415
+            db = sqlite3.connect(f"file:{game_database()}?mode=ro", uri=True)
+            _ABILITIES = [r[0] for r in db.execute("select UnitAbilityType from UnitAbilities order by rowid")]
+        except Exception:  # noqa: BLE001
+            _ABILITIES = []
+    return _ABILITIES[index].removeprefix("ABILITY_") if 0 <= index < len(_ABILITIES) else str(index)
 
 
 class Game:
@@ -177,7 +197,9 @@ def unit_line(g: Game, d: dict) -> str:
     if d.get("experience") and d["experience"] != [0, 1, 0]:
         out += f" xp={d['experience']}"
     if d.get("abilities"):
-        out += f" abilities={d['abilities']}"
+        out += " abilities=[" + ", ".join(ability_name(a) + (f"x{n}" if n != 1 else "") for a, n in d["abilities"]) + "]"
+    if any(v not in (0, -1) for v in d.get("combat") or []):
+        out += f" combat={d['combat']}"
     if len(members) > 1:
         out += f" formation={members}"
     if path:
