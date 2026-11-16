@@ -300,7 +300,7 @@ class SimTactics:
 
     def _tac_hostile_on(self, seat: int, rel: bool) -> torch.Tensor:
         """[B, T] bool — `_tac_hostile` on the map layer of a religious mover
-        (`rel`) or of any other (`enemyOnLayer`)"""
+        (`rel`) or of any other (`enemyAt`)"""
         out = torch.zeros(self.B, self.T, dtype=torch.bool, device=self.device)
         for pl in (self.military_at, self.civilian_at, self.support_at, self.embarked_at):
             s = torch.where(pl >= 0, self.unit_seat.gather(1, pl.clamp(min=0)), torch.full_like(pl, -1))
@@ -863,6 +863,12 @@ class SimTactics:
             embarks = embarks | m_emb
         else:
             placed = embarks
+        # the formation ignores zones of control where any member does (its
+        # +0x578, the OR of the members' +0x13b0: 0x267650 at 0x26784d,
+        # read by 0x26f980): `zocFree`
+        zoc_ign = self._tac_zoc_ignored(utype)
+        if bool(mate_on.count_nonzero()):
+            zoc_ign = zoc_ign | (mate_on & self._tac_zoc_ignored(m_type))
         # ground closed to the unit (`groundOf`'s shut): none to a formation
         # of Traders or Spies, whose location test skips the border branch
         # (0x586360 at 0x5865e7..0x5865fd); and whatever the unit, no step
@@ -1061,7 +1067,7 @@ class SimTactics:
                 # a Trader's: the districts' alone (Rules_Movement 0x530f50 on
                 # the formation's layer)
                 zs = torch.where(trader_u.unsqueeze(1), self._tac_zoc(seat, sn, units=False)[rows], zs)
-            zs = zs & ~self._tac_zoc_ignored(utype).unsqueeze(1)
+            zs = zs & ~zoc_ign.unsqueeze(1)
         # a path's turn may not end on a plot its own stacking unit holds (the
         # path validity 0x2720a0; `groundOf`'s full; under flag 0x1000 its
         # first turn alone); a formation (`mate` [N] its other member's local
@@ -1101,11 +1107,11 @@ class SimTactics:
         if bool(haz[rows].any()):
             haz_n = haz[rows] & self._barb_seen("barbarians" if seat == BARB_SEAT else seat)[rows]
         # a zone of control's step on the path's destination (`groundOf`'s zoc)
-        zp = self._tac_zoc_path(rows, seat, zsea, self._tac_zoc_ignored(utype), dest, crowd_n, sn) if zoc else None
+        zp = self._tac_zoc_path(rows, seat, zsea, zoc_ign, dest, crowd_n, sn) if zoc else None
         # ...and on every plot whatever the search (`groundOf`'s zoc): the
         # domain a new turn sets out on
         zt = zp if zp is not None else self._tac_zoc_path(
-            rows, seat, zsea, self._tac_zoc_ignored(utype), dest,
+            rows, seat, zsea, zoc_ign, dest,
             crowd_n if crowd_n is not None else torch.zeros(N, T, dtype=torch.bool, device=dev), sn)
         tseat = self.tile_seat
         # the nodes: one per plot, and in every search but the planning's a
@@ -2176,6 +2182,11 @@ class SimTactics:
         if bool(m_on.count_nonzero()):
             mcl = mr.clamp(min=0)
             emb = emb | (m_on & self._tac_embarks(rows, ut_pool[rows, mcl].clamp(min=0, max=self.NU - 1), seat, orig_p[rows, mcl]))
+        # the formation ignores zones of control where any member does
+        # (`zocFree`)
+        zoc_ign = self._tac_zoc_ignored(ut)
+        if bool(m_on.count_nonzero()):
+            zoc_ign = zoc_ign | (m_on & self._tac_zoc_ignored(ut_pool[rows, mr.clamp(min=0)].clamp(min=0, max=self.NU - 1)))
         ign_shore = self._ignore_shores(torch.full_like(ut_pool, seat), ut_pool)[rows, sr] | ~emb
         # its terrain waivers (`terrainMp`: hills, Woods)
         waive = self._tac_waive_code(ut, getattr(self, f"{pre}_unit_promos")[rows, sr],
@@ -2192,7 +2203,7 @@ class SimTactics:
         # a zone of control ends the walk (`walk`'s inEnemyZoc on the order's
         # destination, a plot it may not end on at the limit), of the
         # formation's domain as it sets out (sea for an embarked unit)
-        halts = self._tac_zoc_path(rows, seat, naval | getattr(self, f"{pre}_unit_emb")[rows, sr], self._tac_zoc_ignored(ut),
+        halts = self._tac_zoc_path(rows, seat, naval | getattr(self, f"{pre}_unit_emb")[rows, sr], zoc_ign,
                                    dr, no_end)
         # how far its Movement carries it: a formation's, the least its
         # members hold (0x262cd0), a member whose moves an order ended none
@@ -2212,7 +2223,7 @@ class SimTactics:
         f_land_w, f_sea_w = self._tac_pool(pre)
         fl_w, fs_w = f_land_w[rows, sr], f_sea_w[rows, sr]
         ww = self.unit_water_walk.take(ut)
-        # a unit at war on its map layer (`enemyOnLayer`: a religious unit on
+        # a unit at war on its map layer (`enemyAt`: a religious unit on
         # its own, walked onto)
         foe_n = self._tac_hostile_on(seat, False)[rows]
         if bool(rel_u.count_nonzero()):
@@ -2378,7 +2389,7 @@ class SimTactics:
             stepped = now != start
             if bool(stepped.count_nonzero()):
                 zoned = self._tac_zoc_path(rows, seat, naval | getattr(self, f"{pre}_unit_emb")[rows, sr],
-                                           self._tac_zoc_ignored(ut), None,
+                                           zoc_ign, None,
                                            no_end)[ar, now.clamp(min=0)]
                 rs, ss = rows[stepped], sr[stepped]
                 zm[rs, ss] = zoned[stepped]
@@ -4148,7 +4159,10 @@ class SimTactics:
             now = tile_p[rows, sr]
             moved = step & (now != dest[rows])
             if bool(moved.count_nonzero()):
-                z = self._tac_zoc_path(rows, seat, naval, self._tac_zoc_ignored(ut), None, no_end)[ar, now.clamp(min=0)]
+                mo = self._tac_mate(rows, sr, pre)
+                ign = self._tac_zoc_ignored(ut) | ((mo >= 0) & self._tac_zoc_ignored(
+                    getattr(self, f"{pre}_unit_type")[rows, mo.clamp(min=0)].clamp(min=0, max=self.NU - 1)))
+                z = self._tac_zoc_path(rows, seat, naval, ign, None, no_end)[ar, now.clamp(min=0)]
                 zm[rows[moved], sr[moved]] = z[moved]
 
     def _tac_carry_out(self, out: dict, done: torch.Tensor, rowof: torch.Tensor, res: dict, pre: str = "barb",
@@ -6280,7 +6294,7 @@ class SimTactics:
                 continue
             rt, rk = self._seat_reach_turns(op, u_b)
             # none at war with it, none that keeps it out (`keptOut`)
-            cand = ((rt == 1) & ~self._tac_hostile(seat) & ~self._tac_own_mil(seat, self._tac_hull(u_b, pre)) & ~self._tac_peaceful(seat)
+            cand = ((rt == 1) & ~self._tac_hostile_on(seat, False) & ~self._tac_own_mil(seat, self._tac_hull(u_b, pre)) & ~self._tac_peaceful(seat)
                     & (self.pair_dist[home].to(torch.long) <= _WANDER_CITY_RANGE))
             count = cand.sum(dim=1)
             wander = ok & (count > 0)
@@ -6425,7 +6439,7 @@ class SimTactics:
             ccity = self.tile_city[bidx, camp]
             bound = (cseat != NO_SEAT) & (ccity != -1)
             same = (self.tile_seat == cseat.unsqueeze(1)) & (self.tile_city == ccity.unsqueeze(1))
-            cand = ((rt == 1) & ~self._tac_hostile(seat) & ~self._tac_own_mil(seat, self._tac_hull(u_b, pre)) & ~self._tac_peaceful(seat)
+            cand = ((rt == 1) & ~self._tac_hostile_on(seat, False) & ~self._tac_own_mil(seat, self._tac_hull(u_b, pre)) & ~self._tac_peaceful(seat)
                     & (self.pair_dist[camp].to(torch.long) <= _WANDER_CAMP_RANGE)
                     & (~bound.unsqueeze(1) | same))
             count = cand.sum(dim=1)

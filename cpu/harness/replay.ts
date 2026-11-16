@@ -1377,9 +1377,15 @@ function barbarianTurn(ctx: Ctx, b: TurnRecord, closing: number): void {
   if (barbPlayer !== undefined) ctx.operations.minorTurn(closing, barbPlayer, opLines, opEvals);
   barbSlotsDying(state);
   // the barbarians' units look round where the record holds them (their
-  // moves are the record's, set without a step)
+  // moves are the record's, set without a step): a unit that has not moved
+  // reveals the look it last took (`unitLook`), a feature felled in its sight
+  // since opening nothing to it (runs/h1_duels1190 t83-107: player 1's
+  // Builder fells the Woods on 29:12 and the Galleys on 28:13 / 29:14 never
+  // reveal 30:12 behind it)
+  const barbs = state.barbSeat;
+  if (state.fogOfWar && !barbs.explored.length) barbs.explored = new Array(state.map.tiles.length).fill(0);
   for (const u of state.units) {
-    if (isBarbSeat(u.seat)) revealAround(state, u.seat, u.tileIndex, unitSight(u, state), { seeThrough: unitSeesThrough(u) });
+    if (state.fogOfWar && isBarbSeat(u.seat) && u.tileIndex >= 0) for (const p of unitLook(state, u)) barbs.explored[p] = 1;
   }
 }
 

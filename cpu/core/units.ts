@@ -758,6 +758,13 @@ export function districtZones(state: GameState, tile: Tile, mover: { seat: numbe
   return side !== null && side.seat !== mover.seat && unitsHostile(state, mover, side);
 }
 
+/** the unit type ignores zones of control (the unit's IgnoresZOC +0x13b0):
+ *  CIV6: a naval raider "ignores enemy zone of control", and cavalry-class
+ *  units ignore it too */
+export function ignoresZoc(type: string): boolean {
+  return !!UNITS[type]?.ignoresZoc || (!!UNITS[type]?.cavalry && !UNITS[type]?.chariot);
+}
+
 /** the plot entered lies in the mover's enemy zone of control (Rules_Movement
  *  0x530f50, by 0x26f980 from the path's cost): over the six plots beside it,
  *  a district at war that exerts one (`districtZones`, any domain, across a
@@ -778,9 +785,7 @@ export function inEnemyZoc(
   crowded = false,
   seen?: ArrayLike<number>,
 ): boolean {
-  // CIV6: a naval raider "ignores enemy zone of control", and cavalry-class
-  // units ignore it too.
-  if (mover.type !== undefined && (UNITS[mover.type]?.ignoresZoc || (UNITS[mover.type]?.cavalry && !UNITS[mover.type]?.chariot))) return false;
+  if (mover.type !== undefined && ignoresZoc(mover.type)) return false;
   const tile = state.map.tiles[tileIndex];
   // CIV6 (Zone of Control): "Religious units exert ZOC against other religious
   // units" — so a religious mover walks through a military zone, and a

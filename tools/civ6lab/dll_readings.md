@@ -19437,3 +19437,46 @@ production step (cpu/core/phase.ts) and the import; GPU `_proj_converted`
 - Open: the portal links in the unit pathfinder and the replay of a move
   through one (C-132); a ranged blow that takes a centre's last hit point
   and the city-states' copy of a centre before the turn's close (C-125).
+
+## C-95 / C-128: a formation ignores zones of control where any member does; the Wanders' unit at war is of the mover's map layer; a standing barbarian reveals its kept look
+
+`zocFree` in `groundOf`'s zone tests (`seenZoc`, `zoc`), `walk`'s and
+`orderRun`'s zone test and the swap partner's step, `ignoresZoc`
+(cpu/core/units.ts, inEnemyZoc's own test); `enemyAt` (cpu/core/tactical.ts:
+Wander Near Camp, Wander Near City, `attackPlot`); the replay's barbarian look
+after their turn (cpu/harness/replay.ts). GPU `_tac_search`'s and
+`_tac_move_to`'s `zoc_ign`, `_tac_swap`'s step, the Wanders' candidates over
+`_tac_hostile_on` (gpu/core/sim_tactics.py).
+
+- THE FORMATION'S ZONES: the formation's refresh 0x267650 ORs each
+  member's IgnoresZOC (unit +0x13b0, the Lua getter lIgnoresZOC 0x9f3e70)
+  into the tracked bool +0x520 (0x26784d..0x267860), whose value +0x578 the
+  zone query 0x26f980 tests first (0x26f98e): set, no zone is asked, in
+  every search and walk alike. A captive Builder escorted by a Cavalry or a
+  Courser plans and walks past the zones its escort ignores.
+- CONFIRMED (aimem windows): runs/h1_duels1189 t170-181: Builder Capture's
+  Builder 4128776 and Cavalry 3997703 on 8:12 plan 10:10 at (1/128) and walk
+  to 11:10 (AI_Operation.csv "Operation Move, UNIT_BUILDER, 8:12, 10:5,
+  10:10"), the t173 / t178 / t179 move rows and the Builder's plan.reach rows
+  of t173-t180 gone (14 rows); runs/h1_duels1175 t121-131: the Builder
+  5505046 and Courser 5439509 rows of t126 / t128 / t129 gone (6 rows).
+- THE UNIT AT WAR (0x5862e0) reads the unit list its caller passes: Wander
+  Near Camp (0x77b9a0 at 0x77bb35..0x77bb92) and Wander Near City (0x77bf50
+  at 0x77c239..0x77c2cf) pass the plot's units of the mover's map layer
+  (0x75c50 on 0x901e0), so a religious unit at war leaves a land unit's plot
+  a candidate.
+- CONFIRMED: runs/h1_duels1145 t69: the barbarian Warrior 2818064 on 33:18
+  draws over five plots ("Random Direction" range 5), player 1's
+  Missionary 1835013 on 34:20 among them, and goes there; the Warrior
+  3342345's range 13 with the same plot; runs/h1_duels1164 t99 / t110 the
+  Warrior 1900555 and the Musketman 3014671 go to the Missionary's 31:11.
+- THE BARBARIANS' LOOK AFTER THEIR TURN in the replay: a unit the record
+  holds where it stood reveals the look it last took (`unitLook`), not a
+  fresh line of sight: a feature felled in its sight reveals nothing behind
+  it (runs/h1_duels1190 t83-t107: player 1's Builder fells the Woods on
+  29:12, the Galleys on 28:13 / 29:14 stand, and 30:12 stays unrevealed to
+  the barbarians, 25 revealed rows gone).
+- OPEN: runs/h1_duels1184 t6 the barbarian Scout 393221 on 7:5 takes 9:5
+  (Move To: 9 5) where ours takes 8:7, both of two unrevealed plots in
+  sight and of one cost (548864) in Explore's search, 8:7 closing first in
+  ours; the game's search order or its sight count unread.

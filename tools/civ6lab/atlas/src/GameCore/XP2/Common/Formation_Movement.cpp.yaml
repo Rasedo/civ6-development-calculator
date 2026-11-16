@@ -431,9 +431,12 @@
 - addr: 0x26f980
   final: 0x1a7e90
   kind: function
-  semantics: "the zone of control query (finder, from, to, the path's destination) -> 0x530f50. Under no flag 0x800, on a step that starts no turn, it sets the step's minimum cost to the Movement it starts with; the parent's carry is added on top (0x26ed00), so a step into a zone of control from a node carrying Movement is left short: a wait a turn on, the unit's own unmoved plot or a turn's first step spending everything. Ported: price's zone branch, price6's waits."
+  semantics: "the zone of control query (finder, from, to, the path's destination) -> 0x530f50. Under no flag 0x800, on a step that starts no turn, it sets the step's minimum cost to the Movement it starts with; the parent's carry is added on top (0x26ed00), so a step into a zone of control from a node carrying Movement is left short: a wait a turn on, the unit's own unmoved plot or a turn's first step spending everything. Ported: price's zone branch, price6's waits. It asks nothing where the formation's +0x578 is set (0x26f98e: a member ignores zones of control)."
   status: READ
   cases:
+    - recording: h1_duels1175
+      turn: 126-129
+      value: Builder Capture's Builder 5505046 with its Courser 5439509 walks to 711 / 845 / 847 as logged
     - recording: h1_duelw1117
       turn: 8
       value: "THE LOG   AGAINST IT: the moves keep their Movement on entering a zone —   runs/h1_duelw1117 log t8, city-state 2's Warrior 196610 steps 13:10 ->   12:11 beside the camp's Spearman (\"Attack Target Mov"
@@ -449,6 +452,7 @@
       turn: 32
       value: "its arguments to 0x530f50: the formation's player +0x1b8, domain 0x266720, layer 0x2665b0, the plot entered (r8 +0x28 / +0x2a), the path's destination ([rsp+0x98]) and the plot's stacking count at its limit (0x585eb0 over 0x75c50's units against [0xf28c80]+0x58c, setae at 0x26fa27); the barbarian Scout 1900552 on 12:15, its move to 10:13, ends on 12:14 as logged"
   impl:
+    - cpu/core/tactical.ts:zocFree
     - cpu/core/tactical.ts:Ground
     - cpu/core/tactical.ts:moves
     - cpu/core/units.ts:inEnemyZoc
@@ -456,7 +460,9 @@
     - cpu/core/tactical.ts:zocMoved
     - cpu/core/tactical.ts:zoned
     - cpu/core/tactical.ts:fighter
+    - gpu/core/sim_tactics.py:_tac_search
   readings:
+    - "C-95 / C-128: a formation ignores zones of control where any member does; the Wanders' unit at war is of the mover's map layer; a standing barbarian reveals its kept look"
     - "C-125: a district's zone of control in a move's path, waived on the path's destination; a city-state's strikes after its units' planning — READ (0x530f50 at 0x531127..0x531302, 0x26f980, 0x26f870), FIT (the strikes' place), both twins"
     - "C-95: the unit pathfinder and the planning's reach — READ, confirmed on the Wander draws"
     - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"

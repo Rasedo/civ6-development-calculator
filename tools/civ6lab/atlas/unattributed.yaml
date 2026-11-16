@@ -960,6 +960,7 @@
     - gpu/core/sim_seats.py:_occ_split
     - cpu/core/tactical.ts:pathNodes
     - cpu/core/tactical.ts:fighterOnLayer
+    - cpu/core/tactical.ts:enemyAt
   readings:
     - "C-95: the planning strikes a religious unit and a Trader on their plot, its foreign test reads the mover's map layer, the blow on them 1.5 x their health — READ (0x790c60 at 0x790f22, 0x790fc9..0x791016, 0x7910b3..0x791162; 0x791470 at 0x791703..0x79174a, 0x7917b1..0x7917f7; 0x793400), both twins"
     - "C-123 / C-95: a Trader stands on the trade layer; a city's shot is a COMBAT_DISTRICT spot's blow back — READ (0x901e0, 0x586360 -> 0x208b80, 0x585eb0 -> 0x585d90, 0x791470 at 0x7917f7..0x7918f7 -> 0x249ee0 / 0x205720, 0x776140 at 0x776780..0x7767fa), both twins"
@@ -970,6 +971,7 @@
     - "C-133 / C-95 / C-134: the kept path's searches inside a queue run; the Trader target, the defending district and Pillage's own plot; the safe plot's unit at war that fights — READ (0x272aa0 at 0x272af9..0x272c76, 0x26ef40 at 0x26f123..0x26f162, 0x26e3a0, 0x782d0, 0x783980 at 0x7842df..0x7842eb / 0x784aec..0x784b36, 0x24c2f0, 0x774380 at 0x774481..0x7744a9, 0x716b90 at 0x716d53..0x716da1), both twins"
     - "C-133 / C-95 / C-134: the kept path's searches inside a queue run; the Trader target, the defending district and Pillage's own plot; the safe plot's unit at war that fights — READ (0x272aa0 at 0x272af9..0x272c76, 0x26ef40 at 0x26f123..0x26f162, 0x26e3a0, 0x782d0, 0x783980 at 0x7842df..0x7842eb / 0x784aec..0x784b36, 0x24c2f0, 0x774380 at 0x774481..0x7744a9, 0x716b90 at 0x716d53..0x716da1), FIT (the planning list's seen unit at war), both twins"
     - "C-134 / C-95: Operation Move's goal and ring plots refused by another player's unit of the mover's layer, at war or not; Pillage passes a unit with no Movement or none the target takes — READ (0x586360 at 0x586542..0x5865a1, 0x208b80 at 0x208c41..0x208d4e, 0x815d50 at 0x815d64..0x815d78 and 0x815e6f..0x815eb9, 0x774380 at 0x7744af..0x7744f8), both twins"
+    - "C-95 / C-128: a formation ignores zones of control where any member does; the Wanders' unit at war is of the mover's map layer; a standing barbarian reveals its kept look"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...e (0x790fc9..0x791016) lists the target plot's units of the planning's +0x10 (0x793400: 0x901e0, the mover's map layer): a religious unit stands on its own, so a military unit lays th..."
@@ -9604,6 +9606,16 @@
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...); else where its original owner (+0x340, m_eOriginalOwner: Lua Unit:GetOriginalOwner 0x9f38d0) is another player below 0x41 whose slot is live (+0x2b48), by that player's CanEmbark...."
+  review: imported
+- addr: 0x9f3e70
+  final: 0x6ff160
+  kind: function
+  name: lIgnoresZOC
+  status: PARTLY
+  readings:
+    - "C-95 / C-128: a formation ignores zones of control where any member does; the Wanders' unit at war is of the mover's map layer; a standing barbarian reveals its kept look"
+  context:
+    - ...refresh 0x267650 ORs each member's IgnoresZOC (unit +0x13b0, the Lua getter lIgnoresZOC 0x9f3e70) into the tracked bool +0x520 (0x26784d..0x267860), whose value +0x578 the zone query...
   review: imported
 - addr: 0x9f6750
   final: 0x701aa0

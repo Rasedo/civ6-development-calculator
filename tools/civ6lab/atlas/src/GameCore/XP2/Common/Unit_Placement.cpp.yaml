@@ -240,9 +240,12 @@
 - addr: 0x5862e0
   final: 0x3b0860
   kind: function
-  semantics: the plot holds a unit the mover is at war with (Operation Move's barred goal).
+  semantics: "the plot holds a unit the mover is at war with (Operation Move's barred goal). The list it reads is its caller's: the Wanders pass the plot's units of the mover's map layer (0x75c50 on 0x901e0), so a religious unit at war holds no plot from a land unit."
   status: READ
   cases:
+    - recording: h1_duels1145
+      turn: 69
+      value: the barbarian Warrior 2818064 on 33:18 draws over five plots, player 1's Missionary 1835013 on 34:20 among them, and goes there
     - recording: AI_Tactical.csv
       value: "Confirmed: the turn's \"Random   Direction\" draws pair one to one with the AI_Tactical.csv rows \"Wander\" and   \"Garrison\", every player's in log order (1,199 of 1,199 turn-pairs of the   five seeds), a"
     - recording: 1124
@@ -252,6 +255,7 @@
       turn: 69
       value: "With no flag a unit a city makes is refused by a hostile defender alone: Mexico City's Heavy Chariot 720899 made onto its centre 8:10 under city-state 3's Trader 458755 (runs/h1_duely1127)."
   impl:
+    - cpu/core/tactical.ts:enemyAt
     - cpu/core/units.ts:tileFreeForUnit
     - gpu/core/sim_masks.py:_spot_free
     - cpu/core/tactical.ts:moveBarred
@@ -262,6 +266,7 @@
     - cpu/core/tactical.ts:ended
     - cpu/core/tactical.ts:canAct
   readings:
+    - "C-95 / C-128: a formation ignores zones of control where any member does; the Wanders' unit at war is of the mover's map layer; a standing barbarian reveals its kept look"
     - "C-95: the tactical pass — READ (the barbarians' moves; the minors share it)"
     - "C-96: the city-states' tactical pass — READ (Wander Near City, Heal, the non-barbarian priorities, FindAlternateLocation), the families it needs PARTLY READ"
     - "C-97: the behaviour trees — READ (the interpreter), the nodes PARTLY READ"

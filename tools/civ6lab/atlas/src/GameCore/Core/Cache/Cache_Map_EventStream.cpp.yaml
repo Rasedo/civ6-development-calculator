@@ -8,7 +8,7 @@
   kind: function
   semantics: the plot is revealed (the planning node's +0x51 bit 0).
   status: PARTLY
-  impl: [cpu/core/tactical.ts:ex, cpu/core/tactical.ts:ignoresZoc]
+  impl: [cpu/core/tactical.ts:ex, cpu/core/tactical.ts:revealedOf, cpu/core/tactical.ts:zocIgnored]
   readings:
     - "C-95: the unit pathfinder and the planning's reach — READ, confirmed on the Wander draws"
     - "C-95: Explore Land and the barbarians' revealed plots — READ, ported (two tests below unread)"

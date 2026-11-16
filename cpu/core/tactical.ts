@@ -20,7 +20,7 @@ import { AI_FEATURES, AI_UNITS } from '../data/aiBuildTables';
 import { AI_UNIT_AI } from '../data/aiOperations';
 import { engineId, gameTypeOf, installFeature } from '../data/aliases';
 import {
-  arrive, canEmbark, cityAtIndex, crossesRiver, embarkTechMoves, escortUnit, inEscort, cliffBlocksStep, shoreCrossing, districtZones, encampmentBlocks, inEnemyZoc, rosterEmbarkMoves, stepCost, stepUnit, terrainMp, unitDomain, unitExertsZoc, unitFullMoves, mapLayer, unitReligious,
+  arrive, canEmbark, cityAtIndex, crossesRiver, embarkTechMoves, escortUnit, inEscort, cliffBlocksStep, shoreCrossing, districtZones, encampmentBlocks, ignoresZoc, inEnemyZoc, rosterEmbarkMoves, stepCost, stepUnit, terrainMp, unitDomain, unitExertsZoc, unitFullMoves, mapLayer, unitReligious,
   setBarbStepLook, unitsHostile, unitVisibleTo, fortifyOrder, operationStart, skipTurn,
   waterEnterable, waterWalks, borderClosedTo, formationBanned, formationCS, setRecordFormation, formationMates, dropLoneRiders, escortOf, escortRiders, disbandUnit,
 } from './units';
@@ -268,6 +268,16 @@ interface Ground {
 
 const NO_FOES: ReadonlySet<number> = new Set();
 
+/** the formation ignores zones of control where any member does (its
+ *  +0x578, the OR of the members' IgnoresZOC +0x13b0: the refresh 0x267650
+ *  at 0x26784d..0x267860), the zone query 0x26f980 asking none then
+ *  (runs/h1_duels1189 t178: Builder Capture's Builder 4128776 and Cavalry
+ *  3997703 on 8:12 plan 10:10 at (1/128) and walk to 11:10 past player 1's
+ *  zone, AI_Planning.csv, AI_Operation.csv) */
+function zocFree(unit: Unit, mates: readonly Unit[]): boolean {
+  return [unit, ...mates].some((m) => ignoresZoc(m.type));
+}
+
 function groundOf(state: GameState, unit: Unit, revealedOnly = true, planning = true, dangerSearch = true,
   mates: readonly Unit[] = formationMates(state, unit), dest = -1): Ground {
   const held = new Set<number>();
@@ -317,7 +327,8 @@ function groundOf(state: GameState, unit: Unit, revealedOnly = true, planning = 
   const enters = new Map<number, boolean>();
   const zocs = new Map<number, boolean>();
   const seenZocs = new Map<number, boolean>();
-  const ignoresZoc = !!UNITS[unit.type]?.ignoresZoc || (!!UNITS[unit.type]?.cavalry && !UNITS[unit.type]?.chariot);
+  // the formation ignores zones of control where any member does
+  const zocIgnored = zocFree(unit, mates);
   // the plots the player revealed (node +0x51 bit 0, 0x154c0); a path
   // (`revealedOnly` false) reads every plot as revealed
   const revealed = revealedOf(state, unit.seat);
@@ -468,7 +479,7 @@ function groundOf(state: GameState, unit: Unit, revealedOnly = true, planning = 
       let v = seenZocs.get(i);
       if (v !== undefined) return v;
       v = false;
-      if (!ignoresZoc) {
+      if (!zocIgnored) {
         seenNow ??= plotsSeenNow(state, new Set([unit.seat]));
         const sn = seenNow;
         const t = state.map.tiles[i];
@@ -634,7 +645,7 @@ function groundOf(state: GameState, unit: Unit, revealedOnly = true, planning = 
       let v = zocs.get(t.index);
       if (v === undefined) {
         seenNow ??= plotsSeenNow(state, new Set([unit.seat]));
-        zocs.set(t.index, (v = inEnemyZoc(state, t.index, unit, dest, crowded(t.index), seenNow)));
+        zocs.set(t.index, (v = !zocIgnored && inEnemyZoc(state, t.index, unit, dest, crowded(t.index), seenNow)));
       }
       return v;
     },
@@ -1465,7 +1476,7 @@ function orderRun(state: GameState, unit: Unit, dest: number, strike: boolean,
   if (zocMoved && unit.tileIndex !== from) {
     // the zone test on the plot it stands on, no destination (0x270800:
     // 0x26f980's fourth argument null), so no exerter's plot is waived
-    const zoned = inEnemyZoc(state, unit.tileIndex, unit);
+    const zoned = !zocFree(unit, mates) && inEnemyZoc(state, unit.tileIndex, unit);
     for (const m of [unit, ...mates]) {
       if (zoned) zocMoved.add(m);
       else zocMoved.delete(m);
@@ -1514,7 +1525,7 @@ interface KeptPath { flagged: number; goal: number; again: number }
  *  or Encampment */
 function attackPlot(state: GameState, unit: Unit, p: number): boolean {
   const t = state.map.tiles[p];
-  if (enemyOnLayer(state, unit, p)) return true;
+  if (enemyAt(state, unit, p)) return true;
   const owner = tileSeat(t);
   if (t.district === 'CITY_CENTER' && owner !== unit.seat && unitsHostile(state, unit, { seat: owner })) return true;
   return encampmentBlocks(state, t, unit);
@@ -1583,7 +1594,7 @@ function walk(state: GameState, unit: Unit, path: number[], dest: number, mates:
     mp = Math.max(0, mp - cost);
     stop += 1;
     from = p;
-    const zoned = inEnemyZoc(state, p, unit, dest, stackedWith(state, unit, mates, p) || peaceAt(state, unit, p));
+    const zoned = !zocFree(unit, mates) && inEnemyZoc(state, p, unit, dest, stackedWith(state, unit, mates, p) || peaceAt(state, unit, p));
     if (zoned && !fighter && mp > 0) {
       spendAt = stop;
       spent = mp;
@@ -1636,14 +1647,15 @@ function onMap(u: Unit): boolean {
   return d !== 'air' && d !== 'spy';
 }
 
-/** a unit of another player at war with the unit's on the plot (0x5862e0) */
+/** a unit of another player at war with the unit's on the plot, of the
+ *  unit's map layer (0x5862e0 on the plot's list 0x75c50 of the layer
+ *  0x901e0; `mapLayer`: a religious unit's its own, a Trader's the trade
+ *  layer): the Wanders' test (0x77b9a0 at 0x77bb35..0x77bb92, 0x77bf50 at
+ *  0x77c239..0x77c2cf) passes a plot only a religious unit at war holds
+ *  (runs/h1_duels1145 t69: the barbarian Warrior 2818064 on 33:18 draws over
+ *  five plots, player 1's Missionary 1835013 on 34:20 among them, and goes
+ *  there) */
 export function enemyAt(state: GameState, unit: Unit, tile: number): boolean {
-  return state.units.some((u) => u.tileIndex === tile && onMap(u) && unitsHostile(state, unit, u));
-}
-
-/** `enemyAt` on the unit's map layer (`mapLayer`: a religious unit's its own, a
- *  Trader's the trade layer) */
-function enemyOnLayer(state: GameState, unit: Unit, tile: number): boolean {
   const layer = mapLayer(unit.type);
   return state.units.some((u) => u.tileIndex === tile && onMap(u) && mapLayer(u.type) === layer && unitsHostile(state, unit, u));
 }
@@ -1706,7 +1718,7 @@ export function swapUnits(state: GameState, pass: Pass, unit: Unit, tile: number
   stepUnit(state, other, state.map.tiles[step.tile]);
   // the step's zone test on the plot it stands on (0x26fe20 at 0x270800)
   if (zocMoved && other.tileIndex !== tile) {
-    if (inEnemyZoc(state, other.tileIndex, other)) zocMoved.add(other);
+    if (!zocFree(other, formationMates(state, other)) && inEnemyZoc(state, other.tileIndex, other)) zocMoved.add(other);
     else zocMoved.delete(other);
   }
 }
