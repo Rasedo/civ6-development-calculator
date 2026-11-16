@@ -1253,6 +1253,15 @@
   context:
     - "- THE BAR: OLD + max(OLD, AI_CURRENT_TASK_BIAS) (GlobalParameters 80, read at 0x00f28c80 + 0xc). The city cancels where a contract it lists stands ACCEPTED (3) with a value at..."
   review: imported
+- addr: 0xf29510
+  kind: global
+  status: PARTLY
+  readings:
+    - "C-133 / C-134: the walk's Movement past a shore and Chase Target's attack flag — READ (0x586d40 at 0x58741c..0x587486, 0x26fe20 at 0x270309, 0x773fb0, 0x775c60 at 0x775dee; 0x962380 at 0x9625a0..0x9625fd, 0x212120, 0x211f80, 0x2726b0, 0x7f040 read for the open case), both twins"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...-1 or its owner is the player Player::Processor::DoAutomation runs (0x7f040: the global 0xf29510 0x7df30 sets as it walks the units' kept operations, -1 between), whether the owner s..."
+  review: imported
 - addr: 0xf2dc70
   kind: global
   semantics: the Trade_Movement path finder.

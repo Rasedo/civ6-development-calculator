@@ -20,7 +20,7 @@ import { AI_FEATURES, AI_UNITS } from '../data/aiBuildTables';
 import { AI_UNIT_AI } from '../data/aiOperations';
 import { engineId, gameTypeOf, installFeature } from '../data/aliases';
 import {
-  arrive, canEmbark, cityAtIndex, crossesRiver, embarkTechMoves, escortUnit, inEscort, cliffBlocksStep, shoreCrossing, districtZones, encampmentBlocks, ignoresZoc, inEnemyZoc, rosterEmbarkMoves, stepCost, stepUnit, terrainMp, unitDomain, unitExertsZoc, unitFullMoves, mapLayer, unitReligious,
+  arrive, canEmbark, cityAtIndex, embarksOn, crossesRiver, embarkTechMoves, escortUnit, inEscort, cliffBlocksStep, shoreCrossing, districtZones, encampmentBlocks, ignoresZoc, inEnemyZoc, rosterEmbarkMoves, stepCost, stepUnit, terrainMp, unitDomain, unitExertsZoc, unitFullMoves, mapLayer, unitReligious,
   setBarbStepLook, unitsHostile, unitVisibleTo, fortifyOrder, operationStart, skipTurn,
   waterEnterable, waterWalks, borderClosedTo, formationBanned, formationCS, setRecordFormation, formationMates, dropLoneRiders, escortOf, escortRiders, disbandUnit,
 } from './units';
@@ -1647,9 +1647,6 @@ function walk(state: GameState, unit: Unit, path: readonly PNode[], dest: number
   let mp = Math.min(unit.movesLeft, ...mates.map((m) => (movesEnded?.has(m.id) ? 0 : m.movesLeft)));
   let from = unit.tileIndex;
   let stop = 0;
-  // a shore crossing's Movement past the new domain's full, paid by the next
-  // step (the pathfinder's `carry`)
-  let carry = 0;
   const embarks = formationEmbarks(state, unit, mates);
   // the step's cost by the formation's +0x398 (0x26fe20 at 0x27021b): one
   // holding a fighter (a member with a Combat, Ranged, Bombard or religious
@@ -1670,14 +1667,16 @@ function walk(state: GameState, unit: Unit, path: readonly PNode[], dest: number
     // step ending the order unmoved on a defender at war it sees (0x209e30)
     if (attackPlot(state, unit, p)) break;
     if (n.turns > 1) break;
-    const cost = stepCost(state, unit, tiles[from], tiles[p], embarks) + carry;
+    const cost = stepCost(state, unit, tiles[from], tiles[p], embarks);
     if (mp < cost && mp < full) break;
-    // a land unit's step across the shore carries, a step off an owned water
-    // plot too: the pathfinder prices that step as no crossing, the walk caps
-    // the Movement it lands with (`stepUnit`)
-    const cross = !UNITS[unit.type]?.naval && !waterWalks(unit.type) && isWater(tiles[from]) !== isWater(tiles[p]);
-    const maxTo = domainPool(state, unit, isWater(tiles[p])) * MP_SCALE;
-    carry = cross && mp > maxTo ? mp - maxTo : 0;
+    // a land unit's step across the shore holds the Movement the placement
+    // leaves it, capped at its Movement in the new domain before the step
+    // pays (`stepUnit`; runs/h1_duels1177 t233: city-state 4's embarked Tank
+    // 1572870 on 31:21 lands on its centre 31:20 with 4, takes the farm
+    // 30:19 for 0.5 and embarks onto 29:19 with 3.5, as recorded)
+    if (!UNITS[unit.type]?.naval && !waterWalks(unit.type) && embarksOn(tiles[from]) !== embarksOn(tiles[p])) {
+      mp = Math.min(mp, unitFullMoves(state, { ...unit, embarked: embarksOn(tiles[p]), tileIndex: p }));
+    }
     mp = Math.max(0, mp - cost);
     stop += 1;
     from = p;
@@ -2818,7 +2817,7 @@ const PLAN_TURNS = 2;
 
 /** One pass's state: its player, whether a move that ends on a plot it
  *  attacks into strikes it (the barbarians' but their Wander; not a
- *  city-state's or the Free Cities' wander or chase), the units left, each one's planning reach,
+ *  city-state's or the Free Cities' wander), the units left, each one's planning reach,
  *  those done (`0x570b40`) and those whose moves an order ended (`0x56d6f0`:
  *  their Movement read as none, their rest kept). */
 export interface Pass {
@@ -3876,7 +3875,11 @@ const CHASE_SIGHT = 8;
  * the last within 8 of it whose plot its planning reaches within two turns,
  * and moves to the first plot of its reach of this turn within its range (1
  * at least) of the target with none of its own stacking there (0x775c60),
- * its turn done; with no such plot it stays for the moves after.
+ * its turn done; with no such plot it stays for the moves after. The order
+ * is Move or Fortify's (0x773fb0), the attack flag 0x10 on it for every
+ * player: a spot on the target itself walks to its side (runs/h1_duels1158
+ * t111: city-state 2's Man-At-Arms 1638403 on 14:11 for the barbarian
+ * Man-At-Arms on 13:9 goes 15:10, 14:9, its search flags 0x110).
  */
 function chaseTarget(state: GameState, pass: Pass): void {
   for (const u of pass.units) {
@@ -3895,7 +3898,7 @@ function chaseTarget(state: GameState, pass: Pass): void {
     const spot = reach.find((x) => x.turns === 1 && plotDistance(state, x.tile, tgt) <= r
       && !stackedOther(state, u, x.tile));
     if (!spot) continue;
-    moveOrFortify(state, pass, u, spot.tile, pass.strike);
+    moveOrFortify(state, pass, u, spot.tile);
     finish(pass, u, 'Chase Target', tgt);
   }
 }
@@ -4743,7 +4746,7 @@ export function seatPoolSlots(state: GameState, s: Seat): UnitPool | undefined {
  * list's order, each walking the units the moves before it left, in pool
  * order — Support Formation, Attack High Priority, Move to Safety, Attack
  * Medium Priority, Attack Civilians, Promotion, Make Military Formation,
- * Attack Low Priority, Heal, Chase Target (no strike), Wander Near City;
+ * Attack Low Priority, Heal, Chase Target, Wander Near City;
  * the homeland's take (`homelandTake`), its Move to Safety over every unit,
  * then its End Turn takes the rest (its Promotion finds no unit the
  * tactical one left due).

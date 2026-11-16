@@ -19,6 +19,7 @@
     - cpu/core/tactical.ts:mine
   readings:
     - "C-133 / C-95: the carried orders run in the unit list's order; a path comes ashore off water only by the disembark test — READ (0x7df30, 0x554e0, 0x523e0, 0x52e90, 0x54910, 0x2720a0 at 0x272380..0x27240d, 0x52fb90 at 0x52fb9d), both twins; UpdateOpenNode's walk and flag 2's plot — READ (0x79560, 0x2720a0 at 0x2721c3..0x27220d / 0x2724c8), unported"
+    - "C-133 / C-134: the walk's Movement past a shore and Chase Target's attack flag — READ (0x586d40 at 0x58741c..0x587486, 0x26fe20 at 0x270309, 0x773fb0, 0x775c60 at 0x775dee; 0x962380 at 0x9625a0..0x9625fd, 0x212120, 0x211f80, 0x2726b0, 0x7f040 read for the open case), both twins"
   context:
     - "...n the unit list's order; a path comes ashore off water only by the disembark test — READ (0x7df30, 0x554e0, 0x523e0, 0x52e90, 0x54910, 0x2720a0 at 0x272380..0x27240d, 0x52fb90 at 0x52fb9d..."
     - "- THE TURN'S DEACTIVATION (Player::Processor::DoAutomation 0x7df30, from DoTurnDeactivate 0x7eb60 at 0x7eba2): for a live player it walks the player's u..."
@@ -74,3 +75,12 @@
   context:
     - ...ed profiler (0x8c05a0 / 0x8c0640) and timing totals (0x5bce20, Player::Processor::EndTurn 0x7ed0a); none is compared to a limit.
   review: imported
+- addr: 0x7f040
+  final: 0x5cdf0
+  kind: function
+  semantics: "the player DoAutomation (0x7df30) is running: the global 0xf29510, set to the player as it walks its units' kept operations (0x7e075) and -1 at 0x7d9a3; read by the MoveTo execution 0x962380 (+0x828 of its frame: the unit's owner is that player)."
+  status: PARTLY
+  readings:
+    - "C-133 / C-134: the walk's Movement past a shore and Chase Target's attack flag — READ"
+    - "C-133 / C-134: the walk's Movement past a shore and Chase Target's attack flag — READ (0x586d40 at 0x58741c..0x587486, 0x26fe20 at 0x270309, 0x773fb0, 0x775c60 at 0x775dee; 0x962380 at 0x9625a0..0x9625fd, 0x212120, 0x211f80, 0x2726b0, 0x7f040 read for the open case), both twins"
+  review: reviewed

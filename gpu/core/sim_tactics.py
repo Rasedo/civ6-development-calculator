@@ -2364,11 +2364,10 @@ class SimTactics:
         frm = start.clone()
         stop = torch.zeros(R, dtype=torch.long, device=dev)
         on = torch.ones(R, dtype=torch.bool, device=dev)
-        # a shore crossing's Movement past the new domain's full, paid by the
-        # next step (`walk`'s carry)
-        carry = torch.zeros_like(mp)
-        f_land_w, f_sea_w = self._tac_pool(pre)
-        fl_w, fs_w = f_land_w[rows, sr], f_sea_w[rows, sr]
+        # a shore crossing caps the Movement the unit holds at its Movement in
+        # the new domain on the plot it lands on (`walk`, `stepUnit`)
+        emb_on = self.water & ~self.tile_submerged
+        aura_w = getattr(self, f"{pre}_unit_aura_mp")
         ww = self.unit_water_walk.take(ut)
         # a unit at war on its map layer (`enemyAt`: a religious unit on
         # its own, walked onto)
@@ -2399,17 +2398,22 @@ class SimTactics:
             # a node of a later turn than the path's first waits (0x26ff81)
             on = on & ~(res["closed"][ar, pc] > 1)
             dcol = (self.neigh[frm] == pc.unsqueeze(1)).long().argmax(dim=1)
-            c = self._tac_step(rows, frm, pc, dcol, ut, ign_shore, waive) + carry
+            c = self._tac_step(rows, frm, pc, dcol, ut, ign_shore, waive)
             # a step dearer than the Movement left, the unit moved, waits
             # (0x270309)
             on = on & ~((mp < c) & (mp < full))
-            tw = self.water[rows, pc]
-            # a land unit's step across the shore carries, a step off an owned
-            # water plot too (`walk`: no crossing to the pathfinder, the step
-            # caps the Movement it lands with)
-            cross = (self.water[rows, frm] != tw) & ~naval & ~ww
-            max_to = torch.where(tw, fs_w, fl_w)
-            carry = torch.where(on & cross & (mp > max_to), mp - max_to, torch.zeros_like(carry))
+            tw = emb_on[rows, pc]
+            # a land unit's step across the shore holds the Movement the
+            # placement leaves it, capped at its Movement in the new domain
+            # before the step pays (`walk`, `stepUnit`)
+            cross = on & (emb_on[rows, frm] != tw) & ~naval & ~ww
+            if bool(cross.count_nonzero()):
+                t_at = getattr(self, f"{pre}_unit_tile").clone()
+                t_at[rows, sr] = pc
+                e_at = getattr(self, f"{pre}_unit_emb").clone()
+                e_at[rows, sr] = tw
+                cap = (self._full_mp(pre, e_at, t_at) - aura_w)[rows, sr]
+                mp = torch.where(cross, torch.minimum(mp, cap), mp)
             mp = torch.where(on, (mp - c).clamp(min=0), mp)
             stop = torch.where(on, torch.full_like(stop, i + 1), stop)
             frm = torch.where(on, pc, frm)
@@ -3745,15 +3749,14 @@ class SimTactics:
                 stood |= go & self.barb_unit_alive[bidx, u_b] & (self.barb_unit_tile[bidx, u_b] == t)
 
     def _tac_chase(self, live, done: torch.Tensor, rowof: torch.Tensor, res: dict, tg: dict,
-                   order: torch.Tensor, npass: torch.Tensor, pre: str = "barb", seat: int = BARB_SEAT,
-                   strike: bool = True) -> None:
+                   order: torch.Tensor, npass: torch.Tensor, pre: str = "barb", seat: int = BARB_SEAT) -> None:
         """CHASE TARGET (`chaseTarget`): each land unit left, in pool order,
         takes the LOW target standing where it does, else the last of the list
         within 8 of it whose plot its reach takes within two turns, and moves
         to the first plot of its reach of this turn within its range (1 at
         least) of the target with none of its own stacking there — the
-        units of pool `pre`, the player `seat`, the move striking with
-        `strike`."""
+        units of pool `pre`, the player `seat`, Move or Fortify's order
+        with the attack flag for every player."""
         dev = self.device
         B = self.B
         bidx = torch.arange(B, device=dev)
@@ -3794,7 +3797,7 @@ class SimTactics:
             key = torch.where(ok & (rk_ >= 0), rk_, torch.full_like(rk_, BIG))
             m, spot = key.min(dim=1)
             mv = on & (m < BIG)
-            self._tac_move_or_fortify(mv, u_b, spot, pre, seat, strike)
+            self._tac_move_or_fortify(mv, u_b, spot, pre, seat)
             done[bidx[mv], u_b[mv]] = True
 
     def _fortify_order(self, m: torch.Tensor, pre: str, ticks: int) -> None:
@@ -6226,7 +6229,7 @@ class SimTactics:
         units they strike as they stood before them), then Support
         Formation, Attack High Priority, Move to Safety, Attack Medium and Low
         Priority, Heal,
-        Chase Target (no strike) and Wander Near City in pool order (Promotion
+        Chase Target and Wander Near City in pool order (Promotion
         and Make Military Formation
         after Attack Medium Priority), the
         homeland's Move to Safety; the rest end their turn."""
@@ -6499,7 +6502,7 @@ class SimTactics:
         # CHASE TARGET: a LOW target within 8 of a unit (the list taken as the
         # pass began: only where a foe stands near is there one to take)
         if tg is not None:
-            self._tac_chase(live, done, op["rowof"], op["res"], tg, order, npass, pre, seat, False)
+            self._tac_chase(live, done, op["rowof"], op["res"], tg, order, npass, pre, seat)
         # WANDER NEAR CITY: by slot, each unit with Movement left; a unit a
         # formation absorbed takes its draw and moves nowhere
         land_ent, wat_ent = self._tac_enter(seat)

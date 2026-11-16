@@ -20313,3 +20313,51 @@ cpu/export/planes.ts; GPU `_soil_mine` in gpu/core/sim_orders.py,
   the slot 12:14 where the game's line names its Warrior for 12:13; Operation
   Move's update on 1156 t82 wins on the nearest member's reach where the
   game's tree stays in its march (C-95).
+
+## C-133 / C-134: the walk's Movement past a shore and Chase Target's attack flag — READ (0x586d40 at 0x58741c..0x587486, 0x26fe20 at 0x270309, 0x773fb0, 0x775c60 at 0x775dee; 0x962380 at 0x9625a0..0x9625fd, 0x212120, 0x211f80, 0x2726b0, 0x7f040 read for the open case), both twins
+
+`walk` (cpu/core/tactical.ts), `chaseTarget`; GPU `_tac_move_to`'s walk
+(gpu/core/sim_tactics.py, `_full_mp` / `_start_tile_mp`'s plot argument in
+gpu/core/sim_economy.py) and `_tac_chase`.
+
+- THE WALK'S MOVEMENT PAST A SHORE: the walk's wait (0x26fe20 at 0x270309,
+  a step dearer than the Movement left once the formation moved) reads the
+  Movement the members hold, and a placement that changes a member's
+  embarked state caps it at GetMaxMoves in the new state on the plot it is
+  placed on (0x586d40 at 0x58741c..0x587486) before the step pays. The walk
+  follows the unit's own Movement as `stepUnit` leaves it: on a shore
+  crossing the least of what it holds and `unitFullMoves` embarked or ashore
+  on the plot entered (the start plot's terms read there), then the step's
+  cost; no carry past the crossing.
+- Confirmed: runs/h1_duels1177 t233 city-state 4's embarked Tank 1572870 on
+  31:21 (6 Movement, Wander for 26:19) lands on its centre 31:20 (5, then 4),
+  takes the farm 30:19 (3.5) and embarks onto 29:19 (0.5), its events in
+  record order; the engines stopped on 30:19 (2.5 by the pathfinder's carry);
+  t238 the same Tank.
+- CHASE TARGET'S ORDER: the chase's move (0x775c60 at 0x775dee) is Move or
+  Fortify's (0x773fb0): MoveTo with the attack flag 0x10 for every player,
+  the city-states' included, its unit on the plot taking the Fortify order.
+  A spot on the target itself walks to its side; Movement left there, it
+  strikes.
+- Confirmed: runs/h1_duels1158 t111 city-state 2's Man-At-Arms 1638403 on
+  14:11, the spot the barbarian Man-At-Arms' 13:9 (14:10 its own unit's),
+  goes 15:10, 14:9 on one search, flags 0x110 (AStar_GC.log #15926); t113
+  the Man-At-Arms and the Knight 1441798 (search #16306, 0x110);
+  duels1146 t103 / t105, duels1139 t200, duels1145 t115, duels1189 t18.
+- READ FOR THE OPEN CASE (duels1162 t62 / t64): the MoveTo execution
+  0x962380 asks, where the unit's +0x590 is not -1 or its owner is the
+  player Player::Processor::DoAutomation runs (0x7f040: the global 0xf29510
+  0x7df30 sets as it walks the units' kept operations, -1 between), whether
+  the owner sees the order's plot and the unit could attack it there
+  (0x212120 -> 0x211f80: +0xe10 above 0, a combat, ranged, bombard or
+  religious strength, +0x18ba clear, the formation placeable there under
+  flag 1 (0x586900), and the combat test 0x51ab00 / 0x51a840 on the plot's
+  defender); so, the order waits (+0x11) under DoAutomation, else ends
+  (+0x10), with no path. The formation's path 0x2726b0: none on its own
+  plot; under the attack flag the A* (0x272aa0); without it, a plot it sees
+  where it may not be placed (0x586900, flags 0) none, else the A*. The
+  Attack Barb Camp Warriors' orders for the camp 16:15 (the attack flag, the
+  ring refused) log no search at t62 / t64, where city-state 4's Galley on
+  16:13 sees the camp's Spearman, and one (flags 0x9101) at t61 / t63, where
+  it does not; neither branch read here gives that in the tactical pass
+  (+0x590 unread for an AI's unit).

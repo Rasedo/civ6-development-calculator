@@ -528,6 +528,7 @@
     - "C-133: a unit's Movement in a domain that is not its own; the planning's spots on a plot it may be placed on — READ (0x56d9f0 at 0x56da28..0x56da36, 0x2715a0 at 0x2717f4..0x27181b, 0x26e920 at 0x26ee12..0x26ee1c, 0x790c60 at 0x790cf3..0x790cfa), both twins"
     - "C-133 / C-134 / C-95: a move order's walk follows its path's turns and stands where it stops; an order that ends puts its unit back; the record's events run per unit — READ (0x26fe20 at 0x26ff6a..0x26ff89 / 0x270309..0x2703d7 / 0x2708fa..0x270945, 0x962380 at 0x9627fc..0x9628fa, 0x52f50 at 0x52fa3 / 0x53165..0x531a1 / 0x531b1..0x53289, 0x961ed0, 0x546f0, 0x56eea0, 0x55230), both twins"
     - "C-95: Operation Pillage's city ground, Make Formation's partner, Siege City's walls gate, the camp defender's kept moves — READ, both twins"
+    - "C-133 / C-134: the walk's Movement past a shore and Chase Target's attack flag — READ (0x586d40 at 0x58741c..0x587486, 0x26fe20 at 0x270309, 0x773fb0, 0x775c60 at 0x775dee; 0x962380 at 0x9625a0..0x9625fd, 0x212120, 0x211f80, 0x2726b0, 0x7f040 read for the open case), both twins"
   notes:
     - ".claude/scratchpad/mu1/readings_c96.md: ...it. - THE PLANNING'S GROUND, beside the barbarians': the list (0x26d890) keeps a   plot only where 0x586900 lets the unit end — another player's unit at   peace it passes and never ends on (runs/h1_duelw1117..."
   context:
@@ -608,6 +609,7 @@
     - "C-125: a unit's blow against a side of no strength, a support defender, a ranged shot's abilities on a district — READ (0x51a240 -> 0x519090, 0x51f070 at 0x51f0a0..0x51f0ca, 0x206960 at 0x206be8..0x206c02, 0x51d670), both twins"
     - "C-134 / C-128: the plot's layer-0 unit count in HL Explore; a walk the shore's carry stops; the city threat's margin on the centre's terms — READ (0x75280 at 0x752ca / 0x7530e, 0x586d40 at 0x587102, 0x70bd40 at 0x70bef4, 0x70b6f0 at 0x70b863 / 0x70b8b0, 0x70b550 at 0x70b64d, 0x24a180, 0x5cbd10 at 0x5cc07b..0x5cc09a), both twins"
     - "C-133 / C-134 / C-95: a move order's walk follows its path's turns and stands where it stops; an order that ends puts its unit back; the record's events run per unit — READ (0x26fe20 at 0x26ff6a..0x26ff89 / 0x270309..0x2703d7 / 0x2708fa..0x270945, 0x962380 at 0x9627fc..0x9628fa, 0x52f50 at 0x52fa3 / 0x53165..0x531a1 / 0x531b1..0x53289, 0x961ed0, 0x546f0, 0x56eea0, 0x55230), both twins"
+    - "C-133 / C-134: the walk's Movement past a shore and Chase Target's attack flag — READ (0x586d40 at 0x58741c..0x587486, 0x26fe20 at 0x270309, 0x773fb0, 0x775c60 at 0x775dee; 0x962380 at 0x9625a0..0x9625fd, 0x212120, 0x211f80, 0x2726b0, 0x7f040 read for the open case), both twins"
   context:
     - "...om 0 to more — newly visible to the barbarian player, not to the scout alone. A move (0x586d40 → 0x58f3f0 with add) adds the new sight before it drops the old, so a plot both sights..."
     - "...The triggers: a unit placed on a plot another player sees (0x5246f0, from the placement 0x586d40: each player whose visibility count of the plot is above 0); a plot coming into view me..."

@@ -776,14 +776,26 @@
 - addr: 0x211f80
   final: 0x161b50
   kind: function
+  semantics: "(unit, coordinates) the unit could attack there: +0xe10 above 0, a combat, ranged, bombard (or religious, +0x1ce0) strength, +0x18ba clear, its formation placeable there under flag 1 (0x586900 == 1); then a religious unit the religious combat test (0x209290, 0x51a840 hash 0x5e2f7468), else the plot's district defender (0x209b10, 0x24c2f0) or best defender (0x208b80 under 9 / 0x19) through 0x51ab00 (hash 0x2ca3edd1): a strength, another owner, an embarked unit only where it fights embarked, Moves and Shoots or not moved, then 0x51ac40."
   status: PARTLY
   readings:
+    - "C-133 / C-134: the walk's Movement past a shore and Chase Target's attack flag — READ"
     - "C-123: Operation Move's danger flags, the MoveTo execution and m_blockedTurns — READ (0x816cb0 at 0x816e70 / 0x817839, 0x962380, 0x73e610), both twins"
     - "C-132 / C-128 / C-95 / C-123 / C-133: the danger map's unmoved flag, a unit made anew's place, the operation queue's push, the strike's turn, the raid's recruit, the shore tests — READ (0x26df90 at 0x26e128..0x26e159, 0x716400 at 0x71672d, 0x586360 at 0x586542..0x58657e / 0x5867ab..0x586875, 0x93fa10 at 0x93fd94..0x93fdab / 0x93fe79, 0x526a0 at 0x52788..0x527ac, 0x523e0, 0x55460, 0x962380 at 0x96268f, 0x60a440, 0x26e570 at 0x26e904, 0x2720a0 at 0x272618..0x272689), both twins"
+    - "C-133 / C-134: the walk's Movement past a shore and Chase Target's attack flag — READ (0x586d40 at 0x58741c..0x587486, 0x26fe20 at 0x270309, 0x773fb0, 0x775c60 at 0x775dee; 0x962380 at 0x9625a0..0x9625fd, 0x212120, 0x211f80, 0x2726b0, 0x7f040 read for the open case), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...goal first) reached this turn (+4 at most 1): under the attack flag 0x10 the battle (0x211f80, 0x1fbae0); else a visible defender at war or a hostile district with defence unpillage..."
   review: imported
+- addr: 0x212120
+  final: 0x161cf0
+  kind: function
+  semantics: "(unit, plot) the unit could attack the plot: 0x211f80 on the plot's coordinates; no plot, false."
+  status: PARTLY
+  readings:
+    - "C-133 / C-134: the walk's Movement past a shore and Chase Target's attack flag — READ"
+    - "C-133 / C-134: the walk's Movement past a shore and Chase Target's attack flag — READ (0x586d40 at 0x58741c..0x587486, 0x26fe20 at 0x270309, 0x773fb0, 0x775c60 at 0x775dee; 0x962380 at 0x9625a0..0x9625fd, 0x212120, 0x211f80, 0x2726b0, 0x7f040 read for the open case), both twins"
+  review: reviewed
 - addr: 0x212500
   kind: function
   name: Combat_Manager

@@ -6652,7 +6652,7 @@ class SimEconomy:
             out = out + (nav.gather(1, rr) * (naval & wr).long()) + (emv.gather(1, rr) * (emb & ~naval & wr).long())
         return out
 
-    def _full_mp(self, pre: str, emb: torch.Tensor | None = None) -> torch.Tensor:
+    def _full_mp(self, pre: str, emb: torch.Tensor | None = None, tile: torch.Tensor | None = None) -> torch.Tensor:
         """[B, U] — refreshUnits' `full + generalAuraMP(state, unit)`, one rule
         for both windows: an EMBARKED land unit marches on the flat
         EMBARK_MOVES pool, everything else on its type's `moves`, plus whatever
@@ -6666,14 +6666,15 @@ class SimEconomy:
         Every walker and every afford rule (`mp >= full`) must read this same
         expression — `stepUnit` is embark-aware in both windows. `emb` [B, U]
         reads every unit as embarked or ashore (the pathfinder's pool of each
-        domain); the units' own state by default."""
+        domain), `tile` [B, U] each on that plot (the start plot's terms); the
+        units' own state by default."""
         typ = getattr(self, f"{pre}_unit_type").clamp(min=0, max=self.NU - 1)
         # The golden dedication raises the unit's OWN movement, so it is added
         # to the type pool and then OVERRIDDEN by the embark pool below —
         # embarkation speed is not a unit's movement stat. `unitFullMoves` has
         # the same shape (`if (embarked && !naval) return EMBARK_MOVES`).
         base = self._type_moves.take(typ) + self._golden_move_mp(pre) + self._emergency_mp(pre) \
-            + self._start_tile_mp(pre, typ)
+            + self._start_tile_mp(pre, typ, tile)
         # CIV6 (TRAIT_*_WAR_MOVEMENT, Amount 2): the flat Movement a leader's
         # units carry for the turns after a declaration of the row's own war
         # kind — a unit's own stat, overridden by the embark pool below exactly
@@ -6736,7 +6737,7 @@ class SimEconomy:
         return (self._mp_scale * (base + self._promo_pool_val(pre, "MOVES"))
                 + getattr(self, f"{pre}_unit_aura_mp"))
 
-    def _start_tile_mp(self, pre: str, typ: torch.Tensor) -> torch.Tensor:
+    def _start_tile_mp(self, pre: str, typ: torch.Tensor, at: torch.Tensor | None = None) -> torch.Tensor:
         """[B, U] long `startTileMoves` — the Movement a chassis draws from the
         tile under it at the turn's start: CIV6 (Heavy Chariot / Maryannu
         Chariot Archer / War-Cart, EFFECT_ADJUST_UNIT_CLEAR_TERRAIN_START_MOVEMENT)
@@ -6748,8 +6749,10 @@ class SimEconomy:
         own ground, a city-state's it is suzerain of or an ally's; (Supply
         Convoy) +1 Movement for a land unit within
         1 of its player's convoy. The barbarian pool trains no unique, and the
-        Heavy Chariot's term reads the same for every pool."""
-        tile = getattr(self, f"{pre}_unit_tile").clamp(min=0)
+        Heavy Chariot's term reads the same for every pool. `at` [B, U] reads
+        each unit on that plot; its own by default."""
+        raw = getattr(self, f"{pre}_unit_tile")
+        tile = (raw if at is None else at).clamp(min=0)
         out = torch.zeros_like(typ)
         terr = self.terrain.gather(1, tile)
         if bool((self._type_open_mp > 0).count_nonzero()):
@@ -6787,13 +6790,12 @@ class SimEconomy:
         # (SUPPLY_CONVOY_BONUS_MOVEMENT) a land unit within 1 of its player's
         # Supply Convoy, the convoy itself included, once however many stand by
         alive = getattr(self, f"{pre}_unit_alive")
-        raw = getattr(self, f"{pre}_unit_tile")
         conv = self._type_logistic_mp.take(getattr(self, f"{pre}_unit_type").clamp(min=0, max=self.NU - 1))
         conv = conv * (alive & (raw >= 0)).long()
         if bool(conv.count_nonzero()):
             seat = getattr(self, f"{pre}_unit_seat")
             T = self.pair_dist.shape[0]
-            near = self.pair_dist.reshape(-1).take(tile.unsqueeze(2) * T + tile.unsqueeze(1)).long() <= 1
+            near = self.pair_dist.reshape(-1).take(tile.unsqueeze(2) * T + raw.clamp(min=0).unsqueeze(1)).long() <= 1
             mine = seat.unsqueeze(2) == seat.unsqueeze(1)
             g = torch.where(near & mine, conv.unsqueeze(1), torch.zeros_like(conv).unsqueeze(1)).amax(dim=2)
             out = out + g * (~self.unit_naval.take(typ)).long()

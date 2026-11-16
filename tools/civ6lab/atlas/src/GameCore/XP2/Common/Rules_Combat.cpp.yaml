@@ -87,6 +87,26 @@
   context:
     - "- The melee result (0x206960, Combat_Manager): the defender's damage is drawn first (0x51a240); the counter — the attacker's damage — is never drawn where the defender is embarked (..."
   review: reviewed
+- addr: 0x51a840
+  final: 0x3679e0
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-133 / C-134: the walk's Movement past a shore and Chase Target's attack flag — READ (0x586d40 at 0x58741c..0x587486, 0x26fe20 at 0x270309, 0x773fb0, 0x775c60 at 0x775dee; 0x962380 at 0x9625a0..0x9625fd, 0x212120, 0x211f80, 0x2726b0, 0x7f040 read for the open case), both twins"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - ..., the formation placeable there under flag 1 (0x586900), and the combat test 0x51ab00 / 0x51a840 on the plot's defender); so, the order waits (+0x11) under DoAutomation, else ends (+...
+  review: imported
+- addr: 0x51ab00
+  final: 0x367c40
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-133 / C-134: the walk's Movement past a shore and Chase Target's attack flag — READ (0x586d40 at 0x58741c..0x587486, 0x26fe20 at 0x270309, 0x773fb0, 0x775c60 at 0x775dee; 0x962380 at 0x9625a0..0x9625fd, 0x212120, 0x211f80, 0x2726b0, 0x7f040 read for the open case), both twins"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - ...x18ba clear, the formation placeable there under flag 1 (0x586900), and the combat test 0x51ab00 / 0x51a840 on the plot's defender); so, the order waits (+0x11) under DoAutomation, els...
+  review: imported
 - addr: 0x51acb0
   final: 0x367d90
   kind: function

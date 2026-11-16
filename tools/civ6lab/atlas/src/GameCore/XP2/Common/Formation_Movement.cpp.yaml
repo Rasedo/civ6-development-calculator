@@ -569,6 +569,7 @@
     - "C-132: the danger map's fitted rules in the DLL; a search's shore crossings on the formation's own domain — READ (0x26dab0, 0x586360 at 0x586624..0x586664, 0x2720a0 at 0x272618..0x272689, 0x66a90, 0x52fe90, 0x56e0a0, 0x26e570, 0x530240, 0x530420), FIT (the unmoved flag, the barbarians' raise, the grant's last turn), both twins"
     - "C-133 / C-128: flag 2's parent plot, the open list as the list itself, the embarked state's Movement cap, the zone's improvement test — READ (0x2720a0 at 0x27220d / 0x2724c8, 0x775a0, 0x79560, 0x586d40 at 0x587042..0x5870aa / 0x58741c..0x587486, 0x5706e0, 0x531ef0, 0x26fe20 at 0x270444 / 0x270776, 0x270be0, 0x52f970), both twins"
     - "C-133 / C-134 / C-95: a move order's walk follows its path's turns and stands where it stops; an order that ends puts its unit back; the record's events run per unit — READ (0x26fe20 at 0x26ff6a..0x26ff89 / 0x270309..0x2703d7 / 0x2708fa..0x270945, 0x962380 at 0x9627fc..0x9628fa, 0x52f50 at 0x52fa3 / 0x53165..0x531a1 / 0x531b1..0x53289, 0x961ed0, 0x546f0, 0x56eea0, 0x55230), both twins"
+    - "C-133 / C-134: the walk's Movement past a shore and Chase Target's attack flag — READ (0x586d40 at 0x58741c..0x587486, 0x26fe20 at 0x270309, 0x773fb0, 0x775c60 at 0x775dee; 0x962380 at 0x9625a0..0x9625fd, 0x212120, 0x211f80, 0x2726b0, 0x7f040 read for the open case), both twins"
   context:
     - "- A unit's move onto a plot holding a religious unit it kills (0x26fe20 → 0x493f80 with the capture flag 1) swings religion: RELIGION_SPREAD_ UNIT_CAPTURE (g..."
     - "- The move 0x26fe20 walks the destination plot's units from the last to the first; for each one not dead (+..."
@@ -1078,6 +1079,7 @@
     - "C-99: a move order carried on as the turn ends, the zone-of-control wait, the embark rule's TO plot — READ (0x962380, 0x52f50, 0x26fe20, 0x2675e0, 0x2673f0, 0x530420, 0x267650), both twins"
     - "C-99 / C-128: the swap's partner test and its step along its own path; Move Unit's update before the executions; a Trader no passenger — READ (0x972540, 0x56e760, 0x972a50 -> 0x26fe20, 0x7d3a00 -> 0x7f0020, 0x586360 -> 0x208b80 / 0x523d60), both twins"
     - "C-95 / C-134: HL Explore's path tests under flags 0, Naval Choose Target's unit kinds, the swap partner's destination test — READ (0x70aa40 at 0x70aed0 / 0x70b063 / 0x70b173 / 0x70b2b6 / 0x70b3b3, 0x802ea0 at 0x802f15..0x802f69, 0x972540 at 0x97273a..0x97276c), both twins"
+    - "C-133 / C-134: the walk's Movement past a shore and Chase Target's attack flag — READ (0x586d40 at 0x58741c..0x587486, 0x26fe20 at 0x270309, 0x773fb0, 0x775c60 at 0x775dee; 0x962380 at 0x9625a0..0x9625fd, 0x212120, 0x211f80, 0x2726b0, 0x7f040 read for the open case), both twins"
   context:
     - "...cost (plot vt +0x18) << 8 needs 0x56e760 clear), and the destinations valid both ways (0x2726b0 flag 4). Start (0x972a50): the unit's formation to the target (flags | 4), then the p..."
   review: imported
