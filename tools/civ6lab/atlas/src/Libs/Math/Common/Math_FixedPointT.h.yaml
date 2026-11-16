@@ -241,6 +241,7 @@
     - "C-98: the unit efficiencies — READ (0x79a440, its simulated combats 0x205720 off the map), ported: every entry the logged table's"
     - "C-98: the unit efficiencies"
     - "C-125: a unit's blow against a side of no strength, a support defender, a ranged shot's abilities on a district — READ (0x51a240 -> 0x519090, 0x51f070 at 0x51f0a0..0x51f0ca, 0x206960 at 0x206be8..0x206c02, 0x51d670), both twins"
+    - "C-125 / C-132: the river a melee blow crosses is the defender's; the replay's Encampment under the barbarians' own blow; a portal step's cost — READ (0x206960 at 0x206a98..0x206bdf, 0x51f070 at 0x51f639, 0x522c10 at 0x522f26..0x523018, 0x530100), the first both twins, the portal link unported"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...mbat: one \"Unit Combat Damage\" draw rand(COMBAT_MAX_EXTRA_DAMAGE 12) per damage figure (0x519090; the preview takes the midpoint 6, no draw); \"Unit Capture Chance\" on a capture; an int..."

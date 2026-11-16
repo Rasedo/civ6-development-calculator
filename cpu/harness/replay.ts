@@ -47,7 +47,7 @@ import { applySeatUnitOrders, buySeatBuilding, declareWar, districtSiteCost, dis
 import { addEnvoys, buildingCreatedCulture, cityStateAt, declareWarOnCityState, minorCity, minorReplaceCitizens, placeCityStateAt, sueForPeaceWithCityState } from '../core/cityStates';
 import { CP_ACCEPTED, CP_CANCELLED, CP_IN_PROGRESS, contractById } from '../core/aiContracts';
 import { availableBuildings, canPlaceWonder, validImprovements, wallsMax } from '../core/rules';
-import { arrive, arriveAll, embarksOn, grantFeatureAbilities, plotFortification, builderHarvest, builderRemoveFeature, spawnUnit, tallyUnitMade, trainableUnits, builderCost, traderCost, disbandUnit, escortable, drawAndPayGoody, grantedMoves, unitFullMoves, restUnit, canFortify, upgradeUnit, naturalistPark, upgradeAnew, unitsAt, unitDomain, fortifyBonus, crossesRiver, waterWalks, cityAtIndex, raiseBestTrained, recordAttacker, unitMadeAnew, holdGarrison, retestGarrisons, FORTIFY_MAX_TURNS, ANTIQUITY_CIVIC, SHIPWRECK_CIVIC } from '../core/units';
+import { arrive, arriveAll, embarksOn, grantFeatureAbilities, plotFortification, builderHarvest, builderRemoveFeature, spawnUnit, tallyUnitMade, trainableUnits, builderCost, traderCost, disbandUnit, escortable, drawAndPayGoody, grantedMoves, unitFullMoves, restUnit, canFortify, upgradeUnit, naturalistPark, upgradeAnew, unitsAt, unitsHostile, unitDomain, fortifyBonus, crossesRiver, waterWalks, cityAtIndex, raiseBestTrained, recordAttacker, unitMadeAnew, holdGarrison, retestGarrisons, FORTIFY_MAX_TURNS, ANTIQUITY_CIVIC, SHIPWRECK_CIVIC } from '../core/units';
 import { availableCivicsIn, availableTechsIn, computeUnlocks, goldPrice, governmentSlots, policyWireOf, seatGovernment, darkAgeEra,
   unlockedPolicyIds } from '../core/effects';
 import { selectResearch, chopGrant, harvestGrant, applyLumpYield, holdResearchEra, researchCost } from '../core/economy';
@@ -87,7 +87,7 @@ import { GOVERNMENTS, GOVERNMENT_LIST, POLICIES } from '../data/policies';
 import { BELIEF_CATALOGS, BELIEF_CLASS_FOLLOWER, BELIEF_SLOTS, PANTHEONS, PANTHEON_IDS, RELIGION_TYPES, gainPopulationPressure } from '../data/religion';
 import { establishMission, missionOf, missionPayable } from '../core/deals';
 import { DEAL_MISSION } from '../data/seats';
-import { CITY_HEAL_PER_TURN, CITY_MAX_HP, UNITS, UNIT_HP } from '../data/units';
+import { CITY_HEAL_PER_TURN, CITY_MAX_HP, ENCAMPMENT_HP, UNITS, UNIT_HP } from '../data/units';
 import { CAMP_DISPERSAL_GOLD, MP_SCALE, scaleByGameSpeed } from '../data/constants';
 import { PROMOTE_HEAL, aiPromotionPick, attacksPerTurn, promoCount, takePromotion, unitPromoRows } from '../core/promotions';
 import { fireFeature } from '../data/disasters';
@@ -210,6 +210,8 @@ interface Ctx {
    *  turn's close heals it: the barbarians, the turn's last player, take
    *  their turn before that heal (`barbarianAi`) */
   barbCentres: Map<number, { hp: number; outerHp?: number }>;
+  /** every standing Encampment's hit points by plot at the same moment */
+  barbEncampments: Map<number, number>;
   /** each major's best strengths trained as the minors' turns opened, before
    *  the next turn's start's units (`bestsBeforeStart`) */
   startBests?: Map<number, [number, number | undefined]>;
@@ -1694,6 +1696,12 @@ function barbarianAi(ctx: Ctx, b: TurnRecord, closing: number, before: ReadonlyS
     if (!c) continue;
     c.hp = was.hp;
     c.outerHp = was.outerHp;
+  }
+  // ...and every Encampment alike (runs/h1_duels1188 t150: the Field Cannon
+  // 6881293's shot on player 1's 16:17 finds it whole, the combat log's
+  // 54 + 7)
+  for (const [plot, hp] of ctx.barbEncampments) {
+    if (copy.map.tiles[plot].district === 'ENCAMPMENT') copy.map.tiles[plot].encampHp = hp;
   }
   // a unit the game holds as their turn opens that the replay's battles
   // killed or its record took off stands on its plot with the log's damage
@@ -7049,7 +7057,7 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
   const ctx: Ctx = {
     state, cat, W: rec0.head.W, seatOfPlayer: first.seatOfPlayer, playerOfSeat: first.playerOfSeat,
     units: new Map(), pendingMinors: new Map(), next: first, tally: new Map(), fellBack: new Map(), imposed: new Map(), reasons: new Map(),
-    engineKilled: new Set(), paths: new Map(), walked: new Set(), steps: new Map(), barbBlows: new Map(), barbCentres: new Map(), gone: new Map(), barbSeized: [], minorBlows: new Map(), minorShots: [], minorPromoted: new Map(), minorBuys: [], minorImproves: [], minorClears: [], minorCleared: new Set(), minorClearItems: new Map(), minorClearUnits: [], barbBattles: [], barbFought: new Set(), barbDraws: [], promoteHp: new Map(), minorUnits: [], minorGround: [], minorLux: new Map(), buyTrace, lateBlows: [], upgradeInto: new Set(), upgradedFrom: new Map(), levyFrom: new Map(), barbSteps: [], barbPillaged: [], envoys: [], battled: new Set(), fortified: new Map(), undug: new Map(), streams: new Map(), applied: new Set(), barbNew: [], lateEnvoys: [], log: history.randLog, warKinds: history.warKinds, stream, prev: rec0,
+    engineKilled: new Set(), paths: new Map(), walked: new Set(), steps: new Map(), barbBlows: new Map(), barbCentres: new Map(), barbEncampments: new Map(), gone: new Map(), barbSeized: [], minorBlows: new Map(), minorShots: [], minorPromoted: new Map(), minorBuys: [], minorImproves: [], minorClears: [], minorCleared: new Set(), minorClearItems: new Map(), minorClearUnits: [], barbBattles: [], barbFought: new Set(), barbDraws: [], promoteHp: new Map(), minorUnits: [], minorGround: [], minorLux: new Map(), buyTrace, lateBlows: [], upgradeInto: new Set(), upgradedFrom: new Map(), levyFrom: new Map(), barbSteps: [], barbPillaged: [], envoys: [], battled: new Set(), fortified: new Map(), undug: new Map(), streams: new Map(), applied: new Set(), barbNew: [], lateEnvoys: [], log: history.randLog, warKinds: history.warKinds, stream, prev: rec0,
     researchAi: report.researchAi, researchScores: report.researchScores, agendaCivics: null, strategyLog: loadStrategyLog(dumpPath), researchBefore: new Map(), researchAtTurn: new Map(), aiResearchLog,
     tactical: loadTactical(dumpPath), barbTally: report.barbTactics, minorTally: report.minorTactics, minorDraws: report.minorDraws,
     civicAi: report.civicAi, civicScores: report.civicScores, civicBefore: new Map(), aiCivicLog: govtLog.civics, aiPolicyLog: govtLog.policies,
@@ -7419,6 +7427,8 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
     const hpPre = new Map(state.units.map((u) => [u, u.hp]));
     // each city centre's hit points before the turn's close and after its heal
     const centreHeal = new Map<{ hp?: number }, { was: number; healed: number }>();
+    // ...and each Encampment's
+    const encampHeal = new Map<Tile, { was: number; healed: number }>();
     // THE ENGINE'S TURN in the order the pair holds it: the other majors'
     // starts and actions of turn t, the city-states' and Free Cities' turns,
     // the barbarians' (sat out), the turn's close and heal, the World
@@ -7812,8 +7822,11 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
       takeBarbs();
       const centres = [...state.seats.flatMap((s) => s.cities), ...state.freeSeat?.cities ?? [], ...state.cityStates];
       ctx.barbCentres = new Map(centres.map((c) => [c.centerIndex, { hp: c.hp ?? CITY_MAX_HP, outerHp: c.outerHp }] as const));
+      const encampments = state.map.tiles.filter((t) => t.district === 'ENCAMPMENT' && t.districtComplete);
+      ctx.barbEncampments = new Map(encampments.map((t) => [t.index, t.encampHp ?? ENCAMPMENT_HP] as const));
       turnClose(state);
       for (const c of centres) centreHeal.set(c, { was: ctx.barbCentres.get(c.centerIndex)!.hp, healed: c.hp ?? CITY_MAX_HP });
+      for (const t of encampments) encampHeal.set(t, { was: ctx.barbEncampments.get(t.index)!, healed: t.encampHp ?? ENCAMPMENT_HP });
       // the Regular Session after the turn's close, as `endTurn` runs it: a
       // competition it starts scores from the next turn (runs/h1_duelq1117:
       // the World's Fair of the t161 session STARTED 162, its podium t181),
@@ -8017,6 +8030,14 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
       const hp = c.hp ?? CITY_MAX_HP;
       if (hp >= healed || (was < CITY_MAX_HP && healed === was)) continue;
       c.hp = Math.min(CITY_MAX_HP, hp - (healed - was) + CITY_HEAL_PER_TURN);
+    }
+    // ...and an Encampment they struck alike (runs/h1_duels1188 t150-151:
+    // player 1's 16:17 takes 13, whole again in the t151 record)
+    for (const [t, { was, healed }] of encampHeal) {
+      const hp = t.encampHp ?? ENCAMPMENT_HP;
+      if (t.district !== 'ENCAMPMENT' || t.districtPillaged || hp >= healed || (was < ENCAMPMENT_HP && healed === was)) continue;
+      if (unitsAt(state, t.index).some((u) => unitsHostile(state, u, { seat: tileSeat(t) }))) continue;
+      t.encampHp = Math.min(ENCAMPMENT_HP, hp - (healed - was) + CITY_HEAL_PER_TURN);
     }
     unlistTurnLosses(b, a.turn, keyOfId, state.cityStates, new Set(state.units.map((u) => u.id)));
     for (const u of struckHp.keys()) {

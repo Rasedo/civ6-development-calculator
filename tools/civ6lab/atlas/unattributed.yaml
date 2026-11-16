@@ -3204,19 +3204,23 @@
       value: "the barbarian Scout 524295 on city-state 4's centre 32:8 (Plains Hills, across the river): the planning's dealt 16 / taken 56; t18 the Galley 262147 on city-state 3's 41:12 (a floodplain) 50 / 18"
   impl:
     - cpu/core/units.ts:meleeCrossesRiver
-    - cpu/core/combat.ts:meleeUnitStrengths
     - cpu/core/combat.ts:assaultAtkCS
     - gpu/core/sim_masks.py:_melee_river
     - gpu/core/sim_masks.py:_atk_pens
     - cpu/core/combat.ts:districtFightTerms
     - cpu/core/combat.ts:plotDefenseModifier
     - gpu/core/sim_seats.py:_district_fight_terms
+    - cpu/core/combat.ts:RIVER_DEFENSE_CS
+    - cpu/core/combat.ts:defenderCS
+    - gpu/core/sim_seats.py:_melee_unit_strengths
+    - cpu/core/combat.ts:base
   readings:
     - "C-95: a damaged centre defends at its wounded strength, the planning's city shot needs standing walls, the barbarians plan on the turn's unhealed centres — READ (0x51eaf0, 0x791470 at 0x79181c..0x791827 -> 0x249ee0 / 0x24b960), both twins; the replay's barbarian copy"
     - "C-99 / C-95: a melee blow's river is the defender plot's edge on the attacker's side at any distance; a levied unit home reveals its sight — READ (0x522c10 at 0x522f1d..0x52301b, 0x51f070 at 0x51f603..0x51f639), both twins"
     - "C-125 / C-95: the target list's trade layer and its one unit of the units' layer; a siege unit's step onto civilians; the city-states' Attack Civilians; the flankers' test, the support's caller, the camp strike's queue — READ (0x783980 at 0x7849bb..0x784c2b and 0x784c30..0x784f57, 0x26fe20 -> 0x212500, 0x521530, 0x51f070 at 0x51f70e..0x51f737, 0x546f0, 0x52f50), both twins"
     - "C-110 / C-125: an embarked unit's strengths in a unit's blow, a promotion's side, ground closed to a strike — READ (0x51f070 at 0x51f3ef..0x51f457, 0x206960 at 0x2069b4..0x2069e0 and 0x206a78..0x206b29, 0x520270 at 0x520576..0x5205db, 0x5228c0, 0x77a4b0), FIT (the closed ground), both twins"
     - "C-125 / C-110 / C-134: a defending district's terrain, a ship's shot at a district, the fuel term's player, the planning's dealt word on a district, Support on a centre, a city-state's plannings — READ (0x51eaf0 at 0x51ec87..0x51ecca, 0x522c10 at 0x522cc6..0x522f16, 0x51d670 at 0x51d7cd..0x51d7fa / 0x51d9c9..0x51da3d, 0x51c810 at 0x51ca2d..0x51ca57, 0x51f070 at 0x51f253..0x51f27a, 0x520270 at 0x520413..0x520429, 0x519440 at 0x51963d..0x51975a, 0x791470 at 0x7916fb..0x79175e, 0x812cc0 at 0x812ecb..0x812f41, 0x51e980), LAB (the aiunits plannings), both twins"
+    - "C-125 / C-132: the river a melee blow crosses is the defender's; the replay's Encampment under the barbarians' own blow; a portal step's cost — READ (0x206960 at 0x206a98..0x206bdf, 0x51f070 at 0x51f639, 0x522c10 at 0x522f26..0x523018, 0x530100), the first both twins, the portal link unported"
   notes:
     - the terrain, improvement and building terms read, unported here (the engines' defenderCS); the attacker's +0x1935 unread (read as Amphibious)
     - "imported: READ in its section, no confirming case found beside it"

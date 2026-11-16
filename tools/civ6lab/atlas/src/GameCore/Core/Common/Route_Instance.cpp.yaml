@@ -50,6 +50,7 @@
   impl: [cpu/core/rules.ts:pathPortals, gpu/core/sim_masks.py:_path_portals]
   readings:
     - "C-108: the trade path's portals, its open list and CanStartRoute's gates — READ, both twins"
+    - "C-125 / C-132: the river a melee blow crosses is the defender's; the replay's Encampment under the barbarians' own blow; a portal step's cost — READ (0x206960 at 0x206a98..0x206bdf, 0x51f070 at 0x51f639, 0x522c10 at 0x522f26..0x523018, 0x530100), the first both twins, the portal link unported"
   review: reviewed
 - addr: 0x88530
   final: 0x63b90
@@ -85,8 +86,19 @@
   impl: [cpu/core/aiValue.ts:playerUnits]
   readings:
     - "C-100: a district on a feature it may not stand on, and the Mountain Portal's analyzer — READ"
+    - "C-125 / C-132: the river a melee blow crosses is the defender's; the replay's Encampment under the barbarians' own blow; a portal step's cost — READ (0x206960 at 0x206a98..0x206bdf, 0x51f070 at 0x51f639, 0x522c10 at 0x522f26..0x523018, 0x530100), the first both twins, the portal link unported"
   context:
     - ...ghbour with a route (plot +0x47 not 0xff) counts, one without a route holding a portal (0x88680, the route manager's per-plot portal) refuses the term, and one of the five mountain...
+  review: reviewed
+- addr: 0x88880
+  final: 0x63e60
+  kind: function
+  semantics: "(portal, plot coordinates): whether the portal's exits name the plot; asked by the movement cost's portal term 0x530100 of the portal on the plot left."
+  status: PARTLY
+  readings:
+    - "C-125 / C-132: the river a melee blow crosses is the defender's; the replay's Encampment under the barbarians' own blow; a portal step's cost — READ (0x206960 at 0x206a98..0x206bdf, 0x51f070 at 0x51f639, 0x522c10 at 0x522f26..0x523018, 0x530100), the first both twins, the portal link unported"
+  context:
+    - ...) and the plot left holds a portal whose exits name the plot entered (0x884d0, 0x88680, 0x88880), the step's cost takes MOVEMENT_PORTAL_COST (GlobalParameters +0x508, 2) << 8 more (...
   review: reviewed
 - addr: 0x889e0
   final: 0x63ff0
@@ -102,4 +114,5 @@
   readings:
     - "C-95: a move order's path steps on from an attack's plot, its attack child by the order's flags, a non-attack order's destination, a melee blow on a civilian — READ (0x2720a0 at 0x272434..0x272544, 0x2715a0 at 0x2717cd / 0x271870..0x2718d7, 0x1385c0, 0x889e0, 0x2714b0, 0x206960 at 0x206a1f), both twins"
     - "C-108: the trade path's portals, its open list and CanStartRoute's gates — READ, both twins"
+    - "C-125 / C-132: the river a melee blow crosses is the defender's; the replay's Encampment under the barbarians' own blow; a portal step's cost — READ (0x206960 at 0x206a98..0x206bdf, 0x51f070 at 0x51f639, 0x522c10 at 0x522f26..0x523018, 0x530100), the first both twins, the portal link unported"
   review: reviewed

@@ -142,7 +142,9 @@ export function terrainDefense(tile: Tile): number {
 }
 
 export const FORT_DEFENSE_CS = 4; // the FORT improvement, physical and theological alike
-const RIVER_ATTACK_PENALTY = 5; // melee across a river, attacker CS −5
+/** COMBAT_RIVER_DEFENSE: what the river between the two plots is worth to
+ *  the side a melee blow lands on (the defence terrain term 0x522c10) */
+const RIVER_DEFENSE_CS = 5;
 /**
  * THE WOUNDED LAW on a unit's strength (0x522630, `woundedLoss256`): the
  * Combat a unit loses is COMBAT_WOUNDED_DAMAGE_MULTIPLIER times its damage
@@ -874,6 +876,14 @@ export function defenderCS(state: GameState, defender: Unit, defTileIndex: numbe
     // on them, so a foreign attacker's target gets it and the attacker does not.
     (tileSeat(tile) === defender.seat ? governorTileSum(state, tile, (e) => e.territoryCS) : 0) +
     terrainDefense(tile) +
+    // the river a melee blow crosses is the defender's (the terrain term
+    // 0x522c10 at 0x522f26..0x523018 under 0x51f070), waived by the
+    // attacker's Amphibious flag: a wounded attacker across it keeps a
+    // strength above 0 (runs/h1_duels1183 t42 the barbarian Scout 131073 at
+    // 50 damage on player 1's Warrior across 35:13's edge, dealt 10 / taken
+    // 90 at 5 against 33)
+    (vs?.melee && vs.attacker.tileIndex >= 0 && !promoFlag(vs.attacker, 'AMPHIBIOUS')
+      && meleeCrossesRiver(state.map, tile, state.map.tiles[vs.attacker.tileIndex]) ? RIVER_DEFENSE_CS : 0) +
     fortifyBonus(defender) -
     woundPenalty(defender) +
     (vs?.melee ? SUPPORT_CS * promoStackMult(defender, 'SUPPORT_MULT') * supportCount(state, defTileIndex, defender, vs.stands) : 0) +
@@ -1696,7 +1706,7 @@ export function assaultAtkCS(state: GameState, attacker: Unit, targetIndex: numb
     (UNITS[attacker.type]?.combat ?? 0) + formationCS(attacker) + convoyCS(state, attacker) - fuelShortCS(state, attacker) + chassisAttackCS(attacker) -
     woundPenalty(attacker) -
     (!amph && meleeCrossesRiver(state.map, state.map.tiles[targetIndex], state.map.tiles[attacker.tileIndex])
-      ? RIVER_ATTACK_PENALTY
+      ? RIVER_DEFENSE_CS
       : 0) -
     amphibiousAttackCS(state, attacker, targetIndex) +
     promoCS(attacker, {
@@ -2193,9 +2203,8 @@ function retreatPlot(state: GameState, u: Unit): number {
 export function meleeUnitStrengths(state: GameState, attacker: Unit, targetIndex: number, defender: Unit, stands = targetIndex): { atk: number; def: number; atkBase: number } {
   const from = state.map.tiles[attacker.tileIndex];
   const target = state.map.tiles[targetIndex];
-  const amph = promoFlag(attacker, 'AMPHIBIOUS');
   const own = attacker.embarked && !isCoastalLand(state.map, target) ? embarkedDefenseCS(state, attacker.seat) : (UNITS[attacker.type]?.combat ?? 0);
-  const atk = own + formationCS(attacker) + convoyCS(state, attacker) - fuelShortCS(state, attacker) + chassisAttackCS(attacker) - woundPenalty(attacker) - (!amph && meleeCrossesRiver(state.map, target, from) ? RIVER_ATTACK_PENALTY : 0)
+  const atk = own + formationCS(attacker) + convoyCS(state, attacker) - fuelShortCS(state, attacker) + chassisAttackCS(attacker) - woundPenalty(attacker)
     - amphibiousAttackCS(state, attacker, stands)
     + FLANKING_CS * promoStackMult(attacker, 'FLANK_MULT') * chassisFlankMult(attacker) * flankCount(state, stands, attacker)
       * (1 + gpPermOf(seatOf(state, attacker.seat),

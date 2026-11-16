@@ -19382,3 +19382,58 @@ production step (cpu/core/phase.ts) and the import; GPU `_proj_converted`
 - Open: 0x3306f0's plot set and 0x469d10's ban are not asked apart from
   the Congress's chop ban; the city's own plot is the seat's in the
   engines (the city id +0xc unasked).
+
+## C-125 / C-132: the river a melee blow crosses is the defender's; the replay's Encampment under the barbarians' own blow; a portal step's cost — READ (0x206960 at 0x206a98..0x206bdf, 0x51f070 at 0x51f639, 0x522c10 at 0x522f26..0x523018, 0x530100), the first both twins, the portal link unported
+
+- THE TWO SUMS THE DAMAGE LAW READS (0x206960): the attacker's base
+  (GetCombat, edi) and its modifier sum (0x51c810, r14d), the defender's
+  base (esi) and its sum (0x51f070, ebx); 0x51a240 takes the struck side's
+  pair first and the striker's second (0x206b4a..0x206b75 the defender's
+  damage, 0x206b9e..0x206bdf the attacker's) and lays base + sum of each in
+  the law's struct (+4 the struck side, +0 the striker), where 0x519090
+  tests each against 0 (0x5190e8, 0x519101). The river (0x522c10 at
+  0x522f26..0x523018: COMBAT_MELEE with an attacker's plot, the defender
+  plot's edge toward the attacker, the attacker's +0x1935 clear) is a term of
+  the DEFENDER's sum, called from the defender's composer alone (0x51f070
+  at 0x51f639; the district composers 0x51eaf0, 0x520270). So an attacker
+  whose Combat less its wound is 5 strikes across a river at 5 against a
+  defence 5 higher, not at 0: the law's value, neither the struck side's
+  maximum nor the striker's minimum.
+  `defenderCS` takes `RIVER_DEFENSE_CS` under a melee blow
+  (cpu/core/combat.ts), `meleeUnitStrengths` no river term;
+  `_melee_unit_strengths` (gpu/core/sim_seats.py) adds `RIVER_DEFENSE_CS`
+  (gpu/core/simbase.py) to the defence and takes the from-the-sea term
+  alone off the attack. An assault on a district keeps the term on the
+  attacker's side (`assaultAtkCS`, `_atk_pens`): the difference alone is
+  read there.
+- Confirmed: runs/h1_duels1183 t42-49 the barbarian Scout 131073, 50
+  damage, on player 1's Warriors across a river edge: dealt 10 / taken 90 at
+  t42 on 35:13 (5 against 33), 11 / 80 at t43, 12 / 74 at t48 (19 rows
+  gone); runs/h1_duels1127 t14-17 the Scout 524295 on the Warriors of
+  players 0 and 2, 15 / 61, 12 / 74, 16 / 56, and city-state 2's Warrior
+  196610 striking it back, back dealt 74 / back taken 12 (9 rows gone).
+- THE REPLAY'S COPY OF THE BARBARIANS' TURN (cpu/harness/replay.ts
+  `barbarianAi`): an Encampment holds the hit points it had before the
+  turn's close and before the barbarians' battles of the pair, as a city
+  centre does (`Ctx.barbEncampments`), and one they struck after the
+  replay's close heals on the hit points they left. runs/h1_duels1188
+  t150-170: the Field Cannon 6881293 shoots player 1's Encampment 16:17
+  each turn (CombatLog 60 - 17 on 54 + 7, 13 and 12 dealt), every record
+  holding it whole: its planned blow 15 on the whole district (101 rows).
+- A PORTAL STEP'S COST (0x530100, in the cost callbacks' rule chain
+  0x26e920 at 0x26ebfb, 0x270980, 0x270be0, after the river term 0x5301e0):
+  where the two plots are not adjacent (0x889e0) and the plot left holds a
+  portal whose exits name the plot entered (0x884d0, 0x88680, 0x88880), the
+  step's cost takes MOVEMENT_PORTAL_COST (GlobalParameters +0x508, 2) << 8
+  more (0x26ee80). The unit pathfinder's extra neighbours are the portal's
+  exits (0x271b50, installed by the pool's default 0x26f330). Unported:
+  `search` (cpu/core/tactical.ts) and `_tac_search` link the six neighbours
+  alone; `pathPortals` (cpu/core/rules.ts) holds the links for the trade
+  path. runs/h1_duels1169 t225: player 0's Scout 3342374 on 37:21, beside
+  the Mountain Tunnel 38:20 (the Tunnels 38:20 and 39:20, the portal plots
+  37:19, 37:21, 38:21, 39:19), lays its 10 on 37:19 and 39:19 in player 1's
+  and city-state 4's danger maps, the two exits not beside it, and stands
+  on 37:19 at t227.
+- Open: the portal links in the unit pathfinder and the replay of a move
+  through one (C-132); a ranged blow that takes a centre's last hit point
+  and the city-states' copy of a centre before the turn's close (C-125).

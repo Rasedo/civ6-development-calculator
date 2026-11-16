@@ -13496,10 +13496,14 @@ class SimSeats:
         # flanking and Support read it
         d_at = self.unit_tile.gather(1, ds0.unsqueeze(1)).squeeze(1)
         stands = torch.where((d_slot >= 0) & (d_at >= 0), d_at, tgt)
+        amph = self._promo_flag(at, a_promos, "AMPHIBIOUS")
+        zp = torch.zeros_like(here)
         atk_e = (atk_cs_all - self._wound(a_hp, at)
                  + atk_promo.to(atk_cs_all.dtype)
-                 - self._atk_pens(at, a_promos, here, tgt, a_emb, stands))
-        def_e = def_cs - self._wound(def_hp, d_type)
+                 - torch.where(amph, zp, self._amph_atk_cs(a_emb, stands)))
+        # the river the blow crosses is the defender's (`defenderCS`: the
+        # terrain term 0x522c10), waived by the attacker's Amphibious flag
+        def_e = def_cs - self._wound(def_hp, d_type) + RIVER_DEFENSE_CS * torch.where(amph, zp, self._melee_river(tgt, here))
         # flanking helps the hostile attacker (barb/civ at `here`), support
         # helps the defender, whichever seat it belongs to.
         _fl, _sp = self._flank_support(

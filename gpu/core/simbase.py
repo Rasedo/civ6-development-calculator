@@ -1038,6 +1038,9 @@ AGE_GOLDEN = 2
 # quantization survives. Cities/CS/rc-cities are not units — no flanking there.
 FLANKING_CS = 2
 SUPPORT_CS = 2
+# COMBAT_RIVER_DEFENSE: what the river between the two plots is worth to the
+# side a melee blow lands on (combat.ts RIVER_DEFENSE_CS)
+RIVER_DEFENSE_CS = 5
 
 # XP & levels (mirrors cpu/core/promotions.ts). A unit banks XP TOWARD its next
 # level and stalls at the threshold until it promotes; the level itself pays no
