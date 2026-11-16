@@ -747,11 +747,13 @@ describe('wonder route terms', () => {
     expect(wonderRouteOriginGold(state, origin)).toBe(0);
   });
 
-  // CIV6 (University of Sankore): "+2 Science for every Trade Route to this
-  // city. Domestic Trade Routes give an additional +1 Faith to this city."
-  // and "Other Civilizations' Trade Routes to this city provide +1 Science
-  // and +1 Gold for them."
-  it('University of Sankore reads its incoming routes and pays the foreign sender', () => {
+  // CIV6 (University of Sankore): SANKORE_TRADE_GAIN_SCIENCE
+  // (..._YIELD_FROM_OTHERS, Domestic false) pays the city +2 Science per
+  // other player's route in; SANKORE_TRADE_OFFER_* (..._YIELD_TO_OTHERS)
+  // pay a foreign sender +1 Science +1 Gold; SANKORE_TRADE_DOMESTIC_*
+  // (..._YIELD_TO_OTHERS, Domestic true) pay a domestic route's origin +2
+  // Science +1 Faith.
+  it('University of Sankore pays the foreign route in, the foreign sender and the domestic origin', () => {
     const { state, origin, dest } = twoCitySandbox();
     const wt = tileAtCoords(state.map, 11, 7);
     wt.builtWonder = 'UNIVERSITY_OF_SANKORE';
@@ -760,20 +762,24 @@ describe('wonder route terms', () => {
     const b0 = computeCityStats(state, dest).breakdown.bonuses;
     addTradeRoute(state, origin.id, dest.id, 0); // one DOMESTIC incoming route
     const b1 = computeCityStats(state, dest).breakdown.bonuses;
-    expect(b1.science - b0.science).toBe(2);
-    expect(b1.faith - b0.faith).toBe(1);
+    expect(b1.science - b0.science).toBe(0);
+    expect(b1.faith - b0.faith).toBe(0);
+    const domW = cityTradeYields(state, origin);
     // a rival's route to the same city: the SENDER earns +1 science +1 gold
     const civ = addCiv(state, 14, 10);
     civ.cities[0].buildings.push('MARKET');
     expect(addIntlTradeRoute(state, civ.cities[0].id, 0, dest.id, civ.seat).ok).toBe(true);
     const withW = cityTradeYields(state, civ.cities[0]);
     const b2 = computeCityStats(state, dest).breakdown.bonuses;
-    expect(b2.science - b0.science).toBe(4); // two routes to it now
-    expect(b2.faith - b0.faith).toBe(1);     // only one is domestic
+    expect(b2.science - b0.science).toBe(2); // the foreign route alone
+    expect(b2.faith - b0.faith).toBe(0);
     dest.wonders = [];
     const withoutW = cityTradeYields(state, civ.cities[0]);
     expect(withW.science - withoutW.science).toBe(1);
     expect(withW.gold - withoutW.gold).toBe(1);
+    const domWithout = cityTradeYields(state, origin);
+    expect(domW.science - domWithout.science).toBe(2);
+    expect(domW.faith - domWithout.faith).toBe(1);
   });
 });
 

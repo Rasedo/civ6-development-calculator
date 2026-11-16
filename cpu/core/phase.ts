@@ -127,7 +127,7 @@ import { cityAppealResolver, cityGovernorEstablished, establishedGovernorCityIds
 import { NO_SEAT, civOf, alliancePtsWith, allianceTypeWith, alliedAtLevel, allyTurnsWith, atWarWithAny, borderTurnsFrom, campTiles, citiesOf, civsAtWar, cityStateOfSeat, clearDelegations, denounceActive, friendTurnsWith, isCiv, isCityStateSeat, isTerritorial, seatOf, seatOfCityState, seatsAllied, seatsFriends, setAlliancePtsWith, setAllyTurnsWith, setBorderTurnsFrom, setFriendTurnsWith, setTileOwner, setWar, setWarKind, clearWarKind, setTreatyTurnsWith, setWarTurnsWith, tileBelongsTo, tileCity, tileOwnedByCiv, tileSeat, unitsOf, treatyTurnsWith, warClockKey, warTurnsWith, warsOf, hasRouteToSeat, leaderOf, warBanned, cityAtTile, onHomeContinent, BARB_SEAT, FREE_SEAT, isFreeSeat, freeSeatOf, cityHolders, civLevelOf, tileClaimed, majorsMet, setPeaceTurnWith } from './seats';
 import { warWearinessBattle, warWearinessPeace, warWearinessTurn } from './weariness';
 import { snipeRing, snipeRing3, spreadFromUnit } from './unitOrders';
-import { unitKillEvent, buildingDedications, layRoad } from './eras';
+import { unitKillEvent, buildingDedications, districtRoad, layRoad } from './eras';
 import { defaultWarKind, warKindAllowed } from './casusBelli';
 import { WAR_KINDS, WAR_KIND_FORMAL, WAR_KIND_SURPRISE } from '../data/warKinds';
 
@@ -1457,6 +1457,8 @@ export function placeSeatWonder(state: GameState, actor: Seat, civCity: City, de
   tile.builtWonder = def.id;
   tile.builtWonderComplete = false;
   paveGround(state, tile, def.placement.onFeature);
+  // its DISTRICT_WONDER stands complete from the placement, its road with it
+  districtRoad(state, civCity.seat, tile);
   civCity.wonders.push({ id: def.id, tileIndex: tile.index });
   commitProduction(state, civCity.seat, civCity, { kind: 'wonder', wonder: def.id, tileIndex: tile.index, progress: 0 });
   // a wonder set on its plot re-places the city's citizens (0x180cb0 under

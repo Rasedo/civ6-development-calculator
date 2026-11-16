@@ -8,8 +8,10 @@
   kind: function
   semantics: a route is valid on the plot.
   status: PARTLY
+  impl: [cpu/core/eras.ts:districtRoad, gpu/core/sim_seats.py:_district_road]
   readings:
     - "C-95: the roads' type per plot — READ (Route_Builder, Player_Trade, Trade_Manager, Rules_Movement), both twins"
+    - "C-98 / C-95: a completed district's road, a wonder's from its placement — READ (0x1e8790, 0x180450 at 0x180524, 0x176210 at 0x176299, 0x3630b0 at 0x36338c, 0x511700), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...player on a plot (0x512120): the route of the highest PlacementValue valid on the plot (0x511700) whose PlacementRequiresOwnedTile is met, whose PrereqEra the player's era (GetEra 0x..."
@@ -31,10 +33,11 @@
   kind: function
   semantics: "the best route for a player on a plot: the route of the highest PlacementValue valid on the plot (0x511700) whose PlacementRequiresOwnedTile is met, whose PrereqEra the player's era (0x467eb0, 0x93e9e0) has reached, whose Routes_XP2 PrereqTech it holds, BuildOnlyWithUnit ones only with a unit; then the plot owner's +0x12e0 count (0x6fe50) raises the value by that many rungs."
   status: PARTLY
-  impl: [cpu/core/eras.ts:bestRoadTier]
+  impl: [cpu/core/eras.ts:bestRoadTier, cpu/core/eras.ts:districtRoad]
   readings:
     - "C-95: the roads' type per plot — READ (Route_Builder, Player_Trade, Trade_Manager, Rules_Movement), both twins"
     - "C-95: the best route's owner term — READ, nothing to port"
+    - "C-98 / C-95: a completed district's road, a wonder's from its placement — READ (0x1e8790, 0x180450 at 0x180524, 0x176210 at 0x176299, 0x3630b0 at 0x36338c, 0x511700), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "- The best route for a player on a plot (0x512120): the route of the highest PlacementValue valid on the plot (0x511700) whose Placemen..."
@@ -55,9 +58,10 @@
   kind: function
   semantics: "Route_Builder's place: the route type (+0x47), the era from the route's PrereqEra (+0x48), the bridge flag +0x4d bit 4 copied from its SupportsBridges."
   status: PARTLY
-  impl: [cpu/core/eras.ts:layRoad]
+  impl: [cpu/core/eras.ts:layRoad, cpu/core/eras.ts:districtRoad]
   readings:
     - "C-95: the roads' type per plot — READ (Route_Builder, Player_Trade, Trade_Manager, Rules_Movement), both twins"
+    - "C-98 / C-95: a completed district's road, a wonder's from its placement — READ (0x1e8790, 0x180450 at 0x180524, 0x176210 at 0x176299, 0x3630b0 at 0x36338c, 0x511700), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...the bridge flag +0x4d bit 4 is copied from the route's SupportsBridges at placement (0x513120: Route_Builder's place; the era written from the route's PrereqEra)."

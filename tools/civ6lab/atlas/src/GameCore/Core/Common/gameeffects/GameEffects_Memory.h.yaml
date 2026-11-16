@@ -3,6 +3,16 @@
 # `review: imported` = bootstrapped from dll_readings.md / code comments / saved
 # labels and not yet reviewed: verify against the disassembly, then edit and
 # set `review: reviewed`.
+- addr: 0xb62390
+  final: 0x829bb0
+  kind: function
+  semantics: "EFFECT_ADJUST_TRADE_ROUTE_YIELD_FROM_OTHERS's creation: the instance (vtable 0xe01cd0) parsed by 0xb79ac0."
+  status: PARTLY
+  readings:
+    - "C-98 / C-127: the University of Sankore's route yields — READ (0xb90780, 0xb90f60, 0x54c6c0 at 0x54ccbf..0x54cec9, 0xb79ac0, 0x54b130 at 0x54b405..0x54b602), both twins"
+  context:
+    - "- EFFECT_ADJUST_TRADE_ROUTE_YIELD_FROM_OTHERS (factory 0xc2a590, creation 0xb62390): its parser 0xb79ac0 reads Amount and YieldType alone, no Domestic; its apply 0xbb36a0..."
+  review: reviewed
 - addr: 0xb67000
   final: 0x82e620
   kind: function
@@ -13,6 +23,16 @@
   context:
     - "- REQUIREMENT_UNIT_ERA_TYPE_MATCHES (vtable 0xde6998; its name 0xb664f0, its factory 0xb67000): its parse 0xb2c600 reads EraType and sets the result 2 (met) where the subject unit's..."
   review: imported
+- addr: 0xc01e10
+  final: 0x8c37a0
+  kind: function
+  semantics: "EFFECT_ADJUST_TRADE_ROUTE_YIELD_TO_OTHERS's creation: the instance (vtable 0xdfb4d8) parsed by 0xb90780."
+  status: PARTLY
+  readings:
+    - "C-98 / C-127: the University of Sankore's route yields — READ (0xb90780, 0xb90f60, 0x54c6c0 at 0x54ccbf..0x54cec9, 0xb79ac0, 0x54b130 at 0x54b405..0x54b602), both twins"
+  context:
+    - "- EFFECT_ADJUST_TRADE_ROUTE_YIELD_TO_OTHERS (factory 0xc2a710, creation 0xc01e10): its parser 0xb90780 reads Amount (+0xc), YieldType (+8) and Domestic (+0x10, false wh..."
+  review: reviewed
 - addr: 0xc0a3a0
   final: 0x8cca10
   kind: function

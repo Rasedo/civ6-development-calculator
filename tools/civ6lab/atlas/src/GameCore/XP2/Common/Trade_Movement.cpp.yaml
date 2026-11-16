@@ -177,6 +177,7 @@
     - "C-127: a major's Religious AI faith boost and the trade path's drowned plots"
     - "C-108: the trade path's portals, its open list and CanStartRoute's gates — READ, both twins"
     - "C-127: a major's Religious AI faith boost and the trade path's drowned plots — READ (0x74f5a0, 0x5583a0 / 0x558460's plot info), the wanted unit's value unread, both twins"
+    - "C-98 / C-95: a completed district's road, a wonder's from its placement — READ (0x1e8790, 0x180450 at 0x180524, 0x176210 at 0x176299, 0x3630b0 at 0x36338c, 0x511700), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "XP2 Trade_Movement.cpp: the pathfinder's callbacks are installed at 0x557fd0: step cost 0x558970, node valid 0x558db0, node init 0x558900, context 0x558ba0, range 0x5579b0. Check: `dll_t..."

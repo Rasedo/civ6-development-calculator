@@ -149,12 +149,14 @@ export interface BuiltWonderDef {
      *  for every Bonus resource within 3 tiles of the city and in this
      *  city's territory." */
     bonusResRouteGold?: number;
-    /** CIV6 (University of Sankore): "+2 Science for every Trade Route to
-     *  this city." */
+    /** CIV6 (University of Sankore, SANKORE_TRADE_GAIN_SCIENCE,
+     *  ..._YIELD_FROM_OTHERS, Domestic false): the Science every other
+     *  player's route to this city pays it */
     routesToCityScience?: number;
-    /** CIV6 (University of Sankore): "Domestic Trade Routes give an
-     *  additional +1 Faith to this city." */
-    domesticRoutesToCityFaith?: number;
+    /** CIV6 (University of Sankore, SANKORE_TRADE_DOMESTIC_SCIENCE and
+     *  SANKORE_TRADE_DOMESTIC_FAITH, ..._YIELD_TO_OTHERS, Domestic true):
+     *  the yields a domestic route to this city pays its ORIGIN */
+    domesticRoutesToCitySender?: { science: number; faith: number };
     /** CIV6 (University of Sankore): "Other Civilizations' Trade Routes to
      *  this city provide +1 Science and +1 Gold for them" — the SENDER's
      *  yields, paid by the destination's wonder. */
@@ -711,10 +713,10 @@ export const BUILT_WONDERS: Record<string, BuiltWonderDef> = Object.fromEntries(
       effects: {
         gpPoints: { SCIENTIST: 2 },
         routesToCityScience: 2,
-        domesticRoutesToCityFaith: 1,
+        domesticRoutesToCitySender: { science: 2, faith: 1 },
         foreignRoutesToCitySender: { science: 1, gold: 1 },
       },
-      description: '+3 science, +1 faith, +2 Scientist points per turn; +2 science per route to this city, +1 faith per domestic one, and foreign senders earn +1 science +1 gold.',
+      description: '+3 science, +1 faith, +2 Scientist points per turn; +2 science per foreign route to this city, foreign senders earn +1 science +1 gold, domestic senders +2 science +1 faith.',
       src: {
         code: { stylized: 'a display code, not a game constant' },
         cost: xml('Buildings', 'BuildingType=BUILDING_UNIVERSITY_SANKORE', 'Cost', { scale: GAME_SPEED }),
@@ -725,7 +727,8 @@ export const BUILT_WONDERS: Record<string, BuiltWonderDef> = Object.fromEntries(
         'effects.gpPoints.SCIENTIST': xml('Building_GreatPersonPoints', 'BuildingType=BUILDING_UNIVERSITY_SANKORE&GreatPersonClassType=GREAT_PERSON_CLASS_SCIENTIST', 'PointsPerTurn'),
         'placement.adjacentDistrict': xml('Buildings', 'BuildingType=BUILDING_UNIVERSITY_SANKORE', 'AdjacentDistrict', { expect: 'DISTRICT_CAMPUS' }),
         'effects.routesToCityScience': xml('ModifierArguments', 'ModifierId=SANKORE_TRADE_GAIN_SCIENCE&Name=Amount', 'Value'),
-        'effects.domesticRoutesToCityFaith': xml('ModifierArguments', 'ModifierId=SANKORE_TRADE_DOMESTIC_FAITH&Name=Amount', 'Value'),
+        'effects.domesticRoutesToCitySender.science': xml('ModifierArguments', 'ModifierId=SANKORE_TRADE_DOMESTIC_SCIENCE&Name=Amount', 'Value'),
+        'effects.domesticRoutesToCitySender.faith': xml('ModifierArguments', 'ModifierId=SANKORE_TRADE_DOMESTIC_FAITH&Name=Amount', 'Value'),
         'effects.foreignRoutesToCitySender.science': xml('ModifierArguments', 'ModifierId=SANKORE_TRADE_OFFER_SCIENCE&Name=Amount', 'Value'),
         'effects.foreignRoutesToCitySender.gold': xml('ModifierArguments', 'ModifierId=SANKORE_TRADE_OFFER_GOLD&Name=Amount', 'Value'),
       },

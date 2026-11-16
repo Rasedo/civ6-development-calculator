@@ -159,3 +159,19 @@
   context:
     - "...territory: none for the barbarians), an improvement's owner (0x84340 from the placement 0x363080 -> 0x362ec0: the plot and the six beside it, no line of sight), the scripted operatio..."
   review: reviewed
+- addr: 0x3630b0
+  final: 0x25d460
+  kind: function
+  semantics: "a wonder set on its plot: zones the wonder's district there at 100 percent (0x176210 at 0x36338c, r9d 0x64), so the district completes at once (0x180450) and carries its owner's road (0x1e8790) from the placement."
+  status: READ
+  cases:
+    - recording: h1_duels1152
+      turn: 39
+      value: China's Pyramids placed on 32:7, the plot's route 1 in the same record, the wonder complete at t49
+  impl: [cpu/core/eras.ts:districtRoad, gpu/core/sim_seats.py:_district_road]
+  readings:
+    - "C-98 / C-95: a completed district's road, a wonder's from its placement — READ (0x1e8790, 0x180450 at 0x180524, 0x176210 at 0x176299, 0x3630b0 at 0x36338c, 0x511700), both twins"
+  context:
+    - "...wonder's from its placement — READ (0x1e8790, 0x180450 at 0x180524, 0x176210 at 0x176299, 0x3630b0 at 0x36338c, 0x511700), both twins"
+    - ...more (0x17628a), completes it at once (0x180450 at 0x176299). The wonder's placement 0x3630b0 (from 0x180cb0 at 0x180eef) zones the wonder's district on the building's plot at 100 (...
+  review: reviewed

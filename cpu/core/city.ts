@@ -1083,7 +1083,7 @@ export function empireGrowth256(state: GameState, seat: number): number {
 /** The flat amenities and housing a city's OWN complete wonders pay it — a
  *  regional wonder's amenities reach it through `regionalWondersReaching`. */
 function wonderCityFlat(state: GameState, city: City,
-  key: 'cityAmenities' | 'cityHousing' | 'routesToCityScience' | 'domesticRoutesToCityFaith'): number {
+  key: 'cityAmenities' | 'cityHousing' | 'routesToCityScience'): number {
   let n = 0;
   for (const w of completedWonders(state, city)) {
     if (key === 'cityAmenities' && w.def.effects?.regionalRange) continue;
@@ -1841,24 +1841,18 @@ export function computeCityStats(
   // CIV6 (Industrialist, Renewable Subsidizer): the named buildings' own
   // extra yields while the governor holds the promotion
   addYields(bonuses, governorBuildingYields(state, city));
-  // CIV6 (University of Sankore): "+2 Science for every Trade Route to this
-  // city. Domestic Trade Routes give an additional +1 Faith to this city."
+  // CIV6 (University of Sankore, SANKORE_TRADE_GAIN_SCIENCE,
+  // ..._YIELD_FROM_OTHERS, Domestic false): +2 Science for every other
+  // player's route to this city (a domestic route's +2 Science and +1 Faith
+  // are its origin's, `routeOriginYields`)
   const perIn = wonderCityFlat(state, city, 'routesToCityScience');
-  const perDom = wonderCityFlat(state, city, 'domesticRoutesToCityFaith');
-  if (perIn || perDom) {
-    let all = 0;
-    let dom = 0;
+  if (perIn) {
+    let n = 0;
     for (const sx of [...state.seats, ...(state.cityStates ?? [])]) {
-      for (const r of sx.tradeRoutes ?? []) {
-        if (sx.seat === city.seat ? r.to === city.id
-          : r.toSeat === city.seat && r.toSeatCity === city.id) {
-          all += 1;
-          if (sx.seat === city.seat) dom += 1;
-        }
-      }
+      if (sx.seat === city.seat) continue;
+      for (const r of sx.tradeRoutes ?? []) if (r.toSeat === city.seat && r.toSeatCity === city.id) n += 1;
     }
-    bonuses.science += perIn * all;
-    bonuses.faith += perDom * dom;
+    bonuses.science += perIn * n;
   }
   // CIV6 (Industrial / Militaristic envoys, ADJUST_*_PRODUCTION): the flat
   // toward the item at the head of the queue is the city's Production as

@@ -429,7 +429,9 @@
     - recording: 1128
       turn: 160
       value: "1128 t160 (climate log FLOOD MITIGATED   on the Amur): China +1."
-  readings: ["H-1: a pillaged building's specialist, the centre's defence, three moments — READ"]
+  readings:
+    - "H-1: a pillaged building's specialist, the centre's defence, three moments — READ"
+    - "C-98 / C-95: a completed district's road, a wonder's from its placement — READ (0x1e8790, 0x180450 at 0x180524, 0x176210 at 0x176299, 0x3630b0 at 0x36338c, 0x511700), both twins"
   context:
     - "...s the damage pass 0xa2a4d0, whose out parameter is the MITIGATING player — the owner (0x24b4b0) of the first complete (+0xb08), unpillaged (0x24c3a0) Dam on the river's plot list, el..."
   review: reviewed
@@ -442,6 +444,7 @@
   readings:
     - "C-110 / C-125: the amphibious penalty reads the plot the defender stands on — READ (0x51bba0, 0x51c810 at 0x51cb7a..0x51cba1, 0x51d670 at 0x51d92e..0x51d957, 0x205f70, 0x211cc0, 0x209870), both twins"
     - "C-125 / C-110 / C-134: a defending district's terrain, a ship's shot at a district, the fuel term's player, the planning's dealt word on a district, Support on a centre, a city-state's plannings — READ (0x51eaf0 at 0x51ec87..0x51ecca, 0x522c10 at 0x522cc6..0x522f16, 0x51d670 at 0x51d7cd..0x51d7fa / 0x51d9c9..0x51da3d, 0x51c810 at 0x51ca2d..0x51ca57, 0x51f070 at 0x51f253..0x51f27a, 0x520270 at 0x520413..0x520429, 0x519440 at 0x51963d..0x51975a, 0x791470 at 0x7916fb..0x79175e, 0x812cc0 at 0x812ecb..0x812f41, 0x51e980), LAB (the aiunits plannings), both twins"
+    - "C-98 / C-95: a completed district's road, a wonder's from its placement — READ (0x1e8790, 0x180450 at 0x180524, 0x176210 at 0x176299, 0x3630b0 at 0x36338c, 0x511700), both twins"
   notes: [read whole (10 instructions); an accessor, no recorded case tells it apart]
   context:
     - ...t the combat's location; the district attack composer 0x51d670 the district's own plot (0x24b530 on the district, 0x51d92e..0x51d957). An embarked attacker's blow on a unit on water, o...

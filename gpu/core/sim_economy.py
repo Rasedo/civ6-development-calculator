@@ -8087,15 +8087,13 @@ class SimEconomy:
             bld_y = bld_y + _wreg_y[:, sl]
         if compw is not None and bool(compw.count_nonzero()):
             bld_y = bld_y + compw.double() @ self._wond_cy
-            # CIV6 (University of Sankore): "+2 Science for every Trade Route
-            # to this city. Domestic Trade Routes give an additional +1 Faith
-            # to this city."
+            # CIV6 (University of Sankore, SANKORE_TRADE_GAIN_SCIENCE,
+            # ..._YIELD_FROM_OTHERS, Domestic false): +2 Science for every
+            # other player's route to this city (a domestic route's are its
+            # origin's, `_seat_route_income`)
             _psci = compw.double() @ self._wond_routes_sci
-            _pfai = compw.double() @ self._wond_routes_faithdom
-            if bool(_psci.count_nonzero()) or bool(_pfai.count_nonzero()):
-                _allin, _domin = self._routes_ending_at(row)
-                bld_y[:, :, 3] = bld_y[:, :, 3] + _psci * _allin[:, sl].double()
-                bld_y[:, :, 5] = bld_y[:, :, 5] + _pfai * _domin[:, sl].double()
+            if bool(_psci.count_nonzero()):
+                bld_y[:, :, 3] = bld_y[:, :, 3] + _psci * self._foreign_routes_ending_at(row)[:, sl].double()
             _impy = self._wonder_improvement_yields(row)
             if _impy is not None:
                 bld_y = bld_y + _impy[:, sl]

@@ -18630,3 +18630,87 @@ harness's seizure (`barbarianAi`, the `seize` decision, cpu/harness/replay.ts).
   t171, the Bombard 5439511 upgraded to the Artillery 6357023 in its turn;
   runs/h1_duels1143 t212-249 the Free Cities' strike from their own ranged
   best (15, their Slinger) where `cityStrikeBase` gives them none.
+
+## C-98 / C-127: the University of Sankore's route yields — READ (0xb90780, 0xb90f60, 0x54c6c0 at 0x54ccbf..0x54cec9, 0xb79ac0, 0x54b130 at 0x54b405..0x54b602), both twins
+
+`wonderRouteDomesticSenderYields` in `routeOriginYields`' domestic leg,
+`wonderRouteGainScience`, `wonderRouteSenderYields` (cpu/core/trade.ts),
+the city's own +2 (`computeCityStats`, cpu/core/city.ts), the wonder's
+`routesToCityScience`, `domesticRoutesToCitySender`,
+`foreignRoutesToCitySender` (cpu/data/builtWonders.ts); GPU
+`_seat_route_income`'s domestic leg (`_wond_dom_sender_sci`,
+`_wond_dom_sender_faith`), `_foreign_routes_ending_at` (gpu/core/sim_seats.py,
+gpu/core/sim_economy.py).
+
+- EFFECT_ADJUST_TRADE_ROUTE_YIELD_TO_OTHERS (factory 0xc2a710, creation
+  0xc01e10): its parser 0xb90780 reads Amount (+0xc), YieldType (+8) and
+  Domestic (+0x10, false where the row has none). Its city apply 0xb90f60
+  adds the Amount into the city trade's (+0x1ee0) row at +8 where Domestic
+  (0x1f8ec0), at +0x28 where not (0x1f8e80).
+- 0x54c6c0, the route's ORIGIN yields, per yield: where the two cities'
+  owners are equal (0x54ccbf) the leg from 0x54ccca adds the DESTINATION's
+  +8 row (0x1f96a0 at 0x54cec9); where they differ (0x54d376) the
+  destination's +0x28 row (0x1f9650 at 0x54d572), the row "C-94:
+  Sovereignty's route yield" reads. So SANKORE_TRADE_DOMESTIC_SCIENCE (2) and
+  SANKORE_TRADE_DOMESTIC_FAITH (1), Domestic true, pay a DOMESTIC route's
+  origin, and SANKORE_TRADE_OFFER_SCIENCE / _GOLD (1 each) a foreign route's.
+- EFFECT_ADJUST_TRADE_ROUTE_YIELD_FROM_OTHERS (factory 0xc2a590, creation
+  0xb62390): its parser 0xb79ac0 reads Amount and YieldType alone, no
+  Domestic; its apply 0xbb36a0 adds into the city trade's +0x48 row
+  (0x1f8e40). 0x54b130, the route's DESTINATION yields, reads that row of
+  the destination (0x1f9600 at 0x54b602) only where the two owners differ
+  (0x54b405): SANKORE_TRADE_GAIN_SCIENCE pays the city +2 Science per other
+  player's route in, none on a domestic one.
+- The description's "+2 Science for every Trade Route to this city. Domestic
+  Trade Routes give an additional +1 Faith to this city" is loose.
+- Confirmed (the route value K, 0x5e9b20, whose domestic leg sums both
+  ends): runs/h1_duels1153 China, Longxi's Sankore complete in China's t142
+  turn: its domestic route to Longxi 3 Food, 1 Production, 2 Science and 1
+  Faith, K 10.71 on the turns of China's faith boost (t142-144, t148-150)
+  and Zanzibar's 10.68 on the rest, one Food more at t151 (Longxi's Theater,
+  12.00 / 12.25), one Production at t161 (its Encampment, 13.45 / 13.70), as
+  logged through t236; runs/h1_duels1132 Xi'an's Sankore t98: China's route
+  to it 3 Food, 3 Production, 2 Science, 1 Faith, K 12.12 t98-100 as logged.
+- Open: no recording runs a domestic route to a Sankore city, so the origin
+  city's own yields under the rows are confirmed by the K alone.
+
+## C-98 / C-95: a completed district's road, a wonder's from its placement — READ (0x1e8790, 0x180450 at 0x180524, 0x176210 at 0x176299, 0x3630b0 at 0x36338c, 0x511700), both twins
+
+`districtRoad` (cpu/core/eras.ts) at `completeQueueItem`'s district
+(cpu/core/production.ts), `placeSeatWonder` (cpu/core/phase.ts), a
+city-state's district (`minorFinish`, cpu/core/minorBuild.ts) and the
+replay's imposed wonder placement (cpu/harness/replay.ts); GPU
+`_district_road` (gpu/core/sim_seats.py) at `_district_completed`
+(gpu/core/sim_phase.py), `_queue_wonder_at` and `_minor_finish`
+(gpu/core/sim_minors.py).
+
+- 0x1e8790 (a district): its plot (0x24b530) and owner (0x24b4b0), the
+  owner's best route on the plot (0x512120); where the plot admits it
+  (0x511700: not water, a route asking one there already none on a bare
+  plot, and no route of a greater PlacementValue standing) it is placed
+  (0x513120). Its callers: a city's founding (0x1eae70) and the new
+  district's completion 0x180450 (at 0x180524).
+- 0x176210 (the build queue, a district type, a plot, a percent) sets the
+  district on its plot (0x181700) and, at 100 percent or more (0x17628a),
+  completes it at once (0x180450 at 0x176299). The wonder's placement
+  0x3630b0 (from 0x180cb0 at 0x180eef) zones the wonder's district on the
+  building's plot at 100 (r9d 0x64 at 0x363384): a wonder's plot carries its
+  owner's road from the turn the wonder is set on it, a district's from its
+  completion. A repair (0x175140's arm on a district standing complete)
+  takes neither.
+- The trade path's step cost (0x558970) reads the plot's route byte +0x47
+  whatever stands on it, so these roads are its +50.
+- Confirmed: runs/h1_duels1152 t182, China sets the Statue of Zeus on 34:6
+  before its turn opens (DistrictAddedToMap, type DISTRICT_WONDER, row
+  65321), the plot's route 3 in record 183 two turns before Vilnius's
+  Trader reaches it; Vilnius's route to Guangzhou begun that turn (row
+  65506) walks 37:6, 36:6, 35:6, 34:6, 33:6, 32:6, 900 on the step costs
+  with the road (200, 150, 150, 300, 100) as the six-step course over
+  36:7..32:7 is, the straight one first in the open list; without it 950
+  against 900 and the other course. The plots' routes in the records:
+  China's Pyramids on 32:7 route 1 in record 39 with the placement (complete
+  t49), its Campus on 35:6 placed t141 and routed in record 152, its
+  Aerodrome on 33:7 placed t170 and routed in record 176, Vilnius's Theater
+  on 35:7 placed t74 and routed in record 78.
+- Open: 0x512120's owned-tile and tech rules are `bestRoadTier`'s as "C-95:
+  the roads' type per plot" ports them.

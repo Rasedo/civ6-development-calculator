@@ -678,8 +678,8 @@ def main() -> None:
         assert float(s15._seat_route_income(0)[0, 0, 2]) - g0 == 4.0, "a far bonus resource paid"
     print("  Great Zimbabwe OK (+2 per owned bonus resource within 3, per route)")
 
-    # Sankore: the dest wonder pays the SENDER, and the city reads its
-    # incoming routes in the walk
+    # Sankore: the dest wonder pays the foreign SENDER and a domestic route's
+    # origin, and the city reads the foreign routes in in the walk
     s16 = settle_all(BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64))
     assert s16.n_majors >= 2
     cap0, cap1 = int(s16.city_id[0, 0, 0]), int(s16.city_id[0, 1, 0])
@@ -687,8 +687,7 @@ def main() -> None:
     s16.city_wonder[0, 0, 0, sk_wi] = wt16
     s16.built_wonder_complete[0, wt16] = True
     s16._eff_version += 1
-    a0, d0 = s16._routes_ending_at(0)
-    base_all, base_dom = int(a0[0, 0]), int(d0[0, 0])
+    base_in = int(s16._foreign_routes_ending_at(0)[0, 0])
     tot_a, _, _, _ = city_totals(s16, 0)
     sci_a, fai_a = float(tot_a[0, 0, 3]), float(tot_a[0, 0, 5])
     s16.seat_routes[0, 1, 0, 0] = cap1
@@ -698,11 +697,11 @@ def main() -> None:
     s16.seat_routes[0, 0, 0, 0] = cap0
     s16.seat_routes[0, 0, 0, 1] = cap0
     s16._eff_version += 1
-    a1, d1 = s16._routes_ending_at(0)
-    assert int(a1[0, 0]) - base_all == 2 and int(d1[0, 0]) - base_dom == 1, \
-        f"incoming counts read {int(a1[0, 0])}/{int(d1[0, 0])}"
-    # the walk: +2 sci per incoming (x2), +1 faith on the domestic one — the
-    # amenity tier scales the columns, so band the deltas like the TS tests
+    in1 = int(s16._foreign_routes_ending_at(0)[0, 0])
+    assert in1 - base_in == 1, f"the foreign routes in read {in1}"
+    # the walk: +2 sci on the foreign route in, +2 sci +1 faith on the
+    # domestic one at its origin (the same city here) — the amenity tier
+    # scales the columns, so band the deltas like the TS tests
     tot_b, _, _, _ = city_totals(s16, 0)
     dsci = float(tot_b[0, 0, 3]) - sci_a
     dfai = float(tot_b[0, 0, 5]) - fai_a
@@ -716,7 +715,7 @@ def main() -> None:
     inc_n = s16._seat_route_income(1)
     assert sci_w - float(inc_n[0, 0, 3]) == 1.0, "the sender science did not ride the dest wonder"
     assert gold_w - float(inc_n[0, 0, 2]) == 1.0, "the sender gold did not ride the dest wonder"
-    print("  Sankore OK (incoming x2 sci + domestic faith in the walk; sender +1/+1 on the intl leg)")
+    print("  Sankore OK (foreign route in +2 sci, domestic origin +2 sci +1 faith; sender +1/+1 on the intl leg)")
 
     print("trade2_test OK — intl District_TradeRouteYields (centre 3 gold, Harbor +3 gold, Campus +1 science), war-cancel with Trader return, "
           "round-trip expiry, the walk, candidate/apply spend, "

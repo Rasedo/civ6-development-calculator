@@ -41,7 +41,7 @@ import { applyTrainingGrants, centreStrength } from './combat';
 import { districtPillagedIn, headLetGo, keepItem, resumeItem } from './production';
 import { districtScaledBase, formationCivicIn, goldAffordable, projectCost, repairAvailable } from './game';
 import { civEraIndex, computeCityStats, extractionChanged, rebuildLuxuries, withPercent256 } from './city';
-import { upgradeRoads } from './eras';
+import { districtRoad, upgradeRoads } from './eras';
 import { researchCost, selectResearch } from './economy';
 import { CP_ACCEPTED, CP_CANCELLED, CP_COMPLETED, CP_FAILED, CP_IN_PROGRESS, contractById, newContractBook } from './aiContracts';
 import { researchAnalysis, researchCompletionChoice, researchUnitTurns, researchDraw, researchTurnChoice, researchInHandLeft, type ResearchChoice, type TechContract } from './aiResearch';
@@ -2500,9 +2500,13 @@ function minorFinish(state: GameState, cityState: CityState, item: Exclude<Minor
       minorSetItem(state, cityState, null);
       return false;
     }
+    const stood = !!state.map.tiles[item.site].districtComplete;
     minorPlaceDistrict(state, cityState, item.district, item.site);
     const t = state.map.tiles[item.site];
     t.districtComplete = true;
+    // a new district's completion lays its road (`districtRoad`), a repair
+    // none
+    if (!stood) districtRoad(state, cityState.seat, t);
     // a repair stands the district unpillaged; its pillaged buildings wait
     // for their own repairs (`minorRepairTarget`)
     t.districtPillaged = false;

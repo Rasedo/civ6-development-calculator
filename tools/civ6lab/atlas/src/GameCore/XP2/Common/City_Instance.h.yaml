@@ -77,6 +77,16 @@
   context:
     - "...UNITS_PRODUCTION, registered 0xc1e610, its arguments' object vt 0xdf78a8, apply +0x60 0xb7e0d0): per Units row whose FormationClass (+0xa0, 0xadd5e0) is not the civilian one (2) and..."
   review: reviewed
+- addr: 0xbb36a0
+  final: 0x876620
+  kind: function
+  semantics: "EFFECT_ADJUST_TRADE_ROUTE_YIELD_FROM_OTHERS's city apply: adds the Amount into the city trade's (+0x1e88 -> its trade) from-others row +0x48 (0x1f8e40)."
+  status: PARTLY
+  readings:
+    - "C-98 / C-127: the University of Sankore's route yields — READ (0xb90780, 0xb90f60, 0x54c6c0 at 0x54ccbf..0x54cec9, 0xb79ac0, 0x54b130 at 0x54b405..0x54b602), both twins"
+  context:
+    - "...0xb62390): its parser 0xb79ac0 reads Amount and YieldType alone, no Domestic; its apply 0xbb36a0 adds into the city trade's +0x48 row (0x1f8e40). 0x54b130, the route's DESTINATION yiel..."
+  review: reviewed
 - addr: 0xbb9de0
   kind: function
   name: EFFECT_ADJUST_VALID_FEATURES_DISTRICTS

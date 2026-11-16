@@ -1543,6 +1543,18 @@ class SimSeats:
         self.road[rows, tiles] = True
         self.road_tier[rows, tiles] = self._row_road_tier(row)[rows]
 
+    def _district_road(self, rows: torch.Tensor, tiles: torch.Tensor, row: int) -> None:
+        """`districtRoad`: a district completed on plots `tiles` of games
+        `rows` carries row `row`'s best road (0x180450 at 0x180524 ->
+        0x1e8790), on land and where no route of a greater PlacementValue
+        stands (0x511700); a wonder's plot from its placement, its
+        DISTRICT_WONDER zoned complete (0x3630b0 -> 0x176210 -> 0x180450)"""
+        tier = self._row_road_tier(row)[rows]
+        ok = ~self.water[rows, tiles] & ~self.railroad[rows, tiles] \
+            & ~(self.road[rows, tiles] & (self.road_tier[rows, tiles] > tier))
+        if bool(ok.count_nonzero()):
+            self._lay_road(rows[ok], tiles[ok], row)
+
     def _upgrade_all_roads(self) -> None:
         """`upgradeAllRoads` at the turn's change: each player whose era
         brought a new road (`_row_road_tier` above the tier it last gave)
@@ -9996,6 +10008,14 @@ class SimSeats:
             _sl = self._governor_sum(row, "routeStartFood")
             if bool(_sl.count_nonzero()):
                 _rk_add(0, _sl.gather(1, dest_j) * pd)
+        # CIV6 (University of Sankore, SANKORE_TRADE_DOMESTIC_SCIENCE and
+        # SANKORE_TRADE_DOMESTIC_FAITH, ..._YIELD_TO_OTHERS, Domestic true):
+        # the DESTINATION's wonder pays a domestic route's origin
+        _cw_d = self._completed_wonders(row)
+        if _cw_d is not None and bool(_cw_d.count_nonzero()):
+            _cwd = _cw_d.double()
+            _rk_add(3, (_cwd @ self._wond_dom_sender_sci).gather(1, dest_j) * pd)
+            _rk_add(5, (_cwd @ self._wond_dom_sender_faith).gather(1, dest_j) * pd)
         # CIV6 (Isolationism): "Domestic routes provide +2 Food, +2
         # Production."
         _dr = self._gov_mods(row)[12]["domroute"].double()
@@ -10465,18 +10485,15 @@ class SimSeats:
         self._seat_route_cache = (key, inc)
         return inc
 
-    def _routes_ending_at(self, row: int) -> tuple[torch.Tensor, torch.Tensor]:
-        """([B, RC], [B, RC]) long — every live route ENDING at each of this
-        row's cities (any sender, a city-state's included), and the row's own DOMESTIC ones among
-        them. Endpoints resolve by persistent id among living cities, the
-        way `_seat_route_income` resolves its own."""
+    def _foreign_routes_ending_at(self, row: int) -> torch.Tensor:
+        """[B, RC] long — every live route of another player ENDING at each
+        of this row's cities (a city-state's included). Endpoints resolve by
+        persistent id among living cities, the way `_seat_route_income`
+        resolves its own."""
         cols = self.RC
         ids = self.city_id[:, row, :cols]
         alive = self.city_alive[:, row, :cols]
-        rr = self.seat_routes[:, row]
-        dom = (((rr[:, :, 0] >= 0) & (rr[:, :, 1] >= 0)).unsqueeze(2)
-               & (rr[:, :, 1].unsqueeze(2) == ids.unsqueeze(1))).sum(dim=1)
-        allc = dom.clone()
+        allc = torch.zeros_like(ids)
         for r2 in range(self.NS):
             if r2 == row:
                 continue
@@ -10484,8 +10501,7 @@ class SimSeats:
                     & (self.seat_route_dseat[:, r2] == row)).unsqueeze(2)
                    & (self.seat_route_dcity[:, r2].unsqueeze(2) == ids.unsqueeze(1)))
             allc = allc + hit.sum(dim=1)
-        z = torch.zeros_like(dom)
-        return torch.where(alive, allc, z), torch.where(alive, dom, z)
+        return torch.where(alive, allc, torch.zeros_like(allc))
 
     def _any_district_pillaged(self) -> bool:
         """Does any plot of any game carry a pillaged district — read once

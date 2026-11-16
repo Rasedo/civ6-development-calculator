@@ -2072,8 +2072,9 @@ class SimInit:
                 [[list(g) for g in w["grantUnits"]] + [[-1, 0]] * (_gk - len(w["grantUnits"])) for w in self._wond_rows],
                 dtype=torch.long, device=device)
             self._wond_bonusres_gold = torch.tensor([float(w["bonusResRouteGold"]) for w in self._wond_rows], dtype=torch.float64, device=device)  # [nW] gold per bonus resource on outgoing routes
-            self._wond_routes_sci = torch.tensor([float(w["routesToSci"]) for w in self._wond_rows], dtype=torch.float64, device=device)  # [nW] science per route TO the city
-            self._wond_routes_faithdom = torch.tensor([float(w["routesToFaithDom"]) for w in self._wond_rows], dtype=torch.float64, device=device)  # [nW] faith per own DOMESTIC route to it
+            self._wond_routes_sci = torch.tensor([float(w["routesToSci"]) for w in self._wond_rows], dtype=torch.float64, device=device)  # [nW] science per other player's route TO the city
+            self._wond_dom_sender_sci = torch.tensor([float(w["routesToDomSenderSci"]) for w in self._wond_rows], dtype=torch.float64, device=device)  # [nW] a DOMESTIC route's origin science
+            self._wond_dom_sender_faith = torch.tensor([float(w["routesToDomSenderFaith"]) for w in self._wond_rows], dtype=torch.float64, device=device)  # [nW] ...and faith
             self._wond_sender_sci = torch.tensor([float(w["routesToSenderSci"]) for w in self._wond_rows], dtype=torch.float64, device=device)  # [nW] the foreign SENDER's science
             self._wond_sender_gold = torch.tensor([float(w["routesToSenderGold"]) for w in self._wond_rows], dtype=torch.float64, device=device)  # [nW] ...and gold
             self._wond_grant_prophet = torch.tensor([bool(w["grantProphet"]) for w in self._wond_rows], dtype=torch.bool, device=device)

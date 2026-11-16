@@ -10530,6 +10530,17 @@
     - ...s HEAVYCHARIOT / LIGHTCHARIOT_FASTER_CLEAR_TERRAIN; the effect 0xc0a3a0, its unit apply 0xb76b20 adding Amount to the block 0x9034b0 of unit +0x18c8, field +4); GetMaxMoves (0x56e130)...
     - ...pu/core/sim_economy.py). EFFECT_ADJUST_UNIT_CLEAR_TERRAIN_START_MOVEMENT (0xc0a3a0, apply 0xb76b20 into 0x9034b0 of +0x18c8, +4); GetMaxMoves 0x56e130 adds +0x1924 where the plot's vt +0x1...
   review: reviewed
+- addr: 0xb79ac0
+  final: 0x88c5f0
+  kind: function
+  semantics: "EFFECT_ADJUST_TRADE_ROUTE_YIELD_FROM_OTHERS's parser: Amount (+0xc) and YieldType (+8) alone; a Domestic argument is not read."
+  status: PARTLY
+  readings:
+    - "C-98 / C-127: the University of Sankore's route yields — READ (0xb90780, 0xb90f60, 0x54c6c0 at 0x54ccbf..0x54cec9, 0xb79ac0, 0x54b130 at 0x54b405..0x54b602), both twins"
+  context:
+    - "...ity of Sankore's route yields — READ (0xb90780, 0xb90f60, 0x54c6c0 at 0x54ccbf..0x54cec9, 0xb79ac0, 0x54b130 at 0x54b405..0x54b602), both twins"
+    - "..._ADJUST_TRADE_ROUTE_YIELD_FROM_OTHERS (factory 0xc2a590, creation 0xb62390): its parser 0xb79ac0 reads Amount and YieldType alone, no Domestic; its apply 0xbb36a0 adds into the city tr..."
+  review: reviewed
 - addr: 0xb7eee0
   kind: function
   name: NEW_WARMONGER
@@ -10598,6 +10609,27 @@
     - "- The first impression (MODIFIER_PLAYER_DIPLOMACY_RANDOM, init 0xb8edb0: RandomRange 3, DifficultyOffset 0): floor(v x (2R + 1) / 100) - R at the meeting (v..."
     - "- The first impression (MODIFIER_PLAYER_DIPLOMACY_RANDOM, init 0xb8edb0: R 3): floor(v × 7 / 100) − 3 at the meeting, −1 per 10 of the owner's starts from it..."
   review: reviewed
+- addr: 0xb90780
+  final: 0x8d5450
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-98 / C-127: the University of Sankore's route yields — READ (0xb90780, 0xb90f60, 0x54c6c0 at 0x54ccbf..0x54cec9, 0xb79ac0, 0x54b130 at 0x54b405..0x54b602), both twins"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "## C-98 / C-127: the University of Sankore's route yields — READ (0xb90780, 0xb90f60, 0x54c6c0 at 0x54ccbf..0x54cec9, 0xb79ac0, 0x54b130 at 0x54b405..0x54b602), bot..."
+    - "...CT_ADJUST_TRADE_ROUTE_YIELD_TO_OTHERS (factory 0xc2a710, creation 0xc01e10): its parser 0xb90780 reads Amount (+0xc), YieldType (+8) and Domestic (+0x10, false where the row has none)...."
+  review: imported
+- addr: 0xb90f60
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-98 / C-127: the University of Sankore's route yields — READ (0xb90780, 0xb90f60, 0x54c6c0 at 0x54ccbf..0x54cec9, 0xb79ac0, 0x54b130 at 0x54b405..0x54b602), both twins"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "## C-98 / C-127: the University of Sankore's route yields — READ (0xb90780, 0xb90f60, 0x54c6c0 at 0x54ccbf..0x54cec9, 0xb79ac0, 0x54b130 at 0x54b405..0x54b602), both twins"
+    - ...0xc), YieldType (+8) and Domestic (+0x10, false where the row has none). Its city apply 0xb90f60 adds the Amount into the city trade's (+0x1ee0) row at +8 where Domestic (0x1f8ec0),...
+  review: imported
 - addr: 0xb95b80
   final: 0x8e7150
   kind: function
@@ -10917,6 +10949,24 @@
     - "- EFFECT_ADJUST_PLAYER_TRADE_ROUTE_BY_CITY_STATE_BONUS_TYPE_MODIFIER (the factory 0xc27d10, the effect's vtable 0xdecb08: apply 0xb468d0 / remove 0xb47620) adds its Amount (WC_RE..."
     - "- EFFECT_ADJUST_PLAYER_TRADE_ROUTE_BY_CITY_STATE_BONUS_TYPE_MODIFIER (factory 0xc27d10, vtable 0xdecb08: 0xb468d0 / 0xb47620) adds Amount 100 into Congress's +0x4b8 by MinorC..."
   review: reviewed
+- addr: 0xc2a590
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-98 / C-127: the University of Sankore's route yields — READ (0xb90780, 0xb90f60, 0x54c6c0 at 0x54ccbf..0x54cec9, 0xb79ac0, 0x54b130 at 0x54b405..0x54b602), both twins"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "- EFFECT_ADJUST_TRADE_ROUTE_YIELD_FROM_OTHERS (factory 0xc2a590, creation 0xb62390): its parser 0xb79ac0 reads Amount and YieldType alone, no Domesti..."
+  review: imported
+- addr: 0xc2a710
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-98 / C-127: the University of Sankore's route yields — READ (0xb90780, 0xb90f60, 0x54c6c0 at 0x54ccbf..0x54cec9, 0xb79ac0, 0x54b130 at 0x54b405..0x54b602), both twins"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "- EFFECT_ADJUST_TRADE_ROUTE_YIELD_TO_OTHERS (factory 0xc2a710, creation 0xc01e10): its parser 0xb90780 reads Amount (+0xc), YieldType (+8) and Dome..."
+  review: imported
 - addr: 0xc2e490
   kind: function
   semantics: EFFECT_ADJUST_YIELD_BY_NUMBER_OF_RESOURCES' factory (instance vtable 0xdece90).

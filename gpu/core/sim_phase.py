@@ -2212,6 +2212,7 @@ class SimPhase:
         dr = made_d.nonzero(as_tuple=True)[0]
         dt = dtile[dr].clamp(min=0)
         self.district_complete[dr, dt] = True
+        self._district_road(dr, dt, row)
         _made = torch.zeros(self.B, dtype=torch.bool, device=self.device)
         _made[dr] = True
         _dtype = torch.full((self.B,), -1, dtype=torch.long, device=self.device)

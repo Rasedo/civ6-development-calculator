@@ -58,6 +58,22 @@
   context:
     - "...ings +0x159 bit 16), +0x15 its MaxWorldInstances (+0x40) reached by the world's copies (0x1e7b70); for a district its PrereqTech / PrereqCivic, +0x14 set): with the player and the co..."
   review: reviewed
+- addr: 0x1e8790
+  final: 0x142cc0
+  kind: function
+  semantics: "a district's road: its plot (0x24b530) and owner (0x24b4b0), the owner's best route on the plot (0x512120), placed (0x513120) where the plot admits it (0x511700). Called by the new district's completion (0x180450 at 0x180524) and a city's founding (0x1eae70)."
+  status: READ
+  cases:
+    - recording: h1_duels1152
+      turn: 182
+      value: China's Statue of Zeus set on 34:6 before its turn opens, the plot's route 3 in record 183; Vilnius's route to Guangzhou begun that turn walks 36:6, 35:6, 34:6, 33:6 at 900 on the step costs
+  impl: [cpu/core/eras.ts:districtRoad, gpu/core/sim_seats.py:_district_road]
+  readings:
+    - "C-98 / C-95: a completed district's road, a wonder's from its placement — READ (0x1e8790, 0x180450 at 0x180524, 0x176210 at 0x176299, 0x3630b0 at 0x36338c, 0x511700), both twins"
+  context:
+    - "## C-98 / C-95: a completed district's road, a wonder's from its placement — READ (0x1e8790, 0x180450 at 0x180524, 0x176210 at 0x176299, 0x3630b0 at 0x36338c, 0x511700), both twins"
+    - "- 0x1e8790 (a district): its plot (0x24b530) and owner (0x24b4b0), the owner's best route on the p..."
+  review: reviewed
 - addr: 0x1e8880
   kind: function
   name: TransferCity

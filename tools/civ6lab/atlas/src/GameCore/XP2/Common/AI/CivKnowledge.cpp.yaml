@@ -53,6 +53,7 @@
     - "C-96: the trade AI's route value — READ (0x5e9b20, 0x78f210, 0x78e010, 0x559140's use), PARTLY READ (0x526330's terms, the knowledge base's city order)"
     - "H-1: the trade record's player — READ (0x5ecb50, 0x787f50, 0x5e9b20's walk), PARTLY READ (the city-states' meetings with each other, the majors' weights)"
     - "C-108: every seat's Trader walks its route; a major's trade list and route value read the Free Cities' cities — READ (0x5f0280, 0x78f210, 0x5e9b20), both twins"
+    - "C-98 / C-127: the University of Sankore's route yields — READ (0xb90780, 0xb90f60, 0x54c6c0 at 0x54ccbf..0x54cec9, 0xb79ac0, 0x54b130 at 0x54b405..0x54b602), both twins"
   context:
     - "## C-96: the trade AI's route value — READ (0x5e9b20, 0x78f210, 0x78e010, 0x559140's use), PARTLY READ (0x526330's terms, the knowledge base's..."
     - "- THE ROUTE VALUE K (0x5e9b20, this = the knowledge base +0x680; called at the tail of the knowledge base's ageing 0x..."

@@ -16,7 +16,7 @@ import { GW_HOLDERS } from '../data/greatWorks';
 import { INDUSTRIAL_ERA_INDEX } from '../data/techs';
 import { ROAD_TIER_ERA, scaleByGameSpeed } from '../data/constants';
 import { hexDistance, tilesWithin } from '../../world/hex';
-import { naturalWonderAt } from '../../world/query';
+import { isWater, naturalWonderAt } from '../../world/query';
 import { isExplored } from './fog';
 import { isFloodplains } from '../../world/features';
 import { recordMoment, LARGEST_KEY, NEAR_WONDER_KEY, NEAR_FLOOD_KEY, NEAR_VOLCANO_KEY } from './moments';
@@ -254,6 +254,21 @@ export function layRoad(state: GameState, seat: number, t: Tile): void {
   const tier = seatRoadTier(state, seat);
   if (tier > 0) t.roadTier = tier;
   else delete t.roadTier;
+}
+
+/** a district completed on its plot carries its owner's best road (the
+ *  completion 0x180450 at 0x180524 -> 0x1e8790: 0x512120's route, placed by
+ *  0x513120 where 0x511700 admits it: land, and no route of a greater
+ *  PlacementValue there already). A wonder's plot is its DISTRICT_WONDER,
+ *  zoned complete as the wonder is set on it (0x3630b0 at 0x36338c ->
+ *  0x176210's 100 percent arm -> 0x180450): the road stands from the
+ *  placement (runs/h1_duels1152 t182: China's Statue of Zeus set on 34:6,
+ *  its road there as city-state 4's Trader takes 36:6, 35:6, 34:6, 33:6 to
+ *  Guangzhou that turn) */
+export function districtRoad(state: GameState, seat: number, t: Tile): void {
+  if (isWater(t) || t.railroad) return;
+  if (t.road && (t.roadTier ?? 0) > seatRoadTier(state, seat)) return;
+  layRoad(state, seat, t);
 }
 
 /** the roads' upgrade as a player's era brings a new one (Player_Trade's era

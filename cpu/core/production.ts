@@ -26,7 +26,7 @@ import { NUCLEAR_DEVICES } from '../data/nuclear';
 import { ALLIANCE_M2_MIL_PROD_PCT, ALLIANCE_MILITARY, CONGRESS_PROD_MULT, CULTURE_BOMB_RANGE, DED_FREE_INQUIRY, DED_MONUMENTALITY, DED_STEAM, DED_TO_ARMS, STEAM_WONDER_PROD_MULT, TO_ARMS_MIL_PROD_MULT, LOYALTY_MAX } from '../data/seats';
 import { ERAS, INDUSTRIAL_ERA_INDEX, TECHS, TECH_TABLE_RANK } from '../data/techs';
 import { CIVIC_TABLE_RANK } from '../data/civics';
-import { buildingDedications, canalMoment, dedicationEvent, goldenDedication, wonderMoment } from './eras';
+import { buildingDedications, canalMoment, dedicationEvent, districtRoad, goldenDedication, wonderMoment } from './eras';
 import { districtMoment } from './moments';
 import { spawnUnit, bestTrainableNaval, unitsHostile } from './units';
 import { grantFreeProphet } from './greatPeople';
@@ -554,6 +554,7 @@ export function completeQueueItem(
         break;
       }
       dt.districtComplete = true;
+      districtRoad(state, city.seat, dt);
       if (dt.district) questDistrictBuilt(state, city.seat, dt.district);
       // the type's own price takes the completed count afresh
       if (dt.district) refreshDistrictDiscount(state, city.seat, dt.district);

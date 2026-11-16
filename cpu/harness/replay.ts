@@ -71,7 +71,7 @@ import { MINOR_UPGRADE_GOLD, LEVY_TURNS } from '../data/cityStates';
 import { addCsTradeRoute, addIntlTradeRoute, addTradeRoute, minorRouteTo, plunderTrader, routeDestCenter, routeOriginCenter } from '../core/trade';
 import { minorRouteCandidate } from '../core/aiTrade';
 import { questCampCleared, questRouteStarted, questUnitAdded } from '../core/quests';
-import { commitDedications, goodyMoment, layRoad, pantheonMoment, religionMoment, unitKillEvent, bestRoadTier } from '../core/eras';
+import { commitDedications, districtRoad, goodyMoment, layRoad, pantheonMoment, religionMoment, unitKillEvent, bestRoadTier } from '../core/eras';
 import { cityStateSight, initFog, revealAround, takeLook, unitLook, unitSeesThrough, unitSight } from '../core/fog';
 import { holdFavor, seatFavor } from '../core/seatTurn';
 import { displaceAirFrom, isAirUnit } from '../core/air';
@@ -3192,6 +3192,7 @@ function placeHead(ctx: Ctx, actor: Seat, city: City, q: QueueItem): boolean {
       t.builtWonder = q.wonder;
       t.builtWonderComplete = false;
       paveGround(state, t, BUILT_WONDERS[q.wonder]?.placement.onFeature);
+      districtRoad(state, seat, t);
       if (!city.wonders.some((w) => w.id === q.wonder)) city.wonders.push({ id: q.wonder, tileIndex: q.tileIndex });
       // set on its plot, the city's citizens re-placed (0x180cb0)
       replaceAllCitizens(state, city, cityFlags(city));

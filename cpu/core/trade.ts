@@ -294,6 +294,26 @@ function wonderRouteSenderYields(state: GameState, dest: City): { science: numbe
   return { science, gold };
 }
 
+/** CIV6 (University of Sankore, SANKORE_TRADE_DOMESTIC_SCIENCE and
+ *  SANKORE_TRADE_DOMESTIC_FAITH, ..._YIELD_TO_OTHERS, Domestic true): the
+ *  DESTINATION's wonder pays a domestic route's ORIGIN +2 Science and +1
+ *  Faith (runs/h1_duels1153 China: the route value K over a route to Longxi,
+ *  3 Food, 1 Production, 2 Science and 1 Faith from t142, 10.71 on the turns
+ *  of China's faith boost, as logged) */
+function wonderRouteDomesticSenderYields(state: GameState, dest: City): { science: number; faith: number } {
+  let science = 0;
+  let faith = 0;
+  for (const w of dest.wonders ?? []) {
+    if (!state.map.tiles[w.tileIndex].builtWonderComplete) continue;
+    const fx = BUILT_WONDERS[w.id]?.effects?.domesticRoutesToCitySender;
+    if (fx) {
+      science += fx.science;
+      faith += fx.faith;
+    }
+  }
+  return { science, faith };
+}
+
 /** TRADE_ROUTE_TURN_DURATION_BASE through the game speed (0x5254d0): a
  *  route's minimum term before its era's (`tradeRouteMinDuration`) */
 export const TRADE_ROUTE_DURATION = srcConst('trade.routeDuration', scaleByGameSpeed(20), {
@@ -1138,6 +1158,9 @@ export function routeOriginYields(state: GameState, city: City, route: TradeRout
     // Food to their starting city" — the DESTINATION's governor pays the
     // ORIGIN, which is the city this walk is computing.
     out.food += governorSum(state, dest, (e) => e.routeStartFood);
+    const snd = wonderRouteDomesticSenderYields(state, dest);
+    out.science += snd.science;
+    out.faith += snd.faith;
     const relT = seatOf(state, seat)!.religion;
     if (relT?.founded && relT.enhancer && dest.followedReligion === seat) {
       const tr = ENHANCER_BELIEFS[relT.enhancer]?.effects.tradeReligionYields;

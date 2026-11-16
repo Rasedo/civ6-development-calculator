@@ -2718,11 +2718,16 @@ class SimMinors:
                 self._minor_set_item(s, gone, -1)
             place = m & ok
             if bool(place.any()):
-                self._minor_place_district(s, place, item, site)
                 rr = place.nonzero(as_tuple=True)[0]
+                stood = self.district_complete[rr, site[rr]]
+                self._minor_place_district(s, place, item, site)
                 dv = (item - self._mk_d0)[rr]
                 tt = site[rr]
                 self.district_complete[rr, tt] = True
+                # a new district's completion lays its road
+                # (`_district_road`), a repair none
+                if bool((~stood).count_nonzero()):
+                    self._district_road(rr[~stood], tt[~stood], self._CITY_MINOR0 + s)
                 # a repair stands the district unpillaged; its pillaged
                 # buildings wait for their own repairs
                 self.district_pillaged[rr, tt] = False
@@ -3085,6 +3090,9 @@ class SimMinors:
         self.built_wonder[rows_w, bwt] = wi
         self.built_wonder_complete[rows_w, bwt] = False
         self._pave_plot(rows_w, bwt, tuple(int(f) for f in wrow["onFeat"] if int(f) >= 0))
+        # its DISTRICT_WONDER stands complete from the placement, its road
+        # with it
+        self._district_road(rows_w, bwt, row)
         self.city_wonder[rows_w, row, j, wi] = bwt
         code_w = self.WONDER_BASE + wi
         # the wonder's PLOT lives in the `city_wonder` registry, which is keyed
