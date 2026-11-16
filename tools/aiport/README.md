@@ -71,9 +71,10 @@ turns before `<from>`.
     python tools/aiport/show.py 1154 122 --player 63 --what danger --plot 10:5
     python tools/aiport/show.py 1171 38 --city AKKAD              # queue at T and T+1, AI_CityBuild lines, logged value tables
     python tools/aiport/show.py 1171 38 --player 2                # events: every log row and record event of the turn
+    python tools/aiport/show.py 1190 97 --player 3 --what record   # the record's own fields of its cities and of the player, T -> T+1 where they differ
 
 `--what`: units, planning, targets, danger, kb, trees, contracts, ops,
-builds, research, events (several with commas). It reads the seed's
+builds, research, events, record (several with commas). It reads the seed's
 `.aimem.jsonl` (sites tactical / log / endlook), `.aiunits.jsonl` (start /
 tactical / tacpass / log / endlook), record T and T+1 and the logs' sqlite
 (`logstore.py`); values in 24.8 fixed point are printed divided. Each

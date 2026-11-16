@@ -195,12 +195,16 @@
     - cpu/data/cityStates.ts:KANDY_WONDER_RELICS
     - cpu/data/seats.ts:MOMENT_CIRCUMNAVIGATED
     - cpu/core/fog.ts:suzerainSight
+    - cpu/core/boosts.ts:stateTrigger
+    - gpu/core/sim_masks.py:_boost_triggers
+    - cpu/core/boosts.ts:s
   readings:
     - "H-1: a drought on a city centre, Monumentality's districts, Kandy's wonder Relic — PARTLY READ"
     - "H-1: a pillaged building's specialist, the centre's defence, three moments — READ"
     - "C-95: Explore Land and the barbarians' revealed plots — READ, ported (two tests below unread)"
     - "C-96: the city-states' tactical pass — READ (Wander Near City, Heal, the non-barbarian priorities, FindAlternateLocation), the families it needs PARTLY READ"
     - "C-119: the revealed plots against the records' planes — an embassy reveals the capital, a new suzerain's reveal meets, a sight raised looks again — READ (0x238330 -> 0x3e6820 -> 0x508bd0 -> 0x507c00 -> 0x508d50, 0x508330 -> 0x50d390, 0x56ce90 -> 0x58f3f0), both twins; the replay's steps and added units"
+    - "C-98: a park unit's value and a city-state's natural wonder — READ (0x620110 at 0x620ef6, 0x32fdb0, 0x3302f0, 0x7b62c0 at 0x7b6991 and 0x7b7456; 0x50d390 at 0x50d808), both twins"
   context:
     - "...Kandy's MINOR_CIV_KANDY_GRANT_RELIC_BONUS, Amount 1): the visibility manager's reveal 0x50d390 (Player_Visibility_Manager.cpp, the natural-wonder discovery notification), for i below..."
     - "- WORLD_CIRCUMNAVIGATED: on a plot revealed (0x50d390, the visibility manager), a player without the flag (+0x8a8) whose team has revealed a..."

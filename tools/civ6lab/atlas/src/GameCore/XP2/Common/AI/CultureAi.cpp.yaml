@@ -58,6 +58,7 @@
     - cpu/core/minorBuild.ts:minorResearchTurn
     - cpu/core/types.ts:ResearchState
     - cpu/core/aiPolicyValue.ts:governmentValues
+    - cpu/core/aiParks.ts:aiParkUnits
   readings:
     - "H-1: the civics AI — READ (the choice, the walk, the propagation), PARTLY READ (the value)"
     - "C-97: the government and policy choice — the choice READ, the values PARTLY READ"
@@ -66,6 +67,7 @@
     - "C-130: the city update's Default Specialization on an empty queue, before the civics AI's turn; the dig sites a major's civic lays before the minors' turns — READ (0x5ce8f0, 0x6096c0's +0x370 list, CultureAI +0x208), both twins"
     - "C-96 / C-130 / C-127 / C-100: a building's modifier-made yields, the walls' threat terms and CanConstruct's walls prerequisite, a regional building's cities, the game state's lock and the yields the AI's jobs read, a city tree's priority — READ (0x18e570's tables, 0x7a7590 at 0x7a826c..0x7a87f3 and 0x7a9044..0x7a91ee, 0x170450 at 0x170644..0x170716, 0x7a4d40 at 0x7a5182..0x7a51d9, 0x608870 at 0x60889e..0x6089e6, 0x1cb8b0, 0x7cb230), both twins"
     - "C-130: the pillage analyzers, the Favor grant's and the extra accumulation's analyzers, CITY_HAS_DISTRICT's evaluator, the Luxury Policy's players — READ (0x6b7ec0, 0x6b92c0, 0x6c2f90, 0x6ae390, 0x6d3d50), both twins"
+    - "C-98: a park unit's value and a city-state's natural wonder — READ (0x620110 at 0x620ef6, 0x32fdb0, 0x3302f0, 0x7b62c0 at 0x7b6991 and 0x7b7456; 0x50d390 at 0x50d808), both twins"
   context:
     - "- THE PROPAGATION, 0x61ee30 (the turn 0x620110's first step, on each entry): a row in reach scores its own value and its prerequisites..."
     - "- WHEN: the AI's turn (0x620110) chooses with key -1 only where nothing is in hand (0x399a90 = -1). A COMPLETION fires..."
@@ -173,25 +175,31 @@
     - recording: h1_duelv1121
       turn: 4
       value: "A DEFENDER   takes its own plot alone as an Attack Units spot (0x776140) and goes in   only before another unit among the strikers (0x775340): runs/h1_duelv1121   t4, city-state 4's Warrior 131073 (it"
+  impl: [cpu/core/aiValue.ts:AiValueView]
   readings:
     - "C-96: the standing army and the Combat Desire's city terms — READ (0x5ca7e0, the watched setter 0x731d10, 0x79b9c0), the unit table's orientation READ"
+    - "C-98: a park unit's value and a city-state's natural wonder — READ (0x620110 at 0x620ef6, 0x32fdb0, 0x3302f0, 0x7b62c0 at 0x7b6991 and 0x7b7456; 0x50d390 at 0x50d808), both twins"
   context:
     - "...city (+0x11d0 == city +0xf8) — one with +0xf30 above 0 that the player's +0x1278 holds (0x623910 >= 0) released (COMBAT 3, home -1); the weakest (0x5c4910: the first of the lowest Co..."
   review: imported
 - addr: 0x6239a0
   final: 0x416540
   kind: function
-  semantics: the culture AI's count off its vector +0x680..+0x688 (0 where it is empty), which the unit value multiplies by ParkCharges as PSEUDOYIELD_TOURISM; 0 at a city-state and the Free Cities.
-  status: PARTLY
+  semantics: the Tourism (0x3302f0) of the first entry of the culture AI's park list (+0x680), 0 where it is empty; the unit value multiplies it by ParkCharges as PSEUDOYIELD_TOURISM
+  status: READ
   cases:
-    - recording: h1_duelv1121
-      value: "every valid minor Naturalist row of the five verbose duels 0.00 (1121: 151 of 151 as logged)"
+    - recording: h1_duels1161
+      turn: 242
+      value: "city-state 3 t242-248: Conservation 408.453 / 412.148 / 416.262 / 416.453 / 421.336 / 417.461 for the game's 408.5 / 412.1 / 416.3 / 416.5 / 421.3 / 417.5, the park site's two Amenities in Geneva from T to H"
   impl:
     - cpu/core/aiCityBuild.ts:unitValue
+    - cpu/core/aiParks.ts:aiParkSite
     - gpu/core/sim_cityvalue.py:_cv_unit
     - cpu/core/aiCityBuild.ts:v
+    - cpu/core/aiValue.ts:parkSite
   readings:
     - "C-98: a religious unit's value at the city-states — READ (0x7b62c0's religious branch, CanTrain's religion and inquisition refusals), both twins"
+    - "C-98: a park unit's value and a city-state's natural wonder — READ (0x620110 at 0x620ef6, 0x32fdb0, 0x3302f0, 0x7b62c0 at 0x7b6991 and 0x7b7456; 0x50d390 at 0x50d808), both twins"
   review: reviewed
 - addr: 0x623b30
   final: 0x4165a0

@@ -20205,3 +20205,60 @@ cpu/export/planes.ts; GPU `_soil_mine` in gpu/core/sim_orders.py,
   39 back); h1_duels1141 t206: player 1's embarked Infantry 5767188 on
   27:18 beside its Great Admiral holds 7 Movement, its 55 in the barbarians'
   map seven plots out.
+
+## C-98: a park unit's value and a city-state's natural wonder — READ (0x620110 at 0x620ef6, 0x32fdb0, 0x3302f0, 0x7b62c0 at 0x7b6991 and 0x7b7456; 0x50d390 at 0x50d808), both twins
+
+`aiParkSite` / `aiParkUnits` (`cpu/core/aiParks.ts`), `unitValue`
+(`cpu/core/aiCityBuild.ts`), `AiValueView.parkSite` / `.parkUnits`;
+`_cv_park_site`, `_cv_unit`, the facts' `park_site` / `park_units`
+(`gpu/core/sim_cityvalue.py`); `stateTrigger` (`cpu/core/boosts.ts`),
+`_boost_triggers` (`gpu/core/sim_masks.py`).
+
+- THE CULTURE AI'S PARK LIST (0x620110 at 0x620ef6, every player's turn):
+  Game_NationalParks 0x32fdb0 lists the parks the player could designate,
+  the culture AI keeps the list (+0x628, its vector +0x680) ordered by
+  Tourism (0x617c50 on 0x3302f0) and counts the player's units of a type
+  with ParkCharges (+0x6f8, the loop 0x621060..0x6211ff).
+- A SITE (0x32fdb0, over every plot in index order): the plot with its
+  NORTHWEST neighbour, its NORTHEAST neighbour and the NORTHWEST one's
+  NORTHEAST neighbour (the direction tables 0xeff670 / 0xeff688, entries 5
+  and 0), each passing 0x330720 — owned by the player, no improvement
+  (+0x44), no district (0x810d0), a mountain (terrain mask 0x4924), a
+  natural wonder (0x82e90) or of Appeal 2 or more (vt +0x28), in no park
+  (0x32f2b0) — the four of one city (their owning city ids equal,
+  0x32ffe5..0x330000) and not all impassable (0x330530, +0x3a bit 3). The
+  sites are sorted by their Appeal sum, the greatest first (0x32c770), and
+  kept one by one unless one already kept stands in its column two rows off
+  or within one plot (0x330100..0x330187): the first entry is the site of
+  the greatest Appeal sum.
+- ITS TOURISM (0x3302f0): the four plots' Appeal summed, times the owner's
+  park percent (player +0x1b24, where above 0) and Tourism percent
+  (PlayerCulture +0x1548 through 0x39b540), whole.
+- THE UNIT VALUE (0x7b62c0, PSEUDOYIELD_UNIT_RELIGIOUS): at 0x7b6991 the
+  first entry's Tourism (0x6239a0, 0 with no entry) times ParkCharges as
+  PSEUDOYIELD_TOURISM joins the religious sum. Past the present value
+  (0x7b7456, a unit with ParkCharges): the first entry's plot (0x623910),
+  its city (0x36f660), 0x79f7c0 of NATIONAL_PARK_AMENITIES_OWNING_CITY
+  (GlobalParameters +0x514) Amenities there from T to H; then 0x32f6b0 —
+  the player's other cities sorted by their distance to the plot, the first
+  NATIONAL_PARK_NUM_OTHER_AMENITY_CITIES (+0x51c) — 0x79f7c0 of one Amenity
+  each. With a park unit already held (+0x6f8 above 0) the whole is 0.
+- Confirmed, runs/h1_duels1161 city-state 3 (Geneva) t242-248: Conservation
+  408.453 / 412.148 / 416.262 / 416.453 / 421.336 / 417.461 / 424.7 for the
+  game's 408.5 / 412.1 / 416.3 / 416.5 / 421.3 / 417.5 / 424.7 (403.7 with
+  no site, its t240 / t241 rows), Cultural Heritage and Environmentalism
+  behind it as logged.
+- A NATURAL WONDER FOUND (0x50d390 at 0x50d808..0x50d880, the visibility
+  manager's reveal): a plot revealed to a player for the first time (the
+  caller's flag, its old revealed count 0) that holds a natural wonder the
+  player has not found (0x4681e0) marks it found (0x46bae0) and signals the
+  discovery — for every player, a city-state among them: BOOST_TRIGGER_
+  FIND_NATURAL_WONDER is a city-state's on its revealed plots
+  (`CityState.revealed`, `mops_revealed`). Confirmed, runs/h1_duels1189
+  t13: city-state 3's Scout on 35:15 reveals Mount Kilimanjaro,
+  TechBoostTriggered for Astrology and its completion at 24 of 25 in the
+  move; the completion's choice takes Mining toward Iron Working (451.1
+  over Writing's 441.3), Animal Husbandry toward Horseback Riding the turn
+  after, as recorded. runs/h1_duels1144 t11 / t12 city-state 2 the same.
+- Open: runs/h1_duels1161 t249 Conservation 429.121 for the game's 429.0
+  (C-98).

@@ -2,7 +2,7 @@ import { dedicationEvent, goldenBoostBonus } from './eras';
 import { seatOf, citiesOf, tileSeat, allianceLevelWith, isCiv, hiddenResourcesFor, isCityStateSeat } from './seats';
 import { minorCity } from './cityStates';
 import { DED_FREE_INQUIRY, DED_PEN_BRUSH_AND_VOICE } from '../data/seats';
-import type { GameState, ResearchState, Seat, Tile } from './types';
+import type { CityState, GameState, ResearchState, Seat, Tile } from './types';
 import { isExplored } from './fog';
 import { BOOSTLESS, BOOSTS, type BoostDef } from '../data/boosts';
 import { getModifiers, seatGovernment } from './effects';
@@ -213,11 +213,16 @@ function stateTrigger(state: GameState, seat: number, b: BoostDef): boolean {
     case 'SETTLE_COAST':
       return boostCities(state, seat).some((c) => isCoastalLand(state.map, state.map.tiles[c.centerIndex]));
     case 'FIND_NATURAL_WONDER':
-      // a natural wonder plot the seat has revealed (runs/h1_duelw1115 Rome's
-      // inspiration at t4, owning no plot beside one); a city-state keeps no
-      // revealed plots and takes none (runs/h1_duelw1117-1128: no city-state's
-      // Astrology boosted)
-      if (isCityStateSeat(seat)) return false;
+      // a natural wonder plot the seat has revealed (the reveal 0x50d390 at
+      // 0x50d808: any player's first reveal of a natural wonder it has not
+      // found; runs/h1_duelw1115 Rome's inspiration at t4, owning no plot
+      // beside one), a city-state's among its revealed plots
+      // (`CityState.revealed`: runs/h1_duels1189 t13, city-state 3's Scout on
+      // 35:15 reveals Mount Kilimanjaro, Astrology boosted complete)
+      if (isCityStateSeat(seat)) {
+        const revealed = (s as unknown as CityState).revealed;
+        return !!revealed && state.map.tiles.some((t) => naturalWonderAt(t) !== null && revealed[t.index] === 1);
+      }
       return state.map.tiles.some((t) => naturalWonderAt(t) !== null && isExplored(state, seat, t.index));
     case 'OWN_X_UNITS_OF_TYPE':
       return ownUnits(state, seat, (t) => isUnitOf(t, b.unit!)) >= n;

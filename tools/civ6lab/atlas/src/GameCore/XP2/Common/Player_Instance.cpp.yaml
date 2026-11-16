@@ -139,6 +139,16 @@
     - ...es (+0x7c), ReligiousHealCharges (+0x74), nothing where the player's majority religion (0x4681c0 +0x1c0) is -1, then PSEUDOYIELD_TOURISM terms (ParkCharges +0x64, Units_XP2 tourism)...
     - "...or ReligiousHealCharges (+0x74) by the counts 0x4be880, 0 with no majority religion (0x4681c0 +0x1c0) — and PSEUDOYIELD_TOURISM terms (ParkCharges +0x64, Units_XP2 TourismBomb). ARC..."
   review: imported
+- addr: 0x4681e0
+  final: 0x2f8100
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-98: a park unit's value and a city-state's natural wonder — READ (0x620110 at 0x620ef6, 0x32fdb0, 0x3302f0, 0x7b62c0 at 0x7b6991 and 0x7b7456; 0x50d390 at 0x50d808), both twins"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...s flag, its old revealed count 0) that holds a natural wonder the player has not found (0x4681e0) marks it found (0x46bae0) and signals the discovery — for every player, a city-state a..."
+  review: imported
 - addr: 0x468220
   final: 0x2f8130
   kind: function

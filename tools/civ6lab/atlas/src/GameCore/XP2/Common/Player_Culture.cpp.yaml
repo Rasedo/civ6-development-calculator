@@ -391,6 +391,15 @@
   context:
     - "- An improvement (the lens 0x399e10 at 0x39a73c, the city 0x1aba40): its Improvement_Tourism row pays only with its PrereqT..."
   review: reviewed
+- addr: 0x39b540
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-98: a park unit's value and a city-state's natural wonder — READ (0x620110 at 0x620ef6, 0x32fdb0, 0x3302f0, 0x7b62c0 at 0x7b6991 and 0x7b7456; 0x50d390 at 0x50d808), both twins"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - ...cent (player +0x1b24, where above 0) and Tourism percent (PlayerCulture +0x1548 through 0x39b540), whole.
+  review: imported
 - addr: 0x39bee0
   final: 0x2805b0
   kind: function

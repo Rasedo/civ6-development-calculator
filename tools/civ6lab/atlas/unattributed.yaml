@@ -701,6 +701,7 @@
     - "C-133 / C-95 / C-134: the kept path's searches inside a queue run; the Trader target, the defending district and Pillage's own plot; the safe plot's unit at war that fights — READ (0x272aa0 at 0x272af9..0x272c76, 0x26ef40 at 0x26f123..0x26f162, 0x26e3a0, 0x782d0, 0x783980 at 0x7842df..0x7842eb / 0x784aec..0x784b36, 0x24c2f0, 0x774380 at 0x774481..0x7744a9, 0x716b90 at 0x716d53..0x716da1), FIT (the planning list's seen unit at war), both twins"
     - "C-129 / C-125 / C-95: the known cities by any district plot the look takes, their whole strike; the target list's revealed plots, its two district entries, its religious and neutral entries — READ (0x7877e0 at 0x7878a0..0x78796e / 0x787c38..0x787cac, 0x5f0280, 0x5f0490 -> 0x5eff10, 0x810d0, 0x81330, 0x783980 at 0x783e98..0x7842eb / 0x7843b8..0x7844f3 / 0x784f5c..0x785008 / 0x785271..0x78555d), FIT (a unit at peace takes no spot), both twins"
     - "C-95 / C-123: a tribe's raise takes a plot no district and no unit holds; a non-fighter is endangered alone on its plot; the barbarians' techs at their close — READ (0x144260 at 0x14427f..0x1442c2, 0x738f20 at 0x739659..0x739675, 0x14f530 in the replay's order), both twins"
+    - "C-98: a park unit's value and a city-state's natural wonder — READ (0x620110 at 0x620ef6, 0x32fdb0, 0x3302f0, 0x7b62c0 at 0x7b6991 and 0x7b7456; 0x50d390 at 0x50d808), both twins"
   context:
     - "...330); OtherDistrictAdjacent: the neighbour's owner (+0x1c) is the player, its district (0x810d0) is not InternalOnly (Districts +0xe1 bit 4 — the Wonder district), is complete (Dist..."
     - "...rovement (+0x44, read as none while pillaged, +0x4d bit 0) and, when the plot's district (0x810d0, the district at the plot's id) is complete (district +0xb08, Lua `District:IsComplete` 0..."
@@ -2420,6 +2421,16 @@
     - "- \"NameManager::GetUnitNamePart\" (0x328760) is called only through 0x327d50 / 0x327de0 from the behaviour tree — \"HL: Rock Band Mo..."
     - "- \"NameManager::GetUnitNamePart\" (0x328760, via 0x327d50 / 0x327de0): the AI's log names (\"HL: Rock Band Move\" 0x710f40, CITY_ASSA..."
   review: reviewed
+- addr: 0x32c770
+  final: 0x642c50
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-98: a park unit's value and a city-state's natural wonder — READ (0x620110 at 0x620ef6, 0x32fdb0, 0x3302f0, 0x7b62c0 at 0x7b6991 and 0x7b7456; 0x50d390 at 0x50d808), both twins"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - ...(0x330530, +0x3a bit 3). The sites are sorted by their Appeal sum, the greatest first (0x32c770), and kept one by one unless one already kept stands in its column two rows off or wi...
+  review: imported
 - addr: 0x32f250
   final: 0x2363e0
   kind: function
@@ -2430,6 +2441,80 @@
   context:
     - ...ete district's enemy unit refusal (+0x29) in the queue; the placement test's first set (0x32f250 / 0x3306f0, the National Parks'); the player's valid-feature counts (0x408ce0 / 0x408f4...
   review: imported
+- addr: 0x32f2b0
+  final: 0x2362c0
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-98: a park unit's value and a city-state's natural wonder — READ (0x620110 at 0x620ef6, 0x32fdb0, 0x3302f0, 0x7b62c0 at 0x7b6991 and 0x7b7456; 0x50d390 at 0x50d808), both twins"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...sk 0x4924), a natural wonder (0x82e90) or of Appeal 2 or more (vt +0x28), in no park (0x32f2b0) — the four of one city (their owning city ids equal, 0x32ffe5..0x330000) and not all i..."
+  review: imported
+- addr: 0x32f6b0
+  kind: function
+  semantics: "the player's other cities a park at a plot pays an Amenity (manager, player, plot, its city, out): every city of the player but the plot's, sorted by its distance to the plot, the first NATIONAL_PARK_NUM_OTHER_AMENITY_CITIES (GlobalParameters +0x51c)"
+  status: PARTLY
+  impl:
+    - cpu/core/aiParks.ts:aiParkSite
+    - gpu/core/sim_cityvalue.py:_FreeFacts
+    - cpu/core/aiParks.ts:AiParkSite
+    - gpu/core/sim_cityvalue.py:park_site
+  readings:
+    - "C-98: a park unit's value and a city-state's natural wonder — READ (0x620110 at 0x620ef6, 0x32fdb0, 0x3302f0, 0x7b62c0 at 0x7b6991 and 0x7b7456; 0x50d390 at 0x50d808), both twins"
+  context:
+    - "..._PARK_AMENITIES_OWNING_CITY (GlobalParameters +0x514) Amenities there from T to H; then 0x32f6b0 — the player's other cities sorted by their distance to the plot, the first NATIONAL_..."
+  review: reviewed
+- addr: 0x32fdb0
+  final: 0x236f00
+  kind: function
+  name: Game_NationalParks
+  semantics: "the National Parks a player could designate (manager, out, player): over every plot in index order the plot with its NORTHWEST and NORTHEAST neighbours and the NORTHWEST one's NORTHEAST neighbour, each passing 0x330720, the four of one city, 0x330530; sorted by Appeal sum, the greatest first, and kept unless a kept one stands in its column two rows off or within one plot"
+  status: READ
+  cases:
+    - recording: h1_duels1161
+      turn: 242
+      value: "city-state 3 t242-248: Conservation 408.453 / 412.148 / 416.262 / 416.453 / 421.336 / 417.461 for the game's 408.5 / 412.1 / 416.3 / 416.5 / 421.3 / 417.5, the park site's two Amenities in Geneva from T to H"
+  impl: [cpu/core/aiParks.ts:aiParkSite, gpu/core/sim_cityvalue.py:_cv_park_site]
+  readings:
+    - "C-98: a park unit's value and a city-state's natural wonder — READ (0x620110 at 0x620ef6, 0x32fdb0, 0x3302f0, 0x7b62c0 at 0x7b6991 and 0x7b7456; 0x50d390 at 0x50d808), both twins"
+  context:
+    - "...C-98: a park unit's value and a city-state's natural wonder — READ (0x620110 at 0x620ef6, 0x32fdb0, 0x3302f0, 0x7b62c0 at 0x7b6991 and 0x7b7456; 0x50d390 at 0x50d808), both twins"
+    - "...CULTURE AI'S PARK LIST (0x620110 at 0x620ef6, every player's turn): Game_NationalParks 0x32fdb0 lists the parks the player could designate, the culture AI keeps the list (+0x628, its..."
+    - "- A SITE (0x32fdb0, over every plot in index order): the plot with its NORTHWEST neighbour, its NORTHEAST..."
+  review: reviewed
+- addr: 0x3302f0
+  final: 0x237440
+  kind: function
+  semantics: "a park site's Tourism (manager, plot index): the Appeal of the plot, its NORTHWEST and NORTHEAST neighbours and the NORTHWEST one's NORTHEAST neighbour summed, times the owner's park percent (player +0x1b24 above 0) and Tourism percent (0x39b540), whole"
+  status: READ
+  cases:
+    - recording: h1_duels1161
+      turn: 242
+      value: "city-state 3 t242-248: Conservation 408.453 / 412.148 / 416.262 / 416.453 / 421.336 / 417.461 for the game's 408.5 / 412.1 / 416.3 / 416.5 / 421.3 / 417.5, the park site's two Amenities in Geneva from T to H"
+  impl: [cpu/core/aiParks.ts:aiParkSite, gpu/core/sim_cityvalue.py:_cv_park_site]
+  readings:
+    - "C-98: a park unit's value and a city-state's natural wonder — READ (0x620110 at 0x620ef6, 0x32fdb0, 0x3302f0, 0x7b62c0 at 0x7b6991 and 0x7b7456; 0x50d390 at 0x50d808), both twins"
+  context:
+    - "...rk unit's value and a city-state's natural wonder — READ (0x620110 at 0x620ef6, 0x32fdb0, 0x3302f0, 0x7b62c0 at 0x7b6991 and 0x7b7456; 0x50d390 at 0x50d808), both twins"
+    - ...e culture AI keeps the list (+0x628, its vector +0x680) ordered by Tourism (0x617c50 on 0x3302f0) and counts the player's units of a type with ParkCharges (+0x6f8, the loop 0x621060..0...
+    - "- ITS TOURISM (0x3302f0): the four plots' Appeal summed, times the owner's park percent (player +0x1b24, where..."
+  review: reviewed
+- addr: 0x330530
+  final: 0x237670
+  kind: function
+  semantics: a park site's four plots exist and are not all impassable (+0x3a bit 3)
+  status: READ
+  cases:
+    - recording: h1_duels1161
+      turn: 242
+      value: "city-state 3 t242-248: Conservation 408.453 / 412.148 / 416.262 / 416.453 / 421.336 / 417.461 for the game's 408.5 / 412.1 / 416.3 / 416.5 / 421.3 / 417.5, the park site's two Amenities in Geneva from T to H"
+  impl: [cpu/core/aiParks.ts:aiParkSite, gpu/core/sim_cityvalue.py:_cv_park_site]
+  readings:
+    - "C-98: a park unit's value and a city-state's natural wonder — READ (0x620110 at 0x620ef6, 0x32fdb0, 0x3302f0, 0x7b62c0 at 0x7b6991 and 0x7b7456; 0x50d390 at 0x50d808), both twins"
+  context:
+    - ...r of one city (their owning city ids equal, 0x32ffe5..0x330000) and not all impassable (0x330530, +0x3a bit 3). The sites are sorted by their Appeal sum, the greatest first (0x32c770),...
+  review: reviewed
 - addr: 0x3306f0
   final: 0x237830
   kind: function
@@ -2441,6 +2526,21 @@
   context:
     - ...t's enemy unit refusal (+0x29) in the queue; the placement test's first set (0x32f250 / 0x3306f0, the National Parks'); the player's valid-feature counts (0x408ce0 / 0x408f40); Check...
   review: imported
+- addr: 0x330720
+  final: 0x237860
+  kind: function
+  semantics: "a plot may join a park of the player (manager, plot, player): owned by it, no improvement (+0x44), no district (0x810d0), a mountain (terrain mask 0x4924), a natural wonder or of Appeal 2 or more, in no park (0x32f2b0)"
+  status: READ
+  cases:
+    - recording: h1_duels1161
+      turn: 242
+      value: "city-state 3 t242-248: Conservation 408.453 / 412.148 / 416.262 / 416.453 / 421.336 / 417.461 for the game's 408.5 / 412.1 / 416.3 / 416.5 / 421.3 / 417.5, the park site's two Amenities in Geneva from T to H"
+  impl: [cpu/core/aiParks.ts:aiParkSite, gpu/core/sim_cityvalue.py:_cv_park_site]
+  readings:
+    - "C-98: a park unit's value and a city-state's natural wonder — READ (0x620110 at 0x620ef6, 0x32fdb0, 0x3302f0, 0x7b62c0 at 0x7b6991 and 0x7b7456; 0x50d390 at 0x50d808), both twins"
+  context:
+    - "...AST neighbour (the direction tables 0xeff670 / 0xeff688, entries 5 and 0), each passing 0x330720 — owned by the player, no improvement (+0x44), no district (0x810d0), a mountain (terra..."
+  review: reviewed
 - addr: 0x3338d0
   final: 0x23a2e0
   kind: function
@@ -2635,6 +2735,16 @@
     - "...hanges 0x39fc00, 0x3a2bf0, 0x3a2e30): save the slots (0x3a3b00 into +0x448, std::sort 0x386350 / 0x385b50 by the card's policy row +0x88 link's +0x1c — the PrereqCivic's Cost, the ci..."
     - "...0x3a25f0; slot counts 0x39fc00, 0x3a2bf0, 0x3a2e30): save (0x3a3b00 into +0x448, sorted 0x386350 / 0x385b50 by the PrereqCivic's Cost (row +0x88 → +0x1c, 0xabc150) highest first, inser..."
   review: reviewed
+- addr: 0x46bae0
+  final: 0x2fad10
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-98: a park unit's value and a city-state's natural wonder — READ (0x620110 at 0x620ef6, 0x32fdb0, 0x3302f0, 0x7b62c0 at 0x7b6991 and 0x7b7456; 0x50d390 at 0x50d808), both twins"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...ount 0) that holds a natural wonder the player has not found (0x4681e0) marks it found (0x46bae0) and signals the discovery — for every player, a city-state among them: BOOST_TRIGGER_..."
+  review: imported
 - addr: 0x46cdd0
   final: 0x2fb530
   kind: function
@@ -4751,6 +4861,16 @@
     - "...k assignment's ties go to the earlier striker — READ (0x776140 -> 0x8b5bf0 -> 0x629480 -> 0x616570 -> 0x61ddb0 at 0x61de20..0x61de39, 0x775340 -> 0x76f210 -> 0x76f5c0 -> 0x76efc0 at 0x76f0..."
     - "...uments) and calls its ninth, the knapsack lambda (vtable 0xd6fe18 +0x10 = 0x629480 -> 0x616570 -> 0x61ddb0): a max_element over the values in agent order, strictly larger replacing (..."
   review: reviewed
+- addr: 0x617c50
+  final: 0x40d720
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-98: a park unit's value and a city-state's natural wonder — READ (0x620110 at 0x620ef6, 0x32fdb0, 0x3302f0, 0x7b62c0 at 0x7b6991 and 0x7b7456; 0x50d390 at 0x50d808), both twins"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - ...ignate, the culture AI keeps the list (+0x628, its vector +0x680) ordered by Tourism (0x617c50 on 0x3302f0) and counts the player's units of a type with ParkCharges (+0x6f8, the loop...
+  review: imported
 - addr: 0x617d70
   final: 0x40d840
   kind: function

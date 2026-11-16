@@ -196,6 +196,7 @@
     - "Border plot: GetNextBuyablePlot — READ"
     - "H-1: the district adjacency — READ"
     - "H-1: the plot's Appeal — READ"
+    - "C-98: a park unit's value and a city-state's natural wonder — READ (0x620110 at 0x620ef6, 0x32fdb0, 0x3302f0, 0x7b62c0 at 0x7b6991 and 0x7b7456; 0x50d390 at 0x50d808), both twins"
   context:
     - ...ING_COST if it is the barbarian camp (0x362130), else IMPROVEMENT_COST; a natural wonder (0x82e90) NW_COST; YIELD_POINT_COST per yield point to the owner (0x82280); then over its six neig...
     - "...hen for each of the six neighbours YieldChange per clause it answers: a natural wonder (0x82e90); the resource AS THE PLAYER SEES IT (0x50a690 with the player's team; artifacts exclud..."

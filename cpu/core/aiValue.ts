@@ -399,6 +399,12 @@ export interface AiValueView {
   competitionLeads(seat: number): number;
   /** a city may advance the ProjectType now */
   cityCanProject(seat: number, cityId: number, project: string): boolean;
+  /** the first National Park site of the seat's culture AI (0x623910 /
+   *  0x6239a0 on its list, `aiParkSite`): its Tourism, its city and the
+   *  other cities a park there pays an Amenity; null where it lists none */
+  parkSite(seat: number): { tourism: number; cityId: number; near: readonly number[] } | null;
+  /** the seat's units of a type with ParkCharges (the culture AI's +0x6f8) */
+  parkUnits(seat: number): number;
 }
 
 /** 0x7a7110, A TRADER'S WORTH from turn `start`: none once the seat's trade

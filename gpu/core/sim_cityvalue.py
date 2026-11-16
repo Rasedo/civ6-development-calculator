@@ -956,6 +956,7 @@ class SimCityValue:
         read = torch.ones_like(like, dtype=torch.bool)
         pseudo = u["pseudo"] or "PSEUDOYIELD_UNIT_COMBAT"
         no_sea = torch.zeros_like(like, dtype=torch.bool)
+        park = f.park_site() if u["parkCharges"] > 0 else None
         if pseudo in _COMBAT_PSEUDO:
             val, obs = f.unit_production(unit)
             v = torch.where(_t(obs, like).bool(), _fmul(_t(val, like), torch.full_like(like, 3 * _FX)), _t(val, like))
@@ -991,18 +992,20 @@ class SimCityValue:
         elif pseudo == "PSEUDOYIELD_UNIT_RELIGIOUS":
             # its religious term counts only in a city of the player's own
             # founded religion (0x4681c0 +0x1c0), which a city-state and the
-            # Free Cities never hold; the culture AI's park term reads 0 at
-            # them; then the tourism bomb, TourismBomb + 10 where
-            # TourismBombPossible, as PSEUDOYIELD_TOURISM
+            # Free Cities never hold; then the park term (0x7b6991), the
+            # Tourism of the culture AI's first park site times ParkCharges,
+            # and the tourism bomb, TourismBomb + 10 where
+            # TourismBombPossible, each as PSEUDOYIELD_TOURISM
             if f.full_civ():
                 read = read & False
             bomb = (u["tourismBomb"] + (10 if u["tourismBombPossible"] else 0)) * _FX
-            v = self._cv_pseudo(torch.full_like(like, bomb), "PSEUDOYIELD_TOURISM", f.pseudo_w("PSEUDOYIELD_TOURISM"))
+            tw = f.pseudo_w("PSEUDOYIELD_TOURISM")
+            v = self._cv_pseudo(torch.full_like(like, bomb), "PSEUDOYIELD_TOURISM", tw)
+            if park is not None:
+                v = self._cv_pseudo(_t(park[1], like) * (int(u["parkCharges"]) * _FX), "PSEUDOYIELD_TOURISM", tw) + v
         else:
             read = read & False
             v = torch.zeros_like(like)
-        # a park-charged unit's own tourism (the culture AI's park term)
-        # reads 0 at a city-state and the Free Cities
         if u["parkCharges"] > 0 and f.full_civ():
             read = read & False
         # a WMDCapable unit: PSEUDOYIELD_NUCLEAR_WEAPON's value of 1.0 over
@@ -1021,6 +1024,16 @@ class SimCityValue:
             # its Maintenance as Gold at the player's weight (0x7b72d1)
             v = v - self._cv_yield(torch.full_like(like, max(0, u["maintenance"]) * _FX), "YIELD_GOLD", f.yield_w("YIELD_GOLD"))
         pv = _present_value(v, r, h) - _present_value(v, r, t)
+        # a unit with ParkCharges (0x7b7456): the Amenities a park on the
+        # culture AI's first site pays its city and the player's nearest
+        # other cities, from `t` to `h`; the whole 0 where the player holds
+        # such a unit
+        if park is not None:
+            for bal, ys, n, on in park[2]:
+                per = self._cv_amenity_per_turn(f, _t(bal, like), ys, n)
+                add = torch.where(t == h, _discounted(per, r, t), _present_value(per, r, h) - _present_value(per, r, t))
+                pv = pv + torch.where(_t(on, like).bool(), add, torch.zeros_like(add))
+            pv = torch.where(_t(f.park_units(), like) > 0, torch.zeros_like(pv), pv)
         # a Units_XP2 ResourceMaintenanceType whose surplus (the turn's
         # income less the units' fuel bill) is not above 0: worth 0 before
         # the modifiers
@@ -1304,6 +1317,38 @@ class SimCityValue:
             add = self._cv_yield(_fmul(amt.expand_as(ratio), ratio), y, f.yield_w(y))
             v = v + torch.where(pb != -100, add, torch.zeros_like(add))
         return torch.where(same, one, v.clamp(min=n * _FX))
+
+    def _cv_park_site(self, own: torch.Tensor, city: torch.Tensor):
+        """`aiParkSite` (0x32fdb0's first entry) over the plots `own` [B, T]
+        a player may take into a park, `city` [B, T] the city owning each:
+        ([B] a site stands, [B] its lowest plot, [B] its four plots' Appeal
+        summed). A site is a plot with its NORTHWEST and NORTHEAST neighbours
+        and the NORTHEAST neighbour of the NORTHWEST one, each bare of
+        improvement, district and park and a mountain, a natural wonder or of
+        the park's Appeal, the four of one city and not all impassable; the
+        site of the greatest Appeal sum, the first in plot order among
+        equals"""
+        dev = self.device
+        ne, nw = self._DIRECTION_TYPES[0], self._DIRECTION_TYPES[5]
+        a = self.neigh[:, nw]
+        b = self.neigh[:, ne]
+        c = torch.where(a >= 0, self.neigh[a.clamp(min=0), ne], torch.full_like(a, -1))
+        quad = torch.stack([torch.arange(self.T, device=dev), a, b, c], dim=1)  # [T, 4]
+        q = quad.clamp(min=0)
+        ap = self._tile_appeal().long()
+        live = (self.feat_id >= 0) & ~self.feat_stripped
+        impass = self.tile_mountain | (live & ~self._feat_passable.take(self.feat_id.clamp(min=0)))
+        ok = (own & (self.park < 0) & (self.improvement < 0) & (self.district < 0) & (self.centre_slot_at < 0)
+              & (self.built_wonder < 0)
+              & ((ap >= self._park_min_appeal) | self.tile_mountain | self.nwonder))
+        cq = city[:, q]  # [B, T, 4]
+        good = (ok[:, q].all(dim=2) & (quad >= 0).all(dim=1).unsqueeze(0)
+                & (cq == cq[:, :, :1]).all(dim=2) & ~impass[:, q].all(dim=2))
+        total = torch.where(good, ap[:, q].sum(dim=2), torch.full_like(ap, -(1 << 30)))
+        best = total.max(dim=1).values
+        plot = (total == best.unsqueeze(1)).long().argmax(dim=1)
+        has = good.any(dim=1)
+        return has, plot, torch.where(has, best, torch.zeros_like(best))
 
     def _cv_power_need(self, f, need: int, t: torch.Tensor, h: torch.Tensor) -> torch.Tensor:
         """`powerNeedValue` (0x7a67f0 at a negative Amount): 0 where the city's
@@ -2404,6 +2449,33 @@ class _MinorFacts:
     def regional_amenities(self, r):
         return [self.amenity()]
 
+    def park_site(self):
+        """`AiValueView.parkSite`: ([B] the culture AI lists a park site, [B]
+        its Tourism, the Amenities a park there pays as (balance, yields, n,
+        [B] the games it pays in) a city) — a city-state's one city, its
+        centre a district no plot names"""
+        def build():
+            sim = self.sim
+            plots = torch.arange(sim.T, device=sim.device).unsqueeze(0)
+            own = (sim.tile_seat == self.seat) & (plots != self._centre().unsqueeze(1))
+            has, _plot, tourism = sim._cv_park_site(own, torch.zeros_like(sim.tile_city))
+            bal, ys = self.amenity()
+            return has, tourism, [(bal, ys, sim._park_amen_owner, has)]
+        return self._get("park", build)
+
+    def _park_types(self):
+        sim = self.sim
+        types = sim._type_park_builder.clone()
+        if sim._naturalist_idx >= 0:
+            types[sim._naturalist_idx] = True
+        return types
+
+    def park_units(self):
+        """`AiValueView.parkUnits`: the seat's units of a type with ParkCharges"""
+        sim = self.sim
+        mt = sim.major_unit_type.clamp(min=0, max=sim.NU - 1)
+        return (self._mine() & self._park_types().take(mt)).sum(dim=1)
+
     def regional_building_cities(self, r, converts):
         """`regionalBuildingCities`: the player's cities a regional building reaches,
         the city among them; a city-state's one"""
@@ -3276,6 +3348,42 @@ class _FreeFacts(_MinorFacts):
         bal = self.sim._amen_balance_of[self.row][:, self.j]
         ys = {y: tot[:, k] for k, y in enumerate(_YIELDS)}
         return bal.long(), ys
+
+    def park_site(self):
+        """the Free Cities' park site: its city NATIONAL_PARK_AMENITIES_OWNING_CITY
+        Amenities, their other cities nearest its plot one each, the earlier
+        city first among equals (0x32f6b0)"""
+        def build():
+            sim = self.sim
+            dev = sim.device
+            cc = sim.city_center[:, self.row]  # [B, C]
+            alive = sim.city_alive[:, self.row] & (cc >= 0)
+            plots = torch.arange(sim.T, device=dev).reshape(1, -1, 1)
+            centre = (plots == torch.where(alive, cc, torch.full_like(cc, -1)).unsqueeze(1)).any(dim=2)
+            has, plot, tourism = sim._cv_park_site((sim.tile_seat == self.row) & ~centre, sim.tile_city)
+            owner = sim.tile_city.gather(1, plot.unsqueeze(1))  # [B, 1]
+            mine = alive & (sim.city_id[:, self.row] == owner) & has.unsqueeze(1)
+            other = alive & ~mine & has.unsqueeze(1)
+            d = torch.where(other, sim.pair_dist[plot.unsqueeze(1), cc.clamp(min=0)].long(), torch.full_like(cc, 1 << 20))
+            C = d.shape[1]
+            col = torch.arange(C, device=dev)
+            # [B, i, j]: city j stands before city i
+            before = (d.unsqueeze(1) < d.unsqueeze(2)) | ((d.unsqueeze(1) == d.unsqueeze(2)) & (col.reshape(1, 1, C) < col.reshape(1, C, 1)))
+            near = other & ((before & other.unsqueeze(1)).sum(dim=2) < sim._park_amen_cities)
+            tot = self._base()
+            terms = []
+            for c in range(C):
+                bal = sim._amen_balance_of[self.row][:, c].long()
+                ys = {y: tot[:, c, k] for k, y in enumerate(_YIELDS)}
+                terms.append((bal, ys, sim._park_amen_owner, mine[:, c]))
+                terms.append((bal, ys, sim._park_amen_near, near[:, c]))
+            return has, tourism, terms
+        return self._get("park", build)
+
+    def park_units(self):
+        sim = self.sim
+        mt = sim.barb_unit_type.clamp(min=0, max=sim.NU - 1)
+        return (self._mine() & self._park_types().take(mt)).sum(dim=1)
 
     def regional_amenities(self, r):
         """the Free Cities' cities within `r` of the centre, each with the

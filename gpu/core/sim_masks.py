@@ -104,8 +104,9 @@ class SimMasks:
         repaired or bought: `_boost_on_improvement`, `_boost_on_reveal`) lands
         where its event happens; a class neither engine models never
         triggers. A city-state
-        holds no pantheon, religion, government, great person or alliance,
-        meets no city-state and keeps no revealed plots."""
+        holds no pantheon, religion, government, great person or alliance
+        and meets no city-state; its natural wonders are those on its
+        revealed plots (`mops_revealed`)."""
         tab = self._boost_tables()
         B, dev = self.B, self.device
         minor = s is not None
@@ -146,7 +147,7 @@ class SimMasks:
         # is not read
         open_ = {"tech": (~techs & ~tboost).any(dim=0).tolist(),
                  "civic": (~civics & ~cboost).any(dim=0).tolist()}
-        never = ("CREATE_PANTHEON", "FOUND_RELIGION", "MEET_X_CITY_STATES", "FIND_NATURAL_WONDER", "HAVE_X_GREAT_PEOPLE",
+        never = ("CREATE_PANTHEON", "FOUND_RELIGION", "MEET_X_CITY_STATES", "HAVE_X_GREAT_PEOPLE",
                  "HAVE_AN_ALLIANCE", "HAVE_ALLIANCE_LEVEL_X", "HAVE_X_CITIES_FOLLOWING_YOUR_RELIGION", "HAVE_GOVERNMENT_TIER")
         for i, b in enumerate(tab["rows"]):
             if not open_[b["target"]][int(b["idx"])]:
@@ -214,7 +215,13 @@ class SimMasks:
             elif cls == "SETTLE_COAST":
                 p = (alive & self.coastal_land.gather(1, self.city_center[:, row].clamp(min=0))).any(dim=1)
             elif cls == "FIND_NATURAL_WONDER":
-                seen = self.seat_explored[:, row] if self.fog_of_war else torch.ones_like(self.nwonder)
+                if minor:
+                    # a city-state's revealed plots; the Free Cities take none
+                    if s >= self.S:
+                        continue
+                    seen = self.mops_revealed[:, s]
+                else:
+                    seen = self.seat_explored[:, row] if self.fog_of_war else torch.ones_like(self.nwonder)
                 p = (self.nwonder & seen).any(dim=1)
             elif cls == "OWN_X_UNITS_OF_TYPE":
                 p = self._boost_units(row, unit_of(int(b["unit"]))) >= n

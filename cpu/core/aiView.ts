@@ -57,6 +57,7 @@ import { borderCandidates, cityTourism, civEraIndex, computeCityStats, tourismTo
 import { PROJECTS } from '../data/projects';
 import { RESOURCES } from '../../world/resources';
 import { tileAppeal } from './appeal';
+import { aiParkSite, aiParkUnits } from './aiParks';
 import { DEFAULT_HANDICAP } from '../data/barbarians';
 import { availableProjects, districtCost, districtScaledBase, projectCost, settlerCost, tilePurchaseCost, unitProdCost } from './game';
 
@@ -424,6 +425,8 @@ export function aiView(state: GameState, opts: { updated?: boolean } = {}): AiVi
     // is not read
     tradeKnowledge: (i) => (isCityStateSeat(i) || i === FREE_SEAT ? seatOf(state, i)?.tradeValue ?? 0 : null),
     citiesTourism: (i) => seatCities(i).reduce((s, c) => s + cityTourism(state, c), 0),
+    parkSite: (i) => aiParkSite(state, i),
+    parkUnits: (i) => aiParkUnits(state, i),
     enemyPlunder: (i, of) => {
       if (!warsOf(state, i).length) return 0;
       // a city-state's or the Free Cities' knowledge base's cities

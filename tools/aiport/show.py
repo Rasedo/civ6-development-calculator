@@ -599,8 +599,26 @@ def what_plot(g: Game, a) -> None:
             print("  AI_CityBuild plot analysis: " + cells(row, skip=("turn",))[:a.wide])
 
 
+def what_record(g: Game, a) -> None:
+    """the record's own fields of the player's cities and of the player, at T
+    and, where T+1 differs, T+1's value after `->`"""
+    def rows(label: str, now: dict, nxt: dict | None) -> None:
+        print(f"== record of {label} t{g.turn} (-> t{g.turn + 1} where it differs)")
+        for k, v in now.items():
+            s = json.dumps(v)
+            n = json.dumps(nxt[k]) if nxt and k in nxt else s
+            print(f"  {k}: {s[:a.wide]}" + (f"  ->  {n[:a.wide]}" if n != s else ""))
+    for c in cities_of(g, a):
+        nxt = next((x for x in (g.next or {}).get("cities", []) if x["id"] == c["id"] and x["owner"] == c["owner"]), None)
+        rows(f"city {c['name'].replace('LOC_CITY_NAME_', '')} (p{c['owner']})", c, nxt)
+    for p in (g.rec or {}).get("players", []):
+        if p.get("id") == a.player:
+            rows(f"p{a.player}", p, next((x for x in (g.next or {}).get("players", []) if x.get("id") == a.player), None))
+
+
 WHAT = {"units": what_units, "planning": what_planning, "targets": what_targets, "danger": what_danger, "kb": what_kb, "trees": what_trees,
-        "contracts": what_contracts, "ops": what_ops, "builds": what_builds, "research": what_research, "events": what_events}
+        "contracts": what_contracts, "ops": what_ops, "builds": what_builds, "research": what_research, "events": what_events,
+        "record": what_record}
 
 
 def main() -> int:

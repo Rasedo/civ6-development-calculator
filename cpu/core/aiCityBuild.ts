@@ -40,6 +40,7 @@ import type { UnitProductionEntry } from './aiUnitProduction';
 import type { CityStats } from './city';
 import type { GameState } from './types';
 import { AMENITY_TIERS, amenityTier, growthFoodNeeded, housingGrowthFactor } from '../data/constants';
+import { PARK_AMENITIES_NEAR, PARK_AMENITIES_OWNER } from '../data/improvements';
 import { AI_YIELD_DEFAULT } from '../data/aiTables';
 import { AI_YIELDS } from './aiWeights';
 import { modifiersValue, type AiModifier, type CorpsFacts } from './aiModifiers';
@@ -793,7 +794,8 @@ export function unitTurns(f: CityBuildFacts, u: AiUnitRow): number {
  *  eras' points as PSEUDOYIELD_GOLDENAGE_POINT; a Trader its worth
  *  (`traderValue` with start and horizon both `t`: one turn's route value
  *  discounted to `t`) through PSEUDOYIELD_UNIT_TRADE; a religious unit
- *  (PSEUDOYIELD_UNIT_RELIGIOUS) its tourism bomb as PSEUDOYIELD_TOURISM — then
+ *  (PSEUDOYIELD_UNIT_RELIGIOUS) its park's Tourism (`aiParkSite`) and its
+ *  tourism bomb as PSEUDOYIELD_TOURISM — then
  *  a WMD's nuclear term, x (the city's extra copies + 1) x the promotion
  *  class weight, 0 outright for a strategic resource the player cannot
  *  reach, through its pseudo-yield, less its Maintenance as Gold below
@@ -807,6 +809,7 @@ export function unitValue(f: CityBuildFacts, u: AiUnitRow, t: number, h = AI_VAL
   if (exit !== null) return exit;
   if (!f.trainsDomain(u.domain)) return FX_MIN;
   const pseudo = u.pseudo ?? 'PSEUDOYIELD_UNIT_COMBAT';
+  const park = u.parkCharges > 0 ? f.view.parkSite(f.seat) : null;
   let v = 0;
   if (COMBAT_PSEUDO.has(pseudo)) {
     const e = f.unitProduction.get(u.type);
@@ -846,19 +849,18 @@ export function unitValue(f: CityBuildFacts, u: AiUnitRow, t: number, h = AI_VAL
     // eras' points) counts only in a city of the player's own founded
     // religion (0x4681c0 +0x1c0, 0x7b67a4..0x7b68f5) — a city-state and the
     // Free Cities found none, so it is 0 (runs/h1_duelv1127: a minor's
-    // Missionary 0.00 on its turns following religion 11). The culture
-    // AI's park term (0x6239a0 x ParkCharges) reads 0 at these players
-    // (every valid Naturalist row of the five verbose duels 0.00). Then
+    // Missionary 0.00 on its turns following religion 11). Then the park
+    // term (0x7b6991): the Tourism of the culture AI's first park site
+    // (0x6239a0, none 0) times ParkCharges as PSEUDOYIELD_TOURISM. Then
     // the tourism bomb, TourismBomb + 10 where TourismBombPossible
     // (Units_XP2 +0x28 / +0x48 bit 32, 0x7b6a3e), as PSEUDOYIELD_TOURISM
     // (runs/h1_duelv1121: every Rock Band row 10.0 a turn from T to H)
     if (f.fullCiv) return null;
-    v = pseudoYieldValue(f.view, f.seat, (u.tourismBomb + (u.tourismBombPossible ? 10 : 0)) * FX, 'PSEUDOYIELD_TOURISM');
+    v = pseudoYieldValue(f.view, f.seat, (park?.tourism ?? 0) * u.parkCharges * FX, 'PSEUDOYIELD_TOURISM')
+      + pseudoYieldValue(f.view, f.seat, (u.tourismBomb + (u.tourismBombPossible ? 10 : 0)) * FX, 'PSEUDOYIELD_TOURISM');
   } else {
     return null;
   }
-  // a park-charged unit's own tourism (0x7b7456: the culture AI's park
-  // term) reads 0 at a city-state and the Free Cities, as above
   if (u.parkCharges > 0 && f.fullCiv) return null;
   // a WMDCapable unit (0x7b709f..0x7b7165): PSEUDOYIELD_NUCLEAR_WEAPON's
   // value of 1.0 over its DefaultValue, x2.0
@@ -882,7 +884,20 @@ export function unitValue(f: CityBuildFacts, u: AiUnitRow, t: number, h = AI_VAL
   // them, a unit with a Units_XP2 ResourceMaintenanceType whose surplus (the
   // turn's income less the units' fuel bill, 0x7b75fd..0x7b7655) is not
   // above 0 is worth 0
-  const pv = u.maintenanceResource && f.surplus(u.maintenanceResource) <= 0 ? 0 : presentValue(v, AI_RATE, h) - presentValue(v, AI_RATE, t);
+  let pv = presentValue(v, AI_RATE, h) - presentValue(v, AI_RATE, t);
+  // a unit with ParkCharges (0x7b7456): the Amenities a park on the culture
+  // AI's first site pays, NATIONAL_PARK_AMENITIES_OWNING_CITY in its city
+  // and one in each of the player's nearest other cities, valued from `t`
+  // to `h` (0x79f7c0); the whole 0 where the player holds such a unit
+  if (u.parkCharges > 0) {
+    if (park) {
+      const of = (id: number): AmenityCity => (f.cities === 1 || id === f.cityId ? f.amenity : f.view.cityAmenity(f.seat, id));
+      pv += valueBetween(amenityPerTurn(f, of(park.cityId), PARK_AMENITIES_OWNER), t, h);
+      for (const c of park.near) pv += valueBetween(amenityPerTurn(f, of(c), PARK_AMENITIES_NEAR), t, h);
+    }
+    if (f.view.parkUnits(f.seat) > 0) pv = 0;
+  }
+  if (u.maintenanceResource && f.surplus(u.maintenanceResource) <= 0) pv = 0;
   return pv
     + modifiersValue({ view: f.view, seat: f.seat, start: t, horizon: h, rate: AI_RATE, valued: u.type }, u.modifiers);
 }
