@@ -73,7 +73,7 @@ import { addCsTradeRoute, addIntlTradeRoute, addTradeRoute, minorRouteTo, plunde
 import { minorRouteCandidate } from '../core/aiTrade';
 import { questCampCleared, questRouteStarted, questUnitAdded } from '../core/quests';
 import { commitDedications, districtRoad, goodyMoment, layRoad, pantheonMoment, religionMoment, unitKillEvent, bestRoadTier } from '../core/eras';
-import { cityStateSight, initFog, revealAround, takeLook, unitLook, unitSeesThrough, unitSight } from '../core/fog';
+import { cityStateSight, initFog, losDisk, revealAround, takeLook, unitLook, unitSeesThrough, unitSight } from '../core/fog';
 import { holdFavor, seatFavor } from '../core/seatTurn';
 import { displaceAirFrom, isAirUnit } from '../core/air';
 import { BARB_SEAT, cityStateOfSeat, civsAtWar, clearWarKind, delegationWith, FREE_SEAT, isBarbSeat, isCityStateSeat, isCiv, MISSION_DELEGATION, MISSION_EMBASSY, prophetsOf, seatOf, setBorderTurnsFrom, setPeaceTurnWith, setTileOwner, setWar, tileSeat, unitsOf } from '../core/seats';
@@ -314,6 +314,9 @@ export interface Ctx {
   upgradedFrom: Map<string, string>;
   /** this pair's levy returns, the city-state's new record key to the major's */
   levyFrom: Map<string, string>;
+  /** this pair's levy returns, the city-state's new record key to the plot
+   *  the game made the unit on */
+  levyHome: Map<string, number>;
   /** each plot's ground at the pair's first record — its road tier (-1 no
    *  road), feature, improvement and pillage: the one its minors plan on */
   groundWas?: GroundWas[];
@@ -2075,13 +2078,22 @@ function minorAi(ctx: Ctx, b: TurnRecord, turn: number, made: ReadonlySet<Unit>,
   // the Mine there and Build City Improvement ends, the Builder unmoved)
   // ...and the plots round each unit its levy's end made anew under it,
   // placed (0x586d40) before its turn (runs/h1_duelq1124 t83: city-state
-  // 4's Heavy Chariot 983040 home on 8:9 plans 7:10, 8:11 and 8:7)
-  const home = [...ctx.levyFrom.keys()].map((k) => ctx.units.get(k)).filter((u): u is Unit => !!u && minorAiSeat(u.seat));
+  // 4's Heavy Chariot 983040 home on 8:9 plans 7:10, 8:11 and 8:7), its look
+  // from the plot the game made it on, not the one the record's moves left
+  // it on (runs/h1_duels1148 t122: city-state 2's Caravel 1441799 made on
+  // 15:5 reveals the ice of 15:2 / 16:2, and its Naval Patrol takes the
+  // fallback 12:4)
+  const home = [...ctx.levyHome].flatMap(([k, plot]) => {
+    const u = ctx.units.get(k);
+    return u && plot >= 0 && minorAiSeat(u.seat) ? [{ u, plot }] : [];
+  });
   for (const cs of copy.cityStates) {
     const r = revealedWas.get(cs.seat);
     if (!r) continue;
     const ground = cityStateSight(state, cs.seat, false);
-    for (const u of home) if (u.seat === cs.seat) for (const n of unitLook(state, u)) ground[n] = 1;
+    for (const { u, plot } of home) {
+      if (u.seat === cs.seat) for (const n of losDisk(state.map, state.map.tiles[plot], unitSight(u, state), unitSeesThrough(u))) ground[n] = 1;
+    }
     cs.revealed = r.map((v, p) => (ground[p] ? 1 : v));
   }
   const twin = new Map<Unit, Unit>();
@@ -7347,7 +7359,7 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
   const ctx: Ctx = {
     state, cat, W: rec0.head.W, seatOfPlayer: first.seatOfPlayer, playerOfSeat: first.playerOfSeat,
     units: new Map(), pendingMinors: new Map(), next: first, tally: new Map(), fellBack: new Map(), imposed: new Map(), reasons: new Map(),
-    engineKilled: new Set(), paths: new Map(), walked: new Set(), steps: new Map(), barbBlows: new Map(), barbCentres: new Map(), barbEncampments: new Map(), gone: new Map(), barbSeized: [], minorSeized: [], minorBlows: new Map(), minorShots: [], minorPromoted: new Map(), minorBuys: [], minorImproves: [], minorClears: [], minorCleared: new Set(), minorClearItems: new Map(), minorClearUnits: [], barbBattles: [], barbFought: new Set(), barbDraws: [], promoteHp: new Map(), minorUnits: [], minorGround: [], minorLux: new Map(), buyTrace, lateBlows: [], upgradeInto: new Set(), upgradedFrom: new Map(), levyFrom: new Map(), barbSteps: [], barbPillaged: [], envoys: [], battled: new Set(), fortified: new Map(), undug: new Map(), streams: new Map(), applied: new Set(), barbNew: [], lateEnvoys: [], log: history.randLog, warKinds: history.warKinds, stream, prev: rec0,
+    engineKilled: new Set(), paths: new Map(), walked: new Set(), steps: new Map(), barbBlows: new Map(), barbCentres: new Map(), barbEncampments: new Map(), gone: new Map(), barbSeized: [], minorSeized: [], minorBlows: new Map(), minorShots: [], minorPromoted: new Map(), minorBuys: [], minorImproves: [], minorClears: [], minorCleared: new Set(), minorClearItems: new Map(), minorClearUnits: [], barbBattles: [], barbFought: new Set(), barbDraws: [], promoteHp: new Map(), minorUnits: [], minorGround: [], minorLux: new Map(), buyTrace, lateBlows: [], upgradeInto: new Set(), upgradedFrom: new Map(), levyFrom: new Map(), levyHome: new Map(), barbSteps: [], barbPillaged: [], envoys: [], battled: new Set(), fortified: new Map(), undug: new Map(), streams: new Map(), applied: new Set(), barbNew: [], lateEnvoys: [], log: history.randLog, warKinds: history.warKinds, stream, prev: rec0,
     researchAi: report.researchAi, researchScores: report.researchScores, agendaCivics: null, strategyLog: loadStrategyLog(dumpPath), researchBefore: new Map(), researchAtTurn: new Map(), aiResearchLog,
     tactical: loadTactical(dumpPath), barbTally: report.barbTactics, minorTally: report.minorTactics, minorDraws: report.minorDraws,
     civicAi: report.civicAi, civicScores: report.civicScores, civicBefore: new Map(), aiCivicLog: govtLog.civics, aiPolicyLog: govtLog.policies,
@@ -7518,6 +7530,7 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
     ctx.upgradeInto = new Set(ds.flatMap((d) => (d.kind === 'upgrade' ? [d.into] : [])));
     ctx.upgradedFrom = new Map(ds.flatMap((d) => (d.kind === 'upgrade' ? [[d.into, d.unit] as const] : [])));
     ctx.levyFrom = new Map(ds.flatMap((d) => (d.kind === 'levyEnd' ? d.units.map(([f, t]) => [t, f] as const) : [])));
+    ctx.levyHome = new Map(ds.flatMap((d) => (d.kind === 'levyEnd' ? d.units.map(([, t, plot]) => [t, plot] as const) : [])));
     stream.actions(a.turn);
     syncDedications(ctx, new Set([seatOfP(ctx, activePlayer(a))]));
     applyPhase(ctx, ds, 'before', b, a);

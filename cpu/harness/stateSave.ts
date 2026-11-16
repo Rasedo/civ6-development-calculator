@@ -115,6 +115,7 @@ export const CTX_FIELDS: Record<keyof Ctx, 'carried' | 'pair' | 'run' | 'tally'>
   upgradeInto: 'pair',
   upgradedFrom: 'pair',
   levyFrom: 'pair',
+  levyHome: 'pair',
   groundWas: 'pair',
   roadTierWas: 'pair',
   envoys: 'pair',
