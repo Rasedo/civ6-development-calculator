@@ -552,6 +552,7 @@
     - "C-130: the damage modifier's analyzer, a unit's tag requirement, the player's units walked by pool slot, a minor's one-time projects — READ (0x6bba30, 0x6d2610, 0x69ec70), both twins"
     - "C-96 / C-130: a building's district copy, the player's Gold as its cities stand, a minor's power after its production; a technology's improvement tourism — READ (0x18e570, 0x7a7dc3, 0x4e0bf0, 0x7b4971..0x7b4b5b), both twins but the tourism"
     - "C-130: the pillage analyzers, the Favor grant's and the extra accumulation's analyzers, CITY_HAS_DISTRICT's evaluator, the Luxury Policy's players — READ (0x6b7ec0, 0x6b92c0, 0x6c2f90, 0x6ae390, 0x6d3d50), both twins"
+    - "C-96 / C-127: the unit value's air, naval, nuclear and fuel terms; a district's rows on an unbought plot; a minor's district progress — READ (0x7b62c0 at 0x7b6eb3..0x7b7045, 0x7b709f..0x7b7165, 0x7b75fd..0x7b7655; 0x2499b0, 0x929680 -> 0x9296e0; 0x7aaf80 at 0x7ab521), both twins"
   notes: ["label: pseudoYieldValue(out,&amt,pseudo,playerAI,..)"]
   context:
     - ...ds' +0x638, +0x7a8, the +0x6b0 list or +0x6c8); per row also pseudo-yield terms through 0x7a60d0 (PSEUDOYIELD_GOLDENAGE_POINT from 0x2c40b0, 0x2c4350 for Science, 0x2c3ed0, 0x2c4290 fo...
@@ -799,7 +800,10 @@
     - recording: h1_duelv1127
       turn: 2
       value: player 3's Campus 109.41 owned (4,13), 91.75 unowned (5,14), 81.80 (5,12), 89.82 beyond the reach (3,16), T 15
-  impl: [cpu/core/aiDistrictValue.ts:districtBodyValue, gpu/core/sim_cityvalue.py:_cv_district_body]
+  impl:
+    - cpu/core/aiDistrictValue.ts:districtBodyValue
+    - gpu/core/sim_cityvalue.py:_cv_district_body
+    - cpu/core/minorCityAi.ts:adjOf
   readings:
     - "H-1: the district adjacency — READ"
     - "C-96: the district value — READ (0x7a51f0, 0x7aaf80's terms below, 0x366df0, the purchase price 0x1b1cb0, 0x1c77c0, 0x1b4450), PARTLY READ (the golden-age term, the claims, modifiers and neighbours terms, the domain's resources path), unwired"
@@ -808,6 +812,7 @@
     - "C-96: the district value's remaining terms"
     - "C-100: the plot values' golden-age, claims and tourism-percent terms, the required features, the power value's negative Amount — READ"
     - "C-96 / C-98 / C-100 / C-99: the city AI's fitted rules read — the analysis before the job list, the unit term's upgrade price, the city's trained domains, a non-major's required power, the eruption's turns — READ (0x608870 at 0x608976..0x608988, 0x7b3e50 at 0x7b4564..0x7b45c8, 0x5376d0, 0x1c77c0, 0x1aed10, 0x1f0440 at 0x1f04c7..0x1f04dc, 0xa1d480), both twins"
+    - "C-96 / C-127: the unit value's air, naval, nuclear and fuel terms; a district's rows on an unbought plot; a minor's district progress — READ (0x7b62c0 at 0x7b6eb3..0x7b7045, 0x7b709f..0x7b7165, 0x7b75fd..0x7b7655; 0x2499b0, 0x929680 -> 0x9296e0; 0x7aaf80 at 0x7ab521), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ...h reach the sum 0x365720 (via 0x366df0, the plot's owner and city); the city's yield walk 0x7aaf80 calls the per-row 0x365ae0 itself.
@@ -1138,6 +1143,9 @@
     - cpu/core/minorBuild.ts:minorListedCount
     - cpu/core/minorBuild.ts:amenity
     - cpu/core/minorBuild.ts:facts
+    - cpu/core/aiCityBuild.ts:airBase
+    - cpu/core/aiCityBuild.ts:pv
+    - cpu/core/air.ts:districtAirBase
   readings:
     - "C-127 / C-96: a minor's unit versions, the unit table's religion gate and the building value's era reasons — READ, both twins"
     - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
@@ -1157,6 +1165,7 @@
     - "H-1 / C-96: at war with a living major, a unit's strategic resource in the City Analysis, a city-state's naval strategy — READ (0x3dcf50, 0x7b62c0 at 0x7b71cd..0x7b725d, 0x6fafc0 at 0x6fc771..0x6fc873, 0x783980 at 0x783ade..0x783d93 and 0x785271..0x7852df, 0x786080, 0x865f20), both twins"
     - "C-127: a major's Religious AI faith boost and the trade path's drowned plots — READ (0x74f5a0, 0x5583a0 / 0x558460's plot info), the wanted unit's value unread, both twins"
     - "C-98: the Free Cities' unit production table, primary region list and grants"
+    - "C-96 / C-127: the unit value's air, naval, nuclear and fuel terms; a district's rows on an unbought plot; a minor's district progress — READ (0x7b62c0 at 0x7b6eb3..0x7b7045, 0x7b709f..0x7b7165, 0x7b75fd..0x7b7655; 0x2499b0, 0x929680 -> 0x9296e0; 0x7aaf80 at 0x7ab521), both twins"
   notes:
     - ".claude/scratchpad/cb/notes.txt: ...req buildings...  value = 0x7a4d40(bld, turns, plot=-9999, horizon=H1=[globalAI+0x2f0][1]) ; units: 0x7b62c0(unit, turns...) horizon H1; wonders H2=[..][2].  rate = &[rbp+0xc8] from 0x6fec30(player+0x1290) ->..."
     - ".claude/scratchpad/cb/notes.txt: ...turns). regional (+0x2c) via 0x79f7c0 for cities in range. walls/defense terms at +0x54. UNIT value 0x7b62c0: combat units -> base 0x79ca90(military AI unit value) (x3 if 0x79d2d0), era terms, x(copies+1), x..."

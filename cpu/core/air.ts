@@ -21,7 +21,7 @@ import { cityAtIndex, gdrHas, unitDomain, unitStackSlot, unitsAt, unitsHostile, 
 import { promoFlag, promoValue } from './promotions';
 import { governorTileSum } from './governors';
 import { srcConst, xml } from '../data/provenance';
-import type { GameState, ImprovementId, Tile, Unit } from './types';
+import type { City, GameState, ImprovementId, Tile, Unit } from './types';
 
 const CITY_CENTER_AIR_SLOTS = 1;
 export const AERODROME_AIR_SLOTS = 4;
@@ -85,6 +85,20 @@ export function airSlotsAt(state: GameState, seat: number, tileIndex: number): n
   // CIV6 (Marina Raskova): the retired general's permanent "+1 air unit
   // slots" on this district tile.
   return AERODROME_AIR_SLOTS + extra + (tile.airSlotBonus ?? 0);
+}
+
+/** the city's district of a type as a unit value's air term reads it
+ *  (0x7b62c0 at 0x7b6ebf..0x7b6f6f): the district found by its own type
+ *  among the city's (0x1ae530, no replacement), the aircraft based on its
+ *  plot (0x929680 -> 0x9296e0) and its slots (0x2499b0: the district's
+ *  AirSlots — the Aerodrome's, the one an aircraft names — and those its
+ *  buildings grant, built or pillaged); null where the city holds none */
+export function districtAirBase(state: GameState, city: City, district: string): { aircraft: number; slots: number } | null {
+  const d = city.districts.find((x) => x.type === district);
+  if (!d) return null;
+  const own = district === 'AERODROME' ? AERODROME_AIR_SLOTS : 0;
+  const granted = city.buildings.reduce((n, id) => n + (BUILDINGS[id]?.district === district ? BUILDINGS[id]?.airSlots ?? 0 : 0), 0);
+  return { aircraft: airUnitsAt(state, d.tileIndex).length, slots: own + granted + (state.map.tiles[d.tileIndex].airSlotBonus ?? 0) };
 }
 
 export function airBaseFree(state: GameState, seat: number, tileIndex: number): boolean {

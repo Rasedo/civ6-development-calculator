@@ -226,7 +226,18 @@ export function submergeTile(state: GameState, tile: Tile): void {
   }
   if (tile.district) {
     for (const cs of state.cityStates ?? []) {
-      if (cs.districts?.some((d) => d.tileIndex === tile.index)) cs.districts = cs.districts.filter((d) => d.tileIndex !== tile.index);
+      const d = cs.districts?.find((x) => x.tileIndex === tile.index);
+      if (!d) continue;
+      cs.districts = cs.districts!.filter((x) => x.tileIndex !== tile.index);
+      // an unfinished district takes the progress its queue kept on the
+      // type (runs/h1_duels1146 Kandy t185: the Holy Site on 40:12 drowned
+      // at 45 of its cost, its queue row gone, its rows elsewhere valued
+      // from nothing)
+      const k = `district:${d.type}`;
+      if (!tile.districtComplete && cs.prodRetained?.[k] !== undefined) {
+        delete cs.prodRetained[k];
+        if (!Object.keys(cs.prodRetained).length) delete cs.prodRetained;
+      }
     }
   }
   const extracted = tile.improvement && !tile.pillaged ? tile.resource : null;

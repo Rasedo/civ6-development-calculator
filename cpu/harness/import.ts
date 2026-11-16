@@ -2795,6 +2795,14 @@ export function importTurn(rec: TurnRecord, cat: Catalog, history?: History): Im
         minor.prodProgress = held.get(key) ?? (num(c.queueProgress?.[0]) || 0);
         held.delete(key);
       }
+      // the progress it holds on each district type not in hand (the
+      // queue's district rows, m_kBuildQueue +146): a new plot of the type
+      // resumes it (runs/h1_duels1146 Kandy t185: the Neighborhood left at
+      // 78.4 of 148 on 38:10, its rows elsewhere at T 29 as logged)
+      for (const [k, n] of buildRows(rec, c).district) {
+        const id = engineRowOf(cat, 'district', k);
+        if (id && `district:${id}` !== key) held.set(`district:${id}`, n);
+      }
       if (held.size) minor.prodRetained = Object.fromEntries(held);
       else delete minor.prodRetained;
       // a district in hand stands at the record's queued Location

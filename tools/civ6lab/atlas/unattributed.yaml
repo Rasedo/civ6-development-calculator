@@ -8615,6 +8615,32 @@
     - ...e its value (CityBuildAI +0xd68 [D']) is above 0, adds it into B's slot (+0xd10 through 0x9034b0 (FinalRelease 0x72a920), the table the PLOT ANALYSIS LOG prints). So a Shrine logs it...
     - "...B's own value is not tested. The slot's holder +0xd10 is a synced variable whose data 0x9034b0 returns at +0x58 = +0xd68, the array the dependents are read from: one table, so a depe..."
   review: reviewed
+- addr: 0x929680
+  final: 0x640d60
+  kind: function
+  semantics: "the map layer of the global @f07400 (the air layer) from the layer manager (0x91e4a0): its +8 vector's entry, 0x120 bytes each; null past its end"
+  status: READ
+  cases:
+    - recording: h1_duels1179
+      turn: 207
+      value: "city-state 4's Fighter contract as logged: the Aerodrome's term 30.0 with no aircraft based"
+  impl: [cpu/core/air.ts:districtAirBase]
+  readings:
+    - "C-96 / C-127: the unit value's air, naval, nuclear and fuel terms; a district's rows on an unbought plot; a minor's district progress — READ (0x7b62c0 at 0x7b6eb3..0x7b7045, 0x7b709f..0x7b7165, 0x7b75fd..0x7b7655; 0x2499b0, 0x929680 -> 0x9296e0; 0x7aaf80 at 0x7ab521), both twins"
+  review: reviewed
+- addr: 0x9296e0
+  final: 0x640dc0
+  kind: function
+  semantics: "a layer's units at a plot: the plot's entry in the layer's map (+0x108, 0x1017b0), its vector of unit ids; an empty one for a plot it holds none on"
+  status: READ
+  cases:
+    - recording: h1_duels1179
+      turn: 207
+      value: "city-state 4's Fighter contract as logged: the Aerodrome's term 30.0 with no aircraft based"
+  impl: [cpu/core/air.ts:districtAirBase]
+  readings:
+    - "C-96 / C-127: the unit value's air, naval, nuclear and fuel terms; a district's rows on an unbought plot; a minor's district progress — READ (0x7b62c0 at 0x7b6eb3..0x7b7045, 0x7b709f..0x7b7165, 0x7b75fd..0x7b7655; 0x2499b0, 0x929680 -> 0x9296e0; 0x7aaf80 at 0x7ab521), both twins"
+  review: reviewed
 - addr: 0x929790
   final: 0x640e90
   kind: function

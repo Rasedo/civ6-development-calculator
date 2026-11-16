@@ -2393,7 +2393,27 @@ class _PlotFacts:
         return plane[self.bb, self.tiles].long()
 
     def rows_adjacency(self, d, y):
-        return self.district_adjacency(d, y)
+        """the rows answer to the city's owner: OtherDistrictAdjacent counts
+        the city-state's own districts beside a plot no one owns"""
+        sim = self.sim
+        T = sim._cv_tables()
+        names = [r["type"] for r in sim.rules.ai_city_build["districts"]]
+        if d not in names:
+            return 0
+        dv = int(T["engine"]["district"][names.index(d)])
+        if dv < 0 or int(sim.districts_cat[dv]["adjYield"]) != _YIELDS.index(y):
+            return 0
+
+        def build():
+            nb = sim.neigh
+            nbc = nb.clamp(min=0)
+            on = (nb >= 0).unsqueeze(0)
+            live = (sim.district[:, nbc] >= 0) & sim.district_complete[:, nbc] & ~sim.district_pillaged[:, nbc]
+            owner = torch.where(sim.tile_seat < 0, torch.full_like(sim.tile_seat, self.ctx.seat), sim.tile_seat)
+            cnt = ((sim._centre_plane()[:, nbc] | live) & (sim.tile_seat[:, nbc] == owner.unsqueeze(2)) & on).sum(dim=2)
+            return torch.floor(sim._district_adj_raw(dv, cnt.to(sim.dtype))) - sim._adj_hidden_cut(self.ctx.row, dv)
+        plane = self.ctx.get(("radj", dv), build)
+        return plane[self.bb, self.tiles].long()
 
     def other_districts(self, d):
         return [(name, m) for name, m in self._cand if name != d]

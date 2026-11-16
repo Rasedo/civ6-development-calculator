@@ -386,7 +386,6 @@ A question the SOURCE under-determines; neither engine ships a branch until the 
   - LAB (buildings and districts): the Free Cities' pick still asks the repair's quiet turns (their queue's refusal unported)
   - LAB (buildings and districts): the walls' repair the game picks where ours picks another item or none: duels1145 Anshan t100 (ours Research Grants), 1139 Wolin t148, 1137 Cardiff t229 (untraced)
   - BUILD (buildings and districts): the majors' CanConstruct (rules.ts) counts a pillaged prerequisite building, the game's refuses it (0x170450 at 0x170a33; the city-states' and the Free Cities' ported on duels1143 t135)
-  - LAB (buildings and districts): the formation discount (0x6aa300) on a purchase pick whose centre unit value the engines do not read (a unit with a Units_XP2 maintenance resource) reads 0: duels1181 Cahokia t239 its sea pick the Nuclear Submarine (-36.94 in the game's table), the game's Seaport 83.83 under the Sewer's 96.67, ours the Seaport contract; duels1143 city-state 2 t227 the Seaport for the game's Sewer alike (untraced); duels1162 city-state 4 t210-t238 the Seaport contract where the game's takes a Fighter (untraced)
   - LAB (picks): a 0.0 pick tie (1117 t168-214)
   - LAB (picks): 1127 Mexico City t22's cancel
   - LAB (picks): the forecast's place (1121 t18)
@@ -395,6 +394,7 @@ A question the SOURCE under-determines; neither engine ships a branch until the 
   - LAB (picks): the founding Archer (1124 t2)
   - LAB (picks): the founding Production (1121 Hunza a turn quicker, 1124 Granada two slower)
   - LAB (picks): 1128 Nazca t27-32 the idle store ~9 over the idle Production (Shrine T 6..2, ours 8..4)
+  - LAB (picks): duels1158 Granada t204-t245: after its Military Academy (t203) the city trains Armies, the record's formation 2 (the Cavalry at 372, formationCost(165, 2), the Scout at 34), ours the lone unit at 165 and its Cavalry complete at t211 (unit.trained and cityState.build t211-t245); the formation a minor's order takes unread (0x17bb40's r15 formation argument)
   - LAB (1128 nazca and hong kong): 1128 Nazca t77 / t84 Shipping for the game's Trader
   - LAB (1128 nazca and hong kong): 1128 Nazca t59 / t69 / t90 / t119 the game's SHIPPING (34.0 at t59)
   - LAB (1128 nazca and hong kong): 1128 Nazca t15 Equestrian Orders unscored in ours
@@ -444,11 +444,12 @@ A question the SOURCE under-determines; neither engine ships a branch until the 
   - LAB (contracts): a mid-turn reveal other than the ground's sight (unread)
   - LAB (contracts): a release's status on a COMPLETED / FAILED contract
   - LAB (contracts): the release's writer (the tree's end 0x7cbb40, an operation's end, 0x7d22f0's caller) unread, the rule read off the aimem contracts (a released contract CANCELLED but a FAILED one, in the city's hand too)
-  - LAB (contracts): duels1146 Kandy from t185, its Holy Site's plot 40:12 submerged: the game's district tree places a new Holy Site (Contract 1059 t199, 1107 t207), ours holds DISTRICT_HOLY_SITE contracts t185 / t191 / t195 and none t207 / t224; its Neighborhood and Purchase Plot (37:13) contracts t174-t198 the game holds none of (untraced)
-  - LAB (contracts): duels1164 Cardiff t185-200 and duels1167 Rapa Nui t206-210: its Neighborhood complete, the game starts a Build City District tree each turn that ends the turn it starts (m_eventTrees slot 2 a new id at each end look, no tree held), ours holds a Purchase Plot contract on 15:7 / 32:14; the game's pick unread (1164 its 15:7 row 881.66, ours 886.28 over the owned 14:7's 885.51; 1167 ours turns away the owned 28:12 at 82.74 under its Farm tree's reservation); duels1136 Buenos Aires t191 the game's tree on the unowned 28:15 lives
+  - LAB (contracts): duels1146 Kandy t185-t198 (every DISTRICTS row of t185 as logged): the game's Build City District tree on its own unfinished Neighborhood 38:10, a flooded lowland, ends each other turn with no contract (t185, t187, ..., Check Plot failing there), ours posts DISTRICT_NEIGHBORHOOD each turn; what ends the game's tree unread (its Reserve Plot of no plot SUCCEEDS, 0x7f7da0 at 0x7f8187); duels1133 Kandy t11-t16 alike on its Holy Site (trees of t13 / t15 holding no contract)
+  - LAB (contracts): duels1167 Rapa Nui t206-210: its Neighborhood complete, the game starts a Build City District tree each turn that ends the turn it starts (m_eventTrees slot 2 a new id at each end look, no tree held), ours holds a Purchase Plot contract on 32:14 (ours turns away the owned 28:12 at 82.74 under its Farm tree's reservation); duels1136 Buenos Aires t191 the game's tree on the unowned 28:15 lives
   - LAB (contracts): the tree on the city's own unfinished district submits its district contract a turn before the game's: duels1173 Ayutthaya t186 and duels1165 Vatican City t186 / t190 ours DISTRICT_NEIGHBORHOOD on 0:17 / 42:10, the game's none (its tree of t185 holds no contract and ends, the next one's at t187)
   - LAB (contracts): the district plot a tree's choice takes: duels1141 city-state 3 t223 the game's Purchase Plot on 12:21 (its rows 12:21 and 14:21 tied at 1369.34), ours 13:21; duels1191 city-state 2 t128 the game's 31:18, ours 30:20 (untraced)
   - LAB (contracts): duels1137 t33-t34 city-state 2: its Build City District tree's Celestial Navigation contract 34 COMPLETED at t33, the game's tree holds it to the t34 log and ends without a district contract, its Harbor contract 84 from a new tree at t35; ours posts the Harbor from the same tree at t33
+  - LAB (contracts): duels1164 Cardiff t185-t196: its Siege City Assault contract's unit ours the Ranger, the game's the Cuirassier (the Ranger from t197), untraced
 - **C-100. CITY-STATES' PLOT AND DISTRICT VALUES.** Weight 4.
   - LAB (power): the free power's sources (ChangeFreePower 0x1ed860 from 0xafe320 / 0xaff790, the percent +0xa8) unread, the city's own renewables read for it
   - LAB (district placement): on the older recordings only (the duelz logs hold no DISTRICTS rows): 1128 Bologna t2 the Campus at 3:8 (355) for the game's 3:7 (311)

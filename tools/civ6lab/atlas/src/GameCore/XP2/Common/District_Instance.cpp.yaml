@@ -79,6 +79,19 @@
   context:
     - ...cency at its plot +0x218, 0x366df0, plus 0x24acc0 and 0x249db0 of the yield, x (100 + 0x249940) / 100) + 0x24aae0 (the same per entry of the district's +0x3e0 list keyed by the yield...
   review: imported
+- addr: 0x2499b0
+  final: 0x190710
+  kind: function
+  semantics: "a district's air slots: its Districts row's AirSlots (+0x28) plus the district's own +0xb68"
+  status: READ
+  cases:
+    - recording: h1_duels1179
+      turn: 207
+      value: "city-state 4's Fighter contract as logged: the Aerodrome's term 30.0 with no aircraft based"
+  impl: [cpu/core/air.ts:districtAirBase]
+  readings:
+    - "C-96 / C-127: the unit value's air, naval, nuclear and fuel terms; a district's rows on an unbought plot; a minor's district progress — READ (0x7b62c0 at 0x7b6eb3..0x7b7045, 0x7b709f..0x7b7165, 0x7b75fd..0x7b7655; 0x2499b0, 0x929680 -> 0x9296e0; 0x7aaf80 at 0x7ab521), both twins"
+  review: reviewed
 - addr: 0x249db0
   final: 0x190a20
   kind: function

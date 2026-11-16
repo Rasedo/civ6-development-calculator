@@ -33,6 +33,7 @@
     - "H-1: a formation's Production cost in the queue — READ (0x17bfa0 -> 0x17bef0 / 0x17be50), both twins"
     - "C-102: the citizen pressure's falloff and the per-citizen term — READ; Stamford Raffles' city"
     - "C-96: the formation discount's analyzer and a suzerained city-state's accumulated income in the unit production table — READ (0x6aa300, 0x6a9fb0, 0x5d2810, 0x5d4cd0, 0x536da0), the income off the recorded memory, both twins"
+    - "C-96 / C-127: the unit value's air, naval, nuclear and fuel terms; a district's rows on an unbought plot; a minor's district progress — READ (0x7b62c0 at 0x7b6eb3..0x7b7045, 0x7b709f..0x7b7165, 0x7b75fd..0x7b7655; 0x2499b0, 0x929680 -> 0x9296e0; 0x7aaf80 at 0x7ab521), both twins"
   notes:
     - "imported: READ in its section, no confirming case found beside it"
     - ".claude/scratchpad/cb/notes.txt: ...*256)&0xff ; fx(0.01)=2 (!), fx(0.5)=128, fx(1/6 const 0.16667)=42. fx_mul a*b>>8 (0x16eb20 assign, 0x16e7d0 new), fx_div (a<<8)/b trunc (0x16e940), add 0xac650, sub 0x16ec10. FX_MIN=-9999.0 (@f04cb0 = 0xffd8..."
@@ -71,6 +72,7 @@
     - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
     - "C-130 / C-112: the domain strength's treasury carry and the city's turn's citizen re-place — READ, both twins"
     - "C-102: the citizen pressure's falloff and the per-citizen term — READ; Stamford Raffles' city"
+    - "C-96 / C-127: the unit value's air, naval, nuclear and fuel terms; a district's rows on an unbought plot; a minor's district progress — READ (0x7b62c0 at 0x7b6eb3..0x7b7045, 0x7b709f..0x7b7165, 0x7b75fd..0x7b7655; 0x2499b0, 0x929680 -> 0x9296e0; 0x7aaf80 at 0x7ab521), both twins"
   notes:
     - ".claude/scratchpad/cb/notes.txt: ...28, fx(1/6 const 0.16667)=42. fx_mul a*b>>8 (0x16eb20 assign, 0x16e7d0 new), fx_div (a<<8)/b trunc (0x16e940), add 0xac650, sub 0x16ec10. FX_MIN=-9999.0 (@f04cb0 = 0xffd8f100).  LOG: AI_CityBuild.csv lines: D..."
   context:
@@ -833,6 +835,7 @@
     - "C-96: the unit value's unit count and the founding Production — READ, both twins"
     - "A minor's items' turns at the Production its AI read before its free Trader's route — the C-130 cache applied to the build turns, both twins"
     - "C-100: the build turns' store — a completion's overflow, an idle city's Production — and a Builder's charge at the count before the turn's contract purchases"
+    - "C-96 / C-127: the unit value's air, naval, nuclear and fuel terms; a district's rows on an unbought plot; a minor's district progress — READ (0x7b62c0 at 0x7b6eb3..0x7b7045, 0x7b709f..0x7b7165, 0x7b75fd..0x7b7655; 0x2499b0, 0x929680 -> 0x9296e0; 0x7aaf80 at 0x7ab521), both twins"
   context:
     - ...T = max(tech turns 0x7610e0, civic turns 0x621920) + the prerequisite district's turns (0x17b5a0, +10 when not the current production) + the build turns (0x17b1e0, the queue's own es...
   review: reviewed

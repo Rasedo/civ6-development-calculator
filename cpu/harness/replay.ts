@@ -6436,8 +6436,9 @@ const UNIT_MEMORY = ['slot', 'aiDefender', 'aiHomed', 'escorted', 'look', 'mpBon
 const GAME_MEMORY = ['barbTribes', 'barbPool', 'barbCampsBegun', 'barbSpotNext'] as const;
 /** THE RULES' STORES NO RECORD SHOWS, carried the same way: the barbarian
  *  kills a boost counts, the wars' clocks; a city-state's production
- *  overflow, the progress its districts, projects and repairs switched from
- *  keep (`minorKeptCarried`; a building's and a unit's are the record's),
+ *  overflow, the progress its projects and repairs switched from keep
+ *  (`minorKeptCarried`; a building's, a unit's and a district's are the
+ *  record's),
  *  its powered project and repair
  *  waits, its strategic stockpile, its reservations and the queue front's
  *  reservation on it (the importer reads a minor's none), the trade routes the record's routes laid (the
@@ -6454,13 +6455,13 @@ const SEAT_STORES = ['barbKills', 'netIncome'] as const;
 const CITY_STORES = ['formerSeat'] as const;
 const MINOR_STORES = ['prodOverflow', 'repairWait', 'tradeRoutes', 'foundedTurn', 'stockpile', 'prodReserved', 'reserved', 'gpPoints', 'projectsDone'] as const;
 
-/** the progress a city-state's districts, projects and repairs it switched
- *  from keep, the engine's own, beside the record's kept on its buildings and
- *  units (`buildRows`) */
+/** the progress a city-state's projects and repairs it switched from keep,
+ *  the engine's own, beside the record's kept on its buildings, units and
+ *  districts (`buildRows`) */
 function minorKeptCarried(from: CityState, to: CityState): void {
   const kept = { ...to.prodRetained };
   for (const [k, v] of Object.entries(from.prodRetained ?? {})) {
-    if (!k.startsWith('building:') && !k.startsWith('unit:') && k !== to.prodItem) kept[k] = v;
+    if (!k.startsWith('building:') && !k.startsWith('unit:') && !k.startsWith('district:') && k !== to.prodItem) kept[k] = v;
   }
   if (Object.keys(kept).length) to.prodRetained = kept;
   else delete to.prodRetained;

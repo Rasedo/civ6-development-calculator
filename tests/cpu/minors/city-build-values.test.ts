@@ -22,7 +22,7 @@ const facts: CityBuildFacts = {
   growth: { surplus: 2 * 256, housing: 5, population: 1, stored: 0, multiplier: 256 },
   forecast: growthForecast({ surplus: 2 * 256, housing: 5, population: 1, stored: 0, multiplier: 256 }),
   unitProduction: new Map(), trainsDomain: () => true, cities: 0, extraCopies: () => 0, promotionWeight: () => 256,
-  resourceAccess: () => true, handicap: 0,
+  resourceAccess: () => true, surplus: () => 0, airBase: () => null, seaReach: true, handicap: 0,
 };
 
 describe('the city build AI\'s unit value', () => {

@@ -51,6 +51,7 @@ import { computeUnlocksIn, purchaseStep, unitMaintenance, type Unlocks } from '.
 import { buildingPillaged, cityPower, repairBuilding } from './yields';
 import { centerBuildingIds } from './prodLayout';
 import { cityLowlands, coastalLowlandCounts, floodBarrierCost, repairBehindBarrier } from './climate';
+import { districtAirBase } from './air';
 import { minorTrade, minorTradePick, tradeCapacity, tradeGraphTurn } from './trade';
 import { BARB_SEAT, FREE_SEAT, atWarWithMajor, civsAtWar, denounceActive, freeSeatOf, hiddenResourcesFor, isCiv, majorityReligionOf, majorsAlive, seatOf, tileSeat } from './seats';
 import { builderCost, cityNavalCapable, cityUnitPlot, disbandUnit, holdGarrison, raiseBestTrained, spawnUnit, gameProgressUnitCost, unitFullMoves, unitIsMilitary, unitMadeAnew, upgradeAnew } from './units';
@@ -60,7 +61,7 @@ import { dangerPlane, knowledgeLook, seatPoolSlots } from './tactical';
 import { plotsSeenNow } from './barbarians';
 import { cityStateMilitary, minorCampsLook, minorCitiesLook, minorMilitaryUpgrade, minorOpsRefresh, upgradeTreesStart } from './minorOps';
 import { tilesWithin } from '../../world/hex';
-import { hasRiver } from '../../world/query';
+import { hasRiver, isCoastalLand } from '../../world/query';
 import { aliases, engineId, gameTypeOf } from '../data/aliases';
 import { DISTRICTS } from '../data/districts';
 import { AI_BUILDINGS, AI_PROJECTS, AI_PROMOTION_CLASS_LISTS, AI_UNITS } from '../data/aiBuildTables';
@@ -2019,6 +2020,7 @@ export function minorBuildFacts(state: GameState, cityState: CityState, known: (
   const centre = state.map.tiles[cityState.centerIndex];
   const worship = minorWorship(state, cityState);
   const amenity = amenityCityOf(stats);
+  let surplus: ((resource: string) => number) | undefined;
   const facts: CityBuildFacts = {
     view,
     seat: cityState.seat,
@@ -2099,6 +2101,12 @@ export function minorBuildFacts(state: GameState, cityState: CityState, known: (
       if (!id) return false;
       if ((cityState.resourceCounts?.[res] ?? 0) > 0) return true;
       return stockFree(state, cityState.seat, id) !== 0;
+    },
+    surplus: (res) => (surplus ??= strategicSurplus(state, cityState.seat))(res),
+    seaReach: isCoastalLand(state.map, centre) || (cityState.districts ?? []).some((x) => x.type === 'HARBOR' && state.map.tiles[x.tileIndex].terrain !== 'LAKE'),
+    airBase: (d) => {
+      const id = engineId('district', d, 'DISTRICT_', DISTRICTS);
+      return id ? districtAirBase(state, city, id) : null;
     },
     handicap: 0,
     artifacts: worldArtifacts(state),

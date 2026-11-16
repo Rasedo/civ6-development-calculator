@@ -20,7 +20,7 @@ import { AI_CIVILIZATION_TRAITS, AI_LEADER_TRAITS } from '../data/aiTables';
 import { AI_BUILDINGS, AI_RESOURCES, AI_UNITS } from '../data/aiBuildTables';
 import { engineId, gameTypeOf } from '../data/aliases';
 import { RESOURCES } from '../../world/resources';
-import { hasRiver } from '../../world/query';
+import { hasRiver, isCoastalLand } from '../../world/query';
 import { hexDistance, tilesWithin } from '../../world/hex';
 import { AI_BUILDING_INDEX, AI_UNIT_INDEX, amenityCityOf, growthForecast, worldArtifacts, type AiUnitRow, type AmenityCity, type CityBuildFacts } from './aiCityBuild';
 import { FX, fdiv, fmul, fxOf, turnsAt, yieldValue } from './aiValue';
@@ -35,6 +35,7 @@ import { getModifiers, prodBoostPct, seatGovernment } from './effects';
 import { FREE_SEAT, atWarWithMajor, citiesOf, freeSeatOf, isCiv, isCityStateSeat, isFreeSeat, seatOf } from './seats';
 import { minorCity } from './cityStates';
 import { cityLowlands, coastalLowlandCounts } from './climate';
+import { districtAirBase } from './air';
 import { accumulatedPerTurn, stockFree, strategicSlot, strategicSurplus, upgradeGoldCost } from './stockpile';
 import { buildingPillaged, cityPower } from './yields';
 import { buildingCostIn, outerDamage, worshipOffered } from './rules';
@@ -155,6 +156,7 @@ function majorBuildFacts(state: GameState, city: City, known: (unit: string) => 
   const has = new Set(city.buildings);
   const centre = state.map.tiles[city.centerIndex];
   const worship = worshipOffered(state, city);
+  const surplus = strategicSurplus(state, seat);
   const own_units = new Map<string, number>();
   for (const u of state.units) {
     if (u.seat !== seat) continue;
@@ -244,7 +246,7 @@ function majorBuildFacts(state: GameState, city: City, known: (unit: string) => 
       listed: seatListed(r, holds, !isFreeSeat(seat)),
       owned: (u) => own_units.get(u) ?? 0,
       known,
-      surplus: strategicSurplus(state, seat),
+      surplus,
     }),
     trainsDomain: (d) => d !== 'DOMAIN_SEA' || cityNavalCapable(state, city),
     cities: own.length,
@@ -256,6 +258,12 @@ function majorBuildFacts(state: GameState, city: City, known: (unit: string) => 
       if ((s.stockpile?.[Object.keys(RESOURCES).indexOf(id)] ?? 0) > 0) return true;
       return own.some((c) => tilesWithin(state.map, state.map.tiles[c.centerIndex].col, state.map.tiles[c.centerIndex].row, 3)
         .some((t) => t.resource === id));
+    },
+    surplus,
+    seaReach: isCoastalLand(state.map, centre) || city.districts.some((x) => x.type === 'HARBOR' && state.map.tiles[x.tileIndex].terrain !== 'LAKE'),
+    airBase: (d) => {
+      const id = engineId('district', d, 'DISTRICT_', DISTRICTS);
+      return id ? districtAirBase(state, city, id) : null;
     },
     handicap: handicapOf(state, seat),
     artifacts: worldArtifacts(state),

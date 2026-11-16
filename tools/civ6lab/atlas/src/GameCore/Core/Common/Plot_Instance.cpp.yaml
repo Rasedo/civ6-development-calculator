@@ -76,6 +76,7 @@
     - cpu/core/combat.ts:meleeUnitStrengths
     - cpu/core/combat.ts:amphibiousAttackCS
     - cpu/core/operations/operation.ts:teamApplies
+    - cpu/core/aiCityBuild.ts:CityBuildFacts
   readings:
     - "C-74: the event draw, the volcanoes, the drought"
     - "C-96 / C-97: the unit value — READ (the combat, trade, explorer branches, the tail, the military AI's unit production), PARTLY READ (its inputs)"
@@ -90,6 +91,7 @@
     - "H-1 / C-96: at war with a living major, a unit's strategic resource in the City Analysis, a city-state's naval strategy — READ (0x3dcf50, 0x7b62c0 at 0x7b71cd..0x7b725d, 0x6fafc0 at 0x6fc771..0x6fc873, 0x783980 at 0x783ade..0x783d93 and 0x785271..0x7852df, 0x786080, 0x865f20), both twins"
     - "C-95 / C-99: a cleared camp's scout still reports; a lake city trains ships; IsCoastalTarget; the recruit's priority; a candidate's own strength — READ (0x153ef0, 0x1485c0, 0x1c77c0 -> 0x82a10, 0x73a440 -> 0x73a880, 0x81c820 at 0x81cacf..0x81cb14, 0x7d1e40 at 0x7d2004..0x7d205f, 0x5cced0 at 0x5cd0c1..0x5cd11e, 0x7f5240), both twins"
     - "C-95 / C-99: a cleared camp's scout still reports; a lake city trains ships; IsCoastalTarget; the recruit's priority; a candidate's own strength — READ (0x153ef0, 0x1485c0, 0x1488a0 at 0x148c38..0x148c64, 0x1c77c0 -> 0x82a10, 0x73a440 -> 0x73a880, 0x81c820 at 0x81cacf..0x81cb14, 0x7d1e40 at 0x7d2004..0x7d205f, 0x5cced0 at 0x5cd0c1..0x5cd11e, 0x7f5240), both twins"
+    - "C-96 / C-127: the unit value's air, naval, nuclear and fuel terms; a district's rows on an unbought plot; a minor's district progress — READ (0x7b62c0 at 0x7b6eb3..0x7b7045, 0x7b709f..0x7b7165, 0x7b75fd..0x7b7655; 0x2499b0, 0x929680 -> 0x9296e0; 0x7aaf80 at 0x7ab521), both twins"
   notes:
     - ".claude/scratchpad/st1/reading.md: ...promise's plot   (PROMISE_DONT_SETTLE_NEAR_ME, 0xfadf5055). Then: the continent (+0x30),   coastal (0x82a10) and fresh water (0x82c20); the nearest own city (a min,   0 with none); the danger (the influence..."
   context:
@@ -165,10 +167,12 @@
     - recording: 1109
       turn: 225
       value: "and a National Park's Tourism (1109 Handan t225-241) read the park's appeal before the Conservation term until t242 — the same cache."
+  impl: [cpu/core/aiCityBuild.ts:airBase]
   readings:
     - "H-1: the plot's Appeal — READ"
     - "C-97: the operations — the manager READ (no-enemy candidates), the war candidates unread"
     - "C-97: the operations — the manager and its candidates READ, the staging list and City Defense's start unread"
+    - "C-96 / C-127: the unit value's air, naval, nuclear and fuel terms; a district's rows on an unbought plot; a minor's district progress — READ (0x7b62c0 at 0x7b6eb3..0x7b7045, 0x7b709f..0x7b7165, 0x7b75fd..0x7b7655; 0x2499b0, 0x929680 -> 0x9296e0; 0x7aaf80 at 0x7ab521), both twins"
   context:
     - ...eturns 0, a mountain (terrain 2/5/8/11/14) that + 4; else +1 for its own river (+0x37) or 0x82e80, -1 for its own complete district while pillaged, -1 for its own pillaged improvement (+0...
     - "...quals) whose ring walk within 4 holds a sea plot not a lake (callback @d6e100: 0x834d0, 0x82e80), value 100, enemy strength the largest best combat strength of the game's majors; BA..."

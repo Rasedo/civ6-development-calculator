@@ -86,6 +86,8 @@
     - cpu/core/aiModifiers.ts:ANALYZERS
     - cpu/core/aiValue.ts:AiValueView
     - cpu/core/aiModifiers.ts:EVALUATORS
+    - cpu/core/aiCityBuild.ts:airBase
+    - cpu/core/air.ts:districtAirBase
   readings:
     - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
     - "C-99: the upgrade trees — READ (the trigger, Find Available Unit's upgradeable offer, Find Unit Targets' job, Upgrade Units, the economic AI's upgrade, Move Unit with no Location), ported; the deletion of an excess obsolete unit unported"
@@ -93,6 +95,7 @@
     - "C-96: a city-state's City Center projects, Build Unit's pillaged building, the pick's pillaged district and the war footing's writer"
     - "C-96 / C-130: a building's district copy, the player's Gold as its cities stand, a minor's power after its production; a technology's improvement tourism — READ (0x18e570, 0x7a7dc3, 0x4e0bf0, 0x7b4971..0x7b4b5b), both twins but the tourism"
     - "C-127 / C-100 / C-96 / C-99: Check Plot's district test and Add Goal Tech's Goal Plot, a flooded lowland's district, the unit production table's at-war field, the pick's repair project — READ (0x7f6ea0 at 0x7f7600..0x7f7662, 0x35f2d0 at 0x35f46b..0x35f48a / 0x35f60f..0x35f81d, 0x7e7d20 at 0x7e888b..0x7e8a9d, 0x173940 at 0x173a05..0x173be1), LAB (the aiunits unit tables, the Default Specialization's project), both twins"
+    - "C-96 / C-127: the unit value's air, naval, nuclear and fuel terms; a district's rows on an unbought plot; a minor's district progress — READ (0x7b62c0 at 0x7b6eb3..0x7b7045, 0x7b709f..0x7b7165, 0x7b75fd..0x7b7655; 0x2499b0, 0x929680 -> 0x9296e0; 0x7aaf80 at 0x7ab521), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...nt stored as fx(Amount x 0.01f)): a city subject with the district (context +0x78, else 0x1ae530 by DistrictType); per building of the district type (Districts +0x130 list, the first r..."

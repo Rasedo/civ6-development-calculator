@@ -34,6 +34,7 @@
  */
 import { AI_BUILDINGS, AI_DISTRICTS, AI_PROJECTS, AI_UNITS } from '../data/aiBuildTables';
 import { AI_VALUE_HORIZON } from '../data/aiValue';
+import { AI_PSEUDOYIELD_DEFAULT } from '../data/aiTables';
 import { FX, FX_MIN, fdiv, fmul, fxConst, fxOf, presentValue, pseudoYieldValue, traderValue, valueBetween, yieldValue, AI_RATE, type AiValueView } from './aiValue';
 import type { UnitProductionEntry } from './aiUnitProduction';
 import type { CityStats } from './city';
@@ -290,6 +291,17 @@ export interface CityBuildFacts {
   /** the player holds the strategic resource, or a city of its has it near
    *  (0x4aa790, 0x5d45c0) */
   resourceAccess(resource: string): boolean;
+  /** the player's accumulated resource a turn (Player_Resources +0x350,
+   *  0x4aa700) less its units' fuel bill of it (0x4ab270): `strategicSurplus` */
+  surplus(resource: string): number;
+  /** the city's district of the type as the air term reads it
+   *  (`districtAirBase`), null where the city holds none */
+  airBase(district: string): { aircraft: number; slots: number } | null;
+  /** a ship of no RangedCombat is valued at the city (0x7b62c0 at
+   *  0x7b6fec..0x7b7045): its plot coastal land (IsCoastalLand 0x82a10 at
+   *  the ocean's least size), or a Harbor of the city (0x1ae530 with its
+   *  replacements) on no lake (IsLake 0x82e80) */
+  seaReach: boolean;
   /** the player's handicap index (player +0x908) */
   handicap: number;
   /** the world's artifacts an Archaeologist's value counts (`worldArtifacts`) */
@@ -760,18 +772,20 @@ export function unitTurns(f: CityBuildFacts, u: AiUnitRow): number {
  *  naval or air one) the military AI's table value (x3 for an entry
  *  obsolete to the player), plus half the player's cities (player +0x12f0
  *  +0xc0) where its Combat exceeds the strongest melee strength the player
- *  has trained (PlayerStats +0xf0, 0x4d9320); an explorer, settler or spy 1.0 plus the
+ *  has trained (PlayerStats +0xf0, 0x4d9320), an aircraft its base's term
+ *  (30.0 at an empty base, 5.0 a free slot); an explorer, settler or spy 1.0 plus the
  *  eras' points as PSEUDOYIELD_GOLDENAGE_POINT; a Trader its worth
  *  (`traderValue` with start and horizon both `t`: one turn's route value
  *  discounted to `t`) through PSEUDOYIELD_UNIT_TRADE; a religious unit
  *  (PSEUDOYIELD_UNIT_RELIGIOUS) its tourism bomb as PSEUDOYIELD_TOURISM — then
- *  x (the city's extra copies + 1) x the promotion class weight, 0 outright
- *  for a strategic resource the player cannot reach, through its
- *  pseudo-yield, less its Maintenance as Gold below handicap 3, paid from
- *  `t` to `h`, plus its modifiers' whole values (its abilities', GlobalAI
- *  +0x3a50, the unit valued in the context). Null where a term it needs is not read (an Archaeologist, a
- *  WMD, an air unit, a unit with a Units_XP2 maintenance resource; a full
- *  civilization's religious or park-charged unit). */
+ *  a WMD's nuclear term, x (the city's extra copies + 1) x the promotion
+ *  class weight, 0 outright for a strategic resource the player cannot
+ *  reach, through its pseudo-yield, less its Maintenance as Gold below
+ *  handicap 3, paid from `t` to `h` (0 for a unit whose maintenance resource
+ *  runs no surplus), plus its modifiers' whole values (its abilities',
+ *  GlobalAI +0x3a50, the unit valued in the context). Null where a term it
+ *  needs is not read (a full civilization's explorer, settler, spy,
+ *  Archaeologist, religious or park-charged unit). */
 export function unitValue(f: CityBuildFacts, u: AiUnitRow, t: number, h = AI_VALUE_HORIZON): number | null {
   const exit = unitValueExit(f, u.type, t, h);
   if (exit !== null) return exit;
@@ -779,11 +793,22 @@ export function unitValue(f: CityBuildFacts, u: AiUnitRow, t: number, h = AI_VAL
   const pseudo = u.pseudo ?? 'PSEUDOYIELD_UNIT_COMBAT';
   let v = 0;
   if (COMBAT_PSEUDO.has(pseudo)) {
-    if (pseudo === 'PSEUDOYIELD_UNIT_AIR_COMBAT') return null;
     const e = f.unitProduction.get(u.type);
     v = e?.value ?? 0;
     if (e?.obsolete) v = fmul(v, 3 * FX);
     if (u.combat > f.view.bestCombatStrength(f.seat)) v += fxConst(f.cities * 0.5);
+    // an aircraft (0x7b6eb3..0x7b6f9d): where the city holds its
+    // PrereqDistrict, 30.0 with no aircraft based there, else 5.0 a free slot
+    const base = pseudo === 'PSEUDOYIELD_UNIT_AIR_COMBAT' && u.district ? f.airBase(u.district) : null;
+    if (base) {
+      if (base.aircraft === 0) v += 30 * FX;
+      else if (base.aircraft < base.slots) v += (base.slots - base.aircraft) * 5 * FX;
+    }
+    // a naval unit of no RangedCombat where the city reaches no sea
+    // (`seaReach`): FX(-9999) (runs/h1_duels1162 Buenos Aires t205-t210: its
+    // Galley, Caravel, Ironclad and Destroyer FX(-9999), its Quadrireme
+    // -6.29, Privateer -7.04 as logged)
+    if (pseudo === 'PSEUDOYIELD_UNIT_NAVAL_COMBAT' && !f.seaReach && u.rangedCombat === 0) return FX_MIN;
   } else if (pseudo === 'PSEUDOYIELD_UNIT_TRADE') {
     const tv = traderValue(f.view, f.seat, 0, t, t);
     if (tv === null) return null;
@@ -818,7 +843,13 @@ export function unitValue(f: CityBuildFacts, u: AiUnitRow, t: number, h = AI_VAL
   }
   // a park-charged unit's own tourism (0x7b7456: the culture AI's park
   // term) reads 0 at a city-state and the Free Cities, as above
-  if (u.wmd || u.maintenanceResource || (u.parkCharges > 0 && f.fullCiv)) return null;
+  if (u.parkCharges > 0 && f.fullCiv) return null;
+  // a WMDCapable unit (0x7b709f..0x7b7165): PSEUDOYIELD_NUCLEAR_WEAPON's
+  // value of 1.0 over its DefaultValue, x2.0
+  if (u.wmd) {
+    v += fmul(fdiv(pseudoYieldValue(f.view, f.seat, FX, 'PSEUDOYIELD_NUCLEAR_WEAPON'),
+      fxConst(AI_PSEUDOYIELD_DEFAULT.PSEUDOYIELD_NUCLEAR_WEAPON ?? 1)), 2 * FX);
+  }
   v = fmul(v, (f.extraCopies(u.type) + 1) * FX);
   v = fmul(v, f.promotionWeight(u.promotionClass));
   if (u.resource && !f.resourceAccess(u.resource)) return 0;
@@ -831,8 +862,12 @@ export function unitValue(f: CityBuildFacts, u: AiUnitRow, t: number, h = AI_VAL
   // then its modifiers (0x7a4b20 at 0x7b76ce) in a context of the player
   // and the unit valued (+0x5c), no city, from `t` to `h`, added whole
   // (runs/h1_duely1124 city-state 4 t179-183: the Supply Convoy's movement
-  // 46 over its -4.48 .. -6.12, Combustion's unit term as logged)
-  return presentValue(v, AI_RATE, h) - presentValue(v, AI_RATE, t)
+  // 46 over its -4.48 .. -6.12, Combustion's unit term as logged); before
+  // them, a unit with a Units_XP2 ResourceMaintenanceType whose surplus (the
+  // turn's income less the units' fuel bill, 0x7b75fd..0x7b7655) is not
+  // above 0 is worth 0
+  const pv = u.maintenanceResource && f.surplus(u.maintenanceResource) <= 0 ? 0 : presentValue(v, AI_RATE, h) - presentValue(v, AI_RATE, t);
+  return pv
     + modifiersValue({ view: f.view, seat: f.seat, start: t, horizon: h, rate: AI_RATE, valued: u.type }, u.modifiers);
 }
 

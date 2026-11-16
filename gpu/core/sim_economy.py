@@ -1408,6 +1408,15 @@ class SimEconomy:
         _dt = self.city_dist_tile
         _gone = take.gather(1, _dt.reshape(self.B, -1).clamp(min=0)).reshape(_dt.shape) & (_dt >= 0)
         if bool(_gone.count_nonzero()):
+            # a city-state's unfinished district takes the progress its queue
+            # kept on the type
+            _m0, _ns = self._CITY_MINOR0, self.citystate_kept.shape[1]
+            _mt = _dt[:, _m0:_m0 + _ns, 0, :]
+            _done = self.district_complete.gather(1, _mt.reshape(self.B, -1).clamp(min=0)).reshape(_mt.shape)
+            _lose = _gone[:, _m0:_m0 + _ns, 0, :] & ~_done
+            if bool(_lose.count_nonzero()):
+                _kd = self.citystate_kept[:, :, self._mk_d0:self._mk_d0 + _lose.shape[2]]
+                _kd[_lose] = 0
             self.city_dist_tile[_gone] = -1
         # THE TILE. `wpass` is `isWater && !isImpassable`, and the ground's own
         # `passable` already carried that second half.

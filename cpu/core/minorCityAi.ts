@@ -447,13 +447,20 @@ export function minorPlotEvals(state: GameState, cs: CityState, facts: CityBuild
       if (!id || !ground.has(id)) return FX_MIN;
       return improvementValue(f, row.type, impT[i], AI_VALUE_HORIZON);
     });
-    // a district's adjacency at the plot, once per district
+    // a district's adjacency at the plot, once per district and owner: the
+    // whole adjacency the plot's owner's, the rows the city's owner's
+    // (0x7aaf80 passes 0x365ae0 the city's +0x1b8, so OtherDistrictAdjacent
+    // counts the city's own districts beside a plot it has yet to buy:
+    // runs/h1_duels1164 Cardiff t138, the Commercial Hub's rows at the
+    // unowned 15:7 the Harbor's 2 and its two districts' 1, the
+    // Neighborhood 646.50 as logged)
     const adjOf = new Map<string, number>();
-    const districtAdj = (d: string, y: string): number => {
+    const adjacency = (d: string, y: string, owner: number): number => {
       const id = DISTRICT_ENGINE.get(d) ?? null;
       if (!id || YIELD_KEY[y] !== DISTRICTS[id].adjacencyYield) return 0;
-      let v = adjOf.get(id);
-      if (v === undefined) adjOf.set(id, (v = baseAdjacency(yctx, tile, id)));
+      const key = `${id}:${owner}`;
+      let v = adjOf.get(key);
+      if (v === undefined) adjOf.set(key, (v = baseAdjacency(yctx, tile, id, [], owner)));
       return v;
     };
     // the plot test (0x35f2d0) asks no population limit: the value's own
@@ -480,8 +487,8 @@ export function minorPlotEvals(state: GameState, cs: CityState, facts: CityBuild
       district: own ? districtType(tile.district!) : null,
       districtPillaged: repair,
       isCity: false,
-      districtAdjacency: districtAdj,
-      rowsAdjacency: districtAdj,
+      districtAdjacency: (d, y) => adjacency(d, y, tileSeat(tile)),
+      rowsAdjacency: (d, y) => adjacency(d, y, cs.seat),
       otherDistricts: (d) => (others ??= AI_DISTRICTS.filter((x) => {
         if (x.trait !== null || x.type === 'DISTRICT_CITY_CENTER' || x.type === 'DISTRICT_WONDER') return false;
         const id = DISTRICT_ENGINE.get(x.type) ?? null;

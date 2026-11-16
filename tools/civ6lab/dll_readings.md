@@ -18919,3 +18919,60 @@ replay's imposed wonder placement (cpu/harness/replay.ts); GPU
   operations ran, so the scorer's plan.aiType reads ours there.
 - Open: the tag 0x36c125c9 names no install or DLL string; a city-state's
   +1 a turn per envoy in a look of the turn an envoy lands (C-129).
+
+## C-96 / C-127: the unit value's air, naval, nuclear and fuel terms; a district's rows on an unbought plot; a minor's district progress — READ (0x7b62c0 at 0x7b6eb3..0x7b7045, 0x7b709f..0x7b7165, 0x7b75fd..0x7b7655; 0x2499b0, 0x929680 -> 0x9296e0; 0x7aaf80 at 0x7ab521), both twins
+
+- THE AIR TERM (0x7b62c0 at 0x7b6eb3..0x7b6f9d): a PSEUDOYIELD_UNIT_AIR_COMBAT
+  unit with a PrereqDistrict (Units +0x278) the city holds by its own type
+  (0x1ae530, no replacement) adds 30.0 where no aircraft stands on the
+  district's plot (the air layer 0x929680, @f07400, its plot list 0x9296e0),
+  else 5.0 (@d2f330) a slot free of the district's slots (0x2499b0: the
+  Districts row's AirSlots +0x28 plus the district's own +0xb68), nothing at
+  a full base or without the district. Ported: `districtAirBase`
+  (cpu/core/air.ts), `CityBuildFacts.airBase`, `unitValue`; GPU
+  `_MinorFacts.air_base`, `_cv_unit`.
+- THE NAVAL TERM (0x7b6fec..0x7b7045): a PSEUDOYIELD_UNIT_NAVAL_COMBAT unit
+  of no RangedCombat (+0x6c) at a city whose centre is not IsCoastalLand
+  (0x82a10, -1) and that holds no Harbor (0x1ae530 with replacements,
+  0xcbecc739) off a lake (0x82e80) is FX(-9999) outright (`seaReach`,
+  `sea_reach`).
+- THE NUCLEAR TERM (0x7b709f..0x7b7165): a WMDCapable unit (+0x1ba bit 6)
+  adds PSEUDOYIELD_NUCLEAR_WEAPON's value of 1.0 (0x7a60d0) over its
+  DefaultValue (the row's +0x1c), x2.0 (0x16e940, 0x16e7d0), before the
+  copies and the promotion weight.
+- THE FUEL TERM (0x7b75fd..0x7b7655): a unit with a Units_XP2
+  ResourceMaintenanceType whose turn's income (0x4aa700, Player_Resources
+  +0x350) less the units' fuel bill (0x4ab270) is not above 0 (0x774c0, a
+  subtraction) is worth 0 before its modifiers (`CityBuildFacts.surplus`,
+  `_MinorFacts.surplus`).
+- A DISTRICT'S ROWS ON AN UNBOUGHT PLOT: the district value body (0x7aaf80)
+  calls each adjacency row (0x365ae0) with the city's +0x1b8 as the player
+  (0x7ab521), so OtherDistrictAdjacent counts the city's own districts
+  beside a plot no one owns; the whole adjacency (0x366df0) stays 0 there.
+  Ported: `baseAdjacency` / `districtAdjacency`'s `owner`, `minorPlotEvals`'
+  `rowsAdjacency`; GPU `_PlotFacts.rows_adjacency`.
+- A MINOR'S DISTRICT PROGRESS: the city's queue keeps its progress per
+  district type (m_kBuildQueue +146, the rows by district index), and the
+  plot analysis's district turns (0x17b5a0) read it for any plot of the
+  type; an unfinished district the sea takes takes its row with it. Ported:
+  the importer reads the district rows into `CityState.prodRetained`, the
+  replay carries only the projects' and repairs' (`minorKeptCarried`);
+  `submergeTile` and GPU `_submerge` clear the type's kept progress.
+- CONFIRMED: runs/h1_duels1179 t207-t235 city-state 4's Fighter and Bomber
+  contracts (5 contracts and 5 progress rows gone); runs/h1_duels1162 t210
+  city-state 4's Fighter contract; runs/h1_duels1143 t232 Jakarta's Nuclear
+  Submarine; runs/h1_duels1164 Cardiff t138: the Commercial Hub's rows at
+  the unowned 15:7 the Harbor's 2 and its two districts' 1, the
+  Neighborhood 646.50 there and 649.49 on 12:9 as logged, the tree on 12:9
+  (the 15:7 contracts of t138-t202 gone); runs/h1_duels1146 Kandy t185: the
+  Neighborhood left at 78.4 of 148, its rows at T 29 (40:13 452.58), the
+  Holy Site on the drowned 40:12 gone with its 45, every DISTRICTS row of
+  the turn as logged.
+- Open: runs/h1_duels1146 Kandy t185-t198: the game's Build City District
+  tree on its flooded own Neighborhood 38:10 ends each other turn with no
+  contract, ours posts the district's contract (Check Plot fails on the
+  flooded plot; what ends the game's tree is unread). runs/h1_duels1158
+  Granada t204-t245: after its Military Academy the city trains Armies (the
+  Cavalry at 372 = `formationCost(165, 2)`, the Scout at 34, formation 2 in
+  the record); the formation a minor's order takes is unread, ours trains
+  the lone unit at 165.

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from .simbase import *  # noqa: F401,F403 — torch, constants, helpers: the shared floor
-from .sim_research import _FX, _discounted, _fmul, _fx_const, _fx_const_t, _present_value, _turns_at
+from .sim_research import _FX, _discounted, _fdiv, _fmul, _fx_const, _fx_const_t, _present_value, _turns_at
 
 # THE CITY BUILD AI'S VALUES (cpu/core/aiPlotValue.ts, aiDistrictValue.ts,
 # aiProjectValue.ts, aiCityBuild.ts's growth forecast and housing value,
@@ -955,14 +955,23 @@ class SimCityValue:
         ex = self._cv_unit_exit(f, unit, t, h)
         read = torch.ones_like(like, dtype=torch.bool)
         pseudo = u["pseudo"] or "PSEUDOYIELD_UNIT_COMBAT"
+        no_sea = torch.zeros_like(like, dtype=torch.bool)
         if pseudo in _COMBAT_PSEUDO:
-            if pseudo == "PSEUDOYIELD_UNIT_AIR_COMBAT":
-                read = read & False
             val, obs = f.unit_production(unit)
             v = torch.where(_t(obs, like).bool(), _fmul(_t(val, like), torch.full_like(like, 3 * _FX)), _t(val, like))
             # half the player's cities where its Combat tops the strongest
             # melee strength the player has trained
             v = v + (u["combat"] > _t(f.best_combat_strength(), like)).long() * (_t(f.city_count(), like) * (_FX // 2))
+            # an aircraft: where the city holds its PrereqDistrict, 30.0 with
+            # no aircraft based there, else 5.0 a free slot (`districtAirBase`)
+            if pseudo == "PSEUDOYIELD_UNIT_AIR_COMBAT" and u["district"]:
+                has, n, cap = f.air_base(u["district"])
+                n, cap = _t(n, like), _t(cap, like)
+                add = torch.where(n == 0, torch.full_like(like, 30 * _FX), (cap - n).clamp(min=0) * (5 * _FX))
+                v = v + torch.where(_t(has, like).bool(), add, torch.zeros_like(add))
+            # a naval unit of no RangedCombat where the city reaches no sea
+            if pseudo == "PSEUDOYIELD_UNIT_NAVAL_COMBAT" and int(u["rangedCombat"]) == 0:
+                no_sea = ~_t(f.sea_reach(), like).bool()
         elif pseudo == "PSEUDOYIELD_UNIT_TRADE":
             # 0x7b62c0 passes the landing turn as both start and horizon:
             # one turn's route value discounted to `t`
@@ -994,8 +1003,14 @@ class SimCityValue:
             v = torch.zeros_like(like)
         # a park-charged unit's own tourism (the culture AI's park term)
         # reads 0 at a city-state and the Free Cities
-        if u["wmd"] or u["maintenanceResource"] or (u["parkCharges"] > 0 and f.full_civ()):
+        if u["parkCharges"] > 0 and f.full_civ():
             read = read & False
+        # a WMDCapable unit: PSEUDOYIELD_NUCLEAR_WEAPON's value of 1.0 over
+        # its DefaultValue, x2.0
+        if u["wmd"]:
+            nuke = "PSEUDOYIELD_NUCLEAR_WEAPON"
+            p1 = self._cv_pseudo(torch.full_like(like, _FX), nuke, f.pseudo_w(nuke))
+            v = v + _fmul(_fdiv(p1, torch.full_like(like, T["pseudo_def"].get(nuke, _FX))), torch.full_like(like, 2 * _FX))
         v = _fmul(v, (_t(f.extra_copies(unit), like) + 1) * _FX)
         v = _fmul(v, _t(f.promotion_weight(u["promotionClass"]), like))
         noaccess = torch.zeros_like(like, dtype=torch.bool)
@@ -1005,8 +1020,15 @@ class SimCityValue:
         if f.handicap() < 3:
             # its Maintenance as Gold at the player's weight (0x7b72d1)
             v = v - self._cv_yield(torch.full_like(like, max(0, u["maintenance"]) * _FX), "YIELD_GOLD", f.yield_w("YIELD_GOLD"))
-        value = _present_value(v, r, h) - _present_value(v, r, t) + self._cv_unit_mods(f, unit, like)
+        pv = _present_value(v, r, h) - _present_value(v, r, t)
+        # a Units_XP2 ResourceMaintenanceType whose surplus (the turn's
+        # income less the units' fuel bill) is not above 0: worth 0 before
+        # the modifiers
+        if u["maintenanceResource"]:
+            pv = torch.where(_t(f.surplus(u["maintenanceResource"]), like) <= 0, torch.zeros_like(pv), pv)
+        value = pv + self._cv_unit_mods(f, unit, like)
         value = torch.where(noaccess, torch.zeros_like(value), value)
+        value = torch.where(no_sea, torch.full_like(value, _FX_MIN), value)
         trains = _t(f.trains_domain(u["domain"]), like).bool()
         value = torch.where(trains, value, torch.full_like(value, _FX_MIN))
         value = torch.where(ex, torch.full_like(value, _FX_MIN), value)
@@ -2295,6 +2317,51 @@ class _MinorFacts:
         if k < 0:
             return self._bools(False)
         return (sim._stock_bank(self.row) - sim._stock_reserved(self.row))[:, k] > 0
+
+    def surplus(self, res):
+        """`strategicSurplus`: the accumulated resource a turn less the units'
+        fuel bill of it, [B]; 0 for another resource"""
+        sim = self.sim
+        ri = self.E["resource"].get(res, -1)
+        k = int(sim._strat_slot_of[ri]) if ri >= 0 else -1
+        if k < 0:
+            return 0
+        net = self._get("surplus", lambda: sim._seat_accumulated(self.row).long() - sim._unit_upkeep_bill(self.row).long())
+        return net[:, k]
+
+    def sea_reach(self):
+        """`seaReach`: the centre coastal land, or the city's Harbor on no
+        lake, [B]"""
+        sim = self.sim
+        out = sim.coastal_land.gather(1, self._centre().clamp(min=0).unsqueeze(1)).squeeze(1)
+        dv = self._didx("DISTRICT_HARBOR")
+        if dv >= 0:
+            t = self._district_at(dv)
+            lake = sim.terrain.gather(1, t.clamp(min=0).unsqueeze(1)).squeeze(1) == sim._terr_lake
+            out = out | ((t >= 0) & ~lake)
+        return out
+
+    def air_base(self, d):
+        """`districtAirBase`: (the city holds the district, the aircraft based
+        on its plot, its slots), each [B] — its AirSlots (the Aerodrome's 4,
+        the centre's 1), its buildings' grants and the plot's own bonus"""
+        sim = self.sim
+        dv = self._didx(d)
+        z = self.like()
+        if dv < 0:
+            return self._bools(False), z, z
+        t = self._district_at(dv)
+        tc = t.clamp(min=0)
+        n = z.clone()
+        for pre in ("major", "barb"):
+            alive = getattr(sim, f"{pre}_unit_alive")
+            typ = getattr(sim, f"{pre}_unit_type").clamp(min=0, max=sim.NU - 1)
+            on = alive & (sim._type_air.take(typ) > 0) & (getattr(sim, f"{pre}_unit_tile") == tc.unsqueeze(1))
+            n = n + on.long().sum(dim=1)
+        own = sim._aerodrome_air_slots if dv == sim._aerodrome_didx else 0
+        granted = (sim.city_bldg[:, self.row, self._slot] & (sim._b_req_district == dv).unsqueeze(0)).long() @ sim._b_air_slots
+        cap = own + granted + sim.tile_air_bonus.gather(1, tc.unsqueeze(1)).squeeze(1)
+        return t >= 0, n, cap
 
     def _base(self):
         """the city yields' attribute bases (`amenityCityOf`): those its City

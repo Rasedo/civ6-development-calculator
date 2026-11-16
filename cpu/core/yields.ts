@@ -404,12 +404,14 @@ function matchesAdjacency(rule: AdjacencyRule, neighbor: Tile, owner: number, hi
  * every neighbour that answers it, divides by TilesRequired and floors — the
  * catalog carries the share per neighbour (0.5 for TilesRequired 2), so each
  * rule's pay is floored on its own and shares of different rows never pool.
- * The district answers to the seat owning its plot; `hidden` holds the
- * resources that seat's plot records do not show (`unseenResourcesFor`).
+ * The district answers to `owner` (0x365ae0's player: the seat owning its
+ * plot, or the city's owner where the AI values a plot it has yet to buy);
+ * `hidden` holds the resources that seat's plot records do not show
+ * (`unseenResourcesFor`).
  */
 export function districtAdjacency(
   map: GameState['map'], tile: Tile, type: DistrictId, extra: readonly AdjacencyRule[] = [],
-  own?: readonly AdjacencyRule[], hidden?: ReadonlySet<string>,
+  own?: readonly AdjacencyRule[], hidden?: ReadonlySet<string>, owner = tileSeat(tile),
 ): number {
   const def = DISTRICTS[type];
   // a UNIQUE district ships its OWN adjacency rows rather than adding to the
@@ -419,7 +421,6 @@ export function districtAdjacency(
   let sum = 0;
   const _parts: string[] = [];
   const around = neighbors(map, tile);
-  const owner = tileSeat(tile);
   for (const rule of [...rows, ...extra]) {
     // the river runs through the plot itself; CIV6 (Seowon): a FLAT bonus
     // that reads no neighbour at all
@@ -440,10 +441,10 @@ export function districtAdjacency(
 /** the adjacency district `type` pays its seat on `tile` before any percent:
  *  the district's rows (a unique district's own), the rules the seat's
  *  modifiers and wonders add, and `extra` */
-export function baseAdjacency(ctx: YieldCtx, tile: Tile, type: DistrictId, extra: readonly AdjacencyRule[] = []): number {
+export function baseAdjacency(ctx: YieldCtx, tile: Tile, type: DistrictId, extra: readonly AdjacencyRule[] = [], owner = tileSeat(tile)): number {
   const own = DISTRICTS[type].civVariants?.find((v) => v.civ === ctx.mods.civ)?.adjacency;
   const add = [...(ctx.mods.districtAdjacencyAdd?.[type] ?? []), ...(ctx.wonderAdjacency?.[type] ?? []), ...extra];
-  return districtAdjacency(ctx.map, tile, type, add, own, ctx.unseenResources);
+  return districtAdjacency(ctx.map, tile, type, add, own, ctx.unseenResources, owner);
 }
 
 export function effectiveAdjacency(ctx: YieldCtx, tile: Tile, type: DistrictId, extra: readonly AdjacencyRule[] = []): number {
