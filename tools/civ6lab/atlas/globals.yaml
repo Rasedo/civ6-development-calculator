@@ -2213,6 +2213,20 @@
   context:
     - "...t event builds. Its execution 0x7f6630 (the second handler table of 0x7cbca0, the slot @0xf2ef18 both tables share): for a player no human drives, the kept unit (+0x40) alive (+0x770 c..."
   review: imported
+- addr: 0xf2f974
+  kind: global
+  name: yieldFoodIndex
+  semantics: the yield type the city yield's modifier leaves without the amenity tier's and the loyalty level's percents (Food).
+  status: READ
+  cases:
+    - recording: h1_duels1143
+      turn: 211
+      value: "Taiyuan at Loyalty 73 (level 2): Production 4.0 -> 2.75, x 0.8 -> x 0.55 on the same worked plots; China's at t201 (75) 2.703 -> 1.953"
+  readings:
+    - "C-98 / C-130: a city's loyalty level on its yields; the Free Cities' AIs' turns after their cities' own turn — READ (0x1c5350 at 0x1c615d..0x1c62e0, 0xa65030), the order off the logs, both twins"
+  context:
+    - "...IELD CHANGE: the city yield's modifier (0x1c5350) skips one yield type alone (cmp edi, [0xf2f974] at 0x1c615d, the type the amenity tier's percent skips too: Food) and for every other..."
+  review: reviewed
 - addr: 0xf2f978
   kind: global
   semantics: the yield index the Mercenary Companies discount names (Production).

@@ -30,7 +30,7 @@ import { containmentBonus, sameReligionToken, getModifiers, makeYieldCtx, seatYi
 import { allRoadsLeadToRome, addTradeRoute, addCsTradeRoute, addIntlTradeRoute, cancelRoutesBetween, congressCancelBannedIntl, plunderTrader, tradeGraphTurn, tradeRouteExpiry, tradeRouteWalk } from './trade';
 import { addEnvoys, allianceSuzInfluence, cityStateById, declareWarOnCityState, envoysOf, hasMet, isSuzerain, minorCity, resolveSuzerains, sueForPeaceWithCityState, suzerainBuildingLoyalty, suzerainGpCultureMult, meetCityState, buildingCreatedCulture, cityStateAt } from './cityStates';
 import { LEVY_TURNS, govInfluence } from '../data/cityStates';
-import { freeCityBuild, freeCombatDesire, freeKnowledge, minorArmyCounts, minorBestOfClass, minorCatchUp, minorCompleteNow, minorOrdersHeld, minorResearch, trainableIn } from './minorBuild';
+import { freeCityProduce, freeCityUpdate, freeCombatDesire, freeKnowledge, minorArmyCounts, minorBestOfClass, minorCatchUp, minorCompleteNow, minorOrdersHeld, minorResearch, minorResearchBank, minorResearchTurn, trainableIn } from './minorBuild';
 import { freeResearchTerms } from './freeCityBuild';
 import { researchUnitTurns } from './aiResearch';
 import { storeUnitStrength } from './aiView';
@@ -1092,26 +1092,31 @@ function joinFromFreeCity(state: GameState, city: City): void {
 }
 
 /** The FREE CITIES player's turn, after every major's and city-state's,
- *  every turn of the game: its research is a city-state's (`minorResearch`:
- *  its cities' Science and Culture, the research and civics
- *  AIs on their unit term (`freeResearchTerms`), its Combat Desire between their policy jobs and government values,
- *  `freeDesire`), with no city on no yield. Each Free City's
+ *  every turn of the game: its research is a city-state's — the bank on its
+ *  cities' Science and Culture as its turn opens (`minorResearchBank`), the
+ *  research and civics AIs' turns after its cities' own turn, on the Science
+ *  and Culture they make then (`minorResearchTurn` on their unit term,
+ *  `freeResearchTerms`: runs/h1_duels1143 t216, Taiyuan's Loyalty fallen to
+ *  Unrest in that turn, every row but the six in hand at its whole cost past
+ *  the horizon), its Combat Desire between their policy jobs and government
+ *  values (`freeDesire`) — with no city on no yield (`minorResearch`). Each Free City's
  *  amenities are the ordinary composer's over the Free Cities seat — the full
  *  need of its population, the supply of what that seat holds (its own
  *  luxuries, buildings and districts; no government, policy or governor) —
  *  and the tier is recorded off one read of every Free City, before the
  *  research and again after a completion. Its
  *  treasury banks the Gold those same stats make, in array order, then pays
- *  its units' upkeep and meets the `bankruptcy` that may force. Its military
- *  AI's turn follows, with or without a city (`freeMilitaryTurn`: the
- *  favoured technology, the knowledge base's ageing look). Then each
- *  city takes its grant when one falls due,
- *  puts the same stats' Production into its item, its city AI stores its
- *  threat and picks the next on an empty queue (`freeCityBuild`),
+ *  its units' upkeep and meets the `bankruptcy` that may force. Then each
+ *  city puts the same stats' Production into its item (`freeCityProduce`),
  *  fires the ranged strikes any walled city fires and runs
  *  `freeCityLoyaltyDelta` (its heal is the turn's end's, `healCities`) — its
  *  cities press a religion they follow on that religion's founder's turn
- *  (`spreadReligiousPressure`). Then the Free Cities' units take their
+ *  (`spreadReligiousPressure`). Then its AIs' turns: the research and
+ *  civics AIs', its military AI's, with or without a city
+ *  (`freeMilitaryTurn`: the favoured technology, the knowledge base's
+ *  ageing look), and each city takes its grant when one falls due and its
+ *  AI stores its threat and picks the next on an empty queue, on the city
+ *  as its turn left it (`freeCityUpdate`). Then the Free Cities' units take their
  *  tactical turn with their operations' (`freeCitiesMilitary`), their
  *  knowledge base looks again; the
  *  cities that reached 0 join their race's winner, in array order, after it. */
@@ -1146,10 +1151,9 @@ export function freeCitiesPhase(state: GameState): void {
     science += s.total.science;
     culture += s.total.culture;
   }
-  const research = minorResearch(state, free.research, FREE_SEAT, science, culture, () => freeResearchTerms(state), urban, []);
-  freeDesire(state);
-  research.government();
-  if (research.gained > 0) {
+  const terms = () => freeResearchTerms(state);
+  const gained = minorResearchBank(state, free.research, FREE_SEAT, science, culture, terms, urban, []);
+  if (gained.techs + gained.civics > 0) {
     luxMap = standingLuxuries(state, FREE_SEAT);
     mods = getModifiers(state, FREE_SEAT);
     free.cities.forEach((city, i) => { stats[i] = computeCityStats(state, city, luxMap, mods); });
@@ -1164,7 +1168,11 @@ export function freeCitiesPhase(state: GameState): void {
     + ` cost${upkeep.toFixed(3)} purse${free.treasury.toFixed(3)}`);
   free.treasury -= upkeep;
   const short0 = free.goldShortfall ?? 0;
+  // a unit its treasury disbands stands in its unit list to its turn's end
+  // (`Seat.unitsDisbanded`)
+  const before = state.units.filter((u) => u.seat === FREE_SEAT);
   bankruptcy(state, free, (u) => unitUpkeep(mods, u));
+  free.unitsDisbanded = before.filter((u) => !state.units.includes(u)).map((u) => u.type);
   // the cities' Production is read again where the shortfall moved what they
   // make
   if ((free.goldShortfall ?? 0) !== short0) {
@@ -1172,11 +1180,9 @@ export function freeCitiesPhase(state: GameState): void {
     const mods2 = getModifiers(state, FREE_SEAT);
     free.cities.forEach((city, i) => { stats[i] = computeCityStats(state, city, lux2, mods2); });
   }
-  freeMilitaryTurn(state);
   const joiners: City[] = [];
   [...free.cities].forEach((city, i) => {
-    freeCityGrant(state, city);
-    freeCityBuild(state, city, stats[i].total.production);
+    freeCityProduce(state, city, stats[i].total.production);
     cityStrikes(state, city, cityStrikeStrength(state, city));
     const next = (city.loyalty ?? LOYALTY_MAX) + freeCityLoyaltyDelta(state, city);
     city.loyalty = Math.max(0, Math.min(LOYALTY_MAX, next));
@@ -1185,7 +1191,27 @@ export function freeCitiesPhase(state: GameState): void {
     // does (0x1fa1d0 at 0x1fa22d -> the full reassign 0x196320)
     replaceAllCitizens(state, city, cityFlags(city));
   });
+  // their AIs' turns on the cities as their own turn left them: the research
+  // and civics AIs on the Science and Culture they make now, the Combat
+  // Desire, the government values, the military AI's turn, then each city's
+  // grant where one falls due and its city AI's update (`freeCityUpdate`)
+  let scienceNow = 0;
+  let cultureNow = 0;
+  for (const city of free.cities) {
+    const now = computeCityStats(state, city);
+    scienceNow += now.total.science;
+    cultureNow += now.total.culture;
+  }
+  const government = minorResearchTurn(state, free.research, FREE_SEAT, scienceNow, cultureNow, terms, []);
+  freeDesire(state);
+  government();
+  freeMilitaryTurn(state);
+  for (const city of [...free.cities]) {
+    freeCityGrant(state, city);
+    freeCityUpdate(state, city);
+  }
   delete free.armyCounted;
+  delete free.unitsDisbanded;
   // (a replay runs their units' turn on a copy beside the record's)
   if (!minorOrdersHeld()) {
     freeCitiesMilitary(state);

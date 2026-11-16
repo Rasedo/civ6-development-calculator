@@ -29,7 +29,7 @@ import { GWO_ARTIFACT, GWO_RELIC, GWO_WRITING } from '../data/greatWorks';
 import { congressBannedLuxury, congressDuplicateLuxury, congressGrowthMult, congressGwMult } from './congress';
 import { cityStateItemProduction, suzerainEffect, suzerainHubAmenities, suzerainPartnerProduction, suzerainResourceTypeProduction, minorCity, minorLuxuries, suzerainMinorSeats, suzerainTypeCount } from './cityStates';
 import { ANSHAN_WRITING_SCIENCE, ANSHAN_RELIC_SCIENCE, ZANZIBAR_LUXURIES, ZANZIBAR_LUXURY_AMENITIES, BUENOS_AIRES_AMENITIES, MINOR_PRODUCTION_PCT } from '../data/cityStates';
-import { bankruptAmenities, DEAL_LUXURY, DED_FREE_INQUIRY, HOLY_CITY_TOURISM, TOURISM_PCT_ROWS, LOYALTY_MAX, GOV_INTOLERANCE, TOURISM_GOV_MULT, TOURISM_OPEN_BORDERS_PCT, TOURISM_ROUTE_PCT } from '../data/seats';
+import { bankruptAmenities, DEAL_LUXURY, DED_FREE_INQUIRY, HOLY_CITY_TOURISM, TOURISM_PCT_ROWS, LOYALTY_MAX, loyaltyYieldPct, GOV_INTOLERANCE, TOURISM_GOV_MULT, TOURISM_OPEN_BORDERS_PCT, TOURISM_ROUTE_PCT } from '../data/seats';
 import { LUXURY_IDS, RESOURCES, extractsResource, resourceImprovement } from '../../world/resources';
 import { FEATURES, isFloodplains } from '../../world/features';
 import { CITY_WORK_RADIUS, BORDER_MAX_RADIUS, PLOT_INFLUENCE, borderGrowthCost, FOOD_PER_CITIZEN, CITIZEN_SCIENCE, CITIZEN_CULTURE, UNASSIGNED_CITIZEN_GOLD, CITY_CENTER_MIN_FOOD, CITY_CENTER_MIN_PRODUCTION, HOUSING_FRESH_WATER, HOUSING_COASTAL, HOUSING_NO_WATER, AQUEDUCT_FRESH_BONUS, AQUEDUCT_NO_FRESH_TOTAL, LUXURY_AMENITY_CITIES, growthFoodNeeded, housingGrowthFactor, amenitiesNeeded, amenityTier, amenityTierIndex, type AmenityTier } from '../data/constants';
@@ -1920,8 +1920,14 @@ export function computeCityStats(
   // wonders') SUMS into it (runs/h1_duelw1108, Handan at t105: 12.5 Science
   // reads 13.125, x 1.05 = -10% Displeased + 15% Librarian, not x 0.9 x 1.15)
   const pct = emptyYields();
+  // CIV6 (LoyaltyLevels.YieldChange, 0x1c5350 at 0x1c61fa..0x1c62e0): the
+  // city's loyalty level takes its percent on the yields its amenity tier
+  // does, in the same modifier (runs/h1_duels1143 Taiyuan: China's at t201,
+  // Loyalty 75, Production 3.0 x 0.9 -> x 0.65; the Free City's at t211, 73,
+  // 5.0 x 0.8 -> x 0.55, at t214, 46, x 0.3, at t217, 19, 0)
+  const loyal = loyaltyYieldPct(city.loyalty ?? LOYALTY_MAX) / 100;
   for (const k of ['production', 'gold', 'science', 'culture', 'faith'] as YieldKey[]) {
-    pct[k] += tier.yieldFactor - 1;
+    pct[k] += tier.yieldFactor - 1 + loyal;
     // CIV6 (EFFECT_ADJUST_CITY_HAPPINESS_YIELD): the roster's per-tier rows
     // (`HAPPY_YIELD_ROWS`)
     for (const r of m.happyYields) if (r.tier === tier.name && r.yield === k) pct[k] += r.pct / 100;
@@ -1988,6 +1994,10 @@ export function computeCityStats(
   // (runs/h1_duelw1117 Valletta t27: 6 Production Displeased reads
   // 2.40234375, 6 x (1 - 0.5 - 0.1))
   if (isCityStateSeat(city.seat)) pct.production += MINOR_PRODUCTION_PCT / 100;
+  // a modifier below -100 percent leaves the yield at none (runs/h1_duels1143
+  // the Free City of Taiyuan t217-t219: Unrest's -100 under its amenities'
+  // -20, Production, Science and Culture 0)
+  for (const k of YIELD_KEYS) pct[k] = Math.max(pct[k], -1);
   // the city's PLAIN Production (City_BuildQueue 0x16f050's read with no
   // item, 0x1c5350): the same sum without the flat toward the head
   const plainProduction = withPercent256(total.production - itemFlat, pct.production);

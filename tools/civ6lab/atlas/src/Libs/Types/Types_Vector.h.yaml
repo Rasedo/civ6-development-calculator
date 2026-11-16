@@ -291,6 +291,7 @@
     - "C-96: the resource value and the research value's resources — READ (bonus, luxury, the call), PARTLY READ (the strategic stockpile terms)"
     - "C-127: the growth forecast the city AI reads is the one its last full update wrote — READ (0x5ce680 at 0x5ce831 / 0x5ce841, 0x5c27e0's +0x258), both twins"
     - "C-96 / C-100 / C-127: a city-state's own leader's unit, an unowned plot's improvement values, a flooded plot and a dig site — READ (0x4f4a50, 0x5c9700, 0x35fd60 at 0x35ff96..0x35ffab), both twins"
+    - "C-98 / C-130: a city's loyalty level on its yields; the Free Cities' AIs' turns after their cities' own turn — READ (0x1c5350 at 0x1c615d..0x1c62e0, 0xa65030), the order off the logs, both twins"
   context:
     - ...adv[YIELD_PRODUCTION] from 0x5d83c0, the YIELD_* list is CityBuildAI +0x908), 0x5c9a00, 0x5c9700, 0x5cb570, 0x5ca7e0, the military AI's city hook 0x79a320, and the City Analysis job (0...
   review: reviewed
@@ -479,7 +480,7 @@
     - gpu/core/sim_minorai.py:_city_regions
     - cpu/core/minorBuild.ts:minorKnowledge
     - cpu/core/minorBuild.ts:freePrimaryRegions
-    - gpu/core/sim_minorai.py:_free_city_build
+    - gpu/core/sim_minorai.py:_free_city_update
     - cpu/core/types.ts:Seat
   readings:
     - "C-95: Explore Land and the barbarians' revealed plots — READ, ported (two tests below unread)"

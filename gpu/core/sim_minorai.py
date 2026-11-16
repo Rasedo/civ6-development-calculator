@@ -1,5 +1,5 @@
 """THE CITY-STATES' CITY AI AND THE FREE CITIES' PICK on the GPU
-(cpu/core/minorCityAi.ts, minorBuild.ts's `freeCityBuild`; GameCore_XP2
+(cpu/core/minorCityAi.ts, minorBuild.ts's `freeCityProduce` and `freeCityUpdate`; GameCore_XP2
 AI/CityBuild.cpp, AI/Economic.cpp; `tools/civ6lab/dll_readings.md` "C-96: the
 city events, trees and contracts"). Each city-state's turn after its step
 (`_minor_build`), as the game's Control Manager runs a player's lists:
@@ -1805,19 +1805,15 @@ class SimMinorAi:
 
     # -- the Free Cities -------------------------------------------------------
 
-    def _free_city_build(self, j: int, act: torch.Tensor, prod: torch.Tensor) -> None:
-        """`freeCityBuild` for the Free City in column `j`, in the games of
+    def _free_city_produce(self, j: int, act: torch.Tensor, prod: torch.Tensor) -> None:
+        """`freeCityProduce` for the Free City in column `j`, in the games of
         `act`: the step pays the turn's Production (`prod`) and the bank
         (`city_prod_bank`) into the item in hand (the queue's head); it
         completes when its progress covers its price — a unit on or beside
         the centre (with no free tile it waits), a building raised (walls at
         full), the walls' repair at the HP it puts back — leaving the bank the
         Production less what it lacked; with nothing in hand the Production
-        banks. Then its city AI's update stores the city's threat
-        (`city_ai_threat`) and its UNITS table (`free_unit_values`) and, on
-        an empty queue, the Default Specialization
-        over the city's tables (`_FreeFacts`) queues its pick."""
-        from .sim_cityvalue import _FreeFacts
+        banks."""
         B, dev = self.B, self.device
         row = self.FREE_ROW
         rd = self.rules_dev
@@ -1880,9 +1876,23 @@ class SimMinorAi:
                 self._q_pop(row, jc, fin)
                 left = (prod - (cost - before).clamp(min=0)).clamp(min=0)
                 self.city_prod_bank[:, row, j] = torch.where(fin, left.to(self.city_prod_bank.dtype), self.city_prod_bank[:, row, j])
-        # its city AI's update: the city's threat (`_free_city_threat`); under
-        # threat the City Defense event's defensive cancel on the item queued;
-        # on an empty queue the Default Specialization
+
+    def _free_city_update(self, j: int, act: torch.Tensor) -> None:
+        """`freeCityUpdate` for the Free City in column `j`, in the games of
+        `act`, after every Free City's own turn: its city AI's update stores
+        the city's threat (`city_ai_threat`) and its UNITS table
+        (`free_unit_values`) on the Production the city makes then and, on an
+        empty queue, the Default Specialization over the city's tables
+        (`_FreeFacts`) queues its pick."""
+        from .sim_cityvalue import _FreeFacts
+        B, dev = self.B, self.device
+        row = self.FREE_ROW
+        rd = self.rules_dev
+        jc = torch.full((B,), j, dtype=torch.long, device=dev)
+        bidx = self._bidx
+        # the city's threat (`_free_city_threat`); under threat the City
+        # Defense event's defensive cancel on the item queued; on an empty
+        # queue the Default Specialization
         threat, near = self._free_city_threat(j)
         self.city_ai_threat[:, row, j] = torch.where(act, threat, self.city_ai_threat[:, row, j])
         self.city_ai_near[:, row, j] = torch.where(act, near, self.city_ai_near[:, row, j])

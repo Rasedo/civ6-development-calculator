@@ -183,7 +183,7 @@ export interface City {
    *  last update left it (`cityThreat`); absent, none */
   aiThreatNear?: boolean;
   /** A FREE CITY's UNITS table (raw, `AI_UNITS`' order) as its City
-   *  Analysis's last update left it (`freeCityBuild`), which the Free Cities'
+   *  Analysis's last update left it (`freeCityUpdate`), which the Free Cities'
    *  research and civics values' unit term reads (`freeResearchTerms`);
    *  absent, none */
   aiUnitValues?: readonly number[];
@@ -1017,6 +1017,12 @@ export interface Seat {
    *  them, before the turn's ageing and look: the unit production table its
    *  city AI's turn reads (`minorKnownUnits`); absent outside that turn */
   armyCounted?: Record<string, number>;
+  /** The Free Cities' units their treasury disbanded this turn, by engine
+   *  type: their unit list holds a deleted unit to their turn's end, so the
+   *  policy jobs' walk of it counts them (0x6b0840; runs/h1_duels1143 t208,
+   *  t213, t218: Conscription 14.0 on the Mechanized Infantry standing and
+   *  the one the treasury disbanded that turn). Absent outside their turn. */
+  unitsDisbanded?: string[];
   /** a city-state's own units by install unit type at the same moment: the
    *  units held its unit production table keeps per entry (`minorOwnedUnits`)
    *  for its city AI's and its military AI's turns; absent outside them */

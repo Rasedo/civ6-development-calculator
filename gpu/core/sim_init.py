@@ -505,6 +505,9 @@ class SimInit:
         # per minor in its city AI's turn, its records by AI_UNITS row as its
         # military AI's turn counted them (`CityState.armyCounted`)
         self._cv_counted: dict[int, torch.Tensor] = {}
+        # [B, NU] the units the Free Cities' treasury disbanded this turn, held
+        # through their AIs' turns (`Seat.unitsDisbanded`); None outside them
+        self._free_disbanded: torch.Tensor | None = None
         # and its units by engine type as its unit list walks them
         # (`CityState.unitsCounted`, `_minor_listed_units`)
         self._cv_owned: dict[int, torch.Tensor] = {}
@@ -1220,6 +1223,8 @@ class SimInit:
         self._coast_y6 = torch.tensor([float(x) for x in _er2["coastYields"]], dtype=dtype, device=device)
         self._coast_appeal = int(_er2["coastAppeal"])
         self._loyalty_max = float(rules.seats["loyaltyMax"])
+        # `loyaltyYieldPct`'s rows, highest level first: (LoyaltyMin, percent)
+        self._loyalty_levels = [(float(m), float(p)) for m, p in rules.seats["loyaltyLevels"]]
         self._special_cost = float(_er2["specialSessionCost"])
         self._special_gap = int(_er2["specialSessionGap"])
         self._emg_member_favor = float(_er2["emergencyMemberFavor"])

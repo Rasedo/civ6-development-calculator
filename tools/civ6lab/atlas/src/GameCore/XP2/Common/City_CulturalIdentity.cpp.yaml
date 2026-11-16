@@ -223,6 +223,21 @@
   context:
     - "- CITIZEN_IDENTITY_PRESSURE_MOD_CULTURAL_DOMINANCE (gp +0xec, 25): 0x1a1640 is a city's citizen pressure at a plot (City_CulturalIdentity.cpp, the one reader of..."
   review: reviewed
+- addr: 0x1a1a10
+  final: 0x117410
+  kind: function
+  name: cityLoyaltyLevel
+  semantics: the city identity's loyalty level (the LoyaltyLevels row index), -1 for none.
+  status: PARTLY
+  cases:
+    - recording: h1_duels1143
+      turn: 211
+      value: "Taiyuan at Loyalty 73 (level 2): Production 4.0 -> 2.75, x 0.8 -> x 0.55 on the same worked plots; China's at t201 (75) 2.703 -> 1.953"
+  readings:
+    - "C-98 / C-130: a city's loyalty level on its yields; the Free Cities' AIs' turns after their cities' own turn — READ (0x1c5350 at 0x1c615d..0x1c62e0, 0xa65030), the order off the logs, both twins"
+  context:
+    - "...OM_HAPPINESS_TOOLTIP) and then the loyalty level's: the level of the city's identity (0x1a1a10 on city +0x2a78, none at -1), its LoyaltyLevels row's YieldChange (+0x2c; the row fille..."
+  review: reviewed
 - addr: 0x1a1ae0
   final: 0x117460
   kind: function

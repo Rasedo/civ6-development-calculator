@@ -5255,6 +5255,10 @@
         "why": "a city-state's unit production table for its city AI's turn (`minorKnownUnits`): written by minorPhase before minorAiTurn and deleted right after it, so it is never live at a turn boundary; the records it counts are compared as minorArmyKnown."
       },
       {
+        "path": "Seat.unitsDisbanded",
+        "why": "the Free Cities' units their treasury disbanded this turn, which their policy jobs' walk of the unit list still counts: written by freeCitiesPhase at its bankruptcy step and deleted before its units' turn, so it is never live at a turn boundary; the units are compared as units."
+      },
+      {
         "path": "Seat.unitsCounted",
         "why": "a city-state's units by type as its unit list walked them when its city AI's turn counted its records (`minorOwnedUnits`), the units held its unit production table reads: written by minorPhase beside armyCounted and deleted after its military AI's upgrade, so it is never live at a turn boundary; the units are compared as units and the list as unitsListed; the GPU twin holds them at the same points (`_cv_owned`, transient)."
       },

@@ -867,21 +867,28 @@ class SimPhase:
         self._free_knowledge(act, True)
         self._free_trade_value(act)
 
+    def _free_units_by_type(self) -> torch.Tensor:
+        """[B, NU] the Free Cities' standing units by type"""
+        mine = self.major_unit_alive & (self.major_unit_seat == FREE_SEAT)
+        out = torch.zeros(self.B, self.NU, dtype=torch.long, device=self.device)
+        return out.scatter_add_(1, self.major_unit_type.clamp(min=0, max=self.NU - 1).long(), mine.long())
+
     def _free_cities_phase(self) -> None:
         """The FREE CITIES player's turn, after every major's — the
-        `freeCitiesPhase` twin, every turn: its research is a city-state's
-        (`_minor_research` at its row `FR`) on its cities' Science and Culture
-        (none with no city). Each Free City's amenity tier is recorded
+        `freeCitiesPhase` twin, every turn: its research is a city-state's at
+        its row `FR` — the bank on its cities' Science and Culture as its
+        turn opens (`_minor_research_bank`), the research and civics AIs'
+        turns after its cities' own turn on what they make then
+        (`_minor_research_turn`); `_minor_research` on none with no city.
+        Each Free City's amenity tier is recorded
         first, off one loop-top `_seat_amenity` over the free row: the full
         need of its population and the supply the Free Cities seat holds (its
         own luxuries, buildings and districts; no government, policy or
         governor). Its treasury (`free_treasury`) banks the Gold that same walk
         makes, in slot order, then pays its units' upkeep, the balance stopping
         at 0 as a minor's does (`_seat_upkeep_and_bankruptcy`). Then
-        each city takes its grant when one falls due (`_free_city_grant`),
-        puts the same
-        walk's Production into its queue and on an empty one queues its
-        Default Specialization's pick (`_free_city_build`), fires the
+        each city puts the same
+        walk's Production into its queue (`_free_city_produce`), fires the
         ranged strikes any walled city fires (`_city_strikes`) and runs its
         loyalty (its heal is the turn's end's, `_heal_cities`): CIV6 (IDENTITY_PER_TURN_FROM_FREE_CITIES)
         the flat base, the pressure term with every Free City's citizens on
@@ -890,8 +897,10 @@ class SimPhase:
         policy or roster term, which are an OWNER's and the Free Cities player
         carries none. Each major's share accrues into the city's race
         (`city_free_press`). Their military AI's turn (`_free_military_turn`)
-        runs before the cities, with or without one; each city's update
-        stores its threat in `_free_city_build`. Then the Free Cities' units
+        runs after the cities' own turn, with or without one; then each
+        city takes its grant when one falls due (`_free_city_grant`) and its
+        update stores its threat and on an empty queue queues its Default
+        Specialization's pick (`_free_city_update`). Then the Free Cities' units
         take their tactical turn (`_free_tactics`) and their knowledge base
         looks again. A city that reaches 0 joins the race's winner,
         after it, in slot order: CIV6 "it will join the Civilization that
@@ -936,10 +945,8 @@ class SimPhase:
         for j in range(self.RC):
             sci = sci + walk[:, j, 3].double()
             cul = cul + walk[:, j, 4].double()
-        done, government = self._minor_research(self.FR, sci, cul)
-        self._free_combat_desire(ones)
-        government()
-        gained = done > 0
+        _techs, _civics = self._minor_research_bank(self.FR, sci, cul)
+        gained = (_techs + _civics) > 0
         if bool(gained.count_nonzero()):
             _yf_r = self._seat_amenity(row)[2]
             walk_r = self._seat_city_walk(row, amen_yf=_yf_r, maint=self._seat_housing(row)[0])
@@ -952,7 +959,11 @@ class SimPhase:
         self.free_treasury.copy_(torch.where(
             acting, self.free_treasury + income.to(self.free_treasury.dtype), self.free_treasury))
         short0 = self.seat_shortfall[:, row].clone()
+        # a unit its treasury disbands stands in its unit list to its turn's
+        # end (`Seat.unitsDisbanded`): [B, NU] by type
+        _held0 = self._free_units_by_type()
         self._seat_upkeep_and_bankruptcy(row, acting)
+        self._free_disbanded = (_held0 - self._free_units_by_type()).clamp(min=0)
         # the cities' Production is read again where the shortfall moved what
         # they make (`freeCitiesPhase`)
         moved = self.seat_shortfall[:, row] != short0
@@ -963,8 +974,6 @@ class SimPhase:
         B, dev, F = self.B, self.device, torch.float64
         bidx, nrow = self._bidx, self.n_majors
         lmax = float(self.rules.seats["loyaltyMax"])
-        # its military AI's turn, in every game: the cityless ones' too
-        self._free_military_turn(ones)
         alive_c = alive.clone()
         joins = torch.zeros(B, self.RC, dtype=torch.bool, device=dev)
         for j in range(self.RC):
@@ -972,8 +981,7 @@ class SimPhase:
             if not bool(act.count_nonzero()):
                 continue
             jc = torch.full((B,), j, dtype=torch.long, device=dev)
-            self._free_city_grant(act, j)
-            self._free_city_build(j, act, prod[:, j].double())
+            self._free_city_produce(j, act, prod[:, j].double())
             self._city_strikes(row, jc, act)
             here = self.city_center[bidx, row, jc].clamp(min=0)
             own = self._citizen_pressure_from(here, row)
@@ -994,7 +1002,29 @@ class SimPhase:
             # player's city does (0x1fa1d0 at 0x1fa22d -> the full reassign
             # 0x196320)
             self._place_citizens(row, jc, act, None, full=True, fav_food=self.city_fav_food[:, row, j])
+        # its AIs' turns on the cities as their own turn left them: the
+        # research and civics AIs on the Science and Culture they make now,
+        # the Combat Desire, the government values, the military AI's turn (in
+        # every game: the cityless ones' too), then each city's grant where
+        # one falls due and its city AI's update (`freeCitiesPhase`)
+        walk_n = self._seat_city_walk(row, amen_yf=self._seat_amenity(row)[2], maint=self._seat_housing(row)[0])
+        sci_n = torch.zeros(self.B, dtype=torch.float64, device=self.device)
+        cul_n = torch.zeros(self.B, dtype=torch.float64, device=self.device)
+        for j in range(self.RC):
+            sci_n = sci_n + walk_n[:, j, 3].double()
+            cul_n = cul_n + walk_n[:, j, 4].double()
+        government = self._minor_research_turn(self.FR, sci_n, cul_n)
+        self._free_combat_desire(ones)
+        government()
+        self._free_military_turn(ones)
+        for j in range(self.RC):
+            act = alive_c[:, j] & self.city_alive[:, row, j]
+            if not bool(act.count_nonzero()):
+                continue
+            self._free_city_grant(act, j)
+            self._free_city_update(j, act)
         del self._cv_counted[self.FK]
+        self._free_disbanded = None
         self._free_tactics(acting)
         self._tac_friendly.pop(FREE_SEAT, None)
         # its knowledge base's look and its research AI's turns per unit at

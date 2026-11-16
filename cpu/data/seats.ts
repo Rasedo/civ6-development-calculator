@@ -122,6 +122,22 @@ export const PEACE_GOLD_COST = (warTurns: number) => 150 + 10 * warTurns;
 export const LOYALTY_MAX = srcConst('seats.loyaltyMax', 100,
   gp('LOYALTY_MAXIMUM'));
 export const LOYALTY_RANGE = 9;
+const loyaltyLevel = (level: number, column: string) =>
+  xml('LoyaltyLevels', `LoyaltyLevelType=LOYALTY_LEVEL_${level}`, column, column === 'YieldChange' ? { scale: 100 } : undefined);
+/** CIV6 (`LoyaltyLevels`): a city's loyalty level is the row whose LoyaltyMin
+ *  its Loyalty reaches, highest first; `yieldPct` is the row's YieldChange as
+ *  the percent the city yield's modifier takes (0x1c5350 at 0x1c623f: the
+ *  row's +0x2c x 100). */
+export const LOYALTY_LEVELS: readonly { min: number; yieldPct: number }[] = [
+  { min: srcConst('seats.loyaltyLevel.3.min', 76, loyaltyLevel(3, 'LoyaltyMin')), yieldPct: srcConst('seats.loyaltyLevel.3.yieldPct', 0, loyaltyLevel(3, 'YieldChange')) },
+  { min: srcConst('seats.loyaltyLevel.2.min', 51, loyaltyLevel(2, 'LoyaltyMin')), yieldPct: srcConst('seats.loyaltyLevel.2.yieldPct', -25, loyaltyLevel(2, 'YieldChange')) },
+  { min: srcConst('seats.loyaltyLevel.1.min', 26, loyaltyLevel(1, 'LoyaltyMin')), yieldPct: srcConst('seats.loyaltyLevel.1.yieldPct', -50, loyaltyLevel(1, 'YieldChange')) },
+  { min: srcConst('seats.loyaltyLevel.0.min', 0, loyaltyLevel(0, 'LoyaltyMin')), yieldPct: srcConst('seats.loyaltyLevel.0.yieldPct', -100, loyaltyLevel(0, 'YieldChange')) },
+];
+/** The percent a city's loyalty level takes on its non-Food yields. */
+export function loyaltyYieldPct(loyalty: number): number {
+  return (LOYALTY_LEVELS.find((l) => Math.floor(loyalty) >= l.min) ?? LOYALTY_LEVELS[LOYALTY_LEVELS.length - 1]).yieldPct;
+}
 /** CIV6 (IDENTITY_PER_TURN_FROM_FREE_CITIES 10): the loyalty a Free City
  *  makes for itself each turn, where a city-state makes 20. */
 export const FREE_CITY_LOYALTY_PER_TURN = srcConst('seats.freeCityLoyaltyPerTurn', 10,

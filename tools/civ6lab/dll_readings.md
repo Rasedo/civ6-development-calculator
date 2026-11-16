@@ -19635,3 +19635,63 @@ list alone.
 - Open (C-98): BOOST_TRIGGER_NUM_IMPROVED_TILES and
   BOOST_TRIGGER_HAVE_UNIT_AND_IMPROVEMENT are read off the standing state
   (`stateTrigger`), their functors unread.
+
+## C-98 / C-130: a city's loyalty level on its yields; the Free Cities' AIs' turns after their cities' own turn — READ (0x1c5350 at 0x1c615d..0x1c62e0, 0xa65030), the order off the logs, both twins
+
+`loyaltyYieldPct`, `LOYALTY_LEVELS` (cpu/data/seats.ts) in `computeCityStats`
+(cpu/core/city.ts); `freeCitiesPhase` (cpu/core/phase.ts) over
+`freeCityProduce` / `freeCityUpdate` (cpu/core/minorBuild.ts),
+`minorResearchBank` / `minorResearchTurn`; `Seat.unitsDisbanded` read by
+the view's `unitMaintenances` (cpu/core/aiView.ts). GPU `_seat_city_walk`
+(`_loyalty_levels`), `_free_cities_phase` over `_free_city_produce` /
+`_free_city_update`, `_free_disbanded` (sim_policy.py's
+EFFECT_ADJUST_UNIT_MAINTENANCE_DISCOUNT).
+
+- THE LOYALTY LEVEL'S YIELD CHANGE: the city yield's modifier (0x1c5350)
+  skips one yield type alone (cmp edi, [0xf2f974] at 0x1c615d, the type the
+  amenity tier's percent skips too: Food) and for every other adds the
+  amenity tier's percent (0x527b40, LOC_CITY_YIELD_FROM_HAPPINESS_TOOLTIP)
+  and then the loyalty level's: the level of the city's identity
+  (0x1a1a10 on city +0x2a78, none at -1), its LoyaltyLevels row's
+  YieldChange (+0x2c; the row filler 0xac8800 of the loader 0xa65030:
+  GrowthChange +0x24, IdentityChange +0x28, LoyaltyMax +0x1c, LoyaltyMin
+  +0x20) in 24.8 times 100 (0x1c623f..0x1c62a1,
+  LOC_CITY_YIELD_FROM_LOYALTY_TOOLTIP). The two sum in the one modifier.
+  The install's rows: level 3 (76-100) 0, level 2 (51-75) -0.25, level 1
+  (26-50) -0.5, level 0 (0-25) -1.0.
+- CONFIRMED: runs/h1_duels1143 Taiyuan, China's at t201 as its Loyalty
+  reaches 75: Production 2.703 -> 1.953, Science 0.902 -> 0.652, Culture
+  1.441 -> 1.039 on the same worked plots (x 0.9 -> x 0.65, Displeased's
+  -10), Food 9 both; the Free City's at t211 (73): 4.0 -> 2.75 (x 0.8 -> x
+  0.55), at t214 (level 1) 1.5 (x 0.3), at t217 (level 0) 0 with Food 11:
+  a modifier below -100 leaves none (a fit: where the game stops it is
+  unread).
+- THE FREE CITIES' TURN ORDER, off AI_Research.csv and the City Analysis
+  values the research rows hold: their cities' own turn (the production
+  step, the loyalty, the citizens re-placed) runs before their AIs' turns —
+  the research and civics AIs analyse on the Science and Culture the
+  cities make after it, and each city AI's update values a unit at the
+  turns the Production of then gives. 1143 t209: Taiyuan pays 4.8 and
+  makes 4.0 once its citizens are re-placed; the t210 rows hold the
+  Archer (30) at 8 turns, the Spearman and Heavy Chariot (32) at 8, the
+  Catapult (60) at 15, the Pikeman (90) at 23 — 17.496, 13.434, 14.723,
+  9.984 and 2.910 to the digit. t210: its Loyalty falls 82 -> 73 in its
+  turn; the t211 rows hold the Spearman at 12 turns on 2.75, the Catapult
+  at 22, the Pikeman past the horizon. t216: its Loyalty falls 28 -> 19;
+  that turn's analysis has every row not at one turn at -9999 (no
+  Science). The bank is left on the yields as the turn opens (the queue's
+  progress 9 at t210 is 4.8 + 4.8), and the grant after the policy jobs
+  (Conscription 7.0 at t212, the turn's granted Mechanized Infantry not
+  walked).
+- THE UNIT LIST'S DISBANDED UNITS: 0x6b0840 walks the player's unit list
+  with the dead flag unread; a unit the Free Cities' treasury disbands in
+  their turn is walked by that turn's policy jobs: 1143 t208, t213, t218
+  Conscription 14.0 (the revolt's and the grants' second Mechanized
+  Infantry disbanded those turns), 7.0 between.
+- Open (C-98): a Free City's resource counts (0x5c9700) — 1143 t209-t214
+  the Horseman's and the Knight's City Analysis values 0 in the game with
+  Horses on 7:9 owned, unimproved and revealed from t209;
+  AI_CityBuild.csv prints the Free City's PLOT ANALYSIS at t208 alone (37
+  plots, each Unowned with no resource), a city-state's every turn: what
+  0x5ce680's full update runs for the Free Cities is unread. The loyalty
+  level's GrowthChange (+0x24) is unported (C-102).

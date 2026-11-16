@@ -783,9 +783,11 @@
     - cpu/core/aiModifiers.ts:ANALYZERS
     - cpu/core/aiView.ts:aiView
     - gpu/core/sim_policy.py:_pol_analyze
+    - cpu/core/types.ts:Seat
   readings:
     - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
     - "C-130 / C-98: the unit list the policy analyzers walk, a city-state's route term and the losses the turn's players took — READ, both twins"
+    - "C-98 / C-130: a city's loyalty level on its yields; the Free Cities' AIs' turns after their cities' own turn — READ (0x1c5350 at 0x1c615d..0x1c62e0, 0xa65030), the order off the logs, both twins"
   context:
     - "- EFFECT_ADJUST_UNIT_MAINTENANCE_DISCOUNT 0x6b0840: over the player's units, min(Amount, Units.Maintenance +0x5c), bare Gold, span."
   review: reviewed

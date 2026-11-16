@@ -613,10 +613,12 @@ A question the SOURCE under-determines; neither engine ships a branch until the 
   - LAB (ops.strength): the team's attack strength at the military AI's refresh (each member's planning of its last pass, the engines' planned anew): duelq1128 city-state 3's City Defense t178 0 for the game's 115, t179 0 for 55, t181 / t182 60 for 0, its Attack Barb Camp t197 0 for 70; duelq1127 t64 the barbarians' 0 for 25
 - **C-98. CITY-STATES' RESEARCH AND CIVIC VALUES.** Weight 3.
   - BUILD (free cities and majors): the Free Cities' resource value (resourceValueOf 0)
-  - LAB (free cities and majors): a Free City's City Analysis unit values under the research unit term: duels1143 t209-t211 Horseback Riding, Construction and Apprenticeship 162-181 over the game's (the Horseman's term), t210-t218 every row in reach 5 to 586 off (t211 Stirrups 3201.2 for 2615.2), untraced
+  - LAB (free cities and majors): a Free City's resource counts: duels1143 t209-t214 the game's Horseman and Knight City Analysis values 0 (ours 18.1 / 12.9 / 20.7 .. 2.6 on Horses at 7:9, owned, unimproved, revealed from t209): Horseback Riding, Construction, Apprenticeship, Education and Stirrups 26 to 1500 over; AI_CityBuild.csv prints the Free City's PLOT ANALYSIS at t208 alone (37 plots Unowned, no resource), a city-state's every turn: what 0x5ce680's full update runs for the Free Cities is unread (the engines count any resource within three)
   - BUILD (free cities and majors): a full civilization's religious unit value (0x7b62c0's heal, Evangelize, evict, inquisition terms)
   - LAB (free cities and majors): a granted unit's missing birth record in the Free Cities' knowledge base is observed only (duels1143 t208 / t212 / t217 grants absent at the tactical site): the create's signal path from 0x273a40 is unread
   - LAB (free cities and majors): duels1143 t208 the Free Cities' revealed plots at Taiyuan's revolt 39 for the game's 41 (7:11 and 8:11 beyond ours)
+  - LAB (free cities and majors): duels1143 t214 the Free Cities' Bronze Working, the Wheel, Iron Working and Engineering 8.7 to 9.8 over the game's (1463.7 for 1455.0): the Spearman's and the Heavy Chariot's City Analysis values of t213's update 0.9 / 1.0 over, untraced
+  - LAB (free cities and majors): duels1143 the Free Cities' civics: t209 Political Philosophy, Defensive Tactics and Recorded History 6.0 under the game's (1822.8 for 1828.8), t210 six rows 60.0 under, t212 six 85.8 under (Civil Service 109.7), t213-t215 rows 2 to 88 off either way (t213 Mercenaries 5995.9 for 5935.9, t215 Reformed Church 3624.7 for 3712.5), t216-t217 Military Training, Mercenaries and Exploration 3.0 under (150.6 for 153.6); t216 the pick Feudalism for the record's, untraced beside the cards below (C-130)
   - LAB (research values): 1121 the trees' goal techs (Present Values)
   - LAB (research values): the Industrial Zone value low (1128 Hong Kong t84)
   - LAB (research values): the military AI's Fav Tech 466 of 513 (duely1127 t1-130: city-state 2's Masonry for the Wheel t21-26)
@@ -666,7 +668,7 @@ A question the SOURCE under-determines; neither engine ships a branch until the 
   - LAB (card values): the Lighthouse's coastal Housing on a centre beside a drowned plot is a fit (duels1146 Kumasi from t199): REQUIREMENT_PLOT_ADJACENT_TO_COAST's evaluator unread, the engines' other coastal tests count a drowned plot as coast
   - LAB (card values): duels1176 city-state 3 Caravansaries 65 for 53 t71-92 and Triangular Trade 147 for 124 t93-97: its Gold 9 for the record's 11 from t70, the Trading Dome on plot 922 (Samarkand's improvement, 2 Gold in the record) having no engine improvement row, its Gold boost on a net -6 for the game's -4
   - LAB (card values): duels1158 city-state 3 Equestrian Orders 96 for 140 at t204 falling 17.5 a turn to 0 for 105 at t210, 0 for 100-20 t211-215, 60 for 190 to 0 for 10 t233-242: its free Horses 29 at t204 in ours (39 less the 10 the Cavalry at the queue's front reserves, record 204), the game's values paying 16 copies at t204, 20 at t206, rising 2 a turn to 40 by t216
-  - LAB (card values): duels1143 the Free Cities' Raid 2 to 5 under the game's each turn from t215 (138 for 141 at t215, 143 for 146 at t216, 284 for 289 at t222: the game's two cities of one owner give an odd sum), untraced; the seed's researchScore.free 146, policyScore.free and civicScore.free rows of t208-218 untraced beside it
+  - LAB (card values): duels1143 the Free Cities' Raid 2 to 7 under the game's each turn from t215 (138 for 141 at t215, 143 for 146 at t216, 284 for 289 at t222: the game's two cities of one owner give an odd sum), untraced
   - BUILD (card values): the importer's replay of a major's stockpile (importPower) pays no reveal's ownership pass (revealPass): duels1158 player 1's Coal under its Entertainment Complex on 12:11 at t163, duels1162 player 1's Uranium under its centre 39:15 at t216
   - LAB (card values): duels1140 city-state 2 Civil Prestige 87 for 58 at t170 and 58 for 102 at t171: its Trader 1900544, its route run out in t169, begins one to 131073 in t170 and Muscat's citizens are re-placed (plot 880 for 1054, the Food surplus 10 -> 12 in record 171); the game's t170 card reads the surplus 12 on the forecast kept at 10 and its t171 card the forecast of 12, ours a turn behind on both; alike duels1135 city-state 4 t215-216 (54 / 69 for 69 / 113) and duels1147 city-state 4 t199-200 (21 / 36 for 36 / 14)
   - LAB (yields at the job): a project begun at 0 converting an unrecorded overflow (1121 Hunza t85)
@@ -676,7 +678,7 @@ A question the SOURCE under-determines; neither engine ships a branch until the 
   - LAB (majors and free cities): a major's victory-manager strategies imported from AI_Victories.csv (Seat.strategies), none in self-play
   - LAB (majors and free cities): a major's and the Free Cities' best plot to buy (none)
   - LAB (majors and free cities): the Free Cities' Raid: duels1143 player 62 t215-249 ours 364 / 0 / 370 / 0 / 377 for 141-146, 141 / 279 for 143 / 284 at t220-221, 0 for 289-525 from t222: their knowledge base's cities are those on the plots they see now (lookCities), no kept list
-  - LAB (majors and free cities): duels1143 player 62 t208-219 cards off (Caravansaries 62 / 38 for 14, Agoge and Feudal Contract up to 102 over, Civil Prestige 22-44 under, Colonization 4 for none)
+  - LAB (majors and free cities): duels1143 player 62 cards off: Civil Prestige 81 / 79 / 78 / 62 / 75 for the game's 103 (87 at t213) t210-t215, Colonization 4 for none logged t208-t215, t212 Agoge and Feudal Contract 80 for 16 the turn the Slinger completes, t213 Limes 24 for 22, t222 Professional Army 0 for 5, untraced
   - LAB (unread): 0x4dd3b0's counter +0x1724
   - LAB (unread): +0x390
   - LAB (unread): 0x5d17b0 (valued 0)
@@ -706,6 +708,7 @@ A question the SOURCE under-determines; neither engine ships a branch until the 
   - LAB (citizen pressure): duelq1128 Guangzhou t246 the game's PopulationPressure −2.34375 reads Rome at population 9 where the record shows 10 (−3.75 at t247: the reading cached from before Rome's growth that turn)
   - LAB (culture): the autoplayed seat's culture boxes held t82–101 and at turns 30k+1
   - LAB (projects): Bread and Circuses (+1 a citizen while it heads the queue, 0x1a1370; +20 Loyalty on completion) ported with no recorded case, no duelq recording queueing it
+  - BUILD (unported rows): the loyalty level's GrowthChange (LoyaltyLevels row +0x24; the engines port its YieldChange alone): duels1143 Taiyuan's overallGrowthMod 0.3516 at t210 (Loyalty 82), 0.2617 at t211 (73, x 0.75)
 - **C-103. WONDERS' UNPORTED EFFECTS.** Weight 2.
   - BUILD (unported rows): Kilwa's MILITARISTIC unit-production and INDUSTRIAL building / district-production rows (how a +15% per suzerain tier composes with the other production factors unread)
   - BUILD (unported rows): Terracotta Army's promotion level (EFFECT_ADJUST_UNIT_GRANT_EXPERIENCE -1) and Archaeologist borders
@@ -778,6 +781,7 @@ A question the SOURCE under-determines; neither engine ships a branch until the 
   - BUILD (city yields): 1127 t183 Shanghai city.food 20.2 for 3.05 (untraced)
   - LAB (city yields): 1121 t215 Taiyuan's Science 23 / Faith 16.5 in the game, ours 19 / 15.5 (read.city.yields from t215, `--from 206`), the term unread
   - LAB (city yields): 1124 t56-58 Taiyuan's yields ×0.9 in the game (happiness yield modifier; Etemenanki +0.9 a turn)
+  - LAB (city yields): a city yield's modifier below -100 percent: duels1143 the Free City of Taiyuan t217-t219 Production, Science and Culture 0 under Unrest's -100 and its amenities' -20; the engines stop the modifier at -100 (a fit: where the game stops it is unread, 0x1c5350)
   - LAB (amenities): where GameEffects re-tests a requirement (the turn end and the next unit move both fit; 0xc7ede0 / 0xc7f640)
   - LAB (amenities): 1117 t84 Xi'an's amenityParts[2] 1 -> 2 with no garrison on the record's plots
   - BUILD (production): a Builder's wonder charge under a wonder percent: 1121 Xi'an t38 Pyramids +18.0703 (4626/256) under Autocracy's +10% for 0.15 x 110 = 16.5 (duelw1105 Chengdu Pyramids +18.1, Oracle +23.9; 1104 Great Library +32.9), most charges a flat 15% (`wonderChargeBoost`)

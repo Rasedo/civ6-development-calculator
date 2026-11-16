@@ -1,6 +1,6 @@
 /**
  * THE FREE CITY'S OWN PLAY (C-60): its production — the item in hand its AI's
- * Default Specialization picked on an empty queue (`freeCityBuild`) — and its
+ * Default Specialization picked on an empty queue (`freeCityProduce`, `freeCityUpdate`) — and its
  * units' walk. The GPU twin is tests/gpu/minor_purse_test.py's Free City
  * scenes.
  */
@@ -15,7 +15,7 @@ import { FX_MIN } from '../../../cpu/core/aiValue';
 import { spawnUnit } from '../../../cpu/core/units';
 import type { WorldFile } from '../../../world/file';
 import { flipCity, freeCitiesPhase } from '../../../cpu/core/phase';
-import { freeCityBuild } from '../../../cpu/core/minorBuild';
+import { freeCityProduce, freeCityUpdate } from '../../../cpu/core/minorBuild';
 import { wallsMax } from '../../../cpu/core/rules';
 import { FREE_SEAT } from '../../../cpu/core/seats';
 import { BUILDINGS } from '../../../cpu/data/buildings';
@@ -65,7 +65,8 @@ describe("the Free City's production", () => {
     expect([bt.length, bt.reduce((a, b) => a + b, 0), ut.length, ut.reduce((a, b) => a + b, 0)]).toEqual([1, 7728, 5, 20541]);
     const seq: unknown[] = [];
     for (let k = 0; k < 8; k++) {
-      freeCityBuild(state, city, 5);
+      freeCityProduce(state, city, 5);
+      freeCityUpdate(state, city);
       const q = city.queue[0];
       seq.push([q?.kind === 'building' ? q.building : q?.kind === 'unit' ? q.unit : '-', q?.progress ?? 0, city.productionBank ?? 0]);
     }
@@ -78,11 +79,13 @@ describe("the Free City's production", () => {
     research(state);
     city.queue = [];
     city.productionBank = 0;
-    freeCityBuild(state, city, 5);
+    freeCityProduce(state, city, 5);
+    freeCityUpdate(state, city);
     expect(city.productionBank).toBe(5);
     expect(city.queue.length).toBe(1);
     const q = city.queue[0];
-    freeCityBuild(state, city, 3);
+    freeCityProduce(state, city, 3);
+    freeCityUpdate(state, city);
     // the step paid the Production and the bank into the item (or completed it)
     expect(city.queue[0] === q ? q.progress : 8).toBe(8);
     expect(city.productionBank).toBe(city.queue[0] === q ? 0 : city.productionBank);
@@ -93,7 +96,8 @@ describe("the Free City's production", () => {
     research(state);
     city.queue = [{ kind: 'building', building: 'MONUMENT', progress: BUILDINGS.MONUMENT.cost - 1 }];
     city.productionBank = 0;
-    freeCityBuild(state, city, 3);
+    freeCityProduce(state, city, 3);
+    freeCityUpdate(state, city);
     expect(city.buildings).toContain('MONUMENT');
     expect(city.productionBank).toBe(2);
     expect(city.queue[0]?.kind === 'building' && city.queue[0].building === 'MONUMENT').toBe(false);
@@ -104,10 +108,12 @@ describe("the Free City's production", () => {
     research(state);
     const before = freeUnits(state).length;
     city.queue = [{ kind: 'unit', unit: 'ARCHER', progress: UNITS.ARCHER.cost }];
-    freeCityBuild(state, city, 1);
+    freeCityProduce(state, city, 1);
+    freeCityUpdate(state, city);
     expect(freeUnits(state).length).toBe(before + 1);
     city.queue = [{ kind: 'building', building: 'ANCIENT_WALLS', progress: BUILDINGS.ANCIENT_WALLS.cost }];
-    freeCityBuild(state, city, 1);
+    freeCityProduce(state, city, 1);
+    freeCityUpdate(state, city);
     expect(city.buildings).toContain('ANCIENT_WALLS');
     expect(city.outerHp).toBe(wallsMax(state, city));
   });

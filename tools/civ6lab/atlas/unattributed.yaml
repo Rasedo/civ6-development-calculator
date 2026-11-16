@@ -9848,6 +9848,22 @@
   context:
     - "..., each plot's improvement (+0x44) its Improvements row's PlunderAmount (+0x48, loader 0xa63870), summed — the whole list again for each city known of that owner; float(sum) x 0.2f x..."
   review: imported
+- addr: 0xa65030
+  final: 0x7604c0
+  kind: function
+  name: loadLoyaltyLevels
+  semantics: the LoyaltyLevels loader (rowid, Description, GrowthChange, IdentityChange, LoyaltyLevelType, LoyaltyMax, LoyaltyMin, Name, YieldChange); its row filler 0xac8800.
+  status: READ
+  cases:
+    - recording: h1_duels1143
+      turn: 211
+      value: "Taiyuan at Loyalty 73 (level 2): Production 4.0 -> 2.75, x 0.8 -> x 0.55 on the same worked plots; China's at t201 (75) 2.703 -> 1.953"
+  readings:
+    - "C-98 / C-130: a city's loyalty level on its yields; the Free Cities' AIs' turns after their cities' own turn — READ (0x1c5350 at 0x1c615d..0x1c62e0, 0xa65030), the order off the logs, both twins"
+  context:
+    - "...e Cities' AIs' turns after their cities' own turn — READ (0x1c5350 at 0x1c615d..0x1c62e0, 0xa65030), the order off the logs, both twins"
+    - "...-1), its LoyaltyLevels row's YieldChange (+0x2c; the row filler 0xac8800 of the loader 0xa65030: GrowthChange +0x24, IdentityChange +0x28, LoyaltyMax +0x1c, LoyaltyMin +0x20) in 24...."
+  review: reviewed
 - addr: 0xa6a7b0
   final: 0x765c40
   kind: function
@@ -10040,6 +10056,21 @@
     - "...0 or 0x35fd60 refuses; T = max(0x7610e0 to +0x160, 0x621920 to +0x158). The row (loader 0xac6bb0): AirSlots +0x2c .. YieldFromAppealPercent +0x60; Adjacencies +0x110, Tourism +0x168,..."
     - ...0; AIR ASSAULT 0x80fb50; BUILD MILITARY IMPROVEMENT 0x7e9b10 / 0x7e9120 (+0x108 & 0x40, 0xac6bb0; 0x95a010).
     - "...releases the research AI's other Tech Contracts — READ (0x35fd60 at 0x36079e / 0x36085d, 0xac6bb0, 0x762d60 at 0x762f7b), both twins"
+  review: reviewed
+- addr: 0xac8800
+  final: 0x7c39f0
+  kind: function
+  name: fillLoyaltyLevelRow
+  semantics: "a LoyaltyLevels row: +0x10 the index, +0x18 the type hash, +0x1c LoyaltyMax, +0x20 LoyaltyMin, +0x24 GrowthChange, +0x28 IdentityChange, +0x2c YieldChange (floats)."
+  status: READ
+  cases:
+    - recording: h1_duels1143
+      turn: 211
+      value: "Taiyuan at Loyalty 73 (level 2): Production 4.0 -> 2.75, x 0.8 -> x 0.55 on the same worked plots; China's at t201 (75) 2.703 -> 1.953"
+  readings:
+    - "C-98 / C-130: a city's loyalty level on its yields; the Free Cities' AIs' turns after their cities' own turn — READ (0x1c5350 at 0x1c615d..0x1c62e0, 0xa65030), the order off the logs, both twins"
+  context:
+    - "...n city +0x2a78, none at -1), its LoyaltyLevels row's YieldChange (+0x2c; the row filler 0xac8800 of the loader 0xa65030: GrowthChange +0x24, IdentityChange +0x28, LoyaltyMax +0x1c, Loy..."
   review: reviewed
 - addr: 0xad1aa0
   final: 0x7cce10

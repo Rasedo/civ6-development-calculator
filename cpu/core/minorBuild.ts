@@ -2681,21 +2681,14 @@ function freeCityBuildingOk(state: GameState, city: City, id: string, unlocks: U
 }
 
 /**
- * A FREE CITY'S PRODUCTION AND ITS AI'S PICK (the Free Cities' list holds the
- * Default Specialization alone: AI_CITY_EVENTS' FreeCitiesCityBuilds names
- * "Simple City Tree", which the install defines no nodes for). The step pays
- * the turn's Production and the bank (`City.productionBank`) into the item in
- * hand (`City.queue[0]`); it completes when its progress covers its price —
- * a unit on or beside the centre (with no free tile it waits), a building
- * raised, the walls' repair at the HP it puts back (`projectCost`) — leaving
- * the bank the Production less what it lacked; with nothing in hand the
- * Production banks. Then its city AI's update stores the city's threat
- * (`City.aiThreat`) and, on an empty queue, the Default Specialization over
- * the city's tables (`freeCityBuildFacts`, `freeCityPickFacts`) queues its
- * pick (runs/h1_duelw1114 Rome t124 UNIT_SLINGER 60.3, runs/h1_duelw1123
- * Chen t205 UNIT_ARCHER 118.5).
+ * A FREE CITY'S PRODUCTION STEP: the turn's Production and the bank
+ * (`City.productionBank`) paid into the item in hand (`City.queue[0]`); it
+ * completes when its progress covers its price — a unit on or beside the
+ * centre (with no free tile it waits), a building raised, the walls' repair
+ * at the HP it puts back (`projectCost`) — leaving the bank the Production
+ * less what it lacked; with nothing in hand the Production banks.
  */
-export function freeCityBuild(state: GameState, city: City, production: number): void {
+export function freeCityProduce(state: GameState, city: City, production: number): void {
   // a building CanConstruct refuses leaves the head before the step
   // (`headLetGo`)
   headLetGo(state, city);
@@ -2711,13 +2704,32 @@ export function freeCityBuild(state: GameState, city: City, production: number):
       city.productionBank = Math.max(0, production - Math.max(0, cost - before));
     }
   }
-  // its city AI's update: the city's threat (`freeCityThreat`); under
-  // threat the City Defense event's defensive cancel on the item queued
-  // (the Free Cities hold no contract: their one tree, Free Cities Assault,
-  // names no Contract ID); on an empty queue the Default Specialization.
-  // Its UNITS table every update, which the Free Cities' research values
-  // read (`City.aiUnitValues`). Its analysis adds the city's regions to the
-  // Free Cities' primary region list (`freePrimaryRegions`)
+}
+
+/**
+ * A FREE CITY'S CITY AI'S UPDATE AND PICK (the Free Cities' list holds the
+ * Default Specialization alone: AI_CITY_EVENTS' FreeCitiesCityBuilds names
+ * "Simple City Tree", which the install defines no nodes for), after every
+ * Free City's own turn — its production step, its loyalty and its citizens
+ * re-placed — so its tables read the Production the city makes as that turn
+ * left it (runs/h1_duels1143 Taiyuan: 4.8 Production paid at t209 and 4.0
+ * after its citizens' re-placing, the Archer's 30 valued at 8 turns, the
+ * Catapult's 60 at 15, the Pikeman's 90 at 23; at t210 the 2.75 its loyalty
+ * falling to the next level left, the Spearman's 32 at 12, the Pikeman past
+ * the horizon). The update stores the city's threat (`City.aiThreat`) and,
+ * on an empty queue, the Default Specialization over the city's tables
+ * (`freeCityBuildFacts`, `freeCityPickFacts`) queues its pick
+ * (runs/h1_duelw1114 Rome t124 UNIT_SLINGER 60.3, runs/h1_duelw1123 Chen
+ * t205 UNIT_ARCHER 118.5).
+ */
+export function freeCityUpdate(state: GameState, city: City): void {
+  // the city's threat (`freeCityThreat`); under threat the City Defense
+  // event's defensive cancel on the item queued (the Free Cities hold no
+  // contract: their one tree, Free Cities Assault, names no Contract ID); on
+  // an empty queue the Default Specialization. Its UNITS table every update,
+  // which the Free Cities' research values read (`City.aiUnitValues`). Its
+  // analysis adds the city's regions to the Free Cities' primary region list
+  // (`freePrimaryRegions`)
   const t = freeCityThreat(state, city);
   city.aiThreat = t.level;
   city.aiThreatNear = t.near;

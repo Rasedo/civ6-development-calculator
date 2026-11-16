@@ -41,13 +41,18 @@
     - recording: 1117
       turn: 15
       value: "B, read with no   item, holds none of the city-states' Production toward the head (the   Industrial / Militaristic envoy rows are toward-item terms): 1117 Rome t15,   a Warrior at 12 + 9 of 20 with on"
-  impl: [cpu/core/city.ts:plainProduction]
+  impl:
+    - cpu/core/city.ts:plainProduction
+    - cpu/core/city.ts:pct
+    - cpu/data/seats.ts:LOYALTY_LEVELS
+    - gpu/core/sim_economy.py:_seat_city_walk
   readings:
     - "H-1: a district project's yield conversion — READ"
     - "H-1: the build queue's overflow, the yields' fixed point, the dispersal Gold, the pantheon's price — READ"
     - "C-96: the unit value's unit count and the founding Production — READ, both twins"
     - "C-130: the flat bonus's wonder term runs on into the combat experience term — READ, both twins"
     - "C-130: a city-state's government values on the city its update left; the boosts its city's turn earns land at once — READ, both twins"
+    - "C-98 / C-130: a city's loyalty level on its yields; the Free Cities' AIs' turns after their cities' own turn — READ (0x1c5350 at 0x1c615d..0x1c62e0, 0xa65030), the order off the logs, both twins"
   context:
     - City_BuildQueue.cpp. The queue's turn 0x177d10 reads the city's Production (0x1c5350), CLEARS the city's per-yield conversion vector (+0x1108 of the city's yield component) a...
     - "...'s step (City_BuildQueue 0x177d10 → 0x16f050) reads the city's Production twice through 0x1c5350: A with the head's id (the Production toward the item), B with none (the city's plain P..."

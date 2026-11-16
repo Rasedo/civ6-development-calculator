@@ -386,6 +386,7 @@
       value: 1124 Bologna t61 60 against 50;
   readings:
     - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
+    - "C-98 / C-130: a city's loyalty level on its yields; the Free Cities' AIs' turns after their cities' own turn — READ (0x1c5350 at 0x1c615d..0x1c62e0, 0xa65030), the order off the logs, both twins"
   context:
     - "...0x1c64d0's attribute) x (after + 100) / (before + 100) - 1, the level's percent being 0x527b40: the Happinesses row's NonFoodYieldModifier (+0x3c, its flag +0x38; the loader 0xac62c0..."
   review: reviewed

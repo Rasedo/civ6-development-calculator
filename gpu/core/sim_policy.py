@@ -838,8 +838,12 @@ class SimPolicy:
                 return span(self._cv_yield(tot, "YIELD_GOLD")) >> 8
             mine = self.major_unit_alive & (self.major_unit_seat == ctx["seat"])
             m = self._type_maintenance.take(self.major_unit_type.clamp(min=0, max=self.NU - 1)).long()
-            tot = (torch.clamp(m, max=amount) * mine.long()).sum(dim=1) * _FX
-            return span(self._cv_yield(tot, "YIELD_GOLD")) >> 8
+            tot = (torch.clamp(m, max=amount) * mine.long()).sum(dim=1)
+            # the units the Free Cities' treasury disbanded this turn stand
+            # in the list to their turn's end (`Seat.unitsDisbanded`)
+            if self._free_disbanded is not None and ctx["s"] == self.FR:
+                tot = tot + (self._free_disbanded * torch.clamp(self._type_maintenance.long(), max=amount)).sum(dim=1)
+            return span(self._cv_yield(tot * _FX, "YIELD_GOLD")) >> 8
         raise NotImplementedError(eff)
 
     def _pol_enemy_plunder(self, ctx: dict, districts: bool) -> torch.Tensor:

@@ -157,8 +157,8 @@
       value: "Wuhan's Ferris Wheel at its head at 0 under its Water Park pillaged again at t235's close: no Ferris Wheel progress in record 237's memory, the overflow 21.6015625 (B), the Builder taken at 0 in its t236 start and at 43.203125 in record 238"
   impl:
     - cpu/core/minorBuild.ts:minorBuild
-    - cpu/core/minorBuild.ts:freeCityBuild
-    - gpu/core/sim_minorai.py:_free_city_build
+    - cpu/core/minorBuild.ts:freeCityProduce
+    - gpu/core/sim_minorai.py:_free_city_produce
     - cpu/core/phase.ts:banked
     - cpu/core/phase.ts:conv
     - cpu/core/phase.ts:lacked

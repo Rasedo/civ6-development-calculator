@@ -472,10 +472,14 @@ export function aiView(state: GameState, opts: { updated?: boolean } = {}): AiVi
     cityStateCount: () => state.cityStates.filter((cs) => cs.centerIndex >= 0).length,
     // over the seat's unit list (Player +0x12e8 +0xd8): a city-state's
     // holds the units its last end of turn listed that the delayed kill
-    // took (`minorListedUnits`)
+    // took (`minorListedUnits`), the Free Cities' the units their treasury
+    // disbanded this turn (`Seat.unitsDisbanded`)
     unitMaintenances: (i) => {
       const cs = isCityStateSeat(i) ? (seatOf(state, i) as CityState | undefined) : undefined;
-      if (!cs) return state.units.filter((u) => u.seat === i).map((u) => UNITS[u.type]?.maintenance ?? 0);
+      if (!cs) {
+        return [...state.units.filter((u) => u.seat === i).map((u) => u.type), ...(seatOf(state, i)?.unitsDisbanded ?? [])]
+          .map((type) => UNITS[type as keyof typeof UNITS]?.maintenance ?? 0);
+      }
       return [...minorListedUnits(state, cs)].flatMap(([type, n]) => Array<number>(n).fill(UNITS[type]?.maintenance ?? 0));
     },
     unitPoolCount: (i) => {

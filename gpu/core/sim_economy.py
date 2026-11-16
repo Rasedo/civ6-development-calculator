@@ -8240,6 +8240,16 @@ class SimEconomy:
         # `pct` (a fraction), applied once at the end (`computeCityStats`)
         pct = torch.zeros_like(total)
         pct[:, :, 1:] = pct[:, :, 1:] + (amen_yf.double() - 1.0).unsqueeze(2)
+        # CIV6 (LoyaltyLevels.YieldChange, 0x1c5350 at 0x1c61fa..0x1c62e0): the
+        # city's loyalty level takes its percent on the yields its amenity
+        # tier does, in the same modifier (`loyaltyYieldPct`); a city-state's
+        # city stands at full Loyalty
+        if not (self._CITY_MINOR0 <= row < self.FREE_ROW):
+            _loy = torch.floor(self.city_loyalty[:, row, sl].double())
+            _lpct = torch.full_like(_loy, float(self._loyalty_levels[-1][1]))
+            for _lmin, _lp in reversed(self._loyalty_levels):
+                _lpct = torch.where(_loy >= float(_lmin), torch.full_like(_lpct, float(_lp)), _lpct)
+            pct[:, :, 1:] = pct[:, :, 1:] + (_lpct * alivef / 100.0).unsqueeze(2)
         # CIV6 (EFFECT_ADJUST_CITY_HAPPINESS_YIELD): the roster's per-tier rows
         # (`HAPPY_YIELD_ROWS`) — a percentage on the yields the row names, in
         # cities at the row's own tier. The tier comes from `_seat_amenity`,
@@ -8356,6 +8366,8 @@ class SimEconomy:
             pct[:, :, 1] = pct[:, :, 1] + float(self.rules.citystate["productionPct"]) / 100.0
         if base is not None:
             base.append(torch.where(alive.unsqueeze(2), total, torch.zeros_like(total)))
+        # a modifier below -100 percent leaves the yield at none
+        pct = pct.clamp(min=-1.0)
         # CIV6 (GameAttribute::Value 0xaa740): base + base x percent / 100 in
         # the game's 24.8 fixed point, the divide truncating toward zero
         # (`withPercent256`)
