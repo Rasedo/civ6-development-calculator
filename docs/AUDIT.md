@@ -423,7 +423,6 @@ A question the SOURCE under-determines; neither engine ships a branch until the 
   - LAB (route value K): the route value K under a major's faith boost: duels1191 t131 the Free Cities' K 16.02 for the game's 15.73 (ours unboosted 19.27 that turn alone, one 13-Faith step below it), untraced
   - LAB (route value K): duels1139 t154 the Free Cities' civic values 50 short for one turn (FOREIGN_TRADE 512.6 / 562.6, POLITICAL_PHILOSOPHY 696.9 / 746.9), no major's policy or completion row in pair 154: untraced; duels1170 t242 city-state 3's policy values 0 where the game's are 9 / 14 / 3 (LOGISTICS, LEVEE_EN_MASSE, AFTER_ACTION_REPORTS): untraced
   - LAB (route value K): the route value K: duels1153 China's best route in our lists is to Zanzibar on 513 (11 Gold, 10.68 t138-150); the game's K rises one Food at China's weights at t151 (12.25, and 12.00 one Faith step below on the turns China's balance after its turn passed its Apostle's 145) and one Production at t161 (13.70 / 13.45), the route carrying the Food, the Faith and the Production not in our lists (no destination there pays Faith), untraced
-  - LAB (route value K): the route value K a Mountain Tunnel's MOUNTAIN_PORTAL term reads: duels1191 Chinguetti t224 ours' K falls 26.09 -> 14.74, its Tunnel on 16:18 818.34 -> 476.34 under the Farm on 15:20 (521.57), a Builder contract t224-t229; the game's pick the Tunnel t223-t225 (m_bestImprovementToMake 46), its tree ended at its Check Plot each turn
   - BUILD (route value K): the route value K: a major's Religious AI's wanted unit (0x74f5a0 over 0x5d4cd0, 0x7b62c0's RELIGIOUS branch at 0x7b6587) unported: the replay takes it from the game's memory (`stageFaithWants`), so a run without the aimem stream, and the RL seats, carry no faith boost (duels1191 China's Missionary t118-163 the K's two steps)
   - LAB (quests): the quests' select ranges (18 draws)
   - LAB (contracts): t178 p2 a Stock Exchange contract the game has none of (seed not named)
@@ -866,7 +865,7 @@ A question the SOURCE under-determines; neither engine ships a branch until the 
   - BUILD (eras): which other readers of `worldEraIndex` read the game era (combat, espionage, grievance, `plotRowsGateOnEra`, the observation's other columns)
   - LAB (eras): fit, unread (action replay): a levied formation paying FORMATION_* and no unit-creation key (1121 t180)
   - BUILD (great people): the Great People's draw and price read the game era (0x2f8f70, 0x2f1c50)
-  - BUILD (great people): a pass or the exhausted class's Faith conversion with free Great Person points (`Seat.gppFree`) held, unread (no recorded case)
+  - BUILD (great people): a pass with free Great Person points (`Seat.gppFree`) held, unread (no recorded case)
   - BUILD (great people): whether Classical Republic's +15% scales the cards' player-level Great Person points (the engines apply it; no recorded case tells it apart)
   - BUILD (great people): a human player's pending claim (0x2f2e90 marks the entry +0x10 and recruits nothing; no recorded case)
   - BUILD (great people): the refund term 0x43ce00's rows past Magnanimous

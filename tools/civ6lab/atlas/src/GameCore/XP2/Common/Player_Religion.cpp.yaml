@@ -37,9 +37,15 @@
     - recording: h1_duely1124
       turn: 36
       value: Bologna's faithYield 16 with no Faith in its city (Campus Research Grants' 16 Great Scientist points)
-  impl: [cpu/core/minorBuild.ts:minorEconomy, gpu/core/sim_minors.py:_minor_economy]
+  impl:
+    - cpu/core/minorBuild.ts:minorEconomy
+    - gpu/core/sim_minors.py:_minor_economy
+    - cpu/core/greatPeople.ts:advanceGreatPeople
+    - gpu/core/sim_phase.py:_advance_great_people
+    - cpu/core/greatPeople.ts:perTurn
   readings:
     - "C-130: a city-state's Great Person points store, its Faith and its flat bonus; Bastions' strike on standing walls — READ, both twins"
+    - "C-114: an exhausted Great Person class's points a turn as Faith — READ (0x2f1ed0 at 0x2f1ef9..0x2f1f1e, 0x2f63f0, 0x43c9a0, 0x43c190), both twins"
   review: reviewed
 - addr: 0x495860
   final: 0x314710

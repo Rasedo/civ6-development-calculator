@@ -3039,7 +3039,7 @@ class SimPhase:
             # points as they stood claims no further (`advanceGreatPeople`)
             changed = active & (pts > 0)
             # maxN + 1: a turn claiming the WHOLE roster still reaches the
-            # exhaustion draw, so both engines convert the same turn.
+            # exhaustion draw, so both engines draw the same turn.
             for _ in range(maxN + 1):
                 self._gp_ensure_offer(active, cls)
                 hit = changed & self._gp_claimable(row, cls, self.civ_gpp[:, row, cls]) & ~_ban
@@ -3050,15 +3050,13 @@ class SimPhase:
                 was = self.civ_gpp[:, row, cls].clone()
                 self._gp_spend(row, hit, cls)
                 changed = hit & (self.civ_gpp[:, row, cls] != was)
-            # CIV6: "GPPs that can no longer be used are converted to Faith,
-            # in a 1:1 ratio" — the exhausted class's stock and flow alike.
-            exh = active & (self.gp_offer[:, cls] == -2) & (self.civ_gpp[:, row, cls] > 0)
+            # a class whose offer is exhausted (-2) keeps its points, and its
+            # points a turn are Faith a turn (0x494090 -> 0x43c9a0 over the
+            # classes 0x2f1ed0 refuses, `advanceGreatPeople`)
+            exh = active & (self.gp_offer[:, cls] == -2)
             if bool(exh.count_nonzero()):
                 self.civ_faith[:, row] = torch.where(
-                    exh, self.civ_faith[:, row] + self.civ_gpp[:, row, cls].to(self.dtype),
-                    self.civ_faith[:, row])
-                self.civ_gpp[:, row, cls] = torch.where(
-                    exh, torch.zeros_like(self.civ_gpp[:, row, cls]), self.civ_gpp[:, row, cls])
+                    exh, self.civ_faith[:, row] + pts.to(self.dtype), self.civ_faith[:, row])
 
     def _gp_ensure_offer(self, active: torch.Tensor, cls: int, from_era: torch.Tensor | None = None) -> None:
         """The DRAW, where pending (0x2f94d0): the pool is the FIRST era at or

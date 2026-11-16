@@ -35,6 +35,7 @@
   readings:
     - "C-97: the government and policy choice — the choice READ, the values PARTLY READ"
     - "C-130: a city-state's Great Person points store, its Faith and its flat bonus; Bastions' strike on standing walls — READ, both twins"
+    - "C-114: an exhausted Great Person class's points a turn as Faith — READ (0x2f1ed0 at 0x2f1ef9..0x2f1f1e, 0x2f63f0, 0x43c9a0, 0x43c190), both twins"
   context:
     - "...nClass the player cannot earn, 0x2f1ed0: its civilization level's CanEarnGreatPeople (0x43a980; a city-state's and the Free Cities' levels lack it — no city-state of the five duels l..."
   review: reviewed
@@ -60,10 +61,14 @@
     - recording: h1_duely1124
       turn: 36
       value: Bologna's store keeps Campus Research Grants' 16 Great Scientist points t36-t40 (its Faith a turn 16 in every record)
-  impl: [cpu/core/types.ts:CityState]
+  impl:
+    - cpu/core/types.ts:CityState
+    - cpu/core/greatPeople.ts:advanceGreatPeople
+    - cpu/core/greatPeople.ts:perTurn
   readings:
     - "C-130: a city-state's Great Person points store, its Faith and its flat bonus; Bastions' strike on standing walls — READ, both twins"
     - "C-130: a minor's levy home after its bank; its free Trader's route before its city update, the AI's yields cached before it; a deleted unit off its list at once; a major's founded city keeps its trade list at once — READ (0x4e4560 at 0x4e45ee / 0x4e4638, 0x6096c0's passes, 0x688eaa, 0x1cb8b0, 0x948500 at 0x9485e5, 0x1eae70 at 0x1eb335 -> 0x5cdd70 at 0x5ce191), the cache's span a fit, both twins"
+    - "C-114: an exhausted Great Person class's points a turn as Faith — READ (0x2f1ed0 at 0x2f1ef9..0x2f1f1e, 0x2f63f0, 0x43c9a0, 0x43c190), both twins"
   review: reviewed
 - addr: 0x43c340
   kind: function
@@ -95,9 +100,15 @@
     - recording: h1_duely1121
       turn: 78
       value: Hunza's faithYield 26 from t69, 56 from t78 (Commercial Hub Investment at t68 and t77)
-  impl: [cpu/core/minorBuild.ts:minorEconomy, gpu/core/sim_minors.py:_minor_economy]
+  impl:
+    - cpu/core/minorBuild.ts:minorEconomy
+    - gpu/core/sim_minors.py:_minor_economy
+    - cpu/core/greatPeople.ts:advanceGreatPeople
+    - gpu/core/sim_phase.py:_advance_great_people
+    - cpu/core/greatPeople.ts:perTurn
   readings:
     - "C-130: a city-state's Great Person points store, its Faith and its flat bonus; Bastions' strike on standing walls — READ, both twins"
+    - "C-114: an exhausted Great Person class's points a turn as Faith — READ (0x2f1ed0 at 0x2f1ef9..0x2f1f1e, 0x2f63f0, 0x43c9a0, 0x43c190), both twins"
   review: reviewed
 - addr: 0x43ce00
   kind: function

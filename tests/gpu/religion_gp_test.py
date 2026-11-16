@@ -177,7 +177,8 @@ def main() -> None:
     sim.game_era[:] = 8  # push the game era past the roster
     sim._advance_great_people(0, torch.ones(sim.B, dtype=torch.bool, device=sim.device))
     assert int(sim.gp_earned[0, _pc]) == 0 and int(sim.gp_offer[0, _pc]) == -2,         "an exhausted class must claim nobody, however fat the bank"
-    assert float(sim.civ_faith[0, 0] - _fa0[0]) == 100_000.0,         "the dead bank must convert to faith 1:1"
+    assert float(sim.civ_faith[0, 0] - _fa0[0]) < 100_000.0,         "an exhausted class's bank must give no faith"
+    assert float(sim.civ_gpp[0, 0, _pc]) >= 100_000.0,         "an exhausted class must keep its bank"
     sim.game_era[:] = _ge0
     sim.civ_prophets[:, 0] = _pro0
     sim.civ_faith[:, 0] = _fa0

@@ -44,10 +44,20 @@
   review: reviewed
 - addr: 0x2f1ed0
   kind: function
-  semantics: "the player can earn a great person class: its civilization level's CanEarnGreatPeople (0x43a980; a city-state's and the Free Cities' lack it), no trait barring the class, a person left."
+  semantics: "the player can earn a great person class: the class's timeline entry (0x2f63f0) present with its individual, class and era not -1 (0x2f1ef9..0x2f1f1e; an exhausted class fails here), its civilization level's CanEarnGreatPeople (0x43a980; a city-state's and the Free Cities' lack it), no civilization or leader trait barring the class, the maximum earned not reached, a sea spawn for a naval class."
   status: PARTLY
-  impl: [cpu/core/quests.ts:gpTargets, cpu/core/aiPolicyValue.ts:policyObsolete]
+  cases:
+    - recording: h1_duels1191
+      turn: 220
+      value: "China's Great Generals exhausted after Vijaya Wimalaratne (t219, the Future game era): the class's points 150, 174, 197 banked t220-t222 and paid again as Faith a turn (87.55 -> 115.15)"
+  impl:
+    - cpu/core/quests.ts:gpTargets
+    - cpu/core/aiPolicyValue.ts:policyObsolete
+    - cpu/core/greatPeople.ts:advanceGreatPeople
+    - gpu/core/sim_phase.py:_advance_great_people
+    - cpu/core/greatPeople.ts:perTurn
   readings:
+    - "C-114: an exhausted Great Person class's points a turn as Faith — READ (0x2f1ed0 at 0x2f1ef9..0x2f1f1e, 0x2f63f0, 0x43c9a0, 0x43c190), both twins"
     - "H-1: the city-states' quests — READ"
     - "C-97: the government and policy choice — the choice READ, the values PARTLY READ"
     - "C-130: a city-state's Great Person points store, its Faith and its flat bonus; Bastions' strike on standing walls — READ, both twins"
@@ -145,6 +155,21 @@
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...08) and the leaving entry's era (+8), walking forward to the first era with candidates (0x2f4990, 0x93eaa0); the entry it writes {individual, class, era, price}. `ensureGpOffer(from)`,..."
+  review: imported
+- addr: 0x2f63f0
+  kind: function
+  semantics: "the class's timeline entry {individual, class, era, ...} by class index, null with none; an exhausted class's holds -1."
+  status: PARTLY
+  impl:
+    - cpu/core/greatPeople.ts:gpOffer
+    - gpu/core/sim_phase.py:_advance_great_people
+    - cpu/core/greatPeople.ts:perTurn
+  readings:
+    - "C-114: an exhausted Great Person class's points a turn as Faith — READ (0x2f1ed0 at 0x2f1ef9..0x2f1f1e, 0x2f63f0, 0x43c9a0, 0x43c190), both twins"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...usted Great Person class's points a turn as Faith — READ (0x2f1ed0 at 0x2f1ef9..0x2f1f1e, 0x2f63f0, 0x43c9a0, 0x43c190), both twins"
+    - ...0x2f1ed0 (the player can earn the class) fails first where the class's timeline entry (0x2f63f0) is missing or holds -1 in its individual, class or era (0x2f1ef9..0x2f1f1e -> 0x2f23d9...
   review: imported
 - addr: 0x2f64a0
   kind: function

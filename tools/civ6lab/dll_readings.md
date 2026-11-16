@@ -18128,3 +18128,26 @@ rules' `unitFormationAi`.
   6:19 / 7:19, player 0's embarked Warriors beside them); the Encampment's
   walls are gated on the city's perimeter, not its own (0x24b960 on the
   district), in the engines.
+
+## C-114: an exhausted Great Person class's points a turn as Faith — READ (0x2f1ed0 at 0x2f1ef9..0x2f1f1e, 0x2f63f0, 0x43c9a0, 0x43c190), both twins
+
+- 0x2f1ed0 (the player can earn the class) fails first where the class's
+  timeline entry (0x2f63f0) is missing or holds -1 in its individual, class
+  or era (0x2f1ef9..0x2f1f1e -> 0x2f23d9), before the civilization level
+  (0x43a980), the civilization and leader traits, the maximum earned and the
+  sea spawn. The Faith yield (0x494090) sums the store +0x168 of each class
+  0x2f1ed0 fails (0x43c9a0); the store is the class's points a turn, set by
+  the Great Person turn (0x43c190), which adds the same points to the bank
+  wherever the civilization level may earn. So a major's exhausted class
+  (offer -2) keeps banking its points and pays them again as Faith a turn;
+  nothing converts the bank. Ported: `advanceGreatPeople`,
+  `_advance_great_people` (the turn's points a turn of a class whose offer
+  is -2 into the Faith balance, after the turn's Faith lands).
+- CONFIRMED: runs/h1_duels1191 China after Vijaya Wimalaratne (granted t219,
+  the last Information-era Great General, the Future game era, no General
+  added to the timeline in Game_GreatPeople.csv): its General points 150,
+  174, 197, 221 t220-t223, its Faith a turn 87.55 -> 115.15 from t220, its
+  balance +115.15 over pair 220.
+- Open: a class a trait bars (Mana's Writers, Religious Convert's Prophets)
+  or one past its maximum earned fails 0x2f1ed0 too: the engines zero its
+  points and pay no Faith of them, unchecked against a record.

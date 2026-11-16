@@ -491,14 +491,15 @@ export function advanceGreatPeople(state: GameState, seat: number): void {
       changed = next !== pts;
       pts = next;
     }
-    // CIV6: "GPPs that can no longer be used are converted to Faith, in a
-    // 1:1 ratio" — the exhausted class's stock and flow alike, checked
-    // AFTER the loop so a class spent mid-loop converts the same turn on
-    // both engines (`_advance_great_people`).
-    if (gpOffer(state, cls) === -2 && pts > 0) {
-      owner.faith += pts;
-      pts = 0;
-    }
+    // a class whose offer is exhausted (-2) keeps its points, and its points
+    // a turn are Faith a turn: the player's Faith yield (0x494090) sums the
+    // store +0x168 of each class it cannot earn (0x43c9a0), and a class with
+    // no timeline entry is one (0x2f1ed0 at 0x2f1ef9..0x2f1f1e, 0x2f63f0);
+    // the store's points still reach the bank (0x43c190) (runs/h1_duels1191
+    // China's Great General points 150, 174, 197 t220-t222 after Vijaya
+    // Wimalaratne, the last of the Information era, in the Future game era,
+    // its Faith a turn 87.55 -> 115.15)
+    if (gpOffer(state, cls) === -2) owner.faith += perTurn[cls];
     owner.gpp[cls] = pts;
   }
 }

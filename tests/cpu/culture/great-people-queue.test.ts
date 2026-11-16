@@ -3,7 +3,7 @@
  * randomly from the unclaimed members of the first era at or past the game
  * era; the price freezes with the draw and outlives an era step. A class
  * with nobody left at or past the game era is exhausted for good, and its
- * points convert to faith 1:1.
+ * points stay in the bank.
  * The GPU twin is religion_gp_test's cost/era-gate block.
  */
 import { describe, it, expect } from 'vitest';
@@ -87,7 +87,7 @@ describe('the offer', () => {
     expect(gpOfferCost(state, 'SCIENTIST')).toBe(cost);
   });
 
-  it('exhausts for good, and the dead bank converts to faith 1:1', () => {
+  it('exhausts for good, and the bank stays, no faith of it', () => {
     const state = scene();
     setGameEra(state, 4); // Industrial — every Prophet is behind the world
     ensureGpOffer(state, 'PROPHET');
@@ -98,8 +98,9 @@ describe('the offer', () => {
     owner.gpp.PROPHET = 1_000_000;
     advanceGreatPeople(state, 0);
     expect(greatPeopleEarned(state, 'PROPHET')).toBe(0);
-    expect(owner.gpp.PROPHET).toBe(0);
-    expect(owner.faith).toBe(faith0 + 1_000_000);
+    expect(owner.gpp.PROPHET).toBeGreaterThanOrEqual(1_000_000);
+    // only the class's points a turn are Faith a turn, never the bank
+    expect(owner.faith - faith0).toBeLessThan(1_000_000);
   });
 });
 
